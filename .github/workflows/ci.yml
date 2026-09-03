@@ -1,0 +1,34 @@
+name: ci
+
+# دقائق GitHub تقاس ولا تقدر (CLAUDE.md).
+# push مقصور على main، و pull_request يتخطى المسودات (D-012).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # مرآة `npm run ci` المحلي: لا بوابة هنا ليست عند المطور
+      - run: npm run ci

@@ -1,0 +1,76 @@
+# صدى — إعداد Cloudflare
+#
+# لا سرّ في هذا الملفّ. القيم الحسّاسة تدخل بـ `wrangler secret put` وحدها،
+# وأسماؤها موثّقة في docs/ARCHITECTURE.md §١.
+#
+# المُعرّفات أدناه موسومة PLACEHOLDER ولا تعمل قبل أن تُنشَأ الموارد فعلاً
+# (المهمّة اليدوية M-05). لا تُخمَّن ولا تُنسَخ من مستودع آخر.
+
+name = "sada-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-02"
+compatibility_flags = ["nodejs_compat"]
+
+# ── staging ─────────────────────────────────────────────────────────
+# النطاق: sada2.basserh.com  (لا يُخلَط بالإنتاج — CLAUDE.md)
+
+[env.staging]
+workers_dev = false
+
+[env.staging.vars]
+SADA_ENV = "staging"
+PUBLIC_BASE_URL = "https://sada2.basserh.com"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "sada-staging"
+database_id = "PLACEHOLDER_D1_STAGING_ID"
+migrations_dir = "migrations"
+
+[[env.staging.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "sada-media-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_KV_STAGING_ID"
+
+[[env.staging.queues.producers]]
+binding = "PUBLISH_QUEUE"
+queue = "sada-publish-staging"
+
+[[env.staging.queues.producers]]
+binding = "GENERATE_QUEUE"
+queue = "sada-generate-staging"
+
+# ── production ──────────────────────────────────────────────────────
+# النطاق: sada.basserh.com
+
+[env.production]
+workers_dev = false
+
+[env.production.vars]
+SADA_ENV = "production"
+PUBLIC_BASE_URL = "https://sada.basserh.com"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "sada"
+database_id = "PLACEHOLDER_D1_PRODUCTION_ID"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "sada-media"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_KV_PRODUCTION_ID"
+
+[[env.production.queues.producers]]
+binding = "PUBLISH_QUEUE"
+queue = "sada-publish"
+
+[[env.production.queues.producers]]
+binding = "GENERATE_QUEUE"
+queue = "sada-generate"

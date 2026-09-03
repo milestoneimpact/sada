@@ -95,6 +95,52 @@
 5. **ماذا لو فشل**: أرسل اسم الخطأ من صفحة Billing.
 6. **ما يقع إن تُرك**: بلا Paid لا Queue، وبلا Queue لا نشر مجدول. خطر على المرحلة ١.
 
+### إضافة 2026-09-03 · الأوامر بأسمائها الفعلية
+
+بعد أن كُتب `wrangler.toml`، صارت أسماء الموارد مثبَّتة ولا تُخمَّن. نفّذ من
+جذر المستودع بالترتيب، بعد `npx wrangler login`:
+
+```bash
+npx wrangler d1 create sada-staging
+npx wrangler r2 bucket create sada-media-staging
+npx wrangler kv namespace create KV --env staging
+npx wrangler queues create sada-publish-staging
+npx wrangler queues create sada-generate-staging
+```
+
+يطبع الأمران الأوّل والثالث مُعرّفين. انسخهما إلى `wrangler.toml` مكان
+`PLACEHOLDER_D1_STAGING_ID` و`PLACEHOLDER_KV_STAGING_ID`. المُعرّفات ليست
+أسراراً وتُدفَع في المستودع؛ الأسرار وحدها تدخل بالأمر التالي:
+
+```bash
+openssl rand -base64 32                              # القيمة لا تُلصَق في محادثة
+npx wrangler secret put TOKEN_ENC_KEY        --env staging
+npx wrangler secret put LINKEDIN_CLIENT_ID   --env staging
+npx wrangler secret put LINKEDIN_CLIENT_SECRET --env staging
+npx wrangler secret put X_CLIENT_ID          --env staging
+npx wrangler secret put X_CLIENT_SECRET      --env staging
+```
+
+ثمّ الترحيل قبل أيّ دالّة:
+
+```bash
+npm run migrate:staging
+```
+
+**ما يعني النجاح** — أمران يُجابان:
+
+```bash
+npx wrangler d1 execute sada-staging --env staging --remote \
+  --command "SELECT count(*) AS n FROM sqlite_master WHERE type='table'"
+# المتوقَّع: n = 11  (عشرة جداول + جدول ترحيلات wrangler)
+
+curl -s https://sada2.basserh.com/ready
+# المتوقَّع: {"ready":true,"missing_secrets":[],"database":"ok"}
+```
+
+`/ready` يردّ 503 ويسمّي الناقص ما دام سرٌّ غائباً — فلا يبدو النظام جاهزاً
+وهو ليس كذلك. وهو المرجع، لا الظنّ.
+
 ## M-06 · Google Cloud: حساب خدمة لقراءة Drive
 
 1. **ما هو**: حساب خدمة بصلاحية قراءة على مجلّد واحد في Drive.
