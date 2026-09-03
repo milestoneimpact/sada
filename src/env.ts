@@ -3,7 +3,16 @@
  *
  * الأسرار (Secrets) لا تظهر في wrangler.toml ولا تكتب في سجل. أسماؤها هنا
  * فقط، وقيمها تدخل بـ `wrangler secret put <NAME> --env <staging|production>`.
+ *
+ * أنواع Cloudflare تُستورَد صراحة لا اعتمادا على النطاق العام، حتى يمر هذا
+ * الملف في فحص الاختبارات أيضا وهو لا يحمّل أنواع Workers.
  */
+import type {
+  D1Database,
+  KVNamespace,
+  Queue,
+  R2Bucket,
+} from '@cloudflare/workers-types'
 export interface Env {
   // متغيرات عادية من wrangler.toml
   readonly SADA_ENV: 'staging' | 'production'

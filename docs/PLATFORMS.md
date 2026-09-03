@@ -41,6 +41,27 @@
 3. التكلفة تُقرأ من كلّ استجابة وتُسجَّل في `cost_ledger`، ولا تُفترَض من هذا الملفّ.
 4. طلب `Community Management API` يُقدَّم في اليوم الأوّل، ولا يُبنى عليه شيء قبل اعتماده.
 
+## ما بُنيت عليه الشيفرة — ويُصحَّح عند أوّل دورة حقيقية
+
+أُضيف 2026-09-03. القيم في `src/lib/oauth/providers.ts`، موضعٌ واحد لا أكثر:
+
+| المنصّة | النهاية | القيمة المفترَضة | حالتها |
+|---|---|---|---|
+| LinkedIn | authorize | `https://www.linkedin.com/oauth/v2/authorization` | مستقرّة منذ سنين |
+| LinkedIn | token | `https://www.linkedin.com/oauth/v2/accessToken` | مستقرّة |
+| LinkedIn | الهوية | `https://api.linkedin.com/v2/userinfo` | OIDC، يعيد `sub` |
+| LinkedIn | الترويسة | `LinkedIn-Version: 202606` | تُرفَع يدوياً بعد قراءة ملاحظات التغيير |
+| X | authorize | `https://x.com/i/oauth2/authorize` | **غير مؤكَّدة** |
+| X | token | `https://api.x.com/2/oauth2/token` | **غير مؤكَّدة** |
+| X | الهوية | `https://api.x.com/2/users/me` | **غير مؤكَّدة** |
+
+مصادقة نهاية الرمز تختلف: LinkedIn يقبل `client_secret` في الجسم، وX يوجب
+ترويسة `Basic`. وكلاهما يمرّ بـ PKCE في صدى — X لأنّه يوجبه، وLinkedIn لأنّ
+المسار واحد ولا يتشعّب بحالتين.
+
+الثلاثة الموسومة «غير مؤكَّدة» تُثبتها أوّل دورة OAuth حقيقية، والمهمّة
+`M-04` تطلب التحقّق منها قبلها.
+
 ## المصادر
 
 - https://docs.x.com/x-api/getting-started/pricing

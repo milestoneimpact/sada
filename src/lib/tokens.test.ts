@@ -1,0 +1,159 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { toBase64 } from './crypto'
+import { fakeDb, type FakeDb } from '../test/fakes'
+import {
+  accountId,
+  loadTokens,
+  markNeedsReauth,
+  saveTokens,
+  upsertAccount,
+  type AccountIdentity,
+} from './tokens'
+
+const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+const OTHER_KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+const IDENTITY: AccountIdentity = {
+  platform: 'linkedin',
+  kind: 'member',
+  externalId: 'urn:li:person:abc',
+  displayName: 'عمر',
+}
+
+const TOKENS = {
+  accessToken: 'AQV_access_notReal',
+  refreshToken: 'AQV_refresh_notReal',
+  expiresAt: '2026-11-02T10:00:00.000Z',
+  refreshExpiresAt: '2027-09-03T10:00:00.000Z',
+  scopes: 'openid profile w_member_social',
+}
+
+let db: FakeDb
+
+beforeEach(() => {
+  db = fakeDb()
+})
+
+describe('upsertAccount', () => {
+  it('يشتق المعرف من الهوية فلا يتكرر الحساب', async () => {
+    const first = await upsertAccount(db, IDENTITY)
+    const second = await upsertAccount(db, { ...IDENTITY, displayName: 'عمر عبدالحميد' })
+    expect(first).toBe(second)
+    expect(first).toBe(accountId(IDENTITY))
+    const count = db.raw.prepare('SELECT count(*) AS n FROM accounts').get() as { n: number }
+    expect(count.n).toBe(1)
+  })
+
+  it('يحدّث الاسم ويعيد الحساب إلى active', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await markNeedsReauth(db, id)
+    await upsertAccount(db, { ...IDENTITY, displayName: 'اسم جديد' })
+    const row = db.raw.prepare('SELECT display_name, status FROM accounts WHERE id = ?').get(id) as {
+      display_name: string
+      status: string
+    }
+    expect(row.display_name).toBe('اسم جديد')
+    expect(row.status).toBe('active')
+  })
+})
+
+describe('saveTokens ثم loadTokens', () => {
+  it('يعيد ما حُفظ كما هو', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    await expect(loadTokens(db, KEY, id)).resolves.toEqual(TOKENS)
+  })
+
+  it('لا يكتب رمزا خاما في D1 — لا access ولا refresh', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    const row = db.raw.prepare('SELECT * FROM tokens WHERE account_id = ?').get(id) as Record<
+      string,
+      unknown
+    >
+    const dump = JSON.stringify(row)
+    expect(dump).not.toContain(TOKENS.accessToken)
+    expect(dump).not.toContain(TOKENS.refreshToken)
+  })
+
+  it('يعطي نصا مشفرا مختلفا لكل حفظ رغم ثبات القيمة', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    const first = db.raw.prepare('SELECT access_enc FROM tokens WHERE account_id = ?').get(id) as {
+      access_enc: string
+    }
+    await saveTokens(db, KEY, id, TOKENS)
+    const second = db.raw.prepare('SELECT access_enc FROM tokens WHERE account_id = ?').get(id) as {
+      access_enc: string
+    }
+    expect(first.access_enc).not.toBe(second.access_enc)
+  })
+
+  it('يقبل حسابا بلا refresh', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, { ...TOKENS, refreshToken: null, refreshExpiresAt: null })
+    const loaded = await loadTokens(db, KEY, id)
+    expect(loaded?.refreshToken).toBeNull()
+    const row = db.raw.prepare('SELECT refresh_iv FROM tokens WHERE account_id = ?').get(id) as {
+      refresh_iv: string | null
+    }
+    expect(row.refresh_iv).toBeNull()
+  })
+
+  it('يستبدل الرمز عند إعادة الربط ولا ينشئ صفا ثانيا', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    await saveTokens(db, KEY, id, { ...TOKENS, accessToken: 'رمز جديد' })
+    const count = db.raw.prepare('SELECT count(*) AS n FROM tokens').get() as { n: number }
+    expect(count.n).toBe(1)
+    const loaded = await loadTokens(db, KEY, id)
+    expect(loaded?.accessToken).toBe('رمز جديد')
+  })
+
+  it('يعيد null لحساب بلا رمز', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await expect(loadTokens(db, KEY, id)).resolves.toBeNull()
+  })
+})
+
+describe('ما يحمي الرموز', () => {
+  it('مفتاح آخر لا يفك التشفير', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    await expect(loadTokens(db, OTHER_KEY, id)).rejects.toThrow()
+  })
+
+  it('نقل صف رموز إلى حساب آخر يفشل، لا يمر صامتا', async () => {
+    const victim = await upsertAccount(db, IDENTITY)
+    const attacker = await upsertAccount(db, {
+      ...IDENTITY,
+      externalId: 'urn:li:person:xyz',
+      displayName: 'آخر',
+    })
+    await saveTokens(db, KEY, victim, TOKENS)
+    // نسخ النص المشفر كما هو إلى حساب آخر — ما يفعله من نفذ إلى القاعدة
+    const row = db.raw
+      .prepare('SELECT access_enc, access_iv, expires_at, scopes FROM tokens WHERE account_id = ?')
+      .get(victim) as { access_enc: string; access_iv: string; expires_at: string; scopes: string }
+    db.raw
+      .prepare(
+        `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, scopes)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(attacker, row.access_enc, row.access_iv, row.expires_at, row.scopes)
+
+    await expect(loadTokens(db, KEY, attacker)).rejects.toThrow()
+    await expect(loadTokens(db, KEY, victim)).resolves.toBeTruthy()
+  })
+
+  it('markNeedsReauth لا يحذف الحساب ولا رموزه', async () => {
+    const id = await upsertAccount(db, IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    await markNeedsReauth(db, id)
+    const row = db.raw.prepare('SELECT status FROM accounts WHERE id = ?').get(id) as {
+      status: string
+    }
+    expect(row.status).toBe('needs_reauth')
+    await expect(loadTokens(db, KEY, id)).resolves.toBeTruthy()
+  })
+})
