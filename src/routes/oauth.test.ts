@@ -7,7 +7,7 @@ import { toBase64 } from '../lib/crypto'
 import { loadTokens } from '../lib/tokens'
 import { LINKEDIN, X } from '../lib/oauth/providers'
 import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
-import app from '../index'
+import { app } from '../index'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const realFetch = globalThis.fetch

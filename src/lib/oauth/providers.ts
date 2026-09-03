@@ -16,6 +16,8 @@ export interface Provider {
   readonly authorizeUrl: string
   readonly tokenUrl: string
   readonly identityUrl: string
+  /** نهاية إنشاء منشور نصي. */
+  readonly postUrl: string
   readonly scopes: readonly string[]
   /**
    * كيف يُصادق التطبيق على نهاية الرمز:
@@ -38,6 +40,7 @@ export const LINKEDIN: Provider = {
   authorizeUrl: 'https://www.linkedin.com/oauth/v2/authorization',
   tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
   identityUrl: 'https://api.linkedin.com/v2/userinfo',
+  postUrl: 'https://api.linkedin.com/rest/posts',
   scopes: ['openid', 'profile', 'w_member_social'],
   clientAuth: 'body',
   extraHeaders: { 'LinkedIn-Version': LINKEDIN_VERSION },
@@ -48,6 +51,7 @@ export const X: Provider = {
   authorizeUrl: 'https://x.com/i/oauth2/authorize',
   tokenUrl: 'https://api.x.com/2/oauth2/token',
   identityUrl: 'https://api.x.com/2/users/me',
+  postUrl: 'https://api.x.com/2/tweets',
   scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
   clientAuth: 'basic',
   extraHeaders: {},

@@ -121,7 +121,12 @@ npx wrangler r2 bucket create sada-media-staging
 npx wrangler kv namespace create KV --env staging
 npx wrangler queues create sada-publish-staging
 npx wrangler queues create sada-generate-staging
+npx wrangler queues create sada-publish-dlq-staging
 ```
+
+> `sada-publish-dlq-staging` طابور الرسائل الميتة: ما فشل ثلاث مرّات يُنقَل
+> إليه بدل أن يدور في الطابور إلى الأبد. وكلّ دورة على X تُحاسَب، فالدوران
+> بلا حدّ إنفاقٌ بلا نتيجة.
 
 يطبع الأمران الأوّل والثالث مُعرّفين. انسخهما إلى `wrangler.toml` مكان
 `PLACEHOLDER_D1_STAGING_ID` و`PLACEHOLDER_KV_STAGING_ID`. المُعرّفات ليست

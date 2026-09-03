@@ -43,6 +43,15 @@ queue = "sada-publish-staging"
 binding = "GENERATE_QUEUE"
 queue = "sada-generate-staging"
 
+# المستهلك: دفعة صغيرة ومحاولات محدودة. المفتاح يمنع التكرار، لكن كل
+# محاولة على X تُحاسَب — فلا تُترك المحاولات مفتوحة.
+[[env.staging.queues.consumers]]
+queue = "sada-publish-staging"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "sada-publish-dlq-staging"
+
 # ── production ──────────────────────────────────────────────────────
 # النطاق: sada.basserh.com
 
@@ -74,3 +83,10 @@ queue = "sada-publish"
 [[env.production.queues.producers]]
 binding = "GENERATE_QUEUE"
 queue = "sada-generate"
+
+[[env.production.queues.consumers]]
+queue = "sada-publish"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "sada-publish-dlq"

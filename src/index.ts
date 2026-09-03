@@ -5,10 +5,13 @@
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
 import { Hono } from 'hono'
+import type { MessageBatch } from '@cloudflare/workers-types'
 import { missingSecrets, type Env } from './env'
+import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
 
-const app = new Hono<{ Bindings: Env }>()
+/** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
+export const app = new Hono<{ Bindings: Env }>()
 
 app.get('/health', (c) =>
   c.json({ ok: true, service: 'sada-api', env: c.env.SADA_ENV }),
@@ -35,4 +38,28 @@ app.route('/', oauth)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
 
-export default app
+/**
+ * مستهلك طابور النشر.
+ *
+ * `ack` للنجاح وللفشل الذي لا تُصلحه إعادة المحاولة — رفضُ منصةٍ لمنشور
+ * مخالف لا يصلحه تكرارُه، وتركُه في الطابور يعني دفعا متكررا بلا فائدة.
+ * `retry` لما قد ينجح لاحقا وحده: 429 و 5xx وانقطاع الشبكة.
+ *
+ * والمفتاح يحمي في الحالتين: إعادة المحاولة تجد محاولة ناجحة بالمفتاح
+ * نفسه فتخرج بلا طلب ثان.
+ */
+async function queue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
+  for (const message of batch.messages) {
+    const outcome = await publishPost(
+      { db: env.DB, encKey: env.TOKEN_ENC_KEY },
+      message.body,
+    )
+    if (outcome.kind === 'failed' && outcome.retryable) {
+      message.retry()
+    } else {
+      message.ack()
+    }
+  }
+}
+
+export default { fetch: app.fetch, queue }
