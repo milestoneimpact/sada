@@ -58,11 +58,17 @@ jobs:
 
       # الترحيل قبل الدالة (CLAUDE.md): Worker يقرأ عمودا لم يُضَف ينكسر
       # على منشور مجدول. والترتيب هنا هو الترتيب نفسه في الوثيقة
+      # -y إلزامي: الأمر يستأذن قبل التطبيق، ولا مجيب في CI.
+      # ملاحظة: 0001_init طُبِّق يدويا عبر API في 2026-09-04، وسُجِّل في
+      # جدول d1_migrations، فلا يُعاد تطبيقه ولا يفشل بـ table already exists
       - name: الترحيل
-        run: npx wrangler d1 migrations apply "$([ "$TARGET" = production ] && echo sada || echo sada-staging)" --env "$TARGET" --remote
+        run: npx wrangler d1 migrations apply "$([ "$TARGET" = production ] && echo sada || echo sada-staging)" --env "$TARGET" --remote -y
 
+      # --yes إلزامي هنا أيضا: منذ نوفمبر 2025 يعرض wrangler فرق الإعدادات
+      # ويستأذن قبل أن يدهس Worker أُنشئ من اللوحة. و sada-api-staging
+      # أُنشئ من قالب في اللوحة فعلا، فبلا --yes يتوقف النشر في انتظار جواب
       - name: النشر
-        run: npx wrangler deploy --env "$TARGET"
+        run: npx wrangler deploy --env "$TARGET" --yes
 
       # لا نقول إن النشر نجح حتى يقول الخادم إنه نجح.
       # /ready يرد 503 ما دام سر ناقصا، ويسمي الناقص بلا قيمته
