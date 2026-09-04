@@ -22,6 +22,7 @@ beforeEach(() => {
   env = {
     SADA_ENV: 'staging',
     PUBLIC_BASE_URL: 'https://sada2.basserh.com',
+    DRIVE_FOLDER_ID: 'folder-test',
     DB: db,
     KV: kv,
     TOKEN_ENC_KEY: KEY,
@@ -224,16 +225,56 @@ describe('/health و /ready', () => {
     expect(response.status).toBe(200)
   })
 
+  interface ReadyBody {
+    ready: boolean
+    database: string
+    phase_0: boolean
+    phase_1: boolean
+    drive_folder: boolean
+    missing_secrets: string[]
+  }
+
   it('ready يرد 503 ويسمي الناقص بلا قيمته', async () => {
     const response = await app.request('/ready', {}, { ...env, X_CLIENT_SECRET: '' })
     expect(response.status).toBe(503)
-    const body = (await response.json()) as { missing_secrets: string[]; database: string }
-    expect(body.missing_secrets).toEqual(['X_CLIENT_SECRET'])
+    const body = (await response.json()) as ReadyBody
+    expect(body.missing_secrets).toContain('X_CLIENT_SECRET')
+    expect(body.phase_0).toBe(false)
     expect(body.database).toBe('ok')
+    // لا قيمة سر في الجواب، الاسم وحده
+    expect(JSON.stringify(body)).not.toContain('x-secret')
   })
 
-  it('ready يرد 200 حين يكتمل كل شيء', async () => {
+  it('ready يرد 200 بأسرار المرحلة صفر وحدها — المرحلة ١ ليست شرط بوابة', async () => {
     const response = await app.request('/ready', {}, env)
     expect(response.status).toBe(200)
+    const body = (await response.json()) as ReadyBody
+    expect(body.phase_0).toBe(true)
+    expect(body.phase_1).toBe(false)
+    expect(body.missing_secrets).toEqual(['GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY'])
+  })
+
+  it('ready يعلن المرحلة ١ جاهزة حين تكتمل أسرارها ومجلدها', async () => {
+    const full = {
+      ...env,
+      GOOGLE_SA_JSON: '{"client_email":"a@b.com","private_key":"-----BEGIN PRIVATE KEY-----"}',
+      ANTHROPIC_API_KEY: 'sk-ant-fake',
+      DRIVE_FOLDER_ID: 'folder-1',
+    }
+    const body = (await (await app.request('/ready', {}, full)).json()) as ReadyBody
+    expect(body.phase_1).toBe(true)
+    expect(body.missing_secrets).toEqual([])
+  })
+
+  it('المرحلة ١ ليست جاهزة بلا مجلد ولو اكتملت أسرارها', async () => {
+    const noFolder = {
+      ...env,
+      GOOGLE_SA_JSON: '{"client_email":"a@b.com","private_key":"-----BEGIN PRIVATE KEY-----"}',
+      ANTHROPIC_API_KEY: 'sk-ant-fake',
+      DRIVE_FOLDER_ID: '',
+    }
+    const body = (await (await app.request('/ready', {}, noFolder)).json()) as ReadyBody
+    expect(body.phase_1).toBe(false)
+    expect(body.drive_folder).toBe(false)
   })
 })

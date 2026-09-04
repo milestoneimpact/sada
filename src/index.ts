@@ -5,8 +5,9 @@
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
 import { Hono } from 'hono'
-import type { MessageBatch } from '@cloudflare/workers-types'
-import { missingSecrets, type Env } from './env'
+import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
+import { readiness, type Env } from './env'
+import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
 
@@ -22,7 +23,7 @@ app.get('/health', (c) =>
  * يرد 503 ما دام شيء ناقصا، حتى لا يبدو النظام جاهزا وهو ليس كذلك.
  */
 app.get('/ready', async (c) => {
-  const missing = missingSecrets(c.env)
+  const state = readiness(c.env)
   let database: 'ok' | 'unreachable' = 'unreachable'
   try {
     await c.env.DB.prepare('SELECT 1').first()
@@ -30,8 +31,37 @@ app.get('/ready', async (c) => {
   } catch {
     database = 'unreachable'
   }
-  const ready = missing.length === 0 && database === 'ok'
-  return c.json({ ready, missing_secrets: missing, database }, ready ? 200 : 503)
+  // البوابة هي المرحلة صفر: نظام ينشر ولا يفهم ليس معطلا
+  const ready = state.phase0 && database === 'ok'
+  return c.json(
+    {
+      ready,
+      database,
+      phase_0: state.phase0,
+      phase_1: state.phase1,
+      drive_folder: state.driveFolder,
+      missing_secrets: state.missing,
+    },
+    ready ? 200 : 503,
+  )
+})
+
+/**
+ * تشغيل المسح يدويا — للتحقق قبل أن يحين موعد Cron.
+ * لا يفعل شيئا لا يفعله Cron: المسار نفسه، فما يُختبر هنا هو ما يجري هناك.
+ */
+app.post('/admin/scan', async (c) => {
+  try {
+    const report = await scanDrive({
+      db: c.env.DB,
+      serviceAccountJson: c.env.GOOGLE_SA_JSON,
+      folderId: c.env.DRIVE_FOLDER_ID,
+    })
+    return c.json(report)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unexpected_error'
+    return c.json({ error: 'scan_failed', detail: message }, 502)
+  }
 })
 
 app.route('/', oauth)
@@ -62,4 +92,35 @@ async function queue(batch: MessageBatch<PublishMessage>, env: Env): Promise<voi
   }
 }
 
-export default { fetch: app.fetch, queue }
+/**
+ * Cron اليومي: يمسح Drive ويوفّقه مع `sources`.
+ *
+ * لا يحلل ولا ينادي Claude — المسح رخيص، والتحليل يقع على ما تغيّر وحده
+ * في خطوة تالية. وفشل المسح يُسجَّل ولا يُرمى: Cron لا يعيد المحاولة،
+ * ورمي الخطأ يضيّع السجل بلا فائدة.
+ */
+async function scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  try {
+    const report = await scanDrive({
+      db: env.DB,
+      serviceAccountJson: env.GOOGLE_SA_JSON,
+      folderId: env.DRIVE_FOLDER_ID,
+    })
+    console.info({
+      job: 'drive-scan',
+      seen: report.seen,
+      added: report.added.length,
+      changed: report.changed.length,
+      unchanged: report.unchanged.length,
+      missing: report.missing.length,
+      to_analyze: report.toAnalyze.length,
+    })
+  } catch (error) {
+    console.error({
+      job: 'drive-scan',
+      failed: error instanceof Error ? error.message : 'unexpected_error',
+    })
+  }
+}
+
+export default { fetch: app.fetch, queue, scheduled }
