@@ -8,7 +8,7 @@
 | M-02 | تطبيق LinkedIn Developer + منتج Share on LinkedIn | مطلوبة قبل اليوم ٣ |
 | M-03 | طلب LinkedIn Community Management API | مطلوبة في اليوم الأوّل (انتظار طويل) |
 | M-04 | حساب X Developer + رصيد + تطبيق OAuth 2.0 | مطلوبة قبل اليوم ٤ |
-| M-05 | Cloudflare: الخطّة المدفوعة + نطاقا صدى | مطلوبة قبل اليوم ١ |
+| M-05 | Cloudflare: الخطّة المدفوعة + نطاقا صدى | جزئيّة — D1 وKV تمّتا |
 | M-06 | Google Cloud: حساب خدمة لقراءة Drive | مطلوبة قبل الأسبوع ٢ |
 
 ---
@@ -100,6 +100,23 @@
 
 ## M-05 · Cloudflare: الخطّة المدفوعة ونطاقا صدى والأسرار
 
+> **تحديث 2026-09-04 — ما أنجزه المساعد بنفسه، فلا تُعِده:**
+>
+> | المورد | الحالة |
+> |---|---|
+> | D1 `sada-staging` | ✅ أُنشئت في `WEUR` · `422cdc81-6485-45cb-9b2e-995b110756a0` |
+> | الترحيل `0001_init` | ✅ طُبّق · ١٠ جداول و٨ فهارس · تُحقّق منه بالعدّ |
+> | KV `sada-kv-staging` | ✅ أُنشئت · `7c4ec65867924a869da8c13146745d2a` |
+> | `wrangler.toml` | ✅ المُعرّفات الحقيقية بدل `PLACEHOLDER` (staging وحدها) |
+>
+> وأُثبت أنّ القيود نافذة على D1 لا على SQLite المحلّي وحده: محاولة إدخال
+> منشور بحالة `queued` بلا `approved_at` رُفضت بـ
+> `CHECK constraint failed` (D-009)، وتراجعت الدفعة كاملةً فلم يبقَ أثر.
+>
+> **الباقي عليك في هذه المهمّة:** الخطّة المدفوعة، والطوابير، وR2،
+> والأسرار، والنطاقان. وأمر إنشاء D1 وKV في القائمة أدناه صار **منفَّذاً**
+> — لا تُعِد تشغيله فيُنشئ موردين مكرَّرين.
+
 1. **ما هو**: تفعيل **Workers Paid** (Queues تتطلّبه)، وإضافة `sada` و`sada2` كسجلّات على `basserh.com`، ووضع الأسرار.
 2. **لماذا الآن**: اليوم ١ ينشئ Queue وD1 وR2 على staging.
 3. **الخطوات**:
@@ -116,10 +133,13 @@
 جذر المستودع بالترتيب، بعد `npx wrangler login`:
 
 ```bash
-npx wrangler d1 create sada-staging
-npx wrangler r2 bucket create sada-media-staging
-npx wrangler kv namespace create KV --env staging
-npx wrangler queues create sada-publish-staging
+# ✅ نُفِّذا — لا تُعِدهما
+# npx wrangler d1 create sada-staging
+# npx wrangler kv namespace create KV --env staging
+
+# ⬜ الباقي عليك:
+npx wrangler r2 bucket create sada-media-staging      # بعد تفعيل R2 (M-09)
+npx wrangler queues create sada-publish-staging       # بعد Workers Paid
 npx wrangler queues create sada-generate-staging
 npx wrangler queues create sada-publish-dlq-staging
 ```
@@ -141,10 +161,12 @@ npx wrangler secret put X_CLIENT_ID          --env staging
 npx wrangler secret put X_CLIENT_SECRET      --env staging
 ```
 
-ثمّ الترحيل قبل أيّ دالّة:
+الترحيل **طُبّق فعلاً** على `sada-staging` في 2026-09-04. الأمر أدناه يبقى
+للإنتاج ولأي ترحيل لاحق:
 
 ```bash
-npm run migrate:staging
+npm run migrate:staging     # لا يلزم الآن — 0001 مطبَّق
+npm run migrate:production  # بعد إنشاء قاعدة الإنتاج
 ```
 
 **ما يعني النجاح** — أمران يُجابان:
