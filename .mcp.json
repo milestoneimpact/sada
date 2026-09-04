@@ -1,0 +1,22 @@
+{
+  "$comment": [
+    "خوادم Cloudflare MCP للمشروع — مصدر العناوين: developers.cloudflare.com/agent-setup",
+    "تُصادَق بـ OAuth في المتصفح عند أول استعمال. لا رمز API هنا ولا في أي ملف بالمستودع.",
+    "cloudflare-api هو المفتاح: يغطي أكثر من 2500 نقطة نهاية (DNS و Queues و Workers والأسرار)",
+    "وهو ما لا يوفره الموصل المحدود. راجع docs/CLOUDFLARE-AGENT-SETUP.md"
+  ],
+  "mcpServers": {
+    "cloudflare-api": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-docs": {
+      "type": "http",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-observability": {
+      "type": "http",
+      "url": "https://observability.mcp.cloudflare.com/mcp"
+    }
+  }
+}
