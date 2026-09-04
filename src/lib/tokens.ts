@@ -15,6 +15,8 @@ export interface Db {
 export interface DbStatement {
   bind(...values: unknown[]): DbStatement
   first<T = unknown>(): Promise<T | null>
+  /** D1 يعيد غلافا لا مصفوفة: { results, success, meta } */
+  all<T = unknown>(): Promise<{ results: T[] }>
   run(): Promise<unknown>
 }
 

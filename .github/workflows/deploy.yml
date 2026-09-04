@@ -1,0 +1,109 @@
+name: deploy
+
+# النشر لا يبدأ إلا ببوابة خضراء، والترحيل قبل الدالة دائما (CLAUDE.md).
+#
+# staging: تلقائي على كل دمج في main.
+# production: يدوي وحده، وعبر بيئة GitHub محمية توجب موافقة بشرية —
+#             لا نشر إنتاج بضغطة سهو.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: البيئة المستهدفة
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    env:
+      TARGET: ${{ github.event.inputs.environment || 'staging' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # البوابة نفسها التي يشغلها المطور محليا. لا نشر على شيفرة لم تمر
+      - name: البوابة
+        run: npm run ci
+
+      # يفشل مبكرا برسالة مفهومة بدل أن يفشل wrangler برسالة غامضة
+      - name: التحقق من وجود السر
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN غير مضبوط في أسرار المستودع."
+            echo "::error::Settings ← Secrets and variables ← Actions ← New repository secret"
+            exit 1
+          fi
+
+      # الترحيل قبل الدالة (CLAUDE.md): Worker يقرأ عمودا لم يُضَف ينكسر
+      # على منشور مجدول. والترتيب هنا هو الترتيب نفسه في الوثيقة
+      # -y إلزامي: الأمر يستأذن قبل التطبيق، ولا مجيب في CI.
+      # ملاحظة: 0001_init طُبِّق يدويا عبر API في 2026-09-04، وسُجِّل في
+      # جدول d1_migrations، فلا يُعاد تطبيقه ولا يفشل بـ table already exists
+      - name: الترحيل
+        run: npx wrangler d1 migrations apply "$([ "$TARGET" = production ] && echo sada || echo sada-staging)" --env "$TARGET" --remote -y
+
+      # --yes إلزامي هنا أيضا: منذ نوفمبر 2025 يعرض wrangler فرق الإعدادات
+      # ويستأذن قبل أن يدهس Worker أُنشئ من اللوحة. و sada-api-staging
+      # أُنشئ من قالب في اللوحة فعلا، فبلا --yes يتوقف النشر في انتظار جواب
+      - name: النشر
+        run: npx wrangler deploy --env "$TARGET" --yes
+
+      # لا نقول إن النشر نجح حتى يقول الخادم إنه نجح.
+      # لكن غياب النطاق ليس فشل نشر: يُجرَّب النطاق، فإن لم يستجب أصلا
+      # جُرِّب عنوان workers.dev. الفشل الحقيقي أن يستجيب ولا يكون جاهزا.
+      - name: التحقق من الجاهزية
+        run: |
+          BASE=$([ "$TARGET" = production ] && echo https://sada.basserh.com || echo https://sada2.basserh.com)
+          probe() {
+            for i in 1 2 3 4 5; do
+              CODE=$(curl -s -o /tmp/ready.json -w '%{http_code}' --max-time 15 "$1/ready" || echo 000)
+              echo "  $1 → HTTP $CODE"
+              [ "$CODE" != 000 ] && { cat /tmp/ready.json; echo; return 0; }
+              sleep 6
+            done
+            return 1
+          }
+
+          echo "فحص النطاق المخصص"
+          if probe "$BASE"; then
+            grep -q '"ready":true' /tmp/ready.json && exit 0
+            echo "::error::النطاق يستجيب لكن النظام ليس جاهزا. الناقص مذكور أعلاه بالاسم."
+            exit 1
+          fi
+
+          echo "::warning::$BASE لا يستجيب — النطاق لم يُربط بعد (M-05)."
+          DEV=$(npx wrangler deployments list --env "$TARGET" 2>/dev/null | grep -om1 'https://[a-z0-9.-]*workers\.dev' || true)
+          if [ -z "$DEV" ]; then
+            echo "::warning::تعذّر استنتاج عنوان workers.dev. النشر تمّ، والتحقق مؤجل."
+            exit 0
+          fi
+          echo "فحص عنوان workers.dev"
+          if probe "$DEV"; then
+            grep -q '"ready":true' /tmp/ready.json && exit 0
+            echo "::error::الخادم يستجيب وليس جاهزا. الناقص مذكور أعلاه بالاسم."
+            exit 1
+          fi
+          echo "::error::لا النطاق ولا workers.dev استجابا. النشر مشكوك فيه."
+          exit 1

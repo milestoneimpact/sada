@@ -3,8 +3,9 @@
 # لا سرّ في هذا الملفّ. القيم الحسّاسة تدخل بـ `wrangler secret put` وحدها،
 # وأسماؤها موثّقة في docs/ARCHITECTURE.md §١.
 #
-# المُعرّفات أدناه موسومة PLACEHOLDER ولا تعمل قبل أن تُنشَأ الموارد فعلاً
-# (المهمّة اليدوية M-05). لا تُخمَّن ولا تُنسَخ من مستودع آخر.
+# مُعرّفات staging حقيقية، أُنشئت في 2026-09-04 وطُبّق عليها الترحيل.
+# وهي ليست أسراراً: مُعرّف قاعدة أو مساحة لا يمنح وصولاً بلا مصادقة الحساب.
+# مُعرّفات الإنتاج ما تزال PLACEHOLDER ولا تعمل قبل أن تُنشَأ (M-05).
 
 name = "sada-api"
 main = "src/index.ts"
@@ -15,16 +16,25 @@ compatibility_flags = ["nodejs_compat"]
 # النطاق: sada2.basserh.com  (لا يُخلَط بالإنتاج — CLAUDE.md)
 
 [env.staging]
-workers_dev = false
+# عنوان workers.dev يعطي staging رابطا يعمل فور النشر، قبل ربط النطاق.
+# لا يُستعمل في OAuth: روابط العودة مسجّلة على sada2.basserh.com وحده
+workers_dev = true
 
 [env.staging.vars]
 SADA_ENV = "staging"
 PUBLIC_BASE_URL = "https://sada2.basserh.com"
+# مجلد «صدى — مصادر». معرّف لا سر: لا يمنح وصولا بلا حساب الخدمة
+DRIVE_FOLDER_ID = "1U2UTordK05t6zJ7H_UU4LfcC7bAFFdi2"
+
+# Cron مجاني على الخطة المجانية (5 لكل حساب).
+# 03:00 UTC = 06:00 بتوقيت الرياض — قبل أن يبدأ اليوم
+[env.staging.triggers]
+crons = ["0 3 * * *"]
 
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "sada-staging"
-database_id = "PLACEHOLDER_D1_STAGING_ID"
+database_id = "422cdc81-6485-45cb-9b2e-995b110756a0"
 migrations_dir = "migrations"
 
 [[env.staging.r2_buckets]]
@@ -33,7 +43,7 @@ bucket_name = "sada-media-staging"
 
 [[env.staging.kv_namespaces]]
 binding = "KV"
-id = "PLACEHOLDER_KV_STAGING_ID"
+id = "7c4ec65867924a869da8c13146745d2a"
 
 [[env.staging.queues.producers]]
 binding = "PUBLISH_QUEUE"
@@ -61,6 +71,10 @@ workers_dev = false
 [env.production.vars]
 SADA_ENV = "production"
 PUBLIC_BASE_URL = "https://sada.basserh.com"
+DRIVE_FOLDER_ID = "1U2UTordK05t6zJ7H_UU4LfcC7bAFFdi2"
+
+[env.production.triggers]
+crons = ["0 3 * * *"]
 
 [[env.production.d1_databases]]
 binding = "DB"

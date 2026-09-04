@@ -17,6 +17,8 @@ export interface Env {
   // متغيرات عادية من wrangler.toml
   readonly SADA_ENV: 'staging' | 'production'
   readonly PUBLIC_BASE_URL: string
+  /** مجلد Drive الوحيد الذي يقرأه النظام. ليس سرا: معرّف لا يمنح وصولا. */
+  readonly DRIVE_FOLDER_ID: string
 
   // موارد Cloudflare
   readonly DB: D1Database
@@ -36,8 +38,8 @@ export interface Env {
   readonly GOOGLE_SA_JSON: string
 }
 
-/** أسماء الأسرار المطلوبة لتشغيل المرحلة صفر. المرجع الوحيد. */
-export const REQUIRED_SECRETS = [
+/** أسرار المرحلة صفر: الربط والنشر. بلا واحد منها لا تُجتاز البوابة. */
+export const PHASE_0_SECRETS = [
   'TOKEN_ENC_KEY',
   'LINKEDIN_CLIENT_ID',
   'LINKEDIN_CLIENT_SECRET',
@@ -45,13 +47,44 @@ export const REQUIRED_SECRETS = [
   'X_CLIENT_SECRET',
 ] as const
 
+/** أسرار المرحلة الأولى: الفهم والتخطيط. المرحلة صفر تعمل بدونها. */
+export const PHASE_1_SECRETS = ['GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY'] as const
+
+/** المرجع الواحد لكل ما يلزم تشغيلا كاملا. */
+export const REQUIRED_SECRETS = [...PHASE_0_SECRETS, ...PHASE_1_SECRETS] as const
+
+function absent(env: Partial<Env>, name: keyof Env): boolean {
+  const value = env[name]
+  return typeof value !== 'string' || value.length === 0
+}
+
 /**
  * يفحص وجود الأسرار دون كشف قيمها.
  * يعيد أسماء الناقص فقط، ولا يعيد قيمة سر قط.
  */
 export function missingSecrets(env: Partial<Env>): string[] {
-  return REQUIRED_SECRETS.filter((name) => {
-    const value = env[name]
-    return typeof value !== 'string' || value.length === 0
-  })
+  return REQUIRED_SECRETS.filter((name) => absent(env, name))
+}
+
+/**
+ * الجاهزية مرحلتان لا حالة واحدة: نظام ينشر ولا يفهم ليس معطلا — هو في
+ * المرحلة صفر. فيُقال ذلك بدل أن يُقال «غير جاهز» فيُظن عطلا.
+ */
+export interface Readiness {
+  readonly phase0: boolean
+  readonly phase1: boolean
+  readonly missing: string[]
+  readonly driveFolder: boolean
+}
+
+export function readiness(env: Partial<Env>): Readiness {
+  const missing0 = PHASE_0_SECRETS.filter((name) => absent(env, name))
+  const missing1 = PHASE_1_SECRETS.filter((name) => absent(env, name))
+  const driveFolder = !absent(env, 'DRIVE_FOLDER_ID')
+  return {
+    phase0: missing0.length === 0,
+    phase1: missing1.length === 0 && driveFolder,
+    missing: [...missing0, ...missing1],
+    driveFolder,
+  }
 }

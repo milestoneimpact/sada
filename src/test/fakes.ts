@@ -31,6 +31,9 @@ export function fakeDb(): FakeDb {
         const row = db.prepare(query).get(...(bound as never[]))
         return (row ?? null) as T | null
       },
+      async all<T = unknown>() {
+        return { results: db.prepare(query).all(...(bound as never[])) as T[] }
+      },
       async run() {
         return db.prepare(query).run(...(bound as never[]))
       },
