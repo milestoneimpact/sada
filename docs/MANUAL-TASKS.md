@@ -10,6 +10,7 @@
 | M-04 | حساب X Developer + رصيد + تطبيق OAuth 2.0 | مطلوبة قبل اليوم ٤ |
 | M-05 | Cloudflare: الخطّة المدفوعة + نطاقا صدى | جزئيّة — D1 وKV تمّتا |
 | M-06 | Google Cloud: حساب خدمة لقراءة Drive | مطلوبة قبل الأسبوع ٢ |
+| M-10 | سرّ النشر `CLOUDFLARE_API_TOKEN` في GitHub | **مطلوبة الآن** |
 
 ---
 
@@ -182,6 +183,33 @@ curl -s https://sada2.basserh.com/ready
 
 `/ready` يردّ 503 ويسمّي الناقص ما دام سرٌّ غائباً — فلا يبدو النظام جاهزاً
 وهو ليس كذلك. وهو المرجع، لا الظنّ.
+
+## M-10 · سرّ النشر في GitHub
+
+1. **ما هو**: رمز Cloudflare API يُوضَع في **أسرار GitHub** — لا هنا ولا في
+   المستودع — فينشر `deploy.yml` تلقائيًّا عند كلّ دمج في `main`.
+2. **لماذا الآن**: لا أملك أداة نشر، ونطاق `mcp.cloudflare.com` محجوب من
+   بيئتي. وهذا المسار ينشر بلا أن يمرّ الرمز بي إطلاقاً.
+3. **الخطوات**:
+   1. `dash.cloudflare.com` ← أيقونة الحساب ← **API Tokens** ← **Create Token**
+   2. اختر قالب **Edit Cloudflare Workers**
+   3. في **Account Resources** اختر حسابك، وفي **Zone Resources** اختر
+      `basserh.com`
+   4. **Continue** ← **Create Token** ← انسخ القيمة **مرّة واحدة**
+   5. `github.com/mooryali95/sada/settings/secrets/actions` ←
+      **New repository secret**
+      - **Name**: `CLOUDFLARE_API_TOKEN` · **Secret**: الصِق القيمة
+   6. أضف سرّاً ثانياً: `CLOUDFLARE_ACCOUNT_ID` (من الشريط الجانبي في
+      Cloudflare ← **Account ID**)
+4. **ما يعني النجاح**: بعد أوّل دمج في `main`، تبويب **Actions** يعرض
+   `deploy` أخضر، وينتهي بخطوة «التحقّق من الجاهزية» تطبع جواب `/ready`.
+5. **ماذا لو فشل**:
+   - `CLOUDFLARE_API_TOKEN غير مضبوط` → السرّ لم يُحفظ باسمه بالضبط.
+   - فشل الترحيل → قاعدة الإنتاج لم تُنشأ بعد؛ الأمر يخصّ `staging` وحدها.
+   - `/ready` ردّ 503 → **ليس عطلاً**: يسمّي السرّ الناقص. اضبطه بـ
+     `wrangler secret put`.
+6. **ما يقع إن تُرك**: كلّ نشر يبقى يدويًّا منك في كلّ مرّة، ويبقى النظام
+   بلا نشر أصلاً ما دمتَ لم تنشره يدوياً. **يوقف بوّابة المرحلة ٠.**
 
 ## M-06 · Google Cloud: حساب خدمة لقراءة Drive
 
