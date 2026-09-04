@@ -1,0 +1,27 @@
+{
+  "name": "sada",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "صدى — مدير محتوى ذكي على Cloudflare",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci": "npm run typecheck && npm run test",
+    "dev": "wrangler dev --env staging",
+    "migrate:staging": "wrangler d1 migrations apply sada-staging --env staging --remote",
+    "migrate:production": "wrangler d1 migrations apply sada --env production --remote",
+    "migrate:local": "wrangler d1 migrations apply sada-staging --env staging --local"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260903.1",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.128.0"
+  },
+  "dependencies": {
+    "hono": "^4.6.20"
+  }
+}

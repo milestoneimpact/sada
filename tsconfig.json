@@ -1,0 +1,21 @@
+{
+  // القاعدة المشتركة. لا تستعمل مباشرة: الفحص يمر على
+  // tsconfig.worker.json (شيفرة Worker) و tsconfig.test.json (الاختبارات)
+  // لأن أنواع Workers وأنواع Node لا تجتمعان في مشروع واحد بلا تصادم.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true
+  }
+}

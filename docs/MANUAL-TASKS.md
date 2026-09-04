@@ -53,6 +53,17 @@
 
 ## M-03 · طلب LinkedIn Community Management API
 
+> **إضافة 2026-09-03 · عقبتان تُحلّان قبل التقديم لا بعده.** أكثر سببَي رفضٍ
+> بحسب المصادر في `docs/PLATFORMS.md`:
+>
+> ١. **بريد العمل.** النموذج يرفض `gmail.com` وأمثاله. يلزم بريد على نطاق
+>    الكيان — `‎@basserh.com` مثلاً — قبل فتح النموذج.
+> ٢. **سياسة الخصوصية.** يُطلب **رابط منشور يفتح فعلاً**، لا وعدٌ بنشره.
+>    صفحة واحدة على النطاق تكفي.
+>
+> ولا يُقدَّم الطلب ناقصَهما ثمّ يُعاد: إعادة التقديم بعد الرفض أبطأ من
+> التقديم مكتملاً.
+
 1. **ما هو**: طلب وصول لصفحة الشركة (`w_organization_social` و`r_organization_social`).
 2. **لماذا الآن**: أطول انتظار في المشروع، ولا يُبنى عليه شيء قبل اعتماده (D-010).
 3. **الخطوات**:
@@ -79,6 +90,10 @@
       **Website URL**: `https://sada.basserh.com`.
    6. انسخ **OAuth 2.0 Client ID**. **Client Secret** لا يُنسَخ إلى المحادثة.
    7. اقرأ من **Pricing** في Console سعر رفع الوسائط وسجّله في `docs/PLATFORMS.md` (غير مؤكَّد حالياً).
+   8. **أُضيف 2026-09-03**: تحقّق من عنوانَي OAuth في وثائق X وقارنهما بما في `src/lib/oauth/providers.ts`:
+      - `authorizeUrl` المفترَض: `https://x.com/i/oauth2/authorize`
+      - `tokenUrl` المفترَض: `https://api.x.com/2/oauth2/token`
+      كُتبا على أساس انتقال X من `twitter.com`، ولم يُؤكَّدا من الوثائق الرسمية لأنّ `developer.x.com` كان محجوباً وقت التحقّق. وهما في ملفّ واحد، فالتصحيح سطران.
 4. **ما يعني النجاح**: رصيد ظاهر في Billing، وتطبيق بحالة OAuth 2.0 مفعَّل.
 5. **ماذا لو فشل**: إن رُفض التسجيل أرسل نصّ الرسالة؛ إن لم يظهر Pay-per-use فالحساب على نموذج قديم ونناقشه.
 6. **ما يقع إن تُرك**: لا نشر على X. تأجيل يوقف اليوم ٤.
@@ -89,11 +104,62 @@
 2. **لماذا الآن**: اليوم ١ ينشئ Queue وD1 وR2 على staging.
 3. **الخطوات**:
    1. Dashboard ← **Workers & Pages** ← **Plans** ← **Workers Paid** (5 دولارات شهرياً).
-   2. **DNS** لنطاق `basserh.com`: سجلّان `CNAME` مؤقّتان لـ `sada` و`sada2` يُربَطان لاحقاً بـ Custom Domains للـ Worker.
+   2. ~~**DNS**: سجلّان `CNAME` مؤقّتان لـ `sada` و`sada2`.~~ **صُحِّح 2026-09-03 — لا تُنشئ سجلّات DNS بيدك.** عند إضافة **Custom Domain** إلى الـ Worker تُنشئ Cloudflare السجلّ وتُصدر الشهادة بنفسها؛ ووجود سجلّ سابق بالاسم نفسه يُفشل الإضافة بـ `record already exists`. والشرط المسبق أن يكون `basserh.com` مُداراً في حساب Cloudflare نفسه.
    3. بعد نشر Worker staging، **Settings** ← **Variables and Secrets** ← أضف: `TOKEN_ENC_KEY` (32 بايت عشوائية بترميز base64)، `LINKEDIN_CLIENT_SECRET`، `X_CLIENT_SECRET`، `ANTHROPIC_API_KEY`، `GEMINI_API_KEY`.
 4. **ما يعني النجاح**: صفحة Plans تعرض Workers Paid، والأسرار تظهر بأسمائها بلا قيم.
 5. **ماذا لو فشل**: أرسل اسم الخطأ من صفحة Billing.
 6. **ما يقع إن تُرك**: بلا Paid لا Queue، وبلا Queue لا نشر مجدول. خطر على المرحلة ١.
+
+### إضافة 2026-09-03 · الأوامر بأسمائها الفعلية
+
+بعد أن كُتب `wrangler.toml`، صارت أسماء الموارد مثبَّتة ولا تُخمَّن. نفّذ من
+جذر المستودع بالترتيب، بعد `npx wrangler login`:
+
+```bash
+npx wrangler d1 create sada-staging
+npx wrangler r2 bucket create sada-media-staging
+npx wrangler kv namespace create KV --env staging
+npx wrangler queues create sada-publish-staging
+npx wrangler queues create sada-generate-staging
+npx wrangler queues create sada-publish-dlq-staging
+```
+
+> `sada-publish-dlq-staging` طابور الرسائل الميتة: ما فشل ثلاث مرّات يُنقَل
+> إليه بدل أن يدور في الطابور إلى الأبد. وكلّ دورة على X تُحاسَب، فالدوران
+> بلا حدّ إنفاقٌ بلا نتيجة.
+
+يطبع الأمران الأوّل والثالث مُعرّفين. انسخهما إلى `wrangler.toml` مكان
+`PLACEHOLDER_D1_STAGING_ID` و`PLACEHOLDER_KV_STAGING_ID`. المُعرّفات ليست
+أسراراً وتُدفَع في المستودع؛ الأسرار وحدها تدخل بالأمر التالي:
+
+```bash
+openssl rand -base64 32                              # القيمة لا تُلصَق في محادثة
+npx wrangler secret put TOKEN_ENC_KEY        --env staging
+npx wrangler secret put LINKEDIN_CLIENT_ID   --env staging
+npx wrangler secret put LINKEDIN_CLIENT_SECRET --env staging
+npx wrangler secret put X_CLIENT_ID          --env staging
+npx wrangler secret put X_CLIENT_SECRET      --env staging
+```
+
+ثمّ الترحيل قبل أيّ دالّة:
+
+```bash
+npm run migrate:staging
+```
+
+**ما يعني النجاح** — أمران يُجابان:
+
+```bash
+npx wrangler d1 execute sada-staging --env staging --remote \
+  --command "SELECT count(*) AS n FROM sqlite_master WHERE type='table'"
+# المتوقَّع: n = 11  (عشرة جداول + جدول ترحيلات wrangler)
+
+curl -s https://sada2.basserh.com/ready
+# المتوقَّع: {"ready":true,"missing_secrets":[],"database":"ok"}
+```
+
+`/ready` يردّ 503 ويسمّي الناقص ما دام سرٌّ غائباً — فلا يبدو النظام جاهزاً
+وهو ليس كذلك. وهو المرجع، لا الظنّ.
 
 ## M-06 · Google Cloud: حساب خدمة لقراءة Drive
 

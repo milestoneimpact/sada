@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "خوادم Cloudflare MCP على مستوى المشروع.",
+    "المصدر: developers.cloudflare.com/agent-setup/prompt.md — جُلب 2026-09-04.",
+    "خادم `cloudflare` (API الكامل · mcp.cloudflare.com) لا يُذكر هنا عمدا:",
+    "إضافة cloudflare@cloudflare تجلبه على مستوى المستخدم، وتكراره هنا يعني",
+    "خادمين بنفس العنوان واسمين مختلفين ودورتي OAuth.",
+    "cloudflare-docs عام ولا يحتاج مصادقة. والبقية تُصادَق بـ OAuth في المتصفح.",
+    "لا رمز API في هذا الملف ولا في أي ملف بالمستودع."
+  ],
+  "mcpServers": {
+    "cloudflare-docs": {
+      "type": "http",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-bindings": {
+      "type": "http",
+      "url": "https://bindings.mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-builds": {
+      "type": "http",
+      "url": "https://builds.mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-observability": {
+      "type": "http",
+      "url": "https://observability.mcp.cloudflare.com/mcp"
+    }
+  }
+}
