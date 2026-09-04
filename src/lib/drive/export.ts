@@ -37,8 +37,23 @@ export function isExportable(mimeType: string): boolean {
   return mimeType in EXPORT_AS
 }
 
+/** ملفات Office: Drive يحوّلها، فالرسالة تقول كيف لا أنها مرفوضة. */
+const OFFICE_HINT: Readonly<Record<string, string>> = {
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    'عرض PowerPoint — افتحه بـ Google Slides ثم «حفظ بصيغة عروض Google»',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    'مستند Word — افتحه بـ Google Docs ثم «حفظ بصيغة مستندات Google»',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+    'جدول Excel — افتحه بـ Google Sheets ثم «حفظ بصيغة جداول Google»',
+  'application/msword': 'مستند Word قديم — افتحه بـ Google Docs واحفظه مستند Google',
+  'application/vnd.ms-powerpoint': 'عرض PowerPoint قديم — افتحه بـ Google Slides واحفظه',
+  'application/vnd.ms-excel': 'جدول Excel قديم — افتحه بـ Google Sheets واحفظه',
+}
+
 /** سبب مفهوم للمالك، لا رمز خطأ. */
 export function unsupportedReason(mimeType: string): string {
+  const office = OFFICE_HINT[mimeType]
+  if (office !== undefined) return office
   if (mimeType === 'application/pdf') {
     return 'PDF غير مدعوم — حوّله إلى «مستند Google» (فتح بـ Google Docs ثم حفظ)'
   }

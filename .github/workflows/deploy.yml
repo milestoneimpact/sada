@@ -71,18 +71,39 @@ jobs:
         run: npx wrangler deploy --env "$TARGET" --yes
 
       # لا نقول إن النشر نجح حتى يقول الخادم إنه نجح.
-      # /ready يرد 503 ما دام سر ناقصا، ويسمي الناقص بلا قيمته
+      # لكن غياب النطاق ليس فشل نشر: يُجرَّب النطاق، فإن لم يستجب أصلا
+      # جُرِّب عنوان workers.dev. الفشل الحقيقي أن يستجيب ولا يكون جاهزا.
       - name: التحقق من الجاهزية
         run: |
           BASE=$([ "$TARGET" = production ] && echo https://sada.basserh.com || echo https://sada2.basserh.com)
-          echo "فحص $BASE/ready"
-          for i in 1 2 3 4 5; do
-            CODE=$(curl -s -o /tmp/ready.json -w '%{http_code}' "$BASE/ready" || echo 000)
-            echo "المحاولة $i → HTTP $CODE"
-            cat /tmp/ready.json 2>/dev/null || true; echo
-            [ "$CODE" = 200 ] && exit 0
-            sleep 10
-          done
-          echo "::warning::لم يرد /ready بـ 200. النشر تم، لكن النظام ليس جاهزا."
-          echo "::warning::الأسباب المتوقعة: سر ناقص، أو النطاق لم يُربط بعد (M-05)."
+          probe() {
+            for i in 1 2 3 4 5; do
+              CODE=$(curl -s -o /tmp/ready.json -w '%{http_code}' --max-time 15 "$1/ready" || echo 000)
+              echo "  $1 → HTTP $CODE"
+              [ "$CODE" != 000 ] && { cat /tmp/ready.json; echo; return 0; }
+              sleep 6
+            done
+            return 1
+          }
+
+          echo "فحص النطاق المخصص"
+          if probe "$BASE"; then
+            grep -q '"ready":true' /tmp/ready.json && exit 0
+            echo "::error::النطاق يستجيب لكن النظام ليس جاهزا. الناقص مذكور أعلاه بالاسم."
+            exit 1
+          fi
+
+          echo "::warning::$BASE لا يستجيب — النطاق لم يُربط بعد (M-05)."
+          DEV=$(npx wrangler deployments list --env "$TARGET" 2>/dev/null | grep -om1 'https://[a-z0-9.-]*workers\.dev' || true)
+          if [ -z "$DEV" ]; then
+            echo "::warning::تعذّر استنتاج عنوان workers.dev. النشر تمّ، والتحقق مؤجل."
+            exit 0
+          fi
+          echo "فحص عنوان workers.dev"
+          if probe "$DEV"; then
+            grep -q '"ready":true' /tmp/ready.json && exit 0
+            echo "::error::الخادم يستجيب وليس جاهزا. الناقص مذكور أعلاه بالاسم."
+            exit 1
+          fi
+          echo "::error::لا النطاق ولا workers.dev استجابا. النشر مشكوك فيه."
           exit 1

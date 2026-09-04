@@ -32,6 +32,19 @@ describe('سبب عدم الدعم — يُقرأ لا يُفكّ', () => {
     expect(reason).toContain('مستند Google')
   })
 
+  it('يرشد صاحب ملف Office إلى التحويل لا إلى الرفض', () => {
+    const pptx =
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    expect(unsupportedReason(pptx)).toContain('Google Slides')
+    const docx =
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    expect(unsupportedReason(docx)).toContain('Google Docs')
+    const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    expect(unsupportedReason(xlsx)).toContain('Google Sheets')
+    // لا رسالة تعرض نوع MIME الطويل في وجه المالك
+    expect(unsupportedReason(pptx)).not.toContain('openxmlformats')
+  })
+
   it('يميّز الصورة عن الوسائط عن النوع المجهول', () => {
     expect(unsupportedReason('image/png')).toContain('صورة')
     expect(unsupportedReason('video/mp4')).toContain('وسائط')

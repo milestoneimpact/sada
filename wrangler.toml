@@ -16,7 +16,9 @@ compatibility_flags = ["nodejs_compat"]
 # النطاق: sada2.basserh.com  (لا يُخلَط بالإنتاج — CLAUDE.md)
 
 [env.staging]
-workers_dev = false
+# عنوان workers.dev يعطي staging رابطا يعمل فور النشر، قبل ربط النطاق.
+# لا يُستعمل في OAuth: روابط العودة مسجّلة على sada2.basserh.com وحده
+workers_dev = true
 
 [env.staging.vars]
 SADA_ENV = "staging"
