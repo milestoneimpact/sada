@@ -42,6 +42,8 @@ import {
   loadSession, readCookie, revokeSessions, sessionCookie, type Session,
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
+import { factorState } from '../lib/security/factors'
+import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
 
@@ -107,6 +109,16 @@ async function guardPost(c: {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) {
     return { denied: loginResponse('انتهت الجلسة — أعد الدخول.') }
+  }
+  // **وهذا هو ما يجعل العامل الثاني عاملا لا سؤالا يُتخطّى**: جلسةٌ لم
+  // تُتمّه لا تغيّر شيئا، ولو نُودي المسار مباشرةً بلا مرورٍ بالشاشة
+  if (session.record.pending) {
+    return {
+      denied: Response.json(
+        { error: 'pending_second_factor', detail: 'أتمّ العامل الثاني أوّلا.' },
+        { status: 403, headers: { Location: '/panel/2fa' } },
+      ),
+    }
   }
 
   // جسدٌ غائبٌ أو مشوَّه ليس عطلا في الخادم: هو طلبٌ لا رمز فيه. ولو تُرك
@@ -185,8 +197,12 @@ function toPanelSource(row: SourceRow): PanelSource {
 panel.get('/panel', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) {
-    return page((nonce) => loginPage({}, nonce), 200)
+    const rp = relyingParty(c.env.PUBLIC_BASE_URL)
+    const factors = await factorState(c.env.DB, rp.id)
+    return page((nonce) => loginPage({ passkeys: factors.passkeys.length > 0 }, nonce), 200)
   }
+  // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const allowance = await checkAllowance(c.env.DB)
 
@@ -251,6 +267,8 @@ panel.get('/panel', async (c) => {
   const routes = await readRoutes(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
+  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
+  const factors = await factorState(c.env.DB, rp.id)
 
   const flash = await takeFlash(c.env, c.req.raw)
   return page((nonce) =>
@@ -282,6 +300,19 @@ panel.get('/panel', async (c) => {
       nonce,
       sessions,
       audit,
+      rpId: rp.id,
+      via: session.record.via,
+      factors: {
+        passkeys: factors.passkeys.map((k) => ({
+          id: k.id,
+          label: k.label,
+          createdAt: k.createdAt,
+          lastUsedAt: k.lastUsedAt,
+        })),
+        totpConfirmed: factors.totp.confirmed,
+        recoveryLeft: factors.recovery.unused,
+        enforced: factors.enforced,
+      },
     }),
   )
 })
@@ -307,11 +338,16 @@ panel.post('/panel/login', async (c) => {
   }
 
   const form = await c.req.formData()
+  // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
+  // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
+  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
+  const factors = await factorState(c.env.DB, rp.id)
   const result = await createSession(
     c.env.KV,
     c.env.ADMIN_TOKEN,
     String(form.get('token') ?? ''),
     c.req.raw,
+    { pending: factors.enforced },
   )
 
   if ('error' in result) {
@@ -350,10 +386,21 @@ panel.post('/panel/login', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
-  await record(c.env.DB, { actor: 'panel', action: 'session.open' }, c.req.raw)
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: factors.enforced ? 'session.pending' : 'session.open',
+      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'بعاملٍ واحد',
+    },
+    c.req.raw,
+  )
   return new Response(null, {
     status: 303,
-    headers: { Location: '/panel', 'Set-Cookie': sessionCookie(result.id) },
+    headers: {
+      Location: factors.enforced ? '/panel/2fa' : '/panel',
+      'Set-Cookie': sessionCookie(result.id),
+    },
   })
 })
 

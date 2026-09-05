@@ -17,6 +17,7 @@ import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
+import { auth } from './routes/auth'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -264,6 +265,8 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 })
 
 app.route('/', oauth)
+// قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
+app.route('/', auth)
 app.route('/', panel)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))

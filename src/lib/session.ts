@@ -63,8 +63,8 @@ export interface SessionStore {
   }): Promise<KvListResult>
 }
 
-/** كيف فُتحت الجلسة. يتّسع لاحقا: `passkey` و `totp`. */
-export type SessionVia = 'admin_token'
+/** كيف فُتحت الجلسة. */
+export type SessionVia = 'admin_token' | 'passkey'
 
 export interface SessionRecord {
   /** متى فُتحت — ISO. */
@@ -78,6 +78,15 @@ export interface SessionRecord {
   readonly ip: string
   /** المتصفّح كما عرّف نفسه — للجرد، مقصوصا. */
   readonly ua: string
+  /**
+   * جلسةٌ لم تُتمّ عاملَها الثاني بعد.
+   *
+   * ودخولٌ بالرمز حين يكون ثمّة عاملٌ ثانٍ **لا يُعطي جلسةً كاملة**: يُعطي
+   * جلسةً معلَّقة لا تفتح إلّا صفحةَ العامل الثاني. وهذا هو الفرق بين
+   * «عاملين» و«عاملٍ ثمّ سؤالٍ يُتخطّى» — لو كانت الجلسة كاملةً ثمّ
+   * عُرضت شاشةُ الرمز، لكفى طلبٌ مباشرٌ إلى `/panel/settings` لتخطّيها.
+   */
+  readonly pending: boolean
 }
 
 export interface Session {
@@ -116,7 +125,7 @@ export async function createSession(
   adminToken: string | undefined,
   presentedToken: string,
   request?: Request,
-  now: Date = new Date(),
+  options: { readonly pending?: boolean; readonly now?: Date } = {},
 ): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' | 'denied' }> {
   // يُبنى طلبٌ صوريّ ليُفحص بالمنطق نفسه — الرمز يجيء من نموذجٍ لا ترويسة
   const probe = new Request('https://sada.local/panel/login', {
@@ -130,19 +139,83 @@ export async function createSession(
   const bind = await currentBind(adminToken)
   if (bind === null) return { error: 'disabled' }
 
-  const id = crypto.randomUUID()
-  const record: SessionRecord = {
-    at: now.toISOString(),
+  return await write(store, {
+    at: (options.now ?? new Date()).toISOString(),
     via: 'admin_token',
     bind,
     csrf: randomToken(32),
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
-  }
+    pending: options.pending === true,
+  })
+}
+
+/**
+ * يكتب صفّا ويعيد معرّفه ومحتواه معا.
+ *
+ * ويعيدهما من وسيطه لا من حالةٍ في الوحدة: Worker يخدم طلباتٍ متوازيةً
+ * في العامل الواحد، ومتغيّرٌ عامّ يحمل «آخرَ ما كُتب» يسلّم جلسةَ فلانٍ
+ * إلى فلان.
+ */
+async function write(
+  store: SessionStore,
+  record: SessionRecord,
+): Promise<{ id: string; record: SessionRecord }> {
+  const id = crypto.randomUUID()
   await store.put(sessionKey(id), JSON.stringify(record), {
     expirationTtl: SESSION_TTL_SECONDS,
   })
   return { id, record }
+}
+
+/**
+ * جلسةٌ فُتحت بمفتاح مرور — كاملةٌ من أوّلها.
+ *
+ * ولا تُعلَّق: Passkey عاملان أصلا — جهازٌ في اليد وبصمةٌ أو رقمٌ يفتحه.
+ * وطلبُ رمزٍ بعدها ليس تشديدا بل تكرارٌ يُتعب المالك بلا مقابل.
+ *
+ * وتُربَط بـ `ADMIN_TOKEN` أيضا وإن لم تُفتح به: تدويرُ الرمز يبقى
+ * المفتاحَ الواحد الذي يُغلق كلَّ الأبواب دفعةً.
+ */
+export async function createPasskeySession(
+  store: SessionStore,
+  adminToken: string | undefined,
+  request?: Request,
+  now: Date = new Date(),
+): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' }> {
+  const bind = await currentBind(adminToken)
+  if (bind === null) return { error: 'disabled' }
+
+  const record: SessionRecord = {
+    at: now.toISOString(),
+    via: 'passkey',
+    bind,
+    csrf: randomToken(32),
+    ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
+    ua: trim(request?.headers.get('User-Agent') ?? null, 160),
+    pending: false,
+  }
+  return await write(store, record)
+}
+
+/**
+ * يرقّي جلسةً معلَّقة إلى كاملة — **بمعرّفٍ جديد**.
+ *
+ * وتبديلُ المعرّف ليس زينة: هو ما يمنع تثبيت الجلسة (Session Fixation).
+ * فمن عرف معرّفَ الجلسة المعلَّقة — من سجلٍّ أو من فوق كتف — لا ينفعه
+ * حين تُتمّ عاملَك الثاني، لأنّ الذي يحمل الصلاحيّة معرّفٌ لم يره.
+ */
+export async function promoteSession(
+  store: SessionStore,
+  session: Session,
+): Promise<{ id: string; record: SessionRecord }> {
+  const written = await write(store, {
+    ...session.record,
+    csrf: randomToken(32),
+    pending: false,
+  })
+  await store.delete(sessionKey(session.id))
+  return written
 }
 
 /** يقرأ معرّف الجلسة من ترويسة الكعكة. */
@@ -162,13 +235,15 @@ function parse(raw: string): SessionRecord | null {
   try {
     const value = JSON.parse(raw) as Partial<SessionRecord>
     if (typeof value.bind !== 'string' || typeof value.csrf !== 'string') return null
+    if (typeof value.pending !== 'boolean') return null
     return {
       at: typeof value.at === 'string' ? value.at : '',
-      via: 'admin_token',
+      via: value.via === 'passkey' ? 'passkey' : 'admin_token',
       bind: value.bind,
       csrf: value.csrf,
       ip: typeof value.ip === 'string' ? value.ip : '',
       ua: typeof value.ua === 'string' ? value.ua : '',
+      pending: value.pending,
     }
   } catch {
     return null
@@ -228,6 +303,7 @@ export interface SessionSummary {
   readonly at: string
   readonly ip: string
   readonly ua: string
+  readonly via: SessionVia
   readonly current: boolean
 }
 
@@ -253,12 +329,15 @@ export async function listSessions(
       if (raw === null) continue
       const record = parse(raw)
       if (record === null) continue
+      // الجلسةُ المعلَّقة ليست بابا مفتوحا: لا تُعرض في جرد الأجهزة
+      if (record.pending) continue
       const id = key.name.slice(PREFIX.length)
       summaries.push({
         id,
         at: record.at,
         ip: record.ip,
         ua: record.ua,
+        via: record.via,
         current: id === currentId,
       })
     }

@@ -196,6 +196,20 @@ footer{margin-top:34px; padding-top:18px; border-top:1px solid var(--line);
 .auth .lede{text-align:center; color:var(--ink-3); font-size:13px; margin:0 0 22px}
 .auth input{width:100%; direction:ltr; text-align:left; margin-bottom:12px}
 .auth button{width:100%; justify-content:center; padding:12px}
+
+/* ── العامل الثاني ────────────────────────────────────── */
+h3.sec{font-size:13px; margin:18px 0 8px; color:var(--ink-2); font-weight:600}
+.codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin:12px 0}
+.codes code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; letter-spacing:.06em; direction:ltr;
+  background:var(--surface-3); border:1px solid var(--line); border-radius:8px;
+  padding:9px 10px; text-align:center; color:var(--ink)}
+.auth .card form + form{margin-top:14px}
+.or{display:flex; align-items:center; gap:10px; color:var(--ink-3); font-size:12px; margin:16px 0}
+.or::before,.or::after{content:''; flex:1; height:1px; background:var(--line)}
+.rec{margin-top:16px; border:1px solid var(--line); border-radius:10px; padding:12px 14px}
+.rec summary{cursor:pointer; font-size:13px; color:var(--ink-2)}
+.rec form{margin-top:12px}
+.cancel{margin-top:16px; text-align:center}
 @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
 `
 
@@ -264,6 +278,126 @@ const SCRIPT = `
   if(q)q.addEventListener('change',apply);
   if(s)s.addEventListener('change',apply);
   apply();
+
+  // ── العامل الثاني ─────────────────────────────────────
+  var csrf=(document.querySelector('input[name="_csrf"]')||{}).value||'';
+  var b64u=function(buf){
+    var by=new Uint8Array(buf),t='';
+    for(var i=0;i<by.length;i++)t+=String.fromCharCode(by[i]);
+    return btoa(t).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+  };
+  var fromB64u=function(v){
+    var t=v.replace(/-/g,'+').replace(/_/g,'/');
+    t+='='.repeat((4-t.length%4)%4);
+    var bin=atob(t),out=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+    return out;
+  };
+  var post=function(url,fields){
+    var body=new FormData(); body.set('_csrf',csrf);
+    for(var k in fields)body.set(k,fields[k]);
+    return fetch(url,{method:'POST',body:body});
+  };
+  var say=function(id,msg){var n=document.getElementById(id); if(n)n.textContent=msg;};
+
+  var add=document.getElementById('pk-add');
+  if(add)add.addEventListener('click',function(){
+    if(!window.PublicKeyCredential){say('pk-msg','متصفّحك لا يدعم مفاتيح المرور.'); return;}
+    var label=(document.getElementById('pk-label')||{}).value||'';
+    add.disabled=true; say('pk-msg','المس مفتاحك…');
+    post('/panel/security/passkey/challenge',{}).then(function(r){
+      if(!r.ok)throw new Error('challenge'); return r.json();
+    }).then(function(d){
+      return navigator.credentials.create({publicKey:{
+        challenge:fromB64u(d.challenge),
+        rp:{id:d.rp.id,name:d.rp.name},
+        user:{id:fromB64u(d.user.id),name:d.user.name,displayName:d.user.displayName},
+        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+        authenticatorSelection:{userVerification:'preferred',residentKey:'preferred'},
+        excludeCredentials:d.excludeCredentials.map(function(id){
+          return {id:fromB64u(id),type:'public-key'};}),
+        attestation:'none', timeout:60000
+      }});
+    }).then(function(cred){
+      var r=cred.response;
+      var pk=r.getPublicKey?r.getPublicKey():null;
+      if(!pk)throw new Error('OldBrowser');
+      return post('/panel/security/passkey/register',{label:label,
+        credential:JSON.stringify({credentialId:cred.id,
+          clientDataJSON:b64u(r.clientDataJSON),
+          authenticatorData:r.getAuthenticatorData?b64u(r.getAuthenticatorData()):'',
+          publicKey:b64u(pk), alg:r.getPublicKeyAlgorithm?r.getPublicKeyAlgorithm():-7})});
+    }).then(function(r){
+      if(r.ok){location.reload(); return;}
+      return r.json().then(function(e){add.disabled=false;
+        say('pk-msg',e.detail||'رُفض التسجيل.');});
+    }).catch(function(err){add.disabled=false;
+      say('pk-msg',err&&err.message==='OldBrowser'
+        ?'متصفّحك لا يقدّم المفتاح العامّ مباشرةً — يلزم متصفّح أحدث.'
+        :'تعذّر: '+(err&&err.name?err.name:'أُلغي'));});
+  });
+
+  document.querySelectorAll('button.pk-del').forEach(function(b){
+    b.addEventListener('click',function(){
+      if(!confirm('حذف المفتاح «'+b.dataset.label+'»؟'))return;
+      b.disabled=true;
+      post('/panel/security/passkey/delete',{id:b.dataset.id}).then(function(r){
+        if(r.ok){location.reload(); return;}
+        return r.json().then(function(e){b.disabled=false;
+          say('pk-msg',e.detail||'تعذّر الحذف.');});
+      });
+    });
+  });
+
+  var ts=document.getElementById('totp-start');
+  if(ts)ts.addEventListener('click',function(){
+    ts.disabled=true;
+    post('/panel/security/totp/start',{}).then(function(r){return r.json();}).then(function(d){
+      if(d.error){ts.disabled=false; say('totp-msg',d.detail||'تعذّر البدء.'); return;}
+      document.getElementById('totp-secret').value=d.secret;
+      document.getElementById('totp-box').hidden=false;
+      say('totp-msg','انسخ السرّ إلى تطبيق المصادقة ثمّ أكّد بالرمز الظاهر.');
+    });
+  });
+
+  var tc=document.getElementById('totp-confirm');
+  if(tc)tc.addEventListener('submit',function(e){
+    e.preventDefault();
+    post('/panel/security/totp/confirm',{code:tc.code.value})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.error){say('totp-msg',d.detail||'رمزٌ غير صحيح.'); return;}
+        if(d.codes&&d.codes.length){showCodes(d.codes); say('totp-msg','أُكّد. وهذه رموز استردادك — انسخها.');}
+        else location.reload();
+      });
+  });
+
+  var tr=document.getElementById('totp-remove');
+  if(tr)tr.addEventListener('click',function(){
+    if(!confirm('إزالة رمز التطبيق؟'))return;
+    tr.disabled=true;
+    post('/panel/security/totp/remove',{}).then(function(r){
+      if(r.ok){location.reload(); return;}
+      return r.json().then(function(e){tr.disabled=false; say('totp-msg',e.detail||'تعذّر.');});
+    });
+  });
+
+  function showCodes(list){
+    var box=document.getElementById('rc-box'), out=document.getElementById('rc-list');
+    if(!box||!out)return;
+    out.textContent='';
+    list.forEach(function(c){var d=document.createElement('code'); d.textContent=c; out.appendChild(d);});
+    box.hidden=false;
+  }
+
+  var ri=document.getElementById('rc-issue');
+  if(ri)ri.addEventListener('click',function(){
+    if(!confirm('توليدُ مجموعةٍ جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
+    ri.disabled=true;
+    post('/panel/security/recovery/issue',{}).then(function(r){return r.json();})
+      .then(function(d){ri.disabled=false;
+        if(d.codes){showCodes(d.codes); say('rc-msg','وُلّدت '+d.codes.length+' رموز. انسخها الآن.');}
+        else say('rc-msg','تعذّر التوليد.');});
+  });
 })();
 `
 
@@ -274,7 +408,7 @@ const SCRIPT = `
  * فوسمٌ داخليّ بلا `nonce` **لا يُنفَّذ ولا يُطبَّق** — وهذا هو المقصود:
  * سطرٌ يحقنه مهاجم لن يحمل قيمةً لا يعرفها.
  */
-function shell(title: string, body: string, nonce: string, script = ''): string {
+export function shell(title: string, body: string, nonce: string, script = ''): string {
   return `<!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="dark">
@@ -305,9 +439,71 @@ export function injectCsrf(html: string, token: string): string {
 export interface LoginState {
   readonly error?: string
   readonly blocked?: boolean
+  /** أثمّة مفاتيحُ مرورٍ مسجَّلة؟ فيُعرض بابُها قبل حقل الرمز. */
+  readonly passkeys?: boolean
 }
 
+/**
+ * سكربتُ الدخول بمفتاح مرور.
+ *
+ * ونداءٌ واحدٌ إلى أصلنا، ولا شيء غيره — و`connect-src 'self'` تفرضه.
+ */
+const LOGIN_SCRIPT = `
+(function(){
+  var b64u=function(buf){
+    var bytes=new Uint8Array(buf),s='';
+    for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+  };
+  var fromB64u=function(v){
+    var s=v.replace(/-/g,'+').replace(/_/g,'/');
+    s+='='.repeat((4-s.length%4)%4);
+    var bin=atob(s),out=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+    return out;
+  };
+  var btn=document.getElementById('pk-login');
+  var note=document.getElementById('pk-note');
+  if(!btn)return;
+  if(!window.PublicKeyCredential){btn.disabled=true;
+    if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — استعمل الرمز.'; return;}
+  btn.addEventListener('click',function(){
+    btn.disabled=true; btn.textContent='المس مفتاحك…';
+    var reset=function(msg){btn.disabled=false; btn.textContent='الدخول بمفتاح المرور';
+      if(note)note.textContent=msg;};
+    fetch('/panel/passkey/challenge',{method:'POST'}).then(function(r){
+      if(!r.ok)throw new Error('challenge');
+      return r.json();
+    }).then(function(d){
+      return navigator.credentials.get({publicKey:{
+        challenge:fromB64u(d.challenge), rpId:d.rpId, userVerification:'preferred',
+        timeout:60000,
+        allowCredentials:d.allowCredentials.map(function(id){
+          return {id:fromB64u(id), type:'public-key'};})
+      }}).then(function(cred){return {cred:cred, ticket:d.ticket};});
+    }).then(function(x){
+      var r=x.cred.response;
+      return fetch('/panel/passkey/login',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ticket:x.ticket, credentialId:x.cred.id,
+          authenticatorData:b64u(r.authenticatorData),
+          clientDataJSON:b64u(r.clientDataJSON), signature:b64u(r.signature)})});
+    }).then(function(r){
+      if(r.ok){location.href='/panel'; return;}
+      return r.json().then(function(e){reset(e.detail||'رُفض المفتاح.');});
+    }).catch(function(err){reset('تعذّر: '+(err&&err.name?err.name:'أُلغي'));});
+  });
+})();
+`
+
 export function loginPage(state: LoginState = {}, nonce = ''): string {
+  const passkey =
+    state.passkeys !== true || state.blocked === true
+      ? ''
+      : `<button class="p" id="pk-login" type="button">الدخول بمفتاح المرور</button>
+         <div class="n" id="pk-note" role="status" aria-live="polite"></div>
+         <div class="or">أو بالرمز</div>`
+
   const note =
     state.error === undefined
       ? ''
@@ -323,6 +519,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
       <p class="lede">أدخل رمز الإدارة للمتابعة</p>
       ${note}
       <div class="card">
+        ${passkey}
         <form method="POST" action="/panel/login">
           <div class="field"><label for="t">ADMIN_TOKEN</label>
             <input id="t" type="password" name="token" autocomplete="current-password"
@@ -333,6 +530,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
       <footer style="border:0;justify-content:center">الجلسة ثماني ساعات</footer>
     </div></div>`,
     nonce,
+    state.passkeys === true ? LOGIN_SCRIPT : '',
   )
 }
 
@@ -406,6 +604,19 @@ export interface PanelData {
   readonly nonce: string
   readonly sessions: PanelSession[]
   readonly audit: PanelAudit[]
+  /** النطاق الذي تُوقَّع عليه المفاتيح — يُعرض ليُعرف أنّه ليس الآخر. */
+  readonly rpId: string
+  readonly via: 'admin_token' | 'passkey'
+  readonly factors: PanelFactors
+}
+
+export interface PanelFactors {
+  readonly passkeys: {
+    id: string; label: string; createdAt: string; lastUsedAt: string | null
+  }[]
+  readonly totpConfirmed: boolean
+  readonly recoveryLeft: number
+  readonly enforced: boolean
 }
 
 export interface PanelSession {
@@ -413,6 +624,7 @@ export interface PanelSession {
   readonly at: string
   readonly ip: string
   readonly ua: string
+  readonly via: 'admin_token' | 'passkey'
   readonly current: boolean
 }
 
@@ -433,6 +645,20 @@ export interface PanelAudit {
  */
 const ACTION_LABEL: Readonly<Record<string, string>> = {
   'session.open': 'فُتحت جلسة',
+  'session.pending': 'دخولٌ ينتظر العامل الثاني',
+  'csrf.reject': 'طلبٌ بلا رمز نموذج',
+  'passkey.denied': 'مفتاح مرورٍ مرفوض',
+  'passkey.rejected': 'رُفض تسجيل مفتاح',
+  'passkey.add': 'سُجّل مفتاح مرور',
+  'passkey.delete': 'حُذف مفتاح مرور',
+  '2fa.passkey': 'عاملٌ ثانٍ بمفتاح مرور',
+  '2fa.totp': 'عاملٌ ثانٍ برمز تطبيق',
+  '2fa.recovery': 'دخولٌ برمز استرداد',
+  '2fa.denied': 'عاملٌ ثانٍ مرفوض',
+  'totp.start': 'بدأ ضبط رمز التطبيق',
+  'totp.confirm': 'أُكّد رمز التطبيق',
+  'totp.remove': 'أُزيل رمز التطبيق',
+  'recovery.issue': 'وُلّدت رموز استرداد',
   'session.close': 'أُغلقت جلسة',
   'session.revoke': 'أُبطلت جلسة',
   'session.revoke_all': 'أُبطلت كلّ الجلسات',
@@ -788,7 +1014,8 @@ export function panelPage(d: PanelData): string {
 
   const sessionRows = d.sessions.map((x) => `<tr>
     <td><div class="nm">${escapeHtml(shortUa(x.ua))}${
-      x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}</div>
+      x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${
+      x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : ''}</div>
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
     <td><span title="${escapeHtml(x.at)} UTC">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td>${x.current
@@ -797,6 +1024,16 @@ export function panelPage(d: PanelData): string {
              data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
            <input type="hidden" name="id" value="${escapeHtml(x.id)}">
            <button class="d sm" type="submit">أبطلها</button></form>`}</td>
+  </tr>`).join('')
+
+  const passkeyRows = d.factors.passkeys.map((k) => `<tr>
+    <td><div class="nm">${escapeHtml(k.label)}</div></td>
+    <td><span title="${escapeHtml(k.createdAt)} UTC">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
+    <td>${k.lastUsedAt === null
+      ? '<span class="st idle"><span class="g">○</span>لم يُستعمل</span>'
+      : `<span title="${escapeHtml(k.lastUsedAt)} UTC">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
+    <td><button class="d sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
+          data-label="${escapeHtml(k.label)}">احذف</button></td>
   </tr>`).join('')
 
   const auditRows = d.audit.map((a) => `<tr>
@@ -962,13 +1199,68 @@ ${flash}
     </div>
   </div>
 
+  <div class="card" style="margin-top:14px" id="factors"><h2>العامل الثاني</h2>
+    <p class="hint">${d.factors.enforced
+      ? 'مفعَّل: الرمز وحده لا يفتح اللوحة — يليه ما يثبت أنّك أنت.'
+      : '<b>غير مفعَّل.</b> الرمز وحده يفتح كلّ شيء. سجّل مفتاح مرورٍ أو اضبط رمز تطبيق.'}</p>
+
+    <h3 class="sec">مفاتيح المرور</h3>
+    <p class="hint">مقاومةٌ للتصيّد بالبناء: المفتاح موقَّعٌ على
+      <span class="mono">${escapeHtml(d.rpId)}</span> — فصفحةٌ مزوّرة على عنوانٍ يشبهه لا تحصل
+      على توقيع مهما أتقنت الشكل. <b>ومفتاحٌ تسجّله هنا لا يعمل على البيئة الأخرى</b>؛ لكلٍّ مفتاحها.</p>
+    ${d.factors.passkeys.length === 0
+      ? '<div class="empty"><b>لا مفاتيح بعد</b></div>'
+      : `<div class="scroll"><table>
+          <thead><tr><th>المفتاح</th><th>سُجّل</th><th>آخر استعمال</th><th></th></tr></thead>
+          <tbody>${passkeyRows}</tbody></table></div>`}
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label for="pk-label">اسمُ الجهاز</label>
+        <input id="pk-label" placeholder="هاتفي · مفتاح YubiKey" maxlength="60"></div>
+      <button class="p" id="pk-add" type="button">سجّل مفتاحا</button>
+    </div>
+    <div class="n" id="pk-msg" role="status" aria-live="polite"></div>
+
+    <hr>
+    <h3 class="sec">رمز التطبيق (TOTP)</h3>
+    <p class="hint">${d.factors.totpConfirmed
+      ? 'مضبوطٌ ومؤكَّد. وهو <b>دون مفتاح المرور</b> درجةً: رمزٌ يُقرأ من شاشة يمكن أن يُملى على صفحةٍ مزوّرة. فموضعُه طريقُ رجوعٍ لا بابٌ رئيس.'
+      : 'غير مضبوط. اضبطه طريقَ رجوعٍ إن فقدتَ مفتاح المرور.'}</p>
+    <div class="row">
+      ${d.factors.totpConfirmed
+        ? '<button class="d" id="totp-remove" type="button">أزل رمز التطبيق</button>'
+        : '<button class="p" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
+    </div>
+    <div id="totp-box" hidden>
+      <div class="field" style="margin-top:12px"><label for="totp-secret">السرّ — انسخه إلى تطبيق المصادقة</label>
+        <input id="totp-secret" readonly dir="ltr"></div>
+      <form class="row" method="POST" action="/panel/security/totp/confirm" id="totp-confirm">
+        <div class="field"><label for="totp-code">الرمز الظاهر الآن</label>
+          <input id="totp-code" name="code" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+        <button class="p" type="submit">أكّد</button>
+      </form>
+    </div>
+    <div class="n" id="totp-msg" role="status" aria-live="polite"></div>
+
+    <hr>
+    <h3 class="sec">رموز الاسترداد</h3>
+    <p class="hint">${d.factors.recoveryLeft > 0
+      ? `بقي <b>${d.factors.recoveryLeft}</b> رمزا غير مستهلَك. تُعرض مرّةً واحدةً حين تُولَّد،
+         ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
+      : 'لا رموزَ استرداد. وبلا طريقِ رجوعٍ يصير فقدُ الجهاز قفلا نهائيّا.'}</p>
+    <div class="row">
+      <button class="${d.factors.recoveryLeft > 0 ? 'g' : 'p'}" id="rc-issue" type="button">
+        ${d.factors.recoveryLeft > 0 ? 'ولّد مجموعةً جديدة' : 'ولّد رموز استرداد'}</button>
+    </div>
+    <div id="rc-box" hidden><div class="codes" id="rc-list"></div>
+      <div class="n"><b>انسخها الآن.</b> لن تُعرض ثانية. والتوليدُ الجديد يُبطل القديمة كلَّها.</div></div>
+    <div class="n" id="rc-msg" role="status" aria-live="polite"></div>
+  </div>
+
   <div class="card" style="margin-top:14px"><h2>الرمز الإداريّ</h2>
     <p class="hint" style="margin:0"><b>تدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
-      فالجلسة مربوطةٌ ببصمة الرمز الذي فتحها، وتُفحص في كلّ طلب. فإن شككتَ في تسرّبٍ فبدّل الرمز
+      فالجلسة مربوطةٌ ببصمة الرمز الذي فتحها، وتُفحص في كلّ طلب — وجلسةُ مفتاحِ المرور كذلك.
+      فإن شككتَ في تسرّبٍ فبدّل الرمز
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
-    <hr>
-    <p class="hint" style="margin:0">وهذه اللوحة اليوم <b>بعاملٍ واحد</b>: رمزٌ يفتح كلّ شيء.
-      وطبقةُ Passkey و 2FA قادمةٌ في الدفعة التالية.</p>
   </div>
 
   <div class="card" style="margin-top:14px"><h2>سجلّ التدقيق</h2>
