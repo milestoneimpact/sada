@@ -57,8 +57,10 @@ describe('الدخول', () => {
     const response = await app.request('/panel', {}, env)
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain('رمز الإدارة')
-    expect(html).not.toContain('لوحة التحكّم')
+    // يُفحص السلوك لا الصياغة: حقلُ رمزٍ حاضر، وتنقّلُ اللوحة غائب
+    expect(html).toContain('name="token"')
+    expect(html).not.toContain('nav class="tabs"')
+    expect(html).not.toContain('/panel/settings')
   })
 
   it('رمزٌ خطأ يردّ 401 ولا يُنشئ جلسة', async () => {
@@ -67,7 +69,43 @@ describe('الدخول', () => {
     const response = await app.request('/panel/login', { method: 'POST', body }, env)
     expect(response.status).toBe(401)
     expect(response.headers.get('Set-Cookie')).toBeNull()
-    expect(kv.size()).toBe(0)
+    // ما في KV عدّادُ محاولةٍ لا جلسة
+    expect(kv.ttlOf('login-attempts:unknown')).not.toBeNull()
+  })
+
+  it('يعدّ المحاولات ويحظر بعد خمس', async () => {
+    const attempt = async (): Promise<Response> => {
+      const body = new FormData()
+      body.set('token', 'wrong')
+      return app.request('/panel/login', { method: 'POST', body }, env)
+    }
+    for (let i = 0; i < 4; i += 1) expect((await attempt()).status).toBe(401)
+    expect((await attempt()).status).toBe(401)
+
+    const blocked = await attempt()
+    expect(blocked.status).toBe(429)
+    expect(await blocked.text()).toContain('حدّ المحاولات')
+  })
+
+  it('الحظر يمنع حتّى الرمز الصحيح — ولا يُنشئ جلسة', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const bad = new FormData()
+      bad.set('token', 'wrong')
+      await app.request('/panel/login', { method: 'POST', body: bad }, env)
+    }
+    const good = new FormData()
+    good.set('token', TOKEN)
+    const response = await app.request('/panel/login', { method: 'POST', body: good }, env)
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+  })
+
+  it('النجاح يمحو العدّ — مَن أخطأ ثمّ أصاب لا يبقى محسوبا', async () => {
+    const bad = new FormData()
+    bad.set('token', 'wrong')
+    await app.request('/panel/login', { method: 'POST', body: bad }, env)
+    await login()
+    expect(kv.ttlOf('login-attempts:unknown')).toBeNull()
   })
 
   it('بلا ADMIN_TOKEN اللوحة مقفلة لا مفتوحة', async () => {
@@ -127,7 +165,7 @@ describe('ما تعرضه اللوحة', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('يعمل')
     expect(html).toContain('لوحة التحكّم')
-    expect(html).toContain('سقف التحليل اليوميّ')
+    expect(html).toContain('سقف التحليل')
   })
 
   it('تعرض المصادر وحالها', async () => {
@@ -252,5 +290,154 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     )
     expect(response.status).toBe(401)
     expect((await readSettings(db)).paused).toBe(false)
+  })
+})
+
+describe('الأفعال — واللوحة ليست طريقا جانبيّا حول الحارس', () => {
+  async function post(cookie: string, path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) body.set(k, v)
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('«حلّل الآن» يمرّ بالإيقاف — فيُمنع ولا يُلمس شيء', async () => {
+    const id = await seedSource('تقرير')
+    const cookie = await login()
+    await post(cookie, '/panel/settings', { key: 'paused', value: 'true' })
+
+    const response = await post(cookie, '/panel/analyze', { id })
+    expect(response.status).toBe(303)
+
+    // لا كلفة ولا تحليل: الحارس منع قبل أيّ عمل
+    const cost = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    expect(cost.n).toBe(0)
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('موقوف')
+  })
+
+  it('«حلّل الآن» يمرّ بالسقف أيضا', async () => {
+    const id = await seedSource('تقرير')
+    const cookie = await login()
+    await post(cookie, '/panel/settings', { key: 'daily_analysis_cap', value: '0' })
+    await post(cookie, '/panel/analyze', { id })
+    const cost = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    expect(cost.n).toBe(0)
+  })
+
+  it('بلا جلسة لا فعل — لا مسحا ولا تحليلا', async () => {
+    const body = new FormData()
+    body.set('id', 'x')
+    expect((await app.request('/panel/analyze', { method: 'POST', body }, env)).status).toBe(401)
+    expect((await app.request('/panel/scan', { method: 'POST' }, env)).status).toBe(401)
+  })
+
+  it('فشلُ المسح يُبلَّغ ولا يُسقط اللوحة', async () => {
+    const cookie = await login()
+    // بلا GOOGLE_SA_JSON صالح يفشل المسح
+    const response = await app.request('/panel/scan', withSession(cookie, { method: 'POST' }), env)
+    expect(response.status).toBe(303)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('تعذّر المسح')
+  })
+})
+
+describe('الإشعار — يقول ما وقع لا ما طُلب', () => {
+  async function save(cookie: string, key: string, value: string): Promise<void> {
+    const body = new FormData()
+    body.set('key', key)
+    body.set('value', value)
+    await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('يظهر بعد الحفظ ويذكر القيمة المحفوظة', async () => {
+    const cookie = await login()
+    await save(cookie, 'daily_analysis_cap', '25')
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('حُفظ 25')
+  })
+
+  it('القيمة المقصوصة تُذكر بقصّها — لا يُقال «حُفظ» لما لم يُحفظ', async () => {
+    const cookie = await login()
+    await save(cookie, 'daily_analysis_cap', '999999')
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('خارج المدى')
+    expect(html).toContain('500')
+  })
+
+  it('يُقرأ مرّة ثمّ يُمحى — فلا يبقى معلّقا في كلّ تحميل', async () => {
+    const cookie = await login()
+    await save(cookie, 'daily_analysis_cap', '25')
+    const first = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(first).toContain('حُفظ 25')
+    const second = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(second).not.toContain('حُفظ 25')
+  })
+
+  it('لا يُقرأ من عنوان الصفحة — فلا يُلفَّق برابط', async () => {
+    const cookie = await login()
+    const html = await (
+      await app.request('/panel?msg=تم%20الحذف&kind=ok', withSession(cookie), env)
+    ).text()
+    expect(html).not.toContain('تم الحذف')
+  })
+})
+
+describe('نضج العرض', () => {
+  it('الوقت نسبيّ والدقيق في title — لا طابعٌ خام وحده', async () => {
+    await seedSource('تقرير')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toMatch(/الآن|قبل /)
+    expect(html).toContain('UTC')
+  })
+
+  it('الحالة تحمل رمزا ونصّا — لا لونا وحده', async () => {
+    await seedSource('تقرير')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('class="g"')
+    expect(html).toContain('ينتظر')
+  })
+
+  it('حالة الفراغ تحمل الفعل لا وصف الغياب وحده', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('لا مصادر بعد')
+    expect(html).toContain('/panel/scan')
+  })
+
+  it('الإيقاف يسأل قبل أن يقع', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('data-confirm')
+  })
+
+  it('فيها تخطٍّ إلى المحتوى وتنقّلٌ مسمّى', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('تخطّي إلى المحتوى')
+    expect(html).toContain('aria-label="أقسام اللوحة"')
+    expect(html).toContain('aria-live="polite"')
+  })
+})
+
+describe('اللون يتبع المرجع لا الذوق', () => {
+  it('المقياس هيئةٌ واحدة — لا كهرمان فيه (يقع من الذهب على ΔE 7.2)', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    // لا صنف تحذيرٍ في المقياس؛ الأحمر وحده هو القفزة المسموحة
+    expect(html).not.toContain('<i class="w"')
+    expect(html).toContain('.bar i.f{background:var(--bad)}')
+  })
+
+  it('بلوغُ السقف يحمل نصّا لا لونا وحده', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('key', 'daily_analysis_cap')
+    body.set('value', '0')
+    await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('بلغ السقف')
   })
 })

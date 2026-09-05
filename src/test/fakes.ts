@@ -59,6 +59,8 @@ export function fakeDb(): FakeDb {
 /** KV في الذاكرة، مع دعم انتهاء الصلاحية بساعة يتحكم بها الاختبار. */
 export function fakeKv(clock: () => number = Date.now): StateStore & {
   readonly size: () => number
+  /** مهلة مفتاحٍ بالثواني — يُفحص بها أنّ العدّ ينتهي وحده. */
+  readonly ttlOf: (key: string) => number | null
 } {
   const entries = new Map<string, { value: string; expiresAt: number }>()
 
@@ -84,6 +86,10 @@ export function fakeKv(clock: () => number = Date.now): StateStore & {
       entries.delete(key)
     },
     size: () => entries.size,
+    ttlOf: (key) => {
+      const entry = entries.get(key)
+      return entry === undefined ? null : Math.round((entry.expiresAt - clock()) / 1000)
+    },
   }
 }
 

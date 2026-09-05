@@ -1,169 +1,316 @@
 /**
- * صفحة اللوحة — HTML خالص يخدمه Worker.
- *
- * بلا إطار ولا خطوة بناء: الحزمة الآن ١٢٤ كيلوبايت، وإطارُ واجهةٍ
- * يضاعفها لأجل ستّ شاشات. وصفحةٌ واحدة تُقرأ كاملةً أسهل مراجعةً من
- * شجرة مكوّنات.
+ * صفحة اللوحة.
  *
  * **قاعدةٌ ملزمة:** لا زرَّ هنا إلا وله قيدٌ مقابلٌ مُختبَر في الخادم.
- * وما لم يُبنَ يُعرض **بحاله الصريحة** لا كجدولٍ فارغ يُظنّ عطلا.
+ * وما لم يُبنَ يُعرض بحاله الصريحة لا كجدولٍ فارغ يُظنّ عطلا.
  *
- * والبيانات تُحقَن كـ JSON في وسمٍ منفصل لا في نصّ JS: `</script>` داخل
- * اسم ملفٍّ يكسر الصفحة، و`JSON.parse` من `<script type="application/json">`
- * لا يُنفّذ شيئا.
+ * وقواعد اللون من مرجع التصوير لا من الذوق:
+ * - **ألوان الحالة محجوزة** (جيّد · تحذير · خطر) ولا تُستعمل لسلسلةٍ ولا زينة
+ * - **لا تعتمد الحالة على اللون وحده**: معه رمزٌ ونصّ دائما
+ * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
+ * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { relativeTime, money } from '../lib/format'
 
-/** يهرب ما يُدرَج في HTML. اسمُ ملفٍّ من Drive نصٌّ لا نثق به. */
 export function escapeHtml(value: string): string {
   return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-/** يهرب `<` داخل JSON المحقون، فلا يُغلق الوسم من داخل البيانات. */
-export function safeJson(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, '\\u003c')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 const STYLE = `
 :root{
-  --bg:#0b0f14; --surface:#111823; --surface-2:#16202e; --line:#22303f;
-  --ink:#e8eef6; --ink-dim:#95a6b8; --ink-faint:#6b7f94;
-  --accent:#c9a227; --accent-ink:#0b0f14;
-  --ok:#3fb27f; --warn:#d9a441; --bad:#d95c5c; --idle:#5b6b7d;
-  --radius:14px;
+  --bg:#080b10; --surface:#0f1620; --surface-2:#141d29; --surface-3:#1b2634;
+  --line:#1f2c3b; --line-soft:#182331;
+  --ink:#eaf0f7; --ink-2:#9fb0c3; --ink-3:#66788c;
+  --gold:#d4af37; --gold-soft:#e8cf76; --on-gold:#0a0d12;
+  /* حالات مدقَّقة: الأدنى بين أزواجها ΔE 15.9 للرؤية العاديّة.
+     والأحمر/الأخضر متقاربان في عمى الألوان (ΔE 4.4) — ولذلك **كلّ حالة
+     تحمل رمزا ونصّا معها**، فالهويّة لا تقع على اللون وحده. */
+  --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
+  --r:12px; --r-lg:16px;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.28);
 }
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{
   margin:0; background:var(--bg); color:var(--ink); direction:rtl;
   font-family:"IBM Plex Sans Arabic","Noto Sans Arabic",system-ui,-apple-system,"Segoe UI",sans-serif;
-  font-size:15px; line-height:1.7; letter-spacing:0;
+  font-size:15px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
 }
-a{color:var(--accent)}
-.wrap{max-width:1120px; margin:0 auto; padding:28px 20px 72px}
+:focus-visible{outline:2px solid var(--gold); outline-offset:2px; border-radius:6px}
+.skip{position:absolute; right:-9999px; top:8px; background:var(--gold); color:var(--on-gold);
+  padding:10px 16px; border-radius:8px; z-index:99; font-weight:700}
+.skip:focus{right:12px}
+.wrap{max-width:1180px; margin:0 auto; padding:24px 20px 80px}
 
-header.top{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:8px}
-.brand{font-size:28px; font-weight:700; letter-spacing:-.5px}
-.brand span{color:var(--accent)}
-.sub{color:var(--ink-faint); font-size:13px}
+/* ── الترويسة ─────────────────────────────────────────── */
+.top{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:18px;
+  border-bottom:1px solid var(--line)}
+.mark{display:flex; align-items:center; gap:11px}
+.glyph{width:38px; height:38px; border-radius:11px; display:grid; place-items:center;
+  background:linear-gradient(150deg,var(--gold),#8f6f18); color:var(--on-gold);
+  font-weight:800; font-size:17px; box-shadow:var(--shadow)}
+.title{font-size:19px; font-weight:700; letter-spacing:-.2px; line-height:1.2}
+.title small{display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.6px}
 .grow{flex:1}
 
-.state{
-  display:inline-flex; align-items:center; gap:8px; padding:7px 14px;
-  border-radius:999px; font-size:13px; font-weight:600; border:1px solid var(--line);
-}
-.dot{width:8px; height:8px; border-radius:50%; background:var(--idle)}
-.state.live{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
-.state.live .dot{background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 18%,transparent)}
-.state.halted{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
-.state.halted .dot{background:var(--warn)}
+.pill{display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:999px;
+  font-size:13px; font-weight:600; border:1px solid var(--line); background:var(--surface)}
+.pill .led{width:7px; height:7px; border-radius:50%; background:var(--ink-3); flex:none}
+.pill.on{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 42%,transparent)}
+.pill.on .led{background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 20%,transparent)}
+.pill.off{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 48%,transparent);
+  background:color-mix(in srgb,var(--warn) 9%,var(--surface))}
+.pill.off .led{background:var(--warn)}
 
-.grid{display:grid; gap:16px; margin-top:22px}
-.cols-4{grid-template-columns:repeat(4,1fr)}
-.cols-2{grid-template-columns:repeat(2,1fr)}
-@media(max-width:860px){.cols-4{grid-template-columns:repeat(2,1fr)} .cols-2{grid-template-columns:1fr}}
-@media(max-width:520px){.cols-4{grid-template-columns:1fr}}
+/* ── الإشعار ──────────────────────────────────────────── */
+.flash{display:flex; align-items:flex-start; gap:11px; padding:13px 16px; border-radius:var(--r);
+  margin-top:18px; font-size:14px; border:1px solid var(--line); background:var(--surface)}
+.flash .ic{flex:none; font-weight:800; font-size:15px; line-height:1.5}
+.flash.ok{border-color:color-mix(in srgb,var(--ok) 40%,transparent);
+  background:color-mix(in srgb,var(--ok) 8%,var(--surface))}
+.flash.ok .ic{color:var(--ok)}
+.flash.warn{border-color:color-mix(in srgb,var(--warn) 42%,transparent);
+  background:color-mix(in srgb,var(--warn) 8%,var(--surface))}
+.flash.warn .ic{color:var(--warn)}
+.flash.bad{border-color:color-mix(in srgb,var(--bad) 42%,transparent);
+  background:color-mix(in srgb,var(--bad) 8%,var(--surface))}
+.flash.bad .ic{color:var(--bad)}
 
-.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px}
-.card h2{margin:0 0 14px; font-size:15px; font-weight:600; color:var(--ink-dim); letter-spacing:.3px}
+/* ── التنقّل ──────────────────────────────────────────── */
+nav.tabs{display:flex; gap:4px; margin:20px 0 4px; border-bottom:1px solid var(--line);
+  overflow-x:auto; scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs a{padding:11px 16px; font-size:14px; font-weight:600; color:var(--ink-3);
+  text-decoration:none; border-bottom:2px solid transparent; white-space:nowrap; transition:color .12s}
+nav.tabs a:hover{color:var(--ink-2)}
+nav.tabs a[aria-current=page]{color:var(--ink); border-bottom-color:var(--gold)}
+nav.tabs .count{display:inline-block; margin-right:6px; padding:0 7px; border-radius:999px;
+  background:var(--surface-3); font-size:11px; font-weight:700; color:var(--ink-2)}
 
-.metric .label{color:var(--ink-faint); font-size:12px; margin-bottom:6px}
-.metric .value{font-size:30px; font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums}
-.metric .note{color:var(--ink-faint); font-size:12px; margin-top:6px}
+section[hidden]{display:none}
+section{padding-top:22px}
 
-.meter{height:6px; background:var(--surface-2); border-radius:99px; overflow:hidden; margin-top:10px}
-.meter i{display:block; height:100%; background:var(--accent); border-radius:99px}
-.meter i.hot{background:var(--warn)} .meter i.full{background:var(--bad)}
+/* ── البطاقات ─────────────────────────────────────────── */
+.grid{display:grid; gap:14px}
+.c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
+.c2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:900px){.c4{grid-template-columns:repeat(2,1fr)} .c3,.c2{grid-template-columns:1fr}}
+@media(max-width:540px){.c4{grid-template-columns:1fr}}
 
-table{width:100%; border-collapse:collapse; font-size:14px}
-th{text-align:right; color:var(--ink-faint); font-weight:600; font-size:12px; padding:0 10px 10px; border-bottom:1px solid var(--line)}
-td{padding:12px 10px; border-bottom:1px solid var(--surface-2); vertical-align:top}
-tr:last-child td{border-bottom:0}
-.name{font-weight:600}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--ink-faint); direction:ltr; display:inline-block}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+  padding:18px; box-shadow:var(--shadow)}
+.card > h2{margin:0 0 4px; font-size:14px; font-weight:600; color:var(--ink-2)}
+.card > .hint{margin:0 0 14px; font-size:12px; color:var(--ink-3)}
+.card-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+.card-head h2{margin:0}
 
-.tag{display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:600; border:1px solid transparent; white-space:nowrap}
-.tag.ok{color:var(--ok); background:color-mix(in srgb,var(--ok) 12%,transparent); border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
-.tag.warn{color:var(--warn); background:color-mix(in srgb,var(--warn) 12%,transparent); border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
-.tag.bad{color:var(--bad); background:color-mix(in srgb,var(--bad) 12%,transparent); border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
-.tag.idle{color:var(--ink-faint); background:var(--surface-2); border-color:var(--line)}
+.tile .k{font-size:11.5px; color:var(--ink-3); letter-spacing:.3px; margin-bottom:7px}
+.tile .v{font-size:29px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums}
+.tile .v em{font-style:normal; font-size:15px; font-weight:600; color:var(--ink-3)}
+.tile .n{font-size:11.5px; color:var(--ink-3); margin-top:8px}
 
-.worth{display:flex; align-items:center; gap:9px; min-width:96px}
-.worth .bar{flex:1; height:5px; background:var(--surface-2); border-radius:99px; overflow:hidden}
-.worth .bar i{display:block; height:100%; border-radius:99px}
-.worth .num{font-variant-numeric:tabular-nums; font-size:12px; color:var(--ink-dim); min-width:30px}
-.reason{color:var(--ink-faint); font-size:12px; margin-top:5px; max-width:52ch}
+/* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه
+   قطّ — الكهرمان يقع من ذهب الهوية على ΔE 7.2 فلا يُرى فرقُهما. والبلوغُ
+   حالةٌ لا مقدار، فيقفز إلى الأحمر (ΔE 19.8 عن الذهب) **ومعه نصّ**. */
+.bar{height:5px; background:var(--surface-3); border-radius:99px; overflow:hidden; margin-top:11px}
+.bar i{display:block; height:100%; border-radius:99px; background:var(--gold); transition:width .3s}
+.bar i.f{background:var(--bad)}
+.cap{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
+  color:var(--bad); margin-top:7px}
+.cap.done{color:var(--ok)}
 
-.empty{padding:26px; text-align:center; color:var(--ink-faint); font-size:13px;
-  border:1px dashed var(--line); border-radius:10px; background:var(--surface-2)}
-.empty b{display:block; color:var(--ink-dim); font-size:14px; margin-bottom:6px}
+/* ── الجداول ──────────────────────────────────────────── */
+.scroll{overflow-x:auto; margin:0 -4px; padding:0 4px}
+table{width:100%; border-collapse:collapse; font-size:14px; min-width:520px}
+th{text-align:right; color:var(--ink-3); font-weight:600; font-size:11.5px;
+  padding:0 10px 11px; border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:13px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--surface-2)}
+.nm{font-weight:600; line-height:1.4}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  color:var(--ink-3); direction:ltr; display:inline-block; unicode-bidi:isolate}
+.sub{color:var(--ink-3); font-size:12.5px; margin-top:5px; max-width:60ch; line-height:1.6}
+.num{font-variant-numeric:tabular-nums}
 
-form.row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:6px}
-label{display:block; font-size:12px; color:var(--ink-faint); margin-bottom:6px}
-input[type=number],input[type=password]{
-  background:var(--bg); border:1px solid var(--line); border-radius:9px;
-  color:var(--ink); padding:10px 12px; font:inherit; font-size:14px; width:130px;
-}
-input:focus{outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent); outline-offset:1px}
-button{
-  background:var(--accent); color:var(--accent-ink); border:0; border-radius:9px;
-  padding:10px 18px; font:inherit; font-weight:700; cursor:pointer;
-}
-button.ghost{background:transparent; color:var(--ink-dim); border:1px solid var(--line)}
-button.danger{background:var(--bad); color:#fff}
-button:hover{filter:brightness(1.08)}
+/* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
+.st{display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px;
+  font-size:11.5px; font-weight:600; border:1px solid transparent; white-space:nowrap}
+.st .g{font-size:9px; line-height:1}
+.st.ok{color:var(--ok); background:color-mix(in srgb,var(--ok) 12%,transparent);
+  border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
+.st.warn{color:var(--warn); background:color-mix(in srgb,var(--warn) 12%,transparent);
+  border-color:color-mix(in srgb,var(--warn) 32%,transparent)}
+.st.bad{color:var(--bad); background:color-mix(in srgb,var(--bad) 12%,transparent);
+  border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+.st.idle{color:var(--ink-3); background:var(--surface-3); border-color:var(--line)}
+.chip{display:inline-block; padding:2px 9px; border-radius:6px; font-size:11px;
+  background:var(--surface-3); color:var(--ink-2); margin:3px 0 0 4px}
 
-.halt{display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap}
-.halt p{margin:0; color:var(--ink-faint); font-size:12px; max-width:56ch}
+/* الاستحقاق: مقياس مقدار — تدرّج هيئةٍ واحدة، والرقم بلون النصّ */
+.worth{display:flex; align-items:center; gap:9px; min-width:104px}
+.worth .track{flex:1; height:5px; background:var(--surface-3); border-radius:99px; overflow:hidden}
+.worth .fill{display:block; height:100%; border-radius:99px}
+.worth .val{font-variant-numeric:tabular-nums; font-size:12.5px; color:var(--ink-2); min-width:32px}
 
-.login{max-width:400px; margin:14vh auto; text-align:center}
-.login .card{text-align:right}
-.login input{width:100%; margin-bottom:12px; direction:ltr; text-align:left}
-.login button{width:100%}
-.err{color:var(--bad); font-size:13px; margin-bottom:12px}
-footer{margin-top:34px; color:var(--ink-faint); font-size:12px; text-align:center}
+/* ── الأزرار ──────────────────────────────────────────── */
+button,.btn{font:inherit; font-weight:600; border-radius:9px; cursor:pointer; border:1px solid transparent;
+  padding:9px 16px; display:inline-flex; align-items:center; gap:7px; text-decoration:none;
+  transition:filter .12s, background .12s}
+.p{background:var(--gold); color:var(--on-gold)}
+.g{background:var(--surface-3); color:var(--ink); border-color:var(--line)}
+.d{background:color-mix(in srgb,var(--bad) 16%,var(--surface-3)); color:var(--bad);
+  border-color:color-mix(in srgb,var(--bad) 38%,transparent)}
+.sm{padding:6px 12px; font-size:12.5px; border-radius:7px}
+button:hover,.btn:hover{filter:brightness(1.12)}
+button:disabled{opacity:.42; cursor:not-allowed; filter:none}
+form.inline{display:inline; margin:0}
+
+.field{display:flex; flex-direction:column; gap:6px}
+label{font-size:12px; color:var(--ink-3)}
+input[type=number],input[type=password],select{
+  background:var(--bg); border:1px solid var(--line); border-radius:9px; color:var(--ink);
+  padding:10px 12px; font:inherit; font-size:14px}
+input[type=number]{width:120px}
+.row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
+
+/* ── الفراغ ───────────────────────────────────────────── */
+.empty{padding:34px 22px; text-align:center; border:1px dashed var(--line);
+  border-radius:var(--r); background:var(--surface-2)}
+.empty b{display:block; font-size:15px; margin-bottom:7px; color:var(--ink)}
+.empty p{margin:0 auto 16px; max-width:46ch; font-size:13px; color:var(--ink-3); line-height:1.7}
+
+.split{display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+.split p{margin:0; font-size:12.5px; color:var(--ink-3); max-width:58ch; line-height:1.7}
+hr{border:0; border-top:1px solid var(--line); margin:18px 0}
+footer{margin-top:34px; padding-top:18px; border-top:1px solid var(--line);
+  color:var(--ink-3); font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+
+/* ── الدخول ───────────────────────────────────────────── */
+.auth{max-width:390px; margin:13vh auto}
+.auth .glyph{width:52px; height:52px; font-size:22px; margin:0 auto 18px}
+.auth h1{text-align:center; font-size:20px; margin:0 0 6px}
+.auth .lede{text-align:center; color:var(--ink-3); font-size:13px; margin:0 0 22px}
+.auth input{width:100%; direction:ltr; text-align:left; margin-bottom:12px}
+.auth button{width:100%; justify-content:center; padding:12px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
 `
 
-function shell(title: string, body: string, extra = ''): string {
+const SCRIPT = `
+(function(){
+  var tabs=document.querySelectorAll('nav.tabs a');
+  var panes=document.querySelectorAll('section[data-pane]');
+  function show(id,push){
+    var found=false;
+    panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m)found=true;});
+    if(!found){show(panes[0].dataset.pane,push); return;}
+    tabs.forEach(function(t){
+      var m=t.getAttribute('href')==='#'+id;
+      if(m){t.setAttribute('aria-current','page');}else{t.removeAttribute('aria-current');}
+    });
+    if(push&&history.replaceState)history.replaceState(null,'','#'+id);
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(e){
+    e.preventDefault(); show(t.getAttribute('href').slice(1),true);
+  });});
+  show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+
+  // تأكيدٌ قبل فعلٍ يوقف النظام كلّه
+  document.querySelectorAll('form[data-confirm]').forEach(function(f){
+    f.addEventListener('submit',function(e){
+      if(!confirm(f.dataset.confirm)){e.preventDefault(); return;}
+      var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent='…';}
+    });
+  });
+  // زرٌّ مضغوط لا يُضغط مرّتين — نداءٌ مدفوع لا يُكرَّر بنقرةٍ عصبيّة
+  document.querySelectorAll('form[data-busy]').forEach(function(f){
+    f.addEventListener('submit',function(){
+      var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent=f.dataset.busy;}
+    });
+  });
+  // تصفية المصادر وفرزها — في المتصفّح، فلا رحلةَ خادمٍ لكلّ ضغطة
+  var q=document.getElementById('flt'), s=document.getElementById('srt'),
+      tb=document.getElementById('src-body');
+  function apply(){
+    if(!tb)return;
+    var rows=Array.prototype.slice.call(tb.querySelectorAll('tr'));
+    var mode=q?q.value:'all';
+    rows.forEach(function(r){
+      r.hidden = mode==='pending' ? r.dataset.pending!=='1'
+              : mode==='analyzed' ? r.dataset.pending==='1' : false;
+    });
+    if(s){
+      var k=s.value;
+      rows.sort(function(a,b){
+        if(k==='worth')return (+b.dataset.worth)-(+a.dataset.worth);
+        if(k==='name')return a.dataset.name.localeCompare(b.dataset.name,'ar');
+        return (+b.dataset.seen)-(+a.dataset.seen);
+      }).forEach(function(r){tb.appendChild(r);});
+    }
+    var vis=rows.filter(function(r){return !r.hidden;}).length;
+    var n=document.getElementById('shown'); if(n)n.textContent=vis;
+  }
+  if(q)q.addEventListener('change',apply);
+  if(s)s.addEventListener('change',apply);
+  apply();
+})();
+`
+
+function shell(title: string, body: string, script = ''): string {
   return `<!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="dark">
 <title>${escapeHtml(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
-<style>${STYLE}</style></head><body><div class="wrap">${body}</div>${extra}</body></html>`
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>${STYLE}</style></head><body>${body}${script === '' ? '' : `<script>${script}</script>`}</body></html>`
 }
 
-export function loginPage(error?: string): string {
+// ── صفحة الدخول ──────────────────────────────────────────
+
+export interface LoginState {
+  readonly error?: string
+  readonly blocked?: boolean
+}
+
+export function loginPage(state: LoginState = {}): string {
+  const note =
+    state.error === undefined
+      ? ''
+      : `<div class="flash ${state.blocked === true ? 'bad' : 'warn'}" role="alert">
+           <span class="ic">${state.blocked === true ? '✕' : '!'}</span>
+           <span>${escapeHtml(state.error)}</span></div>`
+  const disabled = state.blocked === true ? ' disabled' : ''
   return shell(
     'صدى — الدخول',
-    `<div class="login">
-      <div class="brand" style="margin-bottom:20px">صــ<span>دى</span></div>
+    `<div class="wrap"><div class="auth">
+      <div class="glyph">صدى</div>
+      <h1>لوحة التحكّم</h1>
+      <p class="lede">أدخل رمز الإدارة للمتابعة</p>
+      ${note}
       <div class="card">
-        <h2>رمز الإدارة</h2>
-        ${error === undefined ? '' : `<div class="err">${escapeHtml(error)}</div>`}
         <form method="POST" action="/panel/login">
-          <input type="password" name="token" autocomplete="current-password"
-                 placeholder="ADMIN_TOKEN" required autofocus>
-          <button type="submit">دخول</button>
+          <div class="field"><label for="t">ADMIN_TOKEN</label>
+            <input id="t" type="password" name="token" autocomplete="current-password"
+                   required autofocus${disabled}></div>
+          <button class="p" type="submit"${disabled}>دخول</button>
         </form>
       </div>
-      <footer>الجلسة ثماني ساعات، ثمّ يُعاد الدخول.</footer>
-    </div>`,
+      <footer style="border:0;justify-content:center">الجلسة ثماني ساعات</footer>
+    </div></div>`,
   )
 }
 
-// ── الصفحة الرئيسة ──────────────────────────────────────────────────
+// ── الصفحة الرئيسة ───────────────────────────────────────
 
 export interface PanelSource {
   readonly id: string
   readonly driveFileId: string
   readonly name: string
-  readonly mime: string
   readonly analyzed: boolean
   readonly stale: boolean
   readonly worth: number | null
@@ -183,6 +330,11 @@ export interface PanelProvider {
   readonly spend: number
 }
 
+export interface PanelFlash {
+  readonly kind: 'ok' | 'warn' | 'bad'
+  readonly text: string
+}
+
 export interface PanelData {
   readonly paused: boolean
   readonly analysisCap: number
@@ -190,192 +342,292 @@ export interface PanelData {
   readonly usedAnalyses: number
   readonly usedSpend: number
   readonly spend30d: number
+  readonly series: { day: string; total: number }[]
   readonly sources: PanelSource[]
   readonly providers: PanelProvider[]
   readonly routing: { task: string; model: string; why: string; ready: boolean; implemented: boolean }[]
   readonly postsBuilt: boolean
+  readonly flash: PanelFlash | null
+  readonly now: Date
 }
 
-function money(value: number): string {
-  return `${value.toFixed(value < 1 ? 4 : 2)}$`
+const TASK_LABEL: Readonly<Record<string, string>> = {
+  analyze: 'الفهم — الحكم على المصدر',
+  draft: 'الكتابة — صياغة المنشور',
+  image: 'الصورة — التوليد البصريّ',
 }
 
-/** نسبةٌ محصورة بين ٠ و ١٠٠، وسقفُ صفرٍ يُعدّ ممتلئا لا مقسوما على صفر. */
 function pct(used: number, cap: number): number {
   if (cap <= 0) return 100
   return Math.min(100, Math.round((used / cap) * 100))
 }
 
-function meter(used: number, cap: number): string {
+/**
+ * مقياسُ مقدار: هيئةٌ واحدة تتدرّج بالطول لا بالهيئة.
+ * والبلوغ حالةٌ لا مقدار — فيقفز إلى الأحمر **ومعه نصّ**، لأنّ الحالة
+ * لا تقع على اللون وحده.
+ */
+function bar(used: number, cap: number, label = 'بلغ السقف'): string {
   const p = pct(used, cap)
-  const cls = p >= 100 ? 'full' : p >= 70 ? 'hot' : ''
-  return `<div class="meter"><i class="${cls}" style="width:${p}%"></i></div>`
+  const full = p >= 100
+  return `<div class="bar"><i class="${full ? 'f' : ''}" style="width:${p}%"></i></div>` +
+    (full
+      ? `<div class="cap${label === 'بلغ السقف' ? '' : ' done'}"><span aria-hidden="true">■</span>${escapeHtml(label)}</div>`
+      : '')
 }
 
+/**
+ * رسمُ منطقةٍ صغير للإنفاق.
+ *
+ * السلسلة كاملةٌ بأصفارها: خطٌّ يقفز فوق يومٍ خالٍ يوصل الاثنين بالأربعاء
+ * وكأنّ الثلاثاء لم يكن. **وسلسلةٌ كلّها أصفار تُرسم خطّا عند القاع**، لا
+ * قمّةً كاذبة من قسمةٍ على صفر.
+ */
+function sparkline(series: { day: string; total: number }[]): string {
+  if (series.length < 2) return '<div class="n">لا بيانات كافية بعد</div>'
+  const w = 260
+  const h = 46
+  const max = Math.max(...series.map((d) => d.total))
+  const step = w / (series.length - 1)
+  const y = (v: number): number => (max <= 0 ? h - 2 : h - 2 - (v / max) * (h - 6))
+  const pts = series.map((d, i) => `${(i * step).toFixed(1)},${y(d.total).toFixed(1)}`)
+  const line = `M ${pts.join(' L ')}`
+  const area = `${line} L ${w},${h} L 0,${h} Z`
+  const peak = series.reduce((a, b) => (b.total > a.total ? b : a))
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="none"
+    aria-label="إنفاق ${series.length} يوما، أعلاه ${money(peak.total)} في ${peak.day}">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--gold)" stop-opacity=".26"/>
+      <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#sg)"/>
+    <path d="${line}" fill="none" stroke="var(--gold)" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`
+}
+
+/** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
 function worthCell(worth: number | null): string {
-  if (worth === null) return '<span class="tag idle">لم يُحلَّل</span>'
+  if (worth === null) return '<span class="st idle"><span class="g">○</span>لم يُحلَّل</span>'
   const p = Math.round(worth * 100)
-  const color = worth >= 0.6 ? 'var(--ok)' : worth >= 0.4 ? 'var(--warn)' : 'var(--bad)'
-  return `<div class="worth">
-    <div class="bar"><i style="width:${p}%;background:${color}"></i></div>
-    <div class="num">${worth.toFixed(2)}</div>
-  </div>`
+  const shade = worth >= 0.66 ? 'var(--gold)' : worth >= 0.33 ? 'var(--gold-soft)' : 'var(--ink-3)'
+  return `<div class="worth" title="درجة الاستحقاق ${worth.toFixed(2)} من 1">
+    <div class="track"><span class="fill" style="width:${p}%;background:${shade}"></span></div>
+    <span class="val">${worth.toFixed(2)}</span></div>`
 }
 
-function sourceRow(s: PanelSource): string {
+function sourceRow(s: PanelSource, now: Date): string {
+  const pending = !s.analyzed || s.stale
   const status = s.stale
-    ? '<span class="tag warn">تغيّر بعد التحليل</span>'
+    ? '<span class="st warn"><span class="g">▲</span>تغيّر بعد التحليل</span>'
     : s.analyzed
-      ? '<span class="tag ok">محلَّل</span>'
-      : '<span class="tag idle">ينتظر</span>'
-  const themes = s.themes.slice(0, 4).map((t) => `<span class="tag idle">${escapeHtml(t)}</span>`).join(' ')
-  const detail = s.summary === null
-    ? ''
-    : `<div class="reason">${escapeHtml(s.summary)}</div>` +
-      (s.reason === null ? '' : `<div class="reason">— ${escapeHtml(s.reason)}</div>`) +
-      (themes.length === 0 ? '' : `<div style="margin-top:7px">${themes}</div>`)
+      ? '<span class="st ok"><span class="g">●</span>محلَّل</span>'
+      : '<span class="st idle"><span class="g">○</span>ينتظر</span>'
 
-  return `<tr>
-    <td><div class="name">${escapeHtml(s.name)}</div>
-        <div class="mono">${escapeHtml(s.driveFileId)}</div>${detail}</td>
+  const themes = s.themes.slice(0, 5).map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')
+  const body = s.summary === null
+    ? ''
+    : `<div class="sub">${escapeHtml(s.summary)}</div>` +
+      (s.reason === null ? '' : `<div class="sub">— ${escapeHtml(s.reason)}</div>`) +
+      (themes === '' ? '' : `<div style="margin-top:6px">${themes}</div>`)
+
+  const action = pending
+    ? `<form class="inline" method="POST" action="/panel/analyze" data-busy="جارٍ…">
+         <input type="hidden" name="id" value="${escapeHtml(s.id)}">
+         <button class="g sm" type="submit">حلّل الآن</button></form>`
+    : '<span class="mono">—</span>'
+
+  const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
+  return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
+      data-name="${escapeHtml(s.name)}" data-seen="${seen}">
+    <td><div class="nm">${escapeHtml(s.name)}</div>
+        <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
     <td>${status}</td>
     <td>${worthCell(s.worth)}</td>
-    <td class="mono">${escapeHtml(s.lastSeenAt)}</td>
+    <td><span title="${escapeHtml(s.lastSeenAt)} UTC">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
+    <td>${action}</td>
   </tr>`
 }
 
-function providerRow(p: PanelProvider): string {
-  const tag = p.configured
-    ? '<span class="tag ok">مضبوط</span>'
-    : '<span class="tag bad">مفتاحه ناقص</span>'
-  const hint = p.configured
-    ? ''
-    : `<div class="reason"><span class="mono">${escapeHtml(p.secretName)}</span> — ${escapeHtml(p.howToGet)}</div>`
-  return `<tr>
-    <td><div class="name">${escapeHtml(p.label)}</div>${hint}</td>
-    <td>${tag}</td>
-    <td class="mono">${p.calls}</td>
-    <td class="mono">${money(p.spend)}</td>
-  </tr>`
-}
+export function panelPage(d: PanelData): string {
+  const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
+  const ready = d.sources.length - pending
+  const missing = d.providers.filter((p) => !p.configured).length
 
-export function panelPage(data: PanelData): string {
-  const pending = data.sources.filter((s) => !s.analyzed || s.stale).length
-  const analyzed = data.sources.filter((s) => s.analyzed && !s.stale).length
+  // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
+  // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
+  const flash = `<div id="flash" role="status" aria-live="polite">${
+    d.flash === null
+      ? ''
+      : `<div class="flash ${d.flash.kind}">
+           <span class="ic">${d.flash.kind === 'ok' ? '✓' : d.flash.kind === 'warn' ? '!' : '✕'}</span>
+           <span>${escapeHtml(d.flash.text)}</span></div>`
+  }</div>`
 
-  const state = data.paused
-    ? '<span class="state halted"><i class="dot"></i> موقوف مؤقتا</span>'
-    : '<span class="state live"><i class="dot"></i> يعمل</span>'
+  const state = d.paused
+    ? '<span class="pill off"><i class="led"></i>موقوف مؤقتا</span>'
+    : '<span class="pill on"><i class="led"></i>يعمل</span>'
 
-  const sourcesBody = data.sources.length === 0
-    ? `<div class="empty"><b>لا مصادر بعد</b>شغّل المسح ليقرأ صدى مجلد Drive.</div>`
-    : `<table><thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th></tr></thead>
-       <tbody>${data.sources.map(sourceRow).join('')}</tbody></table>`
+  const scanBtn = `<form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">
+      <button class="g sm" type="submit">مسح Drive الآن</button></form>`
 
-  const postsBody = data.postsBuilt
-    ? '<div class="empty">لا منشورات بعد.</div>'
-    : `<div class="empty"><b>طبقة الكتابة لم تُبنَ بعد</b>
-        الجدول قائم بقيوده — ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة (D-009).
-        وحين تُبنى، يظهر هنا نصُّ كلّ منشور ومنصّته وتاريخ نشره وحالته.</div>`
+  const sourcesTable = d.sources.length === 0
+    ? `<div class="empty"><b>لا مصادر بعد</b>
+         <p>صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.</p>
+         <form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">
+           <button class="p" type="submit">مسح Drive الآن</button></form></div>`
+    : `<div class="row" style="margin-bottom:14px">
+         <div class="field"><label for="flt">التصفية</label>
+           <select id="flt"><option value="all">الكلّ</option>
+             <option value="pending">ما ينتظر تحليلا</option>
+             <option value="analyzed">المحلَّل</option></select></div>
+         <div class="field"><label for="srt">الفرز</label>
+           <select id="srt"><option value="seen">الأحدث مسحا</option>
+             <option value="worth">الأعلى استحقاقا</option>
+             <option value="name">الاسم</option></select></div>
+         <div class="grow"></div>
+         <div class="tile" style="text-align:left">
+           <span class="n">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
+       </div>
+       <div class="scroll"><table>
+         <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th></th></tr></thead>
+         <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now)).join('')}</tbody>
+       </table></div>`
 
-  const routingBody = data.routing.map((r) => {
-    const tag = r.ready
-      ? '<span class="tag ok">جاهز</span>'
-      : r.implemented
-        ? '<span class="tag bad">مفتاحه ناقص</span>'
-        : '<span class="tag idle">لم تُبنَ</span>'
-    return `<tr><td><div class="name">${escapeHtml(r.task)}</div>
-      <div class="reason">${escapeHtml(r.why)}</div></td>
-      <td class="mono">${escapeHtml(r.model)}</td><td>${tag}</td></tr>`
-  }).join('')
+  const providerRows = d.providers.map((p) => `<tr>
+      <td><div class="nm">${escapeHtml(p.label)}</div>
+          ${p.configured ? '' : `<div class="sub"><span class="mono">${escapeHtml(p.secretName)}</span> — ${escapeHtml(p.howToGet)}</div>`}</td>
+      <td>${p.configured
+        ? '<span class="st ok"><span class="g">●</span>مضبوط</span>'
+        : '<span class="st bad"><span class="g">✕</span>مفتاحه ناقص</span>'}</td>
+      <td class="num">${p.calls}</td>
+      <td class="num">${money(p.spend)}</td></tr>`).join('')
+
+  const routingRows = d.routing.map((r) => `<tr>
+      <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
+          <div class="sub">${escapeHtml(r.why)}</div></td>
+      <td><span class="mono">${escapeHtml(r.model)}</span></td>
+      <td>${r.ready
+        ? '<span class="st ok"><span class="g">●</span>جاهز</span>'
+        : r.implemented
+          ? '<span class="st bad"><span class="g">✕</span>مفتاحه ناقص</span>'
+          : '<span class="st idle"><span class="g">○</span>لم تُبنَ</span>'}</td></tr>`).join('')
 
   const body = `
+<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+<div class="wrap">
 <header class="top">
-  <div><div class="brand">صــ<span>دى</span></div>
-       <div class="sub">لوحة التحكّم — staging</div></div>
+  <div class="mark"><div class="glyph">صدى</div>
+    <div class="title">لوحة التحكّم<small>SADA · STAGING</small></div></div>
   <div class="grow"></div>
   ${state}
-  <form method="POST" action="/panel/logout" style="margin:0">
-    <button class="ghost" type="submit">خروج</button>
-  </form>
+  <form class="inline" method="POST" action="/panel/logout">
+    <button class="g" type="submit">خروج</button></form>
 </header>
+${flash}
 
-<div class="grid cols-4">
-  <div class="card metric">
-    <div class="label">تحليلات اليوم</div>
-    <div class="value">${data.usedAnalyses}<span style="font-size:16px;color:var(--ink-faint)"> / ${data.analysisCap}</span></div>
-    ${meter(data.usedAnalyses, data.analysisCap)}
-    <div class="note">يُعاد الصفر عند منتصف الليل UTC</div>
-  </div>
-  <div class="card metric">
-    <div class="label">إنفاق اليوم</div>
-    <div class="value">${money(data.usedSpend)}<span style="font-size:16px;color:var(--ink-faint)"> / ${money(data.spendCap)}</span></div>
-    ${meter(data.usedSpend, data.spendCap)}
-    <div class="note">من دفتر الكلفة نفسه</div>
-  </div>
-  <div class="card metric">
-    <div class="label">إنفاق ٣٠ يوما</div>
-    <div class="value">${money(data.spend30d)}</div>
-    <div class="note">كلّ المزوّدين</div>
-  </div>
-  <div class="card metric">
-    <div class="label">المصادر</div>
-    <div class="value">${analyzed}<span style="font-size:16px;color:var(--ink-faint)"> / ${data.sources.length}</span></div>
-    <div class="note">${pending === 0 ? 'لا شيء ينتظر' : `${pending} تنتظر تحليلا`}</div>
-  </div>
-</div>
+<nav class="tabs" aria-label="أقسام اللوحة">
+  <a href="#overview">نظرة عامّة</a>
+  <a href="#sources">المصادر${pending > 0 ? `<span class="count">${pending}</span>` : ''}</a>
+  <a href="#providers">المزوّدون${missing > 0 ? `<span class="count">${missing}</span>` : ''}</a>
+  <a href="#posts">المنشورات</a>
+  <a href="#settings">الإعدادات</a>
+</nav>
 
-<div class="grid" style="margin-top:16px">
-  <div class="card">
-    <h2>التحكّم</h2>
-    <div class="halt">
-      <p>${data.paused
+<main id="main">
+<section data-pane="overview" hidden>
+  <div class="grid c4">
+    <div class="card tile"><div class="k">تحليلات اليوم</div>
+      <div class="v">${d.usedAnalyses}<em> / ${d.analysisCap}</em></div>
+      ${bar(d.usedAnalyses, d.analysisCap)}
+      <div class="n">يُصفَّر عند منتصف الليل UTC</div></div>
+    <div class="card tile"><div class="k">إنفاق اليوم</div>
+      <div class="v">${money(d.usedSpend)}<em> / ${money(d.spendCap)}</em></div>
+      ${bar(d.usedSpend, d.spendCap)}
+      <div class="n">من دفتر الكلفة نفسه</div></div>
+    <div class="card tile"><div class="k">المصادر المحلَّلة</div>
+      <div class="v">${ready}<em> / ${d.sources.length}</em></div>
+      ${d.sources.length === 0 ? '' : bar(ready, d.sources.length, 'كلّها محلَّلة')}
+      <div class="n">${pending === 0 ? 'لا شيء ينتظر' : `${pending} تنتظر تحليلا`}</div></div>
+    <div class="card tile"><div class="k">إنفاق ٣٠ يوما</div>
+      <div class="v">${money(d.spend30d)}</div>
+      <div class="n">كلّ المزوّدين</div></div>
+  </div>
+  <div class="grid c2" style="margin-top:14px">
+    <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
+      <p class="hint">كلّ المزوّدين، بالدولار</p>${sparkline(d.series)}</div>
+    <div class="card"><h2>إجراءات سريعة</h2>
+      <p class="hint">ما يُشغَّل يدويّا الآن</p>
+      <div class="row">${scanBtn}
+        <a class="btn g sm" href="#sources">مراجعة المصادر</a>
+        <a class="btn g sm" href="#settings">الحدود والإيقاف</a></div></div>
+  </div>
+</section>
+
+<section data-pane="sources" hidden>
+  <div class="card"><div class="card-head"><h2>المصادر والتحليل</h2><div class="grow"></div>${scanBtn}</div>
+    ${sourcesTable}</div>
+</section>
+
+<section data-pane="providers" hidden>
+  <div class="grid c2">
+    <div class="card"><h2>المزوّدون</h2><p class="hint">المفاتيح في أسرار Worker — لا تمرّ بهذه الصفحة ولا تُعرض فيها</p>
+      <div class="scroll"><table><thead><tr><th>المزوّد</th><th>الحال</th><th>نداءات ٣٠ يوما</th><th>الإنفاق</th></tr></thead>
+        <tbody>${providerRows}</tbody></table></div></div>
+    <div class="card"><h2>توجيه المهامّ</h2><p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، ولماذا</p>
+      <div class="scroll"><table><thead><tr><th>المهمّة</th><th>النموذج</th><th>الحال</th></tr></thead>
+        <tbody>${routingRows}</tbody></table></div></div>
+  </div>
+</section>
+
+<section data-pane="posts" hidden>
+  <div class="card"><h2>المنشورات وتواريخ النشر</h2>
+    ${d.postsBuilt ? '<div class="empty"><b>لا منشورات بعد</b></div>' : `<div class="empty">
+      <b>طبقة الكتابة لم تُبنَ بعد</b>
+      <p>جدول المنشورات قائم بقيوده — ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة.
+         وحين تُبنى الطبقة، يظهر هنا نصُّ كلّ منشور ومنصّته وتاريخ نشره وحالته.</p>
+      <span class="st idle"><span class="g">○</span>مرحلةٌ قادمة</span></div>`}</div>
+</section>
+
+<section data-pane="settings" hidden>
+  <div class="card"><h2>الإيقاف المؤقت</h2>
+    <div class="split">
+      <p>${d.paused
         ? 'النظام موقوف: لا نداء مدفوع ولا مسح ولا نشر. والقيد في الشيفرة لا في هذه الصفحة.'
-        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude.'}</p>
-      <form method="POST" action="/panel/settings" style="margin:0">
+        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude، وفي الطابور و Cron معا.'}</p>
+      <form class="inline" method="POST" action="/panel/settings"
+            data-confirm="${d.paused ? 'استئناف عمل النظام؟' : 'إيقاف النظام كلّه؟ سيتوقّف المسح والتحليل والنشر حتّى تستأنفه.'}">
         <input type="hidden" name="key" value="paused">
-        <input type="hidden" name="value" value="${data.paused ? 'false' : 'true'}">
-        <button class="${data.paused ? '' : 'danger'}" type="submit">
-          ${data.paused ? 'استئناف العمل' : 'إيقاف مؤقت'}
-        </button>
+        <input type="hidden" name="value" value="${d.paused ? 'false' : 'true'}">
+        <button class="${d.paused ? 'p' : 'd'}" type="submit">${d.paused ? 'استئناف العمل' : 'إيقاف مؤقت'}</button>
       </form>
     </div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+  </div>
+
+  <div class="card" style="margin-top:14px"><h2>الحدود اليوميّة</h2>
+    <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="daily_analysis_cap">
-      <div><label for="cap1">سقف التحليل اليوميّ</label>
-        <input id="cap1" type="number" name="value" min="0" max="500" step="1" value="${data.analysisCap}"></div>
-      <button type="submit">حفظ</button>
+      <div class="field"><label for="c1">سقف التحليل (عدد)</label>
+        <input id="c1" type="number" name="value" min="0" max="500" step="1" value="${d.analysisCap}"></div>
+      <button class="p" type="submit">حفظ</button>
+      <span class="n" style="align-self:center">المستهلَك اليوم: ${d.usedAnalyses}</span>
     </form>
+    <hr>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="daily_spend_cap_usd">
-      <div><label for="cap2">سقف الإنفاق اليوميّ (دولار)</label>
-        <input id="cap2" type="number" name="value" min="0" max="100" step="0.5" value="${data.spendCap}"></div>
-      <button type="submit">حفظ</button>
+      <div class="field"><label for="c2">سقف الإنفاق (دولار)</label>
+        <input id="c2" type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}"></div>
+      <button class="p" type="submit">حفظ</button>
+      <span class="n" style="align-self:center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
     </form>
-    <div class="reason">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار.</div>
   </div>
-</div>
+</section>
+</main>
 
-<div class="grid cols-2" style="margin-top:16px">
-  <div class="card">
-    <h2>المزوّدون</h2>
-    <table><thead><tr><th>المزوّد</th><th>الحال</th><th>نداءات ٣٠ يوما</th><th>الإنفاق</th></tr></thead>
-    <tbody>${data.providers.map(providerRow).join('')}</tbody></table>
-  </div>
-  <div class="card">
-    <h2>توجيه المهامّ</h2>
-    <table><thead><tr><th>المهمّة</th><th>النموذج</th><th>الحال</th></tr></thead>
-    <tbody>${routingBody}</tbody></table>
-  </div>
-</div>
+<footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
+  <span class="mono">${escapeHtml(d.now.toISOString().slice(0, 16).replace('T', ' '))} UTC</span></footer>
+</div>`
 
-<div class="grid" style="margin-top:16px">
-  <div class="card"><h2>المصادر والتحليل</h2>${sourcesBody}</div>
-  <div class="card"><h2>المنشورات وتواريخ النشر</h2>${postsBody}</div>
-</div>
-
-<footer>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم.</footer>`
-
-  return shell('صدى — لوحة التحكّم', body)
+  return shell('صدى — لوحة التحكّم', body, SCRIPT)
 }
