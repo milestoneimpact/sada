@@ -4,12 +4,24 @@
  * `fakeDb` ليس محاكاة: هو SQLite حقيقي يُشغّل عليه الترحيل نفسه، فما يمر
  * في الاختبار يمر على المخطط الحقيقي بقيوده — لا على مخطط متخيَّل.
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import type { Db, DbStatement } from '../lib/tokens'
 import type { StateStore } from '../lib/oauth/state'
 
-const MIGRATION = readFileSync(new URL('../../migrations/0001_init.sql', import.meta.url), 'utf8')
+/**
+ * كلّ الترحيلات بترتيبها، لا الأوّل وحده.
+ *
+ * تثبيتُ اسم ملفّ واحد يعني أنّ ترحيلا جديدا يمرّ في الإنتاج ولا يمرّ في
+ * الاختبار — فتُختبَر الشيفرة على مخطّط لم يعد قائما، وهو أخطر من ألّا
+ * تُختبَر: تعطي خُضرةً كاذبة.
+ */
+const MIGRATIONS_DIR = new URL('../../migrations/', import.meta.url)
+const MIGRATION = readdirSync(MIGRATIONS_DIR)
+  .filter((name) => name.endsWith('.sql'))
+  .sort()
+  .map((name) => readFileSync(new URL(name, MIGRATIONS_DIR), 'utf8'))
+  .join('\n')
 
 export interface FakeDb extends Db {
   readonly raw: DatabaseSync
