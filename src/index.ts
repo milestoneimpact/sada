@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
 import { authorizeAdmin } from './lib/adminAuth'
 import { readiness, type Env } from './env'
+import { analyzeSource } from './lib/analyze/job'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
@@ -88,6 +89,29 @@ app.post('/admin/scan', async (c) => {
   }
 })
 
+/**
+ * تحليل مصدرٍ واحد يدويا — للتحقق قبل أن يتولّاه الطابور.
+ * خلف الحارس نفسه: النداء يكلّف مالا، فلا يُترك مفتوحا (D-019).
+ */
+app.post('/admin/analyze/:sourceId', async (c) => {
+  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
+  if (verdict.kind === 'disabled') {
+    return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
+  }
+  if (verdict.kind !== 'ok') {
+    return c.json({ error: 'unauthorized' }, 401)
+  }
+  const outcome = await analyzeSource(
+    {
+      db: c.env.DB,
+      serviceAccountJson: c.env.GOOGLE_SA_JSON,
+      anthropicKey: c.env.ANTHROPIC_API_KEY,
+    },
+    c.req.param('sourceId'),
+  )
+  return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
+})
+
 app.route('/', oauth)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
@@ -102,7 +126,38 @@ app.notFound((c) => c.json({ error: 'not_found' }, 404))
  * والمفتاح يحمي في الحالتين: إعادة المحاولة تجد محاولة ناجحة بالمفتاح
  * نفسه فتخرج بلا طلب ثان.
  */
-async function queue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
+/** ما يحمله طابور التوليد: معرّف مصدرٍ يُفهَم، لا نصّه. */
+export interface AnalyzeMessage {
+  readonly sourceId: string
+}
+
+/**
+ * مستهلك طابور الفهم.
+ *
+ * `retry` لما قد ينجح وحده (429 · 5xx · انقطاع)، و `ack` لما لا يصلحه
+ * التكرار: نوعٌ غير مدعوم، أو رفضُ سياسة، أو مصدرٌ لا وجود له. وتركُ
+ * الثاني في الطابور يعني نداءً مدفوعا يتكرّر بلا أمل.
+ */
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Promise<void> {
+  for (const message of batch.messages) {
+    const outcome = await analyzeSource(
+      {
+        db: env.DB,
+        serviceAccountJson: env.GOOGLE_SA_JSON,
+        anthropicKey: env.ANTHROPIC_API_KEY,
+      },
+      message.body.sourceId,
+    )
+    console.info({ job: 'analyze', ...outcome })
+    if (outcome.kind === 'failed' && outcome.retryable) {
+      message.retry()
+    } else {
+      message.ack()
+    }
+  }
+}
+
+async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     const outcome = await publishPost(
       { db: env.DB, encKey: env.TOKEN_ENC_KEY },
@@ -145,6 +200,25 @@ async function scheduled(_controller: ScheduledController, env: Env): Promise<vo
       failed: error instanceof Error ? error.message : 'unexpected_error',
     })
   }
+}
+
+/**
+ * Cloudflare يسلّم كلّ الطوابير إلى دالّة واحدة، فيُفرَّق بينها بالاسم.
+ * والاسم غير المعروف يُقَرّ لا يُعاد: رسالةٌ لطابور لا نعرفه لن تُفهَم
+ * بإعادة المحاولة، وتركها تدور يستهلك حصّة الطابور بلا فائدة.
+ */
+async function queue(
+  batch: MessageBatch<PublishMessage | AnalyzeMessage>,
+  env: Env,
+): Promise<void> {
+  if (batch.queue.startsWith('sada-generate')) {
+    return analyzeQueue(batch as MessageBatch<AnalyzeMessage>, env)
+  }
+  if (batch.queue.startsWith('sada-publish')) {
+    return publishQueue(batch as MessageBatch<PublishMessage>, env)
+  }
+  console.error({ job: 'queue', unknown: batch.queue, messages: batch.messages.length })
+  for (const message of batch.messages) message.ack()
 }
 
 export default { fetch: app.fetch, queue, scheduled }

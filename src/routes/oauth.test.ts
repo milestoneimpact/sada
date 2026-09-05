@@ -301,6 +301,36 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
   })
 })
 
+describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
+  const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
+
+  it('يرد 503 بلا ADMIN_TOKEN — النداء يكلّف مالا فلا يُترك مفتوحا', async () => {
+    const response = await app.request('/admin/analyze/s1', { method: 'POST' }, env)
+    expect(response.status).toBe(503)
+  })
+
+  it('يرد 401 لرمز خطأ', async () => {
+    const response = await app.request(
+      '/admin/analyze/s1',
+      { method: 'POST', headers: { Authorization: 'Bearer wrong' } },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('بالرمز الصحيح يمضي إلى التحليل — ومصدرٌ مفقود ليس عطل خادم', async () => {
+    const response = await app.request(
+      '/admin/analyze/لا-وجود-له',
+      { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` } },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
+    expect(response.status).toBe(502)
+    const body = (await response.json()) as Record<string, unknown>
+    expect(body['kind']).toBe('failed')
+    expect(body['retryable']).toBe(false)
+  })
+})
+
 describe('/health و /ready', () => {
   it('health يجيب بلا شرط', async () => {
     const response = await app.request('/health', {}, env)
