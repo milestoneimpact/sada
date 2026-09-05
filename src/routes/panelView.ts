@@ -39,6 +39,10 @@ const SCRIPT = `
     e.preventDefault(); show(t.getAttribute('href').slice(1),true);
   });});
   show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+  // عنوانُ الشريط العلويّ يتبع القسم — فلا يبقى «نظرة عامّة» فوق الأمان
+  var head=document.getElementById('pane-title');
+  if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
+    var s=t.querySelector('span'); if(s)head.textContent=s.textContent;});});
 
   // تأكيدٌ قبل فعلٍ يوقف النظام كلّه
   document.querySelectorAll('form[data-confirm]').forEach(function(f){
@@ -428,26 +432,72 @@ export interface PanelAudit {
  * قمّةً كاذبة من قسمةٍ على صفر.
  */
 function sparkline(series: { day: string; total: number }[]): string {
-  if (series.length < 2) return '<div class="n">لا بيانات كافية بعد</div>'
-  const w = 260
-  const h = 46
-  const max = Math.max(...series.map((d) => d.total))
-  const step = w / (series.length - 1)
-  const y = (v: number): number => (max <= 0 ? h - 2 : h - 2 - (v / max) * (h - 6))
-  const pts = series.map((d, i) => `${(i * step).toFixed(1)},${y(d.total).toFixed(1)}`)
+  if (series.length < 2) return '<div class="empty"><b>لا بيانات كافية بعد</b></div>'
+
+  // مساحةٌ للمحور وأرقامه، لا رسمٌ مقصوصٌ إلى حافّة البطاقة
+  const w = 640
+  const h = 168
+  const padTop = 14
+  const padBottom = 26
+  const padStart = 46
+  const plotH = h - padTop - padBottom
+  const plotW = w - padStart - 8
+
+  const raw = Math.max(...series.map((d) => d.total))
+  // سقفٌ مستدير: محورٌ ينتهي عند ٣٫٤٧ يُقرأ رقما عشوائيّا لا حدّا
+  const max = raw <= 0 ? 1 : Math.ceil(raw * 1.15 * 2) / 2
+  const step = plotW / (series.length - 1)
+  const x = (i: number): number => padStart + i * step
+  const y = (v: number): number => padTop + plotH - (v / max) * plotH
+
+  const pts = series.map((d, i) => `${x(i).toFixed(1)},${y(d.total).toFixed(1)}`)
   const line = `M ${pts.join(' L ')}`
-  const area = `${line} L ${w},${h} L 0,${h} Z`
-  const peak = series.reduce((a, b) => (b.total > a.total ? b : a))
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="none"
-    aria-label="إنفاق ${series.length} يوما، أعلاه ${money(peak.total)} في ${peak.day}">
-    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--gold)" stop-opacity=".26"/>
-      <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
-    </linearGradient></defs>
-    <path d="${area}" fill="url(#sg)"/>
-    <path d="${line}" fill="none" stroke="var(--gold)" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`
+  const area = `${line} L ${x(series.length - 1).toFixed(1)},${padTop + plotH} L ${padStart},${padTop + plotH} Z`
+
+  // ثلاثةُ خطوطٍ أفقيّة بأرقامها — وبدونها الرسمُ شكلٌ لا مقدار
+  const ticks = [0, 0.5, 1].map((t) => {
+    const value = max * t
+    const yy = y(value).toFixed(1)
+    return `<line class="grid-l" x1="${padStart}" y1="${yy}" x2="${w - 8}" y2="${yy}"/>
+      <text class="axis" x="${padStart - 8}" y="${(Number(yy) + 3.5).toFixed(1)}"
+        text-anchor="end">${value.toFixed(1)}</text>`
+  }).join('')
+
+  const peakIndex = series.reduce((best, d, i) => (d.total > series[best]!.total ? i : best), 0)
+  const peak = series[peakIndex]!
+  const last = series[series.length - 1]!
+  const first = series[0]!
+
+  // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
+  const label = (d: { day: string }): string => d.day.slice(5)
+  const dates = `<text class="axis" x="${x(0)}" y="${h - 8}" text-anchor="start">${label(first)}</text>
+    <text class="axis" x="${x(series.length - 1)}" y="${h - 8}" text-anchor="end">${label(last)}</text>`
+
+  const total = series.reduce((sum, d) => sum + d.total, 0)
+  const average = total / series.length
+
+  return `<div class="chart">
+    <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
+      aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
+      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--gold)" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${ticks}
+      <path d="${area}" fill="url(#sg)"/>
+      <path d="${line}" fill="none" stroke="var(--gold)" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${x(peakIndex).toFixed(1)}" cy="${y(peak.total).toFixed(1)}" r="3.5"
+        fill="var(--surface)" stroke="var(--gold)" stroke-width="2"/>
+      <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
+      ${dates}
+    </svg>
+    <div class="legend">
+      <span>المجموع <b>${money(total)}</b></span>
+      <span>المتوسّط اليوميّ <b>${money(average)}</b></span>
+      <span>الذروة <b>${money(peak.total)}</b> · ${escapeHtml(peak.day.slice(5))}</span>
+    </div>
+  </div>`
 }
 
 /** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
@@ -491,6 +541,36 @@ function sourceRow(s: PanelSource, now: Date): string {
     <td data-label="آخر ظهور"><span title="${escapeHtml(s.lastSeenAt)} UTC">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
     <td data-label="">${action}</td>
   </tr>`
+}
+
+/** أيقوناتُ الرافدة. `currentColor` فتتبع حالَ العنصر والثيم معا. */
+const ICON = {
+  overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  sources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+  posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/></svg>',
+  channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.4 10.8 15.6 6.7M8.4 13.2l7.2 4.1"/></svg>',
+  providers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
+  security: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.6-8 9.5-4.6-.9-8-4.5-8-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>',
+} as const
+
+/**
+ * فرقُ اليوم عن أمس — **علامةٌ ونصّ**، فالسهم وحده لا يُقرأ بصوتٍ عالٍ.
+ *
+ * ويُحسب من السلسلة نفسها لا من رقمٍ يُمرَّر: رقمان من مصدرين يتباعدان.
+ * ويوما أمسٍ صفران يعنيان «بلا تغيير» لا قسمةً على صفر.
+ */
+function deltaOf(series: readonly { day: string; total: number }[]): string {
+  if (series.length < 2) return ''
+  const today = series[series.length - 1]!.total
+  const yesterday = series[series.length - 2]!.total
+  if (yesterday === 0 && today === 0) return '<div class="delta">كأمس تماما</div>'
+  if (yesterday === 0) return `<div class="delta up"><span class="ar">▲</span>بدأ اليوم</div>`
+  const change = ((today - yesterday) / yesterday) * 100
+  if (Math.abs(change) < 1) return '<div class="delta">كأمس تقريبا</div>'
+  const up = change > 0
+  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${up ? '▲' : '▼'}</span>${
+    Math.abs(change).toFixed(0)}٪ ${up ? 'أكثر' : 'أقلّ'} من أمس</div>`
 }
 
 export function panelPage(d: PanelData): string {
@@ -595,34 +675,46 @@ export function panelPage(d: PanelData): string {
   const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
     securitySection(d)
 
+  const nav = (href: string, icon: string, text: string, count = 0): string =>
+    `<a href="${href}">${icon}<span>${text}</span>${
+      count > 0 ? `<span class="count">${count}</span>` : ''
+    }</a>`
+
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
-<div class="wrap">
-<header class="top">
-  <div class="mark"><div class="glyph">صدى</div>
-    <div class="title">لوحة التحكّم<small>SADA · STAGING</small></div></div>
+<div class="app">
+
+<aside class="rail">
+  <div class="rail-head">
+    <div class="glyph">صدى</div>
+    <div class="brand"><b>صدى</b><span>SADA · STAGING</span></div>
+  </div>
+  <nav class="tabs" aria-label="أقسام اللوحة">
+    <span class="lbl">العمل</span>
+    ${nav('#overview', ICON.overview, 'نظرة عامّة')}
+    ${nav('#sources', ICON.sources, 'المصادر', pending)}
+    ${nav('#posts', ICON.posts, 'المنشورات')}
+    ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
+    <span class="lbl">الضبط</span>
+    ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
+    ${nav('#settings', ICON.settings, 'الحدود')}
+    ${nav('#security', ICON.security, 'الأمان', d.sessions.length > 1 ? d.sessions.length : 0)}
+  </nav>
+  <div class="rail-foot">${themeSwitch()}</div>
+</aside>
+
+<div class="main">
+<header class="topbar">
+  <div><h1 id="pane-title">نظرة عامّة</h1>
+    <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
-  ${themeSwitch()}
   ${state}
   <form class="inline" method="POST" action="/panel/logout">
-    <button class="g" type="submit">خروج</button></form>
+    <button class="g sm" type="submit">خروج</button></form>
 </header>
+
+<main id="main" class="content">
 ${flash}
-
-<nav class="tabs" aria-label="أقسام اللوحة">
-  <span class="lbl">العمل</span>
-  <a href="#overview">نظرة عامّة</a>
-  <a href="#sources">المصادر${pending > 0 ? `<span class="count">${pending}</span>` : ''}</a>
-  <a href="#posts">المنشورات</a>
-  <a href="#channels">القنوات${linkedChannels === 0 ? '' : `<span class="count">${linkedChannels}</span>`}</a>
-  <span class="sep"></span>
-  <span class="lbl">الضبط</span>
-  <a href="#providers">المزوّدون${missing > 0 ? `<span class="count">${missing}</span>` : ''}</a>
-  <a href="#settings">الحدود</a>
-  <a href="#security">الأمان${d.sessions.length > 1 ? `<span class="count">${d.sessions.length}</span>` : ''}</a>
-</nav>
-
-<main id="main">
 <section data-pane="overview" hidden>
   <div class="grid c4">
     <div class="card tile"><div class="k">تحليلات اليوم</div>
@@ -632,14 +724,15 @@ ${flash}
     <div class="card tile"><div class="k">إنفاق اليوم</div>
       <div class="v">${money(d.usedSpend)}<em> / ${money(d.spendCap)}</em></div>
       ${bar(d.usedSpend, d.spendCap)}
-      <div class="n">من دفتر الكلفة نفسه</div></div>
+      ${deltaOf(d.series)}</div>
     <div class="card tile"><div class="k">المصادر المحلَّلة</div>
       <div class="v">${ready}<em> / ${d.sources.length}</em></div>
       ${d.sources.length === 0 ? '' : bar(ready, d.sources.length, 'كلّها محلَّلة')}
       <div class="n">${pending === 0 ? 'لا شيء ينتظر' : `${pending} تنتظر تحليلا`}</div></div>
     <div class="card tile"><div class="k">إنفاق ٣٠ يوما</div>
       <div class="v">${money(d.spend30d)}</div>
-      <div class="n">كلّ المزوّدين</div></div>
+      <div class="n">${d.providers.filter((p) => p.calls > 0).length} مزوّدا نشطا · ${
+        d.providers.reduce((sum, p) => sum + p.calls, 0)} نداءً</div></div>
   </div>
   <div class="grid c2" style="margin-top:14px">
     <div class="card"><h2>ما ينتظرك</h2>
@@ -833,10 +926,11 @@ ${flash}
           <tbody>${auditRows}</tbody></table></div>`}
   </div>
 </section>
-</main>
 
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
   <span class="mono">${escapeHtml(d.now.toISOString().slice(0, 16).replace('T', ' '))} UTC</span></footer>
+</main>
+</div>
 </div>`
 
   return shell('صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT)
