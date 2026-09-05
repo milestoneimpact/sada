@@ -81,3 +81,21 @@ export async function dailySpend(db: Db, days = 14): Promise<DailySpend[]> {
   }
   return series
 }
+
+/** إنفاق مزوّدٍ واحد اليوم — لسقفه الخاصّ. */
+export async function spendTodayFor(db: Db, provider: string): Promise<number> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT coalesce(sum(total), 0) AS total
+           FROM cost_ledger
+          WHERE provider = ? AND at >= date('now')`,
+      )
+      .bind(provider)
+      .first<{ total: number }>()
+    return row?.total ?? 0
+  } catch {
+    // دفترٌ لا يُقرأ يُفترض مستهلَكا: الخطأ يميل إلى المنع لا إلى الإنفاق
+    return Number.POSITIVE_INFINITY
+  }
+}

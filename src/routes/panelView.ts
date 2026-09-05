@@ -328,6 +328,15 @@ export interface PanelProvider {
   readonly howToGet: string
   readonly calls: number
   readonly spend: number
+  /** من أين جاء المفتاح المستعمَل فعلا. */
+  readonly source: 'worker_secret' | 'vault' | 'none'
+  /** «AIzaSy…7f2a» — أوّله وآخره. ولا يوجد الوسط مقروءا في أيّ مكان. */
+  readonly hint: string | null
+  readonly enabled: boolean
+  readonly dailyCap: number | null
+  readonly spendToday: number
+  readonly verifiedAt: string | null
+  readonly updatedAt: string | null
 }
 
 export interface PanelFlash {
@@ -495,14 +504,82 @@ export function panelPage(d: PanelData): string {
          <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now)).join('')}</tbody>
        </table></div>`
 
-  const providerRows = d.providers.map((p) => `<tr>
-      <td><div class="nm">${escapeHtml(p.label)}</div>
-          ${p.configured ? '' : `<div class="sub"><span class="mono">${escapeHtml(p.secretName)}</span> — ${escapeHtml(p.howToGet)}</div>`}</td>
-      <td>${p.configured
-        ? '<span class="st ok"><span class="g">●</span>مضبوط</span>'
-        : '<span class="st bad"><span class="g">✕</span>مفتاحه ناقص</span>'}</td>
-      <td class="num">${p.calls}</td>
-      <td class="num">${money(p.spend)}</td></tr>`).join('')
+  const providerCards = d.providers.map((p) => {
+    const status = !p.configured
+      ? '<span class="st bad"><span class="g">✕</span>لا مفتاح</span>'
+      : !p.enabled
+        ? '<span class="st warn"><span class="g">▲</span>معطَّل</span>'
+        : p.source === 'worker_secret'
+          ? '<span class="st ok"><span class="g">●</span>سرّ Worker</span>'
+          : '<span class="st ok"><span class="g">●</span>الخزانة</span>'
+
+    const verified = p.verifiedAt === null
+      ? p.configured
+        ? '<span class="st idle"><span class="g">○</span>لم يُختبر</span>'
+        : ''
+      : `<span class="st ok" title="${escapeHtml(p.verifiedAt)} UTC"><span class="g">✓</span>اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}</span>`
+
+    // سرّ Worker لا يُدار من هنا: لا تبديلَ ولا تعطيل لما لا نملكه
+    const locked = p.source === 'worker_secret'
+    const capValue = p.dailyCap === null ? '' : String(p.dailyCap)
+
+    return `<div class="card">
+      <div class="card-head"><h2 style="font-size:15px;color:var(--ink)">${escapeHtml(p.label)}</h2>
+        <div class="grow"></div>${status}</div>
+
+      <div class="row" style="margin-bottom:12px">
+        ${p.hint === null
+          ? `<div class="sub" style="margin:0">المفتاح المتوقّع: <span class="mono">${escapeHtml(p.secretName)}</span><br>${escapeHtml(p.howToGet)}</div>`
+          : `<div><div class="k" style="font-size:11.5px;color:var(--ink-3)">المفتاح المحفوظ</div>
+               <span class="mono" style="font-size:13px">${escapeHtml(p.hint)}</span></div>`}
+        <div class="grow"></div>${verified}
+      </div>
+
+      <div class="row" style="gap:18px;margin-bottom:14px">
+        <div><div class="k" style="font-size:11.5px;color:var(--ink-3)">إنفاق اليوم</div>
+          <div class="num" style="font-size:18px;font-weight:700">${money(p.spendToday)}${
+            p.dailyCap === null ? '' : `<span style="font-size:12px;color:var(--ink-3)"> / ${money(p.dailyCap)}</span>`
+          }</div>
+          ${p.dailyCap === null ? '' : bar(p.spendToday, p.dailyCap)}</div>
+        <div><div class="k" style="font-size:11.5px;color:var(--ink-3)">٣٠ يوما</div>
+          <div class="num" style="font-size:18px;font-weight:700">${money(p.spend)}</div>
+          <div class="n">${p.calls} نداء</div></div>
+      </div>
+
+      ${locked
+        ? `<div class="sub" style="margin:0">مفتاح هذا المزوّد في <b>أسرار Worker</b> — لا يُبدَّل ولا يُعطَّل من هنا،
+             وهو أأمن موضع. ولتبديله: لوحة Cloudflare ← Variables and Secrets.</div>`
+        : `<form class="row" method="POST" action="/panel/providers/key" data-busy="جارٍ الحفظ…">
+             <input type="hidden" name="provider" value="${escapeHtml(p.name)}">
+             <div class="field" style="flex:1;min-width:200px">
+               <label for="k-${escapeHtml(p.name)}">${p.hint === null ? 'أضف المفتاح' : 'استبدل المفتاح'}</label>
+               <input id="k-${escapeHtml(p.name)}" type="password" name="key" required
+                      autocomplete="off" style="width:100%;direction:ltr;text-align:left"></div>
+             <button class="p" type="submit">حفظ</button>
+           </form>
+           <div class="row" style="margin-top:10px">
+             ${p.hint === null ? '' : `
+             <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جارٍ الاختبار…">
+               <input type="hidden" name="provider" value="${escapeHtml(p.name)}">
+               <button class="g sm" type="submit">اختبر المفتاح</button></form>
+             <form class="inline" method="POST" action="/panel/providers/toggle">
+               <input type="hidden" name="provider" value="${escapeHtml(p.name)}">
+               <input type="hidden" name="enabled" value="${p.enabled ? 'false' : 'true'}">
+               <button class="g sm" type="submit">${p.enabled ? 'تعطيل' : 'تفعيل'}</button></form>
+             <form class="inline" method="POST" action="/panel/providers/delete"
+                   data-confirm="حذف مفتاح ${escapeHtml(p.label)} من الخزانة؟ لا يُسترجَع.">
+               <input type="hidden" name="provider" value="${escapeHtml(p.name)}">
+               <button class="d sm" type="submit">حذف</button></form>
+             <div class="grow"></div>
+             <form class="row" method="POST" action="/panel/providers/cap" style="gap:8px">
+               <input type="hidden" name="provider" value="${escapeHtml(p.name)}">
+               <div class="field"><label for="c-${escapeHtml(p.name)}">سقفه اليوميّ ($)</label>
+                 <input id="c-${escapeHtml(p.name)}" type="number" name="cap" min="0" max="100"
+                        step="0.5" value="${escapeHtml(capValue)}" placeholder="عامّ" style="width:100px"></div>
+               <button class="g sm" type="submit" style="align-self:flex-end">حفظ</button></form>`}
+           </div>`}
+    </div>`
+  }).join('')
 
   const routingRows = d.routing.map((r) => `<tr>
       <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
@@ -571,13 +648,19 @@ ${flash}
 </section>
 
 <section data-pane="providers" hidden>
-  <div class="grid c2">
-    <div class="card"><h2>المزوّدون</h2><p class="hint">المفاتيح في أسرار Worker — لا تمرّ بهذه الصفحة ولا تُعرض فيها</p>
-      <div class="scroll"><table><thead><tr><th>المزوّد</th><th>الحال</th><th>نداءات ٣٠ يوما</th><th>الإنفاق</th></tr></thead>
-        <tbody>${providerRows}</tbody></table></div></div>
-    <div class="card"><h2>توجيه المهامّ</h2><p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، ولماذا</p>
-      <div class="scroll"><table><thead><tr><th>المهمّة</th><th>النموذج</th><th>الحال</th></tr></thead>
-        <tbody>${routingRows}</tbody></table></div></div>
+  <div class="card" style="margin-bottom:14px">
+    <h2>عن مفاتيح المزوّدين</h2>
+    <p class="hint" style="margin:0"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّله وآخره فقط.</p>
+  </div>
+  <div class="grid c2">${providerCards}</div>
+  <div class="card" style="margin-top:14px"><h2>توجيه المهامّ</h2>
+    <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، ولماذا</p>
+    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>النموذج</th><th>الحال</th></tr></thead>
+      <tbody>${routingRows}</tbody></table></div>
+    <div class="sub" style="margin-top:12px">إضافةُ مزوّدٍ لم يُكتب له سائق تحتاج شيفرة، لا زرّا:
+      لكلّ خدمةٍ شكلُ طلبٍ وجوابٍ وأخطاءٍ مختلف. وما يُدار من هنا مفاتيحُ المزوّدين المعروفين.</div>
   </div>
 </section>
 

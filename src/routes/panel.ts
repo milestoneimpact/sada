@@ -11,12 +11,17 @@
 import { Hono } from 'hono'
 import type { Env } from '../env'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from '../lib/ai/registry'
-import { dailySpend, spendByProvider } from '../lib/ai/spend'
+import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
+import { verifyKey } from '../lib/ai/verify'
 import { analyzeSource } from '../lib/analyze/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
+import {
+  deleteKey, listRecords, markVerified, resolveKey,
+  saveKey, setDailyCap, setEnabled,
+} from '../lib/providerKeys'
 import { writeSetting, type SettingKey } from '../lib/settings'
 import {
   clearedCookie, COOKIE, createSession, destroySession, readCookie,
@@ -129,6 +134,38 @@ panel.get('/panel', async (c) => {
   }
   const series = (await dailySpend(c.env.DB, 14)).map((d) => ({ day: d.day, total: d.total }))
 
+  // حال كلّ مزوّد: المصدر والتلميح والسقف والإنفاق اليوم
+  const vault = new Map((await listRecords(c.env.DB)).map((r) => [r.provider, r]))
+  const providerCards = await Promise.all(
+    (Object.keys(PROVIDERS) as ProviderName[]).map(async (name) => {
+      const record = vault.get(name) ?? null
+      const resolved = await resolveKey(
+        c.env.DB,
+        c.env.TOKEN_ENC_KEY,
+        name,
+        c.env[PROVIDERS[name].secret] as string | undefined,
+      )
+      const today = record?.dailyCap === null || record === null ? 0 : await spendTodayFor(c.env.DB, name)
+      return {
+        name,
+        label: PROVIDERS[name].label,
+        configured: isConfigured(c.env, name) || resolved.key !== null,
+        secretName: String(PROVIDERS[name].secret),
+        howToGet: PROVIDERS[name].docs,
+        calls: spend[name]?.calls ?? 0,
+        spend: spend[name]?.total ?? 0,
+        source: resolved.source,
+        // التلميح من الخزانة وحدها: سرّ Worker لا يُقنَّع ولا يُعرض منه شيء
+        hint: resolved.source === 'worker_secret' ? null : (record?.hint ?? null),
+        enabled: record?.enabled ?? true,
+        dailyCap: record?.dailyCap ?? null,
+        spendToday: Number.isFinite(today) ? today : 0,
+        verifiedAt: record?.verifiedAt ?? null,
+        updatedAt: record?.updatedAt ?? null,
+      }
+    }),
+  )
+
   return c.html(
     panelPage({
       paused: allowance.settings.paused,
@@ -141,15 +178,7 @@ panel.get('/panel', async (c) => {
       spend30d: Object.values(spend).reduce((sum, e) => sum + (e?.total ?? 0), 0),
       series,
       sources,
-      providers: (Object.keys(PROVIDERS) as ProviderName[]).map((name) => ({
-        name,
-        label: PROVIDERS[name].label,
-        configured: isConfigured(c.env, name),
-        secretName: String(PROVIDERS[name].secret),
-        howToGet: PROVIDERS[name].docs,
-        calls: spend[name]?.calls ?? 0,
-        spend: spend[name]?.total ?? 0,
-      })),
+      providers: providerCards,
       routing: routeStatuses(c.env).map((r) => ({
         task: r.task, model: r.model, why: r.why, ready: r.ready, implemented: r.implemented,
       })),
@@ -318,6 +347,7 @@ panel.post('/panel/analyze', async (c) => {
       db: c.env.DB,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
+      encKey: c.env.TOKEN_ENC_KEY,
     },
     String(form.get('id') ?? ''),
   )
@@ -335,4 +365,144 @@ panel.post('/panel/analyze', async (c) => {
 
   await setFlash(c.env, c.req.raw, flash)
   return back('sources')
+})
+
+// ── إدارة مفاتيح المزوّدين ───────────────────────────────────────────
+
+const KNOWN: ReadonlySet<string> = new Set(Object.keys(PROVIDERS))
+
+/**
+ * حارسٌ مشترك لكلّ مسارات المفاتيح.
+ *
+ * ويفحص اسم المزوّد بقائمة سماحٍ من السجلّ: **اسمٌ لا سائق له لا يُقبل**
+ * ولو كُتب في النموذج. فلا يُملأ الجدول بمزوّدين وهميّين يُظنّ أنّهم
+ * يعملون.
+ */
+async function keyGuard(
+  c: { env: Env; req: { raw: Request } },
+  provider: string,
+): Promise<Response | null> {
+  if (!(await validSession(c.env.KV, c.req.raw))) {
+    return new Response(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), {
+      status: 401,
+      headers: HTML,
+    })
+  }
+  if (!KNOWN.has(provider)) {
+    return Response.json({ error: 'unknown_provider' }, { status: 400 })
+  }
+  return null
+}
+
+panel.post('/panel/providers/key', async (c) => {
+  const form = await c.req.formData()
+  const provider = String(form.get('provider') ?? '')
+  const denied = await keyGuard(c, provider)
+  if (denied !== null) return denied
+
+  const raw = String(form.get('key') ?? '')
+  if (raw.trim().length === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'المفتاح فارغ — لم يُحفظ شيء.' })
+    return back('providers')
+  }
+  if (c.env.TOKEN_ENC_KEY.length === 0) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: 'TOKEN_ENC_KEY غير مضبوط — والخزانة لا تعمل بلا مفتاح تشفير.',
+    })
+    return back('providers')
+  }
+
+  try {
+    const result = await saveKey(c.env.DB, c.env.TOKEN_ENC_KEY, provider, raw, 'panel')
+    // **لا يُذكر المفتاح في الإشعار** — التلميح وحده
+    await setFlash(c.env, c.req.raw, {
+      kind: result.unchanged ? 'ok' : 'warn',
+      text: result.unchanged
+        ? `${provider}: المفتاح نفسه لم يتغيّر (${result.hint}).`
+        : `${provider}: حُفظ المفتاح ${result.hint} — اختبره قبل أن تعتمد عليه.`,
+    })
+  } catch (error) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: `تعذّر الحفظ: ${error instanceof Error ? error.message : 'عطل غير متوقّع'}`,
+    })
+  }
+  return back('providers')
+})
+
+panel.post('/panel/providers/verify', async (c) => {
+  const form = await c.req.formData()
+  const provider = String(form.get('provider') ?? '')
+  const denied = await keyGuard(c, provider)
+  if (denied !== null) return denied
+
+  const resolved = await resolveKey(
+    c.env.DB,
+    c.env.TOKEN_ENC_KEY,
+    provider,
+    c.env[PROVIDERS[provider as ProviderName].secret] as string | undefined,
+  )
+  if (resolved.key === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `${provider}: لا مفتاح لاختباره.` })
+    return back('providers')
+  }
+
+  const result = await verifyKey(provider as ProviderName, resolved.key)
+  if (result.ok) {
+    await markVerified(c.env.DB, provider)
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: `${provider}: ${result.detail}.` })
+  } else {
+    // لا تُمحى شهادةُ تحقّقٍ سابقة على فشلٍ قد يكون من الخدمة لا المفتاح
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `${provider}: ${result.detail}.` })
+  }
+  return back('providers')
+})
+
+panel.post('/panel/providers/toggle', async (c) => {
+  const form = await c.req.formData()
+  const provider = String(form.get('provider') ?? '')
+  const denied = await keyGuard(c, provider)
+  if (denied !== null) return denied
+
+  const enabled = String(form.get('enabled') ?? '') === 'true'
+  await setEnabled(c.env.DB, provider, enabled, 'panel')
+  await setFlash(c.env, c.req.raw, {
+    kind: enabled ? 'ok' : 'warn',
+    text: enabled ? `${provider}: فُعّل.` : `${provider}: عُطّل — ومفتاحه محفوظ.`,
+  })
+  return back('providers')
+})
+
+panel.post('/panel/providers/cap', async (c) => {
+  const form = await c.req.formData()
+  const provider = String(form.get('provider') ?? '')
+  const denied = await keyGuard(c, provider)
+  if (denied !== null) return denied
+
+  const raw = String(form.get('cap') ?? '').trim()
+  const cap = raw === '' ? null : Number(raw)
+  if (cap !== null && !Number.isFinite(cap)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'السقف ليس رقما — لم يُحفظ.' })
+    return back('providers')
+  }
+  await setDailyCap(c.env.DB, provider, cap, 'panel')
+  await setFlash(c.env, c.req.raw, {
+    kind: 'ok',
+    text: cap === null
+      ? `${provider}: أُزيل سقفه الخاصّ — يعود إلى السقف العامّ.`
+      : `${provider}: سقفه اليوميّ ${money(Math.min(Math.max(cap, 0), 100))}.`,
+  })
+  return back('providers')
+})
+
+panel.post('/panel/providers/delete', async (c) => {
+  const form = await c.req.formData()
+  const provider = String(form.get('provider') ?? '')
+  const denied = await keyGuard(c, provider)
+  if (denied !== null) return denied
+
+  await deleteKey(c.env.DB, provider)
+  await setFlash(c.env, c.req.raw, { kind: 'warn', text: `${provider}: حُذف مفتاحه من الخزانة.` })
+  return back('providers')
 })

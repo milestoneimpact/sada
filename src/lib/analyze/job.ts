@@ -15,7 +15,8 @@
  * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
  */
 import { recordCost } from '../cost'
-import { blockerReason, checkAllowance } from '../limits'
+import { blockerReason, checkAllowance, checkProvider } from '../limits'
+import { resolveKey } from '../providerKeys'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'
@@ -58,7 +59,10 @@ export type AnalyzeOutcome =
 export interface AnalyzeJobDeps {
   readonly db: Db
   readonly serviceAccountJson: string
+  /** سرّ Worker. يغلب الخزانة دائما — والخزانة تُستعمل حين يغيب. */
   readonly anthropicKey: string
+  /** مفتاح التشفير، لازمٌ لقراءة الخزانة. */
+  readonly encKey?: string
   readonly now?: Date
   readonly fetchImpl?: typeof fetch
 }
@@ -114,6 +118,11 @@ export async function analyzeSource(
   if (allowance.blocker !== null) {
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
   }
+  // ثمّ حارس المزوّد: تفصيلٌ تحت الجملة لا فوقها
+  const providerBlocker = await checkProvider(deps.db, 'anthropic')
+  if (providerBlocker !== null) {
+    return { kind: 'blocked', sourceId: source.id, reason: blockerReason(providerBlocker) }
+  }
 
   try {
     // ٤ · التصدير
@@ -135,9 +144,13 @@ export async function analyzeSource(
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
-    // ٥ · النداء
+    // ٥ · النداء — بالمفتاح المحلول: سرّ Worker أوّلا ثمّ الخزانة
+    const resolved =
+      deps.encKey === undefined || deps.encKey.length === 0
+        ? { key: deps.anthropicKey, source: 'worker_secret' as const }
+        : await resolveKey(deps.db, deps.encKey, 'anthropic', deps.anthropicKey)
     const claudeDeps: AnalyzeDeps = {
-      apiKey: deps.anthropicKey,
+      apiKey: resolved.key ?? '',
       ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
     }
     const result = await analyzeText(claudeDeps, {

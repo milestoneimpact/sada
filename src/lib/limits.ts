@@ -12,13 +12,19 @@
  * `datetime('now')` وهو UTC، وقياسٌ بمنطقةٍ أخرى يجعل السقف يُفتح مرّتين
  * أو لا يُفتح — والاتّساق أهمّ من موافقة الساعة المحليّة.
  */
-import type { Db } from './tokens'
+import { spendTodayFor } from './ai/spend'
+import { readRecord } from './providerKeys'
 import { readSettings, type Settings } from './settings'
+import type { Db } from './tokens'
 
 export type Blocker =
   | { readonly kind: 'paused' }
   | { readonly kind: 'analysis_cap'; readonly used: number; readonly cap: number }
   | { readonly kind: 'spend_cap'; readonly used: number; readonly cap: number }
+  /** سقفٌ خاصّ بمزوّد — Anthropic لا يستهلك حصّة Gemini. */
+  | { readonly kind: 'provider_cap'; readonly provider: string; readonly used: number; readonly cap: number }
+  /** مزوّدٌ عطّله المالك بمفتاحه محفوظا. */
+  | { readonly kind: 'provider_disabled'; readonly provider: string }
 
 export interface Allowance {
   readonly allowed: boolean
@@ -64,6 +70,27 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
  * الترتيب مقصود: الإيقاف أوّلا لأنّه قرارُ المالك الصريح، ولا يُنقَض
  * بسقفٍ لم يُبلغ. ثمّ العدد، ثمّ المال.
  */
+/**
+ * حارسٌ خاصّ بمزوّد، فوق الحارس العامّ.
+ *
+ * يُفحَص **بعد** العامّ لا قبله: الإيقاف والسقف الكلّيّ يخصّان النظام
+ * كلّه، وسقفُ مزوّدٍ تفصيلٌ تحته. ومَن قدّم التفصيل على الجملة قال
+ * «Gemini متاح» ونظامُه موقوف.
+ */
+export async function checkProvider(db: Db, provider: string): Promise<Blocker | null> {
+  const record = await readRecord(db, provider)
+  if (record === null) return null
+
+  if (!record.enabled) return { kind: 'provider_disabled', provider }
+  if (record.dailyCap === null) return null
+
+  const used = await spendTodayFor(db, provider)
+  if (used >= record.dailyCap) {
+    return { kind: 'provider_cap', provider, used, cap: record.dailyCap }
+  }
+  return null
+}
+
 export async function checkAllowance(db: Db): Promise<Allowance> {
   const settings = await readSettings(db)
   const usage = await usageToday(db)
@@ -89,5 +116,9 @@ export function blockerReason(blocker: Blocker): string {
       return `بلغ سقف التحليل اليوميّ: ${blocker.used} من ${blocker.cap}`
     case 'spend_cap':
       return `بلغ سقف الإنفاق اليوميّ: ${blocker.used.toFixed(4)}$ من ${blocker.cap}$`
+    case 'provider_cap':
+      return `بلغ سقف ${blocker.provider} اليوميّ: ${blocker.used.toFixed(4)}$ من ${blocker.cap}$`
+    case 'provider_disabled':
+      return `${blocker.provider} معطَّل بقرار المالك`
   }
 }
