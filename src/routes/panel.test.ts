@@ -441,3 +441,33 @@ describe('اللون يتبع المرجع لا الذوق', () => {
     expect(html).toContain('بلغ السقف')
   })
 })
+
+describe('مفتاح الإدراج الآليّ في اللوحة', () => {
+  it('يظهر مطفأ ويشرح ما يقع إن رُفع', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('الإدراج الآليّ')
+    expect(html).toContain('رفع الإدراج الآليّ')
+    expect(html).toContain('مطفأ')
+  })
+
+  it('يسأل قبل رفعه ويذكر الحدّ في السؤال — فلا يُرفع بلا علم', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('سيبدأ إنفاقٌ يوميّ بلا أمرٍ منك')
+    expect(html).toContain('data-confirm')
+  })
+
+  it('رفعُه يُحفظ ويُبلَّغ عنه', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('key', 'auto_enqueue')
+    body.set('value', 'true')
+    await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+    expect((await readSettings(db)).autoEnqueue).toBe(true)
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('رُفع الإدراج الآليّ')
+    expect(html).toContain('إطفاء')
+  })
+})

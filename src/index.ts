@@ -327,6 +327,25 @@ async function scheduled(_controller: ScheduledController, env: Env): Promise<vo
       serviceAccountJson: env.GOOGLE_SA_JSON,
       folderId: env.DRIVE_FOLDER_ID,
     })
+
+    /**
+     * الإدراج الآليّ — بمفتاح المالك، وبما بقي من السقف لا بما وجد المسح.
+     *
+     * **يُقصّ على المتبقّي قبل الإرسال لا بعده.** ولو أُرسل الكلّ لاعتمدنا
+     * على حارس المستهلك وحده: يمنع النداء نعم، لكنّ الرسائل تدخل الطابور
+     * وتُقرأ وتُقَرّ — فتُستهلك حصّتُه اليوميّة على رسائل لن ينجح منها
+     * شيء. والحدّ الذي يُطبَّق بعد الإنفاق ليس حدّا.
+     */
+    let enqueued = 0
+    if (allowance.settings.autoEnqueue && report.toAnalyze.length > 0) {
+      const room = Math.max(0, allowance.settings.dailyAnalysisCap - allowance.usage.analyses)
+      const batch = report.toAnalyze.slice(0, room)
+      if (batch.length > 0) {
+        await env.GENERATE_QUEUE.sendBatch(batch.map((sourceId) => ({ body: { sourceId } })))
+        enqueued = batch.length
+      }
+    }
+
     console.info({
       job: 'drive-scan',
       seen: report.seen,
@@ -335,6 +354,10 @@ async function scheduled(_controller: ScheduledController, env: Env): Promise<vo
       unchanged: report.unchanged.length,
       missing: report.missing.length,
       to_analyze: report.toAnalyze.length,
+      auto_enqueue: allowance.settings.autoEnqueue,
+      enqueued,
+      // ما تُرك لغدٍ: يُسجَّل ليُعرف أنّ السقف قصّ لا أنّ المسح أخفق
+      deferred: report.toAnalyze.length - enqueued,
     })
   } catch (error) {
     console.error({
