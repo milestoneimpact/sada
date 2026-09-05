@@ -49,33 +49,103 @@ app.get('/ready', async (c) => {
 })
 
 /**
+ * حارس `/admin/*` في موضعٍ واحد.
+ *
+ * تكرارُه في كلّ مسار يعني أنّ مسارا جديدا قد يُكتب بلا حارس ولا يلحظه
+ * أحد — وهي الثغرة نفسها التي كشفها D-019، فلا تُترك لتتكرّر بالنسخ.
+ */
+async function guardAdmin(c: {
+  env: Env
+  req: { raw: Request }
+}): Promise<Response | null> {
+  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
+  if (verdict.kind === 'ok') return null
+  if (verdict.kind === 'disabled') {
+    return Response.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, { status: 503 })
+  }
+  if (verdict.kind === 'no_header') {
+    return Response.json(
+      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
+      { status: 401 },
+    )
+  }
+  return Response.json(
+    {
+      error: 'unauthorized',
+      presented_length: verdict.presentedLength,
+      hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
+    },
+    { status: 401 },
+  )
+}
+
+/**
+ * ما في القاعدة الآن: معرّف كلّ مصدر وحاله.
+ *
+ * وُجد لأنّ `/admin/scan` يعيد معرّفات Drive، والتحليل كان يطلب معرّف
+ * الصفّ — فلا سبيل للمالك إلى الثاني. ونقصٌ كهذا يجعل ما بُني غير قابل
+ * للاستعمال وإن كان سليما.
+ */
+app.get('/admin/sources', async (c) => {
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id, s.drive_file_id, s.name, s.mime, s.content_hash, s.last_seen_at,
+            i.worth_score, i.summary, i.themes_json
+       FROM sources s
+       LEFT JOIN content_items i ON i.source_id = s.id
+      ORDER BY s.last_seen_at DESC`,
+  ).all<{
+    id: string
+    drive_file_id: string
+    name: string
+    mime: string
+    content_hash: string
+    last_seen_at: string
+    worth_score: number | null
+    summary: string | null
+    themes_json: string | null
+  }>()
+
+  const sources = results.map((row) => {
+    // البصمة محفوظة مع التحليل: يُقارَن بها ليُعرف أهو للنسخة الحاليّة
+    let analyzedHash: string | null = null
+    if (row.themes_json !== null) {
+      try {
+        analyzedHash = (JSON.parse(row.themes_json) as { hash?: string }).hash ?? null
+      } catch {
+        analyzedHash = null
+      }
+    }
+    return {
+      id: row.id,
+      drive_file_id: row.drive_file_id,
+      name: row.name,
+      mime: row.mime,
+      last_seen_at: row.last_seen_at,
+      analyzed: analyzedHash !== null,
+      stale: analyzedHash !== null && analyzedHash !== row.content_hash,
+      worth_score: row.worth_score,
+      summary: row.summary,
+    }
+  })
+
+  return c.json({
+    count: sources.length,
+    pending: sources.filter((s) => !s.analyzed || s.stale).length,
+    sources,
+  })
+})
+
+/**
  * تشغيل المسح يدويا — للتحقق قبل أن يحين موعد Cron.
  * لا يفعل شيئا لا يفعله Cron: المسار نفسه، فما يُختبر هنا هو ما يجري هناك.
  */
 app.post('/admin/scan', async (c) => {
   // الحارس قبل أيّ عمل: لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
-  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
-  if (verdict.kind === 'disabled') {
-    return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
-  }
-  if (verdict.kind === 'no_header') {
-    return c.json(
-      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
-      401,
-    )
-  }
-  if (verdict.kind === 'denied') {
-    // طول ما أرسله المنادي يعرفه هو أصلا. ويكشف أشيع الأخطاء: قوسان
-    // زائدان، أو مسافة، أو سطر جديد. ولا يُذكر طول المحفوظ قطّ.
-    return c.json(
-      {
-        error: 'unauthorized',
-        presented_length: verdict.presentedLength,
-        hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
-      },
-      401,
-    )
-  }
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
   try {
     const report = await scanDrive({
       db: c.env.DB,
@@ -91,23 +161,20 @@ app.post('/admin/scan', async (c) => {
 
 /**
  * تحليل مصدرٍ واحد يدويا — للتحقق قبل أن يتولّاه الطابور.
- * خلف الحارس نفسه: النداء يكلّف مالا، فلا يُترك مفتوحا (D-019).
+ *
+ * يقبل معرّف الصفّ أو معرّف Drive: تقرير المسح يعيد الثاني.
+ * وخلف الحارس نفسه: النداء يكلّف مالا، فلا يُترك مفتوحا (D-019).
  */
-app.post('/admin/analyze/:sourceId', async (c) => {
-  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
-  if (verdict.kind === 'disabled') {
-    return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
-  }
-  if (verdict.kind !== 'ok') {
-    return c.json({ error: 'unauthorized' }, 401)
-  }
+app.post('/admin/analyze/:sourceRef', async (c) => {
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
     },
-    c.req.param('sourceId'),
+    c.req.param('sourceRef'),
   )
   return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
 })

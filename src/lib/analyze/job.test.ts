@@ -181,6 +181,25 @@ describe('لا يُدفع ثمن ما لم يتغيّر (D-008)', () => {
   })
 })
 
+describe('يُقبل معرّف Drive كما يُقبل معرّف الصفّ', () => {
+  it('التحليل بمعرّف Drive يعمل — وهو ما يعيده تقرير المسح', async () => {
+    const sourceId = await seedSource()
+    const out = await analyzeSource(deps(net()), 'drive-1')
+    expect(out.kind).toBe('analyzed')
+    // والمخرَج يعيد معرّف الصفّ لا ما أُدخل، فلا يلتبس المرجعان
+    expect(out.sourceId).toBe(sourceId)
+  })
+
+  it('«محلَّل بالفعل» يُكتشف عبر معرّف Drive أيضا', async () => {
+    await seedSource()
+    await analyzeSource(deps(net()), 'drive-1')
+    const second = net()
+    const out = await analyzeSource(deps(second), 'drive-1')
+    expect(out.kind).toBe('already')
+    expect(calls.filter((u) => u.includes('anthropic'))).toHaveLength(0)
+  })
+})
+
 describe('ما يُتخطّى ولا يوقف شيئا', () => {
   it.each([
     ['PDF', 'application/pdf'],

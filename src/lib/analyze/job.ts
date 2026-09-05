@@ -82,9 +82,13 @@ export async function analyzeSource(
   sourceId: string,
 ): Promise<AnalyzeOutcome> {
   const now = deps.now ?? new Date()
+  // يُقبل معرّف الصفّ أو معرّف Drive: تقرير المسح يعيد الثاني، وإلزام
+  // المالك بترجمته يدويا عبءٌ صنعناه نحن ولا يخدم شيئا
   const source = await deps.db
-    .prepare('SELECT id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ?')
-    .bind(sourceId)
+    .prepare(
+      'SELECT id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
+    )
+    .bind(sourceId, sourceId)
     .first<SourceRow>()
 
   if (source === null) {
@@ -93,7 +97,7 @@ export async function analyzeSource(
 
   // ٢ · لا يُدفع ثمن نداءٍ لمحتوى لم يتغيّر
   if (await alreadyAnalyzed(deps.db, source.id, source.content_hash)) {
-    return { kind: 'already', sourceId }
+    return { kind: 'already', sourceId: source.id }
   }
 
   try {
@@ -107,13 +111,13 @@ export async function analyzeSource(
       deps.fetchImpl ?? fetch,
     )
     if (extracted.kind === 'unsupported') {
-      return { kind: 'skipped', sourceId, reason: extracted.reason }
+      return { kind: 'skipped', sourceId: source.id, reason: extracted.reason }
     }
     if (extracted.kind === 'too_large') {
-      return { kind: 'skipped', sourceId, reason: `النصّ ${extracted.bytes} بايت — فوق السقف` }
+      return { kind: 'skipped', sourceId: source.id, reason: `النصّ ${extracted.bytes} بايت — فوق السقف` }
     }
     if (extracted.text.trim().length === 0) {
-      return { kind: 'skipped', sourceId, reason: 'المستند فارغ' }
+      return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
     // ٤ · النداء
@@ -155,13 +159,13 @@ export async function analyzeSource(
       .bind(crypto.randomUUID(), source.id, analysis.summary, themes, analysis.worth_score)
       .run()
 
-    return { kind: 'analyzed', sourceId, worth: analysis.worth_score, cost }
+    return { kind: 'analyzed', sourceId: source.id, worth: analysis.worth_score, cost }
   } catch (error) {
     if (error instanceof AnalyzeError) {
-      return { kind: 'failed', sourceId, reason: error.message, retryable: error.retryable }
+      return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }
     }
     const reason = error instanceof Error ? error.message : 'عطل غير متوقّع'
     // عطل Drive أو القاعدة: قد ينجح لاحقا وحده
-    return { kind: 'failed', sourceId, reason, retryable: true }
+    return { kind: 'failed', sourceId: source.id, reason, retryable: true }
   }
 }

@@ -331,6 +331,100 @@ describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
   })
 })
 
+describe('GET /admin/sources — الجسر الذي كان مفقودا', () => {
+  const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
+
+  function withToken(): Record<string, unknown> {
+    return { ...env, ADMIN_TOKEN: TOKEN }
+  }
+  function auth(): RequestInit {
+    return { headers: { Authorization: `Bearer ${TOKEN}` } }
+  }
+
+  async function seed(hash: string): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare('INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, `drive-${id.slice(0, 6)}`, 'تقرير', 'application/vnd.google-apps.document', hash)
+      .run()
+    return id
+  }
+
+  interface Body {
+    count: number
+    pending: number
+    sources: Array<{
+      id: string
+      drive_file_id: string
+      analyzed: boolean
+      stale: boolean
+      worth_score: number | null
+    }>
+  }
+
+  it('محروس كسائر مسارات الإدارة', async () => {
+    expect((await app.request('/admin/sources', {}, env)).status).toBe(503)
+    expect((await app.request('/admin/sources', {}, withToken())).status).toBe(401)
+  })
+
+  it('يعطي معرّف الصفّ ومعرّف Drive معا — فيُوصل تقرير المسح بالتحليل', async () => {
+    const id = await seed('md5:a')
+    const body = (await (await app.request('/admin/sources', auth(), withToken())).json()) as Body
+    expect(body.count).toBe(1)
+    expect(body.sources[0]!.id).toBe(id)
+    expect(body.sources[0]!.drive_file_id).toMatch(/^drive-/)
+  })
+
+  it('غير المحلَّل يُعدّ منتظرا', async () => {
+    await seed('md5:a')
+    const body = (await (await app.request('/admin/sources', auth(), withToken())).json()) as Body
+    expect(body.sources[0]!.analyzed).toBe(false)
+    expect(body.pending).toBe(1)
+  })
+
+  it('المحلَّل ببصمته الحاليّة ليس منتظرا', async () => {
+    const id = await seed('md5:a')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), id, 'خلاصة', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.7)
+      .run()
+    const body = (await (await app.request('/admin/sources', auth(), withToken())).json()) as Body
+    expect(body.sources[0]!.analyzed).toBe(true)
+    expect(body.sources[0]!.stale).toBe(false)
+    expect(body.sources[0]!.worth_score).toBe(0.7)
+    expect(body.pending).toBe(0)
+  })
+
+  it('تحليلٌ لبصمةٍ قديمة يُعلَّم بائتا ويعود منتظرا', async () => {
+    const id = await seed('md5:جديد')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), id, 'خلاصة', JSON.stringify({ hash: 'md5:قديم', themes: [] }), 0.7)
+      .run()
+    const body = (await (await app.request('/admin/sources', auth(), withToken())).json()) as Body
+    expect(body.sources[0]!.stale).toBe(true)
+    expect(body.pending).toBe(1)
+  })
+
+  it('themes_json فاسد لا يُسقط المسار كلّه', async () => {
+    const id = await seed('md5:a')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), id, 'خلاصة', 'ليس json', 0.5)
+      .run()
+    const response = await app.request('/admin/sources', auth(), withToken())
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as Body
+    expect(body.sources[0]!.analyzed).toBe(false)
+  })
+
+  it('لا يذكر قيمة رمزٍ في أيّ ردّ', async () => {
+    await seed('md5:a')
+    const text = await (await app.request('/admin/sources', auth(), withToken())).text()
+    expect(text).not.toContain(TOKEN)
+  })
+})
+
 describe('/health و /ready', () => {
   it('health يجيب بلا شرط', async () => {
     const response = await app.request('/health', {}, env)
