@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
 import { authorizeAdmin } from './lib/adminAuth'
 import { readiness, type Env } from './env'
+import { analyzeSource } from './lib/analyze/job'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
@@ -48,33 +49,103 @@ app.get('/ready', async (c) => {
 })
 
 /**
+ * حارس `/admin/*` في موضعٍ واحد.
+ *
+ * تكرارُه في كلّ مسار يعني أنّ مسارا جديدا قد يُكتب بلا حارس ولا يلحظه
+ * أحد — وهي الثغرة نفسها التي كشفها D-019، فلا تُترك لتتكرّر بالنسخ.
+ */
+async function guardAdmin(c: {
+  env: Env
+  req: { raw: Request }
+}): Promise<Response | null> {
+  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
+  if (verdict.kind === 'ok') return null
+  if (verdict.kind === 'disabled') {
+    return Response.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, { status: 503 })
+  }
+  if (verdict.kind === 'no_header') {
+    return Response.json(
+      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
+      { status: 401 },
+    )
+  }
+  return Response.json(
+    {
+      error: 'unauthorized',
+      presented_length: verdict.presentedLength,
+      hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
+    },
+    { status: 401 },
+  )
+}
+
+/**
+ * ما في القاعدة الآن: معرّف كلّ مصدر وحاله.
+ *
+ * وُجد لأنّ `/admin/scan` يعيد معرّفات Drive، والتحليل كان يطلب معرّف
+ * الصفّ — فلا سبيل للمالك إلى الثاني. ونقصٌ كهذا يجعل ما بُني غير قابل
+ * للاستعمال وإن كان سليما.
+ */
+app.get('/admin/sources', async (c) => {
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id, s.drive_file_id, s.name, s.mime, s.content_hash, s.last_seen_at,
+            i.worth_score, i.summary, i.themes_json
+       FROM sources s
+       LEFT JOIN content_items i ON i.source_id = s.id
+      ORDER BY s.last_seen_at DESC`,
+  ).all<{
+    id: string
+    drive_file_id: string
+    name: string
+    mime: string
+    content_hash: string
+    last_seen_at: string
+    worth_score: number | null
+    summary: string | null
+    themes_json: string | null
+  }>()
+
+  const sources = results.map((row) => {
+    // البصمة محفوظة مع التحليل: يُقارَن بها ليُعرف أهو للنسخة الحاليّة
+    let analyzedHash: string | null = null
+    if (row.themes_json !== null) {
+      try {
+        analyzedHash = (JSON.parse(row.themes_json) as { hash?: string }).hash ?? null
+      } catch {
+        analyzedHash = null
+      }
+    }
+    return {
+      id: row.id,
+      drive_file_id: row.drive_file_id,
+      name: row.name,
+      mime: row.mime,
+      last_seen_at: row.last_seen_at,
+      analyzed: analyzedHash !== null,
+      stale: analyzedHash !== null && analyzedHash !== row.content_hash,
+      worth_score: row.worth_score,
+      summary: row.summary,
+    }
+  })
+
+  return c.json({
+    count: sources.length,
+    pending: sources.filter((s) => !s.analyzed || s.stale).length,
+    sources,
+  })
+})
+
+/**
  * تشغيل المسح يدويا — للتحقق قبل أن يحين موعد Cron.
  * لا يفعل شيئا لا يفعله Cron: المسار نفسه، فما يُختبر هنا هو ما يجري هناك.
  */
 app.post('/admin/scan', async (c) => {
   // الحارس قبل أيّ عمل: لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
-  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
-  if (verdict.kind === 'disabled') {
-    return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
-  }
-  if (verdict.kind === 'no_header') {
-    return c.json(
-      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
-      401,
-    )
-  }
-  if (verdict.kind === 'denied') {
-    // طول ما أرسله المنادي يعرفه هو أصلا. ويكشف أشيع الأخطاء: قوسان
-    // زائدان، أو مسافة، أو سطر جديد. ولا يُذكر طول المحفوظ قطّ.
-    return c.json(
-      {
-        error: 'unauthorized',
-        presented_length: verdict.presentedLength,
-        hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
-      },
-      401,
-    )
-  }
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
   try {
     const report = await scanDrive({
       db: c.env.DB,
@@ -86,6 +157,26 @@ app.post('/admin/scan', async (c) => {
     const message = error instanceof Error ? error.message : 'unexpected_error'
     return c.json({ error: 'scan_failed', detail: message }, 502)
   }
+})
+
+/**
+ * تحليل مصدرٍ واحد يدويا — للتحقق قبل أن يتولّاه الطابور.
+ *
+ * يقبل معرّف الصفّ أو معرّف Drive: تقرير المسح يعيد الثاني.
+ * وخلف الحارس نفسه: النداء يكلّف مالا، فلا يُترك مفتوحا (D-019).
+ */
+app.post('/admin/analyze/:sourceRef', async (c) => {
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
+  const outcome = await analyzeSource(
+    {
+      db: c.env.DB,
+      serviceAccountJson: c.env.GOOGLE_SA_JSON,
+      anthropicKey: c.env.ANTHROPIC_API_KEY,
+    },
+    c.req.param('sourceRef'),
+  )
+  return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
 })
 
 app.route('/', oauth)
@@ -102,7 +193,38 @@ app.notFound((c) => c.json({ error: 'not_found' }, 404))
  * والمفتاح يحمي في الحالتين: إعادة المحاولة تجد محاولة ناجحة بالمفتاح
  * نفسه فتخرج بلا طلب ثان.
  */
-async function queue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
+/** ما يحمله طابور التوليد: معرّف مصدرٍ يُفهَم، لا نصّه. */
+export interface AnalyzeMessage {
+  readonly sourceId: string
+}
+
+/**
+ * مستهلك طابور الفهم.
+ *
+ * `retry` لما قد ينجح وحده (429 · 5xx · انقطاع)، و `ack` لما لا يصلحه
+ * التكرار: نوعٌ غير مدعوم، أو رفضُ سياسة، أو مصدرٌ لا وجود له. وتركُ
+ * الثاني في الطابور يعني نداءً مدفوعا يتكرّر بلا أمل.
+ */
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Promise<void> {
+  for (const message of batch.messages) {
+    const outcome = await analyzeSource(
+      {
+        db: env.DB,
+        serviceAccountJson: env.GOOGLE_SA_JSON,
+        anthropicKey: env.ANTHROPIC_API_KEY,
+      },
+      message.body.sourceId,
+    )
+    console.info({ job: 'analyze', ...outcome })
+    if (outcome.kind === 'failed' && outcome.retryable) {
+      message.retry()
+    } else {
+      message.ack()
+    }
+  }
+}
+
+async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     const outcome = await publishPost(
       { db: env.DB, encKey: env.TOKEN_ENC_KEY },
@@ -145,6 +267,25 @@ async function scheduled(_controller: ScheduledController, env: Env): Promise<vo
       failed: error instanceof Error ? error.message : 'unexpected_error',
     })
   }
+}
+
+/**
+ * Cloudflare يسلّم كلّ الطوابير إلى دالّة واحدة، فيُفرَّق بينها بالاسم.
+ * والاسم غير المعروف يُقَرّ لا يُعاد: رسالةٌ لطابور لا نعرفه لن تُفهَم
+ * بإعادة المحاولة، وتركها تدور يستهلك حصّة الطابور بلا فائدة.
+ */
+async function queue(
+  batch: MessageBatch<PublishMessage | AnalyzeMessage>,
+  env: Env,
+): Promise<void> {
+  if (batch.queue.startsWith('sada-generate')) {
+    return analyzeQueue(batch as MessageBatch<AnalyzeMessage>, env)
+  }
+  if (batch.queue.startsWith('sada-publish')) {
+    return publishQueue(batch as MessageBatch<PublishMessage>, env)
+  }
+  console.error({ job: 'queue', unknown: batch.queue, messages: batch.messages.length })
+  for (const message of batch.messages) message.ack()
 }
 
 export default { fetch: app.fetch, queue, scheduled }

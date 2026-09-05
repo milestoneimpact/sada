@@ -1,0 +1,171 @@
+/**
+ * مهمّة الفهم: من صفٍّ في `sources` إلى صفٍّ في `content_items`.
+ *
+ * **الترتيب هو الحوكمة، لا تعليقٌ عليها:**
+ *
+ *   ١ · اقرأ المصدر من القاعدة
+ *   ٢ · إن كان محلَّلا ببصمته الحاليّة — اخرج بلا نداء (D-008: لا يُدفع مرّتين)
+ *   ٣ · صدّر النصّ من Drive
+ *   ٤ · نادِ Claude
+ *   ٥ · **سجّل الكلفة**
+ *   ٦ · اكتب التحليل
+ *
+ * والخامسة قبل السادسة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
+ * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
+ */
+import { recordCost } from '../cost'
+import type { Db } from '../tokens'
+import { accessToken, parseServiceAccount } from '../drive/client'
+import { extractText } from '../drive/export'
+import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
+
+/**
+ * أسعار Claude Opus 5 لكلّ مليون رمز (2026-06-24).
+ * تتغيّر، فتُراجَع مع كلّ تحديث. والمقروء من الخبيئة عُشر الداخل.
+ */
+export const OPUS_5_INPUT_PER_TOKEN = 5 / 1_000_000
+export const OPUS_5_OUTPUT_PER_TOKEN = 25 / 1_000_000
+export const OPUS_5_CACHED_INPUT_PER_TOKEN = 0.5 / 1_000_000
+
+export function analysisCost(usage: {
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens: number
+}): number {
+  return (
+    usage.inputTokens * OPUS_5_INPUT_PER_TOKEN +
+    usage.cachedInputTokens * OPUS_5_CACHED_INPUT_PER_TOKEN +
+    usage.outputTokens * OPUS_5_OUTPUT_PER_TOKEN
+  )
+}
+
+export type AnalyzeOutcome =
+  | { readonly kind: 'analyzed'; readonly sourceId: string; readonly worth: number; readonly cost: number }
+  /** مُحلَّل ببصمته الحاليّة — لا نداء ولا كلفة. */
+  | { readonly kind: 'already'; readonly sourceId: string }
+  /** نوعٌ لا يُصدَّر، أو نصٌّ أكبر من السقف. لا يُعاد ولا يُرمى. */
+  | { readonly kind: 'skipped'; readonly sourceId: string; readonly reason: string }
+  | { readonly kind: 'failed'; readonly sourceId: string; readonly reason: string; readonly retryable: boolean }
+
+export interface AnalyzeJobDeps {
+  readonly db: Db
+  readonly serviceAccountJson: string
+  readonly anthropicKey: string
+  readonly now?: Date
+  readonly fetchImpl?: typeof fetch
+}
+
+interface SourceRow {
+  readonly id: string
+  readonly drive_file_id: string
+  readonly name: string
+  readonly mime: string
+  readonly content_hash: string
+}
+
+/**
+ * بصمةُ ما حُلِّل تُحفظ في `content_items.summary`? لا — في جدولها.
+ * والقيد هنا: صفُّ تحليلٍ واحدٌ لكلّ مصدر، يُستبدل حين تتغيّر البصمة.
+ * فالسؤال «أحُلِّل هذا؟» يُجاب من القاعدة لا من ذاكرةٍ في العملية.
+ */
+async function alreadyAnalyzed(db: Db, sourceId: string, hash: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT id FROM content_items WHERE source_id = ? AND themes_json LIKE ?')
+    .bind(sourceId, `%"hash":"${hash}"%`)
+    .first<{ id: string }>()
+  return row !== null
+}
+
+/** يحلّل مصدرا واحدا. لا يرمي — يعيد ما وقع ليُسجَّل ويُقرَّر. */
+export async function analyzeSource(
+  deps: AnalyzeJobDeps,
+  sourceId: string,
+): Promise<AnalyzeOutcome> {
+  const now = deps.now ?? new Date()
+  // يُقبل معرّف الصفّ أو معرّف Drive: تقرير المسح يعيد الثاني، وإلزام
+  // المالك بترجمته يدويا عبءٌ صنعناه نحن ولا يخدم شيئا
+  const source = await deps.db
+    .prepare(
+      'SELECT id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
+    )
+    .bind(sourceId, sourceId)
+    .first<SourceRow>()
+
+  if (source === null) {
+    return { kind: 'failed', sourceId, reason: 'المصدر غير موجود', retryable: false }
+  }
+
+  // ٢ · لا يُدفع ثمن نداءٍ لمحتوى لم يتغيّر
+  if (await alreadyAnalyzed(deps.db, source.id, source.content_hash)) {
+    return { kind: 'already', sourceId: source.id }
+  }
+
+  try {
+    // ٣ · التصدير
+    const sa = parseServiceAccount(deps.serviceAccountJson)
+    const token = await accessToken(sa, now, deps.fetchImpl ?? fetch)
+    const extracted = await extractText(
+      token,
+      source.drive_file_id,
+      source.mime,
+      deps.fetchImpl ?? fetch,
+    )
+    if (extracted.kind === 'unsupported') {
+      return { kind: 'skipped', sourceId: source.id, reason: extracted.reason }
+    }
+    if (extracted.kind === 'too_large') {
+      return { kind: 'skipped', sourceId: source.id, reason: `النصّ ${extracted.bytes} بايت — فوق السقف` }
+    }
+    if (extracted.text.trim().length === 0) {
+      return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
+    }
+
+    // ٤ · النداء
+    const claudeDeps: AnalyzeDeps = {
+      apiKey: deps.anthropicKey,
+      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    }
+    const result = await analyzeText(claudeDeps, {
+      name: source.name,
+      text: extracted.text,
+      now,
+    })
+
+    // ٥ · الكلفة **قبل** الكتابة (D-008)
+    const cost = analysisCost(result.usage)
+    const units = result.usage.inputTokens + result.usage.cachedInputTokens + result.usage.outputTokens
+    await recordCost(deps.db, {
+      provider: 'anthropic',
+      operation: `analyze:${result.model}`,
+      units,
+      unitCost: units === 0 ? 0 : cost / units,
+      refId: source.id,
+    })
+
+    // ٦ · الكتابة — والبصمة معها، فيُعرف ما حُلِّل ولأيّ نسخة
+    const { analysis } = result
+    const themes = JSON.stringify({
+      hash: source.content_hash,
+      themes: analysis.themes,
+      audience: analysis.audience,
+      angles: analysis.angles,
+      reason: analysis.worth_reason,
+    })
+    await deps.db
+      .prepare(
+        `INSERT INTO content_items (id, source_id, summary, themes_json, worth_score)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), source.id, analysis.summary, themes, analysis.worth_score)
+      .run()
+
+    return { kind: 'analyzed', sourceId: source.id, worth: analysis.worth_score, cost }
+  } catch (error) {
+    if (error instanceof AnalyzeError) {
+      return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }
+    }
+    const reason = error instanceof Error ? error.message : 'عطل غير متوقّع'
+    // عطل Drive أو القاعدة: قد ينجح لاحقا وحده
+    return { kind: 'failed', sourceId: source.id, reason, retryable: true }
+  }
+}
