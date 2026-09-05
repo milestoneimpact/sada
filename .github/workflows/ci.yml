@@ -7,6 +7,11 @@ on:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # مخرجٌ حين لا ينطلق شيء: حدث opened على طلب #5 لم يولّد تشغيلاً، و push
+  # مقصورٌ على main، فبقي الفرع بلا بوّابة — ولا سبيل لتشغيلها إلا بدفعة.
+  # وبوّابةٌ لا تُشغَّل عند الطلب تدفع إلى دفعةٍ فارغة تكسر قاعدة الدقائق،
+  # أو إلى دمجٍ بلا بوّابة. وكلاهما أسوأ من سطرين هنا.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
