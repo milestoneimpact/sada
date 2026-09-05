@@ -9,6 +9,8 @@ import type { MessageBatch, ScheduledController } from '@cloudflare/workers-type
 import { authorizeAdmin } from './lib/adminAuth'
 import { readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
+import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
+import { spendByProvider } from './lib/ai/spend'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
@@ -78,6 +80,65 @@ async function guardAdmin(c: {
     { status: 401 },
   )
 }
+
+/**
+ * لوحة المزوّدين — قراءةٌ محضة.
+ *
+ * تجيب في نداءٍ واحد: أيّ مزوّدٍ مضبوط، وأيّ نموذجٍ ينفّذ كلّ مهمّة ولمَ،
+ * وكم أنفق كلٌّ منهم. وكان ذلك يُعرف بقراءة الشيفرة وحدها.
+ *
+ * **ولا تعيد قيمة مفتاحٍ قطّ** — ولا جزءا منها. أسماءٌ وحالٌ وأرقام.
+ * ومفاتيح المزوّدين تبقى في أسرار Worker: لا تمرّ بهذه الشيفرة ولا
+ * تُقرأ منها.
+ */
+app.get('/admin/providers', async (c) => {
+  const denied = await guardAdmin(c)
+  if (denied !== null) return denied
+
+  const days = 30
+  let spend: Awaited<ReturnType<typeof spendByProvider>> = {}
+  let ledger: 'ok' | 'unreachable' = 'unreachable'
+  try {
+    spend = await spendByProvider(c.env.DB, days)
+    ledger = 'ok'
+  } catch {
+    // دفترٌ لا يُقرأ لا يُسقط اللوحة: التوجيه والحال يُقالان بلا أرقام
+    ledger = 'unreachable'
+  }
+
+  const routes = routeStatuses(c.env)
+  const providers = (Object.keys(PROVIDERS) as ProviderName[]).map((name) => {
+    const used = routes.filter((r) => r.provider === name)
+    const entry = spend[name]
+    return {
+      name,
+      label: PROVIDERS[name].label,
+      configured: isConfigured(c.env, name),
+      // اسم السرّ لا قيمته — ليعرف المالك ما يضبط
+      secret_name: PROVIDERS[name].secret,
+      how_to_get: PROVIDERS[name].docs,
+      tasks: used.map((r) => r.task),
+      models_in_use: [...new Set(used.filter((r) => r.implemented).map((r) => r.model))],
+      calls: entry?.calls ?? 0,
+      spend: entry?.total ?? 0,
+    }
+  })
+
+  const totalSpend = Object.values(spend).reduce((sum, e) => sum + (e?.total ?? 0), 0)
+
+  return c.json({
+    window_days: days,
+    ledger,
+    currency: 'USD',
+    total_spend: totalSpend,
+    providers,
+    routing: routes,
+    /** ما ينقص لتعمل مهمّةٌ مبنيّة — لا لتعمل مهمّةٌ لم تُبنَ بعد. */
+    blocked: routes
+      .filter((r) => r.implemented && !r.ready)
+      .map((r) => ({ task: r.task, missing_secret: PROVIDERS[r.provider].secret })),
+  })
+})
 
 /**
  * ما في القاعدة الآن: معرّف كلّ مصدر وحاله.

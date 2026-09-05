@@ -331,6 +331,119 @@ describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
   })
 })
 
+describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
+  const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
+  const KEY = 'sk-ant-قيمة-سرّ-حقيقيّة-لا-يجوز-أن-تظهر'
+
+  function ctx(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return { ...env, ADMIN_TOKEN: TOKEN, ...extra }
+  }
+  function auth(): RequestInit {
+    return { headers: { Authorization: `Bearer ${TOKEN}` } }
+  }
+
+  interface Body {
+    window_days: number
+    ledger: string
+    total_spend: number
+    providers: Array<{
+      name: string
+      configured: boolean
+      secret_name: string
+      models_in_use: string[]
+      calls: number
+      spend: number
+    }>
+    routing: Array<{ task: string; provider: string; model: string; why: string; ready: boolean }>
+    blocked: Array<{ task: string; missing_secret: string }>
+  }
+
+  async function read(extra: Record<string, unknown> = {}): Promise<Body> {
+    const response = await app.request('/admin/providers', auth(), ctx(extra))
+    expect(response.status).toBe(200)
+    return (await response.json()) as Body
+  }
+
+  it('محروس كسائر مسارات الإدارة', async () => {
+    expect((await app.request('/admin/providers', {}, env)).status).toBe(503)
+    expect((await app.request('/admin/providers', {}, ctx())).status).toBe(401)
+  })
+
+  it('**لا يعيد قيمة مفتاحٍ ولا جزءا منها**', async () => {
+    const response = await app.request(
+      '/admin/providers',
+      auth(),
+      ctx({ ANTHROPIC_API_KEY: KEY, GEMINI_API_KEY: 'AIzaSyقيمة-أخرى' }),
+    )
+    const text = await response.text()
+    expect(text).not.toContain(KEY)
+    expect(text).not.toContain('AIzaSy')
+    expect(text).not.toContain(KEY.slice(0, 8))
+    // ولا رمز الإدارة نفسه
+    expect(text).not.toContain(TOKEN)
+  })
+
+  it('يقول اسم السرّ لا قيمته — ليعرف المالك ما يضبط', async () => {
+    const body = await read()
+    const anthropic = body.providers.find((p) => p.name === 'anthropic')!
+    expect(anthropic.secret_name).toBe('ANTHROPIC_API_KEY')
+    expect(anthropic.configured).toBe(false)
+  })
+
+  it('يعلن المزوّد مضبوطا حين يوجد سرّه', async () => {
+    const body = await read({ ANTHROPIC_API_KEY: KEY })
+    expect(body.providers.find((p) => p.name === 'anthropic')!.configured).toBe(true)
+    expect(body.providers.find((p) => p.name === 'gemini')!.configured).toBe(false)
+  })
+
+  it('يعطي لكلّ مهمّة نموذجها وسببه', async () => {
+    const body = await read()
+    const analyze = body.routing.find((r) => r.task === 'analyze')!
+    expect(analyze.provider).toBe('anthropic')
+    expect(analyze.model).toBe('claude-opus-5')
+    expect(analyze.why.length).toBeGreaterThan(10)
+  })
+
+  it('يسمّي ما يعطّل مهمّةً مبنيّة، ولا يشكو ممّا لم يُبنَ', async () => {
+    const body = await read()
+    expect(body.blocked).toEqual([{ task: 'analyze', missing_secret: 'ANTHROPIC_API_KEY' }])
+    // image موجّهة إلى gemini غير المضبوط، لكنّها لم تُبنَ — فلا تُعدّ عائقا
+    expect(body.blocked.map((b) => b.task)).not.toContain('image')
+  })
+
+  it('يفرز الإنفاق بالمزوّد من الدفتر نفسه', async () => {
+    await db
+      .prepare(
+        "INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total) VALUES (?, 'anthropic', 'analyze', 100, 0.01, 1.0)",
+      )
+      .bind(crypto.randomUUID())
+      .run()
+    const body = await read()
+    const anthropic = body.providers.find((p) => p.name === 'anthropic')!
+    expect(anthropic.calls).toBe(1)
+    expect(anthropic.spend).toBe(1)
+    expect(body.total_spend).toBe(1)
+    expect(body.ledger).toBe('ok')
+    expect(body.window_days).toBe(30)
+  })
+
+  it('دفترٌ لا يُقرأ لا يُسقط اللوحة — التوجيه يبقى مقروءا', async () => {
+    const broken = {
+      prepare: () => ({
+        bind: () => ({
+          all: () => Promise.reject(new Error('D1 معطّلة')),
+        }),
+      }),
+    }
+    const response = await app.request('/admin/providers', auth(), ctx({ DB: broken }))
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as Body
+    expect(body.ledger).toBe('unreachable')
+    expect(body.routing.length).toBeGreaterThan(0)
+    expect(body.total_spend).toBe(0)
+  })
+})
+
 describe('GET /admin/sources — الجسر الذي كان مفقودا', () => {
   const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 
