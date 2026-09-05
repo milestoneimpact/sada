@@ -337,6 +337,7 @@ export interface PanelFlash {
 
 export interface PanelData {
   readonly paused: boolean
+  readonly autoEnqueue: boolean
   readonly analysisCap: number
   readonly spendCap: number
   readonly usedAnalyses: number
@@ -602,6 +603,24 @@ ${flash}
         <button class="${d.paused ? 'p' : 'd'}" type="submit">${d.paused ? 'استئناف العمل' : 'إيقاف مؤقت'}</button>
       </form>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:14px"><h2>الإدراج الآليّ</h2>
+    <div class="split">
+      <p>${d.autoEnqueue
+        ? `مرفوع: المسح اليوميّ (٣ فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
+        : `مطفأ: المسح يرصد ما تغيّر ولا يحلّل شيئا حتّى تضغط «حلّل الآن». ورفعُه يجعل الخطّ كاملا — مستندٌ تعدّله يظهر محلَّلا في اللوحة صباحا.`}</p>
+      <form class="inline" method="POST" action="/panel/settings"
+            data-confirm="${d.autoEnqueue
+              ? 'إطفاء الإدراج الآليّ؟ لن يُحلَّل شيء إلا بأمرك.'
+              : `رفعُ الإدراج الآليّ؟ سيبدأ إنفاقٌ يوميّ بلا أمرٍ منك، بحدّ ${d.analysisCap} تحليلا و ${money(d.spendCap)} في اليوم.`}">
+        <input type="hidden" name="key" value="auto_enqueue">
+        <input type="hidden" name="value" value="${d.autoEnqueue ? 'false' : 'true'}">
+        <button class="${d.autoEnqueue ? 'g' : 'p'}" type="submit">
+          ${d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ'}</button>
+      </form>
+    </div>
+    <div class="sub" style="margin-top:12px">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
   </div>
 
   <div class="card" style="margin-top:14px"><h2>الحدود اليوميّة</h2>

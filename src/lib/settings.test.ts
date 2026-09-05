@@ -14,6 +14,27 @@ describe('القيم الأولى من الترحيل', () => {
     expect(settings.dailyAnalysisCap).toBe(10)
     expect(settings.dailySpendCapUsd).toBe(5)
   })
+
+  it('الإدراج الآليّ مطفأ افتراضا — إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة', async () => {
+    expect((await readSettings(db)).autoEnqueue).toBe(false)
+  })
+})
+
+describe('مفاتيح الخطر تُقرأ بالمطابقة لا بالتساهل', () => {
+  it.each(['نعم', '1', 'TRUE', 'on', ''])('«%s» لا ترفع الإدراج الآليّ', async (raw) => {
+    await writeSetting(db, 'auto_enqueue', raw, 'panel')
+    expect((await readSettings(db)).autoEnqueue).toBe(false)
+  })
+
+  it('«true» وحدها ترفعه', async () => {
+    await writeSetting(db, 'auto_enqueue', 'true', 'panel')
+    expect((await readSettings(db)).autoEnqueue).toBe(true)
+  })
+
+  it('غيابُ الصفّ يعني مطفأ لا مرفوعا', async () => {
+    db.raw.exec("DELETE FROM settings WHERE key = 'auto_enqueue'")
+    expect((await readSettings(db)).autoEnqueue).toBe(false)
+  })
 })
 
 describe('الكتابة', () => {

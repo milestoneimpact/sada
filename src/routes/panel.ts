@@ -132,6 +132,7 @@ panel.get('/panel', async (c) => {
   return c.html(
     panelPage({
       paused: allowance.settings.paused,
+      autoEnqueue: allowance.settings.autoEnqueue,
       analysisCap: allowance.settings.dailyAnalysisCap,
       spendCap: allowance.settings.dailySpendCapUsd,
       // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
@@ -219,7 +220,7 @@ panel.post('/panel/logout', async (c) => {
 })
 
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
-  'paused', 'daily_analysis_cap', 'daily_spend_cap_usd',
+  'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',
 ])
 
 const LABEL: Readonly<Record<string, string>> = {
@@ -250,7 +251,11 @@ panel.post('/panel/settings', async (c) => {
 
   // الإشعار يقول ما وقع **فعلا** لا ما طُلب: قيمةٌ قُصّت تُذكر بقصّها
   let flash: PanelFlash
-  if (key === 'paused') {
+  if (key === 'auto_enqueue') {
+    flash = result.stored === 'true'
+      ? { kind: 'warn', text: 'رُفع الإدراج الآليّ. المسح اليوميّ سيحلّل ما تغيّر ضمن حدّ اليوم.' }
+      : { kind: 'ok', text: 'أُطفئ الإدراج الآليّ. لا تحليل إلا بأمرك.' }
+  } else if (key === 'paused') {
     flash = result.stored === 'true'
       ? { kind: 'warn', text: 'أُوقف النظام. لا نداء مدفوع ولا مسح ولا نشر حتّى تستأنفه.' }
       : { kind: 'ok', text: 'استُؤنف العمل.' }

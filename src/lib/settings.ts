@@ -14,12 +14,18 @@ export interface Settings {
   readonly paused: boolean
   readonly dailyAnalysisCap: number
   readonly dailySpendCapUsd: number
+  /**
+   * أيُدرج المسحُ اليوميّ ما تغيّر في طابور الفهم بلا أمر؟
+   * افتراضه مطفأ: إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة.
+   */
+  readonly autoEnqueue: boolean
 }
 
 export const DEFAULTS: Settings = {
   paused: false,
   dailyAnalysisCap: 10,
   dailySpendCapUsd: 5,
+  autoEnqueue: false,
 }
 
 /** حدود ما يُقبل. الحدّ الأعلى يحرس من خطأ إصبعٍ في اللوحة. */
@@ -28,7 +34,7 @@ export const LIMITS = {
   dailySpendCapUsd: { min: 0, max: 100 },
 } as const
 
-export type SettingKey = 'paused' | 'daily_analysis_cap' | 'daily_spend_cap_usd'
+export type SettingKey = 'paused' | 'daily_analysis_cap' | 'daily_spend_cap_usd' | 'auto_enqueue'
 
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback
@@ -60,6 +66,9 @@ export async function readSettings(db: Db): Promise<Settings> {
   const map = new Map(rows.map((r) => [r.key, r.value]))
   return {
     paused: map.get('paused') === 'true',
+    // مفاتيح الخطر تُقرأ بالمطابقة الحرفيّة لا بالتساهل: غيابها أو فسادها
+    // يعني «مطفأ»، ولا يُفتح باب إنفاقٍ بقيمةٍ لم تُفهَم
+    autoEnqueue: map.get('auto_enqueue') === 'true',
     dailyAnalysisCap: toNumber(map.get('daily_analysis_cap'), DEFAULTS.dailyAnalysisCap, 'dailyAnalysisCap'),
     dailySpendCapUsd: toNumber(map.get('daily_spend_cap_usd'), DEFAULTS.dailySpendCapUsd, 'dailySpendCapUsd'),
   }
@@ -81,7 +90,7 @@ export async function writeSetting(
   updatedBy: string,
 ): Promise<WriteResult> {
   let stored: string
-  if (key === 'paused') {
+  if (key === 'paused' || key === 'auto_enqueue') {
     stored = raw === 'true' ? 'true' : 'false'
   } else {
     const limitKey = key === 'daily_analysis_cap' ? 'dailyAnalysisCap' : 'dailySpendCapUsd'
