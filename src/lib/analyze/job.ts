@@ -5,15 +5,17 @@
  *
  *   ١ · اقرأ المصدر من القاعدة
  *   ٢ · إن كان محلَّلا ببصمته الحاليّة — اخرج بلا نداء (D-008: لا يُدفع مرّتين)
- *   ٣ · صدّر النصّ من Drive
- *   ٤ · نادِ Claude
- *   ٥ · **سجّل الكلفة**
- *   ٦ · اكتب التحليل
+ *   ٣ · **افحص الإيقاف والسقفين** — قبل أن يُلمس Drive
+ *   ٤ · صدّر النصّ من Drive
+ *   ٥ · نادِ Claude
+ *   ٦ · **سجّل الكلفة**
+ *   ٧ · اكتب التحليل
  *
- * والخامسة قبل السادسة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
+ * والسادسة قبل السابعة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
  * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
  */
 import { recordCost } from '../cost'
+import { blockerReason, checkAllowance } from '../limits'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'
@@ -41,6 +43,12 @@ export function analysisCost(usage: {
 
 export type AnalyzeOutcome =
   | { readonly kind: 'analyzed'; readonly sourceId: string; readonly worth: number; readonly cost: number }
+  /**
+   * منعه الإيقاف أو أحد السقفين. ليس فشلا: قرارٌ نُفِّذ.
+   * ولا يُعاد في الطابور — إعادةُ ما مُنع بسقفٍ تدور بلا نهاية حتّى
+   * ينتهي اليوم، وتستنزف حصّة الطابور بلا نداءٍ واحد ينجح.
+   */
+  | { readonly kind: 'blocked'; readonly sourceId: string; readonly reason: string }
   /** مُحلَّل ببصمته الحاليّة — لا نداء ولا كلفة. */
   | { readonly kind: 'already'; readonly sourceId: string }
   /** نوعٌ لا يُصدَّر، أو نصٌّ أكبر من السقف. لا يُعاد ولا يُرمى. */
@@ -100,8 +108,15 @@ export async function analyzeSource(
     return { kind: 'already', sourceId: source.id }
   }
 
+  // ٣ · الإيقاف والسقفان — قبل أن يُلمس Drive، فضلا عن Claude.
+  // وموضعه بعد فحص «محلَّل بالفعل» عمدا: ما لا يكلّف شيئا لا يُمنع بسقف.
+  const allowance = await checkAllowance(deps.db)
+  if (allowance.blocker !== null) {
+    return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
+  }
+
   try {
-    // ٣ · التصدير
+    // ٤ · التصدير
     const sa = parseServiceAccount(deps.serviceAccountJson)
     const token = await accessToken(sa, now, deps.fetchImpl ?? fetch)
     const extracted = await extractText(
@@ -120,7 +135,7 @@ export async function analyzeSource(
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
-    // ٤ · النداء
+    // ٥ · النداء
     const claudeDeps: AnalyzeDeps = {
       apiKey: deps.anthropicKey,
       ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
@@ -131,7 +146,7 @@ export async function analyzeSource(
       now,
     })
 
-    // ٥ · الكلفة **قبل** الكتابة (D-008)
+    // ٦ · الكلفة **قبل** الكتابة (D-008)
     const cost = analysisCost(result.usage)
     const units = result.usage.inputTokens + result.usage.cachedInputTokens + result.usage.outputTokens
     await recordCost(deps.db, {
@@ -142,7 +157,7 @@ export async function analyzeSource(
       refId: source.id,
     })
 
-    // ٦ · الكتابة — والبصمة معها، فيُعرف ما حُلِّل ولأيّ نسخة
+    // ٧ · الكتابة — والبصمة معها، فيُعرف ما حُلِّل ولأيّ نسخة
     const { analysis } = result
     const themes = JSON.stringify({
       hash: source.content_hash,

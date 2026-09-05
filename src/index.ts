@@ -11,9 +11,11 @@ import { readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
 import { spendByProvider } from './lib/ai/spend'
+import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { oauth } from './routes/oauth'
+import { panel } from './routes/panel'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -237,10 +239,13 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
     },
     c.req.param('sourceRef'),
   )
+  // 423 Locked: مُنع بقرارٍ قائم لا بعطل. و 502 لعطلٍ حقيقيّ.
+  if (outcome.kind === 'blocked') return c.json(outcome, 423)
   return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
 })
 
 app.route('/', oauth)
+app.route('/', panel)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
 
@@ -291,6 +296,8 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
       { db: env.DB, encKey: env.TOKEN_ENC_KEY },
       message.body,
     )
+    // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
+    // اليوم وتستنزف حصّة الطابور بلا نداءٍ واحد ينجح
     if (outcome.kind === 'failed' && outcome.retryable) {
       message.retry()
     } else {
@@ -308,6 +315,13 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
  */
 async function scheduled(_controller: ScheduledController, env: Env): Promise<void> {
   try {
+    // الإيقاف يوقف المسح أيضا: المسح لا يكلّف مالا، لكن «موقوف مؤقتا»
+    // تعني موقوفا — ونظامٌ يواصل عملا وقد أُوقف يُفقِد المفتاح معناه
+    const allowance = await checkAllowance(env.DB)
+    if (allowance.blocker !== null) {
+      console.info({ job: 'drive-scan', skipped: blockerReason(allowance.blocker) })
+      return
+    }
     const report = await scanDrive({
       db: env.DB,
       serviceAccountJson: env.GOOGLE_SA_JSON,

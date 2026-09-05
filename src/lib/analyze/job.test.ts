@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { analysisCost, analyzeSource, type AnalyzeJobDeps } from './job'
 import { MODEL } from './claude'
+import { writeSetting } from '../settings'
 
 /**
  * مفتاح RSA حقيقيّ يُولَّد مرّة.
@@ -178,6 +179,84 @@ describe('لا يُدفع ثمن ما لم يتغيّر (D-008)', () => {
     expect(out.kind).toBe('analyzed')
     const count = db.raw.prepare('SELECT count(*) AS n FROM content_items').get() as { n: number }
     expect(count.n).toBe(2)
+  })
+})
+
+/**
+ * أهمّ ما في هذه الطبقة: أنّ الحدّ **يُفرَض** لا أنّه مكتوب.
+ * فيُرصد `fetch` ويُثبَت أنّه لم يُستدعَ إطلاقا.
+ */
+describe('الإيقاف والسقفان يُفرضان قبل أيّ نداء', () => {
+  function ledgerEntry(total: number): void {
+    db.raw
+      .prepare(
+        `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total)
+         VALUES (?, 'anthropic', 'analyze:claude-opus-5', 1000, ?, ?)`,
+      )
+      .run(crypto.randomUUID(), total / 1000, total)
+  }
+
+  it('الإيقاف يمنع — ولا يُلمس Drive فضلا عن Claude', async () => {
+    const sourceId = await seedSource()
+    await writeSetting(db, 'paused', 'true', 'test')
+
+    const out = await analyzeSource(deps(net()), sourceId)
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('موقوف')
+    // لا نداء شبكة إطلاقا: لا Google ولا Anthropic
+    expect(calls).toHaveLength(0)
+  })
+
+  it('سقف العدد يمنع بعد بلوغه', async () => {
+    const sourceId = await seedSource()
+    await writeSetting(db, 'daily_analysis_cap', '1', 'test')
+    ledgerEntry(0.001)
+
+    const out = await analyzeSource(deps(net()), sourceId)
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('سقف التحليل')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('سقف المال يمنع ولو بقي في سقف العدد متّسع', async () => {
+    const sourceId = await seedSource()
+    await writeSetting(db, 'daily_analysis_cap', '100', 'test')
+    await writeSetting(db, 'daily_spend_cap_usd', '0.5', 'test')
+    ledgerEntry(0.9)
+
+    const out = await analyzeSource(deps(net()), sourceId)
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('سقف الإنفاق')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('المنع لا يكتب في الدفتر ولا في التحليل', async () => {
+    const sourceId = await seedSource()
+    await writeSetting(db, 'paused', 'true', 'test')
+    await analyzeSource(deps(net()), sourceId)
+
+    const cost = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    const items = db.raw.prepare('SELECT count(*) AS n FROM content_items').get() as { n: number }
+    expect(cost.n).toBe(0)
+    expect(items.n).toBe(0)
+  })
+
+  it('رفعُ الإيقاف يعيد العمل فورا — بلا نشرٍ ولا إعادة تشغيل', async () => {
+    const sourceId = await seedSource()
+    await writeSetting(db, 'paused', 'true', 'test')
+    expect((await analyzeSource(deps(net()), sourceId)).kind).toBe('blocked')
+
+    await writeSetting(db, 'paused', 'false', 'test')
+    expect((await analyzeSource(deps(net()), sourceId)).kind).toBe('analyzed')
+  })
+
+  it('«محلَّل بالفعل» لا يُمنع بسقف — ما لا يكلّف شيئا لا يُحاسَب', async () => {
+    const sourceId = await seedSource()
+    await analyzeSource(deps(net()), sourceId)
+
+    await writeSetting(db, 'paused', 'true', 'test')
+    const out = await analyzeSource(deps(net()), sourceId)
+    expect(out.kind).toBe('already')
   })
 })
 
