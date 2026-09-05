@@ -31,8 +31,10 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'staging' }}
     env:
       TARGET: ${{ github.event.inputs.environment || 'staging' }}
+      # معرّف الحساب في wrangler.toml لا هنا — قيمةٌ في ملفّ تُراجَع،
+      # وسرٌّ يُلصق يدوياً أسقط نشرين. ولا يُمرَّر من الأسرار إطلاقاً:
+      # متغيّر البيئة يغلب الملفّ، فقيمةٌ فاسدة فيه تُبطل الملفّ الصحيح.
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,58 +51,18 @@ jobs:
 
       # يفشل مبكرا برسالة مفهومة بدل أن يفشل wrangler برسالة غامضة.
       #
-      # الوجود وحده لا يكفي: النشر الثاني سقط على معرّف حساب صحيح القيمة
-      # فاسد الشكل، ورسالة wrangler عنه تعرض `***` لأن GitHub يقنّع السر —
-      # فلا يعرف القارئ ما العلّة. فيُفحص الشكل هنا حيث تُقال العلّة بلغة
-      # تُقرأ، قبل أن تُنفَق دقيقة على ترحيل لن يبدأ.
-      - name: التحقق من الأسرار
+      # لم يبقَ إلا الرمز يُفحَص: معرّف الحساب انتقل إلى wrangler.toml بعد
+      # أن أسقط نشرين، ورسالة wrangler عنه كانت تعرض `***` لأنّ GitHub
+      # يقنّع السرّ — فلا يعرف قارئ السجلّ ما العلّة. وما لا يُلصق يدوياً
+      # لا يحتاج بوّابة تحرسه.
+      - name: التحقّق من الرمز
         run: |
-          missing=0
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::error::CLOUDFLARE_API_TOKEN غير مضبوط في أسرار المستودع."
-            missing=1
-          fi
-          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID غير مضبوط في أسرار المستودع."
-            missing=1
-          fi
-          if [ "$missing" -eq 1 ]; then
             echo "::error::Settings ← Secrets and variables ← Actions ← New repository secret"
             exit 1
           fi
-
-          # مسافةٌ أو سطرٌ جديد في نهاية اللصق عطلٌ شائع لا يستحقّ دورة نشر:
-          # يُقلَّم هنا، ويُقنَّع الناتج قبل أن يبلغ أيّ سجلّ — فالقيمة
-          # المقلَّمة تخالف السرّ المسجَّل لدى GitHub فلا يقنّعها تلقائيا.
-          raw_len=${#CLOUDFLARE_ACCOUNT_ID}
-          account=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')
-          if [ -n "$account" ]; then echo "::add-mask::$account"; fi
-          len=${#account}
-
-          if [ "$len" -eq 0 ]; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID مسافاتٌ لا قيمة فيها."
-            exit 1
-          fi
-          if [ "$len" -ne "$raw_len" ]; then
-            echo "::warning::CLOUDFLARE_ACCOUNT_ID كان يحمل مسافةً أو سطرا جديدا — قُلِّم هنا، وصوابه أن يُصحَّح في السرّ نفسه."
-          fi
-
-          # قاعدة wrangler نفسها: حرفٌ أو رقمٌ أو شرطةٌ أو شرطةٌ سفليّة لا غير.
-          case "$account" in
-            *[!A-Za-z0-9_-]*)
-              echo "::error::CLOUDFLARE_ACCOUNT_ID يحمل محارف لا يقبلها wrangler."
-              echo "::error::القيمة معرّف الحساب وحده: لا https:// ولا شرطة مائلة ولا رابط كامل."
-              echo "::error::تجده في عنوان اللوحة بعد أوّل شرطة مائلة: dash.cloudflare.com/<المعرّف>"
-              echo "::error::طوله الآن $len محرفا، والمتوقّع 32 من ستّ عشريّ."
-              exit 1
-              ;;
-          esac
-          if [ "$len" -ne 32 ]; then
-            echo "::warning::طول CLOUDFLARE_ACCOUNT_ID $len لا 32 — تحقّق أنّه المعرّف كاملا لا جزءا منه."
-          fi
-
-          echo "CLOUDFLARE_ACCOUNT_ID=$account" >> "$GITHUB_ENV"
-          echo "السرّان حاضران، وشكل معرّف الحساب سليم."
+          echo "الرمز حاضر. ومعرّف الحساب من wrangler.toml."
 
       # الترحيل قبل الدالة (CLAUDE.md): Worker يقرأ عمودا لم يُضَف ينكسر
       # على منشور مجدول. والترتيب هنا هو الترتيب نفسه في الوثيقة
