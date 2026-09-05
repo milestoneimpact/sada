@@ -1,0 +1,175 @@
+/**
+ * البَتُّ في المسوّدات — **و D-009 يُقطَع في القاعدة لا يُفترَض.**
+ *
+ * آخرُ اختبارٍ هنا هو المهمّ: يحاول أن يدفع منشورا إلى `queued` بلا
+ * `approved_at` **مباشرةً بـ SQL**، متجاوزا كلَّ شيفرةٍ كتبناها. فلو
+ * أخطأنا في كلّ سطرٍ في `store.ts` لبقي القيدُ قائما — وهذا ما يجعله
+ * قيدا لا عادة.
+ */
+import { beforeEach, describe, expect, it } from 'vitest'
+import { fakeDb, type FakeDb } from '../../test/fakes'
+import { decide, listDrafts } from './store'
+
+let db: FakeDb
+
+const LONG = 'ن'.repeat(300)
+
+async function seedDraft(options: {
+  platform?: 'linkedin' | 'x'
+  text?: string
+  status?: string
+  hash?: string
+} = {}): Promise<string> {
+  const sourceId = crypto.randomUUID()
+  await db
+    .prepare(
+      "INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES (?, ?, 'تقرير الأثر', 'text/plain', 'md5:abc')",
+    )
+    .bind(sourceId, sourceId)
+    .run()
+
+  const id = crypto.randomUUID()
+  await db
+    .prepare(
+      `INSERT INTO posts (id, platform, source_id, source_hash, model, cost_usd, type, text,
+                          rationale, status, idempotency_key)
+       VALUES (?, ?, ?, ?, 'claude-opus-5', 0.012, 'text', ?, 'زاوية', ?, ?)`,
+    )
+    .bind(
+      id,
+      options.platform ?? 'linkedin',
+      sourceId,
+      options.hash ?? 'md5:abc',
+      options.text ?? LONG,
+      options.status ?? 'draft',
+      `k-${id}`,
+    )
+    .run()
+  return id
+}
+
+async function readPost(id: string): Promise<Record<string, unknown> | null> {
+  return db
+    .prepare('SELECT status, text, approved_by, approved_at FROM posts WHERE id = ?')
+    .bind(id)
+    .first<Record<string, unknown>>()
+}
+
+beforeEach(() => {
+  db = fakeDb()
+})
+
+describe('الاعتماد', () => {
+  it('نصٌّ لم يتغيّر يُعتمد approved، ومع صاحبِ القرار ووقته', async () => {
+    const id = await seedDraft()
+    const out = await decide(db, id, { kind: 'approve', text: LONG }, 'panel:passkey')
+
+    expect(out).toEqual({ ok: true, status: 'approved' })
+    const row = await readPost(id)
+    expect(row?.['status']).toBe('approved')
+    expect(row?.['approved_by']).toBe('panel:passkey')
+    expect(row?.['approved_at']).not.toBeNull()
+  })
+
+  it('نصٌّ تغيّر يُعتمد edited — والحالةُ تُستنتَج ولا تُسأل', async () => {
+    const id = await seedDraft()
+    const out = await decide(db, id, { kind: 'approve', text: `${LONG} زيادة` }, 'panel:token')
+
+    expect(out).toEqual({ ok: true, status: 'edited' })
+    const row = await readPost(id)
+    expect(row?.['text']).toContain('زيادة')
+  })
+
+  it('نصٌّ فوق حدّ المنصّة يُرفض عند الاعتماد لا عند النشر', async () => {
+    const id = await seedDraft({ platform: 'x', text: 'ن'.repeat(200) })
+    const out = await decide(db, id, { kind: 'approve', text: 'ن'.repeat(400) }, 'panel:token')
+
+    expect(out.ok).toBe(false)
+    // ولا يُكتب شيء: لا نصٌّ ولا اعتماد
+    const row = await readPost(id)
+    expect(row?.['status']).toBe('draft')
+    expect(row?.['approved_at']).toBeNull()
+    expect(String(row?.['text']).length).toBe(200)
+  })
+
+  it('نصٌّ أقصر من أن يكون منشورا يُرفض', async () => {
+    const id = await seedDraft()
+    expect((await decide(db, id, { kind: 'approve', text: 'قصير' }, 'x')).ok).toBe(false)
+  })
+})
+
+describe('الرفض', () => {
+  it('يُعلَّم rejected بلا approved_at — فلا يفتح بابَ الطابور', async () => {
+    const id = await seedDraft()
+    expect(await decide(db, id, { kind: 'reject' }, 'panel:token')).toEqual({
+      ok: true,
+      status: 'rejected',
+    })
+    const row = await readPost(id)
+    expect(row?.['status']).toBe('rejected')
+    expect(row?.['approved_at']).toBeNull()
+  })
+
+  it('ولا يُحذف الصفّ: كلفتُه وقعت، وما دُفع ثمنُه يُرى', async () => {
+    const id = await seedDraft()
+    await decide(db, id, { kind: 'reject' }, 'panel:token')
+    const list = await listDrafts(db)
+    expect(list.map((d) => d.id)).toContain(id)
+    expect(list[0]?.cost).toBe(0.012)
+  })
+})
+
+describe('ما غادر المسوّدةَ لا يُبَتّ فيه ثانية', () => {
+  it('المعتمَدُ لا يُعتمد مرّتين', async () => {
+    const id = await seedDraft({ status: 'approved' })
+    expect((await decide(db, id, { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
+  })
+
+  it('المرفوضُ لا يُقلَب اعتمادا من هذا الباب', async () => {
+    const id = await seedDraft({ status: 'rejected' })
+    expect((await decide(db, id, { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
+  })
+
+  it('معرّفٌ لا وجود له لا يُنشئ صفّا', async () => {
+    expect((await decide(db, 'لا-شيء', { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
+  })
+})
+
+describe('العرض', () => {
+  it('يعلّم المسوّدةَ التي تغيّر مصدرُها بعدها', async () => {
+    const fresh = await seedDraft()
+    const stale = await seedDraft({ hash: 'md5:قديم' })
+    const list = await listDrafts(db)
+    expect(list.find((d) => d.id === stale)?.stale).toBe(true)
+    expect(list.find((d) => d.id === fresh)?.stale).toBe(false)
+  })
+
+  it('يجلب اسمَ المصدر مع المسوّدة — فلا يُقرأ نصٌّ بلا أصله', async () => {
+    const id = await seedDraft()
+    const list = await listDrafts(db)
+    expect(list.find((d) => d.id === id)?.sourceName).toBe('تقرير الأثر')
+  })
+})
+
+describe('D-009 · القيدُ في القاعدة لا في الشيفرة', () => {
+  it('SQL مباشر يحاول الطابورَ بلا اعتماد — فتردّه القاعدة', async () => {
+    const id = await seedDraft()
+    await expect(
+      db
+        .prepare("UPDATE posts SET status = 'queued', scheduled_at = '2026-09-09T09:00:00Z' WHERE id = ?")
+        .bind(id)
+        .run(),
+    ).rejects.toThrow()
+  })
+
+  it('ولا طابورَ إلى حسابٍ لا وجود له، وإن كان الاعتماد قائما', async () => {
+    const id = await seedDraft()
+    await decide(db, id, { kind: 'approve', text: LONG }, 'panel:token')
+    await expect(
+      db
+        .prepare("UPDATE posts SET status = 'queued', scheduled_at = '2026-09-09T09:00:00Z' WHERE id = ?")
+        .bind(id)
+        .run(),
+    ).rejects.toThrow()
+  })
+})

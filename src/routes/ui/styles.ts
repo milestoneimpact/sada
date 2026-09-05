@@ -268,6 +268,45 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .ago{font-size:11.5px; color:var(--ink-3)}
 .ch-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
 
+/* ── المسوّدات ────────────────────────────────────────────────────────
+   المربّعُ نفسه هو المعروض: لا «اعرض» ثمّ «عدّل» في شاشتين، فما يُقرأ هو
+   ما يُرسَل. ولذلك يرث خطَّ الصفحة وقياسَها لا خطَّ النماذج الافتراضيّ —
+   منشورٌ يُقرأ في مربّعٍ ضيّق يُحكَم عليه بغير ما سيبدو عليه. */
+/* شبكةٌ لا تمطّ: بطاقتان بنصّين مختلفَي الطول لا تُجبَران على ارتفاعٍ
+   واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين. */
+.grid.ragged{align-items:start}
+.draft{display:flex; flex-direction:column; gap:11px; background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px; box-shadow:var(--sh-1)}
+.draft.done{background:var(--surface-2); box-shadow:none}
+.draft-top{display:flex; align-items:center; gap:11px}
+.ch-logo.sm{width:30px; height:30px; border-radius:8px}
+.draft-why{margin:0; font-size:12px; color:var(--ink-3); line-height:1.7;
+  border-inline-start:2px solid var(--line); padding-inline-start:10px}
+/* ارتفاعٌ من مضاعفاتِ السطر بالضبط.
+   بارتفاعٍ حرّ يقع السطرُ الأخير مقصوصا في نصفه — نصفُ حرفٍ عند الحافّة
+   يُقرأ عطلا في الرسم لا نصّا يفيض. والحسابُ يقتضي line-height بالبكسل
+   لا بمعامل: المعاملُ يعطي كسرا لا يُضرَب فيبقى النصف. */
+.draft-text{width:100%; box-sizing:border-box; font:inherit; font-size:13.5px;
+  line-height:26px; color:var(--ink); background:var(--bg); border:1px solid var(--line);
+  border-radius:var(--r); padding:13px 15px; resize:vertical;
+  white-space:pre-wrap; word-break:break-word; overflow-y:auto;
+  height:calc(var(--lines) * 26px + 28px)}
+/* المقروءُ يأخذ قدرَ نصّه بسقف: مربّعٌ ثابتٌ تحت نصٍّ قصير فراغٌ بلا سبب،
+   وتحت نصٍّ طويل تمريرٌ في نصٍّ لا يُحرَّر. */
+.draft-text[data-ro]{height:auto; max-height:calc(var(--lines) * 26px + 28px)}
+.draft-text:focus{outline:none; border-color:var(--gold-deep); box-shadow:var(--ring)}
+/* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
+   على نصٍّ لا يُحرَّر يعد بما لا يقع. */
+.draft-text.ro{background:var(--surface-3); color:var(--ink-2); resize:none}
+.draft-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:9px}
+/* عدّادٌ لاتينيّ الأرقام: يُعزَل عن اتّجاه الصفحة فلا يُقلب «١٢٠ / ٢٨٠» */
+.draft-foot .count{font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums;
+  direction:ltr; unicode-bidi:isolate}
+.draft-foot .count b{color:var(--ink-2); font-weight:700}
+.draft-foot .count.warn b{color:var(--warn)}
+.draft-foot .count.bad b{color:var(--bad)}
+.draft-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+
 /* ── العامل الثاني ─────────────────────────────────────────── */
 .codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; margin:12px 0}
 .codes code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
@@ -307,6 +346,8 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
   .topbar{padding:0 16px} .content{padding:16px}
 }
 @media(max-width:720px){
+  .draft-text{height:calc((var(--lines) + 6) * 26px + 28px)}
+  .draft-text[data-ro]{height:auto; max-height:calc((var(--lines) + 6) * 26px + 28px)}
   .scroll{overflow:visible; margin:0}
   table{min-width:0; display:block}
   thead{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}

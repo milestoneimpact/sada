@@ -40,13 +40,14 @@ async function seedPost(options: {
   const approved = options.approved ?? true
   db.raw
     .prepare(
-      `INSERT INTO posts (id, account_id, type, text, scheduled_at, status,
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
                           idempotency_key, approved_by, approved_at)
-       VALUES (?, ?, 'text', ?, '2026-09-08T09:00:00Z', ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'text', ?, '2026-09-08T09:00:00Z', ?, ?, ?, ?)`,
     )
     .run(
       postId,
       accountId,
+      options.platform,
       options.text ?? 'نص المنشور',
       options.status ?? 'queued',
       await idempotencyKey(postId),

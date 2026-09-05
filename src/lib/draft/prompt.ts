@@ -1,0 +1,165 @@
+/**
+ * وصفُ الكتابة — ولكلّ منصّةٍ وصفُها.
+ *
+ * ## لماذا لا يُعاد استعمال نصٍّ واحد
+ *
+ * منشورُ LinkedIn فقراتٌ في ألفٍ ومئتي محرف، ومنشورُ X جملةٌ في مئتين
+ * وخمسٍ وسبعين. ونصٌّ يُكتب لأحدهما ثمّ يُقصّ للآخر **يفشل في كليهما**:
+ * الطويلُ مبتورٌ في X، والقصيرُ أجوفُ في LinkedIn.
+ *
+ * فلكلٍّ نداؤه ووصفُه — وثمنُ ذلك نداءان لا واحد، وهو ثمنٌ يُدفع لأنّ
+ * البديلَ منشورٌ لا يُنشر.
+ *
+ * ## وما لا يُطلب من النموذج
+ *
+ * **لا وعودَ ولا أرقامَ لم ترد في المصدر.** فالمنشورُ يخرج باسم المالك،
+ * ورقمٌ اخترعه نموذجٌ يصير قولا قاله المالك. ولذلك يُطلب صراحةً: لا رقم
+ * ولا اسمَ علمٍ ولا تاريخَ إلّا ما في الخلاصة.
+ */
+
+export type Platform = 'linkedin' | 'x'
+
+export interface PlatformSpec {
+  readonly id: Platform
+  readonly label: string
+  /** أقصى ما تقبله المنصّة — حدٌّ تقنيّ لا ذوقيّ. */
+  readonly hardLimit: number
+  /** ما نستهدفه: دون الحدّ بمسافةٍ تحتمل تعديل المالك. */
+  readonly target: number
+  readonly guide: string
+}
+
+export const PLATFORMS: Readonly<Record<Platform, PlatformSpec>> = {
+  linkedin: {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    hardLimit: 3000,
+    target: 1300,
+    guide: [
+      'اكتب منشور LinkedIn عربيّا في حدود ١١٠٠ إلى ١٤٠٠ محرف.',
+      'ابدأ بجملةٍ تقف وحدها وتستحقّ التوقّف — لا بمقدّمةٍ عن أهمّية الموضوع.',
+      'ثلاثُ فقراتٍ إلى خمس، بينها سطرٌ فارغ. والفقرةُ سطران أو ثلاثة لا أكثر.',
+      'نبرةٌ مهنيّةٌ هادئة: تشرح ولا تعظ، وتقرّر ولا تبالغ.',
+      'اختم بسؤالٍ أو خلاصةٍ تدعو إلى تعليق — بلا «ما رأيكم؟» المستهلكة.',
+      'ثلاثةُ وسومٍ في آخر النصّ على الأكثر، ولا وسمَ داخل الجملة.',
+    ].join('\n'),
+  },
+  x: {
+    id: 'x',
+    label: 'X',
+    hardLimit: 280,
+    target: 250,
+    guide: [
+      'اكتب منشور X عربيّا في حدود ٢٢٠ إلى ٢٦٠ محرفا — ولا تتجاوز ٢٧٥.',
+      'الفكرةُ كاملةٌ في المنشور الواحد: لا «تتمّة» ولا «خيط».',
+      'الجملةُ الأولى تحمل الفكرة كلَّها؛ وما بعدها يسندها.',
+      'جملٌ قصيرة، وبلا حشوٍ ولا تمهيد.',
+      'وسمٌ واحد على الأكثر، أو بلا وسم.',
+    ].join('\n'),
+  },
+}
+
+/**
+ * الوصفُ الحاكم — ثابتٌ لكلّ نداء، فيُخزَّن مؤقّتا عند المزوّد ولا
+ * يُحاسَب على إعادة إرساله.
+ */
+export function systemPrompt(spec: PlatformSpec): string {
+  return [
+    'أنت تكتب باسم مالك الحساب، لا باسمك. فما تكتبه يخرج قولا له.',
+    '',
+    '## قيودٌ لا تُخالَف',
+    '',
+    '**لا رقمَ ولا اسمَ علمٍ ولا تاريخَ ولا اقتباسَ إلّا ما ورد في الخلاصة',
+    'المعطاة.** ورقمٌ تخترعه يصير رقما قاله المالك — وهذا أسوأ ما يمكن أن',
+    'يقع. وإن نقصك سندٌ فاكتب الفكرة بلا رقم.',
+    '',
+    '**لا رابطَ ولا دعوةَ إلى منتَج ولا وعدَ بنتيجة.**',
+    '',
+    '**العربيّةُ فصيحةٌ معاصرة**: لا عامّيّة، ولا تكلّفَ في الجزالة، ولا',
+    'ترجمةٌ حرفيّة من الإنجليزيّة. والمصطلحُ التقنيّ يبقى بحروفه اللاتينيّة',
+    'إن كان ذلك أوضح.',
+    '',
+    '## المنصّة',
+    '',
+    spec.guide,
+    '',
+    '## المخرَج',
+    '',
+    'أعد JSON بحقلين لا غير:',
+    '`text` نصُّ المنشور كما يُنشر — بلا عنوانٍ ولا تعليقٍ منك.',
+    '`rationale` سطرٌ واحد يشرح لماذا هذه الزاوية دون غيرها.',
+  ].join('\n')
+}
+
+export interface SourceBrief {
+  readonly name: string
+  readonly summary: string
+  readonly themes: readonly string[]
+  readonly worth: number
+}
+
+/** ما يُعطاه النموذج عن المصدر — خلاصتُه لا نصُّه كاملا. */
+export function userPrompt(brief: SourceBrief): string {
+  return [
+    `# ${brief.name}`,
+    '',
+    '## الخلاصة',
+    brief.summary,
+    '',
+    brief.themes.length === 0 ? '' : `## المحاور\n${brief.themes.join(' · ')}`,
+    '',
+    'اكتب منشورا واحدا من هذه المادّة.',
+  ]
+    .filter((line) => line !== '')
+    .join('\n')
+}
+
+/** مخطَّطُ الجواب — يُفرض على المزوّد لا يُرجى منه. */
+export const DRAFT_SCHEMA = {
+  type: 'object',
+  properties: {
+    text: { type: 'string', minLength: 40 },
+    rationale: { type: 'string' },
+  },
+  required: ['text', 'rationale'],
+  additionalProperties: false,
+} as const
+
+export interface Draft {
+  readonly text: string
+  readonly rationale: string
+}
+
+/**
+ * يقرأ جواب النموذج ويتحقّق منه.
+ *
+ * والطولُ يُفحص هنا لا يُترك للنموذج: وصفٌ يقول «لا تتجاوز ٢٧٥» يُطاع
+ * أكثرَ ممّا يُعصى ولا يُطاع دائما. ونصٌّ يتجاوز حدَّ المنصّة يُرفض عند
+ * النشر — **فيُمسك الآن، لا بعد أن يعتمده المالك.**
+ */
+export function parseDraft(
+  raw: unknown,
+  spec: PlatformSpec,
+): { ok: true; draft: Draft } | { ok: false; reason: string } {
+  if (typeof raw !== 'object' || raw === null) {
+    return { ok: false, reason: 'الجواب ليس كائنا' }
+  }
+  const value = raw as Partial<Draft>
+  if (typeof value.text !== 'string' || value.text.trim().length < 40) {
+    return { ok: false, reason: 'النصّ فارغ أو أقصر من أن يكون منشورا' }
+  }
+  const text = value.text.trim()
+  if (text.length > spec.hardLimit) {
+    return {
+      ok: false,
+      reason: `النصّ ${text.length} محرفا و ${spec.label} تقبل ${spec.hardLimit}`,
+    }
+  }
+  return {
+    ok: true,
+    draft: {
+      text,
+      rationale: typeof value.rationale === 'string' ? value.rationale.trim() : '',
+    },
+  }
+}
