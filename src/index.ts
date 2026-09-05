@@ -54,11 +54,26 @@ app.get('/ready', async (c) => {
 app.post('/admin/scan', async (c) => {
   // الحارس قبل أيّ عمل: لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
   const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
-  if (verdict === 'disabled') {
+  if (verdict.kind === 'disabled') {
     return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
   }
-  if (verdict === 'denied') {
-    return c.json({ error: 'unauthorized' }, 401)
+  if (verdict.kind === 'no_header') {
+    return c.json(
+      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
+      401,
+    )
+  }
+  if (verdict.kind === 'denied') {
+    // طول ما أرسله المنادي يعرفه هو أصلا. ويكشف أشيع الأخطاء: قوسان
+    // زائدان، أو مسافة، أو سطر جديد. ولا يُذكر طول المحفوظ قطّ.
+    return c.json(
+      {
+        error: 'unauthorized',
+        presented_length: verdict.presentedLength,
+        hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
+      },
+      401,
+    )
   }
   try {
     const report = await scanDrive({

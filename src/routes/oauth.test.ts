@@ -253,13 +253,28 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
     expect(net.calls).toBe(0)
   })
 
-  it('يرد 401 بلا ترويسة أصلا', async () => {
-    const response = await app.request(
+  it('يميّز غياب الترويسة عن مخالفة الرمز — الأول لا يعطي طولا', async () => {
+    const bare = await app.request(
       '/admin/scan',
       { method: 'POST' },
       { ...env, ADMIN_TOKEN: TOKEN },
     )
+    expect(bare.status).toBe(401)
+    const bareBody = (await bare.json()) as Record<string, unknown>
+    expect(bareBody['error']).toBe('no_authorization_header')
+    expect(bareBody['presented_length']).toBeUndefined()
+  })
+
+  it('يعيد طول ما أرسله المنادي ليكشف القوسين والمسافة', async () => {
+    const response = await app.request(
+      '/admin/scan',
+      { method: 'POST', headers: { Authorization: `Bearer <${TOKEN}>` } },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
     expect(response.status).toBe(401)
+    const body = (await response.json()) as Record<string, unknown>
+    expect(body['error']).toBe('unauthorized')
+    expect(body['presented_length']).toBe(TOKEN.length + 2)
   })
 
   it('لا يذكر قيمة الرمز في أيّ ردّ', async () => {
