@@ -21,6 +21,7 @@
 | **`GOOGLE_SA_JSON`** | ملفّ حساب الخدمة **كاملًا** |
 | `ANTHROPIC_API_KEY` | الفهم والتخطيط والكتابة |
 | `GEMINI_API_KEY` | توليد الصور (المرحلة ٢) |
+| **`ADMIN_TOKEN`** | يحرس `/admin/*` (D-019) |
 
 **طريقان — اللوحة أسهل لملفّ JSON:**
 
@@ -39,6 +40,28 @@ rm ~/Downloads/sa.json
 # قيمة سطر واحد: يسأل ويخفي أثناء الكتابة
 npx wrangler secret put ANTHROPIC_API_KEY --env staging
 ```
+
+#### `ADMIN_TOKEN` — ولّده، ولا تخترعه
+
+`/admin/scan` مقفلٌ ما دام غائبًا (D-019): مغلقٌ افتراضًا لا مفتوح.
+ولّده عشوائيًّا، **ASCII لا عربيّة** — ترويسة HTTP نصّ `latin-1` فلا
+تحمل حرفًا عربيًّا أصلًا:
+
+```bash
+# يطبع الرمز مرّة، فانسخه ثمّ الصقه في الأمر التالي
+openssl rand -hex 32
+npx wrangler secret put ADMIN_TOKEN --env staging
+```
+
+ثمّ يُستدعى المسح به:
+
+```bash
+curl -X POST https://sada2.basserh.com/admin/scan \
+  -H "Authorization: Bearer <الرمز>"
+```
+
+⛔ **لا ترسل هذا الرمز في محادثة ولا بريد.** وهو مثل `TOKEN_ENC_KEY`:
+تولّده أنت، ولا يمرّ بي.
 
 > **اسم الـ Worker `sada-api-staging`** مشتقّ: `name = "sada-api"` في
 > `wrangler.toml` زائد لاحقة البيئة. ضع الأسرار عليه الآن ولا تنتظر النشر:
@@ -247,6 +270,7 @@ npx wrangler secret put LINKEDIN_CLIENT_ID   --env staging
 npx wrangler secret put LINKEDIN_CLIENT_SECRET --env staging
 npx wrangler secret put X_CLIENT_ID          --env staging
 npx wrangler secret put X_CLIENT_SECRET      --env staging
+npx wrangler secret put ADMIN_TOKEN          --env staging
 ```
 
 الترحيل **طُبّق فعلاً** على `sada-staging` في 2026-09-04. الأمر أدناه يبقى

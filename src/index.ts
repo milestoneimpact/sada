@@ -6,6 +6,7 @@
  */
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
+import { authorizeAdmin } from './lib/adminAuth'
 import { readiness, type Env } from './env'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
@@ -51,6 +52,14 @@ app.get('/ready', async (c) => {
  * لا يفعل شيئا لا يفعله Cron: المسار نفسه، فما يُختبر هنا هو ما يجري هناك.
  */
 app.post('/admin/scan', async (c) => {
+  // الحارس قبل أيّ عمل: لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
+  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
+  if (verdict === 'disabled') {
+    return c.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
+  }
+  if (verdict === 'denied') {
+    return c.json({ error: 'unauthorized' }, 401)
+  }
   try {
     const report = await scanDrive({
       db: c.env.DB,
