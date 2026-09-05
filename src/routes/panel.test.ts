@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { readSettings } from '../lib/settings'
+import { readRecord, resolveKey } from '../lib/providerKeys'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -469,5 +470,105 @@ describe('مفتاح الإدراج الآليّ في اللوحة', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('رُفع الإدراج الآليّ')
     expect(html).toContain('إطفاء')
+  })
+})
+
+describe('خزانة المفاتيح في اللوحة', () => {
+  const GEMINI = 'AIzaSyZZZZZZZZZZZZZZZZZZZZZZZZZZZZ9x1c'
+
+  async function post(cookie: string, path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) body.set(k, v)
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('يحفظ المفتاح ويسترجعه — ولا يظهر في الصفحة', async () => {
+    const cookie = await login()
+    const response = await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    expect(response.status).toBe(303)
+    expect((await resolveKey(db, KEY, 'gemini', undefined)).key).toBe(GEMINI)
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).not.toContain(GEMINI)
+    expect(html).not.toContain(GEMINI.slice(8, 24))
+    // التلميح وحده
+    expect(html).toContain('AIzaSyZ…9x1c')
+  })
+
+  it('**الإشعار لا يذكر المفتاح** — التلميح فقط', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).not.toContain(GEMINI)
+    expect(html).toContain('اختبره قبل أن تعتمد عليه')
+  })
+
+  it('اسمُ مزوّدٍ لا سائق له يُرفض — قائمةُ سماحٍ لا منع', async () => {
+    const cookie = await login()
+    const response = await post(cookie, '/panel/providers/key', { provider: 'openai', key: 'sk-whatever-long' })
+    expect(response.status).toBe(400)
+    const rows = db.raw.prepare('SELECT count(*) AS n FROM provider_keys').get() as { n: number }
+    expect(rows.n).toBe(0)
+  })
+
+  it('بلا جلسة لا يُحفظ ولا يُحذف مفتاح', async () => {
+    const body = new FormData()
+    body.set('provider', 'gemini')
+    body.set('key', GEMINI)
+    expect((await app.request('/panel/providers/key', { method: 'POST', body }, env)).status).toBe(401)
+
+    const del = new FormData()
+    del.set('provider', 'gemini')
+    expect((await app.request('/panel/providers/delete', { method: 'POST', body: del }, env)).status).toBe(401)
+  })
+
+  it('التعطيل يمنع الاستعمال ويُبقي المفتاح', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    await post(cookie, '/panel/providers/toggle', { provider: 'gemini', enabled: 'false' })
+    expect((await resolveKey(db, KEY, 'gemini', undefined)).key).toBeNull()
+
+    await post(cookie, '/panel/providers/toggle', { provider: 'gemini', enabled: 'true' })
+    expect((await resolveKey(db, KEY, 'gemini', undefined)).key).toBe(GEMINI)
+  })
+
+  it('السقف الخاصّ يُحفظ ويُزال', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    await post(cookie, '/panel/providers/cap', { provider: 'gemini', cap: '2.5' })
+    expect((await readRecord(db, 'gemini'))?.dailyCap).toBe(2.5)
+
+    await post(cookie, '/panel/providers/cap', { provider: 'gemini', cap: '' })
+    expect((await readRecord(db, 'gemini'))?.dailyCap).toBeNull()
+  })
+
+  it('الحذف يسأل قبل أن يقع', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('لا يُسترجَع')
+  })
+
+  it('سرُّ Worker لا يُدار من اللوحة — ولا يُقنَّع ولا يُعرض', async () => {
+    const cookie = await login()
+    const withSecret = { ...env, ANTHROPIC_API_KEY: 'sk-ant-سرّ-في-الورَكر' }
+    const html = await (await app.request('/panel', withSession(cookie), withSecret)).text()
+    expect(html).toContain('سرّ Worker')
+    expect(html).toContain('لا يُبدَّل ولا يُعطَّل من هنا')
+    expect(html).not.toContain('sk-ant-سرّ')
+  })
+
+  it('بلا TOKEN_ENC_KEY لا تعمل الخزانة — ويُقال ذلك لا يُبتلَع', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('provider', 'gemini')
+    body.set('key', GEMINI)
+    await app.request(
+      '/panel/providers/key',
+      withSession(cookie, { method: 'POST', body }),
+      { ...env, TOKEN_ENC_KEY: '' },
+    )
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('TOKEN_ENC_KEY غير مضبوط')
   })
 })

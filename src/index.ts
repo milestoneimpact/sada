@@ -236,6 +236,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
       db: c.env.DB,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
+      encKey: c.env.TOKEN_ENC_KEY,
     },
     c.req.param('sourceRef'),
   )
@@ -278,6 +279,7 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Prom
         db: env.DB,
         serviceAccountJson: env.GOOGLE_SA_JSON,
         anthropicKey: env.ANTHROPIC_API_KEY,
+        encKey: env.TOKEN_ENC_KEY,
       },
       message.body.sourceId,
     )
