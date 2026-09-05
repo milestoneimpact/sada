@@ -267,7 +267,14 @@ const SCRIPT = `
 })();
 `
 
-function shell(title: string, body: string, script = ''): string {
+/**
+ * القشرة — و `nonce` يمرّ إلى كلّ ما هو داخليّ.
+ *
+ * السياسةُ في الترويسة تسمح بـ `'nonce-…'` وحده، لا بـ `'unsafe-inline'`.
+ * فوسمٌ داخليّ بلا `nonce` **لا يُنفَّذ ولا يُطبَّق** — وهذا هو المقصود:
+ * سطرٌ يحقنه مهاجم لن يحمل قيمةً لا يعرفها.
+ */
+function shell(title: string, body: string, nonce: string, script = ''): string {
   return `<!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="dark">
@@ -275,7 +282,22 @@ function shell(title: string, body: string, script = ''): string {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>${STYLE}</style></head><body>${body}${script === '' ? '' : `<script>${script}</script>`}</body></html>`
+<style nonce="${escapeHtml(nonce)}">${STYLE}</style></head><body>${body}${
+    script === '' ? '' : `<script nonce="${escapeHtml(nonce)}">${script}</script>`
+  }</body></html>`
+}
+
+/**
+ * يحقن رمز CSRF في **كلّ** نموذج POST في الصفحة.
+ *
+ * ولم يُكتب في كلّ نموذجٍ يدا لسببٍ واحد: نموذجٌ جديد يُضاف بعد شهر
+ * فيُنسى فيه الحقل، ويعمل عملا صحيحا فلا يلحظ أحدٌ نقصه — وهي عينُ
+ * الثغرة التي كشفها D-019: حارسٌ يُنسى نسخُه في مسارٍ جديد. فالحقن هنا
+ * مرّةً واحدة، ولا سبيل إلى نسيانه.
+ */
+export function injectCsrf(html: string, token: string): string {
+  const field = `<input type="hidden" name="_csrf" value="${escapeHtml(token)}">`
+  return html.replace(/(<form\b[^>]*\bmethod="POST"[^>]*>)/gi, (tag) => tag + field)
 }
 
 // ── صفحة الدخول ──────────────────────────────────────────
@@ -285,7 +307,7 @@ export interface LoginState {
   readonly blocked?: boolean
 }
 
-export function loginPage(state: LoginState = {}): string {
+export function loginPage(state: LoginState = {}, nonce = ''): string {
   const note =
     state.error === undefined
       ? ''
@@ -310,6 +332,7 @@ export function loginPage(state: LoginState = {}): string {
       </div>
       <footer style="border:0;justify-content:center">الجلسة ثماني ساعات</footer>
     </div></div>`,
+    nonce,
   )
 }
 
@@ -377,6 +400,69 @@ export interface PanelData {
   readonly postsBuilt: boolean
   readonly flash: PanelFlash | null
   readonly now: Date
+  /** رمز CSRF لهذه الجلسة — يُحقن في كلّ نموذج. */
+  readonly csrf: string
+  /** قيمة `nonce` لهذا الردّ وحده. */
+  readonly nonce: string
+  readonly sessions: PanelSession[]
+  readonly audit: PanelAudit[]
+}
+
+export interface PanelSession {
+  readonly id: string
+  readonly at: string
+  readonly ip: string
+  readonly ua: string
+  readonly current: boolean
+}
+
+export interface PanelAudit {
+  readonly at: string
+  readonly actor: string
+  readonly action: string
+  readonly target: string | null
+  readonly detail: string | null
+  readonly ip: string | null
+}
+
+/**
+ * اسمُ الفعل بالعربيّة.
+ *
+ * والقاموس ناقصٌ عمدا: فعلٌ لا اسمَ له يُعرض باسمه الحرفيّ لا بـ«غير
+ * معروف». سجلٌّ يُخفي ما لا يفهمه ليس سجلّا.
+ */
+const ACTION_LABEL: Readonly<Record<string, string>> = {
+  'session.open': 'فُتحت جلسة',
+  'session.close': 'أُغلقت جلسة',
+  'session.revoke': 'أُبطلت جلسة',
+  'session.revoke_all': 'أُبطلت كلّ الجلسات',
+  'login.denied': 'محاولة دخول مرفوضة',
+  'settings.write': 'تغيير إعداد',
+  'drive.scan': 'مسح Drive',
+  'source.analyze': 'تحليل مصدر',
+  'provider.upsert': 'إضافة مزوّد أو تعديله',
+  'provider.key': 'تبديل مفتاح',
+  'provider.verify': 'اختبار مفتاح',
+  'provider.toggle': 'تفعيل أو تعطيل',
+  'provider.delete': 'حذف مزوّد',
+  'route.write': 'توجيه مهمّة',
+}
+
+/** متصفّحٌ يُختصر إلى ما يُميّزه. الترويسة كاملةً سطرٌ لا يُقرأ. */
+function shortUa(ua: string): string {
+  if (ua === '') return 'غير معروف'
+  const os = /Windows/i.test(ua) ? 'Windows'
+    : /iPhone|iPad/i.test(ua) ? 'iOS'
+    : /Android/i.test(ua) ? 'Android'
+    : /Mac OS X|Macintosh/i.test(ua) ? 'macOS'
+    : /Linux/i.test(ua) ? 'Linux' : ''
+  const browser = /Edg\//i.test(ua) ? 'Edge'
+    : /OPR\//i.test(ua) ? 'Opera'
+    : /Firefox\//i.test(ua) ? 'Firefox'
+    : /Chrome\//i.test(ua) ? 'Chrome'
+    : /Safari\//i.test(ua) ? 'Safari' : ''
+  const parts = [browser, os].filter((x) => x !== '')
+  return parts.length === 0 ? ua.slice(0, 40) : parts.join(' · ')
 }
 
 const TASK_LABEL: Readonly<Record<string, string>> = {
@@ -700,6 +786,28 @@ export function panelPage(d: PanelData): string {
           ? '<span class="st bad"><span class="g">✕</span>مزوّده غير جاهز</span>'
           : '<span class="st idle"><span class="g">○</span>لم تُبنَ</span>'}</td></tr>`).join('')
 
+  const sessionRows = d.sessions.map((x) => `<tr>
+    <td><div class="nm">${escapeHtml(shortUa(x.ua))}${
+      x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}</div>
+      <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
+    <td><span title="${escapeHtml(x.at)} UTC">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
+    <td>${x.current
+      ? '<span class="st ok"><span class="g">●</span>جلستك</span>'
+      : `<form class="inline" method="POST" action="/panel/sessions/revoke"
+             data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
+           <input type="hidden" name="id" value="${escapeHtml(x.id)}">
+           <button class="d sm" type="submit">أبطلها</button></form>`}</td>
+  </tr>`).join('')
+
+  const auditRows = d.audit.map((a) => `<tr>
+    <td><span title="${escapeHtml(a.at)} UTC">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
+    <td><div class="nm">${escapeHtml(ACTION_LABEL[a.action] ?? a.action)}</div>
+      <div class="mono">${escapeHtml(a.action)}</div></td>
+    <td>${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(a.target)}</span>`}
+      ${a.detail === null ? '' : `<div class="sub">${escapeHtml(a.detail)}</div>`}</td>
+    <td><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>
+  </tr>`).join('')
+
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="wrap">
@@ -719,6 +827,7 @@ ${flash}
   <a href="#providers">المزوّدون${missing > 0 ? `<span class="count">${missing}</span>` : ''}</a>
   <a href="#posts">المنشورات</a>
   <a href="#settings">الإعدادات</a>
+  <a href="#security">الأمان${d.sessions.length > 1 ? `<span class="count">${d.sessions.length}</span>` : ''}</a>
 </nav>
 
 <main id="main">
@@ -835,11 +944,47 @@ ${flash}
     </form>
   </div>
 </section>
+
+<section data-pane="security" hidden>
+  <div class="card"><h2>الأجهزة المفتوحة</h2>
+    <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة ثماني ساعات ثمّ تنتهي وحدها.</p>
+    ${d.sessions.length === 0
+      ? '<div class="empty"><b>لا جلسات محفوظة</b><p>قد يكون التخزين لا يدعم الجرد في هذه البيئة.</p></div>'
+      : `<div class="scroll"><table>
+          <thead><tr><th>الجهاز</th><th>فُتحت</th><th></th></tr></thead>
+          <tbody>${sessionRows}</tbody></table></div>`}
+    <hr>
+    <div class="split">
+      <p>إبطالُ الجلسات كلّها عدا جلستك هذه. ويُستعمل إن فقدتَ جهازا أو شككتَ في تسرّب.</p>
+      <form class="inline" method="POST" action="/panel/sessions/revoke-all"
+            data-confirm="إبطال كلّ الجلسات الأخرى؟ كلّ جهازٍ آخر سيُطلب منه الدخول من جديد.">
+        <button class="d" type="submit">أخرِج الأجهزة الأخرى</button></form>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px"><h2>الرمز الإداريّ</h2>
+    <p class="hint" style="margin:0"><b>تدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
+      فالجلسة مربوطةٌ ببصمة الرمز الذي فتحها، وتُفحص في كلّ طلب. فإن شككتَ في تسرّبٍ فبدّل الرمز
+      بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
+    <hr>
+    <p class="hint" style="margin:0">وهذه اللوحة اليوم <b>بعاملٍ واحد</b>: رمزٌ يفتح كلّ شيء.
+      وطبقةُ Passkey و 2FA قادمةٌ في الدفعة التالية.</p>
+  </div>
+
+  <div class="card" style="margin-top:14px"><h2>سجلّ التدقيق</h2>
+    <p class="hint">آخر ${d.audit.length} فعلٍ مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاحٌ قطّ.</p>
+    ${d.audit.length === 0
+      ? '<div class="empty"><b>لا شيء بعد</b><p>أوّل فعلٍ في اللوحة يظهر هنا.</p></div>'
+      : `<div class="scroll"><table>
+          <thead><tr><th>متى</th><th>الفعل</th><th>على ماذا</th><th>العنوان</th></tr></thead>
+          <tbody>${auditRows}</tbody></table></div>`}
+  </div>
+</section>
 </main>
 
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
   <span class="mono">${escapeHtml(d.now.toISOString().slice(0, 16).replace('T', ' '))} UTC</span></footer>
 </div>`
 
-  return shell('صدى — لوحة التحكّم', body, SCRIPT)
+  return shell('صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT)
 }

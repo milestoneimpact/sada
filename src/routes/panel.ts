@@ -38,14 +38,31 @@ import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, writeRoute } from '../lib/ai/routes'
 import { writeSetting, type SettingKey } from '../lib/settings'
 import {
-  clearedCookie, COOKIE, createSession, destroySession, readCookie,
-  sessionCookie, validSession,
+  checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
+  loadSession, readCookie, revokeSessions, sessionCookie, type Session,
 } from '../lib/session'
+import { htmlHeaders, makeNonce } from '../lib/security/headers'
+import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
 
 export const panel = new Hono<{ Bindings: Env }>()
 
-const HTML = { 'Content-Type': 'text/html; charset=utf-8' } as const
+/**
+ * صفحةُ HTML بترويساتها كاملةً.
+ *
+ * الـ `nonce` يُولَّد **قبل** الرسم لأنّه يدخل في الوسوم نفسها، ويخرج في
+ * الترويسة. فلا سبيل إلى رسم صفحةٍ بلا سياسةٍ تحرسها: من نادى هذه الدالّة
+ * نال الاثنين معا.
+ */
+function page(render: (nonce: string) => string, status = 200): Response {
+  const nonce = makeNonce()
+  return new Response(render(nonce), { status, headers: htmlHeaders(nonce) })
+}
+
+/** صفحةُ دخولٍ برسالة. تُستعمل حين تسقط الجلسة في منتصف عمل. */
+function loginResponse(error: string, status = 401): Response {
+  return page((nonce) => loginPage({ error }, nonce), status)
+}
 
 /**
  * الإشعار يُخزَّن في KV بمفتاح الجلسة لا في عنوان الصفحة.
@@ -71,6 +88,53 @@ async function takeFlash(env: Env, request: Request): Promise<PanelFlash | null>
   } catch {
     return null
   }
+}
+
+/**
+ * بوّابةُ كلّ فعلٍ في اللوحة: جلسةٌ صالحة، ثمّ رمزُ CSRF.
+ *
+ * **وهي تقرأ النموذج بنفسها وتردّه.** ولو تركتُ كلّ مسارٍ يقرأ نموذجه ثمّ
+ * ينادي حارسا، لأمكن أن يُكتب مسارٌ يقرأ ولا ينادي — والجسدُ لا يُقرأ
+ * مرّتين فلا سبيل إلى حارسٍ يسبق. فمن أراد النموذج مرّ من هنا، ومن لم
+ * يمرّ لا نموذج له.
+ *
+ * وترتيبُ الفحصين مقصود: الجلسةُ أوّلا لأنّ رمز CSRF يُقرأ منها.
+ */
+async function guardPost(c: {
+  env: Env
+  req: { raw: Request; formData: () => Promise<FormData> }
+}): Promise<{ denied: Response } | { form: FormData; session: Session }> {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) {
+    return { denied: loginResponse('انتهت الجلسة — أعد الدخول.') }
+  }
+
+  // جسدٌ غائبٌ أو مشوَّه ليس عطلا في الخادم: هو طلبٌ لا رمز فيه. ولو تُرك
+  // يرمي لردّ 500 — فيبدو خللا في صدى وهو طلبٌ مرفوض
+  let form: FormData
+  try {
+    form = await c.req.formData()
+  } catch {
+    form = new FormData()
+  }
+
+  if (!(await checkCsrf(session, String(form.get('_csrf') ?? '')))) {
+    // 403 لا 401: الجلسةُ قائمة، والطلبُ هو المرفوض. ولا يُعاد رسمُ صفحةِ
+    // دخولٍ هنا فيظنّ المالك أنّ جلسته سقطت وهي لم تسقط.
+    await record(
+      c.env.DB,
+      { actor: 'panel', action: 'csrf.reject', target: new URL(c.req.raw.url).pathname },
+      c.req.raw,
+    )
+    return {
+      denied: Response.json(
+        { error: 'csrf_failed', detail: 'رمز النموذج لا يطابق الجلسة. أعد تحميل اللوحة.' },
+        { status: 403 },
+      ),
+    }
+  }
+
+  return { form, session }
 }
 
 /** كلّ فعلٍ يعود إلى القسم الذي انطلق منه — لا إلى رأس الصفحة. */
@@ -119,8 +183,9 @@ function toPanelSource(row: SourceRow): PanelSource {
 }
 
 panel.get('/panel', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage(), 200, HTML)
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) {
+    return page((nonce) => loginPage({}, nonce), 200)
   }
 
   const allowance = await checkAllowance(c.env.DB)
@@ -184,8 +249,11 @@ panel.get('/panel', async (c) => {
     }),
   )
   const routes = await readRoutes(c.env.DB)
+  const sessions = await listSessions(c.env.KV, session.id)
+  const audit = await recentAudit(c.env.DB, 50)
 
-  return c.html(
+  const flash = await takeFlash(c.env, c.req.raw)
+  return page((nonce) =>
     panelPage({
       paused: allowance.settings.paused,
       autoEnqueue: allowance.settings.autoEnqueue,
@@ -208,11 +276,13 @@ panel.get('/panel', async (c) => {
       })),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       postsBuilt: false,
-      flash: await takeFlash(c.env, c.req.raw),
+      flash,
       now: new Date(),
+      csrf: session.record.csrf,
+      nonce,
+      sessions,
+      audit,
     }),
-    200,
-    HTML,
   )
 })
 
@@ -223,54 +293,127 @@ panel.get('/panel', async (c) => {
  * أنّه مُنع فيبدّل عنوانه ويستأنف.
  */
 panel.post('/panel/login', async (c) => {
+  const blockedText = (global: boolean): string =>
+    global
+      ? 'الدخول موقوف مؤقتا: محاولاتٌ كثيرة من عناوين شتّى. انتظر ربع ساعة.'
+      : 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
+
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
-    return c.html(
-      loginPage({ error: 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true }),
+    return page(
+      (nonce) => loginPage({ error: blockedText(state.globalBlock), blocked: true }, nonce),
       429,
-      HTML,
     )
   }
 
   const form = await c.req.formData()
-  const result = await createSession(c.env.KV, c.env.ADMIN_TOKEN, String(form.get('token') ?? ''))
+  const result = await createSession(
+    c.env.KV,
+    c.env.ADMIN_TOKEN,
+    String(form.get('token') ?? ''),
+    c.req.raw,
+  )
 
   if ('error' in result) {
     if (result.error === 'disabled') {
-      return c.html(
-        loginPage({ error: 'ADMIN_TOKEN غير مضبوط على هذه البيئة — اللوحة مقفلة لا مفتوحة.' }),
+      return page(
+        (nonce) =>
+          loginPage(
+            { error: 'ADMIN_TOKEN غير مضبوط على هذه البيئة — اللوحة مقفلة لا مفتوحة.' },
+            nonce,
+          ),
         401,
-        HTML,
       )
     }
     const after = await recordFailure(c.env.KV, c.req.raw)
+    // المحاولةُ المرفوضة تُسجَّل: تكرارُها من عنوانٍ واحد هو ما يُقرأ لاحقا
+    await record(
+      c.env.DB,
+      { actor: 'anonymous', action: 'login.denied', detail: `المحاولة ${after.attempts}` },
+      c.req.raw,
+    )
     const wait = delayMs(after.attempts)
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
-    return c.html(
-      loginPage({
-        error: after.blocked
-          ? 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
-          : `رمزٌ غير صحيح — بقيت ${after.remaining} محاولات.`,
-        blocked: after.blocked,
-      }),
+    return page(
+      (nonce) =>
+        loginPage(
+          {
+            error: after.blocked
+              ? blockedText(after.globalBlock)
+              : `رمزٌ غير صحيح — بقيت ${after.remaining} محاولات.`,
+            blocked: after.blocked,
+          },
+          nonce,
+        ),
       401,
-      HTML,
     )
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'session.open' }, c.req.raw)
   return new Response(null, {
     status: 303,
     headers: { Location: '/panel', 'Set-Cookie': sessionCookie(result.id) },
   })
 })
 
+/**
+ * الخروج — بلا فحص CSRF.
+ *
+ * ولذلك عذر: أسوأُ ما يصنعه طلبُ خروجٍ مزوَّر أن يُخرجك، وهو أذًى لا
+ * خطر. وفحصُه يعني أنّ جلسةً سقط رمزُها لا تُغلَق — فيبقى البابُ مفتوحا
+ * حتّى تنتهي مهلته. **بابُ الخروج لا يُقفَل.**
+ */
 panel.post('/panel/logout', async (c) => {
   await destroySession(c.env.KV, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'session.close' }, c.req.raw)
   return new Response(null, {
     status: 303,
     headers: { Location: '/panel', 'Set-Cookie': clearedCookie() },
   })
+})
+
+// ── الجلسات ─────────────────────────────────────────────────────────
+
+/** إبطالُ جلسةٍ بعينها من الجرد. */
+panel.post('/panel/sessions/revoke', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const id = String(gate.form.get('id') ?? '')
+  if (id === '') return c.json({ error: 'missing_id' }, 400)
+
+  if (id === gate.session.id) {
+    // إبطالُ جلستك من هنا يتركك في صفحةٍ ميّتة بلا كعكةٍ مُمحاة. للخروج زرّه.
+    await setFlash(c.env, c.req.raw, {
+      kind: 'warn',
+      text: 'هذه جلستك — استعمل زرّ «خروج» لإغلاقها.',
+    })
+    return back('security')
+  }
+
+  await revokeSessions(c.env.KV, { only: id })
+  await record(c.env.DB, { actor: 'panel', action: 'session.revoke', target: id }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُبطلت الجلسة.' })
+  return back('security')
+})
+
+/** إبطالُ كلّ الجلسات إلّا جلسةَ الفاعل. */
+panel.post('/panel/sessions/revoke-all', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const removed = await revokeSessions(c.env.KV, { keepId: gate.session.id })
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'session.revoke_all', detail: `${removed} جلسة` },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, {
+    kind: removed === 0 ? 'ok' : 'warn',
+    text: removed === 0 ? 'لا جلسات أخرى مفتوحة.' : `أُبطلت ${removed} جلسة. جلستك هذه باقية.`,
+  })
+  return back('security')
 })
 
 const KNOWN_TASKS: ReadonlySet<string> = new Set(['analyze', 'draft', 'image'])
@@ -287,23 +430,28 @@ const LABEL: Readonly<Record<string, string>> = {
 /**
  * تغيير إعداد.
  *
- * الحماية من CSRF هي `SameSite=Strict` على الكعكة: المتصفّح لا يرسلها مع
- * طلبٍ نشأ في موقعٍ آخر، فلا يصل الطلب مصادَقا أصلا.
+ * الحمايةُ من CSRF طبقتان: `SameSite=Strict` في المتصفّح، ورمزٌ في
+ * النموذج يفرضه الخادم. والثانية أُضيفت لأنّ الأولى — على قوّتها — تعيش
+ * في المتصفّح وحده، وما يعيش هناك لا نملك ضمانه.
  *
  * ومفاتيح الكتابة **قائمةُ سماحٍ لا منع**: مفتاحٌ جديد في القاعدة لا
  * يصير قابلا للكتابة من الشبكة لمجرّد وجوده.
  */
 panel.post('/panel/settings', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), 401, HTML)
-  }
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
 
-  const form = await c.req.formData()
   const key = String(form.get('key') ?? '')
   const value = String(form.get('value') ?? '')
   if (!WRITABLE.has(key)) return c.json({ error: 'unknown_setting' }, 400)
 
   const result = await writeSetting(c.env.DB, key as SettingKey, value, 'panel')
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'settings.write', target: key, detail: `← ${result.stored}` },
+    c.req.raw,
+  )
 
   // الإشعار يقول ما وقع **فعلا** لا ما طُلب: قيمةٌ قُصّت تُذكر بقصّها
   let flash: PanelFlash
@@ -330,9 +478,8 @@ panel.post('/panel/settings', async (c) => {
 
 /** مسح Drive من اللوحة — المسار نفسه الذي يشغّله Cron، لا نسخةٌ ثانية. */
 panel.post('/panel/scan', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), 401, HTML)
-  }
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
 
   try {
     const report = await scanDrive({
@@ -344,6 +491,11 @@ panel.post('/panel/scan', async (c) => {
     if (report.added.length > 0) parts.push(`جديد ${report.added.length}`)
     if (report.changed.length > 0) parts.push(`تغيّر ${report.changed.length}`)
     if (report.missing.length > 0) parts.push(`مفقود ${report.missing.length}`)
+    await record(
+      c.env.DB,
+      { actor: 'panel', action: 'drive.scan', detail: parts.join(' · ') },
+      c.req.raw,
+    )
     await setFlash(c.env, c.req.raw, {
       kind: 'ok',
       text: `تمّ المسح — ${parts.join(' · ')}. ${report.toAnalyze.length} تنتظر تحليلا.`,
@@ -364,11 +516,10 @@ panel.post('/panel/scan', async (c) => {
  * طريقا جانبيّا حول الحارس.**
  */
 panel.post('/panel/analyze', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), 401, HTML)
-  }
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
 
-  const form = await c.req.formData()
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
@@ -390,30 +541,38 @@ panel.post('/panel/analyze', async (c) => {
             ? { kind: 'warn', text: `تُخطّي: ${outcome.reason}` }
             : { kind: 'bad', text: `تعذّر التحليل: ${outcome.reason}` }
 
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'source.analyze',
+      target: String(form.get('id') ?? ''),
+      detail: outcome.kind,
+    },
+    c.req.raw,
+  )
   await setFlash(c.env, c.req.raw, flash)
   return back('sources')
 })
 
 // ── إدارة المزوّدين ──────────────────────────────────────────────────
 
-/** حارسٌ مشترك: جلسةٌ قائمة، ومزوّدٌ موجود في الجدول. */
+/**
+ * حارسُ أفعال المزوّدين: البوّابةُ الموحّدة، ثمّ وجودُ المزوّد.
+ *
+ * يبني على `guardPost` ولا ينسخه: فحصُ الجلسة و CSRF يبقى في موضعٍ واحد.
+ */
 async function providerGuard(
-  c: { env: Env; req: { raw: Request } },
-  name: string,
-): Promise<{ denied: Response } | { provider: Provider }> {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return {
-      denied: new Response(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), {
-        status: 401,
-        headers: HTML,
-      }),
-    }
-  }
-  const provider = await getProvider(c.env.DB, name)
+  c: { env: Env; req: { raw: Request; formData: () => Promise<FormData> } },
+): Promise<{ denied: Response } | { provider: Provider; form: FormData; session: Session }> {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate
+
+  const provider = await getProvider(c.env.DB, String(gate.form.get('provider') ?? ''))
   if (provider === null) {
     return { denied: Response.json({ error: 'unknown_provider' }, { status: 400 }) }
   }
-  return { provider }
+  return { provider, form: gate.form, session: gate.session }
 }
 
 function num(form: FormData, field: string): number | null {
@@ -430,10 +589,10 @@ function num(form: FormData, field: string): number | null {
  * ما كُتب، فعنوانٌ داخليّ أو `http` يُرفض قبل أن يُحفظ.
  */
 panel.post('/panel/providers/add', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), 401, HTML)
-  }
-  const form = await c.req.formData()
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
   const name = normalizeName(String(form.get('name') ?? ''))
   if (name === null) {
     await setFlash(c.env, c.req.raw, {
@@ -474,6 +633,16 @@ panel.post('/panel/providers/add', async (c) => {
     'panel',
   )
 
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'provider.upsert',
+      target: name,
+      detail: existing === null ? 'جديد' : 'تعديل',
+    },
+    c.req.raw,
+  )
   await setFlash(c.env, c.req.raw, {
     kind: 'ok',
     text: existing === null
@@ -484,9 +653,9 @@ panel.post('/panel/providers/add', async (c) => {
 })
 
 panel.post('/panel/providers/key', async (c) => {
-  const form = await c.req.formData()
-  const guard = await providerGuard(c, String(form.get('provider') ?? ''))
+  const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
+  const form = guard.form
 
   const raw = String(form.get('key') ?? '')
   if (raw.trim().length === 0) {
@@ -503,6 +672,17 @@ panel.post('/panel/providers/key', async (c) => {
 
   try {
     const result = await saveKey(c.env.DB, c.env.TOKEN_ENC_KEY, guard.provider.name, raw, 'panel')
+    // **ولا في السجلّ**: التلميحُ وحده — وهو أوّلُ المفتاح وآخرُه لا نصُّه
+    await record(
+      c.env.DB,
+      {
+        actor: 'panel',
+        action: 'provider.key',
+        target: guard.provider.name,
+        detail: result.unchanged ? `لم يتغيّر (${result.hint})` : `بُدّل إلى ${result.hint}`,
+      },
+      c.req.raw,
+    )
     // **لا يُذكر المفتاح في الإشعار** — التلميح وحده
     await setFlash(c.env, c.req.raw, {
       kind: result.unchanged ? 'ok' : 'warn',
@@ -521,8 +701,7 @@ panel.post('/panel/providers/key', async (c) => {
 
 /** الاختبار يمرّ بلهجة المزوّد: لكلٍّ نقطةُ تحقّقها. */
 panel.post('/panel/providers/verify', async (c) => {
-  const form = await c.req.formData()
-  const guard = await providerGuard(c, String(form.get('provider') ?? ''))
+  const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
   const provider = guard.provider
 
@@ -545,6 +724,17 @@ panel.post('/panel/providers/verify', async (c) => {
         ? { ok: false as const, detail: 'لا عنوان لهذا المزوّد', status: null }
         : await verifyCompat(provider.baseUrl, resolved.key)
 
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'provider.verify',
+      target: provider.name,
+      detail: result.ok ? 'نجح' : `فشل — ${result.detail}`,
+    },
+    c.req.raw,
+  )
+
   if (result.ok) {
     await markVerified(c.env.DB, provider.name)
     await setFlash(c.env, c.req.raw, { kind: 'ok', text: `${provider.label}: ${result.detail}.` })
@@ -556,12 +746,22 @@ panel.post('/panel/providers/verify', async (c) => {
 })
 
 panel.post('/panel/providers/toggle', async (c) => {
-  const form = await c.req.formData()
-  const guard = await providerGuard(c, String(form.get('provider') ?? ''))
+  const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
+  const form = guard.form
 
   const enabled = String(form.get('enabled') ?? '') === 'true'
   await setEnabled(c.env.DB, guard.provider.name, enabled, 'panel')
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'provider.toggle',
+      target: guard.provider.name,
+      detail: enabled ? 'فُعّل' : 'عُطّل',
+    },
+    c.req.raw,
+  )
   await setFlash(c.env, c.req.raw, {
     kind: enabled ? 'ok' : 'warn',
     text: enabled ? `${guard.provider.label}: فُعّل.` : `${guard.provider.label}: عُطّل — ومفتاحه محفوظ.`,
@@ -570,11 +770,20 @@ panel.post('/panel/providers/toggle', async (c) => {
 })
 
 panel.post('/panel/providers/delete', async (c) => {
-  const form = await c.req.formData()
-  const guard = await providerGuard(c, String(form.get('provider') ?? ''))
+  const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
 
   const removed = await deleteProvider(c.env.DB, guard.provider.name)
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'provider.delete',
+      target: guard.provider.name,
+      detail: removed ? 'حُذف' : 'مدمَج — رُفض الحذف',
+    },
+    c.req.raw,
+  )
   await setFlash(c.env, c.req.raw, {
     kind: removed ? 'warn' : 'bad',
     text: removed
@@ -586,10 +795,10 @@ panel.post('/panel/providers/delete', async (c) => {
 
 /** توجيه مهمّة إلى مزوّدٍ ونموذج — قرارُ المالك لا الشيفرة. */
 panel.post('/panel/routes', async (c) => {
-  if (!(await validSession(c.env.KV, c.req.raw))) {
-    return c.html(loginPage({ error: 'انتهت الجلسة — أعد الدخول.' }), 401, HTML)
-  }
-  const form = await c.req.formData()
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
   const task = String(form.get('task') ?? '')
   const provider = String(form.get('provider') ?? '')
   const model = String(form.get('model') ?? '').trim()
@@ -604,6 +813,11 @@ panel.post('/panel/routes', async (c) => {
   }
 
   await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel')
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'route.write', target: task, detail: `${provider} / ${model}` },
+    c.req.raw,
+  )
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: `${task} ← ${provider} / ${model}.` })
   return back('providers')
 })

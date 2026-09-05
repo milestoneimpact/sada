@@ -7,6 +7,7 @@
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
 import { authorizeAdmin } from './lib/adminAuth'
+import { BASE_HEADERS } from './lib/security/headers'
 import { readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
@@ -19,6 +20,23 @@ import { panel } from './routes/panel'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
+
+/**
+ * ترويسات الأمان على **كلّ** ردّ — لا على صفحات اللوحة وحدها.
+ *
+ * وُضعت وسيطا لا في كلّ مسار للسبب نفسه الذي وُضع له حارسُ `/admin/*` في
+ * موضعٍ واحد: مسارٌ جديد يُكتب بلا ترويسات ولا يلحظه أحد، فردُّ JSON بلا
+ * `nosniff` يصير موضعا يُفسَّر فيه ما لُقّم على أنّه HTML.
+ *
+ * و`set` لا `append`: ردُّ HTML من اللوحة يحمل سياستَه بـ `nonce` — ولا
+ * تُدهس هنا، لأنّ هذه القائمة لا تحمل `Content-Security-Policy` أصلا.
+ */
+app.use('*', async (c, next) => {
+  await next()
+  for (const [name, value] of Object.entries(BASE_HEADERS)) {
+    c.res.headers.set(name, value)
+  }
+})
 
 app.get('/health', (c) =>
   c.json({ ok: true, service: 'sada-api', env: c.env.SADA_ENV }),

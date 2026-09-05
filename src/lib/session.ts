@@ -2,30 +2,107 @@
  * جلسة اللوحة.
  *
  * المتصفّح لا يرسل `Authorization: Bearer` من صفحةٍ عاديّة، فلا بدّ من
- * كعكة. وثلاثة قيود تجعلها كعكةً لا ثغرة:
+ * كعكة. وأربعةُ قيودٍ تجعلها كعكةً لا ثغرة:
  *
  * ١ · **`HttpOnly`** — لا تُقرأ من JavaScript، فثغرة XSS لا تسرقها.
- * ٢ · **`SameSite=Strict`** — لا تُرسل مع طلبٍ من موقعٍ آخر، وهذا وحده
- *     يسدّ CSRF على أفعال اللوحة بلا رمزٍ إضافيّ في كلّ نموذج.
+ * ٢ · **`SameSite=Strict`** — لا تُرسل مع طلبٍ من موقعٍ آخر.
  * ٣ · **`Secure`** — لا تُرسل إلا على HTTPS.
+ * ٤ · **`__Host-`** — بادئةٌ يفرضها المتصفّح نفسه: لا تُقبَل الكعكة إلا
+ *     بـ `Secure` و `Path=/` وبلا `Domain`. فنطاقٌ شقيقٌ مخترَق لا
+ *     يستطيع أن يكتب كعكةً تُقبَل هنا (Cookie Tossing).
  *
  * والمعرّف عشوائيّ من `crypto`، والقيمة في KV بمهلة انتهاء — لا في
  * الكعكة نفسها. فلا يُزوَّر بتعديل نصّها، ولا يُقرأ منها شيء.
+ *
+ * **والجلسة مربوطةٌ بما أنشأها.** يُحفظ مع الصفّ بصمةُ الاعتماد الذي فتحه،
+ * ويُقارَن في كلّ طلب. فتدويرُ `ADMIN_TOKEN` يُبطل كلّ الجلسات القائمة في
+ * اللحظة نفسها. وكان قبل ذلك لا يُبطل شيئا: تُبدّل الرمز المسروق فتظنّ
+ * البابَ أُغلق، وجلسةُ السارق حيّةٌ ثماني ساعات.
  */
+import { fingerprint, randomToken, sameSecret } from './security/digest'
 import { authorizeAdmin } from './adminAuth'
 
-export const COOKIE = 'sada_session'
+/**
+ * `__Host-` بادئةٌ ذاتُ معنى عند المتصفّح لا مجرّد اسم.
+ *
+ * وهي تشترط `Path=/`، فالكعكة تُرسل إلى كلّ المسارات — وكان `Path=/panel`
+ * يضيّقها. والمقايضة مقصودة: منعُ نطاقٍ شقيقٍ من زرع كعكةٍ أهمّ من
+ * تضييقِ المسار، لأنّ المسار لا يمنع شيئا أصلا (المسارات كلّها لنا).
+ */
+export const COOKIE = '__Host-sada_session'
 /** ثمانُ ساعات: يومُ عملٍ واحد. أطول من ذلك يجعل جهازا منسيّا بابا مفتوحا. */
 export const SESSION_TTL_SECONDS = 8 * 60 * 60
 
+/** بادئةُ مفاتيح الجلسات في KV — يُجرَد بها ويُبطَل. */
+const PREFIX = 'session:'
+
+export interface KvListKey {
+  readonly name: string
+}
+export interface KvListResult {
+  readonly keys: KvListKey[]
+  readonly list_complete: boolean
+  readonly cursor?: string
+}
+
+/**
+ * ما نحتاجه من KV لا أكثر.
+ *
+ * و`list` **اختياريّة**: بيئةُ اختبارٍ لا تدعمها تُشغّل كلَّ شيءٍ عداها،
+ * والجردُ يعود فارغا بدل أن يسقط. وأنواعُها مكتوبةٌ لتقبل ما تعيده
+ * Cloudflare حرفيّا — `null` لا `undefined` في المؤشّر.
+ */
 export interface SessionStore {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
   delete(key: string): Promise<void>
+  list?(options?: {
+    prefix?: string | null
+    cursor?: string | null
+    limit?: number
+  }): Promise<KvListResult>
+}
+
+/** كيف فُتحت الجلسة. يتّسع لاحقا: `passkey` و `totp`. */
+export type SessionVia = 'admin_token'
+
+export interface SessionRecord {
+  /** متى فُتحت — ISO. */
+  readonly at: string
+  readonly via: SessionVia
+  /** بصمةُ الاعتماد الذي فتحها. تبديلُه يُبطلها. */
+  readonly bind: string
+  /** سرُّ CSRF لهذه الجلسة وحدها. */
+  readonly csrf: string
+  /** عنوانُ من فتحها — للجرد، لا للتحقّق. */
+  readonly ip: string
+  /** المتصفّح كما عرّف نفسه — للجرد، مقصوصا. */
+  readonly ua: string
+}
+
+export interface Session {
+  readonly id: string
+  readonly record: SessionRecord
 }
 
 function sessionKey(id: string): string {
-  return `session:${id}`
+  return `${PREFIX}${id}`
+}
+
+/** يُقصّ ما يُعرض في الجرد: ترويسةٌ طويلة لا تملأ KV ولا الشاشة. */
+function trim(value: string | null, max: number): string {
+  return value === null ? '' : value.slice(0, max)
+}
+
+/**
+ * بصمةُ الاعتماد الحاليّ.
+ *
+ * تُعاد `null` إن لم يكن ثمّة `ADMIN_TOKEN`: فلا جلسةَ تصحّ على بيئةٍ
+ * مقفلة — الغيابُ يُغلق لا يفتح، هنا كما في `authorizeAdmin`.
+ */
+async function currentBind(adminToken: string | undefined): Promise<string | null> {
+  const secret = typeof adminToken === 'string' ? adminToken.trim() : ''
+  return secret.length === 0 ? null : await fingerprint(secret)
 }
 
 /**
@@ -38,8 +115,9 @@ export async function createSession(
   store: SessionStore,
   adminToken: string | undefined,
   presentedToken: string,
+  request?: Request,
   now: Date = new Date(),
-): Promise<{ id: string } | { error: 'disabled' | 'denied' }> {
+): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' | 'denied' }> {
   // يُبنى طلبٌ صوريّ ليُفحص بالمنطق نفسه — الرمز يجيء من نموذجٍ لا ترويسة
   const probe = new Request('https://sada.local/panel/login', {
     method: 'POST',
@@ -49,11 +127,22 @@ export async function createSession(
   if (verdict.kind === 'disabled') return { error: 'disabled' }
   if (verdict.kind !== 'ok') return { error: 'denied' }
 
+  const bind = await currentBind(adminToken)
+  if (bind === null) return { error: 'disabled' }
+
   const id = crypto.randomUUID()
-  await store.put(sessionKey(id), JSON.stringify({ at: now.toISOString() }), {
+  const record: SessionRecord = {
+    at: now.toISOString(),
+    via: 'admin_token',
+    bind,
+    csrf: randomToken(32),
+    ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
+    ua: trim(request?.headers.get('User-Agent') ?? null, 160),
+  }
+  await store.put(sessionKey(id), JSON.stringify(record), {
     expirationTtl: SESSION_TTL_SECONDS,
   })
-  return { id }
+  return { id, record }
 }
 
 /** يقرأ معرّف الجلسة من ترويسة الكعكة. */
@@ -69,10 +158,64 @@ export function readCookie(header: string | null, name: string): string | null {
   return null
 }
 
-export async function validSession(store: SessionStore, request: Request): Promise<boolean> {
+function parse(raw: string): SessionRecord | null {
+  try {
+    const value = JSON.parse(raw) as Partial<SessionRecord>
+    if (typeof value.bind !== 'string' || typeof value.csrf !== 'string') return null
+    return {
+      at: typeof value.at === 'string' ? value.at : '',
+      via: 'admin_token',
+      bind: value.bind,
+      csrf: value.csrf,
+      ip: typeof value.ip === 'string' ? value.ip : '',
+      ua: typeof value.ua === 'string' ? value.ua : '',
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * يقرأ جلسةً صالحة، أو `null`.
+ *
+ * ويُبطل بلا تردّد: صفٌّ لا يُقرأ، أو صفٌّ من صيغةٍ قديمة بلا `bind`، أو
+ * بصمةٌ لا تطابق الاعتماد الحاليّ — كلّها «لا جلسة». وصفٌّ فاسد لا
+ * يُترك ليُقرأ ثانيةً: يُمحى.
+ */
+export async function loadSession(
+  store: SessionStore,
+  request: Request,
+  adminToken: string | undefined,
+): Promise<Session | null> {
   const id = readCookie(request.headers.get('Cookie'), COOKIE)
-  if (id === null) return false
-  return (await store.get(sessionKey(id))) !== null
+  if (id === null) return null
+
+  const raw = await store.get(sessionKey(id))
+  if (raw === null) return null
+
+  const record = parse(raw)
+  if (record === null) {
+    await store.delete(sessionKey(id))
+    return null
+  }
+
+  const bind = await currentBind(adminToken)
+  if (bind === null || bind !== record.bind) {
+    // الاعتماد تبدّل أو رُفع: الجلسة تسقط معه، ولا تُترك لتنتهي وحدها
+    await store.delete(sessionKey(id))
+    return null
+  }
+
+  return { id, record }
+}
+
+/** ما تحتاجه المسارات التي لا تعنيها تفاصيل الجلسة. */
+export async function validSession(
+  store: SessionStore,
+  request: Request,
+  adminToken: string | undefined,
+): Promise<boolean> {
+  return (await loadSession(store, request, adminToken)) !== null
 }
 
 export async function destroySession(store: SessionStore, request: Request): Promise<void> {
@@ -80,11 +223,99 @@ export async function destroySession(store: SessionStore, request: Request): Pro
   if (id !== null) await store.delete(sessionKey(id))
 }
 
-/** الكعكة بقيودها الثلاثة. `Path=/panel` يمنع إرسالها إلى مسارات API. */
+export interface SessionSummary {
+  readonly id: string
+  readonly at: string
+  readonly ip: string
+  readonly ua: string
+  readonly current: boolean
+}
+
+/**
+ * جردُ الجلسات المفتوحة.
+ *
+ * وُجد لأنّ الخروج كان يقتل جلستك أنت وحدها، فلا سبيل إلى معرفة كم بابا
+ * مفتوحٌ ولا إلى إغلاقه. و`list` في KV **متّسقةٌ في النهاية** لا فورا،
+ * فقد يظهر صفٌّ حُذف للتوّ — ولذلك يُقرأ كلّ صفٍّ ويُتخطّى ما بطل، فلا
+ * يُعرض في الجرد إلا ما هو حيٌّ فعلا.
+ */
+export async function listSessions(
+  store: SessionStore,
+  currentId: string | null,
+): Promise<SessionSummary[]> {
+  if (store.list === undefined) return []
+  const summaries: SessionSummary[] = []
+  let cursor: string | undefined
+  do {
+    const page = await store.list({ prefix: PREFIX, cursor: cursor ?? null })
+    for (const key of page.keys) {
+      const raw = await store.get(key.name)
+      if (raw === null) continue
+      const record = parse(raw)
+      if (record === null) continue
+      const id = key.name.slice(PREFIX.length)
+      summaries.push({
+        id,
+        at: record.at,
+        ip: record.ip,
+        ua: record.ua,
+        current: id === currentId,
+      })
+    }
+    cursor = page.list_complete === false ? page.cursor : undefined
+  } while (cursor !== undefined)
+
+  return summaries.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/**
+ * يُبطل جلسةً بعينها، أو كلَّ الجلسات.
+ *
+ * و`keepId` تُبقي الجلسة الحاليّة: مالكٌ يُخرج أجهزته المنسيّة لا يريد أن
+ * يُخرج نفسه ويعيد الدخول — وإخراجُه لنفسه معه يجعله يتردّد في الضغط.
+ */
+export async function revokeSessions(
+  store: SessionStore,
+  options: { readonly only?: string; readonly keepId?: string } = {},
+): Promise<number> {
+  if (options.only !== undefined) {
+    await store.delete(sessionKey(options.only))
+    return 1
+  }
+  if (store.list === undefined) return 0
+
+  let removed = 0
+  let cursor: string | undefined
+  do {
+    const page = await store.list({ prefix: PREFIX, cursor: cursor ?? null })
+    for (const key of page.keys) {
+      if (options.keepId !== undefined && key.name === sessionKey(options.keepId)) continue
+      await store.delete(key.name)
+      removed += 1
+    }
+    cursor = page.list_complete === false ? page.cursor : undefined
+  } while (cursor !== undefined)
+  return removed
+}
+
+/**
+ * يتحقّق من رمز CSRF بمقارنةٍ ثابتة الزمن.
+ *
+ * و`SameSite=Strict` وحدها كانت الدفاع، وهي قويّة — لكنّها **طبقةٌ واحدة
+ * في المتصفّح**، لا في الخادم. ومتصفّحٌ قديم أو استثناءٌ في التطبيق أو
+ * تغيّرٌ في تفسير المواصفة يُسقطها كلَّها دفعةً واحدة. والرمزُ في النموذج
+ * يفرضه الخادمُ نفسه فلا يسقط بسقوطها.
+ */
+export async function checkCsrf(session: Session, presented: string): Promise<boolean> {
+  if (presented.length === 0) return false
+  return await sameSecret(presented, session.record.csrf)
+}
+
+/** الكعكة بقيودها. `Path=/` تفرضه بادئةُ `__Host-` نفسها. */
 export function sessionCookie(id: string): string {
   return [
     `${COOKIE}=${id}`,
-    'Path=/panel',
+    'Path=/',
     'HttpOnly',
     'Secure',
     'SameSite=Strict',
@@ -93,5 +324,5 @@ export function sessionCookie(id: string): string {
 }
 
 export function clearedCookie(): string {
-  return `${COOKIE}=; Path=/panel; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
+  return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
 }

@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import type { Db, DbStatement } from '../lib/tokens'
 import type { StateStore } from '../lib/oauth/state'
+import type { SessionStore } from '../lib/session'
 
 /**
  * كلّ الترحيلات بترتيبها، لا الأوّل وحده.
@@ -57,7 +58,7 @@ export function fakeDb(): FakeDb {
 }
 
 /** KV في الذاكرة، مع دعم انتهاء الصلاحية بساعة يتحكم بها الاختبار. */
-export function fakeKv(clock: () => number = Date.now): StateStore & {
+export function fakeKv(clock: () => number = Date.now): StateStore & SessionStore & {
   readonly size: () => number
   /** مهلة مفتاحٍ بالثواني — يُفحص بها أنّ العدّ ينتهي وحده. */
   readonly ttlOf: (key: string) => number | null
@@ -84,6 +85,20 @@ export function fakeKv(clock: () => number = Date.now): StateStore & {
     },
     async delete(key) {
       entries.delete(key)
+    },
+    /**
+     * `list` بصفحةٍ واحدة.
+     *
+     * وتُرشَّح بالمهلة كما يفعل `get`: مفتاحٌ انتهى لا يظهر في الجرد —
+     * وإلّا لأثبت الاختبارُ جردا يعرض جلساتٍ ميّتة.
+     */
+    async list(options) {
+      const prefix = options?.prefix ?? ''
+      const keys = [...entries.keys()]
+        .filter((name) => name.startsWith(prefix) && alive(name) !== null)
+        .sort()
+        .map((name) => ({ name }))
+      return { keys, list_complete: true }
     },
     size: () => entries.size,
     ttlOf: (key) => {
