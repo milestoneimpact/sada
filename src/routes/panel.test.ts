@@ -1000,3 +1000,161 @@ describe('سجلّ التدقيق — من فعل ماذا', () => {
     expect((await readSettings(db)).dailyAnalysisCap).toBe(9)
   })
 })
+
+describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يقع', () => {
+  async function seedAccount(platform: string, status = 'active'): Promise<void> {
+    await db
+      .prepare(
+        `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+         VALUES (?, ?, 'member', ?, 'عمر عبدالحميد', ?)`,
+      )
+      .bind(crypto.randomUUID(), platform, crypto.randomUUID(), status)
+      .run()
+  }
+
+  it('يعرض المبنيَّ وغيرَ المبنيّ معا', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('data-pane="channels"')
+    for (const name of ['LinkedIn', 'Snapchat', 'Instagram', 'TikTok', 'YouTube']) {
+      expect(html).toContain(name)
+    }
+  })
+
+  it('**لا زرَّ ربطٍ لما لم يُبنَ** — وزرٌّ يقول «غير مدعوم» أسوأ من غيابه', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    for (const id of ['snapchat', 'instagram', 'tiktok', 'threads', 'youtube']) {
+      expect(html).not.toContain(`/oauth/${id}/start`)
+    }
+    expect(html).toContain('يحتاج سائقا')
+  })
+
+  it('بلا أسرار: تُسمّى الأسرار الناقصة ومهمّتها، ولا يُعرض زرّ', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('LINKEDIN_CLIENT_ID')
+    expect(html).toContain('M-02')
+    expect(html).not.toContain('/oauth/linkedin/start')
+  })
+
+  it('بالأسرار: زرُّ الربط يظهر ويشير إلى مسارٍ قائم', async () => {
+    const withSecrets = {
+      ...env,
+      LINKEDIN_CLIENT_ID: 'id',
+      LINKEDIN_CLIENT_SECRET: 'secret',
+    }
+    const body = new FormData()
+    body.set('token', TOKEN)
+    const login2 = await app.request('/panel/login', { method: 'POST', body }, withSecrets)
+    const cookie = (login2.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const html = await (
+      await app.request('/panel', { headers: { Cookie: cookie } }, withSecrets)
+    ).text()
+    expect(html).toContain('/oauth/linkedin/start')
+  })
+
+  it('الحسابُ المربوط يُعرض باسمه', async () => {
+    await seedAccount('linkedin')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('عمر عبدالحميد')
+    expect(html).toContain('مربوطة')
+  })
+
+  it('**رمزٌ انتهى يظهر في «ما ينتظرك»** — فلا يقف النشر صامتا', async () => {
+    await seedAccount('x', 'needs_reauth')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('انتهى الإذن')
+  })
+
+  it('اسمٌ يحمل HTML يُهرَّب ولا يُحقَن', async () => {
+    await db
+      .prepare(
+        `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+         VALUES (?, 'x', 'member', 'e1', ?, 'active')`,
+      )
+      .bind(crypto.randomUUID(), '<script>alert(1)</script>')
+      .run()
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+})
+
+describe('الثيم النهاريّ', () => {
+  it('الرموز تُعرَّف على :root كاملةً — فلا تسقط بسقوط شرط', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const root = html.slice(html.indexOf(':root{'), html.indexOf('}', html.indexOf(':root{')))
+    for (const token of ['--bg', '--surface', '--ink', '--gold', '--ok', '--warn', '--bad']) {
+      expect(root).toContain(token)
+    }
+  })
+
+  it('مفتاحُ الثيم حاضرٌ بخياراته الثلاثة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('id="theme"')
+    expect(html).toContain('data-theme="light"')
+    expect(html).toContain('data-theme="dark"')
+    expect(html).toContain('data-theme="system"')
+  })
+
+  it('**سكربتُ الثيم في الرأس** — فلا يومض الثيمُ الخطأ قبل الرسم', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const head = html.slice(0, html.indexOf('</head>'))
+    expect(head).toContain('sada-theme')
+  })
+
+  it('وهو يحمل nonce الصفحة كغيره — وإلّا لما نُفّذ', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel', withSession(cookie), env)
+    const html = await response.text()
+    const nonce = /nonce-([A-Za-z0-9+/]+)/.exec(
+      response.headers.get('Content-Security-Policy') ?? '',
+    )?.[1]
+    const head = html.slice(0, html.indexOf('</head>'))
+    expect(head).toContain(`<script nonce="${nonce}">`)
+  })
+
+  it('صفحةُ الدخول تتبع الثيم أيضا', async () => {
+    const html = await (await app.request('/panel', {}, env)).text()
+    expect(html.slice(0, html.indexOf('</head>'))).toContain('sada-theme')
+  })
+})
+
+describe('الجاهزيّة تفرز ما سدّته الخزانة', () => {
+  it('مفتاحٌ في الخزانة لا يُعدّ ناقصا — ويُذكر على حدة', async () => {
+    const cookie = await login()
+    await readSettings(db)
+    const body = new FormData()
+    body.set('_csrf', csrf)
+    body.set('provider', 'anthropic')
+    body.set('key', 'sk-ant-test-value-0001')
+    await app.request(
+      '/panel/providers/key',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+
+    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+      missing_secrets: string[]
+      configured_in_vault: string[]
+    }
+    expect(ready.configured_in_vault).toContain('ANTHROPIC_API_KEY')
+    expect(ready.missing_secrets).not.toContain('ANTHROPIC_API_KEY')
+  })
+
+  it('وما لا خزانةَ له يبقى ناقصا', async () => {
+    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+      missing_secrets: string[]
+      configured_in_vault: string[]
+    }
+    expect(ready.missing_secrets).toContain('LINKEDIN_CLIENT_ID')
+    expect(ready.configured_in_vault).toEqual([])
+  })
+})

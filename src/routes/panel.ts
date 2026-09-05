@@ -43,6 +43,7 @@ import {
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
+import { listAccounts, viewChannels } from '../lib/channels'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
@@ -269,6 +270,11 @@ panel.get('/panel', async (c) => {
   const audit = await recentAudit(c.env.DB, 50)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
+  // سرُّ Worker يُفحص بوجوده لا بقيمته — والقيمةُ لا تغادر البيئة
+  const channels = viewChannels(await listAccounts(c.env.DB), (name) => {
+    const value = c.env[name as keyof Env]
+    return typeof value === 'string' && value.length > 0
+  })
 
   const flash = await takeFlash(c.env, c.req.raw)
   return page((nonce) =>
@@ -313,6 +319,7 @@ panel.get('/panel', async (c) => {
         recoveryLeft: factors.recovery.unused,
         enforced: factors.enforced,
       },
+      channels,
     }),
   )
 })

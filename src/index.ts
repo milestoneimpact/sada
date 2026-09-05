@@ -11,6 +11,7 @@ import { BASE_HEADERS } from './lib/security/headers'
 import { readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
+import { resolveKey } from './lib/providers'
 import { spendByProvider } from './lib/ai/spend'
 import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
@@ -46,6 +47,12 @@ app.get('/health', (c) =>
 /**
  * جاهزية التشغيل: يقول ما الناقص بالاسم، ولا يكشف قيمة سر.
  * يرد 503 ما دام شيء ناقصا، حتى لا يبدو النظام جاهزا وهو ليس كذلك.
+ *
+ * **ومفتاحٌ في الخزانة ليس مفتاحا ناقصا.** كان `/ready` يقرأ أسرار
+ * Worker وحدها، فيقول «ANTHROPIC_API_KEY ناقص» واللوحةُ تقول «حُفظ» —
+ * وكلاهما صادقٌ في مصدره، والمالكُ يرى تناقضا فيشكّ في أيّهما يصدّق.
+ * فصار الناقصُ يُفرز: ما لا وجود له، وما وُجد في الخزانة. والجاهزيّةُ
+ * لا تُحجب على الثاني.
  */
 app.get('/ready', async (c) => {
   const state = readiness(c.env)
@@ -56,6 +63,13 @@ app.get('/ready', async (c) => {
   } catch {
     database = 'unreachable'
   }
+  // ما سُدّ من الخزانة يُذكر على حدة — لا في «ناقص» ولا مسكوتا عنه
+  let inVault: string[] = []
+  if (database === 'ok' && state.missing.length > 0) {
+    inVault = await vaultCovered(c.env, state.missing)
+  }
+  const stillMissing = state.missing.filter((name) => !inVault.includes(name))
+
   // البوابة هي المرحلة صفر: نظام ينشر ولا يفهم ليس معطلا
   const ready = state.phase0 && database === 'ok'
   return c.json(
@@ -65,11 +79,36 @@ app.get('/ready', async (c) => {
       phase_0: state.phase0,
       phase_1: state.phase1,
       drive_folder: state.driveFolder,
-      missing_secrets: state.missing,
+      missing_secrets: stillMissing,
+      configured_in_vault: inVault,
     },
     ready ? 200 : 503,
   )
 })
+
+/**
+ * أيُّ الأسرار الناقصة سدّته خزانةُ المزوّدين.
+ *
+ * والربطُ باسم السرّ لا بالمزوّد: `ANTHROPIC_API_KEY` هو سرُّ `anthropic`،
+ * وهذا ما تعرفه `PROVIDERS`. **ولا تُقرأ قيمةُ مفتاحٍ هنا** — وجودُه
+ * وحده يُسأل عنه.
+ */
+async function vaultCovered(env: Env, missing: readonly string[]): Promise<string[]> {
+  const covered: string[] = []
+  for (const name of missing) {
+    const provider = (Object.keys(PROVIDERS) as ProviderName[]).find(
+      (p) => PROVIDERS[p].secret === name,
+    )
+    if (provider === undefined) continue
+    try {
+      const resolved = await resolveKey(env.DB, env.TOKEN_ENC_KEY, provider, undefined)
+      if (resolved.key !== null) covered.push(name)
+    } catch {
+      // خزانةٌ لا تُقرأ تعني «لم يُسدّ» — والصمتُ هنا لا يخفي شيئا
+    }
+  }
+  return covered
+}
 
 /**
  * حارس `/admin/*` في موضعٍ واحد.
