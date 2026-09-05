@@ -36,6 +36,11 @@ export interface Env {
   readonly ANTHROPIC_API_KEY: string
   readonly GEMINI_API_KEY: string
   readonly GOOGLE_SA_JSON: string
+  /**
+   * يحرس مسارات `/admin/*`. غيابه يُغلقها لا يفتحها (D-019).
+   * ليس من أسرار البوّابة: نظامٌ بلا مسار إدارةٍ ليس معطّلاً.
+   */
+  readonly ADMIN_TOKEN: string
 }
 
 /** أسرار المرحلة صفر: الربط والنشر. بلا واحد منها لا تُجتاز البوابة. */

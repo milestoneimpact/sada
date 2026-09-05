@@ -219,6 +219,73 @@ describe('GET /oauth/:platform/callback', () => {
   })
 })
 
+describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
+  const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
+
+  /** يرصد أيّ خروج إلى الشبكة: الحارس يجب أن يمنعه قبل وقوعه. */
+  function watchNetwork(): { calls: number } {
+    const seen = { calls: 0 }
+    globalThis.fetch = ((): Promise<Response> => {
+      seen.calls += 1
+      return Promise.resolve(new Response('{}'))
+    }) as typeof fetch
+    return seen
+  }
+
+  it('يرد 503 ولا ينادي Google حين لا ADMIN_TOKEN — مغلق افتراضا', async () => {
+    const net = watchNetwork()
+    const response = await app.request('/admin/scan', { method: 'POST' }, env)
+    expect(response.status).toBe(503)
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({
+      error: 'admin_disabled',
+    })
+    expect(net.calls).toBe(0)
+  })
+
+  it('يرد 401 لرمز خطأ ولا ينادي Google', async () => {
+    const net = watchNetwork()
+    const response = await app.request(
+      '/admin/scan',
+      { method: 'POST', headers: { Authorization: 'Bearer wrong-token-entirely' } },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
+    expect(response.status).toBe(401)
+    expect(net.calls).toBe(0)
+  })
+
+  it('يرد 401 بلا ترويسة أصلا', async () => {
+    const response = await app.request(
+      '/admin/scan',
+      { method: 'POST' },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('لا يذكر قيمة الرمز في أيّ ردّ', async () => {
+    const denied = await app.request(
+      '/admin/scan',
+      { method: 'POST', headers: { Authorization: 'Bearer wrong' } },
+      { ...env, ADMIN_TOKEN: TOKEN },
+    )
+    expect(await denied.text()).not.toContain(TOKEN)
+  })
+
+  it('يمرّر الرمز الصحيح إلى المسح — فيتجاوز الحارس ويعطل على المصدر', async () => {
+    // بلا GOOGLE_SA_JSON صالح يفشل المسح بـ 502 لا بـ 401: دليل أن
+    // الحارس اجتيز فعلا، وأن ما بعده هو ما تعطّل
+    const response = await app.request(
+      '/admin/scan',
+      { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` } },
+      { ...env, ADMIN_TOKEN: TOKEN, GOOGLE_SA_JSON: 'ليس json' },
+    )
+    expect(response.status).toBe(502)
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({
+      error: 'scan_failed',
+    })
+  })
+})
+
 describe('/health و /ready', () => {
   it('health يجيب بلا شرط', async () => {
     const response = await app.request('/health', {}, env)
