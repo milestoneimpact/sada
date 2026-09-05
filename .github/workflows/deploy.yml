@@ -80,10 +80,18 @@ jobs:
       - name: النشر
         run: npx wrangler deploy --env "$TARGET"
 
-      # لا نقول إن النشر نجح حتى يقول الخادم إنه نجح.
-      # لكن غياب النطاق ليس فشل نشر: يُجرَّب النطاق، فإن لم يستجب أصلا
-      # جُرِّب عنوان workers.dev. الفشل الحقيقي أن يستجيب ولا يكون جاهزا.
-      - name: التحقق من الجاهزية
+      # لا نقول إنّ النشر نجح حتّى يقول الخادم إنّه نجح.
+      #
+      # لكنّ البوّابة تحاسب على ما يخصّ النشر وحده، لا على ما يخصّ حسابات
+      # المالك. أسرار LinkedIn و X تنتظر موافقاتٍ تستغرق أيّاماً؛ ولو بقي
+      # كلّ نشرٍ أحمر طوالها لصار الأحمر عادةً تُتجاهَل — وحين يقع عطلٌ
+      # حقيقيّ لا يميّزه أحد. فالأسرار الناقصة **تحذير**، وتُذكر بأسمائها.
+      #
+      # وما يُحاسَب عليه النشر ثلاثة، وكلّها فشلٌ حقيقيّ:
+      #   ١ · أن يستجيب الخادم أصلاً       — وإلا فالنشر لم يهبط
+      #   ٢ · أن يكون الرادّ صدى لا قالباً — بحقلٍ لا يعرفه غيرها
+      #   ٣ · أن تكون القاعدة موصولة       — الربوط والترحيل معاً
+      - name: التحقّق من النشر
         run: |
           BASE=$([ "$TARGET" = production ] && echo https://sada.basserh.com || echo https://sada2.basserh.com)
           probe() {
@@ -96,24 +104,38 @@ jobs:
             return 1
           }
 
-          echo "فحص النطاق المخصص"
-          if probe "$BASE"; then
-            grep -q '"ready":true' /tmp/ready.json && exit 0
-            echo "::error::النطاق يستجيب لكن النظام ليس جاهزا. الناقص مذكور أعلاه بالاسم."
+          echo "فحص النطاق المخصّص"
+          if ! probe "$BASE"; then
+            echo "::warning::$BASE لا يستجيب — النطاق لم يُربط بعد (M-05)."
+            DEV=$(npx wrangler deployments list --env "$TARGET" 2>/dev/null | grep -om1 'https://[a-z0-9.-]*workers\.dev' || true)
+            if [ -z "$DEV" ]; then
+              echo "::error::لا النطاق استجاب ولا استُنتج عنوان workers.dev. النشر مشكوك فيه."
+              exit 1
+            fi
+            echo "فحص عنوان workers.dev"
+            if ! probe "$DEV"; then
+              echo "::error::لا النطاق ولا workers.dev استجابا. النشر مشكوك فيه."
+              exit 1
+            fi
+          fi
+
+          # ٢ · الرادّ صدى لا قالب: phase_0 حقلٌ لا يعرفه غيرها
+          if ! grep -q '"phase_0"' /tmp/ready.json; then
+            echo "::error::الخادم يستجيب لكن جوابه ليس جواب صدى — قالبٌ قديم ما يزال منشوراً؟"
             exit 1
           fi
 
-          echo "::warning::$BASE لا يستجيب — النطاق لم يُربط بعد (M-05)."
-          DEV=$(npx wrangler deployments list --env "$TARGET" 2>/dev/null | grep -om1 'https://[a-z0-9.-]*workers\.dev' || true)
-          if [ -z "$DEV" ]; then
-            echo "::warning::تعذّر استنتاج عنوان workers.dev. النشر تمّ، والتحقق مؤجل."
-            exit 0
-          fi
-          echo "فحص عنوان workers.dev"
-          if probe "$DEV"; then
-            grep -q '"ready":true' /tmp/ready.json && exit 0
-            echo "::error::الخادم يستجيب وليس جاهزا. الناقص مذكور أعلاه بالاسم."
+          # ٣ · القاعدة موصولة: يثبت الربوط والترحيل معاً
+          if ! grep -q '"database":"ok"' /tmp/ready.json; then
+            echo "::error::صدى منشورة لكنّها لا تصل إلى D1. ربطٌ ناقص أو ترحيلٌ لم يُطبَّق."
             exit 1
           fi
-          echo "::error::لا النطاق ولا workers.dev استجابا. النشر مشكوك فيه."
-          exit 1
+
+          if grep -q '"ready":true' /tmp/ready.json; then
+            echo "النشر تمّ، والنظام جاهز."
+            exit 0
+          fi
+
+          echo "::warning::النشر تمّ وصدى تعمل والقاعدة موصولة — وأسرارٌ ما تزال ناقصة:"
+          echo "::warning::$(grep -o '"missing_secrets":\[[^]]*\]' /tmp/ready.json || echo 'تعذّرت قراءة القائمة')"
+          echo "::warning::هذه مهامّ المالك (docs/MANUAL-TASKS.md)، لا عطلٌ في النشر."
