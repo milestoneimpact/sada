@@ -1,0 +1,119 @@
+/**
+ * يرسم اللوحة إلى ملفٍّ لتُرى.
+ *
+ * وُجد لأنّي كنتُ أبني الواجهة بالاستدلال: أقرأ الرموز وأحسب التباين
+ * وأتخيّل النتيجة. **والتصميم لا يُبنى هكذا** — الفرقُ بين «صحيحٍ في
+ * الحساب» و«جميلٍ في العين» لا يُدرَك إلا بالنظر.
+ *
+ * يستورد `panelPage` نفسها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
+ */
+import { writeFileSync } from 'node:fs'
+import { panelPage, type PanelData } from '../src/routes/panelView'
+import { viewChannels, type LinkedAccount } from '../src/lib/channels'
+
+const now = new Date('2026-09-05T18:00:00Z')
+
+function ago(hours: number): string {
+  return new Date(now.getTime() - hours * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+const accounts: LinkedAccount[] = [
+  { id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر عبدالحميد', status: 'active', createdAt: ago(700) },
+  { id: 'a2', platform: 'linkedin', kind: 'org', displayName: 'بصائر للاستشارات', status: 'active', createdAt: ago(300) },
+  { id: 'a3', platform: 'x', kind: 'member', displayName: '@omar_ah', status: 'needs_reauth', createdAt: ago(1200) },
+]
+
+const data: PanelData = {
+  paused: false,
+  autoEnqueue: true,
+  analysisCap: 10,
+  spendCap: 5,
+  usedAnalyses: 6,
+  usedSpend: 1.84,
+  spend30d: 23.41,
+  series: [
+    { day: '2026-08-23', total: 0.4 }, { day: '2026-08-24', total: 1.1 },
+    { day: '2026-08-25', total: 0.9 }, { day: '2026-08-26', total: 2.3 },
+    { day: '2026-08-27', total: 1.7 }, { day: '2026-08-28', total: 0 },
+    { day: '2026-08-29', total: 0.6 }, { day: '2026-08-30', total: 2.9 },
+    { day: '2026-08-31', total: 3.4 }, { day: '2026-09-01', total: 1.2 },
+    { day: '2026-09-02', total: 2.1 }, { day: '2026-09-03', total: 1.5 },
+    { day: '2026-09-04', total: 2.7 }, { day: '2026-09-05', total: 1.84 },
+  ],
+  sources: [
+    {
+      id: 's1', driveFileId: '1kDa1TyYKK_2lpT', name: 'منهجية إدارة المشروعات للقادة — الإطار الأول',
+      analyzed: true, stale: false, worth: 0.86,
+      summary: 'يشرح الإطارَ الأوّل من المنهجيّة: قيادةُ القيمة، وكيف تُقاس بمعالمَ لا بمخرجات.',
+      reason: 'مادّةٌ أصيلة، وفيها إطارٌ قابل للاقتباس.',
+      themes: ['إدارة المشروعات', 'القيادة', 'قياس الأثر'], lastSeenAt: ago(3),
+    },
+    {
+      id: 's2', driveFileId: '1deicGMZG72tztw', name: 'تقرير الإغلاق — مشروع الرواد ألبانيا',
+      analyzed: true, stale: true, worth: 0.61,
+      summary: 'تقريرُ إغلاقٍ فيه أرقامُ المستفيدين والدروسُ المستفادة.',
+      reason: 'قابلٌ للنشر بعد تجريده من التفاصيل التعاقديّة.',
+      themes: ['أثر', 'ألبانيا'], lastSeenAt: ago(26),
+    },
+    {
+      id: 's3', driveFileId: '1QpXm4Rt9YbNc2v', name: 'مسوّدة — ملاحظاتٌ متفرّقة',
+      analyzed: false, stale: false, worth: null, summary: null, reason: null,
+      themes: [], lastSeenAt: ago(50),
+    },
+  ],
+  providers: [
+    {
+      name: 'anthropic', label: 'Anthropic', kind: 'anthropic',
+      baseUrl: null, model: 'claude-opus-5', builtin: true, configured: true,
+      secretName: 'ANTHROPIC_API_KEY', howToGet: 'console.anthropic.com ← API Keys',
+      calls: 47, spend: 18.2, source: 'vault', hint: 'sk-ant-…_QAA', enabled: true,
+      dailyCap: null, priceIn: 5, priceOut: 25, spendToday: 1.84, verifiedAt: null, updatedAt: ago(1),
+    },
+    {
+      name: 'gemini', label: 'Gemini', kind: 'openai_compat',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      model: 'gemini-2.5-flash', builtin: true, configured: false,
+      secretName: 'GEMINI_API_KEY', howToGet: 'aistudio.google.com/apikey',
+      calls: 0, spend: 0, source: 'none', hint: null, enabled: true,
+      dailyCap: null, priceIn: null, priceOut: null, spendToday: 0, verifiedAt: null, updatedAt: ago(400),
+    },
+    {
+      name: 'deepseek', label: 'DeepSeek', kind: 'openai_compat',
+      baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', builtin: false,
+      configured: true, secretName: null, howToGet: '', calls: 12, spend: 5.21,
+      source: 'vault', hint: 'sk-8f3a…c19d', enabled: true, dailyCap: 2,
+      priceIn: 0.27, priceOut: 1.1, spendToday: 0.32, verifiedAt: ago(20), updatedAt: ago(20),
+    },
+  ],
+  routing: [
+    { task: 'analyze', provider: 'anthropic', model: 'claude-opus-5', why: 'حكمٌ يحتاج فهما عميقا', ready: true, implemented: true },
+    { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', why: 'الصياغةُ العربيّة', ready: false, implemented: false },
+    { task: 'image', provider: 'gemini', model: 'gemini-2.5-flash-image', why: 'توليدُ الصور', ready: false, implemented: false },
+  ],
+  knownProviders: [
+    { name: 'anthropic', label: 'Anthropic' },
+    { name: 'gemini', label: 'Gemini' },
+    { name: 'deepseek', label: 'DeepSeek' },
+  ],
+  postsBuilt: false,
+  flash: { kind: 'ok', text: 'تمّ المسح — رأى 3 · جديد 1. مصدرٌ واحد ينتظر تحليلا.' },
+  now,
+  csrf: 'demo-csrf-token',
+  nonce: 'demoNonce123',
+  sessions: [
+    { id: 'x1', at: ago(2), ip: '203.0.113.9', ua: 'Mozilla/5.0 (Macintosh) Chrome/120', via: 'admin_token', current: true },
+    { id: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false },
+  ],
+  audit: [
+    { at: ago(1), actor: 'panel', action: 'provider.key', target: 'anthropic', detail: 'بُدّل إلى sk-ant-…_QAA', ip: '203.0.113.9' },
+    { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعاملٍ واحد', ip: '203.0.113.9' },
+    { at: ago(26), actor: 'cron', action: 'drive.scan', target: null, detail: 'رأى 3 · تغيّر 1', ip: null },
+  ],
+  rpId: 'sada2.basserh.com',
+  via: 'admin_token',
+  factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
+  channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),
+}
+
+writeFileSync(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
+console.log('رُسمت')

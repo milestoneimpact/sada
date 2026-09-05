@@ -61,7 +61,7 @@ function card(view: ChannelView, now: Date): string {
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? '<span class="st bad"><span class="g">▲</span>جدّد الإذن</span>'
-          : `<span class="mono" title="${escapeHtml(a.createdAt)} UTC">منذ ${escapeHtml(
+          : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">منذ ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
       </div>`,
@@ -87,8 +87,8 @@ function card(view: ChannelView, now: Date): string {
         : state === 'linked'
           ? `<a class="btn g sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : state === 'awaiting_owner'
-            ? '<span class="mono">بلا سرٍّ لا يبدأ الربط</span>'
-            : '<span class="mono">يحتاج سائقا يُكتب لها</span>'
+            ? '<span class="st idle"><span class="g">○</span>بلا سرٍّ لا يبدأ الربط</span>'
+            : '<span class="st idle"><span class="g">○</span>يحتاج سائقا يُكتب له</span>'
 
   return `<div class="ch${state === 'unbuilt' ? ' off' : ''}">
     <div class="ch-top">
@@ -108,21 +108,21 @@ export function channelsSection(views: readonly ChannelView[], now: Date): strin
   const rest = views.filter((v) => !v.spec.built)
   const linked = built.filter((v) => v.state === 'linked' || v.state === 'needs_reauth').length
 
-  return `<div class="card" style="margin-bottom:14px">
-    <h2>القنوات</h2>
-    <p class="hint" style="margin:0">${linked === 0
-      ? 'لا قناةَ مربوطةٍ بعد. والنظام يقرأ ويفهم ويكتب — ولا ينشر إلى شيء حتّى تربط واحدة.'
-      : `${linked} من ${built.length} مربوطة.`}
-      <b>ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b> مهما كانت القنواتُ مربوطة.</p>
+  return `<div class="lede-row">
+    <h3 class="sec" style="margin:0; border:0; padding:0">القنوات المبنيّة</h3>
+    <span class="grow"></span>
+    <span class="st ${linked === 0 ? 'warn' : 'ok'}"><span class="g">${
+      linked === 0 ? '!' : '●'}</span>${linked} من ${built.length} مربوطة</span>
+    <span class="lede-note">ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة، مهما كانت القنواتُ مربوطة.</span>
   </div>
 
   <div class="grid c2">${built.map((v) => card(v, now)).join('')}</div>
 
-  <div class="card" style="margin:18px 0 14px">
-    <h2>ما لم يُبنَ بعد</h2>
-    <p class="hint" style="margin:0">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
-      (<span class="mono">chat/completions</span>). <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b> —
-      لكلٍّ واجهةُ نشرٍ مختلفةٌ جذريّا. فحقلُ «عنوان API» لا يكفيها، ولوحةٌ تعرضه توهم بما لا يقع.</p>
+  <div class="lede-row" style="margin-top:22px">
+    <h3 class="sec" style="margin:0; border:0; padding:0">لم تُبنَ بعد</h3>
+    <span class="grow"></span>
+    <span class="lede-note">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —
+      <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</span>
   </div>
 
   <div class="grid c3">${rest.map((v) => card(v, now)).join('')}</div>`
