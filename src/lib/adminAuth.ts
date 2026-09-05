@@ -14,6 +14,8 @@
  * بـ Cloudflare وحدها.
  */
 
+import { sameSecret } from './security/digest'
+
 export type AdminVerdict =
   | { readonly kind: 'ok' }
   /** لا `ADMIN_TOKEN` — المسار مقفل، لا مفتوح. */
@@ -28,19 +30,6 @@ export type AdminVerdict =
    * لصقت مع الرمز، أو سطرٌ جديد. ولا يُذكر طول المحفوظ قطّ.
    */
   | { readonly kind: 'denied'; readonly presentedLength: number }
-
-async function digest(value: string): Promise<Uint8Array> {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return new Uint8Array(bytes)
-}
-
-/** يقارن بصمتين بزمنٍ ثابت — لا خروج مبكر عند أوّل اختلاف. */
-function sameDigest(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i += 1) diff |= a[i]! ^ b[i]!
-  return diff === 0
-}
 
 /**
  * يستخرج الرمز من `Authorization: Bearer <token>`.
@@ -72,8 +61,7 @@ export async function authorizeAdmin(
   const presented = bearer(request.headers.get('Authorization'))
   if (presented === null) return { kind: 'no_header' }
 
-  const [a, b] = await Promise.all([digest(presented), digest(secret)])
-  return sameDigest(a, b)
+  return (await sameSecret(presented, secret))
     ? { kind: 'ok' }
     : { kind: 'denied', presentedLength: presented.length }
 }

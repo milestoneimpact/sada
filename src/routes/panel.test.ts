@@ -31,16 +31,30 @@ beforeEach(() => {
   }
 })
 
+/** رمز CSRF للجلسة الجارية — يُقرأ من الصفحة كما يقرؤه المتصفّح. */
+let csrf = ''
+
 async function login(): Promise<string> {
   const body = new FormData()
   body.set('token', TOKEN)
   const response = await app.request('/panel/login', { method: 'POST', body }, env)
   expect(response.status).toBe(303)
-  const cookie = response.headers.get('Set-Cookie') ?? ''
-  return cookie.split(';')[0]!
+  const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
+
+  const page = await app.request('/panel', { headers: { Cookie: cookie } }, env)
+  csrf = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+  expect(csrf).not.toBe('')
+  return cookie
 }
 
+/**
+ * كعكةُ الجلسة ورمزُ النموذج معا — كما يرسلهما المتصفّح.
+ *
+ * والرمز يُحقن هنا لا في كلّ اختبار: اختبارٌ يُغفله يفشل لسببٍ لا علاقة
+ * له بما يفحصه، فيُخفي العطل الحقيقيّ بضجيج.
+ */
 function withSession(cookie: string, init: RequestInit = {}): RequestInit {
+  if (init.body instanceof FormData && !init.body.has('_csrf')) init.body.set('_csrf', csrf)
   return { ...init, headers: { ...(init.headers ?? {}), Cookie: cookie } }
 }
 
@@ -125,7 +139,9 @@ describe('الدخول', () => {
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Strict')
     expect(cookie).toContain('Secure')
-    expect(cookie).toContain('Path=/panel')
+    // بادئة __Host- تشترط Path=/ — ومنعُ نطاقٍ شقيقٍ من زرع كعكة أولى
+    expect(cookie).toContain('Path=/')
+    expect(cookie).not.toContain('Domain=')
   })
 
   it('الخروج يُبطل الجلسة فورا', async () => {
@@ -336,7 +352,11 @@ describe('الأفعال — واللوحة ليست طريقا جانبيّا �
   it('فشلُ المسح يُبلَّغ ولا يُسقط اللوحة', async () => {
     const cookie = await login()
     // بلا GOOGLE_SA_JSON صالح يفشل المسح
-    const response = await app.request('/panel/scan', withSession(cookie, { method: 'POST' }), env)
+    const response = await app.request(
+      '/panel/scan',
+      withSession(cookie, { method: 'POST', body: new FormData() }),
+      env,
+    )
     expect(response.status).toBe(303)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('تعذّر المسح')
@@ -693,5 +713,290 @@ describe('توجيه المهامّ يصير للمالك', () => {
     body.set('provider', 'anthropic')
     body.set('model', 'x')
     expect((await app.request('/panel/routes', { method: 'POST', body }, env)).status).toBe(401)
+  })
+})
+
+describe('ترويسات الأمان — والقفل على بابٍ جدارُه زجاج ليس أمنا', () => {
+  it('صفحة اللوحة تمنع التأطير بالطريقتين', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel', withSession(cookie), env)
+    const csp = response.headers.get('Content-Security-Policy') ?? ''
+    expect(csp).toContain("frame-ancestors 'none'")
+    expect(response.headers.get('X-Frame-Options')).toBe('DENY')
+  })
+
+  it('السياسة قائمةُ سماحٍ من العدم', async () => {
+    const cookie = await login()
+    const csp =
+      (await app.request('/panel', withSession(cookie), env)).headers.get(
+        'Content-Security-Policy',
+      ) ?? ''
+    expect(csp).toContain("default-src 'none'")
+    expect(csp).toContain("base-uri 'none'")
+    expect(csp).toContain("form-action 'self'")
+    // ولا تُفتَح بابا يُبطلها كلَّها
+    expect(csp).not.toContain('unsafe-inline')
+    expect(csp).not.toContain('unsafe-eval')
+  })
+
+  it('كلّ وسمٍ داخليّ يحمل nonce الصفحة — وإلّا لما نُفّذ', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel', withSession(cookie), env)
+    const html = await response.text()
+    const nonce = /nonce-([A-Za-z0-9+/]+)/.exec(
+      response.headers.get('Content-Security-Policy') ?? '',
+    )?.[1]
+    expect(nonce).toBeTruthy()
+    expect(html).toContain(`<style nonce="${nonce}">`)
+    expect(html).toContain(`<script nonce="${nonce}">`)
+  })
+
+  it('nonce يتبدّل مع كلّ ردّ — وثابتٌ مشترك يُبطل السياسة', async () => {
+    const cookie = await login()
+    const first = await app.request('/panel', withSession(cookie), env)
+    const second = await app.request('/panel', withSession(cookie), env)
+    expect(first.headers.get('Content-Security-Policy')).not.toBe(
+      second.headers.get('Content-Security-Policy'),
+    )
+  })
+
+  it('صفحةُ الدخول محروسةٌ كاللوحة — لا تُترك لأنّها قبل الجلسة', async () => {
+    const response = await app.request('/panel', {}, env)
+    expect(response.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'")
+    expect(response.headers.get('X-Frame-Options')).toBe('DENY')
+  })
+
+  it('اللوحة لا تُخزَّن في متصفّحٍ مشترك', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel', withSession(cookie), env)
+    expect(response.headers.get('Cache-Control')).toContain('no-store')
+  })
+
+  it('الترويسات الأساس على كلّ ردّ — JSON كان أو HTML', async () => {
+    for (const path of ['/health', '/ready', '/panel']) {
+      const response = await app.request(path, {}, env)
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+      expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
+      expect(response.headers.get('Strict-Transport-Security')).toContain('includeSubDomains')
+    }
+  })
+})
+
+describe('CSRF — طبقةٌ في الخادم لا في المتصفّح وحده', () => {
+  it('كلّ نموذج POST في اللوحة يحمل الرمز — بلا استثناء', async () => {
+    const cookie = await login()
+    await seedSource('مستند')
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    // يُفحص كلّ موضعٍ على حدة لا كلّ نصٍّ فريد: نموذجان متطابقان نصّا
+    // موضعان اثنان، ولو فُحص الأوّل مرّتين لمرّ ثانٍ ناقص
+    const pattern = /<form\b[^>]*method="POST"[^>]*>/gi
+    let seen = 0
+    for (let m = pattern.exec(html); m !== null; m = pattern.exec(html)) {
+      seen += 1
+      expect(html.slice(pattern.lastIndex, pattern.lastIndex + 90)).toContain('name="_csrf"')
+    }
+    expect(seen).toBeGreaterThan(5)
+  })
+
+  it('طلبٌ بلا رمز يُرفض ٤٠٣ ولا يغيّر القاعدة', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('key', 'paused')
+    body.set('value', 'true')
+    // بلا `_csrf` — كما يرسله موقعٌ آخر
+    const response = await app.request(
+      '/panel/settings',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(403)
+    expect((await readSettings(db)).paused).toBe(false)
+  })
+
+  it('رمزٌ ملفَّق يُرفض كذلك', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('key', 'paused')
+    body.set('value', 'true')
+    body.set('_csrf', 'a'.repeat(64))
+    const response = await app.request(
+      '/panel/settings',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(403)
+    expect((await readSettings(db)).paused).toBe(false)
+  })
+
+  it('رمزُ جلسةٍ أخرى لا يعمل في هذه', async () => {
+    const first = await login()
+    const stolen = csrf
+    const second = await login()
+    expect(csrf).not.toBe(stolen)
+
+    const body = new FormData()
+    body.set('key', 'paused')
+    body.set('value', 'true')
+    body.set('_csrf', stolen)
+    const response = await app.request(
+      '/panel/settings',
+      { method: 'POST', body, headers: { Cookie: second } },
+      env,
+    )
+    expect(response.status).toBe(403)
+    expect(first).not.toBe(second)
+  })
+
+  it('الخروج لا يحتاج رمزا — بابُ الخروج لا يُقفَل', async () => {
+    const cookie = await login()
+    const response = await app.request(
+      '/panel/logout',
+      { method: 'POST', headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(303)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('name="token"')
+  })
+})
+
+describe('تدويرُ ADMIN_TOKEN يُبطل الجلسات', () => {
+  it('جلسةٌ قائمة تسقط حين يُبدَّل الرمز — لا تنتظر انتهاء مهلتها', async () => {
+    const cookie = await login()
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).toContain(
+      'nav class="tabs"',
+    )
+
+    const rotated = { ...env, ADMIN_TOKEN: 'Zz9qW8vY1nMtB6oS3uXgA7dC5eI2kH0f' }
+    const html = await (await app.request('/panel', withSession(cookie), rotated)).text()
+    expect(html).toContain('name="token"')
+    expect(html).not.toContain('nav class="tabs"')
+  })
+
+  it('ولا يغيّر شيئا بجلسةٍ سقطت', async () => {
+    const cookie = await login()
+    const rotated = { ...env, ADMIN_TOKEN: 'Zz9qW8vY1nMtB6oS3uXgA7dC5eI2kH0f' }
+    const body = new FormData()
+    body.set('key', 'paused')
+    body.set('value', 'true')
+    body.set('_csrf', csrf)
+    const response = await app.request(
+      '/panel/settings',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      rotated,
+    )
+    expect(response.status).toBe(401)
+    expect((await readSettings(db)).paused).toBe(false)
+  })
+})
+
+describe('جرد الأجهزة في اللوحة', () => {
+  it('يعرض الجلسات ويعلّم الحاليّة', async () => {
+    const cookie = await login()
+    await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('الأجهزة المفتوحة')
+    expect(html).toContain('هذا الجهاز')
+    expect(html).toContain('/panel/sessions/revoke')
+  })
+
+  it('«أخرِج الأجهزة الأخرى» يُبقي جلسة الفاعل', async () => {
+    const other = await login()
+    const mine = await login()
+    const response = await app.request(
+      '/panel/sessions/revoke-all',
+      withSession(mine, { method: 'POST', body: new FormData() }),
+      env,
+    )
+    expect(response.status).toBe(303)
+
+    expect(await (await app.request('/panel', withSession(mine), env)).text()).toContain(
+      'nav class="tabs"',
+    )
+    expect(await (await app.request('/panel', { headers: { Cookie: other } }, env)).text()).toContain(
+      'name="token"',
+    )
+  })
+
+  it('إبطالُ جلستك من الجرد يُردّ إلى زرّ الخروج — لا يترك صفحةً ميّتة', async () => {
+    const cookie = await login()
+    const id = cookie.split('=')[1]!
+    const body = new FormData()
+    body.set('id', id)
+    await app.request('/panel/sessions/revoke', withSession(cookie, { method: 'POST', body }), env)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('nav class="tabs"')
+    expect(html).toContain('استعمل زرّ «خروج»')
+  })
+})
+
+describe('سجلّ التدقيق — من فعل ماذا', () => {
+  async function actions(): Promise<string[]> {
+    const { results } = await db
+      .prepare('SELECT action FROM audit_log ORDER BY id')
+      .all<{ action: string }>()
+    return results.map((r) => r.action)
+  }
+
+  it('يسجّل الدخول وتغيير الإعداد', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('key', 'daily_analysis_cap')
+    body.set('value', '7')
+    await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+    expect(await actions()).toContain('session.open')
+    expect(await actions()).toContain('settings.write')
+  })
+
+  it('يسجّل المحاولة المرفوضة — وتكرارُها هو ما يُقرأ لاحقا', async () => {
+    const body = new FormData()
+    body.set('token', 'wrong')
+    await app.request('/panel/login', { method: 'POST', body }, env)
+    expect(await actions()).toContain('login.denied')
+  })
+
+  it('**لا يُذكر مفتاحٌ في السجلّ** — التلميح وحده', async () => {
+    const cookie = await login()
+    const secret = 'sk-super-secret-value-2b7f'
+    const add = new FormData()
+    add.set('name', 'deepseek')
+    add.set('label', 'DeepSeek')
+    add.set('base_url', 'https://api.deepseek.com/v1')
+    add.set('model', 'deepseek-chat')
+    await app.request('/panel/providers/add', withSession(cookie, { method: 'POST', body: add }), env)
+
+    const key = new FormData()
+    key.set('provider', 'deepseek')
+    key.set('key', secret)
+    await app.request('/panel/providers/key', withSession(cookie, { method: 'POST', body: key }), env)
+
+    const { results } = await db
+      .prepare('SELECT detail FROM audit_log')
+      .all<{ detail: string | null }>()
+    const all = results.map((r) => r.detail ?? '').join(' | ')
+    expect(all).not.toContain(secret)
+    expect(await actions()).toContain('provider.key')
+  })
+
+  it('يظهر في اللوحة بأسمائه العربيّة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('سجلّ التدقيق')
+    expect(html).toContain('فُتحت جلسة')
+  })
+
+  it('عطلٌ في السجلّ لا يُسقط الفعل — الإعدادُ يُحفظ ولو لم يُسجَّل', async () => {
+    const cookie = await login()
+    db.raw.exec('DROP TABLE audit_log')
+    const body = new FormData()
+    body.set('key', 'daily_analysis_cap')
+    body.set('value', '9')
+    const response = await app.request(
+      '/panel/settings',
+      withSession(cookie, { method: 'POST', body }),
+      env,
+    )
+    expect(response.status).toBe(303)
+    expect((await readSettings(db)).dailyAnalysisCap).toBe(9)
   })
 })

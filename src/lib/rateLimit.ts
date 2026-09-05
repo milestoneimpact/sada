@@ -19,10 +19,24 @@ export interface AttemptStore {
 export const MAX_ATTEMPTS = 5
 export const WINDOW_SECONDS = 15 * 60
 
+/**
+ * سقفٌ عامّ فوق سقف العنوان.
+ *
+ * العدُّ لكلّ IP وحده يوقف مخمّنا واحدا، ولا يوقف من يوزّع محاولاته على
+ * مئة عنوان — وهذا ما تفعله كلّ أداةِ تخمينٍ جادّة. فالسقف العامّ هو ما
+ * يمنع الحملة، وسقفُ العنوان هو ما يمنع الملحّ.
+ *
+ * وثلاثون في ربع ساعة سخيّ لمالكٍ واحد: من أخطأ ثلاثين مرّةً في ربع ساعة
+ * ليس مالكا يكتب رمزه.
+ */
+export const MAX_GLOBAL_ATTEMPTS = 30
+
 export interface AttemptState {
   readonly blocked: boolean
   readonly attempts: number
   readonly remaining: number
+  /** أمُنع لأنّ الحملةَ عامّة لا لأنّ عنوانه أخطأ؟ يُقال في الرسالة. */
+  readonly globalBlock: boolean
 }
 
 /**
@@ -37,29 +51,51 @@ function keyFor(request: Request): string {
   return `login-attempts:${ip}`
 }
 
-export async function attemptState(store: AttemptStore, request: Request): Promise<AttemptState> {
-  const raw = await store.get(keyFor(request))
-  const attempts = raw === null ? 0 : Number.parseInt(raw, 10) || 0
+const GLOBAL_KEY = 'login-attempts:global'
+
+async function countOf(store: AttemptStore, key: string): Promise<number> {
+  const raw = await store.get(key)
+  return raw === null ? 0 : Number.parseInt(raw, 10) || 0
+}
+
+function verdict(attempts: number, global: number): AttemptState {
+  const globalBlock = global >= MAX_GLOBAL_ATTEMPTS
   return {
-    blocked: attempts >= MAX_ATTEMPTS,
+    blocked: attempts >= MAX_ATTEMPTS || globalBlock,
     attempts,
     remaining: Math.max(0, MAX_ATTEMPTS - attempts),
+    globalBlock,
   }
+}
+
+export async function attemptState(store: AttemptStore, request: Request): Promise<AttemptState> {
+  const [attempts, global] = await Promise.all([
+    countOf(store, keyFor(request)),
+    countOf(store, GLOBAL_KEY),
+  ])
+  return verdict(attempts, global)
 }
 
 /** يسجّل محاولةً فاشلة. النافذة تُجدَّد مع كلّ فشل: إلحاحٌ يطيل المنع. */
 export async function recordFailure(store: AttemptStore, request: Request): Promise<AttemptState> {
-  const current = await attemptState(store, request)
-  const attempts = current.attempts + 1
-  await store.put(keyFor(request), String(attempts), { expirationTtl: WINDOW_SECONDS })
-  return {
-    blocked: attempts >= MAX_ATTEMPTS,
-    attempts,
-    remaining: Math.max(0, MAX_ATTEMPTS - attempts),
-  }
+  const [attempts, global] = await Promise.all([
+    countOf(store, keyFor(request)),
+    countOf(store, GLOBAL_KEY),
+  ])
+  await Promise.all([
+    store.put(keyFor(request), String(attempts + 1), { expirationTtl: WINDOW_SECONDS }),
+    store.put(GLOBAL_KEY, String(global + 1), { expirationTtl: WINDOW_SECONDS }),
+  ])
+  return verdict(attempts + 1, global + 1)
 }
 
-/** نجاحٌ يمحو العدّ: المالك الذي أخطأ مرّتين ثمّ أصاب لا يُحاسَب. */
+/**
+ * نجاحٌ يمحو عدّ العنوان: المالك الذي أخطأ مرّتين ثمّ أصاب لا يُحاسَب.
+ *
+ * **ولا يمحو العدّ العامّ.** لو محاه لصار الدخولُ الناجح أداةً تُصفّر
+ * الحملةَ الجارية: يخمّن المهاجم تسعا وعشرين، ثمّ يدخل المالكُ فيُعاد
+ * العدّاد إلى الصفر ويستأنف. والعدّ العامّ ينتهي بمهلته وحدها.
+ */
 export async function clearAttempts(store: AttemptStore, request: Request): Promise<void> {
   await store.delete(keyFor(request))
 }

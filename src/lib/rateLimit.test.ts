@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeKv } from '../test/fakes'
 import {
+  MAX_ATTEMPTS,
+  MAX_GLOBAL_ATTEMPTS,
+  WINDOW_SECONDS,
   attemptState,
   clearAttempts,
   delayMs,
-  MAX_ATTEMPTS,
   recordFailure,
-  WINDOW_SECONDS,
 } from './rateLimit'
 
 let kv: ReturnType<typeof fakeKv>
@@ -24,7 +25,7 @@ function from(ip: string): Request {
 describe('العدّ', () => {
   it('يبدأ صفرا وغير محظور', async () => {
     const state = await attemptState(kv, from('1.1.1.1'))
-    expect(state).toEqual({ blocked: false, attempts: 0, remaining: MAX_ATTEMPTS })
+    expect(state).toEqual({ blocked: false, attempts: 0, remaining: MAX_ATTEMPTS, globalBlock: false })
   })
 
   it('يحظر عند بلوغ الحدّ لا بعد تجاوزه', async () => {
@@ -71,5 +72,40 @@ describe('التأخير المتصاعد', () => {
     expect(delayMs(2)).toBeGreaterThan(0)
     expect(delayMs(3)).toBeGreaterThan(delayMs(2))
     expect(delayMs(50)).toBe(2000)
+  })
+})
+
+describe('السقف العامّ — ما يمنع الحملة الموزّعة', () => {
+  it('محاولاتٌ من عناوين شتّى لا يوقفها سقف العنوان، ويوقفها العامّ', async () => {
+    // كلّ عنوانٍ يخطئ مرّتين: دون سقفه بكثير، وفوق السقف العامّ مجتمعا
+    for (let i = 0; i < MAX_GLOBAL_ATTEMPTS / 2; i += 1) {
+      const ip = `198.51.100.${i}`
+      await recordFailure(kv, from(ip))
+      await recordFailure(kv, from(ip))
+    }
+    const fresh = await attemptState(kv, from('203.0.113.77'))
+    expect(fresh.attempts).toBe(0)
+    expect(fresh.globalBlock).toBe(true)
+    expect(fresh.blocked).toBe(true)
+  })
+
+  it('نجاحُ الدخول لا يُصفّر العدّ العامّ — وإلّا صار أداةً تُنعش الحملة', async () => {
+    for (let i = 0; i < MAX_GLOBAL_ATTEMPTS; i += 1) {
+      await recordFailure(kv, from(`198.51.100.${i}`))
+    }
+    await clearAttempts(kv, from('198.51.100.0'))
+    expect((await attemptState(kv, from('198.51.100.0'))).globalBlock).toBe(true)
+  })
+
+  it('ويُصفّر عدّ العنوان وحده', async () => {
+    await recordFailure(kv, from('1.1.1.1'))
+    await recordFailure(kv, from('1.1.1.1'))
+    await clearAttempts(kv, from('1.1.1.1'))
+    expect((await attemptState(kv, from('1.1.1.1'))).attempts).toBe(0)
+  })
+
+  it('العدّ العامّ ينتهي بمهلته هو أيضا', async () => {
+    await recordFailure(kv, from('1.1.1.1'))
+    expect(kv.ttlOf('login-attempts:global')).toBe(WINDOW_SECONDS)
   })
 })
