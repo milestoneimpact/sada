@@ -14,7 +14,20 @@
  * بـ Cloudflare وحدها.
  */
 
-export type AdminVerdict = 'ok' | 'disabled' | 'denied'
+export type AdminVerdict =
+  | { readonly kind: 'ok' }
+  /** لا `ADMIN_TOKEN` — المسار مقفل، لا مفتوح. */
+  | { readonly kind: 'disabled' }
+  /** لا ترويسة `Authorization: Bearer` أصلا، أو صيغتها ليست كذلك. */
+  | { readonly kind: 'no_header' }
+  /**
+   * ترويسةٌ سليمة الصيغة ورمزٌ مخالف.
+   *
+   * `presentedLength` طول ما أرسله المنادي هو نفسه — يعرفه أصلا، فلا
+   * يُسرَّب به شيء. وهو ما يكشف الخطأ الشائع: قوسان زائدان، أو مسافةٌ
+   * لصقت مع الرمز، أو سطرٌ جديد. ولا يُذكر طول المحفوظ قطّ.
+   */
+  | { readonly kind: 'denied'; readonly presentedLength: number }
 
 async function digest(value: string): Promise<Uint8Array> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -29,11 +42,16 @@ function sameDigest(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0
 }
 
-/** يستخرج الرمز من `Authorization: Bearer <token>`. */
+/**
+ * يستخرج الرمز من `Authorization: Bearer <token>`.
+ * ويُقلَّم الناتج: مسافةٌ لصقت مع الرمز عطلٌ شائع لا يستحقّ رفضا.
+ */
 function bearer(header: string | null): string | null {
   if (header === null) return null
   const match = /^Bearer (.+)$/.exec(header.trim())
-  return match === null ? null : match[1]!
+  if (match === null) return null
+  const token = match[1]!.trim()
+  return token.length === 0 ? null : token
 }
 
 /**
@@ -46,9 +64,16 @@ export async function authorizeAdmin(
   expected: string | undefined,
   request: Request,
 ): Promise<AdminVerdict> {
-  if (typeof expected !== 'string' || expected.length === 0) return 'disabled'
+  // يُقلَّم المحفوظ أيضا: سطرٌ جديد يتسلّل مع `echo … | wrangler secret put`
+  // فيجعل رمزا صحيحا يُرفض أبدا، بلا أثرٍ يدلّ على السبب
+  const secret = typeof expected === 'string' ? expected.trim() : ''
+  if (secret.length === 0) return { kind: 'disabled' }
+
   const presented = bearer(request.headers.get('Authorization'))
-  if (presented === null) return 'denied'
-  const [a, b] = await Promise.all([digest(presented), digest(expected)])
-  return sameDigest(a, b) ? 'ok' : 'denied'
+  if (presented === null) return { kind: 'no_header' }
+
+  const [a, b] = await Promise.all([digest(presented), digest(secret)])
+  return sameDigest(a, b)
+    ? { kind: 'ok' }
+    : { kind: 'denied', presentedLength: presented.length }
 }
