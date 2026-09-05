@@ -176,6 +176,24 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     })
   })
 
+  it('**عدّادٌ تقدّم ثمّ عاد صفرا يُرفض** — وهو عينُ ما وُضع الفحص له', async () => {
+    // مفتاحٌ بلغ عدّاده خمسا لا يعود إلى الصفر من نفسه. وكان `&&` يُسقط
+    // الفحص هنا، ثمّ يكتب `touchPasskey` الصفرَ فوق الخمسة فيمحو الأثر
+    const challenge = newChallenge()
+    const signed = await assertion(challenge, { signCount: 0 })
+    const result = await verifyAssertion(signed, stored(5), expected(challenge))
+    expect(result).toMatchObject({ ok: false })
+    if (!result.ok) expect(result.reason).toContain('مستنسَخا')
+  })
+
+  it('وأوّلُ استعمالٍ لمتوثِّقٍ يعدّ يمرّ — محفوظٌ صفر ووارِدٌ واحد', async () => {
+    const challenge = newChallenge()
+    const signed = await assertion(challenge, { signCount: 1 })
+    expect(await verifyAssertion(signed, stored(0), expected(challenge))).toMatchObject({
+      ok: true,
+    })
+  })
+
   it('**صفرٌ لا يُحاسَب** — متوثِّقاتٌ كثيرة لا تعدّ أصلا', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 0 })

@@ -201,8 +201,15 @@ export interface Assertion {
  * يتحقّق من دخولٍ بمفتاح مرور.
  *
  * وفحصُ عدّاد التوقيع هو ما يكشف **استنساخ** المتوثِّق: عدّادٌ لم يتقدّم
- * يعني نسخةً ثانيةً من المفتاح تُستعمل بالتوازي. ومتوثِّقاتٌ كثيرة لا
- * تعدّ أصلا فتُبقيه صفرا — فالصفرُ لا يُحاسَب عليه، وما عداه يُحاسَب.
+ * يعني نسخةً ثانيةً من المفتاح تُستعمل بالتوازي.
+ *
+ * **ويُتخطّى الفحصُ في حالٍ واحدة لا اثنتين**: أن يكون المحفوظ صفرا
+ * والوارد صفرا معا — وهذا متوثِّقٌ لا يعدّ أصلا. أمّا محفوظٌ تقدّم ثمّ
+ * وارِدٌ صفر فهو عينُ ما وُضع الفحص له: مفتاحٌ عدّاده بلغ خمسا لا يعود
+ * إلى الصفر من نفسه. وكان الشرط `&&` فيسقط الفحصُ هنا، ثمّ يكتب
+ * `touchPasskey` الصفرَ فوق الخمسة فيمحو الأثر الذي كان يدلّ.
+ *
+ * وهو ما تقوله المواصفة (WebAuthn §7.2): يُقارَن ما لم يكونا صفرين.
  */
 export async function verifyAssertion(
   assertion: Assertion,
@@ -215,10 +222,9 @@ export async function verifyAssertion(
   const auth = await checkAuthData(assertion.authenticatorData, expected)
   if (!auth.ok) return fail(auth.reason)
 
-  if (credential.signCount > 0 && auth.data.signCount > 0) {
-    if (auth.data.signCount <= credential.signCount) {
-      return fail('عدّاد التوقيع لم يتقدّم — قد يكون المفتاح مستنسَخا')
-    }
+  const neitherCounts = credential.signCount === 0 && auth.data.signCount === 0
+  if (!neitherCounts && auth.data.signCount <= credential.signCount) {
+    return fail('عدّاد التوقيع لم يتقدّم — قد يكون المفتاح مستنسَخا')
   }
 
   // ما وُقّع عليه: بيانات المتوثِّق ثمّ بصمةُ بيانات العميل
