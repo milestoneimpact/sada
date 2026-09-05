@@ -13,7 +13,7 @@
  * أو لا يُفتح — والاتّساق أهمّ من موافقة الساعة المحليّة.
  */
 import { spendTodayFor } from './ai/spend'
-import { readRecord } from './providerKeys'
+import { getProvider } from './providers'
 import { readSettings, type Settings } from './settings'
 import type { Db } from './tokens'
 
@@ -78,7 +78,7 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
  * «Gemini متاح» ونظامُه موقوف.
  */
 export async function checkProvider(db: Db, provider: string): Promise<Blocker | null> {
-  const record = await readRecord(db, provider)
+  const record = await getProvider(db, provider)
   if (record === null) return null
 
   if (!record.enabled) return { kind: 'provider_disabled', provider }

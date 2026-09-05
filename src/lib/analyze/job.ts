@@ -16,7 +16,7 @@
  */
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { resolveKey } from '../providerKeys'
+import { resolveKey } from '../providers'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'

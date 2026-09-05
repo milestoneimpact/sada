@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { readSettings } from '../lib/settings'
-import { readRecord, resolveKey } from '../lib/providerKeys'
+import { getProvider, resolveKey } from '../lib/providers'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -218,7 +218,7 @@ describe('ما تعرضه اللوحة', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('ANTHROPIC_API_KEY')
-    expect(html).toContain('مفتاحه ناقص')
+    expect(html).toContain('لا مفتاح')
   })
 
   it('صفٌّ بتحليلٍ فاسد لا يُسقط اللوحة', async () => {
@@ -503,12 +503,10 @@ describe('خزانة المفاتيح في اللوحة', () => {
     expect(html).toContain('اختبره قبل أن تعتمد عليه')
   })
 
-  it('اسمُ مزوّدٍ لا سائق له يُرفض — قائمةُ سماحٍ لا منع', async () => {
+  it('مزوّدٌ غير مضاف يُرفض حفظُ مفتاحه — يُضاف أوّلا', async () => {
     const cookie = await login()
-    const response = await post(cookie, '/panel/providers/key', { provider: 'openai', key: 'sk-whatever-long' })
+    const response = await post(cookie, '/panel/providers/key', { provider: 'deepseek', key: 'sk-whatever-long' })
     expect(response.status).toBe(400)
-    const rows = db.raw.prepare('SELECT count(*) AS n FROM provider_keys').get() as { n: number }
-    expect(rows.n).toBe(0)
   })
 
   it('بلا جلسة لا يُحفظ ولا يُحذف مفتاح', async () => {
@@ -532,21 +530,27 @@ describe('خزانة المفاتيح في اللوحة', () => {
     expect((await resolveKey(db, KEY, 'gemini', undefined)).key).toBe(GEMINI)
   })
 
-  it('السقف الخاصّ يُحفظ ويُزال', async () => {
+  it('السقف والسعر يُحفظان ويُزالان', async () => {
     const cookie = await login()
-    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
-    await post(cookie, '/panel/providers/cap', { provider: 'gemini', cap: '2.5' })
-    expect((await readRecord(db, 'gemini'))?.dailyCap).toBe(2.5)
+    await post(cookie, '/panel/providers/add', {
+      name: 'gemini', label: 'Gemini', daily_cap: '2.5', price_in: '0.3', price_out: '2.5',
+    })
+    const saved = await getProvider(db, 'gemini')
+    expect(saved?.dailyCap).toBe(2.5)
+    expect(saved?.priceIn).toBe(0.3)
 
-    await post(cookie, '/panel/providers/cap', { provider: 'gemini', cap: '' })
-    expect((await readRecord(db, 'gemini'))?.dailyCap).toBeNull()
+    await post(cookie, '/panel/providers/add', { name: 'gemini', label: 'Gemini' })
+    expect((await getProvider(db, 'gemini'))?.dailyCap).toBeNull()
   })
 
-  it('الحذف يسأل قبل أن يقع', async () => {
+  it('**المدمَج لا يُحذف** — يُعطَّل بدل ذلك', async () => {
     const cookie = await login()
-    await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+    const response = await post(cookie, '/panel/providers/delete', { provider: 'gemini' })
+    expect(response.status).toBe(303)
+    expect(await getProvider(db, 'gemini')).not.toBeNull()
+
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('لا يُسترجَع')
+    expect(html).toContain('مدمَج ولا يُحذف')
   })
 
   it('سرُّ Worker لا يُدار من اللوحة — ولا يُقنَّع ولا يُعرض', async () => {
@@ -554,7 +558,7 @@ describe('خزانة المفاتيح في اللوحة', () => {
     const withSecret = { ...env, ANTHROPIC_API_KEY: 'sk-ant-سرّ-في-الورَكر' }
     const html = await (await app.request('/panel', withSession(cookie), withSecret)).text()
     expect(html).toContain('سرّ Worker')
-    expect(html).toContain('لا يُبدَّل ولا يُعطَّل من هنا')
+    expect(html).toContain('لا يُبدَّل من هنا')
     expect(html).not.toContain('sk-ant-سرّ')
   })
 
@@ -570,5 +574,124 @@ describe('خزانة المفاتيح في اللوحة', () => {
     )
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('TOKEN_ENC_KEY غير مضبوط')
+  })
+})
+
+describe('**مزوّدٌ يُضاف من اللوحة كاملا**', () => {
+  async function post(cookie: string, path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) body.set(k, v)
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('DeepSeek يُضاف بمفتاحه ويُحفظ مشفَّرا', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'deepseek', label: 'DeepSeek',
+      base_url: 'https://api.deepseek.com/v1', model: 'deepseek-chat',
+      price_in: '0.27', price_out: '1.1',
+    })
+    const provider = await getProvider(db, 'deepseek')
+    expect(provider?.kind).toBe('openai_compat')
+    expect(provider?.baseUrl).toBe('https://api.deepseek.com/v1')
+    expect(provider?.builtin).toBe(false)
+
+    await post(cookie, '/panel/providers/key', { provider: 'deepseek', key: 'sk-deepseek-secret-value' })
+    expect((await resolveKey(db, KEY, 'deepseek', undefined)).key).toBe('sk-deepseek-secret-value')
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('DeepSeek')
+    expect(html).not.toContain('sk-deepseek-secret-value')
+  })
+
+  it('**عنوانٌ داخليّ يُرفض قبل أن يُحفظ**', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'evil', label: 'Evil', base_url: 'https://169.254.169.254/latest',
+    })
+    expect(await getProvider(db, 'evil')).toBeNull()
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('العنوان مرفوض')
+  })
+
+  it('http يُرفض — المفتاح لا يُرسل على اتّصالٍ غير مشفَّر', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'plain', label: 'Plain', base_url: 'http://api.example.com/v1',
+    })
+    expect(await getProvider(db, 'plain')).toBeNull()
+  })
+
+  it('اسمٌ غير صالح يُرفض — يُستعمل مفتاحا وسياقَ تشفير وقيمةً في الدفتر', async () => {
+    const cookie = await login()
+    for (const name of ['دييب سيك', '9start', 'a', 'bad!name', 'x'.repeat(40)]) {
+      await post(cookie, '/panel/providers/add', {
+        name, label: 'X', base_url: 'https://api.example.com/v1',
+      })
+    }
+    const rows = db.raw.prepare('SELECT count(*) AS n FROM providers').get() as { n: number }
+    expect(rows.n).toBe(2) // المدمَجان وحدهما
+  })
+
+  it('المسافة تُطبَّع شرطة — تسهيلٌ مقصود لا تساهل', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'Deep Seek', label: 'DeepSeek', base_url: 'https://api.deepseek.com/v1',
+    })
+    expect(await getProvider(db, 'deep-seek')).not.toBeNull()
+  })
+
+  it('المضاف يُحذف — بخلاف المدمَج', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'groq', label: 'Groq', base_url: 'https://api.groq.com/openai/v1',
+    })
+    await post(cookie, '/panel/providers/delete', { provider: 'groq' })
+    expect(await getProvider(db, 'groq')).toBeNull()
+  })
+
+  it('التأكيد يعرض ما سيُرسَل قبل أن يُرسَل', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان')
+  })
+})
+
+describe('توجيه المهامّ يصير للمالك', () => {
+  async function post(cookie: string, path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) body.set(k, v)
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('يوجّه الفهم إلى مزوّدٍ أضافه المالك', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', {
+      name: 'deepseek', label: 'DeepSeek', base_url: 'https://api.deepseek.com/v1',
+    })
+    const response = await post(cookie, '/panel/routes', {
+      task: 'analyze', provider: 'deepseek', model: 'deepseek-chat',
+    })
+    expect(response.status).toBe(303)
+
+    const row = db.raw.prepare("SELECT provider, model FROM task_routes WHERE task='analyze'").get() as
+      { provider: string; model: string }
+    expect(row.provider).toBe('deepseek')
+    expect(row.model).toBe('deepseek-chat')
+  })
+
+  it('مهمّةٌ غير معروفة أو مزوّدٌ غير موجود يُرفضان', async () => {
+    const cookie = await login()
+    expect((await post(cookie, '/panel/routes', { task: 'hack', provider: 'anthropic', model: 'x' })).status).toBe(400)
+    expect((await post(cookie, '/panel/routes', { task: 'analyze', provider: 'ghost', model: 'x' })).status).toBe(400)
+  })
+
+  it('بلا جلسة لا يُغيَّر توجيه', async () => {
+    const body = new FormData()
+    body.set('task', 'analyze')
+    body.set('provider', 'anthropic')
+    body.set('model', 'x')
+    expect((await app.request('/panel/routes', { method: 'POST', body }, env)).status).toBe(401)
   })
 })
