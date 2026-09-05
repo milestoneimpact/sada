@@ -38,3 +38,46 @@ export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvide
   }
   return out
 }
+
+export interface DailySpend {
+  /** `YYYY-MM-DD` بـ UTC — نفس ما يكتبه الدفتر. */
+  readonly day: string
+  readonly total: number
+  readonly calls: number
+}
+
+/**
+ * سلسلةٌ يوميّة للرسم الزمنيّ.
+ *
+ * تُملأ الأيّام الخالية بصفر: سلسلةٌ تقفز فوق يومٍ بلا إنفاق ترسم خطّا
+ * يكذب — يوصل الاثنين بالأربعاء وكأنّ الثلاثاء لم يكن. والصفر حقيقةٌ
+ * لا فجوة.
+ */
+export async function dailySpend(db: Db, days = 14): Promise<DailySpend[]> {
+  let rows: { day: string; total: number; calls: number }[] = []
+  try {
+    const result = await db
+      .prepare(
+        `SELECT date(at) AS day, coalesce(sum(total), 0) AS total, count(*) AS calls
+           FROM cost_ledger
+          WHERE at >= date('now', ?)
+          GROUP BY date(at)`,
+      )
+      .bind(`-${days - 1} days`)
+      .all<{ day: string; total: number; calls: number }>()
+    rows = result.results
+  } catch {
+    rows = []
+  }
+
+  const found = new Map(rows.map((r) => [r.day, r]))
+  const series: DailySpend[] = []
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i))
+    const day = date.toISOString().slice(0, 10)
+    const row = found.get(day)
+    series.push({ day, total: row?.total ?? 0, calls: row?.calls ?? 0 })
+  }
+  return series
+}
