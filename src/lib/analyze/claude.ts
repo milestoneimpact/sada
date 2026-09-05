@@ -6,6 +6,7 @@
  * التسجيل اختياريّا، والاختياريّ يُنسى.
  */
 import Anthropic from '@anthropic-ai/sdk'
+import { ROUTES } from '../ai/registry'
 import { ANALYSIS_SCHEMA, SYSTEM_PROMPT, userPrompt, type Analysis } from './prompt'
 
 /** ما يُقرأ من استجابة المزوّد لا ما يُقدَّر. */
@@ -33,7 +34,11 @@ export class AnalyzeError extends Error {
   }
 }
 
-export const MODEL = 'claude-opus-5'
+/**
+ * من السجلّ لا من ثابتٍ هنا: نموذجٌ مكتوبٌ في موضعين يفترق أحدهما يوما،
+ * فتقول اللوحة غير ما يجري فعلا — وهو أسوأ من ألّا تقول شيئا.
+ */
+export const MODEL = ROUTES.analyze.model
 
 export interface AnalyzeDeps {
   readonly apiKey: string
