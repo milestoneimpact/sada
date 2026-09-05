@@ -49,9 +49,14 @@ npx wrangler secret put ANTHROPIC_API_KEY --env staging
 | السرّ | لأجل |
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | يدخل `deploy.yml` إلى حسابك |
-| `CLOUDFLARE_ACCOUNT_ID` | يحدّد أيّ حساب |
 
-`github.com/mooryali95/sada/settings/secrets/actions` ← **New repository secret**
+سرٌّ واحدٌ لا اثنان. `github.com/mooryali95/sada/settings/secrets/actions`
+← **New repository secret**
+
+⛔ **`CLOUDFLARE_ACCOUNT_ID` لا يوضع هنا** (D-018). معرّف الحساب في
+`wrangler.toml`: ليس سرّاً، ولصقه يدوياً في سرٍّ أسقط نشرين. وإن كان
+مضبوطاً عندك من قبل فاحذفه — `deploy.yml` لم يعد يقرأه، وبقاؤه لغوٌ
+يُوهم أنّه يعمل.
 
 ⛔ **ملفّ `GOOGLE_SA_JSON` لا يوضع هنا.** CI لا يقرأ Drive — الـ Worker يقرأه.
 
@@ -281,8 +286,7 @@ curl -s https://sada2.basserh.com/ready
    5. `github.com/mooryali95/sada/settings/secrets/actions` ←
       **New repository secret**
       - **Name**: `CLOUDFLARE_API_TOKEN` · **Secret**: الصِق القيمة
-   6. أضف سرّاً ثانياً: `CLOUDFLARE_ACCOUNT_ID` (من الشريط الجانبي في
-      Cloudflare ← **Account ID**)
+   6. ولا سرّ ثانٍ: معرّف الحساب في `wrangler.toml` (D-018).
 4. **ما يعني النجاح**: بعد أوّل دمج في `main`، تبويب **Actions** يعرض
    `deploy` أخضر، وينتهي بخطوة «التحقّق من الجاهزية» تطبع جواب `/ready`.
 5. **ماذا لو فشل**:
