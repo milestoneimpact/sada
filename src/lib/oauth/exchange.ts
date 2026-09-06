@@ -93,6 +93,7 @@ async function postForm(
   body: URLSearchParams,
   now: Date,
   fetchImpl: typeof fetch,
+  requested: readonly string[],
 ): Promise<TokenResponse> {
   const response = await fetchImpl(provider.tokenUrl, {
     method: 'POST',
@@ -110,14 +111,26 @@ async function postForm(
     }
     throw new OAuthError(`${provider.platform}: رفض نهاية الرمز (${code})`, response.status)
   }
-  return parseToken((await response.json()) as RawToken, now, provider.scopes)
+  return parseToken((await response.json()) as RawToken, now, requested)
 }
 
 /** يبدل `code` برمز وصول. `verifier` هو PKCE code_verifier. */
 export function exchangeCode(
   provider: Provider,
   creds: ClientCredentials,
-  params: { code: string; redirectUri: string; verifier: string },
+  params: {
+    code: string
+    redirectUri: string
+    verifier: string
+    /**
+     * ما طُلب في **هذه** الدورة — لا نطاقاتُ المزوّد الكاملة.
+     *
+     * فدورةُ النجاة تطلب الهويّةَ وحدها (D-045)، ومن سجّل الكاملةَ
+     * مكانها كتب في القاعدة أنّ الحسابَ ينشر وهو لا ينشر — **والحارسُ
+     * يقرأ من القاعدة**، فيمرّ ما كان يجب أن يُمنَع.
+     */
+    readonly requestedScopes?: readonly string[]
+  },
   now: Date = new Date(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<TokenResponse> {
@@ -132,6 +145,7 @@ export function exchangeCode(
     }),
     now,
     fetchImpl,
+    params.requestedScopes ?? provider.scopes,
   )
 }
 
@@ -142,6 +156,8 @@ export function refreshToken(
   refresh: string,
   now: Date = new Date(),
   fetchImpl: typeof fetch = fetch,
+  /** ما كان ممنوحا قبل التجديد: التجديدُ لا يوسّع نطاقا، فلا يُفترَض أوسع. */
+  granted: readonly string[] = provider.scopes,
 ): Promise<TokenResponse> {
   return postForm(
     provider,
@@ -149,6 +165,7 @@ export function refreshToken(
     new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refresh }),
     now,
     fetchImpl,
+    granted,
   )
 }
 

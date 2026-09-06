@@ -55,6 +55,14 @@ export interface SetupGuide {
   readonly whereSecret: string
   /** علامةُ النجاح — تُرى ولا تُفترَض. */
   readonly success: string
+  /**
+   * وما يقع إن فشل — **بالرسالة كما تُرى، لا بوصفٍ عامّ**.
+   *
+   * وُجد بعد أن ردّت LinkedIn <span dir="ltr">unauthorized_scope_error</span>
+   * على أوّل ربطٍ حقيقيّ، ولم يكن في الدليل سطرٌ واحدٌ يفسّرها. ودليلٌ
+   * يقول «إن نجح» ولا يقول «إن فشل» يترك أحوجَ الحالين بلا شيء.
+   */
+  readonly failure: string
   /** ما يجب أن يبقى صحيحا وإلّا فشل الربط بخطأٍ غامض. */
   readonly gotcha: string
 }
@@ -80,6 +88,13 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     whereId: 'تبويب Auth ← Application credentials ← Client ID: Primary',
     whereSecret: 'تحته مباشرةً — اضغط 👁 ليظهر، ثمّ 📋 لتنسخه. ولا تضغط «Generate a new Client Secret».',
     success: 'تحت OAuth 2.0 scopes في تبويب Auth تظهر ثلاثةٌ: openid و profile و w_member_social.',
+    failure:
+      'تعود الشاشةُ بـ <span class="mono">unauthorized_scope_error</span> — ' +
+      '<b>ومعناها أنّ نطاقا طُلب ولم يُمنَح لتطبيقك</b>، لا أنّ السرَّ خطأ. ' +
+      'ومصدرُه تبويب Products: <span class="mono">w_member_social</span> من ' +
+      '«Share on LinkedIn»، و <span class="mono">openid</span> و ' +
+      '<span class="mono">profile</span> من «Sign In with LinkedIn using OpenID Connect». ' +
+      'وصدى يعرض عندها ما نقص بالاسم، ويعرض <b>ربطَ الهويّة وحدها</b> لتمضي اليوم وتُكمل غدا.',
     gotcha:
       'رابطُ العودة يُطابَق حرفا بحرف: شرطةٌ في آخره أو http بدل https تُسقط الربط.',
   },
@@ -104,6 +119,11 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     whereSecret:
       'في القسم نفسه. <b>و X يعرضه مرّةً واحدةً عند إنشائه</b> — فإن لم تحفظه اضغط Regenerate، ولا ضرر ما دام لم يُربَط حساب.',
     success: 'تظهر بطاقةُ X هنا «جاهزةٌ للربط» بزرٍّ يعمل، ويُظهر /ready أنّ سرَّيها لم يعودا ناقصين.',
+    failure:
+      'يعود الربطُ بـ <span class="mono">unauthorized_client</span> أو ' +
+      '<span class="mono">invalid_request</span> — <b>وأكثرُه من شاشة User authentication ' +
+      'settings لم تُكمَل</b>، أو App permissions تركت على Read فقط. ' +
+      'وأوّلُ نشرٍ يفشل بـ 403 إن لم يكن في حساب المطوّر رصيد.',
     gotcha:
       'إن بقيت App permissions على Read فقط، يفشل الربطُ أو ينجح ولا يُرفَع وسيط.',
   },

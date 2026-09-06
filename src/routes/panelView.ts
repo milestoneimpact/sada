@@ -20,11 +20,33 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { escapeHtml, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { bar, pct } from './ui/parts'
 
 export { escapeHtml, injectCsrf, shell }
 
+
+/**
+ * رأسُ القسم — لصيقةٌ وعنوانٌ وسطر.
+ *
+ * كان أعلى ما في الشاشة عنوانا في الشريط بستّةَ عشرَ بكسلا، وتحته
+ * أرقامٌ باثنين وثلاثين. **فالرقمُ هو الذي يُقرأ عنوانا**، وتصير الشاشةُ
+ * لوحةَ عدّاداتٍ لا شاشةَ عمل: العينُ تقع على أكبر شيءٍ أوّلا، لا على
+ * ما وُسم عنوانا.
+ *
+ * والسطرُ الثالث ليس زينة: قسمٌ يبدأ بجدولٍ بلا جملةٍ تقول ما هو يجعل
+ * القارئَ يستنتج غرضَه من أعمدته.
+ */
+function pageHead(eyebrow: string, title: string, lede: string, aside = ''): string {
+  return `<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p class="lede">${lede}</p>
+    </div>
+    ${aside === '' ? '' : `<div class="aside">${aside}</div>`}
+  </div>`
+}
 
 const SCRIPT = `
 (function(){
@@ -346,7 +368,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
   return shell(
     'صدى — الدخول',
     `<div class="wrap"><div class="auth">
-      <div class="glyph">صدى</div>
+      <div class="glyph">${GLYPH_SVG}</div>
       <h1>لوحة التحكّم</h1>
       <p class="lede">أدخل رمز الإدارة للمتابعة</p>
       ${note}
@@ -763,7 +785,7 @@ export function panelPage(d: PanelData): string {
 
 <aside class="rail">
   <div class="rail-head">
-    <div class="glyph">صدى</div>
+    <div class="glyph">${GLYPH_SVG}</div>
     <div class="brand"><b>صدى</b><span>SADA · STAGING</span></div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
@@ -782,7 +804,7 @@ export function panelPage(d: PanelData): string {
 
 <div class="main">
 <header class="topbar">
-  <div><h1 id="pane-title">نظرة عامّة</h1>
+  <div class="ttl"><h1 id="pane-title">نظرة عامّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${state}
@@ -793,6 +815,7 @@ export function panelPage(d: PanelData): string {
 <main id="main" class="content">
 ${flash}
 <section data-pane="overview" hidden>
+  ${pageHead('لوحةُ صدى', 'نظرة عامّة', 'حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك. <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b>')}
   <div class="grid c4">
     <div class="card tile"><div class="k">تحليلات اليوم</div>
       <div class="v">${d.usedAnalyses}<em> / ${d.analysisCap}</em></div>
@@ -825,11 +848,13 @@ ${flash}
 </section>
 
 <section data-pane="sources" hidden>
+  ${pageHead('Google Drive', 'المصادر والتحليل', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
   <div class="card"><div class="card-head"><h2>المصادر والتحليل</h2><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
 </section>
 
 <section data-pane="providers" hidden>
+  ${pageHead('الذكاء', 'المزوّدون والتوجيه', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
   <div class="card" style="margin-bottom:14px">
     <h2>عن مفاتيح المزوّدين</h2>
     <p class="hint" style="margin:0"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
@@ -848,10 +873,12 @@ ${flash}
 </section>
 
 <section data-pane="channels" hidden>
+  ${pageHead('النشر', 'القنوات والحسابات', 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
   ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
 </section>
 
 <section data-pane="posts" hidden>
+  ${pageHead('التحرير', 'الخطّة والمسوّدات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
   <div style="margin-bottom:14px">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
@@ -873,6 +900,7 @@ ${flash}
 </section>
 
 <section data-pane="settings" hidden>
+  ${pageHead('الحدود', 'الإيقاف والسقوف', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
   <div class="card"><h2>الإيقاف المؤقت</h2>
     <div class="split">
       <p>${d.paused
@@ -926,6 +954,7 @@ ${flash}
 </section>
 
 <section data-pane="security" hidden>
+  ${pageHead('الدخول', 'الأمان والجلسات', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة ثماني ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0

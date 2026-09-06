@@ -9,6 +9,8 @@
  * دورة OAuth حقيقية هي التي تؤكدها، والمهمة M-04 تطلب التحقق منها.
  */
 
+import { scopeSet } from './scopes'
+
 export type Platform = 'linkedin' | 'x'
 
 export interface Provider {
@@ -26,6 +28,12 @@ export interface Provider {
    * حقيقيّ هو الذي يؤكّدها.
    */
   readonly uploadUrl: string
+  /**
+   * النطاقاتُ الكاملة — **مشتقّةٌ من `scopes.ts` لا مكتوبةٌ هنا ثانيةً**.
+   *
+   * ولو كُتبت في الموضعين لافترقتا: نطاقٌ يُضاف هناك بشرحه ومصدره
+   * ويُنسى هنا، فيُشرَح في الشاشة ما لا يُطلَب في الرابط.
+   */
   readonly scopes: readonly string[]
   /**
    * كيف يُصادق التطبيق على نهاية الرمز:
@@ -51,7 +59,7 @@ export const LINKEDIN: Provider = {
   postUrl: 'https://api.linkedin.com/rest/posts',
   // خطوتان: تهيئةٌ تعطي عنوانَ رفعٍ ومعرّفَ صورة، ثمّ PUT للبايتات عليه
   uploadUrl: 'https://api.linkedin.com/rest/images?action=initializeUpload',
-  scopes: ['openid', 'profile', 'w_member_social'],
+  scopes: scopeSet('linkedin'),
   clientAuth: 'body',
   extraHeaders: { 'LinkedIn-Version': LINKEDIN_VERSION },
 }
@@ -63,7 +71,7 @@ export const X: Provider = {
   identityUrl: 'https://api.x.com/2/users/me',
   postUrl: 'https://api.x.com/2/tweets',
   uploadUrl: 'https://api.x.com/2/media/upload',
-  scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'],
+  scopes: scopeSet('x'),
   clientAuth: 'basic',
   extraHeaders: {},
 }

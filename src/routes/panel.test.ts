@@ -1039,7 +1039,7 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('LINKEDIN_CLIENT_ID')
     // صار الضبطُ من اللوحة (D-042)، فالبطاقةُ تعرض النموذجَ لا رقمَ مهمّة
-    expect(html).toContain('اضبط التطبيق')
+    expect(html).toContain('دليلُ ضبط التطبيق')
     expect(html).not.toContain('/oauth/linkedin/start')
   })
 
@@ -1410,13 +1410,114 @@ describe('الجدولة من اللوحة', () => {
  * تُطبَعان حرفا**. واختبارُ محتوًى يجد الكلمةَ فيمرّ — فيُفحَص الشكل.
  */
 describe('لا Markdown في مخرَج اللوحة', () => {
-  it('صفحةُ اللوحة لا تحمل نجوما ولا شرطاتِ قوائم حرفيّة', async () => {
+  // والمسارُ يُعدَّد لا يُكتب واحدا: صفحةٌ جديدة تُضاف هنا فتُفحَص معها،
+  // ولا تُترك لأنّ أحدا نسي نسخَ الاختبار — وهي العلّةُ التي وقعت ثلاثا
+  const PAGES = ['/panel', '/panel/channels/linkedin', '/panel/channels/x',
+    '/panel/channels/instagram']
+
+  it.each(PAGES)('%s لا تحمل نجوما ولا شرطاتِ قوائم حرفيّة', async (path) => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await app.request(path, withSession(cookie), env)).text()
     const body = html.slice(html.indexOf('<body>'))
     expect(body).not.toMatch(/\*\*/)
     // والعلامةُ المائلة للشيفرة تُستبدَل بـ mono، فلا تبقى حرفا
     expect(body).not.toMatch(/`[^`\n]{2,40}`/)
+  })
+})
+
+/**
+ * شاشةُ المنصّة (D-046) — `/panel/channels/:platform`.
+ *
+ * وثلاثةُ أشياءَ تُثبَت هنا: أنّها محروسةٌ كاللوحة، وأنّها تعرض ما نُشر
+ * برابطه، وأنّ ما لم يُبنَ له سائقٌ **يُقال سببُه لا «قريبا»**.
+ */
+describe('شاشةُ المنصّة', () => {
+  it('لا تُفتَح بلا جلسة — والحارسُ هو حارسُ اللوحة نفسه', async () => {
+    const response = await app.request('/panel/channels/linkedin', {}, env)
+    expect(response.status).toBe(401)
+  })
+
+  it('ومنصّةٌ لا وجودَ لها ٤٠٤ — لا صفحةٌ فارغة', async () => {
+    const cookie = await login()
+    const response = await app.request(
+      '/panel/channels/myspace', withSession(cookie), env,
+    )
+    expect(response.status).toBe(404)
+  })
+
+  it('تعرض المنشورَ برابطه عند المنصّة', async () => {
+    const cookie = await login()
+    db.raw
+      .prepare(
+        `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+         VALUES ('linkedin:member:abc', 'linkedin', 'member', 'abc', 'عمر', 'active')`,
+      )
+      .run()
+    db.raw
+      .prepare(
+        `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at,
+                            status, idempotency_key, approved_by, approved_at)
+         VALUES ('p1', 'linkedin:member:abc', 'linkedin', 'text', 'نصُّ المنشور',
+                 '2026-09-01T09:00:00Z', 'published', 'k1', 'omar', '2026-09-01T08:00:00Z')`,
+      )
+      .run()
+    db.raw
+      .prepare(
+        `INSERT INTO publish_attempts
+           (id, post_id, idempotency_key, attempt_no, request_json,
+            platform_post_id, status)
+         VALUES ('a1', 'p1', 'k1', 1, '{}', 'urn:li:share:99', 'succeeded')`,
+      )
+      .run()
+
+    const html = await (
+      await app.request('/panel/channels/linkedin', withSession(cookie), env)
+    ).text()
+    expect(html).toContain('نصُّ المنشور')
+    expect(html).toContain('linkedin.com/feed/update/')
+  })
+
+  it('وما لم يُبنَ يقول سببَه لا «قريبا»', async () => {
+    const cookie = await login()
+    const html = await (
+      await app.request('/panel/channels/tiktok', withSession(cookie), env)
+    ).text()
+    expect(html).toContain('منصّةٌ لم تُبنَ')
+    // السببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى
+    expect(html).not.toContain('قريبا')
+    expect(html).toContain('رفعا مجزّأً')
+  })
+
+  it('ولا زرَّ ربطٍ لما لم يُبنَ — ولو فُتحت شاشتُه', async () => {
+    const cookie = await login()
+    const html = await (
+      await app.request('/panel/channels/tiktok', withSession(cookie), env)
+    ).text()
+    expect(html).not.toContain('/oauth/tiktok/start')
+  })
+
+  it('وتقول ما نقص من النطاقات بالاسم ومَن يمنحه', async () => {
+    const cookie = await login()
+    db.raw
+      .prepare(
+        `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+         VALUES ('linkedin:member:abc', 'linkedin', 'member', 'abc', 'عمر', 'active')`,
+      )
+      .run()
+    // رمزٌ بالهويّة وحدها — وهي الحالُ بعد مخرج النجاة في D-045
+    db.raw
+      .prepare(
+        `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, scopes)
+         VALUES ('linkedin:member:abc', 'e', 'i', '2026-12-01T00:00:00Z', 'openid profile')`,
+      )
+      .run()
+
+    const html = await (
+      await app.request('/panel/channels/linkedin', withSession(cookie), env)
+    ).text()
+    expect(html).toContain('w_member_social')
+    expect(html).toContain('Share on LinkedIn')
+    expect(html).toContain('نطاقا ناقصا')
   })
 })
 
@@ -1460,7 +1561,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
   it('ويصير الربطُ ممكنا — بعد أن كان «تنتظرك»', async () => {
     const cookie = await login()
     const before = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(before).toContain('اضبط التطبيق')
+    expect(before).toContain('دليلُ ضبط التطبيق')
 
     await save(cookie)
     const after = await (await app.request('/panel', withSession(cookie), env)).text()

@@ -3,6 +3,7 @@
  * ما يُثبت هنا هو ما يمنع النشر مرتين والدفع مرتين.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { scopeSet } from '../oauth/scopes'
 import { toBase64 } from '../crypto'
 import { idempotencyKey } from '../idempotency'
 import { saveTokens, upsertAccount } from '../tokens'
@@ -20,7 +21,10 @@ const LIVE_TOKENS = {
   refreshToken: null,
   expiresAt: '2026-11-02T10:00:00.000Z',
   refreshExpiresAt: null,
-  scopes: 'tweet.write',
+  // النطاقاتُ تُشتقّ من مصدرها لا تُكتب هنا: نطاقٌ يُضاف في `scopes.ts`
+  // ويُنسى هنا يجعل كلَّ اختبارات النشر تفشل بـ `missing_publish_scope`
+  // — وهو صادق، ولا يخبرنا شيئا عمّا نختبره (D-045)
+  scopes: '',
 }
 
 async function seedPost(options: {
@@ -35,7 +39,10 @@ async function seedPost(options: {
     externalId: options.platform === 'x' ? '4242' : 'abc',
     displayName: 'عمر',
   })
-  await saveTokens(db, KEY, accountId, LIVE_TOKENS)
+  await saveTokens(db, KEY, accountId, {
+    ...LIVE_TOKENS,
+    scopes: scopeSet(options.platform).join(' '),
+  })
   const postId = `p-${options.platform}`
   const approved = options.approved ?? true
   db.raw

@@ -21,6 +21,18 @@ export interface OAuthState {
   readonly verifier: string
   readonly redirectUri: string
   readonly createdAt: string
+  /**
+   * ما طُلب من نطاقاتٍ في **هذه** الدورة، مفصولةً بمسافة.
+   *
+   * ودورةٌ تطلب الهويّةَ وحدها (D-045) تفترق عن الكاملة، **والفرقُ
+   * يُحفظ مع الحالة لا يُستنتَج بعدها**: ما يُسجَّل في القاعدة عند
+   * غياب `scope` في الجواب يُبنى عليه، والحارسُ يقرأ من القاعدة —
+   * فمن سجّل الكاملةَ مكان الهويّة كتب أنّ الحسابَ ينشر وهو لا ينشر.
+   *
+   * واختياريٌّ لأنّ حالةً محفوظةً قبل هذا التغيير لا تحمله: تُقرأ ولا
+   * تُرفَض، ويُفترَض عندها الكامل — وهو ما كان يقع فعلا قبله.
+   */
+  readonly scopes?: string
 }
 
 export class StateError extends Error {
@@ -74,6 +86,7 @@ function isOAuthState(value: unknown): value is OAuthState {
     (v['platform'] === 'linkedin' || v['platform'] === 'x') &&
     typeof v['verifier'] === 'string' &&
     typeof v['redirectUri'] === 'string' &&
-    typeof v['createdAt'] === 'string'
+    typeof v['createdAt'] === 'string' &&
+    (v['scopes'] === undefined || typeof v['scopes'] === 'string')
   )
 }

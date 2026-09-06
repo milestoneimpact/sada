@@ -13,7 +13,8 @@
     "migrate:staging": "wrangler d1 migrations apply sada-staging --env staging --remote",
     "migrate:production": "wrangler d1 migrations apply sada --env production --remote",
     "migrate:local": "wrangler d1 migrations apply sada-staging --env staging --local",
-    "contrast": "node scripts/validate_contrast.js"
+    "contrast": "node scripts/validate_contrast.js",
+    "render": "tsx scripts/render_panel.ts /tmp/panel.html && tsx scripts/render_screens.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260903.1",
