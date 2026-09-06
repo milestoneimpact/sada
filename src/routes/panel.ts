@@ -28,7 +28,7 @@ import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
-import { animateForPost } from '../lib/media/video'
+import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { appStatuses, deleteApp, saveApp } from '../lib/oauth/apps'
 import { schedulePost, unschedule } from '../lib/schedule/job'
@@ -879,7 +879,7 @@ panel.post('/panel/media/animate', async (c) => {
     {
       db: c.env.DB,
       bucket: c.env.MEDIA,
-      ai: c.env.AI,
+      ai: pickBinding(c.env),
       encKey: c.env.TOKEN_ENC_KEY,
       baseUrl: c.env.PUBLIC_BASE_URL,
     },
