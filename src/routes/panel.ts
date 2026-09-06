@@ -61,6 +61,8 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
+import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
+import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
@@ -314,6 +316,11 @@ panel.get('/panel', async (c) => {
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
   const openCount = (await openSuggestions(c.env.DB)).length
   const ownerPending = pendingCount(await ownerFacts(c))
+  // **يُحسَب عند العرض لا يُقرأ من الصفّ**: الصفُّ أثرُ ما وقع،
+  // والشريطُ حالٌ الآن — ودورةٌ سقطت لا تُخفي رمزا يوشك (D-065)
+  const expiring = (await expiringTokens(c.env.DB, new Date())).map((e) => ({
+    platform: e.platform, displayName: e.displayName, kind: e.kind, daysLeft: e.daysLeft,
+  }))
   return page((nonce) =>
     panelPage({
       paused: allowance.settings.paused,
@@ -399,6 +406,7 @@ panel.get('/panel', async (c) => {
       openSuggestions: openCount,
       promoCap: allowance.settings.weeklyPromoCapUsd,
       ownerPending,
+      expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     }),
   )
@@ -1184,7 +1192,12 @@ panel.get('/panel/tasks', async (c) => {
   if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const body = tasksScreen({ rows: ownerRows(await ownerFacts(c)) })
+  const gates = gatesOf(await readGateFacts(c.env.DB))
+  const body = tasksScreen({
+    rows: ownerRows(await ownerFacts(c)),
+    gates,
+    phase: currentPhase(gates),
+  })
 
   return page((nonce) =>
     shell(

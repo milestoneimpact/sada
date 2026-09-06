@@ -481,6 +481,18 @@ export interface PanelData {
   readonly baseUrl: string
   /** كم توصيةَ ترويجٍ تنتظر بتّك — عددٌ على رابط التقرير (D-058). */
   readonly openSuggestions: number
+  /**
+   * رموزٌ تقترب من الانتهاء — **تُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح.**
+   *
+   * وسقوطُ رمزِ تجديدٍ **يوقف المنصّة حتّى يجلس المالكُ إليها**، فلا
+   * يُترك في صفحةٍ قد لا تُفتَح قبل أن يقع (D-065).
+   */
+  readonly expiring: readonly {
+    readonly platform: string
+    readonly displayName: string
+    readonly kind: 'access' | 'refresh'
+    readonly daysLeft: number
+  }[]
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
   readonly promoCap: number
   /**
@@ -733,7 +745,39 @@ export function panelPage(d: PanelData): string {
 
   // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
   // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
-  const flash = `<div id="flash" role="status" aria-live="polite">${
+  /**
+   * شريطُ الرموز المقتربة — **فوق كلّ شيءٍ في اللوحة.**
+   *
+   * ولا يُخفى خلف زرّ: سقوطُ رمزِ تجديدٍ يوقف المنصّة، **وأوّلُ علامةٍ
+   * بغير هذا منشورٌ وُعد بموعده ولم يخرج**.
+   *
+   * والتجديدُ يُعرَض `bad` والوصولُ `warn`: **الأوّلُ يوجب يدَك،
+   * والثاني يُصلحه النظامُ وحده** — ولا يُسوَّى بينهما فيُقرآن سواء.
+   */
+  const expiring = d.expiring.length === 0 ? '' : `<div class="flash ${
+    d.expiring.some((e) => e.kind === 'refresh') ? 'bad' : 'warn'
+  }" role="alert"><span class="ic">!</span><span>${
+    d.expiring
+      .slice(0, 3)
+      .map((e) => {
+        const what = e.kind === 'refresh' ? 'رمزُ التجديد' : 'رمزُ الوصول'
+        const when = e.daysLeft < 0
+          ? '<b>انتهى</b>'
+          : e.daysLeft === 0
+            ? '<b>ينتهي اليوم</b>'
+            : `يبقى <b>${e.daysLeft}</b> يوما`
+        const why = e.kind === 'refresh'
+          ? ' — <b>ويوجب سقوطُه دورةَ إذنٍ بيدك</b>'
+          : ''
+        return `${what} لـ<b>${escapeHtml(e.displayName)}</b>
+                (${escapeHtml(e.platform)}): ${when}${why}`
+      })
+      .join(' · ')
+  }${
+    d.expiring.length > 3 ? ` · <b>و${d.expiring.length - 3} غيرُها</b>` : ''
+  } <a href="#channels">جدّد الإذن</a></span></div>`
+
+  const flash = `${expiring}<div id="flash" role="status" aria-live="polite">${
     d.flash === null
       ? ''
       : `<div class="flash ${d.flash.kind}">

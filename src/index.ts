@@ -19,6 +19,7 @@ import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
 import { runWeekly } from './lib/report/job'
+import { expiringTokens, recordAlerts } from './lib/token/expiry'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
 import { legal } from './routes/legal'
@@ -576,6 +577,26 @@ async function reportTick(env: Env): Promise<void> {
   }
 }
 
+/**
+ * دورةُ تنبيه الرموز — **تُلحَق بالمسح اليوميّ لا بجدولٍ ثالث.**
+ *
+ * فالسؤالُ يوميٌّ بطبعه («أبقي أقلُّ من سبعةِ أيّام؟»)، وجدولٌ رابعٌ
+ * يزيد ما يُنسى مقابلتُه بـ`wrangler.toml` (D-058).
+ *
+ * وعطلُها لا يُرمى: **التنبيهُ يُعرَض في اللوحة من الحساب المباشر لا
+ * من الصفّ** — فسقوطُ الكتابة يُفقد الأثرَ ولا يُفقد التنبيه.
+ */
+async function alertTick(env: Env): Promise<void> {
+  try {
+    const items = await expiringTokens(env.DB, new Date())
+    if (items.length === 0) return
+    const out = await recordAlerts(env.DB, items)
+    if (out.written > 0) console.log({ job: 'token-alerts', ...out })
+  } catch (error) {
+    console.log({ job: 'token-alerts', failed: String(error) })
+  }
+}
+
 /** جدولُ المسح — يُعرَّف هنا وفي `wrangler.toml`، ويُقارَن نصّا. */
 const SCAN_CRON = '0 3 * * *'
 
@@ -621,7 +642,10 @@ const REPORT_CRON = '14 4 * * 1'
  */
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
   await dispatchTick(env)
-  if (controller.cron === SCAN_CRON) await scanTick(env)
+  if (controller.cron === SCAN_CRON) {
+    await scanTick(env)
+    await alertTick(env)
+  }
   if (controller.cron === METRICS_CRON) await metricsTick(env)
   if (controller.cron === REPORT_CRON) await reportTick(env)
 }

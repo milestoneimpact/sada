@@ -243,6 +243,11 @@ const data: PanelData = {
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
   channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),
   baseUrl: 'https://sada2.basserh.com',
+  // **الشريطُ يُرسَم ليُقاس** — وما لا يُرسَم لا يُقاس (D-061)
+  expiring: [
+    { platform: 'x', displayName: '@omar_ah', kind: 'refresh', daysLeft: 2 },
+    { platform: 'linkedin', displayName: 'بصائر للاستشارات', kind: 'access', daysLeft: 6 },
+  ],
   apps: [
     // LinkedIn من البيئة: لا نموذجَ يُعرض، ويُقال لماذا
     {
