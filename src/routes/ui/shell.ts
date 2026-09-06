@@ -7,6 +7,30 @@
  */
 import { STYLE } from './styles'
 
+/**
+ * رمزُ التبويب — **مرسومٌ في الوثيقة لا مطلوبٌ من الشبكة**.
+ *
+ * ملفٌّ خارجيّ يعني نداءً ثانيا، ومسارا يُنسى عند نقل النطاق، وسياسةَ
+ * محتوًى تُوسَّع لتسمح به. و data: URI يعبر `img-src 'self' data:`
+ * القائمة أصلا، ويظهر قبل أن يكتمل تحميل الصفحة.
+ *
+ * **والشكلُ من الاسم لا من الذوق**: «صدى» ارتدادُ صوت، فثلاثةُ أقواسٍ
+ * متراكزةٍ تخفتُ كلّما اتّسعت. وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ
+ * لطخةً — والقوسُ يُقرأ عند كلّ قياس.
+ */
+const ICON_SVG = [
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
+  '<rect width="32" height="32" rx="7" fill="#8a6d1f"/>',
+  '<g fill="none" stroke="#fff" stroke-linecap="round">',
+  '<path d="M11 9a10 10 0 0 1 0 14" stroke-width="2.6" opacity=".95"/>',
+  '<path d="M17 11a6.5 6.5 0 0 1 0 10" stroke-width="2.2" opacity=".6"/>',
+  '<path d="M22.5 13.5a3.3 3.3 0 0 1 0 5" stroke-width="1.9" opacity=".33"/>',
+  '</g></svg>',
+].join('')
+
+const FAVICON = `<link rel="icon" href="data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG)}">
+<meta name="theme-color" content="#8a6d1f">`
+
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -105,6 +129,7 @@ export function shell(
       : `\n<meta name="description" content="${escapeHtml(options.description)}">`
   }
 <title>${escapeHtml(title)}</title>
+${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
