@@ -44,7 +44,7 @@ import {
 import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, writeRoute } from '../lib/ai/routes'
-import { writeSetting, type SettingKey } from '../lib/settings'
+import { readSettings, writeSetting, type SettingKey } from '../lib/settings'
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
   loadSession, readCookie, revokeSessions, sessionCookie, type Session,
@@ -54,6 +54,9 @@ import { factorState } from '../lib/security/factors'
 import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
 import { grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { metricsFor } from '../lib/metrics/job'
+import { listReports, readReport } from '../lib/report/weekly'
+import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
+import { reportScreen } from './ui/reportView'
 import { platformScreen } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
@@ -304,6 +307,8 @@ panel.get('/panel', async (c) => {
   })
 
   const flash = await takeFlash(c.env, c.req.raw)
+  // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
+  const openCount = (await openSuggestions(c.env.DB)).length
   return page((nonce) =>
     panelPage({
       paused: allowance.settings.paused,
@@ -386,6 +391,8 @@ panel.get('/panel', async (c) => {
       channels,
       apps,
       baseUrl: c.env.PUBLIC_BASE_URL,
+      openSuggestions: openCount,
+      promoCap: allowance.settings.weeklyPromoCapUsd,
     }),
   )
 })
@@ -540,11 +547,13 @@ const KNOWN_TASKS: ReadonlySet<string> = new Set(['analyze', 'draft', 'image'])
 
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
   'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',
+  'weekly_promo_cap_usd',
 ])
 
 const LABEL: Readonly<Record<string, string>> = {
   daily_analysis_cap: 'سقف التحليل اليوميّ',
   daily_spend_cap_usd: 'سقف الإنفاق اليوميّ',
+  weekly_promo_cap_usd: 'سقف الترويج الأسبوعيّ',
 }
 
 /**
@@ -1000,6 +1009,117 @@ panel.get('/panel/channels/:platform', async (c) => {
       THEME_SCRIPT,
     ),
   )
+})
+
+/**
+ * شاشةُ التقرير الأسبوعيّ — **تقرأ ما كُتب ولا تحسبه.**
+ *
+ * ولا زرَّ «ولّد الآن»: التقريرُ شهادةٌ على أسبوعٍ مضى، وزرٌّ يكتبه
+ * قبل أوانه يثبّت أرقاما لم تكتمل نوافذُها — **ثمّ لا يُعاد حسابُها
+ * أبدا**، لأنّ أوّلَ كتابةٍ هي الشهادة (D-058).
+ */
+panel.get('/panel/report', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const reports = await listReports(c.env.DB)
+  const settings = await readSettings(c.env.DB)
+  const body = reportScreen({
+    reports,
+    current: reports[0] ?? null,
+    suggestions: await openSuggestions(c.env.DB),
+    promoCapUsd: settings.weeklyPromoCapUsd,
+    now: new Date(),
+  })
+
+  return page((nonce) =>
+    shell(
+      'صدى — التقرير الأسبوعيّ',
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel">← اللوحة</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${body}</main>
+       </div>`,
+      nonce,
+      THEME_SCRIPT,
+    ),
+  )
+})
+
+/** تقريرُ أسبوعٍ بعينه — بمفتاحه، وهو أوّلُ يومٍ فيه. */
+panel.get('/panel/report/:week', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const stored = await readReport(c.env.DB, c.req.param('week'))
+  if (stored === null) return c.text('لا تقريرَ لهذا الأسبوع', 404)
+
+  const settings = await readSettings(c.env.DB)
+  const body = reportScreen({
+    reports: await listReports(c.env.DB),
+    current: stored,
+    suggestions: await openSuggestions(c.env.DB),
+    promoCapUsd: settings.weeklyPromoCapUsd,
+    now: new Date(),
+  })
+
+  return page((nonce) =>
+    shell(
+      `صدى — تقريرُ ${stored.id}`,
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel/report">← التقارير</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${body}</main>
+       </div>`,
+      nonce,
+      THEME_SCRIPT,
+    ),
+  )
+})
+
+/**
+ * بتُّ توصيةِ ترويج — **تسجيلُ رأيٍ لا أمرُ إنفاق.**
+ *
+ * «أقبل» تعني: هذا يستحقّ ترويجا. **ولا يقع منه إنفاق** — لا عميلَ
+ * إعلاناتٍ في المستودع ولا مفتاحَ يُطلَب (D-006). وما يفعله المالكُ
+ * بالمبلغ يفعله في لوحة المنصّة بيده.
+ */
+panel.post('/panel/report/promote', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const postId = String(gate.form.get('post_id') ?? '')
+  const raw = String(gate.form.get('decision') ?? '')
+  if (raw !== 'accepted' && raw !== 'rejected') {
+    return c.json({ error: 'unknown_decision' }, 400)
+  }
+  if (postId === '') return c.json({ error: 'missing_post' }, 400)
+
+  const changed = await decidePromotion(c.env.DB, postId, raw)
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'promotion.decide', target: postId, detail: raw },
+    c.req.raw,
+  )
+
+  await setFlash(c.env, c.req.raw, changed
+    ? {
+        kind: raw === 'accepted' ? 'warn' : 'ok',
+        text: raw === 'accepted'
+          ? 'سُجّل قبولُك. ولم يُنفَق شيء — الترويجُ يقع في لوحة المنصّة بيدك.'
+          : 'سُجّل رفضُك، ولا يُقترَح هذا المنشورُ ثانيةً.',
+      }
+    : { kind: 'warn', text: 'لا توصيةَ تنتظر لهذا المنشور — أو بُتَّ فيها قبلا.' })
+
+  return new Response(null, { status: 303, headers: { Location: '/panel/report' } })
 })
 
 /**

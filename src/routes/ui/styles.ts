@@ -339,6 +339,10 @@ td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vert
 tbody tr:last-child td{border-bottom:0}
 tbody tr:hover{background:var(--surface-2)}
 .nm{font-weight:600; line-height:var(--lh-tight)}
+/* «nm» تُستعمَل span وتُستعمَل فقرةً. والفقرةُ بلا قاعدةِ هامشٍ
+   ترث 14px من المتصفّح — **خارجَ السلّم**، ولا تظهر في grep لأنّها
+   لم تُكتَب (D-057). فتُصاب هنا، والوسمُ في المحدّد لا الصنف. */
+p.nm{margin:0 0 var(--s-3)}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xs);
   color:var(--ink-3); direction:ltr; display:inline-block; unicode-bidi:isolate}
 .sub{color:var(--ink-3); font-size:var(--t-sm); margin-top:var(--s-1); max-width:62ch; line-height:var(--lh)}

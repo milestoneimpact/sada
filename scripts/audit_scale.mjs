@@ -36,7 +36,7 @@ if (files.length === 0) {
   process.exit(2)
 }
 
-const browser = await chromium.launch()
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 let failed = 0
 

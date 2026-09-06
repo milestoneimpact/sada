@@ -479,6 +479,10 @@ export interface PanelData {
   readonly apps: readonly AppStatus[]
   /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروض للنسخ. */
   readonly baseUrl: string
+  /** كم توصيةَ ترويجٍ تنتظر بتّك — عددٌ على رابط التقرير (D-058). */
+  readonly openSuggestions: number
+  /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
+  readonly promoCap: number
 }
 
 export interface PanelFactors {
@@ -684,6 +688,7 @@ const ICON = {
   channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.4 10.8 15.6 6.7M8.4 13.2l7.2 4.1"/></svg>',
   providers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
+  report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg>',
   security: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.6-8 9.5-4.6-.9-8-4.5-8-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>',
 } as const
 
@@ -838,6 +843,7 @@ export function panelPage(d: PanelData): string {
     ${nav('#posts', ICON.posts, 'المنشورات', waitingDrafts)}
     ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
     ${platformNav(d.channels)}
+    ${nav('/panel/report', ICON.report, 'التقرير', d.openSuggestions)}
     <span class="lbl">الضبط</span>
     ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
     ${nav('#settings', ICON.settings, 'الحدود')}
@@ -994,6 +1000,21 @@ ${flash}
       <button class="p" type="submit">حفظ</button>
       <span class="n" style="align-self:center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
     </form>
+  </div>
+
+  <div class="card" style="margin-top:var(--s-3)"><h2>سقف الترويج الأسبوعيّ</h2>
+    <p class="hint"><b>ومنه وحده يأتي مبلغُ التوصية.</b> رقمٌ يؤلّفه صدى رقمٌ بلا مصدر —
+      والتوصيةُ هنا تقترح <b>مالا</b> لا كتابة. <b>وصفرٌ يعني لا توصيةَ تُكتب أصلا.</b></p>
+    <form class="row" method="POST" action="/panel/settings">
+      <input type="hidden" name="key" value="weekly_promo_cap_usd">
+      <div class="field"><label for="c3">سقف الترويج (دولار في الأسبوع)</label>
+        <input id="c3" type="number" name="value" min="0" max="500" step="1"
+               value="${d.promoCap}"></div>
+      <button class="p" type="submit">حفظ</button>
+    </form>
+    <div class="sub" style="margin-top:var(--s-3)"><b>ولا يُنفَق منه شيءٌ آليّا</b>:
+      لا عميلَ إعلاناتٍ في صدى ولا مفتاحَ يُطلَب (D-006). والتوصيةُ صفٌّ ينتظر بتّك،
+      وما تفعله بالمبلغ تفعله في لوحة المنصّة بيدك.</div>
   </div>
 </section>
 
