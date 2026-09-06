@@ -285,6 +285,7 @@ writeFileSync(
         appsVerified: new Set(['linkedin']),
         anyPublished: false,
         videoPriced: false,
+        linkedInVersionDue: true,   // D-072: حالٌ وسطى تُرسَم لتُقاس
       }),
       // حالٌ وسطى في البوّابات كذلك: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس
       gates: gatesOf(GATE_FIXTURE),

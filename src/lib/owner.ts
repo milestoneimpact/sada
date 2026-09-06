@@ -38,6 +38,14 @@ export interface OwnerTask {
    * دالّةٌ تقرأ ما هو متاح. و`null` تعني **لا يُعرَف**، لا «لم تتمّ».
    */
   readonly done: (facts: OwnerFacts) => boolean | null
+  /**
+   * سطرٌ يقول **ما قِيس** — كما تحمل بنودُ البوّابات دليلَها (D-064).
+   *
+   * وُجد لأنّ «تمّت» وحدها تكذب على مهمّةٍ **دوريّة**: مراجعةُ رقمٍ لم
+   * تقع بعد، ولكنّها **ليست مستحقّةً** — والفرقُ يُقال لا يُترَك
+   * للقارئ يخمّنه (D-072).
+   */
+  readonly evidence?: (facts: OwnerFacts) => string
 }
 
 /** الحقائقُ التي تُشتقّ منها الحالُ — تُجمَع مرّةً وتُمرَّر. */
@@ -56,6 +64,12 @@ export interface OwnerFacts {
   readonly anyPublished: boolean
   /** أوُلّد فيديو بسعرٍ مؤكَّد؟ `false` يعني أنّ السقفَ لا يحرسه. */
   readonly videoPriced: boolean
+  /**
+   * أبلغت `LinkedIn-Version` المثبَّتةُ دورةَ المراجعة؟ (D-072)
+   *
+   * **يُحسَب من الرقم نفسِه ومن التاريخ** — لا يُكتب بيد.
+   */
+  readonly linkedInVersionDue: boolean
 }
 
 /**
@@ -88,6 +102,19 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'ودورةٌ تدور مرّاتٍ تُنفق بلا أن يوقفها شيء (D-008).',
     unblocks: 'guard',
     done: (f) => f.videoPriced,
+  },
+  {
+    code: 'M-18',
+    title: 'مراجعةُ `LinkedIn-Version` المثبَّتة',
+    ifLeft:
+      'الرقمُ يشيخ صامتا. ويومَ تُسقط LinkedIn نسختَه **يتوقّف النشرُ كلُّه** ' +
+      'بخطأٍ من المنصّة — **ولا شيءَ في اللوحة كان يقول إنّه شاخ** (D-072).',
+    unblocks: 'guard',
+    done: (f) => !f.linkedInVersionDue,
+    evidence: (f) =>
+      f.linkedInVersionDue
+        ? 'بلغت دورةَ المراجعة — اقرأ ملاحظاتِ التغيير'
+        : 'لم تبلغ دورةَ المراجعة بعد — **ولم تُراجَع**',
   },
   {
     code: 'M-17',
@@ -144,12 +171,18 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
 export interface OwnerRow extends OwnerTask {
   /** `true` تمّت · `false` لم تتمّ · `null` **لا يُعرَف من هنا**. */
   readonly state: boolean | null
+  /** ما قِيس — أو فراغٌ إن لم يكن للمهمّة قياسٌ يُعرَض. */
+  readonly measured: string
 }
 
 /** يقرأ الحالَ لكلّ مهمّة — والترتيبُ: ما لم يتمّ أوّلا، ثمّ ما لا يُعرَف. */
 export function ownerRows(facts: OwnerFacts): OwnerRow[] {
   const weight: Record<Unblocks, number> = { gate: 0, guard: 1, capability: 2 }
-  return OWNER_TASKS.map((t) => ({ ...t, state: t.done(facts) })).sort((a, b) => {
+  return OWNER_TASKS.map((t) => ({
+    ...t,
+    state: t.done(facts),
+    measured: t.evidence === undefined ? '' : t.evidence(facts),
+  })).sort((a, b) => {
     const rank = (r: OwnerRow): number => (r.state === false ? 0 : r.state === null ? 1 : 2)
     return rank(a) - rank(b) || weight[a.unblocks] - weight[b.unblocks]
   })
