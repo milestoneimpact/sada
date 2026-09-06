@@ -28,7 +28,23 @@ body{
   font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
   font-feature-settings:"kern" 1;
 }
-:focus-visible{outline:2px solid var(--gold); outline-offset:2px; border-radius:6px}
+/* ── حلقةُ التركيز ────────────────────────────────────────────────────
+   طبقتان: خطٌّ ذهبيٌّ وحلقةٌ بيضاءُ تحته. فعلى أرضٍ داكنةٍ يُرى الذهب،
+   وعلى الذهب نفسه — زرٌّ أوّليٌّ مثلا — تُرى البيضاء. وحلقةٌ بلونٍ واحد
+   تختفي على ما يوافقها، وهو أكثرُ ما يقع على الأزرار الأوّليّة. */
+:focus-visible{outline:2px solid var(--gold); outline-offset:2px; border-radius:6px;
+  box-shadow:0 0 0 4px var(--surface)}
+
+/* التحديدُ بالهويّة: تفصيلٌ يُرى في كلّ نسخةٍ ولصق */
+::selection{background:color-mix(in srgb,var(--gold) 26%,transparent); color:var(--ink)}
+
+/* وشريطُ التمرير يتبع الثيم: شريطٌ فضّيٌّ فاتح على لوحةٍ داكنة نشاز */
+*{scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent}
+::-webkit-scrollbar{width:11px; height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line-strong); border-radius:99px;
+  border:3px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-3); background-clip:content-box}
 /* رابطُ التخطّي: يُقصّ ولا يُنفى خارج الشاشة.
    وكان عند right:-9999px، **فامتدّ المستند إلى 10389px** وصار الجوّالُ
    يُسحَب جانبا. وهي علّةٌ لا تُرى: العنصرُ نفسه غيرُ مرئيّ، وأثرُه
@@ -80,8 +96,12 @@ nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold
    (ارتفاعُه أربعةُ بكسل) — فكان المقياسُ يدهسه فينسحق الشريطُ إلى خيط.
    علّةٌ لا يكشفها اختبارٌ ولا مدقّق: الصفحةُ تعمل، والترويسةُ غائبة. */
 .topbar{position:sticky; top:0; z-index:20; background:var(--chrome);
-  border-bottom:1px solid var(--line); padding:0 24px; min-height:60px; flex:none;
-  display:flex; align-items:center; gap:12px}
+  border-bottom:1px solid var(--line); padding:0 var(--s-6); min-height:60px; flex:none;
+  display:flex; align-items:center; gap:var(--s-3); transition:box-shadow .18s}
+/* ظلٌّ يظهر حين يكون فوقك محتوًى — إشارةٌ تُقرأ بلا وعي: الشريطُ يطفو
+   فوق شيء، لا يجلس على أرضٍ فارغة. ويُضاف بـ JS لأنّ CSS وحدها لا تعرف
+   موضعَ التمرير. */
+.topbar.lifted{box-shadow:var(--sh-2)}
 .topbar h1{font-size:var(--t-lg); font-weight:700; letter-spacing:-.2px}
 .topbar .crumb{font-size:var(--t-xs); color:var(--ink-3); margin-top:1px}
 .content{padding:20px 24px 48px; max-width:1500px; width:100%}
@@ -123,6 +143,9 @@ section[hidden]{display:none}
 /* والسلاسلُ اللاتينيّة الطويلة تُكسَر عند الضرورة لا تُقصّ: عنوانٌ مقصوصٌ
    لا يُنسَخ صحيحا، ومكسورٌ يُقرأ ويُنسَخ. */
 .mono{overflow-wrap:anywhere}
+/* أرقامٌ ثابتةُ العرض في كلّ موضعٍ تتبدّل فيه: عمودٌ يهتزّ مع كلّ تحديث
+   يُقرأ عطلا. وكانت مضبوطةً على البطاقات وحدها. */
+table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
 .c2{grid-template-columns:repeat(2,1fr)}
 .c21{grid-template-columns:2fr 1fr}
@@ -131,7 +154,11 @@ section[hidden]{display:none}
 @media(max-width:560px){.c4{grid-template-columns:1fr}}
 
 .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
-  padding:18px 20px; box-shadow:var(--sh-1)}
+  padding:var(--s-5) var(--s-5); box-shadow:var(--sh-1);
+  transition:box-shadow .18s, border-color .18s}
+/* بطاقةُ القناة والمسوّدة تحملان فعلا، فترتفعان قليلا عند التحويم.
+   وبطاقاتُ العرض لا ترتفع: حركةٌ بلا فعلٍ خلفها تَعِد بما لا يقع. */
+.ch:hover,.draft:hover{box-shadow:var(--sh-2); border-color:var(--line-strong)}
 .card > h2{font-size:var(--t-md); font-weight:700; letter-spacing:-.15px; margin-bottom:3px}
 .card > .hint{margin:0 0 var(--s-4); font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
 .card-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
@@ -217,6 +244,21 @@ button,.btn{font:inherit; font-size:var(--t-base); font-weight:650; border-radiu
    وتقصيرُه يُسقطه دون حدّ الهدف — وهو ما كان يقع. */
 .sm{padding:var(--s-1) var(--s-3); font-size:var(--t-sm); border-radius:7px}
 button:disabled{opacity:.45; cursor:not-allowed}
+/* ضغطةٌ تُحسّ: إزاحةُ بكسلٍ واحد. وبلا ردٍّ يظنّ الضاغطُ أنّه لم يُصب */
+button:active:not(:disabled),.btn:active{transform:translateY(1px)}
+
+/* ── دوّامةُ الانتظار ─────────────────────────────────────────────────
+   النصُّ يبقى والدوّامةُ تُضاف: كان النصُّ يُستبدَل بـ «جارٍ…»، **فيضيع
+   ما كان مكتوبا** — ويسأل الضاغطُ نفسَه ماذا ضغط. والنداءُ هنا مدفوع،
+   فالسؤالُ ليس هيّنا. */
+button[data-busy-on]{position:relative}
+button[data-busy-on]::after{content:''; width:13px; height:13px; flex:none;
+  border-radius:50%; border:2px solid currentColor; border-top-color:transparent;
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+  button[data-busy-on]::after{animation:none; border-top-color:currentColor; opacity:.4}
+}
 form.inline{display:inline; margin:0}
 
 .field{display:flex; flex-direction:column; gap:var(--s-1)}
@@ -504,6 +546,27 @@ ol.steps .why{display:block; color:var(--ink-3)}
 /* مصطلحٌ لا يُكسَر عند شرطته: «AES-» في سطرٍ و«GCM» في التالي يُقرأ اسمين */
 .doc .nb{white-space:nowrap}
 .doc footer{margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-size:12.5px}
+
+/* ── الطباعة ──────────────────────────────────────────────────────────
+   مراجعُ منصّةٍ قد يطبع سياسة الخصوصيّة، وصفحةٌ تخرج برافدةٍ وأزرارٍ
+   وظلالٍ تُقرأ مسوّدةً لا وثيقة. فيبقى النصُّ وحده على بياض.
+
+   والروابطُ تُطبَع بعناوينها: ورقةٌ فيها «اضغط هنا» لا تُتابَع. */
+@media print{
+  @page{margin:18mm}
+  *{box-shadow:none!important; transition:none!important}
+  html,body{background:#fff!important; color:#000!important}
+  .rail,.topbar,.theme,.skip,footer,nav.tabs,button,.btn,form{display:none!important}
+  .app{display:block}
+  /* والهوامشُ من @page لا من الحاوية: حاويةٌ بلا حدٍّ أقصى تمدّ السطرَ
+     عبر الورقة كلّها، وقيدُ المقاس على الفقرات يبقى قائما */
+  .content,.doc{padding:0; margin:0; max-width:100%}
+  .card,.ch,.draft{border:1px solid #ccc; break-inside:avoid; page-break-inside:avoid}
+  section[data-pane][hidden]{display:none!important}
+  h1,h2,h3{break-after:avoid; page-break-after:avoid}
+  a[href^="http"]::after{content:' (' attr(href) ')'; font-size:10px; color:#555}
+  .doc a[href^="mailto"]::after{content:''}
+}
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
 `

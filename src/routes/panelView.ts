@@ -85,12 +85,31 @@ const SCRIPT = `
       var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent='…';}
     });
   });
-  // زرٌّ مضغوط لا يُضغط مرّتين — نداءٌ مدفوع لا يُكرَّر بنقرةٍ عصبيّة
+  // زرٌّ مضغوط لا يُضغط مرّتين — نداءٌ مدفوع لا يُكرَّر بنقرةٍ عصبيّة.
+  //
+  // والنصُّ يبقى وتُضاف دوّامة: كان النصُّ يُستبدَل فيضيع ما كان
+  // مكتوبا، ويسأل الضاغطُ نفسَه ماذا ضغط. والنداءُ مدفوع فالسؤال ليس
+  // هيّنا. والزرُّ المضغوط وحده يدور، لا كلُّ أزرار النموذج.
   document.querySelectorAll('form[data-busy]').forEach(function(f){
+    var pressed=null;
+    f.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click',function(){pressed=b;});
+    });
     f.addEventListener('submit',function(){
-      var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent=f.dataset.busy;}
+      var b=pressed||f.querySelector('button[type=submit]')||f.querySelector('button');
+      f.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+      if(b){b.setAttribute('data-busy-on','1');
+        b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
     });
   });
+
+  // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا
+  // يمنع التمرير، وبدونها يؤخّره المتصفّحُ احتياطا
+  var bar=document.querySelector('.topbar');
+  if(bar){
+    var sync=function(){bar.classList.toggle('lifted',window.scrollY>4);};
+    window.addEventListener('scroll',sync,{passive:true}); sync();
+  }
   // تصفية المصادر وفرزها — في المتصفّح، فلا رحلةَ خادمٍ لكلّ ضغطة
   document.querySelectorAll('button.preset').forEach(function(b){
     b.addEventListener('click',function(){
