@@ -249,7 +249,7 @@ export function platformScreen(d: PlatformScreenData): string {
       const granted = d.scopes[a.id] ?? ''
       const rows = capabilities(platform, granted)
       const missing = rows.filter((r) => !r.granted).length
-      return `<div class="card" style="margin-bottom:14px">
+      return `<div class="card" style="margin-bottom:var(--s-3)">
         <div class="card-head">
           <h2>${escapeHtml(a.displayName)}</h2>
           <span class="chip">${a.kind === 'org' ? 'صفحةٌ أو شركة' : 'حسابٌ شخصيّ'}</span>

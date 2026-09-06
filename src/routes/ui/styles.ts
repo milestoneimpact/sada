@@ -29,7 +29,7 @@ body{
      العربيّة. ولو قُدّم Tajawal لأخذ اللاتينيَّ أيضا — وهو ليس
      أحسنَ فيه، والمعرّفاتُ عندنا لاتينيّةٌ كثيرة. */
   font-family:"Inter","Beiruti",system-ui,-apple-system,"Segoe UI",sans-serif;
-  font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  font-size:var(--t-base); line-height:var(--lh); -webkit-font-smoothing:antialiased;
   font-feature-settings:"kern" 1;
   /* أوزانٌ محمّلةٌ فعلا: 400 · 500 · 600 · 700. وطلبُ 650 أو 800 من خطٍّ
      لا يحملهما يجعل المتصفّحَ **يصطنع الثخانة** بتغليظ الحروف رقميّا —
@@ -72,6 +72,10 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
   inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2)}
 .grow{flex:1}
 h1,h2,h3{margin:0}
+/* **والثخينُ ‏٧٠٠ لا ‏٩٠٠.** الافتراضيُّ «bold» يُحَلّ عند بعض الخطوط
+   إلى ‏٩٠٠، وهو وزنٌ لا نحمّله من Google — فيُصطنَع رقميّا، والعربيّةُ
+   المصطنَعةُ الثخانة تلتصق نقاطُها. */
+b,strong{font-weight:700}
 
 /* ══ هيكلُ التطبيق ═══════════════════════════════════════════ */
 .app{display:grid; grid-template-columns:256px 1fr; min-height:100vh}
@@ -92,7 +96,7 @@ h1,h2,h3{margin:0}
 .rail::after{content:''; position:absolute; inset-block:0; inset-inline-end:0; width:1px;
   background:linear-gradient(180deg,color-mix(in srgb,var(--au) 60%,transparent),transparent 46%);
   pointer-events:none}
-.rail-head{padding:22px 20px 18px; display:flex; align-items:center; gap:12px}
+.rail-head{padding:var(--s-5) var(--s-5) var(--s-4); display:flex; align-items:center; gap:var(--s-3)}
 /* ── العلامة ──────────────────────────────────────────────────────────
    الأقواسُ نفسها التي في رمز التبويب، مرسومةً لا مكتوبة. وكانت مربّعا
    فيه «صدى» بخمسةَ عشرَ بكسلا: **الحرفان يزدحمان في ستٍّ وثلاثين**،
@@ -108,13 +112,13 @@ h1,h2,h3{margin:0}
    شاشة الدخول و 38 في الوثائق — وقياسٌ ثابتٌ يجعلها تسبح في الأكبر. */
 .glyph svg{width:56%; height:56%; display:block}
 .brand{min-width:0}
-.brand b{display:block; font-size:15px; font-weight:700; letter-spacing:-.2px; line-height:1.3}
-.brand span{display:block; font-size:9.5px; font-weight:600; color:var(--ink-3);
+.brand b{display:block; font-size:var(--t-base); font-weight:700; letter-spacing:-.2px; line-height:var(--lh-tight)}
+.brand span{display:block; font-size:var(--t-xs); font-weight:600; color:var(--ink-3);
   letter-spacing:var(--ls-eyebrow); direction:ltr; unicode-bidi:isolate; margin-top:1px}
 
-nav.tabs{padding:4px 12px 16px; display:flex; flex-direction:column; gap:1px}
-nav.tabs .lbl{font-size:10px; font-weight:700; color:var(--ink-3); letter-spacing:1.1px;
-  padding:16px 10px 6px}
+nav.tabs{padding:var(--s-1) var(--s-3) var(--s-4); display:flex; flex-direction:column; gap:1px}
+nav.tabs .lbl{font-size:var(--t-xs); font-weight:700; color:var(--ink-3); letter-spacing:1.1px;
+  padding:var(--s-4) var(--s-2) var(--s-1)}
 nav.tabs .sep{display:none}
 nav.tabs a{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-2) var(--s-3);
   border-radius:var(--r-sm); min-height:var(--tap); font-size:var(--t-base); font-weight:600; color:var(--ink-2); text-decoration:none;
@@ -127,8 +131,8 @@ nav.tabs a[aria-current=page]{background:var(--brand-wash); color:var(--brand); 
 nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block:7px;
   inset-inline-start:0; width:2.5px; border-radius:99px; background:var(--brand)}
 nav.tabs a[aria-current=page] svg{opacity:1}
-nav.tabs .count{margin-inline-start:auto; min-width:20px; text-align:center; padding:1px 6px;
-  border-radius:999px; background:var(--surface-3); font-size:10.5px; font-weight:700;
+nav.tabs .count{margin-inline-start:auto; min-width:20px; text-align:center; padding:1px var(--s-1);
+  border-radius:999px; background:var(--surface-3); font-size:var(--t-xs); font-weight:700;
   color:var(--ink-2); font-variant-numeric:tabular-nums}
 nav.tabs a[aria-current=page] .count{background:var(--brand); color:var(--on-brand)}
 /* ── فرعُ المنصّات ────────────────────────────────────────────────────
@@ -142,7 +146,7 @@ details.plat>summary::-webkit-details-marker{display:none}
 details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}
 details.plat>summary svg{width:16px; height:16px; flex:none; opacity:.7}
 /* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
-details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:10px;
+details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:var(--t-xs);
   color:var(--ink-3); transition:transform .18s}
 details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
@@ -161,7 +165,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list .dot.bad{background:var(--bad)}
 .plat-list .dot.idle{background:transparent; border:1px solid var(--line-strong)}
 
-.rail-foot{margin-top:auto; padding:14px; border-top:1px solid var(--line-soft)}
+.rail-foot{margin-top:auto; padding:var(--s-3); border-top:1px solid var(--line-soft)}
 
 /* ── الشريط العلويّ ────────────────────────────────────────── */
 .main{min-width:0; display:flex; flex-direction:column}
@@ -203,15 +207,15 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
   font-weight:700; color:var(--au); margin-bottom:var(--s-2)}
 .eyebrow .ln{height:1px; width:30px; flex:none;
   background:linear-gradient(90deg,var(--au),transparent)}
-.page-head h1{font-size:var(--t-display); font-weight:700; line-height:1.2;
+.page-head h1{font-size:var(--t-display); font-weight:700; line-height:var(--lh-tight);
   letter-spacing:-.9px; margin:0}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
   color:var(--ink-2); max-width:var(--measure)}
 .page-head .aside{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
 @media(max-width:720px){.page-head h1{font-size:var(--t-2xl); letter-spacing:-.5px}}
 
-.pill{display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px;
-  font-size:12px; font-weight:600; border:1px solid var(--line); background:var(--surface-2)}
+.pill{display:inline-flex; align-items:center; gap:var(--s-2); padding:var(--s-1) var(--s-3); border-radius:999px;
+  font-size:var(--t-sm); font-weight:600; border:1px solid var(--line); background:var(--surface-2)}
 .pill .led{width:6px; height:6px; border-radius:50%; background:var(--ink-3); flex:none}
 .pill.on{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 26%,transparent)}
 .pill.on .led{background:var(--ok)}
@@ -219,16 +223,16 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
   border-color:color-mix(in srgb,var(--warn) 34%,transparent)}
 .pill.off .led{background:var(--warn)}
 
-.theme{display:inline-flex; padding:2px; gap:1px; border-radius:999px;
+.theme{display:inline-flex; padding:var(--s-0); gap:1px; border-radius:999px;
   border:1px solid var(--line); background:var(--surface-2)}
-.theme button{padding:5px 10px; border-radius:999px; background:transparent; border:0;
-  color:var(--ink-3); font-size:11.5px; font-weight:600}
+.theme button{padding:var(--s-1) var(--s-2); border-radius:999px; background:transparent; border:0;
+  color:var(--ink-3); font-size:var(--t-xs); font-weight:600}
 .theme button[aria-pressed=true]{background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
 
 /* ── الإشعار ───────────────────────────────────────────────── */
 .flash{display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-3) var(--s-4);
   border-radius:var(--r); margin-bottom:var(--s-4); font-size:var(--t-base); border:1px solid var(--line); background:var(--surface)}
-.flash .ic{flex:none; font-weight:700; font-size:13px; line-height:1.55}
+.flash .ic{flex:none; font-weight:700; font-size:var(--t-sm); line-height:var(--lh)}
 .flash.ok{border-color:color-mix(in srgb,var(--ok) 28%,transparent); background:var(--ok-wash)}
 .flash.ok .ic{color:var(--ok)}
 .flash.warn{border-color:color-mix(in srgb,var(--warn) 32%,transparent); background:var(--warn-wash)}
@@ -273,9 +277,15 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    وبطاقاتُ العرض لا ترتفع: حركةٌ بلا فعلٍ خلفها تَعِد بما لا يقع. */
 .ch:hover,.draft:hover{box-shadow:var(--sh-2), inset 0 1px 0 var(--hair);
   border-color:var(--line-strong)}
-.card > h2{font-size:var(--t-lg); font-weight:700; letter-spacing:-.25px; margin-bottom:3px}
+/* **الابنُ المباشرُ وحده كان يُصاب.** و .card-head h2 حفيدٌ لا ابن،
+   فسقط من القاعدة وورث حجمَ المتصفّح الافتراضيّ — ‏٢١px، وهو خارجُ
+   السلّم كلِّه. علّةٌ لم تُرَ لأنّ ٢١ قريبةٌ ممّا حولها، **وكشفها
+   قياسُ المقاييس المستعملة فعلا** لا النظرُ.
+   والمحدّدُ صار وصفيّا: كلُّ عنوانٍ في بطاقة. */
+.card h2{font-size:var(--t-lg); font-weight:700; letter-spacing:-.25px;
+  margin-bottom:var(--s-0)}
 .card > .hint{margin:0 0 var(--s-4); font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
-.card-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+.card-head{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-bottom:var(--s-3)}
 .card-head h2{margin:0}
 /* عنوانُ القسم: خيطٌ قصيرٌ بلون الهويّة يبدؤه بدل خطٍّ رماديٍّ يمتدّ تحته.
    والخطُّ الممتدُّ يفصل ولا يُعلِّم — والقصيرُ يُعلِّم موضعَ البداية. */
@@ -293,65 +303,65 @@ h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; 
 .tile::before{content:''; position:absolute; inset-inline:0; top:0; height:2px;
   background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--au) 75%,transparent),transparent)}
 .tile .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3); letter-spacing:.4px}
-.tile .v{font-size:var(--t-display); font-weight:700; line-height:1.12; letter-spacing:-1.4px;
-  font-variant-numeric:tabular-nums; margin-top:6px;
+.tile .v{font-size:var(--t-display); font-weight:700; line-height:var(--lh-tight); letter-spacing:-1.4px;
+  font-variant-numeric:tabular-nums; margin-top:var(--s-1);
   /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته */
   direction:ltr; unicode-bidi:isolate; text-align:right}
-.tile .v em{font-style:normal; font-size:14px; font-weight:600; color:var(--ink-3);
-  letter-spacing:0; margin-inline-start:2px}
+.tile .v em{font-style:normal; font-size:var(--t-base); font-weight:600; color:var(--ink-3);
+  letter-spacing:0; margin-inline-start:var(--s-0)}
 /* والمؤشّرُ الأوّل وحده يأخذ الذهبَ في رقمه: ندرةٌ تصنع مرتبة، وذهبٌ
    على الأربعة يُلغي معنى الأوّل */
 .grid.c4>.tile:first-child .v{color:var(--au)}
-.tile .n{font-size:11.5px; color:var(--ink-3); margin-top:9px}
+.tile .n{font-size:var(--t-xs); color:var(--ink-3); margin-top:var(--s-2)}
 
 /* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه
    قطّ — الكهرمان يقع من ذهب الهوية على ΔE 7.2 فلا يُرى فرقُهما. والبلوغُ
    حالةٌ لا مقدار، فيقفز إلى الأحمر (ΔE 19.8 عن الذهب) **ومعه نصّ**. */
-.bar{height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; margin-top:12px}
+.bar{height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; margin-top:var(--s-3)}
 .bar i{display:block; height:100%; border-radius:99px; background:var(--brand); transition:width .3s}
 .bar i.f{background:var(--bad)}
-.cap{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
-  color:var(--bad); margin-top:7px}
+.cap{display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-xs); font-weight:600;
+  color:var(--bad); margin-top:var(--s-2)}
 .cap.done{color:var(--ok)}
 
 /* الفرقُ عن الأمس: علامةٌ **ونصّ** — والسهمُ وحده لا يُقرأ بصوتٍ عالٍ */
-.delta{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600;
-  margin-top:9px; color:var(--ink-3)}
+.delta{display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-xs); font-weight:600;
+  margin-top:var(--s-2); color:var(--ink-3)}
 .delta.up{color:var(--ok)} .delta.down{color:var(--warn)}
-.delta .ar{font-size:9px; line-height:1}
+.delta .ar{font-size:var(--t-xs); line-height:var(--lh-tight)}
 
 /* ══ الجداول ═════════════════════════════════════════════════ */
-.scroll{overflow-x:auto; margin:0 -2px; padding:0 2px}
-table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:520px}
-th{text-align:right; color:var(--ink-3); font-weight:600; font-size:10.5px; letter-spacing:.5px;
-  padding:0 10px 9px; border-bottom:1px solid var(--line); white-space:nowrap}
-td{padding:12px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+.scroll{overflow-x:auto; margin:0 -var(--s-0); padding:0 var(--s-0)}
+table{width:100%; border-collapse:collapse; font-size:var(--t-base); min-width:520px}
+th{text-align:right; color:var(--ink-3); font-weight:600; font-size:var(--t-xs); letter-spacing:.5px;
+  padding:0 var(--s-2) var(--s-2); border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vertical-align:top}
 tbody tr:last-child td{border-bottom:0}
 tbody tr:hover{background:var(--surface-2)}
-.nm{font-weight:600; line-height:1.45}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+.nm{font-weight:600; line-height:var(--lh-tight)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xs);
   color:var(--ink-3); direction:ltr; display:inline-block; unicode-bidi:isolate}
-.sub{color:var(--ink-3); font-size:12px; margin-top:5px; max-width:62ch; line-height:1.65}
+.sub{color:var(--ink-3); font-size:var(--t-sm); margin-top:var(--s-1); max-width:62ch; line-height:var(--lh)}
 .num,.money{font-variant-numeric:tabular-nums}
 /* المبلغُ نصٌّ لاتينيّ داخل عربيّ: بلا عزلٍ ينقلب رمزُ العملة إلى آخره */
 .money{direction:ltr; unicode-bidi:isolate; display:inline-block}
 
 /* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
-.st{display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:6px;
-  font-size:11px; font-weight:600; border:1px solid transparent; white-space:nowrap}
-.st .g{font-size:8px; line-height:1}
+.st{display:inline-flex; align-items:center; gap:var(--s-1); padding:var(--s-0) var(--s-2); border-radius:6px;
+  font-size:var(--t-xs); font-weight:600; border:1px solid transparent; white-space:nowrap}
+.st .g{font-size:var(--t-xs); line-height:var(--lh-tight)}
 .st.ok{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 24%,transparent)}
 .st.warn{color:var(--warn); background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 28%,transparent)}
 .st.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
 .st.idle{color:var(--ink-3); background:var(--surface-2); border-color:var(--line)}
-.chip{display:inline-block; padding:2px 8px; border-radius:5px; font-size:10.5px; font-weight:600;
-  background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink-2); margin:3px 0 0 4px}
+.chip{display:inline-block; padding:var(--s-0) var(--s-2); border-radius:5px; font-size:var(--t-xs); font-weight:600;
+  background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink-2); margin:var(--s-0) 0 0 var(--s-1)}
 
 /* الاستحقاق: مقياس مقدار — تدرّج هيئةٍ واحدة، والرقم بلون النصّ */
-.worth{display:flex; align-items:center; gap:9px; min-width:104px}
+.worth{display:flex; align-items:center; gap:var(--s-2); min-width:104px}
 .worth .track{flex:1; height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden}
 .worth .fill{display:block; height:100%; border-radius:99px}
-.worth .val{font-variant-numeric:tabular-nums; font-size:12px; color:var(--ink-2); min-width:30px}
+.worth .val{font-variant-numeric:tabular-nums; font-size:var(--t-sm); color:var(--ink-2); min-width:30px}
 
 /* ══ الأزرار — أربعُ درجاتٍ لا لونان ══════════════════════════ */
 /* ارتفاعُ الهدف 44 لا 31: WCAG 2.5.5 و Apple HIG. والحشوُ يُترك
@@ -411,21 +421,21 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 .row{display:flex; gap:var(--s-3); align-items:flex-end; flex-wrap:wrap}
 
 /* ── الفراغ ────────────────────────────────────────────────── */
-.empty{padding:30px 20px; text-align:center; border:1px dashed var(--line-strong);
+.empty{padding:var(--s-8) var(--s-5); text-align:center; border:1px dashed var(--line-strong);
   border-radius:var(--r); background:var(--surface-2)}
-.empty b{display:block; font-size:14px; margin-bottom:6px; color:var(--ink)}
-.empty p{margin:0 auto 14px; max-width:46ch; font-size:12.5px; color:var(--ink-3); line-height:1.7}
+.empty b{display:block; font-size:var(--t-base); margin-bottom:var(--s-1); color:var(--ink)}
+.empty p{margin:0 auto var(--s-3); max-width:46ch; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
 
-.split{display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap}
-.split p{margin:0; font-size:12.5px; color:var(--ink-3); max-width:60ch; line-height:1.7}
-hr{border:0; border-top:1px solid var(--line-soft); margin:16px 0}
-footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
+.split{display:flex; gap:var(--s-4); align-items:center; justify-content:space-between; flex-wrap:wrap}
+.split p{margin:0; font-size:var(--t-sm); color:var(--ink-3); max-width:60ch; line-height:var(--lh)}
+hr{border:0; border-top:1px solid var(--line-soft); margin:var(--s-4) 0}
+footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(--line-soft);
   border-image:linear-gradient(90deg,color-mix(in srgb,var(--au) 34%,transparent),transparent) 1;
-  color:var(--ink-3); font-size:11.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  color:var(--ink-3); font-size:var(--t-xs); display:flex; justify-content:space-between; flex-wrap:wrap; gap:var(--s-2)}
 
 /* ── ما ينتظرك ─────────────────────────────────────────────── */
 .todo{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
-.todo li{display:flex; align-items:center; gap:10px; padding:10px 2px; font-size:13px;
+.todo li{display:flex; align-items:center; gap:var(--s-2); padding:var(--s-2) var(--s-0); font-size:var(--t-sm);
   border-bottom:1px solid var(--line-soft)}
 .todo li:last-child{border-bottom:0}
 .todo .dot{width:6px; height:6px; border-radius:50%; flex:none; background:var(--ink-3)}
@@ -434,45 +444,45 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .todo a,.todo form{margin-inline-start:auto}
 
 /* ── الرسم ─────────────────────────────────────────────────── */
-.chart{margin-top:4px}
+.chart{margin-top:var(--s-1)}
 .chart svg{display:block; width:100%}
 /* **الاتّجاه اللاتينيّ هنا ليس زينة**: نصُّ SVG يرث اتّجاه الصفحة، و RTL
    يقلب معنى text-anchor — فتمتدّ التسميةُ خارج المربّع وتُقصّ. علّةٌ
    لا تظهر إلا بالنظر إلى الرسم مرسوما. */
-.chart .axis{font-size:10px; fill:var(--ink-3); font-variant-numeric:tabular-nums;
+.chart .axis{font-size:var(--t-xs); fill:var(--ink-3); font-variant-numeric:tabular-nums;
   direction:ltr; unicode-bidi:isolate}
 .chart .grid-l{stroke:var(--line-soft); stroke-width:1}
 .chart .base{stroke:var(--line); stroke-width:1}
-.legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:11.5px; color:var(--ink-3)}
+.legend{display:flex; gap:var(--s-3); flex-wrap:wrap; margin-top:var(--s-3); font-size:var(--t-xs); color:var(--ink-3)}
 .legend b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums;
   direction:ltr; unicode-bidi:isolate; display:inline-block}
 
 /* ── القنوات ───────────────────────────────────────────────── */
 /* صفُّ تمهيدٍ رفيع بدل بطاقةٍ كاملة: الشرحُ يصحب القسم ولا يزاحمه */
-.lede-row{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px}
-.lede-note{font-size:11.5px; color:var(--ink-3); line-height:1.6; flex-basis:100%}
+.lede-row{display:flex; align-items:baseline; gap:var(--s-3); flex-wrap:wrap; margin-bottom:var(--s-3)}
+.lede-note{font-size:var(--t-xs); color:var(--ink-3); line-height:var(--lh); flex-basis:100%}
 @media(min-width:1100px){.lede-note{flex-basis:auto; max-width:62ch; text-align:end}}
 
-.ch{display:flex; flex-direction:column; gap:11px; background:var(--surface);
-  border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px; box-shadow:var(--sh-1)}
+.ch{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .ch.off{background:var(--surface-2); box-shadow:none; border-style:dashed}
-.ch-top{display:flex; align-items:center; gap:11px}
+.ch-top{display:flex; align-items:center; gap:var(--s-3)}
 .ch-logo{width:34px; height:34px; border-radius:9px; flex:none; display:grid; place-items:center;
   background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2)}
 .ch.off .ch-logo{color:var(--ink-3)}
 .ch-logo svg{width:17px; height:17px; display:block}
-.ch-name{font-weight:700; font-size:var(--t-md); line-height:1.35; letter-spacing:-.1px}
+.ch-name{font-weight:700; font-size:var(--t-md); line-height:var(--lh-tight); letter-spacing:-.1px}
 .ch-name a{color:inherit; text-decoration:none}
 .ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}
-.ch-name span{display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:0}
-.ch-note{font-size:12px; color:var(--ink-3); line-height:1.7; margin:0}
-.ch-acc{display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:var(--r-sm);
-  background:var(--surface-2); border:1px solid var(--line-soft); font-size:12.5px}
+.ch-name span{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3); letter-spacing:0}
+.ch-note{font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh); margin:0}
+.ch-acc{display:flex; align-items:center; gap:var(--s-2); padding:var(--s-2) var(--s-3); border-radius:var(--r-sm);
+  background:var(--surface-2); border:1px solid var(--line-soft); font-size:var(--t-sm)}
 .ch-acc .who{font-weight:600}
 /* نصٌّ عربيّ خافت — ولا يُعطى صنفَ mono: خطٌّ لاتينيّ باتّجاه LTR يفكّك
    الحروف العربيّة فتُقرأ «سا ئقا». علّةٌ تُرى ولا يكشفها اختبار. */
-.ago{font-size:11.5px; color:var(--ink-3)}
-.ch-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+.ago{font-size:var(--t-xs); color:var(--ink-3)}
+.ch-foot{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin-top:auto; padding-top:var(--s-0)}
 /* ══ الدليل — الشرحُ عنصرٌ لا هامش ══════════════════════════════════
    قيل لي ثلاثَ مرّات إنّ الشرحَ «ليس بشكل هينت احترافي». وكان محقّا:
    الشرحُ كان **نصّا رماديّا صغيرا** موزّعا تحت الحقول وفوقها — صحيحا
@@ -502,13 +512,13 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .guide .g-ic svg{width:15px; height:15px; display:block}
 .guide .g-t{min-width:0}
 .guide .g-t b{display:block; font-size:var(--t-md); font-weight:700; letter-spacing:-.15px}
-.guide .g-t span{display:block; font-size:var(--t-sm); color:var(--ink-3); line-height:1.6;
+.guide .g-t span{display:block; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh);
   max-width:var(--measure)}
 /* «افتح/أغلق» — وسمُ summary لا يُعلن حالَه لقارئ الشاشة بنفسه، فالنصُّ
    يقوله. وسهمٌ وحده لا يُقرأ بصوتٍ عالٍ. */
 .guide .g-tog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
   display:inline-flex; align-items:center; gap:var(--s-2)}
-.guide .g-tog::after{content:'▾'; font-size:10px; transition:transform .18s}
+.guide .g-tog::after{content:'▾'; font-size:var(--t-xs); transition:transform .18s}
 .guide[open] .g-tog::after{transform:rotate(180deg)}
 .guide[open] .g-tog .lbl-open{display:none}
 .guide:not([open]) .g-tog .lbl-close{display:none}
@@ -539,8 +549,8 @@ ol.steps .n{flex:none; width:25px; height:25px; border-radius:50%; margin-top:0;
   font-size:var(--t-sm); font-weight:700; font-variant-numeric:tabular-nums;
   border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);
   box-shadow:0 0 0 3px var(--surface-2)}
-ol.steps .body{min-width:0; max-width:var(--measure); padding-top:2px}
-ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:3px;
+ol.steps .body{min-width:0; max-width:var(--measure); padding-top:var(--s-0)}
+ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:var(--s-0);
   font-size:var(--t-base); line-height:var(--lh-tight)}
 ol.steps .why{display:block; color:var(--ink-3)}
 
@@ -555,8 +565,8 @@ ol.steps .why{display:block; color:var(--ink-3)}
   padding:var(--s-3) var(--s-4); border-radius:var(--r);
   background:var(--surface); border:1px solid var(--line-soft);
   font-size:var(--t-sm); line-height:var(--lh); color:var(--ink-2); max-width:var(--measure)}
-.help .i{flex:none; width:17px; height:17px; border-radius:50%; margin-top:2px;
-  display:grid; place-items:center; font-size:10px; font-weight:700;
+.help .i{flex:none; width:17px; height:17px; border-radius:50%; margin-top:var(--s-0);
+  display:grid; place-items:center; font-size:var(--t-xs); font-weight:700;
   background:var(--brand-wash); color:var(--brand);
   border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
 .help b{color:var(--ink); font-weight:600}
@@ -576,7 +586,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
   padding:var(--s-3) var(--s-4); border-radius:var(--r); background:var(--ok-wash);
   border:1px solid color-mix(in srgb,var(--ok) 20%,transparent)}
 .outcome .k{flex:none; font-size:var(--t-xs); font-weight:700; color:var(--ok);
-  letter-spacing:.3px; padding-top:2px; min-width:62px}
+  letter-spacing:.3px; padding-top:var(--s-0); min-width:62px}
 .outcome .v{font-size:var(--t-sm); line-height:var(--lh); color:var(--ink-2);
   max-width:var(--measure)}
 .outcome.warn{background:var(--warn-wash);
@@ -584,7 +594,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
 .outcome.warn .k{color:var(--warn)}
 
 /* المطويُّ العامّ — لا يُصنَّف دليلا: صناديقُ الاسترداد وما شابهها */
-.setup{border-top:1px solid var(--line-soft); padding-top:11px; margin-top:2px}
+.setup{border-top:1px solid var(--line-soft); padding-top:var(--s-3); margin-top:var(--s-0)}
 /* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
    — وهو ثلثُ الحدّ. */
 summary{min-height:var(--tap); display:flex; align-items:center}
@@ -593,7 +603,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .setup>summary::-webkit-details-marker{display:none}
 .setup>summary::before{content:'▸'; display:inline-block; margin-inline-end:var(--s-2)}
 .setup[open]>summary::before{content:'▾'}
-.setup-body{padding-top:10px}
+.setup-body{padding-top:var(--s-2)}
 
 .copy{display:flex; gap:var(--s-2); align-items:stretch}
 .copy input{flex:1 1 auto; min-width:0; font-size:var(--t-sm);
@@ -606,20 +616,20 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* شبكةٌ لا تمطّ: بطاقتان بنصّين مختلفَي الطول لا تُجبَران على ارتفاعٍ
    واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين. */
 .grid.ragged{align-items:start}
-.draft{display:flex; flex-direction:column; gap:11px; background:var(--surface);
-  border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px; box-shadow:var(--sh-1)}
+.draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .draft.done{background:var(--surface-2); box-shadow:none}
-.draft-top{display:flex; align-items:center; gap:11px}
+.draft-top{display:flex; align-items:center; gap:var(--s-3)}
 .ch-logo.sm{width:30px; height:30px; border-radius:8px}
-.draft-why{margin:0; font-size:12px; color:var(--ink-3); line-height:1.7;
-  border-inline-start:2px solid var(--line); padding-inline-start:10px}
+.draft-why{margin:0; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh);
+  border-inline-start:2px solid var(--line); padding-inline-start:var(--s-2)}
 /* ارتفاعٌ من مضاعفاتِ السطر بالضبط.
    بارتفاعٍ حرّ يقع السطرُ الأخير مقصوصا في نصفه — نصفُ حرفٍ عند الحافّة
    يُقرأ عطلا في الرسم لا نصّا يفيض. والحسابُ يقتضي line-height بالبكسل
    لا بمعامل: المعاملُ يعطي كسرا لا يُضرَب فيبقى النصف. */
-.draft-text{width:100%; box-sizing:border-box; font:inherit; font-size:13.5px;
+.draft-text{width:100%; box-sizing:border-box; font:inherit; font-size:var(--t-base);
   line-height:26px; color:var(--ink); background:var(--bg); border:1px solid var(--line);
-  border-radius:var(--r); padding:13px 15px; resize:vertical;
+  border-radius:var(--r); padding:var(--s-3) var(--s-4); resize:vertical;
   white-space:pre-wrap; word-break:break-word; overflow-y:auto;
   height:calc(var(--lines) * 26px + 28px)}
 /* المقروءُ يأخذ قدرَ نصّه بسقف: مربّعٌ ثابتٌ تحت نصٍّ قصير فراغٌ بلا سبب،
@@ -629,50 +639,50 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
    على نصٍّ لا يُحرَّر يعد بما لا يقع. */
 .draft-text.ro{background:var(--surface-3); color:var(--ink-2); resize:none}
-.draft-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:9px}
+.draft-foot{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2)}
 /* عدّادٌ لاتينيّ الأرقام: يُعزَل عن اتّجاه الصفحة فلا يُقلب «١٢٠ / ٢٨٠» */
-.draft-foot .count{font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums;
+.draft-foot .count{font-size:var(--t-xs); color:var(--ink-3); font-variant-numeric:tabular-nums;
   direction:ltr; unicode-bidi:isolate}
 .draft-foot .count b{color:var(--ink-2); font-weight:700}
 .draft-foot .count.warn b{color:var(--warn)}
 .draft-foot .count.bad b{color:var(--bad)}
-.draft-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+.draft-meta{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:auto; padding-top:var(--s-0)}
 /* ── الصورة ───────────────────────────────────────────────────────────
    تُعرض بعرض البطاقة كاملا: المالك يقرّر عليها، وقرارٌ على مربّعٍ صغير
    ليس قرارا. و aspect-ratio مع object-fit:cover يمنعان القفزَ قبل
    التحميل ويمنعان المطّ بعده — وصورةٌ ممطوطة تُقرأ إهمالا. */
-.pic{margin-top:10px}
+.pic{margin-top:var(--s-2)}
 /* height:auto ضروريّةٌ لا زينة: سِمَتا width/height على الوسم تُترجَمان
    إلى CSS بأولويّةٍ دنيا، فـ width:100% تغلب الأولى **ولا شيء يغلب
    الثانية** — فيبقى الارتفاع 628px والعرض عرضَ البطاقة، وتخرج الصورة
    ممطوطةً طولا. علّةٌ رأيتُها ولم يمسكها اختبار. */
 .pic img{display:block; width:100%; height:auto; aspect-ratio:1.91/1; object-fit:cover;
   border-radius:var(--r); border:1px solid var(--line); background:var(--surface-2)}
-.pic-foot{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px}
-.pic.none{display:flex; align-items:center; gap:9px; flex-wrap:wrap;
-  padding:11px 13px; border-radius:var(--r); background:var(--surface-2);
+.pic-foot{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:var(--s-2)}
+.pic.none{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
+  padding:var(--s-3) var(--s-3); border-radius:var(--r); background:var(--surface-2);
   border:1px dashed var(--line)}
 .pic.none .ago{flex:1 1 200px}
 /* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
    ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
-.sched{display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:10px;
-  padding:11px 13px; border-radius:var(--r); background:var(--surface-2);
+.sched{display:flex; align-items:flex-end; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2);
+  padding:var(--s-3) var(--s-3); border-radius:var(--r); background:var(--surface-2);
   border:1px solid var(--line-soft)}
 .sched.set{background:var(--ok-wash); border-color:transparent}
 .sched.gone{background:var(--warn-wash); border-color:transparent}
 .sched.none{background:var(--warn-wash); border-color:transparent; align-items:center}
 .sched .field{margin:0; flex:1 1 150px; min-width:0}
-.sched label{font-size:10.5px}
-.sched input,.sched select{padding:7px 9px; font-size:12.5px}
+.sched label{font-size:var(--t-xs)}
+.sched input,.sched select{padding:var(--s-2) var(--s-2); font-size:var(--t-sm)}
 /* الموعدُ لاتينيّ الأرقام ويُعزَل عن اتّجاه الصفحة */
-.sched .when{font-size:12px; color:var(--ink-2); direction:ltr; unicode-bidi:isolate}
+.sched .when{font-size:var(--t-sm); color:var(--ink-2); direction:ltr; unicode-bidi:isolate}
 .sched .ago{flex:1 1 auto}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
-.codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; margin:12px 0}
-.codes code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
+.codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:var(--s-2); margin:var(--s-3) 0}
+.codes code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-sm);
   letter-spacing:.06em; direction:ltr; background:var(--surface-2); border:1px solid var(--line);
-  border-radius:var(--r-sm); padding:9px 10px; text-align:center; color:var(--ink)}
+  border-radius:var(--r-sm); padding:var(--s-2) var(--s-2); text-align:center; color:var(--ink)}
 
 /* ══ شاشةُ المنصّة ═══════════════════════════════════════════════════
    بطاقةُ القناة تجيب «أمربوطةٌ أم لا» — وهو سؤالُ الضبط، يُسأل مرّةً.
@@ -725,43 +735,43 @@ nav.back a:hover{color:var(--brand)}
   font-size:var(--t-sm); line-height:var(--lh); max-width:var(--measure)}
 .why.bad{background:var(--bad-wash); color:var(--ink-2);
   border:1px solid color-mix(in srgb,var(--bad) 20%,transparent)}
-.why .i{flex:none; color:var(--bad); font-size:10px; padding-top:4px}
+.why .i{flex:none; color:var(--bad); font-size:var(--t-xs); padding-top:var(--s-1)}
 .why b{color:var(--ink)}
 .why .t{min-width:0}
 /* الموعدُ لاتينيُّ الأرقام ويُعزَل عن اتّجاه الصفحة */
 .ago.when{direction:ltr; unicode-bidi:isolate; display:inline-block}
 
 /* ══ صفحتا الدخول والعامل الثاني ═════════════════════════════ */
-.wrap{max-width:1180px; margin:0 auto; padding:24px 20px 60px}
+.wrap{max-width:1180px; margin:0 auto; padding:var(--s-6) var(--s-5) var(--s-16)}
 .auth{max-width:400px; margin:12vh auto}
-.auth .glyph{width:54px; height:54px; border-radius:16px; margin:0 auto 18px}
-.auth h1{text-align:center; font-size:19px; margin:0 0 6px; letter-spacing:-.3px}
-.auth .lede{text-align:center; color:var(--ink-3); font-size:13px; margin:0 0 22px}
-.auth .card{padding:22px}
-.auth input{width:100%; direction:ltr; text-align:left; margin-bottom:12px}
-.auth button{width:100%; justify-content:center; padding:11px}
-.auth .card form + form{margin-top:14px}
-.or{display:flex; align-items:center; gap:10px; color:var(--ink-3); font-size:11.5px; margin:16px 0}
+.auth .glyph{width:54px; height:54px; border-radius:16px; margin:0 auto var(--s-4)}
+.auth h1{text-align:center; font-size:var(--t-xl); margin:0 0 var(--s-1); letter-spacing:-.3px}
+.auth .lede{text-align:center; color:var(--ink-3); font-size:var(--t-sm); margin:0 0 var(--s-5)}
+.auth .card{padding:var(--s-5)}
+.auth input{width:100%; direction:ltr; text-align:left; margin-bottom:var(--s-3)}
+.auth button{width:100%; justify-content:center; padding:var(--s-3)}
+.auth .card form + form{margin-top:var(--s-3)}
+.or{display:flex; align-items:center; gap:var(--s-2); color:var(--ink-3); font-size:var(--t-xs); margin:var(--s-4) 0}
 .or::before,.or::after{content:''; flex:1; height:1px; background:var(--line)}
-.rec{margin-top:16px; border:1px solid var(--line); border-radius:var(--r); padding:12px 14px;
+.rec{margin-top:var(--s-4); border:1px solid var(--line); border-radius:var(--r); padding:var(--s-3) var(--s-3);
   background:var(--surface)}
-.rec summary{cursor:pointer; font-size:12.5px; color:var(--ink-2)}
-.rec form{margin-top:12px}
-.cancel{margin-top:16px; text-align:center}
-.n{font-size:11.5px; color:var(--ink-3); margin-top:8px}
+.rec summary{cursor:pointer; font-size:var(--t-sm); color:var(--ink-2)}
+.rec form{margin-top:var(--s-3)}
+.cancel{margin-top:var(--s-4); text-align:center}
+.n{font-size:var(--t-xs); color:var(--ink-3); margin-top:var(--s-2)}
 
 /* ══ الشاشة الضيّقة ══════════════════════════════════════════ */
 @media(max-width:960px){
   .app{grid-template-columns:1fr}
   .rail{position:static; height:auto; border-inline-start:0; border-bottom:1px solid var(--line)}
-  .rail-head{padding:14px 16px 10px}
-  nav.tabs{flex-direction:row; overflow-x:auto; padding:0 12px 10px; gap:4px; scrollbar-width:none}
+  .rail-head{padding:var(--s-3) var(--s-4) var(--s-2)}
+  nav.tabs{flex-direction:row; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1); scrollbar-width:none}
   nav.tabs::-webkit-scrollbar{display:none}
   nav.tabs .lbl{display:none}
-  nav.tabs a{white-space:nowrap; padding:8px 12px}
-  nav.tabs .count{margin-inline-start:4px}
+  nav.tabs a{white-space:nowrap; padding:var(--s-2) var(--s-3)}
+  nav.tabs .count{margin-inline-start:var(--s-1)}
   .rail-foot{display:none}
-  .topbar{padding:0 16px} .content{padding:16px}
+  .topbar{padding:0 var(--s-4)} .content{padding:var(--s-4)}
 }
 @media(max-width:720px){
   .draft-text{height:calc((var(--lines) + 6) * 26px + 28px)}
@@ -770,40 +780,40 @@ nav.back a:hover{color:var(--brand)}
   table{min-width:0; display:block}
   thead{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
   tbody,tr,td{display:block; width:100%}
-  tr{border:1px solid var(--line); border-radius:var(--r); padding:12px; margin-bottom:10px;
+  tr{border:1px solid var(--line); border-radius:var(--r); padding:var(--s-3); margin-bottom:var(--s-2);
     background:var(--surface-2)}
   tbody tr:hover{background:var(--surface-2)}
-  td{border:0; padding:4px 0}
-  td::before{content:attr(data-label); display:block; font-size:10px; color:var(--ink-3);
-    margin-bottom:3px; letter-spacing:.4px}
+  td{border:0; padding:var(--s-1) 0}
+  td::before{content:attr(data-label); display:block; font-size:var(--t-xs); color:var(--ink-3);
+    margin-bottom:var(--s-0); letter-spacing:.4px}
   td:first-child::before{display:none}
 }
 /* ── الوثائق العامّة ──────────────────────────────────────────────────
    عمودٌ واحدٌ مقيَّدُ العرض: سطرٌ يمتدّ عبر شاشةٍ عريضة يُقرأ بعينٍ تقفز،
    وهذه صفحةٌ يُراد لها أن تُقرأ لا أن تُتصفَّح. */
-.doc{max-width:820px; margin:0 auto; padding:44px 22px 72px; background:var(--bg)}
-.doc header{border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:8px}
-.doc .glyph{width:38px; height:38px; margin-bottom:14px}
-.doc h1{font-size:27px; letter-spacing:-.5px; margin:0 0 10px}
-.doc h2{font-size:16px; margin:32px 0 10px; letter-spacing:-.2px}
+.doc{max-width:820px; margin:0 auto; padding:var(--s-10) var(--s-5) var(--s-16); background:var(--bg)}
+.doc header{border-bottom:1px solid var(--line); padding-bottom:var(--s-5); margin-bottom:var(--s-2)}
+.doc .glyph{width:38px; height:38px; margin-bottom:var(--s-3)}
+.doc h1{font-size:var(--t-2xl); letter-spacing:-.5px; margin:0 0 var(--s-2)}
+.doc h2{font-size:var(--t-lg); margin:var(--s-8) 0 var(--s-2); letter-spacing:-.2px}
 .doc .lede{font-size:var(--t-lg); line-height:var(--lh); color:var(--ink-2);
   /* والصدرُ أضيقُ قياسا لا أوسع: قياسُه أكبر، فالوحدةُ ch أعرض معه —
      و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس. */
   margin:0 0 var(--s-3); max-width:54ch}
-.doc p{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin:0 0 11px}
-.doc ul{margin:0 0 11px; padding-inline-start:20px}
-.doc li{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin-bottom:7px}
+.doc p{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin:0 0 var(--s-3)}
+.doc ul{margin:0 0 var(--s-3); padding-inline-start:var(--s-5)}
+.doc li{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin-bottom:var(--s-2)}
 .doc b{color:var(--ink)}
 .doc a{color:var(--brand-deep); text-underline-offset:3px}
-.doc table{font-size:12.5px}
+.doc table{font-size:var(--t-sm)}
 .doc td b{font-weight:600}
 /* «ما لا يقع» أبرزُ ما في الصفحة: هو ما يبحث عنه المراجع أوّلا */
 .doc ul.never{list-style:none; padding:0; margin:0}
 .doc ul.never li{background:var(--surface-2); border:1px solid var(--line-soft);
-  border-radius:var(--r); padding:11px 14px; margin-bottom:8px}
+  border-radius:var(--r); padding:var(--s-3) var(--s-3); margin-bottom:var(--s-2)}
 /* مصطلحٌ لا يُكسَر عند شرطته: «AES-» في سطرٍ و«GCM» في التالي يُقرأ اسمين */
 .doc .nb{white-space:nowrap}
-.doc footer{margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-size:12.5px}
+.doc footer{margin-top:var(--s-10); padding-top:var(--s-4); border-top:1px solid var(--line); font-size:var(--t-sm)}
 
 /* ── الطباعة ──────────────────────────────────────────────────────────
    مراجعُ منصّةٍ قد يطبع سياسة الخصوصيّة، وصفحةٌ تخرج برافدةٍ وأزرارٍ
@@ -822,7 +832,7 @@ nav.back a:hover{color:var(--brand)}
   .card,.ch,.draft{border:1px solid #ccc; break-inside:avoid; page-break-inside:avoid}
   section[data-pane][hidden]{display:none!important}
   h1,h2,h3{break-after:avoid; page-break-after:avoid}
-  a[href^="http"]::after{content:' (' attr(href) ')'; font-size:10px; color:#555}
+  a[href^="http"]::after{content:' (' attr(href) ')'; font-size:var(--t-xs); color:#555}
   .doc a[href^="mailto"]::after{content:''}
 }
 

@@ -265,7 +265,7 @@ export function channelsSection(
 
   <div class="grid c2 ragged">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
 
-  <div class="lede-row" style="margin-top:22px">
+  <div class="lede-row" style="margin-top:var(--s-5)">
     <h3 class="sec" style="margin:0; border:0; padding:0">لم تُبنَ بعد</h3>
     <span class="grow"></span>
     <span class="lede-note">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —

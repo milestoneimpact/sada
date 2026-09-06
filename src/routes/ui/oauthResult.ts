@@ -115,7 +115,7 @@ export function connectedBody(d: ConnectedData): string {
 
   ${verdict}
 
-  <div class="card" style="margin-top:16px">
+  <div class="card" style="margin-top:var(--s-4)">
     <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
       <div class="grow"></div>${refresh}</div>
     <p class="hint">وقتُ انتهاء الإذن: <span class="mono">${escapeHtml(
@@ -129,7 +129,7 @@ export function connectedBody(d: ConnectedData): string {
       <tbody>${scopeRows(d.platform, granted)}</tbody></table></div>
   </div>
 
-  <div class="row" style="margin-top:18px">
+  <div class="row" style="margin-top:var(--s-4)">
     <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
       LABEL[d.platform],
     )}</a>
@@ -181,7 +181,7 @@ export function refusedBody(d: RefusedData): string {
       <h2>لا شيءَ يحتاج إصلاحا</h2>
       <p class="hint">هذا قرارُك لا عطلٌ في الضبط. وزرُّ الربط في لوح القنوات
         يعمل كما كان متى شئت.</p>
-      <div class="row" style="margin-top:14px">
+      <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
         <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
       </div>
@@ -209,7 +209,7 @@ export function refusedBody(d: RefusedData): string {
       </ol>
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
         <span class="v">${guide.failure}</span></div>`}
-      <div class="row" style="margin-top:14px">
+      <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/panel#channels">افتح الدليل والحقول</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
       </div>
@@ -239,7 +239,7 @@ export function refusedBody(d: RefusedData): string {
         <td data-label="النطاق"><span class="mono">${escapeHtml(s.name)}</span></td>
         <td data-label="يفتح">${escapeHtml(s.enables)}</td>
         <td data-label="مَن يمنحه"><span class="nm">${escapeHtml(s.grantedBy)}</span>
-          <div class="sub" style="margin-top:4px">${escapeHtml(s.where)}</div></td>
+          <div class="sub" style="margin-top:var(--s-1)">${escapeHtml(s.where)}</div></td>
       </tr>`,
     )
     .join('')
@@ -262,7 +262,7 @@ export function refusedBody(d: RefusedData): string {
     والجدولُ تحت يقول ما طُلب ومَن يمنح كلَّ واحدٍ منه.
     <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.</span></div>
 
-  <div class="card" style="margin-top:16px">
+  <div class="card" style="margin-top:var(--s-4)">
     <div class="card-head"><h2>${
       named ? 'النطاقُ الناقص ومَن يمنحه' : 'ما طُلب في هذه المحاولة'
     }</h2></div>
@@ -279,7 +279,7 @@ export function refusedBody(d: RefusedData): string {
   </div>
 
   ${identityBlocked
-    ? `<div class="card" style="margin-top:16px">
+    ? `<div class="card" style="margin-top:var(--s-4)">
       <div class="card-head"><h2>ولا يفيدك ربطُ الهويّة وحدها هنا</h2></div>
       <p class="hint"><b>الناقصُ هو نطاقُ الهويّة نفسه</b> — فمحاولةٌ تطلبه وحده
         تُردّ بالردّ نفسه. والمنتَجُ الذي يمنحه
@@ -288,12 +288,12 @@ export function refusedBody(d: RefusedData): string {
     </div>`
     : !offerIdentity
     ? ''
-    : `<div class="card" style="margin-top:16px">
+    : `<div class="card" style="margin-top:var(--s-4)">
       <div class="card-head"><h2>ولا تنتظر البوّابة لتربط</h2></div>
       <p class="hint">يمكن الربطُ <b>بالهويّة وحدها</b> الآن: يُحفَظ الحساب ويظهر باسمه،
         <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَجُ الناقص ثمّ تضغط «جدّد الإذن».
         وصدى يقرأ ما مُنح فعلا، فلن يحاول نشرا يعرف أنّه سيُردّ.</p>
-      <div class="row" style="margin-top:14px">
+      <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
           >اربط الهويّة وحدها</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
@@ -302,13 +302,13 @@ export function refusedBody(d: RefusedData): string {
 
   ${!identityBlocked
     ? ''
-    : `<div class="row" style="margin-top:18px">
+    : `<div class="row" style="margin-top:var(--s-4)">
         <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
       </div>`}
 
   ${guide === undefined
     ? ''
-    : `<div class="card" style="margin-top:16px">
+    : `<div class="card" style="margin-top:var(--s-4)">
       <div class="card-head"><h2>الخطواتُ في ${escapeHtml(guide.portalLabel)}</h2></div>
       <ol class="steps">${guide.before
         .map(
@@ -322,7 +322,7 @@ export function refusedBody(d: RefusedData): string {
         <span class="v">${guide.success}</span></div>
     </div>`}
 
-  <div class="row" style="margin-top:18px">
+  <div class="row" style="margin-top:var(--s-4)">
     <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
   </div>`
 }

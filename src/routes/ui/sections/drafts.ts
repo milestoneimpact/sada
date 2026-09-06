@@ -294,7 +294,7 @@ export function draftsSection(input: DraftsInput): string {
          </form>
          ${input.ready
            ? ''
-           : '<p class="hint" style="margin:10px 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
+           : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
 
   const list =
     drafts.length === 0
@@ -304,7 +304,7 @@ export function draftsSection(input: DraftsInput): string {
           .map((d) => card(d, now, input.targets, input.earliest, input.media))
           .join('')}</div>`
 
-  return `<div class="card" style="margin-bottom:14px">
+  return `<div class="card" style="margin-bottom:var(--s-3)">
     <div class="card-head"><h2>الكتابة من مصدر</h2>
       <div class="grow"></div>
       <span class="st ${waiting === 0 ? 'idle' : 'warn'}"><span class="g">${
