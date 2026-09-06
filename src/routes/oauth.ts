@@ -221,6 +221,40 @@ oauth.get('/oauth/:platform/callback', async (c) => {
       200,
     )
   } catch (error) {
+    // **من وصل هنا إنسانٌ ينظر، لا برنامجٌ يقرأ** (D-046).
+    //
+    // ورفضُ نهاية الرمز كان يعود سطرَ JSON: `oauth_failed` ومعه نصٌّ
+    // عربيٌّ في متصفّح. **وهو أسوأُ موضعٍ يقع فيه ذلك**: نصفُ الدورة
+    // نجح — شاشةُ الإذن مرّت — فالمالكُ لا يعرف أين يفتّش.
+    //
+    // و`StateError` يبقى JSON: حالةٌ منتهيةٌ أو مزوَّرة ليست عطلَ ضبطٍ
+    // يُشخَّص، وصفحةٌ لها تدعو إلى إعادةٍ لا تنفع.
+    if (error instanceof OAuthError && error.status !== 503) {
+      // ما أُرسل فعلا — يُقرأ من المصدر نفسِه لا يُعاد بناؤه.
+      // **وقراءةٌ ثانيةٌ قد تُخالف الأولى** لو بُدّل السرُّ بين اللحظتين،
+      // فتُعرَض قيمةٌ لم تُرسَل ويُطارَد وهم. ولا يُقرأ السرُّ أصلا.
+      let sent: { clientId: string; redirectUri: string } | undefined
+      try {
+        const creds = await credentialsFor(c.env, platform)
+        sent = { clientId: creds.clientId, redirectUri: redirectUri(c.env.PUBLIC_BASE_URL, platform) }
+      } catch {
+        // تعذّرت القراءة: تُعرَض الصفحةُ بلا المقارنة، ولا تسقط
+      }
+      return resultPage(
+        'صدى — لم يكتمل الربط',
+        refusedBody({
+          platform,
+          reason: error.code ?? 'token_exchange_failed',
+          ...(error.description === undefined ? {} : { description: error.description }),
+          ...(sent === undefined ? {} : { sent }),
+          requested: scopeSet(platform),
+          // ودورةُ الهويّة وحدها لا تُعرَض: العطلُ في زوج المفاتيح،
+          // **ودورةٌ أضيق تُردّ بالرمز نفسه** فتضيف محاولةً تفشل
+          identityRetry: false,
+        }),
+        502,
+      )
+    }
     const failure = oauthFailure(error)
     return c.json(failure.body, failure.status)
   }

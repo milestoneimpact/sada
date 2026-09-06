@@ -483,6 +483,13 @@ export interface PanelData {
   readonly openSuggestions: number
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
   readonly promoCap: number
+  /**
+   * معرّفُ حساب Cloudflare إن كان مضبوطا — يُملأ به عنوانُ نموذجه.
+   *
+   * **وليس سرّا**: هو في كلّ عنوانٍ يُنادى، وفي لوحة Cloudflare نفسِها.
+   * والسرُّ هو الرمز، ولا يمرّ من هنا (D-005).
+   */
+  readonly cfAccountId: string | null
 }
 
 export interface PanelFactors {
