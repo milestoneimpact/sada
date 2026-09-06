@@ -76,6 +76,12 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
         <span class="mono">${escapeHtml(app.secretNames[1])}</span>.</span></div>
       ${app.clientId === null ? '' : `<p class="ch-note">المعرّف الحاليّ:
         <span class="mono">${escapeHtml(app.clientId)}</span></p>`}
+      <form method="POST" action="/panel/channels/app/verify" data-busy="جارٍ الفحص…">
+        <input type="hidden" name="platform" value="${escapeHtml(view.spec.id)}">
+        <button class="g sm" type="submit">افحص الزوج</button>
+        <span class="ago">يسأل المنصّةَ أتقبل هذا الزوج — بلا دورةِ إذن، وبلا
+          رمزِ وصولٍ يُنتَج.</span>
+      </form>
     </div></div>`
   }
 
@@ -143,6 +149,10 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
         </div>
         <div class="ch-foot">
           <button class="p" type="submit">احفظ</button>
+          ${app.source === 'none'
+            ? ''
+            : `<button class="g sm" type="submit" formaction="/panel/channels/app/verify"
+                 formnovalidate>افحص الزوج</button>`}
           <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
           <span class="grow"></span>
           ${app.source === 'vault'
@@ -150,6 +160,13 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
                  data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
             : ''}
         </div>
+        ${app.source === 'none' ? '' : `<div class="sub" style="margin-top:var(--s-2)">
+          <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا —
+          <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بمسار
+          <span class="mono">client_credentials</span> الذي <b>لا منحةَ فيه تُفحَص</b>،
+          فلا يبقى إلّا التوثيق. ويفرّق الجوابُ بين <b>سرٍّ خاطئ</b> و<b>معرّفٍ
+          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج رمزُ وصولٍ لصدى، ولا
+          تُنفَق فلسا.</div>`}
       </form>
 
       <div class="outcome"><span class="k">إن نجح</span>
