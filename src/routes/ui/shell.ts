@@ -14,40 +14,44 @@ import { STYLE } from './styles'
  * محتوًى تُوسَّع لتسمح به. و data: URI يعبر `img-src 'self' data:`
  * القائمة أصلا، ويظهر قبل أن يكتمل تحميل الصفحة.
  *
- * **والشكلُ من الاسم لا من الذوق**: «صدى» ارتدادُ صوت، فثلاثةُ أقواسٍ
- * متراكزةٍ تخفتُ كلّما اتّسعت. وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ
- * لطخةً — والقوسُ يُقرأ عند كلّ قياس.
+ * **والشكلُ من الهويّة لا من الذوق**: شريطُ صدى نفسه، بتدرّجه من
+ * التركواز إلى النعناع. وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ لطخةً —
+ * والشريطُ يُقرأ عند كلّ قياس.
  */
+const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
+
 const ICON_SVG = [
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
-  '<rect width="32" height="32" rx="7" fill="#8a6d1f"/>',
-  '<g fill="none" stroke="#fff" stroke-linecap="round">',
-  '<path d="M11 9a10 10 0 0 1 0 14" stroke-width="2.6" opacity=".95"/>',
-  '<path d="M17 11a6.5 6.5 0 0 1 0 10" stroke-width="2.2" opacity=".6"/>',
-  '<path d="M22.5 13.5a3.3 3.3 0 0 1 0 5" stroke-width="1.9" opacity=".33"/>',
-  '</g></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48">',
+  '<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0">',
+  '<stop offset="0" stop-color="#0E6B66"/><stop offset="1" stop-color="#4CD1B6"/>',
+  '</linearGradient></defs>',
+  '<rect width="64" height="48" rx="11" fill="#04100f"/>',
+  '<path d="' + RIBBON + '" fill="none" stroke="url(#g)" stroke-width="11" ',
+  'stroke-linecap="round"/>',
+  '</svg>',
 ].join('')
 
 /**
- * العلامةُ في الرافدة — **الأقواسُ نفسها، لا الحرفان**.
+ * العلامةُ في الرافدة — شريطُ الهويّة — **مرسومٌ تقريبا لا منقولٌ من الأصل.**
  *
- * كان المربّعُ يحمل «صدى» بخمسةَ عشرَ بكسلا في ستٍّ وثلاثين، فيزدحم
- * الحرفان ويُقرأ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب.
+ * ما وصلني من الشعار صورةٌ نقطيّة (PNG)، **ولا تُحوَّل صورةٌ نقطيّةٌ
+ * إلى متّجهٍ بيدٍ تحويلا أمينا**. فهذا **تفسيرٌ للشكل** يحفظ حركتَه
+ * وتدرّجَه ونهاياتِه المستديرة، ويعمل عند كلّ قياس ويتبع الثيم.
+ *
+ * وحين يصلني ملفُّ `.svg` أو `.ai` الأصليّ يُستبدَل هذا بسطرٍ واحد —
+ * وموضعُه واحدٌ لا مواضع. **ولا أدّعي أنّه الأصل.**
+ *
  * والعلامةُ الواحدة في الموضعين تُعرَف: تبويبٌ في المتصفّح ورافدةٌ في
  * الصفحة يحملان الشكلَ نفسه.
  */
 export const GLYPH_SVG =
-  // إطارٌ مشدودٌ على الأقواس وحدها: viewBox الرمزِ كاملا يترك فراغا
-  // يمينَ الشكل، فتبدو العلامةُ مزاحةً في مربّعها
-  '<svg viewBox="9 7 15 18" fill="none" stroke="currentColor" ' +
+  '<svg viewBox="0 0 64 48" fill="none" stroke="currentColor" ' +
   'stroke-linecap="round" aria-hidden="true">' +
-  '<path d="M11 9a10 10 0 0 1 0 14" stroke-width="2.6" opacity=".95"/>' +
-  '<path d="M17 11a6.5 6.5 0 0 1 0 10" stroke-width="2.2" opacity=".62"/>' +
-  '<path d="M22.5 13.5a3.3 3.3 0 0 1 0 5" stroke-width="1.9" opacity=".34"/>' +
+  '<path d="' + RIBBON + '" stroke-width="11"/>' +
   '</svg>'
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG)}">
-<meta name="theme-color" content="#8a6d1f">`
+<meta name="theme-color" content="#0e6b66">`
 
 export function escapeHtml(value: string): string {
   return value
@@ -151,7 +155,7 @@ ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style nonce="${safeNonce}">${STYLE}</style></head><body>${body}${
     script === '' ? '' : `<script nonce="${safeNonce}">${script}</script>`
   }</body></html>`

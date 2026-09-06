@@ -7,11 +7,22 @@
  * يُقلَب بإعادة تعريف القيَم هنا وحدها — لا بنسخِ ورقةِ أنماطٍ ثانية
  * تتباعد عن الأولى مع كلّ تعديل.
  *
- * ## الذهب يتبدّل بين الثيمين — وهذا ليس تنازلا عن الهويّة
+ * ## هويّةُ صدى — والتركوازُ يتبدّل بين الثيمين
  *
- * ذهبُ الهويّة `#d4af37` يقرأ على الداكن (‏٩٫٤:١) ولا يقرأ على الأبيض
- * (‏١٫٩:١ — نصفُ ما تشترطه WCAG). فالنهاريُّ يأخذ ذهبا أغمق `#8a6d1f`،
- * وهو **الذهبُ نفسه أُنقص ضوؤه** لا لونٌ آخر.
+ * دليلُ الهويّة يعطي خمسةً، **ولا يقول أيُّها يصلح نصّا** — وذاك ما
+ * يُقاس لا يُختار. فقيست على أرضيّاتنا الأربع، **فأفرزت نفسها بنفسها**:
+ *
+ *   النعناع  `#4CD1B6` على البطاقة الليليّة   ‏٩٫٦١:١  ✓
+ *   التركواز `#0E6B66` على البطاقة النهاريّة  ‏٦٫٣٤:١  ✓
+ *   النعناع  على النهاريّة                    ‏١٫٨٩:١  ✗
+ *   التركواز على الليليّة                     ‏٢٫٨٧:١  ✗
+ *
+ * فالليليُّ يأخذ **النعناع**، والنهاريُّ يأخذ **التركواز** — وهما لونا
+ * الهويّة نفسها لا لونان مخترَعان. والأعمقُ `#0B2F31` أرضُ الظلّ وحبرُ
+ * العناوين نهارا، و`#A7E9DB` غسلاتٌ **لا نصَّ عليها أبدا**.
+ *
+ * وكلاهما **يعلو الذهبَ الذي كان**: ‏٨٫٦٤ ليلا و‏٤٫٩٠ نهارا. فالهويّةُ
+ * حُفظت والتباينُ تحسّن — ولم يكن ذلك مصادفةً بل بنيةَ اللوحة.
  *
  * وهذا ما لا تكشفه لقطةُ شاشة: النصُّ يبدو ظاهرا لعينٍ سليمة في ضوء
  * غرفة، ويختفي في الشمس. فيُقاس بـ `npm run contrast` لا بالعين.
@@ -26,19 +37,20 @@
 export const TOKENS = `
 /* THEME:light */
 :root{
-  /* الأرض: رماديّةٌ دافئة لا بيضاء ناصعة — البياضُ المطلق يُتعب في
-     الجلسة الطويلة، والدفءُ يسند ذهب الهويّة */
-  --bg:#f6f6f3;
+  /* الأرضُ «Soft Background» من دليل الهويّة — باردةٌ خفيفة لا بيضاءُ
+     ناصعة: البياضُ المطلق يُتعب في الجلسة الطويلة */
+  --bg:#f4faf9;
   --chrome:#ffffff;
-  --surface:#ffffff; --surface-2:#f4f4f1; --surface-3:#eeede8;
-  --line:#e2e0d8; --line-soft:#eeece5; --line-strong:#d3d0c5;
-  --ink:#16181c; --ink-2:#495460; --ink-3:#5e6771;
-  --gold:#8a6d1f; --gold-soft:#a8862c; --gold-deep:#6d5518; --on-gold:#ffffff;
-  --gold-wash:#faf6ea;
+  --surface:#ffffff; --surface-2:#f2f8f7; --surface-3:#e6f1ef;
+  --line:#d8e8e5; --line-soft:#e8f2f0; --line-strong:#bcd6d1;
+  /* والحبرُ الأوّل هو «Deep Teal» من الهويّة لا رماديٌّ محايد */
+  --ink:#0b2f31; --ink-2:#3d5457; --ink-3:#556c70;
+  --brand:#0e6b66; --brand-soft:#128b84; --brand-deep:#0a4f4b; --on-brand:#ffffff;
+  --brand-wash:#e6f4f2;
   /* حالاتٌ محجوزة: لا تُستعمل لسلسلةٍ ولا زينة. والأحمر والأخضر
      متقاربان في عمى الألوان — ولذلك **كلّ حالة تحمل رمزا ونصّا** */
   --ok:#1c7a52; --warn:#8a5a00; --bad:#b3261e;
-  --ok-wash:#eef7f2; --warn-wash:#fdf6e8; --bad-wash:#fdf0ef;
+  --ok-wash:#e4f4ed; --warn-wash:#fdf4e6; --bad-wash:#fdeeec;
 
   /* ── مقياسُ الحرف ─────────────────────────────────────────────────
      نسبةٌ ثابتة (~1.2) لا أرقامٌ تُختار عند الحاجة. وكانت القياساتُ
@@ -92,7 +104,7 @@ export const TOKENS = `
   --sh-1:0 1px 2px rgba(22,24,28,.05);
   --sh-2:0 1px 3px rgba(22,24,28,.07), 0 8px 24px rgba(22,24,28,.05);
   --sh-3:0 12px 32px rgba(22,24,28,.10);
-  --ring:rgba(138,109,31,.30);
+  --ring:rgba(14,107,102,.30);
 
   /* ── المادّة ──────────────────────────────────────────────────────
      ثلاثةُ متغيّراتٍ تصنع فرقَ «مسطّحٍ» و«مصنوع»، وكلٌّ منها يقلد ما
@@ -111,53 +123,53 @@ export const TOKENS = `
      يُرى وسخا، وعلى أرضٍ داكنةٍ يُرى صنعة. */
   --hair:rgba(255,255,255,.9);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0) 58%);
-  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(138,109,31,.09),transparent 62%);
-  --glow:0 0 0 1px rgba(138,109,31,.14), 0 10px 30px rgba(138,109,31,.12);
+  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(14,107,102,.10),transparent 62%);
+  --glow:0 0 0 1px rgba(14,107,102,.14), 0 10px 30px rgba(14,107,102,.12);
   color-scheme:light;
 }
 
 @media(prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#070a0e;
-    --chrome:#0c1219;
-    --surface:#0f1620; --surface-2:#141d29; --surface-3:#1b2634;
-    --line:#1f2c3b; --line-soft:#172230; --line-strong:#2a3a4c;
-    --ink:#eaf0f7; --ink-2:#9fb0c3; --ink-3:#8b9cb0;
-    --gold:#d4af37; --gold-soft:#e8cf76; --gold-deep:#8f6f18; --on-gold:#0a0d12;
-    --gold-wash:#1a1608;
+    --bg:#04100f;
+    --chrome:#071b1a;
+    --surface:#0a2422; --surface-2:#0e2e2b; --surface-3:#133a36;
+    --line:#1a463f; --line-soft:#123531; --line-strong:#256158;
+    --ink:#e8f5f2; --ink-2:#9dbdb7; --ink-3:#87a8a2;
+    --brand:#4cd1b6; --brand-soft:#a7e9db; --brand-deep:#0e6b66; --on-brand:#04100f;
+    --brand-wash:#0a2f2b;
     --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
-    --ok-wash:#0d1c17; --warn-wash:#1d160a; --bad-wash:#1e1012;
+    --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
     --sh-1:0 1px 2px rgba(0,0,0,.4);
     --sh-2:0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.30);
     --sh-3:0 12px 32px rgba(0,0,0,.45);
-    --ring:rgba(212,175,55,.36);
+    --ring:rgba(76,209,182,.34);
     --hair:rgba(255,255,255,.055);
     --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
-    --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(212,175,55,.13),transparent 62%);
-    --glow:0 0 0 1px rgba(212,175,55,.18), 0 10px 34px rgba(212,175,55,.10);
+    --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(76,209,182,.12),transparent 62%);
+    --glow:0 0 0 1px rgba(76,209,182,.18), 0 10px 34px rgba(76,209,182,.10);
     color-scheme:dark;
   }
 }
 
 /* THEME:dark */
 [data-theme="dark"]{
-  --bg:#070a0e;
-  --chrome:#0c1219;
-  --surface:#0f1620; --surface-2:#141d29; --surface-3:#1b2634;
-  --line:#1f2c3b; --line-soft:#172230; --line-strong:#2a3a4c;
-  --ink:#eaf0f7; --ink-2:#9fb0c3; --ink-3:#8b9cb0;
-  --gold:#d4af37; --gold-soft:#e8cf76; --gold-deep:#8f6f18; --on-gold:#0a0d12;
-  --gold-wash:#1a1608;
+  --bg:#04100f;
+  --chrome:#071b1a;
+  --surface:#0a2422; --surface-2:#0e2e2b; --surface-3:#133a36;
+  --line:#1a463f; --line-soft:#123531; --line-strong:#256158;
+  --ink:#e8f5f2; --ink-2:#9dbdb7; --ink-3:#87a8a2;
+  --brand:#4cd1b6; --brand-soft:#a7e9db; --brand-deep:#0e6b66; --on-brand:#04100f;
+  --brand-wash:#0a2f2b;
   --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
-  --ok-wash:#0d1c17; --warn-wash:#1d160a; --bad-wash:#1e1012;
+  --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
   --sh-1:0 1px 2px rgba(0,0,0,.4);
   --sh-2:0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.30);
   --sh-3:0 12px 32px rgba(0,0,0,.45);
-  --ring:rgba(212,175,55,.36);
+  --ring:rgba(76,209,182,.34);
   --hair:rgba(255,255,255,.055);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
-  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(212,175,55,.13),transparent 62%);
-  --glow:0 0 0 1px rgba(212,175,55,.18), 0 10px 34px rgba(212,175,55,.10);
+  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(76,209,182,.12),transparent 62%);
+  --glow:0 0 0 1px rgba(76,209,182,.18), 0 10px 34px rgba(76,209,182,.10);
   color-scheme:dark;
 }
 `

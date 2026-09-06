@@ -570,15 +570,15 @@ function sparkline(series: { day: string; total: number }[]): string {
     <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
       aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
       <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--gold)" stop-opacity=".22"/>
-        <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+        <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
       </linearGradient></defs>
       ${ticks}
       <path d="${area}" fill="url(#sg)"/>
-      <path d="${line}" fill="none" stroke="var(--gold)" stroke-width="2"
+      <path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${x(peakIndex).toFixed(1)}" cy="${y(peak.total).toFixed(1)}" r="3.5"
-        fill="var(--surface)" stroke="var(--gold)" stroke-width="2"/>
+        fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
       <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
       ${dates}
     </svg>
@@ -594,7 +594,7 @@ function sparkline(series: { day: string; total: number }[]): string {
 function worthCell(worth: number | null): string {
   if (worth === null) return '<span class="st idle"><span class="g">○</span>لم يُحلَّل</span>'
   const p = Math.round(worth * 100)
-  const shade = worth >= 0.66 ? 'var(--gold)' : worth >= 0.33 ? 'var(--gold-soft)' : 'var(--ink-3)'
+  const shade = worth >= 0.66 ? 'var(--brand)' : worth >= 0.33 ? 'var(--brand-soft)' : 'var(--ink-3)'
   return `<div class="worth" title="درجة الاستحقاق ${worth.toFixed(2)} من 1">
     <div class="track"><span class="fill" style="width:${p}%;background:${shade}"></span></div>
     <span class="val">${worth.toFixed(2)}</span></div>`
