@@ -20,11 +20,30 @@ import type { Db } from './tokens'
 /** ما بُني له سائقٌ فعلا. يقابل `CHECK (platform IN (...))` في المخطّط. */
 export type BuiltPlatform = 'linkedin' | 'x'
 
+/**
+ * مرتبةُ السائق — **ثلاثٌ لا اثنتان.**
+ *
+ * كان الحقلُ `built: boolean`، وهو يكذب على حالٍ ثالثةٍ صارت قائمة:
+ * منصّةٌ **يُربَط حسابُها فعلا** ولا يُنشَر عليها بعد. وقولُ «لم تُبنَ»
+ * عنها يُخفي زرَّ ربطٍ يعمل، وقولُ «بُنيت» يَعِد بنشرٍ لا يقع.
+ *
+ * **والثالثةُ هي أصدقُ ما يُقال**: اربِط اليوم، وانتظر السائق.
+ */
+export type DriverStage =
+  /** يُربَط ويُنشَر. */
+  | 'publish'
+  /** يُربَط ولا يُنشَر بعد — ودورةُ OAuth مبنيّةٌ له فعلا. */
+  | 'link'
+  /** لا سائقَ له البتّة. */
+  | 'none'
+
 export interface ChannelSpec {
   readonly id: string
   readonly label: string
-  /** أبُني له سائقٌ ينشر؟ */
+  /** أبُني له سائقٌ ينشر؟ — يبقى للتوافق، ويُشتقّ من `stage`. */
   readonly built: boolean
+  /** مرتبةُ سائقه — وهي الأصدق. */
+  readonly stage: DriverStage
   /** أسرارُ Worker التي يحتاجها الربط. */
   readonly secrets: readonly string[]
   /** مهمّةُ المالك التي تفتحه، إن كانت. */
@@ -67,6 +86,94 @@ export interface SetupGuide {
   readonly gotcha: string
 }
 
+/**
+ * دليلُ YouTube.
+ *
+ * **والمراجعةُ هي العقبة، لا الضبط.** نطاقُ الرفع «حسّاسٌ» عند Google،
+ * وتطبيقٌ لم يُجَز يبقى في وضع Testing: **مئةُ مستخدمٍ ورمزُ تجديدٍ
+ * يسقط كلَّ سبعة أيّام**. وهذا يعمل للتجريب ويُعيد الربطَ كلَّ أسبوع.
+ */
+const YOUTUBE_GUIDE: SetupGuide = {
+  portal: 'https://console.cloud.google.com/apis/credentials',
+  portalLabel: 'Google Cloud Console',
+  before: [
+    {
+      what: 'أنشئ مشروعا، ثمّ APIs & Services ← Library ← فعّل <b>YouTube Data API v3</b>',
+      why: 'بلا تفعيلها يُردّ كلُّ نداءٍ بـ <span class="mono">accessNotConfigured</span> — <b>ولو صحّ السرُّ والنطاق</b>.',
+    },
+    {
+      what: 'OAuth consent screen ← External ← أضف بريدك في <b>Test users</b>',
+      why: 'التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج. <b>وبريدُك أنت أوّلُهم</b>، وإلّا رُدّ إذنُك أنت.',
+    },
+    {
+      what: 'Data access ← Add scopes ← اختر <span class="mono">youtube.upload</span> و <span class="mono">youtube.readonly</span>',
+      why: '<b>ونطاقُ الرفع «حسّاس»</b>: يعمل في Testing بلا مراجعة، ويحتاجها للنشر العلنيّ.',
+    },
+    {
+      what: 'Credentials ← Create credentials ← <b>OAuth client ID</b> ← Web application',
+      why: 'ونوعُ «Web application» وحده يقبل رابطَ عودة. و«Desktop» يعطي سرّا لا يعمل هنا.',
+    },
+    {
+      what: 'وفي الشاشة نفسها: <b>Authorized redirect URIs</b> ← الصق رابط العودة أدناه',
+      why: 'Google يطابقه <b>حرفا بحرف</b>، ويردّ <span class="mono">redirect_uri_mismatch</span> على أدنى فرق.',
+    },
+  ],
+  whereId: 'Credentials ← عميلُك ← <b>Client ID</b> (ينتهي بـ .apps.googleusercontent.com)',
+  whereSecret: 'تحته: <b>Client secret</b>. واضغط زرَّ النسخ — ولا تعيد إنشاء العميل.',
+  success:
+    'يظهر <span class="mono">youtube.readonly</span> و <span class="mono">youtube.upload</span> ' +
+    'في شاشة الإذن حين تضغط «اربط»، وبعدها تُعرض قناتُك باسمها لا بمعرّفها.',
+  failure:
+    '<span class="mono">access_denied</span> ← بريدُك ليس في Test users. ' +
+    'و <span class="mono">redirect_uri_mismatch</span> ← الرابطُ لم يُلصق حرفا بحرف. ' +
+    'و <b>لا قناةَ على هذا الحساب</b> ← حسابُ Google بلا قناة YouTube، فأنشئ قناةً أوّلا.',
+  gotcha:
+    'صدى يطلب <span class="mono">access_type=offline</span> و <span class="mono">prompt=consent</span> — ' +
+    '<b>وبدونهما لا رمزَ تجديد</b>، فيسقط الربطُ بعد ساعة. وهما مضبوطان في الشيفرة، لا تحتاج فعلا.',
+}
+
+/**
+ * دليلُ TikTok.
+ *
+ * **وأوّلُ نشرٍ يقع مسوّدةً في التطبيق لا منشورا** حتّى تُجاز مراجعةُ
+ * المحتوى — وهذا حدُّ المنصّة لا نقصٌ عندنا، ويُقال قبل الربط.
+ */
+const TIKTOK_GUIDE: SetupGuide = {
+  portal: 'https://developers.tiktok.com/apps',
+  portalLabel: 'TikTok for Developers',
+  before: [
+    {
+      what: 'أنشئ تطبيقا، ثمّ <b>Add products</b> ← <b>Login Kit</b>',
+      why: 'هو الذي يفتح دورةَ الإذن أصلا. <b>وبدونه لا رابطَ إذنٍ يعمل.</b>',
+    },
+    {
+      what: 'وأضف <b>Content Posting API</b>',
+      why: 'يمنح <span class="mono">video.upload</span> — ورفعُ المقطع مسوّدةً إلى تطبيقك.',
+    },
+    {
+      what: 'ولـ <b>Direct Post</b> اطلب مراجعةَ المحتوى في الشاشة نفسها',
+      why: 'بدونها يصل المقطعُ <b>مسوّدةً تنشرها بيدك</b> من تطبيق TikTok. وهي تعمل، ولا تنشر وحدها.',
+    },
+    {
+      what: 'وتبويب <b>Domain verification</b>: أضف <span class="mono">sada2.basserh.com</span> وأثبت ملكيّته',
+      why: 'TikTok يسحب المقطعَ من رابطٍ عندنا، <b>ولا يسحب من نطاقٍ لم يُثبَت</b>.',
+    },
+    {
+      what: 'وفي Login Kit: <b>Redirect URI</b> ← الصق رابط العودة أدناه',
+      why: 'يُطابَق حرفا بحرف كغيره.',
+    },
+  ],
+  whereId: 'شاشةُ التطبيق ← <b>Client key</b> — ولاحظ أنّه «key» لا «id»',
+  whereSecret: 'تحته: <b>Client secret</b>. ويُعرَض مرّةً، فاحفظه أو أعد توليده.',
+  success: 'تظهر بطاقةُ TikTok «مربوطة» باسم حسابك، وتُعرض نطاقاتُه في شاشة المنصّة.',
+  failure:
+    'رمزٌ يذكر <span class="mono">client_key</span> ← السرُّ لُصق في الحقل الخطأ. ' +
+    'و <b>فشلُ سحبِ المقطع</b> ← النطاق لم يُثبَت في Domain verification.',
+  gotcha:
+    'TikTok يسمّي المعرّف <span class="mono">client_key</span> لا <span class="mono">client_id</span>. ' +
+    '<b>وصدى يرسله بالاسم الصحيح</b> — لا تحتاج فعلا، لكن لا تخلط بينه وبين الـ secret.',
+}
+
 export const SETUP: Readonly<Record<string, SetupGuide>> = {
   linkedin: {
     portal: 'https://www.linkedin.com/developers/apps',
@@ -98,6 +205,8 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     gotcha:
       'رابطُ العودة يُطابَق حرفا بحرف: شرطةٌ في آخره أو http بدل https تُسقط الربط.',
   },
+  youtube: YOUTUBE_GUIDE,
+  tiktok: TIKTOK_GUIDE,
   x: {
     portal: 'https://developer.x.com/en/portal/dashboard',
     portalLabel: 'X Developer Portal',
@@ -134,6 +243,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'linkedin',
     label: 'LinkedIn',
     built: true,
+    stage: 'publish',
     secrets: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
     task: 'M-02',
     note: 'النشرُ باسمك أو باسم صفحة. ويحتاج موافقةَ LinkedIn على Community Management API (M-03) للصفحات.',
@@ -142,6 +252,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'x',
     label: 'X',
     built: true,
+    stage: 'publish',
     secrets: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
     task: 'M-04',
     note: 'النشرُ يحتاج رصيدا في حساب المطوّر — وكلّ طلبٍ يُحاسَب عليه.',
@@ -150,6 +261,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'snapchat',
     label: 'Snapchat',
     built: false,
+    stage: 'none',
     secrets: [],
     task: null,
     note: 'واجهةُ نشرِها لا تشبه غيرَها، فتحتاج سائقا يُكتب لها وحدها.',
@@ -158,6 +270,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'instagram',
     label: 'Instagram',
     built: false,
+    stage: 'none',
     secrets: [],
     task: null,
     note: 'تمرّ عبر Graph API بحسابِ أعمالٍ مربوط — خطُّ ربطٍ مختلفٌ كلّيّا.',
@@ -166,14 +279,18 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'tiktok',
     label: 'TikTok',
     built: false,
-    secrets: [],
-    task: null,
-    note: 'النشرُ فيديو لا نصّ، فيحتاج رفعا مجزّأً ومعالجةَ وسائط.',
+    stage: 'link',
+    secrets: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'],
+    task: 'M-14',
+    note:
+      'الربطُ مبنيّ. والنشرُ ينتظر سائقا يرفع المقطعَ — ' +
+      'والمقاطعُ تُولَّد عندنا رأسيّةً بخمسَ عشرةَ ثانية (D-052)، فالمادّةُ جاهزة.',
   },
   {
     id: 'threads',
     label: 'Threads',
     built: false,
+    stage: 'none',
     secrets: [],
     task: null,
     note: 'واجهتُها حديثةٌ وتتبدّل، ولم تستقرّ بعد استقرارا يُبنى عليه.',
@@ -182,9 +299,12 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'youtube',
     label: 'YouTube',
     built: false,
-    secrets: [],
-    task: null,
-    note: 'رفعُ فيديو بحصّةٍ يوميّةٍ صارمة — وحسابُه غير حساب Drive.',
+    stage: 'link',
+    secrets: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET'],
+    task: 'M-15',
+    note:
+      'الربطُ مبنيّ. والنشرُ ينتظر سائقا يرفع رفعا مستأنَفا — ' +
+      'ومقاطعُ Shorts رأسيّةٌ بخمسَ عشرةَ ثانية، وهي ما يولّده صدى.',
   },
 ]
 
@@ -271,7 +391,10 @@ export function viewChannels(
     const missing = spec.secrets.filter((name) => !presentSecrets(name))
 
     let state: ChannelState
-    if (!spec.built) {
+    // **والمرتبةُ `link` تُعامَل معاملةَ المبنيّ في الحال**: زرُّ ربطها
+    // يعمل فعلا، وحسابُها يُحفَظ. والفرقُ — أنّها لا تنشر — يُقال نصّا
+    // في البطاقة والشاشة، لا يُخفى بإسقاط الزرّ
+    if (spec.stage === 'none') {
       state = 'unbuilt'
     } else if (mine.some((a) => a.status === 'needs_reauth')) {
       state = 'needs_reauth'

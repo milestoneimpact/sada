@@ -32,7 +32,9 @@ import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 
-const LABEL: Readonly<Record<Platform, string>> = { linkedin: 'LinkedIn', x: 'X' }
+const LABEL: Readonly<Record<Platform, string>> = {
+  linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok',
+}
 
 function head(platform: Platform, eyebrow: string, title: string, lede: string): string {
   return `<div class="page-head">

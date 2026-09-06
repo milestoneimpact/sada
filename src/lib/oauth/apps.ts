@@ -52,6 +52,8 @@ export interface AppCredentials {
 export const SECRET_NAMES: Readonly<Record<Platform, readonly [string, string]>> = {
   linkedin: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
   x: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
+  youtube: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET'],
+  tiktok: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'],
 }
 
 function fromEnv(

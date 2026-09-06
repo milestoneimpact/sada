@@ -181,7 +181,12 @@ export async function publishPost(
     .run()
 
   // ٤ — التكلفة تُسجَّل قبل أن يُعدّ الطلب ناجحا
-  const unitCost = estimatePostCost(post.platform, hasUrl)
+  //
+  // **والقاعدةُ هي التي تضمن النوع**: `posts.platform` محصورٌ في
+  // المنصّتين اللتين لهما سائق (0013 لم يوسّعه عمدا). فالصفُّ الواصل
+  // لا يحمل غيرَهما، ويُضيَّق النوعُ هنا بلا فحصٍ يتظاهر بالحراسة
+  const paying = post.platform as 'linkedin' | 'x'
+  const unitCost = estimatePostCost(paying, hasUrl)
   if (unitCost > 0) {
     await recordCost(db, {
       provider: post.platform,

@@ -192,6 +192,15 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
     .join('')
 
   // ما يُقال ولمَ: كلُّ حالٍ لها جملتُها، ولا تُترك حالٌ بلا تفسير
+  // **والمرتبةُ تُقال قبل كلّ شيء**: منصّةٌ تُربَط ولا تنشر يجب أن
+  // يعرف مالكُها ذلك **قبل** أن يربط، لا بعد أوّل جدولةٍ تُردّ
+  const stageNote =
+    spec.stage === 'link'
+      ? `<div class="why warn"><span class="i">◍</span><span class="t">
+         <b>تُربَط ولا تنشر بعد.</b> دورةُ الإذن مبنيّةٌ لها، وسائقُ الرفع لم يُبنَ —
+         فيُحفَظ الحساب وتُقرأ نطاقاتُه، <b>ولا تُكتب لها مسوّدة</b>.</span></div>`
+      : ''
+
   const note =
     state === 'awaiting_owner'
       ? `ينقص سرّا التطبيق. <b>اضبطهما من هنا</b> — أو من أسرار Worker باسمَي
@@ -224,6 +233,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
       <span class="grow"></span>${badge}
     </div>
     ${rows}
+    ${stageNote}
     <p class="ch-note">${note}</p>
     ${setupPane(view, app, base)}
     <div class="ch-foot">${action}

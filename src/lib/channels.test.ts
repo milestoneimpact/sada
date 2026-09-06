@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { CHANNELS, listAccounts, viewChannels } from './channels'
+import { CHANNELS, SETUP, listAccounts, viewChannels } from './channels'
 
 let db: FakeDb
 const ALL = (): boolean => true
@@ -26,15 +26,45 @@ async function seed(
 }
 
 describe('السجلّ', () => {
-  it('يحمل المبنيَّ وغيرَ المبنيّ، ولا يعد بما لم يُبنَ', () => {
-    const built = CHANNELS.filter((c) => c.built).map((c) => c.id)
-    expect(built).toEqual(['linkedin', 'x'])
-    for (const spec of CHANNELS.filter((c) => !c.built)) {
-      // غيرُ المبنيّ لا سرَّ له ولا مهمّة: لا شيء ينتظره المالك
-      expect(spec.secrets).toHaveLength(0)
-      expect(spec.task).toBeNull()
+  /**
+   * **ثلاثُ مراتبَ لا اثنتان** (D-056).
+   *
+   * والقاعدةُ تُثبَّت لا تُعدَّد: ما ينشر يحمل أسرارا، وما يُربَط يحمل
+   * أسرارا، **وما لا سائقَ له لا يحمل شيئا** — فلا ينتظره المالك.
+   */
+  it('لكلّ مرتبةٍ ما يليق بها، ولا يعد بما لم يُبنَ', () => {
+    expect(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id))
+      .toEqual(['linkedin', 'x'])
+
+    for (const spec of CHANNELS) {
       // ولكلٍّ سببٌ مكتوب، لا صمت
       expect(spec.note.length).toBeGreaterThan(20)
+
+      if (spec.stage === 'none') {
+        // لا سرَّ له ولا مهمّة: لا شيء ينتظره المالك
+        expect(spec.secrets).toHaveLength(0)
+        expect(spec.task).toBeNull()
+      } else {
+        // وما يُربَط يحتاج سرَّين ومهمّةً تفتحهما
+        expect(spec.secrets).toHaveLength(2)
+        expect(spec.task).not.toBeNull()
+      }
+    }
+  })
+
+  /** و`built` مشتقٌّ من المرتبة، فلا يفترقان. */
+  it('و built هو stage === publish — لا حقلٌ ثانٍ يُنسى', () => {
+    for (const spec of CHANNELS) expect(spec.built).toBe(spec.stage === 'publish')
+  })
+
+  /** ولكلّ ما يُربَط دليلٌ مكتوب — وزرُّ ربطٍ بلا دليلٍ يترك المالكَ واقفا. */
+  it('ولكلّ ما يُربَط دليلُ ضبطٍ كامل', () => {
+    for (const spec of CHANNELS.filter((c) => c.stage !== 'none')) {
+      const guide = SETUP[spec.id]
+      expect(guide, spec.id).toBeDefined()
+      expect(guide!.before.length).toBeGreaterThan(1)
+      expect(guide!.success.length).toBeGreaterThan(20)
+      expect(guide!.failure.length).toBeGreaterThan(20)
     }
   })
 
@@ -102,7 +132,8 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
   it('**ما لم يُبنَ يبقى «لم يُبنَ» مهما كانت الأسرار**', () => {
     for (const guard of [ALL, NONE]) {
       const views = viewChannels([], guard)
-      for (const view of views.filter((v) => !v.spec.built)) {
+      // و«لم يُبنَ» للمرتبة الدنيا وحدها: ما يُربَط له زرٌّ يعمل
+      for (const view of views.filter((v) => v.spec.stage === 'none')) {
         expect(view.state).toBe('unbuilt')
       }
     }

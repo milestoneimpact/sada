@@ -212,8 +212,17 @@ export function platformScreen(d: PlatformScreenData): string {
             ? '<span class="st warn"><span class="g">!</span>تنتظرك</span>'
             : '<span class="st idle"><span class="g">○</span>لم يُبنَ سائقُها</span>'
 
+  // ── ما يُربَط ولا ينشر: الحقيقةُ كاملةً في صدر الشاشة ─────────────
+  const stageBanner =
+    spec.stage === 'link'
+      ? `<div class="outcome warn"><span class="k">تُربَط ولا تنشر</span><span class="v">
+         دورةُ الإذن مبنيّةٌ لهذه المنصّة: <b>يُحفَظ حسابُك وتُقرأ نطاقاتُه</b>.
+         وسائقُ الرفع لم يُبنَ بعد، <b>فلا تُكتب لها مسوّدةٌ ولا تُجدوَل</b> —
+         والقاعدةُ هي التي تمنع ذلك لا الشاشة.</span></div>`
+      : ''
+
   // ── ما لم يُبنَ: شاشةٌ تقول السببَ لا «قريبا» ──────────────────────
-  if (!spec.built) {
+  if (spec.stage === 'none') {
     return `<div class="page-head">
       <div class="txt">
         <div class="eyebrow"><span class="ln"></span>منصّةٌ لم تُبنَ</div>
@@ -295,7 +304,8 @@ export function platformScreen(d: PlatformScreenData): string {
     </div>
   </div>
 
-  ${tallyRow(d.tally, d.now)}
+  ${stageBanner}
+  ${spec.stage === 'link' ? '' : tallyRow(d.tally, d.now)}
 
   <h3 class="sec">الحساباتُ وما تستطيعه</h3>
   ${accounts.length === 0
@@ -306,8 +316,19 @@ export function platformScreen(d: PlatformScreenData): string {
        <a class="btn g sm" href="/panel#channels">افتح لوح القنوات</a></div>`
     : accountBlocks}
 
-  <h3 class="sec">ما نُشر وما ينتظر</h3>
-  ${d.posts.length === 0 ? emptyPosts : `<div class="posts">${posts}</div>`}
+  ${spec.stage === 'link'
+    ? `<h3 class="sec">ولماذا لا تُكتب لها مسوّدةٌ بعد</h3>
+       <div class="card"><p class="hint">قيدُ <span class="mono">posts.platform</span> في
+         القاعدة يحصر المسوّدات في المنصّات التي لها سائقُ نشر.
+         <b>وهذا مقصود</b>: مسوّدةٌ تُكتب لمنصّةٍ لا تنشر هي وعدٌ يُخلَف عند الجدولة —
+         <b>والقاعدةُ هي التي تمنعه لا الشاشة</b> (D-009).
+         ويُوسَّع القيدُ في ترحيل السائق نفسِه، لا قبله.</p>
+       <div class="outcome"><span class="k">وما جاهز</span><span class="v">
+         المقاطعُ تُولَّد رأسيّةً <span class="mono">9:16</span> بخمسَ عشرةَ ثانية،
+         والنافذةُ الموقّعةُ تعطي المنصّةَ رابطا تسحب منه. <b>فالمادّةُ حاضرة،
+         والباقي سائقُ الرفع.</b></span></div></div>`
+    : `<h3 class="sec">ما نُشر وما ينتظر</h3>
+       ${d.posts.length === 0 ? emptyPosts : `<div class="posts">${posts}</div>`}`}
 
   ${guide === undefined
     ? ''

@@ -1480,20 +1480,38 @@ describe('شاشةُ المنصّة', () => {
   it('وما لم يُبنَ يقول سببَه لا «قريبا»', async () => {
     const cookie = await login()
     const html = await (
-      await app.request('/panel/channels/tiktok', withSession(cookie), env)
+      await app.request('/panel/channels/snapchat', withSession(cookie), env)
     ).text()
     expect(html).toContain('منصّةٌ لم تُبنَ')
     // السببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى
     expect(html).not.toContain('قريبا')
-    expect(html).toContain('رفعا مجزّأً')
+    expect(html).toContain('سائقا يُكتب لها وحدها')
   })
 
   it('ولا زرَّ ربطٍ لما لم يُبنَ — ولو فُتحت شاشتُه', async () => {
     const cookie = await login()
     const html = await (
-      await app.request('/panel/channels/tiktok', withSession(cookie), env)
+      await app.request('/panel/channels/snapchat', withSession(cookie), env)
     ).text()
-    expect(html).not.toContain('/oauth/tiktok/start')
+    expect(html).not.toContain('/oauth/snapchat/start')
+  })
+
+  /**
+   * **المرتبةُ الثالثة تُقال ولا تُخفى** (D-056).
+   *
+   * منصّةٌ تُربَط ولا تنشر: زرُّ ربطها يعمل، **ويجب أن يعرف مالكُها
+   * ذلك قبل أن يربط** لا بعد أوّل جدولةٍ تُردّ.
+   */
+  it('وما يُربَط ولا ينشر يقول الاثنين معا', async () => {
+    const cookie = await login()
+    for (const platform of ['youtube', 'tiktok']) {
+      const html = await (
+        await app.request(`/panel/channels/${platform}`, withSession(cookie), env)
+      ).text()
+      expect(html, platform).toContain('تُربَط ولا تنشر')
+      // ولا يُعرَض حصادُ نشرٍ لمنصّةٍ لا تنشر — أصفارٌ تُقرأ فشلا
+      expect(html, platform).not.toContain('لم يُنشر شيءٌ بعد')
+    }
   })
 
   it('وتقول ما نقص من النطاقات بالاسم ومَن يمنحه', async () => {

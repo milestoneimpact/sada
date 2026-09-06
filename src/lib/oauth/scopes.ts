@@ -109,9 +109,65 @@ const X_SCOPES: readonly ScopeSpec[] = [
   },
 ]
 
+/**
+ * YouTube — عبر Google OAuth.
+ *
+ * **ونطاقُ الرفع حسّاسٌ عند Google**: تطبيقٌ يطلبه يبقى في وضع
+ * `Testing` بمئةِ مستخدمٍ ورمزٍ يسقط كلَّ سبعة أيّام، حتّى تُجاز
+ * المراجعة. **وهذا يُقال قبل الربط لا بعد أسبوع.**
+ */
+const YOUTUBE_SCOPES: readonly ScopeSpec[] = [
+  {
+    name: 'https://www.googleapis.com/auth/youtube.readonly',
+    need: 'identity',
+    grantedBy: 'YouTube Data API v3',
+    where: 'Google Cloud ← APIs & Services ← Library ← فعّل YouTube Data API v3',
+    enables: 'قراءةُ اسم قناتك ومعرّفِها',
+  },
+  {
+    name: 'https://www.googleapis.com/auth/youtube.upload',
+    need: 'publish',
+    grantedBy: 'YouTube Data API v3 — ونطاقٌ حسّاسٌ يحتاج مراجعةَ Google',
+    where: 'OAuth consent screen ← Data access ← Add scopes ← ثمّ Publish app',
+    enables: 'رفعُ المقاطع إلى قناتك',
+  },
+]
+
+/**
+ * TikTok — Content Posting API.
+ *
+ * **وأوّلُ نشرٍ يقع مسوّدةً في التطبيق لا منشورا**، حتّى تُجاز مراجعةُ
+ * المحتوى. وهذا حدُّ المنصّة لا نقصٌ عندنا.
+ */
+const TIKTOK_SCOPES: readonly ScopeSpec[] = [
+  {
+    name: 'user.info.basic',
+    need: 'identity',
+    grantedBy: 'Login Kit',
+    where: 'لوحةُ المطوّرين ← تطبيقك ← Add products ← Login Kit',
+    enables: 'التعرّفُ على حسابك واسمِه',
+  },
+  {
+    name: 'video.upload',
+    need: 'publish',
+    grantedBy: 'Content Posting API',
+    where: 'Add products ← Content Posting API',
+    enables: 'رفعُ المقطع مسوّدةً إلى تطبيق TikTok لتنشره بيدك',
+  },
+  {
+    name: 'video.publish',
+    need: 'media',
+    grantedBy: 'Content Posting API — بعد Audit المحتوى',
+    where: 'Content Posting API ← Direct Post ← اطلب المراجعة',
+    enables: 'النشرُ مباشرةً بلا فتحِ التطبيق — ويحتاج إجازةَ TikTok',
+  },
+]
+
 export const SCOPES: Readonly<Record<Platform, readonly ScopeSpec[]>> = {
   linkedin: LINKEDIN_SCOPES,
   x: X_SCOPES,
+  youtube: YOUTUBE_SCOPES,
+  tiktok: TIKTOK_SCOPES,
 }
 
 /**

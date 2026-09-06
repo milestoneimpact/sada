@@ -16,7 +16,7 @@ export interface StateStore {
 }
 
 export interface OAuthState {
-  readonly platform: 'linkedin' | 'x'
+  readonly platform: 'linkedin' | 'x' | 'youtube' | 'tiktok'
   /** معرف PKCE — موجود لـ X دائما، ولـ LinkedIn أيضا لأن المسار واحد. */
   readonly verifier: string
   readonly redirectUri: string
@@ -83,7 +83,8 @@ function isOAuthState(value: unknown): value is OAuthState {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   return (
-    (v['platform'] === 'linkedin' || v['platform'] === 'x') &&
+    (v['platform'] === 'linkedin' || v['platform'] === 'x' ||
+      v['platform'] === 'youtube' || v['platform'] === 'tiktok') &&
     typeof v['verifier'] === 'string' &&
     typeof v['redirectUri'] === 'string' &&
     typeof v['createdAt'] === 'string' &&
