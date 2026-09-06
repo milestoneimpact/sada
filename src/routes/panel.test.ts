@@ -1290,3 +1290,113 @@ describe('الكتابة من اللوحة', () => {
     expect(row?.status).toBe('draft')
   })
 })
+
+/**
+ * الجدولةُ من اللوحة (D-037).
+ *
+ * الحارسُ مقطوعٌ في `schedule/job.test.ts`؛ وما هنا أنّ الزرّ **يمرّ به**
+ * ولا يلتفّ حوله، وأنّ القرار يُسجَّل بصاحبه.
+ */
+describe('الجدولة من اللوحة', () => {
+  async function seedApproved(platform: 'linkedin' | 'x' = 'linkedin'): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at)
+         VALUES (?, ?, 'text', ?, 'approved', ?, 'panel:token', '2026-09-08T07:00:00Z')`,
+      )
+      .bind(id, platform, 'ن'.repeat(300), `k-${id}`)
+      .run()
+    return id
+  }
+
+  async function seedAccount(platform: 'linkedin' | 'x' = 'linkedin', status = 'active'): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        'INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .bind(id, platform, 'member', id.slice(0, 8), 'عمر', status)
+      .run()
+    return id
+  }
+
+  function future(): string {
+    return new Date(Date.now() + 3600_000).toISOString().slice(0, 16)
+  }
+
+  it('تجدول وتسجّل الموعد في السجلّ', async () => {
+    const post = await seedApproved()
+    const account = await seedAccount()
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('id', post)
+    body.set('account', account)
+    body.set('when', future())
+    await app.request('/panel/drafts/schedule', withSession(cookie, { method: 'POST', body }), env)
+
+    const row = await db
+      .prepare('SELECT status, account_id, scheduled_at, dispatched_at FROM posts WHERE id = ?')
+      .bind(post)
+      .first<Record<string, unknown>>()
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['account_id']).toBe(account)
+    expect(row?.['dispatched_at']).toBeNull()
+
+    const audit = await db
+      .prepare("SELECT detail FROM audit_log WHERE action = 'draft.schedule'")
+      .all<{ detail: string }>()
+    expect(audit.results).toHaveLength(1)
+  })
+
+  it('حسابٌ من منصّةٍ أخرى يُردّ — والزرُّ ليس طريقا حول الحارس', async () => {
+    const post = await seedApproved('x')
+    const account = await seedAccount('linkedin')
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('id', post)
+    body.set('account', account)
+    body.set('when', future())
+    await app.request('/panel/drafts/schedule', withSession(cookie, { method: 'POST', body }), env)
+
+    expect(
+      (await db.prepare('SELECT status FROM posts WHERE id = ?').bind(post).first<{ status: string }>())
+        ?.status,
+    ).toBe('approved')
+  })
+
+  it('الجدولةُ بلا رمز CSRF تُردّ ولا تغيّر حالا', async () => {
+    const post = await seedApproved()
+    const account = await seedAccount()
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('id', post)
+    body.set('account', account)
+    body.set('when', future())
+    const response = await app.request(
+      '/panel/drafts/schedule',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(403)
+  })
+
+  it('لا نموذجَ جدولةٍ حيث لا قناة — بل جملةٌ تقول لماذا', async () => {
+    await seedApproved()
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('لا قناةَ LinkedIn مربوطة')
+    expect(html).not.toContain('action="/panel/drafts/schedule"')
+  })
+
+  it('وقناةٌ إذنُها منتهٍ ليست وجهة — فلا تُعرض في القائمة', async () => {
+    await seedApproved()
+    await seedAccount('linkedin', 'needs_reauth')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('لا قناةَ LinkedIn مربوطة')
+  })
+})

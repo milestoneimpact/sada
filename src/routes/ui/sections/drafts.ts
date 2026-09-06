@@ -20,7 +20,7 @@
  * ينشر أسوأ من غيابه.**
  */
 import type { DraftRow } from '../../../lib/draft/store'
-import { PLATFORMS } from '../../../lib/draft/prompt'
+import { PLATFORMS, type Platform } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
 import { relativeTime } from '../../../lib/format'
 
@@ -34,7 +34,7 @@ const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string
   approved: { cls: 'ok', glyph: '●', text: 'معتمَدة' },
   edited: { cls: 'ok', glyph: '●', text: 'معتمَدة بعد تعديل' },
   rejected: { cls: 'bad', glyph: '✕', text: 'مرفوضة' },
-  queued: { cls: 'warn', glyph: '↑', text: 'في الطابور' },
+  queued: { cls: 'warn', glyph: '◔', text: 'مجدولة' },
   published: { cls: 'ok', glyph: '✓', text: 'نُشرت' },
   failed: { cls: 'bad', glyph: '▲', text: 'فشل النشر' },
 }
@@ -48,10 +48,76 @@ const LINES: Readonly<Record<string, number>> = { linkedin: 12, x: 6 }
 const LINE = 26
 const PAD = 28
 
-function card(d: DraftRow, now: Date): string {
+/**
+ * شريطُ الجدولة — ولا يظهر إلّا حيث يعمل.
+ *
+ * ثلاثةُ أحوالٍ لا حالان: معتمَدٌ بلا قناةٍ لمنصّته **يقول لماذا** ولا
+ * يعرض نموذجا معطَّلا؛ ومعتمَدٌ بقناةٍ يعرض وجهةً وموعدا؛ ومجدولٌ يعرض
+ * موعده — وزرَّ سحبٍ ما دام لم يغادر.
+ *
+ * ونموذجٌ معطَّلٌ بلا تفسير أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا
+ * في نقص قناته.
+ */
+function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, now: Date): string {
+  const approved = d.status === 'approved' || d.status === 'edited'
+
+  if (d.status === 'queued') {
+    const when = d.scheduledAt === null ? '' : d.scheduledAt.replace(' ', ' · ')
+    const gone = d.dispatchedAt !== null
+    return `<div class="sched ${gone ? 'gone' : 'set'}">
+      <span class="st ${gone ? 'warn' : 'ok'}"><span class="g">${gone ? '↑' : '◔'}</span>${
+        gone ? 'غادرت إلى الطابور' : 'مجدولة'}</span>
+      <span class="when mono">${escapeHtml(when)} UTC</span>
+      ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
+      <span class="grow"></span>
+      ${gone
+        ? '<span class="ago">ولا تُستردّ من هناك</span>'
+        : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
+             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…">
+             <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+             <button class="g sm" type="submit">اسحب الموعد</button></form>`}
+    </div>`
+  }
+
+  if (!approved) return ''
+
+  const fit = targets.filter((t) => t.platform === d.platform)
+  if (fit.length === 0) {
+    return `<div class="sched none">
+      <span class="st warn"><span class="g">!</span>لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة</span>
+      <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
+      <span class="grow"></span>
+      <a class="btn g sm" href="#channels">اربط قناة</a>
+    </div>`
+  }
+
+  const id = d.id.slice(0, 8)
+  return `<form class="sched" method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+    <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+    <div class="field"><label for="ac-${id}">الوجهة</label>
+      <select id="ac-${id}" name="account">${fit
+        .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
+        .join('')}</select></div>
+    <div class="field"><label for="wh-${id}">الموعد (UTC)</label>
+      <input id="wh-${id}" name="when" type="datetime-local"
+        min="${escapeHtml(earliest)}" required></div>
+    <span class="grow"></span>
+    <button class="p sm" type="submit">جدوِل</button>
+  </form>`
+}
+
+function card(d: DraftRow, now: Date, targets: readonly Target[], earliest: string): string {
   const spec = PLATFORMS[d.platform]
-  const st = STATUS[d.status] ?? STATUS['draft']!
+  // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
+  // شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا
+  const st =
+    d.status === 'queued' && d.dispatchedAt !== null
+      ? { cls: 'warn', glyph: '↑', text: 'في الطريق' }
+      : (STATUS[d.status] ?? STATUS['draft']!)
   const open = d.status === 'draft'
+  // بطاقةٌ فيها فعلٌ باقٍ ليست منتهية: المعتمَدُ ينتظر موعدا، والمجدولُ
+  // ينتظر ساعته — والرماديُّ للمرفوض والمنشور وحدهما
+  const live = open || d.status === 'approved' || d.status === 'edited' || d.status === 'queued'
   const len = d.text.length
   // متغيّرٌ لا خاصّيّة: ارتفاعٌ مكتوبٌ في `style` لا تغلبه استفسارةُ وسط،
   // فيبقى الجوّالُ — حيث يلتفّ النصّ أضعافا — بمربّعٍ مقاسِ الشاشة العريضة
@@ -91,7 +157,7 @@ function card(d: DraftRow, now: Date): string {
                d.approvedBy,
              )}</span>`}</div>`
 
-  return `<div class="draft${open ? '' : ' done'}">
+  return `<div class="draft${live ? '' : ' done'}">
     <div class="draft-top">
       <div class="ch-logo sm">${MARK[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}
@@ -101,12 +167,24 @@ function card(d: DraftRow, now: Date): string {
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
+    ${scheduler(d, targets, earliest, now)}
     <div class="draft-meta">${meta}</div>
   </div>`
 }
 
+/** حسابٌ مربوطٌ يصلح وجهةً — والقائمةُ تُبنى من القنوات لا من ثابت. */
+export interface Target {
+  readonly id: string
+  readonly platform: Platform
+  readonly label: string
+}
+
 export interface DraftsInput {
   readonly drafts: readonly DraftRow[]
+  /** الوجهاتُ الحيّة: مربوطةٌ وإذنُها قائم. */
+  readonly targets: readonly Target[]
+  /** «الآن» بصيغة نموذج datetime-local — أدنى موعدٍ يُقبل. */
+  readonly earliest: string
   /** مصادرُ محلَّلةٌ يمكن أن تُكتب منها — بلا خلاصةٍ لا مادّة. */
   readonly writable: readonly { id: string; name: string }[]
   readonly now: Date
@@ -146,7 +224,9 @@ export function draftsSection(input: DraftsInput): string {
     drafts.length === 0
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
-      : `<div class="grid c2 ragged">${drafts.map((d) => card(d, now)).join('')}</div>`
+      : `<div class="grid c2 ragged">${drafts
+          .map((d) => card(d, now, input.targets, input.earliest))
+          .join('')}</div>`
 
   return `<div class="card" style="margin-bottom:14px">
     <div class="card-head"><h2>الكتابة من مصدر</h2>

@@ -61,15 +61,28 @@ function env(count: number): Record<string, unknown> {
         sent.push(...messages)
       },
     },
+    // طابورُ النشر: يُلتقَط منه ما أُرسل، فيُقطَع أنّ الموزّع أرسل فعلا
+    PUBLISH_QUEUE: {
+      async sendBatch(messages: { body: { postId: string } }[]) {
+        for (const m of messages) published.push(m.body.postId)
+      },
+    },
   }
 }
 
-/** `scheduled` يستعمل `fetch` العامّ، فيُبدَّل حول النداء وحده. */
-async function runCron(count: number): Promise<void> {
+let published: string[] = []
+
+/**
+ * `scheduled` يستعمل `fetch` العامّ، فيُبدَّل حول النداء وحده.
+ *
+ * والجدولُ يُمرَّر كما يمرّره Cloudflare: الموزّع يفرّق بالجدول، ونداءٌ
+ * بمتحكّمٍ فارغ يختبر فرعا لا يقع في الإنتاج.
+ */
+async function runCron(count: number, cron = '0 3 * * *'): Promise<void> {
   const real = globalThis.fetch
   globalThis.fetch = drive(count)
   try {
-    await worker.scheduled({} as ScheduledController, env(count) as never)
+    await worker.scheduled({ cron } as ScheduledController, env(count) as never)
   } finally {
     globalThis.fetch = real
   }
@@ -78,6 +91,7 @@ async function runCron(count: number): Promise<void> {
 beforeEach(() => {
   db = fakeDb()
   sent = []
+  published = []
 })
 
 describe('المسح اليوميّ', () => {
@@ -160,5 +174,59 @@ describe('الإدراج الآليّ — والحدّ يُقصّ قبل الإ�
     await writeSetting(db, 'paused', 'true', 'test')
     await runCron(3)
     expect(sent).toHaveLength(0)
+  })
+})
+
+/**
+ * موزّعُ الدورات (D-037).
+ *
+ * ما يُختبَر هنا ليس أنّ الإرسال يعمل — ذاك مقطوعٌ في `schedule/job.test.ts`
+ * — بل **أنّه لا يتوقّف حين يتبدّل جدولٌ في `wrangler.toml`**. وهو أخطر
+ * ما في الموزّع: نشرٌ يسقط بلا صوت، ووعدٌ للمالك بموعدٍ لا يجيء.
+ */
+describe('موزّعُ الدورات', () => {
+  async function seedDue(): Promise<string> {
+    const account = crypto.randomUUID()
+    await db
+      .prepare(
+        "INSERT INTO accounts (id, platform, kind, external_id, display_name) VALUES (?, 'linkedin', 'member', 'x1', 'عمر')",
+      )
+      .bind(account)
+      .run()
+    const post = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, account_id, type, text, status, scheduled_at,
+                            idempotency_key, approved_by, approved_at)
+         VALUES (?, 'linkedin', ?, 'text', 'نصّ المنشور', 'queued', '2020-01-01 00:00:00', ?, 'omar', '2020-01-01 00:00:00')`,
+      )
+      .bind(post, account, `k-${post}`)
+      .run()
+    return post
+  }
+
+  it('يرسل المستحقّ على جدول المسح — فالدورتان تلتقيان ولا تتعطّلان', async () => {
+    const post = await seedDue()
+    await runCron(0, '0 3 * * *')
+    expect(published).toEqual([post])
+  })
+
+  it('يرسله على دورة الربع أيضا', async () => {
+    const post = await seedDue()
+    await runCron(0, '*/15 * * * *')
+    expect(published).toEqual([post])
+  })
+
+  it('**وعلى جدولٍ لا يعرفه** — تغييرٌ في wrangler.toml لا يوقف النشر صامتا', async () => {
+    const post = await seedDue()
+    await runCron(0, '*/7 * * * *')
+    expect(published).toEqual([post])
+  })
+
+  it('ولا يرسله مرّتين حين تلتقي الدورتان في الثالثة فجرا', async () => {
+    await seedDue()
+    await runCron(0, '0 3 * * *')
+    await runCron(0, '*/15 * * * *')
+    expect(published).toHaveLength(1)
   })
 })

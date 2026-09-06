@@ -13,7 +13,7 @@
 import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import { channelsSection } from './ui/channels'
-import { draftsSection } from './ui/sections/drafts'
+import { draftsSection, type Target } from './ui/sections/drafts'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
@@ -390,6 +390,8 @@ export interface PanelData {
   }[]
   readonly knownProviders: { name: string; label: string }[]
   readonly drafts: readonly DraftRow[]
+  /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
+  readonly targets: readonly Target[]
   /** المصادرُ التي لها خلاصة — وحدها تُكتب منها مسوّدة. */
   readonly writableSources: readonly { id: string; name: string }[]
   /** أمزوّدُ مهمّة `draft` مضبوطٌ ومفعَّل؟ */
@@ -806,6 +808,10 @@ ${flash}
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
+    targets: d.targets,
+    // أدنى موعدٍ يقبله المتصفّح: ربعُ ساعةٍ من الآن. ودورةُ الإرسال تدور
+    // كلَّ ربع، فموعدٌ أقرب من ذلك يعد بدقّةٍ لا نملكها
+    earliest: new Date(d.now.getTime() + 15 * 60_000).toISOString().slice(0, 16),
     now: d.now,
     ready: d.draftReady,
   })}

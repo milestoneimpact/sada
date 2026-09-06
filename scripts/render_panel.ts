@@ -117,6 +117,7 @@ const data: PanelData = {
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
       stale: false, approvedBy: null, approvedAt: null,
       createdAt: ago(0.4),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
     },
     {
       id: 'd2', platform: 'x',
@@ -127,6 +128,7 @@ const data: PanelData = {
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
       stale: true, approvedBy: null, approvedAt: null,
       createdAt: ago(0.9),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
     },
     {
       id: 'd3', platform: 'linkedin',
@@ -137,6 +139,7 @@ const data: PanelData = {
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(22),
       createdAt: ago(26),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
     },
     {
       id: 'd4', platform: 'x',
@@ -147,7 +150,38 @@ const data: PanelData = {
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:token', approvedAt: null,
       createdAt: ago(30),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
     },
+    {
+      id: 'd5', platform: 'linkedin',
+      text:
+        'ما يُقاس شهريّا يُصحَّح في حينه. وما يُقاس سنويّا يُوثَّق بعد فوات أوانه.\n\nوالفرقُ بينهما ليس في الدقّة — كلاهما دقيق — بل في أنّ أحدهما يغيّر القرار والآخر يشرحه بعد وقوعه.\n\nاختر أيّهما تبني عليه، واعلم أنّك اخترت.',
+      rationale: 'أقصرُ صياغةٍ للفكرة، وأقربُها إلى قرارٍ يُتّخذ.',
+      status: 'queued', model: 'claude-opus-5', cost: 0.0355,
+      sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
+      stale: false, approvedBy: 'panel:passkey', approvedAt: ago(4),
+      createdAt: ago(5),
+      scheduledAt: '2026-09-08 09:00:00',
+      accountName: 'بصائر للاستشارات',
+      dispatchedAt: null,
+    },
+    {
+      id: 'd6', platform: 'x',
+      text:
+        'البرنامجُ بلا صاحبٍ لا يفشل — يذبل. والذبولُ يُموَّل سنةً أخرى لأنّ أحدا لم يعلنه.',
+      rationale: 'جملةٌ تقف وحدها.',
+      status: 'queued', model: 'claude-opus-5', cost: 0.0097,
+      sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
+      stale: false, approvedBy: 'panel:passkey', approvedAt: ago(9),
+      createdAt: ago(10),
+      scheduledAt: '2026-09-05 17:45:00',
+      accountName: '@omar_ah',
+      dispatchedAt: ago(0.2),
+    },
+  ],
+  targets: [
+    { id: 'a1', platform: 'linkedin', label: 'عمر عبدالحميد · LinkedIn' },
+    { id: 'a2', platform: 'linkedin', label: 'بصائر للاستشارات · LinkedIn' },
   ],
   writableSources: [
     { id: 's1', name: 'تقرير الأثر السنويّ 2026.docx' },

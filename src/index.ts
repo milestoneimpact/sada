@@ -16,6 +16,7 @@ import { spendByProvider } from './lib/ai/spend'
 import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
+import { dispatchDue } from './lib/schedule/job'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { auth } from './routes/auth'
@@ -369,13 +370,37 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
 }
 
 /**
+ * دورةُ الربع: ترسل ما حلّ موعدُه إلى طابور النشر.
+ *
+ * رخيصةٌ حين لا شيء يستحقّ: استعلامٌ واحدٌ على فهرس `idx_posts_due` ثمّ
+ * خروج. ولذلك تدور كلَّ ربع ساعة بلا حرج — والبديلُ دورةٌ يوميّةٌ تجعل
+ * «في موعده» تعني «في مكانٍ ما من اليوم التالي».
+ */
+async function dispatchTick(env: Env): Promise<void> {
+  try {
+    const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
+    if (report.kind === 'sent') {
+      console.info({ job: 'dispatch', sent: report.count, ids: report.ids })
+    } else if (report.kind === 'blocked') {
+      console.info({ job: 'dispatch', skipped: report.reason })
+    }
+    // `none` لا يُسجَّل: سطرٌ كلَّ ربع ساعة يغرق السجلّ فيما لا يُقرأ
+  } catch (error) {
+    console.error({
+      job: 'dispatch',
+      failed: error instanceof Error ? error.message : 'unexpected_error',
+    })
+  }
+}
+
+/**
  * Cron اليومي: يمسح Drive ويوفّقه مع `sources`.
  *
  * لا يحلل ولا ينادي Claude — المسح رخيص، والتحليل يقع على ما تغيّر وحده
  * في خطوة تالية. وفشل المسح يُسجَّل ولا يُرمى: Cron لا يعيد المحاولة،
  * ورمي الخطأ يضيّع السجل بلا فائدة.
  */
-async function scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+async function scanTick(env: Env): Promise<void> {
   try {
     // الإيقاف يوقف المسح أيضا: المسح لا يكلّف مالا، لكن «موقوف مؤقتا»
     // تعني موقوفا — ونظامٌ يواصل عملا وقد أُوقف يُفقِد المفتاح معناه
@@ -446,6 +471,29 @@ async function queue(
   }
   console.error({ job: 'queue', unknown: batch.queue, messages: batch.messages.length })
   for (const message of batch.messages) message.ack()
+}
+
+/** جدولُ المسح — يُعرَّف هنا وفي `wrangler.toml`، ويُقارَن نصّا. */
+const SCAN_CRON = '0 3 * * *'
+
+/**
+ * موزّعُ الدورات — **والإرسالُ يقع في كلّ دورة، لا في دورةٍ نعرفها.**
+ *
+ * Cloudflare يسلّم كلّ الجداول إلى دالّة واحدة ويعطي جدولَ الدورة في
+ * `controller.cron`. والقسمةُ الساذجة — «هذا الجدول للمسح وذاك للإرسال»
+ * — تجعل **تغييرا في `wrangler.toml` نُسي هنا يوقف النشر صامتا**:
+ * منشوراتٌ اعتمدها المالك ووُعد بمواعيدها لا تخرج، ولا شيء يشتكي.
+ *
+ * فالإرسالُ يقع دائما — استعلامٌ واحدٌ على فهرس، وثمنُه لا يُذكر — والمسحُ
+ * وحده هو الذي يحتاج أن يُعرَف جدولُه. وأسوأُ ما يفعله جدولٌ مجهول عندئذٍ
+ * تأجيلُ مسحٍ للمالك زرٌّ يشغّله بيده، لا نشرٌ يسقط بلا صوت.
+ *
+ * وفي الثالثة فجرا يلتقي الجدولان فيدور الإرسال مرّتين — **وذاك لا يضرّ**:
+ * `dispatched_at` يجعل الثانية تجد الطابور فارغا (D-037).
+ */
+async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  await dispatchTick(env)
+  if (controller.cron === SCAN_CRON) await scanTick(env)
 }
 
 export default { fetch: app.fetch, queue, scheduled }
