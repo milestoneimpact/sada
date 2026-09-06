@@ -170,7 +170,9 @@ export function exchangeCode(
       grant_type: 'authorization_code',
       code: params.code,
       redirect_uri: params.redirectUri,
-      code_verifier: params.verifier,
+      // **ولا يُرسَل إلّا لمن أُرسل إليه `code_challenge`** (D-075):
+      // مُثبِتٌ لتحدٍّ لم يُطلَب ليس إثباتا
+      ...(provider.pkce ? { code_verifier: params.verifier } : {}),
     }),
     now,
     fetchImpl,
