@@ -962,9 +962,14 @@ panel.post('/panel/media/generate', async (c) => {
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }
-        : outcome.kind === 'blocked'
-          ? { kind: 'warn', text: outcome.reason }
-          : { kind: 'bad', text: `تعذّر التوليد: ${outcome.reason}` }
+        : outcome.kind === 'in_progress'
+          ? {
+              kind: 'warn',
+              text: `توليدٌ جارٍ لهذه الصورة منذ ${outcome.since} — انتظره ولا تنقر ثانيةً.`,
+            }
+          : outcome.kind === 'blocked'
+            ? { kind: 'warn', text: outcome.reason }
+            : { kind: 'bad', text: `تعذّر التوليد: ${outcome.reason}` }
 
   await record(
     c.env.DB,
@@ -1007,9 +1012,16 @@ panel.post('/panel/media/animate', async (c) => {
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'لهذا المنشور مقطعٌ من قبل — لم يُنفَق شيء.' }
-        : outcome.kind === 'blocked'
-          ? { kind: 'warn', text: outcome.reason }
-          : { kind: 'bad', text: `تعذّر التحريك: ${outcome.reason}` }
+        : outcome.kind === 'in_progress'
+          // **وليس عطلا**: نداءٌ سابقٌ لم يفرغ بعد، والتوليدُ دقائق
+          ? {
+              kind: 'warn',
+              text: `توليدٌ جارٍ لهذا المقطع منذ ${outcome.since} — ` +
+                'انتظره ولا تنقر ثانيةً، فالنقرةُ الثانيةُ كانت تدفع ثانيةً.',
+            }
+          : outcome.kind === 'blocked'
+            ? { kind: 'warn', text: outcome.reason }
+            : { kind: 'bad', text: `تعذّر التحريك: ${outcome.reason}` }
 
   await record(
     c.env.DB,

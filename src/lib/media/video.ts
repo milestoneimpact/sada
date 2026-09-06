@@ -24,6 +24,7 @@
  * تبقى يتيمةً ولا تضرّ.
  */
 import { recordCost } from '../cost'
+import { claimGeneration, releaseClaim } from './claim'
 import { blockerReason, checkAllowance } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
 import {
@@ -41,6 +42,13 @@ export type VideoOutcome =
   | { readonly kind: 'already'; readonly mediaId: string }
   /** حرسٌ منع النداء قبل أن يقع: إيقافٌ أو سقف. */
   | { readonly kind: 'blocked'; readonly reason: string }
+  /**
+   * نداءٌ لهذا المقطع جارٍ الآن — **وليس فشلا ولا سقفا**.
+   *
+   * التوليدُ دقائق، وصفُّ `media` لا يظهر قبل آخرها. فنقرةٌ ثانيةٌ في
+   * تلك الدقائق كانت تبدأ توليدا ثانيا **وتدفع ثمنَه** (D-068).
+   */
+  | { readonly kind: 'in_progress'; readonly since: string }
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean }
 
 /**
@@ -83,6 +91,32 @@ interface ImageRow {
 }
 
 /**
+ * الوصفُ حين لا يُمرَّر.
+ *
+ * **ومُصدَّرٌ لأنّه يدخل المفتاح**: `videoKey` تشتقّ منه، فنسخةٌ ثانيةٌ
+ * منه في اختبارٍ أو مسارٍ تعطي مفتاحا آخر — وحجزا لا يلتقي بحجز.
+ */
+export const DEFAULT_PROMPT = 'حركةٌ هادئةٌ للكاميرا نحو المشهد، بإضاءةٍ ناعمةٍ ثابتة'
+
+/**
+ * مفتاحُ عدم التكرار للمقطع.
+ *
+ * كان مفتاحُ R2 نفسَه — `video/{post}/{uuid}` — **وهو فريدٌ لكلّ نداء**،
+ * فالقيدُ `UNIQUE` على العمود لا يقع أبدا ولا يمنع شيئا.
+ *
+ * فصار يُشتقُّ من المنشور والوصف كما في الصور (`imageKey`): نداءان
+ * بالوصف نفسِه مفتاحُهما واحد، **ووصفٌ جديدٌ يستحقّ مقطعا جديدا**.
+ */
+export async function videoKey(postId: string, prompt: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(prompt.trim()))
+  const hex = [...new Uint8Array(digest)]
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+  return `video:${postId}:${hex}`
+}
+
+/**
  * يحرّك صورةَ منشورٍ معتمَدةً.
  *
  * ولا يُحرَّك ما لم يُعتمَد من الصور: **المرفوضةُ حُكم عليها**، وتحريكُها
@@ -91,7 +125,7 @@ interface ImageRow {
 export async function animateForPost(
   deps: VideoDeps,
   postId: string,
-  prompt = 'حركةٌ هادئةٌ للكاميرا نحو المشهد، بإضاءةٍ ناعمةٍ ثابتة',
+  prompt = DEFAULT_PROMPT,
 ): Promise<VideoOutcome> {
   const now = (deps.now ?? (() => new Date()))()
 
@@ -135,7 +169,21 @@ export async function animateForPost(
   const token = await signMediaToken(deps.encKey, image.id, now)
   const imageUrl = mediaUrl(deps.baseUrl, token)
 
-  // ٥ — الكلفةُ تُسجَّل قبل أن يُعدّ النداءُ ناجحا (D-008).
+  /*
+   * ٥ — الحجزُ قبل أوّل إنفاق (D-068).
+   *
+   * **والقراءةُ في ٢ لا تكفي**: صفُّ `media` لا يوجد إلّا بعد دقائق —
+   * التوليدُ ثمّ السحبُ ثمّ الرفع — فكلُّ نقرةٍ في تلك الدقائق تجد
+   * «لا مقطع» وتبدأ توليدا يُدفَع ثمنُه.
+   *
+   * **وهنا لا فوق**: حجزٌ قبل حارسٍ يمنع يُقفل البابَ ثلاثين دقيقةً
+   * على منشورٍ لم يُنفَق عليه شيءٌ أصلا.
+   */
+  const key = await videoKey(postId, prompt)
+  const held = await claimGeneration(deps.db, key, postId, 'video', now)
+  if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+
+  // ٦ — الكلفةُ تُسجَّل قبل أن يُعدّ النداءُ ناجحا (D-008).
   //
   // **ولا يُخترَع سعر.** سعرُ الفيديو عند Cloudflare يُقرأ من لوحة
   // الحساب ولم يُقرأ بعد، فيُسجَّل صفرٌ **موسومٌ** — ودفترٌ فيه صفرٌ
@@ -155,6 +203,8 @@ export async function animateForPost(
     })
     url = out.url
   } catch (error) {
+    // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة**
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'تعذّر التوليد',
@@ -162,7 +212,7 @@ export async function animateForPost(
     }
   }
 
-  // ٦ — البايتاتُ تُسحَب فورا: الرابطُ عند المزوّد لا عندنا
+  // ٧ — البايتاتُ تُسحَب فورا: الرابطُ عند المزوّد لا عندنا
   let bytes: Uint8Array
   let mime: string
   try {
@@ -170,6 +220,7 @@ export async function animateForPost(
     bytes = pulled.bytes
     mime = pulled.mime
   } catch (error) {
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'تعذّر السحب',
@@ -177,12 +228,16 @@ export async function animateForPost(
     }
   }
 
-  // ٧ — R2 قبل الصفّ: صفٌّ بلا بايتات يكذب، وبايتاتٌ بلا صفٍّ تيتم
+  // ٨ — R2 قبل الصفّ: صفٌّ بلا بايتات يكذب، وبايتاتٌ بلا صفٍّ تيتم
+  //
+  // **ومفتاحُ R2 ليس مفتاحَ عدم التكرار**: كان الواحدُ يؤدّي الدورين،
+  // وفيه `uuid` — فعمودٌ `UNIQUE` لا يمنع شيئا (D-068)
   const mediaId = crypto.randomUUID()
-  const key = `video/${postId}/${mediaId}.mp4`
+  const r2Key = `video/${postId}/${mediaId}.mp4`
   try {
-    await deps.bucket.put(key, bytes)
+    await deps.bucket.put(r2Key, bytes)
   } catch (error) {
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: `تعذّر حفظُ البايتات: ${error instanceof Error ? error.message : 'عطل'}`,
@@ -196,7 +251,7 @@ export async function animateForPost(
                           status, idempotency_key)
        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'ready', ?)`,
     )
-    .bind(mediaId, postId, key, mime, bytes.length, prompt, VIDEO_MODELS.fromImage, key)
+    .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, VIDEO_MODELS.fromImage, key)
     .run()
 
   return { kind: 'generated', mediaId, bytes: bytes.length }

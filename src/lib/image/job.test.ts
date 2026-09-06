@@ -14,6 +14,7 @@ import { fakeDb, type FakeDb } from '../../test/fakes'
 import { generateForPost, imageKey, mediaFor, rejectMedia, type Bucket, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
 import { writeSetting } from '../settings'
+import { claimGeneration } from '../media/claim'
 
 let db: FakeDb
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
@@ -233,6 +234,38 @@ describe('لا توليدَ مرّتين', () => {
   it('ونصٌّ عدّله المالك يعطي مفتاحا جديدا', async () => {
     const post = await seedPost()
     expect(await imageKey(post, 'نصّ')).not.toBe(await imageKey(post, 'نصّ آخر'))
+  })
+
+  /**
+   * **والقيدُ `UNIQUE` يقع متأخّرا (D-068).**
+   *
+   * الفحصُ فوقُ يقرأ صفّا لا يوجد قبل انتهاء النداء. فطلبان متزامنان
+   * يقرآن «لا» كلاهما **ويدفعان كلاهما**، ثمّ يُردّ أحدُهما عند الكتابة
+   * — والقيدُ منع الصفَّ المكرّر **بعد** أن وقع الدفعُ المكرّر.
+   */
+  it('ونداءٌ جارٍ يمنع الثانيَ قبل أن يُنفِق', async () => {
+    const post = await seedPost()
+    const row = db.raw.prepare('SELECT text FROM posts WHERE id = ?').get(post) as { text: string }
+    const key = await imageKey(post, row.text)
+    await claimGeneration(db, key, post, 'image', new Date('2026-09-08T09:00:00.000Z'))
+
+    const out = await generateForPost(
+      { ...deps(net()), now: () => new Date('2026-09-08T09:01:00.000Z') },
+      post,
+    )
+    expect(out.kind).toBe('in_progress')
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  /** **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة عشرَ دقائق.** */
+  it('وفشلُ النداء يحرّر حجزَه فتُقبل الإعادة', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net({ status: 500 })), post)
+    expect(first.kind).toBe('failed')
+
+    const second = await generateForPost(deps(net()), post)
+    expect(second.kind).toBe('generated')
   })
 })
 

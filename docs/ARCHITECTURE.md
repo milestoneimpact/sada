@@ -64,6 +64,7 @@
 | `metrics` | `post_id` · `window` (24h/72h/7d) · `impressions` · `reactions` · `comments` · `shares` · `clicks` · `pulled_at` | |
 | `promotion_suggestions` | `post_id` · `suggested_budget` · `reason` · `human_decision` · `decided_at` | يقيس التطابق (D-006) |
 | `cost_ledger` | `id` · `provider` · `operation` · `units` · `unit_cost` · `total` · `ref_id` · `at` | X · Claude · Gemini (D-008) |
+| `media_claims` | `idempotency_key` · `post_id` · `kind` · `claimed_at` | **حجزٌ يسبق الإنفاق** — القيدُ الفريدُ على `media` يقع بعد الدفع (D-068) |
 
 ## ٤. عقد المنشور (ما يُخرجه Claude وتقرأه اللوحة والناشر)
 
