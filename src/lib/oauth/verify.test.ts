@@ -70,8 +70,16 @@ describe('ما قِيس من LinkedIn', () => {
    */
   it('وجوابُ مسارِ الرمز لا يُقرأ حكما على الزوج', async () => {
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.codeFirst).fetch)
-    // لا `bad_secret` ولا `bad_client_id` — فهو لا يتكلّم عن الزوج أصلا
-    expect(out.kind).toBe('accepted')
+    /*
+     * **واسمُ هذا الاختبار كان أصدقَ من توكيده** (D-076).
+     *
+     * يقول «لا يُقرأ حكما»، وكان يوكّد `accepted` — **وهو حكمٌ**، بل
+     * أخطرُ الأحكام: خُضرةٌ تصرف المالكَ عن موضع العطب. فصار «لا
+     * يُعرَف» كما يقول اسمُه.
+     */
+    expect(out.kind).toBe('inconclusive')
+    if (out.kind !== 'inconclusive') return
+    expect(out.detail).toContain('invalid_request')
   })
 })
 
