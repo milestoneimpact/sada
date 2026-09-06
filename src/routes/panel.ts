@@ -28,6 +28,7 @@ import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
+import { animateForPost } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { appStatuses, deleteApp, saveApp } from '../lib/oauth/apps'
 import { schedulePost, unschedule } from '../lib/schedule/job'
@@ -856,6 +857,51 @@ panel.post('/panel/media/generate', async (c) => {
   await record(
     c.env.DB,
     { actor: 'panel', action: 'media.generate', target: id, detail: outcome.kind },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * تحريكُ الصورة إلى مقطعٍ رأسيّ (D-052).
+ *
+ * **ولا يُنادى إلّا على صورةٍ معتمَدة**: الفيديو أغلى ما يُنادى في
+ * النظام، وتحريكُ ما رُفض إنفاقٌ على ما لن يُنشَر. والحارسُ في الدالّة
+ * لا هنا — فمسارٌ ثانٍ ينسخه ينسى شرطا (D-019).
+ */
+panel.post('/panel/media/animate', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+
+  const outcome = await animateForPost(
+    {
+      db: c.env.DB,
+      bucket: c.env.MEDIA,
+      ai: c.env.AI,
+      encKey: c.env.TOKEN_ENC_KEY,
+      baseUrl: c.env.PUBLIC_BASE_URL,
+    },
+    id,
+  )
+
+  const flash: PanelFlash =
+    outcome.kind === 'generated'
+      ? {
+          kind: 'ok',
+          text: `وُلّد مقطعٌ رأسيّ — ${Math.round(outcome.bytes / 1024)}KB. ` +
+            'والسعرُ لم يُقرأ من لوحة Cloudflare بعد، فسُجّل صفرا موسوما.',
+        }
+      : outcome.kind === 'already'
+        ? { kind: 'ok', text: 'لهذا المنشور مقطعٌ من قبل — لم يُنفَق شيء.' }
+        : outcome.kind === 'blocked'
+          ? { kind: 'warn', text: outcome.reason }
+          : { kind: 'bad', text: `تعذّر التحريك: ${outcome.reason}` }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'media.animate', target: id, detail: outcome.kind },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
