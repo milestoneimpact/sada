@@ -88,13 +88,25 @@ export function wizardFor(view: ChannelView, app: AppStatus | undefined): Wizard
    */
   const callback: StepState = linked ? 'done' : 'unknowable'
 
+  /**
+   * **وفحصٌ لم يُحسَم ليس فحصا لم يقع** (D-076).
+   *
+   * الفحصُ يسأل بمنحة `client_credentials`، وقد تردّ المنصّةُ بما
+   * لا يتكلّم عن الزوج أصلا. **وكان ذلك يُقرأ جوازا** فتخضرّ الخطوةُ
+   * على زوجٍ ترفضه المنصّةُ في منحة الرمز — وهو ما وقع حرفا.
+   *
+   * فصار «لا يُعرَف»: لا خُضرةٌ تكذب، ولا «لم يُفحَص» تكذب أيضا.
+   */
+  const probed = kind !== null
   const secrets: StepState = rejected
     ? 'failed'
     : verified || linked
       ? 'done'
-      : hasSecrets
-        ? 'now'
-        : 'waiting'
+      : probed
+        ? 'unknowable'
+        : hasSecrets
+          ? 'now'
+          : 'waiting'
 
   const connect: StepState = linked
     ? 'done'
@@ -138,9 +150,12 @@ export function wizardFor(view: ChannelView, app: AppStatus | undefined): Wizard
             ? app?.verifiedAt === null || app?.verifiedAt === undefined
               ? 'ثبت بنجاح الربط.'
               : 'ثبت: المنصّةُ قبلت الزوج.'
-            : secrets === 'now'
-              ? 'محفوظٌ ولم يُفحَص. **واضغط «افحص الزوج»** — يجيب في ثانيةٍ بلا دورةِ إذن.'
-              : 'تنتظر الخطوةَ ١.',
+            : secrets === 'unknowable'
+              ? 'فُحص **فلم يُحسَم**: ردّت المنصّةُ بما لا يتكلّم عن الزوج. ' +
+                'والبرهانُ الوحيدُ نجاحُ الربط — والإشعارُ يحمل نصَّها.'
+              : secrets === 'now'
+                ? 'محفوظٌ ولم يُفحَص. **واضغط «افحص الزوج»** — يجيب في ثانيةٍ بلا دورةِ إذن.'
+                : 'تنتظر الخطوةَ ١.',
     },
     {
       n: 4,

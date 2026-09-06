@@ -138,19 +138,38 @@ export async function verifyAppCredentials(
     return { kind: 'inconclusive', detail: `جوابٌ بلا رمزِ خطأ (${response.status})` }
   }
 
-  const kind = ID_FAILURES.has(code)
-    ? 'bad_client_id'
-    : SECRET_FAILURES.has(code)
-      ? 'bad_secret'
-      : /**
-         * **وما عدا ذلك يُعدّ جوازا.**
-         *
-         * خطأٌ يتكلّم عن المنحة أو المنتَج (`unsupported_grant_type`
-         * مثلا عند منصّةٍ لم تُقَس) يعني أنّ المنصّة **تجاوزت التوثيق**
-         * ووصلت إلى ما بعده. وهو استدلالٌ لا قياس، فيُقال في الشاشة
-         * نصُّ المنصّة كاملا ليحكم المالكُ بعينه.
-         */
-        'accepted'
+  if (ID_FAILURES.has(code)) {
+    return description === undefined
+      ? { kind: 'bad_client_id', code }
+      : { kind: 'bad_client_id', code, description }
+  }
+  if (SECRET_FAILURES.has(code)) {
+    return description === undefined
+      ? { kind: 'bad_secret', code }
+      : { kind: 'bad_secret', code, description }
+  }
 
-  return description === undefined ? { kind, code } : { kind, code, description }
+  /*
+   * **وما عدا ذلك «لا يُعرَف» — لا جواز** (D-076).
+   *
+   * كان يُعدّ جوازا باستدلال: «خطأٌ يتكلّم عن المنحة يعني أنّ المنصّة
+   * تجاوزت التوثيق». **والاستدلالُ كذب على LinkedIn**: أعطى «تقت»
+   * خضراءَ على زوجٍ ردّته المنصّةُ نفسُها في منحة `authorization_code`
+   * — وقِيس ذلك حرفا: `invalid_client` من طرفيّةٍ مباشرة، بلا PKCE،
+   * برمزٍ صحيح.
+   *
+   * **وخُضرةٌ كاذبة أسوأُ من لا فحص**: تصرف المالكَ عن الموضع الذي
+   * فيه العطب — وكلّفت ساعاتٍ حرفا لا مجازا.
+   *
+   * فالجوازُ من **٢٠٠ وحدَها**: المنصّةُ أعطت رمزا فالزوجُ سليمٌ يقينا.
+   * وما دونه يُقال «لا يُعرَف» ويُعرَض نصُّ المنصّة كما هو — **ولا
+   * علامةَ صحٍّ على ما لم يُتحقَّق منه** (D-061).
+   */
+  return {
+    kind: 'inconclusive',
+    detail:
+      `المنصّةُ ردّت «${code}»${description === undefined ? '' : ` — ${description}`}. ` +
+      'وهذا ليس حكما على الزوج: لا يقول إنّه سليمٌ ولا إنّه مرفوض. ' +
+      'والبرهانُ الوحيدُ نجاحُ الربط.',
+  }
 }

@@ -52,10 +52,17 @@ describe('ما لا يُعرَف لا تُوضَع عليه علامة', () => {
     expect(at(wizardFor(view(0), app({ verifiedKind: 'accepted' })), 1)).toBe('done')
   })
 
-  it('و«لم يُحسَم» لا يُعدّ جوازا ولا رفضا', () => {
+  /**
+   * **ولا «لم يُفحَص» أيضا** (D-076).
+   *
+   * كانت الخطوةُ ٣ تعود `now` — أي «محفوظٌ ولم يُفحَص، فاضغط افحص».
+   * **وقد فُحص**، وردّت المنصّةُ بما لا يتكلّم عن الزوج. فيُقال ذلك:
+   * لا خُضرةٌ تكذب، ولا دعوةٌ إلى فحصٍ وقع.
+   */
+  it('و«لم يُحسَم» لا يُعدّ جوازا ولا رفضا ولا فحصا لم يقع', () => {
     const w = wizardFor(view(0), app({ verifiedKind: 'inconclusive' }))
     expect(at(w, 1)).toBe('unknowable')
-    expect(at(w, 3)).toBe('now')
+    expect(at(w, 3)).toBe('unknowable')
   })
 })
 
