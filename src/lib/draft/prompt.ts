@@ -17,6 +17,8 @@
  * ولا اسمَ علمٍ ولا تاريخَ إلّا ما في الخلاصة.
  */
 
+import { postLength } from './length'
+
 export type Platform = 'linkedin' | 'x'
 
 export interface PlatformSpec {
@@ -149,10 +151,14 @@ export function parseDraft(
     return { ok: false, reason: 'النصّ فارغ أو أقصر من أن يكون منشورا' }
   }
   const text = value.text.trim()
-  if (text.length > spec.hardLimit) {
+  // **بحساب المنصّة لا بحساب JavaScript** (D-071): رابطٌ عند X بطولٍ
+  // ثابت، ورمزٌ تعبيريٌّ بمحرفين — ورفضٌ هنا يقع **بعد أن دُفعت كلفةُ
+  // النموذج**، فمسوّدةٌ صالحةٌ تُرمى وقد دُفع ثمنُها
+  const counted = postLength(text, spec.id)
+  if (counted > spec.hardLimit) {
     return {
       ok: false,
-      reason: `النصّ ${text.length} محرفا و ${spec.label} تقبل ${spec.hardLimit}`,
+      reason: `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`,
     }
   }
   return {
