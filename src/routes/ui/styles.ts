@@ -267,6 +267,27 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
    الحروف العربيّة فتُقرأ «سا ئقا». علّةٌ تُرى ولا يكشفها اختبار. */
 .ago{font-size:11.5px; color:var(--ink-3)}
 .ch-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+/* ── لوحُ ضبط التطبيق ─────────────────────────────────────────────────
+   مطويٌّ افتراضا حيث لا يلزم، ومفتوحٌ حيث ينقص سرّ: بطاقةٌ تفتح نموذجا
+   لا حاجة إليه تزحم الشاشة، وبطاقةٌ تخفيه حيث يلزم تجعل المالك يبحث. */
+.setup{border-top:1px solid var(--line-soft); padding-top:11px; margin-top:2px}
+.setup>summary{cursor:pointer; font-size:12.5px; font-weight:650; color:var(--gold-deep);
+  list-style:none; padding:3px 0}
+.setup>summary::-webkit-details-marker{display:none}
+.setup>summary::before{content:'▸ '; display:inline-block; transition:transform .15s}
+.setup[open]>summary::before{content:'▾ '}
+.setup-body{padding-top:10px}
+.setup .field{margin-bottom:12px}
+.setup .hint-sm{display:block; font-size:11px; color:var(--ink-3); line-height:1.65; margin-top:5px}
+.lbl-sm{display:block; font-size:10.5px; color:var(--ink-3); letter-spacing:.3px; margin-bottom:5px}
+/* خطواتٌ لكلٍّ سببُها: «افعل» وحدها تُنفَّذ ولا تُفهَم، فلا تُصحَّح إن أخطأت */
+ol.steps{margin:0 0 14px; padding-inline-start:18px}
+ol.steps li{font-size:12px; line-height:1.75; margin-bottom:9px; color:var(--ink-2)}
+ol.steps .what{display:block; font-weight:650; color:var(--ink)}
+ol.steps .why{display:block; color:var(--ink-3)}
+.copy{display:flex; gap:7px; align-items:center; margin-bottom:8px}
+.copy input{flex:1 1 auto; min-width:0; font-size:11.5px; padding:8px 10px;
+  direction:ltr; text-align:left; background:var(--surface-2)}
 
 /* ── المسوّدات ────────────────────────────────────────────────────────
    المربّعُ نفسه هو المعروض: لا «اعرض» ثمّ «عدّل» في شاشتين، فما يُقرأ هو

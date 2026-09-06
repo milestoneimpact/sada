@@ -13,6 +13,7 @@ import { createPkce, randomToken } from '../lib/pkce'
 import { exchangeCode, OAuthError, type ClientCredentials } from '../lib/oauth/exchange'
 import { fetchIdentity } from '../lib/oauth/identity'
 import { PROVIDERS, redirectUri, type Platform } from '../lib/oauth/providers'
+import { readApp } from '../lib/oauth/apps'
 import { consumeState, saveState, StateError } from '../lib/oauth/state'
 import { saveTokens, upsertAccount } from '../lib/tokens'
 
@@ -39,16 +40,22 @@ function oauthFailure(error: unknown): { body: Record<string, string>; status: 4
   throw error
 }
 
-function credentialsFor(env: Env, platform: Platform): ClientCredentials {
-  const [id, secret] =
-    platform === 'linkedin'
-      ? [env.LINKEDIN_CLIENT_ID, env.LINKEDIN_CLIENT_SECRET]
-      : [env.X_CLIENT_ID, env.X_CLIENT_SECRET]
-  if (typeof id !== 'string' || id.length === 0 || typeof secret !== 'string' || secret.length === 0) {
-    // الاسم فقط. القيمة لا تُذكر ولو كانت موجودة
-    throw new OAuthError(`أسرار ${platform} غير مضبوطة على هذه البيئة`, 503)
+/**
+ * أسرارُ التطبيق — من البيئة أوّلا ثمّ الخزانة (D-030 · D-042).
+ *
+ * والرسالةُ تسمّي ولا تكشف: «غير مضبوطة» لا تُذكر معها قيمةٌ ولو وُجدت.
+ */
+async function credentialsFor(env: Env, platform: Platform): Promise<ClientCredentials> {
+  const app = await readApp(
+    env.DB,
+    env.TOKEN_ENC_KEY,
+    platform,
+    env as unknown as Record<string, string | undefined>,
+  )
+  if (app === null) {
+    throw new OAuthError(`أسرار ${platform} غير مضبوطة — اضبطها من لوحة القنوات`, 503)
   }
-  return { clientId: id, clientSecret: secret }
+  return { clientId: app.clientId, clientSecret: app.clientSecret }
 }
 
 oauth.get('/oauth/:platform/start', async (c) => {
@@ -58,7 +65,7 @@ oauth.get('/oauth/:platform/start', async (c) => {
   const provider = PROVIDERS[platform]
   let creds
   try {
-    creds = credentialsFor(c.env, platform) // يفشل مبكرا إن نقص سر
+    creds = await credentialsFor(c.env, platform) // يفشل مبكرا إن نقص سر
   } catch (error) {
     const failure = oauthFailure(error)
     return c.json(failure.body, failure.status)
@@ -108,7 +115,7 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     }
 
     const provider = PROVIDERS[platform]
-    const creds = credentialsFor(c.env, platform)
+    const creds = await credentialsFor(c.env, platform)
     const tokens = await exchangeCode(provider, creds, {
       code,
       redirectUri: saved.redirectUri,

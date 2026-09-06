@@ -17,6 +17,7 @@ import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
+import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { legal } from './routes/legal'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
@@ -107,6 +108,22 @@ async function vaultCovered(env: Env, missing: readonly string[]): Promise<strin
       if (resolved.key !== null) covered.push(name)
     } catch {
       // خزانةٌ لا تُقرأ تعني «لم يُسدّ» — والصمتُ هنا لا يخفي شيئا
+    }
+  }
+
+  // وأسرارُ تطبيقَي OAuth كذلك (D-042): سُدّت من اللوحة فلا تُعدّ ناقصة
+  for (const platform of ['linkedin', 'x'] as const) {
+    const [idName, secretName] = SECRET_NAMES[platform]
+    if (!missing.includes(idName) && !missing.includes(secretName)) continue
+    try {
+      // بلا بيئة: يُسأل عن الخزانة وحدها — والبيئةُ محسوبةٌ أصلا في `missing`
+      const app = await readApp(env.DB, env.TOKEN_ENC_KEY, platform, {})
+      if (app === null) continue
+      for (const name of [idName, secretName]) {
+        if (missing.includes(name)) covered.push(name)
+      }
+    } catch {
+      // كسابقتها: ما لا يُقرأ لا يُعدّ مسدودا
     }
   }
   return covered

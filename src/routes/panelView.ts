@@ -12,6 +12,7 @@
  */
 import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
+import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
@@ -47,6 +48,22 @@ const SCRIPT = `
   var head=document.getElementById('pane-title');
   if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
     var s=t.querySelector('span'); if(s)head.textContent=s.textContent;});});
+
+  // زرُّ النسخ: رابطُ العودة يُطابَق حرفا بحرف عند المنصّة، وكتابتُه يدا
+  // تُدخل مسافةً أو شرطةً فيفشل الربطُ بخطأٍ لا يدلّ على سببه
+  document.querySelectorAll('button[data-copy]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var f=document.getElementById(b.dataset.copy); if(!f)return;
+      f.select(); f.setSelectionRange(0,f.value.length);
+      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
+        setTimeout(function(){b.textContent=t;},1400);};
+      // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(f.value).then(done,function(){
+          try{document.execCommand('copy'); done();}catch(e){}});
+      }else{try{document.execCommand('copy'); done();}catch(e){}}
+    });
+  });
 
   // عدّادُ المسوّدة يتحرّك مع الكتابة: طولٌ يُعرف بعد الإرسال يأتي متأخّرا
   // بنداءٍ كامل. والحدُّ من data-limit لا من ثابتٍ هنا — منصّةٌ تُضاف
@@ -416,6 +433,10 @@ export interface PanelData {
   readonly via: 'admin_token' | 'passkey'
   readonly factors: PanelFactors
   readonly channels: readonly ChannelView[]
+  /** حالُ تطبيقَي OAuth — بلا سرٍّ ولا فكِّ تشفير. */
+  readonly apps: readonly AppStatus[]
+  /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروض للنسخ. */
+  readonly baseUrl: string
 }
 
 export interface PanelFactors {
@@ -808,7 +829,7 @@ ${flash}
 </section>
 
 <section data-pane="channels" hidden>
-  ${channelsSection(d.channels, d.now)}
+  ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
 </section>
 
 <section data-pane="posts" hidden>

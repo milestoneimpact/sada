@@ -37,6 +37,78 @@ export interface ChannelSpec {
  * السجلّ. والمبنيّ أوّلا، ثمّ ما ينتظر سائقا — بترتيبٍ ثابت لا يتبدّل
  * بين تحميلين، فالعينُ تحفظ مواضعها.
  */
+/**
+ * دليلُ ضبطِ التطبيق — **بجانب الحقل لا في وثيقةٍ أخرى**.
+ *
+ * مالكٌ يفتح اللوحة فيجد حقلين فارغين ثمّ يبحث في ملفٍّ عن معناهما
+ * يتوقّف. والخطواتُ هنا بأسماء الأزرار كما تُرى على الشاشة، ومعها
+ * **ما يعني النجاح** — فلا يُترك أحدٌ يظنّ أنّه أتمّ وقد نقص.
+ */
+export interface SetupGuide {
+  /** بوّابةُ المطوّرين — يُفتَح في تبويبٍ آخر. */
+  readonly portal: string
+  readonly portalLabel: string
+  /** خطواتٌ قبل السرّين — كلٌّ لها سببُها. */
+  readonly before: readonly { readonly what: string; readonly why: string }[]
+  /** أين يجد المعرّف والسرّ بالضبط. */
+  readonly whereId: string
+  readonly whereSecret: string
+  /** علامةُ النجاح — تُرى ولا تُفترَض. */
+  readonly success: string
+  /** ما يجب أن يبقى صحيحا وإلّا فشل الربط بخطأٍ غامض. */
+  readonly gotcha: string
+}
+
+export const SETUP: Readonly<Record<string, SetupGuide>> = {
+  linkedin: {
+    portal: 'https://www.linkedin.com/developers/apps',
+    portalLabel: 'LinkedIn Developers',
+    before: [
+      {
+        what: 'تبويب Auth ← Authorized redirect URLs ← الصق رابط العودة أدناه',
+        why: 'بلا رابطِ عودةٍ مسجَّل تردّ LinkedIn الطلبَ <b>قبل أن تعرض شاشة الإذن</b>. وهذا عائقٌ لا يُصلحه سرّ.',
+      },
+      {
+        what: 'تبويب Products ← Request access على «Share on LinkedIn»',
+        why: 'هو الذي يمنح <span class="mono">w_member_social</span> — <b>ويُمنَح فورا بلا مراجعة</b>. وبدونه يعمل الربطُ ولا يعمل النشر.',
+      },
+      {
+        what: 'وأضف «Community Management API» إن أردت صفحةَ الشركة',
+        why: 'مراجعةٌ طويلة، <b>ولا تنتظرها للحساب الشخصيّ</b> — فهي لصفحة الشركة وحدها.',
+      },
+    ],
+    whereId: 'تبويب Auth ← Application credentials ← Client ID: Primary',
+    whereSecret: 'تحته مباشرةً — اضغط 👁 ليظهر، ثمّ 📋 لتنسخه. ولا تضغط «Generate a new Client Secret».',
+    success: 'تحت OAuth 2.0 scopes في تبويب Auth تظهر ثلاثةٌ: openid و profile و w_member_social.',
+    gotcha:
+      'رابطُ العودة يُطابَق حرفا بحرف: شرطةٌ في آخره أو http بدل https تُسقط الربط.',
+  },
+  x: {
+    portal: 'https://developer.x.com/en/portal/dashboard',
+    portalLabel: 'X Developer Portal',
+    before: [
+      {
+        what: 'Billing ← اشترِ رصيدا (عشرة دولارات تكفي شهورا)',
+        why: 'X يحاسب على كلّ منشور. <b>وبلا رصيدٍ ينجح الربطُ ويفشل أوّلُ نشر.</b>',
+      },
+      {
+        what: 'User authentication settings ← Set up ← App permissions: <b>Read and write</b>',
+        why: 'رفعُ الصور يوجب <span class="mono">media.write</span>، <b>وتطبيقٌ بصلاحية قراءةٍ فقط لا يمنحه</b> — فيفشل الربط بخطأٍ غامض.',
+      },
+      {
+        what: 'وفي الشاشة نفسها: Type of App = Web App، و Callback URI = رابط العودة أدناه',
+        why: '<b>لا يوجد OAuth 2.0 Client ID أصلا</b> قبل أن تُكمل هذه الشاشة.',
+      },
+    ],
+    whereId: 'تبويب Keys and tokens ← قسم OAuth 2.0 Client ID and Client Secret',
+    whereSecret:
+      'في القسم نفسه. <b>و X يعرضه مرّةً واحدةً عند إنشائه</b> — فإن لم تحفظه اضغط Regenerate، ولا ضرر ما دام لم يُربَط حساب.',
+    success: 'تظهر بطاقةُ X هنا «جاهزةٌ للربط» بزرٍّ يعمل، ويُظهر /ready أنّ سرَّيها لم يعودا ناقصين.',
+    gotcha:
+      'إن بقيت App permissions على Read فقط، يفشل الربطُ أو ينجح ولا يُرفَع وسيط.',
+  },
+}
+
 export const CHANNELS: readonly ChannelSpec[] = [
   {
     id: 'linkedin',

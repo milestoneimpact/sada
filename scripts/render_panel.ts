@@ -242,6 +242,21 @@ const data: PanelData = {
   via: 'admin_token',
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
   channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),
+  baseUrl: 'https://sada2.basserh.com',
+  apps: [
+    // LinkedIn من البيئة: لا نموذجَ يُعرض، ويُقال لماذا
+    {
+      platform: 'linkedin', source: 'worker_secret',
+      clientId: '78k4gm3yw1g18e', hint: null, updatedAt: null, updatedBy: null,
+      secretNames: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
+    },
+    // و X لم يُضبَط: النموذجُ مفتوحٌ بإرشاده
+    {
+      platform: 'x', source: 'none',
+      clientId: null, hint: null, updatedAt: null, updatedBy: null,
+      secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
+    },
+  ],
 }
 
 writeFileSync(process.argv[2] ?? '/tmp/panel.html', panelPage(data))

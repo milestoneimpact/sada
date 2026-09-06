@@ -1038,7 +1038,8 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('LINKEDIN_CLIENT_ID')
-    expect(html).toContain('M-02')
+    // صار الضبطُ من اللوحة (D-042)، فالبطاقةُ تعرض النموذجَ لا رقمَ مهمّة
+    expect(html).toContain('اضبط التطبيق')
     expect(html).not.toContain('/oauth/linkedin/start')
   })
 
@@ -1398,5 +1399,132 @@ describe('الجدولة من اللوحة', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('لا قناةَ LinkedIn مربوطة')
+  })
+})
+
+/**
+ * لا Markdown في مخرَج HTML — على اللوحة كما على الوثائق.
+ *
+ * العلّةُ وقعت مرّتين: في `/privacy` (D-038) وفي دليل ضبط التطبيق
+ * (D-042). ونصُّ الإرشاد يُدرَج بلا تهريبٍ ليعمل `<b>` فيه، **فنجمتان
+ * تُطبَعان حرفا**. واختبارُ محتوًى يجد الكلمةَ فيمرّ — فيُفحَص الشكل.
+ */
+describe('لا Markdown في مخرَج اللوحة', () => {
+  it('صفحةُ اللوحة لا تحمل نجوما ولا شرطاتِ قوائم حرفيّة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const body = html.slice(html.indexOf('<body>'))
+    expect(body).not.toMatch(/\*\*/)
+    // والعلامةُ المائلة للشيفرة تُستبدَل بـ mono، فلا تبقى حرفا
+    expect(body).not.toMatch(/`[^`\n]{2,40}`/)
+  })
+})
+
+/**
+ * ضبطُ تطبيقَي OAuth من اللوحة (D-042).
+ *
+ * وأخطرُ ما يُختبَر: **أنّ السرَّ لا يعود إلى الشاشة بعد حفظه**.
+ */
+describe('ضبطُ التطبيق من اللوحة', () => {
+  async function save(cookie: string, id = '78k4gm3yw1g18e', secret = 'WPL_AP1.سرّيّةٌ.طويلة') {
+    const body = new FormData()
+    body.set('platform', 'linkedin')
+    body.set('client_id', id)
+    body.set('client_secret', secret)
+    return app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('يحفظ مشفَّرا، ولا يُخزَّن السرُّ خاما', async () => {
+    const cookie = await login()
+    await save(cookie)
+
+    const row = db.raw
+      .prepare('SELECT client_id, secret_enc, hint FROM oauth_apps WHERE platform = ?')
+      .get('linkedin') as { client_id: string; secret_enc: string; hint: string }
+    expect(row.client_id).toBe('78k4gm3yw1g18e')
+    expect(row.secret_enc).not.toContain('سرّيّةٌ')
+    expect(row.hint).not.toContain('سرّيّةٌ')
+  })
+
+  it('**ولا يعود السرُّ إلى الشاشة** — قناعُه وحده', async () => {
+    const cookie = await login()
+    await save(cookie)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+
+    expect(html).not.toContain('سرّيّةٌ')
+    expect(html).not.toContain('WPL_AP1')
+    // والمعرّفُ علنيٌّ فيظهر
+    expect(html).toContain('78k4gm3yw1g18e')
+  })
+
+  it('ويصير الربطُ ممكنا — بعد أن كان «تنتظرك»', async () => {
+    const cookie = await login()
+    const before = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(before).toContain('اضبط التطبيق')
+
+    await save(cookie)
+    const after = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(after).toContain('/oauth/linkedin/start')
+  })
+
+  it('ويُعدّ مسدودا في /ready بدل أن يبقى ناقصا', async () => {
+    const cookie = await login()
+    await save(cookie)
+    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+      missing_secrets: string[]
+      configured_in_vault: string[]
+    }
+    expect(ready.configured_in_vault).toContain('LINKEDIN_CLIENT_SECRET')
+    expect(ready.missing_secrets).not.toContain('LINKEDIN_CLIENT_SECRET')
+    // و X ما زال ناقصا: كلٌّ على حدة
+    expect(ready.missing_secrets).toContain('X_CLIENT_SECRET')
+  })
+
+  it('والسجلُّ يحفظ مَن بدّل ولأيّ منصّة — ولا يحفظ القيمة', async () => {
+    const cookie = await login()
+    await save(cookie)
+    const audit = db.raw
+      .prepare("SELECT target, detail FROM audit_log WHERE action = 'oauth_app.save'")
+      .all() as { target: string; detail: string }[]
+    expect(audit).toHaveLength(1)
+    expect(audit[0]?.target).toBe('linkedin')
+    expect(JSON.stringify(audit)).not.toContain('سرّيّةٌ')
+  })
+
+  it('والسرُّ نفسه يُقال إنّه لم يتغيّر — فلا يُوهَم المالك', async () => {
+    const cookie = await login()
+    await save(cookie)
+    await save(cookie)
+    const audit = db.raw
+      .prepare("SELECT detail FROM audit_log WHERE action = 'oauth_app.save' ORDER BY rowid")
+      .all() as { detail: string }[]
+    expect(audit.map((a) => a.detail)).toEqual(['saved', 'unchanged'])
+  })
+
+  it('ومنصّةٌ غير معروفة تُردّ ولا تصل إلى القاعدة', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('platform', 'snapchat')
+    body.set('client_id', 'a')
+    body.set('client_secret', 'b')
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body }), env)
+
+    const rows = db.raw.prepare('SELECT platform FROM oauth_apps').all()
+    expect(rows).toHaveLength(0)
+  })
+
+  it('وبلا رمز CSRF لا يُحفَظ شيء', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('platform', 'linkedin')
+    body.set('client_id', 'a')
+    body.set('client_secret', 'b')
+    const response = await app.request(
+      '/panel/channels/app',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(403)
+    expect(db.raw.prepare('SELECT platform FROM oauth_apps').all()).toHaveLength(0)
   })
 })
