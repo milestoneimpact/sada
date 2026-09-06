@@ -189,6 +189,21 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
             <span class="t">${guide.whereId}</span></div>
           <input id="ci-${id}" name="client_id" required aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
+          ${/*
+            * **الفخُّ الذي أضاع ساعة** (D-074).
+            *
+            * حقلُ المعرّف يُملأ من المحفوظ، وحقلُ السرّ يبقى فارغا
+            * دائما. فمن أنشأ تطبيقا جديدا يلصق سرَّه **ولا ينتبه أنّ
+            * المعرّفَ فوقه لتطبيقٍ آخر** — فيُحفَظ زوجٌ مختلط: معرّفٌ
+            * قديم وسرٌّ جديد. **وجوابُه `invalid_client` مهما نُسخ
+            * السرُّ حرفا حرفا**، والرسالةُ تتّهم السرَّ وهو سليم.
+            */ ''}${app.clientId === null
+            ? ''
+            : `<div class="help"><span class="i">!</span><span class="t">
+                <b>هذا المعرّفُ محفوظٌ من قبل — والسرُّ أدناه يبدأ فارغا دائما.</b>
+                فإن كنتَ تنسخ السرَّ من <b>تطبيقٍ آخر</b> (أنشأتَه حديثا مثلا)
+                <b>فبدّل المعرّفَ معه</b>: سرٌّ صحيحٌ على معرّفٍ قديم يُردّ
+                <span class="mono">invalid_client</span> — والرسالةُ تتّهم السرَّ وهو سليم.</span></div>`}
         </div>
         <div class="field">
           <label for="cs-${id}">Client Secret</label>
@@ -198,6 +213,12 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
             aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
             autocomplete="off" spellcheck="false">
+          ${app.hint === null
+            ? ''
+            : `<div class="help"><span class="i">i</span><span class="t">
+                المحفوظُ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
+                <b>قارنه بأوّل السرّ وآخرِه في بوّابة LinkedIn</b> قبل أن تكتب.
+                فإن طابق فالسرُّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
         </div>
         <div class="ch-foot">
           <button class="p" type="submit">احفظ</button>
