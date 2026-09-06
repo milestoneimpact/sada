@@ -18,6 +18,7 @@ import { draftsSection, type MediaView, type Target } from './ui/sections/drafts
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
+import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
@@ -49,7 +50,14 @@ function pageHead(eyebrow: string, title: string, lede: string, aside = ''): str
   </div>`
 }
 
-const SCRIPT = `
+/**
+ * نصُّ اللوحة الجاري في المتصفّح.
+ *
+ * **ومُصدَّرٌ ليُختبَر لا ليُستورَد**: فيه عدّادٌ يجب أن يعدّ كما يعدّ
+ * الخادم (D-071)، **وعدّادٌ يخالفه أسوأُ من لا عدّاد** — يُري المالكَ
+ * أحمرَ على منشورٍ مقبول. فيُنتزَع في الاختبار ويُقارَن حالةً حالة.
+ */
+export const SCRIPT = `
 (function(){
   var tabs=document.querySelectorAll('nav.tabs a');
   var panes=document.querySelectorAll('section[data-pane]');
@@ -91,11 +99,36 @@ const SCRIPT = `
   // عدّادُ المسوّدة يتحرّك مع الكتابة: طولٌ يُعرف بعد الإرسال يأتي متأخّرا
   // بنداءٍ كامل. والحدُّ من data-limit لا من ثابتٍ هنا — منصّةٌ تُضاف
   // تجلب حدَّها معها
+  //
+  // والعدّادُ يعدّ كما تعدّ المنصّة (D-071): كان يعدّ محارف
+  // JavaScript، فيُري المالكَ أحمرَ على منشورٍ تقبله X، ويُريه أخضرَ
+  // على آخرَ ترفضه. وعدّادٌ يخالف الخادمَ أسوأُ من لا عدّاد.
+  //
+  // والقاعدةُ واحدةٌ في الموضعين: ثوابتُها مُمرَّرةٌ من «length.ts»
+  // أدناه، فلا رقمَ مكتوبٌ هنا يشيخ وحدَه.
+  var URL_LEN=${X_URL_LENGTH}, HEAVY=${X_HEAVY};
+  var LIGHT=${JSON.stringify(X_LIGHT_RANGES)};
+  var RE_URL=/https?:\\/\\/\\S+/gu;
+  var RE_EMOJI=/\\p{RI}\\p{RI}|\\p{Extended_Pictographic}(?:\\uFE0F?(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)/gu;
+  function weigh(cp){
+    for(var i=0;i<LIGHT.length;i++){if(cp>=LIGHT[i][0]&&cp<=LIGHT[i][1])return 1;}
+    return HEAVY;
+  }
+  function xLen(text){
+    var total=0;
+    var rest=text.replace(RE_URL,function(){total+=URL_LEN; return '';});
+    var plain=rest.replace(RE_EMOJI,function(){total+=HEAVY; return '';});
+    for(var ch of plain)total+=weigh(ch.codePointAt(0)||0);
+    return total;
+  }
   document.querySelectorAll('textarea.draft-text').forEach(function(t){
     var out=t.parentNode.querySelector('.count'); if(!out)return;
     var b=out.querySelector('b'); var lim=+t.dataset.limit||0; var tgt=+t.dataset.target||0;
+    // و LinkedIn على عدّ المحارف: لا قاعدةَ وزنٍ منشورةً لها فلا تُخترَع
+    var weighted=t.dataset.count==='x';
     function tick(){
-      var n=t.value.trim().length; if(b)b.textContent=n;
+      var v=t.value.trim();
+      var n=weighted?xLen(v):v.length; if(b)b.textContent=n;
       out.className='count'+(n>lim?' bad':n>tgt?' warn':'');
     }
     t.addEventListener('input',tick); tick();

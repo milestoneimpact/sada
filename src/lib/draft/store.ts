@@ -23,6 +23,7 @@ import { PLATFORMS, type Platform } from './prompt'
 import type { Db } from '../tokens'
 import { containsUrl } from '../idempotency'
 import { estimatePostCost } from '../cost'
+import { postLength } from './length'
 
 export type DraftStatus = 'draft' | 'approved' | 'edited' | 'rejected' | 'queued' | 'published' | 'failed'
 
@@ -184,8 +185,13 @@ export async function decide(
   if (text.length < 40) return { ok: false, reason: 'النصّ أقصر من أن يكون منشورا' }
   // الطولُ يُفحص هنا أيضا: المالك يلصق ما يشاء، ونصٌّ فوق الحدّ يُرفض عند
   // النشر بعد أسابيع — فيُمسك عند الاعتماد لا عند الإرسال
-  if (text.length > spec.hardLimit) {
-    return { ok: false, reason: `النصّ ${text.length} محرفا و ${spec.label} تقبل ${spec.hardLimit}` }
+  // وبحساب المنصّة كذلك (D-071): المالكُ يلصق رابطا فيُردّ رفضا كاذبا
+  const counted = postLength(text, spec.id)
+  if (counted > spec.hardLimit) {
+    return {
+      ok: false,
+      reason: `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`,
+    }
   }
 
   const status: DraftStatus = text === row.text.trim() ? 'approved' : 'edited'

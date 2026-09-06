@@ -20,6 +20,7 @@
  * ينشر أسوأ من غيابه.**
  */
 import type { DraftRow } from '../../../lib/draft/store'
+import { postLength } from '../../../lib/draft/length'
 import { PLATFORMS, type Platform } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
 import { relativeTime } from '../../../lib/format'
@@ -185,7 +186,7 @@ function card(
   // بطاقةٌ فيها فعلٌ باقٍ ليست منتهية: المعتمَدُ ينتظر موعدا، والمجدولُ
   // ينتظر ساعته — والرماديُّ للمرفوض والمنشور وحدهما
   const live = open || d.status === 'approved' || d.status === 'edited' || d.status === 'queued'
-  const len = d.text.length
+  const len = postLength(d.text, d.platform)
   // متغيّرٌ لا خاصّيّة: ارتفاعٌ مكتوبٌ في `style` لا تغلبه استفسارةُ وسط،
   // فيبقى الجوّالُ — حيث يلتفّ النصّ أضعافا — بمربّعٍ مقاسِ الشاشة العريضة
   const box = `--lines:${LINES[d.platform] ?? 9}`
@@ -221,6 +222,7 @@ function card(
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <textarea name="text" class="draft-text" style="${box}"
            data-limit="${spec.hardLimit}" data-target="${spec.target}"
+           data-count="${spec.id}"
            aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
          <div class="draft-foot">
            <span class="count ${len > spec.hardLimit ? 'bad' : len > spec.target ? 'warn' : ''}"
