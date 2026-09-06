@@ -160,6 +160,8 @@ oauth.get('/oauth/:platform/callback', async (c) => {
       refusedBody({
         platform,
         reason: denied,
+        // وصفُ المنصّة يحمل اسمَ النطاق المرفوض غالبا — وكان يُهمَل
+        description: c.req.query('error_description') ?? '',
         requested,
         // ولا يُعرَض مخرجُ الهويّة إن كانت هي التي رُفضت: زرٌّ يعيد
         // المحاولةَ نفسها التي فشلت يَعِد بما لا يقع
