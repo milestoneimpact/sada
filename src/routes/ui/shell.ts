@@ -23,9 +23,10 @@ const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
 const ICON_SVG = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48">',
   '<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0">',
-  '<stop offset="0" stop-color="#0E6B66"/><stop offset="1" stop-color="#4CD1B6"/>',
+  '<stop offset="0" stop-color="#316b4c"/><stop offset=".55" stop-color="#82c69e"/>',
+  '<stop offset="1" stop-color="#d1b473"/>',
   '</linearGradient></defs>',
-  '<rect width="64" height="48" rx="11" fill="#04100f"/>',
+  '<rect width="64" height="48" rx="11" fill="#050f09"/>',
   '<path d="' + RIBBON + '" fill="none" stroke="url(#g)" stroke-width="11" ',
   'stroke-linecap="round"/>',
   '</svg>',
@@ -51,7 +52,7 @@ export const GLYPH_SVG =
   '</svg>'
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG)}">
-<meta name="theme-color" content="#0e6b66">`
+<meta name="theme-color" content="#12623e">`
 
 export function escapeHtml(value: string): string {
   return value
@@ -155,7 +156,7 @@ ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Beiruti:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style nonce="${safeNonce}">${STYLE}</style></head><body>${body}${
     script === '' ? '' : `<script nonce="${safeNonce}">${script}</script>`
   }</body></html>`
