@@ -1094,7 +1094,7 @@ describe('الثيم النهاريّ', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     const root = html.slice(html.indexOf(':root{'), html.indexOf('}', html.indexOf(':root{')))
-    for (const token of ['--bg', '--surface', '--ink', '--gold', '--ok', '--warn', '--bad']) {
+    for (const token of ['--bg', '--surface', '--ink', '--brand', '--ok', '--warn', '--bad']) {
       expect(root).toContain(token)
     }
   })

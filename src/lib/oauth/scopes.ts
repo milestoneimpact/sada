@@ -170,6 +170,17 @@ export function capabilities(platform: Platform, grantedRaw: string): Capability
 }
 
 /**
+ * أفي الممنوح نطاقٌ بعينه؟
+ *
+ * سؤالٌ أدقُّ من `canPublish`: القراءةُ تحتاج نطاقا واحدا لا مجموعةً،
+ * ودورةُ القياس تسأل عنه قبل النداء — فرمزٌ بلا نطاقِ قراءةٍ يُردّ 403
+ * **بعد** أن تُحسَب تكلفتُه (D-008 · D-019).
+ */
+export function hasScope(grantedRaw: string, name: string): boolean {
+  return parseGranted(grantedRaw).includes(name)
+}
+
+/**
  * أيستطيع هذا الرمزُ النشرَ؟
  *
  * يُسأل **قبل** النداء لا بعده — كما وقع حارسُ الإدارة قبل نداء Google

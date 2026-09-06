@@ -17,8 +17,10 @@ import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
+import { pullDue } from './lib/metrics/job'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { legal } from './routes/legal'
+import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { auth } from './routes/auth'
@@ -324,6 +326,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
+app.route('/', media)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)
@@ -495,8 +498,36 @@ async function queue(
   for (const message of batch.messages) message.ack()
 }
 
+/**
+ * دورةُ القياس (D-048).
+ *
+ * ولا تُسقط دورةَ الإرسال إن سقطت: القياسُ معرفةٌ، والنشرُ التزامٌ
+ * بموعد. فتُغلَّف بـ try، ويُسجَّل عطلُها ولا يُرمى.
+ */
+async function metricsTick(env: Env): Promise<void> {
+  try {
+    const summary = await pullDue({ db: env.DB, encKey: env.TOKEN_ENC_KEY })
+    if (summary.due > 0) console.log({ job: 'metrics', ...summary })
+  } catch (error) {
+    console.log({ job: 'metrics', failed: String(error) })
+  }
+}
+
 /** جدولُ المسح — يُعرَّف هنا وفي `wrangler.toml`، ويُقارَن نصّا. */
 const SCAN_CRON = '0 3 * * *'
+
+/**
+ * جدولُ القياس — ساعيٌّ عند الدقيقة السابعة.
+ *
+ * ولم يوضع في كلّ دورةٍ كالإرسال، **والفرقُ في ثمن الإخفاق**: دورةٌ
+ * تُنسى تعني أرقاما تشيخ، **وشيخوختُها تُرى** — كلُّ رقمٍ في الشاشة
+ * يحمل «قِيس منذ…». أمّا إرسالٌ يُنسى فمنشورٌ وُعد بموعده ولا يخرج،
+ * ولا شيء يشتكي.
+ *
+ * والسابعةُ لا الصفر: عند الصفر تلتقي الجداولُ كلُّها فتزدحم، وإزاحةُ
+ * دقائقَ تفرّقها بلا أثرٍ على المعنى.
+ */
+const METRICS_CRON = '7 * * * *'
 
 /**
  * موزّعُ الدورات — **والإرسالُ يقع في كلّ دورة، لا في دورةٍ نعرفها.**
@@ -516,6 +547,7 @@ const SCAN_CRON = '0 3 * * *'
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
   await dispatchTick(env)
   if (controller.cron === SCAN_CRON) await scanTick(env)
+  if (controller.cron === METRICS_CRON) await metricsTick(env)
 }
 
 export default { fetch: app.fetch, queue, scheduled }

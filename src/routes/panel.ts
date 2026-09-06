@@ -52,6 +52,7 @@ import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
 import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
 import { grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
+import { metricsFor } from '../lib/metrics/job'
 import { platformScreen } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
@@ -928,7 +929,10 @@ panel.get('/panel/channels/:platform', async (c) => {
     : { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }
   const scopes = built ? await grantedScopes(c.env.DB, id as 'linkedin' | 'x') : {}
 
-  const body = platformScreen({ view, posts, tally, scopes, now })
+  // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
+  const metrics = await metricsFor(c.env.DB, posts.map((p) => p.id))
+
+  const body = platformScreen({ view, posts, tally, scopes, metrics, now })
 
   return page((nonce) =>
     shell(

@@ -24,7 +24,11 @@ export const STYLE = TOKENS + `
 html{scroll-behavior:smooth}
 body{
   margin:0; background:var(--bg); color:var(--ink); direction:rtl;
-  font-family:"IBM Plex Sans Arabic","Noto Sans Arabic",system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* والترتيبُ ليس ذوقا: أوّلُ خطٍّ يملك المحرف يفوز به. و Inter لا
+     عربيّةَ فيه، فيأخذ اللاتينيَّ والرقمَ ويسقط إلى Tajawal في
+     العربيّة. ولو قُدّم Tajawal لأخذ اللاتينيَّ أيضا — وهو ليس
+     أحسنَ فيه، والمعرّفاتُ عندنا لاتينيّةٌ كثيرة. */
+  font-family:"Inter","Tajawal",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
   font-feature-settings:"kern" 1;
   /* أوزانٌ محمّلةٌ فعلا: 400 · 500 · 600 · 700. وطلبُ 650 أو 800 من خطٍّ
@@ -39,14 +43,14 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
   background:var(--bloom)}
 .app,.doc,.wrap{position:relative; z-index:1}
 /* ── حلقةُ التركيز ────────────────────────────────────────────────────
-   طبقتان: خطٌّ ذهبيٌّ وحلقةٌ بيضاءُ تحته. فعلى أرضٍ داكنةٍ يُرى الذهب،
-   وعلى الذهب نفسه — زرٌّ أوّليٌّ مثلا — تُرى البيضاء. وحلقةٌ بلونٍ واحد
+   طبقتان: خطٌّ بلون الهويّة وحلقةٌ بلون السطح تحته. فعلى أرضٍ داكنةٍ
+   يُرى التركواز، وعليه نفسِه — زرٌّ أوّليٌّ مثلا — تُرى الحلقة. وحلقةٌ بلونٍ واحد
    تختفي على ما يوافقها، وهو أكثرُ ما يقع على الأزرار الأوّليّة. */
-:focus-visible{outline:2px solid var(--gold); outline-offset:2px; border-radius:6px;
+:focus-visible{outline:2px solid var(--brand); outline-offset:2px; border-radius:6px;
   box-shadow:0 0 0 4px var(--surface)}
 
 /* التحديدُ بالهويّة: تفصيلٌ يُرى في كلّ نسخةٍ ولصق */
-::selection{background:color-mix(in srgb,var(--gold) 26%,transparent); color:var(--ink)}
+::selection{background:color-mix(in srgb,var(--brand) 26%,transparent); color:var(--ink)}
 
 /* وشريطُ التمرير يتبع الثيم: شريطٌ فضّيٌّ فاتح على لوحةٍ داكنة نشاز */
 *{scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent}
@@ -62,7 +66,7 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
    والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض. */
 .skip{position:absolute; width:1px; height:1px; overflow:hidden;
   clip-path:inset(50%); white-space:nowrap;
-  background:var(--gold); color:var(--on-gold);
+  background:var(--brand); color:var(--on-brand);
   padding:var(--s-3) var(--s-4); border-radius:8px; z-index:99; font-weight:700}
 .skip:focus{width:auto; height:auto; overflow:visible; clip-path:none;
   inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2)}
@@ -75,11 +79,18 @@ h1,h2,h3{margin:0}
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--chrome); border-inline-start:1px solid var(--line);
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
-  background-image:var(--sheen)}
-/* خيطٌ ذهبيٌّ على الحافّة الداخليّة — الحدُّ الرماديُّ وحده يفصل، وهذا
+  background-image:var(--sheen);
+  /* **اللونُ يُعاد صراحةً، ولا يكفي إعادةُ تعريف الرمز.**
+     المتغيّراتُ تُورَث، أمّا اللونُ فيُورَث **محسوبا**: الجسدُ حسب
+     var(--ink) بقيمة الثيم النهاريّ، فورث اسمُ العلامة حبرا داكنا —
+     ثمّ وُضع على رافدةٍ داكنة فاختفى.
+     علّةٌ لا يمسكها مدقّقُ الرموز (القيَمُ صحيحة) ولا المدقّقُ البصريّ
+     (الأحجامُ صحيحة). رأيتُها بالنظر إلى الصفحة مرسومة. */
+  color:var(--ink)}
+/* خيطٌ بلون الهويّة على الحافّة الداخليّة — الحدُّ الرماديُّ وحده يفصل، وهذا
    **يقول أيُّ الجهتين هي البيت**. ويخفت نزولا فلا يصير خطّا مرسوما. */
 .rail::after{content:''; position:absolute; inset-block:0; inset-inline-end:0; width:1px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 55%,transparent),transparent 46%);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 55%,transparent),transparent 46%);
   pointer-events:none}
 .rail-head{padding:22px 20px 18px; display:flex; align-items:center; gap:12px}
 /* ── العلامة ──────────────────────────────────────────────────────────
@@ -87,7 +98,7 @@ h1,h2,h3{margin:0}
    فيه «صدى» بخمسةَ عشرَ بكسلا: **الحرفان يزدحمان في ستٍّ وثلاثين**،
    فيُقرأ المربّعُ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب. */
 .glyph{width:38px; height:38px; border-radius:11px; display:grid; place-items:center; flex:none;
-  background:linear-gradient(150deg,var(--gold-soft),var(--gold-deep)); color:var(--on-gold);
+  background:linear-gradient(150deg,var(--brand-soft),var(--brand-deep)); color:var(--on-brand);
   box-shadow:var(--sh-1), inset 0 1px 0 rgba(255,255,255,.28)}
 /* نسبةٌ لا قياسٌ ثابت: العلامةُ نفسها تظهر بـ 38 في الرافدة و 50 في
    شاشة الدخول و 38 في الوثائق — وقياسٌ ثابتٌ يجعلها تسبح في الأكبر. */
@@ -106,16 +117,46 @@ nav.tabs a{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-2) 
   transition:background .12s, color .12s}
 nav.tabs a svg{width:16px; height:16px; flex:none; opacity:.7}
 nav.tabs a:hover{background:var(--surface-2); color:var(--ink)}
-/* والحاليُّ يُعلَّم **بحدٍّ ولون**: أرضيّةٌ ذهبيّةٌ خافتة وحدها تختفي في
+/* والحاليُّ يُعلَّم **بحدٍّ ولون**: أرضيّةٌ خافتةٌ وحدها تختفي في
    وضع التباين العالي، وخطٌّ على الحافّة يبقى. */
-nav.tabs a[aria-current=page]{background:var(--gold-wash); color:var(--gold); position:relative}
+nav.tabs a[aria-current=page]{background:var(--brand-wash); color:var(--brand); position:relative}
 nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block:7px;
-  inset-inline-start:0; width:2.5px; border-radius:99px; background:var(--gold)}
+  inset-inline-start:0; width:2.5px; border-radius:99px; background:var(--brand)}
 nav.tabs a[aria-current=page] svg{opacity:1}
 nav.tabs .count{margin-inline-start:auto; min-width:20px; text-align:center; padding:1px 6px;
   border-radius:999px; background:var(--surface-3); font-size:10.5px; font-weight:700;
   color:var(--ink-2); font-variant-numeric:tabular-nums}
-nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold)}
+nav.tabs a[aria-current=page] .count{background:var(--brand); color:var(--on-brand)}
+/* ── فرعُ المنصّات ────────────────────────────────────────────────────
+   شاشاتُ المنصّات كانت لا تُبلَغ إلّا من بطاقةٍ في لوحٍ آخر، فمن لم
+   يفتحه لم يعرف أنّها موجودة. وهي التي يُسأل فيها كلَّ يوم. */
+details.plat{margin:0}
+details.plat>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-2) var(--s-3); border-radius:var(--r-sm); min-height:var(--tap);
+  font-size:var(--t-base); font-weight:600; color:var(--ink-2); list-style:none}
+details.plat>summary::-webkit-details-marker{display:none}
+details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}
+details.plat>summary svg{width:16px; height:16px; flex:none; opacity:.7}
+/* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
+details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:10px;
+  color:var(--ink-3); transition:transform .18s}
+details.plat[open]>summary::after{transform:rotate(180deg)}
+.plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
+/* بإزاحةٍ تقول «هذه تحت تلك» — والقائمةُ المسطّحة تُقرأ سبعةَ أقسام */
+.plat-list a{padding-inline-start:var(--s-8)}
+.plat-list .pl{width:15px; height:15px; flex:none; display:grid; place-items:center;
+  color:var(--ink-3)}
+.plat-list .pl svg{width:15px; height:15px; display:block}
+.plat-list a:hover .pl{color:var(--ink-2)}
+/* الحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء. ومعها title — واللونُ وحده
+   لا يقول شيئا لمن لا يفرزه */
+.plat-list .dot{width:6px; height:6px; border-radius:50%; flex:none;
+  margin-inline-start:auto; background:var(--ink-3)}
+.plat-list .dot.ok{background:var(--ok)}
+.plat-list .dot.warn{background:var(--warn)}
+.plat-list .dot.bad{background:var(--bad)}
+.plat-list .dot.idle{background:transparent; border:1px solid var(--line-strong)}
+
 .rail-foot{margin-top:auto; padding:14px; border-top:1px solid var(--line-soft)}
 
 /* ── الشريط العلويّ ────────────────────────────────────────── */
@@ -152,9 +193,9 @@ nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold
   margin:var(--s-2) 0 var(--s-6)}
 .page-head .txt{min-width:0; flex:1 1 340px}
 .eyebrow{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-xs);
-  font-weight:700; color:var(--gold); margin-bottom:var(--s-2)}
+  font-weight:700; color:var(--brand); margin-bottom:var(--s-2)}
 .eyebrow .ln{height:1px; width:26px; flex:none;
-  background:linear-gradient(90deg,var(--gold),transparent)}
+  background:linear-gradient(90deg,var(--brand),transparent)}
 .page-head h1{font-size:var(--t-display); font-weight:700; line-height:1.2;
   letter-spacing:-.9px; margin:0}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
@@ -229,20 +270,20 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .card > .hint{margin:0 0 var(--s-4); font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
 .card-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
 .card-head h2{margin:0}
-/* عنوانُ القسم: خيطٌ ذهبيٌّ قصيرٌ يبدؤه بدل خطٍّ رماديٍّ يمتدّ تحته.
+/* عنوانُ القسم: خيطٌ قصيرٌ بلون الهويّة يبدؤه بدل خطٍّ رماديٍّ يمتدّ تحته.
    والخطُّ الممتدُّ يفصل ولا يُعلِّم — والقصيرُ يُعلِّم موضعَ البداية. */
 h3.sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-2); letter-spacing:.8px;
   margin:var(--s-8) 0 var(--s-3); padding-bottom:var(--s-2);
   border-bottom:1px solid var(--line-soft); position:relative}
 h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; width:34px;
-  height:2px; border-radius:99px; background:var(--gold)}
+  height:2px; border-radius:99px; background:var(--brand)}
 
 /* ── بطاقةُ المؤشّر ────────────────────────────────────────── */
 .tile{display:flex; flex-direction:column; position:relative; overflow:hidden}
-/* خيطٌ ذهبيٌّ على رأس المؤشّر — يربط الأربعةَ بعضَها ببعضٍ فتُقرأ صفّا
+/* خيطٌ بلون الهويّة على رأس المؤشّر — يربط الأربعةَ بعضَها ببعضٍ فتُقرأ صفّا
    واحدا، ويميّزها عن بطاقات المحتوى تحتها. */
 .tile::before{content:''; position:absolute; inset-inline:0; top:0; height:2px;
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold) 70%,transparent),transparent)}
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--brand) 70%,transparent),transparent)}
 .tile .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3); letter-spacing:.4px}
 .tile .v{font-size:var(--t-display); font-weight:700; line-height:1.12; letter-spacing:-1.4px;
   font-variant-numeric:tabular-nums; margin-top:6px;
@@ -256,7 +297,7 @@ h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; 
    قطّ — الكهرمان يقع من ذهب الهوية على ΔE 7.2 فلا يُرى فرقُهما. والبلوغُ
    حالةٌ لا مقدار، فيقفز إلى الأحمر (ΔE 19.8 عن الذهب) **ومعه نصّ**. */
 .bar{height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; margin-top:12px}
-.bar i{display:block; height:100%; border-radius:99px; background:var(--gold); transition:width .3s}
+.bar i{display:block; height:100%; border-radius:99px; background:var(--brand); transition:width .3s}
 .bar i.f{background:var(--bad)}
 .cap{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
   color:var(--bad); margin-top:7px}
@@ -309,8 +350,8 @@ button,.btn{font:inherit; font-size:var(--t-base); font-weight:600; border-radiu
   min-height:var(--tap); min-width:var(--tap); box-sizing:border-box;
   display:inline-flex; align-items:center; justify-content:center; gap:var(--s-2);
   text-decoration:none; white-space:nowrap; transition:background .12s, border-color .12s, box-shadow .12s}
-.p{background:var(--gold); color:var(--on-gold); box-shadow:var(--sh-1)}
-.p:hover{background:var(--gold-deep)}
+.p{background:var(--brand); color:var(--on-brand); box-shadow:var(--sh-1)}
+.p:hover{background:var(--brand-deep)}
 .g{background:var(--surface); color:var(--ink); border-color:var(--line-strong); box-shadow:var(--sh-1)}
 .g:hover{background:var(--surface-2)}
 .d{background:var(--surface); color:var(--bad); border-color:color-mix(in srgb,var(--bad) 34%,transparent)}
@@ -344,7 +385,7 @@ input:not([type]),select,textarea{
   color:var(--ink); padding:var(--s-2) var(--s-3); font:inherit; font-size:var(--t-md);
   min-height:var(--tap); box-sizing:border-box;
   transition:border-color .12s, box-shadow .12s}
-input:focus,select:focus,textarea:focus{border-color:var(--gold); box-shadow:0 0 0 3px var(--ring); outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--brand); box-shadow:0 0 0 3px var(--ring); outline:none}
 input[type=number]{width:110px}
 /* ── طولُ السطر ───────────────────────────────────────────────────────
    45 إلى 75 محرفا. وقيست كتلٌ عند 135 — ضعفُ الحدّ. والعينُ ترتدّ من
@@ -410,7 +451,7 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .ch-logo svg{width:17px; height:17px; display:block}
 .ch-name{font-weight:700; font-size:var(--t-md); line-height:1.35; letter-spacing:-.1px}
 .ch-name a{color:inherit; text-decoration:none}
-.ch-name a:hover{color:var(--gold); text-decoration:underline; text-underline-offset:3px}
+.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}
 .ch-name span{display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:0}
 .ch-note{font-size:12px; color:var(--ink-3); line-height:1.7; margin:0}
 .ch-acc{display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:var(--r-sm);
@@ -436,16 +477,16 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
    يُنفَّذ — ومهمّةٌ لم تُنفَّذ في البوّابة تظهر عندنا خطأً غامضا. */
 .guide{margin-top:var(--s-4); border:1px solid var(--line); border-radius:var(--r-lg);
   background:var(--surface-2); overflow:hidden; position:relative}
-/* الرافدةُ الذهبيّة: تفصل الدليلَ عمّا حوله بلا حدٍّ ثخينٍ يحبسه */
+/* رافدةُ الهويّة: تفصل الدليلَ عمّا حوله بلا حدٍّ ثخينٍ يحبسه */
 .guide::before{content:''; position:absolute; inset-block:0; inset-inline-start:0; width:3px;
-  background:linear-gradient(180deg,var(--gold),color-mix(in srgb,var(--gold) 18%,transparent))}
+  background:linear-gradient(180deg,var(--brand),color-mix(in srgb,var(--brand) 18%,transparent))}
 .guide>summary{cursor:pointer; list-style:none; display:flex; align-items:center;
   gap:var(--s-3); padding:var(--s-3) var(--s-5); min-height:56px}
 .guide>summary::-webkit-details-marker{display:none}
 .guide>summary:hover{background:var(--surface-3)}
 .guide .g-ic{flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
-  background:var(--gold-wash); color:var(--gold);
-  border:1px solid color-mix(in srgb,var(--gold) 26%,transparent)}
+  background:var(--brand-wash); color:var(--brand);
+  border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
 .guide .g-ic svg{width:15px; height:15px; display:block}
 .guide .g-t{min-width:0}
 .guide .g-t b{display:block; font-size:var(--t-md); font-weight:700; letter-spacing:-.15px}
@@ -453,7 +494,7 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
   max-width:var(--measure)}
 /* «افتح/أغلق» — وسمُ summary لا يُعلن حالَه لقارئ الشاشة بنفسه، فالنصُّ
    يقوله. وسهمٌ وحده لا يُقرأ بصوتٍ عالٍ. */
-.guide .g-tog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--gold);
+.guide .g-tog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
   display:inline-flex; align-items:center; gap:var(--s-2)}
 .guide .g-tog::after{content:'▾'; font-size:10px; transition:transform .18s}
 .guide[open] .g-tog::after{transform:rotate(180deg)}
@@ -482,9 +523,9 @@ ol.steps li{display:flex; gap:var(--s-3); align-items:flex-start; position:relat
 ol.steps li:not(:last-child)::before{content:''; position:absolute; top:26px; bottom:calc(-1 * var(--s-4));
   inset-inline-start:12px; width:1px; background:var(--line-strong)}
 ol.steps .n{flex:none; width:25px; height:25px; border-radius:50%; margin-top:0; z-index:1;
-  display:grid; place-items:center; background:var(--surface); color:var(--gold);
+  display:grid; place-items:center; background:var(--surface); color:var(--brand);
   font-size:var(--t-sm); font-weight:700; font-variant-numeric:tabular-nums;
-  border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);
+  border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);
   box-shadow:0 0 0 3px var(--surface-2)}
 ol.steps .body{min-width:0; max-width:var(--measure); padding-top:2px}
 ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:3px;
@@ -496,7 +537,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
    أبدا** — فالموضعُ فوق الحقل، وهو ما كان.
 
    والذي تبدّل هو **الوزن**: كان سطرا رماديّا بحجم 12 لا يُميَّز عن
-   الزينة، فصار لوحا مؤطَّرا برمزٍ ذهبيّ. والموضعُ صحيحٌ في الحالين،
+   الزينة، فصار لوحا مؤطَّرا برمزٍ ملوّن. والموضعُ صحيحٌ في الحالين،
    والفرقُ أنّ الثاني يُرى. */
 .help{display:flex; gap:var(--s-3); align-items:flex-start; margin:var(--s-2) 0 var(--s-3);
   padding:var(--s-3) var(--s-4); border-radius:var(--r);
@@ -504,8 +545,8 @@ ol.steps .why{display:block; color:var(--ink-3)}
   font-size:var(--t-sm); line-height:var(--lh); color:var(--ink-2); max-width:var(--measure)}
 .help .i{flex:none; width:17px; height:17px; border-radius:50%; margin-top:2px;
   display:grid; place-items:center; font-size:10px; font-weight:700;
-  background:var(--gold-wash); color:var(--gold);
-  border:1px solid color-mix(in srgb,var(--gold) 26%,transparent)}
+  background:var(--brand-wash); color:var(--brand);
+  border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
 .help b{color:var(--ink); font-weight:600}
 .help .t{min-width:0}
 .guide .field{margin-bottom:var(--s-5)}
@@ -535,7 +576,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
 /* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
    — وهو ثلثُ الحدّ. */
 summary{min-height:var(--tap); display:flex; align-items:center}
-.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--gold-deep);
+.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--brand-deep);
   list-style:none; padding:var(--s-2) 0}
 .setup>summary::-webkit-details-marker{display:none}
 .setup>summary::before{content:'▸'; display:inline-block; margin-inline-end:var(--s-2)}
@@ -572,7 +613,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* المقروءُ يأخذ قدرَ نصّه بسقف: مربّعٌ ثابتٌ تحت نصٍّ قصير فراغٌ بلا سبب،
    وتحت نصٍّ طويل تمريرٌ في نصٍّ لا يُحرَّر. */
 .draft-text[data-ro]{height:auto; max-height:calc(var(--lines) * 26px + 28px)}
-.draft-text:focus{outline:none; border-color:var(--gold-deep); box-shadow:var(--ring)}
+.draft-text:focus{outline:none; border-color:var(--brand-deep); box-shadow:var(--ring)}
 /* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
    على نصٍّ لا يُحرَّر يعد بما لا يقع. */
 .draft-text.ro{background:var(--surface-3); color:var(--ink-2); resize:none}
@@ -630,7 +671,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 nav.back{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-3) 0 var(--s-5)}
 nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-decoration:none;
   display:inline-flex; align-items:center; min-height:var(--tap)}
-nav.back a:hover{color:var(--gold)}
+nav.back a:hover{color:var(--brand)}
 
 .plat-logo{width:46px; height:46px; border-radius:13px; flex:none; display:grid; place-items:center;
   background:var(--surface); border:1px solid var(--line); color:var(--ink);
@@ -653,6 +694,19 @@ nav.back a:hover{color:var(--gold)}
   font-size:var(--t-md); line-height:var(--lh); color:var(--ink); max-width:var(--measure)}
 .post-foot{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   margin-top:var(--s-3)}
+/* ── صفُّ الأرقام ─────────────────────────────────────────────────────
+   والشرطةُ تختلف عن الصفر: الصفرُ «قِيس فكان لا شيء»، والشرطةُ «لا يُقاس
+   أصلا» — و LinkedIn لا يعطي الظهورَ لمنشور عضو. فتُعطى الشرطةُ لونا
+   خافتا وعنوانا يُقرأ بالتحويم، ولا تُعرَض رقما. */
+.stats{display:flex; align-items:center; gap:var(--s-5); flex-wrap:wrap;
+  margin-top:var(--s-3); padding-top:var(--s-3); border-top:1px solid var(--line-soft)}
+.stats.none{border-top:1px dashed var(--line); gap:var(--s-2)}
+.stat{display:inline-flex; align-items:baseline; gap:var(--s-2);
+  font-size:var(--t-xs); color:var(--ink-3)}
+.stat b{font-size:var(--t-lg); font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums; letter-spacing:-.3px}
+.stat .na{color:var(--ink-3); font-weight:400; cursor:help}
+
 /* سببُ الفشل بنصّه: «فشل» وحدها لا تُعالَج، والسببُ يُعالَج */
 .why{display:flex; gap:var(--s-3); align-items:flex-start; margin-top:var(--s-3);
   padding:var(--s-3) var(--s-4); border-radius:var(--r);
@@ -728,7 +782,7 @@ nav.back a:hover{color:var(--gold)}
 .doc ul{margin:0 0 11px; padding-inline-start:20px}
 .doc li{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin-bottom:7px}
 .doc b{color:var(--ink)}
-.doc a{color:var(--gold-deep); text-underline-offset:3px}
+.doc a{color:var(--brand-deep); text-underline-offset:3px}
 .doc table{font-size:12.5px}
 .doc td b{font-weight:600}
 /* «ما لا يقع» أبرزُ ما في الصفحة: هو ما يبحث عنه المراجع أوّلا */

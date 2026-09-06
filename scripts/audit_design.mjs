@@ -87,8 +87,67 @@ for (const file of pages) {
       }
       probe.remove()
 
+      // ── التباينُ **محسوبا** لا مقروءا من الرموز ────────────────────
+      //
+      // ومدقّقُ الرموز يفحص القيَم، وهي قد تكون كلُّها صحيحة ويقع العطل
+      // مع ذلك: المتغيّراتُ تُورَث، أمّا اللونُ فيُورَث محسوبا. فعنصرٌ
+      // يعيد تعريف الرموز على نفسه (الرافدةُ الداكنة في الثيم النهاريّ)
+      // **لا يغيّر لونا ورثه أبناؤه من الجسد** — فيقع حبرٌ داكنٌ على
+      // أرضٍ داكنة، والقيَمُ كلُّها سليمة.
+      //
+      // فيُقاس ما يراه المتصفّح: لونُ النصّ الفعليّ في مقابل أقربِ
+      // خلفيّةٍ غيرِ شفّافة فوقه.
+      const rgb = (v) => {
+        const m = (v || '').match(/[\d.]+/g)
+        return m && m.length >= 3 ? m.slice(0, 3).map(Number) : null
+      }
+      const alpha = (v) => {
+        const m = (v || '').match(/[\d.]+/g)
+        return m && m.length >= 4 ? Number(m[3]) : 1
+      }
+      const lum = ([r, g, b]) => {
+        const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+      }
+      const contrast = (a, b) => {
+        const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+        return (hi + 0.05) / (lo + 0.05)
+      }
+      const groundOf = (el) => {
+        for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+          const bg = getComputedStyle(n).backgroundColor
+          if (alpha(bg) > 0.85) { const c = rgb(bg); if (c) return c }
+        }
+        return [255, 255, 255]
+      }
+
+      const faint = []
+      for (const el of document.querySelectorAll('body *')) {
+        if (!seen(el)) continue
+        // نصٌّ مباشرٌ فقط: الحاوياتُ تُقاس بأبنائها لا بنفسها
+        const own = [...el.childNodes]
+          .filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join('')
+        if (own.length < 2) continue
+        const style = getComputedStyle(el)
+        if (style.visibility === 'hidden' || Number(style.opacity) < 0.15) continue
+        const fg = rgb(style.color)
+        if (fg === null || alpha(style.color) < 0.5) continue
+        const size = Number.parseFloat(style.fontSize)
+        const bold = Number(style.fontWeight) >= 700
+        // حدُّ WCAG AA: 3:1 للكبير (18.66px فأكبر، أو 14px عريض)
+        const min = size >= 18.66 || (bold && size >= 14) ? 3 : 4.5
+        const value = contrast(fg, groundOf(el))
+        if (value < min) {
+          faint.push({
+            cls: el.className || el.tagName.toLowerCase(),
+            text: own.slice(0, 26),
+            ratio: Math.round(value * 100) / 100, min,
+          })
+        }
+      }
+
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1
-      return { small, long, overflow, scrollWidth: document.documentElement.scrollWidth }
+      return { small, long, faint, overflow, scrollWidth: document.documentElement.scrollWidth }
     }, { MIN_TARGET, MAX_LINE })
 
     findings.push({ file: file.split('/').pop(), label, width, ...result })
@@ -99,7 +158,7 @@ await browser.close()
 
 let failed = 0
 for (const f of findings) {
-  const issues = f.small.length + f.long.length + (f.overflow ? 1 : 0)
+  const issues = f.small.length + f.long.length + f.faint.length + (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
   if (issues === 0) { console.log('  ✓ نظيف'); continue }
@@ -117,6 +176,12 @@ for (const f of findings) {
   if (f.long.length > 0) {
     console.log(`  ✕ ${f.long.length} كتلةً فوق ${MAX_LINE} محرفا:`)
     for (const l of f.long.slice(0, 8)) console.log(`      ${l.cls} — ${l.chars} محرفا «${l.text}»`)
+  }
+  if (f.faint.length > 0) {
+    console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)
+    for (const c of f.faint.slice(0, 10)) {
+      console.log(`      ${String(c.cls).slice(0, 34)} — ${c.ratio}:1 (الحدّ ${c.min}) «${c.text}»`)
+    }
   }
 }
 console.log(`\nالمجموع: ${failed} ملحوظة`)

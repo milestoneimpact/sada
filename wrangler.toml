@@ -45,13 +45,18 @@ LEGAL_CONTACT = ""
 # ودورةٌ يوميّةٌ وحدها كانت تعني أنّ منشورا موعدُه التاسعة صباحا لا يخرج
 # قبل الثالثة فجرا بعده — تأخيرٌ يبلغ اثنتين وعشرين ساعة، و«نُشرت في
 # مواعيدها» لا تصحّ معه.
-crons = ["*/15 * * * *", "0 3 * * *"]
+crons = ["*/15 * * * *", "7 * * * *", "0 3 * * *"]
 
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "sada-staging"
 database_id = "422cdc81-6485-45cb-9b2e-995b110756a0"
 migrations_dir = "migrations"
+
+# رابطُ Workers AI — بلا مفتاح: الحسابُ نفسه هو الإذن ما دام
+# النداءُ من داخل Cloudflare (D-050)
+[env.staging.ai]
+binding = "AI"
 
 [[env.staging.r2_buckets]]
 binding = "MEDIA"
@@ -101,13 +106,18 @@ LEGAL_CONTACT = ""
 # ودورةٌ يوميّةٌ وحدها كانت تعني أنّ منشورا موعدُه التاسعة صباحا لا يخرج
 # قبل الثالثة فجرا بعده — تأخيرٌ يبلغ اثنتين وعشرين ساعة، و«نُشرت في
 # مواعيدها» لا تصحّ معه.
-crons = ["*/15 * * * *", "0 3 * * *"]
+crons = ["*/15 * * * *", "7 * * * *", "0 3 * * *"]
 
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "sada"
 database_id = "PLACEHOLDER_D1_PRODUCTION_ID"
 migrations_dir = "migrations"
+
+# رابطُ Workers AI — بلا مفتاح: الحسابُ نفسه هو الإذن ما دام
+# النداءُ من داخل Cloudflare (D-050)
+[env.production.ai]
+binding = "AI"
 
 [[env.production.r2_buckets]]
 binding = "MEDIA"
