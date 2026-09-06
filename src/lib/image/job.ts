@@ -25,6 +25,7 @@ import { costOf, getProvider, resolveKey } from '../providers'
 import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
+import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
 import { imagePrompt, topicOf } from './prompt'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
@@ -130,7 +131,16 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   const perProvider = await checkProvider(deps.db, provider.name)
   if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
 
-  const secretName = provider.builtin && provider.name === 'gemini' ? 'GEMINI_API_KEY' : undefined
+  /*
+   * **واسمُ السرِّ يتبع المزوّد** (D-079): كان مقصورا على Gemini، فمن
+   * وجّه الصورَ إلى Cloudflare لم يجد رمزَه في البيئة ولو كان مضبوطا.
+   */
+  const secretName =
+    provider.name === 'gemini' && provider.builtin
+      ? 'GEMINI_API_KEY'
+      : provider.name === 'cloudflare'
+        ? 'CF_AI_TOKEN'
+        : undefined
   const resolved = await resolveKey(
     deps.db,
     deps.encKey,
@@ -154,14 +164,32 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   const platform: Platform = post.platform === 'x' ? 'x' : 'linkedin'
   const prompt = imagePrompt({ topic: topicOf(post.text), platform })
 
+  /*
+   * **والسائقُ يتبع المزوّدَ المختار** (D-079).
+   *
+   * كان الاستيرادُ مثبَّتا على Gemini: يُقرأ اختيارُ المالك من اللوحة
+   * ثمّ يُنادى Gemini على كلّ حال. فمن وجّه الصورَ إلى Cloudflare أُرسل
+   * اسمُ نموذجِها إلى عنوان Google — **فردّت ٤٠٥**. والاختيارُ كان
+   * يُقرأ ولا يُطاع.
+   */
   let image: Awaited<ReturnType<typeof generateImage>>
   try {
-    image = await generateImage({
-      apiKey: resolved.key,
-      model: route.model,
-      prompt,
-      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-    })
+    image =
+      provider.name === 'cloudflare'
+        ? await generateImageCf({
+            accountId: deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? '',
+            apiToken: resolved.key,
+            // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
+            model: route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL,
+            prompt,
+            ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+          })
+        : await generateImage({
+            apiKey: resolved.key,
+            model: route.model,
+            prompt,
+            ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+          })
   } catch (error) {
     const retryable =
       typeof error === 'object' && error !== null && 'retryable' in error
