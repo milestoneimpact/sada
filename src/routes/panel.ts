@@ -27,6 +27,7 @@ import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
+import { schedulePost, unschedule } from '../lib/schedule/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
@@ -304,6 +305,19 @@ panel.get('/panel', async (c) => {
       })),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       drafts,
+      // الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
+      // في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا
+      targets: channels.flatMap((c) =>
+        c.spec.built
+          ? c.accounts
+              .filter((a) => a.status === 'active')
+              .map((a) => ({
+                id: a.id,
+                platform: c.spec.id as 'linkedin' | 'x',
+                label: `${a.displayName} · ${c.spec.label}`,
+              }))
+          : [],
+      ),
       writableSources: sources
         .filter((x) => x.analyzed)
         .map((x) => ({ id: x.id, name: x.name })),
@@ -716,6 +730,74 @@ panel.post('/panel/drafts/decide', async (c) => {
       action: 'draft.decide',
       target: id,
       detail: result.ok ? result.status : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * الجدولة — **القرارُ الذي يُخرج المنشور من اللوحة إلى العالم.**
+ *
+ * والحارسُ في `schedulePost` لا هنا: المنصّةُ والحسابُ والموعدُ تُفحص في
+ * موضعٍ واحد يشترك فيه هذا الزرّ وأيُّ منادٍ آخر. وزرٌّ في صفحةٍ ليس
+ * طريقا جانبيّا حول الحارس (D-019).
+ */
+panel.post('/panel/drafts/schedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
+  const id = String(form.get('id') ?? '')
+  const result = await schedulePost(
+    c.env.DB,
+    id,
+    String(form.get('account') ?? ''),
+    String(form.get('when') ?? ''),
+    new Date(),
+  )
+
+  const flash: PanelFlash = result.ok
+    ? {
+        kind: 'ok',
+        text: `جُدولت إلى ${result.account} في ${result.at} UTC. وتخرج في أوّل دورةٍ بعد موعدها.`,
+      }
+    : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}` }
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.schedule',
+      target: id,
+      detail: result.ok ? result.at : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/** سحبُ الموعد — قبل مغادرة الرسالة وحده. */
+panel.post('/panel/drafts/unschedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const id = String(gate.form.get('id') ?? '')
+  const result = await unschedule(c.env.DB, id)
+
+  const flash: PanelFlash = result.ok
+    ? { kind: 'ok', text: 'سُحب الموعد — وتبقى معتمَدةً تنتظر موعدا جديدا.' }
+    : { kind: 'bad', text: `تعذّر السحب: ${result.reason}` }
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.unschedule',
+      target: id,
+      detail: result.ok ? 'withdrawn' : `refused:${result.reason}`,
     },
     c.req.raw,
   )

@@ -306,6 +306,20 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .draft-foot .count.warn b{color:var(--warn)}
 .draft-foot .count.bad b{color:var(--bad)}
 .draft-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+/* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
+   ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
+.sched{display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:10px;
+  padding:11px 13px; border-radius:var(--r); background:var(--surface-2);
+  border:1px solid var(--line-soft)}
+.sched.set{background:var(--ok-wash); border-color:transparent}
+.sched.gone{background:var(--warn-wash); border-color:transparent}
+.sched.none{background:var(--warn-wash); border-color:transparent; align-items:center}
+.sched .field{margin:0; flex:1 1 150px; min-width:0}
+.sched label{font-size:10.5px}
+.sched input,.sched select{padding:7px 9px; font-size:12.5px}
+/* الموعدُ لاتينيّ الأرقام ويُعزَل عن اتّجاه الصفحة */
+.sched .when{font-size:12px; color:var(--ink-2); direction:ltr; unicode-bidi:isolate}
+.sched .ago{flex:1 1 auto}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
 .codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; margin:12px 0}

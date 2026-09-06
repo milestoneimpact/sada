@@ -39,6 +39,12 @@ export interface DraftRow {
   readonly approvedBy: string | null
   readonly approvedAt: string | null
   readonly createdAt: string
+  /** موعدُ النشر إن جُدول — بصيغة القاعدة (UTC). */
+  readonly scheduledAt: string | null
+  /** الحسابُ الذي سيُنشر إليه، باسمه لا بمعرّفه. */
+  readonly accountName: string | null
+  /** خُتم حين غادرت الرسالةُ إلى الطابور — وبعده لا سحب. */
+  readonly dispatchedAt: string | null
 }
 
 interface Raw {
@@ -56,6 +62,9 @@ interface Raw {
   approved_by: string | null
   approved_at: string | null
   created_at: string
+  scheduled_at: string | null
+  dispatched_at: string | null
+  account_name: string | null
 }
 
 function toDraft(row: Raw): DraftRow {
@@ -76,6 +85,9 @@ function toDraft(row: Raw): DraftRow {
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     createdAt: row.created_at,
+    scheduledAt: row.scheduled_at,
+    accountName: row.account_name,
+    dispatchedAt: row.dispatched_at,
   }
 }
 
@@ -91,8 +103,12 @@ export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
       .prepare(
         `SELECT p.id, p.platform, p.text, p.rationale, p.status, p.model, p.cost_usd,
                 p.source_id, p.source_hash, p.approved_by, p.approved_at, p.created_at,
-                s.name AS source_name, s.content_hash AS current_hash
-           FROM posts p LEFT JOIN sources s ON s.id = p.source_id
+                p.scheduled_at, p.dispatched_at,
+                s.name AS source_name, s.content_hash AS current_hash,
+                a.display_name AS account_name
+           FROM posts p
+           LEFT JOIN sources s ON s.id = p.source_id
+           LEFT JOIN accounts a ON a.id = p.account_id
           ORDER BY p.created_at DESC
           LIMIT ?`,
       )
