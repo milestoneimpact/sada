@@ -20,6 +20,7 @@ import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { legal } from './routes/legal'
+import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { auth } from './routes/auth'
@@ -325,6 +326,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
+app.route('/', media)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)

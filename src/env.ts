@@ -23,6 +23,17 @@ export interface Env {
   // موارد Cloudflare
   readonly DB: D1Database
   readonly MEDIA: R2Bucket
+  /**
+   * رابطُ Workers AI — **ولا مفتاحَ معه** (D-050).
+   *
+   * الحسابُ نفسه هو الإذن ما دام النداءُ من داخل Cloudflare. ورمزُ
+   * `cfut_` لا يلزم إلّا لمن ينادي من خارجها — **فلا سرَّ يُخزَّن ولا
+   * يُدوَّر ولا يُسرَّب**، وهو أفضلُ ما في هذا الخيار.
+   *
+   * واختياريٌّ لأنّ الرابطَ قد لا يكون مضبوطا في بيئةٍ قديمة: فيُفحَص
+   * قبل الاستعمال ويُقال «غيرُ مضبوط»، ولا يسقط الطلبُ بـ 500.
+   */
+  readonly AI?: { run(model: string, input: Record<string, unknown>): Promise<unknown> }
   readonly KV: KVNamespace
   readonly PUBLISH_QUEUE: Queue
   readonly GENERATE_QUEUE: Queue

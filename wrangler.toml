@@ -53,6 +53,11 @@ database_name = "sada-staging"
 database_id = "422cdc81-6485-45cb-9b2e-995b110756a0"
 migrations_dir = "migrations"
 
+# رابطُ Workers AI — بلا مفتاح: الحسابُ نفسه هو الإذن ما دام
+# النداءُ من داخل Cloudflare (D-050)
+[env.staging.ai]
+binding = "AI"
+
 [[env.staging.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "sada-media-staging"
@@ -108,6 +113,11 @@ binding = "DB"
 database_name = "sada"
 database_id = "PLACEHOLDER_D1_PRODUCTION_ID"
 migrations_dir = "migrations"
+
+# رابطُ Workers AI — بلا مفتاح: الحسابُ نفسه هو الإذن ما دام
+# النداءُ من داخل Cloudflare (D-050)
+[env.production.ai]
+binding = "AI"
 
 [[env.production.r2_buckets]]
 binding = "MEDIA"
