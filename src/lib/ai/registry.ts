@@ -15,7 +15,7 @@ import type { Env } from '../../env'
 export type ProviderName = 'anthropic' | 'gemini'
 
 /** المهامّ التي تنادي نموذجا. تُوسَّع حين تُبنى طبقةٌ جديدة. */
-export type TaskName = 'analyze' | 'draft' | 'image'
+export type TaskName = 'analyze' | 'draft' | 'image' | 'plan'
 
 export interface ProviderSpec {
   readonly label: string
@@ -62,6 +62,11 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
     model: 'claude-opus-5',
     why: 'كتابةٌ عربية تُنشر باسم المالك — الخطأ فيها يُقرأ عليه لا علينا',
   },
+  plan: {
+    provider: 'anthropic',
+    model: 'claude-opus-5',
+    why: 'حكمٌ على أسبوعٍ كامل — يقرّر ما يُنفَق بعده، فالخطأ فيه أغلى من ثمنه',
+  },
   image: {
     provider: 'gemini',
     model: 'gemini-2.5-flash-image',
@@ -70,7 +75,7 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
-export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft', 'image'])
+export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft', 'image', 'plan'])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {
   const value = env[PROVIDERS[provider].secret]

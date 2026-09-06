@@ -14,6 +14,8 @@ import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import { channelsSection } from './ui/channels'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
+import { planSection } from './ui/sections/plan'
+import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
@@ -394,6 +396,9 @@ export interface PanelData {
   readonly targets: readonly Target[]
   /** الصورُ المولَّدة لهذه المسوّدات. */
   readonly media: readonly MediaView[]
+  /** خطّةُ الأسبوع إن وُجدت، وأمزوّدُها جاهز. */
+  readonly plan: StoredPlan | null
+  readonly planReady: boolean
   /** المصادرُ التي لها خلاصة — وحدها تُكتب منها مسوّدة. */
   readonly writableSources: readonly { id: string; name: string }[]
   /** أمزوّدُ مهمّة `draft` مضبوطٌ ومفعَّل؟ */
@@ -807,6 +812,13 @@ ${flash}
 </section>
 
 <section data-pane="posts" hidden>
+  <div style="margin-bottom:14px">${planSection({
+    plan: d.plan,
+    names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
+    ready: d.planReady,
+    analyzed: d.sources.filter((s) => s.analyzed).length,
+    now: d.now,
+  })}</div>
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
