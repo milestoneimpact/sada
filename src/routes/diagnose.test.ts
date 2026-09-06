@@ -19,6 +19,7 @@ const realFetch = globalThis.fetch
 
 let db: FakeDb
 let env: Record<string, unknown>
+let csrf = ''
 
 beforeEach(() => {
   db = fakeDb()
@@ -298,5 +299,104 @@ describe('ونموذجُ Cloudflare في اللوحة', () => {
   /** والمفتاحُ رمزُ Cloudflare لا مفتاحُ مزوّدٍ آخر — ويُقال. */
   it('ويُقال أيُّ مفتاحٍ يلزم', async () => {
     expect(await panelBody('acc-123')).toContain('Workers AI · Read')
+  })
+})
+
+describe('فحصُ الزوج من اللوحة — الأداةُ التي تُنهي التخمين', () => {
+  async function login(): Promise<string> {
+    const body = new FormData()
+    body.set('token', TOKEN)
+    const response = await app.request('/panel/login', { method: 'POST', body }, env)
+    const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const page = await app.request('/panel', { headers: { Cookie: cookie } }, env)
+    csrf = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+    return cookie
+  }
+
+  async function probe(cookie: string): Promise<string> {
+    const form = new FormData()
+    form.set('platform', 'linkedin')
+    form.set('_csrf', csrf)
+    await app.request(
+      '/panel/channels/app/verify',
+      { method: 'POST', body: form, headers: { Cookie: cookie } },
+      env,
+    )
+    // الإشعارُ يُقرأ من الصفحة التالية كما يقرؤه المالك
+    return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+  }
+
+  it('«الزوجُ مرفوض» حين تردّ المنصّةُ invalid_client — ومعه المعرّفُ للمقارنة', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: {
+        status: 401,
+        json: { error: 'invalid_client', error_description: 'Client authentication failed' },
+      },
+    })
+    try {
+      const body = await probe(await login())
+      expect(body).toContain('الزوجُ مرفوض')
+      expect(body).toContain('Client authentication failed')
+      expect(body).toContain('li-id')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  /** وهذا هو الجوابُ الذي يبرّئ السرَّ ويوجّه البحثَ إلى غيره. */
+  it('و«مقبول» حين تردّ invalid_grant على الرمز الباطل', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { status: 400, json: { error: 'invalid_grant' } },
+    })
+    try {
+      const body = await probe(await login())
+      expect(body).toContain('الزوجُ مقبول')
+      expect(body).toContain('ليست في السرّ')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  it('ولا يُدَّعى حكمٌ حين لا يُفهَم الجواب', async () => {
+    globalThis.fetch = (async () =>
+      new Response('<html>', { status: 502 })) as unknown as typeof fetch
+    try {
+      expect(await probe(await login())).toContain('لم يُحسَم الفحص')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  /** **ولا يُسرَّب السرُّ في إشعارٍ يُعرَض ويُسجَّل** (D-005). */
+  it('ولا يظهر السرُّ في الإشعار', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
+    })
+    try {
+      expect(await probe(await login())).not.toContain('li-secret')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  it('وبلا أسرارٍ محفوظةٍ يُقال ذلك ولا يُنادى أحد', async () => {
+    const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
+    const body = new FormData()
+    body.set('token', TOKEN)
+    const login = await app.request('/panel/login', { method: 'POST', body }, bare)
+    const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const page = await app.request('/panel', { headers: { Cookie: cookie } }, bare)
+    const token = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+
+    const form = new FormData()
+    form.set('platform', 'linkedin')
+    form.set('_csrf', token)
+    await app.request(
+      '/panel/channels/app/verify',
+      { method: 'POST', body: form, headers: { Cookie: cookie } },
+      bare,
+    )
+    const after = await (await app.request('/panel', { headers: { Cookie: cookie } }, bare)).text()
+    expect(after).toContain('لا أسرارَ محفوظة')
   })
 })

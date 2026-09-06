@@ -30,7 +30,9 @@ import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
-import { appStatuses, deleteApp, saveApp } from '../lib/oauth/apps'
+import { appStatuses, deleteApp, readApp, saveApp } from '../lib/oauth/apps'
+import { verifyAppCredentials } from '../lib/oauth/verify'
+import { PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
@@ -743,6 +745,82 @@ panel.post('/panel/channels/app', async (c) => {
 })
 
 /** حذفُ التطبيق من الخزانة — ولا يمسّ ما في أسرار Worker. */
+/**
+ * فحصُ زوج الأسرار — **قبل الربط، لا بعد أن يفشل.**
+ *
+ * `invalid_client` يصل بعد أن ينجح كلُّ شيءٍ قبله، **فلا يُعرَف أهو
+ * السرُّ أم علّةٌ أخرى** إلّا بدورةِ إذنٍ كاملةٍ في كلّ مرّة. وهذا
+ * الفحصُ يسأل السؤالَ وحده: **أيَقبل المزوّدُ هذا الزوج؟** (D-060)
+ *
+ * ولا يُنتَج رمزُ وصول: المرسَلُ رمزٌ باطلٌ عمدا. ولا تكلفة، فلا صفَّ
+ * في الدفتر (D-008 يوجب التسجيل على المدفوع).
+ */
+panel.post('/panel/channels/app/verify', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const platform = platformParam(String(gate.form.get('platform') ?? ''))
+  if (platform === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    return back('channels')
+  }
+
+  const creds = await readApp(
+    c.env.DB,
+    c.env.TOKEN_ENC_KEY,
+    platform,
+    c.env as unknown as Record<string, string | undefined>,
+  )
+  if (creds === null) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: `لا أسرارَ محفوظةً لـ ${platform} — احفظها أوّلا ثمّ افحص.`,
+    })
+    return back('channels')
+  }
+
+  const verdict = await verifyAppCredentials(
+    PROVIDERS[platform],
+    { clientId: creds.clientId, clientSecret: creds.clientSecret },
+    callbackUri(c.env.PUBLIC_BASE_URL, platform),
+  )
+
+  // **ونصُّ المزوّد يُعرَض ولا يُبنى عليه حكم** (D-054)
+  const said = verdict.kind === 'inconclusive'
+    ? verdict.detail
+    : verdict.description === undefined
+      ? verdict.code
+      : `${verdict.code} — ${verdict.description}`
+
+  let flash: PanelFlash
+  if (verdict.kind === 'rejected') {
+    flash = {
+      kind: 'bad',
+      text:
+        `الزوجُ مرفوضٌ عند ${platform}: ردّت «${said}». ` +
+        `والمعرّفُ الذي أُرسل ${creds.clientId} — قارنه بما في تبويب Auth. ` +
+        'فإن طابقه فالسرُّ هو الخطأ: ولّد سرّا جديدا والصقه.',
+    }
+  } else if (verdict.kind === 'accepted') {
+    flash = {
+      kind: 'ok',
+      text:
+        `الزوجُ مقبولٌ عند ${platform} — ردّت «${said}» على رمزٍ باطلٍ أرسلناه عمدا، ` +
+        'وهذا هو المنتظَر. فإن بقي الربطُ يفشل فالعلّةُ ليست في السرّ.',
+    }
+  } else {
+    flash = { kind: 'warn', text: `لم يُحسَم الفحص: ${said}. ولا يُدَّعى حكمٌ بلا دليل.` }
+  }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'oauth_app.verify', target: platform, detail: verdict.kind },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('channels')
+})
+
 panel.post('/panel/channels/app/delete', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
