@@ -1,0 +1,208 @@
+/**
+ * الخطّةُ الأسبوعيّة — وهي **حكمٌ لا جدولة**.
+ *
+ * ## ما تجيب عنه
+ *
+ * صدى تحلّل كلَّ مصدرٍ على حدة، فتعرف قيمةَ كلٍّ منفردا. والخطّةُ تجيب
+ * سؤالا لا يجيبه التحليل: **أيُّ هذه يستحقّ أن يُنشر هذا الأسبوع، وبأيّ
+ * ترتيب، وعلى أيّ منصّة؟** — وهو سؤالُ محرّرٍ لا سؤالُ قارئ.
+ *
+ * ## ولا تُنفق ولا تجدول
+ *
+ * بندٌ في الخطّة **اقتراح**: لا يُكتب منه نصٌّ حتّى يضغط المالك، ولا
+ * يُجدول حتّى يعتمد النصّ. فالخطّةُ نداءٌ واحدٌ رخيص، والكتابةُ نداءٌ
+ * لكلّ بندٍ يُختار.
+ *
+ * ## ولا مصدرَ يُخترَع
+ *
+ * النموذجُ يختار من قائمةٍ معطاةٍ بمعرّفاتها. ومعرّفٌ يخترعه يعطي بندا
+ * **لا يمكن تنفيذُه** — فيُرفض في الشيفرة لا يُرجى من الوصف.
+ */
+
+export interface PlanSource {
+  readonly id: string
+  readonly name: string
+  readonly summary: string
+  readonly themes: readonly string[]
+  readonly worth: number
+  /** كم منشورا خرج من هذا المصدر — فلا يُعاد ما استُنفد. */
+  readonly used: number
+}
+
+/**
+ * بدايةُ الأسبوع: الأحدُ القادم، أو اليومَ إن كان أحدا.
+ *
+ * والأحدُ لا الاثنين: أسبوعُ العمل في الرياض يبدأ الأحد، وخطّةٌ تبدأ
+ * الاثنين تترك يوما بلا موضع. والقياسُ بـ UTC كما في كلّ ما يُخزَّن.
+ */
+export function weekStart(now: Date): string {
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const ahead = (7 - date.getUTCDay()) % 7
+  date.setUTCDate(date.getUTCDate() + ahead)
+  return date.toISOString().slice(0, 10)
+}
+
+export function systemPrompt(): string {
+  return [
+    'أنت محرّرُ محتوًى يخطّط أسبوعا لحسابٍ مهنيّ واحد.',
+    '',
+    '## ما تقرّره',
+    '',
+    'تُعطى مصادرَ محلَّلةً بخلاصاتها ومحاورها ودرجةِ استحقاقها. واختر منها',
+    'ما يستحقّ النشر في الأسبوع القادم، ورتّبه.',
+    '',
+    '## قيودٌ لا تُخالَف',
+    '',
+    '**لا تختر مصدرا ليس في القائمة، ولا تخترع معرّفا.** والمعرّفُ يُنسخ',
+    'كما هو حرفا بحرف.',
+    '',
+    '**من ثلاثة إلى ستّة بنودٍ لا أكثر.** أسبوعٌ بعشرة منشورات يُتعب',
+    'القارئ ويُستهلك المصادر في أسبوع.',
+    '',
+    '**ولا تكرّر مصدرا في منصّةٍ استُعمل فيها**، إلّا أن يكون عاليَ',
+    'الاستحقاق وللزاوية الثانية وجهٌ مختلفٌ حقّا.',
+    '',
+    '## التوزيع',
+    '',
+    'باعد بين البنود: يومٌ فارغٌ بين منشورين خيرٌ من يومين متتاليين.',
+    'ولا تضع منشورين في يومٍ واحدٍ على المنصّة نفسها.',
+    'والأوقاتُ بـ UTC، واختر ما بين 05:00 و 15:00 — وهو نهارُ الخليج.',
+    '',
+    'وLinkedIn للفكرة المطوّلة، و X للجملة التي تقف وحدها. فالمصدرُ',
+    'الغنيّ يصلح للأولى، والفكرةُ الحادّة للثانية.',
+    '',
+    '## المخرَج',
+    '',
+    'أعد JSON بحقلين: `rationale` سطرٌ واحد يشرح منطق الأسبوع كلِّه،',
+    'و `items` مصفوفةُ البنود.',
+  ].join('\n')
+}
+
+export function userPrompt(sources: readonly PlanSource[], week: string): string {
+  const lines = sources.map((s) =>
+    [
+      `### ${s.name}`,
+      `id: ${s.id}`,
+      `الاستحقاق: ${s.worth.toFixed(2)}`,
+      s.used === 0 ? 'لم يُنشر منه شيء' : `خرج منه ${s.used} منشورا`,
+      s.themes.length === 0 ? '' : `المحاور: ${s.themes.join(' · ')}`,
+      s.summary,
+    ]
+      .filter((l) => l !== '')
+      .join('\n'),
+  )
+  return [`# أسبوعٌ يبدأ ${week}`, '', '# المصادر المتاحة', '', lines.join('\n\n')].join('\n')
+}
+
+export const PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    rationale: { type: 'string' },
+    items: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 6,
+      items: {
+        type: 'object',
+        properties: {
+          source_id: { type: 'string' },
+          platform: { type: 'string', enum: ['linkedin', 'x'] },
+          angle: { type: 'string', minLength: 10 },
+          day: { type: 'string' },
+          time: { type: 'string' },
+          why: { type: 'string' },
+        },
+        required: ['source_id', 'platform', 'angle', 'day', 'time', 'why'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['rationale', 'items'],
+  additionalProperties: false,
+} as const
+
+export interface PlanItem {
+  readonly sourceId: string
+  readonly platform: 'linkedin' | 'x'
+  readonly angle: string
+  /** `YYYY-MM-DD` داخل الأسبوع. */
+  readonly day: string
+  /** `HH:MM` بـ UTC. */
+  readonly time: string
+  readonly why: string
+}
+
+export interface Plan {
+  readonly rationale: string
+  readonly items: readonly PlanItem[]
+}
+
+function within(day: string, week: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false
+  const start = Date.parse(`${week}T00:00:00Z`)
+  const at = Date.parse(`${day}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(at)) return false
+  const days = (at - start) / 86_400_000
+  return days >= 0 && days < 7
+}
+
+/**
+ * يقرأ الخطّةَ ويتحقّق منها.
+ *
+ * **والتحقّقُ يقع هنا لا يُترك للنموذج**: وصفٌ يقول «لا تخترع معرّفا»
+ * يُطاع أكثرَ ممّا يُعصى ولا يُطاع دائما. وبندٌ بمعرّفٍ مخترَع يُعرض على
+ * المالك فيضغط «اكتب» فيفشل — **فيُمسك الآن، لا بعد أن يُعرض.**
+ *
+ * والبندُ الفاسد يُسقَط وحده ولا تسقط الخطّة: خمسةٌ صالحةٌ من ستّةٍ خيرٌ
+ * من نداءٍ يُعاد كاملا بكلفته.
+ */
+export function parsePlan(
+  raw: unknown,
+  known: ReadonlySet<string>,
+  week: string,
+): { ok: true; plan: Plan; dropped: number } | { ok: false; reason: string } {
+  if (typeof raw !== 'object' || raw === null) return { ok: false, reason: 'الجواب ليس كائنا' }
+  const value = raw as { rationale?: unknown; items?: unknown }
+  if (!Array.isArray(value.items)) return { ok: false, reason: 'لا بنودَ في الخطّة' }
+
+  const items: PlanItem[] = []
+  let dropped = 0
+  for (const entry of value.items) {
+    const item = entry as Partial<Record<keyof PlanItem | 'source_id', unknown>>
+    const sourceId = typeof item['source_id'] === 'string' ? item['source_id'] : ''
+    const platform = item['platform']
+    const angle = typeof item['angle'] === 'string' ? item['angle'].trim() : ''
+    const day = typeof item['day'] === 'string' ? item['day'] : ''
+    const time = typeof item['time'] === 'string' ? item['time'] : ''
+
+    const valid =
+      known.has(sourceId) &&
+      (platform === 'linkedin' || platform === 'x') &&
+      angle.length >= 10 &&
+      within(day, week) &&
+      /^\d{2}:\d{2}$/.test(time)
+
+    if (!valid) {
+      dropped += 1
+      continue
+    }
+    items.push({
+      sourceId,
+      platform,
+      angle,
+      day,
+      time,
+      why: typeof item['why'] === 'string' ? item['why'].trim() : '',
+    })
+  }
+
+  if (items.length === 0) return { ok: false, reason: 'لم يبقَ بندٌ صالحٌ في الخطّة' }
+  return {
+    ok: true,
+    plan: {
+      rationale: typeof value.rationale === 'string' ? value.rationale.trim() : '',
+      items: items.sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`)),
+    },
+    dropped,
+  }
+}

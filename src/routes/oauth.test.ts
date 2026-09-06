@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { loadTokens } from '../lib/tokens'
 import { LINKEDIN, X } from '../lib/oauth/providers'
+import { IMPLEMENTED, PROVIDERS, ROUTES, type TaskName } from '../lib/ai/registry'
 import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 
@@ -404,17 +405,23 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     expect(analyze.why.length).toBeGreaterThan(10)
   })
 
+  /**
+   * كُتب هذا بقائمةٍ ثابتة، **فكسرته كلُّ مهمّةٍ جديدة ثلاثَ مرّات** —
+   * وكسرٌ متكرّرٌ في اختبارٍ منطقُه صحيح يُغري بتأجيل ما يلزم بناؤه.
+   * فصار يثبّت **القاعدة**: كلُّ مهمّةٍ مبنيّةٍ ينقص سرُّ مزوّدها تُسمَّى،
+   * وما لم يُبنَ لا يُشتكى منه — أيّا كانت المهامّ يومَ يُقرأ هذا.
+   */
   it('يسمّي ما يعطّل مهمّةً مبنيّة، ولا يشكو ممّا لم يُبنَ', async () => {
     const body = await read()
-    // الفهمُ والكتابةُ مبنيّان وكلاهما على Anthropic — فسرٌّ واحدٌ ناقص
-    // يعطّلهما معا، ويُسمَّى مرّةً لكلّ مهمّة لا مرّةً للنظام
-    // الثلاثةُ مبنيّةٌ الآن، ولكلٍّ سرُّ مزوّدها: فسرٌّ ناقصٌ يُسمَّى مرّةً
-    // لكلّ مهمّةٍ يعطّلها لا مرّةً للنظام
-    expect(body.blocked).toEqual([
-      { task: 'analyze', missing_secret: 'ANTHROPIC_API_KEY' },
-      { task: 'draft', missing_secret: 'ANTHROPIC_API_KEY' },
-      { task: 'image', missing_secret: 'GEMINI_API_KEY' },
-    ])
+    const tasks = Object.keys(ROUTES) as TaskName[]
+
+    expect(body.blocked.map((b) => b.task)).toEqual(tasks.filter((t) => IMPLEMENTED.has(t)))
+    for (const entry of body.blocked) {
+      // ويُسمَّى السرُّ باسمه: «مزوّدٌ ناقص» لا يقول للمالك ماذا يضبط
+      expect(entry.missing_secret).toBe(PROVIDERS[ROUTES[entry.task as TaskName].provider].secret)
+    }
+    // ولا مهمّةَ تُسمَّى مرّتين
+    expect(new Set(body.blocked.map((b) => b.task)).size).toBe(body.blocked.length)
   })
 
   it('يفرز الإنفاق بالمزوّد من الدفتر نفسه', async () => {

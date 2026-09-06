@@ -28,6 +28,8 @@ import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
+import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
+import { appStatuses, deleteApp, saveApp } from '../lib/oauth/apps'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
@@ -273,12 +275,25 @@ panel.get('/panel', async (c) => {
   const routes = await readRoutes(c.env.DB)
   const drafts = await listDrafts(c.env.DB, 60)
   const media = await mediaFor(c.env.DB, drafts.map((d) => d.id))
+  const plan = await latestPlan(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
-  // سرُّ Worker يُفحص بوجوده لا بقيمته — والقيمةُ لا تغادر البيئة
+  const apps = await appStatuses(c.env.DB, c.env as unknown as Record<string, string | undefined>)
+
+  /**
+   * أمتاحٌ هذا السرّ؟ — **ومصدرانِ لا واحد** (D-042).
+   *
+   * سرُّ Worker يُفحص بوجوده لا بقيمته، والقيمةُ لا تغادر البيئة. وما
+   * حُفظ في الخزانة يُعدّ متاحا كذلك — وإلّا لبقيت البطاقةُ تقول
+   * «تنتظرك» بعد أن ضبطها المالك من اللوحة نفسها.
+   */
+  const configured = new Set(
+    apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames),
+  )
   const channels = viewChannels(await listAccounts(c.env.DB), (name) => {
+    if (configured.has(name)) return true
     const value = c.env[name as keyof Env]
     return typeof value === 'string' && value.length > 0
   })
@@ -315,6 +330,12 @@ panel.get('/panel', async (c) => {
         cost: m.cost,
         status: m.status,
       })),
+      plan,
+      planReady: routes.some(
+        (r) =>
+          r.task === 'plan' &&
+          providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
+      ),
       // الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
       // في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا
       targets: channels.flatMap((c) =>
@@ -358,6 +379,8 @@ panel.get('/panel', async (c) => {
         enforced: factors.enforced,
       },
       channels,
+      apps,
+      baseUrl: c.env.PUBLIC_BASE_URL,
     }),
   )
 })
@@ -645,6 +668,149 @@ panel.post('/panel/analyze', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('sources')
+})
+
+// ── تطبيقا OAuth ─────────────────────────────────────────────────────
+
+/** المنصّاتُ التي لها سائقٌ مبنيّ — وما عداها لا يُقبل في مسار. */
+function platformParam(raw: string): 'linkedin' | 'x' | null {
+  return raw === 'linkedin' || raw === 'x' ? raw : null
+}
+
+/**
+ * حفظُ أسرار تطبيقٍ من اللوحة (D-042).
+ *
+ * **ولا يُسجَّل السرُّ في السجلّ ولا يُعاد في ردّ.** ما يُسجَّل: مَن بدّل،
+ * ولأيّ منصّة، وهل تغيّرت القيمة — لا القيمةُ نفسها.
+ */
+panel.post('/panel/channels/app', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
+  const platform = platformParam(String(form.get('platform') ?? ''))
+  if (platform === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    return back('channels')
+  }
+
+  const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
+  let flash: PanelFlash
+  let detail: string
+  try {
+    const result = await saveApp(
+      c.env.DB,
+      c.env.TOKEN_ENC_KEY,
+      platform,
+      String(form.get('client_id') ?? ''),
+      String(form.get('client_secret') ?? ''),
+      by,
+    )
+    detail = result.unchanged ? 'unchanged' : 'saved'
+    flash = {
+      kind: 'ok',
+      text: result.unchanged
+        ? `أسرارُ ${platform} محفوظةٌ كما هي — السرُّ نفسه لم يتغيّر.`
+        : `حُفظت أسرارُ ${platform} مشفَّرة (${result.hint}). جرّب «اربط» الآن.`,
+    }
+  } catch (error) {
+    detail = 'failed'
+    flash = { kind: 'bad', text: error instanceof Error ? error.message : 'تعذّر الحفظ' }
+  }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'oauth_app.save', target: platform, detail },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('channels')
+})
+
+/** حذفُ التطبيق من الخزانة — ولا يمسّ ما في أسرار Worker. */
+panel.post('/panel/channels/app/delete', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const platform = platformParam(String(gate.form.get('platform') ?? ''))
+  if (platform === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    return back('channels')
+  }
+
+  const done = await deleteApp(c.env.DB, platform)
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'oauth_app.delete', target: platform, detail: done ? 'deleted' : 'absent' },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, {
+    kind: done ? 'ok' : 'bad',
+    text: done ? `حُذفت أسرارُ ${platform} من الخزانة.` : 'لا أسرارَ محفوظةً لهذه المنصّة.',
+  })
+  return back('channels')
+})
+
+// ── الخطّة الأسبوعيّة ─────────────────────────────────────────────────
+
+/**
+ * توليدُ خطّة الأسبوع — نداءٌ واحدٌ مدفوع، بحارسه.
+ *
+ * **ولا يكتب منشورا ولا يجدول.** يقترح، والكتابةُ زرٌّ لكلّ بند يمرّ
+ * بـ `/panel/drafts/write` نفسه — لا طريقا ثانيا حول الحارس.
+ */
+panel.post('/panel/plan/generate', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const outcome = await planWeek({
+    db: c.env.DB,
+    encKey: c.env.TOKEN_ENC_KEY,
+    workerSecrets: c.env as unknown as Record<string, string | undefined>,
+  })
+
+  const flash: PanelFlash =
+    outcome.kind === 'planned'
+      ? {
+          kind: 'ok',
+          text: `خطّةُ أسبوع ${outcome.week}: ${outcome.items} بندا${
+            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped} لمصدرٍ لا نعرفه)`
+          }، الكلفة ${money(outcome.cost)}.`,
+        }
+      : outcome.kind === 'not_enough'
+        ? { kind: 'warn', text: outcome.reason }
+        : outcome.kind === 'blocked'
+          ? { kind: 'warn', text: outcome.reason }
+          : { kind: 'bad', text: `تعذّر التخطيط: ${outcome.reason}` }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'plan.generate', target: null, detail: outcome.kind },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/** اعتمادُ منطق الخطّة — علامةٌ لا تنفيذ. */
+panel.post('/panel/plan/approve', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+
+  const done = await approvePlan(c.env.DB, id)
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'plan.approve', target: id, detail: done ? 'approved' : 'refused' },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, {
+    kind: done ? 'ok' : 'bad',
+    text: done
+      ? 'اعتُمد منطقُ الأسبوع. ولا يُكتب منه حرفٌ حتّى تضغط «اكتب منه» لبند.'
+      : 'لا خطّةَ بهذه الحال.',
+  })
+  return back('posts')
 })
 
 // ── الصور ────────────────────────────────────────────────────────────

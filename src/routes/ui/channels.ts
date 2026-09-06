@@ -17,7 +17,8 @@
  * سرّ، **ولا شيء** حيث لم يُبنَ سائق. وزرٌّ يُعرض ثمّ يقول «غير مدعوم»
  * أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا في نضج النظام.
  */
-import type { ChannelView } from '../../lib/channels'
+import { SETUP, type ChannelView } from '../../lib/channels'
+import type { AppStatus } from '../../lib/oauth/apps'
 import { escapeHtml } from './shell'
 import { relativeTime } from '../../lib/format'
 
@@ -37,8 +38,106 @@ const KIND: Readonly<Record<string, string>> = {
   org: 'صفحةٌ أو شركة',
 }
 
+/**
+ * لوحُ ضبط التطبيق (D-042).
+ *
+ * ## الإرشادُ بجانب الحقل لا في وثيقة
+ *
+ * مالكٌ يجد حقلين فارغين ثمّ يبحث عن معناهما يتوقّف. فتحت كلّ حقلٍ من
+ * أين تأتي قيمتُه، وقبلَهما ما يجب أن يتمّ أوّلا **ولماذا** — ورابطُ
+ * العودة معروضٌ ليُنسَخ لا ليُكتب.
+ *
+ * ## والسرُّ يُكتب ولا يُقرأ
+ *
+ * الحقلُ يبقى فارغا دائما ولو كان محفوظا: يُعرض قناعُه بجانبه، فيعرف
+ * المالك أنّ هناك سرّا ولا يُكشَف. **وحقلٌ يُملأ بالمحفوظ يُسرّبه إلى
+ * كلّ من يفتح الصفحة.**
+ *
+ * ## وسرُّ Worker لا يُدهَس صامتا
+ *
+ * حيث تكون البيئةُ هي المصدر، **لا نموذجَ يُعرض**: النموذجُ يوهم بأنّ
+ * الكتابةَ فيه تغيّر المستعمَل، وهي لا تغيّره (D-030).
+ */
+function setupPane(view: ChannelView, app: AppStatus | undefined, base: string): string {
+  const guide = SETUP[view.spec.id]
+  if (guide === undefined || app === undefined) return ''
+
+  const callback = `${base.replace(/\/+$/, '')}/oauth/${view.spec.id}/callback`
+
+  if (app.source === 'worker_secret') {
+    return `<details class="setup">
+      <summary>مضبوطٌ من أسرار Worker</summary>
+      <div class="setup-body">
+        <p class="ch-note"><b>وسرُّ البيئة يغلب الخزانة دائما.</b> فلا نموذجَ هنا:
+          الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو —
+          <span class="mono">${escapeHtml(app.secretNames[1])}</span> في أسرار Worker.</p>
+        ${app.clientId === null ? '' : `<p class="ch-note">المعرّف الحاليّ:
+          <span class="mono">${escapeHtml(app.clientId)}</span></p>`}
+      </div>
+    </details>`
+  }
+
+  const steps = guide.before
+    .map(
+      (b) => `<li><span class="what">${b.what}</span>
+        <span class="why">${b.why}</span></li>`,
+    )
+    .join('')
+
+  const saved =
+    app.source === 'vault'
+      ? `<p class="ch-note"><span class="st ok"><span class="g">●</span>محفوظ</span>
+         المعرّف <span class="mono">${escapeHtml(app.clientId ?? '')}</span> ·
+         السرّ <span class="mono">${escapeHtml(app.hint ?? '')}</span>
+         ${app.updatedBy === null ? '' : `· بدّله ${escapeHtml(app.updatedBy)}`}</p>`
+      : ''
+
+  const id = view.spec.id
+  return `<details class="setup"${app.source === 'none' ? ' open' : ''}>
+    <summary>${app.source === 'none' ? 'اضبط التطبيق' : 'بدّل أسرار التطبيق'}</summary>
+    <div class="setup-body">
+      ${saved}
+
+      <p class="ch-note">افتح <a href="${escapeHtml(guide.portal)}" target="_blank"
+        rel="noopener noreferrer">${escapeHtml(guide.portalLabel)}</a> وأتمم هذه أوّلا:</p>
+      <ol class="steps">${steps}</ol>
+
+      <label class="lbl-sm" for="cb-${id}">رابطُ العودة — انسخه كما هو</label>
+      <div class="copy">
+        <input id="cb-${id}" class="mono" value="${escapeHtml(callback)}" readonly>
+        <button type="button" class="g sm" data-copy="cb-${id}">انسخ</button>
+      </div>
+      <p class="ch-note">${guide.gotcha}</p>
+
+      <form method="POST" action="/panel/channels/app" data-busy="جارٍ الحفظ…">
+        <input type="hidden" name="platform" value="${escapeHtml(id)}">
+        <div class="field"><label for="ci-${id}">Client ID</label>
+          <input id="ci-${id}" name="client_id" required
+            value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
+          <span class="hint-sm">${guide.whereId}</span></div>
+        <div class="field"><label for="cs-${id}">Client Secret</label>
+          <input id="cs-${id}" name="client_secret" type="password" required
+            placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
+            autocomplete="off" spellcheck="false">
+          <span class="hint-sm">${guide.whereSecret}</span></div>
+        <div class="ch-foot">
+          <button class="p sm" type="submit">احفظ</button>
+          ${app.source === 'vault'
+            ? `<button class="g sm" type="submit" formaction="/panel/channels/app/delete"
+                 data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
+            : ''}
+          <span class="grow"></span>
+          <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
+        </div>
+      </form>
+
+      <p class="ch-note"><b>علامةُ النجاح:</b> ${guide.success}</p>
+    </div>
+  </details>`
+}
+
 /** بطاقةُ قناةٍ واحدة. */
-function card(view: ChannelView, now: Date): string {
+function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: string): string {
   const { spec, state, accounts, missing } = view
   const logo = LOGOS[spec.id] ?? ''
 
@@ -71,8 +170,8 @@ function card(view: ChannelView, now: Date): string {
   // ما يُقال ولمَ: كلُّ حالٍ لها جملتُها، ولا تُترك حالٌ بلا تفسير
   const note =
     state === 'awaiting_owner'
-      ? `ينقص من أسرار Worker: <span class="mono">${missing.map(escapeHtml).join('</span> · <span class="mono">')}</span>.
-         ${spec.task === null ? '' : `وهي مهمّة <b>${escapeHtml(spec.task)}</b> في <span class="mono">docs/MANUAL-TASKS.md</span>.`}`
+      ? `ينقص سرّا التطبيق. <b>اضبطهما من هنا</b> — أو من أسرار Worker باسمَي
+         <span class="mono">${missing.map(escapeHtml).join('</span> و <span class="mono">')}</span>.`
       : state === 'needs_reauth'
         ? 'رمزُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
         : escapeHtml(spec.note)
@@ -99,11 +198,18 @@ function card(view: ChannelView, now: Date): string {
     </div>
     ${rows}
     <p class="ch-note">${note}</p>
+    ${setupPane(view, app, base)}
     <div class="ch-foot">${action}</div>
   </div>`
 }
 
-export function channelsSection(views: readonly ChannelView[], now: Date): string {
+export function channelsSection(
+  views: readonly ChannelView[],
+  now: Date,
+  apps: readonly AppStatus[] = [],
+  base = '',
+): string {
+  const byPlatform = new Map(apps.map((a) => [String(a.platform), a]))
   const built = views.filter((v) => v.spec.built)
   const rest = views.filter((v) => !v.spec.built)
   const linked = built.filter((v) => v.state === 'linked' || v.state === 'needs_reauth').length
@@ -116,7 +222,7 @@ export function channelsSection(views: readonly ChannelView[], now: Date): strin
     <span class="lede-note">ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة، مهما كانت القنواتُ مربوطة.</span>
   </div>
 
-  <div class="grid c2">${built.map((v) => card(v, now)).join('')}</div>
+  <div class="grid c2">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
 
   <div class="lede-row" style="margin-top:22px">
     <h3 class="sec" style="margin:0; border:0; padding:0">لم تُبنَ بعد</h3>
@@ -125,5 +231,5 @@ export function channelsSection(views: readonly ChannelView[], now: Date): strin
       <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</span>
   </div>
 
-  <div class="grid c3">${rest.map((v) => card(v, now)).join('')}</div>`
+  <div class="grid c3">${rest.map((v) => card(v, now, undefined, base)).join('')}</div>`
 }

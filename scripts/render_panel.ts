@@ -179,6 +179,38 @@ const data: PanelData = {
       dispatchedAt: ago(0.2),
     },
   ],
+  plan: {
+    id: 'pl1',
+    week: '2026-09-13',
+    model: 'claude-opus-5',
+    status: 'draft',
+    createdAt: ago(3),
+    plan: {
+      rationale:
+        'أسبوعٌ يبدأ بالأثقل: تقريرُ الأثر يفتح النقاش يوم الاثنين، ثمّ تسنده جملةٌ حادّة على X بعد يومين، ويُختم بدرسٍ من مراجعة المحفظة.',
+      items: [
+        {
+          sourceId: 's1', platform: 'linkedin',
+          angle: 'زاويةُ الوقت لا زاويةُ المبلغ — الفجوةُ بين القرار وأثره',
+          day: '2026-09-14', time: '09:00',
+          why: 'أعلى المصادر استحقاقا، ولم يُنشر منه شيء.',
+        },
+        {
+          sourceId: 's1', platform: 'x',
+          angle: 'الجملةُ التي تقف وحدها: القياسُ أداةُ قيادةٍ لا تقرير',
+          day: '2026-09-16', time: '11:30',
+          why: 'المصدرُ نفسه بزاويةٍ أحدّ، وبينهما يومان.',
+        },
+        {
+          sourceId: 's2', platform: 'linkedin',
+          angle: 'ثلاثةُ دروسٍ من مراجعة المحفظة، وأحدها كلّف سنة',
+          day: '2026-09-18', time: '08:00',
+          why: 'يُغلق الأسبوع بخلاصةٍ عمليّة.',
+        },
+      ],
+    },
+  },
+  planReady: true,
   media: [
     // معاينةٌ محلّيّة: `data:` تكفي للنظر، والحيُّ يُخدَم من `/panel/media/:id`
     { id: 'm1', postId: 'd3', mime: 'image/svg+xml', bytes: 148_320, cost: 0.039, status: 'ready' },
@@ -210,6 +242,21 @@ const data: PanelData = {
   via: 'admin_token',
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
   channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),
+  baseUrl: 'https://sada2.basserh.com',
+  apps: [
+    // LinkedIn من البيئة: لا نموذجَ يُعرض، ويُقال لماذا
+    {
+      platform: 'linkedin', source: 'worker_secret',
+      clientId: '78k4gm3yw1g18e', hint: null, updatedAt: null, updatedBy: null,
+      secretNames: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
+    },
+    // و X لم يُضبَط: النموذجُ مفتوحٌ بإرشاده
+    {
+      platform: 'x', source: 'none',
+      clientId: null, hint: null, updatedAt: null, updatedBy: null,
+      secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
+    },
+  ],
 }
 
 writeFileSync(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
