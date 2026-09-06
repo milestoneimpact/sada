@@ -406,7 +406,12 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
 
   it('يسمّي ما يعطّل مهمّةً مبنيّة، ولا يشكو ممّا لم يُبنَ', async () => {
     const body = await read()
-    expect(body.blocked).toEqual([{ task: 'analyze', missing_secret: 'ANTHROPIC_API_KEY' }])
+    // الفهمُ والكتابةُ مبنيّان وكلاهما على Anthropic — فسرٌّ واحدٌ ناقص
+    // يعطّلهما معا، ويُسمَّى مرّةً لكلّ مهمّة لا مرّةً للنظام
+    expect(body.blocked).toEqual([
+      { task: 'analyze', missing_secret: 'ANTHROPIC_API_KEY' },
+      { task: 'draft', missing_secret: 'ANTHROPIC_API_KEY' },
+    ])
     // image موجّهة إلى gemini غير المضبوط، لكنّها لم تُبنَ — فلا تُعدّ عائقا
     expect(body.blocked.map((b) => b.task)).not.toContain('image')
   })

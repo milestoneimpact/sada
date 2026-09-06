@@ -60,7 +60,7 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
   draft: {
     provider: 'anthropic',
     model: 'claude-opus-5',
-    why: 'كتابةٌ عربية تُنشر باسم المالك — لم تُبنَ بعد',
+    why: 'كتابةٌ عربية تُنشر باسم المالك — الخطأ فيها يُقرأ عليه لا علينا',
   },
   image: {
     provider: 'gemini',
@@ -70,7 +70,7 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
-export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze'])
+export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft'])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {
   const value = env[PROVIDERS[provider].secret]

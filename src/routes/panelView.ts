@@ -13,6 +13,8 @@
 import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import { channelsSection } from './ui/channels'
+import { draftsSection } from './ui/sections/drafts'
+import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { escapeHtml, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
@@ -43,6 +45,19 @@ const SCRIPT = `
   var head=document.getElementById('pane-title');
   if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
     var s=t.querySelector('span'); if(s)head.textContent=s.textContent;});});
+
+  // عدّادُ المسوّدة يتحرّك مع الكتابة: طولٌ يُعرف بعد الإرسال يأتي متأخّرا
+  // بنداءٍ كامل. والحدُّ من data-limit لا من ثابتٍ هنا — منصّةٌ تُضاف
+  // تجلب حدَّها معها
+  document.querySelectorAll('textarea.draft-text').forEach(function(t){
+    var out=t.parentNode.querySelector('.count'); if(!out)return;
+    var b=out.querySelector('b'); var lim=+t.dataset.limit||0; var tgt=+t.dataset.target||0;
+    function tick(){
+      var n=t.value.trim().length; if(b)b.textContent=n;
+      out.className='count'+(n>lim?' bad':n>tgt?' warn':'');
+    }
+    t.addEventListener('input',tick); tick();
+  });
 
   // تأكيدٌ قبل فعلٍ يوقف النظام كلّه
   document.querySelectorAll('form[data-confirm]').forEach(function(f){
@@ -374,7 +389,11 @@ export interface PanelData {
     why: string; ready: boolean; implemented: boolean
   }[]
   readonly knownProviders: { name: string; label: string }[]
-  readonly postsBuilt: boolean
+  readonly drafts: readonly DraftRow[]
+  /** المصادرُ التي لها خلاصة — وحدها تُكتب منها مسوّدة. */
+  readonly writableSources: readonly { id: string; name: string }[]
+  /** أمزوّدُ مهمّة `draft` مضبوطٌ ومفعَّل؟ */
+  readonly draftReady: boolean
   readonly flash: PanelFlash | null
   readonly now: Date
   /** رمز CSRF لهذه الجلسة — يُحقن في كلّ نموذج. */
@@ -577,6 +596,7 @@ export function panelPage(d: PanelData): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
+  const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
 
   // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
   // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
@@ -660,6 +680,14 @@ export function panelPage(d: PanelData): string {
   for (const p of unverified) {
     items.push({ kind: 'warn', text: `${p.label}: مفتاحُه لم يُختبر بعد.`, go: '#providers', label: 'اختبره' })
   }
+  if (waitingDrafts > 0) {
+    items.push({
+      kind: 'ok',
+      text: `${waitingDrafts} مسوّدة تنتظر قرارك — ولا تُنشر واحدةٌ منها قبله.`,
+      go: '#posts',
+      label: 'اقرأها',
+    })
+  }
   if (pending > 0) {
     items.push({ kind: 'ok', text: `${pending} مصدرا ينتظر تحليلا.`, go: '#sources', label: 'راجعها' })
   }
@@ -693,7 +721,7 @@ export function panelPage(d: PanelData): string {
     <span class="lbl">العمل</span>
     ${nav('#overview', ICON.overview, 'نظرة عامّة')}
     ${nav('#sources', ICON.sources, 'المصادر', pending)}
-    ${nav('#posts', ICON.posts, 'المنشورات')}
+    ${nav('#posts', ICON.posts, 'المنشورات', waitingDrafts)}
     ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
     <span class="lbl">الضبط</span>
     ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
@@ -775,12 +803,12 @@ ${flash}
 </section>
 
 <section data-pane="posts" hidden>
-  <div class="card"><h2>المنشورات وتواريخ النشر</h2>
-    ${d.postsBuilt ? '<div class="empty"><b>لا منشورات بعد</b></div>' : `<div class="empty">
-      <b>طبقة الكتابة لم تُبنَ بعد</b>
-      <p>جدول المنشورات قائم بقيوده — ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة.
-         وحين تُبنى الطبقة، يظهر هنا نصُّ كلّ منشور ومنصّته وتاريخ نشره وحالته.</p>
-      <span class="st idle"><span class="g">○</span>مرحلةٌ قادمة</span></div>`}</div>
+  ${draftsSection({
+    drafts: d.drafts,
+    writable: d.writableSources,
+    now: d.now,
+    ready: d.draftReady,
+  })}
 </section>
 
 <section data-pane="settings" hidden>

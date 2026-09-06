@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
-import { readSettings } from '../lib/settings'
+import { readSettings, writeSetting } from '../lib/settings'
 import { getProvider, resolveKey } from '../lib/providers'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
@@ -224,10 +224,14 @@ describe('ما تعرضه اللوحة', () => {
     expect(html).toContain('0.82')
   })
 
-  it('تقول إنّ طبقة الكتابة لم تُبنَ — لا تعرض جدولا فارغا يُظنّ عطلا', async () => {
+  it('تعرض قسم الكتابة، وتقول إنّ الاعتماد لا ينشر', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('طبقة الكتابة لم تُبنَ بعد')
+    expect(html).toContain('الكتابة من مصدر')
+    // الوعدُ المكتوب في الصفحة هو الوعدُ المنفَّذ في القاعدة (D-009)
+    expect(html).toContain('لا يُنشر منشورٌ بلا موافقةٍ مسجّلة')
+    // ولا زرَّ نشرٍ هنا: الاعتمادُ يفتح البابَ ولا يعبره
+    expect(html).not.toContain('action="/panel/drafts/publish"')
   })
 
   it('تسمّي السرّ الناقص لمزوّدٍ غير مضبوط', async () => {
@@ -1156,5 +1160,133 @@ describe('الجاهزيّة تفرز ما سدّته الخزانة', () => {
     }
     expect(ready.missing_secrets).toContain('LINKEDIN_CLIENT_ID')
     expect(ready.configured_in_vault).toEqual([])
+  })
+})
+
+/**
+ * الكتابةُ والبَتُّ من اللوحة.
+ *
+ * ما يُفحَص هنا ليس أنّ الزرّ يعمل، بل أنّه **يمرّ بالحارس نفسه**: زرٌّ
+ * في صفحةٍ ليس طريقا جانبيّا حول الإيقاف والسقوف (D-019). ولا شبكةَ
+ * تُزيَّف في هذا الملفّ، فما يُختبر هو المنعُ الذي يقع قبل النداء.
+ */
+describe('الكتابة من اللوحة', () => {
+  async function seedAnalyzed(): Promise<string> {
+    const id = await seedSource('تقرير الأثر')
+    await db
+      .prepare(
+        'INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)',
+      )
+      .bind(
+        crypto.randomUUID(),
+        id,
+        'خلاصةٌ عربية عن أثر الوقف.',
+        JSON.stringify({ hash: 'md5:a', themes: ['الوقف'] }),
+        0.8,
+      )
+      .run()
+    return id
+  }
+
+  it('لا تعرض مصدرا غير محلَّل في قائمة الكتابة — بلا خلاصةٍ لا مادّة', async () => {
+    await seedSource('لم يُحلَّل')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const form = html.slice(html.indexOf('id="dw-src"'), html.indexOf('id="dw-pf"'))
+    expect(form).not.toContain('لم يُحلَّل')
+  })
+
+  it('الإيقافُ يمنع الكتابة — والزرُّ ليس طريقا حوله', async () => {
+    const id = await seedAnalyzed()
+    const cookie = await login()
+    await writeSetting(db, 'paused', 'true', 'test')
+
+    const body = new FormData()
+    body.set('id', id)
+    body.set('platform', 'linkedin')
+    await app.request('/panel/drafts/write', withSession(cookie, { method: 'POST', body }), env)
+
+    const { results } = await db.prepare('SELECT id FROM posts').all()
+    expect(results).toHaveLength(0)
+    const ledger = await db.prepare('SELECT id FROM cost_ledger').all()
+    expect(ledger.results).toHaveLength(0)
+  })
+
+  it('منصّةٌ غير معروفة تُردّ ولا تصل إلى القاعدة', async () => {
+    const id = await seedAnalyzed()
+    const cookie = await login()
+    const body = new FormData()
+    body.set('id', id)
+    body.set('platform', 'snapchat')
+    const response = await app.request(
+      '/panel/drafts/write',
+      withSession(cookie, { method: 'POST', body }),
+      env,
+    )
+    expect(response.status).toBe(303)
+    const { results } = await db.prepare('SELECT id FROM posts').all()
+    expect(results).toHaveLength(0)
+  })
+
+  it('البَتُّ يكتب صاحبَ القرار في السجلّ — وموافقةٌ بلا أثرٍ لا تُراجَع', async () => {
+    const sourceId = await seedAnalyzed()
+    const postId = crypto.randomUUID()
+    const text = 'ن'.repeat(300)
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, source_id, source_hash, model, cost_usd, type, text, status, idempotency_key)
+         VALUES (?, 'linkedin', ?, 'md5:a', 'claude-opus-5', 0.01, 'text', ?, 'draft', ?)`,
+      )
+      .bind(postId, sourceId, text, `k-${postId}`)
+      .run()
+
+    const cookie = await login()
+    const body = new FormData()
+    body.set('id', postId)
+    body.set('do', 'approve')
+    body.set('text', text)
+    await app.request('/panel/drafts/decide', withSession(cookie, { method: 'POST', body }), env)
+
+    const row = await db
+      .prepare('SELECT status, approved_by, approved_at FROM posts WHERE id = ?')
+      .bind(postId)
+      .first<Record<string, unknown>>()
+    expect(row?.['status']).toBe('approved')
+    expect(row?.['approved_by']).toBe('panel:token')
+    expect(row?.['approved_at']).not.toBeNull()
+
+    const audit = await db
+      .prepare("SELECT action, detail FROM audit_log WHERE action = 'draft.decide'")
+      .all<{ action: string; detail: string }>()
+    expect(audit.results).toHaveLength(1)
+    expect(audit.results[0]?.detail).toBe('approved')
+  })
+
+  it('البَتُّ بلا رمز CSRF يُردّ ولا يغيّر حالا', async () => {
+    const sourceId = await seedAnalyzed()
+    const postId = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, source_id, model, cost_usd, type, text, status, idempotency_key)
+         VALUES (?, 'linkedin', ?, 'm', 0, 'text', ?, 'draft', ?)`,
+      )
+      .bind(postId, sourceId, 'ن'.repeat(300), `k-${postId}`)
+      .run()
+
+    const cookie = await login()
+    const body = new FormData()
+    body.set('id', postId)
+    body.set('do', 'approve')
+    body.set('text', 'ن'.repeat(300))
+    // بلا `withSession`: الكعكةُ وحدها بلا رمزِ النموذج
+    const response = await app.request(
+      '/panel/drafts/decide',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(403)
+
+    const row = await db.prepare('SELECT status FROM posts WHERE id = ?').bind(postId).first<{ status: string }>()
+    expect(row?.status).toBe('draft')
   })
 })

@@ -10,7 +10,24 @@
  */
 import type { Db } from './tokens'
 
-export type Provider = 'x' | 'linkedin' | 'anthropic' | 'gemini' | 'google'
+/**
+ * المزوّدون المعروفون بأسمائهم — **ولا يُغلَق البابُ عليهم.**
+ *
+ * الترحيل 0005 فتح عمودَ `provider` في الدفتر (`length(provider) > 0`)
+ * حين صار المزوّدُ صفّا يُضاف من اللوحة (D-031). وبقاءُ الاتّحاد ضيّقا
+ * هنا كان يمنع تسجيلَ كلفةِ مزوّدٍ أضافه المالك — **فيُنادى ولا يُحاسَب
+ * عليه**، وذاك أسوأ ما يقع لدفتر (D-008).
+ *
+ * و `(string & {})` تُبقي الإكمالَ يقترح الخمسة ولا يرفض السادس.
+ */
+export type Provider =
+  | 'x'
+  | 'linkedin'
+  | 'anthropic'
+  | 'gemini'
+  | 'google'
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {})
 
 export interface CostEntry {
   readonly provider: Provider

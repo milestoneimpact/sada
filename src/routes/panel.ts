@@ -24,6 +24,9 @@ const BUILTIN_DOCS: Readonly<Record<string, string>> = {
 import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
 import { verifyKey } from '../lib/ai/verify'
 import { analyzeSource } from '../lib/analyze/job'
+import { draftPost } from '../lib/draft/job'
+import type { Platform } from '../lib/draft/prompt'
+import { decide, listDrafts } from '../lib/draft/store'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
@@ -266,6 +269,7 @@ panel.get('/panel', async (c) => {
     }),
   )
   const routes = await readRoutes(c.env.DB)
+  const drafts = await listDrafts(c.env.DB, 60)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
@@ -299,7 +303,17 @@ panel.get('/panel', async (c) => {
         ready: r.implemented && providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       })),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
-      postsBuilt: false,
+      drafts,
+      writableSources: sources
+        .filter((x) => x.analyzed)
+        .map((x) => ({ id: x.id, name: x.name })),
+      // زرٌّ لا ينادي أحدا لا يُعرض عاملا: الطريقُ جاهزٌ إن كان مزوّدُه
+      // مضبوطا ومفعَّلا — وإلّا فالضغطةُ تنتهي إلى رسالةِ عطل
+      draftReady: routes.some(
+        (r) =>
+          r.task === 'draft' &&
+          providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
+      ),
       flash,
       now: new Date(),
       csrf: session.record.csrf,
@@ -607,6 +621,106 @@ panel.post('/panel/analyze', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('sources')
+})
+
+// ── الكتابة والبَتّ ──────────────────────────────────────────────────
+
+/**
+ * كتابةُ مسوّدة من اللوحة.
+ *
+ * يمرّ بـ `draftPost` نفسه — بسقوفه وإيقافه وسقفِ مزوّده: **زرٌّ في صفحةٍ
+ * ليس طريقا جانبيّا حول الحارس** (D-019). ولا يُنشئ شيئا بحالةٍ غير
+ * `draft`، فلا يمسّ D-009 من قريبٍ ولا بعيد.
+ */
+panel.post('/panel/drafts/write', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
+  const id = String(form.get('id') ?? '')
+  const raw = String(form.get('platform') ?? '')
+  // منصّةٌ لا نعرفها لا تُمرَّر إلى القاعدة لتردَّها بقيدٍ غامض
+  if (raw !== 'linkedin' && raw !== 'x') {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    return back('posts')
+  }
+  const platform: Platform = raw
+
+  const outcome = await draftPost(
+    { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
+    id,
+    platform,
+  )
+
+  const flash: PanelFlash =
+    outcome.kind === 'drafted'
+      ? {
+          kind: 'ok',
+          text: `كُتبت مسوّدة ${platform === 'x' ? 'X' : 'LinkedIn'} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+        }
+      : outcome.kind === 'already'
+        ? { kind: 'ok', text: 'سُوّدت هذه النسخةُ لهذه المنصّة — لم يُنفَق شيء.' }
+        : outcome.kind === 'blocked'
+          ? { kind: 'warn', text: outcome.reason }
+          : outcome.kind === 'not_analyzed'
+            ? { kind: 'warn', text: outcome.reason }
+            : { kind: 'bad', text: `تعذّرت الكتابة: ${outcome.reason}` }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'draft.write', target: `${id}:${platform}`, detail: outcome.kind },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * البَتُّ في مسوّدة — **وهو القرار الذي يفتح بابَ النشر.**
+ *
+ * يُسجَّل في `audit_log` بمعرّف المسوّدة وحالتها الجديدة: D-009 يشترط
+ * موافقةً بشريّة، وموافقةٌ بلا أثرٍ يُقرأ لا تُراجَع بعد شهر.
+ */
+panel.post('/panel/drafts/decide', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
+  const id = String(form.get('id') ?? '')
+  const wants = String(form.get('do') ?? '')
+  // النصُّ المرسَل هو المعروض: تُقارنه `decide` بالمحفوظ فتعرف
+  // أعُتمد كما كُتب أم بعد تعديل — والحالةُ تُستنتَج ولا تُسأل
+  const result = await decide(
+    c.env.DB,
+    id,
+    wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text: String(form.get('text') ?? '') },
+    gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+  )
+
+  const flash: PanelFlash = !result.ok
+    ? { kind: 'bad', text: result.reason }
+    : result.status === 'rejected'
+      ? { kind: 'ok', text: 'رُفضت — وتبقى معروضةً بكلفتها، فما دُفع ثمنُه يُرى.' }
+      : {
+          kind: 'ok',
+          text:
+            result.status === 'edited'
+              ? 'اعتُمدت بنصّك بعد التعديل. ولا تُنشر حتّى تُربَط قناتُها ويُبنى الطابور.'
+              : 'اعتُمدت كما كُتبت. ولا تُنشر حتّى تُربَط قناتُها ويُبنى الطابور.',
+        }
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.decide',
+      target: id,
+      detail: result.ok ? result.status : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
 })
 
 // ── إدارة المزوّدين ──────────────────────────────────────────────────
