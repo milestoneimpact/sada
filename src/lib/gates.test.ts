@@ -8,7 +8,7 @@ import { currentPhase, gatesOf, readGateFacts, type GateFacts } from './gates'
 const empty: GateFacts = {
   publishedPerPlatform: {}, publishedWithMedia: {}, scheduledPublished: 0,
   ledgerPerPlatform: {}, plans: 0, reports: 0, suggestions: 0,
-  promoSpend: 0, orgAccounts: 0,
+  promoSpend: 0, orgAccounts: 0, weekAlertFired: false,
 }
 
 const gate = (f: GateFacts, phase: string) => gatesOf(f).find((g) => g.phase === phase)!
@@ -49,24 +49,28 @@ describe('لا تُجتاز بقول', () => {
   })
 })
 
-describe('وما لا يُقاس لا يُجيز', () => {
+describe('وبندُ التنبيه صار يُقاس', () => {
   /**
-   * **بوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل.**
-   *
-   * وتنبيهُ انتهاء الرمز يصل بريدا لا نقرؤه — فيبقى `unmeasured`،
-   * **والبوّابةُ لا تُجتاز ولو تحقّق كلُّ ما عداه**.
+   * **كان `unmeasured`** — وسببُه أنّ التنبيه كان يُتصوَّر بريدا لا
+   * نقرؤه. **فنُقل إلى حيث يُقاس** (D-065)، ولا يبقى في البوّابة بندٌ
+   * يُجيزها بلا دليل.
    */
-  it('بندٌ لا يُقاس يُبقي البوّابةَ غيرَ مجتازة', () => {
-    const all: GateFacts = {
-      ...empty,
-      publishedPerPlatform: { linkedin: 3, x: 2 },
-      publishedWithMedia: { linkedin: 1, x: 1 },
-      orgAccounts: 1,
-    }
-    const g = gate(all, '٢')
-    expect(g.items.filter((i) => i.state === 'unmet')).toEqual([])
-    expect(g.items.some((i) => i.state === 'unmeasured')).toBe(true)
+  const almost: GateFacts = {
+    ...empty,
+    publishedPerPlatform: { linkedin: 3, x: 2 },
+    publishedWithMedia: { linkedin: 1, x: 1 },
+    orgAccounts: 1,
+  }
+
+  it('بلا تنبيهٍ سُجّل: البوّابةُ لا تُجتاز، والبندُ «لم يتحقّق» لا «لا يُقاس»', () => {
+    const g = gate(almost, '٢')
     expect(g.passed).toBe(false)
+    expect(g.items.some((i) => i.state === 'unmeasured')).toBe(false)
+    expect(g.items.filter((i) => i.state === 'unmet')).toHaveLength(1)
+  })
+
+  it('وبتنبيهٍ سُجّل تُجتاز', () => {
+    expect(gate({ ...almost, weekAlertFired: true }, '٢').passed).toBe(true)
   })
 })
 

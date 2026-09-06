@@ -71,6 +71,14 @@ export interface GateFacts {
   readonly promoSpend: number
   /** كم حسابَ صفحةٍ أو شركةٍ مربوط. */
   readonly orgAccounts: number
+  /**
+   * أوقع تنبيهُ سبعةِ أيّامٍ يوما ما؟
+   *
+   * **وكان هذا البندُ `unmeasured`** — وسببُه أنّ التنبيه كان يُتصوَّر
+   * بريدا لا نقرؤه. **فالعلاجُ نقلُه إلى حيث يُقاس** لا الاعترافُ بأنّ
+   * القياسَ مستحيل (D-065).
+   */
+  readonly weekAlertFired: boolean
 }
 
 const PLATFORMS = ['linkedin', 'x'] as const
@@ -146,15 +154,15 @@ export function gatesOf(f: GateFacts): Gate[] {
           `${f.orgAccounts} حسابَ صفحةٍ مربوط`,
         ),
         /**
-         * **تنبيهٌ يصل بريدا لا نقرؤه.**
-         *
-         * وقولُ «تحقّق» عنه **يُجيز مرحلةً لم تكتمل** — فيُقال إنّه لا
-         * يُقاس من هنا، وتبقى البوّابةُ غيرَ مجتازة.
+         * **صار يُقاس**: التنبيهُ يُسجَّل صفّا عند العتبة (D-065)،
+         * فالسؤالُ «أوقع؟» يُجاب من القاعدة لا يُفترَض.
          */
         item(
-          'وتنبيهُ انتهاء رمزٍ وصل قبل أسبوع',
-          'unmeasured',
-          'يصل خارج القاعدة — ولا يُقرأ من هنا',
+          'وتنبيهُ انتهاء رمزٍ سُجّل قبل أسبوع من الانتهاء',
+          f.weekAlertFired ? 'met' : 'unmet',
+          f.weekAlertFired
+            ? 'صفٌّ في `token_alerts` عند عتبة السبعة'
+            : 'لم يقع بعد — ولا رمزَ بلغ العتبة',
         ),
       ],
       passed: false,
@@ -202,7 +210,7 @@ export async function readGateFacts(db: Db): Promise<GateFacts> {
   const zero: GateFacts = {
     publishedPerPlatform: {}, publishedWithMedia: {}, scheduledPublished: 0,
     ledgerPerPlatform: {}, plans: 0, reports: 0, suggestions: 0,
-    promoSpend: 0, orgAccounts: 0,
+    promoSpend: 0, orgAccounts: 0, weekAlertFired: false,
   }
 
   const count = async (sql: string, ...binds: unknown[]): Promise<number> => {
@@ -257,5 +265,7 @@ export async function readGateFacts(db: Db): Promise<GateFacts> {
         WHERE operation LIKE '%promot%' OR operation LIKE '%ads%'`,
     ),
     orgAccounts: await count("SELECT count(*) AS n FROM accounts WHERE kind = 'org'"),
+    weekAlertFired:
+      (await count('SELECT count(*) AS n FROM token_alerts WHERE threshold >= 7')) > 0,
   }
 }

@@ -128,11 +128,14 @@ describe('وبوّاباتُ المراحل تُقاس', () => {
   })
 
   /**
-   * **بوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل** — فيُقال
-   * «لا يُقاس من هنا» وتبقى غيرَ مجتازة.
+   * **ولا بندَ يُجيز بوّابةً بلا دليل.**
+   *
+   * كان بندُ تنبيه الرمز `unmeasured` — **ثمّ نُقل التنبيهُ إلى حيث
+   * يُقاس** (D-065). فلم يبقَ في البوّابات بندٌ لا يُقاس، **والحالُ
+   * محروسةٌ باختبار**: بندٌ جديدٌ يُضاف بلا استعلامٍ يُسقط هذا.
    */
-  it('وبندٌ لا يُقاس يُقال ولا يُدَّعى', async () => {
-    expect(await open()).toContain('لا يُقاس من هنا')
+  it('ولا بندَ في البوّابات يُجيزها بلا قياس', async () => {
+    expect(await open()).not.toContain('لا يُقاس من هنا')
   })
 
   it('ومنشورٌ خرج فعلا يُغيّر الدليل', async () => {
@@ -152,5 +155,55 @@ describe('وبوّاباتُ المراحل تُقاس', () => {
        VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
     )
     expect(await open()).toContain('x: 1')
+  })
+})
+
+describe('وشريطُ الرموز المقتربة', () => {
+  async function panel(): Promise<string> {
+    const body = new FormData()
+    body.set('token', TOKEN)
+    const login = await app.request('/panel/login', { method: 'POST', body }, env)
+    const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+  }
+
+  function seed(days: number, kind: 'access' | 'refresh'): void {
+    const at = new Date(Date.now() + days * 86_400_000).toISOString()
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name)
+       VALUES ('a1', 'x', 'member', 'e1', '@omar')`,
+    )
+    db.raw.exec(
+      `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at,
+                           refresh_expires_at, scopes)
+       VALUES ('a1', 'x', 'y', '${kind === 'access' ? at : new Date(Date.now() + 90 * 86_400_000).toISOString()}',
+               ${kind === 'refresh' ? `'${at}'` : 'NULL'}, 'tweet.write')`,
+    )
+  }
+
+  it('لا شريطَ حيث لا رمزَ يقترب', async () => {
+    expect(await panel()).not.toContain('رمزُ التجديد')
+  })
+
+  /** **يُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح** — قد لا تُفتَح قبل أن يقع. */
+  it('ورمزُ وصولٍ قريبٌ يُعرَض تحذيرا', async () => {
+    seed(4, 'access')
+    const html = await panel()
+    expect(html).toContain('رمزُ الوصول')
+    expect(html).toContain('@omar')
+  })
+
+  /**
+   * **ولا يُسوَّى بين الرمزين.**
+   *
+   * سقوطُ الوصول يُصلحه النظامُ وحده، **وسقوطُ التجديد يوجب يدَ
+   * المالك** — فيُعرَض أشدّ، ويُقال ذلك نصّا لا بلونٍ وحده.
+   */
+  it('ورمزُ تجديدٍ يُعرَض أشدَّ ويُقال أنّه يوجب يدَك', async () => {
+    seed(2, 'refresh')
+    const html = await panel()
+    expect(html).toContain('رمزُ التجديد')
+    expect(html).toContain('يوجب سقوطُه دورةَ إذنٍ بيدك')
+    expect(html).toContain('class="flash bad"')
   })
 })
