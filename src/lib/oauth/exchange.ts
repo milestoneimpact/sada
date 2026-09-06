@@ -20,6 +20,14 @@ export class OAuthError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /**
+     * رمزُ المزوّد كما عاد — `invalid_client` مثلا.
+     *
+     * **ويُحمَل حقلا لا يُستخرَج من نصّ الرسالة**: الرسالةُ عربيّةٌ
+     * قابلةٌ للتحسين، وتشخيصٌ يقرأ صياغتَنا **ينكسر عند أوّل تحرير**
+     * ولا ينكسر ظاهرا — يسقط إلى فرعٍ عامّ ويبدو أنّه يعمل (D-054).
+     */
+    readonly code?: string,
   ) {
     super(message)
   }
@@ -109,7 +117,11 @@ async function postForm(
     } catch {
       code = 'unparsable'
     }
-    throw new OAuthError(`${provider.platform}: رفض نهاية الرمز (${code})`, response.status)
+    throw new OAuthError(
+      `${provider.platform}: رفض نهاية الرمز (${code})`,
+      response.status,
+      code,
+    )
   }
   return parseToken((await response.json()) as RawToken, now, requested)
 }

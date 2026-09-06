@@ -20,6 +20,7 @@ import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
 import { runWeekly } from './lib/report/job'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
+import { ICON_BYTES } from './routes/ui/shell'
 import { legal } from './routes/legal'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
@@ -42,7 +43,22 @@ export const app = new Hono<{ Bindings: Env }>()
 app.use('*', async (c, next) => {
   await next()
   for (const [name, value] of Object.entries(BASE_HEADERS)) {
-    c.res.headers.set(name, value)
+    /**
+     * **يملأ ما نقص، ولا يدهس ما قيل عمدا.**
+     *
+     * كانت `set` تدهس، **فترويسةٌ يضعها مسارٌ لسببٍ لا أثرَ لها** —
+     * وهذا ما وقع فعلا: مسارُ الوسائط الموقَّع (D-050) يضع
+     * `Cross-Origin-Resource-Policy: cross-origin` منذ كُتب، **ولم
+     * تخرج مرّةً واحدة**. ولا اختبارَ كان يقرؤها، فبدا أنّها تعمل.
+     *
+     * والعطبُ من هذا النوع لا يُرى: لا عطل، ولا سطرَ في السجلّ —
+     * سطرُ شيفرةٍ يبدو أنّه يفعل شيئا وهو لا يفعل.
+     *
+     * وما في `BASE_HEADERS` لا يضعه مسارٌ من تلقائه (HSTS، `nosniff`،
+     * `Referrer-Policy`)، **فالملءُ عند الغياب يساوي الدهسَ لها** —
+     * ويفترق عنه حيث يجب أن يفترق وحده.
+     */
+    if (!c.res.headers.has(name)) c.res.headers.set(name, value)
   }
 })
 
@@ -332,6 +348,30 @@ app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)
 app.route('/', panel)
+
+/**
+ * رمزُ التبويب — **مسارٌ حقيقيّ، لا لأنّ الوثيقة تحتاجه**.
+ *
+ * الوثيقةُ تحمل الرمزَ في `data:` وتكفيها. **لكنّ المتصفّح يطلب
+ * `/favicon.ico` بغير ذلك**: للتاريخ، وللإشارات المرجعيّة، ولطلبٍ
+ * سابقٍ للوثيقة أحيانا. وبلا مسارٍ يردّ الخادمُ ٤٠٤ يحمل
+ * `Cross-Origin-Resource-Policy: same-origin` — **فيظهر في الكونسول
+ * حظرٌ يقرأه القارئُ عطلَ أمن**، وهو أثرُ صفحةٍ لا وجودَ لها.
+ *
+ * و`cross-origin` على هذا المسار وحده: **الرمزُ علامةٌ عامّة**، وهو ما
+ * فُعل بمسار الوسائط الموقَّع (D-050). ولا يُوسَّع إلى غيره.
+ *
+ * وSVG لا ICO: المتصفّحاتُ الحيّةُ كلُّها تقرؤه، وهو يعمل عند كلّ قياس.
+ */
+app.get('/favicon.ico', (c) =>
+  c.body(ICON_BYTES, 200, {
+    'Content-Type': 'image/svg+xml; charset=utf-8',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'X-Content-Type-Options': 'nosniff',
+    // علامةٌ لا تتبدّل — ويومٌ كاملٌ يمنع نداءً في كلّ فتحة
+    'Cache-Control': 'public, max-age=86400',
+  }),
+)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
 

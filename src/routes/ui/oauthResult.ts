@@ -188,6 +188,59 @@ export function refusedBody(d: RefusedData): string {
     </div>`
   }
 
+  /**
+   * **`invalid_client` ليس رفضَ نطاق، ولا رفضَ مستخدم.**
+   *
+   * شاشةُ الإذن نجحت، والمنصّةُ أعطت `code` — ثمّ **ردّت تبديلَه**.
+   * ومعناه واحدٌ عند كلّ المنصّات: **الزوجُ الذي في صدى ليس زوجَ هذا
+   * التطبيق**.
+   *
+   * وأشيعُ سببٍ له **إعادةُ إنشاء التطبيق**: التطبيقُ الجديد معرّفٌ
+   * جديدٌ وسرٌّ جديد، وصدى يحمل القديم — **فالشاشةُ تعمل والتبديلُ
+   * يُردّ**، وهو أشدُّ ما يُربك: نصفُ الدورة نجح.
+   *
+   * ويُقال بالاسم لأنّ فرعا عامّا يقول «راجع الضبط» **يجعل المالك
+   * يفتّش في المنتَجات والنطاقات — وليس فيها العطل**.
+   */
+  if (d.reason === 'invalid_client') {
+    return `${head(
+      d.platform,
+      'رُفض',
+      'الإذنُ نجح، وتبديلُ الرمز رُدّ',
+      'شاشةُ الإذن مرّت، ثمّ ردّت ' + LABEL[d.platform] + ' تبديلَ الرمز بـ ' +
+        '<span class="mono">invalid_client</span>. ' +
+        '<b>ومعناه أنّ Client ID أو Client Secret في صدى ليس زوجَ هذا التطبيق.</b> ' +
+        '<b>ولم يُحفَظ شيء.</b>',
+    )}
+    <div class="card">
+      <h2>ولا علاقةَ له بالنطاقات ولا بالمنتَجات</h2>
+      <p class="hint">النطاقاتُ تُفحَص <b>قبل</b> شاشة الإذن، وقد مرّت.
+        <b>فلا تفتّش في تبويب Products</b> — العطلُ في زوج المفاتيح وحده.</p>
+      <ol class="steps">
+        <li><span class="n">1</span><span class="body">
+          <span class="what">أأُعيد إنشاءُ التطبيق؟</span>
+          <span class="why"><b>هذا أشيعُ سبب.</b> تطبيقٌ جديدٌ معرّفُه جديدٌ وسرُّه
+            جديد — وصدى يحمل زوجَ التطبيق القديم.</span></span></li>
+        <li><span class="n">2</span><span class="body">
+          <span class="what">أأُعيد توليدُ السرّ؟</span>
+          <span class="why">سرٌّ يُولَّد من جديد <b>يُبطل السابق فورا</b>،
+            والمعرّفُ يبقى كما هو — فيبدو أنّ شيئا لم يتغيّر.</span></span></li>
+        <li><span class="n">3</span><span class="body">
+          <span class="what">أَلُصق السرُّ في حقل المعرّف أو العكس؟</span>
+          <span class="why">الحقلان متجاوران، والقيمتان طويلتان متشابهتان
+            في الشكل.</span></span></li>
+      </ol>
+      <div class="outcome warn"><span class="k">ما يُفعَل</span>
+        <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من تبويب
+          <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
+          <b>لوح القنوات ← دليلُ ضبط التطبيق</b>، ثمّ أعد الربط.</span></div>
+      <div class="row" style="margin-top:var(--s-3)">
+        <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">اضبط الأسرار</a>
+        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      </div>
+    </div>`
+  }
+
   if (!scopeProblem) {
     return `${head(
       d.platform,

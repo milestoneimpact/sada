@@ -61,6 +61,23 @@ export function checkProviderUrl(raw: string): UrlVerdict {
     return { ok: false, reason: `المضيف «${host}» ليس نطاقا عامّا` }
   }
 
+  /**
+   * **قالبٌ لم يُملأ.**
+   *
+   * عناوينُ بعض المزوّدين تحمل معرّفَ حسابٍ في المسار — Cloudflare
+   * مثلا. ونموذجٌ جاهزٌ يملأ الحقل بـ `{ACCOUNT_ID}` **يُحفَظ صامتا**:
+   * المضيفُ صحيحٌ والبروتوكول https، **فيمرّ الحارس** ثمّ يُرسَل
+   * المفتاحُ إلى مسارٍ لا وجودَ له عند أوّل نداء.
+   *
+   * والقوسان لا يقعان في عنوانٍ صحيح، فردُّهما بلا ثمن.
+   */
+  if (/[{}]/.test(trimmed)) {
+    return {
+      ok: false,
+      reason: 'في العنوان قالبٌ لم يُملأ — استبدل ما بين القوسين بقيمته',
+    }
+  }
+
   // تُزال الشرطة الأخيرة فلا يصير المسار `//chat/completions`
   const normalized = `${url.origin}${url.pathname.replace(/\/+$/, '')}`
   return { ok: true, url: normalized, host }

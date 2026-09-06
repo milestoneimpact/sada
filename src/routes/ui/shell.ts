@@ -51,7 +51,18 @@ export const GLYPH_SVG =
   '<path d="' + RIBBON + '" stroke-width="11"/>' +
   '</svg>'
 
-const FAVICON = `<link rel="icon" href="data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG)}">
+/**
+ * وتُصدَّر البايتات ليخدمها مسارٌ كذلك — **والسببُ عطلٌ وقع**.
+ *
+ * كانت الصيغةُ «data:image/svg+xml;utf8,» — و«;utf8» **ليست معاملا
+ * صحيحا** في data URI (الصحيحُ «;charset=utf-8»). فرفضها فايرفوكس،
+ * **وسقط إلى /favicon.ico** الذي لا مسارَ له، فردّ الخادمُ ٤٠٤ يحمل
+ * «Cross-Origin-Resource-Policy: same-origin» — **فظهر في الكونسول
+ * حظرٌ يبدو عطلَ أمنٍ وهو حرفان في نصّ**.
+ */
+export const ICON_BYTES = ICON_SVG
+
+const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
 <meta name="theme-color" content="#12623e">`
 
 export function escapeHtml(value: string): string {

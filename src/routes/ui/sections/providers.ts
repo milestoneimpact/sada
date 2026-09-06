@@ -143,6 +143,28 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     { name: 'mistral', label: 'Mistral', url: 'https://api.mistral.ai/v1', model: 'mistral-large-latest' },
     { name: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o' },
     { name: 'xai', label: 'xAI', url: 'https://api.x.ai/v1', model: 'grok-2-latest' },
+    /**
+     * **Cloudflare — والعنوانُ وحده هو الذي يختلف.**
+     *
+     * Workers AI يتكلّم لهجة `chat/completions` مثلَ الباقين
+     * (D-031: سائقٌ لكلّ لهجة لا لكلّ شركة) — **لكنّ معرّفَ حسابك في
+     * المسار**، لا في ترويسةٍ ولا في جسد. فعنوانٌ عامٌّ لا يعمل، وهذا
+     * سببُ غيابه عن القائمة حتّى الآن.
+     *
+     * ويُملأ المعرّفُ من `CF_AI_ACCOUNT_ID` إن كان مضبوطا — **اللوحةُ
+     * تعرفه، فلا يُطلَب من المالك أن يبحث عنه**. وإن لم يكن، بقي
+     * القالبُ ظاهرا، **وحارسُ العنوان يردّ حفظَه** فلا يُرسَل المفتاح
+     * إلى مسارٍ لا وجودَ له.
+     */
+    {
+      name: 'cloudflare',
+      label: 'Cloudflare',
+      url:
+        'https://api.cloudflare.com/client/v4/accounts/' +
+        (d.cfAccountId === null ? '{ACCOUNT_ID}' : d.cfAccountId) +
+        '/ai/v1',
+      model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    },
   ]
 
   const presetChips = PRESETS.map((preset) =>
@@ -155,6 +177,17 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <h2>أضف مزوّدا</h2>
     <p class="hint">أيّ مزوّدٍ يتكلّم لهجة <span class="mono">chat/completions</span> — وهي ما يتكلّمه أكثرهم.</p>
     <div class="row" style="margin-bottom:var(--s-3)">${presetChips}</div>
+    ${d.cfAccountId === null
+      ? `<div class="outcome warn"><span class="k">Cloudflare</span><span class="v">
+          عنوانُه يحمل <b>معرّفَ حسابك</b> في المسار، و<span class="mono">CF_AI_ACCOUNT_ID</span>
+          غيرُ مضبوطٍ في هذه البيئة — <b>فالقالبُ يبقى ظاهرا ولن يُحفَظ</b>.
+          اضبطه في <span class="mono">wrangler.toml</span> ليُملأ وحده.
+          <b>والمفتاحُ</b> رمزُ Cloudflare بصلاحيّة
+          <span class="mono">Workers AI · Read</span>.</span></div>`
+      : `<div class="sub" style="margin-bottom:var(--s-3)"><b>Cloudflare</b>:
+          العنوانُ يحمل معرّفَ حسابك وقد مُلئ وحده.
+          <b>والمفتاحُ</b> رمزُ Cloudflare بصلاحيّة
+          <span class="mono">Workers AI · Read</span> — لا مفتاحَ مزوّدٍ آخر.</div>`}
     <form method="POST" action="/panel/providers/add" id="add-provider"
           data-confirm="سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان. أتؤكّد؟">
       <div class="row">

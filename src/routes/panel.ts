@@ -393,6 +393,7 @@ panel.get('/panel', async (c) => {
       baseUrl: c.env.PUBLIC_BASE_URL,
       openSuggestions: openCount,
       promoCap: allowance.settings.weeklyPromoCapUsd,
+      cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     }),
   )
 })
