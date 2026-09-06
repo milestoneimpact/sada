@@ -289,10 +289,14 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .card-head h2{margin:0}
 /* عنوانُ القسم: خيطٌ قصيرٌ بلون الهويّة يبدؤه بدل خطٍّ رماديٍّ يمتدّ تحته.
    والخطُّ الممتدُّ يفصل ولا يُعلِّم — والقصيرُ يُعلِّم موضعَ البداية. */
-h3.sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-2); letter-spacing:.8px;
+/* **والصنفُ لا يُقيَّد بوسم.** كان «h3.sec»، فـ«h2» يحمل الصنفَ نفسَه
+   يسقط من القاعدة ويرث 21px من المتصفّح — **خارجَ السلّم**، وهي علّةُ
+   «.card > h2» نفسُها (D-057). ومدقّقُ السلّم أمسكها هنا كذلك. */
+.sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-2); letter-spacing:.8px;
   margin:var(--s-8) 0 var(--s-3); padding-bottom:var(--s-2);
   border-bottom:1px solid var(--line-soft); position:relative}
-h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; width:34px;
+
+.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; width:34px;
   height:2px; border-radius:99px;
   background:linear-gradient(90deg,var(--au),color-mix(in srgb,var(--au) 20%,transparent))}
 
@@ -557,6 +561,26 @@ ol.steps .body{min-width:0; max-width:var(--measure); padding-top:var(--s-0)}
 ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:var(--s-0);
   font-size:var(--t-base); line-height:var(--lh-tight)}
 ol.steps .why{display:block; color:var(--ink-3)}
+
+/* ── معالجُ الربط: الخطواتُ نفسُها، وحالُ كلٍّ بجانبها ────────────────
+   والحالُ **يمينَ السطر لا تحته**: عينٌ تمسح عمودا واحدا تجد موضعَها
+   في الطريق بلا قراءة. ويلتفّ تحت المحتوى في الجوّال حيث لا عرضَ له.
+
+   والخطوةُ الجارية **تُظلَّل**: أربعُ خطواتٍ متساويةٍ في الوزن تجعل
+   العينَ تقرؤها كلَّها لتعرف أين هي — وواحدةٌ مميّزةٌ تُقرأ بلا قراءة. */
+ol.steps.wiz{gap:var(--s-3); margin-bottom:0}
+ol.steps.wiz li{align-items:center; flex-wrap:wrap; padding:var(--s-2) var(--s-3);
+  border-radius:var(--r-sm); border:1px solid transparent}
+ol.steps.wiz li.at{background:var(--brand-wash); border-color:var(--line-strong)}
+/* والخيطُ يُزاح مع الحشو، فلا يقع خارجَ الدوائر */
+ol.steps.wiz li:not(:last-child)::before{top:34px; bottom:calc(-1 * var(--s-3));
+  inset-inline-start:24px}
+ol.steps.wiz .body{flex:1; min-width:180px}
+ol.steps.wiz .st{flex:none; margin-inline-start:auto}
+/* ورقمُ خطوةٍ رُدّت أو تمّت يحمل لونَ حالها — والعلامةُ نصٌّ بجانبه */
+ol.steps.wiz li.ok .n{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+ol.steps.wiz li.bad .n{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+ol.steps.wiz li.idle .n{color:var(--ink-3); border-color:var(--line)}
 
 /* ── لوحُ الإرشاد تحت اللصيقة ─────────────────────────────────────────
    بحثُ GOV.UK: المستخدمُ يبدأ الكتابة فور رؤية الحقل، **ولا ينظر تحته

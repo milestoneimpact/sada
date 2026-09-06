@@ -114,6 +114,14 @@ export interface AppStatus {
   readonly updatedBy: string | null
   /** أسماءُ السرّين في البيئة — للإرشاد لا للقيم. */
   readonly secretNames: readonly [string, string]
+  /**
+   * آخرُ فحصٍ وقع على **هذا السرّ بعينه** — و`null` تعني «لم يُفحَص».
+   *
+   * ويُبطَل عند كلّ حفظ: **نتيجةٌ عن سرٍّ مضى أسوأُ من لا نتيجة** —
+   * تقول «مفحوص» عن شيءٍ لم يُفحَص (D-061).
+   */
+  readonly verifiedAt: string | null
+  readonly verifiedKind: string | null
 }
 
 /** حالُ التطبيقين للعرض — بلا فكّ تشفيرٍ ولا كشفِ قيمة. */
@@ -125,7 +133,11 @@ export async function appStatuses(
   let rows: Record<string, string>[] = []
   try {
     const result = await db
-      .prepare('SELECT platform, client_id, hint, updated_at, updated_by FROM oauth_apps')
+      .prepare(
+        `SELECT platform, client_id, hint, updated_at, updated_by,
+                verified_at, verified_kind
+           FROM oauth_apps`,
+      )
       .all<Record<string, string>>()
     rows = result.results
   } catch {
@@ -147,6 +159,9 @@ export async function appStatuses(
         updatedAt: null,
         updatedBy: null,
         secretNames: names,
+        // سرُّ البيئة يُفحَص كذلك، ولا صفَّ له يحمل الأثر
+        verifiedAt: null,
+        verifiedKind: null,
       }
     }
     if (row === undefined) {
@@ -158,6 +173,8 @@ export async function appStatuses(
         updatedAt: null,
         updatedBy: null,
         secretNames: names,
+        verifiedAt: null,
+        verifiedKind: null,
       }
     }
     return {
@@ -168,8 +185,38 @@ export async function appStatuses(
       updatedAt: String(row['updated_at']),
       updatedBy: String(row['updated_by']),
       secretNames: names,
+      verifiedAt: row['verified_at'] === null || row['verified_at'] === undefined
+        ? null : String(row['verified_at']),
+      verifiedKind: row['verified_kind'] === null || row['verified_kind'] === undefined
+        ? null : String(row['verified_kind']),
     }
   })
+}
+
+/**
+ * يكتب أثرَ الفحص على الصفّ.
+ *
+ * **والحكمُ يُكتب كما عاد** بلا قيدٍ في القاعدة: حكمٌ جديدٌ يُضاف في
+ * الشيفرة لا يوجب ترحيلا، **وقيدٌ يردّ حكما لا يعرفه يُسقط الفحصَ
+ * كلَّه لا يحفظه** (D-061).
+ */
+export async function recordVerification(
+  db: Db,
+  platform: Platform,
+  kind: string,
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `UPDATE oauth_apps
+            SET verified_at = datetime('now'), verified_kind = ?
+          WHERE platform = ?`,
+      )
+      .bind(kind, platform)
+      .run()
+  } catch {
+    // أثرٌ لم يُكتَب لا يُسقط فحصا وقع — والمالكُ رأى جوابَه في الإشعار
+  }
 }
 
 export interface SaveResult {
@@ -214,7 +261,13 @@ export async function saveApp(
          client_id = excluded.client_id, secret_enc = excluded.secret_enc,
          secret_iv = excluded.secret_iv, hint = excluded.hint,
          fingerprint = excluded.fingerprint, updated_by = excluded.updated_by,
-         updated_at = datetime('now')`,
+         updated_at = datetime('now'),
+         -- **ويُبطَل الفحصُ عند كلّ حفظ.**
+         --
+         -- نتيجةٌ عن سرٍّ مضى **أسوأُ من لا نتيجة**: تقول «مفحوص» عن
+         -- شيءٍ لم يُفحَص، فيمضي المالكُ إلى الخطوة التالية على وهم.
+         -- ويُبطَل ولو لم يتبدّل السرّ — المعرّفُ قد يتبدّل وحدَه.
+         verified_at = NULL, verified_kind = NULL`,
     )
     .bind(platform, id, sealed.ciphertext, sealed.iv, hint, print, by)
     .run()

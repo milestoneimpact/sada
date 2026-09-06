@@ -30,7 +30,7 @@ import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
-import { appStatuses, deleteApp, readApp, saveApp } from '../lib/oauth/apps'
+import { appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
 import { PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { schedulePost, unschedule } from '../lib/schedule/job'
@@ -821,6 +821,9 @@ panel.post('/panel/channels/app/verify', async (c) => {
     flash = { kind: 'warn', text: `لم يُحسَم الفحص: ${said}. ولا يُدَّعى حكمٌ بلا دليل.` }
   }
 
+  // **والأثرُ يُحفَظ ليقرأه المعالج** — نتيجةٌ تُنسى عند كلّ فتحةٍ
+  // ليست نتيجة، ويُسأل المالكُ أن يفحص مرّةً بعد مرّة (D-061)
+  await recordVerification(c.env.DB, platform, verdict.kind)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'oauth_app.verify', target: platform, detail: verdict.kind },
