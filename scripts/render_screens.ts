@@ -81,7 +81,28 @@ writeFileSync(
           platformPostId: null, publishedAt: null,
           lastError: 'Not enough permissions to create a post on behalf of this member',
           hasMedia: false, costUsd: 0.026 },
+        { id: 'p4', status: 'draft',
+          text: 'مسوّدةٌ بمقطعٍ رأسيّ — والمصغَّرُ يُري ما يُعتمَد، ولا يُقال «بمقطع» فقط.',
+          scheduledAt: null, createdAt: ago(2), accountName: 'عمر عبدالحميد',
+          platformPostId: null, publishedAt: null, lastError: null,
+          hasMedia: true, costUsd: 0.019 },
+        // **وصفٌّ يقول إنّ له وسيطا ولا وسيطَ يُقرأ** — يُقال ولا يُخفى
+        { id: 'p5', status: 'approved',
+          text: 'ومنشورٌ صفُّه يقول إنّ له وسيطا، ولا صفَّ وسيطٍ يقابله.',
+          scheduledAt: null, createdAt: ago(1), accountName: 'عمر عبدالحميد',
+          platformPostId: null, publishedAt: null, lastError: null,
+          hasMedia: true, costUsd: 0 },
       ],
+      // **الوسائطُ تُرسَم لتُرى** — ومصغَّرٌ لا يُرسَم لا يُقاس (D-061)
+      media: {
+        // بايتاتُ صورةٍ حقيقيّةٍ صغيرة: مسارُ الجلسة لا يعمل في ملفٍّ
+        // على القرص، والغرضُ هنا **قياسُ الشكل** لا عرضُ المحتوى
+        p1: [{ id: 'm1', mime: 'image/png', status: 'ready' }],
+        p4: [
+          { id: 'm2', mime: 'video/mp4', status: 'ready' },
+          { id: 'm3', mime: 'image/png', status: 'rejected' },
+        ],
+      },
     }),
   ),
 )
@@ -96,6 +117,7 @@ writeFileSync(
         lastPublishedAt: null },
       metrics: {},
       scopes: { 'x:member:4242': 'tweet.read users.read tweet.write offline.access' },
+      media: {},
       posts: [],
     }),
   ),
@@ -106,7 +128,7 @@ writeFileSync(
   page('صدى — Instagram', platformScreen({
     view: ig, now,
     tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
-    scopes: {}, metrics: {}, posts: [],
+    scopes: {}, metrics: {}, media: {}, posts: [],
   })),
 )
 
@@ -115,7 +137,7 @@ writeFileSync(
   page('صدى — YouTube', platformScreen({
     view: yt, now,
     tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
-    scopes: {}, metrics: {}, posts: [],
+    scopes: {}, metrics: {}, media: {}, posts: [],
   })),
 )
 

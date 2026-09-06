@@ -24,6 +24,13 @@ import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
 import { relativeTime } from '../../lib/format'
 import { widest, type PostMetricRow } from '../../lib/metrics/job'
+
+/** ما يلزم لعرض وسيطٍ في القائمة — لا صفُّ القاعدة كاملا. */
+export interface PostMedia {
+  readonly id: string
+  readonly mime: string
+  readonly status: 'ready' | 'rejected'
+}
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 
@@ -35,6 +42,16 @@ export interface PlatformScreenData {
   readonly scopes: Readonly<Record<string, string>>
   /** ما قِيس لكلّ منشور — مفتاحُها معرّفُ المنشور (D-048). */
   readonly metrics: Readonly<Record<string, readonly PostMetricRow[]>>
+  /**
+   * الوسائطُ المولَّدة لكلّ منشور — مفتاحُها معرّفُ المنشور.
+   *
+   * **وصدى يولّد صورا ومقاطعَ منذ D-039 و D-052، والقائمةُ لا تُظهر
+   * منها شيئا** — لصيقةُ «بصورة» تقول إنّ هناك شيئا ولا تُريه. ومالكٌ
+   * يعتمد منشورا بصورةٍ لم يرَها **يعتمد نصفَه**.
+   */
+  readonly media: Readonly<Record<string, readonly PostMedia[]>>
+  /** أيُّ تبويبٍ مفتوح — من الاستعلام، فحالُ الصفحة في عنوانها. */
+  readonly show?: Show
   readonly now: Date
 }
 
@@ -125,12 +142,49 @@ function capabilityTable(rows: readonly Capability[]): string {
     <tbody>${cells}</tbody></table></div>`
 }
 
+/**
+ * مصغَّراتُ الوسائط تحت النصّ.
+ *
+ * **والصورةُ تُعرَض لا يُقال إنّ هناك صورة.** لصيقةُ «بصورة» تخبر
+ * ولا تُري، ومالكٌ يعتمد منشورا بصورةٍ لم يرَها **يعتمد نصفَه**.
+ *
+ * والبايتاتُ من `/panel/media/:id` **خلف الجلسة** (D-050): صورةٌ
+ * لمنشورٍ لم يُنشر بعد تكشف ما يُعدُّه المالك قبل أن يعلنه.
+ *
+ * **والمرفوضُ يُعرَض مُعلَّما لا يُخفى**: كلفتُه دُفعت، وإخفاؤه يجعل
+ * سطرا في الدفتر بلا ما يقابله.
+ *
+ * والفيديو `<video>` لا `<img>`: إطارٌ أوّلُ ساكنٌ يكفي للتعرّف،
+ * **ولا تشغيلَ آليّ** — صوتٌ يبدأ وحده في لوحةِ عملٍ عدوان.
+ */
+function mediaStrip(items: readonly PostMedia[]): string {
+  if (items.length === 0) return ''
+  const cells = items
+    .map((m) => {
+      const src = `/panel/media/${encodeURIComponent(m.id)}`
+      const isVideo = m.mime.startsWith('video/')
+      const body = isVideo
+        ? `<video src="${escapeHtml(src)}" preload="metadata" muted playsinline
+             aria-label="مقطعٌ مولَّد"></video>`
+        : `<img src="${escapeHtml(src)}" alt="صورةٌ مولَّدة لهذا المنشور" loading="lazy">`
+      return `<a class="thumb${m.status === 'rejected' ? ' off' : ''}"
+        href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">
+        ${body}
+        ${isVideo ? '<span class="tag">مقطع</span>' : ''}
+        ${m.status === 'rejected' ? '<span class="tag bad">مرفوضة</span>' : ''}
+      </a>`
+    })
+    .join('')
+  return `<div class="thumbs">${cells}</div>`
+}
+
 /** بطاقةُ منشورٍ واحد — نصُّه هو المعروض، لا ملخّصٌ عنه. */
 function postCard(
   post: PlatformPost,
   platform: Platform,
   now: Date,
   metrics: readonly PostMetricRow[],
+  media: readonly PostMedia[],
 ): string {
   const meta = STATUS[post.status] ?? { label: post.status, cls: 'idle', g: '○' }
   const link = permalink(platform, post.platformPostId)
@@ -159,10 +213,16 @@ function postCard(
       ${post.accountName === null
         ? ''
         : `<span class="chip">${escapeHtml(post.accountName)}</span>`}
-      ${post.hasMedia ? '<span class="chip">بصورة</span>' : ''}
+      ${media.length === 0
+        ? post.hasMedia
+          // صفٌّ يقول إنّ له وسيطا ولا وسيطَ يُقرأ: يُقال ولا يُخفى
+          ? '<span class="chip">وسيطٌ لا يُقرأ</span>'
+          : ''
+        : ''}
       <span class="grow"></span>${when}
     </div>
     <p class="post-text">${escapeHtml(post.text)}</p>
+    ${mediaStrip(media)}
     ${metricRow(metrics, post.status === 'published', now)}
     ${error}
     <div class="post-foot">
@@ -194,6 +254,70 @@ function tallyRow(t: PlatformTally, now: Date): string {
     ${cell('فشل', String(t.failed), t.failed === 0 ? 'لا فشلَ مسجَّل' : 'يُقرأ سببُه تحت')}
     ${cell('كلفةُ الكتابة', `${t.spend.toFixed(2)}<em>$</em>`, 'على منشورات هذه المنصّة وحدها')}
   </div>`
+}
+
+/**
+ * تبويباتُ القائمة — **فرزٌ لا إخفاء.**
+ *
+ * ## ولماذا لم تكن
+ *
+ * D-046 قال: «الفاشلةُ تُعرض مع الناجحة ولا تُخفى في تبويبٍ ثانٍ —
+ * **فشلٌ لا يُرى لا يُعالَج**». وذاك صحيحٌ عند ثلاثةِ منشورات.
+ * **وعند ستّين لا يُرى الفشلُ أصلا**: يغرق بين الناجحات.
+ *
+ * ## فالفرزُ يخدم القاعدةَ نفسَها إن حُرس بشرطين
+ *
+ * **١ · العددُ على كلّ تبويبٍ دائما** — فمن يقف على «الكلّ» يرى «فشل ٣»
+ * بلا أن يفتحه. **والرقمُ هو الذي يُنبّه، لا فتحُ التبويب.**
+ *
+ * **٢ · والافتراضُ «الكلّ»** لا «نُشر»: تبويبٌ افتراضيٌّ يُخفي الفشلَ
+ * هو عينُ ما حذّر منه D-046.
+ *
+ * ## ويعمل بلا جافاسكربت
+ *
+ * التبويباتُ **روابطُ استعلام** (`?show=failed`) لا أزرارُ سكربت:
+ * تُفتَح في تبويبٍ جديد، وتُحفَظ في المفضّلة، وتعمل إن سقط السكربت.
+ * **وحالُ الصفحة في عنوانها** — فمن يشارك رابطا يشارك ما يرى.
+ */
+type Show = 'all' | 'published' | 'queued' | 'failed' | 'drafts'
+
+const SHOW_LABEL: Readonly<Record<Show, string>> = {
+  all: 'الكلّ',
+  published: 'نُشر',
+  queued: 'في الطابور',
+  failed: 'فشل',
+  drafts: 'مسوّدات',
+}
+
+const SHOW_MATCH: Readonly<Record<Show, (status: string) => boolean>> = {
+  all: () => true,
+  published: (s) => s === 'published',
+  queued: (s) => s === 'queued',
+  failed: (s) => s === 'failed',
+  drafts: (s) => s === 'draft' || s === 'approved' || s === 'edited' || s === 'rejected',
+}
+
+export function showOf(raw: string | undefined): Show {
+  return raw !== undefined && raw in SHOW_LABEL ? (raw as Show) : 'all'
+}
+
+function postTabs(posts: readonly PlatformPost[], active: Show, platform: string): string {
+  const order: Show[] = ['all', 'published', 'queued', 'failed', 'drafts']
+  const links = order
+    .map((show) => {
+      const n = posts.filter((p) => SHOW_MATCH[show](p.status)).length
+      // تبويبٌ فارغٌ لا يُعرَض — إلّا «الكلّ» فهو المرجع
+      if (n === 0 && show !== 'all') return ''
+      const href = show === 'all'
+        ? `/panel/channels/${encodeURIComponent(platform)}`
+        : `/panel/channels/${encodeURIComponent(platform)}?show=${show}`
+      const on = show === active
+      return `<a class="ftab${on ? ' on' : ''}${show === 'failed' && n > 0 ? ' bad' : ''}"
+        href="${escapeHtml(href)}"${on ? ' aria-current="page"' : ''}
+        >${SHOW_LABEL[show]}<span class="count">${n}</span></a>`
+    })
+    .join('')
+  return `<nav class="ftabs" aria-label="فرزُ المنشورات">${links}</nav>`
 }
 
 export function platformScreen(d: PlatformScreenData): string {
@@ -272,8 +396,10 @@ export function platformScreen(d: PlatformScreenData): string {
     })
     .join('')
 
-  const posts = d.posts
-    .map((p) => postCard(p, platform, d.now, d.metrics[p.id] ?? []))
+  const show = d.show ?? 'all'
+  const shown = d.posts.filter((p) => SHOW_MATCH[show](p.status))
+  const posts = shown
+    .map((p) => postCard(p, platform, d.now, d.metrics[p.id] ?? [], d.media[p.id] ?? []))
     .join('')
 
   const emptyPosts = `<div class="empty">
@@ -328,7 +454,14 @@ export function platformScreen(d: PlatformScreenData): string {
          والنافذةُ الموقّعةُ تعطي المنصّةَ رابطا تسحب منه. <b>فالمادّةُ حاضرة،
          والباقي سائقُ الرفع.</b></span></div></div>`
     : `<h3 class="sec">ما نُشر وما ينتظر</h3>
-       ${d.posts.length === 0 ? emptyPosts : `<div class="posts">${posts}</div>`}`}
+       ${d.posts.length === 0
+         ? emptyPosts
+         : `${postTabs(d.posts, show, spec.id)}
+            ${shown.length === 0
+              ? `<div class="empty"><b>لا شيءَ في «${SHOW_LABEL[show]}»</b>
+                 <p>والعددُ على كلّ تبويبٍ يقول أين ما تبحث عنه.</p>
+                 <a class="btn g sm" href="/panel/channels/${escapeHtml(spec.id)}">الكلّ</a></div>`
+              : `<div class="posts">${posts}</div>`}`}`}
 
   ${guide === undefined
     ? ''

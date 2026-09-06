@@ -582,6 +582,45 @@ ol.steps.wiz li.ok .n{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 
 ol.steps.wiz li.bad .n{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 ol.steps.wiz li.idle .n{color:var(--ink-3); border-color:var(--line)}
 
+/* ── تبويباتُ الفرز ───────────────────────────────────────────────────
+   روابطُ استعلامٍ لا أزرارُ سكربت: تُفتَح في تبويبٍ جديد، وتُحفَظ في
+   المفضّلة، وتعمل إن سقط السكربت. **وحالُ الصفحة في عنوانها.**
+
+   والعددُ **معروضٌ دائما** لا عند الفتح: من يقف على «الكلّ» يرى «فشل ٣»
+   بلا أن يفتحه — والرقمُ هو الذي يُنبّه. */
+.ftabs{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-bottom:var(--s-4)}
+.ftab{display:inline-flex; align-items:center; gap:var(--s-2);
+  padding:var(--s-2) var(--s-3); min-height:var(--tap); border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+  font-size:var(--t-sm); font-weight:600; text-decoration:none}
+.ftab:hover{border-color:var(--line-strong); color:var(--ink)}
+.ftab .count{font-size:var(--t-xs); font-weight:700; font-variant-numeric:tabular-nums;
+  padding:0 var(--s-2); border-radius:99px; background:var(--surface-3); color:var(--ink-3)}
+/* المفتوحُ يُعلَّم بأكثر من لون: خطٌّ وثِقَلٌ وأرضيّة (D-043) */
+.ftab.on{border-color:var(--brand); background:var(--brand-wash); color:var(--ink)}
+.ftab.on .count{background:var(--brand); color:var(--on-brand)}
+/* والفشلُ يحمل لونَه ولو لم يُفتَح — فلا يُقرأ تبويبا كسائره */
+.ftab.bad .count{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.ftab.bad.on{border-color:var(--bad); background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.ftab.bad.on .count{background:var(--bad); color:var(--bg)}
+
+/* ── مصغَّراتُ الوسائط ────────────────────────────────────────────────
+   **الصورةُ تُعرَض لا يُقال إنّ هناك صورة.** ومقاسٌ ثابتٌ يمنع القفزَ
+   قبل التحميل: صفٌّ يتمدّد بعد وصول البايتات يزيح ما تحته تحت الإصبع.
+
+   والمرفوضةُ تبقى معروضةً مُعتِمةً: كلفتُها دُفعت، وإخفاؤها يجعل سطرا
+   في الدفتر بلا ما يقابله. */
+.thumbs{display:flex; flex-wrap:wrap; gap:var(--s-2); margin:var(--s-3) 0}
+.thumb{position:relative; display:block; width:96px; height:96px; flex:none;
+  border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--line);
+  background:var(--surface-3)}
+.thumb img,.thumb video{width:100%; height:100%; object-fit:cover; display:block}
+.thumb.off{opacity:.45; filter:grayscale(1)}
+.thumb .tag{position:absolute; inset-inline-start:var(--s-1); bottom:var(--s-1);
+  font-size:var(--t-xs); font-weight:700; padding:0 var(--s-2); border-radius:99px;
+  background:var(--chrome); color:var(--ink)}
+.thumb .tag.bad{background:var(--bad); color:var(--bg)}
+
 /* ── لوحُ الإرشاد تحت اللصيقة ─────────────────────────────────────────
    بحثُ GOV.UK: المستخدمُ يبدأ الكتابة فور رؤية الحقل، **ولا ينظر تحته
    أبدا** — فالموضعُ فوق الحقل، وهو ما كان.
