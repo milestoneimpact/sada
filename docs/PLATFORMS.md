@@ -62,6 +62,26 @@
 الثلاثة الموسومة «غير مؤكَّدة» تُثبتها أوّل دورة OAuth حقيقية، والمهمّة
 `M-04` تطلب التحقّق منها قبلها.
 
+## ما قِيس من نهاية رمز LinkedIn — حرفا
+
+أُضيف 2026-09-06 بعد قياسٍ حيّ على تطبيق المالك.
+
+| ما أُرسل | ما عاد |
+|---|---|
+| `client_credentials` + سرٌّ خاطئ | `invalid_client` · «Client authentication failed» |
+| `client_credentials` + معرّفٌ مجهول | `invalid_client_id` · «The passed in client_id is invalid …» |
+| `client_credentials` + **تطبيقٌ بلا منحة رموز التطبيقات** | `access_denied` · «This application is not allowed to create application tokens» |
+| `authorization_code` + رمزٌ باطل | `invalid_request` · «Unable to retrieve access token: authorization code not found» |
+
+**وثلاثةُ أحكامٍ تُستخرَج من هذا الجدول:**
+
+1. **الرمزُ يُفحَص قبل السرّ** في منحة `authorization_code` — فجوابُ الرمز
+   الباطل يعود **سواءٌ صحَّ السرُّ أم لم يصحّ**، ولا يميّز.
+2. **`access_denied` خطأُ منتَجٍ لا خطأُ توثيق** — يعود بالنصّ نفسِه لأيّ
+   سرّ. **وقراءتُه جوازا كذبٌ صريح** (D-076).
+3. فحصُ الزوج بمنحة `client_credentials` **لا يحكم لتطبيقٍ بلا هذا
+   المنتَج**. والبرهانُ الوحيد نجاحُ الربط.
+
 ## المصادر
 
 - https://docs.x.com/x-api/getting-started/pricing
