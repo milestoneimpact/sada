@@ -249,6 +249,14 @@ export interface MediaRow {
   readonly key: string
   readonly mime: string
   readonly bytes: number
+  /**
+   * الوصفُ الذي وُلّدت به.
+   *
+   * وتعليقُ `0010` يقول لماذا: **«صورةٌ لا يُعرف وصفُها لا تُعاد ولا
+   * تُحسَّن»** — وكان يُكتب في كلّ صفٍّ **ولا يُقرأ في أيّ استعلام**
+   * (D-070).
+   */
+  readonly prompt: string
   readonly model: string
   readonly cost: number
   readonly status: 'ready' | 'rejected'
@@ -262,7 +270,7 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, post_id, r2_key, mime, bytes, model, cost_usd, status, created_at
+        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at
            FROM media WHERE post_id IN (${marks}) ORDER BY created_at DESC`,
       )
       .bind(...postIds)
@@ -273,6 +281,7 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
       key: String(r['r2_key']),
       mime: String(r['mime']),
       bytes: Number(r['bytes']),
+      prompt: String(r['prompt'] ?? ''),
       model: String(r['model']),
       cost: Number(r['cost_usd']),
       status: r['status'] === 'rejected' ? 'rejected' : 'ready',

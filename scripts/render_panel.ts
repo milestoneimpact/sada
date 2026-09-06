@@ -220,8 +220,13 @@ const data: PanelData = {
   planReady: true,
   media: [
     // معاينةٌ محلّيّة: `data:` تكفي للنظر، والحيُّ يُخدَم من `/panel/media/:id`
-    { id: 'm1', postId: 'd3', mime: 'image/svg+xml', bytes: 148_320, cost: 0.039, status: 'ready' },
-    { id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected' },
+    {
+      id: 'm1', postId: 'd3', mime: 'image/svg+xml', bytes: 148_320, cost: 0.039,
+      status: 'ready',
+      // **يُرسَم ليُقاس** (D-070): وصفٌ فارغٌ لا يُظهر الشارة
+      prompt: 'مشهدٌ تجريديٌّ بالأخضر والذهب، خطوطٌ هادئةٌ وإضاءةٌ ناعمة',
+    },
+    { id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected', prompt: '' },
   ],
   targets: [
     { id: 'a1', platform: 'linkedin', label: 'عمر عبدالحميد · LinkedIn' },

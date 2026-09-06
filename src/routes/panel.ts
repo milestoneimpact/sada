@@ -349,6 +349,7 @@ panel.get('/panel', async (c) => {
         postId: m.postId,
         mime: m.mime,
         bytes: m.bytes,
+        prompt: m.prompt,
         cost: m.cost,
         status: m.status,
       })),
