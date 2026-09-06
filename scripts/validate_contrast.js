@@ -78,6 +78,9 @@ const css = readFileSync(SOURCE, 'utf8')
 const THEMES = [
   ['النهاريّ', readTokens(css, '/* THEME:light */\n:root')],
   ['الداكن', readTokens(css, '/* THEME:dark */\n[data-theme="dark"]')],
+  // والرافدةُ ثيمٌ ثالث: تبقى داكنةً في النهاريّ، فتُفحَص على حدة —
+  // وإلّا مرّ لونٌ يقرأ على الأرض النهاريّة ولا يقرأ عليها
+  ['الرافدة', readTokens(css, 'THEME:rail')],
 ]
 
 let failures = 0

@@ -22,6 +22,7 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { bar, pct } from './ui/parts'
+import { LOGOS } from './ui/logos'
 
 export { escapeHtml, injectCsrf, shell }
 
@@ -634,6 +635,48 @@ function sourceRow(s: PanelSource, now: Date): string {
 }
 
 /** أيقوناتُ الرافدة. `currentColor` فتتبع حالَ العنصر والثيم معا. */
+/**
+ * فرعُ المنصّات في الرافدة.
+ *
+ * وشاشاتُ المنصّات (D-046) كانت لا تُبلَغ إلّا من بطاقةٍ في لوح
+ * القنوات — **فمن لم يفتح اللوحَ لم يعرف أنّها موجودة**. وهي الشاشاتُ
+ * التي يُسأل فيها كلَّ يومٍ «ماذا نُشر»، فموضعُها الرافدة.
+ *
+ * ومطويٌّ افتراضا حيث لا قناةَ مربوطة، مفتوحٌ حيث توجد: **رافدةٌ تفتح
+ * سبعةَ أسماءٍ لمن لم يربط شيئا تزحم بلا أن تفيد.**
+ *
+ * والحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء، والنقطةُ تُقرأ بلمحة. ومعها
+ * `title` لقارئ الشاشة — واللونُ وحده لا يقول شيئا.
+ */
+function platformNav(views: readonly ChannelView[]): string {
+  const built = views.filter((v) => v.spec.built)
+  const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
+
+  const row = (v: ChannelView): string => {
+    const dot =
+      v.state === 'linked' ? 'ok'
+      : v.state === 'needs_reauth' ? 'bad'
+      : v.state === 'awaiting_owner' ? 'warn'
+      : 'idle'
+    const title =
+      v.state === 'linked' ? 'مربوطة'
+      : v.state === 'needs_reauth' ? 'تحتاج تجديدا'
+      : v.state === 'awaiting_owner' ? 'تنتظرك'
+      : v.state === 'connectable' ? 'جاهزةٌ للربط'
+      : 'لم يُبنَ سائقُها'
+    return `<a href="/panel/channels/${escapeHtml(v.spec.id)}">
+      <span class="pl">${LOGOS[v.spec.id] ?? ''}</span>
+      <span>${escapeHtml(v.spec.label)}</span>
+      <span class="dot ${dot}" title="${escapeHtml(title)}"></span></a>`
+  }
+
+  return `<details class="plat"${anyLinked ? ' open' : ''}>
+    <summary>${ICON.channels}<span>المنصّات</span></summary>
+    <div class="plat-list">${views.map(row).join('')}</div>
+  </details>`
+}
+
+
 const ICON = {
   overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
   sources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
@@ -794,6 +837,7 @@ export function panelPage(d: PanelData): string {
     ${nav('#sources', ICON.sources, 'المصادر', pending)}
     ${nav('#posts', ICON.posts, 'المنشورات', waitingDrafts)}
     ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
+    ${platformNav(d.channels)}
     <span class="lbl">الضبط</span>
     ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
     ${nav('#settings', ICON.settings, 'الحدود')}

@@ -79,7 +79,14 @@ h1,h2,h3{margin:0}
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--chrome); border-inline-start:1px solid var(--line);
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
-  background-image:var(--sheen)}
+  background-image:var(--sheen);
+  /* **اللونُ يُعاد صراحةً، ولا يكفي إعادةُ تعريف الرمز.**
+     المتغيّراتُ تُورَث، أمّا اللونُ فيُورَث **محسوبا**: الجسدُ حسب
+     var(--ink) بقيمة الثيم النهاريّ، فورث اسمُ العلامة حبرا داكنا —
+     ثمّ وُضع على رافدةٍ داكنة فاختفى.
+     علّةٌ لا يمسكها مدقّقُ الرموز (القيَمُ صحيحة) ولا المدقّقُ البصريّ
+     (الأحجامُ صحيحة). رأيتُها بالنظر إلى الصفحة مرسومة. */
+  color:var(--ink)}
 /* خيطٌ بلون الهويّة على الحافّة الداخليّة — الحدُّ الرماديُّ وحده يفصل، وهذا
    **يقول أيُّ الجهتين هي البيت**. ويخفت نزولا فلا يصير خطّا مرسوما. */
 .rail::after{content:''; position:absolute; inset-block:0; inset-inline-end:0; width:1px;
@@ -120,6 +127,36 @@ nav.tabs .count{margin-inline-start:auto; min-width:20px; text-align:center; pad
   border-radius:999px; background:var(--surface-3); font-size:10.5px; font-weight:700;
   color:var(--ink-2); font-variant-numeric:tabular-nums}
 nav.tabs a[aria-current=page] .count{background:var(--brand); color:var(--on-brand)}
+/* ── فرعُ المنصّات ────────────────────────────────────────────────────
+   شاشاتُ المنصّات كانت لا تُبلَغ إلّا من بطاقةٍ في لوحٍ آخر، فمن لم
+   يفتحه لم يعرف أنّها موجودة. وهي التي يُسأل فيها كلَّ يوم. */
+details.plat{margin:0}
+details.plat>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-2) var(--s-3); border-radius:var(--r-sm); min-height:var(--tap);
+  font-size:var(--t-base); font-weight:600; color:var(--ink-2); list-style:none}
+details.plat>summary::-webkit-details-marker{display:none}
+details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}
+details.plat>summary svg{width:16px; height:16px; flex:none; opacity:.7}
+/* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
+details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:10px;
+  color:var(--ink-3); transition:transform .18s}
+details.plat[open]>summary::after{transform:rotate(180deg)}
+.plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
+/* بإزاحةٍ تقول «هذه تحت تلك» — والقائمةُ المسطّحة تُقرأ سبعةَ أقسام */
+.plat-list a{padding-inline-start:var(--s-8)}
+.plat-list .pl{width:15px; height:15px; flex:none; display:grid; place-items:center;
+  color:var(--ink-3)}
+.plat-list .pl svg{width:15px; height:15px; display:block}
+.plat-list a:hover .pl{color:var(--ink-2)}
+/* الحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء. ومعها title — واللونُ وحده
+   لا يقول شيئا لمن لا يفرزه */
+.plat-list .dot{width:6px; height:6px; border-radius:50%; flex:none;
+  margin-inline-start:auto; background:var(--ink-3)}
+.plat-list .dot.ok{background:var(--ok)}
+.plat-list .dot.warn{background:var(--warn)}
+.plat-list .dot.bad{background:var(--bad)}
+.plat-list .dot.idle{background:transparent; border:1px solid var(--line-strong)}
+
 .rail-foot{margin-top:auto; padding:14px; border-top:1px solid var(--line-soft)}
 
 /* ── الشريط العلويّ ────────────────────────────────────────── */
