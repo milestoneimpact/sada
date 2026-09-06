@@ -77,10 +77,13 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
     </details>`
   }
 
+  // رقمٌ في دائرةٍ لا نقطةٌ في قائمة: الخطواتُ تُنفَّذ بالترتيب، والعينُ
+  // تحتاج موضعا تعود إليه بعد أن تغادر الشاشة إلى بوّابة المنصّة
   const steps = guide.before
     .map(
-      (b) => `<li><span class="what">${b.what}</span>
-        <span class="why">${b.why}</span></li>`,
+      (b, i) => `<li><span class="n">${i + 1}</span>
+        <span class="body"><span class="what">${b.what}</span>
+        <span class="why">${b.why}</span></span></li>`,
     )
     .join('')
 
@@ -102,36 +105,45 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
         rel="noopener noreferrer">${escapeHtml(guide.portalLabel)}</a> وأتمم هذه أوّلا:</p>
       <ol class="steps">${steps}</ol>
 
-      <label class="lbl-sm" for="cb-${id}">رابطُ العودة — انسخه كما هو</label>
-      <div class="copy">
-        <input id="cb-${id}" class="mono" value="${escapeHtml(callback)}" readonly>
-        <button type="button" class="g sm" data-copy="cb-${id}">انسخ</button>
+      <div class="field cb">
+        <label for="cb-${id}">رابطُ العودة</label>
+        <span class="hint-sm">${guide.gotcha}</span>
+        <div class="copy">
+          <input id="cb-${id}" class="mono" value="${escapeHtml(callback)}" readonly
+            aria-label="رابط العودة — للنسخ">
+          <button type="button" class="g sm" data-copy="cb-${id}">انسخ</button>
+        </div>
       </div>
-      <p class="ch-note">${guide.gotcha}</p>
 
       <form method="POST" action="/panel/channels/app" data-busy="جارٍ الحفظ…">
         <input type="hidden" name="platform" value="${escapeHtml(id)}">
-        <div class="field"><label for="ci-${id}">Client ID</label>
-          <input id="ci-${id}" name="client_id" required
+        <div class="field">
+          <label for="ci-${id}">Client ID</label>
+          <span class="hint-sm" id="ci-${id}-h">${guide.whereId}</span>
+          <input id="ci-${id}" name="client_id" required aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
-          <span class="hint-sm">${guide.whereId}</span></div>
-        <div class="field"><label for="cs-${id}">Client Secret</label>
+        </div>
+        <div class="field">
+          <label for="cs-${id}">Client Secret</label>
+          <span class="hint-sm" id="cs-${id}-h">${guide.whereSecret}</span>
           <input id="cs-${id}" name="client_secret" type="password" required
+            aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
             autocomplete="off" spellcheck="false">
-          <span class="hint-sm">${guide.whereSecret}</span></div>
+        </div>
         <div class="ch-foot">
-          <button class="p sm" type="submit">احفظ</button>
+          <button class="p" type="submit">احفظ</button>
+          <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
+          <span class="grow"></span>
           ${app.source === 'vault'
-            ? `<button class="g sm" type="submit" formaction="/panel/channels/app/delete"
+            ? `<button class="d sm" type="submit" formaction="/panel/channels/app/delete"
                  data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
             : ''}
-          <span class="grow"></span>
-          <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
         </div>
       </form>
 
-      <p class="ch-note"><b>علامةُ النجاح:</b> ${guide.success}</p>
+      <div class="outcome"><span class="k">علامةُ النجاح</span>
+        <span class="v">${guide.success}</span></div>
     </div>
   </details>`
 }

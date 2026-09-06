@@ -29,9 +29,17 @@ body{
   font-feature-settings:"kern" 1;
 }
 :focus-visible{outline:2px solid var(--gold); outline-offset:2px; border-radius:6px}
-.skip{position:absolute; right:-9999px; top:8px; background:var(--gold); color:var(--on-gold);
-  padding:10px 16px; border-radius:8px; z-index:99; font-weight:700}
-.skip:focus{right:12px}
+/* رابطُ التخطّي: يُقصّ ولا يُنفى خارج الشاشة.
+   وكان عند right:-9999px، **فامتدّ المستند إلى 10389px** وصار الجوّالُ
+   يُسحَب جانبا. وهي علّةٌ لا تُرى: العنصرُ نفسه غيرُ مرئيّ، وأثرُه
+   شريطُ تمريرٍ أفقيّ يظنّه الناظر عيبا في التخطيط.
+   والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض. */
+.skip{position:absolute; width:1px; height:1px; overflow:hidden;
+  clip-path:inset(50%); white-space:nowrap;
+  background:var(--gold); color:var(--on-gold);
+  padding:var(--s-3) var(--s-4); border-radius:8px; z-index:99; font-weight:700}
+.skip:focus{width:auto; height:auto; overflow:visible; clip-path:none;
+  inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2)}
 .grow{flex:1}
 h1,h2,h3{margin:0}
 
@@ -53,8 +61,8 @@ nav.tabs{padding:4px 12px 16px; display:flex; flex-direction:column; gap:1px}
 nav.tabs .lbl{font-size:10px; font-weight:700; color:var(--ink-3); letter-spacing:1.1px;
   padding:16px 10px 6px}
 nav.tabs .sep{display:none}
-nav.tabs a{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:var(--r-sm);
-  font-size:13.5px; font-weight:600; color:var(--ink-2); text-decoration:none;
+nav.tabs a{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-2) var(--s-3);
+  border-radius:var(--r-sm); min-height:var(--tap); font-size:var(--t-base); font-weight:600; color:var(--ink-2); text-decoration:none;
   transition:background .12s, color .12s}
 nav.tabs a svg{width:16px; height:16px; flex:none; opacity:.7}
 nav.tabs a:hover{background:var(--surface-2); color:var(--ink)}
@@ -74,8 +82,8 @@ nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold
 .topbar{position:sticky; top:0; z-index:20; background:var(--chrome);
   border-bottom:1px solid var(--line); padding:0 24px; min-height:60px; flex:none;
   display:flex; align-items:center; gap:12px}
-.topbar h1{font-size:16px; font-weight:700; letter-spacing:-.2px}
-.topbar .crumb{font-size:11.5px; color:var(--ink-3); margin-top:1px}
+.topbar h1{font-size:var(--t-lg); font-weight:700; letter-spacing:-.2px}
+.topbar .crumb{font-size:var(--t-xs); color:var(--ink-3); margin-top:1px}
 .content{padding:20px 24px 48px; max-width:1500px; width:100%}
 
 .pill{display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px;
@@ -94,8 +102,8 @@ nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold
 .theme button[aria-pressed=true]{background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
 
 /* ── الإشعار ───────────────────────────────────────────────── */
-.flash{display:flex; align-items:flex-start; gap:10px; padding:11px 14px; border-radius:var(--r);
-  margin-bottom:16px; font-size:13px; border:1px solid var(--line); background:var(--surface)}
+.flash{display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-3) var(--s-4);
+  border-radius:var(--r); margin-bottom:var(--s-4); font-size:var(--t-base); border:1px solid var(--line); background:var(--surface)}
 .flash .ic{flex:none; font-weight:800; font-size:13px; line-height:1.55}
 .flash.ok{border-color:color-mix(in srgb,var(--ok) 28%,transparent); background:var(--ok-wash)}
 .flash.ok .ic{color:var(--ok)}
@@ -107,7 +115,14 @@ nav.tabs a[aria-current=page] .count{background:var(--gold); color:var(--on-gold
 section[hidden]{display:none}
 
 /* ══ الشبكة والبطاقات ════════════════════════════════════════ */
-.grid{display:grid; gap:12px}
+/* عنصرُ الشبكة لا ينكمش تحت محتواه ما لم يُقَل له: min-width الافتراضيّة
+   auto، **فسلسلةٌ لا تنكسر — عنوانُ API أو اسمُ نموذج — تدفع العمودَ
+   فيفيض المستندُ كلُّه**. وقيس ذلك في لوح المزوّدين: 406px على شاشة 390. */
+.grid{display:grid; gap:var(--s-3)}
+.grid>*{min-width:0}
+/* والسلاسلُ اللاتينيّة الطويلة تُكسَر عند الضرورة لا تُقصّ: عنوانٌ مقصوصٌ
+   لا يُنسَخ صحيحا، ومكسورٌ يُقرأ ويُنسَخ. */
+.mono{overflow-wrap:anywhere}
 .c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
 .c2{grid-template-columns:repeat(2,1fr)}
 .c21{grid-template-columns:2fr 1fr}
@@ -117,11 +132,11 @@ section[hidden]{display:none}
 
 .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
   padding:18px 20px; box-shadow:var(--sh-1)}
-.card > h2{font-size:14px; font-weight:700; letter-spacing:-.15px; margin-bottom:3px}
-.card > .hint{margin:0 0 14px; font-size:12px; color:var(--ink-3); line-height:1.65}
+.card > h2{font-size:var(--t-md); font-weight:700; letter-spacing:-.15px; margin-bottom:3px}
+.card > .hint{margin:0 0 var(--s-4); font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
 .card-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
 .card-head h2{margin:0}
-h3.sec{font-size:11px; font-weight:700; color:var(--ink-3); letter-spacing:1px;
+h3.sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-3); letter-spacing:1px;
   margin:22px 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line-soft)}
 
 /* ── بطاقةُ المؤشّر ────────────────────────────────────────── */
@@ -185,8 +200,12 @@ tbody tr:hover{background:var(--surface-2)}
 .worth .val{font-variant-numeric:tabular-nums; font-size:12px; color:var(--ink-2); min-width:30px}
 
 /* ══ الأزرار — أربعُ درجاتٍ لا لونان ══════════════════════════ */
-button,.btn{font:inherit; font-size:13px; font-weight:650; border-radius:var(--r-sm); cursor:pointer;
-  border:1px solid transparent; padding:8px 14px; display:inline-flex; align-items:center; gap:7px;
+/* ارتفاعُ الهدف 44 لا 31: WCAG 2.5.5 و Apple HIG. والحشوُ يُترك
+   للتوسيط، و min-height هي التي تضمن — فنصٌّ قصيرٌ لا يُقزّم الزرّ. */
+button,.btn{font:inherit; font-size:var(--t-base); font-weight:650; border-radius:var(--r-sm);
+  cursor:pointer; border:1px solid transparent; padding:var(--s-2) var(--s-4);
+  min-height:var(--tap); min-width:var(--tap); box-sizing:border-box;
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--s-2);
   text-decoration:none; white-space:nowrap; transition:background .12s, border-color .12s, box-shadow .12s}
 .p{background:var(--gold); color:var(--on-gold); box-shadow:var(--sh-1)}
 .p:hover{background:var(--gold-deep)}
@@ -194,18 +213,33 @@ button,.btn{font:inherit; font-size:13px; font-weight:650; border-radius:var(--r
 .g:hover{background:var(--surface-2)}
 .d{background:var(--surface); color:var(--bad); border-color:color-mix(in srgb,var(--bad) 34%,transparent)}
 .d:hover{background:var(--bad-wash)}
-.sm{padding:5px 11px; font-size:12px; border-radius:7px}
+/* «الصغير» أضيقُ حشوا لا أقصرُ قامة: زرٌّ في جدولٍ يزدحم عرضا لا طولا،
+   وتقصيرُه يُسقطه دون حدّ الهدف — وهو ما كان يقع. */
+.sm{padding:var(--s-1) var(--s-3); font-size:var(--t-sm); border-radius:7px}
 button:disabled{opacity:.45; cursor:not-allowed}
 form.inline{display:inline; margin:0}
 
-.field{display:flex; flex-direction:column; gap:5px}
-label{font-size:11.5px; font-weight:600; color:var(--ink-3)}
-input[type=number],input[type=password],input[type=text],input:not([type]),select{
+.field{display:flex; flex-direction:column; gap:var(--s-1)}
+label{font-size:var(--t-xs); font-weight:600; color:var(--ink-3)}
+input[type=number],input[type=password],input[type=text],input[type=datetime-local],
+input:not([type]),select,textarea{
   background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--r-sm);
-  color:var(--ink); padding:8px 11px; font:inherit; font-size:13.5px; transition:border-color .12s, box-shadow .12s}
-input:focus,select:focus{border-color:var(--gold); box-shadow:0 0 0 3px var(--ring); outline:none}
+  color:var(--ink); padding:var(--s-2) var(--s-3); font:inherit; font-size:var(--t-md);
+  min-height:var(--tap); box-sizing:border-box;
+  transition:border-color .12s, box-shadow .12s}
+input:focus,select:focus,textarea:focus{border-color:var(--gold); box-shadow:0 0 0 3px var(--ring); outline:none}
 input[type=number]{width:110px}
-.row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
+/* ── طولُ السطر ───────────────────────────────────────────────────────
+   45 إلى 75 محرفا. وقيست كتلٌ عند 135 — ضعفُ الحدّ. والعينُ ترتدّ من
+   آخر السطر إلى أوّل التالي، فتفقد موضعَها كلّما طال.
+
+   والتقييدُ بأقصى عرضٍ لا بعرضٍ ثابت: الكتلةُ تضيق مع الشاشة ولا تتمدّد
+   معها، فالجوّالُ سليمٌ أصلا والشاشةُ العريضة هي التي تُفسد. */
+p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)}
+/* وما يقرؤه غريبٌ لا مالك — الوثائقُ العامّة — يُعطى فسحةً أوسع قليلا */
+.doc p,.doc li{max-width:var(--measure-wide)}
+
+.row{display:flex; gap:var(--s-3); align-items:flex-end; flex-wrap:wrap}
 
 /* ── الفراغ ────────────────────────────────────────────────── */
 .empty{padding:30px 20px; text-align:center; border:1px dashed var(--line-strong);
@@ -271,22 +305,55 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
    مطويٌّ افتراضا حيث لا يلزم، ومفتوحٌ حيث ينقص سرّ: بطاقةٌ تفتح نموذجا
    لا حاجة إليه تزحم الشاشة، وبطاقةٌ تخفيه حيث يلزم تجعل المالك يبحث. */
 .setup{border-top:1px solid var(--line-soft); padding-top:11px; margin-top:2px}
-.setup>summary{cursor:pointer; font-size:12.5px; font-weight:650; color:var(--gold-deep);
-  list-style:none; padding:3px 0}
+/* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
+   — وهو ثلثُ الحدّ. */
+summary{min-height:var(--tap); display:flex; align-items:center}
+.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:650; color:var(--gold-deep);
+  list-style:none; padding:var(--s-2) 0}
 .setup>summary::-webkit-details-marker{display:none}
-.setup>summary::before{content:'▸ '; display:inline-block; transition:transform .15s}
-.setup[open]>summary::before{content:'▾ '}
+.setup>summary::before{content:'▸'; display:inline-block; margin-inline-end:var(--s-2)}
+.setup[open]>summary::before{content:'▾'}
 .setup-body{padding-top:10px}
-.setup .field{margin-bottom:12px}
-.setup .hint-sm{display:block; font-size:11px; color:var(--ink-3); line-height:1.65; margin-top:5px}
-.lbl-sm{display:block; font-size:10.5px; color:var(--ink-3); letter-spacing:.3px; margin-bottom:5px}
-/* خطواتٌ لكلٍّ سببُها: «افعل» وحدها تُنفَّذ ولا تُفهَم، فلا تُصحَّح إن أخطأت */
-ol.steps{margin:0 0 14px; padding-inline-start:18px}
-ol.steps li{font-size:12px; line-height:1.75; margin-bottom:9px; color:var(--ink-2)}
-ol.steps .what{display:block; font-weight:650; color:var(--ink)}
+.setup .field{margin-bottom:var(--s-5)}
+
+/* ── الوصفُ فوق الحقل لا تحته ─────────────────────────────────────────
+   بحثُ GOV.UK Design System: المستخدمُ يبدأ الكتابة فور رؤية الحقل،
+   **ولا ينظر تحته أبدا**. فوصفٌ أسفلَه يُقرأ بعد أن يُخطئ، ووصفٌ فوقه
+   يُقرأ قبل أن يكتب.
+   و aria-describedby يربطهما، فقارئُ الشاشة يسمع الوصفَ مع اللصيقة. */
+.setup .hint-sm{display:block; font-size:var(--t-sm); color:var(--ink-3);
+  line-height:var(--lh); margin:var(--s-1) 0 var(--s-2); max-width:var(--measure)}
+.setup .field label{font-size:var(--t-base); color:var(--ink); font-weight:700}
+.setup .cb .copy{margin:0}
+
+/* ── الخطوات ─────────────────────────────────────────────────────────
+   رقمٌ في دائرةٍ لا نقطةٌ في قائمة: الخطواتُ تُنفَّذ بالترتيب، وتُغادَر
+   الشاشةُ بينها إلى بوّابة المنصّة — فالعينُ تحتاج موضعا تعود إليه.
+   ولكلّ خطوةٍ سببُها: «افعل» وحدها تُنفَّذ ولا تُفهَم، فلا تُصحَّح إن أخطأت. */
+ol.steps{margin:0 0 var(--s-5); padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-3)}
+ol.steps li{display:flex; gap:var(--s-3); align-items:flex-start;
+  font-size:var(--t-sm); line-height:var(--lh); color:var(--ink-2)}
+ol.steps .n{flex:none; width:22px; height:22px; border-radius:50%; margin-top:1px;
+  display:grid; place-items:center; background:var(--gold-wash); color:var(--gold-deep);
+  font-size:var(--t-xs); font-weight:700; font-variant-numeric:tabular-nums;
+  border:1px solid color-mix(in srgb,var(--gold) 24%,transparent)}
+ol.steps .body{min-width:0; max-width:var(--measure)}
+ol.steps .what{display:block; font-weight:650; color:var(--ink); margin-bottom:2px}
 ol.steps .why{display:block; color:var(--ink-3)}
-.copy{display:flex; gap:7px; align-items:center; margin-bottom:8px}
-.copy input{flex:1 1 auto; min-width:0; font-size:11.5px; padding:8px 10px;
+
+/* ── علامةُ النجاح ────────────────────────────────────────────────────
+   تُفصَل عن النموذج بلونها: هي ما يُقرأ **بعد** الحفظ، وسطرٌ رماديٌّ
+   في آخر النموذج يُقرأ قبله ثمّ يُنسى. */
+.outcome{display:flex; gap:var(--s-3); align-items:flex-start; margin-top:var(--s-4);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r); background:var(--ok-wash)}
+.outcome .k{flex:none; font-size:var(--t-xs); font-weight:700; color:var(--ok);
+  letter-spacing:.3px; padding-top:2px}
+.outcome .v{font-size:var(--t-sm); line-height:var(--lh); color:var(--ink-2);
+  max-width:var(--measure)}
+
+.copy{display:flex; gap:var(--s-2); align-items:stretch}
+.copy input{flex:1 1 auto; min-width:0; font-size:var(--t-sm);
   direction:ltr; text-align:left; background:var(--surface-2)}
 
 /* ── المسوّدات ────────────────────────────────────────────────────────
@@ -419,7 +486,10 @@ ol.steps .why{display:block; color:var(--ink-3)}
 .doc .glyph{width:38px; height:38px; margin-bottom:14px}
 .doc h1{font-size:27px; letter-spacing:-.5px; margin:0 0 10px}
 .doc h2{font-size:16px; margin:32px 0 10px; letter-spacing:-.2px}
-.doc .lede{font-size:14.5px; line-height:1.9; color:var(--ink-2); margin:0 0 10px}
+.doc .lede{font-size:var(--t-lg); line-height:var(--lh); color:var(--ink-2);
+  /* والصدرُ أضيقُ قياسا لا أوسع: قياسُه أكبر، فالوحدةُ ch أعرض معه —
+     و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس. */
+  margin:0 0 var(--s-3); max-width:54ch}
 .doc p{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin:0 0 11px}
 .doc ul{margin:0 0 11px; padding-inline-start:20px}
 .doc li{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin-bottom:7px}
