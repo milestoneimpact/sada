@@ -30,6 +30,7 @@ const views = viewChannels(accounts, () => true)
 const li = views.find((v) => v.spec.id === 'linkedin')!
 const x = views.find((v) => v.spec.id === 'x')!
 const ig = views.find((v) => v.spec.id === 'instagram')!
+const yt = views.find((v) => v.spec.id === 'youtube')!
 
 const page = (title: string, body: string): string =>
   shell(
@@ -106,6 +107,15 @@ writeFileSync(
 )
 
 writeFileSync(
+  '/tmp/screen-link-only.html',
+  page('صدى — YouTube', platformScreen({
+    view: yt, now,
+    tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
+    scopes: {}, metrics: {}, posts: [],
+  })),
+)
+
+writeFileSync(
   '/tmp/screen-refused.html',
   page(
     'صدى — لم يكتمل الربط',
@@ -132,4 +142,4 @@ writeFileSync(
   ),
 )
 
-console.log('رُسمت خمسٌ في /tmp')
+console.log('رُسمت ستٌّ في /tmp')

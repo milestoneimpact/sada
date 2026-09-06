@@ -966,14 +966,19 @@ panel.get('/panel/channels/:platform', async (c) => {
   const view = views.find((v) => v.spec.id === id)
   if (view === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
 
-  // ما لم يُبنَ لا منشوراتٍ له ولا نطاقات: لا يُسأل عنها أصلا
-  const built = spec.built
   const now = new Date()
-  const posts = built ? await platformPosts(c.env.DB, id as 'linkedin' | 'x', 60) : []
-  const tally = built
+
+  // **والمنشوراتُ لما ينشر وحده**: منصّةٌ تُربَط ولا تنشر تُسأل عن
+  // نطاقاتها لا عن حصادها — وأصفارُ نشرٍ على شاشتها تُقرأ فشلا لا
+  // «لم يُبنَ بعد» (D-056)
+  const publishes = spec.stage === 'publish'
+  const posts = publishes ? await platformPosts(c.env.DB, id as 'linkedin' | 'x', 60) : []
+  const tally = publishes
     ? await platformTally(c.env.DB, id as 'linkedin' | 'x')
     : { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }
-  const scopes = built ? await grantedScopes(c.env.DB, id as 'linkedin' | 'x') : {}
+  // والنطاقاتُ تُقرأ لكلّ ما يُربَط: هي جوابُ «ماذا يستطيع هذا الحساب»
+  const scopes =
+    spec.stage === 'none' ? {} : await grantedScopes(c.env.DB, id as Platform)
 
   // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
   const metrics = await metricsFor(c.env.DB, posts.map((p) => p.id))

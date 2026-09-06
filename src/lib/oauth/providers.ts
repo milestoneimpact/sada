@@ -11,7 +11,17 @@
 
 import { scopeSet } from './scopes'
 
-export type Platform = 'linkedin' | 'x'
+/**
+ * ما يُربَط. **أربعٌ**، واثنتان منها تنشران.
+ *
+ * والفرقُ بين النوعين ليس تفصيلا: `PublishPlatform` هو ما يقابل
+ * `CHECK (platform IN (…))` في `posts`، **فالمترجمُ يمنع كتابةَ مسوّدةٍ
+ * لمنصّةٍ لا تنشر قبل أن تمنعها القاعدة**.
+ */
+export type Platform = 'linkedin' | 'x' | 'youtube' | 'tiktok'
+
+/** ما بُني له سائقُ نشرٍ فعلا — ويقابل قيدَ `posts.platform`. */
+export type PublishPlatform = 'linkedin' | 'x'
 
 export interface Provider {
   readonly platform: Platform
@@ -43,6 +53,21 @@ export interface Provider {
   readonly clientAuth: 'body' | 'basic'
   /** ترويسات إلزامية على كل طلب مُصدَّر. */
   readonly extraHeaders: Readonly<Record<string, string>>
+  /**
+   * اسمُ حقل المعرّف في رابط الإذن.
+   *
+   * **TikTok يسمّيه `client_key` لا `client_id`** — وهو خروجٌ عن
+   * OAuth 2.0، ورابطٌ يحمل الاسمَ المعياريَّ يُردّ بخطأٍ لا يذكر السبب.
+   */
+  readonly clientIdParam?: string
+  /**
+   * معاملاتٌ إضافيّةٌ في رابط الإذن.
+   *
+   * **و Google لا يعطي رمزَ تجديدٍ بلا `access_type=offline`** — ولا
+   * يعطيه ثانيةً بلا `prompt=consent` لمن وافق مرّة. فمن أغفلهما رُبط
+   * حسابُه ثمّ سقط بعد ساعة، **ولا شيء يقول لماذا**.
+   */
+  readonly extraAuthorize?: Readonly<Record<string, string>>
 }
 
 /**
@@ -76,7 +101,56 @@ export const X: Provider = {
   extraHeaders: {},
 }
 
-export const PROVIDERS: Readonly<Record<Platform, Provider>> = { linkedin: LINKEDIN, x: X }
+/**
+ * YouTube — عبر Google OAuth.
+ *
+ * **ونهايةُ الرفع مستأنَفة** (`uploadType=resumable`): يُطلَب عنوانُ
+ * جلسةٍ أوّلا ثمّ تُدفَع البايتات إليه. وهي غيرُ نهاية `videos.insert`
+ * العاديّة — ومقطعٌ بخمسَ عشرةَ ثانيةً يمرّ في دفعةٍ واحدة.
+ */
+export const YOUTUBE: Provider = {
+  platform: 'youtube',
+  authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+  identityUrl: 'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+  postUrl:
+    'https://www.googleapis.com/upload/youtube/v3/videos' +
+    '?uploadType=resumable&part=snippet,status',
+  uploadUrl:
+    'https://www.googleapis.com/upload/youtube/v3/videos' +
+    '?uploadType=resumable&part=snippet,status',
+  scopes: scopeSet('youtube'),
+  clientAuth: 'body',
+  extraHeaders: {},
+  // بلا هذين لا رمزَ تجديد — والحسابُ يسقط بعد ساعةٍ بلا سببٍ يُقرأ
+  extraAuthorize: { access_type: 'offline', prompt: 'consent' },
+}
+
+/**
+ * TikTok — Content Posting API.
+ *
+ * **ويسمّي المعرّفَ `client_key`** في رابط الإذن، لا `client_id`.
+ */
+export const TIKTOK: Provider = {
+  platform: 'tiktok',
+  authorizeUrl: 'https://www.tiktok.com/v2/auth/authorize/',
+  tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
+  identityUrl:
+    'https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url',
+  postUrl: 'https://open.tiktokapis.com/v2/post/publish/video/init/',
+  uploadUrl: 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/',
+  scopes: scopeSet('tiktok'),
+  clientAuth: 'body',
+  extraHeaders: {},
+  clientIdParam: 'client_key',
+}
+
+export const PROVIDERS: Readonly<Record<Platform, Provider>> = {
+  linkedin: LINKEDIN,
+  x: X,
+  youtube: YOUTUBE,
+  tiktok: TIKTOK,
+}
 
 /**
  * رابط العودة يُبنى من `PUBLIC_BASE_URL` ولا يُكتب ثابتا.

@@ -44,8 +44,11 @@ function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503):
 
 export const oauth = new Hono<{ Bindings: Env }>()
 
+/** الأربعُ التي تُربَط — والسجلُّ هو الحكم، لا قائمةٌ منسوخة. */
 function platformOf(value: string): Platform | null {
-  return value === 'linkedin' || value === 'x' ? value : null
+  return Object.prototype.hasOwnProperty.call(PROVIDERS, value)
+    ? (value as Platform)
+    : null
 }
 
 /**
@@ -125,12 +128,19 @@ oauth.get('/oauth/:platform/start', async (c) => {
 
   const url = new URL(provider.authorizeUrl)
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('client_id', creds.clientId)
+  // **واسمُ حقل المعرّف ليس واحدا**: TikTok يسمّيه `client_key`، ورابطٌ
+  // بالاسم المعياريّ يُردّ بخطأٍ لا يذكر السبب
+  url.searchParams.set(provider.clientIdParam ?? 'client_id', creds.clientId)
   url.searchParams.set('redirect_uri', uri)
   url.searchParams.set('scope', scopes.join(' '))
   url.searchParams.set('state', state)
   url.searchParams.set('code_challenge', pkce.challenge)
   url.searchParams.set('code_challenge_method', pkce.method)
+  // ومعاملاتُ المزوّد الخاصّة آخرا: Google لا يعطي رمزَ تجديدٍ بلا
+  // `access_type=offline`، فيُربَط الحسابُ ثمّ يسقط بعد ساعة
+  for (const [key, value] of Object.entries(provider.extraAuthorize ?? {})) {
+    url.searchParams.set(key, value)
+  }
 
   return c.redirect(url.toString(), 302)
 })

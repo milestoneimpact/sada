@@ -47,6 +47,42 @@ export async function fetchIdentity(
     }
   }
 
+  if (provider.platform === 'youtube') {
+    // قناةٌ واحدةٌ على الأقلّ: حسابُ Google بلا قناةٍ يعيد قائمةً فارغة
+    const items = (body as { items?: unknown }).items
+    const first = Array.isArray(items) ? (items[0] as Record<string, unknown>) : undefined
+    const id = first?.['id']
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new OAuthError(
+        'youtube: لا قناةَ على هذا الحساب — أنشئ قناةً ثمّ أعد الربط',
+        502,
+      )
+    }
+    const snippet = first?.['snippet'] as { title?: unknown } | undefined
+    return {
+      platform: 'youtube',
+      // القناةُ كيانٌ لا شخص، فتُسجَّل `org` — والتمييزُ يُقرأ في اللوحة
+      kind: 'org',
+      externalId: id,
+      displayName: typeof snippet?.title === 'string' ? snippet.title : id,
+    }
+  }
+
+  if (provider.platform === 'tiktok') {
+    const data = (body as { data?: { user?: Record<string, unknown> } }).data?.user
+    const openId = data?.['open_id']
+    if (typeof openId !== 'string' || openId.length === 0) {
+      throw new OAuthError('tiktok: استجابة الهوية بلا open_id', 502)
+    }
+    const name = data?.['display_name']
+    return {
+      platform: 'tiktok',
+      kind: 'member',
+      externalId: openId,
+      displayName: typeof name === 'string' && name.length > 0 ? name : openId,
+    }
+  }
+
   const user = (body as XUserResponse).data
   if (user === undefined || typeof user.id !== 'string' || user.id.length === 0) {
     throw new OAuthError('x: استجابة الهوية بلا data.id', 502)

@@ -70,9 +70,9 @@ export function planSection(input: PlanInput): string {
 
   const why =
     !input.ready
-      ? '<p class="hint" style="margin:10px 0 0">مزوّدُ مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
+      ? '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
       : input.analyzed < 2
-        ? `<p class="hint" style="margin:10px 0 0">${input.analyzed} مصدرا محلَّلا — والخطّةُ تحتاج اثنين على الأقلّ.
+        ? `<p class="hint" style="margin:var(--s-2) 0 0">${input.analyzed} مصدرا محلَّلا — والخطّةُ تحتاج اثنين على الأقلّ.
            <a href="#sources">حلّل مصادرك</a>.</p>`
         : ''
 
@@ -95,7 +95,7 @@ export function planSection(input: PlanInput): string {
     <div class="card-head"><h2>الخطّة الأسبوعيّة</h2>
       <div class="grow"></div>${status}${generate}</div>
 
-    <div class="lede-row" style="margin:0 0 12px">
+    <div class="lede-row" style="margin:0 0 var(--s-3)">
       <span class="chip mono">أسبوعُ ${escapeHtml(plan.week)}</span>
       <span class="chip mono">${escapeHtml(plan.model)}</span>
       <span class="ago">وُضعت منذ ${escapeHtml(relativeTime(plan.createdAt, now))}</span>
@@ -103,14 +103,14 @@ export function planSection(input: PlanInput): string {
 
     ${plan.plan.rationale === ''
       ? ''
-      : `<p class="draft-why" style="margin-bottom:16px">${escapeHtml(plan.plan.rationale)}</p>`}
+      : `<p class="draft-why" style="margin-bottom:var(--s-4)">${escapeHtml(plan.plan.rationale)}</p>`}
 
     <div class="scroll"><table>
       <thead><tr><th>متى</th><th>المنصّة</th><th>المصدر والزاوية</th><th></th></tr></thead>
       <tbody>${plan.plan.items.map((i) => row(i, input.names)).join('')}</tbody>
     </table></div>
 
-    <div class="lede-row" style="margin-top:14px">
+    <div class="lede-row" style="margin-top:var(--s-3)">
       <span class="lede-note"><b>الخطّةُ تقترح ولا تنفّذ.</b> كلُّ «اكتب منه» نداءٌ مدفوعٌ بضغطتك،
         والمسوّدةُ بعده تنتظر اعتمادَك كأيّ مسوّدة.</span>
       <span class="grow"></span>

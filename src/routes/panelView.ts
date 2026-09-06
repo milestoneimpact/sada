@@ -614,7 +614,7 @@ function sourceRow(s: PanelSource, now: Date): string {
     ? ''
     : `<div class="sub">${escapeHtml(s.summary)}</div>` +
       (s.reason === null ? '' : `<div class="sub">— ${escapeHtml(s.reason)}</div>`) +
-      (themes === '' ? '' : `<div style="margin-top:6px">${themes}</div>`)
+      (themes === '' ? '' : `<div style="margin-top:var(--s-1)">${themes}</div>`)
 
   const action = pending
     ? `<form class="inline" method="POST" action="/panel/analyze" data-busy="جارٍ…">
@@ -734,7 +734,7 @@ export function panelPage(d: PanelData): string {
          <p>صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.</p>
          <form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">
            <button class="p" type="submit">مسح Drive الآن</button></form></div>`
-    : `<div class="row" style="margin-bottom:14px">
+    : `<div class="row" style="margin-bottom:var(--s-3)">
          <div class="field"><label for="flt">التصفية</label>
            <select id="flt"><option value="all">الكلّ</option>
              <option value="pending">ما ينتظر تحليلا</option>
@@ -878,7 +878,7 @@ ${flash}
       <div class="n">${d.providers.filter((p) => p.calls > 0).length} مزوّدا نشطا · ${
         d.providers.reduce((sum, p) => sum + p.calls, 0)} نداءً</div></div>
   </div>
-  <div class="grid c2" style="margin-top:14px">
+  <div class="grid c2" style="margin-top:var(--s-3)">
     <div class="card"><h2>ما ينتظرك</h2>
       <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
       ${todo === ''
@@ -886,7 +886,7 @@ ${flash}
         : `<ul class="todo">${todo}</ul>`}</div>
     <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
       <p class="hint">كلّ المزوّدين، بالدولار</p>${sparkline(d.series)}
-      <div class="row" style="margin-top:14px">${scanBtn}
+      <div class="row" style="margin-top:var(--s-3)">${scanBtn}
         <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
   </div>
 </section>
@@ -899,19 +899,19 @@ ${flash}
 
 <section data-pane="providers" hidden>
   ${pageHead('الذكاء', 'المزوّدون والتوجيه', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
-  <div class="card" style="margin-bottom:14px">
+  <div class="card" style="margin-bottom:var(--s-3)">
     <h2>عن مفاتيح المزوّدين</h2>
     <p class="hint" style="margin:0"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
       الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
       ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّله وآخره فقط.</p>
   </div>
   <div class="grid c2">${providerCards}</div>
-  <div style="margin-top:14px">${addCard}</div>
-  <div class="card" style="margin-top:14px"><h2>توجيه المهامّ</h2>
+  <div style="margin-top:var(--s-3)">${addCard}</div>
+  <div class="card" style="margin-top:var(--s-3)"><h2>توجيه المهامّ</h2>
     <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، ولماذا</p>
     <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
       <tbody>${routingRows}</tbody></table></div>
-    <div class="sub" style="margin-top:12px">اختر لكلّ مهمّة مزوّدها ونموذجها. والافتراض في الشيفرة
+    <div class="sub" style="margin-top:var(--s-3)">اختر لكلّ مهمّة مزوّدها ونموذجها. والافتراض في الشيفرة
       يعمل حتّى تختار — فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
   </div>
 </section>
@@ -923,7 +923,7 @@ ${flash}
 
 <section data-pane="posts" hidden>
   ${pageHead('التحرير', 'الخطّة والمسوّدات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
-  <div style="margin-bottom:14px">${planSection({
+  <div style="margin-bottom:var(--s-3)">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
     ready: d.planReady,
@@ -959,7 +959,7 @@ ${flash}
     </div>
   </div>
 
-  <div class="card" style="margin-top:14px"><h2>الإدراج الآليّ</h2>
+  <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
     <div class="split">
       <p>${d.autoEnqueue
         ? `مرفوع: المسح اليوميّ (٣ فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
@@ -974,10 +974,10 @@ ${flash}
           ${d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ'}</button>
       </form>
     </div>
-    <div class="sub" style="margin-top:12px">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
+    <div class="sub" style="margin-top:var(--s-3)">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
   </div>
 
-  <div class="card" style="margin-top:14px"><h2>الحدود اليوميّة</h2>
+  <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>
     <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="daily_analysis_cap">
@@ -1015,7 +1015,7 @@ ${flash}
     </div>
   </div>
 
-  <div class="card" style="margin-top:14px" id="factors"><h2>العامل الثاني</h2>
+  <div class="card" style="margin-top:var(--s-3)" id="factors"><h2>العامل الثاني</h2>
     <p class="hint">${d.factors.enforced
       ? 'مفعَّل: الرمز وحده لا يفتح اللوحة — يليه ما يثبت أنّك أنت.'
       : '<b>غير مفعَّل.</b> الرمز وحده يفتح كلّ شيء. سجّل مفتاح مرورٍ أو اضبط رمز تطبيق.'}</p>
@@ -1029,7 +1029,7 @@ ${flash}
       : `<div class="scroll"><table>
           <thead><tr><th>المفتاح</th><th>سُجّل</th><th>آخر استعمال</th><th></th></tr></thead>
           <tbody>${passkeyRows}</tbody></table></div>`}
-    <div class="row" style="margin-top:12px">
+    <div class="row" style="margin-top:var(--s-3)">
       <div class="field"><label for="pk-label">اسمُ الجهاز</label>
         <input id="pk-label" placeholder="هاتفي · مفتاح YubiKey" maxlength="60"></div>
       <button class="p" id="pk-add" type="button">سجّل مفتاحا</button>
@@ -1047,7 +1047,7 @@ ${flash}
         : '<button class="p" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
     </div>
     <div id="totp-box" hidden>
-      <div class="field" style="margin-top:12px"><label for="totp-secret">السرّ — انسخه إلى تطبيق المصادقة</label>
+      <div class="field" style="margin-top:var(--s-3)"><label for="totp-secret">السرّ — انسخه إلى تطبيق المصادقة</label>
         <input id="totp-secret" readonly dir="ltr"></div>
       <form class="row" method="POST" action="/panel/security/totp/confirm" id="totp-confirm">
         <div class="field"><label for="totp-code">الرمز الظاهر الآن</label>
@@ -1072,14 +1072,14 @@ ${flash}
     <div class="n" id="rc-msg" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="card" style="margin-top:14px"><h2>الرمز الإداريّ</h2>
+  <div class="card" style="margin-top:var(--s-3)"><h2>الرمز الإداريّ</h2>
     <p class="hint" style="margin:0"><b>تدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
       فالجلسة مربوطةٌ ببصمة الرمز الذي فتحها، وتُفحص في كلّ طلب — وجلسةُ مفتاحِ المرور كذلك.
       فإن شككتَ في تسرّبٍ فبدّل الرمز
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
   </div>
 
-  <div class="card" style="margin-top:14px"><h2>سجلّ التدقيق</h2>
+  <div class="card" style="margin-top:var(--s-3)"><h2>سجلّ التدقيق</h2>
     <p class="hint">آخر ${d.audit.length} فعلٍ مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاحٌ قطّ.</p>
     ${d.audit.length === 0
       ? '<div class="empty"><b>لا شيء بعد</b><p>أوّل فعلٍ في اللوحة يظهر هنا.</p></div>'

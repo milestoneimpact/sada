@@ -48,36 +48,36 @@ export function providersSection(d: PanelData): ProvidersMarkup {
 
     return `<div class="card">
       <div class="card-head">
-        <h2 style="font-size:15px;color:var(--ink)">${escapeHtml(p.label)}</h2>
+        <h2 style="font-size:var(--t-base);color:var(--ink)">${escapeHtml(p.label)}</h2>
         <span class="st idle">${p.kind === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'}</span>
         ${p.builtin ? '<span class="st idle">مدمَج</span>' : ''}
         <div class="grow"></div>${status}
       </div>
 
-      <div class="row" style="margin-bottom:12px">
+      <div class="row" style="margin-bottom:var(--s-3)">
         ${p.hint === null
           ? p.secretName === null
             ? '<div class="sub" style="margin:0">لا مفتاح محفوظ بعد</div>'
             : `<div class="sub" style="margin:0">أو ضعه سرّا: <span class="mono">${escapeHtml(p.secretName)}</span><br>${escapeHtml(p.howToGet)}</div>`
-          : `<div><div class="k" style="font-size:11.5px;color:var(--ink-3)">المفتاح المحفوظ</div>
-               <span class="mono" style="font-size:13px">${escapeHtml(p.hint)}</span></div>`}
+          : `<div><div class="k" style="font-size:var(--t-xs);color:var(--ink-3)">المفتاح المحفوظ</div>
+               <span class="mono" style="font-size:var(--t-sm)">${escapeHtml(p.hint)}</span></div>`}
         <div class="grow"></div>${verified}
       </div>
 
-      <div class="sub" style="margin:0 0 6px">
+      <div class="sub" style="margin:0 0 var(--s-1)">
         النموذج <span class="mono">${escapeHtml(p.model ?? '—')}</span>
         ${p.baseUrl === null ? '' : ` · <span class="mono">${escapeHtml(p.baseUrl)}</span>`}
       </div>
       ${priceNote}
 
-      <div class="row" style="gap:18px;margin:14px 0">
-        <div><div class="k" style="font-size:11.5px;color:var(--ink-3)">إنفاق اليوم</div>
-          <div class="num" style="font-size:18px;font-weight:700">${money(p.spendToday)}${
-            p.dailyCap === null ? '' : `<span style="font-size:12px;color:var(--ink-3)"> / ${money(p.dailyCap)}</span>`
+      <div class="row" style="gap:var(--s-4);margin:var(--s-3) 0">
+        <div><div class="k" style="font-size:var(--t-xs);color:var(--ink-3)">إنفاق اليوم</div>
+          <div class="num" style="font-size:var(--t-lg);font-weight:700">${money(p.spendToday)}${
+            p.dailyCap === null ? '' : `<span style="font-size:var(--t-sm);color:var(--ink-3)"> / ${money(p.dailyCap)}</span>`
           }</div>
           ${p.dailyCap === null ? '' : bar(p.spendToday, p.dailyCap)}</div>
-        <div><div class="k" style="font-size:11.5px;color:var(--ink-3)">٣٠ يوما</div>
-          <div class="num" style="font-size:18px;font-weight:700">${money(p.spend)}</div>
+        <div><div class="k" style="font-size:var(--t-xs);color:var(--ink-3)">٣٠ يوما</div>
+          <div class="num" style="font-size:var(--t-lg);font-weight:700">${money(p.spend)}</div>
           <div class="n">${p.calls} نداء</div></div>
       </div>
 
@@ -93,7 +93,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
              <button class="p" type="submit">حفظ</button>
            </form>`}
 
-      <div class="row" style="margin-top:10px">
+      <div class="row" style="margin-top:var(--s-2)">
         ${p.configured ? `
         <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جارٍ الاختبار…">
           <input type="hidden" name="provider" value="${id}">
@@ -109,9 +109,9 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <input type="hidden" name="provider" value="${id}">
           <button class="d sm" type="submit">حذف</button></form>`}
         <div class="grow"></div>
-        <details style="width:100%;margin-top:8px">
-          <summary style="cursor:pointer;font-size:12.5px;color:var(--ink-3)">تعديل النموذج والسعر والسقف</summary>
-          <form class="row" method="POST" action="/panel/providers/add" style="margin-top:10px">
+        <details style="width:100%;margin-top:var(--s-2)">
+          <summary style="cursor:pointer;font-size:var(--t-sm);color:var(--ink-3)">تعديل النموذج والسعر والسقف</summary>
+          <form class="row" method="POST" action="/panel/providers/add" style="margin-top:var(--s-2)">
             <input type="hidden" name="name" value="${id}">
             <input type="hidden" name="label" value="${escapeHtml(p.label)}">
             ${p.builtin ? '' : `<div class="field"><label for="u-${id}">العنوان</label>
@@ -154,7 +154,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
   const add = `<div class="card">
     <h2>أضف مزوّدا</h2>
     <p class="hint">أيّ مزوّدٍ يتكلّم لهجة <span class="mono">chat/completions</span> — وهي ما يتكلّمه أكثرهم.</p>
-    <div class="row" style="margin-bottom:14px">${presetChips}</div>
+    <div class="row" style="margin-bottom:var(--s-3)">${presetChips}</div>
     <form method="POST" action="/panel/providers/add" id="add-provider"
           data-confirm="سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان. أتؤكّد؟">
       <div class="row">
@@ -166,7 +166,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <input id="nu" name="base_url" required placeholder="https://api.deepseek.com/v1"
                  style="width:100%;direction:ltr"></div>
       </div>
-      <div class="row" style="margin-top:10px">
+      <div class="row" style="margin-top:var(--s-2)">
         <div class="field"><label for="nm">النموذج</label>
           <input id="nm" name="model" placeholder="deepseek-chat" style="width:170px;direction:ltr"></div>
         <div class="field"><label for="ni">سعر الدخول /M</label>
@@ -176,7 +176,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         <button class="p" type="submit" style="align-self:flex-end">أضف</button>
       </div>
     </form>
-    <div class="sub" style="margin-top:10px">العنوان يُفحص قبل الحفظ: <b>https</b> وحدها،
+    <div class="sub" style="margin-top:var(--s-2)">العنوان يُفحص قبل الحفظ: <b>https</b> وحدها،
       ولا عناوين داخليّة — خطأٌ مطبعيّ في المضيف يرسل مفتاحك إلى حيث لا تريد.</div>
   </div>`
 
@@ -189,7 +189,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
           <div class="sub">${escapeHtml(r.why)}</div></td>
       <td>
-        <form class="row" method="POST" action="/panel/routes" style="gap:8px">
+        <form class="row" method="POST" action="/panel/routes" style="gap:var(--s-2)">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
           <select name="provider" style="width:130px">${providerOptions(r.provider)}</select>
           <input name="model" value="${escapeHtml(r.model)}" style="width:160px;direction:ltr" required>
