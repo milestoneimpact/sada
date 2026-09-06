@@ -59,11 +59,20 @@ describe('routeStatuses', () => {
     expect(analyze.ready).toBe(false)
   })
 
-  it('ما لم يُبنَ ليس جاهزا ولو ضُبط سرّه — تصريحٌ بالنيّة لا وعدٌ بالعمل', () => {
-    const statuses = routeStatuses({ ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y' })
-    const image = statuses.find((s) => s.task === 'image')!
-    expect(IMPLEMENTED.has('image')).toBe(false)
-    expect(image.ready).toBe(false)
+  /**
+   * كان هذا يثبّت أنّ `image` لم تُبنَ. وقد بُنيت (D-039)، فلو بقي على
+   * حاله لصار اختبارا يمنع البناء لا يحرسه. **والمبدأ هو الذي يُثبَّت لا
+   * المثال**: الجاهزيّةُ بناءٌ وضبطٌ معا، وسقوطُ أحدهما يُسقطها.
+   */
+  it('الجاهزيّةُ بناءٌ **و** ضبطٌ معا — لا أحدُهما', () => {
+    const all = { ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y' }
+    for (const status of routeStatuses(all)) {
+      expect(status.ready).toBe(IMPLEMENTED.has(status.task))
+    }
+    // وبلا سرٍّ لا شيءَ جاهزٌ مهما بُني
+    for (const status of routeStatuses({})) {
+      expect(status.ready).toBe(false)
+    }
   })
 
   it('يغطّي كلّ مهمّة في السجلّ بلا نقص', () => {

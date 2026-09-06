@@ -308,3 +308,40 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
     ).rejects.toThrow()
   })
 })
+
+/**
+ * صورةٌ لم يُبنَ رفعُها (D-039).
+ *
+ * **ولا يُنشر النصُّ وحده**: المالك اعتمد منشورا بصورة، ونشرُه بلا صورته
+ * نشرٌ لشيءٍ لم يعتمده. ويُقال عند الجدولة لا بعد أن تفشل الرسالة في
+ * الطابور حيث لا أحد ينظر.
+ */
+describe('منشورٌ بصورة', () => {
+  async function withImage(): Promise<{ post: string; account: string }> {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
+         VALUES (?, ?, ?, 'image/png', 100, 'وصف', 'gemini', ?)`,
+      )
+      .bind(crypto.randomUUID(), post, `img/${post}/a.png`, `image:${post}:aa`)
+      .run()
+    return { post, account }
+  }
+
+  it('لا يُجدول، ويُقال لماذا', async () => {
+    const { post, account } = await withImage()
+    const out = await schedulePost(db, post, account, SOON, NOW)
+
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('رفعُ الصور')
+    expect((await readPost(post))?.['status']).toBe('approved')
+  })
+
+  it('وصورةٌ مرفوضةٌ لا تمنع — فالرفضُ مخرجٌ لا حائط', async () => {
+    const { post, account } = await withImage()
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE post_id = ?").bind(post).run()
+    expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)
+  })
+})

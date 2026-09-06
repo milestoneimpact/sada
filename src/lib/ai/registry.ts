@@ -65,12 +65,12 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
   image: {
     provider: 'gemini',
     model: 'gemini-2.5-flash-image',
-    why: 'لا بديل عند Anthropic — لم تُبنَ بعد',
+    why: 'لا بديل عند Anthropic — وصورةٌ تصاحب النصّ تُرى أكثر',
   },
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
-export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft'])
+export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft', 'image'])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {
   const value = env[PROVIDERS[provider].secret]
