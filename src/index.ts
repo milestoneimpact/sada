@@ -359,7 +359,9 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Prom
 async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     const outcome = await publishPost(
-      { db: env.DB, encKey: env.TOKEN_ENC_KEY },
+      // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
+      // بلا صورةٍ لا يمسّه (D-040)
+      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA },
       message.body,
     )
     // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي

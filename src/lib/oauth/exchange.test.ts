@@ -87,7 +87,10 @@ describe('exchangeCode', () => {
   it('يعوّض scope الغائب بما طلبناه', async () => {
     const f = fakeFetch({ [X.tokenUrl]: { json: { access_token: 'a', expires_in: 7200 } } })
     const tokens = await exchangeCode(X, CREDS, { code: 'c', redirectUri: 'r', verifier: 'v' }, NOW, f)
-    expect(tokens.scopes).toBe('tweet.read tweet.write users.read offline.access')
+    // تُشتَقّ من المزوّد لا تُكتب: قائمةٌ ثابتةٌ هنا تكسر الاختبار كلَّما
+    // أُضيف نطاقٌ لازم — وهذا ما وقع حين لزم `media.write` لرفع الصور
+    expect(tokens.scopes).toBe(X.scopes.join(' '))
+    expect(tokens.scopes).toContain('media.write')
   })
 })
 
