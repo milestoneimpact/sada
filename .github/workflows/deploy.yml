@@ -131,6 +131,25 @@ jobs:
             exit 1
           fi
 
+          # ٤ · الوثيقتان العامّتان تفتحان (D-038)
+          #
+          # هما رابطان تضعهما في مراجعة LinkedIn و Meta، وقيمتُهما في أن
+          # يفتحا لغريبٍ بلا جلسة. ومسارٌ ينكسر بعد شهر يسقط الطلبَ صامتاً
+          # — فيُقطَع هنا في كلّ نشر لا يُظنّ.
+          for doc in privacy terms; do
+            CODE=$(curl -s -o /tmp/doc.html -w '%{http_code}' --max-time 15 "$BASE/$doc" || echo 000)
+            echo "  $BASE/$doc → HTTP $CODE"
+            if [ "$CODE" != 200 ]; then
+              echo "::error::$BASE/$doc لا يفتح ($CODE). ورابطٌ لا يفتح يُسقط مراجعة المنصّة."
+              exit 1
+            fi
+            # ولا يكفي 200: صفحةُ خطأٍ ترد 200 أحياناً
+            if ! grep -q 'صدى' /tmp/doc.html; then
+              echo "::error::$BASE/$doc يردّ 200 لكنّ محتواه ليس الوثيقة."
+              exit 1
+            fi
+          done
+
           if grep -q '"ready":true' /tmp/ready.json; then
             echo "النشر تمّ، والنظام جاهز."
             exit 0
