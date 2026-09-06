@@ -152,6 +152,18 @@ export interface RefusedData {
   readonly requested: readonly string[]
   /** أتُعرَض محاولةُ الهويّة وحدها؟ لا تُعرَض إن كانت هي التي رُفضت. */
   readonly identityRetry: boolean
+  /**
+   * ما أُرسل فعلا — **معرّفُ التطبيق ورابطُ العودة، لا السرّ**.
+   *
+   * وهذان **علنيّان**: المعرّفُ معروضٌ في بوّابة المنصّة نفسِها،
+   * والرابطُ يظهر في شريط العنوان عند كلّ دورة. فعرضُهما لا يكشف شيئا،
+   * **ويحسم سؤالا لا يُحسَم بغيرهما**: أهو تطبيقٌ آخرُ أصلا؟
+   *
+   * **ولا يُعرَض السرُّ ولا قناعُه ولا بصمتُه هنا**: هذه الصفحةُ ليست
+   * خلف جلسة — من أتمّ إذنا عند المنصّة يبلغها. وقناعُ السرّ يكشف
+   * أوّلَه وآخرَه، فموضعُه لوحُ القنوات خلف الدخول (D-042).
+   */
+  readonly sent?: { readonly clientId: string; readonly redirectUri: string }
 }
 
 /**
@@ -230,10 +242,40 @@ export function refusedBody(d: RefusedData): string {
           <span class="why">الحقلان متجاوران، والقيمتان طويلتان متشابهتان
             في الشكل.</span></span></li>
       </ol>
+      ${d.description === undefined ? '' : `<div class="outcome warn">
+        <span class="k">وهذا نصُّ ${LABEL[d.platform]} حرفا</span>
+        <span class="v"><span class="mono">${escapeHtml(d.description)}</span></span></div>`}
+      ${d.sent === undefined ? '' : `<div class="card" style="margin-top:var(--s-3)">
+        <h2>وهذا ما أرسله صدى — قارنه بما في البوّابة</h2>
+        <p class="hint"><b>القيمتان علنيّتان</b>: المعرّفُ معروضٌ في البوّابة نفسِها،
+          والرابطُ يظهر في شريط العنوان عند كلّ دورة. <b>ولا يُعرَض السرُّ هنا</b> —
+          هذه الصفحةُ ليست خلف دخول؛ قناعُ السرّ في لوح القنوات.</p>
+        <div class="field cb">
+          <label for="sent-id">Client ID الذي أُرسل</label>
+          <div class="copy">
+            <input id="sent-id" class="mono" value="${escapeHtml(d.sent.clientId)}" readonly
+              aria-label="معرّف التطبيق الذي أُرسل">
+            <button type="button" class="g sm" data-copy="sent-id">انسخ</button>
+          </div>
+          <div class="help"><span class="i">!</span><span class="t">
+            <b>إن خالف المعرّفَ في تبويب Auth فهذا تطبيقٌ آخر</b> — وهو وحده يفسّر
+            الرفض. وإن طابقه، <b>فالسرُّ هو الخطأ</b>: ولّد سرّا جديدا والصقه.</span></div>
+        </div>
+        <div class="field cb">
+          <label for="sent-cb">رابطُ العودة الذي أُرسل</label>
+          <div class="copy">
+            <input id="sent-cb" class="mono" value="${escapeHtml(d.sent.redirectUri)}" readonly
+              aria-label="رابط العودة الذي أُرسل">
+            <button type="button" class="g sm" data-copy="sent-cb">انسخ</button>
+          </div>
+        </div>
+      </div>`}
       <div class="outcome warn"><span class="k">ما يُفعَل</span>
         <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من تبويب
           <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
-          <b>لوح القنوات ← دليلُ ضبط التطبيق</b>، ثمّ أعد الربط.</span></div>
+          <b>لوح القنوات ← دليلُ ضبط التطبيق</b>، ثمّ أعد الربط.
+          <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
+          المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الرمزَ نفسه.</span></div>
       <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">اضبط الأسرار</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>

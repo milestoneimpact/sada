@@ -28,6 +28,17 @@ export class OAuthError extends Error {
      * ولا ينكسر ظاهرا — يسقط إلى فرعٍ عامّ ويبدو أنّه يعمل (D-054).
      */
     readonly code?: string,
+    /**
+     * وصفُ المزوّد كما عاد — **وكان يُرمى.**
+     *
+     * D-054 التقط الوصفَ في ساق الإذن وحدها، **وساقُ تبديل الرمز
+     * بقيت تقرأ `error` وتُهمل `error_description`** — وهي الساقُ
+     * التي تفشل بعد أن ينجح كلُّ شيءٍ قبلها، فأحوجُ ما تكون إلى بيان.
+     *
+     * وهو **نصُّ المزوّد لا نصُّنا**، فيُعرَض مقتبَسا ومهرَّبا ولا
+     * يُبنى عليه قرار (D-054: يُضيّق ولا يقرّر).
+     */
+    readonly description?: string,
   ) {
     super(message)
   }
@@ -111,9 +122,14 @@ async function postForm(
   if (!response.ok) {
     // `error` وحده: وصف المزود قد يحمل قيما لا تُسجل
     let code = 'unknown'
+    let description: string | undefined
     try {
-      const failure = (await response.json()) as { error?: unknown }
+      const failure = (await response.json()) as { error?: unknown; error_description?: unknown }
       if (typeof failure.error === 'string') code = failure.error
+      // **يُقصّ عندنا**: نصُّ مزوّدٍ بلا حدٍّ يُعرَض في صفحةٍ ويُسجَّل
+      if (typeof failure.error_description === 'string' && failure.error_description.length > 0) {
+        description = failure.error_description.slice(0, 300)
+      }
     } catch {
       code = 'unparsable'
     }
@@ -121,6 +137,7 @@ async function postForm(
       `${provider.platform}: رفض نهاية الرمز (${code})`,
       response.status,
       code,
+      description,
     )
   }
   return parseToken((await response.json()) as RawToken, now, requested)

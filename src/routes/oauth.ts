@@ -230,11 +230,23 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     // و`StateError` يبقى JSON: حالةٌ منتهيةٌ أو مزوَّرة ليست عطلَ ضبطٍ
     // يُشخَّص، وصفحةٌ لها تدعو إلى إعادةٍ لا تنفع.
     if (error instanceof OAuthError && error.status !== 503) {
+      // ما أُرسل فعلا — يُقرأ من المصدر نفسِه لا يُعاد بناؤه.
+      // **وقراءةٌ ثانيةٌ قد تُخالف الأولى** لو بُدّل السرُّ بين اللحظتين،
+      // فتُعرَض قيمةٌ لم تُرسَل ويُطارَد وهم. ولا يُقرأ السرُّ أصلا.
+      let sent: { clientId: string; redirectUri: string } | undefined
+      try {
+        const creds = await credentialsFor(c.env, platform)
+        sent = { clientId: creds.clientId, redirectUri: redirectUri(c.env.PUBLIC_BASE_URL, platform) }
+      } catch {
+        // تعذّرت القراءة: تُعرَض الصفحةُ بلا المقارنة، ولا تسقط
+      }
       return resultPage(
         'صدى — لم يكتمل الربط',
         refusedBody({
           platform,
           reason: error.code ?? 'token_exchange_failed',
+          ...(error.description === undefined ? {} : { description: error.description }),
+          ...(sent === undefined ? {} : { sent }),
           requested: scopeSet(platform),
           // ودورةُ الهويّة وحدها لا تُعرَض: العطلُ في زوج المفاتيح،
           // **ودورةٌ أضيق تُردّ بالرمز نفسه** فتضيف محاولةً تفشل

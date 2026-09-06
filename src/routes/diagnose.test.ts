@@ -72,6 +72,94 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
     }
   })
 
+  /**
+   * **D-054 التقط الوصفَ في ساق الإذن وحدها.**
+   *
+   * وساقُ تبديل الرمز بقيت تقرأ `error` وتُهمل `error_description` —
+   * **وهي الساقُ التي تفشل بعد أن ينجح كلُّ شيءٍ قبلها**، فأحوجُ ما
+   * تكون إلى بيان. وبلا وصفٍ لا يُفرَّق بين سرٍّ خاطئ ومعرّفٍ خاطئ.
+   */
+  it('ووصفُ المنصّة يُعرَض حرفا — وكان يُرمى', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: {
+        status: 401,
+        json: {
+          error: 'invalid_client',
+          error_description: 'Client authentication failed',
+        },
+      },
+    })
+    try {
+      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
+      const body = await (
+        await app.request(
+          `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
+          {},
+          env,
+        )
+      ).text()
+      expect(body).toContain('Client authentication failed')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  /**
+   * **يحسم سؤالا لا يُحسَم بغيره**: أهو تطبيقٌ آخرُ أصلا؟
+   *
+   * والقيمتان علنيّتان — المعرّفُ معروضٌ في بوّابة المنصّة، والرابطُ
+   * يظهر في شريط العنوان عند كلّ دورة.
+   */
+  it('ويُعرَض ما أُرسل: المعرّفُ ورابطُ العودة', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
+    })
+    try {
+      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
+      const body = await (
+        await app.request(
+          `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
+          {},
+          env,
+        )
+      ).text()
+      expect(body).toContain('li-id')
+      expect(body).toContain('https://sada2.basserh.com/oauth/linkedin/callback')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  /**
+   * **ولا يُعرَض السرُّ ولا قناعُه ولا بصمتُه.**
+   *
+   * هذه الصفحةُ ليست خلف جلسة: **من أتمّ إذنا عند المنصّة يبلغها**.
+   * وقناعُ السرّ يكشف أوّلَه وآخرَه، فموضعُه لوحُ القنوات خلف الدخول.
+   */
+  it('ولا يظهر السرُّ ولا قناعُه في صفحةٍ ليست خلف دخول', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
+    })
+    try {
+      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
+      const body = await (
+        await app.request(
+          `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
+          {},
+          env,
+        )
+      ).text()
+      expect(body).not.toContain('li-secret')
+      // ولا قناعُه: أوّلُ أربعةٍ وآخرُ أربعة
+      expect(body).not.toContain('li-s…cret')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
   it('ورمزُ المزوّد يُحمَل حقلا لا يُستخرَج من نصّ عربيّ', () => {
     const error = new OAuthError('linkedin: رفض نهاية الرمز (invalid_client)', 401, 'invalid_client')
     expect(error.code).toBe('invalid_client')
