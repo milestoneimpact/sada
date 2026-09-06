@@ -15,6 +15,8 @@ import { generateForPost, imageKey, mediaFor, rejectMedia, type Bucket, type Ima
 import { imagePrompt, topicOf } from './prompt'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
+import { writeRoute } from '../ai/routes'
+import { upsertProvider } from '../providers'
 
 let db: FakeDb
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
@@ -355,5 +357,46 @@ describe('الوصف', () => {
     const x = imagePrompt({ topic: 'الوقف', platform: 'x' })
     expect(li).toContain('1.91:1')
     expect(x).toContain('16:9')
+  })
+})
+
+/**
+ * **الاختيارُ يُطاع لا يُقرأ وحسب** (D-079).
+ *
+ * كان الاستيرادُ مثبَّتا على Gemini: يُقرأ توجيهُ المالك من اللوحة ثمّ
+ * يُنادى Gemini على كلّ حال. فمن وجّه الصورَ إلى Cloudflare أُرسل اسمُ
+ * نموذجِها إلى عنوان Google — **فردّت ٤٠٥**.
+ */
+describe('توجيهُ الصور يُطاع (D-079)', () => {
+  it('ووجهةُ Cloudflare تُنادى عندها لا عند Google', async () => {
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      model: '@cf/black-forest-labs/flux-1-schnell',
+    }, 'test')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+
+    const post = await seedPost()
+    const seen: string[] = []
+    const net = (async (url: unknown) => {
+      seen.push(String(url))
+      return new Response(JSON.stringify({ success: true, result: { image: 'AAECAw==' } }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }) as unknown as typeof fetch
+
+    const out = await generateForPost(
+      {
+        db, bucket: bucket(), encKey: '',
+        workerSecrets: { CF_AI_ACCOUNT_ID: 'acc-1', CF_AI_TOKEN: 'tok-1' },
+        fetchImpl: net,
+      },
+      post,
+    )
+
+    expect(out.kind).toBe('generated')
+    expect(seen[0]).toContain('api.cloudflare.com')
+    expect(seen[0]).toContain('/ai/run/@cf/black-forest-labs/flux-1-schnell')
+    // **ولا يُلمَس عنوانُ Google** — وهو ما كان يقع
+    expect(seen.join(' ')).not.toContain('generativelanguage')
   })
 })

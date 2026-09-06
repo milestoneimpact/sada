@@ -38,6 +38,8 @@
  * نداءٍ حقيقيّ هو الذي يؤكّده** — كما قيل في سائق Gemini قبله.
  */
 
+import { cfRunUrl } from '../ai/cloudflare'
+
 /** ما يكفي من واجهة `env.AI`، حتّى تُختبَر الوحدةُ بلا Worker. */
 export interface AiBinding {
   run(model: string, input: Record<string, unknown>): Promise<unknown>
@@ -56,8 +58,10 @@ export function restBinding(
 ): AiBinding {
   return {
     async run(model, input) {
+      // **والعنوانُ من `cfRunUrl` لا يُكتب هنا** (D-081): كُتب في هذا
+      // الملفّ وفي غيرِه، فأُصلح أحدُهما وبقي الآخرُ ينادي نهايةً لا تُخدَم
       const response = await fetchImpl(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+        cfRunUrl(accountId, model),
         {
           method: 'POST',
           headers: {
