@@ -99,20 +99,6 @@ export async function schedulePost(
     return { ok: false, reason: `${account.display_name}: الحساب ${account.status} — جدّد إذنه أوّلا` }
   }
 
-  // صورةٌ لم يُبنَ رفعُها: يُقال الآن لا بعد أن تفشل الرسالة في الطابور
-  // حيث لا أحد ينظر (D-039)
-  const withImage = await db
-    .prepare("SELECT count(*) AS n FROM media WHERE post_id = ? AND status = 'ready'")
-    .bind(postId)
-    .first<{ n: number }>()
-    .catch(() => null)
-  if ((withImage?.n ?? 0) > 0) {
-    return {
-      ok: false,
-      reason: 'المنشور يحمل صورةً ورفعُ الصور إلى المنصّات لم يُبنَ بعد — ارفض الصورة أو انتظر الدفعة التالية',
-    }
-  }
-
   const at = parseWhen(when)
   if (at === null) return { ok: false, reason: 'موعدٌ غير مفهوم — الصيغة YYYY-MM-DDTHH:MM' }
   // موعدٌ مضى يُرسَل في أوّل دورة — وذاك إرسالٌ فوريّ لا جدولة. ومَن أراد

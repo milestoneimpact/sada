@@ -255,25 +255,154 @@ describe('الفشل', () => {
  * والجدولةُ تمنعه قبل ذلك — لكنّ رسالةً دخلت الطابور قبل أن يُبنى هذا
  * تجده قائما. **وحارسان في طبقتين خيرٌ من واحدٍ في الأعلى.**
  */
-describe('منشورٌ بصورة (D-039)', () => {
-  it('لا يُنشر، ولا يُرسَل طلبٌ إلى المنصّة', async () => {
-    const postId = await seedPost({ platform: 'x' })
+/**
+ * النشرُ بصورة (D-040).
+ *
+ * وما يُختبَر ليس أنّ الرفع يعمل — بل **أنّ النصّ لا يخرج بلا صورته**،
+ * وأنّ إعادةَ المحاولة لا ترفع مرّتين. والأولى تحمي المالكَ ممّا لم
+ * يعتمده، والثانية تحمي جيبَه.
+ */
+describe('النشرُ بصورة (D-040)', () => {
+  async function seedWithImage(platform: 'x' | 'linkedin'): Promise<{ postId: string; key: string }> {
+    const postId = await seedPost({ platform })
+    const key = `img/${postId}/a.png`
     await db
       .prepare(
         `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
          VALUES (?, ?, ?, 'image/png', 100, 'وصف', 'gemini', ?)`,
       )
-      .bind(crypto.randomUUID(), postId, `img/${postId}/a.png`, `image:${postId}:aa`)
+      .bind(crypto.randomUUID(), postId, key, `image:${postId}:aa`)
       .run()
+    return { postId, key }
+  }
 
+  function bucket(has = true) {
+    return {
+      async get(k: string) {
+        return has ? { async arrayBuffer() { return new Uint8Array([1, 2, 3]).buffer } } : null
+      },
+      calls: [] as string[],
+    }
+  }
+
+  it('**لا يُنشر النصُّ وحده حين لا دلو** — ولا يُرسَل طلب', async () => {
+    const { postId } = await seedWithImage('x')
     const f = fakeFetch(X_OK)
     const outcome = await publishPost(deps(f), { postId })
+
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') expect(outcome.reason).toBe('no_media_bucket')
+    expect(f.calls).toHaveLength(0)
+  })
+
+  it('وبايتاتٌ مفقودةٌ توقف النشر ولا تُعاد', async () => {
+    const { postId } = await seedWithImage('x')
+    const f = fakeFetch(X_OK)
+    const outcome = await publishPost({ ...deps(f), bucket: bucket(false) }, { postId })
+
     expect(outcome.kind).toBe('failed')
     if (outcome.kind === 'failed') {
-      expect(outcome.reason).toBe('media_upload_not_built')
-      // ولا يُعاد: بناءُ الرفع لا يقع بإعادة المحاولة
+      expect(outcome.reason).toBe('media_bytes_missing')
       expect(outcome.retryable).toBe(false)
     }
     expect(f.calls).toHaveLength(0)
+  })
+
+  it('يرفع ثمّ ينشر، ويُلحق المعرّف بالمنشور', async () => {
+    const { postId } = await seedWithImage('x')
+    const f = fakeFetch({
+      [X.uploadUrl]: { json: { data: { id: 'media-9' } } },
+      [X.postUrl]: { json: { data: { id: 'tweet-1' } } },
+    })
+    const outcome = await publishPost({ ...deps(f), bucket: bucket() }, { postId })
+
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'tweet-1' })
+    expect(f.calls.map((c) => c.url)).toEqual([X.uploadUrl, X.postUrl])
+    expect(JSON.parse(f.calls[1]!.body)).toMatchObject({ media: { media_ids: ['media-9'] } })
+  })
+
+  it('**ويحفظ معرّف الوسيط فلا يُرفَع مرّتين** — و X يحاسب على الرفع', async () => {
+    const { postId } = await seedWithImage('x')
+    await publishPost(
+      {
+        ...deps(
+          fakeFetch({
+            [X.uploadUrl]: { json: { data: { id: 'media-9' } } },
+            [X.postUrl]: { status: 500, json: { error: 'server' } },
+          }),
+        ),
+        bucket: bucket(),
+      },
+      { postId },
+    )
+
+    const saved = db.raw
+      .prepare('SELECT platform_media_id FROM media WHERE post_id = ?')
+      .get(postId) as { platform_media_id: string }
+    expect(saved.platform_media_id).toBe('media-9')
+
+    // الإعادةُ لا تنادي نهايةَ الرفع أصلا
+    const again = fakeFetch({ [X.postUrl]: { json: { data: { id: 'tweet-2' } } } })
+    const outcome = await publishPost({ ...deps(again), bucket: bucket() }, { postId })
+    expect(outcome.kind).toBe('published')
+    expect(again.calls.map((c) => c.url)).toEqual([X.postUrl])
+  })
+
+  it('ويسجّل نداءَ الرفع في الدفتر بصفرٍ مُعلَّم — لا يُخترَع سعرٌ ولا يُسكَت', async () => {
+    const { postId } = await seedWithImage('x')
+    await publishPost(
+      {
+        ...deps(
+          fakeFetch({
+            [X.uploadUrl]: { json: { data: { id: 'media-9' } } },
+            [X.postUrl]: { json: { data: { id: 'tweet-1' } } },
+          }),
+        ),
+        bucket: bucket(),
+      },
+      { postId },
+    )
+    const rows = db.raw
+      .prepare("SELECT operation, total FROM cost_ledger WHERE operation LIKE 'media_upload%'")
+      .all() as { operation: string; total: number }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.operation).toContain('price_unverified')
+    expect(rows[0]?.total).toBe(0)
+  })
+
+  it('LinkedIn: تهيئةٌ ثمّ PUT ثمّ نشرٌ بمعرّف الصورة', async () => {
+    const { postId } = await seedWithImage('linkedin')
+    const seen: string[] = []
+    const impl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = input.toString()
+      seen.push(url)
+      if (url === LINKEDIN.uploadUrl) {
+        return Response.json({ value: { uploadUrl: 'https://up.li/abc', image: 'urn:li:image:7' } })
+      }
+      if (url === 'https://up.li/abc') {
+        expect(init?.method).toBe('PUT')
+        return new Response(null, { status: 201 })
+      }
+      const body = JSON.parse(String(init?.body)) as { content?: { media?: { id?: string } } }
+      expect(body.content?.media?.id).toBe('urn:li:image:7')
+      return new Response('{}', { status: 201, headers: { 'x-restli-id': 'urn:li:share:9' } })
+    }) as unknown as typeof fetch
+
+    const outcome = await publishPost(
+      { ...deps(impl), bucket: bucket() },
+      { postId },
+    )
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'urn:li:share:9' })
+    expect(seen).toEqual([LINKEDIN.uploadUrl, 'https://up.li/abc', LINKEDIN.postUrl])
+  })
+
+  it('وصورةٌ مرفوضةٌ لا تُرفَع — الرفضُ مخرجٌ لا حائط', async () => {
+    const { postId } = await seedWithImage('x')
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE post_id = ?").bind(postId).run()
+    const f = fakeFetch(X_OK)
+    const outcome = await publishPost({ ...deps(f), bucket: bucket() }, { postId })
+
+    expect(outcome.kind).toBe('published')
+    expect(f.calls.map((c) => c.url)).toEqual([X.postUrl])
   })
 })

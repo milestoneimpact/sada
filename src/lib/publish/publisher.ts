@@ -18,7 +18,10 @@ import { containsUrl } from '../idempotency'
 import { loadTokens, markNeedsReauth, type Db } from '../tokens'
 import { isExpiring } from '../oauth/exchange'
 import type { Platform } from '../oauth/providers'
-import { publishLinkedIn, publishX, PublishError, type PublishResult } from './platforms'
+import {
+  publishLinkedIn, publishX, uploadLinkedInImage, uploadXMedia,
+  PublishError, type PublishResult,
+} from './platforms'
 
 export interface PublishMessage {
   readonly postId: string
@@ -41,9 +44,16 @@ interface PostRow {
   account_status: string
 }
 
+/** أقلُّ ما نحتاجه من R2: قراءةُ كائنٍ واحد. */
+export interface MediaBucket {
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>
+}
+
 export interface PublisherDeps {
   readonly db: Db
   readonly encKey: string
+  /** يلزم للمنشورات التي تحمل صورة، ويُترك حين لا صور (D-040). */
+  readonly bucket?: MediaBucket
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
 }
@@ -90,26 +100,26 @@ export async function publishPost(
   }
 
   /**
-   * صورةٌ لم يُبنَ رفعُها بعد (D-039).
+   * الصورةُ المعتمَدة إن وُجدت (D-040).
    *
-   * **ولا يُنشر النصُّ وحده.** المالك اعتمد منشورا بصورة، ونشرُه بلا
-   * صورته نشرٌ لشيءٍ لم يعتمده — والفرقُ لا يُرى في اللوحة، فيُكتشَف على
-   * المنصّة بعد أن يقرأه الناس.
-   *
-   * والحارسُ هنا لا في الجدولة وحدها: الجدولةُ تعطي سببا يُقرأ مبكّرا،
-   * وهذا يمنع فعلا — ورسالةٌ دخلت الطابور قبل بناء الرفع تجده قائما.
+   * واحدةٌ لا أكثر: المنصّتان تقبلان عدّة، وصدى تولّد واحدة. ومعالجةُ ما
+   * لا يقع تُكتب ولا تُختبَر، فتنكسر يومَ يقع.
    */
-  const pending = await db
-    .prepare("SELECT count(*) AS n FROM media WHERE post_id = ? AND status = 'ready'")
+  const image = await db
+    .prepare(
+      `SELECT id, r2_key, mime, platform_media_id FROM media
+        WHERE post_id = ? AND status = 'ready'
+        ORDER BY created_at DESC LIMIT 1`,
+    )
     .bind(post.id)
-    .first<{ n: number }>()
+    .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null }>()
     .catch(() => null)
-  if ((pending?.n ?? 0) > 0) {
-    return {
-      kind: 'failed',
-      reason: 'media_upload_not_built',
-      retryable: false,
-    }
+
+  // دلوٌ غير ممرَّرٍ ومنشورٌ بصورة: **لا يُنشر النصُّ وحده**. المالك اعتمد
+  // منشورا بصورة، ونشرُه بلا صورته نشرٌ لشيءٍ لم يعتمده — والفرقُ لا يُرى
+  // في اللوحة، فيُكتشَف على المنصّة بعد أن يقرأه الناس
+  if (image !== null && deps.bucket === undefined) {
+    return { kind: 'failed', reason: 'no_media_bucket', retryable: false }
   }
 
   const tokens = await loadTokens(db, encKey, post.account_id)
@@ -155,9 +165,52 @@ export async function publishPost(
     })
   }
 
-  // ٥ — الإرسال
+  // ٥ — الرفعُ ثمّ الإرسال
+  //
+  // ومعرّفُ الوسيط يُحفَظ فور نجاحه: رفعٌ نجح ثمّ نشرٌ فشل ثمّ إعادةُ
+  // محاولةٍ من الطابور ترفع الصورةَ ثانية، **و X يحاسب على الرفع**.
+  // فالإعادةُ تعيد استعمالَه ولا تدفع مرّتين (D-004).
   let result: PublishResult
   try {
+    let mediaId = image?.platform_media_id ?? null
+
+    if (image !== null && mediaId === null) {
+      const object = await deps.bucket!.get(image.r2_key)
+      if (object === null) {
+        // الصفُّ قائمٌ والبايتاتُ مفقودة: لا يُعالَج بإعادةٍ، ولا يُنشر
+        // النصُّ وحده — يُقال ويُوقَف
+        throw new PublishError('media_bytes_missing', 502, false)
+      }
+      const upload = { bytes: new Uint8Array(await object.arrayBuffer()), mime: image.mime }
+
+      // نداءٌ خارجيٌّ قد يُحاسَب عليه: يُسجَّل قبل أن يُعدّ ناجحا (D-008).
+      // **وبصفرٍ مُعلَّم**: سعرُ رفع الوسائط عند X لم يُؤكَّد بعد
+      // (docs/PLATFORMS.md)، ورقمٌ مخترَعٌ كذب، وسكوتٌ عن نداءٍ وقع يجعل
+      // الدفتر أقلَّ من الحقيقة — وهو الاتّجاه الأسوأ للخطأ
+      await recordCost(db, {
+        provider: post.platform,
+        operation: 'media_upload:price_unverified',
+        units: 1,
+        unitCost: 0,
+        refId: post.id,
+      })
+
+      mediaId =
+        post.platform === 'linkedin'
+          ? await uploadLinkedInImage(
+              tokens.accessToken,
+              `urn:li:person:${post.external_id}`,
+              upload,
+              fetchImpl,
+            )
+          : await uploadXMedia(tokens.accessToken, upload, fetchImpl)
+
+      await db
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
+        .bind(mediaId, image.id)
+        .run()
+    }
+
     result =
       post.platform === 'linkedin'
         ? await publishLinkedIn(
@@ -165,8 +218,9 @@ export async function publishPost(
             `urn:li:person:${post.external_id}`,
             post.text,
             fetchImpl,
+            mediaId,
           )
-        : await publishX(tokens.accessToken, post.text, fetchImpl)
+        : await publishX(tokens.accessToken, post.text, fetchImpl, mediaId)
   } catch (error) {
     const failure =
       error instanceof PublishError

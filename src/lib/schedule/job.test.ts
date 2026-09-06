@@ -310,11 +310,11 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
 })
 
 /**
- * صورةٌ لم يُبنَ رفعُها (D-039).
+ * منشورٌ بصورة.
  *
- * **ولا يُنشر النصُّ وحده**: المالك اعتمد منشورا بصورة، ونشرُه بلا صورته
- * نشرٌ لشيءٍ لم يعتمده. ويُقال عند الجدولة لا بعد أن تفشل الرسالة في
- * الطابور حيث لا أحد ينظر.
+ * كان يُمنَع من الجدولة حتّى يُبنى الرفع (D-039). وقد بُني (D-040)،
+ * **فالمنعُ رُفع** — والحارسُ الباقي في الناشر: هو الذي يمنع فعلا،
+ * ورسالةٌ في الطابور تجده قائما.
  */
 describe('منشورٌ بصورة', () => {
   async function withImage(): Promise<{ post: string; account: string }> {
@@ -330,18 +330,11 @@ describe('منشورٌ بصورة', () => {
     return { post, account }
   }
 
-  it('لا يُجدول، ويُقال لماذا', async () => {
+  it('يُجدول كغيره — والرفعُ يقع عند النشر لا عند الجدولة', async () => {
     const { post, account } = await withImage()
     const out = await schedulePost(db, post, account, SOON, NOW)
 
-    expect(out.ok).toBe(false)
-    if (!out.ok) expect(out.reason).toContain('رفعُ الصور')
-    expect((await readPost(post))?.['status']).toBe('approved')
-  })
-
-  it('وصورةٌ مرفوضةٌ لا تمنع — فالرفضُ مخرجٌ لا حائط', async () => {
-    const { post, account } = await withImage()
-    await db.prepare("UPDATE media SET status = 'rejected' WHERE post_id = ?").bind(post).run()
-    expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)
+    expect(out.ok).toBe(true)
+    expect((await readPost(post))?.['status']).toBe('queued')
   })
 })

@@ -18,6 +18,14 @@ export interface Provider {
   readonly identityUrl: string
   /** نهاية إنشاء منشور نصي. */
   readonly postUrl: string
+  /**
+   * نهايةُ رفع الصور — **لم تُؤكَّد من الوثائق** (D-040).
+   *
+   * الشبكةُ كانت محجوبةً وقت الكتابة، ونهاياتُ X مشكوكٌ فيها في هذا
+   * الملفّ أصلا. فتُوضع هنا حيث يُصحَّح كلُّ عنوانٍ بسطر — وأوّلُ رفعٍ
+   * حقيقيّ هو الذي يؤكّدها.
+   */
+  readonly uploadUrl: string
   readonly scopes: readonly string[]
   /**
    * كيف يُصادق التطبيق على نهاية الرمز:
@@ -41,6 +49,8 @@ export const LINKEDIN: Provider = {
   tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
   identityUrl: 'https://api.linkedin.com/v2/userinfo',
   postUrl: 'https://api.linkedin.com/rest/posts',
+  // خطوتان: تهيئةٌ تعطي عنوانَ رفعٍ ومعرّفَ صورة، ثمّ PUT للبايتات عليه
+  uploadUrl: 'https://api.linkedin.com/rest/images?action=initializeUpload',
   scopes: ['openid', 'profile', 'w_member_social'],
   clientAuth: 'body',
   extraHeaders: { 'LinkedIn-Version': LINKEDIN_VERSION },
@@ -52,7 +62,8 @@ export const X: Provider = {
   tokenUrl: 'https://api.x.com/2/oauth2/token',
   identityUrl: 'https://api.x.com/2/users/me',
   postUrl: 'https://api.x.com/2/tweets',
-  scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+  uploadUrl: 'https://api.x.com/2/media/upload',
+  scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'],
   clientAuth: 'basic',
   extraHeaders: {},
 }
