@@ -59,7 +59,7 @@ import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
-import { platformScreen } from './ui/platformView'
+import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
@@ -1083,7 +1083,21 @@ panel.get('/panel/channels/:platform', async (c) => {
   // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
   const metrics = await metricsFor(c.env.DB, posts.map((p) => p.id))
 
-  const body = platformScreen({ view, posts, tally, scopes, metrics, now })
+  // والوسائطُ تُعرَض لا يُقال إنّ هناك وسيطا (D-062) — استعلامٌ واحدٌ
+  // لكلّ الصفحة لا واحدٌ لكلّ بطاقة
+  const mediaRows = await mediaFor(c.env.DB, posts.map((p) => p.id))
+  const media: Record<string, { id: string; mime: string; status: 'ready' | 'rejected' }[]> = {}
+  for (const row of mediaRows) {
+    const list = media[row.postId] ?? []
+    list.push({ id: row.id, mime: row.mime, status: row.status })
+    media[row.postId] = list
+  }
+
+  const body = platformScreen({
+    view, posts, tally, scopes, metrics, media, now,
+    // حالُ الصفحة في عنوانها: يُشارَك رابطٌ فيُرى ما رآه صاحبُه
+    show: showOf(c.req.query('show')),
+  })
 
   return page((nonce) =>
     shell(

@@ -51,6 +51,17 @@ export function htmlHeaders(nonce: string): Record<string, string> {
     `style-src 'nonce-${nonce}' ${FONT_CSS}`,
     `font-src ${FONT_FILES}`,
     "img-src 'self' data:",
+    /**
+     * **والمقاطعُ تحتاج بابا خاصّا بها.**
+     *
+     * `img-src` لا يشمل `<video>` — و`default-src 'none'` يمنعه.
+     * فمصغَّرُ مقطعٍ يُرسَم ولا يُحمَّل، **بلا عطلٍ ظاهرٍ في الصفحة**:
+     * مربّعٌ فارغٌ يُقرأ «لا مقطع» وهو «مُنع» (D-062).
+     *
+     * و`'self'` وحدها: البايتاتُ من `/panel/media/:id` خلف الجلسة،
+     * ولا مقطعَ من نطاقٍ آخر بحال.
+     */
+    "media-src 'self'",
     "connect-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
