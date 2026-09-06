@@ -118,7 +118,9 @@ function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, no
 function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   const open = d.status === 'draft' || d.status === 'approved' || d.status === 'edited'
   const mine = media.filter((m) => m.postId === d.id)
-  const ready = mine.find((m) => m.status === 'ready')
+  // الصورةُ والمقطعُ صفّان في `media` يفترقان بالنوع — لا جدولَ ثانٍ
+  const ready = mine.find((m) => m.status === 'ready' && !m.mime.startsWith('video/'))
+  const clip = mine.find((m) => m.status === 'ready' && m.mime.startsWith('video/'))
 
   if (ready !== undefined) {
     return `<div class="pic">
@@ -129,11 +131,22 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
         <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>
         <span class="grow"></span>
         ${open
-          ? `<form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
+          ? `<form class="inline" method="POST" action="/panel/media/animate"
+                   data-busy="جارٍ التحريك…">
+               <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+               <button class="g sm" type="submit">حرّكها فيديو</button></form>
+             <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
                <button class="g sm" type="submit">ارفض الصورة</button></form>`
           : ''}
       </div>
+      ${clip === undefined
+        ? ''
+        : `<div class="pic-foot">
+             <span class="st ok"><span class="g">●</span>مقطعٌ رأسيّ ١٥ث</span>
+             <span class="chip mono">${Math.round(clip.bytes / 1024)}KB</span>
+             <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
+           </div>`}
     </div>`
   }
 
