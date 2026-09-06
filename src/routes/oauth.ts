@@ -134,8 +134,12 @@ oauth.get('/oauth/:platform/start', async (c) => {
   url.searchParams.set('redirect_uri', uri)
   url.searchParams.set('scope', scopes.join(' '))
   url.searchParams.set('state', state)
-  url.searchParams.set('code_challenge', pkce.challenge)
-  url.searchParams.set('code_challenge_method', pkce.method)
+  // **ولا يُرسَل PKCE إلى مَن لا يدعمه** (D-075): حقلٌ لبروتوكولٍ لا
+  // يجري عند المستقبِل ليس حيادا — وإسقاطُه يضيّق دائرةَ الشكّ
+  if (provider.pkce) {
+    url.searchParams.set('code_challenge', pkce.challenge)
+    url.searchParams.set('code_challenge_method', pkce.method)
+  }
   // ومعاملاتُ المزوّد الخاصّة آخرا: Google لا يعطي رمزَ تجديدٍ بلا
   // `access_type=offline`، فيُربَط الحسابُ ثمّ يسقط بعد ساعة
   for (const [key, value] of Object.entries(provider.extraAuthorize ?? {})) {

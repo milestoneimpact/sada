@@ -66,9 +66,26 @@ describe('GET /oauth/:platform/start', () => {
     expect(`${location.origin}${location.pathname}`).toBe(LINKEDIN.authorizeUrl)
     expect(location.searchParams.get('response_type')).toBe('code')
     expect(location.searchParams.get('client_id')).toBe('li-id')
+    expect(location.searchParams.get('scope')).toBe('openid profile w_member_social')
+  })
+
+  /**
+   * **و PKCE لمن يدعمه وحده** (D-075).
+   *
+   * كان يُرسَل إلى الجميع «لأنّ المسار واحد» — و LinkedIn لا تدعمه،
+   * فكان يُرسَل `code_challenge` في الرابط و`code_verifier` عند
+   * التبديل، **حقلان لبروتوكولٍ لا يجري عند المستقبِل**.
+   */
+  it('و X يُرسَل إليه تحدّي PKCE', async () => {
+    const { location } = await startAndCaptureState('x')
     expect(location.searchParams.get('code_challenge_method')).toBe('S256')
     expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/)
-    expect(location.searchParams.get('scope')).toBe('openid profile w_member_social')
+  })
+
+  it('و LinkedIn لا يُرسَل إليه — لأنّها لا تدعمه', async () => {
+    const { location } = await startAndCaptureState('linkedin')
+    expect(location.searchParams.get('code_challenge')).toBeNull()
+    expect(location.searchParams.get('code_challenge_method')).toBeNull()
   })
 
   it('يبني رابط العودة من نطاق البيئة لا من ثابت', async () => {

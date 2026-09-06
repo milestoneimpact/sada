@@ -51,6 +51,19 @@ export interface Provider {
    * - `basic`  : ترويسة Basic بـ client_id:client_secret (X)
    */
   readonly clientAuth: 'body' | 'basic'
+  /**
+   * أتدعم المنصّةُ PKCE؟ (D-075)
+   *
+   * **وكان يُرسَل إلى الجميع** — «لأنّ المسار واحدٌ ولا يتشعّب بحالتين».
+   * ووحدةُ المسار مكسبٌ ما دام المُرسَلُ مفهوما عند المستقبِل؛ **و
+   * LinkedIn لا تدعم PKCE أصلا**، فكنّا نرسل `code_challenge` في رابط
+   * الإذن و`code_verifier` عند التبديل — **حقلين لبروتوكولٍ لا يجري**.
+   *
+   * ولا يُقال هنا إنّ ذلك سببُ رفضٍ بعينه: **لم يُقَس** — الرمزُ
+   * المزيّف يوقف الفحصَ قبل موضع الحكم، ولا رمزَ صحيحٌ عندي. لكنّ
+   * **إرسالَ ما لا يُفهَم ليس حيادا**، وإسقاطُه يضيّق دائرةَ الشكّ.
+   */
+  readonly pkce: boolean
   /** ترويسات إلزامية على كل طلب مُصدَّر. */
   readonly extraHeaders: Readonly<Record<string, string>>
   /**
@@ -86,6 +99,7 @@ export const LINKEDIN: Provider = {
   uploadUrl: 'https://api.linkedin.com/rest/images?action=initializeUpload',
   scopes: scopeSet('linkedin'),
   clientAuth: 'body',
+  pkce: false,   // **LinkedIn لا تدعم PKCE** (D-075)
   extraHeaders: { 'LinkedIn-Version': LINKEDIN_VERSION },
 }
 
@@ -98,6 +112,7 @@ export const X: Provider = {
   uploadUrl: 'https://api.x.com/2/media/upload',
   scopes: scopeSet('x'),
   clientAuth: 'basic',
+  pkce: true,
   extraHeaders: {},
 }
 
@@ -121,6 +136,7 @@ export const YOUTUBE: Provider = {
     '?uploadType=resumable&part=snippet,status',
   scopes: scopeSet('youtube'),
   clientAuth: 'body',
+  pkce: true,
   extraHeaders: {},
   // بلا هذين لا رمزَ تجديد — والحسابُ يسقط بعد ساعةٍ بلا سببٍ يُقرأ
   extraAuthorize: { access_type: 'offline', prompt: 'consent' },
@@ -141,6 +157,7 @@ export const TIKTOK: Provider = {
   uploadUrl: 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/',
   scopes: scopeSet('tiktok'),
   clientAuth: 'body',
+  pkce: true,
   extraHeaders: {},
   clientIdParam: 'client_key',
 }

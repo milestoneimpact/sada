@@ -56,6 +56,22 @@ describe('exchangeCode', () => {
     expect(f.calls[0]!.body).toContain('grant_type=authorization_code')
   })
 
+  /**
+   * **ولا يُرسَل إلى LinkedIn** (D-075): لا تدعم PKCE، فلا يُرسَل إليها
+   * `code_challenge` في رابط الإذن — **ومُثبِتٌ لتحدٍّ لم يُطلَب ليس
+   * إثباتا**، بل حقلٌ زائدٌ في طلبٍ حسّاس.
+   */
+  it('ولا يُرسَل إلى LinkedIn — لأنّها لا تدعمه', async () => {
+    const f = fakeFetch({
+      [LINKEDIN.tokenUrl]: { json: { access_token: 'a', expires_in: 5_184_000 } },
+    })
+    await exchangeCode(LINKEDIN, CREDS, { code: 'c', redirectUri: 'r', verifier: 'v' }, NOW, f)
+    expect(f.calls[0]!.body).not.toContain('code_verifier')
+    // وما يلزمها يبقى كما هو
+    expect(f.calls[0]!.body).toContain('grant_type=authorization_code')
+    expect(f.calls[0]!.body).toContain('client_secret=')
+  })
+
   it('X يصادق بترويسة Basic، و LinkedIn بالجسم', async () => {
     const fx = fakeFetch({ [X.tokenUrl]: { json: { access_token: 'a', expires_in: 7200 } } })
     await exchangeCode(X, CREDS, { code: 'c', redirectUri: 'r', verifier: 'v' }, NOW, fx)
