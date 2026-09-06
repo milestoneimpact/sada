@@ -32,7 +32,8 @@ import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
-import { PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
+import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
+import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
@@ -1194,6 +1195,8 @@ async function ownerFacts(c: {
     ),
     anyPublished,
     videoPriced,
+    // **يُحسَب من الرقم والتاريخ** لا من صفٍّ ولا من يد (D-072)
+    linkedInVersionDue: versionAge(LINKEDIN_VERSION, new Date())?.due ?? false,
   }
 }
 

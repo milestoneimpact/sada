@@ -19,6 +19,8 @@ const empty: OwnerFacts = {
   secrets: new Set(), linked: new Set(), appsConfigured: new Set(),
   appsVerified: new Set(), vars: new Set(),
   anyPublished: false, videoPriced: false,
+  // **مستحقّةٌ للمراجعة**: `empty` تعني «لا شيءَ تمّ»، فالرقمُ شائخٌ فيها
+  linkedInVersionDue: true,
 }
 
 describe('السجلُّ والوثيقةُ لا يفترقان', () => {

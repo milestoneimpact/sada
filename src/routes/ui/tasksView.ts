@@ -61,6 +61,11 @@ function row(r: OwnerRow): string {
     </td>
     <td data-label="الحال">
       <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+      ${/*
+         * **و«تمّت» وحدها تكذب على مهمّةٍ دوريّة** (D-072): مراجعةٌ لم
+         * تقع بعدُ وليست مستحقّةً ليست «تمّت» — فيُقال ما قِيس، كما
+         * تحمل بنودُ البوّابات دليلَها.
+         */ ''}${r.measured === '' ? '' : `<div class="sub">${bold(r.measured)}</div>`}
     </td>
   </tr>`
 }
