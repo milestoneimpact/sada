@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { loadTokens } from '../lib/tokens'
-import { LINKEDIN, X } from '../lib/oauth/providers'
+import { LINKEDIN, TIKTOK, X, YOUTUBE } from '../lib/oauth/providers'
 import { IMPLEMENTED, PROVIDERS, ROUTES, type TaskName } from '../lib/ai/registry'
 import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -31,6 +31,10 @@ beforeEach(() => {
     LINKEDIN_CLIENT_SECRET: 'li-secret',
     X_CLIENT_ID: 'x-id',
     X_CLIENT_SECRET: 'x-secret',
+    YOUTUBE_CLIENT_ID: 'yt-id',
+    YOUTUBE_CLIENT_SECRET: 'yt-secret',
+    TIKTOK_CLIENT_KEY: 'tt-key',
+    TIKTOK_CLIENT_SECRET: 'tt-secret',
   }
 })
 
@@ -89,6 +93,35 @@ describe('GET /oauth/:platform/start', () => {
   it('يرد 404 لمنصة غير معروفة', async () => {
     const response = await app.request('/oauth/facebook/start', {}, env)
     expect(response.status).toBe(404)
+  })
+
+  /**
+   * **معاملٌ خاصٌّ بمزوّدٍ واحد، وعطبٌ يظهر متأخّرا.**
+   *
+   * Google لا يعطي `refresh_token` إلّا بـ `access_type=offline` مع
+   * `prompt=consent`. وبدونهما **يُربَط الحسابُ ويبدو ناجحا**، ثمّ
+   * يسقط بعد ساعةٍ بلا ما يجدّده — فيُثبَّت المعاملان هنا.
+   */
+  it('يطلب من Google رمزَ تجديدٍ صراحةً — وإلّا سقط الربطُ بعد ساعة', async () => {
+    const response = await app.request('/oauth/youtube/start', {}, env)
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location') ?? '')
+    expect(`${location.origin}${location.pathname}`).toBe(YOUTUBE.authorizeUrl)
+    expect(location.searchParams.get('access_type')).toBe('offline')
+    expect(location.searchParams.get('prompt')).toBe('consent')
+  })
+
+  /**
+   * **TikTok يسمّي المعرّف `client_key`.** ورابطٌ يحمل الاسمَ
+   * المعياريَّ يُردّ بخطأٍ لا يذكر السبب — فيُثبَّت الاسمُ لا يُترك.
+   */
+  it('يسمّي معرّفَ TikTok client_key لا client_id', async () => {
+    const response = await app.request('/oauth/tiktok/start', {}, env)
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location') ?? '')
+    expect(`${location.origin}${location.pathname}`).toBe(TIKTOK.authorizeUrl)
+    expect(location.searchParams.get('client_key')).toBe('tt-key')
+    expect(location.searchParams.get('client_id')).toBeNull()
   })
 
   it('يرد 503 حين ينقص سر، ولا يذكر قيمة', async () => {
