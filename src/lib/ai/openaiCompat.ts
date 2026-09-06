@@ -16,6 +16,8 @@
  *     تتغيّر بلا إعلان، والرمز لا.
  */
 
+import { compatCatalogUrl } from './models'
+
 export interface CompatUsage {
   readonly inputTokens: number
   readonly outputTokens: number
@@ -143,6 +145,15 @@ export async function chatCompletion(
  * `GET {base}/models` جزءٌ من اللهجة نفسها، فيعمل عند الجميع تقريبا.
  * ومَن لا يدعمها يردّ 404 — **ويُميَّز ذلك عن «المفتاح مرفوض»**، فلا
  * يُتّهم مفتاحٌ صحيح.
+ *
+ * **والعنوانُ من `compatCatalogUrl` لا يُبنى هنا** (D-081): Cloudflare
+ * لا تخدم `‎/ai/v1/models` — طبقةُ توافقِ OpenAI عندها مقصورةٌ على
+ * `chat/completions` و `embeddings` — فكان الفاحصُ يردّ فشلا **على
+ * مفتاحٍ صحيح**، وهو صنفُ الكذب الذي كلّفنا ليلةً في D-076.
+ *
+ * **ويُحكَم بالرمز لا بالشكل**: ٢٠٠ جوازٌ ولو لم نفهم جسدَ الجواب.
+ * فهمُ الجسد شأنُ `listModels`، وخلطُ الأمرين يجعل شكلا تغيّر عند
+ * المزوّد تهمةً على مفتاحٍ سليم.
  */
 export async function verifyCompat(
   baseUrl: string,
@@ -150,7 +161,7 @@ export async function verifyCompat(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: boolean; detail: string; status: number | null }> {
   try {
-    const response = await fetchImpl(`${baseUrl}/models`, {
+    const response = await fetchImpl(compatCatalogUrl(baseUrl), {
       headers: { Authorization: `Bearer ${apiKey.trim()}` },
     })
     if (response.ok) return { ok: true, detail: 'المفتاح يعمل', status: response.status }

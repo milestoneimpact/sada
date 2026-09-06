@@ -319,6 +319,101 @@ export const SCRIPT = `
         if(d.codes){showCodes(d.codes); say('rc-msg','وُلّدت '+d.codes.length+' رموز. انسخها الآن.');}
         else say('rc-msg','تعذّر التوليد.');});
   });
+
+  // ── دَرَجُ النماذج (D-081) ────────────────────────────
+  //
+  // القائمةُ تُجلَب من عند المزوّد بضغطةٍ لا تلقائيّا: فتحُ الشاشة لا
+  // يوقظ نداءً إلى كلّ مزوّد. والقيمةُ المحفوظة تبقى مختارةً مهما وقع —
+  // فتعذُّرُ الجلب لا يمحو نموذجا يعمل.
+  var mpSet=function(sel,value){
+    if(!value)return;
+    var found=false,i;
+    for(i=0;i<sel.options.length;i++)
+      if(sel.options[i].value===value){found=true;break;}
+    if(!found){
+      var o=document.createElement('option');
+      o.value=value; o.textContent=value;
+      sel.insertBefore(o,sel.firstChild);
+    }
+    sel.value=value;
+  };
+  // في جدول التوجيه يتبدّل المزوّدُ في الصفّ نفسه، فيُقرأ منه لا من الحقل
+  var mpProvider=function(box){
+    var form=box.closest('form');
+    var pick=form?form.querySelector('.mp-provider'):null;
+    return pick&&pick.value?pick.value:(box.dataset.provider||'');
+  };
+  // السعرُ يُملأ ممّا يعطيه الفهرس — ولا يُحفَظ إلّا بضغطة المالك
+  var mpFillPrice=function(box,opt,note){
+    if(box.dataset.price!=='1'||!opt)return;
+    var form=box.closest('form'); if(!form)return;
+    var pin=form.querySelector('[name=price_in]');
+    var pout=form.querySelector('[name=price_out]');
+    var a=opt.dataset.pin,b=opt.dataset.pout;
+    if(pin&&a)pin.value=a;
+    if(pout&&b)pout.value=b;
+    if(note&&(a||b))note.textContent='السعرُ مُلئ من فهرس المزوّد — احفظ ليُثبَت.';
+  };
+  document.querySelectorAll('.mp').forEach(function(box){
+    var sel=box.querySelector('.mp-sel');
+    var btn=box.querySelector('.mp-load');
+    var note=box.querySelector('.mp-note');
+    if(!sel||!btn||!note)return;
+    var last=sel.value;
+
+    sel.addEventListener('change',function(){
+      if(sel.value==='__manual__'){
+        var typed=prompt('اسمُ النموذج كما هو عند المزوّد:',last||'');
+        if(typed&&typed.trim())mpSet(sel,typed.trim());
+        else sel.value=last;
+        last=sel.value;
+        return;
+      }
+      last=sel.value;
+      mpFillPrice(box,sel.options[sel.selectedIndex],note);
+    });
+
+    btn.addEventListener('click',function(){
+      var name=mpProvider(box);
+      if(!name){note.textContent='لا مزوّدَ لهذا الحقل.';return;}
+      btn.disabled=true; note.textContent='يُجلَب من '+name+'…';
+      post('/panel/providers/models',{provider:name}).then(function(r){
+        return r.json();
+      }).then(function(d){
+        btn.disabled=false;
+        var models=(d&&d.models)||[];
+        if(!d||!d.ok||!models.length){
+          note.textContent=(d&&d.detail)||'تعذّر الجلب — اكتب الاسم يدويّا.';
+          return;
+        }
+        // يُصفّى إلى صنف المهمّة، وصنفٌ مجهولٌ يبقى: إخفاءُ نموذجٍ موجود
+        // أسوأُ من عرضِ نموذجٍ لا يناسب
+        var want=box.dataset.task||'';
+        var keep=models.filter(function(m){return !want||!m.task||m.task===want;});
+        if(!keep.length)keep=models;
+        var chosen=last;
+        while(sel.options.length)sel.remove(0);
+        keep.forEach(function(m){
+          var o=document.createElement('option');
+          o.value=m.id; o.textContent=m.label||m.id;
+          if(m.priceIn!==null&&m.priceIn!==undefined)o.dataset.pin=String(m.priceIn);
+          if(m.priceOut!==null&&m.priceOut!==undefined)o.dataset.pout=String(m.priceOut);
+          sel.appendChild(o);
+        });
+        var man=document.createElement('option');
+        man.value='__manual__'; man.textContent='اكتبه يدويّا…';
+        sel.appendChild(man);
+        mpSet(sel,chosen);
+        last=sel.value;
+        note.textContent=keep.length+' نموذجا الآن عند '+name
+          +(keep.length<models.length?' (صُفّيت من '+models.length+')':'')
+          +' — قائمةٌ لحظيّة لا محفوظة.';
+      }).catch(function(){
+        btn.disabled=false;
+        note.textContent='تعذّر الاتّصال — اكتب الاسم يدويّا.';
+      });
+    });
+  });
 })();
 `
 

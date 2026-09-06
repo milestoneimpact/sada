@@ -2,7 +2,7 @@
  * اللوحة تُختبَر من طرفها إلى طرفها: القاعدة حقيقيّة و KV حقيقيّ،
  * والصفحة تُقرأ كنصٍّ كما يراها المتصفّح.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { readSettings, writeSetting } from '../lib/settings'
 import { getProvider, resolveKey } from '../lib/providers'
@@ -565,6 +565,77 @@ describe('خزانة المفاتيح في اللوحة', () => {
 
     await post(cookie, '/panel/providers/add', { name: 'gemini', label: 'Gemini' })
     expect((await getProvider(db, 'gemini'))?.dailyCap).toBeNull()
+  })
+
+  /**
+   * فهرسُ النماذج (D-081).
+   *
+   * وكان الاسمُ يُكتب يدويّا، فحرفٌ خطأ لا يُكتشَف إلّا في أوّل مهمّةٍ
+   * حقيقيّة. والفهرسُ يُجلَب من عند المزوّد لحظةَ الطلب — **ولا يُخزَّن**:
+   * قائمةٌ محفوظةٌ تتقادم بصمت.
+   */
+  describe('فهرسُ النماذج — يُجلَب ولا يُكتب', () => {
+    const real = globalThis.fetch
+
+    function stub(payload: unknown, status = 200): string[] {
+      const urls: string[] = []
+      globalThis.fetch = (async (input: unknown): Promise<Response> => {
+        urls.push(input instanceof Request ? input.url : String(input))
+        return new Response(JSON.stringify(payload), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }) as unknown as typeof fetch
+      return urls
+    }
+
+    afterEach(() => {
+      globalThis.fetch = real
+    })
+
+    it('بلا جلسة لا يُجلَب شيء', async () => {
+      const body = new FormData()
+      body.set('provider', 'gemini')
+      const response = await app.request('/panel/providers/models', { method: 'POST', body }, env)
+      expect(response.status).toBe(401)
+    })
+
+    it('ولا مفتاحَ يعني جوابا يقول لماذا — لا عطلا', async () => {
+      const cookie = await login()
+      const response = await post(cookie, '/panel/providers/models', { provider: 'gemini' })
+      expect(response.status).toBe(200)
+      const body = (await response.json()) as { ok: boolean; detail: string }
+      expect(body.ok).toBe(false)
+      expect(body.detail).toContain('لا مفتاح')
+    })
+
+    it('يجلب المعرّفات من عند المزوّد', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      const urls = stub({ models: [{ name: 'models/gemini-2.5-flash', displayName: 'Flash' }] })
+
+      const response = await post(cookie, '/panel/providers/models', { provider: 'gemini' })
+      const body = (await response.json()) as { ok: boolean; models: { id: string }[] }
+      expect(body.ok).toBe(true)
+      expect(body.models[0]!.id).toBe('gemini-2.5-flash')
+      expect(urls[0]).toContain('generativelanguage.googleapis.com')
+    })
+
+    it('و**المفتاحُ لا يظهر في الجواب ولا في العنوان**', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      const urls = stub({ models: [{ name: 'models/gemini-2.5-flash' }] })
+
+      const text = await (await post(cookie, '/panel/providers/models', { provider: 'gemini' })).text()
+      expect(text).not.toContain(GEMINI)
+      expect(urls[0]).not.toContain(GEMINI)
+    })
+
+    it('ومزوّدٌ لا وجودَ له يُردّ لا يُخترَع', async () => {
+      const cookie = await login()
+      const response = await post(cookie, '/panel/providers/models', { provider: 'لا-أحد' })
+      expect(response.status).toBe(400)
+    })
   })
 
   it('**المدمَج لا يُحذف** — يُعطَّل بدل ذلك', async () => {

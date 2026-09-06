@@ -26,6 +26,7 @@ import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
+import { cfAccountId } from '../ai/cloudflare'
 import { imagePrompt, topicOf } from './prompt'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
@@ -177,7 +178,16 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     image =
       provider.name === 'cloudflare'
         ? await generateImageCf({
-            accountId: deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? '',
+            /*
+             * **ومعرّفُ الحساب يُقرأ من عنوان المزوّد حين يغيب السرّ**
+             * (D-081): العنوان المحفوظ يحمله في مساره أصلا
+             * (`‎/accounts/{id}/ai/v1`)، فمن ضبط البطاقة ولم يضبط
+             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ.
+             */
+            accountId:
+              deps.workerSecrets['CF_AI_ACCOUNT_ID'] ??
+              cfAccountId(provider.baseUrl) ??
+              '',
             apiToken: resolved.key,
             // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
             model: route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL,

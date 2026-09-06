@@ -23,6 +23,7 @@ const BUILTIN_DOCS: Readonly<Record<string, string>> = {
 }
 import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
 import { verifyKey } from '../lib/ai/verify'
+import { listModels } from '../lib/ai/models'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
@@ -1688,30 +1689,85 @@ panel.post('/panel/providers/key', async (c) => {
   return back('providers')
 })
 
+/**
+ * مفتاحُ مزوّدٍ للفحص أو للفهرسة — **ومصدرُه واحدٌ لا اثنان**.
+ *
+ * كان يُقرأ في «اختبر» وحدَه، فلمّا وُجدت «حدّث القائمة» كان الأمرُ أن
+ * يُنسَخ. والنسخُ يفترق: يُضاف مدمَجٌ إلى `BUILTIN_SECRET` فيراه أحدُهما
+ * ولا يراه الآخر.
+ */
+async function providerKey(env: Env, provider: Provider): Promise<string | null> {
+  const secretName = provider.builtin ? BUILTIN_SECRET[provider.name] : undefined
+  const resolved = await resolveKey(
+    env.DB,
+    env.TOKEN_ENC_KEY,
+    provider.name,
+    secretName === undefined ? undefined : (env[secretName as keyof Env] as string | undefined),
+  )
+  return resolved.key
+}
+
+/**
+ * فهرسُ نماذجِ مزوّد — يُجلَب من عنده لحظةَ الطلب (D-081).
+ *
+ * **ولا يُخزَّن**: قائمةٌ محفوظةٌ تتقادم بصمت — نموذجٌ سُحب يبقى معروضا،
+ * ونموذجٌ نزل أمسِ لا يظهر. والجلبُ قراءةٌ رخيصةٌ لا تكلّف رموزا.
+ *
+ * وهو `POST` لا `GET` عمدا: يمرّ بحارس CSRF نفسِه الذي تمرّ به بقيّةُ
+ * أفعال اللوحة — **زرٌّ في صفحةٍ ليس طريقا جانبيّا حول الحارس**.
+ */
+panel.post('/panel/providers/models', async (c) => {
+  const guard = await providerGuard(c)
+  if ('denied' in guard) return guard.denied
+  const provider = guard.provider
+
+  const key = await providerKey(c.env, provider)
+  if (key === null) {
+    return c.json({ ok: false, detail: 'لا مفتاح لهذا المزوّد — احفظه أوّلا', models: [] })
+  }
+
+  const catalog = await listModels({
+    name: provider.name,
+    kind: provider.kind,
+    baseUrl: provider.baseUrl,
+    apiKey: key,
+    builtin: provider.builtin,
+  })
+
+  // **ولا يُسجَّل هذا في `audit`**: قراءةٌ لا تغيّر شيئا، وسجلٌّ يمتلئ
+  // بها يُخفي ما يُغيّر
+  return c.json({
+    ok: catalog.ok,
+    detail: catalog.detail,
+    // السعرُ يُمرَّر كما قرأناه — والشاشةُ تعرضه ولا تحفظه إلّا بضغطة
+    models: catalog.models.map((m) => ({
+      id: m.id,
+      label: m.label,
+      task: m.task,
+      priceIn: m.priceIn,
+      priceOut: m.priceOut,
+    })),
+  })
+})
+
 /** الاختبار يمرّ بلهجة المزوّد: لكلٍّ نقطةُ تحقّقها. */
 panel.post('/panel/providers/verify', async (c) => {
   const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
   const provider = guard.provider
 
-  const secretName = provider.builtin ? BUILTIN_SECRET[provider.name] : undefined
-  const resolved = await resolveKey(
-    c.env.DB,
-    c.env.TOKEN_ENC_KEY,
-    provider.name,
-    secretName === undefined ? undefined : (c.env[secretName as keyof Env] as string | undefined),
-  )
-  if (resolved.key === null) {
+  const key = await providerKey(c.env, provider)
+  if (key === null) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: `${provider.label}: لا مفتاح لاختباره.` })
     return back('providers')
   }
 
   const result =
     provider.kind === 'anthropic'
-      ? await verifyKey('anthropic', resolved.key)
+      ? await verifyKey('anthropic', key)
       : provider.baseUrl === null
         ? { ok: false as const, detail: 'لا عنوان لهذا المزوّد', status: null }
-        : await verifyCompat(provider.baseUrl, resolved.key)
+        : await verifyCompat(provider.baseUrl, key)
 
   await record(
     c.env.DB,
