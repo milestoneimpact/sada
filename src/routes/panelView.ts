@@ -943,7 +943,7 @@ export function panelPage(d: PanelData): string {
          <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now)).join('')}</tbody>
        </table></div>`
 
-  const { cards: providerCards, add: addCard, routing: routingRows } =
+  const { strip: providerStrip, rows: providerRows, add: addCard, routing: routingRows } =
     providersSection(d)
   const linkedChannels = d.channels.filter(
     (c) => c.state === 'linked' || c.state === 'needs_reauth',
@@ -1092,21 +1092,28 @@ ${flash}
 
 <section data-pane="providers" hidden>
   ${pageHead('الذكاء', 'المزوّدون والتوجيه', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
-  <div class="card" style="margin-bottom:var(--s-3)">
-    <h2>عن مفاتيح المزوّدين</h2>
-    <p class="hint" style="margin:0"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
-      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
-      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّله وآخره فقط.</p>
-  </div>
-  <div class="grid c2">${providerCards}</div>
-  <div style="margin-top:var(--s-3)">${addCard}</div>
-  <div class="card" style="margin-top:var(--s-3)"><h2>توجيه المهامّ</h2>
-    <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، ولماذا</p>
+  ${providerStrip}
+
+  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
+      <span class="st idle">القرار</span></div>
+    <p class="hint">أيّ مزوّدٍ ونموذجٍ ينفّذ كلَّ مهمّة. <b>والنموذجُ يُختار من درجٍ يُملأ من عندهم</b> —
+      اضغط «حدّث» بجانبه.</p>
     <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
       <tbody>${routingRows}</tbody></table></div>
-    <div class="sub" style="margin-top:var(--s-3)">اختر لكلّ مهمّة مزوّدها ونموذجها. والافتراض في الشيفرة
-      يعمل حتّى تختار — فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
+    <div class="sub" style="margin-top:var(--s-3)">والافتراضُ في الشيفرة يعمل حتّى تختار —
+      فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
   </div>
+
+  <div class="card" style="margin-top:var(--s-3)">
+    <div class="card-head"><h2>المزوّدون</h2><div class="grow"></div>
+      <span class="st idle">${d.providers.length} مزوّدا</span></div>
+    <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
+    ${providerRows}
+  </div>
+
+  <div style="margin-top:var(--s-3)">${addCard}</div>
 </section>
 
 <section data-pane="channels" hidden>

@@ -212,7 +212,14 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
   color:var(--ink-2); max-width:var(--measure)}
 .page-head .aside{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
-@media(max-width:720px){.page-head h1{font-size:var(--t-2xl); letter-spacing:-.5px}}
+@media(max-width:720px){
+  /* الأعمدةُ الثابتةُ لا تسع في ٣٩٠px: يلتفّ الصفُّ ويسقط النموذجُ من
+     السطر — الاسمُ والحالُ والإنفاقُ تكفي للفرز، والنموذجُ في اللوح */
+  .prow>summary{flex-wrap:wrap; gap:var(--s-2)}
+  .prow .pm{display:none}
+  .prow .pst{width:auto}
+  .prow .pv{width:auto; margin-inline-start:auto}
+.page-head h1{font-size:var(--t-2xl); letter-spacing:-.5px}}
 
 .pill{display:inline-flex; align-items:center; gap:var(--s-2); padding:var(--s-1) var(--s-3); border-radius:999px;
   font-size:var(--t-sm); font-weight:600; border:1px solid var(--line); background:var(--surface-2)}
@@ -566,6 +573,47 @@ ol.steps .body{min-width:0; max-width:var(--measure); padding-top:var(--s-0)}
 ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:var(--s-0);
   font-size:var(--t-base); line-height:var(--lh-tight)}
 ol.steps .why{display:block; color:var(--ink-3)}
+
+/* ── قائمةُ المزوّدين: صفٌّ يفتح لوحَه ────────────────────────────────
+   كانت ستَّ بطاقاتٍ في شبكةٍ من عمودين، كلُّ بطاقةٍ سبعةُ شؤون. **والعينُ
+   لا تمسح شبكةً كما تمسح عمودا**: كلُّ بطاقةٍ تُقرأ وحدةً قائمةً بذاتها،
+   فمقارنةُ ستٍّ تحتاج ستَّ قراءات.
+
+   فصار صفّا: أربعةُ أعمدةٍ ثابتةِ الموضع — الاسمُ والنموذجُ وإنفاقُ اليوم
+   والحال — تُقرأ رأسيّا بمسحةٍ واحدة. **وما عداها في لوحٍ ينفتح في
+   مكانه**، فلا ينقل القارئَ إلى شاشةٍ أخرى.
+
+   و«details» لا زرٌّ بـ JS: صفحةٌ تحتاج سكربتا لتُقرأ تنكسر صامتة. */
+.plist{display:flex; flex-direction:column; border:1px solid var(--line);
+  border-radius:var(--r); overflow:hidden; margin-top:var(--s-3)}
+.prow+.prow{border-top:1px solid var(--line-soft)}
+.prow>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-3) var(--s-4); min-height:var(--tap); list-style:none;
+  background:var(--surface)}
+.prow>summary::-webkit-details-marker{display:none}
+.prow>summary:hover{background:var(--surface-2)}
+.prow[open]>summary{background:var(--surface-2); border-bottom:1px solid var(--line-soft)}
+/* الاسمُ يأخذ ما بقي، وما بعده ثابتُ العرض — فالأعمدةُ تصطفّ رأسيّا */
+.prow .pn{flex:1; min-width:0; font-size:var(--t-base); font-weight:700; color:var(--ink)}
+.prow .pk{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
+.prow .pm{flex:none; width:200px; font-size:var(--t-xs); color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr; text-align:left}
+.prow .pv{flex:none; width:80px; font-size:var(--t-base); font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.prow .pv i{display:block; font-style:normal; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
+.prow .pst{flex:none; width:150px}
+/* «تفاصيل/إغلاق»: النصُّ يقول الحالَ — وسهمٌ وحده لا يُقرأ بصوتٍ عالٍ */
+.prow .ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
+  display:inline-flex; align-items:center; gap:var(--s-2)}
+.prow .ptog::after{content:'▾'; font-size:var(--t-xs); transition:transform .18s}
+.prow[open] .ptog::after{transform:rotate(180deg)}
+.prow[open] .ptog .lbl-open{display:none}
+.prow:not([open]) .ptog .lbl-close{display:none}
+.pbody{padding:var(--s-4); background:var(--surface-2)}
+/* أربعةُ حقولٍ في سطرٍ على الشاشة، واثنان في الجوّال — ولا يُقصّ شيء */
+.pgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--s-3)}
+.pgrid .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3); margin-bottom:var(--s-1)}
+.pgrid .mono{font-size:var(--t-sm)}
 
 /* ── معالجُ الربط: الخطواتُ نفسُها، وحالُ كلٍّ بجانبها ────────────────
    والحالُ **يمينَ السطر لا تحته**: عينٌ تمسح عمودا واحدا تجد موضعَها
