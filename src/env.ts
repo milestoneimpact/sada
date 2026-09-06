@@ -85,20 +85,9 @@ export const PHASE_0_SECRETS = [
 /** أسرار المرحلة الأولى: الفهم والتخطيط. المرحلة صفر تعمل بدونها. */
 export const PHASE_1_SECRETS = ['GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY'] as const
 
-/** المرجع الواحد لكل ما يلزم تشغيلا كاملا. */
-export const REQUIRED_SECRETS = [...PHASE_0_SECRETS, ...PHASE_1_SECRETS] as const
-
 function absent(env: Partial<Env>, name: keyof Env): boolean {
   const value = env[name]
   return typeof value !== 'string' || value.length === 0
-}
-
-/**
- * يفحص وجود الأسرار دون كشف قيمها.
- * يعيد أسماء الناقص فقط، ولا يعيد قيمة سر قط.
- */
-export function missingSecrets(env: Partial<Env>): string[] {
-  return REQUIRED_SECRETS.filter((name) => absent(env, name))
 }
 
 /**

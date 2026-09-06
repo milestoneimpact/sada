@@ -16,7 +16,7 @@ import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
 import { tasksScreen } from '../src/routes/ui/tasksView'
 import { ownerRows } from '../src/lib/owner'
-import { currentPhase, gatesOf } from '../src/lib/gates'
+import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
 import { shell } from '../src/routes/ui/shell'
 
@@ -259,6 +259,18 @@ writeFileSync(
 )
 
 // ── «ما عليك»: الحالاتُ الثلاث في صفحةٍ واحدة ───────────────────────
+// حالٌ وسطى في البوّابات: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس.
+// **وواحدٌ لا اثنان**: كان هذا الحرفيُّ مكتوبا مرّتين — للبوّابات وللمرحلة
+// — فيُعدَّل أحدُهما وتُرسَم شاشةٌ تناقض نفسَها.
+const GATE_FIXTURE: GateFacts = {
+  publishedPerPlatform: { linkedin: 4, x: 2 },
+  publishedWithMedia: { linkedin: 1 },
+  ledgerPerPlatform: { linkedin: 4, x: 2 },
+  scheduledPublished: 3,
+  plans: 1, reports: 0, suggestions: 0, promoSpend: 0, orgAccounts: 1,
+  weekAlertFired: false,
+}
+
 writeFileSync(
   '/tmp/screen-tasks.html',
   page(
@@ -275,21 +287,9 @@ writeFileSync(
         videoPriced: false,
       }),
       // حالٌ وسطى في البوّابات كذلك: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس
-      gates: gatesOf({
-        publishedPerPlatform: { linkedin: 4, x: 2 },
-        publishedWithMedia: { linkedin: 1 },
-        ledgerPerPlatform: { linkedin: 4, x: 2 },
-        scheduledPublished: 3,
-        plans: 1, reports: 0, suggestions: 0, promoSpend: 0, orgAccounts: 1,
-      }),
+      gates: gatesOf(GATE_FIXTURE),
       phase: currentPhase(
-        gatesOf({
-          publishedPerPlatform: { linkedin: 4, x: 2 },
-          publishedWithMedia: { linkedin: 1 },
-          ledgerPerPlatform: { linkedin: 4, x: 2 },
-          scheduledPublished: 3,
-          plans: 1, reports: 0, suggestions: 0, promoSpend: 0, orgAccounts: 1,
-        }),
+        gatesOf(GATE_FIXTURE),
       ),
     }),
   ),

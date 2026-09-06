@@ -22,6 +22,7 @@
  * تُجتاز بشرطٍ لم يُقَس **تُجيز مرحلةً لم تكتمل**.
  */
 import type { Db } from './tokens'
+import { anyWeekAlert } from './token/expiry'
 
 export type ItemState =
   /** تحقّق — والاستعلامُ هو الدليل. */
@@ -265,7 +266,8 @@ export async function readGateFacts(db: Db): Promise<GateFacts> {
         WHERE operation LIKE '%promot%' OR operation LIKE '%ads%'`,
     ),
     orgAccounts: await count("SELECT count(*) AS n FROM accounts WHERE kind = 'org'"),
-    weekAlertFired:
-      (await count('SELECT count(*) AS n FROM token_alerts WHERE threshold >= 7')) > 0,
+    // **والسؤالُ يُسأل عند كاتبِه**: عتبةُ السبعة تعريفُها في `token/expiry`
+    // ومعها كُتبت. واستعلامٌ ثانٍ هنا يشيخ حين تتغيّر العتبةُ هناك
+    weekAlertFired: await anyWeekAlert(db),
   }
 }

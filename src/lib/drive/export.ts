@@ -33,10 +33,6 @@ export type ExtractOutcome =
   | { readonly kind: 'unsupported'; readonly reason: string }
   | { readonly kind: 'too_large'; readonly bytes: number }
 
-export function isExportable(mimeType: string): boolean {
-  return mimeType in EXPORT_AS
-}
-
 /** ملفات Office: Drive يحوّلها، فالرسالة تقول كيف لا أنها مرفوضة. */
 const OFFICE_HINT: Readonly<Record<string, string>> = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation':

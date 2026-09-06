@@ -21,7 +21,8 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes } from '../ai/routes'
+import { routeFor } from '../ai/routes'
+import { containsUrl } from '../idempotency'
 import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
 import type { Db } from '../tokens'
@@ -141,9 +142,7 @@ export async function draftPost(
   }
 
   // المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const routes = await readRoutes(deps.db)
-  const route = routes.find((r) => r.task === 'draft')
-  if (route === undefined) return { kind: 'failed', reason: 'لا توجيه لمهمّة الكتابة', retryable: false }
+  const route = await routeFor(deps.db, 'draft')
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
@@ -258,7 +257,7 @@ export async function draftPost(
         `INSERT INTO posts
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
             source_refs, rationale, has_url, status, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, 0, 'draft', ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?)`,
       )
       .bind(
         postId,
@@ -270,6 +269,10 @@ export async function draftPost(
         draft.draft.text,
         JSON.stringify([row.id]),
         draft.draft.rationale,
+        // **صفرٌ كان مكتوبا هنا حرفا** — و`ARCHITECTURE.md §٤` تقول إنّه
+        // «يُحسَب بالشيفرة لا بالنموذج ويُعرَض في اللوحة مع تكلفته على
+        // X». فكان يُحسَب عند النشر (بعد الاعتماد) ولا يُعرَض قطّ (D-069)
+        containsUrl(draft.draft.text) ? 1 : 0,
         key,
       )
       .run()

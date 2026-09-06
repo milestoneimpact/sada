@@ -128,6 +128,40 @@ describe('المسار الكامل', () => {
     expect(book[0]?.total).toBeGreaterThan(0)
   })
 
+  /**
+   * **و`has_url` كان صفرا مكتوبا حرفا في `INSERT` (D-069).**
+   *
+   * و`ARCHITECTURE.md §٤` تقول منذ أوّل يوم إنّه «يُحسَب بالشيفرة لا
+   * بالنموذج» — وكان يُحسَب عند النشر وحده، **بعد الاعتماد بأسابيع**.
+   */
+  it('و`has_url` يُحسَب من النصّ لا يُكتب صفرا', async () => {
+    const id = await seed()
+    const out = await draftPost(
+      deps(net({ draft: { text: `${'ن'.repeat(200)} https://basserh.com`, rationale: 'ز' } })),
+      id,
+      'x',
+    )
+    expect(out.kind).toBe('drafted')
+    if (out.kind !== 'drafted') return
+
+    const row = await db
+      .prepare('SELECT has_url FROM posts WHERE id = ?')
+      .bind(out.postId)
+      .first<{ has_url: number }>()
+    expect(row?.has_url).toBe(1)
+  })
+
+  it('ونصٌّ بلا رابطٍ يبقى صفرا', async () => {
+    const id = await seed()
+    const out = await draftPost(deps(net()), id, 'linkedin')
+    if (out.kind !== 'drafted') throw new Error('لم تُكتب')
+    const row = await db
+      .prepare('SELECT has_url FROM posts WHERE id = ?')
+      .bind(out.postId)
+      .first<{ has_url: number }>()
+    expect(row?.has_url).toBe(0)
+  })
+
   it('يرسل وصفَ المنصّة لا وصفا عامّا — ولكلٍّ حدُّه', async () => {
     const id = await seed()
     await draftPost(deps(net({ draft: { text: 'ن'.repeat(200), rationale: '' } })), id, 'x')

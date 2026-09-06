@@ -22,7 +22,8 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes } from '../ai/routes'
+import { routeFor } from '../ai/routes'
+import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { imagePrompt, topicOf } from './prompt'
 import type { Platform } from '../draft/prompt'
@@ -41,6 +42,13 @@ export type ImageOutcome =
     }
   /** وُلّدت لهذا النصّ — لا نداء ولا كلفة. */
   | { readonly kind: 'already'; readonly mediaId: string }
+  /**
+   * نداءٌ لهذه الصورة جارٍ الآن — **وليس فشلا**.
+   *
+   * الفحصُ في ٢ يقرأ صفّا لا يوجد قبل انتهاء النداء، فطلبان متزامنان
+   * يقرآن «لا» كلاهما **ويدفعان كلاهما** (D-068).
+   */
+  | { readonly kind: 'in_progress'; readonly since: string }
   | { readonly kind: 'blocked'; readonly reason: string }
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean }
 
@@ -57,6 +65,8 @@ export interface ImageDeps {
   readonly encKey: string
   readonly workerSecrets: Readonly<Record<string, string | undefined>>
   readonly fetchImpl?: typeof fetch
+  /** تُحقَن ليُختبَر شيخوخةُ الحجز بلا انتظار (D-068). */
+  readonly now?: () => Date
 }
 
 /**
@@ -108,11 +118,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
-  const routes = await readRoutes(deps.db)
-  const route = routes.find((r) => r.task === 'image')
-  if (route === undefined) {
-    return { kind: 'failed', reason: 'لا توجيه لمهمّة الصور', retryable: false }
-  }
+  const route = await routeFor(deps.db, 'image')
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
@@ -135,6 +141,15 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
   }
 
+  /*
+   * ٣·ب · الحجزُ قبل النداء (D-068).
+   *
+   * **والقيدُ `UNIQUE` في ٧ يقع متأخّرا**: يمنع الصفَّ المكرّر بعد أن
+   * وقع الدفعُ المكرّر — وهو ليس ما وُجد لأجله (D-004).
+   */
+  const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
+  if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+
   // ٤ · النداء
   const platform: Platform = post.platform === 'x' ? 'x' : 'linkedin'
   const prompt = imagePrompt({ topic: topicOf(post.text), platform })
@@ -152,6 +167,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
         : true
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'نداءٌ فشل',
@@ -175,6 +191,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
 
   // حدُّ الحجم بعد التسجيل: صورةٌ ضخمة كلّفت ما كلّفت
   if (image.bytes.length > MAX_BYTES) {
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: `الصورة ${Math.round(image.bytes.length / 1024)}KB وفوق السقف`,
@@ -191,6 +208,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
       httpMetadata: { contentType: image.mime },
     })
   } catch (error) {
+    await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
       reason: `تعذّر رفعُ الصورة: ${error instanceof Error ? error.message : 'عطل'}`,
@@ -218,6 +236,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
         .first<{ id: string }>()
       if (won !== null) return { kind: 'already', mediaId: won.id }
     }
+    await releaseClaim(deps.db, key)
     return { kind: 'failed', reason: `تعذّرت كتابة الصفّ: ${message}`, retryable: false }
   }
 

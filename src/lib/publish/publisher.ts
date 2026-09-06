@@ -16,7 +16,7 @@
 import { estimatePostCost, recordCost } from '../cost'
 import { containsUrl } from '../idempotency'
 import { loadTokens, markNeedsReauth, type Db } from '../tokens'
-import { canPublish, canUploadMedia } from '../oauth/scopes'
+import { canPublish, canUploadMedia, missingScopes } from '../oauth/scopes'
 import { isExpiring } from '../oauth/exchange'
 import type { Platform } from '../oauth/providers'
 import {
@@ -166,9 +166,17 @@ export async function publishPost(
     ? canUploadMedia(post.platform, tokens.scopes)
     : canPublish(post.platform, tokens.scopes)
   if (!capable) {
+    // **ويُسمّى الناقصُ لا يُشار إليه.** كان الردُّ `missing_publish_scope`
+    // وحدَه: يقول إنّ نطاقا نقص ولا يقول أيَّه، فيبقى المالكُ أمام رفضٍ
+    // لا يدلّه على بابٍ يفتحه. و`missingScopes` تعيد الأسماءَ ومصادرَها
+    // منذ D-020 ولم تُنادَ قطّ
+    const lacking = missingScopes(post.platform, tokens.scopes)
+      .map((sc) => sc.name)
+      .join('، ')
+    const which = needsMedia ? 'missing_media_scope' : 'missing_publish_scope'
     return {
       kind: 'failed',
-      reason: needsMedia ? 'missing_media_scope' : 'missing_publish_scope',
+      reason: lacking === '' ? which : `${which}: ${lacking}`,
       retryable: false,
     }
   }

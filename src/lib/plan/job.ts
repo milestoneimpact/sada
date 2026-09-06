@@ -16,7 +16,7 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes } from '../ai/routes'
+import { routeFor } from '../ai/routes'
 import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
 import {
@@ -118,9 +118,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
-  const routes = await readRoutes(deps.db)
-  const route = routes.find((r) => r.task === 'plan')
-  if (route === undefined) return { kind: 'failed', reason: 'لا توجيه لمهمّة الخطّة', retryable: false }
+  const route = await routeFor(deps.db, 'plan')
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {

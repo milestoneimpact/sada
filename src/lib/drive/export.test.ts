@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fakeFetch } from '../../test/fakes'
 import { DriveError } from './client'
-import { extractText, isExportable, MAX_TEXT_BYTES, unsupportedReason } from './export'
+import { extractText, MAX_TEXT_BYTES, unsupportedReason } from './export'
 
 const DOC = 'application/vnd.google-apps.document'
 const SHEET = 'application/vnd.google-apps.spreadsheet'
@@ -12,19 +12,6 @@ function exportUrl(id: string, as: string): string {
   url.searchParams.set('mimeType', as)
   return url.toString()
 }
-
-describe('ما يُصدَّر وما لا يُصدَّر', () => {
-  it.each([DOC, SHEET, DECK])('يدعم %s', (mime) => {
-    expect(isExportable(mime)).toBe(true)
-  })
-
-  it.each(['application/pdf', 'image/png', 'video/mp4', 'application/zip'])(
-    'لا يدعم %s',
-    (mime) => {
-      expect(isExportable(mime)).toBe(false)
-    },
-  )
-})
 
 describe('سبب عدم الدعم — يُقرأ لا يُفكّ', () => {
   it('يرشد صاحب PDF إلى الحلّ لا إلى الرفض', () => {

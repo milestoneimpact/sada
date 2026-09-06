@@ -5,7 +5,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { scopeSet } from '../oauth/scopes'
 import { toBase64 } from '../crypto'
-import { idempotencyKey } from '../idempotency'
 import { saveTokens, upsertAccount } from '../tokens'
 import { X, LINKEDIN } from '../oauth/providers'
 import { fakeDb, fakeFetch, type FakeDb } from '../../test/fakes'
@@ -57,7 +56,7 @@ async function seedPost(options: {
       options.platform,
       options.text ?? 'نص المنشور',
       options.status ?? 'queued',
-      await idempotencyKey(postId),
+      `draft:src:${options.platform}:${postId}`,
       approved ? 'omar' : null,
       approved ? '2026-09-07T10:00:00Z' : null,
     )
@@ -276,6 +275,32 @@ describe('الفشل', () => {
       .prepare(`SELECT status FROM accounts WHERE id = 'x:member:4242'`)
       .get() as { status: string }
     expect(account.status).toBe('active')
+  })
+
+  /**
+   * **ورفضٌ لا يسمّي سببَه يوقف المالكَ بلا بابٍ يفتحه.**
+   *
+   * كان الردُّ `missing_publish_scope` وحدَه: يقول إنّ نطاقا نقص ولا
+   * يقول أيَّه — والمالكُ لا يملك أن يمنح ما لا يعرف اسمَه (D-067).
+   */
+  it('ورفضُ النطاق يسمّي الناقصَ لا يشير إليه', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    // نطاقٌ واحدٌ ممنوح، والباقي ناقص
+    await saveTokens(db, KEY, 'x:member:4242', {
+      accessToken: 'a', refreshToken: null, expiresAt: '2026-11-02T10:00:00.000Z',
+      refreshExpiresAt: null, scopes: 'users.read',
+    })
+
+    const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId })
+    expect(outcome).toMatchObject({ kind: 'failed', retryable: false })
+    const reason = (outcome as { reason: string }).reason
+    expect(reason).toContain('missing_publish_scope')
+    // **والاسمُ من `scopes.ts` لا مكتوبا هنا**: نطاقٌ يتغيّر اسمُه
+    // يُغيّر الرسالةَ معه، ولا يبقى الاختبارُ يُصدّق ما بطل
+    for (const name of scopeSet('x').filter((sc) => sc !== 'users.read')) {
+      expect(reason).toContain(name)
+    }
+    expect(reason).not.toContain('users.read')
   })
 
   it('يبلّغ عن منشور غير موجود بلا رمي', async () => {

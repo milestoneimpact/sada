@@ -11,7 +11,8 @@ import { toBase64 } from '../crypto'
 import { writeSetting } from '../settings'
 import { verifyMediaToken } from './link'
 import { VIDEO_MODELS, type AiBinding } from './workersAi'
-import { animateForPost, pickBinding } from './video'
+import { animateForPost, DEFAULT_PROMPT, pickBinding, videoKey } from './video'
+import { claimGeneration } from './claim'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const BASE = 'https://sada2.basserh.com'
@@ -177,6 +178,69 @@ describe('التوليد', () => {
     expect(a.calls).toHaveLength(0)
     const n = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
     expect(n.n).toBe(1)
+  })
+})
+
+/**
+ * **الحجزُ قبل الإنفاق (D-068).**
+ *
+ * الفحصُ في «ولا يولّد مرّتين» يقرأ صفَّ `media` — **ولا يوجد إلّا بعد
+ * دقائق**: التوليدُ ثمّ السحبُ ثمّ الرفع. فنقرةٌ ثانيةٌ في تلك الدقائق
+ * كانت تجد «لا مقطع» وتبدأ توليدا ثانيا **وتدفع ثمنَه**.
+ *
+ * وما يُثبَت هنا أنّ الثانيةَ **لا تنادي ولا تُسجَّل لها كلفة**.
+ */
+describe('الحجزُ قبل الإنفاق (D-068)', () => {
+  it('ونداءٌ جارٍ يمنع الثانيَ قبل أن يُنفِق', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+
+    // نداءٌ سابقٌ حجز ولم يفرغ بعد
+    const key = await videoKey('p1', DEFAULT_PROMPT)
+    await claimGeneration(db, key, 'p1', 'video', new Date('2026-09-08T09:00:00.000Z'))
+
+    const a = ai(OK_VIDEO)
+    const out = await animateForPost(
+      { ...deps(a), now: () => new Date('2026-09-08T09:02:00.000Z') },
+      'p1',
+    )
+
+    expect(out.kind).toBe('in_progress')
+    expect(a.calls).toHaveLength(0)
+    const n = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    expect(n.n).toBe(0)
+  })
+
+  /**
+   * **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — فالمالكُ
+   * يرى «جارٍ» على نداءٍ مات.
+   */
+  it('وفشلُ التوليد يحرّر حجزَه فتُقبل الإعادة', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+
+    const failing = ai(undefined)
+    const first = await animateForPost(deps(failing), 'p1')
+    expect(first.kind).toBe('failed')
+
+    const second = await animateForPost(deps(ai(OK_VIDEO)), 'p1')
+    expect(second.kind).toBe('generated')
+  })
+
+  /**
+   * **ومفتاحُ R2 ليس مفتاحَ عدم التكرار.** كان الواحدُ يؤدّي الدورين
+   * وفيه `uuid` — فعمودٌ `UNIQUE` لا يمنع شيئا.
+   */
+  it('ومفتاحُ الصفّ مشتقٌّ من المحتوى لا من الصدفة', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+    await animateForPost(deps(ai(OK_VIDEO)), 'p1')
+
+    const row = db.raw
+      .prepare(`SELECT idempotency_key AS k, r2_key AS r FROM media WHERE mime LIKE 'video/%'`)
+      .get() as { k: string; r: string }
+    expect(row.k).toBe(await videoKey('p1', DEFAULT_PROMPT))
+    expect(row.r).not.toBe(row.k)
   })
 })
 

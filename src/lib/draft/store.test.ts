@@ -173,3 +173,60 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
     ).rejects.toThrow()
   })
 })
+
+/**
+ * **ثمنُ النشر غيرُ ثمن الكتابة — ولم يُعرَض قطّ (D-069).**
+ *
+ * `ARCHITECTURE.md §٤` تقول إنّ `has_url` «يُحسَب بالشيفرة لا بالنموذج
+ * **ويُعرَض في اللوحة مع تكلفته على X**» منذ أوّل يوم. وكان يُكتب
+ * صفرا **حرفا** في المسوّدة، ويُحسَب عند النشر — بعد الاعتماد بأسابيع
+ * — فلا يراه المالكُ حين يبتّ. **ورابطٌ على X ثلاثةَ عشرَ ضعفا.**
+ */
+describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
+  // **يسع الرابطَ تحت حدّ X (٢٨٠)**: `LONG` بثلاثمئةٍ يُردّ قبل أن
+  // يُحسَب العمود، فيمرّ الاختبارُ على فرعٍ غير الذي يفحصه
+  const FITS = 'ن'.repeat(200)
+  const LINK = 'https://basserh.com'
+
+  it('ورابطٌ على X يُسعَّر مئتين لا خمسةَ عشر', async () => {
+    await seedDraft({ platform: 'x', text: `${FITS} ${LINK}` })
+    const [row] = await listDrafts(db)
+    expect(row?.publishCost).toBeCloseTo(0.2)
+  })
+
+  it('وبلا رابطٍ خمسةَ عشر', async () => {
+    await seedDraft({ platform: 'x' })
+    const [row] = await listDrafts(db)
+    expect(row?.publishCost).toBeCloseTo(0.015)
+  })
+
+  it('و LinkedIn بلا رسمٍ على المنشور — فلا يُعرَض شيء', async () => {
+    await seedDraft({ platform: 'linkedin', text: `${FITS} ${LINK}` })
+    const [row] = await listDrafts(db)
+    expect(row?.publishCost).toBe(0)
+  })
+
+  /**
+   * **والمالكُ يعتمد بنصِّه بعد التعديل.** فنصٌّ بلا رابطٍ عند الكتابة
+   * يخرج من البَتّ برابط — وعمودٌ حُسب مرّةً يبقى يقول ما بطل.
+   */
+  it('وتعديلٌ يضيف رابطا يعيد حسابَ العمود', async () => {
+    const id = await seedDraft({ platform: 'x' })
+    const before = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
+    expect(before.u).toBe(0)
+
+    const edited = await decide(db, id, { kind: 'approve', text: `${FITS} ${LINK}` }, 'omar')
+    expect(edited.ok).toBe(true)
+
+    const after = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
+    expect(after.u).toBe(1)
+  })
+
+  it('وتعديلٌ يحذف الرابطَ يعيده صفرا', async () => {
+    const id = await seedDraft({ platform: 'x', text: `${FITS} ${LINK}` })
+    const edited = await decide(db, id, { kind: 'approve', text: FITS }, 'omar')
+    expect(edited.ok).toBe(true)
+    const after = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
+    expect(after.u).toBe(0)
+  })
+})
