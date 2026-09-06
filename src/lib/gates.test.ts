@@ -1,0 +1,146 @@
+/**
+ * البوّابات — **والاختبارُ يحرس أنّها لا تُجتاز بقول.**
+ */
+import { beforeEach, describe, expect, it } from 'vitest'
+import { fakeDb, type FakeDb } from '../test/fakes'
+import { currentPhase, gatesOf, readGateFacts, type GateFacts } from './gates'
+
+const empty: GateFacts = {
+  publishedPerPlatform: {}, publishedWithMedia: {}, scheduledPublished: 0,
+  ledgerPerPlatform: {}, plans: 0, reports: 0, suggestions: 0,
+  promoSpend: 0, orgAccounts: 0,
+}
+
+const gate = (f: GateFacts, phase: string) => gatesOf(f).find((g) => g.phase === phase)!
+
+describe('لا تُجتاز بقول', () => {
+  it('بلا شيءٍ: لا بوّابةَ مجتازة', () => {
+    expect(gatesOf(empty).every((g) => !g.passed)).toBe(true)
+    expect(currentPhase(gatesOf(empty))).toBe('٠')
+  })
+
+  /** **منصّةٌ واحدةٌ لا تكفي**: البوّابةُ تقول «على كلّ منصّة». */
+  it('ومنصّةٌ واحدةٌ لا تجتاز بوّابةَ المرحلة ٠', () => {
+    const half: GateFacts = {
+      ...empty,
+      publishedPerPlatform: { linkedin: 3 },
+      ledgerPerPlatform: { linkedin: 3 },
+    }
+    expect(gate(half, '٠').passed).toBe(false)
+
+    const both: GateFacts = {
+      ...empty,
+      publishedPerPlatform: { linkedin: 3, x: 1 },
+      ledgerPerPlatform: { linkedin: 3, x: 1 },
+    }
+    expect(gate(both, '٠').passed).toBe(true)
+  })
+
+  /** **ومنشورٌ بلا سطرٍ في الدفتر لا يجتاز** — D-008 شرطٌ لا زينة. */
+  it('ونشرٌ بلا سطرٍ في الدفتر لا يجتاز', () => {
+    const noLedger: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3, x: 1 } }
+    expect(gate(noLedger, '٠').passed).toBe(false)
+  })
+
+  it('وأربعةٌ من خمسةٍ لا تجتاز بوّابةَ المرحلة ١', () => {
+    const four: GateFacts = { ...empty, plans: 1, scheduledPublished: 4 }
+    expect(gate(four, '١').passed).toBe(false)
+    expect(gate({ ...four, scheduledPublished: 5 }, '١').passed).toBe(true)
+  })
+})
+
+describe('وما لا يُقاس لا يُجيز', () => {
+  /**
+   * **بوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل.**
+   *
+   * وتنبيهُ انتهاء الرمز يصل بريدا لا نقرؤه — فيبقى `unmeasured`،
+   * **والبوّابةُ لا تُجتاز ولو تحقّق كلُّ ما عداه**.
+   */
+  it('بندٌ لا يُقاس يُبقي البوّابةَ غيرَ مجتازة', () => {
+    const all: GateFacts = {
+      ...empty,
+      publishedPerPlatform: { linkedin: 3, x: 2 },
+      publishedWithMedia: { linkedin: 1, x: 1 },
+      orgAccounts: 1,
+    }
+    const g = gate(all, '٢')
+    expect(g.items.filter((i) => i.state === 'unmet')).toEqual([])
+    expect(g.items.some((i) => i.state === 'unmeasured')).toBe(true)
+    expect(g.passed).toBe(false)
+  })
+})
+
+describe('وبندٌ سلبيٌّ يُجتاز بالصفر', () => {
+  /** «ولم يُنفَق شيء» شرطٌ سلبيّ — وأيُّ صفٍّ يُسقط البوّابة (D-006). */
+  it('إنفاقُ ترويجٍ يُسقط بوّابةَ المرحلة ٣ ولو تمّ الباقي', () => {
+    const clean: GateFacts = { ...empty, reports: 1, suggestions: 1 }
+    expect(gate(clean, '٣').passed).toBe(true)
+
+    const spent: GateFacts = { ...clean, promoSpend: 10 }
+    expect(gate(spent, '٣').passed).toBe(false)
+    expect(gate(spent, '٣').items.at(-1)!.evidence).toContain('يُسقط البوّابة')
+  })
+})
+
+describe('ولكلّ بندٍ دليلُه لا حكمُه وحده', () => {
+  it('يُعرَض الرقمُ الذي بُني عليه الحكم', () => {
+    const f: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3 } }
+    const first = gate(f, '٠').items[0]!
+    expect(first.evidence).toContain('linkedin: 3')
+    expect(first.evidence).toContain('x: 0')
+  })
+})
+
+describe('والقراءةُ من قاعدةٍ حقيقيّة', () => {
+  let db: FakeDb
+  beforeEach(() => { db = fakeDb() })
+
+  it('قاعدةٌ فارغةٌ تعطي أصفارا ولا تسقط', async () => {
+    const f = await readGateFacts(db)
+    expect(f.plans).toBe(0)
+    expect(f.publishedPerPlatform).toEqual({})
+    expect(gatesOf(f).every((g) => !g.passed)).toBe(true)
+  })
+
+  it('ومنشورٌ خرج فعلا يُعَدّ لمنصّته', async () => {
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name)
+       VALUES ('a-x', 'x', 'member', 'e', 'عمر')`,
+    )
+    db.raw.exec(
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
+                          idempotency_key, approved_by, approved_at)
+       VALUES ('p1', 'a-x', 'x', 'text', 'ن', '2026-09-01T00:00:00Z', 'published',
+               'k1', 'omar', '2026-09-01T00:00:00Z')`,
+    )
+    db.raw.exec(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no,
+                                     request_json, status)
+       VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
+    )
+    const f = await readGateFacts(db)
+    expect(f.publishedPerPlatform['x']).toBe(1)
+    // **وجُدوِل ثمّ خرج** — فيُعَدّ في «بلا تدخّل»
+    expect(f.scheduledPublished).toBe(1)
+  })
+
+  /** ومحاولةٌ فاشلةٌ ليست نشرا — والبوّابةُ لا تُخدَع بصفٍّ حالتُه تقول ذلك. */
+  it('ومحاولةٌ فاشلةٌ لا تُعَدّ نشرا', async () => {
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name)
+       VALUES ('a-x', 'x', 'member', 'e', 'عمر')`,
+    )
+    db.raw.exec(
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
+                          idempotency_key, approved_by, approved_at)
+       VALUES ('p1', 'a-x', 'x', 'text', 'ن', '2026-09-01T00:00:00Z', 'published',
+               'k1', 'omar', '2026-09-01T00:00:00Z')`,
+    )
+    db.raw.exec(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no,
+                                     request_json, status)
+       VALUES ('at1', 'p1', 'k1', 1, '{}', 'failed')`,
+    )
+    expect((await readGateFacts(db)).publishedPerPlatform['x']).toBeUndefined()
+  })
+})

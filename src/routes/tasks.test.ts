@@ -105,3 +105,52 @@ describe('والرابطُ في اللوحة', () => {
     expect(html).toContain('ما عليك')
   })
 })
+
+describe('وبوّاباتُ المراحل تُقاس', () => {
+  /**
+   * `PLAN.md` يعلّق القاعدةَ على `STATUS.md` — **وهو يُكتب بيد، وقد
+   * شاخ مرّتين**. فتُقاس هنا من القاعدة.
+   */
+  it('تُعرَض الأربعُ، ولا واحدةَ مجتازةٌ على قاعدةٍ فارغة', async () => {
+    const html = await open()
+    for (const phase of ['٠', '١', '٢', '٣']) {
+      expect(html).toContain(`المرحلة ${phase}`)
+    }
+    expect(html).not.toContain('اجتِيزت')
+    expect(html).toContain('أنت في المرحلة ٠')
+  })
+
+  /** **ومعه دليلُه**: «لم تُجتَز» بلا رقمٍ لا تُعالَج. */
+  it('ولكلّ بندٍ دليلُه لا حكمُه وحده', async () => {
+    const html = await open()
+    expect(html).toContain('linkedin: 0')
+    expect(html).toContain('x: 0')
+  })
+
+  /**
+   * **بوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل** — فيُقال
+   * «لا يُقاس من هنا» وتبقى غيرَ مجتازة.
+   */
+  it('وبندٌ لا يُقاس يُقال ولا يُدَّعى', async () => {
+    expect(await open()).toContain('لا يُقاس من هنا')
+  })
+
+  it('ومنشورٌ خرج فعلا يُغيّر الدليل', async () => {
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name)
+       VALUES ('a-x', 'x', 'member', 'e', 'عمر')`,
+    )
+    db.raw.exec(
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
+                          idempotency_key, approved_by, approved_at)
+       VALUES ('p1', 'a-x', 'x', 'text', 'ن', '2026-09-01T00:00:00Z', 'published',
+               'k1', 'omar', '2026-09-01T00:00:00Z')`,
+    )
+    db.raw.exec(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no,
+                                     request_json, status)
+       VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
+    )
+    expect(await open()).toContain('x: 1')
+  })
+})

@@ -17,6 +17,7 @@
  */
 import { escapeHtml } from './shell'
 import type { OwnerRow, Unblocks } from '../../lib/owner'
+import type { Gate, ItemState } from '../../lib/gates'
 
 const MARK: Readonly<Record<string, { g: string; cls: string; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تمّت' },
@@ -64,8 +65,50 @@ function row(r: OwnerRow): string {
   </tr>`
 }
 
+/**
+ * بطاقةُ بوّابةٍ — **ومعها دليلُ كلّ بند، لا حكمُه وحده.**
+ *
+ * «لم تُجتَز» بلا رقمٍ لا تُعالَج: **مِن أينَ يبدأ من يقرؤها؟** فيُعرَض
+ * تحت كلّ بندٍ ما بُني عليه الحكم — «linkedin: 3 · x: 0» تقول ما ينقص
+ * بلا كلمة.
+ */
+const ITEM_MARK: Readonly<Record<ItemState, { g: string; cls: string; label: string }>> = {
+  met: { g: '●', cls: 'ok', label: 'تحقّق' },
+  unmet: { g: '○', cls: 'idle', label: 'لم يتحقّق' },
+  unmeasured: { g: '?', cls: 'warn', label: 'لا يُقاس من هنا' },
+}
+
+function gateCard(g: Gate): string {
+  const items = g.items
+    .map((i) => {
+      const mark = ITEM_MARK[i.state]
+      return `<li class="wz ${mark.cls}">
+        <span class="body">
+          <span class="what">${bold(i.text)}</span>
+          <span class="why">${escapeHtml(i.evidence)}</span>
+        </span>
+        <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+      </li>`
+    })
+    .join('')
+
+  return `<div class="card" style="margin-bottom:var(--s-3)">
+    <div class="card-head">
+      <h2>المرحلة ${escapeHtml(g.phase)} · ${escapeHtml(g.title)}</h2>
+      <div class="grow"></div>
+      ${g.passed
+        ? '<span class="st ok"><span class="g">●</span>اجتِيزت</span>'
+        : '<span class="st idle"><span class="g">○</span>لم تُجتَز</span>'}
+    </div>
+    <ol class="steps wiz nodot">${items}</ol>
+  </div>`
+}
+
 export interface TasksScreenData {
   readonly rows: readonly OwnerRow[]
+  readonly gates: readonly Gate[]
+  /** أوّلُ مرحلةٍ لم تُجتَز — أو `null` إن اجتِزن. */
+  readonly phase: string | null
 }
 
 export function tasksScreen(d: TasksScreenData): string {
@@ -102,6 +145,23 @@ export function tasksScreen(d: TasksScreenData): string {
       <tbody>${d.rows.map(row).join('')}</tbody>
     </table></div>
   </div>
+
+  <div class="lede-row" style="margin-top:var(--s-6)">
+    <h3 class="sec" style="margin:0; border:0; padding:0">بوّاباتُ المراحل</h3>
+    <span class="grow"></span>
+    <span class="st ${d.phase === null ? 'ok' : 'warn'}"><span class="g">${
+      d.phase === null ? '●' : '◍'}</span>${
+      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}</span>
+  </div>
+
+  <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
+    <span class="mono">docs/PLAN.md</span> يقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
+    سابقتها ويُسجَّل ذلك في <span class="mono">STATUS.md</span>» —
+    <b>وسجلٌّ يُكتب بيدٍ يشيخ</b>، وقد شاخ. فكلُّ بندٍ هنا استعلامٌ على ما وقع،
+    <b>ومعه دليلُه</b>. <b>وبندٌ لا يُقاس يُبقي بوّابتَه غيرَ مجتازة</b> —
+    فبوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
+
+  ${d.gates.map(gateCard).join('')}
 
   <div class="card">
     <h2>وأين الخطوات</h2>

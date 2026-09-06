@@ -61,6 +61,7 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
+import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
@@ -1184,7 +1185,12 @@ panel.get('/panel/tasks', async (c) => {
   if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const body = tasksScreen({ rows: ownerRows(await ownerFacts(c)) })
+  const gates = gatesOf(await readGateFacts(c.env.DB))
+  const body = tasksScreen({
+    rows: ownerRows(await ownerFacts(c)),
+    gates,
+    phase: currentPhase(gates),
+  })
 
   return page((nonce) =>
     shell(

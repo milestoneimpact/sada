@@ -284,6 +284,11 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    والمحدّدُ صار وصفيّا: كلُّ عنوانٍ في بطاقة. */
 .card h2{font-size:var(--t-lg); font-weight:700; letter-spacing:-.25px;
   margin-bottom:var(--s-0)}
+/* **والهامشُ قاعدةٌ لا استثناء.** كانت على «.card > .hint» وحدها،
+   فـ«hint» خارج بطاقةٍ يرث 14px من المتصفّح — **خارجَ السلّم**، وهي
+   علّةُ «p.nm» و«h3.sec» نفسُها (D-057 · D-061 · D-062). فتُوضَع
+   القاعدةُ للصنف، ويبقى محدّدُ البطاقة لِما يخصّها من لونٍ وقياس. */
+.hint{margin:0 0 var(--s-4)}
 .card > .hint{margin:0 0 var(--s-4); font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh)}
 .card-head{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-bottom:var(--s-3)}
 .card-head h2{margin:0}
@@ -581,6 +586,8 @@ ol.steps.wiz .st{flex:none; margin-inline-start:auto}
 ol.steps.wiz li.ok .n{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
 ol.steps.wiz li.bad .n{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 ol.steps.wiz li.idle .n{color:var(--ink-3); border-color:var(--line)}
+/* بنودُ البوّابة شروطٌ لا خطواتٌ مرتَّبة — فلا رقمَ ولا خيطٌ يصلها */
+ol.steps.wiz.nodot li::before{display:none}
 
 /* ── تبويباتُ الفرز ───────────────────────────────────────────────────
    روابطُ استعلامٍ لا أزرارُ سكربت: تُفتَح في تبويبٍ جديد، وتُحفَظ في
