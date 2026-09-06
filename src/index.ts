@@ -20,6 +20,8 @@ import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
 import { runWeekly } from './lib/report/job'
 import { expiringTokens, recordAlerts } from './lib/token/expiry'
+import { renewDue } from './lib/token/renew'
+import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
 import { legal } from './routes/legal'
@@ -443,6 +445,40 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
  * خروج. ولذلك تدور كلَّ ربع ساعة بلا حرج — والبديلُ دورةٌ يوميّةٌ تجعل
  * «في موعده» تعني «في مكانٍ ما من اليوم التالي».
  */
+/**
+ * دورةُ التجديد — **قبل الطابور، كما وعد تعليقُ الناشر.**
+ *
+ * `publisher.ts` يقول: «التجديد يقع قبل الطابور لا داخله؛ هنا نعلّم
+ * ونتوقف بدل أن ننشر برمزٍ ميت». **ولم يكن يقع** — و`refreshToken()`
+ * مبنيٌّ منذ المرحلة ٠ ولا يناديه أحد (D-066).
+ *
+ * وتقع **في كلّ دورة** لا في جدولٍ خاصّ: استعلامٌ على فهرس
+ * `idx_tokens_expires` ثمنُه لا يُذكر، **وجدولٌ خامسٌ يزيد ما يُنسى
+ * مقابلتُه بـ`wrangler.toml`** (D-058).
+ *
+ * وعطلُها لا يُرمى: حارسُ الناشر يمنع النشرَ برمزٍ ميت على كلّ حال —
+ * **فسقوطُ التجديد يؤخّر ولا يُفسد.**
+ */
+async function renewTick(env: Env): Promise<void> {
+  try {
+    const summary = await renewDue({
+      db: env.DB,
+      encKey: env.TOKEN_ENC_KEY,
+      providerFor: (platform) => OAUTH_PROVIDERS[platform],
+      credentialsFor: async (platform) =>
+        readApp(
+          env.DB,
+          env.TOKEN_ENC_KEY,
+          platform,
+          env as unknown as Record<string, string | undefined>,
+        ),
+    })
+    if (summary.due > 0) console.info({ job: 'renew', ...summary })
+  } catch (error) {
+    console.error({ job: 'renew', failed: String(error) })
+  }
+}
+
 async function dispatchTick(env: Env): Promise<void> {
   try {
     const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
@@ -641,6 +677,9 @@ const REPORT_CRON = '14 4 * * 1'
  * `dispatched_at` يجعل الثانية تجد الطابور فارغا (D-037).
  */
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  // **والتجديدُ قبل الطابور** — منشورٌ ينتظر رمزا انتهى يُجدَّد رمزُه
+  // في هذه الدورة نفسِها، فلا يفشل فشلا نهائيّا لأجل دقائق (D-066)
+  await renewTick(env)
   await dispatchTick(env)
   if (controller.cron === SCAN_CRON) {
     await scanTick(env)

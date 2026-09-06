@@ -250,6 +250,34 @@ describe('الفشل', () => {
     expect(account.status).toBe('needs_reauth')
   })
 
+  /**
+   * **ورمزُ تجديدٍ قائمٌ يعني عطلا عابرا لا حسابا معطوبا.**
+   *
+   * التجديدُ يقع قبل الطابور (D-066)، فالوصولُ هنا يعني أنّ الدورةَ
+   * لم تُصلحه — دورةٌ سقطت، أو سرٌّ ناقص. **وتعليمُ الحساب
+   * `needs_reauth` عندئذٍ يوقف نشرَه كلَّه لأجل دقائق**، ويُعلِّم
+   * المالكَ أن يتجاهل طلبَ إذنٍ لا حاجةَ إليه.
+   */
+  it('ورمزٌ منتهٍ ومعه رمزُ تجديدٍ يُعاد ولا يُعلَّم الحساب', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    // **ويُحفَظ بالتشفير الحقيقيّ**: بايتاتٌ مزيّفةٌ لا تُفكّ، فتُقرأ
+    // «لا رمزَ محفوظ» ويمرّ الاختبارُ على فرعٍ آخر غير الذي يفحصه
+    await saveTokens(db, KEY, 'x:member:4242', {
+      accessToken: 'a', refreshToken: 'r', expiresAt: '2026-09-08T09:01:00Z',
+      refreshExpiresAt: null, scopes: scopeSet('x').join(' '),
+    })
+
+    const f = fakeFetch(X_OK)
+    const outcome = await publishPost(deps(f), { postId })
+    expect(outcome).toMatchObject({ kind: 'failed', reason: 'token_expired_retry', retryable: true })
+    expect(f.calls).toHaveLength(0)
+
+    const account = db.raw
+      .prepare(`SELECT status FROM accounts WHERE id = 'x:member:4242'`)
+      .get() as { status: string }
+    expect(account.status).toBe('active')
+  })
+
   it('يبلّغ عن منشور غير موجود بلا رمي', async () => {
     const outcome = await publishPost(deps(fakeFetch({})), { postId: 'لا-وجود-له' })
     expect(outcome).toMatchObject({ kind: 'failed', reason: 'post_not_found', retryable: false })
