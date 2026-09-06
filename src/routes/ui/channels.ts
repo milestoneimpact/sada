@@ -19,6 +19,7 @@
  */
 import { SETUP, type ChannelView } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
+import { wizardFor, type Step } from '../../lib/oauth/wizard'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { relativeTime } from '../../lib/format'
@@ -62,14 +63,65 @@ const KIND: Readonly<Record<string, string>> = {
  * حيث تكون البيئةُ هي المصدر، **لا نموذجَ يُعرض**: النموذجُ يوهم بأنّ
  * الكتابةَ فيه تغيّر المستعمَل، وهي لا تغيّره (D-030).
  */
+/**
+ * شريطُ الخطوات الأربع.
+ *
+ * **ولا علامةَ صحٍّ على ما لم يُتحقَّق منه.** أربعُ حالاتٍ لا اثنتان:
+ * تمّت · الآن · تنتظر · **لا يُعرَف من هنا** · رُدّت. والخامسةُ
+ * والرابعةُ هما ما يفرق هذا عن شريطِ تقدّمٍ يزيّن.
+ *
+ * والرمزُ **مع النصّ لا وحدَه**: لونٌ أو شكلٌ بلا كلمةٍ لا يُقرأ بصوتٍ
+ * عالٍ، ولا يفرزه من لا يميّز الألوان (D-043).
+ */
+const STEP_MARK: Readonly<Record<Step['state'], { g: string; cls: string; label: string }>> = {
+  done: { g: '●', cls: 'ok', label: 'تمّت' },
+  now: { g: '◍', cls: 'warn', label: 'الآن' },
+  waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
+  unknowable: { g: '?', cls: 'idle', label: 'لا يُعرَف من هنا' },
+  failed: { g: '▲', cls: 'bad', label: 'رُدّت' },
+}
+
+function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
+  const w = wizardFor(view, app)
+  const rows = w.steps
+    .map((step) => {
+      const mark = STEP_MARK[step.state]
+      return `<li class="wz ${mark.cls}${step.state === 'now' ? ' at' : ''}">
+        <span class="n" aria-hidden="true">${step.n}</span>
+        <span class="body">
+          <span class="what">${escapeHtml(step.title)}</span>
+          <span class="why">${step.proof.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</span>
+        </span>
+        <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+      </li>`
+    })
+    .join('')
+
+  const head = w.linked
+    ? '<b>تمّ الطريقُ كلُّه.</b> والخطواتُ تبقى معروضةً لتُراجَع عند أيّ تبديل.'
+    : w.current === null
+      ? '<b>الطريق.</b>'
+      : `<b>أنت عند الخطوة ${w.current} من ${w.steps.length}.</b>`
+
+  return `<div class="card" style="margin-bottom:var(--s-3)">
+    <div class="card-head"><h2>الطريقُ إلى الربط</h2><div class="grow"></div>
+      <span class="chip">${w.steps.filter((x) => x.state === 'done').length} من ${w.steps.length} ثبتت</span></div>
+    <p class="hint">${head} <b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
+      خطوتان تقعان في بوّابة المنصّة ولا تُقرآن من هنا، <b>وبرهانُهما نجاحُ
+      ما بعدهما</b> — فيُقال «لا يُعرَف» ولا يُقال «تمّت».</p>
+    <ol class="steps wiz">${rows}</ol>
+  </div>`
+}
+
 function setupPane(view: ChannelView, app: AppStatus | undefined, base: string): string {
   const guide = SETUP[view.spec.id]
   if (guide === undefined || app === undefined) return ''
 
   const callback = `${base.replace(/\/+$/, '')}/oauth/${view.spec.id}/callback`
+  const wizard = wizardStrip(view, app)
 
   if (app.source === 'worker_secret') {
-    return `<div class="guide"><div class="guide-body" style="border-top:0">
+    return `${wizard}<div class="guide"><div class="guide-body" style="border-top:0">
       <div class="help"><span class="i">i</span><span class="t">
         <b>مضبوطٌ من أسرار Worker — وسرُّ البيئة يغلب الخزانة دائما.</b>
         فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو —
@@ -103,7 +155,7 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
 
   const id = view.spec.id
   const open = app.source === 'none'
-  return `<details class="guide"${open ? ' open' : ''}>
+  return `${wizard}<details class="guide"${open ? ' open' : ''}>
     <summary>
       <span class="g-ic">${ICON_GUIDE}</span>
       <span class="g-t"><b>${open ? 'دليلُ ضبط التطبيق' : 'الدليل وتبديلُ الأسرار'}</b>

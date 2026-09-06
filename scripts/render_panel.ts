@@ -249,12 +249,14 @@ const data: PanelData = {
       platform: 'linkedin', source: 'worker_secret',
       clientId: '78k4gm3yw1g18e', hint: null, updatedAt: null, updatedBy: null,
       secretNames: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
+      verifiedAt: null, verifiedKind: null,
     },
     // و X لم يُضبَط: النموذجُ مفتوحٌ بإرشاده
     {
       platform: 'x', source: 'none',
       clientId: null, hint: null, updatedAt: null, updatedBy: null,
       secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
+      verifiedAt: null, verifiedKind: null,
     },
   ],
 }

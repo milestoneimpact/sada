@@ -10,6 +10,8 @@ import { writeFileSync } from 'node:fs'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { scopeSet } from '../src/lib/oauth/scopes'
 import { platformScreen } from '../src/routes/ui/platformView'
+import { channelsSection } from '../src/routes/ui/channels'
+import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
@@ -194,4 +196,41 @@ writeFileSync(
   })),
 )
 
-console.log('رُسمت سبعٌ في /tmp')
+// ── معالجُ الربط في حالاته التي تهمّ ────────────────────────────────
+//
+// **ومحاكاةٌ كلُّها مربوطةٌ لا تُري شيئا**: أربعُ خطواتٍ «تمّت» تبدو
+// صحيحةً وتُخفي أنّ الحالاتِ الأخرى لم تُرسَم قطّ. فتُرسَم هنا صراحةً
+// ليراها المدقّقان والعين (D-061).
+const app = (over: Partial<AppStatus>): AppStatus => ({
+  platform: 'x', source: 'vault', clientId: '78k4gm3yw1g18e', hint: 'WPL_…kw==',
+  updatedAt: ago(2), updatedBy: 'panel', secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
+  verifiedAt: null, verifiedKind: null,
+  ...over,
+})
+
+const soloX = viewChannels(
+  accounts.filter((a) => a.platform === 'linkedin'),
+  () => true,
+)
+
+const wizardCases: { title: string; app: AppStatus }[] = [
+  { title: 'محفوظٌ ولم يُفحَص', app: app({}) },
+  { title: 'فُحص فرُدّ السرّ', app: app({ verifiedKind: 'bad_secret', verifiedAt: ago(1) }) },
+  { title: 'ومعرّفٌ لا تعرفه المنصّة', app: app({ verifiedKind: 'bad_client_id', verifiedAt: ago(1) }) },
+  { title: 'وجاز الفحصُ ولم يُربَط بعد', app: app({ verifiedKind: 'accepted', verifiedAt: ago(1) }) },
+]
+
+writeFileSync(
+  '/tmp/screen-wizard.html',
+  page(
+    'صدى — معالجُ الربط',
+    wizardCases
+      .map(
+        (c) => `<h2 class="sec">${c.title}</h2>` +
+          channelsSection(soloX, now, [c.app], 'https://sada2.basserh.com'),
+      )
+      .join(''),
+  ),
+)
+
+console.log('رُسمت ثمانٍ في /tmp')
