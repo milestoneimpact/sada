@@ -18,6 +18,7 @@ import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
+import { runWeekly } from './lib/report/job'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { legal } from './routes/legal'
 import { media } from './routes/media'
@@ -513,6 +514,28 @@ async function metricsTick(env: Env): Promise<void> {
   }
 }
 
+/**
+ * دورةُ التقرير — **أسبوعيّة، وتكتب مرّةً لا تُعيد الحساب.**
+ *
+ * وعطلُها لا يُرمى كسابقتها: دورةٌ تسقط لا تُفسد نشرا، ومفتاحُ الأسبوع
+ * يجعل الدورةَ التالية تكتب ما فات إن كان في مدّته — وإلّا بقي أسبوعٌ
+ * بلا تقرير، **وغيابُه يُرى في القائمة** (D-058).
+ */
+async function reportTick(env: Env): Promise<void> {
+  try {
+    const out = await runWeekly(env.DB, new Date())
+    if (out.written) {
+      console.log({
+        job: 'report', week: out.id,
+        published: out.report.published, measured: out.report.measured,
+        promotion: out.promotion.kind,
+      })
+    }
+  } catch (error) {
+    console.log({ job: 'report', failed: String(error) })
+  }
+}
+
 /** جدولُ المسح — يُعرَّف هنا وفي `wrangler.toml`، ويُقارَن نصّا. */
 const SCAN_CRON = '0 3 * * *'
 
@@ -528,6 +551,18 @@ const SCAN_CRON = '0 3 * * *'
  * دقائقَ تفرّقها بلا أثرٍ على المعنى.
  */
 const METRICS_CRON = '7 * * * *'
+
+/**
+ * جدولُ التقرير — **الاثنينُ فجرا، بعد أن تكون نوافذُ الأسبوع قد قِيست.**
+ *
+ * والاثنينُ لأنّ الأسبوع يُغلَق عليه (`weekBounds`)، والرابعةَ عشرةَ
+ * دقيقةً بعد الرابعة لا عند الصفر: **عند الصفر تلتقي الجداولُ فتزدحم**،
+ * وإزاحةٌ تفرّقها بلا أثرٍ على المعنى — كما فُعل بجدول القياس.
+ *
+ * وبعد الثالثة فجرا عمدا: المسحُ اليوميّ يسبقه، ودورةُ القياس السابقة
+ * تكون قد ختمت نوافذَ آخرِ يومٍ في الأسبوع.
+ */
+const REPORT_CRON = '14 4 * * 1' 
 
 /**
  * موزّعُ الدورات — **والإرسالُ يقع في كلّ دورة، لا في دورةٍ نعرفها.**
@@ -548,6 +583,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   await dispatchTick(env)
   if (controller.cron === SCAN_CRON) await scanTick(env)
   if (controller.cron === METRICS_CRON) await metricsTick(env)
+  if (controller.cron === REPORT_CRON) await reportTick(env)
 }
 
 export default { fetch: app.fetch, queue, scheduled }

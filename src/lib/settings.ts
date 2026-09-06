@@ -19,6 +19,13 @@ export interface Settings {
    * افتراضه مطفأ: إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة.
    */
   readonly autoEnqueue: boolean
+  /**
+   * سقفُ الترويج الأسبوعيّ بالدولار — **ومنه وحده يأتي مبلغُ التوصية.**
+   *
+   * وافتراضُه صفر، ومعناه **لا توصيةَ تُكتب أصلا**: رقمٌ نؤلّفه نحن
+   * رقمٌ بلا مصدر، والتوصيةُ هنا تقترح مالا لا كتابة (D-058).
+   */
+  readonly weeklyPromoCapUsd: number
 }
 
 export const DEFAULTS: Settings = {
@@ -26,15 +33,22 @@ export const DEFAULTS: Settings = {
   dailyAnalysisCap: 10,
   dailySpendCapUsd: 5,
   autoEnqueue: false,
+  weeklyPromoCapUsd: 0,
 }
 
 /** حدود ما يُقبل. الحدّ الأعلى يحرس من خطأ إصبعٍ في اللوحة. */
 export const LIMITS = {
   dailyAnalysisCap: { min: 0, max: 500 },
   dailySpendCapUsd: { min: 0, max: 100 },
+  weeklyPromoCapUsd: { min: 0, max: 500 },
 } as const
 
-export type SettingKey = 'paused' | 'daily_analysis_cap' | 'daily_spend_cap_usd' | 'auto_enqueue'
+export type SettingKey =
+  | 'paused'
+  | 'daily_analysis_cap'
+  | 'daily_spend_cap_usd'
+  | 'auto_enqueue'
+  | 'weekly_promo_cap_usd'
 
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback
@@ -71,6 +85,9 @@ export async function readSettings(db: Db): Promise<Settings> {
     autoEnqueue: map.get('auto_enqueue') === 'true',
     dailyAnalysisCap: toNumber(map.get('daily_analysis_cap'), DEFAULTS.dailyAnalysisCap, 'dailyAnalysisCap'),
     dailySpendCapUsd: toNumber(map.get('daily_spend_cap_usd'), DEFAULTS.dailySpendCapUsd, 'dailySpendCapUsd'),
+    weeklyPromoCapUsd: toNumber(
+      map.get('weekly_promo_cap_usd'), DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd',
+    ),
   }
 }
 
@@ -92,6 +109,8 @@ export async function writeSetting(
   let stored: string
   if (key === 'paused' || key === 'auto_enqueue') {
     stored = raw === 'true' ? 'true' : 'false'
+  } else if (key === 'weekly_promo_cap_usd') {
+    stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
   } else {
     const limitKey = key === 'daily_analysis_cap' ? 'dailyAnalysisCap' : 'dailySpendCapUsd'
     const fallback = key === 'daily_analysis_cap' ? DEFAULTS.dailyAnalysisCap : DEFAULTS.dailySpendCapUsd

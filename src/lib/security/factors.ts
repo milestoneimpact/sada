@@ -14,6 +14,7 @@ import { importKey, open, seal } from '../crypto'
 import { randomBytes, toBase64Url } from './bytes'
 import { digest, sameBytes } from './digest'
 import type { Db } from '../tokens'
+import { changedRows } from '../dbResult'
 
 const TOTP_CONTEXT = 'totp:secret'
 
@@ -290,9 +291,7 @@ export async function useRecoveryCode(db: Db, presented: string): Promise<boolea
     .bind(match)
     .run()
 
-  const changes = (result as { meta?: { changes?: number }; changes?: number }).meta?.changes ??
-    (result as { changes?: number }).changes
-  return changes === undefined ? true : changes > 0
+  return changedRows(result)
 }
 
 // ── الحال المجمَّع ───────────────────────────────────────────────────

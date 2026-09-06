@@ -11,6 +11,8 @@ import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { scopeSet } from '../src/lib/oauth/scopes'
 import { platformScreen } from '../src/routes/ui/platformView'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
+import { reportScreen } from '../src/routes/ui/reportView'
+import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
 import { shell } from '../src/routes/ui/shell'
 
 const now = new Date('2026-09-06T09:00:00Z')
@@ -142,4 +144,54 @@ writeFileSync(
   ),
 )
 
-console.log('رُسمت ستٌّ في /tmp')
+// ── شاشةُ التقرير: أرقامٌ حقيقيّةُ الشكل، وفراغٌ حيث لا قياس ─────────
+const reportPost = (
+  id: string, platform: 'linkedin' | 'x',
+  impressions: number | null, interactions: number,
+): ReportPost => ({
+  id, platform, text: `نصُّ المنشور ${id} — سطرٌ يُقرأ كما يُعرَض في الشاشة.`,
+  publishedAt: '2026-08-26T10:00:00.000Z', window: '24h', impressions, interactions,
+})
+
+const week = summarize(
+  [
+    reportPost('a', 'x', 4200, 96),
+    reportPost('b', 'x', 1100, 21),
+    reportPost('c', 'x', 980, 18),
+    reportPost('d', 'linkedin', null, 34),
+    reportPost('e', 'linkedin', null, 12),
+  ],
+  new Date('2026-08-24T00:00:00Z'),
+  new Date('2026-08-31T00:00:00Z'),
+  1.84,
+)
+
+const stored: StoredReport = {
+  id: '2026-08-24',
+  from: week.from,
+  to: week.to,
+  createdAt: '2026-08-31T04:14:00.000Z',
+  body: week,
+}
+
+writeFileSync(
+  '/tmp/screen-report.html',
+  page('صدى — التقرير الأسبوعيّ', reportScreen({
+    reports: [stored],
+    current: stored,
+    promoCapUsd: 20,
+    now,
+    suggestions: [
+      {
+        postId: 'a', platform: 'x',
+        text: 'نصُّ المنشور a — سطرٌ يُقرأ كما يُعرَض في الشاشة.',
+        budgetUsd: 10, currency: 'USD',
+        reason: 'تفاعلُه 96 — 4.6× وسيطَ نافذة 24h (3 منشورات). ' +
+          'والمبلغُ 10$ نصفُ سقفٍ وضعتَه (20$)، ولا يُنفَق حتّى تقبله.',
+        createdAt: '2026-08-31T04:14:00.000Z',
+      },
+    ],
+  })),
+)
+
+console.log('رُسمت سبعٌ في /tmp')
