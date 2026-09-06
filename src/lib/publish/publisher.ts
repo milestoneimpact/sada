@@ -129,7 +129,20 @@ export async function publishPost(
     return { kind: 'failed', reason: 'no_tokens', retryable: false }
   }
   if (isExpiring(tokens.expiresAt, now())) {
-    // التجديد يقع قبل الطابور لا داخله؛ هنا نعلّم ونتوقف بدل أن ننشر برمز ميت
+    /**
+     * التجديدُ يقع قبل الطابور لا داخله (D-066)، **فالوصولُ هنا يعني
+     * أنّ الدورةَ لم تُصلحه**. ويفترق الحالان:
+     *
+     * **ورمزُ تجديدٍ قائمٌ يعني عطلا عابرا** — دورةٌ سقطت، أو سرٌّ
+     * ناقص. فيُردّ **قابلا للإعادة ولا يُعلَّم الحساب**: تعليمُه
+     * `needs_reauth` يوقف نشرَه كلَّه حتّى يجلس المالكُ إليه، **وإذنٌ
+     * يُطلَب بلا حاجةٍ يُعلِّم المالكَ أن يتجاهل الطلب**.
+     *
+     * **وبلا رمزِ تجديدٍ لا سبيلَ إلّا يدُه** — فيُعلَّم ويُردّ نهائيّا.
+     */
+    if (tokens.refreshToken !== null) {
+      return { kind: 'failed', reason: 'token_expired_retry', retryable: true }
+    }
     await markNeedsReauth(db, post.account_id)
     return { kind: 'failed', reason: 'token_expired', retryable: false }
   }
