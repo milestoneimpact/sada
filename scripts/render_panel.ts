@@ -179,6 +179,11 @@ const data: PanelData = {
       dispatchedAt: ago(0.2),
     },
   ],
+  media: [
+    // معاينةٌ محلّيّة: `data:` تكفي للنظر، والحيُّ يُخدَم من `/panel/media/:id`
+    { id: 'm1', postId: 'd3', mime: 'image/svg+xml', bytes: 148_320, cost: 0.039, status: 'ready' },
+    { id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected' },
+  ],
   targets: [
     { id: 'a1', platform: 'linkedin', label: 'عمر عبدالحميد · LinkedIn' },
     { id: 'a2', platform: 'linkedin', label: 'بصائر للاستشارات · LinkedIn' },

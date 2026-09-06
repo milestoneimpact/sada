@@ -89,6 +89,29 @@ export async function publishPost(
     return { kind: 'skipped_duplicate', platformPostId: done.platform_post_id ?? '' }
   }
 
+  /**
+   * صورةٌ لم يُبنَ رفعُها بعد (D-039).
+   *
+   * **ولا يُنشر النصُّ وحده.** المالك اعتمد منشورا بصورة، ونشرُه بلا
+   * صورته نشرٌ لشيءٍ لم يعتمده — والفرقُ لا يُرى في اللوحة، فيُكتشَف على
+   * المنصّة بعد أن يقرأه الناس.
+   *
+   * والحارسُ هنا لا في الجدولة وحدها: الجدولةُ تعطي سببا يُقرأ مبكّرا،
+   * وهذا يمنع فعلا — ورسالةٌ دخلت الطابور قبل بناء الرفع تجده قائما.
+   */
+  const pending = await db
+    .prepare("SELECT count(*) AS n FROM media WHERE post_id = ? AND status = 'ready'")
+    .bind(post.id)
+    .first<{ n: number }>()
+    .catch(() => null)
+  if ((pending?.n ?? 0) > 0) {
+    return {
+      kind: 'failed',
+      reason: 'media_upload_not_built',
+      retryable: false,
+    }
+  }
+
   const tokens = await loadTokens(db, encKey, post.account_id)
   if (tokens === null) {
     await markNeedsReauth(db, post.account_id)

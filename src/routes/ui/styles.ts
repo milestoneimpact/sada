@@ -306,6 +306,22 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
 .draft-foot .count.warn b{color:var(--warn)}
 .draft-foot .count.bad b{color:var(--bad)}
 .draft-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:auto; padding-top:3px}
+/* ── الصورة ───────────────────────────────────────────────────────────
+   تُعرض بعرض البطاقة كاملا: المالك يقرّر عليها، وقرارٌ على مربّعٍ صغير
+   ليس قرارا. و aspect-ratio مع object-fit:cover يمنعان القفزَ قبل
+   التحميل ويمنعان المطّ بعده — وصورةٌ ممطوطة تُقرأ إهمالا. */
+.pic{margin-top:10px}
+/* height:auto ضروريّةٌ لا زينة: سِمَتا width/height على الوسم تُترجَمان
+   إلى CSS بأولويّةٍ دنيا، فـ width:100% تغلب الأولى **ولا شيء يغلب
+   الثانية** — فيبقى الارتفاع 628px والعرض عرضَ البطاقة، وتخرج الصورة
+   ممطوطةً طولا. علّةٌ رأيتُها ولم يمسكها اختبار. */
+.pic img{display:block; width:100%; height:auto; aspect-ratio:1.91/1; object-fit:cover;
+  border-radius:var(--r); border:1px solid var(--line); background:var(--surface-2)}
+.pic-foot{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px}
+.pic.none{display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  padding:11px 13px; border-radius:var(--r); background:var(--surface-2);
+  border:1px dashed var(--line)}
+.pic.none .ago{flex:1 1 200px}
 /* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
    ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
 .sched{display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:10px;

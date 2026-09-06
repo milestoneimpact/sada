@@ -106,7 +106,58 @@ function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, no
   </form>`
 }
 
-function card(d: DraftRow, now: Date, targets: readonly Target[], earliest: string): string {
+/**
+ * لوحُ الصورة.
+ *
+ * ثلاثةُ أحوال: بلا صورةٍ فزرُّ توليد، وبصورةٍ فمعاينةٌ وزرُّ رفض،
+ * ومرفوضةٌ فأثرٌ يبقى بكلفته.
+ *
+ * **والصورةُ تُعرض بحجمها الحقيقيّ لا مصغَّرةً بعشرين بكسلا**: المالك
+ * يقرّر عليها، وقرارٌ على مربّعٍ صغير ليس قرارا.
+ */
+function imagePane(d: DraftRow, media: readonly MediaView[]): string {
+  const open = d.status === 'draft' || d.status === 'approved' || d.status === 'edited'
+  const mine = media.filter((m) => m.postId === d.id)
+  const ready = mine.find((m) => m.status === 'ready')
+
+  if (ready !== undefined) {
+    return `<div class="pic">
+      <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
+        loading="lazy" width="1200" height="628">
+      <div class="pic-foot">
+        <span class="chip mono">${Math.round(ready.bytes / 1024)}KB</span>
+        <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>
+        <span class="grow"></span>
+        ${open
+          ? `<form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
+               <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
+               <button class="g sm" type="submit">ارفض الصورة</button></form>`
+          : ''}
+      </div>
+    </div>`
+  }
+
+  const rejected = mine.filter((m) => m.status === 'rejected').length
+  if (!open) return ''
+
+  return `<div class="pic none">
+    <span class="st idle"><span class="g">○</span>${
+      rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}</span>
+    <span class="ago">صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.</span>
+    <span class="grow"></span>
+    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
+      <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+      <button class="g sm" type="submit">ولّد صورة</button></form>
+  </div>`
+}
+
+function card(
+  d: DraftRow,
+  now: Date,
+  targets: readonly Target[],
+  earliest: string,
+  media: readonly MediaView[],
+): string {
   const spec = PLATFORMS[d.platform]
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
   // شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا
@@ -167,6 +218,7 @@ function card(d: DraftRow, now: Date, targets: readonly Target[], earliest: stri
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
+    ${imagePane(d, media)}
     ${scheduler(d, targets, earliest, now)}
     <div class="draft-meta">${meta}</div>
   </div>`
@@ -179,8 +231,19 @@ export interface Target {
   readonly label: string
 }
 
+/** صورةٌ مولَّدة كما تُعرض — بلا بايتات، فالبايتاتُ خلف `/panel/media/:id`. */
+export interface MediaView {
+  readonly id: string
+  readonly postId: string
+  readonly mime: string
+  readonly bytes: number
+  readonly cost: number
+  readonly status: 'ready' | 'rejected'
+}
+
 export interface DraftsInput {
   readonly drafts: readonly DraftRow[]
+  readonly media: readonly MediaView[]
   /** الوجهاتُ الحيّة: مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
   /** «الآن» بصيغة نموذج datetime-local — أدنى موعدٍ يُقبل. */
@@ -225,7 +288,7 @@ export function draftsSection(input: DraftsInput): string {
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
       : `<div class="grid c2 ragged">${drafts
-          .map((d) => card(d, now, input.targets, input.earliest))
+          .map((d) => card(d, now, input.targets, input.earliest, input.media))
           .join('')}</div>`
 
   return `<div class="card" style="margin-bottom:14px">

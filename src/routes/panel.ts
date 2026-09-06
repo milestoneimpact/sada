@@ -27,6 +27,7 @@ import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
+import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
@@ -271,6 +272,7 @@ panel.get('/panel', async (c) => {
   )
   const routes = await readRoutes(c.env.DB)
   const drafts = await listDrafts(c.env.DB, 60)
+  const media = await mediaFor(c.env.DB, drafts.map((d) => d.id))
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
@@ -305,6 +307,14 @@ panel.get('/panel', async (c) => {
       })),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       drafts,
+      media: media.map((m) => ({
+        id: m.id,
+        postId: m.postId,
+        mime: m.mime,
+        bytes: m.bytes,
+        cost: m.cost,
+        status: m.status,
+      })),
       // الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
       // في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا
       targets: channels.flatMap((c) =>
@@ -635,6 +645,103 @@ panel.post('/panel/analyze', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('sources')
+})
+
+// ── الصور ────────────────────────────────────────────────────────────
+
+/**
+ * توليدُ صورةٍ لمنشور.
+ *
+ * يمرّ بـ `generateForPost` نفسه — بسقوفه وإيقافه وسقفِ مزوّده. **وهو
+ * نداءٌ مدفوعٌ بضغطة**، فالزرُّ يُعطَّل بعد الأولى ومفتاحُ عدم التكرار
+ * يمنع الثانية إن سبقت.
+ */
+panel.post('/panel/media/generate', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+
+  const outcome = await generateForPost(
+    {
+      db: c.env.DB,
+      bucket: c.env.MEDIA,
+      encKey: c.env.TOKEN_ENC_KEY,
+      workerSecrets: c.env as unknown as Record<string, string | undefined>,
+    },
+    id,
+  )
+
+  const flash: PanelFlash =
+    outcome.kind === 'generated'
+      ? {
+          kind: 'ok',
+          text: `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.`,
+        }
+      : outcome.kind === 'already'
+        ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }
+        : outcome.kind === 'blocked'
+          ? { kind: 'warn', text: outcome.reason }
+          : { kind: 'bad', text: `تعذّر التوليد: ${outcome.reason}` }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'media.generate', target: id, detail: outcome.kind },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/** رفضُ صورة — تبقى بكلفتها ولا تُحذف بايتاتُها. */
+panel.post('/panel/media/reject', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+
+  const done = await rejectMedia(c.env.DB, id)
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'media.reject', target: id, detail: done ? 'rejected' : 'refused' },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, {
+    kind: done ? 'ok' : 'bad',
+    text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورةَ بهذه الحال.',
+  })
+  return back('posts')
+})
+
+/**
+ * تسليمُ بايتات الصورة — **خلف الجلسة**.
+ *
+ * R2 ليس له عنوانٌ عامّ هنا، وهذا مقصود: صورةٌ لمنشورٍ لم يُنشر بعد
+ * تكشف ما يُعدّه المالك قبل أن يعلنه. فتُقرأ من الدلو ويُسلَّمها من
+ * يملك جلسةً، ولا رابطَ يُشارَك.
+ *
+ * والمفتاحُ يُقرأ من القاعدة لا من المسار: مسارٌ يُبنى من مدخلٍ يفتح
+ * الدلوَ كلَّه لمن يخمّن مفتاحا.
+ */
+panel.get('/panel/media/:id', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
+
+  const row = await c.env.DB
+    .prepare('SELECT r2_key, mime FROM media WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ r2_key: string; mime: string }>()
+  if (row === null) return c.text('لا صورة', 404)
+
+  const object = await c.env.MEDIA.get(row.r2_key)
+  if (object === null) return c.text('البايتات مفقودة', 404)
+
+  return new Response(await object.arrayBuffer(), {
+    headers: {
+      'Content-Type': row.mime,
+      // خاصّةٌ لا عامّة: وسيطٌ مشترك لا يخزّن ما يخصّ جلسة
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
 })
 
 // ── الكتابة والبَتّ ──────────────────────────────────────────────────

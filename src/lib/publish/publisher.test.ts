@@ -248,3 +248,32 @@ describe('الفشل', () => {
     expect(outcome).toMatchObject({ kind: 'failed', reason: 'post_not_found', retryable: false })
   })
 })
+
+/**
+ * الحارسُ الأخير: منشورٌ بصورةٍ لم يُبنَ رفعُها لا يُنشر نصّا وحده.
+ *
+ * والجدولةُ تمنعه قبل ذلك — لكنّ رسالةً دخلت الطابور قبل أن يُبنى هذا
+ * تجده قائما. **وحارسان في طبقتين خيرٌ من واحدٍ في الأعلى.**
+ */
+describe('منشورٌ بصورة (D-039)', () => {
+  it('لا يُنشر، ولا يُرسَل طلبٌ إلى المنصّة', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
+         VALUES (?, ?, ?, 'image/png', 100, 'وصف', 'gemini', ?)`,
+      )
+      .bind(crypto.randomUUID(), postId, `img/${postId}/a.png`, `image:${postId}:aa`)
+      .run()
+
+    const f = fakeFetch(X_OK)
+    const outcome = await publishPost(deps(f), { postId })
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') {
+      expect(outcome.reason).toBe('media_upload_not_built')
+      // ولا يُعاد: بناءُ الرفع لا يقع بإعادة المحاولة
+      expect(outcome.retryable).toBe(false)
+    }
+    expect(f.calls).toHaveLength(0)
+  })
+})
