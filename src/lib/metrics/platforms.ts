@@ -28,10 +28,6 @@ export interface PostMetrics {
   readonly clicks: number | null
 }
 
-export const NO_METRICS: PostMetrics = {
-  impressions: null, reactions: null, comments: null, shares: null, clicks: null,
-}
-
 export class MetricsError extends Error {
   override readonly name = 'MetricsError'
   constructor(

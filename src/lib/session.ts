@@ -284,15 +284,6 @@ export async function loadSession(
   return { id, record }
 }
 
-/** ما تحتاجه المسارات التي لا تعنيها تفاصيل الجلسة. */
-export async function validSession(
-  store: SessionStore,
-  request: Request,
-  adminToken: string | undefined,
-): Promise<boolean> {
-  return (await loadSession(store, request, adminToken)) !== null
-}
-
 export async function destroySession(store: SessionStore, request: Request): Promise<void> {
   const id = readCookie(request.headers.get('Cookie'), COOKIE)
   if (id !== null) await store.delete(sessionKey(id))

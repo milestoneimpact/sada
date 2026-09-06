@@ -21,7 +21,7 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes } from '../ai/routes'
+import { routeFor } from '../ai/routes'
 import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
 import type { Db } from '../tokens'
@@ -141,9 +141,7 @@ export async function draftPost(
   }
 
   // المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const routes = await readRoutes(deps.db)
-  const route = routes.find((r) => r.task === 'draft')
-  if (route === undefined) return { kind: 'failed', reason: 'لا توجيه لمهمّة الكتابة', retryable: false }
+  const route = await routeFor(deps.db, 'draft')
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {

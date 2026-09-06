@@ -54,14 +54,6 @@ export function estimatePostCost(platform: 'linkedin' | 'x', hasUrl: boolean): n
   return hasUrl ? X_PRICE_PER_POST_WITH_URL : X_PRICE_PER_POST
 }
 
-/**
- * تكلفة ثريد: كل منشور فيه طلبٌ يُحاسَب على حدة، لا الثريد كوحدة
- * (PLATFORMS.md §نتائج ١).
- */
-export function estimateThreadCost(texts: readonly string[], hasUrl: (t: string) => boolean): number {
-  return texts.reduce((total, text) => total + estimatePostCost('x', hasUrl(text)), 0)
-}
-
 export async function recordCost(db: Db, entry: CostEntry): Promise<string> {
   const id = crypto.randomUUID()
   const total = entry.units * entry.unitCost

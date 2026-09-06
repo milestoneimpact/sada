@@ -264,6 +264,11 @@ const data: PanelData = {
       verifiedAt: null, verifiedKind: null,
     },
   ],
+  // ما زادته القراراتُ الأخيرة — **ويُرسَم ليُقاس**
+  openSuggestions: 2,      // D-058
+  promoCap: 50,            // D-062
+  ownerPending: 4,         // D-063
+  cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
 }
 
 writeFileSync(process.argv[2] ?? '/tmp/panel.html', panelPage(data))

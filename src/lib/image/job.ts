@@ -22,7 +22,7 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes } from '../ai/routes'
+import { routeFor } from '../ai/routes'
 import { generateImage } from './gemini'
 import { imagePrompt, topicOf } from './prompt'
 import type { Platform } from '../draft/prompt'
@@ -108,11 +108,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
-  const routes = await readRoutes(deps.db)
-  const route = routes.find((r) => r.task === 'image')
-  if (route === undefined) {
-    return { kind: 'failed', reason: 'لا توجيه لمهمّة الصور', retryable: false }
-  }
+  const route = await routeFor(deps.db, 'image')
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {

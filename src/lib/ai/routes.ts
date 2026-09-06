@@ -45,6 +45,17 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
   })
 }
 
+/**
+ * توجيهُ مهمّةٍ واحدة — **ولا يعود فارغا**.
+ *
+ * كانت المهامُّ الثلاث تقرأ الجدول كلَّه ثمّ تبحث فيه، وكلُّ واحدةٍ تحمل
+ * فرعا لِـ «لا توجيه لهذه المهمّة» **لا يقع أبدا**: `readRoutes` تُسقِط
+ * على مفاتيح `ROUTES` كلِّها، فكلُّ `TaskName` فيها بالضرورة. وفرعٌ لا
+ * يقع لا يُختبَر، ومَن قرأه ظنّ الحالةَ ممكنةً فاحتاط لها في موضعٍ آخر.
+ *
+ * فالنوعُ هنا يقول الحقيقة: توجيهٌ دائما، من اللوحة إن كُتب ومن الشيفرة
+ * إن لم يُكتَب.
+ */
 export async function routeFor(db: Db, task: TaskName): Promise<{ provider: string; model: string }> {
   const routes = await readRoutes(db)
   const found = routes.find((r) => r.task === task)

@@ -12,7 +12,6 @@ import {
   revokeSessions,
   sessionCookie,
   SESSION_TTL_SECONDS,
-  validSession,
 } from './session'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
@@ -102,7 +101,20 @@ describe('createSession', () => {
   })
 })
 
-describe('validSession', () => {
+/**
+ * ما كان `validSession` في الشيفرة، وصار هنا.
+ *
+ * كان غلافا مُصدَّرا لا ينادِيه مسار: كلُّ مسارٍ يستعمل `loadSession`
+ * لأنّه يحتاج الجلسةَ نفسَها لا خبرَ وجودها. فحُذف الغلافُ وبقيت
+ * أسئلتُه — وهي عن `loadSession` أصلا لا عنه.
+ */
+const validSession = async (
+  store: Parameters<typeof loadSession>[0],
+  request: Request,
+  adminToken: string | undefined,
+): Promise<boolean> => (await loadSession(store, request, adminToken)) !== null
+
+describe('صلاحيّةُ الجلسة', () => {
   it('كعكة جلسةٍ قائمة تُقبل', async () => {
     const id = await open()
     expect(await validSession(kv, withCookie(`${COOKIE}=${id}`), TOKEN)).toBe(true)

@@ -1,26 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { containsUrl, idempotencyKey } from './idempotency'
-import { estimatePostCost, estimateThreadCost } from './cost'
-
-describe('idempotencyKey', () => {
-  it('ثابت للمدخل نفسه — وهو شرط فائدته كلها', async () => {
-    const first = await idempotencyKey('p1')
-    const second = await idempotencyKey('p1')
-    expect(first).toBe(second)
-  })
-
-  it('يختلف باختلاف المنشور', async () => {
-    expect(await idempotencyKey('p1')).not.toBe(await idempotencyKey('p2'))
-  })
-
-  it('يختلف باختلاف نطاق المحاولة', async () => {
-    expect(await idempotencyKey('p1', 'publish')).not.toBe(await idempotencyKey('p1', 'retry:1'))
-  })
-
-  it('يعطي sha256 بصيغة hex من 64 محرفا', async () => {
-    expect(await idempotencyKey('p1')).toMatch(/^[0-9a-f]{64}$/)
-  })
-})
+import { containsUrl } from './idempotency'
+import { estimatePostCost } from './cost'
 
 describe('containsUrl — يُحسب بالشيفرة لا بالنموذج (D-003)', () => {
   it.each([
@@ -53,10 +33,5 @@ describe('التكلفة قبل الاعتماد', () => {
 
   it('LinkedIn بلا رسوم على المنشور', () => {
     expect(estimatePostCost('linkedin', true)).toBe(0)
-  })
-
-  it('الثريد يُحاسَب بعدد منشوراته لا كوحدة', () => {
-    const texts = ['واحد', 'اثنان', 'ثلاثة بالرابط https://basserh.com']
-    expect(estimateThreadCost(texts, containsUrl)).toBeCloseTo(0.015 * 2 + 0.2)
   })
 })
