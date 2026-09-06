@@ -11,7 +11,7 @@ import { toBase64 } from '../crypto'
 import { writeSetting } from '../settings'
 import { verifyMediaToken } from './link'
 import { VIDEO_MODELS, type AiBinding } from './workersAi'
-import { animateForPost } from './video'
+import { animateForPost, pickBinding } from './video'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const BASE = 'https://sada2.basserh.com'
@@ -242,5 +242,34 @@ describe('الفشلُ لا يترك صفّا يكذب', () => {
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(deps(ai({ state: 'Running' })), 'p1')
     expect(out).toMatchObject({ kind: 'failed', retryable: true })
+  })
+})
+
+describe('اختيارُ الوجه — والرابطُ يُفضَّل متى بلغ', () => {
+  const binding: AiBinding = { async run() { return {} } }
+
+  /** مَن جمع الحسابين حذف السرَّ من نظامه. */
+  it('بلا حسابٍ ثانٍ يُختار الرابط — ولا سرَّ يُدوَّر', () => {
+    expect(pickBinding({ AI: binding })).toBe(binding)
+  })
+
+  /** والرابطُ يبلغ حسابَ الـ Worker وحده، فحسابٌ آخر يوجب REST. */
+  it('وبحسابٍ ثانٍ ورمزٍ يُختار REST ولو وُجد الرابط', () => {
+    const picked = pickBinding({
+      AI: binding, CF_AI_ACCOUNT_ID: 'acc', CF_AI_TOKEN: 'tok',
+    })
+    expect(picked).toBeDefined()
+    expect(picked).not.toBe(binding)
+  })
+
+  it('وضبطٌ ناقصٌ يعود إلى الرابط — ولا يُنادى بنصفِ ضبط', () => {
+    expect(pickBinding({ AI: binding, CF_AI_ACCOUNT_ID: 'acc' })).toBe(binding)
+    expect(pickBinding({ AI: binding, CF_AI_TOKEN: 'tok' })).toBe(binding)
+    // وفراغٌ بمسافاتٍ ليس ضبطا
+    expect(pickBinding({ AI: binding, CF_AI_ACCOUNT_ID: '  ', CF_AI_TOKEN: ' ' })).toBe(binding)
+  })
+
+  it('وبلا شيءٍ لا وجه', () => {
+    expect(pickBinding({})).toBeUndefined()
   })
 })

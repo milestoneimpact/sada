@@ -28,7 +28,7 @@ body{
      عربيّةَ فيه، فيأخذ اللاتينيَّ والرقمَ ويسقط إلى Tajawal في
      العربيّة. ولو قُدّم Tajawal لأخذ اللاتينيَّ أيضا — وهو ليس
      أحسنَ فيه، والمعرّفاتُ عندنا لاتينيّةٌ كثيرة. */
-  font-family:"Inter","Tajawal",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-family:"Inter","Beiruti",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
   font-feature-settings:"kern" 1;
   /* أوزانٌ محمّلةٌ فعلا: 400 · 500 · 600 · 700. وطلبُ 650 أو 800 من خطٍّ
@@ -46,7 +46,7 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
    طبقتان: خطٌّ بلون الهويّة وحلقةٌ بلون السطح تحته. فعلى أرضٍ داكنةٍ
    يُرى التركواز، وعليه نفسِه — زرٌّ أوّليٌّ مثلا — تُرى الحلقة. وحلقةٌ بلونٍ واحد
    تختفي على ما يوافقها، وهو أكثرُ ما يقع على الأزرار الأوّليّة. */
-:focus-visible{outline:2px solid var(--brand); outline-offset:2px; border-radius:6px;
+:focus-visible{outline:2px solid var(--au); outline-offset:2px; border-radius:6px;
   box-shadow:0 0 0 4px var(--surface)}
 
 /* التحديدُ بالهويّة: تفصيلٌ يُرى في كلّ نسخةٍ ولصق */
@@ -90,16 +90,20 @@ h1,h2,h3{margin:0}
 /* خيطٌ بلون الهويّة على الحافّة الداخليّة — الحدُّ الرماديُّ وحده يفصل، وهذا
    **يقول أيُّ الجهتين هي البيت**. ويخفت نزولا فلا يصير خطّا مرسوما. */
 .rail::after{content:''; position:absolute; inset-block:0; inset-inline-end:0; width:1px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 55%,transparent),transparent 46%);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--au) 60%,transparent),transparent 46%);
   pointer-events:none}
 .rail-head{padding:22px 20px 18px; display:flex; align-items:center; gap:12px}
 /* ── العلامة ──────────────────────────────────────────────────────────
    الأقواسُ نفسها التي في رمز التبويب، مرسومةً لا مكتوبة. وكانت مربّعا
    فيه «صدى» بخمسةَ عشرَ بكسلا: **الحرفان يزدحمان في ستٍّ وثلاثين**،
    فيُقرأ المربّعُ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب. */
+/* والعلامةُ وحدها تجمع اللونين: زمرّدٌ يتحوّل ذهبا — ولا يتكرّر هذا
+   الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها */
 .glyph{width:38px; height:38px; border-radius:11px; display:grid; place-items:center; flex:none;
-  background:linear-gradient(150deg,var(--brand-soft),var(--brand-deep)); color:var(--on-brand);
-  box-shadow:var(--sh-1), inset 0 1px 0 rgba(255,255,255,.28)}
+  background:linear-gradient(145deg,var(--brand-soft) 0%,var(--brand) 45%,var(--au) 100%);
+  color:var(--on-brand);
+  box-shadow:var(--sh-1), inset 0 1px 0 rgba(255,255,255,.28),
+    0 0 0 1px color-mix(in srgb,var(--au) 24%,transparent)}
 /* نسبةٌ لا قياسٌ ثابت: العلامةُ نفسها تظهر بـ 38 في الرافدة و 50 في
    شاشة الدخول و 38 في الوثائق — وقياسٌ ثابتٌ يجعلها تسبح في الأكبر. */
 .glyph svg{width:56%; height:56%; display:block}
@@ -192,10 +196,13 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .page-head{display:flex; align-items:flex-end; gap:var(--s-5); flex-wrap:wrap;
   margin:var(--s-2) 0 var(--s-6)}
 .page-head .txt{min-width:0; flex:1 1 340px}
+/* ── الذهبُ يُقتَّر ولا يُسكَب ─────────────────────────────────────────
+   خيوطٌ وحوافُّ وعلاماتٌ صغيرة، لا أرضيّاتٌ ولا أزرارٌ ممتلئة. وذهبٌ
+   يُملأ به سطحٌ يُقرأ رخيصا، وخيطٌ منه على حافّةٍ يُقرأ صنعة. */
 .eyebrow{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-xs);
-  font-weight:700; color:var(--brand); margin-bottom:var(--s-2)}
-.eyebrow .ln{height:1px; width:26px; flex:none;
-  background:linear-gradient(90deg,var(--brand),transparent)}
+  font-weight:700; color:var(--au); margin-bottom:var(--s-2)}
+.eyebrow .ln{height:1px; width:30px; flex:none;
+  background:linear-gradient(90deg,var(--au),transparent)}
 .page-head h1{font-size:var(--t-display); font-weight:700; line-height:1.2;
   letter-spacing:-.9px; margin:0}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
@@ -276,14 +283,15 @@ h3.sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-2); letter-spacin
   margin:var(--s-8) 0 var(--s-3); padding-bottom:var(--s-2);
   border-bottom:1px solid var(--line-soft); position:relative}
 h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; width:34px;
-  height:2px; border-radius:99px; background:var(--brand)}
+  height:2px; border-radius:99px;
+  background:linear-gradient(90deg,var(--au),color-mix(in srgb,var(--au) 20%,transparent))}
 
 /* ── بطاقةُ المؤشّر ────────────────────────────────────────── */
 .tile{display:flex; flex-direction:column; position:relative; overflow:hidden}
 /* خيطٌ بلون الهويّة على رأس المؤشّر — يربط الأربعةَ بعضَها ببعضٍ فتُقرأ صفّا
    واحدا، ويميّزها عن بطاقات المحتوى تحتها. */
 .tile::before{content:''; position:absolute; inset-inline:0; top:0; height:2px;
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--brand) 70%,transparent),transparent)}
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--au) 75%,transparent),transparent)}
 .tile .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3); letter-spacing:.4px}
 .tile .v{font-size:var(--t-display); font-weight:700; line-height:1.12; letter-spacing:-1.4px;
   font-variant-numeric:tabular-nums; margin-top:6px;
@@ -291,6 +299,9 @@ h3.sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; 
   direction:ltr; unicode-bidi:isolate; text-align:right}
 .tile .v em{font-style:normal; font-size:14px; font-weight:600; color:var(--ink-3);
   letter-spacing:0; margin-inline-start:2px}
+/* والمؤشّرُ الأوّل وحده يأخذ الذهبَ في رقمه: ندرةٌ تصنع مرتبة، وذهبٌ
+   على الأربعة يُلغي معنى الأوّل */
+.grid.c4>.tile:first-child .v{color:var(--au)}
 .tile .n{font-size:11.5px; color:var(--ink-3); margin-top:9px}
 
 /* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه
@@ -409,6 +420,7 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 .split p{margin:0; font-size:12.5px; color:var(--ink-3); max-width:60ch; line-height:1.7}
 hr{border:0; border-top:1px solid var(--line-soft); margin:16px 0}
 footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
+  border-image:linear-gradient(90deg,color-mix(in srgb,var(--au) 34%,transparent),transparent) 1;
   color:var(--ink-3); font-size:11.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
 
 /* ── ما ينتظرك ─────────────────────────────────────────────── */
@@ -479,7 +491,7 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
   background:var(--surface-2); overflow:hidden; position:relative}
 /* رافدةُ الهويّة: تفصل الدليلَ عمّا حوله بلا حدٍّ ثخينٍ يحبسه */
 .guide::before{content:''; position:absolute; inset-block:0; inset-inline-start:0; width:3px;
-  background:linear-gradient(180deg,var(--brand),color-mix(in srgb,var(--brand) 18%,transparent))}
+  background:linear-gradient(180deg,var(--au),color-mix(in srgb,var(--brand) 22%,transparent))}
 .guide>summary{cursor:pointer; list-style:none; display:flex; align-items:center;
   gap:var(--s-3); padding:var(--s-3) var(--s-5); min-height:56px}
 .guide>summary::-webkit-details-marker{display:none}

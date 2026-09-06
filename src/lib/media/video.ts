@@ -27,7 +27,8 @@ import { recordCost } from '../cost'
 import { blockerReason, checkAllowance } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
 import {
-  AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, type AiBinding,
+  AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
+  type AiBinding,
 } from './workersAi'
 import type { Db } from '../tokens'
 
@@ -41,6 +42,28 @@ export type VideoOutcome =
   /** حرسٌ منع النداء قبل أن يقع: إيقافٌ أو سقف. */
   | { readonly kind: 'blocked'; readonly reason: string }
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean }
+
+/**
+ * أيُّ وجهٍ يُنادى — والرابطُ يُفضَّل متى بلغ.
+ *
+ * `env.AI` يبلغ حسابَ الـ Worker وحده. فإن كان حسابُ Workers AI غيرَه
+ * — وهو حالُ المالك — **فالرابطُ لا يبلغه مهما ضُبط**، ويُنادى بـ REST.
+ *
+ * ويُفضَّل الرابطُ حيث يصحّ: **مَن جمع الحسابين حذف السرَّ من نظامه**،
+ * فلا يُخزَّن ولا يُدوَّر ولا يُسرَّب.
+ */
+export function pickBinding(env: {
+  AI?: AiBinding
+  CF_AI_ACCOUNT_ID?: string
+  CF_AI_TOKEN?: string
+}, fetchImpl?: typeof fetch): AiBinding | undefined {
+  const account = (env.CF_AI_ACCOUNT_ID ?? '').trim()
+  const token = (env.CF_AI_TOKEN ?? '').trim()
+  if (account.length > 0 && token.length > 0) {
+    return restBinding(account, token, fetchImpl ?? fetch)
+  }
+  return env.AI
+}
 
 export interface VideoDeps {
   readonly db: Db

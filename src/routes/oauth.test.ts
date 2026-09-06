@@ -206,6 +206,72 @@ describe('GET /oauth/:platform/callback', () => {
     expect(body).toContain('لا تُعِد توليدَ السرّ')
   })
 
+  /**
+   * **الحالةُ التي وقعت فعلا.**
+   *
+   * أضاف المالكُ «Share on LinkedIn» فمُنح `w_member_social`، ولم يُضِف
+   * «Sign In with LinkedIn using OpenID Connect» — فردّت المنصّةُ
+   * بالاسم في `error_description`. وكانت الصفحةُ تعرض الثلاثةَ وتقول
+   * «لا أعرف أيَّها» — وهي تعرف.
+   */
+  it('يسمّي النطاقَ الذي سمّته المنصّةُ وحدَه، ولا يعرض الثلاثة', async () => {
+    const { state } = await startAndCaptureState('linkedin')
+    const description = encodeURIComponent(
+      'Scope "openid" is not authorized for your application',
+    )
+    const response = await app.request(
+      `/oauth/linkedin/callback?error=unauthorized_scope_error` +
+        `&error_description=${description}&state=${encodeURIComponent(state)}`,
+      {},
+      env,
+    )
+    const body = await response.text()
+
+    expect(body).toContain('openid')
+    expect(body).toContain('Sign In with LinkedIn using OpenID Connect')
+    // العنوانُ نفسه يتبدّل: «النطاقُ الناقص» لا «ما طُلب في هذه المحاولة»
+    expect(body).toContain('النطاقُ الناقص ومَن يمنحه')
+    expect(body).not.toContain('ما طُلب في هذه المحاولة')
+    // وجدولُ الاتّهام صفٌّ واحد: صفوفُه تحمل «يُمنَح فورا» في عمود المصدر
+    const rows = body.split('<tr>').length - 1
+    expect(rows).toBe(2) // ترويسةٌ وصفٌّ واحد
+  })
+
+  /**
+   * ونطاقُ الهويّة إن كان هو الناقصَ **أسقط مخرجَ الهويّة**: زرٌّ يطلب
+   * ما رُفض بعينه يَعِد بما لا يقع.
+   */
+  it('ولا يعرض «اربط الهويّة وحدها» حين يكون الناقصُ نطاقَ الهويّة', async () => {
+    const { state } = await startAndCaptureState('linkedin')
+    const description = encodeURIComponent('Scope "openid" is not authorized')
+    const response = await app.request(
+      `/oauth/linkedin/callback?error=unauthorized_scope_error` +
+        `&error_description=${description}&state=${encodeURIComponent(state)}`,
+      {},
+      env,
+    )
+    const body = await response.text()
+    expect(body).not.toContain('scope=identity')
+    expect(body).toContain('لا يفيدك ربطُ الهويّة وحدها')
+  })
+
+  it('ووصفٌ لا يسمّي شيئا يعيد عرضَ القائمة كاملةً', async () => {
+    const { state } = await startAndCaptureState('linkedin')
+    const response = await app.request(
+      `/oauth/linkedin/callback?error=unauthorized_scope_error` +
+        `&error_description=${encodeURIComponent('Your app lacks a product.')}` +
+        `&state=${encodeURIComponent(state)}`,
+      {},
+      env,
+    )
+    const body = await response.text()
+    expect(body).toContain('w_member_social')
+    expect(body).toContain('openid')
+    expect(body).toContain('ما طُلب في هذه المحاولة')
+    const rows = body.split('<tr>').length - 1
+    expect(rows).toBe(4) // ترويسةٌ وثلاثةُ نطاقات
+  })
+
   it('ولا يُعرَض مخرجُ الهويّة إن كانت هي التي رُفضت', async () => {
     const { state } = await startAndCaptureState('linkedin', 'identity')
     const response = await app.request(

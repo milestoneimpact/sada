@@ -7,7 +7,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   AiError, IMAGE_MODELS, MAX_SECONDS, MIN_SECONDS, VIDEO_MODELS,
-  clampDuration, fetchVideoBytes, generateImage, generateVideo, type AiBinding,
+  clampDuration, fetchVideoBytes, generateImage, generateVideo, restBinding,
+  type AiBinding,
 } from './workersAi'
 
 function ai(reply: unknown | ((m: string, i: Record<string, unknown>) => unknown)): AiBinding & {
@@ -175,5 +176,72 @@ describe('السجلّ', () => {
     for (const name of [...Object.values(IMAGE_MODELS), ...Object.values(VIDEO_MODELS)]) {
       expect(name.length).toBeGreaterThan(4)
     }
+  })
+})
+
+describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () => {
+  const seen: { url: string; auth: string; body: string }[] = []
+  const stub = (
+    reply: { status?: number; json?: unknown; bytes?: Uint8Array },
+  ): typeof fetch =>
+    (async (input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push({
+        url: String(input),
+        auth: String((init?.headers as Record<string, string>)?.['Authorization'] ?? ''),
+        body: String(init?.body ?? ''),
+      })
+      if (reply.bytes !== undefined) {
+        return new Response(reply.bytes as unknown as BodyInit, {
+          status: reply.status ?? 200,
+          headers: { 'Content-Type': 'image/png' },
+        })
+      }
+      return new Response(JSON.stringify(reply.json ?? {}), {
+        status: reply.status ?? 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as unknown as typeof fetch
+
+  it('ينادي حسابا بعينه ويحمل الرمزَ في الترويسة وحدها', async () => {
+    seen.length = 0
+    const ai = restBinding('acc-1', 'tok-1', stub({ json: { success: true, result: { a: 1 } } }))
+    await ai.run('alibaba/hh1-i2v', { prompt: 'ن' })
+
+    expect(seen[0]!.url).toBe(
+      'https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run/alibaba/hh1-i2v',
+    )
+    expect(seen[0]!.auth).toBe('Bearer tok-1')
+    // **ولا يُسرَّب في الجسد** (D-005)
+    expect(seen[0]!.body).not.toContain('tok-1')
+  })
+
+  /** يُفَضّ الغلافُ ليتّحد شكلُ الوجهين — فالمنادي لا يعرف بأيّهما نُودي. */
+  it('ويفضّ غلافَ Cloudflare إلى result', async () => {
+    const ai = restBinding('a', 't', stub({ json: { success: true, result: { image: 'AAA' } } }))
+    expect(await ai.run('m', {})).toEqual({ image: 'AAA' })
+  })
+
+  it('وجوابٌ ليس JSON يعود بايتاتٍ كما هو', async () => {
+    const ai = restBinding('a', 't', stub({ bytes: new Uint8Array([1, 2, 3]) }))
+    const out = await ai.run('m', {})
+    expect(out).toBeInstanceOf(ArrayBuffer)
+  })
+
+  it('و 429 و 5xx تُعاد، و 4xx لا تُعاد', async () => {
+    for (const [status, retryable] of [[429, true], [503, true], [403, false], [404, false]] as const) {
+      const ai = restBinding('a', 't', stub({ status, json: {} }))
+      await expect(ai.run('m', {})).rejects.toMatchObject({ retryable })
+    }
+  })
+
+  it('و success:false يُعدّ فشلا لا يُعاد', async () => {
+    const ai = restBinding('a', 't', stub({ json: { success: false, errors: [{ code: 1 }] } }))
+    await expect(ai.run('m', {})).rejects.toMatchObject({ retryable: false })
+  })
+
+  /** ولا يُذكر الرمزُ في نصّ الخطأ — الرسائلُ تُسجَّل. */
+  it('ولا يظهر الرمزُ في رسالة الخطأ', async () => {
+    const ai = restBinding('a', 'super-secret', stub({ status: 403, json: {} }))
+    await expect(ai.run('m', {})).rejects.toThrow(/^(?!.*super-secret).*$/)
   })
 })

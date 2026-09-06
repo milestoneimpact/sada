@@ -34,6 +34,17 @@ export interface Env {
    * قبل الاستعمال ويُقال «غيرُ مضبوط»، ولا يسقط الطلبُ بـ 500.
    */
   readonly AI?: { run(model: string, input: Record<string, unknown>): Promise<unknown> }
+  /**
+   * حسابُ Workers AI حين يكون **غيرَ حساب الـ Worker**.
+   *
+   * ورابطُ `AI` يبلغ حسابَ الـ Worker وحده. فمَن فرّق الحسابين يضبط
+   * هذين، ويُنادى عبر REST. **ومَن جمعهما لا يضبط شيئا** — ولا سرَّ
+   * عنده يُدوَّر، وذاك الأفضل.
+   *
+   * والمعرّفُ متغيّرٌ عاديّ (يُعرَف من عنوان اللوحة)، **والرمزُ سرٌّ**.
+   */
+  readonly CF_AI_ACCOUNT_ID?: string
+  readonly CF_AI_TOKEN?: string
   readonly KV: KVNamespace
   readonly PUBLISH_QUEUE: Queue
   readonly GENERATE_QUEUE: Queue

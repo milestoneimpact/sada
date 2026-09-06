@@ -19,6 +19,18 @@
  * فيُسحَب فورا ويُكتب في R2 — **ورابطٌ لم يُسحَب هو منشورٌ يفشل بعد
  * أسبوعٍ بلا سبب يُقرأ.**
  *
+ * ## ورابطٌ واحدٌ بوجهين — والسببُ أنّ الحسابين اثنان
+ *
+ * `env.AI` **يصل إلى حساب الـ Worker وحده**. وحسابُ Workers AI عند
+ * المالك حسابٌ آخر — **فالرابطُ لا يبلغه مهما ضُبط.**
+ *
+ * فوجهٌ ثانٍ: نداءُ REST على
+ * `‎/accounts/{id}/ai/run/{model}` برمزٍ في الترويسة. وهو نفسُ
+ * الواجهة ونفسُ الأجوبة، **ويفترق في شيءٍ واحدٍ يُقال ولا يُخفى: يحتاج
+ * سرّا يُخزَّن ويُدوَّر** — وهو ما كان الرابطُ يعفينا منه.
+ *
+ * ويُفضَّل الرابطُ متى وُجد: **مَن جمع الحسابين حذف السرَّ من نظامه.**
+ *
  * ## وحدٌّ يُقال قبل أن يُكتشَف
  *
  * لم يُنادَ هذا الرابطُ من هذه الجلسة قطّ: `env.AI` لا وجود له خارج
@@ -29,6 +41,57 @@
 /** ما يكفي من واجهة `env.AI`، حتّى تُختبَر الوحدةُ بلا Worker. */
 export interface AiBinding {
   run(model: string, input: Record<string, unknown>): Promise<unknown>
+}
+
+/**
+ * وجهُ REST — لحسابٍ غيرِ حساب الـ Worker.
+ *
+ * ولا يُسجَّل الرمزُ ولا يُعاد في جواب: يمرّ في الترويسة وحدها (D-005).
+ * والخطأُ يُقرأ من الرمز لا من نصّ الرسالة، كما في كلّ سائقٍ عندنا.
+ */
+export function restBinding(
+  accountId: string,
+  apiToken: string,
+  fetchImpl: typeof fetch = fetch,
+): AiBinding {
+  return {
+    async run(model, input) {
+      const response = await fetchImpl(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+        },
+      )
+
+      if (!response.ok) {
+        // الرمزُ يقرّر الإعادة. و 429 و 5xx تُعاد، وما عداهما لا
+        const retryable = response.status === 429 || response.status >= 500
+        // ولا يُقرأ الجسدُ كاملا: قد يحمل قيَما لا تُسجَّل
+        throw new AiError(
+          `Workers AI (REST) ردّ ${response.status}`,
+          retryable,
+        )
+      }
+
+      const contentType = response.headers.get('Content-Type') ?? ''
+      // الصورُ تعود بايتاتٍ لا JSON عند بعض النماذج
+      if (!contentType.includes('json')) return await response.arrayBuffer()
+
+      const payload = (await response.json()) as Record<string, unknown>
+      // غلافُ Cloudflare: { success, result, errors }. ويُفَضّ إلى `result`
+      // ليتّحد شكلُ الجوابين — فالمنادي لا يعرف بأيّ وجهٍ نُودي
+      if (payload['success'] === false) {
+        throw new AiError('Workers AI (REST) ردّ فشلا', false)
+      }
+      const result = payload['result']
+      return result === undefined ? payload : result
+    },
+  }
 }
 
 export class AiError extends Error {

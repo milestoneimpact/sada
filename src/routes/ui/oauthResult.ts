@@ -25,7 +25,8 @@
  * تُعرض بعد أن يُخزَّن الرمزُ مشفّرا، ولا تحمل منه شيئا: اسمُ الحساب
  * وحالُ النطاقات لا أكثر (D-005).
  */
-import { SCOPES, type ScopeSpec } from '../../lib/oauth/scopes'
+import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
+import { blamedScopes } from '../../lib/oauth/refusal'
 import type { Platform } from '../../lib/oauth/providers'
 import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
@@ -138,6 +139,13 @@ export interface RefusedData {
   readonly platform: Platform
   /** رمزُ الرفض كما ردّته المنصّة — لا نصُّ وصفها. */
   readonly reason: string
+  /**
+   * وصفُ المنصّة — **يُضيّق ولا يقرّر**.
+   *
+   * فيه اسمُ النطاق المرفوض غالبا، ويُطابَق على سجلٍّ نعرفه: ما وافق
+   * أُخذ، وما لم يوافق أُهمل وعُرضت القائمةُ كاملةً كما كانت.
+   */
+  readonly description?: string
   /** ما طُلب في الدورة التي رُفضت. */
   readonly requested: readonly string[]
   /** أتُعرَض محاولةُ الهويّة وحدها؟ لا تُعرَض إن كانت هي التي رُفضت. */
@@ -207,8 +215,22 @@ export function refusedBody(d: RefusedData): string {
   }
 
   // ── رفضُ نطاق: التشخيصُ بالاسم، والمخرجُ بزرّ ────────────────────
+  //
+  // **والمنصّةُ تسمّي النطاقَ في وصفها.** فإن سمّته عُرض وحده، وإلّا
+  // عُرضت القائمةُ كاملة — وعرضُ ثلاثةٍ حيث يُعرَف واحدٌ يجعل المالك
+  // يفحص ثلاثةَ منتَجاتٍ وأحدُها وحده الناقص
   const asked = new Set(d.requested)
-  const suspects = SCOPES[d.platform].filter((s) => asked.has(s.name))
+  const blamed = blamedScopes(d.description ?? '', d.requested)
+  const named = blamed.length > 0
+  const suspects = SCOPES[d.platform].filter(
+    (s) => asked.has(s.name) && (!named || blamed.includes(s.name)),
+  )
+
+  // ونطاقُ الهويّة إن كان هو الناقصَ **أسقط مخرجَ الهويّة**: زرٌّ يطلب
+  // ما رُفض بعينه يَعِد بما لا يقع
+  const identity = new Set(scopeSet(d.platform, 'identity'))
+  const identityBlocked = blamed.some((name) => identity.has(name))
+  const offerIdentity = d.identityRetry && !identityBlocked
   const rows = suspects
     .map(
       (s) => `<tr>
@@ -224,9 +246,13 @@ export function refusedBody(d: RefusedData): string {
     d.platform,
     'نطاقٌ لم يُمنَح',
     `${LABEL[d.platform]} رفضت نطاقا طلبناه`,
-    `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
-      '<b>ومعناه أنّ التطبيقَ لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
-      'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
+    named
+      ? `النطاقُ الناقص: <span class="mono">${escapeHtml(blamed.join('</span> و <span class="mono">'))}</span>. ` +
+        '<b>سمّته المنصّةُ في جوابها</b>، فلا حاجةَ إلى تخمين. ' +
+        'ولا علاقةَ للسرّ بهذا: <b>لا تُعِد توليده.</b>'
+      : `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
+        '<b>ومعناه أنّ التطبيقَ لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
+        'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
   )}
 
   <div class="outcome warn"><span class="k">أين العلّة</span><span class="v">
@@ -235,16 +261,30 @@ export function refusedBody(d: RefusedData): string {
     <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.</span></div>
 
   <div class="card" style="margin-top:16px">
-    <div class="card-head"><h2>ما طُلب في هذه المحاولة</h2></div>
-    <p class="hint">المنصّةُ لا تقول أيَّ واحدٍ رفضت، <b>فكلُّها معروضة</b>.
-      وأكثرُ ما يقع أن يكون النقصُ في المنتَج الذي يمنح النشر — وهو يُمنَح فورا
-      بلا مراجعةٍ في الحالين.</p>
+    <div class="card-head"><h2>${
+      named ? 'النطاقُ الناقص ومَن يمنحه' : 'ما طُلب في هذه المحاولة'
+    }</h2></div>
+    <p class="hint">${
+      named
+        ? 'سمّته المنصّةُ بعينه، <b>فهذا وحده ما ينقص</b>. وما عداه ممنوحٌ أصلا — ' +
+          'وتبويب Auth في بوّابتك يُظهر ما مُنح تحت <span class="mono">OAuth 2.0 scopes</span>.'
+        : 'المنصّةُ لم تسمِّ نطاقا في جوابها، <b>فكلُّها معروضة</b>. ' +
+          'وأكثرُ ما يقع أن يكون النقصُ في المنتَج الذي يمنح النشر.'
+    } والمنتَجُ يُمنَح <b>فورا بلا مراجعة</b>.</p>
     <div class="scroll"><table>
       <thead><tr><th>النطاق</th><th>يفتح</th><th>مَن يمنحه</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
   </div>
 
-  ${!d.identityRetry
+  ${identityBlocked
+    ? `<div class="card" style="margin-top:16px">
+      <div class="card-head"><h2>ولا يفيدك ربطُ الهويّة وحدها هنا</h2></div>
+      <p class="hint"><b>الناقصُ هو نطاقُ الهويّة نفسه</b> — فمحاولةٌ تطلبه وحده
+        تُردّ بالردّ نفسه. والمنتَجُ الذي يمنحه
+        <b>${escapeHtml(SCOPES[d.platform].find((s) => blamed.includes(s.name))?.grantedBy ?? '')}</b>،
+        ويُضاف في دقيقةٍ بلا مراجعة. <b>أضفه ثمّ أعد المحاولة كاملةً.</b></p>
+    </div>`
+    : !offerIdentity
     ? ''
     : `<div class="card" style="margin-top:16px">
       <div class="card-head"><h2>ولا تنتظر البوّابة لتربط</h2></div>
@@ -257,6 +297,12 @@ export function refusedBody(d: RefusedData): string {
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
       </div>
     </div>`}
+
+  ${!identityBlocked
+    ? ''
+    : `<div class="row" style="margin-top:18px">
+        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+      </div>`}
 
   ${guide === undefined
     ? ''
