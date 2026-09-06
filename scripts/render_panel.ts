@@ -118,6 +118,7 @@ const data: PanelData = {
       stale: false, approvedBy: null, approvedAt: null,
       createdAt: ago(0.4),
       scheduledAt: null, accountName: null, dispatchedAt: null,
+      publishCost: 0,
     },
     {
       id: 'd2', platform: 'x',
@@ -129,6 +130,8 @@ const data: PanelData = {
       stale: true, approvedBy: null, approvedAt: null,
       createdAt: ago(0.9),
       scheduledAt: null, accountName: null, dispatchedAt: null,
+      // **حالُ التحذير**: رابطٌ على X — ثلاثةَ عشرَ ضعفا (D-069)
+      publishCost: 0.2,
     },
     {
       id: 'd3', platform: 'linkedin',
@@ -140,6 +143,7 @@ const data: PanelData = {
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(22),
       createdAt: ago(26),
       scheduledAt: null, accountName: null, dispatchedAt: null,
+      publishCost: 0,
     },
     {
       id: 'd4', platform: 'x',
@@ -151,6 +155,7 @@ const data: PanelData = {
       stale: false, approvedBy: 'panel:token', approvedAt: null,
       createdAt: ago(30),
       scheduledAt: null, accountName: null, dispatchedAt: null,
+      publishCost: 0,
     },
     {
       id: 'd5', platform: 'linkedin',
@@ -164,6 +169,7 @@ const data: PanelData = {
       scheduledAt: '2026-09-08 09:00:00',
       accountName: 'بصائر للاستشارات',
       dispatchedAt: null,
+      publishCost: 0,
     },
     {
       id: 'd6', platform: 'x',
@@ -177,6 +183,7 @@ const data: PanelData = {
       scheduledAt: '2026-09-05 17:45:00',
       accountName: '@omar_ah',
       dispatchedAt: ago(0.2),
+      publishCost: 0.015,
     },
   ],
   plan: {

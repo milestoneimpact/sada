@@ -21,6 +21,8 @@
  */
 import { PLATFORMS, type Platform } from './prompt'
 import type { Db } from '../tokens'
+import { containsUrl } from '../idempotency'
+import { estimatePostCost } from '../cost'
 
 export type DraftStatus = 'draft' | 'approved' | 'edited' | 'rejected' | 'queued' | 'published' | 'failed'
 
@@ -45,6 +47,17 @@ export interface DraftRow {
   readonly accountName: string | null
   /** خُتم حين غادرت الرسالةُ إلى الطابور — وبعده لا سحب. */
   readonly dispatchedAt: string | null
+  /**
+   * ما سيُدفَع للمنصّة عند النشر — **لا ما دُفع للنموذج عند الكتابة**.
+   *
+   * و`cost` فوقُ هو الثاني: كلفةُ التوليد، وقد وقعت. وهذا ما لم يقع
+   * بعدُ، **وهو الذي يبتّ فيه المالك**: منشورٌ برابطٍ على X بمئتي
+   * جزءٍ من الألف، وبلا رابطٍ بخمسةَ عشر — ثلاثةَ عشرَ ضعفا (D-003).
+   *
+   * **ويُشتقُّ من النصّ لا من العمود**: العمودُ كان يُكتب صفرا حرفا،
+   * وصفوفٌ قديمةٌ تحمله كذلك (D-069).
+   */
+  readonly publishCost: number
 }
 
 interface Raw {
@@ -88,6 +101,7 @@ function toDraft(row: Raw): DraftRow {
     scheduledAt: row.scheduled_at,
     accountName: row.account_name,
     dispatchedAt: row.dispatched_at,
+    publishCost: estimatePostCost(row.platform === 'x' ? 'x' : 'linkedin', containsUrl(row.text)),
   }
 }
 
@@ -177,11 +191,21 @@ export async function decide(
   const status: DraftStatus = text === row.text.trim() ? 'approved' : 'edited'
   // `approved_at` و `approved_by` معا في جملةٍ واحدة: اعتمادٌ بلا صاحبٍ
   // مسمّى قرارٌ لا يُراجَع بعد شهر
+  /*
+   * **و`has_url` يُعاد حسابُه هنا لا يُترَك.**
+   *
+   * المالكُ يعتمد بنصِّه بعد التعديل — فنصٌّ بلا رابطٍ عند الكتابة قد
+   * يخرج من هنا برابط، **وثمنُه على X ثلاثةَ عشرَ ضعفا** (D-003).
+   * وعمودٌ حُسب مرّةً عند الكتابة يبقى يقول ما بطل، **واللوحةُ تعرض
+   * ثمنا أرخصَ ممّا سيُدفَع** (D-069).
+   */
   await db
     .prepare(
-      "UPDATE posts SET text = ?, status = ?, approved_by = ?, approved_at = datetime('now') WHERE id = ?",
+      `UPDATE posts SET text = ?, has_url = ?, status = ?, approved_by = ?,
+              approved_at = datetime('now')
+        WHERE id = ?`,
     )
-    .bind(text, status, by, id)
+    .bind(text, containsUrl(text) ? 1 : 0, status, by, id)
     .run()
   return { ok: true, status }
 }

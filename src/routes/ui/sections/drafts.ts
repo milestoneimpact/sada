@@ -190,7 +190,22 @@ function card(
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${escapeHtml(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip mono">${escapeHtml(d.model)}</span>`,
-    `<span class="chip mono">${money(d.cost)}</span>`,
+    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${money(d.cost)}</span>`,
+    /*
+     * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك.
+     *
+     * `ARCHITECTURE.md §٤` تقول إنّ `has_url` «يُعرَض في اللوحة مع
+     * تكلفته على X» منذ أوّل يوم. **ولم يُعرَض قطّ**: كان يُحسَب عند
+     * النشر — بعد الاعتماد بأسابيع — ويُكتب صفرا حرفا في المسوّدة.
+     *
+     * ورابطٌ على X ثلاثةَ عشرَ ضعفا (D-003 · D-069): يُعلَّم تحذيرا
+     * ليُرى قبل النقر لا بعده. و LinkedIn بلا رسمٍ فلا يُعرَض شيء.
+     */
+    d.publishCost === 0
+      ? ''
+      : `<span class="st ${d.publishCost >= 0.1 ? 'warn' : ''}"
+           ><span class="g">${d.publishCost >= 0.1 ? '!' : '●'}</span
+           >نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}</span>`,
     d.stale ? '<span class="st warn"><span class="g">▲</span>المصدر تغيّر بعدها</span>' : '',
   ]
     .filter((x) => x !== '')
