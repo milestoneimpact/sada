@@ -349,6 +349,7 @@ panel.get('/panel', async (c) => {
         postId: m.postId,
         mime: m.mime,
         bytes: m.bytes,
+        prompt: m.prompt,
         cost: m.cost,
         status: m.status,
       })),
@@ -1454,8 +1455,8 @@ panel.post('/panel/drafts/decide', async (c) => {
           kind: 'ok',
           text:
             result.status === 'edited'
-              ? 'اعتُمدت بنصّك بعد التعديل. ولا تُنشر حتّى تُربَط قناتُها ويُبنى الطابور.'
-              : 'اعتُمدت كما كُتبت. ولا تُنشر حتّى تُربَط قناتُها ويُبنى الطابور.',
+              ? 'اعتُمدت بنصّك بعد التعديل — اختر لها حسابا وموعدا لتدخل الطابور.'
+              : 'اعتُمدت كما كُتبت — اختر لها حسابا وموعدا لتدخل الطابور.',
         }
 
   await record(

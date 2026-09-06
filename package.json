@@ -8,7 +8,7 @@
     "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "npm run typecheck && npm run contrast && npm run dead && npm run test",
+    "ci": "npm run typecheck && npm run contrast && npm run dead && npm run columns && npm run test",
     "dev": "wrangler dev --env staging",
     "migrate:staging": "wrangler d1 migrations apply sada-staging --env staging --remote",
     "migrate:production": "wrangler d1 migrations apply sada --env production --remote",
@@ -16,7 +16,8 @@
     "contrast": "node scripts/validate_contrast.js",
     "render": "tsx scripts/render_panel.ts /tmp/panel.html && tsx scripts/render_screens.ts && tsx scripts/render_legal.ts /tmp/privacy.html /privacy",
     "audit": "npm run render && node scripts/audit_design.mjs /tmp/panel.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-refused.html /tmp/privacy.html && node scripts/audit_scale.mjs /tmp/panel.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-refused.html /tmp/privacy.html",
-    "dead": "node scripts/audit_dead.mjs"
+    "dead": "node scripts/audit_dead.mjs",
+    "columns": "node scripts/audit_columns.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260903.1",

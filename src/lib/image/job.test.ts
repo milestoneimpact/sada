@@ -140,6 +140,20 @@ describe('المسار الكامل', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]?.status).toBe('ready')
     expect(rows[0]?.mime).toBe('image/png')
+    /*
+     * **والوصفُ يُقرأ لا يُكتَب وحسب (D-070).**
+     *
+     * تعليقُ `0010` يقول لماذا: «صورةٌ لا يُعرف وصفُها لا تُعاد ولا
+     * تُحسَّن». وكان العمودُ يُملأ في كلّ صفٍّ **ولا يُذكَر في أيّ
+     * استعلامٍ يقرأ** — فلا يبلغ اللوحةَ ولا المالك.
+     */
+    expect(rows[0]?.prompt).not.toBe('')
+    // **والمتوقَّعُ يُشتقُّ من نصّ المنشور نفسِه** لا يُكتب هنا: نسخةٌ
+    // ثانيةٌ من النصّ في الاختبار تُصدّق ما بطل يومَ يتغيّر الفخّ
+    const seeded = db.raw.prepare('SELECT text FROM posts WHERE id = ?').get(post) as { text: string }
+    expect(rows[0]?.prompt).toBe(
+      imagePrompt({ topic: topicOf(seeded.text), platform: 'linkedin' }),
+    )
 
     expect((await ledger())[0]?.operation).toContain('image:linkedin')
   })

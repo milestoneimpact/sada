@@ -129,6 +129,9 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
       <div class="pic-foot">
         <span class="chip mono">${Math.round(ready.bytes / 1024)}KB</span>
         <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>
+        ${ready.prompt === ''
+          ? ''
+          : `<span class="chip" title="${escapeHtml(ready.prompt)}">الوصف</span>`}
         <span class="grow"></span>
         ${open
           ? `<form class="inline" method="POST" action="/panel/media/animate"
@@ -265,6 +268,8 @@ export interface MediaView {
   readonly postId: string
   readonly mime: string
   readonly bytes: number
+  /** الوصفُ الذي وُلّدت به — **ومَن لا يعرفه لا يُحسِّن** (D-070). */
+  readonly prompt: string
   readonly cost: number
   readonly status: 'ready' | 'rejected'
 }
