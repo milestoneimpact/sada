@@ -161,11 +161,12 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
             : ''}
         </div>
         ${app.source === 'none' ? '' : `<div class="sub" style="margin-top:var(--s-2)">
-          <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا:
-          <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بإرسال <b>رمزٍ باطلٍ عمدا</b>.
-          فإن رُدّ بـ<span class="mono">invalid_grant</span> فالزوجُ سليمٌ والعلّةُ في
-          موضعٍ آخر، وإن رُدّ بـ<span class="mono">invalid_client</span>
-          <b>فالزوجُ هو العطل</b>. ولا يُنتَج رمزُ وصولٍ ولا تُنفَق فلسا.</div>`}
+          <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا —
+          <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بمسار
+          <span class="mono">client_credentials</span> الذي <b>لا منحةَ فيه تُفحَص</b>،
+          فلا يبقى إلّا التوثيق. ويفرّق الجوابُ بين <b>سرٍّ خاطئ</b> و<b>معرّفٍ
+          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج رمزُ وصولٍ لصدى، ولا
+          تُنفَق فلسا.</div>`}
       </form>
 
       <div class="outcome"><span class="k">إن نجح</span>

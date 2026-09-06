@@ -782,32 +782,41 @@ panel.post('/panel/channels/app/verify', async (c) => {
   const verdict = await verifyAppCredentials(
     PROVIDERS[platform],
     { clientId: creds.clientId, clientSecret: creds.clientSecret },
-    callbackUri(c.env.PUBLIC_BASE_URL, platform),
   )
 
   // **ونصُّ المزوّد يُعرَض ولا يُبنى عليه حكم** (D-054)
-  const said = verdict.kind === 'inconclusive'
-    ? verdict.detail
-    : verdict.description === undefined
-      ? verdict.code
-      : `${verdict.code} — ${verdict.description}`
+  const said =
+    verdict.kind === 'unsupported' || verdict.kind === 'inconclusive'
+      ? verdict.detail
+      : verdict.description === undefined
+        ? verdict.code
+        : `${verdict.code} — ${verdict.description}`
 
   let flash: PanelFlash
-  if (verdict.kind === 'rejected') {
+  if (verdict.kind === 'bad_secret') {
     flash = {
       kind: 'bad',
       text:
-        `الزوجُ مرفوضٌ عند ${platform}: ردّت «${said}». ` +
-        `والمعرّفُ الذي أُرسل ${creds.clientId} — قارنه بما في تبويب Auth. ` +
-        'فإن طابقه فالسرُّ هو الخطأ: ولّد سرّا جديدا والصقه.',
+        `السرُّ مرفوض. المعرّفُ ${creds.clientId} **تعرفه** ${platform}، ` +
+        `والسرُّ لا يوافقه — ردّت «${said}». ` +
+        'ولّد سرّا جديدا في تبويب Auth والصقه في اللحظة التي يظهر فيها.',
+    }
+  } else if (verdict.kind === 'bad_client_id') {
+    flash = {
+      kind: 'bad',
+      text:
+        `المعرّفُ نفسُه مجهولٌ عند ${platform}: أُرسل ${creds.clientId} وردّت «${said}». ` +
+        'فهو تطبيقٌ آخرُ أو حرفٌ ساقط — انسخه من تبويب Auth.',
     }
   } else if (verdict.kind === 'accepted') {
     flash = {
       kind: 'ok',
       text:
-        `الزوجُ مقبولٌ عند ${platform} — ردّت «${said}» على رمزٍ باطلٍ أرسلناه عمدا، ` +
-        'وهذا هو المنتظَر. فإن بقي الربطُ يفشل فالعلّةُ ليست في السرّ.',
+        `الزوجُ مقبولٌ عند ${platform} — جاز التوثيق («${said}»). ` +
+        'فإن بقي الربطُ يفشل فالعلّةُ ليست في المعرّف ولا في السرّ.',
     }
+  } else if (verdict.kind === 'unsupported') {
+    flash = { kind: 'warn', text: `لا فحصَ لهذه المنصّة: ${said}` }
   } else {
     flash = { kind: 'warn', text: `لم يُحسَم الفحص: ${said}. ولا يُدَّعى حكمٌ بلا دليل.` }
   }

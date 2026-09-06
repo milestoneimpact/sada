@@ -326,7 +326,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
   }
 
-  it('«الزوجُ مرفوض» حين تردّ المنصّةُ invalid_client — ومعه المعرّفُ للمقارنة', async () => {
+  it('«السرُّ مرفوض» حين تردّ المنصّةُ invalid_client — ومعه المعرّفُ', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: {
         status: 401,
@@ -335,7 +335,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     })
     try {
       const body = await probe(await login())
-      expect(body).toContain('الزوجُ مرفوض')
+      expect(body).toContain('السرُّ مرفوض')
       expect(body).toContain('Client authentication failed')
       expect(body).toContain('li-id')
     } finally {
@@ -343,15 +343,34 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     }
   })
 
-  /** وهذا هو الجوابُ الذي يبرّئ السرَّ ويوجّه البحثَ إلى غيره. */
-  it('و«مقبول» حين تردّ invalid_grant على الرمز الباطل', async () => {
+  /** **والمعرّفُ يُفرَد عن السرّ** — فلا يفتّش المالكُ في الحقلين معا. */
+  it('و«المعرّفُ مجهول» حين تردّ invalid_client_id', async () => {
     globalThis.fetch = fakeFetch({
-      [LINKEDIN.tokenUrl]: { status: 400, json: { error: 'invalid_grant' } },
+      [LINKEDIN.tokenUrl]: {
+        status: 400,
+        json: {
+          error: 'invalid_client_id',
+          error_description: 'The passed in client_id is invalid "li-id"',
+        },
+      },
+    })
+    try {
+      const body = await probe(await login())
+      expect(body).toContain('المعرّفُ نفسُه مجهول')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  /** وهذا هو الجوابُ الذي يبرّئ الزوجَ ويوجّه البحثَ إلى غيره. */
+  it('و«مقبول» حين يجوز التوثيق', async () => {
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { status: 200, json: { access_token: 'app-token' } },
     })
     try {
       const body = await probe(await login())
       expect(body).toContain('الزوجُ مقبول')
-      expect(body).toContain('ليست في السرّ')
+      expect(body).toContain('ليست في المعرّف ولا في السرّ')
     } finally {
       globalThis.fetch = realFetch
     }
