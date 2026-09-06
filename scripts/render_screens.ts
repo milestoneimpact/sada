@@ -14,6 +14,8 @@ import { channelsSection } from '../src/routes/ui/channels'
 import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
+import { tasksScreen } from '../src/routes/ui/tasksView'
+import { ownerRows } from '../src/lib/owner'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
 import { shell } from '../src/routes/ui/shell'
 
@@ -255,4 +257,24 @@ writeFileSync(
   ),
 )
 
-console.log('رُسمت ثمانٍ في /tmp')
+// ── «ما عليك»: الحالاتُ الثلاث في صفحةٍ واحدة ───────────────────────
+writeFileSync(
+  '/tmp/screen-tasks.html',
+  page(
+    'صدى — مهامُّ المالك',
+    tasksScreen({
+      rows: ownerRows({
+        // حالٌ وسطى: بعضٌ تمّ، وبعضٌ عليك، وبعضٌ لا يُعرَف
+        secrets: new Set(['TOKEN_ENC_KEY', 'ADMIN_TOKEN']),
+        vars: new Set(['CF_AI_ACCOUNT_ID']),
+        linked: new Set(['linkedin']),
+        appsConfigured: new Set(['linkedin', 'x']),
+        appsVerified: new Set(['linkedin']),
+        anyPublished: false,
+        videoPriced: false,
+      }),
+    }),
+  ),
+)
+
+console.log('رُسمت تسعٌ في /tmp')
