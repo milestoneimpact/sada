@@ -29,6 +29,14 @@ export interface Env {
 
   // أسرار Worker
   readonly TOKEN_ENC_KEY: string
+  /**
+   * جهةُ التشغيل وبريدُ التواصل — يظهران في `/privacy` و `/terms`.
+   *
+   * متغيّرا بيئةٍ لا سرّان: كلاهما يُنشر على الصفحة نفسها، فلا معنى
+   * لإخفائه. واختياريّان: ما لم يُضبَط لا يُخترَع (`legal.ts`).
+   */
+  readonly LEGAL_ENTITY?: string
+  readonly LEGAL_CONTACT?: string
   readonly LINKEDIN_CLIENT_ID: string
   readonly LINKEDIN_CLIENT_SECRET: string
   readonly X_CLIENT_ID: string

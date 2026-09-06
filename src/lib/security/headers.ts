@@ -79,3 +79,29 @@ export function makeNonce(): string {
   crypto.getRandomValues(bytes)
   return btoa(String.fromCharCode(...bytes)).replace(/=+$/, '')
 }
+
+/**
+ * ترويساتُ الوثائق العامّة — السياسةُ والشروط.
+ *
+ * تفترق عن `htmlHeaders` في شيئين، وكلاهما مقصود:
+ *
+ * **تُخزَّن مؤقّتا.** `no-store` وُضعت على اللوحة لأنّها تحمل حالَ النظام،
+ * ووثيقةٌ قانونيّةٌ ثابتة تُقرأ من الخارج لا تحتاجها — ومنعُ التخزين عليها
+ * يعني نداءَ خادمٍ لكلّ فتحة.
+ *
+ * **ولا تُمنع من التأطير.** مراجعُ منصّةٍ قد يفتحها في إطارٍ داخل أداته،
+ * و`DENY` تجعلها تظهر فارغةً عنده فيُعدّها غير موجودة. والصفحةُ لا تحمل
+ * فعلا ولا نموذجا، فلا شيء يُنقَر خلسةً فيها (لا clickjacking بلا زرّ).
+ */
+export function publicPageHeaders(nonce: string): Record<string, string> {
+  const headers = htmlHeaders(nonce)
+  delete headers['X-Frame-Options']
+  return {
+    ...headers,
+    'Content-Security-Policy': headers['Content-Security-Policy']!.replace(
+      "frame-ancestors 'none'",
+      'frame-ancestors *',
+    ),
+    'Cache-Control': 'public, max-age=3600',
+  }
+}

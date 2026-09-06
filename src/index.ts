@@ -17,6 +17,7 @@ import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
+import { legal } from './routes/legal'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { auth } from './routes/auth'
@@ -304,6 +305,8 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
   return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
 })
 
+// الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
+app.route('/', legal)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)

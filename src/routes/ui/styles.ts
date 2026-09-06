@@ -374,5 +374,29 @@ footer{margin-top:28px; padding-top:16px; border-top:1px solid var(--line-soft);
     margin-bottom:3px; letter-spacing:.4px}
   td:first-child::before{display:none}
 }
+/* ── الوثائق العامّة ──────────────────────────────────────────────────
+   عمودٌ واحدٌ مقيَّدُ العرض: سطرٌ يمتدّ عبر شاشةٍ عريضة يُقرأ بعينٍ تقفز،
+   وهذه صفحةٌ يُراد لها أن تُقرأ لا أن تُتصفَّح. */
+.doc{max-width:820px; margin:0 auto; padding:44px 22px 72px; background:var(--bg)}
+.doc header{border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:8px}
+.doc .glyph{width:38px; height:38px; margin-bottom:14px}
+.doc h1{font-size:27px; letter-spacing:-.5px; margin:0 0 10px}
+.doc h2{font-size:16px; margin:32px 0 10px; letter-spacing:-.2px}
+.doc .lede{font-size:14.5px; line-height:1.9; color:var(--ink-2); margin:0 0 10px}
+.doc p{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin:0 0 11px}
+.doc ul{margin:0 0 11px; padding-inline-start:20px}
+.doc li{font-size:13.5px; line-height:1.95; color:var(--ink-2); margin-bottom:7px}
+.doc b{color:var(--ink)}
+.doc a{color:var(--gold-deep); text-underline-offset:3px}
+.doc table{font-size:12.5px}
+.doc td b{font-weight:650}
+/* «ما لا يقع» أبرزُ ما في الصفحة: هو ما يبحث عنه المراجع أوّلا */
+.doc ul.never{list-style:none; padding:0; margin:0}
+.doc ul.never li{background:var(--surface-2); border:1px solid var(--line-soft);
+  border-radius:var(--r); padding:11px 14px; margin-bottom:8px}
+/* مصطلحٌ لا يُكسَر عند شرطته: «AES-» في سطرٍ و«GCM» في التالي يُقرأ اسمين */
+.doc .nb{white-space:nowrap}
+.doc footer{margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-size:12.5px}
+
 @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
 `
