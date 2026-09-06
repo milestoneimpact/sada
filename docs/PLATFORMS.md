@@ -82,6 +82,40 @@
 3. فحصُ الزوج بمنحة `client_credentials` **لا يحكم لتطبيقٍ بلا هذا
    المنتَج**. والبرهانُ الوحيد نجاحُ الربط.
 
+## عقدُ رفع YouTube — مقروءٌ من وثيقة Google لا من الذاكرة
+
+أُضيف 2026-09-06. المصدرُ **آليّ**: `discovery/v1/apis/youtube/v3/rest`
+— وهي الوثيقةُ التي تولّد منها Google عملاءَها، فلا تشيخ عن الواجهة.
+
+| القيمة | ما قرأتُه | كيف تُعاد قراءتُه |
+|---|---|---|
+| المسار | `youtube/v3/videos` · `POST` | `resources.videos.methods.insert.path` |
+| الرفعُ المستأنَف | `/resumable/upload/youtube/v3/videos` | `…insert.mediaUpload.protocols.resumable` |
+| الرفعُ البسيط | `/upload/youtube/v3/videos` | `…protocols.simple` |
+| المعامل الإلزاميّ | `part` | `…parameterOrder` |
+| النطاق | `…/auth/youtube.upload` | `…insert.scopes` |
+| السقف | ‏٢٥٦ غيغابايت | `…mediaUpload.maxSize` |
+| المقبول | `video/*` · `application/octet-stream` | `…mediaUpload.accept` |
+
+**وما في `providers.ts` صحيحٌ ومقيس:**
+
+    https://www.googleapis.com/upload/youtube/v3/videos
+      ?uploadType=resumable&part=snippet,status
+
+نُودي بلا إذنٍ فردّ **401** (فالمسار موجود)، وبـ`uploadType` مخترَعٍ ردّ
+**400** — **فالمعاملُ يُفحَص فعلا**، وليس مُهمَلا يُظنّ مقبولا.
+
+**والنطاقُ الذي نطلبه هو الذي يوجبه الرفع** — طُوبق حرفا.
+
+## و TikTok لا يُقاس من هنا
+
+`open.tiktokapis.com` و `developers.tiktok.com` **محجوبان** (اتّصالٌ لا
+يقوم أصلا، لا رفضٌ ولا مهلة). فما في `providers.ts` من نهاياتها **مكتوبٌ
+بلا قياس**، ويبقى موسوما كذلك.
+
+**ولا يُبنى لها سائقُ نشرٍ من الذاكرة**: ليلةُ D-071 حتّى D-077 كلُّها
+درسٌ واحد — **قيمةٌ تُكتب بلا مصدرٍ تكذب، وثمنُها يقع بعد شهور**.
+
 ## المصادر
 
 - https://docs.x.com/x-api/getting-started/pricing
