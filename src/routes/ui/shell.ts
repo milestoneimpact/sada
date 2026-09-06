@@ -82,11 +82,28 @@ export function injectCsrf(html: string, token: string): string {
  * فوسمٌ داخليّ بلا `nonce` **لا يُنفَّذ ولا يُطبَّق** — وهذا هو المقصود:
  * سطرٌ يحقنه مهاجم لن يحمل قيمةً لا يعرفها.
  */
-export function shell(title: string, body: string, nonce: string, script = ''): string {
+/**
+ * `noindex` هو الأصل، و`indexable` استثناءٌ يُطلب.
+ *
+ * صفحاتُ اللوحة تحمل حالَ النظام وأسماءَ المصادر، فلا تُفهرَس. أمّا
+ * السياسةُ والشروطُ فوثيقتان **الغرضُ منهما أن تُقرآ من الخارج** — ومنعُ
+ * الفهرسة عليهما يجعل مراجعا يبحث عنهما فلا يجدهما.
+ */
+export function shell(
+  title: string,
+  body: string,
+  nonce: string,
+  script = '',
+  options: { indexable?: boolean; description?: string } = {},
+): string {
   const safeNonce = escapeHtml(nonce)
   return `<!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="${options.indexable === true ? 'index,follow' : 'noindex,nofollow'}">${
+    options.description === undefined
+      ? ''
+      : `\n<meta name="description" content="${escapeHtml(options.description)}">`
+  }
 <title>${escapeHtml(title)}</title>
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
