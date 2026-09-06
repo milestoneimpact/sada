@@ -484,6 +484,12 @@ export interface PanelData {
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
   readonly promoCap: number
   /**
+   * كم مهمّةً **يُعرَف** أنّها على المالك — ولا يُعدّ فيها ما لا يُعرَف.
+   *
+   * وعدٌّ يشمل المجهولَ يجعل الرقمَ لا ينزل أبدا، **فيُهمَل** (D-063).
+   */
+  readonly ownerPending: number
+  /**
    * معرّفُ حساب Cloudflare إن كان مضبوطا — يُملأ به عنوانُ نموذجه.
    *
    * **وليس سرّا**: هو في كلّ عنوانٍ يُنادى، وفي لوحة Cloudflare نفسِها.
@@ -695,6 +701,7 @@ const ICON = {
   channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.4 10.8 15.6 6.7M8.4 13.2l7.2 4.1"/></svg>',
   providers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
+  tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h9M9 12h9M9 19h9"/><path d="m3.5 5 1.3 1.3L7 4"/><path d="m3.5 12 1.3 1.3L7 11"/><circle cx="5" cy="19" r="1.4"/></svg>',
   report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg>',
   security: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.6-8 9.5-4.6-.9-8-4.5-8-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>',
 } as const
@@ -852,6 +859,7 @@ export function panelPage(d: PanelData): string {
     ${platformNav(d.channels)}
     ${nav('/panel/report', ICON.report, 'التقرير', d.openSuggestions)}
     <span class="lbl">الضبط</span>
+    ${nav('/panel/tasks', ICON.tasks, 'ما عليك', d.ownerPending)}
     ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
     ${nav('#settings', ICON.settings, 'الحدود')}
     ${nav('#security', ICON.security, 'الأمان', d.sessions.length > 1 ? d.sessions.length : 0)}

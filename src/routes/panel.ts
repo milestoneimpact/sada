@@ -59,6 +59,8 @@ import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
+import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
+import { tasksScreen } from './ui/tasksView'
 import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
@@ -311,6 +313,7 @@ panel.get('/panel', async (c) => {
   const flash = await takeFlash(c.env, c.req.raw)
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
   const openCount = (await openSuggestions(c.env.DB)).length
+  const ownerPending = pendingCount(await ownerFacts(c))
   return page((nonce) =>
     panelPage({
       paused: allowance.settings.paused,
@@ -395,6 +398,7 @@ panel.get('/panel', async (c) => {
       baseUrl: c.env.PUBLIC_BASE_URL,
       openSuggestions: openCount,
       promoCap: allowance.settings.weeklyPromoCapUsd,
+      ownerPending,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     }),
   )
@@ -1106,6 +1110,89 @@ panel.get('/panel/channels/:platform', async (c) => {
        <div class="wrap">
          <nav class="back" aria-label="مسارُ العودة">
            <a href="/panel#channels">← القنوات</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${body}</main>
+       </div>`,
+      nonce,
+      THEME_SCRIPT,
+    ),
+  )
+})
+
+/**
+ * حقائقُ المالك — **تُجمَع من البيئة والقاعدة، ولا تُكتب بيد.**
+ *
+ * ولا يُقرأ سرٌّ ولا يُفكّ تشفير: **أسماءٌ وحالٌ فقط** (D-005).
+ */
+async function ownerFacts(c: {
+  env: Env
+}): Promise<OwnerFacts> {
+  const env = c.env as unknown as Record<string, string | undefined>
+  const has = (name: string): boolean => {
+    const v = env[name]
+    return typeof v === 'string' && v.trim() !== ''
+  }
+
+  const accounts = await listAccounts(c.env.DB)
+  const apps = await appStatuses(c.env.DB, env, ['linkedin', 'x', 'youtube', 'tiktok'])
+
+  let anyPublished = false
+  try {
+    const row = await c.env.DB
+      .prepare("SELECT 1 AS n FROM publish_attempts WHERE status = 'succeeded' LIMIT 1")
+      .first<{ n: number }>()
+    anyPublished = row !== null
+  } catch {
+    // جدولٌ لا يُقرأ: تبقى `false` — **ولا يُدَّعى نجاحٌ لم يُقرأ**
+  }
+
+  let videoPriced = false
+  try {
+    const row = await c.env.DB
+      .prepare(
+        `SELECT 1 AS n FROM cost_ledger
+          WHERE operation LIKE '%video%' AND unit_cost > 0 LIMIT 1`,
+      )
+      .first<{ n: number }>()
+    videoPriced = row !== null
+  } catch {
+    // كما سبق
+  }
+
+  return {
+    secrets: new Set(
+      ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
+       'GOOGLE_SA_JSON', 'CF_AI_TOKEN'].filter(has),
+    ),
+    vars: new Set(['LEGAL_ENTITY', 'LEGAL_CONTACT', 'CF_AI_ACCOUNT_ID'].filter(has)),
+    linked: new Set(accounts.filter((a) => a.status !== 'revoked').map((a) => a.platform)),
+    appsConfigured: new Set(apps.filter((a) => a.source !== 'none').map((a) => a.platform)),
+    appsVerified: new Set(
+      apps.filter((a) => a.verifiedKind === 'accepted').map((a) => a.platform),
+    ),
+    anyPublished,
+    videoPriced,
+  }
+}
+
+/**
+ * شاشةُ «ما عليك» — **وثيقةٌ تقول الخطوات، وشاشةٌ تقول أين أنت منها.**
+ */
+panel.get('/panel/tasks', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const body = tasksScreen({ rows: ownerRows(await ownerFacts(c)) })
+
+  return page((nonce) =>
+    shell(
+      'صدى — مهامُّ المالك',
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel">← اللوحة</a>
            <span class="grow"></span>${themeSwitch()}
          </nav>
          <main id="main">${body}</main>
