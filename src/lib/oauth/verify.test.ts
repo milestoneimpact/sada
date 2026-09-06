@@ -23,6 +23,16 @@ const REAL = {
     error: 'invalid_request',
     error_description: 'Unable to retrieve access token: authorization code not found',
   },
+  /**
+   * **وهذا ما كان يُقرأ جوازا ساعاتٍ** (D-076 · D-077).
+   *
+   * خطأُ منتَجٍ لا خطأُ توثيق: يعود بالنصّ نفسِه **لأيّ سرّ**، صحيحا
+   * كان أو خاطئا — فلا يميّز شيئا. نُسخ من لوحة المالك حرفا.
+   */
+  noAppTokens: {
+    error: 'access_denied',
+    error_description: 'This application is not allowed to create application tokens',
+  },
 } as const
 
 function reply(body: unknown, status = 400): { fetch: typeof fetch; seen: RequestInit[] } {
@@ -80,6 +90,25 @@ describe('ما قِيس من LinkedIn', () => {
     expect(out.kind).toBe('inconclusive')
     if (out.kind !== 'inconclusive') return
     expect(out.detail).toContain('invalid_request')
+  })
+})
+
+describe('وخطأُ المنتَج يُسمَّى ولا يُقرأ جوازا', () => {
+  /**
+   * **الجوابُ الذي كلّف الليلة.** كان يُصنَّف `accepted` بالاستدلال،
+   * فتخضرّ الخطوةُ على سرٍّ ترفضه المنصّةُ في منحة الرمز.
+   */
+  it('«لا يملك منحةَ رموز التطبيقات» لا يُعدّ جوازا', async () => {
+    const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.noAppTokens, 403).fetch)
+    expect(out.kind).toBe('inconclusive')
+  })
+
+  /** **ويُقال معناه** — لا يُعرَض نصٌّ خامٌ يُترَك تفسيرُه للمالك. */
+  it('ويُقال للمالك أنّه ليس عيبا في زوجه', async () => {
+    const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.noAppTokens, 403).fetch)
+    if (out.kind !== 'inconclusive') return
+    expect(out.detail).toContain('رموز التطبيقات')
+    expect(out.detail).toContain('نجاحُ الربط')
   })
 })
 
