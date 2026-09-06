@@ -24,6 +24,7 @@ const BUILTIN_DOCS: Readonly<Record<string, string>> = {
 import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
 import { verifyKey } from '../lib/ai/verify'
 import { listModels } from '../lib/ai/models'
+import { cfAccountId } from '../lib/ai/cloudflare'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import type { Platform } from '../lib/draft/prompt'
@@ -47,7 +48,7 @@ import {
 } from '../lib/providers'
 import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
-import { readRoutes, writeRoute } from '../lib/ai/routes'
+import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
 import { readSettings, writeSetting, type SettingKey } from '../lib/settings'
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
@@ -1849,11 +1850,30 @@ panel.post('/panel/routes', async (c) => {
   const model = String(form.get('model') ?? '').trim()
 
   if (!KNOWN_TASKS.has(task)) return c.json({ error: 'unknown_task' }, 400)
-  if ((await getProvider(c.env.DB, provider)) === null) {
+  const target = await getProvider(c.env.DB, provider)
+  if (target === null) {
     return c.json({ error: 'unknown_provider' }, 400)
   }
   if (model === '') {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اسم النموذج مطلوب.' })
+    return back('providers')
+  }
+
+  /*
+   * **ولا يُحفَظ نموذجٌ بقي من مزوّدٍ سابق** (D-083).
+   *
+   * الدرجُ في المتصفّح يُفرَّغ عند التبديل، **لكنّ الشاشةَ ليست حارسا**:
+   * من حفظ قبل أن يصل الجلبُ يمرّ. وتوجيهٌ لا يعمل لا يُكتشَف إلّا عند
+   * أوّل نداءٍ مدفوع.
+   */
+  const before = (await readRoutes(c.env.DB)).find((r) => r.task === task)
+  const mismatch = routeMismatch(
+    before === undefined || !before.custom ? null : { provider: before.provider, model: before.model },
+    { provider, model },
+    cfAccountId(target.baseUrl) !== null,
+  )
+  if (mismatch !== null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: mismatch })
     return back('providers')
   }
 

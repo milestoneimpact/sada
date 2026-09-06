@@ -354,12 +354,30 @@ export const SCRIPT = `
     if(pout&&b)pout.value=b;
     if(note&&(a||b))note.textContent='السعرُ مُلئ من فهرس المزوّد — احفظ ليُثبَت.';
   };
+  // خيارُ الكتابة اليدويّة يُعاد بناؤه في كلّ تعبئة — فلا يُنسى
+  var mpManual=function(sel){
+    var man=document.createElement('option');
+    man.value='__manual__'; man.textContent='اكتبه يدويّا…';
+    sel.appendChild(man);
+  };
+  // «يُفرَّغ الدرجُ حين يتبدّل المزوّد» (D-083): نماذجُ مزوّدٍ معروضةً
+  // تحت اسم آخر ليست إزعاجا — هي حفظُ توجيهٍ لا يعمل
+  var mpClear=function(sel,placeholder){
+    while(sel.options.length)sel.remove(0);
+    var o=document.createElement('option');
+    o.value=''; o.textContent=placeholder; o.selected=true;
+    sel.appendChild(o);
+    mpManual(sel);
+  };
   document.querySelectorAll('.mp').forEach(function(box){
     var sel=box.querySelector('.mp-sel');
     var btn=box.querySelector('.mp-load');
     var note=box.querySelector('.mp-note');
     if(!sel||!btn||!note)return;
     var last=sel.value;
+    // لأيّ مزوّدٍ هذه القائمةُ المعروضة الآن؟ فارغٌ يعني «لم تُجلَب بعد»
+    var loadedFor='';
+    var busy=false;
 
     sel.addEventListener('change',function(){
       if(sel.value==='__manual__'){
@@ -373,26 +391,33 @@ export const SCRIPT = `
       mpFillPrice(box,sel.options[sel.selectedIndex],note);
     });
 
-    btn.addEventListener('click',function(){
+    var load=function(silent){
       var name=mpProvider(box);
       if(!name){note.textContent='لا مزوّدَ لهذا الحقل.';return;}
-      btn.disabled=true; note.textContent='يُجلَب من '+name+'…';
+      if(busy||loadedFor===name)return;
+      busy=true; btn.disabled=true; note.textContent='تُجلَب نماذجُ '+name+'…';
       post('/panel/providers/models',{provider:name}).then(function(r){
         return r.json();
       }).then(function(d){
-        btn.disabled=false;
+        busy=false; btn.disabled=false;
         var models=(d&&d.models)||[];
         if(!d||!d.ok||!models.length){
           note.textContent=(d&&d.detail)||'تعذّر الجلب — اكتب الاسم يدويّا.';
           return;
         }
+        loadedFor=name;
         // يُصفّى إلى صنف المهمّة، وصنفٌ مجهولٌ يبقى: إخفاءُ نموذجٍ موجود
         // أسوأُ من عرضِ نموذجٍ لا يناسب
         var want=box.dataset.task||'';
         var keep=models.filter(function(m){return !want||!m.task||m.task===want;});
-        if(!keep.length)keep=models;
-        var chosen=last;
+        var filtered=keep.length<models.length;
+        if(!keep.length){keep=models;filtered=false;}
+        // القيمةُ السابقة تبقى «إن كانت لهذا المزوّد»؛ وإلّا سقطت معه
+        var chosen=silent?last:'';
         while(sel.options.length)sel.remove(0);
+        var ph=document.createElement('option');
+        ph.value=''; ph.textContent='— اختر نموذجا —';
+        sel.appendChild(ph);
         keep.forEach(function(m){
           var o=document.createElement('option');
           o.value=m.id; o.textContent=m.label||m.id;
@@ -400,18 +425,37 @@ export const SCRIPT = `
           if(m.priceOut!==null&&m.priceOut!==undefined)o.dataset.pout=String(m.priceOut);
           sel.appendChild(o);
         });
-        var man=document.createElement('option');
-        man.value='__manual__'; man.textContent='اكتبه يدويّا…';
-        sel.appendChild(man);
-        mpSet(sel,chosen);
+        mpManual(sel);
+        var has=false,i;
+        for(i=0;i<sel.options.length;i++)
+          if(chosen&&sel.options[i].value===chosen){has=true;break;}
+        sel.value=has?chosen:'';
         last=sel.value;
         note.textContent=keep.length+' نموذجا الآن عند '+name
-          +(keep.length<models.length?' (صُفّيت من '+models.length+')':'')
-          +' — قائمةٌ لحظيّة لا محفوظة.';
+          +(filtered?' (صُفّيت من '+models.length+')':'')
+          +(chosen&&!has?' — والنموذجُ السابق ليس منها، فاختر واحدا.':'')
+          +' · قائمةٌ لحظيّة لا محفوظة.';
       }).catch(function(){
-        btn.disabled=false;
+        busy=false; btn.disabled=false;
         note.textContent='تعذّر الاتّصال — اكتب الاسم يدويّا.';
       });
+    };
+
+    btn.addEventListener('click',function(){loadedFor='';load(true);});
+    // «وتُجلَب عند أوّل لمسةٍ للدرج»: تغييرُ النموذج لا يحتاج ضغطتين
+    sel.addEventListener('focus',function(){load(true);});
+
+    // «وتبديلُ المزوّد يُسقط نماذجَه» — وهو موضعُ العطل الذي رُئي:
+    // اختير Cloudflare فبقيت نماذجُ Gemini معروضة، وحُفظ توجيهٌ لا يعمل
+    var form=box.closest('form');
+    var pick=form?form.querySelector('.mp-provider'):null;
+    if(pick)pick.addEventListener('change',function(){
+      loadedFor='';
+      box.dataset.provider=pick.value;
+      mpClear(sel,'— اختر نموذجا —');
+      last='';
+      note.textContent='بدّلتَ المزوّد — تُجلَب نماذجُه…';
+      load(false);
     });
   });
 })();
