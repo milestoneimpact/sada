@@ -50,6 +50,10 @@ writeFileSync(
         lastPublishedAt: ago(19) },
       // الحسابُ الأوّل كاملُ النطاقات، والثاني ينقصه النشر — وهي الحالُ
       // التي وقعت فعلا، فتُرى مرسومةً لا مُتخيَّلة
+      metrics: {
+        p1: [{ window: '7d', impressions: null, reactions: 84, comments: 12,
+               shares: null, pulledAt: ago(3) }],
+      },
       scopes: {
         'linkedin:member:abc': scopeSet('linkedin').join(' '),
         'linkedin:org:99': 'openid profile',
@@ -85,6 +89,7 @@ writeFileSync(
       view: x, now,
       tally: { published: 0, queued: 0, failed: 0, drafts: 2, spend: 0,
         lastPublishedAt: null },
+      metrics: {},
       scopes: { 'x:member:4242': 'tweet.read users.read tweet.write offline.access' },
       posts: [],
     }),
@@ -96,7 +101,7 @@ writeFileSync(
   page('صدى — Instagram', platformScreen({
     view: ig, now,
     tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
-    scopes: {}, posts: [],
+    scopes: {}, metrics: {}, posts: [],
   })),
 )
 

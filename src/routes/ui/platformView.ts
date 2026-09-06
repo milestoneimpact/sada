@@ -23,6 +23,7 @@ import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
 import { relativeTime } from '../../lib/format'
+import { widest, type PostMetricRow } from '../../lib/metrics/job'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 
@@ -32,7 +33,42 @@ export interface PlatformScreenData {
   readonly tally: PlatformTally
   /** نطاقاتُ كلّ حسابٍ كما مُنحت — مفتاحُها معرّفُ الحساب. */
   readonly scopes: Readonly<Record<string, string>>
+  /** ما قِيس لكلّ منشور — مفتاحُها معرّفُ المنشور (D-048). */
+  readonly metrics: Readonly<Record<string, readonly PostMetricRow[]>>
   readonly now: Date
+}
+
+/**
+ * رقمٌ في الشاشة — **والفراغُ يُقال ولا يُصفَّر**.
+ *
+ * `0` تعني «قِيس فكان لا شيء»، و `null` تعني «لا يُقاس أصلا» —
+ * و LinkedIn لا يعطي الظهورَ لمنشور عضو. فلو عُرض صفرا لقُرئ فشلا،
+ * ولبُني على ذلك قرارُ نشرٍ خاطئ (D-048).
+ */
+function stat(label: string, value: number | null): string {
+  return `<span class="stat"><b>${
+    value === null ? '<span class="na" title="لا تعطيه المنصّة لهذا الحساب">—</span>' : value
+  }</b>${escapeHtml(label)}</span>`
+}
+
+/** صفُّ الأرقام تحت المنشور — أو سببُ غيابه. */
+function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date): string {
+  if (!published) return ''
+  const m = widest(rows)
+  if (m === undefined || m === null) {
+    return `<div class="stats none"><span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد
+      ٢٤ ساعةً من النشر</span></div>`
+  }
+  return `<div class="stats">
+    ${stat('ظهور', m.impressions)}
+    ${stat('تفاعل', m.reactions)}
+    ${stat('تعليق', m.comments)}
+    ${stat('مشاركة', m.shares)}
+    <span class="grow"></span>
+    <span class="ago" title="${escapeHtml(m.pulledAt)} UTC">نافذةُ ${escapeHtml(
+      m.window,
+    )} · قِيس منذ ${escapeHtml(relativeTime(m.pulledAt, now))}</span>
+  </div>`
 }
 
 const STATUS: Readonly<Record<string, { label: string; cls: string; g: string }>> = {
@@ -90,7 +126,12 @@ function capabilityTable(rows: readonly Capability[]): string {
 }
 
 /** بطاقةُ منشورٍ واحد — نصُّه هو المعروض، لا ملخّصٌ عنه. */
-function postCard(post: PlatformPost, platform: Platform, now: Date): string {
+function postCard(
+  post: PlatformPost,
+  platform: Platform,
+  now: Date,
+  metrics: readonly PostMetricRow[],
+): string {
   const meta = STATUS[post.status] ?? { label: post.status, cls: 'idle', g: '○' }
   const link = permalink(platform, post.platformPostId)
 
@@ -122,6 +163,7 @@ function postCard(post: PlatformPost, platform: Platform, now: Date): string {
       <span class="grow"></span>${when}
     </div>
     <p class="post-text">${escapeHtml(post.text)}</p>
+    ${metricRow(metrics, post.status === 'published', now)}
     ${error}
     <div class="post-foot">
       ${link === null
@@ -221,7 +263,9 @@ export function platformScreen(d: PlatformScreenData): string {
     })
     .join('')
 
-  const posts = d.posts.map((p) => postCard(p, platform, d.now)).join('')
+  const posts = d.posts
+    .map((p) => postCard(p, platform, d.now, d.metrics[p.id] ?? []))
+    .join('')
 
   const emptyPosts = `<div class="empty">
     <b>لا منشورَ على ${escapeHtml(spec.label)} بعد</b>

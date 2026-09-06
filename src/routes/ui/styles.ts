@@ -653,6 +653,19 @@ nav.back a:hover{color:var(--gold)}
   font-size:var(--t-md); line-height:var(--lh); color:var(--ink); max-width:var(--measure)}
 .post-foot{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   margin-top:var(--s-3)}
+/* ── صفُّ الأرقام ─────────────────────────────────────────────────────
+   والشرطةُ تختلف عن الصفر: الصفرُ «قِيس فكان لا شيء»، والشرطةُ «لا يُقاس
+   أصلا» — و LinkedIn لا يعطي الظهورَ لمنشور عضو. فتُعطى الشرطةُ لونا
+   خافتا وعنوانا يُقرأ بالتحويم، ولا تُعرَض رقما. */
+.stats{display:flex; align-items:center; gap:var(--s-5); flex-wrap:wrap;
+  margin-top:var(--s-3); padding-top:var(--s-3); border-top:1px solid var(--line-soft)}
+.stats.none{border-top:1px dashed var(--line); gap:var(--s-2)}
+.stat{display:inline-flex; align-items:baseline; gap:var(--s-2);
+  font-size:var(--t-xs); color:var(--ink-3)}
+.stat b{font-size:var(--t-lg); font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums; letter-spacing:-.3px}
+.stat .na{color:var(--ink-3); font-weight:400; cursor:help}
+
 /* سببُ الفشل بنصّه: «فشل» وحدها لا تُعالَج، والسببُ يُعالَج */
 .why{display:flex; gap:var(--s-3); align-items:flex-start; margin-top:var(--s-3);
   padding:var(--s-3) var(--s-4); border-radius:var(--r);
