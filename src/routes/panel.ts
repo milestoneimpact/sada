@@ -50,7 +50,10 @@ import {
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
-import { listAccounts, viewChannels } from '../lib/channels'
+import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
+import { grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
+import { platformScreen } from './ui/platformView'
+import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
@@ -875,6 +878,73 @@ panel.post('/panel/media/reject', async (c) => {
     text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورةَ بهذه الحال.',
   })
   return back('posts')
+})
+
+/**
+ * شاشةُ منصّةٍ واحدة — `/panel/channels/:platform`.
+ *
+ * ## لماذا صفحةٌ لا تبويبٌ في اللوحة
+ *
+ * أقسامُ اللوحة تُبنى كلُّها في كلّ تحميلٍ ثمّ تُخفى بـ `hidden`. وهذا
+ * يصحّ لسبعةِ أقسامٍ ثابتة، **ولا يصحّ لسبعِ منصّاتٍ لكلٍّ ستّون منشورا**:
+ * تحميلُ اللوحة يصير أربعَ مئةِ صفٍّ لا يُقرأ منها إلّا ما فُتح.
+ *
+ * وصفحةٌ لها عنوانُها يُشارَك ويُحفظ في المفضّلة ويُفتَح في تبويبٍ ثانٍ —
+ * وشظيّةُ `#channels` لا تفعل شيئا من ذلك.
+ *
+ * ## والحارسُ هو حارسُ اللوحة نفسه
+ *
+ * لا نسخةَ منه: مسارٌ جديد بحارسٍ منسوخٍ هو الثغرةُ التي كشفها D-019.
+ * والجلسةُ المعلَّقة تُردّ إلى العامل الثاني كما تُردّ من `/panel`.
+ */
+panel.get('/panel/channels/:platform', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const id = c.req.param('platform')
+  const spec = CHANNELS.find((ch) => ch.id === id)
+  if (spec === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
+
+  const accounts = await listAccounts(c.env.DB)
+  const apps = await appStatuses(
+    c.env.DB,
+    c.env as unknown as Record<string, string | undefined>,
+    ['linkedin', 'x'],
+  )
+  const present = new Set(apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames))
+  const views = viewChannels(accounts, (name) =>
+    present.has(name) || (c.env[name as keyof Env] as string | undefined) !== undefined,
+  )
+  const view = views.find((v) => v.spec.id === id)
+  if (view === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
+
+  // ما لم يُبنَ لا منشوراتٍ له ولا نطاقات: لا يُسأل عنها أصلا
+  const built = spec.built
+  const now = new Date()
+  const posts = built ? await platformPosts(c.env.DB, id as 'linkedin' | 'x', 60) : []
+  const tally = built
+    ? await platformTally(c.env.DB, id as 'linkedin' | 'x')
+    : { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }
+  const scopes = built ? await grantedScopes(c.env.DB, id as 'linkedin' | 'x') : {}
+
+  const body = platformScreen({ view, posts, tally, scopes, now })
+
+  return page((nonce) =>
+    shell(
+      `صدى — ${spec.label}`,
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel#channels">← القنوات</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${body}</main>
+       </div>`,
+      nonce,
+      THEME_SCRIPT,
+    ),
+  )
 })
 
 /**

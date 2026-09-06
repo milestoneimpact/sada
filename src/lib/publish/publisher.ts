@@ -16,6 +16,7 @@
 import { estimatePostCost, recordCost } from '../cost'
 import { containsUrl } from '../idempotency'
 import { loadTokens, markNeedsReauth, type Db } from '../tokens'
+import { canPublish, canUploadMedia } from '../oauth/scopes'
 import { isExpiring } from '../oauth/exchange'
 import type { Platform } from '../oauth/providers'
 import {
@@ -131,6 +132,32 @@ export async function publishPost(
     // التجديد يقع قبل الطابور لا داخله؛ هنا نعلّم ونتوقف بدل أن ننشر برمز ميت
     await markNeedsReauth(db, post.account_id)
     return { kind: 'failed', reason: 'token_expired', retryable: false }
+  }
+  /**
+   * ورمزٌ لا يملك نطاقَ النشر لا يُرسَل به شيء (D-045).
+   *
+   * **الحارسُ قبل النداء لا بعده** — كما وقع حارسُ الإدارة قبل نداء
+   * Google (D-019). ومحاولةٌ برمزٍ ناقص تمرّ على ثلاثة أشياء قبل أن
+   * تُردّ: تُسجَّل محاولةً، وتُحسَب تكلفتُها في الدفتر (D-008)، وتُرفَع
+   * صورتُها إن كانت — **و X يحاسب على الرفع**. ثمّ تعود 403.
+   *
+   * فيُسأل هنا، قبل الثلاثة. والجوابُ من `tokens.scopes` وهو **ما مُنح**
+   * لا ما طُلب: المنصّةُ قد تمنح أقلَّ ممّا طُلب بلا خطأ.
+   *
+   * ورفعُ الوسيط له نطاقُه عند X وحده، فيُفرَز: منشورٌ بصورةٍ يحتاج
+   * الاثنين، ونصٌّ يحتاج الأوّل — ومنعُ النصّ لنقص نطاق الصور منعٌ بلا
+   * سبب.
+   */
+  const needsMedia = image !== null
+  const capable = needsMedia
+    ? canUploadMedia(post.platform, tokens.scopes)
+    : canPublish(post.platform, tokens.scopes)
+  if (!capable) {
+    return {
+      kind: 'failed',
+      reason: needsMedia ? 'missing_media_scope' : 'missing_publish_scope',
+      retryable: false,
+    }
   }
 
   const attemptNo = await nextAttemptNo(db, post.id)

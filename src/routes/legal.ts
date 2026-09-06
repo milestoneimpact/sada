@@ -23,7 +23,7 @@
 import { Hono } from 'hono'
 import type { Env } from '../env'
 import { publicPageHeaders } from '../lib/security/headers'
-import { escapeHtml, shell } from './ui/shell'
+import { escapeHtml, shell, GLYPH_SVG } from './ui/shell'
 
 export const legal = new Hono<{ Bindings: Env }>()
 
@@ -127,7 +127,7 @@ function policyBody(env: Env, base: string): string {
 
   return `<div class="doc">
   <header>
-    <div class="glyph">صدى</div>
+    <div class="glyph">${GLYPH_SVG}</div>
     <h1>سياسةُ الخصوصيّة</h1>
     <p class="lede">صدى أداةٌ يشغّلها شخصٌ واحد لنشر محتواه هو.
       وهذه الوثيقة تصف ما تعالجه فعلا — لا ما قد تعالجه يوما.</p>
@@ -188,7 +188,7 @@ function termsBody(env: Env, base: string): string {
   const { entity, contact } = operator(env)
   return `<div class="doc">
   <header>
-    <div class="glyph">صدى</div>
+    <div class="glyph">${GLYPH_SVG}</div>
     <h1>شروطُ الاستعمال</h1>
     <p class="ago">آخر تحديث: <span class="mono">${UPDATED}</span> ·
       المشغّل: ${escapeHtml(entity)} · النطاق: <span class="mono">${escapeHtml(base)}</span></p>

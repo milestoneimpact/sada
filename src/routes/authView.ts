@@ -7,6 +7,7 @@
  * يُثبت عاملَه الثاني بعد.
  */
 import { escapeHtml, shell } from './panelView'
+import { GLYPH_SVG } from './ui/shell'
 
 export interface SecondFactorData {
   readonly csrf: string
@@ -125,7 +126,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
   return shell(
     'صدى — العامل الثاني',
     `<div class="wrap"><div class="auth">
-      <div class="glyph">صدى</div>
+      <div class="glyph">${GLYPH_SVG}</div>
       <h1>خطوةٌ أخيرة</h1>
       <p class="lede">أثبتَّ الرمز. وبقي ما يثبت أنّك أنت.</p>
       ${note}${nothing}

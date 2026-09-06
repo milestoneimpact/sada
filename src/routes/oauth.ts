@@ -14,8 +14,33 @@ import { exchangeCode, OAuthError, type ClientCredentials } from '../lib/oauth/e
 import { fetchIdentity } from '../lib/oauth/identity'
 import { PROVIDERS, redirectUri, type Platform } from '../lib/oauth/providers'
 import { readApp } from '../lib/oauth/apps'
+import { parseGranted, scopeSet, type ScopeMode } from '../lib/oauth/scopes'
 import { consumeState, saveState, StateError } from '../lib/oauth/state'
 import { saveTokens, upsertAccount } from '../lib/tokens'
+import { htmlHeaders, makeNonce } from '../lib/security/headers'
+import { shell } from './ui/shell'
+import { connectedBody, refusedBody } from './ui/oauthResult'
+
+/**
+ * صفحةٌ لا سطرُ JSON.
+ *
+ * كان الردُّ هنا JSON عاريا، **وهذه نهايةُ تحويلٍ من متصفّح**: من يصل
+ * إليها إنسانٌ ينظر، لا برنامجٌ يقرأ. وسطرٌ فيه
+ * <span dir="ltr">unauthorized_scope_error</span> يقول له أنّ شيئا فشل
+ * ولا يقول أيَّ نطاقٍ ولا مَن يمنحه — فأعاد توليدَ سرِّه، وهي أوّلُ
+ * حركةٍ خاطئة.
+ */
+function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
+  const nonce = makeNonce()
+  const html = shell(
+    title,
+    `<div class="wrap"><nav class="back" aria-label="مسارُ العودة">
+       <a href="/panel#channels">← القنوات</a></nav>
+     <main id="main">${body}</main></div>`,
+    nonce,
+  )
+  return new Response(html, { status, headers: htmlHeaders(nonce) })
+}
 
 export const oauth = new Hono<{ Bindings: Env }>()
 
@@ -58,11 +83,24 @@ async function credentialsFor(env: Env, platform: Platform): Promise<ClientCrede
   return { clientId: app.clientId, clientSecret: app.clientSecret }
 }
 
+/**
+ * وضعُ النطاقات — الكاملُ هو الأصل، و`identity` مخرجُ نجاة.
+ *
+ * ولا يُقدَّم خيارا ابتداءً: مالكٌ يُخيَّر بين «كامل» و«هويّةٍ وحدها»
+ * قبل أن يفشل شيء **يختار الأضيق ظنّا أنّه الأحوط**، ثمّ يسأل لماذا لا
+ * ينشر النظام. فيُعرَض بعد الرفض وحده، من صفحة التشخيص.
+ */
+function scopeModeOf(raw: string | undefined): ScopeMode {
+  return raw === 'identity' ? 'identity' : 'full'
+}
+
 oauth.get('/oauth/:platform/start', async (c) => {
   const platform = platformOf(c.req.param('platform'))
   if (platform === null) return c.json({ error: 'unknown_platform' }, 404)
 
   const provider = PROVIDERS[platform]
+  const mode = scopeModeOf(c.req.query('scope'))
+  const scopes = scopeSet(platform, mode)
   let creds
   try {
     creds = await credentialsFor(c.env, platform) // يفشل مبكرا إن نقص سر
@@ -80,13 +118,16 @@ oauth.get('/oauth/:platform/start', async (c) => {
     verifier: pkce.verifier,
     redirectUri: uri,
     createdAt: new Date().toISOString(),
+    // ما طُلب في **هذه** الدورة يُحفظ معها: صفحةُ التشخيص تعرضه، وما
+    // يُسجَّل في القاعدة يُبنى عليه — والحارسُ يقرأ من القاعدة
+    scopes: scopes.join(' '),
   })
 
   const url = new URL(provider.authorizeUrl)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('client_id', creds.clientId)
   url.searchParams.set('redirect_uri', uri)
-  url.searchParams.set('scope', provider.scopes.join(' '))
+  url.searchParams.set('scope', scopes.join(' '))
   url.searchParams.set('state', state)
   url.searchParams.set('code_challenge', pkce.challenge)
   url.searchParams.set('code_challenge_method', pkce.method)
@@ -98,10 +139,34 @@ oauth.get('/oauth/:platform/callback', async (c) => {
   const platform = platformOf(c.req.param('platform'))
   if (platform === null) return c.json({ error: 'unknown_platform' }, 404)
 
-  // رفض المستخدم للموافقة ليس عطلا: يُقال كما هو
+  // رفضُ المستخدم ورفضُ المنصّة للنطاق يصلان من الباب نفسه، ويفترقان
+  // في العلاج — فيُشخَّصان في صفحةٍ واحدةٍ تفرزهما
   const denied = c.req.query('error')
   if (typeof denied === 'string' && denied.length > 0) {
-    return c.json({ error: 'consent_denied', platform, reason: denied }, 400)
+    // ما طُلب يُقرأ من الحالة المحفوظة إن أمكن؛ وإلّا فالكامل
+    let requested = scopeSet(platform)
+    let wasIdentityOnly = false
+    try {
+      const saved = await consumeState(c.env.KV, c.req.query('state') ?? '')
+      if (typeof saved.scopes === 'string' && saved.scopes.length > 0) {
+        requested = parseGranted(saved.scopes)
+        wasIdentityOnly = requested.length === scopeSet(platform, 'identity').length
+      }
+    } catch {
+      // حالةٌ منتهيةٌ أو مستهلَكة: يُشخَّص بالكامل — وهو الأصل
+    }
+    return resultPage(
+      `صدى — لم يكتمل الربط`,
+      refusedBody({
+        platform,
+        reason: denied,
+        requested,
+        // ولا يُعرَض مخرجُ الهويّة إن كانت هي التي رُفضت: زرٌّ يعيد
+        // المحاولةَ نفسها التي فشلت يَعِد بما لا يقع
+        identityRetry: !wasIdentityOnly,
+      }),
+      400,
+    )
   }
 
   const code = c.req.query('code') ?? ''
@@ -116,25 +181,33 @@ oauth.get('/oauth/:platform/callback', async (c) => {
 
     const provider = PROVIDERS[platform]
     const creds = await credentialsFor(c.env, platform)
+    const requested =
+      typeof saved.scopes === 'string' && saved.scopes.length > 0
+        ? parseGranted(saved.scopes)
+        : provider.scopes
     const tokens = await exchangeCode(provider, creds, {
       code,
       redirectUri: saved.redirectUri,
       verifier: saved.verifier,
+      requestedScopes: requested,
     })
 
     const identity = await fetchIdentity(provider, tokens.accessToken)
     const id = await upsertAccount(c.env.DB, identity)
     await saveTokens(c.env.DB, c.env.TOKEN_ENC_KEY, id, tokens)
 
-    // لا رمز في الجواب. ما يُعاد يكفي للوحة ولا يكفي لمنتحل
-    return c.json({
-      connected: true,
-      account_id: id,
-      platform,
-      display_name: identity.displayName,
-      expires_at: tokens.expiresAt,
-      has_refresh: tokens.refreshToken !== null,
-    })
+    // لا رمزَ في الصفحة ولا في عنوانها: اسمٌ وحالُ نطاقاتٍ لا أكثر
+    return resultPage(
+      `صدى — رُبط ${identity.displayName}`,
+      connectedBody({
+        platform,
+        displayName: identity.displayName,
+        grantedScopes: parseGranted(tokens.scopes),
+        hasRefresh: tokens.refreshToken !== null,
+        expiresAt: tokens.expiresAt,
+      }),
+      200,
+    )
   } catch (error) {
     const failure = oauthFailure(error)
     return c.json(failure.body, failure.status)

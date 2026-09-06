@@ -39,11 +39,18 @@ afterEach(() => {
 })
 
 /** يمرّ بـ start ويعيد قيمة state التي أصدرها الخادم. */
-async function startAndCaptureState(platform: 'linkedin' | 'x'): Promise<{
+async function startAndCaptureState(
+  platform: 'linkedin' | 'x',
+  scope?: 'identity',
+): Promise<{
   state: string
   location: URL
 }> {
-  const response = await app.request(`/oauth/${platform}/start`, {}, env)
+  const response = await app.request(
+    `/oauth/${platform}/start${scope === undefined ? '' : `?scope=${scope}`}`,
+    {},
+    env,
+  )
   expect(response.status).toBe(302)
   const location = new URL(response.headers.get('location') ?? '')
   return { state: location.searchParams.get('state') ?? '', location }
@@ -119,11 +126,12 @@ describe('GET /oauth/:platform/callback', () => {
       env,
     )
     expect(response.status).toBe(200)
-    const body = (await response.json()) as Record<string, unknown>
-    expect(body['connected']).toBe(true)
-    expect(body['account_id']).toBe('linkedin:member:urn:li:person:abc')
-    expect(body['display_name']).toBe('عمر')
-    expect(body['has_refresh']).toBe(true)
+    // صفحةٌ لا سطرُ JSON (D-045): من يصل هنا إنسانٌ ينظر لا برنامجٌ يقرأ
+    const body = await response.text()
+    expect(response.headers.get('Content-Type')).toContain('text/html')
+    expect(body).toContain('عمر')
+    // وما مُنح معروضٌ بالاسم — لا يُترك ليُكتشَف عند أوّل نشرٍ يُردّ
+    expect(body).toContain('w_member_social')
 
     const stored = await loadTokens(db, KEY, 'linkedin:member:urn:li:person:abc')
     expect(stored?.accessToken).toBe('li-access')
@@ -170,9 +178,43 @@ describe('GET /oauth/:platform/callback', () => {
       env,
     )
     expect(response.status).toBe(400)
-    const body = (await response.json()) as Record<string, unknown>
-    expect(body['error']).toBe('consent_denied')
-    expect(body['reason']).toBe('access_denied')
+    const body = await response.text()
+    // ورفضُ المستخدم يُقال قرارا لا عطلا: لا تشخيصَ ولا خطوات
+    expect(body).toContain('أُلغي')
+    expect(body).toContain('لم يُحفَظ شيء')
+    expect(body).not.toContain('نطاقٌ لم يُمنَح')
+  })
+
+  it('ورفضُ نطاقٍ يُشخَّص بالاسم ومصدرِه — لا يُخلَط برفض المستخدم', async () => {
+    // العلّةُ التي وُلد منها D-045: الجوابُ كان
+    // { error: consent_denied, reason: unauthorized_scope_error } وحده
+    const { state } = await startAndCaptureState('linkedin')
+    const response = await app.request(
+      `/oauth/linkedin/callback?error=unauthorized_scope_error&state=${encodeURIComponent(state)}`,
+      {},
+      env,
+    )
+    expect(response.status).toBe(400)
+    const body = await response.text()
+    expect(body).toContain('unauthorized_scope_error')
+    // النطاقُ ومَن يمنحه بالاسم كما يُرى في البوّابة
+    expect(body).toContain('w_member_social')
+    expect(body).toContain('Share on LinkedIn')
+    // ومخرجٌ لا شاشةُ عطلٍ مغلقة
+    expect(body).toContain('/oauth/linkedin/start?scope=identity')
+    // ولا يُتّهم السرُّ وهو بريء
+    expect(body).toContain('لا تُعِد توليدَ السرّ')
+  })
+
+  it('ولا يُعرَض مخرجُ الهويّة إن كانت هي التي رُفضت', async () => {
+    const { state } = await startAndCaptureState('linkedin', 'identity')
+    const response = await app.request(
+      `/oauth/linkedin/callback?error=unauthorized_scope_error&state=${encodeURIComponent(state)}`,
+      {},
+      env,
+    )
+    const body = await response.text()
+    expect(body).not.toContain('scope=identity')
   })
 
   it('يرد 400 حين يغيب code', async () => {
@@ -204,8 +246,8 @@ describe('GET /oauth/:platform/callback', () => {
     stubNetwork()
     const { state } = await startAndCaptureState('x')
     const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
-    const body = (await response.json()) as Record<string, unknown>
-    expect(body['account_id']).toBe('x:member:4242')
+    const body = await response.text()
+    expect(body).toContain('Omar')
   })
 
   it('إعادة الربط لا تنشئ حسابا ثانيا', async () => {

@@ -1,0 +1,280 @@
+/**
+ * ما يُرى بعد العودة من شاشة الإذن.
+ *
+ * ## العلّة التي وُلد منها هذا الملفّ
+ *
+ * ربطُ X نجح، وربطُ LinkedIn ردّ هذا في المتصفّح:
+ *
+ *     { "error": "consent_denied",
+ *       "platform": "linkedin",
+ *       "reason": "unauthorized_scope_error" }
+ *
+ * وهو **صادقٌ وعديمُ النفع معا**. لا يقول أيَّ نطاقٍ رُفض، ولا مَن
+ * يمنحه، ولا أنّ العلّة في بوّابة المنصّة لا في السرّ الذي كُتب. ومن
+ * قرأه ظنّ أنّ سرَّه خطأ فأعاد توليده — وهي أوّلُ حركةٍ خاطئة.
+ *
+ * ## وثلاثةُ أشياءَ تصنعها هذه الصفحة
+ *
+ * ١ · **تسمّي الناقصَ ومصدرَه** بالاسم كما يُرى في البوّابة.
+ * ٢ · **تفتح مخرجا**: زرٌّ يعيد المحاولة بالهويّة وحدها، فيُربَط الحساب
+ *     اليوم ويُكمَل النشرُ غدا — بدل شاشةٍ لا مخرجَ منها.
+ * ٣ · **تقول ما لا يعمل بعدها**، فلا يظنّ المالكُ أنّه أتمّ وقد نقص.
+ *
+ * ## ولا رمزَ في هذه الصفحة ولا في عنوانها
+ *
+ * تُعرض بعد أن يُخزَّن الرمزُ مشفّرا، ولا تحمل منه شيئا: اسمُ الحساب
+ * وحالُ النطاقات لا أكثر (D-005).
+ */
+import { SCOPES, type ScopeSpec } from '../../lib/oauth/scopes'
+import type { Platform } from '../../lib/oauth/providers'
+import { SETUP } from '../../lib/channels'
+import { escapeHtml } from './shell'
+import { LOGOS } from './logos'
+
+const LABEL: Readonly<Record<Platform, string>> = { linkedin: 'LinkedIn', x: 'X' }
+
+function head(platform: Platform, eyebrow: string, title: string, lede: string): string {
+  return `<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p class="lede">${lede}</p>
+    </div>
+    <div class="aside"><div class="plat-logo lg">${LOGOS[platform] ?? ''}</div></div>
+  </div>`
+}
+
+/** صفٌّ لكلّ نطاق: أمُنح، وما يفتحه، ومَن يمنحه إن نقص. */
+function scopeRows(platform: Platform, granted: ReadonlySet<string>): string {
+  return SCOPES[platform]
+    .map((spec: ScopeSpec) => {
+      const on = granted.has(spec.name)
+      return `<tr>
+        <td data-label="النطاق"><span class="mono">${escapeHtml(spec.name)}</span></td>
+        <td data-label="يفتح"><span class="nm">${escapeHtml(spec.enables)}</span></td>
+        <td data-label="الحال">${
+          on
+            ? '<span class="st ok"><span class="g">●</span>ممنوح</span>'
+            : '<span class="st bad"><span class="g">▲</span>ناقص</span>'
+        }</td>
+        <td data-label="مصدرُه">${
+          on
+            ? '<span class="ago">—</span>'
+            : `<span class="sub" style="margin:0"><b>${escapeHtml(spec.grantedBy)}</b><br>
+               ${escapeHtml(spec.where)}</span>`
+        }</td>
+      </tr>`
+    })
+    .join('')
+}
+
+export interface ConnectedData {
+  readonly platform: Platform
+  readonly displayName: string
+  readonly grantedScopes: readonly string[]
+  readonly hasRefresh: boolean
+  readonly expiresAt: string
+}
+
+/** رُبط الحساب — وما يستطيعه يُقال هنا لا يُترك ليُكتشَف عند أوّل نشر. */
+export function connectedBody(d: ConnectedData): string {
+  const granted = new Set(d.grantedScopes)
+  const missing = SCOPES[d.platform].filter((s) => !granted.has(s.name))
+  const canPublish = SCOPES[d.platform]
+    .filter((s) => s.need === 'publish')
+    .every((s) => granted.has(s.name))
+
+  const verdict =
+    missing.length === 0
+      ? `<div class="outcome"><span class="k">تمّ</span><span class="v">
+         كلُّ النطاقات ممنوحة. <b>يستطيع صدى أن ينشر باسم هذا الحساب</b> —
+         بعد موافقتك على كلّ منشورٍ على حدة.</span></div>`
+      : canPublish
+        ? `<div class="outcome warn"><span class="k">ينقص</span><span class="v">
+           النشرُ يعمل، <b>و ${missing.length} نطاقا لم يُمنَح</b> — وما يفتحه لا يعمل.
+           والجدولُ تحت يقول أيَّها ومَن يمنحه.</span></div>`
+        : `<div class="outcome warn"><span class="k">مربوطٌ ولا ينشر</span><span class="v">
+           <b>الهويّةُ مقروءة، والنشرُ غيرُ ممكن</b> — نطاقُ النشر لم يُمنَح.
+           والحسابُ محفوظٌ كما هو: أضف المنتَجَ في البوّابة ثمّ اضغط «جدّد الإذن»،
+           ولا تُعِد بناء التطبيق.</span></div>`
+
+  const refresh = d.hasRefresh
+    ? '<span class="st ok"><span class="g">●</span>يُجدَّد تلقائيّا</span>'
+    : `<span class="st warn"><span class="g">!</span>بلا تجديدٍ تلقائيّ</span>`
+
+  return `${head(
+    d.platform,
+    'رُبط',
+    `${LABEL[d.platform]} — ${d.displayName}`,
+    'الرمزُ محفوظٌ مشفّرا، ولا يظهر في هذه الصفحة ولا في سجلّ. ' +
+      '<b>وما يستطيعه هذا الحسابُ مقروءٌ ممّا مُنح لا ممّا طُلب.</b>',
+  )}
+
+  ${verdict}
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
+      <div class="grow"></div>${refresh}</div>
+    <p class="hint">وقتُ انتهاء الإذن: <span class="mono">${escapeHtml(
+      d.expiresAt.slice(0, 16).replace('T', ' '),
+    )}</span> UTC.
+      ${d.hasRefresh
+        ? 'ويُجدَّد قبل انتهائه بلا تدخّل.'
+        : '<b>ولا رمزَ تجديدٍ معه</b> — فسيتوقّف النشرُ عند انتهائه حتّى تُعيد الربط.'}</p>
+    <div class="scroll"><table>
+      <thead><tr><th>النطاق</th><th>يفتح</th><th>الحال</th><th>مصدرُه إن نقص</th></tr></thead>
+      <tbody>${scopeRows(d.platform, granted)}</tbody></table></div>
+  </div>
+
+  <div class="row" style="margin-top:18px">
+    <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
+      LABEL[d.platform],
+    )}</a>
+    <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+  </div>`
+}
+
+export interface RefusedData {
+  readonly platform: Platform
+  /** رمزُ الرفض كما ردّته المنصّة — لا نصُّ وصفها. */
+  readonly reason: string
+  /** ما طُلب في الدورة التي رُفضت. */
+  readonly requested: readonly string[]
+  /** أتُعرَض محاولةُ الهويّة وحدها؟ لا تُعرَض إن كانت هي التي رُفضت. */
+  readonly identityRetry: boolean
+}
+
+/**
+ * رُفض الإذن — والرفضُ نوعان لا نوع.
+ *
+ * **رفضُ المستخدم** قرارٌ لا عطل: يُقال كما هو بلا تشخيص.
+ * **ورفضُ المنصّة للنطاق** عطلُ ضبطٍ في بوّابتها: يُشخَّص بالاسم.
+ *
+ * وخلطُهما — وهو ما كان — يجعل من ضغط «إلغاء» يقرأ صفحةَ عطل، ومن رُفض
+ * نطاقُه يقرأ «أُلغي» فيظنّ أنّه هو ألغى.
+ */
+export function refusedBody(d: RefusedData): string {
+  const scopeProblem =
+    d.reason === 'unauthorized_scope_error' || d.reason === 'invalid_scope'
+  const userDenied = d.reason === 'user_cancelled_login' || d.reason === 'access_denied' ||
+    d.reason === 'user_cancelled_authorize'
+  const guide = SETUP[d.platform]
+
+  if (userDenied) {
+    return `${head(
+      d.platform,
+      'أُلغي',
+      `لم تُمنَح ${LABEL[d.platform]} إذنا`,
+      'أُغلقت شاشةُ الإذن قبل الموافقة. <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.',
+    )}
+    <div class="card">
+      <h2>لا شيءَ يحتاج إصلاحا</h2>
+      <p class="hint">هذا قرارُك لا عطلٌ في الضبط. وزرُّ الربط في لوح القنوات
+        يعمل كما كان متى شئت.</p>
+      <div class="row" style="margin-top:14px">
+        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
+        <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+      </div>
+    </div>`
+  }
+
+  if (!scopeProblem) {
+    return `${head(
+      d.platform,
+      'رُفض',
+      `ردّت ${LABEL[d.platform]} الطلب`,
+      `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
+        '<b>ولم يُحفَظ شيء.</b>',
+    )}
+    <div class="card">
+      <h2>أوّلُ ما يُراجَع</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><span class="body">
+          <span class="what">رابطُ العودة المسجَّل في البوّابة</span>
+          <span class="why">${guide === undefined ? '' : guide.gotcha}</span></span></li>
+        <li><span class="n">2</span><span class="body">
+          <span class="what">Client ID و Client Secret</span>
+          <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
+            يعطي هذا الرمزَ نفسه.</span></span></li>
+      </ol>
+      ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
+        <span class="v">${guide.failure}</span></div>`}
+      <div class="row" style="margin-top:14px">
+        <a class="btn p" href="/panel#channels">افتح الدليل والحقول</a>
+        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      </div>
+    </div>`
+  }
+
+  // ── رفضُ نطاق: التشخيصُ بالاسم، والمخرجُ بزرّ ────────────────────
+  const asked = new Set(d.requested)
+  const suspects = SCOPES[d.platform].filter((s) => asked.has(s.name))
+  const rows = suspects
+    .map(
+      (s) => `<tr>
+        <td data-label="النطاق"><span class="mono">${escapeHtml(s.name)}</span></td>
+        <td data-label="يفتح">${escapeHtml(s.enables)}</td>
+        <td data-label="مَن يمنحه"><span class="nm">${escapeHtml(s.grantedBy)}</span>
+          <div class="sub" style="margin-top:4px">${escapeHtml(s.where)}</div></td>
+      </tr>`,
+    )
+    .join('')
+
+  return `${head(
+    d.platform,
+    'نطاقٌ لم يُمنَح',
+    `${LABEL[d.platform]} رفضت نطاقا طلبناه`,
+    `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
+      '<b>ومعناه أنّ التطبيقَ لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
+      'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
+  )}
+
+  <div class="outcome warn"><span class="k">أين العلّة</span><span class="v">
+    النطاقُ يُمنَح <b>بمنتَجٍ يُضاف في بوّابة المنصّة</b>، لا بمفتاحٍ يُكتب هنا.
+    والجدولُ تحت يقول ما طُلب ومَن يمنح كلَّ واحدٍ منه.
+    <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.</span></div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>ما طُلب في هذه المحاولة</h2></div>
+    <p class="hint">المنصّةُ لا تقول أيَّ واحدٍ رفضت، <b>فكلُّها معروضة</b>.
+      وأكثرُ ما يقع أن يكون النقصُ في المنتَج الذي يمنح النشر — وهو يُمنَح فورا
+      بلا مراجعةٍ في الحالين.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>النطاق</th><th>يفتح</th><th>مَن يمنحه</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+  </div>
+
+  ${!d.identityRetry
+    ? ''
+    : `<div class="card" style="margin-top:16px">
+      <div class="card-head"><h2>ولا تنتظر البوّابة لتربط</h2></div>
+      <p class="hint">يمكن الربطُ <b>بالهويّة وحدها</b> الآن: يُحفَظ الحساب ويظهر باسمه،
+        <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَجُ الناقص ثمّ تضغط «جدّد الإذن».
+        وصدى يقرأ ما مُنح فعلا، فلن يحاول نشرا يعرف أنّه سيُردّ.</p>
+      <div class="row" style="margin-top:14px">
+        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
+          >اربط الهويّة وحدها</a>
+        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+      </div>
+    </div>`}
+
+  ${guide === undefined
+    ? ''
+    : `<div class="card" style="margin-top:16px">
+      <div class="card-head"><h2>الخطواتُ في ${escapeHtml(guide.portalLabel)}</h2></div>
+      <ol class="steps">${guide.before
+        .map(
+          (b, i) => `<li><span class="n">${i + 1}</span><span class="body">
+            <span class="what">${b.what}</span><span class="why">${b.why}</span></span></li>`,
+        )
+        .join('')}</ol>
+      <a class="btn g sm" href="${escapeHtml(guide.portal)}" target="_blank"
+        rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
+      <div class="outcome"><span class="k">إن نجح</span>
+        <span class="v">${guide.success}</span></div>
+    </div>`}
+
+  <div class="row" style="margin-top:18px">
+    <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+  </div>`
+}

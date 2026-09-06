@@ -28,6 +28,24 @@ const ICON_SVG = [
   '</g></svg>',
 ].join('')
 
+/**
+ * العلامةُ في الرافدة — **الأقواسُ نفسها، لا الحرفان**.
+ *
+ * كان المربّعُ يحمل «صدى» بخمسةَ عشرَ بكسلا في ستٍّ وثلاثين، فيزدحم
+ * الحرفان ويُقرأ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب.
+ * والعلامةُ الواحدة في الموضعين تُعرَف: تبويبٌ في المتصفّح ورافدةٌ في
+ * الصفحة يحملان الشكلَ نفسه.
+ */
+export const GLYPH_SVG =
+  // إطارٌ مشدودٌ على الأقواس وحدها: viewBox الرمزِ كاملا يترك فراغا
+  // يمينَ الشكل، فتبدو العلامةُ مزاحةً في مربّعها
+  '<svg viewBox="9 7 15 18" fill="none" stroke="currentColor" ' +
+  'stroke-linecap="round" aria-hidden="true">' +
+  '<path d="M11 9a10 10 0 0 1 0 14" stroke-width="2.6" opacity=".95"/>' +
+  '<path d="M17 11a6.5 6.5 0 0 1 0 10" stroke-width="2.2" opacity=".62"/>' +
+  '<path d="M22.5 13.5a3.3 3.3 0 0 1 0 5" stroke-width="1.9" opacity=".34"/>' +
+  '</svg>'
+
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG)}">
 <meta name="theme-color" content="#8a6d1f">`
 
