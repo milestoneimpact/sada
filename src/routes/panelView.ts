@@ -473,6 +473,82 @@ export const SCRIPT = `
       load(false);
     });
   });
+
+  /*
+   * «الموعدُ يُكتب UTC ويُقرأ بتوقيت المالك» (D-089).
+   *
+   * الخادمُ يقرأ الصندوقَ UTC ولا يعرف منطقةَ أحد — وهذا صواب: منطقةٌ
+   * تُخزَّن في إعدادٍ تُنسى فتكذب بعد سفرٍ أو تحوّلٍ صيفيّ. فالتحويلُ
+   * هنا، حيث المنطقةُ معروفةٌ يقينا وتُقرأ لحظتَها.
+   *
+   * «والدوالُّ الثلاثُ خالصة»: تأخذ لحظةً وتردّ لحظةً، ولا تمسّ صفحةً
+   * ولا شبكة. فهي تُنتزَع من هذا النصّ عينِه وتُختبَر — كما يُنتزَع
+   * العدّاد (D-071). ونسخةٌ ثانيةٌ في الاختبار تفترق بلا حارس.
+   */
+  function pad2(n){return (n<10?'0':'')+n;}
+  function utcBox(d){
+    return d.getUTCFullYear()+'-'+pad2(d.getUTCMonth()+1)+'-'+pad2(d.getUTCDate())
+      +'T'+pad2(d.getUTCHours())+':'+pad2(d.getUTCMinutes());
+  }
+  function localAt(now,days,hour){
+    var d=new Date(now.getTime());
+    d.setDate(d.getDate()+days);
+    d.setHours(hour,0,0,0);
+    return d;
+  }
+  function preset(now,kind){
+    if(kind==='hour')return new Date(now.getTime()+3600000);
+    if(kind==='tonight'){var t=localAt(now,0,20);return t>now?t:localAt(now,1,20);}
+    if(kind==='tomorrow')return localAt(now,1,9);
+    if(kind==='sunday'){
+      var d=localAt(now,1,9);
+      /* «ولا يقع في الماضي أبدا»: يبدأ من الغد ثمّ يتقدّم إلى الأحد */
+      for(var i=0;i<7&&d.getDay()!==0;i++)d.setDate(d.getDate()+1);
+      return d;
+    }
+    return null;
+  }
+  function boxToDate(v){
+    var m=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(v||'');
+    if(!m)return null;
+    var d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));
+    /*
+     * «والشكلُ ليس صحّة»: «2026-13-40T99:99» يوافق النمطَ، و«Date.UTC»
+     * يدحرجه إلى فبراير ٢٠٢٧ — «فتقول المرآةُ تاريخا واثقا لا علاقةَ له
+     * بما كُتب». فيُقارَن الذهابُ بالإياب: ما لم يُعِد الرقمَ نفسَه فليس
+     * لحظةً، وصمتٌ خيرٌ من رقمٍ يُصدَّق.
+     */
+    return utcBox(d)===v.slice(0,16)?d:null;
+  }
+
+  document.querySelectorAll('.quick').forEach(function(bar){
+    var field=document.getElementById(bar.dataset.quick);
+    var mirror=bar.parentNode.querySelector('[data-mirror="'+bar.dataset.quick+'"]');
+    if(!field)return;
+    function reflect(){
+      if(!mirror)return;
+      var at=boxToDate(field.value);
+      if(at===null){mirror.textContent='';return;}
+      /*
+       * «والرقمان حاضران معا»: الصندوقُ UTC والمرآةُ محلّيّة. ومَن
+       * أظهر واحدا وأخفى الآخر جعل المالكَ يحوّل ذهنيّا كما كان.
+       */
+      try{
+        mirror.textContent='= '+at.toLocaleString('ar',{weekday:'long',day:'numeric',
+          month:'long',hour:'numeric',minute:'2-digit'})+' بتوقيتك';
+      }catch(e){mirror.textContent='';}
+    }
+    bar.querySelectorAll('[data-preset]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var at=preset(new Date(),btn.dataset.preset);
+        if(at===null)return;
+        field.value=utcBox(at);
+        reflect();
+      });
+    });
+    field.addEventListener('input',reflect);
+    reflect();
+  });
 })();
 `
 
