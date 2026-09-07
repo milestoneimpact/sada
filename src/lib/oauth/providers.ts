@@ -21,7 +21,14 @@ import { scopeSet } from './scopes'
 export type Platform = 'linkedin' | 'x' | 'youtube' | 'tiktok'
 
 /** ما بُني له سائقُ نشرٍ فعلا — ويقابل قيدَ `posts.platform`. */
-export type PublishPlatform = 'linkedin' | 'x'
+/**
+ * ما تنشر اليوم — **ويُوسَّع مع سائقه لا قبله** (D-092).
+ *
+ * TikTok تنشر بالصندوق (`video.upload`) بلا انتظار إجازة، وبالنشر
+ * المباشر (`video.publish`) بعدها. و YouTube و Instagram تُربطان ولا
+ * تنشران بعد — **والفرقُ في النوع وفي قيد القاعدة معا** (0019).
+ */
+export type PublishPlatform = 'linkedin' | 'x' | 'tiktok'
 
 export interface Provider {
   readonly platform: Platform

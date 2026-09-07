@@ -1575,7 +1575,8 @@ describe('شاشةُ المنصّة', () => {
    */
   it('وما يُربَط ولا ينشر يقول الاثنين معا', async () => {
     const cookie = await login()
-    for (const platform of ['youtube', 'tiktok']) {
+    // **و TikTok خرجت من هذه المرتبة** بسائقها (D-092)، فبقيت YouTube
+    for (const platform of ['youtube']) {
       const html = await (
         await app.request(`/panel/channels/${platform}`, withSession(cookie), env)
       ).text()
@@ -1583,6 +1584,15 @@ describe('شاشةُ المنصّة', () => {
       // ولا يُعرَض حصادُ نشرٍ لمنصّةٍ لا تنشر — أصفارٌ تُقرأ فشلا
       expect(html, platform).not.toContain('لم يُنشر شيءٌ بعد')
     }
+  })
+
+  /** **وما صار ينشر لا يبقى يقول إنّه لا ينشر** — الشاشةُ تتبع السائق. */
+  it('و TikTok لم تعد تقول «تُربَط ولا تنشر»', async () => {
+    const cookie = await login()
+    const html = await (
+      await app.request('/panel/channels/tiktok', withSession(cookie), env)
+    ).text()
+    expect(html).not.toContain('تُربَط ولا تنشر')
   })
 
   it('وتقول ما نقص من النطاقات بالاسم ومَن يمنحه', async () => {
