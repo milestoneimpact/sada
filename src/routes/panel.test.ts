@@ -1300,6 +1300,148 @@ describe('الكتابة من اللوحة', () => {
     expect(results).toHaveLength(0)
   })
 
+  /** مسوّدةٌ جاهزةٌ للبَتّ — تُعاد بمعرّفها. */
+  async function seedPost(status = 'draft', text = 'ن'.repeat(300)): Promise<string> {
+    const sourceId = await seedAnalyzed()
+    const postId = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, source_id, source_hash, model, cost_usd, type,
+                            text, status, idempotency_key)
+         VALUES (?, 'linkedin', ?, 'md5:a', 'm', 0.01, 'text', ?, ?, ?)`,
+      )
+      .bind(postId, sourceId, text, status, `k-${postId}`)
+      .run()
+    return postId
+  }
+
+  async function statusOf(id: string): Promise<string | undefined> {
+    const row = await db
+      .prepare('SELECT status FROM posts WHERE id = ?')
+      .bind(id)
+      .first<{ status: string }>()
+    return row?.status
+  }
+
+  /**
+   * التراجعُ عن الرفض (D-090) — **ومسارٌ ينقل ولا يقرّر.**
+   *
+   * الحكمُ في `undoReject`، وهذا يُثبت أنّ البابَ محروسٌ كسائر الأبواب:
+   * لا جلسةَ فلا مرور، ولا رمزَ نموذجٍ فلا مرور — **وزرٌّ في إشعارٍ ليس
+   * طريقا جانبيّا حول الحارس** (D-019).
+   */
+  describe('التراجعُ عن الرفض', () => {
+    it('يعيدها مسوّدةً ويكتب أثرا في السجلّ', async () => {
+      const postId = await seedPost('rejected')
+      const cookie = await login()
+      const body = new FormData()
+      body.set('id', postId)
+
+      const response = await app.request(
+        '/panel/drafts/undo-reject',
+        withSession(cookie, { method: 'POST', body }),
+        env,
+      )
+      expect(response.status).toBe(303)
+      expect(await statusOf(postId)).toBe('draft')
+
+      const { results } = await db
+        .prepare("SELECT action FROM audit_log WHERE action = 'draft.undo_reject'")
+        .all()
+      expect(results).toHaveLength(1)
+    })
+
+    it('بلا رمزِ نموذجٍ لا يمرّ — والحالُ يبقى', async () => {
+      const postId = await seedPost('rejected')
+      const cookie = await login()
+      const body = new FormData()
+      body.set('id', postId)
+
+      const response = await app.request(
+        '/panel/drafts/undo-reject',
+        { method: 'POST', body, headers: { Cookie: cookie } },
+        env,
+      )
+      expect(response.status).toBe(403)
+      expect(await statusOf(postId)).toBe('rejected')
+    })
+
+    it('وبلا جلسةٍ ٤٠١', async () => {
+      const body = new FormData()
+      body.set('id', 'أيّا كان')
+      const response = await app.request('/panel/drafts/undo-reject', { method: 'POST', body }, env)
+      expect(response.status).toBe(401)
+    })
+  })
+
+  /**
+   * البَتُّ الجماعيّ (D-090).
+   *
+   * وأهمُّ ما يُثبَت هنا **أنّ المعرّفاتِ تُقرأ كلُّها**: `form.get` تعطي
+   * الأوّلَ وحدَه، فصندوقان محدَّدان يمرّ منهما واحدٌ **بلا خطأ ولا أثر**
+   * — علّةٌ يراها المالكُ «اعتُمدت واحدةٌ من خمس» ولا يعرف لماذا.
+   */
+  describe('البَتُّ الجماعيّ', () => {
+    it('يعتمد كلَّ ما أُرسِل لا أوّلَه', async () => {
+      const one = await seedPost()
+      const two = await seedPost()
+      const three = await seedPost()
+      const cookie = await login()
+      const body = new FormData()
+      body.append('id', one)
+      body.append('id', two)
+      body.append('id', three)
+
+      const response = await app.request(
+        '/panel/drafts/approve-many',
+        withSession(cookie, { method: 'POST', body }),
+        env,
+      )
+      expect(response.status).toBe(303)
+      for (const id of [one, two, three]) expect(await statusOf(id)).toBe('approved')
+    })
+
+    it('وسقفٌ يمنع طلبا يحمل أكثرَ من خمسٍ وعشرين — ولا يُعتمَد منه شيء', async () => {
+      const postId = await seedPost()
+      const cookie = await login()
+      const body = new FormData()
+      for (let i = 0; i < 26; i += 1) body.append('id', postId)
+
+      const response = await app.request(
+        '/panel/drafts/approve-many',
+        withSession(cookie, { method: 'POST', body }),
+        env,
+      )
+      expect(response.status).toBe(303)
+      expect(await statusOf(postId)).toBe('draft')
+    })
+
+    it('وطلبٌ بلا معرّفٍ واحدٍ لا يرمي', async () => {
+      const cookie = await login()
+      const response = await app.request(
+        '/panel/drafts/approve-many',
+        withSession(cookie, { method: 'POST', body: new FormData() }),
+        env,
+      )
+      expect(response.status).toBe(303)
+    })
+
+    it('وبلا رمزِ نموذجٍ لا يمرّ', async () => {
+      const postId = await seedPost()
+      const cookie = await login()
+      const body = new FormData()
+      body.append('id', postId)
+
+      const response = await app.request(
+        '/panel/drafts/approve-many',
+        { method: 'POST', body, headers: { Cookie: cookie } },
+        env,
+      )
+      expect(response.status).toBe(403)
+      expect(await statusOf(postId)).toBe('draft')
+    })
+  })
+
   it('البَتُّ يكتب صاحبَ القرار في السجلّ — وموافقةٌ بلا أثرٍ لا تُراجَع', async () => {
     const sourceId = await seedAnalyzed()
     const postId = crypto.randomUUID()

@@ -215,3 +215,93 @@ export async function decide(
     .run()
   return { ok: true, status }
 }
+
+/**
+ * التراجعُ عن رفض — **وهو الفعلُ الوحيد الذي يُتراجَع عنه هنا** (D-090).
+ *
+ * ## لماذا الرفضُ وحدَه
+ *
+ * الرفضُ عمودٌ واحدٌ يُقلَب: `rejected` ← `draft`، و`approved_by` يُمحى.
+ * ولا يفقد شيئا في الطريق، ولا يحتاج قيمةً تُستعاد.
+ *
+ * **وسحبُ الموعد ليس كذلك**: التراجعُ عنه يحتاج موعدا قد يكون مضى بينما
+ * كان المالكُ يقرأ الإشعار — وإعادتُه تتخطّى حارسَ الجدولة الذي يمنع
+ * موعدا في الماضي. **وزرٌّ يتخطّى حارسا ليس زرّا** (D-019)، فيبقى له
+ * سؤالُه قبل الفعل.
+ *
+ * ## ولا يُتراجَع عمّا لم يقع
+ *
+ * الشرطُ أنّ الحالَ `rejected` الآن. فمسوّدةٌ رُفضت ثمّ كُتب فوقها شيءٌ
+ * آخر — أو رُفضت في تبويبٍ ثانٍ ثمّ أُعيدت — **لا يُقلَب حالُها بضغطةٍ
+ * على إشعارٍ شاخ**.
+ */
+export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
+  const row = await db
+    .prepare('SELECT id, status FROM posts WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; status: string }>()
+  if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
+  if (row.status !== 'rejected') {
+    return { ok: false, reason: `حالتُها «${row.status}» — والتراجعُ عن الرفض وحدَه` }
+  }
+
+  await db
+    .prepare("UPDATE posts SET status = 'draft', approved_by = NULL WHERE id = ?")
+    .bind(id)
+    .run()
+  return { ok: true, status: 'draft' }
+}
+
+/** حصيلةُ بَتٍّ جماعيّ — **ولكلِّ متعثّرٍ سببُه باسمه**. */
+export interface BulkResult {
+  readonly done: readonly string[]
+  readonly failed: readonly { readonly id: string; readonly reason: string }[]
+}
+
+/**
+ * اعتمادُ جملةٍ من المسوّدات — **بنصّها المحفوظ لا بنصٍّ مُرسَل** (D-090).
+ *
+ * ## ولا حارسَ ثانٍ يُكتب هنا
+ *
+ * تنادي `decide` لكلِّ واحدة، فتمرّ من الفحوص نفسِها: الحالُ `draft`،
+ * والطولُ بحساب المنصّة، و`has_url` يُعاد حسابُه، و`approved_at` مع
+ * `approved_by` في جملةٍ واحدة. **وطريقٌ جانبيٌّ حول الحارس هو عينُ ما
+ * كشفه D-019.**
+ *
+ * ## والنصُّ من القاعدة لا من النموذج
+ *
+ * البَتُّ الجماعيُّ لا يحرّر: المالكُ يعتمد ما قرأه كما هو. **فيُقرأ
+ * المحفوظُ ويُمرَّر إلى `decide`**، فتخرج الحالُ `approved` لا `edited` —
+ * وهي الحقيقة: لم يُعدَّل شيء.
+ *
+ * ولو أُخذ النصُّ من النموذج لأمكن أن يُرسَل لمسوّدةٍ نصُّ أخرى.
+ *
+ * ## وواحدةٌ تتعثّر لا توقف البقيّة
+ *
+ * مسوّدةٌ فوق حدّ المنصّة تُردّ **باسمها وسببها**، ويمضي ما عداها.
+ * **وحصيلةٌ تقول «فشل» بلا تسمية تجعل المالك يعيد الكلّ.**
+ */
+export async function approveMany(
+  db: Db,
+  ids: readonly string[],
+  by: string,
+): Promise<BulkResult> {
+  const done: string[] = []
+  const failed: { id: string; reason: string }[] = []
+
+  for (const id of ids) {
+    const row = await db
+      .prepare('SELECT text FROM posts WHERE id = ?')
+      .bind(id)
+      .first<{ text: string }>()
+    if (row === null) {
+      failed.push({ id, reason: 'لا مسوّدة بهذا المعرّف' })
+      continue
+    }
+    const result = await decide(db, id, { kind: 'approve', text: row.text }, by)
+    if (result.ok) done.push(id)
+    else failed.push({ id, reason: result.reason })
+  }
+
+  return { done, failed }
+}

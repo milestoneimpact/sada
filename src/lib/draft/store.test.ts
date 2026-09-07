@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { decide, listDrafts } from './store'
+import { approveMany, decide, listDrafts, undoReject } from './store'
 
 let db: FakeDb
 
@@ -228,5 +228,120 @@ describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
     expect(edited.ok).toBe(true)
     const after = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
     expect(after.u).toBe(0)
+  })
+})
+
+/**
+ * التراجعُ عن الرفض (D-090) — **والحارسُ في الحال لا في الزرّ.**
+ *
+ * الزرُّ يظهر في إشعارٍ يعيش دقيقة. وقد يُترَك التبويبُ مفتوحا ساعةً ثمّ
+ * يُضغَط، وقد تكون المسوّدةُ بُتَّ فيها من تبويبٍ آخر بينهما. **فالشرطُ
+ * أنّ الحالَ `rejected` الآن، لا أنّ الرفضَ وقع يوما.**
+ */
+describe('التراجعُ عن الرفض', () => {
+  it('يعيدها مسوّدةً ويمحو اسمَ الرافض', async () => {
+    const id = await seedDraft({})
+    await decide(db, id, { kind: 'reject' }, 'omar')
+
+    const back = await undoReject(db, id)
+    expect(back.ok).toBe(true)
+
+    const [row] = await listDrafts(db)
+    expect(row?.status).toBe('draft')
+    // واسمُ الرافض يُمحى: قرارٌ رُجع عنه لا يبقى له صاحب
+    expect(row?.approvedBy).toBeNull()
+  })
+
+  it('**ولا يُتراجَع عمّا لم يُرفَض** — والمعتمَدُ يُردّ بحاله', async () => {
+    const id = await seedDraft({})
+    await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
+
+    const back = await undoReject(db, id)
+    expect(back.ok).toBe(false)
+    if (!back.ok) expect(back.reason).toContain('approved')
+  })
+
+  it('ومسوّدةٌ لم تُبَتّ لا يُتراجَع عنها', async () => {
+    const id = await seedDraft({})
+    const back = await undoReject(db, id)
+    expect(back.ok).toBe(false)
+  })
+
+  it('ومعرّفٌ لا وجودَ له يُردّ ولا يرمي', async () => {
+    const back = await undoReject(db, 'لا-شيء')
+    expect(back.ok).toBe(false)
+  })
+
+  /** والدورةُ كاملةً: رُفضت، فرُجع عنها، فاعتُمدت. */
+  it('والمُرجَعُ عنها يُعتمَد بعدها', async () => {
+    const id = await seedDraft({})
+    await decide(db, id, { kind: 'reject' }, 'omar')
+    await undoReject(db, id)
+
+    const done = await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
+    expect(done.ok).toBe(true)
+    if (done.ok) expect(done.status).toBe('approved')
+  })
+})
+
+/**
+ * البَتُّ الجماعيّ (D-090) — **ولا حارسَ ثانٍ فيه.**
+ *
+ * يمرّ من `decide` نفسِها، فما يُردّ فرديًّا يُردّ جماعيًّا بالسبب نفسِه.
+ * وأهمُّ ما يُثبَت هنا اثنان: أنّ النصَّ يُؤخَذ من القاعدة **فتخرج الحالُ
+ * `approved` لا `edited`**، وأنّ متعثّرةً واحدةً لا توقف البقيّة.
+ */
+describe('البَتُّ الجماعيّ', () => {
+  it('يعتمد الجملةَ بنصّها المحفوظ — والحالُ approved لا edited', async () => {
+    const one = await seedDraft({})
+    const two = await seedDraft({})
+
+    const result = await approveMany(db, [one, two], 'omar')
+    expect(result.done).toHaveLength(2)
+    expect(result.failed).toHaveLength(0)
+
+    const rows = await listDrafts(db)
+    // **لم يُعدَّل شيء، فلا تُقال «عُدّلت»**
+    expect(rows.every((r) => r.status === 'approved')).toBe(true)
+    expect(rows.every((r) => r.approvedBy === 'omar')).toBe(true)
+  })
+
+  it('**ومتعثّرةٌ لا توقف البقيّة** — وتُسمّى بسببها', async () => {
+    const good = await seedDraft({})
+    const gone = await seedDraft({})
+    await decide(db, gone, { kind: 'reject' }, 'omar')
+
+    const result = await approveMany(db, [gone, good], 'omar')
+    expect(result.done).toEqual([good])
+    expect(result.failed).toHaveLength(1)
+    expect(result.failed[0]?.id).toBe(gone)
+    expect(result.failed[0]?.reason).toContain('rejected')
+  })
+
+  it('ومعرّفٌ لا وجودَ له يُسمَّى ولا يرمي', async () => {
+    const good = await seedDraft({})
+    const result = await approveMany(db, ['لا-شيء', good], 'omar')
+    expect(result.done).toEqual([good])
+    expect(result.failed[0]?.id).toBe('لا-شيء')
+  })
+
+  it('وقائمةٌ فارغة تعطي حصيلةً فارغة', async () => {
+    const result = await approveMany(db, [], 'omar')
+    expect(result.done).toHaveLength(0)
+    expect(result.failed).toHaveLength(0)
+  })
+
+  /**
+   * **وحدُّ الطول يُطبَّق جماعيًّا كما يُطبَّق فرديًّا.**
+   *
+   * مسوّدةٌ وُلّدت فوق حدّ المنصّة تُردّ عند الاعتماد لا عند النشر — وهذا
+   * هو الفحصُ الذي يجعل البَتَّ الجماعيَّ آمنا: **لا يمرّ منه ما لا يمرّ
+   * من الفرديّ.**
+   */
+  it('ونصٌّ فوق حدّ المنصّة يُردّ في الجملة كما يُردّ وحده', async () => {
+    const big = await seedDraft({ platform: 'x', text: 'ن'.repeat(400) })
+    const result = await approveMany(db, [big], 'omar')
+    expect(result.done).toHaveLength(0)
+    expect(result.failed[0]?.reason).toContain('محرفا')
   })
 })

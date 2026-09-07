@@ -200,6 +200,124 @@ export const SCRIPT = `
   if(s)s.addEventListener('change',apply);
   apply();
 
+  // ══ مسرحُ القرار (D-090) ══════════════════════════════
+  //
+  // ثلاثةٌ تعمل على المسوّدات وحدها، وكلُّها تحسينٌ فوق صفحةٍ تعمل
+  // بدونها: بلا سكربتٍ تظهر المسوّداتُ كلُّها، ويُبَتُّ فيها واحدةً
+  // واحدةً بالنماذج — وهو ما كان يقع قبل اليوم بالضبط.
+  var cards=Array.prototype.slice.call(document.querySelectorAll('[data-draft]'));
+  if(cards.length){
+    var picks=Array.prototype.slice.call(document.querySelectorAll('input[data-pick]'));
+    var bulkForm=document.getElementById('bulk');
+    var tabs=document.getElementById('draft-filter');
+    var none=document.getElementById('draft-none');
+    var help=document.getElementById('keys');
+    if(help)help.hidden=false;
+
+    // ── الفرز ───────────────────────────────────────────
+    // الشريحةُ مخفيّةٌ في الوثيقة وتُظهَر هنا: تبويبٌ لا يرشّح بلا
+    // سكربتٍ يُقرأ عطلا، والغائبُ لا يُعِد بشيء
+    var bucket='all';
+    function refilter(){
+      var shown=0;
+      cards.forEach(function(c){
+        var on = bucket==='all' || c.dataset.status===bucket;
+        c.hidden=!on; if(on)shown++;
+        // صندوقٌ مخفيٌّ يبقى مرسَلا مع النموذج — فيُعتمَد ما لا يُرى
+        if(!on){
+          var box=c.querySelector('input[data-pick]');
+          if(box&&box.checked){box.checked=false;}
+        }
+      });
+      if(none)none.hidden=shown>0;
+      count();
+    }
+    if(tabs){
+      tabs.hidden=false;
+      tabs.querySelectorAll('button[data-bucket]').forEach(function(b){
+        b.addEventListener('click',function(){
+          bucket=b.dataset.bucket;
+          tabs.querySelectorAll('button[data-bucket]').forEach(function(o){
+            var on=o===b;
+            o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
+          });
+          refilter();
+        });
+      });
+    }
+
+    // ── شريطُ البَتِّ الجماعيّ ───────────────────────────
+    // والكلفةُ المعروضةُ ثمنُ النشر لا ثمنُ الكتابة (D-069): الأوّلُ
+    // لم يقع بعدُ وهو الذي يبتّ فيه المالك، والثاني وقع ولا يُستردّ
+    function count(){
+      if(!bulkForm)return;
+      var on=picks.filter(function(b){return b.checked;});
+      var n=bulkForm.querySelector('[data-bulk-n]');
+      var c=bulkForm.querySelector('[data-bulk-cost]');
+      if(n)n.textContent=String(on.length);
+      if(c){
+        var sum=0; on.forEach(function(b){sum+=parseFloat(b.dataset.cost||'0')||0;});
+        c.textContent = sum>0 ? 'ثمنُ نشرها ‎'+sum.toFixed(4)+'$' : '';
+      }
+      bulkForm.hidden=on.length===0;
+    }
+    picks.forEach(function(b){b.addEventListener('change',count);});
+    if(bulkForm){
+      var clear=bulkForm.querySelector('[data-bulk-clear]');
+      if(clear)clear.addEventListener('click',function(){
+        picks.forEach(function(b){b.checked=false;}); count();
+      });
+    }
+    count();
+
+    // ── البَتُّ بلوحة المفاتيح ──────────────────────────
+    //
+    // وموضعُ المفتاح لا حرفُه — وهذا ليس تفصيلا: المالكُ يكتب
+    // عربيّةً، وبتخطيطٍ عربيٍّ يعطي المفتاحُ الذي عليه «J» الحرفَ «ت».
+    // فمقارنةُ الحرف تجعل الاختصاراتِ تعمل بالإنجليزيّ وتصمت
+    // بالعربيّ — صمتا لا يُفسَّر. والموضعُ يعمل في التخطيطين معا.
+    var here=-1;
+    function visible(){return cards.filter(function(c){return !c.hidden;});}
+    function mark(i){
+      cards.forEach(function(c){c.classList.remove('here');});
+      var list=visible(); if(!list.length)return;
+      here=Math.max(0,Math.min(i,list.length-1));
+      var el=list[here];
+      el.classList.add('here');
+      el.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+    function press(sel){
+      var list=visible(); if(here<0||!list[here])return false;
+      var el=list[here].querySelector(sel);
+      if(!el)return false;
+      el.focus(); if(el.tagName!=='TEXTAREA'&&el.tagName!=='SELECT')el.click();
+      return true;
+    }
+    document.addEventListener('keydown',function(e){
+      // حقلُ كتابةٍ يملك مفاتيحَه: من يكتب منشورا لا يبتّ فيه
+      var t=e.target, tag=(t&&t.tagName)||'';
+      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable))return;
+      // ومركّبةٌ للمتصفّح: Ctrl+R إعادةُ تحميل، لا رفضُ مسوّدة
+      if(e.metaKey||e.ctrlKey||e.altKey)return;
+      var did=true;
+      switch(e.code){
+        case 'KeyJ': mark(here+1); break;
+        case 'KeyK': mark(here<=0?0:here-1); break;
+        case 'KeyA': did=press('button[value="approve"]'); break;
+        case 'KeyR': did=press('button[value="reject"]'); break;
+        case 'KeyE': did=press('textarea.draft-text'); break;
+        case 'KeyS': did=press('.sched select'); break;
+        case 'Slash': {
+          var help=document.getElementById('keys');
+          if(help)help.open=!help.open; else did=false;
+          break;
+        }
+        default: did=false;
+      }
+      if(did)e.preventDefault();
+    });
+  }
+
   // ── العامل الثاني ─────────────────────────────────────
   var csrf=(document.querySelector('input[name="_csrf"]')||{}).value||'';
   var b64u=function(buf){
@@ -604,6 +722,30 @@ export interface PanelProvider {
 export interface PanelFlash {
   readonly kind: 'ok' | 'warn' | 'bad'
   readonly text: string
+  /**
+   * فعلٌ يُتراجَع عنه — **والنافذةُ نافذةُ الإشعار نفسِها** (D-090).
+   *
+   * ## ولا عدّادَ ثوانٍ
+   *
+   * وُعِد في الخطّة بشريطٍ يعطي ثمانيَ ثوانٍ. **وعدّادٌ في المتصفّح يَعِد
+   * بما لا يملك**: يُغلق التبويبُ فيسقط، وتُبطئ الشبكةُ فينفد قبل أن
+   * تُرسَم الصفحة. والحقيقةُ أنّ النافذة **نافذةُ الإشعار في KV** — دقيقةٌ
+   * واحدة، ويُستهلَك عند أوّل قراءة.
+   *
+   * فالتراجعُ متاحٌ ما دام الإشعارُ معروضا، **ويذهب بذهابه**. وهذا ما
+   * يقع فعلا، فهو ما يُقال.
+   *
+   * ## والحارسُ في القاعدة لا في الزرّ
+   *
+   * `undoReject` تشترط أنّ الحالَ `rejected` الآن. فإشعارٌ شاخ في تبويبٍ
+   * منسيٍّ لا يقلب حالا تبدّلت بعده.
+   */
+  readonly undo?: {
+    /** المسارُ الذي يُرسَل إليه — ولا يُبنى في المتصفّح. */
+    readonly action: string
+    readonly id: string
+    readonly label: string
+  }
 }
 
 export interface PanelData {
@@ -958,7 +1100,17 @@ export function panelPage(d: PanelData): string {
       ? ''
       : `<div class="flash ${d.flash.kind}">
            <span class="ic">${d.flash.kind === 'ok' ? '✓' : d.flash.kind === 'warn' ? '!' : '✕'}</span>
-           <span>${escapeHtml(d.flash.text)}</span></div>`
+           <span>${escapeHtml(d.flash.text)}</span>
+           ${
+             d.flash.undo === undefined
+               ? ''
+               : `<span class="grow"></span>
+                  <form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
+                        data-busy="جارٍ…">
+                    <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
+                    <button class="g sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
+                  </form>`
+           }</div>`
   }</div>`
 
   const state = d.paused

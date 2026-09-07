@@ -168,6 +168,55 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   </div>`
 }
 
+/**
+ * سِلالُ الفرز — **خمسٌ لا سبع**.
+ *
+ * `approved` و `edited` حالان في القاعدة **وسؤالٌ واحدٌ عند المالك**:
+ * «اعتُمدت، وتنتظر موعدا». والفرقُ بينهما (أعُدّلت قبل الاعتماد؟) يُقرأ
+ * على البطاقة، **ولا يستحقّ تبويبا يقسم القائمة نصفين بلا سبب**.
+ *
+ * وكذلك `failed` مع `published`: كلتاهما «غادرت»، والفشلُ يُرى بشارته.
+ */
+function bucketOf(d: DraftRow): string {
+  if (d.status === 'draft') return 'waiting'
+  if (d.status === 'approved' || d.status === 'edited') return 'approved'
+  if (d.status === 'queued') return 'queued'
+  if (d.status === 'rejected') return 'rejected'
+  return 'gone'
+}
+
+const BUCKETS: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'all', label: 'الكلّ' },
+  { id: 'waiting', label: 'تنتظر قرارك' },
+  { id: 'approved', label: 'معتمَدة' },
+  { id: 'queued', label: 'مجدولة' },
+  { id: 'gone', label: 'غادرت' },
+  { id: 'rejected', label: 'مرفوضة' },
+]
+
+/**
+ * تبويباتُ الفرز — **وشرطا D-062 يُوَرَّثان**: العددُ معروضٌ دائما ولو
+ * كان صفرا، والافتراضُ «الكلّ».
+ *
+ * وعددٌ يختفي حين يكون صفرا يجعل القائمةَ تتبدّل طولا بين فتحةٍ وأخرى،
+ * **فيظنّ القارئُ أنّ تبويبا سقط**.
+ *
+ * ## وأزرارٌ لا روابط
+ *
+ * التبويبُ هنا يرشّح ما هو معروضٌ في الصفحة نفسِها، **ولا ينتقل**. ورابطٌ
+ * لا ينتقل يكذب على من يفتحه في تبويبٍ جديد. وبلا JavaScript لا تظهر
+ * هذه الشريحةُ أصلا — والقائمةُ كاملةٌ كما هي اليوم.
+ */
+function filterTabs(drafts: readonly DraftRow[]): string {
+  const tabs = BUCKETS.map((b) => {
+    const n = b.id === 'all' ? drafts.length : drafts.filter((d) => bucketOf(d) === b.id).length
+    return `<button type="button" class="ftab${b.id === 'all' ? ' on' : ''}"
+      data-bucket="${b.id}" aria-pressed="${b.id === 'all'}"
+      >${escapeHtml(b.label)}<span class="count">${n}</span></button>`
+  }).join('')
+  return `<nav class="ftabs" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>`
+}
+
 function card(
   d: DraftRow,
   now: Date,
@@ -241,8 +290,16 @@ function card(
                d.approvedBy,
              )}</span>`}</div>`
 
-  return `<div class="draft${live ? '' : ' done'}">
+  return `<div class="draft${live ? '' : ' done'}" data-draft="${escapeHtml(d.id)}"
+    data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}">
     <div class="draft-top">
+      ${open
+        ? `<label class="pick" title="حدّدها للاعتماد الجماعيّ">
+             <input type="checkbox" form="bulk" name="id" value="${escapeHtml(d.id)}"
+               data-pick data-cost="${d.publishCost}"
+               aria-label="حدّد هذه المسوّدة للاعتماد الجماعيّ">
+           </label>`
+        : ''}
       <div class="ch-logo sm">${MARK[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}
         <span class="ago">منذ ${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
@@ -318,6 +375,28 @@ export function draftsSection(input: DraftsInput): string {
            ? ''
            : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
 
+  /*
+   * لوحُ الاختصارات — **ولا يُعرض إلّا حيث تعمل**.
+   *
+   * الاختصاراتُ مربوطةٌ ببطاقات المسوّدات، فلوحٌ يُعلنها في شاشةٍ لا
+   * مسوّدةَ فيها **يَعِد بما لا يقع**. وهو مخفيٌّ في الوثيقة ويُظهره
+   * السكربتُ — لأنّها كلَّها لا تعمل بدونه.
+   */
+  const keys = `<details class="keys" id="keys" hidden>
+    <summary>اختصاراتُ لوحة المفاتيح <span class="grow"></span><kbd>?</kbd></summary>
+    <div class="rows">
+      <span class="row-k"><kbd>J</kbd><kbd>K</kbd> التنقّل</span>
+      <span class="row-k"><kbd>A</kbd> اعتمد</span>
+      <span class="row-k"><kbd>R</kbd> ارفض</span>
+      <span class="row-k"><kbd>E</kbd> حرّر النصّ</span>
+      <span class="row-k"><kbd>S</kbd> الجدولة</span>
+      <span class="row-k"><kbd>?</kbd> هذا اللوح</span>
+    </div>
+    <p class="hint" style="padding:0 var(--s-3) var(--s-3); margin:0">
+      <b>وتُقاس بموضع المفتاح لا بحرفه</b> — فتعمل بالتخطيط العربيّ كما
+      تعمل بالإنجليزيّ. ولا تعمل وأنت داخل مربّع كتابة.</p>
+  </details>`
+
   const list =
     drafts.length === 0
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
@@ -326,7 +405,30 @@ export function draftsSection(input: DraftsInput): string {
           .map((d) => card(d, now, input.targets, input.earliest, input.media))
           .join('')}</div>`
 
-  return `<div class="card" style="margin-bottom:var(--s-3)">
+  /*
+   * شريطُ البَتِّ الجماعيّ — **ونموذجُه خارج البطاقات لا فيها**.
+   *
+   * صناديقُ التحديد موزّعةٌ على بطاقاتٍ فيها نماذجُ اعتمادٍ مستقلّة،
+   * **ونموذجٌ داخل نموذجٍ لا يصحّ في HTML** — يتجاهله المتصفّح صامتا.
+   * فالسمةُ `form="bulk"` تربط الصندوقَ بنموذجٍ في مكانٍ آخر من الوثيقة،
+   * وهي القياسيّةُ لهذا بعينه.
+   *
+   * **والشريطُ يبقى ملتصقا بأسفل الشاشة**: من يحدّد خمسا وهو في آخر
+   * القائمة لا يُطلَب منه أن يصعد ليضغط.
+   *
+   * وبلا JavaScript يبقى مخفيّا: العدّادُ والكلفةُ يُحسبان في المتصفّح،
+   * **وشريطٌ يقول «٠ محدَّدة» أبدا زينةٌ تشغل مكانا**.
+   */
+  const bulk = `<form id="bulk" class="bulkbar" method="POST"
+      action="/panel/drafts/approve-many" data-busy="جارٍ الاعتماد…" hidden>
+    <span class="st ok"><span class="g">●</span><b data-bulk-n>0</b> محدَّدة</span>
+    <span class="ago" data-bulk-cost></span>
+    <span class="grow"></span>
+    <button type="button" class="g sm" data-bulk-clear>ألغِ التحديد</button>
+    <button class="p sm" type="submit">اعتمدها كما كُتبت</button>
+  </form>`
+
+  return `${bulk}<div class="card" style="margin-bottom:var(--s-3)">
     <div class="card-head"><h2>الكتابة من مصدر</h2>
       <div class="grow"></div>
       <span class="st ${waiting === 0 ? 'idle' : 'warn'}"><span class="g">${
@@ -342,5 +444,10 @@ export function draftsSection(input: DraftsInput): string {
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
   </div>
-  ${list}`
+  ${filterTabs(drafts)}
+  ${keys}
+  ${list}
+  <div class="empty" id="draft-none" hidden>
+    <b>لا مسوّدةَ في هذا الفرز</b>
+    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>`
 }

@@ -101,3 +101,64 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
     expect(SCRIPT).toContain("box.dataset.provider=pick.value")
   })
 })
+
+/**
+ * الاختصاراتُ تُقاس بموضع المفتاح لا بحرفه (D-090).
+ *
+ * ## ولماذا اختبارُ شكلٍ لا اختبارُ سلوك
+ *
+ * المالكُ يكتب عربيّةً. وبتخطيطٍ عربيٍّ يعطي المفتاحُ الذي عليه «J»
+ * الحرفَ «ت»، والذي عليه «A» يعطي «ش». **فمقارنةُ `event.key` تجعل
+ * الاختصاراتِ تعمل بالإنجليزيّ وتصمت بالعربيّ** — وصمتٌ لا رسالةَ له
+ * يُقرأ «الاختصاراتُ لا تعمل عندي»، ولا يُبلَّغ عنه أصلا.
+ *
+ * و`event.code` موضعُ المفتاح على اللوح لا الحرفُ الذي يُنتجه، فيعمل في
+ * التخطيطين معا.
+ *
+ * **وهذا لا يُختبَر بتشغيل**: لا لوحَ مفاتيحَ في vitest ولا تخطيطَ لغة.
+ * فيُفحَص النصُّ المُرسَل: أيقارن الموضعَ أم الحرف؟ — وهو ما يُشحَن.
+ */
+describe('اختصاراتُ لوحة المفاتيح', () => {
+  /** كتلةُ القرار وحدَها — فلا يُفحَص ما تكتبه أجزاءٌ أخرى من اللوحة. */
+  function keyBlock(): string {
+    const block = /document\.addEventListener\('keydown'[\s\S]*?\n {4}\}\);/.exec(SCRIPT)
+    if (block === null) throw new Error('لم يُعثَر على مستمع لوحة المفاتيح في نصّ اللوحة')
+    return block[0]
+  }
+
+  it('**تقارن `event.code` لا `event.key`** — فتعمل بالتخطيط العربيّ', () => {
+    const block = keyBlock()
+    expect(block).toContain('e.code')
+    // و`e.key` غيابُه هو المقصود: وجودُه يعني أنّ مقارنةً بالحرف عادت
+    expect(block).not.toContain('e.key')
+  })
+
+  it('وتُسمّي المفاتيحَ بمواضعها الستّة', () => {
+    const block = keyBlock()
+    for (const code of ['KeyJ', 'KeyK', 'KeyA', 'KeyR', 'KeyE', 'KeyS', 'Slash']) {
+      expect(block).toContain(code)
+    }
+  })
+
+  /**
+   * **وحقلُ الكتابة يملك مفاتيحَه.**
+   *
+   * من يكتب منشورا عربيّا يطبع «ش» و«ت» و«ق» — وهي مواضعُ A و J و R.
+   * فبلا هذا الحارس **يُرفَض المنشورُ وهو يُكتَب**.
+   */
+  it('ولا تعمل داخل مربّع كتابة', () => {
+    const block = keyBlock()
+    expect(block).toContain('TEXTAREA')
+    expect(block).toContain('INPUT')
+    expect(block).toContain('SELECT')
+    expect(block).toContain('isContentEditable')
+  })
+
+  /** ومركّبةٌ للمتصفّح: Ctrl+R إعادةُ تحميل، لا رفضُ مسوّدة. */
+  it('وتترك المركَّبات للمتصفّح', () => {
+    const block = keyBlock()
+    expect(block).toContain('e.metaKey')
+    expect(block).toContain('e.ctrlKey')
+    expect(block).toContain('e.altKey')
+  })
+})

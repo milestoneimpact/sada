@@ -797,6 +797,55 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .draft.done{background:var(--surface-2); box-shadow:none}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}
+/* ══ مسرحُ القرار (D-090) ═══════════════════════════════════════════
+   ── صندوقُ التحديد ───────────────────────────────────────────────
+   اللصيقةُ هي الهدفُ لا الصندوق: صندوقُ المتصفّح ثلاثةَ عشرَ بكسلا،
+   **ولا يُكبَّر بلا أن يُرسَم من جديد**. فتُمَدّ اللصيقةُ حوله إلى ٤٤
+   (D-086) ويبقى الصندوقُ بحجمه — يرى الإصبعُ هدفا، وترى العينُ صندوقا. */
+.pick{flex:none; display:grid; place-items:center;
+  width:var(--tap); height:var(--tap); margin-inline-start:calc(-1 * var(--s-3));
+  border-radius:var(--r-sm); cursor:pointer}
+@media(hover:hover){.pick:hover{background:var(--surface-2)}}
+.pick input{width:17px; height:17px; margin:0; accent-color:var(--brand); cursor:pointer}
+
+/* ── البطاقةُ الحاليّة تحت لوحة المفاتيح ──────────────────────────
+   حدٌّ بلون الهويّة **وحلقةٌ**: الحدُّ وحده يبدّل مقاسَ البطاقة بكسلا
+   فتهتزّ القائمةُ مع كلّ ضغطةِ J. والحلقةُ خارج الصندوق فلا تُزيح شيئا. */
+.draft.here{border-color:var(--brand);
+  box-shadow:0 0 0 3px var(--ring), var(--sh-2), inset 0 1px 0 var(--hair)}
+
+/* ── شريطُ البَتِّ الجماعيّ ───────────────────────────────────────
+   ملتصقٌ بأسفل الشاشة: من يحدّد خمسا وهو في آخر القائمة لا يُطلَب منه
+   أن يصعد. و«sticky» لا «fixed» — الأولى تبقى في تدفّق الصفحة فلا
+   تغطّي آخرَ بطاقةٍ عند نهاية التمرير. */
+.bulkbar{position:sticky; bottom:var(--s-3); z-index:15;
+  display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap;
+  margin:0 0 var(--s-3); padding:var(--s-3) var(--s-4);
+  background:var(--surface); background-image:var(--sheen);
+  border:1px solid var(--brand); border-radius:var(--r-lg);
+  box-shadow:var(--sh-2), inset 0 1px 0 var(--hair)}
+.bulkbar b{font-variant-numeric:tabular-nums}
+.bulkbar .ago{direction:ltr; unicode-bidi:isolate}
+
+/* ── لوحُ الاختصارات ─────────────────────────────────────────────
+   مطويٌّ بالافتراض: من لا يعرفها لا يحتاج أن يراها في كلّ فتحة، ومن
+   يعرفها لا يقرؤها. **ويُفتَح بالمفتاح نفسِه الذي يسأل عنه.** */
+.keys{margin:0 0 var(--s-3); border:1px solid var(--line); border-radius:var(--r);
+  background:var(--surface-2); font-size:var(--t-sm)}
+.keys>summary{cursor:pointer; list-style:none; padding:var(--s-2) var(--s-3);
+  min-height:var(--tap); display:flex; align-items:center; gap:var(--s-2);
+  color:var(--ink-2); font-weight:600}
+.keys>summary::-webkit-details-marker{display:none}
+@media(hover:hover){.keys>summary:hover{background:var(--surface-3)}}
+.keys .rows{display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-5);
+  padding:0 var(--s-3) var(--s-3)}
+.keys .row-k{display:inline-flex; align-items:center; gap:var(--s-2); color:var(--ink-3)}
+/* والمفتاحُ يُرسَم مفتاحا: حرفٌ لاتينيٌّ في جملةٍ عربيّةٍ يُقرأ جزءا منها */
+.keys kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xs);
+  direction:ltr; unicode-bidi:isolate; min-width:22px; text-align:center;
+  padding:var(--s-0) var(--s-1); border-radius:5px; color:var(--ink);
+  background:var(--surface); border:1px solid var(--line-strong);
+  box-shadow:0 1px 0 var(--line-strong)}
 .ch-logo.sm{width:30px; height:30px; border-radius:8px}
 .draft-why{margin:0; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh);
   border-inline-start:2px solid var(--line); padding-inline-start:var(--s-2)}

@@ -53,10 +53,30 @@ for (const file of pages) {
         return r.width > 0 && r.height > 0
       }
 
+      /*
+       * **واللصيقةُ الحاضنةُ هي الهدف** (D-090).
+       *
+       * صندوقُ الاختيار يرسمه المتصفّح ثلاثةَ عشرَ بكسلا ولا يُكبَّر إلّا
+       * بإعادة رسمه — وإعادةُ رسمه تفقده سلوكَ النظام في قارئ الشاشة.
+       * فيُلَفّ بـ`<label>`، **وضغطةٌ في أيّ موضعٍ منها تُفعّله**: سلوكُ
+       * HTML لا حيلةُ أنماط.
+       *
+       * فمدقّقٌ يقرأ صندوقَ العنصر وحدَه يتّهم هدفا سليما — وهي علّةُ
+       * `::after` في D-086 معكوسةً: تلك طبقةٌ فوقه، وهذه حاضنةٌ حولَه.
+       * **ولصيقةٌ لغيره (`for` إلى عنصرٍ آخر) لا تُحتسَب.**
+       */
+      const target = (el) => {
+        const r = el.getBoundingClientRect()
+        const lab = el.closest('label')
+        if (lab === null || (lab.htmlFor !== '' && lab.htmlFor !== el.id)) return r
+        const lr = lab.getBoundingClientRect()
+        return { width: Math.max(r.width, lr.width), height: Math.max(r.height, lr.height) }
+      }
+
       const small = []
       for (const el of document.querySelectorAll('button, a.btn, input:not([type=hidden]), select, textarea, summary')) {
         if (!seen(el)) continue
-        const r = el.getBoundingClientRect()
+        const r = target(el)
         if (r.height < MIN_TARGET || r.width < MIN_TARGET) {
           small.push({
             tag: el.tagName.toLowerCase(),
