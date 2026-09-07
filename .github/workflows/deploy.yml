@@ -64,6 +64,32 @@ jobs:
           fi
           echo "الرمز حاضر. ومعرّف الحساب من wrangler.toml."
 
+      # معرّفاتُ الإنتاج ما تزال PLACEHOLDER حتّى تُنشَأ مواردُه (M-05).
+      #
+      # وبدونها يسقط النشر **في عمق wrangler برسالةٍ لا تدلّ**:
+      #
+      #   A request to the Cloudflare API (/d1/database/PLACEHOLDER_D1_PRODUCTION_ID/query)
+      #   Invalid property: databaseId => Invalid uuid [code: 7400]
+      #
+      # فيقرؤها المالك فيظنّ العطلَ عابراً، **ويعيد التشغيل على staging
+      # فيخضرّ** — فيحسب الإنتاجَ منشوراً وهو لم يُنشَر قطّ. وقد وقع.
+      #
+      # وهذه هي حجّة خطوة «التحقّق من الرمز» نفسها: يفشل مبكراً برسالةٍ
+      # مفهومة. **وقد كُتبت لسبب واحد من سببين** — فيُغلَق الثاني.
+      - name: التحقّق من معرّفات البيئة
+        if: env.TARGET == 'production'
+        run: |
+          if grep -q 'PLACEHOLDER_' wrangler.toml; then
+            echo "::error::معرّفات الإنتاج في wrangler.toml ما تزال PLACEHOLDER — والإنتاج لا يُنشَر بها."
+            echo "::error::الناقص:"
+            grep -n 'PLACEHOLDER_' wrangler.toml | sed 's/^/::error::  /'
+            echo "::error::أنشئ الموارد ثم ضع معرّفاتها (M-05 · docs/MANUAL-TASKS.md):"
+            echo "::error::  npx wrangler d1 create sada"
+            echo "::error::  npx wrangler kv namespace create SADA_KV_PRODUCTION"
+            exit 1
+          fi
+          echo "معرّفات الإنتاج مضبوطة."
+
       # الترحيل قبل الدالة (CLAUDE.md): Worker يقرأ عمودا لم يُضَف ينكسر
       # على منشور مجدول. والترتيب هنا هو الترتيب نفسه في الوثيقة
       # لا علم تأكيد هنا: wrangler لا يقبل -y ولا --yes على هذا الأمر
