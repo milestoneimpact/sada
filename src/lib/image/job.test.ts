@@ -549,3 +549,59 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
   })
 })
+
+/**
+ * **الرفضُ يُطلِق المفتاح** (D-087).
+ *
+ * شكا المالك: «لم تُولَّد أيُّ صورة». وكانت اللوحةُ تقول «وُلّدت صورةٌ
+ * لهذا النصّ — لم يُنفق شيء» **ولا صورةَ تُعرض** — لأنّ صفَّ الصورة
+ * المرفوضة يحتفظ بمفتاح عدم التكرار، فتخرج الخطوةُ ٢ قبل أيّ نداء.
+ *
+ * **فمن رفض صورةً لم يستطع توليدَ بديلٍ لها أبدا.**
+ */
+describe('المرفوضةُ لا تسدّ الطريق', () => {
+  it('يولّد بديلا بعد الرفض — ولا يقول «وُلّدت»', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net()), post)
+    expect(first.kind).toBe('generated')
+
+    // قبل الرفض: المفتاحُ محجوز، فلا نداءَ ثانٍ
+    const blocked = await generateForPost(deps(net()), post)
+    expect(blocked.kind).toBe('already')
+
+    expect(await rejectMedia(db, (first as { mediaId: string }).mediaId)).toBe(true)
+
+    // بعد الرفض: يُولَّد بديلٌ فعلا
+    const again = await generateForPost(deps(net()), post)
+    expect(again.kind).toBe('generated')
+    expect((again as { mediaId: string }).mediaId).not.toBe((first as { mediaId: string }).mediaId)
+  })
+
+  it('و**الصفُّ المرفوضُ يبقى بكلفته** — الدفترُ لا يُمحى', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net()), post)
+    await rejectMedia(db, (first as { mediaId: string }).mediaId)
+    await generateForPost(deps(net()), post)
+
+    const { results } = await db
+      .prepare('SELECT id, status FROM media WHERE post_id = ?')
+      .bind(post)
+      .all<{ id: string; status: string }>()
+    expect(results).toHaveLength(2)
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
+  })
+
+  it('ورفضٌ ثانٍ لصفٍّ مرفوضٍ يُردّ — ولا يُوسَم مفتاحُه مرّتين', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net()), post)
+    const id = (first as { mediaId: string }).mediaId
+    expect(await rejectMedia(db, id)).toBe(true)
+    expect(await rejectMedia(db, id)).toBe(false)
+
+    const row = await db
+      .prepare('SELECT idempotency_key FROM media WHERE id = ?')
+      .bind(id)
+      .first<{ idempotency_key: string }>()
+    expect((row!.idempotency_key.match(/:rejected:/g) ?? []).length).toBe(1)
+  })
+})

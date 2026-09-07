@@ -27,6 +27,7 @@ const data: PanelData = {
   paused: false,
   autoEnqueue: true,
   imageOverlay: true,
+  pageOnly: [],
   browserToken: false,
   analysisCap: 10,
   spendCap: 5,

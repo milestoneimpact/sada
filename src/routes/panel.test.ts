@@ -1718,3 +1718,34 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     expect(db.raw.prepare('SELECT platform FROM oauth_apps').all()).toHaveLength(0)
   })
 })
+
+/**
+ * **الشريطُ فيه روابطُ صفحاتٍ حقيقيّة** (D-087).
+ *
+ * وهذا ما يجعل تصفيةَ المراسي في السكربت شرطا لا تحسينا: لو خلا الشريطُ
+ * منها لما ظهر العطل. فيُحرَس الطرفان — الشاشةُ التي تعرضها، والسكربتُ
+ * الذي لا يخطفها.
+ */
+describe('روابطُ الشريط — والصفحاتُ منها تُفتَح فعلا', () => {
+  it('في الشريط روابطُ صفحاتٍ لا مراسيَ فقط', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const nav = /<nav class="tabs"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? ''
+    const hrefs = [...nav.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]!)
+    expect(hrefs.filter((h) => !h.startsWith('#')).length).toBeGreaterThan(0)
+    expect(hrefs).toContain('/panel/tasks')
+  })
+
+  it('و«ما عليك» تُفتَح صفحةً — لا تُعيد إلى اللوحة', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel/tasks', withSession(cookie), env)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('مهامُّ المالك')
+  })
+
+  it('وشاشةُ المنصّة كذلك', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel/channels/linkedin', withSession(cookie), env)
+    expect(response.status).toBe(200)
+  })
+})

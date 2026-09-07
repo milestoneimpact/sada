@@ -59,7 +59,13 @@ const PAD = 28
  * ونموذجٌ معطَّلٌ بلا تفسير أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا
  * في نقص قناته.
  */
-function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, now: Date): string {
+function scheduler(
+  d: DraftRow,
+  targets: readonly Target[],
+  earliest: string,
+  now: Date,
+  pageOnly: readonly string[],
+): string {
   const approved = d.status === 'approved' || d.status === 'edited'
 
   if (d.status === 'queued') {
@@ -84,6 +90,17 @@ function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, no
 
   const fit = targets.filter((t) => t.platform === d.platform)
   if (fit.length === 0) {
+    // **والسببُ يُقال كما هو**: «لا قناة» حيث القناةُ مربوطةٌ صفحةً كذبٌ
+    // يرسل المالكَ يربط ما هو مربوط
+    if (pageOnly.includes(d.platform)) {
+      return `<div class="sched none">
+        <span class="st warn"><span class="g">!</span>الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ</span>
+        <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
+          أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
+        <span class="grow"></span>
+        <a class="btn g sm" href="/panel/tasks">ما عليك</a>
+      </div>`
+    }
     return `<div class="sched none">
       <span class="st warn"><span class="g">!</span>لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة</span>
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
@@ -174,6 +191,7 @@ function card(
   targets: readonly Target[],
   earliest: string,
   media: readonly MediaView[],
+  pageOnly: readonly string[],
 ): string {
   const spec = PLATFORMS[d.platform]
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
@@ -252,7 +270,7 @@ function card(
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
     ${imagePane(d, media)}
-    ${scheduler(d, targets, earliest, now)}
+    ${scheduler(d, targets, earliest, now, pageOnly)}
     <div class="draft-meta">${meta}</div>
   </div>`
 }
@@ -288,6 +306,14 @@ export interface DraftsInput {
   readonly now: Date
   /** أمزوّدُ مهمّة `draft` جاهز؟ زرٌّ لا ينادي أحدا لا يُعرض عاملا. */
   readonly ready: boolean
+  /**
+   * منصّاتٌ حساباتُها الحيّةُ **صفحاتٌ لا أشخاص** (D-087).
+   *
+   * ولولا هذا لقيل «لا قناةَ مربوطة» وهي مربوطة — **وذاك كذبٌ يُرسل
+   * المالكَ يربط ما هو مربوط**. فيُقال السببُ الحقيقيّ: الصفحةُ مربوطةٌ،
+   * والنشرُ باسمها لم يُبنَ.
+   */
+  readonly pageOnly: readonly string[]
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -323,7 +349,7 @@ export function draftsSection(input: DraftsInput): string {
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
       : `<div class="grid c2 ragged">${drafts
-          .map((d) => card(d, now, input.targets, input.earliest, input.media))
+          .map((d) => card(d, now, input.targets, input.earliest, input.media, input.pageOnly))
           .join('')}</div>`
 
   return `<div class="card" style="margin-bottom:var(--s-3)">

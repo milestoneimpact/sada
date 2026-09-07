@@ -470,11 +470,45 @@ export async function rejectMedia(db: Db, mediaId: string): Promise<boolean> {
   // وقراءةُ حقلٍ غيرِ مضمونٍ في غلافٍ يعيده السائق تربط الشيفرةَ بشكلٍ
   // قد يتبدّل. واستعلامان رخيصان أوثقُ من حقلٍ لا يضمنه العقد
   const row = await db
-    .prepare("SELECT status FROM media WHERE id = ?")
+    .prepare('SELECT status, idempotency_key FROM media WHERE id = ?')
     .bind(mediaId)
-    .first<{ status: string }>()
+    .first<{ status: string; idempotency_key: string }>()
   if (row === null || row.status !== 'ready') return false
 
-  await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(mediaId).run()
+  /*
+   * **والحجزُ يُطلَق معه — وإلّا بقي الطريقُ مسدودا بطبقةٍ ثانية.**
+   *
+   * `media_claims` مفتاحُها هو `idempotency_key` بعينه (D-068). ويُكتب
+   * الحجزُ قبل النداء ولا يُمحى بعد نجاحه — لأنّ صفَّ الصورة صار يحرس
+   * التكرار. فإذا أُطلق مفتاحُ الصفّ وحده، ردّت الخطوةُ ٣·ب
+   * `in_progress` **عشرَ دقائقَ كاملة** بلا سببٍ يُقرأ.
+   *
+   * وقد وقع في أوّل اختبار: `generated` ثمّ رفضٌ ثمّ `in_progress`.
+   */
+  await releaseClaim(db, row.idempotency_key)
+
+  /*
+   * **والرفضُ يُطلِق المفتاح** (D-087).
+   *
+   * كان الصفُّ يُعلَّم `rejected` **ويحتفظ بمفتاح عدم التكرار**. والخطوةُ
+   * ٢ في `generateForPost` تسأل عن المفتاح ولا تسأل عن الحال، فتجده
+   * فتقول «وُلّدت صورةٌ لهذا النصّ — لم يُنفق شيء» وتخرج.
+   *
+   * **فمن رفض صورةً لم يستطع توليدَ بديلٍ لها أبدا.** ولا رسالةَ تقول
+   * ذلك: يقرأ المالكُ «وُلّدت» ولا يرى صورة، فيظنّ العطلَ في المزوّد.
+   * وقد وقع — وهو ما شكا منه.
+   *
+   * والمفتاحُ `UNIQUE` منذ ‏0010، فلا يكفي تجاهلُ المرفوض في القراءة:
+   * الإدراجُ الجديد يصطدم بالقيد. **فيُوسَم المفتاح بمعرّف الصفّ** —
+   * يبقى الصفُّ بكلفته في الدفتر (وهو المقصود من إبقائه)، **ويُخلى
+   * الاسمُ لتوليدٍ جديد**.
+   */
+  await db
+    .prepare(
+      "UPDATE media SET status = 'rejected', idempotency_key = idempotency_key || ':rejected:' || id" +
+        ' WHERE id = ?',
+    )
+    .bind(mediaId)
+    .run()
   return true
 }
