@@ -236,7 +236,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
   font-weight:700; color:var(--au); margin-bottom:var(--s-2)}
 .eyebrow .ln{height:1px; width:30px; flex:none;
   background:linear-gradient(90deg,var(--au),transparent)}
-.page-head h1{font-size:var(--t-display); font-weight:700; line-height:var(--lh-tight);
+.page-head h1{font-size:var(--t-3xl); font-weight:700; line-height:var(--lh-tight);
   letter-spacing:-.9px; margin:0}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
   color:var(--ink-2); max-width:var(--measure)}
@@ -348,7 +348,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .tile::before{content:''; position:absolute; inset-inline:0; top:0; height:2px;
   background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--au) 75%,transparent),transparent)}
 .tile .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3); letter-spacing:.4px}
-.tile .v{font-size:var(--t-display); font-weight:700; line-height:var(--lh-tight); letter-spacing:-1.4px;
+.tile .v{font-size:var(--t-3xl); font-weight:700; line-height:var(--lh-tight); letter-spacing:-1.4px;
   font-variant-numeric:tabular-nums; margin-top:var(--s-1);
   /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته */
   direction:ltr; unicode-bidi:isolate; text-align:right}

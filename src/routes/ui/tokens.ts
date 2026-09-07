@@ -65,7 +65,7 @@ export const TOKENS = `
   /* ── الذهبُ: طبقةُ التشديد ──────────────────────────────────────
      يُقتَّر ولا يُسكَب. وقيمتُه نهارا تُعتَم كثيرا: ذهبٌ فاتحٌ على
      أبيضَ يختفي (‏١٫٩:١)، فيصير برونزا يُقرأ. */
-  --au:#745914; --au-soft:#937630; --au-wash:#faefd8;
+  --au:#745914;
   /* حالاتٌ محجوزة: لا تُستعمل لسلسلةٍ ولا زينة. والأحمر والأخضر
      متقاربان في عمى الألوان — ولذلك **كلّ حالة تحمل رمزا ونصّا** */
   --ok:#1c7a52; --warn:#8a5a00; --bad:#b3261e;
@@ -87,8 +87,24 @@ export const TOKENS = `
   /* جسرٌ واحدٌ خارج العنقودين: عناوينُ الأقسام حيث ‏٢٦ صاخبةٌ و‏١٦ خافتة */
   --t-xl:20px;
   --t-2xl:26px; --t-3xl:42px;
-  /* اسمان قديمان يبقيان لئلّا ينكسر ما بُني عليهما */
-  --t-md:14px; --t-display:42px; --t-hero:56px;
+  /* اسمٌ قديمٌ يبقى لأنّ عليه بناءً قائما — وكان معه اسمان.
+     و«--t-display» كان ‏٤٢px، **وهي «--t-3xl» نفسُها باسمٍ ثانٍ**، فوحّدا
+     على اسم العنقود. و«--t-hero» ‏٥٦px **لم يُبنَ عليه شيءٌ قطّ** — بقي
+     بحجّة «لئلّا ينكسر ما بُني عليه»، ولم يكن هناك ما بُني (D-067). */
+  --t-md:14px;
+
+  /* ── تباعدُ الحرف: للاتينيّ المعزول وحدَه ─────────────────────────
+     **والتباعدُ في العربيّة يفكّ الوصل**: حرفٌ يُزاح عمّا بعده يُقرأ
+     منفصلا — «صــدى» لا «صدى». فلا يُوضَع إلّا حيث النصُّ لاتينيٌّ
+     بـ«direction:ltr»، وهو هنا اسمُ البيئة تحت العلامة.
+
+     **وكان يُنادى بلا تعريف** (styles.ts:146): القاعدةُ تُقرأ صحيحةً
+     ويسقط المتصفّح إلى «normal» صامتا — لا خطأً ولا تحذيرا. ولا اختبارٌ
+     يمسكها ولا عينٌ تراها. وهي أوّلُ ما أمسكه audit_tokens.
+
+     **ولا علامةَ خلفيّةً في هذا الملفّ**: القيَمُ كلُّها في قالبٍ نصّيّ،
+     والعلامةُ تُنهيه — فيصير الشرحُ شيفرةً ويسقط فحصُ الأنواع. */
+  --ls-eyebrow:.08em;
 
   /* والعربيّةُ تحتاج فسحةً أوسع بين السطور: نقاطُها وشدّاتُها فوق
      الخطّ وتحته، وسطرٌ ضيّقٌ يجعلها تتلامس.
@@ -124,10 +140,9 @@ export const TOKENS = `
      خطّ، ولا تُنقَل. */
   --measure:62ch; --measure-wide:66ch;
 
-  --r-sm:8px; --r:10px; --r-lg:16px; --r-xl:22px;
+  --r-sm:8px; --r:10px; --r-lg:16px;
   --sh-1:0 1px 2px rgba(22,24,28,.05);
   --sh-2:0 1px 3px rgba(22,24,28,.07), 0 8px 24px rgba(22,24,28,.05);
-  --sh-3:0 12px 32px rgba(22,24,28,.10);
   --ring:rgba(18,98,62,.30);
 
   /* ── المادّة ──────────────────────────────────────────────────────
@@ -149,7 +164,6 @@ export const TOKENS = `
   --sheen:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(116,89,20,.07),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(18,98,62,.06),transparent 60%);
-  --glow:0 0 0 1px rgba(116,89,20,.16), 0 10px 30px rgba(116,89,20,.10);
   color-scheme:light;
 }
 
@@ -161,19 +175,17 @@ export const TOKENS = `
     --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
     --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
     --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d1b473; --au-soft:#e8d6af; --au-wash:#2f250e;
+    --au:#d1b473;
     --brand-wash:#133020;
     --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
     --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
     --sh-1:0 1px 2px rgba(0,0,0,.4);
     --sh-2:0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.30);
-    --sh-3:0 12px 32px rgba(0,0,0,.45);
     --ring:rgba(130,198,158,.34);
     --hair:rgba(255,255,255,.055);
     --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
     --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(209,180,115,.10),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
-    --glow:0 0 0 1px rgba(209,180,115,.20), 0 10px 34px rgba(209,180,115,.10);
     color-scheme:dark;
   }
 }
@@ -186,19 +198,17 @@ export const TOKENS = `
   --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
   --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
   --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d1b473; --au-soft:#e8d6af; --au-wash:#2f250e;
+  --au:#d1b473;
   --brand-wash:#133020;
   --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
   --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
   --sh-1:0 1px 2px rgba(0,0,0,.4);
   --sh-2:0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.30);
-  --sh-3:0 12px 32px rgba(0,0,0,.45);
   --ring:rgba(130,198,158,.34);
   --hair:rgba(255,255,255,.055);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(209,180,115,.10),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
-  --glow:0 0 0 1px rgba(209,180,115,.20), 0 10px 34px rgba(209,180,115,.10);
   color-scheme:dark;
 }
 
@@ -221,7 +231,7 @@ export const TOKENS = `
   --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
   --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
   --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d1b473; --au-soft:#e8d6af; --au-wash:#2f250e;
+  --au:#d1b473;
   --brand-wash:#133020;
   --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
   --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
