@@ -447,13 +447,29 @@ describe('نضج العرض', () => {
   })
 })
 
+/**
+ * ورقةُ الأنماط كما يجلبها المتصفّح (D-091).
+ *
+ * خرجت من الوثيقة إلى `/a/…`، **فاختبارٌ يفتّش عنها في الوثيقة يمرّ على
+ * غيابها لا على حضورها**. فيُقرأ المسارُ من الوثيقة ثمّ تُطلَب — وهذا ما
+ * يفعله المتصفّح، فهو ما يُختبَر.
+ */
+async function stylesheet(cookie: string): Promise<string> {
+  const html = await (await app.request('/panel', withSession(cookie), env)).text()
+  const href = /<link rel="stylesheet" href="([^"]+)"/.exec(html)
+  expect(href).not.toBeNull()
+  const sheet = await app.request(href![1]!, {}, env)
+  expect(sheet.status).toBe(200)
+  return sheet.text()
+}
+
 describe('اللون يتبع المرجع لا الذوق', () => {
   it('المقياس هيئةٌ واحدة — لا كهرمان فيه (يقع من الذهب على ΔE 7.2)', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     // لا صنف تحذيرٍ في المقياس؛ الأحمر وحده هو القفزة المسموحة
     expect(html).not.toContain('<i class="w"')
-    expect(html).toContain('.bar i.f{background:var(--bad)}')
+    expect(await stylesheet(cookie)).toContain('.bar i.f{background:var(--bad)}')
   })
 
   it('بلوغُ السقف يحمل نصّا لا لونا وحده', async () => {
@@ -1162,9 +1178,8 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
 
 describe('الثيم النهاريّ', () => {
   it('الرموز تُعرَّف على :root كاملةً — فلا تسقط بسقوط شرط', async () => {
-    const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    const root = html.slice(html.indexOf(':root{'), html.indexOf('}', html.indexOf(':root{')))
+    const css = await stylesheet(await login())
+    const root = css.slice(css.indexOf(':root{'), css.indexOf('}', css.indexOf(':root{')))
     for (const token of ['--bg', '--surface', '--ink', '--brand', '--ok', '--warn', '--bad']) {
       expect(root).toContain(token)
     }

@@ -5,7 +5,7 @@
  * وحقنُ رمز CSRF، و `nonce` السياسة. فما بُني فوقها ورثها، وما نسيها
  * لم يُبنَ فوقها أصلا.
  */
-import { STYLE } from './styles'
+import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
 import { BEIRUTI, INTER } from '../../lib/ui/fonts'
 
 /**
@@ -208,7 +208,8 @@ export function shell(
 ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 ${FONT_PRELOAD}
-<style nonce="${safeNonce}">${FONT_CSS}${STYLE}</style></head><body>${body}${
-    script === '' ? '' : `<script nonce="${safeNonce}">${script}</script>`
+<style nonce="${safeNonce}">${FONT_CSS}</style>
+<link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
+    script === '' ? '' : `<script nonce="${safeNonce}">${stripJs(script)}</script>`
   }</body></html>`
 }

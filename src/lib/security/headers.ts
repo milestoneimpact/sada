@@ -57,7 +57,15 @@ export function htmlHeaders(nonce: string): Record<string, string> {
   const csp = [
     "default-src 'none'",
     `script-src 'nonce-${nonce}'`,
-    `style-src 'nonce-${nonce}'`,
+    /*
+     * **و`'self'` مع `nonce` لا بدلا عنه** (D-091).
+     *
+     * ورقةُ الأنماط خرجت إلى `/a/…` فتحتاج `'self'`. **و`nonce` يبقى**:
+     * وسمُ `<style>` الباقي يحمل وجهَي الخطّ، وسطرٌ يحقنه مهاجمٌ لا
+     * يحمل قيمةً لا يعرفها — **و`'self'` لا تفتح للداخليّ بابا**، إنّما
+     * تسمح بموردٍ من أصلنا وحدَه، وكلُّ مساراتِ أصلنا نكتبها.
+     */
+    `style-src 'self' 'nonce-${nonce}'`,
     "font-src 'self'",
     "img-src 'self' data:",
     /**

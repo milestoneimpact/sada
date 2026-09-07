@@ -26,7 +26,7 @@ describe('السياسة — قائمةُ سماحٍ من العدم', () => {
 
   it.each([
     ['البرمجة', "script-src 'nonce-N0NCE'"],
-    ['الأنماط', "style-src 'nonce-N0NCE'"],
+    ['الأنماط', "style-src 'self' 'nonce-N0NCE'"],
     ['الخطوط', "font-src 'self'"],
     ['التأطير', "frame-ancestors 'none'"],
     ['وجهة النماذج', "form-action 'self'"],

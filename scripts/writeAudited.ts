@@ -25,9 +25,23 @@
  */
 import { writeFileSync } from 'node:fs'
 import { FACES } from '../src/lib/ui/fonts'
+import { STYLE_BODY, STYLE_PATH } from '../src/lib/ui/asset'
 
 export function writeAudited(path: string, html: string): void {
-  let inlined = html
+  /*
+   * **وورقةُ الأنماط تُضَمّ كذلك** (D-091).
+   *
+   * خرجت إلى `/a/…`، **والمدقّقُ يفتح ملفّا محلّيّا** فلا أصلَ هناك ولا
+   * مسار. فيقيس صفحةً بلا أنماطٍ أصلا — **ويعطي «صفرا» على كلّ شيء**:
+   * لا هدفَ لمسٍ صغير، ولا سطرَ طويل، ولا فيضَ أفقيّ. **وصفرٌ من العدم
+   * أخطرُ من ملحوظة.**
+   *
+   * وهي علّةُ الخطّ نفسُها في D-089، وقد وقعت مرّةً — فتُغلَق ههنا معه.
+   */
+  let inlined = html.replace(
+    `<link rel="stylesheet" href="${STYLE_PATH}">`,
+    `<style>${STYLE_BODY}</style>`,
+  )
   for (const face of FACES) {
     inlined = inlined.replace(
       `url('${face.path}')`,
