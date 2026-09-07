@@ -993,8 +993,12 @@ panel.post('/panel/media/generate', async (c) => {
   const flash: PanelFlash =
     outcome.kind === 'generated'
       ? {
-          kind: 'ok',
-          text: `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.`,
+          // **والنصُّ فوق الصورة قد لا يُركَّب لخمسة أسباب** — وسقوطُه كان
+          // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
+          kind: outcome.note === '' ? 'ok' : 'warn',
+          text:
+            `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.` +
+            (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }

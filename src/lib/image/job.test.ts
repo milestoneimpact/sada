@@ -548,6 +548,43 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
     expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
   })
+
+  /**
+   * **وكلُّ سقوطٍ يُقال** (D-088).
+   *
+   * الأسبابُ خمسةٌ لا تُفرَّق من الشاشة: رمزٌ غائب، وتركيبٌ مُطفأ، وموجزٌ
+   * بلا عنوان، وصورةٌ فوق الحدّ، ولقطةٌ سقطت. فالمالكُ يرى صورةً بلا
+   * نصّ **ويُصلِح في مكانٍ سليم**.
+   */
+  it('وسببُ السقوط يُعاد مع المخرَج — لا صمت', async () => {
+    await seedWriter()
+    const out = await generateForPost(
+      slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }),
+      await seedPost(),
+    )
+    expect(out.kind).toBe('generated')
+    if (out.kind !== 'generated') return
+    expect(out.note).toContain('CF_BROWSER_TOKEN')
+  })
+
+  it('وحين تُركَّب الشريحةُ فلا سبب — الفراغُ يعني أنّ كلَّ شيءٍ تمّ', async () => {
+    await seedWriter()
+    const out = await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
+    expect(out.kind).toBe('generated')
+    if (out.kind !== 'generated') return
+    expect(out.note).toBe('')
+  })
+
+  it('وسقوطُ التصوير يُسمّى — لا يُخلَط بالغياب', async () => {
+    await seedWriter()
+    const out = await generateForPost(
+      slideDeps(twoLane({ shotStatus: 500 }), bucket(), READY),
+      await seedPost(),
+    )
+    expect(out.kind).toBe('generated')
+    if (out.kind !== 'generated') return
+    expect(out.note).toContain('تعذّر تصويرُ الشريحة')
+  })
 })
 
 /**
@@ -603,5 +640,54 @@ describe('المرفوضةُ لا تسدّ الطريق', () => {
       .bind(id)
       .first<{ idempotency_key: string }>()
     expect((row!.idempotency_key.match(/:rejected:/g) ?? []).length).toBe(1)
+  })
+})
+
+/**
+ * **والصفُّ الذي رُفض قبل D-087 يحمل مفتاحَه نظيفا** (D-088).
+ *
+ * D-087 غيّرت الكاتب: كلُّ رفضٍ **جديد** يوسم مفتاحَه. **ولم تُصلِح ما
+ * وقع قبلها.** فصفٌّ رُفض في الأسبوع الماضي بقي مفتاحُه كما هو، والخطوةُ
+ * ٢ تسأل عن المفتاح ولا تسأل عن الحال — فتجده، فتقول «وُلّدت صورةٌ لهذا
+ * النصّ» **بلونٍ أخضر**، ولا صورة.
+ *
+ * وهو ما شكا منه المالك في X بالحرف: «يظهر أنّها تمّت، ولم تتمّ».
+ *
+ * **والحارسُ يُبنى على الحال لا على الاسم**: الاسمُ يُصلَح بترحيل،
+ * والحالُ صحيحةٌ في كلّ صفٍّ منذ ‏0010.
+ */
+describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-088)', () => {
+  it('لا يقول «وُلّدت» على صفٍّ مرفوضٍ مفتاحُه نظيف', async () => {
+    const post = await seedPost({ platform: 'x' })
+    const first = await generateForPost(deps(net()), post)
+    expect(first.kind).toBe('generated')
+    const id = (first as { mediaId: string }).mediaId
+
+    // **رفضٌ بالكاتب القديم**: الحالُ تتغيّر والمفتاحُ يبقى — كما في كلّ
+    // صفٍّ رُفض قبل D-087
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
+    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
+
+    const again = await generateForPost(deps(net()), post)
+    expect(again.kind).toBe('generated')
+    expect((again as { mediaId: string }).mediaId).not.toBe(id)
+  })
+
+  it('ويبقى الصفُّ القديمُ بكلفته — الدفترُ لا يُمحى', async () => {
+    const post = await seedPost({ platform: 'x' })
+    const first = await generateForPost(deps(net()), post)
+    const id = (first as { mediaId: string }).mediaId
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
+    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
+    await generateForPost(deps(net()), post)
+
+    const { results } = await db
+      .prepare('SELECT id, status FROM media WHERE post_id = ?')
+      .bind(post)
+      .all<{ id: string; status: string }>()
+    expect(results).toHaveLength(2)
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
   })
 })
