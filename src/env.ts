@@ -122,3 +122,44 @@ export function readiness(env: Partial<Env>): Readiness {
     driveFolder,
   }
 }
+
+/**
+ * الجاهزيّةُ بعد الخزانة — **وسرٌّ سُدّ من اللوحة سرٌّ حاضر** (D-095).
+ *
+ * ## العلّة المقيسة
+ *
+ * `readiness` تقرأ بيئةَ Worker وحدَها، وهذا صوابُها: دالّةٌ خالصةٌ لا
+ * تمسّ قاعدة. **وخزانةُ المزوّدين (D-042) تسدّ أكثرَها من اللوحة** —
+ * مفاتيحُ Anthropic وسرّا LinkedIn و X تُحفَظ مشفّرةً في D1 لا في أسرار
+ * Worker.
+ *
+ * فكان `‎/ready` يعرف ذلك ويحسبه (`configured_in_vault`) **ثمّ لا يردّه
+ * إلى الحكم**. فخرج جوابٌ يناقض نفسَه في سطرين:
+ *
+ *     "missing_secrets": []        ← لا شيءَ ناقص
+ *     "phase_0": false, "ready": false   ← وغيرُ جاهز
+ *
+ * وردَّ ٥٠٣. **وسجلُّ النشر يطبع «أسرارٌ ما تزال ناقصة» ثمّ يعدّد فراغا.**
+ *
+ * ## ولماذا هذا أخطرُ من رقمٍ خاطئ
+ *
+ * إشارةٌ حمراءُ دائما تُتجاهَل — وهي حجّةٌ مكتوبةٌ في سير النشر نفسِه:
+ * «ولو بقي كلُّ نشرٍ أحمرَ طوالها لصار الأحمرُ عادةً تُتجاهَل، وحين يقع
+ * عطلٌ حقيقيٌّ لا يميّزه أحد».
+ *
+ * **فالحكمُ يُعاد بعد أن يُعرَف ما سُدّ**، والدالّةُ خالصةٌ كسابقتها:
+ * تأخذ ما قِيس وتردّ الحكم، ولا تنادي أحدا.
+ */
+export function afterVault(state: Readiness, covered: readonly string[]): Readiness {
+  const sealed = new Set(covered)
+  const left = state.missing.filter((name) => !sealed.has(name))
+  const remains = (names: readonly string[]): boolean =>
+    names.every((name) => !left.includes(name))
+  return {
+    phase0: remains(PHASE_0_SECRETS),
+    // **والمجلَّدُ يبقى شرطا**: لا خزانةَ تسدّ متغيّرَ بيئة
+    phase1: remains(PHASE_1_SECRETS) && state.driveFolder,
+    missing: left,
+    driveFolder: state.driveFolder,
+  }
+}
