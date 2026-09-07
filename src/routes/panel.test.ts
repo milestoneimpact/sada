@@ -1995,3 +1995,48 @@ describe('لوحُ المراجعة في اللوحة', () => {
     expect(html).not.toContain('ملحوظةً على الصياغة')
   })
 })
+
+/**
+ * **ما يُعرَض في جدول التوجيه يُقبَل حفظُه** (D-091).
+ *
+ * كانت `KNOWN_TASKS` ثلاثا مكتوبةً حرفا و`readRoutes` تعرض مفاتيحَ
+ * `ROUTES` كلَّها — **فيُعرَض `plan` ويُردّ عند الحفظ**. والمالكُ يبدّل
+ * نموذجَه فيسمع «مهمّةٌ غير معروفة» على مهمّةٍ يراها أمامه.
+ */
+describe('توجيهُ كلِّ مهمّةٍ يُحفَظ لا يُعرَض وحسب', () => {
+  async function post(cookie: string, path: string, fields: Record<string, string>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) body.set(k, v)
+    return await app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('كلُّ مهمّةٍ معروضةٍ تُقبَل — الخطّةُ والفيديو معهما', async () => {
+    const cookie = await login()
+    for (const task of ['analyze', 'draft', 'plan', 'image', 'video']) {
+      const response = await post(cookie, '/panel/routes', {
+        task, provider: 'anthropic', model: 'claude-opus-5',
+      })
+      expect([200, 303], task).toContain(response.status)
+      const row = await db
+        .prepare('SELECT model FROM task_routes WHERE task = ?')
+        .bind(task)
+        .first<{ model: string }>()
+      expect(row?.model, task).toBe('claude-opus-5')
+    }
+  })
+
+  it('وما ليس مهمّةً يُردّ — القائمةُ لم تنفتح على كلّ شيء', async () => {
+    const cookie = await login()
+    const response = await post(cookie, '/panel/routes', {
+      task: 'publish', provider: 'anthropic', model: 'claude-opus-5',
+    })
+    expect(response.status).toBe(400)
+  })
+
+  it('ويُعرَض لكلِّ مهمّةٍ اسمٌ عربيّ — لا مفتاحٌ خام', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('الخطّة — منطقُ الأسبوع')
+    expect(html).toContain('الفيديو — تحريكُ الصورة')
+  })
+})

@@ -13,6 +13,7 @@ import { verifyMediaToken } from './link'
 import { VIDEO_MODELS, type AiBinding } from './workersAi'
 import { animateForPost, DEFAULT_PROMPT, pickBinding, videoKey } from './video'
 import { claimGeneration } from './claim'
+import { writeRoute } from '../ai/routes'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const BASE = 'https://sada2.basserh.com'
@@ -335,5 +336,63 @@ describe('اختيارُ الوجه — والرابطُ يُفضَّل متى �
 
   it('وبلا شيءٍ لا وجه', () => {
     expect(pickBinding({})).toBeUndefined()
+  })
+})
+
+/**
+ * **توجيهُ الفيديو يُطاع** (D-091).
+ *
+ * كان `alibaba/hh1-i2v` مثبَّتا في الشيفرة، **فاختيارُ المالك في اللوحة
+ * يُكتب في `task_routes` ولا يصل إلى النداء**. وهي علّةُ D-079 نفسُها في
+ * مكانٍ لم يُفتَّش: يُقرأ ولا يُطاع.
+ *
+ * وهو **أغلى ما يُنادى في النظام** — فأن يُختار نموذجُه أولى لا أدنى.
+ */
+describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091)', () => {
+  it('النموذجُ المكتوبُ في اللوحة هو المُنادى', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+    await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
+
+    const link = ai(OK_VIDEO)
+    const out = await animateForPost(deps(link), 'p1')
+    expect(out.kind).toBe('generated')
+    expect(link.calls[0]!.model).toBe('@cf/other/model-v2')
+  })
+
+  it('ويُسجَّل في الدفتر ما نُودي به — لا اسمٌ ثابت', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+    await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
+
+    await animateForPost(deps(ai(OK_VIDEO)), 'p1')
+    const row = await db
+      .prepare("SELECT operation FROM cost_ledger WHERE operation LIKE 'video:%'")
+      .first<{ operation: string }>()
+    expect(row?.operation).toContain('@cf/other/model-v2')
+  })
+
+  it('ويُكتب في صفّ الوسيط كذلك — فيُعرَف بأيّ نموذجٍ وُلّد', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+    await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
+
+    const out = await animateForPost(deps(ai(OK_VIDEO)), 'p1')
+    expect(out.kind).toBe('generated')
+    if (out.kind !== 'generated') return
+    const row = await db
+      .prepare('SELECT model FROM media WHERE id = ?')
+      .bind(out.mediaId)
+      .first<{ model: string }>()
+    expect(row?.model).toBe('@cf/other/model-v2')
+  })
+
+  it('وبلا توجيهٍ مكتوبٍ يُنادى افتراضُ الشيفرة — لا فراغ', async () => {
+    seedPost()
+    seedMedia({ id: 'img', mime: 'image/png' })
+
+    const link = ai(OK_VIDEO)
+    await animateForPost(deps(link), 'p1')
+    expect(link.calls[0]!.model).toBe(VIDEO_MODELS.fromImage)
   })
 })

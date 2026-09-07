@@ -24,6 +24,7 @@
  * تبقى يتيمةً ولا تضرّ.
  */
 import { recordCost } from '../cost'
+import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from './claim'
 import { blockerReason, checkAllowance } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
@@ -183,6 +184,20 @@ export async function animateForPost(
   const held = await claimGeneration(deps.db, key, postId, 'video', now)
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
+  /*
+   * ٥٫٥ — **النموذجُ من التوجيه لا من الشيفرة** (D-091).
+   *
+   * كان `alibaba/hh1-i2v` مثبَّتا هنا حرفا — **فاختيارُ المالك في
+   * اللوحة يُكتب في `task_routes` ولا يصل إلى هذا النداء**. وهي علّةُ
+   * D-079 نفسُها في مكانٍ لم يُفتَّش: يُقرأ ولا يُطاع.
+   *
+   * **ويُقرأ بعد الحجز لا قبله**: قراءةُ صفٍّ قد تسقط، وسقوطُها قبل
+   * الحجز يترك البابَ مفتوحا لنقرةٍ ثانية. و`routeFor` لا تعود فارغةً
+   * أبدا — إن لم يُكتَب صفٌّ رجعت إلى افتراض الشيفرة.
+   */
+  const route = await routeFor(deps.db, 'video').catch(() => null)
+  const model = route?.model ?? VIDEO_MODELS.fromImage
+
   // ٦ — الكلفةُ تُسجَّل قبل أن يُعدّ النداءُ ناجحا (D-008).
   //
   // **ولا يُخترَع سعر.** سعرُ الفيديو عند Cloudflare يُقرأ من لوحة
@@ -190,7 +205,9 @@ export async function animateForPost(
   // يقول «لم يُسعَّر» أصدقُ من رقمٍ يُظنّ حقيقةً وهو تخمين
   await recordCost(deps.db, {
     provider: 'cloudflare',
-    operation: `video:${VIDEO_MODELS.fromImage}:price_unverified`,
+    // **والدفترُ يسجّل ما نُودي به فعلا**: اسمٌ ثابتٌ في الدفتر
+    // ونموذجٌ متغيّرٌ في النداء يجعل الكلفةَ تُنسَب إلى غير صاحبها
+    operation: `video:${model}:price_unverified`,
     units: 1,
     unitCost: 0,
     refId: postId,
@@ -198,9 +215,11 @@ export async function animateForPost(
 
   let url: string
   try {
-    const out = await generateVideo(deps.ai, {
-      imageUrl, prompt, durationSeconds: MAX_SECONDS, ratio: '9:16', resolution: '720P',
-    })
+    const out = await generateVideo(
+      deps.ai,
+      { imageUrl, prompt, durationSeconds: MAX_SECONDS, ratio: '9:16', resolution: '720P' },
+      model,
+    )
     url = out.url
   } catch (error) {
     // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة**
@@ -251,7 +270,7 @@ export async function animateForPost(
                           status, idempotency_key)
        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'ready', ?)`,
     )
-    .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, VIDEO_MODELS.fromImage, key)
+    .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, model, key)
     .run()
 
   return { kind: 'generated', mediaId, bytes: bytes.length }
