@@ -217,6 +217,48 @@ function filterTabs(drafts: readonly DraftRow[]): string {
   return `<nav class="ftabs" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>`
 }
 
+/**
+ * المعاينة — **كما تُقرأ لا كما تُحرَّر** (D-090).
+ *
+ * ## ما تُضيفه على المربّع
+ *
+ * المربّعُ حقلُ تحرير: خطُّ اللوحة، وحدٌّ، وشريطُ تمرير، وعرضُ البطاقة.
+ * **والمنشورُ يُقرأ فقرةً في عمودٍ ضيّقٍ تحت اسم الحساب** — وحكمٌ على
+ * نصٍّ في حقلٍ ليس حكما عليه منشورا.
+ *
+ * ## وحدُّ الصدق — ولا يُرسَم ما لم يُقَس
+ *
+ * **الطيُّ («اقرأ المزيد») لا يُرسَم.** حدُّه عند LinkedIn يتبدّل بالجهاز
+ * وبوجود صورة، **و`PLATFORMS.md` لا تحمله مقيسا** — ورسمُ خطٍّ عند رقمٍ
+ * من الذاكرة يجعل المالكَ يقصّر نصَّه أو يطيله على وهم.
+ *
+ * وهي قاعدةُ D-076 نفسُها: **الفحصُ يكذب حين يستدلّ**. فيُقال إنّها
+ * تقريبٌ، ويُسمَّى ما لا تعرفه.
+ *
+ * ## وما تعرفه تعرفه يقينا
+ *
+ * السطرُ الأوّل هو ما يُقرأ قبل أيّ طيّ **مهما كان حدُّه** — فيُعلَّم.
+ * والأسطرُ تُحفظ كما كُتبت (`pre-wrap`): منشورٌ بفقرتين يُقرأ فقرةً واحدة
+ * إن طُويت أسطرُه، فيُحكَم عليه بغير ما يظهر.
+ */
+function preview(d: DraftRow, target: string): string {
+  const [first = '', ...rest] = d.text.split('\n')
+  return `<div class="pv" data-pv="${escapeHtml(d.id)}">
+    <div class="pv-head">
+      <span class="pv-dot" aria-hidden="true"></span>
+      <span class="pv-who">${escapeHtml(target)}</span>
+      <span class="grow"></span>
+      <span class="ago">معاينة</span>
+    </div>
+    <p class="pv-body"><b data-pv-first>${escapeHtml(first)}</b><span data-pv-rest>${
+      rest.length === 0 ? '' : escapeHtml('\n' + rest.join('\n'))
+    }</span></p>
+    <p class="pv-note">تقريبٌ لا محاكاة: السطرُ الأوّل ما يُقرأ أوّلا.
+      <b>والطيُّ لا يُرسَم</b> — حدُّه يتبدّل بالجهاز ولم يُقَس، ورقمٌ من
+      الذاكرة يجعلك تقصّر نصَّك على وهم.</p>
+  </div>`
+}
+
 function card(
   d: DraftRow,
   now: Date,
@@ -280,7 +322,8 @@ function card(
            <button class="g sm" type="submit" name="do" value="reject">ارفض</button>
            <button class="p sm" type="submit" name="do" value="approve">اعتمد</button>
          </div>
-       </form>`
+       </form>
+       ${preview(d, spec.label)}`
     : `<div class="draft-text ro" style="${box}" data-ro>${escapeHtml(d.text)}</div>
        <div class="draft-foot"><span class="count"><b>${len}</b> / ${spec.hardLimit}</span>
          <span class="grow"></span>

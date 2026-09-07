@@ -814,6 +814,31 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .draft.here{border-color:var(--brand);
   box-shadow:0 0 0 3px var(--ring), var(--sh-2), inset 0 1px 0 var(--hair)}
 
+/* ── المعاينة: كما تُقرأ لا كما تُحرَّر ───────────────────────────
+   المربّعُ حقلُ تحرير — خطُّ اللوحة وحدٌّ وشريطُ تمرير وعرضُ البطاقة.
+   **والمنشورُ يُقرأ فقرةً في عمودٍ ضيّق**، وحكمٌ على نصٍّ في حقلٍ ليس
+   حكما عليه منشورا.
+
+   والعمودُ أضيقُ من «--measure» قصدا: عمودُ المنصّة أضيقُ من عمود
+   قراءةٍ عاديّ، وهذا أقربُ ما نملك إليه بلا ادّعاء رقمٍ لم يُقَس. */
+.pv{margin-top:var(--s-3); border:1px solid var(--line-soft); border-radius:var(--r);
+  background:var(--surface-2); padding:var(--s-3) var(--s-4)}
+.pv-head{display:flex; align-items:center; gap:var(--s-2); margin-bottom:var(--s-2)}
+/* دائرةٌ خافتةٌ مكانَ صورة الحساب: مربّعٌ فارغٌ يُقرأ صورةً لم تُحمَّل */
+.pv-dot{width:26px; height:26px; border-radius:50%; flex:none;
+  background:var(--surface-3); border:1px solid var(--line)}
+.pv-who{font-weight:600; font-size:var(--t-sm)}
+/* والأسطرُ تُحفظ كما كُتبت: منشورٌ بفقرتين يُقرأ فقرةً واحدة إن طُويت
+   أسطرُه، فيُحكَم عليه بغير ما يظهر */
+.pv-body{margin:0; white-space:pre-wrap; word-break:break-word;
+  font-size:var(--t-base); line-height:var(--lh); color:var(--ink); max-width:46ch}
+/* السطرُ الأوّلُ هو ما يُقرأ قبل أيّ طيّ **مهما كان حدُّه** — فيُثخَّن.
+   ولا يُلوَّن: لونٌ على سطرٍ من فقرةٍ يُقرأ رابطا أو حالة. */
+.pv-body b{font-weight:700}
+.pv-note{margin:var(--s-3) 0 0; font-size:var(--t-xs); color:var(--ink-3);
+  line-height:var(--lh); max-width:var(--measure);
+  padding-top:var(--s-2); border-top:1px dashed var(--line)}
+
 /* ── شريطُ البَتِّ الجماعيّ ───────────────────────────────────────
    ملتصقٌ بأسفل الشاشة: من يحدّد خمسا وهو في آخر القائمة لا يُطلَب منه
    أن يصعد. و«sticky» لا «fixed» — الأولى تبقى في تدفّق الصفحة فلا

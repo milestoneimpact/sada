@@ -270,6 +270,29 @@ export const SCRIPT = `
     }
     count();
 
+    // ── المعاينةُ تتبع المربّع ──────────────────────────
+    //
+    // والمربّعُ هو المصدر: النصُّ الذي يراه المالك هو النصُّ الذي
+    // يُرسَل، والمعاينةُ تصويرٌ له لا نسخةٌ ثانية تُحرَّر. فلو انقطع
+    // الرباطُ بقيت المعاينةُ تعرض ما لن يُنشَر — وهو أسوأُ من غيابها.
+    //
+    // و textContent لا innerHTML: النصُّ من المالك، وحقنُه وسما يجعل
+    // معاينةً تعرض ما ليس فيه.
+    cards.forEach(function(c){
+      var box=c.querySelector('textarea.draft-text');
+      var pv=c.querySelector('.pv');
+      if(!box||!pv)return;
+      var head=pv.querySelector('[data-pv-first]');
+      var tail=pv.querySelector('[data-pv-rest]');
+      if(!head||!tail)return;
+      var sync=function(){
+        var t=box.value, nl=t.indexOf('\\n');
+        head.textContent = nl<0 ? t : t.slice(0,nl);
+        tail.textContent = nl<0 ? '' : t.slice(nl);
+      };
+      box.addEventListener('input',sync);
+    });
+
     // ── البَتُّ بلوحة المفاتيح ──────────────────────────
     //
     // وموضعُ المفتاح لا حرفُه — وهذا ليس تفصيلا: المالكُ يكتب
