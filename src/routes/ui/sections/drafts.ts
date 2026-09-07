@@ -21,6 +21,7 @@
  */
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
+import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type Platform } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
 import { relativeTime } from '../../../lib/format'
@@ -223,6 +224,40 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   </div>`
 }
 
+/**
+ * لوحُ المراجعة — **ملحوظاتٌ تُقرأ ولا تمنع** (D-090).
+ *
+ * ولا يظهر إلّا حيث يُفيد: مسوّدةٌ يُبَتّ فيها. **وملحوظةٌ على منشورٍ
+ * نُشر عتابٌ لا مراجعة** — فات وقتُ تعديله، ولا يبقى منها إلّا الإزعاج.
+ *
+ * **ولا شارةَ حمراء**: هذه ملحوظاتُ ذوقٍ لا أخطاءُ نظام. ولونٌ يقول
+ * «عطل» على «ما رأيكم؟» يجعل المالكَ يتجاهل اللونَ حين يعني عطلا حقّا.
+ */
+function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
+  // **والشرطُ هو شرطُ المحرِّر نفسُه**: ملحوظةٌ حيث لا مربّعَ يُحرَّر
+  // عتابٌ لا مراجعة. وشرطان متقاربان يفترقان بلا حارس
+  if (d.status !== 'draft' && d.status !== 'approved' && d.status !== 'edited') return ''
+  const notes: readonly ReviewNote[] = reviewText(d.text, d.platform, counted, hardLimit)
+  if (notes.length === 0) return ''
+
+  return `<details class="notes">
+    <summary><span class="st idle"><span class="g">◍</span>${
+      notes.length} ملحوظةً على الصياغة</span>
+      <span class="ago">تُقرأ ولا تمنع — والقرارُ لك</span></summary>
+    <ul class="plain">${notes
+      .map(
+        (n) => `<li><b>${escapeHtml(n.text)}</b>${
+          n.hits.length === 0
+            ? ''
+            : ` <span class="hit-list">${n.hits
+                .map((h) => `<span class="chip">${escapeHtml(h)}</span>`)
+                .join(' ')}</span>`
+        }</li>`,
+      )
+      .join('')}</ul>
+  </details>`
+}
+
 function card(
   d: DraftRow,
   now: Date,
@@ -277,11 +312,11 @@ function card(
     ? `<form method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <textarea name="text" class="draft-text" style="${box}"
-           data-limit="${spec.hardLimit}" data-target="${spec.target}"
+           data-limit="${spec.hardLimit}" data-target="${ceilingOf(spec.hardLimit)}"
            data-count="${spec.id}"
            aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
          <div class="draft-foot">
-           <span class="count ${len > spec.hardLimit ? 'bad' : len > spec.target ? 'warn' : ''}"
+           <span class="count ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
              ><b>${len}</b> / ${spec.hardLimit}</span>
            <span class="grow"></span>
            <button class="g sm" type="submit" name="do" value="reject">ارفض</button>
@@ -298,6 +333,7 @@ function card(
              )}</span>`}</div>`
 
   return `<div class="draft${live ? '' : ' done'}">
+    ${notesPane(d, len, spec.hardLimit)}
     <div class="draft-top">
       <div class="ch-logo sm">${MARK[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}

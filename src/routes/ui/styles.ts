@@ -836,6 +836,18 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   border-top:1px solid var(--line)}
 .quick .mirror{font-size:var(--t-xs); color:var(--ink-2);
   direction:rtl; unicode-bidi:isolate}
+/* لوحُ المراجعة — مطويٌّ عمدا (D-090): ملحوظاتُ ذوقٍ لا تزاحم النصَّ
+   حتّى تُطلَب، «ولا شارةَ حمراء» فتُقرأ عطلا. */
+.notes{margin-bottom:var(--s-2); border:1px solid var(--line);
+  border-radius:var(--r-sm); background:var(--surface-2)}
+.notes summary{display:flex; align-items:center; gap:var(--s-2);
+  padding:var(--s-2); cursor:pointer; min-height:var(--tap)}
+.notes summary::-webkit-details-marker{display:none}
+.notes ul{margin:0; padding:0 var(--s-3) var(--s-2) var(--s-3)}
+.notes li{margin-bottom:var(--s-2); font-size:var(--t-sm); line-height:1.7}
+.notes li:last-child{margin-bottom:0}
+.notes .hit-list{display:inline-flex; flex-wrap:wrap; gap:var(--s-1);
+  margin-inline-start:var(--s-1)}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
 .codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:var(--s-2); margin:var(--s-3) 0}
