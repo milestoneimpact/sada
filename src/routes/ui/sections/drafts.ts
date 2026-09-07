@@ -50,6 +50,36 @@ const LINE = 26
 const PAD = 28
 
 /**
+ * مواعيدُ بضغطةٍ واحدة — **بتوقيت المالك لا بالـ UTC** (D-089).
+ *
+ * ## العلّة المقيسة
+ *
+ * قال المالك: «تسهيل عمليّة الجدولة، حيث إنّ استخدامها صعب». وقُرئ
+ * الشريطُ فوُجد فيه حقلٌ واحد `datetime-local` **بلا أيّ اقتراح**:
+ * يُكتب التاريخُ والساعةُ والدقيقةُ يدا، في كلّ مسوّدةٍ على حدة.
+ *
+ * **والموعدُ بالـ UTC والمالكُ في الرياض** — فبينهما ثلاثُ ساعات. فمن
+ * أراد «التاسعةَ صباحا» كتب `06:00`، **ويحوّل ذهنيّا في كلّ مرّة**.
+ * وخطأُ ساعةٍ هنا منشورٌ يخرج في وقتٍ لا يقرؤه أحد.
+ *
+ * ## والحلُّ لا يمسّ الخادم
+ *
+ * الخادمُ يقرأ الـ UTC ولا يعرف منطقةَ أحد — **وهذا صواب**: منطقةٌ
+ * تُخزَّن في إعدادٍ تُنسى فتكذب بعد سفرٍ أو تحوّلٍ صيفيّ. فالتحويلُ في
+ * المتصفّح، حيث المنطقةُ معروفةٌ يقينا وتُقرأ لحظتَها.
+ *
+ * فالأزرارُ تحسب لحظةً **محلّيّة** ثمّ تكتبها في الصندوق **UTC**،
+ * ومرآةٌ تحته تقرأ ما في الصندوق وتقوله بتوقيت المالك. **فالرقمان
+ * حاضران معا**، ولا يُصدَّق أحدُهما على حساب الآخر.
+ */
+const QUICK: readonly { kind: string; label: string }[] = [
+  { kind: 'hour', label: 'بعد ساعة' },
+  { kind: 'tonight', label: 'الليلة ٨م' },
+  { kind: 'tomorrow', label: 'غدا ٩ص' },
+  { kind: 'sunday', label: 'الأحد ٩ص' },
+]
+
+/**
  * شريطُ الجدولة — ولا يظهر إلّا حيث يعمل.
  *
  * ثلاثةُ أحوالٍ لا حالان: معتمَدٌ بلا قناةٍ لمنصّته **يقول لماذا** ولا
@@ -117,10 +147,18 @@ function scheduler(
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>
     <div class="field"><label for="wh-${id}">الموعد (UTC)</label>
-      <input id="wh-${id}" name="when" type="datetime-local"
+      <input id="wh-${id}" name="when" type="datetime-local" data-when
         min="${escapeHtml(earliest)}" required></div>
     <span class="grow"></span>
     <button class="p sm" type="submit">جدوِل</button>
+    <div class="quick" data-quick="wh-${id}">
+      ${QUICK.map(
+        (q) =>
+          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+      ).join('')}
+      <span class="grow"></span>
+      <span class="mirror mono" data-mirror="wh-${id}"></span>
+    </div>
   </form>`
 }
 
@@ -368,5 +406,50 @@ export function draftsSection(input: DraftsInput): string {
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
   </div>
+  ${spreadBar(input)}
   ${list}`
+}
+
+/**
+ * شريطُ التوزيع — **ولا يظهر إلّا حيث يعمل** (D-089).
+ *
+ * معتمَدةٌ واحدةٌ تُجدوَل من بطاقتها في ضغطتين. **والتوزيعُ يُوجد
+ * لاثنتين فصاعدا**، فزرٌّ يظهر على واحدةٍ يزحم الصفحةَ بلا أن يوفّر شيئا.
+ *
+ * وشرطُ الوجهة معه: معتمَدةٌ بلا قناةٍ لمنصّتها لا تُوزَّع أصلا — **وزرٌّ
+ * يفتح شاشةً تقول «لا شيءَ يُوزَّع» وعدٌ يُخلَف**.
+ */
+function spreadBar(input: DraftsInput): string {
+  const ready = input.drafts.filter(
+    (d) =>
+      (d.status === 'approved' || d.status === 'edited') &&
+      input.targets.some((t) => t.platform === d.platform),
+  ).length
+  if (ready < 2) return ''
+
+  return `<form class="card spread-bar" method="POST" action="/panel/drafts/spread">
+    <div class="card-head"><h2>وزّع المعتمَد</h2>
+      <div class="grow"></div>
+      <span class="st ok"><span class="g">●</span>${ready} جاهزةً للتوزيع</span></div>
+    <p class="hint">موعدٌ للأولى وفاصلٌ بين كلِّ اثنتين — <b>ويُعرَض الجدولُ كاملا
+      قبل أن يقع منه شيء</b>.</p>
+    <div class="row">
+      <div class="field"><label for="sp-start">أوّلُ موعد (UTC)</label>
+        <input id="sp-start" name="start" type="datetime-local" data-when
+          min="${escapeHtml(input.earliest)}" required></div>
+      <div class="field"><label for="sp-gap">الفاصل (ساعة)</label>
+        <input id="sp-gap" name="gap" type="number" inputmode="numeric"
+          min="1" max="168" value="24" required></div>
+      <span class="grow"></span>
+      <button class="p" type="submit">اعرض الجدول</button>
+    </div>
+    <div class="quick" data-quick="sp-start">
+      ${QUICK.map(
+        (q) =>
+          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+      ).join('')}
+      <span class="grow"></span>
+      <span class="mirror mono" data-mirror="sp-start"></span>
+    </div>
+  </form>`
 }

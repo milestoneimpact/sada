@@ -829,6 +829,13 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* الموعدُ لاتينيّ الأرقام ويُعزَل عن اتّجاه الصفحة */
 .sched .when{font-size:var(--t-sm); color:var(--ink-2); direction:ltr; unicode-bidi:isolate}
 .sched .ago{flex:1 1 auto}
+/* شريطُ المواعيد السريعة — سطرٌ كاملٌ تحت الحقول لا بينها (D-089).
+   «flex-basis:100%» يكسر السطر، فالأزرارُ لا تزاحم «جدوِل» على الجوّال. */
+.quick{flex:1 0 100%; display:flex; align-items:center; gap:var(--s-1);
+  flex-wrap:wrap; margin-top:var(--s-2); padding-top:var(--s-2);
+  border-top:1px solid var(--line)}
+.quick .mirror{font-size:var(--t-xs); color:var(--ink-2);
+  direction:rtl; unicode-bidi:isolate}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
 .codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:var(--s-2); margin:var(--s-3) 0}

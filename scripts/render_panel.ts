@@ -149,6 +149,20 @@ const data: PanelData = {
       publishCost: 0,
     },
     {
+      // معتمَدةٌ ثانيةٌ عمدا: شريطُ التوزيع لا يظهر دون اثنتين (D-089)،
+      // ومدقّقٌ لا يرى الشريطَ لا يحرسه
+      id: 'd3b', platform: 'linkedin',
+      text:
+        'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره.\n\nوهذا ما يقيسه التقرير: كم يوما بين أن يُعتمد بندٌ وأن يبدأ العمل به.',
+      rationale: 'رقمٌ واحدٌ يقف وحده، ويصلح مدخلا للتقرير.',
+      status: 'approved', model: 'claude-opus-5', cost: 0.0301,
+      sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
+      stale: false, approvedBy: 'panel:passkey', approvedAt: ago(18),
+      createdAt: ago(20),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
+      publishCost: 0,
+    },
+    {
       id: 'd4', platform: 'x',
       text:
         'البرنامجُ الذي لا صاحبَ له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nوهذا أخطر من الفشل الصريح: الفشلُ يُراجَع، والذبولُ يُموَّل سنةً أخرى.',

@@ -37,6 +37,7 @@ import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
+import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
@@ -68,6 +69,7 @@ import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { spreadScreen, SPREAD_SCRIPT } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
@@ -1550,6 +1552,141 @@ panel.post('/panel/drafts/schedule', async (c) => {
       target: id,
       detail: result.ok ? result.at : `refused:${result.reason}`,
     },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * قراءةُ الفاصل والبداية — **في مكانٍ واحدٍ لا في مسارين** (D-089).
+ *
+ * المعاينةُ والتنفيذُ يقرآن المدخلاتِ نفسَها، **فلو قرأها كلٌّ بطريقته
+ * لعُرض جدولٌ ونُفّذ غيرُه** — وهو أسوأ من ألّا تكون هناك معاينة.
+ */
+function readGap(raw: unknown): number {
+  const value = Number(raw ?? '24')
+  if (!Number.isFinite(value)) return 24
+  return Math.min(GAP_MAX_HOURS, Math.max(GAP_MIN_HOURS, Math.round(value)))
+}
+
+/** بدايةٌ غيرُ مفهومةٍ تصير «بعد ساعة» — ولا تُردّ الاستمارةُ كلُّها. */
+function readStart(raw: unknown, now: Date): Date {
+  const text = String(raw ?? '')
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return new Date(now.getTime() + 3_600_000)
+  const at = new Date(`${text}:00Z`)
+  return Number.isNaN(at.getTime()) ? new Date(now.getTime() + 3_600_000) : at
+}
+
+/**
+ * توزيعُ المعتمَد — **معاينةٌ أوّلا** (D-089).
+ *
+ * ولا يكتب هذا المسارُ شيئا. يقرأ ويحسب ويعرض، **والتنفيذُ في مسارٍ
+ * ثانٍ يضغطه المالكُ بعد أن يرى**. ومسارٌ يفعل الاثنين يجعل زرَّ
+ * «وزّع» يجدول عشرةَ منشوراتٍ بضغطةٍ واحدةٍ بلا أن يُقرأ جدول.
+ */
+panel.post('/panel/drafts/spread', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const drafts = await listDrafts(c.env.DB, 60)
+  const accounts = await listAccounts(c.env.DB)
+  const targets = accounts
+    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
+
+  const now = new Date()
+  const gap = readGap(gate.form.get('gap'))
+  const plan = planSpread(
+    drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+    targets,
+    readStart(gate.form.get('start'), now),
+    gap,
+    now,
+  )
+
+  const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
+  return page((nonce) =>
+    shell(
+      'صدى — توزيعُ المعتمَد',
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel">← اللوحة</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf })}</main>
+       </div>`,
+      nonce,
+      SPREAD_SCRIPT + THEME_SCRIPT,
+    ),
+  )
+})
+
+/**
+ * تنفيذُ التوزيع — **بـ `schedulePost` واحدةً واحدة**.
+ *
+ * لا كتابةَ `queued` من هنا: الحارسُ الذي يمنع الجدولةَ إلى قناةٍ إذنُها
+ * منتهٍ، أو إلى موعدٍ مضى، أو من منصّةٍ إلى أخرى — **كلُّه في تلك
+ * الدالّة**. ومسارٌ ثانٍ ينسخه ينسى شرطا (D-019).
+ *
+ * **والوجهةُ تُحسَب هنا ولا تُقرأ من النموذج**: معرّفُ حسابٍ يأتي من
+ * الصفحة يُصدَّق بلا فحص. فالمعرّفاتُ وحدَها تُقرأ منها — أي **ما عُرض**
+ * — والوجهةُ والموعدُ يُحسبان من المدخلات نفسِها.
+ */
+panel.post('/panel/drafts/spread/apply', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const wanted = gate.form.getAll('post').map(String)
+  const now = new Date()
+  const gap = readGap(gate.form.get('gap'))
+
+  const drafts = await listDrafts(c.env.DB, 60)
+  const accounts = await listAccounts(c.env.DB)
+  const targets = accounts
+    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
+
+  // **وما لم يُعرَض لا يُنفَّذ**: القائمةُ تُقصر على ما حمله النموذج
+  // بترتيبه، فمسوّدةٌ اعتُمدت بين المعاينة والتنفيذ لا تدخل خِلسة
+  const wantedSet = new Set(wanted)
+  const plan = planSpread(
+    drafts
+      .filter((d) => wantedSet.has(d.id))
+      .sort((a, b) => wanted.indexOf(a.id) - wanted.indexOf(b.id))
+      .map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+    targets,
+    readStart(gate.form.get('start'), now),
+    gap,
+    now,
+  )
+
+  let done = 0
+  const failed: string[] = []
+  for (const slot of plan.slots) {
+    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date())
+    if (result.ok) done += 1
+    else failed.push(result.reason)
+  }
+
+  const missing = wanted.length - plan.slots.length
+  const flash: PanelFlash =
+    done === 0
+      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed[0] ?? 'لم تعد أيُّ مسوّدةٍ صالحةً للجدولة.'}` }
+      : failed.length === 0 && missing === 0
+        ? { kind: 'ok', text: `جُدول ${done} منشورا، كلُّ ${gap} ساعةً واحد.` }
+        : {
+            kind: 'warn',
+            text:
+              `جُدول ${done} منشورا. ` +
+              (missing > 0 ? `و${missing} لم تعد صالحةً للجدولة. ` : '') +
+              (failed.length > 0 ? `وردَّ ${failed.length}: ${failed[0]}` : ''),
+          }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'draft.spread', target: String(wanted.length), detail: `done:${done}` },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)

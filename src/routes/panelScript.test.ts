@@ -125,3 +125,109 @@ describe('الشريطُ لا يخطف إلّا المراسي', () => {
     expect(SCRIPT).not.toContain('all.forEach(function(t){t.addEventListener')
   })
 })
+
+/**
+ * **مواعيدُ الجدولة تُنتزَع وتُشغَّل** (D-089).
+ *
+ * الأزرارُ تحسب لحظةً **محلّيّة** ثمّ تكتبها في الصندوق **UTC**. وبين
+ * الاثنين تحويلٌ يخطئ في أربعة مواضع لا يكشفها النظر: آخرُ الشهر،
+ * وآخرُ السنة، وتحوّلُ التوقيت الصيفيّ، **والأحدُ حين يكون اليومَ**.
+ *
+ * فتُنتزَع الدوالُّ من النصّ المُرسَل — لا من نسخةٍ هنا — وتُشغَّل.
+ * **ونسخةٌ ثانيةٌ في الاختبار تفترق بلا حارس** (D-071).
+ */
+function clientPresets(): {
+  utcBox: (d: Date) => string
+  preset: (now: Date, kind: string) => Date | null
+  boxToDate: (v: string) => Date | null
+} {
+  const parts = [
+    /function pad2\(n\)\{[\s\S]*?\}\n/.exec(SCRIPT),
+    /function utcBox\(d\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
+    /function localAt\(now,days,hour\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
+    /function preset\(now,kind\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
+    /function boxToDate\(v\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
+  ]
+  if (parts.some((p) => p === null)) {
+    throw new Error('لم تُعثَر دوالُّ المواعيد في نصّ اللوحة — أنُقلت أم أُعيدت تسميتُها؟')
+  }
+  return new Function(
+    `${parts.map((p) => p![0]).join('')}\nreturn {utcBox:utcBox,preset:preset,boxToDate:boxToDate};`,
+  )() as ReturnType<typeof clientPresets>
+}
+
+describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
+  const { utcBox, preset, boxToDate } = clientPresets()
+
+  it('«بعد ساعة» ساعةٌ بالضبط', () => {
+    const now = new Date('2026-09-07T10:17:33Z')
+    const at = preset(now, 'hour')!
+    expect(at.getTime() - now.getTime()).toBe(3_600_000)
+  })
+
+  it('وكلُّ موعدٍ في المستقبل — مهما كانت الساعة', () => {
+    // أربعٌ وعشرون لحظةً في اليوم: لا واحدةَ منها تعطي موعدا مضى
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = new Date(2026, 8, 7, hour, 31, 0)
+      for (const kind of ['hour', 'tonight', 'tomorrow', 'sunday']) {
+        const at = preset(now, kind)!
+        expect(at.getTime(), `${kind} عند ${hour}`).toBeGreaterThan(now.getTime())
+      }
+    }
+  })
+
+  it('و«الأحد» أحدٌ فعلا — ولو كان اليومُ أحدا', () => {
+    // ٦ سبتمبر ٢٠٢٦ أحد. فالزرُّ يعطي الأحدَ القادم لا اليوم
+    for (let day = 6; day <= 12; day += 1) {
+      const now = new Date(2026, 8, day, 11, 0, 0)
+      const at = preset(now, 'sunday')!
+      expect(at.getDay()).toBe(0)
+      expect(at.getHours()).toBe(9)
+      expect(at.getTime()).toBeGreaterThan(now.getTime())
+    }
+  })
+
+  it('و«الليلة ٨م» تصير الغدَ بعد الثامنة', () => {
+    const before = preset(new Date(2026, 8, 7, 19, 0, 0), 'tonight')!
+    expect(before.getDate()).toBe(7)
+    const after = preset(new Date(2026, 8, 7, 21, 0, 0), 'tonight')!
+    expect(after.getDate()).toBe(8)
+    expect(after.getHours()).toBe(20)
+  })
+
+  it('والصندوقُ يُكتب UTC — والصيغةُ هي التي يقرؤها الخادم', () => {
+    const box = utcBox(new Date(Date.UTC(2026, 8, 7, 6, 5)))
+    expect(box).toBe('2026-09-07T06:05')
+    expect(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(box)).toBe(true)
+  })
+
+  it('وما كُتب يُقرأ كما كُتب — ذهابا وإيابا', () => {
+    for (const kind of ['hour', 'tonight', 'tomorrow', 'sunday']) {
+      const at = preset(new Date(2026, 8, 7, 14, 22, 0), kind)!
+      const back = boxToDate(utcBox(at))!
+      // الصندوقُ بدقّة الدقيقة، فالثواني تسقط ولا شيءَ غيرها
+      expect(Math.abs(back.getTime() - at.getTime())).toBeLessThan(60_000)
+    }
+  })
+
+  it('وصندوقٌ فارغٌ أو مشوَّهٌ لا يُقرأ لحظةً كاذبة', () => {
+    for (const bad of ['', 'غدا', '2026-13-40T99:99', '2026-09-07']) {
+      expect(boxToDate(bad)).toBe(null)
+    }
+  })
+})
+
+describe('شريطُ المواعيد في الصفحة', () => {
+  it('الأزرارُ تملأ الحقلَ الذي يُرسَل — لا حقلا آخر', () => {
+    expect(SCRIPT).toContain("document.getElementById(bar.dataset.quick)")
+    expect(SCRIPT).toContain('field.value=utcBox(at)')
+  })
+
+  it('والمرآةُ تُحدَّث على الكتابة اليدويّة كذلك', () => {
+    expect(SCRIPT).toContain("field.addEventListener('input',reflect)")
+  })
+
+  it('وسقوطُ التنسيق المحلّيّ لا يُسقِط الصفحة', () => {
+    expect(SCRIPT).toContain("catch(e){mirror.textContent='';}")
+  })
+})

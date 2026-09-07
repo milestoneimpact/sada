@@ -1749,3 +1749,186 @@ describe('روابطُ الشريط — والصفحاتُ منها تُفتَح
     expect(response.status).toBe(200)
   })
 })
+
+/**
+ * **التوزيعُ يُعرَض ثمّ يقع** (D-089).
+ *
+ * قال المالك: «تسهيل عمليّة الجدولة، حيث إنّ استخدامها صعب». وأثقلُ ما
+ * فيها تكرارُ الاستمارة: عشرُ مسوّداتٍ معتمَدةٍ = عشرُ استماراتٍ يدويّة.
+ *
+ * وأخطرُ ما في علاجها **أن يُعرض جدولٌ ويقع غيرُه**. فالمعاينةُ لا تكتب
+ * شيئا، والتنفيذُ لا يتجاوز `schedulePost` ولا يخترع وجهةً من النموذج.
+ */
+describe('توزيعُ المعتمَد على أيّام', () => {
+  async function seedApproved(platform: 'linkedin' | 'x' = 'linkedin'): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at)
+         VALUES (?, ?, 'text', ?, 'approved', ?, 'panel:token', '2026-09-08T07:00:00Z')`,
+      )
+      .bind(id, platform, `منشورٌ ${id.slice(0, 6)}\nوسطرٌ ثانٍ`, `k-${id}`)
+      .run()
+    return id
+  }
+
+  async function seedAccount(
+    platform: 'linkedin' | 'x' = 'linkedin',
+    kind = 'member',
+  ): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        'INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .bind(id, platform, kind, id.slice(0, 8), 'عمر', 'active')
+      .run()
+    return id
+  }
+
+  function soon(): string {
+    return new Date(Date.now() + 3600_000).toISOString().slice(0, 16)
+  }
+
+  async function preview(cookie: string, gap = '24'): Promise<Response> {
+    const body = new FormData()
+    body.set('start', soon())
+    body.set('gap', gap)
+    return await app.request('/panel/drafts/spread', withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('**المعاينةُ لا تكتب شيئا** — ولا منشورَ يصير مجدولا بعرضه', async () => {
+    const posts = [await seedApproved(), await seedApproved(), await seedApproved()]
+    await seedAccount()
+    const cookie = await login()
+
+    const response = await preview(cookie)
+    expect(response.status).toBe(200)
+    const html = await response.text()
+    expect(html).toContain('اعتمد التوزيع')
+    expect(html).toContain('ولا يقع منه شيءٌ حتّى تضغط')
+
+    for (const id of posts) {
+      const row = await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>()
+      expect(row?.status).toBe('approved')
+    }
+  })
+
+  it('وتعرض كلَّ خانةٍ بموعدها — لا عددا مجرّدا', async () => {
+    await seedApproved()
+    await seedApproved()
+    await seedAccount()
+    const cookie = await login()
+
+    const html = await (await preview(cookie, '6')).text()
+    // موعدان اثنان بصيغةٍ تُقرأ، وفاصلٌ يُقال
+    expect((html.match(/data-utc="/g) ?? []).length).toBe(2)
+    expect(html).toContain('كلُّ 6 ساعةً')
+  })
+
+  it('**والتنفيذُ يجدول ما عُرض** — بحالةٍ ومواعيدَ متتابعة', async () => {
+    const posts = [await seedApproved(), await seedApproved()]
+    const account = await seedAccount()
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('start', soon())
+    body.set('gap', '24')
+    for (const id of posts) body.append('post', id)
+    await app.request(
+      '/panel/drafts/spread/apply',
+      withSession(cookie, { method: 'POST', body }),
+      env,
+    )
+
+    const { results } = await db
+      .prepare('SELECT id, status, account_id, scheduled_at FROM posts ORDER BY scheduled_at')
+      .all<{ id: string; status: string; account_id: string; scheduled_at: string }>()
+    expect(results.filter((r) => r.status === 'queued')).toHaveLength(2)
+    for (const row of results) expect(row.account_id).toBe(account)
+    // أربعٌ وعشرون ساعةً بينهما بالضبط
+    const gap =
+      new Date(`${results[1]!.scheduled_at.replace(' ', 'T')}Z`).getTime() -
+      new Date(`${results[0]!.scheduled_at.replace(' ', 'T')}Z`).getTime()
+    expect(gap).toBe(24 * 3600_000)
+  })
+
+  it('**وما لم يُعرَض لا يُنفَّذ** — منشورٌ خارجَ النموذج يبقى معتمَدا', async () => {
+    const shown = await seedApproved()
+    const hidden = await seedApproved()
+    await seedAccount()
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('start', soon())
+    body.set('gap', '24')
+    body.append('post', shown)
+    await app.request(
+      '/panel/drafts/spread/apply',
+      withSession(cookie, { method: 'POST', body }),
+      env,
+    )
+
+    const one = await db.prepare('SELECT status FROM posts WHERE id = ?').bind(shown).first<{ status: string }>()
+    const two = await db.prepare('SELECT status FROM posts WHERE id = ?').bind(hidden).first<{ status: string }>()
+    expect(one?.status).toBe('queued')
+    expect(two?.status).toBe('approved')
+  })
+
+  it('**ولا يلتفّ حول حارس الجدولة** — صفحةٌ ليست وجهةً تُنشَر باسمها', async () => {
+    await seedApproved()
+    await seedApproved()
+    await seedAccount('linkedin', 'org')
+    const cookie = await login()
+
+    const html = await (await preview(cookie)).text()
+    expect(html).toContain('لا شيءَ يُوزَّع')
+    expect(html).toContain('لا قناة')
+  })
+
+  it('وفاصلٌ خارجَ المدى يُقصّ ولا تُردّ الاستمارة', async () => {
+    await seedApproved()
+    await seedApproved()
+    await seedAccount()
+    const cookie = await login()
+
+    const response = await preview(cookie, '99999')
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('كلُّ 168 ساعةً')
+  })
+
+  it('والشريطُ لا يظهر على معتمَدةٍ واحدة — التوزيعُ لاثنتين فصاعدا', async () => {
+    await seedApproved()
+    await seedAccount()
+    const cookie = await login()
+
+    const one = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(one).not.toContain('وزّع المعتمَد')
+
+    await seedApproved()
+    const two = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(two).toContain('وزّع المعتمَد')
+  })
+
+  it('ويُسجَّل في الدفتر ما وقع — لا ما طُلب', async () => {
+    const posts = [await seedApproved(), await seedApproved()]
+    await seedAccount()
+    const cookie = await login()
+
+    const body = new FormData()
+    body.set('start', soon())
+    body.set('gap', '24')
+    for (const id of posts) body.append('post', id)
+    await app.request(
+      '/panel/drafts/spread/apply',
+      withSession(cookie, { method: 'POST', body }),
+      env,
+    )
+
+    const audit = await db
+      .prepare("SELECT target, detail FROM audit_log WHERE action = 'draft.spread'")
+      .first<{ target: string; detail: string }>()
+    expect(audit?.target).toBe('2')
+    expect(audit?.detail).toBe('done:2')
+  })
+})
