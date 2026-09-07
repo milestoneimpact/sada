@@ -24,6 +24,16 @@ import {
   PublishError, type PublishResult,
 } from './platforms'
 import { publishTikTok } from './tiktok'
+import { publishYouTube } from './youtube'
+
+/**
+ * منصّاتُ المقاطع — **تطلب مقطعا ولا تقبل نصّا وحده** (D-096).
+ *
+ * ولا نهايةَ نشرٍ نصّيّةٍ عند أيٍّ منهما أصلا. **ومجموعةٌ واحدةٌ لا شرطان
+ * متكرّران**: شرطٌ يُزاد في موضعٍ ويُنسى في خمسةٍ هو علّةُ `KNOWN_TASKS`
+ * نفسُها (D-091) — وقد تكرّر هنا خمسَ مرّات.
+ */
+const CLIP_PLATFORMS: ReadonlySet<string> = new Set(['tiktok', 'youtube'])
 
 export interface PublishMessage {
   readonly postId: string
@@ -139,13 +149,13 @@ export async function publishPost(
        * LinkedIn حُرّكت صورتُه فيديو (D-052) يصير أحدثُ وسيطه **مقطعا**
        * — فيُرفَع مقطعٌ إلى نهايةِ صور، فيُردّ بخطأٍ لا يقول لماذا.
        *
-       * فلكلّ منصّةٍ نوعُها: TikTok مقطعا، والاثنتان صورة.
+       * فلكلّ منصّةٍ نوعُها: TikTok و YouTube مقطعا، والاثنتان صورة.
        */
       `SELECT id, r2_key, mime, platform_media_id FROM media
         WHERE post_id = ? AND status = 'ready' AND mime LIKE ?
         ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(post.id, post.platform === 'tiktok' ? 'video/%' : 'image/%')
+    .bind(post.id, CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%')
     .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null }>()
     .catch(() => null)
 
@@ -158,7 +168,7 @@ export async function publishPost(
 
   // **ومنصّةُ المقاطع لا تقبل نصّا وحده**: لا نهايةَ نشرٍ نصّيّةٍ عندها
   // أصلا، فمحاولةٌ بلا مقطعٍ تُردّ بعد أن تُسجَّل وتُحاسَب
-  if (post.platform === 'tiktok' && image === null) {
+  if (CLIP_PLATFORMS.has(post.platform) && image === null) {
     return {
       kind: 'failed',
       reason: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها',
@@ -218,12 +228,11 @@ export async function publishPost(
    * ثمنُه وجاهز. فالثاني تحسينٌ يُقرأ لا شرطٌ يُفرَض.
    */
   const direct = post.platform === 'tiktok' && canUploadMedia('tiktok', tokens.scopes)
-  const capable =
-    post.platform === 'tiktok'
-      ? canPublish('tiktok', tokens.scopes)
-      : needsMedia
-        ? canUploadMedia(post.platform, tokens.scopes)
-        : canPublish(post.platform, tokens.scopes)
+  const capable = CLIP_PLATFORMS.has(post.platform)
+    ? canPublish(post.platform, tokens.scopes)
+    : needsMedia
+      ? canUploadMedia(post.platform, tokens.scopes)
+      : canPublish(post.platform, tokens.scopes)
   if (!capable) {
     // **ويُسمّى الناقصُ لا يُشار إليه.** كان الردُّ `missing_publish_scope`
     // وحدَه: يقول إنّ نطاقا نقص ولا يقول أيَّه، فيبقى المالكُ أمام رفضٍ
@@ -286,7 +295,7 @@ export async function publishPost(
   try {
     let mediaId = image?.platform_media_id ?? null
 
-    if (image !== null && mediaId === null && post.platform !== 'tiktok') {
+    if (image !== null && mediaId === null && !CLIP_PLATFORMS.has(post.platform)) {
       const object = await deps.bucket!.get(image.r2_key)
       if (object === null) {
         // الصفُّ قائمٌ والبايتاتُ مفقودة: لا يُعالَج بإعادةٍ، ولا يُنشر
@@ -323,7 +332,7 @@ export async function publishPost(
         .run()
     }
 
-    if (post.platform === 'tiktok') {
+    if (CLIP_PLATFORMS.has(post.platform)) {
       /*
        * **و TikTok يرفع وينشر في نداءٍ واحد** — لا معرّفَ وسيطٍ يُحفَظ
        * بينهما. فالبايتاتُ تُقرأ هنا، والسائقُ يهيّئ ويدفع ويسأل.
@@ -335,19 +344,17 @@ export async function publishPost(
       const object = await deps.bucket!.get(image!.r2_key)
       if (object === null) throw new PublishError('media_bytes_missing', 502, false)
       await recordCost(db, {
-        provider: 'tiktok',
+        provider: post.platform,
         operation: 'clip_upload:price_unverified',
         units: 1,
         unitCost: 0,
         refId: post.id,
       })
-      const out = await publishTikTok(
-        tokens.accessToken,
-        { bytes: new Uint8Array(await object.arrayBuffer()), mime: image!.mime },
-        post.text,
-        direct,
-        fetchImpl,
-      )
+      const clip = { bytes: new Uint8Array(await object.arrayBuffer()), mime: image!.mime }
+      const out =
+        post.platform === 'tiktok'
+          ? await publishTikTok(tokens.accessToken, clip, post.text, direct, fetchImpl)
+          : await publishYouTube(tokens.accessToken, clip, post.text, fetchImpl)
       await db
         .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
         .bind(out.platformPostId, image!.id)
