@@ -65,7 +65,7 @@ describe('routeStatuses', () => {
    * المثال**: الجاهزيّةُ بناءٌ وضبطٌ معا، وسقوطُ أحدهما يُسقطها.
    */
   it('الجاهزيّةُ بناءٌ **و** ضبطٌ معا — لا أحدُهما', () => {
-    const all = { ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y' }
+    const all = { ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y', CF_AI_TOKEN: 'z' }
     for (const status of routeStatuses(all)) {
       expect(status.ready).toBe(IMPLEMENTED.has(status.task))
     }

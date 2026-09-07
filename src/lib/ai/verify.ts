@@ -28,6 +28,17 @@ const ENDPOINTS: Readonly<Record<ProviderName, (key: string) => Request>> = {
     new Request('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
       headers: { 'x-goog-api-key': key },
     }),
+  /*
+   * **ونهايةُ Cloudflare تفحص الرمزَ نفسَه لا حسابا** (D-091).
+   *
+   * فهرسُ نماذجها تحت `‎/accounts/{id}/ai/models/search` — **ومعرّفُ
+   * الحساب ليس في يد هذا الفاحص**. و«tokens/verify» تسأل عن الرمز
+   * مجرَّدا: صالحٌ أم لا، بلا حسابٍ ولا رموزَ تُحسَب.
+   */
+  cloudflare: (key) =>
+    new Request('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+      headers: { Authorization: `Bearer ${key}` },
+    }),
 }
 
 /** يميّز «مفتاح خطأ» من «الخدمة متعبة» — وعلاجهما مختلف. */

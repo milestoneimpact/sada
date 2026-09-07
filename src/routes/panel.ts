@@ -10,7 +10,7 @@
  */
 import { Hono } from 'hono'
 import type { Env } from '../env'
-import type { TaskName } from '../lib/ai/registry'
+import { ROUTES, type TaskName } from '../lib/ai/registry'
 
 /** أسماء أسرار المدمَجين — سرٌّ في البيئة يغلب ما في الجدول. */
 const BUILTIN_SECRET: Readonly<Record<string, string>> = {
@@ -592,7 +592,18 @@ panel.post('/panel/sessions/revoke-all', async (c) => {
   return back('security')
 })
 
-const KNOWN_TASKS: ReadonlySet<string> = new Set(['analyze', 'draft', 'image'])
+/**
+ * المهامُّ التي يُقبَل توجيهُها — **مشتقّةٌ من `ROUTES` لا مكتوبةٌ بيد**
+ * (D-091).
+ *
+ * كانت ثلاثا مكتوبةً حرفا، و`readRoutes` تعرض مفاتيحَ `ROUTES` كلَّها.
+ * **فكان `plan` يُعرَض في الجدول ويُردّ عند الحفظ** — والمالكُ يبدّل
+ * نموذجَه فيسمع «مهمّةٌ غير معروفة» على مهمّةٍ يراها أمامه.
+ *
+ * وهو صنفُ «نصفِ الحارس»: قائمتان لشيءٍ واحد، تُزاد إحداهما وتُنسى
+ * الأخرى. فصارتا واحدة.
+ */
+const KNOWN_TASKS: ReadonlySet<string> = new Set(Object.keys(ROUTES))
 
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
   'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',

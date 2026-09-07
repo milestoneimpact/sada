@@ -40,7 +40,7 @@ import { cfAccountId, cfModelsUrl } from './cloudflare'
  * وفائدتُه أنّ توجيهَ «الصورة» لا يعرض نموذجَ نصّ: اختيارٌ خاطئٌ في
  * القائمة يكلّف نداءً يُردّ، والقائمةُ التي تمنعه أرخص.
  */
-export type ModelTask = 'text' | 'image' | 'embedding' | 'other'
+export type ModelTask = 'text' | 'image' | 'video' | 'embedding' | 'other'
 
 export interface ModelChoice {
   /** ما يُكتب في `providers.model` — المعرّفُ لا الاسمُ المعروض. */
@@ -97,6 +97,10 @@ export function classifyTask(raw: unknown): ModelTask | null {
   if (text.includes('embed')) return 'embedding'
   // «to-image» و «image generation»: المخرَجُ صورة. و «image-to-text»
   // مخرَجُه نصّ، فيُفحَص الاتّجاه لا وجودُ الكلمة
+  // **والفيديو يُفحَص قبل الصورة** (D-091): «image-to-video» تحمل
+  // الكلمتين، ومخرَجُها مقطعٌ لا صورة. فمن فحص الصورةَ أوّلا صنّفها صورةً
+  // — فلا يجدها المالكُ في قائمة الفيديو أبدا
+  if (/(to[- ]?video|video generation|text2video)/.test(text)) return 'video'
   if (/(to[- ]?image|image generation|text2image)/.test(text)) return 'image'
   if (/(text generation|chat|completion|to[- ]?text|instruct)/.test(text)) return 'text'
   return 'other'
