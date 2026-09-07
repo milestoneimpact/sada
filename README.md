@@ -27,6 +27,8 @@
 | [docs/PLATFORMS.md](docs/PLATFORMS.md) | حقائق LinkedIn وX المتحقَّق منها بتاريخها ومصادرها |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | سجلّ القرارات المعمارية D-001 … |
 | [docs/MANUAL-TASKS.md](docs/MANUAL-TASKS.md) | ما يقع على المالك يدويًّا، بالعناصر الستّة |
+| [docs/UI-PLAN.md](docs/UI-PLAN.md) | خطّة الواجهة: سبعة مسارات، وما قِيس، ولوح الحيازة |
+| [docs/UX-PLAN.md](docs/UX-PLAN.md) | خطّة التجربة: سبعة مسارات، مرتّبة بأثرها على المالك |
 | [CLAUDE.md](CLAUDE.md) | التعليمات الدائمة للمساعد في هذا المستودع |
 
 ## الحالة
