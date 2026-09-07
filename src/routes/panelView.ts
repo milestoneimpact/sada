@@ -609,6 +609,10 @@ export interface PanelFlash {
 export interface PanelData {
   readonly paused: boolean
   readonly autoEnqueue: boolean
+  /** أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085) */
+  readonly imageOverlay: boolean
+  /** أمضبوطٌ رمزُ المتصفّح؟ **وجودُه يُفحَص، وقيمتُه لا تغادر البيئة**. */
+  readonly browserToken: boolean
   readonly analysisCap: number
   readonly spendCap: number
   readonly usedAnalyses: number
@@ -1219,6 +1223,30 @@ ${flash}
       </form>
     </div>
     <div class="sub" style="margin-top:var(--s-3)">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
+  </div>
+
+  <div class="card" style="margin-top:var(--s-3)"><h2>النصُّ فوق الصورة</h2>
+    <div class="split">
+      <p>${d.imageOverlay
+        ? `مرفوع: يُركَّب عنوانٌ عربيٌّ من كلمتين فوق كلّ صورةٍ مولَّدة، وفوقه كلمتان إنجليزيّتان.
+           <b>والنصُّ يُرسَم في متصفّحٍ لا في نموذج التوليد</b> — فالوصلُ صحيحٌ والحروفُ تُقرأ.`
+        : `مطفأ: تخرج الصورةُ نظيفةً بلا عنوان. <b>وهذا ليس عطلا</b> — النصُّ في المنشور نفسِه
+           حيث يُقرأ ويُترجَم ويبحث عنه محرّك.`}</p>
+      <form class="inline" method="POST" action="/panel/settings">
+        <input type="hidden" name="key" value="image_overlay">
+        <input type="hidden" name="value" value="${d.imageOverlay ? 'false' : 'true'}">
+        <button class="${d.imageOverlay ? 'g' : 'p'}" type="submit">
+          ${d.imageOverlay ? 'إطفاء' : 'رفع التركيب'}</button>
+      </form>
+    </div>
+    ${d.browserToken
+      ? '<div class="sub" style="margin-top:var(--s-3)">رمزُ المتصفّح مضبوط.'
+        + ' وكلُّ لقطةٍ تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
+      : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
+          <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،
+          <b>فلا يقع نداءٌ ولا كلفة</b> — وتخرج الصورةُ بلا عنوانٍ مهما كان هذا المفتاح مرفوعا.
+          وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
+          <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>

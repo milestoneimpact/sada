@@ -26,6 +26,8 @@ const accounts: LinkedAccount[] = [
 const data: PanelData = {
   paused: false,
   autoEnqueue: true,
+  imageOverlay: true,
+  browserToken: false,
   analysisCap: 10,
   spendCap: 5,
   usedAnalyses: 6,

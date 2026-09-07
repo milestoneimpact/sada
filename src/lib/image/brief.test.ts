@@ -9,7 +9,7 @@ import { toBase64 } from '../crypto'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { upsertProvider, saveKey } from '../providers'
 import { writeRoute } from '../ai/routes'
-import { BRIEF_SYSTEM, briefUser, parseBrief, visualBrief } from './brief'
+import { BRIEF_SYSTEM, briefUser, parseBrief, twoWords, visualBrief } from './brief'
 import { imagePrompt } from './prompt'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -60,7 +60,10 @@ describe('التعليمةُ نفسُها — إنجليزيّة، وتمنع م
 })
 
 describe('الوصفُ النهائيّ — الموجزُ هو الموضوع، والاحتياطُ يُعلَّم', () => {
-  const visual = { subject: 'layered basalt slabs', composition: 'low angle', palette: 'slate and teal' }
+  const visual = {
+    subject: 'layered basalt slabs', composition: 'low angle', palette: 'slate and teal',
+    headline: 'أثرٌ يُقاس', kicker: 'Measured Impact',
+  }
 
   it('حين يوجد الموجزُ يصير هو الموضوع', () => {
     const prompt = imagePrompt({ topic: 'الحوكمة', platform: 'linkedin', visual })
@@ -179,5 +182,41 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     expect(out.brief).toBeNull()
     const { results } = await db.prepare('SELECT id FROM cost_ledger').all<{ id: string }>()
     expect(results).toHaveLength(1)
+  })
+})
+
+/**
+ * **العنوانُ يُوقِف العين لا يشرح** (D-085).
+ *
+ * سطرٌ طويلٌ فوق صورةٍ لا يُقرأ — يُقرأ المنشورُ نفسُه. فكلمتان أو ثلاث
+ * بالعربيّة، وكلمتان بالإنجليزيّة فوقهما.
+ */
+describe('عنوانُ الشريحة — والقصُّ عندنا لا رجاءٌ عند النموذج', () => {
+  it('يقرأ العنوانَ والفوقيّة', () => {
+    const brief = parseBrief(
+      '{"subject":"a","headline":"الحوكمةُ تسبق السرعة","kicker":"Governance First"}',
+    )
+    expect(brief?.headline).toBe('الحوكمةُ تسبق السرعة')
+    expect(brief?.kicker).toBe('Governance First')
+  })
+
+  it('و**الفوقيّةُ تُقصّ إلى كلمتين** ولو زاد النموذج', () => {
+    expect(twoWords('Governance First And Always')).toBe('Governance First')
+    expect(twoWords('  Measured   Impact  ')).toBe('Measured Impact')
+    expect(twoWords('Impact')).toBe('Impact')
+    expect(twoWords('   ')).toBe('')
+  })
+
+  it('وموجزٌ بلا عنوانٍ يبقى صالحا — والشريحةُ وحدَها تُتخطّى', () => {
+    const brief = parseBrief('{"subject":"a"}')
+    expect(brief).not.toBeNull()
+    expect(brief?.headline).toBe('')
+    expect(brief?.kicker).toBe('')
+  })
+
+  it('والتعليمةُ تطلب العربيّةَ للعنوان وكلمتين للفوقيّة', () => {
+    expect(BRIEF_SYSTEM).toContain('ARABIC. Two or three words')
+    expect(BRIEF_SYSTEM).toContain('EXACTLY TWO WORDS')
+    expect(BRIEF_SYSTEM).toContain('does NOT translate it')
   })
 })

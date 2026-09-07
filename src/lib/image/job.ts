@@ -29,6 +29,9 @@ import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
 import { cfAccountId } from '../ai/cloudflare'
 import { imagePrompt, topicOf } from './prompt'
 import { visualBrief } from './brief'
+import { screenshotSlide } from './render'
+import { SLIDE_SIZE, slideHtml } from './slide'
+import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
 
@@ -92,6 +95,85 @@ interface PostRow {
   platform: string
   text: string
   status: string
+}
+
+/** أقصى صورةٍ تُضَمّ في الشريحة — وفوقه يبقى الأصلُ بلا نصّ. */
+export const MAX_OVERLAY_BYTES = 3 * 1024 * 1024
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = ''
+  // على دفعاتٍ: `String.fromCharCode(...bytes)` تتجاوز حدَّ الوسائط على
+  // صورةٍ بمئات الكيلوبايتات فترمي RangeError
+  const step = 0x8000
+  for (let i = 0; i < bytes.length; i += step) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + step))
+  }
+  return btoa(binary)
+}
+
+interface SlideRequest {
+  readonly image: { bytes: Uint8Array; mime: string; model: string }
+  readonly platform: Platform
+  readonly headline: string
+  readonly kicker: string
+}
+
+/**
+ * يركّب النصَّ العربيَّ فوق الصورة — **ويعيد `null` بدل أن يرمي**.
+ *
+ * فالشريحةُ تحسينٌ لا شرط: كلُّ سببِ سقوطٍ هنا يُبقي الصورةَ كما هي.
+ * **ومنشورٌ بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة** — وهي قاعدةُ الموجز
+ * البصريّ نفسُها (D-083).
+ */
+export async function composeSlide(
+  deps: ImageDeps,
+  request: SlideRequest,
+): Promise<{ bytes: Uint8Array; mime: string; model: string } | null> {
+  if (request.headline.trim() === '') return null
+  if (request.image.bytes.length > MAX_OVERLAY_BYTES) return null
+
+  const settings = await readSettings(deps.db)
+  if (!settings.imageOverlay) return null
+
+  const accountId = deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? ''
+  const apiToken = deps.workerSecrets['CF_BROWSER_TOKEN'] ?? ''
+  if (accountId.trim() === '' || apiToken.trim() === '') return null
+
+  const size = SLIDE_SIZE[request.platform]
+  const html = slideHtml({
+    imageBase64: toBase64(request.image.bytes),
+    imageMime: request.image.mime,
+    headline: request.headline,
+    kicker: request.kicker,
+    platform: request.platform,
+  })
+
+  let shot: { bytes: Uint8Array; mime: string }
+  try {
+    shot = await screenshotSlide({
+      accountId,
+      apiToken,
+      html,
+      width: size.width,
+      height: size.height,
+      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    })
+  } catch {
+    // **ولا يُسجَّل ما لم يقع**: نداءٌ سقط قبل أن يُصوَّر شيءٌ لا كلفةَ له،
+    // ونداءٌ ردَّ خطأً لا يُحاسَب عليه عند Cloudflare
+    return null
+  }
+
+  // **وكلفةُ اللقطة تُسجَّل** — نداءٌ خارجيٌّ مدفوعٌ لا يُخفى (D-008).
+  // وسعرُها غيرُ مضبوطٍ عندنا فيُسجَّل صفرا **معلَّما**، ولا يُخمَّن رقم
+  await recordCost(deps.db, {
+    provider: 'cloudflare-browser',
+    operation: `slide:${request.platform}`,
+    units: 1,
+    unitCost: 0,
+  })
+
+  return { bytes: shot.bytes, mime: shot.mime, model: request.image.model }
 }
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
@@ -231,6 +313,25 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
       retryable,
     }
   }
+
+  /*
+   * ٤·ب · **الشريحة: النصُّ العربيُّ فوق الصورة** (D-085).
+   *
+   * ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ مُشكِّلِ
+   * خطوطٍ لا عملُ مولّد صور**. فتُبنى صفحةٌ ويصوّرها متصفّحُ Cloudflare.
+   *
+   * **وأربعةُ شروطٍ قبل النداء، وكلُّها سقوطٌ صامتٌ لا عطل:**
+   * لم يُطفَأ التركيبُ من الإعدادات · ووُلّد عنوانٌ من الموجز · والحسابُ
+   * والرمزُ مضبوطان · والصورةُ دون حدِّ الضمّ. **وما سقط منها يُبقي
+   * الصورةَ بلا شريحة** — ومنشورٌ بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة.
+   */
+  const overlay = await composeSlide(deps, {
+    image,
+    platform,
+    headline: visual.brief?.headline ?? '',
+    kicker: visual.brief?.kicker ?? '',
+  })
+  if (overlay !== null) image = overlay
 
   // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه
   //

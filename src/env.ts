@@ -45,6 +45,16 @@ export interface Env {
    */
   readonly CF_AI_ACCOUNT_ID?: string
   readonly CF_AI_TOKEN?: string
+  /**
+   * رمزُ Browser Rendering — **لتركيب النصّ العربيّ فوق الصورة** (D-085).
+   *
+   * وهو **غيرُ `CF_AI_TOKEN`**: صلاحيّتُه `Browser Rendering · Edit` لا
+   * `Workers AI · Read`، ورمزٌ يحمل أحدَهما يُردّ على نهاية الآخر. ومن
+   * جمعهما في رمزٍ واحدٍ بصلاحيّتين وضع القيمةَ نفسَها في الاثنين.
+   *
+   * **وغيابُه ليس عطلا**: تخرج الصورةُ بلا نصّ، ولا يقع نداءٌ ولا كلفة.
+   */
+  readonly CF_BROWSER_TOKEN?: string
   readonly KV: KVNamespace
   readonly PUBLISH_QUEUE: Queue
   readonly GENERATE_QUEUE: Queue

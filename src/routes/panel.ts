@@ -328,6 +328,9 @@ panel.get('/panel', async (c) => {
     panelPage({
       paused: allowance.settings.paused,
       autoEnqueue: allowance.settings.autoEnqueue,
+      imageOverlay: allowance.settings.imageOverlay,
+      // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
+      browserToken: typeof c.env.CF_BROWSER_TOKEN === 'string' && c.env.CF_BROWSER_TOKEN.length > 0,
       analysisCap: allowance.settings.dailyAnalysisCap,
       spendCap: allowance.settings.dailySpendCapUsd,
       // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
@@ -566,7 +569,7 @@ const KNOWN_TASKS: ReadonlySet<string> = new Set(['analyze', 'draft', 'image'])
 
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
   'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',
-  'weekly_promo_cap_usd',
+  'weekly_promo_cap_usd', 'image_overlay',
 ])
 
 const LABEL: Readonly<Record<string, string>> = {
@@ -607,6 +610,10 @@ panel.post('/panel/settings', async (c) => {
     flash = result.stored === 'true'
       ? { kind: 'warn', text: 'رُفع الإدراج الآليّ. المسح اليوميّ سيحلّل ما تغيّر ضمن حدّ اليوم.' }
       : { kind: 'ok', text: 'أُطفئ الإدراج الآليّ. لا تحليل إلا بأمرك.' }
+  } else if (key === 'image_overlay') {
+    flash = result.stored === 'true'
+      ? { kind: 'ok', text: 'رُفع تركيبُ النصّ. الصورةُ تخرج بعنوانها العربيّ فوقها.' }
+      : { kind: 'warn', text: 'أُطفئ تركيبُ النصّ. تخرج الصورةُ نظيفةً بلا عنوان.' }
   } else if (key === 'paused') {
     flash = result.stored === 'true'
       ? { kind: 'warn', text: 'أُوقف النظام. لا نداء مدفوع ولا مسح ولا نشر حتّى تستأنفه.' }

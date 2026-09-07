@@ -126,6 +126,16 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     done: (f) => f.vars.has('LEGAL_ENTITY') && f.vars.has('LEGAL_CONTACT'),
   },
   {
+    code: 'M-19',
+    title: '`CF_BROWSER_TOKEN` — النصُّ فوق الصورة',
+    ifLeft:
+      'تخرج الصورةُ **نظيفةً بلا عنوان**، ولا يقع نداءٌ ولا كلفة. ' +
+      'ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ متصفّحٍ** ' +
+      'لا عملُ مولّد صور (D-085).',
+    unblocks: 'capability',
+    done: (f) => f.vars.has('CF_BROWSER_TOKEN'),
+  },
+  {
     code: 'M-15',
     title: 'ربطُ YouTube',
     ifLeft:
