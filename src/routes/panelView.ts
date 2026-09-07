@@ -951,7 +951,7 @@ export function panelPage(d: PanelData): string {
       .join(' · ')
   }${
     d.expiring.length > 3 ? ` · <b>و${d.expiring.length - 3} غيرُها</b>` : ''
-  } <a href="#channels">جدّد الإذن</a></span></div>`
+  } <a class="tap" href="#channels">جدّد الإذن</a></span></div>`
 
   const flash = `${expiring}<div id="flash" role="status" aria-live="polite">${
     d.flash === null
