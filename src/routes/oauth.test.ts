@@ -9,6 +9,8 @@ import { LINKEDIN, TIKTOK, X, YOUTUBE } from '../lib/oauth/providers'
 import { IMPLEMENTED, PROVIDERS, ROUTES, type TaskName } from '../lib/ai/registry'
 import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
+import { saveApp } from '../lib/oauth/apps'
+import { PHASE_0_SECRETS } from '../env'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const realFetch = globalThis.fetch
@@ -742,6 +744,42 @@ describe('/health و /ready', () => {
     expect(body.phase_0).toBe(true)
     expect(body.phase_1).toBe(false)
     expect(body.missing_secrets).toEqual(['GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY'])
+  })
+
+  /**
+   * **ولا يقول «لا ناقص» و«غيرُ جاهز» معا** (D-095).
+   *
+   * الخزانةُ تسدّ سرَّي LinkedIn و X من اللوحة (D-042)، وكان `‎/ready`
+   * يحسبها في `configured_in_vault` **ثمّ لا يردّها إلى الحكم** — فيخرج
+   * جوابٌ يناقض نفسَه، ويردّ ٥٠٣ إلى الأبد.
+   *
+   * **وإشارةٌ حمراءُ دائما تُتجاهَل** — وهي حجّةٌ مكتوبةٌ في سير النشر.
+   */
+  it('**ما سُدّ من الخزانة يُجيز البوّابة** — ولا جوابَ يناقض نفسَه', async () => {
+    // بيئةٌ بلا سرَّي LinkedIn: الخزانةُ وحدَها تسدّهما
+    const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
+    const before = (await (await app.request('/ready', {}, bare)).json()) as ReadyBody
+    expect(before.phase_0).toBe(false)
+    expect(before.missing_secrets).toContain('LINKEDIN_CLIENT_ID')
+
+    await saveApp(db, KEY, 'linkedin', 'li-id', 'li-secret-long-enough', 'panel')
+
+    const response = await app.request('/ready', {}, bare)
+    const after = (await response.json()) as ReadyBody
+    expect(after.missing_secrets).not.toContain('LINKEDIN_CLIENT_ID')
+    expect(after.phase_0).toBe(true)
+    expect(response.status).toBe(200)
+  })
+
+  /** **والجوابُ لا يناقض نفسَه في أيّ حال**: لا ناقصَ ⇒ المرحلةُ ماضية. */
+  it('لا ناقصَ ومع ذلك غيرُ جاهزٍ — حالٌ لا تقع', async () => {
+    for (const candidate of [env, { ...env, X_CLIENT_SECRET: '' }]) {
+      const body = (await (await app.request('/ready', {}, candidate)).json()) as ReadyBody
+      const missingPhase0 = body.missing_secrets.some((name) =>
+        (PHASE_0_SECRETS as readonly string[]).includes(name),
+      )
+      expect(body.phase_0, JSON.stringify(body)).toBe(!missingPhase0)
+    }
   })
 
   it('ready يعلن المرحلة ١ جاهزة حين تكتمل أسرارها ومجلدها', async () => {
