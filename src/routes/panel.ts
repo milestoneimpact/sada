@@ -27,7 +27,7 @@ import { listModels } from '../lib/ai/models'
 import { cfAccountId } from '../lib/ai/cloudflare'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
-import type { Platform } from '../lib/draft/prompt'
+import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { decide, listDrafts } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
@@ -1444,11 +1444,17 @@ panel.post('/panel/drafts/write', async (c) => {
   const id = String(form.get('id') ?? '')
   const raw = String(form.get('platform') ?? '')
   // منصّةٌ لا نعرفها لا تُمرَّر إلى القاعدة لتردَّها بقيدٍ غامض
-  if (raw !== 'linkedin' && raw !== 'x') {
+  /*
+   * **والقائمةُ من المواصفة لا من شرطٍ يُكتب حرفا** (D-092).
+   *
+   * كانت منصّتان مكتوبتين هنا وفي `<select>` هناك، **وثالثةٌ تُضاف
+   * فتُنسى إحداهما** — وهي علّةُ `KNOWN_TASKS` نفسُها (D-091).
+   */
+  if (!(raw in PLATFORMS)) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
     return back('posts')
   }
-  const platform: Platform = raw
+  const platform = raw as Platform
 
   const outcome = await draftPost(
     { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },

@@ -39,6 +39,8 @@ export const SLIDE_SIZE: Readonly<Record<Platform, { width: number; height: numb
   linkedin: { width: 1200, height: 628 },
   // 16:9
   x: { width: 1200, height: 675 },
+  // 9:16 — والمقطعُ يُشتقّ منها، وهي مقاسُ Shorts و Reels و TikTok معا
+  tiktok: { width: 1080, height: 1920 },
 }
 
 /** أقصى ما يُقبَل في العنوان والفوقيّة — والقصُّ هنا لا في الشاشة. */

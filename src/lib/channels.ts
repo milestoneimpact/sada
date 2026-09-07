@@ -278,13 +278,14 @@ export const CHANNELS: readonly ChannelSpec[] = [
   {
     id: 'tiktok',
     label: 'TikTok',
-    built: false,
-    stage: 'link',
+    built: true,
+    stage: 'publish',
     secrets: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'],
     task: 'M-14',
     note:
-      'الربطُ مبنيّ. والنشرُ ينتظر سائقا يرفع المقطعَ — ' +
-      'والمقاطعُ تُولَّد عندنا رأسيّةً بخمسَ عشرةَ ثانية (D-052)، فالمادّةُ جاهزة.',
+      'الربطُ والنشرُ مبنيّان (D-092). **ويصل المقطعُ صندوقَ تطبيقك** فتنشره ' +
+      'بيدك — وذلك يعمل بمجرّد الربط. والنشرُ المباشرُ باسمك يحتاج ' +
+      '<span class="mono">video.publish</span> بعد مراجعةِ محتوى من TikTok.',
   },
   {
     id: 'threads',

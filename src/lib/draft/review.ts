@@ -28,6 +28,11 @@
  */
 import type { Platform } from './prompt'
 
+/** الاسمُ كما يُكتب في الملحوظة — ولا يُشتقّ بشرطٍ ثنائيّ يشيخ. */
+const PLATFORM_NAME: Readonly<Record<Platform, string>> = {
+  linkedin: 'LinkedIn', x: 'X', tiktok: 'TikTok',
+}
+
 export type NoteKind = 'filler' | 'repeat' | 'sentence' | 'hashtag' | 'cliche' | 'ceiling'
 
 export interface ReviewNote {
@@ -100,10 +105,11 @@ const STOP: ReadonlySet<string> = new Set([
 ])
 
 /** أقصى ما تحتمله الجملةُ من كلماتٍ قبل أن تُقرأ مرّتين. */
-const SENTENCE_WORDS: Readonly<Record<Platform, number>> = { linkedin: 28, x: 22 }
+// و TikTok أضيقُها: وصفٌ يُطوى بعد سطرين، فجملةٌ طويلةٌ فيه لا تُقرأ
+const SENTENCE_WORDS: Readonly<Record<Platform, number>> = { linkedin: 28, x: 22, tiktok: 18 }
 
 /** ما تحتمله المنصّةُ من وسوم — مقروءٌ من عرفها لا مخترَع. */
-const HASHTAG_MAX: Readonly<Record<Platform, number>> = { linkedin: 3, x: 1 }
+const HASHTAG_MAX: Readonly<Record<Platform, number>> = { linkedin: 3, x: 1, tiktok: 3 }
 
 /**
  * **قربُ السقف — نسبةٌ من الحدّ لا رقمٌ مستقلّ** (D-090).
@@ -194,7 +200,7 @@ export function reviewText(
   if (tags.length > tagMax) {
     notes.push({
       kind: 'hashtag',
-      text: `${tags.length} وسما و ${platform === 'x' ? 'X' : 'LinkedIn'} تحتمل ${tagMax}`,
+      text: `${tags.length} وسما و ${PLATFORM_NAME[platform]} تحتمل ${tagMax}`,
       hits: tags.slice(0, 6),
     })
   }

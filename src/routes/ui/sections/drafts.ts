@@ -22,7 +22,7 @@
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
-import { PLATFORMS, type Platform } from '../../../lib/draft/prompt'
+import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
 import { relativeTime } from '../../../lib/format'
 
@@ -46,7 +46,7 @@ function money(value: number): string {
 }
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
-const LINES: Readonly<Record<string, number>> = { linkedin: 12, x: 6 }
+const LINES: Readonly<Record<string, number>> = { linkedin: 12, x: 6, tiktok: 5 }
 const LINE = 26
 const PAD = 28
 
@@ -408,9 +408,15 @@ export function draftsSection(input: DraftsInput): string {
                .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)
                .join('')}</select></div>
            <div class="field"><label for="dw-pf">المنصّة</label>
-             <select id="dw-pf" name="platform">
-               <option value="linkedin">LinkedIn — نحو ١٣٠٠ محرف</option>
-               <option value="x">X — نحو ٢٥٠ محرفا</option></select></div>
+             <select id="dw-pf" name="platform">${(
+               Object.values(PLATFORMS) as PlatformSpec[]
+             )
+               .map(
+                 (spec) =>
+                   `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — حتّى ${
+                     spec.hardLimit} محرفا</option>`,
+               )
+               .join('')}</select></div>
            <div class="grow"></div>
            <button class="p" type="submit"${input.ready ? '' : ' disabled'}>اكتب مسوّدة</button>
          </form>
