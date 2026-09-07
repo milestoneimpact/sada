@@ -1,14 +1,29 @@
 /**
  * وصفُ توليد الصورة.
  *
- * ## لماذا «لا حرفَ في الصورة» أوّلُ سطرٍ فيه
+ * ## لماذا هو بالإنجليزيّة كلُّه (D-083)
+ *
+ * كان بالعربيّة: الأسلوبُ والقيدُ والموضوع. **ونماذجُ الصور إنجليزيّةُ
+ * اللسان** — مُرمِّزُ النصّ فيها مدرَّبٌ على وصفٍ إنجليزيّ ساحق. فوصفٌ
+ * عربيٌّ **يُقرأ ضجيجا لا معنى**: تخرج الصورةُ في الأسلوب المطلوب
+ * تقريبا، **ولا علاقةَ لها بالموضوع**.
+ *
+ * وهو ما رآه المالكُ حرفا: «الصورُ المولَّدة لا تتعلّق بالنصّ المولَّد،
+ * لا يوجد أيُّ ربط».
+ *
+ * **والقيدُ العربيُّ كان أسوأَ من عديم الأثر**: «لا حرفَ في الصورة»
+ * مكتوبةً بالعربيّة قد تُقرأ عند النموذج **طلبا لحروفٍ عربيّة** — فيرسم
+ * خربشةً تشبهها. فالمنعُ يُكتب بلسانٍ يفهمه المانَع.
+ *
+ * ## ولماذا «لا حرفَ في الصورة» باقٍ
  *
  * نماذجُ التوليد ترسم الحروفَ العربيّة **مشوّهةً**: أشكالٌ تشبه الحروف
  * ولا تُقرأ، وحروفٌ منفصلةٌ حيث يجب أن تتّصل. وصورةٌ فيها خربشةٌ تشبه
  * العربيّة تخرج باسم المالك فتُقرأ إهمالا لا فنّا.
  *
- * والنصُّ في المنشور حيث يُقرأ وحيث يُترجَم وحيث يبحث عنه محرّك. فلا
- * حاجةَ إليه في الصورة أصلا — وهذا منعٌ يخدم لا يقيّد.
+ * **والنصُّ العربيُّ يُركَّب فوق الصورة عندنا لا فيها** — وذاك بابٌ لم
+ * يُبنَ بعد: تركيبُ عربيّةٍ صحيحةِ الوصل يحتاج مُشكِّلَ خطوطٍ حقيقيّا،
+ * ولا يجري في Worker بلا خدمةٍ تُشترى. **فيبقى موسوما ولا يُدَّعى.**
  *
  * ## وأسلوبٌ واحدٌ عبر المنشورات
  *
@@ -16,11 +31,12 @@
  * فيُثبَّت الأسلوب في الوصف الحاكم، ويتبدّل الموضوعُ وحده.
  */
 import type { Platform } from '../draft/prompt'
+import type { VisualBrief } from './brief'
 
 /** نسبةُ كلّ منصّة — تُطلب في الوصف، ويُقصّ الناتج إن خالفها لاحقا. */
 export const ASPECT: Readonly<Record<Platform, string>> = {
-  linkedin: '1.91:1 (منظر أفقيّ عريض)',
-  x: '16:9 (منظر أفقيّ)',
+  linkedin: '1.91:1 wide landscape',
+  x: '16:9 landscape',
 }
 
 /**
@@ -30,38 +46,64 @@ export const ASPECT: Readonly<Record<Platform, string>> = {
  * واقعا لم يقع، ومنشورٌ مهنيٌّ لا يحتاج أن يدّعي.
  */
 const STYLE = [
-  'أسلوبٌ تحريريٌّ مجرّد: أشكالٌ هندسيّةٌ وتدرّجاتٌ ونسيجٌ خفيف.',
-  'لوحةٌ لونيّةٌ هادئةٌ محدودة — لونان أو ثلاثة، بينها تركوازٌ خافت.',
-  'إضاءةٌ ناعمةٌ وعمقٌ لطيف، بلا مبالغةٍ في التباين.',
-  'بلا وجوهٍ ولا أشخاصٍ يُعرَفون، وبلا شعاراتِ علاماتٍ تجاريّة.',
-  'بلا صورٍ نمطيّةٍ للمكاتب: لا مصافحةٌ ولا رسمٌ بيانيٌّ صاعدٌ ولا مصباحُ فكرة.',
+  'Abstract editorial illustration: geometric forms, gradients, fine texture.',
+  'Muted limited palette — two or three colours, with a restrained teal accent.',
+  'Soft directional light, gentle depth, no harsh contrast.',
+  'No faces, no recognisable people, no brand logos.',
+  'No office cliches: no handshakes, no rising bar charts, no lightbulbs.',
+].join('\n')
+
+/**
+ * القيدُ الحاكم — **أوّلُ ما يُقرأ وآخرُ ما يُقرأ**.
+ *
+ * ونماذجُ الانتشار تُرجّح أوائلَ الوصف وأواخرَه، والوسطُ يُبهَت. فقيدٌ في
+ * الوسط وحده يسقط — **وقد كان في الوسط**.
+ */
+const NO_TEXT = [
+  'ABSOLUTELY NO text, letters, words, numbers, captions, watermarks or',
+  'signage anywhere in the image — no Arabic script, no Latin script,',
+  'nothing that resembles writing.',
 ].join('\n')
 
 export interface ImageBrief {
-  /** موضوعُ المنشور — لا نصُّه كاملا. */
+  /** موضوعُ المنشور — يُستعمَل حين يسقط الموجزُ البصريّ. */
   readonly topic: string
   readonly platform: Platform
+  /** الموجزُ البصريُّ الإنجليزيّ إن وُلّد — وهو ما يربط الصورةَ بالنصّ. */
+  readonly visual?: VisualBrief | null
 }
 
 export function imagePrompt(brief: ImageBrief): string {
+  const visual = brief.visual ?? null
   return [
-    '# المطلوب',
+    NO_TEXT,
     '',
-    `صورةٌ واحدةٌ تصاحب منشورا مهنيّا عن: ${brief.topic}`,
+    '# Subject',
     '',
-    '# قيدٌ لا يُخالَف',
+    visual === null
+      // احتياطُ السقوط: الموضوعُ العربيُّ كما هو. **وأضعفُ ربطا بالضرورة**
+      // — ويُقال ذلك للنموذج بدل أن يُترَك يخمّن
+      ? `A single abstract editorial image accompanying a professional post.\n` +
+        `The post (Arabic, for context only — do not render it): ${brief.topic}`
+      : visual.subject,
     '',
-    '**لا حرفَ ولا كلمةَ ولا رقمَ في الصورة — لا بالعربيّة ولا بغيرها.**',
-    'ولا شيءَ يشبه الكتابة: لا نصٌّ مموَّه ولا حروفٌ في الخلفيّة.',
-    'فالنصُّ في المنشور نفسه، والصورةُ تصاحبه ولا تكرّره.',
+    '# Composition',
     '',
-    '# الأسلوب',
+    visual === null ? 'Wide editorial composition with generous negative space.' : visual.composition,
+    '',
+    '# Colour and light',
+    '',
+    visual === null ? 'Muted limited palette with a soft teal accent.' : visual.palette,
+    '',
+    '# Style',
     '',
     STYLE,
     '',
-    '# القياس',
+    '# Format',
     '',
     ASPECT[brief.platform],
+    '',
+    NO_TEXT,
   ].join('\n')
 }
 
@@ -70,6 +112,8 @@ export function imagePrompt(brief: ImageBrief): string {
  *
  * ونموذجٌ يُعطى ألفَ محرفٍ يرسم كلَّ ما فيها فتخرج صورةٌ مزدحمة. والجملةُ
  * الأولى في منشورٍ مكتوبٍ جيّدا **تحمل فكرتَه** — وذاك ما نريد رسمه.
+ *
+ * **وهي احتياطٌ الآن لا أصل**: الأصلُ الموجزُ البصريّ من `brief.ts`.
  */
 export function topicOf(text: string): string {
   const first = text

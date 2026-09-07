@@ -78,9 +78,26 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
     expect(SCRIPT).toContain('__manual__')
   })
 
-  it('ولا يُجلَب الفهرسُ عند فتح الشاشة — بضغطةٍ وحدها', () => {
-    // الجلبُ داخلَ مستمع الضغط: فتحُ اللوحة لا يوقظ نداءً إلى كلّ مزوّد
-    const inClick = /addEventListener\('click',function\(\)\{[\s\S]{0,600}?providers\/models/.test(SCRIPT)
-    expect(inClick).toBe(true)
+  /**
+   * **الجلبُ من إيماءةٍ لا من فتح الشاشة.**
+   *
+   * فتحُ اللوحة لا يوقظ نداءً باسم المالك إلى كلّ مزوّدٍ عنده. وأوّلُ
+   * لمسةٍ للدرج تجلب — فتبديلُ النموذج لا يحتاج ضغطتين (D-083).
+   */
+  it('الجلبُ من إيماءةٍ لا من فتح الشاشة — ولمسةٌ ثانيةٌ لا تُعيده', () => {
+    expect(SCRIPT).toContain("sel.addEventListener('focus',function(){load(true);})")
+    expect(SCRIPT).toContain("btn.addEventListener('click',function(){loadedFor='';load(true);})")
+    // حارسٌ يمنع نداءً ثانيا لقائمةٍ جُلبت — وإلّا نُودي عند كلّ لمسة
+    expect(SCRIPT).toContain('if(busy||loadedFor===name)return')
+  })
+
+  /**
+   * **وتبديلُ المزوّد يُسقط نماذجَه** — وهو العطلُ الذي رآه المالك:
+   * اختير Cloudflare فبقيت نماذجُ Gemini معروضة، وحُفظ توجيهٌ لا يعمل.
+   */
+  it('وتبديلُ المزوّد يُفرّغ الدرجَ ويجلب نماذجَ الجديد', () => {
+    expect(SCRIPT).toContain("pick.addEventListener('change'")
+    expect(SCRIPT).toContain("mpClear(sel,'— اختر نموذجا —')")
+    expect(SCRIPT).toContain("box.dataset.provider=pick.value")
   })
 })

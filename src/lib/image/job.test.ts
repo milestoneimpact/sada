@@ -166,11 +166,32 @@ describe('المسار الكامل', () => {
     expect(calls[0]?.headers['x-goog-api-key']).toBe('AIza-test')
   })
 
-  it('يطلب صورةً بلا حرف — وهو أوّلُ قيدٍ في الوصف', async () => {
+  /**
+   * **والقيدُ بالإنجليزيّة وفي الطرفين** (D-083).
+   *
+   * كان بالعربيّة وفي الوسط. ونماذجُ الانتشار تُرجّح أوائلَ الوصف
+   * وأواخرَه ويُبهَت الوسط، **ومنعٌ بلغةٍ لا يقرؤها المانَع قد يُقرأ
+   * طلبا**: «لا حرفَ عربيّ» عربيّةً ترسم خربشةً تشبه العربيّة.
+   */
+  it('يطلب صورةً بلا حرف — بالإنجليزيّة، وفي أوّل الوصف وآخره', async () => {
     await generateForPost(deps(net()), await seedPost())
     const sent = calls[0]?.body as { contents?: { parts?: { text?: string }[] }[] }
     const prompt = sent.contents?.[0]?.parts?.[0]?.text ?? ''
-    expect(prompt).toContain('لا حرفَ ولا كلمةَ ولا رقمَ في الصورة')
+    expect(prompt.startsWith('ABSOLUTELY NO text')).toBe(true)
+    expect(prompt.trimEnd().endsWith('resembles writing.')).toBe(true)
+    expect((prompt.match(/ABSOLUTELY NO text/g) ?? []).length).toBe(2)
+  })
+
+  /** **ولا عربيّةَ في وصفٍ لا يقرؤها** — إلّا سياقَ الاحتياط مُعلَّما. */
+  it('والوصفُ إنجليزيٌّ كلُّه — فالنموذجُ لا يقرأ غيرها', async () => {
+    await generateForPost(deps(net()), await seedPost())
+    const sent = calls[0]?.body as { contents?: { parts?: { text?: string }[] }[] }
+    const prompt = sent.contents?.[0]?.parts?.[0]?.text ?? ''
+    // الأسلوبُ والتركيبُ والقياس: لا حرفَ عربيّ فيها
+    for (const line of ['# Subject', '# Composition', '# Style', '# Format']) {
+      expect(prompt).toContain(line)
+    }
+    expect(prompt).toContain('for context only')
   })
 })
 

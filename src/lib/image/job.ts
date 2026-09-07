@@ -28,6 +28,7 @@ import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
 import { cfAccountId } from '../ai/cloudflare'
 import { imagePrompt, topicOf } from './prompt'
+import { visualBrief } from './brief'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
 
@@ -161,9 +162,27 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
-  // ٤ · النداء
+  // ٤ · **الموجزُ البصريّ أوّلا** (D-083)
+  //
+  // ونداءُ الصورة لا يفهم العربيّة، فمنشورٌ عربيٌّ يُرسَل إليه كما هو
+  // يُقرأ ضجيجا: تخرج الصورةُ في الأسلوب ولا علاقةَ لها بالموضوع. فيُبنى
+  // موجزٌ بصريٌّ إنجليزيٌّ من نصّ المنشور بمزوّد الكتابة، ثمّ يُركَّب
+  // الوصفُ منه.
+  //
+  // **وسقوطُه لا يوقف التوليد**: يُبنى الوصفُ من الموضوع كما كان، ويُقال
+  // ذلك — صورةٌ أضعفُ ربطا خيرٌ من منشورٍ بلا صورة.
   const platform: Platform = post.platform === 'x' ? 'x' : 'linkedin'
-  const prompt = imagePrompt({ topic: topicOf(post.text), platform })
+  const visual = await visualBrief(
+    {
+      db: deps.db,
+      encKey: deps.encKey,
+      workerSecrets: deps.workerSecrets,
+      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    },
+    post.text,
+    post.id,
+  )
+  const prompt = imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
 
   /*
    * **والسائقُ يتبع المزوّدَ المختار** (D-079).
@@ -278,7 +297,15 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     return { kind: 'failed', reason: `تعذّرت كتابة الصفّ: ${message}`, retryable: false }
   }
 
-  return { kind: 'generated', mediaId, key: r2Key, bytes: image.bytes.length, cost: priced.total }
+  // **والكلفةُ المعادة تجمع النداءين**: الموجزَ والصورة. ورقمٌ يعرض
+  // أحدَهما ويُخفي الآخر يجعل الدفترَ أصدقَ من الشاشة
+  return {
+    kind: 'generated',
+    mediaId,
+    key: r2Key,
+    bytes: image.bytes.length,
+    cost: priced.total + visual.cost,
+  }
 }
 
 export interface MediaRow {

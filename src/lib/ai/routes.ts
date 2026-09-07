@@ -80,3 +80,48 @@ export async function writeRoute(
     .bind(task, provider, model, by)
     .run()
 }
+
+/**
+ * **نموذجٌ بقي من مزوّدٍ سابق** (D-083).
+ *
+ * رُئي في اللوحة: بُدّل المزوّدُ إلى Cloudflare **وبقيت نماذجُ Gemini
+ * معروضةً**، فحُفظ توجيهٌ لا يعمل — ولا شيء يقول ذلك حتّى أوّل نداءٍ
+ * مدفوع.
+ *
+ * والدرجُ في المتصفّح صار يُفرَّغ عند التبديل، **لكنّ الشاشةَ ليست
+ * حارسا**: من حفظ قبل أن يصل الجلب، أو أرسل النموذجَ من طرفيّة، يمرّ.
+ *
+ * وحكمان لا ثالث لهما — **وكلاهما يقينيّ لا استدلال**:
+ *
+ * ١ · بُدّل المزوّدُ **والنموذجُ هو نموذجُ السابق حرفا**. فهذا ليس
+ *     اختيارا: هو ما بقي في الحقل.
+ * ٢ · معرّفٌ يبدأ بـ `@cf/` عند مزوّدٍ ليس Cloudflare. **ولا أحدَ غيرُها
+ *     يخدم هذه المعرّفات** — فهو خطأٌ مقطوعٌ به لا مشتبَهٌ فيه.
+ *
+ * وما عداهما يمرّ: **حارسٌ يخمّن يمنع اختيارا صحيحا**، وذاك أسوأُ من
+ * أن يمرّ خطأٌ يُكشَف عند أوّل اختبار.
+ */
+export function routeMismatch(
+  previous: { readonly provider: string; readonly model: string } | null,
+  next: { readonly provider: string; readonly model: string },
+  providerIsCloudflare: boolean,
+): string | null {
+  if (
+    previous !== null &&
+    previous.provider !== next.provider &&
+    previous.model.trim() === next.model.trim() &&
+    next.model.trim() !== ''
+  ) {
+    return (
+      `بدّلتَ المزوّدَ إلى «${next.provider}» والنموذجُ ما زال «${next.model}» — ` +
+      `وهو نموذجُ «${previous.provider}». اضغط «حدّث» بجانب الدرج واختر من نماذجه.`
+    )
+  }
+  if (next.model.trim().startsWith('@cf/') && !providerIsCloudflare) {
+    return (
+      `«${next.model}» معرّفُ نموذجٍ في Workers AI، ولا يخدمه «${next.provider}». ` +
+      'اختر مزوّدَ Cloudflare، أو اختر نموذجا من نماذج هذا المزوّد.'
+    )
+  }
+  return null
+}
