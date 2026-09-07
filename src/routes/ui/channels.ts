@@ -339,7 +339,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   return `<div class="ch${state === 'unbuilt' ? ' off' : ''}" id="ch-${escapeHtml(spec.id)}">
     <div class="ch-top">
       <div class="ch-logo">${logo}</div>
-      <div class="ch-name"><a href="/panel/channels/${escapeHtml(spec.id)}"
+      <div class="ch-name"><a class="tap" href="/panel/channels/${escapeHtml(spec.id)}"
         >${escapeHtml(spec.label)}</a>
         <span>${accounts.length === 0 ? 'لا حساب' : `${accounts.length} حساب`}</span></div>
       <span class="grow"></span>${badge}

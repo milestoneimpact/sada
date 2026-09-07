@@ -58,7 +58,7 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--line-strong); border-radius:99px;
   border:3px solid transparent; background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:var(--ink-3); background-clip:content-box}
+@media(hover:hover){::-webkit-scrollbar-thumb:hover{background:var(--ink-3); background-clip:content-box}}
 /* رابطُ التخطّي: يُقصّ ولا يُنفى خارج الشاشة.
    وكان عند right:-9999px، **فامتدّ المستند إلى 10389px** وصار الجوّالُ
    يُسحَب جانبا. وهي علّةٌ لا تُرى: العنصرُ نفسه غيرُ مرئيّ، وأثرُه
@@ -68,8 +68,11 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
   clip-path:inset(50%); white-space:nowrap;
   background:var(--brand); color:var(--on-brand);
   padding:var(--s-3) var(--s-4); border-radius:8px; z-index:99; font-weight:700}
+/* وحين يظهر يصير هدفا كاملا: من يتنقّل بلوحة المفاتيح على لوحٍ لمسيّ
+   قد يلمسه بإصبعه — والقاعدةُ تنطبق حيث يُرى (D-086) */
 .skip:focus{width:auto; height:auto; overflow:visible; clip-path:none;
-  inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2)}
+  inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2);
+  display:inline-flex; align-items:center; min-height:var(--tap)}
 .grow{flex:1}
 h1,h2,h3{margin:0}
 /* **والثخينُ ‏٧٠٠ لا ‏٩٠٠.** الافتراضيُّ «bold» يُحَلّ عند بعض الخطوط
@@ -77,12 +80,38 @@ h1,h2,h3{margin:0}
    المصطنَعةُ الثخانة تلتصق نقاطُها. */
 b,strong{font-weight:700}
 
+/* ══ اللمس ══════════════════════════════════════════════════════
+   **الإصبعُ ليس مؤشّرا** (D-086). عرضُه نحوَ ‏٤٥px، ولا يرى ما تحته.
+   فهدفٌ بارتفاع ‏١٦px يُصاب **بالمصادفة لا بالقصد** — وقد كان في اللوحة
+   ثمانيةٌ منها، أضيقُها رابطُ «X» بعرض ‏١١px.
+
+   والحدُّ ‏٤٤×٤٤ من Apple HIG، وهو أشدُّ من ‏٢٤×٢٤ عند WCAG 2.5.8 — وشدّتُه
+   هي المرادة: الفرقُ بينهما هو الفرقُ بين «يمكن إصابتُه» و«يُصاب».
+
+   ## والمنطقةُ تُمَدّ ولا يُكبَّر النصّ
+
+   تكبيرُ النصّ يبدّل الشكلَ ويكسر السلّم. فتُمَدّ منطقةُ اللمس بطبقةٍ
+   شفّافةٍ فوق الرابط: **لا ترى العينُ فرقا، ويرى الإصبعُ هدفا كاملا.**
+   والعرضُ يمتدّ إلى ‏٤٤px حين يكون النصُّ أضيق منها. */
+.tap{position:relative; display:inline-block; min-width:var(--tap); text-align:center}
+/* **والامتدادُ رأسيٌّ لا أفقيّ.**
+   طبقةٌ أعرضُ من الرابط تخرج عن الصفحة فتصنع تمريرا أفقيّا — قِيس ‏١٢px
+   عند ‏٣٢٠px، مصدرُها رابطُ «X» بعرض ‏١١ وطبقتُه ‏٤٤. فتُقصَر الطبقةُ على
+   عرض الرابط («left» و«right» صفرا) ويُعطى الرابطُ عرضا أدنى في التخطيط.
+   والفيضُ الرأسيُّ لا يضرّ: الصفحةُ تُمرَّر رأسيّا أصلا. */
+.tap::after{content:''; position:absolute; left:0; right:0; top:50%;
+  transform:translateY(-50%); height:var(--tap)}
+
 /* ══ هيكلُ التطبيق ═══════════════════════════════════════════ */
-.app{display:grid; grid-template-columns:256px 1fr; min-height:100vh}
+/* **«dvh» لا «vh»** (D-086): يحسب iOS مئةً من «vh» بلا شريطِ المتصفّح،
+   فيمتدّ العمودُ تحته ويُقطَع أسفلُه. و«dvh» تتبع المرئيَّ وهو يتحرّك.
+   والسطرُ الأوّل احتياطٌ لمتصفّحٍ لا يعرفها — يقرؤه ثمّ يدهسه الثاني. */
+.app{display:grid; grid-template-columns:256px 1fr; min-height:100vh; min-height:100dvh}
 
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--chrome); border-inline-start:1px solid var(--line);
-  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
+  display:flex; flex-direction:column; position:sticky; top:0;
+  height:100vh; height:100dvh; overflow-y:auto;
   background-image:var(--sheen);
   /* **اللونُ يُعاد صراحةً، ولا يكفي إعادةُ تعريف الرمز.**
      المتغيّراتُ تُورَث، أمّا اللونُ فيُورَث **محسوبا**: الجسدُ حسب
@@ -124,7 +153,7 @@ nav.tabs a{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-2) 
   border-radius:var(--r-sm); min-height:var(--tap); font-size:var(--t-base); font-weight:600; color:var(--ink-2); text-decoration:none;
   transition:background .12s, color .12s}
 nav.tabs a svg{width:16px; height:16px; flex:none; opacity:.7}
-nav.tabs a:hover{background:var(--surface-2); color:var(--ink)}
+@media(hover:hover){nav.tabs a:hover{background:var(--surface-2); color:var(--ink)}}
 /* والحاليُّ يُعلَّم **بحدٍّ ولون**: أرضيّةٌ خافتةٌ وحدها تختفي في
    وضع التباين العالي، وخطٌّ على الحافّة يبقى. */
 nav.tabs a[aria-current=page]{background:var(--brand-wash); color:var(--brand); position:relative}
@@ -143,7 +172,7 @@ details.plat>summary{display:flex; align-items:center; gap:var(--s-3); cursor:po
   padding:var(--s-2) var(--s-3); border-radius:var(--r-sm); min-height:var(--tap);
   font-size:var(--t-base); font-weight:600; color:var(--ink-2); list-style:none}
 details.plat>summary::-webkit-details-marker{display:none}
-details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}
+@media(hover:hover){details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}}
 details.plat>summary svg{width:16px; height:16px; flex:none; opacity:.7}
 /* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
 details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:var(--t-xs);
@@ -155,7 +184,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list .pl{width:15px; height:15px; flex:none; display:grid; place-items:center;
   color:var(--ink-3)}
 .plat-list .pl svg{width:15px; height:15px; display:block}
-.plat-list a:hover .pl{color:var(--ink-2)}
+@media(hover:hover){.plat-list a:hover .pl{color:var(--ink-2)}}
 /* الحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء. ومعها title — واللونُ وحده
    لا يقول شيئا لمن لا يفرزه */
 .plat-list .dot{width:6px; height:6px; border-radius:50%; flex:none;
@@ -282,8 +311,8 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
   transition:box-shadow .18s, border-color .18s}
 /* بطاقةُ القناة والمسوّدة تحملان فعلا، فترتفعان قليلا عند التحويم.
    وبطاقاتُ العرض لا ترتفع: حركةٌ بلا فعلٍ خلفها تَعِد بما لا يقع. */
-.ch:hover,.draft:hover{box-shadow:var(--sh-2), inset 0 1px 0 var(--hair);
-  border-color:var(--line-strong)}
+@media(hover:hover){.ch:hover,.draft:hover{box-shadow:var(--sh-2), inset 0 1px 0 var(--hair);
+  border-color:var(--line-strong)}}
 /* **الابنُ المباشرُ وحده كان يُصاب.** و .card-head h2 حفيدٌ لا ابن،
    فسقط من القاعدة وورث حجمَ المتصفّح الافتراضيّ — ‏٢١px، وهو خارجُ
    السلّم كلِّه. علّةٌ لم تُرَ لأنّ ٢١ قريبةٌ ممّا حولها، **وكشفها
@@ -353,7 +382,7 @@ th{text-align:right; color:var(--ink-3); font-weight:600; font-size:var(--t-xs);
   padding:0 var(--s-2) var(--s-2); border-bottom:1px solid var(--line); white-space:nowrap}
 td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vertical-align:top}
 tbody tr:last-child td{border-bottom:0}
-tbody tr:hover{background:var(--surface-2)}
+@media(hover:hover){tbody tr:hover{background:var(--surface-2)}}
 .nm{font-weight:600; line-height:var(--lh-tight)}
 /* «nm» تُستعمَل span وتُستعمَل فقرةً. والفقرةُ بلا قاعدةِ هامشٍ
    ترث 14px من المتصفّح — **خارجَ السلّم**، ولا تظهر في grep لأنّها
@@ -392,11 +421,11 @@ button,.btn{font:inherit; font-size:var(--t-base); font-weight:600; border-radiu
   display:inline-flex; align-items:center; justify-content:center; gap:var(--s-2);
   text-decoration:none; white-space:nowrap; transition:background .12s, border-color .12s, box-shadow .12s}
 .p{background:var(--brand); color:var(--on-brand); box-shadow:var(--sh-1)}
-.p:hover{background:var(--brand-deep)}
+@media(hover:hover){.p:hover{background:var(--brand-deep)}}
 .g{background:var(--surface); color:var(--ink); border-color:var(--line-strong); box-shadow:var(--sh-1)}
-.g:hover{background:var(--surface-2)}
+@media(hover:hover){.g:hover{background:var(--surface-2)}}
 .d{background:var(--surface); color:var(--bad); border-color:color-mix(in srgb,var(--bad) 34%,transparent)}
-.d:hover{background:var(--bad-wash)}
+@media(hover:hover){.d:hover{background:var(--bad-wash)}}
 /* «الصغير» أضيقُ حشوا لا أقصرُ قامة: زرٌّ في جدولٍ يزدحم عرضا لا طولا،
    وتقصيرُه يُسقطه دون حدّ الهدف — وهو ما كان يقع. */
 .sm{padding:var(--s-1) var(--s-3); font-size:var(--t-sm); border-radius:7px}
@@ -427,6 +456,7 @@ input:not([type]),select,textarea{
   min-height:var(--tap); box-sizing:border-box;
   transition:border-color .12s, box-shadow .12s}
 input:focus,select:focus,textarea:focus{border-color:var(--brand); box-shadow:0 0 0 3px var(--ring); outline:none}
+
 input[type=number]{width:110px}
 /* ── طولُ السطر ───────────────────────────────────────────────────────
    45 إلى 75 محرفا. وقيست كتلٌ عند 135 — ضعفُ الحدّ. والعينُ ترتدّ من
@@ -493,7 +523,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 .ch-logo svg{width:17px; height:17px; display:block}
 .ch-name{font-weight:700; font-size:var(--t-md); line-height:var(--lh-tight); letter-spacing:-.1px}
 .ch-name a{color:inherit; text-decoration:none}
-.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}
+@media(hover:hover){.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}}
 .ch-name span{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3); letter-spacing:0}
 .ch-note{font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh); margin:0}
 .ch-acc{display:flex; align-items:center; gap:var(--s-2); padding:var(--s-2) var(--s-3); border-radius:var(--r-sm);
@@ -525,7 +555,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 .guide>summary{cursor:pointer; list-style:none; display:flex; align-items:center;
   gap:var(--s-3); padding:var(--s-3) var(--s-5); min-height:56px}
 .guide>summary::-webkit-details-marker{display:none}
-.guide>summary:hover{background:var(--surface-3)}
+@media(hover:hover){.guide>summary:hover{background:var(--surface-3)}}
 .guide .g-ic{flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
   background:var(--brand-wash); color:var(--brand);
   border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
@@ -591,7 +621,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
   padding:var(--s-3) var(--s-4); min-height:var(--tap); list-style:none;
   background:var(--surface)}
 .prow>summary::-webkit-details-marker{display:none}
-.prow>summary:hover{background:var(--surface-2)}
+@media(hover:hover){.prow>summary:hover{background:var(--surface-2)}}
 .prow[open]>summary{background:var(--surface-2); border-bottom:1px solid var(--line-soft)}
 /* الاسمُ يأخذ ما بقي، وما بعده ثابتُ العرض — فالأعمدةُ تصطفّ رأسيّا */
 .prow .pn{flex:1; min-width:0; font-size:var(--t-base); font-weight:700; color:var(--ink)}
@@ -648,7 +678,7 @@ ol.steps.wiz.nodot li::before{display:none}
   padding:var(--s-2) var(--s-3); min-height:var(--tap); border-radius:var(--r-sm);
   border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
   font-size:var(--t-sm); font-weight:600; text-decoration:none}
-.ftab:hover{border-color:var(--line-strong); color:var(--ink)}
+@media(hover:hover){.ftab:hover{border-color:var(--line-strong); color:var(--ink)}}
 .ftab .count{font-size:var(--t-xs); font-weight:700; font-variant-numeric:tabular-nums;
   padding:0 var(--s-2); border-radius:99px; background:var(--surface-3); color:var(--ink-3)}
 /* المفتوحُ يُعلَّم بأكثر من لون: خطٌّ وثِقَلٌ وأرضيّة (D-043) */
@@ -815,7 +845,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 nav.back{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-3) 0 var(--s-5)}
 nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-decoration:none;
   display:inline-flex; align-items:center; min-height:var(--tap)}
-nav.back a:hover{color:var(--brand)}
+@media(hover:hover){nav.back a:hover{color:var(--brand)}}
 
 .plat-logo{width:46px; height:46px; border-radius:13px; flex:none; display:grid; place-items:center;
   background:var(--surface); border:1px solid var(--line); color:var(--ink);
@@ -904,7 +934,7 @@ nav.back a:hover{color:var(--brand)}
   tbody,tr,td{display:block; width:100%}
   tr{border:1px solid var(--line); border-radius:var(--r); padding:var(--s-3); margin-bottom:var(--s-2);
     background:var(--surface-2)}
-  tbody tr:hover{background:var(--surface-2)}
+  @media(hover:hover){tbody tr:hover{background:var(--surface-2)}}
   td{border:0; padding:var(--s-1) 0}
   td::before{content:attr(data-label); display:block; font-size:var(--t-xs); color:var(--ink-3);
     margin-bottom:var(--s-0); letter-spacing:.4px}
@@ -959,4 +989,43 @@ nav.back a:hover{color:var(--brand)}
 }
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
+
+/* ══════════════════════════════════════════════════════════════════
+   طبقةُ اللمس — **وموضعُها آخرُ الورقة قصدا** (D-086).
+
+   CSS يرجّح المتأخّرَ عند تساوي المحدّدات. وكتلةٌ في الوسط تغلبها كلُّ
+   قاعدةٍ بعدها — جُرّبت فبقيت الحقولُ على ‏١٢٫٥px رغم أنّ الوسيطَ يطابق.
+   فطبقةُ الجهاز تُكتب آخرا، كما تُكتب طبقةُ الطباعة.
+   ══════════════════════════════════════════════════════════════════ */
+/* ══ الحقولُ على اللمس ═══════════════════════════════════════════
+   **Safari يُقرّب الصفحةَ عند لمس حقلٍ خطُّه دون ‏١٦px** — سلوكٌ لا
+   يُعطَّل إلّا بمنع التقريب كلِّه، ومنعُه يخالف WCAG 1.4.4. وثمنُه أنّ
+   الصفحةَ تقفز وتكبر عند كلّ لمسةِ حقل، ثمّ يُصغّرها المالكُ بإصبعين.
+
+   فيُرفَع الخطُّ إلى «--t-lg» (‏١٦px) على الشاشات اللمسيّة وحدها: القراءةُ
+   على مسافةِ ذراعٍ تحتاجه أصلا، والشاشةُ الواسعةُ تبقى على ‏١٤ حيث
+   الكثافةُ مطلوبة. **و«--t-base» أربعةَ عشرَ لا ستّةَ عشرَ** — جُرّبت
+   فلم يتبدّل شيء، والرمزُ الصحيح «--t-lg».
+
+   و«pointer: coarse» أدقُّ من عرضِ الشاشة: لوحٌ بقلمٍ ليس هاتفا، وحاسوبٌ
+   بشاشةٍ لمسيّةٍ ليس شاشةَ فأرة.
+
+   **وموضعُها بعد قاعدةِ الحقول لا قبلها**: تلك تختار بمحدّدات السمات
+   فتغلب المحدّدَ العارِيَ مهما كان الوسيط — وقد جُرّب فبقي ‏١٤. */
+@media(pointer:coarse){
+  input[type=number],input[type=password],input[type=text],input[type=datetime-local],
+  input:not([type]),select,textarea,button,.btn{font-size:var(--t-lg)}
+  /* والمحدّداتُ الأخصُّ تُذكَر باسمها: قاعدةٌ عامّةٌ لا تغلب
+     «.copy input» ولا «.sched select» مهما تأخّرت */
+  .copy input,.sched input,.sched select,.draft-text,input.mono{font-size:var(--t-lg)}
+  /* **وعرضٌ ثابتٌ يفيض حين يكبر الخطّ**: أُضيف الحدُّ هنا لا في كلّ حقل،
+     فحقلٌ يُكتب غدا بعرضٍ ثابتٍ يرثه. وقِيس فيضٌ ١٢px عند ٣٢٠px قبله */
+  input,select,textarea{max-width:100%}
+  /* **وعنصرُ الشبكةِ المرنةِ لا ينكمش دون محتواه ما لم يُؤذَن له.**
+     و«min-width» الافتراضيّةُ في flex هي «auto» = عرضُ المحتوى، فدَرَجٌ
+     خيارُه طويلٌ يدفع صفَّه كلَّه خارج البطاقة. وقِيس: حقلٌ ‏٢٩١px في
+     حاويةٍ ‏٢٣٨px — وهو مصدرُ الفيض بعد رفعِ الخطّ إلى ١٦ */
+  .row > *,.field{min-width:0}
+}
+
 `

@@ -178,9 +178,9 @@ function policyBody(env: Env, base: string): string {
   ${section('٧ · التواصل', contact === null
     ? `<p class="ago">لم يُضبط بريدُ تواصلٍ بعد على هذا النشر.</p>`
     : `<p>لأيّ سؤالٍ عن هذه الوثيقة أو طلبِ حذف:
-       <a href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
+       <a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
-  <footer><a href="/terms">شروط الاستعمال</a></footer>
+  <footer><a class="tap" href="/terms">شروط الاستعمال</a></footer>
 </div>`
 }
 
@@ -208,9 +208,9 @@ function termsBody(env: Env, base: string): string {
 
   ${section('٥ · التواصل', contact === null
     ? `<p class="ago">لم يُضبط بريدُ تواصلٍ بعد على هذا النشر.</p>`
-    : `<p><a href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
+    : `<p><a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
-  <footer><a href="/privacy">سياسة الخصوصيّة</a></footer>
+  <footer><a class="tap" href="/privacy">سياسة الخصوصيّة</a></footer>
 </div>`
 }
 
