@@ -94,6 +94,57 @@ for (const file of files) {
   }
 }
 
+/**
+ * ورقمُ زمنٍ يُكتب حرفا — **وهو ما كان قبل `--dur-*`**.
+ *
+ * قِيست الورقةُ فوُجدت ثلاثةَ أزمنةٍ في عشرِ قواعد: انضباطٌ قائمٌ بلا
+ * اسم. **ورقمٌ في عشرة مواضعَ يتباعد عند أوّل تعديل** — وهي علّةُ
+ * السلّمين نفسُها (D-057): ما لا يُسمَّى لا يبقى واحدا.
+ *
+ * **والقاعدةُ مقصورةٌ على `transition`**: `animation:spin .7s` دورةُ
+ * دوّامةٍ لا ردُّ تفاعل، ولها زمنُها وحدها.
+ */
+const literalTime = []
+for (const file of files) {
+  if (NOT_USAGE.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  for (const m of code.matchAll(/transition:[^;}]*/g)) {
+    if (/\d*\.?\d+m?s\b/.test(m[0])) {
+      literalTime.push([m[0].slice(0, 58), file.slice(SRC.length)])
+    }
+  }
+}
+
+/**
+ * وتباعدُ حرفٍ موجبٌ على نصٍّ عربيّ — **يفكّ الوصل**.
+ *
+ * الحرفُ العربيُّ يتّصل بما بعده، **وإزاحتُه عنه تقطع الوصل**: تُقرأ
+ * «صــدى» لا «صدى». وهي علّةٌ تُرى ولا تُقاس بمدقّقٍ بصريّ — الأحجامُ
+ * صحيحةٌ والتباينُ صحيح، والحروفُ منفكّة. وقِيست ستّةَ مواضع.
+ *
+ * **والاستثناءُ يُعرَف بالشيفرة لا بالنيّة**: قاعدةٌ تكتب `direction:ltr`
+ * تصف نصّا لاتينيّا معزولا — ورموزُ الاسترداد مثلا — **والتباعدُ فيه
+ * صنعةٌ لا عيب**. فالفحصُ على الكتلة الواحدة: أفيها تباعدٌ موجبٌ بلا
+ * إعلانِ اتّجاه؟
+ *
+ * **والقيمةُ تُقرأ عددا لا نمطا.** أوّلُ صياغةٍ فحصت بنمطٍ نصّيّ
+ * فاتّهمت `letter-spacing:0` في `.tile .v em` و `.ch-name span` — **وتلك
+ * صفرٌ يُلغي تضييقا موروثا، لا تباعدا يفكّ وصلا**. ومدقّقٌ يكذب مرّةً لا
+ * يُقرأ ثانيةً (D-070). فالسالبُ والصفرُ يمرّان، والموجبُ وحدَه يُتَّهم.
+ */
+const spaced = []
+for (const file of files) {
+  if (NOT_USAGE.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  // الكتلُ الداخليّةُ وحدَها — فقاعدةٌ داخل `@media` تُفحَص بذاتها
+  for (const m of code.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    const value = m[2].match(/letter-spacing:\s*(-?[\d.]+)/)
+    if (value === null || Number.parseFloat(value[1]) <= 0) continue
+    if (/direction:\s*ltr/.test(m[2])) continue
+    spaced.push([m[1].trim().split('\n').pop().trim().slice(0, 48), file.slice(SRC.length)])
+  }
+}
+
 const ghosts = [...used].filter(([name]) => !defined.has(name))
 const orphans = [...defined].filter(
   ([name]) => !used.has(name) && !ALLOWED.has(name.slice(2)),
@@ -111,11 +162,20 @@ for (const [name, where] of orphans) {
   console.log(`  ✕ ${name}  —  يُعرَّف في ${where}`)
 }
 
+console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
+if (literalTime.length === 0) console.log('  ✓ لا زمنَ خارج السلّم')
+for (const [rule, where] of literalTime) console.log(`  ✕ ${rule}  —  ${where}`)
+
+console.log('\n═══ تباعدُ حرفٍ موجبٌ بلا اتّجاهٍ لاتينيّ ═══\n')
+if (spaced.length === 0) console.log('  ✓ لا تباعدَ يفكّ وصلا')
+for (const [sel, where] of spaced) console.log(`  ✕ ${sel}  —  ${where}`)
+
 console.log(
   `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة)\n`,
 )
 
-if (ghosts.length + orphans.length === 0) process.exit(0)
+const total = ghosts.length + orphans.length + literalTime.length + spaced.length
+if (total === 0) process.exit(0)
 
 console.log('والمنادَى بلا تعريفٍ **يُعرَّف أو يُحذَف نداؤه** — ولا يُترَك:')
 console.log('قاعدةٌ تُقرأ صحيحةً ولا تعمل أسوأُ من قاعدةٍ غائبة.')
