@@ -26,6 +26,15 @@ export interface Settings {
    * رقمٌ بلا مصدر، والتوصيةُ هنا تقترح مالا لا كتابة (D-058).
    */
   readonly weeklyPromoCapUsd: number
+  /**
+   * أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085)
+   *
+   * **وافتراضُه مُشغَّل** — خلافا لبقيّة مفاتيح الإنفاق. والسبب أنّه
+   * **لا يُنفِق شيئا ما لم يُضبَط `CF_BROWSER_TOKEN`**: بلا رمزٍ لا
+   * نداءَ ولا لقطة. فالمفتاحُ هنا ليس بابَ إنفاقٍ يُفتَح، هو **إطفاءٌ
+   * لمن ضبط الرمزَ ثمّ أراد صورةً نظيفةً بلا نصّ**.
+   */
+  readonly imageOverlay: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -34,6 +43,7 @@ export const DEFAULTS: Settings = {
   dailySpendCapUsd: 5,
   autoEnqueue: false,
   weeklyPromoCapUsd: 0,
+  imageOverlay: true,
 }
 
 /** حدود ما يُقبل. الحدّ الأعلى يحرس من خطأ إصبعٍ في اللوحة. */
@@ -49,6 +59,7 @@ export type SettingKey =
   | 'daily_spend_cap_usd'
   | 'auto_enqueue'
   | 'weekly_promo_cap_usd'
+  | 'image_overlay'
 
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback
@@ -83,6 +94,9 @@ export async function readSettings(db: Db): Promise<Settings> {
     // مفاتيح الخطر تُقرأ بالمطابقة الحرفيّة لا بالتساهل: غيابها أو فسادها
     // يعني «مطفأ»، ولا يُفتح باب إنفاقٍ بقيمةٍ لم تُفهَم
     autoEnqueue: map.get('auto_enqueue') === 'true',
+    // **وهذا يُقرأ بالعكس**: غيابُه يعني «مشغَّل»، لأنّه لا يفتح إنفاقا —
+    // والرمزُ وحده هو الذي يفتحه. فمَن لم يضبط شيئا لا يقع عليه نداء
+    imageOverlay: map.get('image_overlay') !== 'false',
     dailyAnalysisCap: toNumber(map.get('daily_analysis_cap'), DEFAULTS.dailyAnalysisCap, 'dailyAnalysisCap'),
     dailySpendCapUsd: toNumber(map.get('daily_spend_cap_usd'), DEFAULTS.dailySpendCapUsd, 'dailySpendCapUsd'),
     weeklyPromoCapUsd: toNumber(
@@ -107,7 +121,7 @@ export async function writeSetting(
   updatedBy: string,
 ): Promise<WriteResult> {
   let stored: string
-  if (key === 'paused' || key === 'auto_enqueue') {
+  if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay') {
     stored = raw === 'true' ? 'true' : 'false'
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))

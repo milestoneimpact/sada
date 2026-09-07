@@ -47,6 +47,20 @@ export interface VisualBrief {
   readonly composition: string
   /** اللون والضوء. */
   readonly palette: string
+  /**
+   * عنوانُ الشريحة — **عربيٌّ، كلمتان أو ثلاث** (D-085).
+   *
+   * ويُركَّب فوق الصورة عندنا لا فيها. **وهو يُوقِف العين لا يشرح**:
+   * سطرٌ طويلٌ فوق صورةٍ لا يُقرأ — يُقرأ المنشورُ نفسُه.
+   */
+  readonly headline: string
+  /**
+   * فوقيّةٌ إنجليزيّة — **كلمتان بالضبط**، متباعدتا الحروف فوق العنوان.
+   *
+   * ولا تُترجِم العنوانَ: تسنده. «Governance First» فوق «الحوكمةُ تسبق
+   * السرعة» تزيد وزنا، وترجمةٌ حرفيّةٌ تحته تُنقصه.
+   */
+  readonly kicker: string
 }
 
 export interface BriefDeps {
@@ -70,12 +84,14 @@ export interface BriefOutcome {
  * النموذجُ بالعربيّة ثمّ يتذكّر. **والاتّساقُ أرخص من التصحيح.**
  */
 export const BRIEF_SYSTEM = [
-  'You turn an Arabic professional social post into a visual brief for a',
-  'text-to-image model. You never translate the post; you decide what a',
-  'single accompanying image should SHOW.',
+  'You turn an Arabic professional social post into (a) a visual brief for a',
+  'text-to-image model and (b) a two-line title card that will be composited',
+  'OVER that image. You never translate the post.',
   '',
-  'Hard rules:',
-  '- Answer with JSON only: {"subject":"…","composition":"…","palette":"…"}.',
+  'Answer with JSON only, exactly these five keys:',
+  '{"subject":"…","composition":"…","palette":"…","headline":"…","kicker":"…"}',
+  '',
+  'subject / composition / palette — the image itself:',
   '- English only, concrete and visual. Name objects, materials, light.',
   '- Never name a concept the model cannot draw ("governance", "strategy").',
   '  Translate the idea into a scene: what physical thing carries it?',
@@ -84,13 +100,41 @@ export const BRIEF_SYSTEM = [
   '- No office cliches: no handshakes, no rising bar charts, no lightbulbs,',
   '  no chess pieces, no puzzle pieces, no gears.',
   '- Abstract editorial style: geometry, gradients, texture, materials.',
-  '- Keep each field under 200 characters.',
+  '- Under 200 characters each.',
+  '',
+  'headline — the Arabic line drawn on the image:',
+  '- ARABIC. Two or three words. Never a full sentence, never a question.',
+  '- It must carry the post\'s single strongest claim, not summarise it.',
+  '- Weighty and declarative, the way a magazine cover line is.',
+  '- No punctuation, no quotes, no emoji, no hashtags. Under 40 characters.',
+  '',
+  'kicker — the English line above it:',
+  '- ENGLISH. EXACTLY TWO WORDS. Title Case. Under 24 characters.',
+  '- It supports the headline; it does NOT translate it.',
+  '- Editorial and strong, like a section label on a cover:',
+  '  "Governance First", "Measured Impact", "Quiet Leverage", "Built To Last".',
+  '- Never generic filler ("Our Update", "New Post", "Read More").',
 ].join('\n')
 
 export function briefUser(postText: string): string {
   // ألفُ محرفٍ تكفي فكرةَ منشور، وما زاد يزيد الكلفةَ ولا يزيد المعنى
   const text = postText.trim().slice(0, 1000)
   return `The Arabic post:\n\n${text}\n\nReturn the JSON brief.`
+}
+
+/** حدُّ ما يُقبَل من العنوان والفوقيّة — ويقابل ما تقصّه `slide.ts`. */
+export const HEADLINE_MAX = 40
+export const KICKER_MAX = 24
+
+/**
+ * **كلمتان لا أكثر** — والنموذجُ يزيد أحيانا مهما قيل له.
+ *
+ * والقصُّ عندنا لا رجاءٌ عنده: تعليمةٌ تُخالَف مرّةً في المئة تكفي
+ * لتخرج شريحةٌ بسطرٍ أعرج، **والقصُّ يقع دائما**.
+ */
+export function twoWords(value: string): string {
+  const words = value.trim().split(/\s+/).filter((w) => w.length > 0)
+  return words.slice(0, 2).join(' ')
 }
 
 function field(raw: unknown, max = 200): string | null {
@@ -121,6 +165,10 @@ export function parseBrief(raw: string): VisualBrief | null {
     subject,
     composition: field(row['composition']) ?? 'wide editorial composition, generous negative space',
     palette: field(row['palette']) ?? 'muted limited palette with a soft teal accent',
+    // **والعنوانُ يبقى فارغا إن لم يأتِ**: شريحةٌ بلا نصّ خيرٌ من شريحةٍ
+    // بنصٍّ مخترَع — والمنادي يتخطّى التركيبَ حين يجده فارغا
+    headline: field(row['headline'], HEADLINE_MAX) ?? '',
+    kicker: twoWords(field(row['kicker'], KICKER_MAX) ?? ''),
   }
 }
 

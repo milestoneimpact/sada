@@ -16,7 +16,8 @@ import { imagePrompt, topicOf } from './prompt'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
 import { writeRoute } from '../ai/routes'
-import { upsertProvider } from '../providers'
+import { saveKey, upsertProvider } from '../providers'
+import { toBase64 } from '../crypto'
 
 let db: FakeDb
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
@@ -419,5 +420,132 @@ describe('توجيهُ الصور يُطاع (D-079)', () => {
     expect(seen[0]).toContain('/ai/run/@cf/black-forest-labs/flux-1-schnell')
     // **ولا يُلمَس عنوانُ Google** — وهو ما كان يقع
     expect(seen.join(' ')).not.toContain('generativelanguage')
+  })
+})
+
+/**
+ * **الشريحة: النصُّ العربيُّ فوق الصورة** (D-085).
+ *
+ * وهي تحسينٌ لا شرط. **فكلُّ سببِ سقوطٍ يُبقي الصورةَ كما هي** — ومنشورٌ
+ * بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة، وهي قاعدةُ الموجز البصريّ (D-083).
+ */
+describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُبقي الصورة', () => {
+  /** بايتاتُ اللقطة كما يعيدها المتصفّح — تُميَّز عن بايتات المولّد. */
+  const SHOT = new Uint8Array([9, 9, 9, 9, 9, 9])
+  const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  /**
+   * شبكةٌ بمسارين: مزوّدُ الكتابة يعطي الموجزَ والعنوان، ومزوّدُ الصورة
+   * يعطي البايتات، ونهايةُ التصوير تعطي اللقطة.
+   */
+  function twoLane(options: { shotStatus?: number } = {}): typeof fetch {
+    calls = []
+    return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      calls.push({ url, body: null, headers: {} })
+
+      if (url.includes('browser-rendering/screenshot')) {
+        if ((options.shotStatus ?? 200) !== 200) {
+          return new Response('{}', { status: options.shotStatus ?? 500 })
+        }
+        return new Response(SHOT, { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+      }
+      if (url.includes('api.writer.test')) {
+        return new Response(
+          JSON.stringify({
+            model: 'w-1',
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  subject: 'folded brass sheets',
+                  headline: 'أثرٌ يُقاس',
+                  kicker: 'Measured Impact',
+                }),
+              },
+              finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 100, completion_tokens: 20 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      return new Response(
+        JSON.stringify({
+          candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG_B64 } }] } }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }) as unknown as typeof fetch
+  }
+
+  async function seedWriter(): Promise<void> {
+    await upsertProvider(
+      db,
+      { name: 'writer', label: 'Writer', kind: 'openai_compat', baseUrl: 'https://api.writer.test/v1' },
+      'test',
+    )
+    await saveKey(db, ENC, 'writer', 'sk-writer-key-long', 'test')
+    await writeRoute(db, 'draft', 'writer', 'w-1', 'test')
+  }
+
+  function slideDeps(fetchImpl: typeof fetch, b: Bucket, secrets: Record<string, string>): ImageDeps {
+    return { db, bucket: b, encKey: ENC, workerSecrets: { GEMINI_API_KEY: 'AIza-test', ...secrets }, fetchImpl }
+  }
+
+  const READY = { CF_AI_ACCOUNT_ID: 'acc', CF_BROWSER_TOKEN: 'cfut_browser' }
+
+  it('يركّب النصَّ ويرفع **اللقطةَ** لا الصورةَ الخام', async () => {
+    await seedWriter()
+    const b = bucket()
+    const out = await generateForPost(slideDeps(twoLane(), b, READY), await seedPost())
+    expect(out.kind).toBe('generated')
+    const stored = [...b.objects.values()][0]!
+    expect([...stored]).toEqual([...SHOT])
+    expect(calls.some((c) => c.url.includes('browser-rendering/screenshot'))).toBe(true)
+  })
+
+  it('و**كلفةُ اللقطة تُسجَّل** — نداءٌ مدفوعٌ لا يُخفى (D-008)', async () => {
+    await seedWriter()
+    await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
+    const ops = (await ledger()).map((e) => e.operation)
+    expect(ops.some((o) => o.startsWith('slide:'))).toBe(true)
+    expect(ops.some((o) => o.startsWith('image-brief:'))).toBe(true)
+    expect(ops.some((o) => o.startsWith('image:'))).toBe(true)
+  })
+
+  it('وسقوطُ التصوير يُبقي الصورةَ الخام — لا منشورَ بلا صورة', async () => {
+    await seedWriter()
+    const b = bucket()
+    const out = await generateForPost(
+      slideDeps(twoLane({ shotStatus: 500 }), b, READY),
+      await seedPost(),
+    )
+    expect(out.kind).toBe('generated')
+    expect([...b.objects.values()][0]!.length).toBeGreaterThan(0)
+    expect([...[...b.objects.values()][0]!]).not.toEqual([...SHOT])
+    // ولا كلفةَ للقطةٍ لم تقع
+    expect((await ledger()).some((e) => e.operation.startsWith('slide:'))).toBe(false)
+  })
+
+  it('و**بلا رمزِ المتصفّح لا نداءَ أصلا** — الغيابُ ليس عطلا', async () => {
+    await seedWriter()
+    await generateForPost(
+      slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }),
+      await seedPost(),
+    )
+    expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
+  })
+
+  it('وبلا عنوانٍ في الموجز لا شريحة — ولا نصَّ يُخترَع', async () => {
+    // لا مزوّدَ كتابةٍ ⇒ لا موجزَ ⇒ لا عنوان
+    await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
+    expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
+  })
+
+  it('وإطفاءُ التركيب من الإعدادات يُحترَم', async () => {
+    await seedWriter()
+    await writeSetting(db, 'image_overlay', 'false', 'test')
+    await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
+    expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
   })
 })
