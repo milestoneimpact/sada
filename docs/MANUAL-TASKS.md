@@ -1029,11 +1029,53 @@ Worker باسم `CF_BROWSER_TOKEN`.
 4. في **Account Resources** اختر حسابَك (`Include` ← حسابُك).
 5. **Continue to summary** ← **Create Token**. وانسخ القيمةَ الآن —
    **تُعرَض مرّةً واحدةً ولا تُقرأ بعدها**.
-6. ضعها سرّا في Worker:
-   `wrangler secret put CF_BROWSER_TOKEN --env staging`
-   ثمّ للإنتاج: `wrangler secret put CF_BROWSER_TOKEN --env production`
-   — أو من لوحة Cloudflare: Workers ← الـWorker ← **Settings** ←
-   **Variables and Secrets** ← **Add** ← نوعُه **Secret**.
+6. **ضعها سرّا في Worker** — والتفصيل في القسم التالي.
+
+### وأين يُوضَع بالضبط — والموضعُ الخطأ يضيّع ساعة
+
+**السرُّ يُوضَع في Worker نفسِه، لا في غيره.** وثلاثةُ مواضعَ يُخلَط
+بينها في هذا المشروع، **وواحدٌ منها فقط هو الصحيح هنا**:
+
+| الموضع | أهو الصحيح؟ | لماذا |
+|---|---|---|
+| **أسرار Worker** على Cloudflare | ✅ **نعم** | التطبيقُ يقرأ منها وهو يعمل |
+| أسرار GitHub (Actions) | ❌ لا | تلك لتدخل GitHub إلى Cloudflare، لا ليقرأها التطبيق |
+| `wrangler.toml` | ❌ **لا أبدا** | ملفٌّ في المستودع — وسرٌّ فيه سرٌّ منشور (D-005) |
+| حقلٌ في لوحة صدى | ❌ لا | لا حقلَ له أصلا: هو سرُّ بيئةٍ لا مفتاحُ مزوّد |
+
+#### الطريقُ الأوّل · من لوحة Cloudflare (بلا طرفيّة)
+
+1. `dash.cloudflare.com` ← **Compute (Workers)** ← **Workers & Pages**.
+2. اضغط الـWorker باسم **`sada-api-staging`**.
+   ⚠️ **وليس `sada-api-production`** — ابدأ بـ staging دائما.
+3. تبويب **Settings**.
+4. قسم **Variables and Secrets** ← زرّ **`+ Add`**.
+5. في **Type** اختر **`Secret`** — **لا `Text`**.
+   فـ`Text` يُعرَض لكلّ من يفتح اللوحة، و`Secret` لا يُعرَض بعد حفظه.
+6. **Variable name**: `CF_BROWSER_TOKEN` (حرفا حرفا، كبيرةً كلُّها).
+7. **Value**: الصق الرمزَ الذي نسختَه.
+8. اضغط **Deploy** (أو **Save and Deploy**). ينشر الـWorker نفسَه.
+
+ثمّ **كرّر الخطوات ٢–٨ على `sada-api-production`** حين تريده في الإنتاج.
+
+#### الطريقُ الثاني · من الطرفيّة (إن كان `wrangler` عندك)
+
+```
+wrangler secret put CF_BROWSER_TOKEN --env staging
+```
+
+يسألك عن القيمة، فتلصقها وتضغط Enter. **ولا تكتبها في نفس السطر** —
+سطرُ الأمر يُحفَظ في تاريخ الصدفة. وللإنتاج:
+
+```
+wrangler secret put CF_BROWSER_TOKEN --env production
+```
+
+#### وثلاثةٌ لا تُفعَل
+
+- **لا تُرسِل الرمزَ في محادثةٍ ولا بريدٍ ولا لقطةِ شاشة** (D-005).
+- **لا تضعه في `wrangler.toml`** — الملفُّ في المستودع.
+- **ولا تُبقِ نسختَه في الحافظة** بعد اللصق.
 
 ### ٤ · ما يعني النجاح
 
