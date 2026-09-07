@@ -97,18 +97,40 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
     })
     .join('')
 
-  const head = w.linked
-    ? '<b>تمّ الطريقُ كلُّه.</b> والخطواتُ تبقى معروضةً لتُراجَع عند أيّ تبديل.'
-    : w.current === null
-      ? '<b>الطريق.</b>'
-      : `<b>أنت عند الخطوة ${w.current} من ${w.steps.length}.</b>`
+  const done = w.steps.filter((x) => x.state === 'done').length
+  const tally = `${done} من ${w.steps.length} ثبتت`
+
+  /*
+   * **والطريقُ التامُّ يُطوى** (D-084).
+   *
+   * كان يُعرض كاملا لكلّ قناة: أربعُ خطواتٍ بشروحها، **مضروبةً في عدد
+   * القنوات**. فقارئُ اللوح يمرّ بأربعِ نسخٍ من الطريق نفسِه قبل أن
+   * يبلغ ما ينتظره فعلا.
+   *
+   * وهو لا يُحذَف: **يُراجَع عند كلّ تبديل**، وضغطةٌ تعيده. والمهمُّ أنّ
+   * ما تمّ لا يزاحم ما لم يتمّ.
+   */
+  if (w.linked) {
+    return `<details class="guide" style="margin-bottom:var(--s-3)">
+      <summary>
+        <span class="g-ic">${ICON_GUIDE}</span>
+        <span class="g-t"><b>الطريقُ إلى الربط — تمّ كلُّه</b>
+          <span>${tally}. والخطواتُ تبقى لتُراجَع عند أيّ تبديل.</span></span>
+        <span class="grow"></span>
+        <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
+      </summary>
+      <div class="guide-body"><ol class="steps wiz">${rows}</ol></div>
+    </details>`
+  }
+
+  const head = w.current === null
+    ? '<b>الطريق.</b>'
+    : `<b>أنت عند الخطوة ${w.current} من ${w.steps.length}.</b>`
 
   return `<div class="card" style="margin-bottom:var(--s-3)">
     <div class="card-head"><h2>الطريقُ إلى الربط</h2><div class="grow"></div>
-      <span class="chip">${w.steps.filter((x) => x.state === 'done').length} من ${w.steps.length} ثبتت</span></div>
-    <p class="hint">${head} <b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
-      خطوتان تقعان في بوّابة المنصّة ولا تُقرآن من هنا، <b>وبرهانُهما نجاحُ
-      ما بعدهما</b> — فيُقال «لا يُعرَف» ولا يُقال «تمّت».</p>
+      <span class="chip">${tally}</span></div>
+    <p class="hint">${head}</p>
     <ol class="steps wiz">${rows}</ol>
   </div>`
 }
@@ -314,7 +336,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
   // والشاشةُ تقول ماذا نُشر وما فشل ولماذا — وهما سؤالان لا واحد
-  return `<div class="ch${state === 'unbuilt' ? ' off' : ''}">
+  return `<div class="ch${state === 'unbuilt' ? ' off' : ''}" id="ch-${escapeHtml(spec.id)}">
     <div class="ch-top">
       <div class="ch-logo">${logo}</div>
       <div class="ch-name"><a href="/panel/channels/${escapeHtml(spec.id)}"
@@ -345,12 +367,70 @@ export function channelsSection(
   const rest = views.filter((v) => !v.spec.built)
   const linked = built.filter((v) => v.state === 'linked' || v.state === 'needs_reauth').length
 
-  return `<div class="lede-row">
+  /**
+   * **ما ينتظرك الآن — فوق كلّ شيء** (D-084).
+   *
+   * رمزُ X انتهى فتوقّف النشرُ عليها، **والتنبيهُ كان في وسط تمريرٍ من
+   * ثلاثة آلاف بكسل**. وعطلٌ صامتٌ لا يُرى ليس أهونَ من عطلٍ لا يُكتشَف:
+   * كلاهما ينتهي بمنشورٍ لم يخرج.
+   *
+   * وترتيبُه بالضرر لا بالأبجديّة: **ما يوقف نشرا قائما قبل ما يمنع
+   * نشرا لم يبدأ**.
+   */
+  const urgent = [
+    ...built.filter((v) => v.state === 'needs_reauth'),
+    ...built.filter((v) => v.state === 'awaiting_owner'),
+  ]
+  const waiting = urgent.length === 0
+    ? ''
+    : `<div class="card" style="margin-bottom:var(--s-4);border-color:var(--warn)">
+        <div class="card-head"><h2>ما ينتظرك الآن</h2><div class="grow"></div>
+          <span class="st warn"><span class="g">!</span>${urgent.length} ${
+            urgent.length === 1 ? 'قناة' : 'قنوات'}</span></div>
+        <ul class="todo">${urgent.map((v) => `<li>
+          <span class="dot ${v.state === 'needs_reauth' ? 'bad' : 'warn'}"></span>
+          <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
+            ? 'رمزُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
+            : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
+          ${v.state === 'needs_reauth'
+            ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start">جدّد الإذن</a>`
+            : `<a class="btn g sm" href="#ch-${escapeHtml(v.spec.id)}">اضبط سرّيه</a>`}
+        </li>`).join('')}</ul>
+      </div>`
+
+  /**
+   * شريطُ الحال — **أربعُ حالاتٍ في نظرة**.
+   *
+   * وكان الجوابُ عن «أين أنا؟» يحتاج مسحَ أربعِ بطاقاتٍ في شبكة، كلٌّ
+   * منها بطولِ معالجٍ كامل.
+   */
+  const count = (state: string): number => views.filter((v) => v.state === state).length
+  const strip = `<div class="grid c4" style="margin-bottom:var(--s-4)">
+    <div class="card tile"><div class="k">مربوطة وتعمل</div>
+      <div class="v">${count('linked')}<em> / ${built.length}</em></div>
+      <div class="n">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>
+    <div class="card tile"><div class="k">تحتاج تجديدا</div>
+      <div class="v">${count('needs_reauth')}</div>
+      <div class="n">${count('needs_reauth') === 0
+        ? 'ولا رمزَ انتهى'
+        : '<b>النشرُ عليها متوقّفٌ حتّى تجدّد</b>'}</div></div>
+    <div class="card tile"><div class="k">تنتظر ضبطا</div>
+      <div class="v">${count('awaiting_owner') + count('connectable')}</div>
+      <div class="n">ينقصها سرٌّ أو ربطُ حساب</div></div>
+    <div class="card tile"><div class="k">لم يُبنَ سائقُها</div>
+      <div class="v">${rest.length}</div>
+      <div class="n">تُعرَض لتُعرَف، ولا زرَّ لا يعمل</div></div>
+  </div>`
+
+  return `${strip}${waiting}<div class="lede-row">
     <h3 class="sec" style="margin:0; border:0; padding:0">القنوات المبنيّة</h3>
     <span class="grow"></span>
     <span class="st ${linked === 0 ? 'warn' : 'ok'}"><span class="g">${
       linked === 0 ? '!' : '●'}</span>${linked} من ${built.length} مربوطة</span>
-    <span class="lede-note">ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة، مهما كانت القنواتُ مربوطة.</span>
+    <span class="lede-note"><b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
+      خطوتان في كلّ طريقٍ تقعان في بوّابة المنصّة ولا تُقرآن من هنا،
+      وبرهانُهما نجاحُ ما بعدهما. ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة،
+      مهما كانت القنواتُ مربوطة.</span>
   </div>
 
   <div class="grid c2 ragged">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
