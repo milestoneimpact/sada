@@ -147,3 +147,26 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
     expect(views.find((v) => v.spec.id === 'linkedin')?.accounts).toHaveLength(0)
   })
 })
+
+/**
+ * **وحقلُ `note` نصٌّ صِرفٌ لا وسمَ فيه** (D-093).
+ *
+ * يُعرَض في أربعة مواضع، **وكلُّها تهرّبه** (`escapeHtml`) — وهو صواب:
+ * نصٌّ من سجلٍّ يُحقَن في صفحةٍ بلا تهريبٍ بابٌ لا يحرسه أحد.
+ *
+ * فوسمٌ يُكتب فيه **يُعرَض حرفا للمالك**: رأى «‎<span class="mono">‎» و
+ * «‎**‎» في شاشة TikTok. والعلّةُ صنفٌ يتكرّر: حقلٌ له عقدٌ غيرُ مكتوب،
+ * فيُخالَف بحسن نيّة.
+ *
+ * **والفرقُ عن `SetupGuide`**: تلك تُرسَم بلا تهريب فتقبل الوسم. فحقلان
+ * متجاوران بعقدين متضادّين — والحارسُ هو ما يفرّق بينهما.
+ */
+describe('عقدُ `note` — نصٌّ يُقرأ لا وسمٌ يُعرَض', () => {
+  it('لا وسمَ HTML ولا Markdown في أيّ سجلّ', () => {
+    for (const spec of CHANNELS) {
+      expect(spec.note, spec.id).not.toContain('<')
+      expect(spec.note, spec.id).not.toContain('**')
+      expect(spec.note, spec.id).not.toContain('`')
+    }
+  })
+})
