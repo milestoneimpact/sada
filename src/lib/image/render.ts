@@ -9,8 +9,12 @@
  *       "screenshotOptions": { "type": "jpeg", "quality": 88 } }
  *     ← بايتاتُ الصورة في الجسد مباشرةً (لا JSON)
  *
- * **والصلاحيّة `Browser Rendering · Edit`** — لا `Workers AI`. وهما
- * إذنان مختلفان، ورمزٌ يحمل أحدَهما يُردّ على نهاية الآخر.
+ * **والصلاحيّة `Browser Run · Edit`** — لا `Workers AI`. وهما إذنان
+ * مختلفان، ورمزٌ يحمل أحدَهما يُردّ على نهاية الآخر.
+ *
+ * **واسمُها في قائمة الرمز غيرُ اسمِها في الوثيقة**: اللوحةُ تقول
+ * «Browser Run» والوثيقةُ «Browser Rendering» — **والمسارُ باقٍ
+ * `‎/browser-rendering/` رغم التبديل**. ومن بحث بالاسم الآخر لم يجده.
  *
  * ## ولماذا REST لا رابطُ Worker
  *
@@ -94,8 +98,19 @@ export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
           html: shot.html,
           viewport: { width: shot.width, height: shot.height },
           screenshotOptions: { type: 'jpeg', quality: 88 },
-          // لا سكربتَ في الشريحة، فلا انتظارَ له. والخطُّ مضمَّنٌ فلا شبكة
-          gotoOptions: { waitUntil: 'domcontentloaded', timeout: 20_000 },
+          /*
+           * **`networkidle0` لا `domcontentloaded`** — والفرقُ نصفُ ثانيةٍ
+           * تشتري يقينا.
+           *
+           * الخطُّ مضمَّنٌ `data:` فلا شبكةَ فيه، **لكنّ فكَّ ترميزه
+           * وتخطيطَ النصّ به يقعان بعد `domcontentloaded`**. ولقطةٌ
+           * تسبقه لا تعطي خطّا بديلا — `font-display: block` تُخفي
+           * النصَّ حتّى يصل الخطُّ الصحيح — **فتخرج شريحةٌ بلا عنوان**.
+           *
+           * و`networkidle0` تنتظر خمسَ مئةِ جزءٍ بلا طلبِ شبكة. وصفحتُنا
+           * بلا طلباتٍ أصلا، **فهي نصفُ ثانيةٍ ثابتةٌ تُغلق البابَ كلَّه**.
+           */
+          gotoOptions: { waitUntil: 'networkidle0', timeout: 20_000 },
         }),
       },
     )
@@ -109,9 +124,15 @@ export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
   if (!response.ok) {
     // الرمزُ يقرّر الإعادة، لا نصُّ الرسالة
     const retryable = response.status === 429 || response.status >= 500
+    /*
+     * **والاسمُ يُقال بوجهيه** — بدّلت Cloudflare اسمَ المنتج ولم تبدّل
+     * مسارَ نهايته: القائمةُ في اللوحة تقول «Browser Run»، والوثيقةُ
+     * تقول «Browser Rendering»، والمسارُ باقٍ `/browser-rendering/`.
+     * فمن قرأ اسما وبحث عنه بالآخر لم يجده — وقد وقع.
+     */
     const hint =
       response.status === 401 || response.status === 403
-        ? ' — والصلاحيّةُ المطلوبة Browser Rendering · Edit'
+        ? ' — والصلاحيّةُ المطلوبة: Browser Run (وتُسمّى Browser Rendering في الوثيقة) · Edit'
         : ''
     throw new SlideError(`تصويرُ الشريحة ردّ ${response.status}${hint}`, retryable)
   }

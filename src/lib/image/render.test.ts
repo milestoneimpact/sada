@@ -48,6 +48,17 @@ describe('ما يُرسَل', () => {
     await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1]), 'image/jpeg') })
     expect(sent[0]!.body['viewport']).toEqual({ width: 1200, height: 628 })
   })
+
+  /**
+   * **وينتظر حتّى يسكن كلُّ شيء** — والخطُّ مضمَّنٌ لكنّ فكَّ ترميزه
+   * وتخطيطَ النصّ به يقعان بعد `domcontentloaded`. ولقطةٌ تسبقه لا
+   * تعطي خطّا بديلا: `font-display: block` تُخفي النصَّ، **فتخرج شريحةٌ
+   * بلا عنوان**.
+   */
+  it('و**ينتظر `networkidle0`** — لا لقطةَ قبل أن يُرسَم الخطّ', async () => {
+    await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1]), 'image/jpeg') })
+    expect(sent[0]!.body['gotoOptions']).toMatchObject({ waitUntil: 'networkidle0' })
+  })
 })
 
 describe('ما يُقرأ — شكلان لا واحد', () => {
@@ -85,10 +96,19 @@ describe('ما يُقرأ — شكلان لا واحد', () => {
 })
 
 describe('الفشلُ يُصنَّف بالرمز لا بالنصّ', () => {
-  it('٤٠٣ تقول الصلاحيّةَ المطلوبة بالاسم — وهي غيرُ صلاحيّة Workers AI', async () => {
-    await expect(
-      screenshotSlide({ ...CALL, fetchImpl: net(403, '{}', 'application/json') }),
-    ).rejects.toThrow('Browser Rendering · Edit')
+  /**
+   * **والاسمُ يُقال بوجهيه**: اللوحةُ تقول «Browser Run» والوثيقةُ
+   * «Browser Rendering». ومن قرأ رسالةً باسمٍ وبحث في القائمة بالآخر لم
+   * يجده — وقد وقع فعلا.
+   */
+  it('٤٠٣ تقول الصلاحيّةَ المطلوبة بالاسمين — وهي غيرُ صلاحيّة Workers AI', async () => {
+    const said = await screenshotSlide({
+      ...CALL,
+      fetchImpl: net(403, '{}', 'application/json'),
+    }).catch((e: SlideError) => e.message)
+    expect(said).toContain('Browser Run')
+    expect(said).toContain('Browser Rendering')
+    expect(said).toContain('Edit')
   })
 
   it('و٥٠٠ تُعاد، و٤٠٠ لا', async () => {
