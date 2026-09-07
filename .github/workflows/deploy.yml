@@ -176,6 +176,26 @@ jobs:
             fi
           done
 
+          # ٥ · ملفّاتُ إثبات ملكيّة النطاق تُخدَم حرفا بحرف (D-094)
+          #
+          # وهي حجّةُ الوثيقتين نفسُها: رابطٌ لا يفتح يُسقط مراجعةَ
+          # المنصّة صامتاً. **والأسماءُ تُقرأ من السجلّ لا تُكتب هنا** —
+          # قائمتان تفترقان، فتُحرَس واحدةٌ ويُنسى ما زيد على الأخرى.
+          NAMES=$(grep -o "file: '[^']*'" src/routes/verify.ts | sed "s/file: '//; s/'$//")
+          if [ -z "$NAMES" ]; then
+            echo "::error::تعذّرت قراءة أسماء ملفّات الإثبات من src/routes/verify.ts."
+            echo "::error::أنُقل الحقل أم أُعيدت تسميته؟ وحارسٌ لا يقرأ لا يحرس."
+            exit 1
+          fi
+          for name in $NAMES; do
+            CODE=$(curl -s -o /tmp/vrf.txt -w '%{http_code}' --max-time 15 "$BASE/$name" || echo 000)
+            echo "  $BASE/$name → HTTP $CODE"
+            if [ "$CODE" != 200 ]; then
+              echo "::error::$BASE/$name لا يفتح ($CODE) — ولا تُقبَل مراجعةُ المنصّة بدونه."
+              exit 1
+            fi
+          done
+
           if grep -q '"ready":true' /tmp/ready.json; then
             echo "النشر تمّ، والنظام جاهز."
             exit 0
