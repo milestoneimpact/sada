@@ -25,6 +25,7 @@ import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
 import { legal } from './routes/legal'
+import { verify } from './routes/verify'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
@@ -346,6 +347,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
+app.route('/', verify)
 app.route('/', media)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
