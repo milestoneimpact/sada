@@ -1932,3 +1932,66 @@ describe('توزيعُ المعتمَد على أيّام', () => {
     expect(audit?.detail).toBe('done:2')
   })
 })
+
+/**
+ * **مراجعةُ الكلمات تُعرَض ولا تمنع** (D-090).
+ *
+ * قال المالك: «ولا تعتمد على عدد حروفٍ معيّنة، يجب أن تكون متغيّرة،
+ * ومراجعةٌ للكلمات».
+ */
+describe('لوحُ المراجعة في اللوحة', () => {
+  async function seedDraft(text: string, status = 'draft'): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at)
+         VALUES (?, 'linkedin', 'text', ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id, text, status, `k-${id}`,
+        status === 'draft' ? null : 'panel:token',
+        status === 'approved' || status === 'edited' ? '2026-09-07T07:00:00Z' : null,
+      )
+      .run()
+    return id
+  }
+
+  const DIRTY =
+    'ومما لا شك فيه ان الحوكمةَ تبدأ بالحوكمة، ولا حوكمةَ بلا قرار. والحوكمةُ قرار.\n\nما رأيكم؟'
+  const CLEAN =
+    'البرنامجُ الذي لا صاحبَ له لا يفشل — يذبل.\n\nولا أحد يعلن ذبوله. وهذا أخطر من السقوط الصريح.'
+
+  it('يعرض الملحوظات ولا يمنع الاعتماد', async () => {
+    const id = await seedDraft(DIRTY)
+    const cookie = await login()
+
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('ملحوظةً على الصياغة')
+    expect(html).toContain('تُقرأ ولا تمنع')
+
+    // والاعتمادُ يمرّ كما هو — الملحوظةُ ليست حارسا
+    const body = new FormData()
+    body.set('id', id)
+    body.set('text', DIRTY)
+    body.set('do', 'approve')
+    await app.request('/panel/drafts/decide', withSession(cookie, { method: 'POST', body }), env)
+
+    const row = await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>()
+    // «معتمَدة» أو «عُدّلت ثمّ اعتُمدت» — كلتاهما مرّت، والملحوظةُ لم تمنع
+    expect(['approved', 'edited']).toContain(row?.status)
+  })
+
+  it('**ونصٌّ نظيفٌ بلا لوح** — ملحوظةٌ كاذبةٌ تُفقِد الباقيَ ثقتَه', async () => {
+    await seedDraft(CLEAN)
+    const cookie = await login()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).not.toContain('ملحوظةً على الصياغة')
+  })
+
+  it('ولا لوحَ على ما بُتّ فيه ورُفض — فات وقتُ تعديله', async () => {
+    await seedDraft(DIRTY, 'rejected')
+    const cookie = await login()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).not.toContain('ملحوظةً على الصياغة')
+  })
+})

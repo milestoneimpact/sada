@@ -13,7 +13,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { draftKey, draftPost, type DraftDeps } from './job'
-import { PLATFORMS } from './prompt'
+import { PLATFORMS, parseDraft } from './prompt'
 import { writeSetting } from '../settings'
 
 let db: FakeDb
@@ -270,9 +270,29 @@ describe('بلا خلاصةٍ لا مادّة', () => {
 })
 
 describe('حدودُ المنصّتين', () => {
-  it('X أقصر من LinkedIn حدّا وهدفا — ولا يُقصّ نصٌّ من أحدهما للآخر', () => {
+  it('X أقصر من LinkedIn حدّا — ولا يُقصّ نصٌّ من أحدهما للآخر', () => {
     expect(PLATFORMS.x.hardLimit).toBeLessThan(PLATFORMS.linkedin.hardLimit)
-    expect(PLATFORMS.x.target).toBeLessThan(PLATFORMS.x.hardLimit)
-    expect(PLATFORMS.linkedin.target).toBeLessThan(PLATFORMS.linkedin.hardLimit)
+  })
+
+  /**
+   * **ولا رقمَ مخترَعٌ في الوصف الحاكم** (D-090).
+   *
+   * كان يقول «في حدود ١١٠٠ إلى ١٤٠٠ محرف» — **ورقمٌ يُملى على النموذج
+   * يُملأ**: يكتب ليبلغ العدّاد لا ليقول شيئا. والحدُّ التقنيُّ يُفرَض
+   * في `parseDraft` لا يُرجى من النموذج.
+   */
+  it('ولا عددَ محارفَ في وصف أيٍّ منهما — البنيةُ تُملى لا الطول', () => {
+    for (const spec of [PLATFORMS.x, PLATFORMS.linkedin]) {
+      expect(spec.guide).not.toMatch(/\d{3,4}\s*محرف/)
+      expect(spec.guide).not.toMatch(/[٠-٩]{3,4}/)
+    }
+  })
+
+  it('والحدُّ يبقى يُفرَض — نصٌّ فوقه يُردّ قبل أن يُعتمَد', () => {
+    const over = parseDraft(
+      { text: 'ن'.repeat(PLATFORMS.x.hardLimit + 1), rationale: 'ر' },
+      PLATFORMS.x,
+    )
+    expect(over.ok).toBe(false)
   })
 })
