@@ -59,7 +59,22 @@ function pageHead(eyebrow: string, title: string, lede: string, aside = ''): str
  */
 export const SCRIPT = `
 (function(){
-  var tabs=document.querySelectorAll('nav.tabs a');
+  /*
+   * «الروابطُ التي تُخطَف هي روابطُ المرساة وحدها» (D-087).
+   *
+   * كان المحدّدُ «nav.tabs a» — أي كلَّ رابطٍ في الشريط. وفي الشريط
+   * روابطُ صفحاتٍ حقيقيّة: «ما عليك» و«التقرير» وشاشةُ كلّ منصّة. فكان
+   * «preventDefault» يمنع انتقالَها، ثمّ «show» يبحث عن لوحٍ اسمُه
+   * «panel/tasks» فلا يجده، «فيرتدّ إلى أوّل لوحٍ — نظرة عامّة».
+   *
+   * فكلُّ زرِّ منصّةٍ وكلُّ صفحةٍ في الشريط كانت تعيد المالكَ إلى نظرة
+   * عامّة. «والزرُّ الذي يعمل خطأً أسوأُ من زرٍّ لا يعمل»: هذا يُشتكى
+   * منه، وذاك يُظنّ به أنّ الصفحةَ فارغة.
+   */
+  var all=document.querySelectorAll('nav.tabs a');
+  var tabs=Array.prototype.filter.call(all,function(a){
+    return (a.getAttribute('href')||'').charAt(0)==='#';
+  });
   var panes=document.querySelectorAll('section[data-pane]');
   function show(id,push){
     var found=false;
@@ -629,6 +644,8 @@ export interface PanelData {
   readonly drafts: readonly DraftRow[]
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
+  /** منصّاتٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص — فالنشرُ باسمها لم يُبنَ (D-087). */
+  readonly pageOnly: readonly string[]
   /** الصورُ المولَّدة لهذه المسوّدات. */
   readonly media: readonly MediaView[]
   /** خطّةُ الأسبوع إن وُجدت، وأمزوّدُها جاهز. */
@@ -1182,6 +1199,7 @@ ${flash}
     drafts: d.drafts,
     writable: d.writableSources,
     targets: d.targets,
+    pageOnly: d.pageOnly,
     media: d.media,
     // أدنى موعدٍ يقبله المتصفّح: ربعُ ساعةٍ من الآن. ودورةُ الإرسال تدور
     // كلَّ ربع، فموعدٌ أقرب من ذلك يعد بدقّةٍ لا نملكها

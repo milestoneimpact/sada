@@ -101,3 +101,27 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
     expect(SCRIPT).toContain("box.dataset.provider=pick.value")
   })
 })
+
+/**
+ * **الشريطُ يخطف روابطَ المرساة وحدها** (D-087).
+ *
+ * كان يخطف كلَّ رابطٍ فيه — وفيه تسعةُ روابطِ صفحاتٍ حقيقيّة: «ما عليك»
+ * و«التقرير» وشاشةُ كلّ منصّة. فكان `preventDefault` يمنع انتقالَها، ثمّ
+ * يبحث عن لوحٍ اسمُه «panel/tasks» فلا يجده **فيرتدّ إلى نظرة عامّة**.
+ *
+ * **وزرٌّ يعمل خطأً أسوأُ من زرٍّ لا يعمل**: هذا يُشتكى منه، وذاك يُظنّ
+ * به أنّ الصفحةَ فارغة.
+ */
+describe('الشريطُ لا يخطف إلّا المراسي', () => {
+  it('يُصفّي الروابطَ إلى ما يبدأ بمرساة', () => {
+    expect(SCRIPT).toContain("(a.getAttribute('href')||'').charAt(0)==='#'")
+  })
+
+  it('و**المُصفّى هو ما يُخطَف**، لا القائمةُ الخام', () => {
+    // ترتيبٌ يهمّ: يُبنى `all` ثمّ يُصفّى إلى `tabs`، والمستمعُ على `tabs`
+    const order = SCRIPT.indexOf('var all=') < SCRIPT.indexOf('var tabs=')
+    expect(order).toBe(true)
+    expect(SCRIPT).toContain('tabs.forEach(function(t){t.addEventListener')
+    expect(SCRIPT).not.toContain('all.forEach(function(t){t.addEventListener')
+  })
+})

@@ -42,6 +42,7 @@ interface PostRow {
   approved_at: string | null
   platform: Platform
   external_id: string
+  account_kind: string
   account_status: string
 }
 
@@ -71,7 +72,8 @@ export async function publishPost(
   const post = await db
     .prepare(
       `SELECT p.id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
-              a.platform, a.external_id, a.status AS account_status
+              a.platform, a.external_id, a.kind AS account_kind,
+              a.status AS account_status
          FROM posts p JOIN accounts a ON a.id = p.account_id
         WHERE p.id = ?`,
     )
@@ -85,6 +87,27 @@ export async function publishPost(
   }
   if (post.status === 'published') {
     return { kind: 'skipped_duplicate', platformPostId: '' }
+  }
+
+  /*
+   * **حسابُ صفحةٍ لا يُنشَر عليه — ويُقال ذلك هنا لا عند المنصّة** (D-087).
+   *
+   * السائقُ يبني `urn:li:person:` حرفا (D-080)، فمنشورٌ إلى صفحةٍ
+   * يُرسَل بمعرّفِ الصفحة تحت وسمِ شخص — **فتردّه LinkedIn برسالةٍ لا
+   * تدلّ على السبب**، بعد أن يكون قد وقع في الطابور وانتُظر موعدُه.
+   *
+   * والوقتُ هو الثمن: تُجدوَل السادسةَ والنصف، ويكتشف المالكُ السابعةَ
+   * أنّ شيئا لم يخرج. **فيُردّ الآن، بسببٍ يُقرأ، وبلا إعادة** — حتّى
+   * يُبنى سائقُ الصفحات يومَ تصل موافقةُ `Community Management API`.
+   */
+  if (post.account_kind === 'org') {
+    return {
+      kind: 'failed',
+      reason:
+        'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
+        'اختر حسابَك الشخصيَّ وجهةً، أو انتظر موافقةَ Community Management API.',
+      retryable: false,
+    }
   }
 
   // ٢ — هل نُشر بالمفتاح نفسه من قبل؟
