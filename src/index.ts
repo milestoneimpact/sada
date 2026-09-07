@@ -24,6 +24,7 @@ import { renewDue } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
+import { fonts } from './routes/fonts'
 import { legal } from './routes/legal'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
@@ -344,6 +345,9 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
   return c.json(outcome, outcome.kind === 'failed' ? 502 : 200)
 })
 
+// **والخطُّ قبل الجميع**: تطلبه صفحةُ الدخول نفسُها، فحارسٌ يردّه يُخرج
+// شاشةَ دخولٍ بخطٍّ بديل — ولا جلسةَ بعدُ ليُحرَس بها (D-089)
+app.route('/', fonts)
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
 app.route('/', media)

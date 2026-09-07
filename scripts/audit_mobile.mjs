@@ -31,7 +31,7 @@
  * الاستعمال:  node scripts/audit_mobile.mjs <ملفّ.html> …
  */
 import { chromium } from 'playwright'
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 
 /** ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max. */
 const WIDTHS = [320, 360, 390, 430]
@@ -66,7 +66,19 @@ let failed = 0
 
 for (const file of files) {
   const name = file.split('/').pop()
-  const kb = Math.round(statSync(file).size / 1024)
+  /**
+   * **والوزنُ من المجرَّد لا من المضموم** (D-089).
+   *
+   * ملفُّ التدقيق يحمل الخطَّ `base64` ليُقاس بخطّه الحقيقيّ — **وذاك
+   * ليس ما يُشحَن**: الخطُّ في الإنتاج مسارٌ يُخبَّأ للأبد. فقياسُ
+   * المضموم يتّهم صفحةً وزنُها الحقيقيُّ دونه بمئةِ كيلوبايت.
+   *
+   * و`writeAudited` يكتب الاثنين، والمجرَّدُ `.bare.html` بجانبه.
+   * وإن غاب — رُسمت الصفحةُ بأداةٍ أخرى — قِيس الموجودُ ولا يُخترَع رقم.
+   */
+  const bare = file.replace(/\.html$/, '.bare.html')
+  const weighed = existsSync(bare) ? bare : file
+  const kb = Math.round(statSync(weighed).size / 1024)
   const notes = []
 
   for (const width of WIDTHS) {

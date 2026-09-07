@@ -6,6 +6,48 @@
  * لم يُبنَ فوقها أصلا.
  */
 import { STYLE } from './styles'
+import { BEIRUTI, INTER } from '../../lib/ui/fonts'
+
+/**
+ * الخطّان — **من أصلنا، وبوجهٍ واحدٍ لكلّ أسرة** (D-089).
+ *
+ * ## `swap` لا `block`
+ *
+ * نقيضُ ما تفعله الشريحةُ (D-085): هناك `block` لأنّ خطّا بديلا يُخرج
+ * **صورةً** باسم المالك بحروفٍ مفكّكة، فالانتظارُ أهون. وهنا `swap`
+ * لأنّ المالكَ يقرأ لوحتَه — **ونصٌّ لا يُرى ثلثَ ثانيةٍ أسوأُ من نصٍّ
+ * يُرى بخطٍّ ثمّ يتبدّل**.
+ *
+ * ## ولا `size-adjust` — **ولا يُدَّعى قياسٌ لم يقع**
+ *
+ * نسبةُ التصحيح تُقاس بقسمة عرضِ نصٍّ بالخطّ على عرضِه بالبديل.
+ * **والبديلُ يختلف باختلاف الجهاز**: «Segoe UI» على ويندوز، و«SF Arabic»
+ * على ماك، و«Noto» على أندرويد — ونسبةٌ تُقاس في حاويةِ بناءٍ لينكسيّة
+ * تصف خطًّا لا يراه المالك.
+ *
+ * **ورقمٌ يُكتب بلا قياسٍ يجعل الصفحةَ تقفز في الاتّجاه المعاكس** — وهي
+ * علّةُ D-076: الفحصُ يكذب حين يستدلّ.
+ *
+ * والذي يُغني عنه قائم: الوجهُ **من أصلنا** لا من شبكةٍ ثالثة،
+ * و`preload` يبدؤه مع الوثيقة، و`immutable` يجعله مخبَّأً بعد أوّل فتحة.
+ * **والقفزةُ تُقاس بعد ذلك** (D-089) — فإن بقيت، قِيست النسبةُ على
+ * أجهزةٍ حقيقيّةٍ وأُضيفت حينئذ.
+ */
+const FONT_CSS = `
+@font-face{font-family:'Beiruti'; font-style:normal; font-weight:400 700;
+  font-display:swap; src:url('${BEIRUTI.path}') format('woff2')}
+@font-face{font-family:'Inter'; font-style:normal; font-weight:400 700;
+  font-display:swap; src:url('${INTER.path}') format('woff2')}
+`
+
+/**
+ * والوجهان يُسبَقان: `preload` يبدأ التحميلَ مع الوثيقة لا بعد قراءة
+ * الأنماط. **وبلا `crossorigin` لا يُستعمَل المحمَّل** — يُحمَّل الخطُّ
+ * مرّتين، ويُقرأ ذلك في الشبكة تكرارا لا يُفسَّر.
+ */
+const FONT_PRELOAD = [BEIRUTI, INTER]
+  .map((f) => `<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`)
+  .join('\n')
 
 /**
  * رمزُ التبويب — **مرسومٌ في الوثيقة لا مطلوبٌ من الشبكة**.
@@ -165,10 +207,8 @@ export function shell(
 <title>${escapeHtml(title)}</title>
 ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Beiruti:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style nonce="${safeNonce}">${STYLE}</style></head><body>${body}${
+${FONT_PRELOAD}
+<style nonce="${safeNonce}">${FONT_CSS}${STYLE}</style></head><body>${body}${
     script === '' ? '' : `<script nonce="${safeNonce}">${script}</script>`
   }</body></html>`
 }

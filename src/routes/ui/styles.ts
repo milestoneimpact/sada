@@ -975,8 +975,9 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .doc h2{font-size:var(--t-lg); margin:var(--s-8) 0 var(--s-2); letter-spacing:-.2px}
 .doc .lede{font-size:var(--t-lg); line-height:var(--lh); color:var(--ink-2);
   /* والصدرُ أضيقُ قياسا لا أوسع: قياسُه أكبر، فالوحدةُ ch أعرض معه —
-     و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس. */
-  margin:0 0 var(--s-3); max-width:54ch}
+     و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس.
+     **وأُعيد بعد الخطّ المتغيّر** (D-089): ‏٥٤ch أعطت ‏٧٧، و‏٥٢ تعطي ‏٧٤. */
+  margin:0 0 var(--s-3); max-width:52ch}
 .doc p{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin:0 0 var(--s-3)}
 .doc ul{margin:0 0 var(--s-3); padding-inline-start:var(--s-5)}
 .doc li{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin-bottom:var(--s-2)}
@@ -1050,7 +1051,17 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
      و«min-width» الافتراضيّةُ في flex هي «auto» = عرضُ المحتوى، فدَرَجٌ
      خيارُه طويلٌ يدفع صفَّه كلَّه خارج البطاقة. وقِيس: حقلٌ ‏٢٩١px في
      حاويةٍ ‏٢٣٨px — وهو مصدرُ الفيض بعد رفعِ الخطّ إلى ١٦ */
-  .row > *,.field{min-width:0}
+  /* **والزرُّ يُستثنى** (D-089): المحدّدُ «.row > *» أخصُّ من «button»،
+     فكان يدهس «min-width: var(--tap)» — **ويسقط الزرُّ دون هدف اللمس**.
+     وقِيس: «حدّث» ‏٤٣×٤٤ عند ‏٣٢٠px، وحدُّه ‏٤٤.
+
+     وعلّةٌ لم تظهر إلّا بعد تبديل الخطّ (D-089): كان النصُّ يبلغ ‏٤٤
+     بعرضه، **فيستر النقصَ بلا أن يسدّه** — ونصٌّ أضيقُ بمحرفٍ يكشفه.
+     **والحارسُ لا يُغني عن الاستثناء**: هذا ما كان يُقاس صحيحا صدفةً.
+
+     والإذنُ بالانكماش كان للحقول لا للأزرار: الدَّرَجُ الطويلُ هو الذي
+     أفاض الصفَّ (D-086)، وزرٌّ نصُّه كلمةٌ لا يفيض. */
+  .row > *:not(button):not(.btn),.field{min-width:0}
 }
 
 `
