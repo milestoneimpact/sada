@@ -9,6 +9,7 @@ import { getProvider, resolveKey } from '../lib/providers'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
+import { CHANNELS } from '../lib/channels'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -1575,24 +1576,30 @@ describe('شاشةُ المنصّة', () => {
    */
   it('وما يُربَط ولا ينشر يقول الاثنين معا', async () => {
     const cookie = await login()
-    // **و TikTok خرجت من هذه المرتبة** بسائقها (D-092)، فبقيت YouTube
-    for (const platform of ['youtube']) {
+    // **والقائمةُ من السجلّ لا مكتوبةٌ حرفا**: منصّةٌ تنتقل مرتبةً
+    // تُنسى في إحدى القائمتين، وهي علّةُ `KNOWN_TASKS` نفسُها (D-091).
+    // والمرتبةُ فارغةٌ اليوم بعد D-092 و D-096 — **ويبقى الحارسُ
+    // مبنيّا**: تُملأ حين تُربَط منصّةٌ قبل أن يُبنى سائقُها.
+    const linkOnly = CHANNELS.filter((c) => c.stage === 'link')
+    for (const spec of linkOnly) {
       const html = await (
-        await app.request(`/panel/channels/${platform}`, withSession(cookie), env)
+        await app.request(`/panel/channels/${spec.id}`, withSession(cookie), env)
       ).text()
-      expect(html, platform).toContain('تُربَط ولا تنشر')
+      expect(html, spec.id).toContain('تُربَط ولا تنشر')
       // ولا يُعرَض حصادُ نشرٍ لمنصّةٍ لا تنشر — أصفارٌ تُقرأ فشلا
-      expect(html, platform).not.toContain('لم يُنشر شيءٌ بعد')
+      expect(html, spec.id).not.toContain('لم يُنشر شيءٌ بعد')
     }
   })
 
   /** **وما صار ينشر لا يبقى يقول إنّه لا ينشر** — الشاشةُ تتبع السائق. */
-  it('و TikTok لم تعد تقول «تُربَط ولا تنشر»', async () => {
+  it('وكلُّ ما بُني سائقُه لا يقول «تُربَط ولا تنشر»', async () => {
     const cookie = await login()
-    const html = await (
-      await app.request('/panel/channels/tiktok', withSession(cookie), env)
-    ).text()
-    expect(html).not.toContain('تُربَط ولا تنشر')
+    for (const spec of CHANNELS.filter((c) => c.stage === 'publish')) {
+      const html = await (
+        await app.request(`/panel/channels/${spec.id}`, withSession(cookie), env)
+      ).text()
+      expect(html, spec.id).not.toContain('تُربَط ولا تنشر')
+    }
   })
 
   it('وتقول ما نقص من النطاقات بالاسم ومَن يمنحه', async () => {

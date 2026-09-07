@@ -56,11 +56,14 @@ export function estimatePostCost(platform: PublishPlatform, hasUrl: boolean): nu
    * **و TikTok صفرٌ معلومٌ لا صفرٌ مسكوتٌ عنه** (D-092).
    *
    * Content Posting API لا يحاسب على النشر — لا اشتراكَ ولا سعرَ طلب،
-   * بخلاف X. **وصفرٌ هنا حقيقةٌ مقروءةٌ لا تقدير**، ونداءُ الرفع نفسُه
+   * بخلاف X. **و YouTube Data API مجّانيٌّ كذلك**: يحدُّه حصّةٌ يوميّةٌ
+   * لا فاتورة (‏١٦٠٠ وحدةً للرفع من عشرة آلاف).
+   *
+   * **وصفرٌ هنا حقيقةٌ مقروءةٌ لا تقدير**، ونداءُ الرفع نفسُه
    * يُسجَّل في الدفتر موسوما بـ `price_unverified` من `publisher.ts`
    * — فما وقع يُرى ولو لم يُدفَع.
    */
-  if (platform === 'tiktok') return 0
+  if (platform === 'tiktok' || platform === 'youtube') return 0
   return hasUrl ? X_PRICE_PER_POST_WITH_URL : X_PRICE_PER_POST
 }
 

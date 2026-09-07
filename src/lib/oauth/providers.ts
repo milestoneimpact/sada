@@ -28,7 +28,7 @@ export type Platform = 'linkedin' | 'x' | 'youtube' | 'tiktok'
  * المباشر (`video.publish`) بعدها. و YouTube و Instagram تُربطان ولا
  * تنشران بعد — **والفرقُ في النوع وفي قيد القاعدة معا** (0019).
  */
-export type PublishPlatform = 'linkedin' | 'x' | 'tiktok'
+export type PublishPlatform = 'linkedin' | 'x' | 'tiktok' | 'youtube'
 
 export interface Provider {
   readonly platform: Platform

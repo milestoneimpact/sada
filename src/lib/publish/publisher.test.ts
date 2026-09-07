@@ -623,3 +623,114 @@ describe('نوعُ الوسيط يُشترَط', () => {
     expect(outcome.kind).toBe('published')
   })
 })
+
+/**
+ * **رفعُ YouTube — والمقطعُ يصل خاصّا** (D-096).
+ *
+ * نطاقُ الرفع «حسّاسٌ» عند Google، ومشروعٌ لم يُجَز يبقى في `Testing`.
+ * **و YouTube تقفل مرفوعاتِه على `private` مهما طُلب** — فيُقال ذلك بدل
+ * أن يُبحَث عنه على القناة علنا. وهي قاعدةُ صندوق TikTok نفسُها.
+ */
+describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال', () => {
+  const INIT =
+    'https://www.googleapis.com/upload/youtube/v3/videos' +
+    '?uploadType=resumable&part=snippet,status'
+  const SESSION = 'https://upload.googleapis.com/session/abc'
+
+  async function seedYouTube(options: { scopes?: string; clip?: boolean } = {}): Promise<string> {
+    const accountId = await upsertAccount(db, {
+      platform: 'youtube',
+      kind: 'member',
+      externalId: 'yt-1',
+      displayName: 'قناةُ عمر',
+    })
+    await saveTokens(db, KEY, accountId, {
+      ...LIVE_TOKENS,
+      scopes: options.scopes ?? scopeSet('youtube').join(' '),
+    })
+    const postId = 'p-youtube'
+    db.raw
+      .prepare(
+        `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
+                            idempotency_key, approved_by, approved_at)
+         VALUES (?, ?, 'youtube', 'text', ?, '2026-09-08T09:00:00Z', 'queued', ?, 'omar', '2026-09-07T10:00:00Z')`,
+      )
+      .run(postId, accountId, 'الحوكمةُ تسبق السرعة\n\nوهذا شرحُها.', `draft:src:yt:${postId}`)
+
+    if (options.clip !== false) {
+      await db
+        .prepare(
+          `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
+           VALUES (?, ?, ?, 'video/mp4', 900, 'وصف', 'hh1-i2v', ?)`,
+        )
+        .bind(crypto.randomUUID(), postId, `video/${postId}/a.mp4`, `video:${postId}:aa`)
+        .run()
+    }
+    return postId
+  }
+
+  const clipBucket = {
+    async get() {
+      return { async arrayBuffer() { return new Uint8Array([7, 7, 7, 7]).buffer } }
+    },
+  }
+
+  /** شبكةٌ بخطوتين: تهيئةٌ تردّ `Location`، ثمّ دفعةٌ تردّ المعرّف. */
+  function net(): typeof fetch & { seen: string[] } {
+    const seen: string[] = []
+    const impl = (async (input: RequestInfo | URL): Promise<Response> => {
+      const url = input.toString()
+      seen.push(url)
+      if (url.startsWith(SESSION)) {
+        return Response.json({ id: 'vid-7' })
+      }
+      return new Response('', { status: 200, headers: { Location: SESSION } })
+    }) as typeof fetch & { seen: string[] }
+    impl.seen = seen
+    return impl
+  }
+
+  it('يرفع المقطعَ ويُسجَّل معرّفُ الفيديو', async () => {
+    const postId = await seedYouTube()
+    const f = net()
+    const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
+
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'vid-7' })
+    expect(f.seen[0]).toBe(INIT)
+    expect(f.seen[1]).toBe(SESSION)
+  })
+
+  it('**ولا رفعَ بلا مقطع** — ولا يُرسَل طلبٌ ولا تُسجَّل كلفة', async () => {
+    const postId = await seedYouTube({ clip: false })
+    const f = net()
+    const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
+
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('no_clip')
+    expect(f.seen).toHaveLength(0)
+    const ledger = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    expect(ledger.n).toBe(0)
+  })
+
+  it('ورمزٌ بلا نطاق الرفع يُردّ قبل النداء ويُسمّى الناقص', async () => {
+    const postId = await seedYouTube({
+      scopes: 'https://www.googleapis.com/auth/youtube.readonly',
+    })
+    const f = net()
+    const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
+
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('youtube.upload')
+    expect(f.seen).toHaveLength(0)
+  })
+
+  it('ونداءُ الرفع يُسجَّل موسوما بمزوّده — لا باسمٍ ثابت (D-008)', async () => {
+    const postId = await seedYouTube()
+    await publishPost({ ...deps(net()), bucket: clipBucket }, { postId })
+    const row = db.raw
+      .prepare("SELECT operation, total FROM cost_ledger WHERE provider = 'youtube'")
+      .get() as { operation: string; total: number }
+    expect(row.operation).toContain('price_unverified')
+    expect(row.total).toBe(0)
+  })
+})

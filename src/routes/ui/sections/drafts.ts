@@ -46,7 +46,9 @@ function money(value: number): string {
 }
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
-const LINES: Readonly<Record<string, number>> = { linkedin: 12, x: 6, tiktok: 5 }
+const LINES: Readonly<Record<string, number>> = {
+  linkedin: 12, x: 6, tiktok: 5, youtube: 8,
+}
 const LINE = 26
 const PAD = 28
 
