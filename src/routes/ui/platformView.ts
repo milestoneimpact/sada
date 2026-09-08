@@ -31,6 +31,7 @@ export interface PostMedia {
   readonly mime: string
   readonly status: 'ready' | 'rejected'
 }
+import { ICON } from './icons'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 
@@ -97,13 +98,6 @@ const STATUS: Readonly<Record<string, { label: string; cls: string; g: string }>
   draft: { label: 'مسوّدة', cls: 'idle', g: '○' },
   rejected: { label: 'مرفوضة', cls: 'idle', g: '○' },
 }
-
-/** رمزُ فتحِ رابطٍ خارجيّ — مرسومٌ لا مُحمَّل، كسائر رموز اللوحة. */
-const OUT =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/>' +
-  '<path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
 
 /**
  * لوحُ القدرات — **ما يستطيعه هذا الرمزُ فعلا**.
@@ -231,7 +225,7 @@ function postCard(
           ? '<span class="ago">نُشر، ولم تُعِد المنصّةُ معرّفا يُبنى منه رابط.</span>'
           : ''
         : `<a class="btn g sm" href="${escapeHtml(link)}" target="_blank"
-             rel="noopener noreferrer">${OUT} افتحه على المنصّة</a>`}
+             rel="noopener noreferrer">${ICON.external} افتحه على المنصّة</a>`}
       <span class="grow"></span>
       ${post.costUsd > 0
         ? `<span class="ago money">${post.costUsd.toFixed(4)}$ كتابةً</span>`

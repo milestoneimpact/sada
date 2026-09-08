@@ -20,23 +20,10 @@
 import { SETUP, type ChannelView } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { wizardFor, type Step } from '../../lib/oauth/wizard'
+import { ICON } from './icons'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { relativeTime } from '../../lib/format'
-
-/** رمزُ الدليل — كتابٌ مفتوح. مرسومٌ لا مُحمَّل، كسائر رموز هذا الملفّ. */
-const ICON_GUIDE =
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ` +
-  `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
-  `<path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2z"/>` +
-  `<path d="M12 6.5v13"/></svg>`
-
-/** سهمُ المغادرة — الرابطُ يفتح تبويبا آخر، والعلامةُ تقول ذلك قبل الضغط. */
-const ICON_EXTERNAL =
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ` +
-  `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
-  `<path d="M14 4h6v6"/><path d="M20 4l-9 9"/>` +
-  `<path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`
 
 const KIND: Readonly<Record<string, string>> = {
   member: 'حسابٌ شخصيّ',
@@ -113,7 +100,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
   if (w.linked) {
     return `<details class="guide" style="margin-bottom:var(--s-3)">
       <summary>
-        <span class="g-ic">${ICON_GUIDE}</span>
+        <span class="g-ic">${ICON.guide}</span>
         <span class="g-t"><b>الطريقُ إلى الربط — تمّ كلُّه</b>
           <span>${tally}. والخطواتُ تبقى لتُراجَع عند أيّ تبديل.</span></span>
         <span class="grow"></span>
@@ -179,7 +166,7 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
   const open = app.source === 'none'
   return `${wizard}<details class="guide"${open ? ' open' : ''}>
     <summary>
-      <span class="g-ic">${ICON_GUIDE}</span>
+      <span class="g-ic">${ICON.guide}</span>
       <span class="g-t"><b>${open ? 'دليلُ ضبط التطبيق' : 'الدليل وتبديلُ الأسرار'}</b>
         <span>${guide.before.length} خطواتٍ في ${escapeHtml(guide.portalLabel)}، ثمّ سرّان هنا.</span></span>
       <span class="grow"></span>
@@ -189,7 +176,7 @@ function setupPane(view: ChannelView, app: AppStatus | undefined, base: string):
       ${saved}
 
       <a class="btn g sm portal" href="${escapeHtml(guide.portal)}" target="_blank"
-        rel="noopener noreferrer">${ICON_EXTERNAL} افتح ${escapeHtml(guide.portalLabel)}</a>
+        rel="noopener noreferrer">${ICON.external} افتح ${escapeHtml(guide.portalLabel)}</a>
 
       <ol class="steps">${steps}</ol>
 

@@ -23,6 +23,8 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { bar, pct } from './ui/parts'
+import { areaChart, barChart } from './ui/chart'
+import { ICON } from './ui/icons'
 import { LOGOS } from './ui/logos'
 
 export { escapeHtml, injectCsrf, shell }
@@ -985,74 +987,6 @@ export interface PanelAudit {
  * وكأنّ الثلاثاء لم يكن. **وسلسلةٌ كلّها أصفار تُرسم خطّا عند القاع**، لا
  * قمّةً كاذبة من قسمةٍ على صفر.
  */
-function sparkline(series: { day: string; total: number }[]): string {
-  if (series.length < 2) return '<div class="empty"><b>لا بيانات كافية بعد</b></div>'
-
-  // مساحةٌ للمحور وأرقامه، لا رسمٌ مقصوصٌ إلى حافّة البطاقة
-  const w = 640
-  const h = 168
-  const padTop = 14
-  const padBottom = 26
-  const padStart = 46
-  const plotH = h - padTop - padBottom
-  const plotW = w - padStart - 8
-
-  const raw = Math.max(...series.map((d) => d.total))
-  // سقفٌ مستدير: محورٌ ينتهي عند ٣٫٤٧ يُقرأ رقما عشوائيّا لا حدّا
-  const max = raw <= 0 ? 1 : Math.ceil(raw * 1.15 * 2) / 2
-  const step = plotW / (series.length - 1)
-  const x = (i: number): number => padStart + i * step
-  const y = (v: number): number => padTop + plotH - (v / max) * plotH
-
-  const pts = series.map((d, i) => `${x(i).toFixed(1)},${y(d.total).toFixed(1)}`)
-  const line = `M ${pts.join(' L ')}`
-  const area = `${line} L ${x(series.length - 1).toFixed(1)},${padTop + plotH} L ${padStart},${padTop + plotH} Z`
-
-  // ثلاثةُ خطوطٍ أفقيّة بأرقامها — وبدونها الرسمُ شكلٌ لا مقدار
-  const ticks = [0, 0.5, 1].map((t) => {
-    const value = max * t
-    const yy = y(value).toFixed(1)
-    return `<line class="grid-l" x1="${padStart}" y1="${yy}" x2="${w - 8}" y2="${yy}"/>
-      <text class="axis" x="${padStart - 8}" y="${(Number(yy) + 3.5).toFixed(1)}"
-        text-anchor="end">${value.toFixed(1)}</text>`
-  }).join('')
-
-  const peakIndex = series.reduce((best, d, i) => (d.total > series[best]!.total ? i : best), 0)
-  const peak = series[peakIndex]!
-  const last = series[series.length - 1]!
-  const first = series[0]!
-
-  // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
-  const label = (d: { day: string }): string => d.day.slice(5)
-  const dates = `<text class="axis" x="${x(0)}" y="${h - 8}" text-anchor="start">${label(first)}</text>
-    <text class="axis" x="${x(series.length - 1)}" y="${h - 8}" text-anchor="end">${label(last)}</text>`
-
-  const total = series.reduce((sum, d) => sum + d.total, 0)
-  const average = total / series.length
-
-  return `<div class="chart">
-    <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
-      aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
-      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
-        <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
-      </linearGradient></defs>
-      ${ticks}
-      <path d="${area}" fill="url(#sg)"/>
-      <path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${x(peakIndex).toFixed(1)}" cy="${y(peak.total).toFixed(1)}" r="3.5"
-        fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
-      <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
-      ${dates}
-    </svg>
-    <div class="legend">
-      <span>المجموع <b>${money(total)}</b></span>
-      <span>المتوسّط اليوميّ <b>${money(average)}</b></span>
-      <span>الذروة <b>${money(peak.total)}</b> · ${escapeHtml(peak.day.slice(5))}</span>
-    </div>
-  </div>`
-}
 
 /** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
 function worthCell(worth: number | null): string {
@@ -1140,17 +1074,6 @@ function platformNav(views: readonly ChannelView[]): string {
 }
 
 
-const ICON = {
-  overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
-  sources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
-  posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/></svg>',
-  channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.4 10.8 15.6 6.7M8.4 13.2l7.2 4.1"/></svg>',
-  providers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="3"/></svg>',
-  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
-  tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h9M9 12h9M9 19h9"/><path d="m3.5 5 1.3 1.3L7 4"/><path d="m3.5 12 1.3 1.3L7 11"/><circle cx="5" cy="19" r="1.4"/></svg>',
-  report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg>',
-  security: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.6-8 9.5-4.6-.9-8-4.5-8-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>',
-} as const
 
 /**
  * فرقُ اليوم عن أمس — **علامةٌ ونصّ**، فالسهم وحده لا يُقرأ بصوتٍ عالٍ.
@@ -1394,9 +1317,17 @@ ${flash}
         ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
         : `<ul class="todo">${todo}</ul>`}</div>
     <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
-      <p class="hint">كلّ المزوّدين، بالدولار</p>${sparkline(d.series)}
+      <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
       <div class="row" style="margin-top:var(--s-3)">${scanBtn}
         <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
+  </div>
+
+  <div class="card" style="margin-top:var(--s-3)">
+    <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
+      <span class="st idle">٣٠ يوما</span></div>
+    <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
+      «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
+    ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
   </div>
 </section>
 

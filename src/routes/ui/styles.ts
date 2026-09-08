@@ -554,6 +554,29 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
   direction:ltr; unicode-bidi:isolate}
 .chart .grid-l{stroke:var(--line-soft); stroke-width:1}
 .chart .base{stroke:var(--line); stroke-width:1}
+/* ── الأعمدةُ الأفقيّة (D-103) ────────────────────────────────────────
+   ثلاثةُ أعمدةٍ ثابتةِ الموضع: الاسمُ والمقياسُ والرقم. **والعينُ تمسح
+   عمودا لا شبكة** — وهي قاعدةُ لوح المزوّدين نفسُها (D-082).
+
+   والاسمُ بعرضٍ أدنى ثابت: أسماءٌ متفاوتةُ الطول تجعل المقاييسَ تبدأ من
+   مواضعَ مختلفة، **فتُقارَن أطوالٌ لا تبدأ من خطٍّ واحد**. */
+.bars{display:flex; flex-direction:column; gap:var(--s-2)}
+.bar-row{display:flex; align-items:center; gap:var(--s-3)}
+.bar-name{flex:none; min-width:88px; font-size:var(--t-sm); color:var(--ink-2);
+  overflow-wrap:anywhere}
+.bar-track{flex:1; height:10px; background:var(--surface-3); border-radius:99px;
+  overflow:hidden; min-width:40px}
+/* **مقياسُ مقدارٍ لا تصنيف**: هيئةٌ واحدةٌ تتدرّج بالطول، ولا لونَ حالةٍ
+   فيها — الأحمرُ حالةٌ لا مقدار (D-043). */
+.bar-fill{display:block; height:100%; border-radius:99px; background:var(--brand);
+  transition:width var(--dur-3) var(--ease-out)}
+/* **والأكبرُ وحدَه يأخذ الذهب**: ندرةٌ تصنع مرتبة، وذهبٌ على الكلّ يُلغي
+   معنى الأوّل — وهي قاعدةُ صفّ المؤشّرات نفسُها. */
+.bar-fill.top{background:var(--au)}
+.bar-val{flex:none; min-width:70px; text-align:end; font-size:var(--t-sm);
+  color:var(--ink); font-variant-numeric:tabular-nums}
+@media(max-width:560px){.bar-name{min-width:62px}}
+
 .legend{display:flex; gap:var(--s-3); flex-wrap:wrap; margin-top:var(--s-3); font-size:var(--t-xs); color:var(--ink-3)}
 .legend b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums;
   direction:ltr; unicode-bidi:isolate; display:inline-block}

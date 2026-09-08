@@ -172,6 +172,40 @@ for (const file of files) {
   }
 }
 
+/**
+ * وأيقونةٌ تُرسَم خارج مصدرها الواحد (D-103).
+ *
+ * قِيست الأيقوناتُ فوُجدت **ثلاثَ ثخاناتٍ في أحدَ عشرَ رمزا**: ‏١٫٨ في
+ * تسعٍ، و‏٢ في اثنتين، و‏١٫٩ في واحدة. **ولا أحدَ يقصد ‏١٫٩** — هي أثرُ
+ * نسخٍ عن أقربِ ما وُجد، وكنّ موزّعاتٍ على ثلاثة ملفّات.
+ *
+ * فصار `ui/icons.ts` مصدرَهنّ الواحد، **والمواصفةُ تُفرَض بالبناء**:
+ * تُكتب الأشكالُ وحدَها ويلبسها `icon()` المواصفةَ.
+ *
+ * **وهذا الحارسُ يمنع الطريقَ الجانبيّ**: من كتب `svg` بيده في ملفٍّ آخر
+ * تخطّى المواصفةَ بلا أن يُمنَع.
+ *
+ * ## وثلاثةٌ تُستثنى — ولكلٍّ سببُه
+ *
+ * `ui/logos.ts` علاماتٌ مسجّلةٌ لأصحابها: تُرسَم كما نشروها،
+ * **وتوحيدُها على مواصفتنا تشويهٌ لعلامةِ غيرِنا**.
+ * و`ui/shell.ts` علامةُ صدى ورمزُ التبويب — هويّتُنا لا أيقونةُ واجهة.
+ * و`ui/chart.ts` رسمٌ بيانيٌّ يُحسَب، لا شكلٌ ثابت.
+ */
+const ICON_HOME = /ui\/(icons|logos|shell|chart)\.ts$/
+const strayIcons = []
+for (const file of files) {
+  if (NOT_USAGE.test(file) || ICON_HOME.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  for (const m of code.matchAll(/<svg[^>]*stroke="currentColor"[^>]*>/g)) {
+    const width = /stroke-width="([\d.]+)"/.exec(m[0])
+    strayIcons.push([
+      `ثخانة ${width === null ? '؟' : width[1]}`,
+      file.slice(SRC.length),
+    ])
+  }
+}
+
 const ghosts = [...used].filter(([name]) => !defined.has(name))
 const orphans = [...defined].filter(
   ([name]) => !used.has(name) && !ALLOWED.has(name.slice(2)),
@@ -197,6 +231,10 @@ console.log('\n═══ علامةٌ خلفيّةٌ داخل قالبٍ نصّ�
 if (backticks.length === 0) console.log('  ✓ لا قالبَ تُنهيه علامةٌ في شرحه')
 for (const [what, where] of backticks) console.log(`  ✕ ${what}  —  ${where}`)
 
+console.log('\n═══ أيقونةٌ تُرسَم خارج مصدرها ═══\n')
+if (strayIcons.length === 0) console.log('  ✓ لا أيقونةَ خارج ui/icons.ts')
+for (const [what, where] of strayIcons) console.log(`  ✕ ${what}  —  ${where}`)
+
 console.log('\n═══ تباعدُ حرفٍ موجبٌ بلا اتّجاهٍ لاتينيّ ═══\n')
 if (spaced.length === 0) console.log('  ✓ لا تباعدَ يفكّ وصلا')
 for (const [sel, where] of spaced) console.log(`  ✕ ${sel}  —  ${where}`)
@@ -205,7 +243,8 @@ console.log(
   `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة)\n`,
 )
 
-const total = ghosts.length + orphans.length + literalTime.length + spaced.length + backticks.length
+const total = ghosts.length + orphans.length + literalTime.length + spaced.length +
+  backticks.length + strayIcons.length
 if (total === 0) process.exit(0)
 
 console.log('والمنادَى بلا تعريفٍ **يُعرَّف أو يُحذَف نداؤه** — ولا يُترَك:')
