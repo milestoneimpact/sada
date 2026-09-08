@@ -7,6 +7,7 @@
  */
 import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
+import { ICON } from '../icons'
 import { escapeHtml } from '../shell'
 import { bar } from '../parts'
 
@@ -34,11 +35,6 @@ const TASK_MODELS: Readonly<Record<string, 'image' | 'video'>> = {
   video: 'video',
 }
 
-
-/** رمزُ الإضافة — مرسومٌ لا مُحمَّل، كسائر رموز اللوحة (سياسةُ `img-src`). */
-const ICON_ADD =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
-  'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
 
 /**
  * قائمةُ النماذج — **دَرَجٌ يُملأ من عند المزوّد، لا حقلُ نصّ** (D-081).
@@ -377,7 +373,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
    */
   const add = `<details class="guide">
     <summary>
-      <span class="g-ic">${ICON_ADD}</span>
+      <span class="g-ic">${ICON.add}</span>
       <span class="g-t"><b>أضف مزوّدا</b>
         <span>أيّ مزوّدٍ يتكلّم لهجة chat/completions — ثلاثُ خطواتٍ بلا نشرٍ ولا شيفرة.</span></span>
       <span class="grow"></span>

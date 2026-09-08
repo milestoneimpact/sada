@@ -5,6 +5,7 @@
  * وحقنُ رمز CSRF، و `nonce` السياسة. فما بُني فوقها ورثها، وما نسيها
  * لم يُبنَ فوقها أصلا.
  */
+import { COMMAND_SCRIPT, commandPalette, commandTrigger, type Command } from './command'
 import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
 import { BEIRUTI, INTER } from '../../lib/ui/fonts'
 
@@ -126,7 +127,9 @@ export function escapeHtml(value: string): string {
  */
 const THEME_BOOT = `
 try{var t=localStorage.getItem('sada-theme');
-if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}
+if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
+var d=localStorage.getItem('sada-density');
+if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 `
 
 /** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
@@ -153,6 +156,61 @@ export const THEME_SCRIPT = `
     b.addEventListener('click',function(){apply(b.dataset.theme);});});
 })();
 `
+
+/**
+ * مبدّلُ الكثافة (D-102) — **ووضعان لا ثلاثة**.
+ *
+ * الثيمُ ثلاثةٌ لأنّ للنظام رأيا فيه (`prefers-color-scheme`). **ولا رأيَ
+ * للنظام في الكثافة** — فوضعٌ ثالثٌ اسمُه «النظام» يَعِد بما لا مصدرَ له.
+ *
+ * والحفظُ في `try` كما في الثيم: `localStorage` يرمي في نافذةٍ خاصّة،
+ * **ونافذةٌ خاصّة يجب أن تفتح اللوحة** لا أن تسقط على سطرٍ من الزينة.
+ */
+export const DENSITY_SCRIPT = `
+(function(){
+  var box=document.getElementById('density');
+  if(!box)return;
+  var apply=function(v){
+    try{
+      if(v==='compact'){localStorage.setItem('sada-density',v);
+        document.documentElement.dataset.density=v;}
+      else{localStorage.removeItem('sada-density');
+        delete document.documentElement.dataset.density;}
+    }catch(e){
+      if(v==='compact')document.documentElement.dataset.density=v;
+      else delete document.documentElement.dataset.density;
+    }
+    box.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.density===v));});
+  };
+  var saved='cozy';
+  try{saved=localStorage.getItem('sada-density')||'cozy';}catch(e){}
+  apply(saved);
+  box.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.density);});});
+})();
+`
+
+export function densitySwitch(): string {
+  return `<div class="theme" id="density" role="group" aria-label="كثافة العرض">
+    <button type="button" data-density="cozy" aria-pressed="true">مريح</button>
+    <button type="button" data-density="compact" aria-pressed="false">مضغوط</button>
+  </div>`
+}
+
+/**
+ * شريطُ العودة — **كُتب ستَّ مرّاتٍ حرفا بحرف، فجُمع** (D-105).
+ *
+ * وليس التكرارُ وحدَه هو السبب: **زرُّ لوحة الأوامر يسكن هنا**. وستّةُ
+ * مواضعَ تعني ستَّ فرصٍ لنسيانه، **وصفحةٌ بلا زرٍّ تُخفي اختصارا لا
+ * يعرفه إلّا من كتبه**. فما دام الشريطُ واحدا، فالزرُّ فيه لا يُنسى.
+ */
+export function backNav(href: string, label: string): string {
+  return `<nav class="back" aria-label="مسارُ العودة">
+    <a href="${escapeHtml(href)}">← ${escapeHtml(label)}</a>
+    <span class="grow"></span>${commandTrigger()}${themeSwitch()}
+  </nav>`
+}
 
 export function themeSwitch(): string {
   return `<div class="theme" id="theme" role="group" aria-label="سمة العرض">
@@ -194,7 +252,19 @@ export function shell(
   body: string,
   nonce: string,
   script = '',
-  options: { indexable?: boolean; description?: string } = {},
+  options: {
+    indexable?: boolean
+    description?: string
+    /**
+     * فهرسُ لوحة الأوامر (D-105) — **ومَن مرّره نالها كاملةً**.
+     *
+     * الجسدُ والنصُّ البرمجيُّ يُضافان هنا معا، ولا سبيلَ إلى تمرير
+     * أحدهما دون الآخر. **وصفحةٌ فيها الجسدُ بلا نصٍّ لوحةٌ لا تُفتَح**،
+     * وهي عينُ العلّة التي وُلد من أجلها حقنُ CSRF في مكانٍ واحد: حارسٌ
+     * يُنسى نسخُه في مسارٍ جديد (D-019).
+     */
+    commands?: readonly Command[]
+  } = {},
 ): string {
   const safeNonce = escapeHtml(nonce)
   return `<!doctype html><html lang="ar" dir="rtl"><head>
@@ -210,6 +280,11 @@ ${FAVICON}
 ${FONT_PRELOAD}
 <style nonce="${safeNonce}">${FONT_CSS}</style>
 <link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
-    script === '' ? '' : `<script nonce="${safeNonce}">${stripJs(script)}</script>`
+    options.commands === undefined ? '' : commandPalette(options.commands)
+  }${
+    (() => {
+      const all = options.commands === undefined ? script : script + COMMAND_SCRIPT
+      return all === '' ? '' : `<script nonce="${safeNonce}">${stripJs(all)}</script>`
+    })()
   }</body></html>`
 }

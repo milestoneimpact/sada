@@ -395,6 +395,12 @@ function card(
            ><span class="g">${d.publishCost >= 0.1 ? '!' : '●'}</span
            >نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}</span>`,
     d.stale ? '<span class="st warn"><span class="g">▲</span>المصدر تغيّر بعدها</span>' : '',
+    /*
+     * **ورابطُ الرحلة على كلّ بطاقة** (D-104): الرحلةُ تُسأل عن منشورٍ
+     * بعينه، **والسؤالُ يقع وأنت تنظر إليه** — لا بعد أن تبحث عن معرّفه.
+     */
+    `<a class="chip" href="/panel/journey/${escapeHtml(d.id)}"
+       title="من الملفّ إلى الأثر — كلُّ ما وقع لهذا المنشور">الرحلة ←</a>`,
   ]
     .filter((x) => x !== '')
     .join('')

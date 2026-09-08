@@ -14,6 +14,7 @@ import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
+import { buildCommands, commandTrigger, SECTIONS } from './ui/command'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
@@ -21,8 +22,10 @@ import type { DraftRow } from '../lib/draft/store'
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { bar, pct } from './ui/parts'
+import { areaChart, barChart } from './ui/chart'
+import { ICON } from './ui/icons'
 import { LOGOS } from './ui/logos'
 
 export { escapeHtml, injectCsrf, shell }
@@ -90,6 +93,25 @@ export const SCRIPT = `
     e.preventDefault(); show(t.getAttribute('href').slice(1),true);
   });});
   show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+  /*
+   * ‏والمرساةُ تُتبَع من أيّ مكان (D-105).
+   *
+   * ‏كان اللوحُ يُبدَّل بنقر الرافدة وحدَها. ولوحةُ الأوامر تُصدر روابطَ
+   * ‏عاديّةً «#posts»، ورابطٌ كهذا يبدّل المرساةَ ولا يُبدّل اللوحَ —
+   * ‏فيُقرأ الأمرُ منفَّذا والصفحةُ لم تتحرّك. وهي علّةُ D-046 نفسُها:
+   * ‏زرٌّ يعمل خطأً أسوأُ من زرٍّ لا يعمل.
+   *
+   * ‏وكذلك من كتب مرساةً في شريط العنوان، أو عاد بزرّ الرجوع.
+   */
+  window.addEventListener('hashchange',function(){
+    show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+    var t=null;
+    for(var i=0;i<tabs.length;i++){
+      if(tabs[i].getAttribute('href')===location.hash)t=tabs[i];
+    }
+    var h=document.getElementById('pane-title');
+    if(t&&h){var sp=t.querySelector('span'); if(sp)h.textContent=sp.textContent;}
+  });
   // عنوانُ الشريط العلويّ يتبع القسم — فلا يبقى «نظرة عامّة» فوق الأمان
   var head=document.getElementById('pane-title');
   if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
@@ -224,7 +246,7 @@ export const SCRIPT = `
   if(cards.length){
     var picks=Array.prototype.slice.call(document.querySelectorAll('input[data-pick]'));
     var bulkForm=document.getElementById('bulk');
-    var tabs=document.getElementById('draft-filter');
+    var ftabs=document.getElementById('draft-filter');
     var none=document.getElementById('draft-none');
     var help=document.getElementById('keys');
     if(help)help.hidden=false;
@@ -247,12 +269,12 @@ export const SCRIPT = `
       if(none)none.hidden=shown>0;
       count();
     }
-    if(tabs){
-      tabs.hidden=false;
-      tabs.querySelectorAll('button[data-bucket]').forEach(function(b){
+    if(ftabs){
+      ftabs.hidden=false;
+      ftabs.querySelectorAll('button[data-bucket]').forEach(function(b){
         b.addEventListener('click',function(){
           bucket=b.dataset.bucket;
-          tabs.querySelectorAll('button[data-bucket]').forEach(function(o){
+          ftabs.querySelectorAll('button[data-bucket]').forEach(function(o){
             var on=o===b;
             o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
           });
@@ -985,74 +1007,6 @@ export interface PanelAudit {
  * وكأنّ الثلاثاء لم يكن. **وسلسلةٌ كلّها أصفار تُرسم خطّا عند القاع**، لا
  * قمّةً كاذبة من قسمةٍ على صفر.
  */
-function sparkline(series: { day: string; total: number }[]): string {
-  if (series.length < 2) return '<div class="empty"><b>لا بيانات كافية بعد</b></div>'
-
-  // مساحةٌ للمحور وأرقامه، لا رسمٌ مقصوصٌ إلى حافّة البطاقة
-  const w = 640
-  const h = 168
-  const padTop = 14
-  const padBottom = 26
-  const padStart = 46
-  const plotH = h - padTop - padBottom
-  const plotW = w - padStart - 8
-
-  const raw = Math.max(...series.map((d) => d.total))
-  // سقفٌ مستدير: محورٌ ينتهي عند ٣٫٤٧ يُقرأ رقما عشوائيّا لا حدّا
-  const max = raw <= 0 ? 1 : Math.ceil(raw * 1.15 * 2) / 2
-  const step = plotW / (series.length - 1)
-  const x = (i: number): number => padStart + i * step
-  const y = (v: number): number => padTop + plotH - (v / max) * plotH
-
-  const pts = series.map((d, i) => `${x(i).toFixed(1)},${y(d.total).toFixed(1)}`)
-  const line = `M ${pts.join(' L ')}`
-  const area = `${line} L ${x(series.length - 1).toFixed(1)},${padTop + plotH} L ${padStart},${padTop + plotH} Z`
-
-  // ثلاثةُ خطوطٍ أفقيّة بأرقامها — وبدونها الرسمُ شكلٌ لا مقدار
-  const ticks = [0, 0.5, 1].map((t) => {
-    const value = max * t
-    const yy = y(value).toFixed(1)
-    return `<line class="grid-l" x1="${padStart}" y1="${yy}" x2="${w - 8}" y2="${yy}"/>
-      <text class="axis" x="${padStart - 8}" y="${(Number(yy) + 3.5).toFixed(1)}"
-        text-anchor="end">${value.toFixed(1)}</text>`
-  }).join('')
-
-  const peakIndex = series.reduce((best, d, i) => (d.total > series[best]!.total ? i : best), 0)
-  const peak = series[peakIndex]!
-  const last = series[series.length - 1]!
-  const first = series[0]!
-
-  // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
-  const label = (d: { day: string }): string => d.day.slice(5)
-  const dates = `<text class="axis" x="${x(0)}" y="${h - 8}" text-anchor="start">${label(first)}</text>
-    <text class="axis" x="${x(series.length - 1)}" y="${h - 8}" text-anchor="end">${label(last)}</text>`
-
-  const total = series.reduce((sum, d) => sum + d.total, 0)
-  const average = total / series.length
-
-  return `<div class="chart">
-    <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
-      aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
-      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
-        <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
-      </linearGradient></defs>
-      ${ticks}
-      <path d="${area}" fill="url(#sg)"/>
-      <path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${x(peakIndex).toFixed(1)}" cy="${y(peak.total).toFixed(1)}" r="3.5"
-        fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
-      <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
-      ${dates}
-    </svg>
-    <div class="legend">
-      <span>المجموع <b>${money(total)}</b></span>
-      <span>المتوسّط اليوميّ <b>${money(average)}</b></span>
-      <span>الذروة <b>${money(peak.total)}</b> · ${escapeHtml(peak.day.slice(5))}</span>
-    </div>
-  </div>`
-}
 
 /** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
 function worthCell(worth: number | null): string {
@@ -1140,17 +1094,6 @@ function platformNav(views: readonly ChannelView[]): string {
 }
 
 
-const ICON = {
-  overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
-  sources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
-  posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/></svg>',
-  channels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.4 10.8 15.6 6.7M8.4 13.2l7.2 4.1"/></svg>',
-  providers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><circle cx="12" cy="12" r="3"/></svg>',
-  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
-  tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h9M9 12h9M9 19h9"/><path d="m3.5 5 1.3 1.3L7 4"/><path d="m3.5 12 1.3 1.3L7 11"/><circle cx="5" cy="19" r="1.4"/></svg>',
-  report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg>',
-  security: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.6-8 9.5-4.6-.9-8-4.5-8-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>',
-} as const
 
 /**
  * فرقُ اليوم عن أمس — **علامةٌ ونصّ**، فالسهم وحده لا يُقرأ بصوتٍ عالٍ.
@@ -1329,6 +1272,33 @@ export function panelPage(d: PanelData): string {
       count > 0 ? `<span class="count">${count}</span>` : ''
     }</a>`
 
+  /*
+   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105) — لا من عشرة أسطرٍ بيد.
+   *
+   * والفهرسُ يُبنى من الجدول نفسِه، **فقسمٌ يُضاف في مكانٍ واحدٍ يظهر
+   * في الاثنين**. ولو كُتبا مفترقَين لبقي القسمُ الجديدُ خارجَ اللوحة،
+   * **ولا حارسَ يمسك غيابا**: لوحةٌ لا تجده تبدو ناقصةَ الفهرسة لا
+   * معطوبة، فلا يُشتكى منها — وتشيخ صامتة.
+   */
+  const counts: Readonly<Record<string, number>> = {
+    sources: pending,
+    posts: waitingDrafts,
+    channels: linkedChannels,
+    report: d.openSuggestions,
+    tasks: d.ownerPending,
+    providers: missing,
+    security: d.sessions.length > 1 ? d.sessions.length : 0,
+  }
+  let lastGroup = ''
+  const tabs = SECTIONS.map((s) => {
+    const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
+    lastGroup = s.group
+    // ‏أزرارُ المنصّات تتبع «القنوات» لأنّها تفريعٌ عنها لا قسمٌ ثالث
+    const after = s.id === 'channels' ? platformNav(d.channels) : ''
+    return head +
+      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0) + after
+  }).join('\n    ')
+
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
@@ -1339,20 +1309,9 @@ export function panelPage(d: PanelData): string {
     <div class="brand"><b>صدى</b><span>SADA · STAGING</span></div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
-    <span class="lbl">العمل</span>
-    ${nav('#overview', ICON.overview, 'نظرة عامّة')}
-    ${nav('#sources', ICON.sources, 'المصادر', pending)}
-    ${nav('#posts', ICON.posts, 'المنشورات', waitingDrafts)}
-    ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
-    ${platformNav(d.channels)}
-    ${nav('/panel/report', ICON.report, 'التقرير', d.openSuggestions)}
-    <span class="lbl">الضبط</span>
-    ${nav('/panel/tasks', ICON.tasks, 'ما عليك', d.ownerPending)}
-    ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
-    ${nav('#settings', ICON.settings, 'الحدود')}
-    ${nav('#security', ICON.security, 'الأمان', d.sessions.length > 1 ? d.sessions.length : 0)}
+    ${tabs}
   </nav>
-  <div class="rail-foot">${themeSwitch()}</div>
+  <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>
 
 <div class="main">
@@ -1360,6 +1319,7 @@ export function panelPage(d: PanelData): string {
   <div class="ttl"><h1 id="pane-title">نظرة عامّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
+  ${commandTrigger()}
   ${state}
   <form class="inline" method="POST" action="/panel/logout">
     <button class="g sm" type="submit">خروج</button></form>
@@ -1394,9 +1354,17 @@ ${flash}
         ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
         : `<ul class="todo">${todo}</ul>`}</div>
     <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
-      <p class="hint">كلّ المزوّدين، بالدولار</p>${sparkline(d.series)}
+      <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
       <div class="row" style="margin-top:var(--s-3)">${scanBtn}
         <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
+  </div>
+
+  <div class="card" style="margin-top:var(--s-3)">
+    <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
+      <span class="st idle">٣٠ يوما</span></div>
+    <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
+      «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
+    ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
   </div>
 </section>
 
@@ -1651,5 +1619,8 @@ ${flash}
 </div>
 </div>`
 
-  return shell('صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT)
+  return shell(
+    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT,
+    { commands: buildCommands({ onPanel: true, drafts: d.drafts }) },
+  )
 }
