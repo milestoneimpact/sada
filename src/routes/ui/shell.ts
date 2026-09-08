@@ -126,7 +126,9 @@ export function escapeHtml(value: string): string {
  */
 const THEME_BOOT = `
 try{var t=localStorage.getItem('sada-theme');
-if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}
+if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
+var d=localStorage.getItem('sada-density');
+if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 `
 
 /** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
@@ -153,6 +155,47 @@ export const THEME_SCRIPT = `
     b.addEventListener('click',function(){apply(b.dataset.theme);});});
 })();
 `
+
+/**
+ * مبدّلُ الكثافة (D-102) — **ووضعان لا ثلاثة**.
+ *
+ * الثيمُ ثلاثةٌ لأنّ للنظام رأيا فيه (`prefers-color-scheme`). **ولا رأيَ
+ * للنظام في الكثافة** — فوضعٌ ثالثٌ اسمُه «النظام» يَعِد بما لا مصدرَ له.
+ *
+ * والحفظُ في `try` كما في الثيم: `localStorage` يرمي في نافذةٍ خاصّة،
+ * **ونافذةٌ خاصّة يجب أن تفتح اللوحة** لا أن تسقط على سطرٍ من الزينة.
+ */
+export const DENSITY_SCRIPT = `
+(function(){
+  var box=document.getElementById('density');
+  if(!box)return;
+  var apply=function(v){
+    try{
+      if(v==='compact'){localStorage.setItem('sada-density',v);
+        document.documentElement.dataset.density=v;}
+      else{localStorage.removeItem('sada-density');
+        delete document.documentElement.dataset.density;}
+    }catch(e){
+      if(v==='compact')document.documentElement.dataset.density=v;
+      else delete document.documentElement.dataset.density;
+    }
+    box.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.density===v));});
+  };
+  var saved='cozy';
+  try{saved=localStorage.getItem('sada-density')||'cozy';}catch(e){}
+  apply(saved);
+  box.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.density);});});
+})();
+`
+
+export function densitySwitch(): string {
+  return `<div class="theme" id="density" role="group" aria-label="كثافة العرض">
+    <button type="button" data-density="cozy" aria-pressed="true">مريح</button>
+    <button type="button" data-density="compact" aria-pressed="false">مضغوط</button>
+  </div>`
+}
 
 export function themeSwitch(): string {
   return `<div class="theme" id="theme" role="group" aria-label="سمة العرض">

@@ -145,6 +145,33 @@ for (const file of files) {
   }
 }
 
+/**
+ * وعلامةٌ خلفيّةٌ داخل قالبٍ نصّيّ — **تُنهيه فيصير الشرحُ شيفرة**.
+ *
+ * `TOKENS` و `STYLE` و `SCRIPT` قوالبُ نصّيّة، وهذا المستودعُ يقتبس
+ * أسماءَ الشيفرة في شرحه بعلامةٍ خلفيّة. **فسطرُ شرحٍ واحدٌ يُسقط الملفَّ
+ * كلَّه** بخطأ صياغة.
+ *
+ * **و`tsc` يمسكها — لكنّه يسمّيها «‏,‏ expected» في سطرٍ بعيدٍ عن السبب.**
+ * ووقعت أربعَ مرّاتٍ في ثلاث جلسات، وكلَّ مرّةٍ ضاعت دورةٌ في البحث عن
+ * موضعها. **وحارسٌ يسمّي العلّةَ خيرٌ من حارسٍ يمسكها ولا يسمّيها.**
+ *
+ * والبديلُ في الشرح: «القوسان» ‏«…» — وهما ما يستعمله المستودعُ أصلا.
+ */
+const backticks = []
+for (const file of files) {
+  if (NOT_USAGE.test(file)) continue
+  const raw = readFileSync(file, 'utf8')
+  // كلُّ قالبٍ مُصدَّر: من `= \`` إلى `\`` في أوّل عمود
+  for (const m of raw.matchAll(/export const (\w+)\s*=\s*(?:\w+\s*\+\s*)?`([\s\S]*?)\n`/g)) {
+    const inner = m[2]
+    if (!inner.includes('`')) continue
+    const line = raw.slice(0, m.index).split('\n').length +
+      inner.slice(0, inner.indexOf('`')).split('\n').length
+    backticks.push([`${m[1]} — سطر ${line}`, file.slice(SRC.length)])
+  }
+}
+
 const ghosts = [...used].filter(([name]) => !defined.has(name))
 const orphans = [...defined].filter(
   ([name]) => !used.has(name) && !ALLOWED.has(name.slice(2)),
@@ -166,6 +193,10 @@ console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n'
 if (literalTime.length === 0) console.log('  ✓ لا زمنَ خارج السلّم')
 for (const [rule, where] of literalTime) console.log(`  ✕ ${rule}  —  ${where}`)
 
+console.log('\n═══ علامةٌ خلفيّةٌ داخل قالبٍ نصّيّ ═══\n')
+if (backticks.length === 0) console.log('  ✓ لا قالبَ تُنهيه علامةٌ في شرحه')
+for (const [what, where] of backticks) console.log(`  ✕ ${what}  —  ${where}`)
+
 console.log('\n═══ تباعدُ حرفٍ موجبٌ بلا اتّجاهٍ لاتينيّ ═══\n')
 if (spaced.length === 0) console.log('  ✓ لا تباعدَ يفكّ وصلا')
 for (const [sel, where] of spaced) console.log(`  ✕ ${sel}  —  ${where}`)
@@ -174,7 +205,7 @@ console.log(
   `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة)\n`,
 )
 
-const total = ghosts.length + orphans.length + literalTime.length + spaced.length
+const total = ghosts.length + orphans.length + literalTime.length + spaced.length + backticks.length
 if (total === 0) process.exit(0)
 
 console.log('والمنادَى بلا تعريفٍ **يُعرَّف أو يُحذَف نداؤه** — ولا يُترَك:')

@@ -21,7 +21,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { bar, pct } from './ui/parts'
 import { LOGOS } from './ui/logos'
 
@@ -1352,7 +1352,7 @@ export function panelPage(d: PanelData): string {
     ${nav('#settings', ICON.settings, 'الحدود')}
     ${nav('#security', ICON.security, 'الأمان', d.sessions.length > 1 ? d.sessions.length : 0)}
   </nav>
-  <div class="rail-foot">${themeSwitch()}</div>
+  <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>
 
 <div class="main">

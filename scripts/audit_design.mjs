@@ -36,7 +36,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const findings = []
 
 for (const file of pages) {
-  for (const [label, width] of [['شاشة', 1440], ['جوّال', 390]]) {
+  /*
+   * **والوضعان يُدقَّقان معا** (D-102).
+   *
+   * الكثافةُ تضرب المسافاتِ في ‏٠٫٧٢، **وهدفُ اللمس ‏٤٤px لا يُمَسّ** — لكنّ
+   * حشوا أضيق قد يُقرّب هدفين حتّى يلتقيا، أو يُسقط زرّا دون الحدّ بطريقٍ
+   * غير مباشر. **ووضعٌ يُشحَن ولا يُدقَّق وضعٌ بلا حارس.**
+   *
+   * وتُضاف الشاشةُ العريضةُ كذلك: الرتبةُ الخامسةُ تُفتَح فوق ‏١٩٢٠ ولم
+   * يكن يُقاس عندها شيء.
+   */
+  for (const [label, width, density] of [
+    ['شاشة', 1440, null], ['عريضة', 2000, null],
+    ['مضغوط', 1440, 'compact'], ['جوّال', 390, null],
+  ]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } })
     await page.goto(`file://${file}`)
     await page.waitForTimeout(700)
@@ -45,6 +58,9 @@ for (const file of pages) {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
       document.querySelectorAll('details').forEach((d) => { d.open = true })
     })
+    if (density !== null) {
+      await page.evaluate((d) => { document.documentElement.dataset.density = d }, density)
+    }
     await page.waitForTimeout(300)
 
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {

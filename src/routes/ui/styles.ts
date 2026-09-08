@@ -215,6 +215,25 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
    فوق شيء، لا يجلس على أرضٍ فارغة. ويُضاف بـ JS لأنّ CSS وحدها لا تعرف
    موضعَ التمرير. */
 .topbar.lifted{box-shadow:var(--sh-2)}
+/* ── الزجاجُ على ما يلصق (D-102) ──────────────────────────────────
+   شريطٌ لاصقٌ بلونٍ مصمتٍ يُقرأ **لوحا ثانيا فوق الصفحة**. وطبقةٌ يشفّ
+   منها ما تحتها تقول «هذا فوق ذاك» بلا حدٍّ ولا ظلٍّ ثخين.
+
+   **وخلف «@supports»**: متصفّحٌ لا يعرفها يرى «--chrome» مصمتا كما
+   يراه اليوم — ولا شيءَ ينكسر. والشفافيّةُ تُضاف هناك وحدَها، فلا يبقى
+   لونٌ نصفُ شفّافٍ بلا ضبابٍ يسنده. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)){
+  /* **وعلى الشريط وحدَه — لا على الرافدة** (D-102).
+     جُرّبت على الاثنين فسقط ‏٧٤ نصّا دون حدّ التباين. **والرافدةُ ثيمٌ
+     ثالثٌ قائمٌ بذاته** (THEME:rail): تبقى داكنةً في النهاريّ، وحبرُها
+     فاتحٌ على أرضٍ داكنة. فشفّها يُظهر أرضَ الصفحة النهاريّةَ من ورائها،
+     **فيصير الحبرُ الفاتحُ على فاتحٍ — ‏٢٫١٤:١**.
+     والشريطُ ليس كذلك: أرضُه من ثيم الصفحة نفسِه، فما وراءه من جنسه. */
+  .topbar{
+    background:color-mix(in srgb,var(--chrome) 82%,transparent);
+    -webkit-backdrop-filter:blur(14px) saturate(1.4);
+    backdrop-filter:blur(14px) saturate(1.4)}
+}
 .topbar h1{font-size:var(--t-md); font-weight:600; letter-spacing:-.1px; color:var(--ink-2)}
 .topbar .crumb{font-size:var(--t-xs); color:var(--ink-3); margin-top:1px}
 /* عنوانُ الشريط يظهر **حين يغيب عنوانُ الصفحة** لا قبله.
@@ -223,7 +242,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
    نفسها التي يظهر بها الظلّ: أنّ فوقك محتوًى. */
 .topbar .ttl{opacity:0; transform:translateY(4px); transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
 .topbar.lifted .ttl{opacity:1; transform:none}
-.content{padding:var(--s-5) var(--s-6) var(--s-12); max-width:1500px; width:100%}
+.content{padding:var(--s-5d) var(--s-6d) var(--s-12d); max-width:var(--shell); width:100%}
 
 /* ══ رأسُ الصفحة ══════════════════════════════════════════════════════
    كان أعلى ما في الشاشة عنوانا بستّةَ عشرَ بكسلا وتحته أرقامٌ باثنين
@@ -234,7 +253,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
    وثلاثين، وسطرٌ يقول ما هذه الشاشة. وثلاثتُها معا هي ما يجعل الصفحةَ
    **تبدأ** بدل أن تنفتح في وسطها. */
 .page-head{display:flex; align-items:flex-end; gap:var(--s-5); flex-wrap:wrap;
-  margin:var(--s-2) 0 var(--s-6)}
+  margin:var(--s-2) 0 var(--s-6d)}
 .page-head .txt{min-width:0; flex:1 1 340px}
 /* ── الذهبُ يُقتَّر ولا يُسكَب ─────────────────────────────────────────
    خيوطٌ وحوافُّ وعلاماتٌ صغيرة، لا أرضيّاتٌ ولا أزرارٌ ممتلئة. وذهبٌ
@@ -310,6 +329,13 @@ section[hidden]{display:none}
 /* أرقامٌ ثابتةُ العرض في كلّ موضعٍ تتبدّل فيه: عمودٌ يهتزّ مع كلّ تحديث
    يُقرأ عطلا. وكانت مضبوطةً على البطاقات وحدها. */
 table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
+/* ── الشاشةُ العريضة تُملأ لا تُترَك (D-102) ────────────────────────
+   صفُّ المؤشّرات أربعةٌ في ‏١٤٤٠px، **وأربعةٌ في ‏٢٥٦٠ كذلك** — فيتمدّد كلٌّ
+   إلى ستّمئة بكسل ليحمل رقما من ثلاث خانات. فتُفتَح رتبةٌ خامسة فوق
+   ‏١٩٢٠: العددُ يزيد ولا يتمدّد العرض.
+
+   **ولا تُفتَح للمحتوى النصّيّ**: عمودٌ خامسٌ من النصّ يخالف «--measure». */
+@media(min-width:1920px){.grid.c4{grid-template-columns:repeat(5,1fr)}}
 .c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
 .c2{grid-template-columns:repeat(2,1fr)}
 .c21{grid-template-columns:2fr 1fr}
@@ -327,7 +353,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    «مصنوع» — وهو ما لا يُصلحه تكبيرُ الظلّ. */
 .card{background:var(--surface); background-image:var(--sheen);
   border:1px solid var(--line); border-radius:var(--r-lg);
-  padding:var(--s-5) var(--s-6); box-shadow:var(--sh-1), inset 0 1px 0 var(--hair);
+  padding:var(--s-5d) var(--s-6d); box-shadow:var(--sh-1), inset 0 1px 0 var(--hair);
   transition:box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
 /* بطاقةُ القناة والمسوّدة تحملان فعلا، فترتفعان قليلا عند التحويم.
    وبطاقاتُ العرض لا ترتفع: حركةٌ بلا فعلٍ خلفها تَعِد بما لا يقع. */
@@ -354,7 +380,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    يسقط من القاعدة ويرث 21px من المتصفّح — **خارجَ السلّم**، وهي علّةُ
    «.card > h2» نفسُها (D-057). ومدقّقُ السلّم أمسكها هنا كذلك. */
 .sec{font-size:var(--t-xs); font-weight:700; color:var(--ink-2);
-  margin:var(--s-8) 0 var(--s-3); padding-bottom:var(--s-2);
+  margin:var(--s-8d) 0 var(--s-3); padding-bottom:var(--s-2);
   border-bottom:1px solid var(--line-soft); position:relative}
 
 .sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; width:34px;
@@ -813,6 +839,12 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    فتهتزّ القائمةُ مع كلّ ضغطةِ J. والحلقةُ خارج الصندوق فلا تُزيح شيئا. */
 .draft.here{border-color:var(--brand);
   box-shadow:0 0 0 3px var(--ring), var(--sh-2), inset 0 1px 0 var(--hair)}
+/* ── وهجُ الذهب: لِما ينتظر قرارا الآن وحدَه ──────────────────────────
+   المسوّدةُ التي لم يُبَتّ فيها هي **الشيءُ الوحيد في الصفحة الذي يمنع
+   إغلاقَها**. فتأخذ وهجَ الهويّة، ولا يأخذه غيرُها — **وذهبٌ يُوهَج به
+   كلُّ شيءٍ يُلغي معنى الوهج**.
+   وهو ظلٌّ لا أرضيّة: الذهبُ يُقتَّر ولا يُسكَب (D-053). */
+.draft[data-status="waiting"]:not(.here){box-shadow:var(--glow)}
 
 /* ── المعاينة: كما تُقرأ لا كما تُحرَّر ───────────────────────────
    المربّعُ حقلُ تحرير — خطُّ اللوحة وحدٌّ وشريطُ تمرير وعرضُ البطاقة.
@@ -848,7 +880,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   margin:0 0 var(--s-3); padding:var(--s-3) var(--s-4);
   background:var(--surface); background-image:var(--sheen);
   border:1px solid var(--brand); border-radius:var(--r-lg);
-  box-shadow:var(--sh-2), inset 0 1px 0 var(--hair)}
+  box-shadow:var(--sh-3), inset 0 1px 0 var(--hair)}
 .bulkbar b{font-variant-numeric:tabular-nums}
 .bulkbar .ago{direction:ltr; unicode-bidi:isolate}
 
