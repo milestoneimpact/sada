@@ -554,6 +554,34 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
   direction:ltr; unicode-bidi:isolate}
 .chart .grid-l{stroke:var(--line-soft); stroke-width:1}
 .chart .base{stroke:var(--line); stroke-width:1}
+/* ── خطُّ الرحلة (D-104) ───────────────────────────────────────────────
+   خيطٌ يصل المحطّاتِ — **وهو المعلومة لا الصفوف**: ثلاثُ محطّاتٍ متفرّقة
+   تُقرأ ثلاثةَ أشياء، وموصولةً تُقرأ سببيّةً لها أوّلٌ وآخر. وهي قاعدةُ
+   «ol.steps» نفسُها في الدليل.
+
+   والخيطُ لا يُرسَم بعد الأخيرة: خيطٌ ينتهي إلى فراغٍ يَعِد بمحطّةٍ لم تقع. */
+.journey{margin:0; padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-4); position:relative}
+.stop{display:flex; gap:var(--s-3); align-items:flex-start; position:relative}
+.stop:not(:last-child)::before{content:''; position:absolute; top:34px;
+  bottom:calc(-1 * var(--s-4)); inset-inline-start:16px; width:1px;
+  background:var(--line-strong)}
+.stop-mark{flex:none; width:33px; height:33px; border-radius:50%; z-index:1;
+  display:grid; place-items:center; background:var(--surface); color:var(--ink-3);
+  border:1px solid var(--line-strong); box-shadow:0 0 0 3px var(--bg)}
+.stop-mark svg{width:15px; height:15px; display:block}
+/* **والحالُ لونٌ ورمزٌ ونصّ** (D-043): اللونُ على الحلقة، والنصُّ في
+   العنوان («لم تنجح»)، والرمزُ نوعُ المحطّة. */
+.stop.done .stop-mark{color:var(--brand); border-color:color-mix(in srgb,var(--brand) 42%,transparent)}
+.stop.failed .stop-mark{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 42%,transparent)}
+.stop.pending .stop-mark{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 42%,transparent);
+  border-style:dashed}
+.stop-body{min-width:0; padding-top:var(--s-1)}
+.stop-t{display:block; font-size:var(--t-base); font-weight:600; line-height:var(--lh-tight)}
+.stop-d{margin:var(--s-1) 0 0; font-size:var(--t-sm); color:var(--ink-2);
+  line-height:var(--lh); max-width:var(--measure)}
+.stop-meta{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2)}
+
 /* ── الأعمدةُ الأفقيّة (D-103) ────────────────────────────────────────
    ثلاثةُ أعمدةٍ ثابتةِ الموضع: الاسمُ والمقياسُ والرقم. **والعينُ تمسح
    عمودا لا شبكة** — وهي قاعدةُ لوح المزوّدين نفسُها (D-082).

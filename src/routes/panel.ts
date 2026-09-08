@@ -29,6 +29,8 @@ import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
+import { readJourney } from '../lib/journey'
+import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
@@ -1312,6 +1314,43 @@ panel.get('/panel/report', async (c) => {
        <div class="wrap">
          <nav class="back" aria-label="مسارُ العودة">
            <a href="/panel">← اللوحة</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${body}</main>
+       </div>`,
+      nonce,
+      THEME_SCRIPT,
+    ),
+  )
+})
+
+/**
+ * رحلةُ منشور (D-104) — `‎/panel/journey/:id`.
+ *
+ * **ومعرّفٌ لا وجودَ له ‏٤٠٤ لا صفحةٌ فارغة**: صفحةٌ تُفتَح بلا محطّاتٍ
+ * تُقرأ عطلا، و‏٤٠٤ تقول ما وقع (D-046).
+ */
+panel.get('/panel/journey/:id', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const journey = await readJourney(c.env.DB, c.req.param('id'))
+  if (journey === null) {
+    return new Response('لا منشور بهذا المعرّف', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  }
+
+  const body = journeyBody(journey, new Date())
+  return page((nonce) =>
+    shell(
+      'صدى — رحلةُ منشور',
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel#posts">← المنشورات</a>
            <span class="grow"></span>${themeSwitch()}
          </nav>
          <main id="main">${body}</main>
