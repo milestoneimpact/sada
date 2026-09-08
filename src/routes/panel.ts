@@ -10,7 +10,7 @@
  */
 import { Hono } from 'hono'
 import type { Env } from '../env'
-import type { TaskName } from '../lib/ai/registry'
+import { ROUTES, type TaskName } from '../lib/ai/registry'
 
 /** أسماء أسرار المدمَجين — سرٌّ في البيئة يغلب ما في الجدول. */
 const BUILTIN_SECRET: Readonly<Record<string, string>> = {
@@ -27,7 +27,7 @@ import { listModels } from '../lib/ai/models'
 import { cfAccountId } from '../lib/ai/cloudflare'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
-import type { Platform } from '../lib/draft/prompt'
+import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
@@ -37,6 +37,7 @@ import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
+import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
@@ -68,6 +69,7 @@ import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
 import { shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { spreadScreen, SPREAD_SCRIPT } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
@@ -365,12 +367,21 @@ panel.get('/panel', async (c) => {
           r.task === 'plan' &&
           providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       ),
-      // الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
-      // في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا
+      /*
+       * الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
+       * في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا.
+       *
+       * **وحسابُ الصفحة كذلك** (D-087): كان الحارسُ يفحص الإذنَ ولا يفحص
+       * النوع — **وهو نصفُ حارسٍ** (علّةُ D-073 نفسُها). فالسائقُ يبني
+       * `urn:li:person:` حرفا (D-080)، ووجهةُ صفحةٍ تُجدوَل فتُنتظَر
+       * ساعاتٍ ثمّ تُردّ عند المنصّة برسالةٍ لا تدلّ على السبب.
+       *
+       * وقد وقع: جُدولت مسوّدةٌ إلى صفحةِ الشركة، ولم يخرج شيء.
+       */
       targets: channels.flatMap((c) =>
         c.spec.built
           ? c.accounts
-              .filter((a) => a.status === 'active')
+              .filter((a) => a.status === 'active' && a.kind !== 'org')
               .map((a) => ({
                 id: a.id,
                 platform: c.spec.id as 'linkedin' | 'x',
@@ -378,6 +389,22 @@ panel.get('/panel', async (c) => {
               }))
           : [],
       ),
+      /*
+       * **منصّةٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص** (D-087).
+       *
+       * تُحسَب هنا لا في الشاشة: الشاشةُ ترى `targets` بعد التصفية، فلا
+       * تفرّق بين «لا قناةَ مربوطة» و«القناةُ مربوطةٌ صفحةً». **والفرقُ
+       * ليس لفظا**: الأولى تُرسل المالكَ يربط، والثانيةُ تُرسله ينتظر
+       * موافقةً — ومن قيل له «اربط» وهو رابطٌ يشكّ في نظامه لا في نضجه.
+       */
+      pageOnly: channels
+        .filter(
+          (c) =>
+            c.spec.built &&
+            c.accounts.some((a) => a.status === 'active') &&
+            !c.accounts.some((a) => a.status === 'active' && a.kind !== 'org'),
+        )
+        .map((c) => c.spec.id),
       writableSources: sources
         .filter((x) => x.analyzed)
         .map((x) => ({ id: x.id, name: x.name })),
@@ -565,7 +592,18 @@ panel.post('/panel/sessions/revoke-all', async (c) => {
   return back('security')
 })
 
-const KNOWN_TASKS: ReadonlySet<string> = new Set(['analyze', 'draft', 'image'])
+/**
+ * المهامُّ التي يُقبَل توجيهُها — **مشتقّةٌ من `ROUTES` لا مكتوبةٌ بيد**
+ * (D-091).
+ *
+ * كانت ثلاثا مكتوبةً حرفا، و`readRoutes` تعرض مفاتيحَ `ROUTES` كلَّها.
+ * **فكان `plan` يُعرَض في الجدول ويُردّ عند الحفظ** — والمالكُ يبدّل
+ * نموذجَه فيسمع «مهمّةٌ غير معروفة» على مهمّةٍ يراها أمامه.
+ *
+ * وهو صنفُ «نصفِ الحارس»: قائمتان لشيءٍ واحد، تُزاد إحداهما وتُنسى
+ * الأخرى. فصارتا واحدة.
+ */
+const KNOWN_TASKS: ReadonlySet<string> = new Set(Object.keys(ROUTES))
 
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
   'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',
@@ -968,8 +1006,12 @@ panel.post('/panel/media/generate', async (c) => {
   const flash: PanelFlash =
     outcome.kind === 'generated'
       ? {
-          kind: 'ok',
-          text: `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.`,
+          // **والنصُّ فوق الصورة قد لا يُركَّب لخمسة أسباب** — وسقوطُه كان
+          // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
+          kind: outcome.note === '' ? 'ok' : 'warn',
+          text:
+            `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.` +
+            (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }
@@ -1402,11 +1444,17 @@ panel.post('/panel/drafts/write', async (c) => {
   const id = String(form.get('id') ?? '')
   const raw = String(form.get('platform') ?? '')
   // منصّةٌ لا نعرفها لا تُمرَّر إلى القاعدة لتردَّها بقيدٍ غامض
-  if (raw !== 'linkedin' && raw !== 'x') {
+  /*
+   * **والقائمةُ من المواصفة لا من شرطٍ يُكتب حرفا** (D-092).
+   *
+   * كانت منصّتان مكتوبتين هنا وفي `<select>` هناك، **وثالثةٌ تُضاف
+   * فتُنسى إحداهما** — وهي علّةُ `KNOWN_TASKS` نفسُها (D-091).
+   */
+  if (!(raw in PLATFORMS)) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
     return back('posts')
   }
-  const platform: Platform = raw
+  const platform = raw as Platform
 
   const outcome = await draftPost(
     { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
@@ -1465,7 +1513,7 @@ panel.post('/panel/drafts/decide', async (c) => {
       ? {
           kind: 'ok',
           text: 'رُفضت — وتبقى معروضةً بكلفتها، فما دُفع ثمنُه يُرى.',
-          // **والتراجعُ يقع مع الإشعار لا بعده** (D-090): الرفضُ عمودٌ
+          // **والتراجعُ يقع مع الإشعار لا بعده** (D-100): الرفضُ عمودٌ
           // واحدٌ يُقلَب، فلا يحتاج سؤالا قبله ويكفيه بابٌ بعده
           undo: { action: '/panel/drafts/undo-reject', id, label: 'تراجَع' },
         }
@@ -1492,7 +1540,7 @@ panel.post('/panel/drafts/decide', async (c) => {
 })
 
 /**
- * التراجعُ عن رفض (D-090).
+ * التراجعُ عن رفض (D-100).
  *
  * **ولا حارسَ هنا**: `undoReject` تشترط أنّ الحالَ `rejected` الآن، فإشعارٌ
  * شاخ في تبويبٍ منسيٍّ لا يقلب حالا تبدّلت بعده. وهذا المسارُ ينقل الطلبَ
@@ -1524,7 +1572,7 @@ panel.post('/panel/drafts/undo-reject', async (c) => {
 })
 
 /**
- * البَتُّ الجماعيّ — **اعتمادٌ فقط، ولا رفضَ جماعيّ** (D-090).
+ * البَتُّ الجماعيّ — **اعتمادٌ فقط، ولا رفضَ جماعيّ** (D-100).
  *
  * ## ولماذا لا رفضَ جماعيّ
  *
@@ -1627,6 +1675,141 @@ panel.post('/panel/drafts/schedule', async (c) => {
       target: id,
       detail: result.ok ? result.at : `refused:${result.reason}`,
     },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * قراءةُ الفاصل والبداية — **في مكانٍ واحدٍ لا في مسارين** (D-089).
+ *
+ * المعاينةُ والتنفيذُ يقرآن المدخلاتِ نفسَها، **فلو قرأها كلٌّ بطريقته
+ * لعُرض جدولٌ ونُفّذ غيرُه** — وهو أسوأ من ألّا تكون هناك معاينة.
+ */
+function readGap(raw: unknown): number {
+  const value = Number(raw ?? '24')
+  if (!Number.isFinite(value)) return 24
+  return Math.min(GAP_MAX_HOURS, Math.max(GAP_MIN_HOURS, Math.round(value)))
+}
+
+/** بدايةٌ غيرُ مفهومةٍ تصير «بعد ساعة» — ولا تُردّ الاستمارةُ كلُّها. */
+function readStart(raw: unknown, now: Date): Date {
+  const text = String(raw ?? '')
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return new Date(now.getTime() + 3_600_000)
+  const at = new Date(`${text}:00Z`)
+  return Number.isNaN(at.getTime()) ? new Date(now.getTime() + 3_600_000) : at
+}
+
+/**
+ * توزيعُ المعتمَد — **معاينةٌ أوّلا** (D-089).
+ *
+ * ولا يكتب هذا المسارُ شيئا. يقرأ ويحسب ويعرض، **والتنفيذُ في مسارٍ
+ * ثانٍ يضغطه المالكُ بعد أن يرى**. ومسارٌ يفعل الاثنين يجعل زرَّ
+ * «وزّع» يجدول عشرةَ منشوراتٍ بضغطةٍ واحدةٍ بلا أن يُقرأ جدول.
+ */
+panel.post('/panel/drafts/spread', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const drafts = await listDrafts(c.env.DB, 60)
+  const accounts = await listAccounts(c.env.DB)
+  const targets = accounts
+    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
+
+  const now = new Date()
+  const gap = readGap(gate.form.get('gap'))
+  const plan = planSpread(
+    drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+    targets,
+    readStart(gate.form.get('start'), now),
+    gap,
+    now,
+  )
+
+  const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
+  return page((nonce) =>
+    shell(
+      'صدى — توزيعُ المعتمَد',
+      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         <nav class="back" aria-label="مسارُ العودة">
+           <a href="/panel">← اللوحة</a>
+           <span class="grow"></span>${themeSwitch()}
+         </nav>
+         <main id="main">${spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf })}</main>
+       </div>`,
+      nonce,
+      SPREAD_SCRIPT + THEME_SCRIPT,
+    ),
+  )
+})
+
+/**
+ * تنفيذُ التوزيع — **بـ `schedulePost` واحدةً واحدة**.
+ *
+ * لا كتابةَ `queued` من هنا: الحارسُ الذي يمنع الجدولةَ إلى قناةٍ إذنُها
+ * منتهٍ، أو إلى موعدٍ مضى، أو من منصّةٍ إلى أخرى — **كلُّه في تلك
+ * الدالّة**. ومسارٌ ثانٍ ينسخه ينسى شرطا (D-019).
+ *
+ * **والوجهةُ تُحسَب هنا ولا تُقرأ من النموذج**: معرّفُ حسابٍ يأتي من
+ * الصفحة يُصدَّق بلا فحص. فالمعرّفاتُ وحدَها تُقرأ منها — أي **ما عُرض**
+ * — والوجهةُ والموعدُ يُحسبان من المدخلات نفسِها.
+ */
+panel.post('/panel/drafts/spread/apply', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const wanted = gate.form.getAll('post').map(String)
+  const now = new Date()
+  const gap = readGap(gate.form.get('gap'))
+
+  const drafts = await listDrafts(c.env.DB, 60)
+  const accounts = await listAccounts(c.env.DB)
+  const targets = accounts
+    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
+
+  // **وما لم يُعرَض لا يُنفَّذ**: القائمةُ تُقصر على ما حمله النموذج
+  // بترتيبه، فمسوّدةٌ اعتُمدت بين المعاينة والتنفيذ لا تدخل خِلسة
+  const wantedSet = new Set(wanted)
+  const plan = planSpread(
+    drafts
+      .filter((d) => wantedSet.has(d.id))
+      .sort((a, b) => wanted.indexOf(a.id) - wanted.indexOf(b.id))
+      .map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+    targets,
+    readStart(gate.form.get('start'), now),
+    gap,
+    now,
+  )
+
+  let done = 0
+  const failed: string[] = []
+  for (const slot of plan.slots) {
+    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date())
+    if (result.ok) done += 1
+    else failed.push(result.reason)
+  }
+
+  const missing = wanted.length - plan.slots.length
+  const flash: PanelFlash =
+    done === 0
+      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed[0] ?? 'لم تعد أيُّ مسوّدةٍ صالحةً للجدولة.'}` }
+      : failed.length === 0 && missing === 0
+        ? { kind: 'ok', text: `جُدول ${done} منشورا، كلُّ ${gap} ساعةً واحد.` }
+        : {
+            kind: 'warn',
+            text:
+              `جُدول ${done} منشورا. ` +
+              (missing > 0 ? `و${missing} لم تعد صالحةً للجدولة. ` : '') +
+              (failed.length > 0 ? `وردَّ ${failed.length}: ${failed[0]}` : ''),
+          }
+
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'draft.spread', target: String(wanted.length), detail: `done:${done}` },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)

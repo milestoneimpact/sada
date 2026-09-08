@@ -797,7 +797,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .draft.done{background:var(--surface-2); box-shadow:none}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}
-/* ══ مسرحُ القرار (D-090) ═══════════════════════════════════════════
+/* ══ مسرحُ القرار (D-100) ═══════════════════════════════════════════
    ── صندوقُ التحديد ───────────────────────────────────────────────
    اللصيقةُ هي الهدفُ لا الصندوق: صندوقُ المتصفّح ثلاثةَ عشرَ بكسلا،
    **ولا يُكبَّر بلا أن يُرسَم من جديد**. فتُمَدّ اللصيقةُ حوله إلى ٤٤
@@ -928,6 +928,25 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* الموعدُ لاتينيّ الأرقام ويُعزَل عن اتّجاه الصفحة */
 .sched .when{font-size:var(--t-sm); color:var(--ink-2); direction:ltr; unicode-bidi:isolate}
 .sched .ago{flex:1 1 auto}
+/* شريطُ المواعيد السريعة — سطرٌ كاملٌ تحت الحقول لا بينها (D-089).
+   «flex-basis:100%» يكسر السطر، فالأزرارُ لا تزاحم «جدوِل» على الجوّال. */
+.quick{flex:1 0 100%; display:flex; align-items:center; gap:var(--s-1);
+  flex-wrap:wrap; margin-top:var(--s-2); padding-top:var(--s-2);
+  border-top:1px solid var(--line)}
+.quick .mirror{font-size:var(--t-xs); color:var(--ink-2);
+  direction:rtl; unicode-bidi:isolate}
+/* لوحُ المراجعة — مطويٌّ عمدا (D-090): ملحوظاتُ ذوقٍ لا تزاحم النصَّ
+   حتّى تُطلَب، «ولا شارةَ حمراء» فتُقرأ عطلا. */
+.notes{margin-bottom:var(--s-2); border:1px solid var(--line);
+  border-radius:var(--r-sm); background:var(--surface-2)}
+.notes summary{display:flex; align-items:center; gap:var(--s-2);
+  padding:var(--s-2); cursor:pointer; min-height:var(--tap)}
+.notes summary::-webkit-details-marker{display:none}
+.notes ul{margin:0; padding:0 var(--s-3) var(--s-2) var(--s-3)}
+.notes li{margin-bottom:var(--s-2); font-size:var(--t-sm); line-height:1.7}
+.notes li:last-child{margin-bottom:0}
+.notes .hit-list{display:inline-flex; flex-wrap:wrap; gap:var(--s-1);
+  margin-inline-start:var(--s-1)}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
 .codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:var(--s-2); margin:var(--s-3) 0}
@@ -1050,7 +1069,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .doc .lede{font-size:var(--t-lg); line-height:var(--lh); color:var(--ink-2);
   /* والصدرُ أضيقُ قياسا لا أوسع: قياسُه أكبر، فالوحدةُ ch أعرض معه —
      و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس.
-     **وأُعيد بعد الخطّ المتغيّر** (D-089): ‏٥٤ch أعطت ‏٧٧، و‏٥٢ تعطي ‏٧٤. */
+     **وأُعيد بعد الخطّ المتغيّر** (D-099): ‏٥٤ch أعطت ‏٧٧، و‏٥٢ تعطي ‏٧٤. */
   margin:0 0 var(--s-3); max-width:52ch}
 .doc p{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin:0 0 var(--s-3)}
 .doc ul{margin:0 0 var(--s-3); padding-inline-start:var(--s-5)}
@@ -1125,11 +1144,11 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
      و«min-width» الافتراضيّةُ في flex هي «auto» = عرضُ المحتوى، فدَرَجٌ
      خيارُه طويلٌ يدفع صفَّه كلَّه خارج البطاقة. وقِيس: حقلٌ ‏٢٩١px في
      حاويةٍ ‏٢٣٨px — وهو مصدرُ الفيض بعد رفعِ الخطّ إلى ١٦ */
-  /* **والزرُّ يُستثنى** (D-089): المحدّدُ «.row > *» أخصُّ من «button»،
+  /* **والزرُّ يُستثنى** (D-099): المحدّدُ «.row > *» أخصُّ من «button»،
      فكان يدهس «min-width: var(--tap)» — **ويسقط الزرُّ دون هدف اللمس**.
      وقِيس: «حدّث» ‏٤٣×٤٤ عند ‏٣٢٠px، وحدُّه ‏٤٤.
 
-     وعلّةٌ لم تظهر إلّا بعد تبديل الخطّ (D-089): كان النصُّ يبلغ ‏٤٤
+     وعلّةٌ لم تظهر إلّا بعد تبديل الخطّ (D-099): كان النصُّ يبلغ ‏٤٤
      بعرضه، **فيستر النقصَ بلا أن يسدّه** — ونصٌّ أضيقُ بمحرفٍ يكشفه.
      **والحارسُ لا يُغني عن الاستثناء**: هذا ما كان يُقاس صحيحا صدفةً.
 

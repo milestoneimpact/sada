@@ -9,6 +9,7 @@
  * فعلا يُقرأ من استجابة المزود حين يعيدها (PLATFORMS.md §نتائج ٣).
  */
 import type { Db } from './tokens'
+import type { PublishPlatform } from './oauth/providers'
 
 /**
  * المزوّدون المعروفون بأسمائهم — **ولا يُغلَق البابُ عليهم.**
@@ -49,8 +50,20 @@ export const X_PRICE_PER_OWNED_READ = 0.001
 export const LINKEDIN_PRICE_PER_POST = 0
 
 /** تكلفة منشور واحد قبل إرساله — ما يُعرض في لوحة الاعتماد. */
-export function estimatePostCost(platform: 'linkedin' | 'x', hasUrl: boolean): number {
+export function estimatePostCost(platform: PublishPlatform, hasUrl: boolean): number {
   if (platform === 'linkedin') return LINKEDIN_PRICE_PER_POST
+  /*
+   * **و TikTok صفرٌ معلومٌ لا صفرٌ مسكوتٌ عنه** (D-092).
+   *
+   * Content Posting API لا يحاسب على النشر — لا اشتراكَ ولا سعرَ طلب،
+   * بخلاف X. **و YouTube Data API مجّانيٌّ كذلك**: يحدُّه حصّةٌ يوميّةٌ
+   * لا فاتورة (‏١٦٠٠ وحدةً للرفع من عشرة آلاف).
+   *
+   * **وصفرٌ هنا حقيقةٌ مقروءةٌ لا تقدير**، ونداءُ الرفع نفسُه
+   * يُسجَّل في الدفتر موسوما بـ `price_unverified` من `publisher.ts`
+   * — فما وقع يُرى ولو لم يُدفَع.
+   */
+  if (platform === 'tiktok' || platform === 'youtube') return 0
   return hasUrl ? X_PRICE_PER_POST_WITH_URL : X_PRICE_PER_POST
 }
 

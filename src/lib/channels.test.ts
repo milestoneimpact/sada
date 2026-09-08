@@ -33,8 +33,9 @@ describe('السجلّ', () => {
    * أسرارا، **وما لا سائقَ له لا يحمل شيئا** — فلا ينتظره المالك.
    */
   it('لكلّ مرتبةٍ ما يليق بها، ولا يعد بما لم يُبنَ', () => {
+    // والمرتبةُ تتبع ما بُني: TikTok في D-092 و YouTube في D-096
     expect(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id))
-      .toEqual(['linkedin', 'x'])
+      .toEqual(['linkedin', 'x', 'tiktok', 'youtube'])
 
     for (const spec of CHANNELS) {
       // ولكلٍّ سببٌ مكتوب، لا صمت
@@ -144,5 +145,28 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
     const views = viewChannels(await listAccounts(db), ALL)
     expect(views.find((v) => v.spec.id === 'x')?.accounts).toHaveLength(1)
     expect(views.find((v) => v.spec.id === 'linkedin')?.accounts).toHaveLength(0)
+  })
+})
+
+/**
+ * **وحقلُ `note` نصٌّ صِرفٌ لا وسمَ فيه** (D-093).
+ *
+ * يُعرَض في أربعة مواضع، **وكلُّها تهرّبه** (`escapeHtml`) — وهو صواب:
+ * نصٌّ من سجلٍّ يُحقَن في صفحةٍ بلا تهريبٍ بابٌ لا يحرسه أحد.
+ *
+ * فوسمٌ يُكتب فيه **يُعرَض حرفا للمالك**: رأى «‎<span class="mono">‎» و
+ * «‎**‎» في شاشة TikTok. والعلّةُ صنفٌ يتكرّر: حقلٌ له عقدٌ غيرُ مكتوب،
+ * فيُخالَف بحسن نيّة.
+ *
+ * **والفرقُ عن `SetupGuide`**: تلك تُرسَم بلا تهريب فتقبل الوسم. فحقلان
+ * متجاوران بعقدين متضادّين — والحارسُ هو ما يفرّق بينهما.
+ */
+describe('عقدُ `note` — نصٌّ يُقرأ لا وسمٌ يُعرَض', () => {
+  it('لا وسمَ HTML ولا Markdown في أيّ سجلّ', () => {
+    for (const spec of CHANNELS) {
+      expect(spec.note, spec.id).not.toContain('<')
+      expect(spec.note, spec.id).not.toContain('**')
+      expect(spec.note, spec.id).not.toContain('`')
+    }
   })
 })

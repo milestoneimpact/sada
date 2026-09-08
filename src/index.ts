@@ -8,7 +8,7 @@ import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
 import { authorizeAdmin } from './lib/adminAuth'
 import { BASE_HEADERS } from './lib/security/headers'
-import { readiness, type Env } from './env'
+import { afterVault, readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
 import { resolveKey } from './lib/providers'
@@ -27,6 +27,7 @@ import { ICON_BYTES } from './routes/ui/shell'
 import { assets } from './routes/assets'
 import { fonts } from './routes/fonts'
 import { legal } from './routes/legal'
+import { verify } from './routes/verify'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
@@ -95,18 +96,20 @@ app.get('/ready', async (c) => {
   if (database === 'ok' && state.missing.length > 0) {
     inVault = await vaultCovered(c.env, state.missing)
   }
-  const stillMissing = state.missing.filter((name) => !inVault.includes(name))
+  // **والحكمُ يُعاد بعد أن يُعرَف ما سُدّ** (D-095): كان يُحسَب من بيئة
+  // Worker وحدَها، فيخرج جوابٌ يقول «لا شيءَ ناقص» و«غيرُ جاهز» معا
+  const sealed = afterVault(state, inVault)
 
   // البوابة هي المرحلة صفر: نظام ينشر ولا يفهم ليس معطلا
-  const ready = state.phase0 && database === 'ok'
+  const ready = sealed.phase0 && database === 'ok'
   return c.json(
     {
       ready,
       database,
-      phase_0: state.phase0,
-      phase_1: state.phase1,
-      drive_folder: state.driveFolder,
-      missing_secrets: stillMissing,
+      phase_0: sealed.phase0,
+      phase_1: sealed.phase1,
+      drive_folder: sealed.driveFolder,
+      missing_secrets: sealed.missing,
       configured_in_vault: inVault,
     },
     ready ? 200 : 503,
@@ -347,11 +350,12 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 })
 
 // **والخطُّ قبل الجميع**: تطلبه صفحةُ الدخول نفسُها، فحارسٌ يردّه يُخرج
-// شاشةَ دخولٍ بخطٍّ بديل — ولا جلسةَ بعدُ ليُحرَس بها (D-089)
+// شاشةَ دخولٍ بخطٍّ بديل — ولا جلسةَ بعدُ ليُحرَس بها (D-099)
 app.route('/', assets)
 app.route('/', fonts)
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
+app.route('/', verify)
 app.route('/', media)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة

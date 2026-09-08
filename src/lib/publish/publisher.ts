@@ -18,11 +18,22 @@ import { containsUrl } from '../idempotency'
 import { loadTokens, markNeedsReauth, type Db } from '../tokens'
 import { canPublish, canUploadMedia, missingScopes } from '../oauth/scopes'
 import { isExpiring } from '../oauth/exchange'
-import type { Platform } from '../oauth/providers'
+import type { Platform, PublishPlatform } from '../oauth/providers'
 import {
   publishLinkedIn, publishX, uploadLinkedInImage, uploadXMedia,
   PublishError, type PublishResult,
 } from './platforms'
+import { publishTikTok } from './tiktok'
+import { publishYouTube } from './youtube'
+
+/**
+ * منصّاتُ المقاطع — **تطلب مقطعا ولا تقبل نصّا وحده** (D-096).
+ *
+ * ولا نهايةَ نشرٍ نصّيّةٍ عند أيٍّ منهما أصلا. **ومجموعةٌ واحدةٌ لا شرطان
+ * متكرّران**: شرطٌ يُزاد في موضعٍ ويُنسى في خمسةٍ هو علّةُ `KNOWN_TASKS`
+ * نفسُها (D-091) — وقد تكرّر هنا خمسَ مرّات.
+ */
+const CLIP_PLATFORMS: ReadonlySet<string> = new Set(['tiktok', 'youtube'])
 
 export interface PublishMessage {
   readonly postId: string
@@ -42,6 +53,7 @@ interface PostRow {
   approved_at: string | null
   platform: Platform
   external_id: string
+  account_kind: string
   account_status: string
 }
 
@@ -71,7 +83,8 @@ export async function publishPost(
   const post = await db
     .prepare(
       `SELECT p.id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
-              a.platform, a.external_id, a.status AS account_status
+              a.platform, a.external_id, a.kind AS account_kind,
+              a.status AS account_status
          FROM posts p JOIN accounts a ON a.id = p.account_id
         WHERE p.id = ?`,
     )
@@ -85,6 +98,27 @@ export async function publishPost(
   }
   if (post.status === 'published') {
     return { kind: 'skipped_duplicate', platformPostId: '' }
+  }
+
+  /*
+   * **حسابُ صفحةٍ لا يُنشَر عليه — ويُقال ذلك هنا لا عند المنصّة** (D-087).
+   *
+   * السائقُ يبني `urn:li:person:` حرفا (D-080)، فمنشورٌ إلى صفحةٍ
+   * يُرسَل بمعرّفِ الصفحة تحت وسمِ شخص — **فتردّه LinkedIn برسالةٍ لا
+   * تدلّ على السبب**، بعد أن يكون قد وقع في الطابور وانتُظر موعدُه.
+   *
+   * والوقتُ هو الثمن: تُجدوَل السادسةَ والنصف، ويكتشف المالكُ السابعةَ
+   * أنّ شيئا لم يخرج. **فيُردّ الآن، بسببٍ يُقرأ، وبلا إعادة** — حتّى
+   * يُبنى سائقُ الصفحات يومَ تصل موافقةُ `Community Management API`.
+   */
+  if (post.account_kind === 'org') {
+    return {
+      kind: 'failed',
+      reason:
+        'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
+        'اختر حسابَك الشخصيَّ وجهةً، أو انتظر موافقةَ Community Management API.',
+      retryable: false,
+    }
   }
 
   // ٢ — هل نُشر بالمفتاح نفسه من قبل؟
@@ -108,11 +142,20 @@ export async function publishPost(
    */
   const image = await db
     .prepare(
+      /*
+       * **والنوعُ يُشترَط لا يُترَك للأحدثيّة** (D-092).
+       *
+       * كان الاستعلامُ يأخذ أحدثَ `ready` أيّا كان نوعُه. ومنشورُ
+       * LinkedIn حُرّكت صورتُه فيديو (D-052) يصير أحدثُ وسيطه **مقطعا**
+       * — فيُرفَع مقطعٌ إلى نهايةِ صور، فيُردّ بخطأٍ لا يقول لماذا.
+       *
+       * فلكلّ منصّةٍ نوعُها: TikTok و YouTube مقطعا، والاثنتان صورة.
+       */
       `SELECT id, r2_key, mime, platform_media_id FROM media
-        WHERE post_id = ? AND status = 'ready'
+        WHERE post_id = ? AND status = 'ready' AND mime LIKE ?
         ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(post.id)
+    .bind(post.id, CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%')
     .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null }>()
     .catch(() => null)
 
@@ -121,6 +164,16 @@ export async function publishPost(
   // في اللوحة، فيُكتشَف على المنصّة بعد أن يقرأه الناس
   if (image !== null && deps.bucket === undefined) {
     return { kind: 'failed', reason: 'no_media_bucket', retryable: false }
+  }
+
+  // **ومنصّةُ المقاطع لا تقبل نصّا وحده**: لا نهايةَ نشرٍ نصّيّةٍ عندها
+  // أصلا، فمحاولةٌ بلا مقطعٍ تُردّ بعد أن تُسجَّل وتُحاسَب
+  if (CLIP_PLATFORMS.has(post.platform) && image === null) {
+    return {
+      kind: 'failed',
+      reason: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها',
+      retryable: false,
+    }
   }
 
   const tokens = await loadTokens(db, encKey, post.account_id)
@@ -162,9 +215,24 @@ export async function publishPost(
    * سبب.
    */
   const needsMedia = image !== null
-  const capable = needsMedia
-    ? canUploadMedia(post.platform, tokens.scopes)
-    : canPublish(post.platform, tokens.scopes)
+
+  /*
+   * **و TikTok لا يُشترَط له النشرُ المباشر** (D-092).
+   *
+   * `video.upload` يوصل المقطعَ صندوقَ التطبيق فينشره المالكُ بيده —
+   * ويعمل يومَ يُربَط الحساب. و`video.publish` ينشر مباشرةً **ويحتاج
+   * مراجعةَ محتوى تستغرق أسابيع**.
+   *
+   * فلو اشتُرط الثاني — كما تفعل `canUploadMedia` على كلّ منشورٍ بوسيط —
+   * **لبقيت المنصّةُ معطَّلةً أسابيعَ بلا سبب**، والمقطعُ مولَّدٌ ومدفوعٌ
+   * ثمنُه وجاهز. فالثاني تحسينٌ يُقرأ لا شرطٌ يُفرَض.
+   */
+  const direct = post.platform === 'tiktok' && canUploadMedia('tiktok', tokens.scopes)
+  const capable = CLIP_PLATFORMS.has(post.platform)
+    ? canPublish(post.platform, tokens.scopes)
+    : needsMedia
+      ? canUploadMedia(post.platform, tokens.scopes)
+      : canPublish(post.platform, tokens.scopes)
   if (!capable) {
     // **ويُسمّى الناقصُ لا يُشار إليه.** كان الردُّ `missing_publish_scope`
     // وحدَه: يقول إنّ نطاقا نقص ولا يقول أيَّه، فيبقى المالكُ أمام رفضٍ
@@ -206,7 +274,7 @@ export async function publishPost(
   // **والقاعدةُ هي التي تضمن النوع**: `posts.platform` محصورٌ في
   // المنصّتين اللتين لهما سائق (0013 لم يوسّعه عمدا). فالصفُّ الواصل
   // لا يحمل غيرَهما، ويُضيَّق النوعُ هنا بلا فحصٍ يتظاهر بالحراسة
-  const paying = post.platform as 'linkedin' | 'x'
+  const paying = post.platform as PublishPlatform
   const unitCost = estimatePostCost(paying, hasUrl)
   if (unitCost > 0) {
     await recordCost(db, {
@@ -227,7 +295,7 @@ export async function publishPost(
   try {
     let mediaId = image?.platform_media_id ?? null
 
-    if (image !== null && mediaId === null) {
+    if (image !== null && mediaId === null && !CLIP_PLATFORMS.has(post.platform)) {
       const object = await deps.bucket!.get(image.r2_key)
       if (object === null) {
         // الصفُّ قائمٌ والبايتاتُ مفقودة: لا يُعالَج بإعادةٍ، ولا يُنشر
@@ -264,16 +332,46 @@ export async function publishPost(
         .run()
     }
 
-    result =
-      post.platform === 'linkedin'
-        ? await publishLinkedIn(
-            tokens.accessToken,
-            `urn:li:person:${post.external_id}`,
-            post.text,
-            fetchImpl,
-            mediaId,
-          )
-        : await publishX(tokens.accessToken, post.text, fetchImpl, mediaId)
+    if (CLIP_PLATFORMS.has(post.platform)) {
+      /*
+       * **و TikTok يرفع وينشر في نداءٍ واحد** — لا معرّفَ وسيطٍ يُحفَظ
+       * بينهما. فالبايتاتُ تُقرأ هنا، والسائقُ يهيّئ ويدفع ويسأل.
+       *
+       * ونداءُ الرفع يُسجَّل بصفرٍ موسوم: **لم يُقرأ لهم سعرٌ بعد**،
+       * ورقمٌ مخترَعٌ كذب، وسكوتٌ عن نداءٍ وقع يجعل الدفترَ أقلَّ من
+       * الحقيقة — وهو الاتّجاه الأسوأ للخطأ (D-008).
+       */
+      const object = await deps.bucket!.get(image!.r2_key)
+      if (object === null) throw new PublishError('media_bytes_missing', 502, false)
+      await recordCost(db, {
+        provider: post.platform,
+        operation: 'clip_upload:price_unverified',
+        units: 1,
+        unitCost: 0,
+        refId: post.id,
+      })
+      const clip = { bytes: new Uint8Array(await object.arrayBuffer()), mime: image!.mime }
+      const out =
+        post.platform === 'tiktok'
+          ? await publishTikTok(tokens.accessToken, clip, post.text, direct, fetchImpl)
+          : await publishYouTube(tokens.accessToken, clip, post.text, fetchImpl)
+      await db
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
+        .bind(out.platformPostId, image!.id)
+        .run()
+      result = out
+    } else {
+      result =
+        post.platform === 'linkedin'
+          ? await publishLinkedIn(
+              tokens.accessToken,
+              `urn:li:person:${post.external_id}`,
+              post.text,
+              fetchImpl,
+              mediaId,
+            )
+          : await publishX(tokens.accessToken, post.text, fetchImpl, mediaId)
+    }
   } catch (error) {
     const failure =
       error instanceof PublishError

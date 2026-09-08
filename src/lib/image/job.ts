@@ -45,6 +45,13 @@ export type ImageOutcome =
       readonly key: string
       readonly bytes: number
       readonly cost: number
+      /**
+       * ما لم يقع — **ويُعرَض** (D-088).
+       *
+       * الشريحةُ تسقط صامتةً بخمسة أسباب، فالمالكُ يرى صورةً بلا نصّ
+       * ولا يعرف السبب. وفارغٌ يعني أنّ كلَّ شيءٍ تمّ.
+       */
+      readonly note: string
     }
   /** وُلّدت لهذا النصّ — لا نداء ولا كلفة. */
   | { readonly kind: 'already'; readonly mediaId: string }
@@ -119,25 +126,50 @@ interface SlideRequest {
 }
 
 /**
- * يركّب النصَّ العربيَّ فوق الصورة — **ويعيد `null` بدل أن يرمي**.
+ * يركّب النصَّ العربيَّ فوق الصورة — **ويعيد سببا بدل أن يرمي**.
  *
  * فالشريحةُ تحسينٌ لا شرط: كلُّ سببِ سقوطٍ هنا يُبقي الصورةَ كما هي.
  * **ومنشورٌ بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة** — وهي قاعدةُ الموجز
  * البصريّ نفسُها (D-083).
+ *
+ * **والسقوطُ الصامتُ يُقرأ عطلا** (D-088): كان يعيد `null` في خمس حالاتٍ
+ * لا تُفرَّق، فالمالكُ يرى «وُلّدت صورة» ولا يرى نصّا فوقها **ولا يعرف
+ * أيَّ الخمسِ وقعت** — أرمزُ المتصفّح غائب؟ أم أُطفئ التركيب؟ أم سقط
+ * النداء؟ فيُعاد الضبطُ في مكانٍ سليمٍ ويبقى العطل. **فيُعاد السببُ
+ * مع المخرَج، ويُعرَض.**
  */
+export interface SlideOutcome {
+  readonly slide: { bytes: Uint8Array; mime: string; model: string } | null
+  /** فارغٌ حين تُركَّب — ونصٌّ يُقرأ حين لا تُركَّب. */
+  readonly reason: string
+}
+
 export async function composeSlide(
   deps: ImageDeps,
   request: SlideRequest,
-): Promise<{ bytes: Uint8Array; mime: string; model: string } | null> {
-  if (request.headline.trim() === '') return null
-  if (request.image.bytes.length > MAX_OVERLAY_BYTES) return null
+): Promise<SlideOutcome> {
+  if (request.headline.trim() === '') {
+    return { slide: null, reason: 'بلا عنوانٍ في الموجز — ولا يُخترَع نصّ' }
+  }
+  if (request.image.bytes.length > MAX_OVERLAY_BYTES) {
+    return { slide: null, reason: 'الصورةُ فوق حدِّ الضمّ — بقيت بلا نصّ' }
+  }
 
   const settings = await readSettings(deps.db)
-  if (!settings.imageOverlay) return null
+  if (!settings.imageOverlay) {
+    return { slide: null, reason: 'تركيبُ النصّ مُطفأٌ من الإعدادات' }
+  }
 
   const accountId = deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? ''
   const apiToken = deps.workerSecrets['CF_BROWSER_TOKEN'] ?? ''
-  if (accountId.trim() === '' || apiToken.trim() === '') return null
+  if (accountId.trim() === '' || apiToken.trim() === '') {
+    return {
+      slide: null,
+      reason:
+        'لا رمزَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
+        ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
+    }
+  }
 
   const size = SLIDE_SIZE[request.platform]
   const html = slideHtml({
@@ -158,10 +190,13 @@ export async function composeSlide(
       height: size.height,
       ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
     })
-  } catch {
+  } catch (error) {
     // **ولا يُسجَّل ما لم يقع**: نداءٌ سقط قبل أن يُصوَّر شيءٌ لا كلفةَ له،
     // ونداءٌ ردَّ خطأً لا يُحاسَب عليه عند Cloudflare
-    return null
+    return {
+      slide: null,
+      reason: `تعذّر تصويرُ الشريحة: ${error instanceof Error ? error.message : 'عطل'}`,
+    }
   }
 
   // **وكلفةُ اللقطة تُسجَّل** — نداءٌ خارجيٌّ مدفوعٌ لا يُخفى (D-008).
@@ -173,7 +208,10 @@ export async function composeSlide(
     unitCost: 0,
   })
 
-  return { bytes: shot.bytes, mime: shot.mime, model: request.image.model }
+  return {
+    slide: { bytes: shot.bytes, mime: shot.mime, model: request.image.model },
+    reason: '',
+  }
 }
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
@@ -189,10 +227,20 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     return { kind: 'failed', reason: `حالتُه «${post.status}» — والصورةُ تُضاف قبل الجدولة`, retryable: false }
   }
 
-  // ٢ · أوُلّدت لهذا النصّ؟
+  /*
+   * ٢ · أوُلّدت لهذا النصّ؟
+   *
+   * **والسؤالُ عن الحال لا عن الاسم** (D-088). كان يسأل عن المفتاح وحده،
+   * فصفٌّ رُفض **قبل** أن يصير الرفضُ يوسم مفتاحَه (D-087) يُوجَد فيُقال
+   * «وُلّدت صورةٌ لهذا النصّ» **بلونٍ أخضر** — ولا صورة. وهو ما شكا منه
+   * المالك: «يظهر أنّها تمّت، ولم تتمّ».
+   *
+   * والاسمُ يُصلَح بترحيلٍ مرّةً واحدة (‏0018)، **والحالُ صحيحةٌ في كلّ
+   * صفٍّ منذ ‏0010** — فالحارسُ يُبنى عليها.
+   */
   const key = await imageKey(post.id, post.text)
   const existing = await deps.db
-    .prepare('SELECT id FROM media WHERE idempotency_key = ?')
+    .prepare("SELECT id FROM media WHERE idempotency_key = ? AND status = 'ready'")
     .bind(key)
     .first<{ id: string }>()
   if (existing !== null) return { kind: 'already', mediaId: existing.id }
@@ -331,7 +379,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     headline: visual.brief?.headline ?? '',
     kicker: visual.brief?.kicker ?? '',
   })
-  if (overlay !== null) image = overlay
+  if (overlay.slide !== null) image = overlay.slide
 
   // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه
   //
@@ -385,13 +433,57 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
       .run()
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
-    // سباقٌ على المفتاح نفسه: الآخرُ سبق. وبايتاتُنا لا يشير إليها أحد فتُمحى
     if (message.includes('UNIQUE')) {
-      await deps.bucket.delete(r2Key).catch(() => undefined)
       const won = await deps.db
-        .prepare('SELECT id FROM media WHERE idempotency_key = ?')
+        .prepare('SELECT id, status FROM media WHERE idempotency_key = ?')
         .bind(key)
-        .first<{ id: string }>()
+        .first<{ id: string; status: string }>()
+
+      /*
+       * **ومَن يشغل الاسمَ قد يكون مرفوضا** (D-088).
+       *
+       * الخطوةُ ٢ تتخطّى المرفوض بحقّ — ثمّ يصطدم الإدراجُ بقيدٍ يعرف
+       * الاسمَ ولا يعرف الحال. وردُّ «وُلّدت» هنا يعيد الكذبةَ نفسَها
+       * **بعد أن دُفع ثمنُ النداء**. فيُخلى الاسمُ ويُعاد الإدراجُ مرّةً
+       * واحدة — والصفُّ المرفوضُ يبقى بكلفته كما هو.
+       */
+      if (won !== null && won.status === 'rejected') {
+        await deps.db
+          .prepare(
+            "UPDATE media SET idempotency_key = idempotency_key || ':rejected:' || id" +
+              ' WHERE id = ? AND idempotency_key NOT LIKE ?',
+          )
+          .bind(won.id, '%:rejected:%')
+          .run()
+        try {
+          await deps.db
+            .prepare(
+              `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key)
+            .run()
+          return {
+            kind: 'generated',
+            mediaId,
+            key: r2Key,
+            bytes: image.bytes.length,
+            cost: priced.total + visual.cost,
+            note: overlay.reason,
+          }
+        } catch (second) {
+          await deps.bucket.delete(r2Key).catch(() => undefined)
+          await releaseClaim(deps.db, key)
+          return {
+            kind: 'failed',
+            reason: `تعذّرت كتابة الصفّ: ${second instanceof Error ? second.message : 'قيد'}`,
+            retryable: false,
+          }
+        }
+      }
+
+      // سباقٌ على المفتاح نفسه: الآخرُ سبق. وبايتاتُنا لا يشير إليها أحد فتُمحى
+      await deps.bucket.delete(r2Key).catch(() => undefined)
       if (won !== null) return { kind: 'already', mediaId: won.id }
     }
     await releaseClaim(deps.db, key)
@@ -406,6 +498,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     key: r2Key,
     bytes: image.bytes.length,
     cost: priced.total + visual.cost,
+    note: overlay.reason,
   }
 }
 
@@ -470,11 +563,45 @@ export async function rejectMedia(db: Db, mediaId: string): Promise<boolean> {
   // وقراءةُ حقلٍ غيرِ مضمونٍ في غلافٍ يعيده السائق تربط الشيفرةَ بشكلٍ
   // قد يتبدّل. واستعلامان رخيصان أوثقُ من حقلٍ لا يضمنه العقد
   const row = await db
-    .prepare("SELECT status FROM media WHERE id = ?")
+    .prepare('SELECT status, idempotency_key FROM media WHERE id = ?')
     .bind(mediaId)
-    .first<{ status: string }>()
+    .first<{ status: string; idempotency_key: string }>()
   if (row === null || row.status !== 'ready') return false
 
-  await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(mediaId).run()
+  /*
+   * **والحجزُ يُطلَق معه — وإلّا بقي الطريقُ مسدودا بطبقةٍ ثانية.**
+   *
+   * `media_claims` مفتاحُها هو `idempotency_key` بعينه (D-068). ويُكتب
+   * الحجزُ قبل النداء ولا يُمحى بعد نجاحه — لأنّ صفَّ الصورة صار يحرس
+   * التكرار. فإذا أُطلق مفتاحُ الصفّ وحده، ردّت الخطوةُ ٣·ب
+   * `in_progress` **عشرَ دقائقَ كاملة** بلا سببٍ يُقرأ.
+   *
+   * وقد وقع في أوّل اختبار: `generated` ثمّ رفضٌ ثمّ `in_progress`.
+   */
+  await releaseClaim(db, row.idempotency_key)
+
+  /*
+   * **والرفضُ يُطلِق المفتاح** (D-087).
+   *
+   * كان الصفُّ يُعلَّم `rejected` **ويحتفظ بمفتاح عدم التكرار**. والخطوةُ
+   * ٢ في `generateForPost` تسأل عن المفتاح ولا تسأل عن الحال، فتجده
+   * فتقول «وُلّدت صورةٌ لهذا النصّ — لم يُنفق شيء» وتخرج.
+   *
+   * **فمن رفض صورةً لم يستطع توليدَ بديلٍ لها أبدا.** ولا رسالةَ تقول
+   * ذلك: يقرأ المالكُ «وُلّدت» ولا يرى صورة، فيظنّ العطلَ في المزوّد.
+   * وقد وقع — وهو ما شكا منه.
+   *
+   * والمفتاحُ `UNIQUE` منذ ‏0010، فلا يكفي تجاهلُ المرفوض في القراءة:
+   * الإدراجُ الجديد يصطدم بالقيد. **فيُوسَم المفتاح بمعرّف الصفّ** —
+   * يبقى الصفُّ بكلفته في الدفتر (وهو المقصود من إبقائه)، **ويُخلى
+   * الاسمُ لتوليدٍ جديد**.
+   */
+  await db
+    .prepare(
+      "UPDATE media SET status = 'rejected', idempotency_key = idempotency_key || ':rejected:' || id" +
+        ' WHERE id = ?',
+    )
+    .bind(mediaId)
+    .run()
   return true
 }

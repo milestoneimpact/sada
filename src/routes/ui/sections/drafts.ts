@@ -21,7 +21,8 @@
  */
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
-import { PLATFORMS, type Platform } from '../../../lib/draft/prompt'
+import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
+import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
 import { relativeTime } from '../../../lib/format'
 
@@ -45,9 +46,41 @@ function money(value: number): string {
 }
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
-const LINES: Readonly<Record<string, number>> = { linkedin: 12, x: 6 }
+const LINES: Readonly<Record<string, number>> = {
+  linkedin: 12, x: 6, tiktok: 5, youtube: 8,
+}
 const LINE = 26
 const PAD = 28
+
+/**
+ * مواعيدُ بضغطةٍ واحدة — **بتوقيت المالك لا بالـ UTC** (D-089).
+ *
+ * ## العلّة المقيسة
+ *
+ * قال المالك: «تسهيل عمليّة الجدولة، حيث إنّ استخدامها صعب». وقُرئ
+ * الشريطُ فوُجد فيه حقلٌ واحد `datetime-local` **بلا أيّ اقتراح**:
+ * يُكتب التاريخُ والساعةُ والدقيقةُ يدا، في كلّ مسوّدةٍ على حدة.
+ *
+ * **والموعدُ بالـ UTC والمالكُ في الرياض** — فبينهما ثلاثُ ساعات. فمن
+ * أراد «التاسعةَ صباحا» كتب `06:00`، **ويحوّل ذهنيّا في كلّ مرّة**.
+ * وخطأُ ساعةٍ هنا منشورٌ يخرج في وقتٍ لا يقرؤه أحد.
+ *
+ * ## والحلُّ لا يمسّ الخادم
+ *
+ * الخادمُ يقرأ الـ UTC ولا يعرف منطقةَ أحد — **وهذا صواب**: منطقةٌ
+ * تُخزَّن في إعدادٍ تُنسى فتكذب بعد سفرٍ أو تحوّلٍ صيفيّ. فالتحويلُ في
+ * المتصفّح، حيث المنطقةُ معروفةٌ يقينا وتُقرأ لحظتَها.
+ *
+ * فالأزرارُ تحسب لحظةً **محلّيّة** ثمّ تكتبها في الصندوق **UTC**،
+ * ومرآةٌ تحته تقرأ ما في الصندوق وتقوله بتوقيت المالك. **فالرقمان
+ * حاضران معا**، ولا يُصدَّق أحدُهما على حساب الآخر.
+ */
+const QUICK: readonly { kind: string; label: string }[] = [
+  { kind: 'hour', label: 'بعد ساعة' },
+  { kind: 'tonight', label: 'الليلة ٨م' },
+  { kind: 'tomorrow', label: 'غدا ٩ص' },
+  { kind: 'sunday', label: 'الأحد ٩ص' },
+]
 
 /**
  * شريطُ الجدولة — ولا يظهر إلّا حيث يعمل.
@@ -59,7 +92,13 @@ const PAD = 28
  * ونموذجٌ معطَّلٌ بلا تفسير أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا
  * في نقص قناته.
  */
-function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, now: Date): string {
+function scheduler(
+  d: DraftRow,
+  targets: readonly Target[],
+  earliest: string,
+  now: Date,
+  pageOnly: readonly string[],
+): string {
   const approved = d.status === 'approved' || d.status === 'edited'
 
   if (d.status === 'queued') {
@@ -84,6 +123,17 @@ function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, no
 
   const fit = targets.filter((t) => t.platform === d.platform)
   if (fit.length === 0) {
+    // **والسببُ يُقال كما هو**: «لا قناة» حيث القناةُ مربوطةٌ صفحةً كذبٌ
+    // يرسل المالكَ يربط ما هو مربوط
+    if (pageOnly.includes(d.platform)) {
+      return `<div class="sched none">
+        <span class="st warn"><span class="g">!</span>الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ</span>
+        <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
+          أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
+        <span class="grow"></span>
+        <a class="btn g sm" href="/panel/tasks">ما عليك</a>
+      </div>`
+    }
     return `<div class="sched none">
       <span class="st warn"><span class="g">!</span>لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة</span>
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
@@ -100,10 +150,18 @@ function scheduler(d: DraftRow, targets: readonly Target[], earliest: string, no
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>
     <div class="field"><label for="wh-${id}">الموعد (UTC)</label>
-      <input id="wh-${id}" name="when" type="datetime-local"
+      <input id="wh-${id}" name="when" type="datetime-local" data-when
         min="${escapeHtml(earliest)}" required></div>
     <span class="grow"></span>
     <button class="p sm" type="submit">جدوِل</button>
+    <div class="quick" data-quick="wh-${id}">
+      ${QUICK.map(
+        (q) =>
+          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+      ).join('')}
+      <span class="grow"></span>
+      <span class="mirror mono" data-mirror="wh-${id}"></span>
+    </div>
   </form>`
 }
 
@@ -218,7 +276,7 @@ function filterTabs(drafts: readonly DraftRow[]): string {
 }
 
 /**
- * المعاينة — **كما تُقرأ لا كما تُحرَّر** (D-090).
+ * المعاينة — **كما تُقرأ لا كما تُحرَّر** (D-100).
  *
  * ## ما تُضيفه على المربّع
  *
@@ -259,12 +317,47 @@ function preview(d: DraftRow, target: string): string {
   </div>`
 }
 
+/**
+ * لوحُ المراجعة — **ملحوظاتٌ تُقرأ ولا تمنع** (D-090).
+ *
+ * ولا يظهر إلّا حيث يُفيد: مسوّدةٌ يُبَتّ فيها. **وملحوظةٌ على منشورٍ
+ * نُشر عتابٌ لا مراجعة** — فات وقتُ تعديله، ولا يبقى منها إلّا الإزعاج.
+ *
+ * **ولا شارةَ حمراء**: هذه ملحوظاتُ ذوقٍ لا أخطاءُ نظام. ولونٌ يقول
+ * «عطل» على «ما رأيكم؟» يجعل المالكَ يتجاهل اللونَ حين يعني عطلا حقّا.
+ */
+function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
+  // **والشرطُ هو شرطُ المحرِّر نفسُه**: ملحوظةٌ حيث لا مربّعَ يُحرَّر
+  // عتابٌ لا مراجعة. وشرطان متقاربان يفترقان بلا حارس
+  if (d.status !== 'draft' && d.status !== 'approved' && d.status !== 'edited') return ''
+  const notes: readonly ReviewNote[] = reviewText(d.text, d.platform, counted, hardLimit)
+  if (notes.length === 0) return ''
+
+  return `<details class="notes">
+    <summary><span class="st idle"><span class="g">◍</span>${
+      notes.length} ملحوظةً على الصياغة</span>
+      <span class="ago">تُقرأ ولا تمنع — والقرارُ لك</span></summary>
+    <ul class="plain">${notes
+      .map(
+        (n) => `<li><b>${escapeHtml(n.text)}</b>${
+          n.hits.length === 0
+            ? ''
+            : ` <span class="hit-list">${n.hits
+                .map((h) => `<span class="chip">${escapeHtml(h)}</span>`)
+                .join(' ')}</span>`
+        }</li>`,
+      )
+      .join('')}</ul>
+  </details>`
+}
+
 function card(
   d: DraftRow,
   now: Date,
   targets: readonly Target[],
   earliest: string,
   media: readonly MediaView[],
+  pageOnly: readonly string[],
 ): string {
   const spec = PLATFORMS[d.platform]
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
@@ -312,11 +405,11 @@ function card(
     ? `<form method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <textarea name="text" class="draft-text" style="${box}"
-           data-limit="${spec.hardLimit}" data-target="${spec.target}"
+           data-limit="${spec.hardLimit}" data-target="${ceilingOf(spec.hardLimit)}"
            data-count="${spec.id}"
            aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
          <div class="draft-foot">
-           <span class="count ${len > spec.hardLimit ? 'bad' : len > spec.target ? 'warn' : ''}"
+           <span class="count ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
              ><b>${len}</b> / ${spec.hardLimit}</span>
            <span class="grow"></span>
            <button class="g sm" type="submit" name="do" value="reject">ارفض</button>
@@ -335,6 +428,7 @@ function card(
 
   return `<div class="draft${live ? '' : ' done'}" data-draft="${escapeHtml(d.id)}"
     data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}">
+    ${notesPane(d, len, spec.hardLimit)}
     <div class="draft-top">
       ${open
         ? `<label class="pick" title="حدّدها للاعتماد الجماعيّ">
@@ -352,7 +446,7 @@ function card(
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
     ${imagePane(d, media)}
-    ${scheduler(d, targets, earliest, now)}
+    ${scheduler(d, targets, earliest, now, pageOnly)}
     <div class="draft-meta">${meta}</div>
   </div>`
 }
@@ -388,6 +482,14 @@ export interface DraftsInput {
   readonly now: Date
   /** أمزوّدُ مهمّة `draft` جاهز؟ زرٌّ لا ينادي أحدا لا يُعرض عاملا. */
   readonly ready: boolean
+  /**
+   * منصّاتٌ حساباتُها الحيّةُ **صفحاتٌ لا أشخاص** (D-087).
+   *
+   * ولولا هذا لقيل «لا قناةَ مربوطة» وهي مربوطة — **وذاك كذبٌ يُرسل
+   * المالكَ يربط ما هو مربوط**. فيُقال السببُ الحقيقيّ: الصفحةُ مربوطةٌ،
+   * والنشرُ باسمها لم يُبنَ.
+   */
+  readonly pageOnly: readonly string[]
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -408,9 +510,15 @@ export function draftsSection(input: DraftsInput): string {
                .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)
                .join('')}</select></div>
            <div class="field"><label for="dw-pf">المنصّة</label>
-             <select id="dw-pf" name="platform">
-               <option value="linkedin">LinkedIn — نحو ١٣٠٠ محرف</option>
-               <option value="x">X — نحو ٢٥٠ محرفا</option></select></div>
+             <select id="dw-pf" name="platform">${(
+               Object.values(PLATFORMS) as PlatformSpec[]
+             )
+               .map(
+                 (spec) =>
+                   `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — حتّى ${
+                     spec.hardLimit} محرفا</option>`,
+               )
+               .join('')}</select></div>
            <div class="grow"></div>
            <button class="p" type="submit"${input.ready ? '' : ' disabled'}>اكتب مسوّدة</button>
          </form>
@@ -445,7 +553,7 @@ export function draftsSection(input: DraftsInput): string {
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
       : `<div class="grid c2 ragged">${drafts
-          .map((d) => card(d, now, input.targets, input.earliest, input.media))
+          .map((d) => card(d, now, input.targets, input.earliest, input.media, input.pageOnly))
           .join('')}</div>`
 
   /*
@@ -487,10 +595,55 @@ export function draftsSection(input: DraftsInput): string {
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
   </div>
+  ${spreadBar(input)}
   ${filterTabs(drafts)}
   ${keys}
   ${list}
   <div class="empty" id="draft-none" hidden>
     <b>لا مسوّدةَ في هذا الفرز</b>
     <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>`
+}
+
+/**
+ * شريطُ التوزيع — **ولا يظهر إلّا حيث يعمل** (D-089).
+ *
+ * معتمَدةٌ واحدةٌ تُجدوَل من بطاقتها في ضغطتين. **والتوزيعُ يُوجد
+ * لاثنتين فصاعدا**، فزرٌّ يظهر على واحدةٍ يزحم الصفحةَ بلا أن يوفّر شيئا.
+ *
+ * وشرطُ الوجهة معه: معتمَدةٌ بلا قناةٍ لمنصّتها لا تُوزَّع أصلا — **وزرٌّ
+ * يفتح شاشةً تقول «لا شيءَ يُوزَّع» وعدٌ يُخلَف**.
+ */
+function spreadBar(input: DraftsInput): string {
+  const ready = input.drafts.filter(
+    (d) =>
+      (d.status === 'approved' || d.status === 'edited') &&
+      input.targets.some((t) => t.platform === d.platform),
+  ).length
+  if (ready < 2) return ''
+
+  return `<form class="card spread-bar" method="POST" action="/panel/drafts/spread">
+    <div class="card-head"><h2>وزّع المعتمَد</h2>
+      <div class="grow"></div>
+      <span class="st ok"><span class="g">●</span>${ready} جاهزةً للتوزيع</span></div>
+    <p class="hint">موعدٌ للأولى وفاصلٌ بين كلِّ اثنتين — <b>ويُعرَض الجدولُ كاملا
+      قبل أن يقع منه شيء</b>.</p>
+    <div class="row">
+      <div class="field"><label for="sp-start">أوّلُ موعد (UTC)</label>
+        <input id="sp-start" name="start" type="datetime-local" data-when
+          min="${escapeHtml(input.earliest)}" required></div>
+      <div class="field"><label for="sp-gap">الفاصل (ساعة)</label>
+        <input id="sp-gap" name="gap" type="number" inputmode="numeric"
+          min="1" max="168" value="24" required></div>
+      <span class="grow"></span>
+      <button class="p" type="submit">اعرض الجدول</button>
+    </div>
+    <div class="quick" data-quick="sp-start">
+      ${QUICK.map(
+        (q) =>
+          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+      ).join('')}
+      <span class="grow"></span>
+      <span class="mirror mono" data-mirror="sp-start"></span>
+    </div>
+  </form>`
 }

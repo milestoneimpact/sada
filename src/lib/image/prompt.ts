@@ -35,6 +35,10 @@ import type { VisualBrief } from './brief'
 
 /** نسبةُ كلّ منصّة — تُطلب في الوصف، ويُقصّ الناتج إن خالفها لاحقا. */
 export const ASPECT: Readonly<Record<Platform, string>> = {
+  // و TikTok رأسيّةٌ خالصة — والصورةُ هنا مصدرُ المقطع لا منشورٌ بذاتها
+  tiktok: '9:16 vertical portrait',
+  // و Shorts رأسيّةٌ كذلك — والمقاسُ واحد
+  youtube: '9:16 vertical portrait',
   linkedin: '1.91:1 wide landscape',
   x: '16:9 landscape',
 }

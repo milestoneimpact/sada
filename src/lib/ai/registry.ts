@@ -12,10 +12,10 @@
  */
 import type { Env } from '../../env'
 
-export type ProviderName = 'anthropic' | 'gemini'
+export type ProviderName = 'anthropic' | 'gemini' | 'cloudflare'
 
 /** المهامّ التي تنادي نموذجا. تُوسَّع حين تُبنى طبقةٌ جديدة. */
-export type TaskName = 'analyze' | 'draft' | 'image' | 'plan'
+export type TaskName = 'analyze' | 'draft' | 'image' | 'plan' | 'video'
 
 export interface ProviderSpec {
   readonly label: string
@@ -34,6 +34,11 @@ export const PROVIDERS: Readonly<Record<ProviderName, ProviderSpec>> = {
     label: 'Gemini — توليد الصور',
     secret: 'GEMINI_API_KEY',
     docs: 'aistudio.google.com/apikey',
+  },
+  cloudflare: {
+    label: 'Cloudflare Workers AI — الفيديو',
+    secret: 'CF_AI_TOKEN',
+    docs: 'dash.cloudflare.com ← My Profile ← API Tokens ← Workers AI',
   },
 }
 
@@ -72,10 +77,27 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
     model: 'gemini-2.5-flash-image',
     why: 'لا بديل عند Anthropic — وصورةٌ تصاحب النصّ تُرى أكثر',
   },
+  /**
+   * **والفيديو كان مثبَّتا في الشيفرة** (D-091).
+   *
+   * `animateForPost` تنادي `alibaba/hh1-i2v` حرفا، **فاختيارُ المالك في
+   * اللوحة لا يصل إليه**. وهي علّةُ D-079 نفسُها في مكانٍ لم يُفتَّش:
+   * يُقرأ ولا يُطاع.
+   *
+   * **وهو أغلى ما يُنادى في النظام** (M-16: سعرُه لم يُقرأ بعد) — فأن
+   * يُختار نموذجُه من اللوحة أولى لا أدنى.
+   */
+  video: {
+    provider: 'cloudflare',
+    model: 'alibaba/hh1-i2v',
+    why: 'صورةٌ ← مقطعٌ رأسيّ: نرى الصورةَ ونعتمدها قبل أن نُنفق على تحريكها',
+  },
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
-export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>(['analyze', 'draft', 'image', 'plan'])
+export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>([
+  'analyze', 'draft', 'image', 'plan', 'video',
+])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {
   const value = env[PROVIDERS[provider].secret]

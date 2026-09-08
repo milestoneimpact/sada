@@ -27,6 +27,7 @@ const data: PanelData = {
   paused: false,
   autoEnqueue: true,
   imageOverlay: true,
+  pageOnly: [],
   browserToken: false,
   analysisCap: 10,
   spendCap: 5,
@@ -125,7 +126,9 @@ const data: PanelData = {
     {
       id: 'd2', platform: 'x',
       text:
-        'البرامجُ التي تُقاس شهريّا تصحّح مسارها في الربع الأوّل. والتي تُقاس سنويّا تكتشف الخطأ بعد أن يصير كلفةً لا درسا.\n\nالقياسُ أداةُ قيادةٍ تُستعمل وهي حارّة، لا تقريرٌ يُرفع في آخر السنة.',
+        // **نصٌّ عليه ملحوظات** عمدا (D-090): حشوٌ وخاتمةٌ مستهلَكة —
+        // ومدقّقٌ لا يرى لوحَ المراجعة لا يحرسه
+        'ومما لا شك فيه ان البرامجَ التي تُقاس شهريّا تصحّح مسارها مبكّرا. والتي تُقاس سنويّا تكتشف الخطأ بعد أن يصير كلفةً لا درسا.\n\nما رأيكم؟',
       rationale: 'الفكرةُ كاملةٌ في منشورٍ واحد — لا خيط.',
       status: 'draft', model: 'claude-opus-5', cost: 0.0118,
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
@@ -144,6 +147,20 @@ const data: PanelData = {
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(22),
       createdAt: ago(26),
+      scheduledAt: null, accountName: null, dispatchedAt: null,
+      publishCost: 0,
+    },
+    {
+      // معتمَدةٌ ثانيةٌ عمدا: شريطُ التوزيع لا يظهر دون اثنتين (D-089)،
+      // ومدقّقٌ لا يرى الشريطَ لا يحرسه
+      id: 'd3b', platform: 'linkedin',
+      text:
+        'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره.\n\nوهذا ما يقيسه التقرير: كم يوما بين أن يُعتمد بندٌ وأن يبدأ العمل به.',
+      rationale: 'رقمٌ واحدٌ يقف وحده، ويصلح مدخلا للتقرير.',
+      status: 'approved', model: 'claude-opus-5', cost: 0.0301,
+      sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
+      stale: false, approvedBy: 'panel:passkey', approvedAt: ago(18),
+      createdAt: ago(20),
       scheduledAt: null, accountName: null, dispatchedAt: null,
       publishCost: 0,
     },

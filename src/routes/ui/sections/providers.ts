@@ -10,10 +10,28 @@ import type { PanelData, PanelProvider } from '../../panelView'
 import { escapeHtml } from '../shell'
 import { bar } from '../parts'
 
+/**
+ * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
+ *
+ * كانت ثلاثا وفي `ROUTES` أربع، فيُعرَض `plan` بمفتاحه الخام. ومفتاحٌ
+ * إنجليزيٌّ في جدولٍ عربيٍّ يُقرأ عطلا لا مهمّة.
+ */
 const TASK_LABEL: Readonly<Record<string, string>> = {
   analyze: 'الفهم — الحكم على المصدر',
   draft: 'الكتابة — صياغة المنشور',
+  plan: 'الخطّة — منطقُ الأسبوع',
   image: 'الصورة — التوليد البصريّ',
+  video: 'الفيديو — تحريكُ الصورة',
+}
+
+/**
+ * صنفُ النماذج الذي يُعرَض لكلّ مهمّة — **فلا يُعرَض نصٌّ لتوجيهِ صورة**.
+ *
+ * وما ليس في الجدول نصٌّ: `analyze` و`draft` و`plan` كلُّها كتابة.
+ */
+const TASK_MODELS: Readonly<Record<string, 'image' | 'video'>> = {
+  image: 'image',
+  video: 'video',
 }
 
 
@@ -43,7 +61,7 @@ function modelPicker(options: {
   readonly provider: string
   readonly current: string
   /** يُصفّى الدرجُ إلى صنفِ المهمّة حين تُعرَف — فلا يُعرَض نصٌّ لتوجيهِ صورة. */
-  readonly task?: 'text' | 'image'
+  readonly task?: 'text' | 'image' | 'video'
   /** أتُملأ حقولُ السعر ممّا يعطيه الفهرس؟ */
   readonly fillsPrice?: boolean
   readonly width?: string
@@ -439,7 +457,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
             id: `rm-${r.task}`,
             provider: r.provider,
             current: r.model,
-            ...(r.task === 'image' ? { task: 'image' as const } : { task: 'text' as const }),
+            task: TASK_MODELS[r.task] ?? ('text' as const),
             width: '190px',
           })}
           <button class="g sm" type="submit">حفظ</button>
