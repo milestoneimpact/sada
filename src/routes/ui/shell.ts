@@ -5,6 +5,7 @@
  * وحقنُ رمز CSRF، و `nonce` السياسة. فما بُني فوقها ورثها، وما نسيها
  * لم يُبنَ فوقها أصلا.
  */
+import { COMMAND_SCRIPT, commandPalette, commandTrigger, type Command } from './command'
 import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
 import { BEIRUTI, INTER } from '../../lib/ui/fonts'
 
@@ -197,6 +198,20 @@ export function densitySwitch(): string {
   </div>`
 }
 
+/**
+ * شريطُ العودة — **كُتب ستَّ مرّاتٍ حرفا بحرف، فجُمع** (D-105).
+ *
+ * وليس التكرارُ وحدَه هو السبب: **زرُّ لوحة الأوامر يسكن هنا**. وستّةُ
+ * مواضعَ تعني ستَّ فرصٍ لنسيانه، **وصفحةٌ بلا زرٍّ تُخفي اختصارا لا
+ * يعرفه إلّا من كتبه**. فما دام الشريطُ واحدا، فالزرُّ فيه لا يُنسى.
+ */
+export function backNav(href: string, label: string): string {
+  return `<nav class="back" aria-label="مسارُ العودة">
+    <a href="${escapeHtml(href)}">← ${escapeHtml(label)}</a>
+    <span class="grow"></span>${commandTrigger()}${themeSwitch()}
+  </nav>`
+}
+
 export function themeSwitch(): string {
   return `<div class="theme" id="theme" role="group" aria-label="سمة العرض">
     <button type="button" data-theme="light" aria-pressed="false">نهاريّ</button>
@@ -237,7 +252,19 @@ export function shell(
   body: string,
   nonce: string,
   script = '',
-  options: { indexable?: boolean; description?: string } = {},
+  options: {
+    indexable?: boolean
+    description?: string
+    /**
+     * فهرسُ لوحة الأوامر (D-105) — **ومَن مرّره نالها كاملةً**.
+     *
+     * الجسدُ والنصُّ البرمجيُّ يُضافان هنا معا، ولا سبيلَ إلى تمرير
+     * أحدهما دون الآخر. **وصفحةٌ فيها الجسدُ بلا نصٍّ لوحةٌ لا تُفتَح**،
+     * وهي عينُ العلّة التي وُلد من أجلها حقنُ CSRF في مكانٍ واحد: حارسٌ
+     * يُنسى نسخُه في مسارٍ جديد (D-019).
+     */
+    commands?: readonly Command[]
+  } = {},
 ): string {
   const safeNonce = escapeHtml(nonce)
   return `<!doctype html><html lang="ar" dir="rtl"><head>
@@ -253,6 +280,11 @@ ${FAVICON}
 ${FONT_PRELOAD}
 <style nonce="${safeNonce}">${FONT_CSS}</style>
 <link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
-    script === '' ? '' : `<script nonce="${safeNonce}">${stripJs(script)}</script>`
+    options.commands === undefined ? '' : commandPalette(options.commands)
+  }${
+    (() => {
+      const all = options.commands === undefined ? script : script + COMMAND_SCRIPT
+      return all === '' ? '' : `<script nonce="${safeNonce}">${stripJs(all)}</script>`
+    })()
   }</body></html>`
 }

@@ -451,6 +451,15 @@ p.nm{margin:0 0 var(--s-3)}
 .st.idle{color:var(--ink-3); background:var(--surface-2); border-color:var(--line)}
 .chip{display:inline-block; padding:var(--s-0) var(--s-2); border-radius:5px; font-size:var(--t-xs); font-weight:600;
   background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink-2); margin:var(--s-0) 0 0 var(--s-1)}
+/* **ورقاقةٌ تُلمَس ليست رقاقةً تُقرأ** (D-105).
+
+   قِيست رقاقةُ رابط الرحلة ‏٥١×‏٢٥ عند ‏٤٣٠px، **وهدفٌ دون ‏٤٤ يُصاب
+   بالمصادفة لا بالقصد**. والقياسُ لا يُكبَّر — الرقاقةُ تبقى بحجمها،
+   **ويُمدّ هدفُ اللمس تحتها بعنصرٍ زائفٍ لا يُزيح شيئا**. فما يُرى
+   يبقى، وما يُلمَس يكفي. */
+a.chip{position:relative}
+a.chip::after{content:''; position:absolute; inset:50% 0 auto;
+  height:var(--tap); transform:translateY(-50%)}
 
 /* الاستحقاق: مقياس مقدار — تدرّج هيئةٍ واحدة، والرقم بلون النصّ */
 .worth{display:flex; align-items:center; gap:var(--s-2); min-width:104px}
@@ -1240,4 +1249,84 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   .row > *:not(button):not(.btn),.field{min-width:0}
 }
 
+/* ── لوحةُ الأوامر (D-105) ────────────────────────────────────────────
+   طبقةٌ تعلو كلَّ شيء وتحجب ما تحتها بلا أن تمحوه: الحجابُ يقول «أنت
+   في مكانٍ مؤقّت»، **وشاشةٌ تُبدَّل بالكامل تقول إنّك انتقلت** — ولم
+   تنتقل بعد.
+
+   وتُثبَّت في الثلث الأعلى لا في المنتصف: المنتصفُ يجعل القائمةَ تنمو
+   في الاتّجاهين فتقفز أوّلُ نتيجةٍ مع كلّ حرف. **والعينُ تلاحق ما
+   يقفز ولا تقرؤه.** */
+/* **و«hidden» تُهزَم صامتةً** (D-105).
+
+   قاعدةُ المتصفّح «[hidden]{display:none}» من أصلٍ أدنى، **وأيُّ قاعدةِ
+   مؤلّفٍ تضع «display» تغلبها**. فحجابُ اللوحة كُتب «display:flex» ورُسم
+   «hidden» — **فظهر على كلّ صفحةٍ عند التحميل**، والسمةُ موجودةٌ تُقرأ
+   في المصدر فتُصدَّق.
+
+   وهي علّةٌ لا تُمسَك بقراءة الوسم: الوسمُ صحيح. **فتُقفَل هنا مرّةً
+   للكلّ** — لا بقاعدةٍ لكلّ صنفٍ يُكتب غدا فيُنسى في واحد. */
+[hidden]{display:none!important}
+
+.cmdk-veil{position:fixed; inset:0; z-index:100; padding:12vh var(--s-4) var(--s-4);
+  display:flex; justify-content:center; align-items:flex-start;
+  background:var(--scrim)}
+@supports (backdrop-filter:blur(2px)){
+  .cmdk-veil{backdrop-filter:blur(3px)}
+}
+.cmdk{width:min(640px,100%); max-height:76vh; display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--line-strong);
+  border-radius:var(--r-lg); box-shadow:var(--sh-3); overflow:hidden}
+.cmdk-in{display:flex; align-items:center; gap:var(--s-3);
+  padding:var(--s-3) var(--s-4); border-bottom:1px solid var(--line)}
+.cmdk-in input{flex:1; min-width:0; border:0; background:none; outline:none;
+  font:inherit; font-size:var(--t-md); color:var(--ink)}
+.cmdk-in input::placeholder{color:var(--ink-3)}
+.cmdk-l{flex:1; margin:0; padding:var(--s-2); list-style:none; overflow-y:auto}
+.cmdk-g{padding:var(--s-3) var(--s-3) var(--s-1); font-size:var(--t-xs);
+  font-weight:600; color:var(--ink-3); letter-spacing:var(--ls-eyebrow)}
+/* الخيارُ رابطٌ يبقى رابطا: يُفتَح بالوسط ويُنسَخ عنوانُه كأيّ رابط */
+.cmdk-o{display:flex; align-items:center; gap:var(--s-3); text-decoration:none;
+  padding:var(--s-2) var(--s-3); border-radius:var(--r); color:var(--ink);
+  min-height:44px; transition:background var(--dur-1) var(--ease)}
+/* **والمختارُ يُعلَّم بأكثرَ من لون** (D-043): أرضيّةٌ وشريطٌ جانبيّ،
+   فمن لا يميّز اللونَ يرى الشريط. */
+.cmdk-o[aria-selected="true"]{background:var(--surface-2);
+  box-shadow:inset 3px 0 0 var(--brand)}
+@media(hover:hover){.cmdk-o:hover{background:var(--surface-2)}}
+.cmdk-i{flex:none; display:grid; place-items:center; width:20px; color:var(--ink-3)}
+.cmdk-i svg{width:17px; height:17px; display:block}
+.cmdk-o[aria-selected="true"] .cmdk-i{color:var(--brand)}
+.cmdk-t{min-width:0; display:flex; flex-direction:column; gap:1px}
+.cmdk-t b{font-size:var(--t-sm); font-weight:600; line-height:var(--lh-tight);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cmdk-t em{font-style:normal; font-size:var(--t-xs); color:var(--ink-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cmdk-none{margin:0; padding:var(--s-6) var(--s-4); text-align:center;
+  font-size:var(--t-sm); color:var(--ink-3)}
+.cmdk-foot{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap;
+  padding:var(--s-2) var(--s-4); border-top:1px solid var(--line);
+  background:var(--surface-2); font-size:var(--t-xs); color:var(--ink-3)}
+.cmdk-foot b{margin-inline-start:auto; font-weight:500; color:var(--ink-3)}
+.kbd{display:inline-block; padding:1px 6px; border-radius:var(--r-sm);
+  border:1px solid var(--line-strong); background:var(--surface);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:var(--t-xs); color:var(--ink-3); direction:ltr}
+/* والزرُّ يقول اختصارَه: اختصارٌ لا يُعلَن لا يعرفه إلّا من كتبه */
+/* وارتفاعُه ارتفاعُ جاره: قِيس زرُّ الخروج ‏٤٤ وهذا ‏٣٤، **وزرّان
+   متجاوران بارتفاعين يُقرآن رتبتين** — ولا رتبةَ بينهما. و‏٤٤ هدفُ
+   اللمس الأدنى (D-102) لا اختيارَ ذوق. */
+.cmdk-open{display:inline-flex; align-items:center; gap:var(--s-2);
+  min-height:var(--tap); padding:0 var(--s-3); border-radius:var(--r);
+  border:1px solid var(--line); background:var(--surface-2); cursor:pointer;
+  color:var(--ink-3); font:inherit; font-size:var(--t-xs);
+  transition:border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease)}
+@media(hover:hover){
+  .cmdk-open:hover{border-color:var(--line-strong); color:var(--ink-2)}
+}
+.cmdk-open svg{width:15px; height:15px; display:block}
+@media (max-width:640px){
+  .cmdk-veil{padding:var(--s-4) var(--s-3)}
+  .cmdk-open span{display:none}
+}
 `

@@ -14,6 +14,7 @@ import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
+import { buildCommands, commandTrigger, SECTIONS } from './ui/command'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
@@ -92,6 +93,25 @@ export const SCRIPT = `
     e.preventDefault(); show(t.getAttribute('href').slice(1),true);
   });});
   show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+  /*
+   * ‏والمرساةُ تُتبَع من أيّ مكان (D-105).
+   *
+   * ‏كان اللوحُ يُبدَّل بنقر الرافدة وحدَها. ولوحةُ الأوامر تُصدر روابطَ
+   * ‏عاديّةً «#posts»، ورابطٌ كهذا يبدّل المرساةَ ولا يُبدّل اللوحَ —
+   * ‏فيُقرأ الأمرُ منفَّذا والصفحةُ لم تتحرّك. وهي علّةُ D-046 نفسُها:
+   * ‏زرٌّ يعمل خطأً أسوأُ من زرٍّ لا يعمل.
+   *
+   * ‏وكذلك من كتب مرساةً في شريط العنوان، أو عاد بزرّ الرجوع.
+   */
+  window.addEventListener('hashchange',function(){
+    show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+    var t=null;
+    for(var i=0;i<tabs.length;i++){
+      if(tabs[i].getAttribute('href')===location.hash)t=tabs[i];
+    }
+    var h=document.getElementById('pane-title');
+    if(t&&h){var sp=t.querySelector('span'); if(sp)h.textContent=sp.textContent;}
+  });
   // عنوانُ الشريط العلويّ يتبع القسم — فلا يبقى «نظرة عامّة» فوق الأمان
   var head=document.getElementById('pane-title');
   if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
@@ -226,7 +246,7 @@ export const SCRIPT = `
   if(cards.length){
     var picks=Array.prototype.slice.call(document.querySelectorAll('input[data-pick]'));
     var bulkForm=document.getElementById('bulk');
-    var tabs=document.getElementById('draft-filter');
+    var ftabs=document.getElementById('draft-filter');
     var none=document.getElementById('draft-none');
     var help=document.getElementById('keys');
     if(help)help.hidden=false;
@@ -249,12 +269,12 @@ export const SCRIPT = `
       if(none)none.hidden=shown>0;
       count();
     }
-    if(tabs){
-      tabs.hidden=false;
-      tabs.querySelectorAll('button[data-bucket]').forEach(function(b){
+    if(ftabs){
+      ftabs.hidden=false;
+      ftabs.querySelectorAll('button[data-bucket]').forEach(function(b){
         b.addEventListener('click',function(){
           bucket=b.dataset.bucket;
-          tabs.querySelectorAll('button[data-bucket]').forEach(function(o){
+          ftabs.querySelectorAll('button[data-bucket]').forEach(function(o){
             var on=o===b;
             o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
           });
@@ -1252,6 +1272,33 @@ export function panelPage(d: PanelData): string {
       count > 0 ? `<span class="count">${count}</span>` : ''
     }</a>`
 
+  /*
+   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105) — لا من عشرة أسطرٍ بيد.
+   *
+   * والفهرسُ يُبنى من الجدول نفسِه، **فقسمٌ يُضاف في مكانٍ واحدٍ يظهر
+   * في الاثنين**. ولو كُتبا مفترقَين لبقي القسمُ الجديدُ خارجَ اللوحة،
+   * **ولا حارسَ يمسك غيابا**: لوحةٌ لا تجده تبدو ناقصةَ الفهرسة لا
+   * معطوبة، فلا يُشتكى منها — وتشيخ صامتة.
+   */
+  const counts: Readonly<Record<string, number>> = {
+    sources: pending,
+    posts: waitingDrafts,
+    channels: linkedChannels,
+    report: d.openSuggestions,
+    tasks: d.ownerPending,
+    providers: missing,
+    security: d.sessions.length > 1 ? d.sessions.length : 0,
+  }
+  let lastGroup = ''
+  const tabs = SECTIONS.map((s) => {
+    const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
+    lastGroup = s.group
+    // ‏أزرارُ المنصّات تتبع «القنوات» لأنّها تفريعٌ عنها لا قسمٌ ثالث
+    const after = s.id === 'channels' ? platformNav(d.channels) : ''
+    return head +
+      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0) + after
+  }).join('\n    ')
+
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
@@ -1262,18 +1309,7 @@ export function panelPage(d: PanelData): string {
     <div class="brand"><b>صدى</b><span>SADA · STAGING</span></div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
-    <span class="lbl">العمل</span>
-    ${nav('#overview', ICON.overview, 'نظرة عامّة')}
-    ${nav('#sources', ICON.sources, 'المصادر', pending)}
-    ${nav('#posts', ICON.posts, 'المنشورات', waitingDrafts)}
-    ${nav('#channels', ICON.channels, 'القنوات', linkedChannels)}
-    ${platformNav(d.channels)}
-    ${nav('/panel/report', ICON.report, 'التقرير', d.openSuggestions)}
-    <span class="lbl">الضبط</span>
-    ${nav('/panel/tasks', ICON.tasks, 'ما عليك', d.ownerPending)}
-    ${nav('#providers', ICON.providers, 'المزوّدون', missing)}
-    ${nav('#settings', ICON.settings, 'الحدود')}
-    ${nav('#security', ICON.security, 'الأمان', d.sessions.length > 1 ? d.sessions.length : 0)}
+    ${tabs}
   </nav>
   <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>
@@ -1283,6 +1319,7 @@ export function panelPage(d: PanelData): string {
   <div class="ttl"><h1 id="pane-title">نظرة عامّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
+  ${commandTrigger()}
   ${state}
   <form class="inline" method="POST" action="/panel/logout">
     <button class="g sm" type="submit">خروج</button></form>
@@ -1582,5 +1619,8 @@ ${flash}
 </div>
 </div>`
 
-  return shell('صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT)
+  return shell(
+    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT,
+    { commands: buildCommands({ onPanel: true, drafts: d.drafts }) },
+  )
 }
