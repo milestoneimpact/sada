@@ -17,6 +17,7 @@
  * ما بين يديه.
  */
 import { escapeHtml } from './shell'
+import { toHijri } from '../../lib/analyze/hijri'
 import { money, relativeTime } from '../../lib/format'
 import type { PlatformSlice, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
@@ -55,6 +56,27 @@ export function reportBody(r: WeeklyReport, now: Date): string {
   const span =
     `${escapeHtml(r.from.slice(0, 10))} — ${escapeHtml(r.to.slice(0, 10))}`
 
+  /*
+   * **والهجريُّ حيث الموسمُ معنًى — لا في كلّ تاريخ** (D-106).
+   *
+   * `analyze/hijri.ts` مبنيٌّ منذ المرحلة الأولى **ويُقرأ في موجّه
+   * النموذج وحدَه**: النموذجُ يعرف أنّه رمضان، **والمالكُ يقرأ تقريرَه
+   * فلا يجد ما يفسّر لِمَ ارتفع أسبوعٌ وهبط آخر**.
+   *
+   * **ولا يُعرَض إلّا حين يكون موسما.** تاريخٌ هجريٌّ فوق كلّ صفٍّ زينةٌ
+   * تُتخطّى بالعين؛ و«العشر الأواخر من رمضان» فوق أسبوعٍ ارتفع فيه
+   * التفاعلُ **هو الجواب**.
+   *
+   * والموسمُ يُقرأ من **وسط** الأسبوع لا من طرفه: أسبوعٌ يبدأ في شعبان
+   * وينتهي في رمضان طرفاه يكذبان عليه، **ووسطُه يقول أيَّهما كان أغلبَ**.
+   */
+  const mid = new Date((Date.parse(r.from) + Date.parse(r.to)) / 2)
+  const h = Number.isNaN(mid.getTime()) ? null : toHijri(mid)
+  const season = h === null || h.season === null
+    ? ''
+    : `<span class="pill" title="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
+        >${escapeHtml(h.season)}</span>`
+
   const top =
     r.top === null
       ? `<p class="hint"><b>لا ترتيبَ في هذا الأسبوع.</b> الترتيبُ يقع داخل نافذةٍ
@@ -82,7 +104,7 @@ export function reportBody(r: WeeklyReport, now: Date): string {
   return `<div class="page-head">
     <div class="txt">
       <div class="eyebrow"><span class="ln"></span>تقريرٌ أسبوعيّ</div>
-      <h1>${span}</h1>
+      <h1>${span}</h1>${season}
       <p class="lede">${
         r.published === 0
           ? 'لا منشورَ خرج في هذه المدّة.'

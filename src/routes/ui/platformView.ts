@@ -33,6 +33,7 @@ export interface PostMedia {
 }
 import { ICON } from './icons'
 import { escapeHtml } from './shell'
+import { whenTag } from './time'
 import { LOGOS } from './logos'
 
 export interface PlatformScreenData {
@@ -189,9 +190,12 @@ function postCard(
           relativeTime(post.publishedAt, now),
         )}</span>`
       : post.scheduledAt !== null
-        ? `<span class="ago when" title="${escapeHtml(post.scheduledAt)} UTC">موعدُه ${escapeHtml(
-            post.scheduledAt.slice(0, 16).replace('T', ' '),
-          )}</span>`
+        /*
+         * **والمنطقةُ في المتن لا في `title`** (D-106): ما في `title` لا
+         * يُرى إلّا بتحويم فأرة، **ولا فأرةَ في الجوّال** — فموعدٌ يُقرأ
+         * هناك بلا منطقةٍ يُحسَب بتوقيت القارئ وهو UTC.
+         */
+        ? `<span class="ago when">${whenTag(post.scheduledAt, { label: 'موعدُه' })}</span>`
         : `<span class="ago">كُتبت منذ ${escapeHtml(relativeTime(post.createdAt, now))}</span>`
 
   // الفشلُ يُعرض بنصّه: «فشل» وحدها لا تُعالَج، والسببُ يُعالَج

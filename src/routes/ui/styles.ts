@@ -1266,6 +1266,25 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 
    وهي علّةٌ لا تُمسَك بقراءة الوسم: الوسمُ صحيح. **فتُقفَل هنا مرّةً
    للكلّ** — لا بقاعدةٍ لكلّ صنفٍ يُكتب غدا فيُنسى في واحد. */
+/* ── الموعدُ بوجهين (D-106) ───────────────────────────────────────────
+   سطرٌ فوق سطر: «UTC» كما كتبه الخادم، وتحته قراءةُ المالك. **ولا
+   يُصدَّق أحدُهما على حساب الآخر** — فمن أخفى الثانيَ جعل المالكَ يحوّل
+   ذهنيّا، ومن أخفى الأوّلَ محا الصيغةَ التي في القاعدة والتقارير.
+
+   والمحلّيُّ أخفتُ وأصغر: **هو الأليفُ الذي يُقرأ بلمحة**، والـUTC هو
+   الذي يُنسَخ ويُقارَن. */
+.when-t{display:inline-flex; flex-direction:column; gap:1px; vertical-align:middle}
+.when-t .tz{font-size:var(--t-xs); color:var(--ink-3); font-weight:500}
+.when-local{font-size:var(--t-xs); color:var(--ink-3); font-family:inherit;
+  direction:rtl; white-space:nowrap}
+/* وقبل أن يعمل النصُّ يبقى سطرا واحدا — ولا يقفز الصفُّ حين يصير سطرين */
+.when-t.two{line-height:var(--lh-tight)}
+
+/* سطرُ الذروة — خبرٌ لا أمر، فبلا زرٍّ ولا لونِ حالة (D-043) */
+.hint.peak{margin-top:var(--s-2); display:flex; align-items:center;
+  gap:var(--s-2); flex-wrap:wrap}
+.hint.peak .chip{margin:0}
+
 [hidden]{display:none!important}
 
 .cmdk-veil{position:fixed; inset:0; z-index:100; padding:12vh var(--s-4) var(--s-4);

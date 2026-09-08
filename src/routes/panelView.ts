@@ -15,6 +15,7 @@ import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandTrigger, SECTIONS } from './ui/command'
+import type { Peaks } from '../lib/schedule/peak'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
@@ -905,6 +906,13 @@ export interface PanelData {
   }[]
   readonly knownProviders: { name: string; label: string }[]
   readonly drafts: readonly DraftRow[]
+  /**
+   * ساعاتُ الذروة لكلّ منصّةٍ في المسوّدات (D-106) — **مقيسةٌ أو صامتة**.
+   *
+   * واختياريّةٌ لأنّ الشاشاتِ الفرعيّةَ لا تجدول، **وحقلٌ إلزاميٌّ يُملأ
+   * بفراغٍ في نصف المواضع حقلٌ يكذب**.
+   */
+  readonly peaks?: Readonly<Record<string, Peaks>>
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
   /** منصّاتٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص — فالنشرُ باسمها لم يُبنَ (D-087). */
@@ -1425,6 +1433,7 @@ ${flash}
     earliest: new Date(d.now.getTime() + 15 * 60_000).toISOString().slice(0, 16),
     now: d.now,
     ready: d.draftReady,
+    peaks: d.peaks ?? {},
   })}
 </section>
 

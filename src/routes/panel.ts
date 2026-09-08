@@ -30,6 +30,7 @@ import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { buildCommands } from './ui/command'
+import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
@@ -297,6 +298,18 @@ panel.get('/panel', async (c) => {
   const routes = await readRoutes(c.env.DB)
   const drafts = await listDrafts(c.env.DB, 60)
   const media = await mediaFor(c.env.DB, drafts.map((d) => d.id))
+
+  /*
+   * **وذروةُ المنصّات التي في المسوّدات وحدَها** (D-106).
+   *
+   * لكلّ منصّةٍ استعلامُها، **وقراءةُ الأربع كلِّها في كلّ فتحةٍ للوحة
+   * ثلاثةُ استعلاماتٍ لا يقرؤها أحد** حين لا تكون في المسوّدات منصّةٌ
+   * غيرُ واحدة. فتُقرأ ما في اليد لا ما قد يقع.
+   */
+  const peaks: Record<string, Peaks> = {}
+  for (const platform of [...new Set(drafts.map((d) => d.platform))]) {
+    peaks[platform] = await readPeaks(c.env.DB, platform)
+  }
   const plan = await latestPlan(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
@@ -418,6 +431,7 @@ panel.get('/panel', async (c) => {
           r.task === 'draft' &&
           providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       ),
+      peaks,
       flash,
       now: new Date(),
       csrf: session.record.csrf,
