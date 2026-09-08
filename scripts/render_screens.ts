@@ -6,7 +6,7 @@
  *
  * وتستورد الدوالَّ نفسَها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
  */
-import { writeFileSync } from 'node:fs'
+import { writeAudited } from './writeAudited'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { scopeSet } from '../src/lib/oauth/scopes'
 import { platformScreen } from '../src/routes/ui/platformView'
@@ -47,7 +47,7 @@ const page = (title: string, body: string): string =>
     'n',
   )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-linkedin.html',
   page(
     'صدى — LinkedIn',
@@ -110,7 +110,7 @@ writeFileSync(
   ),
 )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-x.html',
   page(
     'صدى — X',
@@ -126,7 +126,7 @@ writeFileSync(
   ),
 )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-unbuilt.html',
   page('صدى — Instagram', platformScreen({
     view: ig, now,
@@ -135,7 +135,7 @@ writeFileSync(
   })),
 )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-link-only.html',
   page('صدى — YouTube', platformScreen({
     view: yt, now,
@@ -144,7 +144,7 @@ writeFileSync(
   })),
 )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-refused.html',
   page(
     'صدى — لم يكتمل الربط',
@@ -157,7 +157,7 @@ writeFileSync(
   ),
 )
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-connected.html',
   page(
     'صدى — رُبط',
@@ -201,7 +201,7 @@ const stored: StoredReport = {
   body: week,
 }
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-report.html',
   page('صدى — التقرير الأسبوعيّ', reportScreen({
     reports: [stored],
@@ -245,7 +245,7 @@ const wizardCases: { title: string; app: AppStatus }[] = [
   { title: 'وجاز الفحصُ ولم يُربَط بعد', app: app({ verifiedKind: 'accepted', verifiedAt: ago(1) }) },
 ]
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-wizard.html',
   page(
     'صدى — معالجُ الربط',
@@ -271,7 +271,7 @@ const GATE_FIXTURE: GateFacts = {
   weekAlertFired: false,
 }
 
-writeFileSync(
+writeAudited(
   '/tmp/screen-tasks.html',
   page(
     'صدى — مهامُّ المالك',

@@ -4,7 +4,7 @@
  * لا نسخةَ ثانية من المحتوى: يُستدعى التطبيق نفسه بـ `app.request`، فما
  * يُرى هو ما يُنشر. ونسخةٌ ثانيةٌ للعرض تفترق عن الأصل في أوّل تعديل.
  */
-import { writeFileSync } from 'node:fs'
+import { writeAudited } from './writeAudited'
 import { app } from '../src/index'
 
 const out = process.argv[2] ?? '/tmp/privacy.html'
@@ -17,5 +17,5 @@ const response = await app.request(path, {}, {
   LEGAL_CONTACT: 'privacy@basserh.com',
 } as never)
 
-writeFileSync(out, await response.text())
+writeAudited(out, await response.text())
 console.error(`رُسمت ${path}`)

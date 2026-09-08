@@ -7,7 +7,7 @@
  *
  * يستورد `panelPage` نفسها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
  */
-import { writeFileSync } from 'node:fs'
+import { writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 
@@ -302,5 +302,5 @@ const data: PanelData = {
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
 }
 
-writeFileSync(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
+writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
 console.log('رُسمت')

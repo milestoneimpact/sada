@@ -28,7 +28,7 @@ import { cfAccountId } from '../lib/ai/cloudflare'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
-import { decide, listDrafts } from '../lib/draft/store'
+import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
@@ -1510,7 +1510,13 @@ panel.post('/panel/drafts/decide', async (c) => {
   const flash: PanelFlash = !result.ok
     ? { kind: 'bad', text: result.reason }
     : result.status === 'rejected'
-      ? { kind: 'ok', text: 'رُفضت — وتبقى معروضةً بكلفتها، فما دُفع ثمنُه يُرى.' }
+      ? {
+          kind: 'ok',
+          text: 'رُفضت — وتبقى معروضةً بكلفتها، فما دُفع ثمنُه يُرى.',
+          // **والتراجعُ يقع مع الإشعار لا بعده** (D-100): الرفضُ عمودٌ
+          // واحدٌ يُقلَب، فلا يحتاج سؤالا قبله ويكفيه بابٌ بعده
+          undo: { action: '/panel/drafts/undo-reject', id, label: 'تراجَع' },
+        }
       : {
           kind: 'ok',
           text:
@@ -1526,6 +1532,106 @@ panel.post('/panel/drafts/decide', async (c) => {
       action: 'draft.decide',
       target: id,
       detail: result.ok ? result.status : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * التراجعُ عن رفض (D-100).
+ *
+ * **ولا حارسَ هنا**: `undoReject` تشترط أنّ الحالَ `rejected` الآن، فإشعارٌ
+ * شاخ في تبويبٍ منسيٍّ لا يقلب حالا تبدّلت بعده. وهذا المسارُ ينقل الطلبَ
+ * ويكتب السجلّ، **ولا يقرّر**.
+ */
+panel.post('/panel/drafts/undo-reject', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const id = String(gate.form.get('id') ?? '')
+  const result = await undoReject(c.env.DB, id)
+
+  const flash: PanelFlash = result.ok
+    ? { kind: 'ok', text: 'عادت مسوّدةً تنتظر قرارك.' }
+    : { kind: 'bad', text: `تعذّر التراجع: ${result.reason}` }
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.undo_reject',
+      target: id,
+      detail: result.ok ? 'restored' : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, flash)
+  return back('posts')
+})
+
+/**
+ * البَتُّ الجماعيّ — **اعتمادٌ فقط، ولا رفضَ جماعيّ** (D-100).
+ *
+ * ## ولماذا لا رفضَ جماعيّ
+ *
+ * الاعتمادُ يفتح بابا ولا يعبره: يبقى بعده اختيارُ حسابٍ وموعد، **وفيه
+ * محطّةٌ ثانية يُرى فيها ما اعتُمد**. والرفضُ الجماعيُّ بابٌ واحدٌ يُغلق
+ * على جملةٍ بضغطة، **وتراجعُه واحدةً واحدة** — فيبقى فرديّا حيث يُقرأ
+ * كلٌّ قبل بَتِّه.
+ *
+ * ## والمعرّفاتُ تُقرأ كلُّها لا أوّلُها
+ *
+ * `form.get` تعطي الأوّلَ وحدَه — **وصندوقان محدَّدان يمرّ منهما واحد،
+ * بلا خطأ**. و`getAll` هي الصحيحة، وسقفٌ يمنع طلبا يحمل ألفا.
+ */
+const BULK_CAP = 25
+
+panel.post('/panel/drafts/approve-many', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const ids = gate.form.getAll('id').map(String).filter((x) => x !== '')
+  if (ids.length === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم تُحدَّد مسوّدةٌ واحدة.' })
+    return back('posts')
+  }
+  if (ids.length > BULK_CAP) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: `${ids.length} مسوّدةً في طلبٍ واحد — والسقفُ ${BULK_CAP}. اعتمدها على دفعات.`,
+    })
+    return back('posts')
+  }
+
+  const result = await approveMany(
+    c.env.DB,
+    ids,
+    gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+  )
+
+  // **والمتعثّرُ يُسمَّى بسببه**: حصيلةٌ تقول «فشل بعضُها» تجعل المالك
+  // يعيد الكلَّ — ولا يعرف أيَّها مضى
+  const flash: PanelFlash =
+    result.failed.length === 0
+      ? {
+          kind: 'ok',
+          text: `اعتُمدت ${result.done.length} مسوّدةً كما كُتبت — اختر لكلٍّ حسابا وموعدا.`,
+        }
+      : {
+          kind: result.done.length === 0 ? 'bad' : 'warn',
+          text:
+            `اعتُمدت ${result.done.length}، وتعثّرت ${result.failed.length}: ` +
+            result.failed.map((f) => f.reason).join(' · '),
+        }
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.approve_many',
+      detail: `${result.done.length} تمّت · ${result.failed.length} تعثّرت`,
     },
     c.req.raw,
   )

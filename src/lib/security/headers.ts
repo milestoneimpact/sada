@@ -8,11 +8,20 @@
  *
  * والسياسةُ **قائمةُ سماحٍ من العدم**: `default-src 'none'` ثمّ يُفتَح ما
  * يلزم بالاسم. فمصدرٌ جديد يُنسى ذكرُه يُمنع — لا يمرّ.
+ *
+ * ## ولا أصلَ خارجيًّا فيها (D-099)
+ *
+ * كانت فيها `fonts.googleapis.com` في `style-src` و`fonts.gstatic.com`
+ * في `font-src`. وصار الخطّان يُخدَمان من `/f/…` في أصلنا، **فضاقت
+ * السياسةُ إلى `'self'`**.
+ *
+ * **وسياسةٌ تبقى واسعةً بعد أن ضاقت الحاجةُ ثغرةٌ نائمة**: بابٌ لا
+ * يُستعمَل يُغلق — وهي القاعدةُ نفسُها التي أغلقت الكاميرا والميكروفون
+ * في `Permissions-Policy`.
+ *
+ * **وبهذا لا يبقى في الوثيقة أصلٌ ثالثٌ واحد**: كلُّ ما استُثني من
+ * `default-src 'none'` هو `'self'` أو `data:`.
  */
-
-/** ما تُسمح به الصفحةُ من خطوط Google. لا شيء غيره من الخارج. */
-const FONT_CSS = 'https://fonts.googleapis.com'
-const FONT_FILES = 'https://fonts.gstatic.com'
 
 /**
  * ترويساتٌ تصلح لكلّ ردّ، JSON كان أو HTML.
@@ -48,8 +57,16 @@ export function htmlHeaders(nonce: string): Record<string, string> {
   const csp = [
     "default-src 'none'",
     `script-src 'nonce-${nonce}'`,
-    `style-src 'nonce-${nonce}' ${FONT_CSS}`,
-    `font-src ${FONT_FILES}`,
+    /*
+     * **و`'self'` مع `nonce` لا بدلا عنه** (D-101).
+     *
+     * ورقةُ الأنماط خرجت إلى `/a/…` فتحتاج `'self'`. **و`nonce` يبقى**:
+     * وسمُ `<style>` الباقي يحمل وجهَي الخطّ، وسطرٌ يحقنه مهاجمٌ لا
+     * يحمل قيمةً لا يعرفها — **و`'self'` لا تفتح للداخليّ بابا**، إنّما
+     * تسمح بموردٍ من أصلنا وحدَه، وكلُّ مساراتِ أصلنا نكتبها.
+     */
+    `style-src 'self' 'nonce-${nonce}'`,
+    "font-src 'self'",
     "img-src 'self' data:",
     /**
      * **والمقاطعُ تحتاج بابا خاصّا بها.**

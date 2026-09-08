@@ -31,7 +31,7 @@
  * الاستعمال:  node scripts/audit_mobile.mjs <ملفّ.html> …
  */
 import { chromium } from 'playwright'
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 
 /** ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max. */
 const WIDTHS = [320, 360, 390, 430]
@@ -66,7 +66,19 @@ let failed = 0
 
 for (const file of files) {
   const name = file.split('/').pop()
-  const kb = Math.round(statSync(file).size / 1024)
+  /**
+   * **والوزنُ من المجرَّد لا من المضموم** (D-099).
+   *
+   * ملفُّ التدقيق يحمل الخطَّ `base64` ليُقاس بخطّه الحقيقيّ — **وذاك
+   * ليس ما يُشحَن**: الخطُّ في الإنتاج مسارٌ يُخبَّأ للأبد. فقياسُ
+   * المضموم يتّهم صفحةً وزنُها الحقيقيُّ دونه بمئةِ كيلوبايت.
+   *
+   * و`writeAudited` يكتب الاثنين، والمجرَّدُ `.bare.html` بجانبه.
+   * وإن غاب — رُسمت الصفحةُ بأداةٍ أخرى — قِيس الموجودُ ولا يُخترَع رقم.
+   */
+  const bare = file.replace(/\.html$/, '.bare.html')
+  const weighed = existsSync(bare) ? bare : file
+  const kb = Math.round(statSync(weighed).size / 1024)
   const notes = []
 
   for (const width of WIDTHS) {
@@ -112,6 +124,31 @@ for (const file of files) {
          * فتُقاس الطبقتان معه، بشرطين: أن تكون مطلقةً (فتخرج عن الصندوق)
          * وألّا تكون `pointer-events: none` (فتلك تُرى ولا تُلمَس).
          */
+        /*
+         * **واللصيقةُ الحاضنةُ هدفٌ كذلك** (D-100).
+         *
+         * صندوقُ الاختيار يرسمه المتصفّح ثلاثةَ عشرَ بكسلا، **ولا
+         * يُكبَّر إلّا بأن يُرسَم من جديد** — وإعادةُ رسمه تفقده سلوكَ
+         * النظام في قارئ الشاشة وفي التباين العالي.
+         *
+         * والطريقُ المعياريُّ أن يُلَفّ بـ`<label>`: **ضغطةٌ في أيّ موضعٍ
+         * منها تُفعّل الصندوق** — وهذا سلوكُ HTML لا حيلةَ أنماط. فمنطقةُ
+         * اللمس منطقتُها لا منطقتُه.
+         *
+         * وهي عينُ علّة `::after` في D-086: المدقّقُ يقرأ صندوقَ العنصر
+         * وحدَه **فيتّهم هدفا سليما**. والفرقُ أنّ تلك طبقةٌ فوقه وهذه
+         * حاضنةٌ حولَه.
+         *
+         * **وبشرطِ الضبط**: لصيقةٌ لغيره (`for` إلى عنصرٍ آخر) لا تُحتسَب،
+         * فتلك تُفعّل شيئا ثالثا.
+         */
+        const owningLabel = (el) => {
+          const lab = el.closest('label')
+          if (lab === null) return null
+          if (lab.htmlFor !== '' && lab.htmlFor !== el.id) return null
+          return lab
+        }
+
         const reach = (el) => {
           const b = el.getBoundingClientRect()
           let w = b.width
@@ -122,6 +159,12 @@ for (const file of files) {
             if (cs.pointerEvents === 'none') continue
             w = Math.max(w, parseFloat(cs.width) || 0)
             h = Math.max(h, parseFloat(cs.height) || 0)
+          }
+          const lab = owningLabel(el)
+          if (lab !== null) {
+            const lb = lab.getBoundingClientRect()
+            w = Math.max(w, lb.width)
+            h = Math.max(h, lb.height)
           }
           return { w, h, box: b }
         }
@@ -145,10 +188,22 @@ for (const file of files) {
           })
         }
 
-        // ٣ · حقولٌ يُقرِّبها iOS
+        /*
+         * ٣ · حقولٌ يُقرِّبها iOS
+         *
+         * **والتقريبُ يقع عند الكتابة لا عند اللمس** (D-100): Safari
+         * يقرّب حين يفتح لوحَ المفاتيح على حقلٍ خطُّه دون ستّةَ عشر.
+         * **وصندوقُ اختيارٍ لا يفتح لوحَ مفاتيحَ ولا يعرض حرفا** — فلا
+         * يُقرَّب، ومقاسُ خطِّه لا معنى له.
+         *
+         * وكانت القاعدةُ على كلّ `input`، فاتّهمت صندوقا لا نصَّ فيه.
+         * **ومدقّقٌ يكذب مرّةً لا يُقرأ ثانيةً** (D-070).
+         */
+        const TYPELESS = new Set(['checkbox', 'radio', 'range', 'color', 'file', 'submit', 'button', 'reset', 'image'])
         const fields = new Set()
         for (const el of document.querySelectorAll('input:not([type=hidden]),select,textarea')) {
           if (!shown(el)) continue
+          if (el.tagName === 'INPUT' && TYPELESS.has(el.type)) continue
           const fs = parseFloat(getComputedStyle(el).fontSize)
           if (fs >= MIN_FIELD_FONT) continue
           const k = key(el)

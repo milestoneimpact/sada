@@ -26,8 +26,8 @@ describe('السياسة — قائمةُ سماحٍ من العدم', () => {
 
   it.each([
     ['البرمجة', "script-src 'nonce-N0NCE'"],
-    ['الأنماط', "style-src 'nonce-N0NCE' https://fonts.googleapis.com"],
-    ['الخطوط', 'font-src https://fonts.gstatic.com'],
+    ['الأنماط', "style-src 'self' 'nonce-N0NCE'"],
+    ['الخطوط', "font-src 'self'"],
     ['التأطير', "frame-ancestors 'none'"],
     ['وجهة النماذج', "form-action 'self'"],
     ['العنوان الأساس', "base-uri 'none'"],
@@ -39,6 +39,17 @@ describe('السياسة — قائمةُ سماحٍ من العدم', () => {
   it('لا تفتح unsafe-inline ولا unsafe-eval', () => {
     expect(csp()).not.toContain('unsafe-inline')
     expect(csp()).not.toContain('unsafe-eval')
+  })
+
+  /**
+   * **ولا أصلَ خارجيًّا واحد** (D-099).
+   *
+   * والفحصُ على الشكل لا على اسمٍ بعينه: اختبارٌ يقول «لا fonts.gstatic»
+   * يمرّ على سياسةٍ فُتح فيها أصلٌ آخرُ غدا. **وما يُحرَس هو القاعدة، لا
+   * المثالُ الذي كسرها.**
+   */
+  it('**لا أصلَ خارجيًّا**: كلُّ ما استُثني من none هو self أو data', () => {
+    expect(csp()).not.toMatch(/https?:\/\//)
   })
 
   it('الـ nonce يدخل في التوجيهين معا لا في واحد', () => {
