@@ -16,6 +16,7 @@ import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
+import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
@@ -24,7 +25,7 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
-import { bar, pct } from './ui/parts'
+import { bar, firstDay, pct } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { LOGOS } from './ui/logos'
@@ -1267,6 +1268,23 @@ export function panelPage(d: PanelData): string {
     items.push({ kind: 'warn', text: 'لا رموزَ استرداد — فقدُ الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
 
+  /*
+   * **اليومُ الأوّل يُشتَقّ ممّا قُرئ — ولا استعلامَ جديد** (D-108).
+   *
+   * الخمسُ كلُّها من حقائقَ في اليد: مصادرُ وحساباتٌ وخطّةٌ ومسوّدات.
+   * **واستعلامٌ يُضاف لمعالجٍ يختفي بعد أسبوعٍ ثمنٌ يُدفَع كلَّ يوم.**
+   */
+  const first = onboarding({
+    sources: d.sources.length,
+    analyzed: d.sources.filter((x) => x.analyzed).length,
+    liveAccounts: d.channels.reduce(
+      (n, c) => n + c.accounts.filter((a) => a.status === 'active').length, 0,
+    ),
+    hasPlan: d.plan !== null,
+    decided: d.drafts.filter((x) => x.status !== 'draft').length,
+    drafts: d.drafts.filter((x) => x.status === 'draft').length,
+  })
+
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
       ${i.go === undefined ? '' : `<a class="btn g sm" href="${i.go}">${escapeHtml(i.label ?? 'اذهب')}</a>`}</li>`)
@@ -1343,6 +1361,7 @@ export function panelPage(d: PanelData): string {
 <main id="main" class="content">
 ${flash}
 <section data-pane="overview" hidden>
+  ${firstDay(first)}
   ${pageHead('لوحةُ صدى', 'نظرة عامّة', 'حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك. <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b>')}
   <div class="grid c4">
     <div class="card tile"><div class="k">تحليلات اليوم</div>

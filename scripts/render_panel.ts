@@ -303,4 +303,24 @@ const data: PanelData = {
 }
 
 writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
+
+/*
+ * **ولوحُ اليوم الأوّل وضعٌ ثانٍ يُشحَن — فيُرسَم ليُدقَّق** (D-108).
+ *
+ * العيّنةُ أعلاه نظامٌ يعمل، **فاللوحُ يختفي فيها وهو الصواب** — ولا
+ * يراه مدقّقٌ أبدا. **ووضعٌ يُشحَن ولا يُدقَّق وضعٌ بلا حارس** (D-102).
+ *
+ * فتُرسَم صورةٌ ثانيةٌ لنظامٍ ناقص: مصادرُ بلا تحليل، ولا قناةَ حيّة،
+ * ولا خطّة — **وهي الحالُ التي يفتح فيها المالكُ لوحتَه أوّلَ مرّة**.
+ */
+writeAudited('/tmp/panel-first.html', panelPage({
+  ...data,
+  sources: data.sources.map((s) => ({ ...s, analyzed: false, summary: null, worth: null })),
+  channels: viewChannels(
+    accounts.map((a) => ({ ...a, status: 'needs_reauth' as const })),
+    (n) => n.startsWith('LINKEDIN'),
+  ),
+  plan: null,
+  drafts: data.drafts.map((d) => ({ ...d, status: 'draft' as const })),
+}))
 console.log('رُسمت')

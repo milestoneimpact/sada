@@ -1356,6 +1356,35 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 
    وهي علّةٌ لا تُمسَك بقراءة الوسم: الوسمُ صحيح. **فتُقفَل هنا مرّةً
    للكلّ** — لا بقاعدةٍ لكلّ صنفٍ يُكتب غدا فيُنسى في واحد. */
+/* ── اليومُ الأوّل (D-108) ─────────────────────────────────────────────
+   خطواتٌ مرقّمةٌ لا بطاقات: **الترتيبُ هو المعلومة** — كلُّ خطوةٍ تفتح
+   التي بعدها، وشبكةٌ من خمسٍ تقول «افعل أيَّها شئت» وهو ليس صحيحا.
+
+   **والمطلوبةُ وحدَها تحمل زرّا**: خمسةُ أزرارٍ في شاشةٍ أوّلَ مرّةٍ تُقرأ
+   عبئا، وأوّلُ ما يُفعَل واحد. */
+.fd{border-color:color-mix(in srgb,var(--brand) 30%,transparent)}
+.fd-h{display:flex; align-items:flex-end; gap:var(--s-4); margin-bottom:var(--s-2)}
+.fd-h h2{margin:var(--s-1) 0 0; font-variant-numeric:tabular-nums}
+.fd-h .track{min-width:120px}
+.fd-l{margin:var(--s-4) 0 0; padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-3)}
+.fd-s{display:flex; align-items:flex-start; gap:var(--s-3)}
+/* **والدائرةُ الفارغةُ ليست فشلا** (D-043): «لم يقع» لا لونَ حالةٍ له */
+.fd-m{flex:none; width:22px; height:22px; border-radius:50%; margin-top:1px;
+  border:1.5px solid var(--line-strong); display:grid; place-items:center;
+  font-size:var(--t-xs); color:var(--ink-3)}
+.fd-m.done{border-color:var(--ok); color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.fd-b{min-width:0; flex:1}
+.fd-b b{display:block; font-size:var(--t-sm); font-weight:600; line-height:var(--lh-tight)}
+.fd-b p{margin:2px 0 0; font-size:var(--t-xs); color:var(--ink-2);
+  line-height:var(--lh); max-width:var(--measure)}
+.fd-s.done .fd-b b{color:var(--ink-3); font-weight:500}
+/* والمطلوبةُ تُميَّز بأرضيّةٍ وحدّ — لا بلونِ حالةٍ محجوز */
+.fd-s.now{background:var(--surface-2); border-radius:var(--r);
+  padding:var(--s-2); margin:calc(-1 * var(--s-2))}
+.fd-s.now + .fd-s{margin-top:var(--s-2)}
+
 /* ── الموعدُ بوجهين (D-106) ───────────────────────────────────────────
    سطرٌ فوق سطر: «UTC» كما كتبه الخادم، وتحته قراءةُ المالك. **ولا
    يُصدَّق أحدُهما على حساب الآخر** — فمن أخفى الثانيَ جعل المالكَ يحوّل
