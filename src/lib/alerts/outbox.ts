@@ -187,6 +187,24 @@ export async function sendAlerts(
   return { sent, skipped, failed, why: null }
 }
 
+/**
+ * يمحو أيَّ عنوانٍ من نصّ عطل (D-110).
+ *
+ * **وعنوانُ القناة اعتمادٌ لا عنوان**: رمزُ Slack في مساره
+ * (`/services/T00/B00/xxxx`)، **ومن ملكه أرسل باسمك**. و`CLAUDE.md` تمنع
+ * سرّا في سجلّ، ونصُّ العطل **يُخزَّن ويُعرَض في اللوحة**.
+ *
+ * **وقِيس على Node فلم يحمل نصُّ الخطأ العنوانَ** — لا في الرسالة ولا في
+ * سببها. **والشيفرةُ تعمل على Workers، ولا أملك قياسَه من هنا** (D-076:
+ * لا يُدَّعى قياسٌ لم يقع).
+ *
+ * **فالمحوُ لا يقوم على قياسٍ يقول إنّه لازم — يقوم على أنّه بلا ثمن.**
+ * وسطران يُغلقان بابا لا أستطيع أن أشهد أنّه مغلق.
+ */
+function redact(text: string): string {
+  return text.replace(/https?:\/\/\S+/gi, '«عنوانٌ مُزال»')
+}
+
 async function mark(
   db: Db, a: Alert, status: number | null, error: string | null,
 ): Promise<void> {
@@ -195,7 +213,7 @@ async function mark(
       `INSERT INTO alert_outbox (ref, kind, body, status, error) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(ref) DO UPDATE SET status = excluded.status, error = excluded.error`,
     )
-    .bind(a.ref, a.kind, a.body, status, error)
+    .bind(a.ref, a.kind, a.body, status, error === null ? null : redact(error))
     .run()
     .catch(() => undefined)
 }

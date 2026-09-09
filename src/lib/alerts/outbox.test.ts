@@ -168,3 +168,30 @@ describe('ولا يُتبَع تحويلٌ إلى الداخل', () => {
     expect(row!.error).toMatch(/مرفوض/)
   })
 })
+
+/**
+ * **ولا عنوانَ في نصّ عطلٍ يُخزَّن ويُعرَض** (D-110).
+ *
+ * عنوانُ القناة اعتمادٌ لا عنوان: رمزُ Slack في مساره، **ومن ملكه أرسل
+ * باسمك**. ونصُّ العطل يُخزَّن في `alert_outbox.error` **ويُعرَض في اللوحة**.
+ */
+describe('ولا سرَّ في نصّ عطلٍ يُخزَّن', () => {
+  it('**والعنوانُ يُمحى من نصّ العطل**', async () => {
+    const f = vi.fn(async () => {
+      throw new Error('تعذّر: https://hooks.slack.com/services/T00/B00/SECRET123')
+    }) as unknown as typeof fetch
+    await sendAlerts(db, HOOK, [budgetAlert('2026-09-09', 5, 5)], f)
+    const row = await db.prepare('SELECT error FROM alert_outbox').first<{ error: string }>()
+    expect(row!.error).not.toContain('SECRET123')
+    expect(row!.error).not.toContain('hooks.slack.com')
+    expect(row!.error).toContain('مُزال')
+  })
+
+  /** **وما ليس عنوانا يبقى مقروءا** — والمحوُ لا يمحو السبب. */
+  it('ويبقى سببُ العطل مقروءا', async () => {
+    const f = vi.fn(async () => new Response('no', { status: 503 })) as unknown as typeof fetch
+    await sendAlerts(db, HOOK, [budgetAlert('2026-09-09', 5, 5)], f)
+    const row = await db.prepare('SELECT error FROM alert_outbox').first<{ error: string }>()
+    expect(row!.error).toContain('503')
+  })
+})

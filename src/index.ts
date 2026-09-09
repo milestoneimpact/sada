@@ -661,9 +661,14 @@ async function alertTick(env: Env): Promise<void> {
     const alerts = await collectAlerts(env.DB, new Date(), settings.dailySpendCapUsd)
     if (alerts.length === 0) return
     const sent = await sendAlerts(env.DB, settings.alertWebhook, alerts)
-    console.log({ job: 'alert-outbox', ...sent })
+    // ‏والعدّاداتُ وحدَها في السجلّ: «why» تحمل مضيفَ القناة، وهو من
+    // ‏اعتمادها. **ولا سرَّ في سجلّ** (CLAUDE.md · D-110)
+    console.log({ job: 'alert-outbox', sent: sent.sent, skipped: sent.skipped, failed: sent.failed })
   } catch (error) {
-    console.log({ job: 'alert-outbox', failed: String(error) })
+    console.log({
+      job: 'alert-outbox',
+      failed: String(error).replace(/https?:\/\/\S+/gi, '«عنوانٌ مُزال»'),
+    })
   }
 }
 
