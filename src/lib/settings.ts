@@ -63,14 +63,28 @@ export const LIMITS = {
   weeklyPromoCapUsd: { min: 0, max: 500 },
 } as const
 
-export type SettingKey =
-  | 'paused'
-  | 'daily_analysis_cap'
-  | 'daily_spend_cap_usd'
-  | 'auto_enqueue'
-  | 'weekly_promo_cap_usd'
-  | 'image_overlay'
-  | 'alert_webhook'
+/**
+ * مفاتيحُ الإعدادات — **قائمةٌ حيّةٌ يُشتَقّ منها النوع** (D-110).
+ *
+ * كانت نوعا وحدَه، **وقائمةُ السماح في المسار مجموعةَ نصوصٍ تُكتب يدا**.
+ * فأُضيف `alert_webhook` إلى النوع في D-109 **ونُسي في المجموعة**: الحقلُ
+ * يُعرَض، ويُضغَط «احفظ»، **ويردّ الخادمُ ‏٤٠٠ صامتة**.
+ *
+ * **ولا تُمسَك بالأنواع**: النوعُ يُمحى عند البناء، والمجموعةُ نصوصٌ في
+ * التشغيل. **فيُبنى الاثنان من مصدرٍ واحد** — ومفتاحٌ يُضاف غدا يدخلهما
+ * معا أو لا يدخل أيّهما.
+ */
+export const SETTING_KEYS = [
+  'paused',
+  'daily_analysis_cap',
+  'daily_spend_cap_usd',
+  'auto_enqueue',
+  'weekly_promo_cap_usd',
+  'image_overlay',
+  'alert_webhook',
+] as const
+
+export type SettingKey = (typeof SETTING_KEYS)[number]
 
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback

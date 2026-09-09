@@ -54,7 +54,7 @@ import {
 import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
-import { readSettings, writeSetting, type SettingKey } from '../lib/settings'
+import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
   loadSession, readCookie, revokeSessions, sessionCookie, type Session,
@@ -639,10 +639,18 @@ panel.post('/panel/sessions/revoke-all', async (c) => {
  */
 const KNOWN_TASKS: ReadonlySet<string> = new Set(Object.keys(ROUTES))
 
-const WRITABLE: ReadonlySet<string> = new Set<SettingKey>([
-  'paused', 'daily_analysis_cap', 'daily_spend_cap_usd', 'auto_enqueue',
-  'weekly_promo_cap_usd', 'image_overlay',
-])
+/*
+ * **وقائمةُ السماح تُنسى** (D-110).
+ *
+ * أُضيف `alert_webhook` إلى `SettingKey` في D-109 **ونُسي هنا**: فالحقلُ
+ * يُعرَض في اللوحة، ويُضغَط «احفظ»، **ويردّ الخادمُ ‏٤٠٠ صامتة** — والمالكُ
+ * يظنّ قناتَه مضبوطةً حتّى يقع الحدثُ فلا يصل.
+ *
+ * وهي عينُ ما حرسه D-109 في العنوان نفسِه، **فوقعت في الطريق إليه**.
+ * ولا تُمسَك بالأنواع: `SettingKey` نوعٌ، وهذه مجموعةُ نصوص. **فيُحرَس
+ * التطابقُ باختبار.**
+ */
+const WRITABLE: ReadonlySet<string> = new Set<SettingKey>(SETTING_KEYS)
 
 const LABEL: Readonly<Record<string, string>> = {
   daily_analysis_cap: 'سقف التحليل اليوميّ',

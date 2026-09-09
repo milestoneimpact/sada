@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { DEFAULTS, LIMITS, readSettings, writeSetting } from './settings'
+import { DEFAULTS, LIMITS, readSettings, writeSetting, SETTING_KEYS } from './settings'
 
 let db: FakeDb
 beforeEach(() => {
@@ -99,5 +99,41 @@ describe('حين تنقص القاعدة', () => {
     expect(settings.paused).toBe(false)
     expect(settings.dailyAnalysisCap).toBe(DEFAULTS.dailyAnalysisCap)
     expect(settings.dailySpendCapUsd).toBe(DEFAULTS.dailySpendCapUsd)
+  })
+})
+
+/**
+ * **ومفاتيحُ الإعدادات مصدرٌ واحد** (D-110).
+ *
+ * كان النوعُ وحدَه، وقائمةُ السماح في المسار مجموعةَ نصوصٍ تُكتب يدا.
+ * فأُضيف `alert_webhook` إلى النوع في D-109 **ونُسي في المجموعة** —
+ * فالحقلُ يُعرَض ويُضغَط «احفظ» **ويردّ الخادمُ ‏٤٠٠ صامتة**.
+ */
+describe('مفاتيحُ الإعدادات — قائمةٌ حيّةٌ لا نوعٌ يُمحى', () => {
+  it('**وكلُّ مفتاحٍ يُقرأ له قيمةٌ يُكتَب له مثلُها**', () => {
+    // ‏ما يُقرأ في `readSettings` يُبنى من هذه القائمة نفسِها
+    expect(new Set(SETTING_KEYS).has('alert_webhook')).toBe(true)
+    expect(SETTING_KEYS.length).toBeGreaterThanOrEqual(7)
+  })
+
+  it('ولا مفتاحَ مكرَّرٌ في القائمة', () => {
+    expect(new Set(SETTING_KEYS).size).toBe(SETTING_KEYS.length)
+  })
+
+  /** **والعنوانُ يُحرَس عند الحفظ** — لا عند الإرسال وحدَه (D-109). */
+  it.each([
+    ['http://localhost/hook'],
+    ['http://169.254.169.254/x'],
+    ['ليس عنوانا'],
+  ])('وعنوانُ قناةٍ مرفوضٌ يُخزَّن فارغا: %s', async (raw) => {
+    const db = fakeDb()
+    const r = await writeSetting(db, 'alert_webhook', raw, 'panel')
+    expect(r.stored).toBe('')
+  })
+
+  it('وعنوانٌ عامٌّ صحيحٌ يُحفَظ كما هو', async () => {
+    const db = fakeDb()
+    const r = await writeSetting(db, 'alert_webhook', 'https://hooks.example.com/t/a', 'panel')
+    expect(r.stored).toContain('hooks.example.com')
   })
 })
