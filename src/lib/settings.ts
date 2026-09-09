@@ -7,6 +7,7 @@
  * **وكلّ قيمة لها حدٌّ أعلى.** سقفٌ يقبل مليونا ليس سقفا؛ وحقلُ إدخالٍ
  * في لوحةٍ يقبل ما يُكتب فيه بابٌ لخطأ إصبعٍ يكلّف مالا.
  */
+import { checkProviderUrl } from './ai/urlGuard'
 import type { Db } from './tokens'
 
 export interface Settings {
@@ -19,6 +20,13 @@ export interface Settings {
    * افتراضه مطفأ: إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة.
    */
   readonly autoEnqueue: boolean
+  /**
+   * عنوانُ قناة التنبيهات (D-109) — **وفارغٌ يعني «لا قناة»**.
+   *
+   * ولا يُخزَّن مشفَّرا لأنّه **ليس سرّا**: عنوانٌ يقبل رسالةً، لا مفتاحٌ
+   * يفتح حسابا. **وخلطُهما يُرخِّص التشفيرَ حيث يجب ويُثقله حيث لا يلزم.**
+   */
+  readonly alertWebhook: string
   /**
    * سقفُ الترويج الأسبوعيّ بالدولار — **ومنه وحده يأتي مبلغُ التوصية.**
    *
@@ -44,6 +52,8 @@ export const DEFAULTS: Settings = {
   autoEnqueue: false,
   weeklyPromoCapUsd: 0,
   imageOverlay: true,
+  // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
+  alertWebhook: '',
 }
 
 /** حدود ما يُقبل. الحدّ الأعلى يحرس من خطأ إصبعٍ في اللوحة. */
@@ -60,6 +70,7 @@ export type SettingKey =
   | 'auto_enqueue'
   | 'weekly_promo_cap_usd'
   | 'image_overlay'
+  | 'alert_webhook'
 
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback
@@ -97,6 +108,8 @@ export async function readSettings(db: Db): Promise<Settings> {
     // **وهذا يُقرأ بالعكس**: غيابُه يعني «مشغَّل»، لأنّه لا يفتح إنفاقا —
     // والرمزُ وحده هو الذي يفتحه. فمَن لم يضبط شيئا لا يقع عليه نداء
     imageOverlay: map.get('image_overlay') !== 'false',
+    // ‏وعنوانٌ فاسدٌ يُقرأ فارغا: قناةٌ لا تعمل خيرٌ من نداءٍ إلى مجهول
+    alertWebhook: map.get('alert_webhook') ?? '',
     dailyAnalysisCap: toNumber(map.get('daily_analysis_cap'), DEFAULTS.dailyAnalysisCap, 'dailyAnalysisCap'),
     dailySpendCapUsd: toNumber(map.get('daily_spend_cap_usd'), DEFAULTS.dailySpendCapUsd, 'dailySpendCapUsd'),
     weeklyPromoCapUsd: toNumber(
@@ -123,6 +136,20 @@ export async function writeSetting(
   let stored: string
   if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay') {
     stored = raw === 'true' ? 'true' : 'false'
+  } else if (key === 'alert_webhook') {
+    /*
+     * **والعنوانُ يُحرَس عند الحفظ لا عند الإرسال وحدَه** (D-109).
+     *
+     * حارسٌ عند الإرسال يمنع النداء، **ويترك المالكَ يظنّ قناتَه مضبوطة
+     * حتّى يقع الحدثُ فلا يصل** — وذاك أسوأُ وقتٍ لاكتشاف العطل.
+     * فيُردّ العنوانُ في وجهه وهو ينظر.
+     */
+    const trimmed = raw.trim()
+    if (trimmed === '') stored = ''
+    else {
+      const verdict = checkProviderUrl(trimmed)
+      stored = verdict.ok ? verdict.url : ''
+    }
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
   } else {

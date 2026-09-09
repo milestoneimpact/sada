@@ -25,7 +25,7 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
-import { bar, firstDay, pct } from './ui/parts'
+import { alertChannel, bar, firstDay, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { LOGOS } from './ui/logos'
@@ -914,6 +914,10 @@ export interface PanelData {
    * بفراغٍ في نصف المواضع حقلٌ يكذب**.
    */
   readonly peaks?: Readonly<Record<string, Peaks>>
+  /** عنوانُ قناة التنبيهات (D-109) — وفارغٌ يعني «لا قناة». */
+  readonly alertWebhook: string
+  /** آخرُ ما خرج من الصندوق — **ولا صمتٌ يُظنّ نجاحا**. */
+  readonly outbox: readonly OutboxRow[]
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
   /** منصّاتٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص — فالنشرُ باسمها لم يُبنَ (D-087). */
@@ -1478,6 +1482,7 @@ ${flash}
       </form>
     </div>
   </div>
+  ${alertChannel(d.alertWebhook, d.outbox)}
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
     <div class="split">

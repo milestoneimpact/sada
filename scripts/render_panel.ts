@@ -300,6 +300,13 @@ const data: PanelData = {
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
+  // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
+  // ‏اللونان والتباينُ فيهما معا
+  alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
+  outbox: [
+    { kind: 'token', body: 'صدى — رمزُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
+    { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },
+  ],
 }
 
 writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data))

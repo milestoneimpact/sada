@@ -436,6 +436,16 @@ tbody tr:last-child td{border-bottom:0}
 p.nm{margin:0 0 var(--s-3)}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xs);
   color:var(--ink-3); direction:ltr; display:inline-block; unicode-bidi:isolate}
+/* **وحقلٌ يُكتَب فيه ليس نصّا يُقرأ** (D-109).
+
+   «mono» صُنعت لعرضِ رمزٍ في سطر: حرفٌ صغيرٌ وحبرٌ خافتٌ وارتفاعٌ بقدر
+   محتواه. **وعلى «input» تهبط بارتفاعه إلى ‏١٩px** — دون هدف اللمس
+   بضعفين، وقِيس ذلك على عنوان قناة التنبيهات.
+
+   ولا يُصلَح في ذلك الموضع وحدَه: **حقلٌ آخر يُكتب غدا بـ«mono» يرث
+   العلّة**. فيُقيَّد الصنفُ حيث يُكتب فيه. */
+input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
+  color:var(--ink); font-size:var(--t-sm)}
 .sub{color:var(--ink-3); font-size:var(--t-sm); margin-top:var(--s-1); max-width:62ch; line-height:var(--lh)}
 .num,.money{font-variant-numeric:tabular-nums}
 /* المبلغُ نصٌّ لاتينيّ داخل عربيّ: بلا عزلٍ ينقلب رمزُ العملة إلى آخره */
@@ -1356,6 +1366,26 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 
    وهي علّةٌ لا تُمسَك بقراءة الوسم: الوسمُ صحيح. **فتُقفَل هنا مرّةً
    للكلّ** — لا بقاعدةٍ لكلّ صنفٍ يُكتب غدا فيُنسى في واحد. */
+/* **وفقرةٌ في بطاقةٍ بلا صنفٍ ترث قاعدةَ المتصفّح** — «margin:1em» = ‏١٤px،
+   وليست من السلّم. ولم يُلحَظ ذلك قبلُ لأنّ كلّ فقرةٍ كانت تحمل صنفا؛
+   **وأوّلُ فقرةٍ عاريةٍ كُتبت أظهرتها**. فتُقيَّد هنا لا في موضعها. */
+.card > p{margin:var(--s-3) 0 0; font-size:var(--t-sm); color:var(--ink-2);
+  line-height:var(--lh); max-width:var(--measure)}
+.card > h2 + p{margin-top:var(--s-2)}
+
+/* ── صندوقُ التنبيهات (D-109) ─────────────────────────────────────────
+   صفٌّ لكلّ ما خرج: حالُه ومتنُه ورمزُ الردّ. **والحالُ لونٌ ورمزٌ ونصّ**
+   (D-043) — ‏٤٠٤ حمراءُ وحدَها لا تُقرأ، ومعها «✕ نشرٌ فشل» تُقرأ. */
+.ax{margin:var(--s-3) 0 0; padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-2)}
+.ax-r{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
+  padding:var(--s-2); border:1px solid var(--line-soft); border-radius:var(--r);
+  background:var(--surface-2)}
+.ax-b{min-width:0; flex:1 1 220px; font-size:var(--t-xs); color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.chip.bad{color:var(--bad); background:var(--bad-wash);
+  border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
+
 /* ── اليومُ الأوّل (D-108) ─────────────────────────────────────────────
    خطواتٌ مرقّمةٌ لا بطاقات: **الترتيبُ هو المعلومة** — كلُّ خطوةٍ تفتح
    التي بعدها، وشبكةٌ من خمسٍ تقول «افعل أيَّها شئت» وهو ليس صحيحا.

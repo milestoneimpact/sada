@@ -306,6 +306,16 @@ panel.get('/panel', async (c) => {
    * ثلاثةُ استعلاماتٍ لا يقرؤها أحد** حين لا تكون في المسوّدات منصّةٌ
    * غيرُ واحدة. فتُقرأ ما في اليد لا ما قد يقع.
    */
+  const { results: outbox } = await c.env.DB
+    .prepare(
+      `SELECT kind, body, status, error, at FROM alert_outbox
+        ORDER BY at DESC LIMIT 5`,
+    )
+    .all<{ kind: string; body: string; status: number | null; error: string | null; at: string }>()
+    .catch(() => ({ results: [] as {
+      kind: string; body: string; status: number | null; error: string | null; at: string
+    }[] }))
+
   const peaks: Record<string, Peaks> = {}
   for (const platform of [...new Set(drafts.map((d) => d.platform))]) {
     peaks[platform] = await readPeaks(c.env.DB, platform)
@@ -432,6 +442,13 @@ panel.get('/panel', async (c) => {
           providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       ),
       peaks,
+      alertWebhook: allowance.settings.alertWebhook,
+      /*
+       * **وآخرُ خمسةٍ لا كلُّها** (D-101): الصندوقُ ينمو ولا يُقلَّم،
+       * **وسجلٌّ كاملٌ في صفحةٍ تُفتَح كلَّ يومٍ ثمنٌ يُدفَع كلَّ يوم**.
+       * والخمسةُ تكفي لتقول «القناةُ تعمل» أو «ماتت».
+       */
+      outbox,
       flash,
       now: new Date(),
       csrf: session.record.csrf,

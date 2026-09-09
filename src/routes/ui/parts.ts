@@ -74,3 +74,73 @@ export function firstDay(o: Onboarding): string {
     <ol class="fd-l">${rows}</ol>
   </div>`
 }
+
+/** صفٌّ في صندوق التنبيهات — **ما خرج فعلا، لا ما وقع**. */
+export interface OutboxRow {
+  readonly kind: string
+  readonly body: string
+  readonly status: number | null
+  readonly error: string | null
+  readonly at: string
+}
+
+const ALERT_KIND: Readonly<Record<string, string>> = {
+  token: 'رمزٌ يقترب',
+  publish: 'نشرٌ فشل',
+  budget: 'سقفُ الإنفاق',
+}
+
+/**
+ * قناةُ التنبيهات (D-109) — **الحقلُ وما خرج منه معا**.
+ *
+ * **ولا صمتٌ يُظنّ نجاحا**: عنوانٌ مضبوطٌ لا يقول إن كان يصل. فيُعرَض
+ * آخرُ ما أُرسل بحاله — **ومن رأى ‏٤٠٤ متكرّرةً عرف أنّ قناتَه ماتت**
+ * قبل أن يقع الحدثُ الذي يحتاجها.
+ *
+ * **ولا يُعرَض المتنُ إلّا مقتضبا**: هو نصٌّ خرج إلى قناةٍ خارجيّة، وقد
+ * قِيس أن لا سرَّ فيه — **لكنّ عرضَه كاملا يجعل الشاشةَ نسخةً من القناة**
+ * لا سجلًّا لها.
+ */
+export function alertChannel(webhook: string, rows: readonly OutboxRow[]): string {
+  const list = rows.length === 0
+    ? `<p class="hint">${webhook === ''
+        ? 'ولا قناةَ مضبوطة — فالتنبيهاتُ تُسجَّل في القاعدة ولا تخرج.'
+        : 'لم يخرج شيءٌ بعد. <b>وهذا خبرٌ جيّد</b> — الثلاثةُ لا تقع كلَّ يوم.'}</p>`
+    : `<ul class="ax">${rows
+        .map((r) => {
+          const ok = r.status !== null && r.status >= 200 && r.status < 300
+          return `<li class="ax-r">
+            <span class="st ${ok ? 'ok' : 'bad'}"><span class="g">${ok ? '↑' : '✕'}</span>${
+              escapeHtml(ALERT_KIND[r.kind] ?? r.kind)}</span>
+            <span class="ax-b">${escapeHtml(r.body.slice(0, 70))}${r.body.length > 70 ? '…' : ''}</span>
+            <span class="grow"></span>
+            ${r.error === null
+              ? `<span class="chip mono">${r.status ?? '—'}</span>`
+              : `<span class="chip bad" title="${escapeHtml(r.error)}">${escapeHtml(
+                  r.error.slice(0, 28))}</span>`}
+          </li>`
+        })
+        .join('')}</ul>`
+
+  return `<div class="card"><h2>قناةُ التنبيهات</h2>
+    <p>ثلاثةُ أحداثٍ <b>فقط</b> تخرج من هنا: رمزٌ يقترب من الانتهاء، ونشرٌ
+      فشل نهائيّا، وبلوغُ سقف الإنفاق. <b>ولا رابع</b> — إشعارٌ يكثر يُطفَأ،
+      وحين يُطفَأ تسقط الثلاثةُ معه.</p>
+    <p class="hint"><b>ولا يحمل الإشعارُ رمزا ولا سرّا ولا رابطا موقَّعا</b> —
+      يقول ما وقع ويُحيلك إلى هذه اللوحة. والقناةُ خارجَ سيطرتنا: سجلُّها
+      يُقرأ بعد سنة.</p>
+    <form class="row" method="POST" action="/panel/settings">
+      <input type="hidden" name="key" value="alert_webhook">
+      <div class="field grow"><label for="hook">عنوانُ القناة (Webhook)</label>
+        <input id="hook" name="value" type="url" class="mono" inputmode="url"
+          placeholder="https://hooks.slack.com/services/…"
+          value="${escapeHtml(webhook)}"></div>
+      <button class="g" type="submit">احفظ</button>
+    </form>
+    <p class="hint">يعمل مع Slack و Discord و Telegram وأيِّ عنوانٍ يقبل
+      <span class="mono">POST</span> بحقل <span class="mono">text</span>.
+      <b>والعناوينُ الداخليّةُ تُردّ عند الحفظ</b> — لا عند الإرسال وحدَه.</p>
+    <h3 class="sec">آخرُ ما خرج</h3>
+    ${list}
+  </div>`
+}
