@@ -103,6 +103,14 @@ export interface Section {
    * تُميَّز في قائمةٍ من عشرين سطرا. **والاسمُ يتبع موضعَه.**
    */
   readonly short?: string
+  /**
+   * أفي شريط الجوّال؟ (D-107)
+   *
+   * خمسةٌ لا تسع: شريطٌ بتسعةٍ في ‏٣٩٠px يعطي ‏٤٣px لكلٍّ — **دون هدف
+   * اللمس**، ونصّا لا يُقرأ. **والخمسةُ هي التي تُفتَح كلَّ يوم**؛ وما
+   * عداها يُبلَغ من «المزيد»، وهو بابُ لوحة الأوامر لا قائمةٌ ثالثة.
+   */
+  readonly bar?: true
   /** صفحةٌ مستقلّة لا لوحٌ في اللوحة — فرابطُها مسارٌ لا مرساة. */
   readonly page?: string
 }
@@ -115,12 +123,12 @@ export interface Section {
  * لا تجد قسما تبدو ناقصةَ الفهرسة لا معطوبة، فلا يُشتكى منها.
  */
 export const SECTIONS: readonly Section[] = [
-  { id: 'overview', label: 'نظرة عامّة', note: 'حالُ اليوم: ما أُنفق وما ينتظر قرارك', icon: ICON.overview, group: 'العمل', alias: 'overview home' },
+  { id: 'overview', label: 'نظرة عامّة', note: 'حالُ اليوم: ما أُنفق وما ينتظر قرارك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
   { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
-  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه' },
-  { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ رموزها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك' },
-  { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', page: '/panel/report' },
-  { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
+  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true },
+  { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ رموزها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
+  { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', bar: true, page: '/panel/report' },
+  { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', bar: true, page: '/panel/tasks' },
   { id: 'providers', label: 'المزوّدون', note: 'المفاتيحُ والتوجيهُ والأسعار', icon: ICON.providers, group: 'الضبط', alias: 'providers keys models مفاتيح نماذج انثروبيك جيميناي' },
   { id: 'settings', label: 'الحدود', note: 'سقفُ الإنفاق وعددُ التحليلات', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget ميزانيه اعدادات سقف' },
   { id: 'security', label: 'الأمان', note: 'الجلساتُ والمفاتيحُ وسجلُّ التدقيق', icon: ICON.security, group: 'الضبط', alias: 'security sessions passkeys جلسات مفاتيح مرور' },
@@ -229,9 +237,23 @@ export function searchKey(c: Command): string {
  * يرفعه إلّا النصُّ الذي يجعله يعمل.
  */
 export function commandTrigger(): string {
-  return `<button type="button" class="cmdk-open" id="cmdk-open" hidden
+  return `<button type="button" class="cmdk-open" hidden
     aria-haspopup="dialog" aria-controls="cmdk">
     ${ICON.overview}<span>بحثٌ وأوامر</span><kbd class="kbd">⌘K</kbd></button>`
+}
+
+/**
+ * «المزيد» في شريط الجوّال (D-107) — **وهو الزرُّ نفسُه بوجهٍ آخر**.
+ *
+ * خمسةُ أقسامٍ في الشريط وتسعةٌ في النظام. **وقائمةُ «مزيد» ثانيةٌ تُبنى
+ * لأربعةٍ تبقى قائمةٌ تشيخ**: قسمٌ يُضاف غدا يدخل الرافدةَ واللوحةَ ولا
+ * يدخلها. **واللوحةُ تفهرس التسعةَ أصلا** — فالمزيدُ بابُها لا قائمةٌ
+ * ثالثة.
+ */
+export function commandMore(): string {
+  return `<button type="button" class="cmdk-open more" hidden
+    aria-haspopup="dialog" aria-controls="cmdk">
+    ${ICON.add}<span>المزيد</span></button>`
 }
 
 /**
@@ -294,12 +316,14 @@ export function commandPalette(cmds: readonly Command[]): string {
 export const COMMAND_SCRIPT = `
 (function(){
   var veil=document.getElementById('cmdk');
-  var open=document.getElementById('cmdk-open');
+  // ‏وأزرارٌ لا زرّ: العلويُّ و«المزيد» في شريط الجوّال — ومعرّفٌ واحدٌ
+  // ‏يجعل الثانيَ لا يعمل صامتا
+  var opens=Array.prototype.slice.call(document.querySelectorAll('.cmdk-open'));
   var q=document.getElementById('cmdk-q');
   var list=document.getElementById('cmdk-l');
   var none=document.getElementById('cmdk-none');
   if(!veil||!q||!list)return;
-  if(open)open.hidden=false;
+  opens.forEach(function(o){o.hidden=false;});
 
   var opts=Array.prototype.slice.call(list.querySelectorAll('.cmdk-o'));
   var heads=Array.prototype.slice.call(list.querySelectorAll('.cmdk-g'));
@@ -360,7 +384,7 @@ export const COMMAND_SCRIPT = `
     from=null;
   }
 
-  if(open)open.addEventListener('click',show);
+  opens.forEach(function(o){o.addEventListener('click',show);});
   veil.addEventListener('mousedown',function(e){if(e.target===veil)hide();});
   q.addEventListener('input',filter);
 

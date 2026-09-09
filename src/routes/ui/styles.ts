@@ -436,6 +436,16 @@ tbody tr:last-child td{border-bottom:0}
 p.nm{margin:0 0 var(--s-3)}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--t-xs);
   color:var(--ink-3); direction:ltr; display:inline-block; unicode-bidi:isolate}
+/* **وحقلٌ يُكتَب فيه ليس نصّا يُقرأ** (D-109).
+
+   «mono» صُنعت لعرضِ رمزٍ في سطر: حرفٌ صغيرٌ وحبرٌ خافتٌ وارتفاعٌ بقدر
+   محتواه. **وعلى «input» تهبط بارتفاعه إلى ‏١٩px** — دون هدف اللمس
+   بضعفين، وقِيس ذلك على عنوان قناة التنبيهات.
+
+   ولا يُصلَح في ذلك الموضع وحدَه: **حقلٌ آخر يُكتب غدا بـ«mono» يرث
+   العلّة**. فيُقيَّد الصنفُ حيث يُكتب فيه. */
+input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
+  color:var(--ink); font-size:var(--t-sm)}
 .sub{color:var(--ink-3); font-size:var(--t-sm); margin-top:var(--s-1); max-width:62ch; line-height:var(--lh)}
 .num,.money{font-variant-numeric:tabular-nums}
 /* المبلغُ نصٌّ لاتينيّ داخل عربيّ: بلا عزلٍ ينقلب رمزُ العملة إلى آخره */
@@ -1135,6 +1145,96 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   .rail-foot{display:none}
   .topbar{padding:0 var(--s-4)} .content{padding:var(--s-4)}
 }
+
+/* ══ الجوّال: الشريطُ ينزل إلى الإبهام (D-107) ═══════════════════════
+   **وما قِيس أحدُّ ممّا خُطِّط.** قالت «UX-7» «شريطُ تمريرٍ أفقيّ»، فقِيس
+   عند ‏٣٩٠×‏٨٤٤: الرافدةُ ‏٤٣٨px فوق المحتوى، **وأوّلُ محتوًى يبدأ عند
+   ‏٦٩٣** — أي أنّ الطُّرَّ يأكل ثمانين بالمئة من الشاشة قبل أن يُقرأ
+   حرف. **والتمريرُ الأفقيُّ عرَضٌ لا داء.**
+
+   فينزل الشريطُ إلى الأسفل حيث الإبهام، **ويختفي رأسُ الرافدة**: علامةٌ
+   تُعرِّف بالمكان لمن يعرف مكانَه أصلا — وهي تُشترى بمئتَي بكسل.
+
+   **وهو الشريطُ نفسُه لا شريطٌ ثانٍ**: «nav.tabs» تُنقَل ولا تُنسَخ،
+   فلا وسمَ يشيخ وحدَه ولا نصٌّ ينسى أن يربطه. */
+@media(max-width:720px){
+  .rail{position:fixed; inset:auto 0 0; z-index:40; height:auto; border:0;
+    border-top:1px solid var(--line-strong); box-shadow:var(--sh-2)}
+  .rail-head{display:none}
+  /* والحشوُ السفليُّ يحترم شريطَ الجهاز: قضيبُ الإيماء يبتلع صفّا كاملا */
+  nav.tabs{padding:var(--s-1) var(--s-1) calc(var(--s-1) + env(safe-area-inset-bottom, 0px));
+    overflow:visible; gap:0; justify-content:space-around}
+  /*
+   * **وما ليس في الخمسة يُبلَغ من «المزيد»** — ولا يُعدَّد ما يُخفى.
+   *
+   * كُتبت القاعدةُ أوّلا «a:not([data-bar])»، **فبقيت أزرارُ المنصّات
+   * ظاهرةً**: هي «details» لا «a»، فابتلعت العرضَ وردّت الستّةَ إلى
+   * ‏٤٥px لكلٍّ. **ولم يظهر ذلك في وسمٍ ولا اختبار — ظهر في قياس.**
+   *
+   * فتُقلَب القاعدة: **يُذكَر ما يبقى لا ما يُخفى**. وعنصرٌ يُضاف غدا
+   * إلى الرافدة لا يتسلّل إلى الشريط لأنّه من نوعٍ لم يُعدَّد.
+   */
+  nav.tabs > :not(a[data-bar]):not(.cmdk-open){display:none}
+  /*
+   * **والرابطُ و«المزيد» قاعدةٌ واحدة.**
+   *
+   * كُتبا مفترقَين أوّلا، **فقُصّت «المزيد» ببكسل**: حيّزُها ‏١٩ وحرفُها
+   * ‏٢٠ — لأنّ قاعدةَ العرض كُتبت لـ «a» وحدَها. **وخانةٌ في صفٍّ واحدٍ
+   * تُصاغ مرّتين تفترق مرّةً.**
+   */
+  nav.tabs > a[data-bar],nav.tabs > .cmdk-open{
+    flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:2px;
+    align-items:center; justify-content:center; padding:var(--s-1) 2px;
+    min-height:var(--tap); border-radius:var(--r); text-align:center}
+  nav.tabs > a[data-bar] span:not(.count),nav.tabs > .cmdk-open span{
+    font-size:10px; line-height:1.2; width:100%; display:block;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  nav.tabs > a[data-bar] svg,nav.tabs > .cmdk-open svg{
+    width:19px; height:19px; opacity:.75}
+  /* والعدُّ شارةٌ فوق الرمز لا رقمٌ بجانب نصٍّ لا يتّسع له */
+  nav.tabs .count{position:absolute; top:2px; inset-inline-end:calc(50% - 18px);
+    margin:0; min-width:16px; font-size:9px; line-height:16px; padding:0 3px}
+  nav.tabs a{position:relative}
+  nav.tabs a[aria-current=page]{background:var(--brand-wash)}
+  nav.tabs a[aria-current=page]::before{display:none}
+  .cmdk-open.more{border:0; background:none; color:var(--ink-3)}
+  .cmdk-open:not(.more){display:none}
+  /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز */
+  .content{padding-bottom:calc(var(--s-16) + var(--s-4) + env(safe-area-inset-bottom, 0px))}
+
+  /*
+   * ── قرارٌ واحدٌ في المرّة — **وصفُّ البتّ يلاصق الإبهام** ─────────
+   *
+   * **وما قِيس ردَّ ما خُطِّط.** قالت «UX-7» إنّ شاشةَ البتّ «تصير بطاقةً
+   * كاملةَ الشاشة»، فقِيست البطاقاتُ عند ‏٣٩٠×‏٨٤٤: **‏٣٧٩ إلى ‏١٤١٩px،
+   * وأربعٌ من سبعٍ تفوق الشاشة**. فبطاقةٌ «كاملةُ الشاشة» تعني قصَّ
+   * محتوًى يُبَتُّ فيه، **وقصفُ التمرير على أبناءٍ أطولَ من الإطار يحبس
+   * القارئ** — يلتقط البطاقةَ ولا يبلغ أسفلَها.
+   *
+   * **والعيبُ الذي كان البندُ يقصده قِيس فوُجد أحدَّ**: في بطاقةٍ
+   * ‏١٤١٩px يقع زرُّ «اعتمد» عند ‏٣١٣٩px — **خارجَ الشاشة بأربعة أضعافها**.
+   * فالمالكُ يقرأ ثمّ يمرّر تمريرا أعمى يبحث عن الزرّ، ثمّ يعود ليتأكّد.
+   *
+   * فيلتصق صفُّ البتّ **ما دامت بطاقتُه في الشاشة**، ويمضي معها إذا
+   * مضت: **قرارٌ واحدٌ حاضرٌ في المرّة، ولا قصَّ ولا حبس**. و«sticky»
+   * تفعلها بلا سطرٍ برمجيّ واحد.
+   */
+  .draft-foot{position:sticky; z-index:5;
+    bottom:calc(var(--s-16) + env(safe-area-inset-bottom, 0px));
+    background:var(--surface); border-radius:var(--r);
+    padding:var(--s-2); margin-top:var(--s-2); box-shadow:var(--sh-2)}
+
+  /*
+   * **والصورةُ فوق النصّ** — وهو ترتيبُ ما سيراه الجمهور.
+   *
+   * والمكتبُ يعرضهما جنبا إلى جنب فلا ترتيبَ بينهما؛ والجوّالُ يكدّسهما،
+   * **فالكدسُ يصير ترتيبا** — ونصٌّ فوق صورته يجعل المالكَ يقرّر على
+   * نصفِ ما سيُنشَر.
+   */
+  .draft > .pv,.draft > .pic{order:-1}
+}
+/* والشريطُ السفليُّ للجوّال وحدَه: في المكتب تبقى الرافدةُ عمودا */
+@media(min-width:721px){.cmdk-open.more{display:none}}
 @media(max-width:720px){
   .draft-text{height:calc((var(--lines) + 6) * 26px + 28px)}
   .draft-text[data-ro]{height:auto; max-height:calc((var(--lines) + 6) * 26px + 28px)}
@@ -1266,6 +1366,74 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 
    وهي علّةٌ لا تُمسَك بقراءة الوسم: الوسمُ صحيح. **فتُقفَل هنا مرّةً
    للكلّ** — لا بقاعدةٍ لكلّ صنفٍ يُكتب غدا فيُنسى في واحد. */
+/* **وفقرةٌ في بطاقةٍ بلا صنفٍ ترث قاعدةَ المتصفّح** — «margin:1em» = ‏١٤px،
+   وليست من السلّم. ولم يُلحَظ ذلك قبلُ لأنّ كلّ فقرةٍ كانت تحمل صنفا؛
+   **وأوّلُ فقرةٍ عاريةٍ كُتبت أظهرتها**. فتُقيَّد هنا لا في موضعها. */
+.card > p{margin:var(--s-3) 0 0; font-size:var(--t-sm); color:var(--ink-2);
+  line-height:var(--lh); max-width:var(--measure)}
+.card > h2 + p{margin-top:var(--s-2)}
+
+/* ── صندوقُ التنبيهات (D-109) ─────────────────────────────────────────
+   صفٌّ لكلّ ما خرج: حالُه ومتنُه ورمزُ الردّ. **والحالُ لونٌ ورمزٌ ونصّ**
+   (D-043) — ‏٤٠٤ حمراءُ وحدَها لا تُقرأ، ومعها «✕ نشرٌ فشل» تُقرأ. */
+.ax{margin:var(--s-3) 0 0; padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-2)}
+.ax-r{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
+  padding:var(--s-2); border:1px solid var(--line-soft); border-radius:var(--r);
+  background:var(--surface-2)}
+.ax-b{min-width:0; flex:1 1 220px; font-size:var(--t-xs); color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.chip.bad{color:var(--bad); background:var(--bad-wash);
+  border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
+
+/* ── اليومُ الأوّل (D-108) ─────────────────────────────────────────────
+   خطواتٌ مرقّمةٌ لا بطاقات: **الترتيبُ هو المعلومة** — كلُّ خطوةٍ تفتح
+   التي بعدها، وشبكةٌ من خمسٍ تقول «افعل أيَّها شئت» وهو ليس صحيحا.
+
+   **والمطلوبةُ وحدَها تحمل زرّا**: خمسةُ أزرارٍ في شاشةٍ أوّلَ مرّةٍ تُقرأ
+   عبئا، وأوّلُ ما يُفعَل واحد. */
+.fd{border-color:color-mix(in srgb,var(--brand) 30%,transparent)}
+.fd-h{display:flex; align-items:flex-end; gap:var(--s-4); margin-bottom:var(--s-2)}
+.fd-h h2{margin:var(--s-1) 0 0; font-variant-numeric:tabular-nums}
+.fd-h .track{min-width:120px}
+.fd-l{margin:var(--s-4) 0 0; padding:0; list-style:none;
+  display:flex; flex-direction:column; gap:var(--s-3)}
+.fd-s{display:flex; align-items:flex-start; gap:var(--s-3)}
+/* **والدائرةُ الفارغةُ ليست فشلا** (D-043): «لم يقع» لا لونَ حالةٍ له */
+.fd-m{flex:none; width:22px; height:22px; border-radius:50%; margin-top:1px;
+  border:1.5px solid var(--line-strong); display:grid; place-items:center;
+  font-size:var(--t-xs); color:var(--ink-3)}
+.fd-m.done{border-color:var(--ok); color:var(--ok);
+  background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.fd-b{min-width:0; flex:1}
+.fd-b b{display:block; font-size:var(--t-sm); font-weight:600; line-height:var(--lh-tight)}
+.fd-b p{margin:2px 0 0; font-size:var(--t-xs); color:var(--ink-2);
+  line-height:var(--lh); max-width:var(--measure)}
+.fd-s.done .fd-b b{color:var(--ink-3); font-weight:500}
+/* والمطلوبةُ تُميَّز بأرضيّةٍ وحدّ — لا بلونِ حالةٍ محجوز */
+.fd-s.now{background:var(--surface-2); border-radius:var(--r);
+  padding:var(--s-2); margin:calc(-1 * var(--s-2))}
+.fd-s.now + .fd-s{margin-top:var(--s-2)}
+
+/* ── الموعدُ بوجهين (D-106) ───────────────────────────────────────────
+   سطرٌ فوق سطر: «UTC» كما كتبه الخادم، وتحته قراءةُ المالك. **ولا
+   يُصدَّق أحدُهما على حساب الآخر** — فمن أخفى الثانيَ جعل المالكَ يحوّل
+   ذهنيّا، ومن أخفى الأوّلَ محا الصيغةَ التي في القاعدة والتقارير.
+
+   والمحلّيُّ أخفتُ وأصغر: **هو الأليفُ الذي يُقرأ بلمحة**، والـUTC هو
+   الذي يُنسَخ ويُقارَن. */
+.when-t{display:inline-flex; flex-direction:column; gap:1px; vertical-align:middle}
+.when-t .tz{font-size:var(--t-xs); color:var(--ink-3); font-weight:500}
+.when-local{font-size:var(--t-xs); color:var(--ink-3); font-family:inherit;
+  direction:rtl; white-space:nowrap}
+/* وقبل أن يعمل النصُّ يبقى سطرا واحدا — ولا يقفز الصفُّ حين يصير سطرين */
+.when-t.two{line-height:var(--lh-tight)}
+
+/* سطرُ الذروة — خبرٌ لا أمر، فبلا زرٍّ ولا لونِ حالة (D-043) */
+.hint.peak{margin-top:var(--s-2); display:flex; align-items:center;
+  gap:var(--s-2); flex-wrap:wrap}
+.hint.peak .chip{margin:0}
+
 [hidden]{display:none!important}
 
 .cmdk-veil{position:fixed; inset:0; z-index:100; padding:12vh var(--s-4) var(--s-4);

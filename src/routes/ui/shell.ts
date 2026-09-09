@@ -6,6 +6,7 @@
  * لم يُبنَ فوقها أصلا.
  */
 import { COMMAND_SCRIPT, commandPalette, commandTrigger, type Command } from './command'
+import { TIME_SCRIPT } from './time'
 import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
 import { BEIRUTI, INTER } from '../../lib/ui/fonts'
 
@@ -283,8 +284,16 @@ ${FONT_PRELOAD}
     options.commands === undefined ? '' : commandPalette(options.commands)
   }${
     (() => {
-      const all = options.commands === undefined ? script : script + COMMAND_SCRIPT
-      return all === '' ? '' : `<script nonce="${safeNonce}">${stripJs(all)}</script>`
+      /*
+       * **ونصُّ الوقت يمرّ بلا شرط** (D-106).
+       *
+       * كلُّ صفحةٍ فيها موعدٌ تحتاجه، **وشرطٌ يُفحَص عند كلّ نداءٍ شرطٌ
+       * يُنسى في مسارٍ جديد** — وهي علّةُ D-019 نفسُها. وثمنُه أنّ
+       * صفحةَ الدخول تحمله بلا موعدٍ فيها: **يجد صفرَ وسومٍ فيعود
+       * فورا**، وثمنُه مقيسٌ لا مقدَّر.
+       */
+      const all = (options.commands === undefined ? script : script + COMMAND_SCRIPT) + TIME_SCRIPT
+      return `<script nonce="${safeNonce}">${stripJs(all)}</script>`
     })()
   }</body></html>`
 }

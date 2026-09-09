@@ -72,8 +72,16 @@ export function planSection(input: PlanInput): string {
     !input.ready
       ? '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
       : input.analyzed < 2
-        ? `<p class="hint" style="margin:var(--s-2) 0 0">${input.analyzed} مصدرا محلَّلا — والخطّةُ تحتاج اثنين على الأقلّ.
-           <a href="#sources">حلّل مصادرك</a>.</p>`
+        /*
+         * **ودعوةٌ إلى فعلٍ زرٌّ لا كلمةٌ في جملة** (D-108).
+         *
+         * قِيست ‏٥٥×‏١٥px عند ‏٤٣٠ — **دون هدف اللمس بثلاثة أضعاف**.
+         * ولم يرَها مدقّقٌ قطُّ لأنّها لا تظهر إلّا حين تكون المصادرُ بلا
+         * تحليل، **وعيّنةُ الرسم كانت نظاما يعمل**. فأظهرتها عيّنةُ
+         * اليوم الأوّل.
+         */
+        ? `<p class="hint" style="margin:var(--s-2) 0 0">${input.analyzed} مصدرا محلَّلا — والخطّةُ تحتاج اثنين على الأقلّ.</p>
+           <a class="btn g sm" href="#sources" style="margin-top:var(--s-2)">حلّل مصادرك</a>`
         : ''
 
   if (plan === null) {

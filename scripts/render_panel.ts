@@ -300,7 +300,34 @@ const data: PanelData = {
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
+  // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
+  // ‏اللونان والتباينُ فيهما معا
+  alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
+  outbox: [
+    { kind: 'token', body: 'صدى — رمزُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
+    { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },
+  ],
 }
 
 writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
+
+/*
+ * **ولوحُ اليوم الأوّل وضعٌ ثانٍ يُشحَن — فيُرسَم ليُدقَّق** (D-108).
+ *
+ * العيّنةُ أعلاه نظامٌ يعمل، **فاللوحُ يختفي فيها وهو الصواب** — ولا
+ * يراه مدقّقٌ أبدا. **ووضعٌ يُشحَن ولا يُدقَّق وضعٌ بلا حارس** (D-102).
+ *
+ * فتُرسَم صورةٌ ثانيةٌ لنظامٍ ناقص: مصادرُ بلا تحليل، ولا قناةَ حيّة،
+ * ولا خطّة — **وهي الحالُ التي يفتح فيها المالكُ لوحتَه أوّلَ مرّة**.
+ */
+writeAudited('/tmp/panel-first.html', panelPage({
+  ...data,
+  sources: data.sources.map((s) => ({ ...s, analyzed: false, summary: null, worth: null })),
+  channels: viewChannels(
+    accounts.map((a) => ({ ...a, status: 'needs_reauth' as const })),
+    (n) => n.startsWith('LINKEDIN'),
+  ),
+  plan: null,
+  drafts: data.drafts.map((d) => ({ ...d, status: 'draft' as const })),
+}))
 console.log('رُسمت')

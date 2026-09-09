@@ -24,6 +24,8 @@ import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/prompt'
 import { escapeHtml } from '../shell'
+import { whenTag } from '../time'
+import type { Peaks } from '../../../lib/schedule/peak'
 import { relativeTime } from '../../../lib/format'
 
 const MARK: Readonly<Record<string, string>> = {
@@ -98,16 +100,16 @@ function scheduler(
   earliest: string,
   now: Date,
   pageOnly: readonly string[],
+  peaks: Peaks | undefined,
 ): string {
   const approved = d.status === 'approved' || d.status === 'edited'
 
   if (d.status === 'queued') {
-    const when = d.scheduledAt === null ? '' : d.scheduledAt.replace(' ', ' · ')
     const gone = d.dispatchedAt !== null
     return `<div class="sched ${gone ? 'gone' : 'set'}">
       <span class="st ${gone ? 'warn' : 'ok'}"><span class="g">${gone ? '↑' : '◔'}</span>${
         gone ? 'غادرت إلى الطابور' : 'مجدولة'}</span>
-      <span class="when mono">${escapeHtml(when)} UTC</span>
+      <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
       <span class="grow"></span>
       ${gone
@@ -162,7 +164,34 @@ function scheduler(
       <span class="grow"></span>
       <span class="mirror mono" data-mirror="wh-${id}"></span>
     </div>
+    ${peakLine(peaks)}
   </form>`
+}
+
+/**
+ * سطرُ الذروة تحت حقل الموعد (D-106) — **أو سببُ الصمت**.
+ *
+ * **ولا زرَّ يملأ الحقل بالذروة.** الاقتراحُ خبرٌ عن الماضي، والقرارُ
+ * للمالك: زرٌّ يكتبها **يجعل المقيسَ أمرا**، وساعةُ ذروةٍ لا تعرف أنّ
+ * غدا عيدٌ أو أنّ للمالك موعدا. **فيُقال ما قِيس، ويُترَك الحقل.**
+ *
+ * والساعةُ تُقال بوسمها فتصير سطرين كسائر المواعيد — **فلا رقمٌ بلا
+ * منطقةٍ في شاشةٍ كلُّها بمنطقتين**.
+ */
+function peakLine(peaks: Peaks | undefined): string {
+  if (peaks === undefined) return ''
+  if (peaks.hours.length === 0) {
+    return peaks.why === null
+      ? ''
+      : `<p class="hint peak"><b>لا اقتراحَ للموعد</b> — ${escapeHtml(peaks.why)}.
+           <span class="ago">واقتراحٌ لم يُقَس أسوأُ من حقلٍ خامّ.</span></p>`
+  }
+  const said = peaks.hours
+    .map((h) => `<span class="chip mono" title="وسيطُ التفاعل ${h.median} في ${h.posts} منشورات"
+      >${String(h.hour).padStart(2, '0')}:00</span>`)
+    .join('')
+  return `<p class="hint peak"><b>أعلى تفاعلٍ قِيس</b> عند ${said}
+    <span class="ago">بـ UTC · من ${peaks.samples} منشوراتٍ نُشرت وقِيست — خبرٌ لا أمر.</span></p>`
 }
 
 /**
@@ -358,6 +387,7 @@ function card(
   earliest: string,
   media: readonly MediaView[],
   pageOnly: readonly string[],
+  peaks: Readonly<Record<string, Peaks>>,
 ): string {
   const spec = PLATFORMS[d.platform]
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
@@ -452,7 +482,7 @@ function card(
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
     ${imagePane(d, media)}
-    ${scheduler(d, targets, earliest, now, pageOnly)}
+    ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform])}
     <div class="draft-meta">${meta}</div>
   </div>`
 }
@@ -496,6 +526,16 @@ export interface DraftsInput {
    * والنشرُ باسمها لم يُبنَ.
    */
   readonly pageOnly: readonly string[]
+  /**
+   * ساعاتُ الذروة لكلّ منصّة (D-106) — **أو صمتٌ يقول لماذا**.
+   *
+   * ولا تُمرَّر مصفوفةً واحدة: **جمهورُ LinkedIn في ساعات العمل وجمهورُ
+   * X ليلا**، وخلطُهما يعطي وسطا لا يصف أيّا منهما.
+   *
+   * **وإلزاميّةٌ ولو فارغة**: حقلٌ اختياريٌّ يُنسى في مسارٍ جديد فيصمت
+   * الاقتراحُ بلا أن يعلم أحد. **وخريطةٌ فارغةٌ تُكتب صراحةً قرارٌ يُقرأ.**
+   */
+  readonly peaks: Readonly<Record<string, Peaks>>
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -559,7 +599,8 @@ export function draftsSection(input: DraftsInput): string {
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
       : `<div class="grid c2 ragged">${drafts
-          .map((d) => card(d, now, input.targets, input.earliest, input.media, input.pageOnly))
+          .map((d) =>
+            card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks))
           .join('')}</div>`
 
   /*

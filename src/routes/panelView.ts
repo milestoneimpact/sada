@@ -14,7 +14,9 @@ import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandTrigger, SECTIONS } from './ui/command'
+import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/command'
+import type { Peaks } from '../lib/schedule/peak'
+import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
@@ -23,7 +25,7 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
-import { bar, pct } from './ui/parts'
+import { alertChannel, bar, firstDay, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { LOGOS } from './ui/logos'
@@ -905,6 +907,17 @@ export interface PanelData {
   }[]
   readonly knownProviders: { name: string; label: string }[]
   readonly drafts: readonly DraftRow[]
+  /**
+   * ساعاتُ الذروة لكلّ منصّةٍ في المسوّدات (D-106) — **مقيسةٌ أو صامتة**.
+   *
+   * واختياريّةٌ لأنّ الشاشاتِ الفرعيّةَ لا تجدول، **وحقلٌ إلزاميٌّ يُملأ
+   * بفراغٍ في نصف المواضع حقلٌ يكذب**.
+   */
+  readonly peaks?: Readonly<Record<string, Peaks>>
+  /** عنوانُ قناة التنبيهات (D-109) — وفارغٌ يعني «لا قناة». */
+  readonly alertWebhook: string
+  /** آخرُ ما خرج من الصندوق — **ولا صمتٌ يُظنّ نجاحا**. */
+  readonly outbox: readonly OutboxRow[]
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
   /** منصّاتٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص — فالنشرُ باسمها لم يُبنَ (D-087). */
@@ -1259,6 +1272,23 @@ export function panelPage(d: PanelData): string {
     items.push({ kind: 'warn', text: 'لا رموزَ استرداد — فقدُ الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
 
+  /*
+   * **اليومُ الأوّل يُشتَقّ ممّا قُرئ — ولا استعلامَ جديد** (D-108).
+   *
+   * الخمسُ كلُّها من حقائقَ في اليد: مصادرُ وحساباتٌ وخطّةٌ ومسوّدات.
+   * **واستعلامٌ يُضاف لمعالجٍ يختفي بعد أسبوعٍ ثمنٌ يُدفَع كلَّ يوم.**
+   */
+  const first = onboarding({
+    sources: d.sources.length,
+    analyzed: d.sources.filter((x) => x.analyzed).length,
+    liveAccounts: d.channels.reduce(
+      (n, c) => n + c.accounts.filter((a) => a.status === 'active').length, 0,
+    ),
+    hasPlan: d.plan !== null,
+    decided: d.drafts.filter((x) => x.status !== 'draft').length,
+    drafts: d.drafts.filter((x) => x.status === 'draft').length,
+  })
+
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
       ${i.go === undefined ? '' : `<a class="btn g sm" href="${i.go}">${escapeHtml(i.label ?? 'اذهب')}</a>`}</li>`)
@@ -1267,8 +1297,8 @@ export function panelPage(d: PanelData): string {
   const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
     securitySection(d)
 
-  const nav = (href: string, icon: string, text: string, count = 0): string =>
-    `<a href="${href}">${icon}<span>${text}</span>${
+  const nav = (href: string, icon: string, text: string, count = 0, attrs = ''): string =>
+    `<a href="${href}"${attrs}>${icon}<span>${text}</span>${
       count > 0 ? `<span class="count">${count}</span>` : ''
     }</a>`
 
@@ -1295,8 +1325,14 @@ export function panelPage(d: PanelData): string {
     lastGroup = s.group
     // ‏أزرارُ المنصّات تتبع «القنوات» لأنّها تفريعٌ عنها لا قسمٌ ثالث
     const after = s.id === 'channels' ? platformNav(d.channels) : ''
+    /*
+     * **وسمةُ الشريط تُقرأ من الجدول** (D-107): الرافدةُ نفسُها تصير
+     * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى** — فقسمٌ يُضاف
+     * مرّةً يدخل الثلاثةَ: الرافدةَ واللوحةَ والشريط.
+     */
+    const bar = s.bar === true ? ' data-bar' : ''
     return head +
-      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0) + after
+      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0, bar) + after
   }).join('\n    ')
 
   const body = `
@@ -1310,6 +1346,7 @@ export function panelPage(d: PanelData): string {
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
+    ${commandMore()}
   </nav>
   <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>
@@ -1328,6 +1365,7 @@ export function panelPage(d: PanelData): string {
 <main id="main" class="content">
 ${flash}
 <section data-pane="overview" hidden>
+  ${firstDay(first)}
   ${pageHead('لوحةُ صدى', 'نظرة عامّة', 'حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك. <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b>')}
   <div class="grid c4">
     <div class="card tile"><div class="k">تحليلات اليوم</div>
@@ -1425,6 +1463,7 @@ ${flash}
     earliest: new Date(d.now.getTime() + 15 * 60_000).toISOString().slice(0, 16),
     now: d.now,
     ready: d.draftReady,
+    peaks: d.peaks ?? {},
   })}
 </section>
 
@@ -1443,6 +1482,7 @@ ${flash}
       </form>
     </div>
   </div>
+  ${alertChannel(d.alertWebhook, d.outbox)}
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
     <div class="split">

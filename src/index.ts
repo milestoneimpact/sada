@@ -19,6 +19,9 @@ import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
 import { pullDue } from './lib/metrics/job'
 import { runWeekly } from './lib/report/job'
+import { collectAlerts } from './lib/alerts/collect'
+import { readSettings } from './lib/settings'
+import { sendAlerts } from './lib/alerts/outbox'
 import { expiringTokens, recordAlerts } from './lib/token/expiry'
 import { renewDue } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
@@ -640,6 +643,27 @@ async function alertTick(env: Env): Promise<void> {
     if (out.written > 0) console.log({ job: 'token-alerts', ...out })
   } catch (error) {
     console.log({ job: 'token-alerts', failed: String(error) })
+  }
+
+  /*
+   * **والخروجُ بعد التسجيل لا معه** (D-109).
+   *
+   * `recordAlerts` تكتب الحدثَ، وهذه تخرج به. **وفصلُهما مقصود**: تسجيلٌ
+   * ينجح وقناةٌ تسقط لا يُضيّع الحدثَ — الدورةُ التالية تجده مسجَّلا
+   * وغيرَ مُرسَل فتعيد النداءَ وحدَه.
+   *
+   * **ولا يقع في دورةٍ أخرى**: الأحداثُ الثلاثةُ يوميّةُ الأثر، ودورةُ
+   * المسح تدور مرّةً كلَّ يوم — **وتنبيهٌ يتكرّر كلَّ ربع ساعةٍ يُطفَأ**.
+   */
+  try {
+    const settings = await readSettings(env.DB)
+    if (settings.alertWebhook === '') return
+    const alerts = await collectAlerts(env.DB, new Date(), settings.dailySpendCapUsd)
+    if (alerts.length === 0) return
+    const sent = await sendAlerts(env.DB, settings.alertWebhook, alerts)
+    console.log({ job: 'alert-outbox', ...sent })
+  } catch (error) {
+    console.log({ job: 'alert-outbox', failed: String(error) })
   }
 }
 
