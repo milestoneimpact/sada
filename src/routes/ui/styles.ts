@@ -1135,6 +1135,96 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   .rail-foot{display:none}
   .topbar{padding:0 var(--s-4)} .content{padding:var(--s-4)}
 }
+
+/* ══ الجوّال: الشريطُ ينزل إلى الإبهام (D-107) ═══════════════════════
+   **وما قِيس أحدُّ ممّا خُطِّط.** قالت «UX-7» «شريطُ تمريرٍ أفقيّ»، فقِيس
+   عند ‏٣٩٠×‏٨٤٤: الرافدةُ ‏٤٣٨px فوق المحتوى، **وأوّلُ محتوًى يبدأ عند
+   ‏٦٩٣** — أي أنّ الطُّرَّ يأكل ثمانين بالمئة من الشاشة قبل أن يُقرأ
+   حرف. **والتمريرُ الأفقيُّ عرَضٌ لا داء.**
+
+   فينزل الشريطُ إلى الأسفل حيث الإبهام، **ويختفي رأسُ الرافدة**: علامةٌ
+   تُعرِّف بالمكان لمن يعرف مكانَه أصلا — وهي تُشترى بمئتَي بكسل.
+
+   **وهو الشريطُ نفسُه لا شريطٌ ثانٍ**: «nav.tabs» تُنقَل ولا تُنسَخ،
+   فلا وسمَ يشيخ وحدَه ولا نصٌّ ينسى أن يربطه. */
+@media(max-width:720px){
+  .rail{position:fixed; inset:auto 0 0; z-index:40; height:auto; border:0;
+    border-top:1px solid var(--line-strong); box-shadow:var(--sh-2)}
+  .rail-head{display:none}
+  /* والحشوُ السفليُّ يحترم شريطَ الجهاز: قضيبُ الإيماء يبتلع صفّا كاملا */
+  nav.tabs{padding:var(--s-1) var(--s-1) calc(var(--s-1) + env(safe-area-inset-bottom, 0px));
+    overflow:visible; gap:0; justify-content:space-around}
+  /*
+   * **وما ليس في الخمسة يُبلَغ من «المزيد»** — ولا يُعدَّد ما يُخفى.
+   *
+   * كُتبت القاعدةُ أوّلا «a:not([data-bar])»، **فبقيت أزرارُ المنصّات
+   * ظاهرةً**: هي «details» لا «a»، فابتلعت العرضَ وردّت الستّةَ إلى
+   * ‏٤٥px لكلٍّ. **ولم يظهر ذلك في وسمٍ ولا اختبار — ظهر في قياس.**
+   *
+   * فتُقلَب القاعدة: **يُذكَر ما يبقى لا ما يُخفى**. وعنصرٌ يُضاف غدا
+   * إلى الرافدة لا يتسلّل إلى الشريط لأنّه من نوعٍ لم يُعدَّد.
+   */
+  nav.tabs > :not(a[data-bar]):not(.cmdk-open){display:none}
+  /*
+   * **والرابطُ و«المزيد» قاعدةٌ واحدة.**
+   *
+   * كُتبا مفترقَين أوّلا، **فقُصّت «المزيد» ببكسل**: حيّزُها ‏١٩ وحرفُها
+   * ‏٢٠ — لأنّ قاعدةَ العرض كُتبت لـ «a» وحدَها. **وخانةٌ في صفٍّ واحدٍ
+   * تُصاغ مرّتين تفترق مرّةً.**
+   */
+  nav.tabs > a[data-bar],nav.tabs > .cmdk-open{
+    flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:2px;
+    align-items:center; justify-content:center; padding:var(--s-1) 2px;
+    min-height:var(--tap); border-radius:var(--r); text-align:center}
+  nav.tabs > a[data-bar] span:not(.count),nav.tabs > .cmdk-open span{
+    font-size:10px; line-height:1.2; width:100%; display:block;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  nav.tabs > a[data-bar] svg,nav.tabs > .cmdk-open svg{
+    width:19px; height:19px; opacity:.75}
+  /* والعدُّ شارةٌ فوق الرمز لا رقمٌ بجانب نصٍّ لا يتّسع له */
+  nav.tabs .count{position:absolute; top:2px; inset-inline-end:calc(50% - 18px);
+    margin:0; min-width:16px; font-size:9px; line-height:16px; padding:0 3px}
+  nav.tabs a{position:relative}
+  nav.tabs a[aria-current=page]{background:var(--brand-wash)}
+  nav.tabs a[aria-current=page]::before{display:none}
+  .cmdk-open.more{border:0; background:none; color:var(--ink-3)}
+  .cmdk-open:not(.more){display:none}
+  /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز */
+  .content{padding-bottom:calc(var(--s-16) + var(--s-4) + env(safe-area-inset-bottom, 0px))}
+
+  /*
+   * ── قرارٌ واحدٌ في المرّة — **وصفُّ البتّ يلاصق الإبهام** ─────────
+   *
+   * **وما قِيس ردَّ ما خُطِّط.** قالت «UX-7» إنّ شاشةَ البتّ «تصير بطاقةً
+   * كاملةَ الشاشة»، فقِيست البطاقاتُ عند ‏٣٩٠×‏٨٤٤: **‏٣٧٩ إلى ‏١٤١٩px،
+   * وأربعٌ من سبعٍ تفوق الشاشة**. فبطاقةٌ «كاملةُ الشاشة» تعني قصَّ
+   * محتوًى يُبَتُّ فيه، **وقصفُ التمرير على أبناءٍ أطولَ من الإطار يحبس
+   * القارئ** — يلتقط البطاقةَ ولا يبلغ أسفلَها.
+   *
+   * **والعيبُ الذي كان البندُ يقصده قِيس فوُجد أحدَّ**: في بطاقةٍ
+   * ‏١٤١٩px يقع زرُّ «اعتمد» عند ‏٣١٣٩px — **خارجَ الشاشة بأربعة أضعافها**.
+   * فالمالكُ يقرأ ثمّ يمرّر تمريرا أعمى يبحث عن الزرّ، ثمّ يعود ليتأكّد.
+   *
+   * فيلتصق صفُّ البتّ **ما دامت بطاقتُه في الشاشة**، ويمضي معها إذا
+   * مضت: **قرارٌ واحدٌ حاضرٌ في المرّة، ولا قصَّ ولا حبس**. و«sticky»
+   * تفعلها بلا سطرٍ برمجيّ واحد.
+   */
+  .draft-foot{position:sticky; z-index:5;
+    bottom:calc(var(--s-16) + env(safe-area-inset-bottom, 0px));
+    background:var(--surface); border-radius:var(--r);
+    padding:var(--s-2); margin-top:var(--s-2); box-shadow:var(--sh-2)}
+
+  /*
+   * **والصورةُ فوق النصّ** — وهو ترتيبُ ما سيراه الجمهور.
+   *
+   * والمكتبُ يعرضهما جنبا إلى جنب فلا ترتيبَ بينهما؛ والجوّالُ يكدّسهما،
+   * **فالكدسُ يصير ترتيبا** — ونصٌّ فوق صورته يجعل المالكَ يقرّر على
+   * نصفِ ما سيُنشَر.
+   */
+  .draft > .pv,.draft > .pic{order:-1}
+}
+/* والشريطُ السفليُّ للجوّال وحدَه: في المكتب تبقى الرافدةُ عمودا */
+@media(min-width:721px){.cmdk-open.more{display:none}}
 @media(max-width:720px){
   .draft-text{height:calc((var(--lines) + 6) * 26px + 28px)}
   .draft-text[data-ro]{height:auto; max-height:calc((var(--lines) + 6) * 26px + 28px)}

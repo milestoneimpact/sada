@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  buildCommands, commandPalette, commandTrigger, COMMAND_SCRIPT,
+  buildCommands, commandMore, commandPalette, commandTrigger, COMMAND_SCRIPT,
   DRAFT_CAP, normalize, searchKey, SECTIONS,
 } from './command'
 import { shell } from './shell'
@@ -195,6 +195,47 @@ describe('النصُّ البرمجيّ — وقواعدُ اللوحة تُوَ
   it('ويعيد التركيزَ إلى ما كان عليه قبل الفتح', () => {
     expect(COMMAND_SCRIPT).toContain('from=document.activeElement')
     expect(COMMAND_SCRIPT).toContain('from.focus()')
+  })
+})
+
+/**
+ * شريطُ الجوّال (D-107) — **والخمسةُ تُعلَّم في الجدول لا في قائمةٍ ثانية.**
+ *
+ * قائمةٌ ثانيةٌ تُبنى للشريط **تشيخ وحدَها**: قسمٌ يُضاف غدا يدخل الرافدةَ
+ * واللوحةَ ولا يدخلها، **ولا حارسَ يمسك غيابا**.
+ */
+describe('شريطُ الجوّال — خمسةٌ في اليد وتسعةٌ في اللوحة', () => {
+  it('**وخمسةٌ لا أقلّ ولا أكثر**', () => {
+    expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(5)
+  })
+
+  /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
+  it('وهي أقسامُ العمل اليوميّ', () => {
+    const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
+    expect(bar).toEqual(['overview', 'posts', 'channels', 'report', 'tasks'])
+  })
+
+  /**
+   * **وما ليس في الشريط يُبلَغ من «المزيد»** — وهو بابُ اللوحة لا
+   * قائمةٌ ثالثة. فالتسعةُ كلُّها مفهرَسةٌ فيها أصلا.
+   */
+  it('وكلُّ ما خرج من الشريط في اللوحة', () => {
+    const labels = buildCommands({ onPanel: true }).map((c) => c.label)
+    for (const s of SECTIONS.filter((x) => x.bar !== true)) {
+      expect(labels).toContain(s.label)
+    }
+  })
+
+  /** **وزرّان لا زرّ**: العلويُّ و«المزيد» — ومعرّفٌ واحدٌ يُعطِّل الثاني. */
+  it('**والنصُّ يربط بالصنف لا بالمعرّف**', () => {
+    expect(COMMAND_SCRIPT).toContain(".querySelectorAll('.cmdk-open')")
+    expect(COMMAND_SCRIPT).not.toContain("getElementById('cmdk-open')")
+    expect(commandTrigger()).toContain('class="cmdk-open"')
+    expect(commandMore()).toContain('class="cmdk-open more"')
+  })
+
+  it('و«المزيد» مخفيٌّ حتّى يعمل النصُّ كأخيه', () => {
+    expect(commandMore()).toContain('hidden')
   })
 })
 

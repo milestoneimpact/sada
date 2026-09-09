@@ -14,7 +14,7 @@ import { relativeTime, money } from '../lib/format'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandTrigger, SECTIONS } from './ui/command'
+import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import { planSection } from './ui/sections/plan'
@@ -1275,8 +1275,8 @@ export function panelPage(d: PanelData): string {
   const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
     securitySection(d)
 
-  const nav = (href: string, icon: string, text: string, count = 0): string =>
-    `<a href="${href}">${icon}<span>${text}</span>${
+  const nav = (href: string, icon: string, text: string, count = 0, attrs = ''): string =>
+    `<a href="${href}"${attrs}>${icon}<span>${text}</span>${
       count > 0 ? `<span class="count">${count}</span>` : ''
     }</a>`
 
@@ -1303,8 +1303,14 @@ export function panelPage(d: PanelData): string {
     lastGroup = s.group
     // ‏أزرارُ المنصّات تتبع «القنوات» لأنّها تفريعٌ عنها لا قسمٌ ثالث
     const after = s.id === 'channels' ? platformNav(d.channels) : ''
+    /*
+     * **وسمةُ الشريط تُقرأ من الجدول** (D-107): الرافدةُ نفسُها تصير
+     * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى** — فقسمٌ يُضاف
+     * مرّةً يدخل الثلاثةَ: الرافدةَ واللوحةَ والشريط.
+     */
+    const bar = s.bar === true ? ' data-bar' : ''
     return head +
-      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0) + after
+      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0, bar) + after
   }).join('\n    ')
 
   const body = `
@@ -1318,6 +1324,7 @@ export function panelPage(d: PanelData): string {
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
+    ${commandMore()}
   </nav>
   <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>
