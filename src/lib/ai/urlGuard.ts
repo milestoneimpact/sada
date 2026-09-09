@@ -82,3 +82,76 @@ export function checkProviderUrl(raw: string): UrlVerdict {
   const normalized = `${url.origin}${url.pathname.replace(/\/+$/, '')}`
   return { ok: true, url: normalized, host }
 }
+
+/**
+ * عددُ التحويلات المسموح بها — **وثلاثةٌ سخاءٌ لا حاجة**.
+ *
+ * نطاقٌ يُحوّل إلى آخر، وذاك إلى مسارٍ مُوقَّع: اثنتان في أسوأ ما رأيت.
+ * **والثالثةُ هامش**، وما زاد عليها سلسلةٌ لا يقصدها مزوّدٌ جادّ.
+ */
+const MAX_HOPS = 3
+
+/**
+ * نداءٌ خارجيٌّ **يُحرَس عند كلّ قفزة** (D-110).
+ *
+ * ## الثغرة التي وُجدت بالقراءة
+ *
+ * `checkProviderUrl` يفحص **العنوان الأوّل وحدَه**، و`fetch` يتبع التحويلَ
+ * افتراضا. **فعنوانٌ عامٌّ يمرّ الحارسَ ثمّ يردّ ‏٣٠٢ إلى `169.254.169.254`
+ * يصل إليها** — وهي بعينها الحالُ التي كُتب الحارسُ ليمنعها.
+ *
+ * وأثرُها يختلف بالموضع:
+ *
+ * | الموضع | ما يقع |
+ * |---|---|
+ * | `openaiCompat` · `models` | الردُّ **يُقرأ ويُعرَض في اللوحة** — كشفٌ تامّ |
+ * | `alerts/outbox` | الحالُ وحدَها تُسجَّل — **كشفٌ أعمى**، وهو أهون لا مأمون |
+ *
+ * **ولا فرقَ في الحكم**: ما يمنعه الحارسُ في القفزة الأولى يمنعه في الثانية،
+ * **وحارسٌ يُفحَص مرّةً في سلسلةٍ حارسٌ لمرّةٍ واحدة**.
+ *
+ * ## ولا تُرفَض التحويلاتُ كلُّها
+ *
+ * `http` إلى `https`، ونطاقٌ قديمٌ إلى جديد — **تحويلاتٌ يقصدها مزوّدٌ
+ * جادّ**. فرفضُها يمنع الصحيحَ ليمنع الخطأ. **فتُتبَع يدا، ويُفحَص كلُّ
+ * موضعٍ كما يُفحَص الأوّل.**
+ */
+export async function guardedFetch(
+  url: string,
+  init: RequestInit,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  let target = url
+  for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+    const verdict = checkProviderUrl(target)
+    if (!verdict.ok) {
+      throw new Error(
+        hop === 0
+          ? `العنوان مرفوض: ${verdict.reason}`
+          : `تحويلٌ إلى عنوانٍ مرفوض بعد ${hop} قفزة: ${verdict.reason}`,
+      )
+    }
+
+    // ‏`manual` يجعل الردَّ يعود بالتحويل بدل أن يُتبَع من تحتنا
+    const res = await fetchImpl(verdict.url, { ...init, redirect: 'manual' })
+    if (res.status < 300 || res.status > 399) return res
+
+    const next = res.headers.get('location')
+    if (next === null || next.trim() === '') {
+      throw new Error(`تحويلٌ ${res.status} بلا عنوانٍ يُتبَع`)
+    }
+    /*
+     * **والنسبيُّ يُحلّ على ما سبقه** — لا على الأصل.
+     *
+     * تحويلٌ إلى `/v2` من `https://a.co/v1` يعني `https://a.co/v2`.
+     * وحلُّه على العنوان الأوّل بعد قفزتين يعطي مضيفا غيرَ الذي حوّل،
+     * **فيُفحَص مضيفٌ ويُنادى آخر**.
+     */
+    try {
+      target = new URL(next, verdict.url).toString()
+    } catch {
+      throw new Error('عنوانُ التحويل غير صالح')
+    }
+  }
+  throw new Error(`تحويلٌ يزيد على ${MAX_HOPS} قفزات — سلسلةٌ لا يقصدها مزوّد`)
+}

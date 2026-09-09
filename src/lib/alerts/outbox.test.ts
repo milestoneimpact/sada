@@ -148,3 +148,23 @@ describe('والمتنُ يقول ما وقع ويُحيل إلى اللوحة',
     expect(row!.error).toContain('404')
   })
 })
+
+/**
+ * **والحارسُ يُفحَص عند كلّ قفزة** (D-110).
+ *
+ * فحصٌ للعنوان الأوّل وحدَه يُهزَم بـ‏٣٠٢: **عنوانٌ عامٌّ يمرّ الحارسَ ثمّ
+ * يحوّل إلى `169.254.169.254`، و`fetch` يتبعه من تحتنا** — وهي بعينها
+ * الحالُ التي كُتب الحارسُ ليمنعها.
+ */
+describe('ولا يُتبَع تحويلٌ إلى الداخل', () => {
+  it('**وردٌّ ٣٠٢ إلى عنوانٍ داخليٍّ يُسجَّل عطلا ولا يُنادى**', async () => {
+    const f = vi.fn(async () => new Response(null, {
+      status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' },
+    })) as unknown as typeof fetch
+    const r = await sendAlerts(db, HOOK, [budgetAlert('2026-09-09', 5, 5)], f)
+    expect(r.sent).toBe(0)
+    expect(r.failed).toBe(1)
+    const row = await db.prepare('SELECT error FROM alert_outbox').first<{ error: string }>()
+    expect(row!.error).toMatch(/مرفوض/)
+  })
+})

@@ -35,7 +35,7 @@
  * `localhost` والشبكاتِ الخاصّة و`169.254` — خدمةَ البيانات الوصفيّة.
  * **وعنوانٌ يُلصَق بلا حارسٍ بابُ SSRF من داخل الـ Worker.**
  */
-import { checkProviderUrl } from '../ai/urlGuard'
+import { checkProviderUrl, guardedFetch } from '../ai/urlGuard'
 import type { Db } from '../tokens'
 
 /** حدثٌ يستحقّ أن يُوقظ المالك — **وثلاثةٌ لا رابعَ لها**. */
@@ -164,12 +164,18 @@ export async function sendAlerts(
     if (already !== null && already.status !== null) { skipped += 1; continue }
 
     try {
-      const res = await fetchImpl(verdict.url, {
+      /*
+       * **والحارسُ يُفحَص عند كلّ قفزة** (D-110).
+       *
+       * فحصٌ للعنوان الأوّل وحدَه يُهزَم بـ‏٣٠٢: عنوانٌ عامٌّ يمرّ ثمّ
+       * يحوّل إلى `169.254.169.254`، **و`fetch` يتبعه من تحتنا**.
+       */
+      const res = await guardedFetch(verdict.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ‏«text» هو الحقلُ الذي يقرؤه Slack وDiscord وأكثرُ ما سواهما
         body: JSON.stringify({ text: a.body }),
-      })
+      }, fetchImpl)
       await mark(db, a, res.status, res.ok ? null : `ردّت القناةُ ${res.status}`)
       if (res.ok) sent += 1
       else failed += 1

@@ -8,9 +8,15 @@ let seen: { url: string; headers: Headers }[] = []
 
 function net(status: number, payload: unknown, contentType = 'application/json'): typeof fetch {
   seen = []
-  return (async (input: unknown): Promise<Response> => {
-    const request = input as Request
-    seen.push({ url: request.url, headers: request.headers })
+  /*
+   * **ويقبل الشكلين** (D-110): كان النداءُ يمرّر `Request` واحدا، وصار
+   * يمرّ بالحارس فيصل `(url, init)`. **وما يُفحَص لم يتبدّل** — العنوانُ
+   * والترويسات — فيُقرآن من أيّهما جاء.
+   */
+  return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : (input as Request).url
+    const headers = new Headers(init?.headers ?? (input as Request).headers)
+    seen.push({ url, headers })
     return new Response(typeof payload === 'string' ? payload : JSON.stringify(payload), {
       status,
       headers: { 'Content-Type': contentType },
