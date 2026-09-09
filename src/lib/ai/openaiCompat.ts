@@ -17,6 +17,7 @@
  */
 
 import { compatCatalogUrl } from './models'
+import { guardedFetch } from './urlGuard'
 
 export interface CompatUsage {
   readonly inputTokens: number
@@ -91,14 +92,19 @@ export async function chatCompletion(
 
   let response: Response
   try {
-    response = await fetchImpl(`${request.baseUrl}/chat/completions`, {
+    /*
+     * **والحارسُ يُفحَص عند كلّ قفزة** (D-110) — وهذا أخطرُ المواضع:
+     * الردُّ **يُقرأ ويُعرَض في اللوحة**، فتحويلٌ إلى عنوانٍ داخليٍّ
+     * يكشف ما وراءه لا يُصمِته.
+     */
+    response = await guardedFetch(`${request.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${request.apiKey.trim()}`,
       },
       body: JSON.stringify(body),
-    })
+    }, fetchImpl)
   } catch (error) {
     throw new CompatError(
       `تعذّر الوصول: ${error instanceof Error ? error.message : 'عطل شبكة'}`,
@@ -161,9 +167,9 @@ export async function verifyCompat(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: boolean; detail: string; status: number | null }> {
   try {
-    const response = await fetchImpl(compatCatalogUrl(baseUrl), {
+    const response = await guardedFetch(compatCatalogUrl(baseUrl), {
       headers: { Authorization: `Bearer ${apiKey.trim()}` },
-    })
+    }, fetchImpl)
     if (response.ok) return { ok: true, detail: 'المفتاح يعمل', status: response.status }
     if (response.status === 404) {
       return {

@@ -33,6 +33,7 @@
  * (وهي قاعدةُ `costOf` نفسُها).
  */
 import { cfAccountId, cfModelsUrl } from './cloudflare'
+import { guardedFetch } from './urlGuard'
 
 /**
  * صنفُ المهمّة — **موحَّدٌ عندنا لا كما يسمّيه كلٌّ منهم**.
@@ -277,7 +278,18 @@ export async function listModels(
 
   let response: Response
   try {
-    response = await fetchImpl(request)
+    /*
+     * **والحارسُ يُفحَص عند كلّ قفزة** (D-110).
+     *
+     * وفرعان من الأربعة يبنيان العنوانَ من `baseUrl` الذي يكتبه المالك،
+     * **وردُّ هذا النداء يُقرأ ويُعرَض قائمةَ نماذجَ في اللوحة**. والفرعان
+     * الثابتان يمرّان بلا أثر — **وتوحيدُ الطريق أسلمُ من شرطٍ يُنسى**.
+     */
+    response = await guardedFetch(
+      request.url,
+      { method: request.method, headers: request.headers },
+      fetchImpl,
+    )
   } catch (error) {
     return {
       ok: false,
