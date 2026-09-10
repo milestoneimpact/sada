@@ -74,6 +74,21 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
   inset-inline-start:auto; inset-inline-end:var(--s-3); top:var(--s-2);
   display:inline-flex; align-items:center; min-height:var(--tap)}
 .grow{flex:1}
+/* ── لفظُ الطَيِّ واحدٌ لكلِّ مطويٍّ ──────────────────────────
+   وسمُ summary لا يُعلن حالَه لقارئ الشاشة بنفسه، فالنّصُّ يقوله
+   — «افتح» مطويّاً و«أغلق» مفتوحاً. **والقاعدةُ على details لا على
+   صنفٍ بعينه**: حِين كانت مقصورةً على «.guide» و«.prow» وُلِدَ مطويٌّ ثالثٌ
+   يستعير الوسمَ فظهرت الكلمتان معاً (D-112). و«>summary» يمنع مطويّاً
+   داخلَ مطويٍّ من أن يقلِب لفظَ أبيه. */
+details[open]>summary .lbl-open{display:none}
+details:not([open])>summary .lbl-close{display:none}
+/* والمَظهرُ معه واحدٌ: لونُ العلامة، وسهمٌ ينقلِب. والسهمُ زينةٌ لا
+   خبرٌ — لذلك لا يُقرأ بصوتٍ عالٍ، واللفظُ فوقه يقول ما يقوله السهم */
+.g-tog,.ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
+  display:inline-flex; align-items:center; gap:var(--s-2)}
+.g-tog::after,.ptog::after{content:'▾'; font-size:var(--t-xs);
+  transition:transform var(--dur-2) var(--ease)}
+details[open]>summary .g-tog::after,details[open]>summary .ptog::after{transform:rotate(180deg)}
 /* ── العنوانُ يُوزَن أسطرُه ─────────────────────────────────────────────
    «balance» توزّع كلماتِ العنوان على أسطره بالتساوي بدل أن تملأ الأوّلَ
    وتترك في الثاني كلمةً وحدها. **وعنوانٌ من أربع كلماتٍ ينكسر إلى ثلاثٍ
@@ -267,6 +282,10 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
   color:var(--ink-2); max-width:var(--measure)}
 .page-head .aside{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+/* وسطرٌ يقود لوحا بلا رأس: يقول ما الشاشة، ولا يُنفق ارتفاعَ عنوانٍ
+   مكرَّرٍ فوقه (D-114) */
+.lede-lead{margin:0 0 var(--s-5); font-size:var(--t-md); line-height:var(--lh);
+  color:var(--ink-2); max-width:var(--measure)}
 @media(max-width:720px){
   /* الأعمدةُ الثابتةُ لا تسع في ٣٩٠px: يلتفّ الصفُّ ويسقط النموذجُ من
      السطر — الاسمُ والحالُ والإنفاقُ تكفي للفرز، والنموذجُ في اللوح */
@@ -685,14 +704,6 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 .guide .g-t b{display:block; font-size:var(--t-md); font-weight:700; letter-spacing:-.15px}
 .guide .g-t span{display:block; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh);
   max-width:var(--measure)}
-/* «افتح/أغلق» — وسمُ summary لا يُعلن حالَه لقارئ الشاشة بنفسه، فالنصُّ
-   يقوله. وسهمٌ وحده لا يُقرأ بصوتٍ عالٍ. */
-.guide .g-tog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
-  display:inline-flex; align-items:center; gap:var(--s-2)}
-.guide .g-tog::after{content:'▾'; font-size:var(--t-xs); transition:transform var(--dur-2) var(--ease)}
-.guide[open] .g-tog::after{transform:rotate(180deg)}
-.guide[open] .g-tog .lbl-open{display:none}
-.guide:not([open]) .g-tog .lbl-close{display:none}
 .guide-body{padding:var(--s-2) var(--s-5) var(--s-5); border-top:1px solid var(--line-soft)}
 
 /* رابطُ البوّابة: زرٌّ لا رابطٌ في جملة. هو **أوّلُ فعلٍ** في الدليل،
@@ -753,13 +764,6 @@ ol.steps .why{display:block; color:var(--ink-3)}
   font-variant-numeric:tabular-nums}
 .prow .pv i{display:block; font-style:normal; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
 .prow .pst{flex:none; width:150px}
-/* «تفاصيل/إغلاق»: النصُّ يقول الحالَ — وسهمٌ وحده لا يُقرأ بصوتٍ عالٍ */
-.prow .ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
-  display:inline-flex; align-items:center; gap:var(--s-2)}
-.prow .ptog::after{content:'▾'; font-size:var(--t-xs); transition:transform var(--dur-2) var(--ease)}
-.prow[open] .ptog::after{transform:rotate(180deg)}
-.prow[open] .ptog .lbl-open{display:none}
-.prow:not([open]) .ptog .lbl-close{display:none}
 .pbody{padding:var(--s-4); background:var(--surface-2)}
 /* أربعةُ حقولٍ في سطرٍ على الشاشة، واثنان في الجوّال — ولا يُقصّ شيء */
 .pgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--s-3)}
@@ -887,7 +891,16 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    ما يُرسَل. ولذلك يرث خطَّ الصفحة وقياسَها لا خطَّ النماذج الافتراضيّ —
    منشورٌ يُقرأ في مربّعٍ ضيّق يُحكَم عليه بغير ما سيبدو عليه. */
 /* شبكةٌ لا تمطّ: بطاقتان بنصّين مختلفَي الطول لا تُجبَران على ارتفاعٍ
-   واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين. */
+   واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين.
+
+   **وهي للمسوّدات وحدَها** (D-111). كانت على شبكة القنوات أيضا، وقِيس
+   أثرُها: بطاقاتٌ ‏٢٩٤ و‏٢١٦ و‏١٨١ في شبكةٍ ارتفاعُ صفّها ‏٢٩٤ — **فأزرارُ
+   الفعل على ثلاثة خطوطٍ مختلفة**، والعينُ تقرأ ذلك عشوائيّةً.
+
+   **والحجّةُ تنطبق على المسوّدة ولا تنطبق على القناة**: طولُ المسوّدة
+   نصُّها، وقد يزيد بأضعاف. وحقولُ القناة متجانسة، وفرقُها ‏٧٨px،
+   **وذيلُها «margin-top:auto» فيملأ الفرقَ بقصدٍ ويصطفّ الفعلُ على خطٍّ
+   واحد**. فما كان فراغا صار محاذاة. */
 .grid.ragged{align-items:start}
 .draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
@@ -1372,6 +1385,20 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .card > p{margin:var(--s-3) 0 0; font-size:var(--t-sm); color:var(--ink-2);
   line-height:var(--lh); max-width:var(--measure)}
 .card > h2 + p{margin-top:var(--s-2)}
+
+/* ── ما لم يُبنَ: سطرٌ يُطوى (D-111) ──────────────────────────────────
+   ثلاثُ بطاقاتٍ ‏١٥٩px لتقول «غيرُ مدعومة» تُعطي الغائبَ وزنَ الحاضر.
+   والسطرُ يقول العددَ والأسماءَ — وذاك كلُّ ما يُحتاج قبل الفتح. */
+.unbuilt{border:1px dashed var(--line-strong); border-radius:var(--r-lg);
+  background:var(--surface-2)}
+.unbuilt>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-3) var(--s-4); list-style:none; min-height:var(--tap)}
+.unbuilt>summary::-webkit-details-marker{display:none}
+.unbuilt>summary b{font-size:var(--t-sm); font-weight:600}
+.unbuilt .names{font-size:var(--t-xs); color:var(--ink-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.unbuilt-body{padding:0 var(--s-4) var(--s-4); border-top:1px solid var(--line)}
+.unbuilt-body .hint{margin:var(--s-3) 0}
 
 /* ── صندوقُ التنبيهات (D-109) ─────────────────────────────────────────
    صفٌّ لكلّ ما خرج: حالُه ومتنُه ورمزُ الردّ. **والحالُ لونٌ ورمزٌ ونصّ**

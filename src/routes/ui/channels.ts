@@ -122,7 +122,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
   </div>`
 }
 
-function setupPane(view: ChannelView, app: AppStatus | undefined, base: string): string {
+export function setupPane(view: ChannelView, app: AppStatus | undefined, base: string): string {
   const guide = SETUP[view.spec.id]
   if (guide === undefined || app === undefined) return ''
 
@@ -302,7 +302,8 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
 
   const note =
     state === 'awaiting_owner'
-      ? `ينقص سرّا التطبيق. <b>اضبطهما من هنا</b> — أو من أسرار Worker باسمَي
+      ? `ينقص سرّا التطبيق. <b>اضبطهما في شاشة ${escapeHtml(spec.label)}</b> — أو من
+         أسرار Worker باسمَي
          <span class="mono">${missing.map(escapeHtml).join('</span> و <span class="mono">')}</span>.`
       : state === 'needs_reauth'
         ? 'رمزُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
@@ -318,7 +319,14 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         : state === 'linked'
           ? `<a class="btn g sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : state === 'awaiting_owner'
-            ? '<span class="st idle"><span class="g">○</span>بلا سرٍّ لا يبدأ الربط</span>'
+            /*
+             * **وزرٌّ يقود إلى الضبط لا شارةٌ تصفه** (D-111).
+             *
+             * كانت شارةً جامدةً تقول «بلا سرٍّ لا يبدأ الربط» — **تصف
+             * المانعَ ولا تفتح بابَه**. ولمّا انتقل الدليلُ إلى شاشة
+             * المنصّة صار للمانع موضعٌ يُقصَد، **فيُقصَد**.
+             */
+            ? `<a class="btn p sm" href="/panel/channels/${escapeHtml(spec.id)}">اضبط سرّيه</a>`
             : '<span class="st idle"><span class="g">○</span>يحتاج سائقا يُكتب له</span>'
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
@@ -334,7 +342,6 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
     ${rows}
     ${stageNote}
     <p class="ch-note">${note}</p>
-    ${setupPane(view, app, base)}
     <div class="ch-foot">${action}
       <span class="grow"></span>
       <a class="btn g sm" href="/panel/channels/${escapeHtml(spec.id)}">شاشةُ ${escapeHtml(
@@ -420,14 +427,31 @@ export function channelsSection(
       مهما كانت القنواتُ مربوطة.</span>
   </div>
 
-  <div class="grid c2 ragged">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
+  <div class="grid c2">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
 
-  <div class="lede-row" style="margin-top:var(--s-5)">
-    <h3 class="sec" style="margin:0; border:0; padding:0">لم تُبنَ بعد</h3>
-    <span class="grow"></span>
-    <span class="lede-note">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —
-      <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</span>
-  </div>
-
-  <div class="grid c3 ragged">${rest.map((v) => card(v, now, undefined, base)).join('')}</div>`
+  ${/*
+   * **وما لم يُبنَ سطرٌ يُطوى لا شبكةُ بطاقات** (D-111).
+   *
+   * قِيست ثلاثُ بطاقاتٍ ‏١٥٩px لكلٍّ — **‏٤٧٧px لتقول «غيرُ مدعومة»**.
+   * وهي أعلى ما يمكن أن تُعطى معلومةٌ سلبيّةٌ من وزن: البطاقةُ في هذه
+   * الصفحة **وحدةُ قناةٍ تُربَط**، ومنصّةٌ لا تُربَط تأخذ شكلَ ما يُربَط
+   * فتُقرأ خياراً معطَّلا لا شيئاً غيرَ موجود.
+   *
+   * **وتبقى كاملةً لمن فتحها**: الأسماءُ والسببُ ورابطُ الشاشة — ولا
+   * يُحذَف شيء.
+   */ ''}
+  <details class="unbuilt" style="margin-top:var(--s-5)">
+    <summary>
+      <b>لم تُبنَ بعد</b>
+      <span class="chip">${rest.length}</span>
+      <span class="names">${rest.map((v) => escapeHtml(v.spec.label)).join(' · ')}</span>
+      <span class="grow"></span>
+      <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
+    </summary>
+    <div class="unbuilt-body">
+      <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —
+        <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</p>
+      <div class="grid c3">${rest.map((v) => card(v, now, undefined, base)).join('')}</div>
+    </div>
+  </details>`
 }

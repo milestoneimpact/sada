@@ -32,6 +32,8 @@ function screen(over: Partial<Parameters<typeof platformScreen>[0]> = {}): strin
     view, posts: POSTS, now,
     tally: { published: 2, queued: 1, failed: 1, drafts: 1, spend: 0, lastPublishedAt: null },
     scopes: {}, metrics: {}, media: {},
+    // ‏الدليلُ يسكن الشاشةَ منذ D-111 — فتحتاجها حالُ التطبيق وأصلُ اللوحة
+    app: undefined, baseUrl: 'https://sada2.basserh.com',
     ...over,
   })
 }
@@ -119,5 +121,38 @@ describe('والوسائطُ تُعرَض لا يُقال إنّ هناك وسي
 
   it('ولا مصغَّرَ حيث لا وسيط', () => {
     expect(screen({ media: {} })).not.toContain('class="thumbs"')
+  })
+})
+
+/**
+ * الدليلُ يسكن الشاشةَ لا اللوح (D-111).
+ *
+ * **وقِيس سببُ النقل**: كتلةُ الدليل ‏١٢٦٥px من بطاقةٍ ‏١٦٢٠ — ‏٧٨٪ منها
+ * وثيقة. وفتحُها يُطيل بطاقتَها ولا يُطيل جارتَها، **فيُمزَّق صفُّ الشبكة
+ * بـ‏١٤٣٩px**. والبطاقةُ حالٌ، والشاشةُ وثيقة.
+ */
+describe('الدليلُ يسكن شاشةَ المنصّة', () => {
+  const app = {
+    platform: 'x' as const, source: 'none' as const,
+    clientId: null, hint: null, updatedAt: null, updatedBy: null,
+    secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'] as readonly [string, string],
+    verifiedAt: null, verifiedKind: null,
+  }
+
+  it('**وبلا تطبيقٍ مضبوطٍ يُعرَض الدليلُ هنا**', () => {
+    const html = screen({ app })
+    expect(html).toContain('ضبطُ التطبيق ودليلُه')
+    expect(html).toContain('دليلُ ضبط التطبيق')
+    // **ورابطُ العودة يُعرَض للنسخ حيث يُضبَط** — لا في لوحٍ آخر
+    expect(html).toContain('oauth/x/callback')
+  })
+
+  /** **ولا تُعيد الشاشةُ المالكَ إلى اللوح** — كانت تقول «الدليلُ هناك». */
+  it('ولا تُحيل إلى لوح القنوات طلبا للدليل', () => {
+    expect(screen({ app })).not.toContain('افتح الدليل')
+  })
+
+  it('وبلا حالِ تطبيقٍ لا يُعرَض شيءٌ ولا يرمي', () => {
+    expect(() => screen({ app: undefined })).not.toThrow()
   })
 })

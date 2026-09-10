@@ -23,6 +23,13 @@
  */
 import { chromium } from 'playwright'
 
+/**
+ * أقصى فرقٍ مقبولٍ بين بطاقتين في صفٍّ واحد.
+ *
+ * **و‏٢٤px ليست ذوقا**: هي `--s-6`، أدنى مسافةٍ في السلّم تُقرأ فصلا
+ * مقصودا. وما دونها يُقرأ اهتزازا. */
+const MAX_TEAR = 24
+
 const MIN_TARGET = 44
 const MAX_LINE = 75
 
@@ -53,6 +60,46 @@ for (const file of pages) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } })
     await page.goto(`file://${file}`)
     await page.waitForTimeout(700)
+    /*
+     * **لفظُ الطَيِّ يقول حالا واحدا** (D-112).
+     *
+     * وسمُ `summary` لا يُعلن لقارئ الشاشة أمفتوحٌ هو أم مطويّ، فالنّصُّ
+     * يقوله: «افتح» مطويّاً و«أغلق» مفتوحاً. وكانت قاعدةُ التبديل
+     * **مقصورةً على `.guide` و`.prow`** — فلمّا وُلِدَ مطويٌّ ثالثٌ يستعير
+     * الوسمَ نفسَه ظهرت الكلمتان معاً، وسقط السهمُ كذلك.
+     *
+     * ولا يمسكها مدقّقُ تباينٍ ولا هدفُ لمس: الكلمتان **مقروءتان
+     * وكبيرتان**، وإنّما هما متناقضتان. فتُقاس بقلب الحال: مطويّاً ثمّ
+     * مفتوحاً، **ويُشترَط لفظٌ واحدٌ مرئيٌّ في كلٍّ**.
+     *
+     * وتُقاس قبل فتح الألواح أدناه، لأنّ الفتح يمحو الحالَ الذي تفحصه.
+     */
+    const labels = await page.evaluate(() => {
+      const out = []
+      for (const d of document.querySelectorAll('details')) {
+        const sum = d.querySelector(':scope > summary')
+        if (sum === null || sum.querySelector('.lbl-open') === null) continue
+        const was = d.open
+        const seenNow = () => [...sum.querySelectorAll('.lbl-open, .lbl-close')]
+          .filter((e) => getComputedStyle(e).display !== 'none')
+          .map((e) => e.textContent.trim())
+        for (const open of [false, true]) {
+          d.open = open
+          const vis = seenNow()
+          if (vis.length !== 1) {
+            out.push({ cls: String(d.className).slice(0, 26), open, vis: vis.join('/') || '\u2014' })
+          }
+        }
+        // والسهمُ زينةٌ، لكنّ غيابَه يقول إنّ النمطَ لم يبلغ هذا المطويّ
+        const tog = sum.querySelector('.g-tog, .ptog')
+        if (tog !== null && getComputedStyle(tog, '::after').content === 'none') {
+          out.push({ cls: String(d.className).slice(0, 26), open: null, vis: '\u0628\u0644\u0627 \u0633\u0647\u0645' })
+        }
+        d.open = was
+      }
+      return out
+    })
+
     // كلُّ الألواح تُفتح: ما هو مخفيٌّ لا يُقاس، وعللُه تبقى
     await page.evaluate(() => {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
@@ -62,6 +109,51 @@ for (const file of pages) {
       await page.evaluate((d) => { document.documentElement.dataset.density = d }, density)
     }
     await page.waitForTimeout(300)
+
+    /*
+     * **صفٌّ ممزَّقٌ يُقرأ عشوائيّةً** (D-111).
+     *
+     * قِيست شبكةُ القنوات فوُجدت بطاقاتٍ ‏٢٩٤ و‏٢١٦ و‏١٨١ في صفٍّ ارتفاعُه
+     * ‏٢٩٤ — **فأزرارُ الفعل على ثلاثة خطوطٍ مختلفة**. ولا تمسكها عينٌ
+     * تقرأ الشيفرة، ولا مدقّقُ تباينٍ ولا هدفُ لمس.
+     *
+     * **والقياسُ داخل الصفّ لا بين الصفوف**: شبكةٌ من أربعةٍ في عمودين
+     * صفّاها مختلفان بطبيعتهما، **وفرقُهما ليس تمزّقا**. فتُجمَع العناصرُ
+     * بموضعها الرأسيّ ثمّ يُقاس كلُّ صفٍّ وحدَه.
+     *
+     * **و`ragged` استثناءٌ مُعلَّل**: المسوّدةُ طولُها نصُّها وقد يزيد
+     * بأضعاف، ومطُّها يفتح فراغا بقدر الفرق. فتُستثنى بصنفها لا بالصمت.
+     */
+    const torn = await page.evaluate((TEAR) => {
+      const out = []
+      /*
+       * **والإعفاءُ يُعَدّ ولا يُصمَت عنه.**
+       *
+       * أوّلُ صياغةٍ استثنت `.ragged` بصمت، **فجُرِّبت بإعادة الصنف إلى
+       * شبكةٍ ممزَّقةٍ فلم يسقط الحارس** — أي أنّ صنفا واحدا يُطفئه.
+       * فصار عددُ المُعفاة يُطبَع مع النتيجة: **إعفاءٌ يُرى يُراجَع،
+       * وإعفاءٌ يُصمَت عنه يشيخ.**
+       */
+      out.exempt = document.querySelectorAll('.grid.ragged').length
+      for (const g of document.querySelectorAll('.grid:not(.ragged)')) {
+        const kids = [...g.children].filter((e) => e.getBoundingClientRect().height > 0)
+        const rows = new Map()
+        for (const e of kids) {
+          const r = e.getBoundingClientRect()
+          const key = Math.round(r.top)
+          rows.set(key, [...(rows.get(key) ?? []), { h: Math.round(r.height), cls: e.className }])
+        }
+        for (const items of rows.values()) {
+          if (items.length < 2) continue
+          const hs = items.map((x) => x.h)
+          const gap = Math.max(...hs) - Math.min(...hs)
+          if (gap > TEAR) {
+            out.push({ gap, cls: String(items[0].cls).slice(0, 30), heights: hs.join('·') })
+          }
+        }
+      }
+      return { rows: out, exempt: out.exempt }
+    }, MAX_TEAR)
 
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
       const seen = (el) => {
@@ -187,6 +279,9 @@ for (const file of pages) {
     }, { MIN_TARGET, MAX_LINE })
 
     findings.push({ file: file.split('/').pop(), label, width, ...result })
+    findings[findings.length - 1].torn = torn.rows
+    findings[findings.length - 1].exempt = torn.exempt
+    findings[findings.length - 1].labels = labels
     await page.close()
   }
 }
@@ -194,10 +289,14 @@ await browser.close()
 
 let failed = 0
 for (const f of findings) {
-  const issues = f.small.length + f.long.length + f.faint.length + (f.overflow ? 1 : 0)
+  const issues = f.small.length + f.long.length + f.faint.length +
+    (f.torn ?? []).length + (f.labels ?? []).length + (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
-  if (issues === 0) { console.log('  ✓ نظيف'); continue }
+  if (issues === 0) {
+    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}`)
+    continue
+  }
   if (f.overflow) console.log(`  ✕ فيضانٌ أفقيّ: ${f.scrollWidth}px > ${f.width}px`)
   if (f.small.length > 0) {
     console.log(`  ✕ ${f.small.length} هدفا دون ${MIN_TARGET}px:`)
@@ -212,6 +311,19 @@ for (const f of findings) {
   if (f.long.length > 0) {
     console.log(`  ✕ ${f.long.length} كتلةً فوق ${MAX_LINE} محرفا:`)
     for (const l of f.long.slice(0, 8)) console.log(`      ${l.cls} — ${l.chars} محرفا «${l.text}»`)
+  }
+  if ((f.torn ?? []).length > 0) {
+    console.log(`  ✕ ${f.torn.length} صفّا ممزَّقا (فوق ${MAX_TEAR}px):`)
+    for (const t of f.torn.slice(0, 8)) {
+      console.log(`      ${t.cls} — فرقٌ ${t.gap}px · ارتفاعات ${t.heights}`)
+    }
+  }
+  if ((f.labels ?? []).length > 0) {
+    console.log(`  \u2715 ${f.labels.length} \u0645\u0637\u0648\u064a\u0651\u0627\u064b \u0644\u0641\u0638\u064f \u0637\u064e\u064a\u0651\u0650\u0647 \u0644\u0627 \u064a\u0642\u0648\u0644 \u062d\u0627\u0644\u0627\u064b \u0648\u0627\u062d\u062f\u0627\u064b:`)
+    for (const l of f.labels.slice(0, 8)) {
+      const st = l.open === null ? '' : ` \u00b7 ${l.open ? '\u0645\u0641\u062a\u0648\u062d' : '\u0645\u0637\u0648\u064a\u0651'}`
+      console.log(`      .${l.cls}${st} \u2014 \u0627\u0644\u0645\u0631\u0626\u064a\u0651: ${l.vis}`)
+    }
   }
   if (f.faint.length > 0) {
     console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)
