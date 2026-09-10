@@ -59,6 +59,8 @@ interface Row {
   display_name: string
   expires_at: string
   refresh_expires_at: string | null
+  /** ‏١ إن كان في الصفّ رمزُ تجديدٍ محفوظ — **ولا يُفَكّ تشفيرُه**. */
+  has_refresh: number
 }
 
 /**
@@ -73,6 +75,7 @@ export async function expiringTokens(db: Db, now: Date): Promise<ExpiringToken[]
     const result = await db
       .prepare(
         `SELECT t.account_id, t.expires_at, t.refresh_expires_at,
+                CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS has_refresh,
                 a.platform, a.display_name
            FROM tokens t JOIN accounts a ON a.id = t.account_id
           WHERE a.status != 'revoked'`,
@@ -97,6 +100,24 @@ export async function expiringTokens(db: Db, now: Date): Promise<ExpiringToken[]
       const daysLeft = Math.floor((ms - now.getTime()) / DAY_MS)
       const threshold = thresholdFor(daysLeft)
       if (threshold === null) continue
+      /*
+       * **ووصولٌ يُجدَّد آليّا لا يُوقظ أحدا** (D-115) — كما يقول جدولُ
+       * هذا الملفّ في صدره، وكانت الشيفرةُ تخالفه.
+       *
+       * وثمنُه على X خاصّةً: رمزُ وصولها يعيش ساعتين، و`RENEW_MARGIN`
+       * ساعتان — **فالبلاغُ قائمٌ أبدا مهما جُدِّد**. وبلاغٌ لا يُطفَأ
+       * بفعلٍ صحيحٍ يُعلَّم المالكُ أن يتجاهله، **ثمّ يتجاهل معه بلاغَ
+       * التجديد الذي يوجب يدَه** — وهو الذي بُنيت الوحدةُ من أجله.
+       *
+       * **والشرطُ وجودُ الرمز لا تاريخُه**: X تعطي رمزَ تجديدٍ بلا
+       * تاريخِ انتهاء، فـ`refresh_expires_at` فارغٌ و`refresh_enc`
+       * ممتلئ — ومن قرأ العمودَ الفارغَ وحدَه ظنّها بلا تجديد.
+       *
+       * **ولا يُسكَت عمّا انتهى فعلا** (`daysLeft < 0`): التجديدُ يفشل
+       * فشلا عابرا (٥٠٣ أو عطلُ شبكة) فيردّ `deferred` **ولا يُعلَّم
+       * الحسابُ `needs_reauth`** — فلو أُسكت الوصولُ مطلقا لمات صامتا.
+       */
+      if (kind === 'access' && row.has_refresh === 1 && daysLeft >= 0) continue
       out.push({
         accountId: row.account_id, platform: row.platform,
         displayName: row.display_name, kind, expiresAt: at, daysLeft, threshold,
