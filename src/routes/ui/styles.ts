@@ -282,6 +282,10 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-md); line-height:var(--lh);
   color:var(--ink-2); max-width:var(--measure)}
 .page-head .aside{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+/* وسطرٌ يقود لوحا بلا رأس: يقول ما الشاشة، ولا يُنفق ارتفاعَ عنوانٍ
+   مكرَّرٍ فوقه (D-114) */
+.lede-lead{margin:0 0 var(--s-5); font-size:var(--t-md); line-height:var(--lh);
+  color:var(--ink-2); max-width:var(--measure)}
 @media(max-width:720px){
   /* الأعمدةُ الثابتةُ لا تسع في ٣٩٠px: يلتفّ الصفُّ ويسقط النموذجُ من
      السطر — الاسمُ والحالُ والإنفاقُ تكفي للفرز، والنموذجُ في اللوح */
