@@ -60,6 +60,46 @@ for (const file of pages) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } })
     await page.goto(`file://${file}`)
     await page.waitForTimeout(700)
+    /*
+     * **لفظُ الطَيِّ يقول حالا واحدا** (D-112).
+     *
+     * وسمُ `summary` لا يُعلن لقارئ الشاشة أمفتوحٌ هو أم مطويّ، فالنّصُّ
+     * يقوله: «افتح» مطويّاً و«أغلق» مفتوحاً. وكانت قاعدةُ التبديل
+     * **مقصورةً على `.guide` و`.prow`** — فلمّا وُلِدَ مطويٌّ ثالثٌ يستعير
+     * الوسمَ نفسَه ظهرت الكلمتان معاً، وسقط السهمُ كذلك.
+     *
+     * ولا يمسكها مدقّقُ تباينٍ ولا هدفُ لمس: الكلمتان **مقروءتان
+     * وكبيرتان**، وإنّما هما متناقضتان. فتُقاس بقلب الحال: مطويّاً ثمّ
+     * مفتوحاً، **ويُشترَط لفظٌ واحدٌ مرئيٌّ في كلٍّ**.
+     *
+     * وتُقاس قبل فتح الألواح أدناه، لأنّ الفتح يمحو الحالَ الذي تفحصه.
+     */
+    const labels = await page.evaluate(() => {
+      const out = []
+      for (const d of document.querySelectorAll('details')) {
+        const sum = d.querySelector(':scope > summary')
+        if (sum === null || sum.querySelector('.lbl-open') === null) continue
+        const was = d.open
+        const seenNow = () => [...sum.querySelectorAll('.lbl-open, .lbl-close')]
+          .filter((e) => getComputedStyle(e).display !== 'none')
+          .map((e) => e.textContent.trim())
+        for (const open of [false, true]) {
+          d.open = open
+          const vis = seenNow()
+          if (vis.length !== 1) {
+            out.push({ cls: String(d.className).slice(0, 26), open, vis: vis.join('/') || '\u2014' })
+          }
+        }
+        // والسهمُ زينةٌ، لكنّ غيابَه يقول إنّ النمطَ لم يبلغ هذا المطويّ
+        const tog = sum.querySelector('.g-tog, .ptog')
+        if (tog !== null && getComputedStyle(tog, '::after').content === 'none') {
+          out.push({ cls: String(d.className).slice(0, 26), open: null, vis: '\u0628\u0644\u0627 \u0633\u0647\u0645' })
+        }
+        d.open = was
+      }
+      return out
+    })
+
     // كلُّ الألواح تُفتح: ما هو مخفيٌّ لا يُقاس، وعللُه تبقى
     await page.evaluate(() => {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
@@ -241,6 +281,7 @@ for (const file of pages) {
     findings.push({ file: file.split('/').pop(), label, width, ...result })
     findings[findings.length - 1].torn = torn.rows
     findings[findings.length - 1].exempt = torn.exempt
+    findings[findings.length - 1].labels = labels
     await page.close()
   }
 }
@@ -249,7 +290,7 @@ await browser.close()
 let failed = 0
 for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
-    (f.torn ?? []).length + (f.overflow ? 1 : 0)
+    (f.torn ?? []).length + (f.labels ?? []).length + (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
   if (issues === 0) {
@@ -275,6 +316,13 @@ for (const f of findings) {
     console.log(`  ✕ ${f.torn.length} صفّا ممزَّقا (فوق ${MAX_TEAR}px):`)
     for (const t of f.torn.slice(0, 8)) {
       console.log(`      ${t.cls} — فرقٌ ${t.gap}px · ارتفاعات ${t.heights}`)
+    }
+  }
+  if ((f.labels ?? []).length > 0) {
+    console.log(`  \u2715 ${f.labels.length} \u0645\u0637\u0648\u064a\u0651\u0627\u064b \u0644\u0641\u0638\u064f \u0637\u064e\u064a\u0651\u0650\u0647 \u0644\u0627 \u064a\u0642\u0648\u0644 \u062d\u0627\u0644\u0627\u064b \u0648\u0627\u062d\u062f\u0627\u064b:`)
+    for (const l of f.labels.slice(0, 8)) {
+      const st = l.open === null ? '' : ` \u00b7 ${l.open ? '\u0645\u0641\u062a\u0648\u062d' : '\u0645\u0637\u0648\u064a\u0651'}`
+      console.log(`      .${l.cls}${st} \u2014 \u0627\u0644\u0645\u0631\u0626\u064a\u0651: ${l.vis}`)
     }
   }
   if (f.faint.length > 0) {

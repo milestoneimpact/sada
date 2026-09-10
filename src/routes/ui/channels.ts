@@ -68,7 +68,7 @@ const STEP_MARK: Readonly<Record<Step['state'], { g: string; cls: string; label:
   failed: { g: '▲', cls: 'bad', label: 'رُدّت' },
 }
 
-export function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
+function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
   const w = wizardFor(view, app)
   const rows = w.steps
     .map((step) => {
