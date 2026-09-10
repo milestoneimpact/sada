@@ -18,12 +18,22 @@ function account(id: string, platform = 'linkedin', status = 'active'): void {
   )
 }
 
-function token(accountId: string, access: string, refresh: string | null): void {
+/**
+ * ويُفرَّق بين **وجود** رمز التجديد و**تاريخِ انتهائه**.
+ *
+ * X تعطي رمزَ تجديدٍ ولا تعطي له تاريخا: `refresh_expires_at` فارغٌ
+ * و`refresh_enc` ممتلئ. **فمن قرأ العمودَ الفارغَ وحدَه ظنّ الحسابَ بلا
+ * تجديد** — وهو يُجدَّد كلَّ ساعتين (D-115).
+ */
+function token(
+  accountId: string, access: string, refresh: string | null, hasRefresh = true,
+): void {
   db.raw.exec(
     `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at,
-                         refresh_expires_at, scopes)
+                         refresh_expires_at, refresh_enc, refresh_iv, scopes)
      VALUES ('${accountId}', 'x', 'y', '${access}',
-             ${refresh === null ? 'NULL' : `'${refresh}'`}, 'openid')`,
+             ${refresh === null ? 'NULL' : `'${refresh}'`},
+             ${hasRefresh ? "'r', 'iv'" : 'NULL, NULL'}, 'openid')`,
   )
 }
 
@@ -55,7 +65,7 @@ describe('ما يُلتقَط', () => {
 
   it('ورمزٌ قريبٌ يُلتقَط بنوعه', async () => {
     account('a1')
-    token('a1', inDays(3), inDays(300))
+    token('a1', inDays(3), null, false)
     const items = await expiringTokens(db, NOW)
     expect(items).toHaveLength(1)
     expect(items[0]).toMatchObject({ kind: 'access', threshold: 7, daysLeft: 3 })
@@ -69,37 +79,98 @@ describe('ما يُلتقَط', () => {
    */
   it('والتجديدُ يسبق الوصولَ عند تساوي الأيّام', async () => {
     account('a1')
-    token('a1', inDays(2), inDays(2))
+    // وبعد الانتهاء يجتمعان: قبله يُسكَت الوصولُ لأنّه يُجدَّد (D-115)
+    token('a1', inDays(-2), inDays(-2))
     const items = await expiringTokens(db, NOW)
     expect(items.map((i) => i.kind)).toEqual(['refresh', 'access'])
   })
 
   it('والأقربُ أوّلا', async () => {
     account('a1'); account('a2', 'x')
-    token('a1', inDays(6), null)
-    token('a2', inDays(1), null)
+    token('a1', inDays(6), null, false)
+    token('a2', inDays(1), null, false)
     expect((await expiringTokens(db, NOW)).map((i) => i.accountId)).toEqual(['a2', 'a1'])
   })
 
   it('وحسابٌ مُبطَلٌ لا يُنبَّه عليه', async () => {
     account('a1', 'linkedin', 'revoked')
-    token('a1', inDays(1), null)
+    token('a1', inDays(1), null, false)
     expect(await expiringTokens(db, NOW)).toEqual([])
   })
 
   /** ورمزُ تجديدٍ لا وجودَ له (X أحيانا) لا يُختلَق له تاريخ. */
   it('ولا رمزَ تجديدٍ لا يُنبَّه عليه', async () => {
     account('a1')
-    token('a1', inDays(2), null)
+    token('a1', inDays(2), null, false)
     const items = await expiringTokens(db, NOW)
+    // **ويُشترَط أن تكون فيها عناصر**: «every» على قائمةٍ خاليةٍ صحيحٌ
+    // دائما، فكان الاختبارُ يمرّ فراغا بعد D-115 لولا هذا السطر
+    expect(items).toHaveLength(1)
     expect(items.every((i) => i.kind === 'access')).toBe(true)
+  })
+
+  /*
+   * ── وصولٌ يُجدَّد آليّا لا يُوقظ أحدا (D-115) ──────────────────────
+   *
+   * جدولُ هذه الوحدة يقول بنفسه: **الوصولُ «تجدّده دورةُ D-066 آليّا —
+   * ولا يُوقظ أحدا»**. والشيفرةُ كانت تُنبّه عليه.
+   *
+   * **وثمنُه على X خاصّةً**: رمزُ وصولها يعيش ساعتين، ودورةُ التجديد
+   * تلتقطه قبل ساعتين — **فالبلاغُ قائمٌ أبدا مهما جُدِّد**. وبلاغٌ لا
+   * يُطفَأ بفعلٍ صحيحٍ يُعلَّم المالكُ أن يتجاهله، **ثمّ يتجاهل معه
+   * بلاغَ التجديد الذي يوجب يدَه**.
+   */
+  it('ووصولٌ له رمزُ تجديدٍ لا يُنبَّه عليه', async () => {
+    account('a1', 'x')
+    token('a1', inDays(0), null)          // ساعاتٌ تبقى — وله refresh_enc
+    expect(await expiringTokens(db, NOW)).toEqual([])
+  })
+
+  /**
+   * **ولا يُسكَت عمّا انتهى فعلا.**
+   *
+   * فالتجديدُ قد يفشل فشلا عابرا (٥٠٣ أو عطلُ شبكة) فيردّ `deferred`
+   * **ولا يُعلَّم الحسابُ `needs_reauth`**. فلو أُسكت الوصولُ مطلقا
+   * لمات الرمزُ صامتا. **فالسكوتُ قبل الانتهاء وحدَه.**
+   */
+  it('وما انتهى فعلا يُنبَّه عليه ولو كان له تجديد', async () => {
+    account('a1', 'x')
+    token('a1', inDays(-1), null)
+    const items = await expiringTokens(db, NOW)
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ kind: 'access', threshold: 0 })
+  })
+
+  /** **وحسابٌ بلا رمز تجديدٍ يبقى منبَّها عليه**: لا سبيلَ آليّ له. */
+  it('ووصولٌ بلا رمز تجديدٍ يبقى منبَّها عليه', async () => {
+    account('a1', 'x')
+    token('a1', inDays(2), null, false)
+    const items = await expiringTokens(db, NOW)
+    expect(items.map((i) => i.kind)).toEqual(['access'])
+  })
+
+  /**
+   * **وهذه هي الحالُ التي رآها المالكُ على شاشته** — منسوخةً من
+   * `sada-staging` كما قُرئت، لا مفترَضةً.
+   *
+   * X: انتهاءٌ بعد ساعةٍ وربع · `refresh_expires_at` **فارغ** ·
+   * `refresh_enc` **ممتلئ**. وLinkedIn بعيدةٌ في الاثنين.
+   *
+   * وقال البلاغُ إنّ X «ستنتهي» **وقد جُدِّدت للتوّ** — ولا يُطفئه تجديد،
+   * لأنّ رمزَها يعيش ساعتين والدورةُ تلتقطه قبل ساعتين.
+   */
+  it('وحالُ staging الحيّة: X لا تُنبِّه قبل انتهائها', async () => {
+    account('li', 'linkedin'); account('x2', 'x')
+    token('li', '2026-11-05T20:00:13.142Z', '2027-09-06T20:00:13.142Z')
+    token('x2', '2026-09-10T19:00:15.658Z', null)
+    expect(await expiringTokens(db, new Date('2026-09-10T17:45:00Z'))).toEqual([])
   })
 
   /** وتاريخٌ فاسدٌ لا يُسقط الدورة ولا يُنبَّه عليه بالخطأ. */
   it('وتاريخٌ لا يُقرأ يُتخطّى ولا يُسقط البقيّة', async () => {
     account('a1'); account('a2', 'x')
-    token('a1', 'ليس تاريخا', null)
-    token('a2', inDays(1), null)
+    token('a1', 'ليس تاريخا', null, false)
+    token('a2', inDays(1), null, false)
     const items = await expiringTokens(db, NOW)
     expect(items.map((i) => i.accountId)).toEqual(['a2'])
   })
@@ -109,7 +180,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   /** دورةٌ يوميّةٌ لا تكتب سبعةَ صفوفٍ لرمزٍ واحد بين العتبتين. */
   it('إعادةُ الدورة لا تكرّر الصفّ', async () => {
     account('a1')
-    token('a1', inDays(3), null)
+    token('a1', inDays(3), null, false)
     const items = await expiringTokens(db, NOW)
 
     expect((await recordAlerts(db, items)).written).toBe(1)
@@ -123,7 +194,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   it('وعتبةٌ أقربُ تُكتب صفّا ثانيا', async () => {
     account('a1')
     const expiry = inDays(3)
-    token('a1', expiry, null)
+    token('a1', expiry, null, false)
     await recordAlerts(db, await expiringTokens(db, NOW))
 
     // بعد يومين: بقي يومٌ واحد — عتبةٌ أخرى
@@ -141,7 +212,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
     account('a1')
     expect(await anyWeekAlert(db)).toBe(false)
 
-    token('a1', inDays(3), null)
+    token('a1', inDays(3), null, false)
     await recordAlerts(db, await expiringTokens(db, NOW))
     expect(await anyWeekAlert(db)).toBe(true)
   })
@@ -149,7 +220,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   /** وتنبيهُ يومٍ واحدٍ وحده لا يُجيز بندَ الأسبوع. */
   it('وتنبيهُ اليوم الواحد لا يُجيز بندَ الأسبوع', async () => {
     account('a1')
-    token('a1', inDays(0), null)
+    token('a1', inDays(0), null, false)
     await recordAlerts(db, await expiringTokens(db, NOW))
     expect(await anyWeekAlert(db)).toBe(false)
   })
