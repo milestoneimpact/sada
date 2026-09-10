@@ -1126,8 +1126,14 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('LINKEDIN_CLIENT_ID')
-    // صار الضبطُ من اللوحة (D-042)، فالبطاقةُ تعرض النموذجَ لا رقمَ مهمّة
-    expect(html).toContain('دليلُ ضبط التطبيق')
+    /*
+     * **واللوحُ يُسمّي المانعَ ويفتح بابَه** (D-111).
+     *
+     * كان يحمل الدليلَ كاملا فيُمزّق شبكتَه (‏٧٨٪ من البطاقة وثيقة).
+     * فانتقل الدليلُ إلى شاشة المنصّة، **وبقي على البطاقة أن تقود إليه**
+     * — وشارةٌ تصف المانعَ ولا تفتحه أسوأُ من غيابها.
+     */
+    expect(html).toContain('/panel/channels/linkedin')
     expect(html).not.toContain('/oauth/linkedin/start')
   })
 
@@ -1814,17 +1820,23 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     const cookie = await login()
     await save(cookie)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const screen = await (await app.request(
+      '/panel/channels/linkedin', withSession(cookie), env,
+    )).text()
 
-    expect(html).not.toContain('سرّيّةٌ')
-    expect(html).not.toContain('WPL_AP1')
-    // والمعرّفُ علنيٌّ فيظهر
-    expect(html).toContain('78k4gm3yw1g18e')
+    // **ولا يعود السرُّ إلى شاشةٍ قطُّ** — لا اللوح ولا شاشةُ المنصّة
+    for (const page of [html, screen]) {
+      expect(page).not.toContain('سرّيّةٌ')
+      expect(page).not.toContain('WPL_AP1')
+    }
+    // والمعرّفُ علنيٌّ فيظهر حيث يسكن الضبط (D-111)
+    expect(screen).toContain('78k4gm3yw1g18e')
   })
 
   it('ويصير الربطُ ممكنا — بعد أن كان «تنتظرك»', async () => {
     const cookie = await login()
     const before = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(before).toContain('دليلُ ضبط التطبيق')
+    expect(before).toContain('/panel/channels/linkedin')
 
     await save(cookie)
     const after = await (await app.request('/panel', withSession(cookie), env)).text()

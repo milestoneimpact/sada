@@ -1214,6 +1214,9 @@ panel.get('/panel/channels/:platform', async (c) => {
 
   const body = platformScreen({
     view, posts, tally, scopes, metrics, media, now,
+    // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
+    app: apps.find((a) => a.platform === id),
+    baseUrl: c.env.PUBLIC_BASE_URL,
     // حالُ الصفحة في عنوانها: يُشارَك رابطٌ فيُرى ما رآه صاحبُه
     show: showOf(c.req.query('show')),
   })

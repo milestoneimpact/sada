@@ -23,6 +23,13 @@
  */
 import { chromium } from 'playwright'
 
+/**
+ * أقصى فرقٍ مقبولٍ بين بطاقتين في صفٍّ واحد.
+ *
+ * **و‏٢٤px ليست ذوقا**: هي `--s-6`، أدنى مسافةٍ في السلّم تُقرأ فصلا
+ * مقصودا. وما دونها يُقرأ اهتزازا. */
+const MAX_TEAR = 24
+
 const MIN_TARGET = 44
 const MAX_LINE = 75
 
@@ -62,6 +69,51 @@ for (const file of pages) {
       await page.evaluate((d) => { document.documentElement.dataset.density = d }, density)
     }
     await page.waitForTimeout(300)
+
+    /*
+     * **صفٌّ ممزَّقٌ يُقرأ عشوائيّةً** (D-111).
+     *
+     * قِيست شبكةُ القنوات فوُجدت بطاقاتٍ ‏٢٩٤ و‏٢١٦ و‏١٨١ في صفٍّ ارتفاعُه
+     * ‏٢٩٤ — **فأزرارُ الفعل على ثلاثة خطوطٍ مختلفة**. ولا تمسكها عينٌ
+     * تقرأ الشيفرة، ولا مدقّقُ تباينٍ ولا هدفُ لمس.
+     *
+     * **والقياسُ داخل الصفّ لا بين الصفوف**: شبكةٌ من أربعةٍ في عمودين
+     * صفّاها مختلفان بطبيعتهما، **وفرقُهما ليس تمزّقا**. فتُجمَع العناصرُ
+     * بموضعها الرأسيّ ثمّ يُقاس كلُّ صفٍّ وحدَه.
+     *
+     * **و`ragged` استثناءٌ مُعلَّل**: المسوّدةُ طولُها نصُّها وقد يزيد
+     * بأضعاف، ومطُّها يفتح فراغا بقدر الفرق. فتُستثنى بصنفها لا بالصمت.
+     */
+    const torn = await page.evaluate((TEAR) => {
+      const out = []
+      /*
+       * **والإعفاءُ يُعَدّ ولا يُصمَت عنه.**
+       *
+       * أوّلُ صياغةٍ استثنت `.ragged` بصمت، **فجُرِّبت بإعادة الصنف إلى
+       * شبكةٍ ممزَّقةٍ فلم يسقط الحارس** — أي أنّ صنفا واحدا يُطفئه.
+       * فصار عددُ المُعفاة يُطبَع مع النتيجة: **إعفاءٌ يُرى يُراجَع،
+       * وإعفاءٌ يُصمَت عنه يشيخ.**
+       */
+      out.exempt = document.querySelectorAll('.grid.ragged').length
+      for (const g of document.querySelectorAll('.grid:not(.ragged)')) {
+        const kids = [...g.children].filter((e) => e.getBoundingClientRect().height > 0)
+        const rows = new Map()
+        for (const e of kids) {
+          const r = e.getBoundingClientRect()
+          const key = Math.round(r.top)
+          rows.set(key, [...(rows.get(key) ?? []), { h: Math.round(r.height), cls: e.className }])
+        }
+        for (const items of rows.values()) {
+          if (items.length < 2) continue
+          const hs = items.map((x) => x.h)
+          const gap = Math.max(...hs) - Math.min(...hs)
+          if (gap > TEAR) {
+            out.push({ gap, cls: String(items[0].cls).slice(0, 30), heights: hs.join('·') })
+          }
+        }
+      }
+      return { rows: out, exempt: out.exempt }
+    }, MAX_TEAR)
 
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
       const seen = (el) => {
@@ -187,6 +239,8 @@ for (const file of pages) {
     }, { MIN_TARGET, MAX_LINE })
 
     findings.push({ file: file.split('/').pop(), label, width, ...result })
+    findings[findings.length - 1].torn = torn.rows
+    findings[findings.length - 1].exempt = torn.exempt
     await page.close()
   }
 }
@@ -194,10 +248,14 @@ await browser.close()
 
 let failed = 0
 for (const f of findings) {
-  const issues = f.small.length + f.long.length + f.faint.length + (f.overflow ? 1 : 0)
+  const issues = f.small.length + f.long.length + f.faint.length +
+    (f.torn ?? []).length + (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
-  if (issues === 0) { console.log('  ✓ نظيف'); continue }
+  if (issues === 0) {
+    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}`)
+    continue
+  }
   if (f.overflow) console.log(`  ✕ فيضانٌ أفقيّ: ${f.scrollWidth}px > ${f.width}px`)
   if (f.small.length > 0) {
     console.log(`  ✕ ${f.small.length} هدفا دون ${MIN_TARGET}px:`)
@@ -212,6 +270,12 @@ for (const f of findings) {
   if (f.long.length > 0) {
     console.log(`  ✕ ${f.long.length} كتلةً فوق ${MAX_LINE} محرفا:`)
     for (const l of f.long.slice(0, 8)) console.log(`      ${l.cls} — ${l.chars} محرفا «${l.text}»`)
+  }
+  if ((f.torn ?? []).length > 0) {
+    console.log(`  ✕ ${f.torn.length} صفّا ممزَّقا (فوق ${MAX_TEAR}px):`)
+    for (const t of f.torn.slice(0, 8)) {
+      console.log(`      ${t.cls} — فرقٌ ${t.gap}px · ارتفاعات ${t.heights}`)
+    }
   }
   if (f.faint.length > 0) {
     console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)

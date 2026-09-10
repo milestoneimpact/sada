@@ -887,7 +887,16 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    ما يُرسَل. ولذلك يرث خطَّ الصفحة وقياسَها لا خطَّ النماذج الافتراضيّ —
    منشورٌ يُقرأ في مربّعٍ ضيّق يُحكَم عليه بغير ما سيبدو عليه. */
 /* شبكةٌ لا تمطّ: بطاقتان بنصّين مختلفَي الطول لا تُجبَران على ارتفاعٍ
-   واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين. */
+   واحد، وإلّا انفتح تحت الأقصر فراغٌ بقدر فرق النصّين.
+
+   **وهي للمسوّدات وحدَها** (D-111). كانت على شبكة القنوات أيضا، وقِيس
+   أثرُها: بطاقاتٌ ‏٢٩٤ و‏٢١٦ و‏١٨١ في شبكةٍ ارتفاعُ صفّها ‏٢٩٤ — **فأزرارُ
+   الفعل على ثلاثة خطوطٍ مختلفة**، والعينُ تقرأ ذلك عشوائيّةً.
+
+   **والحجّةُ تنطبق على المسوّدة ولا تنطبق على القناة**: طولُ المسوّدة
+   نصُّها، وقد يزيد بأضعاف. وحقولُ القناة متجانسة، وفرقُها ‏٧٨px،
+   **وذيلُها «margin-top:auto» فيملأ الفرقَ بقصدٍ ويصطفّ الفعلُ على خطٍّ
+   واحد**. فما كان فراغا صار محاذاة. */
 .grid.ragged{align-items:start}
 .draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
@@ -1372,6 +1381,20 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .card > p{margin:var(--s-3) 0 0; font-size:var(--t-sm); color:var(--ink-2);
   line-height:var(--lh); max-width:var(--measure)}
 .card > h2 + p{margin-top:var(--s-2)}
+
+/* ── ما لم يُبنَ: سطرٌ يُطوى (D-111) ──────────────────────────────────
+   ثلاثُ بطاقاتٍ ‏١٥٩px لتقول «غيرُ مدعومة» تُعطي الغائبَ وزنَ الحاضر.
+   والسطرُ يقول العددَ والأسماءَ — وذاك كلُّ ما يُحتاج قبل الفتح. */
+.unbuilt{border:1px dashed var(--line-strong); border-radius:var(--r-lg);
+  background:var(--surface-2)}
+.unbuilt>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-3) var(--s-4); list-style:none; min-height:var(--tap)}
+.unbuilt>summary::-webkit-details-marker{display:none}
+.unbuilt>summary b{font-size:var(--t-sm); font-weight:600}
+.unbuilt .names{font-size:var(--t-xs); color:var(--ink-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.unbuilt-body{padding:0 var(--s-4) var(--s-4); border-top:1px solid var(--line)}
+.unbuilt-body .hint{margin:var(--s-3) 0}
 
 /* ── صندوقُ التنبيهات (D-109) ─────────────────────────────────────────
    صفٌّ لكلّ ما خرج: حالُه ومتنُه ورمزُ الردّ. **والحالُ لونٌ ورمزٌ ونصّ**

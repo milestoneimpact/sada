@@ -33,6 +33,8 @@ export interface PostMedia {
 }
 import { ICON } from './icons'
 import { escapeHtml } from './shell'
+import { setupPane } from './channels'
+import type { AppStatus } from '../../lib/oauth/apps'
 import { whenTag } from './time'
 import { LOGOS } from './logos'
 
@@ -54,6 +56,10 @@ export interface PlatformScreenData {
   readonly media: Readonly<Record<string, readonly PostMedia[]>>
   /** أيُّ تبويبٍ مفتوح — من الاستعلام، فحالُ الصفحة في عنوانها. */
   readonly show?: Show
+  /** حالُ تطبيق المنصّة — يُعرَض دليلُه هنا لا في لوح القنوات (D-111). */
+  readonly app: AppStatus | undefined
+  /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروضُ للنسخ. */
+  readonly baseUrl: string
   readonly now: Date
 }
 
@@ -435,9 +441,8 @@ export function platformScreen(d: PlatformScreenData): string {
   ${accounts.length === 0
     ? `<div class="empty"><b>لا حسابَ مربوطا</b>
        <p>${state === 'awaiting_owner'
-         ? 'ينقص سرّا التطبيق. اضبطهما من لوح القنوات، ثمّ عُد إلى هنا.'
-         : 'زرُّ الربط أعلاه يفتح شاشةَ الإذن عند المنصّة.'}</p>
-       <a class="btn g sm" href="/panel#channels">افتح لوح القنوات</a></div>`
+         ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
+         : 'زرُّ الربط أعلاه يفتح شاشةَ الإذن عند المنصّة.'}</p></div>`
     : accountBlocks}
 
   ${spec.stage === 'link'
@@ -463,9 +468,17 @@ export function platformScreen(d: PlatformScreenData): string {
 
   ${guide === undefined
     ? ''
-    : `<h3 class="sec">إن احتجت ضبطا</h3>
-       <div class="card"><div class="card-head"><h2>ضبطُ التطبيق ودليلُه</h2></div>
-         <p class="hint">الدليلُ كاملا في لوح القنوات — بخطواته في
-           ${escapeHtml(guide.portalLabel)}، ورابطِ العودة، وعلامةِ النجاح وما يقع إن فشل.</p>
-         <a class="btn g sm" href="/panel#channels">افتح الدليل</a></div>`}`
+    /*
+     * **والدليلُ هنا لا في اللوح** (D-111).
+     *
+     * كان مقلوبا: البطاقةُ في لوح القنوات تحمل الدليلَ كاملا، والشاشةُ
+     * تقول «الدليلُ في اللوح». **فقِيست البطاقةُ فوُجدت كتلةُ الدليل
+     * ‏١٢٦٥px من أصل ‏١٦٢٠ — ‏٧٨٪ منها وثيقة**، وفتحُها يُطيلها ولا يُطيل
+     * جارتَها **فيُمزَّق صفُّ الشبكة بـ‏١٤٣٩px**.
+     *
+     * **والبطاقةُ حالٌ، والشاشةُ وثيقة.** فما يحتاج مساحةً يسكن حيث
+     * المساحةُ عمودٌ واحدٌ لا شبكةٌ تُمزَّق.
+     */
+    : `<h3 class="sec">ضبطُ التطبيق ودليلُه</h3>
+       ${setupPane(d.view, d.app, d.baseUrl)}`}`
 }
