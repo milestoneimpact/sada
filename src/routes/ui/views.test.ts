@@ -109,6 +109,15 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(STYLE).not.toContain('.delta.down{color:var(--warn)}')
   })
 
+  /**
+   * **وأربعٌ في خمسة أعمدةٍ تترك عمودا أبيض** (لاحقةُ D-123). كانت قاعدةُ
+   * D-102 تفتح خمسةً لكلّ «c4» فوق ‏١٩٢٠، **وبعد D-119 العددُ يقرّر الصنف**.
+   */
+  it('ولا عمودَ خامسَ يُفرَض على شبكةٍ من أربع', () => {
+    expect(STYLE).not.toMatch(/min-width:1920px\)\{\.grid\.c4/)
+    expect(STYLE).toContain('.c5{grid-template-columns:repeat(5,1fr)}')
+  })
+
   it('واسمُ المزوّد يأخذ سطرَه في الجوّال، والعلامةُ في الشريط هناك وحدَه', () => {
     expect(STYLE).toContain('.prow .pn{flex:1 1 100%}')
     expect(STYLE).toContain('.topbar .glyph.tb{display:none')
