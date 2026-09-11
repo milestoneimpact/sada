@@ -30,7 +30,7 @@ const RETIRED = new Map([
 
 const empty: OwnerFacts = {
   secrets: new Set(), linked: new Set(), appsConfigured: new Set(),
-  appsVerified: new Set(), vars: new Set(),
+  appsVerified: new Set(), vars: new Set(), providersReady: new Set(),
   anyPublished: false, videoPriced: false,
   // **مستحقّةٌ للمراجعة**: `empty` تعني «لا شيءَ تمّ»، فالرقمُ شائخٌ فيها
   linkedInVersionDue: true,

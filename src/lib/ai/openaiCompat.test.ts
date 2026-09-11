@@ -166,3 +166,75 @@ describe('التحقّق من المفتاح', () => {
     expect((await verifyCompat('https://x.com/v1', 'k', net(200, {}))).ok).toBe(true)
   })
 })
+
+/**
+ * الرؤية — **اللهجةُ نفسُها لا سائقٌ ثانٍ** (D-124).
+ */
+describe('صورةٌ مع النصّ', () => {
+  function capture(): { impl: typeof fetch; bodies: string[] } {
+    const bodies: string[] = []
+    const impl = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(String(init?.body ?? ''))
+      return Response.json({
+        choices: [{ message: { content: 'عرضٌ فيه أربعُ شرائح' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 900, completion_tokens: 20 },
+        model: 'deepseek-vision',
+      })
+    }) as typeof fetch
+    return { impl, bodies }
+  }
+
+  const base = {
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKey: 'k',
+    model: 'm',
+    system: 'صف',
+    user: 'ماذا في الصورة؟',
+  }
+
+  it('يلفّ الرسالةَ أجزاءً حين تحمل صورة', async () => {
+    const { impl, bodies } = capture()
+    const out = await chatCompletion({ ...base, imageUrl: 'https://x/m/t.png' }, impl)
+    expect(out.text).toBe('عرضٌ فيه أربعُ شرائح')
+
+    const sent = JSON.parse(bodies[0] ?? '{}') as {
+      messages: { role: string; content: unknown }[]
+    }
+    const user = sent.messages[1]
+    expect(Array.isArray(user?.content)).toBe(true)
+    expect(user?.content).toEqual([
+      { type: 'text', text: 'ماذا في الصورة؟' },
+      { type: 'image_url', image_url: { url: 'https://x/m/t.png' } },
+    ])
+  })
+
+  /**
+   * **والنصُّ وحدَه يبقى نصّا.**
+   *
+   * بعضُ المزوّدين يردّ المصفوفةَ على نموذجٍ نصّيٍّ صِرف، **فلفُّها
+   * دائما يكسر ما يعمل اليوم** — وهو كلُّ مسوّدةٍ وكلُّ تحليل.
+   */
+  it('ولا يلفُّها حين لا صورة', async () => {
+    const { impl, bodies } = capture()
+    await chatCompletion(base, impl)
+    const sent = JSON.parse(bodies[0] ?? '{}') as { messages: { content: unknown }[] }
+    expect(sent.messages[1]?.content).toBe('ماذا في الصورة؟')
+  })
+
+  it('وعنوانٌ فارغٌ كغيابه', async () => {
+    const { impl, bodies } = capture()
+    await chatCompletion({ ...base, imageUrl: '' }, impl)
+    const sent = JSON.parse(bodies[0] ?? '{}') as { messages: { content: unknown }[] }
+    expect(sent.messages[1]?.content).toBe('ماذا في الصورة؟')
+  })
+
+  /** و`data:` يُقبَل — **ولا يوجب نافذةً عامّةً على وسيطنا**. */
+  it('ويقبل data: كما يقبل عنوانا', async () => {
+    const { impl, bodies } = capture()
+    await chatCompletion({ ...base, imageUrl: 'data:image/png;base64,AAAA' }, impl)
+    const sent = JSON.parse(bodies[0] ?? '{}') as {
+      messages: { content: { type: string; image_url?: { url: string } }[] }[]
+    }
+    expect(sent.messages[1]?.content[1]?.image_url?.url).toBe('data:image/png;base64,AAAA')
+  })
+})

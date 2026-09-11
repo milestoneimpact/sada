@@ -32,6 +32,17 @@ export type ExtractOutcome =
   | { readonly kind: 'text'; readonly text: string; readonly bytes: number }
   | { readonly kind: 'unsupported'; readonly reason: string }
   | { readonly kind: 'too_large'; readonly bytes: number }
+  /** صورةٌ تُقرأ بمزوّد رؤية — **بايتاتُها لا نصُّها** (D-124). */
+  | { readonly kind: 'image'; readonly dataUrl: string; readonly bytes: number }
+
+/**
+ * سقفُ الصورة — **وأضيقُ من سقف النصّ بكثير**.
+ *
+ * فالصورةُ تُرسَل `base64`، **وهو يزيد الحجمَ الثلث**. وصورةٌ بأربعة
+ * ميغا تصير أكثرَ من خمسة في الطلب، **وتُحاسَب برموزٍ كثيرة** عند
+ * المزوّد. فيُردّ ما فوق الحدّ ويُقال حجمُه، لا يُنفَق عليه صامتا.
+ */
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 /** ملفات Office: Drive يحوّلها، فالرسالة تقول كيف لا أنها مرفوضة. */
 const OFFICE_HINT: Readonly<Record<string, string>> = {
@@ -53,7 +64,11 @@ export function unsupportedReason(mimeType: string): string {
   if (mimeType === 'application/pdf') {
     return 'PDF غير مدعوم — حوّله إلى «مستند Google» (فتح بـ Google Docs ثم حفظ)'
   }
-  if (mimeType.startsWith('image/')) return 'صورة — لا نص فيها تُقرأ منه'
+  // **والصورةُ صارت تُقرأ** (D-124) — فلا تصل هنا إلّا إن لم يُضبَط
+  // مزوّدُ رؤيةٍ بعد، ورسالتُها تقول ما يفعل المالك لا ما يعجز عنه النظام
+  if (mimeType.startsWith('image/')) {
+    return 'صورة — ووجّه مهمّةَ «الرؤية» إلى مزوّدٍ يقرؤها في «توجيه المهامّ»'
+  }
   if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) {
     return 'وسائط — خارج نطاق المرحلة الأولى'
   }
@@ -67,12 +82,67 @@ export function unsupportedReason(mimeType: string): string {
  * لا يرمي على «غير مدعوم» ولا على «أكبر من اللازم»: كلاهما نتيجة متوقعة
  * تُعاد لتُسجَّل، لا عطل يوقف المسح كله على ملف واحد.
  */
+/**
+ * يجلب بايتاتِ ملفٍّ ثنائيّ — **`alt=media` لا `export`**.
+ *
+ * فـ`export` للأنواع التي يحوّلها Drive، **والصورةُ تُنزَّل كما هي**.
+ */
+async function fetchBytes(
+  token: string,
+  fileId: string,
+  fetchImpl: typeof fetch,
+): Promise<ArrayBuffer> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+  const response = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!response.ok) {
+    throw new DriveError(`drive: تعذّر تنزيل ${fileId}`, response.status)
+  }
+  return response.arrayBuffer()
+}
+
+/** بايتاتٌ إلى `data:` — **بلا مكتبة، وبلا سلسلةٍ وسيطةٍ ضخمة**. */
+function toDataUrl(bytes: Uint8Array, mime: string): string {
+  let binary = ''
+  // **ودفعاتٌ لا حرفا حرفا**: `String.fromCharCode(...all)` على ميغابايت
+  // يتجاوز حدَّ وسائط الدالّة فيرمي `RangeError`
+  const CHUNK = 8192
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return `data:${mime};base64,${btoa(binary)}`
+}
+
 export async function extractText(
   token: string,
   fileId: string,
   mimeType: string,
   fetchImpl: typeof fetch = fetch,
+  /**
+   * أيُنزَّل الوسيطُ إن كان صورة؟ — **يقوله المنادي لا هذا الملفّ**.
+   *
+   * فهو يعرف أمضبوطٌ مزوّدُ رؤيةٍ أم لا. **وافتراضُه `false`**: بلا
+   * مزوّدٍ لا يُنزَّل ما لا يُقرأ، **ولا يُنفَق على نقلٍ بلا فائدة**.
+   */
+  wantsImage = false,
 ): Promise<ExtractOutcome> {
+  /*
+   * **والصورةُ تُنزَّل ولا تُصدَّر** (D-124).
+   *
+   * و`wantsImage` يقولها المنادي: **مزوّدُ رؤيةٍ مضبوطٌ أم لا**. فبلا
+   * مزوّدٍ تبقى «غيرَ مدعومة» كما كانت — **ولا يُنزَّل ما لا يُقرأ**.
+   */
+  if (mimeType.startsWith('image/') && wantsImage) {
+    const buffer = await fetchBytes(token, fileId, fetchImpl)
+    if (buffer.byteLength > MAX_IMAGE_BYTES) {
+      return { kind: 'too_large', bytes: buffer.byteLength }
+    }
+    return {
+      kind: 'image',
+      dataUrl: toDataUrl(new Uint8Array(buffer), mimeType),
+      bytes: buffer.byteLength,
+    }
+  }
+
   const exportAs = EXPORT_AS[mimeType]
   if (exportAs === undefined) {
     return { kind: 'unsupported', reason: unsupportedReason(mimeType) }

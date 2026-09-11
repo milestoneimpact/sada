@@ -7,6 +7,8 @@ import { fakeDb, type FakeDb } from '../../test/fakes'
 import { analysisCost, analyzeSource, type AnalyzeJobDeps } from './job'
 import { MODEL } from './claude'
 import { writeSetting } from '../settings'
+import { toBase64 } from '../crypto'
+import { saveKey } from '../providers'
 
 /**
  * مفتاح RSA حقيقيّ يُولَّد مرّة.
@@ -331,5 +333,126 @@ describe('حين يفشل النداء', () => {
     )
     if (out.kind !== 'failed') throw new Error('توقّعنا فشلا')
     expect(out.retryable).toBe(false)
+  })
+})
+
+/**
+ * صورةٌ في Drive — **تُقرأ نصّا ثمّ تمضي في المسار نفسِه** (D-124).
+ *
+ * وكانت تُردّ «صورة — لا نص فيها تُقرأ منه»، **وعرضٌ مصوَّرٌ يحمل ما
+ * يستحقّ النشر**.
+ */
+describe('قراءةُ الصور (D-124)', () => {
+  const PNG = 'image/png'
+  const SEEN = 'عرضٌ من أربع شرائح، عنوانُه «أثرُ البرامج»، وفيه جدولٌ وأرقامٌ ربعيّة تُقرأ.'
+
+  /**
+   * يُضبَط مزوّدُ رؤيةٍ حقيقيٌّ — **بمفتاحٍ مشفَّرٍ كما يُحفَظ فعلا**.
+   *
+   * ولا يُكتب `key_enc` حرفا: `resolveKey` تفكّه بـAES-GCM، **فقيمةٌ
+   * مصنوعةٌ تُسقط الحلَّ لا تختبره**.
+   */
+  const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  async function seedVision(): Promise<void> {
+    await saveKey(db, KEY, 'gemini', 'gk-test', 'test')
+  }
+
+  /** شبكةٌ تخدم Drive وGemini وAnthropic. */
+  function visionNet(options: { description?: string } = {}): typeof fetch {
+    return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('oauth2.googleapis.com')) {
+        return Response.json({ access_token: 'g', expires_in: 3600 })
+      }
+      // **`alt=media` لا `export`**: الصورةُ تُنزَّل كما هي
+      if (url.includes('alt=media')) {
+        return new Response(new Uint8Array([137, 80, 78, 71]).buffer)
+      }
+      if (url.includes('generativelanguage')) {
+        return Response.json({
+          choices: [{
+            message: { content: options.description ?? SEEN },
+            finish_reason: 'stop',
+          }],
+          usage: { prompt_tokens: 1500, completion_tokens: 80 },
+          model: 'gemini-2.5-flash',
+        })
+      }
+      if (url.includes('api.anthropic.com')) {
+        return Response.json({
+          id: 'msg_1', type: 'message', role: 'assistant', model: MODEL,
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: JSON.stringify(ANALYSIS) }],
+          usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 0 },
+        })
+      }
+      void init
+      throw new Error(`نداء غير متوقّع: ${url}`)
+    }) as unknown as typeof fetch
+  }
+
+  it('صورةٌ تُقرأ ثمّ تُحلَّل كأيّ نصّ', async () => {
+    await seedVision()
+    const sourceId = await seedSource(PNG)
+    const out = await analyzeSource({ ...deps(visionNet()), encKey: KEY }, sourceId)
+
+    expect(out.kind).toBe('analyzed')
+    // **والفهمُ كُتب فعلا** — لا «تُخطّيت»
+    const row = db.raw
+      .prepare('SELECT summary FROM content_items WHERE source_id = ?')
+      .get(sourceId) as { summary: string } | undefined
+    expect(row?.summary).toBeDefined()
+  })
+
+  /** **والنداءُ يُسجَّل قبل أن يُعَدّ ناجحا** (D-008) — بمزوّده لا باسمٍ ثابت. */
+  it('ونداءُ الرؤية يُسجَّل في الدفتر', async () => {
+    await seedVision()
+    const sourceId = await seedSource(PNG)
+    await analyzeSource({ ...deps(visionNet()), encKey: KEY }, sourceId)
+
+    const row = db.raw
+      .prepare("SELECT operation, units FROM cost_ledger WHERE operation LIKE 'vision:%'")
+      .get() as { operation: string; units: number } | undefined
+    expect(row?.operation).toContain('gemini-2.5-flash')
+    expect(row?.units).toBe(1580)
+  })
+
+  /**
+   * **وبلا مزوّدِ رؤيةٍ تبقى كما كانت** — ولا تُنزَّل بايتاتُها.
+   *
+   * فلا نقلَ بلا فائدة، **والرسالةُ تقول ما يفعل المالك**.
+   */
+  it('وبلا مزوّدٍ تبقى غيرَ مدعومةٍ ولا تُنزَّل', async () => {
+    const sourceId = await seedSource(PNG)
+    let downloaded = false
+    const net = (async (input: unknown): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('alt=media')) { downloaded = true }
+      if (url.includes('oauth2.googleapis.com')) {
+        return Response.json({ access_token: 'g', expires_in: 3600 })
+      }
+      throw new Error(`نداء غير متوقّع: ${url}`)
+    }) as unknown as typeof fetch
+
+    const out = await analyzeSource(deps(net), sourceId)
+    expect(out.kind).toBe('skipped')
+    if (out.kind === 'skipped') expect(out.reason).toContain('الرؤية')
+    expect(downloaded).toBe(false)
+  })
+
+  /** **ووصفٌ قصيرٌ لا يُمرَّر**: التحليلُ يحكم على الفراغ وينفق ثمنَ حكمه. */
+  it('ووصفٌ قصيرٌ يُردّ ولا يُحلَّل', async () => {
+    await seedVision()
+    const sourceId = await seedSource(PNG)
+    const out = await analyzeSource(
+      { ...deps(visionNet({ description: 'صورة.' })), encKey: KEY },
+      sourceId,
+    )
+    expect(out.kind).toBe('failed')
+    const row = db.raw
+      .prepare('SELECT count(*) AS n FROM content_items WHERE source_id = ?')
+      .get(sourceId) as { n: number }
+    expect(row.n).toBe(0)
   })
 })

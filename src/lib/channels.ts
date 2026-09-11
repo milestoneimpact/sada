@@ -329,7 +329,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     built: true,
     stage: 'publish',
     secrets: ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'],
-    task: 'M-16',
+    task: 'M-20',
     // **ونصٌّ صِرفٌ بلا وسم**: يُهرَّب في أربعة مواضع (D-093)
     note:
       'الربطُ والنشرُ مبنيّان، ولها طريقان: تسجيلُ دخولٍ مباشرٍ بحسابٍ ' +

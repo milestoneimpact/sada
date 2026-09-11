@@ -16,11 +16,13 @@
  */
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { resolveKey } from '../providers'
+import { costOf, getProvider, resolveKey, type Provider } from '../providers'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
+import { describeImage, type VisionDeps } from './vision'
+import { routeFor } from '../ai/routes'
 
 /**
  * أسعار Claude Opus 5 لكلّ مليون رمز (2026-06-24).
@@ -89,6 +91,47 @@ async function alreadyAnalyzed(db: Db, sourceId: string, hash: string): Promise<
 }
 
 /** يحلّل مصدرا واحدا. لا يرمي — يعيد ما وقع ليُسجَّل ويُقرَّر. */
+/**
+ * قارئُ الصور — **يُحَلّ مرّةً، ويُقال أموجودٌ هو** (D-124).
+ *
+ * ويُردّ `null` حين **لا مزوّدَ أو لا مفتاحَ أو لا عنوان**: فتبقى الصورةُ
+ * «غيرَ مدعومة» كما كانت، **ولا تُنزَّل بايتاتُها أصلا**.
+ *
+ * **ولا يقرأ Anthropic هنا**: صياغتُها غيرُ لهجة `chat/completions`،
+ * **ووعدُها بلا شيفرةٍ تحته وعدٌ يكذب**.
+ */
+async function visionReader(deps: AnalyzeJobDeps): Promise<
+  { deps: VisionDeps; provider: Provider; providerName: string } | null
+> {
+  try {
+    const route = await routeFor(deps.db, 'vision')
+    const provider = await getProvider(deps.db, route.provider)
+    if (provider === null || provider.kind === 'anthropic' || provider.baseUrl === null) return null
+
+    const resolved = await resolveKey(
+      deps.db,
+      deps.encKey ?? '',
+      provider.name,
+      provider.name === 'anthropic' ? deps.anthropicKey : undefined,
+    )
+    if (resolved.key === null || resolved.key.length === 0) return null
+
+    return {
+      provider,
+      providerName: provider.name,
+      deps: {
+        baseUrl: provider.baseUrl,
+        apiKey: resolved.key,
+        model: route.model,
+        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+      },
+    }
+  } catch {
+    // **وعطلٌ في حلّ الطريق لا يُسقط تحليلَ نصٍّ سليم**
+    return null
+  }
+}
+
 export async function analyzeSource(
   deps: AnalyzeJobDeps,
   sourceId: string,
@@ -128,11 +171,20 @@ export async function analyzeSource(
     // ٤ · التصدير
     const sa = parseServiceAccount(deps.serviceAccountJson)
     const token = await accessToken(sa, now, deps.fetchImpl ?? fetch)
+    /*
+     * **والصورةُ تُنزَّل إن كان لها قارئ** (D-124).
+     *
+     * فيُقرأ طريقُ «الرؤية» أوّلا: مزوّدُه موجودٌ ومفتاحُه مضبوط؟ **وبلا
+     * ذلك تبقى الصورةُ «غيرَ مدعومة» كما كانت** — ولا تُنزَّل بايتاتُها،
+     * فلا نقلَ بلا فائدة.
+     */
+    const vision = await visionReader(deps)
     const extracted = await extractText(
       token,
       source.drive_file_id,
       source.mime,
       deps.fetchImpl ?? fetch,
+      vision !== null,
     )
     if (extracted.kind === 'unsupported') {
       return { kind: 'skipped', sourceId: source.id, reason: extracted.reason }
@@ -140,7 +192,41 @@ export async function analyzeSource(
     if (extracted.kind === 'too_large') {
       return { kind: 'skipped', sourceId: source.id, reason: `النصّ ${extracted.bytes} بايت — فوق السقف` }
     }
-    if (extracted.text.trim().length === 0) {
+    /*
+     * **والصورةُ تصير نصّا، ثمّ يجري عليها ما يجري على كلّ نصّ.**
+     *
+     * فلا مسارَ تحليلٍ ثانٍ يشيخ وحدَه: الوصفُ يدخل النموذجَ نفسَه،
+     * **والحكمُ على الجدوى يبقى عند نموذج التحليل** لا عند قارئ الصور.
+     */
+    let text: string
+    if (extracted.kind === 'image') {
+      if (vision === null) {
+        // لا يقع — `wantsImage` كان `false` — ويُقال ولا يُفترَض
+        return { kind: 'skipped', sourceId: source.id, reason: 'لا مزوّدَ رؤية' }
+      }
+      const seen = await describeImage(vision.deps, extracted.dataUrl, source.name)
+      // **والنداءُ يُسجَّل قبل أن يُعَدّ ناجحا** (D-008)
+      const visionUnits = seen.inputTokens + seen.outputTokens
+      /*
+       * **وسعرٌ لم يُقرأ يُسجَّل صفرا موسوما لا يُخترَع** (D-008).
+       *
+       * فمزوّدٌ بلا سعرٍ في جدوله يردّ `priced: false`، **والنداءُ وقع**
+       * — وسكوتٌ عنه يجعل الدفترَ أقلَّ من الحقيقة.
+       */
+      const priced = costOf(vision.provider, seen)
+      await recordCost(deps.db, {
+        provider: vision.providerName,
+        operation: priced.priced ? `vision:${seen.model}` : `vision:${seen.model}:price_unverified`,
+        units: visionUnits,
+        unitCost: visionUnits === 0 ? 0 : priced.total / visionUnits,
+        refId: source.id,
+      })
+      text = seen.text
+    } else {
+      text = extracted.text
+    }
+
+    if (text.trim().length === 0) {
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
@@ -155,7 +241,7 @@ export async function analyzeSource(
     }
     const result = await analyzeText(claudeDeps, {
       name: source.name,
-      text: extracted.text,
+      text,
       now,
     })
 

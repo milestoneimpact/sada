@@ -286,7 +286,7 @@ writeAudited(
         vars: new Set(['CF_AI_ACCOUNT_ID']),
         linked: new Set(['linkedin']),
         appsConfigured: new Set(['linkedin', 'x']),
-        appsVerified: new Set(['linkedin']),
+        appsVerified: new Set(['linkedin']), providersReady: new Set(),
         anyPublished: false,
         videoPriced: false,
         linkedInVersionDue: true,   // D-072: حالٌ وسطى تُرسَم لتُقاس

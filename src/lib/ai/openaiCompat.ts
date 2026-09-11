@@ -50,6 +50,18 @@ export interface CompatRequest {
   /** يُطلب JSON. والتحقّق من الشكل عندنا: لا نثق بوعد المزوّد. */
   readonly json?: boolean
   readonly maxTokens?: number
+  /**
+   * صورةٌ تُقرأ مع النصّ — **وهي اللهجةُ نفسُها لا سائقٌ ثانٍ** (D-124).
+   *
+   * فالرؤيةُ في `chat/completions` ليست نهايةً أخرى: **يصير `content`
+   * مصفوفةَ أجزاء** بدل نصٍّ واحد، وفيها جزءٌ `image_url`. فمن بنى لها
+   * ملفّا مستقلّا نسخ كلَّ ما في هذا الملفّ — الحارسَ، وقراءةَ
+   * الاستهلاك، وتصنيفَ الأخطاء — **ثمّ شاخت نسختُه وحدَها**.
+   *
+   * **وعنوانٌ أو `data:` كلاهما يُقبَل**: المزوّدون يقبلون الاثنين،
+   * و`data:` لا يوجب نافذةً عامّةً على وسيطنا.
+   */
+  readonly imageUrl?: string
 }
 
 function readUsage(raw: unknown): CompatUsage {
@@ -79,12 +91,26 @@ export async function chatCompletion(
     throw new CompatError('لا مفتاح لهذا المزوّد', 503, false)
   }
 
+  /*
+   * **والنصُّ وحدَه يبقى نصّا** (D-124).
+   *
+   * فلا تُلَفّ الرسالةُ في مصفوفةِ أجزاءٍ إلّا حين تحمل صورة: **بعضُ
+   * المزوّدين يردّ المصفوفةَ على نموذجٍ نصّيٍّ صِرف**، فلو لُفّت دائما
+   * لانكسر ما يعمل اليوم.
+   */
+  const content = request.imageUrl === undefined || request.imageUrl === ''
+    ? request.user
+    : [
+        { type: 'text', text: request.user },
+        { type: 'image_url', image_url: { url: request.imageUrl } },
+      ]
+
   const body: Record<string, unknown> = {
     model: request.model,
     max_tokens: request.maxTokens ?? 4096,
     messages: [
       { role: 'system', content: request.system },
-      { role: 'user', content: request.user },
+      { role: 'user', content },
     ],
   }
   // الأضعف الذي يفهمه الجميع: `json_object` لا مخطّط كامل

@@ -1343,7 +1343,23 @@ async function ownerFacts(c: {
     // كما سبق
   }
 
+  /*
+   * **ومزوّدٌ جاهزٌ هو الذي ضُبط مفتاحُه** (D-124) — لا الذي وُجد صفُّه.
+   *
+   * فالصفُّ يوجد للمدمَجين دائما (`0005`)، **وبلا مفتاحٍ لا يُنادى**.
+   */
+  let providersReady: string[] = []
+  try {
+    const { results } = await c.env.DB
+      .prepare("SELECT name FROM providers WHERE key_enc IS NOT NULL AND enabled = 1")
+      .all<{ name: string }>()
+    providersReady = results.map((r) => r.name)
+  } catch {
+    // كما سبق: جدولٌ لا يُقرأ يعني «لا مزوّدَ جاهز»، ولا يُدَّعى العكس
+  }
+
   return {
+    providersReady: new Set(providersReady),
     secrets: new Set(
       ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
        'GOOGLE_SA_JSON', 'CF_AI_TOKEN'].filter(has),

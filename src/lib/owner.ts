@@ -70,6 +70,8 @@ export interface OwnerFacts {
    * **يُحسَب من الرقم نفسِه ومن التاريخ** — لا يُكتب بيد.
    */
   readonly linkedInVersionDue: boolean
+  /** مزوّدو الذكاء الذين ضُبط مفتاحُهم — بأسمائهم (D-124). */
+  readonly providersReady: ReadonlySet<string>
 }
 
 /**
@@ -150,6 +152,26 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     ifLeft: 'كسابقتها — ولا يُدَّعى نشرٌ لم يُبنَ سائقُه.',
     unblocks: 'capability',
     done: (f) => f.linked.has('tiktok'),
+  },
+  {
+    code: 'M-20',
+    title: 'ربطُ Instagram',
+    ifLeft:
+      'السائقُ مبنيٌّ ولا يُنادى. **وهي الوحيدةُ التي تقبل الصورةَ التي ' +
+      'يولّدها صدى** — وTikTok وYouTube تريدان مقطعا. وأوّلُ عقبةٍ فيها ' +
+      'نوعُ الحساب لا الضبط: الشخصيُّ لا يفتح النشرَ أصلا.',
+    unblocks: 'capability',
+    done: (f) => f.linked.has('instagram'),
+  },
+  {
+    code: 'M-21',
+    title: 'ربطُ DeepSeek',
+    ifLeft:
+      'لا شيءَ ينكسر: كلُّ مسوّدةٍ وتحليلٍ تبقى على أغلى نموذجٍ وهو يعمل. ' +
+      '**والفرقُ في الفاتورة وحدَها** — وفي أنّ صورَ Drive تبقى غيرَ ' +
+      'مقروءةٍ حتّى يُضبَط مزوّدُ رؤية.',
+    unblocks: 'capability',
+    done: (f) => f.providersReady.has('deepseek'),
   },
   {
     code: 'M-03',

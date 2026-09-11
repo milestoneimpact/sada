@@ -14,8 +14,16 @@ import type { Env } from '../../env'
 
 export type ProviderName = 'anthropic' | 'gemini' | 'cloudflare'
 
-/** المهامّ التي تنادي نموذجا. تُوسَّع حين تُبنى طبقةٌ جديدة. */
-export type TaskName = 'analyze' | 'draft' | 'image' | 'plan' | 'video'
+/**
+ * المهامّ التي تنادي نموذجا — **قائمةٌ حيّةٌ يُشتَقّ منها النوع**.
+ *
+ * وكانت اتّحادا مكتوبا يدا **و`ROUTES` جدولا بجانبه**: مهمّةٌ تُضاف في
+ * أحدهما وتُنسى في الآخر. وهي علّةُ `SETTING_KEYS` (D-110) و`Platform`
+ * (D-121) — **ثالثةً في المستودع نفسِه**، فأُغلقت هنا كما أُغلقتا.
+ */
+export const TASK_NAMES = ['analyze', 'draft', 'image', 'plan', 'video', 'vision'] as const
+
+export type TaskName = (typeof TASK_NAMES)[number]
 
 export interface ProviderSpec {
   readonly label: string
@@ -92,11 +100,29 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
     model: 'alibaba/hh1-i2v',
     why: 'صورةٌ ← مقطعٌ رأسيّ: نرى الصورةَ ونعتمدها قبل أن نُنفق على تحريكها',
   },
+  /**
+   * قراءةُ صورةٍ نصّا — **خطوةٌ قبل التحليل لا تحليلٌ ثانٍ** (D-124).
+   *
+   * وملفُّ Drive الذي صورةٌ كان يُردّ بلا قراءة، **وعرضٌ مصوَّرٌ أو
+   * مخطّطٌ يحمل ما يستحقّ النشر**.
+   *
+   * **وافتراضُه Gemini لأنّه يعمل، لا لأنّه أوّلُ ما خطر.** مدمَجٌ في
+   * `0005` بلهجةٍ موحَّدةٍ وعنوانٍ حقيقيّ، **ويقرأ الصور**. وAnthropic
+   * تقرؤها كذلك لكنّ صياغتَها غيرُ هذه اللهجة، **وافتراضٌ لا يعمل
+   * بالشيفرة التي تحته أسوأُ من افتراضٍ فارغ**.
+   *
+   * **وDeepSeek تُوجَّه إليها من اللوحة** متى ضُبط مفتاحُها (M-21).
+   */
+  vision: {
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    why: 'قراءةُ الصور نصّا — والوصفُ وحدَه، والحكمُ يبقى عند التحليل',
+  },
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
 export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>([
-  'analyze', 'draft', 'image', 'plan', 'video',
+  'analyze', 'draft', 'image', 'plan', 'video', 'vision',
 ])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {
