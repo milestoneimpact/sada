@@ -357,10 +357,14 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 @media(min-width:1920px){.grid.c4{grid-template-columns:repeat(5,1fr)}}
 .c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
 .c2{grid-template-columns:repeat(2,1fr)}
+/* خمسٌ حين يختار المالكُ خمسا (D-119): **ولا تُترَك واحدةٌ وحيدةً في صفٍّ
+   ثانٍ** — وهو التمزّقُ الذي حُرِس في D-111، يقع هنا بالعدد لا بالارتفاع */
+.c5{grid-template-columns:repeat(5,1fr)}
 .c21{grid-template-columns:2fr 1fr}
-@media(max-width:1180px){.c4{grid-template-columns:repeat(2,1fr)} .c21{grid-template-columns:1fr}}
+@media(max-width:1180px){
+  .c4,.c5{grid-template-columns:repeat(2,1fr)} .c21{grid-template-columns:1fr}}
 @media(max-width:900px){.c3,.c2{grid-template-columns:1fr}}
-@media(max-width:560px){.c4{grid-template-columns:1fr}}
+@media(max-width:560px){.c4,.c5{grid-template-columns:1fr}}
 
 /* ── مادّةُ السطح ─────────────────────────────────────────────────────
    ثلاث طبقاتٍ على كلّ بطاقة، ولكلٍّ سببٌ ماديّ:
@@ -910,6 +914,28 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    **وذيلُها «margin-top:auto» فيملأ الفرقَ بقصدٍ ويصطفّ الفعلُ على خطٍّ
    واحد**. فما كان فراغا صار محاذاة. */
 .grid.ragged{align-items:start}
+
+/* ── اختيارُ بطاقات اللوح (D-119) ─────────────────────────────────────
+   **واللصيقةُ هي الهدف لا المربّع**: صندوقُ الاختيار يرسمه المتصفّح
+   ثلاثةَ عشرَ بكسلا، فيُلَفّ بلصيقةٍ تُضغَط في أيّ موضعٍ منها — سلوكُ
+   HTML لا حيلةُ أنماط (D-100). */
+.tgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:var(--s-2)}
+.tpick{display:flex; align-items:flex-start; gap:var(--s-3); cursor:pointer;
+  padding:var(--s-3); border:1px solid var(--line); border-radius:var(--r);
+  background:var(--surface-2); min-height:var(--tap);
+  transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
+@media(hover:hover){.tpick:hover{background:var(--surface-3)}}
+/* والمختارةُ تُعرَف بحدٍّ لا بأرضيّةٍ ملوّنة: أرضيّةٌ تحت نصٍّ تخفض تباينَه */
+.tpick.on{border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
+/* **والهامشُ يُصرَّح به كلُّه**: المتصفّحُ يضع لصندوق الاختيار ٣px من
+   عنده، **وهي خارج السلّم** — فيُضبَط الأربعةُ لا الأعلى وحدَه */
+.tpick input{flex:none; margin:var(--s-1) 0 0; width:16px; height:16px;
+  accent-color:var(--brand)}
+.tpick .tp-t{min-width:0}
+.tpick .tp-t b{display:block; font-size:var(--t-sm); font-weight:700}
+.tpick .tp-t span{display:block; font-size:var(--t-xs); color:var(--ink-3);
+  line-height:var(--lh); margin-top:var(--s-1)}
 .draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .draft.done{background:var(--surface-2); box-shadow:none}

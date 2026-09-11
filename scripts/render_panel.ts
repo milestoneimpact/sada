@@ -303,6 +303,8 @@ const data: PanelData = {
   // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
   // ‏اللونان والتباينُ فيهما معا
   alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
+  // الافتراضُ نفسُه — فالمقاييسُ تُقارَن بما يراه مَن لم يختر شيئا
+  dashboardTiles: 'analyses_today,spend_today,sources_analyzed,spend_30d',
   outbox: [
     { kind: 'token', body: 'صدى — رمزُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
     { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },

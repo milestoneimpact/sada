@@ -11,6 +11,7 @@
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
 import { relativeTime, money } from '../lib/format'
+import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
@@ -916,6 +917,8 @@ export interface PanelData {
   readonly peaks?: Readonly<Record<string, Peaks>>
   /** عنوانُ قناة التنبيهات (D-109) — وفارغٌ يعني «لا قناة». */
   readonly alertWebhook: string
+  /** بطاقاتُ لوح المالك بمعرِّفاتها (D-119) — **مصفّاةً**. */
+  readonly dashboardTiles: string
   /** آخرُ ما خرج من الصندوق — **ولا صمتٌ يُظنّ نجاحا**. */
   readonly outbox: readonly OutboxRow[]
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
@@ -1114,6 +1117,63 @@ function platformNav(views: readonly ChannelView[]): string {
  * ويُحسب من السلسلة نفسها لا من رقمٍ يُمرَّر: رقمان من مصدرين يتباعدان.
  * ويوما أمسٍ صفران يعنيان «بلا تغيير» لا قسمةً على صفر.
  */
+/**
+ * صفُّ البطاقات — **كما اختاره المالكُ لا كما كُتب في الملفّ** (D-119).
+ *
+ * والعرضُ يتبع العدد: أربعٌ في `c4` وثلاثٌ في `c3` واثنتان في `c2`.
+ * **وشبكةُ أربعةٍ فيها خمسُ بطاقاتٍ تترك واحدةً وحيدةً في صفٍّ ثانٍ** —
+ * وهي عينُ التمزّق الذي حُرِس في D-111.
+ */
+function tileRow(d: PanelData): string {
+  const tiles = chosenTiles(d.dashboardTiles)
+  const cols = tiles.length >= 6 ? 'c3' : tiles.length === 5 ? 'c5' : `c${tiles.length}`
+  const cards = tiles.map((spec) => {
+    const v = spec.of(d, { money })
+    return `<div class="card tile"><div class="k">${escapeHtml(spec.label)}</div>
+      <div class="v">${escapeHtml(v.value)}${
+        v.em === undefined ? '' : `<em> ${escapeHtml(v.em)}</em>`}</div>
+      ${v.bar === undefined ? '' : bar(v.bar.used, v.bar.cap, v.bar.full)}
+      ${v.delta === true ? deltaOf(d.series) : ''}
+      ${v.note === undefined ? '' : `<div class="n">${escapeHtml(v.note)}</div>`}</div>`
+  })
+  return `<div class="grid ${cols}">${cards.join('')}</div>`
+}
+
+/**
+ * شاشةُ اختيار البطاقات — **والاختيارُ يُرى قبل أن يُحفَظ** (D-119).
+ *
+ * **ومربّعاتُ اختيارٍ لا سحبٌ وإفلات.** السحبُ يحتاج جافاسكربت يعمل،
+ * **ولوحةٌ تُضبَط بالسحب وحدَه لا تُضبَط بلوحة المفاتيح ولا بقارئ
+ * الشاشة**. والترتيبُ يتبع ترتيبَ الكتالوج — وهو ترتيبٌ مقصود.
+ *
+ * **والحدُّ يُقال قبل أن يُردّ**: «ستّ على الأكثر» مكتوبةٌ فوق المربّعات،
+ * لا رسالةَ خطأ بعد الضغط.
+ */
+function tilePicker(d: PanelData): string {
+  const chosen = new Set(chosenTiles(d.dashboardTiles).map((t) => t.id))
+  const boxes = TILES.map((spec) => {
+    const on = chosen.has(spec.id)
+    return `<label class="tpick${on ? ' on' : ''}">
+      <input type="checkbox" name="tile" value="${escapeHtml(spec.id)}"${on ? ' checked' : ''}>
+      <span class="tp-t"><b>${escapeHtml(spec.label)}</b>
+        <span>${escapeHtml(spec.why.replaceAll('**', ''))}</span></span>
+    </label>`
+  }).join('')
+  return `<div class="card" style="margin-top:var(--s-3)"><h2>بطاقاتُ لوحك</h2>
+    <p class="hint">ما تراه في صدر «نظرة عامّة». اختر من ${TILE_MIN} إلى ${TILE_MAX}،
+      وترتيبُها ترتيبُ هذه القائمة.</p>
+    <form method="POST" action="/panel/settings">
+      <input type="hidden" name="key" value="dashboard_tiles">
+      <div class="tgrid">${boxes}</div>
+      <div class="row" style="margin-top:var(--s-4)">
+        <button class="p" type="submit">احفظ لوحي</button>
+        <span class="n" style="align-self:center">
+          وما دون ${TILE_MIN} يعود إلى الأربع الأصليّة — فلا شاشةَ فارغة.</span>
+      </div>
+    </form>
+  </div>`
+}
+
 function deltaOf(series: readonly { day: string; total: number }[]): string {
   if (series.length < 2) return ''
   const today = series[series.length - 1]!.total
@@ -1380,24 +1440,7 @@ ${flash}
     */''}
   <p class="lede lede-lead">حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك.
     <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b></p>
-  <div class="grid c4">
-    <div class="card tile"><div class="k">تحليلات اليوم</div>
-      <div class="v">${d.usedAnalyses}<em> / ${d.analysisCap}</em></div>
-      ${bar(d.usedAnalyses, d.analysisCap)}
-      <div class="n">يُصفَّر عند منتصف الليل UTC</div></div>
-    <div class="card tile"><div class="k">إنفاق اليوم</div>
-      <div class="v">${money(d.usedSpend)}<em> / ${money(d.spendCap)}</em></div>
-      ${bar(d.usedSpend, d.spendCap)}
-      ${deltaOf(d.series)}</div>
-    <div class="card tile"><div class="k">المصادر المحلَّلة</div>
-      <div class="v">${ready}<em> / ${d.sources.length}</em></div>
-      ${d.sources.length === 0 ? '' : bar(ready, d.sources.length, 'كلّها محلَّلة')}
-      <div class="n">${pending === 0 ? 'لا شيء ينتظر' : `${pending} تنتظر تحليلا`}</div></div>
-    <div class="card tile"><div class="k">إنفاق ٣٠ يوما</div>
-      <div class="v">${money(d.spend30d)}</div>
-      <div class="n">${d.providers.filter((p) => p.calls > 0).length} مزوّدا نشطا · ${
-        d.providers.reduce((sum, p) => sum + p.calls, 0)} نداءً</div></div>
-  </div>
+  ${tileRow(d)}
   <div class="grid c2" style="margin-top:var(--s-3)">
     <div class="card"><h2>ما ينتظرك</h2>
       <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
@@ -1538,6 +1581,8 @@ ${flash}
           وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
           <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
+
+  ${tilePicker(d)}
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>
     <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>

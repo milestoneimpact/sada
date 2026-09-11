@@ -55,6 +55,7 @@ import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
 import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
+import { TILE_MAX, TILE_MIN } from '../lib/dashboard'
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
   loadSession, readCookie, revokeSessions, sessionCookie, type Session,
@@ -443,6 +444,7 @@ panel.get('/panel', async (c) => {
       ),
       peaks,
       alertWebhook: allowance.settings.alertWebhook,
+      dashboardTiles: allowance.settings.dashboardTiles,
       /*
        * **وآخرُ خمسةٍ لا كلُّها** (D-101): الصندوقُ ينمو ولا يُقلَّم،
        * **وسجلٌّ كاملٌ في صفحةٍ تُفتَح كلَّ يومٍ ثمنٌ يُدفَع كلَّ يوم**.
@@ -674,7 +676,16 @@ panel.post('/panel/settings', async (c) => {
   const form = gate.form
 
   const key = String(form.get('key') ?? '')
-  const value = String(form.get('value') ?? '')
+  /*
+   * **وحقلٌ واحدٌ لا يسع اختيارا متعدّدا** (D-119).
+   *
+   * بطاقاتُ اللوح مربّعاتُ اختيارٍ لا حقلٌ واحد، **ومربّعٌ غيرُ مؤشَّرٍ لا
+   * يُرسَل أصلا** — فلا يكفي `form.get`. وتُجمَع بفاصلة، ثمّ تُصفّى في
+   * `writeSetting` بقواعد القراءة نفسِها.
+   */
+  const value = key === 'dashboard_tiles'
+    ? form.getAll('tile').map((v) => String(v)).join(',')
+    : String(form.get('value') ?? '')
   if (!WRITABLE.has(key)) return c.json({ error: 'unknown_setting' }, 400)
 
   const result = await writeSetting(c.env.DB, key as SettingKey, value, 'panel')
@@ -698,6 +709,21 @@ panel.post('/panel/settings', async (c) => {
     flash = result.stored === 'true'
       ? { kind: 'warn', text: 'أُوقف النظام. لا نداء مدفوع ولا مسح ولا نشر حتّى تستأنفه.' }
       : { kind: 'ok', text: 'استُؤنف العمل.' }
+  } else if (key === 'dashboard_tiles') {
+    /*
+     * **والإشعارُ يقول ما وقع فعلا** — لا ما طُلب. من أشّر واحدةً رجع
+     * إلى الأربع، **ومن أشّر ثمانيا حُفظت له ستّ**: يُقال له، ولا يُترَك
+     * يظنّ أنّ لوحَه غيرُ ما يرى.
+     */
+    const n = result.stored === '' ? 0 : result.stored.split(',').length
+    const asked = value === '' ? 0 : value.split(',').filter((x) => x !== '').length
+    flash = asked === n
+      ? { kind: 'ok', text: `حُفظ لوحُك: ${n} بطاقاتٍ في صدر «نظرة عامّة».` }
+      : {
+          kind: 'warn',
+          text: `اخترتَ ${asked} — وحُفظت ${n}. والحدُّ من ${TILE_MIN} إلى ${TILE_MAX}،`
+            + ' وما دون الأدنى يعود إلى الأربع الأصليّة.',
+        }
   } else if (result.clamped) {
     flash = {
       kind: 'warn',

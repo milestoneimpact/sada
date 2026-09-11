@@ -272,6 +272,59 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     expect(html).toContain('استئناف العمل')
   })
 
+  /*
+   * ── لوحُ المالك: من الضغطة إلى الشاشة (D-119) ─────────────────────
+   *
+   * **ولا يكفي أن يُحفَظ في القاعدة**: المقصودُ أن تتغيّر الشاشةُ التي
+   * يفتحها. فيُقرأ `/panel` بعد الحفظ ويُفحَص ما فيه ومـا **ليس** فيه.
+   */
+  async function submitTiles(cookie: string, ids: readonly string[]): Promise<Response> {
+    const body = new FormData()
+    body.set('key', 'dashboard_tiles')
+    for (const id of ids) body.append('tile', id)
+    return app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('اختيارُ البطاقات يغيّر صدرَ اللوحة', async () => {
+    const cookie = await login()
+    /*
+     * **ويُفحَص وسمُ البطاقة لا اسمُها.** كلُّ الأسماء الأربعةَ عشرَ
+     * مكتوبةٌ في شاشة الاختيار، **فنصٌّ موجودٌ لا يعني بطاقةً معروضة** —
+     * وأوّلُ صياغةٍ لهذا الاختبار سقطت بهذا بالذات.
+     */
+    const k = (label: string): string => `<div class="k">${label}</div>`
+    const before = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(before).toContain(k('تحليلات اليوم'))
+    expect(before).not.toContain(k('ذروةُ الإنفاق'))
+
+    expect((await submitTiles(cookie, ['drafts_waiting', 'peak_spend_day', 'live_targets'])).status)
+      .toBe(303)
+    expect((await readSettings(db)).dashboardTiles)
+      .toBe('drafts_waiting,peak_spend_day,live_targets')
+
+    const after = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(after).toContain(k('ذروةُ الإنفاق'))
+    expect(after).toContain(k('مسوّدات تنتظرك'))
+    // **وما لم يُختَر يغيب**: لوحٌ يضيف ولا يحذف ليس اختيارا
+    expect(after).not.toContain(k('تحليلات اليوم'))
+  })
+
+  /** **ومعرِّفٌ مخترَعٌ لا يُخزَّن** — قائمةُ سماحٍ لا منع، كما في D-110. */
+  it('ومعرِّفٌ لا يعرفه الكتالوجُ يُطرَح عند الحفظ', async () => {
+    const cookie = await login()
+    await submitTiles(cookie, ['drafts_waiting', 'لا_وجودَ_لها', 'live_targets'])
+    expect((await readSettings(db)).dashboardTiles).toBe('drafts_waiting,live_targets')
+  })
+
+  /** وما دون الأدنى يعود إلى الأربع — **ولا شاشةَ بيضاء**. */
+  it('وواحدةٌ وحدَها تعيد الأربعَ الأصليّة', async () => {
+    const cookie = await login()
+    await submitTiles(cookie, ['drafts_waiting'])
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<div class="k">تحليلات اليوم</div>')
+    expect(html).toContain('<div class="k">إنفاق ٣٠ يوما</div>')
+  })
+
   it('السقف يُحفظ ويُقرأ', async () => {
     const cookie = await login()
     await submit(cookie, 'daily_analysis_cap', '25')
