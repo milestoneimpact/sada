@@ -438,7 +438,16 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
     const outcome = await publishPost(
       // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
       // بلا صورةٍ لا يمسّه (D-040)
-      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA },
+      //
+      // **و`baseUrl` كذلك** (D-123): Instagram تسحب الوسيطَ من رابطٍ
+      // موقَّعٍ ولا تقبل بايتات. **وبلا تمريره يُردّ كلُّ نشرٍ عليها**
+      // بـ`instagram_needs_base_url` — والسائقُ مبنيٌّ ومختبَرٌ ولا يُنادى.
+      {
+        db: env.DB,
+        encKey: env.TOKEN_ENC_KEY,
+        bucket: env.MEDIA,
+        baseUrl: env.PUBLIC_BASE_URL,
+      },
       message.body,
     )
     // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي

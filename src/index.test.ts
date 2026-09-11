@@ -9,6 +9,9 @@ import type { ScheduledController } from '@cloudflare/workers-types'
 import worker from './index'
 import { writeSetting } from './lib/settings'
 import { fakeDb, type FakeDb } from './test/fakes'
+import { toBase64 } from './lib/crypto'
+import { saveTokens } from './lib/tokens'
+import { scopeSet } from './lib/oauth/scopes'
 
 let db: FakeDb
 let sent: { body: { sourceId: string } }[]
@@ -228,5 +231,97 @@ describe('موزّعُ الدورات', () => {
     await runCron(0, '0 3 * * *')
     await runCron(0, '*/15 * * * *')
     expect(published).toHaveLength(1)
+  })
+})
+
+/**
+ * توصيلُ طابور النشر — **وما لا يُمرَّر لا يُنادى** (D-123).
+ *
+ * السائقُ يُختبَر بـ`deps` تُبنى في الاختبار، **فيمرّ وهو غيرُ موصولٍ في
+ * الإنتاج**: بُني سائقُ Instagram وله عشرةُ اختباراتٍ خضراء، **و`index.ts`
+ * لا يمرّر `baseUrl`** — فكلُّ نشرٍ عليها يُردّ `instagram_needs_base_url`.
+ *
+ * **فيُنادى المعالجُ الحقيقيُّ من المُصدَّر الافتراضيّ**، ويُفحَص أنّ
+ * النداءَ بلغ نهايةَ Meta **وفي جسمه رابطُنا الموقَّع** — لا أنّه «لم
+ * يسقط».
+ */
+describe('طابورُ النشر يمرّر ما يلزم (D-123)', () => {
+  const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  async function seedInstagram(): Promise<string> {
+    const account = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO accounts (id, platform, kind, external_id, display_name)
+         VALUES (?, 'instagram', 'member', '17841', '@basserh')`,
+      )
+      .bind(account)
+      .run()
+    await saveTokens(db, ENC, account, {
+      accessToken: 'tok',
+      refreshToken: null,
+      expiresAt: '2030-01-01T00:00:00Z',
+      refreshExpiresAt: null,
+      scopes: scopeSet('instagram').join(' '),
+    })
+    const post = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, account_id, type, text, status, scheduled_at,
+                            idempotency_key, approved_by, approved_at)
+         VALUES (?, 'instagram', ?, 'image', 'نصّ', 'queued', '2020-01-01 00:00:00',
+                 ?, 'omar', '2020-01-01 00:00:00')`,
+      )
+      .bind(post, account, `k-${post}`)
+      .run()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
+         VALUES (?, ?, 'm/a.png', 'image/png', 9, 'وصف', 'nano', ?)`,
+      )
+      .bind(crypto.randomUUID(), post, `media:${post}`)
+      .run()
+    return post
+  }
+
+  it('يمرّر baseUrl فيبلغ النداءُ Meta برابطنا', async () => {
+    const post = await seedInstagram()
+    const calls: { url: string; body: string }[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input)
+      calls.push({ url, body: String(init?.body ?? '') })
+      return url.includes('media_publish')
+        ? Response.json({ id: 'ig-9' })
+        : Response.json({ id: 'container-9' })
+    }) as typeof fetch
+
+    try {
+      await worker.queue(
+        {
+          queue: 'sada-publish-staging',
+          messages: [{ body: { postId: post }, ack() {}, retry() {} }],
+        } as never,
+        {
+          ...env(0),
+          TOKEN_ENC_KEY: ENC,
+          PUBLIC_BASE_URL: 'https://sada2.basserh.com',
+          MEDIA: {
+            async get() { return { async arrayBuffer() { return new ArrayBuffer(9) } } },
+          },
+        } as never,
+      )
+    } finally {
+      globalThis.fetch = realFetch
+    }
+
+    // **والنداءُ بلغ نهايةَ الحاوية** — لا رُدَّ قبل أن يُنادى شيء
+    const container = calls.find((c) => c.url.includes('/media'))
+    expect(container, JSON.stringify(calls.map((c) => c.url))).toBeDefined()
+    // **وفي جسمه رابطُنا الموقَّع**: هو الذي كان يسقط بلا baseUrl
+    expect(decodeURIComponent(container?.body ?? '')).toContain('https://sada2.basserh.com/m/')
+    // ونُشر فعلا
+    const row = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(post) as { status: string }
+    expect(row.status).toBe('published')
   })
 })
