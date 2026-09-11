@@ -163,11 +163,79 @@ const TIKTOK_SCOPES: readonly ScopeSpec[] = [
   },
 ]
 
+/*
+ * Instagram — **وطريقان إلى النطاقات نفسِها تقريبا** (D-121).
+ *
+ * `Instagram Business Login` يعطي `instagram_business_*` مباشرةً بحسابٍ
+ * احترافيّ. و`Facebook Login for Business` يعطي `instagram_basic` و
+ * `instagram_content_publish` **عبر صفحةٍ مربوطة**.
+ *
+ * **والمشترَكُ بينهما أنّ النشرَ يوجب وسيطا**: لا منشورَ نصّيٌّ في
+ * Instagram — صورةٌ أو مقطع.
+ */
+const INSTAGRAM_SCOPES: readonly ScopeSpec[] = [
+  {
+    name: 'instagram_business_basic',
+    need: 'identity',
+    grantedBy: 'Instagram — API setup with Instagram business login',
+    where: 'لوحةُ Meta ← تطبيقُك ← Instagram ← API setup ← أضف الحسابَ',
+    enables: 'التعرّفُ على حسابك واسمِه',
+  },
+  {
+    name: 'instagram_business_content_publish',
+    need: 'publish',
+    grantedBy: 'Instagram — API setup with Instagram business login',
+    where: 'النطاقُ نفسُه في شاشة الإعداد — **ويحتاج حسابا احترافيّا**',
+    enables: 'نشرُ صورةٍ أو مقطعٍ باسمك',
+  },
+]
+
+/**
+ * والطريقُ الثاني — **عبر صفحة فيسبوك**.
+ *
+ * نطاقاتُه غيرُ نطاقاتِ الأوّل اسما، **والوجهةُ واحدة**. ويوجب صفحةً
+ * مربوطةً بالحساب، **ومراجعةَ تطبيقٍ أطول** — ويعطي إحصاءاتٍ أوسعَ
+ * وإدارةَ تعليقات.
+ */
+const INSTAGRAM_PAGE_SCOPES: readonly ScopeSpec[] = [
+  {
+    name: 'instagram_basic',
+    need: 'identity',
+    grantedBy: 'Facebook Login for Business',
+    where: 'لوحةُ Meta ← Use cases ← أضف النطاقَ',
+    enables: 'التعرّفُ على حساب Instagram المربوط بالصفحة',
+  },
+  {
+    name: 'pages_show_list',
+    need: 'identity',
+    grantedBy: 'Facebook Login for Business',
+    where: 'النطاقُ نفسُه — **ولا يُعرَف الحسابُ بدونه**',
+    enables: 'قراءةُ صفحاتك لتُعرَف أيُّها يحمل حسابَ Instagram',
+  },
+  {
+    name: 'instagram_content_publish',
+    need: 'publish',
+    grantedBy: 'Facebook Login for Business',
+    where: 'Use cases ← Instagram ← أضف النطاقَ ثمّ اطلب المراجعة',
+    enables: 'نشرُ صورةٍ أو مقطعٍ على الحساب المربوط',
+  },
+]
+
+/**
+ * نطاقاتُ الطريق الثاني — **تُعرَض في الشاشة ولا تدخل الرابط**.
+ *
+ * فالمنصّةُ واحدةٌ في `SCOPES`، **والطريقُ يُختار عند الربط**. ولو
+ * دخلت المجموعتان رابطا واحدا لرُدّ الإذنُ كلُّه: **نطاقٌ لا يعرفه
+ * المزوّدُ يُسقط الطلبَ لا يُتجاهَل**.
+ */
+export const INSTAGRAM_VIA_PAGE: readonly ScopeSpec[] = INSTAGRAM_PAGE_SCOPES
+
 export const SCOPES: Readonly<Record<Platform, readonly ScopeSpec[]>> = {
   linkedin: LINKEDIN_SCOPES,
   x: X_SCOPES,
   youtube: YOUTUBE_SCOPES,
   tiktok: TIKTOK_SCOPES,
+  instagram: INSTAGRAM_SCOPES,
 }
 
 /**

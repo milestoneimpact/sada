@@ -174,7 +174,64 @@ const TIKTOK_GUIDE: SetupGuide = {
     '<b>وصدى يرسله بالاسم الصحيح</b> — لا تحتاج فعلا، لكن لا تخلط بينه وبين الـ secret.',
 }
 
+/**
+ * دليلُ Instagram — **وطريقان، والفرقُ بينهما ما تملكه لا ما تريده**.
+ *
+ * **الأوّل: Instagram Business Login.** حسابٌ احترافيٌّ وحدَه يكفي، بلا
+ * صفحةِ فيسبوك ولا Business Manager. وهو المكتوبُ هنا.
+ *
+ * **والثاني: Facebook Login for Business** — عبر صفحةٍ مربوطة. يعطي
+ * إحصاءاتٍ أوسعَ وإدارةَ تعليقات، **ويوجب صفحةً ومراجعةً أطول**. وهو
+ * مبنيٌّ في `INSTAGRAM_VIA_PAGE`، **ويُختار عند الربط**.
+ *
+ * **والعقبةُ الأولى ليست الضبطَ بل نوعَ الحساب**: شخصيٌّ لا يفتح هذه
+ * النهاياتِ أصلا، **والردُّ حينئذٍ ‏٤٠٠ لا ‏٤٠٣** — فيُقرأ «طلبٌ خطأ»
+ * وهو «حسابٌ خطأ».
+ */
+const INSTAGRAM_GUIDE: SetupGuide = {
+  portal: 'https://developers.facebook.com/apps',
+  portalLabel: 'Meta for Developers',
+  before: [
+    {
+      what: 'حوِّل حسابَك إلى احترافيّ: تطبيقُ Instagram ← Settings ← '
+        + 'Account type and tools ← Switch to professional account',
+      why: 'هذه <b>أوّلُ عقبةٍ وأخفاها</b>: حسابٌ شخصيٌّ لا يفتح نهاياتِ النشر أصلا، '
+        + 'وردُّ Meta حينئذٍ ٤٠٠ لا ٤٠٣ — فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ».',
+    },
+    {
+      what: 'أنشئ تطبيقا: Create app ← اختر Business ← ثمّ أضف منتج Instagram',
+      why: 'ومنتجُ <span dir="ltr">Instagram</span> هو الذي يفتح شاشةَ '
+        + '<span dir="ltr">API setup with Instagram business login</span>. '
+        + 'وبلا إضافته لا تجد المعرّفَ ولا السرَّ في اللوحة.',
+    },
+    {
+      what: 'Instagram ← API setup ← Business login settings ← الصق رابطَ العودة أدناه',
+      why: 'بلا رابطِ عودةٍ مسجَّلٍ تردّ Meta الطلبَ <b>قبل أن تعرض شاشة الإذن</b>. '
+        + 'وهذا عائقٌ لا يُصلحه سرّ.',
+    },
+    {
+      what: 'وفي الشاشة نفسِها: Add account — واختر حسابَك الاحترافيّ',
+      why: 'والتطبيقُ في وضع Development يعمل <b>مع الحسابات المضافة وحدَها</b>. '
+        + 'وحسابٌ لم يُضَف يُردّ إذنُه بلا سببٍ ظاهر.',
+    },
+  ],
+  whereId: 'Instagram ← API setup ← <span dir="ltr">Instagram app ID</span>',
+  whereSecret: 'تحته مباشرةً: <span dir="ltr">Instagram app secret</span> ← Show',
+  success: 'تعود إلى هذه الشاشة فتجد بطاقةَ Instagram مربوطةً باسم حسابك '
+    + '(<span dir="ltr">@username</span>) لا بمعرّفٍ رقميّ.',
+  failure: 'إن رأيتَ <span dir="ltr">Invalid platform app</span> فالمنتَجُ لم يُضَف، '
+    + 'أو أنّك نسختَ معرّفَ <b>تطبيق Meta</b> لا معرّفَ <span dir="ltr">Instagram app</span> '
+    + '— وهما رقمان مختلفان في الشاشة نفسِها. '
+    + 'وإن رأيتَ <span dir="ltr">not an Instagram Professional account</span> '
+    + 'فالحسابُ لم يُحوَّل بعد.',
+  gotcha: 'ولا منشورَ نصّيٌّ في Instagram: <b>صورةٌ أو مقطعٌ ولا ثالث</b> — '
+    + 'فمسوّدةٌ بلا وسيطٍ تُردّ قبل أن تُنادى المنصّة. '
+    + 'والمقطعُ يُنشَر <span dir="ltr">REELS</span>، ويُسحَب من رابطٍ موقَّعٍ '
+    + 'تفتحه خوادمُ Meta لخمسَ عشرةَ دقيقة.',
+}
+
 export const SETUP: Readonly<Record<string, SetupGuide>> = {
+  instagram: INSTAGRAM_GUIDE,
   linkedin: {
     portal: 'https://www.linkedin.com/developers/apps',
     portalLabel: 'LinkedIn Developers',
@@ -269,11 +326,15 @@ export const CHANNELS: readonly ChannelSpec[] = [
   {
     id: 'instagram',
     label: 'Instagram',
-    built: false,
-    stage: 'none',
-    secrets: [],
-    task: null,
-    note: 'تمرّ عبر Graph API بحسابِ أعمالٍ مربوط — خطُّ ربطٍ مختلفٌ كلّيّا.',
+    built: true,
+    stage: 'publish',
+    secrets: ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'],
+    task: 'M-16',
+    // **ونصٌّ صِرفٌ بلا وسم**: يُهرَّب في أربعة مواضع (D-093)
+    note:
+      'الربطُ والنشرُ مبنيّان، ولها طريقان: تسجيلُ دخولٍ مباشرٍ بحسابٍ ' +
+      'احترافيّ، أو عبر صفحة فيسبوك. ويلزم حسابٌ احترافيّ (Business أو ' +
+      'Creator) — والشخصيُّ لا يفتح النشرَ أصلا. ولا منشورَ نصّيّ: صورةٌ أو مقطع.',
   },
   {
     id: 'tiktok',

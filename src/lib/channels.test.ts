@@ -33,9 +33,10 @@ describe('السجلّ', () => {
    * أسرارا، **وما لا سائقَ له لا يحمل شيئا** — فلا ينتظره المالك.
    */
   it('لكلّ مرتبةٍ ما يليق بها، ولا يعد بما لم يُبنَ', () => {
-    // والمرتبةُ تتبع ما بُني: TikTok في D-092 و YouTube في D-096
+    // والمرتبةُ تتبع ما بُني: TikTok في D-092 وYouTube في D-096
+    // وInstagram في D-121 — **والترتيبُ ترتيبُ السجلّ لا ترتيبُ البناء**
     expect(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id))
-      .toEqual(['linkedin', 'x', 'tiktok', 'youtube'])
+      .toEqual(['linkedin', 'x', 'instagram', 'tiktok', 'youtube'])
 
     for (const spec of CHANNELS) {
       // ولكلٍّ سببٌ مكتوب، لا صمت

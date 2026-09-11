@@ -1147,3 +1147,82 @@ wrangler secret put CF_BROWSER_TOKEN --env production
 **ولقطةُ شريحتنا ثانيتان أو ثلاث.** فالمتاحُ المجّانيّ يغطّي مئاتِ
 الشرائح يوميّا على الخطّة المجّانيّة، وآلافَها شهريّا على المدفوعة —
 **والكلفةُ عمليّا صفر** عند حجم نشرٍ معقول.
+
+## M-16 · ربطُ Instagram — بالخطوات
+
+> **اقرأ هذا أوّلا:** الربطُ **والنشرُ** مبنيّان (D-121). فما تفتحه بهذه
+> الخطوات يعمل يومَ تُتمّها. **ولا منشورَ نصّيٌّ في Instagram**: صورةٌ أو
+> مقطعٌ ولا ثالث — فمسوّدةٌ بلا وسيطٍ تُردّ قبل أن تُنادى المنصّة.
+
+**١ · ما هي.** تطبيقٌ في Meta for Developers بمنتَج Instagram، ثمّ سرّاه
+في أسرار Worker. **وقبلهما: حسابُ Instagram احترافيّ.**
+
+**٢ · لماذا الآن.** `oauth_apps` لا يحمل صفّا لـ`instagram`، فزرُّ الربط
+يردّك قبل أن يفتح شاشةَ الإذن. **والسائقُ ينتظر** — مبنيٌّ وله ‏١٠
+اختبارات.
+
+**٣ · الخطوات.**
+
+**أ · حوِّل حسابَك إلى احترافيّ** — وهي **أوّلُ عقبةٍ وأخفاها**:
+
+    تطبيقُ Instagram ← Settings ← Account type and tools
+    ← Switch to professional account ← Business أو Creator
+
+**ب · أنشئ التطبيق:**
+
+    developers.facebook.com/apps ← Create app ← Business
+    ← اسمُ التطبيق ← Create app
+
+**ج · أضف منتَج Instagram:**
+
+    لوحةُ التطبيق ← Add product ← Instagram ← Set up
+    ← API setup with Instagram business login
+
+**د · سجّل رابطَ العودة** — انسخه من شاشة Instagram في لوحتك:
+
+    https://sada2.basserh.com/oauth/instagram/callback
+
+ويُلصَق في: `Business login settings ← OAuth redirect URIs`
+
+**هـ · أضف حسابَك:** في الشاشة نفسِها `Add account` — واختر حسابَك
+الاحترافيّ. **والتطبيقُ في وضع Development يعمل مع الحسابات المضافة
+وحدَها.**
+
+**و · خذ السرّين** من `API setup`:
+
+| ما تنسخه | اسمُه في أسرار Worker |
+|---|---|
+| `Instagram app ID` | `INSTAGRAM_APP_ID` |
+| `Instagram app secret` ← Show | `INSTAGRAM_APP_SECRET` |
+
+> **ولا تنسخ معرّفَ تطبيق Meta**: في الشاشة رقمان مختلفان، والمطلوبُ
+> **`Instagram app ID`** لا `App ID` الأعلى.
+
+**ز · ارفعهما** — من شاشة Instagram في لوحتك (خزانةُ الأسرار)، أو:
+
+    npx wrangler secret put INSTAGRAM_APP_ID --env staging
+    npx wrangler secret put INSTAGRAM_APP_SECRET --env staging
+
+**٤ · ما يعني النجاح.** تعود إلى شاشة القنوات فتجد بطاقةَ Instagram
+مربوطةً **باسم حسابك** (`@username`) لا بمعرّفٍ رقميّ. وتظهر في «قنواتٌ
+جاهزة» في لوحك.
+
+**٥ · ماذا لو فشل.**
+
+| ما تراه | ما يعنيه |
+|---|---|
+| `Invalid platform app` | المنتَجُ لم يُضَف، أو نسختَ `App ID` لا `Instagram app ID` |
+| `not an Instagram Professional account` | الحسابُ لم يُحوَّل بعد — عد إلى (أ) |
+| `redirect_uri` mismatch | الرابطُ في (د) يخالف حرفا — **ولا يُخلَط النطاقان** |
+
+وأرسل إليّ **نصَّ الرسالة كما تراه**، لا وصفَها.
+
+**٦ · ما يقع إن تُرك.** تبقى Instagram بطاقةً تقول «ينقصها سرّا التطبيق»،
+**والسائقُ مبنيٌّ لا يُستعمَل** — كحال TikTok وYouTube اليوم. ولا يُكسَر
+شيءٌ قائم.
+
+### والطريقُ الثاني — عبر صفحة فيسبوك
+
+مبنيٌّ كذلك (`INSTAGRAM_VIA_PAGE`)، **ويُختار عند الربط**. يعطي إحصاءاتٍ
+أوسعَ وإدارةَ تعليقات، **ويوجب صفحةً مربوطةً بالحساب ومراجعةَ تطبيقٍ
+أطول**. ولا تحتاجه للنشر — فابدأ بالأوّل.

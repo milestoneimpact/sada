@@ -54,6 +54,8 @@ export const SECRET_NAMES: Readonly<Record<Platform, readonly [string, string]>>
   x: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
   youtube: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET'],
   tiktok: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'],
+  // **وMeta تسمّيه «App ID» و«App secret»** — والاسمُ هنا كما يُرى هناك
+  instagram: ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'],
 }
 
 function fromEnv(
