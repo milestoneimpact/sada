@@ -17,6 +17,7 @@ import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import type { DraftRow } from '../../lib/draft/store'
+import { windowLabel } from '../../lib/metrics/job'
 
 describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
   it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {
@@ -122,6 +123,43 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(STYLE).toContain('.prow .pn{flex:1 1 100%}')
     expect(STYLE).toContain('.topbar .glyph.tb{display:none')
     expect(STYLE).toContain('.topbar .glyph.tb{display:grid}')
+  })
+})
+
+describe('نافذةُ القياس تُقرأ اسما لا مفتاحا (D-124)', () => {
+  it('«24h» تُقال «٢٤ ساعة»، وما ليس في القاموس يُعرَض بحرفه', () => {
+    expect(windowLabel('24h')).toBe('‏٢٤ ساعة')
+    expect(windowLabel('7d')).toBe('‏٧ أيّام')
+    expect(windowLabel('90d')).toBe('90d')
+  })
+
+  it('والتقريرُ لا يكتب مفتاحَ `CHECK` في جملةٍ عربيّة', () => {
+    const html = reportScreen({
+      reports: [], suggestions: [], promoCapUsd: 0, now: new Date('2026-09-06T09:00:00Z'),
+      current: {
+        id: '2026-08-31', createdAt: '2026-09-01 03:00:00',
+        body: {
+          version: 1, from: '2026-08-24', to: '2026-08-31', published: 2, measured: 2,
+          spendUsd: 1, platforms: [], notes: [],
+          top: { window: '24h', basis: 'count', cohort: 2,
+            post: { id: 'p', platform: 'x', text: 'نصّ', publishedAt: '2026-08-25 09:00:00',
+              impressions: 10, interactions: 3, window: '24h' } },
+        },
+      } as never,
+    })
+    expect(html).toContain('الأوّلُ في نافذة ‏٢٤ ساعة')
+    expect(html).not.toContain('نافذة 24h')
+  })
+})
+
+describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
+  /**
+   * زرُّ «ليليّ» يحمل `data-theme="dark"` قيمةً لا حالا. **ومحدّدٌ بلا قيدٍ
+   * يجعل الزرَّ وحدَه ليليّا** — حبرُ الليل على أرض النهار، ‏٢٫٣٨:١.
+   */
+  it('المحدّدُ مقيّدٌ بالجذر فلا يلبسه زرٌّ يحمل السمةَ قيمةً', () => {
+    expect(STYLE).toContain(':root[data-theme="dark"]{')
+    expect(STYLE).not.toMatch(/\n\[data-theme="dark"\]\{/)
   })
 })
 

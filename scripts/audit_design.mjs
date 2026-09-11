@@ -184,6 +184,45 @@ for (const file of pages) {
       return out
     })
 
+    /*
+     * **عمودٌ فارغٌ في صفّ مؤشّرات، وترويسةٌ بلا جسد** (D-124).
+     *
+     * كلاهما رُئي بالعين بعد أن قال المدقّقُ «صفرا» (لاحقةُ D-123):
+     * أربعُ بطاقاتٍ في خمسة أعمدة، وعنوانُ «ضبطُ التطبيق» تحته لا شيء.
+     * **وكلاهما هندسةٌ لا حكم**: عددُ الأعمدة المحسوبة مقابلَ عدد
+     * الأبناء، وعنوانٌ لا يليه في أبيه ما له نصٌّ أو أداة.
+     *
+     * والصفُّ يُحاسَب حين يكون كلُّ أبنائه `.tile`: شبكةُ المسوّدات تنقص
+     * أبناؤها بالمحتوى لا بالتصميم، وشبكةُ المؤشّرات لا تنقص إلّا بعيب.
+     * ويُستثنى الجوّالُ: الأعمدةُ هناك واحدةٌ قصدا.
+     */
+    const shape = await page.evaluate((width) => {
+      const holes = []
+      const orphans = []
+      const panes = [...document.querySelectorAll('section[data-pane]')]
+      const was = panes.map((s) => s.hidden)
+      panes.forEach((s) => { s.hidden = false })
+      if (width > 720) {
+        for (const g of document.querySelectorAll('.grid')) {
+          const kids = [...g.children]
+          if (kids.length < 2 || !kids.every((k) => k.classList.contains('tile'))) continue
+          const cols = getComputedStyle(g).gridTemplateColumns.split(' ').filter((c) => c !== '').length
+          if (cols > kids.length) holes.push({ cls: g.className, cols, kids: kids.length })
+        }
+      }
+      for (const h of document.querySelectorAll('h2.sec, h3.sec')) {
+        let sib = h.nextElementSibling
+        let fed = false
+        while (sib !== null) {
+          if (sib.textContent.trim() !== '' || sib.querySelector('svg,img,input,table,button') !== null) { fed = true; break }
+          sib = sib.nextElementSibling
+        }
+        if (!fed) orphans.push({ text: h.textContent.trim().slice(0, 30) })
+      }
+      panes.forEach((s, i) => { s.hidden = was[i] })
+      return { holes, orphans }
+    }, width)
+
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
       const seen = (el) => {
         const r = el.getBoundingClientRect()
@@ -312,6 +351,8 @@ for (const file of pages) {
     findings[findings.length - 1].exempt = torn.exempt
     findings[findings.length - 1].labels = labels
     findings[findings.length - 1].ranks = ranks
+    findings[findings.length - 1].holes = shape.holes
+    findings[findings.length - 1].orphans = shape.orphans
     await page.close()
   }
 }
@@ -321,6 +362,7 @@ let failed = 0
 for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
+    (f.holes ?? []).length + (f.orphans ?? []).length +
     (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
@@ -361,6 +403,14 @@ for (const f of findings) {
     for (const r of f.ranks) {
       console.log(`      ${r.pane} \u2014 ${r.tied} \u0645\u0646 ${r.total} \u0639\u0646\u062f ${r.top}px`)
     }
+  }
+  if ((f.holes ?? []).length > 0) {
+    console.log(`  ✕ ${f.holes.length} صفَّ مؤشّراتٍ فيه عمودٌ فارغ:`)
+    for (const h of f.holes) console.log(`      .${h.cls} — ${h.kids} بطاقاتٍ في ${h.cols} أعمدة`)
+  }
+  if ((f.orphans ?? []).length > 0) {
+    console.log(`  ✕ ${f.orphans.length} ترويسةً بلا جسد:`)
+    for (const o of f.orphans) console.log(`      «${o.text}»`)
   }
   if (f.faint.length > 0) {
     console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)

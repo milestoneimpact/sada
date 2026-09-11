@@ -69,7 +69,12 @@ export function spreadScreen(d: SpreadScreenData): string {
 
     ${skipped.length === 0
       ? ''
-      : `<h3>وخارجَ الجدول — ${skipped.length}</h3>
+      /*
+       * **وعنوانٌ عارٍ يرث قياسَ المتصفّح** (D-124): `h3` بلا صنفٍ ‏١٦٫٤px —
+       * خارجَ السلّم، ولم يُمسَك لأنّ الشاشةَ لم تكن تُرسَم. فيلبس صنفَ
+       * عنوان القسم كأخواته.
+       */
+      : `<h3 class="sec">وخارجَ الجدول — ${skipped.length}</h3>
          <p class="hint">تبقى معتمَدةً كما هي، ولا يضيع منها شيء.</p>
          <ul class="plain">${skipped
            .map((s) => `<li><b>${escapeHtml(s.preview)}</b> — ${escapeHtml(s.reason)}</li>`)

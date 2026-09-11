@@ -36,6 +36,23 @@ export const WINDOWS = [
 
 export type WindowName = (typeof WINDOWS)[number]['name']
 
+/**
+ * اسمُ النافذة كما يُقرأ — **والمفتاحُ يبقى في القاعدة** (D-124).
+ *
+ * كان التقريرُ يقول «الأوّلُ في نافذة 24h» وشاشةُ المنصّة «نافذةُ 7d»:
+ * **مفتاحُ `CHECK` في جملةٍ عربيّة** — وهي علّةُ ترويسات اللوح المحوريّ
+ * (D-123) بعينها في موضعٍ ثالث. وما ليس في القاموس يُعرَض بحرفه.
+ */
+const WINDOW_LABEL: Readonly<Record<WindowName, string>> = {
+  '24h': '‏٢٤ ساعة',
+  '72h': '‏٧٢ ساعة',
+  '7d': '‏٧ أيّام',
+}
+
+export function windowLabel(name: string): string {
+  return (WINDOW_LABEL as Readonly<Record<string, string>>)[name] ?? name
+}
+
 /** نطاقُ القراءة لكلّ منصّة — يُسأل عنه قبل النداء. */
 const READ_SCOPE: Readonly<Record<string, string>> = {
   linkedin: 'w_member_social',
