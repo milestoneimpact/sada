@@ -122,6 +122,21 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
   </div>`
 }
 
+/*
+ * **ولصيقةٌ تُقرأ وحدَها تُسمّي وجهتَها** (D-122).
+ *
+ * ستُّ بطاقاتٍ تحمل «اضبط سرّيه» تذهب إلى ستّ شاشات. **والعينُ تفرّق
+ * بينها بالبطاقة التي حولها، وقارئُ الشاشة لا يرى البطاقة**: يسرد
+ * الروابطَ فيقول «اضبط سرّيه» ستَّ مرّات.
+ *
+ * فيُضاف `aria-label` يسمّي المنصّة، **ويبقى النصُّ المرئيُّ قصيرا** —
+ * فلا يُمدَّد الزرُّ في بطاقةٍ ضيّقة.
+ *
+ * **وفعلان مختلفان لا يتسمّيان باسمٍ واحد.** زرُّ البطاقة يفتح شاشةَ
+ * المنصّة، وزرُّ التنبيه **ينتقل إلى البطاقة في الشاشة نفسِها** — فلمّا
+ * تسمّيا «اضبط سرّيه» معا صار الاسمُ الواحدُ يعني فعلين. فسُمّي كلٌّ
+ * بما يفعل، **والقياسُ هو الذي فرّقهما**: لصيقةٌ واحدةٌ إلى وجهتين.
+ */
 export function setupPane(view: ChannelView, app: AppStatus | undefined, base: string): string {
   const guide = SETUP[view.spec.id]
   if (guide === undefined || app === undefined) return ''
@@ -315,7 +330,8 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
     state === 'connectable'
       ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
       : state === 'needs_reauth'
-        ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start">جدّد الإذن</a>`
+        ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start"
+              aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
         : state === 'linked'
           ? `<a class="btn g sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : state === 'awaiting_owner'
@@ -326,7 +342,8 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
              * المانعَ ولا تفتح بابَه**. ولمّا انتقل الدليلُ إلى شاشة
              * المنصّة صار للمانع موضعٌ يُقصَد، **فيُقصَد**.
              */
-            ? `<a class="btn p sm" href="/panel/channels/${escapeHtml(spec.id)}">اضبط سرّيه</a>`
+            ? `<a class="btn p sm" href="/panel/channels/${escapeHtml(spec.id)}"
+                  aria-label="اضبط سرّي ${escapeHtml(spec.label)}">اضبط سرّيه</a>`
             : '<span class="st idle"><span class="g">○</span>يحتاج سائقا يُكتب له</span>'
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
@@ -387,8 +404,10 @@ export function channelsSection(
             ? 'رمزُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
             : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
           ${v.state === 'needs_reauth'
-            ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start">جدّد الإذن</a>`
-            : `<a class="btn g sm" href="#ch-${escapeHtml(v.spec.id)}">اضبط سرّيه</a>`}
+            ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
+                  aria-label="جدّد إذن ${escapeHtml(v.spec.label)}">جدّد الإذن</a>`
+            : `<a class="btn g sm" href="#ch-${escapeHtml(v.spec.id)}"
+                  aria-label="انتقل إلى بطاقة ${escapeHtml(v.spec.label)}">اعرضها</a>`}
         </li>`).join('')}</ul>
       </div>`
 

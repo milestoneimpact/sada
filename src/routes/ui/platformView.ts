@@ -417,7 +417,8 @@ export function platformScreen(d: PlatformScreenData): string {
     state === 'connectable'
       ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
       : state === 'needs_reauth'
-        ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start">جدّد الإذن</a>`
+        ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start"
+              aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
         : state === 'linked'
           ? `<a class="btn g" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : ''

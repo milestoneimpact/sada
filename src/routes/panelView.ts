@@ -1469,7 +1469,12 @@ ${pivotPane(d.pivot)}
 
 <section data-pane="sources" hidden>
   ${pageHead('Google Drive', 'المصادر والتحليل', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
-  <div class="card"><div class="card-head"><h2>المصادر والتحليل</h2><div class="grow"></div>${scanBtn}</div>
+  ${/*
+    * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
+    * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
+    * الجدولُ ما فيه هو، لا ما في الشاشة كلِّها.
+    */''}
+  <div class="card"><div class="card-head"><h2>ملفّاتُ مجلّدك</h2><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
 </section>
 
