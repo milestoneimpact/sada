@@ -155,6 +155,35 @@ for (const file of pages) {
       return { rows: out, exempt: out.exempt }
     }, MAX_TEAR)
 
+    /*
+     * **رقمٌ أوّلٌ واحدٌ في كلّ صفِّ مؤشّرات** (D-117).
+     *
+     * وفي الشيفرة قاعدةٌ قديمة: **الذهبُ للأوّل وحدَه** — «ندرةٌ تصنع
+     * مرتبة، وذهبٌ على الأربعة يُلغي معنى الأوّل» (D-103). **وكان
+     * القياسُ يخالف اللون**: أربعةُ أرقامٍ عند ‏٤٢px في صفٍّ واحد،
+     * فتُقرأ الشاشةُ لوحةَ عدّاداتٍ لا شاشةَ عمل.
+     *
+     * **وهذه تُحرَس ولا تُستفتى**: تقارن قياسَ خطٍّ بقياسِ خطّ داخل
+     * صنفٍ واحد (`.tile .v`) — **ولا رأيَ لأحدٍ في أيُّهما أكبر**. وهو
+     * الفرقُ عن نسبة الشرح التي رُفض حَرسُها (D-113).
+     */
+    const ranks = await page.evaluate(() => {
+      const out = []
+      for (const s of document.querySelectorAll('section[data-pane]')) {
+        const was = s.hidden
+        s.hidden = false
+        const vs = [...s.querySelectorAll('.tile .v')]
+          .filter((e) => e.getBoundingClientRect().height > 0)
+          .map((e) => Math.round(Number.parseFloat(getComputedStyle(e).fontSize)))
+        s.hidden = was
+        if (vs.length < 2) continue
+        const top = Math.max(...vs)
+        const tied = vs.filter((v) => v === top).length
+        if (tied > 1) out.push({ pane: s.dataset.pane, tied, total: vs.length, top })
+      }
+      return out
+    })
+
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
       const seen = (el) => {
         const r = el.getBoundingClientRect()
@@ -282,6 +311,7 @@ for (const file of pages) {
     findings[findings.length - 1].torn = torn.rows
     findings[findings.length - 1].exempt = torn.exempt
     findings[findings.length - 1].labels = labels
+    findings[findings.length - 1].ranks = ranks
     await page.close()
   }
 }
@@ -290,7 +320,8 @@ await browser.close()
 let failed = 0
 for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
-    (f.torn ?? []).length + (f.labels ?? []).length + (f.overflow ? 1 : 0)
+    (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
+    (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
   if (issues === 0) {
@@ -323,6 +354,12 @@ for (const f of findings) {
     for (const l of f.labels.slice(0, 8)) {
       const st = l.open === null ? '' : ` \u00b7 ${l.open ? '\u0645\u0641\u062a\u0648\u062d' : '\u0645\u0637\u0648\u064a\u0651'}`
       console.log(`      .${l.cls}${st} \u2014 \u0627\u0644\u0645\u0631\u0626\u064a\u0651: ${l.vis}`)
+    }
+  }
+  if ((f.ranks ?? []).length > 0) {
+    console.log(`  \u2715 ${f.ranks.length} \u0635\u0641\u0651\u064e \u0645\u0624\u0634\u0651\u0631\u0627\u062a\u064d \u0628\u0644\u0627 \u0631\u0642\u0645\u064d \u0623\u0648\u0651\u0644:`)
+    for (const r of f.ranks) {
+      console.log(`      ${r.pane} \u2014 ${r.tied} \u0645\u0646 ${r.total} \u0639\u0646\u062f ${r.top}px`)
     }
   }
   if (f.faint.length > 0) {

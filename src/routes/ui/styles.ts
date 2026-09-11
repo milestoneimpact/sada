@@ -413,15 +413,23 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .tile::before{content:''; position:absolute; inset-inline:0; top:0; height:2px;
   background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--au) 75%,transparent),transparent)}
 .tile .k{font-size:var(--t-xs); font-weight:600; color:var(--ink-3)}
-.tile .v{font-size:var(--t-3xl); font-weight:700; line-height:var(--lh-tight); letter-spacing:-1.4px;
+.tile .v{font-size:var(--t-2xl); font-weight:700; line-height:var(--lh-tight); letter-spacing:-1.4px;
   font-variant-numeric:tabular-nums; margin-top:var(--s-1);
   /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته */
   direction:ltr; unicode-bidi:isolate; text-align:right}
 .tile .v em{font-style:normal; font-size:var(--t-base); font-weight:600; color:var(--ink-3);
   letter-spacing:0; margin-inline-start:var(--s-0)}
-/* والمؤشّرُ الأوّل وحده يأخذ الذهبَ في رقمه: ندرةٌ تصنع مرتبة، وذهبٌ
-   على الأربعة يُلغي معنى الأوّل */
-.grid.c4>.tile:first-child .v{color:var(--au)}
+/* ── والمؤشّرُ الأوّل يقود بالقياس كما يقود باللون (D-117) ───────────
+   ندرةٌ تصنع مرتبة، وذهبٌ على الأربعة يُلغي معنى الأوّل. **وكان اللونُ
+   وحدَه يقول ذلك والقياسُ يخالفه**: أربعةُ أرقامٍ عند ‏٤٢px في صفٍّ
+   واحد، **فلا تقول الشاشةُ أيُّها الجواب**.
+
+   وذهبٌ يقول «هذا أوّلٌ» وقياسٌ يقول «الأربعةُ سواء» **يُلغي أحدُهما
+   الآخر**، ويبقى الصفُّ يُقرأ لوحةَ عدّادات.
+
+   **ويشمل شبكةَ الثلاثة كذلك** (المزوّدون): القاعدةُ في الأوّليّة لا في
+   العدد. */
+.grid>.tile:first-child .v{font-size:var(--t-3xl); color:var(--au)}
 .tile .n{font-size:var(--t-xs); color:var(--ink-3); margin-top:var(--s-2)}
 
 /* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه

@@ -43,6 +43,19 @@ for (const file of files) {
       for (const el of s.querySelectorAll('*')) {
         for (const n of el.childNodes) {
           if (n.nodeType !== 3 || n.textContent.trim().length < 12) continue
+          /*
+           * **ونصُّ الآلة يلتفّ ولا يُقرأ جملةً** (D-116).
+           *
+           * قِيس لوحُ المزوّدين فقيل فيه ‏١١ جملة، **وثلاثٌ منها عنوانُ
+           * `API` ومساران في لوحة مزوّد**: طولُها يلفّها سطرين، وليست
+           * كلاما. **ولو صُدِّق لاختُصر عنوانٌ لا يجوز اختصارُه.**
+           *
+           * والفرقُ **يقوله المتصفّح لا أنا**: هذه الشيفرةُ تسم نصَّ
+           * الآلة بخطٍّ ثابت العرض قصدا، **فـ`font-family` المحسوبةُ
+           * تفصلهما** — ولا قائمةَ أصنافٍ تشيخ.
+           */
+          const font = getComputedStyle(el).fontFamily
+          if (/\bmonospace\b|ui-monospace|SFMono/i.test(font)) continue
           range.selectNodeContents(n)
           const boxes = [...range.getClientRects()].filter((r) => r.height > 0)
           if (boxes.length === 0) continue
