@@ -467,9 +467,7 @@ export function platformScreen(d: PlatformScreenData): string {
                  <a class="btn g sm" href="/panel/channels/${escapeHtml(spec.id)}">الكلّ</a></div>`
               : `<div class="posts">${posts}</div>`}`}`}
 
-  ${guide === undefined
-    ? ''
-    /*
+  ${/*
      * **والدليلُ هنا لا في اللوح** (D-111).
      *
      * كان مقلوبا: البطاقةُ في لوح القنوات تحمل الدليلَ كاملا، والشاشةُ
@@ -479,7 +477,13 @@ export function platformScreen(d: PlatformScreenData): string {
      *
      * **والبطاقةُ حالٌ، والشاشةُ وثيقة.** فما يحتاج مساحةً يسكن حيث
      * المساحةُ عمودٌ واحدٌ لا شبكةٌ تُمزَّق.
-     */
-    : `<h3 class="sec">ضبطُ التطبيق ودليلُه</h3>
-       ${setupPane(d.view, d.app, d.baseUrl)}`}`
+     *
+     * **وترويسةٌ بلا جسدٍ لا تُرسَم** (لاحقةُ D-123). `setupPane` تردّ فراغا
+     * حين لا حالَ للتطبيق — وهي حالُ YouTube وTikTok وInstagram في اللوحة،
+     * لأنّ `appStatuses` تُقرأ لمنصّتين — **فكانت الشاشةُ تنتهي بعنوانٍ
+     * تحته لا شيء**، يُقرأ قسما سقط. فيُحسَب اللوحُ أوّلا، والعنوانُ يتبعه.
+     */''}${(() => {
+    const setup = guide === undefined ? '' : setupPane(d.view, d.app, d.baseUrl)
+    return setup === '' ? '' : `<h3 class="sec">ضبطُ التطبيق ودليلُه</h3>\n       ${setup}`
+  })()}`
 }
