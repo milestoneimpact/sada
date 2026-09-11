@@ -18,7 +18,12 @@ import { tasksScreen } from '../src/routes/ui/tasksView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
-import { shell } from '../src/routes/ui/shell'
+import { backNav, shell } from '../src/routes/ui/shell'
+import { journeyBody } from '../src/routes/ui/journeyView'
+import { spreadScreen } from '../src/routes/ui/spreadView'
+import { loginPage } from '../src/routes/panelView'
+import { secondFactorPage } from '../src/routes/authView'
+import type { Journey } from '../src/lib/journey'
 
 const now = new Date('2026-09-06T09:00:00Z')
 const ago = (h: number): string =>
@@ -300,4 +305,64 @@ writeAudited(
   ),
 )
 
-console.log('رُسمت تسعٌ في /tmp')
+// ── أربعُ شاشاتٍ كانت بلا عيّنة (D-124) ─────────────────────────────
+// الرحلةُ والتوزيعُ والدخولُ والعاملُ الثاني **لم يرَها مدقّقٌ قطّ**: تُرسَم
+// في الخادم من الدوالّ نفسِها، ولا ملفَّ لها في /tmp فلا تدخل المدقّقات
+// الثلاثة. **وشاشةٌ لا تُرسَم لا تُقاس، وما لا يُقاس يشيخ صامتا.**
+const journey: Journey = {
+  postId: 'p1', platform: 'linkedin', status: 'published', spent: 0.0723,
+  text: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهٌ يُصرف على ما لا يُحرّك المعلمَ التالي.',
+  stations: [
+    { kind: 'source', title: 'ملفٌّ في Drive', at: ago(200), detail: 'منهجية إدارة المشروعات للقادة — الإطار الأول', cost: null, model: null, state: 'done' },
+    { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاقٌ ‏٠٫٨٦: مادّةٌ أصيلة وفيها إطارٌ قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
+    { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاويةُ الوقت لا زاويةُ المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
+    { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'panel:passkey — عُدّل السطرُ الأخير', cost: null, model: null, state: 'done' },
+    { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ UTC على عمر عبدالحميد', cost: null, model: null, state: 'done' },
+    { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولةُ الأولى — نجحت', cost: 0, model: null, state: 'done' },
+    { kind: 'metrics', title: 'قياسُ ‏٢٤ ساعة', at: null, detail: 'أوّلُ قياسٍ بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
+  ],
+}
+writeAudited(
+  '/tmp/screen-journey.html',
+  shell(
+    'صدى — رحلةُ منشور',
+    `<div class="wrap">${backNav('/panel#posts', 'المنشورات')}
+     <main id="main">${journeyBody(journey, now)}</main></div>`,
+    'n',
+  ),
+)
+
+writeAudited(
+  '/tmp/screen-spread.html',
+  shell(
+    'صدى — توزيعُ المعتمَد',
+    `<div class="wrap">${backNav('/panel', 'اللوحة')}
+     <main id="main">${spreadScreen({
+       start: '2026-09-08T06:00', gap: 24, csrf: 'c',
+       plan: {
+         slots: [
+           { postId: 'p1', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-08T06:00', preview: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.' },
+           { postId: 'p2', accountId: 'a3', accountLabel: '@omar_ah', platform: 'x', when: '2026-09-09T06:00', preview: 'ثلاثةُ دروسٍ من مراجعة محفظةٍ كاملة — وأحدُها كلّفنا سنة.' },
+           { postId: 'p3', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-10T06:00', preview: 'تقريرُ الإغلاق ليس وثيقةً إداريّة.' },
+         ],
+         skipped: [
+           { postId: 'p4', preview: 'مسوّدةٌ لـ TikTok', reason: 'لا قناةَ TikTok مربوطة' },
+         ],
+       },
+     })}</main></div>`,
+    'n',
+  ),
+)
+
+// الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض
+writeAudited('/tmp/screen-login.html', loginPage({ passkeys: true }, 'n'))
+writeAudited(
+  '/tmp/screen-2fa.html',
+  secondFactorPage(
+    { csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true,
+      hasTotp: true, hasRecovery: true, error: 'رمزٌ غير صحيح — بقيت محاولتان.' },
+    'n',
+  ),
+)
+
+console.log('رُسمت ثلاثَ عشرةَ في /tmp')

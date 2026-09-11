@@ -22,6 +22,7 @@ import { money, relativeTime } from '../../lib/format'
 import type { PlatformSlice, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
+import { windowLabel } from '../../lib/metrics/job'
 
 const LABEL: Readonly<Record<string, string>> = { linkedin: 'LinkedIn', x: 'X' }
 
@@ -82,7 +83,7 @@ export function reportBody(r: WeeklyReport, now: Date): string {
       ? `<p class="hint"><b>لا ترتيبَ في هذا الأسبوع.</b> الترتيبُ يقع داخل نافذةٍ
          واحدة، ويحتاج <b>اثنين فأكثر</b> فيها — وواحدٌ وحده ليس ترتيبا.</p>`
       : `<div class="outcome ok">
-          <span class="k">الأوّلُ في نافذة ${escapeHtml(r.top.window)}</span>
+          <span class="k">الأوّلُ في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
           <span class="v">${escapeHtml(r.top.post.text.slice(0, 160))}${
             r.top.post.text.length > 160 ? '…' : ''
           }</span>

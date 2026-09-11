@@ -23,7 +23,7 @@ import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
 import { relativeTime } from '../../lib/format'
-import { widest, type PostMetricRow } from '../../lib/metrics/job'
+import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 
 /** ما يلزم لعرض وسيطٍ في القائمة — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -91,7 +91,7 @@ function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date
     ${stat('مشاركة', m.shares)}
     <span class="grow"></span>
     <span class="ago" title="${escapeHtml(m.pulledAt)} UTC">نافذةُ ${escapeHtml(
-      m.window,
+      windowLabel(m.window),
     )} · قِيس منذ ${escapeHtml(relativeTime(m.pulledAt, now))}</span>
   </div>`
 }
