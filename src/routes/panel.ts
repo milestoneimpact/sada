@@ -56,6 +56,22 @@ import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
 import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
 import { TILE_MAX, TILE_MIN } from '../lib/dashboard'
+import { pivot, readCols, readDimension, readMeasure } from '../lib/pivot'
+import { FACT_CAP, loadFacts } from '../lib/pivotStore'
+import type { PivotView } from './ui/sections/pivot'
+
+/**
+ * المدى بالأيّام — **قائمةُ سماحٍ لا مدى مفتوح**.
+ *
+ * ورقمٌ يأتي من الشبكة يفتح استعلاما بمداه: **«‏٩٩٩٩٩ يوما» تمسح الجدولَ
+ * كلَّه** في كلّ فتحةٍ للصفحة. والسقفُ في `LIMIT` يحرس الذاكرة، **وهذا
+ * يحرس القاعدة**.
+ */
+const SPAN_DAYS: ReadonlySet<number> = new Set([7, 30, 90, 365])
+function readSpan(raw: string | null): number {
+  const n = Number(raw)
+  return SPAN_DAYS.has(n) ? n : 30
+}
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
   loadSession, readCookie, revokeSessions, sessionCookie, type Session,
@@ -237,6 +253,30 @@ panel.get('/panel', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const allowance = await checkAllowance(c.env.DB)
+
+  /*
+   * **واللوحُ المحوريُّ يُقرأ من العنوان** (D-120).
+   *
+   * فالعرضُ كلُّه في الرابط: يُنسَخ ويُرسَل ويُحفَظ في المفضّلة. **وما
+   * لا يُعرَف من قيمةٍ يعود إلى افتراضه** ولا يُسقط الصفحة — القيمُ تأتي
+   * من الشبكة، **ونصٌّ في `SQL` أو في المخرَج لا يقع** لأنّها تُطابَق
+   * بقائمة سماحٍ لا تُمرَّر.
+   */
+  const q = new URL(c.req.url).searchParams
+  const pivotRows = readDimension(q.get('rows') ?? undefined, 'platform')
+  const pivotCols = readCols(q.get('cols') ?? undefined)
+  const pivotMeasure = readMeasure(q.get('m') ?? undefined, 'count')
+  const pivotDays = readSpan(q.get('days'))
+  const loaded = await loadFacts(c.env.DB, pivotDays)
+  const pivotView: PivotView = {
+    table: pivot(loaded.facts, { rows: pivotRows, cols: pivotCols, measure: pivotMeasure }),
+    rows: pivotRows,
+    cols: pivotCols,
+    measure: pivotMeasure,
+    sinceDays: pivotDays,
+    capped: loaded.capped,
+    cap: FACT_CAP,
+  }
 
   let sources: PanelSource[] = []
   try {
@@ -445,6 +485,7 @@ panel.get('/panel', async (c) => {
       peaks,
       alertWebhook: allowance.settings.alertWebhook,
       dashboardTiles: allowance.settings.dashboardTiles,
+      pivot: pivotView,
       /*
        * **وآخرُ خمسةٍ لا كلُّها** (D-101): الصندوقُ ينمو ولا يُقلَّم،
        * **وسجلٌّ كاملٌ في صفحةٍ تُفتَح كلَّ يومٍ ثمنٌ يُدفَع كلَّ يوم**.

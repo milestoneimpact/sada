@@ -12,6 +12,7 @@
  */
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
+import { pivotPane, type PivotView } from './ui/sections/pivot'
 import type { ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
@@ -919,6 +920,8 @@ export interface PanelData {
   readonly alertWebhook: string
   /** بطاقاتُ لوح المالك بمعرِّفاتها (D-119) — **مصفّاةً**. */
   readonly dashboardTiles: string
+  /** اللوحُ المحوريّ: جدولُه ومواصفتُه (D-120). */
+  readonly pivot: PivotView
   /** آخرُ ما خرج من الصندوق — **ولا صمتٌ يُظنّ نجاحا**. */
   readonly outbox: readonly OutboxRow[]
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
@@ -1461,6 +1464,8 @@ ${flash}
     ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
   </div>
 </section>
+
+${pivotPane(d.pivot)}
 
 <section data-pane="sources" hidden>
   ${pageHead('Google Drive', 'المصادر والتحليل', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}

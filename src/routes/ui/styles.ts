@@ -460,6 +460,26 @@ th{text-align:right; color:var(--ink-3); font-weight:600; font-size:var(--t-xs);
 td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vertical-align:top}
 tbody tr:last-child td{border-bottom:0}
 @media(hover:hover){tbody tr:hover{background:var(--surface-2)}}
+/* ── اللوحُ المحوريّ (D-120) ───────────────────────────────────────
+   **والجدولُ وحدَه يمرّر أفقيّا**: عشرةُ أعمدةٍ لا تسع ٣٩٠px، وجسمُ
+   الصفحة لا يُمرَّر — فالغلافُ حوله لا الصفحةُ كلُّها. */
+.pv-wrap{overflow-x:auto}
+.pv{min-width:auto}
+.pv th,.pv td{text-align:center; padding:var(--s-2); white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+/* **وترويسةُ الصفّ تُقرأ اسما لا رقما**: يمينَ السطر، وبحبرٍ أثقل */
+.pv tbody th[scope=row]{text-align:right; font-size:var(--t-sm); color:var(--ink);
+  font-weight:700; border-bottom:1px solid var(--line-soft)}
+.pv thead th{font-size:var(--t-xs)}
+.pv td{border-bottom:1px solid var(--line-soft); vertical-align:middle}
+/* وعمودُ المجموع يُفصَل بخيطٍ لا بلون: **اللونُ رتبةٌ، والخيطُ حدّ** */
+.pv .pv-t{border-inline-start:1px solid var(--line); font-weight:700}
+.pv .pv-f th,.pv .pv-f td{border-top:1px solid var(--line); font-weight:700;
+  border-bottom:0}
+/* وصفُّ الضبط يلتفّ ولا يُقَصّ: أربعةُ حقولٍ وزرٌّ لا تسع في الجوّال */
+.pv-form{flex-wrap:wrap; align-items:flex-end; gap:var(--s-3)}
+.pv-form .field{flex:1 1 150px; min-width:0}
+.pv-form button{flex:none}
 .nm{font-weight:600; line-height:var(--lh-tight)}
 /* «nm» تُستعمَل span وتُستعمَل فقرةً. والفقرةُ بلا قاعدةِ هامشٍ
    ترث 14px من المتصفّح — **خارجَ السلّم**، ولا تظهر في grep لأنّها
