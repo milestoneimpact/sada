@@ -734,3 +734,121 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     expect(row.total).toBe(0)
   })
 })
+
+describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => {
+  const BASE = 'https://sada2.basserh.com'
+
+  async function seedInstagram(options: { media?: 'image' | 'video' | 'none' } = {}) {
+    const accountId = await upsertAccount(db, {
+      platform: 'instagram',
+      kind: 'member',
+      externalId: '17841400000000000',
+      displayName: '@basserh',
+    })
+    await saveTokens(db, KEY, accountId, {
+      ...LIVE_TOKENS,
+      scopes: scopeSet('instagram').join(' '),
+    })
+    const postId = 'p-instagram'
+    db.raw
+      .prepare(
+        `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
+                            idempotency_key, approved_by, approved_at)
+         VALUES (?, ?, 'instagram', 'image', ?, '2026-09-08T09:00:00Z', 'queued', ?,
+                 'omar', '2026-09-07T10:00:00Z')`,
+      )
+      .run(postId, accountId, 'الحوكمةُ تسبق السرعة', `draft:src:ig:${postId}`)
+
+    const kind = options.media ?? 'image'
+    if (kind !== 'none') {
+      const mime = kind === 'video' ? 'video/mp4' : 'image/png'
+      await db
+        .prepare(
+          `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key)
+           VALUES (?, ?, ?, ?, 900, 'وصف', 'nano', ?)`,
+        )
+        .bind(crypto.randomUUID(), postId, `m/${postId}.bin`, mime, `media:${postId}:a`)
+        .run()
+    }
+    return postId
+  }
+
+  const bucket = {
+    async get() {
+      return { async arrayBuffer() { return new Uint8Array([1, 2, 3]).buffer } }
+    },
+  }
+
+  function net(): typeof fetch & { seen: string[]; bodies: string[] } {
+    const seen: string[] = []
+    const bodies: string[] = []
+    const impl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = input.toString()
+      seen.push(url)
+      if (init?.body !== undefined) bodies.push(String(init.body))
+      if (url.includes('media_publish')) return Response.json({ id: 'ig-post-1' })
+      if (url.includes('/media')) return Response.json({ id: 'container-1' })
+      return Response.json({ status_code: 'FINISHED' })
+    }) as typeof fetch & { seen: string[]; bodies: string[] }
+    impl.seen = seen
+    impl.bodies = bodies
+    return impl
+  }
+
+  it('ينشر صورةً برابطٍ موقَّعٍ لا ببايتات', async () => {
+    const postId = await seedInstagram()
+    const f = net()
+    const outcome = await publishPost(
+      { ...deps(f), bucket, baseUrl: BASE }, { postId },
+    )
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'ig-post-1' })
+    // **والرابطُ موقَّعٌ ويشير إلى نافذتنا** — لا بايتاتٍ في الجسم
+    expect(f.bodies[0]).toContain('image_url=')
+    expect(decodeURIComponent(f.bodies[0] ?? '')).toContain(`${BASE}/m/`)
+    expect(f.seen[1]).toContain('media_publish')
+  })
+
+  /** **ومقطعٌ يُرسَل REELS ويُستطلَع** — والنوعُ من `mime` لا من إعداد. */
+  it('ومقطعٌ يُرسَل REELS', async () => {
+    const postId = await seedInstagram({ media: 'video' })
+    const f = net()
+    const outcome = await publishPost(
+      { ...deps(f), bucket, baseUrl: BASE }, { postId },
+    )
+    expect(outcome.kind).toBe('published')
+    expect(f.bodies[0]).toContain('media_type=REELS')
+    expect(f.bodies[0]).toContain('video_url=')
+  })
+
+  /** **ولا منشورَ نصّيٌّ فيها** — ويُردّ قبل أن تُنادى المنصّة. */
+  it('وبلا وسيطٍ يُردّ ولا يُنادى شيء', async () => {
+    const postId = await seedInstagram({ media: 'none' })
+    const f = net()
+    const outcome = await publishPost(
+      { ...deps(f), bucket, baseUrl: BASE }, { postId },
+    )
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('لا تقبل منشورا نصّيّا')
+    expect(f.seen).toHaveLength(0)
+  })
+
+  /** **ولا يُدَّعى عطلُ منصّةٍ لنقصٍ عندنا**: يُسمّى ما نقص. */
+  it('وبلا عنوانِ موقعٍ يُقال ما نقص ولا يُنادى شيء', async () => {
+    const postId = await seedInstagram()
+    const f = net()
+    const outcome = await publishPost({ ...deps(f), bucket }, { postId })
+    expect(outcome.kind).toBe('failed')
+    if (outcome.kind === 'failed') expect(outcome.reason).toBe('instagram_needs_base_url')
+    expect(f.seen).toHaveLength(0)
+  })
+
+  it('والنداءُ يُسجَّل في الدفتر قبل أن يُعدّ ناجحا (D-008)', async () => {
+    const postId = await seedInstagram()
+    await publishPost({ ...deps(net()), bucket, baseUrl: BASE }, { postId })
+    const row = db.raw
+      .prepare("SELECT operation, total FROM cost_ledger WHERE provider = 'instagram'")
+      .get() as { operation: string; total: number }
+    expect(row.operation).toContain('price_unverified')
+    expect(row.total).toBe(0)
+  })
+})

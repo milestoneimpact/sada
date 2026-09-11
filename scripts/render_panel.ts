@@ -10,6 +10,7 @@
 import { writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
+import { pivot } from '../src/lib/pivot'
 
 const now = new Date('2026-09-05T18:00:00Z')
 
@@ -303,6 +304,31 @@ const data: PanelData = {
   // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
   // ‏اللونان والتباينُ فيهما معا
   alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
+  // الافتراضُ نفسُه — فالمقاييسُ تُقارَن بما يراه مَن لم يختر شيئا
+  dashboardTiles: 'analyses_today,spend_today,sources_analyzed,spend_30d',
+  /*
+   * **واللوحُ المحوريُّ يُقاس بجدولٍ فيه صفوف** (D-120): جدولٌ فارغٌ
+   * لا يُقاس منه ارتفاعٌ ولا تمزّقٌ ولا تباين — **والمدقّقُ يمرّ عليه
+   * فيقول «نظيف» وهو لم ير شيئا**.
+   */
+  pivot: {
+    table: pivot(
+      [
+        { platform: 'LinkedIn', account: 'شخصيّ', status: 'published', day: '2026-09-07', type: 'text', attempts: 1, succeeded: true, cost: 0.02 },
+        { platform: 'LinkedIn', account: 'الشركة', status: 'published', day: '2026-09-08', type: 'image', attempts: 2, succeeded: true, cost: 0.11 },
+        { platform: 'X', account: 'شخصيّ', status: 'failed', day: '2026-09-08', type: 'text', attempts: 3, succeeded: false, cost: 0.01 },
+        { platform: 'X', account: 'شخصيّ', status: 'published', day: '2026-09-09', type: 'text', attempts: 1, succeeded: true, cost: 0.01 },
+        { platform: 'TikTok', account: 'القناة', status: 'queued', day: '2026-09-10', type: 'document', attempts: 0, succeeded: false, cost: 0 },
+      ],
+      { rows: 'platform', cols: 'status', measure: 'count' },
+    ),
+    rows: 'platform' as const,
+    cols: 'status' as const,
+    measure: 'count' as const,
+    sinceDays: 30,
+    capped: false,
+    cap: 1500,
+  },
   outbox: [
     { kind: 'token', body: 'صدى — رمزُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
     { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },

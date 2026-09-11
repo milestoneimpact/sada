@@ -34,6 +34,7 @@ import { LOGOS } from './logos'
 
 const LABEL: Readonly<Record<Platform, string>> = {
   linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok',
+  instagram: 'Instagram',
 }
 
 function head(platform: Platform, eyebrow: string, title: string, lede: string): string {

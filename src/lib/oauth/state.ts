@@ -15,8 +15,17 @@ export interface StateStore {
   delete(key: string): Promise<void>
 }
 
+import { PLATFORM_IDS, type Platform } from './providers'
+
 export interface OAuthState {
-  readonly platform: 'linkedin' | 'x' | 'youtube' | 'tiktok'
+  /**
+   * **والمنصّةُ تُشتَقّ ولا تُكتب ثانيةً** (D-121).
+   *
+   * كانت مكتوبةً هنا اتّحادا يدويّا، **فبقيت أربعا حين صارت خمسا** —
+   * وهي علّةُ `SETTING_KEYS` في D-110 بعينها: نوعٌ في موضعٍ وقائمةٌ في
+   * موضع، فيفترقان صامتين.
+   */
+  readonly platform: Platform
   /** معرف PKCE — موجود لـ X دائما، ولـ LinkedIn أيضا لأن المسار واحد. */
   readonly verifier: string
   readonly redirectUri: string
@@ -83,8 +92,10 @@ function isOAuthState(value: unknown): value is OAuthState {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   return (
-    (v['platform'] === 'linkedin' || v['platform'] === 'x' ||
-      v['platform'] === 'youtube' || v['platform'] === 'tiktok') &&
+    // **والفحصُ من القائمة الحيّة**: منصّةٌ تُضاف غدا تدخل النوعَ
+    // والفحصَ معا، أو لا تدخل أيّهما
+    typeof v['platform'] === 'string' &&
+    (PLATFORM_IDS as readonly string[]).includes(v['platform']) &&
     typeof v['verifier'] === 'string' &&
     typeof v['redirectUri'] === 'string' &&
     typeof v['createdAt'] === 'string' &&

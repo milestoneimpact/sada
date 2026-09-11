@@ -254,6 +254,101 @@ describe('ما تعرضه اللوحة', () => {
   })
 })
 
+describe('اللوحُ المحوريّ (D-120)', () => {
+  /** منشورٌ حقيقيٌّ في القاعدة — **والجدولُ يُقرأ من الصفحة كما تُعرَض**. */
+  function seed(): void {
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+       VALUES ('a1','linkedin','member','e1','شخصيّ','active'),
+              ('a2','x','member','e2','حسابُ X','active')`,
+    )
+    db.raw.exec(
+      // **والمنشورُ يحمل موافقتَه** (D-009): قيدٌ في القاعدة يمنع
+      // «منشورٌ» بلا `approved_at` — فالبذرةُ تحترمه كما يحترمه الناشر
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at,
+                          status, idempotency_key, approved_by, approved_at)
+       VALUES ('p1','a1','linkedin','text','نصّ',datetime('now','-2 days'),
+               'published','i1','panel',datetime('now','-2 days')),
+              ('p2','a1','linkedin','text','نصّ',datetime('now','-1 days'),
+               'published','i2','panel',datetime('now','-1 days')),
+              ('p3','a2','x','text','نصّ',datetime('now','-1 days'),
+               'failed','i3',NULL,NULL),
+              -- **ومسوّدةٌ بلا حساب**: تُكتب قبل الربط، وهي أهمُّ ما ينتظر
+              ('p4',NULL,'x','text','نصّ',datetime('now'),'draft','i4',NULL,NULL)`,
+    )
+    db.raw.exec(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no,
+                                     request_json, status)
+       VALUES ('t1','p1','k1',1,'{}','succeeded'),
+              ('t2','p3','k3',1,'{}','failed')`,
+    )
+  }
+
+  it('يبني الجدولَ من القاعدة ويعرضه', async () => {
+    const cookie = await login()
+    seed()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('data-pane="pivot"')
+    expect(html).toContain('table class="pv"')
+    // صفّان: منصّتان — والاسمُ كما في القاعدة
+    expect(html).toContain('>linkedin<')
+    expect(html).toContain('>x<')
+  })
+
+  /**
+   * **ومسوّدةٌ بلا حسابٍ تدخل الجدول** — وهي التي تنتظر قرارَ المالك.
+   *
+   * وأوّلُ صياغةٍ ضمّت `accounts` ضمّا داخليّا **فأسقطتها صامتةً**:
+   * `account_id` يقبل الفراغ منذ الترحيل ‏٠٠٠٨، والمنصّةُ على الصفّ.
+   */
+  it('ومسوّدةٌ لم تُربَط بعدُ لا تسقط من الجدول', async () => {
+    const cookie = await login()
+    seed()
+    const url = '/panel?rows=status&cols=none&m=count&days=30'
+    const html = await (await app.request(url, withSession(cookie), env)).text()
+    expect(html).toContain('>draft<')
+  })
+
+  /** **والعنوانُ يحمل العرضَ**: يُنسَخ ويُرسَل ويُحفَظ في المفضّلة. */
+  it('والعنوانُ يغيّر محاورَه', async () => {
+    const cookie = await login()
+    seed()
+    const url = '/panel?rows=status&cols=none&m=success_rate&days=90'
+    const html = await (await app.request(url, withSession(cookie), env)).text()
+    expect(html).toContain('<option value="status" selected>')
+    expect(html).toContain('<option value="success_rate" selected>')
+    expect(html).toContain('<option value="90" selected>')
+    // محورٌ واحدٌ فلا عمودَ مجموع
+    expect(html).not.toContain('pv-t')
+  })
+
+  /**
+   * **وقيمةٌ لا تُعرَف تعود إلى افتراضها ولا تُسقط الصفحة.**
+   *
+   * القيمُ تأتي من الشبكة، **ومدى «‏٩٩٩٩٩ يوما» يمسح الجدولَ كلَّه** في
+   * كلّ فتحة. فالمدى قائمةُ سماحٍ لا رقمٌ يُمرَّر.
+   */
+  it('وقيمةٌ مخترَعةٌ في العنوان لا تُسقط اللوحة', async () => {
+    const cookie = await login()
+    seed()
+    const url = '/panel?rows=DROP+TABLE&cols=%27%3B--&m=؟&days=99999'
+    const response = await app.request(url, withSession(cookie), env)
+    expect(response.status).toBe(200)
+    const html = await response.text()
+    // الافتراضاتُ: منصّةٌ · بلا أعمدة · عدد · ٣٠ يوما
+    expect(html).toContain('<option value="platform" selected>')
+    expect(html).toContain('<option value="count" selected>')
+    expect(html).toContain('<option value="30" selected>')
+  })
+
+  /** وجدولٌ فارغٌ يقول لماذا — **لا «لا نتائج» وحدَها**. */
+  it('ولا منشورَ يعطي سببا لا صمتا', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('لا منشورَ في هذا المدى')
+  })
+})
+
 describe('الأزرار تغيّر القاعدة فعلا', () => {
   async function submit(cookie: string, key: string, value: string): Promise<Response> {
     const body = new FormData()
@@ -270,6 +365,59 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('موقوف مؤقتا')
     expect(html).toContain('استئناف العمل')
+  })
+
+  /*
+   * ── لوحُ المالك: من الضغطة إلى الشاشة (D-119) ─────────────────────
+   *
+   * **ولا يكفي أن يُحفَظ في القاعدة**: المقصودُ أن تتغيّر الشاشةُ التي
+   * يفتحها. فيُقرأ `/panel` بعد الحفظ ويُفحَص ما فيه ومـا **ليس** فيه.
+   */
+  async function submitTiles(cookie: string, ids: readonly string[]): Promise<Response> {
+    const body = new FormData()
+    body.set('key', 'dashboard_tiles')
+    for (const id of ids) body.append('tile', id)
+    return app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  it('اختيارُ البطاقات يغيّر صدرَ اللوحة', async () => {
+    const cookie = await login()
+    /*
+     * **ويُفحَص وسمُ البطاقة لا اسمُها.** كلُّ الأسماء الأربعةَ عشرَ
+     * مكتوبةٌ في شاشة الاختيار، **فنصٌّ موجودٌ لا يعني بطاقةً معروضة** —
+     * وأوّلُ صياغةٍ لهذا الاختبار سقطت بهذا بالذات.
+     */
+    const k = (label: string): string => `<div class="k">${label}</div>`
+    const before = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(before).toContain(k('تحليلات اليوم'))
+    expect(before).not.toContain(k('ذروةُ الإنفاق'))
+
+    expect((await submitTiles(cookie, ['drafts_waiting', 'peak_spend_day', 'live_targets'])).status)
+      .toBe(303)
+    expect((await readSettings(db)).dashboardTiles)
+      .toBe('drafts_waiting,peak_spend_day,live_targets')
+
+    const after = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(after).toContain(k('ذروةُ الإنفاق'))
+    expect(after).toContain(k('مسوّدات تنتظرك'))
+    // **وما لم يُختَر يغيب**: لوحٌ يضيف ولا يحذف ليس اختيارا
+    expect(after).not.toContain(k('تحليلات اليوم'))
+  })
+
+  /** **ومعرِّفٌ مخترَعٌ لا يُخزَّن** — قائمةُ سماحٍ لا منع، كما في D-110. */
+  it('ومعرِّفٌ لا يعرفه الكتالوجُ يُطرَح عند الحفظ', async () => {
+    const cookie = await login()
+    await submitTiles(cookie, ['drafts_waiting', 'لا_وجودَ_لها', 'live_targets'])
+    expect((await readSettings(db)).dashboardTiles).toBe('drafts_waiting,live_targets')
+  })
+
+  /** وما دون الأدنى يعود إلى الأربع — **ولا شاشةَ بيضاء**. */
+  it('وواحدةٌ وحدَها تعيد الأربعَ الأصليّة', async () => {
+    const cookie = await login()
+    await submitTiles(cookie, ['drafts_waiting'])
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<div class="k">تحليلات اليوم</div>')
+    expect(html).toContain('<div class="k">إنفاق ٣٠ يوما</div>')
   })
 
   it('السقف يُحفظ ويُقرأ', async () => {

@@ -8,6 +8,7 @@
  * في لوحةٍ يقبل ما يُكتب فيه بابٌ لخطأ إصبعٍ يكلّف مالا.
  */
 import { checkProviderUrl } from './ai/urlGuard'
+import { DEFAULT_TILES, normalizeTiles, parseTiles } from './dashboard'
 import type { Db } from './tokens'
 
 export interface Settings {
@@ -27,6 +28,12 @@ export interface Settings {
    * يفتح حسابا. **وخلطُهما يُرخِّص التشفيرَ حيث يجب ويُثقله حيث لا يلزم.**
    */
   readonly alertWebhook: string
+  /**
+   * بطاقاتُ لوح المالك بمعرِّفاتها، مفصولةً بفاصلة (D-119).
+   *
+   * **ومصفّاةٌ دائما**: ما تقرؤه هذه الوحدةُ هو ما يُعرَض حرفا بحرف.
+   */
+  readonly dashboardTiles: string
   /**
    * سقفُ الترويج الأسبوعيّ بالدولار — **ومنه وحده يأتي مبلغُ التوصية.**
    *
@@ -54,6 +61,8 @@ export const DEFAULTS: Settings = {
   imageOverlay: true,
   // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
   alertWebhook: '',
+  // والأربعُ التي كانت مكتوبةً في الشيفرة — **فلا شاشةَ فارغةً في أوّل يوم**
+  dashboardTiles: DEFAULT_TILES.join(','),
 }
 
 /** حدود ما يُقبل. الحدّ الأعلى يحرس من خطأ إصبعٍ في اللوحة. */
@@ -82,6 +91,7 @@ export const SETTING_KEYS = [
   'weekly_promo_cap_usd',
   'image_overlay',
   'alert_webhook',
+  'dashboard_tiles',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -124,6 +134,9 @@ export async function readSettings(db: Db): Promise<Settings> {
     imageOverlay: map.get('image_overlay') !== 'false',
     // ‏وعنوانٌ فاسدٌ يُقرأ فارغا: قناةٌ لا تعمل خيرٌ من نداءٍ إلى مجهول
     alertWebhook: map.get('alert_webhook') ?? '',
+    // **والاختيارُ يُصفَّى عند القراءة كما يُصفَّى عند الكتابة** (D-119):
+    // معرِّفٌ زال من الكتالوج يُتخطّى، وفراغٌ يعود إلى الافتراض
+    dashboardTiles: parseTiles(map.get('dashboard_tiles')).join(','),
     dailyAnalysisCap: toNumber(map.get('daily_analysis_cap'), DEFAULTS.dailyAnalysisCap, 'dailyAnalysisCap'),
     dailySpendCapUsd: toNumber(map.get('daily_spend_cap_usd'), DEFAULTS.dailySpendCapUsd, 'dailySpendCapUsd'),
     weeklyPromoCapUsd: toNumber(
@@ -164,6 +177,14 @@ export async function writeSetting(
       const verdict = checkProviderUrl(trimmed)
       stored = verdict.ok ? verdict.url : ''
     }
+  } else if (key === 'dashboard_tiles') {
+    /*
+     * **ويُصفَّى بقواعد القراءة نفسِها** (D-119).
+     *
+     * فلا يُخزَّن معرِّفٌ لا يُقرأ، ولا يُخزَّن سبعةٌ ليُقرأ منها ستّ.
+     * **وحقلٌ يقبل ما لا يَعرض يُري المالكَ أنّه حفظ ما لم يُحفَظ.**
+     */
+    stored = normalizeTiles(raw)
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
   } else {

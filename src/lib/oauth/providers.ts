@@ -9,7 +9,7 @@
  * دورة OAuth حقيقية هي التي تؤكدها، والمهمة M-04 تطلب التحقق منها.
  */
 
-import { scopeSet } from './scopes'
+import { INSTAGRAM_VIA_PAGE as INSTAGRAM_VIA_PAGE_SCOPES, scopeSet } from './scopes'
 
 /**
  * ما يُربَط. **أربعٌ**، واثنتان منها تنشران.
@@ -18,17 +18,29 @@ import { scopeSet } from './scopes'
  * `CHECK (platform IN (…))` في `posts`، **فالمترجمُ يمنع كتابةَ مسوّدةٍ
  * لمنصّةٍ لا تنشر قبل أن تمنعها القاعدة**.
  */
-export type Platform = 'linkedin' | 'x' | 'youtube' | 'tiktok'
+/**
+ * معرِّفاتُ المنصّات — **قائمةٌ حيّةٌ يُشتَقّ منها النوع**.
+ *
+ * والنوعُ يُمحى عند البناء، **والفحصُ يقع في التشغيل**. فمن كتب الاتّحادَ
+ * يدا في `state.ts` بقي عنده أربعٌ حين صارت خمسا (D-121) — وهي علّةُ
+ * `SETTING_KEYS` بعينها (D-110). **فمنصّةٌ تُضاف تدخل الاثنين معا أو لا
+ * تدخل أيّهما.**
+ */
+export const PLATFORM_IDS = ['linkedin', 'x', 'youtube', 'tiktok', 'instagram'] as const
+
+export type Platform = (typeof PLATFORM_IDS)[number]
 
 /** ما بُني له سائقُ نشرٍ فعلا — ويقابل قيدَ `posts.platform`. */
 /**
  * ما تنشر اليوم — **ويُوسَّع مع سائقه لا قبله** (D-092).
  *
  * TikTok تنشر بالصندوق (`video.upload`) بلا انتظار إجازة، وبالنشر
- * المباشر (`video.publish`) بعدها. و YouTube و Instagram تُربطان ولا
- * تنشران بعد — **والفرقُ في النوع وفي قيد القاعدة معا** (0019).
+ * المباشر (`video.publish`) بعدها. و YouTube ترفع خاصّا فينشره المالك.
+ *
+ * **وInstagram دخلت في 0022** بسائقها: حاويةٌ ثمّ نشر. **ولا منشورَ
+ * نصّيٌّ فيها** — وذلك يُحرَس في السائق، والقاعدةُ تحرس الوجهةَ لا الشكل.
  */
-export type PublishPlatform = 'linkedin' | 'x' | 'tiktok' | 'youtube'
+export type PublishPlatform = 'linkedin' | 'x' | 'tiktok' | 'youtube' | 'instagram'
 
 export interface Provider {
   readonly platform: Platform
@@ -169,11 +181,68 @@ export const TIKTOK: Provider = {
   clientIdParam: 'client_key',
 }
 
+/**
+ * Instagram — **Instagram Business Login**، وهو الطريقُ الأقصر.
+ *
+ * ## والنشرُ خطوتان لا واحدة
+ *
+ * `POST /media` يُنشئ **حاويةً** بعنوان الوسيط ونصِّه، ثمّ
+ * `POST /media_publish` ينشرها بمعرِّف الحاوية. **والوسيطُ يُسحَب من
+ * عنوانٍ عامّ** — لا يُدفَع بايتاتٍ كما في X.
+ *
+ * **ولا منشورَ نصّيٌّ في Instagram**: صورةٌ أو مقطع. وذلك يُحرَس في
+ * السائق، **والقاعدةُ تحرس الوجهةَ لا الشكل**.
+ *
+ * ## وحسابٌ احترافيٌّ شرطٌ لا تفصيل
+ *
+ * حسابٌ شخصيٌّ لا يفتح هذه النهاياتِ أصلا — **والردُّ حينئذٍ ‏٤٠٠ لا
+ * ‏٤٠٣**، فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ».
+ */
+export const INSTAGRAM: Provider = {
+  platform: 'instagram',
+  authorizeUrl: 'https://www.instagram.com/oauth/authorize',
+  tokenUrl: 'https://api.instagram.com/oauth/access_token',
+  identityUrl: 'https://graph.instagram.com/v21.0/me?fields=id,username',
+  postUrl: 'https://graph.instagram.com/v21.0/me/media_publish',
+  uploadUrl: 'https://graph.instagram.com/v21.0/me/media',
+  scopes: scopeSet('instagram'),
+  clientAuth: 'body',
+  pkce: false,
+  extraHeaders: {},
+  clientIdParam: 'client_id',
+}
+
+/**
+ * والطريقُ الثاني — **Facebook Login for Business**، عبر صفحة.
+ *
+ * **ولا يدخل `PROVIDERS`**: المنصّةُ في القاعدة واحدةٌ (`instagram`)،
+ * وهذا اختلافُ إذنٍ لا اختلافُ وجهة. فيُختار عند الربط، **ولو دخل
+ * الجدولَ لانقسم كلُّ تقريرٍ على منصّةٍ واحدة**.
+ *
+ * ويوجب صفحةً مربوطةً بالحساب، **ومراجعةَ تطبيقٍ أطول** — ويعطي
+ * إحصاءاتٍ أوسعَ وإدارةَ تعليقات.
+ */
+export const INSTAGRAM_VIA_PAGE: Provider = {
+  platform: 'instagram',
+  authorizeUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
+  tokenUrl: 'https://graph.facebook.com/v21.0/oauth/access_token',
+  identityUrl: 'https://graph.facebook.com/v21.0/me/accounts'
+    + '?fields=instagram_business_account{id,username},name',
+  postUrl: 'https://graph.facebook.com/v21.0/me/media_publish',
+  uploadUrl: 'https://graph.facebook.com/v21.0/me/media',
+  scopes: INSTAGRAM_VIA_PAGE_SCOPES.map((x) => x.name),
+  clientAuth: 'body',
+  pkce: false,
+  extraHeaders: {},
+  clientIdParam: 'client_id',
+}
+
 export const PROVIDERS: Readonly<Record<Platform, Provider>> = {
   linkedin: LINKEDIN,
   x: X,
   youtube: YOUTUBE,
   tiktok: TIKTOK,
+  instagram: INSTAGRAM,
 }
 
 /**

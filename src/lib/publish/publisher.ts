@@ -23,6 +23,8 @@ import {
   publishLinkedIn, publishX, uploadLinkedInImage, uploadXMedia,
   PublishError, type PublishResult,
 } from './platforms'
+import { publishInstagram } from './instagram'
+import { mediaUrl, signMediaToken } from '../media/link'
 import { publishTikTok } from './tiktok'
 import { publishYouTube } from './youtube'
 
@@ -67,6 +69,16 @@ export interface PublisherDeps {
   readonly encKey: string
   /** يلزم للمنشورات التي تحمل صورة، ويُترك حين لا صور (D-040). */
   readonly bucket?: MediaBucket
+  /**
+   * عنوانُ الموقع — **يلزم Instagram وحدَها** (D-121).
+   *
+   * فهي لا تقبل بايتاتٍ مدفوعة: تطلب `image_url` **يفتحه خادمُها
+   * بنفسه**. ويُبنى الرابطُ موقَّعا لخمسَ عشرةَ دقيقة (`media/link.ts`).
+   *
+   * **واختياريٌّ كـ`bucket`**: مسارٌ لا ينشر على Instagram لا يحتاجه،
+   * **وحقلٌ إلزاميٌّ يُملأ بفراغٍ في نصف المواضع حقلٌ يكذب**.
+   */
+  readonly baseUrl?: string
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
 }
@@ -150,12 +162,20 @@ export async function publishPost(
        * — فيُرفَع مقطعٌ إلى نهايةِ صور، فيُردّ بخطأٍ لا يقول لماذا.
        *
        * فلكلّ منصّةٍ نوعُها: TikTok و YouTube مقطعا، والاثنتان صورة.
+       *
+       * **وInstagram تقبل الاثنين** (D-121): صورةً أو `REELS`. فنمطُها
+       * يقبل الاثنين، **والسائقُ يفرّق بينهما من `mime` لا من إعداد**.
        */
       `SELECT id, r2_key, mime, platform_media_id FROM media
         WHERE post_id = ? AND status = 'ready' AND mime LIKE ?
         ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(post.id, CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%')
+    .bind(
+      post.id,
+      post.platform === 'instagram'
+        ? '%/%'
+        : CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%',
+    )
     .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null }>()
     .catch(() => null)
 
@@ -172,6 +192,14 @@ export async function publishPost(
     return {
       kind: 'failed',
       reason: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها',
+      retryable: false,
+    }
+  }
+  // **وInstagram كذلك لا نهايةَ نصّيّةَ لها** — صورةٌ أو مقطعٌ ولا ثالث
+  if (post.platform === 'instagram' && image === null) {
+    return {
+      kind: 'failed',
+      reason: 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور',
       retryable: false,
     }
   }
@@ -295,7 +323,17 @@ export async function publishPost(
   try {
     let mediaId = image?.platform_media_id ?? null
 
-    if (image !== null && mediaId === null && !CLIP_PLATFORMS.has(post.platform)) {
+    /*
+     * **وInstagram تُستثنى من رفع البايتات** (D-121): تسحب من رابطٍ
+     * ولا تُدفَع إليها. **وبلا هذا الاستثناء تقع في فرع X**، فيُرفَع
+     * وسيطُها إلى نهايةٍ لا تخصّها ويُردّ «رفعٌ نجح بلا معرّف وسيط» —
+     * وهو ما وقع فعلا في أوّل تشغيل.
+     */
+    if (
+      image !== null && mediaId === null
+      && !CLIP_PLATFORMS.has(post.platform)
+      && post.platform !== 'instagram'
+    ) {
       const object = await deps.bucket!.get(image.r2_key)
       if (object === null) {
         // الصفُّ قائمٌ والبايتاتُ مفقودة: لا يُعالَج بإعادةٍ، ولا يُنشر
@@ -332,7 +370,48 @@ export async function publishPost(
         .run()
     }
 
-    if (CLIP_PLATFORMS.has(post.platform)) {
+    if (post.platform === 'instagram') {
+      /*
+       * **وInstagram تسحب ولا تُدفَع إليها** (D-121).
+       *
+       * فلا بايتاتٍ تُقرأ من R2 هنا: يُوقَّع رابطٌ لخمسَ عشرةَ دقيقة
+       * وتفتحه خوادمُ Meta بنفسها — وهو ما بُنيت له النافذةُ الموقّعة.
+       *
+       * **ولا منشورَ نصّيٌّ فيها**: صورةٌ أو مقطعٌ ولا ثالث. وقد رُدّ
+       * ذلك في `needsMedia` أعلاه، **ويُردّ هنا ثانيةً** لأنّ هذا
+       * الفرعَ يُنادى من غير طريق.
+       */
+      if (image === null) {
+        return { kind: 'failed', reason: 'instagram_needs_media', retryable: false }
+      }
+      if (deps.baseUrl === undefined || deps.baseUrl === '') {
+        // **ولا يُدَّعى عطلُ منصّةٍ لنقصٍ عندنا**: يُسمّى ما نقص
+        return { kind: 'failed', reason: 'instagram_needs_base_url', retryable: false }
+      }
+      const token = await signMediaToken(encKey, image.id, now())
+      await recordCost(db, {
+        provider: post.platform,
+        operation: 'instagram_publish:price_unverified',
+        units: 1,
+        unitCost: 0,
+        refId: post.id,
+      })
+      const out = await publishInstagram(
+        tokens.accessToken,
+        post.external_id,
+        {
+          kind: image.mime.startsWith('video/') ? 'video' : 'image',
+          url: mediaUrl(deps.baseUrl, token),
+        },
+        post.text,
+        fetchImpl,
+      )
+      await db
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
+        .bind(out.platformPostId, image.id)
+        .run()
+      result = out
+    } else if (CLIP_PLATFORMS.has(post.platform)) {
       /*
        * **و TikTok يرفع وينشر في نداءٍ واحد** — لا معرّفَ وسيطٍ يُحفَظ
        * بينهما. فالبايتاتُ تُقرأ هنا، والسائقُ يهيّئ ويدفع ويسأل.

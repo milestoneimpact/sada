@@ -63,7 +63,14 @@ export function estimatePostCost(platform: PublishPlatform, hasUrl: boolean): nu
    * يُسجَّل في الدفتر موسوما بـ `price_unverified` من `publisher.ts`
    * — فما وقع يُرى ولو لم يُدفَع.
    */
-  if (platform === 'tiktok' || platform === 'youtube') return 0
+  /*
+   * **وInstagram كذلك** (D-121): Graph API لا يحاسب على النشر — حصّةٌ
+   * لا فاتورة. **وقد كانت تسقط إلى سعر X** لأنّ السطرَ الأخير يردّ
+   * سعرَ X لكلّ ما لم يُسمَّ، **فتُحاسَب منصّةٌ مجّانيّةٌ بسعر منصّةٍ
+   * مدفوعة** — ودفترٌ يقول أكثرَ من الحقيقة يُفقِد الثقةَ به كما
+   * يُفقِدها الذي يقول أقلّ.
+   */
+  if (platform === 'tiktok' || platform === 'youtube' || platform === 'instagram') return 0
   return hasUrl ? X_PRICE_PER_POST_WITH_URL : X_PRICE_PER_POST
 }
 
