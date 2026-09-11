@@ -63,6 +63,37 @@ export const MEASURE_LABEL: Readonly<Record<Measure, string>> = {
 export const NO_KEY = '—'
 
 /**
+ * اسمُ المفتاح كما يُقرأ — **والمفتاحُ نفسُه لا يُعرَض** (D-123).
+ *
+ * الجدولُ يُجمَع على قيَم القاعدة: `published` و`queued` و`linkedin`.
+ * **وقيمةُ قاعدةٍ في ترويسةِ جدولٍ عربيٍّ تُقرأ عطلا لا حالا** — وهي
+ * علّةُ `TASK_LABEL` في المزوّدين (D-091) بعينها، وقعت هنا في ثلاثة
+ * أبعاد.
+ *
+ * **ولم تُرَ في عيّنة الرسم لأنّ البذرةَ كذبت**: كُتب فيها
+ * `platform: 'LinkedIn'` والقاعدةُ تحمل `linkedin` — فرُسم الجدولُ
+ * بأسماءٍ لن يراها المالك قطّ. وبذرةٌ لا تحترم قيودَ المخطّط تستر
+ * العيبَ الذي وُضعت لتكشفه (D-120).
+ *
+ * **والقاموسُ ناقصٌ عمدا**: ما ليس فيه يُعرَض بحرفه لا بـ«غير معروف» —
+ * قاعدةُ سجلّ التدقيق نفسُها. والأبعادُ الزمنيّةُ والحسابُ تُقرأ كما هي.
+ */
+const KEY_LABEL: Readonly<Partial<Record<Dimension, Readonly<Record<string, string>>>>> = {
+  platform: {
+    linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
+  },
+  status: {
+    draft: 'تنتظر قرارك', approved: 'معتمَدة', edited: 'معتمَدة بعد تعديل',
+    rejected: 'مرفوضة', queued: 'مجدولة', published: 'نُشرت', failed: 'فشل النشر',
+  },
+  type: { text: 'نصّ', image: 'صورة', document: 'مستند', thread: 'سلسلة' },
+}
+
+export function keyLabel(dim: Dimension, key: string): string {
+  return KEY_LABEL[dim]?.[key] ?? key
+}
+
+/**
  * أسبوعُ ISO — **الاثنينُ أوّلُه**.
  *
  * ولا تُستعمَل `Date` للحساب: **نصٌّ ثابتُ الطول يُقارَن نصّا**، والمناطقُ

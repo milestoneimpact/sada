@@ -249,6 +249,8 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
     -webkit-backdrop-filter:blur(14px) saturate(1.4);
     backdrop-filter:blur(14px) saturate(1.4)}
 }
+/* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
+.topbar .glyph.tb{display:none; width:30px; height:30px; border-radius:9px}
 .topbar h1{font-size:var(--t-md); font-weight:600; letter-spacing:-.1px; color:var(--ink-2)}
 .topbar .crumb{font-size:var(--t-xs); color:var(--ink-3); margin-top:1px}
 /* عنوانُ الشريط يظهر **حين يغيب عنوانُ الصفحة** لا قبله.
@@ -449,7 +451,11 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 /* الفرقُ عن الأمس: علامةٌ **ونصّ** — والسهمُ وحده لا يُقرأ بصوتٍ عالٍ */
 .delta{display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-xs); font-weight:600;
   margin-top:var(--s-2); color:var(--ink-3)}
-.delta.up{color:var(--ok)} .delta.down{color:var(--warn)}
+/* **والفرقُ مقدارٌ لا حالة** (D-123): كان الصاعدُ أخضرَ والهابطُ كهرمانا،
+   والبطاقةُ إنفاق — **فإنفاقٌ نزل يُقرأ تحذيرا وإنفاقٌ صعد يُقرأ نجاحا**،
+   وهو عكسُ ما يعنيه. وألوانُ الحالة محجوزة (D-043): السهمُ والنصُّ يقولان
+   الاتّجاه، والحبرُ يبقى حبرا. والصنفان يبقيان للاتّجاه لا للّون. */
+.delta.up,.delta.down{color:var(--ink-2)}
 .delta .ar{font-size:var(--t-xs); line-height:var(--lh-tight)}
 
 /* ══ الجداول ═════════════════════════════════════════════════ */
@@ -613,6 +619,20 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 .todo .dot.warn{background:var(--warn)} .todo .dot.bad{background:var(--bad)}
 .todo .dot.ok{background:var(--ok)}
 .todo a,.todo form{margin-inline-start:auto}
+
+/* ── صفٌّ عاجلٌ في «ما عليك» (D-123) ────────────────────────────────
+   مهمّةٌ توقف بوّابةَ مرحلةٍ ولم تتمّ. **وكان الصنفُ يُكتب في الوسم ولا
+   قاعدةَ له** — فيُقرأ في المصدر مميَّزا ويُرسَم كسائر الصفوف. والغسلُ
+   خافتٌ لأنّ الحالَ تقولها شارةُ «بوّابة» الحمراء بنصّها (D-043)؛ الأرضُ
+   تُعين العينَ على المسح ولا تحمل المعنى وحدَها. */
+tr.urgent td{background:color-mix(in srgb,var(--bad) 5%,transparent)}
+/* ── قائمةٌ بلا زينة (D-123) ──────────────────────────────────────────
+   ملحوظاتُ المراجعة وما خرج من التوزيع: **بنودٌ تُقرأ لا نقاطٌ تُعدّ**.
+   وكان الصنفُ بلا قاعدة، فيرث نقطةَ المتصفّح وحشوَه — والحشوُ ‏٤٠px
+   خارجَ السلّم. */
+ul.plain{list-style:none; margin:0; padding:0}
+ul.plain li{margin:0 0 var(--s-2); font-size:var(--t-sm); line-height:var(--lh)}
+ul.plain li:last-child{margin-bottom:0}
 
 /* ── الرسم ─────────────────────────────────────────────────── */
 .chart{margin-top:var(--s-1)}
@@ -1228,6 +1248,13 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   .rail{position:fixed; inset:auto 0 0; z-index:40; height:auto; border:0;
     border-top:1px solid var(--line-strong); box-shadow:var(--sh-2)}
   .rail-head{display:none}
+  .topbar .glyph.tb{display:grid}
+  /* **واسمُ المزوّد يأخذ السطرَ كلَّه**: قِيس عند ‏٣٩٠px فوُجد ‏٢٠px
+     عرضا — «flex:1» بجانب عمودين ثابتَي العرض تركت له ما بقي، وما بقي لا
+     يسع حرفا، فالتفّ الاسمُ حرفا حرفا فوق أخيه (D-123).
+     **وموضعُها هنا لا في كتلة ‏٧٢٠ الأولى**: قاعدةُ الصفّ الأصليّة تأتي
+     بعد تلك الكتلة فتدهسها بتساوي المحدّد — جُرّبت هناك فبقي ‏٢٠px. */
+  .prow .pn{flex:1 1 100%}
   /* والحشوُ السفليُّ يحترم شريطَ الجهاز: قضيبُ الإيماء يبتلع صفّا كاملا */
   nav.tabs{padding:var(--s-1) var(--s-1) calc(var(--s-1) + env(safe-area-inset-bottom, 0px));
     overflow:visible; gap:0; justify-content:space-around}

@@ -87,7 +87,7 @@ function gateCard(g: Gate): string {
   const items = g.items
     .map((i) => {
       const mark = ITEM_MARK[i.state]
-      return `<li class="wz ${mark.cls}">
+      return `<li class="${mark.cls}">
         <span class="body">
           <span class="what">${bold(i.text)}</span>
           <span class="why">${escapeHtml(i.evidence)}</span>

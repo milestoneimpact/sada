@@ -806,7 +806,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
       <div class="card">
         ${passkey}
         <form method="POST" action="/panel/login">
-          <div class="field"><label for="t">ADMIN_TOKEN</label>
+          <div class="field"><label for="t">رمزُ الإدارة <span class="mono">ADMIN_TOKEN</span></label>
             <input id="t" type="password" name="token" autocomplete="current-password"
                    required autofocus${disabled}></div>
           <button class="p" type="submit"${disabled}>دخول</button>
@@ -1416,6 +1416,13 @@ export function panelPage(d: PanelData): string {
 
 <div class="main">
 <header class="topbar">
+  ${/*
+    * **والعلامةُ حاضرةٌ في كلّ عرض** (D-123). رأسُ الرافدة يختفي في
+    * الجوّال (D-107) فلم يبقَ في الشاشة ما يقول «هذه صدى» — ثلاثون
+    * بكسلا في شريطٍ ارتفاعُه ستّون لا تُشترى بشيء. وفي المكتب تُخفى:
+    * علامتان في شاشةٍ واحدة تكرار.
+    */''}
+  <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
   <div class="ttl"><h1 id="pane-title">نظرة عامّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>

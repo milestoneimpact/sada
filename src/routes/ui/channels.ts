@@ -73,7 +73,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
   const rows = w.steps
     .map((step) => {
       const mark = STEP_MARK[step.state]
-      return `<li class="wz ${mark.cls}${step.state === 'now' ? ' at' : ''}">
+      return `<li class="${mark.cls}${step.state === 'now' ? ' at' : ''}">
         <span class="n" aria-hidden="true">${step.n}</span>
         <span class="body">
           <span class="what">${escapeHtml(step.title)}</span>

@@ -290,9 +290,11 @@ describe('اللوحُ المحوريّ (D-120)', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('data-pane="pivot"')
     expect(html).toContain('table class="pv"')
-    // صفّان: منصّتان — والاسمُ كما في القاعدة
-    expect(html).toContain('>linkedin<')
-    expect(html).toContain('>x<')
+    // صفّان: منصّتان — **والاسمُ كما يُقرأ لا كما في القاعدة** (D-123):
+    // كان الاختبارُ يثبّت `linkedin` خاما، فثبّت العيبَ الذي كان يجب أن يمسكه
+    expect(html).toContain('<th scope="row">LinkedIn</th>')
+    expect(html).toContain('<th scope="row">X</th>')
+    expect(html).not.toContain('>linkedin<')
   })
 
   /**
@@ -306,7 +308,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
     seed()
     const url = '/panel?rows=status&cols=none&m=count&days=30'
     const html = await (await app.request(url, withSession(cookie), env)).text()
-    expect(html).toContain('>draft<')
+    expect(html).toContain('<th scope="row">تنتظر قرارك</th>')
   })
 
   /** **والعنوانُ يحمل العرضَ**: يُنسَخ ويُرسَل ويُحفَظ في المفضّلة. */

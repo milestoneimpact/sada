@@ -445,7 +445,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
   const routing = d.routing.map((r) => `<tr>
       <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
           <div class="sub">${escapeHtml(r.why)}</div></td>
-      <td>
+      <td data-label="المزوّد والنموذج">
         <form class="row" method="POST" action="/panel/routes" style="gap:var(--s-2)">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
           <select name="provider" class="mp-provider" style="width:130px">${providerOptions(r.provider)}</select>
@@ -459,7 +459,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <button class="g sm" type="submit">حفظ</button>
         </form>
       </td>
-      <td>${r.ready
+      <td data-label="الحال">${r.ready
         ? '<span class="st ok"><span class="g">●</span>جاهز</span>'
         : r.implemented
           ? '<span class="st bad"><span class="g">✕</span>مزوّده غير جاهز</span>'
