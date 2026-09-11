@@ -11,7 +11,7 @@
  */
 import { escapeHtml } from '../shell'
 import {
-  cellText, DIMENSION_LABEL, DIMENSIONS, MEASURE_LABEL, MEASURES,
+  cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
   type Dimension, type Measure, type PivotTable,
 } from '../../../lib/pivot'
 
@@ -66,14 +66,21 @@ export function pivotPane(d: PivotView): string {
   const max = Math.max(0, ...t.cells.flat().map((v) => v ?? 0))
   const twoAxis = d.cols !== null
 
-  const head = `<tr><th class="pv-h">${escapeHtml(DIMENSION_LABEL[d.rows])}</th>${
+  /*
+   * **والترويسةُ تُقرأ اسما لا مفتاحا** (D-123): `keyLabel` تقلب
+   * `published` إلى «نُشرت» — والمفتاحُ يبقى في الحساب كما هو.
+   * و`scope="col"` لقارئ الشاشة: يقرأ العمودَ مع كلّ خليّةٍ تحته.
+   */
+  const head = `<tr><th scope="col">${escapeHtml(DIMENSION_LABEL[d.rows])}</th>${
     t.colKeys.map((c) =>
-      `<th>${c === '' ? escapeHtml(MEASURE_LABEL[d.measure]) : escapeHtml(c)}</th>`).join('')
-  }${twoAxis ? '<th class="pv-t">الكلّ</th>' : ''}</tr>`
+      `<th scope="col">${c === '' || d.cols === null
+        ? escapeHtml(MEASURE_LABEL[d.measure])
+        : escapeHtml(keyLabel(d.cols, c))}</th>`).join('')
+  }${twoAxis ? '<th scope="col" class="pv-t">الكلّ</th>' : ''}</tr>`
 
   const body = t.rowKeys.map((r, i) => {
     const cells = t.cells[i] ?? []
-    return `<tr><th scope="row">${escapeHtml(r)}</th>${
+    return `<tr><th scope="row">${escapeHtml(keyLabel(d.rows, r))}</th>${
       cells.map((v) => `<td${heat(v, max)}>${escapeHtml(cellText(v, d.measure))}</td>`).join('')
     }${twoAxis ? `<td class="pv-t">${escapeHtml(cellText(t.rowTotals[i] ?? null, d.measure))}</td>` : ''}</tr>`
   }).join('')

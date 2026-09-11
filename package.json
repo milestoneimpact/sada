@@ -8,7 +8,7 @@
     "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "npm run typecheck && npm run contrast && npm run tokens && npm run dead && npm run columns && npm run test",
+    "ci": "npm run typecheck && npm run contrast && npm run tokens && npm run classes && npm run dead && npm run columns && npm run test",
     "dev": "wrangler dev --env staging",
     "migrate:staging": "wrangler d1 migrations apply sada-staging --env staging --remote",
     "migrate:production": "wrangler d1 migrations apply sada --env production --remote",
@@ -19,6 +19,7 @@
     "audit": "npm run render && node scripts/audit_design.mjs /tmp/panel.html /tmp/panel-first.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-refused.html /tmp/privacy.html && node scripts/audit_scale.mjs /tmp/panel.html /tmp/panel-first.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-refused.html /tmp/privacy.html && npm run mobile",
     "dead": "node scripts/audit_dead.mjs",
     "tokens": "node scripts/audit_tokens.mjs",
+    "classes": "node scripts/audit_classes.mjs",
     "columns": "node scripts/audit_columns.mjs",
     "mobile": "node scripts/audit_mobile.mjs /tmp/panel.html /tmp/panel-first.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-refused.html /tmp/privacy.html",
     "fonts": "node scripts/embed_ui_font.mjs"

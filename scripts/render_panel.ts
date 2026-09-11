@@ -312,13 +312,15 @@ const data: PanelData = {
    * فيقول «نظيف» وهو لم ير شيئا**.
    */
   pivot: {
+    // **والبذرةُ تحمل مفاتيحَ القاعدة لا أسماءَ العرض** (D-123): كانت
+    // `'LinkedIn'` فرُسم الجدولُ بأسماءٍ لن يراها المالك، وستر العيبَ
     table: pivot(
       [
-        { platform: 'LinkedIn', account: 'شخصيّ', status: 'published', day: '2026-09-07', type: 'text', attempts: 1, succeeded: true, cost: 0.02 },
-        { platform: 'LinkedIn', account: 'الشركة', status: 'published', day: '2026-09-08', type: 'image', attempts: 2, succeeded: true, cost: 0.11 },
-        { platform: 'X', account: 'شخصيّ', status: 'failed', day: '2026-09-08', type: 'text', attempts: 3, succeeded: false, cost: 0.01 },
-        { platform: 'X', account: 'شخصيّ', status: 'published', day: '2026-09-09', type: 'text', attempts: 1, succeeded: true, cost: 0.01 },
-        { platform: 'TikTok', account: 'القناة', status: 'queued', day: '2026-09-10', type: 'document', attempts: 0, succeeded: false, cost: 0 },
+        { platform: 'linkedin', account: 'شخصيّ', status: 'published', day: '2026-09-07', type: 'text', attempts: 1, succeeded: true, cost: 0.02 },
+        { platform: 'linkedin', account: 'الشركة', status: 'published', day: '2026-09-08', type: 'image', attempts: 2, succeeded: true, cost: 0.11 },
+        { platform: 'x', account: 'شخصيّ', status: 'failed', day: '2026-09-08', type: 'text', attempts: 3, succeeded: false, cost: 0.01 },
+        { platform: 'x', account: 'شخصيّ', status: 'published', day: '2026-09-09', type: 'text', attempts: 1, succeeded: true, cost: 0.01 },
+        { platform: 'tiktok', account: 'القناة', status: 'queued', day: '2026-09-10', type: 'document', attempts: 0, succeeded: false, cost: 0 },
       ],
       { rows: 'platform', cols: 'status', measure: 'count' },
     ),

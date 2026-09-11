@@ -162,8 +162,14 @@ function suggestionCard(s: OpenSuggestion): string {
       <span class="v">${escapeHtml(s.reason)}</span></div>
     <form method="post" action="/panel/report/promote" class="row">
       <input type="hidden" name="post_id" value="${escapeHtml(s.postId)}">
-      <button type="submit" name="decision" value="accepted">أقبل</button>
-      <button type="submit" name="decision" value="rejected" class="ghost">أرفض</button>
+      ${/*
+        * **وزرّان بلا درجة ليسا زرّين** (D-123). كان الأوّلُ بلا صنفٍ والثاني
+        * `ghost` — **وصنفٌ لا قاعدةَ له في الورقة**: فرُسما بلا أرضيّةٍ ولا
+        * حدٍّ، لا يُعرَف أيُّهما الأوّليّ. والقبولُ أوّليٌّ لأنّه ما يُنتظَر،
+        * والرفضُ ثانويٌّ — **ولا أحمرَ عليه**: رفضُ توصيةٍ رأيٌ لا خطر.
+        */''}
+      <button type="submit" name="decision" value="accepted" class="p">أقبل</button>
+      <button type="submit" name="decision" value="rejected" class="g">أرفض</button>
       <span class="grow"></span>
       <span class="ago">وقبولُك <b>تسجيلُ رأيٍ لا أمرُ إنفاق</b> — لا مسارَ
         إعلاناتٍ في صدى أصلا (D-006).</span>

@@ -27,11 +27,14 @@ import { escapeHtml } from '../shell'
 import { whenTag } from '../time'
 import type { Peaks } from '../../../lib/schedule/peak'
 import { relativeTime } from '../../../lib/format'
-
-const MARK: Readonly<Record<string, string>> = {
-  linkedin: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM10 9h3.8v1.7h.05c.53-1 1.83-2.05 3.76-2.05C21.4 8.65 22 11 22 14.2V21h-4v-6c0-1.43-.03-3.27-2-3.27-2 0-2.3 1.56-2.3 3.17V21h-4z"/></svg>',
-  x: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 3h3.1l-6.8 7.8L21.8 21h-6.2l-4.9-6.4L5.1 21H2l7.3-8.3L2.5 3h6.3l4.4 5.8zm-1.1 16.1h1.7L7.7 4.8H5.9z"/></svg>',
-}
+/*
+ * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
+ *
+ * كان هنا قاموسُ `MARK` بشعارَي LinkedIn وX **منسوخَين حرفا من
+ * `logos.ts`** — نسخةٌ ثانيةٌ تفترق عن الأولى عند أوّل تصحيح، ولا تعرف
+ * منصّةً تُضاف بعدهما: مسوّدةُ TikTok أو YouTube كانت تُرسَم بلا شعار.
+ */
+import { LOGOS } from '../logos'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -473,7 +476,7 @@ function card(
                aria-label="حدّد هذه المسوّدة للاعتماد الجماعيّ">
            </label>`
         : ''}
-      <div class="ch-logo sm">${MARK[d.platform] ?? ''}</div>
+      <div class="ch-logo sm">${LOGOS[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}
         <span class="ago">منذ ${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
       <span class="grow"></span>
@@ -668,7 +671,7 @@ function spreadBar(input: DraftsInput): string {
   ).length
   if (ready < 2) return ''
 
-  return `<form class="card spread-bar" method="POST" action="/panel/drafts/spread">
+  return `<form class="card" method="POST" action="/panel/drafts/spread">
     <div class="card-head"><h2>وزّع المعتمَد</h2>
       <div class="grow"></div>
       <span class="st ok"><span class="g">●</span>${ready} جاهزةً للتوزيع</span></div>

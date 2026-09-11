@@ -240,7 +240,7 @@ export function searchKey(c: Command): string {
 export function commandTrigger(): string {
   return `<button type="button" class="cmdk-open" hidden
     aria-haspopup="dialog" aria-controls="cmdk">
-    ${ICON.overview}<span>بحثٌ وأوامر</span><kbd class="kbd">⌘K</kbd></button>`
+    ${ICON.search}<span>بحثٌ وأوامر</span><kbd class="kbd">⌘K</kbd></button>`
 }
 
 /**
@@ -254,7 +254,7 @@ export function commandTrigger(): string {
 export function commandMore(): string {
   return `<button type="button" class="cmdk-open more" hidden
     aria-haspopup="dialog" aria-controls="cmdk">
-    ${ICON.add}<span>المزيد</span></button>`
+    ${ICON.more}<span>المزيد</span></button>`
 }
 
 /**
