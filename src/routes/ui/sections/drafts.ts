@@ -536,6 +536,13 @@ export interface DraftsInput {
    * الاقتراحُ بلا أن يعلم أحد. **وخريطةٌ فارغةٌ تُكتب صراحةً قرارٌ يُقرأ.**
    */
   readonly peaks: Readonly<Record<string, Peaks>>
+  /**
+   * مزوّدو الذكاء الجاهزون — **للمقارنة على المهمّة الواحدة** (D-125).
+   *
+   * **وفارغةٌ تعني «لا خيار»**: يُكتب بالتوجيه المحفوظ وحدَه، ولا
+   * تُعرَض قائمةٌ من سطرٍ واحدٍ توهم بخيارٍ لا وجودَ له.
+   */
+  readonly writers: readonly { readonly name: string; readonly label: string }[]
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -565,9 +572,20 @@ export function draftsSection(input: DraftsInput): string {
                      spec.hardLimit} محرفا</option>`,
                )
                .join('')}</select></div>
+           ${input.writers.length < 2 ? '' : `<div class="field">
+             <label for="dw-pv">بأيّ مزوّد</label>
+             <select id="dw-pv" name="provider">
+               <option value="">المحفوظ في التوجيه</option>
+               ${input.writers.map((w) =>
+                 `<option value="${escapeHtml(w.name)}">${escapeHtml(w.label)}</option>`).join('')}
+             </select></div>`}
            <div class="grow"></div>
            <button class="p" type="submit"${input.ready ? '' : ' disabled'}>اكتب مسوّدة</button>
          </form>
+         ${input.writers.length < 2 ? '' : `<p class="hint" style="margin:var(--s-2) 0 0">
+           <b>واكتبها بمزوّدين لتقارن.</b> لكلّ مزوّدٍ نسخةٌ واحدةٌ من هذه
+           النسخة — والثانيةُ بالمزوّد نفسِه لا تُنفِق شيئا. وتظهر النسختان
+           في القائمة بكلفتَيهما.</p>`}
          ${input.ready
            ? ''
            : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`

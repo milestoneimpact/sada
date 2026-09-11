@@ -224,6 +224,48 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
     await draftPost(deps(net()), id, 'linkedin')
     expect(draftKey(id, 'linkedin', 'md5:abc')).not.toBe(draftKey(id, 'linkedin', 'md5:xyz'))
   })
+
+  /*
+   * ── المقارنةُ بين مزوّدين (D-125) ─────────────────────────────────
+   *
+   * **ولا تفتح بابَ إنفاقٍ متكرّر**: كتابةٌ واحدةٌ لكلّ مزوّد، والثانيةُ
+   * بالمزوّد نفسِه تُردّ كما تُردّ اليوم.
+   */
+  it('والمفتاحُ بلا مزوّدٍ يبقى كما كان حرفا', () => {
+    // **وهذا ما يحفظ كلَّ ما كُتب قبل اليوم**: مفتاحٌ يتبدّل يعيد الكتابة
+    expect(draftKey('s1', 'linkedin', 'h')).toBe('draft:s1:linkedin:h')
+    expect(draftKey('s1', 'linkedin', 'h', '')).toBe('draft:s1:linkedin:h')
+  })
+
+  it('ومزوّدان يعطيان مفتاحين — والمزوّدُ نفسُه مفتاحا واحدا', () => {
+    const a = draftKey('s1', 'linkedin', 'h', 'anthropic')
+    const b = draftKey('s1', 'linkedin', 'h', 'deepseek')
+    expect(a).not.toBe(b)
+    expect(draftKey('s1', 'linkedin', 'h', 'deepseek')).toBe(b)
+    // ولا يخلط أحدُهما بالافتراض
+    expect(a).not.toBe(draftKey('s1', 'linkedin', 'h'))
+  })
+
+  it('ونسخةٌ ثانيةٌ بمزوّدٍ آخر تُكتب، وبالمزوّد نفسِه تُردّ', async () => {
+    const id = await seed()
+    const first = await draftPost(deps(net()), id, 'linkedin', { provider: 'anthropic' })
+    expect(first.kind).toBe('drafted')
+
+    // **والثانيةُ بالمزوّد نفسِه لا تُنفِق** — وهو حارسُ التكرار
+    const again = await draftPost(deps(net()), id, 'linkedin', { provider: 'anthropic' })
+    expect(again.kind).toBe('already')
+    expect(await ledger()).toHaveLength(1)
+  })
+
+  /** **ولا يُبدَّل التوجيهُ المحفوظ**: هذه مقارنةٌ لا تبديل. */
+  it('ولا يمسّ التجاوزُ توجيهَ المالك', async () => {
+    const id = await seed()
+    await draftPost(deps(net()), id, 'linkedin', { provider: 'anthropic' })
+    const saved = db.raw
+      .prepare("SELECT count(*) AS n FROM task_routes WHERE task = 'draft'")
+      .get() as { n: number }
+    expect(saved.n).toBe(0)
+  })
 })
 
 describe('الحارس قبل النداء', () => {

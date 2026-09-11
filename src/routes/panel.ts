@@ -482,6 +482,16 @@ panel.get('/panel', async (c) => {
           r.task === 'draft' &&
           providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       ),
+      /*
+       * **ومن يكتب هو من ضُبط مفتاحُه** (D-125) — لا من وُجد صفُّه.
+       *
+       * فالصفُّ يوجد للمدمَجين كلِّهم منذ `0005`، **وعرضُ مزوّدٍ بلا
+       * مفتاحٍ في قائمةِ اختيارٍ يَعِد بكتابةٍ تنتهي إلى «لا مفتاح لـ…»**
+       * — وهي ضغطةٌ ضاعت وثقةٌ نقصت.
+       */
+      writers: providerCards
+        .filter((p) => p.configured && p.enabled)
+        .map((p) => ({ name: p.name, label: p.label })),
       peaks,
       alertWebhook: allowance.settings.alertWebhook,
       dashboardTiles: allowance.settings.dashboardTiles,
@@ -1611,20 +1621,40 @@ panel.post('/panel/drafts/write', async (c) => {
   }
   const platform = raw as Platform
 
+  /*
+   * **ومزوّدٌ يُختار لهذه الكتابة وحدَها** (D-125).
+   *
+   * **وقائمةُ سماحٍ لا نصٌّ يُمرَّر**: الاسمُ يُطابَق على مزوّدٍ قائمٍ في
+   * القاعدة، فاسمٌ مخترَعٌ يُتجاهَل ويعود التوجيهُ المحفوظ — **ولا يُفتَح
+   * بابُ إنفاقٍ باسمٍ يكتبه من يرسل النموذج**.
+   */
+  const wanted = String(form.get('provider') ?? '').trim()
+  const override = wanted === '' || (await getProvider(c.env.DB, wanted)) === null
+    ? undefined
+    : { provider: wanted }
+
   const outcome = await draftPost(
     { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
     id,
     platform,
+    override,
   )
 
   const flash: PanelFlash =
     outcome.kind === 'drafted'
       ? {
           kind: 'ok',
-          text: `كُتبت مسوّدة ${platform === 'x' ? 'X' : 'LinkedIn'} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+          text: `كُتبت مسوّدة ${platform === 'x' ? 'X' : 'LinkedIn'}${
+            override === undefined ? '' : ` بـ${override.provider}`
+          } — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
         }
       : outcome.kind === 'already'
-        ? { kind: 'ok', text: 'سُوّدت هذه النسخةُ لهذه المنصّة — لم يُنفَق شيء.' }
+        ? {
+            kind: 'ok',
+            text: override === undefined
+              ? 'سُوّدت هذه النسخةُ لهذه المنصّة — لم يُنفَق شيء.'
+              : `سُوّدت هذه النسخةُ بـ${override.provider} — لم يُنفَق شيء.`,
+          }
         : outcome.kind === 'blocked'
           ? { kind: 'warn', text: outcome.reason }
           : outcome.kind === 'not_analyzed'

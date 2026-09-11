@@ -257,6 +257,11 @@ const data: PanelData = {
     { id: 's2', name: 'مراجعة المحفظة — الربع الثالث.pdf' },
   ],
   draftReady: true,
+  // المضبوطان في `providers` أعلاه — وGemini بلا مفتاحٍ فلا يُعرض خيارا
+  writers: [
+    { name: 'anthropic', label: 'Anthropic' },
+    { name: 'deepseek', label: 'DeepSeek' },
+  ],
   flash: { kind: 'ok', text: 'تمّ المسح — رأى 3 · جديد 1. مصدرٌ واحد ينتظر تحليلا.' },
   now,
   csrf: 'demo-csrf-token',

@@ -937,6 +937,13 @@ export interface PanelData {
   readonly writableSources: readonly { id: string; name: string }[]
   /** أمزوّدُ مهمّة `draft` مضبوطٌ ومفعَّل؟ */
   readonly draftReady: boolean
+  /**
+   * المزوّدون الجاهزون للكتابة — **للمقارنة على النسخة الواحدة** (D-125).
+   *
+   * وهم الذين ضُبط مفتاحُهم وفُعِّلوا، **لا كلُّ من له صفّ**: قائمةٌ
+   * تعرض مزوّدا بلا مفتاحٍ تَعِد بكتابةٍ تنتهي إلى «لا مفتاح لـ…».
+   */
+  readonly writers: readonly { readonly name: string; readonly label: string }[]
   readonly flash: PanelFlash | null
   readonly now: Date
   /** رمز CSRF لهذه الجلسة — يُحقن في كلّ نموذج. */
@@ -1530,6 +1537,7 @@ ${pivotPane(d.pivot)}
     now: d.now,
     ready: d.draftReady,
     peaks: d.peaks ?? {},
+    writers: d.writers,
   })}
 </section>
 

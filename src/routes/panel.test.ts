@@ -1454,6 +1454,43 @@ describe('الكتابة من اللوحة', () => {
     expect(ledger.results).toHaveLength(0)
   })
 
+  /**
+   * **واسمُ المزوّد يُطابَق لا يُمرَّر** (D-125).
+   *
+   * حقلٌ في نموذجٍ يرسله المتصفّح، **فمن مرّره كما هو فتح بابا لينفق
+   * باسمٍ يخترعه المرسِل**. والدليلُ أنّ المخترَعَ سقط: الرسالةُ تتكلّم
+   * عن مفتاح المزوّد المحفوظ لا عن «مزوّدٌ غير موجود: ghost».
+   */
+  it('مزوّدٌ مخترَعٌ يُتجاهَل — ويعود التوجيهُ المحفوظ', async () => {
+    const id = await seedAnalyzed()
+    const cookie = await login()
+    const body = new FormData()
+    body.set('id', id)
+    body.set('platform', 'linkedin')
+    body.set('provider', 'ghost')
+    await app.request('/panel/drafts/write', withSession(cookie, { method: 'POST', body }), env)
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).not.toContain('ghost')
+    expect(html).toContain('لا مفتاح لـ')
+
+    const { results } = await db.prepare('SELECT id FROM posts').all()
+    expect(results).toHaveLength(0)
+  })
+
+  /**
+   * **ولا تُعرَض قائمةٌ من سطرٍ واحد.**
+   *
+   * لا مفتاحَ مضبوطا في هذه الدورة، **فلا مزوّدَ جاهزا** — وقائمةُ
+   * اختيارٍ بلا خيارٍ تَعِد بمقارنةٍ لا تقع.
+   */
+  it('لا قائمةَ مزوّدين حين لا جاهزَ منهم', async () => {
+    await seedAnalyzed()
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).not.toContain('id="dw-pv"')
+  })
+
   it('منصّةٌ غير معروفة تُردّ ولا تصل إلى القاعدة', async () => {
     const id = await seedAnalyzed()
     const cookie = await login()

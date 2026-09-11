@@ -96,8 +96,24 @@ function toBrief(row: SourceRow): { brief: SourceBrief; hash: string | null } {
  * لا ينجح منهما إلّا واحد، والقاعدةُ هي التي تفصل (`UNIQUE`) لا الشيفرة.
  * ونسخةٌ جديدة من المستند تعطي مفتاحا جديدا، فتُسوَّد من جديد بحقّ.
  */
-export function draftKey(sourceId: string, platform: Platform, hash: string): string {
-  return `draft:${sourceId}:${platform}:${hash}`
+export function draftKey(
+  sourceId: string,
+  platform: Platform,
+  hash: string,
+  /**
+   * مزوّدٌ اختاره المالكُ لهذه الكتابة بعينها — **للمقارنة** (D-125).
+   *
+   * **وغيابُه يبقي المفتاحَ كما كان حرفا**: كلُّ ما كُتب قبل اليوم
+   * يبقى معروفا، **ولا تُعاد كتابةُ ما كُتب** فتُدفَع كلفتُه مرّتين.
+   *
+   * **وحضورُه يفتح كتابةً واحدةً لكلّ مزوّد**: الثانيةُ بالمزوّد نفسِه
+   * تُردّ `already` كما تُردّ اليوم — **فالمقارنةُ لا تفتح بابَ إنفاقٍ
+   * متكرّر**، وإنّما تفتح نسخةً ثانيةً بيدٍ أخرى.
+   */
+  provider?: string,
+): string {
+  const base = `draft:${sourceId}:${platform}:${hash}`
+  return provider === undefined || provider === '' ? base : `${base}:${provider}`
 }
 
 /** يكتب مسوّدةً واحدة لمنصّةٍ واحدة. */
@@ -105,6 +121,13 @@ export async function draftPost(
   deps: DraftDeps,
   sourceRef: string,
   platform: Platform,
+  /**
+   * مزوّدٌ يغلب التوجيهَ لهذه الكتابة وحدَها (D-125).
+   *
+   * **ولا يُبدّل التوجيهَ المحفوظ**: الكتابةُ التالية تعود إلى ما اختاره
+   * المالكُ في «توجيه المهامّ». فهذه مقارنةٌ لا تبديل.
+   */
+  override?: { readonly provider: string; readonly model?: string },
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
 
@@ -128,7 +151,7 @@ export async function draftPost(
   }
 
   // ٣ · أسُوِّدت هذه النسخةُ لهذه المنصّة؟
-  const key = draftKey(row.id, platform, hash)
+  const key = draftKey(row.id, platform, hash, override?.provider)
   const existing = await deps.db
     .prepare('SELECT id FROM posts WHERE idempotency_key = ?')
     .bind(key)
@@ -142,7 +165,10 @@ export async function draftPost(
   }
 
   // المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const route = await routeFor(deps.db, 'draft')
+  const routed = await routeFor(deps.db, 'draft')
+  const route = override === undefined
+    ? routed
+    : { ...routed, provider: override.provider, model: override.model ?? routed.model }
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
