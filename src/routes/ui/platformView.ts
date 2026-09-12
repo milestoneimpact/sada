@@ -19,6 +19,7 @@
  * **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
  */
 import { SETUP, type ChannelView } from '../../lib/channels'
+import type { AccountHealth } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
@@ -44,6 +45,8 @@ export interface PlatformScreenData {
   readonly tally: PlatformTally
   /** نطاقاتُ كلّ حسابٍ كما مُنحت — مفتاحُها معرّفُ الحساب. */
   readonly scopes: Readonly<Record<string, string>>
+  /** سجلُّ صحّة كلّ حساب — مفتاحُها معرّفُ الحساب (D-129). */
+  readonly health: Readonly<Record<string, AccountHealth>>
   /** ما قِيس لكلّ منشور — مفتاحُها معرّفُ المنشور (D-048). */
   readonly metrics: Readonly<Record<string, readonly PostMetricRow[]>>
   /**
@@ -324,6 +327,32 @@ function postTabs(posts: readonly PlatformPost[], active: Show, platform: string
   return `<nav class="ftabs" aria-label="فرزُ المنشورات">${links}</nav>`
 }
 
+/**
+ * **سجلُّ صحّة الحساب** (D-129): متى رُبط، ومتى جُدّد آخرَ مرّةٍ بنجاح، ومتى
+ * ينتهي رمزُه ورمزُ تجديده، وما سُجّل من اقترابٍ. كلُّه من صفوفٍ في
+ * القاعدة — `accounts` و`tokens` و`token_alerts` — **ولا محطّةَ تُخترَع**:
+ * حسابٌ لم يُجدَّد قطّ يُقال فيه ذلك، لا يُرسَم له تاريخٌ فارغ.
+ */
+function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): string {
+  const when = (at: string | null, none: string): string =>
+    at === null ? none : `<span title="${escapeHtml(at)} UTC">${escapeHtml(relativeTime(at, now))}</span>`
+  const alerts = (h?.alerts ?? []).slice(0, 5).map((al) =>
+    `<li><span class="dot ${al.threshold === 0 ? 'bad' : 'warn'}"></span>
+      <span>${al.kind === 'refresh' ? 'رمزُ التجديد' : 'رمزُ الوصول'} ${
+        al.threshold === 0 ? 'انتهى' : `يقترب — بقي ${al.threshold} ${al.threshold === 1 ? 'يوم' : 'أيّام'}`}
+      <span class="ago">${escapeHtml(relativeTime(al.at, now))}</span></span></li>`).join('')
+  return `<h3 class="sec">سجلُّ صحّة الحساب</h3>
+      <ul class="todo health">
+        <li><span class="dot ok"></span><span>رُبط ${when(linkedAt, '—')}</span></li>
+        <li><span class="dot ${h?.refreshedAt ? 'ok' : ''}"></span><span>${
+          h?.refreshedAt ? `جُدّد آخرَ مرّةٍ ${when(h.refreshedAt, '')}` : 'لم يُجدَّد بعدُ — يُجدَّد قبل انتهائه بساعتين'}</span></li>
+        <li><span class="dot"></span><span>${
+          h?.expiresAt ? `رمزُ الوصول ينتهي ${when(h.expiresAt, '')}` : 'لا رمزَ وصولٍ محفوظا'}${
+          h?.refreshExpiresAt ? ` · والتجديدُ ${when(h.refreshExpiresAt, '')}` : ''}</span></li>
+        ${alerts}
+      </ul>`
+}
+
 export function platformScreen(d: PlatformScreenData): string {
   const { spec, state, accounts } = d.view
   const logo = LOGOS[spec.id] ?? ''
@@ -396,6 +425,7 @@ export function platformScreen(d: PlatformScreenData): string {
               : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدرُ في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
         }</p>
         ${capabilityTable(rows)}
+        ${healthLog(d.health[a.id], a.createdAt, d.now)}
       </div>`
     })
     .join('')

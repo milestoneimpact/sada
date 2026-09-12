@@ -59,6 +59,12 @@ export interface DraftRow {
    * وصفوفٌ قديمةٌ تحمله كذلك (D-069).
    */
   readonly publishCost: number
+  /**
+   * النصُّ كما كتبه النموذجُ قبل أن يعدّله المالك — **أو `null` إن اعتُمد
+   * كما كُتب** (D-128). يُحفَظ عند أوّل تعديلٍ ولا يُكتب ثانية، **والفرقُ
+   * يُشتَقّ منه في الشاشة ولا يُخزَّن.**
+   */
+  readonly originalText: string | null
 }
 
 interface Raw {
@@ -79,6 +85,7 @@ interface Raw {
   scheduled_at: string | null
   dispatched_at: string | null
   account_name: string | null
+  original_text: string | null
 }
 
 function toDraft(row: Raw): DraftRow {
@@ -103,6 +110,7 @@ function toDraft(row: Raw): DraftRow {
     accountName: row.account_name,
     dispatchedAt: row.dispatched_at,
     publishCost: estimatePostCost(row.platform === 'x' ? 'x' : 'linkedin', containsUrl(row.text)),
+    originalText: row.original_text ?? null,
   }
 }
 
@@ -118,7 +126,7 @@ export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
       .prepare(
         `SELECT p.id, p.platform, p.text, p.rationale, p.status, p.model, p.cost_usd,
                 p.source_id, p.source_hash, p.approved_by, p.approved_at, p.created_at,
-                p.scheduled_at, p.dispatched_at,
+                p.scheduled_at, p.dispatched_at, p.original_text,
                 s.name AS source_name, s.content_hash AS current_hash,
                 a.display_name AS account_name
            FROM posts p
@@ -205,13 +213,19 @@ export async function decide(
    * وعمودٌ حُسب مرّةً عند الكتابة يبقى يقول ما بطل، **واللوحةُ تعرض
    * ثمنا أرخصَ ممّا سيُدفَع** (D-069).
    */
+  /*
+   * **والأصلُ يُحفَظ عند أوّل تعديلٍ ولا يُكتب ثانية** (D-128): `COALESCE`
+   * يبقي ما حُفظ إن كان، ويكتب النصَّ الذي كان قبل هذا التعديل إن لم يكن.
+   * واعتمادٌ بلا تعديلٍ لا يكتب شيئا — `NULL` تعني «كما كُتب».
+   */
   await db
     .prepare(
       `UPDATE posts SET text = ?, has_url = ?, status = ?, approved_by = ?,
-              approved_at = datetime('now')
+              approved_at = datetime('now'),
+              original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END
         WHERE id = ?`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, status, by, id)
+    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, id)
     .run()
   return { ok: true, status }
 }

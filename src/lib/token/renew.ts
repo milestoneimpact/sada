@@ -26,7 +26,7 @@
  * فما نقص **يُورَث من المحفوظ**، ولا يُكتب فراغا فوق قيمة.
  */
 import type { Db, StoredTokens } from '../tokens'
-import { loadTokens, markNeedsReauth, saveTokens } from '../tokens'
+import { loadTokens, markNeedsReauth, markRefreshed, saveTokens } from '../tokens'
 import type { Platform, Provider } from '../oauth/providers'
 import type { ClientCredentials, TokenResponse } from '../oauth/exchange'
 import { isExpiring, OAuthError, refreshToken } from '../oauth/exchange'
@@ -159,6 +159,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
       parseGranted(stored.scopes),
     )
     await saveTokens(deps.db, deps.encKey, row.account_id, mergeRenewed(fresh, stored))
+    await markRefreshed(deps.db, row.account_id)
     return { kind: 'renewed', accountId: row.account_id }
   } catch (error) {
     /**

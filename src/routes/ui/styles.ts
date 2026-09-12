@@ -623,6 +623,8 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
   border-bottom:1px solid var(--line-soft)}
 .todo li:last-child{border-bottom:0}
 .todo .dot{width:6px; height:6px; border-radius:50%; flex:none; background:var(--ink-3)}
+/* سجلُّ صحّة الحساب يعيد قائمةَ «ما ينتظرك» بلا زرّ (D-129) */
+.todo.health{margin-top:var(--s-2)}
 .todo .dot.warn{background:var(--warn)} .todo .dot.bad{background:var(--bad)}
 .todo .dot.ok{background:var(--ok)}
 .todo a,.todo form{margin-inline-start:auto}
@@ -678,6 +680,16 @@ ul.plain li:last-child{margin-bottom:0}
 .stop-d{margin:var(--s-1) 0 0; font-size:var(--t-sm); color:var(--ink-2);
   line-height:var(--lh); max-width:var(--measure)}
 .stop-meta{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2)}
+/* ما تغيّر قبل الاعتماد (D-128): مطويٌّ في ذيل البطاقة، والفرقُ سطرًا سطرًا
+   بعلامةٍ قبل اللون — لونُ الحالة يُقرأ على البطاقة لا على غسيله */
+.diff{margin-top:var(--s-2); border-top:1px solid var(--line-soft); padding-top:var(--s-1)}
+.diff>summary{font-size:var(--t-sm); color:var(--ink-2); cursor:pointer; gap:var(--s-2)}
+.diff-body{margin:var(--s-2) 0 0; font:inherit; font-size:var(--t-sm); line-height:var(--lh);
+  white-space:pre-wrap; overflow-wrap:anywhere; max-width:var(--measure)}
+.dl{display:block; padding:0 var(--s-1); border-radius:4px}
+.dl.del{color:var(--bad); text-decoration:line-through; text-decoration-thickness:1px}
+.dl.add{color:var(--ok)}
+.dl.same{color:var(--ink-3)}
 /* رابطُ المحطّة إلى موضعها — آخرَ السطر، ويلتفّ مع الضيق (D-126) */
 .stop-go{margin-inline-start:auto}
 /* أمرُ wrangler في صفّ المهمّة: حقلٌ يُقرأ ويُنسَخ، لاتينيٌّ معزول (D-126) */

@@ -127,6 +127,17 @@ describe('والدمجُ لا يمحو بالفراغ', () => {
     expect(stored?.accessToken).toBe('FRESH')
     // **ولم يُمحَ رمزُ التجديد** ولو غاب عن الردّ
     expect(stored?.refreshToken).toBe('r1')
+    // **والتجديدُ الناجحُ يُختَم** (D-129) — والربطُ الأوّل لا يُختَم
+    const stamp = db.raw.prepare('SELECT refreshed_at FROM tokens WHERE account_id = ?').get('a1') as { refreshed_at: string | null }
+    expect(stamp.refreshed_at).not.toBeNull()
+  })
+
+  it('والتجديدُ المردودُ لا يختم شيئا', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    const out = await renewOne(deps(reply({ error: 'invalid_grant' }, 400)), { account_id: 'a1', platform: 'linkedin' })
+    expect(out.kind).toBe('needs_owner')
+    const stamp = db.raw.prepare('SELECT refreshed_at FROM tokens WHERE account_id = ?').get('a1') as { refreshed_at: string | null }
+    expect(stamp.refreshed_at).toBeNull()
   })
 })
 

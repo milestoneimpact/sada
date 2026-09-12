@@ -35,6 +35,7 @@ import { relativeTime } from '../../../lib/format'
  * منصّةً تُضاف بعدهما: مسوّدةُ TikTok أو YouTube كانت تُرسَم بلا شعار.
  */
 import { LOGOS } from '../logos'
+import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
@@ -298,6 +299,27 @@ const BUCKETS: readonly { readonly id: string; readonly label: string }[] = [
  * لا ينتقل يكذب على من يفتحه في تبويبٍ جديد. وبلا JavaScript لا تظهر
  * هذه الشريحةُ أصلا — والقائمةُ كاملةٌ كما هي اليوم.
  */
+/**
+ * **ما تغيّر قبل الاعتماد** (D-128): `edited` كانت تقول إنّ تعديلًا وقع ولا
+ * تقول ما هو. فيُعرَض الفرقُ سطرًا سطرًا من الأصل المحفوظ — مطويًّا،
+ * لأنّ السؤالَ يُسأل عند المراجعة لا عند كلّ فتحة. **والحالُ لونٌ ورمزٌ
+ * ونصّ** (D-043): المحذوفُ بـ«−» والمضافُ بـ«+» قبل اللون.
+ */
+function editDiff(d: DraftRow): string {
+  if (d.status !== 'edited' || d.originalText === null) return ''
+  const diff = diffLines(d.originalText, d.text)
+  const n = changedCount(diff)
+  if (n === 0) return ''
+  const body = diff.map((l) => {
+    const mark = l.kind === 'del' ? '−' : l.kind === 'add' ? '+' : ' '
+    return `<span class="dl ${l.kind}">${mark} ${escapeHtml(l.text)}</span>`
+  }).join('\n')
+  return `<details class="diff">
+    <summary>ما تغيّر قبل الاعتماد <span class="chip">${n} ${n === 1 ? 'سطر' : n === 2 ? 'سطران' : 'أسطر'}</span></summary>
+    <pre class="diff-body" dir="auto">${body}</pre>
+  </details>`
+}
+
 function filterTabs(drafts: readonly DraftRow[]): string {
   const tabs = BUCKETS.map((b) => {
     const n = b.id === 'all' ? drafts.length : drafts.filter((d) => bucketOf(d) === b.id).length
@@ -505,6 +527,7 @@ function card(
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
+    ${editDiff(d)}
     ${imagePane(d, media)}
     ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform])}
     <div class="draft-meta">${meta}</div>
