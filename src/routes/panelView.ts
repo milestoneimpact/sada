@@ -30,6 +30,8 @@ import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell
 import { alertChannel, bar, firstDay, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
+import { COPY_SCRIPT } from './ui/shell'
+import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 
 export { escapeHtml, injectCsrf, shell }
@@ -121,21 +123,8 @@ export const SCRIPT = `
   if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
     var s=t.querySelector('span'); if(s)head.textContent=s.textContent;});});
 
-  // زرُّ النسخ: رابطُ العودة يُطابَق حرفا بحرف عند المنصّة، وكتابتُه يدا
-  // تُدخل مسافةً أو شرطةً فيفشل الربطُ بخطأٍ لا يدلّ على سببه
-  document.querySelectorAll('button[data-copy]').forEach(function(b){
-    b.addEventListener('click',function(){
-      var f=document.getElementById(b.dataset.copy); if(!f)return;
-      f.select(); f.setSelectionRange(0,f.value.length);
-      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
-        setTimeout(function(){b.textContent=t;},1400);};
-      // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(f.value).then(done,function(){
-          try{document.execCommand('copy'); done();}catch(e){}});
-      }else{try{document.execCommand('copy'); done();}catch(e){}}
-    });
-  });
+  // زرُّ النسخ مشترَكٌ مع شاشة «ما عليك» (D-126) — يُعرَّف في shell.ts
+  ${COPY_SCRIPT}
 
   // عدّادُ المسوّدة يتحرّك مع الكتابة: طولٌ يُعرف بعد الإرسال يأتي متأخّرا
   // بنداءٍ كامل. والحدُّ من data-limit لا من ثابتٍ هنا — منصّةٌ تُضاف
@@ -1059,7 +1048,18 @@ function sourceRow(s: PanelSource, now: Date): string {
     ? `<form class="inline" method="POST" action="/panel/analyze" data-busy="جارٍ…">
          <input type="hidden" name="id" value="${escapeHtml(s.id)}">
          <button class="g sm" type="submit">حلّل الآن</button></form>`
-    : '<span class="mono">—</span>'
+    : ''
+  /*
+   * **«افتح في Drive»** (D-126): المعرِّفُ في اليد والرابطُ ثابتُ الصيغة،
+   * ويفتح في تبويبٍ جديدٍ بأيقونة المغادرة — كرابط بوّابة المطوّرين.
+   * **ومعرِّفٌ لا يوافق صيغةَ Drive لا يصير رابطًا.**
+   */
+  const drive = driveFileUrl(s.driveFileId)
+  const open = drive === null
+    ? ''
+    : `<a class="btn g sm" href="${escapeHtml(drive)}" target="_blank" rel="noopener noreferrer"
+         aria-label="افتح ${escapeHtml(s.name)} في Drive">${ICON.external} افتح في Drive</a>`
+  const acts = `${action}${open}`
 
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
@@ -1069,7 +1069,7 @@ function sourceRow(s: PanelSource, now: Date): string {
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(s.lastSeenAt)} UTC">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
-    <td data-label="">${action}</td>
+    <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row" style="gap:var(--s-2)">${acts}</div>`}</td>
   </tr>`
 }
 
@@ -1545,6 +1545,8 @@ ${pivotPane(d.pivot)}
 
 <section data-pane="settings" hidden>
   ${pageHead('الحدود', 'الإيقاف والسقوف', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
+  <!-- الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا،
+       ثمّ ما يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل -->
   <div class="card"><h2>الإيقاف المؤقت</h2>
     <div class="split">
       <p>${d.paused
@@ -1558,51 +1560,6 @@ ${pivotPane(d.pivot)}
       </form>
     </div>
   </div>
-  ${alertChannel(d.alertWebhook, d.outbox)}
-
-  <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
-    <div class="split">
-      <p>${d.autoEnqueue
-        ? `مرفوع: المسح اليوميّ (٣ فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
-        : `مطفأ: المسح يرصد ما تغيّر ولا يحلّل شيئا حتّى تضغط «حلّل الآن». ورفعُه يجعل الخطّ كاملا — مستندٌ تعدّله يظهر محلَّلا في اللوحة صباحا.`}</p>
-      <form class="inline" method="POST" action="/panel/settings"
-            data-confirm="${d.autoEnqueue
-              ? 'إطفاء الإدراج الآليّ؟ لن يُحلَّل شيء إلا بأمرك.'
-              : `رفعُ الإدراج الآليّ؟ سيبدأ إنفاقٌ يوميّ بلا أمرٍ منك، بحدّ ${d.analysisCap} تحليلا و ${money(d.spendCap)} في اليوم.`}">
-        <input type="hidden" name="key" value="auto_enqueue">
-        <input type="hidden" name="value" value="${d.autoEnqueue ? 'false' : 'true'}">
-        <button class="${d.autoEnqueue ? 'g' : 'p'}" type="submit">
-          ${d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ'}</button>
-      </form>
-    </div>
-    <div class="sub" style="margin-top:var(--s-3)">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
-  </div>
-
-  <div class="card" style="margin-top:var(--s-3)"><h2>النصُّ فوق الصورة</h2>
-    <div class="split">
-      <p>${d.imageOverlay
-        ? `مرفوع: يُركَّب عنوانٌ عربيٌّ من كلمتين فوق كلّ صورةٍ مولَّدة، وفوقه كلمتان إنجليزيّتان.
-           <b>والنصُّ يُرسَم في متصفّحٍ لا في نموذج التوليد</b> — فالوصلُ صحيحٌ والحروفُ تُقرأ.`
-        : `مطفأ: تخرج الصورةُ نظيفةً بلا عنوان. <b>وهذا ليس عطلا</b> — النصُّ في المنشور نفسِه
-           حيث يُقرأ ويُترجَم ويبحث عنه محرّك.`}</p>
-      <form class="inline" method="POST" action="/panel/settings">
-        <input type="hidden" name="key" value="image_overlay">
-        <input type="hidden" name="value" value="${d.imageOverlay ? 'false' : 'true'}">
-        <button class="${d.imageOverlay ? 'g' : 'p'}" type="submit">
-          ${d.imageOverlay ? 'إطفاء' : 'رفع التركيب'}</button>
-      </form>
-    </div>
-    ${d.browserToken
-      ? '<div class="sub" style="margin-top:var(--s-3)">رمزُ المتصفّح مضبوط.'
-        + ' وكلُّ لقطةٍ تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
-      : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
-          <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،
-          <b>فلا يقع نداءٌ ولا كلفة</b> — وتخرج الصورةُ بلا عنوانٍ مهما كان هذا المفتاح مرفوعا.
-          وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
-          <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`}
-  </div>
-
-  ${tilePicker(d)}
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>
     <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
@@ -1636,6 +1593,52 @@ ${pivotPane(d.pivot)}
     <div class="sub" style="margin-top:var(--s-3)"><b>ولا يُنفَق منه شيءٌ آليّا</b>:
       لا عميلَ إعلاناتٍ في صدى ولا مفتاحَ يُطلَب (D-006). والتوصيةُ صفٌّ ينتظر بتّك،
       وما تفعله بالمبلغ تفعله في لوحة المنصّة بيدك.</div>
+  </div>
+
+  <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
+    <div class="split">
+      <p>${d.autoEnqueue
+        ? `مرفوع: المسح اليوميّ (٣ فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
+        : `مطفأ: المسح يرصد ما تغيّر ولا يحلّل شيئا حتّى تضغط «حلّل الآن». ورفعُه يجعل الخطّ كاملا — مستندٌ تعدّله يظهر محلَّلا في اللوحة صباحا.`}</p>
+      <form class="inline" method="POST" action="/panel/settings"
+            data-confirm="${d.autoEnqueue
+              ? 'إطفاء الإدراج الآليّ؟ لن يُحلَّل شيء إلا بأمرك.'
+              : `رفعُ الإدراج الآليّ؟ سيبدأ إنفاقٌ يوميّ بلا أمرٍ منك، بحدّ ${d.analysisCap} تحليلا و ${money(d.spendCap)} في اليوم.`}">
+        <input type="hidden" name="key" value="auto_enqueue">
+        <input type="hidden" name="value" value="${d.autoEnqueue ? 'false' : 'true'}">
+        <button class="${d.autoEnqueue ? 'g' : 'p'}" type="submit">
+          ${d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ'}</button>
+      </form>
+    </div>
+    <div class="sub" style="margin-top:var(--s-3)">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدٌّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
+  </div>
+
+  ${alertChannel(d.alertWebhook, d.outbox)}
+
+  ${tilePicker(d)}
+
+  <div class="card" style="margin-top:var(--s-3)"><h2>النصُّ فوق الصورة</h2>
+    <div class="split">
+      <p>${d.imageOverlay
+        ? `مرفوع: يُركَّب عنوانٌ عربيٌّ من كلمتين فوق كلّ صورةٍ مولَّدة، وفوقه كلمتان إنجليزيّتان.
+           <b>والنصُّ يُرسَم في متصفّحٍ لا في نموذج التوليد</b> — فالوصلُ صحيحٌ والحروفُ تُقرأ.`
+        : `مطفأ: تخرج الصورةُ نظيفةً بلا عنوان. <b>وهذا ليس عطلا</b> — النصُّ في المنشور نفسِه
+           حيث يُقرأ ويُترجَم ويبحث عنه محرّك.`}</p>
+      <form class="inline" method="POST" action="/panel/settings">
+        <input type="hidden" name="key" value="image_overlay">
+        <input type="hidden" name="value" value="${d.imageOverlay ? 'false' : 'true'}">
+        <button class="${d.imageOverlay ? 'g' : 'p'}" type="submit">
+          ${d.imageOverlay ? 'إطفاء' : 'رفع التركيب'}</button>
+      </form>
+    </div>
+    ${d.browserToken
+      ? '<div class="sub" style="margin-top:var(--s-3)">رمزُ المتصفّح مضبوط.'
+        + ' وكلُّ لقطةٍ تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
+      : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
+          <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،
+          <b>فلا يقع نداءٌ ولا كلفة</b> — وتخرج الصورةُ بلا عنوانٍ مهما كان هذا المفتاح مرفوعا.
+          وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
+          <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
 </section>
 

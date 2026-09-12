@@ -25,6 +25,19 @@ interface SourceRow {
 }
 
 /** معرّف ثابت مشتق من معرّف Drive، فلا يتكرر الصف عند إعادة المزامنة. */
+/**
+ * رابطُ الملفّ في Drive — **ولا يُبنى من نصٍّ يكتبه أحد** (D-126).
+ *
+ * المعرِّفُ يأتي من Drive نفسِه، وصيغتُه حروفٌ وأرقامٌ وشرطتان. **وما خالف
+ * الصيغةَ لا يصير رابطًا**: يُعاد `null` فلا يُرسَم زرٌّ يقود إلى عنوانٍ
+ * مصنوع.
+ */
+export function driveFileUrl(driveFileId: string): string | null {
+  return /^[A-Za-z0-9_-]{8,}$/.test(driveFileId)
+    ? `https://drive.google.com/file/d/${driveFileId}/view`
+    : null
+}
+
 export function sourceId(driveFileId: string): string {
   return `src:${driveFileId}`
 }

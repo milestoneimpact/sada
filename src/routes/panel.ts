@@ -56,7 +56,7 @@ import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
 import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
 import { TILE_MAX, TILE_MIN } from '../lib/dashboard'
-import { pivot, readCols, readDimension, readMeasure } from '../lib/pivot'
+import { pivot, readCols, readDimension, readMeasure, toCsv } from '../lib/pivot'
 import { FACT_CAP, loadFacts } from '../lib/pivotStore'
 import type { PivotView } from './ui/sections/pivot'
 
@@ -89,7 +89,7 @@ import { tasksScreen } from './ui/tasksView'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
-import { backNav, shell, THEME_SCRIPT } from './ui/shell'
+import { backNav, shell, COPY_SCRIPT, THEME_SCRIPT } from './ui/shell'
 import { spreadScreen, SPREAD_SCRIPT } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
@@ -241,6 +241,39 @@ function toPanelSource(row: SourceRow): PanelSource {
     lastSeenAt: row.last_seen_at,
   }
 }
+
+/**
+ * الجدولُ ملفًّا (D-126) — **المسارُ نفسُه بلاحقة، والقراءةُ نفسُها**.
+ *
+ * تُقرأ المعاملاتُ بقوائم السماح نفسِها التي يقرأ بها اللوح، ويُحمَّل ما
+ * يحمّله، **فلا يُنزَّل غيرُ ما يُعرَض**. ولا مكتبةَ في المتصفّح: `CSV`
+ * يُكتب في الخادم من الجدول نفسِه.
+ */
+panel.get('/panel/pivot.csv', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.redirect('/panel', 303)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const q = new URL(c.req.url).searchParams
+  const spec = {
+    rows: readDimension(q.get('rows') ?? undefined, 'platform'),
+    cols: readCols(q.get('cols') ?? undefined),
+    measure: readMeasure(q.get('m') ?? undefined, 'count'),
+  }
+  const days = readSpan(q.get('days'))
+  const loaded = await loadFacts(c.env.DB, days)
+  const body = toCsv(pivot(loaded.facts, spec), spec)
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="sada-${spec.rows}${
+        spec.cols === null ? '' : `-${spec.cols}`}-${spec.measure}-${days}d.csv"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
 
 panel.get('/panel', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
@@ -1374,6 +1407,7 @@ panel.get('/panel/tasks', async (c) => {
     rows: ownerRows(await ownerFacts(c)),
     gates,
     phase: currentPhase(gates),
+    env: c.env.SADA_ENV,
   })
 
   return page((nonce) =>
@@ -1385,7 +1419,7 @@ panel.get('/panel/tasks', async (c) => {
          <main id="main">${body}</main>
        </div>`,
       nonce,
-      THEME_SCRIPT,
+      THEME_SCRIPT + COPY_SCRIPT,
       { commands: buildCommands({ onPanel: false }) },
     ),
   )

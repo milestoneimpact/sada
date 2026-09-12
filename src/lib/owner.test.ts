@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { OWNER_TASKS, ownerRows, pendingCount, type OwnerFacts } from './owner'
+import { OWNER_TASKS, ownerRows, pendingCount, type OwnerFacts, secretCommand } from './owner'
 
 const DOC = readFileSync(new URL('../../docs/MANUAL-TASKS.md', import.meta.url), 'utf8')
 
@@ -145,3 +145,23 @@ describe('والترتيبُ بما يفتح لا بترقيمه', () => {
     }
   })
 })
+
+describe('أمرُ السرّ (D-126)', () => {
+  it('بصيغة MANUAL-TASKS.md حرفا، وللبيئة المعطاة', () => {
+    expect(secretCommand('X_CLIENT_ID', 'staging')).toBe('npx wrangler secret put X_CLIENT_ID --env staging')
+    expect(secretCommand('CF_BROWSER_TOKEN', 'production')).toBe('npx wrangler secret put CF_BROWSER_TOKEN --env production')
+  })
+
+  it('ومهمّةٌ تمّت لا تحمل أمرا — والأسماءُ أسماءٌ لا قيَم', () => {
+    const rows = ownerRows({
+      secrets: new Set(['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET']),
+      vars: new Set(), linked: new Set(['linkedin']), appsConfigured: new Set(['linkedin']),
+      appsVerified: new Set(['linkedin']), videoPriced: false, linkedInVersionDue: false,
+    } as never)
+    const m02 = rows.find((r) => r.code === 'M-02')!
+    expect(m02.state).toBe(true)
+    expect(m02.secrets).toEqual(['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'])
+    for (const r of rows) for (const n of r.secrets ?? []) expect(n).toMatch(/^[A-Z0-9_]+$/)
+  })
+})
+

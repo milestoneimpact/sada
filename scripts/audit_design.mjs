@@ -264,27 +264,9 @@ for (const file of pages) {
        * عرّفت العنصرَ بترتيبه في الشجرة، **والنصُّ يبدّل الشجرةَ وهي
        * تُضغَط** — فقرأ عنصرا جديدا بمفتاح عنصرٍ مرّ به وصاح «مصيدة».
        */
-      const expected = await page.evaluate(() => {
-        window.scrollTo(0, 0)
-        const sel = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex]'
-        const out = []
-        let n = 0
-        for (const el of document.querySelectorAll(sel)) {
-          el.__kb = `e${n += 1}`
-          if (el.disabled || el.closest('[inert], [hidden], [data-palette]') !== null) continue
-          const r = el.getBoundingClientRect()
-          // ورابطُ التخطّي مقصوصٌ حتّى يُركَّز — مرئيٌّ بالقصد لا بالصندوق
-          if (!(r.width > 0 && r.height > 0) && !el.classList.contains('skip')) continue
-          if (getComputedStyle(el).visibility === 'hidden') continue
-          // وظلُّ السكون يُحفَظ: **ظلٌّ زينةٌ على زرٍّ ليس حلقةَ تركيز** —
-          // أوّلُ صياغةٍ قرأت «box-shadow ≠ none» فرأت حلقةً في كلّ زرٍّ له ظلّ
-          el.__rest = getComputedStyle(el).boxShadow
-          out.push({ key: el.__kb, tag: el.tagName.toLowerCase(), cls: String(el.className).slice(0, 24),
-            text: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 24),
-            neg: el.getAttribute('tabindex') === '-1' })
-        }
-        return out
-      })
+      // وما رُكِّز عند التحميل (`autofocus`) بُلغ بلا ضغطة — يُعَدّ مبلوغا،
+      // **ويُوصَف قبل أن يُرفَع عنه التركيز**: ظلُّ سكونه يُقاس بلا تركيز،
+      // وإلّا قُرئت حلقتُه ظلَّ سكونٍ فقيل «بلا حلقة» — وقد قيل مرّةً
       const describe = () => {
         const el = document.activeElement
         if (el === null || el === document.body || el === document.documentElement) return null
@@ -300,13 +282,39 @@ for (const file of pages) {
           // وحقلُ التاريخ أجزاءٌ يمشي `Tab` بينها والعنصرُ واحد — ليس مصيدة
           parts: /^(date|time|datetime-local|month|week)$/.test(el.type ?? '') }
       }
+      const initial = await page.evaluate(describe)
+      const expected = await page.evaluate(() => {
+        // **والحركةُ تُطفأ قبل القياس**: ظلُّ التركيز ينتقل في ‏١٥٠ms، وقراءةٌ
+        // في منتصف الانتقال تعطي ظلَّ السكون ظلَّ تركيز — فيُقرأ ما يستقرّ عليه
+        const still = document.createElement('style')
+        still.textContent = '*{transition:none!important}'
+        document.head.appendChild(still)
+        document.activeElement?.blur?.()
+        window.scrollTo(0, 0)
+        const sel = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex]'
+        const out = []
+        let n = 0
+        for (const el of document.querySelectorAll(sel)) {
+          if (el.__kb === undefined) el.__kb = `e${n += 1}`
+          if (el.disabled || el.closest('[inert], [hidden], [data-palette]') !== null) continue
+          const r = el.getBoundingClientRect()
+          // ورابطُ التخطّي مقصوصٌ حتّى يُركَّز — مرئيٌّ بالقصد لا بالصندوق
+          if (!(r.width > 0 && r.height > 0) && !el.classList.contains('skip')) continue
+          if (getComputedStyle(el).visibility === 'hidden') continue
+          // وظلُّ السكون يُحفَظ: **ظلٌّ زينةٌ على زرٍّ ليس حلقةَ تركيز** —
+          // أوّلُ صياغةٍ قرأت «box-shadow ≠ none» فرأت حلقةً في كلّ زرٍّ له ظلّ
+          el.__rest = getComputedStyle(el).boxShadow
+          out.push({ key: el.__kb, tag: el.tagName.toLowerCase(), cls: String(el.className).slice(0, 24),
+            text: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 24),
+            neg: el.getAttribute('tabindex') === '-1' })
+        }
+        return out
+      })
       const reached = new Map()
       let trapped = false
       let skipFirst = true
       let last = null
       let stay = 0
-      // وما رُكِّز عند التحميل (`autofocus`) بُلغ بلا ضغطة — يُعَدّ مبلوغا
-      const initial = await page.evaluate(describe)
       /*
        * **والمشيُ من أوّل الصفحة لا من حيث وقف التركيز.** `blur()` لا يعيد
        * نقطةَ البدء: المتصفّح يحفظها عند آخر عنصرٍ رُكِّز، فـ`Tab` بعد

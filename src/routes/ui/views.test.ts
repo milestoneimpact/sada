@@ -20,10 +20,12 @@ import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
 import { platformLabel } from '../../lib/oauth/providers'
 import { gatesOf, type GateFacts } from '../../lib/gates'
-import { journeyBody } from './journeyView'
+import { journeyBody, stationHref } from './journeyView'
+import { driveFileUrl } from '../../lib/drive/sync'
+import { tokenDays } from './channels'
 import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
-import { SCRIPT } from '../panelView'
+import { SCRIPT, panelPage } from '../panelView'
 
 describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
   it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {
@@ -102,7 +104,7 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(STYLE).toContain('tr.urgent td{')
     expect(STYLE).toContain('ul.plain{list-style:none')
     const html = tasksScreen({
-      phase: null, gates: [],
+      phase: null, gates: [], env: 'staging',
       rows: [{
         code: 'M-99', title: 'مهمّة', ifLeft: 'يقف', unblocks: 'gate',
         state: false, measured: '', done: () => false,
@@ -269,5 +271,54 @@ describe('ما مشاه Tab (D-125)', () => {
 
   it('ورابطُ العودة هدفُ لمسٍ عرضا كما هو ارتفاعا', () => {
     expect(STYLE).toMatch(/nav\.back a\{[^}]*min-width:var\(--tap\)/)
+  })
+})
+
+/**
+ * المرحلةُ الثالثة — الإمكاناتُ الرخيصة (D-126): **لا استعلامَ مدفوعًا،
+ * وكلُّ رابطٍ يُبنى من معرِّفٍ لا من نصّ.**
+ */
+describe('من المحطّة إلى موضعها (D-126)', () => {
+  it('كلُّ نوعٍ يقود إلى حيث يُفعَل به شيء', () => {
+    expect(stationHref('source', 'x')).toEqual({ href: '/panel#sources', label: 'المصادر' })
+    expect(stationHref('decision', 'x').href).toBe('/panel#posts')
+    expect(stationHref('publish', 'linkedin')).toEqual({ href: '/panel/channels/linkedin', label: 'شاشةُ LinkedIn' })
+    expect(stationHref('metrics', 'a b').href).toBe('/panel/channels/a%20b')
+  })
+
+  it('والرحلةُ ترسم الرابطَ في كلّ محطّة', () => {
+    const html = journeyBody({
+      postId: 'p1', platform: 'x', status: 'published', spent: 0, text: 'نصّ',
+      stations: [
+        { kind: 'source', title: 'ملفّ', at: null, detail: '', cost: null, model: null, state: 'done' },
+        { kind: 'publish', title: 'نُشرت', at: null, detail: '', cost: null, model: null, state: 'done' },
+      ],
+    }, new Date('2026-09-06T09:00:00Z'))
+    expect(html).toContain('<a class="btn g sm stop-go" href="/panel#sources">المصادر ←</a>')
+    expect(html).toContain('<a class="btn g sm stop-go" href="/panel/channels/x">شاشةُ X ←</a>')
+  })
+})
+
+describe('«افتح في Drive» لا يُبنى من نصّ (D-126)', () => {
+  it('معرِّفٌ بصيغة Drive يصير رابطًا، وما سواه لا', () => {
+    expect(driveFileUrl('1AbC_dEf-GhIjK')).toBe('https://drive.google.com/file/d/1AbC_dEf-GhIjK/view')
+    expect(driveFileUrl('a/b')).toBeNull()
+    expect(driveFileUrl('"><script>')).toBeNull()
+    expect(driveFileUrl('short')).toBeNull()
+  })
+})
+
+describe('عدُّ الأيّام على البطاقة (D-126)', () => {
+  const now = new Date('2026-09-12T12:00:00Z')
+  it('أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوقُ رقاقةٌ هادئة، ولا رمزَ لا شيء', () => {
+    expect(tokenDays(null, now)).toBe('')
+    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('st bad')
+    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('انتهى الإذن')
+    expect(tokenDays('2026-09-12 20:00:00', now)).toContain('ينتهي الإذن اليوم')
+    expect(tokenDays('2026-09-14 12:00:00', now)).toContain('يبقى 2 يومان للإذن')
+    expect(tokenDays('2026-09-19 12:00:00', now)).toContain('st warn')
+    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('<span class="chip"')
+    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('الإذن 48 يوما')
+    expect(tokenDays('not-a-date', now)).toBe('')
   })
 })

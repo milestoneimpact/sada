@@ -134,6 +134,32 @@ if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 `
 
 /** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
+/**
+ * زرُّ النسخ — **حرفًا بحرف، ومن مصدرٍ واحد** (D-042 · D-126).
+ *
+ * رابطُ العودة يُطابَق حرفًا بحرف عند المنصّة، وكتابتُه يدًا تُدخل مسافةً
+ * أو شرطةً فيفشل الربطُ بخطأٍ لا يدلّ على سببه. وأمرُ `wrangler` في شاشة
+ * «ما عليك» من الجنس نفسِه. **فالنصُّ واحدٌ تحمله اللوحةُ والشاشة**، لا
+ * نسختان تفترقان في أوّل تعديل.
+ */
+export const COPY_SCRIPT = `
+(function(){
+  document.querySelectorAll('button[data-copy]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var f=document.getElementById(b.dataset.copy); if(!f)return;
+      f.select(); f.setSelectionRange(0,f.value.length);
+      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
+        setTimeout(function(){b.textContent=t;},1400);};
+      // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(f.value).then(done,function(){
+          try{document.execCommand('copy'); done();}catch(e){}});
+      }else{try{document.execCommand('copy'); done();}catch(e){}}
+    });
+  });
+})();
+`
+
 export const THEME_SCRIPT = `
 (function(){
   var box=document.getElementById('theme');

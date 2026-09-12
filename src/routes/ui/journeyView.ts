@@ -37,7 +37,28 @@ const MARK: Readonly<Record<Station['kind'], string>> = {
   metrics: ICON.report,
 }
 
-function stationRow(s: Station, now: Date): string {
+/**
+ * **من المحطّة إلى موضعها** (D-126).
+ *
+ * الرحلةُ تقرأ ما وقع، **والفعلُ يقع في موضعه لا هنا**: المصدرُ في لوح
+ * المصادر، والمسوّدةُ والقرارُ والموعدُ في لوح المنشورات، والنشرُ والقياسُ
+ * في شاشة المنصّة. فكلُّ محطّةٍ تحمل رابطًا إلى حيث يُفعَل بها شيء —
+ * **ولا زرَّ يفعل من هنا** (سنّةُ ‏⌘K في D-105).
+ */
+export function stationHref(kind: Station['kind'], platform: string): { href: string; label: string } {
+  switch (kind) {
+    case 'source':
+    case 'analysis':
+      return { href: '/panel#sources', label: 'المصادر' }
+    case 'publish':
+    case 'metrics':
+      return { href: `/panel/channels/${encodeURIComponent(platform)}`, label: `شاشةُ ${platformLabel(platform)}` }
+    default:
+      return { href: '/panel#posts', label: 'المنشورات' }
+  }
+}
+
+function stationRow(s: Station, now: Date, platform: string): string {
   const when = s.at === null
     ? '<span class="ago">بلا وقتٍ مسجَّل</span>'
     : `<span class="ago when">${escapeHtml(relativeTime(s.at, now))}</span>`
@@ -49,6 +70,7 @@ function stationRow(s: Station, now: Date): string {
    * كلّفت شيئا لم يُسجَّل بعد أو سعرٌ لم يُؤكَّد (D-040). **فالأولى تُخفى
    * والثانيةُ تُعرَض** — وإخفاءُ الصفر يجعل الدفترَ يبدو أنقصَ ممّا هو.
    */
+  const go = stationHref(s.kind, platform)
   const cost = s.cost === null
     ? ''
     : `<span class="chip mono" title="ما دُفع في هذه المحطّة">${escapeHtml(money(s.cost))}</span>`
@@ -60,7 +82,7 @@ function stationRow(s: Station, now: Date): string {
       <p class="stop-d">${escapeHtml(s.detail)}</p>
       <div class="stop-meta">${when}${cost}${
         s.model === null ? '' : `<span class="chip mono">${escapeHtml(s.model)}</span>`
-      }</div>
+      }<a class="btn g sm stop-go" href="${escapeHtml(go.href)}">${escapeHtml(go.label)} ←</a></div>
     </div>
   </li>`
 }
@@ -73,7 +95,7 @@ export function journeyBody(j: Journey, now: Date): string {
    * ثمنُه ثمّ فشل يبقى فيه **ولا محطّةَ له**. والفرقُ بين الرقمين ليس
    * خطأً — **هو ما دُفع بلا أثر**، وهو أنفعُ ما في الشاشة.
    */
-  const stops = j.stations.map((s) => stationRow(s, now)).join('')
+  const stops = j.stations.map((s) => stationRow(s, now, j.platform)).join('')
 
   return `<div class="page-head">
     <div class="txt">

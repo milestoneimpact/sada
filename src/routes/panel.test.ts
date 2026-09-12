@@ -298,6 +298,34 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   })
 
   /**
+   * **ما يُعرَض يُنزَّل** (D-126): الرابطُ يحمل العرضَ نفسَه، والملفُّ يُكتب في
+   * الخادم بالأسماء التي تُرسَم — ولا يُفتَح لغير صاحب الجلسة.
+   */
+  it('ويُنزَّل CSV بالعرض نفسِه، ولصاحب الجلسة وحدَه', async () => {
+    const cookie = await login()
+    seed()
+    const html = await (await app.request('/panel?rows=platform&cols=status', withSession(cookie), env)).text()
+    expect(html).toContain('href="/panel/pivot.csv?rows=platform&amp;cols=status&amp;m=count&amp;days=30" download')
+
+    const res = await app.request('/panel/pivot.csv?rows=platform&cols=status&m=count&days=30', withSession(cookie), env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8')
+    expect(res.headers.get('Content-Disposition')).toBe('attachment; filename="sada-platform-status-count-30d.csv"')
+    // و`text()` يقصّ علامةَ BOM وفق مواصفة Fetch — فتُقرأ البايتاتُ نفسُها
+    const bytes = new Uint8Array(await res.clone().arrayBuffer())
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    const csv = await res.text()
+    expect(csv).toContain('LinkedIn')
+    expect(csv).toContain('نُشرت')
+    expect(csv).not.toContain('linkedin')
+    expect(csv).not.toContain('published')
+
+    const anon = await app.request('/panel/pivot.csv?rows=platform', {}, env)
+    expect(anon.status).toBe(303)
+    expect(anon.headers.get('Location')).toBe('/panel')
+  })
+
+  /**
    * **ومسوّدةٌ بلا حسابٍ تدخل الجدول** — وهي التي تنتظر قرارَ المالك.
    *
    * وأوّلُ صياغةٍ ضمّت `accounts` ضمّا داخليّا **فأسقطتها صامتةً**:
@@ -2376,3 +2404,26 @@ describe('توجيهُ كلِّ مهمّةٍ يُحفَظ لا يُعرَض وح
     expect(html).toContain('الفيديو — تحريكُ الصورة')
   })
 })
+
+/**
+ * **ترتيبُ الحدود بالخطورة** (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما يحدّ
+ * إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل.
+ */
+describe('ترتيبُ بطاقات الحدود (D-126)', () => {
+  it('الإيقافُ ثمّ السقوفُ ثمّ الإدراجُ ثمّ التنبيهاتُ ثمّ البطاقاتُ ثمّ الصورة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const pane = html.slice(html.indexOf('<section data-pane="settings"'))
+    const at = (marker: string): number => {
+      const i = pane.indexOf(marker)
+      expect(i, marker).toBeGreaterThan(-1)
+      return i
+    }
+    const order = [
+      'value="paused"', 'value="daily_analysis_cap"', 'value="weekly_promo_cap_usd"',
+      'value="auto_enqueue"', 'value="alert_webhook"', 'value="dashboard_tiles"', 'value="image_overlay"',
+    ].map(at)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+  })
+})
+

@@ -12,7 +12,7 @@ const now = new Date('2026-09-06T12:00:00Z')
 
 const accounts: LinkedAccount[] = [
   { id: 'a1', platform: 'x', kind: 'member', displayName: '@omar', status: 'active',
-    createdAt: '2026-09-01T00:00:00Z' },
+    createdAt: '2026-09-01T00:00:00Z', expiresAt: null },
 ]
 const view = viewChannels(accounts, () => true).find((v) => v.spec.id === 'x')!
 

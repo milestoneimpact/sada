@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  cellText, DIMENSIONS, type Fact, MEASURES, NO_KEY,
-  pivot, readCols, readDimension, readMeasure,
+  cellText, DIMENSIONS, type Fact, keyLabel, MEASURES, NO_KEY,
+  pivot, readCols, readDimension, readMeasure, toCsv,
 } from './pivot'
 
 const f = (o: Partial<Fact>): Fact => ({
@@ -170,5 +170,58 @@ describe('نصُّ الخليّة', () => {
     expect(cellText(1.5, 'cost')).toBe('1.50$')
     expect(cellText(0, 'cost')).toBe('0$')
     expect(cellText(2.25, 'attempts')).toBe('2.3')
+  })
+})
+
+/**
+ * **ما يُعرَض يُنزَّل** (D-126): الملفُّ يُقابَل بالجدول خليّةً خليّة، بالأسماء
+ * التي تُرسَم لا بالمفاتيح، وبالنصّ الذي يُكتب في الخليّة.
+ */
+describe('CSV — ما يُعرَض يُنزَّل', () => {
+  const facts: Fact[] = [
+    f({ platform: 'linkedin', status: 'published', day: '2026-09-01', cost: 0.5 }),
+    f({ platform: 'linkedin', status: 'failed', day: '2026-09-02', cost: 0 }),
+    f({ platform: 'x', status: 'published', day: '2026-09-02', cost: 0.25 }),
+  ]
+
+  it('يطابق الجدولَ خليّةً خليّة، بالأسماء لا بالمفاتيح', () => {
+    const spec = { rows: 'platform', cols: 'status', measure: 'count' } as const
+    const table = pivot(facts, spec)
+    const csv = toCsv(table, spec)
+    expect(csv.startsWith('\uFEFF')).toBe(true)
+    const lines = csv.slice(1).trimEnd().split('\r\n').map((l) => l.split(','))
+    expect(lines[0]).toEqual(['المنصّة', ...table.colKeys.map((c) => keyLabel('status', c)), 'الكلّ'])
+    table.rowKeys.forEach((r, i) => {
+      expect(lines[i + 1]).toEqual([
+        keyLabel('platform', r),
+        ...table.cells[i]!.map((v) => cellText(v, 'count')),
+        cellText(table.rowTotals[i]!, 'count'),
+      ])
+    })
+    expect(lines[lines.length - 1]).toEqual([
+      'الكلّ', ...table.colTotals.map((v) => cellText(v, 'count')), cellText(table.grand, 'count'),
+    ])
+    expect(csv).not.toContain('published')
+    expect(csv).not.toContain('linkedin')
+  })
+
+  it('وبلا محورٍ ثانٍ عمودٌ واحدٌ ولا صفَّ مجاميع', () => {
+    const spec = { rows: 'platform', cols: null, measure: 'cost' } as const
+    const csv = toCsv(pivot(facts, spec), spec)
+    const lines = csv.slice(1).trimEnd().split('\r\n')
+    expect(lines[0]).toBe('المنصّة,الكلفة')
+    expect(lines).toHaveLength(3)
+    expect(lines.some((l) => l.startsWith('الكلّ'))).toBe(false)
+  })
+
+  it('والخليّةُ التي تبدأ بصيغةٍ تُعقَّم، وما فيه فاصلٌ يُحاط', () => {
+    const spec = { rows: 'account', cols: null, measure: 'count' } as const
+    const table = pivot([
+      f({ account: '=HYPERLINK("x")' }), f({ account: 'a,b' }), f({ account: '-1' }),
+    ], spec)
+    const csv = toCsv(table, spec)
+    expect(csv).toContain('"\'=HYPERLINK(""x"")"')
+    expect(csv).toContain('"a,b"')
+    expect(csv).toContain("'-1")
   })
 })
