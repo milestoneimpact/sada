@@ -349,6 +349,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
         <li><span class="dot"></span><span>${
           h?.expiresAt ? `رمزُ الوصول ينتهي ${when(h.expiresAt, '')}` : 'لا رمزَ وصولٍ محفوظا'}${
           h?.refreshExpiresAt ? ` · والتجديدُ ${when(h.refreshExpiresAt, '')}` : ''}</span></li>
+        ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
         ${alerts}
       </ul>`
 }

@@ -59,6 +59,8 @@ export interface OwnerTask {
    * ثمنُها ضغطةٌ في اللوحة تحمل بابَها، كما تحمل مهمّةُ السرّ أمرَها.
    */
   readonly go?: string
+  /** اسمُ الباب على الزرّ — **فزرّان باسمٍ واحدٍ إلى بابين يكذبان** (D-122). */
+  readonly goLabel?: string
 }
 
 /** أمرُ ضبطِ سرٍّ واحد — بصيغة `MANUAL-TASKS.md` حرفًا. */
@@ -186,6 +188,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     done: (f) => f.tilesChosen >= 6,
     evidence: (f) => `${f.tilesChosen} من ٦ بطاقاتٍ مختارة`,
     go: '/panel#settings',
+    goLabel: 'افتح الحدود',
   },
   {
     code: 'M-21',
@@ -197,6 +200,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     done: (f) => f.promoCapUsd > 0,
     evidence: (f) => (f.promoCapUsd > 0 ? `السقفُ ${f.promoCapUsd}$ في الأسبوع` : 'صفر — لا توصيةَ تُكتب'),
     go: '/panel#settings',
+    goLabel: 'افتح الحدود',
   },
   {
     code: 'M-03',
@@ -215,6 +219,18 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'guard',
     // يُقرأ من `webauthn_credentials`، ولا يُمرَّر هنا بعد
     done: () => null,
+  },
+  {
+    code: 'M-22',
+    title: 'إطلاقُ الإنتاج على sada.basserh.com',
+    ifLeft:
+      'يبقى صدى على staging وحدَه: **كلُّ ما نُشر ويُنشر تجربةٌ**، والنطاقُ ' +
+      'المسجَّلُ في مراجعات المنصّات لا يردّ (D-133).',
+    unblocks: 'capability',
+    // يُقرأ عند sada.basserh.com لا من هنا: staging لا تعرف حالَ الإنتاج
+    done: () => null,
+    go: 'https://github.com/mooryali95/sada/actions/workflows/deploy.yml',
+    goLabel: 'افتح صفحةَ النشر',
   },
   {
     code: 'M-11',

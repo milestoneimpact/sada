@@ -292,8 +292,9 @@ describe('اللوحُ المحوريّ (D-120)', () => {
     expect(html).toContain('table class="pv"')
     // صفّان: منصّتان — **والاسمُ كما يُقرأ لا كما في القاعدة** (D-123):
     // كان الاختبارُ يثبّت `linkedin` خاما، فثبّت العيبَ الذي كان يجب أن يمسكه
-    expect(html).toContain('<th scope="row">LinkedIn</th>')
-    expect(html).toContain('<th scope="row">X</th>')
+    // ورأسُ الصفّ بابٌ إلى شاشة المنصّة منذ D-132
+    expect(html).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشةُ LinkedIn">LinkedIn</a></th>')
+    expect(html).toContain('<th scope="row"><a href="/panel/channels/x" title="شاشةُ X">X</a></th>')
     expect(html).not.toContain('>linkedin<')
   })
 

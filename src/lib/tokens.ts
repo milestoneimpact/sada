@@ -47,7 +47,8 @@ export async function upsertAccount(db: Db, identity: AccountIdentity): Promise<
       `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
        VALUES (?, ?, ?, ?, ?, 'active')
        ON CONFLICT (platform, kind, external_id)
-       DO UPDATE SET display_name = excluded.display_name, status = 'active'`,
+       DO UPDATE SET display_name = excluded.display_name, status = 'active',
+                     needs_reauth_at = NULL`,
     )
     .bind(id, identity.platform, identity.kind, identity.externalId, identity.displayName)
     .run()
@@ -154,5 +155,13 @@ export async function markRefreshed(db: Db, id: string): Promise<void> {
 }
 
 export async function markNeedsReauth(db: Db, id: string): Promise<void> {
-  await db.prepare(`UPDATE accounts SET status = 'needs_reauth' WHERE id = ?`).bind(id).run()
+  // **ويُختَم وقتُ السقوط مرّةً** (D-131): تعليمٌ ثانٍ لحسابٍ ساقطٍ لا يبدّل التاريخ
+  await db
+    .prepare(
+      `UPDATE accounts SET status = 'needs_reauth',
+              needs_reauth_at = COALESCE(needs_reauth_at, datetime('now'))
+        WHERE id = ?`,
+    )
+    .bind(id)
+    .run()
 }

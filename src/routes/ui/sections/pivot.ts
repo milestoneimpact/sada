@@ -10,6 +10,7 @@
  * واحد**. وزرٌّ لا يعمل بلا جافاسكربت زرٌّ يعمل خطأً (D-046).
  */
 import { escapeHtml } from '../shell'
+import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
   type Dimension, type Measure, type PivotTable,
@@ -72,6 +73,17 @@ function csvHref(d: PivotView): string {
   return `/panel/pivot.csv?${q.toString()}`
 }
 
+/**
+ * **رأسُ الصفّ بابٌ إلى شاشته** (D-132): حين يكون الصفُّ منصّةً لها شاشة،
+ * يصير اسمُه رابطًا إليها. وما سواه (حسابٌ، حالٌ، يومٌ) اسمٌ كما كان.
+ * والرابطُ في `th` لا يغيّر الجدولَ للطباعة ولا لقارئ الشاشة.
+ */
+function rowHead(dim: Dimension, key: string): string {
+  const label = escapeHtml(keyLabel(dim, key))
+  if (dim !== 'platform' || !(key in PLATFORM_LABEL)) return label
+  return `<a href="/panel/channels/${escapeHtml(key)}" title="شاشةُ ${label}">${label}</a>`
+}
+
 export function pivotPane(d: PivotView): string {
   const t = d.table
   const max = Math.max(0, ...t.cells.flat().map((v) => v ?? 0))
@@ -91,7 +103,7 @@ export function pivotPane(d: PivotView): string {
 
   const body = t.rowKeys.map((r, i) => {
     const cells = t.cells[i] ?? []
-    return `<tr><th scope="row">${escapeHtml(keyLabel(d.rows, r))}</th>${
+    return `<tr><th scope="row">${rowHead(d.rows, r)}</th>${
       cells.map((v) => `<td${heat(v, max)}>${escapeHtml(cellText(v, d.measure))}</td>`).join('')
     }${twoAxis ? `<td class="pv-t">${escapeHtml(cellText(t.rowTotals[i] ?? null, d.measure))}</td>` : ''}</tr>`
   }).join('')

@@ -47,7 +47,8 @@ describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المف�
       capped: false, cap: 1500,
     })
     expect(html).toContain('<th scope="col">نُشرت</th>')
-    expect(html).toContain('<th scope="row">LinkedIn</th>')
+    // ورأسُ صفّ المنصّة رابطٌ إلى شاشتها منذ D-132 — والاسمُ فيه لا المفتاح
+    expect(html).toContain('title="شاشةُ LinkedIn">LinkedIn</a></th>')
     expect(html).not.toMatch(/>published</)
     expect(html).not.toMatch(/>linkedin</)
   })
@@ -418,3 +419,25 @@ describe('ما تغيّر قبل الاعتماد (D-128)', () => {
     expect(section(base({ originalText: null }))).not.toContain('class="diff"')
   })
 })
+
+/**
+ * رأسُ الصفّ بابٌ إلى شاشته (D-132): منصّةٌ لها شاشةٌ تصير رابطًا، وما سواه اسم.
+ */
+describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
+  const facts = [{ platform: 'linkedin', account: 'a', status: 'published', day: '2026-09-07',
+    type: 'text', attempts: 1, succeeded: true, cost: 0 }]
+  it('صفُّ المنصّة رابطٌ إلى شاشتها، وصفُّ الحال اسمٌ كما كان', () => {
+    const byPlatform = pivotPane({
+      table: pivot(facts, { rows: 'platform', cols: null, measure: 'count' }),
+      rows: 'platform', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
+    })
+    expect(byPlatform).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشةُ LinkedIn">LinkedIn</a></th>')
+    const byStatus = pivotPane({
+      table: pivot(facts, { rows: 'status', cols: null, measure: 'count' }),
+      rows: 'status', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
+    })
+    expect(byStatus).toContain('<th scope="row">نُشرت</th>')
+    expect(byStatus).not.toContain('/panel/channels/')
+  })
+})
+

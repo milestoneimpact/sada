@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { upsertAccount } from '../tokens'
+import { markNeedsReauth, upsertAccount } from '../tokens'
 import { accountHealth, grantedScopes, permalink, platformPosts, platformTally } from './screen'
 
 let db: FakeDb
@@ -271,6 +271,32 @@ describe('accountHealth', () => {
     expect(h.refreshedAt).toBe('2026-09-10 03:00:00')
     expect(h.alerts.map((a) => `${a.kind}:${a.threshold}`)).toEqual(['refresh:1', 'access:7'])
     expect(await accountHealth(db, 'x')).toEqual({})
+  })
+})
+
+/**
+ * ختمُ السقوط (D-131): يُختَم مرّةً عند التعليم، ويُمحى عند إعادة الربط.
+ */
+describe('needs_reauth_at', () => {
+  it('يُختَم عند أوّل تعليمٍ ولا يتبدّل بتعليمٍ ثانٍ، ويُمحى بإعادة الربط', async () => {
+    const id = await seedAccount('linkedin')
+    expect((await accountHealth(db, 'linkedin'))[id]!.needsReauthAt).toBeNull()
+
+    await markNeedsReauth(db, id)
+    const first = (await accountHealth(db, 'linkedin'))[id]!
+    expect(first.status).toBe('needs_reauth')
+    expect(first.needsReauthAt).not.toBeNull()
+
+    db.raw.exec(`UPDATE accounts SET needs_reauth_at = '2026-09-01 00:00:00' WHERE id = '${id}'`)
+    await markNeedsReauth(db, id)
+    expect((await accountHealth(db, 'linkedin'))[id]!.needsReauthAt).toBe('2026-09-01 00:00:00')
+
+    const row = db.raw.prepare('SELECT platform, kind, external_id, display_name FROM accounts WHERE id = ?').get(id) as
+      { platform: 'linkedin'; kind: 'member' | 'org'; external_id: string; display_name: string }
+    await upsertAccount(db, { id, platform: row.platform, kind: row.kind, externalId: row.external_id, displayName: row.display_name } as never)
+    const back = (await accountHealth(db, 'linkedin'))[id]!
+    expect(back.status).toBe('active')
+    expect(back.needsReauthAt).toBeNull()
   })
 })
 
