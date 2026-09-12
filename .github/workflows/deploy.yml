@@ -162,8 +162,24 @@ jobs:
           # هما رابطان تضعهما في مراجعة LinkedIn و Meta، وقيمتُهما في أن
           # يفتحا لغريبٍ بلا جلسة. ومسارٌ ينكسر بعد شهر يسقط الطلبَ صامتاً
           # — فيُقطَع هنا في كلّ نشر لا يُظنّ.
+          # **والفحصُ يعيد المحاولةَ كما يعيدها فحصُ الجاهزيّة** (D-124).
+          # سقط نشرٌ ناجحٌ لأنّ اتّصالا واحدا انقطع على ملفّ إثباتٍ يفتح
+          # بـ٢٠٠ من كلّ مكان: «curl» رمى، و«|| echo 000» لحق بما طبعته
+          # «-w» ناقصا فصار «000000». وحارسٌ يسقط على انقطاعٍ عابر
+          # يُقرأ أحمرَ ثمّ لا يُقرأ — فخمسُ محاولاتٍ كما في probe، والرمزُ
+          # يُقرأ من ملفٍّ لا من مخرَجٍ قد ينقطع في منتصفه.
+          fetch() {
+            for i in 1 2 3 4 5; do
+              if curl -s -o "$2" -w '%{http_code}' --max-time 15 "$1" > /tmp/code.txt 2>/dev/null; then
+                CODE=$(cat /tmp/code.txt); return 0
+              fi
+              sleep 6
+            done
+            CODE=000; return 1
+          }
+
           for doc in privacy terms; do
-            CODE=$(curl -s -o /tmp/doc.html -w '%{http_code}' --max-time 15 "$BASE/$doc" || echo 000)
+            fetch "$BASE/$doc" /tmp/doc.html || true
             echo "  $BASE/$doc → HTTP $CODE"
             if [ "$CODE" != 200 ]; then
               echo "::error::$BASE/$doc لا يفتح ($CODE). ورابطٌ لا يفتح يُسقط مراجعة المنصّة."
@@ -188,7 +204,7 @@ jobs:
             exit 1
           fi
           for name in $NAMES; do
-            CODE=$(curl -s -o /tmp/vrf.txt -w '%{http_code}' --max-time 15 "$BASE/$name" || echo 000)
+            fetch "$BASE/$name" /tmp/vrf.txt || true
             echo "  $BASE/$name → HTTP $CODE"
             if [ "$CODE" != 200 ]; then
               echo "::error::$BASE/$name لا يفتح ($CODE) — ولا تُقبَل مراجعةُ المنصّة بدونه."
