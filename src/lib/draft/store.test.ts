@@ -80,6 +80,24 @@ describe('الاعتماد', () => {
     expect(row?.['text']).toContain('زيادة')
   })
 
+  /**
+   * **والأصلُ يُحفَظ عند أوّل تعديل** (D-128): اعتمادٌ بلا تعديلٍ يترك
+   * `original_text` فارغا — «كما كُتب» — وتعديلٌ يحفظ ما كان قبله.
+   */
+  it('والأصلُ يُحفَظ عند التعديل ويبقى فارغا عند الاعتماد كما كُتب', async () => {
+    const same = await seedDraft()
+    await decide(db, same, { kind: 'approve', text: LONG }, 'omar')
+    const kept = (await listDrafts(db, 10)).find((d) => d.id === same)!
+    expect(kept.originalText).toBeNull()
+
+    const changed = await seedDraft()
+    await decide(db, changed, { kind: 'approve', text: `${LONG} زيادة` }, 'omar')
+    const edited = (await listDrafts(db, 10)).find((d) => d.id === changed)!
+    expect(edited.status).toBe('edited')
+    expect(edited.originalText).toBe(LONG)
+    expect(edited.text).toBe(`${LONG} زيادة`)
+  })
+
   it('نصٌّ فوق حدّ المنصّة يُرفض عند الاعتماد لا عند النشر', async () => {
     const id = await seedDraft({ platform: 'x', text: 'ن'.repeat(200) })
     const out = await decide(db, id, { kind: 'approve', text: 'ن'.repeat(400) }, 'panel:token')

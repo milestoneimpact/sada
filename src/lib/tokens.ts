@@ -148,6 +148,11 @@ export async function loadTokens(
 }
 
 /** يعلّم حسابا بأنه يحتاج إعادة ربط — بلا حذف، فالجدولة لا تضيع. */
+/** يختم تجديدا ناجحا — **وحدَه**، فالربطُ الأوّل ليس تجديدا (D-129). */
+export async function markRefreshed(db: Db, id: string): Promise<void> {
+  await db.prepare("UPDATE tokens SET refreshed_at = datetime('now') WHERE account_id = ?").bind(id).run()
+}
+
 export async function markNeedsReauth(db: Db, id: string): Promise<void> {
   await db.prepare(`UPDATE accounts SET status = 'needs_reauth' WHERE id = ?`).bind(id).run()
 }

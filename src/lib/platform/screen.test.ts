@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { upsertAccount } from '../tokens'
-import { grantedScopes, permalink, platformPosts, platformTally } from './screen'
+import { accountHealth, grantedScopes, permalink, platformPosts, platformTally } from './screen'
 
 let db: FakeDb
 
@@ -246,3 +246,31 @@ describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح �
     expect(await grantedScopes(db, 'linkedin')).toEqual({})
   })
 })
+
+/**
+ * سجلُّ صحّة الحساب (D-129) — **من صفوفه، ولا محطّةَ تُخترَع**.
+ */
+describe('accountHealth', () => {
+  it('حسابٌ بلا رمزٍ يُقال فيه ذلك، وبرمزٍ يُقرأ موعدُه وتجديدُه وتنبيهاتُه', async () => {
+    const id = await seedAccount('linkedin')
+    const bare = await accountHealth(db, 'linkedin')
+    expect(bare[id]).toMatchObject({ status: 'active', expiresAt: null, refreshedAt: null, alerts: [] })
+
+    db.raw.exec(
+      `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, refresh_expires_at, scopes, refreshed_at)
+       VALUES ('${id}', 'e', 'i', '2026-10-01 00:00:00', '2027-01-01 00:00:00', 'openid', '2026-09-10 03:00:00')`,
+    )
+    db.raw.exec(
+      `INSERT INTO token_alerts (account_id, kind, threshold, expires_at, at)
+       VALUES ('${id}', 'access', 7, '2026-10-01 00:00:00', '2026-09-24 03:00:00'),
+              ('${id}', 'refresh', 1, '2027-01-01 00:00:00', '2026-12-31 03:00:00')`,
+    )
+    const h = (await accountHealth(db, 'linkedin'))[id]!
+    expect(h.expiresAt).toBe('2026-10-01 00:00:00')
+    expect(h.refreshExpiresAt).toBe('2027-01-01 00:00:00')
+    expect(h.refreshedAt).toBe('2026-09-10 03:00:00')
+    expect(h.alerts.map((a) => `${a.kind}:${a.threshold}`)).toEqual(['refresh:1', 'access:7'])
+    expect(await accountHealth(db, 'x')).toEqual({})
+  })
+})
+

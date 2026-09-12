@@ -40,6 +40,14 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
   })
 
   /** ومن ترحيل التحقّق — **وبناءٌ ينساهما يمحو أثرَ كلّ تحقّقٍ وقع**. */
+  it('tokens.refreshed_at (D-129)', () => {
+    expect(schemaOf('tokens')).toContain('refreshed_at')
+  })
+
+  it('posts.original_text (D-128)', () => {
+    expect(schemaOf('posts')).toContain('original_text')
+  })
+
   it('oauth_apps.verified_at و verified_kind', () => {
     const sql = schemaOf('oauth_apps')
     expect(sql).toContain('verified_at')

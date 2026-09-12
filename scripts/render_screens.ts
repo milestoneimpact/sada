@@ -57,6 +57,13 @@ writeAudited(
   page(
     'صدى — LinkedIn',
     platformScreen({
+    health: {
+      'linkedin:member:abc': {
+        status: 'active', expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30),
+        alerts: [{ kind: 'access', threshold: 7, at: ago(6) }],
+      },
+      'linkedin:org:99': { status: 'active', expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, alerts: [] },
+    },
   app: undefined, baseUrl: 'https://sada2.basserh.com',
       view: li,
       now,
@@ -121,6 +128,7 @@ writeAudited(
   page(
     'صدى — X',
     platformScreen({
+    health: {},
   app: undefined, baseUrl: 'https://sada2.basserh.com',
       view: x, now,
       tally: { published: 0, queued: 0, failed: 0, drafts: 2, spend: 0,
@@ -136,6 +144,7 @@ writeAudited(
 writeAudited(
   '/tmp/screen-unbuilt.html',
   page('صدى — Instagram', platformScreen({
+    health: {},
   app: undefined, baseUrl: 'https://sada2.basserh.com',
     view: ig, now,
     tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
@@ -146,6 +155,7 @@ writeAudited(
 writeAudited(
   '/tmp/screen-link-only.html',
   page('صدى — YouTube', platformScreen({
+    health: {},
   app: undefined, baseUrl: 'https://sada2.basserh.com',
     view: yt, now,
     tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },

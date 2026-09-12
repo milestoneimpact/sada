@@ -73,7 +73,7 @@ describe('شعارُ المسوّدة من مصدره الواحد', () => {
     id: 'd1', platform, text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
     approvedAt: null, createdAt: '2026-09-05 09:00:00', scheduledAt: null,
-    accountName: null, dispatchedAt: null, publishCost: 0,
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: null
   })
   const section = (platform: DraftRow['platform']): string =>
     draftsSection({
@@ -331,7 +331,7 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
     id, platform, text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
     approvedAt: null, createdAt, scheduledAt: null,
-    accountName: null, dispatchedAt: null, publishCost: cost,
+    accountName: null, dispatchedAt: null, publishCost: cost, originalText: null
   })
   const html = draftsSection({
     drafts: [draft('a', 'linkedin', '2026-09-05 09:00:00', 0.02), draft('b', 'x', '2026-09-06 09:00:00', 0.05)],
@@ -383,5 +383,38 @@ describe('«ما مضى» رسمًا (D-127)', () => {
     expect(html).toContain('<b>8</b> <span class="sub">قِيس 3</span>')
     expect(html).toContain('bar-fill part')
     expect(html.match(/bar-fill part/g)).toHaveLength(1)
+  })
+})
+
+/**
+ * المرحلةُ الرابعة — ما يحتاج ترحيلًا (D-128): الفرقُ سطرًا سطرًا من الأصل
+ * المحفوظ، مطويًّا، وبعلامةٍ قبل اللون.
+ */
+describe('ما تغيّر قبل الاعتماد (D-128)', () => {
+  const base = (over: Partial<DraftRow>): DraftRow => ({
+    id: 'd1', platform: 'linkedin', text: 'أوّل\nثانٍ معدَّل', rationale: null, status: 'edited', model: null,
+    cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: 'omar',
+    approvedAt: '2026-09-05 09:00:00', createdAt: '2026-09-05 08:00:00', scheduledAt: null,
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: 'أوّل\nثانٍ',
+    ...over,
+  })
+  const section = (d: DraftRow): string =>
+    draftsSection({
+      drafts: [d], media: [], targets: [], earliest: '2026-09-06T09:15',
+      writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+    })
+
+  it('المعدَّلةُ تحمل فرقَها مطويًّا: المحذوفُ بـ«−» والمضافُ بـ«+»', () => {
+    const html = section(base({}))
+    expect(html).toContain('<details class="diff">')
+    expect(html).toContain('ما تغيّر قبل الاعتماد <span class="chip">2 سطران</span>')
+    expect(html).toContain('<span class="dl del">− ثانٍ</span>')
+    expect(html).toContain('<span class="dl add">+ ثانٍ معدَّل</span>')
+    expect(html).toContain('<span class="dl same">  أوّل</span>')
+  })
+
+  it('والمعتمَدةُ كما كُتبت، والمعدَّلةُ بلا أصلٍ محفوظ، لا فرقَ لهما', () => {
+    expect(section(base({ status: 'approved', originalText: null }))).not.toContain('class="diff"')
+    expect(section(base({ originalText: null }))).not.toContain('class="diff"')
   })
 })

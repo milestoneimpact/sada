@@ -231,3 +231,62 @@ export async function grantedScopes(
     return {}
   }
 }
+
+/** سجلُّ صحّة حسابٍ واحد — من `accounts` و`tokens` و`token_alerts` (D-129). */
+export interface AccountHealth {
+  readonly status: string
+  readonly expiresAt: string | null
+  readonly refreshExpiresAt: string | null
+  /** آخرُ تجديدٍ ناجح — و`null` لحسابٍ لم يُجدَّد قطّ. */
+  readonly refreshedAt: string | null
+  /** ما سُجّل من اقترابٍ أو انتهاء — الأحدثُ أوّلا. */
+  readonly alerts: readonly { readonly kind: 'access' | 'refresh'; readonly threshold: number; readonly at: string }[]
+}
+
+/**
+ * سجلُّ صحّة حسابات منصّةٍ — **استعلامان لا واحد**، كما في الرحلة (D-104):
+ * وصلُ التنبيهات بالرموز يضرب الصفوفَ بعضَها في بعض.
+ */
+export async function accountHealth(
+  db: Db,
+  platform: Platform,
+): Promise<Record<string, AccountHealth>> {
+  try {
+    const { results: rows } = await db
+      .prepare(
+        `SELECT a.id, a.status, t.expires_at, t.refresh_expires_at, t.refreshed_at
+           FROM accounts a
+           LEFT JOIN tokens t ON t.account_id = a.id
+          WHERE a.platform = ?`,
+      )
+      .bind(platform)
+      .all<{ id: string; status: string; expires_at: string | null; refresh_expires_at: string | null; refreshed_at: string | null }>()
+    const out: Record<string, AccountHealth> = {}
+    for (const r of rows) {
+      out[r.id] = {
+        status: r.status, expiresAt: r.expires_at ?? null, refreshExpiresAt: r.refresh_expires_at ?? null,
+        refreshedAt: r.refreshed_at ?? null, alerts: [],
+      }
+    }
+    if (rows.length === 0) return out
+    const { results: alerts } = await db
+      .prepare(
+        `SELECT al.account_id, al.kind, al.threshold, al.at
+           FROM token_alerts al JOIN accounts a ON a.id = al.account_id
+          WHERE a.platform = ?
+          ORDER BY al.at DESC
+          LIMIT 40`,
+      )
+      .bind(platform)
+      .all<{ account_id: string; kind: 'access' | 'refresh'; threshold: number; at: string }>()
+    for (const al of alerts) {
+      const h = out[al.account_id]
+      if (h === undefined) continue
+      out[al.account_id] = { ...h, alerts: [...h.alerts, { kind: al.kind, threshold: al.threshold, at: al.at }] }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+

@@ -80,7 +80,7 @@ import {
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
 import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
-import { grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
+import { accountHealth, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
@@ -1317,6 +1317,8 @@ panel.get('/panel/channels/:platform', async (c) => {
 
   const body = platformScreen({
     view, posts, tally, scopes, metrics, media, now,
+    // سجلُّ صحّة الحساب من صفوفه لا من حال (D-129)
+    health: spec.stage === 'none' ? {} : await accountHealth(c.env.DB, id as Platform),
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,

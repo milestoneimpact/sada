@@ -29,6 +29,7 @@ const POSTS: PlatformPost[] = [
 
 function screen(over: Partial<Parameters<typeof platformScreen>[0]> = {}): string {
   return platformScreen({
+    health: {},
     view, posts: POSTS, now,
     tally: { published: 2, queued: 1, failed: 1, drafts: 1, spend: 0, lastPublishedAt: null },
     scopes: {}, metrics: {}, media: {},
@@ -167,3 +168,33 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
     expect(() => screen({ app: undefined })).not.toThrow()
   })
 })
+
+/**
+ * سجلُّ صحّة الحساب (D-129): ترويسةٌ بجسدٍ دائم، وما لم يقع يُقال لا يُرسَم.
+ */
+describe('سجلُّ صحّة الحساب', () => {
+  it('بلا سجلٍّ: رُبط، ولم يُجدَّد بعد، ولا رمزَ محفوظا', () => {
+    const html = screen({})
+    expect(html).toContain('<h3 class="sec">سجلُّ صحّة الحساب</h3>')
+    expect(html).toContain('لم يُجدَّد بعدُ')
+    expect(html).toContain('لا رمزَ وصولٍ محفوظا')
+  })
+
+  it('وبسجلٍّ: آخرُ تجديدٍ وموعدُ الانتهاء والتنبيهاتُ بأسمائها', () => {
+    const html = screen({
+      health: {
+        a1: {
+          status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: '2027-01-01 00:00:00',
+          refreshedAt: '2026-09-10 03:00:00',
+          alerts: [{ kind: 'access', threshold: 7, at: '2026-09-24 03:00:00' }, { kind: 'refresh', threshold: 0, at: '2027-01-01 03:00:00' }],
+        },
+      },
+    })
+    expect(html).toContain('جُدّد آخرَ مرّةٍ')
+    expect(html).toContain('رمزُ الوصول ينتهي')
+    expect(html).toContain('رمزُ الوصول يقترب — بقي 7 أيّام')
+    expect(html).toContain('رمزُ التجديد انتهى')
+    expect(html).toContain('<span class="dot bad"></span>')
+  })
+})
+

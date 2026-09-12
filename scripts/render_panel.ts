@@ -122,7 +122,7 @@ const data: PanelData = {
       stale: false, approvedBy: null, approvedAt: null,
       createdAt: ago(0.4),
       scheduledAt: null, accountName: null, dispatchedAt: null,
-      publishCost: 0,
+      publishCost: 0, originalText: null
     },
     {
       id: 'd2', platform: 'x',
@@ -137,19 +137,19 @@ const data: PanelData = {
       createdAt: ago(0.9),
       scheduledAt: null, accountName: null, dispatchedAt: null,
       // **حالُ التحذير**: رابطٌ على X — ثلاثةَ عشرَ ضعفا (D-069)
-      publishCost: 0.2,
+      publishCost: 0.2, originalText: null
     },
     {
       id: 'd3', platform: 'linkedin',
       text:
         'ثلاثةُ دروسٍ من مراجعة محفظة البرامج هذا الربع، وأحدها كلّفنا سنةً لنتعلّمه:\n\nأوّلا، البرنامجُ الذي لا صاحبَ له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nثانيا، مؤشّرٌ واحدٌ صادق خيرٌ من لوحةٍ فيها عشرون لا يُنظر إليها.\n\nثالثا، ما لا يُراجَع في اجتماعٍ ثابت لا يُراجَع أبدا.',
       rationale: 'الدروسُ الثلاثة أوضحُ ما في المصدر، وأقربُ إلى قارئ LinkedIn.',
-      status: 'approved', model: 'claude-opus-5', cost: 0.0389,
+      status: 'edited', model: 'claude-opus-5', cost: 0.0389,
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(22),
       createdAt: ago(26),
       scheduledAt: null, accountName: null, dispatchedAt: null,
-      publishCost: 0,
+      publishCost: 0, originalText: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات هو الوقت.'
     },
     {
       // معتمَدةٌ ثانيةٌ عمدا: شريطُ التوزيع لا يظهر دون اثنتين (D-089)،
@@ -163,7 +163,7 @@ const data: PanelData = {
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(18),
       createdAt: ago(20),
       scheduledAt: null, accountName: null, dispatchedAt: null,
-      publishCost: 0,
+      publishCost: 0, originalText: null
     },
     {
       id: 'd4', platform: 'x',
@@ -175,7 +175,7 @@ const data: PanelData = {
       stale: false, approvedBy: 'panel:token', approvedAt: null,
       createdAt: ago(30),
       scheduledAt: null, accountName: null, dispatchedAt: null,
-      publishCost: 0,
+      publishCost: 0, originalText: null
     },
     {
       id: 'd5', platform: 'linkedin',
@@ -189,7 +189,7 @@ const data: PanelData = {
       scheduledAt: '2026-09-08 09:00:00',
       accountName: 'بصائر للاستشارات',
       dispatchedAt: null,
-      publishCost: 0,
+      publishCost: 0, originalText: null
     },
     {
       id: 'd6', platform: 'x',
@@ -203,7 +203,7 @@ const data: PanelData = {
       scheduledAt: '2026-09-05 17:45:00',
       accountName: '@omar_ah',
       dispatchedAt: ago(0.2),
-      publishCost: 0.015,
+      publishCost: 0.015, originalText: null
     },
   ],
   plan: {
