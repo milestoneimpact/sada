@@ -17,6 +17,7 @@
  * ما بين يديه.
  */
 import { escapeHtml } from './shell'
+import { historyBars } from './chart'
 import { toHijri } from '../../lib/analyze/hijri'
 import { money, relativeTime } from '../../lib/format'
 import type { PlatformSlice, StoredReport, WeeklyReport } from '../../lib/report/weekly'
@@ -218,6 +219,11 @@ export function reportScreen(d: ReportScreenData): string {
       ? ''
       : `<div class="card">
           <h2>ما مضى</h2>
+          <p class="hint">ما خرج أسبوعًا بأسبوع، <b>ومع كلّ عمودٍ عددُ المقيس</b> — فلا
+            نسبةَ بين أسبوعين قِيس أحدُهما نصفَ قياس.</p>
+          ${historyBars(d.reports.map((r) => ({
+            label: r.id, value: r.body.published, measured: r.body.measured, href: `/panel/report/${r.id}`,
+          })))}
           <div class="scroll"><table>
             <thead><tr><th>الأسبوع</th><th>خرج</th><th>قِيس</th><th>أُنفق</th></tr></thead>
             <tbody>${d.reports

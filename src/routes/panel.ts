@@ -58,6 +58,7 @@ import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../li
 import { TILE_MAX, TILE_MIN } from '../lib/dashboard'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../lib/pivot'
 import { FACT_CAP, loadFacts } from '../lib/pivotStore'
+import { todayFeed } from '../lib/today'
 import type { PivotView } from './ui/sections/pivot'
 
 /**
@@ -531,6 +532,8 @@ panel.get('/panel', async (c) => {
       nonce,
       sessions,
       audit,
+      // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
+      today: todayFeed({ now: new Date(), audit, drafts, facts: loaded.facts }),
       rpId: rp.id,
       via: session.record.via,
       factors: {

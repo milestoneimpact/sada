@@ -146,3 +146,35 @@ export function barChart(
     ${bars}
   </div>`
 }
+
+/**
+ * «ما مضى» رسمًا — **أسابيعُ بترتيبها لا بحجمها** (D-127).
+ *
+ * `barChart` يرتّب نازلًا لأنّ سؤالَه «أيُّها أكبر». وسؤالُ الأسابيع «كيف
+ * تغيّر»، **والزمنُ لا يُرتَّب بالحجم**. فالصفوفُ كما تُعطى، الأحدثُ أوّلًا
+ * كجدولها. **ومع كلّ عمودٍ عددُ المقيس**: أسبوعٌ خرج فيه خمسةٌ وقِيس واحدٌ
+ * لا يُقارَن بأسبوعٍ قِيس كلُّه — فلا نسبةَ نموٍّ تُكتب بين قياسٍ ونصفِ قياس
+ * (سنّةُ D-058).
+ */
+export function historyBars(
+  rows: readonly { readonly label: string; readonly value: number; readonly measured: number; readonly href: string }[],
+): string {
+  if (rows.length === 0) return ''
+  const max = Math.max(1, ...rows.map((r) => r.value))
+  const bars = rows
+    .map((r) => {
+      const pct = (r.value / max) * 100
+      const partial = r.measured < r.value
+      return `<div class="bar-row">
+        <a class="bar-name" href="${escapeHtml(r.href)}">${escapeHtml(r.label)}</a>
+        <span class="bar-track"><i class="bar-fill${partial ? ' part' : ''}" style="width:${pct.toFixed(1)}%"></i></span>
+        <span class="bar-val"><b>${r.value}</b> <span class="sub">قِيس ${r.measured}</span></span>
+      </div>`
+    })
+    .join('')
+  return `<div class="chart bars history" role="img"
+    aria-label="${escapeHtml(`${rows.length} أسابيع، وآخرُها ${rows[0]!.label}: خرج ${rows[0]!.value} وقِيس ${rows[0]!.measured}`)}">
+    ${bars}
+  </div>`
+}
+

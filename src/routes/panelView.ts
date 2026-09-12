@@ -31,6 +31,7 @@ import { alertChannel, bar, firstDay, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { COPY_SCRIPT } from './ui/shell'
+import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 
@@ -248,10 +249,22 @@ export const SCRIPT = `
     // الشريحةُ مخفيّةٌ في الوثيقة وتُظهَر هنا: تبويبٌ لا يرشّح بلا
     // سكربتٍ يُقرأ عطلا، والغائبُ لا يُعِد بشيء
     var bucket='all';
+    // والمنصّةُ والترتيبُ فرزٌ ثانٍ وثالث (D-127) — بالقاعدة نفسِها: افتراضُهما
+    // «الكلّ» و«الأحدث»، وما يُخفى يُلغى تحديدُه
+    var platform='all', order='new';
+    var ptabs=document.getElementById('draft-platform');
+    var orderSel=document.getElementById('draft-order');
+    function reorder(){
+      if(!cards.length)return;
+      var parent=cards[0].parentNode; if(!parent)return;
+      var key=function(c){return order==='cost'?parseFloat(c.dataset.cost||'0')||0:parseFloat(c.dataset.created||'0')||0;};
+      var sorted=cards.slice().sort(function(a,b){var d=key(b)-key(a); return order==='old'?-d:d;});
+      sorted.forEach(function(c){parent.appendChild(c);});
+    }
     function refilter(){
       var shown=0;
       cards.forEach(function(c){
-        var on = bucket==='all' || c.dataset.status===bucket;
+        var on = (bucket==='all' || c.dataset.status===bucket) && (platform==='all' || c.dataset.platform===platform);
         c.hidden=!on; if(on)shown++;
         // صندوقٌ مخفيٌّ يبقى مرسَلا مع النموذج — فيُعتمَد ما لا يُرى
         if(!on){
@@ -275,6 +288,20 @@ export const SCRIPT = `
         });
       });
     }
+    if(ptabs){
+      ptabs.hidden=false;
+      ptabs.querySelectorAll('button[data-platform-tab]').forEach(function(b){
+        b.addEventListener('click',function(){
+          platform=b.dataset.platformTab;
+          ptabs.querySelectorAll('button[data-platform-tab]').forEach(function(o){
+            var on=o===b;
+            o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
+          });
+          refilter();
+        });
+      });
+    }
+    if(orderSel){orderSel.addEventListener('change',function(){order=orderSel.value; reorder();});}
 
     // ── شريطُ البَتِّ الجماعيّ ───────────────────────────
     // والكلفةُ المعروضةُ ثمنُ النشر لا ثمنُ الكتابة (D-069): الأوّلُ
@@ -937,6 +964,8 @@ export interface PanelData {
   readonly nonce: string
   readonly sessions: PanelSession[]
   readonly audit: PanelAudit[]
+  /** «ما وقع اليوم» — مرويٌّ ممّا في اليد (D-127). */
+  readonly today: { readonly items: readonly TodayItem[]; readonly more: number }
   /** النطاق الذي تُوقَّع عليه المفاتيح — يُعرض ليُعرف أنّه ليس الآخر. */
   readonly rpId: string
   readonly via: 'admin_token' | 'passkey'
@@ -1191,6 +1220,24 @@ function deltaOf(series: readonly { day: string; total: number }[]): string {
   const up = change > 0
   return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${up ? '▲' : '▼'}</span>${
     Math.abs(change).toFixed(0)}٪ ${up ? 'أكثر' : 'أقلّ'} من أمس</div>`
+}
+
+/**
+ * «ما وقع اليوم» (D-127) — **الروايةُ تحت «ما ينتظرك»**: الأولى ما عليك،
+ * والثانيةُ ما وقع منذ منتصف الليل UTC. ولا استعلامَ لها: تُروى من سجلّ
+ * التدقيق والمسوّدات وحقائق اللوح المحوريّ التي قُرئت أصلًا.
+ */
+function todayList(d: PanelData): string {
+  const rows = d.today.items
+    .map((i) => `<li><span class="dot ${i.kind}"></span>
+      <span>${escapeHtml(i.text)}${i.at === null ? '' : ` <span class="ago">${escapeHtml(relativeTime(i.at, d.now))}</span>`}</span>
+      ${i.go === undefined ? '' : `<a class="btn g sm" href="${escapeHtml(i.go)}">${escapeHtml(i.goLabel ?? 'افتح')}</a>`}</li>`)
+    .join('')
+  const more = d.today.more === 0 ? '' : `<p class="hint">و${d.today.more} غيرُها اليوم — في سجلّ الأمان.</p>`
+  return `<h3 class="sec">ما وقع اليوم</h3>
+      ${rows === ''
+        ? '<p class="hint">لم يقع شيءٌ بعدُ منذ منتصف الليل UTC.</p>'
+        : `<ul class="todo">${rows}</ul>${more}`}`
 }
 
 export function panelPage(d: PanelData): string {
@@ -1459,7 +1506,8 @@ ${flash}
       <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
       ${todo === ''
         ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
-        : `<ul class="todo">${todo}</ul>`}</div>
+        : `<ul class="todo">${todo}</ul>`}
+      ${todayList(d)}</div>
     <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
       <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
       <div class="row" style="margin-top:var(--s-3)">${scanBtn}

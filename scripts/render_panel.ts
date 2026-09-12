@@ -270,6 +270,15 @@ const data: PanelData = {
     { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعاملٍ واحد', ip: '203.0.113.9' },
     { at: ago(26), actor: 'cron', action: 'drive.scan', target: null, detail: 'رأى 3 · تغيّر 1', ip: null },
   ],
+  today: {
+    items: [
+      { at: ago(1), kind: 'note', text: 'تبديل مفتاح — Anthropic', go: '#security', goLabel: 'الأمان' },
+      { at: ago(3), kind: 'ok', text: 'اعتمدتَ مسوّدةً لـLinkedIn', go: '#posts', goLabel: 'المنشورات' },
+      { at: null, kind: 'ok', text: 'نُشر منشورٌ على LinkedIn', go: '/panel/channels/linkedin', goLabel: 'شاشةُ LinkedIn' },
+      { at: null, kind: 'bad', text: 'فشل النشرُ على X', go: '/panel/channels/x', goLabel: 'شاشةُ X' },
+    ],
+    more: 0,
+  },
   rpId: 'sada2.basserh.com',
   via: 'admin_token',
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
