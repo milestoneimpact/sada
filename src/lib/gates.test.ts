@@ -90,8 +90,8 @@ describe('ولكلّ بندٍ دليلُه لا حكمُه وحده', () => {
   it('يُعرَض الرقمُ الذي بُني عليه الحكم', () => {
     const f: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3 } }
     const first = gate(f, '٠').items[0]!
-    expect(first.evidence).toContain('linkedin: 3')
-    expect(first.evidence).toContain('x: 0')
+    expect(first.evidence).toContain('LinkedIn: 3')
+    expect(first.evidence).toContain('X: 0')
   })
 })
 

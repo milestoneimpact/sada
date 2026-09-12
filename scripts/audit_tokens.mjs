@@ -315,6 +315,44 @@ for (const file of files) {
   }
 }
 
+/**
+ * وجردُ الرموز — **رمزٌ يُرسَم في سياقين، ورمزٌ لا يرسمه أحد** (D-125 · `N-5`).
+ *
+ * `ICON` كائنٌ واحدٌ مُصدَّر، **و`audit_dead` يرى الكائنَ حيّا ما دام اسمٌ
+ * واحدٌ منه يُنادى** — فمفتاحٌ فيه يُعرَّف ولا يُنادى ينجو بجيرانه. وهي
+ * علّةُ D-067 على مستوى المفتاح لا الملفّ: بُني ولم يُستعمَل.
+ *
+ * ## وما يَحرُس وما يُطبَع — والفرقُ هندسةٌ لا حكم
+ *
+ * | ما يُقاس | كيف | الحكم |
+ * |---|---|---|
+ * | **مفتاحٌ بلا منادٍ** خارج الاختبارات | وجودٌ مقابلَ غياب | **يردّ** |
+ * | **مفتاحٌ يُنادى من أكثرَ من ملفّ** | عدُّ ملفّات | **يُطبَع ليُقرأ** |
+ *
+ * والثاني لا يردّ لأنّ «معنيين» حكمٌ: الرحلةُ تعيد `report` **قصدا**
+ * — «علامةُ نوعٍ لا صورةُ فعل» (D-104). فيُطبَع الجردُ ويُبَتّ عند كلّ رمزٍ
+ * يُضاف، **ولا يُصدَّق حارسٌ يصيح على الصواب** (D-113).
+ */
+const ICON_KEYS = []
+{
+  const raw = strip(readFileSync(join(SRC, 'routes/ui/icons.ts'), 'utf8'))
+  const body = /export const ICON = \{([\s\S]*?)\n\}/.exec(raw)
+  if (body !== null) {
+    for (const m of body[1].matchAll(/^\s{2}([a-zA-Z][a-zA-Z0-9]*):\s*icon\(/gm)) ICON_KEYS.push(m[1])
+  }
+}
+const iconUses = new Map(ICON_KEYS.map((k) => [k, new Set()]))
+for (const file of files) {
+  if (NOT_USAGE.test(file) || /ui\/icons\.ts$/.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  for (const m of code.matchAll(/ICON\.([a-zA-Z][a-zA-Z0-9]*)/g)) {
+    iconUses.get(m[1])?.add(file.slice(SRC.length))
+  }
+}
+const unusedIcons = [...iconUses].filter(([, where]) => where.size === 0).map(([k]) => k)
+const sharedIcons = [...iconUses].filter(([, where]) => where.size > 1)
+  .sort((a, b) => b[1].size - a[1].size)
+
 const ghosts = [...used].filter(([name]) => !defined.has(name))
 const orphans = [...defined].filter(
   ([name]) => !used.has(name) && !ALLOWED.has(name.slice(2)),
@@ -330,6 +368,16 @@ console.log('\n═══ رموزٌ تُعرَّف ولا تُنادى ═══
 if (orphans.length === 0) console.log('  ✓ لا رمزَ معرَّفٍ بلا منادٍ')
 for (const [name, where] of orphans) {
   console.log(`  ✕ ${name}  —  يُعرَّف في ${where}`)
+}
+
+console.log('\n═══ رموزٌ في ICON لا يرسمها أحد ═══\n')
+if (unusedIcons.length === 0) console.log('  ✓ كلُّ رمزٍ في ICON له موضع')
+for (const k of unusedIcons) console.log(`  ✕ ICON.${k}  —  يُعرَّف ولا يُنادى خارج الاختبارات`)
+
+console.log('\n═══ جردُ الرموز — ما يُرسَم في أكثرَ من ملفّ (يُقرأ ولا يردّ · N-5) ═══\n')
+if (sharedIcons.length === 0) console.log('  · لا رمزَ يُرسَم في ملفّين')
+for (const [k, where] of sharedIcons) {
+  console.log(`  · ICON.${k}  في ${where.size}:  ${[...where].join(' · ')}`)
 }
 
 console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
@@ -353,11 +401,11 @@ if (spaced.length === 0) console.log('  ✓ لا تباعدَ يفكّ وصلا'
 for (const [sel, where] of spaced) console.log(`  ✕ ${sel}  —  ${where}`)
 
 console.log(
-  `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة)\n`,
+  `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة · ${ICON_KEYS.length} رمزا في ICON)\n`,
 )
 
 const total = ghosts.length + orphans.length + literalTime.length + spaced.length +
-  backticks.length + strayIcons.length + dupVars.length
+  backticks.length + strayIcons.length + dupVars.length + unusedIcons.length
 if (total === 0) process.exit(0)
 
 console.log('والمنادَى بلا تعريفٍ **يُعرَّف أو يُحذَف نداؤه** — ولا يُترَك:')

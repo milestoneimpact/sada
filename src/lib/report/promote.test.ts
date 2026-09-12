@@ -52,6 +52,9 @@ describe('لا مبلغَ بلا سقفٍ يضعه المالك', () => {
     if (out.kind !== 'suggested') return
     expect(out.candidate.budgetUsd).toBe(20 * MAX_SHARE)
     expect(out.candidate.reason).toContain('سقفٍ وضعتَه')
+    // والنافذةُ باسمها لا بمفتاح `CHECK` (D-125): «‏٢٤ ساعة» لا «24h»
+    expect(out.candidate.reason).toContain('نافذة ‏٢٤ ساعة')
+    expect(out.candidate.reason).not.toMatch(/نافذة (24h|72h|7d)/)
   })
 })
 

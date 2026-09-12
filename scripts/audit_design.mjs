@@ -53,12 +53,25 @@ for (const file of pages) {
    * وتُضاف الشاشةُ العريضةُ كذلك: الرتبةُ الخامسةُ تُفتَح فوق ‏١٩٢٠ ولم
    * يكن يُقاس عندها شيء.
    */
-  for (const [label, width, density] of [
-    ['شاشة', 1440, null], ['عريضة', 2000, null],
-    ['مضغوط', 1440, 'compact'], ['جوّال', 390, null],
+  /*
+   * **والليليُّ يُدقَّق مرسوما لا مقروءا من الرموز** (D-125).
+   *
+   * مدقّقُ التباين الثابت يفحص أزواجَ الرموز في الثيمين **ولا يرى عنصرا
+   * يلبس ثيما غيرَ ثيم صفحته** — وقد وقع: زرُّ «ليليّ» بحبر الليل على أرض
+   * النهار في كلّ صفحةٍ خارج اللوحة (D-124)، وكشفته عيّنةٌ لا رمز. فيُشغَّل
+   * الوضعُ الأوّلُ مرّةً ثانيةً و`data-theme="dark"` على الجذر، **فيُقاس
+   * التباينُ المحسوبُ والهندسةُ كلُّها بألوان الليل**.
+   */
+  for (const [label, width, density, theme] of [
+    ['شاشة', 1440, null, null], ['عريضة', 2000, null, null],
+    ['مضغوط', 1440, 'compact', null], ['جوّال', 390, null, null],
+    ['ليليّ', 1440, null, 'dark'],
   ]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } })
     await page.goto(`file://${file}`)
+    if (theme !== null) {
+      await page.evaluate((t) => { document.documentElement.dataset.theme = t }, theme)
+    }
     await page.waitForTimeout(700)
     /*
      * **لفظُ الطَيِّ يقول حالا واحدا** (D-112).
@@ -223,6 +236,114 @@ for (const file of pages) {
       return { holes, orphans }
     }, width)
 
+    /*
+     * **الرحلةُ بلوحة المفاتيح** (D-125).
+     *
+     * إمكانيّةُ الوصول الوحيدةُ التي لم تُقَس: التباينُ يُقاس، والهدفُ
+     * يُقاس، **وترتيبُ `Tab` لم يضغطه أحدٌ في مدقّق**. فيُضغَط هنا فعلا —
+     * ضغطةً ضغطةً حتّى يخرج التركيزُ من الصفحة — ويُقاس ثلاثةٌ، وكلُّها
+     * وجودٌ مقابلَ غياب:
+     *
+     * | ما يُقاس | الحكم |
+     * |---|---|
+     * | عنصرٌ تفاعليٌّ مرئيٌّ لا يبلغه `Tab` | يُتخطّى — ولا يصل إليه من لا فأرةَ له |
+     * | تركيزٌ يقع على عنصرٍ بلا صندوق | يضيع — يضغط المالكُ ولا يرى أين |
+     * | عنصرٌ مركَّزٌ بلا حلقةٍ مرئيّة | `outline` و`box-shadow` كلاهما `none` |
+     * | التركيزُ يعود إلى عنصرٍ مرّ به | مصيدة |
+     *
+     * وأوّلُ ضغطةٍ تبلغ رابطَ التخطّي حيث وُجد (WCAG 2.4.1).
+     *
+     * **وتُقاس في الوضع الأوّل وحدَه**: الترتيبُ ترتيبُ الشجر، ولا يبدّله
+     * عرضٌ ولا كثافةٌ ولا ثيم. وضغطُ ثلاثمئة `Tab` خمسَ مرّاتٍ لا يقيس شيئا
+     * جديدا.
+     */
+    let keyboard = { unreached: [], blind: [], ringless: [], trapped: false, skipFirst: true, reached: 0, expected: 0 }
+    if (label === 'شاشة') {
+      /*
+       * **والهويّةُ تُعلَّق على العنصر لا تُحسَب من موضعه.** أوّلُ صياغةٍ
+       * عرّفت العنصرَ بترتيبه في الشجرة، **والنصُّ يبدّل الشجرةَ وهي
+       * تُضغَط** — فقرأ عنصرا جديدا بمفتاح عنصرٍ مرّ به وصاح «مصيدة».
+       */
+      const expected = await page.evaluate(() => {
+        window.scrollTo(0, 0)
+        const sel = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex]'
+        const out = []
+        let n = 0
+        for (const el of document.querySelectorAll(sel)) {
+          el.__kb = `e${n += 1}`
+          if (el.disabled || el.closest('[inert], [hidden], [data-palette]') !== null) continue
+          const r = el.getBoundingClientRect()
+          // ورابطُ التخطّي مقصوصٌ حتّى يُركَّز — مرئيٌّ بالقصد لا بالصندوق
+          if (!(r.width > 0 && r.height > 0) && !el.classList.contains('skip')) continue
+          if (getComputedStyle(el).visibility === 'hidden') continue
+          // وظلُّ السكون يُحفَظ: **ظلٌّ زينةٌ على زرٍّ ليس حلقةَ تركيز** —
+          // أوّلُ صياغةٍ قرأت «box-shadow ≠ none» فرأت حلقةً في كلّ زرٍّ له ظلّ
+          el.__rest = getComputedStyle(el).boxShadow
+          out.push({ key: el.__kb, tag: el.tagName.toLowerCase(), cls: String(el.className).slice(0, 24),
+            text: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 24),
+            neg: el.getAttribute('tabindex') === '-1' })
+        }
+        return out
+      })
+      const describe = () => {
+        const el = document.activeElement
+        if (el === null || el === document.body || el === document.documentElement) return null
+        if (el.__kb === undefined) el.__kb = `x${Math.random().toString(36).slice(2, 8)}`
+        const st = getComputedStyle(el)
+        const r = el.getBoundingClientRect()
+        // الحلقةُ: خطٌّ خارجيٌّ ظاهر، **أو ظلٌّ تغيّر عن ظلّ السكون**
+        const outlined = st.outlineStyle !== 'none' && Number.parseFloat(st.outlineWidth) > 0
+        const ring = outlined || (el.__rest !== undefined ? st.boxShadow !== el.__rest : st.boxShadow !== 'none')
+        return { key: el.__kb, tag: el.tagName.toLowerCase(), cls: String(el.className).slice(0, 24),
+          text: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 24),
+          box: r.width > 0 && r.height > 0, ring,
+          // وحقلُ التاريخ أجزاءٌ يمشي `Tab` بينها والعنصرُ واحد — ليس مصيدة
+          parts: /^(date|time|datetime-local|month|week)$/.test(el.type ?? '') }
+      }
+      const reached = new Map()
+      let trapped = false
+      let skipFirst = true
+      let last = null
+      let stay = 0
+      // وما رُكِّز عند التحميل (`autofocus`) بُلغ بلا ضغطة — يُعَدّ مبلوغا
+      const initial = await page.evaluate(describe)
+      /*
+       * **والمشيُ من أوّل الصفحة لا من حيث وقف التركيز.** `blur()` لا يعيد
+       * نقطةَ البدء: المتصفّح يحفظها عند آخر عنصرٍ رُكِّز، فـ`Tab` بعد
+       * `autofocus` يقفز فوق كلّ ما قبله — وقرأ المدقّقُ زرَّ مفتاح المرور
+       * «لا يُبلَغ» وهو قبل الحقل. فتُعاد نقطةُ البدء إلى رأس الجسد بعنصرٍ
+       * مؤقّتٍ يُركَّز ثمّ يُرفَع.
+       */
+      await page.evaluate(() => {
+        const s = document.createElement('span')
+        s.tabIndex = -1
+        document.body.prepend(s)
+        s.focus()
+        s.remove()
+      })
+      for (let i = 0; i <= expected.length * 2 + 8; i += 1) {
+        await page.keyboard.press('Tab')
+        const cur = await page.evaluate(describe)
+        if (cur === null) break
+        if (i === 0) skipFirst = cur.cls.includes('skip') || expected.every((e) => !e.cls.includes('skip'))
+        if (reached.has(cur.key)) {
+          if (cur.parts && cur.key === last && (stay += 1) < 8) continue
+          trapped = true
+          break
+        }
+        stay = 0
+        last = cur.key
+        reached.set(cur.key, cur)
+      }
+      if (initial !== null && !reached.has(initial.key)) reached.set(initial.key, initial)
+      keyboard = {
+        expected: expected.length, reached: reached.size, trapped, skipFirst,
+        unreached: expected.filter((e) => !reached.has(e.key)),
+        blind: [...reached.values()].filter((c) => !c.box && !c.cls.includes('skip')),
+        ringless: [...reached.values()].filter((c) => !c.ring),
+      }
+    }
+
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
       const seen = (el) => {
         const r = el.getBoundingClientRect()
@@ -314,7 +435,9 @@ for (const file of pages) {
           const bg = getComputedStyle(n).backgroundColor
           if (alpha(bg) > 0.85) { const c = rgb(bg); if (c) return c }
         }
-        return [255, 255, 255]
+        // ولا أرضَ مفترَضة: ما لم يُوجَد أرضٌ كثيفةٌ فأرضُ الجذر — وهي في الليل ليلٌ
+        const root = rgb(getComputedStyle(document.documentElement).backgroundColor)
+        return root ?? [255, 255, 255]
       }
 
       const faint = []
@@ -353,6 +476,7 @@ for (const file of pages) {
     findings[findings.length - 1].ranks = ranks
     findings[findings.length - 1].holes = shape.holes
     findings[findings.length - 1].orphans = shape.orphans
+    findings[findings.length - 1].keyboard = keyboard
     await page.close()
   }
 }
@@ -363,12 +487,30 @@ for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
     (f.holes ?? []).length + (f.orphans ?? []).length +
+    (f.keyboard?.unreached.length ?? 0) + (f.keyboard?.blind.length ?? 0) + (f.keyboard?.ringless.length ?? 0) +
+    (f.keyboard?.trapped ? 1 : 0) + (f.keyboard?.skipFirst === false ? 1 : 0) +
     (f.overflow ? 1 : 0)
   failed += issues
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
+  const kb = f.keyboard
+  const kbNote = kb !== undefined && f.label === 'شاشة' ? ` · Tab بلغ ${kb.reached} من ${kb.expected}` : ''
   if (issues === 0) {
-    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}`)
+    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}${kbNote}`)
     continue
+  }
+  if (kb !== undefined && kb.trapped) console.log('  ✕ مصيدةُ تركيز: Tab عاد إلى عنصرٍ مرّ به')
+  if (kb !== undefined && kb.skipFirst === false) console.log('  ✕ أوّلُ Tab لا يبلغ رابطَ التخطّي')
+  if (kb !== undefined && kb.unreached.length > 0) {
+    console.log(`  ✕ ${kb.unreached.length} عنصرا تفاعليّا لا يبلغه Tab${kbNote}:`)
+    for (const u of kb.unreached.slice(0, 8)) console.log(`      ${u.tag}.${u.cls}${u.neg ? ' [tabindex=-1]' : ''} «${u.text}»`)
+  }
+  if (kb !== undefined && kb.blind.length > 0) {
+    console.log(`  ✕ ${kb.blind.length} تركيزا على عنصرٍ بلا صندوق:`)
+    for (const b of kb.blind.slice(0, 8)) console.log(`      ${b.tag}.${b.cls} «${b.text}»`)
+  }
+  if (kb !== undefined && kb.ringless.length > 0) {
+    console.log(`  ✕ ${kb.ringless.length} عنصرا مركَّزا بلا حلقةٍ مرئيّة:`)
+    for (const b of kb.ringless.slice(0, 8)) console.log(`      ${b.tag}.${b.cls} «${b.text}»`)
   }
   if (f.overflow) console.log(`  ✕ فيضانٌ أفقيّ: ${f.scrollWidth}px > ${f.width}px`)
   if (f.small.length > 0) {

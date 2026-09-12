@@ -30,6 +30,24 @@ export const PLATFORM_IDS = ['linkedin', 'x', 'youtube', 'tiktok', 'instagram'] 
 
 export type Platform = (typeof PLATFORM_IDS)[number]
 
+/**
+ * **الاسمُ بجانب المعرِّف — في موضعٍ واحد** (D-123 · D-125).
+ *
+ * `linkedin` مفتاحٌ في القاعدة و`LinkedIn` اسمٌ في الشاشة. وكان الاسمُ
+ * يُكتب في ثلاثة مواضع (اللوحُ المحوريّ، والمراجعة، والقنوات) **ويُترَك
+ * في مواضعَ أخرى بحرف المفتاح** — بوّابةُ التأسيس ورحلةُ المنشور. فيُعرَّف
+ * هنا مرّةً، ومن احتاج الاسمَ قرأه من هنا.
+ *
+ * **والقاموسُ ناقصٌ عمدا**: ما ليس فيه يُعرَض بحرفه لا بـ«غير معروف».
+ */
+export const PLATFORM_LABEL: Readonly<Record<Platform, string>> = {
+  linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
+}
+
+export function platformLabel(id: string): string {
+  return (PLATFORM_LABEL as Readonly<Record<string, string>>)[id] ?? id
+}
+
 /** ما بُني له سائقُ نشرٍ فعلا — ويقابل قيدَ `posts.platform`. */
 /**
  * ما تنشر اليوم — **ويُوسَّع مع سائقه لا قبله** (D-092).

@@ -18,6 +18,8 @@ export type ProviderName = 'anthropic' | 'gemini' | 'cloudflare'
 export type TaskName = 'analyze' | 'draft' | 'image' | 'plan' | 'video'
 
 export interface ProviderSpec {
+  /** الاسمُ وحدَه — لرقاقةٍ لا تتّسع لدوره (D-125). */
+  readonly name: string
   readonly label: string
   /** اسم السرّ في بيئة Worker. اسمٌ لا قيمة. */
   readonly secret: keyof Env
@@ -26,16 +28,19 @@ export interface ProviderSpec {
 
 export const PROVIDERS: Readonly<Record<ProviderName, ProviderSpec>> = {
   anthropic: {
+    name: 'Anthropic',
     label: 'Anthropic — الفهم والكتابة',
     secret: 'ANTHROPIC_API_KEY',
     docs: 'console.anthropic.com ← API Keys',
   },
   gemini: {
+    name: 'Gemini',
     label: 'Gemini — توليد الصور',
     secret: 'GEMINI_API_KEY',
     docs: 'aistudio.google.com/apikey',
   },
   cloudflare: {
+    name: 'Cloudflare',
     label: 'Cloudflare Workers AI — الفيديو',
     secret: 'CF_AI_TOKEN',
     docs: 'dash.cloudflare.com ← My Profile ← API Tokens ← Workers AI',

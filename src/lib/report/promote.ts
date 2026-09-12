@@ -21,7 +21,7 @@
 import type { Db } from '../tokens'
 import { changedRows } from '../dbResult'
 import type { ReportPost } from './weekly'
-import type { WindowName } from '../metrics/job'
+import { windowLabel, type WindowName } from '../metrics/job'
 
 /**
  * كم منشورا في النافذة يلزم قبل أن يُقال «هذا فوق المعتاد».
@@ -100,7 +100,7 @@ export function pick(posts: readonly ReportPost[], capUsd: number): PromoteOutco
         median: mid,
         budgetUsd,
         reason:
-          `تفاعلُه ${best.interactions} — ${times}× وسيطَ نافذة ${window} ` +
+          `تفاعلُه ${best.interactions} — ${times}× وسيطَ نافذة ${windowLabel(window)} ` +
           `(${cohort.length} منشورات). والمبلغُ ${budgetUsd}$ نصفُ سقفٍ وضعتَه ` +
           `(${money(capUsd)}$)، ولا يُنفَق حتّى تقبله.`,
       },

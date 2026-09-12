@@ -16,6 +16,7 @@
 import { escapeHtml } from './shell'
 import { money, relativeTime } from '../../lib/format'
 import { ICON } from './icons'
+import { platformLabel } from '../../lib/oauth/providers'
 import type { Journey, Station } from '../../lib/journey'
 
 /**
@@ -82,7 +83,7 @@ export function journeyBody(j: Journey, now: Date): string {
         محطّةَ تُخترَع لتكتمل الصورة. وما لم يقع لا يُرسَم له مكانٌ فارغ.</p>
     </div>
     <div class="aside">
-      <span class="pill"><i class="led"></i>${escapeHtml(j.platform)}</span>
+      <span class="pill"><i class="led"></i>${escapeHtml(platformLabel(j.platform))}</span>
       <span class="pill">أُنفق ${escapeHtml(money(j.spent))}</span>
     </div>
   </div>

@@ -18,6 +18,12 @@ import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
+import { platformLabel } from '../../lib/oauth/providers'
+import { gatesOf, type GateFacts } from '../../lib/gates'
+import { journeyBody } from './journeyView'
+import { securitySection } from './sections/security'
+import { PROVIDERS } from '../../lib/ai/registry'
+import { SCRIPT } from '../panelView'
 
 describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
   it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {
@@ -167,5 +173,101 @@ describe('صفحةُ الدخول تقول ما تطلب بالعربيّة', ()
   it('اللصيقةُ «رمزُ الإدارة» واسمُ السرّ بجانبها', () => {
     const html = loginPage({}, 'n')
     expect(html).toContain('رمزُ الإدارة <span class="mono">ADMIN_TOKEN</span>')
+  })
+})
+
+/**
+ * **مقياسُ المفتاح الظاهر أمسك أربعةً في أوّل تشغيل** (D-125 · `N-4`):
+ * `linkedin: 4` في بوّابة التأسيس، و`linkedin` في رحلة المنشور، و`anthropic`
+ * في «على ماذا»، و`24h` في سبب التوصية. **وكلُّها من جنس D-123**: مفتاحٌ
+ * في مكان اسم. فصار للمنصّة اسمٌ بجانب معرِّفها في موضعٍ واحد.
+ */
+describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-125)', () => {
+  it('اسمُ المنصّة بجانب معرِّفها، وما ليس في القاموس بحرفه', () => {
+    expect(platformLabel('linkedin')).toBe('LinkedIn')
+    expect(platformLabel('tiktok')).toBe('TikTok')
+    expect(platformLabel('mastodon')).toBe('mastodon')
+  })
+
+  it('وبوّابةُ التأسيس تعدّ بالاسم — **وكانت تعدّ `linkedin: 4`**', () => {
+    const facts = {
+      publishedPerPlatform: { linkedin: 4, x: 2 }, ledgerPerPlatform: { linkedin: 4, x: 2 },
+      publishedWithMedia: {}, linkedInVersionDue: false,
+    } as unknown as GateFacts
+    const text = gatesOf(facts).flatMap((g) => g.items).map((i) => i.evidence).join('\n')
+    expect(text).toContain('LinkedIn: 4 · X: 2')
+    expect(text).not.toMatch(/\blinkedin: /)
+  })
+
+  it('والرحلةُ تسمّي منصّتَها', () => {
+    const html = journeyBody({
+      postId: 'p1', platform: 'linkedin', status: 'published', spent: 0, text: 'نصّ',
+      stations: [{ kind: 'draft', title: 'كُتبت', at: '2026-09-05 09:00:00', detail: '',
+        cost: null, model: null, state: 'done' }],
+    }, new Date('2026-09-06T09:00:00Z'))
+    expect(html).toContain('<i class="led"></i>LinkedIn</span>')
+    expect(html).not.toMatch(/<i class="led"><\/i>linkedin</)
+  })
+
+  it('و«على ماذا» في سجلّ التدقيق اسمُ المزوّد لا مفتاحُه، وما ليس مزوّدا ولا منصّةً بحرفه', () => {
+    expect(PROVIDERS.anthropic.name).toBe('Anthropic')
+    const now = new Date('2026-09-06T09:00:00Z')
+    const audit = (target: string): string => securitySection({
+      sessions: [], factors: { passkeys: [] }, now,
+      audit: [{ at: '2026-09-06 08:00:00', actor: 'panel:token', action: 'provider.key',
+        target, detail: null, ip: null }],
+    } as never).audit
+    expect(audit('anthropic')).toContain('<span class="chip">Anthropic</span>')
+    expect(audit('x')).toContain('<span class="chip">X</span>')
+    expect(audit('d-42')).toContain('<span class="chip">d-42</span>')
+  })
+
+  /**
+   * **والليليُّ في المدقّق البصريّ أمسك علّةَ إنتاجٍ في أوّل تشغيل**:
+   * رابطُ الوثيقة بلون `--brand-deep` — وهو في الليل أرضُ ضغطٍ لا حبرٌ —
+   * ‏٣٫٠٩:١ على أرض الليل. **فالحبرُ من `--brand` المقيس في الثيمات الثلاثة**،
+   * و`--brand-deep` لا يُكتب حبرا في موضع.
+   */
+  it('ولا `--brand-deep` حبرا — هو أرضُ ضغطٍ في الليل لا حبرٌ', () => {
+    // ولا يُتَّهم `border-color` — الحدُّ ليس حبرا
+    expect(STYLE).not.toMatch(/[^-]color:var\(--brand-deep\)/)
+    expect(STYLE).toContain('.doc a{color:var(--brand)')
+  })
+})
+
+/**
+ * **والورقُ أبيضُ في الثيمين** (D-125): مدقّقُ الطباعة قاس الوثيقةَ مطبوعةً
+ * من الليليّ فوجد الترويساتِ ‏١٫٣٣:١ — حبرُ الليل على ورقٍ أبيض. فتُعاد
+ * قيَمُ النهار على الجذر في الطباعة **بالمحدّد نفسِه الذي يحمل الليل**،
+ * لتغلبَه بالترتيب لا بالوزن.
+ */
+describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
+  it('كتلةُ الطباعة تعيد حبرَ النهار على محدّد الليل نفسِه', () => {
+    const print = STYLE.slice(STYLE.indexOf('THEME:print'))
+    expect(print).toContain(':root,:root:not([data-theme="light"]),:root[data-theme="dark"]{')
+    expect(print).toContain('--ink:#14291d;')
+    expect(print).toContain('--bg:#ffffff;')
+    expect(print).toContain('color-scheme:light;')
+  })
+})
+
+/**
+ * **الرحلةُ بلوحة المفاتيح أمسكت ثلاثةً في أوّل مشي** (D-125): حلقةُ تركيزٍ
+ * على محرّر المسوّدة تُكتب لونا في مكان ظلٍّ فتُحسَب `none`، وزرُّ «حدّث»
+ * يُعطَّل لحظةَ يُركَّز على القائمة فيقفز عنه `Tab`، ورابطُ العودة ‏٤٠px عرضا.
+ */
+describe('ما مشاه Tab (D-125)', () => {
+  it('حلقةُ محرّر المسوّدة ظلٌّ مقيسٌ لا لونٌ في مكان ظلّ', () => {
+    expect(STYLE).toContain('.draft-text:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--ring)}')
+    expect(STYLE).not.toContain('box-shadow:var(--ring)}')
+  })
+
+  it('و«حدّث» لا يُعطَّل وهي تُجلَب — busy يحرس التكرار', () => {
+    expect(SCRIPT).toContain("btn.setAttribute('aria-busy','true')")
+    expect(SCRIPT).not.toContain('btn.disabled=true')
+  })
+
+  it('ورابطُ العودة هدفُ لمسٍ عرضا كما هو ارتفاعا', () => {
+    expect(STYLE).toMatch(/nav\.back a\{[^}]*min-width:var\(--tap\)/)
   })
 })

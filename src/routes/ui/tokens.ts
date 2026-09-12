@@ -345,4 +345,28 @@ export const TOKENS = `
   --sh-1:0 1px 2px rgba(0,0,0,.4);
   color-scheme:dark;
 }
+
+/* ── الورقُ أبيضُ في الثيمين ─────────────────────────────────────────
+   THEME:print (D-125)
+
+   **الرموزُ لا تعرف الورق**: من يطبع من الثيم الليليّ يحمل «--ink:#e8f1eb»
+   إلى ورقٍ أبيض — قِيس فوُجدت الترويساتُ ‏١٫٣٣:١ والمتنُ ‏٢٫٢٨:١ على
+   الورق. وطبقةُ الطباعة في ورقة الأنماط تُبيّض الأرضَ وتُسوّد المتنَ
+   بالوراثة، **وما كُتب بـ var(--ink-2) لا يرث** — فتُعاد قيَمُ النهار على
+   الجذر في الطباعة، بالمحدّد نفسِه الذي يحمل الليلَ لتغلبَه بالترتيب. */
+@media print{
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{
+    --bg:#ffffff;
+    --chrome:#ffffff;
+    --surface:#ffffff; --surface-2:#f4f9f6; --surface-3:#edf5f0;
+    --line:#d5e2d9; --line-soft:#e4eee8; --line-strong:#bacdc1;
+    --ink:#14291d; --ink-2:#495a4f; --ink-3:#57685e;
+    --brand:#12623e; --brand-soft:#2c8157; --brand-deep:#004427; --on-brand:#ffffff;
+    --au:#745914;
+    --brand-wash:#e0f5e7;
+    --ok:#1c7a52; --warn:#8a5a00; --bad:#b3261e;
+    --ok-wash:#e2f3e9; --warn-wash:#fdf3e4; --bad-wash:#fdedeb;
+    color-scheme:light;
+  }
+}
 `

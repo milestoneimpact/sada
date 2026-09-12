@@ -29,6 +29,31 @@
  * **ولذلك يقيس ويطبع ولا يردّ** — كـ`measure_prose` وللسبب نفسِه.
  */
 import { chromium } from 'playwright'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+/*
+ * ٥ · **مفتاحٌ في مكان الاسم** (`N-4` · D-125).
+ *
+ * `published` في ترويسة اللوح المحوريّ، و`24h` في التقرير — **مفردةُ
+ * `CHECK` من المخطّط تظهر نصّا مرئيّا في شاشةٍ عربيّة** (D-123 · D-124).
+ * والقاموسُ يُقرأ من الترحيلات نفسِها لا من قائمةٍ تُكتب هنا فتشيخ:
+ * كلُّ `IN ('…')` في `migrations/*.sql` مفردةٌ يُبحَث عنها كلمةً كاملة.
+ *
+ * **ولماذا مقياسٌ لا حارس**: `x` و`linkedin` مفتاحان في القاعدة
+ * **واسمان مقصودان في الشاشة** حين يُكتبان `X` و`LinkedIn` — والحرفُ
+ * يفرّق، **ولا يفرّق أبدا**: اسمُ ملفٍّ من المالك قد يحمل الكلمة. فيُطبَع
+ * ويُقرأ عند كلّ موجة، ولا يردّ (D-113).
+ */
+const MIGRATIONS = new URL('../migrations/', import.meta.url).pathname
+const CHECK_WORDS = new Set()
+for (const name of readdirSync(MIGRATIONS)) {
+  if (!name.endsWith('.sql')) continue
+  const sql = readFileSync(join(MIGRATIONS, name), 'utf8')
+  for (const m of sql.matchAll(/\bIN\s*\(([^)]*)\)/gi)) {
+    for (const w of m[1].matchAll(/'([^']+)'/g)) if (w[1].length > 1) CHECK_WORDS.add(w[1])
+  }
+}
 
 const files = process.argv.slice(2)
 if (files.length === 0) {
@@ -45,7 +70,7 @@ for (const file of files) {
   await page.goto(`file://${file}`)
   await page.waitForTimeout(500)
 
-  const report = await page.evaluate(() => {
+  const report = await page.evaluate((CHECK_WORDS) => {
     const panes = [...document.querySelectorAll('section[data-pane]')]
     /*
      * **وشاشةُ حالاتٍ ليست شاشةً واحدة.**
@@ -226,24 +251,43 @@ for (const file of files) {
         }
       }
 
+      // ٥ · مفتاحٌ ظاهر — **كلمةٌ كاملةٌ بحرفها** من مفردات المخطّط
+      const keys = []
+      for (const node of el.querySelectorAll('*')) {
+        // **وما كُتب شيفرةً ليس اسما**: `.mono` يعرض حقلا أو نطاقا أو مسارَ ضبطٍ بحرفه قصدا
+        if (node.closest('script, style, svg, template, textarea, input, code, kbd, pre, .mono') !== null) continue
+        if (node.getBoundingClientRect().height === 0) continue
+        for (const child of node.childNodes) {
+          if (child.nodeType !== 3) continue
+          const text = norm(child.textContent ?? '')
+          for (const raw of text.split(/\s+/)) {
+            // الكلمةُ تُجرَّد من ترقيمها الطرفيّ، **ومعرِّفٌ مركَّب** (`video.publish` ·
+            // `gemini-2.5-flash` · `panel:token`) اسمٌ تقنيٌّ لا مفتاحٌ في مكان اسم
+            const w = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
+            if (/[.\-:/_]/.test(w)) continue
+            if (CHECK_WORDS.includes(w)) keys.push({ w, tag: node.tagName.toLowerCase(), text: text.slice(0, 40) })
+          }
+        }
+      }
+
       const words = strings.reduce((a, s) => a + s.text.split(' ').length, 0)
       out.totals.strings += strings.length
       out.totals.words += words
       out.panes.push({
         name, strings: strings.length, words,
-        repeated, clashes, dupHeads,
+        repeated, clashes, dupHeads, keys,
         clipped: clipped.slice(0, 6),
         clippedCount: clipped.length,
       })
       if (was) el.hidden = true
     }
     return out
-  })
+  }, [...CHECK_WORDS])
 
   console.log(`\n═══ ${file.split('/').pop()} ═══`)
   console.log(`  ${report.totals.strings} سلسلةً · ${report.totals.words} كلمة\n`)
   for (const p of report.panes.sort((a, b) => b.words - a.words)) {
-    const issues = p.repeated.length + p.clashes.length + p.dupHeads.length + p.clippedCount
+    const issues = p.repeated.length + p.clashes.length + p.dupHeads.length + p.clippedCount + p.keys.length
     const head = `  ${String(p.name).padEnd(11)} ${String(p.strings).padStart(4)} سلسلة`
       + ` · ${String(p.words).padStart(5)} كلمة`
     if (issues === 0) { console.log(`${head}  ✓`); continue }
@@ -252,6 +296,7 @@ for (const file of files) {
     for (const r of p.repeated) console.log(`      ✕ تكرارٌ ×${r.n}: «${r.text}»`)
     for (const c of p.clashes) console.log(`      ✕ «${c.label}» تذهب إلى ${c.to} وجهات`)
     for (const h of p.dupHeads) console.log(`      ✕ ترويسةٌ ×${h.n}: «${h.t}»`)
+    for (const k of p.keys) console.log(`      ✕ مفتاحٌ ظاهر «${k.w}» في ${k.tag}: «${k.text}»`)
     for (const c of p.clipped) console.log(`      ✕ مقصوصٌ ${c.over}px: ${c.cls} «${c.text}»`)
     if (p.clippedCount > p.clipped.length) {
       console.log(`      … و${p.clippedCount - p.clipped.length} مقصوصا غيرَها`)
@@ -259,4 +304,4 @@ for (const file of files) {
   }
 }
 await browser.close()
-console.log(`\nالمجموع: ${findings} ملحوظة`)
+console.log(`\nالمجموع: ${findings} ملحوظة · (${CHECK_WORDS.size} مفردةً من CHECK تُبحَث)`)
