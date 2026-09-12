@@ -54,6 +54,11 @@ export interface OwnerTask {
    * تُفتَح منها الشاشة. **أسماءٌ لا قيَم** — كما في كلّ موضع (D-005).
    */
   readonly secrets?: readonly string[]
+  /**
+   * أين يُتَّخذ القرار — **رابطٌ إلى موضعه لا شرحٌ له** (D-130). مهمّةٌ
+   * ثمنُها ضغطةٌ في اللوحة تحمل بابَها، كما تحمل مهمّةُ السرّ أمرَها.
+   */
+  readonly go?: string
 }
 
 /** أمرُ ضبطِ سرٍّ واحد — بصيغة `MANUAL-TASKS.md` حرفًا. */
@@ -77,6 +82,10 @@ export interface OwnerFacts {
   readonly anyPublished: boolean
   /** أوُلّد فيديو بسعرٍ مؤكَّد؟ `false` يعني أنّ السقفَ لا يحرسه. */
   readonly videoPriced: boolean
+  /** كم بطاقةً اختار المالكُ لصدر لوحه — بوّابةُ الستّة (D-114 · D-130). */
+  readonly tilesChosen: number
+  /** سقفُ الترويج الأسبوعيّ — وصفرٌ يعني لا توصيةَ تُكتب (D-006). */
+  readonly promoCapUsd: number
   /**
    * أبلغت `LinkedIn-Version` المثبَّتةُ دورةَ المراجعة؟ (D-072)
    *
@@ -166,6 +175,28 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     ifLeft: 'كسابقتها — ولا يُدَّعى نشرٌ لم يُبنَ سائقُه.',
     unblocks: 'capability',
     done: (f) => f.linked.has('tiktok'),
+  },
+  {
+    code: 'M-20',
+    title: 'بوّابةُ الستّة — ستُّ بطاقاتٍ في صدر لوحك',
+    ifLeft:
+      'تبقى الأربعُ الافتراضيّةُ اختيارَ من كتب الملفّ لا اختيارَك — ' +
+      '**والشاشةُ اليوميّةُ تبدأ بجواب غيرِك** (D-114).',
+    unblocks: 'capability',
+    done: (f) => f.tilesChosen >= 6,
+    evidence: (f) => `${f.tilesChosen} من ٦ بطاقاتٍ مختارة`,
+    go: '/panel#settings',
+  },
+  {
+    code: 'M-21',
+    title: 'سقفُ الترويج الأسبوعيّ',
+    ifLeft:
+      '**لا توصيةَ تُكتب أصلا**: رقمٌ نؤلّفه رقمٌ بلا مصدر، والتقريرُ يقول ' +
+      '«لا سقفَ موضوع» كلَّ اثنين (D-006).',
+    unblocks: 'capability',
+    done: (f) => f.promoCapUsd > 0,
+    evidence: (f) => (f.promoCapUsd > 0 ? `السقفُ ${f.promoCapUsd}$ في الأسبوع` : 'صفر — لا توصيةَ تُكتب'),
+    go: '/panel#settings',
   },
   {
     code: 'M-03',

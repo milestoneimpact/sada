@@ -55,7 +55,7 @@ import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
 import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
-import { TILE_MAX, TILE_MIN } from '../lib/dashboard'
+import { chosenTiles, TILE_MAX, TILE_MIN } from '../lib/dashboard'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../lib/pivot'
 import { FACT_CAP, loadFacts } from '../lib/pivotStore'
 import { todayFeed } from '../lib/today'
@@ -1357,6 +1357,7 @@ async function ownerFacts(c: {
 
   const accounts = await listAccounts(c.env.DB)
   const apps = await appStatuses(c.env.DB, env, ['linkedin', 'x', 'youtube', 'tiktok'])
+  const ownerSettings = await readSettings(c.env.DB)
 
   let anyPublished = false
   try {
@@ -1396,6 +1397,9 @@ async function ownerFacts(c: {
     videoPriced,
     // **يُحسَب من الرقم والتاريخ** لا من صفٍّ ولا من يد (D-072)
     linkedInVersionDue: versionAge(LINKEDIN_VERSION, new Date())?.due ?? false,
+    // قراراتُ المالك تُقاس من الإعدادات نفسِها لا من يد (D-130)
+    tilesChosen: chosenTiles(ownerSettings.dashboardTiles).length,
+    promoCapUsd: ownerSettings.weeklyPromoCapUsd,
   }
 }
 

@@ -73,6 +73,9 @@ function row(r: OwnerRow, env: string): string {
         · ${escapeHtml(r.title)}</div>
       <div class="sub">${bold(r.ifLeft)}</div>
       ${commandBox(r, env)}
+      ${r.go === undefined || r.state === true
+        ? ''
+        : `<a class="btn g sm" style="margin-top:var(--s-2)" href="${escapeHtml(r.go)}">افتح الحدود</a>`}
     </td>
     <td data-label="تفتح">
       <span class="st ${opens.cls}"><span class="g">◆</span>${opens.label}</span>
