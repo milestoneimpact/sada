@@ -59,10 +59,10 @@ writeAudited(
     platformScreen({
     health: {
       'linkedin:member:abc': {
-        status: 'active', expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30),
+        status: 'active', expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30), needsReauthAt: null,
         alerts: [{ kind: 'access', threshold: 7, at: ago(6) }],
       },
-      'linkedin:org:99': { status: 'active', expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, alerts: [] },
+      'linkedin:org:99': { status: 'active', expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] },
     },
   app: undefined, baseUrl: 'https://sada2.basserh.com',
       view: li,

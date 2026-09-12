@@ -475,6 +475,9 @@ tbody tr:last-child td{border-bottom:0}
    **والجدولُ وحدَه يمرّر أفقيّا**: عشرةُ أعمدةٍ لا تسع ٣٩٠px، وجسمُ
    الصفحة لا يُمرَّر — فالغلافُ حوله لا الصفحةُ كلُّها. */
 .pv-wrap{overflow-x:auto}
+/* رأسُ صفّ المنصّة رابطٌ إلى شاشتها — وهدفُ لمسٍ كاملٌ لا سطرُ نصّ (D-132) */
+.pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--brand); text-decoration:none; text-underline-offset:3px}
+@media(hover:hover){.pv th a:hover{text-decoration:underline}}
 /* زرُّ التنزيل وشرحُه في سطرٍ واحدٍ يلتفّ على الضيق (D-126) */
 .pv-dl{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-top:var(--s-3)}
 .pv{min-width:auto}

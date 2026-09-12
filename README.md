@@ -32,6 +32,7 @@
 | [docs/UI-UX-AUDIT.md](docs/UI-UX-AUDIT.md) | تدقيقُ الواجهة لوحًا لوحًا ورمزًا رمزًا: ما قِيس، وما أُصلح، وما بقي للمالك |
 | [docs/UI-UX-NEXT.md](docs/UI-UX-NEXT.md) | خطّةُ ما بعد التدقيق: ستّةُ مسارات، خمسةٌ تمّت وواحدٌ للمالك |
 | [docs/DASHBOARD-ROADMAP.md](docs/DASHBOARD-ROADMAP.md) | خارطةُ طريق الداشبورد: أين نقف بالعدد، وكلُّ تابٍ بسؤاله وجوابه، وخمسُ مراحلَ ببوّاباتها |
+| [docs/DASHBOARD-ROADMAP-2.md](docs/DASHBOARD-ROADMAP-2.md) | الخارطةُ الثانية: من staging إلى الإنتاج، ستُّ مراحلَ ببوّابات تحقّقٍ رقميّة |
 | [CLAUDE.md](CLAUDE.md) | التعليمات الدائمة للمساعد في هذا المستودع |
 
 ## الحالة

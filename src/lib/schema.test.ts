@@ -40,6 +40,10 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
   })
 
   /** ومن ترحيل التحقّق — **وبناءٌ ينساهما يمحو أثرَ كلّ تحقّقٍ وقع**. */
+  it('accounts.needs_reauth_at (D-131)', () => {
+    expect(schemaOf('accounts')).toContain('needs_reauth_at')
+  })
+
   it('tokens.refreshed_at (D-129)', () => {
     expect(schemaOf('tokens')).toContain('refreshed_at')
   })

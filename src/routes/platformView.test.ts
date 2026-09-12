@@ -185,7 +185,7 @@ describe('سجلُّ صحّة الحساب', () => {
       health: {
         a1: {
           status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: '2027-01-01 00:00:00',
-          refreshedAt: '2026-09-10 03:00:00',
+          refreshedAt: '2026-09-10 03:00:00', needsReauthAt: null,
           alerts: [{ kind: 'access', threshold: 7, at: '2026-09-24 03:00:00' }, { kind: 'refresh', threshold: 0, at: '2027-01-01 03:00:00' }],
         },
       },
@@ -195,6 +195,17 @@ describe('سجلُّ صحّة الحساب', () => {
     expect(html).toContain('رمزُ الوصول يقترب — بقي 7 أيّام')
     expect(html).toContain('رمزُ التجديد انتهى')
     expect(html).toContain('<span class="dot bad"></span>')
+  })
+})
+
+describe('ختمُ السقوط في سجلّ الصحّة (D-131)', () => {
+  it('حسابٌ ساقطٌ يقول متى سقط، والقائمُ لا يقول شيئا', () => {
+    const base = { status: 'needs_reauth', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, alerts: [] }
+    const dropped = screen({ health: { a1: { ...base, needsReauthAt: '2026-09-10 03:00:00' } } })
+    expect(dropped).toContain('سقط الإذن')
+    expect(dropped).toContain('والنشرُ متوقّفٌ عليه منذها')
+    const fine = screen({ health: { a1: { ...base, status: 'active', needsReauthAt: null } } })
+    expect(fine).not.toContain('سقط الإذن')
   })
 })
 
