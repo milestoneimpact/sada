@@ -577,11 +577,14 @@ export const SCRIPT = `
       var name=mpProvider(box);
       if(!name){note.textContent='لا مزوّدَ لهذا الحقل.';return;}
       if(busy||loadedFor===name)return;
-      busy=true; btn.disabled=true; note.textContent='تُجلَب نماذجُ '+name+'…';
+      // **ولا يُعطَّل الزرُّ وهي تُجلَب** (D-125): التركيزُ على القائمة يطلق
+      // الجلبَ، وزرٌّ معطَّلٌ في تلك اللحظة يقفز عنه Tab — قِيس فوُجد
+      // «حدّث» لا يُبلَغ بلوحة المفاتيح. و«busy» يحرس التكرار.
+      busy=true; btn.setAttribute('aria-busy','true'); note.textContent='تُجلَب نماذجُ '+name+'…';
       post('/panel/providers/models',{provider:name}).then(function(r){
         return r.json();
       }).then(function(d){
-        busy=false; btn.disabled=false;
+        busy=false; btn.removeAttribute('aria-busy');
         var models=(d&&d.models)||[];
         if(!d||!d.ok||!models.length){
           note.textContent=(d&&d.detail)||'تعذّر الجلب — اكتب الاسم يدويّا.';
@@ -618,7 +621,7 @@ export const SCRIPT = `
           +(chosen&&!has?' — والنموذجُ السابق ليس منها، فاختر واحدا.':'')
           +' · قائمةٌ لحظيّة لا محفوظة.';
       }).catch(function(){
-        busy=false; btn.disabled=false;
+        busy=false; btn.removeAttribute('aria-busy');
         note.textContent='تعذّر الاتّصال — اكتب الاسم يدويّا.';
       });
     };

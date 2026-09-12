@@ -24,6 +24,8 @@
  */
 
 /** صفُّ الحقيقة — **منشورٌ واحد**، بكلّ ما يُقاس عليه. */
+import { PLATFORM_LABEL } from './oauth/providers'
+
 export interface Fact {
   readonly platform: string
   readonly account: string
@@ -79,9 +81,7 @@ export const NO_KEY = '—'
  * قاعدةُ سجلّ التدقيق نفسُها. والأبعادُ الزمنيّةُ والحسابُ تُقرأ كما هي.
  */
 const KEY_LABEL: Readonly<Partial<Record<Dimension, Readonly<Record<string, string>>>>> = {
-  platform: {
-    linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
-  },
+  platform: PLATFORM_LABEL,
   status: {
     draft: 'تنتظر قرارك', approved: 'معتمَدة', edited: 'معتمَدة بعد تعديل',
     rejected: 'مرفوضة', queued: 'مجدولة', published: 'نُشرت', failed: 'فشل النشر',

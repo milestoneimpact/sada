@@ -23,6 +23,7 @@
  */
 import type { Db } from './tokens'
 import { anyWeekAlert } from './token/expiry'
+import { platformLabel } from './oauth/providers'
 
 export type ItemState =
   /** تحقّق — والاستعلامُ هو الدليل. */
@@ -106,12 +107,12 @@ export function gatesOf(f: GateFacts): Gate[] {
         item(
           'منشورٌ نصّيٌّ واحدٌ على كلّ منصّة من لوحة صدى',
           bothPublished ? 'met' : 'unmet',
-          PLATFORMS.map((p) => `${p}: ${n(f.publishedPerPlatform, p)}`).join(' · '),
+          PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.publishedPerPlatform, p)}`).join(' · '),
         ),
         item(
           'وسطرٌ في `cost_ledger` لكلٍّ منهما',
           bothLedger ? 'met' : 'unmet',
-          PLATFORMS.map((p) => `${p}: ${n(f.ledgerPerPlatform, p)}`).join(' · '),
+          PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.ledgerPerPlatform, p)}`).join(' · '),
         ),
         // ومفتاحُ التفرّد **يحرسه القيدُ في القاعدة** لا استعلامٌ هنا:
         // عمودُ `idempotency_key` فريدٌ منذ `0001_init` (D-004)
@@ -147,7 +148,7 @@ export function gatesOf(f: GateFacts): Gate[] {
         item(
           'منشورٌ بصورةٍ على كلّ منصّة',
           bothWithMedia ? 'met' : 'unmet',
-          PLATFORMS.map((p) => `${p}: ${n(f.publishedWithMedia, p)}`).join(' · '),
+          PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.publishedWithMedia, p)}`).join(' · '),
         ),
         item(
           'ومنشورٌ على صفحة الشركة',

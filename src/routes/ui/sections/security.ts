@@ -7,6 +7,21 @@
 import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../shell'
+import { platformLabel } from '../../../lib/oauth/providers'
+import { PROVIDERS } from '../../../lib/ai/registry'
+
+/**
+ * «على ماذا» يُقرأ اسما لا مفتاحا (D-125).
+ *
+ * هدفُ الفعل في `audit_log` مفتاحٌ بحرفه: `anthropic` لمفتاح مزوّد،
+ * و`linkedin` لحساب. **والمزوّدُ له اسمٌ بجانب تعريفه والمنصّةُ كذلك**،
+ * فيُقرآن من هناك. وما ليس مزوّدا ولا منصّةً — معرِّفُ مسوّدةٍ أو مفتاحُ
+ * ضبط — يُعرَض بحرفه: القاموسُ ناقصٌ عمدا.
+ */
+function targetLabel(target: string): string {
+  const provider = (PROVIDERS as Readonly<Record<string, { readonly name: string }>>)[target]
+  return provider?.name ?? platformLabel(target)
+}
 
 const ACTION_LABEL: Readonly<Record<string, string>> = {
   'session.open': 'فُتحت جلسة',
@@ -91,7 +106,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
     <td><span title="${escapeHtml(a.at)} UTC">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
     <td data-label="الفعل"><div class="nm">${escapeHtml(ACTION_LABEL[a.action] ?? a.action)}</div>
       <div class="mono">${escapeHtml(a.action)}</div></td>
-    <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(a.target)}</span>`}
+    <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}
       ${a.detail === null ? '' : `<div class="sub">${escapeHtml(a.detail)}</div>`}</td>
     <td data-label="العنوان"><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>
   </tr>`).join('')

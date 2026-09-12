@@ -27,11 +27,8 @@
  * يُمسَك حشوٌ كُتب بألفٍ همزتُها ساقطة.
  */
 import type { Platform } from './prompt'
+import { platformLabel } from '../oauth/providers'
 
-/** الاسمُ كما يُكتب في الملحوظة — ولا يُشتقّ بشرطٍ ثنائيّ يشيخ. */
-const PLATFORM_NAME: Readonly<Record<Platform, string>> = {
-  linkedin: 'LinkedIn', x: 'X', tiktok: 'TikTok', youtube: 'YouTube',
-}
 
 export type NoteKind = 'filler' | 'repeat' | 'sentence' | 'hashtag' | 'cliche' | 'ceiling'
 
@@ -204,7 +201,7 @@ export function reviewText(
   if (tags.length > tagMax) {
     notes.push({
       kind: 'hashtag',
-      text: `${tags.length} وسما و ${PLATFORM_NAME[platform]} تحتمل ${tagMax}`,
+      text: `${tags.length} وسما و ${platformLabel(platform)} تحتمل ${tagMax}`,
       hits: tags.slice(0, 6),
     })
   }

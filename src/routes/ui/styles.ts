@@ -932,7 +932,7 @@ ol.steps.wiz.nodot li::before{display:none}
 /* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
    — وهو ثلثُ الحدّ. */
 summary{min-height:var(--tap); display:flex; align-items:center}
-.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--brand-deep);
+.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--brand);
   list-style:none; padding:var(--s-2) 0}
 .setup>summary::-webkit-details-marker{display:none}
 .setup>summary::before{content:'▸'; display:inline-block; margin-inline-end:var(--s-2)}
@@ -1080,7 +1080,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* المقروءُ يأخذ قدرَ نصّه بسقف: مربّعٌ ثابتٌ تحت نصٍّ قصير فراغٌ بلا سبب،
    وتحت نصٍّ طويل تمريرٌ في نصٍّ لا يُحرَّر. */
 .draft-text[data-ro]{height:auto; max-height:calc(var(--lines) * 26px + 28px)}
-.draft-text:focus{outline:none; border-color:var(--brand-deep); box-shadow:var(--ring)}
+.draft-text:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--ring)}
 /* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
    على نصٍّ لا يُحرَّر يعد بما لا يقع. */
 .draft-text.ro{background:var(--surface-3); color:var(--ink-2); resize:none}
@@ -1156,7 +1156,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    فيها. و«رجوع» المتصفّح ليس بابا: مَن فتحها في تبويبٍ جديد لا رجوعَ له. */
 nav.back{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-3) 0 var(--s-5)}
 nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-decoration:none;
-  display:inline-flex; align-items:center; min-height:var(--tap)}
+  display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap)}
 @media(hover:hover){nav.back a:hover{color:var(--brand)}}
 
 .plat-logo{width:46px; height:46px; border-radius:13px; flex:none; display:grid; place-items:center;
@@ -1366,7 +1366,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .doc ul{margin:0 0 var(--s-3); padding-inline-start:var(--s-5)}
 .doc li{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin-bottom:var(--s-2)}
 .doc b{color:var(--ink)}
-.doc a{color:var(--brand-deep); text-underline-offset:3px}
+.doc a{color:var(--brand); text-underline-offset:3px}
 .doc table{font-size:var(--t-sm)}
 .doc td b{font-weight:600}
 /* «ما لا يقع» أبرزُ ما في الصفحة: هو ما يبحث عنه المراجع أوّلا */

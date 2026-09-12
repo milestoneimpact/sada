@@ -123,8 +123,8 @@ describe('وبوّاباتُ المراحل تُقاس', () => {
   /** **ومعه دليلُه**: «لم تُجتَز» بلا رقمٍ لا تُعالَج. */
   it('ولكلّ بندٍ دليلُه لا حكمُه وحده', async () => {
     const html = await open()
-    expect(html).toContain('linkedin: 0')
-    expect(html).toContain('x: 0')
+    expect(html).toContain('LinkedIn: 0')
+    expect(html).toContain('X: 0')
   })
 
   /**
@@ -154,7 +154,7 @@ describe('وبوّاباتُ المراحل تُقاس', () => {
                                      request_json, status)
        VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
     )
-    expect(await open()).toContain('x: 1')
+    expect(await open()).toContain('X: 1')
   })
 })
 
