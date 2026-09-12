@@ -85,6 +85,21 @@ describe('listAccounts', () => {
     expect(rows[0]).toMatchObject({ platform: 'linkedin', displayName: 'عمر', status: 'active' })
   })
 
+  it('ويحمل موعدَ انتهاء الرمز من جانبه — و`null` حين لا رمز (D-126)', async () => {
+    await seed('linkedin')
+    const bare = await listAccounts(db)
+    expect(bare[0]!.expiresAt).toBeNull()
+    await db
+      .prepare(
+        `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, scopes)
+         VALUES (?, 'e', 'i', '2026-09-20 00:00:00', 'openid')`,
+      )
+      .bind(bare[0]!.id)
+      .run()
+    const withToken = await listAccounts(db)
+    expect(withToken[0]!.expiresAt).toBe('2026-09-20 00:00:00')
+  })
+
   it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE accounts')
     expect(await listAccounts(db)).toEqual([])

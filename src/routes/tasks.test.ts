@@ -207,3 +207,18 @@ describe('وشريطُ الرموز المقتربة', () => {
     expect(html).toContain('class="flash bad"')
   })
 })
+
+/**
+ * **الأمرُ يُنسَخ من الصفّ** (D-126): مهمّةٌ تُغلَق بسرٍّ في Worker تحمل أمرَ
+ * `wrangler` للبيئة الحاليّة وزرَّ نسخ، ولا تحمله مهمّةٌ تمّت.
+ */
+describe('أمرُ wrangler في صفّ المهمّة (D-126)', () => {
+  it('المهمّةُ المفتوحةُ تحمل الأمرَ للبيئة الحاليّة وزرَّ النسخ', async () => {
+    const html = await open()
+    expect(html).toContain('data-copy="cmd-M-19"')
+    expect(html).toContain('npx wrangler secret put CF_BROWSER_TOKEN --env staging')
+    expect(html).toContain('npx wrangler secret put X_CLIENT_ID --env staging\nnpx wrangler secret put X_CLIENT_SECRET --env staging')
+    expect(html).not.toContain('--env production')
+  })
+})
+

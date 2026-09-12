@@ -295,6 +295,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
       (a) => `<div class="ch-acc">
         <span class="who">${escapeHtml(a.displayName)}</span>
         <span class="chip">${escapeHtml(KIND[a.kind] ?? a.kind)}</span>
+        ${a.status === 'needs_reauth' ? '' : tokenDays(a.expiresAt, now)}
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? '<span class="st bad"><span class="g">▲</span>جدّد الإذن</span>'
@@ -365,6 +366,28 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         spec.label,
       )}</a></div>
   </div>`
+}
+
+/**
+ * **عدُّ الأيّام على البطاقة** (D-126).
+ *
+ * تنبيهُ صدر اللوحة يقول «يبقى ‏٧ أيّام» حين يعبر الرمزُ عتبةً (D-065)،
+ * **والبطاقةُ التي تصف الحسابَ نفسَه كانت لا تقوله** — والحقلُ في القاعدة.
+ * فيُقرأ من الحقل نفسِه: أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوق ذلك
+ * رقاقةٌ هادئة. ولا رمزَ محفوظًا — لا شيء، لا «غير معروف».
+ */
+export function tokenDays(expiresAt: string | null, now: Date): string {
+  if (expiresAt === null) return ''
+  const ms = Date.parse(expiresAt.replace(' ', 'T') + (expiresAt.endsWith('Z') ? '' : 'Z'))
+  if (Number.isNaN(ms)) return ''
+  const days = Math.floor((ms - now.getTime()) / 86_400_000)
+  const title = `title="ينتهي رمزُ الوصول ${escapeHtml(expiresAt)} UTC"`
+  if (days < 0) return `<span class="st bad" ${title}><span class="g">▲</span>انتهى الإذن</span>`
+  if (days <= 7) {
+    return `<span class="st warn" ${title}><span class="g">◍</span>${
+      days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${days} ${days === 1 ? 'يوم' : days === 2 ? 'يومان' : 'أيّام'} للإذن`}</span>`
+  }
+  return `<span class="chip" ${title}>الإذن ${days} يوما</span>`
 }
 
 export function channelsSection(

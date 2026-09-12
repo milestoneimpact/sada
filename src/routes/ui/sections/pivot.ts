@@ -61,6 +61,17 @@ function heat(v: number | null, max: number): string {
   return ` style="background:color-mix(in srgb,var(--brand) ${Math.round(t * 16)}%,transparent)"`
 }
 
+/**
+ * عنوانُ الملفّ يحمل العرضَ نفسَه الذي يحمله عنوانُ الصفحة (D-120) —
+ * **فما يُنزَّل هو ما يُرى، لا افتراضٌ ثانٍ.**
+ */
+function csvHref(d: PivotView): string {
+  const q = new URLSearchParams({
+    rows: d.rows, cols: d.cols ?? 'none', m: d.measure, days: String(d.sinceDays),
+  })
+  return `/panel/pivot.csv?${q.toString()}`
+}
+
 export function pivotPane(d: PivotView): string {
   const t = d.table
   const max = Math.max(0, ...t.cells.flat().map((v) => v ?? 0))
@@ -124,6 +135,9 @@ export function pivotPane(d: PivotView): string {
       <span class="n">${escapeHtml(String(t.facts))} منشورا${
         d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
     </div>
+    ${t.rowKeys.length === 0 ? '' : `<p class="hint pv-dl"><a class="btn g sm" href="${
+      escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>
+      <span>ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</span></p>`}
     ${t.rowKeys.length === 0
       ? empty
       : `<div class="pv-wrap"><table class="pv">

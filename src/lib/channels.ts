@@ -383,6 +383,12 @@ export interface LinkedAccount {
   readonly displayName: string
   readonly status: 'active' | 'needs_reauth' | 'revoked'
   readonly createdAt: string
+  /**
+   * متى ينتهي رمزُ الوصول — من `tokens` بجانب الحساب (D-126). و`null` حين
+   * لا رمزَ محفوظًا له. **والبطاقةُ تعدّ الأيّامَ منه** كما يعدّها تنبيهُ
+   * صدر اللوحة (D-065) — الحقلُ واحد.
+   */
+  readonly expiresAt: string | null
 }
 
 interface AccountRow {
@@ -392,6 +398,7 @@ interface AccountRow {
   display_name: string
   status: string
   created_at: string
+  expires_at: string | null
 }
 
 /**
@@ -404,8 +411,11 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, platform, kind, display_name, status, created_at
-           FROM accounts ORDER BY platform, created_at`,
+        `SELECT a.id, a.platform, a.kind, a.display_name, a.status, a.created_at,
+                t.expires_at
+           FROM accounts a
+           LEFT JOIN tokens t ON t.account_id = a.id
+          ORDER BY a.platform, a.created_at`,
       )
       .all<AccountRow>()
     return results.map((row) => ({
@@ -416,6 +426,7 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
       status:
         row.status === 'needs_reauth' || row.status === 'revoked' ? row.status : 'active',
       createdAt: row.created_at,
+      expiresAt: row.expires_at ?? null,
     }))
   } catch {
     return []

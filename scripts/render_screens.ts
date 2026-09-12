@@ -31,11 +31,11 @@ const ago = (h: number): string =>
 
 const accounts: LinkedAccount[] = [
   { id: 'linkedin:member:abc', platform: 'linkedin', kind: 'member',
-    displayName: 'عمر عبدالحميد', status: 'active', createdAt: ago(700) },
+    displayName: 'عمر عبدالحميد', status: 'active', createdAt: ago(700), expiresAt: ago(-5 * 24) },
   { id: 'linkedin:org:99', platform: 'linkedin', kind: 'org',
-    displayName: 'بصائر للاستشارات', status: 'active', createdAt: ago(300) },
+    displayName: 'بصائر للاستشارات', status: 'active', createdAt: ago(300), expiresAt: ago(-40 * 24) },
   { id: 'x:member:4242', platform: 'x', kind: 'member',
-    displayName: '@omar_ah', status: 'active', createdAt: ago(40) },
+    displayName: '@omar_ah', status: 'active', createdAt: ago(40), expiresAt: ago(-40 * 24) },
 ]
 
 const views = viewChannels(accounts, () => true)
@@ -285,6 +285,7 @@ writeAudited(
   page(
     'صدى — مهامُّ المالك',
     tasksScreen({
+      env: 'staging',
       rows: ownerRows({
         // حالٌ وسطى: بعضٌ تمّ، وبعضٌ عليك، وبعضٌ لا يُعرَف
         secrets: new Set(['TOKEN_ENC_KEY', 'ADMIN_TOKEN']),

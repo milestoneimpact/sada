@@ -16,7 +16,7 @@
  * قُبل (D-061).
  */
 import { escapeHtml } from './shell'
-import type { OwnerRow, Unblocks } from '../../lib/owner'
+import { secretCommand, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
 
 const MARK: Readonly<Record<string, { g: string; cls: string; label: string }>> = {
@@ -45,7 +45,25 @@ function bold(text: string): string {
   return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
 }
 
-function row(r: OwnerRow): string {
+/**
+ * **الأمرُ يُنسَخ من الصفّ** (D-126): مهمّةٌ تُغلَق بسرٍّ في Worker تحمل أمرَها
+ * مكتوبًا للبيئة الحاليّة وزرَّ نسخٍ بجانبه. ولا يُعرَض لما تمّ.
+ */
+function commandBox(r: OwnerRow, env: string): string {
+  if (r.secrets === undefined || r.secrets.length === 0 || r.state === true) return ''
+  const id = `cmd-${r.code}`
+  const text = r.secrets.map((n) => secretCommand(n, env)).join('\n')
+  return `<div class="cmd">
+      <label class="sub" for="${escapeHtml(id)}">من جذر المستودع، بعد <span class="mono">npx wrangler login</span>:</label>
+      <div class="row" style="gap:var(--s-2)">
+        <textarea class="mono cmd-text" id="${escapeHtml(id)}" rows="${r.secrets.length}" readonly
+                  spellcheck="false">${escapeHtml(text)}</textarea>
+        <button class="g sm" type="button" data-copy="${escapeHtml(id)}">انسخ الأمر</button>
+      </div>
+    </div>`
+}
+
+function row(r: OwnerRow, env: string): string {
   const key = r.state === true ? 'done' : r.state === null ? 'unknown' : 'todo'
   const mark = MARK[key]!
   const opens = OPENS[r.unblocks]
@@ -54,6 +72,7 @@ function row(r: OwnerRow): string {
       <div class="nm"><span class="mono">${escapeHtml(r.code)}</span>
         · ${escapeHtml(r.title)}</div>
       <div class="sub">${bold(r.ifLeft)}</div>
+      ${commandBox(r, env)}
     </td>
     <td data-label="تفتح">
       <span class="st ${opens.cls}"><span class="g">◆</span>${opens.label}</span>
@@ -114,6 +133,8 @@ export interface TasksScreenData {
   readonly gates: readonly Gate[]
   /** أوّلُ مرحلةٍ لم تُجتَز — أو `null` إن اجتِزن. */
   readonly phase: string | null
+  /** البيئةُ التي تُفتَح منها — فأمرُ `wrangler` يُكتب لها لا لغيرها. */
+  readonly env: string
 }
 
 export function tasksScreen(d: TasksScreenData): string {
@@ -147,7 +168,7 @@ export function tasksScreen(d: TasksScreenData): string {
       لا «لم تتمّ»</b>: قولُ «لم تتمّ» عن طلبٍ قُبل يجعلك تعيده.</p>
     <div class="scroll"><table>
       <thead><tr><th>المهمّة وما يقع إن تُركت</th><th>تفتح</th><th>الحال</th></tr></thead>
-      <tbody>${d.rows.map(row).join('')}</tbody>
+      <tbody>${d.rows.map((r) => row(r, d.env)).join('')}</tbody>
     </table></div>
   </div>
 

@@ -278,3 +278,46 @@ export function cellText(v: number | null, m: Measure): string {
     case 'attempts': return v.toFixed(1)
   }
 }
+
+/**
+ * الجدولُ ملفًّا — **ما يُعرَض يُنزَّل، خليّةً خليّة** (D-126).
+ *
+ * لا مكتبةَ ولا `JavaScript`: الخادمُ يكتب `CSV` من الجدول نفسِه الذي
+ * رسمه، بالأسماء التي رسمها (`keyLabel`) وبالنصّ الذي كتبه في الخليّة
+ * (`cellText`). **فما في الملفّ هو ما في الشاشة حرفًا** — والاختبارُ
+ * يقابلهما خليّةً خليّة.
+ *
+ * ## وثلاثةٌ من RFC 4180 وواحدةٌ من الأمن
+ *
+ * - الفاصلُ `,` والسطرُ `\r\n`، والخليّةُ تُحاط بعلامتَي تنصيصٍ إن حملت
+ *   فاصلًا أو تنصيصًا أو سطرًا، والتنصيصُ الداخليُّ يُضاعَف.
+ * - وعلامةُ `BOM` في أوّل الملفّ: **بدونها يفتح Excel العربيّةَ رموزًا**.
+ * - وخليّةٌ تبدأ بـ`=` أو `+` أو `-` أو `@` **تُسبَق بفاصلةٍ عليا**: جدولُ
+ *   البيانات ينفّذها صيغةً، ومفتاحُ حسابٍ يكتبه غيرُنا قد يبدأ بها.
+ */
+export function toCsv(table: PivotTable, spec: PivotSpec): string {
+  const twoAxis = spec.cols !== null
+  const cell = (raw: string): string => {
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+  }
+  const line = (cells: readonly string[]): string => cells.map(cell).join(',')
+
+  const head = [
+    DIMENSION_LABEL[spec.rows],
+    ...table.colKeys.map((c) =>
+      c === '' || spec.cols === null ? MEASURE_LABEL[spec.measure] : keyLabel(spec.cols, c)),
+    ...(twoAxis ? ['الكلّ'] : []),
+  ]
+  const rows = table.rowKeys.map((r, i) => [
+    keyLabel(spec.rows, r),
+    ...(table.cells[i] ?? []).map((v) => cellText(v, spec.measure)),
+    ...(twoAxis ? [cellText(table.rowTotals[i] ?? null, spec.measure)] : []),
+  ])
+  const foot = twoAxis
+    ? [['الكلّ', ...table.colTotals.map((v) => cellText(v, spec.measure)), cellText(table.grand, spec.measure)]]
+    : []
+
+  return '\uFEFF' + [head, ...rows, ...foot].map(line).join('\r\n') + '\r\n'
+}
+

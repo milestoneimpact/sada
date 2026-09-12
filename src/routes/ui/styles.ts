@@ -475,6 +475,8 @@ tbody tr:last-child td{border-bottom:0}
    **والجدولُ وحدَه يمرّر أفقيّا**: عشرةُ أعمدةٍ لا تسع ٣٩٠px، وجسمُ
    الصفحة لا يُمرَّر — فالغلافُ حوله لا الصفحةُ كلُّها. */
 .pv-wrap{overflow-x:auto}
+/* زرُّ التنزيل وشرحُه في سطرٍ واحدٍ يلتفّ على الضيق (D-126) */
+.pv-dl{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-top:var(--s-3)}
 .pv{min-width:auto}
 .pv th,.pv td{text-align:center; padding:var(--s-2); white-space:nowrap;
   font-variant-numeric:tabular-nums}
@@ -676,6 +678,13 @@ ul.plain li:last-child{margin-bottom:0}
 .stop-d{margin:var(--s-1) 0 0; font-size:var(--t-sm); color:var(--ink-2);
   line-height:var(--lh); max-width:var(--measure)}
 .stop-meta{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2)}
+/* رابطُ المحطّة إلى موضعها — آخرَ السطر، ويلتفّ مع الضيق (D-126) */
+.stop-go{margin-inline-start:auto}
+/* أمرُ wrangler في صفّ المهمّة: حقلٌ يُقرأ ويُنسَخ، لاتينيٌّ معزول (D-126) */
+.cmd{margin-top:var(--s-2)}
+.cmd-text{flex:1 1 220px; min-width:0; direction:ltr; text-align:left; font-size:var(--t-sm);
+  padding:var(--s-2) var(--s-3); border:1px solid var(--line); border-radius:8px;
+  background:var(--surface-2); color:var(--ink); resize:none; white-space:pre; overflow-x:auto}
 
 /* ── الأعمدةُ الأفقيّة (D-103) ────────────────────────────────────────
    ثلاثةُ أعمدةٍ ثابتةِ الموضع: الاسمُ والمقياسُ والرقم. **والعينُ تمسح

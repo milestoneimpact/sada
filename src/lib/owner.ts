@@ -46,6 +46,19 @@ export interface OwnerTask {
    * للقارئ يخمّنه (D-072).
    */
   readonly evidence?: (facts: OwnerFacts) => string
+  /**
+   * أسرارُ Worker التي تُغلق المهمّةَ — **فالأمرُ يُنسَخ من الصفّ** (D-126).
+   *
+   * مهمّةٌ ثمنُها أمرُ `wrangler` واحدٌ تحمل زرَّ نسخٍ كما يحمله رابطُ
+   * العودة (D-042): الاسمُ يُكتب هنا مرّةً، والأمرُ يُبنى منه للبيئة التي
+   * تُفتَح منها الشاشة. **أسماءٌ لا قيَم** — كما في كلّ موضع (D-005).
+   */
+  readonly secrets?: readonly string[]
+}
+
+/** أمرُ ضبطِ سرٍّ واحد — بصيغة `MANUAL-TASKS.md` حرفًا. */
+export function secretCommand(name: string, env: string): string {
+  return `npx wrangler secret put ${name} --env ${env}`
 }
 
 /** الحقائقُ التي تُشتقّ منها الحالُ — تُجمَع مرّةً وتُمرَّر. */
@@ -86,6 +99,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'لا يُربَط حسابٌ ولا يُنشَر حرف. **وبوّاباتُ المراحل ٠ و١ و٢ كلُّها تقف عليها.**',
     unblocks: 'gate',
     done: (f) => f.appsVerified.has('linkedin') || f.linked.has('linkedin'),
+    secrets: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
   },
   {
     code: 'M-04',
@@ -93,6 +107,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     ifLeft: 'المنصّةُ الثانيةُ لا تنشر — والبوّابةُ تطلب منشورا على كلٍّ منهما.',
     unblocks: 'gate',
     done: (f) => f.appsVerified.has('x') || f.linked.has('x'),
+    secrets: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
   },
   {
     code: 'M-16',
@@ -134,6 +149,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'لا عملُ مولّد صور (D-085).',
     unblocks: 'capability',
     done: (f) => f.vars.has('CF_BROWSER_TOKEN'),
+    secrets: ['CF_BROWSER_TOKEN'],
   },
   {
     code: 'M-15',
