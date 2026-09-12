@@ -34,6 +34,8 @@ const empty: OwnerFacts = {
   anyPublished: false, videoPriced: false,
   // **مستحقّةٌ للمراجعة**: `empty` تعني «لا شيءَ تمّ»، فالرقمُ شائخٌ فيها
   linkedInVersionDue: true,
+  // قراراتُ المالك على افتراضها: أربعُ بطاقاتٍ وسقفٌ صفر (D-130)
+  tilesChosen: 4, promoCapUsd: 0,
 }
 
 describe('السجلُّ والوثيقةُ لا يفترقان', () => {
@@ -162,6 +164,27 @@ describe('أمرُ السرّ (D-126)', () => {
     expect(m02.state).toBe(true)
     expect(m02.secrets).toEqual(['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'])
     for (const r of rows) for (const n of r.secrets ?? []) expect(n).toMatch(/^[A-Z0-9_]+$/)
+  })
+})
+
+/**
+ * **قراراتُ المالك تُقاس لا تُوصَف** (D-130): بوّابةُ الستّة وسقفُ الترويج
+ * صفّان في «ما عليك» حالُهما من الإعدادات نفسِها، ولكلٍّ بابُه.
+ */
+describe('قراراتُ المالك (D-130)', () => {
+  it('على الافتراض كلاهما عليك، ومع القرار يتمّان — والدليلُ يقول الرقم', () => {
+    const before = ownerRows(empty)
+    const six = before.find((r) => r.code === 'M-20')!
+    const cap = before.find((r) => r.code === 'M-21')!
+    expect(six.state).toBe(false)
+    expect(six.measured).toBe('4 من ٦ بطاقاتٍ مختارة')
+    expect(six.go).toBe('/panel#settings')
+    expect(cap.state).toBe(false)
+    expect(cap.measured).toBe('صفر — لا توصيةَ تُكتب')
+
+    const after = ownerRows({ ...empty, tilesChosen: 6, promoCapUsd: 20 })
+    expect(after.find((r) => r.code === 'M-20')!.state).toBe(true)
+    expect(after.find((r) => r.code === 'M-21')!).toMatchObject({ state: true, measured: 'السقفُ 20$ في الأسبوع' })
   })
 })
 
