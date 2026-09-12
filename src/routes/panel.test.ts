@@ -2427,3 +2427,23 @@ describe('ترتيبُ بطاقات الحدود (D-126)', () => {
   })
 })
 
+/**
+ * «ما وقع اليوم» (D-127): يُروى ممّا قُرئ — ولا يُفتَح له استعلام.
+ */
+describe('ما وقع اليوم (D-127)', () => {
+  it('الترويسةُ ثابتة، ويومٌ بلا شيءٍ يُقال، وما وقع يُروى بالاسم', async () => {
+    const cookie = await login()
+    const empty = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(empty).toContain('<h3 class="sec">ما وقع اليوم</h3>')
+    const at = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    db.raw.exec(
+      `INSERT INTO audit_log (actor, action, target, detail, ip, ua)
+       VALUES ('panel', 'provider.key', 'anthropic', NULL, NULL, NULL)`,
+    )
+    db.raw.exec(`UPDATE audit_log SET at = '${at}'`)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('تبديل مفتاح — Anthropic')
+    expect(html).not.toContain('لم يقع شيءٌ بعدُ')
+  })
+})
+

@@ -705,6 +705,10 @@ ul.plain li:last-child{margin-bottom:0}
 /* **والأكبرُ وحدَه يأخذ الذهب**: ندرةٌ تصنع مرتبة، وذهبٌ على الكلّ يُلغي
    معنى الأوّل — وهي قاعدةُ صفّ المؤشّرات نفسُها. */
 .bar-fill.top{background:var(--au)}
+/* أسبوعٌ قِيس بعضُه — عمودُه مخطَّط، والرقمُ بجانبه يقول كم (D-127) */
+.bar-fill.part{background:repeating-linear-gradient(135deg,var(--brand) 0 6px,color-mix(in srgb,var(--brand) 45%,transparent) 6px 12px)}
+.history{margin-bottom:var(--s-4)}
+.history .bar-name{text-decoration:none; color:var(--brand); font-variant-numeric:tabular-nums}
 .bar-val{flex:none; min-width:70px; text-align:end; font-size:var(--t-sm);
   color:var(--ink); font-variant-numeric:tabular-nums}
 @media(max-width:560px){.bar-name{min-width:62px}}
@@ -874,6 +878,10 @@ ol.steps.wiz.nodot li::before{display:none}
   padding:0 var(--s-2); border-radius:99px; background:var(--surface-3); color:var(--ink-3)}
 /* المفتوحُ يُعلَّم بأكثر من لون: خطٌّ وثِقَلٌ وأرضيّة (D-043) */
 .ftab.on{border-color:var(--brand); background:var(--brand-wash); color:var(--ink)}
+/* الصفُّ الثاني: منصّاتٌ وترتيبٌ في سطرٍ واحدٍ يلتفّ (D-127) */
+.ftabs-2{align-items:center; margin-top:calc(-1 * var(--s-2))}
+.ftabs-2 .order{display:inline-flex; align-items:center; gap:var(--s-2)}
+.ftabs-2 .order select{min-height:var(--tap)}
 .ftab.on .count{background:var(--brand); color:var(--on-brand)}
 /* والفشلُ يحمل لونَه ولو لم يُفتَح — فلا يُقرأ تبويبا كسائره */
 .ftab.bad .count{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
@@ -1436,7 +1444,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   input:not([type]),select,textarea,button,.btn{font-size:var(--t-lg)}
   /* والمحدّداتُ الأخصُّ تُذكَر باسمها: قاعدةٌ عامّةٌ لا تغلب
      «.copy input» ولا «.sched select» مهما تأخّرت */
-  .copy input,.sched input,.sched select,.draft-text,input.mono{font-size:var(--t-lg)}
+  .copy input,.sched input,.sched select,.draft-text,input.mono,textarea.mono,.cmd-text{font-size:var(--t-lg)}
   /* **وعرضٌ ثابتٌ يفيض حين يكبر الخطّ**: أُضيف الحدُّ هنا لا في كلّ حقل،
      فحقلٌ يُكتب غدا بعرضٍ ثابتٍ يرثه. وقِيس فيضٌ ١٢px عند ٣٢٠px قبله */
   input,select,textarea{max-width:100%}

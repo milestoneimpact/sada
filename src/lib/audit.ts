@@ -10,6 +10,8 @@
  * نعم؛ المفتاحُ نفسه لا. والسجلّ يُقرأ في اللوحة ويُصدَّر ويُنسخ.
  */
 import type { Db } from './tokens'
+import { PROVIDERS } from './ai/registry'
+import { platformLabel } from './oauth/providers'
 
 export interface AuditEntry {
   /** كيف دخل الفاعل. `panel` جلسةُ لوحة، `admin_token` نداءُ طرفيّة. */
@@ -78,3 +80,56 @@ export async function recentAudit(db: Db, limit = 50): Promise<AuditRow[]> {
     return []
   }
 }
+
+/**
+ * اسمُ الفعل بجانب مفتاحه — **في موضعٍ واحدٍ يقرؤه سجلُّ الأمان و«ما وقع
+ * اليوم»** (D-127). والقاموسُ ناقصٌ عمدًا: ما ليس فيه يُعرَض بحرفه.
+ */
+export const ACTION_LABEL: Readonly<Record<string, string>> = {
+  'session.open': 'فُتحت جلسة',
+  'session.pending': 'دخولٌ ينتظر العامل الثاني',
+  'csrf.reject': 'طلبٌ بلا رمز نموذج',
+  'passkey.denied': 'مفتاح مرورٍ مرفوض',
+  'passkey.rejected': 'رُفض تسجيل مفتاح',
+  'passkey.add': 'سُجّل مفتاح مرور',
+  'passkey.delete': 'حُذف مفتاح مرور',
+  '2fa.passkey': 'عاملٌ ثانٍ بمفتاح مرور',
+  '2fa.totp': 'عاملٌ ثانٍ برمز تطبيق',
+  '2fa.recovery': 'دخولٌ برمز استرداد',
+  '2fa.denied': 'عاملٌ ثانٍ مرفوض',
+  'totp.start': 'بدأ ضبط رمز التطبيق',
+  'totp.confirm': 'أُكّد رمز التطبيق',
+  'totp.remove': 'أُزيل رمز التطبيق',
+  'recovery.issue': 'وُلّدت رموز استرداد',
+  'session.close': 'أُغلقت جلسة',
+  'session.revoke': 'أُبطلت جلسة',
+  'session.revoke_all': 'أُبطلت كلّ الجلسات',
+  'login.denied': 'محاولة دخول مرفوضة',
+  'settings.write': 'تغيير إعداد',
+  'drive.scan': 'مسح Drive',
+  'source.analyze': 'تحليل مصدر',
+  'provider.upsert': 'إضافة مزوّد أو تعديله',
+  'provider.key': 'تبديل مفتاح',
+  'provider.verify': 'اختبار مفتاح',
+  'provider.toggle': 'تفعيل أو تعطيل',
+  'provider.delete': 'حذف مزوّد',
+  'route.write': 'توجيه مهمّة',
+}
+
+export function actionLabel(action: string): string {
+  return ACTION_LABEL[action] ?? action
+}
+
+/**
+ * «على ماذا» يُقرأ اسمًا لا مفتاحًا (D-125 · D-127).
+ *
+ * هدفُ الفعل في `audit_log` مفتاحٌ بحرفه: `anthropic` لمفتاح مزوّد،
+ * و`linkedin` لحساب. **والمزوّدُ له اسمٌ بجانب تعريفه والمنصّةُ كذلك**،
+ * فيُقرآن من هناك. وما ليس مزوّدًا ولا منصّةً — معرِّفُ مسوّدةٍ أو مفتاحُ
+ * ضبط — يُعرَض بحرفه: القاموسُ ناقصٌ عمدًا.
+ */
+export function targetLabel(target: string): string {
+  const provider = (PROVIDERS as Readonly<Record<string, { readonly name: string }>>)[target]
+  return provider?.name ?? platformLabel(target)
+}
+

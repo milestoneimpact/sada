@@ -35,6 +35,7 @@ import { relativeTime } from '../../../lib/format'
  * منصّةً تُضاف بعدهما: مسوّدةُ TikTok أو YouTube كانت تُرسَم بلا شعار.
  */
 import { LOGOS } from '../logos'
+import { platformLabel } from '../../../lib/oauth/providers'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -304,7 +305,26 @@ function filterTabs(drafts: readonly DraftRow[]): string {
       data-bucket="${b.id}" aria-pressed="${b.id === 'all'}"
       >${escapeHtml(b.label)}<span class="count">${n}</span></button>`
   }).join('')
-  return `<nav class="ftabs" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>`
+  /*
+   * **وفرزٌ ثانٍ بالمنصّة، وترتيب** (D-127) — بشرطَي D-062 نفسيهما:
+   * العددُ معروضٌ ولو صفرًا، والافتراضُ «الكلّ» والأحدثُ أوّلًا. والمنصّاتُ
+   * من المسوّدات نفسِها لا من قائمةٍ ثابتة: منصّةٌ بلا مسوّدةٍ لا تبويبَ لها.
+   * **وبلا JavaScript لا يظهر شيءٌ من هذا** — والقائمةُ كاملةٌ كما هي.
+   */
+  const platforms = [...new Set(drafts.map((d) => d.platform))]
+  const ptabs = [
+    `<button type="button" class="ftab on" data-platform-tab="all" aria-pressed="true">كلُّ المنصّات<span class="count">${drafts.length}</span></button>`,
+    ...platforms.map((p) => `<button type="button" class="ftab" data-platform-tab="${escapeHtml(p)}" aria-pressed="false"
+      >${escapeHtml(platformLabel(p))}<span class="count">${drafts.filter((d) => d.platform === p).length}</span></button>`),
+  ].join('')
+  const order = `<label class="order"><span class="sub">الترتيب</span>
+    <select id="draft-order" aria-label="ترتيبُ المسوّدات">
+      <option value="new" selected>الأحدث أوّلًا</option>
+      <option value="old">الأقدم أوّلًا</option>
+      <option value="cost">الأغلى نشرًا أوّلًا</option>
+    </select></label>`
+  return `<nav class="ftabs" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>
+  <nav class="ftabs ftabs-2" id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden>${ptabs}<span class="grow"></span>${order}</nav>`
 }
 
 /**
@@ -466,7 +486,8 @@ function card(
              )}</span>`}</div>`
 
   return `<div class="draft${live ? '' : ' done'}" data-draft="${escapeHtml(d.id)}"
-    data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}">
+    data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}"
+    data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     ${notesPane(d, len, spec.hardLimit)}
     <div class="draft-top">
       ${open

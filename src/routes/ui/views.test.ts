@@ -322,3 +322,66 @@ describe('عدُّ الأيّام على البطاقة (D-126)', () => {
     expect(tokenDays('not-a-date', now)).toBe('')
   })
 })
+
+/**
+ * المرحلةُ الثالثة — الموجةُ الثانية (D-127): فرزٌ بالمنصّة وترتيب، و«ما مضى» رسمًا.
+ */
+describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
+  const draft = (id: string, platform: DraftRow['platform'], createdAt: string, cost: number): DraftRow => ({
+    id, platform, text: 'نصّ', rationale: null, status: 'draft', model: null,
+    cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
+    approvedAt: null, createdAt, scheduledAt: null,
+    accountName: null, dispatchedAt: null, publishCost: cost,
+  })
+  const html = draftsSection({
+    drafts: [draft('a', 'linkedin', '2026-09-05 09:00:00', 0.02), draft('b', 'x', '2026-09-06 09:00:00', 0.05)],
+    media: [], targets: [], earliest: '2026-09-06T09:15',
+    writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+  })
+
+  it('تبويبُ المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراضُ الكلّ', () => {
+    expect(html).toContain('data-platform-tab="all" aria-pressed="true">كلُّ المنصّات<span class="count">2</span>')
+    expect(html).toContain('data-platform-tab="linkedin" aria-pressed="false"\n      >LinkedIn<span class="count">1</span>')
+    expect(html).toContain('data-platform-tab="x"')
+    expect(html).not.toContain('data-platform-tab="tiktok"')
+  })
+
+  it('والترتيبُ قائمةٌ افتراضُها الأحدث، والبطاقةُ تحمل مفتاحَيه', () => {
+    expect(html).toContain('<select id="draft-order"')
+    expect(html).toContain('<option value="new" selected>')
+    expect(html).toContain(`data-created="${Date.parse('2026-09-06T09:00:00Z')}" data-cost="0.05"`)
+  })
+
+  it('والشريحةُ مخفيّةٌ بلا JavaScript — والقائمةُ كاملة', () => {
+    expect(html).toContain('id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden')
+    expect(SCRIPT).toContain("platform=b.dataset.platformTab")
+    expect(SCRIPT).toContain("order=orderSel.value; reorder();")
+  })
+})
+
+describe('حقلُ الأمر على اللمس (D-127)', () => {
+  it('textarea.mono يُذكَر باسمه في طبقة اللمس — وإلّا قرّبه iOS', () => {
+    expect(STYLE).toMatch(/@media\(pointer:coarse\)\{[\s\S]*textarea\.mono,\.cmd-text\{font-size:var\(--t-lg\)\}/)
+  })
+})
+
+describe('«ما مضى» رسمًا (D-127)', () => {
+  const report = (id: string, published: number, measured: number) => ({
+    id, createdAt: '2026-09-01 03:00:00',
+    body: { version: 1, from: id, to: id, published, measured, spendUsd: 1, platforms: [], notes: [], top: null },
+  })
+  it('أسابيعُ بترتيبها، ومع كلّ عمودٍ عددُ المقيس، والجزئيُّ مخطَّط', () => {
+    const html = reportScreen({
+      reports: [report('2026-09-07', 5, 5), report('2026-08-31', 8, 3)] as never,
+      current: null, suggestions: [], promoCapUsd: 0, now: new Date('2026-09-08T09:00:00Z'),
+    })
+    expect(html).toContain('class="chart bars history"')
+    const first = html.indexOf('href="/panel/report/2026-09-07"')
+    const second = html.indexOf('href="/panel/report/2026-08-31"')
+    expect(first).toBeGreaterThan(-1)
+    expect(first).toBeLessThan(second)
+    expect(html).toContain('<b>8</b> <span class="sub">قِيس 3</span>')
+    expect(html).toContain('bar-fill part')
+    expect(html.match(/bar-fill part/g)).toHaveLength(1)
+  })
+})
