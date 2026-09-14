@@ -372,6 +372,21 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
   .c4,.c5{grid-template-columns:repeat(2,1fr)} .c21{grid-template-columns:1fr}}
 @media(max-width:900px){.c3,.c2{grid-template-columns:1fr}}
 @media(max-width:560px){.c4,.c5{grid-template-columns:1fr}}
+/* ── صفُّ المؤشّرات في الجوّال زوجان لا عمود (D-136) ──────────────────
+   ستُّ بطاقاتٍ في عمودٍ واحدٍ على ‏٣٩٠px ثمانُ مئةِ بكسلٍ قبل أوّل قائمة،
+   وكلُّ بطاقةٍ رقمٌ واحدٌ في ‏١٣٠px. **فالمؤشّراتُ اثنان في الصفّ ما دام
+   الرقمُ يسع**، والرقمُ يصغر درجةً ليسع. */
+@media(max-width:900px){
+  .tiles.c2,.tiles.c3,.tiles.c4,.tiles.c5{grid-template-columns:repeat(2,1fr)}
+  .tiles .v{font-size:var(--t-xl); letter-spacing:-.6px}
+  .tiles>.tile:first-child .v{font-size:var(--t-2xl)}}
+/* ── نظرةٌ عامّة: عمودان يُملآن لا يُمدّان (D-136) ──────────────────────
+   شبكةٌ تمدّ البطاقةَ لتساوي جارتَها تترك تحت رسم الإنفاق ‏٥٢١px بيضاء
+   (قِيست). فالعمودُ الثاني **رصّةٌ** من بطاقتين تملأ ما تملؤه القائمة،
+   ولا بطاقةَ تُمدّ فوق محتواها. */
+.ov{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:var(--s-3); align-items:start}
+.stack{display:grid; gap:var(--s-3); align-content:start}
+@media(max-width:1180px){.ov{grid-template-columns:1fr}}
 
 /* ── مادّةُ السطح ─────────────────────────────────────────────────────
    ثلاث طبقاتٍ على كلّ بطاقة، ولكلٍّ سببٌ ماديّ:
@@ -608,6 +623,9 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 .doc p,.doc li{max-width:var(--measure-wide)}
 
 .row{display:flex; gap:var(--s-3); align-items:flex-end; flex-wrap:wrap}
+/* أفعالُ الصفّ تُرصّ على الحافّة الخارجيّة (D-136): صفٌّ بزرٍّ وصفٌّ بزرّين
+   يتّفقان على موضع «افتح في Drive»، فلا يقفز العمودُ بين الصفوف. */
+.row.acts{gap:var(--s-2); justify-content:flex-end; align-items:center}
 
 /* ── الفراغ ────────────────────────────────────────────────── */
 .empty{padding:var(--s-8) var(--s-5); text-align:center; border:1px dashed var(--line-strong);
@@ -633,6 +651,9 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 .todo .dot.warn{background:var(--warn)} .todo .dot.bad{background:var(--bad)}
 .todo .dot.ok{background:var(--ok)}
 .todo a,.todo form{margin-inline-start:auto}
+/* أزرارُ الصفوف عمودٌ واحدٌ لا حافّةٌ مسنّنة (D-136): عرضٌ أدنى واحد،
+   والأطولُ يتجاوزه بحقّه. */
+.todo>li>a.btn,.todo>li>form .btn{min-width:7.25rem}
 
 /* ── صفٌّ عاجلٌ في «ما عليك» (D-123) ────────────────────────────────
    مهمّةٌ توقف بوّابةَ مرحلةٍ ولم تتمّ. **وكان الصنفُ يُكتب في الوسم ولا

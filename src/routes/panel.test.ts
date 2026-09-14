@@ -663,6 +663,29 @@ describe('اللون يتبع المرجع لا الذوق', () => {
   })
 })
 
+/**
+ * **عمودان يُملآن لا يُمدّان** (D-136): بطاقةُ الإنفاق كانت تُمدّ لتساوي
+ * القائمةَ فتترك ‏٥٢١px بيضاء. فالمالُ رصّةٌ في عمودٍ، والقائمةُ في الآخر،
+ * وصفُّ المؤشّرات موسومٌ ليصير زوجين في الجوّال.
+ */
+describe('هندسةُ نظرة عامّة (D-136)', () => {
+  it('القائمةُ في عمود، والمالُ رصّةً في الآخر، والمؤشّراتُ موسومة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<div class="grid tiles c4">')
+    const ov = html.indexOf('<div class="ov"')
+    const stack = html.indexOf('<div class="stack">', ov)
+    const spend = html.indexOf('الإنفاق — أربعة عشر يوما', stack)
+    const money = html.indexOf('أين يذهب المال', spend)
+    expect(ov).toBeGreaterThan(0)
+    expect(stack).toBeGreaterThan(ov)
+    expect(spend).toBeGreaterThan(stack)
+    expect(money).toBeGreaterThan(spend)
+    expect(html.indexOf('ما ينتظرك', ov)).toBeLessThan(stack)
+    expect(html).not.toContain('<div class="grid c2" style="margin-top:var(--s-3)">')
+  })
+})
+
 describe('مفتاح الإدراج الآليّ في اللوحة', () => {
   it('يظهر مطفأ ويشرح ما يقع إن رُفع', async () => {
     const cookie = await login()
