@@ -449,6 +449,8 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .bar{height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; margin-top:var(--s-3)}
 .bar i{display:block; height:100%; border-radius:99px; background:var(--brand); transition:width var(--dur-3) var(--ease-out)}
 .bar i.f{background:var(--bad)}
+/* اكتمالٌ لا بلوغُ سقف — خضرةٌ كعلامته تحته (D-134) */
+.bar i.done{background:var(--ok)}
 .cap{display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-xs); font-weight:600;
   color:var(--bad); margin-top:var(--s-2)}
 .cap.done{color:var(--ok)}

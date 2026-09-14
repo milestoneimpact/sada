@@ -162,10 +162,11 @@ export const TILES: readonly TileSpec[] = [
     id: 'scheduled',
     label: 'مجدولٌ للنشر',
     why: 'ما اعتمدتَه وله موعدٌ لم يحن بعد.',
-    of: (d) => ({
-      value: String(d.drafts.filter((x) => x.scheduledAt !== null).length),
-      note: 'له موعدٌ في الطابور',
-    }),
+    of: (d) => {
+      const n = d.drafts.filter((x) => x.scheduledAt !== null).length
+      // **والصفرُ لا «له موعد»**: الملاحظةُ تتبع الرقم لا القالب (D-134)
+      return { value: String(n), note: n === 0 ? 'لا موعدَ في الطابور' : 'له موعدٌ في الطابور' }
+    },
   },
   {
     id: 'live_targets',

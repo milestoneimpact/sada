@@ -16,6 +16,7 @@ import { ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
+import { bar } from './parts'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -441,3 +442,28 @@ describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
   })
 })
 
+
+/**
+ * **الامتلاءُ ليس واحدًا** (D-134): سقفٌ بُلغ أحمرُ، وعملٌ اكتمل أخضر —
+ * والشريطُ وعلامتُه تحته لونٌ واحد.
+ */
+describe('شريطُ المقدار (D-134)', () => {
+  it('السقفُ المبلوغ أحمرُ f، والاكتمالُ done — وكلاهما بنصّ', () => {
+    const capped = bar(10, 10)
+    expect(capped).toContain('<i class="f"')
+    expect(capped).toContain('بلغ السقف')
+    expect(capped).not.toContain('done')
+
+    const done = bar(2, 2, 'كلّها محلَّلة')
+    expect(done).toContain('<i class="done"')
+    expect(done).toContain('class="cap done"')
+    expect(done).not.toContain('class="f"')
+    expect(STYLE).toContain('.bar i.done{background:var(--ok)}')
+  })
+
+  it('وما لم يمتلئ بلا لونِ حالٍ ولا نصّ', () => {
+    const part = bar(1, 2, 'كلّها محلَّلة')
+    expect(part).toContain('<i class=""')
+    expect(part).not.toContain('cap')
+  })
+})

@@ -96,6 +96,33 @@ export const SETTING_KEYS = [
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
 
+/**
+ * اسمُ الإعداد بجانب مفتاحه — **في موضعٍ واحد** (D-134).
+ *
+ * كان القاموسُ في `panel.ts` ناقصًا ثلاثةً، فقرأ المالكُ في «ما وقع اليوم»
+ * `dashboard_tiles` و`weekly_promo_cap_usd` بحرفهما. **والقائمةُ تُقاس
+ * على `SETTING_KEYS`**: مفتاحٌ يُضاف بلا اسمٍ يُردّ في الاختبار.
+ */
+export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
+  paused: 'الإيقاف المؤقّت',
+  daily_analysis_cap: 'سقف التحليل اليوميّ',
+  daily_spend_cap_usd: 'سقف الإنفاق اليوميّ',
+  auto_enqueue: 'الإدراج الآليّ',
+  weekly_promo_cap_usd: 'سقف الترويج الأسبوعيّ',
+  image_overlay: 'تركيب النصّ على الصورة',
+  alert_webhook: 'قناة التنبيهات',
+  dashboard_tiles: 'بطاقات اللوح',
+}
+
+export function isSettingKey(key: string): key is SettingKey {
+  return (SETTING_KEYS as readonly string[]).includes(key)
+}
+
+/** ما ليس مفتاحَ إعدادٍ يُعاد بحرفه — القاموسُ لا يخترع. */
+export function settingLabel(key: string): string {
+  return isSettingKey(key) ? SETTING_LABEL[key] : key
+}
+
 function toNumber(raw: string | undefined, fallback: number, key: keyof typeof LIMITS): number {
   if (raw === undefined) return fallback
   const value = Number(raw)

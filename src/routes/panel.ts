@@ -54,7 +54,7 @@ import {
 import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { verifyCompat } from '../lib/ai/openaiCompat'
 import { readRoutes, routeMismatch, writeRoute } from '../lib/ai/routes'
-import { readSettings, SETTING_KEYS, writeSetting, type SettingKey } from '../lib/settings'
+import { readSettings, SETTING_KEYS, settingLabel, writeSetting, type SettingKey } from '../lib/settings'
 import { chosenTiles, TILE_MAX, TILE_MIN } from '../lib/dashboard'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../lib/pivot'
 import { FACT_CAP, loadFacts } from '../lib/pivotStore'
@@ -731,12 +731,6 @@ const KNOWN_TASKS: ReadonlySet<string> = new Set(Object.keys(ROUTES))
  */
 const WRITABLE: ReadonlySet<string> = new Set<SettingKey>(SETTING_KEYS)
 
-const LABEL: Readonly<Record<string, string>> = {
-  daily_analysis_cap: 'سقف التحليل اليوميّ',
-  daily_spend_cap_usd: 'سقف الإنفاق اليوميّ',
-  weekly_promo_cap_usd: 'سقف الترويج الأسبوعيّ',
-}
-
 /**
  * تغيير إعداد.
  *
@@ -766,9 +760,16 @@ panel.post('/panel/settings', async (c) => {
   if (!WRITABLE.has(key)) return c.json({ error: 'unknown_setting' }, 400)
 
   const result = await writeSetting(c.env.DB, key as SettingKey, value, 'panel')
+  /*
+   * **والسجلُّ يُقرأ بالأسماء لا بالمعرِّفات** (D-134): بطاقاتٌ تُكتب
+   * `sources_analyzed,spend_30d` تُقرأ في سجلّ الأمان أسماءً كما على اللوح.
+   */
+  const detail = key === 'dashboard_tiles'
+    ? `← ${chosenTiles(result.stored).map((t) => t.label).join(' · ')}`
+    : `← ${result.stored}`
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'settings.write', target: key, detail: `← ${result.stored}` },
+    { actor: 'panel', action: 'settings.write', target: key, detail },
     c.req.raw,
   )
 
@@ -804,10 +805,10 @@ panel.post('/panel/settings', async (c) => {
   } else if (result.clamped) {
     flash = {
       kind: 'warn',
-      text: `${LABEL[key] ?? key}: القيمة ${value} خارج المدى — حُفظت ${result.stored}.`,
+      text: `${settingLabel(key)}: القيمة ${value} خارج المدى — حُفظت ${result.stored}.`,
     }
   } else {
-    flash = { kind: 'ok', text: `${LABEL[key] ?? key}: حُفظ ${result.stored}.` }
+    flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
   await setFlash(c.env, c.req.raw, flash)

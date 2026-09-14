@@ -12,6 +12,7 @@
 import type { Db } from './tokens'
 import { PROVIDERS } from './ai/registry'
 import { platformLabel } from './oauth/providers'
+import { isSettingKey, SETTING_LABEL } from './settings'
 
 export interface AuditEntry {
   /** كيف دخل الفاعل. `panel` جلسةُ لوحة، `admin_token` نداءُ طرفيّة. */
@@ -127,8 +128,12 @@ export function actionLabel(action: string): string {
  * و`linkedin` لحساب. **والمزوّدُ له اسمٌ بجانب تعريفه والمنصّةُ كذلك**،
  * فيُقرآن من هناك. وما ليس مزوّدًا ولا منصّةً — معرِّفُ مسوّدةٍ أو مفتاحُ
  * ضبط — يُعرَض بحرفه: القاموسُ ناقصٌ عمدًا.
+ *
+ * **ومفتاحُ الإعداد له اسمٌ بجانب مفتاحه أيضًا** (D-134): `dashboard_tiles`
+ * قرأها المالكُ بحرفها في «ما وقع اليوم» يومَ اختار بطاقاتِه.
  */
 export function targetLabel(target: string): string {
+  if (isSettingKey(target)) return SETTING_LABEL[target]
   const provider = (PROVIDERS as Readonly<Record<string, { readonly name: string }>>)[target]
   return provider?.name ?? platformLabel(target)
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { record, recentAudit } from './audit'
+import { record, recentAudit, targetLabel } from './audit'
 
 let db: FakeDb
 
@@ -66,5 +66,14 @@ describe('recentAudit', () => {
   it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE audit_log')
     expect(await recentAudit(db)).toEqual([])
+  })
+})
+
+describe('targetLabel (D-134)', () => {
+  it('مفتاحُ الإعداد اسمٌ، والمزوّدُ اسمُه، والمنصّةُ اسمُها، وما سواها بحرفه', () => {
+    expect(targetLabel('dashboard_tiles')).toBe('بطاقات اللوح')
+    expect(targetLabel('anthropic')).toBe('Anthropic')
+    expect(targetLabel('linkedin')).toBe('LinkedIn')
+    expect(targetLabel('draft-42')).toBe('draft-42')
   })
 })
