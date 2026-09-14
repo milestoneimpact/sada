@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { DEFAULTS, LIMITS, readSettings, writeSetting, SETTING_KEYS } from './settings'
+import { DEFAULTS, LIMITS, readSettings, writeSetting, SETTING_KEYS, SETTING_LABEL, settingLabel } from './settings'
 
 let db: FakeDb
 beforeEach(() => {
@@ -135,5 +135,24 @@ describe('مفاتيحُ الإعدادات — قائمةٌ حيّةٌ لا ن�
     const db = fakeDb()
     const r = await writeSetting(db, 'alert_webhook', 'https://hooks.example.com/t/a', 'panel')
     expect(r.stored).toContain('hooks.example.com')
+  })
+})
+
+/**
+ * **اسمٌ لكلّ مفتاح** (D-134): ما يُقرأ في «ما وقع اليوم» وسجلّ الأمان
+ * والإشعارات اسمٌ عربيّ، لا `dashboard_tiles` بحرفها.
+ */
+describe('أسماءُ الإعدادات (D-134)', () => {
+  it('كلُّ مفتاحٍ في SETTING_KEYS له اسمٌ عربيٌّ يخالف حرفَه', () => {
+    for (const key of SETTING_KEYS) {
+      expect(SETTING_LABEL[key], key).toMatch(/[\u0600-\u06FF]/)
+      expect(SETTING_LABEL[key]).not.toBe(key)
+    }
+  })
+
+  it('وما ليس مفتاحًا يُعاد بحرفه — القاموسُ لا يخترع', () => {
+    expect(settingLabel('dashboard_tiles')).toBe('بطاقات اللوح')
+    expect(settingLabel('weekly_promo_cap_usd')).toBe('سقف الترويج الأسبوعيّ')
+    expect(settingLabel('draft-42')).toBe('draft-42')
   })
 })

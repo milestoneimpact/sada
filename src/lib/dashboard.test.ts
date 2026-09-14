@@ -164,3 +164,13 @@ describe('البطاقاتُ بأعيانها', () => {
     expect(spec?.of(src, fmt)).toMatchObject({ value: '3.00$', note: 'يوم 09-02' })
   })
 })
+
+/** الملاحظةُ تتبع الرقم: صفرٌ مجدولٌ «لا موعدَ»، لا «له موعد» (D-134). */
+describe('مجدولٌ للنشر (D-134)', () => {
+  it('صفرٌ يقول «لا موعدَ في الطابور»', () => {
+    const spec = TILES.find((t) => t.id === 'scheduled')!
+    const none = { ...src, drafts: [{ status: 'draft', scheduledAt: null }] }
+    expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعدَ في الطابور' })
+    expect(spec.of(src, fmt).note).toBe('له موعدٌ في الطابور')
+  })
+})

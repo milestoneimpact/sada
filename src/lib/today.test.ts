@@ -45,13 +45,33 @@ describe('ما وقع اليوم', () => {
     expect(JSON.stringify(items)).not.toContain('linkedin»')
   })
 
+  /** ضغطتا «احفظ» على البطاقات سطرٌ واحدٌ بعدده — والمختلفُ لا يُطوى (D-134). */
+  it('والفعلُ الواحدُ مرّتين سطرٌ واحدٌ بعدده، ومفتاحُ الإعداد اسمٌ', () => {
+    const { items } = todayFeed({
+      now,
+      audit: [
+        { at: '2026-09-12 14:58:00', action: 'settings.write', target: 'dashboard_tiles', detail: null },
+        { at: '2026-09-12 14:59:00', action: 'settings.write', target: 'dashboard_tiles', detail: null },
+        { at: '2026-09-12 14:59:30', action: 'settings.write', target: 'weekly_promo_cap_usd', detail: null },
+        { at: '2026-09-12 14:50:00', action: 'settings.write', target: 'dashboard_tiles', detail: null },
+      ],
+      drafts: [], facts: [],
+    })
+    expect(items.map((x) => x.text)).toEqual([
+      'تغيير إعداد — سقف الترويج الأسبوعيّ',
+      'تغيير إعداد — بطاقات اللوح — 3 مرّات',
+    ])
+    expect(items[1]!.at).toBe('2026-09-12 14:59:00')
+    expect(JSON.stringify(items)).not.toContain('dashboard_tiles')
+  })
+
   it('ويومٌ بلا شيء قائمةٌ فارغة — لا «لا يُعرَف»', () => {
     expect(todayFeed({ now, audit: [], drafts: [], facts: [] })).toEqual({ items: [], more: 0 })
   })
 
   it('والسقفُ يُقال عددًا لا يُصمَت عنه', () => {
     const audit = Array.from({ length: TODAY_CAP + 5 }, (_, n) => ({
-      at: `2026-09-12 0${Math.min(9, n)}:${String(n).padStart(2, '0')}:00`, action: 'settings.write', target: null, detail: null,
+      at: `2026-09-12 0${Math.min(9, n)}:${String(n).padStart(2, '0')}:00`, action: 'settings.write', target: `k${n}`, detail: null,
     }))
     const { items, more } = todayFeed({ now, audit, drafts: [], facts: [] })
     expect(items).toHaveLength(TODAY_CAP)

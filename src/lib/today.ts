@@ -107,5 +107,30 @@ export function todayFeed(i: TodayInput): { items: readonly TodayItem[]; more: n
     if (x.at === null || y.at === null) return x.at === null ? (y.at === null ? 0 : 1) : -1
     return x.at < y.at ? 1 : x.at > y.at ? -1 : 0
   })
-  return { items: out.slice(0, TODAY_CAP), more: Math.max(0, out.length - TODAY_CAP) }
+  const folded = fold(out)
+  return { items: folded.slice(0, TODAY_CAP), more: Math.max(0, folded.length - TODAY_CAP) }
+}
+
+/**
+ * **الفعلُ الواحدُ مرّتين سطرٌ واحدٌ بعدده** (D-134).
+ *
+ * ضغط المالكُ «احفظ» مرّتين على بطاقات اللوح فقرأ «تغيير إعداد — بطاقات
+ * اللوح» سطرين متطابقين تحت بعضهما. **والتطابقُ بالنصّ والحال**: يبقى
+ * الأحدثُ بوقته، ويُلحَق به العدد، ولا يُطوى ما اختلف نصُّه.
+ */
+function fold(items: readonly TodayItem[]): readonly TodayItem[] {
+  const seen = new Map<string, { item: TodayItem; n: number }>()
+  const order: string[] = []
+  for (const item of items) {
+    const key = `${item.kind}\u0000${item.text}`
+    const hit = seen.get(key)
+    if (hit === undefined) {
+      seen.set(key, { item, n: 1 })
+      order.push(key)
+    } else hit.n += 1
+  }
+  return order.map((key) => {
+    const { item, n } = seen.get(key)!
+    return n === 1 ? item : { ...item, text: `${item.text} — ${n === 2 ? 'مرّتين' : `${n} مرّات`}` }
+  })
 }

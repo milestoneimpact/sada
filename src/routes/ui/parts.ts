@@ -17,13 +17,19 @@ export function pct(used: number, cap: number): number {
  * مقياسُ مقدار: هيئةٌ واحدة تتدرّج بالطول لا بالهيئة.
  * والبلوغ حالةٌ لا مقدار — فيقفز إلى الأحمر **ومعه نصّ**، لأنّ الحالة
  * لا تقع على اللون وحده.
+ *
+ * **والامتلاءُ ليس واحدًا** (D-134): سقفٌ بُلغ إنذارٌ أحمر، **وعملٌ اكتمل
+ * (كلُّها محلَّلة، كلُّهم جاهزون) خضرة** — وكان الشريطُ يحمرّ للاثنين،
+ * فقرأ المالكُ «2 من 2 محلَّلة» عطلًا. والعلامةُ نصٌّ تحت الشريط تُلوَّن
+ * كلونه، فلا يفترق الاثنان.
  */
 export function bar(used: number, cap: number, label = 'بلغ السقف'): string {
   const p = pct(used, cap)
   const full = p >= 100
-  return `<div class="bar"><i class="${full ? 'f' : ''}" style="width:${p}%"></i></div>` +
+  const done = label !== 'بلغ السقف'
+  return `<div class="bar"><i class="${full ? (done ? 'done' : 'f') : ''}" style="width:${p}%"></i></div>` +
     (full
-      ? `<div class="cap${label === 'بلغ السقف' ? '' : ' done'}"><span aria-hidden="true">■</span>${escapeHtml(label)}</div>`
+      ? `<div class="cap${done ? ' done' : ''}"><span aria-hidden="true">■</span>${escapeHtml(label)}</div>`
       : '')
 }
 
