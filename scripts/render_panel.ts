@@ -266,12 +266,19 @@ const data: PanelData = {
     { id: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false },
   ],
   audit: [
+    // **كما فعل المالكُ يومَ قرّر** (D-135): ضغطتان على البطاقات وسقفُ الترويج —
+    // فيُقاس أنّ المفتاحَ يُقرأ اسمًا، وأنّ المكرَّرَ يُطوى
+    { at: ago(0.5), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما · مسوّدات تنتظرك · مجدولٌ للنشر · مزوّدون جاهزون', ip: '203.0.113.9' },
+    { at: ago(0.6), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · إنفاق اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما', ip: '203.0.113.9' },
+    { at: ago(0.7), actor: 'panel', action: 'settings.write', target: 'weekly_promo_cap_usd', detail: '← 2', ip: '203.0.113.9' },
     { at: ago(1), actor: 'panel', action: 'provider.key', target: 'anthropic', detail: 'بُدّل إلى sk-ant-…_QAA', ip: '203.0.113.9' },
     { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعاملٍ واحد', ip: '203.0.113.9' },
     { at: ago(26), actor: 'cron', action: 'drive.scan', target: null, detail: 'رأى 3 · تغيّر 1', ip: null },
   ],
   today: {
     items: [
+      { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#security', goLabel: 'الأمان' },
+      { at: ago(0.7), kind: 'note', text: 'تغيير إعداد — سقف الترويج الأسبوعيّ', go: '#security', goLabel: 'الأمان' },
       { at: ago(1), kind: 'note', text: 'تبديل مفتاح — Anthropic', go: '#security', goLabel: 'الأمان' },
       { at: ago(3), kind: 'ok', text: 'اعتمدتَ مسوّدةً لـLinkedIn', go: '#posts', goLabel: 'المنشورات' },
       { at: null, kind: 'ok', text: 'نُشر منشورٌ على LinkedIn', go: '/panel/channels/linkedin', goLabel: 'شاشةُ LinkedIn' },

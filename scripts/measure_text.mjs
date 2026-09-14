@@ -55,6 +55,19 @@ for (const name of readdirSync(MIGRATIONS)) {
   }
 }
 
+/**
+ * **ومفاتيحُ الإعدادات كذلك** (D-135): `dashboard_tiles` قرأها المالكُ بحرفها
+ * في «ما وقع اليوم» ولم يمسكها هذا الحارس — لأنّها ليست `CHECK`، **ولأنّ
+ * الشرطةَ السفليّة كانت تجعلها «معرِّفًا مركَّبًا» يُتخطّى**. فتُقرأ القائمةُ من
+ * `settings.ts` نفسِه، وتُفحَص قبل استثناء المركَّب.
+ */
+const SETTINGS_SRC = readFileSync(new URL('../src/lib/settings.ts', import.meta.url), 'utf8')
+const SETTING_KEYS = [...(SETTINGS_SRC.match(/SETTING_KEYS = \[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1])
+if (SETTING_KEYS.length === 0) {
+  console.error('لم تُقرأ SETTING_KEYS من settings.ts — الحارسُ أعمى')
+  process.exit(1)
+}
+
 const files = process.argv.slice(2)
 if (files.length === 0) {
   console.error('الاستعمال: node scripts/measure_text.mjs <ملفّ.html>…')
@@ -70,7 +83,7 @@ for (const file of files) {
   await page.goto(`file://${file}`)
   await page.waitForTimeout(500)
 
-  const report = await page.evaluate((CHECK_WORDS) => {
+  const report = await page.evaluate(([CHECK_WORDS, SETTING_KEYS]) => {
     const panes = [...document.querySelectorAll('section[data-pane]')]
     /*
      * **وشاشةُ حالاتٍ ليست شاشةً واحدة.**
@@ -264,8 +277,10 @@ for (const file of files) {
             // الكلمةُ تُجرَّد من ترقيمها الطرفيّ، **ومعرِّفٌ مركَّب** (`video.publish` ·
             // `gemini-2.5-flash` · `panel:token`) اسمٌ تقنيٌّ لا مفتاحٌ في مكان اسم
             const w = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
-            if (/[.\-:/_]/.test(w)) continue
-            if (CHECK_WORDS.includes(w)) keys.push({ w, tag: node.tagName.toLowerCase(), text: text.slice(0, 40) })
+            // مفتاحُ إعدادٍ بحرفه مفتاحٌ وإن حمل شرطةً سفليّة (D-135)
+            if (SETTING_KEYS.includes(w) || (!/[.\-:/_]/.test(w) && CHECK_WORDS.includes(w))) {
+              keys.push({ w, tag: node.tagName.toLowerCase(), text: text.slice(0, 40) })
+            }
           }
         }
       }
@@ -282,7 +297,7 @@ for (const file of files) {
       if (was) el.hidden = true
     }
     return out
-  }, [...CHECK_WORDS])
+  }, [[...CHECK_WORDS], SETTING_KEYS])
 
   console.log(`\n═══ ${file.split('/').pop()} ═══`)
   console.log(`  ${report.totals.strings} سلسلةً · ${report.totals.words} كلمة\n`)
@@ -304,4 +319,4 @@ for (const file of files) {
   }
 }
 await browser.close()
-console.log(`\nالمجموع: ${findings} ملحوظة · (${CHECK_WORDS.size} مفردةً من CHECK تُبحَث)`)
+console.log(`\nالمجموع: ${findings} ملحوظة · (${CHECK_WORDS.size} مفردةً من CHECK و${SETTING_KEYS.length} مفاتيحَ إعدادٍ تُبحَث)`)
