@@ -223,6 +223,31 @@ for (const file of pages) {
           if (cols > kids.length) holes.push({ cls: g.className, cols, kids: kids.length })
         }
       }
+      /*
+       * **بطاقةٌ فارغةُ الذيل** (D-136): شبكةٌ تمدّ بطاقةً لتساوي جارتَها،
+       * فيبقى تحت رسم الإنفاق نصفُ متر أبيض. رُئي بالعين في نظرةٍ عامّة على
+       * ‏١٤٤٠ بعد أن قال المدقّق «صفرا». والقياسُ هندسة: أسفلُ آخر محتوًى
+       * مقابلَ أسفل البطاقة بعد حشوتها، **وذيلٌ أطولُ من ‏١٢٠px فراغٌ لا
+       * تنفّس** (ثلاثةُ أسطرٍ من النصّ).
+       */
+      const tails = []
+      if (width > 720) {
+        for (const c of document.querySelectorAll('.card')) {
+          const r = c.getBoundingClientRect()
+          if (r.height < 200) continue
+          let last = r.top
+          for (const el of c.querySelectorAll('*')) {
+            if (el.closest('script,style,template') !== null) continue
+            const b = el.getBoundingClientRect()
+            if (b.height === 0) continue
+            const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '')
+            if (own || /^(svg|table|button|input|select|textarea|img|canvas)$/i.test(el.tagName)) last = Math.max(last, b.bottom)
+          }
+          const pad = parseFloat(getComputedStyle(c).paddingBottom) || 0
+          const tail = Math.round(r.bottom - pad - last)
+          if (tail > 120) tails.push({ head: (c.querySelector('h2,h3')?.textContent ?? '').trim().slice(0, 30), tail, height: Math.round(r.height) })
+        }
+      }
       for (const h of document.querySelectorAll('h2.sec, h3.sec')) {
         let sib = h.nextElementSibling
         let fed = false
@@ -233,7 +258,7 @@ for (const file of pages) {
         if (!fed) orphans.push({ text: h.textContent.trim().slice(0, 30) })
       }
       panes.forEach((s, i) => { s.hidden = was[i] })
-      return { holes, orphans }
+      return { holes, orphans, tails }
     }, width)
 
     /*
@@ -484,6 +509,7 @@ for (const file of pages) {
     findings[findings.length - 1].ranks = ranks
     findings[findings.length - 1].holes = shape.holes
     findings[findings.length - 1].orphans = shape.orphans
+    findings[findings.length - 1].tails = shape.tails
     findings[findings.length - 1].keyboard = keyboard
     await page.close()
   }
@@ -494,7 +520,7 @@ let failed = 0
 for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
-    (f.holes ?? []).length + (f.orphans ?? []).length +
+    (f.holes ?? []).length + (f.orphans ?? []).length + (f.tails ?? []).length +
     (f.keyboard?.unreached.length ?? 0) + (f.keyboard?.blind.length ?? 0) + (f.keyboard?.ringless.length ?? 0) +
     (f.keyboard?.trapped ? 1 : 0) + (f.keyboard?.skipFirst === false ? 1 : 0) +
     (f.overflow ? 1 : 0)
@@ -561,6 +587,10 @@ for (const f of findings) {
   if ((f.orphans ?? []).length > 0) {
     console.log(`  ✕ ${f.orphans.length} ترويسةً بلا جسد:`)
     for (const o of f.orphans) console.log(`      «${o.text}»`)
+  }
+  if ((f.tails ?? []).length > 0) {
+    console.log(`  ✕ ${f.tails.length} بطاقةً فارغةَ الذيل:`)
+    for (const t of f.tails) console.log(`      «${t.head}» — ${t.tail}px فراغٌ من ${t.height}px`)
   }
   if (f.faint.length > 0) {
     console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)

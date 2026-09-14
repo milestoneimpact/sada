@@ -1171,7 +1171,7 @@ function tileRow(d: PanelData): string {
       ${v.delta === true ? deltaOf(d.series) : ''}
       ${v.note === undefined ? '' : `<div class="n">${escapeHtml(v.note)}</div>`}</div>`
   })
-  return `<div class="grid ${cols}">${cards.join('')}</div>`
+  return `<div class="grid tiles ${cols}">${cards.join('')}</div>`
 }
 
 /**
@@ -1501,25 +1501,32 @@ ${flash}
   <p class="lede lede-lead">حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك.
     <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b></p>
   ${tileRow(d)}
-  <div class="grid c2" style="margin-top:var(--s-3)">
+  ${/*
+   * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
+   * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
+   * الإنفاق تُمدّ لتساوي القائمةَ فتترك ‏٥٢١px بيضاء — أمسكها مدقّقُ
+   * الذيل بعد أن رآها المالك.
+   */''}
+  <div class="ov" style="margin-top:var(--s-3)">
     <div class="card"><h2>ما ينتظرك</h2>
       <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
       ${todo === ''
         ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
         : `<ul class="todo">${todo}</ul>`}
       ${todayList(d)}</div>
-    <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
-      <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
-      <div class="row" style="margin-top:var(--s-3)">${scanBtn}
-        <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
-  </div>
-
-  <div class="card" style="margin-top:var(--s-3)">
-    <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
-      <span class="st idle">٣٠ يوما</span></div>
-    <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
-      «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
-    ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
+    <div class="stack">
+      <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
+        <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
+        <div class="row" style="margin-top:var(--s-3)">${scanBtn}
+          <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
+      <div class="card">
+        <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
+          <span class="st idle">٣٠ يوما</span></div>
+        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
+          «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
+        ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
+      </div>
+    </div>
   </div>
 </section>
 
