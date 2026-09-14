@@ -623,6 +623,9 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 .doc p,.doc li{max-width:var(--measure-wide)}
 
 .row{display:flex; gap:var(--s-3); align-items:flex-end; flex-wrap:wrap}
+/* أفعالُ الصفّ تُرصّ على الحافّة الخارجيّة (D-136): صفٌّ بزرٍّ وصفٌّ بزرّين
+   يتّفقان على موضع «افتح في Drive»، فلا يقفز العمودُ بين الصفوف. */
+.row.acts{gap:var(--s-2); justify-content:flex-end; align-items:center}
 
 /* ── الفراغ ────────────────────────────────────────────────── */
 .empty{padding:var(--s-8) var(--s-5); text-align:center; border:1px dashed var(--line-strong);

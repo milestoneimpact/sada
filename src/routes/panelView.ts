@@ -1098,7 +1098,7 @@ function sourceRow(s: PanelSource, now: Date): string {
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(s.lastSeenAt)} UTC">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
-    <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row" style="gap:var(--s-2)">${acts}</div>`}</td>
+    <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row acts">${acts}</div>`}</td>
   </tr>`
 }
 
