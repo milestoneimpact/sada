@@ -10,6 +10,7 @@
  * واحد**. وزرٌّ لا يعمل بلا جافاسكربت زرٌّ يعمل خطأً (D-046).
  */
 import { escapeHtml } from '../shell'
+import { pageHead } from '../parts'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
@@ -123,8 +124,7 @@ export function pivotPane(d: PivotView): string {
       وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.</p></div>`
 
   return `<section data-pane="pivot" hidden>
-  <p class="lede lede-lead">تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول.
-    <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.</p>
+  ${pageHead('القياس', 'الجدول المحوريّ', 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
 
   <div class="card">
     <form class="row pv-form" method="GET" action="/panel">
@@ -144,12 +144,12 @@ export function pivotPane(d: PivotView): string {
       <h2>${escapeHtml(MEASURE_LABEL[d.measure])} — ${
         escapeHtml(DIMENSION_LABEL[d.rows])}${
         d.cols === null ? '' : ` × ${escapeHtml(DIMENSION_LABEL[d.cols])}`}</h2>
-      <span class="n">${escapeHtml(String(t.facts))} منشورا${
+      <div class="row acts"><span class="n">${escapeHtml(String(t.facts))} منشورا${
         d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
+      ${t.rowKeys.length === 0 ? '' : `<a class="btn g sm" href="${
+        escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>`}</div>
     </div>
-    ${t.rowKeys.length === 0 ? '' : `<p class="hint pv-dl"><a class="btn g sm" href="${
-      escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>
-      <span>ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</span></p>`}
+    ${t.rowKeys.length === 0 ? '' : `<p class="hint">ملفُّ CSV يحمل ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</p>`}
     ${t.rowKeys.length === 0
       ? empty
       : `<div class="pv-wrap"><table class="pv">

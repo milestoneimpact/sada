@@ -686,6 +686,25 @@ describe('هندسةُ نظرة عامّة (D-136)', () => {
   })
 })
 
+/**
+ * **رأسٌ لكلّ لوحٍ سوى «نظرة عامّة»** (D-137): كان الجدولُ المحوريُّ وحدَه
+ * بلا رأس. والحارسُ يعدّ `h1` في كلّ `section[data-pane]`.
+ */
+describe('رؤوسُ الألواح (D-137)', () => {
+  it('لكلّ لوحٍ h1 واحدٌ، ونظرةٌ عامّة بلا رأسٍ قصدًا', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const panes = html.split('<section data-pane="').slice(1)
+    expect(panes.length).toBeGreaterThanOrEqual(8)
+    for (const p of panes) {
+      const name = p.slice(0, p.indexOf('"'))
+      const h1s = (p.match(/<h1[\s>]/g) ?? []).length
+      expect(h1s, name).toBe(name === 'overview' ? 0 : 1)
+    }
+    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+  })
+})
+
 describe('مفتاح الإدراج الآليّ في اللوحة', () => {
   it('يظهر مطفأ ويشرح ما يقع إن رُفع', async () => {
     const cookie = await login()

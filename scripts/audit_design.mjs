@@ -248,6 +248,34 @@ for (const file of pages) {
           if (tail > 120) tails.push({ head: (c.querySelector('h2,h3')?.textContent ?? '').trim().slice(0, 30), tail, height: Math.round(r.height) })
         }
       }
+      /*
+       * **بطاقةٌ جوفاءُ العرض** (D-137): بطاقةٌ عريضةٌ طويلةٌ محتواها في نصفها،
+       * ونصفُها الآخر أبيض — كلوح اليوم الأوّل على ‏١٤٤٠: خمسُ خطواتٍ في
+       * ‏٤٥٪ من عرضها. والقياسُ هندسةٌ كسابقه: مدى المحتوى أفقيًّا مقابلَ
+       * عرض البطاقة بعد حشوتها، **ودون ‏٥٥٪ في بطاقةٍ فوق ‏٣٠٠px علّة**.
+       * وتُستثنى بطاقةٌ قصيرة: فقرةٌ واحدةٌ بمقياسها المقروء ليست جوفاء.
+       */
+      const hollow = []
+      if (width > 900) {
+        for (const c of document.querySelectorAll('.card')) {
+          const r = c.getBoundingClientRect()
+          if (r.height < 300 || r.width < 700) continue
+          let left = Infinity, right = -Infinity
+          for (const el of c.querySelectorAll('*')) {
+            if (el.closest('script,style,template') !== null) continue
+            const b = el.getBoundingClientRect()
+            if (b.height === 0 || b.width === 0) continue
+            const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '')
+            if (!own && !/^(svg|table|button|input|select|textarea|img|canvas)$/i.test(el.tagName)) continue
+            left = Math.min(left, b.left); right = Math.max(right, b.right)
+          }
+          if (left === Infinity) continue
+          const cs = getComputedStyle(c)
+          const inner = r.width - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+          const share = (right - left) / inner
+          if (share < 0.55) hollow.push({ head: (c.querySelector('h1,h2,h3')?.textContent ?? '').trim().slice(0, 30), share: Math.round(share * 100), height: Math.round(r.height) })
+        }
+      }
       for (const h of document.querySelectorAll('h2.sec, h3.sec')) {
         let sib = h.nextElementSibling
         let fed = false
@@ -258,7 +286,7 @@ for (const file of pages) {
         if (!fed) orphans.push({ text: h.textContent.trim().slice(0, 30) })
       }
       panes.forEach((s, i) => { s.hidden = was[i] })
-      return { holes, orphans, tails }
+      return { holes, orphans, tails, hollow }
     }, width)
 
     /*
@@ -510,6 +538,7 @@ for (const file of pages) {
     findings[findings.length - 1].holes = shape.holes
     findings[findings.length - 1].orphans = shape.orphans
     findings[findings.length - 1].tails = shape.tails
+    findings[findings.length - 1].hollow = shape.hollow
     findings[findings.length - 1].keyboard = keyboard
     await page.close()
   }
@@ -520,7 +549,7 @@ let failed = 0
 for (const f of findings) {
   const issues = f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
-    (f.holes ?? []).length + (f.orphans ?? []).length + (f.tails ?? []).length +
+    (f.holes ?? []).length + (f.orphans ?? []).length + (f.tails ?? []).length + (f.hollow ?? []).length +
     (f.keyboard?.unreached.length ?? 0) + (f.keyboard?.blind.length ?? 0) + (f.keyboard?.ringless.length ?? 0) +
     (f.keyboard?.trapped ? 1 : 0) + (f.keyboard?.skipFirst === false ? 1 : 0) +
     (f.overflow ? 1 : 0)
@@ -591,6 +620,10 @@ for (const f of findings) {
   if ((f.tails ?? []).length > 0) {
     console.log(`  ✕ ${f.tails.length} بطاقةً فارغةَ الذيل:`)
     for (const t of f.tails) console.log(`      «${t.head}» — ${t.tail}px فراغٌ من ${t.height}px`)
+  }
+  if ((f.hollow ?? []).length > 0) {
+    console.log(`  ✕ ${f.hollow.length} بطاقةً جوفاءَ العرض:`)
+    for (const h of f.hollow) console.log(`      «${h.head}» — المحتوى في ${h.share}٪ من عرضها، وطولُها ${h.height}px`)
   }
   if (f.faint.length > 0) {
     console.log(`  ✕ ${f.faint.length} نصّا دون حدّ التباين (محسوبا لا من الرموز):`)
