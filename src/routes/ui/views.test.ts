@@ -17,6 +17,8 @@ import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { bar } from './parts'
+import { refusedBody } from './oauthResult'
+import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -465,5 +467,41 @@ describe('شريطُ المقدار (D-134)', () => {
     const part = bar(1, 2, 'كلّها محلَّلة')
     expect(part).toContain('<i class=""')
     expect(part).not.toContain('cap')
+  })
+})
+
+/** بطاقةُ الجدول: العدُّ وزرُّ CSV في رأسها، والشرحُ تحته (D-137). */
+describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
+  it('الزرُّ في الرأس مع العدّ، ورأسُ اللوح موجود', () => {
+    const rows = [
+      { day: '2026-09-01', platform: 'x', account: 'a', status: 'published', costUsd: 0.1, week: '2026-W36', month: '2026-09' },
+      { day: '2026-09-02', platform: 'linkedin', account: 'b', status: 'failed', costUsd: 0.2, week: '2026-W36', month: '2026-09' },
+    ] as never
+    const html = pivotPane({ rows: 'platform', cols: 'status', measure: 'count', sinceDays: 30, table: pivot(rows, { rows: 'platform', cols: 'status', measure: 'count' }), capped: false, cap: 5000 } as never)
+    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+    const split = html.indexOf('<div class="split">')
+    const acts = html.indexOf('<div class="row acts">', split)
+    const csv = html.indexOf('نزّل الجدولَ CSV', acts)
+    const hint = html.indexOf('ملفُّ CSV يحمل', csv)
+    expect(acts).toBeGreaterThan(split)
+    expect(csv).toBeGreaterThan(acts)
+    expect(hint).toBeGreaterThan(csv)
+    expect(html).toContain(' download>')
+  })
+})
+
+/** بطاقةُ الخطوات في شاشة الرفض: عمودان على العريض (D-137). */
+describe('بطاقةُ الخطوات (D-137)', () => {
+  it('الخطواتُ ثمّ جانبٌ فيه البابُ و«إن نجح»', () => {
+    const html = refusedBody({ platform: 'linkedin', reason: 'unauthorized_scope_error', requested: scopeSet('linkedin'), identityRetry: true })
+    const card = html.indexOf('<div class="card guide"')
+    const steps = html.indexOf('<ol class="steps">', card)
+    const aside = html.indexOf('<div class="guide-aside">', steps)
+    const outcome = html.indexOf('<div class="outcome">', aside)
+    expect(card).toBeGreaterThan(0)
+    expect(steps).toBeGreaterThan(card)
+    expect(aside).toBeGreaterThan(steps)
+    expect(outcome).toBeGreaterThan(aside)
+    expect(STYLE).toContain('.card.guide{display:grid')
   })
 })

@@ -27,7 +27,7 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
-import { alertChannel, bar, firstDay, pct, type OutboxRow } from './ui/parts'
+import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { COPY_SCRIPT } from './ui/shell'
@@ -38,27 +38,6 @@ import { LOGOS } from './ui/logos'
 export { escapeHtml, injectCsrf, shell }
 
 
-/**
- * رأسُ القسم — لصيقةٌ وعنوانٌ وسطر.
- *
- * كان أعلى ما في الشاشة عنوانا في الشريط بستّةَ عشرَ بكسلا، وتحته
- * أرقامٌ باثنين وثلاثين. **فالرقمُ هو الذي يُقرأ عنوانا**، وتصير الشاشةُ
- * لوحةَ عدّاداتٍ لا شاشةَ عمل: العينُ تقع على أكبر شيءٍ أوّلا، لا على
- * ما وُسم عنوانا.
- *
- * والسطرُ الثالث ليس زينة: قسمٌ يبدأ بجدولٍ بلا جملةٍ تقول ما هو يجعل
- * القارئَ يستنتج غرضَه من أعمدته.
- */
-function pageHead(eyebrow: string, title: string, lede: string, aside = ''): string {
-  return `<div class="page-head">
-    <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
-      <h1>${escapeHtml(title)}</h1>
-      <p class="lede">${lede}</p>
-    </div>
-    ${aside === '' ? '' : `<div class="aside">${aside}</div>`}
-  </div>`
-}
 
 /**
  * نصُّ اللوحة الجاري في المتصفّح.

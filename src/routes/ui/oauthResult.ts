@@ -404,7 +404,7 @@ export function refusedBody(d: RefusedData): string {
 
   ${guide === undefined
     ? ''
-    : `<div class="card" style="margin-top:var(--s-4)">
+    : `<div class="card guide" style="margin-top:var(--s-4)">
       <div class="card-head"><h2>الخطواتُ في ${escapeHtml(guide.portalLabel)}</h2></div>
       <ol class="steps">${guide.before
         .map(
@@ -412,10 +412,16 @@ export function refusedBody(d: RefusedData): string {
             <span class="what">${b.what}</span><span class="why">${b.why}</span></span></li>`,
         )
         .join('')}</ol>
-      <a class="btn g sm" href="${escapeHtml(guide.portal)}" target="_blank"
-        rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
-      <div class="outcome"><span class="k">إن نجح</span>
-        <span class="v">${guide.success}</span></div>
+      ${/*
+       * **الخطواتُ في عمودٍ وما بعدها في الآخر** (D-137): البابُ و«إن نجح»
+       * بجانب الخطوات على العريض لا تحتها — كانت البطاقةُ جوفاءَ نصفِها.
+       */''}
+      <div class="guide-aside">
+        <a class="btn g sm" href="${escapeHtml(guide.portal)}" target="_blank"
+          rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
+        <div class="outcome"><span class="k">إن نجح</span>
+          <span class="v">${guide.success}</span></div>
+      </div>
     </div>`}
 
   <div class="row" style="margin-top:var(--s-4)">

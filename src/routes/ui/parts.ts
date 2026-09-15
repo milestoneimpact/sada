@@ -8,6 +8,22 @@
 import { escapeHtml } from './shell'
 import type { Onboarding } from '../../lib/onboard'
 
+/**
+ * رأسُ اللوح — **واحدٌ لكلّ لوحٍ سوى «نظرة عامّة»** (D-137): كان لوحُ
+ * الجدول المحوريّ وحدَه بلا رأس، فقُرئ ناقصًا بين ألواحٍ لكلٍّ منها اسمٌ
+ * وسطرٌ. ونظرةٌ عامّة تُفتَح كلَّ صباحٍ فتحمل السطرَ وحدَه قصدًا.
+ */
+export function pageHead(eyebrow: string, title: string, lede: string, aside = ''): string {
+  return `<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <p class="lede">${lede}</p>
+    </div>
+    ${aside === '' ? '' : `<div class="aside">${aside}</div>`}
+  </div>`
+}
+
 export function pct(used: number, cap: number): number {
   if (cap <= 0) return 100
   return Math.min(100, Math.round((used / cap) * 100))
@@ -67,16 +83,23 @@ export function firstDay(o: Onboarding): string {
     })
     .join('')
 
+  /*
+   * **عمودان على العريض** (D-137): العنوانُ والعدُّ والشريطُ والشرحُ في
+   * عمود، والخطواتُ الخمسُ في الآخر. كانت الخطواتُ وحدَها في ‏٤٩٪ من عرض
+   * البطاقة ونصفُها الآخرُ أبيض — أمسكه مدقّقُ «الجوفاء».
+   */
   return `<div class="card fd">
-    <div class="fd-h">
-      <div><div class="eyebrow"><span class="ln"></span>اليومُ الأوّل</div>
-        <h2>${o.done} من ${o.steps.length}</h2></div>
-      <span class="grow"></span>
-      ${bar(o.done, o.steps.length, 'تمّت')}
+    <div class="fd-a">
+      <div class="fd-h">
+        <div><div class="eyebrow"><span class="ln"></span>اليومُ الأوّل</div>
+          <h2>${o.done} من ${o.steps.length}</h2></div>
+        <span class="grow"></span>
+        ${bar(o.done, o.steps.length, 'تمّت')}
+      </div>
+      <p class="hint"><b>وحالُ كلِّ خطوةٍ مشتقٌّ من القاعدة</b> — لا علمَ
+        يُخزَّن ولا صحٌّ على ما لم يُتحقَّق منه. <b>ويختفي هذا اللوحُ وحدَه
+        حين تتمّ الخمس.</b></p>
     </div>
-    <p class="hint"><b>وحالُ كلِّ خطوةٍ مشتقٌّ من القاعدة</b> — لا علمَ
-      يُخزَّن ولا صحٌّ على ما لم يُتحقَّق منه. <b>ويختفي هذا اللوحُ وحدَه
-      حين تتمّ الخمس.</b></p>
     <ol class="fd-l">${rows}</ol>
   </div>`
 }

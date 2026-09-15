@@ -496,7 +496,6 @@ tbody tr:last-child td{border-bottom:0}
 .pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--brand); text-decoration:none; text-underline-offset:3px}
 @media(hover:hover){.pv th a:hover{text-decoration:underline}}
 /* زرُّ التنزيل وشرحُه في سطرٍ واحدٍ يلتفّ على الضيق (D-126) */
-.pv-dl{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-top:var(--s-3)}
 .pv{min-width:auto}
 .pv th,.pv td{text-align:center; padding:var(--s-2); white-space:nowrap;
   font-variant-numeric:tabular-nums}
@@ -626,6 +625,9 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 /* أفعالُ الصفّ تُرصّ على الحافّة الخارجيّة (D-136): صفٌّ بزرٍّ وصفٌّ بزرّين
    يتّفقان على موضع «افتح في Drive»، فلا يقفز العمودُ بين الصفوف. */
 .row.acts{gap:var(--s-2); justify-content:flex-end; align-items:center}
+/* ملاحظةُ منتقي النموذج لا تحجز سطرًا وهي فارغة (D-137): كانت تُنزل
+   «حفظ» ‏٢٠px تحت «حدّث» في صفّ التوجيه. */
+.mp-note:empty{display:none}
 
 /* ── الفراغ ────────────────────────────────────────────────── */
 .empty{padding:var(--s-8) var(--s-5); text-align:center; border:1px dashed var(--line-strong);
@@ -971,6 +973,14 @@ ol.steps.wiz.nodot li::before{display:none}
 
    والاثنان معا لا واحد: «إن نجح» وحدها تترك من فشل بلا شيء — وهو
    أحوجُ الاثنين إلى سطر. */
+/* بطاقةُ الخطوات على العريض عمودان (D-137): الخطواتُ يمينًا، والبابُ
+   و«إن نجح» يسارًا — فلا تبقى جوفاءَ نصفِها. */
+.guide-aside{display:grid; gap:var(--s-3); align-content:start}
+@media(min-width:901px){
+  .card.guide{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); column-gap:var(--s-6); align-items:start}
+  .card.guide .card-head{grid-column:1 / -1}
+  .card.guide ol.steps{margin-bottom:0}
+  .card.guide .outcome{margin-top:0}}
 .outcome{display:flex; gap:var(--s-3); align-items:flex-start; margin-top:var(--s-3);
   padding:var(--s-3) var(--s-4); border-radius:var(--r); background:var(--ok-wash);
   border:1px solid color-mix(in srgb,var(--ok) 20%,transparent)}
@@ -1561,6 +1571,12 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
    **والمطلوبةُ وحدَها تحمل زرّا**: خمسةُ أزرارٍ في شاشةٍ أوّلَ مرّةٍ تُقرأ
    عبئا، وأوّلُ ما يُفعَل واحد. */
 .fd{border-color:color-mix(in srgb,var(--brand) 30%,transparent)}
+/* عمودان على العريض (D-137): الرأسُ والشرحُ يمينًا، والخطواتُ يسارًا —
+   فلا تبقى البطاقةُ جوفاءَ نصفِها. وتحت ‏٩٠٠px عمودٌ واحدٌ كما كان. */
+@media(min-width:901px){
+  .fd{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); column-gap:var(--s-6); align-items:start}
+  .fd .fd-a .hint{margin-bottom:0}
+  .fd-l{margin-top:0}}
 .fd-h{display:flex; align-items:flex-end; gap:var(--s-4); margin-bottom:var(--s-2)}
 .fd-h h2{margin:var(--s-1) 0 0; font-variant-numeric:tabular-nums}
 .fd-h .track{min-width:120px}
