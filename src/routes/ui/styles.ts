@@ -1681,4 +1681,80 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
   .cmdk-veil{padding:var(--s-4) var(--s-3)}
   .cmdk-open span{display:none}
 }
+
+/* ══ الطبعةُ الثانية — فخامةٌ تُقاس (D-138) ═══════════════════════════
+   طلب المالكُ «إعادةَ تصميمٍ كاملةً باحترافيّةٍ وفخامة». **والفخامةُ في
+   المادّة والمقياس لا في لونٍ جديد**: الهويّةُ زمرّدٌ وذهبٌ منذ D-043
+   ومقيسةٌ في ثلاثة ثيمات. فتُرفَع الرتبةُ الكبرى للعنوان، وتُعمَّق الأرضُ
+   الليليّة، ويُثخَّن خيطُ الذهب حيث يُقرأ صنعةً (رأسُ المؤشّر، حافّةُ
+   الإشعار، رأسُ الجدول)، وتُلمَع الأزرارُ الأوّليّةُ بتدرّجٍ وخيطِ ضوء.
+
+   **وكلُّ قيمةٍ هنا من السلّم**: ‏٥٦ في سلّم الحرف، والأوزانُ ‏٧٠٠ لا
+   ‏٨٠٠ (المدقّقُ يردّ ما ليس محمَّلا)، والألوانُ رموزٌ تمرّ بمدقّق التباين.
+   وموضعُ الكتلة آخرَ الورقة قصدا: تغلب ما قبلها بالترتيب عند تساوي
+   المحدّد، وتُقرأ طبعةً فوق الأصل لا رقعةً فيه. */
+
+/* ── الإطار: رافدةٌ بعمق، وعلامةٌ بحلقة ذهب ───────────────────────── */
+/* **والتدرّجُ صورةُ خلفيّةٍ لا لون**: كُتب معه «background-image:none» في
+   أوّل مسودّةٍ فمحا التدرّجَ نفسَه وصارت الرافدةُ شفّافةً على أرض النهار —
+   واختفى اسمُ العلامة أبيضَ على أبيض. رُئي في أوّل لقطة. */
+.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}
+.rail::after{background:linear-gradient(180deg,color-mix(in srgb,var(--au) 70%,transparent),transparent 60%)}
+.rail-head{padding:var(--s-6) var(--s-5) var(--s-5)}
+.glyph{width:42px; height:42px; border-radius:12px;
+  box-shadow:var(--sh-2), inset 0 1px 0 rgba(255,255,255,.3),
+    0 0 0 1px color-mix(in srgb,var(--au) 45%,transparent)}
+.brand b{font-size:var(--t-lg); letter-spacing:-.3px}
+nav.tabs a{border-radius:var(--r)}
+nav.tabs a[aria-current=page]::before{width:3px; background:var(--au)}
+.rail-foot{border-top-color:color-mix(in srgb,var(--au) 22%,var(--line-soft))}
+
+/* ── الشريطُ العلويّ: أطولُ بأربعة، والبحثُ حبّةٌ ────────────────────── */
+.topbar{min-height:64px}
+.cmdk-open{border-radius:999px; padding:0 var(--s-4)}
+
+/* ── رأسُ الصفحة: الرتبةُ الكبرى على العريض ─────────────────────────── */
+.eyebrow .ln{width:40px; background:linear-gradient(90deg,var(--au),color-mix(in srgb,var(--au) 35%,transparent))}
+@media(min-width:1181px){.page-head h1{font-size:var(--t-4xl); letter-spacing:-1.4px}}
+
+/* ── السطح: ظلٌّ بثلاث طبقاتٍ من أوّل نظرة، وحافّةٌ تلمع ─────────────── */
+.card{box-shadow:var(--sh-2), inset 0 1px 0 var(--hair)}
+@media(hover:hover){.ch:hover,.draft:hover{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);
+  border-color:color-mix(in srgb,var(--au) 35%,var(--line-strong))}}
+.empty{border-radius:var(--r-lg); background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
+
+/* ── المؤشّر: خيطُ ذهبٍ كامل، ووهجٌ في ركن الأوّل، والرقمُ أكبرُ رتبة ── */
+.tile::before{background:linear-gradient(90deg,transparent 4%,var(--au) 50%,transparent 96%)}
+.tile .k{font-weight:700}
+.grid>.tile:first-child{background-image:var(--sheen),
+  radial-gradient(460px 180px at 100% 0%,color-mix(in srgb,var(--au) 12%,transparent),transparent 68%)}
+@media(min-width:901px){.grid>.tile:first-child .v{font-size:var(--t-4xl); letter-spacing:-2px}}
+
+/* ── الأزرار: الأوّليُّ يلمع، والثانويُّ بخيط ضوء ──────────────────────── */
+button,.btn{border-radius:var(--r)}
+.sm{border-radius:var(--r-sm)}
+/* **واللونُ يُكتب مع التدرّج لا بدلَه**: المدقّقُ يقرأ «background-color»
+   المحسوبةَ، والتدرّجُ صورةٌ لا لون — فزرٌّ بتدرّجٍ وحدَه يُقاس نصُّه على
+   أرض الصفحة (‏١:١). وكذلك الرافدةُ أعلاه. */
+.p{background-color:var(--brand); background-image:linear-gradient(180deg,var(--brand-soft),var(--brand));
+  box-shadow:var(--sh-1), inset 0 1px 0 rgba(255,255,255,.2)}
+@media(hover:hover){.p:hover{background-color:var(--brand-deep); background-image:linear-gradient(180deg,var(--brand),var(--brand-deep))}}
+.g{box-shadow:var(--sh-1), inset 0 1px 0 var(--hair)}
+
+/* ── الحالُ حبّةٌ، والإشعارُ بحافّةٍ تقول لونَه قبل نصّه ────────────────── */
+.st,.chip,.count{border-radius:999px}
+.flash{border-inline-start:3px solid var(--line-strong); border-radius:var(--r)}
+.flash.ok{border-inline-start-color:var(--ok)}
+.flash.warn{border-inline-start-color:var(--warn)}
+.flash.bad{border-inline-start-color:var(--bad)}
+
+/* ── الجدول: رأسُه بخيطٍ من ذهبٍ خافت، وعنوانُ القسم أطولُ علامةً ──────── */
+th{border-bottom-color:color-mix(in srgb,var(--au) 32%,var(--line))}
+.sec::after{width:44px}
+
+/* ── الدخول: بطاقةٌ بحلقة ذهبٍ وعلامةٌ أكبر ──────────────────────────── */
+.auth .glyph{width:64px; height:64px; border-radius:18px}
+.auth .card{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);
+  border-color:color-mix(in srgb,var(--au) 30%,var(--line))}
+.auth h1{font-size:var(--t-2xl)}
 `

@@ -54,10 +54,10 @@ export const TOKENS = `
 :root{
   /* الأرضُ «Soft Background» من دليل الهويّة — باردةٌ خفيفة لا بيضاءُ
      ناصعة: البياضُ المطلق يُتعب في الجلسة الطويلة */
-  --bg:#f4f9f6;
+  --bg:#f3f7f4;
   --chrome:#ffffff;
-  --surface:#ffffff; --surface-2:#edf5f0; --surface-3:#e4f0e9;
-  --line:#d5e2d9; --line-soft:#e4eee8; --line-strong:#bacdc1;
+  --surface:#ffffff; --surface-2:#ecf2ee; --surface-3:#e2ebe5;
+  --line:#d3ded7; --line-soft:#e3ece6; --line-strong:#b7cabe;
   /* والحبرُ الأوّل أخضرُ الظلّ لا رماديٌّ محايد: الهويّةُ في الحبر أيضا */
   --ink:#14291d; --ink-2:#495a4f; --ink-3:#57685e;
   --brand:#12623e; --brand-soft:#2c8157; --brand-deep:#004427; --on-brand:#ffffff;
@@ -87,6 +87,9 @@ export const TOKENS = `
   /* جسرٌ واحدٌ خارج العنقودين: عناوينُ الأقسام حيث ‏٢٦ صاخبةٌ و‏١٦ خافتة */
   --t-xl:20px;
   --t-2xl:26px; --t-3xl:42px;
+  /* رتبةُ العرض الكبرى (D-138): عنوانُ الصفحة على العريض. و‏٥٦ هي الخطوةُ
+     الذهبيّةُ بعد ‏٤٢ مقرَّبةً، وهي في سلّم المدقّق منذ D-067. */
+  --t-4xl:56px;
   /* اسمٌ قديمٌ يبقى لأنّ عليه بناءً قائما — وكان معه اسمان.
      و«--t-display» كان ‏٤٢px، **وهي «--t-3xl» نفسُها باسمٍ ثانٍ**، فوحّدا
      على اسم العنقود. و«--t-hero» ‏٥٦px **لم يُبنَ عليه شيءٌ قطّ** — بقي
@@ -205,7 +208,9 @@ export const TOKENS = `
   --dur-1:120ms; --dur-2:180ms; --dur-3:300ms;
   --ease:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.22,1,.36,1);
 
-  --r-sm:8px; --r:10px; --r-lg:16px;
+  /* الزوايا أوسعُ درجةً (D-138): ‏١٨ للبطاقة تُقرأ مصنوعةً لا مرسومة، وما
+     دونها يتبعها بالنسبة نفسِها. */
+  --r-sm:9px; --r:12px; --r-lg:18px;
   /* ── الظلُّ ثلاثُ طبقاتٍ لا اثنتان (D-102) ─────────────────────────
      جسمٌ حقيقيٌّ على سطحٍ يُلقي ثلاثةَ ظلال: **تماسٌّ** ضيّقٌ داكنٌ عند
      الحافّة يقول «ملامسٌ للسطح»، و**مفتاحٌ** موجَّهٌ من الضوء، و**محيطٌ**
@@ -255,14 +260,14 @@ export const TOKENS = `
 
 @media(prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#050f09;
-    --chrome:#0e1c14;
-    --surface:#15261c; --surface-2:#1e3226; --surface-3:#243b2e;
-    --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
+    --bg:#040b07;
+    --chrome:#0b1710;
+    --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
+    --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
     --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
     --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-    --au:#d1b473;
-    --brand-wash:#133020;
+    --au:#d6bb7a;
+    --brand-wash:#123020;
     --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
     --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
     --sh-1:0 .5px 1px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
@@ -292,14 +297,14 @@ export const TOKENS = `
    الزرُّ وحدَه يلبس حبرَ الليل على أرض النهار: ‏٢٫٣٨:١. سترته الرافدةُ
    الداكنةُ في اللوحة، وكشفته أوّلُ عيّنةٍ رُسمت لشريط العودة. */
 :root[data-theme="dark"]{
-  --bg:#050f09;
-  --chrome:#0e1c14;
-  --surface:#15261c; --surface-2:#1e3226; --surface-3:#243b2e;
-  --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
+  --bg:#040b07;
+  --chrome:#0b1710;
+  --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
+  --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
   --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
   --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d1b473;
-  --brand-wash:#133020;
+  --au:#d6bb7a;
+  --brand-wash:#123020;
   --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
   --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
   --sh-1:0 .5px 1px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
@@ -330,14 +335,14 @@ export const TOKENS = `
    ولا قاعدةَ في ورقة الأنماط تتبدّل: كلُّها تكتب var(--…) — D-043،
    فإعادةُ التعريف على العنصر وحدها تكفي ذرّيّتَه كلَّها. */
 .rail{
-  --bg:#050f09;
-  --chrome:#0e1c14;
-  --surface:#15261c; --surface-2:#1e3226; --surface-3:#243b2e;
-  --line:#35473c; --line-soft:#25342b; --line-strong:#526a5b;
+  --bg:#040b07;
+  --chrome:#0b1710;
+  --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
+  --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
   --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
   --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d1b473;
-  --brand-wash:#133020;
+  --au:#d6bb7a;
+  --brand-wash:#123020;
   --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
   --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
   --hair:rgba(255,255,255,.055);
