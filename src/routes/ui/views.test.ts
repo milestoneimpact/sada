@@ -506,14 +506,14 @@ describe('بطاقةُ الخطوات (D-137)', () => {
   })
 })
 
-/** الطبعةُ الثانية (D-138): كلُّ قيمةٍ من السلّم، والكتلةُ آخرَ الورقة. */
-describe('الطبعةُ الثانية (D-138)', () => {
+/** الطبعةُ الثانية (D-139): كلُّ قيمةٍ من السلّم، والكتلةُ آخرَ الورقة. */
+describe('الطبعةُ الثانية (D-139)', () => {
   it('الرتبةُ الكبرى معرَّفةٌ وتُستعمل على العريض وحدَه، والرافدةُ بتدرّج', () => {
     expect(STYLE).toContain('--t-4xl:56px')
     expect(STYLE).toMatch(/@media\(min-width:1181px\)\{\.page-head h1\{font-size:var\(--t-4xl\)/)
     expect(STYLE).toMatch(/@media\(min-width:901px\)\{\.grid>\.tile:first-child \.v\{font-size:var\(--t-4xl\)/)
     expect(STYLE).toContain('.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}')
     expect(STYLE).not.toContain('background-image:none}')
-    expect(STYLE.lastIndexOf('D-138')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
+    expect(STYLE.lastIndexOf('D-139')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
   })
 })
