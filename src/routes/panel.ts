@@ -36,7 +36,7 @@ import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, pickBinding } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
-import { appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
+import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { versionAge } from '../lib/oauth/version'
@@ -897,8 +897,9 @@ panel.post('/panel/analyze', async (c) => {
 // ── تطبيقا OAuth ─────────────────────────────────────────────────────
 
 /** المنصّاتُ التي لها سائقٌ مبنيّ — وما عداها لا يُقبل في مسار. */
-function platformParam(raw: string): 'linkedin' | 'x' | null {
-  return raw === 'linkedin' || raw === 'x' ? raw : null
+/** كلُّ منصّةٍ لها سرّان تُقبَل في الخزانة (D-142) — وما سواها يُردّ قبل القاعدة. */
+function platformParam(raw: string): Platform | null {
+  return (APP_PLATFORMS as readonly string[]).includes(raw) ? (raw as Platform) : null
 }
 
 /**
@@ -1277,10 +1278,11 @@ panel.get('/panel/channels/:platform', async (c) => {
   if (spec === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
 
   const accounts = await listAccounts(c.env.DB)
+  // **لكلّ منصّةٍ لها سرّان** (D-142) — لا لمنصّتين، وإلّا بقيت شاشةُ
+  // YouTube تعد بدليلٍ لا يأتي
   const apps = await appStatuses(
     c.env.DB,
     c.env as unknown as Record<string, string | undefined>,
-    ['linkedin', 'x'],
   )
   const present = new Set(apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames))
   const views = viewChannels(accounts, (name) =>

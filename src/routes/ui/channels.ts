@@ -241,7 +241,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
             ? ''
             : `<div class="help"><span class="i">i</span><span class="t">
                 المحفوظُ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
-                <b>قارنه بأوّل السرّ وآخرِه في بوّابة LinkedIn</b> قبل أن تكتب.
+                <b>قارنه بأوّل السرّ وآخرِه في ${escapeHtml(guide.portalLabel)}</b> قبل أن تكتب.
                 فإن طابق فالسرُّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
         </div>
         <div class="ch-foot">

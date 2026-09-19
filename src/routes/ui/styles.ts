@@ -1779,6 +1779,20 @@ nav.back .home,nav.back .home .glyph{flex:none}
 .slice .stats{margin:0 0 0 auto; padding:0; border-top:0; margin-inline-start:auto}
 .slice .chip{margin:0}
 
+/* ── الليلُ يُرى ذهبًا (D-142) ───────────────────────────────────────────
+   قال المالكُ بعد الطبعة «الشكلُ لم يتغيّر» وأرسل الليل. والليلُ كان يحمل
+   الطبعةَ كلَّها في تدرّجاتٍ لا تراها عينٌ على ‏٢٠٠٠px. فتُدفَّأ حوافُّ
+   البطاقات ليلًا بالذهب، ويُوهَج ركنُ كلّ مؤشّرٍ لا الأوّل وحدَه، ويُثخَّن
+   خيطُ الذهب فوقه — **والتباينُ لا يُمَسّ**: حوافُّ لا نصوص. */
+:root[data-theme="dark"] .card,:root:not([data-theme="light"]) .card{
+  border-color:color-mix(in srgb,var(--au) 16%,var(--line))}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]) .card{border-color:var(--line)}}
+.tile{background-image:var(--sheen),
+  radial-gradient(360px 140px at 100% 0%,color-mix(in srgb,var(--au) 7%,transparent),transparent 70%)}
+.tile::before{height:3px}
+.grid>.tile:first-child{background-image:var(--sheen),
+  radial-gradient(460px 180px at 100% 0%,color-mix(in srgb,var(--au) 16%,transparent),transparent 68%)}
+
 /* ── الدخول: بطاقةٌ بحلقة ذهبٍ وعلامةٌ أكبر ──────────────────────────── */
 .auth .glyph{width:64px; height:64px; border-radius:18px}
 .auth .card{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);

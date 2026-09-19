@@ -233,6 +233,18 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     goLabel: 'افتح صفحةَ النشر',
   },
   {
+    code: 'M-23',
+    title: 'دقائقُ GitHub Actions — البوّابةُ والنشرُ يقفان بلا عدّاء',
+    ifLeft:
+      'لا يُكسَر staging — **لكنّ كلَّ دمجٍ لا يصله**، ولا يجري CI على أيّ ' +
+      'طلب، فيُدمَج ما لم يُحرَس أو يتوقّف الدفعُ كلُّه (D-141).',
+    unblocks: 'gate',
+    // تُقرأ عند GitHub لا من هنا: العاملُ لا يعرف رصيدَ الدقائق ولا حالَ العدّاء
+    done: () => null,
+    go: 'https://github.com/settings/billing',
+    goLabel: 'افتح الفوترة',
+  },
+  {
     code: 'M-11',
     title: 'تدويرُ مفتاح حساب خدمة Google',
     ifLeft: 'مفتاحٌ ظهر مرّةً يبقى صالحا — **وصلاحيّتُه لا تنتهي وحدها**.',
