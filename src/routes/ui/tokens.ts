@@ -7,7 +7,25 @@
  * يُقلَب بإعادة تعريف القيَم هنا وحدها — لا بنسخِ ورقةِ أنماطٍ ثانية
  * تتباعد عن الأولى مع كلّ تعديل.
  *
- * ## لماذا كان الأخضرُ قاسيا — وما الذي قيس
+ * ## الطبعةُ الرابعة — الحبرُ والنحاس (D-144)
+ *
+ * طلب المالكُ إعادةَ البناء على مثال أحسن بيوت الواجهات وتبديلَ اللون.
+ * وما يجمع Linear وStripe وVercel وMercury انضباطٌ لا لون: **أسطحٌ محايدةٌ
+ * دافئة** (بورسلين نهارًا ‏#f5f4ef، وحبرٌ ليلًا ‏#0b0c10)، و**الحبرُ لونُ
+ * البنية**: الأزرارُ الأوّليّةُ والروابطُ والتبويبُ الحاليُّ بلون الحبر
+ * (‏#1f2430 نهارًا، وعاجٌ ‏#e9e6de ليلًا)، و**معدنٌ واحدٌ يُقتَّر**: النحاسُ
+ * ‏#7f6128 نهارًا و‏#d2b57c ليلًا للرقم الأوّل وخيط المؤشّرات وشارة البيئة،
+ * و**ألوانُ الحال وحدَها مشبعة**. والزمرّدُ خرج من البنية إلى ذاكرة
+ * الهويّة؛ وبقي في `--ok` معنىً لا زينة، وفي غلاف الصور المنشورة
+ * (`lib/image/slide.ts`) لأنّه علامةٌ عامّةٌ لا واجهة.
+ *
+ * والرافدةُ ترث الثيم: كانت داكنةً في النهاريّ «إطارًا»، وهي هيئةُ قوالب
+ * الإدارة. والعلامةُ وحدها ثابتة: حبرٌ ونحاسٌ في الثيمين (`--glyph-*`).
+ *
+ * والأزواجُ التسعةَ عشرَ تجتاز في النهاريّ والداكن والطباعة، وأدناها
+ * ‏٤٫٦٧:١.
+ *
+ * ## ما قبلها: لماذا كان الأخضرُ قاسيا — وما الذي قيس (تاريخ)
  *
  * قيل إنّ اللون «قاسٍ وليس بقوّة». **وكان محقّا، وقياسُ OKLCH يقوله
  * بالأرقام**:
@@ -54,22 +72,24 @@ export const TOKENS = `
 :root{
   /* الأرضُ «Soft Background» من دليل الهويّة — باردةٌ خفيفة لا بيضاءُ
      ناصعة: البياضُ المطلق يُتعب في الجلسة الطويلة */
-  --bg:#f3f7f4;
-  --chrome:#ffffff;
-  --surface:#ffffff; --surface-2:#ecf2ee; --surface-3:#e2ebe5;
-  --line:#d3ded7; --line-soft:#e3ece6; --line-strong:#b7cabe;
+  --bg:#f5f4ef;
+  --chrome:#fbfaf7;
+  --surface:#ffffff; --surface-2:#f1efe9; --surface-3:#e8e5dd;
+  --line:#e0ddd4; --line-soft:#ebe8e0; --line-strong:#c8c3b6;
   /* والحبرُ الأوّل أخضرُ الظلّ لا رماديٌّ محايد: الهويّةُ في الحبر أيضا */
-  --ink:#14291d; --ink-2:#495a4f; --ink-3:#57685e;
-  --brand:#12623e; --brand-soft:#2c8157; --brand-deep:#004427; --on-brand:#ffffff;
-  --brand-wash:#e0f5e7;
+  --ink:#191b1f; --ink-2:#4e525b; --ink-3:#5f636c;
+  --brand:#1f2430; --brand-soft:#3a4152; --brand-deep:#0f1218; --on-brand:#f7f5ef;
+  --brand-wash:#ecebe5;
   /* ── الذهبُ: طبقةُ التشديد ──────────────────────────────────────
      يُقتَّر ولا يُسكَب. وقيمتُه نهارا تُعتَم كثيرا: ذهبٌ فاتحٌ على
      أبيضَ يختفي (‏١٫٩:١)، فيصير برونزا يُقرأ. */
-  --au:#745914;
+  --au:#7f6128;
+  /* أرضُ العلامة وشريطُها ثابتان في الثيمين: حبرٌ ونحاس (D-144) */
+  --glyph-bg:#14161c; --glyph-fg:#e2c98f;
   /* حالاتٌ محجوزة: لا تُستعمل لسلسلةٍ ولا زينة. والأحمر والأخضر
      متقاربان في عمى الألوان — ولذلك **كلّ حالة تحمل رمزا ونصّا** */
-  --ok:#1c7a52; --warn:#8a5a00; --bad:#b3261e;
-  --ok-wash:#e2f3e9; --warn-wash:#fdf3e4; --bad-wash:#fdedeb;
+  --ok:#2d7a4f; --warn:#8a5a00; --bad:#b3261e;
+  --ok-wash:#e6f2ea; --warn-wash:#fbf1df; --bad-wash:#fbebe9;
 
   /* ── مقياسُ الحرف: نسبتان لا واحدة ──────────────────────────────
      قيست القياساتُ المستعملةَ فعلا في الصفحة فوُجدت **ستَّ عشرةَ
@@ -230,7 +250,7 @@ export const TOKENS = `
      الحجابُ ليس سطحا يُقرأ عليه شيء؛ هو ظلٌّ يقول «ما تحتَه معطَّلٌ
      مؤقّتا». وحجابٌ فاتحٌ فوق صفحةٍ فاتحة **لا يفصل شيئا عن شيء** —
      فيبقى داكنا في الحالين، ولا يُعرَّف في كتلة الليل لأنّه لا يتبدّل. */
-  --scrim:rgba(5,15,9,.55);
+  --scrim:rgba(15,18,24,.55);
   /* والثالثُ لِما يطفو فوق الصفحة: لوحٌ منبثقٌ أو شريطٌ لاصقٌ حامل. */
   --sh-3:0 1px 2px rgba(22,24,28,.08), 0 6px 12px rgba(22,24,28,.07),
     0 20px 48px rgba(22,24,28,.10);
@@ -238,7 +258,7 @@ export const TOKENS = `
      وذهبٌ يُوهَج به كلُّ شيءٍ يُلغي معنى الوهج. */
   --glow:0 0 0 1px color-mix(in srgb,var(--au) 30%,transparent),
     0 8px 28px color-mix(in srgb,var(--au) 16%,transparent);
-  --ring:rgba(18,98,62,.30);
+  --ring:rgba(31,36,48,.28);
 
   /* ── المادّة ──────────────────────────────────────────────────────
      ثلاثةُ متغيّراتٍ تصنع فرقَ «مسطّحٍ» و«مصنوع»، وكلٌّ منها يقلد ما
@@ -257,23 +277,23 @@ export const TOKENS = `
      يُرى وسخا، وعلى أرضٍ داكنةٍ يُرى صنعة. */
   --hair:rgba(255,255,255,.9);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0) 58%);
-  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(116,89,20,.07),transparent 58%),
+  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(127,97,40,.06),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(18,98,62,.06),transparent 60%);
   color-scheme:light;
 }
 
 @media(prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#040b07;
-    --chrome:#0b1710;
-    --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
-    --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
-    --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
-    --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-    --au:#d6bb7a;
-    --brand-wash:#123020;
-    --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
-    --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
+    --bg:#0b0c10;
+    --chrome:#0f1015;
+    --surface:#15171d; --surface-2:#1b1e25; --surface-3:#23262f;
+    --line:#282c35; --line-soft:#1f232b; --line-strong:#3b404c;
+    --ink:#ebe9e3; --ink-2:#a7aab3; --ink-3:#8b8f99;
+    --brand:#e9e6de; --brand-soft:#f5f3ee; --brand-deep:#c9c5bb; --on-brand:#12141a;
+    --au:#d2b57c;
+    --brand-wash:#262a33;
+    --ok:#5cbf8f; --warn:#e0a845; --bad:#ec7a7a;
+    --ok-wash:#12271d; --warn-wash:#2a2010; --bad-wash:#2c1517;
     --sh-1:0 .5px 1px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
     --sh-2:0 .5px 1px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.45),
       0 8px 24px rgba(0,0,0,.30);
@@ -281,10 +301,10 @@ export const TOKENS = `
       0 20px 48px rgba(0,0,0,.38);
     --glow:0 0 0 1px color-mix(in srgb,var(--au) 34%,transparent),
       0 8px 28px color-mix(in srgb,var(--au) 20%,transparent);
-    --ring:rgba(130,198,158,.34);
+    --ring:rgba(233,230,222,.30);
     --hair:rgba(255,255,255,.055);
     --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
-    --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(209,180,115,.10),transparent 58%),
+    --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
     color-scheme:dark;
   }
@@ -301,16 +321,16 @@ export const TOKENS = `
    الزرُّ وحدَه يلبس حبرَ الليل على أرض النهار: ‏٢٫٣٨:١. سترته الرافدةُ
    الداكنةُ في اللوحة، وكشفته أوّلُ عيّنةٍ رُسمت لشريط العودة. */
 :root[data-theme="dark"]{
-  --bg:#040b07;
-  --chrome:#0b1710;
-  --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
-  --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
-  --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
-  --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d6bb7a;
-  --brand-wash:#123020;
-  --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
-  --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
+  --bg:#0b0c10;
+  --chrome:#0f1015;
+  --surface:#15171d; --surface-2:#1b1e25; --surface-3:#23262f;
+  --line:#282c35; --line-soft:#1f232b; --line-strong:#3b404c;
+  --ink:#ebe9e3; --ink-2:#a7aab3; --ink-3:#8b8f99;
+  --brand:#e9e6de; --brand-soft:#f5f3ee; --brand-deep:#c9c5bb; --on-brand:#12141a;
+  --au:#d2b57c;
+  --brand-wash:#262a33;
+  --ok:#5cbf8f; --warn:#e0a845; --bad:#ec7a7a;
+  --ok-wash:#12271d; --warn-wash:#2a2010; --bad-wash:#2c1517;
   --sh-1:0 .5px 1px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
   --sh-2:0 .5px 1px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.45),
     0 8px 24px rgba(0,0,0,.30);
@@ -318,47 +338,24 @@ export const TOKENS = `
     0 20px 48px rgba(0,0,0,.38);
   --glow:0 0 0 1px color-mix(in srgb,var(--au) 34%,transparent),
     0 8px 28px color-mix(in srgb,var(--au) 20%,transparent);
-  --ring:rgba(130,198,158,.34);
+  --ring:rgba(233,230,222,.30);
   --hair:rgba(255,255,255,.055);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
-  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(209,180,115,.10),transparent 58%),
+  --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
   color-scheme:dark;
 }
 
-/* ── الرافدةُ تبقى داكنةً في الثيمين ────────────────────────────────
-   THEME:rail
-
-   وهذا ليس تنازلا عن الثيم: **الرافدةُ إطارُ التطبيق لا صفحتُه**.
-   وأرضٌ داكنةٌ ثابتة تحت العلامة تجعلها تُقرأ إطارا يحيط بالمحتوى،
-   لا عمودا من الصفحة نفسها. وهو ما تفعله كلُّ لوحةٍ في المحاكاة.
-
-   والقيَمُ هي قيَمُ الليليّ نفسها لا نسخةٌ ثانية — فما جاز هناك جاز
-   هنا**، ومدقّقُ التباين يفحصها كثيمٍ ثالث.
-
-   ولا قاعدةَ في ورقة الأنماط تتبدّل: كلُّها تكتب var(--…) — D-043،
-   فإعادةُ التعريف على العنصر وحدها تكفي ذرّيّتَه كلَّها. */
-.rail{
-  --bg:#040b07;
-  --chrome:#0b1710;
-  --surface:#111f17; --surface-2:#182a20; --surface-3:#203629;
-  --line:#2f4438; --line-soft:#22352b; --line-strong:#4f6858;
-  --ink:#e8f1eb; --ink-2:#a1afa6; --ink-3:#94a399;
-  --brand:#82c69e; --brand-soft:#b4e1c5; --brand-deep:#316b4c; --on-brand:#050f09;
-  --au:#d6bb7a;
-  --brand-wash:#123020;
-  --ok:#4bb98c; --warn:#e0a03a; --bad:#e8686f;
-  --ok-wash:#08261d; --warn-wash:#231a08; --bad-wash:#2a1214;
-  --hair:rgba(255,255,255,.055);
-  --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
-  --sh-1:0 1px 2px rgba(0,0,0,.4);
-  color-scheme:dark;
-}
+/* ── الرافدةُ من الثيم لا ثيمٌ ثالث (D-144) ──────────────────────────
+   كانت الرافدةُ داكنةً في النهاريّ «إطارًا يحيط بالمحتوى». والإطارُ الداكنُ
+   على صفحةٍ فاتحة هو هيئةُ قوالب الإدارة، لا هيئةُ Linear وStripe وMercury:
+   عندهم الرافدةُ من أرض الصفحة بدرجةٍ أفتح وخيطٍ يفصل. فلا رموزَ تُعاد هنا،
+   والرافدةُ ترث الثيم. */
 
 /* ── الورقُ أبيضُ في الثيمين ─────────────────────────────────────────
    THEME:print (D-125)
 
-   **الرموزُ لا تعرف الورق**: من يطبع من الثيم الليليّ يحمل «--ink:#e8f1eb»
+   **الرموزُ لا تعرف الورق**: من يطبع من الثيم الليليّ يحمل «--ink:#ebe9e3»
    إلى ورقٍ أبيض — قِيس فوُجدت الترويساتُ ‏١٫٣٣:١ والمتنُ ‏٢٫٢٨:١ على
    الورق. وطبقةُ الطباعة في ورقة الأنماط تُبيّض الأرضَ وتُسوّد المتنَ
    بالوراثة، **وما كُتب بـ var(--ink-2) لا يرث** — فتُعاد قيَمُ النهار على
@@ -366,15 +363,17 @@ export const TOKENS = `
 @media print{
   :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{
     --bg:#ffffff;
-    --chrome:#ffffff;
-    --surface:#ffffff; --surface-2:#f4f9f6; --surface-3:#edf5f0;
-    --line:#d5e2d9; --line-soft:#e4eee8; --line-strong:#bacdc1;
-    --ink:#14291d; --ink-2:#495a4f; --ink-3:#57685e;
-    --brand:#12623e; --brand-soft:#2c8157; --brand-deep:#004427; --on-brand:#ffffff;
-    --au:#745914;
-    --brand-wash:#e0f5e7;
-    --ok:#1c7a52; --warn:#8a5a00; --bad:#b3261e;
-    --ok-wash:#e2f3e9; --warn-wash:#fdf3e4; --bad-wash:#fdedeb;
+    --chrome:#fbfaf7;
+    --surface:#ffffff; --surface-2:#f4f3ee; --surface-3:#ebe9e2;
+    --line:#e0ddd4; --line-soft:#ebe8e0; --line-strong:#c8c3b6;
+    --ink:#191b1f; --ink-2:#4e525b; --ink-3:#5f636c;
+    --brand:#1f2430; --brand-soft:#3a4152; --brand-deep:#0f1218; --on-brand:#f7f5ef;
+    --au:#7f6128;
+  /* أرضُ العلامة وشريطُها ثابتان في الثيمين: حبرٌ ونحاس (D-144) */
+  --glyph-bg:#14161c; --glyph-fg:#e2c98f;
+    --brand-wash:#ecebe5;
+    --ok:#2d7a4f; --warn:#8a5a00; --bad:#b3261e;
+    --ok-wash:#e6f2ea; --warn-wash:#fbf1df; --bad-wash:#fbebe9;
     color-scheme:light;
   }
 }
