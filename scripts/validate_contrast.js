@@ -81,9 +81,9 @@ const css = readFileSync(SOURCE, 'utf8')
 const THEMES = [
   ['النهاريّ', readTokens(css, '/* THEME:light */\n:root')],
   ['الداكن', readTokens(css, ':root[data-theme="dark"]')],
-  // والرافدةُ ثيمٌ ثالث: تبقى داكنةً في النهاريّ، فتُفحَص على حدة —
-  // وإلّا مرّ لونٌ يقرأ على الأرض النهاريّة ولا يقرأ عليها
-  ['الرافدة', readTokens(css, 'THEME:rail')],
+  // والرافدةُ ترث الثيم منذ D-144 فلا تُفحَص ثيمًا ثالثًا؛ والطباعةُ تُعيد
+  // قيَمَ النهار على أبيضَ ناصع، فتُفحَص هي.
+  ['الطباعة', readTokens(css, '@media print')],
 ]
 
 let failures = 0
@@ -110,4 +110,4 @@ if (failures > 0) {
   console.error(`\n✕ ${failures} زوجا دون الحدّ. لا يُدفع ثيمٌ لا يُقرأ.`)
   process.exit(1)
 }
-console.log('\n✓ كلّ الأزواج تجتاز WCAG AA في الثيمين.')
+console.log('\n✓ كلّ الأزواج تجتاز WCAG AA في الثيمات الثلاث.')

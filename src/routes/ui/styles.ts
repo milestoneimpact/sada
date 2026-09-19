@@ -1854,4 +1854,47 @@ th{font-weight:600}
 nav.tabs .lbl{color:var(--au); font-weight:600}
 /* والبحثُ يبقى حبّةً مضغوطة: جُرّب حقلًا عريضًا فالتفّ محتواه إلى طرفه
    الأبعد في الاتّجاه اليمينيّ وقُرئ فارغًا. */
+
+/* ══ الطبعةُ الرابعة — الحبرُ والنحاس (D-144) ═════════════════════════════
+   طلب المالكُ إعادةَ البناء على مثال أحسن بيوت الواجهات، وتبديلَ اللون
+   والثيم. وما يجمع Linear وStripe وVercel وMercury ليس لونًا بل **انضباطٌ
+   واحد**: أسطحٌ محايدةٌ دافئة، وحرفٌ واحدٌ يحمل الرتبةَ بالوزن، وأزرارٌ
+   أوّليّةٌ بلون الحبر لا بلون العلامة، ومعدنٌ واحدٌ يُقتَّر، وألوانُ الحال
+   وحدَها مشبعة. فالزمرّدُ يخرج من البنية إلى ذاكرة الهويّة، ويبقى النحاسُ
+   خيطًا، ويصير الحبرُ هو اللونَ الأوّل. والرافدةُ ترث الثيمَ بدل أن تكون
+   إطارًا داكنًا على صفحةٍ فاتحة. **والرموزُ وحدها تبدّلت**؛ هذه الكتلةُ
+   تنزع ما كان يُلمّع الزمرّد: تدرّجاتٌ وأوهاجٌ وظلال. */
+
+/* ── الرافدةُ من الأرض، والحاليُّ بخيطٍ من نحاس ───────────────────────── */
+.rail{background-color:var(--chrome); background-image:none}
+.rail::after{display:none}
+.rail-foot{border-top-color:var(--line-soft)}
+nav.tabs a[aria-current=page]{background:var(--surface-3); color:var(--ink)}
+nav.tabs a[aria-current=page]::before{width:2px; background:var(--au)}
+nav.tabs a[aria-current=page] .count{background:var(--ink); color:var(--surface)}
+
+/* ── وجهُ العرض للعناوين وحدَها: اللصائقُ الصغيرة بحرف المتن ──────────── */
+nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-family:inherit}
+
+/* ── العلامةُ ثابتةٌ في الثيمين: حبرٌ ونحاس ──────────────────────────── */
+.glyph{background:var(--glyph-bg); color:var(--glyph-fg);
+  box-shadow:var(--sh-1), 0 0 0 1px color-mix(in srgb,var(--au) 28%,transparent)}
+.auth .glyph{box-shadow:var(--sh-2), 0 0 0 1px color-mix(in srgb,var(--au) 28%,transparent)}
+
+/* ── الأزرارُ الأوّليّةُ حبرٌ مصمت ────────────────────────────────────── */
+.p{background-color:var(--brand); background-image:none; box-shadow:none}
+@media(hover:hover){.p:hover{background:var(--brand-soft)}}
+
+/* ── الأسطحُ مسطّحةٌ: خيطٌ لا ظلّ ولا لمعة ────────────────────────────── */
+.card{background-image:none; box-shadow:none}
+:root[data-theme="dark"] .card,:root:not([data-theme="light"]) .card{border-color:var(--line)}
+.tile,.grid>.tile:first-child,.grid.tiles>.tile:first-child{background-image:none}
+.grid.tiles{box-shadow:none}
+.auth .card{box-shadow:var(--sh-2); border-color:var(--line)}
+
+/* ── التنبيهاتُ هادئة: سطحٌ وخيطٌ جانبيٌّ بلون الحال ────────────────────── */
+.flash.ok,.flash.warn,.flash.bad{background:var(--surface); border-color:var(--line)}
+.flash.ok{border-inline-start-color:var(--ok)}
+.flash.warn{border-inline-start-color:var(--warn)}
+.flash.bad{border-inline-start-color:var(--bad)}
 `

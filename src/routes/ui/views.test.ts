@@ -15,12 +15,13 @@ import { draftsSection } from './sections/drafts'
 import { tasksScreen } from './tasksView'
 import { commandMore, commandTrigger } from './command'
 import { ICON } from './icons'
+import { TOKENS } from './tokens'
 import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { bar } from './parts'
 import { refusedBody } from './oauthResult'
-import { backNav } from './shell'
+import { backNav, ICON_BYTES, shell } from './shell'
 import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
@@ -254,7 +255,7 @@ describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
   it('كتلةُ الطباعة تعيد حبرَ النهار على محدّد الليل نفسِه', () => {
     const print = STYLE.slice(STYLE.indexOf('THEME:print'))
     expect(print).toContain(':root,:root:not([data-theme="light"]),:root[data-theme="dark"]{')
-    expect(print).toContain('--ink:#14291d;')
+    expect(print).toContain('--ink:#191b1f;')
     expect(print).toContain('--bg:#ffffff;')
     expect(print).toContain('color-scheme:light;')
   })
@@ -516,7 +517,8 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(STYLE).toMatch(/@media\(min-width:1181px\)\{\.page-head h1\{font-size:var\(--t-4xl\)/)
     expect(STYLE).toMatch(/@media\(min-width:901px\)\{\.grid>\.tile:first-child \.v\{font-size:var\(--t-4xl\)/)
     expect(STYLE).toContain('.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}')
-    expect(STYLE).not.toContain('background-image:none}')
+    // والطبعةُ الرابعة تُسطّح الرافدةَ بعده في الترتيب (D-144)
+    expect(STYLE.lastIndexOf('.rail{background-color:var(--chrome); background-image:none}')).toBeGreaterThan(STYLE.lastIndexOf('D-139'))
     expect(STYLE.lastIndexOf('D-139')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
   })
 })
@@ -540,6 +542,44 @@ describe('الطبعةُ الثالثة (D-143)', () => {
     expect(STYLE).toContain('.tile .v{font-weight:400')
     expect(STYLE).toMatch(/\.todo>li>a\.btn,\.todo>li>form \.btn\{background:transparent;[^}]*min-width:44px/)
     expect(STYLE.lastIndexOf('D-143')).toBeGreaterThan(STYLE.lastIndexOf('D-142'))
+  })
+})
+
+/**
+ * الطبعةُ الرابعة — الحبرُ والنحاس (D-144): الحبرُ هو اللونُ الأوّل، والنحاسُ
+ * خيطٌ، والرافدةُ من الثيم لا ثيمٌ ثالث، والعلامةُ ثابتةٌ في الثيمين.
+ */
+describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)', () => {
+  it('الحبرُ لونُ البنية نهارًا وليلًا، والنحاسُ يجتاز نصّا', () => {
+    const light = TOKENS.slice(TOKENS.indexOf('THEME:light'), TOKENS.indexOf('@media(prefers-color-scheme:dark)'))
+    const dark = TOKENS.slice(TOKENS.indexOf(':root[data-theme="dark"]'))
+    expect(light).toContain('--brand:#1f2430;')
+    expect(light).toContain('--on-brand:#f7f5ef;')
+    expect(light).toContain('--au:#7f6128;')
+    expect(dark).toContain('--brand:#e9e6de;')
+    expect(dark).toContain('--on-brand:#12141a;')
+    expect(TOKENS).not.toContain('#12623e')
+    expect(TOKENS).not.toContain('#82c69e')
+  })
+  it('الرافدةُ ترث الثيم، والعلامةُ حبرٌ ونحاسٌ ثابتان', () => {
+    expect(TOKENS).not.toContain('THEME:rail')
+    expect(TOKENS).toContain('--glyph-bg:#14161c; --glyph-fg:#e2c98f;')
+    expect(STYLE).toContain('.rail::after{display:none}')
+    expect(STYLE).toContain('.glyph{background:var(--glyph-bg); color:var(--glyph-fg);')
+    expect(STYLE).toContain('nav.tabs a[aria-current=page]::before{width:2px; background:var(--au)}')
+  })
+  it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ مسطّحة، والتنبيهاتُ سطحٌ بخيط', () => {
+    expect(STYLE).toContain('.p{background-color:var(--brand); background-image:none; box-shadow:none}')
+    expect(STYLE).toContain('.card{background-image:none; box-shadow:none}')
+    expect(STYLE).toContain('.flash.ok,.flash.warn,.flash.bad{background:var(--surface); border-color:var(--line)}')
+    expect(STYLE.lastIndexOf('D-144')).toBeGreaterThan(STYLE.lastIndexOf('D-143'))
+  })
+  it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
+    expect(ICON_BYTES).toContain('c9a962')
+    expect(ICON_BYTES).toContain('14161c')
+    expect(ICON_BYTES).not.toContain('82c69e')
+    const html = shell('ت', '<p>x</p>', 'n1')
+    expect(html).toContain('<meta name="theme-color" content="#1f2430">')
   })
 })
 

@@ -61,7 +61,7 @@ const FONT_PRELOAD = [BEIRUTI, INTER, REEM_KUFI]
  * القائمة أصلا، ويظهر قبل أن يكتمل تحميل الصفحة.
  *
  * **والشكلُ من الهويّة لا من الذوق**: شريطُ صدى نفسه، بتدرّجه من
- * التركواز إلى النعناع. وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ لطخةً —
+ * النحاس الداكن إلى الشمبانيا على أرضٍ من حبر (D-144). وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ لطخةً —
  * والشريطُ يُقرأ عند كلّ قياس.
  */
 const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
@@ -69,10 +69,10 @@ const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
 const ICON_SVG = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48">',
   '<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0">',
-  '<stop offset="0" stop-color="#316b4c"/><stop offset=".55" stop-color="#82c69e"/>',
-  '<stop offset="1" stop-color="#d1b473"/>',
+  '<stop offset="0" stop-color="#6e5a33"/><stop offset=".55" stop-color="#c9a962"/>',
+  '<stop offset="1" stop-color="#f0dcae"/>',
   '</linearGradient></defs>',
-  '<rect width="64" height="48" rx="11" fill="#050f09"/>',
+  '<rect width="64" height="48" rx="11" fill="#14161c"/>',
   '<path d="' + RIBBON + '" fill="none" stroke="url(#g)" stroke-width="11" ',
   'stroke-linecap="round"/>',
   '</svg>',
@@ -109,7 +109,7 @@ export const GLYPH_SVG =
 export const ICON_BYTES = ICON_SVG
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
-<meta name="theme-color" content="#12623e">`
+<meta name="theme-color" content="#1f2430">`
 
 export function escapeHtml(value: string): string {
   return value
