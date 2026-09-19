@@ -6,6 +6,7 @@
  * غيرَ ما يعنيه. **والعينُ ترى مرّةً، والاختبارُ يرى في كلّ دفعة.**
  */
 import { describe, expect, it } from 'vitest'
+import { FACES, REEM_KUFI } from '../../lib/ui/fonts'
 import { readFileSync } from 'node:fs'
 import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
@@ -517,6 +518,28 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(STYLE).toContain('.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}')
     expect(STYLE).not.toContain('background-image:none}')
     expect(STYLE.lastIndexOf('D-139')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
+  })
+})
+
+/**
+ * الطبعةُ الثالثة — المؤسّسيّة (D-143): وجهُ عرضٍ كوفيٌّ للعناوين، وشريطُ
+ * المؤشّرات سطحٌ واحدٌ بفواصلَ من خيط، والرقمُ رقيقٌ، وأفعالُ القوائم هادئةٌ
+ * بهدفِ لمسٍ باقٍ. والكتلةُ آخرَ الورقة فتغلب.
+ */
+describe('الطبعةُ الثالثة (D-143)', () => {
+  it('وجهُ العرض معرَّفٌ رمزًا ومحمَّلٌ وجهًا ثالثًا بمسارٍ بلا فراغ', () => {
+    expect(STYLE).toContain('--font-display:"Inter","Reem Kufi","Beiruti"')
+    expect(STYLE).toMatch(/\.page-head h1,\.card h2,\.sec,[^{]*\{font-family:var\(--font-display\)\}/)
+    expect(FACES).toContain(REEM_KUFI)
+    expect(REEM_KUFI.path).toBe('/f/reem-kufi.9eccd028.woff2')
+    expect(REEM_KUFI.path).not.toMatch(/\s/)
+  })
+  it('شريطُ المؤشّرات سطحٌ واحد، والرقمُ رقيق، والفعلُ الهادئ يبقى هدفَ لمس', () => {
+    expect(STYLE).toContain('.grid.tiles{gap:1px; background:var(--line)')
+    expect(STYLE).toContain('.grid.tiles>.tile{border:0; border-radius:0; box-shadow:none')
+    expect(STYLE).toContain('.tile .v{font-weight:400')
+    expect(STYLE).toMatch(/\.todo>li>a\.btn,\.todo>li>form \.btn\{background:transparent;[^}]*min-width:44px/)
+    expect(STYLE.lastIndexOf('D-143')).toBeGreaterThan(STYLE.lastIndexOf('D-142'))
   })
 })
 

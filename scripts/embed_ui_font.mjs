@@ -61,6 +61,18 @@ const FACES = [
     family: 'Inter',
     why: 'اللاتينيُّ والرقم — أسماءُ النماذج والمعرّفاتُ والمبالغ',
   },
+  /*
+   * **وجهُ العرض** (D-143): كوفيٌّ هندسيٌّ للعناوين ولصائق المؤشّرات
+   * ورؤوس الأقسام — يقول «مؤسّسة» حيث تقول بيروتي «متن». المجموعةُ
+   * العربيّةُ وحدَها: ‏١٢KB، واللاتينيُّ يبقى لـ Inter.
+   */
+  {
+    pkg: '@fontsource-variable/reem-kufi',
+    file: 'reem-kufi-arabic-wght-normal.woff2',
+    name: 'REEM_KUFI',
+    family: 'Reem Kufi',
+    why: 'وجهُ العرض — العناوينُ ولصائقُ المؤشّرات ورؤوسُ الأقسام',
+  },
 ]
 
 /** سقفٌ **مُعلَنٌ ليُحرَس، لا ليُرضي** — كما في `audit_mobile`. */
@@ -104,7 +116,7 @@ const out = `/**
  *
  * ## الرخصة
  *
- * Beiruti و Inter — SIL Open Font License 1.1، وهي تجيز الضمَّ وإعادةَ
+ * Beiruti و Inter و Reem Kufi — SIL Open Font License 1.1، وهي تجيز الضمَّ وإعادةَ
  * التوزيع داخل برنامج. حقوقُ المؤلّفين محفوظةٌ لأصحابها.
  */
 
@@ -123,14 +135,14 @@ ${faces
 export const ${f.name}: EmbeddedFace = {
   family: '${f.family}',
   hash: '${f.hash}',
-  path: '/f/${f.family.toLowerCase()}.${f.hash}.woff2',
+  path: '/f/${f.family.toLowerCase().replace(/\s+/g, '-')}.${f.hash}.woff2',
   bytes: ${f.bytes.length},
   b64: '${f.b64}',
 }`,
   )
   .join('\n\n')}
 
-/** الوجهان معا — يُمسحان في المسار وفي القشرة، فلا يُنسى أحدُهما. */
+/** الأوجهُ معا — تُمسَح في المسار وفي القشرة، فلا يُنسى أحدُها. */
 export const FACES: readonly EmbeddedFace[] = [${faces.map((f) => f.name).join(', ')}]
 `
 

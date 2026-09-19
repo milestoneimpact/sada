@@ -8,7 +8,7 @@
 import { COMMAND_SCRIPT, commandPalette, commandTrigger, type Command } from './command'
 import { TIME_SCRIPT } from './time'
 import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
-import { BEIRUTI, INTER } from '../../lib/ui/fonts'
+import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
 
 /**
  * الخطّان — **من أصلنا، وبوجهٍ واحدٍ لكلّ أسرة** (D-099).
@@ -40,6 +40,8 @@ const FONT_CSS = `
   font-display:swap; src:url('${BEIRUTI.path}') format('woff2')}
 @font-face{font-family:'Inter'; font-style:normal; font-weight:400 700;
   font-display:swap; src:url('${INTER.path}') format('woff2')}
+@font-face{font-family:'Reem Kufi'; font-style:normal; font-weight:400 700;
+  font-display:swap; src:url('${REEM_KUFI.path}') format('woff2')}
 `
 
 /**
@@ -47,7 +49,7 @@ const FONT_CSS = `
  * الأنماط. **وبلا `crossorigin` لا يُستعمَل المحمَّل** — يُحمَّل الخطُّ
  * مرّتين، ويُقرأ ذلك في الشبكة تكرارا لا يُفسَّر.
  */
-const FONT_PRELOAD = [BEIRUTI, INTER]
+const FONT_PRELOAD = [BEIRUTI, INTER, REEM_KUFI]
   .map((f) => `<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`)
   .join('\n')
 
