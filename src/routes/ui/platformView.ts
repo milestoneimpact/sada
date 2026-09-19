@@ -474,7 +474,10 @@ export function platformScreen(d: PlatformScreenData): string {
     ? `<div class="empty"><b>لا حسابَ مربوطا</b>
        <p>${state === 'awaiting_owner'
          ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
-         : 'زرُّ الربط أعلاه يفتح شاشةَ الإذن عند المنصّة.'}</p></div>`
+         : 'زرُّ الربط أعلاه يفتح شاشةَ الإذن عند المنصّة.'}</p>${
+         state === 'awaiting_owner' && guide !== undefined
+           ? '<a class="btn p sm" href="#setup">اضبط التطبيق</a>'
+           : ''}</div>`
     : accountBlocks}
 
   ${spec.stage === 'link'
@@ -515,6 +518,6 @@ export function platformScreen(d: PlatformScreenData): string {
      * تحته لا شيء**، يُقرأ قسما سقط. فيُحسَب اللوحُ أوّلا، والعنوانُ يتبعه.
      */''}${(() => {
     const setup = guide === undefined ? '' : setupPane(d.view, d.app, d.baseUrl)
-    return setup === '' ? '' : `<h3 class="sec">ضبطُ التطبيق ودليلُه</h3>\n       ${setup}`
+    return setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n       ${setup}`
   })()}`
 }

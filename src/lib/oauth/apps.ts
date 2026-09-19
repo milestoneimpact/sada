@@ -126,11 +126,20 @@ export interface AppStatus {
   readonly verifiedKind: string | null
 }
 
-/** حالُ التطبيقين للعرض — بلا فكّ تشفيرٍ ولا كشفِ قيمة. */
+/**
+ * المنصّاتُ التي لها تطبيقٌ وسرّان — **كلُّ ما في `SECRET_NAMES`** (D-142).
+ *
+ * كانت الحالُ تُقرأ لمنصّتين، فشاشةُ YouTube تقول «اضبطهما من ضبط التطبيق
+ * أسفلَ هذه الصفحة» **ولا شيءَ أسفلَها**: `setupPane` تردّ فراغًا بلا حال.
+ * رآه المالكُ على staging وقال إنّه لا يستطيع الربط — وكان محقًّا.
+ */
+export const APP_PLATFORMS: readonly Platform[] = Object.keys(SECRET_NAMES) as Platform[]
+
+/** حالُ التطبيقات للعرض — بلا فكّ تشفيرٍ ولا كشفِ قيمة. */
 export async function appStatuses(
   db: Db,
   env: Readonly<Record<string, string | undefined>>,
-  platforms: readonly Platform[] = ['linkedin', 'x'],
+  platforms: readonly Platform[] = APP_PLATFORMS,
 ): Promise<AppStatus[]> {
   let rows: Record<string, string>[] = []
   try {

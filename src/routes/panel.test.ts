@@ -2098,6 +2098,31 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     expect(audit.map((a) => a.detail)).toEqual(['saved', 'unchanged'])
   })
 
+  /**
+   * **الخزانةُ لكلّ منصّةٍ لها سرّان** (D-142): كانت مقصورةً على LinkedIn وX،
+   * فشاشةُ YouTube تعد بدليلٍ أسفلَها ولا شيءَ أسفلَها، والحفظُ لها يُردّ.
+   */
+  it('وYouTube تُحفَظ أسرارُها وتُقرأ حالُها كغيرها', async () => {
+    const cookie = await login()
+    const before = await (await app.request('/panel/channels/youtube', withSession(cookie), env)).text()
+    expect(before).toContain('ضبطُ التطبيق ودليلُه')
+    expect(before).toContain('id="setup"')
+    expect(before).toContain('href="#setup"')
+    expect(before).toContain('oauth/youtube/callback')
+
+    const body = new FormData()
+    body.set('platform', 'youtube')
+    body.set('client_id', '1234567890-abc.apps.googleusercontent.com')
+    body.set('client_secret', 'GOCSPX-سرٌّ-طويلٌ-لا-يُعرَض')
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body }), env)
+    const rows = db.raw.prepare('SELECT platform FROM oauth_apps').all() as { platform: string }[]
+    expect(rows.map((r) => r.platform)).toEqual(['youtube'])
+
+    const after = await (await app.request('/panel/channels/youtube', withSession(cookie), env)).text()
+    expect(after).toContain('محفوظ.')
+    expect(after).not.toContain('GOCSPX-سرٌّ')
+  })
+
   it('ومنصّةٌ غير معروفة تُردّ ولا تصل إلى القاعدة', async () => {
     const cookie = await login()
     const body = new FormData()
