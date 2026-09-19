@@ -1213,10 +1213,11 @@ function todayList(d: PanelData): string {
       ${i.go === undefined ? '' : `<a class="btn g sm" href="${escapeHtml(i.go)}">${escapeHtml(i.goLabel ?? 'افتح')}</a>`}</li>`)
     .join('')
   const more = d.today.more === 0 ? '' : `<p class="hint">و${d.today.more} غيرُها اليوم — في سجلّ الأمان.</p>`
-  return `<h3 class="sec">ما وقع اليوم</h3>
+  return `<div class="card"><h2>ما وقع اليوم</h2>
+      <p class="hint">يُروى ممّا قُرئ — ولا يُفتَح له استعلام</p>
       ${rows === ''
-        ? '<p class="hint">لم يقع شيءٌ بعدُ منذ منتصف الليل UTC.</p>'
-        : `<ul class="todo">${rows}</ul>${more}`}`
+        ? '<div class="empty"><b>لم يقع شيءٌ بعد</b><p>منذ منتصف الليل UTC.</p></div>'
+        : `<ul class="todo">${rows}</ul>${more}`}</div>`
 }
 
 export function panelPage(d: PanelData): string {
@@ -1486,13 +1487,21 @@ ${flash}
    * الإنفاق تُمدّ لتساوي القائمةَ فتترك ‏٥٢١px بيضاء — أمسكها مدقّقُ
    * الذيل بعد أن رآها المالك.
    */''}
+  ${/*
+   * **رصّتان لا رصّةٌ وبطاقة** (D-145): كانت «ما ينتظرك» و«ما وقع اليوم»
+   * قائمتين في بطاقةٍ واحدة تطول إلى ‏١٣١٠px والمالُ في العمود الآخر يقف
+   * عند ‏٩٦٥ — ‏٣٥٠px من الأرض الفارغة تحته. والاثنتان شيئان: أفعالٌ تنتظر
+   * وسجلٌّ وقع. فلكلٍّ بطاقتُها، والعمودُ الأوّل رصّةٌ كالثاني.
+   */''}
   <div class="ov" style="margin-top:var(--s-3)">
-    <div class="card"><h2>ما ينتظرك</h2>
-      <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
-      ${todo === ''
-        ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
-        : `<ul class="todo">${todo}</ul>`}
-      ${todayList(d)}</div>
+    <div class="stack">
+      <div class="card"><h2>ما ينتظرك</h2>
+        <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
+        ${todo === ''
+          ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
+          : `<ul class="todo">${todo}</ul>`}</div>
+      ${todayList(d)}
+    </div>
     <div class="stack">
       <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
         <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}

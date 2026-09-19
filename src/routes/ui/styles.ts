@@ -1897,4 +1897,11 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
 .flash.ok{border-inline-start-color:var(--ok)}
 .flash.warn{border-inline-start-color:var(--warn)}
 .flash.bad{border-inline-start-color:var(--bad)}
+
+/* ── هندسةُ نظرة عامّة، الجولةُ الثانية (D-145) ────────────────────────────
+   صفوفُ القوائم كانت ‏٦٠px: هدفُ اللمس ‏٤٤ وحشوٌ ‏٨ فوقه وتحته. والصفُّ في
+   Linear وStripe ‏٤٤–٤٨. فالحشوُ ‏٤ والهدفُ باقٍ، وإحدى عشرةَ صفًّا توفّر
+   ‏٨٨px. والبطاقتان في العمود الأوّل يفصلهما ما يفصل بطاقتَي المال. */
+.todo li{padding:var(--s-1) var(--s-0)}
+.todo>li>a.btn,.todo>li>form .btn{margin-block:-1px}
 `
