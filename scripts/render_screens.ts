@@ -44,10 +44,15 @@ const x = views.find((v) => v.spec.id === 'x')!
 const ig = views.find((v) => v.spec.id === 'instagram')!
 const yt = views.find((v) => v.spec.id === 'youtube')!
 
+/*
+ * **والشريطُ من مصدره لا نسخةٌ منه** (D-140): كان يُكتب هنا حرفًا،
+ * فتُدقَّق الشاشاتُ بشريطٍ ليس شريطَ المنتَج — وعلامةٌ أُضيفت إليه لم
+ * تصل المدقّقَ ولا اللقطة.
+ */
 const page = (title: string, body: string): string =>
   shell(
     title,
-    `<div class="wrap"><nav class="back"><a href="/panel#channels">← القنوات</a></nav>
+    `<div class="wrap">${backNav('/panel#channels', 'القنوات')}
      <main id="main">${body}</main></div>`,
     'n',
   )

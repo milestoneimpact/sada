@@ -18,6 +18,7 @@ import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { bar } from './parts'
 import { refusedBody } from './oauthResult'
+import { backNav } from './shell'
 import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
@@ -515,5 +516,19 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(STYLE).toContain('.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}')
     expect(STYLE).not.toContain('background-image:none}')
     expect(STYLE.lastIndexOf('D-139')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
+  })
+})
+
+/** الشاشةُ المستقلّة تحمل العلامة (D-140): بابٌ إلى اللوحة قبل سهم العودة. */
+describe('شريطُ العودة (D-140)', () => {
+  it('العلامةُ أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
+    const html = backNav('/panel#channels', 'القنوات')
+    const home = html.indexOf('<a class="home" href="/panel"')
+    const back = html.indexOf('← القنوات')
+    expect(home).toBeGreaterThan(0)
+    expect(back).toBeGreaterThan(home)
+    expect(html).toContain('<span class="glyph sm">')
+    expect(STYLE).toContain('nav.back .home,nav.back .home .glyph{flex:none}')
+    expect(STYLE).toContain('.glyph.sm svg{width:17px; height:17px}')
   })
 })

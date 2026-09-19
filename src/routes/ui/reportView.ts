@@ -37,15 +37,19 @@ function sum(label: string, value: number | null, from: number, of: number): str
   return `<span class="stat"><b>${value}</b>${escapeHtml(label)}${partial}</span>`
 }
 
+/**
+ * صفُّ منصّةٍ في «ما خرج» — **صفٌّ لا بطاقةٌ في بطاقة** (D-140).
+ *
+ * كانت كلُّ منصّةٍ بطاقةً داخل البطاقة: شعارٌ واسمٌ في سطر، ورقاقةٌ في طرفه
+ * البعيد، والأرقامُ في سطرٍ ثانٍ تحت خيط — **وثلاثةُ أرباع الصفّ بيضاء**.
+ * فالشعارُ والاسمُ والعدُّ والأرقامُ في سطرٍ واحدٍ يلتفّ على الضيق.
+ */
 function sliceCard(s: PlatformSlice): string {
   const logo = LOGOS[s.platform] ?? ''
-  return `<div class="card" style="margin-bottom:var(--s-3)">
-    <div class="card-head">
-      <div class="plat-logo">${logo}</div>
-      <h2>${escapeHtml(LABEL[s.platform] ?? s.platform)}</h2>
-      <div class="grow"></div>
-      <span class="chip">${s.published} منشورا · قِيس ${s.measured}</span>
-    </div>
+  return `<div class="slice">
+    <div class="plat-logo">${logo}</div>
+    <div class="slice-id"><h3>${escapeHtml(LABEL[s.platform] ?? s.platform)}</h3>
+      <span class="chip">${s.published} منشورا · قِيس ${s.measured}</span></div>
     <div class="stats">
       ${sum('ظهور', s.impressions, s.impressionsFrom, s.published)}
       ${sum('تفاعل', s.interactions, s.interactionsFrom, s.published)}
@@ -122,7 +126,7 @@ export function reportBody(r: WeeklyReport, now: Date): string {
       <span class="chip" title="من دفتر التكلفة في هذه المدّة وحدها">
         أُنفق ${escapeHtml(money(r.spendUsd))}</span>
     </div>
-    ${r.platforms.map(sliceCard).join('')}
+    ${r.platforms.length === 0 ? '' : `<div class="slices">${r.platforms.map(sliceCard).join('')}</div>`}
     ${r.platforms.length === 0 ? '<p class="hint">لا شيءَ يُعرَض — ولا أصفارَ تُختلَق.</p>' : ''}
   </div>
 
