@@ -1798,4 +1798,60 @@ nav.back .home,nav.back .home .glyph{flex:none}
 .auth .card{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);
   border-color:color-mix(in srgb,var(--au) 30%,var(--line))}
 .auth h1{font-size:var(--t-2xl)}
+
+/* ══ الطبعةُ الثالثة — المؤسّسيّة (D-143) ═══════════════════════════════
+   قال المالكُ بعد الطبعتين: «لا أراها ترتقي لواجهةٍ مؤسّسيّة». وكان محقًّا
+   في شيءٍ لم تقله المقاييس: **كلُّ شيءٍ في اللوحة صندوقٌ بحدّ** — ستُّ
+   بطاقاتٍ للمؤشّرات، وأحدَ عشرَ زرًّا محدودًا في قائمةٍ واحدة، وحالاتٌ فارغةٌ
+   بحدٍّ متقطّعٍ يقول «تحت الإنشاء». والمؤسّسيُّ عكسُ ذلك: **سطحٌ واحد، وخيوطٌ
+   لا صناديق، وحرفُ عرضٍ يُعرَف من بعيد، وأرقامٌ كبيرةٌ رقيقة**.
+
+   ثلاثُ حركاتٍ لا زينة:
+   ١ · وجهُ عرضٍ كوفيٌّ للعناوين واللصائق (Reem Kufi، ‏١٢KB).
+   ٢ · شريطُ المؤشّرات سطحٌ واحدٌ بفواصلَ من خيط، والرقمُ رقيقٌ ‏٤٠٠.
+   ٣ · أفعالُ القوائم روابطٌ هادئةٌ لا أزرارٌ محدودة، والحالاتُ الفارغةُ بخيطٍ
+       لا بحدٍّ متقطّع، والظلُّ الأدنى لا الأوسط.
+
+   **وكلُّ قيمةٍ من السلّم**: الوزنُ ‏٤٠٠ محمَّلٌ، والقياساتُ رتبٌ، وهدفُ اللمس
+   ‏٤٤ باقٍ على الروابط الهادئة (min-height من .btn). */
+
+/* ── وجهُ العرض حيث يُقرأ من بعيد ───────────────────────────────────── */
+.page-head h1,.card h2,.sec,.brand b,nav.tabs .lbl,.auth h1,.tile .k,th,
+.cmdk-t b,.fd-h h2,.slice h3,.stat b,.topbar h1{font-family:var(--font-display)}
+.page-head h1{letter-spacing:0; font-weight:700}
+.card h2{font-size:var(--t-xl); letter-spacing:0}
+.sec{font-size:var(--t-sm); font-weight:600}
+.tile .k{font-size:var(--t-sm); font-weight:600; color:var(--ink-2)}
+th{font-weight:600}
+
+/* ── شريطُ المؤشّرات: سطحٌ واحدٌ وخيوط ────────────────────────────────── */
+.grid.tiles{gap:1px; background:var(--line); border:1px solid var(--line);
+  border-top:2px solid var(--au); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--sh-1)}
+.grid.tiles>.tile{border:0; border-radius:0; box-shadow:none; background:var(--surface);
+  background-image:none; padding:var(--s-5d) var(--s-5d)}
+.grid.tiles>.tile::before{display:none}
+.grid.tiles>.tile:first-child{background-image:
+  radial-gradient(420px 170px at 100% 0%,color-mix(in srgb,var(--au) 14%,transparent),transparent 70%)}
+.tile .v{font-weight:400; letter-spacing:-.8px}
+.tile .v em{font-weight:500}
+.grid>.tile:first-child .v{font-weight:400; letter-spacing:-1.2px}
+
+/* ── أفعالُ القوائم روابطٌ هادئة، والحالُ الفارغةُ خيطٌ لا تقطيع ──────── */
+.todo>li>a.btn,.todo>li>form .btn{background:transparent; border-color:transparent; box-shadow:none;
+  color:var(--brand); min-width:44px; padding-inline:var(--s-3); font-weight:600}
+@media(hover:hover){.todo>li>a.btn:hover,.todo>li>form .btn:hover{background:var(--brand-wash);
+  border-color:transparent}}
+.empty{border:1px solid var(--line-soft); background:transparent; border-radius:var(--r-lg)}
+
+/* ── الانضباط: الظلُّ الأدنى، والثانويُّ مسطّح، ورأسٌ بخيط ─────────────── */
+.card{box-shadow:var(--sh-1), inset 0 1px 0 var(--hair)}
+.g{box-shadow:none}
+.page-head{padding-bottom:var(--s-5); border-bottom:1px solid var(--line-soft)}
+
+/* ── الإطار: بيئةٌ حبّةً ذهبيّة، ولصائقُ الأقسام بالذهب ───────────────── */
+.brand span{display:inline-block; margin-top:var(--s-1); padding:0 var(--s-2); border-radius:999px;
+  color:var(--au); border:1px solid color-mix(in srgb,var(--au) 45%,transparent); line-height:1.6}
+nav.tabs .lbl{color:var(--au); font-weight:600}
+/* والبحثُ يبقى حبّةً مضغوطة: جُرّب حقلًا عريضًا فالتفّ محتواه إلى طرفه
+   الأبعد في الاتّجاه اليمينيّ وقُرئ فارغًا. */
 `
