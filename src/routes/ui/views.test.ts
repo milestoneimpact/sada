@@ -6,6 +6,7 @@
  * غيرَ ما يعنيه. **والعينُ ترى مرّةً، والاختبارُ يرى في كلّ دفعة.**
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
@@ -530,5 +531,19 @@ describe('شريطُ العودة (D-140)', () => {
     expect(html).toContain('<span class="glyph sm">')
     expect(STYLE).toContain('nav.back .home,nav.back .home .glyph{flex:none}')
     expect(STYLE).toContain('.glyph.sm svg{width:17px; height:17px}')
+  })
+})
+
+/**
+ * **العيّنةُ تستدعي الإطارَ من مصدره** (لاحقةُ D-140): كانت `render_screens`
+ * تكتب شريطَ العودة حرفًا، فدُقّق شريطٌ ليس شريطَ المنتَج وضاعت علامةٌ أُضيفت
+ * إليه. فلا يُكتب في العيّنات وسمٌ من وسوم الإطار — يُستدعى.
+ */
+describe('العيّناتُ لا تنسخ الإطار (D-140)', () => {
+  it.each(['render_screens.ts', 'render_panel.ts', 'render_legal.ts'])('%s بلا وسمِ إطارٍ مكتوبٍ بيد', (name) => {
+    const src = readFileSync(new URL(`../../../scripts/${name}`, import.meta.url), 'utf8')
+    for (const tag of ['<nav class="back"', 'class="rail"', 'class="topbar"', 'class="theme"', 'class="rail-head"']) {
+      expect(src, `${name} يكتب ${tag} بدل استدعاء مصدره`).not.toContain(tag)
+    }
   })
 })
