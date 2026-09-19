@@ -233,7 +233,13 @@ export function densitySwitch(): string {
  * يعرفه إلّا من كتبه**. فما دام الشريطُ واحدا، فالزرُّ فيه لا يُنسى.
  */
 export function backNav(href: string, label: string): string {
+  /*
+   * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
+   * وحدَه، فتُقرأ صفحةً خارج التطبيق. والعلامةُ بجانب السهم تقول «هذه من
+   * صدى» قبل أن يُقرأ العنوان — وهي بابٌ إلى اللوحة كذلك.
+   */
   return `<nav class="back" aria-label="مسارُ العودة">
+    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
     <a href="${escapeHtml(href)}">← ${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`

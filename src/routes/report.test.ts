@@ -105,6 +105,9 @@ describe('ما يُعرَض', () => {
     expect(body).toContain('الأوّلُ في نافذة ‏٢٤ ساعة')
     expect(body).not.toContain('نافذة 24h')
     expect(body).toContain('نصُّ المنشور 4')
+    // **صفوفٌ لا بطاقاتٌ في بطاقة** (D-140): كلُّ منصّةٍ صفٌّ في «ما خرج»
+    expect(body).toContain('<div class="slices">')
+    expect(body).toMatch(/<div class="slice">\s*<div class="plat-logo">/)
   })
 
   /**

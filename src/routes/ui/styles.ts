@@ -1752,6 +1752,33 @@ button,.btn{border-radius:var(--r)}
 th{border-bottom-color:color-mix(in srgb,var(--au) 32%,var(--line))}
 .sec::after{width:44px}
 
+/* ── الشاشةُ المستقلّة تحمل العلامة (D-140) ─────────────────────────────
+   شريطُ العودة يبدأ بالعلامة واسمِها بابًا إلى اللوحة، ثمّ سهمُ العودة.
+   وخيطٌ تحته يفصله عن الرأس كما يفصل الشريطُ العلويُّ اللوحةَ. */
+nav.back{border-bottom:1px solid var(--line-soft); margin-bottom:var(--s-4); gap:var(--s-4)}
+nav.back .home{display:inline-flex; align-items:center; gap:var(--s-2); color:var(--ink);
+  font-size:var(--t-base); font-weight:700; text-decoration:none; padding-inline-end:var(--s-3);
+  border-inline-end:1px solid var(--line)}
+nav.back .home b{font-weight:700}
+/* **والعلامةُ لا تنكمش**: قِيس رسمُها ‏٣px عرضًا لأنّ الرابطَ عنصرٌ مرنٌ يقبل
+   الانكماش حتّى ‏٤٤ ونسبةُ الرسم من صندوقٍ انكمش. فالثباتُ بالبكسل لا بالنسبة. */
+nav.back .home,nav.back .home .glyph{flex:none}
+.glyph.sm{width:30px; height:30px; border-radius:9px}
+.glyph.sm svg{width:17px; height:17px}
+/* وعلى ‏٣٢٠px تبقى العلامةُ ويسقط اسمُها: قِيس الشريطُ يفيض ‏١٠px بالاسم
+   والسهم ومبدّل الثيم معًا، والعلامةُ وحدَها تقول ما يقوله الاسم. */
+@media(max-width:400px){nav.back .home b{display:none} nav.back .home{padding-inline-end:var(--s-2)}}
+
+/* ── «ما خرج»: صفوفٌ لا بطاقاتٌ في بطاقة (D-140) ─────────────────────── */
+.slices{display:flex; flex-direction:column}
+.slice{display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap;
+  padding:var(--s-3) 0; border-bottom:1px solid var(--line-soft)}
+.slice:last-child{border-bottom:0}
+.slice-id{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; min-width:0}
+.slice h3{font-size:var(--t-base); font-weight:700}
+.slice .stats{margin:0 0 0 auto; padding:0; border-top:0; margin-inline-start:auto}
+.slice .chip{margin:0}
+
 /* ── الدخول: بطاقةٌ بحلقة ذهبٍ وعلامةٌ أكبر ──────────────────────────── */
 .auth .glyph{width:64px; height:64px; border-radius:18px}
 .auth .card{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);
