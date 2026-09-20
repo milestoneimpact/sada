@@ -253,7 +253,7 @@ function tallyRow(t: PlatformTally, now: Date): string {
     `<div class="card tile"><div class="k">${k}</div><div class="v">${v}</div>
      <div class="n">${n}</div></div>`
 
-  return `<div class="grid c4">
+  return `<div class="grid tiles c4">
     ${cell('نُشر', String(t.published), t.lastPublishedAt === null
       ? 'لم يُنشر شيءٌ بعد'
       : `آخرُه منذ ${escapeHtml(relativeTime(t.lastPublishedAt, now))}`)}

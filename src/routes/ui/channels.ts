@@ -441,7 +441,7 @@ export function channelsSection(
    * منها بطولِ معالجٍ كامل.
    */
   const count = (state: string): number => views.filter((v) => v.state === state).length
-  const strip = `<div class="grid c4" style="margin-bottom:var(--s-4)">
+  const strip = `<div class="grid tiles c4" style="margin-bottom:var(--s-4)">
     <div class="card tile"><div class="k">مربوطة وتعمل</div>
       <div class="v">${count('linked')}<em> / ${built.length}</em></div>
       <div class="n">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>
