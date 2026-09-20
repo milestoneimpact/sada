@@ -85,7 +85,7 @@ function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date
   const m = widest(rows)
   if (m === undefined || m === null) {
     return `<div class="stats none"><span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد
-      ٢٤ ساعةً من النشر</span></div>`
+      24 ساعةً من النشر</span></div>`
   }
   return `<div class="stats">
     ${stat('ظهور', m.impressions)}

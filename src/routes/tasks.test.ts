@@ -226,7 +226,7 @@ describe('قراراتُ المالك في «ما عليك» (D-130)', () => {
   it('بوّابةُ الستّة وسقفُ الترويج صفّان بحالهما من الإعدادات، ولكلٍّ بابُه', async () => {
     const html = await open()
     expect(html).toContain('M-20')
-    expect(html).toContain('4 من ٦ بطاقاتٍ مختارة')
+    expect(html).toContain('4 من 6 بطاقاتٍ مختارة')
     expect(html).toContain('M-21')
     expect(html).toContain('صفر — لا توصيةَ تُكتب')
     expect(html).toContain('href="/panel#settings">افتح الحدود</a>')

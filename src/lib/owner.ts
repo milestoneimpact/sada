@@ -186,7 +186,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       '**والشاشةُ اليوميّةُ تبدأ بجواب غيرِك** (D-114).',
     unblocks: 'capability',
     done: (f) => f.tilesChosen >= 6,
-    evidence: (f) => `${f.tilesChosen} من ٦ بطاقاتٍ مختارة`,
+    evidence: (f) => `${f.tilesChosen} من 6 بطاقاتٍ مختارة`,
     go: '/panel#settings',
     goLabel: 'افتح الحدود',
   },

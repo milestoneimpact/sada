@@ -44,9 +44,9 @@ export type WindowName = (typeof WINDOWS)[number]['name']
  * (D-123) بعينها في موضعٍ ثالث. وما ليس في القاموس يُعرَض بحرفه.
  */
 const WINDOW_LABEL: Readonly<Record<WindowName, string>> = {
-  '24h': '‏٢٤ ساعة',
-  '72h': '‏٧٢ ساعة',
-  '7d': '‏٧ أيّام',
+  '24h': '24 ساعة',
+  '72h': '72 ساعة',
+  '7d': '7 أيّام',
 }
 
 export function windowLabel(name: string): string {

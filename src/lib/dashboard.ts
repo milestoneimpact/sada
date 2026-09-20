@@ -137,7 +137,7 @@ export const TILES: readonly TileSpec[] = [
   },
   {
     id: 'spend_30d',
-    label: 'إنفاق ٣٠ يوما',
+    label: 'إنفاق 30 يوما',
     why: 'المجموعُ الشهريُّ، ومَن أنفقه.',
     of: (d, f) => ({
       value: f.money(d.spend30d),
@@ -256,7 +256,7 @@ export const TILES: readonly TileSpec[] = [
       const on = [!d.paused, d.autoEnqueue, d.browserToken].filter(Boolean).length
       return {
         value: d.paused ? 'موقوف' : 'يعمل',
-        note: `${on} من ٣ مفاتيحَ مرفوعة`,
+        note: `${on} من 3 مفاتيحَ مرفوعة`,
       }
     },
   },
