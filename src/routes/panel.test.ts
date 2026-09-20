@@ -668,6 +668,27 @@ describe('اللون يتبع المرجع لا الذوق', () => {
  * القائمةَ فتترك ‏٥٢١px بيضاء. فالمالُ رصّةٌ في عمودٍ، والقائمةُ في الآخر،
  * وصفُّ المؤشّرات موسومٌ ليصير زوجين في الجوّال.
  */
+/**
+ * **شريطُ المؤشّرات واحدٌ في كلّ لوح** (D-146): D-143 جعلته سطحًا واحدًا في
+ * نظرة عامّة وبقيت ثلاثةُ أشرطةٍ بطاقاتًا منفصلة. فالصنفُ على الأربعة، ولا
+ * شريطَ مؤشّراتٍ بلا الصنف.
+ */
+describe('شريطُ المؤشّرات واحد (D-146)', () => {
+  it('القنواتُ والمزوّدون وشاشةُ المنصّة يحملون tiles، ولا شريطَ بلاه', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<div class="grid tiles c4" style="margin-bottom:var(--s-4)">')
+    expect(html).toContain('<div class="grid tiles c3" style="margin-bottom:var(--s-3)">')
+    const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
+    expect(screen).toContain('<div class="grid tiles c4">')
+    for (const page of [html, screen]) {
+      for (const m of page.matchAll(/<div class="grid (c[234])[^"]*">\s*<div class="card tile">/g)) {
+        expect(m[0], 'شريطُ مؤشّراتٍ بلا tiles').toBe('')
+      }
+    }
+  })
+})
+
 describe('هندسةُ نظرة عامّة (D-136)', () => {
   it('القائمةُ في عمود، والمالُ رصّةً في الآخر، والمؤشّراتُ موسومة', async () => {
     const cookie = await login()

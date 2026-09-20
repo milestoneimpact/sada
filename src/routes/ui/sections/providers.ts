@@ -132,7 +132,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
    * وكان الجوابُ يحتاج مسحَ ستّ بطاقاتٍ وجدولا في آخر اللوح. **ورقمٌ
    * أعلى الصفحة ليس زينة**: من لا يرى أنّ مفتاحا لم يُختبر لا يختبره.
    */
-  const strip = `<div class="grid c3" style="margin-bottom:var(--s-3)">
+  const strip = `<div class="grid tiles c3" style="margin-bottom:var(--s-3)">
     <div class="card tile"><div class="k">مزوّدون جاهزون</div>
       <div class="v">${ready.length}<em> / ${d.providers.length}</em></div>
       ${bar(ready.length, Math.max(1, d.providers.length))}
