@@ -196,7 +196,7 @@ const INSTAGRAM_GUIDE: SetupGuide = {
       what: 'حوِّل حسابَك إلى احترافيّ: تطبيقُ Instagram ← Settings ← '
         + 'Account type and tools ← Switch to professional account',
       why: 'هذه <b>أوّلُ عقبةٍ وأخفاها</b>: حسابٌ شخصيٌّ لا يفتح نهاياتِ النشر أصلا، '
-        + 'وردُّ Meta حينئذٍ ٤٠٠ لا ٤٠٣ — فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ».',
+        + 'وردُّ Meta حينئذٍ 400 لا 403 — فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ».',
     },
     {
       what: 'أنشئ تطبيقا: Create app ← اختر Business ← ثمّ أضف منتج Instagram',

@@ -31,8 +31,8 @@ export interface PivotView {
 /** المدى بالأيّام — **وخياراتٌ معدودةٌ خيرٌ من حقلٍ يقبل أيَّ رقم**. */
 const SPANS: readonly { readonly days: number; readonly label: string }[] = [
   { days: 7, label: 'أسبوع' },
-  { days: 30, label: '٣٠ يوما' },
-  { days: 90, label: '٩٠ يوما' },
+  { days: 30, label: '30 يوما' },
+  { days: 90, label: '90 يوما' },
   { days: 365, label: 'سنة' },
 ]
 

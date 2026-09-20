@@ -144,8 +144,8 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
 
 describe('نافذةُ القياس تُقرأ اسما لا مفتاحا (D-124)', () => {
   it('«24h» تُقال «٢٤ ساعة»، وما ليس في القاموس يُعرَض بحرفه', () => {
-    expect(windowLabel('24h')).toBe('‏٢٤ ساعة')
-    expect(windowLabel('7d')).toBe('‏٧ أيّام')
+    expect(windowLabel('24h')).toBe('24 ساعة')
+    expect(windowLabel('7d')).toBe('7 أيّام')
     expect(windowLabel('90d')).toBe('90d')
   })
 
@@ -163,7 +163,7 @@ describe('نافذةُ القياس تُقرأ اسما لا مفتاحا (D-124
         },
       } as never,
     })
-    expect(html).toContain('الأوّلُ في نافذة ‏٢٤ ساعة')
+    expect(html).toContain('الأوّلُ في نافذة 24 ساعة')
     expect(html).not.toContain('نافذة 24h')
   })
 })

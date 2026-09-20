@@ -448,7 +448,7 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     await submitTiles(cookie, ['drafts_waiting'])
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="k">تحليلات اليوم</div>')
-    expect(html).toContain('<div class="k">إنفاق ٣٠ يوما</div>')
+    expect(html).toContain('<div class="k">إنفاق 30 يوما</div>')
   })
 
   it('السقف يُحفظ ويُقرأ', async () => {
@@ -673,6 +673,27 @@ describe('اللون يتبع المرجع لا الذوق', () => {
  * نظرة عامّة وبقيت ثلاثةُ أشرطةٍ بطاقاتًا منفصلة. فالصنفُ على الأربعة، ولا
  * شريطَ مؤشّراتٍ بلا الصنف.
  */
+/**
+ * **رقمٌ واحدٌ في الواجهة** (D-147): القيمُ المحسوبة تُطبَع بالأرقام الغربيّة
+ * (`toFixed` وأخواتها)، وكانت اللصائقُ الثابتة تكتب «٣٠ يوما» بالهنديّة إلى
+ * جانب «23.41$». فالواجهةُ كلُّها غربيّة؛ وأسماءُ المراحل («المرحلة ٠») أسماءٌ
+ * لا كمّيّات فتبقى، والوثائقُ القانونيّةُ نثرٌ لا واجهة.
+ */
+describe('رقمٌ واحدٌ في الواجهة (D-147)', () => {
+  it('لا رقمًا هنديًّا في اللوحة ولا في شاشة المنصّة سوى أسماء المراحل', async () => {
+    const cookie = await login()
+    for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks']) {
+      const html = await (await app.request(path, withSession(cookie), env)).text()
+      const body = html
+        .replace(/<style[\s\S]*?<\/style>/g, '')
+        .replace(/المرحلة [٠-٩]/g, '')
+        .replace(/المراحل [٠-٩ و]+/g, '')
+      const hits = [...body.matchAll(/[^<>]{0,30}[٠-٩]+[^<>]{0,30}/g)].map((m) => m[0].trim())
+      expect(hits, path).toEqual([])
+    }
+  })
+})
+
 describe('شريطُ المؤشّرات واحد (D-146)', () => {
   it('القنواتُ والمزوّدون وشاشةُ المنصّة يحملون tiles، ولا شريطَ بلاه', async () => {
     const cookie = await login()

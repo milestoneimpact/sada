@@ -213,7 +213,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
             <span class="mono" style="font-size:var(--t-xs)">${escapeHtml(p.baseUrl ?? '—')}</span></div>
           <div><div class="k">السعر</div>
             <div class="sub" style="margin:0">${priceNote}</div></div>
-          <div><div class="k">٣٠ يوما</div>
+          <div><div class="k">30 يوما</div>
             <div class="sub" style="margin:0">${money(p.spend)} · ${p.calls} نداء${
               p.dailyCap === null ? '' : ` · سقفُه ${money(p.dailyCap)}`}</div></div>
         </div>
@@ -383,13 +383,13 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <form method="POST" action="/panel/providers/add" id="add-provider"
           data-confirm="سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان. أتؤكّد؟">
       <ol class="steps" style="margin-top:var(--s-4)">
-        <li><span class="n">١</span><span class="body">
+        <li><span class="n">1</span><span class="body">
           <span class="what">اختر مزوّدا</span>
           <span class="why">تُملأ الحقولُ وحدَها. ومزوّدٌ ليس هنا: املأها يدويّا —
             وعنوانُه ينتهي بـ <span class="mono">/v1</span> عند أكثرهم.</span>
           <span class="row" style="margin-top:var(--s-2)">${presetChips}</span></span></li>
 
-        <li><span class="n">٢</span><span class="body">
+        <li><span class="n">2</span><span class="body">
           <span class="what">راجع البيانات ثمّ أضف</span>
           <span class="why"><b>العنوان يُفحَص قبل الحفظ</b>: https وحدها، ولا عناوين داخليّة،
             ولا قالبٌ لم يُملأ — خطأٌ مطبعيٌّ في المضيف يرسل مفتاحَك إلى حيث لا تريد.</span>
@@ -422,7 +422,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
                 (<span class="mono">/ai/run</span> و <span class="mono">/ai/models/search</span>)
                 — فلا تُدخِل عنوانا ثانيا.</span></span>`}</span></li>
 
-        <li><span class="n">٣</span><span class="body">
+        <li><span class="n">3</span><span class="body">
           <span class="what">ضع المفتاح في صفّه، ثمّ «اختبر» و«حدّث»</span>
           <span class="why">بعد الإضافة يظهر صفُّه في القائمة أعلاه. <b>«اختبر»</b> يقول أيعمل المفتاح،
             <b>و«حدّث»</b> يجلب قائمةَ نماذجه الآن فتختار منها بدل أن تكتب اسما —

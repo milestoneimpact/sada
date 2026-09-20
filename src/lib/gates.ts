@@ -136,7 +136,7 @@ export function gatesOf(f: GateFacts): Gate[] {
         item(
           'وخمسةُ منشوراتٍ معتمدةٍ نُشرت في مواعيدها بلا تدخّل',
           f.scheduledPublished >= 5 ? 'met' : 'unmet',
-          `${f.scheduledPublished} من ٥ — جُدوِلت ثمّ خرجت`,
+          `${f.scheduledPublished} من 5 — جُدوِلت ثمّ خرجت`,
         ),
       ],
       passed: false,

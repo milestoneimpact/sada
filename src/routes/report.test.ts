@@ -102,7 +102,7 @@ describe('ما يُعرَض', () => {
 
     expect(body).toContain('2026-08-24')
     // **والنافذةُ باسمها لا بمفتاح CHECK** (D-124): كان الاختبارُ يثبّت «24h»
-    expect(body).toContain('الأوّلُ في نافذة ‏٢٤ ساعة')
+    expect(body).toContain('الأوّلُ في نافذة 24 ساعة')
     expect(body).not.toContain('نافذة 24h')
     expect(body).toContain('نصُّ المنشور 4')
     // **صفوفٌ لا بطاقاتٌ في بطاقة** (D-140): كلُّ منصّةٍ صفٌّ في «ما خرج»

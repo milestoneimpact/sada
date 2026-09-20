@@ -177,7 +177,7 @@ describe('قراراتُ المالك (D-130)', () => {
     const six = before.find((r) => r.code === 'M-20')!
     const cap = before.find((r) => r.code === 'M-21')!
     expect(six.state).toBe(false)
-    expect(six.measured).toBe('4 من ٦ بطاقاتٍ مختارة')
+    expect(six.measured).toBe('4 من 6 بطاقاتٍ مختارة')
     expect(six.go).toBe('/panel#settings')
     expect(cap.state).toBe(false)
     expect(cap.measured).toBe('صفر — لا توصيةَ تُكتب')

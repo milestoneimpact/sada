@@ -84,9 +84,9 @@ const PAD = 28
  */
 const QUICK: readonly { kind: string; label: string }[] = [
   { kind: 'hour', label: 'بعد ساعة' },
-  { kind: 'tonight', label: 'الليلة ٨م' },
-  { kind: 'tomorrow', label: 'غدا ٩ص' },
-  { kind: 'sunday', label: 'الأحد ٩ص' },
+  { kind: 'tonight', label: 'الليلة 8م' },
+  { kind: 'tomorrow', label: 'غدا 9ص' },
+  { kind: 'sunday', label: 'الأحد 9ص' },
 ]
 
 /**
@@ -239,7 +239,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
-             <span class="st ok"><span class="g">●</span>مقطعٌ رأسيّ ١٥ث</span>
+             <span class="st ok"><span class="g">●</span>مقطعٌ رأسيّ 15ث</span>
              <span class="chip mono">${Math.round(clip.bytes / 1024)}KB</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}

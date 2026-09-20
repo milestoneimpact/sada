@@ -1509,7 +1509,7 @@ ${flash}
           <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
       <div class="card">
         <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
-          <span class="st idle">٣٠ يوما</span></div>
+          <span class="st idle">30 يوما</span></div>
         <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
           «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
         ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
@@ -1641,7 +1641,7 @@ ${pivotPane(d.pivot)}
   <div class="card" style="margin-top:var(--s-3)"><h2>الإدراج الآليّ</h2>
     <div class="split">
       <p>${d.autoEnqueue
-        ? `مرفوع: المسح اليوميّ (٣ فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
+        ? `مرفوع: المسح اليوميّ (3 فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
         : `مطفأ: المسح يرصد ما تغيّر ولا يحلّل شيئا حتّى تضغط «حلّل الآن». ورفعُه يجعل الخطّ كاملا — مستندٌ تعدّله يظهر محلَّلا في اللوحة صباحا.`}</p>
       <form class="inline" method="POST" action="/panel/settings"
             data-confirm="${d.autoEnqueue
