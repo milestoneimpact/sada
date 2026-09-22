@@ -118,5 +118,38 @@ for (const [cls, why] of HOOKS) {
   console.log(`  ${alive ? '·' : '✕'} .${cls} — ${why}${alive ? '' : ' — **ولم يعد يُكتب: احذفه من القائمة**'}`)
 }
 
-console.log(`\nالمجموع: ${bad} صنفا بلا قاعدة · ${stale} إعفاءً شاخ\n`)
-process.exit(bad + stale === 0 ? 0 : 1)
+/**
+ * ── محدّدٌ يُعلَن مرّتين (D-148) ──────────────────────────────────────
+ *
+ * كانت الطبعاتُ تُكتب كتلًا آخرَ الورقة تغلب ما قبلها بالترتيب، فصار ‏٤٩
+ * محدّدًا يُعلَن مرّتين إلى خمس، والقارئُ لا يعرف أيُّها الساري إلّا بقراءة
+ * الورقة كلِّها. وفي D-148 دُمجت في مواضعها بعد أن قِيست الأنماطُ المحسوبة
+ * فلم تتغيّر. **فالقاعدةُ**: محدّدٌ واحدٌ في المستوى الأعلى يُعلَن مرّةً؛
+ * وما يُعاد داخلَ @media أو @supports لا يُعدّ، فذلك شرطٌ لا تكرار.
+ */
+const sheet = readFileSync(STYLES, 'utf8')
+const cssStart = sheet.indexOf('export const STYLE = TOKENS + `') + 'export const STYLE = TOKENS + `'.length
+const css = sheet.slice(cssStart, sheet.lastIndexOf('`')).replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
+const seen = new Map()
+let depth = 0
+let selStart = 0
+for (let i = 0; i < css.length; i++) {
+  const c = css[i]
+  if (c === '{') {
+    if (depth === 0) {
+      const sel = css.slice(selStart, i).trim().replace(/\s+/g, ' ')
+      if (!sel.startsWith('@')) seen.set(sel, (seen.get(sel) ?? 0) + 1)
+    }
+    depth++
+  } else if (c === '}') {
+    depth--
+    if (depth === 0) selStart = i + 1
+  }
+}
+const twice = [...seen].filter(([, n]) => n > 1)
+console.log('═══ محدّدٌ يُعلَن مرّتين ═══\n')
+if (twice.length === 0) console.log('  ✓ كلُّ محدّدٍ في المستوى الأعلى يُعلَن مرّةً')
+for (const [sel, n] of twice) console.log(`  ✕ ${sel}  —  ${n} مرّات`)
+
+console.log(`\nالمجموع: ${bad} صنفا بلا قاعدة · ${stale} إعفاءً شاخ · ${twice.length} محدّدًا مكرّرًا\n`)
+process.exit(bad + stale + twice.length === 0 ? 0 : 1)
