@@ -78,7 +78,7 @@ export const TOKENS = `
   --line:#e0ddd4; --line-soft:#ebe8e0; --line-strong:#c8c3b6;
   /* والحبرُ الأوّل أخضرُ الظلّ لا رماديٌّ محايد: الهويّةُ في الحبر أيضا */
   --ink:#191b1f; --ink-2:#4e525b; --ink-3:#5f636c;
-  --brand:#1f2430; --brand-soft:#3a4152; --brand-deep:#0f1218; --on-brand:#f7f5ef;
+  --brand:#1f2430; --brand-soft:#3a4152; --on-brand:#f7f5ef;
   --brand-wash:#ecebe5;
   /* ── الذهبُ: طبقةُ التشديد ──────────────────────────────────────
      يُقتَّر ولا يُسكَب. وقيمتُه نهارا تُعتَم كثيرا: ذهبٌ فاتحٌ على
@@ -289,7 +289,7 @@ export const TOKENS = `
     --surface:#15171d; --surface-2:#1b1e25; --surface-3:#23262f;
     --line:#282c35; --line-soft:#1f232b; --line-strong:#3b404c;
     --ink:#ebe9e3; --ink-2:#a7aab3; --ink-3:#8b8f99;
-    --brand:#e9e6de; --brand-soft:#f5f3ee; --brand-deep:#c9c5bb; --on-brand:#12141a;
+    --brand:#e9e6de; --brand-soft:#f5f3ee; --on-brand:#12141a;
     --au:#d2b57c;
     --brand-wash:#262a33;
     --ok:#5cbf8f; --warn:#e0a845; --bad:#ec7a7a;
@@ -326,7 +326,7 @@ export const TOKENS = `
   --surface:#15171d; --surface-2:#1b1e25; --surface-3:#23262f;
   --line:#282c35; --line-soft:#1f232b; --line-strong:#3b404c;
   --ink:#ebe9e3; --ink-2:#a7aab3; --ink-3:#8b8f99;
-  --brand:#e9e6de; --brand-soft:#f5f3ee; --brand-deep:#c9c5bb; --on-brand:#12141a;
+  --brand:#e9e6de; --brand-soft:#f5f3ee; --on-brand:#12141a;
   --au:#d2b57c;
   --brand-wash:#262a33;
   --ok:#5cbf8f; --warn:#e0a845; --bad:#ec7a7a;
@@ -367,7 +367,7 @@ export const TOKENS = `
     --surface:#ffffff; --surface-2:#f4f3ee; --surface-3:#ebe9e2;
     --line:#e0ddd4; --line-soft:#ebe8e0; --line-strong:#c8c3b6;
     --ink:#191b1f; --ink-2:#4e525b; --ink-3:#5f636c;
-    --brand:#1f2430; --brand-soft:#3a4152; --brand-deep:#0f1218; --on-brand:#f7f5ef;
+    --brand:#1f2430; --brand-soft:#3a4152; --on-brand:#f7f5ef;
     --au:#7f6128;
   /* أرضُ العلامة وشريطُها ثابتان في الثيمين: حبرٌ ونحاس (D-144) */
   --glyph-bg:#14161c; --glyph-fg:#e2c98f;

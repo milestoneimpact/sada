@@ -516,10 +516,9 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(STYLE).toContain('--t-4xl:56px')
     expect(STYLE).toMatch(/@media\(min-width:1181px\)\{\.page-head h1\{font-size:var\(--t-4xl\)/)
     expect(STYLE).toMatch(/@media\(min-width:901px\)\{\.grid>\.tile:first-child \.v\{font-size:var\(--t-4xl\)/)
-    expect(STYLE).toContain('.rail{background-color:var(--chrome); background-image:linear-gradient(180deg,var(--chrome),var(--bg) 160%)}')
-    // والطبعةُ الرابعة تُسطّح الرافدةَ بعده في الترتيب (D-144)
-    expect(STYLE.lastIndexOf('.rail{background-color:var(--chrome); background-image:none}')).toBeGreaterThan(STYLE.lastIndexOf('D-139'))
-    expect(STYLE.lastIndexOf('D-139')).toBeGreaterThan(STYLE.lastIndexOf('.cmdk-open svg'))
+    // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148
+    expect(STYLE).toMatch(/\.rail\{background:var\(--chrome\); border-inline-start:1px solid var\(--line\);/)
+    expect(STYLE).not.toContain('background-image:linear-gradient(180deg,var(--chrome)')
   })
 })
 
@@ -539,7 +538,7 @@ describe('الطبعةُ الثالثة (D-143)', () => {
   it('شريطُ المؤشّرات سطحٌ واحد، والرقمُ رقيق، والفعلُ الهادئ يبقى هدفَ لمس', () => {
     expect(STYLE).toContain('.grid.tiles{gap:1px; background:var(--line)')
     expect(STYLE).toContain('.grid.tiles>.tile{border:0; border-radius:0; box-shadow:none')
-    expect(STYLE).toContain('.tile .v{font-weight:400')
+    expect(STYLE).toMatch(/\.tile \.v\{font-size:var\(--t-2xl\); font-weight:400;/)
     expect(STYLE).toMatch(/\.todo>li>a\.btn,\.todo>li>form \.btn\{background:transparent;[^}]*min-width:44px/)
     expect(STYLE.lastIndexOf('D-143')).toBeGreaterThan(STYLE.lastIndexOf('D-142'))
   })
@@ -564,15 +563,16 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
   it('الرافدةُ ترث الثيم، والعلامةُ حبرٌ ونحاسٌ ثابتان', () => {
     expect(TOKENS).not.toContain('THEME:rail')
     expect(TOKENS).toContain('--glyph-bg:#14161c; --glyph-fg:#e2c98f;')
-    expect(STYLE).toContain('.rail::after{display:none}')
-    expect(STYLE).toContain('.glyph{background:var(--glyph-bg); color:var(--glyph-fg);')
-    expect(STYLE).toContain('nav.tabs a[aria-current=page]::before{width:2px; background:var(--au)}')
+    expect(STYLE).not.toContain('.rail::after{')
+    expect(STYLE).toMatch(/\.glyph\{[^}]*background:var\(--glyph-bg\); color:var\(--glyph-fg\);/)
+    expect(STYLE).toMatch(/nav\.tabs a\[aria-current=page\]::before\{[^}]*width:2px;[^}]*background:var\(--au\)\}/)
   })
   it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ مسطّحة، والتنبيهاتُ سطحٌ بخيط', () => {
-    expect(STYLE).toContain('.p{background-color:var(--brand); background-image:none; box-shadow:none}')
-    expect(STYLE).toContain('.card{background-image:none; box-shadow:none}')
-    expect(STYLE).toContain('.flash.ok,.flash.warn,.flash.bad{background:var(--surface); border-color:var(--line)}')
-    expect(STYLE.lastIndexOf('D-144')).toBeGreaterThan(STYLE.lastIndexOf('D-143'))
+    expect(STYLE).toContain('.p{background:var(--brand); color:var(--on-brand)}')
+    expect(STYLE).toMatch(/\.card\{background:var\(--surface\); border:1px solid var\(--line\);[^}]*\}/)
+    expect(STYLE).not.toMatch(/\n\.card\{[^}]*box-shadow:var/)
+    expect(STYLE).toMatch(/\.flash\{[^}]*background:var\(--surface\);[^}]*border-inline-start:3px solid var\(--line-strong\)/)
+    expect(STYLE).toContain('.flash.ok{border-inline-start-color:var(--ok)}')
   })
   it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
     expect(ICON_BYTES).toContain('c9a962')
@@ -580,6 +580,24 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     expect(ICON_BYTES).not.toContain('82c69e')
     const html = shell('ت', '<p>x</p>', 'n1')
     expect(html).toContain('<meta name="theme-color" content="#1f2430">')
+  })
+})
+
+/**
+ * تصفيةُ الطبعات (D-148): محدّدٌ واحدٌ في المستوى الأعلى يُعلَن مرّةً. الحارسُ
+ * في `audit_classes`، وهنا يُثبَّت أنّ الطبقاتِ التي كانت تُعاد صارت قاعدةً
+ * واحدةً تحمل آخرَ قيمة.
+ */
+describe('تصفيةُ الطبعات (D-148)', () => {
+  it('البطاقةُ والرافدةُ والمؤشّرُ الأوّل كلٌّ بقاعدةٍ واحدة تحمل آخرَ قيمة', () => {
+    const count = (sel: string): number => STYLE.split('\n').filter((l) => l.startsWith(sel + '{')).length
+    for (const sel of ['.card', '.rail', '.p', '.flash', '.tile .v', '.grid>.tile:first-child .v', '.rail-head', 'nav.tabs a[aria-current=page]']) {
+      expect(count(sel), sel).toBe(1)
+    }
+    expect(STYLE).toContain('.grid>.tile:first-child .v{font-size:var(--t-3xl); color:var(--au); font-weight:400; letter-spacing:-1.2px}')
+    expect(STYLE).toContain('.rail-head{padding:var(--s-6) var(--s-5) var(--s-5);')
+    expect(STYLE).toContain('nav.tabs a[aria-current=page]{background:var(--surface-3); color:var(--ink); position:relative}')
+    expect(STYLE).not.toMatch(/radial-gradient\([^)]*var\(--au\)/)
   })
 })
 
