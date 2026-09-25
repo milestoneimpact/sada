@@ -152,7 +152,7 @@ function scheduler(
   const id = d.id.slice(0, 8)
   return `<form class="sched" method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-    <div class="field"><label for="ac-${id}">الوجهة</label>
+    <div class="field"><label for="ac-${id}">الحساب</label>
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>

@@ -162,6 +162,28 @@ describe('التوصية — تقترح ولا تُنفق', () => {
     expect(body).toContain('تسجيلُ رأيٍ لا أمرُ إنفاق')
   })
 
+  /**
+   * **النموذجُ يحمل رمزَه** (D-150). كان `reportScreen` يرسم «أقبل/أرفض» بلا
+   * `_csrf` فيردّه `guardPost` كلَّ مرّة — زرٌّ ظاهرٌ لا يعمل. والفحصُ على كلّ
+   * نموذجِ POST في الشاشتين لا على واحد.
+   */
+  it('**كلُّ نموذجٍ في شاشتَي التقرير يحمل `_csrf` الجلسة**', async () => {
+    seedWeek()
+    await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
+    await runWeekly(db, MONDAY)
+    const cookie = await login()
+    const week = (db.raw.prepare('SELECT id FROM reports').get() as { id: string }).id
+    for (const path of ['/panel/report', `/panel/report/${week}`]) {
+      const response = await app.request(path, { headers: { Cookie: cookie } }, env)
+      expect(response.status, path).toBe(200)
+      const html = await response.text()
+      const forms = html.match(/<form\b[^>]*\bmethod="post"[^>]*>[\s\S]*?<\/form>/gi) ?? []
+      expect(forms.length, path).toBeGreaterThan(0)
+      for (const form of forms) expect(form, path).toContain(`name="_csrf" value="${csrf}"`)
+      expect(html, path).toContain('action="/panel/report/promote"')
+    }
+  })
+
   /** **قبولٌ لا يُنفق** — ولا صفَّ يدخل دفترَ التكلفة (D-006 · D-008). */
   it('والقبولُ يسجَّل ولا يُنفق دولارا', async () => {
     seedWeek()

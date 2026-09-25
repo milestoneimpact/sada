@@ -45,7 +45,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
       ? '<span class="st ok"><span class="g">●</span>جلستك</span>'
       : `<form class="inline" method="POST" action="/panel/sessions/revoke"
              data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
-           <input type="hidden" name="id" value="${escapeHtml(x.id)}">
+           <input type="hidden" name="handle" value="${escapeHtml(x.handle)}">
            <button class="d sm" type="submit">أبطلها</button></form>`}</td>
   </tr>`).join('')
 

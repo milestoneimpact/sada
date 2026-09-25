@@ -69,7 +69,7 @@ export const TIME_SCRIPT = `
     if(isNaN(at.getTime()))return;
     var said='';
     try{
-      said=at.toLocaleString('ar',{weekday:'long',day:'numeric',month:'long',
+      said=at.toLocaleString('ar-u-nu-latn',{weekday:'long',day:'numeric',month:'long',
         hour:'numeric',minute:'2-digit'});
     }catch(e){return;}
     if(said==='')return;

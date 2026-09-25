@@ -290,7 +290,12 @@ export async function destroySession(store: SessionStore, request: Request): Pro
 }
 
 export interface SessionSummary {
-  readonly id: string
+  /**
+   * **بصمةُ الجلسة لا سرُّها** (D-150). كان الجردُ يحمل `id` — وهو قيمةُ
+   * الكعكة بعينها — فيُطبَع سرُّ كلِّ جهازٍ آخر في HTML اللوحة وفي `target`
+   * سجلِّ التدقيق. البصمةُ ستّةَ عشرَ محرفا لا تُعكَس، وتكفي للإبطال.
+   */
+  readonly handle: string
   readonly at: string
   readonly ip: string
   readonly ua: string
@@ -324,7 +329,7 @@ export async function listSessions(
       if (record.pending) continue
       const id = key.name.slice(PREFIX.length)
       summaries.push({
-        id,
+        handle: await fingerprint(id),
         at: record.at,
         ip: record.ip,
         ua: record.ua,
@@ -346,8 +351,24 @@ export async function listSessions(
  */
 export async function revokeSessions(
   store: SessionStore,
-  options: { readonly only?: string; readonly keepId?: string } = {},
+  options: { readonly only?: string; readonly onlyHandle?: string; readonly keepId?: string } = {},
 ): Promise<number> {
+  if (options.onlyHandle !== undefined) {
+    // الإبطالُ بالبصمة: يُمشى الجردُ حتّى تُطابَق، ولا يُقبَل سرٌّ من النموذج
+    if (store.list === undefined) return 0
+    let cursor: string | undefined
+    do {
+      const page = await store.list({ prefix: PREFIX, cursor: cursor ?? null })
+      for (const key of page.keys) {
+        const id = key.name.slice(PREFIX.length)
+        if ((await fingerprint(id)) !== options.onlyHandle) continue
+        await store.delete(key.name)
+        return 1
+      }
+      cursor = page.list_complete === false ? page.cursor : undefined
+    } while (cursor !== undefined)
+    return 0
+  }
   if (options.only !== undefined) {
     await store.delete(sessionKey(options.only))
     return 1

@@ -601,12 +601,43 @@ describe('تصفيةُ الطبعات (D-148)', () => {
   })
 })
 
+/**
+ * ما وراء المقاييس (D-149): ستّةَ عشرَ إصلاحًا ثبت كلٌّ منها بثلاثة خصوم.
+ * تُثبَّت هنا الأسطرُ التي تحمل الإصلاحَ، والسلوكُ الذي يُقاس في المتصفّح
+ * يُقاس بـ audit_design وscripts/snapshot_styles.
+ */
+describe('ما وراء المقاييس (D-149)', () => {
+  it('الاتّجاه: هامشٌ منطقيٌّ واحد، وخيطُ القسم من البداية، وشريطُ المختار في النهاية، وسهمُ العودة إلى البداية', () => {
+    expect(STYLE).toContain('.slice .stats{margin:0; margin-inline-start:auto; padding:0; border-top:0}')
+    expect(STYLE).toMatch(/\.sec::after\{[^}]*linear-gradient\(to left,var\(--au\)/)
+    expect(STYLE).toContain('.cmdk-o[aria-selected="true"]{background:var(--surface-2);\n  box-shadow:inset -3px 0 0 var(--brand)}')
+    expect(STYLE).not.toMatch(/\.cmdk-g\{[^}]*letter-spacing/)
+    expect(backNav('/panel#channels', 'القنوات')).toContain('→ القنوات')
+    expect(backNav('/panel#channels', 'القنوات')).not.toContain('\u2190')
+  })
+  it('الوصول: حشوُ التمرير تحت الشريط، والرابطُ الهادئ بخيطٍ لا بلونٍ وحدَه، وحقلُ الأوامر يقول «هنا»', () => {
+    expect(STYLE).toMatch(/html\{[^}]*scroll-padding-top:calc\(64px \+ var\(--s-3\)\)/)
+    expect(STYLE).toMatch(/\.todo>li>a\.btn,\.todo>li>form \.btn\{[^}]*text-decoration:underline;[^}]*text-decoration-color:var\(--au\)/)
+    expect(STYLE).toMatch(/\.pv th a\{[^}]*text-decoration:underline/)
+    expect(STYLE).toContain('.cmdk-in:focus-within{box-shadow:inset 0 -2px 0 var(--au)}')
+    expect(STYLE).toContain('.busy-note{')
+  })
+  it('الرموز: لا زمرّدَ في الوهج بصيغة rgba، والتاريخُ في مفتاح الرسم معزول، والرقمُ المحلّيُّ غربيٌّ في كلّ ICU', () => {
+    expect(TOKENS).not.toContain('rgba(18,98,62')
+    expect(TOKENS).not.toContain('rgba(130,198,158')
+    const chart = readFileSync(new URL('./chart.ts', import.meta.url), 'utf8')
+    expect(chart).toContain('· <span class="mono">${escapeHtml(peak.day.slice(5))}</span>')
+    const time = readFileSync(new URL('./time.ts', import.meta.url), 'utf8')
+    expect(time).toContain("toLocaleString('ar-u-nu-latn'")
+  })
+})
+
 /** الشاشةُ المستقلّة تحمل العلامة (D-140): بابٌ إلى اللوحة قبل سهم العودة. */
 describe('شريطُ العودة (D-140)', () => {
   it('العلامةُ أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
     const html = backNav('/panel#channels', 'القنوات')
     const home = html.indexOf('<a class="home" href="/panel"')
-    const back = html.indexOf('← القنوات')
+    const back = html.indexOf('→ القنوات')
     expect(home).toBeGreaterThan(0)
     expect(back).toBeGreaterThan(home)
     expect(html).toContain('<span class="glyph sm">')

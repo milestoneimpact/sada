@@ -36,9 +36,13 @@ describe('السياسة — قائمةُ سماحٍ من العدم', () => {
     expect(csp()).toContain(directive)
   })
 
-  it('لا تفتح unsafe-inline ولا unsafe-eval', () => {
-    expect(csp()).not.toContain('unsafe-inline')
+  it('لا تفتح unsafe-eval، ولا unsafe-inline إلّا على السِّمة وحدَها (D-150)', () => {
     expect(csp()).not.toContain('unsafe-eval')
+    const directives = csp().split(';').map((d) => d.trim())
+    const opened = directives.filter((d) => d.includes('unsafe-inline'))
+    expect(opened).toEqual(["style-src-attr 'unsafe-inline'"])
+    expect(directives.find((d) => d.startsWith('style-src '))).toBe("style-src 'self' 'nonce-N0NCE'")
+    expect(directives.find((d) => d.startsWith('script-src'))).toBe("script-src 'nonce-N0NCE'")
   })
 
   /**

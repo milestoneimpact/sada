@@ -127,7 +127,7 @@ export const SECTIONS: readonly Section[] = [
   { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
   { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true },
   { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ رموزها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
-  { id: 'pivot', label: 'اللوح المحوريّ', note: 'تختار الصفوفَ والأعمدةَ والقياس — وتقارن بنظرة', icon: ICON.pivot, group: 'العمل', alias: 'pivot table analysis لوح محوري جدول تحليل مقارنه', short: 'اللوح' },
+  { id: 'pivot', label: 'الجدول المحوريّ', note: 'تختار الصفوفَ والأعمدةَ والقياس — وتقارن بنظرة', icon: ICON.pivot, group: 'العمل', alias: 'pivot table analysis لوح محوري جدول تحليل مقارنه', short: 'اللوح' },
   { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', bar: true, page: '/panel/report' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', bar: true, page: '/panel/tasks' },
   { id: 'providers', label: 'المزوّدون', note: 'المفاتيحُ والتوجيهُ والأسعار', icon: ICON.providers, group: 'الضبط', alias: 'providers keys models مفاتيح نماذج انثروبيك جيميناي' },
@@ -193,7 +193,7 @@ export function buildCommands(
   for (const a of [
     { label: 'امسح Drive', note: 'يقرأ الملفّاتِ الجديدةَ — والزرُّ في المصادر', id: 'sources', alias: 'scan drive درايف مسح' },
     { label: 'ولّد خطّةَ الأسبوع', note: 'نداءٌ مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
-    { label: 'اعتمد مسوّدة', note: 'القرارُ لك وحدَك (D-009) — في المنشورات', id: 'posts', alias: 'approve draft' },
+    { label: 'اعتمد مسوّدة', note: 'القرارُ لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
     { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'channels', alias: 'connect account oauth ربط حساب' },
     { label: 'بدّل سقفَ الإنفاق', note: 'الحدُّ اليوميّ وعددُ التحليلات', id: 'settings', alias: 'budget cap spend ميزانيه انفاق سقف' },
     { label: 'راجع الجلسات', note: 'ما هو مفتوحٌ الآن، وإنهاؤه', id: 'security', alias: 'sessions revoke' },
@@ -275,7 +275,7 @@ export function commandPalette(cmds: readonly Command[]): string {
       ? '<span class="cmdk-i" aria-hidden="true"></span>'
       : `<span class="cmdk-i" aria-hidden="true">${c.icon}</span>`
     return `${head}<li role="presentation">` +
-      `<a class="cmdk-o" role="option" id="cmdk-o${i}" aria-selected="false"` +
+      `<a class="cmdk-o" role="option" tabindex="-1" id="cmdk-o${i}" aria-selected="false"` +
       ` data-g="${escapeHtml(c.group)}" data-k="${escapeHtml(searchKey(c))}"` +
       ` href="${escapeHtml(c.href)}">${mark}` +
       `<span class="cmdk-t"><b>${escapeHtml(c.label)}</b>` +
@@ -291,7 +291,7 @@ export function commandPalette(cmds: readonly Command[]): string {
       <kbd class="kbd">Esc</kbd>
     </div>
     <ul class="cmdk-l" id="cmdk-l" role="listbox" aria-label="النتائج">${rows}</ul>
-    <p class="cmdk-none" id="cmdk-none" hidden>لا شيءَ بهذا الاسم.</p>
+    <p class="cmdk-none" id="cmdk-none" role="status" hidden>لا شيءَ بهذا الاسم.</p>
     <div class="cmdk-foot"><span><kbd class="kbd">↑↓</kbd> تنقّل</span>
       <span><kbd class="kbd">Enter</kbd> اذهب</span>
       <b>ولا يقع فعلٌ من هنا — تنقلك إلى موضعه</b></div>
@@ -398,6 +398,8 @@ export const COMMAND_SCRIPT = `
     }
     if(veil.hidden)return;
     if(e.key==='Escape'){e.preventDefault(); hide(); return;}
+    // ‏حوارٌ لا يُغادَر بـTab: السهمان يتنقّلان والحقلُ يبقى مركَّزًا (D-149)
+    if(e.key==='Tab'){e.preventDefault(); q.focus(); return;}
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){
       if(live.length===0)return;
       e.preventDefault();
@@ -408,8 +410,16 @@ export const COMMAND_SCRIPT = `
       e.preventDefault();
       // ‏ونقرةٌ على الرابط لا انتقالٌ باليد: الرابطُ يبقى رابطا، ويُعامَل
       // ‏كما لو ضُغط بالفأرة — بمرساته وسلوك المتصفّح فيها
+      var href=live[at].getAttribute('href')||'';
       live[at].click();
+      // ‏مرساةٌ في الصفحة نفسِها: اللوحُ تبدّل واللوحةُ يجب أن تنطفئ، والتركيزُ
+      // ‏إلى رأس اللوح لا إلى الزرّ الذي فتحها (D-149)
+      if(href.charAt(0)==='#'){from=null; hide();}
     }
+  });
+  list.addEventListener('click',function(e){
+    var a=e.target&&e.target.closest?e.target.closest('a.cmdk-o'):null;
+    if(a&&(a.getAttribute('href')||'').charAt(0)==='#'){from=null; setTimeout(hide,0);}
   });
 })();
 `

@@ -93,7 +93,7 @@ export function areaChart(series: { day: string; total: number }[]): string {
     <div class="legend">
       <span>المجموع <b>${money(total)}</b></span>
       <span>المتوسّط اليوميّ <b>${money(average)}</b></span>
-      <span>الذروة <b>${money(peak.total)}</b> · ${escapeHtml(peak.day.slice(5))}</span>
+      <span>الذروة <b>${money(peak.total)}</b> · <span class="mono">${escapeHtml(peak.day.slice(5))}</span></span>
     </div>
   </div>`
 }

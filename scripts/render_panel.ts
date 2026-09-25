@@ -262,8 +262,8 @@ const data: PanelData = {
   csrf: 'demo-csrf-token',
   nonce: 'demoNonce123',
   sessions: [
-    { id: 'x1', at: ago(2), ip: '203.0.113.9', ua: 'Mozilla/5.0 (Macintosh) Chrome/120', via: 'admin_token', current: true },
-    { id: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false },
+    { handle: 'x1', at: ago(2), ip: '203.0.113.9', ua: 'Mozilla/5.0 (Macintosh) Chrome/120', via: 'admin_token', current: true },
+    { handle: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false },
   ],
   audit: [
     // **كما فعل المالكُ يومَ قرّر** (D-135): ضغطتان على البطاقات وسقفُ الترويج —
