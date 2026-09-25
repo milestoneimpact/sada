@@ -90,7 +90,8 @@ import { tasksScreen } from './ui/tasksView'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
-import { backNav, shell, COPY_SCRIPT, THEME_SCRIPT } from './ui/shell'
+import { fingerprint } from '../lib/security/digest'
+import { backNav, injectCsrf, shell, COPY_SCRIPT, THEME_SCRIPT } from './ui/shell'
 import { spreadScreen, SPREAD_SCRIPT } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
@@ -669,10 +670,11 @@ panel.post('/panel/sessions/revoke', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
-  const id = String(gate.form.get('id') ?? '')
-  if (id === '') return c.json({ error: 'missing_id' }, 400)
+  // البصمةُ لا السرّ (D-150): النموذجُ لا يحمل كعكةَ جهازٍ آخر ولا يقبلها
+  const handle = String(gate.form.get('handle') ?? '')
+  if (handle === '') return c.json({ error: 'missing_handle' }, 400)
 
-  if (id === gate.session.id) {
+  if (handle === (await fingerprint(gate.session.id))) {
     // إبطالُ جلستك من هنا يتركك في صفحةٍ ميّتة بلا كعكةٍ مُمحاة. للخروج زرّه.
     await setFlash(c.env, c.req.raw, {
       kind: 'warn',
@@ -681,8 +683,8 @@ panel.post('/panel/sessions/revoke', async (c) => {
     return back('security')
   }
 
-  await revokeSessions(c.env.KV, { only: id })
-  await record(c.env.DB, { actor: 'panel', action: 'session.revoke', target: id }, c.req.raw)
+  await revokeSessions(c.env.KV, { onlyHandle: handle })
+  await record(c.env.DB, { actor: 'panel', action: 'session.revoke', target: handle }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُبطلت الجلسة.' })
   return back('security')
 })
@@ -1444,6 +1446,12 @@ panel.get('/panel/tasks', async (c) => {
  * قبل أوانه يثبّت أرقاما لم تكتمل نوافذُها — **ثمّ لا يُعاد حسابُها
  * أبدا**، لأنّ أوّلَ كتابةٍ هي الشهادة (D-058).
  */
+/*
+ * **نموذجُ «أقبل/أرفض» كان بلا `_csrf`** (D-150): `reportScreen` يرسم
+ * النموذجَ، و`injectCsrf` كانت تُطبَّق على اللوحة وحدَها. فكان `guardPost`
+ * يردّ كلَّ بتٍّ بـ`csrf_failed` — والزرُّ ظاهرٌ ولا يعمل. والحقنُ هنا لا
+ * في `reportScreen` لأنّ الرمزَ من الجلسة والعرضُ لا يعرفها.
+ */
 panel.get('/panel/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
@@ -1465,7 +1473,7 @@ panel.get('/panel/report', async (c) => {
       `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        <div class="wrap">
          ${backNav('/panel', 'اللوحة')}
-         <main id="main">${body}</main>
+         <main id="main">${injectCsrf(body, session.record.csrf)}</main>
        </div>`,
       nonce,
       THEME_SCRIPT,
@@ -1533,7 +1541,7 @@ panel.get('/panel/report/:week', async (c) => {
       `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        <div class="wrap">
          ${backNav('/panel/report', 'التقارير')}
-         <main id="main">${body}</main>
+         <main id="main">${injectCsrf(body, session.record.csrf)}</main>
        </div>`,
       nonce,
       THEME_SCRIPT,

@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
+import { fingerprint } from '../lib/security/digest'
 import { readSettings, writeSetting } from '../lib/settings'
 import { getProvider, resolveKey } from '../lib/providers'
 import { COOKIE } from '../lib/session'
@@ -1097,7 +1098,8 @@ describe('ترويسات الأمان — والقفل على بابٍ جدار�
     expect(csp).toContain("base-uri 'none'")
     expect(csp).toContain("form-action 'self'")
     // ولا تُفتَح بابا يُبطلها كلَّها
-    expect(csp).not.toContain('unsafe-inline')
+    // unsafe-inline على السِّمة وحدَها (D-150): الوسمُ والبرمجةُ خلف nonce
+    expect(csp.split(';').filter((d) => d.includes('unsafe-inline')).map((d) => d.trim())).toEqual(["style-src-attr 'unsafe-inline'"])
     expect(csp).not.toContain('unsafe-eval')
   })
 
@@ -1280,11 +1282,44 @@ describe('جرد الأجهزة في اللوحة', () => {
     )
   })
 
+  /**
+   * **سرُّ الجهاز الآخر لا يُطبَع** (D-150). كان الجردُ يضع قيمةَ كعكة كلّ
+   * جلسةٍ في `<input type="hidden" name="id">`، فمن قرأ الصفحةَ ملك الأجهزةَ
+   * كلَّها. البصمةُ تُطبَع، والإبطالُ بها يعمل، والسرُّ لا يُقبَل.
+   */
+  it('الجردُ يحمل بصمةَ الجلسة لا سرَّها — والإبطالُ بالبصمة يعمل', async () => {
+    const other = await login()
+    const mine = await login()
+    const otherId = other.split('=')[1]!
+    const html = await (await app.request('/panel', withSession(mine), env)).text()
+    expect(html).not.toContain(otherId)
+    expect(html).toContain(`name="handle" value="${await fingerprint(otherId)}"`)
+
+    const bySecret = new FormData()
+    bySecret.set('id', otherId)
+    const refused = await app.request(
+      '/panel/sessions/revoke',
+      withSession(mine, { method: 'POST', body: bySecret }),
+      env,
+    )
+    expect(refused.status).toBe(400)
+
+    const body = new FormData()
+    body.set('handle', await fingerprint(otherId))
+    await app.request('/panel/sessions/revoke', withSession(mine, { method: 'POST', body }), env)
+    expect(await (await app.request('/panel', { headers: { Cookie: other } }, env)).text()).toContain(
+      'name="token"',
+    )
+    const { results } = await db
+      .prepare("SELECT target FROM audit_log WHERE action = 'session.revoke'")
+      .all<{ target: string }>()
+    expect(results.map((r) => r.target)).toEqual([await fingerprint(otherId)])
+  })
+
   it('إبطالُ جلستك من الجرد يُردّ إلى زرّ الخروج — لا يترك صفحةً ميّتة', async () => {
     const cookie = await login()
-    const id = cookie.split('=')[1]!
     const body = new FormData()
-    body.set('id', id)
+    body.set('handle', await fingerprint(cookie.split('=')[1]!))
     await app.request('/panel/sessions/revoke', withSession(cookie, { method: 'POST', body }), env)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('nav class="tabs"')
@@ -1487,6 +1522,14 @@ describe('الثيم النهاريّ', () => {
     )?.[1]
     const head = html.slice(0, html.indexOf('</head>'))
     expect(head).toContain(`<script nonce="${nonce}">`)
+  })
+
+  /** **مبدّلُ الكثافة له سكربت** (D-150): كان `DENSITY_SCRIPT` يُستورَد ولا يُلحَق. */
+  it('وسكربتُ الكثافة يُلحَق بالصفحة لا يُستورَد وحسب', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('id="density"')
+    expect(html).toContain("getElementById('density')")
   })
 
   it('صفحةُ الدخول تتبع الثيم أيضا', async () => {

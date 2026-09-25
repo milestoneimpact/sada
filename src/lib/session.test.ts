@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { fingerprint } from './security/digest'
 import { fakeKv } from '../test/fakes'
 import {
   checkCsrf,
@@ -209,7 +210,16 @@ describe('جرد الجلسات وإبطالها', () => {
     const second = await open()
     await revokeSessions(kv, { only: first })
     const list = await listSessions(kv, second)
-    expect(list.map((x) => x.id)).toEqual([second])
+    expect(list.map((x) => x.handle)).toEqual([await fingerprint(second)])
+    expect(JSON.stringify(list)).not.toContain(second)
+  })
+
+  it('الإبطالُ بالبصمة يصيب جلسةً واحدةً ويُعيد صفرا لبصمةٍ لا يعرفها (D-150)', async () => {
+    const first = await open()
+    const second = await open()
+    expect(await revokeSessions(kv, { onlyHandle: 'ffffffffffffffff' })).toBe(0)
+    expect(await revokeSessions(kv, { onlyHandle: await fingerprint(first) })).toBe(1)
+    expect((await listSessions(kv, second)).map((x) => x.handle)).toEqual([await fingerprint(second)])
   })
 
   it('«أخرِج الأجهزة الأخرى» يُبقي جلسة الفاعل وحدها', async () => {

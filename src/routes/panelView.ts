@@ -1001,7 +1001,8 @@ export interface PanelFactors {
 }
 
 export interface PanelSession {
-  readonly id: string
+  /** بصمةُ الجلسة لا سرُّها (D-150) — ما يُطبَع في النموذج لا يفتح بابا */
+  readonly handle: string
   readonly at: string
   readonly ip: string
   readonly ua: string
@@ -1790,7 +1791,7 @@ ${pivotPane(d.pivot)}
 </div>`
 
   return shell(
-    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT,
+    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT + DENSITY_SCRIPT,
     { commands: buildCommands({ onPanel: true, drafts: d.drafts }) },
   )
 }
