@@ -720,7 +720,7 @@ describe('هندسةُ نظرة عامّة (D-136)', () => {
     const waiting = html.indexOf('<h2>ما ينتظرك</h2>', first)
     const happened = html.indexOf('<h2>ما وقع اليوم</h2>', waiting)
     const second = html.indexOf('<div class="stack">', happened)
-    const spend = html.indexOf('الإنفاق — أربعة عشر يوما', second)
+    const spend = html.indexOf('الإنفاق — 14 يوما', second)
     const money = html.indexOf('أين يذهب المال', spend)
     expect(ov).toBeGreaterThan(0)
     // رصّتان (D-145): الأفعالُ ثمّ السجلُّ بطاقتين في الأولى، والمالُ في الثانية

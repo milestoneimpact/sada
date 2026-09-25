@@ -65,20 +65,30 @@ export const SCRIPT = `
     return (a.getAttribute('href')||'').charAt(0)==='#';
   });
   var panes=document.querySelectorAll('section[data-pane]');
-  function show(id,push){
-    var found=false;
-    panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m)found=true;});
-    if(!found){show(panes[0].dataset.pane,push); return;}
+  // ‏دالّةٌ واحدةٌ لثلاثة مستدعين (النقر، والمرساة، والتحميل): تُظهر اللوحَ
+  // ‏وتعلّم التبويبَ وتضبط عنوانَ الشريط، وإن كان السببُ فعلًا من المالك
+  // ‏نقلت التركيزَ إلى رأس اللوح — فلا يبقى في الرافدة ‏٢٣ ضغطةَ Tab عن
+  // ‏المحتوى، ولا يبقى «نظرة عامّة» فوق الأمان عند رابطٍ عميق (D-149)
+  var head=document.getElementById('pane-title');
+  function show(id,push,focus){
+    var found=false, pane=null;
+    panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m){found=true; pane=p;}});
+    if(!found){show(panes[0].dataset.pane,push,focus); return;}
     tabs.forEach(function(t){
       var m=t.getAttribute('href')==='#'+id;
-      if(m){t.setAttribute('aria-current','page');}else{t.removeAttribute('aria-current');}
+      if(m){t.setAttribute('aria-current','page');
+        var sp=t.querySelector('span');
+        if(sp&&head){head.textContent=sp.textContent; document.title=sp.textContent+' — صدى';}
+      }else{t.removeAttribute('aria-current');}
     });
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
+    if(focus&&pane){var hd=pane.querySelector('h1,h2');
+      if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
   }
   tabs.forEach(function(t){t.addEventListener('click',function(e){
-    e.preventDefault(); show(t.getAttribute('href').slice(1),true);
+    e.preventDefault(); show(t.getAttribute('href').slice(1),true,true);
   });});
-  show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
+  show((location.hash||'').slice(1)||panes[0].dataset.pane,false,false);
   /*
    * ‏والمرساةُ تُتبَع من أيّ مكان (D-105).
    *
@@ -90,18 +100,8 @@ export const SCRIPT = `
    * ‏وكذلك من كتب مرساةً في شريط العنوان، أو عاد بزرّ الرجوع.
    */
   window.addEventListener('hashchange',function(){
-    show((location.hash||'').slice(1)||panes[0].dataset.pane,false);
-    var t=null;
-    for(var i=0;i<tabs.length;i++){
-      if(tabs[i].getAttribute('href')===location.hash)t=tabs[i];
-    }
-    var h=document.getElementById('pane-title');
-    if(t&&h){var sp=t.querySelector('span'); if(sp)h.textContent=sp.textContent;}
+    show((location.hash||'').slice(1)||panes[0].dataset.pane,false,true);
   });
-  // عنوانُ الشريط العلويّ يتبع القسم — فلا يبقى «نظرة عامّة» فوق الأمان
-  var head=document.getElementById('pane-title');
-  if(head)tabs.forEach(function(t){t.addEventListener('click',function(){
-    var s=t.querySelector('span'); if(s)head.textContent=s.textContent;});});
 
   // زرُّ النسخ مشترَكٌ مع شاشة «ما عليك» (D-126) — يُعرَّف في shell.ts
   ${COPY_SCRIPT}
@@ -161,11 +161,17 @@ export const SCRIPT = `
     f.querySelectorAll('button').forEach(function(b){
       b.addEventListener('click',function(){pressed=b;});
     });
-    f.addEventListener('submit',function(){
+    f.addEventListener('submit',function(e){
+      // ‏الإرسالُ الثاني يُمنَع بعلَمٍ لا بتعطيل الزرّ المضغوط: زرٌّ يُعطَّل يُسقط
+      // ‏التركيزَ إلى body ولا يُقرأ. والنموذجُ يقول «مشغول» ورسالتُه تُعلَن (D-149)
+      if(f.getAttribute('aria-busy')==='true'){e.preventDefault(); return;}
       var b=pressed||f.querySelector('button[type=submit]')||f.querySelector('button');
-      f.querySelectorAll('button').forEach(function(x){x.disabled=true;});
-      if(b){b.setAttribute('data-busy-on','1');
+      f.setAttribute('aria-busy','true');
+      f.querySelectorAll('button').forEach(function(x){if(x!==b)x.disabled=true;});
+      if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-disabled','true');
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
+      var st=document.getElementById('flash');
+      if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);}
     });
   });
 
@@ -810,7 +816,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
           <button class="p" type="submit"${disabled}>دخول</button>
         </form>
       </div>
-      <footer style="border:0;justify-content:center">الجلسة ثماني ساعات</footer>
+      <footer style="border:0;justify-content:center">الجلسة 8 ساعات</footer>
     </div></div>`,
     nonce,
     state.passkeys === true ? LOGIN_SCRIPT : '',
@@ -1453,7 +1459,7 @@ export function panelPage(d: PanelData): string {
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title">نظرة عامّة</h1>
+  <div class="ttl"><h1 id="pane-title" aria-live="polite">نظرة عامّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${commandTrigger()}
@@ -1503,7 +1509,7 @@ ${flash}
       ${todayList(d)}
     </div>
     <div class="stack">
-      <div class="card"><h2>الإنفاق — أربعة عشر يوما</h2>
+      <div class="card"><h2>الإنفاق — 14 يوما</h2>
         <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
         <div class="row" style="margin-top:var(--s-3)">${scanBtn}
           <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
@@ -1605,7 +1611,7 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>
-    <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من عشرة صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
+    <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من 10 صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="daily_analysis_cap">
       <div class="field"><label for="c1">سقف التحليل (عدد)</label>
@@ -1688,7 +1694,7 @@ ${pivotPane(d.pivot)}
 <section data-pane="security" hidden>
   ${pageHead('الدخول', 'الأمان والجلسات', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
   <div class="card"><h2>الأجهزة المفتوحة</h2>
-    <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة ثماني ساعات ثمّ تنتهي وحدها.</p>
+    <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0
       ? '<div class="empty"><b>لا جلسات محفوظة</b><p>قد يكون التخزين لا يدعم الجرد في هذه البيئة.</p></div>'
       : `<div class="scroll"><table>

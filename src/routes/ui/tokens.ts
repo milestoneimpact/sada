@@ -278,7 +278,7 @@ export const TOKENS = `
   --hair:rgba(255,255,255,.9);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(127,97,40,.06),transparent 58%),
-          radial-gradient(900px 460px at 12% -6%,rgba(18,98,62,.06),transparent 60%);
+          radial-gradient(900px 460px at 12% -6%,rgba(127,97,40,.035),transparent 60%);
   color-scheme:light;
 }
 
@@ -305,7 +305,7 @@ export const TOKENS = `
     --hair:rgba(255,255,255,.055);
     --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
     --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
-          radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
+          radial-gradient(900px 460px at 12% -6%,rgba(210,181,124,.05),transparent 60%);
     color-scheme:dark;
   }
 }
@@ -342,7 +342,7 @@ export const TOKENS = `
   --hair:rgba(255,255,255,.055);
   --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
-          radial-gradient(900px 460px at 12% -6%,rgba(130,198,158,.09),transparent 60%);
+          radial-gradient(900px 460px at 12% -6%,rgba(210,181,124,.05),transparent 60%);
   color-scheme:dark;
 }
 

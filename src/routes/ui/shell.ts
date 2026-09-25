@@ -242,7 +242,7 @@ export function backNav(href: string, label: string): string {
    */
   return `<nav class="back" aria-label="مسارُ العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
-    <a href="${escapeHtml(href)}">← ${escapeHtml(label)}</a>
+    <a href="${escapeHtml(href)}">→ ${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
 }

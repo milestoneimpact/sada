@@ -50,7 +50,7 @@ export function spreadScreen(d: SpreadScreenData): string {
         : `<ul class="plain">${skipped
             .map((s) => `<li><b>${escapeHtml(s.preview)}</b> — ${escapeHtml(s.reason)}</li>`)
             .join('')}</ul>`}
-      <p><a class="btn g" href="/panel#posts">← عُد إلى المسوّدات</a></p>
+      <p><a class="btn g" href="/panel#posts">→ عُد إلى المسوّدات</a></p>
     </section>`
   }
 
@@ -61,7 +61,7 @@ export function spreadScreen(d: SpreadScreenData): string {
       <b>ولا يقع منه شيءٌ حتّى تضغط «اعتمد التوزيع»</b>.</p>
 
     <div class="scroll"><table>
-      <thead><tr><th>#</th><th>المنشور</th><th>الوجهة</th><th>الموعد</th></tr></thead>
+      <thead><tr><th>#</th><th>المنشور</th><th>الحساب</th><th>الموعد</th></tr></thead>
       <tbody>${slots
         .map((s, i) => row(i, s.when, s.accountLabel, s.preview))
         .join('')}</tbody>

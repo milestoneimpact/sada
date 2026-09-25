@@ -139,8 +139,10 @@ for (const file of files) {
   const code = strip(readFileSync(file, 'utf8'))
   // الكتلُ الداخليّةُ وحدَها — فقاعدةٌ داخل `@media` تُفحَص بذاتها
   for (const m of code.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    // ‏والرمزُ يُحلّ لا يُتجاوَز: `var(--ls-eyebrow)` تباعدٌ موجبٌ كتب بالاسم (D-149)
     const value = m[2].match(/letter-spacing:\s*(-?[\d.]+)/)
-    if (value === null || Number.parseFloat(value[1]) <= 0) continue
+    const byToken = /letter-spacing:\s*var\(--ls-/.test(m[2])
+    if (!byToken && (value === null || Number.parseFloat(value[1]) <= 0)) continue
     if (/direction:\s*ltr/.test(m[2])) continue
     spaced.push([m[1].trim().split('\n').pop().trim().slice(0, 48), file.slice(SRC.length)])
   }

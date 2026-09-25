@@ -171,7 +171,7 @@ export const TILES: readonly TileSpec[] = [
   {
     id: 'live_targets',
     label: 'قنواتٌ جاهزة',
-    why: 'كم وجهةً مربوطةً وإذنُها قائمٌ الآن — **وهي التي يقع عليها النشر**.',
+    why: 'كم حسابًا مربوطًا وإذنُه قائمٌ الآن — **وهي التي يقع عليها النشر**.',
     of: (d) => {
       const platforms = new Set(d.targets.map((t) => t.platform)).size
       return {

@@ -21,7 +21,9 @@ import { TOKENS } from './tokens'
 
 export const STYLE = TOKENS + `
 *{box-sizing:border-box; scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;
+  /* ما يُركَّز أو يُقصَد بمرساةٍ لا يختفي خلف الشريط اللاصق ولا شريط الجوّال (D-149) */
+  scroll-padding-top:calc(64px + var(--s-3)); scroll-padding-bottom:calc(var(--tap) + var(--s-6))}
 body{
   margin:0; background:var(--bg); color:var(--ink); direction:rtl;
   /* والترتيبُ ليس ذوقا: أوّلُ خطٍّ يملك المحرف يفوز به. و Inter لا
@@ -311,6 +313,8 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
   border-inline-start:3px solid var(--line-strong);
   transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
 .flash .ic{flex:none; font-weight:700; font-size:var(--t-sm); line-height:var(--lh)}
+/* رسالةُ النموذج المشغول تُكتب في منطقة الإعلان فتُقرأ وتُرى (D-149) */
+.busy-note{margin:0 0 var(--s-3); font-size:var(--t-sm); color:var(--ink-2)}
 .flash.ok{border-inline-start-color:var(--ok)}
 .flash.ok .ic{color:var(--ok)}
 .flash.warn{border-inline-start-color:var(--warn)}
@@ -423,7 +427,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 
 .sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; height:2px;
   border-radius:99px;
-  background:linear-gradient(90deg,var(--au),color-mix(in srgb,var(--au) 20%,transparent));
+  background:linear-gradient(to left,var(--au),color-mix(in srgb,var(--au) 20%,transparent));
   width:44px}
 
 /* ── بطاقةُ المؤشّر ────────────────────────────────────────── */
@@ -488,7 +492,8 @@ tbody tr:last-child td{border-bottom:0}
    الصفحة لا يُمرَّر — فالغلافُ حوله لا الصفحةُ كلُّها. */
 .pv-wrap{overflow-x:auto}
 /* رأسُ صفّ المنصّة رابطٌ إلى شاشتها — وهدفُ لمسٍ كاملٌ لا سطرُ نصّ (D-132) */
-.pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--brand); text-decoration:none; text-underline-offset:3px}
+.pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--brand);
+  text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au); text-underline-offset:3px}
 @media(hover:hover){.pv th a:hover{text-decoration:underline}}
 /* زرُّ التنزيل وشرحُه في سطرٍ واحدٍ يلتفّ على الضيق (D-126) */
 .pv{min-width:auto; margin-top:var(--s-3); border:1px solid var(--line-soft);
@@ -650,7 +655,9 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
    والأطولُ يتجاوزه بحقّه. */
 .todo>li>a.btn,.todo>li>form .btn{background:transparent; border-color:transparent;
   box-shadow:none; color:var(--brand); min-width:44px; padding-inline:var(--s-3); font-weight:600;
-  margin-block:-1px}
+  margin-block:-1px;
+  /* منذ صار الحبرُ لونَ العلامة لا يفرّق اللونُ رابطًا عن نصّه (‏١٫١١:١)؛ فعلامةٌ لا لونيّة: خيطُ نحاسٍ تحته (D-149) */
+  text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au)}
 
 /* ── صفٌّ عاجلٌ في «ما عليك» (D-123) ────────────────────────────────
    مهمّةٌ توقف بوّابةَ مرحلةٍ ولم تتمّ. **وكان الصنفُ يُكتب في الوسم ولا
@@ -767,7 +774,7 @@ ul.plain li:last-child{margin-bottom:0}
 .ch.off .ch-logo{color:var(--ink-3)}
 .ch-logo svg{width:17px; height:17px; display:block}
 .ch-name{font-weight:700; font-size:var(--t-md); line-height:var(--lh-tight); letter-spacing:-.1px}
-.ch-name a{color:inherit; text-decoration:none}
+.ch-name a{color:inherit; text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au)}
 @media(hover:hover){.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}}
 .ch-name span{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3); letter-spacing:0}
 .ch-note{font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh); margin:0}
@@ -1627,9 +1634,11 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .cmdk-in input{flex:1; min-width:0; border:0; background:none; outline:none;
   font:inherit; font-size:var(--t-md); color:var(--ink)}
 .cmdk-in input::placeholder{color:var(--ink-3)}
+/* الحقلُ بلا حدٍّ فلا يتبدّل لونُه عند التركيز؛ خيطُ نحاسٍ تحته يقول «هنا» (D-149) */
+.cmdk-in:focus-within{box-shadow:inset 0 -2px 0 var(--au)}
 .cmdk-l{flex:1; margin:0; padding:var(--s-2); list-style:none; overflow-y:auto}
 .cmdk-g{padding:var(--s-3) var(--s-3) var(--s-1); font-size:var(--t-xs);
-  font-weight:600; color:var(--ink-3); letter-spacing:var(--ls-eyebrow)}
+  font-weight:600; color:var(--ink-3)}
 /* الخيارُ رابطٌ يبقى رابطا: يُفتَح بالوسط ويُنسَخ عنوانُه كأيّ رابط */
 .cmdk-o{display:flex; align-items:center; gap:var(--s-3); text-decoration:none;
   padding:var(--s-2) var(--s-3); border-radius:var(--r); color:var(--ink);
@@ -1637,7 +1646,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 /* **والمختارُ يُعلَّم بأكثرَ من لون** (D-043): أرضيّةٌ وشريطٌ جانبيّ،
    فمن لا يميّز اللونَ يرى الشريط. */
 .cmdk-o[aria-selected="true"]{background:var(--surface-2);
-  box-shadow:inset 3px 0 0 var(--brand)}
+  box-shadow:inset -3px 0 0 var(--brand)}
 @media(hover:hover){.cmdk-o:hover{background:var(--surface-2)}}
 .cmdk-i{flex:none; display:grid; place-items:center; width:20px; color:var(--ink-3)}
 .cmdk-i svg{width:17px; height:17px; display:block}
@@ -1719,7 +1728,7 @@ nav.back .home,nav.back .home .glyph{flex:none}
 .slice:last-child{border-bottom:0}
 .slice-id{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; min-width:0}
 .slice h3{font-size:var(--t-base); font-weight:700}
-.slice .stats{margin:0 0 0 auto; padding:0; border-top:0; margin-inline-start:auto}
+.slice .stats{margin:0; margin-inline-start:auto; padding:0; border-top:0}
 .slice .chip{margin:0}
 
 /* ── وجهُ العرض للعناوين (D-143)، واللصائقُ الصغيرة بحرف المتن (D-144) ────
