@@ -1544,6 +1544,17 @@ describe('الثيم النهاريّ', () => {
     expect(production).not.toContain('STAGING')
   })
 
+  /** **وجهُ العرض يُسبَق حيث يُرسَم** (D-152): الوثيقةُ العامّة بلا عنوانٍ كوفيّ. */
+  it('اللوحةُ تسبق ثلاثةَ أوجه، والوثيقةُ العامّة اثنين', async () => {
+    const cookie = await login()
+    const panel = await (await app.request('/panel', withSession(cookie), env)).text()
+    const doc = await (await app.request('/privacy', {}, env)).text()
+    const preloads = (html: string): number => (html.match(/rel="preload" as="font"/g) ?? []).length
+    expect(preloads(panel)).toBe(3)
+    expect(preloads(doc)).toBe(2)
+    expect(doc).not.toMatch(/rel="preload"[^>]*reem/i)
+  })
+
   it('صفحةُ الدخول تتبع الثيم أيضا', async () => {
     const html = await (await app.request('/panel', {}, env)).text()
     expect(html.slice(0, html.indexOf('</head>'))).toContain('sada-theme')

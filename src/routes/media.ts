@@ -67,6 +67,14 @@ media.get('/m/:token', async (c) => {
     headers: {
       ...BASE_HEADERS,
       'Content-Type': row.mime,
+      /*
+       * **الوسيطُ بايتاتٌ لا صفحة** (D-152). النوعُ يأتي من ترويسة المزوّد
+       * كما جاءت، ويُبثّ تحت أصل اللوحة؛ فلو جاء يومًا `text/html` لرُسم
+       * صفحةً بجلسة المالك. `sandbox` بلا أعلامٍ يمنع البرمجةَ والأصلَ معًا،
+       * و`inline` بـ`filename` يمنع أن يُفسَّر باسمٍ يختاره غيرُنا.
+       */
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': `inline; filename="${row.r2_key.split('/').pop() ?? 'media'}"`,
       // **لا تخزين مشترك**: وسيطٌ خلف نافذةٍ موقّتة لا يُترَك في وسيطٍ
       // عامّ بعد أن تُغلق. و`private` تمنع أن تحتفظ به شبكةُ توصيل
       'Cache-Control': 'private, max-age=300',

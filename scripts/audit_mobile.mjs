@@ -31,7 +31,8 @@
  * الاستعمال:  node scripts/audit_mobile.mjs <ملفّ.html> …
  */
 import { chromium } from 'playwright'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 
 /** ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max. */
 const WIDTHS = [320, 360, 390, 430]
@@ -44,6 +45,12 @@ const MIN_FIELD_FONT = 16
 
 /** سقفُ وزن الصفحة — **يُعلَن ليُحرَس، لا ليُرضي**. */
 const MAX_PAGE_KB = 260
+/*
+ * **والوزنُ الذي يعبر الشبكة مضغوط** (D-152): الخامُ رقمٌ يُطبَع، والبوّابةُ
+ * على gzip لأنّ حافّةَ Cloudflare تضغط HTML قبل أن يصل. اللوحةُ كاملةً
+ * ‏٣٦KB مضغوطةً و‏١٧١KB خامًا؛ والسقفُ ‏٦٠ يترك للنموّ ويمسك تضاعفًا.
+ */
+const MAX_PAGE_GZ_KB = 60
 
 /**
  * ما يُعفى — **وبسطرٍ يقول لماذا**، كما في كلّ مدقّقٍ عندنا.
@@ -79,6 +86,7 @@ for (const file of files) {
   const bare = file.replace(/\.html$/, '.bare.html')
   const weighed = existsSync(bare) ? bare : file
   const kb = Math.round(statSync(weighed).size / 1024)
+  const gz = Math.round(gzipSync(readFileSync(weighed)).length / 1024)
   const notes = []
 
   for (const width of WIDTHS) {
@@ -261,6 +269,7 @@ for (const file of files) {
   for (const s of css.vh) notes.push({ kind: 'vh', what: s, detail: '`100vh` بلا احتياطِ `dvh`', width: 0 })
   for (const s of css.bare) notes.push({ kind: 'hover', what: s, detail: '`:hover` خارج `@media (hover)`', width: 0 })
   if (kb > MAX_PAGE_KB) notes.push({ kind: 'weight', what: name, detail: `${kb}KB فوق سقف ${MAX_PAGE_KB}KB`, width: 0 })
+  if (gz > MAX_PAGE_GZ_KB) notes.push({ kind: 'weight', what: name, detail: `${gz}KB مضغوطةً فوق سقف ${MAX_PAGE_GZ_KB}KB`, width: 0 })
 
   const LABEL = {
     overflow: 'تمريرٌ أفقيّ',
@@ -271,7 +280,7 @@ for (const file of files) {
     weight: 'وزنٌ فوق السقف',
   }
 
-  console.log(`\n═══ ${name} · ${kb}KB ═══`)
+  console.log(`\n═══ ${name} · ${kb}KB خامًا · ${gz}KB gzip ═══`)
   if (notes.length === 0) {
     console.log('  ✓ نظيف')
     continue

@@ -143,6 +143,17 @@ describe('سحبُ البايتات', () => {
       .rejects.toMatchObject({ retryable: false })
   })
 
+  /** **النوعُ من قائمةٍ** (D-152): ما ليس مقطعًا لا يُخزَّن ليُبَثّ تحت أصل اللوحة. */
+  it('ونوعٌ ليس مقطعًا يُرفَض ولا يُعاد — والمعامِلاتُ تُقصّ', async () => {
+    const typed = (type: string): typeof fetch =>
+      (async () => new Response(new Uint8Array(4), { headers: { 'Content-Type': type } })) as unknown as typeof fetch
+    await expect(fetchVideoBytes('https://x/v', typed('text/html; charset=utf-8')))
+      .rejects.toMatchObject({ retryable: false })
+    await expect(fetchVideoBytes('https://x/v', typed('image/svg+xml')))
+      .rejects.toMatchObject({ retryable: false })
+    expect((await fetchVideoBytes('https://x/v', typed('Video/WebM; codecs="vp9"'))).mime).toBe('video/webm')
+  })
+
   it('و 5xx يُعاد، و 4xx لا يُعاد', async () => {
     const status = (s: number): typeof fetch =>
       (async () => new Response('', { status: s })) as unknown as typeof fetch

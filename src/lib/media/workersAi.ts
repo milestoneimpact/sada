@@ -287,8 +287,17 @@ export async function fetchVideoBytes(
   if (buffer.byteLength === 0) throw new AiError('فيديو فارغ', true)
   if (buffer.byteLength > maxBytes) throw new AiError('الفيديو أكبر من الحدّ', false)
 
-  return {
-    bytes: new Uint8Array(buffer),
-    mime: response.headers.get('Content-Type') ?? 'video/mp4',
-  }
+  /*
+   * **النوعُ من قائمةٍ لا من الترويسة كما جاءت** (D-152). كانت تُخزَّن
+   * وتُبَثّ من `/panel/media/:id` تحت أصل اللوحة؛ ومزوّدٌ يردّ يومًا
+   * `text/html` كان سيُرسَم صفحةً بجلسة المالك. ما ليس مقطعًا يُرفَض ولا
+   * يُعاد: البايتاتُ عندهم لا تتبدّل بإعادة السحب.
+   */
+  const declared = (response.headers.get('Content-Type') ?? 'video/mp4').split(';')[0]!.trim().toLowerCase()
+  if (!VIDEO_MIMES.has(declared)) throw new AiError(`نوعُ الفيديو غيرُ مقبول: ${declared}`, false)
+
+  return { bytes: new Uint8Array(buffer), mime: declared }
 }
+
+/** ما يُقبَل مقطعًا — ويقابل ما يرسمه `<video>` في اللوحة. */
+export const VIDEO_MIMES: ReadonlySet<string> = new Set(['video/mp4', 'video/webm'])

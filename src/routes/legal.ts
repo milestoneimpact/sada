@@ -217,7 +217,7 @@ function termsBody(env: Env, base: string): string {
 /** `nonce` جديدٌ لكلّ ردّ — كما في اللوحة سواء. */
 function render(body: string, title: string, description: string): Response {
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
-  return new Response(shell(title, body, nonce, '', { indexable: true, description }), {
+  return new Response(shell(title, body, nonce, '', { indexable: true, description, noDisplayFace: true }), {
     headers: publicPageHeaders(nonce),
   })
 }
