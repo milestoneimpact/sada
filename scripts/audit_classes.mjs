@@ -87,16 +87,75 @@ function stripExpressions(code) {
 const styles = readFileSync(STYLES, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ')
 const defined = new Set([...styles.matchAll(/\.([a-zA-Z_][\w-]*)/g)].map((m) => m[1]))
 
+/**
+ * ── الأصنافُ التي كانت عمياء عنها (D-151) ────────────────────────────
+ *
+ * `stripExpressions` تمحو `${…}` كلَّها، فصنفٌ يُختار داخل التعبير
+ * (`class="st ${ok ? 'ok' : 'bad'}"`) وصنفٌ يضيفه السكربتُ
+ * (`classList.add('lifted')`) لم يُعدّا مستعملَين قطّ — وعيبٌ مزروعٌ فيهما
+ * كان يجتاز. فتُقرأ الآن: الحرفيّاتُ داخل تعبيرٍ يقع **داخل سِمة class**
+ * وحدَها (لا كلُّ حرفيّة، وإلّا عُدّت الأسماءُ والمعرّفاتُ أصنافًا)، ونداءاتُ
+ * `classList` و`className` من نصّ السكربت.
+ */
+export function classesOf(code) {
+  const out = new Set()
+  const add = (text) => {
+    for (const cls of text.split(/\s+/)) if (/^[a-zA-Z_][\w-]*$/.test(cls)) out.add(cls)
+  }
+  // سِمةُ class كاملةً مع تعبيراتها، بمسحٍ يوازن الأقواس
+  let i = 0
+  while ((i = code.indexOf('class="', i)) !== -1) {
+    let j = i + 7
+    let depth = 0
+    let literal = ''
+    while (j < code.length) {
+      const ch = code[j]
+      if (depth === 0 && ch === '"') break
+      if (ch === '$' && code[j + 1] === '{') { depth += 1; j += 2; continue }
+      if (depth > 0 && ch === '}') { depth -= 1; j += 1; continue }
+      if (depth === 0) literal += ch
+      else if (ch === "'" || ch === '`') {
+        const end = code.indexOf(ch, j + 1)
+        if (end === -1) break
+        // حرفيّةٌ تُقارَن (`p === 'all' ? 'on' : ''`) ليست صنفًا؛ ما يُكتب في السِّمة هو الفرعان
+        const before = code.slice(Math.max(0, j - 4), j).trimEnd()
+        const after = code.slice(end + 1, end + 5).trimStart()
+        const compared = /(===|!==|==|!=)$/.test(before) || /^(===|!==|==|!=)/.test(after)
+        if (!compared) add(code.slice(j + 1, end))
+        j = end + 1
+        continue
+      }
+      j += 1
+    }
+    add(literal)
+    i = j
+  }
+  for (const m of code.matchAll(/classList\.(?:add|toggle|remove|replace)\(([^)]*)\)/g)) {
+    for (const lit of m[1].matchAll(/'([^']*)'/g)) add(lit[1])
+  }
+  for (const m of code.matchAll(/className\s*=\s*'([^']*)'/g)) add(m[1])
+  return out
+}
+
+if (process.argv.includes('--self-test')) {
+  const sample = 'x(`<span class="st ${ok ? \'ok\' : \'bad\'} ${n}">` + `class="chip"`); el.classList.add(\'lifted\'); el.className=\'ago\''
+  const found = classesOf(sample)
+  const want = ['st', 'ok', 'bad', 'chip', 'lifted', 'ago']
+  const missing = want.filter((c) => !found.has(c))
+  if (missing.length > 0 || found.has('n')) {
+    console.log(`  ✕ self-test: missing ${missing.join(',')}${found.has('n') ? ' · n counted' : ''}`)
+    process.exit(1)
+  }
+  console.log('  ✓ self-test: الأصنافُ داخل ${…} وفي classList تُقرأ')
+  process.exit(0)
+}
+
 const used = new Map()
 for (const file of walk(ROUTES)) {
   if (file === STYLES || file.endsWith('tokens.ts')) continue
-  const code = stripExpressions(readFileSync(file, 'utf8'))
-  for (const m of code.matchAll(/class="([^"]*)"/g)) {
-    for (const cls of m[1].split(/\s+/)) {
-      if (!/^[a-zA-Z_][\w-]*$/.test(cls)) continue
-      if (!used.has(cls)) used.set(cls, new Set())
-      used.get(cls).add(file.slice(ROOT.length))
-    }
+  for (const cls of classesOf(readFileSync(file, 'utf8'))) {
+    if (!used.has(cls)) used.set(cls, new Set())
+    used.get(cls).add(file.slice(ROOT.length))
   }
 }
 

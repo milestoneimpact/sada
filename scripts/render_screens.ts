@@ -18,7 +18,8 @@ import { tasksScreen } from '../src/routes/ui/tasksView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
-import { backNav, shell } from '../src/routes/ui/shell'
+import { soloPage } from '../src/routes/ui/shell'
+import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { loginPage } from '../src/routes/panelView'
@@ -49,13 +50,9 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
  * فتُدقَّق الشاشاتُ بشريطٍ ليس شريطَ المنتَج — وعلامةٌ أُضيفت إليه لم
  * تصل المدقّقَ ولا اللقطة.
  */
+// العيّنةُ من القالب الذي يُخدَم (D-151) — لا غلافٍ ثالث
 const page = (title: string, body: string): string =>
-  shell(
-    title,
-    `<div class="wrap">${backNav('/panel#channels', 'القنوات')}
-     <main id="main">${body}</main></div>`,
-    'n',
-  )
+  soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }))
 
 writeAudited(
   '/tmp/screen-linkedin.html',
@@ -341,20 +338,13 @@ const journey: Journey = {
 }
 writeAudited(
   '/tmp/screen-journey.html',
-  shell(
-    'صدى — رحلةُ منشور',
-    `<div class="wrap">${backNav('/panel#posts', 'المنشورات')}
-     <main id="main">${journeyBody(journey, now)}</main></div>`,
-    'n',
-  ),
+  soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' }, journeyBody(journey, now), 'n', '',
+    buildCommands({ onPanel: false })),
 )
 
 writeAudited(
   '/tmp/screen-spread.html',
-  shell(
-    'صدى — توزيعُ المعتمَد',
-    `<div class="wrap">${backNav('/panel', 'اللوحة')}
-     <main id="main">${spreadScreen({
+  soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({
        start: '2026-09-08T06:00', gap: 24, csrf: 'c',
        plan: {
          slots: [
@@ -366,9 +356,7 @@ writeAudited(
            { postId: 'p4', preview: 'مسوّدةٌ لـ TikTok', reason: 'لا قناةَ TikTok مربوطة' },
          ],
        },
-     })}</main></div>`,
-    'n',
-  ),
+     }), 'n', '', buildCommands({ onPanel: false })),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

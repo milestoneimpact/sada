@@ -21,7 +21,7 @@ import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { bar } from './parts'
 import { refusedBody } from './oauthResult'
-import { backNav, ICON_BYTES, shell } from './shell'
+import { backNav, ICON_BYTES, shell, soloPage } from './shell'
 import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
@@ -657,5 +657,32 @@ describe('العيّناتُ لا تنسخ الإطار (D-140)', () => {
     for (const tag of ['<nav class="back"', 'class="rail"', 'class="topbar"', 'class="theme"', 'class="rail-head"']) {
       expect(src, `${name} يكتب ${tag} بدل استدعاء مصدره`).not.toContain(tag)
     }
+  })
+})
+
+describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقاموسٌ واحدٌ للمنصّات', () => {
+  it('soloPage يبني التخطّي والعلامةَ والعودةَ والمحتوى ويحمل سكربتَ الثيم', () => {
+    const html = soloPage('صدى — تجربة', { href: '/panel#posts', label: 'المنشورات' }, '<p>x</p>', 'n')
+    expect(html).toContain('<a class="skip" href="#main">')
+    expect(html).toContain('class="home"')
+    expect(html).toContain('→ المنشورات')
+    expect(html).toContain('<main id="main"><p>x</p></main>')
+    expect(html).toContain('sada-theme')
+  })
+
+  it('بندُ خطّةٍ لمنصّةٍ خارج الاثنتين يحمل اسمَها لا مفتاحَها', async () => {
+    const { planSection } = await import('./sections/plan')
+    // النوعُ يحصر المنصّةَ في اثنتين، والخطّةُ تصل JSON من نموذجٍ لا يعرف النوع
+    const html = planSection({
+      plan: {
+        id: 'w', week: '2026-09-13', model: 'm', status: 'draft', createdAt: '2026-09-12 08:00',
+        plan: { rationale: 'ر', items: [
+          { sourceId: 's', platform: 'youtube' as never, angle: 'ز', day: '2026-09-14', time: '09:00', why: 'س' },
+        ] },
+      },
+      names: { s: 'مصدر' }, ready: true, analyzed: 2, now: new Date('2026-09-13T00:00:00Z'),
+    })
+    expect(html).toContain('YouTube')
+    expect(html).not.toMatch(/>youtube</)
   })
 })

@@ -7,7 +7,7 @@
  * يُثبت عاملَه الثاني بعد.
  */
 import { escapeHtml, shell } from './panelView'
-import { GLYPH_SVG } from './ui/shell'
+import { B64URL_SCRIPT, GLYPH_SVG } from './ui/shell'
 
 export interface SecondFactorData {
   readonly csrf: string
@@ -25,20 +25,9 @@ export interface SecondFactorData {
  * ويعمل بلا شبكةٍ سوى نداءٍ واحد إلى أصلنا — والسياسة تسمح بـ
  * `connect-src 'self'` لا أكثر.
  */
-const SCRIPT = `
+const SCRIPT = `${B64URL_SCRIPT}
 (function(){
-  var b64u=function(buf){
-    var bytes=new Uint8Array(buf),s='';
-    for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
-  };
-  var fromB64u=function(v){
-    var s=v.replace(/-/g,'+').replace(/_/g,'/');
-    s+='='.repeat((4-s.length%4)%4);
-    var bin=atob(s),out=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
-    return out;
-  };
+  var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var form=document.getElementById('pk-form');
   var btn=document.getElementById('pk-btn');
   var note=document.getElementById('pk-note');

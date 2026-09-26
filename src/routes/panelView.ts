@@ -26,7 +26,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { densitySwitch, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { densitySwitch, B64URL_SCRIPT, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
 import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
@@ -46,7 +46,7 @@ export { escapeHtml, injectCsrf, shell }
  * الخادم (D-071)، **وعدّادٌ يخالفه أسوأُ من لا عدّاد** — يُري المالكَ
  * أحمرَ على منشورٍ مقبول. فيُنتزَع في الاختبار ويُقارَن حالةً حالة.
  */
-export const SCRIPT = `
+export const SCRIPT = `${B64URL_SCRIPT}
 (function(){
   /*
    * «الروابطُ التي تُخطَف هي روابطُ المرساة وحدها» (D-087).
@@ -385,18 +385,7 @@ export const SCRIPT = `
 
   // ── العامل الثاني ─────────────────────────────────────
   var csrf=(document.querySelector('input[name="_csrf"]')||{}).value||'';
-  var b64u=function(buf){
-    var by=new Uint8Array(buf),t='';
-    for(var i=0;i<by.length;i++)t+=String.fromCharCode(by[i]);
-    return btoa(t).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
-  };
-  var fromB64u=function(v){
-    var t=v.replace(/-/g,'+').replace(/_/g,'/');
-    t+='='.repeat((4-t.length%4)%4);
-    var bin=atob(t),out=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
-    return out;
-  };
+  var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var post=function(url,fields){
     var body=new FormData(); body.set('_csrf',csrf);
     for(var k in fields)body.set(k,fields[k]);
@@ -705,7 +694,7 @@ export const SCRIPT = `
        * أظهر واحدا وأخفى الآخر جعل المالكَ يحوّل ذهنيّا كما كان.
        */
       try{
-        mirror.textContent='= '+at.toLocaleString('ar',{weekday:'long',day:'numeric',
+        mirror.textContent='= '+at.toLocaleString('ar-u-nu-latn',{weekday:'long',day:'numeric',
           month:'long',hour:'numeric',minute:'2-digit'})+' بتوقيتك';
       }catch(e){mirror.textContent='';}
     }
@@ -737,20 +726,9 @@ export interface LoginState {
  *
  * ونداءٌ واحدٌ إلى أصلنا، ولا شيء غيره — و`connect-src 'self'` تفرضه.
  */
-const LOGIN_SCRIPT = `
+const LOGIN_SCRIPT = `${B64URL_SCRIPT}
 (function(){
-  var b64u=function(buf){
-    var bytes=new Uint8Array(buf),s='';
-    for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
-  };
-  var fromB64u=function(v){
-    var s=v.replace(/-/g,'+').replace(/_/g,'/');
-    s+='='.repeat((4-s.length%4)%4);
-    var bin=atob(s),out=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
-    return out;
-  };
+  var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var btn=document.getElementById('pk-login');
   var note=document.getElementById('pk-note');
   if(!btn)return;
@@ -893,6 +871,8 @@ export interface PanelFlash {
 }
 
 export interface PanelData {
+  /** البيئةُ كما يعرفها Worker — تُطبَع في العلامة (D-151) */
+  readonly env: 'staging' | 'production'
   readonly paused: boolean
   readonly autoEnqueue: boolean
   /** أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085) */
@@ -1442,7 +1422,7 @@ export function panelPage(d: PanelData): string {
 <aside class="rail">
   <div class="rail-head">
     <div class="glyph">${GLYPH_SVG}</div>
-    <div class="brand"><b>صدى</b><span>SADA · STAGING</span></div>
+    <div class="brand"><b>صدى</b><span>SADA · ${d.env === 'production' ? 'PRODUCTION' : 'STAGING'}</span></div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
