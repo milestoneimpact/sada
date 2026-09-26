@@ -113,7 +113,7 @@ export interface Provider {
   /**
    * معاملاتٌ إضافيّةٌ في رابط الإذن.
    *
-   * **و Google لا يعطي رمزَ تجديدٍ بلا `access_type=offline`** — ولا
+   * **و Google لا يعطي إذنَ تجديدٍ بلا `access_type=offline`** — ولا
    * يعطيه ثانيةً بلا `prompt=consent` لمن وافق مرّة. فمن أغفلهما رُبط
    * حسابُه ثمّ سقط بعد ساعة، **ولا شيء يقول لماذا**.
    */
@@ -175,7 +175,7 @@ export const YOUTUBE: Provider = {
   clientAuth: 'body',
   pkce: true,
   extraHeaders: {},
-  // بلا هذين لا رمزَ تجديد — والحسابُ يسقط بعد ساعةٍ بلا سببٍ يُقرأ
+  // بلا هذين لا إذنَ تجديد — والحسابُ يسقط بعد ساعةٍ بلا سببٍ يُقرأ
   extraAuthorize: { access_type: 'offline', prompt: 'consent' },
 }
 

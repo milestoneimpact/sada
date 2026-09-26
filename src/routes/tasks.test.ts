@@ -182,14 +182,14 @@ describe('وشريطُ الرموز المقتربة', () => {
   }
 
   it('لا شريطَ حيث لا رمزَ يقترب', async () => {
-    expect(await panel()).not.toContain('رمزُ التجديد')
+    expect(await panel()).not.toContain('إذنُ التجديد')
   })
 
   /** **يُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح** — قد لا تُفتَح قبل أن يقع. */
-  it('ورمزُ وصولٍ قريبٌ يُعرَض تحذيرا', async () => {
+  it('وإذنُ وصولٍ قريبٌ يُعرَض تحذيرا', async () => {
     seed(4, 'access')
     const html = await panel()
-    expect(html).toContain('رمزُ الوصول')
+    expect(html).toContain('إذنُ الوصول')
     expect(html).toContain('@omar')
   })
 
@@ -202,7 +202,7 @@ describe('وشريطُ الرموز المقتربة', () => {
   it('ورمزُ تجديدٍ يُعرَض أشدَّ ويُقال أنّه يوجب يدَك', async () => {
     seed(2, 'refresh')
     const html = await panel()
-    expect(html).toContain('رمزُ التجديد')
+    expect(html).toContain('إذنُ التجديد')
     expect(html).toContain('يوجب سقوطُه دورةَ إذنٍ بيدك')
     expect(html).toContain('class="flash bad"')
   })

@@ -121,7 +121,7 @@ describe('GET /oauth/:platform/start', () => {
    * `prompt=consent`. وبدونهما **يُربَط الحسابُ ويبدو ناجحا**، ثمّ
    * يسقط بعد ساعةٍ بلا ما يجدّده — فيُثبَّت المعاملان هنا.
    */
-  it('يطلب من Google رمزَ تجديدٍ صراحةً — وإلّا سقط الربطُ بعد ساعة', async () => {
+  it('يطلب من Google إذنَ تجديدٍ صراحةً — وإلّا سقط الربطُ بعد ساعة', async () => {
     const response = await app.request('/oauth/youtube/start', {}, env)
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location') ?? '')
@@ -540,7 +540,7 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     expect(text).not.toContain(KEY)
     expect(text).not.toContain('AIzaSy')
     expect(text).not.toContain(KEY.slice(0, 8))
-    // ولا رمز الإدارة نفسه
+    // ولا كلمة الإدارة نفسه
     expect(text).not.toContain(TOKEN)
   })
 

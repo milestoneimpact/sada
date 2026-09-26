@@ -339,7 +339,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
     at === null ? none : `<span title="${escapeHtml(at)} UTC">${escapeHtml(relativeTime(at, now))}</span>`
   const alerts = (h?.alerts ?? []).slice(0, 5).map((al) =>
     `<li><span class="dot ${al.threshold === 0 ? 'bad' : 'warn'}"></span>
-      <span>${al.kind === 'refresh' ? 'رمزُ التجديد' : 'رمزُ الوصول'} ${
+      <span>${al.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'} ${
         al.threshold === 0 ? 'انتهى' : `يقترب — بقي ${al.threshold} ${al.threshold === 1 ? 'يوم' : 'أيّام'}`}
       <span class="ago">${escapeHtml(relativeTime(al.at, now))}</span></span></li>`).join('')
   return `<h3 class="sec">سجلُّ صحّة الحساب</h3>
@@ -348,7 +348,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
         <li><span class="dot ${h?.refreshedAt ? 'ok' : ''}"></span><span>${
           h?.refreshedAt ? `جُدّد آخرَ مرّةٍ ${when(h.refreshedAt, '')}` : 'لم يُجدَّد بعدُ — يُجدَّد قبل انتهائه بساعتين'}</span></li>
         <li><span class="dot"></span><span>${
-          h?.expiresAt ? `رمزُ الوصول ينتهي ${when(h.expiresAt, '')}` : 'لا رمزَ وصولٍ محفوظا'}${
+          h?.expiresAt ? `إذنُ الوصول ينتهي ${when(h.expiresAt, '')}` : 'لا إذنَ وصولٍ محفوظا'}${
           h?.refreshExpiresAt ? ` · والتجديدُ ${when(h.refreshExpiresAt, '')}` : ''}</span></li>
         ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
         ${alerts}

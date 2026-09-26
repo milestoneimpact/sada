@@ -23,7 +23,7 @@ import { extractText } from '../drive/export'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
 
 /**
- * أسعار Claude Opus 5 لكلّ مليون رمز (2026-06-24).
+ * أسعار Claude Opus 5 لكلّ مليون وحدة (2026-06-24).
  * تتغيّر، فتُراجَع مع كلّ تحديث. والمقروء من الخبيئة عُشر الداخل.
  */
 export const OPUS_5_INPUT_PER_TOKEN = 5 / 1_000_000

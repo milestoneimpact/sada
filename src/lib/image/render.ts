@@ -76,7 +76,7 @@ function decodeBase64(value: string): Uint8Array {
  */
 export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
   if (shot.accountId.trim() === '' || shot.apiToken.trim() === '') {
-    throw new SlideError('حسابُ Cloudflare أو رمزُ المتصفّح غيرُ مضبوط', false)
+    throw new SlideError('حسابُ Cloudflare أو مفتاحُ المتصفّح غيرُ مضبوط', false)
   }
   // القصُّ عندنا لا عندهم: طلبٌ فوق الحدّ يُردّ بخطأٍ لا يقول إنّ السببَ الحجم
   if (shot.html.length > MAX_HTML_BYTES) {

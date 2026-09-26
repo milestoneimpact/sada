@@ -287,12 +287,32 @@ for (const file of files) {
         }
       }
 
+      // ٦ · معجمٌ واحد (D-155): الشيءُ الواحد بكلمةٍ واحدة، ولا رقمَ قرارٍ في نصٍّ يقرؤه المالك
+      const lexicon = []
+      const BANNED = [
+        [/\(D-\d{3}\)/, 'رقمُ قرارٍ في الواجهة'],
+        [/رمز[ُِ]? ?الإدارة|الرمز الإداري/, '«رمز الإدارة» — والكلمةُ «كلمةُ الإدارة»'],
+        [/رمز[ُِ]? ?(الوصول|التجديد)|رمز[َِ] (وصول|تجديد)/, '«رمز الوصول/التجديد» — والكلمةُ «الإذن»'],
+        [/رمز[ُِ]? ?المتصفّح|رمز Cloudflare/, '«رمز المتصفّح» — والكلمةُ «مفتاح»'],
+        [/مليون رمز/, '«مليون رمز» — والكلمةُ «وحدة»'],
+        [/الوجهة/, '«الوجهة» — والكلمةُ «الحساب»'],
+      ]
+      for (const node of el.querySelectorAll('*')) {
+        if (node.closest('script, style, svg, template, textarea, input, code, kbd, pre') !== null) continue
+        if (node.getBoundingClientRect().height === 0) continue
+        for (const child of node.childNodes) {
+          if (child.nodeType !== 3) continue
+          const text = norm(child.textContent ?? '')
+          for (const [re, why] of BANNED) if (re.test(text)) lexicon.push({ why, text: text.slice(0, 50) })
+        }
+      }
+
       const words = strings.reduce((a, s) => a + s.text.split(' ').length, 0)
       out.totals.strings += strings.length
       out.totals.words += words
       out.panes.push({
         name, strings: strings.length, words,
-        repeated, clashes, dupHeads, keys,
+        repeated, clashes, dupHeads, keys, lexicon,
         clipped: clipped.slice(0, 6),
         clippedCount: clipped.length,
       })
@@ -304,7 +324,7 @@ for (const file of files) {
   console.log(`\n═══ ${file.split('/').pop()} ═══`)
   console.log(`  ${report.totals.strings} سلسلةً · ${report.totals.words} كلمة\n`)
   for (const p of report.panes.sort((a, b) => b.words - a.words)) {
-    const issues = p.repeated.length + p.clashes.length + p.dupHeads.length + p.clippedCount + p.keys.length
+    const issues = p.repeated.length + p.clashes.length + p.dupHeads.length + p.clippedCount + p.keys.length + p.lexicon.length
     const head = `  ${String(p.name).padEnd(11)} ${String(p.strings).padStart(4)} سلسلة`
       + ` · ${String(p.words).padStart(5)} كلمة`
     if (issues === 0) { console.log(`${head}  ✓`); continue }
@@ -315,6 +335,7 @@ for (const file of files) {
     for (const h of p.dupHeads) console.log(`      ✕ ترويسةٌ ×${h.n}: «${h.t}»`)
     for (const k of p.keys) console.log(`      ✕ مفتاحٌ ظاهر «${k.w}» في ${k.tag}: «${k.text}»`)
     for (const c of p.clipped) console.log(`      ✕ مقصوصٌ ${c.over}px: ${c.cls} «${c.text}»`)
+    for (const l of p.lexicon) console.log(`      ✕ معجم: ${l.why} — «${l.text}»`)
     if (p.clippedCount > p.clipped.length) {
       console.log(`      … و${p.clippedCount - p.clipped.length} مقصوصا غيرَها`)
     }

@@ -125,7 +125,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'سعرُ نموذج الفيديو من لوحة Cloudflare',
     ifLeft:
       'يُسجَّل اليوم `price_unverified` بصفر — **فسقفُ الإنفاق اليوميّ لا يحرس الفيديو**، ' +
-      'ودورةٌ تدور مرّاتٍ تُنفق بلا أن يوقفها شيء (D-008).',
+      'ودورةٌ تدور مرّاتٍ تُنفق بلا أن يوقفها شيء.',
     unblocks: 'guard',
     done: (f) => f.videoPriced,
   },
@@ -134,7 +134,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'مراجعةُ `LinkedIn-Version` المثبَّتة',
     ifLeft:
       'الرقمُ يشيخ صامتا. ويومَ تُسقط LinkedIn نسختَه **يتوقّف النشرُ كلُّه** ' +
-      'بخطأٍ من المنصّة — **ولا شيءَ في اللوحة كان يقول إنّه شاخ** (D-072).',
+      'بخطأٍ من المنصّة — **ولا شيءَ في اللوحة كان يقول إنّه شاخ**.',
     unblocks: 'guard',
     done: (f) => !f.linkedInVersionDue,
     evidence: (f) =>
@@ -147,7 +147,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: '`LEGAL_ENTITY` و`LEGAL_CONTACT` في `wrangler.toml`',
     ifLeft:
       'صفحتا الشروط والخصوصيّة بلا كيانٍ مسمّى ولا بريدِ تواصل — ' +
-      '**ومراجعةُ المنصّات تسقط عليهما**، ولا يُخترَع بريدٌ لا وجودَ له (D-038).',
+      '**ومراجعةُ المنصّات تسقط عليهما**، ولا يُخترَع بريدٌ لا وجودَ له.',
     unblocks: 'capability',
     done: (f) => f.vars.has('LEGAL_ENTITY') && f.vars.has('LEGAL_CONTACT'),
   },
@@ -157,7 +157,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     ifLeft:
       'تخرج الصورةُ **نظيفةً بلا عنوان**، ولا يقع نداءٌ ولا كلفة. ' +
       'ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ متصفّحٍ** ' +
-      'لا عملُ مولّد صور (D-085).',
+      'لا عملُ مولّد صور.',
     unblocks: 'capability',
     done: (f) => f.vars.has('CF_BROWSER_TOKEN'),
     secrets: ['CF_BROWSER_TOKEN'],
@@ -183,7 +183,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'بوّابةُ الستّة — ستُّ بطاقاتٍ في صدر لوحك',
     ifLeft:
       'تبقى الأربعُ الافتراضيّةُ اختيارَ من كتب الملفّ لا اختيارَك — ' +
-      '**والشاشةُ اليوميّةُ تبدأ بجواب غيرِك** (D-114).',
+      '**والشاشةُ اليوميّةُ تبدأ بجواب غيرِك**.',
     unblocks: 'capability',
     done: (f) => f.tilesChosen >= 6,
     evidence: (f) => `${f.tilesChosen} من 6 بطاقاتٍ مختارة`,
@@ -195,7 +195,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'سقفُ الترويج الأسبوعيّ',
     ifLeft:
       '**لا توصيةَ تُكتب أصلا**: رقمٌ نؤلّفه رقمٌ بلا مصدر، والتقريرُ يقول ' +
-      '«لا سقفَ موضوع» كلَّ اثنين (D-006).',
+      '«لا سقفَ موضوع» كلَّ اثنين.',
     unblocks: 'capability',
     done: (f) => f.promoCapUsd > 0,
     evidence: (f) => (f.promoCapUsd > 0 ? `السقفُ ${f.promoCapUsd}$ في الأسبوع` : 'صفر — لا توصيةَ تُكتب'),
@@ -225,7 +225,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'إطلاقُ الإنتاج على sada.basserh.com',
     ifLeft:
       'يبقى صدى على staging وحدَه: **كلُّ ما نُشر ويُنشر تجربةٌ**، والنطاقُ ' +
-      'المسجَّلُ في مراجعات المنصّات لا يردّ (D-133).',
+      'المسجَّلُ في مراجعات المنصّات لا يردّ.',
     unblocks: 'capability',
     // يُقرأ عند sada.basserh.com لا من هنا: staging لا تعرف حالَ الإنتاج
     done: () => null,
@@ -237,7 +237,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     title: 'دقائقُ GitHub Actions — البوّابةُ والنشرُ يقفان بلا عدّاء',
     ifLeft:
       'لا يُكسَر staging — **لكنّ كلَّ دمجٍ لا يصله**، ولا يجري CI على أيّ ' +
-      'طلب، فيُدمَج ما لم يُحرَس أو يتوقّف الدفعُ كلُّه (D-141).',
+      'طلب، فيُدمَج ما لم يُحرَس أو يتوقّف الدفعُ كلُّه.',
     unblocks: 'gate',
     // تُقرأ عند GitHub لا من هنا: العاملُ لا يعرف رصيدَ الدقائق ولا حالَ العدّاء
     done: () => null,

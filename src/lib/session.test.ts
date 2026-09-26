@@ -95,7 +95,7 @@ describe('createSession', () => {
     expect(first.record.csrf.length).toBeGreaterThanOrEqual(32)
   })
 
-  it('لا يُخزَّن الرمز الإداريّ في الجلسة — بصمته فقط', async () => {
+  it('لا يُخزَّن كلمةُ الإدارة في الجلسة — بصمته فقط', async () => {
     const id = await open()
     const raw = (await kv.get(`session:${id}`)) ?? ''
     expect(raw).not.toContain(TOKEN)

@@ -49,7 +49,7 @@ export interface ModelChoice {
   /** ما يُعرَض في القائمة. وقد يساوي المعرّف حين لا اسمَ عندهم. */
   readonly label: string
   readonly task: ModelTask | null
-  /** لكلّ مليون رمز — `null` حين لا يعطيه المزوّد. */
+  /** لكلّ مليون وحدة — `null` حين لا يعطيه المزوّد. */
   readonly priceIn: number | null
   readonly priceOut: number | null
 }

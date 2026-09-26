@@ -109,7 +109,7 @@ export function connectedBody(d: ConnectedData): string {
     d.platform,
     'رُبط',
     `${LABEL[d.platform]} — ${d.displayName}`,
-    'الرمزُ محفوظٌ مشفّرا، ولا يظهر في هذه الصفحة ولا في سجلّ. ' +
+    'الإذنُ محفوظٌ مشفّرا، ولا يظهر في هذه الصفحة ولا في سجلّ. ' +
       '<b>وما يستطيعه هذا الحسابُ مقروءٌ ممّا مُنح لا ممّا طُلب.</b>',
   )}
 
@@ -123,7 +123,7 @@ export function connectedBody(d: ConnectedData): string {
     )}</span> UTC.
       ${d.hasRefresh
         ? 'ويُجدَّد قبل انتهائه بلا تدخّل.'
-        : '<b>ولا رمزَ تجديدٍ معه</b> — فسيتوقّف النشرُ عند انتهائه حتّى تُعيد الربط.'}</p>
+        : '<b>ولا إذنَ تجديدٍ معه</b> — فسيتوقّف النشرُ عند انتهائه حتّى تُعيد الربط.'}</p>
     <div class="scroll"><table>
       <thead><tr><th>النطاق</th><th>يفتح</th><th>الحال</th><th>مصدرُه إن نقص</th></tr></thead>
       <tbody>${scopeRows(d.platform, granted)}</tbody></table></div>
@@ -187,7 +187,7 @@ export function refusedBody(d: RefusedData): string {
       d.platform,
       'أُلغي',
       `لم تُمنَح ${LABEL[d.platform]} إذنا`,
-      'أُغلقت شاشةُ الإذن قبل الموافقة. <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.',
+      'أُغلقت شاشةُ الإذن قبل الموافقة. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.',
     )}
     <div class="card">
       <h2>لا شيءَ يحتاج إصلاحا</h2>
@@ -218,8 +218,8 @@ export function refusedBody(d: RefusedData): string {
     return `${head(
       d.platform,
       'رُفض',
-      'الإذنُ نجح، وتبديلُ الرمز رُدّ',
-      'شاشةُ الإذن مرّت، ثمّ ردّت ' + LABEL[d.platform] + ' تبديلَ الرمز بـ ' +
+      'الإذنُ نجح، وتبديلُ الإذن رُدّ',
+      'شاشةُ الإذن مرّت، ثمّ ردّت ' + LABEL[d.platform] + ' تبديلَ الإذن بـ ' +
         '<span class="mono">invalid_client</span>. ' +
         '<b>ومعناه أنّ Client ID أو Client Secret في صدى ليس زوجَ هذا التطبيق.</b> ' +
         '<b>ولم يُحفَظ شيء.</b>',
@@ -275,7 +275,7 @@ export function refusedBody(d: RefusedData): string {
           <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
           <b>لوح القنوات ← دليلُ ضبط التطبيق</b>، ثمّ أعد الربط.
           <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
-          المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الرمزَ نفسه.</span></div>
+          المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
       <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">اضبط الأسرار</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
@@ -288,7 +288,7 @@ export function refusedBody(d: RefusedData): string {
       d.platform,
       'رُفض',
       `ردّت ${LABEL[d.platform]} الطلب`,
-      `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
+      `ما أعادته حرفًا: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
         '<b>ولم يُحفَظ شيء.</b>',
     )}
     <div class="card">
@@ -300,7 +300,7 @@ export function refusedBody(d: RefusedData): string {
         <li><span class="n">2</span><span class="body">
           <span class="what">Client ID و Client Secret</span>
           <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
-            يعطي هذا الرمزَ نفسه.</span></span></li>
+            يعطي هذا الردَّ نفسه.</span></span></li>
       </ol>
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
         <span class="v">${guide.failure}</span></div>`}
@@ -347,7 +347,7 @@ export function refusedBody(d: RefusedData): string {
       ? `النطاقُ الناقص: <span class="mono">${escapeHtml(blamed.join('</span> و <span class="mono">'))}</span>. ` +
         '<b>سمّته المنصّةُ في جوابها</b>، فلا حاجةَ إلى تخمين. ' +
         'ولا علاقةَ للسرّ بهذا: <b>لا تُعِد توليده.</b>'
-      : `الرمزُ الذي أعادته: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
+      : `ما أعادته حرفًا: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
         '<b>ومعناه أنّ التطبيقَ لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
         'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
   )}
@@ -355,7 +355,7 @@ export function refusedBody(d: RefusedData): string {
   <div class="outcome warn"><span class="k">أين العلّة</span><span class="v">
     النطاقُ يُمنَح <b>بمنتَجٍ يُضاف في بوّابة المنصّة</b>، لا بمفتاحٍ يُكتب هنا.
     والجدولُ تحت يقول ما طُلب ومَن يمنح كلَّ واحدٍ منه.
-    <b>ولم يُحفَظ شيء</b> — لا حساب ولا رمز.</span></div>
+    <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.</span></div>
 
   <div class="card" style="margin-top:var(--s-4)">
     <div class="card-head"><h2>${

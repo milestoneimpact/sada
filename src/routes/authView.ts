@@ -117,7 +117,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
     `<div class="wrap"><div class="auth">
       <div class="glyph">${GLYPH_SVG}</div>
       <h1>خطوةٌ أخيرة</h1>
-      <p class="lede">أثبتَّ الرمز. وبقي ما يثبت أنّك أنت.</p>
+      <p class="lede">أثبتَّ كلمةَ الإدارة. وبقي ما يثبت أنّك أنت.</p>
       ${note}${nothing}
       <div class="card">${passkey}${totp}</div>
       ${recovery}

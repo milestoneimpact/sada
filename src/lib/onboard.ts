@@ -118,7 +118,7 @@ export function onboarding(f: OnboardFacts): Onboarding {
     {
       id: 'decide',
       title: 'ابتّ في أوّل مسوّدة',
-      why: 'لا يُنشَر شيءٌ بلا قرارك (D-009) — والقرارُ الأوّل هو الذي يُثبت ذلك',
+      why: 'لا يُنشَر شيءٌ بلا قرارك — والقرارُ الأوّل هو الذي يُثبت ذلك',
       go: '#posts',
       done: f.decided > 0,
       proof: f.decided > 0

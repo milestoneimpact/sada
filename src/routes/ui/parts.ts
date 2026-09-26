@@ -149,7 +149,7 @@ export interface OutboxRow {
 }
 
 const ALERT_KIND: Readonly<Record<string, string>> = {
-  token: 'رمزٌ يقترب',
+  token: 'إذنٌ يقترب',
   publish: 'نشرٌ فشل',
   budget: 'سقفُ الإنفاق',
 }
@@ -186,10 +186,10 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
         .join('')}</ul>`
 
   return `<div class="card"><h2>قناةُ التنبيهات</h2>
-    <p>ثلاثةُ أحداثٍ <b>فقط</b> تخرج من هنا: رمزٌ يقترب من الانتهاء، ونشرٌ
+    <p>ثلاثةُ أحداثٍ <b>فقط</b> تخرج من هنا: إذنٌ يقترب من الانتهاء، ونشرٌ
       فشل نهائيّا، وبلوغُ سقف الإنفاق. <b>ولا رابع</b> — إشعارٌ يكثر يُطفَأ،
       وحين يُطفَأ تسقط الثلاثةُ معه.</p>
-    <p class="hint"><b>ولا يحمل الإشعارُ رمزا ولا سرّا ولا رابطا موقَّعا</b> —
+    <p class="hint"><b>ولا يحمل الإشعارُ إذنا ولا سرّا ولا رابطا موقَّعا</b> —
       يقول ما وقع ويُحيلك إلى هذه اللوحة. والقناةُ خارجَ سيطرتنا: سجلُّها
       يُقرأ بعد سنة.</p>
     <form class="row" method="POST" action="/panel/settings">

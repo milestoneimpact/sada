@@ -173,11 +173,11 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
  * سجلُّ صحّة الحساب (D-129): ترويسةٌ بجسدٍ دائم، وما لم يقع يُقال لا يُرسَم.
  */
 describe('سجلُّ صحّة الحساب', () => {
-  it('بلا سجلٍّ: رُبط، ولم يُجدَّد بعد، ولا رمزَ محفوظا', () => {
+  it('بلا سجلٍّ: رُبط، ولم يُجدَّد بعد، ولا إذنَ محفوظا', () => {
     const html = screen({})
     expect(html).toContain('<h3 class="sec">سجلُّ صحّة الحساب</h3>')
     expect(html).toContain('لم يُجدَّد بعدُ')
-    expect(html).toContain('لا رمزَ وصولٍ محفوظا')
+    expect(html).toContain('لا إذنَ وصولٍ محفوظا')
   })
 
   it('وبسجلٍّ: آخرُ تجديدٍ وموعدُ الانتهاء والتنبيهاتُ بأسمائها', () => {
@@ -191,9 +191,9 @@ describe('سجلُّ صحّة الحساب', () => {
       },
     })
     expect(html).toContain('جُدّد آخرَ مرّةٍ')
-    expect(html).toContain('رمزُ الوصول ينتهي')
-    expect(html).toContain('رمزُ الوصول يقترب — بقي 7 أيّام')
-    expect(html).toContain('رمزُ التجديد انتهى')
+    expect(html).toContain('إذنُ الوصول ينتهي')
+    expect(html).toContain('إذنُ الوصول يقترب — بقي 7 أيّام')
+    expect(html).toContain('إذنُ التجديد انتهى')
     expect(html).toContain('<span class="dot bad"></span>')
   })
 })

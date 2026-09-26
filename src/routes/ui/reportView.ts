@@ -178,7 +178,7 @@ function suggestionCard(s: OpenSuggestion): string {
       <button type="submit" name="decision" value="rejected" class="g">أرفض</button>
       <span class="grow"></span>
       <span class="ago">وقبولُك <b>تسجيلُ رأيٍ لا أمرُ إنفاق</b> — لا مسارَ
-        إعلاناتٍ في صدى أصلا (D-006).</span>
+        إعلاناتٍ في صدى أصلا.</span>
     </form>
   </div>`
 }

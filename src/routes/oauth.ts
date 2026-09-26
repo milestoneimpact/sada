@@ -137,7 +137,7 @@ oauth.get('/oauth/:platform/start', async (c) => {
     url.searchParams.set('code_challenge', pkce.challenge)
     url.searchParams.set('code_challenge_method', pkce.method)
   }
-  // ومعاملاتُ المزوّد الخاصّة آخرا: Google لا يعطي رمزَ تجديدٍ بلا
+  // ومعاملاتُ المزوّد الخاصّة آخرا: Google لا يعطي إذنَ تجديدٍ بلا
   // `access_type=offline`، فيُربَط الحسابُ ثمّ يسقط بعد ساعة
   for (const [key, value] of Object.entries(provider.extraAuthorize ?? {})) {
     url.searchParams.set(key, value)

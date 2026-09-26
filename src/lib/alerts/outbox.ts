@@ -65,7 +65,7 @@ export interface SendResult {
  * ما وُصف**، ولا تُقبَل قطعةٌ حرّةٌ من نداءٍ خارجيّ.
  */
 export function tokenAlert(account: string, days: number, kind: string): Alert {
-  const which = kind === 'refresh' ? 'رمزُ التجديد' : 'رمزُ الوصول'
+  const which = kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'
   return {
     kind: 'token',
     ref: `token:${account}:${kind}:${days}`,

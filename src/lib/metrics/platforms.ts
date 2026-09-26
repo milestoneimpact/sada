@@ -54,7 +54,7 @@ function num(value: unknown): number | null {
 function classify(status: number): MetricsError {
   if (status === 404) return new MetricsError('المنشور غير موجود عند المنصّة', 404, false)
   if (status === 401 || status === 403) {
-    return new MetricsError('الرمز مرفوض أو ينقصه نطاقُ القراءة', status, false)
+    return new MetricsError('الإذن مرفوض أو ينقصه نطاقُ القراءة', status, false)
   }
   if (status === 429) return new MetricsError('بلغ حدَّ المنصّة', 429, true)
   if (status >= 500) return new MetricsError('المنصّة متعبة', status, true)
