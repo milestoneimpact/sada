@@ -180,9 +180,9 @@ describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
 })
 
 describe('صفحةُ الدخول تقول ما تطلب بالعربيّة', () => {
-  it('اللصيقةُ «رمزُ الإدارة» واسمُ السرّ بجانبها', () => {
+  it('اللصيقةُ «كلمةُ الإدارة» واسمُ السرّ بجانبها', () => {
     const html = loginPage({}, 'n')
-    expect(html).toContain('رمزُ الإدارة <span class="mono">ADMIN_TOKEN</span>')
+    expect(html).toContain('كلمةُ الإدارة <span class="mono">ADMIN_TOKEN</span>')
   })
 })
 

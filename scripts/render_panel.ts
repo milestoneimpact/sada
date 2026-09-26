@@ -349,7 +349,7 @@ const data: PanelData = {
     cap: 1500,
   },
   outbox: [
-    { kind: 'token', body: 'صدى — رمزُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
+    { kind: 'token', body: 'صدى — إذنُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
     { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },
   ],
 }

@@ -129,7 +129,7 @@ const YOUTUBE_GUIDE: SetupGuide = {
     'و <b>لا قناةَ على هذا الحساب</b> ← حسابُ Google بلا قناة YouTube، فأنشئ قناةً أوّلا.',
   gotcha:
     'صدى يطلب <span class="mono">access_type=offline</span> و <span class="mono">prompt=consent</span> — ' +
-    '<b>وبدونهما لا رمزَ تجديد</b>، فيسقط الربطُ بعد ساعة. وهما مضبوطان في الشيفرة، لا تحتاج فعلا.',
+    '<b>وبدونهما لا إذنَ تجديد</b>، فيسقط الربطُ بعد ساعة. وهما مضبوطان في الشيفرة، لا تحتاج فعلا.',
 }
 
 /**
@@ -167,7 +167,7 @@ const TIKTOK_GUIDE: SetupGuide = {
   whereSecret: 'تحته: <b>Client secret</b>. ويُعرَض مرّةً، فاحفظه أو أعد توليده.',
   success: 'تظهر بطاقةُ TikTok «مربوطة» باسم حسابك، وتُعرض نطاقاتُه في شاشة المنصّة.',
   failure:
-    'رمزٌ يذكر <span class="mono">client_key</span> ← السرُّ لُصق في الحقل الخطأ. ' +
+    'ردٌّ يذكر <span class="mono">client_key</span> ← السرُّ لُصق في الحقل الخطأ. ' +
     'و <b>فشلُ سحبِ المقطع</b> ← النطاق لم يُثبَت في Domain verification.',
   gotcha:
     'TikTok يسمّي المعرّف <span class="mono">client_key</span> لا <span class="mono">client_id</span>. ' +
@@ -384,8 +384,8 @@ export interface LinkedAccount {
   readonly status: 'active' | 'needs_reauth' | 'revoked'
   readonly createdAt: string
   /**
-   * متى ينتهي رمزُ الوصول — من `tokens` بجانب الحساب (D-126). و`null` حين
-   * لا رمزَ محفوظًا له. **والبطاقةُ تعدّ الأيّامَ منه** كما يعدّها تنبيهُ
+   * متى ينتهي إذنُ الوصول — من `tokens` بجانب الحساب (D-126). و`null` حين
+   * لا إذنَ محفوظًا له. **والبطاقةُ تعدّ الأيّامَ منه** كما يعدّها تنبيهُ
    * صدر اللوحة (D-065) — الحقلُ واحد.
    */
   readonly expiresAt: string | null

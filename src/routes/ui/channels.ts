@@ -157,7 +157,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         <input type="hidden" name="platform" value="${escapeHtml(view.spec.id)}">
         <button class="g sm" type="submit">افحص الزوج</button>
         <span class="ago">يسأل المنصّةَ أتقبل هذا الزوج — بلا دورةِ إذن، وبلا
-          رمزِ وصولٍ يُنتَج.</span>
+          إذنِ وصولٍ يُنتَج.</span>
       </form>
     </div></div>`
   }
@@ -263,7 +263,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بمسار
           <span class="mono">client_credentials</span> الذي <b>لا منحةَ فيه تُفحَص</b>،
           فلا يبقى إلّا التوثيق. ويفرّق الجوابُ بين <b>سرٍّ خاطئ</b> و<b>معرّفٍ
-          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج رمزُ وصولٍ لصدى، ولا
+          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج إذنُ وصولٍ لصدى، ولا
           تُنفَق فلسا.</div>`}
       </form>
 
@@ -323,7 +323,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
          أسرار Worker باسمَي
          <span class="mono">${missing.map(escapeHtml).join('</span> و <span class="mono">')}</span>.`
       : state === 'needs_reauth'
-        ? 'رمزُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
+        ? 'إذنُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
         : escapeHtml(spec.note)
 
   // زرُّ الربط لا يُعرض إلا حيث يعمل. و «اربط» فعلٌ يغادر اللوحة إلى
@@ -375,14 +375,14 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
  * تنبيهُ صدر اللوحة يقول «يبقى ‏٧ أيّام» حين يعبر الرمزُ عتبةً (D-065)،
  * **والبطاقةُ التي تصف الحسابَ نفسَه كانت لا تقوله** — والحقلُ في القاعدة.
  * فيُقرأ من الحقل نفسِه: أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوق ذلك
- * رقاقةٌ هادئة. ولا رمزَ محفوظًا — لا شيء، لا «غير معروف».
+ * رقاقةٌ هادئة. ولا إذنَ محفوظًا — لا شيء، لا «غير معروف».
  */
 export function tokenDays(expiresAt: string | null, now: Date): string {
   if (expiresAt === null) return ''
   const ms = Date.parse(expiresAt.replace(' ', 'T') + (expiresAt.endsWith('Z') ? '' : 'Z'))
   if (Number.isNaN(ms)) return ''
   const days = Math.floor((ms - now.getTime()) / 86_400_000)
-  const title = `title="ينتهي رمزُ الوصول ${escapeHtml(expiresAt)} UTC"`
+  const title = `title="ينتهي إذنُ الوصول ${escapeHtml(expiresAt)} UTC"`
   if (days < 0) return `${status('bad', '▲', `انتهى الإذن`, `${title}`)}`
   if (days <= 7) {
     return `${status('warn', '◍', `${
@@ -425,7 +425,7 @@ export function channelsSection(
         <ul class="todo">${urgent.map((v) => `<li>
           <span class="dot ${v.state === 'needs_reauth' ? 'bad' : 'warn'}"></span>
           <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
-            ? 'رمزُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
+            ? 'إذنُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
             : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
           ${v.state === 'needs_reauth'
             ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
@@ -449,7 +449,7 @@ export function channelsSection(
     <div class="card tile"><div class="k">تحتاج تجديدا</div>
       <div class="v">${count('needs_reauth')}</div>
       <div class="n">${count('needs_reauth') === 0
-        ? 'ولا رمزَ انتهى'
+        ? 'ولا إذنَ انتهى'
         : '<b>النشرُ عليها متوقّفٌ حتّى تجدّد</b>'}</div></div>
     <div class="card tile"><div class="k">تنتظر ضبطا</div>
       <div class="v">${count('awaiting_owner') + count('connectable')}</div>

@@ -11,7 +11,7 @@
  *
  * > بعد ستّين يوما ينتهي رمزُ وصول LinkedIn، **فيفشل كلُّ منشورٍ
  * > مجدولٍ فشلا نهائيّا** (`retryable: false`)، ويُعلَّم الحسابُ
- * > `needs_reauth` — **ورمزُ التجديد صالحٌ عشرةَ أشهرٍ أخرى**.
+ * > `needs_reauth` — **وإذنُ التجديد صالحٌ عشرةَ أشهرٍ أخرى**.
  *
  * وهي علّةُ «بُني ولم يُستعمَل» للمرّة الرابعة: السلّم (D-057)، وجدولُ
  * المقاييس (D-058)، وترويسةُ الوسائط (D-059) — **وهذه أغلاها ثمنا**.
@@ -56,7 +56,7 @@ export interface RenewDeps {
 export type RenewOutcome =
   /** جُدِّد وحُفظ. */
   | { readonly kind: 'renewed'; readonly accountId: string }
-  /** لا رمزَ تجديدٍ أو انتهى هو كذلك — **ولا سبيلَ إلّا يدُ المالك**. */
+  /** لا إذنَ تجديدٍ أو انتهى هو كذلك — **ولا سبيلَ إلّا يدُ المالك**. */
   | { readonly kind: 'needs_owner'; readonly accountId: string; readonly why: string }
   /** عطلٌ عابر — يُترك للدورة التالية ولا يُعلَّم الحساب. */
   | { readonly kind: 'deferred'; readonly accountId: string; readonly why: string }
@@ -122,19 +122,19 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
   const stored = await loadTokens(deps.db, deps.encKey, row.account_id)
   if (stored === null) {
     await markNeedsReauth(deps.db, row.account_id)
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا رمزَ محفوظ' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذنَ محفوظ' }
   }
   if (!isExpiring(stored.expiresAt, now, RENEW_MARGIN_SECONDS)) {
     return { kind: 'skipped', accountId: row.account_id }
   }
   if (stored.refreshToken === null) {
-    // **ولا يُعلَّم هنا**: منصّةٌ لا تعطي رمزَ تجديدٍ أصلا (X أحيانا)
+    // **ولا يُعلَّم هنا**: منصّةٌ لا تعطي إذنَ تجديدٍ أصلا (X أحيانا)
     // ليست حسابا معطوبا — والحارسُ عند النشر يمنع النشرَ برمزٍ ميت
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا رمزَ تجديدٍ لهذا الحساب' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذنَ تجديدٍ لهذا الحساب' }
   }
   if (stored.refreshExpiresAt !== null && Date.parse(stored.refreshExpiresAt) <= now.getTime()) {
     await markNeedsReauth(deps.db, row.account_id)
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'انتهى رمزُ التجديد نفسُه' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'انتهى إذنُ التجديد نفسُه' }
   }
 
   const platform = row.platform as Platform

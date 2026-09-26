@@ -85,7 +85,7 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
       ? null
       : restBinding(call.accountId.trim(), call.apiToken.trim(), call.fetchImpl ?? fetch))
   if (binding === null) {
-    throw new ImageError('حسابُ Cloudflare أو رمزُه غيرُ مضبوط', 503, false)
+    throw new ImageError('حسابُ Cloudflare أو مفتاحُه غيرُ مضبوط', 503, false)
   }
 
   let out: unknown

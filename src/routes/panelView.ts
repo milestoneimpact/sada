@@ -733,7 +733,7 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}
   var note=document.getElementById('pk-note');
   if(!btn)return;
   if(!window.PublicKeyCredential){btn.disabled=true;
-    if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — استعمل الرمز.'; return;}
+    if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — استعمل كلمةَ الإدارة.'; return;}
   btn.addEventListener('click',function(){
     btn.disabled=true; btn.textContent='المس مفتاحك…';
     var reset=function(msg){btn.disabled=false; btn.textContent='الدخول بمفتاح المرور';
@@ -769,7 +769,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
       ? ''
       : `<button class="p" id="pk-login" type="button">الدخول بمفتاح المرور</button>
          <div class="n" id="pk-note" role="status" aria-live="polite"></div>
-         <div class="or">أو بالرمز</div>`
+         <div class="or">أو بكلمة الإدارة</div>`
 
   const note =
     state.error === undefined
@@ -783,12 +783,12 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
     `<div class="wrap"><div class="auth">
       <div class="glyph">${GLYPH_SVG}</div>
       <h1>لوحة التحكّم</h1>
-      <p class="lede">أدخل رمز الإدارة للمتابعة</p>
+      <p class="lede">أدخل كلمةَ الإدارة للمتابعة</p>
       ${note}
       <div class="card">
         ${passkey}
         <form method="POST" action="/panel/login">
-          <div class="field"><label for="t">رمزُ الإدارة <span class="mono">ADMIN_TOKEN</span></label>
+          <div class="field"><label for="t">كلمةُ الإدارة <span class="mono">ADMIN_TOKEN</span></label>
             <input id="t" type="password" name="token" autocomplete="current-password"
                    required autofocus${disabled}></div>
           <button class="p" type="submit"${disabled}>دخول</button>
@@ -877,7 +877,7 @@ export interface PanelData {
   readonly autoEnqueue: boolean
   /** أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085) */
   readonly imageOverlay: boolean
-  /** أمضبوطٌ رمزُ المتصفّح؟ **وجودُه يُفحَص، وقيمتُه لا تغادر البيئة**. */
+  /** أمضبوطٌ مفتاحُ المتصفّح؟ **وجودُه يُفحَص، وقيمتُه لا تغادر البيئة**. */
   readonly browserToken: boolean
   readonly analysisCap: number
   readonly spendCap: number
@@ -1230,7 +1230,7 @@ export function panelPage(d: PanelData): string {
     d.expiring
       .slice(0, 3)
       .map((e) => {
-        const what = e.kind === 'refresh' ? 'رمزُ التجديد' : 'رمزُ الوصول'
+        const what = e.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'
         const when = e.daysLeft < 0
           ? '<b>انتهى</b>'
           : e.daysLeft === 0
@@ -1325,7 +1325,7 @@ export function panelPage(d: PanelData): string {
   if (!d.factors.enforced) {
     items.push({
       kind: 'warn',
-      text: 'لا عاملَ ثانٍ: الرمزُ وحده يفتح اللوحة.',
+      text: 'لا عاملَ ثانٍ: كلمةُ الإدارة وحدَها تفتح اللوحة.',
       go: '#security',
       label: 'سجّل مفتاحا',
     })
@@ -1508,7 +1508,7 @@ ${flash}
 ${pivotPane(d.pivot)}
 
 <section data-pane="sources" hidden>
-  ${pageHead('Google Drive', 'المصادر والتحليل', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${pageHead('Google Drive', 'المصادر', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -1519,7 +1519,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="providers" hidden>
-  ${pageHead('الذكاء', 'المزوّدون والتوجيه', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
+  ${pageHead('الذكاء', 'المزوّدون', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
   ${providerStrip}
 
   <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
@@ -1533,7 +1533,7 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="card" style="margin-top:var(--s-3)">
-    <div class="card-head"><h2>المزوّدون</h2><div class="grow"></div>
+    <div class="card-head"><h2>المفاتيحُ المضبوطة</h2><div class="grow"></div>
       <span class="st idle">${d.providers.length} مزوّدا</span></div>
     <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
       الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
@@ -1545,12 +1545,12 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="channels" hidden>
-  ${pageHead('النشر', 'القنوات والحسابات', 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
+  ${pageHead('النشر', 'القنوات', 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
   ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
 </section>
 
 <section data-pane="posts" hidden>
-  ${pageHead('التحرير', 'الخطّة والمسوّدات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
+  ${pageHead('التحرير', 'المنشورات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
   <div style="margin-bottom:var(--s-3)">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
@@ -1574,7 +1574,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الحدود', 'الإيقاف والسقوف', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
+  ${pageHead('الضبط', 'الحدود', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
   <!-- الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا،
        ثمّ ما يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل -->
   <div class="card"><h2>الإيقاف المؤقت</h2>
@@ -1621,7 +1621,7 @@ ${pivotPane(d.pivot)}
       <button class="p" type="submit">حفظ</button>
     </form>
     <div class="sub" style="margin-top:var(--s-3)"><b>ولا يُنفَق منه شيءٌ آليّا</b>:
-      لا عميلَ إعلاناتٍ في صدى ولا مفتاحَ يُطلَب (D-006). والتوصيةُ صفٌّ ينتظر بتّك،
+      لا عميلَ إعلاناتٍ في صدى ولا مفتاحَ يُطلَب. والتوصيةُ صفٌّ ينتظر بتّك،
       وما تفعله بالمبلغ تفعله في لوحة المنصّة بيدك.</div>
   </div>
 
@@ -1662,7 +1662,7 @@ ${pivotPane(d.pivot)}
       </form>
     </div>
     ${d.browserToken
-      ? '<div class="sub" style="margin-top:var(--s-3)">رمزُ المتصفّح مضبوط.'
+      ? '<div class="sub" style="margin-top:var(--s-3)">مفتاحُ المتصفّح مضبوط.'
         + ' وكلُّ لقطةٍ تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
       : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
           <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،
@@ -1673,7 +1673,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="security" hidden>
-  ${pageHead('الدخول', 'الأمان والجلسات', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
+  ${pageHead('الدخول', 'الأمان', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0
@@ -1693,7 +1693,7 @@ ${pivotPane(d.pivot)}
   <div class="card" style="margin-top:var(--s-3)" id="factors"><h2>العامل الثاني</h2>
     <p class="hint">${d.factors.enforced
       ? 'مفعَّل: الرمز وحده لا يفتح اللوحة — يليه ما يثبت أنّك أنت.'
-      : '<b>غير مفعَّل.</b> الرمز وحده يفتح كلّ شيء. سجّل مفتاح مرورٍ أو اضبط رمز تطبيق.'}</p>
+      : '<b>غير مفعَّل.</b> كلمةُ الإدارة وحدَها تفتح كلّ شيء. سجّل مفتاح مرورٍ أو اضبط رمز تطبيق.'}</p>
 
     <h3 class="sec">مفاتيح المرور</h3>
     <p class="hint">مقاومةٌ للتصيّد بالبناء: المفتاح موقَّعٌ على
@@ -1747,10 +1747,10 @@ ${pivotPane(d.pivot)}
     <div class="n" id="rc-msg" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="card" style="margin-top:var(--s-3)"><h2>الرمز الإداريّ</h2>
+  <div class="card" style="margin-top:var(--s-3)"><h2>كلمةُ الإدارة</h2>
     <p class="hint" style="margin:0"><b>تدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
-      فالجلسة مربوطةٌ ببصمة الرمز الذي فتحها، وتُفحص في كلّ طلب — وجلسةُ مفتاحِ المرور كذلك.
-      فإن شككتَ في تسرّبٍ فبدّل الرمز
+      فالجلسة مربوطةٌ ببصمة كلمة الإدارة التي فتحتها، وتُفحص في كلّ طلب — وجلسةُ مفتاحِ المرور كذلك.
+      فإن شككتَ في تسرّبٍ فبدّل كلمةَ الإدارة
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
   </div>
 

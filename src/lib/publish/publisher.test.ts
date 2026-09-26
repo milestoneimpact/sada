@@ -260,7 +260,7 @@ describe('الفشل', () => {
   it('ورمزٌ منتهٍ ومعه رمزُ تجديدٍ يُعاد ولا يُعلَّم الحساب', async () => {
     const postId = await seedPost({ platform: 'x' })
     // **ويُحفَظ بالتشفير الحقيقيّ**: بايتاتٌ مزيّفةٌ لا تُفكّ، فتُقرأ
-    // «لا رمزَ محفوظ» ويمرّ الاختبارُ على فرعٍ آخر غير الذي يفحصه
+    // «لا إذنَ محفوظ» ويمرّ الاختبارُ على فرعٍ آخر غير الذي يفحصه
     await saveTokens(db, KEY, 'x:member:4242', {
       accessToken: 'a', refreshToken: 'r', expiresAt: '2026-09-08T09:01:00Z',
       refreshExpiresAt: null, scopes: scopeSet('x').join(' '),

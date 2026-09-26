@@ -56,7 +56,7 @@ describe('من يُجدَّد', () => {
     expect(await dueForRenewal(db, NOW)).toEqual([])
   })
 
-  it('ورمزٌ يقترب يُجدَّد', async () => {
+  it('وإذنٌ يقترب يُجدَّد', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     expect((await dueForRenewal(db, NOW)).map((r) => r.account_id)).toEqual(['a1'])
   })
@@ -125,7 +125,7 @@ describe('والدمجُ لا يمحو بالفراغ', () => {
 
     const stored = await loadTokens(db, KEY, 'a1')
     expect(stored?.accessToken).toBe('FRESH')
-    // **ولم يُمحَ رمزُ التجديد** ولو غاب عن الردّ
+    // **ولم يُمحَ إذنُ التجديد** ولو غاب عن الردّ
     expect(stored?.refreshToken).toBe('r1')
     // **والتجديدُ الناجحُ يُختَم** (D-129) — والربطُ الأوّل لا يُختَم
     const stamp = db.raw.prepare('SELECT refreshed_at FROM tokens WHERE account_id = ?').get('a1') as { refreshed_at: string | null }
@@ -195,12 +195,12 @@ describe('ومتى يُطلَب من المالك إذنٌ جديد', () => {
     expect(row.status).toBe('active')
   })
 
-  it('وانتهاءُ رمز التجديد نفسِه يُعلَّم', async () => {
+  it('وانتهاءُ إذن التجديد نفسِه يُعلَّم', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1', refreshExpires: inSec(-10) })
     const out = await renewOne(deps(reply({})), { account_id: 'a1', platform: 'linkedin' })
     expect(out.kind).toBe('needs_owner')
     if (out.kind !== 'needs_owner') return
-    expect(out.why).toContain('رمزُ التجديد')
+    expect(out.why).toContain('إذنُ التجديد')
   })
 })
 

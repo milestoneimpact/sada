@@ -150,7 +150,7 @@ describe('الدخول', () => {
     const cookie = await login()
     await app.request('/panel/logout', withSession(cookie, { method: 'POST' }), env)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('رمز الإدارة')
+    expect(html).toContain('أدخل كلمةَ الإدارة')
   })
 })
 

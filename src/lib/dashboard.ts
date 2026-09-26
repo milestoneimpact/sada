@@ -251,7 +251,7 @@ export const TILES: readonly TileSpec[] = [
   {
     id: 'system_state',
     label: 'حالُ النظام',
-    why: 'مفتاحُ الإيقاف والإدراجُ الآليّ ورمزُ المتصفّح في بطاقةٍ واحدة.',
+    why: 'مفتاحُ الإيقاف والإدراجُ الآليّ ومفتاحُ المتصفّح في بطاقةٍ واحدة.',
     of: (d) => {
       const on = [!d.paused, d.autoEnqueue, d.browserToken].filter(Boolean).length
       return {

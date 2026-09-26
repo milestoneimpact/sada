@@ -115,7 +115,7 @@ async function currentBind(adminToken: string | undefined): Promise<string | nul
 }
 
 /**
- * يبدّل الرمز الإداريّ بجلسة.
+ * يبدّل كلمةُ الإدارة بجلسة.
  *
  * يُعيد استعمال `authorizeAdmin` نفسه لا فحصا موازيا: منطق مقارنةٍ ثانٍ
  * يعني موضعا ثانيا يُخطئ فيه أحد، ومقارنةً قد تفقد ثبات الزمن.

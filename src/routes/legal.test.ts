@@ -112,7 +112,7 @@ describe('تصفان ما يقع فعلا', () => {
     expect(html).toContain('لا نشرَ آليّ')
   })
 
-  it('ولا تسرّبان رمز الإدارة', async () => {
+  it('ولا تسرّبان كلمة الإدارة', async () => {
     const html = await (await app.request('/privacy', {}, env())).text()
     expect(html).not.toContain('token-for-tests-0001')
   })

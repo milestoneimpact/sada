@@ -170,7 +170,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
-      : `لكلّ مليون رمز: دخول ${money(p.priceIn ?? 0)} · خروج ${money(p.priceOut ?? 0)}`
+      : `لكلّ مليون وحدة: دخول ${money(p.priceIn ?? 0)} · خروج ${money(p.priceOut ?? 0)}`
 
     return `<details class="prow">
       <summary>
@@ -430,7 +430,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <span class="scroll" style="margin-top:var(--s-3)"><table>
             <thead><tr><th>المزوّد</th><th>موضعُ المفتاح عندهم</th></tr></thead>
             <tbody>${presetRows}</tbody></table></span>
-          <span class="why">وصلاحيّةُ رمز Cloudflare: <span class="mono">Account · Workers AI · Read</span>
+          <span class="why">وصلاحيّةُ مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
             — ولا تكفي صلاحيّةُ AI Gateway وحدَها.</span></span></li>
       </ol>
     </form>
