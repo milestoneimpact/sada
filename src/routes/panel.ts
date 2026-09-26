@@ -91,7 +91,7 @@ import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
 import { fingerprint } from '../lib/security/digest'
-import { injectCsrf, soloPage, COPY_SCRIPT } from './ui/shell'
+import { injectCsrf, soloPage } from './ui/shell'
 import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
@@ -1418,7 +1418,7 @@ panel.get('/panel/tasks', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage('صدى — مهامُّ المالك', { href: '/panel', label: 'اللوحة' }, body, nonce, COPY_SCRIPT,
+    soloPage('صدى — مهامُّ المالك', { href: '/panel', label: 'اللوحة' }, body, nonce, '',
       buildCommands({ onPanel: false })),
   )
 })

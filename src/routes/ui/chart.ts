@@ -52,13 +52,23 @@ export function areaChart(series: { day: string; total: number }[]): string {
   const line = `M ${pts.join(' L ')}`
   const area = `${line} L ${x(series.length - 1).toFixed(1)},${padTop + plotH} L ${padStart},${padTop + plotH} Z`
 
-  // ثلاثةُ خطوطٍ أفقيّة بأرقامها — وبدونها الرسمُ شكلٌ لا مقدار
+  /*
+   * **الرسمُ يتمدّد والحرفُ لا** (D-153). كان الـSVG كلُّه بنسبة viewBox
+   * (`preserveAspectRatio="none"`) فتُقلَّص محاورُه إلى ‏٥px عند ‏٣٢٠ والخطُّ
+   * دون بكسل. فالمسارُ وحدَه يبقى في SVG بحدٍّ لا يتمدّد
+   * (`vector-effect:non-scaling-stroke`)، والأرقامُ والتواريخُ ونقطةُ الذروة
+   * HTML فوقه بمواضعَ مئويّة من إحداثيّات الرسم نفسِها.
+   */
+  const px = (v: number): string => `${((v / w) * 100).toFixed(2)}%`
+  const py = (v: number): string => `${((v / h) * 100).toFixed(2)}%`
   const ticks = [0, 0.5, 1].map((t) => {
     const value = max * t
-    const yy = y(value).toFixed(1)
-    return `<line class="grid-l" x1="${padStart}" y1="${yy}" x2="${w - 8}" y2="${yy}"/>
-      <text class="axis" x="${padStart - 8}" y="${(Number(yy) + 3.5).toFixed(1)}"
-        text-anchor="end">${value.toFixed(1)}</text>`
+    const yy = y(value)
+    return `<line class="grid-l" x1="${padStart}" y1="${yy.toFixed(1)}" x2="${w - 8}" y2="${yy.toFixed(1)}"/>`
+  }).join('')
+  const tickLabels = [0, 0.5, 1].map((t) => {
+    const value = max * t
+    return `<span class="axis y" style="top:${py(y(value))};right:${px(w - padStart + 8)}">${value.toFixed(1)}</span>`
   }).join('')
 
   const peakIndex = series.reduce((best, d, i) => (d.total > series[best]!.total ? i : best), 0)
@@ -68,13 +78,15 @@ export function areaChart(series: { day: string; total: number }[]): string {
 
   // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
   const label = (d: { day: string }): string => d.day.slice(5)
-  const dates = `<text class="axis" x="${x(0)}" y="${h - 8}" text-anchor="start">${label(first)}</text>
-    <text class="axis" x="${x(series.length - 1)}" y="${h - 8}" text-anchor="end">${label(last)}</text>`
+  const dates = `<span class="axis x" style="left:${px(x(0))};top:${py(h - 8)}">${label(first)}</span>
+    <span class="axis x end" style="right:${px(w - x(series.length - 1))};top:${py(h - 8)}">${label(last)}</span>`
+  const peakDot = `<i class="peak" style="left:${px(x(peakIndex))};top:${py(y(peak.total))}" aria-hidden="true"></i>`
 
   const total = series.reduce((sum, d) => sum + d.total, 0)
   const average = total / series.length
 
   return `<div class="chart">
+    <div class="plot">
     <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
       aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
       <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
@@ -84,12 +96,11 @@ export function areaChart(series: { day: string; total: number }[]): string {
       ${ticks}
       <path d="${area}" fill="url(#sg)"/>
       <path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${x(peakIndex).toFixed(1)}" cy="${y(peak.total).toFixed(1)}" r="3.5"
-        fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
+        stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
       <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
-      ${dates}
     </svg>
+    ${tickLabels}${dates}${peakDot}
+    </div>
     <div class="legend">
       <span>المجموع <b>${money(total)}</b></span>
       <span>المتوسّط اليوميّ <b>${money(average)}</b></span>

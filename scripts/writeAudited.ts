@@ -25,7 +25,7 @@
  */
 import { writeFileSync } from 'node:fs'
 import { FACES } from '../src/lib/ui/fonts'
-import { STYLE_BODY, STYLE_PATH } from '../src/lib/ui/asset'
+import { assetAt, STYLE_BODY, STYLE_PATH } from '../src/lib/ui/asset'
 
 export function writeAudited(path: string, html: string): void {
   /*
@@ -48,6 +48,11 @@ export function writeAudited(path: string, html: string): void {
       `url('data:font/woff2;base64,${face.b64}')`,
     )
   }
+  // والسكربتاتُ الأصولُ تُضَمّ كالأنماط (D-153): لا أصلَ في `file://`
+  inlined = inlined.replace(/<script nonce="([^"]*)" src="(\/a\/[^"]+)"><\/script>/g, (tag, nonce: string, path: string) => {
+    const found = assetAt(path)
+    return found === null ? tag : `<script nonce="${nonce}">${found.body}</script>`
+  })
   // والسبقُ يُحذَف: مسارٌ لا يُحلّ من `file://` يعطي خطأ شبكةٍ في السجلّ
   inlined = inlined.replace(/<link rel="preload" as="font"[^>]*>\n?/g, '')
 
