@@ -5,9 +5,8 @@
  * وحقنُ رمز CSRF، و `nonce` السياسة. فما بُني فوقها ورثها، وما نسيها
  * لم يُبنَ فوقها أصلا.
  */
-import { COMMAND_SCRIPT, commandPalette, commandTrigger, type Command } from './command'
-import { TIME_SCRIPT } from './time'
-import { STYLE_PATH, stripJs } from '../../lib/ui/asset'
+import { commandPalette, commandTrigger, type Command } from './command'
+import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
 
 /**
@@ -265,7 +264,7 @@ export function soloPage(
          <main id="main">${body}</main>
        </div>`,
     nonce,
-    THEME_SCRIPT + script,
+    script,
     commands === undefined ? {} : { commands },
   )
 }
@@ -358,6 +357,8 @@ export function shell(
      * يُنسى نسخُه في مسارٍ جديد (D-019).
      */
     commands?: readonly Command[]
+    /** صفحةُ اللوحة وحدَها تحمل سكربتَها أصلًا ببصمة (D-153) */
+    panelScript?: boolean
   } = {},
 ): string {
   const safeNonce = escapeHtml(nonce)
@@ -385,8 +386,16 @@ ${options.noDisplayFace === true ? FONT_PRELOAD_BODY : FONT_PRELOAD}
        * صفحةَ الدخول تحمله بلا موعدٍ فيها: **يجد صفرَ وسومٍ فيعود
        * فورا**، وثمنُه مقيسٌ لا مقدَّر.
        */
-      const all = (options.commands === undefined ? script : script + COMMAND_SCRIPT) + TIME_SCRIPT
-      return `<script nonce="${safeNonce}">${stripJs(all)}</script>`
+      /*
+       * **والثابتُ أصلٌ ببصمة** (D-153): لوحةُ الأوامر والوقتُ والثيمُ في
+       * `/a/u.<hash>.js` تُخبَّأ سنةً، وسكربتُ اللوحة في `/a/p.<hash>.js`؛
+       * ولا يبقى سطرًا إلّا ما يتبدّل بالطلب. وكلٌّ بـ`nonce`.
+       */
+      const tags = [`<script nonce="${safeNonce}" src="${uiScript().path}"></script>`]
+      if (options.panelScript === true) tags.push(`<script nonce="${safeNonce}" src="${panelScript().path}"></script>`)
+      const inline = stripJs(script)
+      if (inline !== '') tags.push(`<script nonce="${safeNonce}">${inline}</script>`)
+      return tags.join('')
     })()
   }</body></html>`
 }

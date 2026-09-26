@@ -676,14 +676,21 @@ ul.plain li:last-child{margin-bottom:0}
 
 /* ── الرسم ─────────────────────────────────────────────────── */
 .chart{margin-top:var(--s-1)}
-.chart svg{display:block; width:100%}
-/* **الاتّجاه اللاتينيّ هنا ليس زينة**: نصُّ SVG يرث اتّجاه الصفحة، و RTL
-   يقلب معنى text-anchor — فتمتدّ التسميةُ خارج المربّع وتُقصّ. علّةٌ
-   لا تظهر إلا بالنظر إلى الرسم مرسوما. */
-.chart .axis{font-size:var(--t-xs); fill:var(--ink-3); font-variant-numeric:tabular-nums;
-  direction:ltr; unicode-bidi:isolate}
-.chart .grid-l{stroke:var(--line-soft); stroke-width:1}
-.chart .base{stroke:var(--line); stroke-width:1}
+/* **الرسمُ يتمدّد والحرفُ لا** (D-153): المسارُ في SVG بحدٍّ لا يتمدّد،
+   والأرقامُ والتواريخُ ونقطةُ الذروة HTML فوقه بمواضعَ مئويّة — فالحرفُ
+   ‏١٢px على كلّ عرض. والصندوقُ لاتينيُّ الاتّجاه لأنّ مواضعَه من إحداثيّات
+   الرسم (يسارُه بدايتُه). */
+.chart .plot{position:relative; direction:ltr; height:168px}
+.chart svg{display:block; width:100%; height:100%}
+.chart .axis{position:absolute; font-size:var(--t-xs); color:var(--ink-3); font-variant-numeric:tabular-nums;
+  line-height:1; white-space:nowrap; unicode-bidi:isolate}
+.chart .axis.y{transform:translateY(-50%)}
+.chart .axis.x{transform:translateY(-100%)}
+.chart .axis.x.end{text-align:right}
+.chart .peak{position:absolute; width:7px; height:7px; border-radius:50%; background:var(--surface);
+  border:2px solid var(--brand); transform:translate(-50%,-50%)}
+.chart .grid-l{stroke:var(--line-soft); stroke-width:1; vector-effect:non-scaling-stroke}
+.chart .base{stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke}
 /* ── خطُّ الرحلة (D-104) ───────────────────────────────────────────────
    خيطٌ يصل المحطّاتِ — **وهو المعلومة لا الصفوف**: ثلاثُ محطّاتٍ متفرّقة
    تُقرأ ثلاثةَ أشياء، وموصولةً تُقرأ سببيّةً لها أوّلٌ وآخر. وهي قاعدةُ

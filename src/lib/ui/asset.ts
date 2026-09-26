@@ -34,6 +34,10 @@
  * صامت خيرٌ من كلِّه به.**
  */
 import { STYLE } from '../../routes/ui/styles'
+import { SCRIPT as PANEL_SCRIPT } from '../../routes/panelView'
+import { COMMAND_SCRIPT } from '../../routes/ui/command'
+import { TIME_SCRIPT } from '../../routes/ui/time'
+import { COPY_SCRIPT, DENSITY_SCRIPT, THEME_SCRIPT } from '../../routes/ui/shell'
 
 /**
  * بصمةٌ متزامنة — **مفتاحُ تخبئةٍ لا حارس**.
@@ -94,3 +98,55 @@ const BODY = stripCss(STYLE)
 export const STYLE_PATH = `/a/s.${fingerprint(BODY)}.css`
 
 export const STYLE_BODY = BODY
+
+/*
+ * ── والسكربتُ الثابتُ يخرج كذلك (D-153) ───────────────────────────────
+ *
+ * قالت D-101 «السكربتُ يختلف باختلاف الصفحة» فأبقته سطرًا. **والصوابُ
+ * أنّ أكثرَه ثابتٌ حرفًا بحرف في كلّ صفحة**: الثيمُ والكثافةُ والنسخُ ولوحةُ
+ * الأوامر والوقتُ (‏١٨KB منزوعةً) في كلّ صفحة، وسكربتُ اللوحة (‏٢٨KB) في
+ * صفحتها — وكلُّها معروفٌ من الشيفرة لا من الطلب، فيُخدَم ببصمةٍ ويُخبَّأ
+ * سنةً كالأنماط. وما يتبدّل بالطلب (سكربتُ الدخول بالمفتاح، والعاملُ
+ * الثاني) يبقى سطرًا بـ`nonce`.
+ *
+ * **وخطرُ D-101 الصامت لا يقع هنا**: الأصلُ يُبنى من ثوابتَ مستورَدة لا من
+ * سجلٍّ يُملأ عند الرسم، فلا طلبَ يسبق تسجيلَه. والبناءُ عند أوّل نداءٍ لا
+ * عند الإقلاع لأنّ الاستيرادَ دائريّ (اللوحةُ تستورد القشرةَ التي تستورد هذا
+ * الملفّ)، **والرباطُ الحيُّ يُقرأ عند النداء وكلُّ الوحدات قد اكتملت**.
+ *
+ * وكلُّ `<script>` يحمل `nonce` — خارجيًّا كان أو سطرًا — فالسياسةُ لا تتبدّل.
+ */
+export interface ScriptAsset {
+  readonly path: string
+  readonly body: string
+}
+
+let ui: ScriptAsset | null = null
+let panel: ScriptAsset | null = null
+
+/** ما تحمله كلُّ صفحة: الثيمُ والكثافةُ والنسخُ ولوحةُ الأوامر والوقت. */
+export function uiScript(): ScriptAsset {
+  if (ui === null) {
+    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + COMMAND_SCRIPT + TIME_SCRIPT)
+    ui = { path: `/a/u.${fingerprint(body)}.js`, body }
+  }
+  return ui
+}
+
+/** سكربتُ اللوحة وحدَها — صفحةٌ واحدةٌ تحمله. */
+export function panelScript(): ScriptAsset {
+  if (panel === null) {
+    const body = stripJs(PANEL_SCRIPT)
+    panel = { path: `/a/p.${fingerprint(body)}.js`, body }
+  }
+  return panel
+}
+
+/** ما يُخدَم من `/a/…` بمساره — أو لا شيء. */
+export function assetAt(path: string): { readonly body: string; readonly type: string } | null {
+  if (path === STYLE_PATH) return { body: STYLE_BODY, type: 'text/css; charset=utf-8' }
+  for (const a of [uiScript(), panelScript()]) {
+    if (path === a.path) return { body: a.body, type: 'text/javascript; charset=utf-8' }
+  }
+  return null
+}

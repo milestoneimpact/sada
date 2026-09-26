@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { assets } from './assets'
-import { STYLE_BODY, STYLE_PATH, stripCss, stripJs } from '../lib/ui/asset'
+import { panelScript, STYLE_BODY, STYLE_PATH, stripCss, stripJs, uiScript } from '../lib/ui/asset'
 
 const env = {} as never
 
@@ -41,6 +41,38 @@ describe('مسارُ الأنماط', () => {
    */
   it('البصمةُ تتبدّل بتبدّل المحتوى', () => {
     expect(STYLE_PATH).toMatch(/^\/a\/s\.[0-9a-f]{8}\.css$/)
+  })
+})
+
+/**
+ * والسكربتُ الثابتُ أصلٌ كذلك (D-153): ما لا يتبدّل بالطلب يُخدَم ببصمةٍ
+ * ويُخبَّأ سنةً — لوحةُ الأوامر والوقتُ والثيمُ في كلّ صفحة، وسكربتُ اللوحة في
+ * صفحتها. **ولا تعليقَ فيهما ولا `nonce`**: الوسمُ يحمله لا الملفّ.
+ */
+describe('مسارا السكربت', () => {
+  it.each([
+    ['العامّ', uiScript, /^\/a\/u\.[0-9a-f]{8}\.js$/, 'cmdk'],
+    ['اللوحة', panelScript, /^\/a\/p\.[0-9a-f]{8}\.js$/, 'sadaB64'],
+  ])('%s يُسلَّم ببصمته مخبَّأً سنةً', async (_name, asset, shape, marker) => {
+    const { path, body } = asset()
+    expect(path).toMatch(shape)
+    expect(body).toContain(marker)
+    expect(body).not.toMatch(/^[ \t]*\/\//m)
+    const res = await assets.request(path, {}, env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('text/javascript; charset=utf-8')
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
+    expect(await res.text()).toBe(body)
+  })
+
+  it('وبصمةٌ خاطئةٌ للسكربت ‏٤٠٤', async () => {
+    expect((await assets.request('/a/u.00000000.js', {}, env)).status).toBe(404)
+    expect((await assets.request('/a/p.00000000.js', {}, env)).status).toBe(404)
+  })
+
+  it('والعامُّ يُبنى دالّةً بلا خطأ صياغة، واللوحةُ كذلك', () => {
+    expect(() => new Function(uiScript().body)).not.toThrow()
+    expect(() => new Function(panelScript().body)).not.toThrow()
   })
 })
 

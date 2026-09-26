@@ -219,6 +219,15 @@ for (const file of files) {
           fields.add(k)
           out.push({ kind: 'zoom', what: k, detail: `خطُّه ${fs}px` })
         }
+        // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
+        for (const t of document.querySelectorAll('svg text')) {
+          if (!shown(t)) continue
+          const box = t.getBoundingClientRect()
+          const fs = parseFloat(getComputedStyle(t).fontSize)
+          const ratio = t.ownerSVGElement ? box.height / Math.max(1, t.getBBox().height) : 1
+          const drawn = Math.round(fs * ratio)
+          if (drawn < 11) out.push({ kind: 'svgtext', what: key(t), detail: `حرفُه ${drawn}px مرسومًا` })
+        }
         return out
       },
       { width, TAP, MIN_FIELD_FONT },
@@ -278,6 +287,7 @@ for (const file of files) {
     vh: 'ارتفاعٌ ثابتٌ لا ديناميّ',
     hover: 'تعليقٌ يعلق على اللمس',
     weight: 'وزنٌ فوق السقف',
+    svgtext: 'حرفٌ في SVG يُقلَّص مع الرسم',
   }
 
   console.log(`\n═══ ${name} · ${kb}KB خامًا · ${gz}KB gzip ═══`)

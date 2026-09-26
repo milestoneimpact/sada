@@ -1529,7 +1529,10 @@ describe('الثيم النهاريّ', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('id="density"')
-    expect(html).toContain("getElementById('density')")
+    // السكربتُ صار في الأصل العامّ (D-153)، والصفحةُ تربطه
+    const { uiScript } = await import('../lib/ui/asset')
+    expect(uiScript().body).toContain("getElementById('density')")
+    expect(html).toContain(`src="${uiScript().path}"`)
   })
 
   /** **العلامةُ تقول بيئتَها** (D-151): كانت «STAGING» ثابتةً حتّى في الإنتاج. */
@@ -1542,6 +1545,21 @@ describe('الثيم النهاريّ', () => {
     ).text()
     expect(production).toContain('SADA · PRODUCTION')
     expect(production).not.toContain('STAGING')
+  })
+
+  /** **الثابتُ أصلٌ ببصمة** (D-153): لا يبقى سطرًا إلّا إقلاعُ الثيم وما يتبدّل بالطلب. */
+  it('اللوحةُ تحمل سكربتَيها أصلَين بـnonce وسطرًا واحدًا للإقلاع', async () => {
+    const cookie = await login()
+    const response = await app.request('/panel', withSession(cookie), env)
+    const html = await response.text()
+    const nonce = /nonce-([A-Za-z0-9+/]+)/.exec(response.headers.get('Content-Security-Policy') ?? '')?.[1]
+    expect(html).toMatch(new RegExp(`<script nonce="${nonce}" src="/a/u\\.[0-9a-f]{8}\\.js"></script>`))
+    expect(html).toMatch(new RegExp(`<script nonce="${nonce}" src="/a/p\\.[0-9a-f]{8}\\.js"></script>`))
+    expect((html.match(/<script nonce="[^"]+">/g) ?? []).length).toBe(1)
+    expect(html).not.toContain('sadaB64=')
+    const doc = await (await app.request('/privacy', {}, env)).text()
+    expect(doc).toMatch(/src="\/a\/u\.[0-9a-f]{8}\.js"/)
+    expect(doc).not.toMatch(/src="\/a\/p\./)
   })
 
   /** **وجهُ العرض يُسبَق حيث يُرسَم** (D-152): الوثيقةُ العامّة بلا عنوانٍ كوفيّ. */

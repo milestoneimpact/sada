@@ -90,7 +90,21 @@ describe('المساحة — والسؤالُ «كيف تغيّر»', () => {
   it('يرسم محورا وشبكةً — لا خطّا معلَّقا في فراغ', () => {
     const html = areaChart(series)
     expect(html).toContain('class="grid-l"')
-    expect(html).toContain('class="axis"')
+    expect(html).toContain('class="axis y"')
+    expect(html).toContain('class="axis x"')
+  })
+
+  /** **الرسمُ يتمدّد والحرفُ لا** (D-153): لا `<text>` في SVG، والحدُّ لا يتمدّد، والذروةُ HTML. */
+  it('لا حرفَ داخل SVG، والمسارُ بحدٍّ ثابت، والذروةُ نقطةٌ فوق الرسم', () => {
+    const html = areaChart(series)
+    expect(html).not.toContain('<text')
+    expect(html).not.toContain('<circle')
+    expect(html).toContain('vector-effect="non-scaling-stroke"')
+    expect(html).toMatch(/<i class="peak" style="left:\d+\.\d+%;top:\d+\.\d+%"/)
+    // الذروةُ في اليوم السابع من ‏١٤: موضعُها بين ‏٤٠٪ و‏٦٠٪ من العرض
+    const left = Number(/class="peak" style="left:([\d.]+)%/.exec(html)?.[1])
+    expect(left).toBeGreaterThan(40)
+    expect(left).toBeLessThan(60)
   })
 
   it('**ويُعلِّم الذروة** — وهي ما يُسأل عنه أوّلا', () => {

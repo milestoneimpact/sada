@@ -11,6 +11,7 @@
  *     يجد في الخادم ما لا يجده في اليد، وهي علّةُ عدّاد D-071 نفسُها.
  */
 import { describe, expect, it } from 'vitest'
+import { uiScript } from '../../lib/ui/asset'
 import {
   buildCommands, commandMore, commandPalette, commandTrigger, COMMAND_SCRIPT,
   DRAFT_CAP, normalize, searchKey, SECTIONS,
@@ -245,7 +246,9 @@ describe('التركيب — واللوحةُ لا تُركَّب نصفَ تر�
   it('**من مرّر الفهرسَ نال الجسدَ والنصَّ معا**', () => {
     const html = shell('ت', '<p>x</p>', 'n1', '', { commands: [one] })
     expect(html).toContain('id="cmdk"')
-    expect(html).toContain("e.code==='KeyK'")
+    // النصُّ في الأصل العامّ الذي تربطه كلُّ صفحة (D-153)
+    expect(html).toContain(`src="${uiScript().path}"`)
+    expect(uiScript().body).toContain("e.code==='KeyK'")
   })
 
   it('ومن لم يمرّره لم ينل واحدا منهما', () => {
@@ -282,7 +285,8 @@ describe('التركيب — واللوحةُ لا تُركَّب نصفَ تر�
 
   it('والنصُّ يبقى داخل نطاق nonce — لا وسمَ ثانٍ بلا ختم', () => {
     const html = shell('ت', '<p>x</p>', 'n1', 'var a=1;', { commands: [one] })
-    expect(html.match(/<script/g)).toHaveLength(2) // ‏ثيمُ الإقلاع، ثمّ نصُّ الصفحة
+    expect(html.match(/<script/g)).toHaveLength(3) // ‏ثيمُ الإقلاع، ثمّ الأصلُ العامّ، ثمّ نصُّ الصفحة
     expect(html).not.toContain('<script>')
+    expect(html.match(/<script nonce="n1"/g)).toHaveLength(3)
   })
 })

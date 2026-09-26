@@ -26,7 +26,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { densitySwitch, B64URL_SCRIPT, DENSITY_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, THEME_SCRIPT } from './ui/shell'
+import { densitySwitch, B64URL_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
@@ -1771,7 +1771,7 @@ ${pivotPane(d.pivot)}
 </div>`
 
   return shell(
-    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, SCRIPT + THEME_SCRIPT + DENSITY_SCRIPT,
-    { commands: buildCommands({ onPanel: true, drafts: d.drafts }) },
+    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, '',
+    { commands: buildCommands({ onPanel: true, drafts: d.drafts }), panelScript: true },
   )
 }
