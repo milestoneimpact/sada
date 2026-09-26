@@ -49,9 +49,16 @@ const FONT_CSS = `
  * الأنماط. **وبلا `crossorigin` لا يُستعمَل المحمَّل** — يُحمَّل الخطُّ
  * مرّتين، ويُقرأ ذلك في الشبكة تكرارا لا يُفسَّر.
  */
-const FONT_PRELOAD = [BEIRUTI, INTER, REEM_KUFI]
+const preloadOf = (faces: readonly { path: string }[]): string => faces
   .map((f) => `<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`)
   .join('\n')
+const FONT_PRELOAD = preloadOf([BEIRUTI, INTER, REEM_KUFI])
+/*
+ * **ووجهُ العرض يُسبَق حيث يُرسَم وحدَه** (D-152): الوثيقةُ العامّة بلا
+ * عنوانٍ كوفيّ، فكان تحميلُ Reem Kufi مسبقًا فيها ‏١٢KB لا يُقرأ منها حرف.
+ * ويبقى `@font-face` فلو رُسم حرفٌ منه جاء بعدَ حين لا أبدًا.
+ */
+const FONT_PRELOAD_BODY = preloadOf([BEIRUTI, INTER])
 
 /**
  * رمزُ التبويب — **مرسومٌ في الوثيقة لا مطلوبٌ من الشبكة**.
@@ -340,6 +347,8 @@ export function shell(
   options: {
     indexable?: boolean
     description?: string
+    /** لا عنوانَ بوجه العرض في هذه الصفحة، فلا يُسبَق تحميلُه (D-152) */
+    noDisplayFace?: boolean
     /**
      * فهرسُ لوحة الأوامر (D-105) — **ومَن مرّره نالها كاملةً**.
      *
@@ -362,7 +371,7 @@ export function shell(
 <title>${escapeHtml(title)}</title>
 ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
-${FONT_PRELOAD}
+${options.noDisplayFace === true ? FONT_PRELOAD_BODY : FONT_PRELOAD}
 <style nonce="${safeNonce}">${FONT_CSS}</style>
 <link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
     options.commands === undefined ? '' : commandPalette(options.commands)

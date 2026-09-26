@@ -1573,6 +1573,9 @@ panel.get('/panel/media/:id', async (c) => {
       // خاصّةٌ لا عامّة: وسيطٌ مشترك لا يخزّن ما يخصّ جلسة
       'Cache-Control': 'private, max-age=3600',
       'X-Content-Type-Options': 'nosniff',
+      // الوسيطُ بايتاتٌ لا صفحة (D-152): لا برمجةَ ولا أصلَ لو جاء نوعٌ غيرُ متوقَّع
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': `inline; filename="${row.r2_key.split('/').pop() ?? 'media'}"`,
     },
   })
 })
