@@ -8,6 +8,7 @@ import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../shell'
 import { actionLabel, targetLabel } from '../../../lib/audit'
+import { status } from '../parts'
 
 
 
@@ -42,7 +43,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
     <td data-label="فُتحت"><span title="${escapeHtml(x.at)} UTC">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td data-label="">${x.current
-      ? '<span class="st ok"><span class="g">●</span>جلستك</span>'
+      ? status('ok', '●', 'جلستك')
       : `<form class="inline" method="POST" action="/panel/sessions/revoke"
              data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
            <input type="hidden" name="handle" value="${escapeHtml(x.handle)}">
@@ -53,7 +54,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
     <td><div class="nm">${escapeHtml(k.label)}</div></td>
     <td data-label="سُجّل"><span title="${escapeHtml(k.createdAt)} UTC">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
-      ? '<span class="st idle"><span class="g">○</span>لم يُستعمل</span>'
+      ? status('idle', '○', 'لم يُستعمل')
       : `<span title="${escapeHtml(k.lastUsedAt)} UTC">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
     <td><button class="d sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
           data-label="${escapeHtml(k.label)}">احذف</button></td>

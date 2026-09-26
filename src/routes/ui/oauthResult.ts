@@ -31,6 +31,7 @@ import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
 import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
+import { status } from './parts'
 
 // القاموسُ واحدٌ في lib/oauth/providers (D-151)
 const LABEL = PLATFORM_LABEL
@@ -56,8 +57,8 @@ function scopeRows(platform: Platform, granted: ReadonlySet<string>): string {
         <td data-label="يفتح"><span class="nm">${escapeHtml(spec.enables)}</span></td>
         <td data-label="الحال">${
           on
-            ? '<span class="st ok"><span class="g">●</span>ممنوح</span>'
-            : '<span class="st bad"><span class="g">▲</span>ناقص</span>'
+            ? status('ok', '●', 'ممنوح')
+            : status('bad', '▲', 'ناقص')
         }</td>
         <td data-label="مصدرُه">${
           on
@@ -101,8 +102,8 @@ export function connectedBody(d: ConnectedData): string {
            ولا تُعِد بناء التطبيق.</span></div>`
 
   const refresh = d.hasRefresh
-    ? '<span class="st ok"><span class="g">●</span>يُجدَّد تلقائيّا</span>'
-    : `<span class="st warn"><span class="g">!</span>بلا تجديدٍ تلقائيّ</span>`
+    ? status('ok', '●', 'يُجدَّد تلقائيّا')
+    : `${status('warn', '!', `بلا تجديدٍ تلقائيّ`)}`
 
   return `${head(
     d.platform,

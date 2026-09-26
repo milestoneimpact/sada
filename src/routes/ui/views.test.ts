@@ -19,7 +19,7 @@ import { TOKENS } from './tokens'
 import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
-import { bar } from './parts'
+import { bar, status } from './parts'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
 import { scopeSet } from '../../lib/oauth/scopes'
@@ -684,5 +684,19 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     })
     expect(html).toContain('YouTube')
     expect(html).not.toMatch(/>youtube</)
+  })
+})
+
+describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
+  it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '!'])('الحرفُ %s يُرسَم SVG بلون النصّ', (glyph) => {
+    const html = status('ok', glyph, 'نصّ')
+    expect(html).toContain('<span class="st ok"><span class="g"><svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">')
+    expect(html).not.toContain(glyph)
+    expect(html).toContain('</svg></span>نصّ</span>')
+  })
+
+  it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
+    expect(status('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="g">&lt;</span>x</span>')
+    expect(status('', '●', 'x')).toContain('<span class="st"><span class="g"><svg')
   })
 })

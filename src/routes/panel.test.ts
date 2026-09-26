@@ -1553,8 +1553,10 @@ describe('الثيم النهاريّ', () => {
     const response = await app.request('/panel', withSession(cookie), env)
     const html = await response.text()
     const nonce = /nonce-([A-Za-z0-9+/]+)/.exec(response.headers.get('Content-Security-Policy') ?? '')?.[1]
-    expect(html).toMatch(new RegExp(`<script nonce="${nonce}" src="/a/u\\.[0-9a-f]{8}\\.js"></script>`))
-    expect(html).toMatch(new RegExp(`<script nonce="${nonce}" src="/a/p\\.[0-9a-f]{8}\\.js"></script>`))
+    // nonce فيه + و/ فلا يدخل تعبيرًا نمطيًّا بلا تهريب
+    const { uiScript, panelScript } = await import('../lib/ui/asset')
+    expect(html).toContain(`<script nonce="${nonce}" src="${uiScript().path}"></script>`)
+    expect(html).toContain(`<script nonce="${nonce}" src="${panelScript().path}"></script>`)
     expect((html.match(/<script nonce="[^"]+">/g) ?? []).length).toBe(1)
     expect(html).not.toContain('sadaB64=')
     const doc = await (await app.request('/privacy', {}, env)).text()

@@ -210,7 +210,8 @@ for (const file of files) {
  * و`ui/shell.ts` علامةُ صدى ورمزُ التبويب — هويّتُنا لا أيقونةُ واجهة.
  * و`ui/chart.ts` رسمٌ بيانيٌّ يُحسَب، لا شكلٌ ثابت.
  */
-const ICON_HOME = /ui\/(icons|logos|shell|chart)\.ts$/
+// وparts.ts يرسم رموزَ الحال (D-154)
+const ICON_HOME = /ui\/(icons|logos|shell|chart|parts)\.ts$/
 const strayIcons = []
 for (const file of files) {
   if (NOT_USAGE.test(file) || ICON_HOME.test(file)) continue

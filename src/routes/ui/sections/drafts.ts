@@ -37,6 +37,7 @@ import { relativeTime } from '../../../lib/format'
 import { LOGOS } from '../logos'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
+import { status } from '../parts'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -112,8 +113,7 @@ function scheduler(
   if (d.status === 'queued') {
     const gone = d.dispatchedAt !== null
     return `<div class="sched ${gone ? 'gone' : 'set'}">
-      <span class="st ${gone ? 'warn' : 'ok'}"><span class="g">${gone ? '↑' : '◔'}</span>${
-        gone ? 'غادرت إلى الطابور' : 'مجدولة'}</span>
+      ${status(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
       <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
       <span class="grow"></span>
@@ -134,7 +134,7 @@ function scheduler(
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
       return `<div class="sched none">
-        <span class="st warn"><span class="g">!</span>الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ</span>
+        ${status('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
         <span class="grow"></span>
@@ -142,7 +142,7 @@ function scheduler(
       </div>`
     }
     return `<div class="sched none">
-      <span class="st warn"><span class="g">!</span>لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة</span>
+      ${status('warn', '!', `لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة`)}
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
       <span class="grow"></span>
       <a class="btn g sm" href="#channels">اربط قناة</a>
@@ -239,7 +239,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
-             <span class="st ok"><span class="g">●</span>مقطعٌ رأسيّ 15ث</span>
+             ${status('ok', '●', `مقطعٌ رأسيّ 15ث`)}
              <span class="chip mono">${Math.round(clip.bytes / 1024)}KB</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}
@@ -250,8 +250,8 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   if (!open) return ''
 
   return `<div class="pic none">
-    <span class="st idle"><span class="g">○</span>${
-      rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}</span>
+    ${status('idle', '○', `${
+      rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.</span>
     <span class="grow"></span>
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
@@ -408,8 +408,8 @@ function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
   if (notes.length === 0) return ''
 
   return `<details class="notes">
-    <summary><span class="st idle"><span class="g">◍</span>${
-      notes.length} ملحوظةً على الصياغة</span>
+    <summary>${status('idle', '◍', `${
+      notes.length} ملحوظةً على الصياغة`)}
       <span class="ago">تُقرأ ولا تمنع — والقرارُ لك</span></summary>
     <ul class="plain">${notes
       .map(
@@ -466,10 +466,9 @@ function card(
      */
     d.publishCost === 0
       ? ''
-      : `<span class="st ${d.publishCost >= 0.1 ? 'warn' : ''}"
-           ><span class="g">${d.publishCost >= 0.1 ? '!' : '●'}</span
-           >نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}</span>`,
-    d.stale ? '<span class="st warn"><span class="g">▲</span>المصدر تغيّر بعدها</span>' : '',
+      : status(d.publishCost >= 0.1 ? 'warn' : '', d.publishCost >= 0.1 ? '!' : '●',
+          `نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}`),
+    d.stale ? status('warn', '▲', 'المصدر تغيّر بعدها') : '',
     /*
      * **ورابطُ الرحلة على كلّ بطاقة** (D-104): الرحلةُ تُسأل عن منشورٍ
      * بعينه، **والسؤالُ يقع وأنت تنظر إليه** — لا بعد أن تبحث عن معرّفه.
@@ -523,7 +522,7 @@ function card(
       <div class="ch-name">${escapeHtml(spec.label)}
         <span class="ago">منذ ${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
       <span class="grow"></span>
-      <span class="st ${st.cls}"><span class="g">${st.glyph}</span>${escapeHtml(st.text)}</span>
+      ${status(st.cls, st.glyph, escapeHtml(st.text))}
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
@@ -666,7 +665,7 @@ export function draftsSection(input: DraftsInput): string {
    */
   const bulk = `<form id="bulk" class="bulkbar" method="POST"
       action="/panel/drafts/approve-many" data-busy="جارٍ الاعتماد…" hidden>
-    <span class="st ok"><span class="g">●</span><b data-bulk-n>0</b> محدَّدة</span>
+    ${status('ok', '●', `<b data-bulk-n>0</b> محدَّدة`)}
     <span class="ago" data-bulk-cost></span>
     <span class="grow"></span>
     <button type="button" class="g sm" data-bulk-clear>ألغِ التحديد</button>
@@ -676,8 +675,7 @@ export function draftsSection(input: DraftsInput): string {
   return `${bulk}<div class="card" style="margin-bottom:var(--s-3)">
     <div class="card-head"><h2>الكتابة من مصدر</h2>
       <div class="grow"></div>
-      <span class="st ${waiting === 0 ? 'idle' : 'warn'}"><span class="g">${
-        waiting === 0 ? '○' : '!'}</span>${waiting} تنتظر قرارك</span></div>
+      ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}</div>
     <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
       <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
     ${writer}
@@ -718,7 +716,7 @@ function spreadBar(input: DraftsInput): string {
   return `<form class="card" method="POST" action="/panel/drafts/spread">
     <div class="card-head"><h2>وزّع المعتمَد</h2>
       <div class="grow"></div>
-      <span class="st ok"><span class="g">●</span>${ready} جاهزةً للتوزيع</span></div>
+      ${status('ok', '●', `${ready} جاهزةً للتوزيع`)}</div>
     <p class="hint">موعدٌ للأولى وفاصلٌ بين كلِّ اثنتين — <b>ويُعرَض الجدولُ كاملا
       قبل أن يقع منه شيء</b>.</p>
     <div class="row">

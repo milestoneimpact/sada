@@ -18,6 +18,7 @@
 import { escapeHtml } from './shell'
 import { secretCommand, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
+import { status } from './parts'
 
 const MARK: Readonly<Record<string, { g: string; cls: string; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تمّت' },
@@ -79,11 +80,11 @@ function row(r: OwnerRow, env: string): string {
             r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
     </td>
     <td data-label="تفتح">
-      <span class="st ${opens.cls}"><span class="g">◆</span>${opens.label}</span>
+      ${status(opens.cls, '◆', opens.label)}
       <div class="sub">${bold(opens.why)}</div>
     </td>
     <td data-label="الحال">
-      <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+      ${status(mark.cls, mark.g, mark.label)}
       ${/*
          * **و«تمّت» وحدها تكذب على مهمّةٍ دوريّة** (D-072): مراجعةٌ لم
          * تقع بعدُ وليست مستحقّةً ليست «تمّت» — فيُقال ما قِيس، كما
@@ -115,7 +116,7 @@ function gateCard(g: Gate): string {
           <span class="what">${bold(i.text)}</span>
           <span class="why">${escapeHtml(i.evidence)}</span>
         </span>
-        <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+        ${status(mark.cls, mark.g, mark.label)}
       </li>`
     })
     .join('')
@@ -125,8 +126,8 @@ function gateCard(g: Gate): string {
       <h2>المرحلة ${escapeHtml(g.phase)} · ${escapeHtml(g.title)}</h2>
       <div class="grow"></div>
       ${g.passed
-        ? '<span class="st ok"><span class="g">●</span>اجتِيزت</span>'
-        : '<span class="st idle"><span class="g">○</span>لم تُجتَز</span>'}
+        ? status('ok', '●', 'اجتِيزت')
+        : status('idle', '○', 'لم تُجتَز')}
     </div>
     <ol class="steps wiz nodot">${items}</ol>
   </div>`
@@ -179,9 +180,8 @@ export function tasksScreen(d: TasksScreenData): string {
   <div class="lede-row" style="margin-top:var(--s-6)">
     <h3 class="sec" style="margin:0; border:0; padding:0">بوّاباتُ المراحل</h3>
     <span class="grow"></span>
-    <span class="st ${d.phase === null ? 'ok' : 'warn'}"><span class="g">${
-      d.phase === null ? '●' : '◍'}</span>${
-      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}</span>
+    ${status(d.phase === null ? 'ok' : 'warn', d.phase === null ? '●' : '◍', `${
+      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}`)}
   </div>
 
   <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>

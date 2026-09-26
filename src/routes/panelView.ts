@@ -27,7 +27,7 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, B64URL_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
-import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow } from './ui/parts'
+import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { COPY_SCRIPT } from './ui/shell'
@@ -1016,7 +1016,7 @@ export interface PanelAudit {
 
 /** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
 function worthCell(worth: number | null): string {
-  if (worth === null) return '<span class="st idle"><span class="g">○</span>لم يُحلَّل</span>'
+  if (worth === null) return chip('idle', '○', 'لم يُحلَّل')
   const p = Math.round(worth * 100)
   const shade = worth >= 0.66 ? 'var(--brand)' : worth >= 0.33 ? 'var(--brand-soft)' : 'var(--ink-3)'
   return `<div class="worth" title="درجة الاستحقاق ${worth.toFixed(2)} من 1">
@@ -1027,10 +1027,10 @@ function worthCell(worth: number | null): string {
 function sourceRow(s: PanelSource, now: Date): string {
   const pending = !s.analyzed || s.stale
   const status = s.stale
-    ? '<span class="st warn"><span class="g">▲</span>تغيّر بعد التحليل</span>'
+    ? chip('warn', '▲', 'تغيّر بعد التحليل')
     : s.analyzed
-      ? '<span class="st ok"><span class="g">●</span>محلَّل</span>'
-      : '<span class="st idle"><span class="g">○</span>ينتظر</span>'
+      ? chip('ok', '●', 'محلَّل')
+      : chip('idle', '○', 'ينتظر')
 
   const themes = s.themes.slice(0, 5).map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')
   const body = s.summary === null
