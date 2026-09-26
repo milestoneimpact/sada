@@ -9,6 +9,41 @@ import { escapeHtml } from './shell'
 import type { Onboarding } from '../../lib/onboard'
 
 /**
+ * رقاقةُ الحال — **دالّةٌ واحدةٌ ورموزٌ مرسومة** (D-154).
+ *
+ * كانت `<span class="st …"><span class="g">●</span>…</span>` تُكتب يدًا
+ * ‏٦٥ مرّةً في عشرة ملفّات، ورمزُها حرفٌ (● ○ ▲ ✓ ✕ ◍ ◔ ↑ ◆ !) ليس في أيّ
+ * وجهٍ مضمَّن، فيسقط إلى خطّ النظام ويختلف من جهازٍ لآخر (التدقيقُ الثالث).
+ * هنا يُرسَم SVG بـ`currentColor` في ‏١٠×‏١٠، **والحرفُ يبقى مفتاحَه** في
+ * جداول الحال، فما لا رسمَ له يُطبَع حرفًا كما كان.
+ */
+const GLYPH: Readonly<Record<string, string>> = {
+  '●': '<circle cx="5" cy="5" r="3.6"/>',
+  '○': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  '◍': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 1.9a3.1 3.1 0 0 0 0 6.2z"/>',
+  '◔': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 5V1.9a3.1 3.1 0 0 1 3.1 3.1z"/>',
+  '▲': '<path d="M5 1.5 9.1 8.6H.9z"/>',
+  '◆': '<path d="M5 1 9 5 5 9 1 5z"/>',
+  '✓': '<path d="M1.8 5.3 4.2 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  '✕': '<path d="M2.3 2.3l5.4 5.4M7.7 2.3 2.3 7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  '↑': '<path d="M5 8.5V1.7M2 4.7 5 1.7l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  '!': '<path d="M5 1.7v4.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="5" cy="8.3" r="1.1"/>',
+}
+
+/**
+ * `cls` من ok · warn · bad · idle (أو فارغ)، و`glyph` حرفُ الحال، و`text`
+ * HTML جاهزٌ (مهرَّبٌ عند من كتبه)، و`attrs` سِماتٌ تُلحَق بالرقاقة.
+ */
+export function status(cls: string, glyph: string, text: string, attrs = ''): string {
+  const drawn = GLYPH[glyph]
+  const g = drawn === undefined
+    ? escapeHtml(glyph)
+    : `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${drawn}</svg>`
+  const open = `<span class="st${cls === '' ? '' : ` ${cls}`}"${attrs === '' ? '' : ` ${attrs}`}>`
+  return `${open}<span class="g">${g}</span>${text}</span>`
+}
+
+/**
  * رأسُ اللوح — **واحدٌ لكلّ لوحٍ سوى «نظرة عامّة»** (D-137): كان لوحُ
  * الجدول المحوريّ وحدَه بلا رأس، فقُرئ ناقصًا بين ألواحٍ لكلٍّ منها اسمٌ
  * وسطرٌ. ونظرةٌ عامّة تُفتَح كلَّ صباحٍ فتحمل السطرَ وحدَه قصدًا.
@@ -139,8 +174,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
         .map((r) => {
           const ok = r.status !== null && r.status >= 200 && r.status < 300
           return `<li class="ax-r">
-            <span class="st ${ok ? 'ok' : 'bad'}"><span class="g">${ok ? '↑' : '✕'}</span>${
-              escapeHtml(ALERT_KIND[r.kind] ?? r.kind)}</span>
+            ${status(ok ? 'ok' : 'bad', ok ? '↑' : '✕', escapeHtml(ALERT_KIND[r.kind] ?? r.kind))}
             <span class="ax-b">${escapeHtml(r.body.slice(0, 70))}${r.body.length > 70 ? '…' : ''}</span>
             <span class="grow"></span>
             ${r.error === null

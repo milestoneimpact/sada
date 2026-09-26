@@ -16,6 +16,7 @@ import { escapeHtml } from '../shell'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { relativeTime } from '../../../lib/format'
 import type { StoredPlan } from '../../../lib/plan/job'
+import { status as chip } from '../parts'
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
@@ -50,7 +51,7 @@ function row(
       <div class="sub">${escapeHtml(item.angle)}</div>
       ${item.why === '' ? '' : `<div class="sub">— ${escapeHtml(item.why)}</div>`}</td>
     <td data-label="">${gone
-      ? '<span class="st idle"><span class="g">○</span>لا مصدر</span>'
+      ? chip('idle', '○', 'لا مصدر')
       : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…">
            <input type="hidden" name="id" value="${escapeHtml(item.sourceId)}">
            <input type="hidden" name="platform" value="${escapeHtml(item.platform)}">
@@ -95,8 +96,8 @@ export function planSection(input: PlanInput): string {
 
   const status =
     plan.status === 'approved'
-      ? '<span class="st ok"><span class="g">●</span>معتمَدة</span>'
-      : '<span class="st idle"><span class="g">○</span>تنتظر قراءتك</span>'
+      ? chip('ok', '●', 'معتمَدة')
+      : chip('idle', '○', 'تنتظر قراءتك')
 
   return `<div class="card">
     <div class="card-head"><h2>الخطّة الأسبوعيّة</h2>

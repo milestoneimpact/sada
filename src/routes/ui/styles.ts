@@ -537,7 +537,9 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 /* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
 .st{display:inline-flex; align-items:center; gap:var(--s-1); padding:var(--s-0) var(--s-2); border-radius:var(--r-pill);
   font-size:var(--t-xs); font-weight:600; border:1px solid transparent; white-space:nowrap}
-.st .g{font-size:var(--t-xs); line-height:var(--lh-tight)}
+/* الرمزُ مرسومٌ لا حرفٌ من خطّ النظام (D-154) */
+.st .g{display:inline-flex; line-height:1}
+.st .g svg{width:10px; height:10px; display:block}
 .st.ok{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 24%,transparent)}
 .st.warn{color:var(--warn); background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 28%,transparent)}
 .st.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 28%,transparent)}

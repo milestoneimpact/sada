@@ -24,6 +24,7 @@ import { ICON } from './icons'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { relativeTime } from '../../lib/format'
+import { status } from './parts'
 
 const KIND: Readonly<Record<string, string>> = {
   member: 'حسابٌ شخصيّ',
@@ -79,7 +80,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
           <span class="what">${escapeHtml(step.title)}</span>
           <span class="why">${step.proof.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</span>
         </span>
-        <span class="st ${mark.cls}"><span class="g">${mark.g}</span>${mark.label}</span>
+        ${status(mark.cls, mark.g, mark.label)}
       </li>`
     })
     .join('')
@@ -281,14 +282,14 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
 
   const badge =
     state === 'linked'
-      ? '<span class="st ok"><span class="g">●</span>مربوطة</span>'
+      ? status('ok', '●', 'مربوطة')
       : state === 'needs_reauth'
-        ? '<span class="st bad"><span class="g">▲</span>تحتاج تجديدا</span>'
+        ? status('bad', '▲', 'تحتاج تجديدا')
         : state === 'connectable'
-          ? '<span class="st idle"><span class="g">○</span>جاهزةٌ للربط</span>'
+          ? status('idle', '○', 'جاهزةٌ للربط')
           : state === 'awaiting_owner'
-            ? '<span class="st warn"><span class="g">!</span>تنتظرك</span>'
-            : '<span class="st idle"><span class="g">○</span>لم تُبنَ</span>'
+            ? status('warn', '!', 'تنتظرك')
+            : status('idle', '○', 'لم تُبنَ')
 
   const rows = accounts
     .map(
@@ -298,7 +299,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         ${a.status === 'needs_reauth' ? '' : tokenDays(a.expiresAt, now)}
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
-          ? '<span class="st bad"><span class="g">▲</span>جدّد الإذن</span>'
+          ? status('bad', '▲', 'جدّد الإذن')
           : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">منذ ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
@@ -345,7 +346,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
              */
             ? `<a class="btn p sm" href="/panel/channels/${escapeHtml(spec.id)}"
                   aria-label="اضبط سرّي ${escapeHtml(spec.label)}">اضبط سرّيه</a>`
-            : '<span class="st idle"><span class="g">○</span>يحتاج سائقا يُكتب له</span>'
+            : status('idle', '○', 'يحتاج سائقا يُكتب له')
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
   // والشاشةُ تقول ماذا نُشر وما فشل ولماذا — وهما سؤالان لا واحد
@@ -382,10 +383,10 @@ export function tokenDays(expiresAt: string | null, now: Date): string {
   if (Number.isNaN(ms)) return ''
   const days = Math.floor((ms - now.getTime()) / 86_400_000)
   const title = `title="ينتهي رمزُ الوصول ${escapeHtml(expiresAt)} UTC"`
-  if (days < 0) return `<span class="st bad" ${title}><span class="g">▲</span>انتهى الإذن</span>`
+  if (days < 0) return `${status('bad', '▲', `انتهى الإذن`, `${title}`)}`
   if (days <= 7) {
-    return `<span class="st warn" ${title}><span class="g">◍</span>${
-      days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${days} ${days === 1 ? 'يوم' : days === 2 ? 'يومان' : 'أيّام'} للإذن`}</span>`
+    return `${status('warn', '◍', `${
+      days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${days} ${days === 1 ? 'يوم' : days === 2 ? 'يومان' : 'أيّام'} للإذن`}`, `${title}`)}`
   }
   return `<span class="chip" ${title}>الإذن ${days} يوما</span>`
 }
@@ -419,8 +420,8 @@ export function channelsSection(
     ? ''
     : `<div class="card" style="margin-bottom:var(--s-4);border-color:var(--warn)">
         <div class="card-head"><h2>ما ينتظرك الآن</h2><div class="grow"></div>
-          <span class="st warn"><span class="g">!</span>${urgent.length} ${
-            urgent.length === 1 ? 'قناة' : 'قنوات'}</span></div>
+          ${status('warn', '!', `${urgent.length} ${
+            urgent.length === 1 ? 'قناة' : 'قنوات'}`)}</div>
         <ul class="todo">${urgent.map((v) => `<li>
           <span class="dot ${v.state === 'needs_reauth' ? 'bad' : 'warn'}"></span>
           <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
@@ -461,8 +462,7 @@ export function channelsSection(
   return `${strip}${waiting}<div class="lede-row">
     <h3 class="sec" style="margin:0; border:0; padding:0">القنوات المبنيّة</h3>
     <span class="grow"></span>
-    <span class="st ${linked === 0 ? 'warn' : 'ok'}"><span class="g">${
-      linked === 0 ? '!' : '●'}</span>${linked} من ${built.length} مربوطة</span>
+    ${status(linked === 0 ? 'warn' : 'ok', linked === 0 ? '!' : '●', `${linked} من ${built.length} مربوطة`)}
     <span class="lede-note"><b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
       خطوتان في كلّ طريقٍ تقعان في بوّابة المنصّة ولا تُقرآن من هنا،
       وبرهانُهما نجاحُ ما بعدهما. ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة،

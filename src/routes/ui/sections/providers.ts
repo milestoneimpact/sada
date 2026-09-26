@@ -9,7 +9,7 @@ import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../shell'
-import { bar } from '../parts'
+import { bar, status as chip } from '../parts'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -161,12 +161,12 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     const locked = p.source === 'worker_secret'
 
     const status = !p.configured
-      ? '<span class="st bad"><span class="g">✕</span>لا مفتاح</span>'
+      ? chip('bad', '✕', 'لا مفتاح')
       : !p.enabled
-        ? '<span class="st warn"><span class="g">▲</span>معطَّل</span>'
+        ? chip('warn', '▲', 'معطَّل')
         : p.verifiedAt === null
-          ? '<span class="st idle"><span class="g">○</span>لم يُختبر</span>'
-          : `<span class="st ok" title="${escapeHtml(p.verifiedAt)} UTC"><span class="g">✓</span>اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}</span>`
+          ? chip('idle', '○', 'لم يُختبر')
+          : `${chip('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(p.verifiedAt)} UTC"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
@@ -460,10 +460,10 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         </form>
       </td>
       <td data-label="الحال">${r.ready
-        ? '<span class="st ok"><span class="g">●</span>جاهز</span>'
+        ? chip('ok', '●', 'جاهز')
         : r.implemented
-          ? '<span class="st bad"><span class="g">✕</span>مزوّده غير جاهز</span>'
-          : '<span class="st idle"><span class="g">○</span>لم تُبنَ</span>'}</td></tr>`).join('')
+          ? chip('bad', '✕', 'مزوّده غير جاهز')
+          : chip('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
 
   return { strip, rows, add, routing }
 }

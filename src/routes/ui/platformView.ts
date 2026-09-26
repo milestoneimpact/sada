@@ -38,6 +38,7 @@ import { setupPane } from './channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { whenTag } from './time'
 import { LOGOS } from './logos'
+import { status } from './parts'
 
 export interface PlatformScreenData {
   readonly view: ChannelView
@@ -128,8 +129,8 @@ function capabilityTable(rows: readonly Capability[]): string {
         <td data-label="يفتح"><span class="nm">${escapeHtml(row.spec.enables)}</span></td>
         <td data-label="الحال">${
           on
-            ? '<span class="st ok"><span class="g">●</span>ممنوح</span>'
-            : '<span class="st bad"><span class="g">▲</span>ناقص</span>'
+            ? status('ok', '●', 'ممنوح')
+            : status('bad', '▲', 'ناقص')
         }</td>
         <td data-label="مصدرُه">${
           on
@@ -216,7 +217,7 @@ function postCard(
 
   return `<article class="post">
     <div class="post-top">
-      <span class="st ${meta.cls}"><span class="g">${meta.g}</span>${meta.label}</span>
+      ${status(meta.cls, meta.g, meta.label)}
       ${post.accountName === null
         ? ''
         : `<span class="chip">${escapeHtml(post.accountName)}</span>`}
@@ -361,14 +362,14 @@ export function platformScreen(d: PlatformScreenData): string {
 
   const badge =
     state === 'linked'
-      ? '<span class="st ok"><span class="g">●</span>مربوطة</span>'
+      ? status('ok', '●', 'مربوطة')
       : state === 'needs_reauth'
-        ? '<span class="st bad"><span class="g">▲</span>تحتاج تجديدا</span>'
+        ? status('bad', '▲', 'تحتاج تجديدا')
         : state === 'connectable'
-          ? '<span class="st idle"><span class="g">○</span>جاهزةٌ للربط</span>'
+          ? status('idle', '○', 'جاهزةٌ للربط')
           : state === 'awaiting_owner'
-            ? '<span class="st warn"><span class="g">!</span>تنتظرك</span>'
-            : '<span class="st idle"><span class="g">○</span>لم يُبنَ سائقُها</span>'
+            ? status('warn', '!', 'تنتظرك')
+            : status('idle', '○', 'لم يُبنَ سائقُها')
 
   // ── ما يُربَط ولا ينشر: الحقيقةُ كاملةً في صدر الشاشة ─────────────
   const stageBanner =
@@ -413,10 +414,10 @@ export function platformScreen(d: PlatformScreenData): string {
           <span class="chip">${a.kind === 'org' ? 'صفحةٌ أو شركة' : 'حسابٌ شخصيّ'}</span>
           <div class="grow"></div>
           ${a.status === 'needs_reauth'
-            ? '<span class="st bad"><span class="g">▲</span>جدّد الإذن</span>'
+            ? status('bad', '▲', 'جدّد الإذن')
             : missing === 0
-              ? '<span class="st ok"><span class="g">●</span>كلُّ النطاقات ممنوحة</span>'
-              : `<span class="st warn"><span class="g">!</span>${missing} نطاقا ناقصا</span>`}
+              ? status('ok', '●', 'كلُّ النطاقات ممنوحة')
+              : `${status('warn', '!', `${missing} نطاقا ناقصا`)}`}
         </div>
         <p class="hint">${
           granted === ''

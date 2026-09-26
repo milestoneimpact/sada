@@ -159,7 +159,23 @@ for (const file of walk(ROUTES)) {
   }
 }
 
-let bad = 0
+/*
+ * ── رقاقةُ الحال من دالّتها وحدَها (D-154) ────────────────────────────
+ * `<span class="g">` يرسمه `status()` في parts.ts؛ من كتبه يدًا أعاد
+ * الحرفَ الساقطَ إلى خطّ النظام وفرّق ما وُحّد.
+ */
+const handChips = []
+for (const file of walk(ROUTES)) {
+  if (file.endsWith('/parts.ts') || file === STYLES) continue
+  const code = readFileSync(file, 'utf8')
+  const n = (code.match(/<span class="g">/g) ?? []).length
+  if (n > 0) handChips.push([file.slice(ROOT.length), n])
+}
+console.log('\n═══ رقاقةُ حالٍ مكتوبةٌ يدًا ═══\n')
+if (handChips.length === 0) console.log('  ✓ كلُّ رقاقةٍ من status()')
+for (const [where, n] of handChips) console.log(`  ✕ ${where}  ×${n}`)
+
+let bad = handChips.length
 console.log('\n═══ صنفٌ يُكتب ولا يُرسَم ═══\n')
 for (const [cls, files] of [...used].sort()) {
   if (defined.has(cls)) continue
