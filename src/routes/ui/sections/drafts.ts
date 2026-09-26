@@ -672,17 +672,17 @@ export function draftsSection(input: DraftsInput): string {
     <button class="p sm" type="submit">اعتمدها كما كُتبت</button>
   </form>`
 
-  return `${bulk}<div class="card" style="margin-bottom:var(--s-3)">
-    <div class="card-head"><h2>الكتابة من مصدر</h2>
-      <div class="grow"></div>
-      ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}</div>
-    <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
-      <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
-    ${writer}
-  </div>
-
+  /*
+   * **الترتيبُ بالقرار لا بالتدفّق** (D-156). كان اللوحُ يبدأ ببطاقة الكتابة
+   * من مصدر، وما ينتظر قرارَ المالك تحتها بـ‏١٦٦٥px عند ‏١٤٤٠×‏٩٠٠ (التدقيقُ
+   * الثالث). السؤالُ الذي يُفتَح له اللوح «ما الذي ينتظرني؟»، فجوابُه أوّلًا:
+   * المسوّداتُ المنتظرة، ثمّ التوزيعُ إن كان له ما يُوزَّع، ثمّ الكتابةُ من
+   * مصدر، والخطّةُ بعدها في اللوح.
+   */
+  return `${bulk}
   <div class="lede-row">
     <h3 class="sec" style="margin:0; border:0; padding:0">المسوّدات</h3>
+    ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
@@ -693,7 +693,14 @@ export function draftsSection(input: DraftsInput): string {
   ${list}
   <div class="empty" id="draft-none" hidden>
     <b>لا مسوّدةَ في هذا الفرز</b>
-    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>`
+    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>
+
+  <div class="card" style="margin-top:var(--s-3)">
+    <div class="card-head"><h2>الكتابة من مصدر</h2></div>
+    <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
+      <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
+    ${writer}
+  </div>`
 }
 
 /**

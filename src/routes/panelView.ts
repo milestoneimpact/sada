@@ -1486,14 +1486,15 @@ ${flash}
         <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
         ${todo === ''
           ? '<div class="empty"><b>لا شيء ينتظر</b><p>كلّ ما بُني مضبوط.</p></div>'
-          : `<ul class="todo">${todo}</ul>`}</div>
+          : `<ul class="todo">${todo}</ul>`}
+        <div class="row" style="margin-top:var(--s-3)">${scanBtn}
+          <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
       ${todayList(d)}
     </div>
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يوما</h2>
         <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
-        <div class="row" style="margin-top:var(--s-3)">${scanBtn}
-          <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
+</div>
       <div class="card">
         <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
           <span class="st idle">30 يوما</span></div>
@@ -1551,13 +1552,6 @@ ${pivotPane(d.pivot)}
 
 <section data-pane="posts" hidden>
   ${pageHead('التحرير', 'المنشورات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
-  <div style="margin-bottom:var(--s-3)">${planSection({
-    plan: d.plan,
-    names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
-    ready: d.planReady,
-    analyzed: d.sources.filter((s) => s.analyzed).length,
-    now: d.now,
-  })}</div>
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
@@ -1571,6 +1565,13 @@ ${pivotPane(d.pivot)}
     ready: d.draftReady,
     peaks: d.peaks ?? {},
   })}
+  <div style="margin-top:var(--s-3)">${planSection({
+    plan: d.plan,
+    names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
+    ready: d.planReady,
+    analyzed: d.sources.filter((s) => s.analyzed).length,
+    now: d.now,
+  })}</div>
 </section>
 
 <section data-pane="settings" hidden>
