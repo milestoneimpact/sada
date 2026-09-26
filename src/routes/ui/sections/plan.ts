@@ -13,10 +13,9 @@
  * الأسبوع ووافقتُ عليه. **وزرٌّ يوهم بأنّه ينفّذ أسوأ من غيابه.**
  */
 import { escapeHtml } from '../shell'
+import { platformLabel } from '../../../lib/oauth/providers'
 import { relativeTime } from '../../../lib/format'
 import type { StoredPlan } from '../../../lib/plan/job'
-
-const PLATFORM: Readonly<Record<string, string>> = { linkedin: 'LinkedIn', x: 'X' }
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
@@ -46,7 +45,7 @@ function row(
   return `<tr>
     <td data-label="متى"><b>${escapeHtml(dayName(item.day))}</b>
       <div class="mono">${escapeHtml(item.day)} · ${escapeHtml(item.time)} UTC</div></td>
-    <td data-label="المنصّة"><span class="chip">${escapeHtml(PLATFORM[item.platform] ?? item.platform)}</span></td>
+    <td data-label="المنصّة"><span class="chip">${escapeHtml(platformLabel(item.platform))}</span></td>
     <td data-label="المصدر"><div class="nm">${escapeHtml(name)}</div>
       <div class="sub">${escapeHtml(item.angle)}</div>
       ${item.why === '' ? '' : `<div class="sub">— ${escapeHtml(item.why)}</div>`}</td>

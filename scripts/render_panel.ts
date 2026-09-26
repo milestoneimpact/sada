@@ -25,6 +25,7 @@ const accounts: LinkedAccount[] = [
 ]
 
 const data: PanelData = {
+  env: 'staging',
   paused: false,
   autoEnqueue: true,
   imageOverlay: true,

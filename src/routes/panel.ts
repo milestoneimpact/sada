@@ -91,8 +91,8 @@ import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { platformScreen, showOf } from './ui/platformView'
 import { fingerprint } from '../lib/security/digest'
-import { backNav, injectCsrf, shell, COPY_SCRIPT, THEME_SCRIPT } from './ui/shell'
-import { spreadScreen, SPREAD_SCRIPT } from './ui/spreadView'
+import { injectCsrf, soloPage, COPY_SCRIPT } from './ui/shell'
+import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
@@ -430,6 +430,8 @@ panel.get('/panel', async (c) => {
   }))
   return page((nonce) =>
     panelPage({
+      // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
+      env: c.env.SADA_ENV,
       paused: allowance.settings.paused,
       autoEnqueue: allowance.settings.autoEnqueue,
       imageOverlay: allowance.settings.imageOverlay,
@@ -1332,17 +1334,8 @@ panel.get('/panel/channels/:platform', async (c) => {
   })
 
   return page((nonce) =>
-    shell(
-      `صدى — ${spec.label}`,
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel#channels', 'القنوات')}
-         <main id="main">${body}</main>
-       </div>`,
-      nonce,
-      THEME_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: 'القنوات' }, body, nonce, '',
+      buildCommands({ onPanel: false })),
   )
 })
 
@@ -1425,17 +1418,8 @@ panel.get('/panel/tasks', async (c) => {
   })
 
   return page((nonce) =>
-    shell(
-      'صدى — مهامُّ المالك',
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel', 'اللوحة')}
-         <main id="main">${body}</main>
-       </div>`,
-      nonce,
-      THEME_SCRIPT + COPY_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage('صدى — مهامُّ المالك', { href: '/panel', label: 'اللوحة' }, body, nonce, COPY_SCRIPT,
+      buildCommands({ onPanel: false })),
   )
 })
 
@@ -1468,17 +1452,8 @@ panel.get('/panel/report', async (c) => {
   })
 
   return page((nonce) =>
-    shell(
-      'صدى — التقرير الأسبوعيّ',
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel', 'اللوحة')}
-         <main id="main">${injectCsrf(body, session.record.csrf)}</main>
-       </div>`,
-      nonce,
-      THEME_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage('صدى — التقرير الأسبوعيّ', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false })),
   )
 })
 
@@ -1503,17 +1478,8 @@ panel.get('/panel/journey/:id', async (c) => {
 
   const body = journeyBody(journey, new Date())
   return page((nonce) =>
-    shell(
-      'صدى — رحلةُ منشور',
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel#posts', 'المنشورات')}
-         <main id="main">${body}</main>
-       </div>`,
-      nonce,
-      THEME_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' }, body, nonce, '',
+      buildCommands({ onPanel: false })),
   )
 })
 
@@ -1536,17 +1502,8 @@ panel.get('/panel/report/:week', async (c) => {
   })
 
   return page((nonce) =>
-    shell(
-      `صدى — تقريرُ ${stored.id}`,
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel/report', 'التقارير')}
-         <main id="main">${injectCsrf(body, session.record.csrf)}</main>
-       </div>`,
-      nonce,
-      THEME_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: 'التقارير' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false })),
   )
 })
 
@@ -1923,17 +1880,8 @@ panel.post('/panel/drafts/spread', async (c) => {
 
   const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
   return page((nonce) =>
-    shell(
-      'صدى — توزيعُ المعتمَد',
-      `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav('/panel', 'اللوحة')}
-         <main id="main">${spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf })}</main>
-       </div>`,
-      nonce,
-      SPREAD_SCRIPT + THEME_SCRIPT,
-      { commands: buildCommands({ onPanel: false }) },
-    ),
+    soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf }), nonce, '',
+      buildCommands({ onPanel: false })),
   )
 })
 

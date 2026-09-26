@@ -17,6 +17,7 @@
  * ما بين يديه.
  */
 import { escapeHtml } from './shell'
+import { platformLabel } from '../../lib/oauth/providers'
 import { historyBars } from './chart'
 import { toHijri } from '../../lib/analyze/hijri'
 import { money, relativeTime } from '../../lib/format'
@@ -25,7 +26,6 @@ import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
 import { windowLabel } from '../../lib/metrics/job'
 
-const LABEL: Readonly<Record<string, string>> = { linkedin: 'LinkedIn', x: 'X' }
 
 /** رقمٌ ومعه من كم صفٍّ جُمع — والفراغُ يُقال ولا يُصفَّر. */
 function sum(label: string, value: number | null, from: number, of: number): string {
@@ -48,7 +48,7 @@ function sliceCard(s: PlatformSlice): string {
   const logo = LOGOS[s.platform] ?? ''
   return `<div class="slice">
     <div class="plat-logo">${logo}</div>
-    <div class="slice-id"><h3>${escapeHtml(LABEL[s.platform] ?? s.platform)}</h3>
+    <div class="slice-id"><h3>${escapeHtml(platformLabel(s.platform))}</h3>
       <span class="chip">${s.published} منشورا · قِيس ${s.measured}</span></div>
     <div class="stats">
       ${sum('ظهور', s.impressions, s.impressionsFrom, s.published)}

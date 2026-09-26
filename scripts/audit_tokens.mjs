@@ -105,6 +105,21 @@ for (const file of files) {
  * **والقاعدةُ مقصورةٌ على `transition`**: `animation:spin .7s` دورةُ
  * دوّامةٍ لا ردُّ تفاعل، ولها زمنُها وحدها.
  */
+/**
+ * ── نصفُ قطرٍ حرفيّ (D-151) ──────────────────────────────────────────
+ * سُلَّمُ الأقطار خمسةُ رموز (--r-xs · --r-sm · --r · --r-lg · --r-pill)؛
+ * كانت ‏١٥ قاعدةً تكتب أرقامًا خارجها والحبّةُ بإملاءين (99px و999px).
+ */
+const literalRadius = []
+for (const file of files) {
+  // غلافُ الصور المنشورة (lib/image) نظامٌ آخر بمقاسه؛ الحارسُ لورقة اللوحة
+  if (NOT_USAGE.test(file) || /\/image\//.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  for (const m of code.matchAll(/border-radius:\s*[^;}]*\d+px[^;}]*/g)) {
+    literalRadius.push([m[0].slice(0, 58), file.slice(SRC.length)])
+  }
+}
+
 const literalTime = []
 for (const file of files) {
   if (NOT_USAGE.test(file)) continue
@@ -383,6 +398,10 @@ for (const [k, where] of sharedIcons) {
 }
 
 console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
+console.log('\n═══ نصفُ قطرٍ خارج السلّم ═══\n')
+if (literalRadius.length === 0) console.log('  ✓ لا نصفَ قطرٍ حرفيًّا')
+for (const [rule, where] of literalRadius) console.log(`  ✕ ${rule}  —  ${where}`)
+
 if (literalTime.length === 0) console.log('  ✓ لا زمنَ خارج السلّم')
 for (const [rule, where] of literalTime) console.log(`  ✕ ${rule}  —  ${where}`)
 
@@ -406,7 +425,7 @@ console.log(
   `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة · ${ICON_KEYS.length} رمزا في ICON)\n`,
 )
 
-const total = ghosts.length + orphans.length + literalTime.length + spaced.length +
+const total = ghosts.length + orphans.length + literalTime.length + literalRadius.length + spaced.length +
   backticks.length + strayIcons.length + dupVars.length + unusedIcons.length
 if (total === 0) process.exit(0)
 

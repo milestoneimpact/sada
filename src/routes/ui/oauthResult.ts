@@ -27,15 +27,13 @@
  */
 import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
 import { blamedScopes } from '../../lib/oauth/refusal'
-import type { Platform } from '../../lib/oauth/providers'
+import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
 import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 
-const LABEL: Readonly<Record<Platform, string>> = {
-  linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok',
-  instagram: 'Instagram',
-}
+// القاموسُ واحدٌ في lib/oauth/providers (D-151)
+const LABEL = PLATFORM_LABEL
 
 function head(platform: Platform, eyebrow: string, title: string, lede: string): string {
   return `<div class="page-head">

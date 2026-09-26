@@ -253,6 +253,8 @@ for (const file of files) {
         const r = node.getBoundingClientRect()
         if (r.height === 0 || node.children.length > 0) continue
         const style = getComputedStyle(node)
+        // المخفيُّ بصريًّا عمدًا لقارئ الشاشة (clip-path:inset(50%) أو clip:rect(0…)) كرابط التخطّي — ليس قصًّا (D-151)
+        if (/inset\(50%\)/.test(style.clipPath) || /^rect\(0px[, ]+0px[, ]+0px[, ]+0px\)$/.test(style.clip)) continue
         const hidden = style.overflow === 'hidden' || style.overflowX === 'hidden'
         if (!hidden) continue
         if (node.scrollWidth > node.clientWidth + 1) {

@@ -1532,6 +1532,18 @@ describe('الثيم النهاريّ', () => {
     expect(html).toContain("getElementById('density')")
   })
 
+  /** **العلامةُ تقول بيئتَها** (D-151): كانت «STAGING» ثابتةً حتّى في الإنتاج. */
+  it('العلامةُ تحمل اسمَ البيئة من SADA_ENV لا ثابتًا', async () => {
+    const cookie = await login()
+    const staging = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(staging).toContain('SADA · STAGING')
+    const production = await (
+      await app.request('/panel', withSession(cookie), { ...env, SADA_ENV: 'production' })
+    ).text()
+    expect(production).toContain('SADA · PRODUCTION')
+    expect(production).not.toContain('STAGING')
+  })
+
   it('صفحةُ الدخول تتبع الثيم أيضا', async () => {
     const html = await (await app.request('/panel', {}, env)).text()
     expect(html.slice(0, html.indexOf('</head>'))).toContain('sada-theme')
@@ -2346,7 +2358,9 @@ describe('توزيعُ المعتمَد على أيّام', () => {
 
     const html = await (await preview(cookie, '6')).text()
     // موعدان اثنان بصيغةٍ تُقرأ، وفاصلٌ يُقال
-    expect((html.match(/data-utc="/g) ?? []).length).toBe(2)
+    // المواعيدُ بوسم whenTag الواحد لا بسكربتٍ خاصّ (D-151)
+    expect((html.match(/<td class="when"><time class="when-t"/g) ?? []).length).toBe(2)
+    expect(html).not.toContain('data-utc=')
     expect(html).toContain('كلُّ 6 ساعةً')
   })
 

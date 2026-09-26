@@ -234,6 +234,56 @@ export function densitySwitch(): string {
  * مواضعَ تعني ستَّ فرصٍ لنسيانه، **وصفحةٌ بلا زرٍّ تُخفي اختصارا لا
  * يعرفه إلّا من كتبه**. فما دام الشريطُ واحدا، فالزرُّ فيه لا يُنسى.
  */
+/**
+ * الشاشةُ المستقلّة — **قالبٌ واحدٌ للمسار والعيّنة** (D-151).
+ *
+ * كانت ستُّ شاشاتٍ في panel.ts تكتب رابطَ التخطّي و`.wrap` و`backNav`
+ * و`<main>` يدًا، وشاشتا نتيجة OAuth تكتبان سهمًا وحدَه بلا علامةٍ ولا
+ * ⌘K ولا ثيم، وعيّنةُ render_screens تُغلَّف بغلافٍ ثالث. فما يُقاس على
+ * العيّنة لم يكن ما يُخدَم. الآن يبنيها الثلاثةُ من هنا.
+ */
+export function soloPage(
+  title: string,
+  back: { readonly href: string; readonly label: string },
+  body: string,
+  nonce: string,
+  script = '',
+  commands?: readonly Command[],
+): string {
+  return shell(
+    title,
+    `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+       <div class="wrap">
+         ${backNav(back.href, back.label)}
+         <main id="main">${body}</main>
+       </div>`,
+    nonce,
+    THEME_SCRIPT + script,
+    commands === undefined ? {} : { commands },
+  )
+}
+
+/**
+ * base64url للمفاتيح — **نسخةٌ واحدة** (D-151). كانت ثلاثًا حرفًا بحرف في
+ * سكربت اللوحة وسكربت الدخول وسكربت العامل الثاني.
+ */
+export const B64URL_SCRIPT = `
+var sadaB64={
+  enc:function(buf){
+    var by=new Uint8Array(buf),t='';
+    for(var i=0;i<by.length;i++)t+=String.fromCharCode(by[i]);
+    return btoa(t).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+  },
+  dec:function(v){
+    var t=v.replace(/-/g,'+').replace(/_/g,'/');
+    t+='='.repeat((4-t.length%4)%4);
+    var bin=atob(t),out=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+    return out;
+  }
+};
+`
+
 export function backNav(href: string, label: string): string {
   /*
    * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ

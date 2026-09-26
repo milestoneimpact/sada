@@ -18,7 +18,8 @@ import { parseGranted, scopeSet, type ScopeMode } from '../lib/oauth/scopes'
 import { consumeState, saveState, StateError } from '../lib/oauth/state'
 import { saveTokens, upsertAccount } from '../lib/tokens'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
-import { shell } from './ui/shell'
+import { soloPage } from './ui/shell'
+import { buildCommands } from './ui/command'
 import { connectedBody, refusedBody } from './ui/oauthResult'
 
 /**
@@ -31,14 +32,10 @@ import { connectedBody, refusedBody } from './ui/oauthResult'
  * حركةٍ خاطئة.
  */
 function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
+  // القالبُ الواحد (D-151): علامةٌ وعودةٌ و⌘K وثيمٌ كسائر الشاشات المستقلّة
   const nonce = makeNonce()
-  const html = shell(
-    title,
-    `<div class="wrap"><nav class="back" aria-label="مسارُ العودة">
-       <a href="/panel#channels">← القنوات</a></nav>
-     <main id="main">${body}</main></div>`,
-    nonce,
-  )
+  const html = soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, nonce, '',
+    buildCommands({ onPanel: false }))
   return new Response(html, { status, headers: htmlHeaders(nonce) })
 }
 

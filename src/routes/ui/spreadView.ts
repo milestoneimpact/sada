@@ -19,6 +19,7 @@
  * تدخل الجدولَ خِلسةً، **ومسوّدةٌ خرجت منه تُردّ بسببها**.
  */
 import { escapeHtml } from './shell'
+import { whenTag } from './time'
 import type { SpreadPlan } from '../../lib/schedule/spread'
 
 export interface SpreadScreenData {
@@ -33,7 +34,7 @@ function row(index: number, when: string, label: string, preview: string): strin
     <td class="mono">${index + 1}</td>
     <td><div class="nm">${escapeHtml(preview)}</div></td>
     <td><span class="chip">${escapeHtml(label)}</span></td>
-    <td class="mono when" data-utc="${escapeHtml(when)}">${escapeHtml(when.replace('T', ' · '))} UTC</td>
+    <td class="when">${whenTag(when.replace('T', ' '))}</td>
   </tr>`
 }
 
@@ -92,27 +93,3 @@ export function spreadScreen(d: SpreadScreenData): string {
     </form>
   </section>`
 }
-
-/**
- * مرآةُ التوقيت في هذه الشاشة — **ونسخةٌ صغيرةٌ عمدا**.
- *
- * لا تحسب موعدا ولا تكتب حقلا: تقرأ ما رسمه الخادمُ وتضيف إليه سطرا
- * محلّيّا. فمنطقُ المواعيد يبقى في مكانٍ واحد.
- */
-export const SPREAD_SCRIPT = `
-(function(){
-  document.querySelectorAll('.when[data-utc]').forEach(function(cell){
-    var raw=cell.dataset.utc;
-    var m=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(raw||'');
-    if(!m)return;
-    var at=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));
-    try{
-      var local=document.createElement('div');
-      local.className='ago';
-      local.textContent=at.toLocaleString('ar',{weekday:'long',day:'numeric',
-        month:'long',hour:'numeric',minute:'2-digit'})+' بتوقيتك';
-      cell.appendChild(local);
-    }catch(e){}
-  });
-})();
-`
