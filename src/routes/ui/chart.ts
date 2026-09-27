@@ -26,7 +26,7 @@
  * لا يُلوَّن عمودٌ بالأحمر لأنّه الأكبر: **الأحمرُ حالةٌ لا مقدار**.
  * والمقدارُ تدرّجُ هيئةٍ واحدة، والأكبرُ يُعلَّم بالذهب — ندرةً لا زينة.
  */
-import { escapeHtml } from './shell'
+import { escapeHtml } from './escape'
 import { money } from '../../lib/format'
 
 export function areaChart(series: { day: string; total: number }[]): string {

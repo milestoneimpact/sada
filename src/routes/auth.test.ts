@@ -388,6 +388,12 @@ describe('الدخول بمفتاح المرور من صفحة الدخول', ()
     )
     expect(response.status).toBe(401)
     expect(response.headers.get('Set-Cookie')).toBeNull()
+    // ‏والسببُ لا يُعاد إلى طالبٍ مجهول (D-160) — يبقى في سجلّ التدقيق وحده
+    expect(await response.json()).toEqual({ error: 'denied' })
+    const logged = db.raw.prepare(
+      "SELECT detail FROM audit_log WHERE action = 'passkey.denied'",
+    ).get() as { detail: string } | undefined
+    expect(logged?.detail).toBe('مفتاحٌ غير مسجَّل')
   })
 
   it('والتذكرةُ تُستهلَك — لا يُعاد إرسالُ التوقيع نفسه', async () => {

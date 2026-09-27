@@ -26,7 +26,7 @@
  * عليه** السطرَ المحلّيّ. فمن عُطّل عنده النصُّ قرأ `UTC` صريحةً موسومةً —
  * **لا فراغا ولا رقما بلا منطقة**، وهو أسوأُ الثلاثة.
  */
-import { escapeHtml } from './shell'
+import { escapeHtml } from './escape'
 import { parseSqliteUtc } from '../../lib/format'
 
 /**

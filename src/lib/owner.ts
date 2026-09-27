@@ -230,7 +230,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     // يُقرأ عند sada.basserh.com لا من هنا: staging لا تعرف حالَ الإنتاج
     done: () => null,
-    go: 'https://github.com/mooryali95/sada/actions/workflows/deploy.yml',
+    go: 'https://github.com/milestoneimpact/sada/actions/workflows/deploy.yml',
     goLabel: 'افتح صفحةَ النشر',
   },
   {

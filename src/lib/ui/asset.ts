@@ -34,10 +34,10 @@
  * صامت خيرٌ من كلِّه به.**
  */
 import { STYLE } from '../../routes/ui/styles'
-import { SCRIPT as PANEL_SCRIPT } from '../../routes/panelView'
+import { SCRIPT as PANEL_SCRIPT } from '../../routes/ui/panelScript'
 import { COMMAND_SCRIPT } from '../../routes/ui/command'
 import { TIME_SCRIPT } from '../../routes/ui/time'
-import { COPY_SCRIPT, DENSITY_SCRIPT, THEME_SCRIPT } from '../../routes/ui/shell'
+import { COPY_SCRIPT, DENSITY_SCRIPT, THEME_SCRIPT } from '../../routes/ui/scripts'
 
 /**
  * بصمةٌ متزامنة — **مفتاحُ تخبئةٍ لا حارس**.
@@ -110,9 +110,16 @@ export const STYLE_BODY = BODY
  * الثاني) يبقى سطرًا بـ`nonce`.
  *
  * **وخطرُ D-101 الصامت لا يقع هنا**: الأصلُ يُبنى من ثوابتَ مستورَدة لا من
- * سجلٍّ يُملأ عند الرسم، فلا طلبَ يسبق تسجيلَه. والبناءُ عند أوّل نداءٍ لا
- * عند الإقلاع لأنّ الاستيرادَ دائريّ (اللوحةُ تستورد القشرةَ التي تستورد هذا
- * الملفّ)، **والرباطُ الحيُّ يُقرأ عند النداء وكلُّ الوحدات قد اكتملت**.
+ * سجلٍّ يُملأ عند الرسم، فلا طلبَ يسبق تسجيلَه.
+ *
+ * **والحلقةُ التي قبلتها D-153 كسرت الدخول** (D-160): هذا الملفُّ كان يستورد
+ * سكربتَ اللوحة من `panelView.ts`، و`panelView` يستورد القشرةَ التي تستورد هذا
+ * الملفّ. فالبناءُ هنا كُسل عند أوّل نداء — **لكنّ قالبَ السكربت نفسَه يُقيَّم عند
+ * التحميل** في `panelView`، وفي الحزمة قُرئ `${B64URL_SCRIPT}` قبل أن يُسنَد:
+ * «undefined» في رأس سكربت اللوحة وسكربت الدخول بمفتاح المرور، ورميٌ عند
+ * التحميل. فالمصادرُ الآن من `ui/scripts.ts` و`ui/panelScript.ts` ولا تستورد
+ * القشرة، و`audit_cycles` يُسقط CI على أيّ حلقة. والبناءُ يبقى كسولًا: لا
+ * حاجةَ إليه قبل أوّل طلب.
  *
  * وكلُّ `<script>` يحمل `nonce` — خارجيًّا كان أو سطرًا — فالسياسةُ لا تتبدّل.
  */

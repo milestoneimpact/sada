@@ -24,7 +24,7 @@
  * وثمنُه أنّ الفهرسَ محدود: **يُقاس ولا يُترك ينمو**. وثمانيةُ مسوّداتٍ
  * لا كلُّها، لأنّ D-101 قاست ما يفعله الشحنُ غيرُ المحسوب بالصفحة.
  */
-import { escapeHtml } from './shell'
+import { escapeHtml } from './escape'
 import { ICON } from './icons'
 
 /**

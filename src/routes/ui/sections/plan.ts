@@ -12,7 +12,7 @@
  * «اعتمد الخطّة» لا يكتب حرفا ولا يُنفق. هو علامةٌ تقول: قرأتُ منطقَ
  * الأسبوع ووافقتُ عليه. **وزرٌّ يوهم بأنّه ينفّذ أسوأ من غيابه.**
  */
-import { escapeHtml } from '../shell'
+import { escapeHtml } from '../escape'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { relativeTime } from '../../../lib/format'
 import type { StoredPlan } from '../../../lib/plan/job'

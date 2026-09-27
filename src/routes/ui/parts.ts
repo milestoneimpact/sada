@@ -5,7 +5,7 @@
  * واستيرادُها منه يصنع دائرةً بين ملفّين. والدائرةُ تعمل في الأنواع
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
-import { escapeHtml } from './shell'
+import { escapeHtml } from './escape'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { Onboarding } from '../../lib/onboard'

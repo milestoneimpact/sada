@@ -1,0 +1,165 @@
+/**
+ * السكربتاتُ الثابتة — **نصوصٌ بلا استيراد** (D-160).
+ *
+ * كانت في `shell.ts` تحت حلقة استيراد (القشرةُ ← الأصلُ ← اللوحةُ ← القشرة)،
+ * فطُبع `${B64URL_SCRIPT}` في الحزمة «undefined» ورمى سكربتُ الدخول بمفتاح
+ * المرور وسكربتُ اللوحة كلاهما عند التحميل. **ونصٌّ لا يستورد شيئًا يُقيَّم
+ * قبل كلِّ من يستورده، في أيّ ترتيب** — وهذا كلُّ ما يلزم.
+ *
+ * والحارسُ `scripts/audit_cycles.mjs` يُسقط CI على أيّ حلقةٍ جديدة، و
+ * `src/bundle.test.ts` يشغّل السكربتاتِ من الحزمة المشحونة نفسِها.
+ */
+
+/**
+ * زرُّ النسخ — **حرفًا بحرف، ومن مصدرٍ واحد** (D-042 · D-126).
+ *
+ * رابطُ العودة يُطابَق حرفًا بحرف عند المنصّة، وكتابتُه يدًا تُدخل مسافةً
+ * أو شرطةً فيفشل الربطُ بخطأٍ لا يدلّ على سببه. وأمرُ `wrangler` في شاشة
+ * «ما عليك» من الجنس نفسِه. **فالنصُّ واحدٌ تحمله اللوحةُ والشاشة**، لا
+ * نسختان تفترقان في أوّل تعديل.
+ */
+export const COPY_SCRIPT = `
+(function(){
+  document.querySelectorAll('button[data-copy]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var f=document.getElementById(b.dataset.copy); if(!f)return;
+      f.select(); f.setSelectionRange(0,f.value.length);
+      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
+        setTimeout(function(){b.textContent=t;},1400);};
+      // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(f.value).then(done,function(){
+          try{document.execCommand('copy'); done();}catch(e){}});
+      }else{try{document.execCommand('copy'); done();}catch(e){}}
+    });
+  });
+})();
+`
+
+/** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
+
+export const THEME_SCRIPT = `
+(function(){
+  var box=document.getElementById('theme');
+  if(!box)return;
+  var apply=function(v){
+    try{
+      if(v==='system'){localStorage.removeItem('sada-theme');
+        delete document.documentElement.dataset.theme;}
+      else{localStorage.setItem('sada-theme',v); document.documentElement.dataset.theme=v;}
+    }catch(e){
+      if(v==='system')delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme=v;
+    }
+    box.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.theme===v));});
+  };
+  var saved='system';
+  try{saved=localStorage.getItem('sada-theme')||'system';}catch(e){}
+  apply(saved);
+  box.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.theme);});});
+})();
+`
+
+/**
+ * مبدّلُ الكثافة (D-102) — **ووضعان لا ثلاثة**.
+ *
+ * الثيمُ ثلاثةٌ لأنّ للنظام رأيا فيه (`prefers-color-scheme`). **ولا رأيَ
+ * للنظام في الكثافة** — فوضعٌ ثالثٌ اسمُه «النظام» يَعِد بما لا مصدرَ له.
+ *
+ * والحفظُ في `try` كما في الثيم: `localStorage` يرمي في نافذةٍ خاصّة،
+ * **ونافذةٌ خاصّة يجب أن تفتح اللوحة** لا أن تسقط على سطرٍ من الزينة.
+ */
+export const DENSITY_SCRIPT = `
+(function(){
+  var box=document.getElementById('density');
+  if(!box)return;
+  var apply=function(v){
+    try{
+      if(v==='compact'){localStorage.setItem('sada-density',v);
+        document.documentElement.dataset.density=v;}
+      else{localStorage.removeItem('sada-density');
+        delete document.documentElement.dataset.density;}
+    }catch(e){
+      if(v==='compact')document.documentElement.dataset.density=v;
+      else delete document.documentElement.dataset.density;
+    }
+    box.querySelectorAll('button').forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.density===v));});
+  };
+  var saved='cozy';
+  try{saved=localStorage.getItem('sada-density')||'cozy';}catch(e){}
+  apply(saved);
+  box.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.density);});});
+})();
+`
+
+/**
+ * base64url للمفاتيح — **نسخةٌ واحدة** (D-151). كانت ثلاثًا حرفًا بحرف في
+ * سكربت اللوحة وسكربت الدخول وسكربت العامل الثاني.
+ */
+export const B64URL_SCRIPT = `
+var sadaB64={
+  enc:function(buf){
+    var by=new Uint8Array(buf),t='';
+    for(var i=0;i<by.length;i++)t+=String.fromCharCode(by[i]);
+    return btoa(t).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+  },
+  dec:function(v){
+    var t=v.replace(/-/g,'+').replace(/_/g,'/');
+    t+='='.repeat((4-t.length%4)%4);
+    var bin=atob(t),out=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+    return out;
+  }
+};
+`
+
+/**
+ * رسائلُ مفتاح المرور بالعربيّة — **لا اسمَ استثناءٍ إنجليزيٍّ على الشاشة** (D-160).
+ *
+ * كانت الشاشاتُ الثلاث (الدخول، والعاملُ الثاني، وإضافةُ مفتاحٍ في الأمان)
+ * تطبع «تعذّر: NotAllowedError»: اسمُ الاستثناء كما يرميه المتصفّح. والمالكُ
+ * لا يعرف أنّ هذا يعني «أغلقتَ النافذة أو انتهت الدقيقة». ورمزُ الخادم
+ * (`rate_limited` · `challenge_expired` · `denied`) كان يُطبَع «رُفض المفتاح»
+ * أيًّا كان — فتذكرةٌ انتهت مهلتُها تُقرأ مفتاحًا مرفوضًا.
+ *
+ * `sadaPk.server(code, status)` يصنع خطأً برسالةٍ تُقرأ، و`sadaPk.why(err)`
+ * يترجم ما يرميه المتصفّح؛ وما لا يُعرَف يحمل اسمَه بين قوسين ليُرسَل كما هو.
+ */
+export const PASSKEY_TEXT_SCRIPT = `
+var sadaPk={
+  server:function(code,status){
+    var t={
+      rate_limited:'محاولاتٌ كثيرة — انتظر دقائقَ ثمّ أعد.',
+      no_passkeys:'لا مفتاحَ مسجَّلًا على هذه البيئة — ادخل بكلمة الإدارة.',
+      challenge_expired:'انتهت مهلةُ الطلب — اضغط مرّةً أخرى.',
+      denied:'لم يُقبَل المفتاح — جرّب مفتاحًا آخر أو ادخل بكلمة الإدارة.',
+      admin_disabled:'الدخولُ معطَّل: كلمةُ الإدارة غير مضبوطة على الخادم.',
+      csrf_failed:'انتهت صلاحيةُ الصفحة — حدّثها ثمّ أعد.',
+      no_session:'انتهت الجلسة — ادخل من جديد.',
+      pending_second_factor:'أتمَّ العاملَ الثانيَ أوّلًا.'
+    }[code];
+    var e=new Error(t||('تعذّر الطلب ('+status+').'));
+    e.name='SadaServer';
+    return e;
+  },
+  why:function(err){
+    var n=err&&err.name?err.name:'';
+    if(n==='SadaServer')return err.message;
+    if(n==='NotAllowedError')return 'أُلغي الطلب أو انتهت مهلتُه — اضغط مرّةً أخرى والمس مفتاحك.';
+    if(n==='AbortError')return 'أُوقف الطلب قبل تمامه.';
+    if(n==='SecurityError')return 'العنوانُ لا يطابق نطاقَ المفتاح — افتح اللوحةَ من عنوانها.';
+    if(n==='InvalidStateError')return 'هذا المفتاحُ مسجَّلٌ من قبل.';
+    if(n==='NotSupportedError')return 'متصفّحُك لا يدعم هذا النوعَ من المفاتيح.';
+    if(n==='TypeError')return 'تعذّر الاتصالُ بالخادم — تحقّق من الشبكة.';
+    return 'تعذّر إتمامُ العمليّة بالمفتاح'+(n?' ('+n+')':'')+'.';
+  },
+  fail:function(r){
+    return r.json().catch(function(){return {};}).then(function(e){
+      throw sadaPk.server(e&&e.error,r.status);});
+  }
+};
+`

@@ -32,7 +32,8 @@ import { driveFileUrl } from '../../lib/drive/sync'
 import { tokenDays } from './channels'
 import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
-import { SCRIPT, panelPage } from '../panelView'
+import { panelPage } from '../panelView'
+import { SCRIPT } from './panelScript'
 
 describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
   it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {

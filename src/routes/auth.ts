@@ -197,7 +197,9 @@ auth.post('/panel/passkey/login', async (c) => {
     )
     const wait = delayMs(state.attempts + 1)
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
-    return json({ error: 'denied', detail: verdict.reason }, 401)
+    // ‏والسببُ في سجلّ التدقيق لا في الردّ (D-160): الطالبُ هنا مجهول، و«مفتاحٌ
+    // ‏غير مسجَّل» أو «تراجع العدّاد» يقول له ما الذي يجرّبه بعدها
+    return json({ error: 'denied' }, 401)
   }
 
   const session = await createPasskeySession(c.env.KV, c.env.ADMIN_TOKEN, c.req.raw)

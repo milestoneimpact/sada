@@ -8,7 +8,7 @@
 import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
-import { escapeHtml } from '../shell'
+import { escapeHtml } from '../escape'
 import { bar, status as chip } from '../parts'
 
 /**

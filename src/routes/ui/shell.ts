@@ -6,6 +6,7 @@
  * لم يُبنَ فوقها أصلا.
  */
 import { commandPalette, commandTrigger, type Command } from './command'
+import { escapeHtml } from './escape'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
 
@@ -114,14 +115,10 @@ export const GLYPH_SVG =
  */
 export const ICON_BYTES = ICON_SVG
 
+export { escapeHtml }
+
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
 <meta name="theme-color" content="#1f2430">`
-
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
 
 /**
  * سكربتُ الثيم — **يُنفَّذ قبل الرسم لا بعده**.
@@ -141,90 +138,7 @@ var d=localStorage.getItem('sada-density');
 if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 `
 
-/** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
-/**
- * زرُّ النسخ — **حرفًا بحرف، ومن مصدرٍ واحد** (D-042 · D-126).
- *
- * رابطُ العودة يُطابَق حرفًا بحرف عند المنصّة، وكتابتُه يدًا تُدخل مسافةً
- * أو شرطةً فيفشل الربطُ بخطأٍ لا يدلّ على سببه. وأمرُ `wrangler` في شاشة
- * «ما عليك» من الجنس نفسِه. **فالنصُّ واحدٌ تحمله اللوحةُ والشاشة**، لا
- * نسختان تفترقان في أوّل تعديل.
- */
-export const COPY_SCRIPT = `
-(function(){
-  document.querySelectorAll('button[data-copy]').forEach(function(b){
-    b.addEventListener('click',function(){
-      var f=document.getElementById(b.dataset.copy); if(!f)return;
-      f.select(); f.setSelectionRange(0,f.value.length);
-      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
-        setTimeout(function(){b.textContent=t;},1400);};
-      // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(f.value).then(done,function(){
-          try{document.execCommand('copy'); done();}catch(e){}});
-      }else{try{document.execCommand('copy'); done();}catch(e){}}
-    });
-  });
-})();
-`
 
-export const THEME_SCRIPT = `
-(function(){
-  var box=document.getElementById('theme');
-  if(!box)return;
-  var apply=function(v){
-    try{
-      if(v==='system'){localStorage.removeItem('sada-theme');
-        delete document.documentElement.dataset.theme;}
-      else{localStorage.setItem('sada-theme',v); document.documentElement.dataset.theme=v;}
-    }catch(e){
-      if(v==='system')delete document.documentElement.dataset.theme;
-      else document.documentElement.dataset.theme=v;
-    }
-    box.querySelectorAll('button').forEach(function(b){
-      b.setAttribute('aria-pressed',String(b.dataset.theme===v));});
-  };
-  var saved='system';
-  try{saved=localStorage.getItem('sada-theme')||'system';}catch(e){}
-  apply(saved);
-  box.querySelectorAll('button').forEach(function(b){
-    b.addEventListener('click',function(){apply(b.dataset.theme);});});
-})();
-`
-
-/**
- * مبدّلُ الكثافة (D-102) — **ووضعان لا ثلاثة**.
- *
- * الثيمُ ثلاثةٌ لأنّ للنظام رأيا فيه (`prefers-color-scheme`). **ولا رأيَ
- * للنظام في الكثافة** — فوضعٌ ثالثٌ اسمُه «النظام» يَعِد بما لا مصدرَ له.
- *
- * والحفظُ في `try` كما في الثيم: `localStorage` يرمي في نافذةٍ خاصّة،
- * **ونافذةٌ خاصّة يجب أن تفتح اللوحة** لا أن تسقط على سطرٍ من الزينة.
- */
-export const DENSITY_SCRIPT = `
-(function(){
-  var box=document.getElementById('density');
-  if(!box)return;
-  var apply=function(v){
-    try{
-      if(v==='compact'){localStorage.setItem('sada-density',v);
-        document.documentElement.dataset.density=v;}
-      else{localStorage.removeItem('sada-density');
-        delete document.documentElement.dataset.density;}
-    }catch(e){
-      if(v==='compact')document.documentElement.dataset.density=v;
-      else delete document.documentElement.dataset.density;
-    }
-    box.querySelectorAll('button').forEach(function(b){
-      b.setAttribute('aria-pressed',String(b.dataset.density===v));});
-  };
-  var saved='cozy';
-  try{saved=localStorage.getItem('sada-density')||'cozy';}catch(e){}
-  apply(saved);
-  box.querySelectorAll('button').forEach(function(b){
-    b.addEventListener('click',function(){apply(b.dataset.density);});});
-})();
-`
 
 export function densitySwitch(): string {
   return `<div class="theme" id="density" role="group" aria-label="كثافة العرض">
@@ -269,26 +183,6 @@ export function soloPage(
   )
 }
 
-/**
- * base64url للمفاتيح — **نسخةٌ واحدة** (D-151). كانت ثلاثًا حرفًا بحرف في
- * سكربت اللوحة وسكربت الدخول وسكربت العامل الثاني.
- */
-export const B64URL_SCRIPT = `
-var sadaB64={
-  enc:function(buf){
-    var by=new Uint8Array(buf),t='';
-    for(var i=0;i<by.length;i++)t+=String.fromCharCode(by[i]);
-    return btoa(t).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
-  },
-  dec:function(v){
-    var t=v.replace(/-/g,'+').replace(/_/g,'/');
-    t+='='.repeat((4-t.length%4)%4);
-    var bin=atob(t),out=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
-    return out;
-  }
-};
-`
 
 export function backNav(href: string, label: string): string {
   /*
