@@ -38,6 +38,7 @@ import { LOGOS } from '../logos'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { status } from '../parts'
+import { SLIDE_SIZE } from '../../../lib/image/slide'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -218,7 +219,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   if (ready !== undefined) {
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
-        loading="lazy" width="1200" height="628">
+        loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
         <span class="chip mono">${Math.round(ready.bytes / 1024)}KB</span>
         <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>

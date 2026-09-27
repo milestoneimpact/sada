@@ -73,8 +73,26 @@ export function systemPrompt(): string {
     '',
     '## المخرَج',
     '',
-    'أعد JSON بحقلين: `rationale` سطرٌ واحد يشرح منطق الأسبوع كلِّه،',
-    'و `items` مصفوفةُ البنود.',
+    /*
+     * **عقدُ الحقول يُكتب في الموجّه لا في المخطّط وحدَه** (D-157).
+     *
+     * كان المخطّطُ PLAN_SCHEMA يصل إلى Anthropic وحدَه (أداةً)، أمّا مزوّدٌ
+     * openai_compat فيُطلب منه json_object بلا وصفٍ للبند — فيعيد بنودًا
+     * بمفاتيحَ من عنده (source, channel, date…) يُسقطها القارئُ كلَّها،
+     * ويعود «لم يبقَ بندٌ صالح» بعد أن دُفع النداء. قِيس على staging:
+     * ثلاثُ محاولاتٍ بـDeepSeek، كلٌّ بصفٍّ في cost_ledger ثمّ failed.
+     */
+    'أعد JSON بحقلين لا غير: `rationale` سطرٌ واحد يشرح منطق الأسبوع كلِّه،',
+    'و `items` مصفوفةُ البنود. **وكلُّ بندٍ كائنٌ بهذه الحقول الستّة بأسمائها حرفًا**:',
+    '- `source_id`: معرّفُ المصدر كما ورد بعد `id:` — يُنسخ حرفًا بحرف.',
+    "- `platform`: `linkedin` أو `x` لا غير.",
+    '- `angle`: الزاويةُ في جملةٍ واحدة (عشرةُ أحرفٍ فأكثر).',
+    '- `day`: تاريخٌ بصيغة YYYY-MM-DD من أيّام الأسبوع المذكورة في الرسالة.',
+    '- `time`: الساعةُ بـ UTC بصيغة HH:MM (مثل 07:30).',
+    '- `why`: لماذا هذا المصدرُ في هذا اليوم، في جملة.',
+    '',
+    'مثالٌ على الشكل لا على المضمون:',
+    '{"rationale":"…","items":[{"source_id":"src:…","platform":"linkedin","angle":"…","day":"2026-01-04","time":"07:30","why":"…"}]}',
   ].join('\n')
 }
 
@@ -91,7 +109,20 @@ export function userPrompt(sources: readonly PlanSource[], week: string): string
       .filter((l) => l !== '')
       .join('\n'),
   )
-  return [`# أسبوعٌ يبدأ ${week}`, '', '# المصادر المتاحة', '', lines.join('\n\n')].join('\n')
+  // أيّامُ الأسبوع السبعةُ بحرفها: النموذجُ لا يحسب تواريخَ، ينسخها
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(`${week}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + i)
+    return d.toISOString().slice(0, 10)
+  })
+  return [
+    `# أسبوعٌ يبدأ ${week}`,
+    `أيّامُه المتاحة للنشر: ${days.join(' · ')}`,
+    '',
+    '# المصادر المتاحة',
+    '',
+    lines.join('\n\n'),
+  ].join('\n')
 }
 
 export const PLAN_SCHEMA = {
@@ -160,35 +191,47 @@ export function parsePlan(
   raw: unknown,
   known: ReadonlySet<string>,
   week: string,
-): { ok: true; plan: Plan; dropped: number } | { ok: false; reason: string } {
+): { ok: true; plan: Plan; dropped: number; droppedWhy: string } | { ok: false; reason: string } {
   if (typeof raw !== 'object' || raw === null) return { ok: false, reason: 'الجواب ليس كائنا' }
   const value = raw as { rationale?: unknown; items?: unknown }
   if (!Array.isArray(value.items)) return { ok: false, reason: 'لا بنودَ في الخطّة' }
 
   const items: PlanItem[] = []
   let dropped = 0
+  // ولماذا أُسقط يُحصى (D-157): «أُسقط ٣» بلا سببٍ لا يقول ما يُصلَح في الموجّه
+  const why = new Map<string, number>()
   for (const entry of value.items) {
-    const item = entry as Partial<Record<keyof PlanItem | 'source_id', unknown>>
-    const sourceId = typeof item['source_id'] === 'string' ? item['source_id'] : ''
-    const platform = item['platform']
+    const item = entry as Partial<Record<keyof PlanItem | 'source_id' | 'source' | 'id', unknown>>
+    // قارئٌ متسامحٌ في الشكل صارمٌ في المعنى (D-157): الاسمُ البديلُ للحقل
+    // يُقبَل، والقيمةُ الخاطئةُ لا تُقبَل
+    const rawId = item['source_id'] ?? item['sourceId'] ?? item['source'] ?? item['id']
+    const sourceId = typeof rawId === 'string' ? rawId.trim() : ''
+    const platform = typeof item['platform'] === 'string' ? item['platform'].trim().toLowerCase() : item['platform']
     const angle = typeof item['angle'] === 'string' ? item['angle'].trim() : ''
-    const day = typeof item['day'] === 'string' ? item['day'] : ''
-    const time = typeof item['time'] === 'string' ? item['time'] : ''
+    const day = typeof item['day'] === 'string' ? item['day'].trim().slice(0, 10) : ''
+    const rawTime = typeof item['time'] === 'string' ? item['time'].trim() : ''
+    const time = /^\d:\d{2}$/.test(rawTime) ? `0${rawTime}` : rawTime.slice(0, 5)
 
-    const valid =
-      known.has(sourceId) &&
-      (platform === 'linkedin' || platform === 'x') &&
-      angle.length >= 10 &&
-      within(day, week) &&
-      /^\d{2}:\d{2}$/.test(time)
+    const fault = !known.has(sourceId)
+      ? 'مصدرٌ لا نعرفه'
+      : platform !== 'linkedin' && platform !== 'x'
+        ? 'منصّةٌ غير مدعومة'
+        : angle.length < 10
+          ? 'زاويةٌ أقصرُ من عشرة أحرف'
+          : !within(day, week)
+            ? 'يومٌ خارج الأسبوع'
+            : !/^\d{2}:\d{2}$/.test(time)
+              ? 'وقتٌ ليس HH:MM'
+              : null
 
-    if (!valid) {
+    if (fault !== null) {
       dropped += 1
+      why.set(fault, (why.get(fault) ?? 0) + 1)
       continue
     }
     items.push({
       sourceId,
-      platform,
+      platform: platform === 'x' ? 'x' : 'linkedin',
       angle,
       day,
       time,
@@ -204,5 +247,6 @@ export function parsePlan(
       items: items.sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`)),
     },
     dropped,
+    droppedWhy: [...why.entries()].map(([k, n]) => (n === 1 ? k : `${k} ×${n}`)).join('، '),
   }
 }

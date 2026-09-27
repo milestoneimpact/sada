@@ -114,6 +114,20 @@ describe('والدمجُ لا يمحو بالفراغ', () => {
     expect(merged.refreshToken).toBe('ROTATED')
   })
 
+  /** **تجديدٌ ناجحٌ يعيد الحسابَ فعّالًا** (D-157): على staging بقي X «يحتاج تجديدًا» بعد تجديدٍ ناجح. */
+  it('وحسابٌ عُلّم «يحتاج تجديدا» يعود فعّالا حين ينجح التجديد', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    db.raw.exec("UPDATE accounts SET status = 'needs_reauth', needs_reauth_at = '2026-09-26 03:01:08' WHERE id = 'a1'")
+    const out = await renewOne(
+      deps(reply({ access_token: 'FRESH', expires_in: 5_184_000 })),
+      { account_id: 'a1', platform: 'linkedin' },
+    )
+    expect(out.kind).toBe('renewed')
+    const row = db.raw.prepare('SELECT status, needs_reauth_at FROM accounts WHERE id = ?').get('a1') as { status: string; needs_reauth_at: string | null }
+    expect(row.status).toBe('active')
+    expect(row.needs_reauth_at).toBeNull()
+  })
+
   /** ويُحفَظ مشفَّرا في القاعدة — لا في الذاكرة وحدها. */
   it('والمحفوظُ بعد التجديد يُقرأ صحيحا', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })

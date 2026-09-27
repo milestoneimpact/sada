@@ -35,7 +35,11 @@ export type PlanOutcome =
       readonly week: string
       readonly items: number
       readonly dropped: number
+      /** لماذا أُسقط ما أُسقط — نصٌّ يُقرأ لا عدد. */
+      readonly droppedWhy: string
       readonly cost: number
+      /** الرموزُ المستهلَكة: صفرٌ في الكلفة مع رموزٍ يعني سعرا لم يُضبط. */
+      readonly units: number
     }
   /** لا مادّةَ تكفي — يُحلَّل أكثرُ أوّلا. */
   | { readonly kind: 'not_enough'; readonly reason: string }
@@ -231,7 +235,9 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     week,
     items: read.plan.items.length,
     dropped: read.dropped,
+    droppedWhy: read.droppedWhy,
     cost: priced.total,
+    units,
   }
 }
 

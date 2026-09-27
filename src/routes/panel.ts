@@ -34,7 +34,7 @@ import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
-import { animateForPost, pickBinding } from '../lib/media/video'
+import { animateForPost, bindingFor } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
@@ -1091,8 +1091,13 @@ panel.post('/panel/plan/generate', async (c) => {
       ? {
           kind: 'ok',
           text: `خطّةُ أسبوع ${outcome.week}: ${outcome.items} بندا${
-            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped} لمصدرٍ لا نعرفه)`
-          }، الكلفة ${money(outcome.cost)}.`,
+            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
+          }، ${
+            // وصفرٌ مع رموزٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008)
+            outcome.cost === 0 && outcome.units > 0
+              ? `و${outcome.units} رمزا بلا سعرٍ مضبوطٍ للمزوّد — سُجّلت صفرا موسوما`
+              : `الكلفة ${money(outcome.cost)}`
+          }.`,
         }
       : outcome.kind === 'not_enough'
         ? { kind: 'warn', text: outcome.reason }
@@ -1100,9 +1105,15 @@ panel.post('/panel/plan/generate', async (c) => {
           ? { kind: 'warn', text: outcome.reason }
           : { kind: 'bad', text: `تعذّر التخطيط: ${outcome.reason}` }
 
+  // السببُ مع النوع (D-157): «failed» وحدَها كانت تُقرأ في السجلّ بلا سبب
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'plan.generate', target: null, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'plan.generate',
+      target: null,
+      detail: outcome.kind === 'planned' ? outcome.kind : `${outcome.kind}: ${outcome.reason}`.slice(0, 200),
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1177,7 +1188,16 @@ panel.post('/panel/media/generate', async (c) => {
 
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'media.generate', target: id, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'media.generate',
+      target: id,
+      // والسببُ مع النوع (D-157): «generated» بلا نصٍّ فوقها كانت تُقرأ نجاحا تامّا
+      detail:
+        outcome.kind === 'generated'
+          ? outcome.note === '' ? 'generated' : `generated: ${outcome.note}`.slice(0, 200)
+          : 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}`.slice(0, 200) : outcome.kind,
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1200,7 +1220,7 @@ panel.post('/panel/media/animate', async (c) => {
     {
       db: c.env.DB,
       bucket: c.env.MEDIA,
-      ai: pickBinding(c.env),
+      ai: await bindingFor(c.env, c.env.DB, c.env.TOKEN_ENC_KEY),
       encKey: c.env.TOKEN_ENC_KEY,
       baseUrl: c.env.PUBLIC_BASE_URL,
     },
@@ -1229,7 +1249,12 @@ panel.post('/panel/media/animate', async (c) => {
 
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'media.animate', target: id, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'media.animate',
+      target: id,
+      detail: 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}`.slice(0, 200) : outcome.kind,
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1383,7 +1408,7 @@ async function ownerFacts(c: {
   return {
     secrets: new Set(
       ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
-       'GOOGLE_SA_JSON', 'CF_AI_TOKEN'].filter(has),
+       'GOOGLE_SA_JSON', 'CF_AI_TOKEN', 'CF_BROWSER_TOKEN'].filter(has),
     ),
     vars: new Set(['LEGAL_ENTITY', 'LEGAL_CONTACT', 'CF_AI_ACCOUNT_ID'].filter(has)),
     linked: new Set(accounts.filter((a) => a.status !== 'revoked').map((a) => a.platform)),

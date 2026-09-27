@@ -154,6 +154,18 @@ export async function markRefreshed(db: Db, id: string): Promise<void> {
   await db.prepare("UPDATE tokens SET refreshed_at = datetime('now') WHERE account_id = ?").bind(id).run()
 }
 
+/**
+ * **تجديدٌ ناجحٌ يعيد الحسابَ فعّالًا** (D-157). كان `needs_reauth` يبقى بعد أن
+ * ينجح التجديدُ التالي: على staging حسابُ X مجدَّدٌ اليوم وإذنُه صالحٌ وحالُه
+ * «يحتاج تجديدًا» منذ أمس — فيُطلَب من المالك ربطٌ لا حاجةَ إليه.
+ */
+export async function markActive(db: Db, id: string): Promise<void> {
+  await db
+    .prepare("UPDATE accounts SET status = 'active', needs_reauth_at = NULL WHERE id = ? AND status = 'needs_reauth'")
+    .bind(id)
+    .run()
+}
+
 export async function markNeedsReauth(db: Db, id: string): Promise<void> {
   // **ويُختَم وقتُ السقوط مرّةً** (D-131): تعليمٌ ثانٍ لحسابٍ ساقطٍ لا يبدّل التاريخ
   await db

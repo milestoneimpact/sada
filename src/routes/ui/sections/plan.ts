@@ -35,6 +35,28 @@ export interface PlanInput {
   /** كم مصدرا محلَّلا — أقلُّ من اثنين لا يصنع أسبوعا. */
   readonly analyzed: number
   readonly now: Date
+  /** آخرُ ضغطةٍ على «خطّط الأسبوع» من سجلّ التدقيق — وسببُها إن فشلت (D-157) */
+  readonly lastAttempt?: { readonly at: string; readonly detail: string | null } | null
+}
+
+/**
+ * **سببُ آخر فشلٍ يُقرأ في مكانه** (D-157). كان الفلاشُ يقوله مرّةً ثمّ يزول،
+ * وسجلُّ التدقيق يحفظ «failed» بلا سبب، فيعود المالكُ إلى الزرّ ولا يعرف
+ * لماذا لم تُكتب خطّة. السطرُ يبقى حتّى تنجح محاولةٌ أحدثُ منه.
+ */
+function lastAttemptLine(input: PlanInput): string {
+  const a = input.lastAttempt
+  if (a === null || a === undefined || a.detail === null || a.detail === 'planned') return ''
+  if (input.plan !== null && input.plan.createdAt >= a.at) return ''
+  const [kind, ...rest] = a.detail.split(': ')
+  const reason = rest.join(': ')
+  const cls = kind === 'failed' ? 'bad' : 'warn'
+  const glyph = kind === 'failed' ? '✕' : '!'
+  const what = kind === 'failed' ? 'فشلت' : kind === 'blocked' ? 'أُوقفت' : 'لم تكفِ المادّة'
+  return `<div class="lede-row" style="margin-top:var(--s-3)">
+      ${chip(cls, glyph, `آخرُ محاولةٍ ${what} منذ ${escapeHtml(relativeTime(a.at, input.now))}`)}
+      <span class="lede-note">${reason === '' ? 'بلا سببٍ مسجَّل — أعد المحاولة وسيُكتب السبب.' : escapeHtml(reason)}</span>
+    </div>`
 }
 
 function row(
@@ -91,6 +113,7 @@ export function planSection(input: PlanInput): string {
         <p>نداءٌ واحدٌ يقرأ خلاصاتِ ما حُلِّل، ويقول ما يستحقّ النشر هذا الأسبوع
            وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابةُ زرٌّ لكلّ بند.</p></div>
       ${why}
+      ${lastAttemptLine(input)}
     </div>`
   }
 
@@ -118,6 +141,7 @@ export function planSection(input: PlanInput): string {
       <tbody>${plan.plan.items.map((i) => row(i, input.names)).join('')}</tbody>
     </table></div>
 
+    ${lastAttemptLine(input)}
     <div class="lede-row" style="margin-top:var(--s-3)">
       <span class="lede-note"><b>الخطّةُ تقترح ولا تنفّذ.</b> كلُّ «اكتب منه» نداءٌ مدفوعٌ بضغطتك،
         والمسوّدةُ بعده تنتظر اعتمادَك كأيّ مسوّدة.</span>

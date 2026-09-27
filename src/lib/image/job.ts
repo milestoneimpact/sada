@@ -148,13 +148,9 @@ export async function composeSlide(
   deps: ImageDeps,
   request: SlideRequest,
 ): Promise<SlideOutcome> {
-  if (request.headline.trim() === '') {
-    return { slide: null, reason: 'بلا عنوانٍ في الموجز — ولا يُخترَع نصّ' }
-  }
-  if (request.image.bytes.length > MAX_OVERLAY_BYTES) {
-    return { slide: null, reason: 'الصورةُ فوق حدِّ الضمّ — بقيت بلا نصّ' }
-  }
-
+  // **والفحوصُ بترتيب ما يقرّره المالك** (D-157): الإعدادُ ثمّ السرّ ثمّ
+  // العنوان ثمّ الحجم. كان العنوانُ أوّلا، فمن لم يضبط المفتاحَ بعدُ وسقط
+  // موجزُه قرأ «بلا عنوان» — وهو سببٌ لا يصلحه، والسببُ الذي يصلحه مخفيّ
   const settings = await readSettings(deps.db)
   if (!settings.imageOverlay) {
     return { slide: null, reason: 'تركيبُ النصّ مُطفأٌ من الإعدادات' }
@@ -169,6 +165,12 @@ export async function composeSlide(
         'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
         ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
     }
+  }
+  if (request.headline.trim() === '') {
+    return { slide: null, reason: 'بلا عنوانٍ في الموجز — ولا يُخترَع نصّ' }
+  }
+  if (request.image.bytes.length > MAX_OVERLAY_BYTES) {
+    return { slide: null, reason: 'الصورةُ فوق حدِّ الضمّ — بقيت بلا نصّ' }
   }
 
   const size = SLIDE_SIZE[request.platform]
@@ -212,6 +214,24 @@ export async function composeSlide(
     slide: { bytes: shot.bytes, mime: shot.mime, model: request.image.model },
     reason: '',
   }
+}
+
+/**
+ * ما يُقال للمالك عن الشريحة.
+ *
+ * **وسببُ سقوط الموجز كان يُحسَب ثمّ يُرمى** (D-157): يعود في `detail`
+ * فلا يقرؤه أحد، ويُقال «بلا عنوانٍ في الموجز» — وهو عرَضٌ لا سبب. فإن
+ * سقط الموجزُ سُمّي سقوطُه قبل ما ترتّب عليه.
+ */
+export function noteOf(
+  visual: { brief: unknown; detail: string },
+  overlay: { reason: string },
+): string {
+  if (overlay.reason === '') return ''
+  if (visual.brief === null && visual.detail !== '') {
+    return `${visual.detail}؛ ${overlay.reason}`
+  }
+  return overlay.reason
 }
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
@@ -469,7 +489,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
             key: r2Key,
             bytes: image.bytes.length,
             cost: priced.total + visual.cost,
-            note: overlay.reason,
+            note: noteOf(visual, overlay),
           }
         } catch (second) {
           await deps.bucket.delete(r2Key).catch(() => undefined)
@@ -498,7 +518,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     key: r2Key,
     bytes: image.bytes.length,
     cost: priced.total + visual.cost,
-    note: overlay.reason,
+    note: noteOf(visual, overlay),
   }
 }
 

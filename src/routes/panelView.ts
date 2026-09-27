@@ -1571,6 +1571,8 @@ ${pivotPane(d.pivot)}
     ready: d.planReady,
     analyzed: d.sources.filter((s) => s.analyzed).length,
     now: d.now,
+    // من الخمسين صفًّا المحمَّلة أصلًا للأمان — لا استعلامَ جديد (D-157)
+    lastAttempt: d.audit.find((a) => a.action === 'plan.generate') ?? null,
   })}</div>
 </section>
 
