@@ -43,7 +43,7 @@ import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
-import { money } from '../lib/format'
+import { kb, money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import {
@@ -95,6 +95,7 @@ import { injectCsrf, soloPage } from './ui/shell'
 import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
+import { pulses, readHeartbeats } from '../lib/ops/heartbeat'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
 
 export const panel = new Hono<{ Bindings: Env }>()
@@ -399,6 +400,7 @@ panel.get('/panel', async (c) => {
   const plan = await latestPlan(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
+  const beats = await readHeartbeats(c.env.DB)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
   const apps = await appStatuses(c.env.DB, c.env as unknown as Record<string, string | undefined>)
@@ -537,6 +539,7 @@ panel.get('/panel', async (c) => {
       audit,
       // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
       today: todayFeed({ now: new Date(), audit, drafts, facts: loaded.facts }),
+      pulses: pulses(beats, new Date()),
       rpId: rp.id,
       via: session.record.via,
       factors: {
@@ -1172,7 +1175,7 @@ panel.post('/panel/media/generate', async (c) => {
           // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
           kind: outcome.note === '' ? 'ok' : 'warn',
           text:
-            `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.` +
+            `وُلّدت صورة — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.` +
             (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
@@ -1231,7 +1234,7 @@ panel.post('/panel/media/animate', async (c) => {
     outcome.kind === 'generated'
       ? {
           kind: 'ok',
-          text: `وُلّد مقطعٌ رأسيّ — ${Math.round(outcome.bytes / 1024)}KB. ` +
+          text: `وُلّد مقطعٌ رأسيّ — ${kb(outcome.bytes)}. ` +
             'والسعرُ لم يُقرأ من لوحة Cloudflare بعد، فسُجّل صفرا موسوما.',
         }
       : outcome.kind === 'already'

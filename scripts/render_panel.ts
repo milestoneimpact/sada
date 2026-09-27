@@ -11,6 +11,7 @@ import { writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { pivot } from '../src/lib/pivot'
+import { pulses } from '../src/lib/ops/heartbeat'
 
 const now = new Date('2026-09-05T18:00:00Z')
 
@@ -276,6 +277,14 @@ const data: PanelData = {
     { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعاملٍ واحد', ip: '203.0.113.9' },
     { at: ago(26), actor: 'cron', action: 'drive.scan', target: null, detail: 'رأى 3 · تغيّر 1', ip: null },
   ],
+  pulses: pulses([
+    { job: 'renew', at: ago(0.2), outcome: 'ok', detail: 'لا مستحقّ' },
+    { job: 'dispatch', at: ago(0.2), outcome: 'ok', detail: 'أُرسل 1' },
+    { job: 'publish', at: ago(3), outcome: 'ok', detail: '1 رسالة' },
+    { job: 'metrics', at: ago(5), outcome: 'ok', detail: '2 مستحقّ' },
+    { job: 'scan', at: ago(26), outcome: 'ok', detail: 'رأى 3 · جديد 1 · تغيّر 0' },
+    { job: 'alerts', at: ago(26), outcome: 'ok', detail: 'لا إذنَ يقترب' },
+  ], new Date()),
   today: {
     items: [
       { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#security', goLabel: 'الأمان' },

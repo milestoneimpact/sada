@@ -41,6 +41,11 @@ export function relativeTime(value: string, now: Date = new Date()): string {
   return 'قبل أكثر من سنة'
 }
 
+/** حجمٌ بالكيلوبايت — معادلةٌ واحدةٌ لكلّ صورةٍ ومقطع (D-158). */
+export function kb(bytes: number): string {
+  return `${Math.round(bytes / 1024)}KB`
+}
+
 /** مبلغٌ بدقّةٍ تناسب حجمه: الكسور الصغيرة تُفقَد بالتقريب إلى منزلتين. */
 export function money(value: number): string {
   if (value === 0) return '0.00$'

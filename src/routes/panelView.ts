@@ -27,7 +27,8 @@ import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../lib/draft/length'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, B64URL_SCRIPT, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
-import { alertChannel, bar, firstDay, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import { alertChannel, bar, firstDay, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import { COPY_SCRIPT } from './ui/shell'
@@ -931,6 +932,8 @@ export interface PanelData {
   readonly audit: PanelAudit[]
   /** «ما وقع اليوم» — مرويٌّ ممّا في اليد (D-127). */
   readonly today: { readonly items: readonly TodayItem[]; readonly more: number }
+  /** نبضُ الدورات — من `heartbeats` (D-158). */
+  readonly pulses: readonly Pulse[]
   /** النطاق الذي تُوقَّع عليه المفاتيح — يُعرض ليُعرف أنّه ليس الآخر. */
   readonly rpId: string
   readonly via: 'admin_token' | 'passkey'
@@ -1490,6 +1493,7 @@ ${flash}
         <div class="row" style="margin-top:var(--s-3)">${scanBtn}
           <a class="btn g sm" href="#sources">مراجعة المصادر</a></div></div>
       ${todayList(d)}
+      ${machineCard(d.pulses, d.now)}
     </div>
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يوما</h2>

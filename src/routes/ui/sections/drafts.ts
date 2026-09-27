@@ -26,7 +26,7 @@ import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/
 import { escapeHtml } from '../shell'
 import { whenTag } from '../time'
 import type { Peaks } from '../../../lib/schedule/peak'
-import { relativeTime } from '../../../lib/format'
+import { kb, money, relativeTime } from '../../../lib/format'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -48,10 +48,6 @@ const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string
   queued: { cls: 'warn', glyph: '◔', text: 'مجدولة' },
   published: { cls: 'ok', glyph: '✓', text: 'نُشرت' },
   failed: { cls: 'bad', glyph: '▲', text: 'فشل النشر' },
-}
-
-function money(value: number): string {
-  return value === 0 ? '—' : `${value.toFixed(4)}$`
 }
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
@@ -221,8 +217,8 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
         loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
-        <span class="chip mono">${Math.round(ready.bytes / 1024)}KB</span>
-        <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>
+        <span class="chip mono">${kb(ready.bytes)}</span>
+        <span class="chip mono">${ready.cost === 0 ? '—' : money(ready.cost)}</span>
         ${ready.prompt === ''
           ? ''
           : `<span class="chip" title="${escapeHtml(ready.prompt)}">الوصف</span>`}
@@ -241,7 +237,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
         ? ''
         : `<div class="pic-foot">
              ${status('ok', '●', `مقطعٌ رأسيّ 15ث`)}
-             <span class="chip mono">${Math.round(clip.bytes / 1024)}KB</span>
+             <span class="chip mono">${kb(clip.bytes)}</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}
     </div>`
@@ -454,7 +450,7 @@ function card(
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${escapeHtml(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip mono">${escapeHtml(d.model)}</span>`,
-    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${money(d.cost)}</span>`,
+    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك.
      *

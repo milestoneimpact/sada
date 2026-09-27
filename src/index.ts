@@ -34,6 +34,7 @@ import { verify } from './routes/verify'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
+import { beat } from './lib/ops/heartbeat'
 import { auth } from './routes/auth'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
@@ -434,6 +435,7 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Prom
 }
 
 async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
+  let failed = 0
   for (const message of batch.messages) {
     const outcome = await publishPost(
       // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
@@ -448,7 +450,13 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
     } else {
       message.ack()
     }
+    if (outcome.kind === 'failed') failed += 1
   }
+  // نبضُ الطابور (D-158): الدفعةُ وقعت، وكم منها سقط
+  await beat(
+    env.DB, 'publish', failed === batch.messages.length ? 'failed' : 'ok',
+    failed === 0 ? `${batch.messages.length} رسالة` : `${failed} من ${batch.messages.length} سقط`,
+  )
 }
 
 /**
@@ -487,8 +495,11 @@ async function renewTick(env: Env): Promise<void> {
         ),
     })
     if (summary.due > 0) console.info({ job: 'renew', ...summary })
+    // النبضُ بعد العمل (D-158): صفٌّ يقول إنّ الدورةَ دارت ولو لم تجد شيئا
+    await beat(env.DB, 'renew', 'ok', summary.due > 0 ? `${summary.due} مستحقّ` : 'لا مستحقّ')
   } catch (error) {
     console.error({ job: 'renew', failed: String(error) })
+    await beat(env.DB, 'renew', 'failed', String(error))
   }
 }
 
@@ -497,15 +508,21 @@ async function dispatchTick(env: Env): Promise<void> {
     const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
     if (report.kind === 'sent') {
       console.info({ job: 'dispatch', sent: report.count, ids: report.ids })
+      await beat(env.DB, 'dispatch', 'ok', `أُرسل ${report.count}`)
     } else if (report.kind === 'blocked') {
       console.info({ job: 'dispatch', skipped: report.reason })
+      await beat(env.DB, 'dispatch', 'skipped', report.reason)
+    } else {
+      // `none` لا يُسجَّل في السجلّ: سطرٌ كلَّ ربع ساعة يغرقه — **ويُنبَض**
+      // في القاعدة: صفٌّ واحدٌ يُستبدَل، والسؤالُ «أدارت؟» يُجاب (D-158)
+      await beat(env.DB, 'dispatch', 'ok', 'لا مستحقّ')
     }
-    // `none` لا يُسجَّل: سطرٌ كلَّ ربع ساعة يغرق السجلّ فيما لا يُقرأ
   } catch (error) {
     console.error({
       job: 'dispatch',
       failed: error instanceof Error ? error.message : 'unexpected_error',
     })
+    await beat(env.DB, 'dispatch', 'failed', error instanceof Error ? error.message : 'unexpected_error')
   }
 }
 
@@ -523,6 +540,7 @@ async function scanTick(env: Env): Promise<void> {
     const allowance = await checkAllowance(env.DB)
     if (allowance.blocker !== null) {
       console.info({ job: 'drive-scan', skipped: blockerReason(allowance.blocker) })
+      await beat(env.DB, 'scan', 'skipped', blockerReason(allowance.blocker))
       return
     }
     const report = await scanDrive({
@@ -562,11 +580,13 @@ async function scanTick(env: Env): Promise<void> {
       // ما تُرك لغدٍ: يُسجَّل ليُعرف أنّ السقف قصّ لا أنّ المسح أخفق
       deferred: report.toAnalyze.length - enqueued,
     })
+    await beat(env.DB, 'scan', 'ok', `رأى ${report.seen} · جديد ${report.added.length} · تغيّر ${report.changed.length}`)
   } catch (error) {
     console.error({
       job: 'drive-scan',
       failed: error instanceof Error ? error.message : 'unexpected_error',
     })
+    await beat(env.DB, 'scan', 'failed', error instanceof Error ? error.message : 'unexpected_error')
   }
 }
 
@@ -599,8 +619,10 @@ async function metricsTick(env: Env): Promise<void> {
   try {
     const summary = await pullDue({ db: env.DB, encKey: env.TOKEN_ENC_KEY })
     if (summary.due > 0) console.log({ job: 'metrics', ...summary })
+    await beat(env.DB, 'metrics', 'ok', summary.due > 0 ? `${summary.due} مستحقّ` : 'لا مستحقّ')
   } catch (error) {
     console.log({ job: 'metrics', failed: String(error) })
+    await beat(env.DB, 'metrics', 'failed', String(error))
   }
 }
 
@@ -621,8 +643,10 @@ async function reportTick(env: Env): Promise<void> {
         promotion: out.promotion.kind,
       })
     }
+    await beat(env.DB, 'report', 'ok', out.written ? `كُتب ${out.id}` : 'لا جديد')
   } catch (error) {
     console.log({ job: 'report', failed: String(error) })
+    await beat(env.DB, 'report', 'failed', String(error))
   }
 }
 
@@ -638,11 +662,16 @@ async function reportTick(env: Env): Promise<void> {
 async function alertTick(env: Env): Promise<void> {
   try {
     const items = await expiringTokens(env.DB, new Date())
-    if (items.length === 0) return
+    if (items.length === 0) {
+      await beat(env.DB, 'alerts', 'ok', 'لا إذنَ يقترب')
+      return
+    }
     const out = await recordAlerts(env.DB, items)
     if (out.written > 0) console.log({ job: 'token-alerts', ...out })
+    await beat(env.DB, 'alerts', 'ok', `${items.length} يقترب`)
   } catch (error) {
     console.log({ job: 'token-alerts', failed: String(error) })
+    await beat(env.DB, 'alerts', 'failed', String(error))
   }
 
   /*

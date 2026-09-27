@@ -193,6 +193,14 @@ details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:v
   color:var(--ink-3); transition:transform var(--dur-2) var(--ease)}
 details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
+/* سلّمُ الجاهزيّة (D-158): بطاقةٌ تُطوى حين تتمّ درجاتُها كلُّها */
+details.ladder>summary{cursor:pointer; list-style:none; margin-bottom:0}
+details.ladder>summary::-webkit-details-marker{display:none}
+details.ladder[open]>summary{margin-bottom:var(--s-3)}
+details.ladder ol.steps.wiz li .btn{flex:none}
+details.ladder ol.steps.wiz li.at .why{color:var(--ink-2)}
+details.ladder .verdict{margin:0 0 var(--s-2); font-weight:600; color:var(--ink)}
+details.ladder .verdict.bad{color:var(--bad)}
 /* بإزاحةٍ تقول «هذه تحت تلك» — والقائمةُ المسطّحة تُقرأ سبعةَ أقسام */
 .plat-list a{padding-inline-start:var(--s-8)}
 .plat-list .pl{width:15px; height:15px; flex:none; display:grid; place-items:center;
