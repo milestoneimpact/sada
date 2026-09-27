@@ -20,8 +20,8 @@ function ago(hours: number): string {
 }
 
 const accounts: LinkedAccount[] = [
-  { id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر عبدالحميد', status: 'active', createdAt: ago(700), expiresAt: null },
-  { id: 'a2', platform: 'linkedin', kind: 'org', displayName: 'بصائر للاستشارات', status: 'active', createdAt: ago(300), expiresAt: null },
+  { id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر عبدالحميد', status: 'active', createdAt: ago(700), expiresAt: ago(-24 * 40) },
+  { id: 'a2', platform: 'linkedin', kind: 'org', displayName: 'بصائر للاستشارات', status: 'active', createdAt: ago(300), expiresAt: ago(-24 * 40) },
   { id: 'a3', platform: 'x', kind: 'member', displayName: '@omar_ah', status: 'needs_reauth', createdAt: ago(1200), expiresAt: null },
 ]
 

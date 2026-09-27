@@ -280,9 +280,14 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   const { spec, state, accounts, missing } = view
   const logo = LOGOS[spec.id] ?? ''
 
+  // **والصفُّ لا الكلمة** (D-159): حسابٌ «مربوطٌ» بلا صفّ `tokens` كان
+  // يُعرَض أخضرَ ثمّ يسقط أوّلُ منشورٍ في الطابور. وهو حالُ LinkedIn على staging
+  const unsigned = accounts.filter((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
   const badge =
-    state === 'linked'
-      ? status('ok', '●', 'مربوطة')
+    state === 'linked' && unsigned.length > 0
+      ? status('bad', '▲', 'مربوطة بلا إذن')
+      : state === 'linked'
+        ? status('ok', '●', 'مربوطة')
       : state === 'needs_reauth'
         ? status('bad', '▲', 'تحتاج تجديدا')
         : state === 'connectable'
@@ -296,7 +301,11 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
       (a) => `<div class="ch-acc">
         <span class="who">${escapeHtml(a.displayName)}</span>
         <span class="chip">${escapeHtml(KIND[a.kind] ?? a.kind)}</span>
-        ${a.status === 'needs_reauth' ? '' : tokenDays(a.expiresAt, now)}
+        ${a.status === 'needs_reauth'
+          ? ''
+          : a.expiresAt === null
+            ? status('bad', '▲', 'بلا إذنٍ محفوظ', 'title="لا صفَّ في tokens لهذا الحساب — أعد الربط"')
+            : tokenDays(a.expiresAt, now)}
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? status('bad', '▲', 'جدّد الإذن')
@@ -324,7 +333,9 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
          <span class="mono">${missing.map(escapeHtml).join('</span> و <span class="mono">')}</span>.`
       : state === 'needs_reauth'
         ? 'إذنُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
-        : escapeHtml(spec.note)
+        : unsigned.length > 0
+          ? `الحسابُ محفوظٌ <b>ولا إذنَ وصولٍ معه</b> — أوّلُ منشورٍ مجدولٍ سيسقط. أعد الربطَ ليُحفَظ الإذن.`
+          : escapeHtml(spec.note)
 
   // زرُّ الربط لا يُعرض إلا حيث يعمل. و «اربط» فعلٌ يغادر اللوحة إلى
   // المنصّة، فهو رابطٌ لا نموذج — ولا رمز CSRF على انتقالٍ لا يغيّر شيئا
@@ -334,6 +345,9 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
       : state === 'needs_reauth'
         ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start"
               aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
+        : state === 'linked' && unsigned.length > 0
+          ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start"
+                aria-label="أعد ربط ${escapeHtml(spec.label)}">أعد الربط</a>`
         : state === 'linked'
           ? `<a class="btn g sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : state === 'awaiting_owner'
@@ -412,8 +426,11 @@ export function channelsSection(
    * وترتيبُه بالضرر لا بالأبجديّة: **ما يوقف نشرا قائما قبل ما يمنع
    * نشرا لم يبدأ**.
    */
+  const unsignedOf = (v: ChannelView): boolean =>
+    v.state === 'linked' && v.accounts.some((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
   const urgent = [
     ...built.filter((v) => v.state === 'needs_reauth'),
+    ...built.filter(unsignedOf),
     ...built.filter((v) => v.state === 'awaiting_owner'),
   ]
   const waiting = urgent.length === 0
@@ -423,13 +440,16 @@ export function channelsSection(
           ${status('warn', '!', `${urgent.length} ${
             urgent.length === 1 ? 'قناة' : 'قنوات'}`)}</div>
         <ul class="todo">${urgent.map((v) => `<li>
-          <span class="dot ${v.state === 'needs_reauth' ? 'bad' : 'warn'}"></span>
+          <span class="dot ${v.state === 'needs_reauth' || unsignedOf(v) ? 'bad' : 'warn'}"></span>
           <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
             ? 'إذنُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
-            : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
-          ${v.state === 'needs_reauth'
+            : unsignedOf(v)
+              ? 'الحسابُ محفوظٌ <b>ولا إذنَ وصولٍ معه</b> — أوّلُ منشورٍ مجدولٍ سيسقط.'
+              : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
+          ${v.state === 'needs_reauth' || unsignedOf(v)
             ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
-                  aria-label="جدّد إذن ${escapeHtml(v.spec.label)}">جدّد الإذن</a>`
+                  aria-label="${v.state === 'needs_reauth' ? 'جدّد إذن' : 'أعد ربط'} ${escapeHtml(v.spec.label)}">${
+                  v.state === 'needs_reauth' ? 'جدّد الإذن' : 'أعد الربط'}</a>`
             : `<a class="btn g sm" href="#ch-${escapeHtml(v.spec.id)}"
                   aria-label="انتقل إلى بطاقة ${escapeHtml(v.spec.label)}">اعرضها</a>`}
         </li>`).join('')}</ul>

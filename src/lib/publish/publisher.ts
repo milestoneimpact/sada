@@ -83,6 +83,45 @@ export interface PublisherDeps {
   readonly now?: () => Date
 }
 
+/**
+ * سقوطٌ قبل الإرسال **يُكتب كما يُكتب سقوطٌ بعده** (D-159).
+ *
+ * كانت سبعةُ حرّاسٍ تعود قبل أن تُكتب محاولةٌ (`no_tokens` و`token_expired`
+ * ونقصُ النطاق وحسابُ الصفحة ولا وسيطَ …)، فيبقى المنشورُ «مجدولًا» في
+ * اللوحة إلى الأبد وسببُه في سجلّ الطابور وحده. فتُكتب محاولةٌ `failed`
+ * بعلامة `preflight`، ويُعلَّم المنشورُ كما يُعلَّم حين تردّه المنصّة —
+ * **فيقرؤه سلّمُ الجاهزيّة وشاشةُ المنصّة من الصفّ نفسِه**.
+ */
+async function preflightFailed(
+  db: Db,
+  post: { id: string; idempotency_key: string; platform: string },
+  reason: string,
+): Promise<Outcome> {
+  try {
+    const attemptNo = await nextAttemptNo(db, post.id)
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts
+           (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'failed')`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        post.id,
+        post.idempotency_key,
+        attemptNo,
+        JSON.stringify({ platform: post.platform, preflight: true }),
+        JSON.stringify({ error: reason, preflight: true }),
+      )
+      .run()
+    await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ?`).bind(post.id).run()
+  } catch (error) {
+    // الأثرُ لا يُسقط الحكم: السببُ يعود ولو لم يُكتب
+    console.error({ job: 'publish', preflight_record_failed: String(error) })
+  }
+  return { kind: 'failed', reason, retryable: false }
+}
+
 export async function publishPost(
   deps: PublisherDeps,
   message: PublishMessage,
@@ -124,13 +163,11 @@ export async function publishPost(
    * يُبنى سائقُ الصفحات يومَ تصل موافقةُ `Community Management API`.
    */
   if (post.account_kind === 'org') {
-    return {
-      kind: 'failed',
-      reason:
-        'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
+    return preflightFailed(
+      db, post,
+      'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
         'اختر حسابَك الشخصيَّ وجهةً، أو انتظر موافقةَ Community Management API.',
-      retryable: false,
-    }
+    )
   }
 
   // ٢ — هل نُشر بالمفتاح نفسه من قبل؟
@@ -183,31 +220,23 @@ export async function publishPost(
   // منشورا بصورة، ونشرُه بلا صورته نشرٌ لشيءٍ لم يعتمده — والفرقُ لا يُرى
   // في اللوحة، فيُكتشَف على المنصّة بعد أن يقرأه الناس
   if (image !== null && deps.bucket === undefined) {
-    return { kind: 'failed', reason: 'no_media_bucket', retryable: false }
+    return preflightFailed(db, post, 'no_media_bucket')
   }
 
   // **ومنصّةُ المقاطع لا تقبل نصّا وحده**: لا نهايةَ نشرٍ نصّيّةٍ عندها
   // أصلا، فمحاولةٌ بلا مقطعٍ تُردّ بعد أن تُسجَّل وتُحاسَب
   if (CLIP_PLATFORMS.has(post.platform) && image === null) {
-    return {
-      kind: 'failed',
-      reason: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها',
-      retryable: false,
-    }
+    return preflightFailed(db, post, 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها')
   }
   // **وInstagram كذلك لا نهايةَ نصّيّةَ لها** — صورةٌ أو مقطعٌ ولا ثالث
   if (post.platform === 'instagram' && image === null) {
-    return {
-      kind: 'failed',
-      reason: 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور',
-      retryable: false,
-    }
+    return preflightFailed(db, post, 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور')
   }
 
   const tokens = await loadTokens(db, encKey, post.account_id)
   if (tokens === null) {
     await markNeedsReauth(db, post.account_id)
-    return { kind: 'failed', reason: 'no_tokens', retryable: false }
+    return preflightFailed(db, post, 'no_tokens')
   }
   if (isExpiring(tokens.expiresAt, now())) {
     /**
@@ -225,7 +254,7 @@ export async function publishPost(
       return { kind: 'failed', reason: 'token_expired_retry', retryable: true }
     }
     await markNeedsReauth(db, post.account_id)
-    return { kind: 'failed', reason: 'token_expired', retryable: false }
+    return preflightFailed(db, post, 'token_expired')
   }
   /**
    * ورمزٌ لا يملك نطاقَ النشر لا يُرسَل به شيء (D-045).
@@ -270,11 +299,7 @@ export async function publishPost(
       .map((sc) => sc.name)
       .join('، ')
     const which = needsMedia ? 'missing_media_scope' : 'missing_publish_scope'
-    return {
-      kind: 'failed',
-      reason: lacking === '' ? which : `${which}: ${lacking}`,
-      retryable: false,
-    }
+    return preflightFailed(db, post, lacking === '' ? which : `${which}: ${lacking}`)
   }
 
   const attemptNo = await nextAttemptNo(db, post.id)

@@ -852,3 +852,52 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
     expect(row.total).toBe(0)
   })
 })
+
+/**
+ * D-159 · سقوطٌ قبل الإرسال يُكتب كما يُكتب سقوطٌ بعده.
+ */
+describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () => {
+  it('بلا رمزٍ محفوظ: محاولةٌ failed بعلامة preflight والمنشورُ failed', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    db.raw.prepare('DELETE FROM tokens').run()
+    const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId })
+    expect(outcome).toMatchObject({ kind: 'failed', reason: 'no_tokens' })
+    const attempt = db.raw
+      .prepare('SELECT status, response_json, attempt_no FROM publish_attempts WHERE post_id = ?')
+      .get(postId) as { status: string; response_json: string; attempt_no: number }
+    expect(attempt.status).toBe('failed')
+    expect(JSON.parse(attempt.response_json)).toEqual({ error: 'no_tokens', preflight: true })
+    expect(attempt.attempt_no).toBe(1)
+    const post = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as { status: string }
+    expect(post.status).toBe('failed')
+  })
+
+  it('ورمزٌ منتهٍ بلا تجديد كذلك، أمّا القابلُ للإعادة فلا صفَّ له', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    db.raw.prepare(`UPDATE tokens SET expires_at = '2026-09-08T09:01:00Z'`).run()
+    await publishPost(deps(fakeFetch(X_OK)), { postId })
+    const rows = db.raw.prepare('SELECT status FROM publish_attempts WHERE post_id = ?').all(postId) as { status: string }[]
+    expect(rows).toEqual([{ status: 'failed' }])
+
+    const retryId = await seedPost({ platform: 'linkedin' })
+    await saveTokens(db, KEY, 'linkedin:member:abc', {
+      ...LIVE_TOKENS, refreshToken: 'live-refresh', expiresAt: '2026-09-08T09:01:00Z',
+      scopes: scopeSet('linkedin').join(' '),
+    })
+    const out = await publishPost(deps(fakeFetch(X_OK)), { postId: retryId })
+    expect(out).toMatchObject({ kind: 'failed', reason: 'token_expired_retry', retryable: true })
+    expect(db.raw.prepare('SELECT count(*) AS n FROM publish_attempts WHERE post_id = ?').get(retryId)).toEqual({ n: 0 })
+  })
+
+  it('ونقصُ النطاق يُكتب باسم الناقص', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    db.raw.prepare(`UPDATE tokens SET scopes = 'users.read'`).run()
+    const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId })
+    expect(outcome.kind).toBe('failed')
+    const attempt = db.raw
+      .prepare('SELECT response_json FROM publish_attempts WHERE post_id = ?')
+      .get(postId) as { response_json: string }
+    expect(JSON.parse(attempt.response_json).error).toContain('missing_publish_scope')
+  })
+})
+
