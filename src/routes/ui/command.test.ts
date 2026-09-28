@@ -18,6 +18,7 @@ import {
 } from './command'
 import { shell } from './shell'
 import { STYLE } from './styles'
+import { sheet } from '../../test/css'
 
 describe('الطبعُ — والمالكُ يكتب همزتَه كما شاء', () => {
   it('يطوي صورَ الألف والياء والتاء المربوطة', () => {
@@ -280,7 +281,8 @@ describe('التركيب — واللوحةُ لا تُركَّب نصفَ تر�
    * لكلّ ما يُرسَم مخفيّا.
    */
   it('**وقفلُ hidden قائمٌ للكلّ** — لا لصنفٍ صنفا', () => {
-    expect(STYLE).toContain('[hidden]{display:none!important}')
+    // ‏في المستوى الأعلى لا في كتلةٍ مشروطة، ومحدّدُه العاري وحدَه
+    expect(sheet(STYLE).rule('[hidden]').display).toBe('none!important')
   })
 
   it('والنصُّ يبقى داخل نطاق nonce — لا وسمَ ثانٍ بلا ختم', () => {
