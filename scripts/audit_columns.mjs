@@ -42,6 +42,7 @@ const ALLOWED = new Map([
   ['reports.version', 'نسخةُ المخطّط — تُقرأ يومَ توجد نسخةٌ ثانيةٌ تحتاج ترقية، ولا معنى لقراءتها قبلها'],
   ['content_items.extracted_at', 'ختمُ التحليل — و`sources.last_seen_at` هو المعروض في اللوحة، وهذا يبقى للاستعلام'],
   ['promotion_suggestions.decided_at', 'ختمُ البَتّ — والتوصيةُ المبتوتُ فيها تخرج من `openSuggestions` أصلا (D-058)'],
+  ['auth_attempts.window_start', 'يُقرأ داخل `ON CONFLICT … CASE` في `security/gate.ts`: العبارةُ الذرّيّةُ نفسُها تسأله أفاتت النافذة، ولا SELECT له لأنّ SELECTًا منفصلًا يعيد النافذةَ التي أغلقها (D-161)'],
 ])
 
 function walk(dir) {

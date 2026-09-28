@@ -26,6 +26,7 @@ import {
   promoteSession, sessionCookie, type Session,
 } from '../lib/session'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
+import { releaseAttempt, reserveAttempt, reserveChallenge } from '../lib/security/gate'
 import { secondFactorPage } from './authView'
 
 export const auth = new Hono<{ Bindings: Env }>()
@@ -38,6 +39,9 @@ function page(render: (nonce: string) => string, status = 200): Response {
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status })
 }
+
+/** أكبرُ جسدٍ يُقرأ لتوقيع مفتاح: الحقولُ الأربعةُ بـbase64url دون كيلوبايتين. */
+const MAX_ASSERTION_BYTES = 16 * 1024
 
 /** التحدّي في KV بمهلةٍ قصيرة، ومربوطٌ بالجلسة إن وُجدت. */
 function challengeKey(scope: string): string {
@@ -71,12 +75,21 @@ async function guardFull(
   return { session, form }
 }
 
-/** حارسٌ لمسارٍ يُنادى بجلسةٍ **معلَّقة** — إتمامُ العامل الثاني. */
+/**
+ * حارسٌ لمسارٍ يُنادى بجلسةٍ **معلَّقة** — إتمامُ العامل الثاني.
+ *
+ * ونماذجُه نماذجُ صفحةٍ لا نداءاتُ سكربت: ما يُردّ هنا يفتحه المتصفّحُ صفحةً
+ * كاملة. فكان «جلسةٌ انتهت» و«رمزُ النموذج لا يطابق» يُريان المالكَ سطرَ JSON
+ * إنجليزيًّا (D-161). الجلسةُ الغائبة تعود إلى الدخول، والرمزُ الخاطئ يعيد
+ * رسمَ الشاشة برسالة.
+ */
 async function guardPending(
   c: { env: Env; req: { raw: Request; formData: () => Promise<FormData> } },
 ): Promise<{ denied: Response } | { session: Session; form: FormData }> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return { denied: json({ error: 'no_session' }, 401) }
+  if (session === null) {
+    return { denied: new Response(null, { status: 303, headers: { Location: '/panel' } }) }
+  }
 
   let form: FormData
   try {
@@ -85,7 +98,7 @@ async function guardPending(
     form = new FormData()
   }
   if (!(await checkCsrf(session, String(form.get('_csrf') ?? '')))) {
-    return { denied: json({ error: 'csrf_failed' }, 403) }
+    return { denied: await failSecondFactor(c, 'انتهت صلاحيةُ الصفحة — أعد المحاولة.', 403) }
   }
   return { session, form }
 }
@@ -145,6 +158,10 @@ auth.post('/panel/passkey/challenge', async (c) => {
 
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) return json({ error: 'rate_limited' }, 429)
+  // ‏كلُّ تحدٍّ كتابةٌ في KV تُدفَع، والطالبُ مجهول: سقفٌ للعنوان وللجميع قبل الكتابة (D-161)
+  if (!(await reserveChallenge(c.env.DB, c.req.raw)).allowed) {
+    return json({ error: 'rate_limited' }, 429)
+  }
 
   const ticket = crypto.randomUUID()
   const challenge = newChallenge()
@@ -171,6 +188,13 @@ auth.post('/panel/passkey/challenge', async (c) => {
 auth.post('/panel/passkey/login', async (c) => {
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) return json({ error: 'rate_limited' }, 429)
+  // ‏توقيعُ مفتاحٍ بضعُ مئاتٍ من البايتات: جسدٌ أكبرُ لا يُقرأ أصلًا (D-161)
+  if (Number(c.req.header('Content-Length') ?? '0') > MAX_ASSERTION_BYTES) {
+    return json({ error: 'bad_request' }, 413)
+  }
+  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
+    return json({ error: 'rate_limited' }, 429)
+  }
 
   const body = await c.req.json<{
     ticket?: string
@@ -188,6 +212,22 @@ auth.post('/panel/passkey/login', async (c) => {
   await c.env.KV.delete(challengeKey(ticket))
 
   const verdict = await completeAssertion(c.env, body, challenge)
+  if (verdict.ok && !verdict.userVerified) {
+    /*
+     * **والمفتاحُ وحدَه بابٌ كامل، فيلزمه أن يعرف صاحبَه** (D-161).
+     *
+     * مفتاحُ أمانٍ بلا بصمةٍ ولا PIN يُثبت الحيازةَ لا الهويّة: من التقطه لمسه
+     * فدخل، ولا كلمةَ إدارةٍ ولا رمزَ تطبيق. فالدخولُ به وحدَه يشترط راية UV،
+     * ويبقى صالحًا عاملًا ثانيًا بعد الكلمة (`/panel/2fa/passkey`).
+     */
+    await recordFailure(c.env.KV, c.req.raw)
+    await record(
+      c.env.DB,
+      { actor: 'anonymous', action: 'passkey.denied', detail: 'لم يتحقّق المفتاحُ من صاحبه (لا بصمةَ ولا PIN)' },
+      c.req.raw,
+    )
+    return json({ error: 'uv_required' }, 401)
+  }
   if (!verdict.ok) {
     await recordFailure(c.env.KV, c.req.raw)
     await record(
@@ -208,6 +248,7 @@ auth.post('/panel/passkey/login', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
+  await releaseAttempt(c.env.DB, c.req.raw)
   await record(
     c.env.DB,
     { actor: 'passkey', action: 'session.open', target: verdict.label },
@@ -231,7 +272,7 @@ async function completeAssertion(
   env: Env,
   body: AssertionBody,
   challenge: string,
-): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {
+): Promise<{ ok: true; label: string; userVerified: boolean } | { ok: false; reason: string }> {
   const rp = relyingParty(env.PUBLIC_BASE_URL)
   const credentialId = String(body.credentialId ?? '')
   if (credentialId === '') return { ok: false, reason: 'لا معرّف اعتماد' }
@@ -259,7 +300,7 @@ async function completeAssertion(
   if (!verdict.ok) return { ok: false, reason: verdict.reason }
 
   await touchPasskey(env.DB, stored.id, verdict.signCount)
-  return { ok: true, label: stored.label }
+  return { ok: true, label: stored.label, userVerified: verdict.userVerified }
 }
 
 // ── إتمامُ العامل الثاني على جلسةٍ معلَّقة ────────────────────────────
@@ -270,7 +311,9 @@ auth.post('/panel/2fa/passkey', async (c) => {
   if (!gate.session.record.pending) return c.redirect('/panel', 303)
 
   const challenge = await c.env.KV.get(challengeKey(gate.session.id))
-  if (challenge === null) return json({ error: 'challenge_expired' }, 400)
+  if (challenge === null) {
+    return failSecondFactor(c, 'انتهت مهلةُ الصفحة — اضغط «الدخول بمفتاح المرور» مرّةً أخرى.', 400)
+  }
   await c.env.KV.delete(challengeKey(gate.session.id))
 
   const raw = String(gate.form.get('assertion') ?? '')
@@ -281,7 +324,7 @@ auth.post('/panel/2fa/passkey', async (c) => {
       return null
     }
   })()
-  if (body === null) return json({ error: 'bad_request' }, 400)
+  if (body === null) return failSecondFactor(c, 'لم يصل توقيعُ المفتاح — أعد المحاولة.', 400)
 
   const verdict = await completeAssertion(c.env, body, challenge)
   if (!verdict.ok) {
@@ -290,7 +333,7 @@ auth.post('/panel/2fa/passkey', async (c) => {
       { actor: 'panel', action: '2fa.denied', detail: verdict.reason },
       c.req.raw,
     )
-    return json({ error: 'denied', detail: verdict.reason }, 401)
+    return failSecondFactor(c, `لم يُقبَل المفتاح: ${verdict.reason}`, 401)
   }
 
   const promoted = await promoteSession(c.env.KV, gate.session)
@@ -308,6 +351,11 @@ auth.post('/panel/2fa/totp', async (c) => {
 
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
+    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+  }
+  // ‏والحجزُ قبل الفحص (D-161): ألفُ طلبٍ متزامنٍ يقرأ «صفرًا» من KV قبل أن
+  // ‏يكتب أحدُها، والعدّادُ الذرّيُّ في D1 يردّ السادسَ قبل أن يُقارَن رمزُه
+  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
     return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
@@ -331,6 +379,7 @@ auth.post('/panel/2fa/totp', async (c) => {
   // الخطوةُ تُسجَّل قبل الترقية: رمزٌ قُبل لا يُقبل ثانيةً ولو تعثّر ما بعده
   await markTotpStep(c.env.DB, result.step)
   await clearAttempts(c.env.KV, c.req.raw)
+  await releaseAttempt(c.env.DB, c.req.raw)
   const promoted = await promoteSession(c.env.KV, gate.session)
   await record(c.env.DB, { actor: 'panel', action: '2fa.totp' }, c.req.raw)
   return new Response(null, {
@@ -355,6 +404,10 @@ auth.post('/panel/2fa/recovery', async (c) => {
     return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
+  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
+    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+  }
+
   const used = await useRecoveryCode(c.env.DB, String(gate.form.get('code') ?? ''))
   if (!used) {
     const after = await recordFailure(c.env.KV, c.req.raw)
@@ -365,6 +418,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
+  await releaseAttempt(c.env.DB, c.req.raw)
   const left = await countRecoveryCodes(c.env.DB)
   const promoted = await promoteSession(c.env.KV, gate.session)
   await record(

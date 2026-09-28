@@ -73,7 +73,7 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       return r.ok?r.json():sadaPk.fail(r);
     }).then(function(d){
       return navigator.credentials.get({publicKey:{
-        challenge:fromB64u(d.challenge), rpId:d.rpId, userVerification:'preferred',
+        challenge:fromB64u(d.challenge), rpId:d.rpId, userVerification:'required',
         timeout:60000,
         allowCredentials:d.allowCredentials.map(function(id){
           return {id:fromB64u(id), type:'public-key'};})
@@ -1036,7 +1036,7 @@ ${pivotPane(d.pivot)}
 
   <div class="card" style="margin-top:var(--s-3)" id="factors"><h2>العامل الثاني</h2>
     <p class="hint">${d.factors.enforced
-      ? 'مفعَّل: الرمز وحده لا يفتح اللوحة — يليه ما يثبت أنّك أنت.'
+      ? 'مفعَّل: كلمةُ الإدارة وحدَها لا تفتح اللوحة — يليها ما يثبت أنّك أنت.'
       : '<b>غير مفعَّل.</b> كلمةُ الإدارة وحدَها تفتح كلّ شيء. سجّل مفتاح مرورٍ أو اضبط رمز تطبيق.'}</p>
 
     <h3 class="sec">مفاتيح المرور</h3>

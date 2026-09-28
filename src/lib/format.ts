@@ -53,3 +53,17 @@ export function money(value: number): string {
   if (value < 1) return `${value.toFixed(3)}$`
   return `${value.toFixed(2)}$`
 }
+
+/**
+ * ما بقي من المحاولات — **بعددٍ عربيٍّ صحيح** (D-161).
+ *
+ * كانت «بقيت 1 محاولات» و«بقيت 2 محاولات». والعربيّةُ تفرد وتثنّي وتجمع:
+ * محاولةٌ واحدة، محاولتان، ثلاثُ محاولاتٍ إلى عشر، ثمّ إحدى عشرة محاولةً.
+ */
+export function attemptsLeft(n: number): string {
+  if (n <= 0) return 'لم تبقَ محاولات'
+  if (n === 1) return 'بقيت محاولةٌ واحدة'
+  if (n === 2) return 'بقيت محاولتان'
+  if (n <= 10) return `بقيت ${n} محاولات`
+  return `بقيت ${n} محاولة`
+}

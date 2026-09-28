@@ -23,6 +23,17 @@ export interface AuditEntry {
   readonly detail?: string | null
 }
 
+/**
+ * سقفُ النصّ الحرّ في الصفّ (D-161): سببُ رفضٍ قد يحمل مدخلاتِ طالبٍ مجهول
+ * («نوعٌ غير متوقّع: …» بما أرسل)، وكلُّ فتحةٍ للّوحة تقرأ آخرَ خمسين صفًّا.
+ * فكان مليونا بايتٍ في `clientDataJSON` يصيران صفًّا يُطبَع في كلّ فتحة.
+ */
+const MAX_TEXT = 300
+
+function capped(value: string | null | undefined): string | null {
+  return value === null || value === undefined ? null : value.slice(0, MAX_TEXT)
+}
+
 function header(request: Request | undefined, name: string, max: number): string | null {
   const value = request?.headers.get(name) ?? null
   return value === null ? null : value.slice(0, max)
@@ -43,8 +54,8 @@ export async function record(
       .bind(
         entry.actor,
         entry.action,
-        entry.target ?? null,
-        entry.detail ?? null,
+        capped(entry.target),
+        capped(entry.detail),
         header(request, 'CF-Connecting-IP', 45),
         header(request, 'User-Agent', 160),
       )

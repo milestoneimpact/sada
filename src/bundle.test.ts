@@ -126,7 +126,8 @@ describe('الحزمةُ المشحونة', () => {
     expect(html).toContain('id="pk-login"')
 
     const scripts = inlineScripts(html)
-    for (const script of scripts) expect(script).not.toMatch(/(^|[\s;(,=+])undefined\b(?![.'"])/)
+    // ‏والعطلُ في شكله الحقيقيّ «undefinedundefined» في رأس السطر: لا حدَّ كلمةٍ بينهما
+    for (const script of scripts) expect(script).not.toMatch(/(^|\n)\s*undefined/)
     const login = scripts.find((s) => s.includes('pk-login'))
     expect(login).toBeDefined()
     expect(login).toContain('var sadaB64=')
@@ -205,6 +206,8 @@ describe('الحزمةُ المشحونة', () => {
     expect(replies[1]!.cookie).toMatch(/^__Host-sada_session=/)
     expect(asked!.publicKey.rpId).toBe('sada2.basserh.com')
     expect(asked!.publicKey.allowCredentials).toHaveLength(1)
+    // ‏والمفتاحُ وحدَه بابٌ كامل: يُطلب التحقّقُ من صاحبه (D-161)
+    expect((asked!.publicKey as { userVerification?: string }).userVerification).toBe('required')
     expect(note['textContent']).not.toMatch(/تعذّر|لم يُقبَل/)
   })
 
@@ -276,7 +279,13 @@ describe('الحزمةُ المشحونة', () => {
     expect(paths.sort()).toEqual([expect.stringMatching(/^\/a\/p\./), expect.stringMatching(/^\/a\/u\./)])
     for (const path of paths) {
       const script = await (await worker.fetch(new Request(`${ORIGIN}${path}`), e, CTX)).text()
-      expect(script.trimStart().startsWith('undefined')).toBe(false)
+      expect(script).not.toMatch(/(^|\n)\s*undefined/)
+      if (path.startsWith('/a/p.')) {
+        // ‏كلُّ ثابتٍ مُدرَجٍ في القالب حاضرٌ بقيمته، لا في أوّله وحدَه
+        expect(script).toContain('var sadaB64=')
+        expect(script).toContain('var sadaPk=')
+        expect(script).toMatch(/var URL_LEN=\d+, HEAVY=\d+;/)
+      }
       expect(() => runInNewContext(script, browserGlobals(emptyDocument())), path).not.toThrow()
     }
     for (const script of inlineScripts(html)) {

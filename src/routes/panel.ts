@@ -43,9 +43,10 @@ import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
-import { kb, money } from '../lib/format'
+import { attemptsLeft, kb, money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
+import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
 import {
   costOf, deleteProvider, getProvider, listProviders, markVerified,
   normalizeName, resolveKey, saveKey, setEnabled, upsertProvider,
@@ -603,6 +604,16 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
+  // ‏والحجزُ قبل الفحص (D-161): طلباتٌ متزامنةٌ تمرّ كلُّها من قراءة KV قبل أن
+  // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن تُقارَن كلمتُها
+  const reserved = await reserveAttempt(c.env.DB, c.req.raw)
+  if (!reserved.allowed) {
+    return page(
+      (nonce) => loginPage({ error: blockedText(false), blocked: true }, nonce),
+      429,
+    )
+  }
+
   const form = await c.req.formData()
   // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
   // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
@@ -645,7 +656,7 @@ panel.post('/panel/login', async (c) => {
           {
             error: after.blocked
               ? blockedText(after.globalBlock)
-              : `كلمةُ الإدارة غير صحيحة — بقيت ${after.remaining} محاولات.`,
+              : `كلمةُ الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
             blocked: after.blocked,
             passkeys: factors.passkeys.length > 0,
           },
@@ -656,6 +667,7 @@ panel.post('/panel/login', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
+  await releaseAttempt(c.env.DB, c.req.raw)
   await record(
     c.env.DB,
     {
