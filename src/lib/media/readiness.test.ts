@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { Blocker } from '../limits'
 import { imageProviderGate, slideGate, type ImageRefusal, type SlideGate } from '../image/gate'
-import { imageReadiness, videoReadiness, type MediaLine } from './readiness'
+import { imageReadiness, routeDot, videoReadiness, type MediaLine } from './readiness'
 import type { VideoFace } from './video'
 
 const READY_SLIDE = slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true })
@@ -197,5 +197,31 @@ describe('وحكمُ المزوّد من البوّابة لا من نسخة', (
       blocker: { kind: 'provider_disabled', provider: 'gemini' },
     })
     expect(image({ refusal }).next?.note).toBe('Gemini معطَّلٌ بقرارك')
+  })
+})
+
+/**
+ * **وجدولُ التوجيه يقرأ النقطةَ ولا يعيد حكمَها**: كان يقول «جاهز» لرابط Worker
+ * وحده بشرطٍ من عنده، والنقطةُ تحت الزرّ «تنتظرك».
+ */
+describe('نقطةُ المهمّة في جدول التوجيه — نقطةُ مزوّدها لا نقطةُ الحدود', () => {
+  const ready = (face: VideoFace, refusal: ImageRefusal | null = null) => ({
+    // موقوفٌ عمدًا: الجدولُ يحكم على المزوّد، والإيقافُ حالُ النظام لا حالُ مهمّة
+    image: image({ blocker: { kind: 'paused' }, refusal }),
+    video: videoReadiness({ face, blocker: { kind: 'paused' } }),
+  })
+
+  it('الصورةُ من نقطة مزوّدها، والمقطعُ من نقطة مفتاحه — والإيقافُ لا يُسقطهما', () => {
+    expect(routeDot(ready('env'), 'image')).toMatchObject({ key: 'provider', state: 'done' })
+    expect(routeDot(ready('env'), 'video')).toMatchObject({ key: 'key', state: 'done', note: 'من أسرار Worker' })
+    expect(routeDot(ready('none', { kind: 'no_key' }), 'image')).toMatchObject({ key: 'provider', state: 'failed' })
+  })
+
+  it('ورابطُ Worker وحده ينتظرك في الجدول كما ينتظرك تحت الزرّ', () => {
+    expect(routeDot(ready('binding'), 'video')).toMatchObject({ state: 'now', note: 'برابط Worker وحده' })
+  })
+
+  it('وما عداهما لا نقطةَ له — فيبقى حكمُه من بطاقة مزوّده', () => {
+    for (const task of ['analyze', 'draft', 'plan']) expect(routeDot(ready('env'), task)).toBeUndefined()
   })
 })

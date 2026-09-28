@@ -168,6 +168,20 @@ export function imageReadiness(i: ImageReadinessInput): MediaLine {
   ])
 }
 
+/**
+ * النقطةُ التي تحكم على مزوّد المهمّة في جدول التوجيه — **الصورةُ من نقطة
+ * مزوّدها، والمقطعُ من نقطة مفتاحه**، وما عداهما لا نقطةَ له.
+ *
+ * كان الجدولُ يعيد الحكمَ بشرطٍ من عنده (`face !== 'none'`)، فقال «جاهز» لرابط
+ * Worker وحده والنقطةُ تحت الزرّ تقول «تنتظرك» — **والشرطُ المنسوخُ يفترق عن
+ * أصله عند أوّل فرعٍ لا يعرفه**. فيُقرأ الحالُ من النقطة نفسِها، ولا يُعاد.
+ */
+export function routeDot(ready: MediaReady, task: string): Dot | undefined {
+  if (task === 'image') return ready.image.dots.find((d) => d.key === 'provider')
+  if (task === 'video') return ready.video.dots.find((d) => d.key === 'key')
+  return undefined
+}
+
 function keyDot(face: VideoFace): Dot {
   const title = 'المفتاح'
   switch (face) {

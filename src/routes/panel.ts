@@ -26,7 +26,7 @@ import { verifyKey } from '../lib/ai/verify'
 import { listModels } from '../lib/ai/models'
 import { cfAccountId, cfAccountOf } from '../lib/ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate } from '../lib/image/gate'
-import { imageReadiness, videoReadiness } from '../lib/media/readiness'
+import { imageReadiness, routeDot, videoReadiness } from '../lib/media/readiness'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
@@ -525,25 +525,30 @@ panel.get('/panel', async (c) => {
       series,
       sources,
       providers: providerCards,
-      routing: routes.map((r) => ({
-        task: r.task,
-        provider: r.provider,
-        model: r.model,
-        why: r.why,
-        implemented: r.implemented,
+      routing: routes.map((r) => {
         /*
-         * **والصورةُ والمقطعُ من حكم نقطتيهما** (D-163): كان الجدولُ يقول
+         * **والصورةُ والمقطعُ من نقطتيهما عينِهما** (D-163): كان الجدولُ يقول
          * «مزوّده غير جاهز» لصورٍ موجَّهةٍ إلى Cloudflare بمفتاح `CF_AI_TOKEN`
          * وهي تعمل، ولمقطعٍ يُنادى من البيئة — فتناقض شاشةُ المزوّدين نقطةً
          * تحت الزرّ تقول «جاهز». والمقطعُ لا يقرأ من توجيهه إلّا النموذج.
+         *
+         * **و«جاهز» هي «تامّة» وحدها**: رابطُ Worker وحده ينتظرك في النقطة،
+         * فينتظرك في الجدول ولا يُعدّ في المهامّ الجاهزة — والرابطُ معرَّفٌ
+         * في البيئتين، فكان كلُّ لوحٍ بلا `CF_AI_ACCOUNT_ID` يقول «جاهز».
          */
-        ready: r.implemented && (
-          r.task === 'image'
-            ? imageRefusal === null
-            : r.task === 'video'
-              ? face !== 'none'
-              : providerCards.some((p) => p.name === r.provider && p.configured && p.enabled)),
-      })),
+        const dot = routeDot(mediaReady, r.task)
+        return {
+          task: r.task,
+          provider: r.provider,
+          model: r.model,
+          why: r.why,
+          implemented: r.implemented,
+          ready: r.implemented && (dot === undefined
+            ? providerCards.some((p) => p.name === r.provider && p.configured && p.enabled)
+            : dot.state === 'done'),
+          ...(r.implemented && dot?.state === 'now' ? { pending: dot.note } : {}),
+        }
+      }),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       drafts,
       media: media.map((m) => ({

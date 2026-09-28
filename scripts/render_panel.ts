@@ -13,7 +13,7 @@ import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
 import { imageProviderGate, slideGate } from '../src/lib/image/gate'
-import { imageReadiness, videoReadiness } from '../src/lib/media/readiness'
+import { imageReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
 
 const now = new Date('2026-09-05T18:00:00Z')
 
@@ -118,6 +118,11 @@ const data: PanelData = {
     { task: 'analyze', provider: 'anthropic', model: 'claude-opus-5', why: 'حكمٌ يحتاج فهما عميقا', ready: true, implemented: true },
     { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', why: 'الصياغةُ العربيّة', ready: false, implemented: false },
     { task: 'image', provider: 'gemini', model: 'gemini-2.5-flash-image', why: 'توليدُ الصور', ready: false, implemented: false },
+    // والمقطعُ برابط Worker وحده: الجدولُ ينتظرك بملاحظة النقطة نفسِها لا «جاهز»
+    {
+      task: 'video', provider: 'cloudflare', model: 'alibaba/hh1-i2v', why: 'صورةٌ ← مقطعٌ رأسيّ',
+      ready: false, implemented: true, pending: routeDot(mediaReady, 'video')?.note ?? '',
+    },
   ],
   knownProviders: [
     { name: 'anthropic', label: 'Anthropic' },

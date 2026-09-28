@@ -9,7 +9,7 @@ import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
-import { bar, status as chip } from '../parts'
+import { RUNG_MARK, bar, status as chip } from '../parts'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -461,9 +461,13 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       </td>
       <td data-label="الحال">${r.ready
         ? chip('ok', '●', 'جاهز')
-        : r.implemented
-          ? chip('bad', '✕', 'مزوّده غير جاهز')
-          : chip('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
+        : r.pending !== undefined
+          // ينتظرك ولا يسقط — بعلامة النقطة وكلمتها، فيقول الجدولُ ما يقوله الزرّ
+          ? chip('warn', RUNG_MARK.now.g, escapeHtml(r.pending),
+              `title="${escapeHtml(`${RUNG_MARK.now.label} — ${r.pending}`)}"`)
+          : r.implemented
+            ? chip('bad', '✕', 'مزوّده غير جاهز')
+            : chip('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
 
   return { strip, rows, add, routing }
 }

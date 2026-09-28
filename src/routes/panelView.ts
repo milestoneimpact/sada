@@ -238,6 +238,12 @@ export interface PanelData {
   readonly routing: {
     task: string; provider: string; model: string
     why: string; ready: boolean; implemented: boolean
+    /**
+     * ما ينتظرك قبل أن يُضمَن النداء — **ملاحظةُ النقطة التي تحت الزرّ بعينها**
+     * حين تنتظرك ولا تسقط (رابطُ Worker وحده). فلا يقول الجدولُ «جاهز» ولا
+     * «غير جاهز» والنقطةُ بينهما.
+     */
+    pending?: string
   }[]
   readonly knownProviders: { name: string; label: string }[]
   readonly drafts: readonly DraftRow[]
