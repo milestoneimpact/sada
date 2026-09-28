@@ -1008,16 +1008,16 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const at = (overlay: boolean, hasBrowserKey: boolean): string =>
       section([draft('d1')], { mediaReady: withImage(slideGate({ overlay, hasBrowserKey, hasAccount: true })) })
     expect(at(false, true)).toContain('صورةٌ مجرّدةٌ <b>بلا حرف</b>')
-    expect(at(true, true)).toContain('<b>وفوقها عنوانٌ من كلمتين</b>')
+    expect(at(true, true)).toContain('<b>وفوقها عنوانٌ من كلمتين أو ثلاث</b>')
     expect(at(true, true)).not.toContain('بلا حرف')
     expect(at(true, false)).toContain('<b>بلا عنوانٍ فوقها بعد</b>')
   })
 
   it('وسببُ السطر لا يمتدّ مئتي بكسل: قاعدةُ «بلا صورة» على ابنها المباشر وحده', () => {
-    expect(STYLE).toContain('.pic.none > .ago{flex:1 1 200px}')
-    expect(STYLE).not.toContain('.pic.none .ago{')
-    expect(STYLE).toContain('.hint.ready{')
+    expect(css.rule('.pic.none > .ago').flex).toBe('1 1 200px')
+    expect(css.rules().some((r) => r.selectors.includes('.pic.none .ago'))).toBe(false)
+    expect(Object.keys(css.rule('.hint.ready')).length).toBeGreaterThan(0)
     // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
-    expect(STYLE).toContain('.hint.ready a{color:var(--brand)')
+    expect(css.rule('.hint.ready a').color).toBe('var(--brand)')
   })
 })
