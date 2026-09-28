@@ -167,6 +167,35 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     expect(out.detail).toContain('تعذّر')
   })
 
+  /**
+   * **والمبتورُ يُسجَّل كذلك** (D-164). سقفُ الموجز `maxTokens: 400`، فهو
+   * أكثرُ المواضع عرضةً للبتر — وكان يعود «تعذّر» بكلفةٍ صفرٍ ولا صفّ.
+   */
+  it('وجوابٌ مبتورٌ بـlength **يُسجَّل** ويُعاد سببا — والكلفةُ لا تُقال صفرا', async () => {
+    await seedWriter()
+    await db.prepare("UPDATE providers SET price_in = 1, price_out = 2 WHERE name = 'writer'").run()
+    const net = (async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          model: 'writer-1',
+          choices: [{ message: { content: '{"subject":"wov' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 300, completion_tokens: 400 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )) as unknown as typeof fetch
+
+    const out = await visualBrief(deps(net), 'نصّ', 'post-1')
+    expect(out.brief).toBeNull()
+    expect(out.detail).toContain('بُتر')
+    const { results } = await db
+      .prepare('SELECT operation, units, total, ref_id FROM cost_ledger')
+      .all<{ operation: string; units: number; total: number; ref_id: string }>()
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({ operation: 'image-brief:writer-1', units: 700, ref_id: 'post-1' })
+    expect(out.cost).toBeCloseTo(results[0]!.total, 10)
+    expect(out.cost).toBeGreaterThan(0)
+  })
+
   it('وجوابٌ مشوَّهٌ **يُسجَّل كلفتُه** ثمّ يُردّ — النداءُ وقع', async () => {
     await seedWriter()
     const net = (async (): Promise<Response> =>

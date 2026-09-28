@@ -76,7 +76,7 @@ export function systemPrompt(): string {
     /*
      * **عقدُ الحقول يُكتب في الموجّه لا في المخطّط وحدَه** (D-157).
      *
-     * كان المخطّطُ PLAN_SCHEMA يصل إلى Anthropic وحدَه (أداةً)، أمّا مزوّدٌ
+     * كان المخطّطُ PLAN_SCHEMA يصل إلى Anthropic وحدَه (عبر `output_config.format`)، أمّا مزوّدٌ
      * openai_compat فيُطلب منه json_object بلا وصفٍ للبند — فيعيد بنودًا
      * بمفاتيحَ من عنده (source, channel, date…) يُسقطها القارئُ كلَّها،
      * ويعود «لم يبقَ بندٌ صالح» بعد أن دُفع النداء. قِيس على staging:
@@ -125,6 +125,14 @@ export function userPrompt(sources: readonly PlanSource[], week: string): string
   ].join('\n')
 }
 
+/**
+ * سقفُ البنود — **يُفرض في `parsePlan` لا يُرجى من المخطّط** (D-164).
+ *
+ * `maxItems` لا يصل إلى المزوّد: `portableSchema` يطويه وصفًا، لأنّ
+ * المخرَجَ المقيَّد لا يقبله. فلو بقي السقفُ في المخطّط وحدَه لسقط كلُّه.
+ */
+export const MAX_ITEMS = 6
+
 export const PLAN_SCHEMA = {
   type: 'object',
   properties: {
@@ -132,7 +140,7 @@ export const PLAN_SCHEMA = {
     items: {
       type: 'array',
       minItems: 1,
-      maxItems: 6,
+      maxItems: MAX_ITEMS,
       items: {
         type: 'object',
         properties: {
@@ -186,6 +194,9 @@ function within(day: string, week: string): boolean {
  *
  * والبندُ الفاسد يُسقَط وحده ولا تسقط الخطّة: خمسةٌ صالحةٌ من ستّةٍ خيرٌ
  * من نداءٍ يُعاد كاملا بكلفته.
+ *
+ * **والسقفُ هنا كذلك** (D-164): ما زاد على `MAX_ITEMS` من الصالح يُقصّ
+ * على ترتيب النموذج، ويُحصى سببًا كغيره.
  */
 export function parsePlan(
   raw: unknown,
@@ -240,6 +251,21 @@ export function parsePlan(
   }
 
   if (items.length === 0) return { ok: false, reason: 'لم يبقَ بندٌ صالحٌ في الخطّة' }
+
+  /*
+   * **القصُّ على ترتيب النموذج، قبل الفرز بالموعد** (D-164).
+   *
+   * الموجّهُ يقول «اختر… ورتّبه»، فترتيبُه حكمٌ بالأولويّة. والقصُّ بعد
+   * الفرز يُسقط آخرَ الأسبوع لا أضعفَ البنود: سابعٌ في الأولويّة يومَ
+   * الأحد يبقى، وثانٍ يومَ الخميس يُرمى.
+   */
+  const over = items.length - MAX_ITEMS
+  if (over > 0) {
+    items.splice(MAX_ITEMS)
+    dropped += over
+    why.set('بندٌ بعد السادس', over)
+  }
+
   return {
     ok: true,
     plan: {

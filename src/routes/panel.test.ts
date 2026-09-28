@@ -9,6 +9,7 @@ import { readSettings, writeSetting } from '../lib/settings'
 import { getProvider, resolveKey, setEnabled, upsertProvider } from '../lib/providers'
 import { recordCost } from '../lib/cost'
 import { writeRoute } from '../lib/ai/routes'
+import { weekStart } from '../lib/plan/prompt'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -1561,6 +1562,48 @@ describe('الثيم النهاريّ', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('آخرُ محاولةٍ لم تكفِ المادّة')
     expect(html).toContain('والخطّةُ تحتاج 2 على الأقلّ')
+  })
+
+  /**
+   * **«وحدة» لا «رمز»** (D-155، D-164): إشعارُ الخطّة كان يقول «2600 رمزا
+   * بلا سعرٍ مضبوط»، والرمزُ في اللوحة رمزُ التطبيق والاسترداد. ولا يُرى
+   * إلّا بخطّةٍ نجحت على مزوّدٍ بلا سعر — فيُبلَغ بـGemini المدمَج.
+   */
+  it('خطّةٌ على مزوّدٍ بلا سعرٍ تقول «وحدةً» لا «رمزا»', async () => {
+    const cookie = await login()
+    const ids = [await seedSource('تقرير الأثر'), await seedSource('مراجعة المحفظة')]
+    for (const id of ids) {
+      await db
+        .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+        .bind(crypto.randomUUID(), id, 'خلاصةٌ عن الوقف', JSON.stringify({ themes: ['الوقف'] }), 0.8)
+        .run()
+    }
+    await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
+    const week = weekStart(new Date())
+    const plan = {
+      rationale: 'أسبوعٌ بمصدرين.',
+      items: [{ source_id: ids[0], platform: 'linkedin', angle: 'زاويةُ الأثر لا زاويةُ المبلغ', day: week, time: '07:30', why: 'الأثقل.' }],
+    }
+    const real = globalThis.fetch
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          model: 'gemini-2.5-flash',
+          choices: [{ message: { content: JSON.stringify(plan) }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 2000, completion_tokens: 600 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )) as unknown as typeof fetch
+    try {
+      const withKey = { ...env, GEMINI_API_KEY: 'g-test' }
+      const res = await app.request('/panel/plan/generate', withSession(cookie, { method: 'POST', body: new FormData() }), withKey)
+      expect(res.status).toBe(303)
+      const html = await (await app.request('/panel', withSession(cookie), withKey)).text()
+      expect(html).toContain('و2600 وحدةً بلا سعرٍ مضبوطٍ للمزوّد')
+      expect(html).not.toContain('رمزا بلا سعر')
+    } finally {
+      globalThis.fetch = real
+    }
   })
 
   /** **الثابتُ أصلٌ ببصمة** (D-153): لا يبقى سطرًا إلّا إقلاعُ الثيم وما يتبدّل بالطلب. */

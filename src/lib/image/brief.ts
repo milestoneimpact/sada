@@ -27,6 +27,10 @@
  * ولو كان صغيرا. **وما لا يُسجَّل لا يظهر في السقف** — فيتسرّب الإنفاق
  * من باب لا يحرسه أحد.
  *
+ * **وجوابٌ مبتورٌ يُسجَّل كذلك** (D-164). سقفُ هذا النداء `maxTokens: 400`
+ * على لهجة التوافق، فهو أكثرُ المواضع عرضةً للبتر — وكان المبتورُ يعود
+ * «تعذّر» بلا صفٍّ في الدفتر، وقد دُفع ثمنُه.
+ *
  * ## ولا يُوقِف فشلُه التوليد
  *
  * الموجزُ تحسينٌ لا شرط. فإن سقط النداء رُدَّ `null`، **وبُني الوصفُ من
@@ -36,6 +40,7 @@
 import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
 import { routeFor } from '../ai/routes'
+import { spentOf, type Spent } from '../ai/spent'
 import { recordCost } from '../cost'
 import { blockerReason, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
@@ -222,9 +227,24 @@ export async function visualBrief(
     return { brief: null, cost: 0, detail: `لا مفتاح لـ ${provider.label}` }
   }
 
+  // **الكلفةُ قبل القراءة** — النداءُ وقع وحوسِب عليه، وجوابٌ مشوَّهٌ أو
+  // مبتورٌ لا يُلغي كلفةً وقعت (D-008، D-164). وتُعرَّف قبل النداء لأنّ
+  // الـcatch يحتاجها كما يحتاجها النجاح
+  const charge = async (spent: Spent): Promise<number> => {
+    const priced = costOf(provider, spent)
+    const units = spent.inputTokens + spent.outputTokens
+    await recordCost(deps.db, {
+      provider: provider.name,
+      operation: `image-brief:${spent.model}`,
+      units,
+      unitCost: units === 0 ? 0 : priced.total / units,
+      ...(refId === undefined ? {} : { refId }),
+    })
+    return priced.total
+  }
+
   let text: string
-  let usage: { inputTokens: number; outputTokens: number }
-  let ran: string
+  let spent: Spent
   try {
     if (provider.kind === 'anthropic') {
       const result = await anthropicChat({
@@ -235,8 +255,7 @@ export async function visualBrief(
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
       text = result.text
-      usage = { inputTokens: result.inputTokens, outputTokens: result.outputTokens }
-      ran = result.model
+      spent = result
     } else {
       if (provider.baseUrl === null) {
         return { brief: null, cost: 0, detail: 'لا عنوان لمزوّد الكتابة' }
@@ -255,33 +274,23 @@ export async function visualBrief(
         deps.fetchImpl ?? fetch,
       )
       text = result.text
-      usage = { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens }
-      ran = result.model
+      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
     }
   } catch (error) {
+    // جوابٌ وصل ثمّ رُدّ: يُسجَّل، وكلفتُه تُعاد مع السبب فلا تُقال صفرا
+    const late = spentOf(error)
     return {
       brief: null,
-      cost: 0,
+      cost: late === null ? 0 : await charge(late),
       detail: `تعذّر الموجزُ البصريّ: ${error instanceof Error ? error.message : 'نداءٌ فشل'}`,
     }
   }
 
-  // **الكلفةُ قبل القراءة** — النداءُ وقع وحوسِب عليه، وجوابٌ مشوَّه لا
-  // يُلغي كلفةً وقعت (D-008)
-  const priced = costOf(provider, usage)
-  const units = usage.inputTokens + usage.outputTokens
-  await recordCost(deps.db, {
-    provider: provider.name,
-    operation: `image-brief:${ran}`,
-    units,
-    unitCost: units === 0 ? 0 : priced.total / units,
-    ...(refId === undefined ? {} : { refId }),
-  })
-
+  const cost = await charge(spent)
   const brief = parseBrief(text)
   return {
     brief,
-    cost: priced.total,
+    cost,
     detail: brief === null ? 'جوابُ الموجز ليس بالشكل المتوقَّع' : 'موجزٌ بصريّ',
   }
 }

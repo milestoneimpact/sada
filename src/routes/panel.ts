@@ -1207,9 +1207,10 @@ panel.post('/panel/plan/generate', async (c) => {
           text: `خطّةُ أسبوع ${outcome.week}: ${outcome.items} بندا${
             outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
           }، ${
-            // وصفرٌ مع رموزٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008)
+            // وصفرٌ مع وحداتٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008).
+            // و«وحدة» لا «رمز» (D-155): الرمزُ في اللوحة رمزُ التطبيق والاسترداد
             outcome.cost === 0 && outcome.units > 0
-              ? `و${outcome.units} رمزا بلا سعرٍ مضبوطٍ للمزوّد — سُجّلت صفرا موسوما`
+              ? `و${outcome.units} وحدةً بلا سعرٍ مضبوطٍ للمزوّد — سُجّلت صفرا موسوما`
               : `الكلفة ${money(outcome.cost)}`
           }.`,
         }
