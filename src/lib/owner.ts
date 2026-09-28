@@ -16,6 +16,7 @@
  * من البيئة أو القاعدة يُشتقّ، **وما لا يُعرَف يُقال «لا يُعرَف من
  * هنا»** — ولا علامةَ صحٍّ على ما لم يُتحقَّق منه (D-061).
  */
+import { slideGate } from './image/gate'
 
 /** ماذا يفتح إنجازُ المهمّة — وبه تُرتَّب، لا بترقيمها. */
 export type Unblocks =
@@ -159,8 +160,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ متصفّحٍ** ' +
       'لا عملُ مولّد صور.',
     unblocks: 'capability',
-    // سرٌّ لا متغيّر (D-157): كان يُسأل عنه في `vars` فلا يكتمل أبدا ولو ضُبط
-    done: (f) => f.secrets.has('CF_BROWSER_TOKEN') && f.vars.has('CF_AI_ACCOUNT_ID'),
+    // سرٌّ لا متغيّر (D-157): كان يُسأل عنه في `vars` فلا يكتمل أبدا ولو ضُبط.
+    // **والحكمُ حكمُ `composeSlide` نفسُه** (D-163): كان ثالثَ نسخةٍ من شرطها
+    done: (f) =>
+      slideGate({
+        overlay: true,
+        hasBrowserKey: f.secrets.has('CF_BROWSER_TOKEN'),
+        hasAccount: f.vars.has('CF_AI_ACCOUNT_ID'),
+      }).state === 'ready',
     secrets: ['CF_BROWSER_TOKEN'],
   },
   {

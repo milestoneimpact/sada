@@ -17,6 +17,7 @@
  */
 
 import { compatCatalogUrl } from './models'
+import type { Spent } from './spent'
 import { guardedFetch } from './urlGuard'
 
 export interface CompatUsage {
@@ -35,6 +36,12 @@ export class CompatError extends Error {
     message: string,
     readonly status: number,
     readonly retryable: boolean,
+    /**
+     * **ما استُهلك حين وصل الجوابُ ثمّ رُدّ** (D-164): فارغًا أو مبتورًا أو
+     * مرفوضًا بعد 2xx. وقع وحوسِب عليه، فيُسجَّل قبل أن يُعدّ فشلًا.
+     * ويغيب فيما لم يصل: الشبكةُ والرمزُ غيرُ الناجح بلا استهلاكٍ يُقرأ.
+     */
+    readonly spent?: Spent,
   ) {
     super(message)
     this.name = 'CompatError'
@@ -130,19 +137,32 @@ export async function chatCompletion(
   const message = first?.['message'] as Record<string, unknown> | undefined
   const text = message?.['content']
 
-  if (typeof text !== 'string' || text.length === 0) {
-    throw new CompatError('لا نصّ في جواب المزوّد', 502, true)
+  // الاستهلاكُ يُقرأ **قبل** أيّ رفضٍ للجسد: ما بعد هذا السطر جوابٌ وصل
+  // وحوسِب عليه، فكلُّ خطأٍ يُرمى منه يحمله (D-164)
+  const usage = readUsage(payload['usage'])
+  const model = typeof payload['model'] === 'string' ? payload['model'] : request.model
+  const spent: Spent = { ...usage, cachedInputTokens: 0, model }
+
+  const empty = typeof text !== 'string' || text.length === 0
+  /*
+   * **والرفضُ حقلٌ لا نصّ** (D-164): OpenAI وطبقاتُ التوافق التي تتبعها
+   * تعيد `message.refusal` مع `content` فارغ. وكان يقع في «لا نصّ» فيُعاد
+   * — وإعادةُ رفضٍ لسياسة المحتوى تدفع ثمنه مرّةً ثانيةً لتلقى الجوابَ
+   * نفسه. فلا يُعاد، كرفض Anthropic تمامًا. ونصُّ الرفض لا يُقرأ: يكفي أنّه وُجد.
+   */
+  const refusal = message?.['refusal']
+  if (empty && typeof refusal === 'string' && refusal.trim().length > 0) {
+    throw new CompatError('رفض المزوّدُ الطلب', 422, false, spent)
+  }
+  if (empty) {
+    throw new CompatError('لا نصّ في جواب المزوّد', 502, true, spent)
   }
   // بُتر قبل تمامه: قد يتمّ في محاولةٍ ثانية
   if (first?.['finish_reason'] === 'length') {
-    throw new CompatError('بُتر الجواب قبل تمامه', 502, true)
+    throw new CompatError('بُتر الجواب قبل تمامه', 502, true, spent)
   }
 
-  return {
-    text,
-    usage: readUsage(payload['usage']),
-    model: typeof payload['model'] === 'string' ? payload['model'] : request.model,
-  }
+  return { text, usage, model }
 }
 
 /**

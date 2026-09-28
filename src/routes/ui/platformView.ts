@@ -38,8 +38,9 @@ import { setupPane } from './channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { whenTag } from './time'
 import { LOGOS } from './logos'
-import { status } from './parts'
-import { readiness, type Readiness, type RungState } from '../../lib/platform/readiness'
+// وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
+import { RUNG_MARK, status } from './parts'
+import { readiness, type Readiness } from '../../lib/platform/readiness'
 
 export interface PlatformScreenData {
   readonly view: ChannelView
@@ -354,14 +355,6 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
         ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
         ${alerts}
       </ul>`
-}
-
-/** علامةُ الدرجة — مع كلمتها لا وحدَها (D-043). */
-const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: string; label: string }>> = {
-  done: { g: '●', cls: 'ok', label: 'تامّة' },
-  now: { g: '◍', cls: 'warn', label: 'تنتظرك' },
-  waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
-  failed: { g: '▲', cls: 'bad', label: 'ساقطة' },
 }
 
 /**

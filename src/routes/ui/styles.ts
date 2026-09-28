@@ -1194,7 +1194,9 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .pic.none{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   padding:var(--s-3) var(--s-3); border-radius:var(--r); background:var(--surface-2);
   border:1px dashed var(--line)}
-.pic.none .ago{flex:1 1 200px}
+/* الابنُ المباشرُ وحدَه: سطرُ الجاهزيّة تحته فيه «ago» أيضًا، وقاعدةٌ تنزل
+   إليه تمدّ سببَه مئتي بكسل فيدفع رابطَه إلى سطرٍ وحدَه (D-163) */
+.pic.none > .ago{flex:1 1 200px}
 /* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
    ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
 .sched{display:flex; align-items:flex-end; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2);
@@ -1643,6 +1645,16 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .hint.peak{margin-top:var(--s-2); display:flex; align-items:center;
   gap:var(--s-2); flex-wrap:wrap}
 .hint.peak .chip{margin:0}
+
+/* سطرُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — نقاطٌ بلونها ورمزها
+   وكلمتها، ثمّ سببُ أوّلِ ساقطةٍ ورابطُه. **ويأخذ سطرَه كاملًا** في صفّ
+   «بلا صورة» المرن، فلا يزاحم الزرَّ في سطره. وبلا لونِ الهويّة: الحالُ
+   تُقال بألوان الحال وحدها */
+.hint.ready{margin:var(--s-2) 0 0; display:flex; align-items:center;
+  gap:var(--s-1) var(--s-2); flex-wrap:wrap; flex-basis:100%}
+/* ورابطُ الإصلاح بلون الهويّة كروابط الوثيقة — لا أزرقُ المتصفّح: الورقةُ
+   لا تلوّن «a» عامّةً، فرابطٌ بلا قاعدةٍ يخرج بلونٍ لا يعرفه الثيمان */
+.hint.ready a{color:var(--brand); font-size:var(--t-xs); font-weight:600; text-underline-offset:3px}
 
 [hidden]{display:none!important}
 

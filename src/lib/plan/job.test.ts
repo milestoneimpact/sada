@@ -7,8 +7,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { approvePlan, eligible, latestPlan, planWeek, type PlanDeps } from './job'
-import { parsePlan, systemPrompt, userPrompt, weekStart } from './prompt'
+import { MAX_ITEMS, parsePlan, systemPrompt, userPrompt, weekStart } from './prompt'
 import { writeSetting } from '../settings'
+import { writeRoute } from '../ai/routes'
 
 let db: FakeDb
 let calls: { body: unknown }[]
@@ -20,7 +21,7 @@ function plan(items: unknown[], rationale = 'أسبوعٌ يبدأ بالأثق�
   return { rationale, items }
 }
 
-function net(options: { payload?: unknown; status?: number } = {}) {
+function net(options: { payload?: unknown; status?: number; stop?: string } = {}) {
   calls = []
   return (async (input: unknown, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : null
@@ -40,7 +41,7 @@ function net(options: { payload?: unknown; status?: number } = {}) {
     return new Response(
       JSON.stringify({
         id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-opus-5',
-        stop_reason: 'end_turn',
+        stop_reason: options.stop ?? 'end_turn',
         content: [{ type: 'text', text: JSON.stringify(options.payload ?? plan([])) }],
         usage: { input_tokens: 2000, output_tokens: 600, cache_read_input_tokens: 0 },
       }),
@@ -353,5 +354,136 @@ describe('لماذا أُسقط ما أُسقط (D-157)', () => {
     expect(read.droppedWhy).toContain('منصّةٌ غير مدعومة')
     expect(read.droppedWhy).toContain('زاويةٌ أقصرُ')
     expect(read.droppedWhy).toContain('يومٌ خارج الأسبوع')
+  })
+})
+
+/**
+ * **المخطّطُ المحمول، والسقفُ في القارئ، والكلفةُ المتأخّرة** (D-164).
+ *
+ * ثلاثةٌ تُختبَر معًا لأنّها وجهٌ واحد: حين يُطوى `maxItems` وصفًا لا يبقى
+ * السقفُ إلّا في `parsePlan`، وحين يُرَدّ جوابٌ وصل لا يبقى أثرُه إلّا في
+ * الدفتر.
+ */
+describe('D-164 · المخطّطُ المحمول', () => {
+  /** كلُّ مفتاحٍ في الشجرة — لا نصُّها: الوصفُ يحمل «minLength: 10» حرفًا. */
+  function keysDeep(value: unknown): string[] {
+    if (Array.isArray(value)) return value.flatMap(keysDeep)
+    if (typeof value !== 'object' || value === null) return []
+    return Object.entries(value).flatMap(([key, child]) => [key, ...keysDeep(child)])
+  }
+
+  it('Anthropic يتلقّى المخطّطَ بلا minLength ولا maxItems ولا minItems', async () => {
+    const a = await seedSource('تقرير', 0.9)
+    await seedSource('مراجعة', 0.5)
+    await planWeek(deps(net({ payload: plan([item(a)]) })))
+
+    const sent = calls[0]?.body as { output_config?: { format?: { schema?: unknown } } }
+    const keys = keysDeep(sent.output_config?.format?.schema)
+    expect(keys).toContain('additionalProperties')
+    for (const banned of ['minLength', 'maxItems', 'minItems']) expect(keys).not.toContain(banned)
+  })
+})
+
+describe('D-164 · سقفُ الستّة في القارئ', () => {
+  /** ثمانيةُ بنودٍ صالحة، والأخيران في ترتيب النموذج **أبكرُها موعدًا**. */
+  function eight() {
+    const days = ['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-19', '2026-09-13', '2026-09-13']
+    return days.map((day, i) => item('s1', { day, time: `0${i + 1}:00`, angle: `زاويةُ البند رقم ${i + 1} في الترتيب` }))
+  }
+
+  it('ثمانيةٌ صالحةٌ تصير ستّة، والاثنان يُحصَيان بسببهما', () => {
+    const read = parsePlan(plan(eight()), new Set(['s1']), WEEK)
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.plan.items).toHaveLength(MAX_ITEMS)
+    expect(read.dropped).toBe(2)
+    expect(read.droppedWhy).toBe('بندٌ بعد السادس ×2')
+  })
+
+  it('**والقصُّ على ترتيب النموذج لا على الموعد** — السابعُ في الأولويّة يُسقَط ولو كان الأحد', () => {
+    const read = parsePlan(plan(eight()), new Set(['s1']), WEEK)
+    if (!read.ok) throw new Error('لم تُقرأ')
+    const kept = read.plan.items.map((i) => i.angle)
+    for (let n = 1; n <= 6; n += 1) expect(kept).toContain(`زاويةُ البند رقم ${n} في الترتيب`)
+    expect(read.plan.items.some((i) => i.day === '2026-09-13')).toBe(false)
+    // والفرزُ بالموعد بعد القصّ لا قبله
+    expect(read.plan.items[0]?.day).toBe('2026-09-14')
+  })
+
+  it('والفاسدُ لا يُعدّ في الستّة — السقفُ على الصالح وحده', () => {
+    const items = [item('مخترَع'), ...eight().slice(0, 6)]
+    const read = parsePlan(plan(items), new Set(['s1']), WEEK)
+    if (!read.ok) throw new Error('لم تُقرأ')
+    expect(read.plan.items).toHaveLength(6)
+    expect(read.droppedWhy).toBe('مصدرٌ لا نعرفه')
+  })
+})
+
+describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفتر', () => {
+  async function book(): Promise<{ operation: string; units: number }[]> {
+    const { results } = await db.prepare('SELECT operation, units FROM cost_ledger').all<{ operation: string; units: number }>()
+    return results
+  }
+
+  it('Anthropic مبتورٌ عند max_tokens: صفٌّ واحد ثمّ failed يُعاد', async () => {
+    await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    const out = await planWeek(deps(net({ stop: 'max_tokens' })))
+
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(true)
+    expect(await book()).toEqual([{ operation: 'plan:claude-opus-5', units: 2600 }])
+    expect(await latestPlan(db)).toBeNull()
+  })
+
+  it('وAnthropic رافضٌ: صفٌّ واحد، ولا يُعاد', async () => {
+    await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    const out = await planWeek(deps(net({ stop: 'refusal' })))
+
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(false)
+    expect(await book()).toHaveLength(1)
+  })
+
+  /** لهجةُ التوافق عبر Gemini المدمَج — مزوّدٌ بعنوانه من الترحيل 0005. */
+  function compat(choice: Record<string, unknown>): typeof fetch {
+    calls = []
+    return (async (_url: unknown, init?: RequestInit): Promise<Response> => {
+      calls.push({ body: JSON.parse(String(init?.body ?? '{}')) })
+      return new Response(
+        JSON.stringify({ model: 'gemini-2.5-flash', choices: [choice], usage: { prompt_tokens: 1500, completion_tokens: 400 } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }) as unknown as typeof fetch
+  }
+
+  function compatDeps(fetchImpl: typeof fetch): PlanDeps {
+    return { ...deps(fetchImpl), workerSecrets: { GEMINI_API_KEY: 'g-test' } }
+  }
+
+  it('وعلى لهجة التوافق: المبتورُ بـlength يُكتب صفًّا ثمّ failed', async () => {
+    await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
+    const out = await planWeek(compatDeps(compat({ message: { content: '{"rationale":"' }, finish_reason: 'length' })))
+
+    expect(out.kind).toBe('failed')
+    expect(await book()).toEqual([{ operation: 'plan:gemini-2.5-flash', units: 1900 }])
+  })
+
+  it('والنجاحُ على لهجة التوافق صفٌّ واحدٌ كذلك — والطلبُ json_object كما كان', async () => {
+    const a = await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
+    const out = await planWeek(
+      compatDeps(compat({ message: { content: JSON.stringify(plan([item(a)])) }, finish_reason: 'stop' })),
+    )
+
+    expect(out.kind).toBe('planned')
+    // Gemini بلا سعرٍ مضبوط: صفرٌ مع وحداتٍ — ما تقوله اللوحةُ «بلا سعرٍ مضبوط»
+    if (out.kind === 'planned') expect({ cost: out.cost, units: out.units }).toEqual({ cost: 0, units: 1900 })
+    expect(await book()).toHaveLength(1)
+    expect((calls[0]?.body as { response_format?: unknown }).response_format).toEqual({ type: 'json_object' })
   })
 })

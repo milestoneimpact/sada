@@ -15,6 +15,7 @@ import { fakeDb, type FakeDb } from '../../test/fakes'
 import { draftKey, draftPost, type DraftDeps } from './job'
 import { PLATFORMS, parseDraft } from './prompt'
 import { writeSetting } from '../settings'
+import { writeRoute } from '../ai/routes'
 
 let db: FakeDb
 let calls: { url: string; body: unknown }[]
@@ -22,7 +23,7 @@ let calls: { url: string; body: unknown }[]
 const OK = { text: 'ن'.repeat(300), rationale: 'زاويةُ الأثر لا زاويةُ الإعلان.' }
 
 /** يزيّف Anthropic وحده — ولا نداءَ آخر في هذا المسار. */
-function net(options: { draft?: unknown; status?: number; usage?: Record<string, number> } = {}) {
+function net(options: { draft?: unknown; status?: number; usage?: Record<string, number>; stop?: string } = {}) {
   calls = []
   return (async (input: unknown, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : null
@@ -45,7 +46,7 @@ function net(options: { draft?: unknown; status?: number; usage?: Record<string,
     return new Response(
       JSON.stringify({
         id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-opus-5',
-        stop_reason: 'end_turn',
+        stop_reason: options.stop ?? 'end_turn',
         content: [{ type: 'text', text: JSON.stringify(options.draft ?? OK) }],
         usage: options.usage ?? { input_tokens: 900, output_tokens: 400, cache_read_input_tokens: 100 },
       }),
@@ -190,12 +191,62 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     expect(results).toHaveLength(0)
   })
 
+  /**
+   * **وجوابٌ وصل ثمّ رُدّ يُسجَّل** (D-164). مبتورٌ عند `max_tokens` حوسِب
+   * عليه كاملًا، وكان يعود `failed` قبل خطوة الكلفة فلا يراه الدفتر.
+   */
+  it('يسجّل كلفةَ الجواب المبتور ثمّ يعود failed — ولا مسوّدة', async () => {
+    const id = await seed()
+    const out = await draftPost(deps(net({ stop: 'max_tokens' })), id, 'linkedin')
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(true)
+
+    const book = await ledger()
+    expect(book).toHaveLength(1)
+    expect(book[0]?.operation).toBe('draft:linkedin:claude-opus-5')
+    expect(book[0]?.total).toBeGreaterThan(0)
+    expect((await db.prepare('SELECT id FROM posts').all()).results).toHaveLength(0)
+  })
+
+  it('وعلى لهجة التوافق كذلك: بترٌ بـlength يُكتب صفًّا', async () => {
+    const id = await seed()
+    await writeRoute(db, 'draft', 'gemini', 'gemini-2.5-flash', 'test')
+    const compat = (async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          model: 'gemini-2.5-flash',
+          choices: [{ message: { content: '{"text":"ن' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 700, completion_tokens: 300 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )) as unknown as typeof fetch
+    const out = await draftPost({ ...deps(compat), workerSecrets: { GEMINI_API_KEY: 'g-test' } }, id, 'x')
+    expect(out.kind).toBe('failed')
+    const book = await ledger()
+    expect(book).toHaveLength(1)
+    expect(book[0]?.operation).toBe('draft:x:gemini-2.5-flash')
+  })
+
   it('لا يسجّل كلفةً حين يفشل النداءُ نفسه — لا نداءَ لا حساب', async () => {
     const id = await seed()
     const out = await draftPost(deps(net({ status: 500 })), id, 'x')
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(true)
     expect(await ledger()).toHaveLength(0)
+  })
+})
+
+describe('D-164 · المخطّطُ المحمول', () => {
+  it('Anthropic يتلقّى مخطّطَ المسوّدة بلا minLength — والحدُّ في parseDraft', async () => {
+    const id = await seed()
+    await draftPost(deps(net()), id, 'linkedin')
+    const sent = calls[0]?.body as { output_config?: { format?: { schema?: { properties?: Record<string, Record<string, unknown>> } } } }
+    const text = sent.output_config?.format?.schema?.properties?.['text']
+    expect(text).toBeDefined()
+    expect(text).not.toHaveProperty('minLength')
+    expect(String(text?.['description'])).toContain('minLength: 40')
+    // والحدُّ نفسُه قائمٌ عندنا: نصٌّ أقصرُ من أربعين يُردّ
+    expect(parseDraft({ text: 'قصير', rationale: '' }, PLATFORMS.x).ok).toBe(false)
   })
 })
 

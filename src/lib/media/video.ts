@@ -33,7 +33,7 @@ import {
   type AiBinding,
 } from './workersAi'
 import { getProvider, resolveKey } from '../providers'
-import { cfAccountId } from '../ai/cloudflare'
+import { cfAccountId, cfAccountOf } from '../ai/cloudflare'
 import type { Db } from '../tokens'
 
 /** أقصى ما يُقبل — و ٦٤ ميغا فوق حدّ مقطعٍ بخمسَ عشرةَ ثانيةً بكثير. */
@@ -83,6 +83,9 @@ export function pickBinding(env: {
  * Cloudflare في بطاقة المزوّد من اللوحة كما تفعل الصور (D-079)، فكان
  * المقطعُ يتجاهله ويقول «رابطُ Workers AI غير مضبوط» ومفتاحُه محفوظ.
  * فالبيئةُ أوّلا، ثمّ البطاقة، ثمّ `env.AI`.
+ *
+ * **والحكمُ من `videoFace`** (D-163): لوحُ المسوّدات يقرؤه قبل الضغط فيقول
+ * بأيّ وجهٍ سيُنادى — ولا يُنسَخ هناك ترتيبٌ يفترق عن هذا.
  */
 export async function bindingFor(
   env: { AI?: AiBinding; CF_AI_ACCOUNT_ID?: string; CF_AI_TOKEN?: string },
@@ -90,16 +93,61 @@ export async function bindingFor(
   encKey: string,
   fetchImpl?: typeof fetch,
 ): Promise<AiBinding | undefined> {
-  const fromEnv = pickBinding(env, fetchImpl)
-  if ((env.CF_AI_ACCOUNT_ID ?? '').trim() !== '' && (env.CF_AI_TOKEN ?? '').trim() !== '') {
-    return fromEnv
+  const envAccount = (env.CF_AI_ACCOUNT_ID ?? '').trim() !== ''
+  const envToken = (env.CF_AI_TOKEN ?? '').trim() !== ''
+  const binding = env.AI !== undefined
+  // **والبيئةُ تُسأل قبل البطاقة**: حين تكفي لا يُقرأ الجدولُ ولا يُفكّ مفتاحُ الخزنة
+  if (videoFace({ envAccount, envToken, card: null, binding }) === 'env') {
+    return pickBinding(env, fetchImpl)
   }
   const card = await getProvider(db, 'cloudflare')
-  if (card === null || !card.enabled) return fromEnv
-  const resolved = await resolveKey(db, encKey, 'cloudflare', undefined)
-  const account = (env.CF_AI_ACCOUNT_ID ?? '').trim() || cfAccountId(card.baseUrl) || ''
-  if (resolved.key === null || account === '') return fromEnv
-  return restBinding(account, resolved.key, fetchImpl ?? fetch)
+  const key = card === null || !card.enabled
+    ? null
+    : (await resolveKey(db, encKey, 'cloudflare', undefined)).key
+  const face = videoFace({
+    envAccount,
+    envToken,
+    card: card === null
+      ? null
+      : { enabled: card.enabled, hasKey: key !== null, urlAccount: cfAccountId(card.baseUrl) !== null },
+    binding,
+  })
+  switch (face) {
+    // لا يقع هنا — خرجت البيئةُ أعلاه — ويُكتب ليبقى الحكمُ حكمَ `videoFace` كاملًا
+    case 'env':
+      return pickBinding(env, fetchImpl)
+    case 'card':
+      return key === null
+        ? undefined
+        : restBinding(cfAccountOf(env.CF_AI_ACCOUNT_ID, card?.baseUrl), key, fetchImpl ?? fetch)
+    case 'binding':
+      return env.AI
+    case 'none':
+      return undefined
+  }
+}
+
+/** الوجهُ الذي يُنادى به Workers AI — أو لا وجه. */
+export type VideoFace = 'env' | 'card' | 'binding' | 'none'
+
+/**
+ * أيُّ وجهٍ يُنادى؟ — **نقيٌّ، يناديه `bindingFor` ولوحُ المسوّدات معًا**.
+ *
+ * البيئةُ إن حضر فيها الحسابُ والمفتاحُ معًا؛ ثمّ بطاقةُ Cloudflare إن كانت
+ * مفعَّلةً ولها مفتاحٌ في الخزنة وحسابٌ من البيئة أو من عنوانها؛ ثمّ رابطُ
+ * `env.AI` — وهو يبلغ حسابَ الـ Worker وحده، فلا يُضمَن أنّه حسابُ Workers AI.
+ */
+export function videoFace(i: {
+  readonly envAccount: boolean
+  readonly envToken: boolean
+  readonly card: { readonly enabled: boolean; readonly hasKey: boolean; readonly urlAccount: boolean } | null
+  readonly binding: boolean
+}): VideoFace {
+  if (i.envAccount && i.envToken) return 'env'
+  if (i.card !== null && i.card.enabled && i.card.hasKey && (i.envAccount || i.card.urlAccount)) {
+    return 'card'
+  }
+  return i.binding ? 'binding' : 'none'
 }
 
 export interface VideoDeps {

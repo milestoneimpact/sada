@@ -11,13 +11,17 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
+import { NOTE_MAX, composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
+import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
 import { writeRoute } from '../ai/routes'
-import { saveKey, upsertProvider } from '../providers'
+import { getProvider, saveKey, setEnabled, upsertProvider } from '../providers'
 import { toBase64 } from '../crypto'
+import { imageProviderGate, imageSecretName, slideGate } from './gate'
+import { providerBlocker } from '../limits'
+import { imageReadiness } from '../media/readiness'
 
 let db: FakeDb
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
@@ -585,6 +589,119 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     if (out.kind !== 'generated') return
     expect(out.note).toContain('تعذّر تصويرُ الشريحة')
   })
+
+  /**
+   * **وما قيل يبقى مع الصورة** (D-162).
+   *
+   * كان السببُ والعنوانُ يُقالان في الوميض مرّةً ثمّ يُرميان: البطاقةُ بعد
+   * التحديث لا تعرف أرُكّب النصُّ أم سقط. فالصفُّ يُسأل هنا لا المخرَج.
+   */
+  describe('والصفُّ يحفظ ما قيل عن الشريحة (D-162)', () => {
+    it('رُكّب: السببُ فراغٌ والعنوانُ هو المرسوم', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note).toBe('')
+      expect(row!.headline).toBe('أثرٌ يُقاس')
+    })
+
+    it('وسقوطُ التركيب يُحفَظ كما قيل في الوميض — والعنوانُ المقترحُ معه', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note).toBe(out.note)
+      expect(row!.note).toContain('CF_BROWSER_TOKEN')
+      expect(row!.headline).toBe('أثرٌ يُقاس')
+    })
+
+    it('وبلا موجزٍ لا عنوانَ يُخترَع في الصفّ — NULL لا فراغ', async () => {
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.headline).toBeNull()
+      expect(row!.note).toContain('بلا عنوانٍ في الموجز')
+    })
+
+    it('والإطفاءُ يُحفَظ بلفظه — فتقرؤه البطاقةُ قرارًا لا عطلا', async () => {
+      await seedWriter()
+      await writeSetting(db, 'image_overlay', 'false', 'test')
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.endsWith(OVERLAY_OFF)).toBe(true)
+    })
+
+    it('وسببٌ يطول بلا حدٍّ يُقصّ عند الكتابة — والوميضُ يقول المقصوصَ نفسَه', async () => {
+      await seedWriter()
+      const lane = twoLane()
+      const endless: typeof fetch = (async (input: unknown, init?: RequestInit) => {
+        if (String(input instanceof Request ? input.url : input).includes('browser-rendering')) {
+          throw new Error('ض'.repeat(2000))
+        }
+        return lane(input as RequestInfo, init)
+      }) as typeof fetch
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(endless, bucket(), READY), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.length).toBe(300)
+      expect(out.note).toBe(row!.note)
+    })
+
+    /**
+     * **ويُقصّ سقوطُ الموجز لا ما بعده.**
+     *
+     * خطأُ الشبكة أوّلُ السبب وقد يطول بلا حدّ — ردُّ Anthropic على رصيدٍ لا
+     * يكفي نحو 270 حرفًا بعد `anthropic: ` — **وما قرّره المالكُ أو ما بيده
+     * في آخره**. كان القصُّ عند 300 من الذيل: فيُؤكَل «مُطفأٌ من الإعدادات»
+     * فتقرأ البطاقةُ القرارَ عطلًا أصفر، أو يُؤكَل «اضبط CF_BROWSER_TOKEN»
+     * كلُّه فلا يرى المالكُ الشيءَ الوحيدَ الذي يُصلحه.
+     */
+    function briefFails(length: number): typeof fetch {
+      const lane = twoLane()
+      return (async (input: unknown, init?: RequestInit) => {
+        if (String(input instanceof Request ? input.url : input).includes('api.writer.test')) {
+          throw new Error('e'.repeat(length))
+        }
+        return lane(input as RequestInfo, init)
+      }) as typeof fetch
+    }
+
+    it('وموجزٌ سقط بخطأٍ طويل والتركيبُ مُطفأ: الإطفاءُ في الذيل كاملًا', async () => {
+      await seedWriter()
+      await writeSetting(db, 'image_overlay', 'false', 'test')
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(briefFails(400), bucket(), READY), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.length).toBeLessThanOrEqual(300)
+      // وسقوطُ الموجز يبقى أوّلا (D-157) — مقصوصًا، لا محذوفًا
+      expect(row!.note!.startsWith('تعذّر الموجزُ البصريّ')).toBe(true)
+      expect(row!.note!.endsWith(`؛ ${OVERLAY_OFF}`)).toBe(true)
+      expect(out.note).toBe(row!.note)
+    })
+
+    it('وموجزٌ سقط بخطأٍ طويل ولا مفتاح: «اضبط CF_BROWSER_TOKEN» يبقى بتمامه', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      const secrets = { CF_AI_ACCOUNT_ID: 'acc' }
+      const out = await generateForPost(slideDeps(briefFails(400), bucket(), secrets), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      // والسببُ يُسأل عنه `composeSlide` نفسُه — لا يُنسَخ حرفًا فيفترق
+      const { reason } = await composeSlide(
+        { db, bucket: bucket(), encKey: ENC, workerSecrets: secrets },
+        { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: '', kicker: '' },
+      )
+      expect(reason).toContain('CF_BROWSER_TOKEN')
+      expect(row!.note!.length).toBeLessThanOrEqual(300)
+      expect(row!.note!.endsWith(`؛ ${reason}`)).toBe(true)
+      expect(out.note).toBe(row!.note)
+    })
+  })
 })
 
 /**
@@ -690,6 +807,47 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
     expect(results).toHaveLength(2)
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
   })
+
+  /**
+   * **والإدراجُ المُعادُ هو الذي ينسى العمودَ الجديد** (D-162).
+   *
+   * مسارٌ نادرٌ لا يمرّ فيه أحدٌ حتّى يمرّ، وكان نسخةً حرفيّةً من الأوّل.
+   * فإن افترقا كُتب صفٌّ بلا سببه، وقالت البطاقةُ عنه ما لم يُسجَّل.
+   */
+  it('والصفُّ المُعادُ بعد تحرير الاسم يحمل سببَه', async () => {
+    const post = await seedPost({ platform: 'x' })
+    const first = await generateForPost(deps(net()), post)
+    const id = (first as { mediaId: string }).mediaId
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
+    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
+
+    const again = await generateForPost(deps(net()), post)
+    if (again.kind !== 'generated') throw new Error(again.kind)
+    const row = (await mediaFor(db, [post])).find((m) => m.id === again.mediaId)
+    expect(row!.note).not.toBeNull()
+    expect(row!.note).toBe(again.note)
+  })
+})
+
+/**
+ * **و`null` ليست فراغا** (D-162): صفٌّ أقدمُ من ‏0028 لم يُسجَّل عنه شيء،
+ * و`String(null)` كانت ستطبع «بلا نصٍّ فوقها: null» على كلّ صورةٍ قديمة.
+ */
+describe('mediaFor يفرّق NULL عن الفراغ (D-162)', () => {
+  it('صفٌّ بالأعمدة التسعة القديمة: note و headline كلاهما null', async () => {
+    const post = await seedPost()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
+         VALUES ('old', ?, 'img/old.png', 'image/png', 10, 'p', 'm', 0, 'k-old')`,
+      )
+      .bind(post)
+      .run()
+    const [row] = await mediaFor(db, [post])
+    expect(row!.note).toBeNull()
+    expect(row!.headline).toBeNull()
+  })
 })
 
 /**
@@ -732,5 +890,168 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'الصورةُ فوق حدِّ الضمّ' }))
       .toBe('الصورةُ فوق حدِّ الضمّ')
     expect(noteOf({ brief: null, detail: 'سقط' }, { reason: '' })).toBe('')
+  })
+
+  /**
+   * **والحدُّ يُقسَم ولا يُقصّ من الذيل** (D-162): السببُ الثاني كاملٌ دائمًا،
+   * والأوّلُ يأخذ ما بقي — وقصُّه معلَّمٌ بـ«…» لا ذيلٌ مبتورٌ يُقرأ كاملا.
+   */
+  it('noteOf تحفظ السببَ الثاني كاملًا وتقصّ الأوّل إلى ما بقي من ‏300', () => {
+    const reason = 'r'.repeat(10)
+    // ‏288 + «؛ » + ‏10 = ‏300 تمامًا: يتّسع بلا قصّ
+    const fits = noteOf({ brief: null, detail: 'd'.repeat(288) }, { reason })
+    expect(fits).toBe(`${'d'.repeat(288)}؛ ${reason}`)
+    // وحرفٌ واحدٌ فوقه: يُقصّ الأوّلُ ويُعلَّم، والثاني كما هو
+    const over = noteOf({ brief: null, detail: 'd'.repeat(289) }, { reason })
+    expect(over).toBe(`${'d'.repeat(287)}…؛ ${reason}`)
+    expect(over).toHaveLength(NOTE_MAX)
+
+    const off = noteOf({ brief: null, detail: 'e'.repeat(5000) }, { reason: OVERLAY_OFF })
+    expect(off).toHaveLength(NOTE_MAX)
+    expect(off.endsWith(`…؛ ${OVERLAY_OFF}`)).toBe(true)
+  })
+
+  it('وسببٌ وحدَه فوق الحدّ يُقصّ معلَّمًا — ولا يتّسع لسقوطٍ قبله', () => {
+    const lone = noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'ض'.repeat(2000) })
+    expect(lone).toBe(`${'ض'.repeat(NOTE_MAX - 1)}…`)
+    // لا مكانَ للأوّل: «؛» في الرأس بلا ما قبلها أسوأُ من إسقاطه
+    const full = noteOf({ brief: null, detail: 'سقط' }, { reason: 'ض'.repeat(2000) })
+    expect(full).toBe(lone)
+  })
+})
+
+/**
+ * D-163 · **القرارُ نقيٌّ، والدالّةُ والنقطةُ تناديانه معًا**.
+ */
+describe('slideGate — حكمُ الشريحة بترتيب composeSlide', () => {
+  it('الإطفاءُ يسبق البيئة، والمفتاحُ والحسابُ حالٌ واحدة، و`missing` يسمّي الغائب', () => {
+    expect(slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }))
+      .toEqual({ state: 'off', missing: ['key', 'account'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true }))
+      .toEqual({ state: 'unset', missing: ['key'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: true, hasAccount: false }))
+      .toEqual({ state: 'unset', missing: ['account'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true }))
+      .toEqual({ state: 'ready', missing: [] })
+  })
+
+  it('ومسافاتٌ وحدها غيابٌ عند composeSlide — فلا يقول اللوحُ «مضبوط» ولا تُنادى', async () => {
+    const out = await composeSlide(
+      { db, bucket: bucket(), encKey: '', workerSecrets: { CF_AI_ACCOUNT_ID: '   ', CF_BROWSER_TOKEN: 't' } },
+      { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: 'عنوان', kicker: '' },
+    )
+    expect(out.slide).toBeNull()
+    expect(out.reason).toContain('CF_BROWSER_TOKEN')
+  })
+})
+
+describe('imageSecretName — اسمُ السرّ يتبع المزوّد', () => {
+  it('Gemini المدمَج ← GEMINI_API_KEY، وCloudflare ← CF_AI_TOKEN، والمضاف ← لا سرّ', () => {
+    expect(imageSecretName({ name: 'gemini', builtin: true })).toBe('GEMINI_API_KEY')
+    expect(imageSecretName({ name: 'cloudflare', builtin: false })).toBe('CF_AI_TOKEN')
+    expect(imageSecretName({ name: 'deepseek', builtin: false })).toBeUndefined()
+    expect(imageSecretName({ name: 'gemini', builtin: false })).toBeUndefined()
+  })
+})
+
+/**
+ * D-163 · **ما يُعرَف قبل الدفع يُسأل قبل الدفع**: كان السائقُ والحسابُ يُكتشفان
+ * داخل النداء، بعد الحجز وبعد أن سُجّل ثمنُ الموجز.
+ */
+describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)', () => {
+  const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  /** مزوّدُ كتابةٍ بمفتاحٍ وعنوانٍ يردّ موجزًا — فعلى الشيفرة القديمة يُدفَع ثمنُه. */
+  async function seedWriter(): Promise<void> {
+    await upsertProvider(
+      db,
+      { name: 'writer', label: 'Writer', kind: 'openai_compat', baseUrl: 'https://api.writer.test/v1' },
+      'test',
+    )
+    await saveKey(db, ENC, 'writer', 'sk-writer-key-long', 'test')
+    await writeRoute(db, 'draft', 'writer', 'w-1', 'test')
+  }
+
+  function lane(): typeof fetch {
+    calls = []
+    return (async (input: unknown): Promise<Response> => {
+      const url = String(input)
+      calls.push({ url, body: null, headers: {} })
+      if (url.includes('api.writer.test')) {
+        return new Response(JSON.stringify({
+          model: 'w-1',
+          choices: [{ message: { content: '{"subject":"folded brass","headline":"أثرٌ يُقاس"}' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 100, completion_tokens: 20 },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: true, result: { image: 'AAECAw==' } }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }) as unknown as typeof fetch
+  }
+
+  const cloudflare = (baseUrl?: string) => upsertProvider(db, {
+    name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+    model: '@cf/black-forest-labs/flux-1-schnell', ...(baseUrl === undefined ? {} : { baseUrl }),
+  }, 'test')
+
+  it('Cloudflare بمفتاحٍ وبلا حساب: يُردّ قبل الموجز — ولا صفَّ في الدفتر', async () => {
+    await seedWriter()
+    await cloudflare()
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_TOKEN: 'tok-1' }, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    if (out.kind === 'failed') expect(out.reason).toContain('CF_AI_ACCOUNT_ID')
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  it('ومتغيّرُ الحساب مسافاتٍ يرجع إلى عنوان البطاقة — كما يفعل المقطع', async () => {
+    await cloudflare('https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_ACCOUNT_ID: '  ', CF_AI_TOKEN: 'tok-1' }, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out.kind).toBe('generated')
+    expect(calls.some((c) => c.url.includes('/accounts/card-acc/ai/run/'))).toBe(true)
+  })
+
+  it('ومزوّدٌ لا سائقَ صورةٍ له: يُردّ قبل أن يُرسَل مفتاحُه إلى Google', async () => {
+    await seedWriter()
+    // مفتاحُ Anthropic في الخزنة — وكان يُفكّ ويُرسَل إلى عنوان Google بعد الموجز
+    await saveKey(db, ENC, 'anthropic', 'sk-ant-vault-secret-0001', 'test')
+    await writeRoute(db, 'image', 'anthropic', 'claude-opus-5', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: {}, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    if (out.kind === 'failed') expect(out.reason).toContain('لا يولّد صورًا')
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  it('تطابق: مزوّدُ الصورة معطَّل — الدالّةُ تعود «معطَّل»، والنقطةُ ساقطةٌ «معطَّلٌ بقرارك»', async () => {
+    await setEnabled(db, 'gemini', false, 'test')
+    const out = await generateForPost(deps(net()), await seedPost())
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('معطَّل')
+    expect(calls).toHaveLength(0)
+
+    const record = (await getProvider(db, 'gemini'))!
+    const refusal = imageProviderGate({
+      name: 'gemini', exists: true, hasKey: true, hasAccount: false,
+      blocker: providerBlocker(record, 0),
+    })
+    const line = imageReadiness({
+      blocker: null, provider: { label: record.label, refusal },
+      slide: slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }), briefReady: true,
+    })
+    expect(line.next).toMatchObject({ key: 'provider', state: 'failed', note: 'Gemini معطَّلٌ بقرارك' })
+    expect(line.blocked).toBe(true)
   })
 })

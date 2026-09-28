@@ -9,6 +9,7 @@ import { escapeHtml } from './escape'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { Onboarding } from '../../lib/onboard'
+import type { RungState } from '../../lib/platform/readiness'
 
 /**
  * رقاقةُ الحال — **دالّةٌ واحدةٌ ورموزٌ مرسومة** (D-154).
@@ -43,6 +44,20 @@ export function status(cls: string, glyph: string, text: string, attrs = ''): st
     : `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${drawn}</svg>`
   const open = `<span class="st${cls === '' ? '' : ` ${cls}`}"${attrs === '' ? '' : ` ${attrs}`}>`
   return `${open}<span class="g">${g}</span>${text}</span>`
+}
+
+/**
+ * علامةُ الدرجة — مع كلمتها لا وحدَها (D-043).
+ *
+ * كانت في `platformView.ts` لسلّم المنصّة وحده (D-158). **ونقاطُ الجاهزيّة
+ * تحت زرَّي الصورة والمقطع تقرأ الحالَ نفسَها** (D-163)، فنسخةٌ ثانيةٌ هناك
+ * كانت تفترق عن الأولى عند أوّل رمزٍ يُبدَّل.
+ */
+export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: string; label: string }>> = {
+  done: { g: '●', cls: 'ok', label: 'تامّة' },
+  now: { g: '◍', cls: 'warn', label: 'تنتظرك' },
+  waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
+  failed: { g: '▲', cls: 'bad', label: 'ساقطة' },
 }
 
 /**

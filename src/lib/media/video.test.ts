@@ -11,7 +11,7 @@ import { toBase64 } from '../crypto'
 import { writeSetting } from '../settings'
 import { verifyMediaToken } from './link'
 import { VIDEO_MODELS, type AiBinding } from './workersAi'
-import { animateForPost, bindingFor, DEFAULT_PROMPT, pickBinding, videoKey } from './video'
+import { animateForPost, bindingFor, DEFAULT_PROMPT, pickBinding, videoFace, videoKey } from './video'
 import { saveKey, upsertProvider } from '../providers'
 import { claimGeneration } from './claim'
 import { writeRoute } from '../ai/routes'
@@ -436,5 +436,48 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
     const binding = ai(OK_VIDEO)
     expect(await bindingFor({ AI: binding }, db, KEY, net)).toBe(binding)
     expect(await bindingFor({}, db, KEY, net)).toBeUndefined()
+  })
+
+  /**
+   * **والبيئةُ تغلب البطاقةَ ولو حضرتا معًا** (D-163). اختبارُ «البيئةُ أوّلا»
+   * أعلاه يعمل على قاعدةٍ بلا بطاقة، فقلبُ الأسبقيّة لا يُسقطه — وهذا يُسقطه.
+   */
+  it('والبطاقةُ حاضرةٌ بمفتاحها: البيئةُ تُنادى لا البطاقة', async () => {
+    seen.length = 0
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      baseUrl: 'https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1',
+    }, 'test')
+    await saveKey(db, KEY, 'cloudflare', 'card-token-long-enough', 'test')
+    const b = await bindingFor({ CF_AI_ACCOUNT_ID: 'env-acc', CF_AI_TOKEN: 'env-tok' }, db, KEY, net)
+    await b!.run('@cf/m', {})
+    expect(seen[0]).toContain('/accounts/env-acc/')
+  })
+
+  it('وحين تكفي البيئة لا يُسأل جدولُ المزوّدين أصلًا — ولا يُفكّ مفتاحُ الخزنة', async () => {
+    const asked: string[] = []
+    const spy = { prepare: (sql: string) => { asked.push(sql); return db.prepare(sql) } }
+    await bindingFor({ CF_AI_ACCOUNT_ID: 'env-acc', CF_AI_TOKEN: 'env-tok' }, spy, KEY, net)
+    expect(asked.filter((q) => q.includes('providers'))).toHaveLength(0)
+    await bindingFor({ CF_AI_TOKEN: 'env-tok' }, spy, KEY, net)
+    expect(asked.filter((q) => q.includes('providers')).length).toBeGreaterThan(0)
+  })
+})
+
+describe('videoFace — الوجهُ نقيًّا، يناديه bindingFor ولوحُ المسوّدات (D-163)', () => {
+  const card = { enabled: true, hasKey: true, urlAccount: true }
+  it.each([
+    ['البيئةُ كاملةً تغلب البطاقة', { envAccount: true, envToken: true, card, binding: true }, 'env'],
+    ['بطاقةٌ بمفتاحٍ وحسابٍ في عنوانها', { envAccount: false, envToken: false, card, binding: true }, 'card'],
+    ['وبلا حسابٍ في عنوانها يكفيها حسابُ البيئة',
+      { envAccount: true, envToken: false, card: { ...card, urlAccount: false }, binding: false }, 'card'],
+    ['بلا حسابٍ هنا ولا هناك: الرابط',
+      { envAccount: false, envToken: true, card: { ...card, urlAccount: false }, binding: true }, 'binding'],
+    ['بطاقةٌ معطَّلة: الرابط', { envAccount: false, envToken: false, card: { ...card, enabled: false }, binding: true }, 'binding'],
+    ['بطاقةٌ بلا مفتاحٍ ولا رابط: لا وجه',
+      { envAccount: false, envToken: false, card: { ...card, hasKey: false }, binding: false }, 'none'],
+    ['لا بطاقة ولا رابط: لا وجه', { envAccount: false, envToken: false, card: null, binding: false }, 'none'],
+  ] as const)('%s', (_, input, face) => {
+    expect(videoFace(input)).toBe(face)
   })
 })

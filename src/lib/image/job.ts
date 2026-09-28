@@ -5,7 +5,7 @@
  *
  *   ١ · اقرأ المنشور
  *   ٢ · إن وُلّدت صورةٌ لهذا النصّ — اخرج بلا نداء (D-004)
- *   ٣ · **افحص الإيقاف والسقفين وسقفَ المزوّد** — قبل أيّ نداء (D-019)
+ *   ٣ · **افحص الإيقاف والسقفين، ثمّ بوّابةَ المزوّد** — قبل أيّ نداء (D-019 · D-163)
  *   ٤ · نادِ المزوّد الموجَّه لمهمّة `image`
  *   ٥ · **سجّل الكلفة** (D-008)
  *   ٦ · ارفع البايتات إلى R2
@@ -26,11 +26,12 @@ import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
-import { cfAccountId } from '../ai/cloudflare'
+import { cfAccountOf } from '../ai/cloudflare'
+import { imageProviderGate, imageSecretName, slideGate, type ImageRefusal } from './gate'
 import { imagePrompt, topicOf } from './prompt'
 import { visualBrief } from './brief'
 import { screenshotSlide } from './render'
-import { SLIDE_SIZE, slideHtml } from './slide'
+import { HEADLINE_MAX, OVERLAY_OFF, SLIDE_SIZE, clip, slideHtml } from './slide'
 import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
@@ -151,14 +152,21 @@ export async function composeSlide(
   // **والفحوصُ بترتيب ما يقرّره المالك** (D-157): الإعدادُ ثمّ السرّ ثمّ
   // العنوان ثمّ الحجم. كان العنوانُ أوّلا، فمن لم يضبط المفتاحَ بعدُ وسقط
   // موجزُه قرأ «بلا عنوان» — وهو سببٌ لا يصلحه، والسببُ الذي يصلحه مخفيّ
+  //
+  // **والحكمُ من `slideGate`** (D-163): اللوحُ يقرؤه قبل الضغط فيقول ما ستقوله
+  // هذه الدالّةُ بعده — وحكمٌ منسوخٌ في اللوح يفترق عن هذا عند أوّل تصحيح
   const settings = await readSettings(deps.db)
-  if (!settings.imageOverlay) {
-    return { slide: null, reason: 'تركيبُ النصّ مُطفأٌ من الإعدادات' }
+  const accountId = (deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? '').trim()
+  const apiToken = (deps.workerSecrets['CF_BROWSER_TOKEN'] ?? '').trim()
+  const gate = slideGate({
+    overlay: settings.imageOverlay,
+    hasBrowserKey: apiToken !== '',
+    hasAccount: accountId !== '',
+  })
+  if (gate.state === 'off') {
+    return { slide: null, reason: OVERLAY_OFF }
   }
-
-  const accountId = deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? ''
-  const apiToken = deps.workerSecrets['CF_BROWSER_TOKEN'] ?? ''
-  if (accountId.trim() === '' || apiToken.trim() === '') {
+  if (gate.state === 'unset') {
     return {
       slide: null,
       reason:
@@ -216,22 +224,82 @@ export async function composeSlide(
   }
 }
 
+/** أقصى ما يُحفَظ من السبب — ورسالةُ خطأٍ من الشبكة قد تطول بلا حدّ. */
+export const NOTE_MAX = 300
+
+/** يقصّ نصًّا إلى حدٍّ — **ويقول إنّه قُصّ**: ذيلٌ مبتورٌ بلا علامةٍ يُقرأ كاملا. */
+function cut(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
 /**
  * ما يُقال للمالك عن الشريحة.
  *
  * **وسببُ سقوط الموجز كان يُحسَب ثمّ يُرمى** (D-157): يعود في `detail`
  * فلا يقرؤه أحد، ويُقال «بلا عنوانٍ في الموجز» — وهو عرَضٌ لا سبب. فإن
  * سقط الموجزُ سُمّي سقوطُه قبل ما ترتّب عليه.
+ *
+ * **والحدُّ يُقسَم هنا لا يُقصّ من الذيل بعدُ** (D-162). السقوطُ أوّلُ
+ * السبب، وفيه خطأُ الشبكة كما جاء — ردُّ Anthropic على رصيدٍ لا يكفي نحو
+ * 270 حرفًا. **وما يُصلحه المالكُ أو ما قرّره في آخره**: «اضبط
+ * CF_BROWSER_TOKEN…» أو «مُطفأٌ من الإعدادات». وكان القصُّ عند 300 يأكل
+ * الآخِرَ أوّلا، فيضيع المفتاحُ الذي بيده، **وتقرأ البطاقةُ الإطفاءَ عطلًا
+ * أصفر** — لأنّها تعرفه بذيله (`OVERLAY_OFF`). فالسببُ الثاني يُحفَظ
+ * كاملًا، ويأخذ الأوّلُ ما بقي من الحدّ.
  */
 export function noteOf(
   visual: { brief: unknown; detail: string },
   overlay: { reason: string },
 ): string {
   if (overlay.reason === '') return ''
-  if (visual.brief === null && visual.detail !== '') {
-    return `${visual.detail}؛ ${overlay.reason}`
+  const reason = cut(overlay.reason, NOTE_MAX)
+  const room = NOTE_MAX - reason.length - '؛ '.length
+  if (visual.brief === null && visual.detail !== '' && room > 0) {
+    return `${cut(visual.detail, room)}؛ ${reason}`
   }
-  return overlay.reason
+  return reason
+}
+
+/**
+ * صفُّ الصورة — **جملةٌ واحدةٌ لموضعَي الكتابة** (D-162).
+ *
+ * كانت منسوخةً حرفًا في الخطوة ٧ وفي إعادتها بعد تحرير اسمٍ مرفوض (D-088).
+ * **والنسخةُ الثانيةُ هي التي تنسى العمودَ الجديد**: مسارٌ نادرٌ لا يمرّ
+ * فيه أحدٌ حتّى يمرّ، فيُكتب صفٌّ بلا سببه والأوّلُ بسببه.
+ */
+const INSERT_IMAGE =
+  `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
+                      note, headline)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+/**
+ * ما يُقال حين تردّ بوّابةُ المزوّد — **ونصوصُ ما كان قائمًا باقيةٌ حرفًا**:
+ * «مزوّدٌ غير موجود» و«لا مفتاح» وسببُ الحارس. والجديدان (السائقُ والحساب)
+ * كانا يقعان داخل النداء بعد الدفع، فلا نصَّ قبلهما يُحفَظ.
+ */
+function refusalOutcome(refusal: ImageRefusal, name: string, label: string): ImageOutcome {
+  switch (refusal.kind) {
+    case 'missing':
+      return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${name}`, retryable: false }
+    case 'cannot_image':
+      return {
+        kind: 'failed',
+        reason: `${label} لا يولّد صورًا — وجّه الصورَ إلى Gemini أو Cloudflare`,
+        retryable: false,
+      }
+    case 'blocked':
+      return { kind: 'blocked', reason: blockerReason(refusal.blocker) }
+    case 'no_key':
+      return { kind: 'failed', reason: `لا مفتاح لـ ${label}`, retryable: false }
+    case 'no_account':
+      return {
+        kind: 'failed',
+        reason:
+          'لا معرّفَ حسابٍ لـ Cloudflare — اضبط CF_AI_ACCOUNT_ID،' +
+          ' أو احفظ البطاقةَ بعنوانٍ فيه معرّفُ الحساب',
+        retryable: false,
+      }
+  }
 }
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
@@ -272,35 +340,45 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   }
 
   const route = await routeFor(deps.db, 'image')
-
   const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${route.provider}`, retryable: false }
-  }
-
-  // وسقفُ المزوّد بعد العامّ لا قبله: مَن قدّم التفصيل على الجملة قال
-  // «Gemini متاح» ونظامُه موقوف
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
 
   /*
+   * ٣·أ · **بوّابةُ المزوّد — حقائقُها تُجمَع ثمّ يُحكَم مرّةً** (D-163).
+   *
+   * والحكمُ في `imageProviderGate` لا هنا: لوحُ المسوّدات يناديه بالحقائق
+   * نفسِها قبل الضغط. وسقفُ المزوّد بعد العامّ لا قبله — مَن قدّم التفصيل
+   * على الجملة قال «Gemini متاح» ونظامُه موقوف.
+   *
    * **واسمُ السرِّ يتبع المزوّد** (D-079): كان مقصورا على Gemini، فمن
-   * وجّه الصورَ إلى Cloudflare لم يجد رمزَه في البيئة ولو كان مضبوطا.
+   * وجّه الصورَ إلى Cloudflare لم يجد مفتاحَه في البيئة ولو كان مضبوطا.
+   *
+   * **والحسابُ يُسأل هنا لا داخل النداء**: كان `generateImageCf` وحده يكتشف
+   * أنّه فارغ — بعد الحجز، وبعد الموجز وقد سُجّل ثمنُه في الدفتر.
    */
-  const secretName =
-    provider.name === 'gemini' && provider.builtin
-      ? 'GEMINI_API_KEY'
-      : provider.name === 'cloudflare'
-        ? 'CF_AI_TOKEN'
-        : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) {
-    return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
+  const secretName = provider === null ? undefined : imageSecretName(provider)
+  const resolved = provider === null
+    ? { key: null }
+    : await resolveKey(
+        deps.db,
+        deps.encKey,
+        provider.name,
+        secretName === undefined ? undefined : deps.workerSecrets[secretName],
+      )
+  const accountId = cfAccountOf(deps.workerSecrets['CF_AI_ACCOUNT_ID'], provider?.baseUrl)
+  const refusal = imageProviderGate({
+    name: route.provider,
+    exists: provider !== null,
+    blocker: provider === null ? null : await checkProvider(deps.db, provider.name),
+    hasKey: resolved.key !== null,
+    hasAccount: accountId !== '',
+  })
+  // والشرطان بعده لا يقعان بعد بوّابةٍ مرّت — يقولانه للنوع لا للتشغيل
+  if (refusal !== null || provider === null || resolved.key === null) {
+    return refusalOutcome(
+      refusal ?? { kind: provider === null ? 'missing' : 'no_key' },
+      route.provider,
+      provider?.label ?? route.provider,
+    )
   }
 
   /*
@@ -351,12 +429,10 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
              * **ومعرّفُ الحساب يُقرأ من عنوان المزوّد حين يغيب السرّ**
              * (D-081): العنوان المحفوظ يحمله في مساره أصلا
              * (`‎/accounts/{id}/ai/v1`)، فمن ضبط البطاقة ولم يضبط
-             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ.
+             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ. وهو
+             * الحسابُ الذي سألت عنه البوّابةُ أعلاه، لا قراءةٌ ثانية
              */
-            accountId:
-              deps.workerSecrets['CF_AI_ACCOUNT_ID'] ??
-              cfAccountId(provider.baseUrl) ??
-              '',
+            accountId,
             apiToken: resolved.key,
             // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
             model: route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL,
@@ -401,6 +477,19 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   })
   if (overlay.slide !== null) image = overlay.slide
 
+  /*
+   * **وما قيل عن الشريحة يُحفَظ مع الصورة** (D-162).
+   *
+   * كان يُقال في الوميض مرّةً ثمّ يُرمى، فالبطاقةُ بعد التحديث لا تعرف
+   * أرُكّب النصُّ أم سقط. ويُحسَب هنا مرّةً ليقول الوميضُ والصفُّ الشيءَ
+   * نفسَه. **والحدُّ داخل `noteOf` لا هنا**: قصٌّ من الذيل يأكل السببَ الذي
+   * تُصنَّف به البطاقة. والعنوانُ بقصِّ الشريحة نفسِه — **فالمحفوظُ هو
+   * المرسومُ حرفًا** — وفراغُه `NULL`: لا عنوانَ في الموجز، ولا يُخترَع.
+   */
+  const note = noteOf(visual, overlay)
+  const drawn = clip(visual.brief?.headline ?? '', HEADLINE_MAX)
+  const headline = drawn === '' ? null : drawn
+
   // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه
   //
   // وصورةٌ تُسعَّر بالنداء لا بالرمز: `costOf` تحسب بالرموز، فتُمرَّر
@@ -442,15 +531,13 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     }
   }
 
-  // ٧ · الصفّ
+  // ٧ · الصفّ — وقيمُه مصفوفةٌ واحدةٌ تُربَط في الموضعين
+  const row = [
+    mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key,
+    note, headline,
+  ]
   try {
-    await deps.db
-      .prepare(
-        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key)
-      .run()
+    await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (message.includes('UNIQUE')) {
@@ -476,20 +563,14 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
           .bind(won.id, '%:rejected:%')
           .run()
         try {
-          await deps.db
-            .prepare(
-              `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .bind(mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key)
-            .run()
+          await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
           return {
             kind: 'generated',
             mediaId,
             key: r2Key,
             bytes: image.bytes.length,
             cost: priced.total + visual.cost,
-            note: noteOf(visual, overlay),
+            note,
           }
         } catch (second) {
           await deps.bucket.delete(r2Key).catch(() => undefined)
@@ -518,7 +599,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     key: r2Key,
     bytes: image.bytes.length,
     cost: priced.total + visual.cost,
-    note: noteOf(visual, overlay),
+    note,
   }
 }
 
@@ -540,6 +621,20 @@ export interface MediaRow {
   readonly cost: number
   readonly status: 'ready' | 'rejected'
   readonly createdAt: string
+  /**
+   * ما قيل عن الشريحة يومَ وُلّدت (D-162) — **ثلاثيّةُ القيمة**:
+   * `null` لم يُسجَّل (صفٌّ أقدمُ من ‏0028، أو مقطع) · `''` رُكّب النصّ ·
+   * نصٌّ سببُ السقوط. **و`null` ليست فراغا**: الأولى لا تَعِد بشيء،
+   * والثانيةُ تقول إنّ العنوانَ على الصورة.
+   */
+  readonly note: string | null
+  /** العنوانُ المرسوم أو الذي كان سيُرسَم — و`null` حين لا عنوانَ في الموجز. */
+  readonly headline: string | null
+}
+
+/** نصٌّ أو `null` — **و`String(null)` تطبع «null» على كلّ صورةٍ قديمة**. */
+function textOrNull(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
 }
 
 /** صورُ منشوراتٍ بعينها — استعلامٌ واحد لا واحدٌ لكلّ بطاقة. */
@@ -549,11 +644,12 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at
+        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at,
+                note, headline
            FROM media WHERE post_id IN (${marks}) ORDER BY created_at DESC`,
       )
       .bind(...postIds)
-      .all<Record<string, string | number>>()
+      .all<Record<string, string | number | null>>()
     return results.map((r) => ({
       id: String(r['id']),
       postId: String(r['post_id']),
@@ -565,6 +661,8 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
       cost: Number(r['cost_usd']),
       status: r['status'] === 'rejected' ? 'rejected' : 'ready',
       createdAt: String(r['created_at']),
+      note: textOrNull(r['note']),
+      headline: textOrNull(r['headline']),
     }))
   } catch {
     // جدولٌ لم يُرحَّل بعد: لوحةٌ تُفتح بلا صورٍ خيرٌ من لوحةٍ لا تُفتح

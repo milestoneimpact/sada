@@ -7,7 +7,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../crypto'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { upsertProvider, saveKey } from '../providers'
+import { upsertProvider, saveKey, setEnabled } from '../providers'
+import { recordCost } from '../cost'
 import { writeRoute } from '../ai/routes'
 import { BRIEF_SYSTEM, briefUser, parseBrief, twoWords, visualBrief } from './brief'
 import { imagePrompt } from './prompt'
@@ -166,6 +167,35 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     expect(out.detail).toContain('تعذّر')
   })
 
+  /**
+   * **والمبتورُ يُسجَّل كذلك** (D-164). سقفُ الموجز `maxTokens: 400`، فهو
+   * أكثرُ المواضع عرضةً للبتر — وكان يعود «تعذّر» بكلفةٍ صفرٍ ولا صفّ.
+   */
+  it('وجوابٌ مبتورٌ بـlength **يُسجَّل** ويُعاد سببا — والكلفةُ لا تُقال صفرا', async () => {
+    await seedWriter()
+    await db.prepare("UPDATE providers SET price_in = 1, price_out = 2 WHERE name = 'writer'").run()
+    const net = (async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          model: 'writer-1',
+          choices: [{ message: { content: '{"subject":"wov' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 300, completion_tokens: 400 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )) as unknown as typeof fetch
+
+    const out = await visualBrief(deps(net), 'نصّ', 'post-1')
+    expect(out.brief).toBeNull()
+    expect(out.detail).toContain('بُتر')
+    const { results } = await db
+      .prepare('SELECT operation, units, total, ref_id FROM cost_ledger')
+      .all<{ operation: string; units: number; total: number; ref_id: string }>()
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({ operation: 'image-brief:writer-1', units: 700, ref_id: 'post-1' })
+    expect(out.cost).toBeCloseTo(results[0]!.total, 10)
+    expect(out.cost).toBeGreaterThan(0)
+  })
+
   it('وجوابٌ مشوَّهٌ **يُسجَّل كلفتُه** ثمّ يُردّ — النداءُ وقع', async () => {
     await seedWriter()
     const net = (async (): Promise<Response> =>
@@ -218,5 +248,58 @@ describe('عنوانُ الشريحة — والقصُّ عندنا لا رجا�
     expect(BRIEF_SYSTEM).toContain('ARABIC. Two or three words')
     expect(BRIEF_SYSTEM).toContain('EXACTLY TWO WORDS')
     expect(BRIEF_SYSTEM).toContain('does NOT translate it')
+  })
+})
+
+/**
+ * **مزوّدُ الكتابة يمرّ بحارسه في الموجز كما يمرّ في الكتابة** (D-163).
+ *
+ * كان `resolveKey` يعيد سرَّ البيئة ولو عُطّل المزوّد، والموجزُ لا يسأل
+ * `checkProvider` — فمزوّدٌ أطفأه المالكُ يُنادى ويُحاسَب عليه مع كلّ صورة.
+ */
+describe('الموجزُ يمرّ بحارس مزوّده (D-163)', () => {
+  let db: FakeDb
+  let calls = 0
+  beforeEach(() => {
+    db = fakeDb()
+    calls = 0
+  })
+  const net = (async (): Promise<Response> => {
+    calls += 1
+    return new Response(
+      JSON.stringify({
+        id: 'msg', type: 'message', role: 'assistant', model: 'claude-opus-5',
+        content: [{ type: 'text', text: '{"subject":"folded brass","headline":"أثرٌ يُقاس"}' }],
+        stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 20 },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }) as unknown as typeof fetch
+  const deps = { encKey: KEY, workerSecrets: { ANTHROPIC_API_KEY: 'sk-ant-env-key-0001' }, fetchImpl: net }
+  const ledger = async (): Promise<unknown[]> =>
+    (await db.prepare('SELECT id FROM cost_ledger').all()).results
+
+  it('معطَّلٌ ومفتاحُه في البيئة: لا نداءَ ولا صفَّ في الدفتر، وسببُه يُقرأ', async () => {
+    await setEnabled(db, 'anthropic', false, 'test')
+    const out = await visualBrief({ db, ...deps }, 'منشورٌ عن أثر الحوكمة', 'post-1')
+    expect(out).toMatchObject({ brief: null, cost: 0 })
+    expect(out.detail).toContain('معطَّل')
+    expect(calls).toBe(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  it('وبلغ سقفَه اليوميّ: كذلك', async () => {
+    await upsertProvider(db, { name: 'anthropic', label: 'Anthropic', kind: 'anthropic', dailyCap: 0.5 }, 'test')
+    await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 0.5 })
+    const out = await visualBrief({ db, ...deps }, 'نصّ', 'post-1')
+    expect(out.brief).toBeNull()
+    expect(out.detail).toContain('سقف')
+    expect(calls).toBe(0)
+  })
+
+  it('ومفعَّلٌ دون سقفه يُنادى — الحارسُ لا يسدّ ما لا يُسدّ', async () => {
+    const out = await visualBrief({ db, ...deps }, 'نصّ', 'post-1')
+    expect(calls).toBe(1)
+    expect(out.brief?.headline).toBe('أثرٌ يُقاس')
   })
 })

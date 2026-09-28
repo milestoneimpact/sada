@@ -194,6 +194,36 @@ describe('رحلةُ المنشور', () => {
     expect(j!.spent).toBeGreaterThan(stationSum)
   })
 
+  /**
+   * **ومحطّةُ الصورة تقول ما عليها** (D-162): من يسأل بعد أسبوعٍ «لماذا خرجت
+   * صورتي بلا عنوان» يجد الجوابَ هنا لا في سجلّ الأمان مقصوصًا. وصفٌّ أقدمُ
+   * من الحفظ لا يُدّعى عنه شيء.
+   */
+  it('ومحطّةُ الصورة تقول ما عليها أو لماذا بلا نصّ — ومتى', async () => {
+    const postId = await seedPost()
+    const seed = async (id: string, note: string | null, headline: string | null): Promise<void> => {
+      await db
+        .prepare(
+          `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd,
+                              idempotency_key, note, headline, created_at)
+           VALUES (?, ?, ?, 'image/jpeg', 148320, 'p', 'm', 0.039, ?, ?, ?, '2026-09-02 08:00:00')`,
+        )
+        .bind(id, postId, `img/${id}.jpg`, `k-${id}`, note, headline).run()
+    }
+    await seed('drawn', '', 'أثرٌ يُقاس')
+    await seed('fell', 'لا مفتاحَ متصفّحٍ مضبوط', 'أثرٌ يُقاس')
+    await seed('old', null, null)
+
+    const images = (await readJourney(db, postId))!.stations.filter((s) => s.kind === 'image')
+    expect(images.map((s) => s.detail)).toEqual([
+      '145KB · وعليها «أثرٌ يُقاس»',
+      '145KB · بلا نصٍّ فوقها: لا مفتاحَ متصفّحٍ مضبوط',
+      '145KB',
+    ])
+    // وكان `at` فيها null والختمُ في الصفّ
+    expect(images.every((s) => s.at === '2026-09-02 08:00:00')).toBe(true)
+  })
+
   it('وجدولٌ لم يُرحَّل لا يرمي — الرحلةُ تُقرأ ناقصةً لا تسقط', async () => {
     const postId = await seedPost()
     await db.raw.prepare('DROP TABLE metrics').run()

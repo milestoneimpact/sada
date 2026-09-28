@@ -37,8 +37,9 @@ import { kb, money, relativeTime } from '../../../lib/format'
 import { LOGOS } from '../logos'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
-import { status } from '../parts'
-import { SLIDE_SIZE } from '../../../lib/image/slide'
+import { RUNG_MARK, status } from '../parts'
+import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
+import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -197,6 +198,44 @@ function peakLine(peaks: Peaks | undefined): string {
 }
 
 /**
+ * ما على الصورة — **أو لماذا لا شيءَ عليها** (D-162).
+ *
+ * كان يُقال في الوميض مرّةً بعد «ولّد صورة» ثمّ يختفي، والمعاينةُ وحدَها لا
+ * تقول أرُكّب العنوانُ أم سقط. فيعتمد المالكُ صورةً بلا عنوانٍ وهو لا يدري،
+ * أو يرفضها ويدفع ثمنَ توليدٍ ثانٍ على أملِ أن يظهر النصّ.
+ *
+ * **وأربعةُ أحوالٍ لا ثلاثة:**
+ *
+ * - `null` — صفٌّ أقدمُ من الحفظ: **لا سطر**، فلا يُدّعى ما لم يُسجَّل.
+ * - `''` — رُكّب: «على الصورة» والعنوانُ نفسُه، **وهو القراءةُ الموثوقة**:
+ *   عنوانٌ رُسم لعرض ‏1200 يصغر في معاينة الجوّال حتّى يُتبيَّن بجهد. وبلا
+ *   عنوانٍ لا سطر: لا يُقال «عليها» ولا شيء.
+ * - الإطفاءُ من الإعدادات — **قرارٌ لا عطل**: رقاقةٌ ساكنة، وبطاقةُ الإعدادات
+ *   تقول ذلك بلفظها. ويُطابَق بآخر السبب لأنّ سقوطَ الموجز يسبقه بـ«؛».
+ * - كلُّ سببٍ سواه — تحذير، ومعه العنوانُ المقترح إن وُجد.
+ *
+ * **والسببُ «عند التوليد» لا الآن**: مفتاحٌ ضُبط بعدها لا يرسم على صورةٍ
+ * رُفعت، وسطرٌ يقول «اضبط المفتاح» لمن ضبطه كاذبٌ إن لم يُؤرَّخ.
+ */
+function slideLine(m: MediaView): string {
+  if (m.note === null) return ''
+  if (m.note === '') {
+    return m.headline === null
+      ? ''
+      : `<div class="pic-foot">
+           ${status('ok', '●', 'على الصورة')}
+           <span class="ago">«${escapeHtml(m.headline)}»</span>
+         </div>`
+  }
+  const off = m.note.endsWith(OVERLAY_OFF)
+  const offered = m.headline === null ? '' : ` — والعنوانُ المقترح «${escapeHtml(m.headline)}»`
+  return `<div class="pic-foot">
+      ${off ? status('idle', '○', 'بلا نصٍّ فوقها') : status('warn', '!', 'بلا نصٍّ فوقها')}
+      <span class="ago">عند التوليد: ${escapeHtml(m.note)}${offered}</span>
+    </div>`
+}
+
+/**
  * لوحُ الصورة.
  *
  * ثلاثةُ أحوال: بلا صورةٍ فزرُّ توليد، وبصورةٍ فمعاينةٌ وزرُّ رفض،
@@ -204,8 +243,11 @@ function peakLine(peaks: Peaks | undefined): string {
  *
  * **والصورةُ تُعرض بحجمها الحقيقيّ لا مصغَّرةً بعشرين بكسلا**: المالك
  * يقرّر عليها، وقرارٌ على مربّعٍ صغير ليس قرارا.
+ *
+ * **وتحت الزرّين سطرُ جاهزيّة** (D-163): ما ستقوله الدالّةُ بعد الضغط يُقال
+ * قبله. وزرٌّ تسقط نقطتُه يُعطَّل وسببُه بجانبه — لا زرٌّ يُضغَط فيُردّ.
  */
-function imagePane(d: DraftRow, media: readonly MediaView[]): string {
+function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines): string {
   const open = d.status === 'draft' || d.status === 'approved' || d.status === 'edited'
   const mine = media.filter((m) => m.postId === d.id)
   // الصورةُ والمقطعُ صفّان في `media` يفترقان بالنوع — لا جدولَ ثانٍ
@@ -213,8 +255,12 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   const clip = mine.find((m) => m.status === 'ready' && m.mime.startsWith('video/'))
 
   if (ready !== undefined) {
+    // والنصُّ المرسومُ في الصورة مكانُه `alt`: قارئُ الشاشة لا يرى البكسلات
+    const alt = ready.note === '' && ready.headline !== null
+      ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
+      : 'صورةٌ مولَّدة تصاحب المنشور'
     return `<div class="pic">
-      <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
+      <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}"
         loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
         <span class="chip mono">${kb(ready.bytes)}</span>
@@ -224,15 +270,21 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
           : `<span class="chip" title="${escapeHtml(ready.prompt)}">الوصف</span>`}
         <span class="grow"></span>
         ${open
-          ? `<form class="inline" method="POST" action="/panel/media/animate"
+          ? `${clip === undefined
+              // **ولا زرَّ تحريكٍ على صورةٍ لها مقطع**: كانت الضغطةُ تُردّ «لهذا
+              // المنشور مقطعٌ من قبل» — زرٌّ يُعرَض ليُقال إنّه لا يفعل شيئا
+              ? `<form class="inline" method="POST" action="/panel/media/animate"
                    data-busy="جارٍ التحريك…">
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-               <button class="g sm" type="submit">حرّكها فيديو</button></form>
+               <button class="g sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
+              : ''}
              <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
                <button class="g sm" type="submit">ارفض الصورة</button></form>`
           : ''}
       </div>
+      ${slideLine(ready)}
+      ${open && clip === undefined ? lines.video : ''}
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
@@ -249,12 +301,73 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   return `<div class="pic none">
     ${status('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
-    <span class="ago">صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.</span>
+    <span class="ago">${lines.caption}</span>
     <span class="grow"></span>
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-      <button class="g sm" type="submit">ولّد صورة</button></form>
+      <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورة</button></form>
+    ${lines.image}
   </div>`
+}
+
+/** ما يُبنى مرّةً للّوح كلِّه — والبطاقاتُ تأخذه ولا تحسبه. */
+interface ReadyLines {
+  readonly image: string
+  readonly video: string
+  readonly imageBlocked: boolean
+  readonly videoBlocked: boolean
+  /** وصفُ الصورة بجانب «بلا صورة» — يتبع حالَ الشريحة لا نصًّا ثابتًا. */
+  readonly caption: string
+}
+
+/**
+ * سطرُ الجاهزيّة (D-163) — **نقطةٌ لكلّ بابٍ يمرّ به النداء**، وأوّلُ
+ * ساقطةٍ (أو أوّلُ ما ينتظرك) سببٌ ورابطٌ بجانبها.
+ *
+ * والنقطةُ لونٌ ورمزٌ وكلمة (D-043)، وحالُها وما وقع في `title` لمن يمرّ
+ * عليها. **وكلُّ ما يُكتب مهرَّب**: اسمُ المزوّد يكتبه المالكُ من اللوحة.
+ *
+ * والرابطُ `a.tap` لا `a.btn`: لا يزاحم زرَّ التوليد في وزنه، والزرُّ هو
+ * الفعل — والرابطُ طريقٌ إلى موضع الإصلاح.
+ */
+function readyLine(line: MediaLine): string {
+  const dots = line.dots
+    .map((dot) => {
+      const mark = RUNG_MARK[dot.state]
+      return status(mark.cls, mark.g, escapeHtml(dot.title),
+        `title="${escapeHtml(`${mark.label} — ${dot.note}`)}"`)
+    })
+    .join('')
+  const next = line.next
+  const why = next === null
+    ? ''
+    : `<span class="ago">${escapeHtml(next.note)}</span>${next.action === undefined
+        ? ''
+        : `<a class="tap" href="${escapeHtml(next.action.href)}">${escapeHtml(next.action.label)}</a>`}`
+  return `<p class="hint ready">${dots}${why}</p>`
+}
+
+/**
+ * **يُبنى مرّةً قبل البطاقات** لا في كلّ واحدةٍ منها: الحالُ حالُ اللوح لا
+ * حالُ المسوّدة — المزوّدُ والحدودُ والبيئةُ واحدةٌ للستّين بطاقة.
+ *
+ * و«بلا حرف» كان ثابتًا بجانب الزرّ **ولو رُفع التركيب** فيقول السطرُ الواحدُ
+ * كلامين متعاكسين. فيتبع الوصفُ نقطةَ «النصُّ فوقها»: غائبةٌ حين يُطفأ، وتامّةٌ
+ * حين يُركَّب، وتنتظرك حين ينقصها شيء.
+ */
+function readyLines(ready: MediaReady): ReadyLines {
+  const overlay = ready.image.dots.find((dot) => dot.key === 'overlay')
+  return {
+    image: readyLine(ready.image),
+    video: readyLine(ready.video),
+    imageBlocked: ready.image.blocked,
+    videoBlocked: ready.video.blocked,
+    caption: overlay === undefined
+      ? 'صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.'
+      : overlay.state === 'done'
+        ? 'صورةٌ <b>وفوقها عنوانٌ من كلمتين أو ثلاث</b>، والنصُّ كاملًا في المنشور.'
+        : 'صورةٌ <b>بلا عنوانٍ فوقها بعد</b> — وما ينقصها تحت الزرّ.',
+  }
 }
 
 /**
@@ -430,6 +543,7 @@ function card(
   media: readonly MediaView[],
   pageOnly: readonly string[],
   peaks: Readonly<Record<string, Peaks>>,
+  lines: ReadyLines,
 ): string {
   const spec = PLATFORMS[d.platform]
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
@@ -524,7 +638,7 @@ function card(
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
     ${editDiff(d)}
-    ${imagePane(d, media)}
+    ${imagePane(d, media, lines)}
     ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform])}
     <div class="draft-meta">${meta}</div>
   </div>`
@@ -547,6 +661,15 @@ export interface MediaView {
   readonly prompt: string
   readonly cost: number
   readonly status: 'ready' | 'rejected'
+  /**
+   * ما قيل عن الشريحة يومَ وُلّدت (D-162): `null` لم يُسجَّل · `''` رُكّب
+   * النصّ · نصٌّ سببُ السقوط.
+   *
+   * **وإلزاميّان ولو `null`**: حقلٌ اختياريٌّ يُنسى في الربط فيصمت السطرُ
+   * تحت كلّ صورة، ولا يعلم أحد.
+   */
+  readonly note: string | null
+  readonly headline: string | null
 }
 
 export interface DraftsInput {
@@ -579,6 +702,14 @@ export interface DraftsInput {
    * الاقتراحُ بلا أن يعلم أحد. **وخريطةٌ فارغةٌ تُكتب صراحةً قرارٌ يُقرأ.**
    */
   readonly peaks: Readonly<Record<string, Peaks>>
+  /**
+   * نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — **محسوبةً مرّةً
+   * للّوح** من حكم الدوالّ التي تحكم عند الضغط.
+   *
+   * **وإلزاميّةٌ** على سابقة `peaks`: حقلٌ اختياريٌّ يُنسى في مسارٍ جديد
+   * فيعود الزرُّ يُضغَط ليُقال بعد الدفع ما كان يُعرَف قبله.
+   */
+  readonly mediaReady: MediaReady
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -637,13 +768,15 @@ export function draftsSection(input: DraftsInput): string {
       تعمل بالإنجليزيّ. ولا تعمل وأنت داخل مربّع كتابة.</p>
   </details>`
 
+  // سطرا الجاهزيّة يُبنيان هنا مرّةً، والبطاقاتُ تأخذهما نصًّا (D-163)
+  const lines = readyLines(input.mediaReady)
   const list =
     drafts.length === 0
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
            <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
       : `<div class="grid c2 ragged">${drafts
           .map((d) =>
-            card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks))
+            card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines))
           .join('')}</div>`
 
   /*

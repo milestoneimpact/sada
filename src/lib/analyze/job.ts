@@ -13,6 +13,8 @@
  *
  * والسادسة قبل السابعة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
  * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
+ * **والسادسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ: مبتورًا
+ * أو مرفوضًا أو بلا نصٍّ أو بـJSON فاسد. وما لم يصل لا يُكتب له صفّ.
  */
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
@@ -20,6 +22,7 @@ import { resolveKey } from '../providers'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'
+import { spentOf, type Spent } from '../ai/spent'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
 
 /**
@@ -124,6 +127,21 @@ export async function analyzeSource(
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(providerBlocker) }
   }
 
+  // خطوةُ الكلفة (٦) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
+  // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
+  const charge = async (spent: Spent): Promise<number> => {
+    const cost = analysisCost(spent)
+    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
+    await recordCost(deps.db, {
+      provider: 'anthropic',
+      operation: `analyze:${spent.model}`,
+      units,
+      unitCost: units === 0 ? 0 : cost / units,
+      refId: source.id,
+    })
+    return cost
+  }
+
   try {
     // ٤ · التصدير
     const sa = parseServiceAccount(deps.serviceAccountJson)
@@ -160,15 +178,7 @@ export async function analyzeSource(
     })
 
     // ٦ · الكلفة **قبل** الكتابة (D-008)
-    const cost = analysisCost(result.usage)
-    const units = result.usage.inputTokens + result.usage.cachedInputTokens + result.usage.outputTokens
-    await recordCost(deps.db, {
-      provider: 'anthropic',
-      operation: `analyze:${result.model}`,
-      units,
-      unitCost: units === 0 ? 0 : cost / units,
-      refId: source.id,
-    })
+    const cost = await charge({ ...result.usage, model: result.model })
 
     // ٧ · الكتابة — والبصمة معها، فيُعرف ما حُلِّل ولأيّ نسخة
     const { analysis } = result
@@ -189,6 +199,10 @@ export async function analyzeSource(
 
     return { kind: 'analyzed', sourceId: source.id, worth: analysis.worth_score, cost }
   } catch (error) {
+    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164).
+    // ومستهلكُ الطابور يعيد المبتور، فكلُّ إعادةٍ صفٌّ — ويراه السقفُ في التالية
+    const late = spentOf(error)
+    if (late !== null) await charge(late)
     if (error instanceof AnalyzeError) {
       return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }
     }

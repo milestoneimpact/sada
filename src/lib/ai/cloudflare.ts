@@ -81,6 +81,19 @@ export function cfAccountId(baseUrl: string | null | undefined): string | null {
 }
 
 /**
+ * الحسابُ الذي يُنادى: **من البيئة أوّلًا ثمّ من عنوان البطاقة**، وفارغٌ
+ * إن غابا (D-163).
+ *
+ * كانت تُكتب في موضعين بصيغتين: المقطعُ يقصّ ما في البيئة ويرجع إلى العنوان
+ * حين يفرغ، والصورةُ تكتب `?? cfAccountId(…)` فمتغيّرٌ مضبوطٌ فراغًا لا يرجع
+ * إلى شيء، **ويُنادى حسابٌ فارغٌ بعد أن دُفع ثمنُ الموجز**. ولوحٌ يسأل
+ * «أيُنادى بحساب؟» قبل الضغط يلزمه الجوابُ نفسُه لا ثالثٌ يشبهه.
+ */
+export function cfAccountOf(envAccount: string | undefined, baseUrl: string | null | undefined): string {
+  return (envAccount ?? '').trim() || cfAccountId(baseUrl) || ''
+}
+
+/**
  * نهايةُ قائمة النماذج.
  *
  * `per_page` أقصاه عندهم، **ونحن نطلب الأكبر عمدا**: قائمةٌ ناقصةٌ

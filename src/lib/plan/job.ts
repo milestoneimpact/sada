@@ -12,6 +12,8 @@
  *   ٧ · اكتب الخطّة، وانسخ سابقةَ الأسبوع نفسه `superseded`
  *
  * والسادسةُ بعد الخامسة عمدا: جوابٌ مشوَّهٌ لا يُلغي كلفةً وقعت.
+ * **والخامسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ —
+ * مبتورًا أو مرفوضًا أو فارغًا. وما لم يصل لا يُكتب له صفّ.
  */
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
@@ -19,6 +21,8 @@ import { costOf, getProvider, resolveKey } from '../providers'
 import { routeFor } from '../ai/routes'
 import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
+import { portableSchema } from '../ai/portableSchema'
+import { spentOf, type Spent } from '../ai/spent'
 import {
   PLAN_SCHEMA, parsePlan, systemPrompt, userPrompt, weekStart,
   type Plan, type PlanSource,
@@ -38,7 +42,7 @@ export type PlanOutcome =
       /** لماذا أُسقط ما أُسقط — نصٌّ يُقرأ لا عدد. */
       readonly droppedWhy: string
       readonly cost: number
-      /** الرموزُ المستهلَكة: صفرٌ في الكلفة مع رموزٍ يعني سعرا لم يُضبط. */
+      /** الوحداتُ المستهلَكة: صفرٌ في الكلفة مع وحداتٍ يعني سعرا لم يُضبط. */
       readonly units: number
     }
   /** لا مادّةَ تكفي — يُحلَّل أكثرُ أوّلا. */
@@ -148,12 +152,26 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
   }
 
+  // خطوةُ الكلفة (٥) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
+  // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
+  const charge = async (spent: Spent): Promise<{ total: number; units: number }> => {
+    const priced = costOf(provider, spent)
+    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
+    await recordCost(deps.db, {
+      provider: provider.name,
+      operation: `plan:${spent.model}`,
+      units,
+      unitCost: units === 0 ? 0 : priced.total / units,
+      refId: week,
+    })
+    return { total: priced.total, units }
+  }
+
   // ٤ · النداء
   const system = systemPrompt()
   const user = userPrompt(sources, week)
   let text: string
-  let usage: { inputTokens: number; outputTokens: number; cachedInputTokens: number }
-  let ran: string
+  let spent: Spent
   try {
     if (provider.kind === 'anthropic') {
       const result = await anthropicChat({
@@ -161,18 +179,15 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
         model: route.model,
         system,
         user,
-        schema: PLAN_SCHEMA as unknown as Record<string, unknown>,
+        // المحمولُ لا الخامّ (D-164): `minLength` و`maxItems` يُطويان وصفًا،
+        // وحدودُهما في `parsePlan`
+        schema: portableSchema(PLAN_SCHEMA),
         // حكمٌ يقرّر إنفاقَ أسبوعٍ كامل — يُعطى جهدَه
         effort: 'high',
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
       text = result.text
-      usage = {
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-        cachedInputTokens: result.cachedInputTokens,
-      }
-      ran = result.model
+      spent = result
     } else {
       if (provider.baseUrl === null) {
         return { kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false }
@@ -182,10 +197,12 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
         deps.fetchImpl ?? fetch,
       )
       text = result.text
-      usage = { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens, cachedInputTokens: 0 }
-      ran = result.model
+      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
     }
   } catch (error) {
+    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
+    const late = spentOf(error)
+    if (late !== null) await charge(late)
     const retryable =
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
@@ -194,15 +211,9 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   }
 
   // ٥ · الكلفة قبل القراءة
-  const priced = costOf(provider, usage)
-  const units = usage.inputTokens + usage.cachedInputTokens + usage.outputTokens
-  await recordCost(deps.db, {
-    provider: provider.name,
-    operation: `plan:${ran}`,
-    units,
-    unitCost: units === 0 ? 0 : priced.total / units,
-    refId: week,
-  })
+  const priced = await charge(spent)
+  const ran = spent.model
+  const units = priced.units
 
   // ٦ · القراءة — وما لا يصحّ يُسقَط
   let parsedJson: unknown

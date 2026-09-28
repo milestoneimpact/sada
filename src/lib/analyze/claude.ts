@@ -7,6 +7,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk'
 import { ROUTES } from '../ai/registry'
+import type { Spent } from '../ai/spent'
 import { ANALYSIS_SCHEMA, SYSTEM_PROMPT, userPrompt, type Analysis } from './prompt'
 
 /** ما يُقرأ من استجابة المزوّد لا ما يُقدَّر. */
@@ -28,6 +29,11 @@ export class AnalyzeError extends Error {
     readonly status: number,
     /** أيُرجى من إعادة المحاولة نفعٌ؟ 429 و 5xx نعم، 400 لا. */
     readonly retryable: boolean,
+    /**
+     * ما استُهلك في جوابٍ وصل ثمّ رُدّ — رفضًا أو بترًا أو بلا نصٍّ أو بـJSON
+     * فاسد (D-164). `message.usage` حاضرٌ في الأربعة، فلا عذرَ لإسقاطه.
+     */
+    readonly spent?: Spent,
   ) {
     super(message)
     this.name = 'AnalyzeError'
@@ -110,25 +116,30 @@ export async function analyzeText(
     )
   }
 
+  // ما بعد هذا جوابٌ وصل وحوسِب عليه: كلُّ رفضٍ منه يحمل استهلاكه (D-164).
+  // وهنا أغلى بترٍ في النظام — حتّى 16000 وحدةِ خروج — فإسقاطُه أغلى إسقاط
+  const usage = toUsage(message.usage)
+  const spent: Spent = { ...usage, model: message.model }
+
   // رفضٌ لسياسة المحتوى ليس عطلا يُعاد: يُبلَّغ ولا يُكرَّر
   if (message.stop_reason === 'refusal') {
-    throw new AnalyzeError('anthropic: رُفض المصدر لسياسة المحتوى', 422, false)
+    throw new AnalyzeError('anthropic: رُفض المصدر لسياسة المحتوى', 422, false, spent)
   }
   if (message.stop_reason === 'max_tokens') {
-    throw new AnalyzeError('anthropic: بُتر الجواب قبل تمامه', 502, true)
+    throw new AnalyzeError('anthropic: بُتر الجواب قبل تمامه', 502, true, spent)
   }
 
   const text = message.content.find((block) => block.type === 'text')
   if (text === undefined) {
-    throw new AnalyzeError('anthropic: لا نصّ في الجواب', 502, true)
+    throw new AnalyzeError('anthropic: لا نصّ في الجواب', 502, true, spent)
   }
 
   let analysis: Analysis
   try {
     analysis = JSON.parse(text.text) as Analysis
   } catch {
-    throw new AnalyzeError('anthropic: الجواب ليس JSON رغم المخطّط', 502, true)
+    throw new AnalyzeError('anthropic: الجواب ليس JSON رغم المخطّط', 502, true, spent)
   }
 
-  return { analysis, usage: toUsage(message.usage), model: message.model }
+  return { analysis, usage, model: message.model }
 }

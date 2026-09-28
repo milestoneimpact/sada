@@ -13,6 +13,8 @@
  *
  * والسادسة قبل السابعة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
  * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
+ * **والسادسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ: مبتورًا
+ * أو مرفوضًا أو فارغًا.
  *
  * **ولا تُنشَر مسوّدةٌ من هنا ولا تُجدوَل.** الحالةُ `draft` وحدها،
  * والقاعدةُ نفسها ترفض `queued` بلا `approved_at` — فلو أخطأتُ في كلّ
@@ -25,6 +27,8 @@ import { routeFor } from '../ai/routes'
 import { containsUrl } from '../idempotency'
 import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
+import { portableSchema } from '../ai/portableSchema'
+import { spentOf, type Spent } from '../ai/spent'
 import type { Db } from '../tokens'
 import {
   DRAFT_SCHEMA, parseDraft, PLATFORMS, systemPrompt, userPrompt,
@@ -171,10 +175,25 @@ export async function draftPost(
     return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
   }
 
+  // خطوةُ الكلفة (٦) تُعرَّف قبل النداء: يحتاجها الجوابُ الناجح، والجوابُ
+  // الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
+  const charge = async (spent: Spent): Promise<number> => {
+    const priced = costOf(provider, spent)
+    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
+    await recordCost(deps.db, {
+      provider: provider.name,
+      operation: `draft:${platform}:${spent.model}`,
+      units,
+      // سعرُ الوحدة مشتقٌّ لا مفترَض: مزوّدٌ بلا سعرٍ مضبوط يعطي صفرا
+      unitCost: units === 0 ? 0 : priced.total / units,
+      refId: row.id,
+    })
+    return priced.total
+  }
+
   // ٥ · النداء — بلهجة المزوّد
   let text: string
-  let usage: { inputTokens: number; outputTokens: number; cachedInputTokens: number }
-  let ran: string
+  let spent: Spent
   try {
     if (provider.kind === 'anthropic') {
       const result = await anthropicChat({
@@ -182,16 +201,12 @@ export async function draftPost(
         model: route.model,
         system: systemPrompt(spec),
         user: userPrompt(brief),
-        schema: DRAFT_SCHEMA as unknown as Record<string, unknown>,
+        // المحمولُ لا الخامّ (D-164): `minLength` يُطوى وصفًا، وحدُّه في `parseDraft`
+        schema: portableSchema(DRAFT_SCHEMA),
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
       text = result.text
-      usage = {
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-        cachedInputTokens: result.cachedInputTokens,
-      }
-      ran = result.model
+      spent = result
     } else {
       if (provider.baseUrl === null) {
         return { kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false }
@@ -208,14 +223,12 @@ export async function draftPost(
         deps.fetchImpl ?? fetch,
       )
       text = result.text
-      usage = {
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        cachedInputTokens: 0,
-      }
-      ran = result.model
+      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
     }
   } catch (error) {
+    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
+    const late = spentOf(error)
+    if (late !== null) await charge(late)
     const retryable =
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
@@ -228,16 +241,8 @@ export async function draftPost(
   }
 
   // ٦ · **الكلفة قبل الكتابة** — النداءُ وقع وحوسِب عليه
-  const priced = costOf(provider, usage)
-  const units = usage.inputTokens + usage.cachedInputTokens + usage.outputTokens
-  await recordCost(deps.db, {
-    provider: provider.name,
-    operation: `draft:${platform}:${ran}`,
-    units,
-    // سعرُ الوحدة مشتقٌّ لا مفترَض: مزوّدٌ بلا سعرٍ مضبوط يعطي صفرا
-    unitCost: units === 0 ? 0 : priced.total / units,
-    refId: row.id,
-  })
+  const cost = await charge(spent)
+  const ran = spent.model
 
   // القراءةُ بعد التسجيل: نصٌّ مشوَّه لا يُلغي كلفةً وقعت
   let parsedJson: unknown
@@ -265,7 +270,7 @@ export async function draftPost(
         row.id,
         hash,
         ran,
-        priced.total,
+        cost,
         draft.draft.text,
         JSON.stringify([row.id]),
         draft.draft.rationale,
@@ -294,6 +299,6 @@ export async function draftPost(
     postId,
     platform,
     length: draft.draft.text.length,
-    cost: priced.total,
+    cost,
   }
 }
