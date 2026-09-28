@@ -11,6 +11,7 @@
  * يستدعي الآخر بلا فرعٍ في المنطق سوى اختيار السائق.
  */
 import Anthropic from '@anthropic-ai/sdk'
+import type { Spent } from './spent'
 
 export interface AnthropicCall {
   readonly apiKey: string
@@ -38,6 +39,11 @@ export class AnthropicError extends Error {
     readonly status: number,
     /** أيُرجى من إعادة المحاولة نفعٌ؟ 429 و 5xx نعم، 4xx لا. */
     readonly retryable: boolean,
+    /**
+     * ما استُهلك في جوابٍ وصل ثمّ رُدّ — رفضًا أو بترًا أو بلا نصّ (D-164).
+     * `message.usage` حاضرٌ في الثلاثة، فلا عذرَ لإسقاطه.
+     */
+    readonly spent?: Spent,
   ) {
     super(message)
     this.name = 'AnthropicError'
@@ -93,24 +99,26 @@ export async function anthropicChat(call: AnthropicCall): Promise<AnthropicResul
     )
   }
 
-  // رفضٌ لسياسة المحتوى ليس عطلا يُعاد: يُبلَّغ ولا يُكرَّر
-  if (message.stop_reason === 'refusal') {
-    throw new AnthropicError('anthropic: رُفض الطلب لسياسة المحتوى', 422, false)
-  }
-  if (message.stop_reason === 'max_tokens') {
-    throw new AnthropicError('anthropic: بُتر الجواب قبل تمامه', 502, true)
-  }
-
-  const block = message.content.find((part) => part.type === 'text')
-  if (block === undefined) {
-    throw new AnthropicError('anthropic: لا نصّ في الجواب', 502, true)
-  }
-
-  return {
-    text: block.text,
+  // ما بعد هذا جوابٌ وصل وحوسِب عليه: كلُّ رفضٍ منه يحمل استهلاكه (D-164)
+  const spent: Spent = {
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
     cachedInputTokens: message.usage.cache_read_input_tokens ?? 0,
     model: message.model,
   }
+
+  // رفضٌ لسياسة المحتوى ليس عطلا يُعاد: يُبلَّغ ولا يُكرَّر
+  if (message.stop_reason === 'refusal') {
+    throw new AnthropicError('anthropic: رُفض الطلب لسياسة المحتوى', 422, false, spent)
+  }
+  if (message.stop_reason === 'max_tokens') {
+    throw new AnthropicError('anthropic: بُتر الجواب قبل تمامه', 502, true, spent)
+  }
+
+  const block = message.content.find((part) => part.type === 'text')
+  if (block === undefined) {
+    throw new AnthropicError('anthropic: لا نصّ في الجواب', 502, true, spent)
+  }
+
+  return { text: block.text, ...spent }
 }

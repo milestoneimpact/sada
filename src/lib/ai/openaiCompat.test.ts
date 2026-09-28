@@ -144,6 +144,76 @@ describe('الأخطاء — تُقرأ من الرمز لا من نصّ الر�
   })
 })
 
+/**
+ * **جوابٌ وصل ثمّ رُدّ يحمل استهلاكَه** (D-164).
+ *
+ * فارغًا أو مبتورًا أو مرفوضًا بعد 2xx: النداءُ وقع وحوسِب عليه. وكان
+ * الخطأُ يُرمى بلا استهلاك، فيعود المنادي `failed` قبل خطوة الكلفة — نداءٌ
+ * مدفوعٌ لا يراه الدفتر.
+ */
+describe('D-164 · ما استُهلك في جوابٍ رُدّ', () => {
+  const SPENT = { inputTokens: 900, outputTokens: 120, cachedInputTokens: 0, model: 'deepseek-chat' }
+
+  async function thrown(payload: unknown, status = 200): Promise<CompatError> {
+    try {
+      await chatCompletion(REQ, net(status, payload))
+    } catch (error) {
+      expect(error).toBeInstanceOf(CompatError)
+      return error as CompatError
+    }
+    throw new Error('توقّعنا عطلا')
+  }
+
+  it('المبتورُ يحمل الاستهلاكَ والنموذج، ويبقى قابلًا للإعادة', async () => {
+    const error = await thrown({ ...OK, choices: [{ message: { content: '{"a":' }, finish_reason: 'length' }] })
+    expect(error.spent).toEqual(SPENT)
+    expect(error.retryable).toBe(true)
+  })
+
+  it('والفارغُ يحمله كذلك', async () => {
+    const error = await thrown({ ...OK, choices: [{ message: { content: '' }, finish_reason: 'stop' }] })
+    expect(error.spent).toEqual(SPENT)
+  })
+
+  it('**والرفضُ حقلٌ يُقرأ**: 422 لا يُعاد — وإعادتُه تدفع ثمنَ الجواب نفسه مرّتين', async () => {
+    const error = await thrown({
+      ...OK,
+      choices: [{ message: { content: null, refusal: 'I can’t help with that.' }, finish_reason: 'stop' }],
+    })
+    expect(error.status).toBe(422)
+    expect(error.retryable).toBe(false)
+    expect(error.message).toContain('رفض')
+    expect(error.spent).toEqual(SPENT)
+    // ونصُّ الرفض لا يصل إلى رسالة الخطأ: ما يقوله المزوّد لا يُعرَض
+    expect(error.message).not.toContain('help')
+  })
+
+  it('ورفضٌ فارغُ النصّ ليس رفضًا — يبقى «لا نصّ» ويُعاد', async () => {
+    const error = await thrown({ ...OK, choices: [{ message: { content: null, refusal: '  ' }, finish_reason: 'stop' }] })
+    expect(error.retryable).toBe(true)
+    expect(error.status).toBe(502)
+  })
+
+  it('والنموذجُ المطلوب حين لا يعيده المزوّد', async () => {
+    const error = await thrown({ ...OK, model: undefined, choices: [{ message: { content: '{' }, finish_reason: 'length' }] })
+    expect(error.spent?.model).toBe('deepseek-chat')
+  })
+
+  it('**وما لم يصل لا استهلاكَ فيه**: الرمزُ غيرُ الناجح بلا spent', async () => {
+    const error = await thrown({ usage: { prompt_tokens: 5, completion_tokens: 0 } }, 500)
+    expect(error.spent).toBeUndefined()
+  })
+
+  it('ولا عطلُ الشبكة', async () => {
+    const boom = (async () => {
+      throw new Error('انقطاع')
+    }) as unknown as typeof fetch
+    const error = await chatCompletion(REQ, boom).then(() => null, (caught: unknown) => caught)
+    expect(error).toBeInstanceOf(CompatError)
+    expect((error as CompatError).spent).toBeUndefined()
+  })
+})
+
 describe('التحقّق من المفتاح', () => {
   it('ينادي models على العنوان نفسه', async () => {
     await verifyCompat('https://api.deepseek.com/v1', 'sk-deep', net(200, { data: [] }))
