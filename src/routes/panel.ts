@@ -485,6 +485,8 @@ panel.get('/panel', async (c) => {
         prompt: m.prompt,
         cost: m.cost,
         status: m.status,
+        note: m.note,
+        headline: m.headline,
       })),
       plan,
       planReady: routes.some(

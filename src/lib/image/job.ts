@@ -30,7 +30,7 @@ import { cfAccountId } from '../ai/cloudflare'
 import { imagePrompt, topicOf } from './prompt'
 import { visualBrief } from './brief'
 import { screenshotSlide } from './render'
-import { SLIDE_SIZE, slideHtml } from './slide'
+import { HEADLINE_MAX, OVERLAY_OFF, SLIDE_SIZE, clip, slideHtml } from './slide'
 import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
@@ -153,7 +153,7 @@ export async function composeSlide(
   // موجزُه قرأ «بلا عنوان» — وهو سببٌ لا يصلحه، والسببُ الذي يصلحه مخفيّ
   const settings = await readSettings(deps.db)
   if (!settings.imageOverlay) {
-    return { slide: null, reason: 'تركيبُ النصّ مُطفأٌ من الإعدادات' }
+    return { slide: null, reason: OVERLAY_OFF }
   }
 
   const accountId = deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? ''
@@ -233,6 +233,21 @@ export function noteOf(
   }
   return overlay.reason
 }
+
+/**
+ * صفُّ الصورة — **جملةٌ واحدةٌ لموضعَي الكتابة** (D-162).
+ *
+ * كانت منسوخةً حرفًا في الخطوة ٧ وفي إعادتها بعد تحرير اسمٍ مرفوض (D-088).
+ * **والنسخةُ الثانيةُ هي التي تنسى العمودَ الجديد**: مسارٌ نادرٌ لا يمرّ
+ * فيه أحدٌ حتّى يمرّ، فيُكتب صفٌّ بلا سببه والأوّلُ بسببه.
+ */
+const INSERT_IMAGE =
+  `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
+                      note, headline)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+/** أقصى ما يُحفَظ من السبب — ورسالةُ خطأٍ من الشبكة قد تطول بلا حدّ. */
+const NOTE_MAX = 300
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
   // ١ · المنشور
@@ -401,6 +416,18 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   })
   if (overlay.slide !== null) image = overlay.slide
 
+  /*
+   * **وما قيل عن الشريحة يُحفَظ مع الصورة** (D-162).
+   *
+   * كان يُقال في الوميض مرّةً ثمّ يُرمى، فالبطاقةُ بعد التحديث لا تعرف
+   * أرُكّب النصُّ أم سقط. ويُحسَب هنا مرّةً ليقول الوميضُ والصفُّ الشيءَ
+   * نفسَه. والعنوانُ بقصِّ الشريحة نفسِه — **فالمحفوظُ هو المرسومُ حرفًا**
+   * — وفراغُه `NULL`: لا عنوانَ في الموجز، ولا يُخترَع.
+   */
+  const note = noteOf(visual, overlay).slice(0, NOTE_MAX)
+  const drawn = clip(visual.brief?.headline ?? '', HEADLINE_MAX)
+  const headline = drawn === '' ? null : drawn
+
   // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه
   //
   // وصورةٌ تُسعَّر بالنداء لا بالرمز: `costOf` تحسب بالرموز، فتُمرَّر
@@ -442,15 +469,13 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     }
   }
 
-  // ٧ · الصفّ
+  // ٧ · الصفّ — وقيمُه مصفوفةٌ واحدةٌ تُربَط في الموضعين
+  const row = [
+    mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key,
+    note, headline,
+  ]
   try {
-    await deps.db
-      .prepare(
-        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key)
-      .run()
+    await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (message.includes('UNIQUE')) {
@@ -476,20 +501,14 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
           .bind(won.id, '%:rejected:%')
           .run()
         try {
-          await deps.db
-            .prepare(
-              `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .bind(mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key)
-            .run()
+          await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
           return {
             kind: 'generated',
             mediaId,
             key: r2Key,
             bytes: image.bytes.length,
             cost: priced.total + visual.cost,
-            note: noteOf(visual, overlay),
+            note,
           }
         } catch (second) {
           await deps.bucket.delete(r2Key).catch(() => undefined)
@@ -518,7 +537,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     key: r2Key,
     bytes: image.bytes.length,
     cost: priced.total + visual.cost,
-    note: noteOf(visual, overlay),
+    note,
   }
 }
 
@@ -540,6 +559,20 @@ export interface MediaRow {
   readonly cost: number
   readonly status: 'ready' | 'rejected'
   readonly createdAt: string
+  /**
+   * ما قيل عن الشريحة يومَ وُلّدت (D-162) — **ثلاثيّةُ القيمة**:
+   * `null` لم يُسجَّل (صفٌّ أقدمُ من ‏0027، أو مقطع) · `''` رُكّب النصّ ·
+   * نصٌّ سببُ السقوط. **و`null` ليست فراغا**: الأولى لا تَعِد بشيء،
+   * والثانيةُ تقول إنّ العنوانَ على الصورة.
+   */
+  readonly note: string | null
+  /** العنوانُ المرسوم أو الذي كان سيُرسَم — و`null` حين لا عنوانَ في الموجز. */
+  readonly headline: string | null
+}
+
+/** نصٌّ أو `null` — **و`String(null)` تطبع «null» على كلّ صورةٍ قديمة**. */
+function textOrNull(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
 }
 
 /** صورُ منشوراتٍ بعينها — استعلامٌ واحد لا واحدٌ لكلّ بطاقة. */
@@ -549,11 +582,12 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at
+        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at,
+                note, headline
            FROM media WHERE post_id IN (${marks}) ORDER BY created_at DESC`,
       )
       .bind(...postIds)
-      .all<Record<string, string | number>>()
+      .all<Record<string, string | number | null>>()
     return results.map((r) => ({
       id: String(r['id']),
       postId: String(r['post_id']),
@@ -565,6 +599,8 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
       cost: Number(r['cost_usd']),
       status: r['status'] === 'rejected' ? 'rejected' : 'ready',
       createdAt: String(r['created_at']),
+      note: textOrNull(r['note']),
+      headline: textOrNull(r['headline']),
     }))
   } catch {
     // جدولٌ لم يُرحَّل بعد: لوحةٌ تُفتح بلا صورٍ خيرٌ من لوحةٍ لا تُفتح

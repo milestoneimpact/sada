@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
+import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
 import { writeRoute } from '../ai/routes'
@@ -585,6 +586,68 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     if (out.kind !== 'generated') return
     expect(out.note).toContain('تعذّر تصويرُ الشريحة')
   })
+
+  /**
+   * **وما قيل يبقى مع الصورة** (D-162).
+   *
+   * كان السببُ والعنوانُ يُقالان في الوميض مرّةً ثمّ يُرميان: البطاقةُ بعد
+   * التحديث لا تعرف أرُكّب النصُّ أم سقط. فالصفُّ يُسأل هنا لا المخرَج.
+   */
+  describe('والصفُّ يحفظ ما قيل عن الشريحة (D-162)', () => {
+    it('رُكّب: السببُ فراغٌ والعنوانُ هو المرسوم', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note).toBe('')
+      expect(row!.headline).toBe('أثرٌ يُقاس')
+    })
+
+    it('وسقوطُ التركيب يُحفَظ كما قيل في الوميض — والعنوانُ المقترحُ معه', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note).toBe(out.note)
+      expect(row!.note).toContain('CF_BROWSER_TOKEN')
+      expect(row!.headline).toBe('أثرٌ يُقاس')
+    })
+
+    it('وبلا موجزٍ لا عنوانَ يُخترَع في الصفّ — NULL لا فراغ', async () => {
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.headline).toBeNull()
+      expect(row!.note).toContain('بلا عنوانٍ في الموجز')
+    })
+
+    it('والإطفاءُ يُحفَظ بلفظه — فتقرؤه البطاقةُ قرارًا لا عطلا', async () => {
+      await seedWriter()
+      await writeSetting(db, 'image_overlay', 'false', 'test')
+      const post = await seedPost()
+      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.endsWith(OVERLAY_OFF)).toBe(true)
+    })
+
+    it('وسببٌ يطول بلا حدٍّ يُقصّ عند الكتابة — والوميضُ يقول المقصوصَ نفسَه', async () => {
+      await seedWriter()
+      const lane = twoLane()
+      const endless: typeof fetch = (async (input: unknown, init?: RequestInit) => {
+        if (String(input instanceof Request ? input.url : input).includes('browser-rendering')) {
+          throw new Error('ض'.repeat(2000))
+        }
+        return lane(input as RequestInfo, init)
+      }) as typeof fetch
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(endless, bucket(), READY), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.length).toBe(300)
+      expect(out.note).toBe(row!.note)
+    })
+  })
 })
 
 /**
@@ -689,6 +752,47 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
       .all<{ id: string; status: string }>()
     expect(results).toHaveLength(2)
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
+  })
+
+  /**
+   * **والإدراجُ المُعادُ هو الذي ينسى العمودَ الجديد** (D-162).
+   *
+   * مسارٌ نادرٌ لا يمرّ فيه أحدٌ حتّى يمرّ، وكان نسخةً حرفيّةً من الأوّل.
+   * فإن افترقا كُتب صفٌّ بلا سببه، وقالت البطاقةُ عنه ما لم يُسجَّل.
+   */
+  it('والصفُّ المُعادُ بعد تحرير الاسم يحمل سببَه', async () => {
+    const post = await seedPost({ platform: 'x' })
+    const first = await generateForPost(deps(net()), post)
+    const id = (first as { mediaId: string }).mediaId
+    await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
+    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
+
+    const again = await generateForPost(deps(net()), post)
+    if (again.kind !== 'generated') throw new Error(again.kind)
+    const row = (await mediaFor(db, [post])).find((m) => m.id === again.mediaId)
+    expect(row!.note).not.toBeNull()
+    expect(row!.note).toBe(again.note)
+  })
+})
+
+/**
+ * **و`null` ليست فراغا** (D-162): صفٌّ أقدمُ من ‏0027 لم يُسجَّل عنه شيء،
+ * و`String(null)` كانت ستطبع «بلا نصٍّ فوقها: null» على كلّ صورةٍ قديمة.
+ */
+describe('mediaFor يفرّق NULL عن الفراغ (D-162)', () => {
+  it('صفٌّ بالأعمدة التسعة القديمة: note و headline كلاهما null', async () => {
+    const post = await seedPost()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key)
+         VALUES ('old', ?, 'img/old.png', 'image/png', 10, 'p', 'm', 0, 'k-old')`,
+      )
+      .bind(post)
+      .run()
+    const [row] = await mediaFor(db, [post])
+    expect(row!.note).toBeNull()
+    expect(row!.headline).toBeNull()
   })
 })
 

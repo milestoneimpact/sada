@@ -23,6 +23,7 @@
  * ومنشورٍ لا نعرف عنه**.
  */
 import type { Db } from './tokens'
+import { kb } from './format'
 
 /** محطّةٌ في الرحلة — **ولا تُنشأ إلّا من صفّ**. */
 export interface Station {
@@ -98,6 +99,19 @@ const ATTEMPT: Readonly<Record<string, { title: string; detail: string }>> = {
 }
 
 /**
+ * ما قيل عن الشريحة — **ذيلٌ لسطر الصورة، أو لا شيء** (D-162).
+ *
+ * والرحلةُ قارئٌ ثانٍ لـ`media.note` بعد البطاقة: من يسأل «لماذا خرجت
+ * صورتي بلا عنوان» بعد أسبوعٍ يجد الجوابَ في المحطّة لا في سجلّ الأمان.
+ * و`null` لا ذيلَ لها: صفٌّ أقدمُ من الحفظ، أو مقطعٌ لا شريحةَ له.
+ */
+function slideSaid(note: string | null, headline: string | null): string {
+  if (note === null) return ''
+  if (note === '') return headline === null ? '' : ` · وعليها «${headline}»`
+  return ` · بلا نصٍّ فوقها: ${note}`
+}
+
+/**
  * يقرأ رحلةَ منشورٍ واحد.
  *
  * **وسبعةُ استعلاماتٍ لا واحد**: ضمُّها في وصلةٍ واحدة يضرب الصفوفَ بعضَها
@@ -159,11 +173,14 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
   // ── ٤ · الصور ──────────────────────────────────────────────────────
   const { results: media } = await db
     .prepare(
-      `SELECT mime, bytes, cost_usd, status, model FROM media
+      `SELECT mime, bytes, cost_usd, status, model, note, headline, created_at FROM media
         WHERE post_id = ? ORDER BY rowid`,
     )
     .bind(postId)
-    .all<{ mime: string; bytes: number; cost_usd: number; status: string; model: string | null }>()
+    .all<{
+      mime: string; bytes: number; cost_usd: number; status: string; model: string | null
+      note: string | null; headline: string | null; created_at: string
+    }>()
     .catch(() => ({ results: [] as never[] }))
 
   for (const m of media) {
@@ -171,10 +188,10 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
     stations.push({
       kind: 'image',
       title: clip ? 'وُلّد مقطع' : 'وُلّدت صورة',
-      at: null,
+      at: m.created_at,
       detail: m.status === 'rejected'
         ? 'رفضتَها — وتبقى بكلفتها'
-        : `${Math.round(m.bytes / 1024)}KB`,
+        : `${kb(m.bytes)}${slideSaid(m.note, m.headline)}`,
       cost: m.cost_usd, model: m.model,
       state: m.status === 'rejected' ? 'failed' : 'done',
     })

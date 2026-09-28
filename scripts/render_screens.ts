@@ -330,6 +330,8 @@ const journey: Journey = {
     { kind: 'source', title: 'ملفٌّ في Drive', at: ago(200), detail: 'منهجية إدارة المشروعات للقادة — الإطار الأول', cost: null, model: null, state: 'done' },
     { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاقٌ ‏٠٫٨٦: مادّةٌ أصيلة وفيها إطارٌ قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
     { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاويةُ الوقت لا زاويةُ المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
+    // وما على الصورة يُقال في محطّتها (D-162) — فيدخل المعجمَ والفيضَ كسائرها
+    { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثرٌ يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
     { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'panel:passkey — عُدّل السطرُ الأخير', cost: null, model: null, state: 'done' },
     { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ UTC على عمر عبدالحميد', cost: null, model: null, state: 'done' },
     { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولةُ الأولى — نجحت', cost: 0, model: null, state: 'done' },

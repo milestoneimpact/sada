@@ -247,8 +247,17 @@ const data: PanelData = {
       status: 'ready',
       // **يُرسَم ليُقاس** (D-070): وصفٌ فارغٌ لا يُظهر الشارة
       prompt: 'مشهدٌ تجريديٌّ بالأخضر والذهب، خطوطٌ هادئةٌ وإضاءةٌ ناعمة',
+      // **وأطولُ سببٍ يُقال** (D-162): فيه اسما سرّين لا ينكسر أحدُهما،
+      // فيُقاس فيضُه على عرض الجوّال — والعنوانُ المقترح بعده
+      note:
+        'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
+        ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
+      headline: 'أثرٌ يُقاس',
     },
-    { id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected', prompt: '' },
+    {
+      id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected', prompt: '',
+      note: null, headline: null,
+    },
   ],
   targets: [
     { id: 'a1', platform: 'linkedin', label: 'عمر عبدالحميد · LinkedIn' },

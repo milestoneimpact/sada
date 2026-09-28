@@ -50,6 +50,17 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
     expect(schema).toContain('window_start')
   })
 
+  /**
+   * ومن ‏0027 — **وبناءٌ لـ`media` ينساهما يُسقط كلَّ توليدٍ بعد دفعه**: الإدراجُ
+   * بأحدَ عشرَ عمودًا يقع بعد تسجيل الكلفة ورفع البايتات. والمطابقةُ بالنوع
+   * لا بالاسم وحدَه: نصُّ الجدول المحفوظُ فيه تعليقاتٌ تذكر `note`.
+   */
+  it('media.note و media.headline (D-162)', () => {
+    const sql = schemaOf('media')
+    expect(sql).toMatch(/\bnote TEXT\b/)
+    expect(sql).toMatch(/\bheadline TEXT\b/)
+  })
+
   it('heartbeats (D-158)', () => {
     expect(schemaOf('heartbeats')).toContain('outcome')
   })

@@ -38,7 +38,7 @@ import { LOGOS } from '../logos'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { status } from '../parts'
-import { SLIDE_SIZE } from '../../../lib/image/slide'
+import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -197,6 +197,44 @@ function peakLine(peaks: Peaks | undefined): string {
 }
 
 /**
+ * ما على الصورة — **أو لماذا لا شيءَ عليها** (D-162).
+ *
+ * كان يُقال في الوميض مرّةً بعد «ولّد صورة» ثمّ يختفي، والمعاينةُ وحدَها لا
+ * تقول أرُكّب العنوانُ أم سقط. فيعتمد المالكُ صورةً بلا عنوانٍ وهو لا يدري،
+ * أو يرفضها ويدفع ثمنَ توليدٍ ثانٍ على أملِ أن يظهر النصّ.
+ *
+ * **وأربعةُ أحوالٍ لا ثلاثة:**
+ *
+ * - `null` — صفٌّ أقدمُ من الحفظ: **لا سطر**، فلا يُدّعى ما لم يُسجَّل.
+ * - `''` — رُكّب: «على الصورة» والعنوانُ نفسُه، **وهو القراءةُ الموثوقة**:
+ *   عنوانٌ رُسم لعرض ‏1200 يصغر في معاينة الجوّال حتّى يُتبيَّن بجهد. وبلا
+ *   عنوانٍ لا سطر: لا يُقال «عليها» ولا شيء.
+ * - الإطفاءُ من الإعدادات — **قرارٌ لا عطل**: رقاقةٌ ساكنة، وبطاقةُ الإعدادات
+ *   تقول ذلك بلفظها. ويُطابَق بآخر السبب لأنّ سقوطَ الموجز يسبقه بـ«؛».
+ * - كلُّ سببٍ سواه — تحذير، ومعه العنوانُ المقترح إن وُجد.
+ *
+ * **والسببُ «عند التوليد» لا الآن**: مفتاحٌ ضُبط بعدها لا يرسم على صورةٍ
+ * رُفعت، وسطرٌ يقول «اضبط المفتاح» لمن ضبطه كاذبٌ إن لم يُؤرَّخ.
+ */
+function slideLine(m: MediaView): string {
+  if (m.note === null) return ''
+  if (m.note === '') {
+    return m.headline === null
+      ? ''
+      : `<div class="pic-foot">
+           ${status('ok', '●', 'على الصورة')}
+           <span class="ago">«${escapeHtml(m.headline)}»</span>
+         </div>`
+  }
+  const off = m.note.endsWith(OVERLAY_OFF)
+  const offered = m.headline === null ? '' : ` — والعنوانُ المقترح «${escapeHtml(m.headline)}»`
+  return `<div class="pic-foot">
+      ${off ? status('idle', '○', 'بلا نصٍّ فوقها') : status('warn', '!', 'بلا نصٍّ فوقها')}
+      <span class="ago">عند التوليد: ${escapeHtml(m.note)}${offered}</span>
+    </div>`
+}
+
+/**
  * لوحُ الصورة.
  *
  * ثلاثةُ أحوال: بلا صورةٍ فزرُّ توليد، وبصورةٍ فمعاينةٌ وزرُّ رفض،
@@ -213,8 +251,12 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   const clip = mine.find((m) => m.status === 'ready' && m.mime.startsWith('video/'))
 
   if (ready !== undefined) {
+    // والنصُّ المرسومُ في الصورة مكانُه `alt`: قارئُ الشاشة لا يرى البكسلات
+    const alt = ready.note === '' && ready.headline !== null
+      ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
+      : 'صورةٌ مولَّدة تصاحب المنشور'
     return `<div class="pic">
-      <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
+      <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}"
         loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
         <span class="chip mono">${kb(ready.bytes)}</span>
@@ -233,6 +275,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
                <button class="g sm" type="submit">ارفض الصورة</button></form>`
           : ''}
       </div>
+      ${slideLine(ready)}
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
@@ -249,7 +292,8 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   return `<div class="pic none">
     ${status('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
-    <span class="ago">صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.</span>
+    <span class="ago">يُولَّد المشهدُ <b>بلا حرف</b>، ثمّ يُركَّب فوقه عنوانٌ عربيٌّ إن كان
+      التركيبُ مرفوعًا ومفتاحُ المتصفّح مضبوطًا.</span>
     <span class="grow"></span>
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
@@ -547,6 +591,15 @@ export interface MediaView {
   readonly prompt: string
   readonly cost: number
   readonly status: 'ready' | 'rejected'
+  /**
+   * ما قيل عن الشريحة يومَ وُلّدت (D-162): `null` لم يُسجَّل · `''` رُكّب
+   * النصّ · نصٌّ سببُ السقوط.
+   *
+   * **وإلزاميّان ولو `null`**: حقلٌ اختياريٌّ يُنسى في الربط فيصمت السطرُ
+   * تحت كلّ صورة، ولا يعلم أحد.
+   */
+  readonly note: string | null
+  readonly headline: string | null
 }
 
 export interface DraftsInput {

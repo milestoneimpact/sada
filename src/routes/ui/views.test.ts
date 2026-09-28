@@ -429,6 +429,80 @@ describe('ما تغيّر قبل الاعتماد (D-128)', () => {
 })
 
 /**
+ * ما قيل عن الشريحة يُقرأ تحت الصورة (D-162): كان يُقال في الوميض مرّةً ثمّ
+ * يُرمى، فالبطاقةُ بعد التحديث لا تعرف أرُكّب العنوانُ أم سقط.
+ */
+describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)', () => {
+  const draft: DraftRow = {
+    id: 'd1', platform: 'linkedin', text: 'نصّ', rationale: null, status: 'draft', model: null,
+    cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
+    approvedAt: null, createdAt: '2026-09-05 09:00:00', scheduledAt: null,
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: null,
+  }
+  const card = (note: string | null, headline: string | null): string =>
+    draftsSection({
+      drafts: [draft],
+      media: [{
+        id: 'm1', postId: 'd1', mime: 'image/jpeg', bytes: 148_320, prompt: 'p', cost: 0.039,
+        status: 'ready', note, headline,
+      }],
+      targets: [], earliest: '2026-09-06T09:15',
+      writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+    })
+  const NO_KEY = 'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker'
+  const OFF = 'تركيبُ النصّ مُطفأٌ من الإعدادات'
+
+  it('رُكّب: «على الصورة» والعنوانُ، و alt يحمله', () => {
+    const html = card('', 'أثرٌ يُقاس')
+    expect(html).toContain(status('ok', '●', 'على الصورة'))
+    expect(html).toContain('«أثرٌ يُقاس»')
+    expect(html).toContain('alt="صورةٌ مولَّدة وعليها: أثرٌ يُقاس"')
+    expect(html).not.toContain('بلا نصٍّ فوقها')
+  })
+
+  it('سقط: «بلا نصٍّ فوقها» تحذيرًا، والسببُ مؤرَّخًا، والعنوانُ المقترح', () => {
+    const html = card(NO_KEY, 'أثرٌ يُقاس')
+    expect(html).toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(html).toContain(`عند التوليد: ${NO_KEY}`)
+    expect(html).toContain('والعنوانُ المقترح «أثرٌ يُقاس»')
+    // وما لم يُرسَم لا يُقال في alt إنّه عليها
+    expect(html).toContain('alt="صورةٌ مولَّدة تصاحب المنشور"')
+  })
+
+  /**
+   * **والإطفاءُ قرارٌ لا عطل**: بطاقةُ الإعدادات تقول «وهذا ليس عطلا»، فتحذيرٌ
+   * أصفرُ على كلّ صورةٍ يكذّبها. ويُطابَق بآخر السبب: سقوطُ الموجز يسبقه بـ«؛».
+   */
+  it('أُطفئ التركيب: رقاقةٌ ساكنة لا تحذير — ولو سبقه سقوطُ الموجز', () => {
+    for (const note of [OFF, `لا مزوّدَ للكتابة (writer)؛ ${OFF}`]) {
+      const html = card(note, null)
+      expect(html).toContain(status('idle', '○', 'بلا نصٍّ فوقها'))
+      expect(html).not.toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    }
+  })
+
+  it('صفٌّ قديمٌ أو رُكّب بلا عنوان: لا سطرَ — لا يُدّعى ما لم يُسجَّل', () => {
+    for (const [note, headline] of [[null, null], [null, 'أثرٌ يُقاس'], ['', null]] as const) {
+      const html = card(note, headline)
+      expect(html).not.toContain('بلا نصٍّ فوقها')
+      expect(html).not.toContain('على الصورة')
+      expect(html).not.toContain('عند التوليد')
+    }
+  })
+
+  it('العنوانُ والسببُ من خارجنا — يُهرَّبان في النصّ وفي alt', () => {
+    const drawn = card('', '<b>x</b>"')
+    expect(drawn).toContain('«&lt;b&gt;x&lt;/b&gt;&quot;»')
+    expect(drawn).toContain('alt="صورةٌ مولَّدة وعليها: &lt;b&gt;x&lt;/b&gt;&quot;"')
+    expect(drawn).not.toContain('<b>x</b>')
+    const failed = card('تعذّر تصويرُ الشريحة: <img src=x>', '<i>y</i>')
+    expect(failed).toContain('&lt;img src=x&gt;')
+    expect(failed).toContain('«&lt;i&gt;y&lt;/i&gt;»')
+    expect(failed).not.toContain('<img src=x>')
+  })
+})
+
+/**
  * رأسُ الصفّ بابٌ إلى شاشته (D-132): منصّةٌ لها شاشةٌ تصير رابطًا، وما سواه اسم.
  */
 describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
