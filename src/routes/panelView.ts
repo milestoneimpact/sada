@@ -63,8 +63,9 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var label=btn.textContent;
   if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true;
     if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — ادخل بكلمة الإدارة.'; return;}
+  // ‏والتركيزُ يعود إلى الزرّ: زرٌّ عُطّل يفقده، فـEnter بعد نافذةٍ أُغلقت لا يفعل شيئًا
   var reset=function(msg){btn.disabled=false; btn.removeAttribute('aria-busy');
-    btn.textContent=label; if(note)note.textContent=msg;};
+    btn.textContent=label; if(note)note.textContent=msg; try{btn.focus();}catch(e){}};
   btn.addEventListener('click',function(){
     btn.disabled=true; btn.setAttribute('aria-busy','true');
     btn.textContent='المس مفتاحك…'; if(note)note.textContent='';
@@ -113,9 +114,11 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
     `<div class="wrap"><div class="auth">
       <div class="glyph">${GLYPH_SVG}</div>
       <h1>لوحة التحكّم</h1>
-      <p class="lede">${state.passkeys === true && state.blocked !== true
-        ? 'ادخل بمفتاح المرور، أو بكلمة الإدارة'
-        : 'أدخل كلمةَ الإدارة للمتابعة'}</p>
+      <p class="lede">${state.blocked === true
+        ? 'الدخولُ موقوفٌ مؤقتًا لحماية اللوحة'
+        : state.passkeys === true
+          ? 'ادخل بمفتاح المرور، أو بكلمة الإدارة'
+          : 'أدخل كلمةَ الإدارة للمتابعة'}</p>
       ${note}
       <div class="card">
         ${passkey}
@@ -126,6 +129,9 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
           <button class="p" type="submit"${disabled}>دخول</button>
         </form>
       </div>
+      ${state.blocked === true
+        ? '<p class="lede"><a href="/panel">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>'
+        : ''}
       <footer style="border:0;justify-content:center">الجلسة 8 ساعات</footer>
     </div></div>`,
     nonce,

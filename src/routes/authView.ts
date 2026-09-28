@@ -58,7 +58,7 @@ const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       form.submit();
     }).catch(function(err){
       btn.disabled=false; btn.removeAttribute('aria-busy'); btn.textContent=label;
-      if(note)note.textContent=sadaPk.why(err);
+      if(note)note.textContent=sadaPk.why(err); try{btn.focus();}catch(e){}
     });
   });
 })();
