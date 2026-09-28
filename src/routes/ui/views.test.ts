@@ -28,6 +28,7 @@ import { windowLabel } from '../../lib/metrics/job'
 import { platformLabel } from '../../lib/oauth/providers'
 import { gatesOf, type GateFacts } from '../../lib/gates'
 import { journeyBody, stationHref } from './journeyView'
+import { noteOf } from '../../lib/image/job'
 import { driveFileUrl } from '../../lib/drive/sync'
 import { tokenDays } from './channels'
 import { securitySection } from './sections/security'
@@ -479,6 +480,25 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
       expect(html).toContain(status('idle', '○', 'بلا نصٍّ فوقها'))
       expect(html).not.toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
     }
+  })
+
+  /**
+   * **وأطولُ سببٍ يُحفَظ يبقى يُقرأ كما قيل**: خطأُ شبكةٍ طويلٌ قبل السبب
+   * كان يُقصّ مع ذيله عند ‏300، فيسقط «مُطفأ» وتصير الرقاقةُ صفراء، أو يسقط
+   * المفتاحُ الذي يُصلحه المالك. والسببُ هنا كما تكتبه المهمّةُ حرفًا.
+   */
+  it('وسقوطُ موجزٍ طويل قبل السبب: التصنيفُ والسببُ الثاني كما هما', () => {
+    const noise = `تعذّر الموجزُ البصريّ: anthropic: 400 ${'{"type":"error"} '.repeat(30)}`
+    const off = noteOf({ brief: null, detail: noise }, { reason: OFF })
+    const quiet = card(off, 'أثرٌ يُقاس')
+    expect(quiet).toContain(status('idle', '○', 'بلا نصٍّ فوقها'))
+    expect(quiet).not.toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(quiet).toContain(`؛ ${OFF}`)
+
+    const missing = noteOf({ brief: null, detail: noise }, { reason: NO_KEY })
+    const loud = card(missing, 'أثرٌ يُقاس')
+    expect(loud).toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(loud).toContain(`؛ ${NO_KEY}`)
   })
 
   it('صفٌّ قديمٌ أو رُكّب بلا عنوان: لا سطرَ — لا يُدّعى ما لم يُسجَّل', () => {

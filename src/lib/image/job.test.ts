@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
+import { NOTE_MAX, composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
 import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
@@ -647,6 +647,57 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       expect(row!.note!.length).toBe(300)
       expect(out.note).toBe(row!.note)
     })
+
+    /**
+     * **ويُقصّ سقوطُ الموجز لا ما بعده.**
+     *
+     * خطأُ الشبكة أوّلُ السبب وقد يطول بلا حدّ — ردُّ Anthropic على رصيدٍ لا
+     * يكفي نحو 270 حرفًا بعد `anthropic: ` — **وما قرّره المالكُ أو ما بيده
+     * في آخره**. كان القصُّ عند 300 من الذيل: فيُؤكَل «مُطفأٌ من الإعدادات»
+     * فتقرأ البطاقةُ القرارَ عطلًا أصفر، أو يُؤكَل «اضبط CF_BROWSER_TOKEN»
+     * كلُّه فلا يرى المالكُ الشيءَ الوحيدَ الذي يُصلحه.
+     */
+    function briefFails(length: number): typeof fetch {
+      const lane = twoLane()
+      return (async (input: unknown, init?: RequestInit) => {
+        if (String(input instanceof Request ? input.url : input).includes('api.writer.test')) {
+          throw new Error('e'.repeat(length))
+        }
+        return lane(input as RequestInfo, init)
+      }) as typeof fetch
+    }
+
+    it('وموجزٌ سقط بخطأٍ طويل والتركيبُ مُطفأ: الإطفاءُ في الذيل كاملًا', async () => {
+      await seedWriter()
+      await writeSetting(db, 'image_overlay', 'false', 'test')
+      const post = await seedPost()
+      const out = await generateForPost(slideDeps(briefFails(400), bucket(), READY), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      expect(row!.note!.length).toBeLessThanOrEqual(300)
+      // وسقوطُ الموجز يبقى أوّلا (D-157) — مقصوصًا، لا محذوفًا
+      expect(row!.note!.startsWith('تعذّر الموجزُ البصريّ')).toBe(true)
+      expect(row!.note!.endsWith(`؛ ${OVERLAY_OFF}`)).toBe(true)
+      expect(out.note).toBe(row!.note)
+    })
+
+    it('وموجزٌ سقط بخطأٍ طويل ولا مفتاح: «اضبط CF_BROWSER_TOKEN» يبقى بتمامه', async () => {
+      await seedWriter()
+      const post = await seedPost()
+      const secrets = { CF_AI_ACCOUNT_ID: 'acc' }
+      const out = await generateForPost(slideDeps(briefFails(400), bucket(), secrets), post)
+      if (out.kind !== 'generated') throw new Error(out.kind)
+      const [row] = await mediaFor(db, [post])
+      // والسببُ يُسأل عنه `composeSlide` نفسُه — لا يُنسَخ حرفًا فيفترق
+      const { reason } = await composeSlide(
+        { db, bucket: bucket(), encKey: ENC, workerSecrets: secrets },
+        { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: '', kicker: '' },
+      )
+      expect(reason).toContain('CF_BROWSER_TOKEN')
+      expect(row!.note!.length).toBeLessThanOrEqual(300)
+      expect(row!.note!.endsWith(`؛ ${reason}`)).toBe(true)
+      expect(out.note).toBe(row!.note)
+    })
   })
 })
 
@@ -777,7 +828,7 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
 })
 
 /**
- * **و`null` ليست فراغا** (D-162): صفٌّ أقدمُ من ‏0027 لم يُسجَّل عنه شيء،
+ * **و`null` ليست فراغا** (D-162): صفٌّ أقدمُ من ‏0028 لم يُسجَّل عنه شيء،
  * و`String(null)` كانت ستطبع «بلا نصٍّ فوقها: null» على كلّ صورةٍ قديمة.
  */
 describe('mediaFor يفرّق NULL عن الفراغ (D-162)', () => {
@@ -836,5 +887,32 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'الصورةُ فوق حدِّ الضمّ' }))
       .toBe('الصورةُ فوق حدِّ الضمّ')
     expect(noteOf({ brief: null, detail: 'سقط' }, { reason: '' })).toBe('')
+  })
+
+  /**
+   * **والحدُّ يُقسَم ولا يُقصّ من الذيل** (D-162): السببُ الثاني كاملٌ دائمًا،
+   * والأوّلُ يأخذ ما بقي — وقصُّه معلَّمٌ بـ«…» لا ذيلٌ مبتورٌ يُقرأ كاملا.
+   */
+  it('noteOf تحفظ السببَ الثاني كاملًا وتقصّ الأوّل إلى ما بقي من ‏300', () => {
+    const reason = 'r'.repeat(10)
+    // ‏288 + «؛ » + ‏10 = ‏300 تمامًا: يتّسع بلا قصّ
+    const fits = noteOf({ brief: null, detail: 'd'.repeat(288) }, { reason })
+    expect(fits).toBe(`${'d'.repeat(288)}؛ ${reason}`)
+    // وحرفٌ واحدٌ فوقه: يُقصّ الأوّلُ ويُعلَّم، والثاني كما هو
+    const over = noteOf({ brief: null, detail: 'd'.repeat(289) }, { reason })
+    expect(over).toBe(`${'d'.repeat(287)}…؛ ${reason}`)
+    expect(over).toHaveLength(NOTE_MAX)
+
+    const off = noteOf({ brief: null, detail: 'e'.repeat(5000) }, { reason: OVERLAY_OFF })
+    expect(off).toHaveLength(NOTE_MAX)
+    expect(off.endsWith(`…؛ ${OVERLAY_OFF}`)).toBe(true)
+  })
+
+  it('وسببٌ وحدَه فوق الحدّ يُقصّ معلَّمًا — ولا يتّسع لسقوطٍ قبله', () => {
+    const lone = noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'ض'.repeat(2000) })
+    expect(lone).toBe(`${'ض'.repeat(NOTE_MAX - 1)}…`)
+    // لا مكانَ للأوّل: «؛» في الرأس بلا ما قبلها أسوأُ من إسقاطه
+    const full = noteOf({ brief: null, detail: 'سقط' }, { reason: 'ض'.repeat(2000) })
+    expect(full).toBe(lone)
   })
 })

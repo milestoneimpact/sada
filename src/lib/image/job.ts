@@ -216,22 +216,40 @@ export async function composeSlide(
   }
 }
 
+/** أقصى ما يُحفَظ من السبب — ورسالةُ خطأٍ من الشبكة قد تطول بلا حدّ. */
+export const NOTE_MAX = 300
+
+/** يقصّ نصًّا إلى حدٍّ — **ويقول إنّه قُصّ**: ذيلٌ مبتورٌ بلا علامةٍ يُقرأ كاملا. */
+function cut(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
 /**
  * ما يُقال للمالك عن الشريحة.
  *
  * **وسببُ سقوط الموجز كان يُحسَب ثمّ يُرمى** (D-157): يعود في `detail`
  * فلا يقرؤه أحد، ويُقال «بلا عنوانٍ في الموجز» — وهو عرَضٌ لا سبب. فإن
  * سقط الموجزُ سُمّي سقوطُه قبل ما ترتّب عليه.
+ *
+ * **والحدُّ يُقسَم هنا لا يُقصّ من الذيل بعدُ** (D-162). السقوطُ أوّلُ
+ * السبب، وفيه خطأُ الشبكة كما جاء — ردُّ Anthropic على رصيدٍ لا يكفي نحو
+ * 270 حرفًا. **وما يُصلحه المالكُ أو ما قرّره في آخره**: «اضبط
+ * CF_BROWSER_TOKEN…» أو «مُطفأٌ من الإعدادات». وكان القصُّ عند 300 يأكل
+ * الآخِرَ أوّلا، فيضيع المفتاحُ الذي بيده، **وتقرأ البطاقةُ الإطفاءَ عطلًا
+ * أصفر** — لأنّها تعرفه بذيله (`OVERLAY_OFF`). فالسببُ الثاني يُحفَظ
+ * كاملًا، ويأخذ الأوّلُ ما بقي من الحدّ.
  */
 export function noteOf(
   visual: { brief: unknown; detail: string },
   overlay: { reason: string },
 ): string {
   if (overlay.reason === '') return ''
-  if (visual.brief === null && visual.detail !== '') {
-    return `${visual.detail}؛ ${overlay.reason}`
+  const reason = cut(overlay.reason, NOTE_MAX)
+  const room = NOTE_MAX - reason.length - '؛ '.length
+  if (visual.brief === null && visual.detail !== '' && room > 0) {
+    return `${cut(visual.detail, room)}؛ ${reason}`
   }
-  return overlay.reason
+  return reason
 }
 
 /**
@@ -245,9 +263,6 @@ const INSERT_IMAGE =
   `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
                       note, headline)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
-/** أقصى ما يُحفَظ من السبب — ورسالةُ خطأٍ من الشبكة قد تطول بلا حدّ. */
-const NOTE_MAX = 300
 
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
   // ١ · المنشور
@@ -421,10 +436,11 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
    *
    * كان يُقال في الوميض مرّةً ثمّ يُرمى، فالبطاقةُ بعد التحديث لا تعرف
    * أرُكّب النصُّ أم سقط. ويُحسَب هنا مرّةً ليقول الوميضُ والصفُّ الشيءَ
-   * نفسَه. والعنوانُ بقصِّ الشريحة نفسِه — **فالمحفوظُ هو المرسومُ حرفًا**
-   * — وفراغُه `NULL`: لا عنوانَ في الموجز، ولا يُخترَع.
+   * نفسَه. **والحدُّ داخل `noteOf` لا هنا**: قصٌّ من الذيل يأكل السببَ الذي
+   * تُصنَّف به البطاقة. والعنوانُ بقصِّ الشريحة نفسِه — **فالمحفوظُ هو
+   * المرسومُ حرفًا** — وفراغُه `NULL`: لا عنوانَ في الموجز، ولا يُخترَع.
    */
-  const note = noteOf(visual, overlay).slice(0, NOTE_MAX)
+  const note = noteOf(visual, overlay)
   const drawn = clip(visual.brief?.headline ?? '', HEADLINE_MAX)
   const headline = drawn === '' ? null : drawn
 
@@ -561,7 +577,7 @@ export interface MediaRow {
   readonly createdAt: string
   /**
    * ما قيل عن الشريحة يومَ وُلّدت (D-162) — **ثلاثيّةُ القيمة**:
-   * `null` لم يُسجَّل (صفٌّ أقدمُ من ‏0027، أو مقطع) · `''` رُكّب النصّ ·
+   * `null` لم يُسجَّل (صفٌّ أقدمُ من ‏0028، أو مقطع) · `''` رُكّب النصّ ·
    * نصٌّ سببُ السقوط. **و`null` ليست فراغا**: الأولى لا تَعِد بشيء،
    * والثانيةُ تقول إنّ العنوانَ على الصورة.
    */
