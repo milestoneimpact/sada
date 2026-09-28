@@ -145,7 +145,7 @@ b,strong{font-weight:700}
    الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها */
 .glyph{display:grid; place-items:center; flex:none; width:42px; height:42px; border-radius:var(--r);
   background:var(--glyph-bg); color:var(--glyph-fg);
-  box-shadow:var(--sh-1), 0 0 0 1px color-mix(in srgb,var(--au) 28%,transparent)}
+  box-shadow:var(--sh-1), 0 0 0 1px var(--line-strong)}
 /* نسبةٌ لا قياسٌ ثابت: العلامةُ نفسها تظهر بـ 38 في الرافدة و 50 في
    شاشة الدخول و 38 في الوثائق — وقياسٌ ثابتٌ يجعلها تسبح في الأكبر. */
 .glyph svg{width:56%; height:56%; display:block}
@@ -154,11 +154,11 @@ b,strong{font-weight:700}
   letter-spacing:-.3px}
 .brand span{font-size:var(--t-xs); font-weight:600; letter-spacing:var(--ls-eyebrow);
   direction:ltr; unicode-bidi:isolate; display:inline-block; margin-top:var(--s-1);
-  padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--au);
-  border:1px solid color-mix(in srgb,var(--au) 45%,transparent); line-height:1.6}
+  padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--ink-3);
+  border:1px solid var(--line-strong); line-height:1.6}
 
 nav.tabs{padding:var(--s-1) var(--s-3) var(--s-4); display:flex; flex-direction:column; gap:1px}
-nav.tabs .lbl{font-size:var(--t-xs); padding:var(--s-4) var(--s-2) var(--s-1); color:var(--au);
+nav.tabs .lbl{font-size:var(--t-xs); padding:var(--s-4) var(--s-2) var(--s-1); color:var(--ink-3);
   font-weight:600}
 nav.tabs .sep{display:none}
 nav.tabs a{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-2) var(--s-3);
@@ -193,6 +193,14 @@ details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:v
   color:var(--ink-3); transition:transform var(--dur-2) var(--ease)}
 details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
+/* سلّمُ الجاهزيّة (D-158): بطاقةٌ تُطوى حين تتمّ درجاتُها كلُّها */
+details.ladder>summary{cursor:pointer; list-style:none; margin-bottom:0}
+details.ladder>summary::-webkit-details-marker{display:none}
+details.ladder[open]>summary{margin-bottom:var(--s-3)}
+details.ladder ol.steps.wiz li .btn{flex:none}
+details.ladder ol.steps.wiz li.at .why{color:var(--ink-2)}
+details.ladder .verdict{margin:0 0 var(--s-2); font-weight:600; color:var(--ink)}
+details.ladder .verdict.bad{color:var(--bad)}
 /* بإزاحةٍ تقول «هذه تحت تلك» — والقائمةُ المسطّحة تُقرأ سبعةَ أقسام */
 .plat-list a{padding-inline-start:var(--s-8)}
 .plat-list .pl{width:15px; height:15px; flex:none; display:grid; place-items:center;
@@ -271,7 +279,7 @@ details.plat[open]>summary::after{transform:rotate(180deg)}
    خيوطٌ وحوافُّ وعلاماتٌ صغيرة، لا أرضيّاتٌ ولا أزرارٌ ممتلئة. وذهبٌ
    يُملأ به سطحٌ يُقرأ رخيصا، وخيطٌ منه على حافّةٍ يُقرأ صنعة. */
 .eyebrow{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-xs);
-  font-weight:700; color:var(--au); margin-bottom:var(--s-2)}
+  font-weight:700; color:var(--ink-3); margin-bottom:var(--s-2)}
 .eyebrow .ln{height:1px; flex:none; width:40px;
   background:linear-gradient(90deg,var(--au),color-mix(in srgb,var(--au) 35%,transparent))}
 .page-head h1{font-size:var(--t-3xl); font-weight:700; line-height:var(--lh-tight);
@@ -426,6 +434,11 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
   border-bottom:1px solid var(--line-soft); position:relative; font-size:var(--t-sm);
   font-weight:600}
 
+/* **ميزانيّةُ النحاس** (D-156): حبرٌ لرقمٍ واحد (المؤشّرُ الأوّل) وخيوطٌ لا
+   غير — خيطُ القسم، ورأسُ شريط المؤشّرات، ومؤشّرُ التبويب الحاليّ، وتحتَ
+   الروابط الهادئة، وحلقةُ التركيز. كان في ‏٩ إلى ‏١١ موضعًا في الشاشة
+   (لصائقُ الرافدة والعلامةُ ورؤوسُ الجدول والذيلُ والحلقات)، وحارسُ
+   audit_tokens يعدّ الآن. */
 .sec::after{content:''; position:absolute; bottom:-1px; inset-inline-start:0; height:2px;
   border-radius:var(--r-pill);
   background:linear-gradient(to left,var(--au),color-mix(in srgb,var(--au) 20%,transparent));
@@ -484,7 +497,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 table{width:100%; border-collapse:collapse; font-size:var(--t-base); min-width:520px}
 th{text-align:right; color:var(--ink-3); font-size:var(--t-xs); padding:0 var(--s-2) var(--s-2);
   border-bottom:1px solid var(--line); white-space:nowrap;
-  border-bottom-color:color-mix(in srgb,var(--au) 32%,var(--line)); font-weight:600}
+  border-bottom-color:var(--line-strong); font-weight:600}
 td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vertical-align:top}
 tbody tr:last-child td{border-bottom:0}
 @media(hover:hover){tbody tr:hover{background:var(--surface-2)}}
@@ -640,7 +653,6 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why,.empty p{max-width:var(--measure)
 .split p{margin:0; font-size:var(--t-sm); color:var(--ink-3); max-width:60ch; line-height:var(--lh)}
 hr{border:0; border-top:1px solid var(--line-soft); margin:var(--s-4) 0}
 footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(--line-soft);
-  border-image:linear-gradient(90deg,color-mix(in srgb,var(--au) 34%,transparent),transparent) 1;
   color:var(--ink-3); font-size:var(--t-xs); display:flex; justify-content:space-between; flex-wrap:wrap; gap:var(--s-2)}
 
 /* ── ما ينتظرك ─────────────────────────────────────────────── */
@@ -1285,7 +1297,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .wrap{max-width:1180px; margin:0 auto; padding:var(--s-6) var(--s-5) var(--s-16)}
 .auth{max-width:400px; margin:12vh auto}
 .auth .glyph{margin:0 auto var(--s-4); width:64px; height:64px; border-radius:var(--r-lg);
-  box-shadow:var(--sh-2), 0 0 0 1px color-mix(in srgb,var(--au) 28%,transparent)}
+  box-shadow:var(--sh-2), 0 0 0 1px var(--line-strong)}
 .auth h1{text-align:center; font-size:var(--t-2xl); margin:0 0 var(--s-1); letter-spacing:-.3px}
 .auth .lede{text-align:center; color:var(--ink-3); font-size:var(--t-sm); margin:0 0 var(--s-5)}
 .auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
@@ -1715,7 +1727,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 @media(min-width:1181px){.page-head h1{font-size:var(--t-4xl)}}
 @media(min-width:901px){.grid>.tile:first-child .v{font-size:var(--t-4xl)}}
 @media(hover:hover){.ch:hover,.draft:hover{box-shadow:var(--sh-3), inset 0 1px 0 var(--hair);
-  border-color:color-mix(in srgb,var(--au) 35%,var(--line-strong))}}
+  border-color:var(--line-strong)}}
 @media(hover:hover){.p:hover{background:var(--brand-soft)}}
 /* الحبّةُ على .st و.chip في موضعهما (D-151)؛ و.count بلا قاعدةٍ أساسيّةٍ غيرِها */
 .count{border-radius:var(--r-pill)}

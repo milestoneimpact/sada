@@ -5,7 +5,9 @@
  * واستيرادُها منه يصنع دائرةً بين ملفّين. والدائرةُ تعمل في الأنواع
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
-import { escapeHtml } from './shell'
+import { escapeHtml } from './escape'
+import type { Pulse } from '../../lib/ops/heartbeat'
+import { relativeTime } from '../../lib/format'
 import type { Onboarding } from '../../lib/onboard'
 
 /**
@@ -207,3 +209,38 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
     ${list}
   </div>`
 }
+
+/**
+ * «هل الآلةُ تعمل؟» (D-158) — نبضُ كلّ دورةٍ من صفّها في `heartbeats`.
+ *
+ * كان الجوابُ يُقرأ من سجلّ Cloudflare وحده، **والمالكُ لا يفتحه**. فمنشورٌ
+ * مجدولٌ فات موعدُه كان يُقرأ «لا يعمل» بلا سبب: أدارت الدورةُ فلم تجد ما
+ * تُرسل، أم لم تدُر (دقائقُ نفدت، M-23)؟ والسطرُ الأحمرُ هنا هو الفرق.
+ */
+export function machineCard(pulses: readonly Pulse[], now: Date): string {
+  const bad = pulses.filter((p) => p.state === 'failed' || p.state === 'late')
+  const never = pulses.filter((p) => p.state === 'never')
+  const head =
+    bad.length > 0
+      ? status('bad', '▲', `${bad.length} دورةٌ متأخّرة أو ساقطة`)
+      : never.length === pulses.length
+        ? status('idle', '○', 'لم تدُر دورةٌ بعد')
+        : status('ok', '●', 'الدوراتُ في مواعيدها')
+  const rows = pulses
+    .map((p) => {
+      const mark =
+        p.state === 'ok' ? status('ok', '●', 'في موعدها')
+        : p.state === 'late' ? status('bad', '▲', `تأخّرت ${Math.round(p.lateBy / 60)} دقيقة`)
+        : p.state === 'failed' ? status('bad', '✕', 'سقطت')
+        : status('idle', '○', 'لم تدُر بعد')
+      const when = p.beat === null ? '' : `<span class="ago">${escapeHtml(relativeTime(p.beat.at, now))}</span>`
+      const detail = p.beat?.detail == null ? '' : `<span class="ax-b">${escapeHtml(p.beat.detail)}</span>`
+      return `<li class="ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
+    })
+    .join('')
+  return `<div class="card"><div class="card-head"><h2>هل الآلةُ تعمل؟</h2><div class="grow"></div>${head}</div>
+    <p class="hint">كلُّ دورةٍ تكتب نبضةً بعد أن تدور — ولو لم تجد شيئا. والتأخّرُ دورةٌ كاملةٌ تغيب،
+      لا دقائقُ cron.</p>
+    <ul class="ax">${rows}</ul></div>`
+}
+

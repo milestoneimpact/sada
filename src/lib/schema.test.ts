@@ -44,6 +44,9 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
     expect(schemaOf('accounts')).toContain('needs_reauth_at')
   })
 
+  it('heartbeats (D-158)', () => {
+    expect(schemaOf('heartbeats')).toContain('outcome')
+  })
   it('tokens.refreshed_at (D-129)', () => {
     expect(schemaOf('tokens')).toContain('refreshed_at')
   })

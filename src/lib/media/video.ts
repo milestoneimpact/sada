@@ -32,6 +32,8 @@ import {
   AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
   type AiBinding,
 } from './workersAi'
+import { getProvider, resolveKey } from '../providers'
+import { cfAccountId } from '../ai/cloudflare'
 import type { Db } from '../tokens'
 
 /** أقصى ما يُقبل — و ٦٤ ميغا فوق حدّ مقطعٍ بخمسَ عشرةَ ثانيةً بكثير. */
@@ -74,6 +76,32 @@ export function pickBinding(env: {
   return env.AI
 }
 
+/**
+ * الوجهُ من البيئة **أو من بطاقة المزوّد** (D-157).
+ *
+ * `pickBinding` تقرأ `CF_AI_TOKEN` من البيئة وحدها. والمالكُ يضبط مفتاحَ
+ * Cloudflare في بطاقة المزوّد من اللوحة كما تفعل الصور (D-079)، فكان
+ * المقطعُ يتجاهله ويقول «رابطُ Workers AI غير مضبوط» ومفتاحُه محفوظ.
+ * فالبيئةُ أوّلا، ثمّ البطاقة، ثمّ `env.AI`.
+ */
+export async function bindingFor(
+  env: { AI?: AiBinding; CF_AI_ACCOUNT_ID?: string; CF_AI_TOKEN?: string },
+  db: Db,
+  encKey: string,
+  fetchImpl?: typeof fetch,
+): Promise<AiBinding | undefined> {
+  const fromEnv = pickBinding(env, fetchImpl)
+  if ((env.CF_AI_ACCOUNT_ID ?? '').trim() !== '' && (env.CF_AI_TOKEN ?? '').trim() !== '') {
+    return fromEnv
+  }
+  const card = await getProvider(db, 'cloudflare')
+  if (card === null || !card.enabled) return fromEnv
+  const resolved = await resolveKey(db, encKey, 'cloudflare', undefined)
+  const account = (env.CF_AI_ACCOUNT_ID ?? '').trim() || cfAccountId(card.baseUrl) || ''
+  if (resolved.key === null || account === '') return fromEnv
+  return restBinding(account, resolved.key, fetchImpl ?? fetch)
+}
+
 export interface VideoDeps {
   readonly db: Db
   readonly bucket: {
@@ -97,7 +125,8 @@ interface ImageRow {
  * **ومُصدَّرٌ لأنّه يدخل المفتاح**: `videoKey` تشتقّ منه، فنسخةٌ ثانيةٌ
  * منه في اختبارٍ أو مسارٍ تعطي مفتاحا آخر — وحجزا لا يلتقي بحجز.
  */
-export const DEFAULT_PROMPT = 'حركةٌ هادئةٌ للكاميرا نحو المشهد، بإضاءةٍ ناعمةٍ ثابتة'
+export const DEFAULT_PROMPT =
+  'Slow, steady camera push toward the scene, soft constant lighting, no text, no captions'
 
 /**
  * مفتاحُ عدم التكرار للمقطع.

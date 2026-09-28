@@ -23,7 +23,7 @@ import type { AccountHealth } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
-import { relativeTime } from '../../lib/format'
+import { money, relativeTime } from '../../lib/format'
 import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 
 /** ما يلزم لعرض وسيطٍ في القائمة — لا صفُّ القاعدة كاملا. */
@@ -39,6 +39,7 @@ import type { AppStatus } from '../../lib/oauth/apps'
 import { whenTag } from './time'
 import { LOGOS } from './logos'
 import { status } from './parts'
+import { readiness, type Readiness, type RungState } from '../../lib/platform/readiness'
 
 export interface PlatformScreenData {
   readonly view: ChannelView
@@ -242,7 +243,7 @@ function postCard(
              rel="noopener noreferrer">${ICON.external} افتحه على المنصّة</a>`}
       <span class="grow"></span>
       ${post.costUsd > 0
-        ? `<span class="ago money">${post.costUsd.toFixed(4)}$ كتابةً</span>`
+        ? `<span class="ago money">${money(post.costUsd)} كتابةً</span>`
         : ''}
     </div>
   </article>`
@@ -260,7 +261,7 @@ function tallyRow(t: PlatformTally, now: Date): string {
       : `آخرُه منذ ${escapeHtml(relativeTime(t.lastPublishedAt, now))}`)}
     ${cell('في الطابور', String(t.queued), 'ينتظر موعدَه أو دورةَ الإرسال')}
     ${cell('فشل', String(t.failed), t.failed === 0 ? 'لا فشلَ مسجَّل' : 'يُقرأ سببُه تحت')}
-    ${cell('كلفةُ الكتابة', `${t.spend.toFixed(2)}<em>$</em>`, 'على منشورات هذه المنصّة وحدها')}
+    ${cell('كلفةُ الكتابة', `${money(t.spend).replace(/\$$/, '')}<em>$</em>`, 'على منشورات هذه المنصّة وحدها')}
   </div>`
 }
 
@@ -353,6 +354,56 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
         ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
         ${alerts}
       </ul>`
+}
+
+/** علامةُ الدرجة — مع كلمتها لا وحدَها (D-043). */
+const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: string; label: string }>> = {
+  done: { g: '●', cls: 'ok', label: 'تامّة' },
+  now: { g: '◍', cls: 'warn', label: 'تنتظرك' },
+  waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
+  failed: { g: '▲', cls: 'bad', label: 'ساقطة' },
+}
+
+/**
+ * سلّمُ الجاهزيّة (D-158): خمسُ درجاتٍ من الصفوف لا من الكلمة، وأوّلُ
+ * ساقطةٍ حكمٌ وزرّ. **ويُطوى ما تمّ**: مالكٌ عاد بعد شهرٍ يريد الدرجةَ
+ * الساقطةَ لا الخمس.
+ */
+export function readinessLadder(r: Readiness): string {
+  if (r.rungs.length === 0) return ''
+  const rows = r.rungs
+    .map((rung, i) => {
+      const mark = RUNG_MARK[rung.state]
+      const act = rung.action === undefined || rung.state === 'done' || rung.state === 'waiting'
+        ? ''
+        : `<a class="btn ${rung.state === 'failed' ? 'p' : 'g'} sm" href="${escapeHtml(rung.action.href)}">${escapeHtml(rung.action.label)}</a>`
+      return `<li class="${mark.cls}${rung === r.next ? ' at' : ''}">
+        <span class="n" aria-hidden="true">${i + 1}</span>
+        <span class="body">
+          <span class="what">${escapeHtml(rung.title)}</span>
+          <span class="why">${escapeHtml(rung.note)}</span>
+        </span>
+        ${act}
+        ${status(mark.cls, mark.g, mark.label)}
+      </li>`
+    })
+    .join('')
+  const done = r.rungs.filter((x) => x.state === 'done').length
+  const all = done === r.rungs.length
+  return `<details class="card ladder"${all ? '' : ' open'}>
+    <summary class="card-head">
+      <h2>أتنشر الآن؟</h2><div class="grow"></div>
+      ${status(
+        r.verdict.kind,
+        r.verdict.kind === 'ok' ? '●' : r.verdict.kind === 'bad' ? '▲' : r.verdict.kind === 'warn' ? '◍' : '○',
+        r.verdict.kind === 'ok' ? 'تعمل' : r.verdict.kind === 'bad' ? 'لا تنشر' : r.verdict.kind === 'warn' ? 'تنتظرك' : 'تنتظر',
+      )}
+      <span class="st idle">${done} من ${r.rungs.length}</span>
+    </summary>
+    <p class="verdict ${r.verdict.kind}">${escapeHtml(r.verdict.text)}</p>
+    <p class="hint">كلُّ درجةٍ تُحسَب من صفٍّ في القاعدة لا من كلمة: الإذنُ من موعد انتهائه، والتجديدُ من آخر مرّةٍ وقع، والنشرُ من آخر محاولة.</p>
+    <ol class="steps wiz">${rows}</ol>
+  </details>`
 }
 
 export function platformScreen(d: PlatformScreenData): string {
@@ -468,6 +519,7 @@ export function platformScreen(d: PlatformScreenData): string {
   </div>
 
   ${stageBanner}
+  ${readinessLadder(readiness({ view: d.view, app: d.app, health: d.health, tally: d.tally, posts: d.posts, now: d.now }))}
   ${spec.stage === 'link' ? '' : tallyRow(d.tally, d.now)}
 
   <h3 class="sec">الحساباتُ وما تستطيعه</h3>

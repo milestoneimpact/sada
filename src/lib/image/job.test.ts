@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { generateForPost, imageKey, mediaFor, rejectMedia, type Bucket, type ImageDeps } from './job'
+import { composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
@@ -689,5 +689,48 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
       .all<{ id: string; status: string }>()
     expect(results).toHaveLength(2)
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
+  })
+})
+
+/**
+ * D-157 · السببُ الذي يُصلحه المالك يُقال أوّلا.
+ */
+describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
+  const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+  const image = { bytes: new Uint8Array([1, 2, 3]), mime: 'image/png', model: 'm' }
+
+  it('بلا مفتاحٍ وبلا عنوان: يُقال المفتاحُ لا العنوان', async () => {
+    const out = await composeSlide(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: {} },
+      { image, platform: 'linkedin', headline: '', kicker: '' },
+    )
+    expect(out.slide).toBeNull()
+    expect(out.reason).toContain('CF_BROWSER_TOKEN')
+    expect(out.reason).not.toContain('بلا عنوان')
+  })
+
+  it('والإعدادُ المطفأ يسبق المفتاح', async () => {
+    await writeSetting(db, 'image_overlay', '0', 'test')
+    const out = await composeSlide(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: {} },
+      { image, platform: 'linkedin', headline: '', kicker: '' },
+    )
+    expect(out.reason).toContain('مُطفأ')
+  })
+
+  it('وبالمفتاح وبلا عنوان: العنوانُ هو السبب', async () => {
+    const out = await composeSlide(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_ACCOUNT_ID: 'a', CF_BROWSER_TOKEN: 't' } },
+      { image, platform: 'linkedin', headline: '', kicker: '' },
+    )
+    expect(out.reason).toContain('بلا عنوان')
+  })
+
+  it('noteOf يقدّم سقوطَ الموجز على ما ترتّب عليه', () => {
+    expect(noteOf({ brief: null, detail: 'لا مزوّدَ للكتابة' }, { reason: 'بلا عنوانٍ في الموجز' }))
+      .toBe('لا مزوّدَ للكتابة؛ بلا عنوانٍ في الموجز')
+    expect(noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'الصورةُ فوق حدِّ الضمّ' }))
+      .toBe('الصورةُ فوق حدِّ الضمّ')
+    expect(noteOf({ brief: null, detail: 'سقط' }, { reason: '' })).toBe('')
   })
 })

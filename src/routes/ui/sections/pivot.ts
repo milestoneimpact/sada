@@ -9,7 +9,7 @@
  * يُنسَخ ويُرسَل ويُحفَظ في المفضّلة، **ويعمل قبل أن يُحمَّل سطرُ نصٍّ
  * واحد**. وزرٌّ لا يعمل بلا جافاسكربت زرٌّ يعمل خطأً (D-046).
  */
-import { escapeHtml } from '../shell'
+import { escapeHtml } from '../escape'
 import { pageHead } from '../parts'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {

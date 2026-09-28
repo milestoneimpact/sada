@@ -11,7 +11,8 @@ import { toBase64 } from '../crypto'
 import { writeSetting } from '../settings'
 import { verifyMediaToken } from './link'
 import { VIDEO_MODELS, type AiBinding } from './workersAi'
-import { animateForPost, DEFAULT_PROMPT, pickBinding, videoKey } from './video'
+import { animateForPost, bindingFor, DEFAULT_PROMPT, pickBinding, videoKey } from './video'
+import { saveKey, upsertProvider } from '../providers'
 import { claimGeneration } from './claim'
 import { writeRoute } from '../ai/routes'
 
@@ -394,5 +395,46 @@ describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091
     const link = ai(OK_VIDEO)
     await animateForPost(deps(link), 'p1')
     expect(link.calls[0]!.model).toBe(VIDEO_MODELS.fromImage)
+  })
+})
+
+describe('الوجهُ من بطاقة المزوّد حين تغيب البيئة (D-157)', () => {
+  const seen: string[] = []
+  const net = (async (url: unknown) => {
+    seen.push(String(url))
+    return new Response(JSON.stringify({ success: true, result: OK_VIDEO }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    })
+  }) as unknown as typeof fetch
+
+  it('وصفُ المقطع الافتراضيّ إنجليزيّ — النموذجُ لا يقرأ العربيّة', () => {
+    expect(/[\u0600-\u06FF]/.test(DEFAULT_PROMPT)).toBe(false)
+    expect(DEFAULT_PROMPT).toContain('no text')
+  })
+
+  it('البيئةُ أوّلا', async () => {
+    seen.length = 0
+    const b = await bindingFor({ CF_AI_ACCOUNT_ID: 'env-acc', CF_AI_TOKEN: 'env-tok' }, db, KEY, net)
+    await b!.run('@cf/m', {})
+    expect(seen[0]).toContain('/accounts/env-acc/')
+  })
+
+  it('ثمّ مفتاحُ البطاقة ومعرّفُ حسابها من عنوانها', async () => {
+    seen.length = 0
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      baseUrl: 'https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1',
+    }, 'test')
+    await saveKey(db, KEY, 'cloudflare', 'card-token-long-enough', 'test')
+    const b = await bindingFor({}, db, KEY, net)
+    expect(b).toBeDefined()
+    await b!.run('@cf/m', {})
+    expect(seen[0]).toContain('/accounts/card-acc/')
+  })
+
+  it('ولا بطاقةَ ولا بيئة: يبقى env.AI أو لا شيء', async () => {
+    const binding = ai(OK_VIDEO)
+    expect(await bindingFor({ AI: binding }, db, KEY, net)).toBe(binding)
+    expect(await bindingFor({}, db, KEY, net)).toBeUndefined()
   })
 })

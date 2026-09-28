@@ -106,7 +106,7 @@ curl -X POST https://sada2.basserh.com/admin/scan \
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | يدخل `deploy.yml` إلى حسابك |
 
-سرٌّ واحدٌ لا اثنان. `github.com/mooryali95/sada/settings/secrets/actions`
+سرٌّ واحدٌ لا اثنان. `github.com/milestoneimpact/sada/settings/secrets/actions`
 ← **New repository secret**
 
 ⛔ **`CLOUDFLARE_ACCOUNT_ID` لا يوضع هنا** (D-018). معرّف الحساب في
@@ -418,7 +418,7 @@ curl -s https://sada2.basserh.com/ready
    3. في **Account Resources** اختر حسابك، وفي **Zone Resources** اختر
       `basserh.com`
    4. **Continue** ← **Create Token** ← انسخ القيمة **مرّة واحدة**
-   5. `github.com/mooryali95/sada/settings/secrets/actions` ←
+   5. `github.com/milestoneimpact/sada/settings/secrets/actions` ←
       **New repository secret**
       - **Name**: `CLOUDFLARE_API_TOKEN` · **Secret**: الصِق القيمة
    6. ولا سرّ ثانٍ: معرّف الحساب في `wrangler.toml` (D-018).
@@ -1081,6 +1081,11 @@ Cloudflare، وإبلاغي به لأثبّته في الشيفرة.
 
 ثمّ **كرّر الخطوات ٢–٨ على `sada-api-production`** حين تريده في الإنتاج.
 
+> **ومعه متغيّرٌ لا سرّ** (D-157): `CF_AI_ACCOUNT_ID` بنوع **`Text`** في
+> الموضع نفسِه، وقيمتُه معرّفُ حسابك (Account ID في يمين صفحة الحساب، ‏٣٢
+> حرفًا). بلا المعرّف لا يُنادى المتصفّح ولو ضُبط الرمز، والبندُ في «ما عليك»
+> يكتمل بهما معًا.
+
 #### الطريقُ الثاني · من الطرفيّة (إن كان `wrangler` عندك)
 
 ```
@@ -1356,6 +1361,13 @@ LinkedIn وX في `redirect_uri`.
 > لم يصله. وقد وقع في ‏2026‑09‑19 (D-141)، **وعاد في ‏2026‑09‑22**: تشغيلا
 > `ci` ‏316 و‏317 على #98 سقطا `startup_failure` في ثانيةٍ بلا خطوة، وإعادةُ
 > تشغيلٍ بقيت «queued» عشرَ دقائق بلا عدّاء. فبقي #98 مسوّدةً ولم يُدمَج.
+> **وعاد ثالثةً في ‏2026‑09‑26**: `ci` ‏347 على #105 سقط `failure` في ثلاث ثوانٍ
+> بلا خطوةٍ وسجلُّه `404`، وإعادتُه سقطت كذلك. فبقي #105 مسوّدةً؛ وCI المحلّيّ
+> عليه أخضر (‏١٨١٨ اختبارًا والمدقّقاتُ صفر) — **والدمجُ ينتظر العدّاء لا الشيفرة**.
+>
+> **وعادت في ‏2026‑09‑27** بعد نقل المستودع إلى `milestoneimpact`: `ci` ‏356
+> (`workflow_dispatch` على رأس #105) أخضرُ بخطواته في ‏١:٤١. والصفُّ يبقى هنا
+> لأنّ النفادَ يعود كلّما بلغ الشهرُ حدَّه.
 
 **١ · ما هي.** رصيدُ دقائق GitHub Actions في حسابك، وسقفُ الإنفاق عليه.
 التشغيلُ الذي يسقط في ثانيتين وسجلُّه يردّ `404` **ليس عطلًا في الشيفرة** —
@@ -1372,7 +1384,7 @@ LinkedIn وX في `redirect_uri`.
 2. إن بلغ الحدَّ: **Spending limits** ← **Actions** ← ارفع الحدَّ من ‏٠ إلى مبلغٍ
    صغير (‏٥$ تكفي شهرًا بمعدّل هذا المشروع: نحو ‏٢ دقيقتين لكلّ دفعة)، **أو**
    انتظر تصفيرَ الشهر.
-3. افتح `https://github.com/mooryali95/sada/actions` ← آخرُ تشغيلِ `deploy`
+3. افتح `https://github.com/milestoneimpact/sada/actions` ← آخرُ تشغيلِ `deploy`
    الساقط ← **Re-run all jobs**.
 
 **٤ · ما يعني النجاح.** التشغيلُ يُظهر «Set up job» ثمّ «البوابة» و«الترحيل»

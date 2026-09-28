@@ -1547,6 +1547,20 @@ describe('الثيم النهاريّ', () => {
     expect(production).not.toContain('STAGING')
   })
 
+  /** **سببُ فشل الخطّة يُحفَظ ويُقرأ** (D-157): «failed» وحدَها كانت في السجلّ، والفلاشُ يزول. */
+  it('محاولةُ تخطيطٍ بلا مادّةٍ تُسجَّل بسببها وتظهر في لوح المنشورات', async () => {
+    const cookie = await login()
+    const res = await app.request('/panel/plan/generate', withSession(cookie, { method: 'POST', body: new FormData() }), env)
+    expect(res.status).toBe(303)
+    const { results } = await db
+      .prepare("SELECT detail FROM audit_log WHERE action = 'plan.generate' ORDER BY id DESC LIMIT 1")
+      .all<{ detail: string }>()
+    expect(results[0]?.detail).toMatch(/^not_enough: /)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('آخرُ محاولةٍ لم تكفِ المادّة')
+    expect(html).toContain('والخطّةُ تحتاج 2 على الأقلّ')
+  })
+
   /** **الثابتُ أصلٌ ببصمة** (D-153): لا يبقى سطرًا إلّا إقلاعُ الثيم وما يتبدّل بالطلب. */
   it('اللوحةُ تحمل سكربتَيها أصلَين بـnonce وسطرًا واحدًا للإقلاع', async () => {
     const cookie = await login()

@@ -159,7 +159,8 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ متصفّحٍ** ' +
       'لا عملُ مولّد صور.',
     unblocks: 'capability',
-    done: (f) => f.vars.has('CF_BROWSER_TOKEN'),
+    // سرٌّ لا متغيّر (D-157): كان يُسأل عنه في `vars` فلا يكتمل أبدا ولو ضُبط
+    done: (f) => f.secrets.has('CF_BROWSER_TOKEN') && f.vars.has('CF_AI_ACCOUNT_ID'),
     secrets: ['CF_BROWSER_TOKEN'],
   },
   {
@@ -229,7 +230,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     // يُقرأ عند sada.basserh.com لا من هنا: staging لا تعرف حالَ الإنتاج
     done: () => null,
-    go: 'https://github.com/mooryali95/sada/actions/workflows/deploy.yml',
+    go: 'https://github.com/milestoneimpact/sada/actions/workflows/deploy.yml',
     goLabel: 'افتح صفحةَ النشر',
   },
   {

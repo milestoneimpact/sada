@@ -7,7 +7,8 @@
  * يُثبت عاملَه الثاني بعد.
  */
 import { escapeHtml, shell } from './panelView'
-import { B64URL_SCRIPT, GLYPH_SVG } from './ui/shell'
+import { GLYPH_SVG } from './ui/shell'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 
 export interface SecondFactorData {
   readonly csrf: string
@@ -25,7 +26,7 @@ export interface SecondFactorData {
  * ويعمل بلا شبكةٍ سوى نداءٍ واحد إلى أصلنا — والسياسة تسمح بـ
  * `connect-src 'self'` لا أكثر.
  */
-const SCRIPT = `${B64URL_SCRIPT}
+const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 (function(){
   var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var form=document.getElementById('pk-form');
@@ -37,8 +38,10 @@ const SCRIPT = `${B64URL_SCRIPT}
     if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور.';
     return;
   }
+  var label=btn.textContent;
   btn.addEventListener('click',function(){
-    btn.disabled=true; btn.textContent='المس مفتاحك…';
+    btn.disabled=true; btn.setAttribute('aria-busy','true');
+    btn.textContent='المس مفتاحك…'; if(note)note.textContent='';
     navigator.credentials.get({publicKey:{
       challenge:fromB64u(form.dataset.challenge),
       rpId:form.dataset.rpid,
@@ -54,8 +57,8 @@ const SCRIPT = `${B64URL_SCRIPT}
       });
       form.submit();
     }).catch(function(err){
-      btn.disabled=false; btn.textContent='الدخول بمفتاح المرور';
-      if(note)note.textContent='تعذّر: '+(err&&err.name?err.name:'أُلغي');
+      btn.disabled=false; btn.removeAttribute('aria-busy'); btn.textContent=label;
+      if(note)note.textContent=sadaPk.why(err);
     });
   });
 })();

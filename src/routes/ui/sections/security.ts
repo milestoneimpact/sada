@@ -6,7 +6,7 @@
  */
 import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
-import { escapeHtml } from '../shell'
+import { escapeHtml } from '../escape'
 import { actionLabel, targetLabel } from '../../../lib/audit'
 import { status } from '../parts'
 

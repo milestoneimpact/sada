@@ -10,7 +10,7 @@
  * ويُقارَن.
  */
 import { describe, expect, it } from 'vitest'
-import { SCRIPT } from './panelView'
+import { SCRIPT } from './ui/panelScript'
 import { xWeightedLength } from '../lib/draft/length'
 
 /** يُنتزَع من النصّ المُرسَل ويُبنى دالّةً — فما يُختبَر هو ما يُشحَن. */

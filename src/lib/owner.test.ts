@@ -188,3 +188,13 @@ describe('قراراتُ المالك (D-130)', () => {
   })
 })
 
+describe('M-19 يكتمل بالسرّ لا بالمتغيّر (D-157)', () => {
+  const m19 = OWNER_TASKS.find((t) => t.code === 'M-19')!
+  it('السرُّ مع معرّف الحساب يُكمله', () => {
+    expect(m19.done({ ...empty, secrets: new Set(['CF_BROWSER_TOKEN']), vars: new Set(['CF_AI_ACCOUNT_ID']) })).toBe(true)
+  })
+  it('والسرُّ وحده أو المعرّفُ وحده لا يكفي', () => {
+    expect(m19.done({ ...empty, secrets: new Set(['CF_BROWSER_TOKEN']) })).toBe(false)
+    expect(m19.done({ ...empty, vars: new Set(['CF_BROWSER_TOKEN', 'CF_AI_ACCOUNT_ID']) })).toBe(false)
+  })
+})

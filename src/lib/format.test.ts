@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { money, parseSqliteUtc, relativeTime } from './format'
+import { kb, money, parseSqliteUtc, relativeTime } from './format'
 
 const NOW = new Date('2026-09-05T12:00:00Z')
 
@@ -70,5 +70,13 @@ describe('money — دقّةٌ تناسب الحجم', () => {
 
   it('لا يُفقِد كسرا صغيرا بالتقريب — وهو حال أوّل نداء', () => {
     expect(money(0.0004231)).not.toBe('0.00$')
+  })
+})
+
+describe('kb — معادلةٌ واحدةٌ للحجم (D-158)', () => {
+  it('يقرّب إلى أقرب كيلوبايت', () => {
+    expect(kb(25_500)).toBe('25KB')
+    expect(kb(1_536)).toBe('2KB')
+    expect(kb(0)).toBe('0KB')
   })
 })

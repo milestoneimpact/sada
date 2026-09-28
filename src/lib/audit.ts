@@ -115,6 +115,23 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'provider.toggle': 'تفعيل أو تعطيل',
   'provider.delete': 'حذف مزوّد',
   'route.write': 'توجيه مهمّة',
+  // أفعالُ الخطّة والوسائط كانت تُعرَض بحرفها (D-157)
+  'plan.generate': 'تخطيط الأسبوع',
+  'plan.approve': 'اعتماد خطّة',
+  'media.generate': 'توليد صورة',
+  'media.animate': 'تحريك صورة',
+  'media.reject': 'رفض صورة',
+  'draft.write': 'كتابة مسوّدة',
+  'draft.decide': 'قرار على مسوّدة',
+  'draft.approve_many': 'اعتماد دفعة',
+  'draft.spread': 'توزيع المعتمَد',
+  'draft.schedule': 'جدولة منشور',
+  'draft.unschedule': 'إلغاء جدولة',
+  'draft.undo_reject': 'تراجع عن رفض',
+  'oauth_app.save': 'حفظ تطبيق منصّة',
+  'oauth_app.verify': 'اختبار تطبيق منصّة',
+  'oauth_app.delete': 'حذف تطبيق منصّة',
+  'promotion.decide': 'قرار ترويج',
 }
 
 export function actionLabel(action: string): string {

@@ -120,6 +120,20 @@ for (const file of files) {
   }
 }
 
+/**
+ * ── ميزانيّةُ النحاس (D-156) ────────────────────────────────────────
+ * `--au` حبرٌ لرقمٍ واحد (`.grid>.tile:first-child .v`) وخيوطٌ فيما سواه.
+ * فـ`color:var(--au)` مرّةً واحدةً في الورقة، ومجموعُ النداءات دون سقفٍ مكتوب.
+ */
+const BRASS_TEXT_MAX = 1
+const BRASS_TOTAL_MAX = 15
+const sheetForBrass = strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
+const brassText = (sheetForBrass.match(/(?<![\w-])color:\s*var\(--au\)/g) ?? []).length
+const brassTotal = (sheetForBrass.match(/var\(--au\)/g) ?? []).length
+const brass = []
+if (brassText > BRASS_TEXT_MAX) brass.push(`النحاسُ حبرًا ${brassText} مرّةً — والميزانيّةُ ${BRASS_TEXT_MAX}`)
+if (brassTotal > BRASS_TOTAL_MAX) brass.push(`النحاسُ ${brassTotal} نداءً — والسقفُ ${BRASS_TOTAL_MAX}`)
+
 const literalTime = []
 for (const file of files) {
   if (NOT_USAGE.test(file)) continue
@@ -399,6 +413,10 @@ for (const [k, where] of sharedIcons) {
 }
 
 console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
+console.log('\n═══ ميزانيّةُ النحاس ═══\n')
+if (brass.length === 0) console.log(`  ✓ حبرٌ ${brassText} · نداءاتٌ ${brassTotal} من ${BRASS_TOTAL_MAX}`)
+for (const b of brass) console.log(`  ✕ ${b}`)
+
 console.log('\n═══ نصفُ قطرٍ خارج السلّم ═══\n')
 if (literalRadius.length === 0) console.log('  ✓ لا نصفَ قطرٍ حرفيًّا')
 for (const [rule, where] of literalRadius) console.log(`  ✕ ${rule}  —  ${where}`)
@@ -426,7 +444,7 @@ console.log(
   `\n(${defined.size} رمزا معرَّفا · ${used.size} منادًى · ${ALLOWED.size} معلَّلا في القائمة · ${ICON_KEYS.length} رمزا في ICON)\n`,
 )
 
-const total = ghosts.length + orphans.length + literalTime.length + literalRadius.length + spaced.length +
+const total = ghosts.length + orphans.length + literalTime.length + literalRadius.length + brass.length + spaced.length +
   backticks.length + strayIcons.length + dupVars.length + unusedIcons.length
 if (total === 0) process.exit(0)
 

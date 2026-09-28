@@ -23,10 +23,10 @@ import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/prompt'
-import { escapeHtml } from '../shell'
+import { escapeHtml } from '../escape'
 import { whenTag } from '../time'
 import type { Peaks } from '../../../lib/schedule/peak'
-import { relativeTime } from '../../../lib/format'
+import { kb, money, relativeTime } from '../../../lib/format'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -38,6 +38,7 @@ import { LOGOS } from '../logos'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { status } from '../parts'
+import { SLIDE_SIZE } from '../../../lib/image/slide'
 
 const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -47,10 +48,6 @@ const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string
   queued: { cls: 'warn', glyph: '◔', text: 'مجدولة' },
   published: { cls: 'ok', glyph: '✓', text: 'نُشرت' },
   failed: { cls: 'bad', glyph: '▲', text: 'فشل النشر' },
-}
-
-function money(value: number): string {
-  return value === 0 ? '—' : `${value.toFixed(4)}$`
 }
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
@@ -218,10 +215,10 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
   if (ready !== undefined) {
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="صورةٌ مولَّدة تصاحب المنشور"
-        loading="lazy" width="1200" height="628">
+        loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
-        <span class="chip mono">${Math.round(ready.bytes / 1024)}KB</span>
-        <span class="chip mono">${ready.cost === 0 ? '—' : `${ready.cost.toFixed(4)}$`}</span>
+        <span class="chip mono">${kb(ready.bytes)}</span>
+        <span class="chip mono">${ready.cost === 0 ? '—' : money(ready.cost)}</span>
         ${ready.prompt === ''
           ? ''
           : `<span class="chip" title="${escapeHtml(ready.prompt)}">الوصف</span>`}
@@ -240,7 +237,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[]): string {
         ? ''
         : `<div class="pic-foot">
              ${status('ok', '●', `مقطعٌ رأسيّ 15ث`)}
-             <span class="chip mono">${Math.round(clip.bytes / 1024)}KB</span>
+             <span class="chip mono">${kb(clip.bytes)}</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}
     </div>`
@@ -453,7 +450,7 @@ function card(
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${escapeHtml(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip mono">${escapeHtml(d.model)}</span>`,
-    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${money(d.cost)}</span>`,
+    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك.
      *
@@ -672,17 +669,17 @@ export function draftsSection(input: DraftsInput): string {
     <button class="p sm" type="submit">اعتمدها كما كُتبت</button>
   </form>`
 
-  return `${bulk}<div class="card" style="margin-bottom:var(--s-3)">
-    <div class="card-head"><h2>الكتابة من مصدر</h2>
-      <div class="grow"></div>
-      ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}</div>
-    <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
-      <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
-    ${writer}
-  </div>
-
+  /*
+   * **الترتيبُ بالقرار لا بالتدفّق** (D-156). كان اللوحُ يبدأ ببطاقة الكتابة
+   * من مصدر، وما ينتظر قرارَ المالك تحتها بـ‏١٦٦٥px عند ‏١٤٤٠×‏٩٠٠ (التدقيقُ
+   * الثالث). السؤالُ الذي يُفتَح له اللوح «ما الذي ينتظرني؟»، فجوابُه أوّلًا:
+   * المسوّداتُ المنتظرة، ثمّ التوزيعُ إن كان له ما يُوزَّع، ثمّ الكتابةُ من
+   * مصدر، والخطّةُ بعدها في اللوح.
+   */
+  return `${bulk}
   <div class="lede-row">
     <h3 class="sec" style="margin:0; border:0; padding:0">المسوّدات</h3>
+    ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
@@ -693,7 +690,14 @@ export function draftsSection(input: DraftsInput): string {
   ${list}
   <div class="empty" id="draft-none" hidden>
     <b>لا مسوّدةَ في هذا الفرز</b>
-    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>`
+    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>
+
+  <div class="card" style="margin-top:var(--s-3)">
+    <div class="card-head"><h2>الكتابة من مصدر</h2></div>
+    <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
+      <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
+    ${writer}
+  </div>`
 }
 
 /**

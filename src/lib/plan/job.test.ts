@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { approvePlan, eligible, latestPlan, planWeek, type PlanDeps } from './job'
-import { parsePlan, weekStart } from './prompt'
+import { parsePlan, systemPrompt, userPrompt, weekStart } from './prompt'
 import { writeSetting } from '../settings'
 
 let db: FakeDb
@@ -282,5 +282,76 @@ describe('المصادر المؤهَّلة', () => {
       .bind(crypto.randomUUID(), s, 'k-2')
       .run()
     expect((await eligible(db))[0]?.used).toBe(0)
+  })
+})
+
+/**
+ * **عقدُ الحقول في الموجّه** (D-157). المخطّطُ يصل إلى Anthropic وحدَه؛ مزوّدٌ
+ * openai_compat لا يعرف حقولَ البند إلّا من نصّ الموجّه، وكان النصُّ يذكر
+ * `rationale` و`items` فقط — فثلاثُ محاولاتٍ على staging دُفعت ثمّ سقطت.
+ */
+describe('D-157 — عقدُ الحقول والقارئُ المتسامح', () => {
+  it('الموجّهُ يسمّي الحقولَ الستّة وصيغَها', () => {
+    const text = systemPrompt()
+    for (const field of ['source_id', 'platform', 'angle', 'day', 'time', 'why']) expect(text).toContain(`\`${field}\``)
+    expect(text).toContain('YYYY-MM-DD')
+    expect(text).toContain('HH:MM')
+  })
+
+  it('ورسالةُ المستخدم تسرد أيّامَ الأسبوع السبعة بحرفها', () => {
+    const text = userPrompt([], '2026-09-13')
+    for (const d of ['2026-09-13', '2026-09-16', '2026-09-19']) expect(text).toContain(d)
+    expect(text).not.toContain('2026-09-20')
+  })
+
+  it('والقارئُ يقبل sourceId وساعةً بلا صفرٍ بادئ، ولا يقبل منصّةً مجهولة', () => {
+    const known = new Set(['src:a'])
+    const read = parsePlan(
+      { rationale: 'r', items: [
+        { sourceId: 'src:a', platform: ' LinkedIn ', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '9:00', why: '' },
+        { source_id: 'src:a', platform: 'tiktok', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-15', time: '09:00' },
+      ] },
+      known,
+      '2026-09-13',
+    )
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.plan.items).toHaveLength(1)
+    expect(read.plan.items[0]?.time).toBe('09:00')
+    expect(read.plan.items[0]?.platform).toBe('linkedin')
+    expect(read.dropped).toBe(1)
+  })
+
+  it('والنداءُ يحمل العقدَ في رسالة النظام', async () => {
+    const a = await seedSource('تقرير', 0.9)
+    await seedSource('مراجعة', 0.5)
+    await planWeek(deps(net({ payload: plan([item(a)]) })))
+    // رسالةُ النظام في Anthropic مصفوفةُ كتلٍ نصّيّة
+    const sent = calls[0]?.body as { system?: string | { text?: string }[] }
+    const system = Array.isArray(sent.system) ? sent.system.map((b) => b.text ?? '').join('\n') : (sent.system ?? '')
+    expect(system).toContain('`source_id`')
+  })
+})
+
+describe('لماذا أُسقط ما أُسقط (D-157)', () => {
+  it('يُحصى بالسبب لا بالعدد وحده', () => {
+    const read = parsePlan(
+      { rationale: 'r', items: [
+        { source_id: 'nope', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'tiktok', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'قصير', day: '2026-09-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-10-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-15', time: '09:00' },
+      ] },
+      new Set(['src:a']),
+      '2026-09-13',
+    )
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.dropped).toBe(4)
+    expect(read.droppedWhy).toContain('مصدرٌ لا نعرفه')
+    expect(read.droppedWhy).toContain('منصّةٌ غير مدعومة')
+    expect(read.droppedWhy).toContain('زاويةٌ أقصرُ')
+    expect(read.droppedWhy).toContain('يومٌ خارج الأسبوع')
   })
 })

@@ -34,7 +34,7 @@ import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
-import { animateForPost, pickBinding } from '../lib/media/video'
+import { animateForPost, bindingFor } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
@@ -43,7 +43,7 @@ import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
-import { money } from '../lib/format'
+import { kb, money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import {
@@ -95,6 +95,7 @@ import { injectCsrf, soloPage } from './ui/shell'
 import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
+import { pulses, readHeartbeats } from '../lib/ops/heartbeat'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
 
 export const panel = new Hono<{ Bindings: Env }>()
@@ -399,6 +400,7 @@ panel.get('/panel', async (c) => {
   const plan = await latestPlan(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
   const audit = await recentAudit(c.env.DB, 50)
+  const beats = await readHeartbeats(c.env.DB)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
   const apps = await appStatuses(c.env.DB, c.env as unknown as Record<string, string | undefined>)
@@ -537,6 +539,7 @@ panel.get('/panel', async (c) => {
       audit,
       // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
       today: todayFeed({ now: new Date(), audit, drafts, facts: loaded.facts }),
+      pulses: pulses(beats, new Date()),
       rpId: rp.id,
       via: session.record.via,
       factors: {
@@ -1091,8 +1094,13 @@ panel.post('/panel/plan/generate', async (c) => {
       ? {
           kind: 'ok',
           text: `خطّةُ أسبوع ${outcome.week}: ${outcome.items} بندا${
-            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped} لمصدرٍ لا نعرفه)`
-          }، الكلفة ${money(outcome.cost)}.`,
+            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
+          }، ${
+            // وصفرٌ مع رموزٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008)
+            outcome.cost === 0 && outcome.units > 0
+              ? `و${outcome.units} رمزا بلا سعرٍ مضبوطٍ للمزوّد — سُجّلت صفرا موسوما`
+              : `الكلفة ${money(outcome.cost)}`
+          }.`,
         }
       : outcome.kind === 'not_enough'
         ? { kind: 'warn', text: outcome.reason }
@@ -1100,9 +1108,15 @@ panel.post('/panel/plan/generate', async (c) => {
           ? { kind: 'warn', text: outcome.reason }
           : { kind: 'bad', text: `تعذّر التخطيط: ${outcome.reason}` }
 
+  // السببُ مع النوع (D-157): «failed» وحدَها كانت تُقرأ في السجلّ بلا سبب
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'plan.generate', target: null, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'plan.generate',
+      target: null,
+      detail: outcome.kind === 'planned' ? outcome.kind : `${outcome.kind}: ${outcome.reason}`.slice(0, 200),
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1161,7 +1175,7 @@ panel.post('/panel/media/generate', async (c) => {
           // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
           kind: outcome.note === '' ? 'ok' : 'warn',
           text:
-            `وُلّدت صورة — ${Math.round(outcome.bytes / 1024)}KB، الكلفة ${money(outcome.cost)}.` +
+            `وُلّدت صورة — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.` +
             (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
@@ -1177,7 +1191,16 @@ panel.post('/panel/media/generate', async (c) => {
 
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'media.generate', target: id, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'media.generate',
+      target: id,
+      // والسببُ مع النوع (D-157): «generated» بلا نصٍّ فوقها كانت تُقرأ نجاحا تامّا
+      detail:
+        outcome.kind === 'generated'
+          ? outcome.note === '' ? 'generated' : `generated: ${outcome.note}`.slice(0, 200)
+          : 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}`.slice(0, 200) : outcome.kind,
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1200,7 +1223,7 @@ panel.post('/panel/media/animate', async (c) => {
     {
       db: c.env.DB,
       bucket: c.env.MEDIA,
-      ai: pickBinding(c.env),
+      ai: await bindingFor(c.env, c.env.DB, c.env.TOKEN_ENC_KEY),
       encKey: c.env.TOKEN_ENC_KEY,
       baseUrl: c.env.PUBLIC_BASE_URL,
     },
@@ -1211,7 +1234,7 @@ panel.post('/panel/media/animate', async (c) => {
     outcome.kind === 'generated'
       ? {
           kind: 'ok',
-          text: `وُلّد مقطعٌ رأسيّ — ${Math.round(outcome.bytes / 1024)}KB. ` +
+          text: `وُلّد مقطعٌ رأسيّ — ${kb(outcome.bytes)}. ` +
             'والسعرُ لم يُقرأ من لوحة Cloudflare بعد، فسُجّل صفرا موسوما.',
         }
       : outcome.kind === 'already'
@@ -1229,7 +1252,12 @@ panel.post('/panel/media/animate', async (c) => {
 
   await record(
     c.env.DB,
-    { actor: 'panel', action: 'media.animate', target: id, detail: outcome.kind },
+    {
+      actor: 'panel',
+      action: 'media.animate',
+      target: id,
+      detail: 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}`.slice(0, 200) : outcome.kind,
+    },
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
@@ -1383,7 +1411,7 @@ async function ownerFacts(c: {
   return {
     secrets: new Set(
       ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
-       'GOOGLE_SA_JSON', 'CF_AI_TOKEN'].filter(has),
+       'GOOGLE_SA_JSON', 'CF_AI_TOKEN', 'CF_BROWSER_TOKEN'].filter(has),
     ),
     vars: new Set(['LEGAL_ENTITY', 'LEGAL_CONTACT', 'CF_AI_ACCOUNT_ID'].filter(has)),
     linked: new Set(accounts.filter((a) => a.status !== 'revoked').map((a) => a.platform)),
