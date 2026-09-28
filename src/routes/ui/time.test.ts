@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { TIME_SCRIPT, whenTag } from './time'
 import { STYLE } from './styles'
+import { sheet } from '../../test/css'
 
 describe('وسمُ الموعد — والـUTC مكتوبةٌ في الوسم', () => {
   it('**يحمل UTC نصّا لا في title وحدَه**', () => {
@@ -71,7 +72,8 @@ describe('نصُّ التحويل — وقواعدُ اللوحة تُوَرَّ
 
 describe('والصنفُ معرَّفٌ في الأنماط — لا يسقط صامتا', () => {
   it('when-t و when-local لهما قواعدُ', () => {
-    expect(STYLE).toContain('.when-t{')
-    expect(STYLE).toContain('.when-local{')
+    const css = sheet(STYLE)
+    expect(css.where('.when-t')).toContain('')
+    expect(css.where('.when-local')).toContain('')
   })
 })
