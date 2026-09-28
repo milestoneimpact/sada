@@ -172,3 +172,47 @@ describe('analyzeText — ما يُعاد وما لا يُعاد', () => {
     )
   })
 })
+
+/**
+ * **جوابٌ وصل ثمّ رُدّ يحمل استهلاكَه** (D-164) — السائقُ الثالث.
+ *
+ * البترُ والرفضُ وغيابُ النصّ والـJSON الفاسد كلُّها جوابٌ بـ200 فيه
+ * `usage`، وقد حوسِب عليه. وكان الخطأُ يُرمى بلا استهلاكه، فيعود المنادي
+ * `failed` قبل خطوة الكلفة ولا يرى الدفترُ شيئا.
+ */
+describe('D-164 · الخطأُ بعد 200 يحمل استهلاكَه', () => {
+  const SPENT = { inputTokens: 1200, outputTokens: 300, cachedInputTokens: 900, model: MODEL }
+
+  async function thrown(f: typeof fetch): Promise<AnalyzeError> {
+    const error = await analyzeText({ apiKey: 'sk-test', fetchImpl: f }, INPUT).then(
+      () => null,
+      (caught: unknown) => caught,
+    )
+    expect(error).toBeInstanceOf(AnalyzeError)
+    return error as AnalyzeError
+  }
+
+  it.each([
+    ['البترُ عند max_tokens', { stop_reason: 'max_tokens' }],
+    ['والرفضُ لسياسة المحتوى', { stop_reason: 'refusal', content: [] }],
+    ['وجوابٌ بلا كتلةِ نصّ', { content: [] }],
+    ['والـJSON الفاسدُ رغم المخطّط', { content: [{ type: 'text', text: '{"summary":"' }] }],
+  ])('%s: معه ما استُهلك', async (_name, overrides) => {
+    const error = await thrown(fakeAnthropic(okReply(overrides)))
+    expect(error.spent).toEqual(SPENT)
+  })
+
+  it('**وما لم يصل لا استهلاكَ فيه**: 500 بلا spent', async () => {
+    const error = await thrown(fakeAnthropic({ status: 500, body: { type: 'error', error: { type: 'x', message: 'x' } } }))
+    expect(error.spent).toBeUndefined()
+  })
+
+  it('وغيابُ المفتاح لم يُرسل شيئا: بلا spent', async () => {
+    const error = await analyzeText({ apiKey: '', fetchImpl: fakeAnthropic(okReply()) }, INPUT).then(
+      () => null,
+      (caught: unknown) => caught,
+    )
+    expect(error).toBeInstanceOf(AnalyzeError)
+    expect((error as AnalyzeError).spent).toBeUndefined()
+  })
+})

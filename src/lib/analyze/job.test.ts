@@ -333,3 +333,83 @@ describe('حين يفشل النداء', () => {
     expect(out.retryable).toBe(false)
   })
 })
+
+/**
+ * **جوابٌ وصل ثمّ رُدّ يُكتب في الدفتر** (D-164) — والتحليلُ أغلى بترٍ في
+ * النظام: `max_tokens: 16000`. فمبتورُه مدفوعٌ كاملا، ومستهلكُ الطابور
+ * يعيده لأنّه `retryable`. وبلا صفٍّ يقيس السقفان على دفترٍ أقلَّ من الحقيقة
+ * في كلّ إعادة.
+ */
+describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفتر', () => {
+  const USAGE = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 500 }
+
+  function arrived(overrides: Record<string, unknown>): unknown {
+    return {
+      id: 'msg_1', type: 'message', role: 'assistant', model: MODEL,
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: JSON.stringify(ANALYSIS) }],
+      usage: USAGE,
+      ...overrides,
+    }
+  }
+
+  function book(): { provider: string; operation: string; units: number; total: number; ref_id: string }[] {
+    return db.raw
+      .prepare('SELECT provider, operation, units, total, ref_id FROM cost_ledger')
+      .all() as { provider: string; operation: string; units: number; total: number; ref_id: string }[]
+  }
+
+  function items(): number {
+    return (db.raw.prepare('SELECT count(*) AS n FROM content_items').get() as { n: number }).n
+  }
+
+  it('Anthropic مبتورٌ عند max_tokens: صفٌّ واحد ثمّ failed يُعاد', async () => {
+    const sourceId = await seedSource()
+    const out = await analyzeSource(deps(net({ anthropic: arrived({ stop_reason: 'max_tokens' }) })), sourceId)
+
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(true)
+    const rows = book()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      provider: 'anthropic',
+      operation: `analyze:${MODEL}`,
+      units: 1700, // 1000 + 500 + 200
+      ref_id: sourceId,
+    })
+    // بالسعر نفسه الذي يُحاسَب به النجاح — لا تقديرٌ آخر للفشل
+    expect(rows[0]!.total).toBeCloseTo(
+      analysisCost({ inputTokens: 1000, outputTokens: 200, cachedInputTokens: 500 }),
+      10,
+    )
+    expect(items()).toBe(0)
+  })
+
+  it('وكلُّ إعادةٍ صفٌّ آخر: ما دُفع مرّتين يُكتب مرّتين، فيراه السقفُ في الثالثة', async () => {
+    const sourceId = await seedSource()
+    const truncated = arrived({ stop_reason: 'max_tokens' })
+    await analyzeSource(deps(net({ anthropic: truncated })), sourceId)
+    await analyzeSource(deps(net({ anthropic: truncated })), sourceId)
+    expect(book()).toHaveLength(2)
+
+    // سقفُ العدد باثنين: الثالثةُ تُمنع بما كُتب — ولا تُلمس الشبكة
+    await writeSetting(db, 'daily_analysis_cap', '2', 'test')
+    const third = await analyzeSource(deps(net({ anthropic: truncated })), sourceId)
+    expect(third.kind).toBe('blocked')
+    expect(calls).toHaveLength(0)
+  })
+
+  it.each([
+    ['وAnthropic رافضٌ: صفٌّ واحد، ولا يُعاد', { stop_reason: 'refusal', content: [] }, false],
+    ['وجوابٌ بلا كتلةِ نصّ: صفٌّ واحد', { content: [] }, true],
+    ['والـJSON الفاسدُ رغم المخطّط: صفٌّ واحد', { content: [{ type: 'text', text: '{"summary":"' }] }, true],
+  ])('%s', async (_name, overrides, retryable) => {
+    const sourceId = await seedSource()
+    const out = await analyzeSource(deps(net({ anthropic: arrived(overrides) })), sourceId)
+
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(retryable)
+    expect(book()).toHaveLength(1)
+    expect(items()).toBe(0)
+  })
+})
