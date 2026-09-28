@@ -1,5 +1,5 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
-import { B64URL_SCRIPT, COPY_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
 
 /**
  * نصُّ اللوحة الجاري في المتصفّح.
@@ -68,8 +68,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     show((location.hash||'').slice(1)||first,false,true);
   });
 
-  // زرُّ النسخ مشترَكٌ مع شاشة «ما عليك» (D-126) — يُعرَّف في scripts.ts
-  ${COPY_SCRIPT}
+  // ‏وزرُّ النسخ (D-126) في u.js الذي تحمله كلُّ صفحة، لا هنا: نسختان في
+  // ‏اللوحة تربطان بالزرّ مستمعَين، فيبقى «نُسخ ✓» عليه لا يعود (D-160)
 
   // عدّادُ المسوّدة يتحرّك مع الكتابة: طولٌ يُعرف بعد الإرسال يأتي متأخّرا
   // بنداءٍ كامل. والحدُّ من data-limit لا من ثابتٍ هنا — منصّةٌ تُضاف

@@ -19,8 +19,10 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { toBase64 } from './lib/crypto'
+import { fromBase64Url, toBase64Url } from './lib/security/bytes'
+import { fakeAuthenticator } from './test/authenticator'
 import { fakeDb, fakeKv } from './test/fakes'
 
 interface Worker {
@@ -130,50 +132,60 @@ describe('الحزمةُ المشحونة', () => {
     expect(login).toContain('var sadaB64=')
   })
 
-  it('زرُّ «الدخول بمفتاح المرور» يُضغَط فيطلب التحدّي ويرسل التوقيع', async () => {
+  it('زرُّ «الدخول بمفتاح المرور» يُضغَط فيفتح جلسةً من خادم الحزمة نفسِه', async () => {
+    /*
+     * **لا خادمَ بديل**: التحدّي والتحقّق من العامل المبنيّ، والتوقيعُ من مفتاح
+     * P-256 حقيقيّ. فحقلٌ يُعاد تسميتُه في السكربت أو في المسار يُسقط هذا
+     * الاختبار — وهو العقدُ الذي يحرسه، لا شكلُ الطلب وحدَه.
+     */
+    const key = await fakeAuthenticator()
     const db = fakeDb()
     db.raw.prepare(
       `INSERT INTO passkeys (id, credential_id, public_key, alg, label, rp_id)
-       VALUES ('pk1', 'AQIDBA', 'x', -7, 'الحاسوب', 'sada2.basserh.com')`,
-    ).run()
-    const html = await (await worker.fetch(new Request(`${ORIGIN}/panel`), env(db), CTX)).text()
+       VALUES ('pk1', ?, ?, ?, 'الحاسوب', 'sada2.basserh.com')`,
+    ).run(key.credentialId, key.publicKey, key.alg)
+    const e = env(db)
+    const html = await (await worker.fetch(new Request(`${ORIGIN}/panel`), e, CTX)).text()
     const login = inlineScripts(html).find((s) => s.includes('pk-login'))!
 
     const clicks: Array<() => void> = []
     const node = (): Record<string, unknown> => ({
       disabled: false,
-      textContent: '',
+      textContent: 'الدخول بمفتاح المرور',
       setAttribute() {},
       removeAttribute() {},
       addEventListener(type: string, fn: () => void) { if (type === 'click') clicks.push(fn) },
     })
     const button = node()
     const note = node()
-    const document = { ...emptyDocument(), getElementById: (id: string) =>
-      id === 'pk-login' ? button : id === 'pk-note' ? note : null }
-    const globals = browserGlobals(document)
-    const sent: Array<{ url: string; body: string }> = []
-    const bytes = (n: number) => new Uint8Array(n).fill(7).buffer
+    const globals = browserGlobals({ ...emptyDocument(), getElementById: (id: string) =>
+      id === 'pk-login' ? button : id === 'pk-note' ? note : null })
+    const replies: Array<{ path: string; status: number; cookie: string | null }> = []
 
     ;(globals['window'] as Record<string, unknown>)['PublicKeyCredential'] = function PublicKeyCredential() {}
-    globals['fetch'] = async (url: string, init: { body?: string } = {}) => {
-      sent.push({ url, body: init.body ?? '' })
-      if (url === '/panel/passkey/challenge') {
-        return new Response(JSON.stringify({
-          ticket: 't-1', challenge: 'AAECAwQFBgcICQoLDA0ODw', rpId: 'sada2.basserh.com',
-          allowCredentials: ['AQIDBA'],
-        }), { status: 200 })
-      }
-      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    globals['fetch'] = async (path: string, init: RequestInit = {}) => {
+      const response = await worker.fetch(new Request(`${ORIGIN}${path}`, init), e, CTX)
+      replies.push({ path, status: response.status, cookie: response.headers.get('Set-Cookie') })
+      return response
     }
-    let asked: { publicKey: { challenge: Uint8Array; rpId: string } } | null = null
+    let asked: { publicKey: { challenge: Uint8Array; rpId: string; allowCredentials: unknown[] } } | null = null
     globals['navigator'] = {
       credentials: {
-        get: async (options: typeof asked) => {
+        get: async (options: NonNullable<typeof asked>) => {
           asked = options
+          const signed = await key.sign({
+            challenge: toBase64Url(options.publicKey.challenge),
+            origin: ORIGIN,
+            rpId: options.publicKey.rpId,
+          })
+          const buffer = (v: string) => fromBase64Url(v).buffer
           return {
-            id: 'AQIDBA',
-            response: { authenticatorData: bytes(37), clientDataJSON: bytes(20), signature: bytes(64) },
+            id: signed.credentialId,
+            response: {
+              authenticatorData: buffer(signed.authenticatorData),
+              clientDataJSON: buffer(signed.clientDataJSON),
+              signature: buffer(signed.signature),
+            },
           }
         },
       },
@@ -182,16 +194,18 @@ describe('الحزمةُ المشحونة', () => {
     runInNewContext(login, globals)
     expect(clicks).toHaveLength(1)
     clicks[0]!()
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await vi.waitFor(() => expect(replies).toHaveLength(2), { timeout: 3000 })
+    await vi.waitFor(() =>
+      expect((globals['location'] as { href: string }).href).toBe('/panel'), { timeout: 3000 })
 
-    expect(sent.map((s) => s.url)).toEqual(['/panel/passkey/challenge', '/panel/passkey/login'])
+    expect(replies.map((r) => [r.path, r.status])).toEqual([
+      ['/panel/passkey/challenge', 200],
+      ['/panel/passkey/login', 200],
+    ])
+    expect(replies[1]!.cookie).toMatch(/^__Host-sada_session=/)
     expect(asked!.publicKey.rpId).toBe('sada2.basserh.com')
-    expect(asked!.publicKey.challenge.length).toBe(16)
-    const body = JSON.parse(sent[1]!.body) as Record<string, string>
-    expect(body['ticket']).toBe('t-1')
-    expect(body['credentialId']).toBe('AQIDBA')
-    expect(body['signature']).toMatch(/^[A-Za-z0-9_-]+$/)
-    expect((globals['location'] as { href: string }).href).toBe('/panel')
+    expect(asked!.publicKey.allowCredentials).toHaveLength(1)
+    expect(note['textContent']).not.toMatch(/تعذّر|لم يُقبَل/)
   })
 
   it.each([
