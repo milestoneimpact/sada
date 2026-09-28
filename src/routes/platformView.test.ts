@@ -4,7 +4,8 @@
  * **وما يُفحَص هنا أنّ الفرزَ لا يُخفي** — وهو الشرطُ الذي قام عليه.
  */
 import { describe, expect, it } from 'vitest'
-import { platformScreen, showOf, type PostMedia } from './ui/platformView'
+import { platformScreen, readinessLadder, showOf, type PostMedia } from './ui/platformView'
+import { status } from './ui/parts'
 import { viewChannels, type LinkedAccount } from '../lib/channels'
 import type { PlatformPost } from '../lib/platform/screen'
 
@@ -206,6 +207,26 @@ describe('ختمُ السقوط في سجلّ الصحّة (D-131)', () => {
     expect(dropped).toContain('والنشرُ متوقّفٌ عليه منذها')
     const fine = screen({ health: { a1: { ...base, status: 'active', needsReauthAt: null } } })
     expect(fine).not.toContain('سقط الإذن')
+  })
+})
+
+/**
+ * علامةُ الدرجة انتقلت إلى `parts` (D-163) — ونقاطُ المسوّدات تقرؤها كذلك.
+ * **والسلّمُ يُرسَم كما كان**: الحالاتُ الأربعُ برمزها ولونها وكلمتها.
+ */
+describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () => {
+  it('السلّمُ ما زال يرسم ●/◍/○/▲ بكلماتها بعد النقل', () => {
+    const html = readinessLadder({
+      rungs: (['done', 'now', 'waiting', 'failed'] as const).map((state, i) => ({
+        key: 'app' as const, title: `درجة ${i}`, state, note: 'ما وقع',
+      })),
+      verdict: { kind: 'bad', text: 'لا تنشر' },
+      next: null,
+    })
+    const want: [string, string, string][] = [
+      ['ok', '●', 'تامّة'], ['warn', '◍', 'تنتظرك'], ['idle', '○', 'تنتظر'], ['bad', '▲', 'ساقطة'],
+    ]
+    for (const [cls, glyph, label] of want) expect(html).toContain(status(cls, glyph, label))
   })
 })
 

@@ -17,8 +17,11 @@ import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
 import { claimGeneration } from '../media/claim'
 import { writeRoute } from '../ai/routes'
-import { saveKey, upsertProvider } from '../providers'
+import { getProvider, saveKey, setEnabled, upsertProvider } from '../providers'
 import { toBase64 } from '../crypto'
+import { imageProviderGate, imageSecretName, slideGate } from './gate'
+import { providerBlocker } from '../limits'
+import { imageReadiness } from '../media/readiness'
 
 let db: FakeDb
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
@@ -914,5 +917,141 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     // لا مكانَ للأوّل: «؛» في الرأس بلا ما قبلها أسوأُ من إسقاطه
     const full = noteOf({ brief: null, detail: 'سقط' }, { reason: 'ض'.repeat(2000) })
     expect(full).toBe(lone)
+  })
+})
+
+/**
+ * D-163 · **القرارُ نقيٌّ، والدالّةُ والنقطةُ تناديانه معًا**.
+ */
+describe('slideGate — حكمُ الشريحة بترتيب composeSlide', () => {
+  it('الإطفاءُ يسبق البيئة، والمفتاحُ والحسابُ حالٌ واحدة، و`missing` يسمّي الغائب', () => {
+    expect(slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }))
+      .toEqual({ state: 'off', missing: ['key', 'account'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true }))
+      .toEqual({ state: 'unset', missing: ['key'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: true, hasAccount: false }))
+      .toEqual({ state: 'unset', missing: ['account'] })
+    expect(slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true }))
+      .toEqual({ state: 'ready', missing: [] })
+  })
+
+  it('ومسافاتٌ وحدها غيابٌ عند composeSlide — فلا يقول اللوحُ «مضبوط» ولا تُنادى', async () => {
+    const out = await composeSlide(
+      { db, bucket: bucket(), encKey: '', workerSecrets: { CF_AI_ACCOUNT_ID: '   ', CF_BROWSER_TOKEN: 't' } },
+      { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: 'عنوان', kicker: '' },
+    )
+    expect(out.slide).toBeNull()
+    expect(out.reason).toContain('CF_BROWSER_TOKEN')
+  })
+})
+
+describe('imageSecretName — اسمُ السرّ يتبع المزوّد', () => {
+  it('Gemini المدمَج ← GEMINI_API_KEY، وCloudflare ← CF_AI_TOKEN، والمضاف ← لا سرّ', () => {
+    expect(imageSecretName({ name: 'gemini', builtin: true })).toBe('GEMINI_API_KEY')
+    expect(imageSecretName({ name: 'cloudflare', builtin: false })).toBe('CF_AI_TOKEN')
+    expect(imageSecretName({ name: 'deepseek', builtin: false })).toBeUndefined()
+    expect(imageSecretName({ name: 'gemini', builtin: false })).toBeUndefined()
+  })
+})
+
+/**
+ * D-163 · **ما يُعرَف قبل الدفع يُسأل قبل الدفع**: كان السائقُ والحسابُ يُكتشفان
+ * داخل النداء، بعد الحجز وبعد أن سُجّل ثمنُ الموجز.
+ */
+describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)', () => {
+  const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  /** مزوّدُ كتابةٍ بمفتاحٍ وعنوانٍ يردّ موجزًا — فعلى الشيفرة القديمة يُدفَع ثمنُه. */
+  async function seedWriter(): Promise<void> {
+    await upsertProvider(
+      db,
+      { name: 'writer', label: 'Writer', kind: 'openai_compat', baseUrl: 'https://api.writer.test/v1' },
+      'test',
+    )
+    await saveKey(db, ENC, 'writer', 'sk-writer-key-long', 'test')
+    await writeRoute(db, 'draft', 'writer', 'w-1', 'test')
+  }
+
+  function lane(): typeof fetch {
+    calls = []
+    return (async (input: unknown): Promise<Response> => {
+      const url = String(input)
+      calls.push({ url, body: null, headers: {} })
+      if (url.includes('api.writer.test')) {
+        return new Response(JSON.stringify({
+          model: 'w-1',
+          choices: [{ message: { content: '{"subject":"folded brass","headline":"أثرٌ يُقاس"}' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 100, completion_tokens: 20 },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: true, result: { image: 'AAECAw==' } }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }) as unknown as typeof fetch
+  }
+
+  const cloudflare = (baseUrl?: string) => upsertProvider(db, {
+    name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+    model: '@cf/black-forest-labs/flux-1-schnell', ...(baseUrl === undefined ? {} : { baseUrl }),
+  }, 'test')
+
+  it('Cloudflare بمفتاحٍ وبلا حساب: يُردّ قبل الموجز — ولا صفَّ في الدفتر', async () => {
+    await seedWriter()
+    await cloudflare()
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_TOKEN: 'tok-1' }, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    if (out.kind === 'failed') expect(out.reason).toContain('CF_AI_ACCOUNT_ID')
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  it('ومتغيّرُ الحساب مسافاتٍ يرجع إلى عنوان البطاقة — كما يفعل المقطع', async () => {
+    await cloudflare('https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_ACCOUNT_ID: '  ', CF_AI_TOKEN: 'tok-1' }, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out.kind).toBe('generated')
+    expect(calls.some((c) => c.url.includes('/accounts/card-acc/ai/run/'))).toBe(true)
+  })
+
+  it('ومزوّدٌ لا سائقَ صورةٍ له: يُردّ قبل أن يُرسَل مفتاحُه إلى Google', async () => {
+    await seedWriter()
+    // مفتاحُ Anthropic في الخزنة — وكان يُفكّ ويُرسَل إلى عنوان Google بعد الموجز
+    await saveKey(db, ENC, 'anthropic', 'sk-ant-vault-secret-0001', 'test')
+    await writeRoute(db, 'image', 'anthropic', 'claude-opus-5', 'test')
+    const out = await generateForPost(
+      { db, bucket: bucket(), encKey: ENC, workerSecrets: {}, fetchImpl: lane() },
+      await seedPost(),
+    )
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    if (out.kind === 'failed') expect(out.reason).toContain('لا يولّد صورًا')
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+  })
+
+  it('تطابق: مزوّدُ الصورة معطَّل — الدالّةُ تعود «معطَّل»، والنقطةُ ساقطةٌ «معطَّلٌ بقرارك»', async () => {
+    await setEnabled(db, 'gemini', false, 'test')
+    const out = await generateForPost(deps(net()), await seedPost())
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('معطَّل')
+    expect(calls).toHaveLength(0)
+
+    const record = (await getProvider(db, 'gemini'))!
+    const refusal = imageProviderGate({
+      name: 'gemini', exists: true, hasKey: true, hasAccount: false,
+      blocker: providerBlocker(record, 0),
+    })
+    const line = imageReadiness({
+      blocker: null, provider: { label: record.label, refusal },
+      slide: slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }), briefReady: true,
+    })
+    expect(line.next).toMatchObject({ key: 'provider', state: 'failed', note: 'Gemini معطَّلٌ بقرارك' })
+    expect(line.blocked).toBe(true)
   })
 })

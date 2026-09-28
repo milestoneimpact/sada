@@ -12,8 +12,30 @@ import { panelPage, type PanelData } from '../src/routes/panelView'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
+import { imageProviderGate, slideGate } from '../src/lib/image/gate'
+import { imageReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
 
 const now = new Date('2026-09-05T18:00:00Z')
+
+/*
+ * **نقاطُ الجاهزيّة من الدوالّ نفسِها لا من نصٍّ مكتوبٍ هنا** (D-163): مفتاحُ
+ * المتصفّح غائبٌ والتركيبُ مرفوع، فتُرسَم «النصُّ فوقها» تنتظرك تحت d1 (صورتُها
+ * مرفوضة)، ويُرسَم سطرُ المقطع برابط Worker وحده تحت d3 (صورتُها جاهزة) —
+ * حالان «تنتظرك» برابطيهما، فيُقاس الرابطُ والسببُ لا النقاطُ وحدها.
+ */
+const slide = slideGate({ overlay: true, hasBrowserKey: false, hasAccount: false })
+const mediaReady = {
+  image: imageReadiness({
+    blocker: null,
+    provider: {
+      label: 'Gemini',
+      refusal: imageProviderGate({ name: 'gemini', exists: true, blocker: null, hasKey: true, hasAccount: false }),
+    },
+    slide,
+    briefReady: true,
+  }),
+  video: videoReadiness({ face: 'binding', blocker: null }),
+}
 
 function ago(hours: number): string {
   return new Date(now.getTime() - hours * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
@@ -31,7 +53,8 @@ const data: PanelData = {
   autoEnqueue: true,
   imageOverlay: true,
   pageOnly: [],
-  browserToken: false,
+  slide,
+  mediaReady,
   analysisCap: 10,
   spendCap: 5,
   usedAnalyses: 6,
@@ -95,6 +118,11 @@ const data: PanelData = {
     { task: 'analyze', provider: 'anthropic', model: 'claude-opus-5', why: 'حكمٌ يحتاج فهما عميقا', ready: true, implemented: true },
     { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', why: 'الصياغةُ العربيّة', ready: false, implemented: false },
     { task: 'image', provider: 'gemini', model: 'gemini-2.5-flash-image', why: 'توليدُ الصور', ready: false, implemented: false },
+    // والمقطعُ برابط Worker وحده: الجدولُ ينتظرك بملاحظة النقطة نفسِها لا «جاهز»
+    {
+      task: 'video', provider: 'cloudflare', model: 'alibaba/hh1-i2v', why: 'صورةٌ ← مقطعٌ رأسيّ',
+      ready: false, implemented: true, pending: routeDot(mediaReady, 'video')?.note ?? '',
+    },
   ],
   knownProviders: [
     { name: 'anthropic', label: 'Anthropic' },

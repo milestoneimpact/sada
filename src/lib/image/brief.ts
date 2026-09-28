@@ -37,6 +37,7 @@ import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
 import { routeFor } from '../ai/routes'
 import { recordCost } from '../cost'
+import { blockerReason, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
 import type { Db } from '../tokens'
 
@@ -189,6 +190,19 @@ export async function visualBrief(
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
     return { brief: null, cost: 0, detail: `لا مزوّدَ للكتابة (${route.provider})` }
+  }
+
+  /*
+   * **ومزوّدُ الكتابة يمرّ بحارسه هنا كما يمرّ في الكتابة** (D-163).
+   *
+   * `draftPost` و`planWeek` تناديان `checkProvider` قبل نداءيهما، والموجزُ
+   * لا. و`resolveKey` تعيد سرَّ البيئة ولو عُطّل المزوّد، **فكان مزوّدٌ
+   * أطفأه المالكُ يُنادى ويُحاسَب عليه** مع كلّ صورة، وسقفُه اليوميُّ لا
+   * يوقفه. والسقوطُ هنا كسائر سقوط الموجز: صورةٌ بلا عنوانٍ بسببٍ يُقرأ.
+   */
+  const perProvider = await checkProvider(deps.db, provider.name)
+  if (perProvider !== null) {
+    return { brief: null, cost: 0, detail: blockerReason(perProvider) }
   }
 
   const secretName = provider.builtin

@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { fingerprint } from '../lib/security/digest'
 import { readSettings, writeSetting } from '../lib/settings'
-import { getProvider, resolveKey } from '../lib/providers'
+import { getProvider, resolveKey, setEnabled, upsertProvider } from '../lib/providers'
+import { recordCost } from '../lib/cost'
+import { writeRoute } from '../lib/ai/routes'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -2663,6 +2665,202 @@ describe('ما وقع اليوم (D-127)', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('تبديل مفتاح — Anthropic')
     expect(html).not.toContain('لم يقع شيءٌ بعدُ')
+  })
+})
+
+/**
+ * نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — **من البيئة والقاعدة كما
+ * يقرؤهما النداءُ عند الضغط**، والأسرارُ تُسأل عن وجودها ولا تُطبَع.
+ */
+describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
+  async function seedDraft(): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'linkedin', 'text', ?, 'draft', ?)`)
+      .bind(id, 'نصٌّ ينتظر صورة', `k-${id}`)
+      .run()
+    return id
+  }
+  /** صورةٌ جاهزةٌ على المسوّدة — فيُرسَم تحتها زرُّ «حرّكها فيديو» وسطرُه. */
+  async function seedImage(postId: string): Promise<void> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key)
+         VALUES (?, ?, ?, 'image/png', 2048, 'وصف', 'gemini-2.5-flash-image', 0.04, 'ready', ?)`,
+      )
+      .bind(id, postId, `image/${postId}/${id}`, `image:${postId}:${id}`)
+      .run()
+  }
+  const panelHtml = async (): Promise<string> =>
+    (await app.request('/panel', withSession(await login()), env)).text()
+  /** صفُّ المهمّة في جدول التوجيه — من اسمها إلى آخر خليّته. */
+  const routeRow = (html: string, label: string): string => {
+    const at = html.indexOf(`<div class="nm">${label}</div>`)
+    expect(at).toBeGreaterThan(-1)
+    return html.slice(at, html.indexOf('</tr>', at))
+  }
+  /** رقمُ «مهامٌّ جاهزة» في شريط المزوّدين. */
+  const tasksReady = (html: string): number =>
+    Number(/مهامٌّ جاهزة<\/div>\s*<div class="v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
+  const IMAGE_BUTTON_OFF = '<button class="g sm" type="submit" disabled>ولّد صورة</button>'
+  const IMAGE_BUTTON_ON = '<button class="g sm" type="submit">ولّد صورة</button>'
+
+  it('صورٌ إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطةُ المزوّد تامّة، والجدولُ «جاهز»، والقيمةُ لا تظهر', async () => {
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      baseUrl: 'https://api.cloudflare.com/client/v4/accounts/acc-1234/ai/v1',
+    }, 'test')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    await seedDraft()
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0001'
+    const html = await panelHtml()
+    expect(html).toContain('title="تامّة — Cloudflare"')
+    expect(html).not.toContain('لا مفتاحَ لـ Cloudflare')
+    const row = html.slice(html.indexOf('الصورة — التوليد البصريّ'), html.indexOf('</tr>', html.indexOf('الصورة — التوليد البصريّ')))
+    expect(row).toContain('جاهز')
+    expect(row).not.toContain('مزوّده غير جاهز')
+    expect(html).not.toContain('cf-ai-secret-value-0001')
+  })
+
+  it('مفتاحُ المتصفّح بلا معرّف الحساب: «ينقصك» المعرّفُ لا المفتاح — والسرُّ لا يظهر', async () => {
+    await seedDraft()
+    // مزوّدُ الصورة الافتراضيُّ بمفتاحه، فأوّلُ ما ينتظرك هو الشريحة
+    env['GEMINI_API_KEY'] = 'AIza-test-0001'
+    env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0001'
+    const html = await panelHtml()
+    expect(html).toContain('<span class="ago">بلا معرّف حساب Cloudflare</span>')
+    expect(html).toContain('<span class="mono">CF_AI_ACCOUNT_ID</span> غيرُ مضبوطٍ')
+    expect(html).not.toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ')
+    expect(html).not.toContain('مضبوطان')
+    expect(html).not.toContain('سرّ-المتصفّح-0001')
+  })
+
+  it('وبطاقةُ «النصُّ فوق الصورة» بفروعها الثلاثة — لا تقول «مضبوط» إلّا للاثنين', async () => {
+    const none = await panelHtml()
+    expect(none).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker، ومعه')
+
+    env['CF_BROWSER_TOKEN'] = 'b-0001'
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    expect(await panelHtml()).toContain('مفتاحُ المتصفّح ومعرّفُ الحساب مضبوطان.')
+
+    // ومسافاتٌ وحدها غيابٌ كما هي عند `composeSlide`
+    env['CF_BROWSER_TOKEN'] = '   '
+    const blank = await panelHtml()
+    expect(blank).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،')
+    expect(blank).not.toContain('مضبوطان')
+  })
+
+  it('والإيقافُ يعطّل «ولّد صورة» وسببُه بجانبه — والحارسُ في الدالّة باقٍ', async () => {
+    await seedDraft()
+    const cookie = await login()
+    await writeSetting(db, 'paused', 'true', 'test')
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
+    expect(html).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
+  })
+
+  /*
+   * **ومن GET /panel إلى النقطة** — الحقائقُ تُجمَع هنا وحدَه. والدوالُّ
+   * النقيّةُ مختبَرةٌ بما يُمرَّر إليها؛ **وما يُمرَّر هو الذي يفترق**: حارسٌ
+   * يُستبدَل بـ`null`، أو موجزٌ يُفرَض جاهزًا، أو حسابٌ يُفرَض حاضرًا، فتقول
+   * النقطةُ «تامّة» والدالّةُ تردّ عند الضغط. فكلُّ حقيقةٍ بحالٍ تُسقطها.
+   */
+  it('Gemini معطَّلٌ ومفتاحُه في البيئة: النقطةُ تسقط بقرارك، والزرُّ معطَّل', async () => {
+    await seedDraft()
+    env['GEMINI_API_KEY'] = 'AIza-test-0001'
+    await setEnabled(db, 'gemini', false, 'test')
+    const html = await panelHtml()
+    expect(html).toContain('<span class="ago">Gemini معطَّلٌ بقرارك</span><a class="tap" href="#providers">افتح المزوّدين</a>')
+    expect(html).toContain(IMAGE_BUTTON_OFF)
+    expect(routeRow(html, 'الصورة — التوليد البصريّ')).toContain('مزوّده غير جاهز')
+  })
+
+  it('Gemini بلغ سقفَه اليوميّ: النقطةُ من الدفتر، والزرُّ معطَّل', async () => {
+    await seedDraft()
+    env['GEMINI_API_KEY'] = 'AIza-test-0001'
+    db.raw.exec(`UPDATE providers SET daily_cap = 0.05 WHERE name = 'gemini'`)
+    // تحت السقف: تامّةٌ والزرُّ يعمل — فالسقوطُ بعده من الدفتر لا من السقف وحدَه
+    await recordCost(db, { provider: 'gemini', operation: 'image', units: 1, unitCost: 0.04 })
+    const under = await panelHtml()
+    expect(under).toContain('title="تامّة — Gemini"')
+    expect(under).toContain(IMAGE_BUTTON_ON)
+
+    await recordCost(db, { provider: 'gemini', operation: 'image', units: 1, unitCost: 0.04 })
+    const over = await panelHtml()
+    expect(over).toContain('<span class="ago">بلغ Gemini سقفَه اليوميّ</span>')
+    expect(over).toContain(IMAGE_BUTTON_OFF)
+  })
+
+  it('مزوّدُ الكتابة معطَّلٌ والشريحةُ مضبوطة: «لا مزوّدَ يصوغ العنوان» ينتظرك ولا يُعطِّل', async () => {
+    await seedDraft()
+    env['GEMINI_API_KEY'] = 'AIza-test-0001'
+    env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+    env['CF_BROWSER_TOKEN'] = 'b-0001'
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    const ready = await panelHtml()
+    expect(ready).toContain('title="تامّة — يُركَّب العنوان"')
+    expect(ready).not.toContain('لا مزوّدَ يصوغ العنوان')
+
+    await setEnabled(db, 'anthropic', false, 'test')
+    const off = await panelHtml()
+    expect(off).toContain('<span class="ago">لا مزوّدَ يصوغ العنوان</span><a class="tap" href="#providers">افتح المزوّدين</a>')
+    // الصورةُ تخرج بلا عنوان — فالزرُّ يعمل
+    expect(off).toContain(IMAGE_BUTTON_ON)
+    expect(off).not.toContain('sk-ant-test-0001')
+  })
+
+  it('الحسابُ والمفتاحُ في أسرار Worker: نقطةُ المقطع «من أسرار Worker»، والجدولُ «جاهز»', async () => {
+    await seedImage(await seedDraft())
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0002'
+    const html = await panelHtml()
+    expect(html).toContain('title="تامّة — من أسرار Worker"')
+    expect(html).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
+    expect(routeRow(html, 'الفيديو — تحريكُ الصورة')).toContain('جاهز')
+    expect(html).not.toContain('cf-ai-secret-value-0002')
+  })
+
+  it('صورٌ إلى بطاقة Cloudflare بلا حسابٍ في عنوانها ولا في البيئة: النقطةُ تسقط، والزرُّ معطَّل', async () => {
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      baseUrl: 'https://gateway.ai.cloudflare.com/v1/compat',
+    }, 'test')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    await seedDraft()
+    // والمفتاحُ حاضرٌ: فالسقوطُ بالحساب وحدَه لا بالمفتاح قبله
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0003'
+    const html = await panelHtml()
+    expect(html).toContain('<span class="ago">لا معرّفَ حسابٍ لـ Cloudflare</span>')
+    expect(html).toContain(IMAGE_BUTTON_OFF)
+    expect(routeRow(html, 'الصورة — التوليد البصريّ')).toContain('مزوّده غير جاهز')
+  })
+
+  /*
+   * **ورابطُ Worker وحدَه ليس «جاهزًا»**: يبلغ حسابَ الـ Worker لا حسابَ
+   * Workers AI — وهو حالُ المالك، والرابطُ معرَّفٌ في البيئتين. فكان الجدولُ
+   * يقول «● جاهز» والنقطةُ تحت الزرّ «تنتظرك»: التناقضُ نفسُه معكوسًا.
+   */
+  it('رابطُ `env.AI` وحده: النقطةُ تنتظرك، والجدولُ ينتظرك مثلَها، ولا يُعدّ في المهامّ الجاهزة', async () => {
+    await seedImage(await seedDraft())
+    env['AI'] = { run: async () => ({}) }
+    const html = await panelHtml()
+    expect(html).toContain('title="تنتظرك — برابط Worker وحده"')
+    // ينتظرك ولا يسقط: الزرُّ يعمل
+    expect(html).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
+    const row = routeRow(html, 'الفيديو — تحريكُ الصورة')
+    expect(row).not.toContain('st ok')
+    expect(row).not.toContain('مزوّده غير جاهز')
+    expect(row).toContain('<span class="st warn"')
+    expect(row).toContain('برابط Worker وحده')
+    expect(tasksReady(html)).toBe(0)
+
+    // والبيئةُ تكفيه: يصير «جاهزًا» ويُعدّ
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0004'
+    const envHtml = await panelHtml()
+    expect(routeRow(envHtml, 'الفيديو — تحريكُ الصورة')).toContain('<span class="st ok"')
+    expect(tasksReady(envHtml)).toBe(1)
   })
 })
 

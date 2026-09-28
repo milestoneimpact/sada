@@ -24,7 +24,9 @@ const BUILTIN_DOCS: Readonly<Record<string, string>> = {
 import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
 import { verifyKey } from '../lib/ai/verify'
 import { listModels } from '../lib/ai/models'
-import { cfAccountId } from '../lib/ai/cloudflare'
+import { cfAccountId, cfAccountOf } from '../lib/ai/cloudflare'
+import { imageProviderGate, imageSecretName, slideGate } from '../lib/image/gate'
+import { imageReadiness, routeDot, videoReadiness } from '../lib/media/readiness'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
@@ -34,7 +36,7 @@ import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
-import { animateForPost, bindingFor } from '../lib/media/video'
+import { animateForPost, bindingFor, videoFace } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
@@ -44,7 +46,7 @@ import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money } from '../lib/format'
-import { checkAllowance } from '../lib/limits'
+import { checkAllowance, providerBlocker } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
 import {
@@ -443,7 +445,63 @@ panel.get('/panel', async (c) => {
   const flash = await takeFlash(c.env, c.req.raw)
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
   const openCount = (await openSuggestions(c.env.DB)).length
-  const ownerPending = pendingCount(await ownerFacts(c))
+  // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
+  const facts = await ownerFacts(c)
+  const ownerPending = pendingCount(facts)
+
+  /*
+   * **نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع** (D-163).
+   *
+   * ممّا حُمِّل أعلاه وحدَه — البطاقاتُ والتوجيهُ والحارسُ والحقائق — ولا
+   * استعلامَ جديد. **وكلُّ حكمٍ من الدالّة التي يحكم بها النداءُ نفسُه عند
+   * الضغط**: `imageProviderGate` و`slideGate` و`videoFace` و`providerBlocker`.
+   * والأسرارُ تُسأل عن وجودها لا عن قيمتها (D-005).
+   */
+  const routeOf = (task: TaskName): string => routes.find((r) => r.task === task)?.provider ?? ''
+  const cardOf = (name: string): (typeof providerCards)[number] | undefined =>
+    providerCards.find((p) => p.name === name)
+  const imageName = routeOf('image')
+  const imageCard = cardOf(imageName)
+  const imageSecret = imageCard === undefined ? undefined : imageSecretName(imageCard)
+  const imageRefusal = imageProviderGate({
+    name: imageName,
+    exists: imageCard !== undefined,
+    blocker: imageCard === undefined ? null : providerBlocker(imageCard, imageCard.spendToday),
+    // `configured` يعرف سرَّ المدمَجين وحدهم، و`generateForPost` تقرأ `CF_AI_TOKEN`
+    // لبطاقة Cloudflare كذلك — فيُسأل عنه باسمه من الدالّة نفسِها
+    hasKey: imageCard !== undefined &&
+      (imageCard.configured || (imageSecret !== undefined && facts.secrets.has(imageSecret))),
+    hasAccount: cfAccountOf(c.env.CF_AI_ACCOUNT_ID, imageCard?.baseUrl) !== '',
+  })
+  const slide = slideGate({
+    overlay: allowance.settings.imageOverlay,
+    hasBrowserKey: facts.secrets.has('CF_BROWSER_TOKEN'),
+    hasAccount: facts.vars.has('CF_AI_ACCOUNT_ID'),
+  })
+  // والموجزُ يكتبه مزوّدُ الكتابة ويمرّ بحارسه (D-163) — فيُسأل عنه بالحارس نفسِه
+  const briefCard = cardOf(routeOf('draft'))
+  const briefReady = briefCard !== undefined && briefCard.configured &&
+    providerBlocker(briefCard, briefCard.spendToday) === null
+  const cfCard = cardOf('cloudflare')
+  const face = videoFace({
+    envAccount: facts.vars.has('CF_AI_ACCOUNT_ID'),
+    envToken: facts.secrets.has('CF_AI_TOKEN'),
+    // ومفتاحُ البطاقة من الخزنة وحدها: غيرُ مدمَجةٍ فلا سرَّ لها في `configured`،
+    // وهو عينُ ما يقرؤه `bindingFor`
+    card: cfCard === undefined
+      ? null
+      : { enabled: cfCard.enabled, hasKey: cfCard.configured, urlAccount: cfAccountId(cfCard.baseUrl) !== null },
+    binding: c.env.AI !== undefined,
+  })
+  const mediaReady = {
+    image: imageReadiness({
+      blocker: allowance.blocker,
+      provider: { label: imageCard?.label ?? imageName, refusal: imageRefusal },
+      slide,
+      briefReady,
+    }),
+    video: videoReadiness({ face, blocker: allowance.blocker }),
+  }
   // **يُحسَب عند العرض لا يُقرأ من الصفّ**: الصفُّ أثرُ ما وقع،
   // والشريطُ حالٌ الآن — ودورةٌ سقطت لا تُخفي رمزا يوشك (D-065)
   const expiring = (await expiringTokens(c.env.DB, new Date())).map((e) => ({
@@ -457,7 +515,8 @@ panel.get('/panel', async (c) => {
       autoEnqueue: allowance.settings.autoEnqueue,
       imageOverlay: allowance.settings.imageOverlay,
       // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
-      browserToken: typeof c.env.CF_BROWSER_TOKEN === 'string' && c.env.CF_BROWSER_TOKEN.length > 0,
+      slide,
+      mediaReady,
       analysisCap: allowance.settings.dailyAnalysisCap,
       spendCap: allowance.settings.dailySpendCapUsd,
       // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
@@ -467,14 +526,30 @@ panel.get('/panel', async (c) => {
       series,
       sources,
       providers: providerCards,
-      routing: routes.map((r) => ({
-        task: r.task,
-        provider: r.provider,
-        model: r.model,
-        why: r.why,
-        implemented: r.implemented,
-        ready: r.implemented && providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
-      })),
+      routing: routes.map((r) => {
+        /*
+         * **والصورةُ والمقطعُ من نقطتيهما عينِهما** (D-163): كان الجدولُ يقول
+         * «مزوّده غير جاهز» لصورٍ موجَّهةٍ إلى Cloudflare بمفتاح `CF_AI_TOKEN`
+         * وهي تعمل، ولمقطعٍ يُنادى من البيئة — فتناقض شاشةُ المزوّدين نقطةً
+         * تحت الزرّ تقول «جاهز». والمقطعُ لا يقرأ من توجيهه إلّا النموذج.
+         *
+         * **و«جاهز» هي «تامّة» وحدها**: رابطُ Worker وحده ينتظرك في النقطة،
+         * فينتظرك في الجدول ولا يُعدّ في المهامّ الجاهزة — والرابطُ معرَّفٌ
+         * في البيئتين، فكان كلُّ لوحٍ بلا `CF_AI_ACCOUNT_ID` يقول «جاهز».
+         */
+        const dot = routeDot(mediaReady, r.task)
+        return {
+          task: r.task,
+          provider: r.provider,
+          model: r.model,
+          why: r.why,
+          implemented: r.implemented,
+          ready: r.implemented && (dot === undefined
+            ? providerCards.some((p) => p.name === r.provider && p.configured && p.enabled)
+            : dot.state === 'done'),
+          ...(r.implemented && dot?.state === 'now' ? { pending: dot.note } : {}),
+        }
+      }),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       drafts,
       media: media.map((m) => ({

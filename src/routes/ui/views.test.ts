@@ -35,6 +35,17 @@ import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
 import { panelPage } from '../panelView'
 import { SCRIPT } from './panelScript'
+import { imageReadiness, videoReadiness } from '../../lib/media/readiness'
+import { slideGate } from '../../lib/image/gate'
+
+/** نقاطٌ تامّةٌ كلُّها — لما لا يُختبَر فيه السطرُ نفسُه (D-163). */
+const READY = {
+  image: imageReadiness({
+    blocker: null, provider: { label: 'Gemini', refusal: null },
+    slide: slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true }), briefReady: true,
+  }),
+  video: videoReadiness({ face: 'env', blocker: null }),
+}
 
 describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
   it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {
@@ -89,6 +100,7 @@ describe('شعارُ المسوّدة من مصدره الواحد', () => {
     draftsSection({
       drafts: [draft(platform)], media: [], targets: [], earliest: '2026-09-06T09:15',
       writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: READY,
     })
 
   it('منصّةٌ ثالثةٌ لها شعارُها — **وكانت تُرسَم بلا شعار**', () => {
@@ -347,6 +359,7 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
     drafts: [draft('a', 'linkedin', '2026-09-05 09:00:00', 0.02), draft('b', 'x', '2026-09-06 09:00:00', 0.05)],
     media: [], targets: [], earliest: '2026-09-06T09:15',
     writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: READY,
   })
 
   it('تبويبُ المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراضُ الكلّ', () => {
@@ -412,6 +425,7 @@ describe('ما تغيّر قبل الاعتماد (D-128)', () => {
     draftsSection({
       drafts: [d], media: [], targets: [], earliest: '2026-09-06T09:15',
       writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: READY,
     })
 
   it('المعدَّلةُ تحمل فرقَها مطويًّا: المحذوفُ بـ«−» والمضافُ بـ«+»', () => {
@@ -449,6 +463,7 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
       }],
       targets: [], earliest: '2026-09-06T09:15',
       writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: READY,
     })
   const NO_KEY = 'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker'
   const OFF = 'تركيبُ النصّ مُطفأٌ من الإعدادات'
@@ -793,5 +808,120 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
   it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
     expect(status('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="g">&lt;</span>x</span>')
     expect(status('', '●', 'x')).toContain('<span class="st"><span class="g"><svg')
+  })
+})
+
+/**
+ * نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — **ما ستقوله الدالّةُ
+ * بعد الضغط يُقال قبله**، وزرٌّ تسقط نقطتُه يُعطَّل وسببُه بجانبه.
+ */
+describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163)', () => {
+  const draft = (id: string, state: DraftRow['status'] = 'draft'): DraftRow => ({
+    id, platform: 'linkedin', text: 'نصّ', rationale: null, status: state, model: null,
+    cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
+    approvedAt: null, createdAt: '2026-09-05 09:00:00', scheduledAt: null,
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: null,
+  })
+  const picture = (postId: string, mime = 'image/png') => ({
+    id: `m-${postId}-${mime.slice(0, 5)}`, postId, mime, bytes: 1000, prompt: '', cost: 0,
+    status: 'ready' as const, note: null, headline: null,
+  })
+  const section = (
+    drafts: DraftRow[],
+    over: { media?: ReturnType<typeof picture>[]; mediaReady?: typeof READY } = {},
+  ): string =>
+    draftsSection({
+      drafts, media: over.media ?? [], targets: [], earliest: '2026-09-06T09:15',
+      writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: over.mediaReady ?? READY,
+    })
+  const withImage = (slide: ReturnType<typeof slideGate>, over: Partial<Parameters<typeof imageReadiness>[0]> = {}) =>
+    ({
+      ...READY,
+      image: imageReadiness({
+        blocker: null, provider: { label: 'Gemini', refusal: null }, slide, briefReady: true, ...over,
+      }),
+    })
+  const ON = slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true })
+
+  it('سطرُ الصورة داخل «بلا صورة» بعد «ولّد صورة»، ونقاطُه لونٌ ورمزٌ وكلمة', () => {
+    const html = section([draft('d1')])
+    const box = html.slice(html.indexOf('<div class="pic none">'), html.indexOf('<div class="draft-meta">'))
+    expect(box.indexOf('ولّد صورة')).toBeGreaterThan(-1)
+    expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(box.indexOf('ولّد صورة'))
+    expect(box).toContain(status('ok', '●', 'الحدود', 'title="تامّة — مفتوحةٌ اليوم"'))
+    expect(box).toContain(status('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
+  })
+
+  it('وسطرُ المقطع بعد «حرّكها فيديو» — ولا زرَّ ولا سطرَ حين يوجد مقطع', () => {
+    const noClip = section([draft('d1')], { media: [picture('d1')] })
+    expect(noClip).toContain('حرّكها فيديو')
+    expect(noClip.indexOf(status('ok', '●', 'المفتاح', 'title="تامّة — من أسرار Worker"')))
+      .toBeGreaterThan(noClip.indexOf('حرّكها فيديو'))
+
+    const withClip = section([draft('d1')], { media: [picture('d1'), picture('d1', 'video/mp4')] })
+    expect(withClip).not.toContain('حرّكها فيديو')
+    expect(withClip).not.toContain('class="hint ready"')
+    expect(withClip).toContain('ارفض الصورة')
+  })
+
+  it('ولا سطرَ لمسوّدةٍ مرفوضةٍ أو منشورة — لا زرَّ فوقه', () => {
+    expect(section([draft('d1', 'rejected')])).not.toContain('class="hint ready"')
+    expect(section([draft('d1', 'published')], { media: [picture('d1')] })).not.toContain('class="hint ready"')
+  })
+
+  it('يُبنى مرّةً: ثلاثُ مسوّداتٍ فيها السطرُ نفسُه حرفًا', () => {
+    const html = section([draft('a'), draft('b'), draft('c')])
+    const lines = [...html.matchAll(/<p class="hint ready">[\s\S]*?<\/p>/g)].map((m) => m[0])
+    expect(lines).toHaveLength(3)
+    expect(new Set(lines).size).toBe(1)
+  })
+
+  it('والنقطةُ الساقطةُ تعطّل الزرَّ وسببُها ورابطُها بجانبه', () => {
+    const blocked = {
+      image: imageReadiness({
+        blocker: { kind: 'paused' }, provider: { label: 'Gemini', refusal: null }, slide: ON, briefReady: true,
+      }),
+      video: videoReadiness({ face: 'none', blocker: null }),
+    }
+    const empty = section([draft('d1')], { mediaReady: blocked })
+    expect(empty).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
+    expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
+
+    const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
+    expect(pictured).toContain('<button class="g sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(pictured).toContain('<span class="ago">لا مفتاحَ لـ Workers AI</span>')
+
+    // وما ينتظرك لا يعطّل: الصورةُ تخرج بلا عنوان، والزرُّ يعمل
+    const waiting = section([draft('d1')], {
+      mediaReady: withImage(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true })),
+    })
+    expect(waiting).toContain('<button class="g sm" type="submit">ولّد صورة</button>')
+    expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
+  })
+
+  it('واسمُ المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
+    const html = section([draft('d1')], {
+      mediaReady: withImage(ON, { provider: { label: '<img onerror=x>', refusal: { kind: 'no_key' } } }),
+    })
+    expect(html).not.toContain('<img onerror')
+    expect(html).toContain('<span class="ago">لا مفتاحَ لـ &lt;img onerror=x&gt;</span>')
+  })
+
+  it('و«بلا حرف» يتبع الشريحة: مطفأةٌ فبلا حرف، ومركَّبةٌ فعنوان، وناقصةٌ فبعدُ', () => {
+    const at = (overlay: boolean, hasBrowserKey: boolean): string =>
+      section([draft('d1')], { mediaReady: withImage(slideGate({ overlay, hasBrowserKey, hasAccount: true })) })
+    expect(at(false, true)).toContain('صورةٌ مجرّدةٌ <b>بلا حرف</b>')
+    expect(at(true, true)).toContain('<b>وفوقها عنوانٌ من كلمتين</b>')
+    expect(at(true, true)).not.toContain('بلا حرف')
+    expect(at(true, false)).toContain('<b>بلا عنوانٍ فوقها بعد</b>')
+  })
+
+  it('وسببُ السطر لا يمتدّ مئتي بكسل: قاعدةُ «بلا صورة» على ابنها المباشر وحده', () => {
+    expect(STYLE).toContain('.pic.none > .ago{flex:1 1 200px}')
+    expect(STYLE).not.toContain('.pic.none .ago{')
+    expect(STYLE).toContain('.hint.ready{')
+    // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
+    expect(STYLE).toContain('.hint.ready a{color:var(--brand)')
   })
 })

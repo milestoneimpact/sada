@@ -12,7 +12,7 @@ const fmt = { money: (n: number) => `${n.toFixed(2)}$` }
 const src: TileSource = {
   paused: false,
   autoEnqueue: true,
-  browserToken: true,
+  slide: { missing: [] },
   analysisCap: 10,
   spendCap: 5,
   usedAnalyses: 6,

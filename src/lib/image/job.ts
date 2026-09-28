@@ -5,7 +5,7 @@
  *
  *   ١ · اقرأ المنشور
  *   ٢ · إن وُلّدت صورةٌ لهذا النصّ — اخرج بلا نداء (D-004)
- *   ٣ · **افحص الإيقاف والسقفين وسقفَ المزوّد** — قبل أيّ نداء (D-019)
+ *   ٣ · **افحص الإيقاف والسقفين، ثمّ بوّابةَ المزوّد** — قبل أيّ نداء (D-019 · D-163)
  *   ٤ · نادِ المزوّد الموجَّه لمهمّة `image`
  *   ٥ · **سجّل الكلفة** (D-008)
  *   ٦ · ارفع البايتات إلى R2
@@ -26,7 +26,8 @@ import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
-import { cfAccountId } from '../ai/cloudflare'
+import { cfAccountOf } from '../ai/cloudflare'
+import { imageProviderGate, imageSecretName, slideGate, type ImageRefusal } from './gate'
 import { imagePrompt, topicOf } from './prompt'
 import { visualBrief } from './brief'
 import { screenshotSlide } from './render'
@@ -151,14 +152,21 @@ export async function composeSlide(
   // **والفحوصُ بترتيب ما يقرّره المالك** (D-157): الإعدادُ ثمّ السرّ ثمّ
   // العنوان ثمّ الحجم. كان العنوانُ أوّلا، فمن لم يضبط المفتاحَ بعدُ وسقط
   // موجزُه قرأ «بلا عنوان» — وهو سببٌ لا يصلحه، والسببُ الذي يصلحه مخفيّ
+  //
+  // **والحكمُ من `slideGate`** (D-163): اللوحُ يقرؤه قبل الضغط فيقول ما ستقوله
+  // هذه الدالّةُ بعده — وحكمٌ منسوخٌ في اللوح يفترق عن هذا عند أوّل تصحيح
   const settings = await readSettings(deps.db)
-  if (!settings.imageOverlay) {
+  const accountId = (deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? '').trim()
+  const apiToken = (deps.workerSecrets['CF_BROWSER_TOKEN'] ?? '').trim()
+  const gate = slideGate({
+    overlay: settings.imageOverlay,
+    hasBrowserKey: apiToken !== '',
+    hasAccount: accountId !== '',
+  })
+  if (gate.state === 'off') {
     return { slide: null, reason: OVERLAY_OFF }
   }
-
-  const accountId = deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? ''
-  const apiToken = deps.workerSecrets['CF_BROWSER_TOKEN'] ?? ''
-  if (accountId.trim() === '' || apiToken.trim() === '') {
+  if (gate.state === 'unset') {
     return {
       slide: null,
       reason:
@@ -264,6 +272,36 @@ const INSERT_IMAGE =
                       note, headline)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
+/**
+ * ما يُقال حين تردّ بوّابةُ المزوّد — **ونصوصُ ما كان قائمًا باقيةٌ حرفًا**:
+ * «مزوّدٌ غير موجود» و«لا مفتاح» وسببُ الحارس. والجديدان (السائقُ والحساب)
+ * كانا يقعان داخل النداء بعد الدفع، فلا نصَّ قبلهما يُحفَظ.
+ */
+function refusalOutcome(refusal: ImageRefusal, name: string, label: string): ImageOutcome {
+  switch (refusal.kind) {
+    case 'missing':
+      return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${name}`, retryable: false }
+    case 'cannot_image':
+      return {
+        kind: 'failed',
+        reason: `${label} لا يولّد صورًا — وجّه الصورَ إلى Gemini أو Cloudflare`,
+        retryable: false,
+      }
+    case 'blocked':
+      return { kind: 'blocked', reason: blockerReason(refusal.blocker) }
+    case 'no_key':
+      return { kind: 'failed', reason: `لا مفتاح لـ ${label}`, retryable: false }
+    case 'no_account':
+      return {
+        kind: 'failed',
+        reason:
+          'لا معرّفَ حسابٍ لـ Cloudflare — اضبط CF_AI_ACCOUNT_ID،' +
+          ' أو احفظ البطاقةَ بعنوانٍ فيه معرّفُ الحساب',
+        retryable: false,
+      }
+  }
+}
+
 export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
   // ١ · المنشور
   const post = await deps.db
@@ -302,35 +340,45 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   }
 
   const route = await routeFor(deps.db, 'image')
-
   const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${route.provider}`, retryable: false }
-  }
-
-  // وسقفُ المزوّد بعد العامّ لا قبله: مَن قدّم التفصيل على الجملة قال
-  // «Gemini متاح» ونظامُه موقوف
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
 
   /*
+   * ٣·أ · **بوّابةُ المزوّد — حقائقُها تُجمَع ثمّ يُحكَم مرّةً** (D-163).
+   *
+   * والحكمُ في `imageProviderGate` لا هنا: لوحُ المسوّدات يناديه بالحقائق
+   * نفسِها قبل الضغط. وسقفُ المزوّد بعد العامّ لا قبله — مَن قدّم التفصيل
+   * على الجملة قال «Gemini متاح» ونظامُه موقوف.
+   *
    * **واسمُ السرِّ يتبع المزوّد** (D-079): كان مقصورا على Gemini، فمن
-   * وجّه الصورَ إلى Cloudflare لم يجد رمزَه في البيئة ولو كان مضبوطا.
+   * وجّه الصورَ إلى Cloudflare لم يجد مفتاحَه في البيئة ولو كان مضبوطا.
+   *
+   * **والحسابُ يُسأل هنا لا داخل النداء**: كان `generateImageCf` وحده يكتشف
+   * أنّه فارغ — بعد الحجز، وبعد الموجز وقد سُجّل ثمنُه في الدفتر.
    */
-  const secretName =
-    provider.name === 'gemini' && provider.builtin
-      ? 'GEMINI_API_KEY'
-      : provider.name === 'cloudflare'
-        ? 'CF_AI_TOKEN'
-        : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) {
-    return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
+  const secretName = provider === null ? undefined : imageSecretName(provider)
+  const resolved = provider === null
+    ? { key: null }
+    : await resolveKey(
+        deps.db,
+        deps.encKey,
+        provider.name,
+        secretName === undefined ? undefined : deps.workerSecrets[secretName],
+      )
+  const accountId = cfAccountOf(deps.workerSecrets['CF_AI_ACCOUNT_ID'], provider?.baseUrl)
+  const refusal = imageProviderGate({
+    name: route.provider,
+    exists: provider !== null,
+    blocker: provider === null ? null : await checkProvider(deps.db, provider.name),
+    hasKey: resolved.key !== null,
+    hasAccount: accountId !== '',
+  })
+  // والشرطان بعده لا يقعان بعد بوّابةٍ مرّت — يقولانه للنوع لا للتشغيل
+  if (refusal !== null || provider === null || resolved.key === null) {
+    return refusalOutcome(
+      refusal ?? { kind: provider === null ? 'missing' : 'no_key' },
+      route.provider,
+      provider?.label ?? route.provider,
+    )
   }
 
   /*
@@ -381,12 +429,10 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
              * **ومعرّفُ الحساب يُقرأ من عنوان المزوّد حين يغيب السرّ**
              * (D-081): العنوان المحفوظ يحمله في مساره أصلا
              * (`‎/accounts/{id}/ai/v1`)، فمن ضبط البطاقة ولم يضبط
-             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ.
+             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ. وهو
+             * الحسابُ الذي سألت عنه البوّابةُ أعلاه، لا قراءةٌ ثانية
              */
-            accountId:
-              deps.workerSecrets['CF_AI_ACCOUNT_ID'] ??
-              cfAccountId(provider.baseUrl) ??
-              '',
+            accountId,
             apiToken: resolved.key,
             // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
             model: route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL,
