@@ -1,0 +1,196 @@
+/**
+ * نقاطُ الجاهزيّة تحت زرَّي «ولّد صورة» و«حرّكها فيديو» (D-163).
+ *
+ * ## لماذا
+ *
+ * كان سببُ الردّ يُقرأ **بعد الضغط**: موقوفٌ، أو سقفٌ بلغ، أو مزوّدٌ معطَّل،
+ * أو بلا مفتاح — في رسالةٍ تظهر مرّةً وتختفي. وأسوأُ منه سببُ الصورة بلا
+ * عنوان: يُقرأ **بعد الدفع**، ونداءُ الصورة ونداءُ الموجز قد حوسِب عليهما.
+ *
+ * فتُقال الأسبابُ قبل الضغط، نقطةً لكلّ بابٍ يمرّ به النداء، **بترتيب ما يقع
+ * عند الضغط**، وأوّلُ ساقطةٍ حكمٌ ورابطٌ إلى موضع إصلاحها — قاعدةُ سلّم المنصّة
+ * نفسُها (D-158).
+ *
+ * ## ولا يُحكَم هنا
+ *
+ * هذه الوحدةُ **تسمّي ولا تقرّر**: الحكمُ من `imageProviderGate` و`slideGate`
+ * و`videoFace` و`checkAllowance` — الدوالِّ التي يحكم بها النداءُ نفسُه. فنقطةٌ
+ * تقول «جاهز» والدالّةُ تردّ لا تقع إلّا إن افترقت الحقائقُ لا الحكم.
+ *
+ * واستيراداتُها أنواعٌ وحدها: لا تجرّ سائقًا ولا دفترًا إلى من يرسمها.
+ *
+ * ## وما لا نقطةَ له
+ *
+ * **العنوانُ والحجم** لا يُعرَفان قبل النداء: الموجزُ يُكتب عند الضغط، والصورةُ
+ * تُوزَن بعد أن تعود. فنقطةُ «النصُّ فوقها» التامّةُ تَعِد بالبيئة لا بالنصّ،
+ * ورسالةُ ما بعد التوليد تبقى الحكمَ الأخير فيهما.
+ */
+import type { Blocker } from '../limits'
+import type { RungState } from '../platform/readiness'
+import type { ImageRefusal, SlideGate } from '../image/gate'
+import type { VideoFace } from './video'
+
+export type DotKey = 'limits' | 'provider' | 'overlay' | 'key'
+
+export interface Dot {
+  readonly key: DotKey
+  readonly title: string
+  readonly state: RungState
+  /** ما وقع — ستُّ كلماتٍ فأقلّ، تُقرأ بجانب الزرّ لا في فقرة. */
+  readonly note: string
+  /** رابطٌ واحدٌ إلى موضع الإصلاح — وحيث لا يصلحها رابطٌ يُترَك. */
+  readonly action?: { readonly label: string; readonly href: string }
+}
+
+/** سطرا اللوح — يُحسَبان مرّةً لكلّ عرضٍ ويُرسَمان تحت كلّ بطاقة. */
+export interface MediaReady {
+  readonly image: MediaLine
+  readonly video: MediaLine
+}
+
+export interface MediaLine {
+  readonly dots: readonly Dot[]
+  /** أوّلُ ساقطةٍ، وإلّا أوّلُ ما ينتظرك — وهي ما يُكتب سببُها بجانب الزرّ. */
+  readonly next: Dot | null
+  /**
+   * أتُردّ الضغطةُ يقينًا؟ — **ساقطةٌ واحدةٌ تكفي**، ولا تسقط إلّا نقطةٌ يردّ
+   * بابُها النداءَ كلَّه. وما يُنقص الصورةَ ولا يمنعها («النصُّ فوقها») ينتظرك
+   * ولا يسقط، فلا يُعطِّل زرًّا يعمل.
+   */
+  readonly blocked: boolean
+}
+
+const LIMITS = { label: 'افتح الحدود', href: '#settings' } as const
+const PROVIDERS = { label: 'افتح المزوّدين', href: '#providers' } as const
+const TASKS = { label: 'ما عليك', href: '/panel/tasks' } as const
+
+/**
+ * سببُ الحارس في ستّ كلماتٍ فأقلّ — **شاملٌ للأنواع الخمسة**.
+ *
+ * و`blockerReason` تبقى نصَّ ما بعد الضغط كما هو: جملةٌ فيها الأرقام. وهذه
+ * تُقرأ بجانب زرٍّ صغير، والرقمُ في لوح الحدود لمن يريده.
+ */
+function blockerNote(b: Blocker, label: string): string {
+  switch (b.kind) {
+    case 'paused':
+      return 'موقوفٌ بقرارك'
+    case 'analysis_cap':
+      return 'بلغ سقفَ التحليل اليوميّ'
+    case 'spend_cap':
+      return 'بلغ سقفَ الإنفاق اليوميّ'
+    case 'provider_cap':
+      return `بلغ ${label} سقفَه اليوميّ`
+    case 'provider_disabled':
+      return `${label} معطَّلٌ بقرارك`
+  }
+}
+
+/**
+ * نقطةُ الحدود — **الإيقافُ والسقفان**، وهي `checkAllowance` نفسُها.
+ *
+ * وسقفُ **التحليل** يحجب الصورةَ والمقطع كما يحجب التحليل: الحارسُ العامّ
+ * واحدٌ للنداءات المدفوعة كلِّها. فتقوله النقطةُ كما هو، ولو قُرئ غريبًا.
+ */
+function limitsDot(blocker: Blocker | null): Dot {
+  if (blocker === null) return { key: 'limits', title: 'الحدود', state: 'done', note: 'مفتوحةٌ اليوم' }
+  const provider = blocker.kind === 'provider_cap' || blocker.kind === 'provider_disabled'
+  return {
+    key: 'limits',
+    title: 'الحدود',
+    state: 'failed',
+    note: blockerNote(blocker, provider ? blocker.provider : ''),
+    action: provider ? PROVIDERS : LIMITS,
+  }
+}
+
+function providerDot(label: string, refusal: ImageRefusal | null): Dot {
+  const failed = (note: string): Dot => ({ key: 'provider', title: 'المزوّد', state: 'failed', note, action: PROVIDERS })
+  if (refusal === null) return { key: 'provider', title: 'المزوّد', state: 'done', note: label }
+  switch (refusal.kind) {
+    case 'missing':
+      return failed('المزوّدُ الموجَّهُ غيرُ موجود')
+    case 'cannot_image':
+      return failed(`${label} لا يولّد صورًا`)
+    case 'blocked':
+      return failed(blockerNote(refusal.blocker, label))
+    case 'no_key':
+      return failed(`لا مفتاحَ لـ ${label}`)
+    case 'no_account':
+      return failed('لا معرّفَ حسابٍ لـ Cloudflare')
+  }
+}
+
+/**
+ * نقطةُ «النصُّ فوقها» — **ولا تُرسَم حين يُطفئه المالك**: الإطفاءُ قرارٌ
+ * لا عطل، ولوحُ الحدود يقوله. وما ينقص منها **ينتظرك ولا يسقط**: الصورةُ
+ * تخرج بلا عنوان، والزرُّ يعمل.
+ *
+ * والموجزُ بعد البيئة لا قبلها، بترتيب `composeSlide`: من لم يضبط المفتاحَ
+ * بعدُ لا يُقال له «لا مزوّدَ يصوغ العنوان» فيصلح ما لا يُصلح شيئًا.
+ */
+function overlayDot(slide: SlideGate, briefReady: boolean): Dot | null {
+  const title = 'النصُّ فوقها'
+  if (slide.state === 'off') return null
+  if (slide.state === 'unset') {
+    return slide.missing.includes('key')
+      ? { key: 'overlay', title, state: 'now', note: 'بلا مفتاح المتصفّح', action: TASKS }
+      : { key: 'overlay', title, state: 'now', note: 'بلا معرّف حساب Cloudflare', action: TASKS }
+  }
+  if (!briefReady) {
+    return { key: 'overlay', title, state: 'now', note: 'لا مزوّدَ يصوغ العنوان', action: PROVIDERS }
+  }
+  return { key: 'overlay', title, state: 'done', note: 'يُركَّب العنوان' }
+}
+
+function lineOf(dots: readonly Dot[]): MediaLine {
+  const failed = dots.find((d) => d.state === 'failed')
+  const now = dots.find((d) => d.state === 'now')
+  return { dots, next: failed ?? now ?? null, blocked: failed !== undefined }
+}
+
+export interface ImageReadinessInput {
+  /** حكمُ `checkAllowance` كما قُرئ للّوح. */
+  readonly blocker: Blocker | null
+  /** اسمُ مزوّد الصورة كما يراه المالك، وحكمُ `imageProviderGate` عليه. */
+  readonly provider: { readonly label: string; readonly refusal: ImageRefusal | null }
+  readonly slide: SlideGate
+  /** أيمرّ مزوّدُ الكتابة بحارسه ومعه مفتاح؟ — هو الذي يكتب الموجزَ والعنوان. */
+  readonly briefReady: boolean
+}
+
+/** سطرُ «ولّد صورة» — بترتيب `generateForPost`: الحدودُ ثمّ المزوّدُ ثمّ الشريحة. */
+export function imageReadiness(i: ImageReadinessInput): MediaLine {
+  const overlay = overlayDot(i.slide, i.briefReady)
+  return lineOf([
+    limitsDot(i.blocker),
+    providerDot(i.provider.label, i.provider.refusal),
+    ...(overlay === null ? [] : [overlay]),
+  ])
+}
+
+function keyDot(face: VideoFace): Dot {
+  const title = 'المفتاح'
+  switch (face) {
+    case 'env':
+      return { key: 'key', title, state: 'done', note: 'من أسرار Worker' }
+    case 'card':
+      return { key: 'key', title, state: 'done', note: 'من بطاقة Cloudflare' }
+    // **ينتظرك ولا يسقط**: الرابطُ يبلغ حسابَ الـ Worker وحده، ولا يُعرَف من
+    // هنا أهو حسابُ Workers AI — فلا يُعطَّل زرٌّ قد يعمل
+    case 'binding':
+      return { key: 'key', title, state: 'now', note: 'برابط Worker وحده', action: PROVIDERS }
+    case 'none':
+      return { key: 'key', title, state: 'failed', note: 'لا مفتاحَ لـ Workers AI', action: PROVIDERS }
+  }
+}
+
+/**
+ * سطرُ «حرّكها فيديو» — بترتيب `animateForPost`: الوجهُ ثمّ الحدود.
+ *
+ * **ولا نقطةَ للسعر**: `animateForPost` تكتب صفرًا موسومًا في كلّ مرّة، ولا
+ * مسارَ في الشيفرة يكتب سعرًا — فنقطتُه تنتظر إلى الأبد ولا يُطفئها فعلٌ من
+ * المالك، **وتنبيهٌ دائمٌ يُتعلَّم تجاهلُه**. ورسالةُ ما بعد التحريك تقوله.
+ */
+export function videoReadiness(i: { readonly face: VideoFace; readonly blocker: Blocker | null }): MediaLine {
+  return lineOf([keyDot(i.face), limitsDot(i.blocker)])
+}

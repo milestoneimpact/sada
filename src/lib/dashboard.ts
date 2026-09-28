@@ -31,7 +31,11 @@
 export interface TileSource {
   readonly paused: boolean
   readonly autoEnqueue: boolean
-  readonly browserToken: boolean
+  /**
+   * ما ينقص الشريحةَ — من `slideGate` (D-163). كان `browserToken` يعدّ
+   * المفتاحَ وحده «مرفوعًا» وحسابُ Cloudflare غائب، والصورةُ بلا عنوان.
+   */
+  readonly slide: { readonly missing: readonly string[] }
   readonly analysisCap: number
   readonly spendCap: number
   readonly usedAnalyses: number
@@ -253,7 +257,7 @@ export const TILES: readonly TileSpec[] = [
     label: 'حالُ النظام',
     why: 'مفتاحُ الإيقاف والإدراجُ الآليّ ومفتاحُ المتصفّح في بطاقةٍ واحدة.',
     of: (d) => {
-      const on = [!d.paused, d.autoEnqueue, d.browserToken].filter(Boolean).length
+      const on = [!d.paused, d.autoEnqueue, d.slide.missing.length === 0].filter(Boolean).length
       return {
         value: d.paused ? 'موقوف' : 'يعمل',
         note: `${on} من 3 مفاتيحَ مرفوعة`,

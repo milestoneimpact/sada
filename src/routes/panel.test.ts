@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { toBase64 } from '../lib/crypto'
 import { fingerprint } from '../lib/security/digest'
 import { readSettings, writeSetting } from '../lib/settings'
-import { getProvider, resolveKey } from '../lib/providers'
+import { getProvider, resolveKey, upsertProvider } from '../lib/providers'
+import { writeRoute } from '../lib/ai/routes'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -2663,6 +2664,76 @@ describe('ما وقع اليوم (D-127)', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('تبديل مفتاح — Anthropic')
     expect(html).not.toContain('لم يقع شيءٌ بعدُ')
+  })
+})
+
+/**
+ * نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — **من البيئة والقاعدة كما
+ * يقرؤهما النداءُ عند الضغط**، والأسرارُ تُسأل عن وجودها ولا تُطبَع.
+ */
+describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
+  async function seedDraft(): Promise<void> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'linkedin', 'text', ?, 'draft', ?)`)
+      .bind(id, 'نصٌّ ينتظر صورة', `k-${id}`)
+      .run()
+  }
+  const panelHtml = async (): Promise<string> =>
+    (await app.request('/panel', withSession(await login()), env)).text()
+
+  it('صورٌ إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطةُ المزوّد تامّة، والجدولُ «جاهز»، والقيمةُ لا تظهر', async () => {
+    await upsertProvider(db, {
+      name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
+      baseUrl: 'https://api.cloudflare.com/client/v4/accounts/acc-1234/ai/v1',
+    }, 'test')
+    await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
+    await seedDraft()
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0001'
+    const html = await panelHtml()
+    expect(html).toContain('title="تامّة — Cloudflare"')
+    expect(html).not.toContain('لا مفتاحَ لـ Cloudflare')
+    const row = html.slice(html.indexOf('الصورة — التوليد البصريّ'), html.indexOf('</tr>', html.indexOf('الصورة — التوليد البصريّ')))
+    expect(row).toContain('جاهز')
+    expect(row).not.toContain('مزوّده غير جاهز')
+    expect(html).not.toContain('cf-ai-secret-value-0001')
+  })
+
+  it('مفتاحُ المتصفّح بلا معرّف الحساب: «ينقصك» المعرّفُ لا المفتاح — والسرُّ لا يظهر', async () => {
+    await seedDraft()
+    // مزوّدُ الصورة الافتراضيُّ بمفتاحه، فأوّلُ ما ينتظرك هو الشريحة
+    env['GEMINI_API_KEY'] = 'AIza-test-0001'
+    env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0001'
+    const html = await panelHtml()
+    expect(html).toContain('<span class="ago">بلا معرّف حساب Cloudflare</span>')
+    expect(html).toContain('<span class="mono">CF_AI_ACCOUNT_ID</span> غيرُ مضبوطٍ')
+    expect(html).not.toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ')
+    expect(html).not.toContain('مضبوطان')
+    expect(html).not.toContain('سرّ-المتصفّح-0001')
+  })
+
+  it('وبطاقةُ «النصُّ فوق الصورة» بفروعها الثلاثة — لا تقول «مضبوط» إلّا للاثنين', async () => {
+    const none = await panelHtml()
+    expect(none).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker، ومعه')
+
+    env['CF_BROWSER_TOKEN'] = 'b-0001'
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    expect(await panelHtml()).toContain('مفتاحُ المتصفّح ومعرّفُ الحساب مضبوطان.')
+
+    // ومسافاتٌ وحدها غيابٌ كما هي عند `composeSlide`
+    env['CF_BROWSER_TOKEN'] = '   '
+    const blank = await panelHtml()
+    expect(blank).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،')
+    expect(blank).not.toContain('مضبوطان')
+  })
+
+  it('والإيقافُ يعطّل «ولّد صورة» وسببُه بجانبه — والحارسُ في الدالّة باقٍ', async () => {
+    await seedDraft()
+    const cookie = await login()
+    await writeSetting(db, 'paused', 'true', 'test')
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
+    expect(html).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
   })
 })
 

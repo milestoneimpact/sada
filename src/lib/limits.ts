@@ -80,13 +80,27 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
 export async function checkProvider(db: Db, provider: string): Promise<Blocker | null> {
   const record = await getProvider(db, provider)
   if (record === null) return null
+  // والدفترُ يُسأل حيث يُحتاج وحدَه: المعطَّلُ والمزوّدُ بلا سقفٍ لا يُقرأ إنفاقُهما
+  const used = record.enabled && record.dailyCap !== null ? await spendTodayFor(db, provider) : 0
+  return providerBlocker({ name: provider, enabled: record.enabled, dailyCap: record.dailyCap }, used)
+}
 
-  if (!record.enabled) return { kind: 'provider_disabled', provider }
+/**
+ * حكمُ الحارس الخاصّ من حقائقه — **نقيٌّ، يناديه `checkProvider` ولوحُ
+ * المسوّدات معًا** (D-163).
+ *
+ * كان الحكمُ لا يُبلَغ إلّا بقراءة D1، فاللوحُ الذي يريد أن يقول قبل الضغط
+ * «المزوّدُ معطَّل» ينسخه أو يسكت. **والنسخةُ تفترق عن أصلها عند أوّل
+ * تصحيح**، فتقول النقطةُ «جاهز» والدالّةُ تردّ.
+ */
+export function providerBlocker(
+  record: { readonly name: string; readonly enabled: boolean; readonly dailyCap: number | null },
+  spentToday: number,
+): Blocker | null {
+  if (!record.enabled) return { kind: 'provider_disabled', provider: record.name }
   if (record.dailyCap === null) return null
-
-  const used = await spendTodayFor(db, provider)
-  if (used >= record.dailyCap) {
-    return { kind: 'provider_cap', provider, used, cap: record.dailyCap }
+  if (spentToday >= record.dailyCap) {
+    return { kind: 'provider_cap', provider: record.name, used: spentToday, cap: record.dailyCap }
   }
   return null
 }

@@ -20,6 +20,8 @@ import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/comma
 import type { Peaks } from '../lib/schedule/peak'
 import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
+import type { SlideGate } from '../lib/image/gate'
+import type { MediaReady } from '../lib/media/readiness'
 import { planSection } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
@@ -215,8 +217,16 @@ export interface PanelData {
   readonly autoEnqueue: boolean
   /** أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085) */
   readonly imageOverlay: boolean
-  /** أمضبوطٌ مفتاحُ المتصفّح؟ **وجودُه يُفحَص، وقيمتُه لا تغادر البيئة**. */
-  readonly browserToken: boolean
+  /**
+   * حكمُ الشريحة كما تحكم به `composeSlide` (D-163) — **وجودُ السرّين يُفحَص،
+   * وقيمتُهما لا تغادر البيئة**.
+   *
+   * كان `browserToken` منطقيًّا يفحص المفتاحَ وحده بلا قصّ، فيقول «مضبوط»
+   * وحسابُ Cloudflare غائب — والدالّةُ تُخرج الصورةَ بلا عنوانٍ في كلّ مرّة.
+   */
+  readonly slide: SlideGate
+  /** نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع — تُحسَب مرّةً للّوح (D-163). */
+  readonly mediaReady: MediaReady
   readonly analysisCap: number
   readonly spendCap: number
   readonly usedAnalyses: number
@@ -905,6 +915,7 @@ ${pivotPane(d.pivot)}
     now: d.now,
     ready: d.draftReady,
     peaks: d.peaks ?? {},
+    mediaReady: d.mediaReady,
   })}
   <div style="margin-top:var(--s-3)">${planSection({
     plan: d.plan,
@@ -1005,14 +1016,25 @@ ${pivotPane(d.pivot)}
           ${d.imageOverlay ? 'إطفاء' : 'رفع التركيب'}</button>
       </form>
     </div>
-    ${d.browserToken
-      ? '<div class="sub" style="margin-top:var(--s-3)">مفتاحُ المتصفّح مضبوط.'
+    ${/* ثلاثةُ فروعٍ لا اثنان (D-163): كان «مضبوط» يُقال متى حضر المفتاح،
+         والحسابُ الغائبُ يُخرج الصورةَ بلا عنوانٍ في كلّ مرّة. ومن أصلحه بفرعين
+         قال «المفتاحُ غيرُ مضبوط» وهو مضبوط — كذبٌ بدل كذب */
+      d.slide.missing.length === 0
+      ? '<div class="sub" style="margin-top:var(--s-3)">مفتاحُ المتصفّح ومعرّفُ الحساب مضبوطان.'
         + ' وكلُّ لقطةٍ تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
-      : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
-          <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker،
+      : d.slide.missing.includes('key')
+        ? `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
+          <span class="mono">CF_BROWSER_TOKEN</span> غيرُ مضبوطٍ في أسرار Worker${
+            d.slide.missing.includes('account')
+              ? '، ومعه <span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّراته'
+              : ''}،
           <b>فلا يقع نداءٌ ولا كلفة</b> — وتخرج الصورةُ بلا عنوانٍ مهما كان هذا المفتاح مرفوعا.
           وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
-          <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`}
+          <b>وهي غيرُ صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`
+        : `<div class="outcome warn"><span class="k">ينقصك</span><span class="v">
+          مفتاحُ المتصفّح في أسرار Worker، و<span class="mono">CF_AI_ACCOUNT_ID</span> غيرُ مضبوطٍ
+          في متغيّراته — <b>واللقطةُ تُنادى على حسابٍ بعينه</b>، فلا يقع نداءٌ ولا كلفة،
+          وتخرج الصورةُ بلا عنوان. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
 </section>
 
