@@ -79,13 +79,14 @@ export function checkClientData(
     return { ok: false, reason: 'بيانات العميل ليست JSON صالحا' }
   }
 
-  if (data.type !== kind) return { ok: false, reason: `نوعٌ غير متوقّع: ${data.type}` }
+  // ‏وما أرسله الطالبُ لا يُعاد كاملًا في السبب: قد يكون مليونَ بايت (D-161)
+  if (data.type !== kind) return { ok: false, reason: `نوعٌ غير متوقّع: ${String(data.type).slice(0, 40)}` }
   // مقارنةُ نصٍّ لا بايتات: التحدّي معرَّفٌ في المواصفة نصّا بـ base64url
   if (data.challenge !== expected.challenge) {
     return { ok: false, reason: 'التحدّي لا يطابق — انتهت المهلة أو أُعيد إرسالٌ قديم' }
   }
   if (data.origin !== expected.origin) {
-    return { ok: false, reason: `الأصل لا يطابق: ${data.origin}` }
+    return { ok: false, reason: `الأصل لا يطابق: ${String(data.origin).slice(0, 80)}` }
   }
   if (data.crossOrigin === true) {
     return { ok: false, reason: 'طلبٌ من إطارٍ عابرٍ للأصل — مرفوض' }

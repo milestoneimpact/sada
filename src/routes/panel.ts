@@ -43,9 +43,10 @@ import { versionAge } from '../lib/oauth/version'
 import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
-import { kb, money } from '../lib/format'
+import { attemptsLeft, kb, money } from '../lib/format'
 import { checkAllowance } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
+import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
 import {
   costOf, deleteProvider, getProvider, listProviders, markVerified,
   normalizeName, resolveKey, saveKey, setEnabled, upsertProvider,
@@ -112,9 +113,27 @@ function page(render: (nonce: string) => string, status = 200): Response {
   return new Response(render(nonce), { status, headers: htmlHeaders(nonce) })
 }
 
+/**
+ * أثمّة مفتاحُ مرورٍ على هذه البيئة؟ — **فبابُه يبقى في كلّ صفحة دخول** (D-161).
+ *
+ * كانت صفحةُ الدخول تعرضه في `GET /panel` وحده: كلمةُ إدارةٍ خاطئةٌ مرّةً، أو
+ * جلسةٌ انتهت في منتصف عمل، فتُرسَم الصفحةُ بلا زرّه، والمالكُ يُدفَع إلى
+ * الكلمة التي بُني المفتاحُ ليغني عنها. والقراءةُ لا تُسقط الصفحة: قاعدةٌ
+ * متعبةٌ تُرسم دخولًا بالكلمة لا خطأً.
+ */
+async function hasPasskeys(env: Env): Promise<boolean> {
+  try {
+    const factors = await factorState(env.DB, relyingParty(env.PUBLIC_BASE_URL).id)
+    return factors.passkeys.length > 0
+  } catch {
+    return false
+  }
+}
+
 /** صفحةُ دخولٍ برسالة. تُستعمل حين تسقط الجلسة في منتصف عمل. */
-function loginResponse(error: string, status = 401): Response {
-  return page((nonce) => loginPage({ error }, nonce), status)
+async function loginResponse(env: Env, error: string, status = 401): Promise<Response> {
+  const passkeys = await hasPasskeys(env)
+  return page((nonce) => loginPage({ error, passkeys }, nonce), status)
 }
 
 /**
@@ -159,7 +178,7 @@ async function guardPost(c: {
 }): Promise<{ denied: Response } | { form: FormData; session: Session }> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) {
-    return { denied: loginResponse('انتهت الجلسة — أعد الدخول.') }
+    return { denied: await loginResponse(c.env, 'انتهت الجلسة — أعد الدخول.') }
   }
   // **وهذا هو ما يجعل العامل الثاني عاملا لا سؤالا يُتخطّى**: جلسةٌ لم
   // تُتمّه لا تغيّر شيئا، ولو نُودي المسار مباشرةً بلا مرورٍ بالشاشة
@@ -585,6 +604,16 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
+  // ‏والحجزُ قبل الفحص (D-161): طلباتٌ متزامنةٌ تمرّ كلُّها من قراءة KV قبل أن
+  // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن تُقارَن كلمتُها
+  const reserved = await reserveAttempt(c.env.DB, c.req.raw)
+  if (!reserved.allowed) {
+    return page(
+      (nonce) => loginPage({ error: blockedText(false), blocked: true }, nonce),
+      429,
+    )
+  }
+
   const form = await c.req.formData()
   // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
   // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
@@ -603,7 +632,10 @@ panel.post('/panel/login', async (c) => {
       return page(
         (nonce) =>
           loginPage(
-            { error: 'ADMIN_TOKEN غير مضبوط على هذه البيئة — اللوحة مقفلة لا مفتوحة.' },
+            {
+              error: 'كلمةُ الإدارة (ADMIN_TOKEN) غير مضبوطة على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
+              passkeys: factors.passkeys.length > 0,
+            },
             nonce,
           ),
         401,
@@ -624,8 +656,9 @@ panel.post('/panel/login', async (c) => {
           {
             error: after.blocked
               ? blockedText(after.globalBlock)
-              : `رمزٌ غير صحيح — بقيت ${after.remaining} محاولات.`,
+              : `كلمةُ الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
             blocked: after.blocked,
+            passkeys: factors.passkeys.length > 0,
           },
           nonce,
         ),
@@ -634,6 +667,7 @@ panel.post('/panel/login', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
+  await releaseAttempt(c.env.DB, c.req.raw)
   await record(
     c.env.DB,
     {
@@ -1302,7 +1336,7 @@ panel.post('/panel/media/reject', async (c) => {
  */
 panel.get('/panel/channels/:platform', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const id = c.req.param('platform')
@@ -1434,7 +1468,7 @@ async function ownerFacts(c: {
  */
 panel.get('/panel/tasks', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const gates = gatesOf(await readGateFacts(c.env.DB))
@@ -1466,7 +1500,7 @@ panel.get('/panel/tasks', async (c) => {
  */
 panel.get('/panel/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const reports = await listReports(c.env.DB)
@@ -1493,7 +1527,7 @@ panel.get('/panel/report', async (c) => {
  */
 panel.get('/panel/journey/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const journey = await readJourney(c.env.DB, c.req.param('id'))
@@ -1514,7 +1548,7 @@ panel.get('/panel/journey/:id', async (c) => {
 /** تقريرُ أسبوعٍ بعينه — بمفتاحه، وهو أوّلُ يومٍ فيه. */
 panel.get('/panel/report/:week', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse('انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const stored = await readReport(c.env.DB, c.req.param('week'))

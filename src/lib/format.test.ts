@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kb, money, parseSqliteUtc, relativeTime } from './format'
+import { kb, money, parseSqliteUtc, relativeTime, attemptsLeft } from './format'
 
 const NOW = new Date('2026-09-05T12:00:00Z')
 
@@ -78,5 +78,16 @@ describe('kb — معادلةٌ واحدةٌ للحجم (D-158)', () => {
     expect(kb(25_500)).toBe('25KB')
     expect(kb(1_536)).toBe('2KB')
     expect(kb(0)).toBe('0KB')
+  })
+})
+
+describe('attemptsLeft', () => {
+  it('تفرد وتثنّي وتجمع: لا «بقيت 1 محاولات»', () => {
+    expect(attemptsLeft(0)).toBe('لم تبقَ محاولات')
+    expect(attemptsLeft(1)).toBe('بقيت محاولةٌ واحدة')
+    expect(attemptsLeft(2)).toBe('بقيت محاولتان')
+    expect(attemptsLeft(3)).toBe('بقيت 3 محاولات')
+    expect(attemptsLeft(10)).toBe('بقيت 10 محاولات')
+    expect(attemptsLeft(11)).toBe('بقيت 11 محاولة')
   })
 })

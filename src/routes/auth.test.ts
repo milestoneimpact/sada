@@ -659,3 +659,181 @@ describe('تدويرُ الرمز يُبطل جلسة مفتاح المرور أ
     expect(html).toContain('name="token"')
   })
 })
+
+describe('D-161 — إحكامُ باب الدخول', () => {
+  /** يفتح شاشةَ العامل الثاني بجلسةٍ معلَّقة ويعيد ما يلزم لإتمامها. */
+  async function pendingScreen(): Promise<{ cookie: string; csrf: string; challenge: string }> {
+    const { cookie } = await loginWithToken()
+    const page = await (await app.request('/panel/2fa', { headers: { Cookie: cookie } }, env)).text()
+    return {
+      cookie,
+      csrf: /name="_csrf" value="([^"]+)"/.exec(page)?.[1] ?? '',
+      challenge: /data-challenge="([^"]+)"/.exec(page)?.[1] ?? '',
+    }
+  }
+
+  it('**ألفُ طلبٍ متزامنٍ لا يفحص إلّا خمسةَ رموز**: الحجزُ قبل الفحص', async () => {
+    const setup = await loginWithToken()
+    await readCsrf(setup.cookie)
+    await enrollTotp(setup.cookie)
+    const { cookie, csrf: pendingCsrf } = await pendingScreen()
+
+    const statuses = await Promise.all(Array.from({ length: 12 }, async () => {
+      const body = new FormData()
+      body.set('_csrf', pendingCsrf)
+      body.set('code', '000000')
+      const response = await app.request(
+        '/panel/2fa/totp',
+        { method: 'POST', body, headers: { Cookie: cookie } },
+        env,
+      )
+      return response.status
+    }))
+    // ‏على الشيفرة القديمة قرأت الاثنا عشرَ «صفرًا» من KV قبل أن تكتب واحدةٌ، ففُحصت كلُّها
+    const checked = db.raw
+      .prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = '2fa.denied' AND detail = 'totp'")
+      .get() as { n: number }
+    expect(checked.n).toBeLessThanOrEqual(5)
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(7)
+  })
+
+  it('المفتاحُ وحدَه لا يفتح اللوحة بلا تحقّقٍ من صاحبه (UV)', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    const key = await enrollPasskey(first.cookie)
+
+    const ticketResponse = await app.request('/panel/passkey/challenge', { method: 'POST' }, env)
+    const { ticket, challenge } = (await ticketResponse.json()) as { ticket: string; challenge: string }
+    const signed = await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID, userVerified: false })
+    const response = await app.request(
+      '/panel/passkey/login',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket, ...signed }) },
+      env,
+    )
+    expect(response.status).toBe(401)
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+    expect(await response.json()).toEqual({ error: 'uv_required' })
+  })
+
+  it('والمفتاحُ نفسُه بلا UV يبقى عاملًا ثانيًا بعد كلمة الإدارة', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    const key = await enrollPasskey(first.cookie)
+    const { cookie, csrf: pendingCsrf, challenge } = await pendingScreen()
+
+    const body = new FormData()
+    body.set('_csrf', pendingCsrf)
+    body.set('assertion', JSON.stringify(
+      await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID, userVerified: false })))
+    const response = await app.request(
+      '/panel/2fa/passkey',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Location')).toBe('/panel')
+  })
+
+  it('تحدٍّ انتهت مهلتُه في شاشة العامل الثاني: صفحةٌ عربيّة بتحدٍّ جديد لا سطرُ JSON', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    const key = await enrollPasskey(first.cookie)
+    const { cookie, csrf: pendingCsrf, challenge } = await pendingScreen()
+    // ‏مرّت خمسُ دقائق: التحدّي غاب من KV والصفحةُ ما زالت مفتوحة
+    const { keys } = await kv.list!({ prefix: 'webauthn:' })
+    for (const { name } of keys) await kv.delete(name)
+
+    const body = new FormData()
+    body.set('_csrf', pendingCsrf)
+    body.set('assertion', JSON.stringify(await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID })))
+    const response = await app.request(
+      '/panel/2fa/passkey',
+      { method: 'POST', body, headers: { Cookie: cookie } },
+      env,
+    )
+    const html = await response.text()
+    expect(response.headers.get('Content-Type') ?? '').toContain('text/html')
+    expect(html).not.toContain('"error"')
+    expect(html).toMatch(/انتهت مهلةُ الصفحة|لم يُقبَل المفتاح/)
+    expect(html).toMatch(/data-challenge="[^"]+"/)
+  })
+
+  it('نموذجُ العامل الثاني بلا جلسة يعود إلى الدخول، وبرمز نموذجٍ قديم يُعاد رسمُه', async () => {
+    const orphan = await app.request('/panel/2fa/totp', { method: 'POST', body: new FormData() }, env)
+    expect(orphan.status).toBe(303)
+    expect(orphan.headers.get('Location')).toBe('/panel')
+
+    const setup = await loginWithToken()
+    await readCsrf(setup.cookie)
+    await enrollTotp(setup.cookie)
+    const { cookie } = await pendingScreen()
+    const body = new FormData()
+    body.set('_csrf', 'stale')
+    body.set('code', '000000')
+    const stale = await app.request('/panel/2fa/totp', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(stale.status).toBe(403)
+    expect(await stale.text()).toContain('انتهت صلاحيةُ الصفحة')
+  })
+
+  it('كلمةُ إدارةٍ خاطئة لا تُخفي بابَ المفتاح، وتقول ما بقي بعربيّةٍ صحيحة', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    await enrollPasskey(first.cookie)
+
+    const body = new FormData()
+    body.set('token', 'wrong-token-wrong-token-wrong-tok')
+    const response = await app.request('/panel/login', { method: 'POST', body }, env)
+    const html = await response.text()
+    expect(response.status).toBe(401)
+    expect(html).toContain('id="pk-login"')
+    expect(html).toContain('كلمةُ الإدارة غير صحيحة — بقيت 4 محاولات.')
+    expect(html).not.toContain('رمزٌ غير صحيح')
+  })
+
+  it('وجلسةٌ انتهت في منتصف عمل تعيد صفحةَ دخولٍ ببابه كذلك', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    await enrollPasskey(first.cookie)
+    const html = await (await app.request('/panel/channels/x', { headers: { Cookie: 'x=y' } }, env)).text()
+    expect(html).toContain('انتهت الجلسة')
+    expect(html).toContain('id="pk-login"')
+  })
+
+  it('إصدارُ التحدّيات لمجهولٍ له سقف: كلُّ تحدٍّ كتابةٌ مدفوعةٌ في KV', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    await enrollPasskey(first.cookie)
+    const statuses: number[] = []
+    for (let i = 0; i < 22; i += 1) {
+      statuses.push((await app.request('/panel/passkey/challenge', { method: 'POST' }, env)).status)
+    }
+    expect(statuses.slice(0, 20).every((s) => s === 200)).toBe(true)
+    expect(statuses.slice(20)).toEqual([429, 429])
+  })
+
+  it('سببُ الرفض في السجلّ لا يحمل مليونَ بايتٍ أرسلها مجهول، وجسدٌ ضخمٌ لا يُقرأ', async () => {
+    const first = await loginWithToken()
+    await readCsrf(first.cookie)
+    const key = await enrollPasskey(first.cookie)
+    const ticketResponse = await app.request('/panel/passkey/challenge', { method: 'POST' }, env)
+    const { ticket } = (await ticketResponse.json()) as { ticket: string }
+    const clientDataJSON = Buffer.from(JSON.stringify({ type: 'X'.repeat(9000), challenge: 'c', origin: ORIGIN }))
+      .toString('base64url')
+    await app.request('/panel/passkey/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket, credentialId: key.credentialId, authenticatorData: 'AA', clientDataJSON, signature: 'AA' }),
+    }, env)
+    const row = db.raw
+      .prepare("SELECT detail FROM audit_log WHERE action = 'passkey.denied' ORDER BY id DESC LIMIT 1")
+      .get() as { detail: string }
+    expect(row.detail.length).toBeLessThanOrEqual(300)
+
+    const huge = await app.request('/panel/passkey/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': String(64 * 1024) },
+      body: JSON.stringify({ pad: 'x'.repeat(64 * 1024) }),
+    }, env)
+    expect(huge.status).toBe(413)
+  })
+})

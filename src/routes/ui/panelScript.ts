@@ -388,11 +388,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }).then(function(r){
       if(r.ok){location.reload(); return;}
       return r.json().catch(function(){return {};}).then(function(e){add.disabled=false;
-        say('pk-msg',e.detail||sadaPk.server(e.error,r.status).message);});
+        say('pk-msg',e.detail||sadaPk.server(e.error,r.status).message); add.focus();});
     }).catch(function(err){add.disabled=false;
       say('pk-msg',err&&err.message==='OldBrowser'
         ?'متصفّحك لا يقدّم المفتاح العامّ مباشرةً — يلزم متصفّح أحدث.'
-        :sadaPk.why(err));});
+        :sadaPk.why(err)); add.focus();});
   });
 
   document.querySelectorAll('button.pk-del').forEach(function(b){
@@ -410,23 +410,32 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var ts=document.getElementById('totp-start');
   if(ts)ts.addEventListener('click',function(){
     ts.disabled=true;
-    post('/panel/security/totp/start',{}).then(function(r){return r.json();}).then(function(d){
-      if(d.error){ts.disabled=false; say('totp-msg',d.detail||'تعذّر البدء.'); return;}
+    post('/panel/security/totp/start',{}).then(function(r){
+      return r.ok?r.json():sadaPk.fail(r);
+    }).then(function(d){
       document.getElementById('totp-secret').value=d.secret;
       document.getElementById('totp-box').hidden=false;
       say('totp-msg','انسخ السرّ إلى تطبيق المصادقة ثمّ أكّد بالرمز الظاهر.');
-    });
+    }).catch(function(err){ts.disabled=false; say('totp-msg',sadaPk.why(err)); ts.focus();});
   });
 
   var tc=document.getElementById('totp-confirm');
   if(tc)tc.addEventListener('submit',function(e){
     e.preventDefault();
+    /*
+     * ‏«رمزٌ غير صحيح» لما هو كذلك وحدَه (D-161): جلسةٌ انتهت أو صفحةٌ قديمة
+     * ‏كانت تُقرأ رمزًا خاطئًا، فيعيد المالكُ رمزًا صحيحًا مرّةً بعد مرّة
+     */
     post('/panel/security/totp/confirm',{code:tc.code.value})
-      .then(function(r){return r.json();}).then(function(d){
-        if(d.error){say('totp-msg',d.detail||'رمزٌ غير صحيح.'); return;}
+      .then(function(r){
+        if(r.ok)return r.json();
+        return r.json().catch(function(){return {};}).then(function(e){
+          if(r.status===401&&e.error==='denied')throw Object.assign(new Error(e.detail||'رمزٌ غير صحيح.'),{name:'SadaServer'});
+          throw sadaPk.server(e.error,r.status);});
+      }).then(function(d){
         if(d.codes&&d.codes.length){showCodes(d.codes); say('totp-msg','أُكّد. وهذه رموز استردادك — انسخها.');}
         else location.reload();
-      });
+      }).catch(function(err){say('totp-msg',sadaPk.why(err));});
   });
 
   var tr=document.getElementById('totp-remove');
@@ -435,8 +444,10 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     tr.disabled=true;
     post('/panel/security/totp/remove',{}).then(function(r){
       if(r.ok){location.reload(); return;}
-      return r.json().then(function(e){tr.disabled=false; say('totp-msg',e.detail||'تعذّر.');});
-    });
+      return r.json().catch(function(){return {};}).then(function(e){
+        if(e.detail)throw Object.assign(new Error(e.detail),{name:'SadaServer'});
+        throw sadaPk.server(e.error,r.status);});
+    }).catch(function(err){tr.disabled=false; say('totp-msg',sadaPk.why(err)); tr.focus();});
   });
 
   function showCodes(list){
@@ -451,10 +462,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   if(ri)ri.addEventListener('click',function(){
     if(!confirm('توليدُ مجموعةٍ جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
     ri.disabled=true;
-    post('/panel/security/recovery/issue',{}).then(function(r){return r.json();})
-      .then(function(d){ri.disabled=false;
+    post('/panel/security/recovery/issue',{}).then(function(r){
+      return r.ok?r.json():sadaPk.fail(r);
+    }).then(function(d){ri.disabled=false;
         if(d.codes){showCodes(d.codes); say('rc-msg','وُلّدت '+d.codes.length+' رموز. انسخها الآن.');}
-        else say('rc-msg','تعذّر التوليد.');});
+        else say('rc-msg','تعذّر التوليد.');
+    }).catch(function(err){ri.disabled=false; say('rc-msg',sadaPk.why(err)); ri.focus();});
   });
 
   // ── دَرَجُ النماذج (D-081) ────────────────────────────

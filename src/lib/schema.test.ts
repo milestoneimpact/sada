@@ -44,6 +44,12 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
     expect(schemaOf('accounts')).toContain('needs_reauth_at')
   })
 
+  it('auth_attempts (D-161)', () => {
+    const schema = schemaOf('auth_attempts')
+    expect(schema).toContain('bucket')
+    expect(schema).toContain('window_start')
+  })
+
   it('heartbeats (D-158)', () => {
     expect(schemaOf('heartbeats')).toContain('outcome')
   })

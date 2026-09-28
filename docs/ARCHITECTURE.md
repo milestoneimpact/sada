@@ -66,6 +66,7 @@
 | `cost_ledger` | `id` · `provider` · `operation` · `units` · `unit_cost` · `total` · `ref_id` · `at` | X · Claude · Gemini (D-008) |
 | `media_claims` | `idempotency_key` · `post_id` · `kind` · `claimed_at` | **حجزٌ يسبق الإنفاق** — القيدُ الفريدُ على `media` يقع بعد الدفع (D-068) |
 | `heartbeats` | `job` · `at` · `outcome` · `detail` | صفٌّ لكلّ دورةٍ يُستبدَل — «هل دارت ومتى» (D-158) |
+| `auth_attempts` | `bucket` · `n` · `window_start` | حجزُ محاولات الدخول والتحدّيات قبل فحصها — عدٌّ ذرّيٌّ لكلّ عنوانٍ وللجميع في ربع ساعة (D-161) |
 
 ## ٤. عقد المنشور (ما يُخرجه Claude وتقرأه اللوحة والناشر)
 
