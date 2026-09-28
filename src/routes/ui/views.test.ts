@@ -18,7 +18,7 @@ import { ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
-import { sheet, type Decl } from '../../test/css'
+import { sheet, type Decl, type Sheet } from '../../test/css'
 import { bar, status } from './parts'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
@@ -203,16 +203,43 @@ describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
    * زرُّ «مضغوط» يحمل السمةَ قيمةً فيلبس ‏`--density:.72` وحدَه — **ولا أثرَ
    * له**، لأنّ ‏`--s-*d` تُحسَب على الجذر وتُورَث محسوبة. فإن صار شيءٌ تحت
    * الجذر يقرأ ‏`var(--density)`، قُيِّد المحدّدُ بـ`:root` كما قُيِّد الليل.
+   *
+   * **و«الجذر» محدّدٌ مركّبٌ وحدَه**: `:root` وما يقيّده هو من سمةٍ أو
+   * `:not()`، ولا رابطَ بعده. كان الشرطُ «يبدأ بـ`:root`»، **فاجتازه
+   * `:root [data-theme="dark"]` — عيبُ D-124 نفسُه بمسافةٍ واحدة** — و`:root .rail`
+   * ثيمًا ثالثًا للرافدة. والمحدّدُ مطبَّعٌ في `test/css`: الفراغُ حول «>» و«+»
+   * و«~» محذوف، فما بقي منه بعد الجذر رابطُ نسب.
    */
+  const ROOT = /^:root(?:\[[^\]]*\]|:not\((?:[^()]|\([^()]*\))*\))*$/
+  const DENSITY = '[data-density="compact"]'
+
+  /** كلُّ محدّدٍ يعلن رمزًا وليس الجذرَ ولا الكثافة، بسياقه. */
+  const offRoot = (c: Sheet): string[] => c.rules()
+    .filter((r) => Object.keys(r.decls).some((p) => p.startsWith('--')))
+    .flatMap((r) => r.selectors.filter((s) => s !== DENSITY && !ROOT.test(s)).map((s) => `${r.at} ${s}`.trim()))
+
   it('المحدّدُ مقيّدٌ بالجذر فلا يلبسه زرٌّ يحمل السمةَ قيمةً', () => {
     expect(css.where(':root[data-theme="dark"]')).toContain('')
     expect(css.where('[data-theme="dark"]')).toEqual([])
-    const DENSITY = '[data-density="compact"]'
-    const stray = css.rules()
-      .filter((r) => Object.keys(r.decls).some((p) => p.startsWith('--')))
-      .flatMap((r) => r.selectors.filter((s) => s !== DENSITY && !s.startsWith(':root')).map((s) => `${r.at} ${s}`.trim()))
-    expect(stray, 'رمزٌ على غير الجذر يلبسه كلُّ ما طابقه').toEqual([])
+    expect(offRoot(css), 'رمزٌ على غير الجذر يلبسه كلُّ ما طابقه').toEqual([])
     expect(css.where(DENSITY), 'الكثافةُ مستثناةٌ ما بقيت قاعدتُها وحدَها في المستوى الأعلى').toEqual([''])
+  })
+
+  /**
+   * **والثابتُ يُمسك ما تحت الجذر لا ما يبدأ به** — كلُّ صفٍّ هنا اجتاز
+   * الشرطَ القديم أخضرَ. يُلحَق آخرَ الورقة فلا مرساةَ تنكسر، والجذرُ في طرق
+   * الليل الثلاث (الزرُّ والنظامُ والطباعة) مقبولٌ بالسؤال الذي فوق.
+   */
+  it.each([
+    ['الزرُّ الليليُّ تحت الجذر بمسافةٍ واحدة', ':root [data-theme="dark"]{--ink:#ebe9e3; --bg:#12141a}',
+      [':root [data-theme="dark"]']],
+    ['الرافدةُ بثيمٍ ثالثٍ تحت الجذر', ':root .rail{--chrome:#14161c; --ink:#ebe9e3}', [':root .rail']],
+    ['تحت الجذر الليليّ في تفضيل النظام', '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{--surface:#000}}',
+      ['@media(prefers-color-scheme:dark) :root:not([data-theme="light"]) .card']],
+    ['ابنُ الجذر المباشر، والفراغُ حول الرابط لا يخفيه', ':root > body{--ink:#191b1f}', [':root>body']],
+  ])('ويُمسك %s', (_name, tail, caught) => {
+    // ‏ما زاده الذيلُ وحدَه: عيبٌ في الورقة نفسِها يُسقط السؤالَ الذي فوق لا هذه الصفوف
+    expect(offRoot(sheet(STYLE + '\n' + tail)).slice(offRoot(css).length)).toEqual(caught)
   })
 })
 
