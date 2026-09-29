@@ -37,6 +37,7 @@ import { panelPage } from '../panelView'
 import { SCRIPT } from './panelScript'
 import { imageReadiness, videoReadiness } from '../../lib/media/readiness'
 import { slideGate } from '../../lib/image/gate'
+import { videoCapGate } from '../../lib/limits'
 
 /** نقاطٌ تامّةٌ كلُّها — لما لا يُختبَر فيه السطرُ نفسُه (D-163). */
 const READY = {
@@ -44,7 +45,7 @@ const READY = {
     blocker: null, provider: { label: 'Gemini', refusal: null },
     slide: slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true }), briefReady: true,
   }),
-  video: videoReadiness({ face: 'env', blocker: null }),
+  video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(0, 2) }),
 }
 
 /**
@@ -978,7 +979,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
       image: imageReadiness({
         blocker: { kind: 'paused' }, provider: { label: 'Gemini', refusal: null }, slide: ON, briefReady: true,
       }),
-      video: videoReadiness({ face: 'none', blocker: null }),
+      video: videoReadiness({ face: 'none', blocker: null, clips: videoCapGate(0, 2) }),
     }
     const empty = section([draft('d1')], { mediaReady: blocked })
     expect(empty).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
@@ -994,6 +995,23 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     })
     expect(waiting).toContain('<button class="g sm" type="submit">ولّد صورة</button>')
     expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
+  })
+
+  /*
+   * **وسقفُ المقاطع يقوله السطرُ قبل الضغط** (D-168): الوجهُ والحدودُ تامّان،
+   * والمقاطعُ بلغت سقفَها — فالزرُّ معطَّلٌ وسببُه ورابطُه إلى الحدود بجانبه.
+   */
+  it('وسقفُ المقاطع يُعطِّل «حرّكها فيديو» وسببُه بجانبه — وتحته يقول كم بقي', () => {
+    const full = { ...READY, video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(2, 2) }) }
+    const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
+    expect(html).toContain('<button class="g sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
+    // ‏وسقفُ المقاطع يحجب التحريكَ وحده: «ولّد صورة» على مسوّدةٍ أخرى يعمل
+    expect(section([draft('d2')], { mediaReady: full })).toContain('<button class="g sm" type="submit">ولّد صورة</button>')
+
+    const under = section([draft('d1')], { media: [picture('d1')] })
+    expect(under).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
+    expect(under).toContain(status('ok', '●', 'المقاطع', 'title="تامّة — بقي 2 من 2 اليوم"'))
   })
 
   it('واسمُ المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {

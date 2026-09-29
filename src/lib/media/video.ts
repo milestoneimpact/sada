@@ -26,7 +26,7 @@
 import { recordCost } from '../cost'
 import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from './claim'
-import { blockerReason, checkAllowance } from '../limits'
+import { blockerReason, checkAllowance, videoCapGate } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
 import {
   AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
@@ -242,6 +242,21 @@ export async function animateForPost(
   if (image === null) {
     return { kind: 'blocked', reason: 'لا صورةَ معتمَدةً لهذا المنشور — ولّدها أوّلا' }
   }
+
+  /*
+   * ٣٫٥ — سقفُ المقاطع اليوميّ بالعدد (D-168).
+   *
+   * **الصفرُ الموسومُ في ٦ لا يبلغ سقفَ مالٍ أبدًا**، فكان الفيديو يُنادى بلا
+   * حدٍّ ما دام سعرُه لم يُقرأ (M-16). والعدُّ من الدفتر الذي قرأه الحارسُ في
+   * ١ — لا استعلامَ ثانٍ ولا عدّادَ موازٍ — **والحكمُ من `videoCapGate`** التي
+   * تقرؤها نقطةُ «المقاطع» تحت الزرّ، فلا تقول «بقي» والدالّةُ تردّ.
+   *
+   * **وبعد ٢ و٣ لا قبلهما**: مقطعٌ قائمٌ يُقال «من قبل» ولا يُقال «بلغ السقف»،
+   * وكلاهما بلا إنفاق. **وقبل الحجز في ٥**: حجزٌ قبل حارسٍ يمنع يُقفل البابَ
+   * ثلاثين دقيقةً على منشورٍ لم يُنفَق عليه شيء.
+   */
+  const clips = videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap)
+  if (clips.blocker !== null) return { kind: 'blocked', reason: blockerReason(clips.blocker) }
 
   // ٤ — الرابطُ يُوقَّع لحظتَه: النافذةُ تبدأ من الاستعمال لا قبله
   const token = await signMediaToken(deps.encKey, image.id, now)

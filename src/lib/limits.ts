@@ -8,6 +8,10 @@
  * وحده لا يحرس منه؛ وسقف المال وحده لا يحرس من طوفان ملفّاتٍ صغيرة
  * يستنزف حصّة الطابور وصفوف D1.
  *
+ * وسقفٌ ثالثٌ للمقاطع بعددها (D-168): سعرُها يُسجَّل صفرًا موسومًا فلا يبلغ
+ * سقفَ المال، **وهو خارج `checkAllowance`** — يحجب التحريكَ وحده، ولا يوقف
+ * تحليلًا ولا صورة.
+ *
  * ويُقاس اليوم بـ UTC لا بتوقيت الرياض: `cost_ledger` يكتب
  * `datetime('now')` وهو UTC، وقياسٌ بمنطقةٍ أخرى يجعل السقف يُفتح مرّتين
  * أو لا يُفتح — والاتّساق أهمّ من موافقة الساعة المحليّة.
@@ -25,6 +29,8 @@ export type Blocker =
   | { readonly kind: 'provider_cap'; readonly provider: string; readonly used: number; readonly cap: number }
   /** مزوّدٌ عطّله المالك بمفتاحه محفوظا. */
   | { readonly kind: 'provider_disabled'; readonly provider: string }
+  /** سقفُ المقاطع اليوميّ بالعدد (D-168) — يحجب التحريكَ وحده لا غيرَه. */
+  | { readonly kind: 'video_cap'; readonly used: number; readonly cap: number }
 
 export interface Allowance {
   readonly allowed: boolean
@@ -37,6 +43,14 @@ export interface DailyUsage {
   /** نداءات Anthropic اليوم — مقروءةً من الدفتر لا من عدّادٍ موازٍ. */
   readonly analyses: number
   readonly spend: number
+  /**
+   * نداءاتُ الفيديو اليوم (D-168) — **صفوفُ الدفتر لا صفوفُ `media`**.
+   *
+   * الصفُّ في `media` لا يُكتب إلّا بعد النجاح، وصفُّ الدفتر قبل النداء
+   * (D-008). فمحاولةٌ سقطت بعد أن بلغت المزوّدَ تُعدّ هنا ولا تُعدّ هناك —
+   * **وقد تكون حوسبت**. والعدُّ من الأعلى يمنع أكثر ممّا يسمح.
+   */
+  readonly clips: number
 }
 
 /**
@@ -48,19 +62,34 @@ export interface DailyUsage {
  */
 export async function usageToday(db: Db): Promise<DailyUsage> {
   try {
+    /*
+     * **والمقاطعُ في الاستعلام نفسِه لا في ثانٍ** (D-168): `checkAllowance`
+     * تُقرأ في كلّ نداءٍ وفي كلّ فتحةٍ للوحة، فيصل العدُّ إلى `animateForPost`
+     * وإلى نقطة «المقاطع» تحت الزرّ بقراءةٍ واحدة — ولا يفترقان.
+     *
+     * والشرطُ على التحليل انتقل من `WHERE` إلى `CASE` بحرفه: ما كان يُعَدّ
+     * يُعَدّ، وما كان يُجمَع يُجمَع.
+     */
     const row = await db
       .prepare(
-        `SELECT count(*) AS analyses, coalesce(sum(total), 0) AS spend
+        `SELECT
+           coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
+                             THEN 1 ELSE 0 END), 0) AS analyses,
+           coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
+                             THEN total ELSE 0 END), 0) AS spend,
+           coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips
            FROM cost_ledger
-          WHERE provider = 'anthropic'
-            AND operation LIKE 'analyze:%'
-            AND at >= date('now')`,
+          WHERE at >= date('now')`,
       )
-      .first<{ analyses: number; spend: number }>()
-    return { analyses: row?.analyses ?? 0, spend: row?.spend ?? 0 }
+      .first<{ analyses: number; spend: number; clips: number }>()
+    return { analyses: row?.analyses ?? 0, spend: row?.spend ?? 0, clips: row?.clips ?? 0 }
   } catch {
     // دفترٌ لا يُقرأ لا يُفتح به الباب: يُفترض السقف مستهلَكا
-    return { analyses: Number.POSITIVE_INFINITY, spend: Number.POSITIVE_INFINITY }
+    return {
+      analyses: Number.POSITIVE_INFINITY,
+      spend: Number.POSITIVE_INFINITY,
+      clips: Number.POSITIVE_INFINITY,
+    }
   }
 }
 
@@ -105,6 +134,36 @@ export function providerBlocker(
   return null
 }
 
+/** حكمُ سقف المقاطع ومعه رقماه — فالنقطةُ تقول كم بقي، والرسالةُ كم بلغ. */
+export interface VideoCapGate {
+  readonly used: number
+  readonly cap: number
+  readonly blocker: Blocker | null
+}
+
+/**
+ * أيُحرَّك مقطعٌ آخرُ اليوم؟ — **نقيٌّ، يناديه `animateForPost` ولوحُ
+ * المسوّدات معًا** (D-168)، كما يُنادى `providerBlocker`.
+ *
+ * ## لماذا بالعدد
+ *
+ * سعرُ نموذج الفيديو لم يُقرأ من لوحة Cloudflare (M-16)، فيُسجَّل صفرًا
+ * موسومًا — **وصفرٌ لا يبلغ سقفَ مالٍ أبدًا**. ثمّ إنّ `usageToday` لا تجمع
+ * في المال إلّا Anthropic، فالمقطعُ لا يدخل سقفَ الإنفاق ولو سُعِّر.
+ *
+ * ## ولماذا دائمًا لا «ما دام السعرُ مجهولًا»
+ *
+ * لا مسارَ في الشيفرة يكتب سعرًا بعد. **وحدٌّ مشروطٌ بسعرٍ يُطفأ يومَ يُكتب
+ * السعر** فيعود البابُ مفتوحًا، وسقفُ المال لا يرى المقطعَ أصلًا. والعددُ
+ * يحرس ما لا يحرسه المال — حلقةَ إعادةٍ على منشوراتٍ شتّى — كما يحرس سقفُ
+ * التحليل بجانب سقف الإنفاق: **سقفان لا واحد**.
+ *
+ * والمنعُ عند البلوغ لا بعد التجاوز، وصفرٌ يُغلق التحريكَ كلَّه.
+ */
+export function videoCapGate(used: number, cap: number): VideoCapGate {
+  return { used, cap, blocker: used >= cap ? { kind: 'video_cap', used, cap } : null }
+}
+
 export async function checkAllowance(db: Db): Promise<Allowance> {
   const settings = await readSettings(db)
   const usage = await usageToday(db)
@@ -134,5 +193,9 @@ export function blockerReason(blocker: Blocker): string {
       return `بلغ سقف ${blocker.provider} اليوميّ: ${blocker.used.toFixed(4)}$ من ${blocker.cap}$`
     case 'provider_disabled':
       return `${blocker.provider} معطَّل بقرار المالك`
+    case 'video_cap':
+      return blocker.cap === 0
+        ? 'سقف المقاطع اليوميّ صفر بقرار المالك — لا تحريك'
+        : `بلغ سقف المقاطع اليوميّ: ${blocker.used} من ${blocker.cap} — يُفتح غدًا، أو ارفعه من «الحدود»`
   }
 }

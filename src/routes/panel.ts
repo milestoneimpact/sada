@@ -46,7 +46,7 @@ import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money } from '../lib/format'
-import { checkAllowance, providerBlocker } from '../lib/limits'
+import { checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
 import {
@@ -500,7 +500,12 @@ panel.get('/panel', async (c) => {
       slide,
       briefReady,
     }),
-    video: videoReadiness({ face, blocker: allowance.blocker }),
+    // ‏والعدُّ من قراءة الحارس نفسِها، والحكمُ من دالّة `animateForPost` نفسِها (D-168)
+    video: videoReadiness({
+      face,
+      blocker: allowance.blocker,
+      clips: videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap),
+    }),
   }
   // **يُحسَب عند العرض لا يُقرأ من الصفّ**: الصفُّ أثرُ ما وقع،
   // والشريطُ حالٌ الآن — ودورةٌ سقطت لا تُخفي رمزا يوشك (D-065)
@@ -522,6 +527,8 @@ panel.get('/panel', async (c) => {
       // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
       usedAnalyses: Number.isFinite(allowance.usage.analyses) ? allowance.usage.analyses : 0,
       usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
+      videoCap: allowance.settings.dailyVideoCap,
+      usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
       spend30d: Object.values(spend).reduce((sum, e) => sum + (e?.total ?? 0), 0),
       series,
       sources,

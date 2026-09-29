@@ -14,8 +14,9 @@
  * ## ولا يُحكَم هنا
  *
  * هذه الوحدةُ **تسمّي ولا تقرّر**: الحكمُ من `imageProviderGate` و`slideGate`
- * و`videoFace` و`checkAllowance` — الدوالِّ التي يحكم بها النداءُ نفسُه. فنقطةٌ
- * تقول «جاهز» والدالّةُ تردّ لا تقع إلّا إن افترقت الحقائقُ لا الحكم.
+ * و`videoFace` و`checkAllowance` و`videoCapGate` — الدوالِّ التي يحكم بها
+ * النداءُ نفسُه. فنقطةٌ تقول «جاهز» والدالّةُ تردّ لا تقع إلّا إن افترقت
+ * الحقائقُ لا الحكم.
  *
  * واستيراداتُها أنواعٌ وحدها: لا تجرّ سائقًا ولا دفترًا إلى من يرسمها.
  *
@@ -25,12 +26,12 @@
  * تُوزَن بعد أن تعود. فنقطةُ «النصُّ فوقها» التامّةُ تَعِد بالبيئة لا بالنصّ،
  * ورسالةُ ما بعد التوليد تبقى الحكمَ الأخير فيهما.
  */
-import type { Blocker } from '../limits'
+import type { Blocker, VideoCapGate } from '../limits'
 import type { RungState } from '../platform/readiness'
 import type { ImageRefusal, SlideGate } from '../image/gate'
 import type { VideoFace } from './video'
 
-export type DotKey = 'limits' | 'provider' | 'overlay' | 'key'
+export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips'
 
 export interface Dot {
   readonly key: DotKey
@@ -82,6 +83,8 @@ function blockerNote(b: Blocker, label: string): string {
       return `بلغ ${label} سقفَه اليوميّ`
     case 'provider_disabled':
       return `${label} معطَّلٌ بقرارك`
+    case 'video_cap':
+      return b.cap === 0 ? 'سقفُ المقاطع صفرٌ بقرارك' : 'بلغ سقفَ المقاطع اليوميّ'
   }
 }
 
@@ -199,12 +202,34 @@ function keyDot(face: VideoFace): Dot {
 }
 
 /**
- * سطرُ «حرّكها فيديو» — بترتيب `animateForPost`: الوجهُ ثمّ الحدود.
+ * نقطةُ «المقاطع» — **حكمُ `videoCapGate` نفسُه** (D-168)، وهو ما تحكم به
+ * `animateForPost` قبل الحجز.
+ *
+ * والتامّةُ تقول كم بقي — والرقمُ في `title` لمن يمرّ عليها — والساقطةُ ترسل
+ * إلى الحدود حيث يُرفَع السقف. **وتسقط لأنّ بابَها يردّ النداءَ كلَّه**.
+ */
+function clipsDot(gate: VideoCapGate): Dot {
+  const title = 'المقاطع'
+  if (gate.blocker === null) {
+    return { key: 'clips', title, state: 'done', note: `بقي ${gate.cap - gate.used} من ${gate.cap} اليوم` }
+  }
+  return { key: 'clips', title, state: 'failed', note: blockerNote(gate.blocker, ''), action: LIMITS }
+}
+
+/**
+ * سطرُ «حرّكها فيديو» — بترتيب `animateForPost`: الوجهُ ثمّ الحدودُ ثمّ المقاطع.
  *
  * **ولا نقطةَ للسعر**: `animateForPost` تكتب صفرًا موسومًا في كلّ مرّة، ولا
  * مسارَ في الشيفرة يكتب سعرًا — فنقطتُه تنتظر إلى الأبد ولا يُطفئها فعلٌ من
  * المالك، **وتنبيهٌ دائمٌ يُتعلَّم تجاهلُه**. ورسالةُ ما بعد التحريك تقوله.
+ * **وما يحرس المالَ المجهولَ هو العدد** (D-168): نقطةُ «المقاطع» يُطفئها
+ * المالكُ من الحدود، فهي حدٌّ لا تنبيه.
  */
-export function videoReadiness(i: { readonly face: VideoFace; readonly blocker: Blocker | null }): MediaLine {
-  return lineOf([keyDot(i.face), limitsDot(i.blocker)])
+export function videoReadiness(i: {
+  readonly face: VideoFace
+  readonly blocker: Blocker | null
+  /** حكمُ `videoCapGate` كما قُرئ للّوح — لا يُعاد هنا. */
+  readonly clips: VideoCapGate
+}): MediaLine {
+  return lineOf([keyDot(i.face), limitsDot(i.blocker), clipsDot(i.clips)])
 }

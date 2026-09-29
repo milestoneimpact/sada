@@ -2684,7 +2684,7 @@ describe('ترتيبُ بطاقات الحدود (D-126)', () => {
       return i
     }
     const order = [
-      'value="paused"', 'value="daily_analysis_cap"', 'value="weekly_promo_cap_usd"',
+      'value="paused"', 'value="daily_analysis_cap"', 'value="daily_video_cap"', 'value="weekly_promo_cap_usd"',
       'value="auto_enqueue"', 'value="alert_webhook"', 'value="dashboard_tiles"', 'value="image_overlay"',
     ].map(at)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
@@ -2904,6 +2904,105 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     const envHtml = await panelHtml()
     expect(routeRow(envHtml, 'الفيديو — تحريكُ الصورة')).toContain('<span class="st ok"')
     expect(tasksReady(envHtml)).toBe(1)
+  })
+})
+
+/**
+ * **سقفُ المقاطع اليوميّ** (D-168) — من الدفتر إلى النقطة تحت «حرّكها فيديو»،
+ * ومن الضغطة إلى الإشعار. **والحكمُ واحد**: `videoCapGate` في الدالّة وفي اللوح.
+ */
+describe('سقفُ المقاطع اليوميّ في اللوحة (D-168)', () => {
+  async function seedPictured(): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'linkedin', 'image', ?, 'draft', ?)`)
+      .bind(id, 'نصٌّ بصورته', `k-${id}`)
+      .run()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key)
+         VALUES (?, ?, ?, 'image/png', 2048, 'وصف', 'gemini-2.5-flash-image', 0.04, 'ready', ?)`,
+      )
+      .bind(`img-${id}`, id, `image/${id}/x`, `image:${id}:x`)
+      .run()
+    return id
+  }
+  /** مقطعٌ في دفتر اليوم كما تكتبه `animateForPost`: صفرٌ موسوم. */
+  const clipToday = (): Promise<string> =>
+    recordCost(db, {
+      provider: 'cloudflare', operation: 'video:alibaba/hh1-i2v:price_unverified', units: 1, unitCost: 0,
+    })
+  const OFF = '<button class="g sm" type="submit" disabled>حرّكها فيديو</button>'
+  const ON = '<button class="g sm" type="submit">حرّكها فيديو</button>'
+
+  beforeEach(() => {
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0005'
+  })
+
+  it('تحت السقف تقول كم بقي، وعند البلوغ تسقط والزرُّ معطَّل — والرقمان في الحدود', async () => {
+    await seedPictured()
+    const cookie = await login()
+    await clipToday()
+    const under = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(under).toContain('title="تامّة — بقي 1 من 2 اليوم"')
+    expect(under).toContain(ON)
+
+    await clipToday()
+    const over = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(over).toContain(OFF)
+    expect(over).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
+    const pane = over.slice(over.indexOf('<section data-pane="settings"'))
+    const form = pane.slice(pane.indexOf('value="daily_video_cap"'), pane.indexOf('</form>', pane.indexOf('value="daily_video_cap"')))
+    expect(form).toContain('value="2"')
+    expect(form).toContain('max="20"')
+    expect(form).toContain('المستهلَك اليوم: 2')
+    expect(over).not.toContain('cf-ai-secret-value-0005')
+  })
+
+  it('والضغطةُ فوق السقف تُردّ بسببها في الإشعار — ولا تبلغ المزوّدَ ولا الدفتر', async () => {
+    const id = await seedPictured()
+    const cookie = await login()
+    await clipToday()
+    await clipToday()
+    let calls = 0
+    // ‏ولا حسابَ في البيئة: الوجهُ رابطُ Worker، فكلُّ نداءٍ يُعَدّ هنا
+    delete env['CF_AI_ACCOUNT_ID']
+    delete env['CF_AI_TOKEN']
+    env['AI'] = { run: async () => { calls += 1; return {} } }
+
+    const body = new FormData()
+    body.set('id', id)
+    const res = await app.request('/panel/media/animate', withSession(cookie, { method: 'POST', body }), env)
+    expect(res.status).toBe(303)
+    expect(calls).toBe(0)
+    const n = db.raw.prepare(`SELECT count(*) AS n FROM cost_ledger WHERE operation LIKE 'video:%'`).get() as { n: number }
+    expect(n.n).toBe(2)
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('بلغ سقف المقاطع اليوميّ: 2 من 2 — يُفتح غدًا، أو ارفعه من «الحدود»')
+  })
+
+  it('ورفعُ السقف من الحدود يُعيد الزرَّ — والإشعارُ يقول ما حُفظ فعلًا', async () => {
+    await seedPictured()
+    const cookie = await login()
+    await clipToday()
+    await clipToday()
+    const save = async (value: string): Promise<string> => {
+      const body = new FormData()
+      body.set('key', 'daily_video_cap')
+      body.set('value', value)
+      await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
+      return (await app.request('/panel', withSession(cookie), env)).text()
+    }
+    const raised = await save('3')
+    expect(raised).toContain('سقف المقاطع اليوميّ: حُفظ 3.')
+    expect(raised).toContain(ON)
+    expect(raised).toContain('title="تامّة — بقي 1 من 3 اليوم"')
+
+    const clamped = await save('500')
+    expect(clamped).toContain('سقف المقاطع اليوميّ: القيمة 500 خارج المدى — حُفظت 20.')
+    expect((await readSettings(db)).dailyVideoCap).toBe(20)
   })
 })
 
