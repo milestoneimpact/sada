@@ -279,6 +279,97 @@ describe('الدفتر', () => {
   })
 })
 
+/**
+ * **سقفُ المقاطع اليوميّ بالعدد** (D-168).
+ *
+ * الدفترُ يكتب صفرًا موسومًا لأنّ السعرَ لم يُقرأ (M-16)، **وصفرٌ لا يبلغ سقفَ
+ * مالٍ أبدًا** — فكان الفيديو، أغلى ما يُنادى، يُنادى بلا حدّ. وما يُثبَت هنا
+ * أنّ الذي فوق السقف **لا يبلغ المزوّدَ ولا الدفترَ ولا الحجز**.
+ */
+describe('سقفُ المقاطع اليوميّ (D-168)', () => {
+  const ledger = (): number =>
+    (db.raw.prepare(`SELECT count(*) AS n FROM cost_ledger WHERE operation LIKE 'video:%'`).get() as { n: number }).n
+  const claims = (postId: string): number =>
+    (db.raw.prepare('SELECT count(*) AS n FROM media_claims WHERE post_id = ?').get(postId) as { n: number }).n
+  const seedPosts = (...ids: string[]): void => {
+    for (const id of ids) {
+      seedPost(id)
+      seedMedia({ id: `img-${id}`, postId: id, mime: 'image/png' })
+    }
+  }
+
+  /** وهو الاختبارُ الذي يسقط على الشيفرة القديمة: الثالثُ كان يُولَّد. */
+  it('الافتراضُ مقطعان: الثالثُ يُردّ قبل المزوّد والدفتر والحجز', async () => {
+    seedPosts('p1', 'p2', 'p3')
+    expect(await animateForPost(deps(ai(OK_VIDEO)), 'p1')).toMatchObject({ kind: 'generated' })
+    expect(await animateForPost(deps(ai(OK_VIDEO)), 'p2')).toMatchObject({ kind: 'generated' })
+
+    const third = ai(OK_VIDEO)
+    const out = await animateForPost(deps(third), 'p3')
+    expect(out).toEqual({
+      kind: 'blocked',
+      reason: 'بلغ سقف المقاطع اليوميّ: 2 من 2 — يُفتح غدًا، أو ارفعه من «الحدود»',
+    })
+    expect(third.calls).toHaveLength(0)
+    expect(ledger()).toBe(2)
+    // ‏والحجزُ لا يُؤخَذ: حجزٌ قبل حارسٍ يمنع يُقفل البابَ ثلاثين دقيقة
+    expect(claims('p1')).toBe(1)
+    expect(claims('p3')).toBe(0)
+  })
+
+  it('والسقفُ من الإعداد: ثلاثةٌ تسمح بالثالث وتردّ الرابع', async () => {
+    await writeSetting(db, 'daily_video_cap', '3', 'omar')
+    seedPosts('p1', 'p2', 'p3', 'p4')
+    for (const id of ['p1', 'p2', 'p3']) {
+      expect(await animateForPost(deps(ai(OK_VIDEO)), id)).toMatchObject({ kind: 'generated' })
+    }
+    const fourth = ai(OK_VIDEO)
+    expect(await animateForPost(deps(fourth), 'p4')).toMatchObject({ kind: 'blocked' })
+    expect(fourth.calls).toHaveLength(0)
+  })
+
+  /** الدفترُ يُكتب قبل النداء (D-008) — فالمحاولةُ التي بلغت المزوّدَ ثمّ سقطت قد حوسبت. */
+  it('والمحاولةُ الفاشلةُ تُعدّ كالناجحة — العدُّ من الدفتر لا من `media`', async () => {
+    await writeSetting(db, 'daily_video_cap', '1', 'omar')
+    seedPosts('p1')
+    expect((await animateForPost(deps(ai(undefined)), 'p1')).kind).toBe('failed')
+
+    const retry = ai(OK_VIDEO)
+    expect(await animateForPost(deps(retry), 'p1')).toMatchObject({ kind: 'blocked' })
+    expect(retry.calls).toHaveLength(0)
+  })
+
+  it('وصفرٌ يُغلق التحريكَ كلَّه — بسببٍ يقول إنّه قرار', async () => {
+    await writeSetting(db, 'daily_video_cap', '0', 'omar')
+    seedPosts('p1')
+    const a = ai(OK_VIDEO)
+    const out = await animateForPost(deps(a), 'p1')
+    expect(out).toMatchObject({ kind: 'blocked', reason: 'سقف المقاطع اليوميّ صفر بقرار المالك — لا تحريك' })
+    expect(a.calls).toHaveLength(0)
+    expect(ledger()).toBe(0)
+  })
+
+  it('ومقاطعُ الأمس لا تُعدّ — اليومُ بتوقيت UTC كما يكتبه الدفتر', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      db.raw
+        .prepare(
+          `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, at)
+           VALUES (?, 'cloudflare', 'video:alibaba/hh1-i2v:price_unverified', 1, 0, 0, datetime('now', '-1 day'))`,
+        )
+        .run(crypto.randomUUID())
+    }
+    seedPosts('p1')
+    expect(await animateForPost(deps(ai(OK_VIDEO)), 'p1')).toMatchObject({ kind: 'generated' })
+  })
+
+  it('ومنشورٌ له مقطعٌ يُقال «من قبل» لا «بلغ السقف» — وكلاهما بلا إنفاق', async () => {
+    seedPosts('p1', 'p2')
+    await animateForPost(deps(ai(OK_VIDEO)), 'p1')
+    await animateForPost(deps(ai(OK_VIDEO)), 'p2')
+    expect((await animateForPost(deps(ai(OK_VIDEO)), 'p1')).kind).toBe('already')
+  })
+})
+
 describe('الفشلُ لا يترك صفّا يكذب', () => {
   /** صفٌّ يشير إلى بايتاتٍ لا وجودَ لها يكذب، وبايتاتٌ بلا صفٍّ تيتم. */
   it('R2 يفشل فلا يُكتب صفٌّ', async () => {

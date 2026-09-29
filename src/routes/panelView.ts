@@ -12,6 +12,7 @@
  */
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
+import { LIMITS as SETTING_LIMITS } from '../lib/settings'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
 import { unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
@@ -231,6 +232,9 @@ export interface PanelData {
   readonly spendCap: number
   readonly usedAnalyses: number
   readonly usedSpend: number
+  /** سقفُ المقاطع اليوميّ بالعدد (D-168)، وما عُدَّ منها في الدفتر اليوم. */
+  readonly videoCap: number
+  readonly usedClips: number
   readonly spend30d: number
   readonly series: { day: string; total: number }[]
   readonly sources: PanelSource[]
@@ -948,7 +952,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقفا اليوم. <b>يُطبَّقان قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
+  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
   ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
        يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
        لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
@@ -982,6 +986,19 @@ ${pivotPane(d.pivot)}
         <input id="c2" type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}"></div>
       <button class="p" type="submit">حفظ</button>
       <span class="n" style="align-self:center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
+    </form>
+    <hr>
+    ${/* ‏والمقاطعُ بعددها لا بمالها (D-168): سعرُها لم يُقرأ فيُسجَّل صفرًا،
+         وصفرٌ لا يبلغ سقفَ الإنفاق أبدًا */ ''}
+    <p class="hint"><b>والمقاطعُ بعددها</b>: سعرُها لم يُقرأ بعد، فيُسجَّل صفرًا لا يبلغ سقفَ الإنفاق.
+      والمحاولةُ التي تسقط تُعدّ كالتي تنجح. <b>وصفرٌ يُغلق التحريك.</b></p>
+    <form class="row" method="POST" action="/panel/settings">
+      <input type="hidden" name="key" value="daily_video_cap">
+      <div class="field"><label for="c4">سقف المقاطع (عدد)</label>
+        <input id="c4" type="number" name="value" min="0"
+          max="${SETTING_LIMITS.dailyVideoCap.max}" step="1" value="${d.videoCap}"></div>
+      <button class="p" type="submit">حفظ</button>
+      <span class="n" style="align-self:center">المستهلَك اليوم: ${d.usedClips}</span>
     </form>
   </div>
 

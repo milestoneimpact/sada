@@ -18,6 +18,31 @@ describe('القيم الأولى من الترحيل', () => {
   it('الإدراج الآليّ مطفأ افتراضا — إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة', async () => {
     expect((await readSettings(db)).autoEnqueue).toBe(false)
   })
+
+  /** ولا صفَّ له في ترحيل: غيابُه يعود إلى الافتراض المحافظ لا إلى اللانهاية (D-168). */
+  it('سقفُ المقاطع مقطعان بلا صفٍّ في القاعدة', async () => {
+    expect(DEFAULTS.dailyVideoCap).toBe(2)
+    expect((await readSettings(db)).dailyVideoCap).toBe(2)
+  })
+})
+
+describe('سقفُ المقاطع اليوميّ (D-168)', () => {
+  it('عددٌ صحيحٌ مقصوصٌ على حدّيه — والإشعارُ يقرأ ما حُفظ', async () => {
+    expect((await writeSetting(db, 'daily_video_cap', '3', 'panel')).stored).toBe('3')
+    expect((await readSettings(db)).dailyVideoCap).toBe(3)
+
+    const over = await writeSetting(db, 'daily_video_cap', '999', 'panel')
+    expect(over).toMatchObject({ stored: String(LIMITS.dailyVideoCap.max), clamped: true })
+    expect((await writeSetting(db, 'daily_video_cap', '2.9', 'panel')).stored).toBe('2')
+    expect((await writeSetting(db, 'daily_video_cap', '-4', 'panel')).stored).toBe('0')
+    // ‏وما لا يُفهَم يعود إلى الافتراض لا إلى اللانهاية
+    expect((await writeSetting(db, 'daily_video_cap', 'كثير', 'panel')).stored).toBe('2')
+  })
+
+  it('وقيمةٌ كُتبت بيدٍ في القاعدة تُقرأ مقصوصةً كذلك', async () => {
+    db.raw.exec(`INSERT INTO settings (key, value, updated_by) VALUES ('daily_video_cap', '5000.7', 'hand')`)
+    expect((await readSettings(db)).dailyVideoCap).toBe(LIMITS.dailyVideoCap.max)
+  })
 })
 
 describe('مفاتيح الخطر تُقرأ بالمطابقة لا بالتساهل', () => {
@@ -153,6 +178,7 @@ describe('أسماءُ الإعدادات (D-134)', () => {
   it('وما ليس مفتاحًا يُعاد بحرفه — القاموسُ لا يخترع', () => {
     expect(settingLabel('dashboard_tiles')).toBe('بطاقات اللوح')
     expect(settingLabel('weekly_promo_cap_usd')).toBe('سقف الترويج الأسبوعيّ')
+    expect(settingLabel('daily_video_cap')).toBe('سقف المقاطع اليوميّ')
     expect(settingLabel('draft-42')).toBe('draft-42')
   })
 })
