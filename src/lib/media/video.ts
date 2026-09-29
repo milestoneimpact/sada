@@ -212,7 +212,7 @@ export async function animateForPost(
   }
 
   // ١ — الحارسُ قبل النداء لا بعده (D-019). والإيقافُ قرارُ المالك
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'video')
   if (!allowance.allowed && allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

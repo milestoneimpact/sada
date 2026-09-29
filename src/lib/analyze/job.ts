@@ -117,7 +117,7 @@ export async function analyzeSource(
 
   // ٣ · الإيقاف والسقفان — قبل أن يُلمس Drive، فضلا عن Claude.
   // وموضعه بعد فحص «محلَّل بالفعل» عمدا: ما لا يكلّف شيئا لا يُمنع بسقف.
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'analyze')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
   }

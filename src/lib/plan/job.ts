@@ -121,7 +121,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   }
 
   // ٣ · الحارس قبل النداء
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'plan')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

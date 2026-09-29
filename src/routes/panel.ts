@@ -46,7 +46,7 @@ import { schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money } from '../lib/format'
-import { checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
+import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
 import {
@@ -309,7 +309,7 @@ panel.get('/panel', async (c) => {
   // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const allowance = await checkAllowance(c.env.DB)
+  const allowance = await checkAllowance(c.env.DB, 'image')
 
   /*
    * **واللوحُ المحوريُّ يُقرأ من العنوان** (D-120).
@@ -503,7 +503,8 @@ panel.get('/panel', async (c) => {
     // ‏والعدُّ من قراءة الحارس نفسِها، والحكمُ من دالّة `animateForPost` نفسِها (D-168)
     video: videoReadiness({
       face,
-      blocker: allowance.blocker,
+      // ‏وحكمُ المقطع من قراءة الحارس نفسِها بسؤاله هو (D-169)
+      blocker: blockerFor('video', allowance.settings, allowance.usage),
       clips: videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap),
     }),
   }
