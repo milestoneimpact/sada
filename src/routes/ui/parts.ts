@@ -26,6 +26,8 @@ const GLYPH: Readonly<Record<string, string>> = {
   '◍': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 1.9a3.1 3.1 0 0 0 0 6.2z"/>',
   '◔': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 5V1.9a3.1 3.1 0 0 1 3.1 3.1z"/>',
   '▲': '<path d="M5 1.5 9.1 8.6H.9z"/>',
+  // ‏ونظيرُه للنزول (D-167): سهمُ الفرق عن الأمس كان يكتبه حرفًا خارج هذا الجدول
+  '▼': '<path d="M5 8.5 9.1 1.4H.9z"/>',
   '◆': '<path d="M5 1 9 5 5 9 1 5z"/>',
   '✓': '<path d="M1.8 5.3 4.2 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   '✕': '<path d="M2.3 2.3l5.4 5.4M7.7 2.3 2.3 7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
@@ -34,16 +36,26 @@ const GLYPH: Readonly<Record<string, string>> = {
 }
 
 /**
- * `cls` من ok · warn · bad · idle (أو فارغ)، و`glyph` حرفُ الحال، و`text`
+ * الرمزُ وحدَه بلا رقاقة — **لما يقول حالًا أو اتّجاهًا خارج «.st»** (D-167).
+ *
+ * سهمُ الفرق عن الأمس، وعلامةُ «آخرُ فشل» في شاشة المنصّة: كانا يكتبان الحرفَ
+ * في الوسم فيسقط إلى خطّ النظام، والرقاقةُ بجانبهما مرسومة. فالرسمُ من هنا،
+ * وحارسُ `audit_classes` يُسقط CI على حرفٍ منها في وسمٍ خارج هذا الملفّ.
+ */
+export function glyph(g: string): string {
+  const drawn = GLYPH[g]
+  return drawn === undefined
+    ? escapeHtml(g)
+    : `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${drawn}</svg>`
+}
+
+/**
+ * `cls` من ok · warn · bad · idle (أو فارغ)، و`g` حرفُ الحال، و`text`
  * HTML جاهزٌ (مهرَّبٌ عند من كتبه)، و`attrs` سِماتٌ تُلحَق بالرقاقة.
  */
-export function status(cls: string, glyph: string, text: string, attrs = ''): string {
-  const drawn = GLYPH[glyph]
-  const g = drawn === undefined
-    ? escapeHtml(glyph)
-    : `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${drawn}</svg>`
+export function status(cls: string, g: string, text: string, attrs = ''): string {
   const open = `<span class="st${cls === '' ? '' : ` ${cls}`}"${attrs === '' ? '' : ` ${attrs}`}>`
-  return `${open}<span class="g">${g}</span>${text}</span>`
+  return `${open}<span class="g">${glyph(g)}</span>${text}</span>`
 }
 
 /**
