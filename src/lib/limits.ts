@@ -17,6 +17,7 @@
  * أو لا يُفتح — والاتّساق أهمّ من موافقة الساعة المحليّة.
  */
 import { spendTodayFor } from './ai/spend'
+import { money } from './format'
 import { getProvider } from './providers'
 import { readSettings, type Settings } from './settings'
 import type { Db } from './tokens'
@@ -42,6 +43,13 @@ export interface Allowance {
 export interface DailyUsage {
   /** نداءات Anthropic اليوم — مقروءةً من الدفتر لا من عدّادٍ موازٍ. */
   readonly analyses: number
+  /**
+   * **كلُّ ما أُنفق اليوم** من الدفتر كلِّه — لا تحليلُ Anthropic وحدَه (D-169).
+   *
+   * كان المجموعُ `provider = 'anthropic' AND operation LIKE 'analyze:%'`، فالكتابةُ
+   * والخطّةُ والموجزُ والصورةُ واللقطةُ والنشرُ خارجه: «سقف الإنفاق اليوميّ»
+   * يسمّي نفسَه ولا يحرس إلّا بعضَه، و«المستهلَك اليوم» تحته يُنقص ما أُنفق.
+   */
   readonly spend: number
   /**
    * نداءاتُ الفيديو اليوم (D-168) — **صفوفُ الدفتر لا صفوفُ `media`**.
@@ -75,8 +83,7 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
         `SELECT
            coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
                              THEN 1 ELSE 0 END), 0) AS analyses,
-           coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
-                             THEN total ELSE 0 END), 0) AS spend,
+           coalesce(sum(total), 0) AS spend,
            coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips
            FROM cost_ledger
           WHERE at >= date('now')`,
@@ -164,19 +171,43 @@ export function videoCapGate(used: number, cap: number): VideoCapGate {
   return { used, cap, blocker: used >= cap ? { kind: 'video_cap', used, cap } : null }
 }
 
-export async function checkAllowance(db: Db): Promise<Allowance> {
+/**
+ * ما يُحرَس — **والحارسُ يسأل عمّا يحرسه** (D-169).
+ *
+ * كان حارسًا واحدًا لكلّ شيء، فسقفُ **عدد التحليلات** يوقف ما لا صلةَ له به:
+ * بلغ المالكُ عشرةَ تحليلاتٍ فتوقّف نشرُ منشوراتٍ اعتمدها وجدولها، وتوقّف
+ * مسحُ Drive وهو لا يكلّف شيئًا، وحُجبت الصورةُ والمقطع. والآن:
+ *
+ * | الحارس | ما يوقفه |
+ * |---|---|
+ * | الإيقاف | كلَّ شيء — وهو قرارُ المالك الصريح |
+ * | سقفُ التحليل (عدد) | التحليلَ وحدَه |
+ * | سقفُ الإنفاق (مال) | ما يولّد بمال: التحليلُ والكتابةُ والخطّةُ والصورةُ والمقطع |
+ *
+ * **والنشرُ لا يوقفه سقفُ المال**: منشورٌ اعتمده المالكُ وجدوله قرارٌ مكتوب
+ * (D-006)، وكلفتُه تُعَدّ في المجموع فتوقف ما يُولَّد بعدها. والمسحُ مجّانيٌّ
+ * فلا يوقفه إلّا الإيقاف.
+ */
+export type Duty = 'analyze' | 'draft' | 'plan' | 'image' | 'video' | 'publish' | 'scan'
+
+const PAID: ReadonlySet<Duty> = new Set(['analyze', 'draft', 'plan', 'image', 'video'])
+
+/** الحكمُ نفسُه بلا قراءة — لمن قرأ الإعدادَ والاستهلاكَ مرّةً ويسأل عن عملين. */
+export function blockerFor(duty: Duty, settings: Settings, usage: DailyUsage): Blocker | null {
+  if (settings.paused) return { kind: 'paused' }
+  if (duty === 'analyze' && usage.analyses >= settings.dailyAnalysisCap) {
+    return { kind: 'analysis_cap', used: usage.analyses, cap: settings.dailyAnalysisCap }
+  }
+  if (PAID.has(duty) && usage.spend >= settings.dailySpendCapUsd) {
+    return { kind: 'spend_cap', used: usage.spend, cap: settings.dailySpendCapUsd }
+  }
+  return null
+}
+
+export async function checkAllowance(db: Db, duty: Duty): Promise<Allowance> {
   const settings = await readSettings(db)
   const usage = await usageToday(db)
-
-  let blocker: Blocker | null = null
-  if (settings.paused) {
-    blocker = { kind: 'paused' }
-  } else if (usage.analyses >= settings.dailyAnalysisCap) {
-    blocker = { kind: 'analysis_cap', used: usage.analyses, cap: settings.dailyAnalysisCap }
-  } else if (usage.spend >= settings.dailySpendCapUsd) {
-    blocker = { kind: 'spend_cap', used: usage.spend, cap: settings.dailySpendCapUsd }
-  }
-
+  const blocker = blockerFor(duty, settings, usage)
   return { allowed: blocker === null, blocker, settings, usage }
 }
 
@@ -188,9 +219,9 @@ export function blockerReason(blocker: Blocker): string {
     case 'analysis_cap':
       return `بلغ سقف التحليل اليوميّ: ${blocker.used} من ${blocker.cap}`
     case 'spend_cap':
-      return `بلغ سقف الإنفاق اليوميّ: ${blocker.used.toFixed(4)}$ من ${blocker.cap}$`
+      return `بلغ سقف الإنفاق اليوميّ: ${money(blocker.used)} من ${money(blocker.cap)}`
     case 'provider_cap':
-      return `بلغ سقف ${blocker.provider} اليوميّ: ${blocker.used.toFixed(4)}$ من ${blocker.cap}$`
+      return `بلغ سقف ${blocker.provider} اليوميّ: ${money(blocker.used)} من ${money(blocker.cap)}`
     case 'provider_disabled':
       return `${blocker.provider} معطَّل بقرار المالك`
     case 'video_cap':

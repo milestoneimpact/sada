@@ -278,6 +278,17 @@ describe('دورةُ الإرسال', () => {
     expect((await readPost(post))?.['dispatched_at']).toBeNull()
   })
 
+  it('**بلوغُ سقف التحليل أو سقف الإنفاق لا يوقف نشرَ ما اعتمده المالك** (D-169)', async () => {
+    const post = await due()
+    await writeSetting(db, 'daily_analysis_cap', '0', 'test')
+    await writeSetting(db, 'daily_spend_cap_usd', '0', 'test')
+    const queue = fakeQueue()
+    const report = await dispatchDue({ db, queue, now: () => new Date('2026-09-08T09:05:00Z') })
+    // ‏كان الحارسُ واحدًا فيردّ النشرَ بـ«بلغ سقف التحليل اليوميّ»
+    expect(report.kind).toBe('sent')
+    expect(queue.sent).toEqual([post])
+  })
+
   it('بلا مستحقٍّ لا شيء', async () => {
     const queue = fakeQueue()
     expect((await dispatchDue({ db, queue, now: () => NOW })).kind).toBe('none')

@@ -140,7 +140,7 @@ export async function draftPost(
   if (existing !== null) return { kind: 'already', postId: existing.id }
 
   // ٤ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'draft')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

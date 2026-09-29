@@ -537,7 +537,7 @@ async function scanTick(env: Env): Promise<void> {
   try {
     // الإيقاف يوقف المسح أيضا: المسح لا يكلّف مالا، لكن «موقوف مؤقتا»
     // تعني موقوفا — ونظامٌ يواصل عملا وقد أُوقف يُفقِد المفتاح معناه
-    const allowance = await checkAllowance(env.DB)
+    const allowance = await checkAllowance(env.DB, 'scan')
     if (allowance.blocker !== null) {
       console.info({ job: 'drive-scan', skipped: blockerReason(allowance.blocker) })
       await beat(env.DB, 'scan', 'skipped', blockerReason(allowance.blocker))

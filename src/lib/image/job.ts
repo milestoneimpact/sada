@@ -334,7 +334,7 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
   if (existing !== null) return { kind: 'already', mediaId: existing.id }
 
   // ٣ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'image')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

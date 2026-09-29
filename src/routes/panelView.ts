@@ -972,7 +972,8 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="card" style="margin-top:var(--s-3)"><h2>الحدود اليوميّة</h2>
-    <p class="hint">سقفان لا واحد: مستندٌ ضخم قد يكلّف أكثر من 10 صغار، وطوفانُ ملفّاتٍ صغيرة يستنزف الحصّة.</p>
+    <p class="hint"><b>سقفُ التحليل</b> يعدّ التحليلاتِ وحدَها، و<b>سقفُ الإنفاق</b> يعدّ كلَّ ما دُفع اليوم:
+      التحليلُ والكتابةُ والخطّةُ والصورُ والنشر. وبلوغُ أيٍّ منهما يوقف التوليدَ <b>ولا يوقف نشرَ ما اعتمدتَه</b>.</p>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="daily_analysis_cap">
       <div class="field"><label for="c1">سقف التحليل (عدد)</label>

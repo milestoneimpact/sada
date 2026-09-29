@@ -212,7 +212,7 @@ export type DispatchReport =
 export async function dispatchDue(deps: DispatchDeps): Promise<DispatchReport> {
   const now = (deps.now ?? (() => new Date()))()
 
-  const allowance = await checkAllowance(deps.db)
+  const allowance = await checkAllowance(deps.db, 'publish')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
