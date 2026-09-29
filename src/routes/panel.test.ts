@@ -2366,7 +2366,8 @@ describe('روابطُ الشريط — والصفحاتُ منها تُفتَح
     const cookie = await login()
     const response = await app.request('/panel/tasks', withSession(cookie), env)
     expect(response.status).toBe(200)
-    expect(await response.text()).toContain('مهامُّ المالك')
+    // ‏واسمُها اسمُها في الرافدة (D-166): كانت «مهامُّ المالك» والرابطُ «ما عليك»
+    expect(await response.text()).toContain('<h1>ما عليك</h1>')
   })
 
   it('وشاشةُ المنصّة كذلك', async () => {
@@ -2907,3 +2908,64 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
   })
 })
 
+
+describe('مربوطةٌ بلا إذن تُقال في كلّ موضع (D-166)', () => {
+  /**
+   * حسابٌ محفوظٌ بلا صفٍّ في `tokens` — حالُ LinkedIn على staging. كانت بطاقةُ
+   * القناة وحدها تقولها (D-159)، وشارةُ شاشة المنصّة ونقطةُ الرافدة و«ما ينتظرك»
+   * تقول «مربوطة» خضراء، فيقرأ المالكُ الأخضرَ ويسقط أوّلُ منشورٍ مجدول.
+   */
+  beforeEach(() => {
+    db.raw.exec(
+      `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+       VALUES ('a1', 'linkedin', 'member', 'e1', 'شخصيّ', 'active')`,
+    )
+  })
+
+  it('الرافدةُ حمراءُ ونظرةٌ عامّة تقول ما ينتظرك', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toMatch(/<span class="dot bad" title="مربوطة بلا إذن">/)
+    expect(html).toContain('LinkedIn: الحسابُ محفوظٌ بلا إذن')
+    expect(html).toContain('href="/panel/channels/linkedin"')
+  })
+
+  it('وشاشةُ المنصّة: الشارةُ والزرُّ الأوّل «أعد الربط»', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel/channels/linkedin', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('مربوطة بلا إذن')
+    expect(html).toContain('>أعد الربط</a>')
+    expect(html).not.toContain('>اربط حسابا آخر</a>')
+  })
+
+  it('ومتى حُفظ الإذنُ عادت خضراءَ في المواضع كلّها', async () => {
+    db.raw.exec(
+      `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, scopes)
+       VALUES ('a1', 'x', 'iv', datetime('now', '+30 days'), 'w_member_social')`,
+    )
+    const cookie = await login()
+    const panelHtml = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(panelHtml).not.toContain('مربوطة بلا إذن')
+    expect(panelHtml).not.toContain('الحسابُ محفوظٌ بلا إذن')
+    const screen = await (await app.request('/panel/channels/linkedin', { headers: { Cookie: cookie } }, env)).text()
+    expect(screen).not.toContain('مربوطة بلا إذن')
+  })
+})
+
+describe('رأسُ كلّ لوحٍ اسمُه في الرافدة (D-166)', () => {
+  it('كلُّ لوحٍ في الصفحة رأسُه من SECTIONS، وشاشةُ «ما عليك» كذلك', async () => {
+    const { SECTIONS } = await import('./ui/command')
+    const cookie = await login()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    const panes = [...html.matchAll(/<section data-pane="([a-z]+)"[^>]*>([\s\S]*?)<\/section>/g)]
+    expect(panes.length).toBeGreaterThan(5)
+    for (const [, id, body] of panes) {
+      const section = SECTIONS.find((s) => s.id === id)
+      if (section === undefined || id === 'overview') continue
+      expect(/<h1>([^<]+)<\/h1>/.exec(body!)?.[1], id).toBe(section.label)
+    }
+    const tasks = await (await app.request('/panel/tasks', { headers: { Cookie: cookie } }, env)).text()
+    expect(tasks).toContain('<h1>ما عليك</h1>')
+    expect(tasks).toContain('<title>صدى — ما عليك</title>')
+  })
+})

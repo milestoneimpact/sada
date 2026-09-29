@@ -13,10 +13,10 @@
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
-import type { ChannelView } from '../lib/channels'
+import { unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/command'
+import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
@@ -443,13 +443,17 @@ function platformNav(views: readonly ChannelView[]): string {
   const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
 
   const row = (v: ChannelView): string => {
+    // ‏والنقطةُ تقرأ الصفَّ لا الكلمة (D-166): مربوطةٌ بلا إذنٍ حمراءُ لا خضراء
+    const unsigned = unsignedAccounts(v).length > 0
     const dot =
-      v.state === 'linked' ? 'ok'
+      unsigned ? 'bad'
+      : v.state === 'linked' ? 'ok'
       : v.state === 'needs_reauth' ? 'bad'
       : v.state === 'awaiting_owner' ? 'warn'
       : 'idle'
     const title =
-      v.state === 'linked' ? 'مربوطة'
+      unsigned ? 'مربوطة بلا إذن'
+      : v.state === 'linked' ? 'مربوطة'
       : v.state === 'needs_reauth' ? 'تحتاج تجديدا'
       : v.state === 'awaiting_owner' ? 'تنتظرك'
       : v.state === 'connectable' ? 'جاهزةٌ للربط'
@@ -675,6 +679,15 @@ export function panelPage(d: PanelData): string {
       label: 'جدّد',
     })
   }
+  // ‏والمحفوظُ بلا إذنٍ بعد المنتهي (D-166): يسقط أوّلُ منشورٍ مجدولٍ عليه
+  for (const c of d.channels.filter((v) => unsignedAccounts(v).length > 0)) {
+    items.push({
+      kind: 'bad',
+      text: `${c.spec.label}: الحسابُ محفوظٌ بلا إذن — أوّلُ منشورٍ مجدولٍ عليها يسقط.`,
+      go: `/panel/channels/${c.spec.id}`,
+      label: 'أعد الربط',
+    })
+  }
   if (d.paused) {
     items.push({ kind: 'warn', text: 'النظام موقوفٌ مؤقّتا — لا مسح ولا تحليل ولا نشر.', go: '#settings', label: 'استأنف' })
   }
@@ -855,8 +868,8 @@ ${flash}
       <div class="card">
         <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
           <span class="st idle">30 يوما</span></div>
-        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
-          «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
+        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة، <b>والأطولُ أكبرُها كلفة</b>. واضبط سقفَ اليوم
+          من «الحدود» إن جاوز أحدُها ما تريد.</p>
         ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
       </div>
     </div>
@@ -866,7 +879,7 @@ ${flash}
 ${pivotPane(d.pivot)}
 
 <section data-pane="sources" hidden>
-  ${pageHead('Google Drive', 'المصادر', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${pageHead('Google Drive', sectionLabel('sources'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -877,7 +890,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="providers" hidden>
-  ${pageHead('الذكاء', 'المزوّدون', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
+  ${pageHead('الذكاء', sectionLabel('providers'), 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
   ${providerStrip}
 
   <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
@@ -903,12 +916,12 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="channels" hidden>
-  ${pageHead('النشر', 'القنوات', 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
+  ${pageHead('النشر', sectionLabel('channels'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
   ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
 </section>
 
 <section data-pane="posts" hidden>
-  ${pageHead('التحرير', 'المنشورات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
+  ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
@@ -935,9 +948,10 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الضبط', 'الحدود', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
-  <!-- الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا،
-       ثمّ ما يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل -->
+  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقفا اليوم. <b>يُطبَّقان قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
+  ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
+       يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
+       لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
   <div class="card"><h2>الإيقاف المؤقت</h2>
     <div class="split">
       <p>${d.paused
@@ -1045,7 +1059,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="security" hidden>
-  ${pageHead('الدخول', 'الأمان', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
+  ${pageHead('الدخول', sectionLabel('security'), 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0

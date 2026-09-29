@@ -17,7 +17,7 @@
  * سرّ، **ولا شيء** حيث لم يُبنَ سائق. وزرٌّ يُعرض ثمّ يقول «غير مدعوم»
  * أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا في نضج النظام.
  */
-import { SETUP, type ChannelView } from '../../lib/channels'
+import { SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { wizardFor, type Step } from '../../lib/oauth/wizard'
 import { ICON } from './icons'
@@ -282,9 +282,9 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
 
   // **والصفُّ لا الكلمة** (D-159): حسابٌ «مربوطٌ» بلا صفّ `tokens` كان
   // يُعرَض أخضرَ ثمّ يسقط أوّلُ منشورٍ في الطابور. وهو حالُ LinkedIn على staging
-  const unsigned = accounts.filter((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
+  const unsigned = unsignedAccounts(view)
   const badge =
-    state === 'linked' && unsigned.length > 0
+    unsigned.length > 0
       ? status('bad', '▲', 'مربوطة بلا إذن')
       : state === 'linked'
         ? status('ok', '●', 'مربوطة')
@@ -426,8 +426,7 @@ export function channelsSection(
    * وترتيبُه بالضرر لا بالأبجديّة: **ما يوقف نشرا قائما قبل ما يمنع
    * نشرا لم يبدأ**.
    */
-  const unsignedOf = (v: ChannelView): boolean =>
-    v.state === 'linked' && v.accounts.some((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
+  const unsignedOf = (v: ChannelView): boolean => unsignedAccounts(v).length > 0
   const urgent = [
     ...built.filter((v) => v.state === 'needs_reauth'),
     ...built.filter(unsignedOf),

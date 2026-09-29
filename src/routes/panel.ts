@@ -31,7 +31,7 @@ import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
-import { buildCommands } from './ui/command'
+import { buildCommands, sectionLabel } from './ui/command'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
@@ -1558,7 +1558,7 @@ panel.get('/panel/tasks', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage('صدى — مهامُّ المالك', { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+    soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' }, body, nonce, '',
       buildCommands({ onPanel: false })),
   )
 })
@@ -1642,7 +1642,7 @@ panel.get('/panel/report/:week', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: 'التقارير' }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: sectionLabel('report') }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false })),
   )
 })

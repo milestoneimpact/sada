@@ -18,7 +18,7 @@
  * وصفحةٌ تقول «النشرُ فيديو لا نصّ، فيحتاج رفعا مجزّأً» تُقرأ سببا —
  * **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
  */
-import { SETUP, type ChannelView } from '../../lib/channels'
+import { SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
 import type { AccountHealth } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
@@ -404,8 +404,12 @@ export function platformScreen(d: PlatformScreenData): string {
   const logo = LOGOS[spec.id] ?? ''
   const guide = SETUP[spec.id]
 
+  // ‏والشارةُ تقرأ الصفَّ كما تقرؤه بطاقةُ القناة (D-166)
+  const unsigned = unsignedAccounts(d.view).length > 0
   const badge =
-    state === 'linked'
+    unsigned
+      ? status('bad', '▲', 'مربوطة بلا إذن')
+      : state === 'linked'
       ? status('ok', '●', 'مربوطة')
       : state === 'needs_reauth'
         ? status('bad', '▲', 'تحتاج تجديدا')
@@ -495,6 +499,9 @@ export function platformScreen(d: PlatformScreenData): string {
       : state === 'needs_reauth'
         ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start"
               aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
+        : unsigned
+          ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start"
+                aria-label="أعد ربط ${escapeHtml(spec.label)}">أعد الربط</a>`
         : state === 'linked'
           ? `<a class="btn g" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : ''
@@ -530,8 +537,8 @@ export function platformScreen(d: PlatformScreenData): string {
     ? `<h3 class="sec">ولماذا لا تُكتب لها مسوّدةٌ بعد</h3>
        <div class="card"><p class="hint">قيدُ <span class="mono">posts.platform</span> في
          القاعدة يحصر المسوّدات في المنصّات التي لها سائقُ نشر.
-         <b>وهذا مقصود</b>: مسوّدةٌ تُكتب لمنصّةٍ لا تنشر هي وعدٌ يُخلَف عند الجدولة —
-         <b>والقاعدةُ هي التي تمنعه لا الشاشة</b> (D-009).
+         فمسوّدةٌ تُكتب لمنصّةٍ لا تنشر وعدٌ يُخلَف عند الجدولة،
+         <b>والقاعدةُ هي التي تمنعه لا الشاشة</b>.
          ويُوسَّع القيدُ في ترحيل السائق نفسِه، لا قبله.</p>
        <div class="outcome"><span class="k">وما جاهز</span><span class="v">
          المقاطعُ تُولَّد رأسيّةً <span class="mono">9:16</span> بخمسَ عشرةَ ثانية،

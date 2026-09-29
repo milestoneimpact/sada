@@ -329,7 +329,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     built: true,
     stage: 'publish',
     secrets: ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET'],
-    task: 'M-16',
+    task: 'M-24',
     // **ونصٌّ صِرفٌ بلا وسم**: يُهرَّب في أربعة مواضع (D-093)
     note:
       'الربطُ والنشرُ مبنيّان، ولها طريقان: تسجيلُ دخولٍ مباشرٍ بحسابٍ ' +
@@ -431,6 +431,23 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
   } catch {
     return []
   }
+}
+
+/**
+ * حساباتٌ «مربوطة» بلا إذن — **والصفُّ لا الكلمة** (D-159 · D-166).
+ *
+ * `accounts.status` يقول «نشط» والحسابُ بلا صفٍّ في `tokens` (و`expires_at`
+ * هناك `NOT NULL`، فالفراغُ في الضمّ غيابُ الصفّ لا إذنٌ بلا نهاية). وهو حالُ
+ * LinkedIn على staging: أوّلُ منشورٍ مجدولٍ يسقط بـ`no_tokens`. **وكان يُقال
+ * في بطاقة القناة وحدها**، وشارةُ شاشة المنصّة ونقطةُ الرافدة و«ما ينتظرك»
+ * تقول «مربوطة» خضراء. فالحكمُ هنا مرّةً، وكلُّها تقرؤه.
+ */
+export function unsignedAccounts(view: {
+  readonly state: ChannelState
+  readonly accounts: readonly LinkedAccount[]
+}): LinkedAccount[] {
+  if (view.state !== 'linked') return []
+  return view.accounts.filter((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
 }
 
 export type ChannelState =

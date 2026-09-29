@@ -126,7 +126,7 @@ export const SECTIONS: readonly Section[] = [
   { id: 'overview', label: 'نظرة عامّة', note: 'حالُ اليوم: ما أُنفق وما ينتظر قرارك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
   { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
   { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true },
-  { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ رموزها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
+  { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ أذوناتها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
   { id: 'pivot', label: 'الجدول المحوريّ', note: 'تختار الصفوفَ والأعمدةَ والقياس — وتقارن بنظرة', icon: ICON.pivot, group: 'العمل', alias: 'pivot table analysis لوح محوري جدول تحليل مقارنه', short: 'اللوح' },
   { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', bar: true, page: '/panel/report' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', bar: true, page: '/panel/tasks' },
@@ -134,6 +134,19 @@ export const SECTIONS: readonly Section[] = [
   { id: 'settings', label: 'الحدود', note: 'سقفُ الإنفاق وعددُ التحليلات', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget ميزانيه اعدادات سقف' },
   { id: 'security', label: 'الأمان', note: 'الجلساتُ والمفاتيحُ وسجلُّ التدقيق', icon: ICON.security, group: 'الضبط', alias: 'security sessions passkeys جلسات مفاتيح مرور' },
 ]
+
+/**
+ * اسمُ اللوح من الفهرس — **ومن هنا وحدَه** (D-166).
+ *
+ * كان رأسُ كلّ لوحٍ مكتوبًا بيد، يطابق الرافدةَ مصادفة: «ما عليك» في الرافدة
+ * تفتح صفحةً عنوانُها «مهامُّ المالك»، ورابطُ العودة من التقرير «التقارير»
+ * واسمُه «التقرير الأسبوعيّ». فالرأسُ والعنوانُ ورابطُ العودة يقرأون من هنا.
+ */
+export function sectionLabel(id: string): string {
+  const section = SECTIONS.find((s) => s.id === id)
+  if (section === undefined) throw new Error(`لا لوحَ باسم ${id} في SECTIONS`)
+  return section.label
+}
 
 /**
  * مرجعُ مسوّدةٍ في الفهرس — **ولا يُحمَل منها إلّا ما يُقرأ سطرا**.
