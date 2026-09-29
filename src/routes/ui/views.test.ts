@@ -19,7 +19,7 @@ import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { sheet, type Decl, type Sheet } from '../../test/css'
-import { bar, status } from './parts'
+import { bar, glyph, status } from './parts'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
 import { scopeSet } from '../../lib/oauth/scopes'
@@ -385,8 +385,10 @@ describe('من المحطّة إلى موضعها (D-126)', () => {
         { kind: 'publish', title: 'نُشرت', at: null, detail: '', cost: null, model: null, state: 'done' },
       ],
     }, new Date('2026-09-06T09:00:00Z'))
-    expect(html).toContain('<a class="btn g sm stop-go" href="/panel#sources">المصادر ←</a>')
-    expect(html).toContain('<a class="btn g sm stop-go" href="/panel/channels/x">شاشةُ X ←</a>')
+    // ‏والسهمُ مرسومٌ يشير إلى نهاية السطر، لا حرفٌ من خطّ النظام (D-167)
+    expect(html).toContain(`<a class="btn g sm stop-go" href="/panel#sources">المصادر${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn g sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
+    expect(html).not.toContain('\u2190')
   })
 })
 
@@ -817,8 +819,10 @@ describe('ما وراء المقاييس (D-149)', () => {
     })
     expect(css.where('.cmdk-g')).toContain('')
     for (const at of css.where('.cmdk-g')) expect(css.rule('.cmdk-g', at)['letter-spacing'], at).toBeUndefined()
-    expect(backNav('/panel#channels', 'القنوات')).toContain('→ القنوات')
-    expect(backNav('/panel#channels', 'القنوات')).not.toContain('\u2190')
+    // ‏وسهمُ العودة مرسومٌ يشير إلى البداية — اليمين هنا — لا حرفٌ من خطّ النظام (D-167)
+    expect(backNav('/panel#channels', 'القنوات')).toContain(`${ICON.back}القنوات</a>`)
+    expect(ICON.back).toContain('m13 6 6 6-6 6')
+    expect(backNav('/panel#channels', 'القنوات')).not.toMatch(/[\u2190\u2192]/)
   })
   it('الوصول: حشوُ التمرير تحت الشريط، والرابطُ الهادئ بخيطٍ لا بلونٍ وحدَه، وحقلُ الأوامر يقول «هنا»', () => {
     expect(css.rule('html')['scroll-padding-top']).toBe('calc(64px + var(--s-3))')
@@ -844,7 +848,7 @@ describe('شريطُ العودة (D-140)', () => {
   it('العلامةُ أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
     const html = backNav('/panel#channels', 'القنوات')
     const home = html.indexOf('<a class="home" href="/panel"')
-    const back = html.indexOf('→ القنوات')
+    const back = html.indexOf(`${ICON.back}القنوات`)
     expect(home).toBeGreaterThan(0)
     expect(back).toBeGreaterThan(home)
     expect(html).toContain('<span class="glyph sm">')
@@ -872,7 +876,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     const html = soloPage('صدى — تجربة', { href: '/panel#posts', label: 'المنشورات' }, '<p>x</p>', 'n')
     expect(html).toContain('<a class="skip" href="#main">')
     expect(html).toContain('class="home"')
-    expect(html).toContain('→ المنشورات')
+    expect(html).toContain(`${ICON.back}المنشورات`)
     expect(html).toContain('<main id="main"><p>x</p></main>')
     expect(html).toContain('sada-theme')
   })
@@ -895,10 +899,11 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
 })
 
 describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
-  it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '!'])('الحرفُ %s يُرسَم SVG بلون النصّ', (glyph) => {
-    const html = status('ok', glyph, 'نصّ')
+  // ‏و«▼» معها منذ D-167: سهمُ الفرق عن الأمس صار يُرسَم من الجدول نفسِه
+  it.each(['●', '○', '◍', '◔', '▲', '▼', '◆', '✓', '✕', '↑', '!'])('الحرفُ %s يُرسَم SVG بلون النصّ', (g) => {
+    const html = status('ok', g, 'نصّ')
     expect(html).toContain('<span class="st ok"><span class="g"><svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">')
-    expect(html).not.toContain(glyph)
+    expect(html).not.toContain(g)
     expect(html).toContain('</svg></span>نصّ</span>')
   })
 
@@ -1037,5 +1042,88 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(Object.keys(css.rule('.hint.ready')).length).toBeGreaterThan(0)
     // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
     expect(css.rule('.hint.ready a').color).toBe('var(--brand)')
+  })
+})
+
+/**
+ * الجوّالُ واللمسُ والرموز (D-167). والورقةُ تُسأل قواعدَ وترتيبًا لا نصًّا:
+ * العلّتان الأوليان قاعدتان **صحيحتان في موضعٍ خطأ** — تغلبهما قاعدةٌ لاحقةٌ
+ * بتساوي المحدّد — فالاختبارُ يسأل عن الموضع كما يسأل عن القيمة.
+ */
+describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
+  const rules = css.rules()
+  const at = (selector: string, ctx = ''): number =>
+    rules.findIndex((r) => r.at === ctx && r.selectors.includes(selector.replace(/\s*>\s*/g, '>')))
+  const TOUCH = '@media(pointer:coarse)'
+
+  it('طبقةُ اللمس آخرُ الورقة، وحقلُ اللوحة فيها باسمه — فلا يُقرّبه iOS', () => {
+    const first = rules.findIndex((r) => r.at === TOUCH)
+    expect(first).toBeGreaterThan(0)
+    // ‏ما بعد أوّل قاعدةٍ فيها كلُّه منها: قاعدةٌ تُكتب بعدها تغلبها بتساوي المحدّد
+    expect(rules.slice(first).filter((r) => r.at !== TOUCH).map((r) => r.selectors.join(','))).toEqual([])
+    expect(css.rule('.cmdk-in input', TOUCH)['font-size']).toBe('var(--t-lg)')
+    expect(at('.cmdk-in input', TOUCH)).toBeGreaterThan(at('.cmdk-in input'))
+    // ‏والحاسوبُ على حاله
+    expect(css.rule('.cmdk-in input')['font-size']).toBe('var(--t-md)')
+  })
+
+  it('رقمُ المؤشّر يصغر على الجوّال: قاعدتُه بعد قاعدتَي الرقم لا قبلهما', () => {
+    const phone = '@media(max-width:900px)'
+    expect(css.rule('.tiles>.tile:first-child .v', phone)['font-size']).toBe('var(--t-2xl)')
+    expect(css.rule('.tiles .v', phone)['font-size']).toBe('var(--t-xl)')
+    expect(at('.tiles>.tile:first-child .v', phone)).toBeGreaterThan(at('.grid>.tile:first-child .v'))
+    expect(at('.tiles .v', phone)).toBeGreaterThan(at('.tile .v'))
+  })
+
+  it('شريطُ الإبهام من السلّم، ولا حرفَ بالبكسل في الورقة كلّها', () => {
+    const bar = '@media(max-width:720px)'
+    expect(css.rule('nav.tabs > a[data-bar] span:not(.count)', bar)).toMatchObject({
+      'font-size': 'var(--t-xs)', 'line-height': 'var(--lh-tight)',
+    })
+    expect(css.rule('nav.tabs .count', bar)).toMatchObject({
+      'font-size': 'var(--t-xs)', 'line-height': 'var(--s-4)', 'min-width': 'var(--s-4)', padding: '0 var(--s-1)',
+    })
+    expect(found((d) => d.prop === 'font-size' && /^\d/.test(d.value))).toEqual([])
+    // ‏وحشوُ المحتوى فوق الشريط رتبةٌ لا مجموعُ رتبتين (‏٨٠ خارجَ السلّم)
+    expect(css.rule('.content', bar)['padding-bottom']).toMatch(/^calc\(var\(--s-16\) \+ env\(/)
+  })
+
+  it('لا حرفَ رمزٍ في «content»: سهمُ الطيّ مثلّثٌ من حدود، والمطويُّ يشير إلى نهاية السطر', () => {
+    expect(found((d) => d.prop === 'content' && /[▾▸▲▼←→⌘]|\\2[05]/.test(d.value))).toEqual([])
+    for (const s of ['.g-tog::after', 'details.plat>summary::after']) {
+      expect(css.rule(s), s).toMatchObject({
+        content: "''", 'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid',
+      })
+    }
+    expect(css.rule('.setup>summary::before')).toMatchObject({
+      'border-block': '.3em solid transparent', 'border-inline-start': '.4em solid', 'border-inline-end': '0',
+    })
+    expect(css.rule('.setup[open]>summary::before')).toMatchObject({
+      'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid', 'border-block-end': '0',
+    })
+  })
+
+  it('والسهمُ ومفتاحُ الأوامر مرسومان بقدر حرفهما، و«▼» في جدول parts', () => {
+    expect(glyph('▼')).toBe('<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 8.5 9.1 1.4H.9z"/></svg>')
+    expect(commandTrigger()).toContain(`<kbd class="kbd">${ICON.command}K</kbd>`)
+    expect(commandTrigger()).not.toContain('⌘')
+    for (const s of ['.btn>svg', 'nav.back a>svg', 'a.chip>svg', '.kbd>svg']) {
+      expect(css.rule(s), s).toMatchObject({ width: '1em', height: '1em', flex: 'none' })
+    }
+    // ‏و«⌘» داخل الزرّ لا يرث قياسَ رمز البحث
+    expect(css.where('.cmdk-open svg')).toEqual([])
+    expect(css.rule('.cmdk-open>svg')).toMatchObject({ width: '15px', height: '15px' })
+    for (const s of ['.delta .ar svg', '.why .i svg']) expect(css.rule(s), s).toMatchObject({ width: '10px', height: '10px' })
+  })
+
+  it('والجانبُ منطقيّ: الفاصلُ في نهاية السطر، والطبقةُ بعرض الرابط، والمحاذاةُ بداية', () => {
+    expect(css.rule('.chip')).toMatchObject({ margin: 'var(--s-0) 0 0', 'margin-inline-end': 'var(--s-1)' })
+    expect(precedes('.chip', 'margin', 'margin-inline-end')).toBe(true)
+    // ‏و«.mono» لاتينيّةُ الاتّجاه، فنهايةُ السطر العربيّ بدايتُها هي
+    expect(css.rule('.chip.mono')['margin-inline']).toBe('var(--s-1) 0')
+    expect(css.rule('.tap::after')['inset-inline']).toBe('0')
+    expect(css.rule('th')['text-align']).toBe('start')
+    expect(found((d) => /^(margin|padding|border)-(left|right)|^(left|right)$/.test(d.prop) ||
+      (['text-align', 'float', 'clear'].includes(d.prop) && /^(left|right)$/.test(d.value)))).toEqual([])
   })
 })

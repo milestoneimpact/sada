@@ -26,7 +26,7 @@
  *
  * قياسٌ يصل بالوراثة أو بمحدّدٍ لم يُصِب لا يظهر في `grep`. **والحدُّ
  * الذي يُفحَص في الشيفرة يُفحَص فيها** (`vh` و`hover` والوزن)، وما عداه
- * يُقاس على أربعة مقاسات.
+ * يُقاس على خمسة مقاسات.
  *
  * الاستعمال:  node scripts/audit_mobile.mjs <ملفّ.html> …
  */
@@ -34,8 +34,15 @@ import { chromium } from 'playwright'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
-/** ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max. */
-const WIDTHS = [320, 360, 390, 430]
+/**
+ * ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max · ‏٧٦٨ لوحٌ لمسيّ.
+ *
+ * **والأخيرُ نطاقٌ لا مقاس** (D-167): بين ‏٧٢١ و‏٩٦٠ تصير الرافدةُ شريطَ
+ * تبويبٍ أفقيًّا ولا شريطَ إبهام — نطاقٌ ثالثٌ بقواعده. وفيه وُجد شريطُ
+ * التبويب ‏٣٧٠px يدفع المحتوى إلى ‏٧٥٠ (D-151)، **وجده القياسُ يدًا لا
+ * المدقّق**: أربعةُ مقاساته كلُّها تحت ‏٧٢٠.
+ */
+const WIDTHS = [320, 360, 390, 430, 768]
 
 /** أدنى هدفِ لمس — Apple HIG. وهو أشدُّ من ‏٢٤ عند WCAG 2.5.8، وهو المراد. */
 const TAP = 44
@@ -209,8 +216,13 @@ for (const file of files) {
          */
         const TYPELESS = new Set(['checkbox', 'radio', 'range', 'color', 'file', 'submit', 'button', 'reset', 'image'])
         const fields = new Set()
+        /*
+         * **والحقلُ المخفيُّ يُقاس كذلك** (D-167): حقلُ لوحة الأوامر يُرسَم
+         * «hidden» حتّى تُفتَح، **فتخطّاه المدقّقُ منذ بُنيت (D-105)** وهو
+         * ‏١٤px على اللمس. والخطُّ المحسوبُ لا يحتاج صندوقا: «getComputedStyle»
+         * تحسبه لعنصرٍ لا يُرسَم. فما يمكن أن يظهر يُقاس.
+         */
         for (const el of document.querySelectorAll('input:not([type=hidden]),select,textarea')) {
-          if (!shown(el)) continue
           if (el.tagName === 'INPUT' && TYPELESS.has(el.type)) continue
           const fs = parseFloat(getComputedStyle(el).fontSize)
           if (fs >= MIN_FIELD_FONT) continue

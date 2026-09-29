@@ -30,7 +30,7 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
-import { alertChannel, bar, firstDay, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import { alertChannel, bar, firstDay, glyph, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
@@ -544,11 +544,12 @@ function deltaOf(series: readonly { day: string; total: number }[]): string {
   const today = series[series.length - 1]!.total
   const yesterday = series[series.length - 2]!.total
   if (yesterday === 0 && today === 0) return '<div class="delta">كأمس تماما</div>'
-  if (yesterday === 0) return `<div class="delta up"><span class="ar">▲</span>بدأ اليوم</div>`
+  // ‏والسهمُ مرسومٌ من parts لا حرفٌ من خطّ النظام (D-167) — و«▼» لم يكن في جدوله
+  if (yesterday === 0) return `<div class="delta up"><span class="ar">${glyph('▲')}</span>بدأ اليوم</div>`
   const change = ((today - yesterday) / yesterday) * 100
   if (Math.abs(change) < 1) return '<div class="delta">كأمس تقريبا</div>'
   const up = change > 0
-  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${up ? '▲' : '▼'}</span>${
+  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${glyph(up ? '▲' : '▼')}</span>${
     Math.abs(change).toFixed(0)}٪ ${up ? 'أكثر' : 'أقلّ'} من أمس</div>`
 }
 
@@ -651,7 +652,7 @@ export function panelPage(d: PanelData): string {
              <option value="worth">الأعلى استحقاقا</option>
              <option value="name">الاسم</option></select></div>
          <div class="grow"></div>
-         <div class="tile" style="text-align:left">
+         <div class="tile" style="text-align:end">
            <span class="n">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
        </div>
        <div class="scroll"><table>

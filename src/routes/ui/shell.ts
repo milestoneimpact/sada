@@ -7,6 +7,7 @@
  */
 import { commandPalette, commandTrigger, type Command } from './command'
 import { escapeHtml } from './escape'
+import { ICON } from './icons'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
 
@@ -189,10 +190,13 @@ export function backNav(href: string, label: string): string {
    * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
    * وحدَه، فتُقرأ صفحةً خارج التطبيق. والعلامةُ بجانب السهم تقول «هذه من
    * صدى» قبل أن يُقرأ العنوان — وهي بابٌ إلى اللوحة كذلك.
+   *
+   * **والسهمُ مرسومٌ لا حرف** (D-167): «→» ليس في خطٍّ مضمَّن (N-7)، فكان
+   * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
   return `<nav class="back" aria-label="مسارُ العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
-    <a href="${escapeHtml(href)}">→ ${escapeHtml(label)}</a>
+    <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
 }

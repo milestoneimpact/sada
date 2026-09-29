@@ -39,7 +39,7 @@ import type { AppStatus } from '../../lib/oauth/apps'
 import { whenTag } from './time'
 import { LOGOS } from './logos'
 // وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
-import { RUNG_MARK, status } from './parts'
+import { glyph, RUNG_MARK, status } from './parts'
 import { readiness, type Readiness } from '../../lib/platform/readiness'
 
 export interface PlatformScreenData {
@@ -214,7 +214,7 @@ function postCard(
   const error =
     post.lastError === null
       ? ''
-      : `<div class="why bad"><span class="i">▲</span><span class="t">
+      : `<div class="why bad"><span class="i">${glyph('▲')}</span><span class="t">
          <b>آخرُ فشل:</b> ${escapeHtml(post.lastError)}</span></div>`
 
   return `<article class="post">

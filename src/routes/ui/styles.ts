@@ -87,7 +87,12 @@ details:not([open])>summary .lbl-close{display:none}
    خبرٌ — لذلك لا يُقرأ بصوتٍ عالٍ، واللفظُ فوقه يقول ما يقوله السهم */
 .g-tog,.ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
   display:inline-flex; align-items:center; gap:var(--s-2)}
-.g-tog::after,.ptog::after{content:'▾'; font-size:var(--t-xs);
+/* **والسهمُ حدودٌ لا حرف** (D-167): كان «▾»، وليس في Beiruti ولا Inter ولا
+   Reem Kufi المضمَّنة، فيُرسَم بخطّ النظام ويختلف من جهازٍ لآخر (N-7). والمثلّثُ
+   من حدَّين شفّافين وثالثٍ بلون النصّ — بلا خطٍّ ولا صورةٍ ولا سياسةِ مصدر. وقياسُه
+   بالـem من «--t-xs» الذي كان الحرفُ يُرسَم به: ‏٠٫٦ عرضًا و‏٠٫٤ ارتفاعًا. */
+.g-tog::after,.ptog::after{content:''; font-size:var(--t-xs); width:0; height:0;
+  border-inline:.3em solid transparent; border-block-start:.4em solid;
   transition:transform var(--dur-2) var(--ease)}
 details[open]>summary .g-tog::after,details[open]>summary .ptog::after{transform:rotate(180deg)}
 /* ── العنوانُ يُوزَن أسطرُه ─────────────────────────────────────────────
@@ -120,9 +125,9 @@ b,strong{font-weight:700}
 /* **والامتدادُ رأسيٌّ لا أفقيّ.**
    طبقةٌ أعرضُ من الرابط تخرج عن الصفحة فتصنع تمريرا أفقيّا — قِيس ‏١٢px
    عند ‏٣٢٠px، مصدرُها رابطُ «X» بعرض ‏١١ وطبقتُه ‏٤٤. فتُقصَر الطبقةُ على
-   عرض الرابط («left» و«right» صفرا) ويُعطى الرابطُ عرضا أدنى في التخطيط.
+   عرض الرابط («inset-inline» صفرا) ويُعطى الرابطُ عرضا أدنى في التخطيط.
    والفيضُ الرأسيُّ لا يضرّ: الصفحةُ تُمرَّر رأسيّا أصلا. */
-.tap::after{content:''; position:absolute; left:0; right:0; top:50%;
+.tap::after{content:''; position:absolute; inset-inline:0; top:50%;
   transform:translateY(-50%); height:var(--tap)}
 
 /* ══ هيكلُ التطبيق ═══════════════════════════════════════════ */
@@ -189,7 +194,8 @@ details.plat>summary::-webkit-details-marker{display:none}
 @media(hover:hover){details.plat>summary:hover{background:var(--surface-2); color:var(--ink)}}
 details.plat>summary svg{width:16px; height:16px; flex:none; opacity:.7}
 /* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
-details.plat>summary::after{content:'▾'; margin-inline-start:auto; font-size:var(--t-xs);
+details.plat>summary::after{content:''; margin-inline-start:auto; font-size:var(--t-xs);
+  width:0; height:0; border-inline:.3em solid transparent; border-block-start:.4em solid;
   color:var(--ink-3); transition:transform var(--dur-2) var(--ease)}
 details.plat[open]>summary::after{transform:rotate(180deg)}
 .plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
@@ -382,12 +388,10 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 /* ── صفُّ المؤشّرات في الجوّال زوجان لا عمود (D-136) ──────────────────
    ستُّ بطاقاتٍ في عمودٍ واحدٍ على ‏٣٩٠px ثمانُ مئةِ بكسلٍ قبل أوّل قائمة،
    وكلُّ بطاقةٍ رقمٌ واحدٌ في ‏١٣٠px. **فالمؤشّراتُ اثنان في الصفّ ما دام
-   الرقمُ يسع**، والرقمُ يصغر درجةً ليسع. */
+   الرقمُ يسع**، والرقمُ يصغر درجةً ليسع — وقاعدتُه بعد قاعدة الرقم أدناه. */
 @media(max-width:900px){
   .tiles.c2,.tiles.c3,.tiles.c4,.tiles.c5{grid-template-columns:repeat(2,1fr)}
-  .tiles.c3>.tile:last-child:nth-child(odd){grid-column:1/-1}
-  .tiles .v{font-size:var(--t-xl); letter-spacing:-.6px}
-  .tiles>.tile:first-child .v{font-size:var(--t-2xl)}}
+  .tiles.c3>.tile:last-child:nth-child(odd){grid-column:1/-1}}
 /* ── نظرةٌ عامّة: عمودان يُملآن لا يُمدّان (D-136) ──────────────────────
    شبكةٌ تمدّ البطاقةَ لتساوي جارتَها تترك تحت رسم الإنفاق ‏٥٢١px بيضاء
    (قِيست). فالعمودُ الثاني **رصّةٌ** من بطاقتين تملأ ما تملؤه القائمة،
@@ -454,7 +458,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .tile .v{font-size:var(--t-2xl); font-weight:400; line-height:var(--lh-tight); letter-spacing:-.8px;
   font-variant-numeric:tabular-nums; margin-top:var(--s-1);
   /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته */
-  direction:ltr; unicode-bidi:isolate; text-align:right}
+  direction:ltr; unicode-bidi:isolate; text-align:end}
 .tile .v em{font-style:normal; font-size:var(--t-base); color:var(--ink-3); letter-spacing:0;
   margin-inline-start:var(--s-0); font-weight:500}
 /* ── والمؤشّرُ الأوّل يقود بالقياس كما يقود باللون (D-117) ───────────
@@ -469,6 +473,14 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    العدد. */
 .grid>.tile:first-child .v{font-size:var(--t-3xl); color:var(--au); font-weight:400; letter-spacing:-1.2px}
 .tile .n{font-size:var(--t-xs); color:var(--ink-3); margin-top:var(--s-2)}
+/* ── والرقمُ يصغر درجةً على الجوّال (D-136) — **وموضعُه بعد قاعدتَي الرقم** ──
+   كُتب أوّلًا مع شبكة الزوجين أعلاه، **فغلبته «.tile .v» و«.grid>.tile:first-child
+   .v» بتساوي المحدّد وتأخُّرِهما**: بقي الأوّلُ ‏٤٢px والبقيّةُ ‏٢٦ عند ‏٣٩٠ —
+   قاعدةٌ تُقرأ صحيحةً وأثرُها صفر. أمسكها القياسُ في D-167، ويحرسها اختبارٌ
+   يسأل الورقةَ عن الترتيب لا عن النصّ. */
+@media(max-width:900px){
+  .tiles .v{font-size:var(--t-xl); letter-spacing:-.6px}
+  .tiles>.tile:first-child .v{font-size:var(--t-2xl)}}
 
 /* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه
    قطّ — الكهرمان يقع من ذهب الهوية على ΔE 7.2 فلا يُرى فرقُهما. والبلوغُ
@@ -491,11 +503,13 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    الاتّجاه، والحبرُ يبقى حبرا. والصنفان يبقيان للاتّجاه لا للّون. */
 .delta.up,.delta.down{color:var(--ink-2)}
 .delta .ar{font-size:var(--t-xs); line-height:var(--lh-tight)}
+/* والسهمُ مرسومٌ بقياس رمز الرقاقة (D-167): ‏١٠px كـ«.st .g svg» */
+.delta .ar svg{width:10px; height:10px; display:block}
 
 /* ══ الجداول ═════════════════════════════════════════════════ */
 .scroll{display:block; overflow-x:auto; margin:0 -var(--s-0); padding:0 var(--s-0)}
 table{width:100%; border-collapse:collapse; font-size:var(--t-base); min-width:520px}
-th{text-align:right; color:var(--ink-3); font-size:var(--t-xs); padding:0 var(--s-2) var(--s-2);
+th{text-align:start; color:var(--ink-3); font-size:var(--t-xs); padding:0 var(--s-2) var(--s-2);
   border-bottom:1px solid var(--line); white-space:nowrap;
   border-bottom-color:var(--line-strong); font-weight:600}
 td{padding:var(--s-3) var(--s-2); border-bottom:1px solid var(--line-soft); vertical-align:top}
@@ -515,7 +529,7 @@ tbody tr:last-child td{border-bottom:0}
 .pv th,.pv td{text-align:center; padding:var(--s-2); white-space:nowrap;
   font-variant-numeric:tabular-nums}
 /* **وترويسةُ الصفّ تُقرأ اسما لا رقما**: يمينَ السطر، وبحبرٍ أثقل */
-.pv tbody th[scope=row]{text-align:right; font-size:var(--t-sm); color:var(--ink);
+.pv tbody th[scope=row]{text-align:start; font-size:var(--t-sm); color:var(--ink);
   font-weight:700; border-bottom:1px solid var(--line-soft)}
 .pv thead th{font-size:var(--t-xs)}
 .pv td{border-bottom:1px solid var(--line-soft); vertical-align:middle}
@@ -558,7 +572,15 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 .st.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
 .st.idle{color:var(--ink-3); background:var(--surface-2); border-color:var(--line)}
 .chip{display:inline-block; padding:var(--s-0) var(--s-2); border-radius:var(--r-pill); font-size:var(--t-xs); font-weight:600;
-  background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink-2); margin:var(--s-0) 0 0 var(--s-1)}
+  background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink-2);
+  /* والفاصلُ في نهاية السطر لا في يساره (D-167): كان «margin:… 0 0 var(--s-1)» —
+     يسارٌ هو نهايةُ السطر في العربيّة مصادفةً، وبدايتُه في حاويةٍ لاتينيّة */
+  margin:var(--s-0) 0 0; margin-inline-end:var(--s-1)}
+/* **والرقاقةُ اللاتينيّةُ تكتب اتّجاهَها بنفسها** («.mono» ‏ltr)، والجانبُ المنطقيُّ
+   يُحَلّ على العنصر لا على أبيه: نهايتُها هي يمينُها، **ونهايةُ السطر العربيّ الذي
+   تقع فيه بدايتُها هي**. قِيس ذلك ببصمة الأنماط المحسوبة: ‏٤٣ رقاقةً انتقل فاصلُها
+   إلى الجهة الأخرى بالسطر أعلاه وحده (D-167) — فتُعطى بدايتَها صراحةً. */
+.chip.mono{margin-inline:var(--s-1) 0}
 /* **ورقاقةٌ تُلمَس ليست رقاقةً تُقرأ** (D-105).
 
    قِيست رقاقةُ رابط الرحلة ‏٥١×‏٢٥ عند ‏٤٣٠px، **وهدفٌ دون ‏٤٤ يُصاب
@@ -595,6 +617,12 @@ button,.btn{font:inherit; font-size:var(--t-base); font-weight:600; cursor:point
 button:disabled{opacity:.45; cursor:not-allowed}
 /* ضغطةٌ تُحسّ: إزاحةُ بكسلٍ واحد. وبلا ردٍّ يظنّ الضاغطُ أنّه لم يُصب */
 button:active:not(:disabled),.btn:active{transform:translateY(1px)}
+/* ── الرمزُ في الرابط بقدرِ حرفه (D-167) ─────────────────────────────
+   سهما الرابط ومفتاحُ الأوامر كانت حروفًا تكبر مع ما حولها. **وSVG بلا قياسٍ
+   في حاويةٍ مرنة يُرسَم ‏٠×‏٠**: هكذا كان سهمُ المغادرة في «افتح في Drive»
+   و«افتحه على المنصّة» غائبًا — قِيس صندوقُه ‏٠×‏٠ عند ‏١٤٤٠. فالرمزُ ‏١em يتبع
+   رتبةَ الحرف الذي يجاوره، ويهبط ثُمنَ em ليقع على سطر الحروف حيث لا مرونة. */
+.btn>svg,nav.back a>svg,a.chip>svg,.kbd>svg{width:1em; height:1em; flex:none; vertical-align:-.125em}
 
 /* ── دوّامةُ الانتظار ─────────────────────────────────────────────────
    النصُّ يبقى والدوّامةُ تُضاف: كان النصُّ يُستبدَل بـ «جارٍ…»، **فيضيع
@@ -700,7 +728,7 @@ ul.plain li:last-child{margin-bottom:0}
   line-height:1; white-space:nowrap; unicode-bidi:isolate}
 .chart .axis.y{transform:translateY(-50%)}
 .chart .axis.x{transform:translateY(-100%)}
-.chart .axis.x.end{text-align:right}
+.chart .axis.x.end{text-align:end}
 .chart .peak{position:absolute; width:7px; height:7px; border-radius:50%; background:var(--surface);
   border:2px solid var(--brand); transform:translate(-50%,-50%)}
 .chart .grid-l{stroke:var(--line-soft); stroke-width:1; vector-effect:non-scaling-stroke}
@@ -746,7 +774,7 @@ ul.plain li:last-child{margin-bottom:0}
 .stop-go{margin-inline-start:auto}
 /* أمرُ wrangler في صفّ المهمّة: حقلٌ يُقرأ ويُنسَخ، لاتينيٌّ معزول (D-126) */
 .cmd{margin-top:var(--s-2)}
-.cmd-text{flex:1 1 220px; min-width:0; direction:ltr; text-align:left; font-size:var(--t-sm);
+.cmd-text{flex:1 1 220px; min-width:0; direction:ltr; text-align:start; font-size:var(--t-sm);
   padding:var(--s-2) var(--s-3); border:1px solid var(--line); border-radius:var(--r-sm);
   background:var(--surface-2); color:var(--ink); resize:none; white-space:pre; overflow-x:auto}
 
@@ -893,7 +921,7 @@ ol.steps .why{display:block; color:var(--ink-3)}
 .prow .pn{flex:1; min-width:0; font-size:var(--t-base); font-weight:700; color:var(--ink)}
 .prow .pk{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
 .prow .pm{flex:none; width:200px; font-size:var(--t-xs); color:var(--ink-2);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr; text-align:left}
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr; text-align:start}
 .prow .pv{flex:none; width:80px; font-size:var(--t-base); font-weight:700; color:var(--ink);
   font-variant-numeric:tabular-nums}
 .prow .pv i{display:block; font-style:normal; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
@@ -1024,13 +1052,19 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--brand);
   list-style:none; padding:var(--s-2) 0}
 .setup>summary::-webkit-details-marker{display:none}
-.setup>summary::before{content:'▸'; display:inline-block; margin-inline-end:var(--s-2)}
-.setup[open]>summary::before{content:'▾'}
+/* والمطويُّ يشير إلى نهاية السطر لا إلى يمينه (D-167): كان «▸» — حرفًا من خطّ
+   النظام **يشير يمينًا في صفحةٍ تُقرأ من اليمين**، أي إلى الوراء. والمثلّثُ من
+   الحدّ المنطقيّ يشير إلى «inline-end» في الاتّجاهين، ويُقلَب إلى الأسفل مفتوحًا */
+.setup>summary::before{content:''; display:inline-block; flex:none; width:0; height:0;
+  margin-inline-end:var(--s-2);
+  border-block:.3em solid transparent; border-inline-start:.4em solid; border-inline-end:0}
+.setup[open]>summary::before{border-inline:.3em solid transparent; border-block-start:.4em solid;
+  border-block-end:0}
 .setup-body{padding-top:var(--s-2)}
 
 .copy{display:flex; gap:var(--s-2); align-items:stretch}
 .copy input{flex:1 1 auto; min-width:0; font-size:var(--t-sm);
-  direction:ltr; text-align:left; background:var(--surface-2)}
+  direction:ltr; text-align:start; background:var(--surface-2)}
 
 /* ── المسوّدات ────────────────────────────────────────────────────────
    المربّعُ نفسه هو المعروض: لا «اعرض» ثمّ «عدّل» في شاشتين، فما يُقرأ هو
@@ -1246,7 +1280,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 nav.back{display:flex; align-items:center; padding:var(--s-3) 0 var(--s-5);
   border-bottom:1px solid var(--line-soft); margin-bottom:var(--s-4); gap:var(--s-4)}
 nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-decoration:none;
-  display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap)}
+  display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); min-width:var(--tap)}
 @media(hover:hover){nav.back a:hover{color:var(--brand)}}
 
 .plat-logo{width:46px; height:46px; border-radius:var(--r); flex:none; display:grid; place-items:center;
@@ -1290,6 +1324,8 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .why.bad{background:var(--bad-wash); color:var(--ink-2);
   border:1px solid color-mix(in srgb,var(--bad) 20%,transparent)}
 .why .i{flex:none; color:var(--bad); font-size:var(--t-xs); padding-top:var(--s-1)}
+/* ورمزُ الفشل مرسومٌ (D-167)، ووسطُه على وسط السطر الأوّل من السبب */
+.why .i svg{width:10px; height:10px; display:block; margin-top:var(--s-0)}
 .why b{color:var(--ink)}
 .why .t{min-width:0}
 /* الموعدُ لاتينيُّ الأرقام ويُعزَل عن اتّجاه الصفحة */
@@ -1303,7 +1339,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .auth h1{text-align:center; font-size:var(--t-2xl); margin:0 0 var(--s-1); letter-spacing:-.3px}
 .auth .lede{text-align:center; color:var(--ink-3); font-size:var(--t-sm); margin:0 0 var(--s-5)}
 .auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
-.auth input{width:100%; direction:ltr; text-align:left; margin-bottom:var(--s-3)}
+.auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
 .auth button{width:100%; justify-content:center; padding:var(--s-3)}
 .auth .card form + form{margin-top:var(--s-3)}
 .or{display:flex; align-items:center; gap:var(--s-2); color:var(--ink-3); font-size:var(--t-xs); margin:var(--s-4) 0}
@@ -1374,23 +1410,29 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
    * تُصاغ مرّتين تفترق مرّةً.**
    */
   nav.tabs > a[data-bar],nav.tabs > .cmdk-open{
-    flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:2px;
-    align-items:center; justify-content:center; padding:var(--s-1) 2px;
+    flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--s-0);
+    align-items:center; justify-content:center; padding:var(--s-1) var(--s-0);
     min-height:var(--tap); border-radius:var(--r); text-align:center}
+  /* **واللصيقةُ من السلّم لا دونه** (D-167): كانت ‏١٠px والعدُّ ‏٩px — خارجَ
+     السلّم كلِّه، وأصغرُ حرفٍ فيه «--t-xs» ‏١١px. ولم يرَهما مدقّقُ السلّم
+     لأنّه لم يرسم إلّا ‏١٤٤٠، حيث لا شريطَ إبهام. وقِيست الستُّ عند ‏٣٢٠
+     بعد الرفع: تسع خاناتِها بلا قصّ، والشريطُ لا يفيض. */
   nav.tabs > a[data-bar] span:not(.count),nav.tabs > .cmdk-open span{
-    font-size:10px; line-height:1.2; width:100%; display:block;
+    font-size:var(--t-xs); line-height:var(--lh-tight); width:100%; display:block;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   nav.tabs > a[data-bar] svg,nav.tabs > .cmdk-open svg{
     width:19px; height:19px; opacity:.75}
   /* والعدُّ شارةٌ فوق الرمز لا رقمٌ بجانب نصٍّ لا يتّسع له */
-  nav.tabs .count{position:absolute; top:2px; inset-inline-end:calc(50% - 18px);
-    margin:0; min-width:16px; font-size:9px; line-height:16px; padding:0 3px}
+  nav.tabs .count{position:absolute; top:var(--s-0); inset-inline-end:calc(50% - 18px);
+    margin:0; min-width:var(--s-4); font-size:var(--t-xs); line-height:var(--s-4); padding:0 var(--s-1)}
   nav.tabs a{position:relative}
   nav.tabs a[aria-current=page]::before{display:none}
   .cmdk-open.more{border:0; background:none; color:var(--ink-3)}
   .cmdk-open:not(.more){display:none}
-  /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز */
-  .content{padding-bottom:calc(var(--s-16) + var(--s-4) + env(safe-area-inset-bottom, 0px))}
+  /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز.
+     والشريطُ ‏٥٢px (هدفٌ ‏٤٤ وحشوٌ ‏٨)، **فـ«--s-16» تتركه ‏١٢ فوقه** — وكان
+     ‏٦٤ + ‏١٦ = ‏٨٠، رقمًا خارج السلّم أمسكه مدقّقُ السلّم عند ‏٣٩٠ (D-167) */
+  .content{padding-bottom:calc(var(--s-16) + env(safe-area-inset-bottom, 0px))}
 
   /*
    * ── قرارٌ واحدٌ في المرّة — **وصفُّ البتّ يلاصق الإبهام** ─────────
@@ -1492,54 +1534,6 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 }
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
-
-/* ══════════════════════════════════════════════════════════════════
-   طبقةُ اللمس — **وموضعُها آخرُ الورقة قصدا** (D-086).
-
-   CSS يرجّح المتأخّرَ عند تساوي المحدّدات. وكتلةٌ في الوسط تغلبها كلُّ
-   قاعدةٍ بعدها — جُرّبت فبقيت الحقولُ على ‏١٢٫٥px رغم أنّ الوسيطَ يطابق.
-   فطبقةُ الجهاز تُكتب آخرا، كما تُكتب طبقةُ الطباعة.
-   ══════════════════════════════════════════════════════════════════ */
-/* ══ الحقولُ على اللمس ═══════════════════════════════════════════
-   **Safari يُقرّب الصفحةَ عند لمس حقلٍ خطُّه دون ‏١٦px** — سلوكٌ لا
-   يُعطَّل إلّا بمنع التقريب كلِّه، ومنعُه يخالف WCAG 1.4.4. وثمنُه أنّ
-   الصفحةَ تقفز وتكبر عند كلّ لمسةِ حقل، ثمّ يُصغّرها المالكُ بإصبعين.
-
-   فيُرفَع الخطُّ إلى «--t-lg» (‏١٦px) على الشاشات اللمسيّة وحدها: القراءةُ
-   على مسافةِ ذراعٍ تحتاجه أصلا، والشاشةُ الواسعةُ تبقى على ‏١٤ حيث
-   الكثافةُ مطلوبة. **و«--t-base» أربعةَ عشرَ لا ستّةَ عشرَ** — جُرّبت
-   فلم يتبدّل شيء، والرمزُ الصحيح «--t-lg».
-
-   و«pointer: coarse» أدقُّ من عرضِ الشاشة: لوحٌ بقلمٍ ليس هاتفا، وحاسوبٌ
-   بشاشةٍ لمسيّةٍ ليس شاشةَ فأرة.
-
-   **وموضعُها بعد قاعدةِ الحقول لا قبلها**: تلك تختار بمحدّدات السمات
-   فتغلب المحدّدَ العارِيَ مهما كان الوسيط — وقد جُرّب فبقي ‏١٤. */
-@media(pointer:coarse){
-  input[type=number],input[type=password],input[type=text],input[type=datetime-local],
-  input:not([type]),select,textarea,button,.btn{font-size:var(--t-lg)}
-  /* والمحدّداتُ الأخصُّ تُذكَر باسمها: قاعدةٌ عامّةٌ لا تغلب
-     «.copy input» ولا «.sched select» مهما تأخّرت */
-  .copy input,.sched input,.sched select,.draft-text,input.mono,textarea.mono,.cmd-text{font-size:var(--t-lg)}
-  /* **وعرضٌ ثابتٌ يفيض حين يكبر الخطّ**: أُضيف الحدُّ هنا لا في كلّ حقل،
-     فحقلٌ يُكتب غدا بعرضٍ ثابتٍ يرثه. وقِيس فيضٌ ١٢px عند ٣٢٠px قبله */
-  input,select,textarea{max-width:100%}
-  /* **وعنصرُ الشبكةِ المرنةِ لا ينكمش دون محتواه ما لم يُؤذَن له.**
-     و«min-width» الافتراضيّةُ في flex هي «auto» = عرضُ المحتوى، فدَرَجٌ
-     خيارُه طويلٌ يدفع صفَّه كلَّه خارج البطاقة. وقِيس: حقلٌ ‏٢٩١px في
-     حاويةٍ ‏٢٣٨px — وهو مصدرُ الفيض بعد رفعِ الخطّ إلى ١٦ */
-  /* **والزرُّ يُستثنى** (D-099): المحدّدُ «.row > *» أخصُّ من «button»،
-     فكان يدهس «min-width: var(--tap)» — **ويسقط الزرُّ دون هدف اللمس**.
-     وقِيس: «حدّث» ‏٤٣×٤٤ عند ‏٣٢٠px، وحدُّه ‏٤٤.
-
-     وعلّةٌ لم تظهر إلّا بعد تبديل الخطّ (D-099): كان النصُّ يبلغ ‏٤٤
-     بعرضه، **فيستر النقصَ بلا أن يسدّه** — ونصٌّ أضيقُ بمحرفٍ يكشفه.
-     **والحارسُ لا يُغني عن الاستثناء**: هذا ما كان يُقاس صحيحا صدفةً.
-
-     والإذنُ بالانكماش كان للحقول لا للأزرار: الدَّرَجُ الطويلُ هو الذي
-     أفاض الصفَّ (D-086)، وزرٌّ نصُّه كلمةٌ لا يفيض. */
-  .row > *:not(button):not(.btn),.field{min-width:0}
-}
 
 /* ── لوحةُ الأوامر (D-105) ────────────────────────────────────────────
    طبقةٌ تعلو كلَّ شيء وتحجب ما تحتها بلا أن تمحوه: الحجابُ يقول «أنت
@@ -1716,7 +1710,8 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 @media(hover:hover){
   .cmdk-open:hover{border-color:var(--line-strong); color:var(--ink-2)}
 }
-.cmdk-open svg{width:15px; height:15px; display:block}
+/* والابنُ المباشرُ وحدَه: «⌘» في مفتاح الاختصار داخلَ الزرّ له قياسُ حرفه (D-167) */
+.cmdk-open>svg{width:15px; height:15px; display:block}
 @media (max-width:640px){
   .cmdk-veil{padding:var(--s-4) var(--s-3)}
   .cmdk-open span{display:none}
@@ -1785,4 +1780,60 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
 .grid.tiles>.tile::before{display:none}
 @media(hover:hover){.todo>li>a.btn:hover,.todo>li>form .btn:hover{background:var(--brand-wash);
   border-color:transparent}}
+
+/* ══════════════════════════════════════════════════════════════════
+   طبقةُ اللمس — **وموضعُها آخرُ الورقة قصدا** (D-086).
+
+   CSS يرجّح المتأخّرَ عند تساوي المحدّدات. وكتلةٌ في الوسط تغلبها كلُّ
+   قاعدةٍ بعدها — جُرّبت فبقيت الحقولُ على ‏١٢٫٥px رغم أنّ الوسيطَ يطابق.
+   فطبقةُ الجهاز تُكتب آخرا، كما تُكتب طبقةُ الطباعة.
+
+   **ثمّ كُتبت بعدها لوحةُ الأوامر (D-105) وسجلُّ الطبعات** فصارت في الوسط،
+   وغلبها «.cmdk-in input» بتساوي المحدّد: حقلُ اللوحة ‏١٤px على اللمس،
+   **فيُقرّبه iOS عند كلّ فتحةٍ للّوحة** — والقياسُ عند ‏٣٩٠ قاله (D-167).
+   فعادت آخرَ الورقة، واختبارٌ في views.test يُسقط CI إن كُتبت قاعدةٌ
+   بعدها: **ما يُضاف يُكتب فوق هذا السطر.**
+   ══════════════════════════════════════════════════════════════════ */
+/* ══ الحقولُ على اللمس ═══════════════════════════════════════════
+   **Safari يُقرّب الصفحةَ عند لمس حقلٍ خطُّه دون ‏١٦px** — سلوكٌ لا
+   يُعطَّل إلّا بمنع التقريب كلِّه، ومنعُه يخالف WCAG 1.4.4. وثمنُه أنّ
+   الصفحةَ تقفز وتكبر عند كلّ لمسةِ حقل، ثمّ يُصغّرها المالكُ بإصبعين.
+
+   فيُرفَع الخطُّ إلى «--t-lg» (‏١٦px) على الشاشات اللمسيّة وحدها: القراءةُ
+   على مسافةِ ذراعٍ تحتاجه أصلا، والشاشةُ الواسعةُ تبقى على ‏١٤ حيث
+   الكثافةُ مطلوبة. **و«--t-base» أربعةَ عشرَ لا ستّةَ عشرَ** — جُرّبت
+   فلم يتبدّل شيء، والرمزُ الصحيح «--t-lg».
+
+   و«pointer: coarse» أدقُّ من عرضِ الشاشة: لوحٌ بقلمٍ ليس هاتفا، وحاسوبٌ
+   بشاشةٍ لمسيّةٍ ليس شاشةَ فأرة.
+
+   **وموضعُها بعد قاعدةِ الحقول لا قبلها**: تلك تختار بمحدّدات السمات
+   فتغلب المحدّدَ العارِيَ مهما كان الوسيط — وقد جُرّب فبقي ‏١٤. */
+@media(pointer:coarse){
+  input[type=number],input[type=password],input[type=text],input[type=datetime-local],
+  input:not([type]),select,textarea,button,.btn{font-size:var(--t-lg)}
+  /* والمحدّداتُ الأخصُّ تُذكَر باسمها: قاعدةٌ عامّةٌ لا تغلب
+     «.copy input» ولا «.sched select» مهما تأخّرت. وحقلُ لوحة الأوامر
+     معها باسمه (D-167): الموضعُ يحرسه اليوم، والاسمُ يحرسه إن تبدّل نوعُه */
+  .copy input,.sched input,.sched select,.draft-text,input.mono,textarea.mono,.cmd-text,
+  .cmdk-in input{font-size:var(--t-lg)}
+  /* **وعرضٌ ثابتٌ يفيض حين يكبر الخطّ**: أُضيف الحدُّ هنا لا في كلّ حقل،
+     فحقلٌ يُكتب غدا بعرضٍ ثابتٍ يرثه. وقِيس فيضٌ ١٢px عند ٣٢٠px قبله */
+  input,select,textarea{max-width:100%}
+  /* **وعنصرُ الشبكةِ المرنةِ لا ينكمش دون محتواه ما لم يُؤذَن له.**
+     و«min-width» الافتراضيّةُ في flex هي «auto» = عرضُ المحتوى، فدَرَجٌ
+     خيارُه طويلٌ يدفع صفَّه كلَّه خارج البطاقة. وقِيس: حقلٌ ‏٢٩١px في
+     حاويةٍ ‏٢٣٨px — وهو مصدرُ الفيض بعد رفعِ الخطّ إلى ١٦ */
+  /* **والزرُّ يُستثنى** (D-099): المحدّدُ «.row > *» أخصُّ من «button»،
+     فكان يدهس «min-width: var(--tap)» — **ويسقط الزرُّ دون هدف اللمس**.
+     وقِيس: «حدّث» ‏٤٣×٤٤ عند ‏٣٢٠px، وحدُّه ‏٤٤.
+
+     وعلّةٌ لم تظهر إلّا بعد تبديل الخطّ (D-099): كان النصُّ يبلغ ‏٤٤
+     بعرضه، **فيستر النقصَ بلا أن يسدّه** — ونصٌّ أضيقُ بمحرفٍ يكشفه.
+     **والحارسُ لا يُغني عن الاستثناء**: هذا ما كان يُقاس صحيحا صدفةً.
+
+     والإذنُ بالانكماش كان للحقول لا للأزرار: الدَّرَجُ الطويلُ هو الذي
+     أفاض الصفَّ (D-086)، وزرٌّ نصُّه كلمةٌ لا يفيض. */
+  .row > *:not(button):not(.btn),.field{min-width:0}
+}
 `

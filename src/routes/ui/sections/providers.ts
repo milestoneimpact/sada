@@ -228,7 +228,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
                <div class="field" style="flex:1;min-width:180px">
                  <label for="k-${id}">${p.hint === null ? 'أضف المفتاح' : 'استبدل المفتاح'}</label>
                  <input id="k-${id}" type="password" name="key" required autocomplete="off"
-                        style="width:100%;direction:ltr;text-align:left"></div>
+                        style="width:100%;direction:ltr;text-align:start"></div>
                <button class="p" type="submit" style="align-self:flex-end">حفظ المفتاح</button>
              </form>`}
 

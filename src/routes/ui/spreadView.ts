@@ -19,6 +19,7 @@
  * تدخل الجدولَ خِلسةً، **ومسوّدةٌ خرجت منه تُردّ بسببها**.
  */
 import { escapeHtml } from './shell'
+import { ICON } from './icons'
 import { whenTag } from './time'
 import type { SpreadPlan } from '../../lib/schedule/spread'
 
@@ -51,7 +52,7 @@ export function spreadScreen(d: SpreadScreenData): string {
         : `<ul class="plain">${skipped
             .map((s) => `<li><b>${escapeHtml(s.preview)}</b> — ${escapeHtml(s.reason)}</li>`)
             .join('')}</ul>`}
-      <p><a class="btn g" href="/panel#posts">→ عُد إلى المسوّدات</a></p>
+      <p><a class="btn g" href="/panel#posts">${ICON.back}عُد إلى المسوّدات</a></p>
     </section>`
   }
 

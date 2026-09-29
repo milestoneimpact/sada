@@ -36,6 +36,7 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import ts from 'typescript'
 
 const ROOT = new URL('../src/', import.meta.url).pathname
 const ROUTES = join(ROOT, 'routes')
@@ -137,8 +138,115 @@ export function classesOf(code) {
   return out
 }
 
+/**
+ * ── حرفٌ من خطّ النظام في الوسم (D-167) ─────────────────────────────
+ *
+ * ▾ ▸ ▲ ▼ ← → ⌘ ليست في Beiruti ولا Inter ولا Reem Kufi المضمَّنة (N-7)،
+ * فتُرسَم بخطّ النظام وتختلف من جهازٍ لآخر. رُسمت رموزُ الحال في D-154 وبقيت
+ * هذه: سهمُ الطيّ في الورقة، وسهمُ الفرق، وسهما الرابط، و⌘ في زرّ اللوحة.
+ * **والرسمُ في بيتين**: `parts.ts` (`glyph()` و`status()`) و`icons.ts`.
+ *
+ * ## وما يُقرأ — شجرةُ TypeScript لا نمطٌ نصّيّ
+ *
+ * الحرفُ نفسُه مفتاحٌ مشروعٌ في جداول الحال (`status('bad', '▲', …)` و
+ * `{ g: '▲' }`)، **ومعيبٌ إن أُقحم في الوسم** (`${up ? '▲' : '▼'}` بين
+ * وسمين) — والفرقُ لا يُرى بنمط. فتُقرأ الحرفيّاتُ من الشجرة (والتعليقُ ليس
+ * عقدةً فلا يُقرأ)، وتُفَكّ فيها `&larr;` و`&#8984;` وهروبُ CSS قبل الفحص:
+ *
+ * | ما يُكتب | الحكم |
+ * |---|---|
+ * | حرفيّةٌ هي الحرفُ وحدَه، مُعطاةٌ لنداءٍ أو خاصّيّةٍ أو مقارنة | مفتاحٌ يُرسَم في parts — **يمرّ** |
+ * | الحرفيّةُ نفسُها تصل `${…}` في قالبٍ مباشرةً (ولو عبر «?:» أو «\|\|»)، أو تُلصَق بـ«+» | **يردّ** |
+ * | ▾ ▸ ▲ ▼ ⌘ في نصٍّ أو وسمٍ أو ورقة (وتعليقُ الورقة يُمحى أوّلًا) | **يردّ** |
+ * | ← → يلاصق حدَّ وسمٍ («>» قبله أو «<» بعده، والفراغُ لا يُعدّ) | سهمُ رابطٍ — **يردّ** |
+ * | ← → في نصٍّ لا يلاصق وسمًا («Credentials ← Create credentials») | **يُطبَع ولا يردّ** |
+ *
+ * والأخيرُ فاصلُ مسارٍ في نصٍّ يُقرأ، لا رمزُ واجهة: في أدلّة المنصّات وسطورِ
+ * المفاتيح، وأكثرُه في `lib/` بياناتٍ لا وسمًا. ورسمُه يحتاج نقلَ ذلك النصّ من
+ * بيانٍ إلى وسم — **فيُعَدّ هنا ليُرى ولا يُسكَت عنه**، وهو في «ما لم يُبنَ
+ * بعد» من D-167.
+ *
+ * **وحدُّه**: حرفٌ يُحفَظ في متغيّرٍ ثمّ يُقحَم (`const g = '▲'` ثمّ `${g}`)
+ * يمرّ — تتبُّعُ القيمة عبر المتغيّرات ليس عملَ حارسٍ نصّيّ. و`lib/` لا يُقرأ.
+ */
+const SYSTEM_GLYPHS = new Set(['▾', '▸', '▲', '▼', '←', '→', '⌘'])
+const ARROWS = new Set(['←', '→'])
+const GLYPH_HOME = /ui\/(parts|icons)\.ts$/
+
+/** الكيانُ والهروبُ يُفَكّان: `&larr;` حرفٌ كما لو كُتب. */
+function decode(text) {
+  const keep = (code, whole) => {
+    const ch = String.fromCodePoint(code)
+    return SYSTEM_GLYPHS.has(ch) ? ch : whole
+  }
+  return text
+    .replace(/&larr;/gi, '←').replace(/&rarr;/gi, '→')
+    .replace(/&#x([0-9a-f]+);/gi, (w, h) => keep(Number.parseInt(h, 16), w))
+    .replace(/&#(\d+);/g, (w, d) => keep(Number(d), w))
+    .replace(/\\([0-9a-f]{4,6}) ?/gi, (w, h) => keep(Number.parseInt(h, 16), w))
+}
+
+/** أقربُ ما ليس فراغًا في اتّجاه `step`، أو `edge` عند طرف الحرفيّة. */
+function neighbour(text, i, step) {
+  for (let j = i + step; j >= 0 && j < text.length; j += step) {
+    if (!/\s/.test(text[j])) return text[j]
+  }
+  return 'edge'
+}
+
+const KEY_PASS = new Set([
+  ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.AmpersandAmpersandToken,
+])
+
+/** يعيد `{ bad, prose }`: ما يردّ بسطره وسببه، وسهامَ النصّ بسطورها. */
+export function rawGlyphs(name, code) {
+  const src = ts.createSourceFile(name, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const bad = []
+  const prose = []
+  const lineOf = (node, text, i) =>
+    src.getLineAndCharacterOfPosition(node.getStart(src)).line + 1 + (text.slice(0, i).match(/\n/g) ?? []).length
+
+  const visit = (node) => {
+    const literal = ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)
+    if (literal) {
+      // ‏التعليقُ داخل القالب (ورقةٌ أو سكربت) يُمحى بفراغٍ يحفظ السطور
+      const text = decode(node.text ?? '').replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+      const alone = (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+        [...text.trim()].length === 1 && SYSTEM_GLYPHS.has(text.trim())
+      if (alone) {
+        let n = node
+        while (n.parent !== undefined && (ts.isParenthesizedExpression(n.parent) ||
+          (ts.isConditionalExpression(n.parent) && n !== n.parent.condition) ||
+          (ts.isBinaryExpression(n.parent) && KEY_PASS.has(n.parent.operatorToken.kind)))) n = n.parent
+        const glued = n.parent !== undefined && ts.isBinaryExpression(n.parent) &&
+          n.parent.operatorToken.kind === ts.SyntaxKind.PlusToken
+        if ((n.parent !== undefined && ts.isTemplateSpan(n.parent)) || glued) {
+          bad.push({ line: lineOf(node, text, 0), ch: text.trim(), why: 'يُقحَم في الوسم خامًا — ارسمه بـglyph()' })
+        }
+      } else {
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i]
+          if (!SYSTEM_GLYPHS.has(ch)) continue
+          if (ARROWS.has(ch) && neighbour(text, i, -1) !== '>' && neighbour(text, i, 1) !== '<') {
+            prose.push({ line: lineOf(node, text, i), ch })
+            continue
+          }
+          bad.push({
+            line: lineOf(node, text, i), ch,
+            why: ARROWS.has(ch) ? 'سهمُ رابطٍ عند حدّ وسم — ICON.back أو ICON.go' : 'في الوسم أو الورقة',
+          })
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(src)
+  return { bad, prose }
+}
+
 if (process.argv.includes('--self-test')) {
-  const sample = 'x(`<span class="st ${ok ? \'ok\' : \'bad\'} ${n}">` + `class="chip"`); el.classList.add(\'lifted\'); el.className=\'ago\''
+  const sample ='x(`<span class="st ${ok ? \'ok\' : \'bad\'} ${n}">` + `class="chip"`); el.classList.add(\'lifted\'); el.className=\'ago\''
   const found = classesOf(sample)
   const want = ['st', 'ok', 'bad', 'chip', 'lifted', 'ago']
   const missing = want.filter((c) => !found.has(c))
@@ -147,6 +255,34 @@ if (process.argv.includes('--self-test')) {
     process.exit(1)
   }
   console.log('  ✓ self-test: الأصنافُ داخل ${…} وفي classList تُقرأ')
+
+  /*
+   * ‏والحرفُ الساقط: كلُّ عيبٍ مزروعٍ يُمسَك بسطره، وكلُّ صوابٍ يمرّ — والعددُ
+   * ‏بعينه. والعيوبُ بصيغها التي كانت في الشجرة قبل D-167.
+   */
+  const planted = [
+    "const a = `<a href=\"${h}\">→ ${label}</a>`",
+    "const b = `<a class=\"btn\">${label} ←</a>`",
+    "const c = `<span class=\"ar\">${up ? '▲' : '▼'}</span>`",
+    "const d = `<kbd class=\"kbd\">⌘K</kbd>`",
+    "export const STYLE = `.t::after{content:'▾'} /* ▸ في شرح */`",
+    "const e = `<a>&larr; عودة</a>`",
+    "const f = '<i>' + '▲'",
+    "const ok1 = status('bad', '▲', 'x') + chip('warn', up ? '▲' : '○', 'y')",
+    "const ok2 = { failed: { g: '▲' } }; if (g === '▼') {}",
+    '// ← تعليقٌ لا يُقرأ ⌘',
+    "const ok3 = 'console.x.ai ← API Keys'; const ok4 = `${task} ← ${model}`",
+    "const g2 = `.x::after{content:'\\\\25BE'}`",
+  ].join('\n')
+  const got = rawGlyphs('planted.ts', planted)
+  const lines = got.bad.map((b) => b.line)
+  const wantLines = [1, 2, 3, 3, 4, 5, 6, 7, 12]
+  if (JSON.stringify(lines) !== JSON.stringify(wantLines) || got.prose.length !== 2) {
+    console.log(`  ✕ self-test: الحرفُ الساقط — ردّ ${JSON.stringify(lines)} والمطلوب ${JSON.stringify(wantLines)}` +
+      ` · سهامُ النصّ ${got.prose.length} والمطلوب 2`)
+    process.exit(1)
+  }
+  console.log('  ✓ self-test: تسعةُ حروفٍ مزروعةٍ تُمسَك بسطورها، والمفتاحُ والشرحُ وفاصلُ المسار تمرّ')
   process.exit(0)
 }
 
@@ -175,7 +311,24 @@ console.log('\n═══ رقاقةُ حالٍ مكتوبةٌ يدًا ═══
 if (handChips.length === 0) console.log('  ✓ كلُّ رقاقةٍ من status()')
 for (const [where, n] of handChips) console.log(`  ✕ ${where}  ×${n}`)
 
-let bad = handChips.length
+/* ── حرفٌ من خطّ النظام في الوسم (D-167) — والشرحُ عند rawGlyphs ─── */
+const glyphHits = []
+const proseArrows = new Map()
+for (const file of walk(ROUTES)) {
+  if (GLYPH_HOME.test(file)) continue
+  const { bad: hits, prose } = rawGlyphs(file, readFileSync(file, 'utf8'))
+  const short = file.slice(ROOT.length)
+  for (const h of hits) glyphHits.push(`${short}:${h.line}  «${h.ch}» ${h.why}`)
+  if (prose.length > 0) proseArrows.set(short, prose.length)
+}
+console.log('\n═══ حرفٌ من خطّ النظام في الوسم أو الورقة ═══\n')
+if (glyphHits.length === 0) console.log('  ✓ لا ▾ ▸ ▲ ▼ ⌘ ولا سهمَ رابطٍ حرفًا — الرسمُ من parts وicons')
+for (const h of glyphHits) console.log(`  ✕ ${h}`)
+const proseTotal = [...proseArrows.values()].reduce((a, b) => a + b, 0)
+console.log(`\n  · سهمٌ في نصٍّ لا يلاصق وسمًا (يُطبَع ولا يردّ): ${proseTotal} في ${proseArrows.size} ملفّات`)
+for (const [where, n] of proseArrows) console.log(`      ${where}  ×${n}`)
+
+let bad = handChips.length + glyphHits.length
 console.log('\n═══ صنفٌ يُكتب ولا يُرسَم ═══\n')
 for (const [cls, files] of [...used].sort()) {
   if (defined.has(cls)) continue
