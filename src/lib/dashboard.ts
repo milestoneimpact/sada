@@ -180,7 +180,7 @@ export const TILES: readonly TileSpec[] = [
       const platforms = new Set(d.targets.map((t) => t.platform)).size
       return {
         value: String(d.targets.length),
-        note: platforms === 0 ? 'لا وجهةَ حيّة' : `على ${platforms} منصّة`,
+        note: platforms === 0 ? 'لا حسابَ مربوطًا' : `على ${platforms} منصّة`,
       }
     },
   },

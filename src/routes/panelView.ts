@@ -12,11 +12,12 @@
  */
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
+import { LIMITS as SETTING_LIMITS } from '../lib/settings'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
-import type { ChannelView } from '../lib/channels'
+import { unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandMore, commandTrigger, SECTIONS } from './ui/command'
+import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
@@ -29,7 +30,7 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
-import { alertChannel, bar, firstDay, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import { alertChannel, bar, firstDay, glyph, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
@@ -231,6 +232,9 @@ export interface PanelData {
   readonly spendCap: number
   readonly usedAnalyses: number
   readonly usedSpend: number
+  /** سقفُ المقاطع اليوميّ بالعدد (D-168)، وما عُدَّ منها في الدفتر اليوم. */
+  readonly videoCap: number
+  readonly usedClips: number
   readonly spend30d: number
   readonly series: { day: string; total: number }[]
   readonly sources: PanelSource[]
@@ -443,13 +447,17 @@ function platformNav(views: readonly ChannelView[]): string {
   const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
 
   const row = (v: ChannelView): string => {
+    // ‏والنقطةُ تقرأ الصفَّ لا الكلمة (D-166): مربوطةٌ بلا إذنٍ حمراءُ لا خضراء
+    const unsigned = unsignedAccounts(v).length > 0
     const dot =
-      v.state === 'linked' ? 'ok'
+      unsigned ? 'bad'
+      : v.state === 'linked' ? 'ok'
       : v.state === 'needs_reauth' ? 'bad'
       : v.state === 'awaiting_owner' ? 'warn'
       : 'idle'
     const title =
-      v.state === 'linked' ? 'مربوطة'
+      unsigned ? 'مربوطة بلا إذن'
+      : v.state === 'linked' ? 'مربوطة'
       : v.state === 'needs_reauth' ? 'تحتاج تجديدا'
       : v.state === 'awaiting_owner' ? 'تنتظرك'
       : v.state === 'connectable' ? 'جاهزةٌ للربط'
@@ -536,11 +544,12 @@ function deltaOf(series: readonly { day: string; total: number }[]): string {
   const today = series[series.length - 1]!.total
   const yesterday = series[series.length - 2]!.total
   if (yesterday === 0 && today === 0) return '<div class="delta">كأمس تماما</div>'
-  if (yesterday === 0) return `<div class="delta up"><span class="ar">▲</span>بدأ اليوم</div>`
+  // ‏والسهمُ مرسومٌ من parts لا حرفٌ من خطّ النظام (D-167) — و«▼» لم يكن في جدوله
+  if (yesterday === 0) return `<div class="delta up"><span class="ar">${glyph('▲')}</span>بدأ اليوم</div>`
   const change = ((today - yesterday) / yesterday) * 100
   if (Math.abs(change) < 1) return '<div class="delta">كأمس تقريبا</div>'
   const up = change > 0
-  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${up ? '▲' : '▼'}</span>${
+  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${glyph(up ? '▲' : '▼')}</span>${
     Math.abs(change).toFixed(0)}٪ ${up ? 'أكثر' : 'أقلّ'} من أمس</div>`
 }
 
@@ -643,7 +652,7 @@ export function panelPage(d: PanelData): string {
              <option value="worth">الأعلى استحقاقا</option>
              <option value="name">الاسم</option></select></div>
          <div class="grow"></div>
-         <div class="tile" style="text-align:left">
+         <div class="tile" style="text-align:end">
            <span class="n">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
        </div>
        <div class="scroll"><table>
@@ -673,6 +682,15 @@ export function panelPage(d: PanelData): string {
       text: `${c.spec.label}: انتهى الإذن — والنشرُ متوقّفٌ عليها.`,
       go: '#channels',
       label: 'جدّد',
+    })
+  }
+  // ‏والمحفوظُ بلا إذنٍ بعد المنتهي (D-166): يسقط أوّلُ منشورٍ مجدولٍ عليه
+  for (const c of d.channels.filter((v) => unsignedAccounts(v).length > 0)) {
+    items.push({
+      kind: 'bad',
+      text: `${c.spec.label}: الحسابُ محفوظٌ بلا إذن — أوّلُ منشورٍ مجدولٍ عليها يسقط.`,
+      go: `/panel/channels/${c.spec.id}`,
+      label: 'أعد الربط',
     })
   }
   if (d.paused) {
@@ -855,8 +873,8 @@ ${flash}
       <div class="card">
         <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
           <span class="st idle">30 يوما</span></div>
-        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة. <b>والسؤالُ «أيُّها أكبر» لا
-          «كيف تغيّر»</b> — فأعمدةٌ لا خطّ: ليس بين مزوّدين زمنٌ يمرّ.</p>
+        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة، <b>والأطولُ أكبرُها كلفة</b>. واضبط سقفَ اليوم
+          من «الحدود» إن جاوز أحدُها ما تريد.</p>
         ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
       </div>
     </div>
@@ -866,7 +884,7 @@ ${flash}
 ${pivotPane(d.pivot)}
 
 <section data-pane="sources" hidden>
-  ${pageHead('Google Drive', 'المصادر', 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${pageHead('Google Drive', sectionLabel('sources'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -877,7 +895,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="providers" hidden>
-  ${pageHead('الذكاء', 'المزوّدون', 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
+  ${pageHead('الذكاء', sectionLabel('providers'), 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
   ${providerStrip}
 
   <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
@@ -903,12 +921,12 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="channels" hidden>
-  ${pageHead('النشر', 'القنوات', 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
+  ${pageHead('النشر', sectionLabel('channels'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
   ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
 </section>
 
 <section data-pane="posts" hidden>
-  ${pageHead('التحرير', 'المنشورات', 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
+  ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
@@ -935,9 +953,10 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الضبط', 'الحدود', 'مفتاحُ الإيقاف وسقفا اليوم. <b>والقيدُ في الشيفرة لا في هذه الصفحة</b> — يقع قبل النداء لا بعده.')}
-  <!-- الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا،
-       ثمّ ما يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل -->
+  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
+  ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
+       يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
+       لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
   <div class="card"><h2>الإيقاف المؤقت</h2>
     <div class="split">
       <p>${d.paused
@@ -968,6 +987,19 @@ ${pivotPane(d.pivot)}
         <input id="c2" type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}"></div>
       <button class="p" type="submit">حفظ</button>
       <span class="n" style="align-self:center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
+    </form>
+    <hr>
+    ${/* ‏والمقاطعُ بعددها لا بمالها (D-168): سعرُها لم يُقرأ فيُسجَّل صفرًا،
+         وصفرٌ لا يبلغ سقفَ الإنفاق أبدًا */ ''}
+    <p class="hint"><b>والمقاطعُ بعددها</b>: سعرُها لم يُقرأ بعد، فيُسجَّل صفرًا لا يبلغ سقفَ الإنفاق.
+      والمحاولةُ التي تسقط تُعدّ كالتي تنجح. <b>وصفرٌ يُغلق التحريك.</b></p>
+    <form class="row" method="POST" action="/panel/settings">
+      <input type="hidden" name="key" value="daily_video_cap">
+      <div class="field"><label for="c4">سقف المقاطع (عدد)</label>
+        <input id="c4" type="number" name="value" min="0"
+          max="${SETTING_LIMITS.dailyVideoCap.max}" step="1" value="${d.videoCap}"></div>
+      <button class="p" type="submit">حفظ</button>
+      <span class="n" style="align-self:center">المستهلَك اليوم: ${d.usedClips}</span>
     </form>
   </div>
 
@@ -1045,7 +1077,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="security" hidden>
-  ${pageHead('الدخول', 'الأمان', 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والرموزُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
+  ${pageHead('الدخول', sectionLabel('security'), 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0

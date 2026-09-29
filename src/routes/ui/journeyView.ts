@@ -82,7 +82,7 @@ function stationRow(s: Station, now: Date, platform: string): string {
       <p class="stop-d">${escapeHtml(s.detail)}</p>
       <div class="stop-meta">${when}${cost}${
         s.model === null ? '' : `<span class="chip mono">${escapeHtml(s.model)}</span>`
-      }<a class="btn g sm stop-go" href="${escapeHtml(go.href)}">${escapeHtml(go.label)} ←</a></div>
+      }<a class="btn g sm stop-go" href="${escapeHtml(go.href)}">${escapeHtml(go.label)}${ICON.go}</a></div>
     </div>
   </li>`
 }

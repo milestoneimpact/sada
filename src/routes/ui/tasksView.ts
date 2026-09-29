@@ -16,6 +16,7 @@
  * قُبل (D-061).
  */
 import { escapeHtml } from './shell'
+import { sectionLabel } from './command'
 import { secretCommand, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
 import { status } from './parts'
@@ -159,7 +160,7 @@ export function tasksScreen(d: TasksScreenData): string {
   return `<div class="page-head">
     <div class="txt">
       <div class="eyebrow"><span class="ln"></span>ما يقع عليك أنت</div>
-      <h1>مهامُّ المالك</h1>
+      <h1>${escapeHtml(sectionLabel('tasks'))}</h1>
       <p class="lede">${lede}</p>
     </div>
   </div>

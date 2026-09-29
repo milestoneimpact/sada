@@ -166,7 +166,7 @@ export async function publishPost(
     return preflightFailed(
       db, post,
       'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
-        'اختر حسابَك الشخصيَّ وجهةً، أو انتظر موافقةَ Community Management API.',
+        'انشر من حسابك الشخصيّ، أو انتظر موافقةَ Community Management API.',
     )
   }
 

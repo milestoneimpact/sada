@@ -50,6 +50,14 @@ export interface Settings {
    * لمن ضبط الرمزَ ثمّ أراد صورةً نظيفةً بلا نصّ**.
    */
   readonly imageOverlay: boolean
+  /**
+   * سقفُ المقاطع اليوميّ — **بالعدد لا بالمال** (D-168).
+   *
+   * `animateForPost` تكتب في الدفتر صفرًا موسومًا لأنّ سعرَ النموذج لم
+   * يُقرأ بعد (M-16)، **وصفرٌ لا يبلغ سقفَ مالٍ أبدًا**. فكان الفيديو —
+   * أغلى ما يُنادى — البابَ الوحيدَ بلا حدّ. وحدٌّ يُعرَف خيرٌ من حدٍّ يُفترَض.
+   */
+  readonly dailyVideoCap: number
 }
 
 export const DEFAULTS: Settings = {
@@ -59,6 +67,13 @@ export const DEFAULTS: Settings = {
   autoEnqueue: false,
   weeklyPromoCapUsd: 0,
   imageOverlay: true,
+  /*
+   * **مقطعان لا أكثر**: D-007 قدّرت الحاجةَ بأربعة مقاطع في الشهر، فمقطعٌ في
+   * اليوم فوقها بكثير. والثاني لإعادةٍ بعد فشل: الدفترُ يُكتب قبل النداء
+   * (D-008)، فالمحاولةُ الفاشلةُ تُعدّ كالناجحة. وأسوأُ الشهر ستّون مقطعًا
+   * بسعرٍ مجهول — حدٌّ معروفٌ يرفعه المالكُ بيده إن احتاج.
+   */
+  dailyVideoCap: 2,
   // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
   alertWebhook: '',
   // والأربعُ التي كانت مكتوبةً في الشيفرة — **فلا شاشةَ فارغةً في أوّل يوم**
@@ -70,6 +85,8 @@ export const LIMITS = {
   dailyAnalysisCap: { min: 0, max: 500 },
   dailySpendCapUsd: { min: 0, max: 100 },
   weeklyPromoCapUsd: { min: 0, max: 500 },
+  // ‏وعشرون حدٌّ لخطأ الإصبع لا للحاجة: عشرةُ أضعاف الافتراض بسعرٍ لم يُقرأ
+  dailyVideoCap: { min: 0, max: 20 },
 } as const
 
 /**
@@ -89,6 +106,7 @@ export const SETTING_KEYS = [
   'daily_spend_cap_usd',
   'auto_enqueue',
   'weekly_promo_cap_usd',
+  'daily_video_cap',
   'image_overlay',
   'alert_webhook',
   'dashboard_tiles',
@@ -109,6 +127,7 @@ export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
   daily_spend_cap_usd: 'سقف الإنفاق اليوميّ',
   auto_enqueue: 'الإدراج الآليّ',
   weekly_promo_cap_usd: 'سقف الترويج الأسبوعيّ',
+  daily_video_cap: 'سقف المقاطع اليوميّ',
   image_overlay: 'تركيب النصّ على الصورة',
   alert_webhook: 'قناة التنبيهات',
   dashboard_tiles: 'بطاقات اللوح',
@@ -129,6 +148,14 @@ function toNumber(raw: string | undefined, fallback: number, key: keyof typeof L
   if (!Number.isFinite(value)) return fallback
   const { min, max } = LIMITS[key]
   return Math.min(Math.max(value, min), max)
+}
+
+/**
+ * سقفُ المقاطع عددٌ صحيح: **لا نصفَ مقطع**. و«2.5» بلا قصٍّ تسمح بثالثٍ
+ * والحقلُ يقول اثنين ونصفًا.
+ */
+function wholeClips(raw: string | undefined): number {
+  return Math.floor(toNumber(raw, DEFAULTS.dailyVideoCap, 'dailyVideoCap'))
 }
 
 /**
@@ -169,6 +196,8 @@ export async function readSettings(db: Db): Promise<Settings> {
     weeklyPromoCapUsd: toNumber(
       map.get('weekly_promo_cap_usd'), DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd',
     ),
+    // ‏وغيابُ الصفّ يعود إلى الافتراض المحافظ لا إلى اللانهاية — ولا ترحيلَ له
+    dailyVideoCap: wholeClips(map.get('daily_video_cap')),
   }
 }
 
@@ -214,6 +243,9 @@ export async function writeSetting(
     stored = normalizeTiles(raw)
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
+  } else if (key === 'daily_video_cap') {
+    // ‏ويُحفَظ ما يُقرأ: عددٌ صحيحٌ مقصوصٌ على حدّيه، فالإشعارُ يقول ما حُفظ فعلًا
+    stored = String(wholeClips(raw))
   } else {
     const limitKey = key === 'daily_analysis_cap' ? 'dailyAnalysisCap' : 'dailySpendCapUsd'
     const fallback = key === 'daily_analysis_cap' ? DEFAULTS.dailyAnalysisCap : DEFAULTS.dailySpendCapUsd

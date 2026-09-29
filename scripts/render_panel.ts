@@ -14,6 +14,7 @@ import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
 import { imageProviderGate, slideGate } from '../src/lib/image/gate'
 import { imageReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
+import { videoCapGate } from '../src/lib/limits'
 
 const now = new Date('2026-09-05T18:00:00Z')
 
@@ -34,7 +35,8 @@ const mediaReady = {
     slide,
     briefReady: true,
   }),
-  video: videoReadiness({ face: 'binding', blocker: null }),
+  // ‏ومقطعٌ واحدٌ اليوم من اثنين — فالنقطةُ تامّةٌ وتقول كم بقي (D-168)
+  video: videoReadiness({ face: 'binding', blocker: null, clips: videoCapGate(1, 2) }),
 }
 
 function ago(hours: number): string {
@@ -59,6 +61,8 @@ const data: PanelData = {
   spendCap: 5,
   usedAnalyses: 6,
   usedSpend: 1.84,
+  videoCap: 2,
+  usedClips: 1,
   spend30d: 23.41,
   series: [
     { day: '2026-08-23', total: 0.4 }, { day: '2026-08-24', total: 1.1 },

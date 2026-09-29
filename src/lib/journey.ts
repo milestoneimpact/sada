@@ -94,7 +94,7 @@ const ATTEMPT: Readonly<Record<string, { title: string; detail: string }>> = {
   failed: { title: 'لم تنجح', detail: 'ردّت المنصّةُ بخطأ — والطابورُ يعيد المحاولة' },
   skipped_duplicate: {
     title: 'تُخطّيت — مكرَّرة',
-    detail: 'المفتاحُ نفسُه نُشر من قبل، فلم يُدفَع ثمنُه مرّتين (D-004)',
+    detail: 'المفتاحُ نفسُه نُشر من قبل، فلم يُدفَع ثمنُه مرّتين',
   },
 }
 

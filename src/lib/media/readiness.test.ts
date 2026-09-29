@@ -7,7 +7,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { Blocker } from '../limits'
+import { videoCapGate, type Blocker, type VideoCapGate } from '../limits'
 import { imageProviderGate, slideGate, type ImageRefusal, type SlideGate } from '../image/gate'
 import { imageReadiness, routeDot, videoReadiness, type MediaLine } from './readiness'
 import type { VideoFace } from './video'
@@ -111,11 +111,43 @@ describe('سطرُ «ولّد صورة» — بترتيب generateForPost', () =
   })
 })
 
-describe('سطرُ «حرّكها فيديو» — بترتيب animateForPost', () => {
-  const video = (face: VideoFace, blocker: Blocker | null = null): MediaLine => videoReadiness({ face, blocker })
+/** مقطعٌ اليومَ من اثنين — تحت السقف، فالنقطةُ تامّة. */
+const UNDER_CAP = videoCapGate(1, 2)
 
-  it('المفتاحُ ثمّ الحدود — ولا نقطةَ للسعر: تنتظر أبدًا ولا يُطفئها المالك', () => {
-    expect(video('env').dots.map((d) => d.key)).toEqual(['key', 'limits'])
+describe('سطرُ «حرّكها فيديو» — بترتيب animateForPost', () => {
+  const video = (face: VideoFace, blocker: Blocker | null = null, clips: VideoCapGate = UNDER_CAP): MediaLine =>
+    videoReadiness({ face, blocker, clips })
+
+  it('المفتاحُ ثمّ الحدودُ ثمّ المقاطع — ولا نقطةَ للسعر: تنتظر أبدًا ولا يُطفئها المالك', () => {
+    expect(video('env').dots.map((d) => d.key)).toEqual(['key', 'limits', 'clips'])
+  })
+
+  /*
+   * **والمقاطعُ بعددها** (D-168): السعرُ صفرٌ موسومٌ لا يبلغ سقفَ مال، فالعددُ
+   * هو الحدّ — وحكمُه من `videoCapGate` التي تحكم بها `animateForPost`.
+   */
+  it('تحت السقف: «المقاطع» تامّةٌ وتقول كم بقي — والزرُّ يعمل', () => {
+    const line = video('env')
+    expect(line.dots[2]).toMatchObject({ key: 'clips', title: 'المقاطع', state: 'done', note: 'بقي 1 من 2 اليوم' })
+    expect(line.blocked).toBe(false)
+    expect(line.next).toBeNull()
+  })
+
+  it('وعند البلوغ تسقط ورابطُها إلى الحدود — والزرُّ معطَّل', () => {
+    const line = video('env', null, videoCapGate(2, 2))
+    expect(line.next).toMatchObject({
+      key: 'clips', state: 'failed', note: 'بلغ سقفَ المقاطع اليوميّ',
+      action: { label: 'افتح الحدود', href: '#settings' },
+    })
+    expect(line.blocked).toBe(true)
+    // وصفرٌ قرارٌ لا بلوغ
+    expect(video('env', null, videoCapGate(0, 0)).next?.note).toBe('سقفُ المقاطع صفرٌ بقرارك')
+  })
+
+  it('وترتيبُها ترتيبُ الدالّة: بلا وجهٍ يُقال الوجه، وموقوفٌ يُقال الإيقاف', () => {
+    const full = videoCapGate(2, 2)
+    expect(video('none', null, full).next?.key).toBe('key')
+    expect(video('env', { kind: 'paused' }, full).next?.key).toBe('limits')
   })
 
   it('البيئةُ والبطاقةُ تامّتان، والرابطُ ينتظرك، ولا وجهَ يسقط', () => {
@@ -152,7 +184,10 @@ describe('النصُّ يُقرأ بجانب زرٍّ صغير — وبكلما�
   const blockers: (Blocker | null)[] = [
     null, { kind: 'paused' }, { kind: 'analysis_cap', used: 1, cap: 1 }, { kind: 'spend_cap', used: 1, cap: 1 },
     { kind: 'provider_cap', provider: 'x', used: 1, cap: 1 }, { kind: 'provider_disabled', provider: 'x' },
+    { kind: 'video_cap', used: 2, cap: 2 },
   ]
+  // ‏وأطولُ ما تقوله «المقاطع»: عشرون من عشرين، وصفرٌ، وبلوغ
+  const caps = [videoCapGate(0, 20), videoCapGate(0, 0), videoCapGate(2, 2)]
   const slides = [
     slideGate({ overlay: true, hasBrowserKey: false, hasAccount: false }),
     slideGate({ overlay: true, hasBrowserKey: true, hasAccount: false }),
@@ -163,7 +198,7 @@ describe('النصُّ يُقرأ بجانب زرٍّ صغير — وبكلما�
     ...refusals.flatMap((refusal) => blockers.flatMap((blocker) => slides.flatMap((slide) =>
       [true, false].map((briefReady) => image({ refusal, blocker, slide, briefReady, label: 'Workers AI' }))))),
     ...(['env', 'card', 'binding', 'none'] as const).flatMap((face) =>
-      blockers.map((blocker) => videoReadiness({ face, blocker }))),
+      blockers.flatMap((blocker) => caps.map((clips) => videoReadiness({ face, blocker, clips })))),
   ]
   const texts = [...new Set(lines.flatMap((l) => l.dots.flatMap((d) => [d.title, d.note, d.action?.label ?? ''])))]
     .filter((t) => t !== '')
@@ -208,10 +243,10 @@ describe('نقطةُ المهمّة في جدول التوجيه — نقطةُ 
   const ready = (face: VideoFace, refusal: ImageRefusal | null = null) => ({
     // موقوفٌ عمدًا: الجدولُ يحكم على المزوّد، والإيقافُ حالُ النظام لا حالُ مهمّة
     image: image({ blocker: { kind: 'paused' }, refusal }),
-    video: videoReadiness({ face, blocker: { kind: 'paused' } }),
+    video: videoReadiness({ face, blocker: { kind: 'paused' }, clips: videoCapGate(2, 2) }),
   })
 
-  it('الصورةُ من نقطة مزوّدها، والمقطعُ من نقطة مفتاحه — والإيقافُ لا يُسقطهما', () => {
+  it('الصورةُ من نقطة مزوّدها، والمقطعُ من نقطة مفتاحه — والإيقافُ وسقفُ المقاطع لا يُسقطانهما', () => {
     expect(routeDot(ready('env'), 'image')).toMatchObject({ key: 'provider', state: 'done' })
     expect(routeDot(ready('env'), 'video')).toMatchObject({ key: 'key', state: 'done', note: 'من أسرار Worker' })
     expect(routeDot(ready('none', { kind: 'no_key' }), 'image')).toMatchObject({ key: 'provider', state: 'failed' })

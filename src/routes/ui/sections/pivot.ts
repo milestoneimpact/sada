@@ -11,6 +11,7 @@
  */
 import { escapeHtml } from '../escape'
 import { pageHead } from '../parts'
+import { sectionLabel } from '../command'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
@@ -124,7 +125,7 @@ export function pivotPane(d: PivotView): string {
       وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.</p></div>`
 
   return `<section data-pane="pivot" hidden>
-  ${pageHead('القياس', 'الجدول المحوريّ', 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
+  ${pageHead('القياس', sectionLabel('pivot'), 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
 
   <div class="card">
     <form class="row pv-form" method="GET" action="/panel">

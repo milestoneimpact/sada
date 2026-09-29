@@ -124,9 +124,10 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
   {
     code: 'M-16',
     title: 'سعرُ نموذج الفيديو من لوحة Cloudflare',
+    // ‏ولم يعد «بلا أن يوقفها شيء» (D-168): سقفُ العدد يوقفها، والمالُ وحده أعمى
     ifLeft:
       'يُسجَّل اليوم `price_unverified` بصفر — **فسقفُ الإنفاق اليوميّ لا يحرس الفيديو**، ' +
-      'ودورةٌ تدور مرّاتٍ تُنفق بلا أن يوقفها شيء.',
+      'ويحرسه سقفُ المقاطع بعددها وحده: مقطعان في اليوم ما لم ترفعه، بثمنٍ لا يُعرَف.',
     unblocks: 'guard',
     done: (f) => f.videoPriced,
   },
@@ -182,9 +183,18 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
   {
     code: 'M-14',
     title: 'ربطُ TikTok',
-    ifLeft: 'كسابقتها — ولا يُدَّعى نشرٌ لم يُبنَ سائقُه.',
+    ifLeft: 'كسابقتها — والمقاطعُ تُولَّد ولا تجد أين تذهب.',
     unblocks: 'capability',
     done: (f) => f.linked.has('tiktok'),
+  },
+  {
+    code: 'M-24',
+    title: 'ربطُ Instagram',
+    ifLeft:
+      'لا شيءَ ينكسر — **والسائقُ مبنيٌّ وينتظر سرّيك**، ' +
+      'فالصورُ والمقاطعُ لا تُنشَر على Instagram.',
+    unblocks: 'capability',
+    done: (f) => f.linked.has('instagram'),
   },
   {
     code: 'M-20',
@@ -222,7 +232,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     code: 'M-12',
     title: 'مفتاحُ مرورٍ (Passkey) على كلّ بيئة',
     ifLeft:
-      '`ADMIN_TOKEN` وحده يحرس اللوحة — **ورمزٌ يُسرَّب يفتح كلَّ شيء**، ' +
+      'كلمةُ الإدارة (`ADMIN_TOKEN`) وحدَها تحرس اللوحة — **وكلمةٌ تُسرَّب تفتح كلَّ شيء**، ' +
       'ولا عاملَ ثانٍ يردّه.',
     unblocks: 'guard',
     // يُقرأ من `webauthn_credentials`، ولا يُمرَّر هنا بعد

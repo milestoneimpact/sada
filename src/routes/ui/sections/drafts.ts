@@ -35,6 +35,7 @@ import { kb, money, relativeTime } from '../../../lib/format'
  * منصّةً تُضاف بعدهما: مسوّدةُ TikTok أو YouTube كانت تُرسَم بلا شعار.
  */
 import { LOGOS } from '../logos'
+import { ICON } from '../icons'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { RUNG_MARK, status } from '../parts'
@@ -585,7 +586,7 @@ function card(
      * بعينه، **والسؤالُ يقع وأنت تنظر إليه** — لا بعد أن تبحث عن معرّفه.
      */
     `<a class="chip" href="/panel/journey/${escapeHtml(d.id)}"
-       title="من الملفّ إلى الأثر — كلُّ ما وقع لهذا المنشور">الرحلة ←</a>`,
+       title="من الملفّ إلى الأثر — كلُّ ما وقع لهذا المنشور">الرحلة ${ICON.go}</a>`,
   ]
     .filter((x) => x !== '')
     .join('')

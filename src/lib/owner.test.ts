@@ -11,9 +11,8 @@ import { OWNER_TASKS, ownerRows, pendingCount, type OwnerFacts, secretCommand } 
 const DOC = readFileSync(new URL('../../docs/MANUAL-TASKS.md', import.meta.url), 'utf8')
 
 /** عناوينُ المهامّ في الوثيقة — `## M-NN · …` */
-const documented = new Set(
-  [...DOC.matchAll(/^##+\s*(?:✅\s*)?(M-\d{2})\b/gm)].map((m) => m[1]!),
-)
+const headings = [...DOC.matchAll(/^##+\s*(?:✅\s*)?(M-\d{2})\b/gm)].map((m) => m[1]!)
+const documented = new Set(headings)
 
 /**
  * مهامٌّ **وقعت وانقضت** — صفحتُها تبقى للسجلّ ولا صفَّ لها.
@@ -196,5 +195,16 @@ describe('M-19 يكتمل بالسرّ لا بالمتغيّر (D-157)', () => {
   it('والسرُّ وحده أو المعرّفُ وحده لا يكفي', () => {
     expect(m19.done({ ...empty, secrets: new Set(['CF_BROWSER_TOKEN']) })).toBe(false)
     expect(m19.done({ ...empty, vars: new Set(['CF_BROWSER_TOKEN', 'CF_AI_ACCOUNT_ID']) })).toBe(false)
+  })
+})
+
+describe('رمزُ المهمّة لا يتكرّر (D-166)', () => {
+  /**
+   * كان «ربطُ Instagram» و«سعرُ نموذج الفيديو» كلاهما M-16، و`documented`
+   * مجموعةٌ فابتلعت التكرار: صفحةُ Instagram بلا صفٍّ في «ما عليك» والحارسُ أخضر.
+   */
+  it('كلُّ عنوانٍ في الوثيقة برمزٍ لا يحمله غيرُه', () => {
+    const repeated = headings.filter((code, i) => headings.indexOf(code) !== i)
+    expect(repeated).toEqual([])
   })
 })
