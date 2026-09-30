@@ -261,7 +261,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
       ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
       : 'صورةٌ مولَّدة تصاحب المنشور'
     return `<div class="pic">
-      <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}"
+      <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
         loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
       <div class="pic-foot">
         <span class="chip mono">${kb(ready.bytes)}</span>
@@ -279,6 +279,13 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
                <button class="g sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
               : ''}
+             <form class="inline" method="POST" action="/panel/media/regenerate"
+               data-busy="جارٍ التوليد…">
+               <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+               <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
+               <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}
+                 title="تُرفَض هذه بعد أن يمرّ التوليدُ بحرّاسه، فلا يبقى المنشورُ بلا صورة"
+                 >ولّد صورةً بديلة</button></form>
              <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
                <button class="g sm" type="submit">ارفض الصورة</button></form>`

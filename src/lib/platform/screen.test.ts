@@ -106,6 +106,16 @@ describe('الرابط — يُبنى ولا يُخزَّن', () => {
     expect(permalink('x', null)).toBeNull()
     expect(permalink('x', '   ')).toBeNull()
   })
+
+  it('ورقمُ Instagram لا يُفتَح على x.com', () => {
+    expect(permalink('instagram', '17912345678901234')).toBeNull()
+    expect(permalink('tiktok', '7312345678901234567')).toBeNull()
+  })
+
+  it('و YouTube من معرّف المقطع', () => {
+    expect(permalink('youtube', 'dQw4w9WgXcQ')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    expect(permalink('youtube', '1874')).toBeNull()
+  })
 })
 
 describe('المنشورات — تُقرأ من محاولاتها', () => {

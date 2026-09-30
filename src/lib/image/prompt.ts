@@ -52,7 +52,9 @@ export const ASPECT: Readonly<Record<Platform, string>> = {
 const STYLE = [
   'Abstract editorial illustration: geometric forms, gradients, fine texture.',
   'Muted limited palette — two or three colours, with a restrained teal accent.',
-  'Soft directional light, gentle depth, no harsh contrast.',
+  'Directional light with defined shadows and a full tonal range.',
+  // «ناعمٌ بلا تباين» مع أربع خطوات انتشارٍ أخرج لوحا رماديّا شبهَ فارغ
+  'Never washed out, never a blank or near-empty canvas.',
   'No faces, no recognisable people, no brand logos.',
   'No office cliches: no handshakes, no rising bar charts, no lightbulbs.',
 ].join('\n')
@@ -68,6 +70,18 @@ const NO_TEXT = [
   'signage anywhere in the image — no Arabic script, no Latin script,',
   'nothing that resembles writing.',
 ].join('\n')
+
+/**
+ * التكوينُ واللونُ حين يسقط الموجز — **ويقرؤهما `brief.ts` كذلك** حين يأتي
+ * الموجزُ بلا أحدهما، فلا نسختان تفترقان.
+ *
+ * و«مساحةٌ فارغةٌ سخيّة» كانت هنا، **والنموذجُ أطاعها حرفيّا**: صورةٌ كلُّها
+ * فراغ. فالتكوينُ الآن يطلب الملءَ صراحةً.
+ */
+export const FALLBACK_COMPOSITION =
+  'One clear focal subject filling most of the frame, with distinct foreground and background; no large empty areas.'
+export const FALLBACK_PALETTE =
+  'Deep ink navy and warm sand with a restrained teal accent, rich shadows and bright highlights.'
 
 export interface ImageBrief {
   /** موضوعُ المنشور — يُستعمَل حين يسقط الموجزُ البصريّ. */
@@ -87,17 +101,23 @@ export function imagePrompt(brief: ImageBrief): string {
     visual === null
       // احتياطُ السقوط: الموضوعُ العربيُّ كما هو. **وأضعفُ ربطا بالضرورة**
       // — ويُقال ذلك للنموذج بدل أن يُترَك يخمّن
-      ? `A single abstract editorial image accompanying a professional post.\n` +
+      /*
+       * **وموضوعٌ مرسومٌ لا موضوعٌ موصوف**: «صورةٌ مجرّدةٌ تصاحب منشورا»
+       * مع نصٍّ عربيٍّ لا يقرؤه النموذج أخرجت على staging لوحا رماديّا شبهَ
+       * فارغ. فيُعطى مشهدا ملموسا يُرسَم، والنصُّ سياقٌ لا أكثر.
+       */
+      ? `A tactile still life of layered paper-cut geometric forms — arcs, stacked planes\n` +
+        `and a single sphere — arranged as one clear focal point, lit from the side.\n` +
         `The post (Arabic, for context only — do not render it): ${brief.topic}`
       : visual.subject,
     '',
     '# Composition',
     '',
-    visual === null ? 'Wide editorial composition with generous negative space.' : visual.composition,
+    visual === null ? FALLBACK_COMPOSITION : visual.composition,
     '',
     '# Colour and light',
     '',
-    visual === null ? 'Muted limited palette with a soft teal accent.' : visual.palette,
+    visual === null ? FALLBACK_PALETTE : visual.palette,
     '',
     '# Style',
     '',

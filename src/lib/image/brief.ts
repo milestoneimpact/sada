@@ -45,6 +45,7 @@ import { recordCost } from '../cost'
 import { blockerReason, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
 import type { Db } from '../tokens'
+import { FALLBACK_COMPOSITION, FALLBACK_PALETTE } from './prompt'
 
 export interface VisualBrief {
   /** ما يُرى — أجسامٌ وموادُّ ومشهد. بالإنجليزيّة، ملموسا لا مفهوما. */
@@ -169,8 +170,8 @@ export function parseBrief(raw: string): VisualBrief | null {
   if (subject === null) return null
   return {
     subject,
-    composition: field(row['composition']) ?? 'wide editorial composition, generous negative space',
-    palette: field(row['palette']) ?? 'muted limited palette with a soft teal accent',
+    composition: field(row['composition']) ?? FALLBACK_COMPOSITION,
+    palette: field(row['palette']) ?? FALLBACK_PALETTE,
     // **والعنوانُ يبقى فارغا إن لم يأتِ**: شريحةٌ بلا نصّ خيرٌ من شريحةٍ
     // بنصٍّ مخترَع — والمنادي يتخطّى التركيبَ حين يجده فارغا
     headline: field(row['headline'], HEADLINE_MAX) ?? '',

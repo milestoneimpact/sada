@@ -37,7 +37,7 @@ import { STYLE } from '../../routes/ui/styles'
 import { SCRIPT as PANEL_SCRIPT } from '../../routes/ui/panelScript'
 import { COMMAND_SCRIPT } from '../../routes/ui/command'
 import { TIME_SCRIPT } from '../../routes/ui/time'
-import { COPY_SCRIPT, DENSITY_SCRIPT, THEME_SCRIPT } from '../../routes/ui/scripts'
+import { COPY_SCRIPT, DENSITY_SCRIPT, IMG_SCRIPT, THEME_SCRIPT } from '../../routes/ui/scripts'
 
 /**
  * بصمةٌ متزامنة — **مفتاحُ تخبئةٍ لا حارس**.
@@ -134,7 +134,7 @@ let panel: ScriptAsset | null = null
 /** ما تحمله كلُّ صفحة: الثيمُ والكثافةُ والنسخُ ولوحةُ الأوامر والوقت. */
 export function uiScript(): ScriptAsset {
   if (ui === null) {
-    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + COMMAND_SCRIPT + TIME_SCRIPT)
+    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + IMG_SCRIPT + COMMAND_SCRIPT + TIME_SCRIPT)
     ui = { path: `/a/u.${fingerprint(body)}.js`, body }
   }
   return ui

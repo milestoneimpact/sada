@@ -8,7 +8,7 @@
  * **وكلّ فعلٍ هنا يمرّ بالقيود نفسها** التي يمرّ بها نداءُ الطرفيّة: زرٌّ
  * في صفحةٍ ليس طريقا جانبيّا حول الحارس.
  */
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { Env } from '../env'
 import { ROUTES, type TaskName } from '../lib/ai/registry'
 
@@ -1273,10 +1273,21 @@ panel.post('/panel/plan/approve', async (c) => {
  * نداءٌ مدفوعٌ بضغطة**، فالزرُّ يُعطَّل بعد الأولى ومفتاحُ عدم التكرار
  * يمنع الثانية إن سبقت.
  */
-panel.post('/panel/media/generate', async (c) => {
+panel.post('/panel/media/generate', (c) => imageRoute(c, false))
+
+/**
+ * صورةٌ بديلة بضغطةٍ واحدة — **والقائمةُ لا تُرفَض إلّا إن مرّ التوليد**.
+ *
+ * كان البديلُ «ارفض» ثمّ «ولّد»: والأولى تقع ولو سقطت الثانيةُ عند سقف،
+ * فيبقى المنشورُ بلا صورة. والحارسُ في `generateForPost` لا هنا (D-019).
+ */
+panel.post('/panel/media/regenerate', (c) => imageRoute(c, true))
+
+async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Promise<Response> {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const id = String(gate.form.get('id') ?? '')
+  const old = replace ? String(gate.form.get('media') ?? '') : ''
 
   const outcome = await generateForPost(
     {
@@ -1286,8 +1297,11 @@ panel.post('/panel/media/generate', async (c) => {
       workerSecrets: c.env as unknown as Record<string, string | undefined>,
     },
     id,
+    replace ? { replace: old } : {},
   )
 
+  // ‏وما لم يُولَّد لم يُرفَض: يُقال ذلك للمالك فلا يبحث عن صورةٍ اختفت
+  const kept = replace ? ' والصورةُ الحاليّة باقيةٌ كما هي.' : ''
   const flash: PanelFlash =
     outcome.kind === 'generated'
       ? {
@@ -1295,7 +1309,8 @@ panel.post('/panel/media/generate', async (c) => {
           // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
           kind: outcome.note === '' ? 'ok' : 'warn',
           text:
-            `وُلّدت صورة — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.` +
+            `وُلّدت صورة${replace ? 'ٌ بديلة' : ''} — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.` +
+            (replace ? ' والسابقةُ مرفوضةٌ تبقى في الدفتر بكلفتها.' : '') +
             (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
@@ -1306,14 +1321,14 @@ panel.post('/panel/media/generate', async (c) => {
               text: `توليدٌ جارٍ لهذه الصورة منذ ${outcome.since} — انتظره ولا تنقر ثانيةً.`,
             }
           : outcome.kind === 'blocked'
-            ? { kind: 'warn', text: outcome.reason }
-            : { kind: 'bad', text: `تعذّر التوليد: ${outcome.reason}` }
+            ? { kind: 'warn', text: `${outcome.reason}.${kept}` }
+            : { kind: 'bad', text: `تعذّر التوليد: ${outcome.reason}.${kept}` }
 
   await record(
     c.env.DB,
     {
       actor: 'panel',
-      action: 'media.generate',
+      action: replace ? 'media.regenerate' : 'media.generate',
       target: id,
       // والسببُ مع النوع (D-157): «generated» بلا نصٍّ فوقها كانت تُقرأ نجاحا تامّا
       detail:
@@ -1325,7 +1340,7 @@ panel.post('/panel/media/generate', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('posts')
-})
+}
 
 /**
  * تحريكُ الصورة إلى مقطعٍ رأسيّ (D-052).

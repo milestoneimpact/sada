@@ -173,7 +173,7 @@ function mediaStrip(items: readonly PostMedia[]): string {
       const body = isVideo
         ? `<video src="${escapeHtml(src)}" preload="metadata" muted playsinline
              aria-label="مقطعٌ مولَّد"></video>`
-        : `<img src="${escapeHtml(src)}" alt="صورةٌ مولَّدة لهذا المنشور" loading="lazy">`
+        : `<img src="${escapeHtml(src)}" alt="صورةٌ مولَّدة لهذا المنشور" loading="lazy" data-media>`
       return `<a class="thumb${m.status === 'rejected' ? ' off' : ''}"
         href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">
         ${body}

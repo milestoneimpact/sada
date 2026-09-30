@@ -165,3 +165,33 @@ var sadaPk={
   }
 };
 `
+
+/**
+ * صورةٌ لم تُحمَّل تُقال بلفظها (D-170).
+ *
+ * كان المربّعُ الرماديُّ خلفَ الصورة يبقى وحدَه إن سقط الملفّ، **فيُقرأ «لا
+ * صورة» أو «صورةٌ فارغة»** ولا يُعرَف أيُّهما. والحدثُ `error` لا يصعد،
+ * فيُلتقَط في طور الالتقاط، **وما سقط قبل أن يُحمَّل السكربتُ** يُكشَف بـ
+ * `complete` مع عرضٍ طبيعيٍّ صفر.
+ */
+export const IMG_SCRIPT = `
+(function(){
+  function broke(img){
+    if(img.dataset.broke)return; img.dataset.broke='1';
+    // ‏وداخلَ رابطٍ لا يُزرَع رابطٌ ثانٍ: وسمٌ يكفي، والرابطُ نفسُه يفتح الملفّ
+    if(img.closest('a')){var s=document.createElement('span'); s.className='tag bad';
+      s.textContent='لم تُحمَّل'; img.replaceWith(s); return;}
+    var box=document.createElement('div'); box.className='pic-err'; box.setAttribute('role','status');
+    var b=document.createElement('b'); b.textContent='تعذّر عرضُ الصورة';
+    var t=document.createElement('span'); t.className='ago';
+    t.textContent='لم يصل الملفّ من المخزن. افتحه وحده، فإن لم يُفتح فولّد صورةً بديلة.';
+    var a=document.createElement('a'); a.className='btn g sm'; a.href=img.currentSrc||img.src;
+    a.target='_blank'; a.rel='noopener noreferrer'; a.textContent='افتح الملفّ';
+    box.append(b,t,a); img.replaceWith(box);
+  }
+  document.addEventListener('error',function(e){var t=e.target;
+    if(t&&t.tagName==='IMG'&&t.hasAttribute('data-media'))broke(t);},true);
+  document.querySelectorAll('img[data-media]').forEach(function(i){
+    if(i.complete&&i.naturalWidth===0)broke(i);});
+})();
+`

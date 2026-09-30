@@ -302,7 +302,22 @@ function refusalOutcome(refusal: ImageRefusal, name: string, label: string): Ima
   }
 }
 
-export async function generateForPost(deps: ImageDeps, postId: string): Promise<ImageOutcome> {
+/**
+ * خيارُ الاستبدال: **صورةٌ جاهزةٌ تُرفَض إن مرّ التوليدُ بحرّاسه كلِّهم**.
+ *
+ * كان البديلُ ضغطتين: «ارفض الصورة» ثمّ «ولّد صورة». **والأولى تقع ولو
+ * سقطت الثانيةُ عند سقفٍ أو مفتاح**، فيبقى المنشورُ بلا صورةٍ أصلا. فالرفضُ
+ * هنا بعد البوّابات لا قبلها: ما سيُردّ لا يمسّ الصورةَ القائمة.
+ */
+export interface GenerateOptions {
+  readonly replace?: string
+}
+
+export async function generateForPost(
+  deps: ImageDeps,
+  postId: string,
+  options: GenerateOptions = {},
+): Promise<ImageOutcome> {
   // ١ · المنشور
   const post = await deps.db
     .prepare('SELECT id, platform, text, status FROM posts WHERE id = ?')
@@ -331,7 +346,18 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
     .prepare("SELECT id FROM media WHERE idempotency_key = ? AND status = 'ready'")
     .bind(key)
     .first<{ id: string }>()
-  if (existing !== null) return { kind: 'already', mediaId: existing.id }
+  if (existing !== null && existing.id !== options.replace) return { kind: 'already', mediaId: existing.id }
+
+  // ‏والمستبدَلةُ صورةُ هذا المنشور الجاهزة، لا معرّفٌ يُمرَّر من النموذج كيفما اتّفق
+  if (options.replace !== undefined) {
+    const old = await deps.db
+      .prepare('SELECT post_id, status FROM media WHERE id = ?')
+      .bind(options.replace)
+      .first<{ post_id: string; status: string }>()
+    if (old === null || old.post_id !== post.id || old.status !== 'ready') {
+      return { kind: 'failed', reason: 'لا صورةَ جاهزةً بهذا المعرّف لهذا المنشور', retryable: false }
+    }
+  }
 
   // ٣ · الحارس العامّ قبل أيّ نداء
   const allowance = await checkAllowance(deps.db, 'image')
@@ -380,6 +406,9 @@ export async function generateForPost(deps: ImageDeps, postId: string): Promise<
       provider?.label ?? route.provider,
     )
   }
+
+  // ‏والرفضُ بعد البوّابات كلِّها: ما سيُردّ لا يمسّ الصورةَ القائمة
+  if (options.replace !== undefined) await rejectMedia(deps.db, options.replace)
 
   /*
    * ٣·ب · الحجزُ قبل النداء (D-068).

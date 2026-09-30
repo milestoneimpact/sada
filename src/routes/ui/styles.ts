@@ -1215,15 +1215,21 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .draft-meta{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:auto; padding-top:var(--s-0)}
 /* ── الصورة ───────────────────────────────────────────────────────────
    تُعرض بعرض البطاقة كاملا: المالك يقرّر عليها، وقرارٌ على مربّعٍ صغير
-   ليس قرارا. و aspect-ratio مع object-fit:cover يمنعان القفزَ قبل
-   التحميل ويمنعان المطّ بعده — وصورةٌ ممطوطة تُقرأ إهمالا. */
+   ليس قرارا. **وتُعرض كاملةً لا مقصوصة**: نسبةٌ مفروضةٌ مع cover كانت تقصّ
+   مربّعَ النموذج إلى شريطٍ عريض، فيعتمد المالكُ وسطَ صورةٍ لم يرَ حوافَّها.
+   فسِمَتا width/height تحجزان المكانَ قبل التحميل، والنسبةُ الحقيقيّةُ تغلب
+   بعده، وcontain يمنع المطّ. */
 .pic{margin-top:var(--s-2)}
 /* height:auto ضروريّةٌ لا زينة: سِمَتا width/height على الوسم تُترجَمان
    إلى CSS بأولويّةٍ دنيا، فـ width:100% تغلب الأولى **ولا شيء يغلب
    الثانية** — فيبقى الارتفاع 628px والعرض عرضَ البطاقة، وتخرج الصورة
    ممطوطةً طولا. علّةٌ رأيتُها ولم يمسكها اختبار. */
-.pic img{display:block; width:100%; height:auto; aspect-ratio:1.91/1; object-fit:cover;
+.pic img{display:block; width:100%; height:auto; max-height:76vh; object-fit:contain;
   border-radius:var(--r); border:1px solid var(--line); background:var(--surface-2)}
+/* صورةٌ لم تُحمَّل تُقال بلفظها: مربّعٌ رماديٌّ فارغٌ كان يُقرأ «لا صورة» */
+.pic-err{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
+  padding:var(--s-3); border-radius:var(--r); background:var(--surface-2);
+  border:1px dashed var(--bad)}
 .pic-foot{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:var(--s-2)}
 .pic.none{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   padding:var(--s-3) var(--s-3); border-radius:var(--r); background:var(--surface-2);
