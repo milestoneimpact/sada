@@ -74,9 +74,24 @@ export function permalink(platform: Platform, platformPostId: string | null): st
     return `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}/`
   }
 
-  // و X يعيد رقما محضا. والمسارُ `i/web/status` يعمل بلا معرفة المُعرّف
-  if (!/^[0-9]+$/.test(id)) return null
-  return `https://x.com/i/web/status/${id}`
+  if (platform === 'x') {
+    // و X يعيد رقما محضا. والمسارُ `i/web/status` يعمل بلا معرفة المُعرّف
+    if (!/^[0-9]+$/.test(id)) return null
+    return `https://x.com/i/web/status/${id}`
+  }
+
+  if (platform === 'youtube') {
+    // ‏YouTube يعيد معرّفَ المقطع: أحدَ عشرَ محرفا، وصفحةُ المشاهدة تفتح Shorts كذلك
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
+    return `https://www.youtube.com/watch?v=${id}`
+  }
+
+  /*
+   * **وما سواها لا يُبنى له رابطٌ من المعرّف وحده.** Instagram يعيد رقما
+   * والرابطُ يحتاج رمزا قصيرا غيرَه، وTikTok يحتاج اسمَ الحساب. وكان الرقمُ
+   * يسقط إلى فرع X فيُفتَح منشورُ Instagram على x.com.
+   */
+  return null
 }
 
 /** نصٌّ مختصرٌ من جواب المنصّة — لا جسمَ جوابٍ كامل في شاشة. */

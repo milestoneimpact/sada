@@ -761,6 +761,47 @@ describe('المرفوضةُ لا تسدّ الطريق', () => {
 })
 
 /**
+ * **البديلُ بضغطةٍ واحدة، والقائمةُ لا تُرفَض إلّا إن مرّ التوليد** (D-170).
+ *
+ * كان «ارفض» ثمّ «ولّد»: والأولى تقع ولو سقطت الثانيةُ عند سقف، فيبقى
+ * المنشورُ بلا صورة.
+ */
+describe('صورةٌ بديلة', () => {
+  it('تُرفَض القائمةُ ويُولَّد بديلُها في نداءٍ واحد', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net()), post)
+    const old = (first as { mediaId: string }).mediaId
+    const again = await generateForPost(deps(net()), post, { replace: old })
+    expect(again.kind).toBe('generated')
+    expect((again as { mediaId: string }).mediaId).not.toBe(old)
+    const row = await db.prepare('SELECT status FROM media WHERE id = ?').bind(old).first<{ status: string }>()
+    expect(row!.status).toBe('rejected')
+  })
+
+  it('وحارسٌ يردّ التوليدَ لا يمسّ القائمة', async () => {
+    const post = await seedPost()
+    const first = await generateForPost(deps(net()), post)
+    const old = (first as { mediaId: string }).mediaId
+    await writeSetting(db, 'paused', 'true', 'test')
+    const again = await generateForPost(deps(net()), post, { replace: old })
+    expect(again.kind).toBe('blocked')
+    const row = await db.prepare('SELECT status FROM media WHERE id = ?').bind(old).first<{ status: string }>()
+    expect(row!.status).toBe('ready')
+  })
+
+  it('ولا تُستبدَل صورةُ منشورٍ آخر', async () => {
+    const a = await seedPost()
+    const b = await seedPost({ platform: 'x' })
+    const first = await generateForPost(deps(net()), a)
+    const old = (first as { mediaId: string }).mediaId
+    const out = await generateForPost(deps(net()), b, { replace: old })
+    expect(out.kind).toBe('failed')
+    const row = await db.prepare('SELECT status FROM media WHERE id = ?').bind(old).first<{ status: string }>()
+    expect(row!.status).toBe('ready')
+  })
+})
+
+/**
  * **والصفُّ الذي رُفض قبل D-087 يحمل مفتاحَه نظيفا** (D-088).
  *
  * D-087 غيّرت الكاتب: كلُّ رفضٍ **جديد** يوسم مفتاحَه. **ولم تُصلِح ما
