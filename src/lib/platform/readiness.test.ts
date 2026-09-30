@@ -33,8 +33,8 @@ const tally = (over: Partial<PlatformTally> = {}): PlatformTally => ({
 })
 const post = (over: Partial<PlatformPost> = {}): PlatformPost => ({
   id: 'p1', text: 'نصّ', status: 'queued', scheduledAt: null, createdAt: '2026-09-26 00:00:00',
-  accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null, hasMedia: false, costUsd: 0,
-  ...over,
+  accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
+  hasMedia: false, costUsd: 0, ...over,
 })
 
 describe('السلّم يقرأ الصفوف', () => {
@@ -89,6 +89,19 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(pub.state).toBe('failed')
     expect(pub.note).toContain('رُدّ 401')
     expect(pub.action?.href).toBe('/panel/journey/p1')
+  })
+
+  it('كُتب قبل آخر نشرٍ ثمّ فشل بعده: النشرُ ساقطٌ بوقت الفشل لا بوقت الكتابة', () => {
+    const r = readiness({
+      view: viewOf([account()]), app, health: { a1: health() },
+      tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }),
+      posts: [post({
+        status: 'failed', lastError: 'رُدّ 401',
+        createdAt: '2026-09-18 00:00:00', lastFailedAt: '2026-09-22 06:00:00',
+      })], now,
+    })
+    expect(r.rungs.find((x) => x.key === 'publish')!.state).toBe('failed')
+    expect(r.verdict.kind).toBe('bad')
   })
 
   it('لا تطبيقَ ولا حساب: التطبيقُ هو «الآن» والحسابُ ينتظره', () => {

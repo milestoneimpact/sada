@@ -15,7 +15,7 @@ let db: FakeDb
 const LONG = 'ن'.repeat(300)
 
 async function seedDraft(options: {
-  platform?: 'linkedin' | 'x'
+  platform?: 'linkedin' | 'x' | 'tiktok' | 'youtube'
   text?: string
   status?: string
   hash?: string
@@ -166,6 +166,25 @@ describe('العرض', () => {
     const id = await seedDraft()
     const list = await listDrafts(db)
     expect(list.find((d) => d.id === id)?.sourceName).toBe('تقرير الأثر')
+  })
+})
+
+/**
+ * **منصّةُ الصفّ كما هي** — كان كلُّ ما ليس X يُقرأ LinkedIn، فمسوّدةُ
+ * TikTok تُعرض بشعار LinkedIn ولا تجد حساباتِها عند الجدولة.
+ */
+describe('المنصّةُ تُقرأ كما كُتبت', () => {
+  it('المنصّاتُ الأربع ذهابا وإيابا', async () => {
+    const ids = {
+      linkedin: await seedDraft({ platform: 'linkedin' }),
+      x: await seedDraft({ platform: 'x', text: 'نصٌّ قصير' }),
+      tiktok: await seedDraft({ platform: 'tiktok' }),
+      youtube: await seedDraft({ platform: 'youtube' }),
+    }
+    const list = await listDrafts(db)
+    for (const [platform, id] of Object.entries(ids)) {
+      expect(list.find((d) => d.id === id)?.platform).toBe(platform)
+    }
   })
 })
 

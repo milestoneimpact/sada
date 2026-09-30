@@ -273,7 +273,7 @@ export function refusedBody(d: RefusedData): string {
       <div class="outcome warn"><span class="k">ما يُفعَل</span>
         <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من تبويب
           <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
-          <b>لوح القنوات ← دليلُ ضبط التطبيق</b>، ثمّ أعد الربط.
+          <b>صفحة المنصّة ← ضبطُ التطبيق ودليلُه</b>، ثمّ أعد الربط.
           <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
           المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
       <div class="row" style="margin-top:var(--s-3)">

@@ -625,7 +625,7 @@ function card(
                d.approvedBy,
              )}</span>`}</div>`
 
-  return `<div class="draft${live ? '' : ' done'}" data-draft="${escapeHtml(d.id)}"
+  return `<div class="draft${live ? '' : ' done'}" id="d-${escapeHtml(d.id)}" data-draft="${escapeHtml(d.id)}"
     data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     ${notesPane(d, len, spec.hardLimit)}

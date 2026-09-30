@@ -162,7 +162,11 @@ export async function publishPost(
    * أنّ شيئا لم يخرج. **فيُردّ الآن، بسببٍ يُقرأ، وبلا إعادة** — حتّى
    * يُبنى سائقُ الصفحات يومَ تصل موافقةُ `Community Management API`.
    */
-  if (post.account_kind === 'org') {
+  /*
+   * **والحارسُ لـ LinkedIn وحدها**: YouTube يحفظ قناتَه بنوع `org`
+   * (`identity.ts`)، فكان كلُّ رفعٍ إليها يُردّ هنا بسببٍ يخصّ LinkedIn.
+   */
+  if (post.platform === 'linkedin' && post.account_kind === 'org') {
     return preflightFailed(
       db, post,
       'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +

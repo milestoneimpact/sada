@@ -42,7 +42,7 @@ import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, sav
 import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { versionAge } from '../lib/oauth/version'
-import { schedulePost, unschedule } from '../lib/schedule/job'
+import { requeue, schedulePost, unschedule } from '../lib/schedule/job'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money } from '../lib/format'
@@ -1497,7 +1497,10 @@ panel.get('/panel/channels/:platform', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: 'القنوات' }, body, nonce, '',
+    // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا
+    // ‏`_csrf` فيردّهما `guardPost` بـ403، والدليلُ يسكن هذه الصفحة منذ D-111
+    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: 'القنوات' },
+      injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false })),
   )
 })
@@ -1581,7 +1584,8 @@ panel.get('/panel/tasks', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+    soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' },
+      injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false })),
   )
 })
@@ -1641,7 +1645,8 @@ panel.get('/panel/journey/:id', async (c) => {
 
   const body = journeyBody(journey, new Date())
   return page((nonce) =>
-    soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' }, body, nonce, '',
+    soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' },
+      injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false })),
   )
 })
@@ -1782,7 +1787,7 @@ panel.post('/panel/drafts/write', async (c) => {
     outcome.kind === 'drafted'
       ? {
           kind: 'ok',
-          text: `كُتبت مسوّدة ${platform === 'x' ? 'X' : 'LinkedIn'} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+          text: `كُتبت مسوّدة ${PLATFORMS[platform].label} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'سُوّدت هذه النسخةُ لهذه المنصّة — لم يُنفَق شيء.' }
@@ -2145,6 +2150,35 @@ panel.post('/panel/drafts/unschedule', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('posts')
+})
+
+/**
+ * إعادةُ الفاشل أو العالق إلى «معتمَد» — والحارسُ في `requeue` لا هنا.
+ *
+ * ويعود المالكُ إلى بطاقته في المنشورات: صار معتمَدا ينتظر موعدا، وهناك
+ * يُجدوَل.
+ */
+panel.post('/panel/drafts/requeue', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const id = String(gate.form.get('id') ?? '')
+  const result = await requeue(c.env.DB, id, new Date())
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.requeue',
+      target: id,
+      detail: result.ok ? 'requeued' : `refused:${result.reason}`.slice(0, 200),
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: 'عاد إلى المعتمَد بنصّه ومفتاحه — اختر له موعدا جديدا.' }
+    : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
+  return result.ok && /^[0-9a-f-]{8,}$/.test(id) ? back(`d-${id}`) : back('posts')
 })
 
 // ── إدارة المزوّدين ──────────────────────────────────────────────────

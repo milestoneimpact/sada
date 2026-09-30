@@ -88,10 +88,21 @@ interface Raw {
   original_text: string | null
 }
 
+/**
+ * منصّةُ الصفّ كما هي — **لا «x أو linkedin»**.
+ *
+ * كان كلُّ ما ليس X يُقرأ LinkedIn، فمسوّدةُ TikTok أو YouTube تُعرض بشعار
+ * LinkedIn، ويبحث المجدوِلُ عن حساباتِ LinkedIn فلا تُجدوَل أبدا.
+ */
+function platformOf(raw: string): Platform {
+  return raw in PLATFORMS ? (raw as Platform) : 'linkedin'
+}
+
 function toDraft(row: Raw): DraftRow {
+  const platform = platformOf(row.platform)
   return {
     id: row.id,
-    platform: row.platform === 'x' ? 'x' : 'linkedin',
+    platform,
     text: row.text,
     rationale: row.rationale,
     status: row.status as DraftStatus,
@@ -109,7 +120,7 @@ function toDraft(row: Raw): DraftRow {
     scheduledAt: row.scheduled_at,
     accountName: row.account_name,
     dispatchedAt: row.dispatched_at,
-    publishCost: estimatePostCost(row.platform === 'x' ? 'x' : 'linkedin', containsUrl(row.text)),
+    publishCost: estimatePostCost(platform, containsUrl(row.text)),
     originalText: row.original_text ?? null,
   }
 }

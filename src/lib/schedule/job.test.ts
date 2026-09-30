@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, schedulePost, unschedule,
+  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, unschedule,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -198,6 +198,81 @@ describe('السحب', () => {
   it('ما ليس مجدولا لا يُسحب', async () => {
     const post = await seedPost()
     expect((await unschedule(db, post)).ok).toBe(false)
+  })
+})
+
+/**
+ * إعادةُ الفاشل أو العالق — **ولا يُعاد ما قد يكون نُشر** (D-004).
+ */
+describe('الإعادة', () => {
+  async function attempt(post: string, status: string, at: string, no = 1): Promise<void> {
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at)
+         VALUES (?, ?, ?, ?, '{}', ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), post, `k-${post}`, no, status, at)
+      .run()
+  }
+  async function failedPost(): Promise<string> {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    await db.prepare("UPDATE posts SET status = 'failed' WHERE id = ?").bind(post).run()
+    await attempt(post, 'failed', '2026-09-08 09:00:05')
+    return post
+  }
+  const LATER = new Date('2026-09-08T12:00:00Z')
+
+  it('الفاشلُ يعود معتمَدا بلا موعدٍ ولا حساب، ومفتاحُه كما هو', async () => {
+    const post = await failedPost()
+    expect((await requeue(db, post, LATER)).ok).toBe(true)
+    const row = await readPost(post)
+    expect(row?.['status']).toBe('approved')
+    expect(row?.['scheduled_at']).toBeNull()
+    expect(row?.['account_id']).toBeNull()
+    const key = await db.prepare('SELECT idempotency_key FROM posts WHERE id = ?').bind(post).first<{ idempotency_key: string }>()
+    expect(key?.idempotency_key).toBe(`k-${post}`)
+  })
+
+  it('ويُردّ إن كانت له محاولةٌ ناجحة', async () => {
+    const post = await failedPost()
+    await attempt(post, 'succeeded', '2026-09-08 09:10:00', 2)
+    const out = await requeue(db, post, LATER)
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('مرّتين')
+    expect((await readPost(post))?.['status']).toBe('failed')
+  })
+
+  it('ويُردّ إن كانت له محاولةٌ أُرسلت بلا جواب', async () => {
+    const post = await failedPost()
+    await attempt(post, 'sent', '2026-09-08 09:10:00', 2)
+    const out = await requeue(db, post, LATER)
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('تحقّق على المنصّة')
+  })
+
+  it('والعالقُ منذ ساعةٍ بلا محاولةٍ يعود، وما دونها يُردّ', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    await markDispatched(db, [post], new Date('2026-09-08T09:00:00Z'))
+    expect((await requeue(db, post, new Date('2026-09-08T09:30:00Z'))).ok).toBe(false)
+    expect((await requeue(db, post, new Date('2026-09-08T10:30:00Z'))).ok).toBe(true)
+    expect((await readPost(post))?.['status']).toBe('approved')
+  })
+
+  it('والمجدولُ الذي ينتظر موعدَه لا يُعاد', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    expect((await requeue(db, post, NOW)).ok).toBe(false)
+  })
+
+  it('وطلبان متتاليان: الأوّلُ يقلب الحال والثاني يُردّ', async () => {
+    const post = await failedPost()
+    const [a, b] = await Promise.all([requeue(db, post, LATER), requeue(db, post, LATER)])
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1)
   })
 })
 
