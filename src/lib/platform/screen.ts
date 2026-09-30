@@ -36,6 +36,8 @@ export interface PlatformPost {
   readonly publishedAt: string | null
   /** آخرُ فشلٍ إن كان — نصّا مختصرا لا جسمَ جوابٍ كاملا. */
   readonly lastError: string | null
+  /** وقتُ آخرِ محاولةٍ فاشلة — يُقارَن بآخر نجاح، لا بوقت الكتابة. */
+  readonly lastFailedAt: string | null
   readonly hasMedia: boolean
   readonly costUsd: number
 }
@@ -50,6 +52,7 @@ interface PostRow {
   platform_post_id: string | null
   published_at: string | null
   last_error: string | null
+  last_failed_at: string | null
   media_json: string
   cost_usd: number
 }
@@ -135,7 +138,10 @@ export async function platformPosts(
                   ORDER BY pa.at DESC LIMIT 1) AS published_at,
                 (SELECT pa.response_json FROM publish_attempts pa
                   WHERE pa.post_id = p.id AND pa.status = 'failed'
-                  ORDER BY pa.at DESC LIMIT 1) AS last_error
+                  ORDER BY pa.at DESC LIMIT 1) AS last_error,
+                (SELECT pa.at FROM publish_attempts pa
+                  WHERE pa.post_id = p.id AND pa.status = 'failed'
+                  ORDER BY pa.at DESC LIMIT 1) AS last_failed_at
            FROM posts p
            LEFT JOIN accounts a ON a.id = p.account_id
           WHERE p.platform = ?
@@ -155,6 +161,7 @@ export async function platformPosts(
       platformPostId: row.platform_post_id,
       publishedAt: row.published_at,
       lastError: briefError(row.last_error),
+      lastFailedAt: row.last_failed_at,
       hasMedia: row.media_json !== '[]' && row.media_json.trim().length > 2,
       costUsd: row.cost_usd,
     }))

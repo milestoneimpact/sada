@@ -1105,6 +1105,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .tpick .tp-t span{display:block; font-size:var(--t-xs); color:var(--ink-3);
   line-height:var(--lh); margin-top:var(--s-1)}
 .draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
+  scroll-margin-block-start:var(--s-16);
   border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
 .draft.done{background:var(--surface-2); box-shadow:none}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}

@@ -169,7 +169,12 @@ export function readiness(input: ReadinessInput): Readiness {
   let publishRung: Rung
   if (spec.stage === 'link') {
     publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: 'سائقُ الرفع لم يُبنَ لهذه المنصّة — تُربَط ولا تنشر' }
-  } else if (lastFailed !== undefined && (tally.lastPublishedAt === null || lastFailed.createdAt > tally.lastPublishedAt)) {
+  } else if (
+    lastFailed !== undefined &&
+    // ‏وقتُ الفشل لا وقتُ الكتابة: منشورٌ كُتب قبل آخر نجاحٍ ثمّ فشل بعده
+    // ‏كان يُحكَم عليه «تعمل»
+    (tally.lastPublishedAt === null || (lastFailed.lastFailedAt ?? lastFailed.createdAt) > tally.lastPublishedAt)
+  ) {
     publishRung = {
       key: 'publish', title: 'النشر', state: 'failed',
       note: `آخرُ محاولةٍ فشلت: ${lastFailed.lastError ?? ''}`,

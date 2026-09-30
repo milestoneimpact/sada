@@ -24,7 +24,7 @@ import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
 import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
 import { money, relativeTime } from '../../lib/format'
-import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
+import { MEASURED, widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 
 /** ما يلزم لعرض وسيطٍ في القائمة — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -83,8 +83,11 @@ function stat(label: string, value: number | null): string {
 }
 
 /** صفُّ الأرقام تحت المنشور — أو سببُ غيابه. */
-function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date): string {
+function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date, platform: Platform): string {
   if (!published) return ''
+  if (!MEASURED.has(platform)) {
+    return `<div class="stats none"><span class="ago">لا يُقاس لهذه المنصّة بعد</span></div>`
+  }
   const m = widest(rows)
   if (m === undefined || m === null) {
     return `<div class="stats none"><span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد
@@ -233,7 +236,7 @@ function postCard(
     </div>
     <p class="post-text">${escapeHtml(post.text)}</p>
     ${mediaStrip(media)}
-    ${metricRow(metrics, post.status === 'published', now)}
+    ${metricRow(metrics, post.status === 'published', now, platform)}
     ${error}
     <div class="post-foot">
       ${link === null
@@ -242,6 +245,12 @@ function postCard(
           : ''
         : `<a class="btn g sm" href="${escapeHtml(link)}" target="_blank"
              rel="noopener noreferrer">${ICON.external} افتحه على المنصّة</a>`}
+      ${post.status === 'failed'
+        // ‏والفاشلُ يُعاد من موضعه: كان يبقى «فشل» بلا طريقٍ إلى المنصّة
+        ? `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
+             <input type="hidden" name="id" value="${escapeHtml(post.id)}">
+             <button class="g sm" type="submit">أعده إلى المعتمَد</button></form>`
+        : ''}
       <span class="grow"></span>
       ${post.costUsd > 0
         ? `<span class="ago money">${money(post.costUsd)} كتابةً</span>`
@@ -488,7 +497,7 @@ export function platformScreen(d: PlatformScreenData): string {
 
   const emptyPosts = `<div class="empty">
     <b>لا منشورَ على ${escapeHtml(spec.label)} بعد</b>
-    <p>ما يُكتب يظهر في «الخطّة والمسوّدات»، ولا يصل إلى هنا حتّى تعتمده وتجدوله.
+    <p>ما يُكتب يظهر في «المنشورات»، ولا يصل إلى هنا حتّى تعتمده وتجدوله.
        <b>ولا يُنشر شيءٌ بلا موافقةٍ مسجّلة</b> — والقيدُ في القاعدة لا في الصفحة.</p>
     <a class="btn g sm" href="/panel#posts">افتح المسوّدات</a>
   </div>`

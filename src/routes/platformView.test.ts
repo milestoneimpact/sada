@@ -19,7 +19,7 @@ const view = viewChannels(accounts, () => true).find((v) => v.spec.id === 'x')!
 
 const post = (id: string, status: string): PlatformPost => ({
   id, text: `نصُّ ${id}`, status, scheduledAt: null, createdAt: '2026-09-05T00:00:00Z',
-  accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null,
+  accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
   hasMedia: false, costUsd: 0,
 })
 

@@ -27,6 +27,20 @@ import { hasScope } from '../oauth/scopes'
 import { loadTokens, type Db } from '../tokens'
 import { fetchLinkedInMetrics, fetchXMetrics, MetricsError, type PostMetrics } from './platforms'
 
+/**
+ * ما تُقرأ أرقامُه — **ولا يُوعَد بقياسٍ لما سواه**.
+ *
+ * شاشةُ المنصّة كانت تقول تحت منشور TikTok «أوّلُ قياسٍ بعد 24 ساعة»،
+ * والدورةُ تتخطّاه دائما. فالقائمةُ هنا، ويقرؤها الاثنان.
+ */
+export const MEASURED: ReadonlySet<string> = new Set<Measured>(['linkedin', 'x'])
+
+type Measured = 'linkedin' | 'x'
+
+function measured(platform: string): platform is Measured {
+  return MEASURED.has(platform)
+}
+
 /** النوافذُ الثلاث وأعمارُها بالساعات. الأسماءُ تقابل `CHECK` في المخطّط. */
 export const WINDOWS = [
   { name: '24h', hours: 24 },
@@ -118,10 +132,11 @@ export async function dueWindows(db: Db, now: Date, limit = 50): Promise<DueRow[
     }
 
     for (const r of results) {
-      if (r.platform !== 'linkedin' && r.platform !== 'x') continue
+      const platform = r.platform
+      if (!measured(platform)) continue
       rows.push({
         postId: r.post_id,
-        platform: r.platform,
+        platform,
         accountId: r.account_id,
         platformPostId: r.platform_post_id,
         window: w.name,

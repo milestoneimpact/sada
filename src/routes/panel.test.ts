@@ -2018,6 +2018,30 @@ describe('الجدولة من اللوحة', () => {
     ).toBe('approved')
   })
 
+  it('الفاشلُ يعود معتمَدا بضغطة، ويعود المالكُ إلى بطاقته', async () => {
+    const post = await seedApproved()
+    const account = await seedAccount()
+    await db
+      .prepare("UPDATE posts SET status = 'failed', account_id = ?, scheduled_at = '2026-09-01 09:00:00' WHERE id = ?")
+      .bind(account, post)
+      .run()
+    const cookie = await login()
+    const body = new FormData()
+    body.set('id', post)
+    const response = await app.request('/panel/drafts/requeue', withSession(cookie, { method: 'POST', body }), env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Location')).toBe(`/panel#d-${post}`)
+    expect(
+      (await db.prepare('SELECT status FROM posts WHERE id = ?').bind(post).first<{ status: string }>())?.status,
+    ).toBe('approved')
+    const audit = await db
+      .prepare("SELECT detail FROM audit_log WHERE action = 'draft.requeue'")
+      .all<{ detail: string }>()
+    expect(audit.results.map((r) => r.detail)).toEqual(['requeued'])
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain(`id="d-${post}"`)
+  })
+
   it('الجدولةُ بلا رمز CSRF تُردّ ولا تغيّر حالا', async () => {
     const post = await seedApproved()
     const account = await seedAccount()
@@ -2085,6 +2109,20 @@ describe('شاشةُ المنصّة', () => {
   it('لا تُفتَح بلا جلسة — والحارسُ هو حارسُ اللوحة نفسه', async () => {
     const response = await app.request('/panel/channels/linkedin', {}, env)
     expect(response.status).toBe(401)
+  })
+
+  /*
+   * **كلُّ نموذجٍ في الشاشة يحمل رمزَه.** نموذجا ضبط التطبيق كانا يُرسَلان
+   * بلا `_csrf` فيُردّان بـ403 — والاختباراتُ تحقن الرمزَ بنفسها فلم تره.
+   */
+  it('كلُّ نموذج POST فيها يحمل رمزَ CSRF', async () => {
+    const cookie = await login()
+    for (const id of ['linkedin', 'x', 'youtube', 'tiktok', 'instagram']) {
+      const html = await (await app.request(`/panel/channels/${id}`, withSession(cookie), env)).text()
+      const forms = html.match(/<form\b[^>]*method="POST"[^>]*>\s*<input type="hidden" name="_csrf"|<form\b[^>]*method="POST"[^>]*>/gi) ?? []
+      expect(forms.length, id).toBeGreaterThan(0)
+      for (const f of forms) expect(f, id).toContain('_csrf')
+    }
   })
 
   it('ومنصّةٌ لا وجودَ لها ٤٠٤ — لا صفحةٌ فارغة', async () => {

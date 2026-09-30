@@ -36,6 +36,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var first=panes.length>0?panes[0].dataset.pane:null;
   function show(id,push,focus){
     if(first===null)return;
+    // ‏ومرساةُ بطاقةٍ «#d-…» تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى
+    // ‏البطاقة لا إلى رأس لوحٍ طولُه آلافُ البكسلات
+    var card=/^d-/.test(id)?document.getElementById(id):null;
+    var host=card?card.closest('section[data-pane]'):null;
+    if(host)id=host.dataset.pane;
     var found=false, pane=null;
     panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m){found=true; pane=p;}});
     if(!found){if(id!==first)show(first,push,focus); return;}
@@ -47,6 +52,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       }else{t.removeAttribute('aria-current');}
     });
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
+    if(card&&host){card.setAttribute('tabindex','-1'); card.scrollIntoView({block:'start'});
+      card.focus({preventScroll:true}); return;}
     if(focus&&pane){var hd=pane.querySelector('h1,h2');
       if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
   }

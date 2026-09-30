@@ -144,6 +144,77 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
   return { ok: true, at: '', account: '' }
 }
 
+/** ما يُعَدّ عالقًا: غادر إلى الطابور منذ ساعةٍ ولم تُكتب له محاولةٌ منذها. */
+export const STUCK_MINUTES = 60
+
+/**
+ * إعادةُ الفاشل أو العالق إلى «معتمَد» — **ولا يُعاد ما قد يكون نُشر**.
+ *
+ * كان المنشورُ الفاشل يبقى «فشل» إلى الأبد: لا زرَّ يعيده، والمسوّدةُ لا
+ * تُكتب ثانيةً لأنّ نسختها مسجّلة. فيبقى نصٌّ اعتمده المالكُ بلا طريقٍ
+ * إلى المنصّة إلّا أن يُكتب من جديد ويُدفع ثمنُه.
+ *
+ * ويُردّ في حالين، **لأنّ الإعادةَ فيهما قد تنشر مرّتين**:
+ * - محاولةٌ ناجحة: نُشر فعلا.
+ * - محاولةٌ `sent` بلا جواب: أُرسلت ولم يُعرف ردُّها، والمنصّةُ قد تكون
+ *   نشرت. فيُتحقّق على المنصّة أوّلا.
+ *
+ * و`idempotency_key` يبقى كما هو، فحارسُ `skipped_duplicate` في الناشر
+ * يمنع نشرا ثانيا إن فات هذا الحارس (D-004). **والتحديثُ ذرّيّ**: طلبان
+ * متزامنان يقلب أحدُهما الحالَ والثاني يُردّ.
+ */
+export async function requeue(db: Db, postId: string, now: Date): Promise<ScheduleResult> {
+  const row = await db
+    .prepare('SELECT status, dispatched_at FROM posts WHERE id = ?')
+    .bind(postId)
+    .first<{ status: string; dispatched_at: string | null }>()
+  if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
+
+  const cutoff = dbNow(new Date(now.getTime() - STUCK_MINUTES * 60_000))
+  const stuck = row.status === 'queued' && row.dispatched_at !== null && row.dispatched_at < cutoff
+  if (row.status !== 'failed' && !stuck) {
+    return {
+      ok: false,
+      reason: row.status === 'queued'
+        ? row.dispatched_at === null
+          ? 'ينتظر موعدَه ولم يفشل — اسحبه من الطابور إن أردت تغييره'
+          : `غادر إلى الطابور منذ أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابَ المنصّة`
+        : `حالتُه «${row.status}» — والإعادةُ للفاشل أو العالق وحده`,
+    }
+  }
+
+  const attempts = await db
+    .prepare(
+      `SELECT status, at FROM publish_attempts
+        WHERE post_id = ? AND (status IN ('succeeded', 'sent', 'skipped_duplicate') OR at >= ?)`,
+    )
+    .bind(postId, cutoff)
+    .all<{ status: string; at: string }>()
+  if (attempts.results.some((a) => a.status === 'succeeded' || a.status === 'skipped_duplicate')) {
+    return { ok: false, reason: 'نُشر من قبل — وإعادتُه تنشره مرّتين' }
+  }
+  if (attempts.results.some((a) => a.status === 'sent')) {
+    return { ok: false, reason: 'أُرسلت محاولةٌ ولم يُعرف ردُّها — تحقّق على المنصّة أوّلا' }
+  }
+  if (stuck && attempts.results.length > 0) {
+    return { ok: false, reason: `حاولت الدورةُ منذ أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابها` }
+  }
+
+  const moved = await db
+    .prepare(
+      `UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, dispatched_at = NULL
+        WHERE id = ?
+          AND (status = 'failed' OR (status = 'queued' AND dispatched_at IS NOT NULL AND dispatched_at < ?))
+          AND NOT EXISTS (SELECT 1 FROM publish_attempts
+                           WHERE post_id = ? AND status IN ('succeeded', 'sent', 'skipped_duplicate'))
+        RETURNING id`,
+    )
+    .bind(postId, cutoff, postId)
+    .first<{ id: string }>()
+  if (moved === null) return { ok: false, reason: 'تغيّرت حالُه قبل الإعادة — أعد تحميل الصفحة' }
+  return { ok: true, at: '', account: '' }
+}
+
 export interface DuePost {
   readonly id: string
   readonly scheduledAt: string

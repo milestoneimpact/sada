@@ -31,10 +31,11 @@ async function seedPost(options: {
   text?: string
   approved?: boolean
   status?: string
+  kind?: 'member' | 'org'
 }): Promise<string> {
   const accountId = await upsertAccount(db, {
     platform: options.platform,
-    kind: 'member',
+    kind: options.kind ?? 'member',
     externalId: options.platform === 'x' ? '4242' : 'abc',
     displayName: 'عمر',
   })
@@ -898,6 +899,26 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
       .prepare('SELECT response_json FROM publish_attempts WHERE post_id = ?')
       .get(postId) as { response_json: string }
     expect(JSON.parse(attempt.response_json).error).toContain('missing_publish_scope')
+  })
+})
+
+/**
+ * **حارسُ «حساب الصفحة» لـ LinkedIn وحدها.** YouTube يحفظ قناتَه بنوع
+ * `org`، فكان كلُّ رفعٍ إليها يُردّ بسببٍ يخصّ صفحاتِ LinkedIn.
+ */
+describe('حسابُ الصفحة', () => {
+  it('صفحةُ LinkedIn تُردّ قبل الإرسال بسببها', async () => {
+    const post = await seedPost({ platform: 'linkedin', kind: 'org' })
+    const outcome = await publishPost(deps(fakeFetch({})), { postId: post })
+    expect(outcome.kind).toBe('failed')
+    const row = db.raw.prepare("SELECT response_json FROM publish_attempts WHERE post_id = ?").get(post) as { response_json: string }
+    expect(row.response_json).toContain('حسابُ صفحة')
+  })
+
+  it('وحسابٌ من نوع org على منصّةٍ أخرى لا يُردّ بسبب LinkedIn', async () => {
+    const post = await seedPost({ platform: 'x', kind: 'org' })
+    const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId: post })
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'tweet-1' })
   })
 })
 

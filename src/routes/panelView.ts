@@ -37,6 +37,7 @@ import { ICON } from './ui/icons'
 import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
+import { platformLabel } from '../lib/oauth/providers'
 
 export { escapeHtml, injectCsrf, shell }
 
@@ -605,7 +606,7 @@ export function panelPage(d: PanelData): string {
           ? ' — <b>ويوجب سقوطُه دورةَ إذنٍ بيدك</b>'
           : ''
         return `${what} لـ<b>${escapeHtml(e.displayName)}</b>
-                (${escapeHtml(e.platform)}): ${when}${why}`
+                (${escapeHtml(platformLabel(e.platform))}): ${when}${why}`
       })
       .join(' · ')
   }${
