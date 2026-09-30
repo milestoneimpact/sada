@@ -84,6 +84,10 @@ import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
 import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
 import { accountHealth, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
+import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
+import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
+import { zoneOf } from '../lib/time/zone'
+import { backTo } from '../lib/nav/back'
 import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
@@ -92,7 +96,7 @@ import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
-import { platformScreen, showOf } from './ui/platformView'
+import { filterOf, platformScreen, tabOf } from './ui/platformView'
 import { fingerprint } from '../lib/security/digest'
 import { injectCsrf, soloPage } from './ui/shell'
 import { spreadScreen } from './ui/spreadView'
@@ -1464,38 +1468,58 @@ panel.get('/panel/channels/:platform', async (c) => {
   // نطاقاتها لا عن حصادها — وأصفارُ نشرٍ على شاشتها تُقرأ فشلا لا
   // «لم يُبنَ بعد» (D-056)
   const publishes = spec.stage === 'publish'
-  const posts = publishes ? await platformPosts(c.env.DB, id as 'linkedin' | 'x', 60) : []
-  const tally = publishes
-    ? await platformTally(c.env.DB, id as 'linkedin' | 'x')
-    : { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }
+  const platform = id as Platform
+  const tab = tabOf(c.req.query('tab'), c.req.query('show'))
+  const filter = filterOf(c.req.query('filter'), c.req.query('show'))
+  const needs = publishes ? platformNeeds(platform) : null
+  // ‏وكلُّ قراءةٍ لما يُعرض في تبويبها — الإعدادُ لا يقرأ الخطَّ الزمنيّ ولا العكس
+  const timeline = publishes && tab !== 'setup'
+  const [posts, tally, counts, upcomingRows, historyPage, waitingRows] = await Promise.all([
+    publishes ? platformPosts(c.env.DB, platform, 60) : Promise.resolve([]),
+    publishes
+      ? platformTally(c.env.DB, platform)
+      : Promise.resolve({ published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }),
+    platformCounts(c.env.DB, platform, CLIP_PLATFORMS.has(platform)),
+    timeline && tab !== 'waiting' ? upcoming(c.env.DB, platform) : Promise.resolve([]),
+    timeline && tab !== 'waiting'
+      ? history(c.env.DB, platform, tab === 'media' ? 'all' : filter, readCursor(c.req.query('before')))
+      : Promise.resolve({ rows: [], next: null }),
+    timeline && tab === 'waiting' ? waiting(c.env.DB, platform) : Promise.resolve([]),
+  ])
   // والنطاقاتُ تُقرأ لكلّ ما يُربَط: هي جوابُ «ماذا يستطيع هذا الحساب»
-  const scopes =
-    spec.stage === 'none' ? {} : await grantedScopes(c.env.DB, id as Platform)
+  const scopes = spec.stage === 'none' || tab !== 'setup' ? {} : await grantedScopes(c.env.DB, platform)
 
+  const shown = [...upcomingRows, ...historyPage.rows, ...waitingRows].map((p) => p.id)
   // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
-  const metrics = await metricsFor(c.env.DB, posts.map((p) => p.id))
+  const metrics = await metricsFor(c.env.DB, historyPage.rows.map((p) => p.id))
+  const costs = await postCosts(c.env.DB, shown)
 
   // والوسائطُ تُعرَض لا يُقال إنّ هناك وسيطا (D-062) — استعلامٌ واحدٌ
-  // لكلّ الصفحة لا واحدٌ لكلّ بطاقة
-  const mediaRows = await mediaFor(c.env.DB, posts.map((p) => p.id))
-  const media: Record<string, { id: string; mime: string; status: 'ready' | 'rejected' }[]> = {}
+  // لكلّ الصفحة لا واحدٌ لكلّ بطاقة، **وبصفّها كاملا**: الملاحظةُ تقول
+  // أرُكّبت الشريحةُ بمقاس المنصّة فتُعرف نسبتُها
+  const mediaRows = await mediaFor(c.env.DB, shown)
+  const media: Record<string, { id: string; mime: string; status: 'ready' | 'rejected'; note: string | null }[]> = {}
   for (const row of mediaRows) {
     const list = media[row.postId] ?? []
-    list.push({ id: row.id, mime: row.mime, status: row.status })
+    list.push({ id: row.id, mime: row.mime, status: row.status, note: row.note })
     media[row.postId] = list
   }
 
   const body = platformScreen({
-    view, posts, tally, scopes, metrics, media, now,
-    // سجلُّ صحّة الحساب من صفوفه لا من حال (D-129)
-    health: spec.stage === 'none' ? {} : await accountHealth(c.env.DB, id as Platform),
+    view, posts, tally, counts, needs, tab, filter, scopes, metrics, media, costs, now,
+    upcoming: upcomingRows,
+    history: historyPage,
+    waiting: waitingRows,
+    // سجلُّ صحّة الحساب من صفوفه لا من حال (D-129) — ويُقرأ للسلّم في كلّ تبويب
+    health: spec.stage === 'none' ? {} : await accountHealth(c.env.DB, platform),
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
-    // حالُ الصفحة في عنوانها: يُشارَك رابطٌ فيُرى ما رآه صاحبُه
-    show: showOf(c.req.query('show')),
+    // ‏ويومُ المالك من كعكة متصفّحه، لا من إعدادٍ يُخزَّن (D-173)
+    zone: zoneOf(c.req.header('Cookie') ?? null),
+    // ‏ووميضُ الفعل يُقرأ حيث عاد المالك، لا في لوحٍ لم يفتحه
+    flash: await takeFlash(c.env, c.req.raw),
   })
-
   return page((nonce) =>
     // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا
     // ‏`_csrf` فيردّهما `guardPost` بـ403، والدليلُ يسكن هذه الصفحة منذ D-111
@@ -2149,7 +2173,8 @@ panel.post('/panel/drafts/unschedule', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  const to = backTo(gate.form.get('return'), '')
+  return to === '' ? back('posts') : new Response(null, { status: 303, headers: { Location: to } })
 })
 
 /**
@@ -2178,6 +2203,8 @@ panel.post('/panel/drafts/requeue', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: 'عاد إلى المعتمَد بنصّه ومفتاحه — اختر له موعدا جديدا.' }
     : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
+  const to = backTo(gate.form.get('return'), '')
+  if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return result.ok && /^[0-9a-f-]{8,}$/.test(id) ? back(`d-${id}`) : back('posts')
 })
 

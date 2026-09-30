@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kb, money, parseSqliteUtc, relativeTime, attemptsLeft } from './format'
+import { kb, money, parseSqliteUtc, relativeTime, attemptsLeft, shortAgo, untilTime } from './format'
 
 const NOW = new Date('2026-09-05T12:00:00Z')
 
@@ -89,5 +89,21 @@ describe('attemptsLeft', () => {
     expect(attemptsLeft(3)).toBe('بقيت 3 محاولات')
     expect(attemptsLeft(10)).toBe('بقيت 10 محاولات')
     expect(attemptsLeft(11)).toBe('بقيت 11 محاولة')
+  })
+})
+
+describe('untilTime و shortAgo (D-172)', () => {
+  const now = new Date('2026-09-06T12:00:00Z')
+  it('ما بقي حتّى موعد', () => {
+    expect(untilTime('2026-09-06 14:00:00', now)).toBe('بعد ساعتين')
+    expect(untilTime('2026-09-07 13:00:00', now)).toBe('غدًا')
+    expect(untilTime('2026-09-09 13:00:00', now)).toBe('بعد 3 أيّام')
+    expect(untilTime('2026-09-06 11:00:00', now)).toBe('الآن')
+  })
+  it('والوقتُ القصيرُ داخل الإطار', () => {
+    expect(shortAgo('2026-09-06 11:55:00', now)).toBe('5 د')
+    expect(shortAgo('2026-09-06 09:00:00', now)).toBe('3 س')
+    expect(shortAgo('2026-09-04 12:00:00', now)).toBe('2 ي')
+    expect(shortAgo('2026-08-20 12:00:00', now)).toBe('20 أغسطس')
   })
 })

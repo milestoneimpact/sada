@@ -67,3 +67,43 @@ export function attemptsLeft(n: number): string {
   if (n <= 10) return `بقيت ${n} محاولات`
   return `بقيت ${n} محاولة`
 }
+
+/**
+ * ما بقي حتّى موعد — «بعد ساعتين» و«بعد 3 أيّام» (D-172).
+ *
+ * كان «القادم» يُقرأ بتاريخٍ مطلقٍ وحدَه، فيحسب المالكُ في رأسه كم بقي.
+ * والماضي لا يُقال هنا: موعدٌ فات يُقرأ في حاله («تأخّر») لا في عدّه.
+ */
+export function untilTime(value: string, now: Date = new Date()): string {
+  const date = parseSqliteUtc(value)
+  if (date === null) return value
+  const minutes = Math.floor((date.getTime() - now.getTime()) / 60_000)
+  if (minutes < 1) return 'الآن'
+  if (minutes < 60) return minutes === 1 ? 'بعد دقيقة' : minutes === 2 ? 'بعد دقيقتين' : `بعد ${minutes} دقيقة`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours === 1 ? 'بعد ساعة' : hours === 2 ? 'بعد ساعتين' : `بعد ${hours} ساعة`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'غدًا'
+  if (days === 2) return 'بعد يومين'
+  if (days <= 10) return `بعد ${days} أيّام`
+  return `بعد ${days} يومًا`
+}
+
+/**
+ * الوقتُ داخل إطار المعاينة — **قصيرٌ كما تكتبه المنصّات**: «5 د» و«3 س»
+ * و«2 ي»، ثمّ التاريخُ بعد أسبوع. والمطلقُ بـ UTC خارج الإطار لا داخله.
+ */
+export function shortAgo(value: string, now: Date = new Date()): string {
+  const date = parseSqliteUtc(value)
+  if (date === null) return value
+  const minutes = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000))
+  if (minutes < 1) return 'الآن'
+  if (minutes < 60) return `${minutes} د`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} س`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} ي`
+  const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+  return `${date.getUTCDate()} ${months[date.getUTCMonth()]}`
+}

@@ -179,7 +179,7 @@ export const IMG_SCRIPT = `
   function broke(img){
     if(img.dataset.broke)return; img.dataset.broke='1';
     // ‏وداخلَ رابطٍ لا يُزرَع رابطٌ ثانٍ: وسمٌ يكفي، والرابطُ نفسُه يفتح الملفّ
-    if(img.closest('a')){var s=document.createElement('span'); s.className='tag bad';
+    if(img.closest('a')){var s=document.createElement('span'); s.className='st bad';
       s.textContent='لم تُحمَّل'; img.replaceWith(s); return;}
     var box=document.createElement('div'); box.className='pic-err'; box.setAttribute('role','status');
     var b=document.createElement('b'); b.textContent='تعذّر عرضُ الصورة';
@@ -195,3 +195,22 @@ export const IMG_SCRIPT = `
     if(i.complete&&i.naturalWidth===0)broke(i);});
 })();
 `
+
+/**
+ * منطقةُ المالك إلى الخادم — **في كلّ فتحة، لا في إعدادٍ يُخزَّن** (D-173).
+ *
+ * رؤوسُ الأيّام في صفحة المنصّة تُجمَع على الخادم، والخادمُ لا يعرف أين
+ * المالك. فتُكتب المنطقةُ كعكةً قصيرةَ العمر يقرؤها في الطلب التالي، وتُعاد
+ * كتابتُها في كلّ فتحة فلا تشيخ بعد سفر. **وليست سرًّا ولا تدخل قرارَ أمن**،
+ * والكتابةُ في `try` فمتصفّحٌ يمنع الكعكات لا يُسقط ما بعدها.
+ */
+export const TZ_SCRIPT = `
+(function(){
+  try{
+    var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';
+    if(tz!=='')document.cookie='sada_tz='+encodeURIComponent(tz)+'; Path=/panel; SameSite=Strict; Max-Age=86400'+
+      (location.protocol==='https:'?'; Secure':'');
+  }catch(e){}
+})();
+`
+
