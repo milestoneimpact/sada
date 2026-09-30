@@ -227,8 +227,8 @@ export function providersSection(d: PanelData): ProvidersMarkup {
                <input type="hidden" name="provider" value="${id}">
                <div class="field" style="flex:1;min-width:180px">
                  <label for="k-${id}">${p.hint === null ? 'أضف المفتاح' : 'استبدل المفتاح'}</label>
-                 <input id="k-${id}" type="password" name="key" required autocomplete="off"
-                        style="width:100%;direction:ltr;text-align:start"></div>
+                 <input id="k-${id}" type="password" name="key" dir="ltr" required autocomplete="off"
+                        style="width:100%"></div>
                <button class="p" type="submit" style="align-self:flex-end">حفظ المفتاح</button>
              </form>`}
 
@@ -236,8 +236,8 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <input type="hidden" name="name" value="${id}">
           <input type="hidden" name="label" value="${escapeHtml(p.label)}">
           ${p.builtin ? '' : `<div class="field"><label for="u-${id}">العنوان</label>
-            <input id="u-${id}" name="base_url" value="${escapeHtml(p.baseUrl ?? '')}"
-                   style="width:220px;direction:ltr" required></div>`}
+            <input id="u-${id}" name="base_url" dir="ltr" value="${escapeHtml(p.baseUrl ?? '')}"
+                   style="width:220px" required></div>`}
           ${modelPicker({
             id: `m-${p.name}`,
             provider: p.name,
@@ -395,16 +395,16 @@ export function providersSection(d: PanelData): ProvidersMarkup {
             ولا قالبٌ لم يُملأ — خطأٌ مطبعيٌّ في المضيف يرسل مفتاحَك إلى حيث لا تريد.</span>
           <span class="row" style="margin-top:var(--s-3)">
             <span class="field"><label for="np">الاسم (لاتينيّ)</label>
-              <input id="np" name="name" required placeholder="deepseek" style="width:140px;direction:ltr"></span>
+              <input id="np" name="name" dir="ltr" required placeholder="deepseek" style="width:140px"></span>
             <span class="field"><label for="nl">الاسم المعروض</label>
               <input id="nl" name="label" placeholder="DeepSeek" style="width:140px"></span>
             <span class="field" style="flex:1;min-width:220px"><label for="nu">العنوان (https)</label>
-              <input id="nu" name="base_url" required placeholder="https://api.deepseek.com/v1"
-                     style="width:100%;direction:ltr"></span>
+              <input id="nu" name="base_url" dir="ltr" required placeholder="https://api.deepseek.com/v1"
+                     style="width:100%"></span>
           </span>
           <span class="row" style="margin-top:var(--s-2)">
             <span class="field"><label for="nm">النموذج (مبدئيّ)</label>
-              <input id="nm" name="model" placeholder="deepseek-chat" style="width:170px;direction:ltr"></span>
+              <input id="nm" name="model" dir="ltr" placeholder="deepseek-chat" style="width:170px"></span>
             <span class="field"><label for="ni">سعر الدخول /M</label>
               <input id="ni" type="number" step="0.01" min="0" name="price_in" style="width:100px"></span>
             <span class="field"><label for="no">سعر الخروج /M</label>

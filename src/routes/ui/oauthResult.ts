@@ -253,7 +253,7 @@ export function refusedBody(d: RefusedData): string {
         <div class="field cb">
           <label for="sent-id">Client ID الذي أُرسل</label>
           <div class="copy">
-            <input id="sent-id" class="mono" value="${escapeHtml(d.sent.clientId)}" readonly
+            <input id="sent-id" class="mono" dir="ltr" value="${escapeHtml(d.sent.clientId)}" readonly
               aria-label="معرّف التطبيق الذي أُرسل">
             <button type="button" class="g sm" data-copy="sent-id">انسخ</button>
           </div>
@@ -264,7 +264,7 @@ export function refusedBody(d: RefusedData): string {
         <div class="field cb">
           <label for="sent-cb">رابطُ العودة الذي أُرسل</label>
           <div class="copy">
-            <input id="sent-cb" class="mono" value="${escapeHtml(d.sent.redirectUri)}" readonly
+            <input id="sent-cb" class="mono" dir="ltr" value="${escapeHtml(d.sent.redirectUri)}" readonly
               aria-label="رابط العودة الذي أُرسل">
             <button type="button" class="g sm" data-copy="sent-cb">انسخ</button>
           </div>

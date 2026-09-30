@@ -721,10 +721,12 @@ curl -s https://sada2.basserh.com/ready
    > والنطاق**.
 3. **APIs & Services** ← **OAuth consent screen** ← **External** ←
    **Create**. املأ اسمَ التطبيق وبريدَ الدعم.
-4. في الشاشة نفسها ← **Audience** ← **Test users** ← **+ Add users** ←
-   **أضف بريدَك أنت**.
-   > التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج. **وإن لم تُدرج
-   > نفسَك رُدّ إذنُك أنت** بـ `access_denied`.
+4. **Google Auth Platform** ← **Audience** ← **Test users** ← **+ Add users** ←
+   **بريدُ الحساب الذي ستختاره في شاشة Google عند «اربط»** ← **Save**.
+   > التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج، **ولو كنتَ مالكَ
+   > المشروع**. والبريدُ هو صاحبُ القناة الذي تختاره في شاشة الإذن، لا
+   > بريدُ Cloud Console إن اختلفا. وإلّا ظهرت صفحةُ Google «تمّ حظر
+   > إمكانيّة الوصول: لم يكمل التطبيق عمليّة التحقّق» بـ `403 access_denied`.
 5. **Data access** ← **Add or remove scopes** ← أضف:
    - `https://www.googleapis.com/auth/youtube.readonly`
    - `https://www.googleapis.com/auth/youtube.upload`
@@ -747,7 +749,8 @@ curl -s https://sada2.basserh.com/ready
 
 | ما يظهر | السبب | العلاج |
 |---|---|---|
-| `access_denied` | بريدُك ليس في Test users | الخطوة ٤ |
+| «لم يكمل التطبيق عمليّة التحقّق» `403 access_denied` | البريدُ الذي اخترته ليس في Test users | الخطوة ٤ بذلك البريد نفسِه |
+| المعرّفُ يظهر في الحقل «معكوسًا» (الأرقامُ في آخره) | عرضٌ لا قيمة: كان الحقلُ يرث اتّجاهَ الصفحة (أُصلح في D-175) | لا شيء: القيمةُ المحفوظةُ كما لُصقت |
 | `redirect_uri_mismatch` | الرابطُ لم يُطابِق | الخطوة ٧ — انسخه من اللوحة ولا تكتبه |
 | `accessNotConfigured` | الواجهةُ لم تُفعَّل | الخطوة ٢ |
 | «لا قناةَ على هذا الحساب» | حسابُ Google بلا قناة YouTube | أنشئ قناةً ثمّ أعد الربط |

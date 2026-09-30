@@ -128,7 +128,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
         ${passkey}
         <form method="POST" action="/panel/login">
           <div class="field"><label for="t">كلمةُ الإدارة <span class="mono">ADMIN_TOKEN</span></label>
-            <input id="t" type="password" name="token" autocomplete="current-password"
+            <input id="t" type="password" name="token" dir="ltr" autocomplete="current-password"
                    required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
           <button class="p" type="submit"${disabled}>دخول</button>
         </form>
@@ -1132,7 +1132,7 @@ ${pivotPane(d.pivot)}
         <input id="totp-secret" readonly dir="ltr"></div>
       <form class="row" method="POST" action="/panel/security/totp/confirm" id="totp-confirm">
         <div class="field"><label for="totp-code">الرمز الظاهر الآن</label>
-          <input id="totp-code" name="code" inputmode="numeric" maxlength="8" autocomplete="off"></div>
+          <input id="totp-code" name="code" dir="ltr" inputmode="numeric" maxlength="8" autocomplete="off"></div>
         <button class="p" type="submit">أكّد</button>
       </form>
     </div>
