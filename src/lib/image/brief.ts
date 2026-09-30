@@ -180,35 +180,51 @@ export function parseBrief(raw: string): VisualBrief | null {
 }
 
 /**
- * يبني الموجزَ من نصّ المنشور — **ولا يرمي**.
+ * نداءُ مزوّد الكتابة بتعليمةٍ وجوابِ JSON — **يُسجَّل في الدفتر ولا يرمي**.
  *
- * ويستعمل توجيهَ مهمّة `draft`: **هو المزوّدُ الذي يفهم العربيّة عندنا**
- * أصلا، ومزوّدُ الصور لا يفهمها. ولا تُضاف مهمّةٌ خامسةٌ في جدول التوجيه
- * لأجل نداءٍ من مئتَي رمز — **جدولٌ يطول بصفٍّ لا يُبدَّل ليس خيارا،
- * هو عبء**.
+ * يستعمل توجيهَ مهمّة `draft`: **هو المزوّدُ الذي يفهم العربيّة عندنا**، ومزوّدُ
+ * الصور لا يفهمها. ويقرؤه الموجزُ البصريّ والإنفوجرافيك معا (D-174)، فحارسُ
+ * المزوّد وسقفُه ومفتاحُه ودفترُه في موضعٍ واحد.
+ *
+ * ## والسقفُ يتّسع لنموذجٍ يفكّر قبل أن يجيب
+ *
+ * كان السقفُ ‏٤٠٠ رمز. **ووجّه staging الكتابةَ إلى `deepseek-v4-pro`**، وهو يصرف
+ * رموزَه على التفكير أوّلا: قرأ الدفترُ ‏١١٢٦ رمزًا وجوابًا فارغًا «لا نصّ في جواب
+ * المزوّد» — فسقط الموجز، وخرجت صورةٌ من الوصف العامّ لا علاقةَ لها بالنصّ.
+ * فالسقفُ يُمرَّر من المنادي بقدر ما يحتاجه جوابُه وتفكيرُه معا.
  */
-export async function visualBrief(
+export async function askWriter(
   deps: BriefDeps,
-  postText: string,
-  refId?: string,
-): Promise<BriefOutcome> {
+  ask: {
+    readonly system: string
+    readonly user: string
+    /** اسمُ العمليّة في الدفتر: `image-brief` أو `infographic`. */
+    readonly operation: string
+    readonly maxTokens: number
+    readonly refId?: string
+  },
+): Promise<{
+  readonly text: string | null
+  readonly cost: number
+  readonly detail: string
+  /** وقع النداءُ فسقط — لا نقصٌ في الضبط قبله. */
+  readonly called: boolean
+}> {
   const route = await routeFor(deps.db, 'draft')
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
-    return { brief: null, cost: 0, detail: `لا مزوّدَ للكتابة (${route.provider})` }
+    return { text: null, cost: 0, detail: `لا مزوّدَ للكتابة (${route.provider})`, called: false }
   }
 
   /*
    * **ومزوّدُ الكتابة يمرّ بحارسه هنا كما يمرّ في الكتابة** (D-163).
    *
-   * `draftPost` و`planWeek` تناديان `checkProvider` قبل نداءيهما، والموجزُ
-   * لا. و`resolveKey` تعيد سرَّ البيئة ولو عُطّل المزوّد، **فكان مزوّدٌ
-   * أطفأه المالكُ يُنادى ويُحاسَب عليه** مع كلّ صورة، وسقفُه اليوميُّ لا
-   * يوقفه. والسقوطُ هنا كسائر سقوط الموجز: صورةٌ بلا عنوانٍ بسببٍ يُقرأ.
+   * `resolveKey` تعيد سرَّ البيئة ولو عُطّل المزوّد، **فكان مزوّدٌ أطفأه المالكُ
+   * يُنادى ويُحاسَب عليه** مع كلّ صورة، وسقفُه اليوميُّ لا يوقفه.
    */
   const perProvider = await checkProvider(deps.db, provider.name)
   if (perProvider !== null) {
-    return { brief: null, cost: 0, detail: blockerReason(perProvider) }
+    return { text: null, cost: 0, detail: blockerReason(perProvider), called: false }
   }
 
   const secretName = provider.builtin
@@ -225,73 +241,97 @@ export async function visualBrief(
     secretName === undefined ? undefined : deps.workerSecrets[secretName],
   )
   if (resolved.key === null) {
-    return { brief: null, cost: 0, detail: `لا مفتاح لـ ${provider.label}` }
+    return { text: null, cost: 0, detail: `لا مفتاح لـ ${provider.label}`, called: false }
   }
 
   // **الكلفةُ قبل القراءة** — النداءُ وقع وحوسِب عليه، وجوابٌ مشوَّهٌ أو
-  // مبتورٌ لا يُلغي كلفةً وقعت (D-008، D-164). وتُعرَّف قبل النداء لأنّ
-  // الـcatch يحتاجها كما يحتاجها النجاح
+  // مبتورٌ لا يُلغي كلفةً وقعت (D-008، D-164)
   const charge = async (spent: Spent): Promise<number> => {
     const priced = costOf(provider, spent)
     const units = spent.inputTokens + spent.outputTokens
     await recordCost(deps.db, {
       provider: provider.name,
-      operation: `image-brief:${spent.model}`,
+      operation: `${ask.operation}:${spent.model}`,
       units,
       unitCost: units === 0 ? 0 : priced.total / units,
-      ...(refId === undefined ? {} : { refId }),
+      ...(ask.refId === undefined ? {} : { refId: ask.refId }),
     })
     return priced.total
   }
 
-  let text: string
-  let spent: Spent
   try {
     if (provider.kind === 'anthropic') {
       const result = await anthropicChat({
         apiKey: resolved.key,
         model: route.model,
-        system: BRIEF_SYSTEM,
-        user: briefUser(postText),
+        system: ask.system,
+        user: ask.user,
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
-      text = result.text
-      spent = result
-    } else {
-      if (provider.baseUrl === null) {
-        return { brief: null, cost: 0, detail: 'لا عنوان لمزوّد الكتابة' }
-      }
-      const result = await chatCompletion(
-        {
-          baseUrl: provider.baseUrl,
-          apiKey: resolved.key,
-          model: route.model,
-          system: BRIEF_SYSTEM,
-          user: briefUser(postText),
-          json: true,
-          // موجزٌ من ثلاثة حقولٍ قصيرة — والسقفُ يمنع جوابا يسترسل
-          maxTokens: 400,
-        },
-        deps.fetchImpl ?? fetch,
-      )
-      text = result.text
-      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
+      return { text: result.text, cost: await charge(result), detail: '', called: true }
+    }
+    if (provider.baseUrl === null) {
+      return { text: null, cost: 0, detail: 'لا عنوان لمزوّد الكتابة', called: false }
+    }
+    const result = await chatCompletion(
+      {
+        baseUrl: provider.baseUrl,
+        apiKey: resolved.key,
+        model: route.model,
+        system: ask.system,
+        user: ask.user,
+        json: true,
+        maxTokens: ask.maxTokens,
+      },
+      deps.fetchImpl ?? fetch,
+    )
+    return {
+      text: result.text,
+      cost: await charge({ ...result.usage, cachedInputTokens: 0, model: result.model }),
+      detail: '',
+      called: true,
     }
   } catch (error) {
     // جوابٌ وصل ثمّ رُدّ: يُسجَّل، وكلفتُه تُعاد مع السبب فلا تُقال صفرا
     const late = spentOf(error)
     return {
-      brief: null,
+      text: null,
       cost: late === null ? 0 : await charge(late),
-      detail: `تعذّر الموجزُ البصريّ: ${error instanceof Error ? error.message : 'نداءٌ فشل'}`,
+      detail: error instanceof Error ? error.message : 'نداءٌ فشل',
+      called: true,
     }
   }
+}
 
-  const cost = await charge(spent)
-  const brief = parseBrief(text)
+/** سقفُ الموجز: ثلاثةُ حقولٍ قصيرة، **وتفكيرُ نموذجٍ يفكّر قبلها**. */
+export const BRIEF_MAX_TOKENS = 2000
+
+/**
+ * يبني الموجزَ من نصّ المنشور — **ولا يرمي**.
+ */
+export async function visualBrief(
+  deps: BriefDeps,
+  postText: string,
+  refId?: string,
+): Promise<BriefOutcome> {
+  const answer = await askWriter(deps, {
+    system: BRIEF_SYSTEM,
+    user: briefUser(postText),
+    operation: 'image-brief',
+    maxTokens: BRIEF_MAX_TOKENS,
+    ...(refId === undefined ? {} : { refId }),
+  })
+  if (answer.text === null) {
+    return {
+      brief: null,
+      cost: answer.cost,
+      detail: answer.called ? `تعذّر الموجزُ البصريّ: ${answer.detail}` : answer.detail,
+    }
+  }
+  const brief = parseBrief(answer.text)
   return {
     brief,
-    cost,
+    cost: answer.cost,
     detail: brief === null ? 'جوابُ الموجز ليس بالشكل المتوقَّع' : 'موجزٌ بصريّ',
   }
 }

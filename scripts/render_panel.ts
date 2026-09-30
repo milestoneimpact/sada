@@ -7,13 +7,13 @@
  *
  * يستورد `panelPage` نفسها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
  */
-import { writeAudited } from './writeAudited'
+import { fixtureImage, writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
 import { imageProviderGate, slideGate } from '../src/lib/image/gate'
-import { imageReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
+import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
 import { videoCapGate } from '../src/lib/limits'
 
 const now = new Date('2026-09-05T18:00:00Z')
@@ -26,6 +26,8 @@ const now = new Date('2026-09-05T18:00:00Z')
  */
 const slide = slideGate({ overlay: true, hasBrowserKey: false, hasAccount: false })
 const mediaReady = {
+  // ‏والمتصفّحُ مضبوطٌ ونموذجُ الكتابة كذلك — الزرُّ الأوّلُ يعمل (D-174)
+  infographic: infographicReadiness({ blocker: null, browser: { key: true, account: true }, briefReady: true }),
   image: imageReadiness({
     blocker: null,
     provider: {
@@ -285,10 +287,18 @@ const data: PanelData = {
         'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
         ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
       headline: 'أثرٌ يُقاس',
+      model: '@cf/black-forest-labs/flux-1-schnell', width: 1024, height: 1024,
     },
     {
       id: 'm2', postId: 'd1', mime: 'image/png', bytes: 0, cost: 0, status: 'rejected', prompt: '',
-      note: null, headline: null,
+      note: null, headline: null, model: 'gemini', width: null, height: null,
+    },
+    // ‏والإنفوجرافيك (D-174): طوليٌّ 4:5 بمحتوى المنشور، والمحتوى من النصّ مباشرةً حين سقط النموذج
+    {
+      id: 'm3', postId: 'd5', mime: 'image/jpeg', bytes: 212_480, cost: 0.004, status: 'ready',
+      prompt: '{"kind":"compare","title":"يغيّر القرار أم يشرحه"}',
+      note: 'المحتوى من نصّ المنشور مباشرةً — تعذّر نموذجُ الكتابة: لا نصّ في جواب المزوّد',
+      headline: 'ما يُقاس شهريّاً يُصحَّح في حينه', model: 'infographic:compare', width: 1080, height: 1350,
     },
   ],
   targets: [
@@ -404,7 +414,10 @@ const data: PanelData = {
   ],
 }
 
-writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data))
+// ‏والعيّنةُ ترى صورَها بمقاساتها (D-172): الملفُّ المدقَّق وحدَه، والمجرّدُ بمساره
+writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data), {
+  m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
+})
 
 /*
  * **ولوحُ اليوم الأوّل وضعٌ ثانٍ يُشحَن — فيُرسَم ليُدقَّق** (D-108).

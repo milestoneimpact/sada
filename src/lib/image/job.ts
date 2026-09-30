@@ -30,7 +30,9 @@ import { cfAccountOf } from '../ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate, type ImageRefusal } from './gate'
 import { imagePrompt, topicOf } from './prompt'
 import { visualBrief } from './brief'
-import { screenshotSlide } from './render'
+import { SlideError, screenshotSlide } from './render'
+import { INFO_SIZE, infographicHtml, infographicSpec } from './infographic'
+import { imageSize } from './size'
 import { HEADLINE_MAX, OVERLAY_OFF, SLIDE_SIZE, clip, slideHtml } from './slide'
 import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
@@ -269,8 +271,8 @@ export function noteOf(
  */
 const INSERT_IMAGE =
   `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
-                      note, headline)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                      note, headline, width, height)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 /**
  * ما يُقال حين تردّ بوّابةُ المزوّد — **ونصوصُ ما كان قائمًا باقيةٌ حرفًا**:
@@ -303,6 +305,13 @@ function refusalOutcome(refusal: ImageRefusal, name: string, label: string): Ima
 }
 
 /**
+ * نمطُ الصورة (D-174): **إنفوجرافيك من نصّ المنشور** (الافتراض)، أو **صورةٌ فنّيّة**
+ * من موجزٍ بصريٍّ يترجم النصّ. وكلاهما يحمل فكرةَ المنشور؛ **ولا تُولَّد صورةٌ بوصفٍ
+ * عامٍّ لا يمتّ إليه** — وتلك التي أخرجت مشهدًا جميلًا عن «خمسة أبعادٍ وثلاث طبقات».
+ */
+export type ImageStyle = 'infographic' | 'illustration'
+
+/**
  * خيارُ الاستبدال: **صورةٌ جاهزةٌ تُرفَض إن مرّ التوليدُ بحرّاسه كلِّهم**.
  *
  * كان البديلُ ضغطتين: «ارفض الصورة» ثمّ «ولّد صورة». **والأولى تقع ولو
@@ -311,6 +320,12 @@ function refusalOutcome(refusal: ImageRefusal, name: string, label: string): Ima
  */
 export interface GenerateOptions {
   readonly replace?: string
+  readonly style?: ImageStyle
+}
+
+/** منصّةُ المقاس — ومنصّاتُ المقاطع رأسيّةٌ لا LinkedIn كما كانت تُقرأ. */
+function sizePlatform(platform: string): Platform {
+  return platform === 'x' || platform === 'tiktok' || platform === 'youtube' ? platform : 'linkedin'
 }
 
 export async function generateForPost(
@@ -333,13 +348,8 @@ export async function generateForPost(
   /*
    * ٢ · أوُلّدت لهذا النصّ؟
    *
-   * **والسؤالُ عن الحال لا عن الاسم** (D-088). كان يسأل عن المفتاح وحده،
-   * فصفٌّ رُفض **قبل** أن يصير الرفضُ يوسم مفتاحَه (D-087) يُوجَد فيُقال
-   * «وُلّدت صورةٌ لهذا النصّ» **بلونٍ أخضر** — ولا صورة. وهو ما شكا منه
-   * المالك: «يظهر أنّها تمّت، ولم تتمّ».
-   *
-   * والاسمُ يُصلَح بترحيلٍ مرّةً واحدة (‏0018)، **والحالُ صحيحةٌ في كلّ
-   * صفٍّ منذ ‏0010** — فالحارسُ يُبنى عليها.
+   * **والسؤالُ عن الحال لا عن الاسم** (D-088). والاسمُ يُصلَح بترحيلٍ مرّةً
+   * واحدة (‏0018)، **والحالُ صحيحةٌ في كلّ صفٍّ منذ ‏0010** — فالحارسُ يُبنى عليها.
    */
   const key = await imageKey(post.id, post.text)
   const existing = await deps.db
@@ -365,21 +375,81 @@ export async function generateForPost(
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
+  const platform = sizePlatform(post.platform)
+  const writerDeps = {
+    db: deps.db,
+    encKey: deps.encKey,
+    workerSecrets: deps.workerSecrets,
+    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+  }
+
+  // ── الإنفوجرافيك (D-174) ─────────────────────────────────────────────
+  if ((options.style ?? 'infographic') === 'infographic') {
+    // ‏والمتصفّحُ شرطُه الوحيد: المحتوى يأتي من النصّ ولو سقط نموذجُ الكتابة
+    const accountId = (deps.workerSecrets['CF_AI_ACCOUNT_ID'] ?? '').trim()
+    const apiToken = (deps.workerSecrets['CF_BROWSER_TOKEN'] ?? '').trim()
+    if (accountId === '' || apiToken === '') {
+      return {
+        kind: 'blocked',
+        reason: 'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker ليُرسم الإنفوجرافيك',
+      }
+    }
+    // ‏والمحتوى قبل الرفض والحجز: لا يسقط (يعود إلى النصّ نفسِه)، والرفضُ بعده لا يُفقد الصورةَ القائمة سُدى
+    const info = await infographicSpec(writerDeps, post.text, post.id)
+    if (options.replace !== undefined) await rejectMedia(deps.db, options.replace)
+    const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
+    if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+
+    const size = INFO_SIZE[platform]
+    let shot: { bytes: Uint8Array; mime: string }
+    try {
+      shot = await screenshotSlide({
+        accountId,
+        apiToken,
+        html: infographicHtml(info.spec, platform),
+        width: size.width,
+        height: size.height,
+        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+      })
+    } catch (error) {
+      await releaseClaim(deps.db, key)
+      return {
+        kind: 'failed',
+        reason: `تعذّر تصويرُ الإنفوجرافيك: ${error instanceof Error ? error.message : 'عطل'}`,
+        retryable: error instanceof SlideError ? error.retryable : true,
+      }
+    }
+    // **وكلفةُ اللقطة تُسجَّل** — نداءٌ خارجيٌّ لا يُخفى (D-008)، وسعرُه غيرُ مضبوطٍ فيُسجَّل صفرا معلَّما
+    await recordCost(deps.db, {
+      provider: 'cloudflare-browser',
+      operation: `infographic:${platform}`,
+      units: 1,
+      unitCost: 0,
+      refId: post.id,
+    })
+    return persistImage(deps, {
+      post, key,
+      image: { bytes: shot.bytes, mime: shot.mime, model: `infographic:${info.spec.kind}` },
+      // ‏والمحتوى المرسومُ هو «الوصف»: يُقرأ في البطاقة كما رُسم، ومن أين جاء
+      prompt: JSON.stringify(info.spec),
+      cost: info.cost,
+      extraCost: 0,
+      note: info.detail,
+      headline: clip(info.spec.title, 70),
+      width: size.width,
+      height: size.height,
+    })
+  }
+
+  // ── الصورةُ الفنّيّة ─────────────────────────────────────────────────
   const route = await routeFor(deps.db, 'image')
   const provider = await getProvider(deps.db, route.provider)
 
   /*
    * ٣·أ · **بوّابةُ المزوّد — حقائقُها تُجمَع ثمّ يُحكَم مرّةً** (D-163).
    *
-   * والحكمُ في `imageProviderGate` لا هنا: لوحُ المسوّدات يناديه بالحقائق
-   * نفسِها قبل الضغط. وسقفُ المزوّد بعد العامّ لا قبله — مَن قدّم التفصيل
-   * على الجملة قال «Gemini متاح» ونظامُه موقوف.
-   *
-   * **واسمُ السرِّ يتبع المزوّد** (D-079): كان مقصورا على Gemini، فمن
-   * وجّه الصورَ إلى Cloudflare لم يجد مفتاحَه في البيئة ولو كان مضبوطا.
-   *
-   * **والحسابُ يُسأل هنا لا داخل النداء**: كان `generateImageCf` وحده يكتشف
-   * أنّه فارغ — بعد الحجز، وبعد الموجز وقد سُجّل ثمنُه في الدفتر.
+   * **واسمُ السرِّ يتبع المزوّد** (D-079)، **والحسابُ يُسأل هنا لا داخل النداء**:
+   * كان `generateImageCf` وحده يكتشف أنّه فارغ — بعد الحجز، وبعد الموجز وقد سُجّل ثمنُه.
    */
   const secretName = provider === null ? undefined : imageSecretName(provider)
   const resolved = provider === null
@@ -407,7 +477,23 @@ export async function generateForPost(
     )
   }
 
-  // ‏والرفضُ بعد البوّابات كلِّها: ما سيُردّ لا يمسّ الصورةَ القائمة
+  /*
+   * ٤ · **الموجزُ البصريّ أوّلا** (D-083) — **وسقوطُه يوقف التوليد الآن** (D-174).
+   *
+   * كان سقوطُه يُبني الوصفَ من «الموضوع» العربيّ الذي لا يقرؤه النموذج، فتخرج
+   * صورةٌ في الأسلوب لا علاقةَ لها بالنصّ. **وصورةٌ لا تمتّ إلى المنشور أسوأُ من
+   * لا صورة**: تُدفع كلفتُها ويُنشر معها ادّعاءٌ لم يُقصد. فيُردّ بسببه، والصورةُ
+   * القائمةُ باقية، والإنفوجرافيك طريقٌ لا يحتاج الموجز.
+   */
+  const visual = await visualBrief(writerDeps, post.text, post.id)
+  if (visual.brief === null) {
+    return {
+      kind: 'failed',
+      reason: `لم تُولَّد الصورةُ الفنّيّة — ${visual.detail}. ولا تُرسم بوصفٍ عامٍّ لا يمتّ إلى النصّ؛ ` +
+        'والإنفوجرافيك يُبنى من النصّ نفسِه',
+      retryable: true,
+    }
+  }
   if (options.replace !== undefined) await rejectMedia(deps.db, options.replace)
 
   /*
@@ -419,48 +505,17 @@ export async function generateForPost(
   const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
-  // ٤ · **الموجزُ البصريّ أوّلا** (D-083)
-  //
-  // ونداءُ الصورة لا يفهم العربيّة، فمنشورٌ عربيٌّ يُرسَل إليه كما هو
-  // يُقرأ ضجيجا: تخرج الصورةُ في الأسلوب ولا علاقةَ لها بالموضوع. فيُبنى
-  // موجزٌ بصريٌّ إنجليزيٌّ من نصّ المنشور بمزوّد الكتابة، ثمّ يُركَّب
-  // الوصفُ منه.
-  //
-  // **وسقوطُه لا يوقف التوليد**: يُبنى الوصفُ من الموضوع كما كان، ويُقال
-  // ذلك — صورةٌ أضعفُ ربطا خيرٌ من منشورٍ بلا صورة.
-  const platform: Platform = post.platform === 'x' ? 'x' : 'linkedin'
-  const visual = await visualBrief(
-    {
-      db: deps.db,
-      encKey: deps.encKey,
-      workerSecrets: deps.workerSecrets,
-      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-    },
-    post.text,
-    post.id,
-  )
   const prompt = imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
 
   /*
-   * **والسائقُ يتبع المزوّدَ المختار** (D-079).
-   *
-   * كان الاستيرادُ مثبَّتا على Gemini: يُقرأ اختيارُ المالك من اللوحة
-   * ثمّ يُنادى Gemini على كلّ حال. فمن وجّه الصورَ إلى Cloudflare أُرسل
-   * اسمُ نموذجِها إلى عنوان Google — **فردّت ٤٠٥**. والاختيارُ كان
-   * يُقرأ ولا يُطاع.
+   * **والسائقُ يتبع المزوّدَ المختار** (D-079): كان الاستيرادُ مثبَّتا على Gemini،
+   * فمن وجّه الصورَ إلى Cloudflare أُرسل اسمُ نموذجِها إلى عنوان Google — فردّت ٤٠٥.
    */
   let image: Awaited<ReturnType<typeof generateImage>>
   try {
     image =
       provider.name === 'cloudflare'
         ? await generateImageCf({
-            /*
-             * **ومعرّفُ الحساب يُقرأ من عنوان المزوّد حين يغيب السرّ**
-             * (D-081): العنوان المحفوظ يحمله في مساره أصلا
-             * (`‎/accounts/{id}/ai/v1`)، فمن ضبط البطاقة ولم يضبط
-             * `CF_AI_ACCOUNT_ID` كان يُنادى بحسابٍ فارغ — ويُردّ. وهو
-             * الحسابُ الذي سألت عنه البوّابةُ أعلاه، لا قراءةٌ ثانية
-             */
             accountId,
             apiToken: resolved.key,
             // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
@@ -488,42 +543,24 @@ export async function generateForPost(
   }
 
   /*
-   * ٤·ب · **الشريحة: النصُّ العربيُّ فوق الصورة** (D-085).
-   *
-   * ولا نموذجَ توليدٍ يكتب عربيّةً صحيحةَ الوصل، **والوصلُ عملُ مُشكِّلِ
-   * خطوطٍ لا عملُ مولّد صور**. فتُبنى صفحةٌ ويصوّرها متصفّحُ Cloudflare.
-   *
-   * **وأربعةُ شروطٍ قبل النداء، وكلُّها سقوطٌ صامتٌ لا عطل:**
-   * لم يُطفَأ التركيبُ من الإعدادات · ووُلّد عنوانٌ من الموجز · والحسابُ
-   * والرمزُ مضبوطان · والصورةُ دون حدِّ الضمّ. **وما سقط منها يُبقي
-   * الصورةَ بلا شريحة** — ومنشورٌ بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة.
+   * ٤·ب · **الشريحة: النصُّ العربيُّ فوق الصورة** (D-085). ولا نموذجَ توليدٍ يكتب
+   * عربيّةً صحيحةَ الوصل، **والوصلُ عملُ مُشكِّلِ خطوطٍ لا عملُ مولّد صور**. وما سقط
+   * من شروطها يُبقي الصورةَ بلا شريحة.
    */
   const overlay = await composeSlide(deps, {
     image,
     platform,
-    headline: visual.brief?.headline ?? '',
-    kicker: visual.brief?.kicker ?? '',
+    headline: visual.brief.headline,
+    kicker: visual.brief.kicker,
   })
   if (overlay.slide !== null) image = overlay.slide
 
-  /*
-   * **وما قيل عن الشريحة يُحفَظ مع الصورة** (D-162).
-   *
-   * كان يُقال في الوميض مرّةً ثمّ يُرمى، فالبطاقةُ بعد التحديث لا تعرف
-   * أرُكّب النصُّ أم سقط. ويُحسَب هنا مرّةً ليقول الوميضُ والصفُّ الشيءَ
-   * نفسَه. **والحدُّ داخل `noteOf` لا هنا**: قصٌّ من الذيل يأكل السببَ الذي
-   * تُصنَّف به البطاقة. والعنوانُ بقصِّ الشريحة نفسِه — **فالمحفوظُ هو
-   * المرسومُ حرفًا** — وفراغُه `NULL`: لا عنوانَ في الموجز، ولا يُخترَع.
-   */
+  // ‏وما قيل عن الشريحة يُحفَظ مع الصورة (D-162)، والعنوانُ بقصِّ الشريحة نفسِه
   const note = noteOf(visual, overlay)
-  const drawn = clip(visual.brief?.headline ?? '', HEADLINE_MAX)
-  const headline = drawn === '' ? null : drawn
+  const drawn = clip(visual.brief.headline, HEADLINE_MAX)
 
-  // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه
-  //
-  // وصورةٌ تُسعَّر بالنداء لا بالرمز: `costOf` تحسب بالرموز، فتُمرَّر
-  // وحدةٌ واحدة في `outputTokens` ليكون سعرُ المخرَج سعرَ الصورة. ومزوّدٌ
-  // بلا سعرٍ مضبوط يعطي صفرا **ويُعلَّم** — ولا يُخمَّن رقمٌ يُظنّ حقيقة
+  // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه. وصورةٌ تُسعَّر
+  // بالنداء: وحدةٌ واحدةٌ في `outputTokens`، ومزوّدٌ بلا سعرٍ يعطي صفرا **ويُعلَّم**
   const priced = costOf(provider, { inputTokens: 0, outputTokens: 1 })
   await recordCost(deps.db, {
     provider: provider.name,
@@ -533,6 +570,39 @@ export async function generateForPost(
     refId: post.id,
   })
 
+  const dims = overlay.slide !== null ? SLIDE_SIZE[platform] : imageSize(image.bytes)
+  return persistImage(deps, {
+    post, key, image, prompt,
+    cost: priced.total,
+    extraCost: visual.cost,
+    note,
+    headline: drawn === '' ? null : drawn,
+    width: dims?.width ?? null,
+    height: dims?.height ?? null,
+  })
+}
+
+/**
+ * ٦ · R2 ثمّ ٧ · الصفّ — **للنمطين معا**: حدُّ الحجم، والبايتاتُ قبل الصفّ،
+ * والقيدُ `UNIQUE` بمن يشغل الاسم.
+ */
+async function persistImage(
+  deps: ImageDeps,
+  save: {
+    readonly post: PostRow
+    readonly key: string
+    readonly image: { readonly bytes: Uint8Array; readonly mime: string; readonly model: string }
+    readonly prompt: string
+    /** كلفةُ الصورة في صفّها — وما قبلها (الموجز) يُضاف إلى ما يُعاد لا إلى الصفّ. */
+    readonly cost: number
+    readonly extraCost: number
+    readonly note: string
+    readonly headline: string | null
+    readonly width: number | null
+    readonly height: number | null
+  },
+): Promise<ImageOutcome> {
+  const { post, key, image } = save
   // حدُّ الحجم بعد التسجيل: صورةٌ ضخمة كلّفت ما كلّفت
   if (image.bytes.length > MAX_BYTES) {
     await releaseClaim(deps.db, key)
@@ -562,9 +632,18 @@ export async function generateForPost(
 
   // ٧ · الصفّ — وقيمُه مصفوفةٌ واحدةٌ تُربَط في الموضعين
   const row = [
-    mediaId, post.id, r2Key, image.mime, image.bytes.length, prompt, image.model, priced.total, key,
-    note, headline,
+    mediaId, post.id, r2Key, image.mime, image.bytes.length, save.prompt, image.model, save.cost, key,
+    save.note, save.headline, save.width, save.height,
   ]
+  const done: ImageOutcome = {
+    kind: 'generated',
+    mediaId,
+    key: r2Key,
+    bytes: image.bytes.length,
+    // **والكلفةُ المعادة تجمع النداءين**: الموجزَ والصورة
+    cost: save.cost + save.extraCost,
+    note: save.note,
+  }
   try {
     await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
   } catch (error) {
@@ -576,12 +655,8 @@ export async function generateForPost(
         .first<{ id: string; status: string }>()
 
       /*
-       * **ومَن يشغل الاسمَ قد يكون مرفوضا** (D-088).
-       *
-       * الخطوةُ ٢ تتخطّى المرفوض بحقّ — ثمّ يصطدم الإدراجُ بقيدٍ يعرف
-       * الاسمَ ولا يعرف الحال. وردُّ «وُلّدت» هنا يعيد الكذبةَ نفسَها
-       * **بعد أن دُفع ثمنُ النداء**. فيُخلى الاسمُ ويُعاد الإدراجُ مرّةً
-       * واحدة — والصفُّ المرفوضُ يبقى بكلفته كما هو.
+       * **ومَن يشغل الاسمَ قد يكون مرفوضا** (D-088): يُخلى الاسمُ ويُعاد الإدراجُ
+       * مرّةً واحدة — والصفُّ المرفوضُ يبقى بكلفته كما هو.
        */
       if (won !== null && won.status === 'rejected') {
         await deps.db
@@ -593,14 +668,7 @@ export async function generateForPost(
           .run()
         try {
           await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
-          return {
-            kind: 'generated',
-            mediaId,
-            key: r2Key,
-            bytes: image.bytes.length,
-            cost: priced.total + visual.cost,
-            note,
-          }
+          return done
         } catch (second) {
           await deps.bucket.delete(r2Key).catch(() => undefined)
           await releaseClaim(deps.db, key)
@@ -619,17 +687,7 @@ export async function generateForPost(
     await releaseClaim(deps.db, key)
     return { kind: 'failed', reason: `تعذّرت كتابة الصفّ: ${message}`, retryable: false }
   }
-
-  // **والكلفةُ المعادة تجمع النداءين**: الموجزَ والصورة. ورقمٌ يعرض
-  // أحدَهما ويُخفي الآخر يجعل الدفترَ أصدقَ من الشاشة
-  return {
-    kind: 'generated',
-    mediaId,
-    key: r2Key,
-    bytes: image.bytes.length,
-    cost: priced.total + visual.cost,
-    note,
-  }
+  return done
 }
 
 export interface MediaRow {
@@ -659,6 +717,9 @@ export interface MediaRow {
   readonly note: string | null
   /** العنوانُ المرسوم أو الذي كان سيُرسَم — و`null` حين لا عنوانَ في الموجز. */
   readonly headline: string | null
+  /** الأبعادُ يومَ التوليد (D-174) — و`null` لصفٍّ أقدمَ من ‏0029. */
+  readonly width: number | null
+  readonly height: number | null
 }
 
 /** نصٌّ أو `null` — **و`String(null)` تطبع «null» على كلّ صورةٍ قديمة**. */
@@ -674,7 +735,7 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
     const { results } = await db
       .prepare(
         `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at,
-                note, headline
+                note, headline, width, height
            FROM media WHERE post_id IN (${marks}) ORDER BY created_at DESC`,
       )
       .bind(...postIds)
@@ -692,6 +753,8 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
       createdAt: String(r['created_at']),
       note: textOrNull(r['note']),
       headline: textOrNull(r['headline']),
+      width: r['width'] === null || r['width'] === undefined ? null : Number(r['width']),
+      height: r['height'] === null || r['height'] === undefined ? null : Number(r['height']),
     }))
   } catch {
     // جدولٌ لم يُرحَّل بعد: لوحةٌ تُفتح بلا صورٍ خيرٌ من لوحةٍ لا تُفتح

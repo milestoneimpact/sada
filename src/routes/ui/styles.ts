@@ -1221,6 +1221,21 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* الابنُ المباشرُ وحدَه: سطرُ الجاهزيّة تحته فيه «ago» أيضًا، وقاعدةٌ تنزل
    إليه تمدّ سببَه مئتي بكسل فيدفع رابطَه إلى سطرٍ وحدَه (D-163) */
 .pic.none > .ago{flex:1 1 200px}
+/* الصورةُ الفنّيّةُ مطويّةٌ تحت الإنفوجرافيك (D-174): بابٌ ثانٍ لا يزاحم
+   الأوّلَ في سطره، وسطرُ جاهزيّته معه لا فوقه — فما ستقوله الدالّةُ يُقال
+   قبل الضغط لكلا الزرّين */
+.art{flex-basis:100%; border-top:1px solid var(--line-soft); padding-top:var(--s-1)}
+.art>summary{display:flex; align-items:center; min-height:var(--tap); cursor:pointer;
+  list-style:none; font-size:var(--t-sm); font-weight:600}
+.art>summary::-webkit-details-marker{display:none}
+/* ‏ومثلّثُ «.setup» نفسُه (D-167): يشير إلى نهاية السطر مطويًّا، وإلى الأسفل مفتوحًا */
+.art>summary::before{content:''; display:inline-block; flex:none; width:0; height:0;
+  margin-inline-end:var(--s-2);
+  border-block:.3em solid transparent; border-inline-start:.4em solid; border-inline-end:0}
+.art[open]>summary::before{border-inline:.3em solid transparent; border-block-start:.4em solid;
+  border-block-end:0}
+.art-row{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+.art-row > .ago{flex:1 1 200px}
 /* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
    ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
 .sched{display:flex; align-items:flex-end; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2);

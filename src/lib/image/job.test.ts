@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { NOTE_MAX, composeSlide, generateForPost, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type ImageDeps } from './job'
+import { NOTE_MAX, composeSlide, generateForPost as generate, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type GenerateOptions, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
 import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
@@ -24,6 +24,26 @@ import { providerBlocker } from '../limits'
 import { imageReadiness } from '../media/readiness'
 
 let db: FakeDb
+
+/**
+ * **هذه الاختباراتُ للصورة الفنّيّة**، والافتراضُ صار الإنفوجرافيك (D-174) — فتُسمّى
+ * هنا صراحةً، واختباراتُ الإنفوجرافيك في `infographic.test.ts` وفي آخر هذا الملفّ.
+ */
+function generateForPost(d: ImageDeps, id: string, o: GenerateOptions = {}): ReturnType<typeof generate> {
+  return generate(d, id, { style: 'illustration', ...o })
+}
+
+/** مفتاحُ الخزنة للاختبارات العلويّة — ومزوّدُ الكتابة يُزرَع به لكلّ اختبار. */
+const TOP_ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+/** جوابُ مزوّد الكتابة: موجزٌ صالح — فالصورةُ الفنّيّةُ لا تُولَّد بلا موجز (D-174). */
+function writerReply(): Response {
+  return new Response(JSON.stringify({
+    model: 'w-1',
+    choices: [{ message: { content: JSON.stringify({ subject: 'folded brass sheets', headline: 'أثرٌ يُقاس', kicker: 'Measured Impact' }) }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 100, completion_tokens: 20 },
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+}
 let calls: { url: string; body: unknown; headers: Record<string, string> }[]
 
 /** بايتاتُ PNG صغيرةٌ صالحة، مرمَّزةٌ base64 كما يعيدها المزوّد. */
@@ -57,6 +77,8 @@ function net(
   calls = []
   return (async (input: unknown, init?: RequestInit): Promise<Response> => {
     const url = input instanceof Request ? input.url : String(input)
+    // ‏ومزوّدُ الكتابة يجيب بموجزٍ ولا يُعَدّ في نداءات الصورة التي تفحصها الاختبارات
+    if (url.includes('api.writer.test')) return writerReply()
     const headers = Object.fromEntries(
       Object.entries((init?.headers ?? {}) as Record<string, string>),
     )
@@ -114,21 +136,29 @@ function deps(fetchImpl: typeof fetch, b: Bucket = bucket()): ImageDeps {
   return {
     db,
     bucket: b,
-    encKey: '',
+    encKey: TOP_ENC,
     workerSecrets: { GEMINI_API_KEY: 'AIza-test' },
     fetchImpl,
   }
 }
 
-async function ledger(): Promise<{ operation: string; total: number }[]> {
+/** صفوفُ الدفتر — **بلا صفّ الموجز** إلّا إن طُلب: الاختباراتُ هنا تعدّ نداءَ الصورة. */
+async function ledger(all = false): Promise<{ operation: string; total: number }[]> {
   const { results } = await db
     .prepare('SELECT operation, total FROM cost_ledger')
     .all<{ operation: string; total: number }>()
-  return results
+  return all ? results : results.filter((r) => !r.operation.startsWith('image-brief:'))
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   db = fakeDb()
+  await upsertProvider(
+    db,
+    { name: 'writer', label: 'Writer', kind: 'openai_compat', baseUrl: 'https://api.writer.test/v1' },
+    'test',
+  )
+  await saveKey(db, TOP_ENC, 'writer', 'sk-writer-key-long', 'test')
+  await writeRoute(db, 'draft', 'writer', 'w-1', 'test')
 })
 
 describe('المسار الكامل', () => {
@@ -158,9 +188,9 @@ describe('المسار الكامل', () => {
     // **والمتوقَّعُ يُشتقُّ من نصّ المنشور نفسِه** لا يُكتب هنا: نسخةٌ
     // ثانيةٌ من النصّ في الاختبار تُصدّق ما بطل يومَ يتغيّر الفخّ
     const seeded = db.raw.prepare('SELECT text FROM posts WHERE id = ?').get(post) as { text: string }
-    expect(rows[0]?.prompt).toBe(
-      imagePrompt({ topic: topicOf(seeded.text), platform: 'linkedin' }),
-    )
+    // ‏والوصفُ من الموجز الذي كتبه مزوّدُ الكتابة لهذا النصّ (D-174)
+    expect(rows[0]?.prompt).toContain('folded brass sheets')
+    expect(rows[0]?.prompt).toContain(topicOf(seeded.text).length > 0 ? 'ABSOLUTELY NO text' : '')
 
     expect((await ledger())[0]?.operation).toContain('image:linkedin')
   })
@@ -196,7 +226,8 @@ describe('المسار الكامل', () => {
     for (const line of ['# Subject', '# Composition', '# Style', '# Format']) {
       expect(prompt).toContain(line)
     }
-    expect(prompt).toContain('for context only')
+    // ‏والموجزُ يترجم النصَّ فلا يصل إلى النموذج حرفٌ عربيٌّ واحد
+    expect(prompt).not.toMatch(/[\u0600-\u06FF]/)
   })
 })
 
@@ -412,9 +443,10 @@ describe('توجيهُ الصور يُطاع (D-079)', () => {
 
     const out = await generateForPost(
       {
-        db, bucket: bucket(), encKey: '',
+        db, bucket: bucket(), encKey: TOP_ENC,
         workerSecrets: { CF_AI_ACCOUNT_ID: 'acc-1', CF_AI_TOKEN: 'tok-1' },
-        fetchImpl: net,
+        fetchImpl: ((url: unknown, init?: RequestInit) =>
+          String(url).includes('api.writer.test') ? Promise.resolve(writerReply()) : net(url as RequestInfo, init)) as typeof fetch,
       },
       post,
     )
@@ -511,7 +543,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
   it('و**كلفةُ اللقطة تُسجَّل** — نداءٌ مدفوعٌ لا يُخفى (D-008)', async () => {
     await seedWriter()
     await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
-    const ops = (await ledger()).map((e) => e.operation)
+    const ops = (await ledger(true)).map((e) => e.operation)
     expect(ops.some((o) => o.startsWith('slide:'))).toBe(true)
     expect(ops.some((o) => o.startsWith('image-brief:'))).toBe(true)
     expect(ops.some((o) => o.startsWith('image:'))).toBe(true)
@@ -617,12 +649,17 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       expect(row!.headline).toBe('أثرٌ يُقاس')
     })
 
-    it('وبلا موجزٍ لا عنوانَ يُخترَع في الصفّ — NULL لا فراغ', async () => {
+    /*
+     * **وبلا موجزٍ لا صورةٌ فنّيّةٌ أصلا** (D-174): كانت تُرسم بوصفٍ عامٍّ لا يمتّ
+     * إلى النصّ. فتُردّ بسببها، ولا نداءَ صورة، ولا صفّ، والإنفوجرافيك يُقال بديلًا.
+     */
+    it('وبلا موجزٍ لا صورةٌ فنّيّة: يُردّ بسببه ولا يُنادى نموذجُ الصورة', async () => {
       const post = await seedPost()
-      await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
-      const [row] = await mediaFor(db, [post])
-      expect(row!.headline).toBeNull()
-      expect(row!.note).toContain('بلا عنوانٍ في الموجز')
+      const out = await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
+      expect(out.kind).toBe('failed')
+      if (out.kind === 'failed') expect(out.reason).toContain('الإنفوجرافيك')
+      expect(await mediaFor(db, [post])).toHaveLength(0)
+      expect(calls.some((c) => c.url.includes('generativelanguage'))).toBe(false)
     })
 
     it('والإطفاءُ يُحفَظ بلفظه — فتقرؤه البطاقةُ قرارًا لا عطلا', async () => {
@@ -670,36 +707,16 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       }) as typeof fetch
     }
 
-    it('وموجزٌ سقط بخطأٍ طويل والتركيبُ مُطفأ: الإطفاءُ في الذيل كاملًا', async () => {
+    it('وموجزٌ سقط بخطأٍ طويل: يُردّ بسببه مقصوصًا، والصورةُ القائمةُ لا تُمَسّ', async () => {
       await seedWriter()
-      await writeSetting(db, 'image_overlay', 'false', 'test')
       const post = await seedPost()
       const out = await generateForPost(slideDeps(briefFails(400), bucket(), READY), post)
-      if (out.kind !== 'generated') throw new Error(out.kind)
-      const [row] = await mediaFor(db, [post])
-      expect(row!.note!.length).toBeLessThanOrEqual(300)
-      // وسقوطُ الموجز يبقى أوّلا (D-157) — مقصوصًا، لا محذوفًا
-      expect(row!.note!.startsWith('تعذّر الموجزُ البصريّ')).toBe(true)
-      expect(row!.note!.endsWith(`؛ ${OVERLAY_OFF}`)).toBe(true)
-      expect(out.note).toBe(row!.note)
-    })
-
-    it('وموجزٌ سقط بخطأٍ طويل ولا مفتاح: «اضبط CF_BROWSER_TOKEN» يبقى بتمامه', async () => {
-      await seedWriter()
-      const post = await seedPost()
-      const secrets = { CF_AI_ACCOUNT_ID: 'acc' }
-      const out = await generateForPost(slideDeps(briefFails(400), bucket(), secrets), post)
-      if (out.kind !== 'generated') throw new Error(out.kind)
-      const [row] = await mediaFor(db, [post])
-      // والسببُ يُسأل عنه `composeSlide` نفسُه — لا يُنسَخ حرفًا فيفترق
-      const { reason } = await composeSlide(
-        { db, bucket: bucket(), encKey: ENC, workerSecrets: secrets },
-        { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: '', kicker: '' },
-      )
-      expect(reason).toContain('CF_BROWSER_TOKEN')
-      expect(row!.note!.length).toBeLessThanOrEqual(300)
-      expect(row!.note!.endsWith(`؛ ${reason}`)).toBe(true)
-      expect(out.note).toBe(row!.note)
+      expect(out.kind).toBe('failed')
+      if (out.kind === 'failed') {
+        expect(out.reason.startsWith('لم تُولَّد الصورةُ الفنّيّة — تعذّر الموجزُ البصريّ')).toBe(true)
+        expect(out.retryable).toBe(true)
+      }
+      expect(await mediaFor(db, [post])).toHaveLength(0)
     })
   })
 })
@@ -1051,6 +1068,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
   })
 
   it('ومتغيّرُ الحساب مسافاتٍ يرجع إلى عنوان البطاقة — كما يفعل المقطع', async () => {
+    await seedWriter()
     await cloudflare('https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1')
     await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
     const out = await generateForPost(
@@ -1094,5 +1112,105 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
     })
     expect(line.next).toMatchObject({ key: 'provider', state: 'failed', note: 'Gemini معطَّلٌ بقرارك' })
     expect(line.blocked).toBe(true)
+  })
+})
+
+/**
+ * **الإنفوجرافيك هو الافتراض** (D-174): المحتوى من النصّ، ويصوّره المتصفّح،
+ * ولا يُنادى نموذجُ الصور.
+ */
+describe('الإنفوجرافيك', () => {
+  const INFO_POST = 'المعلم ليس نقطة على الخط الزمني.\n\nيُعاد تعريفه بخمسة أبعاد: قرار، توقيت، تحكّم، قياس، قيمة.\n\nوالنتيجة: حوكمةٌ تُقاس بالمعالم.'
+  const BROWSER = { CF_AI_ACCOUNT_ID: 'acc', CF_BROWSER_TOKEN: 'cfut_browser' }
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xd9])
+
+  function lane(options: { writer?: 'ok' | 'fails' | 'fabricates'; shot?: number } = {}): typeof fetch {
+    calls = []
+    return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      calls.push({ url, body: init?.body === undefined ? null : String(init.body), headers: {} })
+      if (url.includes('browser-rendering/screenshot')) {
+        return (options.shot ?? 200) === 200
+          ? new Response(JPEG, { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+          : new Response('{}', { status: options.shot ?? 500 })
+      }
+      if (url.includes('api.writer.test')) {
+        if (options.writer === 'fails') throw new Error('انقطع')
+        const spec = options.writer === 'fabricates'
+          ? { kind: 'stats', title: 'أرقامٌ مخترَعة', kicker: '', items: [{ label: 'أ', value: '85%', note: '' }, { label: 'ب', value: '12', note: '' }], secondary: null, takeaway: '' }
+          : { kind: 'pillars', kicker: 'Milestone Governance', title: 'المعلم نقطةُ قيادة', items: [
+              { label: 'قرار', value: '', note: '' }, { label: 'توقيت', value: '', note: '' }, { label: 'قياس', value: '', note: '' }],
+            secondary: null, takeaway: 'حوكمةٌ تُقاس بالمعالم' }
+        return new Response(JSON.stringify({
+          model: 'w-1', choices: [{ message: { content: JSON.stringify(spec) }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 300, completion_tokens: 120 },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response('{}', { status: 404 })
+    }) as typeof fetch
+  }
+
+  function infoDeps(fetchImpl: typeof fetch, secrets: Record<string, string> = BROWSER): ImageDeps {
+    return { db, bucket: bucket(), encKey: TOP_ENC, workerSecrets: secrets, fetchImpl }
+  }
+
+  it('يُرسم من محتوى النصّ ويُحفَظ بأبعاده، ولا يُنادى نموذجُ الصور', async () => {
+    const post = await seedPost({ text: INFO_POST })
+    const out = await generate(infoDeps(lane()), post)
+    expect(out.kind).toBe('generated')
+    const [row] = await mediaFor(db, [post])
+    expect(row!.model).toBe('infographic:pillars')
+    expect([row!.width, row!.height]).toEqual([1080, 1350])
+    expect(row!.headline).toBe('المعلم نقطةُ قيادة')
+    expect(JSON.parse(row!.prompt).items).toHaveLength(3)
+    expect(calls.some((c) => c.url.includes('generativelanguage') || c.url.includes('/ai/run/'))).toBe(false)
+    // ‏والصفحةُ المصوَّرةُ تحمل كلماتِ المنشور
+    const shot = calls.find((c) => c.url.includes('browser-rendering'))!
+    expect(String(shot.body)).toContain('"width":1080')
+    expect(String(shot.body)).toContain('المعلم نقطةُ قيادة')
+    const ops = (await ledger(true)).map((e) => e.operation)
+    expect(ops).toContain('infographic:w-1')
+    expect(ops).toContain('infographic:linkedin')
+  })
+
+  it('وبلا مفتاح المتصفّح يُردّ قبل أيّ نداء', async () => {
+    const out = await generate(infoDeps(lane(), { CF_AI_ACCOUNT_ID: 'acc' }), await seedPost({ text: INFO_POST }))
+    expect(out.kind).toBe('blocked')
+    if (out.kind === 'blocked') expect(out.reason).toContain('CF_BROWSER_TOKEN')
+    expect(calls).toHaveLength(0)
+    expect(await ledger(true)).toHaveLength(0)
+  })
+
+  it('وسقوطُ نموذج الكتابة لا يُخرج صورةً عامّة: المحتوى من النصّ نفسِه، ويُقال ذلك', async () => {
+    const post = await seedPost({ text: INFO_POST })
+    const out = await generate(infoDeps(lane({ writer: 'fails' })), post)
+    expect(out.kind).toBe('generated')
+    const [row] = await mediaFor(db, [post])
+    expect(row!.note).toContain('المحتوى من نصّ المنشور مباشرةً')
+    expect(JSON.parse(row!.prompt).items.map((i: { label: string }) => i.label)).toEqual(['قرار', 'توقيت', 'تحكّم', 'قياس', 'قيمة'])
+  })
+
+  it('**ورقمٌ اخترعه النموذجُ لا يصل إلى الصورة**', async () => {
+    const post = await seedPost({ text: INFO_POST })
+    await generate(infoDeps(lane({ writer: 'fabricates' })), post)
+    const [row] = await mediaFor(db, [post])
+    expect(row!.prompt).not.toContain('85%')
+    expect(row!.model).not.toBe('infographic:stats')
+  })
+
+  it('وسقوطُ التصوير يُردّ ويحرّر حجزَه، ولا صفّ', async () => {
+    const post = await seedPost({ text: INFO_POST })
+    const out = await generate(infoDeps(lane({ shot: 500 })), post)
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.reason).toContain('تعذّر تصويرُ الإنفوجرافيك')
+    expect(await mediaFor(db, [post])).toHaveLength(0)
+    expect((await generate(infoDeps(lane()), post)).kind).toBe('generated')
+  })
+
+  it('ومنشورُ TikTok رأسيٌّ 9:16 لا بمقاس LinkedIn', async () => {
+    const post = await seedPost({ text: INFO_POST, platform: 'tiktok' })
+    await generate(infoDeps(lane()), post)
+    const [row] = await mediaFor(db, [post])
+    expect([row!.width, row!.height]).toEqual([1080, 1920])
   })
 })

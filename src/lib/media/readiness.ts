@@ -31,7 +31,7 @@ import type { RungState } from '../platform/readiness'
 import type { ImageRefusal, SlideGate } from '../image/gate'
 import type { VideoFace } from './video'
 
-export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips'
+export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips' | 'browser' | 'writer'
 
 export interface Dot {
   readonly key: DotKey
@@ -45,6 +45,8 @@ export interface Dot {
 
 /** سطرا اللوح — يُحسَبان مرّةً لكلّ عرضٍ ويُرسَمان تحت كلّ بطاقة. */
 export interface MediaReady {
+  /** الإنفوجرافيك — **وهو الافتراض** (D-174). */
+  readonly infographic: MediaLine
   readonly image: MediaLine
   readonly video: MediaLine
 }
@@ -169,6 +171,29 @@ export function imageReadiness(i: ImageReadinessInput): MediaLine {
     providerDot(i.provider.label, i.provider.refusal),
     ...(overlay === null ? [] : [overlay]),
   ])
+}
+
+/**
+ * سطرُ «ولّد إنفوجرافيك» (D-174) — بترتيب فرعه في `generateForPost`: الحدودُ ثمّ
+ * المتصفّح ثمّ الصياغة.
+ *
+ * **والمتصفّحُ وحدَه يسقط**: بلا مفتاحه لا لقطة. والصياغةُ تنتظرك ولا تسقط: بلا
+ * مزوّد كتابةٍ يُستخرج المحتوى من النصّ بقواعدَ حتميّة، فالزرُّ يعمل والصورةُ من النصّ.
+ */
+export function infographicReadiness(i: {
+  readonly blocker: Blocker | null
+  readonly browser: { readonly key: boolean; readonly account: boolean }
+  readonly briefReady: boolean
+}): MediaLine {
+  const browser: Dot = !i.browser.key
+    ? { key: 'browser', title: 'المتصفّح', state: 'failed', note: 'بلا مفتاح المتصفّح', action: TASKS }
+    : !i.browser.account
+      ? { key: 'browser', title: 'المتصفّح', state: 'failed', note: 'بلا معرّف حساب Cloudflare', action: TASKS }
+      : { key: 'browser', title: 'المتصفّح', state: 'done', note: 'يصوّر الصفحة' }
+  const writer: Dot = i.briefReady
+    ? { key: 'writer', title: 'الصياغة', state: 'done', note: 'نموذجُ الكتابة يستخرج المحتوى' }
+    : { key: 'writer', title: 'الصياغة', state: 'now', note: 'المحتوى من النصّ مباشرةً', action: PROVIDERS }
+  return lineOf([limitsDot(i.blocker), browser, writer])
 }
 
 /**

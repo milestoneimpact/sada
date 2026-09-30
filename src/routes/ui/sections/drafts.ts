@@ -218,7 +218,22 @@ function peakLine(peaks: Peaks | undefined): string {
  * **والسببُ «عند التوليد» لا الآن**: مفتاحٌ ضُبط بعدها لا يرسم على صورةٍ
  * رُفعت، وسطرٌ يقول «اضبط المفتاح» لمن ضبطه كاذبٌ إن لم يُؤرَّخ.
  */
+/** أشكالُ الإنفوجرافيك بأسمائها — تُقرأ تحت الصورة. */
+const INFO_KIND: Readonly<Record<string, string>> = {
+  pillars: 'أعمدة', layers: 'طبقات', steps: 'خطوات', stats: 'أرقام', bars: 'أعمدةٌ بيانيّة', compare: 'مقارنة', quote: 'فكرةٌ واحدة',
+}
+
 function slideLine(m: MediaView): string {
+  if (m.model.startsWith('infographic:')) {
+    // ‏والإنفوجرافيك يُقال بشكله ومن أين جاء محتواه — لا «على الصورة» ولا تحذير
+    const kind = INFO_KIND[m.model.slice('infographic:'.length)] ?? ''
+    return `<div class="pic-foot">
+        ${status('ok', '●', `إنفوجرافيك${kind === '' ? '' : ` · ${escapeHtml(kind)}`}`)}
+        <span class="ago">${m.note === null || m.note === ''
+          ? 'المحتوى من نصّ المنشور بصياغة نموذج الكتابة، ولا رقمَ فيه لا يرد في النصّ.'
+          : escapeHtml(m.note)}</span>
+      </div>`
+  }
   if (m.note === null) return ''
   if (m.note === '') {
     return m.headline === null
@@ -256,13 +271,26 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
   const clip = mine.find((m) => m.status === 'ready' && m.mime.startsWith('video/'))
 
   if (ready !== undefined) {
+    const info = ready.model.startsWith('infographic:')
     // والنصُّ المرسومُ في الصورة مكانُه `alt`: قارئُ الشاشة لا يرى البكسلات
-    const alt = ready.note === '' && ready.headline !== null
-      ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
-      : 'صورةٌ مولَّدة تصاحب المنشور'
+    const alt = info && ready.headline !== null
+      ? `إنفوجرافيك: ${ready.headline}`
+      : ready.note === '' && ready.headline !== null
+        ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
+        : 'صورةٌ مولَّدة تصاحب المنشور'
+    // ‏والأبعادُ المحفوظةُ تحجز المكانَ بنسبته الحقيقيّة (D-174)، وإلّا فمقاسُ الشريحة
+    const w = ready.width ?? SLIDE_SIZE[d.platform].width
+    const h = ready.height ?? SLIDE_SIZE[d.platform].height
+    const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string =>
+      `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جارٍ التوليد…">
+         <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+         <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
+         <input type="hidden" name="style" value="${style}">
+         <button class="g sm" type="submit"${blocked ? ' disabled' : ''}
+           title="تُرفَض هذه بعد أن يمرّ التوليدُ بحرّاسه، فلا يبقى المنشورُ بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
-        loading="lazy" width="${SLIDE_SIZE[d.platform].width}" height="${SLIDE_SIZE[d.platform].height}">
+        loading="lazy" width="${w}" height="${h}">
       <div class="pic-foot">
         <span class="chip mono">${kb(ready.bytes)}</span>
         <span class="chip mono">${ready.cost === 0 ? '—' : money(ready.cost)}</span>
@@ -279,13 +307,9 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
                <button class="g sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
               : ''}
-             <form class="inline" method="POST" action="/panel/media/regenerate"
-               data-busy="جارٍ التوليد…">
-               <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-               <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
-               <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}
-                 title="تُرفَض هذه بعد أن يمرّ التوليدُ بحرّاسه، فلا يبقى المنشورُ بلا صورة"
-                 >ولّد صورةً بديلة</button></form>
+             ${info
+               ? `${regen('infographic', 'ولّد إنفوجرافيك بديلًا', lines.infoBlocked)}${regen('illustration', 'بدّلها صورةً فنّيّة', lines.imageBlocked)}`
+               : `${regen('illustration', 'ولّد صورةً بديلة', lines.imageBlocked)}${regen('infographic', 'بدّلها إنفوجرافيك', lines.infoBlocked)}`}
              <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
                <button class="g sm" type="submit">ارفض الصورة</button></form>`
@@ -309,22 +333,37 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
   return `<div class="pic none">
     ${status('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
-    <span class="ago">${lines.caption}</span>
+    <span class="ago">${INFO_CAPTION}</span>
     <span class="grow"></span>
-    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
+    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…">
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-      <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورة</button></form>
-    ${lines.image}
+      <input type="hidden" name="style" value="infographic">
+      <button class="p sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
+    ${lines.info}
+    <details class="art">
+      <summary>أو صورةٌ فنّيّة</summary>
+      <div class="art-row">
+        <span class="ago">${lines.caption}</span>
+        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
+          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+          <input type="hidden" name="style" value="illustration">
+          <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
+        ${lines.image}
+      </div>
+    </details>
   </div>`
 }
 
 /** ما يُبنى مرّةً للّوح كلِّه — والبطاقاتُ تأخذه ولا تحسبه. */
 interface ReadyLines {
+  /** سطرُ الإنفوجرافيك (D-174) — وهو الزرُّ الأوّل. */
+  readonly info: string
+  readonly infoBlocked: boolean
   readonly image: string
   readonly video: string
   readonly imageBlocked: boolean
   readonly videoBlocked: boolean
-  /** وصفُ الصورة بجانب «بلا صورة» — يتبع حالَ الشريحة لا نصًّا ثابتًا. */
+  /** وصفُ الصورة الفنّيّة في طيّتها — يتبع حالَ الشريحة لا نصًّا ثابتًا. */
   readonly caption: string
 }
 
@@ -366,17 +405,23 @@ function readyLine(line: MediaLine): string {
 function readyLines(ready: MediaReady): ReadyLines {
   const overlay = ready.image.dots.find((dot) => dot.key === 'overlay')
   return {
+    info: readyLine(ready.infographic),
+    infoBlocked: ready.infographic.blocked,
     image: readyLine(ready.image),
     video: readyLine(ready.video),
     imageBlocked: ready.image.blocked,
     videoBlocked: ready.video.blocked,
+    // ‏والصورةُ الفنّيّةُ تُرسم من موجزٍ يترجم النصّ، ولا تُرسم بوصفٍ عامّ إن سقط (D-174)
     caption: overlay === undefined
-      ? 'صورةٌ مجرّدةٌ <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.'
+      ? 'مشهدٌ من موجزٍ يترجم النصّ، <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.'
       : overlay.state === 'done'
-        ? 'صورةٌ <b>وفوقها عنوانٌ من كلمتين أو ثلاث</b>، والنصُّ كاملًا في المنشور.'
-        : 'صورةٌ <b>بلا عنوانٍ فوقها بعد</b> — وما ينقصها تحت الزرّ.',
+        ? 'مشهدٌ من موجزٍ يترجم النصّ، <b>وفوقه عنوانٌ من كلمتين أو ثلاث</b>.'
+        : 'مشهدٌ من موجزٍ يترجم النصّ، <b>بلا عنوانٍ فوقه بعد</b> — وما ينقصه تحت الزرّ.',
   }
 }
+
+/** وصفُ الزرّ الأوّل (D-174): الإنفوجرافيك من النصّ نفسِه، ولا رقمَ من خارجه. */
+const INFO_CAPTION = '<b>إنفوجرافيك من نصّ المنشور</b>: عنوانُه وأبعادُه وأرقامُه كما كُتبت، ولا يُخترَع فيه رقم.'
 
 /**
  * سِلالُ الفرز — **خمسٌ لا سبع**.
@@ -678,6 +723,11 @@ export interface MediaView {
    */
   readonly note: string | null
   readonly headline: string | null
+  /** `infographic:<شكل>` للإنفوجرافيك (D-174)، واسمُ النموذج للصورة الفنّيّة. */
+  readonly model: string
+  /** الأبعادُ يومَ التوليد — و`null` لصفٍّ أقدمَ من ‏0029. */
+  readonly width: number | null
+  readonly height: number | null
 }
 
 export interface DraftsInput {
