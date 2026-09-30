@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { videoCapGate, type Blocker, type VideoCapGate } from '../limits'
 import { imageProviderGate, slideGate, type ImageRefusal, type SlideGate } from '../image/gate'
-import { imageReadiness, routeDot, videoReadiness, type MediaLine } from './readiness'
+import { imageReadiness, routeDot, videoReadiness, type MediaLine, infographicReadiness } from './readiness'
 import type { VideoFace } from './video'
 
 const READY_SLIDE = slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true })
@@ -241,6 +241,7 @@ describe('وحكمُ المزوّد من البوّابة لا من نسخة', (
  */
 describe('نقطةُ المهمّة في جدول التوجيه — نقطةُ مزوّدها لا نقطةُ الحدود', () => {
   const ready = (face: VideoFace, refusal: ImageRefusal | null = null) => ({
+    infographic: infographicReadiness({ blocker: { kind: 'paused' }, browser: { key: true, account: true }, briefReady: true }),
     // موقوفٌ عمدًا: الجدولُ يحكم على المزوّد، والإيقافُ حالُ النظام لا حالُ مهمّة
     image: image({ blocker: { kind: 'paused' }, refusal }),
     video: videoReadiness({ face, blocker: { kind: 'paused' }, clips: videoCapGate(2, 2) }),

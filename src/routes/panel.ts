@@ -26,7 +26,7 @@ import { verifyKey } from '../lib/ai/verify'
 import { listModels } from '../lib/ai/models'
 import { cfAccountId, cfAccountOf } from '../lib/ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate } from '../lib/image/gate'
-import { imageReadiness, routeDot, videoReadiness } from '../lib/media/readiness'
+import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '../lib/media/readiness'
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
@@ -498,6 +498,12 @@ panel.get('/panel', async (c) => {
     binding: c.env.AI !== undefined,
   })
   const mediaReady = {
+    // ‏والإنفوجرافيك يحتاج المتصفّحَ وحدَه، وبلا مزوّد كتابةٍ يُستخرج من النصّ (D-174)
+    infographic: infographicReadiness({
+      blocker: allowance.blocker,
+      browser: { key: facts.secrets.has('CF_BROWSER_TOKEN'), account: facts.vars.has('CF_AI_ACCOUNT_ID') },
+      briefReady,
+    }),
     image: imageReadiness({
       blocker: allowance.blocker,
       provider: { label: imageCard?.label ?? imageName, refusal: imageRefusal },
@@ -574,6 +580,9 @@ panel.get('/panel', async (c) => {
         status: m.status,
         note: m.note,
         headline: m.headline,
+        model: m.model,
+        width: m.width,
+        height: m.height,
       })),
       plan,
       planReady: routes.some(
@@ -1292,6 +1301,8 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
   if ('denied' in gate) return gate.denied
   const id = String(gate.form.get('id') ?? '')
   const old = replace ? String(gate.form.get('media') ?? '') : ''
+  // ‏والنمطُ من قائمةٍ مغلقة، وما سواها إنفوجرافيك وهو الافتراض (D-174)
+  const style = gate.form.get('style') === 'illustration' ? 'illustration' : 'infographic'
 
   const outcome = await generateForPost(
     {
@@ -1301,7 +1312,7 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
       workerSecrets: c.env as unknown as Record<string, string | undefined>,
     },
     id,
-    replace ? { replace: old } : {},
+    replace ? { replace: old, style } : { style },
   )
 
   // ‏وما لم يُولَّد لم يُرفَض: يُقال ذلك للمالك فلا يبحث عن صورةٍ اختفت
@@ -1311,11 +1322,13 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
       ? {
           // **والنصُّ فوق الصورة قد لا يُركَّب لخمسة أسباب** — وسقوطُه كان
           // صامتا، فيُقرأ عطلا في مكانٍ آخر (D-088)
-          kind: outcome.note === '' ? 'ok' : 'warn',
+          kind: style === 'infographic' || outcome.note === '' ? 'ok' : 'warn',
           text:
-            `وُلّدت صورة${replace ? 'ٌ بديلة' : ''} — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.` +
+            (style === 'infographic'
+              ? `رُسم إنفوجرافيك${replace ? ' بديل' : ''} من نصّ المنشور — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.`
+              : `وُلّدت صورة${replace ? 'ٌ بديلة' : ''} — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.`) +
             (replace ? ' والسابقةُ مرفوضةٌ تبقى في الدفتر بكلفتها.' : '') +
-            (outcome.note === '' ? '' : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
+            (outcome.note === '' ? '' : style === 'infographic' ? ` ${outcome.note}.` : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
         ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }
@@ -1335,10 +1348,11 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
       action: replace ? 'media.regenerate' : 'media.generate',
       target: id,
       // والسببُ مع النوع (D-157): «generated» بلا نصٍّ فوقها كانت تُقرأ نجاحا تامّا
-      detail:
+      // ‏والنمطُ في أوّل التفصيل: اسمُ الفعل باقٍ كما تقرؤه الرحلة (D-174)
+      detail: `${style} · ${
         outcome.kind === 'generated'
-          ? outcome.note === '' ? 'generated' : `generated: ${outcome.note}`.slice(0, 200)
-          : 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}`.slice(0, 200) : outcome.kind,
+          ? outcome.note === '' ? 'generated' : `generated: ${outcome.note}`
+          : 'reason' in outcome ? `${outcome.kind}: ${outcome.reason}` : outcome.kind}`.slice(0, 200),
     },
     c.req.raw,
   )

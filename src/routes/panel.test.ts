@@ -2791,8 +2791,10 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
   /** رقمُ «مهامٌّ جاهزة» في شريط المزوّدين. */
   const tasksReady = (html: string): number =>
     Number(/مهامٌّ جاهزة<\/div>\s*<div class="v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
-  const IMAGE_BUTTON_OFF = '<button class="g sm" type="submit" disabled>ولّد صورة</button>'
-  const IMAGE_BUTTON_ON = '<button class="g sm" type="submit">ولّد صورة</button>'
+  const IMAGE_BUTTON_OFF = '<button class="g sm" type="submit" disabled>ولّد صورةً فنّيّة</button>'
+  const IMAGE_BUTTON_ON = '<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>'
+  const INFO_BUTTON_OFF = '<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
+  const INFO_BUTTON_ON = '<button class="p sm" type="submit">ولّد إنفوجرافيك</button>'
 
   it('صورٌ إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطةُ المزوّد تامّة، والجدولُ «جاهز»، والقيمةُ لا تظهر', async () => {
     await upsertProvider(db, {
@@ -2839,12 +2841,13 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     expect(blank).not.toContain('مضبوطان')
   })
 
-  it('والإيقافُ يعطّل «ولّد صورة» وسببُه بجانبه — والحارسُ في الدالّة باقٍ', async () => {
+  it('والإيقافُ يعطّل زرَّي الصورة وسببُه بجانبهما — والحارسُ في الدالّة باقٍ', async () => {
     await seedDraft()
     const cookie = await login()
     await writeSetting(db, 'paused', 'true', 'test')
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
+    expect(html).toContain(IMAGE_BUTTON_OFF)
+    expect(html).toContain(INFO_BUTTON_OFF)
     expect(html).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
   })
 
@@ -2896,6 +2899,24 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     // الصورةُ تخرج بلا عنوان — فالزرُّ يعمل
     expect(off).toContain(IMAGE_BUTTON_ON)
     expect(off).not.toContain('sk-ant-test-0001')
+  })
+
+  /*
+   * **والإنفوجرافيك يُصوَّر بالمتصفّح** (D-174): المفتاحُ والحسابُ من البيئة
+   * كما تقرؤهما `generateForPost`، ونموذجُ الكتابة الغائبُ لا يُعطِّله.
+   */
+  it('الإنفوجرافيك: بلا مفتاح المتصفّح معطَّل، وبه وبالحساب يعمل — والسرُّ لا يظهر', async () => {
+    await seedDraft()
+    const none = await panelHtml()
+    expect(none).toContain(INFO_BUTTON_OFF)
+    expect(none).toContain('title="ساقطة — بلا مفتاح المتصفّح"')
+
+    env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0002'
+    env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
+    const ready = await panelHtml()
+    expect(ready).toContain(INFO_BUTTON_ON)
+    expect(ready).toContain('title="تامّة — يصوّر الصفحة"')
+    expect(ready).not.toContain('سرّ-المتصفّح-0002')
   })
 
   it('الحسابُ والمفتاحُ في أسرار Worker: نقطةُ المقطع «من أسرار Worker»، والجدولُ «جاهز»', async () => {

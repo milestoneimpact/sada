@@ -359,9 +359,10 @@ export async function animateForPost(
   await deps.db
     .prepare(
       `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd,
-                          status, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'ready', ?)`,
+                          status, idempotency_key, width, height)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'ready', ?, 720, 1280)`,
     )
+    // ‏والمقطعُ رأسيٌّ بمقاسٍ واحد (D-052): ‏9:16 بدقّة 720P كما يُطلب من النموذج
     .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, model, key)
     .run()
 

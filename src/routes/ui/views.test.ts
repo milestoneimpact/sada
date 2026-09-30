@@ -35,12 +35,13 @@ import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
 import { panelPage } from '../panelView'
 import { SCRIPT } from './panelScript'
-import { imageReadiness, videoReadiness } from '../../lib/media/readiness'
+import { imageReadiness, infographicReadiness, videoReadiness } from '../../lib/media/readiness'
 import { slideGate } from '../../lib/image/gate'
 import { videoCapGate } from '../../lib/limits'
 
 /** نقاطٌ تامّةٌ كلُّها — لما لا يُختبَر فيه السطرُ نفسُه (D-163). */
 const READY = {
+  infographic: infographicReadiness({ blocker: null, browser: { key: true, account: true }, briefReady: true }),
   image: imageReadiness({
     blocker: null, provider: { label: 'Gemini', refusal: null },
     slide: slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true }), briefReady: true,
@@ -532,7 +533,7 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
       drafts: [draft],
       media: [{
         id: 'm1', postId: 'd1', mime: 'image/jpeg', bytes: 148_320, prompt: 'p', cost: 0.039,
-        status: 'ready', note, headline,
+        status: 'ready', note, headline, model: 'gemini', width: null, height: null,
       }],
       targets: [], earliest: '2026-09-06T09:15',
       writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
@@ -926,7 +927,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
   })
   const picture = (postId: string, mime = 'image/png') => ({
     id: `m-${postId}-${mime.slice(0, 5)}`, postId, mime, bytes: 1000, prompt: '', cost: 0,
-    status: 'ready' as const, note: null, headline: null,
+    status: 'ready' as const, note: null, headline: null, model: 'gemini', width: null, height: null,
   })
   const section = (
     drafts: DraftRow[],
@@ -946,13 +947,43 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     })
   const ON = slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true })
 
-  it('سطرُ الصورة داخل «بلا صورة» بعد «ولّد صورة»، ونقاطُه لونٌ ورمزٌ وكلمة', () => {
+  it('سطرُ كلِّ زرٍّ بعده داخل «بلا صورة»: الإنفوجرافيك أوّلًا، والفنّيّةُ في طيّتها (D-174)', () => {
     const html = section([draft('d1')])
     const box = html.slice(html.indexOf('<div class="pic none">'), html.indexOf('<div class="draft-meta">'))
-    expect(box.indexOf('ولّد صورة')).toBeGreaterThan(-1)
-    expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(box.indexOf('ولّد صورة'))
+    const info = box.indexOf('ولّد إنفوجرافيك')
+    const art = box.indexOf('ولّد صورةً فنّيّة')
+    expect(info).toBeGreaterThan(-1)
+    expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(info)
+    expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
+    expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
+    expect(box).toContain(status('ok', '●', 'المتصفّح', 'title="تامّة — يصوّر الصفحة"'))
+    expect(box).toContain(status('ok', '●', 'الصياغة', 'title="تامّة — نموذجُ الكتابة يستخرج المحتوى"'))
     expect(box).toContain(status('ok', '●', 'الحدود', 'title="تامّة — مفتوحةٌ اليوم"'))
     expect(box).toContain(status('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
+    expect(box).toContain('<b>إنفوجرافيك من نصّ المنشور</b>')
+    // ‏والزرّان يرسلان نمطَهما — والدالّةُ تأخذ الإنفوجرافيك حين يغيب
+    expect(box).toContain('<input type="hidden" name="style" value="infographic">')
+    expect(box).toContain('<input type="hidden" name="style" value="illustration">')
+  })
+
+  it('والإنفوجرافيك بلا مفتاح المتصفّح معطَّلٌ وسببُه بجانبه — والفنّيّةُ لا تتبعه', () => {
+    const noBrowser = {
+      ...READY,
+      infographic: infographicReadiness({ blocker: null, browser: { key: false, account: true }, briefReady: true }),
+    }
+    const html = section([draft('d1')], { mediaReady: noBrowser })
+    expect(html).toContain('<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
+    expect(html).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
+
+    // ‏ونموذجُ الكتابة الساقطُ ينتظرك ولا يُعطِّل: المحتوى من النصّ مباشرةً
+    const noWriter = {
+      ...READY,
+      infographic: infographicReadiness({ blocker: null, browser: { key: true, account: true }, briefReady: false }),
+    }
+    const plain = section([draft('d1')], { mediaReady: noWriter })
+    expect(plain).toContain('<button class="p sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(plain).toContain('<span class="ago">المحتوى من النصّ مباشرةً</span>')
   })
 
   it('وسطرُ المقطع بعد «حرّكها فيديو» — ولا زرَّ ولا سطرَ حين يوجد مقطع', () => {
@@ -972,22 +1003,24 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(section([draft('d1', 'published')], { media: [picture('d1')] })).not.toContain('class="hint ready"')
   })
 
-  it('يُبنى مرّةً: ثلاثُ مسوّداتٍ فيها السطرُ نفسُه حرفًا', () => {
+  it('يُبنى مرّةً: ثلاثُ مسوّداتٍ فيها السطران نفسُهما حرفًا', () => {
     const html = section([draft('a'), draft('b'), draft('c')])
     const lines = [...html.matchAll(/<p class="hint ready">[\s\S]*?<\/p>/g)].map((m) => m[0])
-    expect(lines).toHaveLength(3)
-    expect(new Set(lines).size).toBe(1)
+    expect(lines).toHaveLength(6)
+    expect(new Set(lines).size).toBe(2)
   })
 
   it('والنقطةُ الساقطةُ تعطّل الزرَّ وسببُها ورابطُها بجانبه', () => {
     const blocked = {
+      infographic: infographicReadiness({ blocker: { kind: 'paused' }, browser: { key: true, account: true }, briefReady: true }),
       image: imageReadiness({
         blocker: { kind: 'paused' }, provider: { label: 'Gemini', refusal: null }, slide: ON, briefReady: true,
       }),
       video: videoReadiness({ face: 'none', blocker: null, clips: videoCapGate(0, 2) }),
     }
     const empty = section([draft('d1')], { mediaReady: blocked })
-    expect(empty).toContain('<button class="g sm" type="submit" disabled>ولّد صورة</button>')
+    expect(empty).toContain('<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(empty).toContain('<button class="g sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
     expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
 
     const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
@@ -998,7 +1031,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const waiting = section([draft('d1')], {
       mediaReady: withImage(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true })),
     })
-    expect(waiting).toContain('<button class="g sm" type="submit">ولّد صورة</button>')
+    expect(waiting).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
     expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
   })
 
@@ -1011,8 +1044,10 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
     expect(html).toContain('<button class="g sm" type="submit" disabled>حرّكها فيديو</button>')
     expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
-    // ‏وسقفُ المقاطع يحجب التحريكَ وحده: «ولّد صورة» على مسوّدةٍ أخرى يعمل
-    expect(section([draft('d2')], { mediaReady: full })).toContain('<button class="g sm" type="submit">ولّد صورة</button>')
+    // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
+    const other = section([draft('d2')], { mediaReady: full })
+    expect(other).toContain('<button class="p sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(other).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
 
     const under = section([draft('d1')], { media: [picture('d1')] })
     expect(under).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
@@ -1030,14 +1065,15 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
   it('و«بلا حرف» يتبع الشريحة: مطفأةٌ فبلا حرف، ومركَّبةٌ فعنوان، وناقصةٌ فبعدُ', () => {
     const at = (overlay: boolean, hasBrowserKey: boolean): string =>
       section([draft('d1')], { mediaReady: withImage(slideGate({ overlay, hasBrowserKey, hasAccount: true })) })
-    expect(at(false, true)).toContain('صورةٌ مجرّدةٌ <b>بلا حرف</b>')
-    expect(at(true, true)).toContain('<b>وفوقها عنوانٌ من كلمتين أو ثلاث</b>')
+    expect(at(false, true)).toContain('مشهدٌ من موجزٍ يترجم النصّ، <b>بلا حرف</b>')
+    expect(at(true, true)).toContain('<b>وفوقه عنوانٌ من كلمتين أو ثلاث</b>')
     expect(at(true, true)).not.toContain('بلا حرف')
-    expect(at(true, false)).toContain('<b>بلا عنوانٍ فوقها بعد</b>')
+    expect(at(true, false)).toContain('<b>بلا عنوانٍ فوقه بعد</b>')
   })
 
   it('وسببُ السطر لا يمتدّ مئتي بكسل: قاعدةُ «بلا صورة» على ابنها المباشر وحده', () => {
     expect(css.rule('.pic.none > .ago').flex).toBe('1 1 200px')
+    expect(css.rule('.art-row > .ago').flex).toBe('1 1 200px')
     expect(css.rules().some((r) => r.selectors.includes('.pic.none .ago'))).toBe(false)
     expect(Object.keys(css.rule('.hint.ready')).length).toBeGreaterThan(0)
     // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
