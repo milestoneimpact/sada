@@ -224,7 +224,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="alert_webhook">
       <div class="field grow"><label for="hook">عنوانُ القناة (Webhook)</label>
-        <input id="hook" name="value" type="url" class="mono" inputmode="url"
+        <input id="hook" name="value" type="url" class="mono" dir="ltr" inputmode="url"
           placeholder="https://hooks.slack.com/services/…"
           value="${escapeHtml(webhook)}"></div>
       <button class="g" type="submit">احفظ</button>

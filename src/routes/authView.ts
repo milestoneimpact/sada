@@ -89,7 +89,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
        <form method="POST" action="/panel/2fa/totp">
          ${hidden}
          <div class="field"><label for="code">رمز التطبيق</label>
-           <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
+           <input id="code" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
                   pattern="[0-9 ]{6,8}" maxlength="8" required
                   ${d.hasPasskey ? '' : 'autofocus'}></div>
          <button class="${d.hasPasskey ? 'g' : 'p'}" type="submit">تأكيد</button>
@@ -101,7 +101,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
          <form method="POST" action="/panel/2fa/recovery">
            ${hidden}
            <div class="field"><label for="rc">رمز الاسترداد</label>
-             <input id="rc" name="code" autocomplete="off" spellcheck="false"
+             <input id="rc" name="code" dir="ltr" autocomplete="off" spellcheck="false"
                     placeholder="XXXXX-XXXXX" required></div>
            <button class="g" type="submit">استخدم الرمز</button>
          </form>

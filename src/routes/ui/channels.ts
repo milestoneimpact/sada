@@ -200,7 +200,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         <label for="cb-${id}">رابطُ العودة</label>
         <div class="help"><span class="i">!</span><span class="t">${guide.gotcha}</span></div>
         <div class="copy">
-          <input id="cb-${id}" class="mono" value="${escapeHtml(callback)}" readonly
+          <input id="cb-${id}" class="mono" dir="ltr" value="${escapeHtml(callback)}" readonly
             aria-label="رابط العودة — للنسخ">
           <button type="button" class="g sm" data-copy="cb-${id}">انسخ</button>
         </div>
@@ -212,7 +212,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           <label for="ci-${id}">Client ID</label>
           <div class="help" id="ci-${id}-h"><span class="i">؟</span>
             <span class="t">${guide.whereId}</span></div>
-          <input id="ci-${id}" name="client_id" required aria-describedby="ci-${id}-h"
+          <input id="ci-${id}" name="client_id" dir="ltr" required aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
           ${/*
             * **الفخُّ الذي أضاع ساعة** (D-074).
@@ -234,7 +234,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           <label for="cs-${id}">Client Secret</label>
           <div class="help" id="cs-${id}-h"><span class="i">؟</span>
             <span class="t">${guide.whereSecret}</span></div>
-          <input id="cs-${id}" name="client_secret" type="password" required
+          <input id="cs-${id}" name="client_secret" type="password" dir="ltr" required
             aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
             autocomplete="off" spellcheck="false">

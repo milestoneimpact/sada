@@ -2262,6 +2262,38 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     return app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body }), env)
   }
 
+  /*
+   * **المعرّفُ يُرى كما لُصق** — لاتينيٌّ في صفحةٍ عربيّة. معرّفُ Google
+   * `147…-k2b….apps.googleusercontent.com` يبدأ بأرقامٍ ثمّ شرطة، وفي حقلٍ
+   * يرث اتّجاهَ الصفحة تنتقل الأرقامُ إلى آخره فيُقرأ معكوسًا والقيمةُ سليمة.
+   * فكلُّ حقلٍ تقنيٍّ لاتينيُّ الاتّجاه بسمته، في كلّ صفحةٍ يُكتب فيها.
+   */
+  it('حقولُ المعرّف والسرّ والمفتاح والعنوان لاتينيّةُ الاتّجاه — ومعرّفُ Google يُحفَظ كما لُصق', async () => {
+    const cookie = await login()
+    const googleId = '147369989995-k2baktqm1upbht37cn4inclce251au8j.apps.googleusercontent.com'
+    const body = new FormData()
+    body.set('platform', 'youtube')
+    body.set('client_id', googleId)
+    body.set('client_secret', 'GOCSPX-سرٌّ-للاختبار')
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body }), env)
+    const row = db.raw.prepare('SELECT client_id FROM oauth_apps WHERE platform = ?').get('youtube') as { client_id: string }
+    expect(row.client_id).toBe(googleId)
+
+    const TECH = /\bname="(client_id|client_secret|key|base_url|model|token|code)"/
+    const pages = [
+      await (await app.request('/panel', withSession(cookie), env)).text(),
+      await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text(),
+    ]
+    const inputs = pages.flatMap((html) => [...html.matchAll(/<input\b[^>]*>/g)].map((m) => m[0]))
+      .filter((tag) => TECH.test(tag) && !tag.includes('type="hidden"'))
+    expect(inputs.map((tag) => TECH.exec(tag)?.[1])).toEqual(expect.arrayContaining(['client_id', 'client_secret', 'key', 'base_url', 'model']))
+    for (const tag of inputs) expect(tag).toContain('dir="ltr"')
+    expect(pages[1]).toContain(`value="${googleId}"`)
+    // ‏ونهايةُ المعرّف في الدليل معزولةٌ: نقطتُها الأولى لا تقفز إلى آخر السطر
+    expect(pages[1]).toContain('<span class="mono">.apps.googleusercontent.com</span>')
+    expect(pages[1]).toContain('<b>Audience</b>')
+  })
+
   it('يحفظ مشفَّرا، ولا يُخزَّن السرُّ خاما', async () => {
     const cookie = await login()
     await save(cookie)

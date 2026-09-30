@@ -102,8 +102,10 @@ const YOUTUBE_GUIDE: SetupGuide = {
       why: 'بلا تفعيلها يُردّ كلُّ نداءٍ بـ <span class="mono">accessNotConfigured</span> — <b>ولو صحّ السرُّ والنطاق</b>.',
     },
     {
-      what: 'OAuth consent screen ← External ← أضف بريدك في <b>Test users</b>',
-      why: 'التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج. <b>وبريدُك أنت أوّلُهم</b>، وإلّا رُدّ إذنُك أنت.',
+      what: 'Google Auth Platform ← <b>Audience</b> ← External ← Test users ← <b>Add users</b> ← بريدُ الحساب الذي ستربط به',
+      why: 'التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج، <b>ولو كنتَ مالكَ المشروع</b>. والبريدُ هو ما تختاره في شاشة Google ' +
+        'عند «اربط» (صاحبُ القناة)، لا بريدُ Cloud Console إن اختلفا. وإلّا ظهر «لم يكمل التطبيقُ عمليّةَ التحقّق» ' +
+        '<span class="mono">403 access_denied</span>.',
     },
     {
       what: 'Data access ← Add scopes ← اختر <span class="mono">youtube.upload</span> و <span class="mono">youtube.readonly</span>',
@@ -118,13 +120,13 @@ const YOUTUBE_GUIDE: SetupGuide = {
       why: 'Google يطابقه <b>حرفا بحرف</b>، ويردّ <span class="mono">redirect_uri_mismatch</span> على أدنى فرق.',
     },
   ],
-  whereId: 'Credentials ← عميلُك ← <b>Client ID</b> (ينتهي بـ .apps.googleusercontent.com)',
+  whereId: 'Credentials ← عميلُك ← <b>Client ID</b>، وينتهي بـ <span class="mono">.apps.googleusercontent.com</span>',
   whereSecret: 'تحته: <b>Client secret</b>. واضغط زرَّ النسخ — ولا تعيد إنشاء العميل.',
   success:
     'يظهر <span class="mono">youtube.readonly</span> و <span class="mono">youtube.upload</span> ' +
     'في شاشة الإذن حين تضغط «اربط»، وبعدها تُعرض قناتُك باسمها لا بمعرّفها.',
   failure:
-    '<span class="mono">access_denied</span> ← بريدُك ليس في Test users. ' +
+    '«لم يكمل التطبيقُ عمليّةَ التحقّق» <span class="mono">403 access_denied</span> ← البريدُ الذي اخترته ليس في Test users. ' +
     'و <span class="mono">redirect_uri_mismatch</span> ← الرابطُ لم يُلصق حرفا بحرف. ' +
     'و <b>لا قناةَ على هذا الحساب</b> ← حسابُ Google بلا قناة YouTube، فأنشئ قناةً أوّلا.',
   gotcha:
@@ -155,7 +157,8 @@ const TIKTOK_GUIDE: SetupGuide = {
       why: 'بدونها يصل المقطعُ <b>مسوّدةً تنشرها بيدك</b> من تطبيق TikTok. وهي تعمل، ولا تنشر وحدها.',
     },
     {
-      what: 'وتبويب <b>Domain verification</b>: أضف <span class="mono">sada2.basserh.com</span> وأثبت ملكيّته',
+      // ‏بلا نطاقٍ مكتوب: الدليلُ نفسُه يُعرض على الإنتاج وstaging، ولكلٍّ نطاقُه في رابط العودة
+      what: 'وتبويب <b>Domain verification</b>: أضف <b>نطاقَ رابط العودة أدناه</b> (بلا https ولا مسار) وأثبت ملكيّته',
       why: 'TikTok يسحب المقطعَ من رابطٍ عندنا، <b>ولا يسحب من نطاقٍ لم يُثبَت</b>.',
     },
     {
