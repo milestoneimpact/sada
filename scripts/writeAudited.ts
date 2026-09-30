@@ -27,7 +27,26 @@ import { writeFileSync } from 'node:fs'
 import { FACES } from '../src/lib/ui/fonts'
 import { assetAt, STYLE_BODY, STYLE_PATH } from '../src/lib/ui/asset'
 
-export function writeAudited(path: string, html: string): void {
+/**
+ * صورٌ للعيّنة بصيغة `data:` — **فيرى المدقّقُ الصورةَ بنسبتها** (D-172).
+ *
+ * مسارُ `/panel/media/:id` خلف الجلسة، ولا جلسةَ في `file://`، فكانت كلُّ
+ * صورةٍ في العيّنات مربّعًا مكسورًا يقيسه المدقّقُ ولا يراه أحد. **والمجرّدُ
+ * يبقى بمساره**، فلا يُحسب وزنُ الصور في وزن الصفحة.
+ */
+export function fixtureImage(width: number, height: number, hue: number): string {
+  const r = Math.min(width, height)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 32% 20%)"/>` +
+    `<stop offset="1" stop-color="hsl(${hue + 30} 42% 56%)"/></linearGradient></defs>` +
+    `<rect width="100%" height="100%" fill="url(#g)"/>` +
+    `<circle cx="${width * 0.62}" cy="${height * 0.46}" r="${r * 0.22}" fill="hsl(${hue + 50} 58% 72%)" opacity=".85"/>` +
+    `<rect x="${width * 0.2}" y="${height * 0.3}" width="${width * 0.26}" height="${height * 0.38}" rx="${r * 0.04}" ` +
+    `fill="hsl(${hue} 28% 90%)" opacity=".7"/></svg>`
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+}
+
+export function writeAudited(path: string, html: string, media: Readonly<Record<string, string>> = {}): void {
   /*
    * **وورقةُ الأنماط تُضَمّ كذلك** (D-101).
    *
@@ -56,6 +75,10 @@ export function writeAudited(path: string, html: string): void {
   // والسبقُ يُحذَف: مسارٌ لا يُحلّ من `file://` يعطي خطأ شبكةٍ في السجلّ
   inlined = inlined.replace(/<link rel="preload" as="font"[^>]*>\n?/g, '')
 
+  for (const [id, uri] of Object.entries(media)) {
+    inlined = inlined.replaceAll(`src="/panel/media/${id}"`, `src="${uri}"`)
+      .replaceAll(`poster="/panel/media/${id}"`, `poster="${uri}"`)
+  }
   writeFileSync(path, inlined)
   // والمجرّدُ بجانبه — يقرؤه مدقّقُ الوزن وحدَه
   writeFileSync(path.replace(/\.html$/, '.bare.html'), html)

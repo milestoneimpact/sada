@@ -13,6 +13,7 @@
  * الخطوتان ٣ و٤ قبل ٥ عمدا: الطلب الذي أُرسل وضاع جوابه قد كُلِّف فعلا،
  * وسجلٌّ أعلى من الحقيقة أهون من سجل أقل منها.
  */
+import { CLIP_PLATFORMS } from '../platform/needs'
 import { estimatePostCost, recordCost } from '../cost'
 import { containsUrl } from '../idempotency'
 import { loadTokens, markNeedsReauth, type Db } from '../tokens'
@@ -28,14 +29,7 @@ import { mediaUrl, signMediaToken } from '../media/link'
 import { publishTikTok } from './tiktok'
 import { publishYouTube } from './youtube'
 
-/**
- * منصّاتُ المقاطع — **تطلب مقطعا ولا تقبل نصّا وحده** (D-096).
- *
- * ولا نهايةَ نشرٍ نصّيّةٍ عند أيٍّ منهما أصلا. **ومجموعةٌ واحدةٌ لا شرطان
- * متكرّران**: شرطٌ يُزاد في موضعٍ ويُنسى في خمسةٍ هو علّةُ `KNOWN_TASKS`
- * نفسُها (D-091) — وقد تكرّر هنا خمسَ مرّات.
- */
-const CLIP_PLATFORMS: ReadonlySet<string> = new Set(['tiktok', 'youtube'])
+// ‏منصّاتُ المقاطع من جدول المطلوب (D-096 · D-172): الناشرُ والشاشةُ يقرآنها من موضعٍ واحد
 
 export interface PublishMessage {
   readonly postId: string

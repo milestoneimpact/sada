@@ -980,23 +980,6 @@ ol.steps.wiz.nodot li::before{display:none}
 .ftab.bad.on{border-color:var(--bad); background:color-mix(in srgb,var(--bad) 10%,transparent)}
 .ftab.bad.on .count{background:var(--bad); color:var(--bg)}
 
-/* ── مصغَّراتُ الوسائط ────────────────────────────────────────────────
-   **الصورةُ تُعرَض لا يُقال إنّ هناك صورة.** ومقاسٌ ثابتٌ يمنع القفزَ
-   قبل التحميل: صفٌّ يتمدّد بعد وصول البايتات يزيح ما تحته تحت الإصبع.
-
-   والمرفوضةُ تبقى معروضةً مُعتِمةً: كلفتُها دُفعت، وإخفاؤها يجعل سطرا
-   في الدفتر بلا ما يقابله. */
-.thumbs{display:flex; flex-wrap:wrap; gap:var(--s-2); margin:var(--s-3) 0}
-.thumb{position:relative; display:block; width:96px; height:96px; flex:none;
-  border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--line);
-  background:var(--surface-3)}
-.thumb img,.thumb video{width:100%; height:100%; object-fit:cover; display:block}
-.thumb.off{opacity:.45; filter:grayscale(1)}
-.thumb .tag{position:absolute; inset-inline-start:var(--s-1); bottom:var(--s-1);
-  font-size:var(--t-xs); font-weight:700; padding:0 var(--s-2); border-radius:var(--r-pill);
-  background:var(--chrome); color:var(--ink)}
-.thumb .tag.bad{background:var(--bad); color:var(--bg)}
-
 /* ── لوحُ الإرشاد تحت اللصيقة ─────────────────────────────────────────
    بحثُ GOV.UK: المستخدمُ يبدأ الكتابة فور رؤية الحقل، **ولا ينظر تحته
    أبدا** — فالموضعُ فوق الحقل، وهو ما كان.
@@ -1297,20 +1280,10 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .plat-logo.lg{width:58px; height:58px; border-radius:var(--r-lg)}
 .plat-logo.lg svg{width:29px; height:29px}
 
-/* المنشوراتُ عمودٌ واحد لا شبكة: النصُّ هو المقروء، وعمودان يقصّان
-   السطرَ إلى نصفِ مقاسٍ يُقرأ فيه. */
-.posts{display:flex; flex-direction:column; gap:var(--s-3)}
-.post{background:var(--surface); background-image:var(--sheen);
-  border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s-4) var(--s-5);
-  box-shadow:var(--sh-1), inset 0 1px 0 var(--hair)}
-.post-top{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
-  margin-bottom:var(--s-3)}
 /* النصُّ كما نُشر: يحفظ أسطرَه — منشورٌ بفقرتين يُقرأ فقرةً واحدة إن
    طُويت أسطرُه، فيُحكَم عليه بغير ما ظهر عليه. */
 .post-text{margin:0; white-space:pre-wrap; word-break:break-word;
   font-size:var(--t-md); line-height:var(--lh); color:var(--ink); max-width:var(--measure)}
-.post-foot{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
-  margin-top:var(--s-3)}
 /* ── صفُّ الأرقام ─────────────────────────────────────────────────────
    والشرطةُ تختلف عن الصفر: الصفرُ «قِيس فكان لا شيء»، والشرطةُ «لا يُقاس
    أصلا» — و LinkedIn لا يعطي الظهورَ لمنشور عضو. فتُعطى الشرطةُ لونا
@@ -1801,6 +1774,195 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
    فعادت آخرَ الورقة، واختبارٌ في views.test يُسقط CI إن كُتبت قاعدةٌ
    بعدها: **ما يُضاف يُكتب فوق هذا السطر.**
    ══════════════════════════════════════════════════════════════════ */
+/* ── صفحةُ المنصّة صفحةَ حساب (D-172) ───────────────────────────────────
+   الغلافُ مسطّحٌ من أرض الثيم وخيطٌ تحته، والشعارُ الأحاديّ في جهة النهاية
+   زخرفٌ مخفيّ. وصورةُ الحساب حرفٌ أوّل تتداخل مع الغلاف بـ translate لا
+   بهامشٍ سالب. ونسبةُ الغلاف تختلف كما تختلف عند المنصّات، ولا غلافَ في
+   Instagram وTikTok. */
+.acct{background-color:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+  overflow:hidden; margin-bottom:var(--s-5); box-shadow:var(--sh-1)}
+.acct-cover{position:relative; block-size:120px; background-color:var(--surface-2);
+  background-image:var(--bloom); border-block-end:1px solid var(--line)}
+.acct-x .acct-cover{block-size:144px}
+.acct-youtube .acct-cover{block-size:96px}
+.acct-instagram .acct-cover,.acct-tiktok .acct-cover{display:none}
+.acct-mark{position:absolute; inset-inline-end:var(--s-6); inset-block-end:var(--s-5); color:var(--ink-3); opacity:.5}
+.acct-mark svg{inline-size:40px; block-size:40px; display:block}
+.acct-body{position:relative; display:flex; align-items:flex-end; gap:var(--s-5); flex-wrap:wrap;
+  padding:var(--s-12) var(--s-6) var(--s-5)}
+.acct-av{flex:none; display:grid; place-items:center; inline-size:96px; block-size:96px; border-radius:50%;
+  background-color:var(--surface-3); color:var(--ink-2); border:4px solid var(--surface);
+  font-family:var(--font-display); font-size:var(--t-3xl); font-weight:700; line-height:var(--lh-tight);
+  position:absolute; inset-block-start:calc(var(--s-12) * -1); inset-inline-start:var(--s-6)}
+.acct-av[data-kind="org"]{border-radius:var(--r-lg)}
+/* وبلا غلافٍ يعود إلى السطر: لا شيءَ يتداخل معه */
+.acct-instagram .acct-av,.acct-tiktok .acct-av{position:static}
+.acct-instagram .acct-body,.acct-tiktok .acct-body{padding-block-start:var(--s-5)}
+.acct-id{flex:1 1 320px; min-inline-size:0}
+.acct-id h1{margin:var(--s-1) 0 0; font-family:var(--font-display); font-size:var(--t-2xl); line-height:var(--lh-tight)}
+.acct-sub{margin:var(--s-1) 0 0; color:var(--ink-3); font-size:var(--t-sm)}
+.acct-counts{display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-5); margin:var(--s-3) 0 0; padding:0;
+  list-style:none; color:var(--ink-2); font-size:var(--t-sm)}
+.acct-counts b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums}
+.acct-counts .bad b{color:var(--bad)}
+.acct-act{display:flex; flex-direction:column; align-items:flex-end; gap:var(--s-3)}
+.acct-verdict{display:inline-flex; align-items:center; gap:var(--s-2)}
+.acct-card{margin-bottom:var(--s-3)}
+
+/* ما تطلبه المنصّة: سبعُ خاناتٍ متساوية، القاعدةُ سطرٌ وحالُ المنصّة تحته.
+   والساقطةُ تُرى بحدٍّ لا بلونٍ وحدَه، والخانةُ رابطٌ بهدف لمسٍ كامل. */
+.needs{margin-bottom:var(--s-5)}
+.needs-h{display:flex; align-items:baseline; gap:var(--s-3); margin:0 0 var(--s-3); font-size:var(--t-md)}
+.needs-list{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-2); margin:0; padding:0; list-style:none}
+.needs-list a{display:flex; flex-direction:column; gap:var(--s-1); block-size:100%; min-block-size:var(--tap);
+  padding:var(--s-3); border:1px solid var(--line); border-radius:var(--r); background-color:var(--surface);
+  color:var(--ink); text-decoration:none}
+@media(hover:hover){.needs-list a:hover{border-color:var(--line-strong)}}
+.needs-top{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-sm)}
+.needs-top .n{font-size:var(--t-xs); color:var(--ink-3); font-variant-numeric:tabular-nums}
+.needs-g{margin-inline-start:auto; display:inline-flex}
+.needs-g svg{inline-size:10px; block-size:10px}
+.needs-rule{font-size:var(--t-xs); color:var(--ink-3); line-height:var(--lh-tight)}
+.needs-now{font-size:var(--t-xs); color:var(--ink-2); font-weight:600; line-height:var(--lh-tight)}
+.needs-list .ok .needs-g{color:var(--ok)}
+.needs-list .warn .needs-g{color:var(--warn)}
+.needs-list .idle .needs-g{color:var(--ink-3)}
+.needs-list .bad a{border-color:var(--bad); background-color:var(--bad-wash)}
+.needs-list .bad .needs-g,.needs-list .bad .needs-now{color:var(--bad)}
+@media(max-width:1180px){.needs-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:720px){
+  /* وعلى الجوّال خانتان في الصفّ، والقاعدةُ تُطوى وتبقى الحال: المنشورُ الأوّلُ
+     قبل الشاشة الثانية لا بعدها */
+  .needs-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .needs-rule{display:none}
+  .needs-list a{padding:var(--s-2) var(--s-3)}
+  .acct-cover,.acct-x .acct-cover,.acct-youtube .acct-cover{block-size:72px}
+  .acct-counts{gap:var(--s-1) var(--s-3)}
+  .acct-body{padding:var(--s-10) var(--s-4) var(--s-4)}
+  .acct-av{inline-size:72px; block-size:72px; font-size:var(--t-2xl); inset-block-start:calc(var(--s-10) * -1);
+    inset-inline-start:var(--s-4)}
+  .acct-act{align-items:stretch; inline-size:100%}
+  .acct-act .btn{justify-content:center}
+}
+
+/* ── المنشورُ كما سيظهر ───────────────────────────────────────────────
+   بنيةُ المنصّة وجلدُ صدى: خطُّ اللوحة وحبرُها، بلا لون المنصّة ولا
+   أيقوناتها. والإطارُ صورةُ المنشور وحدَه؛ الحالُ والأزرارُ خارجه. */
+.np-list{display:flex; flex-direction:column}
+.np-row{display:grid; grid-template-columns:8.5rem minmax(0,var(--np-w-li)) minmax(0,1fr); gap:var(--s-5);
+  align-items:start; padding-block:var(--s-5); border-block-end:1px solid var(--line-soft);
+  scroll-margin-block-start:var(--s-16)}
+.np-row:target{outline:2px solid var(--ring); outline-offset:var(--s-2); border-radius:var(--r)}
+.np-when{display:flex; flex-direction:column; gap:var(--s-1); align-items:flex-start}
+.np-dayl{font-size:var(--t-sm); color:var(--ink-2); font-weight:600}
+.np-clock{font-family:var(--font-display); font-size:var(--t-xl); line-height:var(--lh-tight);
+  font-variant-numeric:tabular-nums}
+.np-utc{font-size:var(--t-xs); color:var(--ink-3); font-variant-numeric:tabular-nums}
+.np-under{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2); font-size:var(--t-sm)}
+.np-acc{color:var(--ink-2); font-weight:600}
+.np-result{color:var(--ink-2)}
+.np-result b{color:var(--ink); font-variant-numeric:tabular-nums}
+.np-why{display:flex; gap:var(--s-2); margin:0; color:var(--bad); line-height:var(--lh)}
+.np-why .i svg{inline-size:10px; block-size:10px}
+.np-day{position:sticky; inset-block-start:0; z-index:1; margin:var(--s-5) 0 0; padding-block:var(--s-2);
+  background-color:var(--bg); color:var(--ink-2); font-size:var(--t-sm); font-weight:700;
+  border-block-end:1px solid var(--line)}
+.np-note{margin:var(--s-6) 0 0; color:var(--ink-3); font-size:var(--t-xs)}
+.acct-more{margin-block:var(--s-4)}
+
+.np{container-type:inline-size; inline-size:100%; margin:0; background-color:var(--surface); color:var(--ink);
+  border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden; font-size:var(--t-base);
+  line-height:var(--lh); box-shadow:var(--sh-1)}
+.np-li{max-inline-size:var(--np-w-li)}
+.np-ig{max-inline-size:var(--np-w-li)}
+.np-tt,.np-yt{max-inline-size:var(--np-w-clip); border:0; border-radius:var(--r-lg);
+  background-color:var(--np-stage); color:var(--np-on-stage)}
+.np-head{display:flex; align-items:center; gap:var(--s-3); padding:var(--s-3) var(--s-4) 0}
+.np-who{display:flex; flex-direction:column; min-inline-size:0}
+.np-name{font-weight:700}
+.np-meta{display:inline-flex; align-items:center; gap:var(--s-1); color:var(--ink-3); font-size:var(--t-xs)}
+.np-meta svg{inline-size:12px; block-size:12px}
+.np-end{margin-inline-start:auto; display:inline-flex; align-items:center; gap:var(--s-3); color:var(--ink-3)}
+.np-end svg{inline-size:18px; block-size:18px}
+.np-av{flex:none; display:grid; place-items:center; inline-size:48px; block-size:48px; border-radius:50%;
+  background-color:var(--surface-3); color:var(--ink-2); font-weight:700; font-size:var(--t-lg); line-height:var(--lh-tight)}
+.np-av[data-kind="org"]{border-radius:var(--r-xs)}
+.np-text{margin:0; padding:var(--s-3) var(--s-4); white-space:pre-wrap; overflow-wrap:anywhere;
+  unicode-bidi:plaintext; max-inline-size:var(--measure)}
+.np-tag{color:var(--brand); font-weight:600}
+.np-media{background-color:var(--surface-2); border-block:1px solid var(--line-soft)}
+.np-media>img,.np-media>video{display:block; inline-size:100%; block-size:auto; max-block-size:calc(100cqi * 1.25);
+  object-fit:contain; margin-inline:auto}
+/* الاختصارُ بهامشٍ لا بحشوة: الحشوةُ داخل الصندوق المقصوص فيطلّ منها نصفُ سطرٍ رابع */
+.np-compact .np-text{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden;
+  padding:0; margin:var(--s-3) var(--s-4)}
+.np-x.np-compact .np-text{margin-inline:0}
+.np-compact .np-media>img,.np-compact .np-media>video{max-block-size:300px}
+.np-counts{display:flex; gap:var(--s-2); padding:var(--s-2) var(--s-4); color:var(--ink-3); font-size:var(--t-xs)}
+.np-counts b{font-weight:600; font-variant-numeric:tabular-nums}
+.np-bar{display:flex; align-items:center; gap:var(--s-4); padding:var(--s-2) var(--s-4) var(--s-3);
+  color:var(--ink-3); font-size:var(--t-xs); line-height:var(--lh-tight)}
+.np-bar span{display:inline-flex; align-items:center; gap:var(--s-1)}
+.np-bar svg{inline-size:18px; block-size:18px}
+.np-bar b{font-weight:400; font-variant-numeric:tabular-nums}
+.np-bar-li{display:grid; grid-template-columns:repeat(4,1fr); border-block-start:1px solid var(--line-soft);
+  padding-block-start:var(--s-2); margin-inline:var(--s-2)}
+.np-bar-li span{justify-content:center; font-weight:600}
+.np-x{max-inline-size:var(--np-w-x); display:grid; grid-template-columns:40px minmax(0,1fr); gap:var(--s-3);
+  padding:var(--s-3) var(--s-4)}
+.np-x .np-av{inline-size:40px; block-size:40px}
+.np-x .np-head,.np-x .np-text,.np-x .np-bar{padding-inline:0}
+.np-x .np-head{padding-block-start:0}
+.np-x .np-text{padding-block:var(--s-1) var(--s-2)}
+.np-x .np-media{border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden}
+.np-x .np-bar{justify-content:space-between; max-inline-size:425px; padding-block-end:0}
+.np-x .np-bar .np-end{margin-inline-start:0}
+.np-ig .np-av{inline-size:32px; block-size:32px; font-size:var(--t-sm)}
+.np-ig .np-head{padding-block-end:var(--s-3)}
+.np-ig .np-bar{color:var(--ink)}
+.np-ig .np-bar svg{inline-size:22px; block-size:22px}
+.np-slot{display:grid; place-items:center; aspect-ratio:4/5; background-color:var(--surface-2); color:var(--ink-3);
+  border-block:1px solid var(--line-soft); font-size:var(--t-sm)}
+.np-likes{margin:0; padding:0 var(--s-4); font-size:var(--t-sm)}
+.np-stage{position:relative; aspect-ratio:9/16; overflow:hidden}
+.np-stage>img,.np-stage>video{position:absolute; inset:0; inline-size:100%; block-size:100%; object-fit:cover}
+.np-noclip{position:absolute; inset-block-start:var(--s-3); inset-inline-start:var(--s-3); z-index:1;
+  padding:var(--s-1) var(--s-2); border-radius:var(--r-pill); background-color:var(--np-scrim);
+  color:var(--np-on-stage); font-size:var(--t-xs); font-weight:600}
+.np-scrim{position:absolute; inset-inline:0; inset-block-end:0; block-size:45%; background-color:transparent;
+  background-image:linear-gradient(to top,var(--np-scrim),transparent)}
+.np-rail{position:absolute; inset-inline-end:var(--s-2); inset-block-end:16%; display:flex; flex-direction:column;
+  align-items:center; gap:var(--s-4); margin:0; padding:0; list-style:none; font-size:var(--t-xs)}
+.np-rail li{display:flex; flex-direction:column; align-items:center; gap:var(--s-0)}
+.np-rail svg{inline-size:26px; block-size:26px}
+.np-rail .np-av{inline-size:40px; block-size:40px; border:2px solid var(--np-on-stage)}
+.np-rail b{font-weight:600}
+.np-over{position:absolute; inset-inline-start:var(--s-3); inset-inline-end:64px; inset-block-end:var(--s-4)}
+.np-over .np-text,.np-over .np-title{padding:var(--s-1) 0 0; font-size:var(--t-sm); line-height:var(--lh-tight)}
+.np-title{margin:0; font-weight:700}
+/* والوسمُ على المسرح الداكن بحبر المسرح وثِقَله: لونُ العلامة عليه ‏١٫٢٦:١ */
+.np-stage .np-tag{color:var(--np-on-stage); font-weight:700}
+.np-desc{padding:var(--s-2) var(--s-3); border-block-start:1px solid var(--line-strong); font-size:var(--t-xs)}
+.np-desc summary{cursor:pointer; color:var(--np-on-stage)}
+
+/* الشبكة: المنصّةُ تقصّ هناك، فالقصُّ هنا يُري ما تُريه — والمنشورُ كاملًا في صفّه */
+.np-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--s-0); max-inline-size:935px}
+.np-grid-clip{grid-template-columns:repeat(5,minmax(0,1fr))}
+.np-tile{position:relative; display:block; aspect-ratio:1; overflow:hidden; background-color:var(--surface-3)}
+.np-grid-ig .np-tile{aspect-ratio:3/4}
+.np-grid-clip .np-tile{aspect-ratio:9/16}
+.np-tile>img,.np-tile>video{inline-size:100%; block-size:100%; object-fit:cover; display:block}
+.np-tile.dim>img,.np-tile.dim>video{opacity:.55}
+.np-play{position:absolute; inset-block-start:var(--s-2); inset-inline-start:var(--s-2); color:var(--np-on-stage)}
+.np-play svg{inline-size:20px; block-size:20px}
+.np-badge{position:absolute; inset-block-end:var(--s-2); inset-inline-end:var(--s-2)}
+@media(max-width:900px){
+  .np-row{grid-template-columns:minmax(0,1fr); gap:var(--s-3)}
+  .np-when{flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:var(--s-2)}
+  .np-under{flex-direction:row; flex-wrap:wrap; align-items:center}
+  .np-grid-clip{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 /* ══ الحقولُ على اللمس ═══════════════════════════════════════════
    **Safari يُقرّب الصفحةَ عند لمس حقلٍ خطُّه دون ‏١٦px** — سلوكٌ لا
    يُعطَّل إلّا بمنع التقريب كلِّه، ومنعُه يخالف WCAG 1.4.4. وثمنُه أنّ

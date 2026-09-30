@@ -704,8 +704,9 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="grid tiles c4" style="margin-bottom:var(--s-4)">')
     expect(html).toContain('<div class="grid tiles c3" style="margin-bottom:var(--s-3)">')
+    // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
-    expect(screen).toContain('<div class="grid tiles c4">')
+    expect(screen).toContain('<ul class="acct-counts">')
     for (const page of [html, screen]) {
       for (const m of page.matchAll(/<div class="grid (c[234])[^"]*">\s*<div class="card tile">/g)) {
         expect(m[0], 'شريطُ مؤشّراتٍ بلا tiles').toBe('')
@@ -2118,10 +2119,14 @@ describe('شاشةُ المنصّة', () => {
   it('كلُّ نموذج POST فيها يحمل رمزَ CSRF', async () => {
     const cookie = await login()
     for (const id of ['linkedin', 'x', 'youtube', 'tiktok', 'instagram']) {
-      const html = await (await app.request(`/panel/channels/${id}`, withSession(cookie), env)).text()
-      const forms = html.match(/<form\b[^>]*method="POST"[^>]*>\s*<input type="hidden" name="_csrf"|<form\b[^>]*method="POST"[^>]*>/gi) ?? []
-      expect(forms.length, id).toBeGreaterThan(0)
-      for (const f of forms) expect(f, id).toContain('_csrf')
+      let seen = 0
+      for (const tab of ['', '?tab=setup', '?tab=waiting']) {
+        const html = await (await app.request(`/panel/channels/${id}${tab}`, withSession(cookie), env)).text()
+        const forms = html.match(/<form\b[^>]*method="POST"[^>]*>\s*<input type="hidden" name="_csrf"|<form\b[^>]*method="POST"[^>]*>/gi) ?? []
+        seen += forms.length
+        for (const f of forms) expect(f, `${id}${tab}`).toContain('_csrf')
+      }
+      expect(seen, id).toBeGreaterThan(0)
     }
   })
 
@@ -2235,7 +2240,7 @@ describe('شاشةُ المنصّة', () => {
       .run()
 
     const html = await (
-      await app.request('/panel/channels/linkedin', withSession(cookie), env)
+      await app.request('/panel/channels/linkedin?tab=setup', withSession(cookie), env)
     ).text()
     expect(html).toContain('w_member_social')
     expect(html).toContain('Share on LinkedIn')
@@ -2274,7 +2279,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     await save(cookie)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     const screen = await (await app.request(
-      '/panel/channels/linkedin', withSession(cookie), env,
+      '/panel/channels/linkedin?tab=setup', withSession(cookie), env,
     )).text()
 
     // **ولا يعود السرُّ إلى شاشةٍ قطُّ** — لا اللوح ولا شاشةُ المنصّة
@@ -2336,10 +2341,11 @@ describe('ضبطُ التطبيق من اللوحة', () => {
    */
   it('وYouTube تُحفَظ أسرارُها وتُقرأ حالُها كغيرها', async () => {
     const cookie = await login()
-    const before = await (await app.request('/panel/channels/youtube', withSession(cookie), env)).text()
+    const before = await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text()
     expect(before).toContain('ضبطُ التطبيق ودليلُه')
     expect(before).toContain('id="setup"')
-    expect(before).toContain('href="#setup"')
+    // ‏وزرُّ الرأس يذهب إليه من أيّ تبويب (D-172)
+    expect(before).toContain('href="/panel/channels/youtube?tab=setup#setup"')
     expect(before).toContain('oauth/youtube/callback')
 
     const body = new FormData()
@@ -2350,7 +2356,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     const rows = db.raw.prepare('SELECT platform FROM oauth_apps').all() as { platform: string }[]
     expect(rows.map((r) => r.platform)).toEqual(['youtube'])
 
-    const after = await (await app.request('/panel/channels/youtube', withSession(cookie), env)).text()
+    const after = await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text()
     expect(after).toContain('محفوظ.')
     expect(after).not.toContain('GOCSPX-سرٌّ')
   })

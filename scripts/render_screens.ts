@@ -6,7 +6,7 @@
  *
  * وتستورد الدوالَّ نفسَها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
  */
-import { writeAudited } from './writeAudited'
+import { fixtureImage, writeAudited } from './writeAudited'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { scopeSet } from '../src/lib/oauth/scopes'
 import { platformScreen } from '../src/routes/ui/platformView'
@@ -25,6 +25,8 @@ import { spreadScreen } from '../src/routes/ui/spreadView'
 import { loginPage } from '../src/routes/panelView'
 import { secondFactorPage } from '../src/routes/authView'
 import type { Journey } from '../src/lib/journey'
+import { platformNeeds } from '../src/lib/platform/needs'
+import type { PlatformCounts, TimelineRow } from '../src/lib/platform/timeline'
 
 const now = new Date('2026-09-06T09:00:00Z')
 const ago = (h: number): string =>
@@ -54,114 +56,147 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
 const page = (title: string, body: string): string =>
   soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }))
 
+// ── صفحاتُ المنصّات: صفحةُ حساب (D-172) ─────────────────────────────
+const tt = views.find((v) => v.spec.id === 'tiktok')!
+const snap = views.find((v) => v.spec.id === 'snapchat')!
+
+/** صفٌّ في الخطّ الزمنيّ — والناقصُ من الحقول فارغٌ لا مخترَع. */
+const row = (over: Partial<TimelineRow> & Pick<TimelineRow, 'id' | 'status' | 'text'>): TimelineRow => ({
+  scheduledAt: null, createdAt: ago(48), dispatchedAt: null, accountName: 'عمر عبدالحميد', accountKind: 'member',
+  sourceName: null, platformPostId: null, publishedAt: null, failedAt: null, failure: null, tries: 0,
+  lastTryAt: null, openTries: 0, hasMedia: false, costUsd: 0.012, sortAt: ago(48), ...over,
+})
+const soon = (h: number): string => ago(-h)
+
+const liHealth = {
+  'linkedin:member:abc': {
+    status: 'active' as const, expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30), needsReauthAt: null,
+    alerts: [{ kind: 'access' as const, threshold: 7, at: ago(6) }],
+  },
+  'linkedin:org:99': { status: 'active' as const, expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] },
+}
+const base = {
+  app: undefined, baseUrl: 'https://sada2.basserh.com', now, zone: 'Asia/Riyadh', flash: null,
+  filter: 'all' as const, costs: {}, scopes: {}, posts: [], waiting: [],
+}
+const counts = (over: Partial<PlatformCounts> = {}): PlatformCounts => ({
+  waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0, ...over,
+})
+const tally0 = { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }
+
+const liUpcoming = [
+  row({ id: 'u1', status: 'queued', scheduledAt: soon(26), sortAt: soon(26),
+    text: 'تقريرُ الإغلاق ليس وثيقةً إداريّة — هو آخرُ فرصةٍ لتحويل ما تعلّمناه إلى شيءٍ يُقرأ بعدنا.\n\n#إدارة_المشاريع #الأثر' }),
+  row({ id: 'u2', status: 'queued', scheduledAt: ago(0.5), sortAt: ago(0.5),
+    text: 'موعدٌ حلّ ولم تُرسله الدورةُ بعد — والصفُّ يقول ذلك بدقائقه.' }),
+  row({ id: 'u3', status: 'queued', scheduledAt: ago(3), dispatchedAt: ago(2.5), sortAt: ago(3),
+    text: 'غادر إلى الطابور ولم يعُد جوابُه — فيُقال «عالق» ومعه طريقُ الإعادة.' }),
+]
+const liHistory = [
+  row({ id: 'p1', status: 'published', platformPostId: 'urn:li:share:7311', publishedAt: ago(19), sortAt: ago(19), tries: 1,
+    text: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهًا يُصرف على ما لا يُحرّك المعلم التالي.\n\n#القيادة #المشاريع' }),
+  row({ id: 'p3', status: 'failed', failedAt: ago(50), sortAt: ago(50), tries: 1, accountName: 'بصائر للاستشارات', accountKind: 'org',
+    failure: 'token_expired', text: 'ثلاثةُ أسئلةٍ قبل أن تبدأ مشروعا: مَن يقرّر أنّه نجح؟ ومتى؟ وبأيّ رقم؟' }),
+  row({ id: 'p6', status: 'published', platformPostId: 'urn:li:share:7290', publishedAt: ago(75), sortAt: ago(75), tries: 2,
+    text: 'المعلمُ الذي لا يُقاس لا يُدار. والذي يُقاس ولا يُقرأ لا يُدار كذلك.' }),
+]
+
 writeAudited(
   '/tmp/screen-linkedin.html',
-  page(
-    'صدى — LinkedIn',
-    platformScreen({
-    health: {
-      'linkedin:member:abc': {
-        status: 'active', expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30), needsReauthAt: null,
-        alerts: [{ kind: 'access', threshold: 7, at: ago(6) }],
-      },
-      'linkedin:org:99': { status: 'active', expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] },
+  page('صدى — LinkedIn', platformScreen({
+    ...base, view: li, tab: 'posts', health: liHealth,
+    tally: { published: 14, queued: 3, failed: 1, drafts: 2, spend: 0.42, lastPublishedAt: ago(19) },
+    counts: counts({ waiting: 2, ready: 1, queued: 3, published: 14, failed: 1, missingMedia: 2 }),
+    needs: platformNeeds('linkedin'),
+    upcoming: liUpcoming,
+    history: { rows: liHistory, next: `${ago(75)}|p6` },
+    costs: { p1: 0.019 },
+    metrics: { p1: [{ window: '72h', impressions: null, reactions: 84, comments: 12, shares: 3, pulledAt: ago(3) }] },
+    media: {
+      u1: [{ id: 'm-li', mime: 'image/png', status: 'ready', note: '' }],
+      p1: [{ id: 'm-sq', mime: 'image/jpeg', status: 'ready', note: null }],
+      p6: [{ id: 'm-missing', mime: 'image/jpeg', status: 'ready', note: '' }],
     },
-  app: undefined, baseUrl: 'https://sada2.basserh.com',
-      view: li,
-      now,
-      tally: { published: 14, queued: 2, failed: 1, drafts: 3, spend: 0.42,
-        lastPublishedAt: ago(19) },
-      // الحسابُ الأوّل كاملُ النطاقات، والثاني ينقصه النشر — وهي الحالُ
-      // التي وقعت فعلا، فتُرى مرسومةً لا مُتخيَّلة
-      metrics: {
-        p1: [{ window: '7d', impressions: null, reactions: 84, comments: 12,
-               shares: null, pulledAt: ago(3) }],
-      },
-      scopes: {
-        'linkedin:member:abc': scopeSet('linkedin').join(' '),
-        'linkedin:org:99': 'openid profile',
-      },
-      posts: [
-        { id: 'p1', status: 'published',
-          text: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهًا يُصرف على ما لا يُحرّك المعلم التالي.',
-          scheduledAt: ago(20), createdAt: ago(40), accountName: 'عمر عبدالحميد',
-          platformPostId: 'urn:li:share:7311', publishedAt: ago(19), lastError: null, lastFailedAt: null,
-          hasMedia: true, costUsd: 0.031 },
-        { id: 'p2', status: 'queued',
-          text: 'تقريرُ الإغلاق ليس وثيقةً إداريّة — هو آخرُ فرصةٍ لتحويل ما تعلّمناه إلى شيءٍ يُقرأ بعدنا.',
-          scheduledAt: new Date(now.getTime() + 7200_000).toISOString(),
-          createdAt: ago(6), accountName: 'عمر عبدالحميد',
-          platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
-          hasMedia: false, costUsd: 0.028 },
-        { id: 'p3', status: 'failed',
-          text: 'ثلاثةُ أسئلةٍ قبل أن تبدأ مشروعا: مَن يقرّر أنّه نجح؟ ومتى؟ وبأيّ رقم؟',
-          scheduledAt: ago(50), createdAt: ago(60), accountName: 'بصائر للاستشارات',
-          platformPostId: null, publishedAt: null,
-          lastError: 'Not enough permissions to create a post on behalf of this member', lastFailedAt: ago(49),
-          hasMedia: false, costUsd: 0.026 },
-        { id: 'p4', status: 'draft',
-          text: 'مسوّدةٌ بمقطعٍ رأسيّ — والمصغَّرُ يُري ما يُعتمَد، ولا يُقال «بمقطع» فقط.',
-          scheduledAt: null, createdAt: ago(2), accountName: 'عمر عبدالحميد',
-          platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
-          hasMedia: true, costUsd: 0.019 },
-        // **وصفٌّ يقول إنّ له وسيطا ولا وسيطَ يُقرأ** — يُقال ولا يُخفى
-        { id: 'p5', status: 'approved',
-          text: 'ومنشورٌ صفُّه يقول إنّ له وسيطا، ولا صفَّ وسيطٍ يقابله.',
-          scheduledAt: null, createdAt: ago(1), accountName: 'عمر عبدالحميد',
-          platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
-          hasMedia: true, costUsd: 0 },
-      ],
-      // **الوسائطُ تُرسَم لتُرى** — ومصغَّرٌ لا يُرسَم لا يُقاس (D-061)
-      media: {
-        // بايتاتُ صورةٍ حقيقيّةٍ صغيرة: مسارُ الجلسة لا يعمل في ملفٍّ
-        // على القرص، والغرضُ هنا **قياسُ الشكل** لا عرضُ المحتوى
-        p1: [{ id: 'm1', mime: 'image/png', status: 'ready' }],
-        p4: [
-          { id: 'm2', mime: 'video/mp4', status: 'ready' },
-          { id: 'm3', mime: 'image/png', status: 'rejected' },
-        ],
-      },
-    }),
-  ),
+  })),
+  { 'm-li': fixtureImage(1200, 628, 205), 'm-sq': fixtureImage(1024, 1024, 25) },
+)
+
+writeAudited(
+  '/tmp/screen-li-setup.html',
+  page('صدى — LinkedIn · الإعداد', platformScreen({
+    ...base, view: li, tab: 'setup', health: liHealth,
+    tally: { published: 14, queued: 3, failed: 1, drafts: 2, spend: 0.42, lastPublishedAt: ago(19) },
+    counts: counts({ waiting: 2, ready: 1, queued: 3, published: 14, failed: 1 }),
+    needs: platformNeeds('linkedin'), upcoming: [], history: { rows: [], next: null },
+    metrics: {}, media: {},
+    // الحسابُ الأوّل كاملُ النطاقات، والثاني ينقصه النشر — وهي الحالُ التي وقعت فعلا
+    scopes: { 'linkedin:member:abc': scopeSet('linkedin').join(' '), 'linkedin:org:99': 'openid profile' },
+  })),
 )
 
 writeAudited(
   '/tmp/screen-x.html',
-  page(
-    'صدى — X',
-    platformScreen({
-    health: {},
-  app: undefined, baseUrl: 'https://sada2.basserh.com',
-      view: x, now,
-      tally: { published: 0, queued: 0, failed: 0, drafts: 2, spend: 0,
-        lastPublishedAt: null },
-      metrics: {},
-      scopes: { 'x:member:4242': 'tweet.read users.read tweet.write offline.access' },
-      media: {},
-      posts: [],
-    }),
-  ),
+  page('صدى — X', platformScreen({
+    ...base, view: x, tab: 'posts', health: {},
+    tally: { published: 1, queued: 1, failed: 0, drafts: 0, spend: 0.03, lastPublishedAt: ago(30) },
+    counts: counts({ queued: 1, published: 1 }),
+    needs: platformNeeds('x'),
+    upcoming: [row({ id: 'x2', status: 'queued', scheduledAt: soon(5), sortAt: soon(5), accountName: '@omar_ah',
+      text: 'فكرةٌ واحدةٌ كاملة في منشورٍ واحد. والقِصَرُ هنا قوّةٌ لا نقص. #قيادة' })],
+    history: { rows: [row({ id: 'x1', status: 'published', platformPostId: '1874', publishedAt: ago(30), sortAt: ago(30),
+      accountName: '@omar_ah', text: 'المعلمُ الذي لا يُقاس لا يُدار.' })], next: null },
+    metrics: { x1: [{ window: '24h', impressions: 1204, reactions: 31, comments: 4, shares: 2, pulledAt: ago(6) }] },
+    media: { x2: [{ id: 'm-x', mime: 'image/png', status: 'ready', note: '' }] },
+  })),
+  { 'm-x': fixtureImage(1200, 675, 160) },
 )
 
 writeAudited(
-  '/tmp/screen-unbuilt.html',
-  page('صدى — Instagram', platformScreen({
-    health: {},
-  app: undefined, baseUrl: 'https://sada2.basserh.com',
-    view: ig, now,
-    tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
-    scopes: {}, metrics: {}, media: {}, posts: [],
+  '/tmp/screen-tiktok.html',
+  page('صدى — TikTok', platformScreen({
+    ...base, view: tt, tab: 'posts', health: {}, zone: null,
+    tally: tally0,
+    counts: counts({ queued: 1, missingMedia: 1 }),
+    needs: platformNeeds('tiktok'),
+    upcoming: [row({ id: 't1', status: 'queued', scheduledAt: soon(50), sortAt: soon(50),
+      text: 'سطرٌ يُغري بالمشاهدة ولا يشرح ما سيُرى. #مشاريع #قيادة' })],
+    history: { rows: [row({ id: 't0', status: 'failed', failedAt: ago(20), sortAt: ago(20), tries: 1,
+      failure: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها', text: 'منشورٌ بلا مقطع يُردّ قبل الإرسال.' })], next: null },
+    metrics: {},
+    media: { t1: [{ id: 'm-tt', mime: 'image/png', status: 'ready', note: '' }] },
   })),
+  { 'm-tt': fixtureImage(1080, 1920, 280) },
 )
 
 writeAudited(
   '/tmp/screen-link-only.html',
   page('صدى — YouTube', platformScreen({
-    health: {},
-  app: undefined, baseUrl: 'https://sada2.basserh.com',
-    view: yt, now,
-    tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
-    scopes: {}, metrics: {}, media: {}, posts: [],
+    ...base, view: yt, tab: 'media', health: {},
+    tally: tally0, counts: counts({ queued: 1 }),
+    needs: platformNeeds('youtube'),
+    upcoming: [row({ id: 'y1', status: 'queued', scheduledAt: soon(30), sortAt: soon(30),
+      text: 'عنوانُ المقطع في السطر الأوّل\n\nوالوصفُ بعده لا يظهر إلّا لمن فتحه.' })],
+    history: { rows: [], next: null }, metrics: {},
+    media: { y1: [{ id: 'm-yt', mime: 'image/png', status: 'ready', note: '' }] },
+  })),
+  { 'm-yt': fixtureImage(1080, 1920, 5) },
+)
+
+writeAudited(
+  '/tmp/screen-unbuilt.html',
+  page('صدى — Snapchat', platformScreen({
+    ...base, view: snap, tab: 'posts', health: {}, tally: tally0, counts: counts(), needs: null,
+    upcoming: [], history: { rows: [], next: null }, metrics: {}, media: {},
+  })),
+)
+
+writeAudited(
+  '/tmp/screen-instagram.html',
+  page('صدى — Instagram', platformScreen({
+    ...base, view: ig, tab: 'waiting', health: {}, tally: tally0, counts: counts({ waiting: 1 }),
+    needs: platformNeeds('instagram'), upcoming: [], history: { rows: [], next: null }, metrics: {}, media: {},
+    waiting: [row({ id: 'i1', status: 'draft', sourceName: 'رؤية 2026.docx',
+      text: 'تعليقٌ على صورةٍ لم تُولَّد بعد — والإطارُ يقول إنّ Instagram لا تنشر بلا صورة.' })],
   })),
 )
 

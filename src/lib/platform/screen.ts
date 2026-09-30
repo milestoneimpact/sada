@@ -98,7 +98,7 @@ export function permalink(platform: Platform, platformPostId: string | null): st
 }
 
 /** نصٌّ مختصرٌ من جواب المنصّة — لا جسمَ جوابٍ كامل في شاشة. */
-function briefError(raw: string | null): string | null {
+export function briefError(raw: string | null): string | null {
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>

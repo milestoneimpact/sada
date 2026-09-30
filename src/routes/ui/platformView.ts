@@ -1,118 +1,171 @@
 /**
- * شاشةُ منصّةٍ واحدة.
+ * صفحةُ المنصّة — **صفحةُ حسابٍ لا لوحُ ضبط** (D-172).
  *
- * ## أربعةُ أسئلةٍ بترتيبها
+ * ## ما قاله المالك
  *
- * ١ · **ما حالُها الآن** — أمربوطةٌ، وبأيّ حساب، ومتى آخرُ نشر.
- * ٢ · **ما تستطيعه فعلا** — من النطاقات الممنوحة لا المطلوبة (D-045).
- * ٣ · **ما نُشر عليها** — بنصّه ورابطه ووقته.
- * ٤ · **ما فشل ولماذا** — ولا يُخفى في تبويبٍ ثانٍ.
+ * «لا رحلةَ توضّح المطلوبَ لكلّ منصّة، وماذا تمّ فيها، في صفحتها، بالتاريخ.
+ * تشبه صفحةَ المنصّة، وتوضّح شكلَ المنشور، والسابقَ واللاحق.»
  *
- * والترتيبُ مقصود: من فتح الشاشةَ يسأل «ماذا نُشر» أوّلا، ويسأل «ماذا
- * أضبط» مرّةً في عمرها. فالدليلُ في آخرها لا في أوّلها — **عكسَ لوح
- * القنوات، حيث الضبطُ هو الغرض.**
+ * وكانت الشاشةُ تبدأ بالسلّم وجداول النطاقات، **فيقع أوّلُ منشورٍ عند ‏٢٤٤٠
+ * بكسلًا**، والقادمُ مخلوطٌ بما نُشر، والتواريخُ نسبيّةٌ والمطلقُ في `title`.
+ *
+ * ## فأربعةُ أسئلةٍ بترتيبها
+ *
+ * ١ · **من أنا هنا، وهل أنشر الآن؟** — رأسُ الحساب ببنية المنصّة، وحكمٌ واحد.
+ * ٢ · **ماذا تطلب المنصّة؟** — سبعُ محطّاتٍ من `platformNeeds` وأعدادِ المنصّة.
+ * ٣ · **ماذا سيُنشر ومتى؟** — «القادم» تصاعديًّا بتوقيت المالك وUTC تحته.
+ * ٤ · **ماذا نُشر ومتى وبأيّ نتيجة؟** — تحت رؤوس أيّامٍ لاصقة، والفاشلُ في يومه
+ *    ومعه سببُه بالعربيّة وفعلُه.
+ *
+ * **والضبطُ في تبويبه**: السلّمُ كاملًا والنطاقاتُ وسجلُّ الصحّة ودليلُ التطبيق
+ * يُسأل عنها مرّةً في عمر المنصّة، فلا تسبق ما يُسأل عنه كلَّ يوم.
  *
  * ## والمنصّةُ التي لم يُبنَ لها سائقٌ لها شاشةٌ أيضا
  *
- * وفيها ما ينقص بالضبط، لا «قريبا». وصفحةٌ تقول «قريبا» تُقرأ وعدا،
- * وصفحةٌ تقول «النشرُ فيديو لا نصّ، فيحتاج رفعا مجزّأً» تُقرأ سببا —
- * **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
+ * وفيها ما ينقص بالضبط، لا «قريبا». **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
  */
 import { SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
-import type { AccountHealth } from '../../lib/platform/screen'
+import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platform/screen'
+import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
-import { permalink, type PlatformPost, type PlatformTally } from '../../lib/platform/screen'
-import { money, relativeTime } from '../../lib/format'
-import { MEASURED, widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
-
-/** ما يلزم لعرض وسيطٍ في القائمة — لا صفُّ القاعدة كاملا. */
-export interface PostMedia {
-  readonly id: string
-  readonly mime: string
-  readonly status: 'ready' | 'rejected'
-}
-import { ICON } from './icons'
-import { escapeHtml } from './shell'
-import { setupPane } from './channels'
+import { money, relativeTime, shortAgo, untilTime } from '../../lib/format'
+import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 import type { AppStatus } from '../../lib/oauth/apps'
-import { whenTag } from './time'
+import type { PlatformNeeds } from '../../lib/platform/needs'
+import {
+  classifyQueued, type HistoryFilter, type HistoryPage, type PlatformCounts, type TimelineRow,
+} from '../../lib/platform/timeline'
+import { whyFailed } from '../../lib/publish/reasons'
+import { clock, dayKey, dayLabel } from '../../lib/time/zone'
+import { ICON } from './icons'
+import { escapeHtml } from './escape'
+import { setupPane } from './channels'
 import { LOGOS } from './logos'
 // وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
 import { glyph, RUNG_MARK, status } from './parts'
 import { readiness, type Readiness } from '../../lib/platform/readiness'
+import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
+import { returnTo } from '../../lib/nav/back'
+
+/** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
+export interface PostMedia {
+  readonly id: string
+  readonly mime: string
+  readonly status: 'ready' | 'rejected'
+  /** `''` حين رُكّبت الشريحةُ بمقاس المنصّة، و`null` لصفٍّ أقدم من الحفظ. */
+  readonly note: string | null
+}
+
+export type Tab = 'posts' | 'waiting' | 'media' | 'setup'
 
 export interface PlatformScreenData {
   readonly view: ChannelView
+  /** آخرُ المنشورات — لسلّم الجاهزيّة وحده (درجةُ النشر من آخر محاولة). */
   readonly posts: readonly PlatformPost[]
   readonly tally: PlatformTally
+  readonly counts: PlatformCounts
+  readonly needs: PlatformNeeds | null
+  readonly upcoming: readonly TimelineRow[]
+  readonly history: HistoryPage
+  readonly waiting: readonly TimelineRow[]
+  readonly filter: HistoryFilter
+  readonly tab: Tab
+  /** كلفةُ الدفتر باسم كلّ منشور — تُضاف إلى عموده. */
+  readonly costs: Readonly<Record<string, number>>
   /** نطاقاتُ كلّ حسابٍ كما مُنحت — مفتاحُها معرّفُ الحساب. */
   readonly scopes: Readonly<Record<string, string>>
   /** سجلُّ صحّة كلّ حساب — مفتاحُها معرّفُ الحساب (D-129). */
   readonly health: Readonly<Record<string, AccountHealth>>
   /** ما قِيس لكلّ منشور — مفتاحُها معرّفُ المنشور (D-048). */
   readonly metrics: Readonly<Record<string, readonly PostMetricRow[]>>
-  /**
-   * الوسائطُ المولَّدة لكلّ منشور — مفتاحُها معرّفُ المنشور.
-   *
-   * **وصدى يولّد صورا ومقاطعَ منذ D-039 و D-052، والقائمةُ لا تُظهر
-   * منها شيئا** — لصيقةُ «بصورة» تقول إنّ هناك شيئا ولا تُريه. ومالكٌ
-   * يعتمد منشورا بصورةٍ لم يرَها **يعتمد نصفَه**.
-   */
+  /** الوسائطُ المولَّدة لكلّ منشور — مفتاحُها معرّفُ المنشور. */
   readonly media: Readonly<Record<string, readonly PostMedia[]>>
-  /** أيُّ تبويبٍ مفتوح — من الاستعلام، فحالُ الصفحة في عنوانها. */
-  readonly show?: Show
-  /** حالُ تطبيق المنصّة — يُعرَض دليلُه هنا لا في لوح القنوات (D-111). */
+  /** حالُ تطبيق المنصّة — يُعرَض دليلُه في «الإعداد» (D-111). */
   readonly app: AppStatus | undefined
   /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروضُ للنسخ. */
   readonly baseUrl: string
+  /** منطقةُ المالك من كعكة متصفّحه، أو `null` فالأيّامُ بـ UTC (D-173). */
+  readonly zone: string | null
+  /** وميضُ آخر فعلٍ عاد إلى هذه الصفحة. */
+  readonly flash: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
   readonly now: Date
 }
 
-/**
- * رقمٌ في الشاشة — **والفراغُ يُقال ولا يُصفَّر**.
- *
- * `0` تعني «قِيس فكان لا شيء»، و `null` تعني «لا يُقاس أصلا» —
- * و LinkedIn لا يعطي الظهورَ لمنشور عضو. فلو عُرض صفرا لقُرئ فشلا،
- * ولبُني على ذلك قرارُ نشرٍ خاطئ (D-048).
- */
-function stat(label: string, value: number | null): string {
-  return `<span class="stat"><b>${
-    value === null ? '<span class="na" title="لا تعطيه المنصّة لهذا الحساب">—</span>' : value
-  }</b>${escapeHtml(label)}</span>`
+const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
+
+export function tabOf(raw: string | undefined, show: string | undefined): Tab {
+  if (raw !== undefined && (TABS as readonly string[]).includes(raw)) return raw as Tab
+  // ‏و`?show=` القديم يُترجَم ولا يُكسَر رابطٌ حُفظ في المفضّلة
+  return show === 'drafts' ? 'waiting' : 'posts'
 }
 
-/** صفُّ الأرقام تحت المنشور — أو سببُ غيابه. */
-function metricRow(rows: readonly PostMetricRow[], published: boolean, now: Date, platform: Platform): string {
-  if (!published) return ''
-  if (!MEASURED.has(platform)) {
-    return `<div class="stats none"><span class="ago">لا يُقاس لهذه المنصّة بعد</span></div>`
-  }
-  const m = widest(rows)
-  if (m === undefined || m === null) {
-    return `<div class="stats none"><span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد
-      24 ساعةً من النشر</span></div>`
-  }
-  return `<div class="stats">
-    ${stat('ظهور', m.impressions)}
-    ${stat('تفاعل', m.reactions)}
-    ${stat('تعليق', m.comments)}
-    ${stat('مشاركة', m.shares)}
-    <span class="grow"></span>
-    <span class="ago" title="${escapeHtml(m.pulledAt)} UTC">نافذةُ ${escapeHtml(
-      windowLabel(m.window),
-    )} · قِيس منذ ${escapeHtml(relativeTime(m.pulledAt, now))}</span>
-  </div>`
+export function filterOf(raw: string | undefined, show: string | undefined): HistoryFilter {
+  const v = raw ?? show
+  return v === 'published' || v === 'failed' ? v : 'all'
 }
 
-const STATUS: Readonly<Record<string, { label: string; cls: string; g: string }>> = {
-  published: { label: 'نُشر', cls: 'ok', g: '●' },
-  queued: { label: 'في الطابور', cls: 'warn', g: '◍' },
-  failed: { label: 'فشل', cls: 'bad', g: '▲' },
-  approved: { label: 'معتمَدة', cls: 'idle', g: '○' },
-  edited: { label: 'معدَّلة', cls: 'idle', g: '○' },
-  draft: { label: 'مسوّدة', cls: 'idle', g: '○' },
-  rejected: { label: 'مرفوضة', cls: 'idle', g: '○' },
+function href(platform: string, query: Record<string, string> = {}, hash = ''): string {
+  const q = new URLSearchParams(query).toString()
+  return `/panel/channels/${encodeURIComponent(platform)}${q === '' ? '' : `?${q}`}${hash}`
+}
+
+/** وسيطُ المنشور: الصورةُ الجاهزة، والمقطعُ إن وُجد يغلبها وتصير غلافَه. */
+function mediaOf(items: readonly PostMedia[] | undefined): { media: NpMedia | null; poster: string | null } {
+  const ready = (items ?? []).filter((m) => m.status === 'ready')
+  const clip = ready.find((m) => m.mime.startsWith('video/'))
+  const image = ready.find((m) => !m.mime.startsWith('video/'))
+  if (clip !== undefined) {
+    return { media: { id: clip.id, mime: clip.mime, composed: true }, poster: image?.id ?? null }
+  }
+  if (image !== undefined) {
+    return { media: { id: image.id, mime: image.mime, composed: image.note === '' }, poster: null }
+  }
+  return { media: null, poster: null }
+}
+
+/** سطرُ الوقت خارج الإطار: الساعةُ بتوقيت المالك كبيرةً، وUTC تحتها نصًّا لا في `title`. */
+function whenCol(value: string, zone: string | null, opts: { day?: boolean; rel?: string | undefined; state: string }): string {
+  const local = clock(value, zone)
+  const utc = clock(value, null)
+  return `${opts.day === true ? `<span class="np-dayl">${escapeHtml(dayLabel(value, zone, false))}</span>` : ''}
+    <b class="np-clock">${escapeHtml(local)}</b>
+    <span class="np-utc">${zone === null ? 'UTC' : `${escapeHtml(utc)} UTC`}</span>
+    ${opts.rel === undefined ? '' : `<span class="ago">${escapeHtml(opts.rel)}</span>`}
+    ${opts.state}`
+}
+
+function frame(d: PlatformScreenData, row: TimelineRow, when: string): string {
+  const { media, poster } = mediaOf(d.media[row.id])
+  const m = d.metrics[row.id]
+  const best = m === undefined ? null : widest(m)
+  return nativePost({
+    platform: d.view.spec.id as NpPlatform,
+    id: row.id,
+    author: { name: row.accountName ?? d.view.accounts[0]?.displayName ?? d.view.spec.label, kind: row.accountKind },
+    text: row.text,
+    when,
+    media,
+    poster,
+    metrics: best,
+    variant: 'compact',
+  })
+}
+
+function journeyLink(id: string): string {
+  return `<a class="tap" href="/panel/journey/${escapeHtml(encodeURIComponent(id))}">سجلُّه</a>`
+}
+
+function requeueForm(id: string, primary: boolean, platform: string): string {
+  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
+    <input type="hidden" name="id" value="${escapeHtml(id)}">
+    <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'waiting'))}">
+    <button class="${primary ? 'p' : 'g'} sm" type="submit">أعده إلى المعتمَد</button></form>`
+}
+
+/** كلفةُ المنشور كلُّها: عمودُه وما في الدفتر باسمه. */
+function costOf(d: PlatformScreenData, row: TimelineRow): number {
+  return row.costUsd + (d.costs[row.id] ?? 0)
 }
 
 /**
@@ -125,6 +178,14 @@ const STATUS: Readonly<Record<string, { label: string; cls: string; g: string }>
  * وصفٌّ لكلّ نطاق: أيُمنَح، وما يفتحه، ومَن يمنحه إن نقص. **فالناقصُ
  * يُسمّى ويُقال أين يُفتَح** — لا «فشل الربط».
  */
+/**
+ * مسارُ البوّابة وأسماءُ أزرارها **بحرفها كما تراها على الشاشة** — شيفرةً لا
+ * كلامًا: «Request access» اسمُ زرٍّ عند LinkedIn، لا كلمةٌ تُترجَم.
+ */
+function portalPath(where: string): string {
+  return escapeHtml(where).replace(/[A-Za-z][A-Za-z .]*[A-Za-z]/g, (m) => `<span class="mono">${m}</span>`)
+}
+
 function capabilityTable(rows: readonly Capability[]): string {
   const cells = rows
     .map((row) => {
@@ -141,7 +202,7 @@ function capabilityTable(rows: readonly Capability[]): string {
           on
             ? '<span class="ago">—</span>'
             : `<span class="sub" style="margin:0"><b>${escapeHtml(row.spec.grantedBy)}</b><br>
-               ${escapeHtml(row.spec.where)}</span>`
+               ${portalPath(row.spec.where)}</span>`
         }</td>
       </tr>`
     })
@@ -152,192 +213,6 @@ function capabilityTable(rows: readonly Capability[]): string {
     <tbody>${cells}</tbody></table></div>`
 }
 
-/**
- * مصغَّراتُ الوسائط تحت النصّ.
- *
- * **والصورةُ تُعرَض لا يُقال إنّ هناك صورة.** لصيقةُ «بصورة» تخبر
- * ولا تُري، ومالكٌ يعتمد منشورا بصورةٍ لم يرَها **يعتمد نصفَه**.
- *
- * والبايتاتُ من `/panel/media/:id` **خلف الجلسة** (D-050): صورةٌ
- * لمنشورٍ لم يُنشر بعد تكشف ما يُعدُّه المالك قبل أن يعلنه.
- *
- * **والمرفوضُ يُعرَض مُعلَّما لا يُخفى**: كلفتُه دُفعت، وإخفاؤه يجعل
- * سطرا في الدفتر بلا ما يقابله.
- *
- * والفيديو `<video>` لا `<img>`: إطارٌ أوّلُ ساكنٌ يكفي للتعرّف،
- * **ولا تشغيلَ آليّ** — صوتٌ يبدأ وحده في لوحةِ عملٍ عدوان.
- */
-function mediaStrip(items: readonly PostMedia[]): string {
-  if (items.length === 0) return ''
-  const cells = items
-    .map((m) => {
-      const src = `/panel/media/${encodeURIComponent(m.id)}`
-      const isVideo = m.mime.startsWith('video/')
-      const body = isVideo
-        ? `<video src="${escapeHtml(src)}" preload="metadata" muted playsinline
-             aria-label="مقطعٌ مولَّد"></video>`
-        : `<img src="${escapeHtml(src)}" alt="صورةٌ مولَّدة لهذا المنشور" loading="lazy" data-media>`
-      return `<a class="thumb${m.status === 'rejected' ? ' off' : ''}"
-        href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">
-        ${body}
-        ${isVideo ? '<span class="tag">مقطع</span>' : ''}
-        ${m.status === 'rejected' ? '<span class="tag bad">مرفوضة</span>' : ''}
-      </a>`
-    })
-    .join('')
-  return `<div class="thumbs">${cells}</div>`
-}
-
-/** بطاقةُ منشورٍ واحد — نصُّه هو المعروض، لا ملخّصٌ عنه. */
-function postCard(
-  post: PlatformPost,
-  platform: Platform,
-  now: Date,
-  metrics: readonly PostMetricRow[],
-  media: readonly PostMedia[],
-): string {
-  const meta = STATUS[post.status] ?? { label: post.status, cls: 'idle', g: '○' }
-  const link = permalink(platform, post.platformPostId)
-
-  const when =
-    post.publishedAt !== null
-      ? `<span class="ago" title="${escapeHtml(post.publishedAt)} UTC">نُشر منذ ${escapeHtml(
-          relativeTime(post.publishedAt, now),
-        )}</span>`
-      : post.scheduledAt !== null
-        /*
-         * **والمنطقةُ في المتن لا في `title`** (D-106): ما في `title` لا
-         * يُرى إلّا بتحويم فأرة، **ولا فأرةَ في الجوّال** — فموعدٌ يُقرأ
-         * هناك بلا منطقةٍ يُحسَب بتوقيت القارئ وهو UTC.
-         */
-        ? `<span class="ago when">${whenTag(post.scheduledAt, { label: 'موعدُه' })}</span>`
-        : `<span class="ago">كُتبت منذ ${escapeHtml(relativeTime(post.createdAt, now))}</span>`
-
-  // الفشلُ يُعرض بنصّه: «فشل» وحدها لا تُعالَج، والسببُ يُعالَج
-  const error =
-    post.lastError === null
-      ? ''
-      : `<div class="why bad"><span class="i">${glyph('▲')}</span><span class="t">
-         <b>آخرُ فشل:</b> ${escapeHtml(post.lastError)}</span></div>`
-
-  return `<article class="post">
-    <div class="post-top">
-      ${status(meta.cls, meta.g, meta.label)}
-      ${post.accountName === null
-        ? ''
-        : `<span class="chip">${escapeHtml(post.accountName)}</span>`}
-      ${media.length === 0
-        ? post.hasMedia
-          // صفٌّ يقول إنّ له وسيطا ولا وسيطَ يُقرأ: يُقال ولا يُخفى
-          ? '<span class="chip">وسيطٌ لا يُقرأ</span>'
-          : ''
-        : ''}
-      <span class="grow"></span>${when}
-    </div>
-    <p class="post-text">${escapeHtml(post.text)}</p>
-    ${mediaStrip(media)}
-    ${metricRow(metrics, post.status === 'published', now, platform)}
-    ${error}
-    <div class="post-foot">
-      ${link === null
-        ? post.status === 'published'
-          ? '<span class="ago">نُشر، ولم تُعِد المنصّةُ معرّفا يُبنى منه رابط.</span>'
-          : ''
-        : `<a class="btn g sm" href="${escapeHtml(link)}" target="_blank"
-             rel="noopener noreferrer">${ICON.external} افتحه على المنصّة</a>`}
-      ${post.status === 'failed'
-        // ‏والفاشلُ يُعاد من موضعه: كان يبقى «فشل» بلا طريقٍ إلى المنصّة
-        ? `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
-             <input type="hidden" name="id" value="${escapeHtml(post.id)}">
-             <button class="g sm" type="submit">أعده إلى المعتمَد</button></form>`
-        : ''}
-      <span class="grow"></span>
-      ${post.costUsd > 0
-        ? `<span class="ago money">${money(post.costUsd)} كتابةً</span>`
-        : ''}
-    </div>
-  </article>`
-}
-
-/** أربعةُ أرقامٍ في صفٍّ — الحصادُ قبل التفاصيل. */
-function tallyRow(t: PlatformTally, now: Date): string {
-  const cell = (k: string, v: string, n: string): string =>
-    `<div class="card tile"><div class="k">${k}</div><div class="v">${v}</div>
-     <div class="n">${n}</div></div>`
-
-  return `<div class="grid tiles c4">
-    ${cell('نُشر', String(t.published), t.lastPublishedAt === null
-      ? 'لم يُنشر شيءٌ بعد'
-      : `آخرُه منذ ${escapeHtml(relativeTime(t.lastPublishedAt, now))}`)}
-    ${cell('في الطابور', String(t.queued), 'ينتظر موعدَه أو دورةَ الإرسال')}
-    ${cell('فشل', String(t.failed), t.failed === 0 ? 'لا فشلَ مسجَّل' : 'يُقرأ سببُه تحت')}
-    ${cell('كلفةُ الكتابة', `${money(t.spend).replace(/\$$/, '')}<em>$</em>`, 'على منشورات هذه المنصّة وحدها')}
-  </div>`
-}
-
-/**
- * تبويباتُ القائمة — **فرزٌ لا إخفاء.**
- *
- * ## ولماذا لم تكن
- *
- * D-046 قال: «الفاشلةُ تُعرض مع الناجحة ولا تُخفى في تبويبٍ ثانٍ —
- * **فشلٌ لا يُرى لا يُعالَج**». وذاك صحيحٌ عند ثلاثةِ منشورات.
- * **وعند ستّين لا يُرى الفشلُ أصلا**: يغرق بين الناجحات.
- *
- * ## فالفرزُ يخدم القاعدةَ نفسَها إن حُرس بشرطين
- *
- * **١ · العددُ على كلّ تبويبٍ دائما** — فمن يقف على «الكلّ» يرى «فشل ٣»
- * بلا أن يفتحه. **والرقمُ هو الذي يُنبّه، لا فتحُ التبويب.**
- *
- * **٢ · والافتراضُ «الكلّ»** لا «نُشر»: تبويبٌ افتراضيٌّ يُخفي الفشلَ
- * هو عينُ ما حذّر منه D-046.
- *
- * ## ويعمل بلا جافاسكربت
- *
- * التبويباتُ **روابطُ استعلام** (`?show=failed`) لا أزرارُ سكربت:
- * تُفتَح في تبويبٍ جديد، وتُحفَظ في المفضّلة، وتعمل إن سقط السكربت.
- * **وحالُ الصفحة في عنوانها** — فمن يشارك رابطا يشارك ما يرى.
- */
-type Show = 'all' | 'published' | 'queued' | 'failed' | 'drafts'
-
-const SHOW_LABEL: Readonly<Record<Show, string>> = {
-  all: 'الكلّ',
-  published: 'نُشر',
-  queued: 'في الطابور',
-  failed: 'فشل',
-  drafts: 'مسوّدات',
-}
-
-const SHOW_MATCH: Readonly<Record<Show, (status: string) => boolean>> = {
-  all: () => true,
-  published: (s) => s === 'published',
-  queued: (s) => s === 'queued',
-  failed: (s) => s === 'failed',
-  drafts: (s) => s === 'draft' || s === 'approved' || s === 'edited' || s === 'rejected',
-}
-
-export function showOf(raw: string | undefined): Show {
-  return raw !== undefined && raw in SHOW_LABEL ? (raw as Show) : 'all'
-}
-
-function postTabs(posts: readonly PlatformPost[], active: Show, platform: string): string {
-  const order: Show[] = ['all', 'published', 'queued', 'failed', 'drafts']
-  const links = order
-    .map((show) => {
-      const n = posts.filter((p) => SHOW_MATCH[show](p.status)).length
-      // تبويبٌ فارغٌ لا يُعرَض — إلّا «الكلّ» فهو المرجع
-      if (n === 0 && show !== 'all') return ''
-      const href = show === 'all'
-        ? `/panel/channels/${encodeURIComponent(platform)}`
-        : `/panel/channels/${encodeURIComponent(platform)}?show=${show}`
-      const on = show === active
-      return `<a class="ftab${on ? ' on' : ''}${show === 'failed' && n > 0 ? ' bad' : ''}"
-        href="${escapeHtml(href)}"${on ? ' aria-current="page"' : ''}
-        >${SHOW_LABEL[show]}<span class="count">${n}</span></a>`
-    })
-    .join('')
-  return `<nav class="ftabs" aria-label="فرزُ المنشورات">${links}</nav>`
-}
 
 /**
  * **سجلُّ صحّة الحساب** (D-129): متى رُبط، ومتى جُدّد آخرَ مرّةٍ بنجاح، ومتى
@@ -408,37 +283,446 @@ export function readinessLadder(r: Readiness): string {
   </details>`
 }
 
-export function platformScreen(d: PlatformScreenData): string {
-  const { spec, state, accounts } = d.view
-  const logo = LOGOS[spec.id] ?? ''
-  const guide = SETUP[spec.id]
 
-  // ‏والشارةُ تقرأ الصفَّ كما تقرؤه بطاقةُ القناة (D-166)
+// ── ١ · رأسُ الحساب ───────────────────────────────────────────────────
+
+/** صنفُ الرأس لكلّ منصّة — **بأسمائه كاملةً** فيراها حارسُ الأصناف. */
+const ACCT_CLASS: Readonly<Record<string, string>> = {
+  linkedin: 'acct-linkedin', x: 'acct-x', youtube: 'acct-youtube', tiktok: 'acct-tiktok', instagram: 'acct-instagram',
+}
+
+/** الحكمُ الواحد في الرأس — **من السلّم لا من حال الربط**: «مربوطة» فوق «لا تنشر» تناقض. */
+function verdictChip(r: Readiness): string {
+  const k = r.verdict.kind
+  return status(
+    k,
+    k === 'ok' ? '●' : k === 'bad' ? '▲' : k === 'warn' ? '◍' : '○',
+    k === 'ok' ? 'تنشر' : k === 'bad' ? 'لا تنشر' : k === 'warn' ? 'تنتظرك' : 'تنتظر',
+  )
+}
+
+/**
+ * الفعلُ التالي الواحد — **زرٌّ أساسيٌّ واحد في الرأس، وما سواه هادئ**.
+ *
+ * بالترتيب: ما يمنع النشرَ أوّلًا (ربطٌ أو إذنٌ أو تطبيق)، ثمّ ما ينتظر قرارَ
+ * المالك، ثمّ المعتمَدُ بلا موعد، ثمّ الكتابة.
+ */
+function nextAction(d: PlatformScreenData, r: Readiness): { label: string; href: string } | null {
+  const id = d.view.spec.id
+  const label = d.view.spec.label
   const unsigned = unsignedAccounts(d.view).length > 0
-  const badge =
-    unsigned
-      ? status('bad', '▲', 'مربوطة بلا إذن')
-      : state === 'linked'
-      ? status('ok', '●', 'مربوطة')
-      : state === 'needs_reauth'
-        ? status('bad', '▲', 'تحتاج تجديدا')
-        : state === 'connectable'
-          ? status('idle', '○', 'جاهزةٌ للربط')
-          : state === 'awaiting_owner'
-            ? status('warn', '!', 'تنتظرك')
-            : status('idle', '○', 'لم يُبنَ سائقُها')
+  if (d.view.state === 'connectable') return { label: `اربط ${label}`, href: `/oauth/${id}/start` }
+  if (d.view.state === 'needs_reauth') return { label: 'جدّد الإذن', href: `/oauth/${id}/start` }
+  if (unsigned) return { label: 'أعد الربط', href: `/oauth/${id}/start` }
+  if (d.view.state === 'awaiting_owner') return { label: 'اضبط التطبيق', href: href(id, { tab: 'setup' }, '#setup') }
+  if (r.next?.action !== undefined && r.next.state === 'failed') return r.next.action
+  if (d.counts.waiting > 0) {
+    return { label: d.counts.waiting === 1 ? 'راجع المسوّدة' : `راجع ${d.counts.waiting} مسوّدات`, href: href(id, { tab: 'waiting' }) }
+  }
+  if (d.counts.ready > 0) return { label: 'جدوِل المعتمَد', href: href(id, { tab: 'waiting' }) }
+  if (d.needs?.drafts === true) return { label: 'اكتب منشورًا من مصدر', href: '/panel#sources' }
+  return null
+}
 
-  // ── ما يُربَط ولا ينشر: الحقيقةُ كاملةً في صدر الشاشة ─────────────
-  const stageBanner =
-    spec.stage === 'link'
-      ? `<div class="outcome warn"><span class="k">تُربَط ولا تنشر</span><span class="v">
-         دورةُ الإذن مبنيّةٌ لهذه المنصّة: <b>يُحفَظ حسابُك وتُقرأ نطاقاتُه</b>.
-         وسائقُ الرفع لم يُبنَ بعد، <b>فلا تُكتب لها مسوّدةٌ ولا تُجدوَل</b> —
-         والقاعدةُ هي التي تمنع ذلك لا الشاشة.</span></div>`
-      : ''
+function accountHeader(d: PlatformScreenData, r: Readiness): string {
+  const { spec, accounts } = d.view
+  const logo = LOGOS[spec.id] ?? ''
+  const first = accounts[0]
+  const name = first?.displayName ?? spec.label
+  const kind = first === undefined
+    ? 'لا حسابَ مربوط'
+    : spec.id === 'youtube' ? 'قناة' : first.kind === 'org' ? 'صفحةٌ أو شركة' : 'حسابٌ شخصيّ'
+  const linked = first === undefined
+    ? ''
+    : ` · رُبط ${escapeHtml(dayLabel(first.createdAt, d.zone))}`
+  const more = accounts.length > 1 ? ` · و${accounts.length - 1} ${accounts.length === 2 ? 'حسابٌ آخر' : 'حساباتٍ أخرى'}` : ''
+  const c = d.counts
+  const last = d.tally.lastPublishedAt
+  const next = nextAction(d, r)
+  const initial = Array.from(name.trim())[0] ?? '؟'
+  return `<header class="acct ${ACCT_CLASS[spec.id] ?? ''}">
+    <div class="acct-cover" aria-hidden="true"><span class="acct-mark">${logo}</span></div>
+    <div class="acct-body">
+      <span class="acct-av" data-kind="${first?.kind === 'org' || spec.id === 'youtube' ? 'org' : 'member'}"
+        aria-hidden="true">${escapeHtml(initial)}</span>
+      <div class="acct-id">
+        <div class="eyebrow"><span class="ln"></span>${escapeHtml(spec.label)}</div>
+        <h1>${escapeHtml(name)}</h1>
+        <p class="acct-sub">${escapeHtml(kind)}${linked}${more}</p>
+        <ul class="acct-counts">
+          <li><b>${c.published}</b> نُشر</li>
+          <li><b>${c.queued}</b> في الطابور</li>
+          <li class="${c.failed > 0 ? 'bad' : ''}"><b>${c.failed}</b> فشل</li>
+          <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
+        </ul>
+      </div>
+      <div class="acct-act">
+        <span class="acct-verdict">${unsignedAccounts(d.view).length > 0
+          // ‏والشارةُ تقرأ الصفَّ كما تقرؤه بطاقةُ القناة (D-166)
+          ? status('bad', '▲', 'مربوطة بلا إذن')
+          : verdictChip(r)}
+          <a class="tap" href="${escapeHtml(href(spec.id, { tab: 'setup' }))}">التفاصيل</a></span>
+        ${next === null ? '' : `<a class="btn p" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>`}
+      </div>
+    </div>
+  </header>`
+}
+
+// ── ٢ · ما تطلبه المنصّة ──────────────────────────────────────────────
+
+interface Station {
+  readonly title: string
+  readonly state: 'ok' | 'warn' | 'bad' | 'idle'
+  readonly rule: string
+  readonly now: string
+  readonly href: string
+}
+
+const STATION_G: Readonly<Record<Station['state'], string>> = { ok: '●', warn: '◍', bad: '▲', idle: '○' }
+
+/**
+ * سبعُ محطّات — **القاعدةُ سطرًا، وحالُ هذه المنصّة سطرًا تحته**.
+ *
+ * والقاعدةُ من `platformNeeds` (ثوابتُ المستودع)، والحالُ من أعداد المنصّة
+ * ومن السلّم. وكلُّ محطّةٍ رابطٌ إلى موضعها، والساقطةُ تُرى بحدٍّ لا بلونٍ وحدَه.
+ */
+function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): Station[] {
+  const id = d.view.spec.id
+  const c = d.counts
+  const setup = href(id, { tab: 'setup' })
+  const waitingHref = href(id, { tab: 'waiting' })
+  const blocking = r.rungs.find((x) => x.state === 'failed' && x.key !== 'publish')
+  const token = r.rungs.find((x) => x.key === 'token')
+  const clip = needs.media.kind === 'clip'
+  const publishRung = r.rungs.find((x) => x.key === 'publish')
+  return [
+    {
+      title: 'الحسابُ والإذن',
+      state: blocking !== undefined ? 'bad' : r.verdict.kind === 'ok' || token?.state === 'done' ? 'ok' : 'warn',
+      rule: needs.account,
+      now: blocking?.note ?? token?.note ?? r.verdict.text,
+      href: setup,
+    },
+    {
+      title: 'النصّ',
+      state: needs.drafts ? 'ok' : 'idle',
+      rule: needs.text,
+      now: needs.drafts ? 'يُكتب من مصدرٍ محلَّل' : 'لا تُكتب لها مسوّدةٌ بعد',
+      href: needs.drafts ? '/panel#sources' : setup,
+    },
+    {
+      title: 'القرار',
+      state: c.waiting > 0 ? 'warn' : 'ok',
+      rule: 'لا يُنشر شيءٌ بلا اعتمادك',
+      now: c.waiting > 0 ? `${c.waiting} تنتظر قرارك` : 'لا مسوّدةَ تنتظرك',
+      href: waitingHref,
+    },
+    {
+      title: clip ? 'المقطع' : 'الصورة',
+      state: c.missingMedia > 0 ? (needs.media.required ? 'bad' : 'idle') : 'ok',
+      rule: needs.media.spec,
+      now: c.missingMedia > 0
+        ? `${c.missingMedia} ${clip ? 'بلا مقطع' : 'بلا صورة'}`
+        : 'لكلّ منشورٍ قادمٍ ما يلزمه',
+      href: waitingHref,
+    },
+    {
+      title: 'الموعد',
+      state: c.ready > 0 ? 'warn' : c.queued > 0 ? 'ok' : 'idle',
+      rule: 'بتوقيتك، وتُرسله الدورةُ كلَّ ربع ساعة',
+      now: c.ready > 0 ? `${c.ready} معتمَدةٌ بلا موعد` : c.queued > 0 ? `${c.queued} مجدولة` : 'لا موعدَ قادم',
+      href: c.ready > 0 ? waitingHref : '#upcoming',
+    },
+    {
+      title: 'النشر',
+      state: publishRung?.state === 'failed' ? 'bad' : c.published > 0 ? 'ok' : 'idle',
+      rule: `${needs.publish} · ${needs.cost}`,
+      now: publishRung?.state === 'failed'
+        ? 'آخرُ محاولةٍ فشلت'
+        : d.tally.lastPublishedAt !== null
+          ? `${c.published} نُشر · آخرُه ${relativeTime(d.tally.lastPublishedAt, d.now)}`
+          : c.queued > 0 ? `${c.queued} ينتظر موعدَه` : 'لا منشورَ بعد',
+      href: '#history',
+    },
+    {
+      title: 'الأثر',
+      state: needs.measured ? 'ok' : 'idle',
+      rule: needs.measure,
+      now: needs.measured ? 'يُقرأ تحت كلّ منشورٍ نُشر' : 'تُقرأ النتيجةُ على المنصّة نفسِها',
+      href: '#history',
+    },
+  ]
+}
+
+function needsStrip(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): string {
+  const list = stations(d, r, needs)
+  const ready = list.filter((s) => s.state === 'ok').length
+  return `<section class="needs" aria-labelledby="needs-h">
+    <h2 class="needs-h" id="needs-h">ما تطلبه ${escapeHtml(needs.label)} <span class="ago">${ready} من ${list.length} جاهزة</span></h2>
+    <ol class="needs-list">${list
+      .map((s, i) => `<li class="${s.state}"><a href="${escapeHtml(s.href)}">
+        <span class="needs-top"><span class="n" aria-hidden="true">${i + 1}</span>
+          <b>${escapeHtml(s.title)}</b><span class="needs-g">${glyph(STATION_G[s.state])}</span></span>
+        <span class="needs-rule">${escapeHtml(s.rule)}</span>
+        <span class="needs-now">${escapeHtml(s.now)}</span></a></li>`)
+      .join('')}</ol>
+  </section>`
+}
+
+// ── ٣ · التبويبات ─────────────────────────────────────────────────────
+
+function tabsNav(d: PlatformScreenData, r: Readiness): string {
+  const id = d.view.spec.id
+  const clip = d.needs?.media.kind === 'clip'
+  const label: Readonly<Record<Tab, string>> = {
+    posts: 'المنشورات',
+    waiting: 'ينتظرك',
+    media: id === 'youtube' ? 'Shorts' : clip || id === 'instagram' ? 'الشبكة' : 'الوسائط',
+    setup: 'الإعداد',
+  }
+  const count: Readonly<Record<Tab, string>> = {
+    posts: `<span class="count">${d.counts.queued + d.counts.published + d.counts.failed}</span>`,
+    waiting: `<span class="count">${d.counts.waiting + d.counts.ready}</span>`,
+    media: '',
+    setup: r.verdict.kind === 'bad' ? '<span class="count">!</span>' : '',
+  }
+  return `<nav class="ftabs" aria-label="أقسامُ صفحة المنصّة">${TABS.map((t) => {
+    const on = t === d.tab
+    // ‏والفشلُ يُنبَّه عليه في فرز «ما نُشر» بعدده، لا بتلوين مجموع المنشورات
+    const bad = t === 'setup' && r.verdict.kind === 'bad'
+    return `<a class="ftab${on ? ' on' : ''}${bad ? ' bad' : ''}" href="${escapeHtml(t === 'posts' ? href(id) : href(id, { tab: t }))}"${
+      on ? ' aria-current="page"' : ''}>${label[t]}${count[t]}</a>`
+  }).join('')}</nav>`
+}
+
+// ── ٤ · القادم ────────────────────────────────────────────────────────
+
+function upcomingSection(d: PlatformScreenData): string {
+  const rows = d.upcoming.map((row) => {
+    const at = row.scheduledAt ?? row.createdAt
+    const q = classifyQueued(row, d.now)
+    const state = q.kind === 'upcoming'
+      ? status('ok', '◍', 'مجدول')
+      : q.kind === 'late'
+        ? status('warn', '!', `تأخّر ${q.minutes} د`)
+        : q.kind === 'sending'
+          ? status('warn', '◍', 'في الطريق')
+          : status('bad', '▲', 'عالق')
+    const under = `
+      ${row.accountName === null ? '' : `<span class="np-acc">${escapeHtml(row.accountName)}</span>`}
+      ${q.kind === 'late' ? '<p class="hint">حلّ موعدُه ولم تُرسله الدورةُ بعد — تدور كلَّ ربع ساعة.</p>' : ''}
+      ${q.kind === 'stuck'
+        ? `<p class="hint">غادر إلى الطابور منذ ${q.minutes} دقيقةً ولم يعُد جوابُه.</p>${requeueForm(row.id, true, d.view.spec.id)}`
+        : row.dispatchedAt === null
+          ? `<form class="inline" method="POST" action="/panel/drafts/unschedule" data-busy="جارٍ…">
+               <input type="hidden" name="id" value="${escapeHtml(row.id)}">
+               <input type="hidden" name="return" value="${escapeHtml(returnTo(d.view.spec.id, 'waiting'))}">
+               <button class="g sm" type="submit">اسحبه من الطابور</button></form>`
+          : ''}
+      ${journeyLink(row.id)}`
+    return npRow(
+      row.id,
+      whenCol(at, d.zone, { day: true, rel: q.kind === 'upcoming' ? untilTime(at, d.now) : undefined, state }),
+      frame(d, row, `${dayLabel(at, d.zone, false).split(' ')[0] ?? ''} ${clock(at, d.zone)}`),
+      under,
+    )
+  })
+  return `<h3 class="sec" id="upcoming">القادم · ${d.upcoming.length}</h3>
+    ${rows.length === 0
+      ? `<div class="empty"><b>لا شيءَ مجدولٌ على ${escapeHtml(d.view.spec.label)}</b>
+         <p>ما تعتمده وتجدوله يظهر هنا بموعده، الأقربُ أوّلًا.</p></div>`
+      : `<div class="np-list">${rows.join('')}</div>`}`
+}
+
+// ── ٥ · ما نُشر وما فشل ───────────────────────────────────────────────
+
+function resultLine(d: PlatformScreenData, row: TimelineRow): string {
+  if (d.needs?.measured !== true) return '<span class="ago">لا يُقاس لهذه المنصّة بعد</span>'
+  const m = widest(d.metrics[row.id] ?? [])
+  if (m === null) return '<span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد 24 ساعةً من النشر</span>'
+  const v = (n: number | null): string => n === null ? '<span title="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
+  return `<span class="np-result">نافذةُ ${escapeHtml(windowLabel(m.window))}:
+    تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}</span>`
+}
+
+function historyRow(d: PlatformScreenData, row: TimelineRow): string {
+  const published = row.status === 'published'
+  const at = published ? row.publishedAt ?? row.sortAt : row.failedAt ?? row.sortAt
+  const platform = d.view.spec.id as Platform
+  const cost = costOf(d, row)
+  let under: string
+  if (published) {
+    const link = permalink(platform, row.platformPostId)
+    under = `${resultLine(d, row)}
+      ${link === null
+        ? '<span class="ago">نُشر، ولا يُبنى رابطُه من معرّفه لهذه المنصّة.</span>'
+        : `<a class="btn g sm" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
+             aria-label="${escapeHtml(`افتحه على ${d.view.spec.label} — منشورُ ${dayLabel(row.publishedAt ?? row.sortAt, d.zone, false)} ${clock(row.publishedAt ?? row.sortAt, d.zone)}`)}"
+             >${ICON.external} افتحه على ${escapeHtml(d.view.spec.label)}</a>`}
+      <span class="ago">${cost > 0 ? `كلّف ${money(cost)} · ` : ''}${row.tries > 1 ? `بعد ${row.tries} محاولات · ` : ''}</span>${journeyLink(row.id)}`
+  } else {
+    const why = whyFailed(row.failure, platform)
+    under = `<p class="np-why"><span class="i">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
+      ${why.action === 'relink'
+        ? `<a class="btn p sm" href="/oauth/${escapeHtml(platform)}/start">أعد الربط</a>${requeueForm(row.id, false, platform)}`
+        : why.action === 'requeue' || why.action === 'open'
+          ? requeueForm(row.id, true, platform)
+          : ''}
+      ${journeyLink(row.id)}`
+  }
+  return npRow(
+    row.id,
+    whenCol(at, d.zone, { state: published ? status('ok', '●', 'نُشر') : status('bad', '▲', 'فشل') }),
+    frame(d, row, shortAgo(at, d.now)),
+    under,
+    published ? '' : 'failed',
+  )
+}
+
+function historySection(d: PlatformScreenData): string {
+  const id = d.view.spec.id
+  const filters: { f: HistoryFilter; label: string; n: number }[] = [
+    { f: 'all', label: 'الكلّ', n: d.counts.published + d.counts.failed },
+    { f: 'published', label: 'نُشر', n: d.counts.published },
+    { f: 'failed', label: 'فشل', n: d.counts.failed },
+  ]
+  const nav = `<nav class="ftabs ftabs-2" aria-label="فرزُ ما نُشر">${filters
+    .filter((x) => x.f === 'all' || x.n > 0)
+    .map((x) => `<a class="ftab${x.f === d.filter ? ' on' : ''}${x.f === 'failed' ? ' bad' : ''}"
+      href="${escapeHtml(x.f === 'all' ? href(id, {}, '#history') : href(id, { filter: x.f }, '#history'))}"${
+        x.f === d.filter ? ' aria-current="page"' : ''}>${x.label}<span class="count">${x.n}</span></a>`)
+    .join('')}</nav>`
+
+  let day = ''
+  const parts: string[] = []
+  for (const row of d.history.rows) {
+    const at = row.status === 'published' ? row.publishedAt ?? row.sortAt : row.failedAt ?? row.sortAt
+    const key = dayKey(at, d.zone)
+    if (key !== day) {
+      day = key
+      parts.push(npDay(dayLabel(at, d.zone)))
+    }
+    parts.push(historyRow(d, row))
+  }
+  const older = d.history.next === null
+    ? ''
+    : `<a class="btn g" href="${escapeHtml(href(id, d.filter === 'all' ? { before: d.history.next } : { filter: d.filter, before: d.history.next }, '#history'))}">أقدم</a>`
+  return `<h3 class="sec" id="history">حتّى الآن · ما نُشر</h3>
+    ${nav}
+    ${parts.length === 0
+      ? `<div class="empty"><b>${d.filter === 'failed' ? 'لا فشلَ مسجَّل' : `لم يُنشر شيءٌ على ${escapeHtml(d.view.spec.label)} بعد`}</b>
+         <p>ما يُنشر يظهر هنا تحت يومه، بنتيجته ورابطه وكلفته.</p></div>`
+      : `<div class="np-list">${parts.join('')}</div>${older}`}`
+}
+
+// ── تبويب «ينتظرك» ────────────────────────────────────────────────────
+
+function waitingSection(d: PlatformScreenData): string {
+  const drafts = d.waiting.filter((r) => r.status === 'draft')
+  const ready = d.waiting.filter((r) => r.status !== 'draft')
+  const row = (r: TimelineRow): string => npRow(
+    r.id,
+    whenCol(r.createdAt, d.zone, {
+      day: true,
+      rel: `كُتبت ${relativeTime(r.createdAt, d.now)}`,
+      state: r.status === 'draft' ? status('warn', '◍', 'تنتظر قرارك') : status('idle', '○', 'معتمَدةٌ بلا موعد'),
+    }),
+    frame(d, r, r.status === 'draft' ? 'مسوّدة' : 'معتمَدة'),
+    `${r.sourceName === null ? '' : `<span class="ago">من «${escapeHtml(r.sourceName)}»</span>`}
+     <a class="btn ${r.status === 'draft' ? 'p' : 'g'} sm" href="/panel#d-${escapeHtml(encodeURIComponent(r.id))}">${
+       r.status === 'draft' ? 'راجعها واعتمدها' : 'جدوِلها'}</a>
+     ${journeyLink(r.id)}`,
+  )
+  const empty = `<div class="empty"><b>لا شيءَ ينتظرك على ${escapeHtml(d.view.spec.label)}</b>
+    <p>ما يُكتب من مصدرٍ محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.</p>
+    <a class="btn g sm" href="/panel#sources">اكتب من مصدر</a></div>`
+  return d.waiting.length === 0
+    ? empty
+    : `${drafts.length === 0 ? '' : `<h3 class="sec">تنتظر قرارك · ${drafts.length}</h3><div class="np-list">${drafts.map(row).join('')}</div>`}
+       ${ready.length === 0 ? '' : `<h3 class="sec">معتمَدةٌ بلا موعد · ${ready.length}</h3><div class="np-list">${ready.map(row).join('')}</div>`}`
+}
+
+// ── تبويب «الوسائط» ───────────────────────────────────────────────────
+
+function mediaSection(d: PlatformScreenData): string {
+  const all = [...d.upcoming, ...d.history.rows]
+  const tiles = all.flatMap((row) => {
+    const { media, poster } = mediaOf(d.media[row.id])
+    if (media === null) return []
+    const badge = row.status === 'queued'
+      ? status('ok', '◍', escapeHtml(clock(row.scheduledAt ?? row.createdAt, d.zone)))
+      : row.status === 'failed'
+        ? status('bad', '▲', 'فشل')
+        : status('ok', '●', escapeHtml(shortAgo(row.publishedAt ?? row.sortAt, d.now)))
+    return [npTile({ id: row.id, media, poster, badge, dim: row.status === 'queued' })]
+  })
+  const bare = all.length - tiles.length
+  const shape = d.needs?.media.kind === 'clip' ? 'np-grid-clip' : d.view.spec.id === 'instagram' ? 'np-grid-ig' : ''
+  return tiles.length === 0
+    ? `<div class="empty"><b>لا وسائطَ بعد</b><p>الصورُ والمقاطعُ التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.</p></div>`
+    : `<p class="hint">${tiles.length} منشورًا لها وسيط${bare > 0 ? ` · و${bare} بلا وسيطٍ لا تظهر هنا` : ''}.
+         المجدولُ خافت، ويفتح كلُّ مربّعٍ منشورَه في الخطّ الزمنيّ.</p>
+       <div class="np-grid${shape === '' ? '' : ` ${shape}`}">${tiles.join('')}</div>`
+}
+
+// ── تبويب «الإعداد» ───────────────────────────────────────────────────
+
+function setupSection(d: PlatformScreenData, r: Readiness): string {
+  const { spec, state, accounts } = d.view
+  const platform = spec.id as Platform
+  const guide = SETUP[spec.id]
+  const accountBlocks = accounts
+    .map((a) => {
+      const granted = d.scopes[a.id] ?? ''
+      const rows = capabilities(platform, granted)
+      const missing = rows.filter((x) => !x.granted).length
+      return `<div class="card acct-card">
+        <div class="card-head">
+          <h2>${escapeHtml(a.displayName)}</h2>
+          <span class="chip">${a.kind === 'org' ? (spec.id === 'youtube' ? 'قناة' : 'صفحةٌ أو شركة') : 'حسابٌ شخصيّ'}</span>
+          <div class="grow"></div>
+          ${a.status === 'needs_reauth'
+            ? status('bad', '▲', 'جدّد الإذن')
+            : missing === 0
+              ? status('ok', '●', 'كلُّ النطاقات ممنوحة')
+              : status('warn', '!', `${missing} نطاقا ناقصا`)}
+        </div>
+        <details${missing > 0 || granted === '' ? ' open' : ''}><summary>ما يستطيعه هذا الحساب</summary>
+        <p class="hint">${
+          granted === ''
+            ? '<b>لا نطاقاتٍ مسجّلة لهذا الحساب.</b> وهذا يقع إن رُبط قبل أن تُسجَّل النطاقات — أعِد الربط ليُقرأ ما مُنح.'
+            : missing === 0
+              ? 'يستطيع هذا الحسابُ كلَّ ما يحتاجه صدى.'
+              : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدرُ في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
+        }</p>
+        ${capabilityTable(rows)}</details>
+        ${healthLog(d.health[a.id], a.createdAt, d.now)}
+      </div>`
+    })
+    .join('')
+  const setup = guide === undefined ? '' : setupPane(d.view, d.app, d.baseUrl)
+  return `${readinessLadder(r)}
+    <h3 class="sec">الحساباتُ وما تستطيعه</h3>
+    ${accounts.length === 0
+      ? `<div class="empty"><b>لا حسابَ مربوطا</b>
+         <p>${state === 'awaiting_owner'
+           ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
+           : 'زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة.'}</p></div>`
+      : accountBlocks}
+    ${state === 'linked' && unsignedAccounts(d.view).length === 0
+      ? `<div class="acct-more"><a class="btn g" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a></div>`
+      : ''}
+    ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n${setup}`}`
+}
+
+// ── الصفحة ────────────────────────────────────────────────────────────
+
+export function platformScreen(d: PlatformScreenData): string {
+  const { spec } = d.view
+  const logo = LOGOS[spec.id] ?? ''
 
   // ── ما لم يُبنَ: شاشةٌ تقول السببَ لا «قريبا» ──────────────────────
-  if (spec.stage === 'none') {
+  if (spec.stage === 'none' || d.needs === null) {
     return `<div class="page-head">
       <div class="txt">
         <div class="eyebrow"><span class="ln"></span>منصّةٌ لم تُبنَ</div>
@@ -458,128 +742,29 @@ export function platformScreen(d: PlatformScreenData): string {
     </div>`
   }
 
-  // ── حساباتُها ونطاقاتُها ─────────────────────────────────────────
-  const platform = spec.id as Platform
-  const accountBlocks = accounts
-    .map((a) => {
-      const granted = d.scopes[a.id] ?? ''
-      const rows = capabilities(platform, granted)
-      const missing = rows.filter((r) => !r.granted).length
-      return `<div class="card" style="margin-bottom:var(--s-3)">
-        <div class="card-head">
-          <h2>${escapeHtml(a.displayName)}</h2>
-          <span class="chip">${a.kind === 'org' ? 'صفحةٌ أو شركة' : 'حسابٌ شخصيّ'}</span>
-          <div class="grow"></div>
-          ${a.status === 'needs_reauth'
-            ? status('bad', '▲', 'جدّد الإذن')
-            : missing === 0
-              ? status('ok', '●', 'كلُّ النطاقات ممنوحة')
-              : `${status('warn', '!', `${missing} نطاقا ناقصا`)}`}
-        </div>
-        <p class="hint">${
-          granted === ''
-            ? '<b>لا نطاقاتٍ مسجّلة لهذا الحساب.</b> وهذا يقع إن رُبط قبل أن تُسجَّل النطاقات — أعِد الربط ليُقرأ ما مُنح.'
-            : missing === 0
-              ? 'يستطيع هذا الحسابُ كلَّ ما يحتاجه صدى.'
-              : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدرُ في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
-        }</p>
-        ${capabilityTable(rows)}
-        ${healthLog(d.health[a.id], a.createdAt, d.now)}
-      </div>`
-    })
-    .join('')
-
-  const show = d.show ?? 'all'
-  const shown = d.posts.filter((p) => SHOW_MATCH[show](p.status))
-  const posts = shown
-    .map((p) => postCard(p, platform, d.now, d.metrics[p.id] ?? [], d.media[p.id] ?? []))
-    .join('')
-
-  const emptyPosts = `<div class="empty">
-    <b>لا منشورَ على ${escapeHtml(spec.label)} بعد</b>
-    <p>ما يُكتب يظهر في «المنشورات»، ولا يصل إلى هنا حتّى تعتمده وتجدوله.
-       <b>ولا يُنشر شيءٌ بلا موافقةٍ مسجّلة</b> — والقيدُ في القاعدة لا في الصفحة.</p>
-    <a class="btn g sm" href="/panel#posts">افتح المسوّدات</a>
-  </div>`
-
-  const action =
-    state === 'connectable'
-      ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
-      : state === 'needs_reauth'
-        ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start"
-              aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
-        : unsigned
-          ? `<a class="btn p" href="/oauth/${escapeHtml(spec.id)}/start"
-                aria-label="أعد ربط ${escapeHtml(spec.label)}">أعد الربط</a>`
-        : state === 'linked'
-          ? `<a class="btn g" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
-          : ''
-
-  return `<div class="page-head">
-    <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>منصّة</div>
-      <h1>${escapeHtml(spec.label)}</h1>
-      <p class="lede">${escapeHtml(spec.note)}</p>
-    </div>
-    <div class="aside">
-      <div class="plat-logo lg">${logo}</div>
-      ${badge}${action}
-    </div>
-  </div>
-
-  ${stageBanner}
-  ${readinessLadder(readiness({ view: d.view, app: d.app, health: d.health, tally: d.tally, posts: d.posts, now: d.now }))}
-  ${spec.stage === 'link' ? '' : tallyRow(d.tally, d.now)}
-
-  <h3 class="sec">الحساباتُ وما تستطيعه</h3>
-  ${accounts.length === 0
-    ? `<div class="empty"><b>لا حسابَ مربوطا</b>
-       <p>${state === 'awaiting_owner'
-         ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
-         : 'زرُّ الربط أعلاه يفتح شاشةَ الإذن عند المنصّة.'}</p>${
-         state === 'awaiting_owner' && guide !== undefined
-           ? '<a class="btn p sm" href="#setup">اضبط التطبيق</a>'
-           : ''}</div>`
-    : accountBlocks}
-
-  ${spec.stage === 'link'
-    ? `<h3 class="sec">ولماذا لا تُكتب لها مسوّدةٌ بعد</h3>
-       <div class="card"><p class="hint">قيدُ <span class="mono">posts.platform</span> في
-         القاعدة يحصر المسوّدات في المنصّات التي لها سائقُ نشر.
-         فمسوّدةٌ تُكتب لمنصّةٍ لا تنشر وعدٌ يُخلَف عند الجدولة،
-         <b>والقاعدةُ هي التي تمنعه لا الشاشة</b>.
-         ويُوسَّع القيدُ في ترحيل السائق نفسِه، لا قبله.</p>
-       <div class="outcome"><span class="k">وما جاهز</span><span class="v">
-         المقاطعُ تُولَّد رأسيّةً <span class="mono">9:16</span> بخمسَ عشرةَ ثانية،
-         والنافذةُ الموقّعةُ تعطي المنصّةَ رابطا تسحب منه. <b>فالمادّةُ حاضرة،
-         والباقي سائقُ الرفع.</b></span></div></div>`
-    : `<h3 class="sec">ما نُشر وما ينتظر</h3>
-       ${d.posts.length === 0
-         ? emptyPosts
-         : `${postTabs(d.posts, show, spec.id)}
-            ${shown.length === 0
-              ? `<div class="empty"><b>لا شيءَ في «${SHOW_LABEL[show]}»</b>
-                 <p>والعددُ على كلّ تبويبٍ يقول أين ما تبحث عنه.</p>
-                 <a class="btn g sm" href="/panel/channels/${escapeHtml(spec.id)}">الكلّ</a></div>`
-              : `<div class="posts">${posts}</div>`}`}`}
-
-  ${/*
-     * **والدليلُ هنا لا في اللوح** (D-111).
-     *
-     * كان مقلوبا: البطاقةُ في لوح القنوات تحمل الدليلَ كاملا، والشاشةُ
-     * تقول «الدليلُ في اللوح». **فقِيست البطاقةُ فوُجدت كتلةُ الدليل
-     * ‏١٢٦٥px من أصل ‏١٦٢٠ — ‏٧٨٪ منها وثيقة**، وفتحُها يُطيلها ولا يُطيل
-     * جارتَها **فيُمزَّق صفُّ الشبكة بـ‏١٤٣٩px**.
-     *
-     * **والبطاقةُ حالٌ، والشاشةُ وثيقة.** فما يحتاج مساحةً يسكن حيث
-     * المساحةُ عمودٌ واحدٌ لا شبكةٌ تُمزَّق.
-     *
-     * **وترويسةٌ بلا جسدٍ لا تُرسَم** (لاحقةُ D-123). `setupPane` تردّ فراغا
-     * حين لا حالَ للتطبيق — وهي حالُ YouTube وTikTok وInstagram في اللوحة،
-     * لأنّ `appStatuses` تُقرأ لمنصّتين — **فكانت الشاشةُ تنتهي بعنوانٍ
-     * تحته لا شيء**، يُقرأ قسما سقط. فيُحسَب اللوحُ أوّلا، والعنوانُ يتبعه.
-     */''}${(() => {
-    const setup = guide === undefined ? '' : setupPane(d.view, d.app, d.baseUrl)
-    return setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n       ${setup}`
-  })()}`
+  const r = readiness({ view: d.view, app: d.app, health: d.health, tally: d.tally, posts: d.posts, now: d.now })
+  const head = accountHeader(d, r)
+  // ‏وما ينتظر يُقال في زرّ الرأس وعددِ التبويب، لا في شريطٍ ثالثٍ يدفع المنشوراتِ إلى الأسفل
+  const zoneNote = d.zone === null && (d.tab === 'posts' || d.tab === 'waiting')
+    ? '<p class="hint">الأيّامُ والساعاتُ بتوقيت UTC — يُعرف توقيتُك من الفتحة التالية.</p>'
+    : ''
+  const body = d.tab === 'setup'
+    ? setupSection(d, r)
+    : d.tab === 'waiting'
+      ? waitingSection(d)
+      : d.tab === 'media'
+        ? mediaSection(d)
+        : `${upcomingSection(d)}${historySection(d)}`
+  const flash = `<div id="flash" role="status" aria-live="polite">${d.flash === null
+    ? ''
+    : `<div class="flash ${d.flash.kind}"><span class="ic">${glyph(d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲')}</span>
+         <span>${escapeHtml(d.flash.text)}</span></div>`}</div>`
+  return `${flash}${head}
+  ${d.tab === 'setup' ? '' : needsStrip(d, r, d.needs)}
+  ${tabsNav(d, r)}
+  ${zoneNote}
+  ${body}
+  ${d.tab === 'posts' || d.tab === 'waiting'
+    ? '<p class="np-note">المعاينةُ ببنية المنصّة وخطّ صدى، لا لقطةٌ منها. والنصُّ مختصرٌ هنا للتصفّح؛ والطيُّ عند المنصّة لم يُقَس فلا يُرسم.</p>'
+    : ''}`
 }

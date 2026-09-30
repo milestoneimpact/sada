@@ -279,6 +279,10 @@ export const TOKENS = `
   --sheen:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(127,97,40,.06),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(127,97,40,.035),transparent 60%);
+  /* معاينةُ المنشور (D-172): عرضُ إطار كلّ منصّةٍ كما تعرضه خلاصتُها،
+     ومسرحُ المقطع الرأسيّ داكنٌ في الثيمين كما هو عند المنصّتين */
+  --np-w-li:555px; --np-w-x:600px; --np-w-clip:300px;
+  --np-stage:#0b0c10; --np-on-stage:#f5f4ef; --np-scrim:rgb(0 0 0 / .6);
   color-scheme:light;
 }
 
@@ -306,6 +310,7 @@ export const TOKENS = `
     --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
     --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(210,181,124,.05),transparent 60%);
+    --np-stage:#0b0c10; --np-on-stage:#f5f4ef; --np-scrim:rgb(0 0 0 / .6);
     color-scheme:dark;
   }
 }
@@ -343,6 +348,7 @@ export const TOKENS = `
   --sheen:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 58%);
   --bloom:radial-gradient(1100px 520px at 82% -8%,rgba(210,181,124,.08),transparent 58%),
           radial-gradient(900px 460px at 12% -6%,rgba(210,181,124,.05),transparent 60%);
+  --np-stage:#0b0c10; --np-on-stage:#f5f4ef; --np-scrim:rgb(0 0 0 / .6);
   color-scheme:dark;
 }
 
@@ -374,6 +380,8 @@ export const TOKENS = `
     --brand-wash:#ecebe5;
     --ok:#2d7a4f; --warn:#8a5a00; --bad:#b3261e;
     --ok-wash:#e6f2ea; --warn-wash:#fbf1df; --bad-wash:#fbebe9;
+    /* والمسرحُ على الورق أبيضُ بحبرٍ داكن: صفحةٌ سوداءُ تستنزف الحبر */
+    --np-stage:#ffffff; --np-on-stage:#191b1f; --np-scrim:transparent;
     color-scheme:light;
   }
 }

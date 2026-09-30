@@ -1,13 +1,13 @@
 /**
- * شاشةُ المنصّة: التبويباتُ والمصغَّرات.
- *
- * **وما يُفحَص هنا أنّ الفرزَ لا يُخفي** — وهو الشرطُ الذي قام عليه.
+ * صفحةُ المنصّة صفحةَ حساب (D-172): الرأسُ، وما تطلبه المنصّة، والقادمُ
+ * تصاعديًّا، وما نُشر تحت أيّامه، والإعدادُ في تبويبه.
  */
 import { describe, expect, it } from 'vitest'
-import { platformScreen, readinessLadder, showOf, type PostMedia } from './ui/platformView'
+import { filterOf, platformScreen, readinessLadder, tabOf, type PlatformScreenData } from './ui/platformView'
 import { status } from './ui/parts'
 import { viewChannels, type LinkedAccount } from '../lib/channels'
-import type { PlatformPost } from '../lib/platform/screen'
+import { platformNeeds } from '../lib/platform/needs'
+import type { TimelineRow } from '../lib/platform/timeline'
 
 const now = new Date('2026-09-06T12:00:00Z')
 
@@ -17,122 +17,121 @@ const accounts: LinkedAccount[] = [
 ]
 const view = viewChannels(accounts, () => true).find((v) => v.spec.id === 'x')!
 
-const post = (id: string, status: string): PlatformPost => ({
-  id, text: `نصُّ ${id}`, status, scheduledAt: null, createdAt: '2026-09-05T00:00:00Z',
-  accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
-  hasMedia: false, costUsd: 0,
+const row = (over: Partial<TimelineRow> & Pick<TimelineRow, 'id' | 'status'>): TimelineRow => ({
+  text: `نصُّ ${over.id}`, scheduledAt: null, createdAt: '2026-09-05 00:00:00', dispatchedAt: null,
+  accountName: '@omar', accountKind: 'member', sourceName: null, platformPostId: null, publishedAt: null,
+  failedAt: null, failure: null, tries: 0, lastTryAt: null, openTries: 0, hasMedia: false, costUsd: 0,
+  sortAt: '2026-09-05 00:00:00', ...over,
 })
 
-const POSTS: PlatformPost[] = [
-  post('p1', 'published'), post('p2', 'published'),
-  post('p3', 'queued'), post('p4', 'failed'), post('p5', 'draft'),
-]
-
-function screen(over: Partial<Parameters<typeof platformScreen>[0]> = {}): string {
+function screen(over: Partial<PlatformScreenData> = {}): string {
   return platformScreen({
-    health: {},
-    view, posts: POSTS, now,
-    tally: { published: 2, queued: 1, failed: 1, drafts: 1, spend: 0, lastPublishedAt: null },
-    scopes: {}, metrics: {}, media: {},
+    health: {}, view, posts: [], now,
+    tally: { published: 1, queued: 1, failed: 1, drafts: 1, spend: 0, lastPublishedAt: '2026-09-05 22:30:00' },
+    counts: { waiting: 1, ready: 0, queued: 1, published: 1, failed: 1, missingMedia: 0 },
+    needs: platformNeeds('x'),
+    upcoming: [row({ id: 'u1', status: 'queued', scheduledAt: '2026-09-07 06:00:00', sortAt: '2026-09-07 06:00:00' })],
+    history: {
+      rows: [
+        row({ id: 'p1', status: 'published', platformPostId: '1874', publishedAt: '2026-09-05 22:30:00', sortAt: '2026-09-05 22:30:00' }),
+        row({ id: 'p2', status: 'failed', failure: 'token_expired', failedAt: '2026-09-04 09:00:00', sortAt: '2026-09-04 09:00:00' }),
+      ],
+      next: null,
+    },
+    waiting: [], filter: 'all', tab: 'posts', costs: {},
+    scopes: {}, metrics: {}, media: {}, zone: 'Asia/Riyadh', flash: null,
     // ‏الدليلُ يسكن الشاشةَ منذ D-111 — فتحتاجها حالُ التطبيق وأصلُ اللوحة
     app: undefined, baseUrl: 'https://sada2.basserh.com',
     ...over,
   })
 }
 
-describe('التبويباتُ تفرز ولا تُخفي', () => {
-  /**
-   * D-046 قال: «الفاشلةُ تُعرض مع الناجحة **فشلٌ لا يُرى لا يُعالَج**».
-   * والفرزُ يخدم القاعدةَ نفسَها **بشرط أن يكون العددُ معروضا دائما**:
-   * من يقف على «الكلّ» يرى «فشل ١» بلا أن يفتحه.
-   */
-  it('العددُ على كلّ تبويبٍ معروضٌ ولو لم يُفتَح', () => {
+describe('صفحةُ حساب', () => {
+  it('القادمُ قبل ما نُشر، وكلٌّ بعنوانه', () => {
     const html = screen()
-    expect(html).toContain('فشل<span class="count">1</span>')
-    expect(html).toContain('نُشر<span class="count">2</span>')
+    expect(html.indexOf('id="upcoming"')).toBeGreaterThan(0)
+    expect(html.indexOf('id="upcoming"')).toBeLessThan(html.indexOf('id="history"'))
+    expect(html).toContain('id="p-u1"')
   })
 
-  /** وتبويبٌ افتراضيٌّ يُخفي الفشلَ هو عينُ ما حذّر منه D-046. */
-  it('والافتراضُ «الكلّ» لا «نُشر»', () => {
+  it('ورأسُ اليوم بتوقيت المالك — 22:30 UTC هو الأحدُ في الرياض لا السبت', () => {
     const html = screen()
-    expect(html).toContain('نصُّ p4') // الفاشلُ ظاهرٌ بلا فرز
-    expect(html).toContain('aria-current="page"')
-    // والمفتوحُ هو «الكلّ»
-    expect(/class="ftab on"[^>]*>الكلّ/.test(html)).toBe(true)
+    expect(html).toContain('الأحد 6 سبتمبر 2026')
+    expect(html).not.toContain('السبت 5 سبتمبر 2026')
+    // والساعةُ المحلّيّةُ كبيرة، وUTC نصٌّ تحتها لا في title
+    expect(html).toContain('<b class="np-clock">01:30</b>')
+    expect(html).toContain('22:30 UTC')
   })
 
-  it('والفرزُ يعرض ما طُلب وحده', () => {
-    const html = screen({ show: 'failed' })
-    expect(html).toContain('نصُّ p4')
-    expect(html).not.toContain('نصُّ p1')
+  it('وبلا كعكةِ منطقةٍ تُجمَع الأيّامُ بـ UTC ويُقال ذلك', () => {
+    const html = screen({ zone: null })
+    expect(html).toContain('السبت 5 سبتمبر 2026')
+    expect(html).toContain('بتوقيت UTC')
   })
 
-  /** ويعمل بلا سكربت: روابطُ استعلامٍ لا أزرار. */
-  it('والتبويباتُ روابطُ استعلام', () => {
+  it('والفاشلُ في يومه ومعه سببُه بالعربيّة وفعلُه — لا رمزُ الناشر', () => {
     const html = screen()
-    expect(html).toContain('href="/panel/channels/x?show=failed"')
-    expect(html).not.toMatch(/<button[^>]*class="ftab/)
+    expect(html).toContain('انتهى الإذنُ قبل الإرسال')
+    expect(html).not.toContain('token_expired')
+    expect(html).toContain('action="/panel/drafts/requeue"')
+    expect(html).toContain('value="platform:x:waiting"')
   })
 
-  it('وتبويبٌ فارغٌ لا يُعرَض — إلّا «الكلّ»', () => {
-    const html = screen({ posts: [post('p1', 'published')] })
-    expect(html).not.toContain('show=failed')
-    expect(html).toContain('الكلّ')
+  it('والمنشورُ برابطه عند المنصّة', () => {
+    expect(screen()).toContain('https://x.com/i/web/status/1874')
   })
 
-  it('وقيمةٌ لا نعرفها تعود إلى «الكلّ» ولا تُفرغ الشاشة', () => {
-    expect(showOf('لا-شيء')).toBe('all')
-    expect(showOf(undefined)).toBe('all')
-    expect(showOf('failed')).toBe('failed')
+  it('ومعاينةٌ ببنية المنصّة لكلّ صفّ، بلا رقمٍ مخترَع', () => {
+    const html = screen()
+    expect(html).toContain('class="np np-x np-compact"')
+    expect(html).not.toContain('<b>0</b>')
+  })
+
+  it('وسبعُ محطّاتٍ فيما تطلبه المنصّة، بقواعدها من الثوابت', () => {
+    const html = screen()
+    expect((html.match(/<li class="(ok|warn|bad|idle)"><a href=/g) ?? []).length).toBe(7)
+    expect(html).toContain('حتّى 280 محرفٍ موزون')
+  })
+
+  it('والإعدادُ في تبويبه لا في صدر الصفحة', () => {
+    expect(screen()).not.toContain('أتنشر الآن؟')
+    expect(screen({ tab: 'setup' })).toContain('أتنشر الآن؟')
+  })
+
+  it('و`?show=` القديم يُترجَم ولا يُكسَر رابطٌ محفوظ', () => {
+    expect(tabOf(undefined, 'drafts')).toBe('waiting')
+    expect(tabOf('setup', undefined)).toBe('setup')
+    expect(tabOf('لا-شيء', undefined)).toBe('posts')
+    expect(filterOf(undefined, 'failed')).toBe('failed')
+    expect(filterOf('<x>', undefined)).toBe('all')
   })
 })
 
 describe('والوسائطُ تُعرَض لا يُقال إنّ هناك وسيطا', () => {
-  const media: Record<string, PostMedia[]> = {
-    p1: [{ id: 'm1', mime: 'image/png', status: 'ready' }],
-    p2: [{ id: 'm2', mime: 'video/mp4', status: 'ready' }],
-    p3: [{ id: 'm3', mime: 'image/png', status: 'rejected' }],
-  }
-
-  it('الصورةُ تُرسَم من مسارٍ خلف الجلسة', () => {
-    const html = screen({ media })
+  it('الصورةُ في موضعها من الإطار ومن مسارٍ خلف الجلسة', () => {
+    const html = screen({ media: { u1: [{ id: 'm1', mime: 'image/png', status: 'ready', note: '' }] } })
     expect(html).toContain('src="/panel/media/m1"')
-    expect(html).toContain('alt="صورةٌ مولَّدة')
+    // ‏الشريحةُ المركّبة بمقاس المنصّة: النسبةُ معلومةٌ فتُحجَز قبل التحميل
+    expect(html).toContain('width="1200" height="675"')
   })
 
-  /** والفيديو `<video>` لا `<img>` — **ولا تشغيلَ آليّ**. */
-  it('والمقطعُ يُرسَم video بلا تشغيلٍ آليّ', () => {
-    const html = screen({ media })
-    expect(html).toContain('<video src="/panel/media/m2"')
+  it('والمقطعُ video بلا تشغيلٍ آليّ، وغلافُه الصورةُ التي حُرّك منها', () => {
+    const html = screen({
+      media: { u1: [
+        { id: 'v1', mime: 'video/mp4', status: 'ready', note: null },
+        { id: 'm1', mime: 'image/png', status: 'ready', note: '' },
+      ] },
+    })
+    expect(html).toContain('<video src="/panel/media/v1" poster="/panel/media/m1"')
     expect(html).not.toContain('autoplay')
-    expect(html).toContain('muted')
   })
 
-  /** كلفتُها دُفعت، وإخفاؤها يجعل سطرا في الدفتر بلا ما يقابله. */
-  it('والمرفوضةُ تُعرَض مُعلَّمةً لا تُخفى', () => {
-    const html = screen({ media })
-    expect(html).toContain('src="/panel/media/m3"')
-    expect(html).toContain('مرفوضة')
-  })
-
-  /** وصفٌّ يقول إنّ له وسيطا ولا وسيطَ يُقرأ: يُقال ولا يُخفى. */
-  it('ووسيطٌ مفقودٌ يُقال', () => {
-    const orphan = [{ ...post('p9', 'published'), hasMedia: true }]
-    expect(screen({ posts: orphan, media: {} })).toContain('وسيطٌ لا يُقرأ')
-  })
-
-  it('ولا مصغَّرَ حيث لا وسيط', () => {
-    expect(screen({ media: {} })).not.toContain('class="thumbs"')
+  it('والمرفوضةُ لا تُرسم في الإطار', () => {
+    const html = screen({ media: { u1: [{ id: 'm9', mime: 'image/png', status: 'rejected', note: '' }] } })
+    expect(html).not.toContain('/panel/media/m9')
   })
 })
 
-/**
- * الدليلُ يسكن الشاشةَ لا اللوح (D-111).
- *
- * **وقِيس سببُ النقل**: كتلةُ الدليل ‏١٢٦٥px من بطاقةٍ ‏١٦٢٠ — ‏٧٨٪ منها
- * وثيقة. وفتحُها يُطيل بطاقتَها ولا يُطيل جارتَها، **فيُمزَّق صفُّ الشبكة
- * بـ‏١٤٣٩px**. والبطاقةُ حالٌ، والشاشةُ وثيقة.
- */
 describe('الدليلُ يسكن شاشةَ المنصّة', () => {
   const app = {
     platform: 'x' as const, source: 'none' as const,
@@ -142,7 +141,7 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
   }
 
   it('**وبلا تطبيقٍ مضبوطٍ يُعرَض الدليلُ هنا**', () => {
-    const html = screen({ app })
+    const html = screen({ app, tab: 'setup' })
     expect(html).toContain('ضبطُ التطبيق ودليلُه')
     expect(html).toContain('دليلُ ضبط التطبيق')
     // **ورابطُ العودة يُعرَض للنسخ حيث يُضبَط** — لا في لوحٍ آخر
@@ -156,13 +155,13 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
    * تصل بلا `app` — **وكانت تنتهي بعنوان «ضبطُ التطبيق» تحته لا شيء**.
    */
   it('وبلا حالِ تطبيقٍ لا عنوانَ يعد بدليلٍ لا يأتي', () => {
-    const html = screen({ app: undefined })
+    const html = screen({ app: undefined, tab: 'setup' })
     expect(html).not.toContain('ضبطُ التطبيق ودليلُه')
   })
 
   /** **ولا تُعيد الشاشةُ المالكَ إلى اللوح** — كانت تقول «الدليلُ هناك». */
   it('ولا تُحيل إلى لوح القنوات طلبا للدليل', () => {
-    expect(screen({ app })).not.toContain('افتح الدليل')
+    expect(screen({ app, tab: 'setup' })).not.toContain('افتح الدليل')
   })
 
   it('وبلا حالِ تطبيقٍ لا يُعرَض شيءٌ ولا يرمي', () => {
@@ -175,7 +174,7 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
  */
 describe('سجلُّ صحّة الحساب', () => {
   it('بلا سجلٍّ: رُبط، ولم يُجدَّد بعد، ولا إذنَ محفوظا', () => {
-    const html = screen({})
+    const html = screen({ tab: 'setup' })
     expect(html).toContain('<h3 class="sec">سجلُّ صحّة الحساب</h3>')
     expect(html).toContain('لم يُجدَّد بعدُ')
     expect(html).toContain('لا إذنَ وصولٍ محفوظا')
@@ -183,6 +182,7 @@ describe('سجلُّ صحّة الحساب', () => {
 
   it('وبسجلٍّ: آخرُ تجديدٍ وموعدُ الانتهاء والتنبيهاتُ بأسمائها', () => {
     const html = screen({
+      tab: 'setup',
       health: {
         a1: {
           status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: '2027-01-01 00:00:00',
@@ -202,10 +202,10 @@ describe('سجلُّ صحّة الحساب', () => {
 describe('ختمُ السقوط في سجلّ الصحّة (D-131)', () => {
   it('حسابٌ ساقطٌ يقول متى سقط، والقائمُ لا يقول شيئا', () => {
     const base = { status: 'needs_reauth', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, alerts: [] }
-    const dropped = screen({ health: { a1: { ...base, needsReauthAt: '2026-09-10 03:00:00' } } })
+    const dropped = screen({ tab: 'setup', health: { a1: { ...base, needsReauthAt: '2026-09-10 03:00:00' } } })
     expect(dropped).toContain('سقط الإذن')
     expect(dropped).toContain('والنشرُ متوقّفٌ عليه منذها')
-    const fine = screen({ health: { a1: { ...base, status: 'active', needsReauthAt: null } } })
+    const fine = screen({ tab: 'setup', health: { a1: { ...base, status: 'active', needsReauthAt: null } } })
     expect(fine).not.toContain('سقط الإذن')
   })
 })
