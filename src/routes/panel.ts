@@ -32,6 +32,7 @@ import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
+import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
@@ -1543,7 +1544,7 @@ panel.get('/panel/channels/:platform', async (c) => {
     // ‏`_csrf` فيردّهما `guardPost` بـ403، والدليلُ يسكن هذه الصفحة منذ D-111
     soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: 'القنوات' },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('channels', spec.id)),
   )
 })
 
@@ -1628,7 +1629,7 @@ panel.get('/panel/tasks', async (c) => {
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('tasks')),
   )
 })
 
@@ -1662,7 +1663,7 @@ panel.get('/panel/report', async (c) => {
 
   return page((nonce) =>
     soloPage('صدى — التقرير الأسبوعيّ', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('report')),
   )
 })
 
@@ -1689,7 +1690,7 @@ panel.get('/panel/journey/:id', async (c) => {
   return page((nonce) =>
     soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })
 
@@ -1713,7 +1714,7 @@ panel.get('/panel/report/:week', async (c) => {
 
   return page((nonce) =>
     soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: sectionLabel('report') }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('report')),
   )
 })
 
@@ -2094,7 +2095,7 @@ panel.post('/panel/drafts/spread', async (c) => {
   const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
   return page((nonce) =>
     soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf }), nonce, '',
-      buildCommands({ onPanel: false })),
+      buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })
 

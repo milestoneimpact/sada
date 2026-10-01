@@ -170,14 +170,21 @@ export function soloPage(
   nonce: string,
   script = '',
   commands?: readonly Command[],
+  /**
+   * الرافدةُ مرسومةً (D-178) — من `soloNav` في `rail.ts`. **وبها تصير الصفحةُ
+   * جزءًا من التطبيق**: رافدةٌ على العريض وشريطٌ سفليٌّ في الجوّال، والثيمُ في
+   * ذيلها لا في شريط العودة (فلا يتكرّر معرّفُه).
+   */
+  rail?: string,
 ): string {
+  const inner = `${backNav(back.href, back.label, rail === undefined)}
+         <main id="main">${body}</main>`
   return shell(
     title,
     `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-       <div class="wrap">
-         ${backNav(back.href, back.label)}
-         <main id="main">${body}</main>
-       </div>`,
+       ${rail === undefined
+         ? `<div class="wrap">${inner}</div>`
+         : `<div class="app">${rail}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -185,7 +192,7 @@ export function soloPage(
 }
 
 
-export function backNav(href: string, label: string): string {
+export function backNav(href: string, label: string, theme = true): string {
   /*
    * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
    * وحدَه، فتُقرأ صفحةً خارج التطبيق. والعلامةُ بجانب السهم تقول «هذه من
@@ -197,7 +204,7 @@ export function backNav(href: string, label: string): string {
   return `<nav class="back" aria-label="مسارُ العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
-    <span class="grow"></span>${commandTrigger()}${themeSwitch()}
+    <span class="grow"></span>${commandTrigger()}${theme ? themeSwitch() : ''}
   </nav>`
 }
 

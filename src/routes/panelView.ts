@@ -37,6 +37,7 @@ import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
+import { railHtml } from './ui/rail'
 import type { JourneyCounts } from '../lib/home'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
@@ -742,18 +743,9 @@ export function panelPage(d: PanelData): string {
   const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
     securitySection(d)
 
-  const nav = (href: string, icon: string, text: string, count = 0, attrs = ''): string =>
-    `<a href="${href}"${attrs}>${icon}<span>${text}</span>${
-      count > 0 ? `<span class="count">${count}</span>` : ''
-    }</a>`
-
   /*
-   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105) — لا من عشرة أسطرٍ بيد.
-   *
-   * والفهرسُ يُبنى من الجدول نفسِه، **فقسمٌ يُضاف في مكانٍ واحدٍ يظهر
-   * في الاثنين**. ولو كُتبا مفترقَين لبقي القسمُ الجديدُ خارجَ اللوحة،
-   * **ولا حارسَ يمسك غيابا**: لوحةٌ لا تجده تبدو ناقصةَ الفهرسة لا
-   * معطوبة، فلا يُشتكى منها — وتشيخ صامتة.
+   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105)، وفي `rail.ts` منذ صارت لكلّ
+   * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
    */
   const counts: Readonly<Record<string, number>> = {
     sources: pending,
@@ -766,37 +758,12 @@ export function panelPage(d: PanelData): string {
     providers: missing,
     security: d.sessions.length > 1 ? d.sessions.length : 0,
   }
-  let lastGroup = ''
-  const tabs = SECTIONS.map((s) => {
-    const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
-    lastGroup = s.group
-    // ‏أزرارُ المنصّات تتبع «القنوات» لأنّها تفريعٌ عنها لا قسمٌ ثالث
-    const after = s.id === 'channels' ? platformNav(d.channels) : ''
-    /*
-     * **وسمةُ الشريط تُقرأ من الجدول** (D-107): الرافدةُ نفسُها تصير
-     * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى** — فقسمٌ يُضاف
-     * مرّةً يدخل الثلاثةَ: الرافدةَ واللوحةَ والشريط.
-     */
-    const bar = s.bar === true ? ' data-bar' : ''
-    return head +
-      nav(s.page ?? `#${s.id}`, s.icon, s.short ?? s.label, counts[s.id] ?? 0, bar) + after
-  }).join('\n    ')
 
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
-<aside class="rail">
-  <div class="rail-head">
-    <div class="glyph">${GLYPH_SVG}</div>
-    <div class="brand"><b>صدى</b><span>SADA · ${d.env === 'production' ? 'PRODUCTION' : 'STAGING'}</span></div>
-  </div>
-  <nav class="tabs" aria-label="أقسام اللوحة">
-    ${tabs}
-    ${commandMore()}
-  </nav>
-  <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
-</aside>
+${railHtml({ inPanel: true, counts, afterChannels: platformNav(d.channels), env: d.env })}
 
 <div class="main">
 <header class="topbar">
