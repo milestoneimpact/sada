@@ -1126,6 +1126,29 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    من ‏740 إلى ‏890px (التدقيقُ الرابع) — صفُّها بطولِ أطولِ بطاقة. والأعمدةُ تصبّ
    البطاقةَ تحت جارتها بلا انتظارِ صفّ، فلا ثقب. وترتيبُ الوثيقة باقٍ: J/K تمشي فيه. */
 .dcols{columns:2 440px; column-gap:var(--s-3)}
+/* ── فيديوهاتك (D-180) ─────────────────────────────────────────────────
+   الملفُّ يُختار بلصيقةٍ بهيئة زرّ: حقلُ الملفّ الأصليّ لا يُصمَّم ويقول «No file chosen»
+   بلغة المتصفّح. **فيغطّي الزرَّ شفّافًا لا يُصغَّر إلى بكسل**: هدفُ اللمس بحجم الزرّ
+   (أمسكه مدقّقُ الأهداف ‏1×1)، وقارئُ الشاشة ولوحةُ المفاتيح يبلغانه كما هو. */
+.vpick{position:relative; overflow:hidden}
+.vpick:focus-within{outline:2px solid var(--brand); outline-offset:2px}
+.vup{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; margin-bottom:var(--s-3)}
+.vfile{position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
+.vup progress{flex:1 1 200px; height:10px; accent-color:var(--ok)}
+.vlist{display:flex; flex-direction:column; gap:var(--s-3)}
+.vrow{display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-3); border-radius:var(--r);
+  border:1px solid var(--line); background:var(--surface-2)}
+.vmeta{display:flex; flex-direction:column; gap:var(--s-1)}
+.vrow > .st{align-self:flex-start}
+.vpfs{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); margin-bottom:var(--s-2)}
+.vpf{display:flex; align-items:flex-start; gap:var(--s-2); padding:var(--s-2); min-height:var(--tap);
+  border-radius:var(--r-sm); background:var(--surface); border:1px solid var(--line-soft)}
+.vpf input{margin:var(--s-1) 0 0}
+.vpf-b{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-1); min-width:0}
+/* ‏وسببُ المنصّة جملةٌ لا لصيقة: يلتفّ ولا يدفع الصفحةَ ‏19px عند ‏320 */
+.vpf-b .st{white-space:normal; max-width:100%}
+.vapprove{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); font-size:var(--t-sm)}
+.vapprove input{margin:0}
 .dcols > *{break-inside:avoid; margin-bottom:var(--s-3)}
 
 /* ── اختيارُ بطاقات اللوح (D-119) ─────────────────────────────────────

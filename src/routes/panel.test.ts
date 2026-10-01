@@ -3194,3 +3194,80 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(home).not.toContain('data-pf="snapchat"')
   })
 })
+
+describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على المنصّات الثلاث (D-180)', () => {
+  function multipartBucket() {
+    const stored = new Map<string, number>()
+    return {
+      stored,
+      async createMultipartUpload(key: string) {
+        return this.resumeMultipartUpload(key, `mp-${key}`)
+      },
+      resumeMultipartUpload(key: string, uploadId: string) {
+        return {
+          uploadId,
+          async uploadPart(n: number, value: ArrayBuffer) { return { partNumber: n, etag: `e${n}-${value.byteLength}` } },
+          async complete(parts: unknown[]) { stored.set(key, parts.length); return {} },
+          async abort() {},
+        }
+      },
+    }
+  }
+
+  it('ابدأ ثمّ قطعةٌ ثمّ أكمل — ثمّ منشورٌ معتمَدٌ لكلّ منصّة، وكلُّها خلف الجلسة وCSRF', async () => {
+    const bucket = multipartBucket()
+    env['MEDIA'] = bucket
+    const cookie = await login()
+    const form = (fields: Record<string, string | Blob>): FormData => {
+      const f = new FormData()
+      for (const [k, v] of Object.entries(fields)) f.set(k, v)
+      return f
+    }
+
+    // ‏بلا رمزٍ يُردّ قبل أن يُفتح رفع
+    const naked = new FormData()
+    naked.set('_csrf', 'wrong')
+    naked.set('name', 'x.mp4')
+    expect((await app.request('/panel/uploads/start', withSession(cookie, { method: 'POST', body: naked }), env)).status).toBe(403)
+
+    const started = await (await app.request('/panel/uploads/start', withSession(cookie, {
+      method: 'POST', body: form({ name: 'قيادة.mp4', mime: 'video/mp4', bytes: '12', width: '1080', height: '1920', duration_ms: '42000' }),
+    }), env)).json() as { ok: boolean; id: string; parts: number }
+    expect(started).toMatchObject({ ok: true, parts: 1 })
+
+    const part = await (await app.request(`/panel/uploads/${started.id}/part`, withSession(cookie, {
+      method: 'POST', body: form({ n: '1', chunk: new Blob([new Uint8Array(12)]) }),
+    }), env)).json() as { ok: boolean; part: { partNumber: number; etag: string } }
+    expect(part.ok).toBe(true)
+
+    const done = await app.request(`/panel/uploads/${started.id}/complete`, withSession(cookie, {
+      method: 'POST', body: form({ parts: JSON.stringify([part.part]) }),
+    }), env)
+    expect(done.status).toBe(200)
+    expect(bucket.stored.get(`upload/${started.id}.mp4`)).toBe(1)
+
+    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(page).toContain('<div class="card" id="videos"')
+    expect(page).toContain('قيادة.mp4')
+    expect(page).toContain('<bdi dir="ltr">0:42</bdi> · <bdi dir="ltr">1080×1920</bdi>')
+
+    const posts = await app.request(`/panel/uploads/${started.id}/posts`, withSession(cookie, {
+      method: 'POST',
+      body: (() => {
+        const f = form({ caption: 'المعلمُ نقطةُ قرار', approve: 'on' })
+        for (const p of ['youtube', 'tiktok', 'instagram']) f.append('platform', p)
+        return f
+      })(),
+    }), env)
+    expect(posts.status).toBe(303)
+    expect(posts.headers.get('Location')).toBe('/panel#videos')
+    const rows = db.raw.prepare(
+      `SELECT p.platform, p.status FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = ? ORDER BY p.platform`,
+    ).all(started.id) as { platform: string; status: string }[]
+    expect(rows).toEqual([
+      { platform: 'instagram', status: 'approved' },
+      { platform: 'tiktok', status: 'approved' },
+      { platform: 'youtube', status: 'approved' },
+    ])
+  })
+})

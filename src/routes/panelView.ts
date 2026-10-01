@@ -38,6 +38,8 @@ import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
+import { videosSection } from './ui/sections/videos'
+import type { UploadRow } from '../lib/media/uploads'
 import type { JourneyCounts } from '../lib/home'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
@@ -308,6 +310,8 @@ export interface PanelData {
   readonly openSuggestions: number
   /** عدُّ المنشورات بحالها ومنصّتها من القاعدة كلِّها — لرحلة الرئيسيّة (D-177). */
   readonly journey: JourneyCounts
+  /** مقاطعُ المالك المرفوعة (D-180) — أحدثُها أوّلًا. */
+  readonly uploads: readonly UploadRow[]
   /**
    * رموزٌ تقترب من الانتهاء — **تُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح.**
    *
@@ -914,6 +918,7 @@ ${pivotPane(d.pivot)}
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
   })}
+  ${videosSection(d.uploads, d.now)}
   <div style="margin-top:var(--s-3)">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),

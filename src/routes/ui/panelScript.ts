@@ -694,5 +694,64 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     field.addEventListener('input',reflect);
     reflect();
   });
+
+  /*
+   * ── رفعُ المقطع قطعًا (D-180) ─────────────────────────────────────
+   * المدّةُ والأبعادُ من ‹video› على عنوانٍ محلّيّ (blob:) قبل أن يُرفع بايت، ثمّ
+   * «ابدأ» فالقطعُ بترتيبها بشريط تقدّم، ثمّ «أكمل». وكلُّ طلبٍ نموذجٌ بـ‹_csrf›
+   * يمرّ من حارس اللوحة نفسِه. وفشلُ قطعةٍ يُلغي الرفعَ فلا يبقى معلّقًا في R2.
+   */
+  var vfile=document.getElementById('vfile');
+  if(vfile)vfile.addEventListener('change',function(){
+    var file=vfile.files&&vfile.files[0];
+    if(!file)return;
+    var msg=document.getElementById('vup-msg'), bar=document.getElementById('vup-bar');
+    var tell=function(t){if(msg)msg.textContent=t;};
+    var id=null;
+    var meta=new Promise(function(done){
+      var v=document.createElement('video'), url=URL.createObjectURL(file), over=false;
+      var end=function(m){if(over)return; over=true; URL.revokeObjectURL(url); done(m);};
+      v.preload='metadata';
+      v.onloadedmetadata=function(){end({w:v.videoWidth,h:v.videoHeight,d:Math.round(v.duration*1000)});};
+      v.onerror=function(){end({w:'',h:'',d:''});};
+      setTimeout(function(){end({w:'',h:'',d:''});},8000);
+      v.src=url;
+    });
+    vfile.disabled=true; tell('يقرأ المقطع…');
+    meta.then(function(m){
+      return post('/panel/uploads/start',{name:file.name,mime:file.type,bytes:String(file.size),
+        width:String(m.w),height:String(m.h),duration_ms:isFinite(m.d)?String(m.d):''});
+    }).then(function(r){return r.json();}).then(function(d){
+      if(!d.ok)throw d.reason||'رُفض المقطع';
+      id=d.id; if(bar){bar.hidden=false; bar.value=0;}
+      var parts=[], n=0;
+      var next=function(){
+        n++;
+        if(n>d.parts)return Promise.resolve();
+        var body=new FormData(); body.set('_csrf',csrf); body.set('n',String(n));
+        body.set('chunk',file.slice((n-1)*d.partBytes,Math.min(n*d.partBytes,file.size)));
+        return fetch('/panel/uploads/'+id+'/part',{method:'POST',body:body})
+          .then(function(r){return r.json();}).then(function(p){
+            if(!p.ok)throw p.reason||'رُدّت قطعة';
+            parts.push(p.part);
+            if(bar)bar.value=Math.round(100*n/d.parts);
+            tell('يرفع… '+Math.round(100*n/d.parts)+'٪');
+            return next();
+          });
+      };
+      return next().then(function(){
+        tell('يجمع المقطع…');
+        return post('/panel/uploads/'+id+'/complete',{parts:JSON.stringify(parts)});
+      });
+    }).then(function(r){return r.json();}).then(function(c){
+      if(!c.ok)throw c.reason||'تعذّر جمعُ المقطع';
+      location.hash='videos'; location.reload();
+    }).catch(function(e){
+      if(id!==null)post('/panel/uploads/'+id+'/abort',{});
+      tell(typeof e==='string'?e:'انقطع الرفع — اختر الملفَّ مرّةً أخرى');
+      vfile.disabled=false; vfile.value='';
+      if(bar)bar.hidden=true;
+    });
+  });
 })();
 `
