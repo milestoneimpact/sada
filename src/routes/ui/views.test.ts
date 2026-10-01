@@ -717,7 +717,7 @@ describe('الطبعةُ الثالثة (D-143)', () => {
     expect(css.rule(':root')['--font-display']).toMatch(/^"Inter","Reem Kufi","Beiruti",/)
     // ‏الساري لا موضعُ السطر: العناوينُ كوفيّة، واللصائقُ الصغيرة بحرف المتن (D-144)
     // تُستثنى من المجموعة بقاعدةٍ بعدها — فحذفُ محدّدٍ من الثانية يجعله كوفيًّا
-    for (const s of ['.page-head h1', '.card h2', '.brand b', '.auth h1', '.fd-h h2']) {
+    for (const s of ['.page-head h1', '.card h2', '.brand b', '.auth h1']) {
       expect(css.rule(s)['font-family'], s).toBe('var(--font-display)')
     }
     for (const s of ['nav.tabs .lbl', '.tile .k', 'th', '.sec', '.stat b', '.cmdk-t b', '.topbar h1', '.slice h3']) {

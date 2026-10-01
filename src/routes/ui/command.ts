@@ -123,7 +123,7 @@ export interface Section {
  * لا تجد قسما تبدو ناقصةَ الفهرسة لا معطوبة، فلا يُشتكى منها.
  */
 export const SECTIONS: readonly Section[] = [
-  { id: 'overview', label: 'نظرة عامّة', note: 'حالُ اليوم: ما أُنفق وما ينتظر قرارك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
+  { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، والرحلة، والمنصّات', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
   { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
   { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true },
   { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ أذوناتها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },

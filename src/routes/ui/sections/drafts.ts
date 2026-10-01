@@ -831,8 +831,9 @@ export function draftsSection(input: DraftsInput): string {
   const list =
     drafts.length === 0
       ? `<div class="empty"><b>لا مسوّدات بعد</b>
-           <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p></div>`
-      : `<div class="grid c2 ragged">${drafts
+           <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p>
+           <a class="btn p sm" href="#write">اكتب من مصدر</a></div>`
+      : `<div class="dcols">${drafts
           .map((d) =>
             card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines))
           .join('')}</div>`
@@ -883,7 +884,7 @@ export function draftsSection(input: DraftsInput): string {
     <b>لا مسوّدةَ في هذا الفرز</b>
     <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>
 
-  <div class="card" style="margin-top:var(--s-3)">
+  <div class="card" id="write" style="margin-top:var(--s-3)">
     <div class="card-head"><h2>الكتابة من مصدر</h2></div>
     <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
       <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>

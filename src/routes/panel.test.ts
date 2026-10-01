@@ -3165,3 +3165,32 @@ describe('سقفُ المقاطع اليوميّ في اللوحة (D-168)', () 
   })
 })
 
+
+describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ المنصّات (D-177)', () => {
+  async function seedPost(status: string, platform = 'linkedin'): Promise<void> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, ?, 'text', 'نصّ', ?, ?)`)
+      .bind(id, platform, status, `k-${id}`)
+      .run()
+  }
+
+  it('الرحلةُ تُعدّ من القاعدة، والمسوّداتُ بعربيّةٍ صحيحة، والمنصّاتُ كلُّها بزرّها', async () => {
+    await seedPost('draft')
+    await seedPost('draft')
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const home = html.slice(html.indexOf('<section data-pane="overview"'), html.indexOf('<h2 class="home-sub">'))
+    expect(home).toContain('خطوتُك التالية')
+    // ‏لا منصّةَ متّصلة: الفعلُ الأوّلُ الربطُ لا المسوّدات
+    expect(home).toContain('اربط أوّلَ منصّة')
+    expect(home).toContain('تنتظر قرارك مسوّدتان')
+    expect(home).toContain('<ol class="trip">')
+    expect((home.match(/<li data-state=/g) ?? []).length).toBe(7)
+    for (const label of ['LinkedIn', 'X', 'Instagram', 'TikTok', 'YouTube']) {
+      expect(home).toContain(`<b>${label}</b>`)
+    }
+    // ‏وما لم يُبنَ سائقُه سطرُ «قريبًا» لا بطاقة
+    expect(home).toContain('قريبًا:')
+    expect(home).not.toContain('data-pf="snapchat"')
+  })
+})
