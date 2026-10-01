@@ -36,6 +36,9 @@ export const REASONS: Readonly<Record<string, FailReason>> = {
   unexpected_error: { text: 'عطلٌ لم يُتوقَّع عندنا قبل الإرسال — وسببُه في سجلّ العامل', action: 'requeue' },
 }
 
+/** البادئةُ التي يكتبها الناشرُ قبل جواب المنصّة: «x: …» و«linkedin: …». */
+const PLATFORM_PREFIX: ReadonlySet<string> = new Set(['x', 'linkedin', 'youtube', 'tiktok', 'instagram'])
+
 /**
  * يقرأ نصَّ الفشل كما حفظه الناشر: رمزٌ، أو رمزٌ ثمّ «:» وتفصيل، أو جملةٌ
  * عربيّةٌ كتبها الحارسُ نفسُه، أو جوابُ المنصّة.
@@ -56,8 +59,16 @@ export function whyFailed(raw: string | null, platform: Platform | string): Fail
         : known
     }
   }
+  const label = platform === 'x' ? 'X' : platform === 'linkedin' ? 'LinkedIn' : platform
+  /*
+   * ‏**ونداءٌ ردّته المنصّةُ يُعاد** (D-176): الناشرُ يكتب «x: تعذّر رفع الوسيط (…)»،
+   * وكانت جملةً عربيّةً فتُقال كما هي **بلا فعل** — فوقف المالكُ أمام منشورٍ فاشلٍ
+   * لا يعرف لماذا ولا ما يفعل. فالبادئةُ اسمُ المنصّة تُرفع، ويُعرض «أعده إلى المعتمَد».
+   */
+  if (code !== null && PLATFORM_PREFIX.has(code[1]!) && (code[2]?.trim() ?? '') !== '') {
+    return { text: `ردّته ${label}: ${code[2]!.trim()}`, action: 'requeue' }
+  }
   // ‏جملةٌ عربيّةٌ كتبها حارسٌ عندنا (حسابُ الصفحة مثلًا) تُقال كما هي
   if (/[؀-ۿ]/.test(text)) return { text, action: 'none' }
-  const label = platform === 'x' ? 'X' : platform === 'linkedin' ? 'LinkedIn' : platform
   return { text: `ردّته ${label}: ${text}`, action: 'requeue' }
 }

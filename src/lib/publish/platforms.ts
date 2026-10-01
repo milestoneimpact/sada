@@ -36,10 +36,18 @@ function classify(status: number): boolean {
 
 async function errorCode(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as { error?: unknown; title?: unknown; detail?: unknown }
-    for (const field of [body.error, body.title, body.detail]) {
-      if (typeof field === 'string' && field.length > 0) return field.slice(0, 120)
+    const body = (await response.json()) as {
+      error?: unknown; title?: unknown; detail?: unknown; errors?: unknown
     }
+    const head = [body.error, body.title, body.detail].find(
+      (field): field is string => typeof field === 'string' && field.length > 0,
+    )
+    // ‏و X يسمّي الحقلَ الخاطئ في `errors[0].message` لا في عنوانه: «Invalid Request»
+    // وحدها لا تقول أيَّ حقل، فيُلحَق بها ما يسمّيه
+    const first = Array.isArray(body.errors) ? (body.errors[0] as { message?: unknown } | undefined) : undefined
+    const named = typeof first?.message === 'string' && first.message !== head ? first.message : ''
+    const text = [head ?? '', named].filter((part) => part !== '').join(' · ')
+    if (text !== '') return text.slice(0, 200)
   } catch {
     return 'unparsable'
   }
@@ -193,6 +201,13 @@ export async function uploadLinkedInImage(
   return imageUrn
 }
 
+/** فئةُ الوسيط عند X من نوعه: الصورةُ المتحرّكةُ غيرُ الصورة، والمقطعُ غيرُهما. */
+export function xMediaCategory(mime: string): 'tweet_image' | 'tweet_gif' | 'tweet_video' {
+  if (mime === 'image/gif') return 'tweet_gif'
+  if (mime.startsWith('video/')) return 'tweet_video'
+  return 'tweet_image'
+}
+
 /**
  * X — رفعٌ في طلبٍ واحد بـ multipart.
  *
@@ -210,6 +225,9 @@ export async function uploadXMedia(
   // `Uint8Array` العامّ لا يوافق `BlobPart` في أنواع Workers
   const buffer = upload.bytes.slice().buffer as ArrayBuffer
   form.set('media', new Blob([buffer], { type: upload.mime }))
+  // ‏**وفئةُ الوسيط إلزاميّةٌ في v2**: بلاها يردّ X ‏400 «Invalid Request» على كلّ صورة —
+  // وهو ما ردّ أوّلَ منشورٍ بإنفوجرافيك على staging (D-176)
+  form.set('media_category', xMediaCategory(upload.mime))
 
   // ولا تُوضَع `Content-Type` يدا: `FormData` تحمل حدَّها الفاصل، وترويسةٌ
   // مكتوبةٌ بلا حدٍّ تجعل الخادم يقرأ الجسمَ فارغا
