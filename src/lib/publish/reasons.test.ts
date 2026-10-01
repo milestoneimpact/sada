@@ -26,4 +26,13 @@ describe('القاموس', () => {
     expect(whyFailed('حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد', 'linkedin').action).toBe('none')
     expect(whyFailed(null, 'x').action).toBe('requeue')
   })
+
+  it('وجوابُ المنصّة بعد بادئتها يُعاد: سببُه بلفظه، وزرُّ «أعده إلى المعتمَد» (D-176)', () => {
+    const r = whyFailed('x: تعذّر رفع الوسيط (Invalid Request)', 'x')
+    expect(r.text).toBe('ردّته X: تعذّر رفع الوسيط (Invalid Request)')
+    expect(r.action).toBe('requeue')
+    // ‏ورمزٌ معروفٌ يبقى على جملته، وجملةُ حارسٍ بلا بادئةٍ تبقى بلا فعل
+    expect(whyFailed('token_expired', 'x').action).toBe('relink')
+    expect(whyFailed('حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد', 'linkedin').action).toBe('none')
+  })
 })
