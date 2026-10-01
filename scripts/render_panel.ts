@@ -383,6 +383,15 @@ const data: PanelData = {
     },
     publishedWeek: 5,
   },
+  // ‏مقاطعُ المالك (D-180): واحدٌ أُنشئ على YouTube وبقيت منصّتان، وآخرُ أفقيٌّ طويل، وثالثٌ لم يكتمل
+  uploads: [
+    { id: 'up1', r2Key: 'upload/up1.mp4', name: 'قيادة المعالم.mp4', mime: 'video/mp4', bytes: 58_200_000,
+      width: 1080, height: 1920, durationMs: 42_000, status: 'ready', createdAt: ago(3), platforms: ['youtube'] },
+    { id: 'up2', r2Key: 'upload/up2.mp4', name: 'ورشة الحوكمة — كاملة.mp4', mime: 'video/mp4', bytes: 412_000_000,
+      width: 1920, height: 1080, durationMs: 1_260_000, status: 'ready', createdAt: ago(26), platforms: [] },
+    { id: 'up3', r2Key: 'upload/up3.mov', name: 'مقابلة.mov', mime: 'video/quicktime', bytes: 96_000_000,
+      width: null, height: null, durationMs: null, status: 'uploading', createdAt: ago(1), platforms: [] },
+  ],
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم

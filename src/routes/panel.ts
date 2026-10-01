@@ -32,6 +32,8 @@ import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
+import { platformLabel } from '../lib/oauth/providers'
+import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
@@ -453,6 +455,7 @@ panel.get('/panel', async (c) => {
   const openCount = (await openSuggestions(c.env.DB)).length
   // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
   const journey = await journeyCounts(c.env.DB, new Date())
+  const uploads = await listUploads(c.env.DB)
   // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
   const facts = await ownerFacts(c)
   const ownerPending = pendingCount(facts)
@@ -679,6 +682,7 @@ panel.get('/panel', async (c) => {
       baseUrl: c.env.PUBLIC_BASE_URL,
       openSuggestions: openCount,
       journey,
+      uploads,
       promoCap: allowance.settings.weeklyPromoCapUsd,
       ownerPending,
       expiring,
@@ -2225,6 +2229,104 @@ panel.post('/panel/drafts/requeue', async (c) => {
   const to = backTo(gate.form.get('return'), '')
   if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return result.ok && /^[0-9a-f-]{8,}$/.test(id) ? back(`d-${id}`) : back('posts')
+})
+
+// ── مقاطعُ المالك (D-180) ─────────────────────────────────────────────
+//
+// أربعُ خطوات: «ابدأ» يفحص النوعَ والحجمَ ويفتح رفعًا متعدّدًا، و«قطعة» تدفع ‏20MB،
+// و«أكمل» يجمعها، و«انشره» يصنع منشورًا لكلّ منصّة. والثلاثُ الأولى من سكربت اللوحة
+// بنموذجٍ يحمل `_csrf` كأيّ نموذج — فتمرّ من `guardPost` نفسِه، ولا حارسَ ثانٍ يُكتب.
+
+const numberOr = (value: string | File | null): number | null => {
+  const n = Number(value)
+  return value === null || value === '' || !Number.isFinite(n) ? null : n
+}
+
+panel.post('/panel/uploads/start', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const result = await startUpload(c.env.DB, c.env.MEDIA, {
+    name: String(f.get('name') ?? ''),
+    mime: String(f.get('mime') ?? ''),
+    bytes: Number(f.get('bytes')),
+    width: numberOr(f.get('width')),
+    height: numberOr(f.get('height')),
+    durationMs: numberOr(f.get('duration_ms')),
+  })
+  await record(c.env.DB, {
+    actor: 'panel', action: 'upload.start', target: result.ok ? result.id : null,
+    detail: result.ok ? `${String(f.get('mime'))} · ${String(f.get('bytes'))}` : `refused:${result.reason}`.slice(0, 200),
+  }, c.req.raw)
+  return Response.json(result, { status: result.ok ? 200 : 400 })
+})
+
+panel.post('/panel/uploads/:id/part', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const chunk = gate.form.get('chunk')
+  if (!(chunk instanceof Blob)) return Response.json({ ok: false, reason: 'قطعةٌ بلا بايتات' }, { status: 400 })
+  const result = await uploadPart(c.env.DB, c.env.MEDIA, c.req.param('id'), Number(gate.form.get('n')),
+    await chunk.arrayBuffer())
+  return Response.json(result, { status: result.ok ? 200 : 400 })
+})
+
+panel.post('/panel/uploads/:id/complete', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  let parts: { partNumber: number; etag: string }[] = []
+  try {
+    const raw = JSON.parse(String(gate.form.get('parts') ?? '[]')) as unknown
+    if (Array.isArray(raw)) {
+      parts = raw.map((p) => ({ partNumber: Number((p as { partNumber?: unknown }).partNumber), etag: String((p as { etag?: unknown }).etag ?? '') }))
+    }
+  } catch {
+    parts = []
+  }
+  const id = c.req.param('id')
+  const result = await completeUpload(c.env.DB, c.env.MEDIA, id, parts)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'upload.complete', target: id,
+    detail: result.ok ? `${parts.length} parts` : `refused:${result.reason}`.slice(0, 200),
+  }, c.req.raw)
+  if (result.ok) await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رُفع المقطع — اكتب نصَّه واختر منصّاته تحته.' })
+  return Response.json(result, { status: result.ok ? 200 : 400 })
+})
+
+panel.post('/panel/uploads/:id/abort', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  await abortUpload(c.env.DB, c.env.MEDIA, c.req.param('id'))
+  return Response.json({ ok: true })
+})
+
+panel.post('/panel/uploads/:id/posts', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = c.req.param('id')
+  const result = await postsFromUpload(c.env.DB, {
+    uploadId: id,
+    platforms: gate.form.getAll('platform').map(String),
+    caption: String(gate.form.get('caption') ?? ''),
+    approve: gate.form.get('approve') === 'on',
+    by: gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+  })
+  await record(c.env.DB, {
+    actor: 'panel', action: 'upload.posts', target: id,
+    detail: result.ok ? `created:${result.created.join(',')} skipped:${result.skipped.join(',')}` : `refused:${result.reason}`.slice(0, 200),
+  }, c.req.raw)
+  const label = (p: string): string => platformLabel(p)
+  await setFlash(c.env, c.req.raw, !result.ok
+    ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
+    : result.created.length === 0
+      ? { kind: 'bad', text: `موجودٌ من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
+      : {
+          kind: 'ok',
+          text: `أُنشئ على ${result.created.map(label).join(' و')}${gate.form.get('approve') === 'on'
+            ? ' معتمَدًا — حدّد موعدَه من «وزّع المعتمَد» أو من بطاقته.'
+            : ' مسوّدةً تنتظر اعتمادك.'}`,
+        })
+  return back('videos')
 })
 
 // ── إدارة المزوّدين ──────────────────────────────────────────────────
