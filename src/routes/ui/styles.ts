@@ -1484,6 +1484,8 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
     margin:0; min-width:var(--s-4); font-size:var(--t-xs); line-height:var(--s-4); padding:0 var(--s-1)}
   nav.tabs a{position:relative}
   nav.tabs a[aria-current=page]::before{display:none}
+  /* ‏والقسمُ الأبُ (D-178) يُلوَّن في الشريط: المنصّةُ المعلَّمةُ تحته مخفيّةٌ هنا */
+  nav.tabs a[aria-current=true]{background:var(--surface-3); color:var(--ink)}
   .cmdk-open.more{border:0; background:none; color:var(--ink-3)}
   .cmdk-open:not(.more){display:none}
   /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز.

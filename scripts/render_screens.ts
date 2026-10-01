@@ -19,6 +19,7 @@ import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
 import { soloPage } from '../src/routes/ui/shell'
+import { soloNav } from '../src/routes/ui/rail'
 import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
@@ -53,8 +54,13 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
  * تصل المدقّقَ ولا اللقطة.
  */
 // العيّنةُ من القالب الذي يُخدَم (D-151) — لا غلافٍ ثالث
-const page = (title: string, body: string): string =>
-  soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }))
+// ‏والقسمُ المعلَّمُ في الرافدة من العنوان (D-178): التقريرُ والمهامُّ أقسامُهما، والباقي منصّات
+const page = (
+  title: string,
+  body: string,
+  active = title.includes('التقرير') ? 'report' : title.includes('مهامُّ') ? 'tasks' : 'channels',
+): string =>
+  soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
 
 // ── صفحاتُ المنصّات: صفحةُ حساب (D-172) ─────────────────────────────
 const tt = views.find((v) => v.spec.id === 'tiktok')!
@@ -376,7 +382,7 @@ const journey: Journey = {
 writeAudited(
   '/tmp/screen-journey.html',
   soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' }, journeyBody(journey, now), 'n', '',
-    buildCommands({ onPanel: false })),
+    buildCommands({ onPanel: false }), soloNav('posts')),
 )
 
 writeAudited(
@@ -393,7 +399,7 @@ writeAudited(
            { postId: 'p4', preview: 'مسوّدةٌ لـ TikTok', reason: 'لا قناةَ TikTok مربوطة' },
          ],
        },
-     }), 'n', '', buildCommands({ onPanel: false })),
+     }), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

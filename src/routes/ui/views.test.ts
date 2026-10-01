@@ -22,6 +22,7 @@ import { sheet, type Decl, type Sheet } from '../../test/css'
 import { bar, glyph, status } from './parts'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
+import { soloNav } from './rail'
 import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
 import { windowLabel } from '../../lib/metrics/job'
@@ -880,6 +881,26 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(html).toContain(`${ICON.back}المنشورات`)
     expect(html).toContain('<main id="main"><p>x</p></main>')
     expect(html).toContain('sada-theme')
+  })
+
+  /*
+   * **والصفحةُ المستقلّةُ جزءٌ من التطبيق** (D-178): رافدةٌ على العريض وشريطٌ في
+   * الجوّال، والقسمُ معلَّمٌ في الوسم، والثيمُ مرّةً واحدة.
+   */
+  it('soloPage برافدته: قسمُه معلَّم، ومساراتُه إلى اللوحة، والمنصّةُ الحاليّةُ تحته، والثيمُ لا يتكرّر', () => {
+    const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'القنوات' }, '<p>x</p>', 'n', '', undefined,
+      soloNav('channels', 'linkedin'))
+    expect(html).toContain('<aside class="rail">')
+    expect(html).toContain('<a href="/panel#posts" data-bar>')
+    expect(html).toContain('<a href="/panel/tasks" data-bar>')
+    expect(html).toContain('<a href="/panel#channels" data-bar aria-current="true">')
+    expect(html).toMatch(/<a href="\/panel\/channels\/linkedin" aria-current="page">/)
+    expect(html).not.toContain('/panel/channels/snapchat')
+    expect((html.match(/id="theme"/g) ?? []).length).toBe(1)
+
+    const tasks = soloPage('صدى — مهامّ', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, soloNav('tasks'))
+    expect(tasks).toContain('<a href="/panel/tasks" data-bar aria-current="page">')
+    expect(tasks).not.toContain('class="plat"')
   })
 
   it('بندُ خطّةٍ لمنصّةٍ خارج الاثنتين يحمل اسمَها لا مفتاحَها', async () => {
