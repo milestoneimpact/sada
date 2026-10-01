@@ -39,11 +39,13 @@
  *
  * ## وحصّةُ اليوم تُقال ولا تُكتشَف
  *
- * `videos.insert` يكلّف **١٦٠٠ وحدة** من عشرة آلافٍ يوميّة — أي ستَّ
- * رفعاتٍ في اليوم تقريبا. **وهذا رقمٌ من وثيقة الحصص لا من الوثيقة
- * الآليّة**، فيبقى موسوما: يُقرأ في رسالة الخطأ حين يقع، ولا يُحرَس به.
+ * كان `videos.insert` يكلّف ‏١٦٠٠ وحدة (ستُّ رفعاتٍ يوميًّا). **وتبدّل مرّتين**
+ * (سجلُّ مراجعات الواجهة): نزل إلى نحو ‏١٠٠ في ‏2025-12-04، ثمّ صار له منذ
+ * ‏2026-06-01 سطلٌ وحدَه بمئة رفعةٍ يوميًّا بالافتراض (D-179). فلا رقمَ يُحرَس به
+ * هنا: يُقال حين يقع، بما قالته Google.
  */
 import { PublishError, type PublishResult, type Upload } from './platforms'
+import { bytesClip, YOUTUBE_CHUNK, type Clip } from './clip'
 
 const INIT_URL =
   'https://www.googleapis.com/upload/youtube/v3/videos' +
@@ -119,11 +121,12 @@ async function detail(response: Response): Promise<string> {
  */
 export async function publishYouTube(
   accessToken: string,
-  clip: Upload,
+  input: Clip | Upload,
   text: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<YouTubeOutcome> {
-  const size = clip.bytes.length
+  const clip = 'read' in input ? input : bytesClip(input)
+  const size = clip.size
   if (size === 0) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
 
   const title = youtubeTitle(text)
@@ -148,9 +151,9 @@ export async function publishYouTube(
   if (!init.ok) {
     const why = await detail(init)
     throw new PublishError(
-      // **وحصّةُ اليوم تُقال حين تقع**: ستُّ رفعاتٍ يوميّا تقريبا
+      // **وحصّةُ اليوم تُقال حين تقع** — بلا رقمٍ تبدّل مرّتين (D-179)
       why === 'quotaExceeded'
-        ? 'youtube: بلغت حصّةَ اليوم (نحو ستّ رفعات) — أعد غدا'
+        ? 'youtube: بلغت حصّةَ اليوم عند Google — أعد غدا'
         : `youtube: رُدّت التهيئة (${why})`,
       init.status,
       retryable(init.status),
@@ -163,12 +166,31 @@ export async function publishYouTube(
   }
 
   // ٢ — دفعُ البايتات على عنوان الجلسة. **ولا إذنَ فيه**: العنوانُ نفسُه
-  // هو الإذن، وهو موقَّتٌ ولا يُخزَّن
-  const put = await fetchImpl(session, {
-    method: 'PUT',
-    headers: { 'Content-Type': clip.mime, 'Content-Length': String(size) },
-    body: clip.bytes as unknown as BodyInit,
-  })
+  // هو الإذن، وهو موقَّتٌ ولا يُخزَّن.
+  // **وقطعًا حين يكبر** (D-179): كلُّ قطعةٍ مضاعفٌ لـ ‏256KB، وما قبل الأخيرة
+  // يُجاب بـ ‏308 «يُستأنَف» — و`redirect: 'manual'` يمنع fetch من قراءته تحويلًا
+  let put: Response | null = null
+  for (let start = 0; start < size; start += YOUTUBE_CHUNK) {
+    const end = Math.min(size, start + YOUTUBE_CHUNK)
+    const whole = start === 0 && end === size
+    put = await fetchImpl(session, {
+      method: 'PUT',
+      redirect: 'manual',
+      headers: whole
+        ? { 'Content-Type': clip.mime, 'Content-Length': String(size) }
+        : { 'Content-Type': clip.mime, 'Content-Length': String(end - start), 'Content-Range': `bytes ${start}-${end - 1}/${size}` },
+      body: (await clip.read(start, end - start)) as unknown as BodyInit,
+    })
+    if (end < size) {
+      if (put.status === 308) continue
+      throw new PublishError(
+        `youtube: رُدّت القطعة (${await detail(put)})`,
+        put.status,
+        retryable(put.status),
+      )
+    }
+  }
+  if (put === null) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
   if (!put.ok) {
     throw new PublishError(
       `youtube: رُدّ الرفع (${await detail(put)})`,

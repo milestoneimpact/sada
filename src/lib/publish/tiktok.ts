@@ -42,6 +42,7 @@
  * عندهم لا عندنا.
  */
 import { PublishError, type PublishResult, type Upload } from './platforms'
+import { bytesClip, tiktokChunks, type Clip } from './clip'
 
 const INBOX_INIT = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/'
 const DIRECT_INIT = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
@@ -93,21 +94,23 @@ export interface TikTokOutcome extends PublishResult {
  */
 export async function publishTikTok(
   accessToken: string,
-  clip: Upload,
+  input: Clip | Upload,
   caption: string,
   direct: boolean,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TikTokOutcome> {
-  const size = clip.bytes.length
+  const clip = 'read' in input ? input : bytesClip(input)
+  const size = clip.size
   if (size === 0) throw new PublishError('tiktok: مقطعٌ فارغ', 400, false)
 
   const title = caption.slice(0, TIKTOK_CAPTION_MAX)
+  // ‏**قطعٌ لا قطعةٌ واحدة** (D-179): مقطعُ المالك قد يجاوز ‏64MB، وTikTok يردّ قطعةً فوقها
+  const { chunkSize, count } = tiktokChunks(size)
   const source = {
     source: 'FILE_UPLOAD',
     video_size: size,
-    // قطعةٌ واحدة: المقطعُ خمسَ عشرةَ ثانيةً بحدٍّ معلوم
-    chunk_size: size,
-    total_chunk_count: 1,
+    chunk_size: chunkSize,
+    total_chunk_count: count,
   }
   const request = direct
     ? { post_info: { title, privacy_level: 'SELF_ONLY' }, source_info: source }
@@ -139,21 +142,26 @@ export async function publishTikTok(
     throw new PublishError('tiktok: تهيئةٌ بلا upload_url', 502, false)
   }
 
-  // ٢ — دفعُ البايتات. و `Content-Range` إلزاميٌّ ولو كانت قطعةً واحدة
-  const put = await fetchImpl(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': clip.mime,
-      'Content-Range': `bytes 0-${size - 1}/${size}`,
-    },
-    body: clip.bytes as unknown as BodyInit,
-  })
-  if (!put.ok) {
-    throw new PublishError(
-      `tiktok: رُدّ الرفع (${put.status})`,
-      put.status,
-      retryable(put.status),
-    )
+  // ٢ — دفعُ البايتات قطعةً قطعةً بترتيبها. و `Content-Range` إلزاميٌّ ولو كانت واحدة،
+  // **والأخيرةُ تمتصّ الباقي** — ولا تُقرأ من الدلو إلّا القطعةُ التي تُدفَع الآن
+  for (let i = 0; i < count; i++) {
+    const start = i * chunkSize
+    const end = i === count - 1 ? size : start + chunkSize
+    const put = await fetchImpl(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': clip.mime,
+        'Content-Range': `bytes ${start}-${end - 1}/${size}`,
+      },
+      body: (await clip.read(start, end - start)) as unknown as BodyInit,
+    })
+    if (!put.ok) {
+      throw new PublishError(
+        `tiktok: رُدّ الرفع (${put.status}${count > 1 ? ` · القطعة ${i + 1} من ${count}` : ''})`,
+        put.status,
+        retryable(put.status),
+      )
+    }
   }
 
   /*

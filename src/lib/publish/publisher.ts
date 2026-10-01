@@ -13,6 +13,7 @@
  * الخطوتان ٣ و٤ قبل ٥ عمدا: الطلب الذي أُرسل وضاع جوابه قد كُلِّف فعلا،
  * وسجلٌّ أعلى من الحقيقة أهون من سجل أقل منها.
  */
+import { bucketClip, type RangeBucket } from './clip'
 import { CLIP_PLATFORMS } from '../platform/needs'
 import { estimatePostCost, recordCost } from '../cost'
 import { containsUrl } from '../idempotency'
@@ -54,9 +55,8 @@ interface PostRow {
 }
 
 /** أقلُّ ما نحتاجه من R2: قراءةُ كائنٍ واحد. */
-export interface MediaBucket {
-  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>
-}
+/** الدلوُ يُقرأ بمداه حين يعرف حجمَه (D-179) — وR2 يعرفه. */
+export type MediaBucket = RangeBucket
 
 export interface PublisherDeps {
   readonly db: Db
@@ -443,8 +443,9 @@ export async function publishPost(
        * ورقمٌ مخترَعٌ كذب، وسكوتٌ عن نداءٍ وقع يجعل الدفترَ أقلَّ من
        * الحقيقة — وهو الاتّجاه الأسوأ للخطأ (D-008).
        */
-      const object = await deps.bucket!.get(image!.r2_key)
-      if (object === null) throw new PublishError('media_bytes_missing', 502, false)
+      // ‏**بمداه لا كاملًا** (D-179): السائقُ يقرأ القطعةَ التي يدفعها، فلا يُحمَل مقطعُ المالك كلُّه
+      const clip = await bucketClip(deps.bucket!, image!.r2_key, image!.mime)
+      if (clip === null) throw new PublishError('media_bytes_missing', 502, false)
       await recordCost(db, {
         provider: post.platform,
         operation: 'clip_upload:price_unverified',
@@ -452,7 +453,6 @@ export async function publishPost(
         unitCost: 0,
         refId: post.id,
       })
-      const clip = { bytes: new Uint8Array(await object.arrayBuffer()), mime: image!.mime }
       const out =
         post.platform === 'tiktok'
           ? await publishTikTok(tokens.accessToken, clip, post.text, direct, fetchImpl)

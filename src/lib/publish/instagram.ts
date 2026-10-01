@@ -44,8 +44,11 @@ export type InstagramMedia =
  * منتصفها تترك حاويةً لا يُعرَف مصيرُها** — وهي علّةُ الاستئناف التي
  * رُفضت في سائق YouTube للسبب نفسِه.
  */
-export const POLL_TRIES = 6
-export const POLL_MS = 2500
+// ‏**خمسُ دقائق لا خمسَ عشرةَ ثانية** (D-179): مقطعُ صدى المولَّد يجهز في ثوانٍ،
+// ومقطعُ المالك (دقيقةٌ بـ ‏1080p) يُرمَّز دقائق. وMeta توصي بسؤالٍ كلَّ دقيقةٍ إلى خمس؛
+// والعشرُ ثوانٍ أقربُ جوابًا وتبقى تحت سقف زمن العامل (‏15 دقيقة)
+export const POLL_TRIES = 30
+export const POLL_MS = 10_000
 
 const GRAPH = 'https://graph.instagram.com/v21.0'
 
