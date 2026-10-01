@@ -107,3 +107,35 @@ export function shortAgo(value: string, now: Date = new Date()): string {
     'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
   return `${date.getUTCDate()} ${months[date.getUTCMonth()]}`
 }
+
+/** صيغُ الاسم مع العدد: المفرد بوصفه، والمثنّى، وجمعُ القلّة، وتمييزُ الكثرة. */
+export interface Noun {
+  readonly one: string
+  readonly two: string
+  readonly few: string
+  readonly many: string
+}
+
+/**
+ * العددُ ومعدودُه **بعربيّةٍ صحيحة** (D-177) — امتدادًا لـ `attemptsLeft`.
+ *
+ * كانت اللوحةُ تكتب «2 يوما» و«5 منشورا خرجت» و«2 مصدرا ينتظر»، فتُقرأ آلةً
+ * تترجم. والقاعدةُ أربع: واحدٌ بوصفه، واثنان بالمثنّى، ومن ثلاثةٍ إلى عشرة
+ * بالجمع، وما فوقها بالتمييز المفرد. والصفرُ يقوله المنادي بجملته.
+ */
+export function counted(n: number, noun: Noun): string {
+  if (n === 1) return noun.one
+  if (n === 2) return noun.two
+  if (n >= 3 && n <= 10) return `${n} ${noun.few}`
+  return `${n} ${noun.many}`
+}
+
+/** المعدوداتُ التي تتكرّر في اللوحة — في موضعٍ واحدٍ لا في كلّ جملة. */
+export const NOUNS = {
+  draft: { one: 'مسوّدةٌ واحدة', two: 'مسوّدتان', few: 'مسوّدات', many: 'مسوّدة' },
+  post: { one: 'منشورٌ واحد', two: 'منشوران', few: 'منشورات', many: 'منشورًا' },
+  source: { one: 'مصدرٌ واحد', two: 'مصدران', few: 'مصادر', many: 'مصدرًا' },
+  image: { one: 'صورةٌ واحدة', two: 'صورتان', few: 'صور', many: 'صورة' },
+  suggestion: { one: 'توصيةٌ واحدة', two: 'توصيتان', few: 'توصيات', many: 'توصية' },
+  day: { one: 'يومٌ واحد', two: 'يومان', few: 'أيّام', many: 'يومًا' },
+} as const satisfies Readonly<Record<string, Noun>>

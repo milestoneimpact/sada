@@ -375,6 +375,14 @@ const data: PanelData = {
   ],
   // ما زادته القراراتُ الأخيرة — **ويُرسَم ليُقاس**
   openSuggestions: 2,      // D-058
+  // ‏عدُّ الرحلة (D-177): مسوّداتٌ تنتظر، ومعتمَدٌ بلا موعد، ومجدولٌ على LinkedIn، وفشلٌ على X
+  journey: {
+    perPlatform: {
+      linkedin: { draft: 3, approved: 1, queued: 2, published: 9, failed: 0, nextAt: '2026-09-06 09:15:00' },
+      x: { draft: 1, approved: 0, queued: 0, published: 4, failed: 1, nextAt: null },
+    },
+    publishedWeek: 5,
+  },
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
@@ -437,5 +445,7 @@ writeAudited('/tmp/panel-first.html', panelPage({
   ),
   plan: null,
   drafts: data.drafts.map((d) => ({ ...d, status: 'draft' as const })),
+  // ‏واليومُ الأوّل لا نشرَ فيه ولا موعد: المسوّداتُ كلُّها تنتظر
+  journey: { perPlatform: { linkedin: { draft: data.drafts.length, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 },
 }))
 console.log('رُسمت')

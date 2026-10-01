@@ -19,7 +19,6 @@ import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
-import { onboarding } from '../lib/onboard'
 import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
@@ -30,13 +29,16 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
-import { alertChannel, bar, firstDay, glyph, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import { alertChannel, bar, glyph, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
 import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
+import { homeTop } from './ui/sections/home'
+import type { JourneyCounts } from '../lib/home'
+import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
 
 export { escapeHtml, injectCsrf, shell }
@@ -303,6 +305,8 @@ export interface PanelData {
   readonly baseUrl: string
   /** كم توصيةَ ترويجٍ تنتظر بتّك — عددٌ على رابط التقرير (D-058). */
   readonly openSuggestions: number
+  /** عدُّ المنشورات بحالها ومنصّتها من القاعدة كلِّها — لرحلة الرئيسيّة (D-177). */
+  readonly journey: JourneyCounts
   /**
    * رموزٌ تقترب من الانتهاء — **تُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح.**
    *
@@ -446,6 +450,9 @@ function sourceRow(s: PanelSource, now: Date): string {
 function platformNav(views: readonly ChannelView[]): string {
   const built = views.filter((v) => v.spec.built)
   const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
+  // ‏وما لم يُبنَ سائقُه لا يُعرض في الرافدة (D-177): سبعُ منصّاتٍ اثنتان منها لا تعمل
+  // كانت تُقرأ وعدًا. ومكانُها سطرُ «قريبًا» في الرئيسيّة
+  const shown = views.filter((v) => v.state !== 'unbuilt')
 
   const row = (v: ChannelView): string => {
     // ‏والنقطةُ تقرأ الصفَّ لا الكلمة (D-166): مربوطةٌ بلا إذنٍ حمراءُ لا خضراء
@@ -471,7 +478,7 @@ function platformNav(views: readonly ChannelView[]): string {
 
   return `<details class="plat"${anyLinked ? ' open' : ''}>
     <summary>${ICON.channels}<span>المنصّات</span></summary>
-    <div class="plat-list">${views.map(row).join('')}</div>
+    <div class="plat-list">${shown.map(row).join('')}</div>
   </details>`
 }
 
@@ -526,7 +533,7 @@ function tilePicker(d: PanelData): string {
     </label>`
   }).join('')
   return `<div class="card" style="margin-top:var(--s-3)"><h2>بطاقاتُ لوحك</h2>
-    <p class="hint">ما تراه في صدر «نظرة عامّة». اختر من ${TILE_MIN} إلى ${TILE_MAX}،
+    <p class="hint">ما تراه تحت «اليوم بالأرقام» في الرئيسيّة. اختر من ${TILE_MIN} إلى ${TILE_MAX}،
       وترتيبُها ترتيبُ هذه القائمة.</p>
     <form method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="dashboard_tiles">
@@ -715,34 +722,17 @@ export function panelPage(d: PanelData): string {
   if (waitingDrafts > 0) {
     items.push({
       kind: 'ok',
-      text: `${waitingDrafts} مسوّدة تنتظر قرارك — ولا تُنشر واحدةٌ منها قبله.`,
+      text: `تنتظر قرارك ${counted(waitingDrafts, NOUNS.draft)} — ولا يُنشر شيءٌ قبله.`,
       go: '#posts',
       label: 'اقرأها',
     })
   }
   if (pending > 0) {
-    items.push({ kind: 'ok', text: `${pending} مصدرا ينتظر تحليلا.`, go: '#sources', label: 'راجعها' })
+    items.push({ kind: 'ok', text: `ينتظر التحليلَ ${counted(pending, NOUNS.source)}.`, go: '#sources', label: 'راجعها' })
   }
   if (d.factors.enforced && d.factors.recoveryLeft === 0) {
     items.push({ kind: 'warn', text: 'لا رموزَ استرداد — فقدُ الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
-
-  /*
-   * **اليومُ الأوّل يُشتَقّ ممّا قُرئ — ولا استعلامَ جديد** (D-108).
-   *
-   * الخمسُ كلُّها من حقائقَ في اليد: مصادرُ وحساباتٌ وخطّةٌ ومسوّدات.
-   * **واستعلامٌ يُضاف لمعالجٍ يختفي بعد أسبوعٍ ثمنٌ يُدفَع كلَّ يوم.**
-   */
-  const first = onboarding({
-    sources: d.sources.length,
-    analyzed: d.sources.filter((x) => x.analyzed).length,
-    liveAccounts: d.channels.reduce(
-      (n, c) => n + c.accounts.filter((a) => a.status === 'active').length, 0,
-    ),
-    hasPlan: d.plan !== null,
-    decided: d.drafts.filter((x) => x.status !== 'draft').length,
-    drafts: d.drafts.filter((x) => x.status === 'draft').length,
-  })
 
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
@@ -768,7 +758,9 @@ export function panelPage(d: PanelData): string {
   const counts: Readonly<Record<string, number>> = {
     sources: pending,
     posts: waitingDrafts,
-    channels: linkedChannels,
+    // ‏**وكلُّ عددٍ في الرافدة يعني «ينتظرك»** (D-177): كان عددُ القنوات وحدَه «كم مربوطة»،
+    // فقرأ المالكُ «2» على القنوات كما يقرؤه على المسوّدات — شيئين ينتظرانه
+    channels: d.channels.filter((c) => c.state === 'needs_reauth' || unsignedAccounts(c).length > 0).length,
     report: d.openSuggestions,
     tasks: d.ownerPending,
     providers: missing,
@@ -815,7 +807,7 @@ export function panelPage(d: PanelData): string {
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">نظرة عامّة</h1>
+  <div class="ttl"><h1 id="pane-title" aria-live="polite">الرئيسيّة</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${commandTrigger()}
@@ -827,7 +819,6 @@ export function panelPage(d: PanelData): string {
 <main id="main" class="content">
 ${flash}
 <section data-pane="overview" hidden>
-  ${firstDay(first)}
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
     *
@@ -840,8 +831,22 @@ ${flash}
     * وهو وحدَه ما لا يُقال في مكانٍ آخر. ولا يسقط على غيره من الألواح —
     * تلك تُفتَح قصدا فتحتمل رأسا، **وهذا يُفتَح كلَّ صباح.**
     */''}
-  <p class="lede lede-lead">حالُ اليوم في سطر: ما أُنفق، وما حُلّل، وما ينتظر قرارك.
-    <b>ولا يُنشر شيءٌ من هنا بلا موافقةٍ مسجّلة.</b></p>
+  ${/*
+    * **الرحلةُ قبل الدفتر** (D-177): خطوتُك التالية، ثمّ المحطّاتُ السبع، ثمّ
+    * المنصّاتُ الخمس. والمالُ وصحّةُ الدورات بعدها — كانت أوّلَ الشاشة فقال
+    * المالك «لا أجد المراحل».
+    */''}
+  ${homeTop({
+    channels: d.channels,
+    counts: d.journey,
+    paused: d.paused,
+    sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
+    withoutImage: d.drafts.filter((x) => (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
+      && !d.media.some((m) => m.postId === x.id && m.status === 'ready')).length,
+    withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
+    openSuggestions: d.openSuggestions,
+  }, d.now)}
+  <h2 class="home-sub">اليوم بالأرقام</h2>
   ${tileRow(d)}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،

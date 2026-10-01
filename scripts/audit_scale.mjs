@@ -32,7 +32,7 @@
 import { chromium } from 'playwright'
 
 /** السلّمُ المعلَن — يقابل ما في `tokens.ts`. */
-const FONTS = [11, 12.5, 14, 16, 20, 26, 42, 56]
+const FONTS = [12.5, 14, 15.5, 17.5, 20, 26, 42, 56]
 const SPACES = [2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
 const WEIGHTS = [400, 500, 600, 700]
 const LEADS = [1.35, 1.7, 1.95]

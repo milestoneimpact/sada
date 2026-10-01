@@ -8,7 +8,6 @@
 import { escapeHtml } from './escape'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
-import type { Onboarding } from '../../lib/onboard'
 import type { RungState } from '../../lib/platform/readiness'
 
 /**
@@ -113,60 +112,6 @@ export function bar(used: number, cap: number, label = 'بلغ السقف'): str
       : '')
 }
 
-
-/**
- * لوحُ اليوم الأوّل (D-108) — **ويختفي من تلقاء نفسه**.
- *
- * ولا يُعرَض إلّا حين ينقص شيء. **ومعالجٌ يبقى بعد أن يُستغنى عنه
- * يُقرأ عطلا**: من أتمّ الخمسَ ثمّ رآه كلَّ صباحٍ ظنّ أنّ شيئا لم يُحفَظ.
- *
- * **وواحدةٌ تُطلَب لا خمس**: أوّلُ ما لم يتمّ يحمل الزرَّ، والباقياتُ
- * تُعرَض حالا لا دعوة. **وخمسةُ أزرارٍ في شاشةٍ أوّلَ مرّةٍ تُقرأ عبئا.**
- */
-export function firstDay(o: Onboarding): string {
-  if (o.hidden) return ''
-  const rows = o.steps
-    .map((s) => {
-      /*
-       * **ولا علامةَ صحٍّ على ما لم يُتحقَّق منه** (D-061): الدائرةُ
-       * الفارغةُ ليست «فشلا» — هي «لم يقع»، وفرقُهما في اللون والنصّ.
-       */
-      const mark = s.done
-        ? '<span class="fd-m done" aria-label="تمّت">✓</span>'
-        : '<span class="fd-m" aria-hidden="true"></span>'
-      const call = s === o.next
-        ? `<a class="btn p sm" href="${escapeHtml(s.go)}">ابدأ</a>`
-        : ''
-      return `<li class="fd-s${s.done ? ' done' : ''}${s === o.next ? ' now' : ''}">
-        ${mark}
-        <div class="fd-b"><b>${escapeHtml(s.title)}</b>
-          <p>${escapeHtml(s.done ? s.proof : s.why)}</p>
-          ${s.done || s === o.next ? '' : `<span class="ago">${escapeHtml(s.proof)}</span>`}
-        </div>${call}
-      </li>`
-    })
-    .join('')
-
-  /*
-   * **عمودان على العريض** (D-137): العنوانُ والعدُّ والشريطُ والشرحُ في
-   * عمود، والخطواتُ الخمسُ في الآخر. كانت الخطواتُ وحدَها في ‏٤٩٪ من عرض
-   * البطاقة ونصفُها الآخرُ أبيض — أمسكه مدقّقُ «الجوفاء».
-   */
-  return `<div class="card fd">
-    <div class="fd-a">
-      <div class="fd-h">
-        <div><div class="eyebrow"><span class="ln"></span>اليومُ الأوّل</div>
-          <h2>${o.done} من ${o.steps.length}</h2></div>
-        <span class="grow"></span>
-        ${bar(o.done, o.steps.length, 'تمّت')}
-      </div>
-      <p class="hint"><b>وحالُ كلِّ خطوةٍ مشتقٌّ من القاعدة</b> — لا علمَ
-        يُخزَّن ولا صحٌّ على ما لم يُتحقَّق منه. <b>ويختفي هذا اللوحُ وحدَه
-        حين تتمّ الخمس.</b></p>
-    </div>
-    <ol class="fd-l">${rows}</ol>
-  </div>`
-}
 
 /** صفٌّ في صندوق التنبيهات — **ما خرج فعلا، لا ما وقع**. */
 export interface OutboxRow {

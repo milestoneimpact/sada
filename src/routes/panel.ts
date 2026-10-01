@@ -31,6 +31,7 @@ import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
+import { journeyCounts } from '../lib/home'
 import { buildCommands, sectionLabel } from './ui/command'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
@@ -449,6 +450,8 @@ panel.get('/panel', async (c) => {
   const flash = await takeFlash(c.env, c.req.raw)
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
   const openCount = (await openSuggestions(c.env.DB)).length
+  // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
+  const journey = await journeyCounts(c.env.DB, new Date())
   // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
   const facts = await ownerFacts(c)
   const ownerPending = pendingCount(facts)
@@ -674,6 +677,7 @@ panel.get('/panel', async (c) => {
       apps,
       baseUrl: c.env.PUBLIC_BASE_URL,
       openSuggestions: openCount,
+      journey,
       promoCap: allowance.settings.weeklyPromoCapUsd,
       ownerPending,
       expiring,
