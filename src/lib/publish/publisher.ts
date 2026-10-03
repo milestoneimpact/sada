@@ -200,10 +200,13 @@ export async function publishPost(
        *
        * **وInstagram تقبل الاثنين** (D-121): صورةً أو `REELS`. فنمطُها
        * يقبل الاثنين، **والسائقُ يفرّق بينهما من `mime` لا من إعداد**.
+       *
+       * **ومقطعُ المالك يغلب ما وُلّد بعده** (D-182): منشورُ Instagram من «فيديوهاتك»
+       * وُلّد له إنفوجرافيك بالخطأ فصار أحدثَ وسيطه، فكان يُنشر صورةً مكانَ الـ Reel.
        */
       `SELECT id, r2_key, mime, platform_media_id FROM media
         WHERE post_id = ? AND status = 'ready' AND mime LIKE ?
-        ORDER BY created_at DESC LIMIT 1`,
+        ORDER BY (upload_id IS NOT NULL) DESC, created_at DESC LIMIT 1`,
     )
     .bind(
       post.id,
@@ -404,12 +407,12 @@ export async function publishPost(
        * ذلك في `needsMedia` أعلاه، **ويُردّ هنا ثانيةً** لأنّ هذا
        * الفرعَ يُنادى من غير طريق.
        */
-      if (image === null) {
-        return { kind: 'failed', reason: 'instagram_needs_media', retryable: false }
-      }
+      // ‏**يُرمى ولا يُعاد** (D-182): الردُّ من داخل `try` كان يترك المحاولةَ «أُرسلت»
+      // والمنشورَ «في الطابور» — فيرفض «أعده» إعادتَه وما بلغ Meta طلبٌ واحد
+      if (image === null) throw new PublishError('instagram_needs_media', 400, false)
       if (deps.baseUrl === undefined || deps.baseUrl === '') {
         // **ولا يُدَّعى عطلُ منصّةٍ لنقصٍ عندنا**: يُسمّى ما نقص
-        return { kind: 'failed', reason: 'instagram_needs_base_url', retryable: false }
+        throw new PublishError('instagram_needs_base_url', 500, false)
       }
       const token = await signMediaToken(encKey, image.id, now())
       await recordCost(db, {

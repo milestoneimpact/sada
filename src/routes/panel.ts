@@ -32,8 +32,12 @@ import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
+import { applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts } from '../lib/plan/import'
+import { planImportScreen } from './ui/planImportView'
+import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
 import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
+import { parseRange, resolveRange } from '../lib/media/range'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
@@ -1779,11 +1783,31 @@ panel.get('/panel/media/:id', async (c) => {
     .first<{ r2_key: string; mime: string }>()
   if (row === null) return c.text('لا صورة', 404)
 
-  const object = await c.env.MEDIA.get(row.r2_key)
+  /*
+   * **بثٌّ بمداه لا مخزنٌ كامل** (D-182). كان يُقرأ الكائنُ كلُّه إلى الذاكرة —
+   * صحيحٌ لصورةٍ ومقطعٍ مولَّدٍ بخمسَ عشرةَ ثانية، **ويُسقط العاملَ على مقطع المالك**
+   * (حتّى ‏500MB وسقفُ الذاكرة ‏128MB) حين يطلبه `<video>` في صفحة المنصّة. فيُقرأ
+   * `Range` ويُطلب من R2 مداه وحده، ويُردّ ‏206 به أو ‏200 بالكائن كلِّه بثًّا.
+   */
+  const wanted = parseRange(c.req.header('Range'))
+  if (wanted !== null) {
+    const head = await c.env.MEDIA.head(row.r2_key)
+    if (head === null) return c.text('البايتات مفقودة', 404)
+    if (resolveRange(wanted, head.size) === null) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${head.size}` } })
+    }
+  }
+  const object = await c.env.MEDIA.get(row.r2_key, wanted === null ? {} : { range: wanted })
   if (object === null) return c.text('البايتات مفقودة', 404)
+  const span = wanted === null ? null : resolveRange(wanted, object.size)
 
-  return new Response(await object.arrayBuffer(), {
+  return new Response(object.body as unknown as BodyInit, {
+    status: span === null ? 200 : 206,
     headers: {
+      ...(span === null
+        ? { 'Content-Length': String(object.size) }
+        : { 'Content-Range': `bytes ${span.start}-${span.end}/${object.size}`, 'Content-Length': String(span.end - span.start + 1) }),
+      'Accept-Ranges': 'bytes',
       'Content-Type': row.mime,
       // خاصّةٌ لا عامّة: وسيطٌ مشترك لا يخزّن ما يخصّ جلسة
       'Cache-Control': 'private, max-age=3600',
@@ -2297,6 +2321,12 @@ panel.post('/panel/uploads/:id/abort', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   await abortUpload(c.env.DB, c.env.MEDIA, c.req.param('id'))
+  // ‏زرُّ «ألغِ» في المكتبة نموذجٌ لا `fetch` (D-182): يعود إلى «فيديوهاتك» برسالته
+  if (gate.form.get('from') === 'library') {
+    await record(c.env.DB, { actor: 'panel', action: 'upload.abort', target: c.req.param('id') }, c.req.raw)
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُلغي الرفعُ الذي انقطع — ارفع المقطعَ من جديد.' })
+    return back('videos')
+  }
   return Response.json({ ok: true })
 })
 
@@ -2327,6 +2357,133 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
             : ' مسوّدةً تنتظر اعتمادك.'}`,
         })
   return back('videos')
+})
+
+// ── خطّتُك من ملفّ (D-181) ────────────────────────────────────────────
+//
+// ثلاثُ خطوات: «اقرأ» يحفظ الملفَّ في KV ساعتين ويفتح معاينته، والمعاينةُ تقرؤه من
+// جديد بحقائق اللحظة (الحساباتُ والمقاطعُ والآن)، و«اعتمد وجدوِل» يقرؤه مرّةً ثالثة
+// ثمّ يمرّر سليمَه من حرّاس الجدولة. **فما يُجدوَل ما رآه المالكُ بحاله ساعةَ الضغط**،
+// لا صورةً منه خُزّنت قبل أن يسقط حسابٌ أو يمضي موعد.
+
+const PLAN_TTL = 2 * 60 * 60
+
+async function planFacts(env: Env, cookie: string | null, now: Date): Promise<PlanFacts> {
+  const { results: scheduled } = await env.DB
+    .prepare(`SELECT platform, text, scheduled_at AS at FROM posts WHERE status = 'queued' AND scheduled_at IS NOT NULL LIMIT 1000`)
+    .all<{ platform: string; text: string; at: string }>()
+  return {
+    accounts: await listAccounts(env.DB),
+    uploads: await listUploads(env.DB, 200),
+    now,
+    zone: zoneOf(cookie) ?? DEFAULT_ZONE,
+    publishable: new Set(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id)),
+    scheduled,
+  }
+}
+
+panel.get('/panel/plan-import/template.csv', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  return new Response(PLAN_TEMPLATE, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="sada-plan.csv"',
+      'Cache-Control': 'no-store',
+    },
+  })
+})
+
+panel.post('/panel/plan-import', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const file = gate.form.get('file')
+  if (!(file instanceof Blob) || file.size === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يصل ملفّ — اختر ملفَّ CSV ثمّ «اقرأ الخطّة».' })
+    return back('plan-import')
+  }
+  if (file.size > MAX_PLAN_BYTES) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `الملفُّ أكبرُ من ${MAX_PLAN_BYTES / 1024}KB — قسّمه ملفّين.` })
+    return back('plan-import')
+  }
+  /*
+   * **UTF-8 أو لا شيء** (D-182). «CSV (Comma delimited)» في Excel العربيّ يحفظ بـ Windows-1256،
+   * و`file.text()` يقلب كلَّ حرفٍ عربيٍّ إلى U+FFFD بصمت — فيُعرض الصفُّ «جاهزًا» ونصُّه علاماتُ
+   * استفهام. ففكٌّ صارمٌ يردّ الملفَّ باسم الصيغة التي تُصلحه.
+   */
+  let csv: string
+  try {
+    csv = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(await file.arrayBuffer())
+  } catch {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: 'الملفُّ ليس UTF-8 — احفظه من Excel بصيغة «CSV UTF-8 (Comma delimited)»، أو نزّله من Google Sheets بصيغة CSV، ثمّ ارفعه.',
+    })
+    return back('plan-import')
+  }
+  const id = crypto.randomUUID()
+  await c.env.KV.put(`plan-import:${id}`, csv, { expirationTtl: PLAN_TTL })
+  await record(c.env.DB, { actor: 'panel', action: 'plan.import.read', target: id, detail: `${file.size} bytes` }, c.req.raw)
+  return new Response(null, { status: 303, headers: { Location: `/panel/plan-import/${id}` } })
+})
+
+panel.get('/panel/plan-import/:id', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const id = c.req.param('id')
+  const csv = await c.env.KV.get(`plan-import:${id}`)
+  if (csv === null) return c.text('انتهت مهلةُ هذه المعاينة (ساعتان) — ارفع الملفَّ من جديد.', 404)
+  const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
+  return page((nonce) =>
+    soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
+      injectCsrf(planImportScreen(id, read), session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+})
+
+panel.post('/panel/plan-import/:id/approve', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = c.req.param('id')
+  const csv = await c.env.KV.get(`plan-import:${id}`)
+  if (csv === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'انتهت مهلةُ المعاينة — ارفع الملفَّ من جديد.' })
+    return back('plan-import')
+  }
+  const now = new Date()
+  const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, now))
+  const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
+  // ‏ما عرضته المعاينةُ جاهزًا وحده (D-182) — والزرُّ وعدَ بعدده
+  const shown = new Set(String(gate.form.get('lines') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 1))
+  if (shown.size === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'هذه المعاينةُ قديمة — افتحها من جديد ثمّ اعتمد.' })
+    return new Response(null, { status: 303, headers: { Location: `/panel/plan-import/${id}` } })
+  }
+  const outcomes = await applyPlan(c.env.DB, read.rows, by, now, shown)
+  // ‏المعاينةُ استُهلكت: ضغطةٌ ثانيةٌ على «اعتمد» من نافذةٍ قديمةٍ لا تجد ما تعيده
+  await c.env.KV.delete(`plan-import:${id}`)
+  const scheduled = outcomes.filter((o) => o.result === 'scheduled').length
+  const exists = outcomes.filter((o) => o.result === 'exists').length
+  const failed = outcomes.filter((o) => o.result === 'failed')
+  await record(c.env.DB, {
+    actor: 'panel', action: 'plan.import.approve', target: id,
+    detail: `scheduled:${scheduled} exists:${exists} failed:${failed.length} blocked:${read.rows.length - outcomes.length}`,
+  }, c.req.raw)
+  // ‏كلُّ صفٍّ لم يُجدوَل يُسمّى بسطره وسببه — ثلاثةٌ أوّلًا، فالرسالةُ تُقرأ لا تُمرَّر
+  const named = (list: readonly { line: number; reason?: string }[]): string =>
+    list.slice(0, 3).map((o) => `السطر ${o.line} (${o.reason ?? ''})`).join('، ') + (list.length > 3 ? ' وغيرُها' : '')
+  const existing = outcomes.filter((o) => o.result === 'exists')
+  const parts = [
+    scheduled === 0 ? '' : scheduled === 1 ? 'جُدول منشورٌ واحد في موعده' : `جُدول ${counted(scheduled, NOUNS.post)} كلٌّ في موعده`,
+    exists > 0 ? `ولم يُكرَّر ما كان موجودًا: ${named(existing)}` : '',
+    failed.length > 0 ? `وتعذّر ${counted(failed.length, NOUNS.row)}: ${named(failed)}` : '',
+  ].filter((p) => p !== '')
+  await setFlash(c.env, c.req.raw, {
+    kind: scheduled > 0 && failed.length === 0 ? 'ok' : 'bad',
+    text: parts.length === 0 ? 'لا صفَّ جاهزًا في الملفّ — لم يُجدوَل شيء.' : `${parts.join('، ')}.`,
+  })
+  return back('posts')
 })
 
 // ── إدارة المزوّدين ──────────────────────────────────────────────────

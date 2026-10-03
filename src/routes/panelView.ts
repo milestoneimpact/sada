@@ -39,6 +39,7 @@ import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
 import { videosSection } from './ui/sections/videos'
+import { planImportCard } from './ui/planImportView'
 import type { UploadRow } from '../lib/media/uploads'
 import type { JourneyCounts } from '../lib/home'
 import { counted, NOUNS } from '../lib/format'
@@ -919,6 +920,7 @@ ${pivotPane(d.pivot)}
     mediaReady: d.mediaReady,
   })}
   ${videosSection(d.uploads, d.now)}
+  ${planImportCard()}
   <div style="margin-top:var(--s-3)">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),

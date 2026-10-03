@@ -17,6 +17,7 @@ import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
+import { expireStaleUploads } from './lib/media/uploads'
 import { pullDue } from './lib/metrics/job'
 import { runWeekly } from './lib/report/job'
 import { collectAlerts } from './lib/alerts/collect'
@@ -440,7 +441,9 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
     const outcome = await publishPost(
       // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
       // بلا صورةٍ لا يمسّه (D-040)
-      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA },
+      // ‏**وأصلُ الموقع يُمرَّر** (D-182): Instagram تسحب الوسيطَ من رابطٍ موقَّعٍ عندنا
+      // (D-121)، وبلا أصلٍ كان كلُّ منشورٍ لها يسقط في الطابور بلا نداءٍ واحد إلى Meta
+      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA, baseUrl: env.PUBLIC_BASE_URL },
       message.body,
     )
     // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
@@ -500,6 +503,16 @@ async function renewTick(env: Env): Promise<void> {
   } catch (error) {
     console.error({ job: 'renew', failed: String(error) })
     await beat(env.DB, 'renew', 'failed', String(error))
+  }
+}
+
+/** رفعٌ تُرك في منتصفه يُلغى ويُعلَّم فاشلًا (D-182) — ولا يُنبَض: ليس عملًا يُنتظر. */
+async function uploadsTick(env: Env): Promise<void> {
+  try {
+    const expired = await expireStaleUploads(env.DB, env.MEDIA, new Date())
+    if (expired > 0) console.info({ job: 'uploads', expired })
+  } catch (error) {
+    console.error({ job: 'uploads', failed: error instanceof Error ? error.message : 'unexpected_error' })
   }
 }
 
@@ -749,6 +762,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   // في هذه الدورة نفسِها، فلا يفشل فشلا نهائيّا لأجل دقائق (D-066)
   await renewTick(env)
   await dispatchTick(env)
+  await uploadsTick(env)
   if (controller.cron === SCAN_CRON) {
     await scanTick(env)
     await alertTick(env)

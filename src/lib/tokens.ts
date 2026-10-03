@@ -11,7 +11,24 @@ import type { Platform } from './oauth/providers'
 /** ما يكفي D1 من واجهة، حتى تُختبر الوحدة على SQLite حقيقي. */
 export interface Db {
   prepare(query: string): DbStatement
+  /** معاملةٌ واحدة في D1 — كلُّها أو لا شيء. واختياريّةٌ لأنّ غيرَ D1 قد لا يملكها. */
+  batch?(statements: DbStatement[]): Promise<unknown>
 }
+
+/**
+ * يكتب الصفوفَ معًا أو لا يكتب منها شيئًا (D-182) — `batch` في D1 معاملةٌ واحدة.
+ *
+ * كان منشورٌ يُدرَج ثمّ وسيطُه في طلبين؛ وخطأٌ عابرٌ بينهما يترك منشورًا بلا مقطعه
+ * ومفتاحُه محجوز، فلا يُصلَح بضغطةٍ ثانية. وقاعدةٌ بلا `batch` تُكتب صفًّا صفًّا كما كانت.
+ */
+export async function atomically(db: Db, statements: DbStatement[]): Promise<void> {
+  if (db.batch !== undefined) {
+    await db.batch(statements)
+    return
+  }
+  for (const statement of statements) await statement.run()
+}
+
 export interface DbStatement {
   bind(...values: unknown[]): DbStatement
   first<T = unknown>(): Promise<T | null>

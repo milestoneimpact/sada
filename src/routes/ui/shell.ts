@@ -172,19 +172,23 @@ export function soloPage(
   commands?: readonly Command[],
   /**
    * الرافدةُ مرسومةً (D-178) — من `soloNav` في `rail.ts`. **وبها تصير الصفحةُ
-   * جزءًا من التطبيق**: رافدةٌ على العريض وشريطٌ سفليٌّ في الجوّال، والثيمُ في
-   * ذيلها لا في شريط العودة (فلا يتكرّر معرّفُه).
+   * جزءًا من التطبيق**: رافدةٌ على العريض وشريطٌ سفليٌّ في الجوّال.
+   *
+   * **والثيمُ في شريط العودة لا في ذيلها**: الذيلُ يُخفى دون ‏٩٦٠px، فكان
+   * الهاتفُ واللوحيُّ بلا مبدّلٍ في أيّ صفحة. **ومبدّلٌ واحدٌ لا اثنان**:
+   * سكربتُ الثيم يربط `#theme` الأوّلَ وحدَه، فنسخةٌ ثانيةٌ زرٌّ لا يعمل —
+   * فتُنزَع نسخةُ الذيل، والكثافةُ تبقى فيه.
    */
   rail?: string,
 ): string {
-  const inner = `${backNav(back.href, back.label, rail === undefined)}
+  const inner = `${backNav(back.href, back.label)}
          <main id="main">${body}</main>`
   return shell(
     title,
     `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        ${rail === undefined
          ? `<div class="wrap">${inner}</div>`
-         : `<div class="app">${rail}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
+         : `<div class="app">${rail.replace(themeSwitch(), '')}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -192,7 +196,7 @@ export function soloPage(
 }
 
 
-export function backNav(href: string, label: string, theme = true): string {
+export function backNav(href: string, label: string): string {
   /*
    * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
    * وحدَه، فتُقرأ صفحةً خارج التطبيق. والعلامةُ بجانب السهم تقول «هذه من
@@ -204,7 +208,7 @@ export function backNav(href: string, label: string, theme = true): string {
   return `<nav class="back" aria-label="مسارُ العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
-    <span class="grow"></span>${commandTrigger()}${theme ? themeSwitch() : ''}
+    <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
 }
 

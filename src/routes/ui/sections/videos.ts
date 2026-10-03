@@ -8,7 +8,7 @@
 import { escapeHtml } from '../escape'
 import { kb, relativeTime } from '../../../lib/format'
 import { platformLabel } from '../../../lib/oauth/providers'
-import { VIDEO_PLATFORMS, videoChecks, type UploadRow, type VideoCheck } from '../../../lib/media/uploads'
+import { STALE_UPLOAD_HOURS, VIDEO_PLATFORMS, videoChecks, type UploadRow, type VideoCheck } from '../../../lib/media/uploads'
 import { status } from '../parts'
 
 const MARK: Readonly<Record<VideoCheck['level'], { cls: string; g: string }>> = {
@@ -39,10 +39,15 @@ function row(u: UploadRow, now: Date): string {
     escapeHtml(relativeTime(u.createdAt, now)),
   ].filter((x) => x !== '').join(' · ')
   if (u.status === 'uploading') {
+    // ‏رفعٌ جارٍ في نافذةٍ أخرى أو انقطع — لا يُستأنف؛ يُلغى ويُرفع من جديد، وما تُرك يُلغى وحده بعد ساعات
     return `<div class="vrow">
       <div class="vmeta"><b><bdi>${escapeHtml(u.name)}</bdi></b><span class="ago">${meta}</span></div>
       ${status('warn', '!', 'لم يكتمل رفعُه')}
-      <span class="ago">اختر الملفَّ نفسَه مرّةً أخرى ليُرفع من أوّله.</span>
+      <form class="row" method="POST" action="/panel/uploads/${escapeHtml(u.id)}/abort" data-busy="جارٍ الإلغاء…">
+        <input type="hidden" name="from" value="library">
+        <span class="ago">إن انقطع رفعُه فألغِه ثمّ ارفعه من جديد — ويُلغى وحده بعد ${STALE_UPLOAD_HOURS} ساعات.</span>
+        <button class="g" type="submit" aria-label="${escapeHtml(`ألغِ رفع ${u.name}`)}">ألغِ</button>
+      </form>
     </div>`
   }
   const boxes = VIDEO_PLATFORMS.map((p) => {

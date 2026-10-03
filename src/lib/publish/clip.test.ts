@@ -85,7 +85,10 @@ describe('publishYouTube قطعًا', () => {
       if (init.method === 'POST') return new Response(null, { status: 200, headers: { Location: 'https://upload.google/session' } })
       puts.push(init.headers as Record<string, string>)
       expect(init.redirect).toBe('manual')
-      return puts.length < 3 ? new Response(null, { status: 308 }) : Response.json({ id: 'vid-9' })
+      // ‏Google تقول في ‏308 آخرَ بايتٍ حفظته
+      const range = (init.headers as Record<string, string>)['Content-Range']!
+      const last = Number(/-(\d+)\//.exec(range)![1])
+      return puts.length < 3 ? new Response(null, { status: 308, headers: { Range: `bytes=0-${last}` } }) : Response.json({ id: 'vid-9' })
     }) as unknown as typeof fetch
     const out = await publishYouTube('t', clip, 'عنوان', fetchImpl)
     expect(out.platformPostId).toBe('vid-9')
@@ -94,6 +97,30 @@ describe('publishYouTube قطعًا', () => {
       `bytes ${YOUTUBE_CHUNK}-${2 * YOUTUBE_CHUNK - 1}/${size}`,
       `bytes ${2 * YOUTUBE_CHUNK}-${size - 1}/${size}`,
     ])
+  })
+
+  it('ومن حيث حفظت Google: قطعةٌ حُفظ بعضُها تُستأنَف من حدّها، وغيابُ Range يعيد من الصفر (D-182)', async () => {
+    const MBs = 1024 * 1024
+    const size = YOUTUBE_CHUNK + 1000
+    const clip = (await bucketClip(rangedBucket(size), 'k', 'video/mp4'))!
+    const sent: string[] = []
+    const fetchImpl = (async (_url: string, init: RequestInit = {}) => {
+      if (init.method === 'POST') return new Response(null, { status: 200, headers: { Location: 'https://upload.google/s' } })
+      sent.push((init.headers as Record<string, string>)['Content-Range']!)
+      // ‏الأولى: حُفظ ‏20MB من ‏32، والثانية: تكمل من 20MB
+      if (sent.length === 1) return new Response(null, { status: 308, headers: { Range: `bytes=0-${20 * MBs - 1}` } })
+      return Response.json({ id: 'v2' })
+    }) as unknown as typeof fetch
+    await publishYouTube('t', clip, 'x', fetchImpl)
+    expect(sent).toEqual([`bytes 0-${YOUTUBE_CHUNK - 1}/${size}`, `bytes ${20 * MBs}-${size - 1}/${size}`])
+
+    // ‏خادمٌ لا يتقدّم أبدًا: يُردّ قابلًا للإعادة لا حلقةً بلا نهاية
+    const stuck = (async (_url: string, init: RequestInit = {}) =>
+      init.method === 'POST'
+        ? new Response(null, { status: 200, headers: { Location: 'https://upload.google/s' } })
+        : new Response(null, { status: 308 })) as unknown as typeof fetch
+    const failure = await publishYouTube('t', clip, 'x', stuck).catch((e: { retryable: boolean }) => e)
+    expect((failure as { retryable: boolean }).retryable).toBe(true)
   })
 
   it('والمقطعُ الصغيرُ طلبٌ واحدٌ بلا Content-Range كما كان', async () => {

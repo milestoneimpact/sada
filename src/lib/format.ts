@@ -115,7 +115,14 @@ export interface Noun {
   readonly two: string
   readonly few: string
   readonly many: string
+  /** المفردُ منصوبًا («منشورًا واحدًا») ومجرورًا («منشورٍ واحد»)، والمثنّى بالياء («منشورَين»). */
+  readonly oneAcc?: string
+  readonly oneGen?: string
+  readonly twoObl?: string
 }
+
+/** موقعُ المعدود في جملته: فاعلٌ أو مبتدأ، أو مفعول، أو مضافٌ إليه ومجرور. */
+export type Case = 'nom' | 'acc' | 'gen'
 
 /**
  * العددُ ومعدودُه **بعربيّةٍ صحيحة** (D-177) — امتدادًا لـ `attemptsLeft`.
@@ -124,9 +131,10 @@ export interface Noun {
  * تترجم. والقاعدةُ أربع: واحدٌ بوصفه، واثنان بالمثنّى، ومن ثلاثةٍ إلى عشرة
  * بالجمع، وما فوقها بالتمييز المفرد. والصفرُ يقوله المنادي بجملته.
  */
-export function counted(n: number, noun: Noun): string {
-  if (n === 1) return noun.one
-  if (n === 2) return noun.two
+export function counted(n: number, noun: Noun, kase: Case = 'nom'): string {
+  // ‏«اعتمد منشورًا واحدًا» لا «اعتمد منشورٌ واحد» (D-182): الإعرابُ في الواحد والاثنين وحدهما
+  if (n === 1) return kase === 'acc' ? noun.oneAcc ?? noun.one : kase === 'gen' ? noun.oneGen ?? noun.one : noun.one
+  if (n === 2) return kase === 'nom' ? noun.two : noun.twoObl ?? noun.two
   if (n >= 3 && n <= 10) return `${n} ${noun.few}`
   return `${n} ${noun.many}`
 }
@@ -134,9 +142,10 @@ export function counted(n: number, noun: Noun): string {
 /** المعدوداتُ التي تتكرّر في اللوحة — في موضعٍ واحدٍ لا في كلّ جملة. */
 export const NOUNS = {
   draft: { one: 'مسوّدةٌ واحدة', two: 'مسوّدتان', few: 'مسوّدات', many: 'مسوّدة' },
-  post: { one: 'منشورٌ واحد', two: 'منشوران', few: 'منشورات', many: 'منشورًا' },
+  post: { one: 'منشورٌ واحد', two: 'منشوران', few: 'منشورات', many: 'منشورًا', oneAcc: 'منشورًا واحدًا', oneGen: 'منشورٍ واحد', twoObl: 'منشورَين' },
   source: { one: 'مصدرٌ واحد', two: 'مصدران', few: 'مصادر', many: 'مصدرًا' },
   image: { one: 'صورةٌ واحدة', two: 'صورتان', few: 'صور', many: 'صورة' },
   suggestion: { one: 'توصيةٌ واحدة', two: 'توصيتان', few: 'توصيات', many: 'توصية' },
   day: { one: 'يومٌ واحد', two: 'يومان', few: 'أيّام', many: 'يومًا' },
+  row: { one: 'صفٌّ واحد', two: 'صفّان', few: 'صفوف', many: 'صفًّا', oneAcc: 'صفًّا واحدًا', oneGen: 'صفٍّ واحد', twoObl: 'صفَّين' },
 } as const satisfies Readonly<Record<string, Noun>>

@@ -270,6 +270,27 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
   const ready = mine.find((m) => m.status === 'ready' && !m.mime.startsWith('video/'))
   const clip = mine.find((m) => m.status === 'ready' && m.mime.startsWith('video/'))
 
+  /*
+   * **مقطعُ المالك يُعرض هو، ولا زرَّ توليدٍ بجانبه** (D-182). كان المنشورُ من
+   * «فيديوهاتك» يُرسم «بلا صورة» وزرُّ «ولّد إنفوجرافيك» أساسيٌّ عليه — وصورةٌ تُولَّد
+   * له كانت تصير أحدثَ وسيطه فتُنشر على Instagram مكانَ الـ Reel.
+   */
+  const owned = mine.find((m) => m.status === 'ready' && m.model === 'upload' && m.mime.startsWith('video/'))
+  if (owned !== undefined) {
+    const dims = owned.width !== null && owned.height !== null
+      ? ` width="${owned.width}" height="${owned.height}"` : ''
+    return `<div class="pic">
+      <video src="/panel/media/${escapeHtml(owned.id)}" controls preload="metadata" playsinline${dims}></video>
+      <div class="pic-foot">
+        ${status('ok', '●', 'مقطعُك كما رفعتَه')}
+        <span class="chip mono">${kb(owned.bytes)}</span>
+        ${owned.width !== null && owned.height !== null
+          ? `<span class="chip mono">${owned.width}×${owned.height}</span>` : ''}
+        <span class="ago">يُنشر كما هو — والنصُّ أعلاه وصفُه.</span>
+      </div>
+    </div>`
+  }
+
   if (ready !== undefined) {
     const info = ready.model.startsWith('infographic:')
     // والنصُّ المرسومُ في الصورة مكانُه `alt`: قارئُ الشاشة لا يرى البكسلات

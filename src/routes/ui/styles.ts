@@ -326,6 +326,9 @@ details.ladder .verdict.bad{color:var(--bad)}
 .theme button{padding:var(--s-1) var(--s-2); border-radius:var(--r-pill); background:transparent; border:0;
   color:var(--ink-3); font-size:var(--t-xs); font-weight:600}
 .theme button[aria-pressed=true]{background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
+/* ‏وفي اللوحة دون ‏٩٦٠px ينقله سكربتُها من ذيل الرافدة المخفيّ إلى آخر المحتوى —
+   ‏مبدّلٌ واحدٌ مرئيٌّ في كلّ عرض، وفي وسطه لا ملتصقًا بحافّة */
+.content > .theme{display:flex; width:fit-content; margin:var(--s-8) auto 0}
 
 /* ── الإشعار ───────────────────────────────────────────────── */
 .flash{display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-3) var(--s-4);
@@ -1149,6 +1152,12 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .vpf-b .st{white-space:normal; max-width:100%}
 .vapprove{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); font-size:var(--t-sm)}
 .vapprove input{margin:0}
+/* ── معاينةُ الخطّة (D-181): الصفُّ ذو المشكلة بأرضٍ حمراءَ خفيفة، ومشكلاتُه قائمةٌ بجانبه ── */
+.pi td{vertical-align:top}
+.pi tr.bad td{background:var(--bad-wash)}
+.pi td .ago{display:block}
+.pi-text{max-width:42ch; line-height:var(--lh)}
+.pi-why{margin:0; padding-inline-start:var(--s-4); color:var(--bad); font-size:var(--t-sm); line-height:var(--lh)}
 .dcols > *{break-inside:avoid; margin-bottom:var(--s-3)}
 
 /* ── اختيارُ بطاقات اللوح (D-119) ─────────────────────────────────────
@@ -1293,7 +1302,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    إلى CSS بأولويّةٍ دنيا، فـ width:100% تغلب الأولى **ولا شيء يغلب
    الثانية** — فيبقى الارتفاع 628px والعرض عرضَ البطاقة، وتخرج الصورة
    ممطوطةً طولا. علّةٌ رأيتُها ولم يمسكها اختبار. */
-.pic img{display:block; width:100%; height:auto; max-height:76vh; object-fit:contain;
+.pic img,.pic video{display:block; width:100%; height:auto; max-height:76vh; object-fit:contain;
   border-radius:var(--r); border:1px solid var(--line); background:var(--surface-2)}
 /* صورةٌ لم تُحمَّل تُقال بلفظها: مربّعٌ رماديٌّ فارغٌ كان يُقرأ «لا صورة» */
 .pic-err{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
@@ -1804,8 +1813,11 @@ nav.back .home,nav.back .home .glyph{flex:none}
 .glyph.sm{width:30px; height:30px; border-radius:var(--r-sm)}
 .glyph.sm svg{width:17px; height:17px}
 /* وعلى ‏٣٢٠px تبقى العلامةُ ويسقط اسمُها: قِيس الشريطُ يفيض ‏١٠px بالاسم
-   والسهم ومبدّل الثيم معًا، والعلامةُ وحدَها تقول ما يقوله الاسم. */
-@media(max-width:400px){nav.back .home b{display:none} nav.back .home{padding-inline-end:var(--s-2)}}
+   والسهم ومبدّل الثيم معًا، والعلامةُ وحدَها تقول ما يقوله الاسم.
+   **ويضيق الفاصلُ كذلك**: عاد المبدّلُ إلى الشريط في كلّ صفحةٍ برافدة (ذيلُها
+   مخفيٌّ في الضيّق)، فقِيس يفيض ‏١٩px بـ«المنشورات» — وثلاثةُ فواصلَ من ‏١٦ إلى ‏٨ تسعه. */
+@media(max-width:400px){nav.back .home b{display:none} nav.back .home{padding-inline-end:var(--s-2)}
+  nav.back{gap:var(--s-2)}}
 
 /* ── «ما خرج»: صفوفٌ لا بطاقاتٌ في بطاقة (D-140) ──────────────────────── */
 .slices{display:flex; flex-direction:column}
