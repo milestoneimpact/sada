@@ -32,6 +32,7 @@ import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { status } from './parts'
+import { counted, NOUNS } from '../../lib/format'
 
 // القاموسُ واحدٌ في lib/oauth/providers (D-151)
 const LABEL = PLATFORM_LABEL
@@ -94,7 +95,7 @@ export function connectedBody(d: ConnectedData): string {
          بعد موافقتك على كلّ منشورٍ على حدة.</span></div>`
       : canPublish
         ? `<div class="outcome warn"><span class="k">ينقص</span><span class="v">
-           النشرُ يعمل، <b>و ${missing.length} نطاقا لم يُمنَح</b> — وما يفتحه لا يعمل.
+           النشرُ يعمل، <b>ولم يُمنَح ${counted(missing.length, NOUNS.scope)}</b> — وما يفتحه لا يعمل.
            والجدولُ تحت يقول أيَّها ومَن يمنحه.</span></div>`
         : `<div class="outcome warn"><span class="k">مربوطٌ ولا ينشر</span><span class="v">
            <b>الهويّةُ مقروءة، والنشرُ غيرُ ممكن</b> — نطاقُ النشر لم يُمنَح.

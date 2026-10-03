@@ -22,7 +22,7 @@
 import type { ChannelView } from '../channels'
 import type { AppStatus } from '../oauth/apps'
 import type { AccountHealth, PlatformPost, PlatformTally } from './screen'
-import { parseSqliteUtc } from '../format'
+import { counted, NOUNS, parseSqliteUtc } from '../format'
 
 export type RungState = 'done' | 'now' | 'waiting' | 'failed'
 export type RungKey = 'app' | 'account' | 'token' | 'renew' | 'publish'
@@ -152,7 +152,7 @@ export function readiness(input: ReadinessInput): Readiness {
     const days = daysUntil(h.expiresAt, now) ?? 0
     tokenRung = {
       key: 'token', title: 'الإذن', state: 'done',
-      note: days === 0 ? 'صالحٌ حتّى اليوم' : days === 1 ? 'صالحٌ حتّى الغد' : `صالحٌ ${days} يوما`,
+      note: days === 0 ? 'صالحٌ حتّى اليوم' : days === 1 ? 'صالحٌ حتّى الغد' : `صالحٌ ${counted(days, NOUNS.day, 'acc')}`,
     }
   }
 

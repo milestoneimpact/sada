@@ -36,13 +36,24 @@ export const COPY_SCRIPT = `
 })();
 `
 
-/** مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل. */
-
+/**
+ * مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل.
+ *
+ * **ولونُ شريط المتصفّح معه** (D-183): وسما «theme-color» بشرط الوضع، فاختيارٌ
+ * يخالف الجهاز يكتب لونَه في الوسمين، و«النظام» يعيد كلًّا إلى وضعه. واللونُ
+ * من «data-c» على الوسم نفسِه لا من استيراد — هذا الملفُّ نصوصٌ بلا استيراد.
+ */
 export const THEME_SCRIPT = `
 (function(){
   var box=document.getElementById('theme');
   if(!box)return;
+  var bar=function(v){
+    var ms=document.querySelectorAll('meta[name="theme-color"]'),own={};
+    ms.forEach(function(m){own[/dark/.test(m.media)?'dark':'light']=m.dataset.c;});
+    ms.forEach(function(m){m.content=v==='system'?m.dataset.c:(own[v]||m.dataset.c);});
+  };
   var apply=function(v){
+    bar(v);
     try{
       if(v==='system'){localStorage.removeItem('sada-theme');
         delete document.documentElement.dataset.theme;}

@@ -29,7 +29,7 @@ import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platf
 import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
-import { money, relativeTime, shortAgo, untilTime } from '../../lib/format'
+import { counted, money, NOUNS, relativeTime, shortAgo, untilTime } from '../../lib/format'
 import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 import type { AppStatus } from '../../lib/oauth/apps'
 import type { PlatformNeeds } from '../../lib/platform/needs'
@@ -660,7 +660,7 @@ function mediaSection(d: PlatformScreenData): string {
   const shape = d.needs?.media.kind === 'clip' ? 'np-grid-clip' : d.view.spec.id === 'instagram' ? 'np-grid-ig' : ''
   return tiles.length === 0
     ? `<div class="empty"><b>لا وسائطَ بعد</b><p>الصورُ والمقاطعُ التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.</p></div>`
-    : `<p class="hint">${tiles.length} منشورًا لها وسيط${bare > 0 ? ` · و${bare} بلا وسيطٍ لا تظهر هنا` : ''}.
+    : `<p class="hint">لها وسيط: ${counted(tiles.length, NOUNS.post)}${bare > 0 ? ` · و${bare} بلا وسيطٍ لا تظهر هنا` : ''}.
          المجدولُ خافت، ويفتح كلُّ مربّعٍ منشورَه في الخطّ الزمنيّ.</p>
        <div class="np-grid${shape === '' ? '' : ` ${shape}`}">${tiles.join('')}</div>`
 }
@@ -685,7 +685,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
             ? status('bad', '▲', 'جدّد الإذن')
             : missing === 0
               ? status('ok', '●', 'كلُّ النطاقات ممنوحة')
-              : status('warn', '!', `${missing} نطاقا ناقصا`)}
+              : status('warn', '!', `ينقص ${counted(missing, NOUNS.scope)}`)}
         </div>
         <details${missing > 0 || granted === '' ? ' open' : ''}><summary>ما يستطيعه هذا الحساب</summary>
         <p class="hint">${

@@ -84,8 +84,9 @@ for (const file of files) {
   const short = file.slice(SRC.length)
 
   // التعريفُ حيثما وقع: في `tokens.ts` أو في `style=` داخل قالبٍ نصّيّ.
-  // و`--lines` تُضبَط في `sections/drafts.ts` لا في ورقة الأنماط.
-  for (const m of code.matchAll(/(--[a-z0-9-]+)\s*:/g)) {
+  // و`--lines` تُضبَط في `sections/drafts.ts` لا في ورقة الأنماط. **ومفتاحًا
+  // في كائن الوضعين** (D-183): `'--bg': '#f5f4ef'` تعريفٌ تولّد منه الكتل.
+  for (const m of code.matchAll(/(--[a-z0-9-]+)['"]?\s*:/g)) {
     if (!defined.has(m[1])) defined.set(m[1], short)
   }
   // والاختباراتُ تُمسَح تعريفا ولا تُمسَح استعمالا

@@ -48,6 +48,17 @@ describe('لا سرَّ في المتن — والحدُّ يُفرَض قبل �
   })
 })
 
+describe('نصُّ تنبيه الإذن بعدده (D-184)', () => {
+  it('يومٌ واحد، وسبعةُ أيّام، والصفرُ «انتهى» لا «خلال 0 يومًا»', () => {
+    expect(tokenAlert('ح', 1, 'access').body).toContain('ينتهي خلال يومٍ واحد.')
+    expect(tokenAlert('ح', 7, 'access').body).toContain('ينتهي خلال 7 أيّام.')
+    const gone = tokenAlert('ح', 0, 'refresh')
+    expect(gone.body).toContain('إذنُ التجديد لحساب «ح» انتهى.')
+    expect(gone.body).not.toMatch(/0 يوم/)
+    expect(gone.ref).toBe('token:ح:refresh:0')
+  })
+})
+
 describe('ولا يُرسَل حدثٌ مرّتين (D-004)', () => {
   it('والثانيةُ تُتخطّى بالقيد لا بالشيفرة', async () => {
     const a = tokenAlert('صفحةُ صدى', 7, 'refresh')

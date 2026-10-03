@@ -20,7 +20,13 @@ const UNITS: readonly (readonly [number, (n: number) => string])[] = [
   [86400, (n) => (n < 2 ? 'قبل ساعة' : n === 2 ? 'قبل ساعتين' : n <= 10 ? `قبل ${n} ساعات` : `قبل ${n} ساعة`)],
 ]
 
-/** وقتٌ نسبيّ بالعربية، بمثنّى صحيح — «قبل ساعتين» لا «قبل ٢ ساعة». */
+/**
+ * وقتٌ نسبيّ بالعربية، بمثنّى صحيح — «قبل ساعتين» لا «قبل ٢ ساعة».
+ *
+ * **والجملةُ كاملةٌ بظرفها**: «قبل …» أو «الآن» أو «أمس»، فلا يسبقها المستدعي
+ * بـ«منذ» (D-183) — كانت أربعةُ مواضع تكتب «منذ ${…}» فقُرئ «منذ قبل 24 دقيقة»
+ * ثماني مرّاتٍ في الصفحة. وما يُسبَق بفعلٍ يُسبَق به: «وُضعت قبل ساعتين».
+ */
 export function relativeTime(value: string, now: Date = new Date()): string {
   const date = parseSqliteUtc(value)
   if (date === null) return value
@@ -32,9 +38,8 @@ export function relativeTime(value: string, now: Date = new Date()): string {
 
   const days = Math.floor(seconds / 86400)
   if (days < 2) return 'أمس'
-  if (days === 2) return 'قبل يومين'
-  if (days < 11) return `قبل ${days} أيام`
-  if (days < 30) return `قبل ${days} يوما`
+  // ‏والعددُ من «counted» (D-183): «قبل يومين» و«قبل 5 أيّام» و«قبل 15 يومًا»
+  if (days < 30) return `قبل ${counted(days, NOUNS.day, 'gen')}`
   const months = Math.floor(days / 30)
   if (months < 2) return 'قبل شهر'
   if (months === 2) return 'قبل شهرين'
@@ -146,6 +151,8 @@ export const NOUNS = {
   source: { one: 'مصدرٌ واحد', two: 'مصدران', few: 'مصادر', many: 'مصدرًا' },
   image: { one: 'صورةٌ واحدة', two: 'صورتان', few: 'صور', many: 'صورة' },
   suggestion: { one: 'توصيةٌ واحدة', two: 'توصيتان', few: 'توصيات', many: 'توصية' },
-  day: { one: 'يومٌ واحد', two: 'يومان', few: 'أيّام', many: 'يومًا' },
+  day: { one: 'يومٌ واحد', two: 'يومان', few: 'أيّام', many: 'يومًا', oneAcc: 'يومًا واحدًا', oneGen: 'يومٍ واحد', twoObl: 'يومين' },
+  channel: { one: 'قناةٌ واحدة', two: 'قناتان', few: 'قنوات', many: 'قناةً' },
+  scope: { one: 'نطاقٌ واحد', two: 'نطاقان', few: 'نطاقات', many: 'نطاقًا' },
   row: { one: 'صفٌّ واحد', two: 'صفّان', few: 'صفوف', many: 'صفًّا', oneAcc: 'صفًّا واحدًا', oneGen: 'صفٍّ واحد', twoObl: 'صفَّين' },
 } as const satisfies Readonly<Record<string, Noun>>

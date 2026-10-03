@@ -297,14 +297,16 @@ for (const file of walk(ROUTES)) {
 
 /*
  * ── رقاقةُ الحال من دالّتها وحدَها (D-154) ────────────────────────────
- * `<span class="g">` يرسمه `status()` في parts.ts؛ من كتبه يدًا أعاد
- * الحرفَ الساقطَ إلى خطّ النظام وفرّق ما وُحّد.
+ * `<span class="st-ic">` يرسمه `status()` في parts.ts؛ من كتبه يدًا أعاد
+ * الحرفَ الساقطَ إلى خطّ النظام وفرّق ما وُحّد. **والاسمُ القديمُ يُمسَك معه**
+ * (D-183): `<span class="g">` كان رمزَ الحال، وهو صنفُ الزرّ الشبحيّ — فمن
+ * أعاده يدًا أعاد المربّعَ الأبيضَ داخل الحبّة.
  */
 const handChips = []
 for (const file of walk(ROUTES)) {
   if (file.endsWith('/parts.ts') || file === STYLES) continue
   const code = readFileSync(file, 'utf8')
-  const n = (code.match(/<span class="g">/g) ?? []).length
+  const n = (code.match(/<span class="(?:g|st-ic)">/g) ?? []).length
   if (n > 0) handChips.push([file.slice(ROOT.length), n])
 }
 console.log('\n═══ رقاقةُ حالٍ مكتوبةٌ يدًا ═══\n')

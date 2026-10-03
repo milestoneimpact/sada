@@ -39,6 +39,10 @@ import { SCRIPT } from './panelScript'
 import { imageReadiness, infographicReadiness, videoReadiness } from '../../lib/media/readiness'
 import { slideGate } from '../../lib/image/gate'
 import { videoCapGate } from '../../lib/limits'
+import { PRINT, THEME } from './tokens'
+import { channelsSection } from './channels'
+import { viewChannels } from '../../lib/channels'
+import { planSection } from './sections/plan'
 
 /** نقاطٌ تامّةٌ كلُّها — لما لا يُختبَر فيه السطرُ نفسُه (D-163). */
 const READY = {
@@ -321,7 +325,7 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
   it('ولا `--brand-deep` حبرا — هو أرضُ ضغطٍ في الليل لا حبرٌ', () => {
     // ولا يُتَّهم `border-color` — الحدُّ ليس حبرا
     expect(found((d) => d.prop === 'color' && d.value.includes('var(--brand-deep)'))).toEqual([])
-    expect(css.rule('.doc a').color).toBe('var(--brand)')
+    expect(css.rule('.doc a').color).toBe('var(--link)')
   })
 })
 
@@ -410,10 +414,13 @@ describe('عدُّ الأيّام على البطاقة (D-126)', () => {
     expect(tokenDays('2026-09-10 00:00:00', now)).toContain('st bad')
     expect(tokenDays('2026-09-10 00:00:00', now)).toContain('انتهى الإذن')
     expect(tokenDays('2026-09-12 20:00:00', now)).toContain('ينتهي الإذن اليوم')
-    expect(tokenDays('2026-09-14 12:00:00', now)).toContain('يبقى 2 يومان للإذن')
+    // ‏والعددُ بمعدوده (D-183): كانت «يبقى 2 يومان» و«الإذن 48 يوما»
+    expect(tokenDays('2026-09-14 12:00:00', now)).toContain('يبقى يومان للإذن')
+    expect(tokenDays('2026-09-17 12:00:00', now)).toContain('يبقى 5 أيّام للإذن')
     expect(tokenDays('2026-09-19 12:00:00', now)).toContain('st warn')
     expect(tokenDays('2026-10-30 12:00:00', now)).toContain('<span class="chip"')
-    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('الإذن 48 يوما')
+    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('الإذن 48 يومًا')
+    expect(tokenDays('2026-09-21 12:00:00', now)).toContain('الإذن 9 أيّام')
     expect(tokenDays('not-a-date', now)).toBe('')
   })
 })
@@ -779,7 +786,10 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     expect(ICON_BYTES).toContain('14161c')
     expect(ICON_BYTES).not.toContain('82c69e')
     const html = shell('ت', '<p>x</p>', 'n1')
-    expect(html).toContain('<meta name="theme-color" content="#1f2430">')
+    // ‏وسمان بشرط الوضع من أرض الصفحة، لا حبرُ الهويّة في الوضعين (D-183)
+    expect(html).toContain(`<meta name="theme-color" media="(prefers-color-scheme: light)" content="${THEME.light['--bg']}"`)
+    expect(html).toContain(`<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${THEME.dark['--bg']}"`)
+    expect(html).not.toContain('content="#1f2430"')
   })
 })
 
@@ -796,8 +806,10 @@ describe('تصفيةُ الطبعات (D-148)', () => {
       expect(count(sel), sel).toBe(1)
     }
     expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({
-      'font-size': 'var(--t-3xl)', color: 'var(--au)', 'font-weight': '400', 'letter-spacing': '-1.2px',
+      'font-size': 'var(--t-3xl)', color: 'var(--au)', 'font-weight': '400',
     })
+    // ‏والتضييقُ بنسبةٍ على الرقم المعزول وحدَه، لا ببكسلٍ لكلّ رتبة (D-183)
+    expect(css.rule('.tile .v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '-.03em' })
     expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-5)')
     expect(css.rule('nav.tabs a[aria-current=page]')).toMatchObject({
       background: 'var(--surface-3)', color: 'var(--ink)', position: 'relative',
@@ -924,14 +936,14 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
   // ‏و«▼» معها منذ D-167: سهمُ الفرق عن الأمس صار يُرسَم من الجدول نفسِه
   it.each(['●', '○', '◍', '◔', '▲', '▼', '◆', '✓', '✕', '↑', '!'])('الحرفُ %s يُرسَم SVG بلون النصّ', (g) => {
     const html = status('ok', g, 'نصّ')
-    expect(html).toContain('<span class="st ok"><span class="g"><svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">')
+    expect(html).toContain('<span class="st ok"><span class="st-ic"><svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">')
     expect(html).not.toContain(g)
     expect(html).toContain('</svg></span>نصّ</span>')
   })
 
   it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
-    expect(status('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="g">&lt;</span>x</span>')
-    expect(status('', '●', 'x')).toContain('<span class="st"><span class="g"><svg')
+    expect(status('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="st-ic">&lt;</span>x</span>')
+    expect(status('', '●', 'x')).toContain('<span class="st"><span class="st-ic"><svg')
   })
 })
 
@@ -1098,7 +1110,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(css.rules().some((r) => r.selectors.includes('.pic.none .ago'))).toBe(false)
     expect(Object.keys(css.rule('.hint.ready')).length).toBeGreaterThan(0)
     // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
-    expect(css.rule('.hint.ready a').color).toBe('var(--brand)')
+    expect(css.rule('.hint.ready a').color).toBe('var(--link)')
   })
 })
 
@@ -1182,5 +1194,85 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(css.rule('th')['text-align']).toBe('start')
     expect(found((d) => /^(margin|padding|border)-(left|right)|^(left|right)$/.test(d.prop) ||
       (['text-align', 'float', 'clear'].includes(d.prop) && /^(left|right)$/.test(d.value)))).toEqual([])
+  })
+})
+
+/**
+ * المرحلة ٠ من خطّة التصميم — الإتقانُ السريع (D-183). كلُّ اختبارٍ هنا علّةٌ
+ * قِيست في التشخيص، ويُسأل عنها المصدرُ لا الصورة.
+ */
+describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
+  it('كتلتا الليل نصٌّ واحد من «THEME.dark»، والطباعةُ من «PRINT»', () => {
+    const viaButton = Object.entries(css.rule(':root[data-theme="dark"]'))
+    const viaSystem = Object.entries(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)'))
+    // ‏الترتيبُ والقيمةُ معًا: نصٌّ واحدٌ بعد تطبيع الفراغ، لا «متقاربان»
+    expect(viaSystem).toEqual(viaButton)
+    expect(viaButton.map(([k]) => k)).toEqual(Object.keys(THEME.dark))
+    expect(Object.keys(THEME.dark)).toEqual(Object.keys(THEME.light))
+    for (const s of [':root', ':root:not([data-theme="light"])', ':root[data-theme="dark"]']) {
+      expect(Object.keys(css.rule(s, '@media print')), s).toEqual(Object.keys(PRINT))
+    }
+  })
+
+  it('رمزُ الحال باسمه: لا أرضَ له ولا حدّ، ولا يلبس صنفَ الزرّ الشبحيّ', () => {
+    const html = status('warn', '!', 'تنتظرك')
+    expect(html).toContain('<span class="st-ic">')
+    expect(html).not.toMatch(/class="g"/)
+    // ‏ولا قاعدةَ في أيّ سياقٍ تعطي الرمزَ أرضًا أو حدًّا أو لونًا غيرَ لون حبّته
+    expect(found((d) => d.selectors.some((x) => /\.st-ic\b/.test(x)) &&
+      /^(background|border|color|box-shadow)/.test(d.prop))).toEqual([])
+  })
+
+  it('التحذيرُ برتقاليٌّ بعيدٌ عن النحاس، ولا إطارَ مكتوبًا بلونه في الوسم', () => {
+    expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fdf4ec'])
+    expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f08a3c', '#2a1b0f'])
+    const now = new Date('2026-09-27T12:00:00Z')
+    const html = channelsSection(viewChannels([{
+      id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: null,
+    }], () => true), now)
+    expect(html).toContain('ما ينتظرك الآن')
+    expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
+  })
+
+  it('الزرُّ على اللمس بقياسه على الحاسوب، والحقلُ وحدَه يكبر', () => {
+    const TOUCH = '@media(pointer:coarse)'
+    for (const s of ['button', '.btn']) expect(css.rule(s, TOUCH)['font-size'], s).toBeUndefined()
+    expect(css.rule('textarea', TOUCH)['font-size']).toBe('var(--t-lg)')
+    expect(css.rule('button')['min-height']).toBe('var(--tap)')
+  })
+
+  it('مربّعُ المنصّة والعلامةُ بحلقةٍ ليلًا، ونهارًا كما كانا', () => {
+    expect(css.rule('.pf-logo')['box-shadow']).toBe('0 0 0 1px var(--logo-ring)')
+    expect(css.rule('.glyph')['box-shadow']).toContain('0 0 0 1px var(--mark-ring)')
+    expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a4e59', '#4a4e59'])
+    expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line-strong)'])
+  })
+
+  it('الرابطُ والزرُّ الهادئ بحبر «--link» وخطٍّ تحته', () => {
+    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#cbced4', '#b0c8f0'])
+    for (const s of ['.g-tog', '.setup>summary', '.history .bar-name', '.todo>li>a.btn']) {
+      expect(css.rule(s), s).toMatchObject({ color: 'var(--link)', 'text-decoration': 'underline' })
+    }
+    // ‏ولا حبرَ رابطٍ من «--brand» بعد اليوم: الهويّةُ للفعل الأوّليّ
+    for (const s of ['.tap', '.pv th a', '.doc a', '.hint.ready a']) expect(css.rule(s).color, s).toBe('var(--link)')
+  })
+
+  it('«قبل …» لا تُسبَق بـ«منذ»: الجملةُ من relativeTime كاملة', () => {
+    const now = new Date('2026-09-06T09:00:00Z')
+    const channels = channelsSection(viewChannels([{
+      id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-06 08:36:00', expiresAt: '2026-11-01 00:00:00',
+    }], () => true), now)
+    const plan = planSection({
+      plan: null, names: {}, ready: true, analyzed: 1, now,
+      lastAttempt: { at: '2026-09-06 08:36:00', detail: 'failed: انقطع' },
+    })
+    // ‏والعددُ بمعدوده: كان «1 مصدرا محلَّلا»
+    expect(plan).toContain('مصدرٌ واحدٌ محلَّل')
+    for (const html of [channels, plan]) {
+      expect(html).toMatch(/قبل 24 دقيقة/)
+      expect(html).not.toMatch(/منذ\s+(قبل|الآن|أمس)/)
+    }
   })
 })

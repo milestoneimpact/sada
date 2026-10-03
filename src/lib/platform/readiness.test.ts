@@ -54,7 +54,8 @@ describe('السلّم يقرأ الصفوف', () => {
     })
     expect(r.rungs.map((x) => x.state)).toEqual(['done', 'done', 'done', 'done', 'done'])
     expect(r.verdict).toEqual({ kind: 'ok', text: 'تعمل وتنشر' })
-    expect(r.rungs[2]!.note).toContain('يوما')
+    // ‏والعددُ بمعدوده (D-183): «صالحٌ 12 يومًا»، و«صالحٌ يومين» لا «صالحٌ 2 يوما»
+    expect(r.rungs[2]!.note).toMatch(/^صالحٌ \d+ (يومًا|أيّام)$/)
   })
 
   it('needs_reauth مع تاريخه: الإذنُ ساقطٌ منذ يومه وزرُّه «جدّد الإذن»', () => {

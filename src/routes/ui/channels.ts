@@ -23,7 +23,7 @@ import { wizardFor, type Step } from '../../lib/oauth/wizard'
 import { ICON } from './icons'
 import { escapeHtml } from './escape'
 import { LOGOS } from './logos'
-import { relativeTime } from '../../lib/format'
+import { counted, NOUNS, relativeTime } from '../../lib/format'
 import { status } from './parts'
 
 const KIND: Readonly<Record<string, string>> = {
@@ -309,7 +309,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? status('bad', '▲', 'جدّد الإذن')
-          : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">منذ ${escapeHtml(
+          : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">رُبط ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
       </div>`,
@@ -399,10 +399,11 @@ export function tokenDays(expiresAt: string | null, now: Date): string {
   const title = `title="ينتهي إذنُ الوصول ${escapeHtml(expiresAt)} UTC"`
   if (days < 0) return `${status('bad', '▲', `انتهى الإذن`, `${title}`)}`
   if (days <= 7) {
+    // ‏والعددُ بمعدوده (D-183): كان «يبقى 2 يومان» و«الإذن 9 يوما»
     return `${status('warn', '◍', `${
-      days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${days} ${days === 1 ? 'يوم' : days === 2 ? 'يومان' : 'أيّام'} للإذن`}`, `${title}`)}`
+      days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(days, NOUNS.day)} للإذن`}`, `${title}`)}`
   }
-  return `<span class="chip" ${title}>الإذن ${days} يوما</span>`
+  return `<span class="chip" ${title}>الإذن ${counted(days, NOUNS.day)}</span>`
 }
 
 export function channelsSection(
@@ -434,10 +435,11 @@ export function channelsSection(
   ]
   const waiting = urgent.length === 0
     ? ''
-    : `<div class="card" style="margin-bottom:var(--s-4);border-color:var(--warn)">
+    // ‏بلا إطارٍ مكتوبٍ بلون التحذير (D-183): كان «border-color:var(--warn)» في
+    // ‏الوسم، يُقرأ ذهبًا في الليل ويُسقط لونًا خارج الورقة. والحالُ في حبّتها
+    : `<div class="card" style="margin-bottom:var(--s-4)">
         <div class="card-head"><h2>ما ينتظرك الآن</h2><div class="grow"></div>
-          ${status('warn', '!', `${urgent.length} ${
-            urgent.length === 1 ? 'قناة' : 'قنوات'}`)}</div>
+          ${status('warn', '!', counted(urgent.length, NOUNS.channel))}</div>
         <ul class="todo">${urgent.map((v) => `<li>
           <span class="dot ${v.state === 'needs_reauth' || unsignedOf(v) ? 'bad' : 'warn'}"></span>
           <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
