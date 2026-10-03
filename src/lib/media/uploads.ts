@@ -10,7 +10,7 @@
  * ولا نداءَ مدفوعًا هنا (D-006 وD-008): لا نموذجَ ولا مزوّد. والنشرُ بعده يمرّ من
  * الطابور بحرّاسه كلّها: الاعتمادُ، والموعد، و`idempotency_key` (D-004).
  */
-import type { Db } from '../tokens'
+import { atomically, type Db, type DbStatement } from '../tokens'
 
 /** الأنواعُ التي تقبلها المنصّاتُ الثلاث أو بعضُها — وما سواها يُردّ قبل أن يُرفَع بايت. */
 export const UPLOAD_MIMES: ReadonlySet<string> = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
@@ -171,6 +171,31 @@ export async function completeUpload(
   return { ok: true }
 }
 
+/** عمرُ رفعٍ لم يكتمل قبل أن يُعدّ متروكًا — أبطأُ رفعٍ لـ ‏500MB دونه بكثير. */
+export const STALE_UPLOAD_HOURS = 6
+
+/**
+ * رفعٌ تُرك في منتصفه (D-182): أُغلقت الصفحةُ أو انقطعت الشبكة، فلم يصل طلبُ الإلغاء.
+ * كان يبقى «لم يكتمل رفعُه» في المكتبة أبدًا ولا زرَّ يزيله. فدورةُ الربع تلغي قطعَه في
+ * R2 وتعلّمه فاشلًا — وفشلُ الإلغاء لا يمنع التعليم: R2 يُسقط القطعَ اليتيمةَ بدورة حياته.
+ */
+export async function expireStaleUploads(db: Db, bucket: MultipartBucket, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - STALE_UPLOAD_HOURS * 3_600_000).toISOString().slice(0, 19).replace('T', ' ')
+  const { results } = await db
+    .prepare(`SELECT id, r2_key, multipart_id FROM uploads WHERE status = 'uploading' AND created_at < ? LIMIT 50`)
+    .bind(cutoff)
+    .all<{ id: string; r2_key: string; multipart_id: string | null }>()
+  for (const row of results) {
+    if (row.multipart_id !== null) {
+      await Promise.resolve()
+        .then(() => bucket.resumeMultipartUpload(row.r2_key, row.multipart_id!).abort())
+        .catch(() => undefined)
+    }
+    await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ? AND status = 'uploading'`).bind(row.id).run()
+  }
+  return results.length
+}
+
 /** يلغي رفعًا لم يكتمل — R2 يحذف قطعه، والصفُّ يُعلَّم فاشلًا لا يُمحى. */
 export async function abortUpload(db: Db, bucket: MultipartBucket, id: string): Promise<void> {
   const row = await pending(db, id)
@@ -187,7 +212,7 @@ export async function listUploads(db: Db, limit = 20): Promise<UploadRow[]> {
         `SELECT u.id, u.r2_key, u.name, u.mime, u.bytes, u.width, u.height, u.duration_ms, u.status,
                 COALESCE(u.ready_at, u.created_at) AS created_at,
                 (SELECT GROUP_CONCAT(DISTINCT p.platform) FROM media m JOIN posts p ON p.id = m.post_id
-                  WHERE m.upload_id = u.id) AS platforms
+                  WHERE m.upload_id = u.id AND p.status != 'rejected') AS platforms
            FROM uploads u WHERE u.status != 'failed'
           ORDER BY u.created_at DESC LIMIT ?`,
       )
@@ -258,6 +283,55 @@ export function videoChecks(u: Pick<UploadRow, 'mime' | 'bytes' | 'width' | 'hei
   return [youtube, tiktok, instagram]
 }
 
+/** حدُّ نصّ المقطع: TikTok وInstagram بالمحرف، وYouTube بالبايت لأنّ النصَّ وصفُه. */
+const CAPTION_LIMIT: Readonly<Record<'tiktok' | 'instagram', number>> = { tiktok: 2200, instagram: 2200 }
+export const YOUTUBE_DESCRIPTION_BYTES = 5000
+
+/**
+ * ما يمنع نصَّ مقطعٍ على منصّته — أو `null` (D-182). **وليس حدَّ LinkedIn**: كان اعتمادُ
+ * مسوّدةِ مقطعٍ يمرّ بشرط «أربعين محرفًا» الذي وُضع لمنشورٍ مكتوب، فيُردّ وصفٌ قصيرٌ
+ * سليمٌ («ثلاثُ طبقاتٍ للحوكمة»). ووصفُ YouTube يُردّ بعد رفع المقطع إن زاد على ‏5000 بايت
+ * أو حمل «<» و«>»، فتضيع حصّةُ يومه — فيُقال قبل الاعتماد.
+ */
+export function captionProblem(platform: VideoPlatform, text: string): string | null {
+  const t = text.trim()
+  if (t === '') return 'النصُّ فارغ'
+  if (platform === 'youtube') {
+    const bytes = new TextEncoder().encode(t).length
+    if (bytes > YOUTUBE_DESCRIPTION_BYTES) return `النصُّ ${bytes} بايتًا وYouTube تقبل ${YOUTUBE_DESCRIPTION_BYTES} — والحرفُ العربيُّ بايتان`
+    if (/[<>]/.test(t)) return 'YouTube لا تقبل «<» ولا «>» في الوصف'
+    return null
+  }
+  const limit = CAPTION_LIMIT[platform]
+  return t.length > limit ? `النصُّ ${t.length} محرفًا و${platform === 'tiktok' ? 'TikTok' : 'Instagram'} تقبل ${limit}` : null
+}
+
+export function isVideoPlatform(p: string): p is VideoPlatform {
+  return (VIDEO_PLATFORMS as readonly string[]).includes(p)
+}
+
+/** ما يُنسخ من صفّ المقطع إلى صفّ الوسيط. */
+export type UploadFacts = { r2_key: string; mime: string; bytes: number; width: number | null; height: number | null; duration_ms: number | null }
+
+export async function readyUpload(db: Db, uploadId: string): Promise<UploadFacts | null> {
+  return db
+    .prepare('SELECT r2_key, mime, bytes, width, height, duration_ms FROM uploads WHERE id = ? AND status = ?')
+    .bind(uploadId, 'ready')
+    .first<UploadFacts>()
+}
+
+/** صفُّ وسيطٍ من مقطع المالك لمنشور — يكتبه «فيديوهاتك» واستيرادُ الخطّة بصيغةٍ واحدة. */
+export function uploadMediaRow(db: Db, postId: string, uploadId: string, u: UploadFacts): DbStatement {
+  return db
+    .prepare(
+      `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key,
+                          width, height, upload_id, duration_ms)
+       VALUES (?, ?, ?, ?, ?, '', 'upload', 0, 'ready', ?, ?, ?, ?, ?)`,
+    )
+    .bind(crypto.randomUUID(), postId, u.r2_key, u.mime, u.bytes, `upload:${uploadId}:${postId}`,
+      u.width, u.height, uploadId, u.duration_ms)
+}
+
 export type PostsResult =
   | { readonly ok: true; readonly created: readonly VideoPlatform[]; readonly skipped: readonly VideoPlatform[] }
   | { readonly ok: false; readonly reason: string }
@@ -293,32 +367,44 @@ export async function postsFromUpload(
   const allowed = wanted.filter((p) => checks.find((c) => c.platform === p)?.level !== 'block')
   if (allowed.length === 0) return { ok: false, reason: 'المقطعُ لا يوافق حدودَ ما اخترت — والسببُ تحت كلّ منصّة' }
 
+  const tooLong = allowed
+    .map((p) => ({ p, why: captionProblem(p, caption) }))
+    .filter((x): x is { p: VideoPlatform; why: string } => x.why !== null)
+  if (tooLong.length > 0) return { ok: false, reason: tooLong.map((x) => x.why).join('؛ ') }
+
+  const media = { r2_key: row.r2_key, mime: row.mime, bytes: row.bytes, width: row.width, height: row.height, duration_ms: row.duration_ms }
   const created: VideoPlatform[] = []
   const skipped: VideoPlatform[] = []
   for (const platform of allowed) {
-    const postId = crypto.randomUUID()
     const key = `upload:${row.id}:${platform}`
-    const exists = await db.prepare('SELECT id FROM posts WHERE idempotency_key = ?').bind(key).first()
-    if (exists !== null) {
+    const exists = await db
+      .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
+      .bind(key)
+      .first<{ id: string; status: string }>()
+    if (exists !== null && exists.status !== 'rejected') {
+      // ‏منشورٌ بلا مقطعه (كُتب قبل أن تصير الكتابةُ ذرّيّة): يُكمَّل ولا يُكرَّر
+      const has = await db.prepare('SELECT 1 AS x FROM media WHERE post_id = ? AND upload_id = ?').bind(exists.id, row.id).first()
+      if (has === null) await uploadMediaRow(db, exists.id, row.id, media).run()
       skipped.push(platform)
       continue
     }
-    await db
+    const postId = crypto.randomUUID()
+    const statements: DbStatement[] = []
+    if (exists !== null) {
+      // ‏رفضه المالكُ ليبدأ من جديد: المرفوضُ يبقى سجلًّا، ومفتاحُه يُحرَّر (كـ D-088)
+      statements.push(db
+        .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id WHERE id = ?`)
+        .bind(exists.id))
+    }
+    statements.push(db
       .prepare(
         `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, approved_by, approved_at)
          VALUES (?, ?, 'text', ?, ?, ?, 'owner', ?, ${input.approve ? "datetime('now')" : 'NULL'})`,
       )
-      .bind(postId, platform, caption, input.approve ? 'approved' : 'draft', key, input.approve ? input.by : null)
-      .run()
-    await db
-      .prepare(
-        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key,
-                            width, height, upload_id, duration_ms)
-         VALUES (?, ?, ?, ?, ?, '', 'upload', 0, 'ready', ?, ?, ?, ?, ?)`,
-      )
-      .bind(crypto.randomUUID(), postId, row.r2_key, row.mime, row.bytes, `upload:${row.id}:${postId}`,
-        row.width, row.height, row.id, row.duration_ms)
-      .run()
+      .bind(postId, platform, caption, input.approve ? 'approved' : 'draft', key, input.approve ? input.by : null))
+    // ‏المنشورُ ووسيطُه معًا أو لا شيء: خطأٌ بينهما كان يترك منشورًا بلا مقطعه ومفتاحُه محجوز
+    statements.push(uploadMediaRow(db, postId, row.id, media))
+    await atomically(db, statements)
     created.push(platform)
   }
   return { ok: true, created, skipped }

@@ -345,6 +345,16 @@ export async function generateForPost(
     return { kind: 'failed', reason: `حالتُه «${post.status}» — والصورةُ تُضاف قبل الجدولة`, retryable: false }
   }
 
+  // ‏**ومنشورُ مقطع المالك لا تُولَّد له صورة** (D-182): الصورةُ تصير أحدثَ وسيطه فتُنشر
+  // على Instagram مكانَ الـ Reel. واللوحةُ لا تعرض الزرَّ له، وهذا الحارسُ لمن نادى المسارَ بلا لوحة
+  const owned = await deps.db
+    .prepare("SELECT id FROM media WHERE post_id = ? AND model = 'upload' AND status = 'ready' LIMIT 1")
+    .bind(post.id)
+    .first<{ id: string }>()
+  if (owned !== null) {
+    return { kind: 'failed', reason: 'لهذا المنشور مقطعُك المرفوع — يُنشر هو، ولا تُولَّد له صورة', retryable: false }
+  }
+
   /*
    * ٢ · أوُلّدت لهذا النصّ؟
    *

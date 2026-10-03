@@ -3271,3 +3271,112 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     ])
   })
 })
+
+describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدوِل (D-181)', () => {
+  it('الملفُّ يُعاين صفًّا صفًّا، ولا يُجدوَل إلّا بالضغطة، والمعاينةُ تُستهلَك', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+    const cookie = await login()
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+    const csv = `date,time,platform,text\n${future},09:30,linkedin,"المعلمُ نقطةُ قرار"\n${future},10:00,tiktok,بلا حساب\n`
+    const body = new FormData()
+    body.set('file', new Blob([csv], { type: 'text/csv' }), 'plan.csv')
+    const read = await app.request('/panel/plan-import', withSession(cookie, { method: 'POST', body }), env)
+    expect(read.status).toBe(303)
+    const to = read.headers.get('Location')!
+    expect(to).toMatch(/^\/panel\/plan-import\/[0-9a-f-]{36}$/)
+
+    // ‏المعاينةُ لا تكتب شيئًا
+    const preview = await (await app.request(to, withSession(cookie), env)).text()
+    expect(preview).toContain('معاينةُ الخطّة')
+    expect(preview).toContain('لا حسابَ متّصلًا على TikTok')
+    expect(preview).toContain('اعتمد وجدوِل منشورًا واحدًا')
+    expect(preview).toContain('<input type="hidden" name="lines" value="2">')
+    expect(preview).toContain('<aside class="rail">')
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
+
+    // ‏نموذجٌ بلا سطورٍ معروضة (معاينةٌ قديمة) لا يُجدوِل شيئًا ويعيد إلى المعاينة
+    const stale = await app.request(`${to}/approve`, withSession(cookie, { method: 'POST', body: new FormData() }), env)
+    expect(stale.headers.get('Location')).toBe(to)
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
+
+    // ‏وسطرٌ لم يُعرَض جاهزًا (3: TikTok بلا حساب) لا يُجدوَل ولو أُضيف إلى النموذج
+    const approve = new FormData()
+    approve.set('lines', '2,3')
+    const done = await app.request(`${to}/approve`, withSession(cookie, { method: 'POST', body: approve }), env)
+    expect(done.status).toBe(303)
+    const rows = db.raw.prepare('SELECT platform, status, account_id FROM posts').all()
+    expect(rows).toEqual([{ platform: 'linkedin', status: 'queued', account_id: 'acc-li' }])
+
+    // ‏والمعاينةُ استُهلكت: الضغطةُ الثانيةُ لا تجد ما تعيده
+    expect((await app.request(to, withSession(cookie), env)).status).toBe(404)
+  })
+
+  it('ملفٌّ بغير UTF-8 (Windows-1256 من Excel) يُردّ باسم الصيغة التي تُصلحه ولا يُعايَن', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    // ‏«نص» بـ Windows-1256: ‏0xE4 0xD5 — بايتاتٌ لا تكون UTF-8 صالحة
+    body.set('file', new Blob([new Uint8Array([0x64, 0x61, 0x74, 0x65, 0x0a, 0xe4, 0xd5])], { type: 'text/csv' }), 'plan.csv')
+    const r = await app.request('/panel/plan-import', withSession(cookie, { method: 'POST', body }), env)
+    expect(r.status).toBe(303)
+    expect(r.headers.get('Location')).toBe('/panel#plan-import')
+    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(page).toContain('CSV UTF-8')
+  })
+
+  it('النموذجُ يُنزَّل CSV خلف الجلسة', async () => {
+    expect((await app.request('/panel/plan-import/template.csv', {}, env)).headers.get('Content-Type')).not.toContain('text/csv')
+    const cookie = await login()
+    const r = await app.request('/panel/plan-import/template.csv', withSession(cookie), env)
+    expect(r.headers.get('Content-Type')).toBe('text/csv; charset=utf-8')
+    expect(await r.text()).toContain('date,time,platform,text,video')
+  })
+})
+
+describe('الوسيطُ يُبثّ بمداه (D-182)', () => {
+  const BYTES = new Uint8Array(Array.from({ length: 100 }, (_, i) => i))
+  function rangedBucket() {
+    return {
+      async head() { return { size: BYTES.length } },
+      async get(_key: string, opts?: { range?: { offset?: number; length?: number; suffix?: number } }) {
+        const r = opts?.range
+        const start = r === undefined ? 0 : r.suffix !== undefined ? BYTES.length - r.suffix : r.offset ?? 0
+        const end = r === undefined || r.suffix !== undefined || r.length === undefined ? BYTES.length : start + r.length
+        return { size: BYTES.length, body: BYTES.slice(start, Math.min(end, BYTES.length)) }
+      },
+    }
+  }
+  async function seedVideo(): Promise<string> {
+    const postId = crypto.randomUUID()
+    await db.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'youtube', 'text', 'نصّ', 'draft', ?)`)
+      .bind(postId, `k-${postId}`).run()
+    const id = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key)
+       VALUES (?, ?, 'upload/u.mp4', 'video/mp4', 100, '', 'upload', 0, 'ready', ?)`,
+    ).bind(id, postId, `upload:u:${postId}`).run()
+    return id
+  }
+
+  it('بلا Range: ‏200 والكائنُ كلُّه. وبمدًى: ‏206 بحدوده. وخارجَه: ‏416 بحجمه', async () => {
+    env['MEDIA'] = rangedBucket()
+    const id = await seedVideo()
+    const cookie = await login()
+    const whole = await app.request(`/panel/media/${id}`, withSession(cookie), env)
+    expect(whole.status).toBe(200)
+    expect(whole.headers.get('Content-Length')).toBe('100')
+    expect(whole.headers.get('Accept-Ranges')).toBe('bytes')
+
+    const part = await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { Range: 'bytes=10-19' } }), env)
+    expect(part.status).toBe(206)
+    expect(part.headers.get('Content-Range')).toBe('bytes 10-19/100')
+    expect(part.headers.get('Content-Length')).toBe('10')
+    expect([...new Uint8Array(await part.arrayBuffer())]).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+
+    const tail = await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { Range: 'bytes=90-' } }), env)
+    expect(tail.headers.get('Content-Range')).toBe('bytes 90-99/100')
+
+    const out = await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { Range: 'bytes=500-' } }), env)
+    expect(out.status).toBe(416)
+    expect(out.headers.get('Content-Range')).toBe('bytes */100')
+  })
+})

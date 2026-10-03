@@ -36,10 +36,19 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var first=panes.length>0?panes[0].dataset.pane:null;
   function show(id,push,focus){
     if(first===null)return;
-    // ‏ومرساةُ بطاقةٍ «#d-…» تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى
-    // ‏البطاقة لا إلى رأس لوحٍ طولُه آلافُ البكسلات
-    var card=/^d-/.test(id)?document.getElementById(id):null;
+    // ‏ومرساةُ ما في اللوح تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى البطاقة
+    // ‏لا إلى رأس لوحٍ طولُه آلافُ البكسلات. وكانت «#d-…» وحدَها، فـ«#videos»
+    // ‏بعد الرفع و«#plan-import» من المعاينة و«#write» تُخفي الألواحَ كلَّها
+    // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
+    var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
+    var card=isPane?null:document.getElementById(id);
     var host=card?card.closest('section[data-pane]'):null;
+    if(card&&!host){
+      // ‏ومرساةٌ خارجَ الألواح («#main» من رابط التخطّي) لا تبدّل اللوحَ المفتوح:
+      // ‏المتصفّحُ ينزل إليها وحدَه. وعند التحميل لا مفتوحَ، فالأوّل
+      if(Array.prototype.some.call(panes,function(p){return !p.hidden;}))return;
+      card=null; id=first;
+    }
     if(host)id=host.dataset.pane;
     var found=false, pane=null;
     panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m){found=true; pane=p;}});
@@ -52,7 +61,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       }else{t.removeAttribute('aria-current');}
     });
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
-    if(card&&host){card.setAttribute('tabindex','-1'); card.scrollIntoView({block:'start'});
+    // ‏و«tabindex=-1» لما لا يُركَّز عليه وحدَه: حقلٌ أو زرٌّ يُعلَّم به يخرج من ترتيب Tab
+    if(card&&host){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.scrollIntoView({block:'start'});
       card.focus({preventScroll:true}); return;}
     if(focus&&pane){var hd=pane.querySelector('h1,h2');
       if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
@@ -74,6 +84,26 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   window.addEventListener('hashchange',function(){
     show((location.hash||'').slice(1)||first,false,true);
   });
+
+  /*
+   * ‏ومبدّلُ الثيم يُنقَل ولا يُنسَخ.
+   *
+   * ‏ذيلُ الرافدة يُخفى دون ‏٩٦٠px، فكان الهاتفُ واللوحيُّ بلا مبدّل. ونسخةٌ
+   * ‏ثانيةٌ في الوسم لا تعمل: سكربتُ الثيم يربط «#theme» الأوّلَ وحدَه. فالعنصرُ
+   * ‏نفسُه — بمستمعيه — ينزل إلى آخر المحتوى في الضيّق، ويعود إلى الذيل في العريض.
+   */
+  var theme=document.getElementById('theme');
+  var foot=theme&&theme.parentNode.classList.contains('rail-foot')?theme.parentNode:null;
+  var content=document.getElementById('main');
+  var narrow=window.matchMedia?window.matchMedia('(max-width:960px)'):null;
+  function seat(){
+    if(narrow.matches){if(theme.parentNode!==content)content.appendChild(theme);}
+    else if(theme.parentNode!==foot)foot.insertBefore(theme,foot.firstChild);
+  }
+  if(foot&&content&&narrow){
+    seat();
+    if(narrow.addEventListener)narrow.addEventListener('change',seat);
+  }
 
   // ‏وزرُّ النسخ (D-126) في u.js الذي تحمله كلُّ صفحة، لا هنا: نسختان في
   // ‏اللوحة تربطان بالزرّ مستمعَين، فيبقى «نُسخ ✓» عليه لا يعود (D-160)

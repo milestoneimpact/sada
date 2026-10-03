@@ -169,8 +169,20 @@ export async function publishYouTube(
   // هو الإذن، وهو موقَّتٌ ولا يُخزَّن.
   // **وقطعًا حين يكبر** (D-179): كلُّ قطعةٍ مضاعفٌ لـ ‏256KB، وما قبل الأخيرة
   // يُجاب بـ ‏308 «يُستأنَف» — و`redirect: 'manual'` يمنع fetch من قراءته تحويلًا
+  /*
+   * **ومن حيث حفظت Google لا من حيث أرسلنا** (D-182): ردُّ ‏308 يحمل `Range: bytes=0-N`
+   * — آخرَ بايتٍ حُفظ — وقد يكون أقلَّ ممّا أُرسل. «لا تفترض أنّ الخادمَ تسلّم كلَّ ما
+   * أُرسل» (وثيقةُ الرفع المستأنَف). وغيابُ الترويسة يعني أنّه لم يحفظ شيئًا.
+   * **وحدٌّ للدورات**: خادمٌ لا يتقدّم لا يُدار عليه بلا نهاية.
+   */
   let put: Response | null = null
-  for (let start = 0; start < size; start += YOUTUBE_CHUNK) {
+  let start = 0
+  let rounds = 0
+  const maxRounds = Math.ceil(size / YOUTUBE_CHUNK) * 3
+  while (start < size) {
+    if (++rounds > maxRounds) {
+      throw new PublishError('youtube: لم يتقدّم الرفعُ بعد دوراتٍ كثيرة — يُعاد لاحقًا', 503, true)
+    }
     const end = Math.min(size, start + YOUTUBE_CHUNK)
     const whole = start === 0 && end === size
     put = await fetchImpl(session, {
@@ -181,16 +193,15 @@ export async function publishYouTube(
         : { 'Content-Type': clip.mime, 'Content-Length': String(end - start), 'Content-Range': `bytes ${start}-${end - 1}/${size}` },
       body: (await clip.read(start, end - start)) as unknown as BodyInit,
     })
-    if (end < size) {
-      if (put.status === 308) continue
-      throw new PublishError(
-        `youtube: رُدّت القطعة (${await detail(put)})`,
-        put.status,
-        retryable(put.status),
-      )
-    }
+    if (put.status !== 308) break
+    const saved = /bytes=0-(\d+)/.exec(put.headers.get('Range') ?? '')
+    start = saved === null ? 0 : Number(saved[1]) + 1
   }
   if (put === null) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
+  if (put.status === 308) {
+    // ‏حفظت Google البايتاتِ كلَّها ولم تُغلق الجلسة: ليس رفضًا — يُعاد
+    throw new PublishError('youtube: اكتمل الرفعُ ولم يُغلَق — يُعاد', 503, true)
+  }
   if (!put.ok) {
     throw new PublishError(
       `youtube: رُدّ الرفع (${await detail(put)})`,

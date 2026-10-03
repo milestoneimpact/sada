@@ -24,6 +24,7 @@ import type { Db } from '../tokens'
 import { containsUrl } from '../idempotency'
 import { estimatePostCost } from '../cost'
 import { postLength } from './length'
+import { captionProblem, isVideoPlatform } from '../media/uploads'
 
 export type DraftStatus = 'draft' | 'approved' | 'edited' | 'rejected' | 'queued' | 'published' | 'failed'
 
@@ -199,17 +200,24 @@ export async function decide(
     return { ok: true, status: 'rejected' }
   }
 
-  const spec = PLATFORMS[row.platform === 'x' ? 'x' : 'linkedin']
   const text = decision.text.trim()
-  if (text.length < 40) return { ok: false, reason: 'النصّ أقصر من أن يكون منشورا' }
-  // الطولُ يُفحص هنا أيضا: المالك يلصق ما يشاء، ونصٌّ فوق الحدّ يُرفض عند
-  // النشر بعد أسابيع — فيُمسك عند الاعتماد لا عند الإرسال
-  // وبحساب المنصّة كذلك (D-071): المالكُ يلصق رابطا فيُردّ رفضا كاذبا
-  const counted = postLength(text, spec.id)
-  if (counted > spec.hardLimit) {
-    return {
-      ok: false,
-      reason: `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`,
+  // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
+  if (isVideoPlatform(row.platform)) {
+    const why = captionProblem(row.platform, text)
+    if (why !== null) return { ok: false, reason: why }
+  }
+  if (!isVideoPlatform(row.platform)) {
+    const spec = PLATFORMS[row.platform === 'x' ? 'x' : 'linkedin']
+    if (text.length < 40) return { ok: false, reason: 'النصّ أقصر من أن يكون منشورا' }
+    // الطولُ يُفحص هنا أيضا: المالك يلصق ما يشاء، ونصٌّ فوق الحدّ يُرفض عند
+    // النشر بعد أسابيع — فيُمسك عند الاعتماد لا عند الإرسال
+    // وبحساب المنصّة كذلك (D-071): المالكُ يلصق رابطا فيُردّ رفضا كاذبا
+    const counted = postLength(text, spec.id)
+    if (counted > spec.hardLimit) {
+      return {
+        ok: false,
+        reason: `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`,
+      }
     }
   }
 

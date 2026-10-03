@@ -2,9 +2,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  completeUpload, listUploads, MAX_UPLOAD_BYTES, PART_BYTES, postsFromUpload, startUpload, uploadPart, videoChecks,
-  type MultipartBucket,
+  captionProblem, completeUpload, expireStaleUploads, listUploads, MAX_UPLOAD_BYTES, PART_BYTES, postsFromUpload,
+  startUpload, uploadPart, videoChecks, type MultipartBucket,
 } from './uploads'
+import { decide } from '../draft/store'
 
 function multipart() {
   const objects = new Map<string, number>()
@@ -114,5 +115,57 @@ describe('منشوراتٌ من مقطع', () => {
     await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'نصّ', approve: false, by: 'o' })
     const row = db.raw.prepare("SELECT status, approved_at FROM posts WHERE platform = 'tiktok'").get() as { status: string; approved_at: string | null }
     expect(row).toEqual({ status: 'draft', approved_at: null })
+  })
+
+  it('المرفوضُ يُحرَّر مفتاحُه ويُنشأ من جديد، ولا يُعدّ «أُنشئ» في المكتبة (D-182)', async () => {
+    await ready()
+    await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
+    const first = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok'").get() as { id: string }
+    // ‏وصفٌ قصيرٌ سليم يُعتمَد: شرطُ «أربعين محرفًا» لمنشورٍ مكتوب لا لوصف مقطع
+    expect(await decide(db, first.id, { kind: 'reject' }, 'o')).toMatchObject({ ok: true })
+    expect((await listUploads(db))[0]!.platforms).toEqual([])
+    const again = await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
+    expect(again).toEqual({ ok: true, created: ['tiktok'], skipped: [] })
+    const second = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok' AND status = 'draft'").get() as { id: string }
+    expect(await decide(db, second.id, { kind: 'approve', text: 'ثلاث طبقات للحوكمة' }, 'o')).toEqual({ ok: true, status: 'approved' })
+  })
+
+  it('منشورٌ بلا مقطعه (كتابةٌ انقطعت) يُكمَّل بالضغطة الثانية ولا يُكرَّر', async () => {
+    await ready()
+    await db.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model) VALUES ('half', 'youtube', 'text', 'نصّ', 'draft', 'upload:u1:youtube', 'owner')`).run()
+    expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: false, by: 'o' }))
+      .toEqual({ ok: true, created: [], skipped: ['youtube'] })
+    expect(db.raw.prepare("SELECT upload_id FROM media WHERE post_id = 'half'").all()).toEqual([{ upload_id: 'u1' }])
+  })
+
+  it('المنشورُ ووسيطُه معًا أو لا شيء: وسيطٌ يُردّ لا يترك منشورًا يتيمًا', async () => {
+    await ready()
+    // ‏مفتاحُ الوسيط محجوزٌ مسبقًا — فيُردّ صفُّه، ومعه يُرجَع المنشور
+    db.raw.exec(`CREATE TRIGGER boom BEFORE INSERT ON media BEGIN SELECT RAISE(ABORT, 'boom'); END`)
+    await expect(postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).rejects.toThrow('boom')
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
+  })
+
+  it('نصٌّ فوق حدّ منصّةٍ يُردّ قبل أن يُكتب شيء — ووصفُ YouTube بالبايت وبلا «<>»', async () => {
+    expect(captionProblem('youtube', 'قبل -> بعد')).toContain('«<»')
+    expect(captionProblem('youtube', 'ع'.repeat(2600))).toContain('5200 بايتًا')
+    expect(captionProblem('tiktok', 'a'.repeat(2201))).toContain('TikTok تقبل 2200')
+    expect(captionProblem('instagram', 'وصفٌ قصير')).toBeNull()
+    await ready()
+    const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok'], caption: 'قبل -> بعد', approve: true, by: 'o' })
+    expect(out).toMatchObject({ ok: false })
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
+  })
+})
+
+describe('الرفعُ المتروك (D-182)', () => {
+  it('ما بقي «يُرفع» أكثرَ من ستّ ساعات يُلغى في R2 ويُعلَّم فاشلًا، والحديثُ يبقى', async () => {
+    const r2 = multipart()
+    await startUpload(db, r2.bucket, META, 'old')
+    await startUpload(db, r2.bucket, META, 'new')
+    db.raw.exec(`UPDATE uploads SET created_at = datetime('now', '-7 hours') WHERE id = 'old'`)
+    expect(await expireStaleUploads(db, r2.bucket, new Date())).toBe(1)
+    expect(r2.aborted).toEqual(['upload/old.mp4'])
+    expect((await listUploads(db)).map((u) => u.id)).toEqual(['new'])
   })
 })

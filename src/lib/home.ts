@@ -26,6 +26,12 @@ export interface PlatformCounts {
   readonly queued: number
   readonly published: number
   readonly failed: number
+  /**
+   * ما فشل منها **في السبعة الأيّام الأخيرة** — بوقت آخر محاولةٍ فاشلة. فهو وحدَه
+   * يُحمِّر الرئيسيّة: فشلٌ قديمٌ واحدٌ كان يُبقيها حمراءَ أبدًا فوق كلّ فعل،
+   * وسببُه وزرُّ إعادته في صفحة منصّته. وغيابُه (عيّنةٌ لا تعرفه) يعني «كلُّه حديث».
+   */
+  readonly recentFailed?: number
   /** أقربُ موعدٍ في الطابور، بصيغة القاعدة. */
   readonly nextAt: string | null
 }
@@ -38,7 +44,10 @@ export interface JourneyCounts {
 
 export const NO_COUNTS: JourneyCounts = { perPlatform: {}, publishedWeek: 0 }
 
-const EMPTY: PlatformCounts = { draft: 0, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null }
+const EMPTY: PlatformCounts = { draft: 0, approved: 0, queued: 0, published: 0, failed: 0, recentFailed: 0, nextAt: null }
+
+/** نافذةُ «الحديث»: ما نُشر هذا الأسبوع، وما فشل فيه. */
+const WEEK_MS = 7 * 86_400_000
 
 /**
  * استعلامان مجمَّعان — **ولا تُسحَب الصفوف**.
@@ -48,13 +57,24 @@ const EMPTY: PlatformCounts = { draft: 0, approved: 0, queued: 0, published: 0, 
  */
 export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
   try {
+    const since = new Date(now.getTime() - WEEK_MS).toISOString().slice(0, 19).replace('T', ' ')
+    /*
+     * ‏ووقتُ الفشل من آخر محاولةٍ فاشلة — فلا عمودَ «updated_at» في `posts`، وطريقا
+     * الفشل في الناشر كلاهما يكتب محاولته قبل الحال. ومنشورٌ فاشلٌ بلا محاولةٍ
+     * (صفٌّ قديم) يُؤرَّخ بموعده ثمّ بإنشائه — فلا يُحسَب حديثًا إلى الأبد
+     */
     const { results } = await db
       .prepare(
         `SELECT platform, status, COUNT(*) AS n,
-                MIN(CASE WHEN status = 'queued' THEN scheduled_at END) AS next_at
+                MIN(CASE WHEN status = 'queued' THEN scheduled_at END) AS next_at,
+                SUM(CASE WHEN status = 'failed' AND coalesce(
+                      (SELECT MAX(pa.at) FROM publish_attempts pa
+                        WHERE pa.post_id = posts.id AND pa.status = 'failed'),
+                      scheduled_at, created_at) >= ? THEN 1 ELSE 0 END) AS recent
            FROM posts GROUP BY platform, status`,
       )
-      .all<{ platform: string; status: string; n: number; next_at: string | null }>()
+      .bind(since)
+      .all<{ platform: string; status: string; n: number; next_at: string | null; recent: number | null }>()
     const perPlatform: Record<string, PlatformCounts> = {}
     for (const row of results) {
       const base = perPlatform[row.platform] ?? EMPTY
@@ -63,10 +83,10 @@ export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
       perPlatform[row.platform] = {
         ...base,
         [key]: base[key] + row.n,
+        recentFailed: (base.recentFailed ?? 0) + (key === 'failed' ? row.recent ?? 0 : 0),
         nextAt: key === 'queued' ? row.next_at : base.nextAt,
       }
     }
-    const since = new Date(now.getTime() - 7 * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
     const week = await db
       .prepare(`SELECT COUNT(DISTINCT post_id) AS n FROM publish_attempts WHERE status = 'succeeded' AND at >= ?`)
       .bind(since)
@@ -78,8 +98,27 @@ export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
 }
 
 /** مجموعُ حالٍ على المنصّات كلّها. */
-export function total(counts: JourneyCounts, key: Exclude<keyof PlatformCounts, 'nextAt'>): number {
+export function total(counts: JourneyCounts, key: Exclude<keyof PlatformCounts, 'nextAt' | 'recentFailed'>): number {
   return Object.values(counts.perPlatform).reduce((n, p) => n + p[key], 0)
+}
+
+/** فشلُ الأسبوع لمنصّة — وما لم يُعدّ بوقته يُعدّ حديثًا كلُّه. */
+function recentFailures(p: PlatformCounts): number {
+  return p.recentFailed ?? p.failed
+}
+
+/** فشلُ الأسبوع على المنصّات كلّها. */
+function sumRecent(counts: JourneyCounts): number {
+  return Object.values(counts.perPlatform).reduce((n, p) => n + recentFailures(p), 0)
+}
+
+/** أوّلُ منصّةٍ فيها فشلٌ حديث، وعددُه — ومنها الأحمرُ في الرئيسيّة كلِّها. */
+function recentFailure(counts: JourneyCounts): { platform: string; n: number } | null {
+  for (const [platform, p] of Object.entries(counts.perPlatform)) {
+    const n = recentFailures(p)
+    if (n > 0) return { platform, n }
+  }
+  return null
 }
 
 /** أقربُ موعدٍ على المنصّات كلّها، ومنصّتُه. */
@@ -129,14 +168,20 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
   const failed = total(c, 'failed')
   const pending = f.sources.total - f.sources.analyzed
   const next = nextScheduled(c)
+  const written = drafts + approved + queued + published + failed
 
+  /*
+   * ‏و«لا مصدر» لا تنتظرك حين في الرحلة منشورات: المقطعُ المرفوع والخطّةُ من ملفٍّ
+   * يكتبان بلا Drive (D-180، D-181)، فمحطّةٌ «تنتظرك» قبلها تخطف التركيزَ ممّا ينتظر فعلًا
+   */
   const source: JourneyStep = f.sources.total === 0
-    ? { key: 'source', title: 'المصدر', state: 'now', note: 'لا ملفّ بعد — امسح مجلّد Drive', href: '#sources' }
+    ? written > 0
+      ? { key: 'source', title: 'المصدر', state: 'done', note: 'لا ملفّ في Drive — وهو اختياريّ', href: '#sources' }
+      : { key: 'source', title: 'المصدر', state: 'now', note: 'لا ملفّ بعد — امسح مجلّد Drive', href: '#sources' }
     : pending > 0
       ? { key: 'source', title: 'المصدر', state: 'now', note: `ينتظر التحليلَ ${counted(pending, NOUNS.source)}`, href: '#sources' }
       : { key: 'source', title: 'المصدر', state: 'done', note: `حُلّل ${counted(f.sources.analyzed, NOUNS.source)}`, href: '#sources' }
 
-  const written = drafts + approved + queued + published + failed
   const draft: JourneyStep = written > 0
     ? { key: 'draft', title: 'المسوّدة', state: 'done', note: `كُتبت ${counted(written, NOUNS.draft)}`, href: '#posts' }
     : f.sources.analyzed > 0
@@ -149,30 +194,44 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
       ? { key: 'image', title: 'الصورة', state: 'done', note: `رُسمت ${counted(f.withImage, NOUNS.image)}`, href: '#posts' }
       : { key: 'image', title: 'الصورة', state: 'waiting', note: 'إنفوجرافيك من نصّ المنشور', href: '#posts' }
 
+  // ‏والفاشلُ مرّ بالاعتماد والموعد قبل أن يسقط: القيدُ في القاعدة لا يُدخل الطابورَ بلا اعتماد
   const approve: JourneyStep = drafts > 0
     ? { key: 'approve', title: 'الاعتماد', state: 'now', note: `تنتظر قرارك ${counted(drafts, NOUNS.draft)}`, href: '#posts' }
-    : approved + queued + published > 0
+    : approved + queued + published + failed > 0
       ? { key: 'approve', title: 'الاعتماد', state: 'done', note: 'لا شيءَ ينتظر قرارك', href: '#posts' }
       : { key: 'approve', title: 'الاعتماد', state: 'waiting', note: 'لا يُنشر شيءٌ قبل اعتمادك', href: '#posts' }
 
+  // ‏و«تامّةٌ» بما جُدول ولو نُشر كلُّه: طابورٌ فارغٌ بعد النشر ليس «بعد الاعتماد»
   const schedule: JourneyStep = approved > 0
     ? { key: 'schedule', title: 'الموعد', state: 'now', note: `بلا موعد: ${counted(approved, NOUNS.post)}`, href: '#posts' }
     : queued > 0
       ? { key: 'schedule', title: 'الموعد', state: 'done', note: `جُدول ${counted(queued, NOUNS.post)}`, href: '#posts' }
-      : { key: 'schedule', title: 'الموعد', state: 'waiting', note: 'بعد الاعتماد', href: '#posts' }
+      : published + failed > 0
+        ? { key: 'schedule', title: 'الموعد', state: 'done', note: 'لا موعدَ قادم — مضى ما جُدول', href: '#posts' }
+        : { key: 'schedule', title: 'الموعد', state: 'waiting', note: 'بعد الاعتماد', href: '#posts' }
 
-  const failedPlatform = Object.entries(c.perPlatform).find(([, p]) => p.failed > 0)?.[0]
-  const publish: JourneyStep = failed > 0
+  // ‏والسقوطُ بفشل الأسبوع وحده — كما في «خطوتك التالية»، فلا تقول المحطّةُ غيرَ ما يقوله الفعل
+  const recent = recentFailure(c)
+  const publish: JourneyStep = recent !== null
     ? {
         key: 'publish', title: 'النشر', state: 'failed',
-        note: `فشل ${counted(failed, NOUNS.post)} — والسببُ في صفحة المنصّة`,
-        href: `/panel/channels/${failedPlatform ?? ''}`,
+        note: `فشل ${counted(sumRecent(c), NOUNS.post)} — والسببُ في صفحة المنصّة`,
+        href: `/panel/channels/${recent.platform}`,
       }
     : c.publishedWeek > 0
       ? { key: 'publish', title: 'النشر', state: 'done', note: `نُشر هذا الأسبوع ${counted(c.publishedWeek, NOUNS.post)}`, href: '#channels' }
       : next !== null
         ? { key: 'publish', title: 'النشر', state: 'waiting', note: 'التالي في موعده', href: `/panel/channels/${next.platform}` }
-        : { key: 'publish', title: 'النشر', state: published > 0 ? 'done' : 'waiting', note: published > 0 ? `نُشر ${counted(published, NOUNS.post)}` : 'في موعده بعد الجدولة', href: '#channels' }
+        : published > 0
+          ? { key: 'publish', title: 'النشر', state: 'done', note: `نُشر ${counted(published, NOUNS.post)}`, href: '#channels' }
+          : failed > 0
+            // ‏والقديمُ يُذكَر ولا يُسقِط: «في موعده بعد الجدولة» عن منشورٍ جُدول وسقط كذب
+            ? {
+                key: 'publish', title: 'النشر', state: 'waiting',
+                note: `فشل ${counted(failed, NOUNS.post)} قبل أسبوعٍ فأكثر`,
+                href: `/panel/channels/${Object.entries(c.perPlatform).find(([, p]) => p.failed > 0)?.[0] ?? ''}`,
+              }
+            : { key: 'publish', title: 'النشر', state: 'waiting', note: 'في موعده بعد الجدولة', href: '#channels' }
 
   const results: JourneyStep = f.openSuggestions > 0
     ? { key: 'results', title: 'النتائج', state: 'now', note: `تنتظر قرارك ${counted(f.openSuggestions, NOUNS.suggestion)}`, href: '/panel/report' }
@@ -213,22 +272,26 @@ export function nextAction(f: HomeFacts): NextAction {
   if (f.paused) {
     return { tone: 'warn', text: 'النظامُ موقوفٌ بقرارك — لا مسحَ ولا تحليلَ ولا نشر.', label: 'استأنف من الإعدادات', href: '#settings' }
   }
-  const failedEntry = Object.entries(f.counts.perPlatform).find(([, p]) => p.failed > 0)
-  if (failedEntry !== undefined) {
-    const label = f.channels.find((c) => c.spec.id === failedEntry[0])?.spec.label ?? failedEntry[0]
+  // ‏وفشلُ الأسبوع وحده: القديمُ يبقى بسببه وزرِّ إعادته في صفحة منصّته، ولا يحجب كلَّ فعلٍ بعده
+  const failure = recentFailure(f.counts)
+  if (failure !== null) {
+    const label = f.channels.find((c) => c.spec.id === failure.platform)?.spec.label ?? failure.platform
     return {
-      tone: 'bad', text: `فشل على ${label} ${counted(failedEntry[1].failed, NOUNS.post)} — والسببُ وزرُّ الإعادة في صفحتها.`,
-      label: `افتح ${label}`, href: `/panel/channels/${failedEntry[0]}`,
+      tone: 'bad', text: `فشل على ${label} ${counted(failure.n, NOUNS.post)} — والسببُ وزرُّ الإعادة في صفحتها.`,
+      label: `افتح ${label}`, href: `/panel/channels/${failure.platform}`,
     }
   }
   const linked = f.channels.some((c) => c.state === 'linked')
   if (!linked) {
     return { tone: 'warn', text: 'لا منصّةَ متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.', label: 'اربط أوّلَ منصّة', href: '#channels' }
   }
-  if (f.sources.total === 0) {
+  const drafts = total(f.counts, 'draft')
+  const approved = total(f.counts, 'approved')
+  // ‏و«لا مصدر» حين لا شيءَ أصلًا: المقطعُ والخطّةُ من ملفٍّ يكتبان بلا Drive (D-180، D-181)
+  const written = drafts + approved + total(f.counts, 'queued') + total(f.counts, 'published') + total(f.counts, 'failed')
+  if (f.sources.total === 0 && written === 0) {
     return { tone: 'warn', text: 'لا مصدرَ بعد — ضع ملفًّا في مجلّد Drive المشترَك ثمّ امسحه.', label: 'اذهب إلى المصادر', href: '#sources' }
   }
-  const drafts = total(f.counts, 'draft')
   const pending = f.sources.total - f.sources.analyzed
   if (drafts === 0 && f.sources.analyzed === 0 && pending > 0) {
     return { tone: 'ok', text: `ينتظر التحليلَ ${counted(pending, NOUNS.source)} — ومنه تُكتب المسوّدات.`, label: 'حلّل مصدرًا', href: '#sources' }
@@ -236,7 +299,6 @@ export function nextAction(f: HomeFacts): NextAction {
   if (drafts > 0) {
     return { tone: 'ok', text: `تنتظر قرارك ${counted(drafts, NOUNS.draft)} — ولا يُنشر شيءٌ قبله.`, label: 'راجع المسوّدات', href: '#posts' }
   }
-  const approved = total(f.counts, 'approved')
   if (approved > 0) {
     return { tone: 'ok', text: `معتمَدٌ بلا موعد: ${counted(approved, NOUNS.post)}.`, label: 'حدّد المواعيد', href: '#posts' }
   }
@@ -244,6 +306,10 @@ export function nextAction(f: HomeFacts): NextAction {
   if (next !== null) {
     const label = f.channels.find((c) => c.spec.id === next.platform)?.spec.label ?? next.platform
     return { tone: 'ok', text: `كلُّ شيءٍ على المسار — والتالي على ${label}.`, label: `افتح ${label}`, href: `/panel/channels/${next.platform}` }
+  }
+  // ‏و«اكتب من مصدر» وعدٌ لا يُوفى بلا مصدر: فالدورةُ الجديدةُ من مقطعٍ يُرفَع
+  if (f.sources.total === 0) {
+    return { tone: 'ok', text: 'لا شيءَ ينتظرك — ارفع مقطعًا أو استورد خطّةً لتبدأ دورةً جديدة.', label: 'ارفع مقطعًا', href: '#videos' }
   }
   return { tone: 'ok', text: 'لا شيءَ ينتظرك — اكتب من مصدرٍ محلَّلٍ لتبدأ دورةً جديدة.', label: 'اكتب من مصدر', href: '#posts' }
 }

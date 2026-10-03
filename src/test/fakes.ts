@@ -54,7 +54,21 @@ export function fakeDb(): FakeDb {
     return statement
   }
 
-  return { prepare, raw: db }
+  /** كـ `batch` في D1: معاملةٌ واحدة، وخطأٌ في أيّ صفٍّ يُرجِع الكلّ. */
+  const batch = async (statements: DbStatement[]): Promise<unknown[]> => {
+    db.exec('BEGIN')
+    try {
+      const out: unknown[] = []
+      for (const statement of statements) out.push(await statement.run())
+      db.exec('COMMIT')
+      return out
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  return { prepare, batch, raw: db }
 }
 
 /** KV في الذاكرة، مع دعم انتهاء الصلاحية بساعة يتحكم بها الاختبار. */
