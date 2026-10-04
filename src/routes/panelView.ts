@@ -29,7 +29,7 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
-import { alertChannel, bar, glyph, machineCard, pageHead, pct, type OutboxRow, status as chip } from './ui/parts'
+import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow, status as chip } from './ui/parts'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import { ICON } from './ui/icons'
@@ -116,7 +116,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
     state.error === undefined
       ? ''
       : `<div class="flash ${state.blocked === true ? 'bad' : 'warn'}" role="alert">
-           <span class="ic">${state.blocked === true ? '✕' : '!'}</span>
+           <span class="ic">${glyph(state.blocked === true ? '✕' : '!')}</span>
            <span>${escapeHtml(state.error)}</span></div>`
   const disabled = state.blocked === true ? ' disabled' : ''
   return shell(
@@ -430,7 +430,7 @@ function sourceRow(s: PanelSource, now: Date): string {
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${escapeHtml(s.name)}</div>
+    <td><div class="nm">${fileName(s.name)}</div>
         <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
@@ -558,12 +558,13 @@ function deltaOf(series: readonly { day: string; total: number }[]): string {
   const today = series[series.length - 1]!.total
   const yesterday = series[series.length - 2]!.total
   if (yesterday === 0 && today === 0) return '<div class="delta">كأمس تماما</div>'
-  // ‏والسهمُ مرسومٌ من parts لا حرفٌ من خطّ النظام (D-167) — و«▼» لم يكن في جدوله
-  if (yesterday === 0) return `<div class="delta up"><span class="ar">${glyph('▲')}</span>بدأ اليوم</div>`
+  // ‏والسهمُ مرسومٌ من parts لا حرفٌ من خطّ النظام (D-167)، **وسهمٌ لا مثلّث** (D-185):
+  // ‏«▲» في جدول الحال يعني «ساقط»، فكان الصاعدُ هنا يُرسَم مثلّثَ تنبيه
+  if (yesterday === 0) return `<div class="delta up"><span class="ar">${glyph('↑')}</span>بدأ اليوم</div>`
   const change = ((today - yesterday) / yesterday) * 100
   if (Math.abs(change) < 1) return '<div class="delta">كأمس تقريبا</div>'
   const up = change > 0
-  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${glyph(up ? '▲' : '▼')}</span>${
+  return `<div class="delta ${up ? 'up' : 'down'}"><span class="ar">${glyph(up ? '↑' : '↓')}</span>${
     Math.abs(change).toFixed(0)}٪ ${up ? 'أكثر' : 'أقلّ'} من أمس</div>`
 }
 
@@ -605,7 +606,7 @@ export function panelPage(d: PanelData): string {
    */
   const expiring = d.expiring.length === 0 ? '' : `<div class="flash ${
     d.expiring.some((e) => e.kind === 'refresh') ? 'bad' : 'warn'
-  }" role="alert"><span class="ic">!</span><span>${
+  }" role="alert"><span class="ic">${glyph('!')}</span><span>${
     d.expiring
       .slice(0, 3)
       .map((e) => {
@@ -615,11 +616,13 @@ export function panelPage(d: PanelData): string {
           : e.daysLeft === 0
             ? '<b>ينتهي اليوم</b>'
             : `يبقى <b>${counted(e.daysLeft, NOUNS.day)}</b>`
+        // ‏والثخينُ للأرقام والأسماء وحدها (خطّة التصميم 4.4/5) — لا لجملةٍ وسط الشرح
         const why = e.kind === 'refresh'
-          ? ' — <b>ويوجب سقوطُه دورةَ إذنٍ بيدك</b>'
+          ? ' — ويوجب سقوطُه دورةَ إذنٍ بيدك'
           : ''
-        return `${what} لـ<b>${escapeHtml(e.displayName)}</b>
-                (${escapeHtml(platformLabel(e.platform))}): ${when}${why}`
+        // ‏والحسابُ معزول (4.4/6): «لـ@omar_ah (X)» كانت تُرسَم «(X)@omar_ah»
+        return `${what} لـ<b><bdi>${escapeHtml(e.displayName)}</bdi></b>
+                (<bdi>${escapeHtml(platformLabel(e.platform))}</bdi>): ${when}${why}`
       })
       .join(' · ')
   }${
@@ -630,8 +633,8 @@ export function panelPage(d: PanelData): string {
     d.flash === null
       ? ''
       : `<div class="flash ${d.flash.kind}">
-           <span class="ic">${d.flash.kind === 'ok' ? '✓' : d.flash.kind === 'warn' ? '!' : '✕'}</span>
-           <span>${escapeHtml(d.flash.text)}</span>
+           <span class="ic">${glyph(d.flash.kind === 'ok' ? '✓' : d.flash.kind === 'warn' ? '!' : '✕')}</span>
+           <span>${pathArrows(escapeHtml(d.flash.text))}</span>
            ${
              d.flash.undo === undefined
                ? ''

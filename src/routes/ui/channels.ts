@@ -24,7 +24,7 @@ import { ICON } from './icons'
 import { escapeHtml } from './escape'
 import { LOGOS } from './logos'
 import { counted, NOUNS, relativeTime } from '../../lib/format'
-import { status } from './parts'
+import { glyph, pathArrows, status } from './parts'
 
 const KIND: Readonly<Record<string, string>> = {
   member: 'حسابٌ شخصيّ',
@@ -165,14 +165,14 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   const steps = guide.before
     .map(
       (b, i) => `<li><span class="n">${i + 1}</span>
-        <span class="body"><span class="what">${b.what}</span>
-        <span class="why">${b.why}</span></span></li>`,
+        <span class="body"><span class="what">${pathArrows(b.what)}</span>
+        <span class="why">${pathArrows(b.why)}</span></span></li>`,
     )
     .join('')
 
   const saved =
     app.source === 'vault'
-      ? `<div class="help"><span class="i">✓</span><span class="t">
+      ? `<div class="help"><span class="i">${glyph('✓')}</span><span class="t">
          <b>محفوظ.</b> المعرّف <span class="mono">${escapeHtml(app.clientId ?? '')}</span> ·
          السرّ <span class="mono">${escapeHtml(app.hint ?? '')}</span>
          ${app.updatedBy === null ? '' : `· بدّله ${escapeHtml(app.updatedBy)}`}</span></div>`
@@ -198,7 +198,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
 
       <div class="field cb">
         <label for="cb-${id}">رابطُ العودة</label>
-        <div class="help"><span class="i">!</span><span class="t">${guide.gotcha}</span></div>
+        <div class="help"><span class="i">!</span><span class="t">${pathArrows(guide.gotcha)}</span></div>
         <div class="copy">
           <input id="cb-${id}" class="mono" dir="ltr" value="${escapeHtml(callback)}" readonly
             aria-label="رابط العودة — للنسخ">
@@ -211,7 +211,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         <div class="field">
           <label for="ci-${id}">Client ID</label>
           <div class="help" id="ci-${id}-h"><span class="i">؟</span>
-            <span class="t">${guide.whereId}</span></div>
+            <span class="t">${pathArrows(guide.whereId)}</span></div>
           <input id="ci-${id}" name="client_id" dir="ltr" required aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
           ${/*
@@ -233,7 +233,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         <div class="field">
           <label for="cs-${id}">Client Secret</label>
           <div class="help" id="cs-${id}-h"><span class="i">؟</span>
-            <span class="t">${guide.whereSecret}</span></div>
+            <span class="t">${pathArrows(guide.whereSecret)}</span></div>
           <input id="cs-${id}" name="client_secret" type="password" dir="ltr" required
             aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
@@ -268,9 +268,9 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
       </form>
 
       <div class="outcome"><span class="k">إن نجح</span>
-        <span class="v">${guide.success}</span></div>
+        <span class="v">${pathArrows(guide.success)}</span></div>
       <div class="outcome warn"><span class="k">إن فشل</span>
-        <span class="v">${guide.failure}</span></div>
+        <span class="v">${pathArrows(guide.failure)}</span></div>
     </div>
   </details>`
 }
@@ -299,7 +299,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   const rows = accounts
     .map(
       (a) => `<div class="ch-acc">
-        <span class="who">${escapeHtml(a.displayName)}</span>
+        <span class="who"><bdi>${escapeHtml(a.displayName)}</bdi></span>
         <span class="chip">${escapeHtml(KIND[a.kind] ?? a.kind)}</span>
         ${a.status === 'needs_reauth'
           ? ''
@@ -321,7 +321,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   // يعرف مالكُها ذلك **قبل** أن يربط، لا بعد أوّل جدولةٍ تُردّ
   const stageNote =
     spec.stage === 'link'
-      ? `<div class="why warn"><span class="i">◍</span><span class="t">
+      ? `<div class="why warn"><span class="i">${glyph('◍')}</span><span class="t">
          <b>تُربَط ولا تنشر بعد.</b> دورةُ الإذن مبنيّةٌ لها، وسائقُ الرفع لم يُبنَ —
          فيُحفَظ الحساب وتُقرأ نطاقاتُه، <b>ولا تُكتب لها مسوّدة</b>.</span></div>`
       : ''
@@ -360,7 +360,11 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
              */
             ? `<a class="btn p sm" href="/panel/channels/${escapeHtml(spec.id)}"
                   aria-label="اضبط سرّي ${escapeHtml(spec.label)}">اضبط سرّيه</a>`
-            : status('idle', '○', 'يحتاج سائقا يُكتب له')
+            /*
+             * ‏**جملةٌ لا شارة** (D-185): الحالُ «لم تُبنَ» في رأس البطاقة، وهذا سببُها.
+             * ‏وكانت شارةً ثانيةً بالحال نفسِه — والشارةُ لصيقةٌ ‏١٣px «لا جُمَل» (خطّة التصميم 4.3)
+             */
+            : '<span class="ago">يحتاج سائقا يُكتب له</span>'
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
   // والشاشةُ تقول ماذا نُشر وما فشل ولماذا — وهما سؤالان لا واحد

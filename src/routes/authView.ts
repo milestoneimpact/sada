@@ -8,6 +8,7 @@
  */
 import { escapeHtml, shell } from './panelView'
 import { GLYPH_SVG } from './ui/shell'
+import { glyph } from './ui/parts'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 
 export interface SecondFactorData {
@@ -70,7 +71,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
   const note =
     d.error === null
       ? ''
-      : `<div class="flash bad" role="alert"><span class="ic">✕</span>
+      : `<div class="flash bad" role="alert"><span class="ic">${glyph('✕')}</span>
          <span>${escapeHtml(d.error)}</span></div>`
 
   const passkey = !d.hasPasskey
@@ -111,7 +112,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
   const nothing =
     d.hasPasskey || d.hasTotp
       ? ''
-      : `<div class="flash warn"><span class="ic">!</span>
+      : `<div class="flash warn"><span class="ic">${glyph('!')}</span>
          <span>لا عاملَ ثانٍ مضبوطا — وهذا لا ينبغي أن يقع.
                أعد الدخول، وإن تكرّر فبدّل <span class="mono">ADMIN_TOKEN</span>.</span></div>`
 

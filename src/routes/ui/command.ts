@@ -104,6 +104,13 @@ export interface Section {
    */
   readonly short?: string
   /**
+   * اسمُ الشريط حين يضيق دون ‏360px (D-185 · خطّة التصميم 5.3).
+   *
+   * ستُّ خاناتٍ في ‏٣٢٠px تعطي كلًّا ‏٤٨px، و«المنشورات» بحرف Plex ‏١٣/٦٠٠ ‏٥٤px — فتُقصّ
+   * بنقاط. **والقصُّ لا يُقرأ**، والخطّةُ قضت: «منشورات» بلا «ال» هناك وحده.
+   */
+  readonly tight?: string
+  /**
    * أفي شريط الجوّال؟ (D-107)
    *
    * خمسةٌ لا تسع: شريطٌ بتسعةٍ في ‏٣٩٠px يعطي ‏٤٣px لكلٍّ — **دون هدف
@@ -125,7 +132,7 @@ export interface Section {
 export const SECTIONS: readonly Section[] = [
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، والرحلة، والمنصّات', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
   { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
-  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true },
+  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true, tight: 'منشورات' },
   { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ أذوناتها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
   { id: 'pivot', label: 'الجدول المحوريّ', note: 'تختار الصفوفَ والأعمدةَ والقياس — وتقارن بنظرة', icon: ICON.pivot, group: 'العمل', alias: 'pivot table analysis لوح محوري جدول تحليل مقارنه', short: 'اللوح' },
   { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', bar: true, page: '/panel/report' },
@@ -253,7 +260,7 @@ export function searchKey(c: Command): string {
 export function commandTrigger(): string {
   return `<button type="button" class="cmdk-open" hidden
     aria-haspopup="dialog" aria-controls="cmdk">
-    ${ICON.search}<span>بحثٌ وأوامر</span><kbd class="kbd">${ICON.command}K</kbd></button>`
+    ${ICON.search}<span>بحثٌ وأوامر</span><kbd class="kbd">Ctrl K</kbd></button>`
 }
 
 /**

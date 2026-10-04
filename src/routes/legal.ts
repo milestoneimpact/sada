@@ -24,6 +24,7 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { publicPageHeaders } from '../lib/security/headers'
 import { escapeHtml, shell, GLYPH_SVG } from './ui/shell'
+import { pathArrows } from './ui/parts'
 
 export const legal = new Hono<{ Bindings: Env }>()
 
@@ -170,8 +171,8 @@ function policyBody(env: Env, base: string): string {
   ${section('٦ · حقّك في الحذف', `<p>يفصل المشغّل أيَّ حساب من لوحة صدى، فتُحذف رموزُه من
     القاعدة. ويمكنك أنت — بوصفك صاحبَ الحساب — سحبُ إذن التطبيق متى شئت من إعدادات المنصّة:</p>
     <ul>
-      <li>LinkedIn: <span class="mono">Settings → Data privacy → Permitted services</span></li>
-      <li>X: <span class="mono">Settings → Security and account access → Apps and sessions</span></li>
+      <li>LinkedIn: <span class="mono">${pathArrows('Settings → Data privacy → Permitted services')}</span></li>
+      <li>X: <span class="mono">${pathArrows('Settings → Security and account access → Apps and sessions')}</span></li>
     </ul>
     <p>وسحبُ الإذن يُبطل الرموز فورا عند المنصّة، ويوقف كلَّ نشرٍ لاحق.</p>`)}
 
@@ -217,7 +218,7 @@ function termsBody(env: Env, base: string): string {
 /** `nonce` جديدٌ لكلّ ردّ — كما في اللوحة سواء. */
 function render(body: string, title: string, description: string): Response {
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
-  return new Response(shell(title, body, nonce, '', { indexable: true, description, noDisplayFace: true }), {
+  return new Response(shell(title, body, nonce, '', { indexable: true, description }), {
     headers: publicPageHeaders(nonce),
   })
 }

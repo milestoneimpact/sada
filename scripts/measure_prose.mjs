@@ -54,12 +54,11 @@ for (const file of files) {
            * `API` ومساران في لوحة مزوّد**: طولُها يلفّها سطرين، وليست
            * كلاما. **ولو صُدِّق لاختُصر عنوانٌ لا يجوز اختصارُه.**
            *
-           * والفرقُ **يقوله المتصفّح لا أنا**: هذه الشيفرةُ تسم نصَّ
-           * الآلة بخطٍّ ثابت العرض قصدا، **فـ`font-family` المحسوبةُ
-           * تفصلهما** — ولا قائمةَ أصنافٍ تشيخ.
+           * والفرقُ **يقوله الوسمُ لا أنا**: نصُّ الآلة في شارةٍ معزولةٍ لاتينيّةِ
+           * الاتّجاه (`.mono` و`code` و`kbd`). وكان الخطُّ الثابتُ العرض يفصله،
+           * **فلمّا خرج من الواجهة** (D-185) بقيت الشارةُ علامتَه.
            */
-          const font = getComputedStyle(el).fontFamily
-          if (/\bmonospace\b|ui-monospace|SFMono/i.test(font)) continue
+          if (el.closest('.mono, code, kbd') !== null) continue
           range.selectNodeContents(n)
           const boxes = [...range.getClientRects()].filter((r) => r.height > 0)
           if (boxes.length === 0) continue
@@ -166,7 +165,46 @@ for (const file of files) {
     return out
   })
 
+  /*
+   * **طولُ السطر الكامل** (خطّة التصميم 4.4/3 · D-185) — يُقرأ ولا يحرس (D-113).
+   *
+   * «--measure» ‏30em، وهدفُه ‏60 إلى ‏75 حرفًا في السطر عند ‏1440. **والبوّابةُ بنيويّةٌ
+   * في `audit_scale`** (حدُّ العرض)، وهذا يقول ما يقع فعلًا: يقسم المتصفّحُ كلَّ فقرةٍ
+   * أو بندٍ يلتفّ سطرين حرفًا حرفًا إلى أسطره، ويُسقط السطرَ الأخير (ناقصٌ بطبعه).
+   */
+  const lineLength = await page.evaluate(() => {
+    const counts = []
+    for (const s of document.querySelectorAll('section[data-pane]')) s.hidden = false
+    const range = document.createRange()
+    for (const el of document.querySelectorAll('p, li')) {
+      if (el.closest('nav, .rail') !== null || el.getBoundingClientRect().height === 0) continue
+      const lines = new Map()
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+        if (n.parentElement?.closest('.mono, code, kbd') != null) continue
+        for (let i = 0; i < n.textContent.length; i += 1) {
+          range.setStart(n, i); range.setEnd(n, i + 1)
+          // ‏والمسافةُ حرفٌ كما يعدّها Bringhurst، ما دامت تُرسَم (المطويُّ لا صندوقَ له)
+          const r = range.getClientRects()[0]
+          if (r === undefined || r.width === 0) continue
+          const key = Math.round(r.top / 4)
+          lines.set(key, (lines.get(key) ?? 0) + 1)
+        }
+      }
+      if (lines.size < 2) continue
+      const ordered = [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c)
+      counts.push(...ordered.slice(0, -1))
+    }
+    return counts
+  })
+
   console.log(`\n═══ ${file.split('/').pop()} ═══`)
+  if (lineLength.length > 0) {
+    const sorted = [...lineLength].sort((a, b) => a - b)
+    const mean = Math.round(lineLength.reduce((a, c) => a + c, 0) / lineLength.length)
+    const median = sorted[Math.floor(sorted.length / 2)]
+    console.log(`  السطرُ الكامل: ${mean} حرفًا وسطًا (الوسيط ${median}) في ${lineLength.length} سطرًا — والهدفُ ‏60 إلى ‏75`)
+  }
   for (const p of panes.sort((a, b) => b.pct - a.pct)) {
     console.log(`  ${String(p.pane).padEnd(11)} ${String(p.pct).padStart(3)}٪ شرحا` +
       ` — ${String(p.ink).padStart(4)}px من ${String(p.height).padStart(4)}px · ${p.runs} جملةً`)

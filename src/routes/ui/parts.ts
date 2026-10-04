@@ -6,6 +6,7 @@
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
 import { escapeHtml } from './escape'
+import { GLYPH_ICON, ICON } from './icons'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { RungState } from '../../lib/platform/readiness'
@@ -16,24 +17,10 @@ import type { RungState } from '../../lib/platform/readiness'
  * كانت `<span class="st …"><span class="g">●</span>…</span>` تُكتب يدًا
  * ‏٦٥ مرّةً في عشرة ملفّات، ورمزُها حرفٌ (● ○ ▲ ✓ ✕ ◍ ◔ ↑ ◆ !) ليس في أيّ
  * وجهٍ مضمَّن، فيسقط إلى خطّ النظام ويختلف من جهازٍ لآخر (التدقيقُ الثالث).
- * هنا يُرسَم SVG بـ`currentColor` في ‏١٠×‏١٠، **والحرفُ يبقى مفتاحَه** في
- * جداول الحال، فما لا رسمَ له يُطبَع حرفًا كما كان.
+ * هنا يُرسَم SVG بـ`currentColor`، **والحرفُ يبقى مفتاحَه** في جداول الحال، فما
+ * لا رسمَ له يُطبَع حرفًا كما كان. **والرسمُ من `icon()` في `icons.ts`** (D-185):
+ * شبكةُ ‏٢٤ وثخانةُ ‏١٫٨ كسائر الأيقونات، لا جدولٌ ثانٍ بثخاناتٍ أربع.
  */
-const GLYPH: Readonly<Record<string, string>> = {
-  '●': '<circle cx="5" cy="5" r="3.6"/>',
-  '○': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/>',
-  '◍': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 1.9a3.1 3.1 0 0 0 0 6.2z"/>',
-  '◔': '<circle cx="5" cy="5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 5V1.9a3.1 3.1 0 0 1 3.1 3.1z"/>',
-  '▲': '<path d="M5 1.5 9.1 8.6H.9z"/>',
-  // ‏ونظيرُه للنزول (D-167): سهمُ الفرق عن الأمس كان يكتبه حرفًا خارج هذا الجدول
-  '▼': '<path d="M5 8.5 9.1 1.4H.9z"/>',
-  '◆': '<path d="M5 1 9 5 5 9 1 5z"/>',
-  '✓': '<path d="M1.8 5.3 4.2 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
-  '✕': '<path d="M2.3 2.3l5.4 5.4M7.7 2.3 2.3 7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
-  '↑': '<path d="M5 8.5V1.7M2 4.7 5 1.7l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-  '!': '<path d="M5 1.7v4.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="5" cy="8.3" r="1.1"/>',
-}
-
 /**
  * الرمزُ وحدَه بلا رقاقة — **لما يقول حالًا أو اتّجاهًا خارج «.st»** (D-167).
  *
@@ -42,10 +29,37 @@ const GLYPH: Readonly<Record<string, string>> = {
  * وحارسُ `audit_classes` يُسقط CI على حرفٍ منها في وسمٍ خارج هذا الملفّ.
  */
 export function glyph(g: string): string {
-  const drawn = GLYPH[g]
-  return drawn === undefined
-    ? escapeHtml(g)
-    : `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${drawn}</svg>`
+  return GLYPH_ICON[g] ?? escapeHtml(g)
+}
+
+/**
+ * اسمُ ملفٍّ في جملةٍ عربيّة — **معزولًا وبلا امتداده** (خطّة التصميم 4.4/8 · D-185).
+ *
+ * «تقرير الأثر السنويّ 2026.docx» في سياقٍ عربيّ تُرسَم «docx.2026 تقرير الأثر السنويّ»:
+ * النقطةُ بين رقمٍ وحرفٍ لاتينيّ تأخذ اتّجاهَ السطر فتنقلب الخانتان. والعزلُ وحدَه لا
+ * يصلحه (الاسمُ عربيُّ الأوّل فيبقى سطرُه عربيًّا)، **والامتدادُ لا يقول للمالك شيئا** —
+ * فيُحذف من المعروض ويبقى الاسمُ كاملًا في `title`.
+ */
+export function fileName(name: string): string {
+  const stem = name.replace(/\.[A-Za-z0-9]{1,5}$/, '')
+  return `<bdi title="${escapeHtml(name)}">${escapeHtml(stem === '' ? name : stem)}</bdi>`
+}
+
+/**
+ * سهمُ المسار في نصٍّ يُقرأ — «Credentials ← Create credentials» (D-185).
+ *
+ * أدلّةُ المنصّات وسطورُ المفاتيح تكتب الطريقَ بين شاشاتٍ بسهم، **والسهمان «←» و«→»
+ * ليسا في Plex** (خطّة التصميم 3.4)، فكانا يُرسَمان بخطّ النظام في مئةِ موضع. والنصُّ
+ * يبقى بيانًا بسهمه في `lib/` (يُقرأ ويُختبَر كما هو)، **ويُرسَم السهمُ عند العرض**:
+ * «←» يشير إلى نهاية السطر العربيّ (`ICON.go`) و«→» إلى نهاية اللاتينيّ (`ICON.back`)،
+ * كما كان الحرفُ يُرى، بلا زيادة. ومعناه في سمته لقارئ الشاشة: «ثمّ».
+ *
+ * **ويُعطى نصًّا مهرَّبًا أو وسمًا موثوقًا**، لا سِمة: الرسمُ وسمٌ، وفي `title=""` يُطبَع حرفًا.
+ */
+export function pathArrows(html: string): string {
+  return html
+    .replaceAll('←', `<span class="arw" role="img" aria-label="ثمّ">${ICON.go}</span>`)
+    .replaceAll('→', `<span class="arw" role="img" aria-label="ثمّ">${ICON.back}</span>`)
 }
 
 /**
@@ -112,7 +126,7 @@ export function bar(used: number, cap: number, label = 'بلغ السقف'): str
   const done = label !== 'بلغ السقف'
   return `<div class="bar"><i class="${full ? (done ? 'done' : 'f') : ''}" style="width:${p}%"></i></div>` +
     (full
-      ? `<div class="cap${done ? ' done' : ''}"><span aria-hidden="true">■</span>${escapeHtml(label)}</div>`
+      ? `<div class="cap${done ? ' done' : ''}"><span class="st-ic">${glyph(done ? '●' : '▲')}</span>${escapeHtml(label)}</div>`
       : '')
 }
 

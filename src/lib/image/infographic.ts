@@ -17,7 +17,8 @@
  *    (`parseInfo`). فإن سقط النداءُ استُخرج المحتوى من النصّ بقواعدَ حتميّة
  *    (`infoFromText`): القوائمُ بعد النقطتين، والمعطوفاتُ بالواو، والفقرات. **فلا
  *    تخرج صورةٌ لا علاقةَ لها بالنصّ في أيّ فرع.**
- * ٢ · **والرسمُ صفحةٌ بخطوط اللوحة** (Reem Kufi للعناوين وBeiruti للمتن وInter للأرقام)
+ * ٢ · **والرسمُ صفحةٌ بخطوطٍ مضمَّنة** (Reem Kufi للعناوين وBeiruti للمتن وInter للأرقام —
+ *    كانت خطوطَ اللوحة، وبقيت للصورة في `font.ts` حين صارت اللوحةُ على Plex: D-185)
  *    يصوّرها متصفّحُ Cloudflare كما يصوّر الشريحة (D-085): عربيّةٌ موصولةٌ بمُشكِّل
  *    خطوطٍ حقيقيّ، وأرقامٌ كما كُتبت.
  *
@@ -27,7 +28,7 @@
  * مقيسة. **لا زخرفَ يدّعي بيانًا**: الأعمدةُ في «bars» بطولِ أرقامها لا بطولٍ يُجمِّل.
  */
 import { askWriter, type BriefDeps } from './brief'
-import { BEIRUTI, INTER, REEM_KUFI } from '../ui/fonts'
+import { BEIRUTI, INTER, REEM_KUFI } from './font'
 import type { Platform } from '../oauth/providers'
 
 export type InfoKind = 'pillars' | 'layers' | 'steps' | 'stats' | 'bars' | 'compare' | 'quote'

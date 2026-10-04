@@ -8,7 +8,7 @@ import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../escape'
 import { actionLabel, targetLabel } from '../../../lib/audit'
-import { status } from '../parts'
+import { pathArrows, status } from '../parts'
 
 
 
@@ -65,7 +65,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
     <td data-label="الفعل"><div class="nm">${escapeHtml(actionLabel(a.action))}</div>
       <div class="mono">${escapeHtml(a.action)}</div></td>
     <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}
-      ${a.detail === null ? '' : `<div class="sub">${escapeHtml(a.detail)}</div>`}</td>
+      ${a.detail === null ? '' : `<div class="sub">${pathArrows(escapeHtml(a.detail))}</div>`}</td>
     <td data-label="العنوان"><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>
   </tr>`).join('')
   return { sessions, passkeys, audit }

@@ -9,7 +9,7 @@ import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
-import { RUNG_MARK, bar, status as chip } from '../parts'
+import { RUNG_MARK, bar, pathArrows, status as chip } from '../parts'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -207,10 +207,10 @@ export function providersSection(d: PanelData): ProvidersMarkup {
             ${p.hint === null
               ? p.secretName === null
                 ? '<div class="sub" style="margin:0">لا مفتاح محفوظ بعد</div>'
-                : `<div class="sub" style="margin:0">أو ضعه سرّا: <span class="mono">${escapeHtml(p.secretName)}</span><br>${escapeHtml(p.howToGet)}</div>`
+                : `<div class="sub" style="margin:0">أو ضعه سرّا: <span class="mono">${escapeHtml(p.secretName)}</span><br>${pathArrows(escapeHtml(p.howToGet))}</div>`
               : `<span class="mono">${escapeHtml(p.hint)}</span>`}</div>
           <div><div class="k">العنوان</div>
-            <span class="mono" style="font-size:var(--t-xs)">${escapeHtml(p.baseUrl ?? '—')}</span></div>
+            <span class="mono">${escapeHtml(p.baseUrl ?? '—')}</span></div>
           <div><div class="k">السعر</div>
             <div class="sub" style="margin:0">${priceNote}</div></div>
           <div><div class="k">30 يوما</div>
@@ -221,7 +221,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         ${locked
           ? `<div class="outcome"><span class="k">محميّ</span><span class="v">مفتاح هذا المزوّد في
                <b>أسرار Worker</b> — لا يُبدَّل من هنا، وهو أأمن موضع.
-               ولتبديله: لوحة Cloudflare ← Variables and Secrets.</span></div>`
+               ولتبديله: ${pathArrows('لوحة Cloudflare ← Variables and Secrets')}.</span></div>`
           : `<form class="row" method="POST" action="/panel/providers/key" data-busy="جارٍ الحفظ…"
                    style="margin-top:var(--s-3)">
                <input type="hidden" name="provider" value="${id}">
@@ -356,7 +356,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     `<tr>
        <td><div class="nm">${escapeHtml(preset.label)}</div>
            <div class="sub" style="margin:0">${escapeHtml(preset.note)}</div></td>
-       <td class="mono" style="font-size:var(--t-xs);direction:ltr">${escapeHtml(preset.keyFrom)}</td>
+       <td><span class="mono">${pathArrows(escapeHtml(preset.keyFrom))}</span></td>
      </tr>`,
   ).join('')
 
@@ -444,7 +444,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
 
   const routing = d.routing.map((r) => `<tr>
       <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
-          <div class="sub">${escapeHtml(r.why)}</div></td>
+          <div class="sub">${pathArrows(escapeHtml(r.why))}</div></td>
       <td data-label="المزوّد والنموذج">
         <form class="row" method="POST" action="/panel/routes" style="gap:var(--s-2)">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">

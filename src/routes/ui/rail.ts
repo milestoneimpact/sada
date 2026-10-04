@@ -14,7 +14,7 @@ import { CHANNELS } from '../../lib/channels'
 import { commandMore, SECTIONS } from './command'
 import { ICON } from './icons'
 import { LOGOS } from './logos'
-import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch } from './shell'
+import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch, wordmark } from './shell'
 
 export interface RailInput {
   /** القسمُ الحاليّ — يُعلَّم `aria-current`. */
@@ -46,7 +46,11 @@ export function railHtml(input: RailInput): string {
      */
     const attrs = `${s.bar === true ? ' data-bar' : ''}${input.active === s.id ? ` aria-current="${input.parent === true ? 'true' : 'page'}"` : ''}`
     const after = s.id === 'channels' ? (input.afterChannels ?? '') : ''
-    return `${head}<a href="${escapeHtml(href)}"${attrs}>${s.icon}<span>${s.short ?? s.label}</span>${
+    // ‏والاسمُ الأقصرُ للشريط الضيّق بجانبه، ويُبدَّل بينهما في الورقة لا في السكربت (D-185)
+    const label = s.tight === undefined
+      ? `<span>${s.short ?? s.label}</span>`
+      : `<span class="wide">${s.short ?? s.label}</span><span class="tight">${escapeHtml(s.tight)}</span>`
+    return `${head}<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
       count > 0 ? `<span class="count">${count}</span>` : ''
     }</a>${after}`
   }).join('\n    ')
@@ -54,7 +58,7 @@ export function railHtml(input: RailInput): string {
   return `<aside class="rail">
   <div class="rail-head">
     <div class="glyph">${GLYPH_SVG}</div>
-    <div class="brand"><b>صدى</b>${input.env === undefined ? '' : `<span>SADA · ${input.env === 'production' ? 'PRODUCTION' : 'STAGING'}</span>`}</div>
+    <div class="brand">${wordmark(true)}${input.env === undefined ? '' : `<span>SADA · ${input.env === 'production' ? 'PRODUCTION' : 'STAGING'}</span>`}</div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
