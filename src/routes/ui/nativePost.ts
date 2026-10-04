@@ -113,7 +113,7 @@ function linkedin(input: NativePostInput): string {
         <span class="np-end">${m.comments === null ? '' : `${num(m.comments)} تعليقات`}${
           m.shares === null ? '' : ` · ${num(m.shares)} إعادة نشر`}</span></div>`
   return `<header class="np-head">${avatar(input)}
-      <span class="np-who"><b class="np-name">${escapeHtml(input.author.name)}</b>
+      <span class="np-who"><b class="np-name"><bdi>${escapeHtml(input.author.name)}</bdi></b>
         <span class="np-meta">${escapeHtml(input.when)} · ${ICON.globe}</span></span>
       <span class="np-end">${ICON.more}</span></header>
     <p class="np-text">${npText(input.text)}</p>
@@ -127,7 +127,7 @@ function x(input: NativePostInput): string {
   const media = mediaFigure(input, false)
   const m = input.metrics
   return `${avatar(input)}<div>
-    <header class="np-head"><b class="np-name">${escapeHtml(input.author.name)}</b>
+    <header class="np-head"><b class="np-name"><bdi>${escapeHtml(input.author.name)}</bdi></b>
       <span class="np-meta">· ${escapeHtml(input.when)}</span><span class="np-end">${ICON.more}</span></header>
     <p class="np-text">${npText(input.text)}</p>
     ${media === '' ? '' : `<div class="np-media">${media}</div>`}
@@ -140,7 +140,7 @@ function x(input: NativePostInput): string {
 function instagram(input: NativePostInput): string {
   const media = mediaFigure(input, false)
   const m = input.metrics
-  return `<header class="np-head">${avatar(input)}<b class="np-name">${escapeHtml(input.author.name)}</b>
+  return `<header class="np-head">${avatar(input)}<b class="np-name"><bdi>${escapeHtml(input.author.name)}</bdi></b>
       <span class="np-meta">· ${escapeHtml(input.when)}</span><span class="np-end">${ICON.more}</span></header>
     ${media === ''
       ? '<div class="np-slot"><span>Instagram لا تنشر بلا صورة</span></div>'
@@ -148,7 +148,7 @@ function instagram(input: NativePostInput): string {
     <div class="np-bar" aria-hidden="true"><span>${ICON.heart}</span><span>${ICON.comment}</span>
       <span>${ICON.send}</span><span class="np-end">${ICON.bookmark}</span></div>
     ${m?.reactions === null || m?.reactions === undefined ? '' : `<p class="np-likes">${num(m.reactions)} إعجابًا</p>`}
-    <p class="np-text"><b class="np-name">${escapeHtml(input.author.name)}</b> ${npText(input.text)}</p>`
+    <p class="np-text"><b class="np-name"><bdi>${escapeHtml(input.author.name)}</bdi></b> ${npText(input.text)}</p>`
 }
 
 /** مسرحُ المقطع الرأسيّ — TikTok وYouTube Shorts معا، ويفترقان في العمود والعنوان. */
@@ -174,7 +174,7 @@ function stage(input: NativePostInput): string {
         <li>${ICON.share}${num(m?.shares)}</li>
       </ul>
       <div class="np-over">
-        <b class="np-name">${escapeHtml(input.author.name)}</b>
+        <b class="np-name"><bdi>${escapeHtml(input.author.name)}</bdi></b>
         ${tube ? `<p class="np-title">${npText(title)}</p>` : `<p class="np-text">${npText(caption)}</p>`}
       </div>
     </div>

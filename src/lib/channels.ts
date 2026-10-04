@@ -253,7 +253,7 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
       },
     ],
     whereId: 'تبويب Auth ← Application credentials ← Client ID: Primary',
-    whereSecret: 'تحته مباشرةً — اضغط 👁 ليظهر، ثمّ 📋 لتنسخه. ولا تضغط «Generate a new Client Secret».',
+    whereSecret: 'تحته مباشرةً — اضغط أيقونةَ العين ليظهر، ثمّ أيقونةَ النسخ بجانبها لتنسخه. ولا تضغط «Generate a new Client Secret».',
     success: 'تحت OAuth 2.0 scopes في تبويب Auth تظهر ثلاثةٌ: openid و profile و w_member_social.',
     failure:
       'تعود الشاشةُ بـ <span class="mono">unauthorized_scope_error</span> — ' +

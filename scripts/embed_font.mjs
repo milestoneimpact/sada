@@ -20,6 +20,15 @@
  * أين جاءت. **وسكربتٌ يعيد توليدَها من حزمةٍ مسمّاةٍ بنسختها يجعلها
  * قابلةً للتدقيق** — ويُعاد تشغيلُه فيُطابِق أو يكشف تبديلا.
  *
+ * ## ووجوهُ الإنفوجرافيك معه (D-185)
+ *
+ * الإنفوجرافيك (D-174) يُرسَم في المتصفّح نفسِه بثلاثة وجوه: Reem Kufi للعناوين
+ * وBeiruti للمتن وInter للأرقام. وكان يستوردها من خطوط اللوحة، **فلمّا خرجت
+ * اللوحةُ إلى Plex (المرحلة ١ من D-183) كان حذفُها يكسر بناءه أو يغيّر الصورَ
+ * المنشورة قبل قرار المالك (M-25)**. فتُضمَّن هنا مع خطّ الشريحة — **بايتاتٍ
+ * هي نفسُها**، فيبقى الإنفوجرافيك كما هو بكسلًا بكسلًا حتّى المرحلة ٥. ولا
+ * تُسبَق ولا تُخدَم للّوحة ولا تُعَدّ في سقف خطّها.
+ *
  * الاستعمال:  node scripts/embed_font.mjs
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -33,6 +42,16 @@ const FACES = [
 const parts = FACES.map(({ file, name }) => {
   const bytes = readFileSync(`${PKG}/${file}`)
   return { name, file, size: bytes.length, b64: bytes.toString('base64') }
+})
+
+/** وجوهُ الإنفوجرافيك — **الملفّاتُ التي كانت في خطوط اللوحة نفسُها**، فلا يتغيّر بايتٌ في الصورة. */
+const INFO_FACES = [
+  { pkg: '@fontsource-variable/reem-kufi', file: 'reem-kufi-arabic-wght-normal.woff2', name: 'REEM_KUFI', why: 'العناوين' },
+  { pkg: '@fontsource-variable/beiruti', file: 'beiruti-arabic-wght-normal.woff2', name: 'BEIRUTI', why: 'المتن' },
+  { pkg: '@fontsource-variable/inter', file: 'inter-latin-wght-normal.woff2', name: 'INTER', why: 'الأرقامُ واللاتينيّ' },
+].map((f) => {
+  const bytes = readFileSync(`node_modules/${f.pkg}/files/${f.file}`)
+  return { ...f, size: bytes.length, b64: bytes.toString('base64') }
 })
 
 const out = `/**
@@ -82,8 +101,26 @@ ${parts
   )
   .join(',\n')},
 ].join('')
+
+/**
+ * وجوهُ الإنفوجرافيك (D-174) — **انتقلت من خطوط اللوحة إلى هنا** (D-185).
+ *
+ * اللوحةُ صارت على Plex، **والصورةُ المنشورةُ لا تتبدّل قبل قرار المالك** (M-25):
+ * فالبايتاتُ هنا هي التي كانت هناك، ولا يتغيّر في الإنفوجرافيك بكسل. وتخرج
+ * مع حزمها في المرحلة ٥ حين يصير خطُّ الصور Plex كذلك.
+ */
+export interface InfoFace {
+  readonly b64: string
+}
+
+${INFO_FACES
+  .map(
+    (f) => `/** ${f.why} — \`${f.file}\` من \`${f.pkg}\` · ${f.size} بايتا قبل الترميز. */
+export const ${f.name}: InfoFace = { b64: '${f.b64}' }`,
+  )
+  .join('\n\n')}
 `
 
 writeFileSync('src/lib/image/font.ts', out)
-const total = parts.reduce((sum, p) => sum + p.size, 0)
-console.log(`✓ ضُمّ ${parts.length} وجها · ${total} بايتا · ${Math.round(out.length / 1024)}KB مصدرا`)
+const total = [...parts, ...INFO_FACES].reduce((sum, p) => sum + p.size, 0)
+console.log(`✓ ضُمّ ${parts.length + INFO_FACES.length} وجها · ${total} بايتا · ${Math.round(out.length / 1024)}KB مصدرا`)

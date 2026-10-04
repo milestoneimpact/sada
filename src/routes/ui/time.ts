@@ -80,7 +80,6 @@ export const TIME_SCRIPT = `
     line.textContent=said+' بتوقيتك';
     if(tz!=='')line.title=tz;
     t.appendChild(line);
-    t.classList.add('two');
   });
 })();
 `

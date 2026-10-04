@@ -24,7 +24,7 @@ export const COPY_SCRIPT = `
     b.addEventListener('click',function(){
       var f=document.getElementById(b.dataset.copy); if(!f)return;
       f.select(); f.setSelectionRange(0,f.value.length);
-      var done=function(){var t=b.textContent; b.textContent='نُسخ ✓';
+      var done=function(){var t=b.textContent; b.textContent='نُسخ';
         setTimeout(function(){b.textContent=t;},1400);};
       // الحديثةُ أوّلا، والقديمةُ احتياطا: نافذةٌ بلا HTTPS لا تملك الأولى
       if(navigator.clipboard&&navigator.clipboard.writeText){

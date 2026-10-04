@@ -1624,15 +1624,21 @@ describe('الثيم النهاريّ', () => {
     expect(doc).not.toMatch(/src="\/a\/p\./)
   })
 
-  /** **وجهُ العرض يُسبَق حيث يُرسَم** (D-152): الوثيقةُ العامّة بلا عنوانٍ كوفيّ. */
-  it('اللوحةُ تسبق ثلاثةَ أوجه، والوثيقةُ العامّة اثنين', async () => {
+  /**
+   * **وجوهُ Plex الثلاثة تُسبَق في كلّ صفحة** (D-185): خرج الكوفيُّ من الواجهة (وكان
+   * لا يُسبَق في الوثيقة العامّة، D-152)، والوجهُ الثخينُ عناوينُ كلِّ صفحة. **ولا وجهَ
+   * قديمٌ يُسبَق أو يُعلَن**: Beiruti وInter وReem Kufi بقيت لخطوط الصور وحدها.
+   */
+  it('اللوحةُ والوثيقةُ العامّة تسبقان أوجهَ Plex الثلاثة، ولا وجهَ قديم', async () => {
     const cookie = await login()
     const panel = await (await app.request('/panel', withSession(cookie), env)).text()
     const doc = await (await app.request('/privacy', {}, env)).text()
     const preloads = (html: string): number => (html.match(/rel="preload" as="font"/g) ?? []).length
-    expect(preloads(panel)).toBe(3)
-    expect(preloads(doc)).toBe(2)
-    expect(doc).not.toMatch(/rel="preload"[^>]*reem/i)
+    for (const html of [panel, doc]) {
+      expect(preloads(html)).toBe(3)
+      expect(html).not.toMatch(/beiruti|reem|'Inter'/i)
+      expect(html).toContain("font-family:'Plex Arabic'")
+    }
   })
 
   it('صفحةُ الدخول تتبع الثيم أيضا', async () => {

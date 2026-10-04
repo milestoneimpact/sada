@@ -31,7 +31,7 @@ import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
 import { SETUP } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
-import { status } from './parts'
+import { pathArrows, status } from './parts'
 import { counted, NOUNS } from '../../lib/format'
 
 // القاموسُ واحدٌ في lib/oauth/providers (D-151)
@@ -65,7 +65,7 @@ function scopeRows(platform: Platform, granted: ReadonlySet<string>): string {
           on
             ? '<span class="ago">—</span>'
             : `<span class="sub" style="margin:0"><b>${escapeHtml(spec.grantedBy)}</b><br>
-               ${escapeHtml(spec.where)}</span>`
+               ${pathArrows(escapeHtml(spec.where))}</span>`
         }</td>
       </tr>`
     })
@@ -274,7 +274,7 @@ export function refusedBody(d: RefusedData): string {
       <div class="outcome warn"><span class="k">ما يُفعَل</span>
         <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من تبويب
           <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
-          <b>صفحة المنصّة ← ضبطُ التطبيق ودليلُه</b>، ثمّ أعد الربط.
+          <b>${pathArrows('صفحة المنصّة ← ضبطُ التطبيق ودليلُه')}</b>، ثمّ أعد الربط.
           <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
           المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
       <div class="row" style="margin-top:var(--s-3)">
@@ -297,14 +297,14 @@ export function refusedBody(d: RefusedData): string {
       <ol class="steps">
         <li><span class="n">1</span><span class="body">
           <span class="what">رابطُ العودة المسجَّل في البوّابة</span>
-          <span class="why">${guide === undefined ? '' : guide.gotcha}</span></span></li>
+          <span class="why">${guide === undefined ? '' : pathArrows(guide.gotcha)}</span></span></li>
         <li><span class="n">2</span><span class="body">
           <span class="what">Client ID و Client Secret</span>
           <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
             يعطي هذا الردَّ نفسه.</span></span></li>
       </ol>
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
-        <span class="v">${guide.failure}</span></div>`}
+        <span class="v">${pathArrows(guide.failure)}</span></div>`}
       <div class="row" style="margin-top:var(--s-3)">
         <a class="btn p" href="/panel#channels">افتح الدليل والحقول</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
@@ -335,7 +335,7 @@ export function refusedBody(d: RefusedData): string {
         <td data-label="النطاق"><span class="mono">${escapeHtml(s.name)}</span></td>
         <td data-label="يفتح">${escapeHtml(s.enables)}</td>
         <td data-label="مَن يمنحه"><span class="nm">${escapeHtml(s.grantedBy)}</span>
-          <div class="sub" style="margin-top:var(--s-1)">${escapeHtml(s.where)}</div></td>
+          <div class="sub" style="margin-top:var(--s-1)">${pathArrows(escapeHtml(s.where))}</div></td>
       </tr>`,
     )
     .join('')
@@ -409,7 +409,7 @@ export function refusedBody(d: RefusedData): string {
       <ol class="steps">${guide.before
         .map(
           (b, i) => `<li><span class="n">${i + 1}</span><span class="body">
-            <span class="what">${b.what}</span><span class="why">${b.why}</span></span></li>`,
+            <span class="what">${pathArrows(b.what)}</span><span class="why">${pathArrows(b.why)}</span></span></li>`,
         )
         .join('')}</ol>
       ${/*
@@ -420,7 +420,7 @@ export function refusedBody(d: RefusedData): string {
         <a class="btn g sm" href="${escapeHtml(guide.portal)}" target="_blank"
           rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
         <div class="outcome"><span class="k">إن نجح</span>
-          <span class="v">${guide.success}</span></div>
+          <span class="v">${pathArrows(guide.success)}</span></div>
       </div>
     </div>`}
 

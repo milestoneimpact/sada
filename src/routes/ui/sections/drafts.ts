@@ -38,7 +38,7 @@ import { LOGOS } from '../logos'
 import { ICON } from '../icons'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
-import { RUNG_MARK, status } from '../parts'
+import { fileName, RUNG_MARK, status } from '../parts'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 
@@ -636,7 +636,8 @@ function card(
   const box = `--lines:${LINES[d.platform] ?? 9}`
 
   const meta = [
-    d.sourceName === null ? '' : `<span class="chip">${escapeHtml(d.sourceName)}</span>`,
+    // ‏واسمُ الملفّ معزولٌ (خطّة التصميم 4.4/8): «تقرير الأثر السنويّ 2026.docx» كان يُقرأ «docx.2026»
+    d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip mono">${escapeHtml(d.model)}</span>`,
     `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*

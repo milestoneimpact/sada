@@ -9,11 +9,18 @@ import { commandPalette, commandTrigger, type Command } from './command'
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
-import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
+import { FACES } from '../../lib/ui/fonts'
 import { THEME } from './tokens'
 
 /**
- * الخطّان — **من أصلنا، وبوجهٍ واحدٍ لكلّ أسرة** (D-099).
+ * الخطّ — **زوجُ Plex من أصلنا** (D-099 · D-185).
+ *
+ * ## ثلاثةُ وجوهٍ لأسرتين، وكلٌّ بنطاقه
+ *
+ * العربيُّ وجهان ثابتان (‏٤٠٠ و‏٦٠٠) واللاتينيُّ متغيّرٌ مقصورٌ عليهما، ولكلّ وجهٍ
+ * `unicode-range` من ورقة حزمته (`embed_ui_font.mjs`). **فالعربيُّ أوّلُ الأسرة
+ * ويأخذ حروفَه وحدها**، واللاتينيُّ يأخذ المسافةَ والرقمَ والترقيمَ العامّ — وكان
+ * Inter أوّلَ الترتيب يرسم مسافاتِ الكلمات العربيّة أعرضَ بـ ‏7.4٪ (خطّة التصميم ١).
  *
  * ## `swap` لا `block`
  *
@@ -27,40 +34,24 @@ import { THEME } from './tokens'
  * نسبةُ التصحيح تُقاس بقسمة عرضِ نصٍّ بالخطّ على عرضِه بالبديل.
  * **والبديلُ يختلف باختلاف الجهاز**: «Segoe UI» على ويندوز، و«SF Arabic»
  * على ماك، و«Noto» على أندرويد — ونسبةٌ تُقاس في حاويةِ بناءٍ لينكسيّة
- * تصف خطًّا لا يراه المالك.
- *
- * **ورقمٌ يُكتب بلا قياسٍ يجعل الصفحةَ تقفز في الاتّجاه المعاكس** — وهي
- * علّةُ D-076: الفحصُ يكذب حين يستدلّ.
- *
- * والذي يُغني عنه قائم: الوجهُ **من أصلنا** لا من شبكةٍ ثالثة،
- * و`preload` يبدؤه مع الوثيقة، و`immutable` يجعله مخبَّأً بعد أوّل فتحة.
- * **والقفزةُ تُقاس بعد ذلك** (D-099) — فإن بقيت، قِيست النسبةُ على
- * أجهزةٍ حقيقيّةٍ وأُضيفت حينئذ.
+ * تصف خطًّا لا يراه المالك. **والقفزةُ تُقاس** (CLS عند التحميل الأوّل بلا
+ * تخبئة، D-185)، ولا يُضاف وجهٌ احتياطيٌّ مقيسٌ إلّا إن تجاوزت ‏0.1.
  */
-const FONT_CSS = `
-@font-face{font-family:'Beiruti'; font-style:normal; font-weight:400 700;
-  font-display:swap; src:url('${BEIRUTI.path}') format('woff2')}
-@font-face{font-family:'Inter'; font-style:normal; font-weight:400 700;
-  font-display:swap; src:url('${INTER.path}') format('woff2')}
-@font-face{font-family:'Reem Kufi'; font-style:normal; font-weight:400 700;
-  font-display:swap; src:url('${REEM_KUFI.path}') format('woff2')}
-`
+const FONT_CSS = FACES.map((f) => `
+@font-face{font-family:'${f.family}'; font-style:normal; font-weight:${f.weight};
+  font-display:swap; src:url('${f.path}') format('woff2'); unicode-range:${f.unicodeRange}}`).join('') + '\n'
 
 /**
- * والوجهان يُسبَقان: `preload` يبدأ التحميلَ مع الوثيقة لا بعد قراءة
- * الأنماط. **وبلا `crossorigin` لا يُستعمَل المحمَّل** — يُحمَّل الخطُّ
+ * والوجوهُ الثلاثة تُسبَق في كلّ صفحة: `preload` يبدأ التحميلَ مع الوثيقة لا بعد
+ * قراءة الأنماط. **وبلا `crossorigin` لا يُستعمَل المحمَّل** — يُحمَّل الخطُّ
  * مرّتين، ويُقرأ ذلك في الشبكة تكرارا لا يُفسَّر.
+ *
+ * وكان وجهُ العرض الكوفيُّ لا يُسبَق في الوثيقة العامّة (D-152). **وخرج الكوفيُّ
+ * من الواجهة** (D-185)، والوجهُ الثخينُ عناوينُ كلِّ صفحةٍ ولصائقُها — فلا استثناء.
  */
-const preloadOf = (faces: readonly { path: string }[]): string => faces
+const FONT_PRELOAD = FACES
   .map((f) => `<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`)
   .join('\n')
-const FONT_PRELOAD = preloadOf([BEIRUTI, INTER, REEM_KUFI])
-/*
- * **ووجهُ العرض يُسبَق حيث يُرسَم وحدَه** (D-152): الوثيقةُ العامّة بلا
- * عنوانٍ كوفيّ، فكان تحميلُ Reem Kufi مسبقًا فيها ‏١٢KB لا يُقرأ منها حرف.
- * ويبقى `@font-face` فلو رُسم حرفٌ منه جاء بعدَ حين لا أبدًا.
- */
-const FONT_PRELOAD_BODY = preloadOf([BEIRUTI, INTER])
 
 /**
  * رمزُ التبويب — **مرسومٌ في الوثيقة لا مطلوبٌ من الشبكة**.
@@ -105,6 +96,26 @@ export const GLYPH_SVG =
   'stroke-linecap="round" aria-hidden="true">' +
   '<path d="' + RIBBON + '" stroke-width="11"/>' +
   '</svg>'
+
+/**
+ * الاسمُ «صدى» — **مسارٌ مرسومٌ لا حرفٌ من خطّ** (D-185 · خطّة التصميم 3.6).
+ *
+ * كان يُكتب بـ Reem Kufi في رأس الرافدة، **وخطٌّ كوفيٌّ كاملٌ يُحمَّل لثلاثة حروف**
+ * ‏(١٢KB) ويتسرّب إلى العناوين. فحُوّلت الحروفُ نفسُها مساراتٍ مرّةً واحدة: Reem Kufi
+ * بوزن ‏٧٠٠، مشكَّلةً بـ HarfBuzz ومرسومةً بـ fontTools من ملفّ `@fontsource-variable/reem-kufi`
+ * — والترخيصُ OFL-1.1 يجيز ذلك. **فيبقى الطابعُ الكوفيُّ في الاسم وحده**، ويخرج
+ * الكوفيُّ من الواجهة، ولا ملفَّ خطٍّ له.
+ *
+ * والإحداثيّاتُ بوحدات الخطّ (‏١٠٠٠ للـ em) وخطُّ القاعدة عند الصفر، فالارتفاعُ في
+ * الورقة نسبةٌ من حجم الحرف الذي كان يُرسَم به. ولونُه `currentColor` فيتبع الثيم.
+ * **ومعناه في سمته**: قارئُ الشاشة يقرأ «صدى» حيث لا نصَّ بجانبه.
+ */
+const WORDMARK_PATH = 'M393 200 162 -203Q122 -274 123.5 -328Q125 -382 154 -422.5Q183 -463 223 -493Q254 -516 271 -534Q288 -552 288 -591L627 0H471L274 -340Q268 -329 268.5 -309.5Q269 -290 279 -272L548 200ZM527 0 457 -140H524Q542 -140 562 -150Q582 -160 592 -180L700 0ZM25 200 133 20Q143 40 163 50Q183 60 201 60H358L418 200Z M750 0 834 -140H1405Q1406 -167 1388.5 -183.5Q1371 -200 1315 -200H860L1016 -460L1026 -453L974 -340H1315Q1381 -340 1423.5 -323Q1466 -306 1491 -277.5Q1516 -249 1527.5 -213.5Q1539 -178 1542 -140H1665V0Z M1720 -50V-409L1860 -440V-50ZM1625 0V-140H1900V0ZM1805 0V-140H2420Q2421 -167 2403.5 -183.5Q2386 -200 2330 -200H1805V-340H2330Q2404 -340 2449 -319Q2494 -298 2517.5 -263Q2541 -228 2550 -186Q2559 -144 2559.5 -101.5Q2560 -59 2560 -23Q2560 -11 2550 -6Q2540 -1 2530 -0.5Q2520 0 2520 0Z'
+
+export function wordmark(label: boolean): string {
+  return `<svg class="wordmark" viewBox="25 -591 2535 791" fill="currentColor" ${
+    label ? 'role="img" aria-label="صدى"' : 'aria-hidden="true"'}><path d="${WORDMARK_PATH}"/></svg>`
+}
 
 /**
  * وتُصدَّر البايتات ليخدمها مسارٌ كذلك — **والسببُ عطلٌ وقع**.
@@ -223,7 +234,7 @@ export function backNav(href: string, label: string): string {
    * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
   return `<nav class="back" aria-label="مسارُ العودة">
-    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span><b>صدى</b></a>
+    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span>${wordmark(false)}</a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
@@ -272,8 +283,6 @@ export function shell(
   options: {
     indexable?: boolean
     description?: string
-    /** لا عنوانَ بوجه العرض في هذه الصفحة، فلا يُسبَق تحميلُه (D-152) */
-    noDisplayFace?: boolean
     /**
      * فهرسُ لوحة الأوامر (D-105) — **ومَن مرّره نالها كاملةً**.
      *
@@ -298,7 +307,7 @@ export function shell(
 <title>${escapeHtml(title)}</title>
 ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
-${options.noDisplayFace === true ? FONT_PRELOAD_BODY : FONT_PRELOAD}
+${FONT_PRELOAD}
 <style nonce="${safeNonce}">${FONT_CSS}</style>
 <link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
     options.commands === undefined ? '' : commandPalette(options.commands)

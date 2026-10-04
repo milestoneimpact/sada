@@ -43,7 +43,7 @@ import { escapeHtml } from './escape'
 import { setupPane } from './channels'
 import { LOGOS } from './logos'
 // وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
-import { glyph, RUNG_MARK, status } from './parts'
+import { fileName, glyph, pathArrows, RUNG_MARK, status } from './parts'
 import { readiness, type Readiness } from '../../lib/platform/readiness'
 import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
 import { returnTo } from '../../lib/nav/back'
@@ -183,7 +183,7 @@ function costOf(d: PlatformScreenData, row: TimelineRow): number {
  * كلامًا: «Request access» اسمُ زرٍّ عند LinkedIn، لا كلمةٌ تُترجَم.
  */
 function portalPath(where: string): string {
-  return escapeHtml(where).replace(/[A-Za-z][A-Za-z .]*[A-Za-z]/g, (m) => `<span class="mono">${m}</span>`)
+  return pathArrows(escapeHtml(where).replace(/[A-Za-z][A-Za-z .]*[A-Za-z]/g, (m) => `<span class="mono">${m}</span>`))
 }
 
 function capabilityTable(rows: readonly Capability[]): string {
@@ -628,7 +628,7 @@ function waitingSection(d: PlatformScreenData): string {
       state: r.status === 'draft' ? status('warn', '◍', 'تنتظر قرارك') : status('idle', '○', 'معتمَدةٌ بلا موعد'),
     }),
     frame(d, r, r.status === 'draft' ? 'مسوّدة' : 'معتمَدة'),
-    `${r.sourceName === null ? '' : `<span class="ago">من «${escapeHtml(r.sourceName)}»</span>`}
+    `${r.sourceName === null ? '' : `<span class="ago">من «${fileName(r.sourceName)}»</span>`}
      <a class="btn ${r.status === 'draft' ? 'p' : 'g'} sm" href="/panel#d-${escapeHtml(encodeURIComponent(r.id))}">${
        r.status === 'draft' ? 'راجعها واعتمدها' : 'جدوِلها'}</a>
      ${journeyLink(r.id)}`,

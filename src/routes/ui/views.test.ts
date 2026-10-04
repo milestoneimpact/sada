@@ -6,7 +6,7 @@
  * غيرَ ما يعنيه. **والعينُ ترى مرّةً، والاختبارُ يرى في كلّ دفعة.**
  */
 import { describe, expect, it } from 'vitest'
-import { FACES, REEM_KUFI } from '../../lib/ui/fonts'
+import { FACES } from '../../lib/ui/fonts'
 import { readFileSync } from 'node:fs'
 import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
@@ -14,12 +14,12 @@ import { reportScreen } from './reportView'
 import { draftsSection } from './sections/drafts'
 import { tasksScreen } from './tasksView'
 import { commandMore, commandTrigger } from './command'
-import { ICON } from './icons'
+import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage } from '../panelView'
 import { STYLE } from './styles'
 import { sheet, type Decl, type Sheet } from '../../test/css'
-import { bar, glyph, status } from './parts'
+import { bar, fileName, glyph, pathArrows, status } from './parts'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
 import { soloNav } from './rail'
@@ -463,10 +463,16 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
 })
 
 describe('حقلُ الأمر على اللمس (D-127)', () => {
-  it('textarea.mono يُذكَر باسمه في طبقة اللمس — وإلّا قرّبه iOS', () => {
+  /*
+   * ‏كان يُذكَر باسمه في طبقة اللمس ليكبر إلى ‏١٧٫٥. **وصار كلُّ حقلٍ ‏١٦ في كلّ عرض**
+   * ‏(D-185 · نمطُ «input»)، وهي ما يكفي iOS — فلا قاعدةَ للّمس تُنسى في حقلٍ جديد.
+   */
+  it('textarea.mono وحقلُ الأمر بنمط «input» في كلّ عرض — ولا قاعدةَ لمسٍ لهما', () => {
     for (const s of ['textarea.mono', '.cmd-text']) {
-      expect(css.rule(s, '@media(pointer:coarse)')['font-size'], s).toBe('var(--t-lg)')
+      expect(css.rule(s)['font-size'], s).toBe('var(--t-input)')
+      expect(css.rule(s, '@media(pointer:coarse)')['font-size'], s).toBeUndefined()
     }
+    expect(css.rule(':root')['--t-input']).toBe('16px')
   })
 })
 
@@ -704,10 +710,12 @@ describe('بطاقةُ الخطوات (D-137)', () => {
 
 /** الطبعةُ الثانية (D-139): كلُّ قيمةٍ من السلّم، والكتلةُ آخرَ الورقة. */
 describe('الطبعةُ الثانية (D-139)', () => {
-  it('الرتبةُ الكبرى معرَّفةٌ وتُستعمل على العريض وحدَه، والرافدةُ بتدرّج', () => {
-    expect(css.rule(':root')['--t-4xl']).toBe('56px')
-    expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBe('var(--t-4xl)')
-    expect(css.rule('.grid>.tile:first-child .v', '@media(min-width:901px)')['font-size']).toBe('var(--t-4xl)')
+  it('الرتبةُ الكبرى سقطت مع السلّم القديم (D-185)، والرافدةُ بلا تدرّج', () => {
+    // ‏عنوانُ الصفحة ‏٢٨ والرقمُ البطل ‏٤٠ من رمزيهما في كلّ عرض، ولا قاعدةَ للعريض
+    expect(css.rule(':root')['--t-4xl']).toBeUndefined()
+    expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBeUndefined()
+    expect(css.rule('.page-head h1')).toMatchObject({ 'font-size': 'var(--t-h1)', 'line-height': 'var(--lh-h1)', 'font-weight': '600' })
+    expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({ 'font-size': 'var(--t-display)', 'line-height': 'var(--lh-display)' })
     // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148
     expect(css.rule('.rail')).toMatchObject({ background: 'var(--chrome)', 'border-inline-start': '1px solid var(--line)' })
     expect(css.rule('.rail')['background-image']).toBeUndefined()
@@ -721,24 +729,23 @@ describe('الطبعةُ الثانية (D-139)', () => {
  * بهدفِ لمسٍ باقٍ. والكتلةُ آخرَ الورقة فتغلب.
  */
 describe('الطبعةُ الثالثة (D-143)', () => {
-  it('وجهُ العرض معرَّفٌ رمزًا ومحمَّلٌ وجهًا ثالثًا بمسارٍ بلا فراغ', () => {
-    expect(css.rule(':root')['--font-display']).toMatch(/^"Inter","Reem Kufi","Beiruti",/)
-    // ‏الساري لا موضعُ السطر: العناوينُ كوفيّة، واللصائقُ الصغيرة بحرف المتن (D-144)
-    // تُستثنى من المجموعة بقاعدةٍ بعدها — فحذفُ محدّدٍ من الثانية يجعله كوفيًّا
-    for (const s of ['.page-head h1', '.card h2', '.brand b', '.auth h1']) {
-      expect(css.rule(s)['font-family'], s).toBe('var(--font-display)')
-    }
-    for (const s of ['nav.tabs .lbl', '.tile .k', 'th', '.sec', '.stat b', '.cmdk-t b', '.topbar h1', '.slice h3']) {
-      expect(css.rule(s)['font-family'], s).toBe('inherit')
-    }
-    expect(FACES).toContain(REEM_KUFI)
-    expect(REEM_KUFI.path).toBe('/f/reem-kufi.9eccd028.woff2')
-    expect(REEM_KUFI.path).not.toMatch(/\s/)
+  /*
+   * ‏كان وجهُ العرض الكوفيُّ للعناوين (D-143). **وخرج في المرحلة ١ من D-183** (D-185):
+   * ‏زوجُ Plex للنصّ كلِّه، والكوفيُّ في «صدى» وحدها مسارًا. فلا رمزَ للوجه ولا قاعدةَ
+   * ‏تطلبه، ولا وجهَ ثالث، والخطُّ على الجذر بلا اصطناع ثخانة.
+   */
+  it('وجهُ العرض سقط: زوجُ Plex على الجذر، ولا قاعدةَ تطلب خطًّا آخر', () => {
+    expect(css.rule(':root')['--font-display']).toBeUndefined()
+    expect(css.rule(':root')['--font-ui']).toMatch(/^"Plex Arabic","Plex Sans",/)
+    expect(css.rule('html')).toMatchObject({ 'font-family': 'var(--font-ui)', 'font-synthesis': 'none' })
+    expect(found((d) => d.prop === 'font-family' && !['inherit', 'var(--font-ui)'].includes(d.value))).toEqual([])
+    expect(FACES.map((f) => f.path)).toEqual(FACES.map((f) => f.path.replace(/\s/g, '')))
+    expect(FACES.every((f) => f.family === 'Plex Arabic' || f.family === 'Plex Sans')).toBe(true)
   })
   it('شريطُ المؤشّرات سطحٌ واحد، والرقمُ رقيق، والفعلُ الهادئ يبقى هدفَ لمس', () => {
     expect(css.rule('.grid.tiles')).toMatchObject({ gap: '1px', background: 'var(--line)' })
     expect(css.rule('.grid.tiles>.tile')).toMatchObject({ border: '0', 'border-radius': '0', 'box-shadow': 'none' })
-    expect(css.rule('.tile .v')).toMatchObject({ 'font-size': 'var(--t-2xl)', 'font-weight': '400' })
+    expect(css.rule('.tile .v')).toMatchObject({ 'font-size': 'var(--t-h1)', 'font-weight': '400' })
     for (const s of ['.todo>li>a.btn', '.todo>li>form .btn']) {
       expect(css.rule(s), s).toMatchObject({ background: 'transparent', 'min-width': '44px' })
     }
@@ -806,10 +813,11 @@ describe('تصفيةُ الطبعات (D-148)', () => {
       expect(count(sel), sel).toBe(1)
     }
     expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({
-      'font-size': 'var(--t-3xl)', color: 'var(--au)', 'font-weight': '400',
+      'font-size': 'var(--t-display)', color: 'var(--au)', 'font-weight': '400',
     })
-    // ‏والتضييقُ بنسبةٍ على الرقم المعزول وحدَه، لا ببكسلٍ لكلّ رتبة (D-183)
-    expect(css.rule('.tile .v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '-.03em' })
+    // ‏والتضييقُ بنسبةٍ على الرقم البطل وحدَه (‏-.01em، خطّة التصميم 4.3)، لا ببكسلٍ لكلّ رتبة
+    expect(css.rule('.tile .v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '0' })
+    expect(css.rule('.grid>.tile:first-child .v')['letter-spacing']).toBe('-.01em')
     expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-5)')
     expect(css.rule('nav.tabs a[aria-current=page]')).toMatchObject({
       background: 'var(--surface-3)', color: 'var(--ink)', position: 'relative',
@@ -933,12 +941,22 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
 })
 
 describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
-  // ‏و«▼» معها منذ D-167: سهمُ الفرق عن الأمس صار يُرسَم من الجدول نفسِه
-  it.each(['●', '○', '◍', '◔', '▲', '▼', '◆', '✓', '✕', '↑', '!'])('الحرفُ %s يُرسَم SVG بلون النصّ', (g) => {
+  // ‏و«↓» معها منذ D-185: سهمُ الفرق عن الأمس سهمٌ لا مثلّث («▲» يعني «ساقط» في الحال)
+  it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '↓', '!'])('الحرفُ %s يُرسَم بمواصفة icon() بلون النصّ', (g) => {
     const html = status('ok', g, 'نصّ')
-    expect(html).toContain('<span class="st ok"><span class="st-ic"><svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">')
+    // ‏شبكةُ ‏٢٤ وثخانةُ ‏١٫٨ بلا تعبئة — مواصفةُ الأيقونات نفسُها (D-103 · D-185)
+    expect(html).toContain('<span class="st ok"><span class="st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"')
     expect(html).not.toContain(g)
     expect(html).toContain('</svg></span>نصّ</span>')
+  })
+
+  it('ورموزُ الحال من GLYPH_ICON وحدَها: ثخانةٌ واحدة، ولا تعبئة، ولا «▼» بعدُ', () => {
+    for (const [g, svg] of Object.entries(GLYPH_ICON)) {
+      expect(glyph(g), g).toBe(svg)
+      expect([...svg.matchAll(/stroke-width="([\d.]+)"/g)].map((m) => m[1]), g).toEqual(['1.8'])
+      expect(svg, g).not.toMatch(/fill="currentColor"/)
+    }
+    expect(glyph('▼')).toBe('▼')
   })
 
   it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
@@ -1130,28 +1148,27 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(first).toBeGreaterThan(0)
     // ‏ما بعد أوّل قاعدةٍ فيها كلُّه منها: قاعدةٌ تُكتب بعدها تغلبها بتساوي المحدّد
     expect(rules.slice(first).filter((r) => r.at !== TOUCH).map((r) => r.selectors.join(','))).toEqual([])
-    expect(css.rule('.cmdk-in input', TOUCH)['font-size']).toBe('var(--t-lg)')
-    expect(at('.cmdk-in input', TOUCH)).toBeGreaterThan(at('.cmdk-in input'))
-    // ‏والحاسوبُ على حاله
-    expect(css.rule('.cmdk-in input')['font-size']).toBe('var(--t-md)')
+    // ‏وحقلُ اللوحة ‏١٦ في كلّ عرض (D-185): لا يُقرّبه iOS بلا قاعدةٍ في طبقة اللمس
+    expect(css.rule('.cmdk-in input')['font-size']).toBe('var(--t-input)')
+    expect(found((d) => d.at === TOUCH && d.prop === 'font-size')).toEqual([])
+    expect(at('.cmdk-in input', TOUCH)).toBe(-1)
   })
 
-  it('رقمُ المؤشّر يصغر على الجوّال: قاعدتُه بعد قاعدتَي الرقم لا قبلهما', () => {
-    const phone = '@media(max-width:900px)'
-    expect(css.rule('.tiles>.tile:first-child .v', phone)['font-size']).toBe('var(--t-2xl)')
-    expect(css.rule('.tiles .v', phone)['font-size']).toBe('var(--t-xl)')
-    expect(at('.tiles>.tile:first-child .v', phone)).toBeGreaterThan(at('.grid>.tile:first-child .v'))
-    expect(at('.tiles .v', phone)).toBeGreaterThan(at('.tile .v'))
+  it('رقمُ المؤشّر يصغر على الجوّال من الرمز لا بقاعدة (D-185)', () => {
+    const phone = '@media(max-width:599px)'
+    expect(css.rule(':root', phone)).toMatchObject({ '--t-display': '32px', '--t-h1': '24px', '--t-body': '17px' })
+    expect(css.rule('.tiles>.tile:first-child .v', '@media(max-width:900px)')['font-size']).toBeUndefined()
+    expect(css.rule('.tiles .v', '@media(max-width:900px)')['font-size']).toBeUndefined()
   })
 
   it('شريطُ الإبهام من السلّم، ولا حرفَ بالبكسل في الورقة كلّها', () => {
     const bar = '@media(max-width:720px)'
+    // ‏نمطُ «caption» ‏13/20/600، والعدُّ يرثه من قاعدته الأولى (خطّة التصميم 5.3)
     expect(css.rule('nav.tabs > a[data-bar] span:not(.count)', bar)).toMatchObject({
-      'font-size': 'var(--t-xs)', 'line-height': 'var(--lh-tight)',
+      'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)', 'font-weight': '600',
     })
-    expect(css.rule('nav.tabs .count', bar)).toMatchObject({
-      'font-size': 'var(--t-xs)', 'line-height': 'var(--s-4)', 'min-width': 'var(--s-4)', padding: '0 var(--s-1)',
-    })
+    expect(css.rule('nav.tabs .count', bar)).toMatchObject({ 'min-width': 'var(--s-5)', padding: '0 var(--s-1)' })
+    expect(css.rule('nav.tabs .count')).toMatchObject({ 'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)' })
     expect(found((d) => d.prop === 'font-size' && /^\d/.test(d.value))).toEqual([])
     // ‏وحشوُ المحتوى فوق الشريط رتبةٌ لا مجموعُ رتبتين (‏٨٠ خارجَ السلّم)
     expect(css.rule('.content', bar)['padding-bottom']).toMatch(/^calc\(var\(--s-16\) \+ env\(/)
@@ -1172,17 +1189,31 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     })
   })
 
-  it('والسهمُ ومفتاحُ الأوامر مرسومان بقدر حرفهما، و«▼» في جدول parts', () => {
-    expect(glyph('▼')).toBe('<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 8.5 9.1 1.4H.9z"/></svg>')
-    expect(commandTrigger()).toContain(`<kbd class="kbd">${ICON.command}K</kbd>`)
+  it('والسهمُ مرسومٌ بقدر حرفه، والاختصارُ «Ctrl K» نصًّا لا «⌘» (D-185)', () => {
+    expect(glyph('↓')).toBe(GLYPH_ICON['↓'])
+    // ‏«⌘» ليس في Plex ولا في أيّ وجهٍ مضمَّن، ورسمُه يقول «ماك» لمن لا يملكه (خطّة التصميم 3.4)
+    expect(commandTrigger()).toContain('<kbd class="kbd">Ctrl K</kbd>')
     expect(commandTrigger()).not.toContain('⌘')
-    for (const s of ['.btn>svg', 'nav.back a>svg', 'a.chip>svg', '.kbd>svg']) {
-      expect(css.rule(s), s).toMatchObject({ width: '1em', height: '1em', flex: 'none' })
+    expect('command' in ICON).toBe(false)
+    for (const s of ['.btn>svg', 'nav.back a>svg', 'a.chip>svg', '.arw svg']) {
+      expect(css.rule(s), s).toMatchObject({ width: '1em', height: '1em' })
     }
-    // ‏و«⌘» داخل الزرّ لا يرث قياسَ رمز البحث
     expect(css.where('.cmdk-open svg')).toEqual([])
-    expect(css.rule('.cmdk-open>svg')).toMatchObject({ width: '15px', height: '15px' })
-    for (const s of ['.delta .ar svg', '.why .i svg']) expect(css.rule(s), s).toMatchObject({ width: '10px', height: '10px' })
+    expect(css.rule('.cmdk-open>svg')).toMatchObject({ width: '16px', height: '16px' })
+    // ‏وأيقونةُ الحال ‏١٤ داخل الشارة وبجوار السطر الصغير (خطّة التصميم 3.4)
+    for (const s of ['.delta .ar svg', '.why .i svg', '.st-ic svg']) expect(css.rule(s), s).toMatchObject({ width: '14px', height: '14px' })
+  })
+
+  it('وسهمُ المسار في الأدلّة مرسومٌ عند العرض لا حرفًا (D-185)', () => {
+    const html = pathArrows('Credentials ← Create credentials → x')
+    expect(html).not.toMatch(/[←→]/)
+    expect(html).toContain(`<span class="arw" role="img" aria-label="ثمّ">${ICON.go}</span>`)
+    expect(html).toContain(`<span class="arw" role="img" aria-label="ثمّ">${ICON.back}</span>`)
+  })
+
+  it('واسمُ الملفّ معزولٌ بلا امتداده، وكاملٌ في العنوان (خطّة التصميم 4.4/8)', () => {
+    expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi title="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
+    expect(fileName('<x>')).toBe('<bdi title="&lt;x&gt;">&lt;x&gt;</bdi>')
   })
 
   it('والجانبُ منطقيّ: الفاصلُ في نهاية السطر، والطبقةُ بعرض الرابط، والمحاذاةُ بداية', () => {
@@ -1235,10 +1266,10 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
-  it('الزرُّ على اللمس بقياسه على الحاسوب، والحقلُ وحدَه يكبر', () => {
+  it('الزرُّ والحقلُ على اللمس بقياسهما على الحاسوب — والحقلُ ‏١٦ في كلّ عرض (D-185)', () => {
     const TOUCH = '@media(pointer:coarse)'
-    for (const s of ['button', '.btn']) expect(css.rule(s, TOUCH)['font-size'], s).toBeUndefined()
-    expect(css.rule('textarea', TOUCH)['font-size']).toBe('var(--t-lg)')
+    for (const s of ['button', '.btn', 'textarea']) expect(css.rule(s, TOUCH)['font-size'], s).toBeUndefined()
+    expect(css.rule('textarea')['font-size']).toBe('var(--t-input)')
     expect(css.rule('button')['min-height']).toBe('var(--tap)')
   })
 
@@ -1274,5 +1305,25 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
       expect(html).toMatch(/قبل 24 دقيقة/)
       expect(html).not.toMatch(/منذ\s+(قبل|الآن|أمس)/)
     }
+  })
+})
+
+describe('لا رمزَ خارج زوج Plex في نصٍّ يُكتب بعد التحميل (D-185)', () => {
+  /*
+   * `audit_fonts` يقيس الصفحةَ كما تُرسَم، ولا يضغط زرًّا. فما يكتبه سكربتٌ بعد النقر
+   * («نُسخ ✓») وما يظهر في دليل ضبطٍ لا تغطّيه العيّنات يُفحَص هنا من مصدره.
+   */
+  const FORBIDDEN = /[✓✕▲▼◐◍■▾⋯⌘]|[\u{1F300}-\u{1FAFF}]/u
+  it('السكربتاتُ وأدلّةُ الضبط', async () => {
+    const scripts = await import('./scripts')
+    const { SCRIPT } = await import('./panelScript')
+    const { SETUP } = await import('../../lib/channels')
+    const texts: [string, string][] = [
+      ...Object.entries(scripts).filter(([, v]) => typeof v === 'string') as [string, string][],
+      ['panelScript', SCRIPT],
+      ...Object.entries(SETUP).flatMap(([k, g]) =>
+        Object.entries(g).filter(([, v]) => typeof v === 'string').map(([f, v]) => [`${k}.${f}`, v as string] as [string, string])),
+    ]
+    for (const [name, text] of texts) expect(FORBIDDEN.test(text), name).toBe(false)
   })
 })

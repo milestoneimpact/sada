@@ -231,6 +231,18 @@ for (const file of files) {
           fields.add(k)
           out.push({ kind: 'zoom', what: k, detail: `خطُّه ${fs}px` })
         }
+        /*
+         * ٥ · **تسميةٌ مقصوصةٌ في شريط الإبهام** (D-185 · خطّة التصميم 5.3 و10.2).
+         *
+         * التسميةُ تُقصّ بنقاطٍ حين لا تسع خانتَها («text-overflow:ellipsis»)، **فلا
+         * يفيض شيءٌ ولا يقول التمريرُ الأفقيُّ شيئا**: «المنشو…» تُقرأ عطلًا ولا تُرى في
+         * أيّ مقياسٍ غيرِ هذا. فيُقارَن عرضُ الحرف بعرض حيّزه في كلّ تسميةٍ ظاهرة.
+         */
+        for (const s of document.querySelectorAll('nav.tabs > a[data-bar] span:not(.count), nav.tabs > .cmdk-open span')) {
+          if (!shown(s)) continue
+          const cut = s.scrollWidth - s.clientWidth
+          if (cut > 0) out.push({ kind: 'clip', what: `«${s.textContent.trim()}»`, detail: `مقصوصةٌ ${cut}px` })
+        }
         // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
         for (const t of document.querySelectorAll('svg text')) {
           if (!shown(t)) continue
@@ -294,6 +306,7 @@ for (const file of files) {
 
   const LABEL = {
     overflow: 'تمريرٌ أفقيّ',
+    clip: 'تسميةٌ مقصوصةٌ في شريط الإبهام',
     tap: 'هدفُ لمسٍ أصغرُ من ٤٤px',
     zoom: 'حقلٌ يُقرِّبه iOS',
     vh: 'ارتفاعٌ ثابتٌ لا ديناميّ',
