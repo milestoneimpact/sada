@@ -17,7 +17,8 @@
  * |---|---|---|
  * | أهدافُ اللمس | ‏٤٤×٤٤ | Apple HIG · و WCAG 2.5.8 يقبل ‏٢٤ |
  * | خطُّ الحقول | ≥ ‏١٦px | سلوكُ Safari: ما دونه يُقرِّب الصفحة |
- * | التمريرُ الأفقيّ | صفر عند ‏٣٢٠px | WCAG 1.4.10 (Reflow) |
+ * | التمريرُ الأفقيّ | صفر عند ‏٣٢٠px وحتّى ‏٩٦٠ | WCAG 1.4.10 (Reflow) |
+ * | فعلٌ مقصوصٌ في حاويةٍ تقصّ | صفر | يُرى ولا يُضغَط — والصفحةُ لا تفيض (مراجعة D-187) |
  * | `100vh` مكشوفة | ممنوعة | ارتفاعُ iOS يشمل شريطَ المتصفّح |
  * | `:hover` بلا حراسة | ممنوعة | لا hover على اللمس — فيعلق |
  * | وزنُ الصفحة | سقفٌ مُعلَن | Core Web Vitals |
@@ -26,7 +27,7 @@
  *
  * قياسٌ يصل بالوراثة أو بمحدّدٍ لم يُصِب لا يظهر في `grep`. **والحدُّ
  * الذي يُفحَص في الشيفرة يُفحَص فيها** (`vh` و`hover` والوزن)، وما عداه
- * يُقاس على خمسة مقاسات.
+ * يُقاس على خمسة مقاساتٍ للهاتف واللوح، وأربعةٍ بنافذة حاسوبٍ للفيض والقصّ (`WIDE`).
  *
  * الاستعمال:  node scripts/audit_mobile.mjs <ملفّ.html> …
  */
@@ -37,12 +38,22 @@ import { gzipSync } from 'node:zlib'
 /**
  * ‏٣٢٠ حدُّ WCAG · ‏٣٦٠ أندرويد شائع · ‏٣٩٠ آيفون · ‏٤٣٠ آيفون Max · ‏٧٦٨ لوحٌ لمسيّ.
  *
- * **والأخيرُ نطاقٌ لا مقاس** (D-167): بين ‏٧٢١ و‏٩٦٠ تصير الرافدةُ شريطَ
- * تبويبٍ أفقيًّا ولا شريطَ إبهام — نطاقٌ ثالثٌ بقواعده. وفيه وُجد شريطُ
- * التبويب ‏٣٧٠px يدفع المحتوى إلى ‏٧٥٠ (D-151)، **وجده القياسُ يدًا لا
- * المدقّق**: أربعةُ مقاساته كلُّها تحت ‏٧٢٠.
+ * **والأخيرُ نطاقٌ لا مقاس** (D-167): كان بين ‏٧٢١ و‏٩٦٠ شريطَ تبويبٍ أفقيًّا لا
+ * شريطَ إبهام — نطاقٌ ثالثٌ بقواعده، وفيه وُجد شريطُ التبويب ‏٣٧٠px يدفع المحتوى
+ * إلى ‏٧٥٠ (D-151)، **وجده القياسُ يدًا لا المدقّق**: أربعةُ مقاساته كلُّها تحت ‏٧٢٠.
+ * وصار منذ D-187 ما دون «md» (‏٩٠٠) كلُّه شريطَ الإبهام، و‏٧٦٨ هو اللوحيُّ فيه: الرتبةُ
+ * بين «sm» و«md» بسلّم الحاسوب وشريط الهاتف.
  */
 const WIDTHS = [320, 360, 390, 430, 768]
+
+/**
+ * ‏**وعرضُ الحافّة والرافدة يُقاس فيضًا وقصًّا** (مراجعة D-187): ‏٦٠٠ أوّلُ الحافّة ‏٣٢،
+ * و‏٧٢٠ اللوحُ الأوسع، و‏٩٠٠ أوّلُ الرافدة الجانبيّة (‏256px)، و‏٩٦٠ بعدها. **ولم يكن بين ‏٧٦٨
+ * و‏١٤٤٠ مقاسٌ واحد** — فمرّ فيضُ صفحات المنصّات ‏154px عند ‏900 و‏960، وقصُّ «تفاصيل» في صفّ
+ * المزوّد ‏67px عند ‏600، ولم يرهما مدقّق. وتُرسَم بنافذةِ حاسوبٍ لا بلمس: المؤشّرُ الدقيق
+ * أشدُّ على الفيض (حقلُ اللمس يُقيَّد بعرض أبيه)، وأهدافُ اللمس وخطُّ الحقول تبقى للهاتف.
+ */
+const WIDE = [600, 720, 900, 960]
 
 /** أدنى هدفِ لمس — Apple HIG. وهو أشدُّ من ‏٢٤ عند WCAG 2.5.8، وهو المراد. */
 const TAP = 44
@@ -96,13 +107,11 @@ for (const file of files) {
   const gz = Math.round(gzipSync(readFileSync(weighed)).length / 1024)
   const notes = []
 
-  for (const width of WIDTHS) {
-    const page = await browser.newPage({
-      viewport: { width, height: 844 },
-      deviceScaleFactor: 3,
-      isMobile: true,
-      hasTouch: true,
-    })
+  for (const width of [...WIDTHS, ...WIDE]) {
+    const touch = WIDTHS.includes(width)
+    const page = await browser.newPage(touch
+      ? { viewport: { width, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }
+      : { viewport: { width, height: 900 } })
     await page.goto(`file://${file}`)
     // ما هو مخفيٌّ لا يُقاس، وعللُه تبقى — كما في `audit_scale`
     await page.evaluate(() => {
@@ -111,7 +120,7 @@ for (const file of files) {
     await page.waitForTimeout(250)
 
     const hits = await page.evaluate(
-      ({ width, TAP, MIN_FIELD_FONT }) => {
+      ({ width, touch, TAP, MIN_FIELD_FONT }) => {
         const out = []
         const key = (el) => {
           const cls = String(el.className || '').split(' ').filter(Boolean)[0]
@@ -124,9 +133,66 @@ for (const file of files) {
           return b.width > 0 && b.height > 0
         }
 
-        // ١ · تمريرٌ أفقيّ — الوثيقةُ كلُّها، لا عنصرٌ مقصوصٌ بأبيه
-        const over = document.documentElement.scrollWidth - width
+        // ١ · تمريرٌ أفقيّ — الوثيقةُ كلُّها، لا عنصرٌ مقصوصٌ بأبيه. وفي نافذة الحاسوب
+        // ‏يُقاس على عرضها بلا شريط التمرير: الشريطُ الرأسيّ ليس فيضًا
+        const over = document.documentElement.scrollWidth - (touch ? width : document.documentElement.clientWidth)
         if (over > 1) out.push({ kind: 'overflow', what: 'الصفحة', detail: `تفيض ${Math.round(over)}px` })
+
+        /*
+         * ٦ · **فعلٌ مقصوصٌ في حاويةٍ تقصّ** (مراجعة D-187).
+         *
+         * الحاويةُ بـ«overflow:hidden» تبتلع ما يفيض منها **فلا تفيض الصفحةُ ولا يقول
+         * التمريرُ شيئًا**: «تفاصيل» في صفّ المزوّد كان خارج «.plist» بـ‏67px عند ‏600 — مختفيًا
+         * كلُّه والصفحةُ نظيفة. فيُقاس كلُّ فعلٍ ظاهرٍ وما يُرسَم داخله على أقرب حاويةٍ تقصّ
+         * فوقه أفقيًّا. **وما يتمرّر لا يُقصّ** (حاويةٌ بـ«auto» تبلغها الإصبع)، فيقف الصعودُ
+         * عندها؛ **وما يقصّه الفعلُ نفسُه بقصد** (اسمُ النموذج بنقاطه) لا يُعدّ من أجزائه.
+         */
+        // ‏ومرسومٌ حقًّا: عنوانُ «details» المطويّ ظاهرٌ وهو بابُها — و«shown» تُسقطه مع ما تحته
+        const painted = (el) => {
+          for (let d = el.closest('details:not([open])'); d; d = d.parentElement?.closest('details:not([open])')) {
+            if (!d.querySelector(':scope > summary')?.contains(el)) return false
+          }
+          const b = el.getBoundingClientRect()
+          return b.width > 0 && b.height > 0
+        }
+        for (const el of document.querySelectorAll(
+          'button,a[href],select,input:not([type=hidden]),textarea,summary,[role=button]',
+        )) {
+          if (!painted(el)) continue
+          let box = el.parentElement
+          let fixed = getComputedStyle(el).position === 'fixed'
+          while (box && box !== document.body && getComputedStyle(box).overflowX === 'visible') {
+            fixed ||= getComputedStyle(box).position === 'fixed'
+            box = box.parentElement
+          }
+          if (!box || box === document.body || fixed) continue
+          const bcs = getComputedStyle(box)
+          if (bcs.overflowX !== 'hidden' && bcs.overflowX !== 'clip') continue
+          const parts = [el, ...el.querySelectorAll('*')].filter((d) => {
+            if (d === el) return true
+            const r = d.getBoundingClientRect()
+            if (r.width === 0 || r.height === 0 || getComputedStyle(d).visibility === 'hidden') return false
+            for (let p = d.parentElement; p && p !== el; p = p.parentElement) {
+              if (getComputedStyle(p).overflowX !== 'visible') return false
+            }
+            return true
+          })
+          const r = box.getBoundingClientRect()
+          const left = r.left + parseFloat(bcs.borderLeftWidth)
+          const right = r.right - parseFloat(bcs.borderRightWidth)
+          let cut = 0
+          for (const d of parts) {
+            const b = d.getBoundingClientRect()
+            cut = Math.max(cut, left - b.left, b.right - right)
+          }
+          if (cut > 1) {
+            out.push({
+              kind: 'cut',
+              what: key(el),
+              detail: `«${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 18)}» خارج ${key(box)} بـ${Math.round(cut)}px`,
+            })
+          }
+        }
 
         // ٢ · أهدافُ اللمس
         /*
@@ -185,9 +251,10 @@ for (const file of files) {
         }
 
         const seen = new Set()
-        for (const el of document.querySelectorAll(
+        // ‏والإصبعُ وتقريبُ iOS للّمس وحدَه: نافذةُ الحاسوب بلا إصبع
+        for (const el of touch ? document.querySelectorAll(
           'button,a[href],select,input:not([type=hidden]),textarea,summary,[role=button]',
-        )) {
+        ) : []) {
           if (!shown(el)) continue
           const { w, h, box: b } = reach(el)
           const min = Math.min(w, h)
@@ -222,7 +289,7 @@ for (const file of files) {
          * ‏١٤px على اللمس. والخطُّ المحسوبُ لا يحتاج صندوقا: «getComputedStyle»
          * تحسبه لعنصرٍ لا يُرسَم. فما يمكن أن يظهر يُقاس.
          */
-        for (const el of document.querySelectorAll('input:not([type=hidden]),select,textarea')) {
+        for (const el of touch ? document.querySelectorAll('input:not([type=hidden]),select,textarea') : []) {
           if (el.tagName === 'INPUT' && TYPELESS.has(el.type)) continue
           const fs = parseFloat(getComputedStyle(el).fontSize)
           if (fs >= MIN_FIELD_FONT) continue
@@ -254,7 +321,7 @@ for (const file of files) {
         }
         return out
       },
-      { width, TAP, MIN_FIELD_FONT },
+      { width, touch, TAP, MIN_FIELD_FONT },
     )
 
     for (const hit of hits) {
@@ -306,6 +373,7 @@ for (const file of files) {
 
   const LABEL = {
     overflow: 'تمريرٌ أفقيّ',
+    cut: 'فعلٌ مقصوصٌ في حاويةٍ تقصّ',
     clip: 'تسميةٌ مقصوصةٌ في شريط الإبهام',
     tap: 'هدفُ لمسٍ أصغرُ من ٤٤px',
     zoom: 'حقلٌ يُقرِّبه iOS',

@@ -359,7 +359,10 @@ for (const [cls, why] of HOOKS) {
  */
 const sheet = readFileSync(STYLES, 'utf8')
 const cssStart = sheet.indexOf('export const STYLE = TOKENS + `') + 'export const STYLE = TOKENS + `'.length
-const css = sheet.slice(cssStart, sheet.lastIndexOf('`')).replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
+// ‏وتعبيرُ القالب يُمحى قبل العدّ: «@media${below('sm')}{» فيه قوسا «${…}»، فيُقرأ
+// ‏القوسُ الأوّلُ كتلةً بمحدّدٍ فارغ (D-187 — نقاطُ الانكسار من «BP»)
+const css = stripExpressions(sheet.slice(cssStart, sheet.lastIndexOf('`')))
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
 const seen = new Map()
 let depth = 0
 let selStart = 0

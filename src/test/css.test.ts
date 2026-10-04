@@ -178,8 +178,8 @@ describe('العيبُ يُلحَق بالورقة فيُرى', () => {
       (c: Sheet) => c.rule('.tile .v')['font-weight'], '400', '600'],
     ['مسافةٌ تهرّب لونَ التحذير إلى نزول الإنفاق', '.delta.down{ color:var(--warn)}',
       (c: Sheet) => c.rule('.delta.down').color, 'var(--ink-2)', 'var(--warn)'],
-    ['رمزٌ يُعاد على الرافدة فتصير ثيمًا ثالثًا', '.rail{--chrome:#14161c}',
-      (c: Sheet) => Object.keys(c.rule('.rail')).filter((p) => p.startsWith('--')), [], ['--chrome']],
+    ['رمزٌ يُعاد على الرافدة فتصير ثيمًا ثالثًا', '.rail{--bg:#14161c}',
+      (c: Sheet) => Object.keys(c.rule('.rail')).filter((p) => p.startsWith('--')), [], ['--bg']],
   ])('%s', (_name, tail, ask, before, after) => {
     expect(ask(sheet(STYLE))).toEqual(before)
     expect(ask(sheet(STYLE + '\n' + tail))).toEqual(after)

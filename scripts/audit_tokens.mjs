@@ -28,7 +28,7 @@
  * والثالثةُ عينُ ما يُحرَس منه: **رمزٌ لا يستعمله إلّا اختبارُه ميّت**،
  * والاختبارُ يبقيه حيًّا في الظاهر.
  *
- * الاستعمال:  node scripts/audit_tokens.mjs
+ * الاستعمال:  node scripts/audit_tokens.mjs  [--self-test: يزرع ظلالًا مغبَّشةً ويتأكّد أنّها تُمسَك]
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import ts from 'typescript'
@@ -107,33 +107,255 @@ for (const file of files) {
  * دوّامةٍ لا ردُّ تفاعل، ولها زمنُها وحدها.
  */
 /**
- * ── نصفُ قطرٍ حرفيّ (D-151) ──────────────────────────────────────────
- * سُلَّمُ الأقطار خمسةُ رموز (--r-xs · --r-sm · --r · --r-lg · --r-pill)؛
- * كانت ‏١٥ قاعدةً تكتب أرقامًا خارجها والحبّةُ بإملاءين (99px و999px).
+ * ── نصفُ قطرٍ حرفيّ (D-151)، **ومن قائمةٍ مغلقة** (خطّة التصميم 3.3 · D-187) ──────
+ * كانت ‏١٥ قاعدةً تكتب أرقامًا خارج السلّم والحبّةُ بإملاءين (99px و999px)، ثمّ صار
+ * السلّمُ خمسةَ رموزٍ بقيَمٍ لا تجمعها قاعدة (‏6 و9 و12 و18 و999). **والقائمةُ اليوم مغلقة**:
+ * ‏4 و8 و12 و16 و999 و‏50٪ لا غير — رمزٌ بقيمةٍ خارجها يردّ، وقطرٌ يُكتب بغير رمزٍ
+ * منها أو ‏50٪ أو صفرٍ يردّ.
  */
+const RADIUS_SET = new Set(['4px', '8px', '12px', '16px', '999px'])
 const literalRadius = []
+const radiusTokens = new Map()
 for (const file of files) {
   // غلافُ الصور المنشورة (lib/image) نظامٌ آخر بمقاسه؛ الحارسُ لورقة اللوحة
   if (NOT_USAGE.test(file) || /\/image\//.test(file)) continue
   const code = strip(readFileSync(file, 'utf8'))
-  for (const m of code.matchAll(/border-radius:\s*[^;}]*\d+px[^;}]*/g)) {
-    literalRadius.push([m[0].slice(0, 58), file.slice(SRC.length)])
+  for (const m of code.matchAll(/(--r-[a-z]+):\s*([^;}]+)/g)) {
+    radiusTokens.set(m[1], m[2].trim())
+    if (!RADIUS_SET.has(m[2].trim())) literalRadius.push([`${m[1]}:${m[2].trim()} خارج القائمة`, file.slice(SRC.length)])
+  }
+  for (const m of code.matchAll(/border-radius:\s*([^;}]*)/g)) {
+    const v = m[1].trim()
+    if (/^(0|50%|var\(--r-[a-z]+\))$/.test(v)) continue
+    literalRadius.push([`border-radius:${v}`.slice(0, 58), file.slice(SRC.length)])
+  }
+}
+const radiusVariants = [...new Set(radiusTokens.values())].sort((a, b) => parseFloat(a) - parseFloat(b))
+
+/**
+ * ── ميزانيّةُ النحاس: ثلاثةُ أدوارٍ لا رابعَ لها (خطّة التصميم 3.2 · D-187) ─────
+ * كان سقفًا عدديًّا (D-156: حبرٌ لرقمٍ واحد ونداءاتٌ دون ‏١٥) — **وخمسةَ عشرَ نداءً
+ * تحت السقف صارت خمسةَ عشرَ موضعًا في الرئيسيّة**: خيطُ كلّ قسم وخطُّ كلّ رابطٍ هادئ.
+ * فالسؤالُ اليوم «أين» لا «كم»: النحاسُ (`--au` وشريطُ العلامة `--mark-fg`) لا يقع إلّا
+ * في الأدوار الثلاثة، **وقيمةً كاملة** لا في تدرّجٍ ولا مزيج، وفي خاصّةِ حبرٍ أو أرضٍ لا
+ * في حدٍّ ولا خطٍّ تحت رابطٍ ولا ظلّ. ويعدّ `audit_design` المواضعَ في كلّ شاشةٍ مرسومة.
+ */
+const COPPER_HOMES = new Map([
+  ['.glyph', 'العلامة'],
+  ['nav.tabs a[aria-current=page]::before', 'مؤشّرُ القسم الحاليّ'],
+  ['.grid>.tile:first-child .v', 'الرقمُ البطل'],
+])
+const COPPER = /var\(--(au|mark-fg)\)/
+const brass = []
+let brassCount = 0
+for (const file of files) {
+  if (NOT_USAGE.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  const short = file.slice(SRC.length)
+  if (!/ui\/styles\.ts$/.test(file)) {
+    // ‏ولا نحاسَ خارج الورقة: سمةُ «style» في وسمٍ لا يراها هذا الحارس ولا يعدّها
+    if (COPPER.test(code)) brass.push(`نحاسٌ خارج الورقة — ${short}`)
+    continue
+  }
+  for (const m of code.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim().split('\n').pop().trim()
+    for (const d of m[2].split(';')) {
+      if (!COPPER.test(d)) continue
+      brassCount += 1
+      const [prop, ...rest] = d.split(':')
+      const val = rest.join(':').trim()
+      if (!COPPER_HOMES.has(sel)) brass.push(`${sel} — ليس من الأدوار الثلاثة`)
+      else if (!/^(color|background|background-color)$/.test(prop.trim()) || !/^var\(--(au|mark-fg)\)$/.test(val)) {
+        brass.push(`${sel} { ${d.trim()} } — النحاسُ حبرٌ أو أرضٌ بقيمته الكاملة`)
+      }
+    }
+  }
+}
+if (brassCount > COPPER_HOMES.size) brass.push(`النحاسُ ${brassCount} تصريحًا — والأدوارُ ${COPPER_HOMES.size}`)
+
+/**
+ * ── الارتفاعُ ثلاثةُ ظلالٍ لا رابعَ لها (خطّة التصميم 3.3 · D-187) ─────────────
+ * كانت البطاقاتُ والأشرطةُ تكتب ظلالَها طبقاتٍ بحروفها (`inset 0 1px 0 var(--hair)`
+ * فوق `--sh-2` ثمّ `--sh-3` على المحدّد نفسِه في قاعدتين). **فالظلُّ الذي يُغبَّش
+ * (نصفُ قطرِ تغبيشٍ فوق الصفر) يُكتب من `--sh-1` أو `--sh-2` أو `--sh-3` وحدها**؛ وما
+ * سواه حلقةٌ حادّةٌ لا ارتفاع (`0 0 0 1px` حولَ مربّعٍ، وهالةُ التركيز).
+ *
+ * **والرمزُ يُحَلّ لا يُتجاوَز** (مراجعة D-187): كان كلُّ `var(--x)` في الظلّ يُحذف قبل
+ * القراءة، فرمزٌ رابعٌ باسمٍ غيرِ `--sh-N` (`--lift: 0 24px 64px …` ثمّ `box-shadow:var(--lift)`)
+ * يمرّ والطبقةُ كلُّها فيه — وجُرّب فمرّ هذا الحارسُ واختبارُ الأسماء معًا. فالطبقةُ
+ * المغبَّشةُ لا تُقبَل إلّا `var(--sh-1|2|3)` بعينها، وكلُّ رمزٍ غيرِها يُقرأ بقيَمه كلِّها
+ * (نهارًا وليلًا وطباعةً)، **وكلُّ رمزٍ قيمتُه ظلٌّ مغبَّش ردٌّ** ولو لم يُنادَ. **والطولُ طولٌ
+ * بأيّ وحدة** (`.5rem` و`1.5em` كانا يسقطان من العدّ)، و`calc()` تغبيشٌ حتّى يثبت غيرُه،
+ * و`drop-shadow()` و`text-shadow` ظلالٌ كذلك. ويُزرَع كلُّ ذلك في `--self-test`.
+ */
+const ELEVATION = /^var\(--sh-[123]\)$/
+const LENGTH = /^-?(\d*\.?\d+)(px|r?em|ch|ex|r?lh|v[whib]|vmin|vmax|[dsl]v[whib]|cq[whib]|cqmin|cqmax|pt|pc|in|cm|mm|q)?$/
+const COMPUTED = /^(calc|min|max|clamp)\(/
+
+/** يقسم على `sep` في العمق صفر — لا داخل قوسين. */
+function topSplit(s, sep) {
+  const out = []
+  let depth = 0
+  let cur = ''
+  for (const c of s) {
+    if (c === '(') depth += 1
+    else if (c === ')') depth -= 1
+    if (depth === 0 && (sep === ' ' ? /\s/.test(c) : c === sep)) {
+      out.push(cur)
+      cur = ''
+      continue
+    }
+    cur += c
+  }
+  out.push(cur)
+  return out.map((x) => x.trim()).filter((x) => x !== '')
+}
+
+/** قيَمُ كلّ رمزٍ في مصادره — كلُّ تعريفٍ بموضعه: الاسمُ ← [{ value, where }]. */
+function tokenValues(sources) {
+  const values = new Map()
+  for (const { short, code } of sources) {
+    for (const m of code.matchAll(/(--[a-z0-9-]+)['"]?\s*:\s*(?:'([^']*)'|"([^"]*)"|([^;}\n"'`]+))/g)) {
+      const list = values.get(m[1]) ?? []
+      list.push({ value: (m[2] ?? m[3] ?? m[4]).trim(), where: short })
+      values.set(m[1], list)
+    }
+  }
+  return values
+}
+
+/** طبقاتُ الظلّ المغبَّشة في قيمة — والرمزُ يُحَلّ بقيَمه كلِّها، إلّا الثلاثة. */
+function blurredLayers(value, values, seen = new Set()) {
+  const hits = []
+  for (const layer of topSplit(value, ',')) {
+    if (ELEVATION.test(layer) || /^(none|inherit|initial|unset|revert)$/.test(layer)) continue
+    const whole = /^var\((--[a-z0-9-]+)\s*(?:,[\s\S]*)?\)$/.exec(layer)
+    if (whole !== null) {
+      if (seen.has(whole[1])) continue
+      const deeper = new Set([...seen, whole[1]])
+      if ((values.get(whole[1]) ?? []).some((d) => blurredLayers(d.value, values, deeper).length > 0)) hits.push(layer)
+      continue
+    }
+    const lengths = topSplit(layer, ' ').filter((t) => {
+      if (LENGTH.test(t) || COMPUTED.test(t)) return true
+      const ref = /^var\((--[a-z0-9-]+)/.exec(t)
+      return ref !== null && (values.get(ref[1]) ?? []).some((d) => LENGTH.test(d.value) || COMPUTED.test(d.value))
+    })
+    if (lengths.length < 3) continue
+    const blur = LENGTH.exec(lengths[2])
+    if (blur === null || Number.parseFloat(blur[1]) > 0) hits.push(layer)
+  }
+  return hits
+}
+
+/** كلُّ ظلٍّ مغبَّشٍ خارج الثلاثة في المصادر — `[[ما وُجد, أين]]`. */
+function shadowFindings(sources, home = 'routes/ui/tokens.ts') {
+  const values = tokenValues(sources)
+  const out = []
+  for (const { short, code } of sources) {
+    const decls = [
+      ...[...code.matchAll(/(box-shadow|text-shadow):\s*([^;}]*)/g)].map((m) => [m[1], m[2]]),
+      ...[...code.matchAll(/drop-shadow\(/g)].map((m) => {
+        let depth = 1
+        let i = m.index + m[0].length
+        const from = i
+        while (i < code.length && depth > 0) {
+          if (code[i] === '(') depth += 1
+          else if (code[i] === ')') depth -= 1
+          i += 1
+        }
+        return ['drop-shadow', code.slice(from, i - 1)]
+      }),
+    ]
+    for (const [prop, value] of decls) {
+      for (const layer of blurredLayers(value.trim(), values)) {
+        out.push([`${prop === 'drop-shadow' ? 'filter:drop-shadow(' : `${prop}:`}${layer}`.slice(0, 70), short])
+      }
+    }
+  }
+  for (const [name, defs] of values) {
+    if (/^--sh-\d+$/.test(name)) {
+      for (const d of defs) if (d.where !== home) out.push([`${name} يُعرَّف خارج ${home}: ${d.value}`.slice(0, 70), d.where])
+      continue
+    }
+    for (const d of defs) {
+      if (blurredLayers(d.value, values).length > 0) out.push([`${name}: ${d.value} — ظلٌّ مغبَّشٌ باسمٍ رابع`.slice(0, 80), d.where])
+    }
+  }
+  const elevations = [...values.keys()].filter((n) => /^--sh-\d+$/.test(n)).sort()
+  if (elevations.join(' ') !== '--sh-1 --sh-2 --sh-3') out.push([`الظلالُ المعرَّفة: ${elevations.join(' ')}`, home])
+  return out
+}
+
+if (process.argv.includes('--self-test')) {
+  const planted = [
+    { short: 'routes/ui/tokens.ts', code: [
+      "const LIGHT = { '--sh-1': '0 1px 2px rgba(0,0,0,.06)', '--sh-2': '0 4px 12px rgba(0,0,0,.08)',",
+      "  '--sh-3': '0 16px 40px rgba(0,0,0,.16)', '--lift': '0 24px 64px rgba(16,24,40,.30)',",
+      "  '--s-1': '4px', '--surface': '#ffffff', '--ring': 'color-mix(in srgb,var(--link) 25%,transparent)' }",
+      "const ROOT = `:root{--lift-2:var(--lift); --dur-1:120ms; --sh-4:0 30px 80px #000}`",
+    ].join('\n') },
+    { short: 'routes/ui/styles.ts', code: [
+      '.auth .card{box-shadow:var(--lift)}',
+      '.a{box-shadow:0 .5rem 1.5rem rgba(0,0,0,.2)}',
+      '.b{filter:drop-shadow(0 8px 24px rgba(0,0,0,.2))}',
+      '.c{text-shadow:0 1px 6px var(--ink)}',
+      '.h{box-shadow:var(--lift-2)}',
+      '.i{--sh-1:0 30px 80px #000}',
+      '.j{box-shadow:0 0 calc(var(--s-1) * 2) var(--ink)}',
+      // ‏وما يمرّ: الثلاثةُ والحلقاتُ الحادّةُ وما لا ظلَّ فيه
+      '.d{box-shadow:var(--sh-2), 0 0 0 1px var(--mark-ring)}',
+      ':focus-visible{box-shadow:0 0 0 4px var(--surface)}',
+      '.e{box-shadow:inset 0 -1px 0 var(--line); transition:box-shadow var(--dur-1)}',
+      '.f{box-shadow:none} .g{box-shadow:0 0 0 var(--s-1) var(--ring)}',
+    ].join('\n') },
+  ]
+  const got = shadowFindings(planted).map(([what]) => what)
+  const want = [
+    'box-shadow:var(--lift)', '--lift: 0 24px 64px', 'box-shadow:0 .5rem 1.5rem', 'filter:drop-shadow(0 8px 24px',
+    'text-shadow:0 1px 6px', 'box-shadow:var(--lift-2)', '--lift-2: var(--lift)', '--sh-1 يُعرَّف خارج',
+    'box-shadow:0 0 calc(', 'الظلالُ المعرَّفة: --sh-1 --sh-2 --sh-3 --sh-4',
+  ]
+  const missed = want.filter((w) => !got.some((g) => g.startsWith(w)))
+  const extra = got.filter((g) => !want.some((w) => g.startsWith(w)))
+  if (missed.length > 0 || extra.length > 0) {
+    console.log(`  ✕ self-test الظلال: فاته ${JSON.stringify(missed)} · واتّهم ${JSON.stringify(extra)}`)
+    process.exit(1)
+  }
+  console.log(`  ✓ self-test الظلال: ${want.length} مزروعًا أُمسِك، والحلقاتُ الحادّةُ والثلاثةُ مرّت`)
+  process.exit(0)
+}
+
+const looseShadows = shadowFindings(files
+  .filter((file) => !NOT_USAGE.test(file) && !/\/image\//.test(file))
+  .map((file) => ({ short: file.slice(SRC.length), code: strip(readFileSync(file, 'utf8')) })))
+
+/**
+ * ── نقاطُ الانكسار من `BP` وحدها (خطّة التصميم 3.3 · D-187) ─────────────────
+ * كانت ثمانيًا بأرقامها في عشرين استعلامًا، وتاسعةٌ في نصّ اللوحة (`matchMedia`). **فلا
+ * عرضَ يُكتب رقمًا في استعلام**: يُقحَم بـ`below()` أو `atLeast()` من `tokens.ts`.
+ * **وحدُّ الحاوية كذلك** (مراجعة D-187): `@container` يُقحَم بـ`narrower()` من `CQ`.
+ */
+const literalBreakpoints = []
+for (const file of files) {
+  if (NOT_USAGE.test(file)) continue
+  const code = strip(readFileSync(file, 'utf8'))
+  for (const m of code.matchAll(/(@media[^{]*|@container[^{]*|matchMedia\([^)]*\))/g)) {
+    if (/(min|max)-width:\s*\d/.test(m[1])) literalBreakpoints.push([m[1].trim().slice(0, 58), file.slice(SRC.length)])
   }
 }
 
 /**
- * ── ميزانيّةُ النحاس (D-156) ────────────────────────────────────────
- * `--au` حبرٌ لرقمٍ واحد (`.grid>.tile:first-child .v`) وخيوطٌ فيما سواه.
- * فـ`color:var(--au)` مرّةً واحدةً في الورقة، ومجموعُ النداءات دون سقفٍ مكتوب.
+ * ── قيمُ px الحرفيّة في الورقة: سقفٌ يمنع الرجوع (خطّة التصميم 10.2) ────────────
+ * كانت ‏399 قيمةً (التعليقاتُ ممحوّة)، والهدفُ ‏60 أو أقلّ (الحدودُ وما في حكمها) بعد
+ * المكوّنات (المرحلة ٢ب) ونقل الأقسام إليها (٢ج). **والسقفُ هنا ما بلغته المرحلةُ ٢أ**:
+ * رقمٌ يزيد يردّ، ورقمٌ ينقص يُخفَض السقفُ إليه في الطلب نفسِه.
  */
-const BRASS_TEXT_MAX = 1
-const BRASS_TOTAL_MAX = 15
-const sheetForBrass = strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
-const brassText = (sheetForBrass.match(/(?<![\w-])color:\s*var\(--au\)/g) ?? []).length
-const brassTotal = (sheetForBrass.match(/var\(--au\)/g) ?? []).length
-const brass = []
-if (brassText > BRASS_TEXT_MAX) brass.push(`النحاسُ حبرًا ${brassText} مرّةً — والميزانيّةُ ${BRASS_TEXT_MAX}`)
-if (brassTotal > BRASS_TOTAL_MAX) brass.push(`النحاسُ ${brassTotal} نداءً — والسقفُ ${BRASS_TOTAL_MAX}`)
+const PX_MAX = 365
+const PX_TARGET = 60
+const sheetPx = (strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
+  .match(/(?<![\w.-])-?\d*\.?\d+px\b/g) ?? []).length
+const pxOver = sheetPx > PX_MAX ? [`${sheetPx} قيمةَ px حرفيّةً في styles.ts — والسقفُ ${PX_MAX} (الهدفُ ${PX_TARGET})`] : []
 
 const literalTime = []
 for (const file of files) {
@@ -415,12 +637,24 @@ for (const [k, where] of sharedIcons) {
 
 console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
 console.log('\n═══ ميزانيّةُ النحاس ═══\n')
-if (brass.length === 0) console.log(`  ✓ حبرٌ ${brassText} · نداءاتٌ ${brassTotal} من ${BRASS_TOTAL_MAX}`)
+if (brass.length === 0) console.log(`  ✓ ${brassCount} تصريحاتٍ في الأدوار الثلاثة: ${[...COPPER_HOMES.values()].join(' · ')}`)
 for (const b of brass) console.log(`  ✕ ${b}`)
 
-console.log('\n═══ نصفُ قطرٍ خارج السلّم ═══\n')
-if (literalRadius.length === 0) console.log('  ✓ لا نصفَ قطرٍ حرفيًّا')
+console.log('\n═══ نصفُ قطرٍ خارج القائمة المغلقة ═══\n')
+if (literalRadius.length === 0) console.log(`  ✓ ${radiusVariants.length + 1} قيم: ${radiusVariants.join(' · ')} · 50%`)
 for (const [rule, where] of literalRadius) console.log(`  ✕ ${rule}  —  ${where}`)
+
+console.log('\n═══ ظلٌّ مُغبَّشٌ خارج الظلال الثلاثة ═══\n')
+if (looseShadows.length === 0) console.log('  ✓ كلُّ ارتفاعٍ من --sh-1 أو --sh-2 أو --sh-3')
+for (const [rule, where] of looseShadows) console.log(`  ✕ ${rule}  —  ${where}`)
+
+console.log('\n═══ عرضٌ يُكتب رقمًا في استعلام ═══\n')
+if (literalBreakpoints.length === 0) console.log('  ✓ كلُّ نقطةِ انكسارٍ من BP، وكلُّ حدِّ حاويةٍ من CQ')
+for (const [rule, where] of literalBreakpoints) console.log(`  ✕ ${rule}  —  ${where}`)
+
+console.log('\n═══ قيمُ px الحرفيّة في الورقة ═══\n')
+if (pxOver.length === 0) console.log(`  ✓ ${sheetPx} من سقف ${PX_MAX} (الهدفُ ${PX_TARGET})`)
+for (const p of pxOver) console.log(`  ✕ ${p}`)
 
 if (literalTime.length === 0) console.log('  ✓ لا زمنَ خارج السلّم')
 for (const [rule, where] of literalTime) console.log(`  ✕ ${rule}  —  ${where}`)
@@ -446,6 +680,7 @@ console.log(
 )
 
 const total = ghosts.length + orphans.length + literalTime.length + literalRadius.length + brass.length + spaced.length +
+  looseShadows.length + literalBreakpoints.length + pxOver.length +
   backticks.length + strayIcons.length + dupVars.length + unusedIcons.length
 if (total === 0) process.exit(0)
 
