@@ -59,8 +59,13 @@ export type Verdict =
   | { readonly kind: 'accepted'; readonly code: string; readonly description?: string }
   /** لا فحصَ لهذه المنصّة — ويُقال السببُ ولا يُدَّعى حكم. */
   | { readonly kind: 'unsupported'; readonly detail: string }
-  /** لم يُفهَم الجواب — ولا يُدَّعى حكمٌ بلا دليل. */
-  | { readonly kind: 'inconclusive'; readonly detail: string }
+  /**
+   * لم يُفهَم الجواب — ولا يُدَّعى حكمٌ بلا دليل.
+   *
+   * ‏و`unreachable` حين لم يصل الطلبُ أصلًا: يُقال للمالك «لم نصل» بجملةٍ، **لا نصُّ
+   * ‏`TypeError` خامًّا** — ويُحمَل حقلًا لا يُستخرَج من صياغة `detail` (D-054).
+   */
+  | { readonly kind: 'inconclusive'; readonly detail: string; readonly unreachable?: true }
 
 /**
  * ما تردّه المنصّةُ حين **لا تملك منحةَ رموز التطبيقات** — مقيسٌ حرفا.
@@ -129,7 +134,7 @@ export async function verifyAppCredentials(
     response = await fetchImpl(provider.tokenUrl, { method: 'POST', headers, body })
   } catch (error) {
     // عطلُ شبكةٍ ليس حكما على الزوج — ولا يُقال «سليم» ولا «مرفوض»
-    return { kind: 'inconclusive', detail: `تعذّر الوصول: ${String(error).slice(0, 120)}` }
+    return { kind: 'inconclusive', detail: `تعذّر الوصول: ${String(error).slice(0, 120)}`, unreachable: true }
   }
 
   /**

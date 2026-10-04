@@ -1000,7 +1000,9 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
 
   it('سطرُ كلِّ زرٍّ بعده داخل «بلا صورة»: الإنفوجرافيك أوّلًا، والفنّيّةُ في طيّتها (D-174)', () => {
     const html = section([draft('d1')])
-    const box = html.slice(html.indexOf('<div class="pic none">'), html.indexOf('<div class="draft-meta">'))
+    // ‏واللوحُ يحمل مرساتَه `i-…` (محطّة «الصورة» في الرئيسيّة)، فيُطلَب بصنفه لا بوسمه كاملًا
+    const box = html.slice(html.indexOf('<div class="pic none"'), html.indexOf('<div class="draft-meta">'))
+    expect(box).toContain('id="i-d1"')
     const info = box.indexOf('ولّد إنفوجرافيك')
     const art = box.indexOf('ولّد صورةً فنّيّة')
     expect(info).toBeGreaterThan(-1)
@@ -1325,5 +1327,32 @@ describe('لا رمزَ خارج زوج Plex في نصٍّ يُكتب بعد ا�
         Object.entries(g).filter(([, v]) => typeof v === 'string').map(([f, v]) => [`${k}.${f}`, v as string] as [string, string])),
     ]
     for (const [name, text] of texts) expect(FORBIDDEN.test(text), name).toBe(false)
+  })
+})
+
+/*
+ * ‏مراجعة الرحلات: **الإشعارُ لا يقع على القرار، والرابطُ لا يُفيض الخطّة.**
+ *
+ * ‏ر-0: كان الإشعارُ العائمُ في الجوّال عند ‏80px من الأسفل وصفُّ البتّ ملتصقٌ عند ‏64px، فغطّى خطأُ
+ * ‏«اعتمد» زرَّي «اعتمد» و«ارفض» حتّى يُغلَق. ر-5: رابطٌ في نصّ صفٍّ دفع المعاينةَ ‏101px جانبًا.
+ */
+describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا يُفيض الخطّة (مراجعة ر-0 ور-5)', () => {
+  it('في الجوّال يطفو الإشعارُ تحت الشريط العلويّ لا حيث يلتصق صفُّ البتّ، وفي العريض في الزاوية', () => {
+    const phone = css.rule('.toast')
+    expect(phone.top).toBe('calc(64px + var(--s-3))')
+    expect(phone.bottom).toBeUndefined()
+    // ‏و64px ارتفاعُ الشريط العلويّ نفسُه؛ وصفُّ البتّ يلتصق بالأسفل
+    expect(css.rule('.topbar')['min-height']).toBe('64px')
+    const act = css.where('.draft-foot.act')
+    expect(act.length).toBeGreaterThan(0)
+    for (const at of act) expect(css.rule('.draft-foot.act', at).bottom ?? '', at).toContain('var(--s-16)')
+    const wide = css.rule('.toast', ['', '@media(min-width:721px)'])
+    expect(wide.top).toBe('auto')
+    expect(wide.bottom).toBe('var(--s-6)')
+  })
+
+  it('ونصُّ صفّ الخطّة يُكسَر حيث لزم، وخلايا الجوّال كلُّها', () => {
+    expect(css.rule('.pi-text')['overflow-wrap']).toBe('anywhere')
+    expect(css.rule('.pi td', '@media(max-width:720px)')['overflow-wrap']).toBe('anywhere')
   })
 })

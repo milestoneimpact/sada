@@ -84,6 +84,61 @@ function at(value: string | Date): Date | null {
   return value instanceof Date ? value : parseSqliteUtc(value)
 }
 
+/** «21 سبتمبر» أو «21 سبتمبر 2025» — من أجزاءٍ قُرئت. */
+function dm(p: LocalParts, withYear: boolean): string {
+  return `${p.day} ${MONTHS[p.month - 1]}${withYear ? ` ${p.year}` : ''}`
+}
+
+/**
+ * «21 سبتمبر» — يومٌ وشهرُه، **والسنةُ حين لا تكون سنةَ `now`** (خطّة التصميم ٨٫٣).
+ * لعنوانٍ قصيرٍ لا يحتاج اسمَ اليوم: عمودُ أسبوعٍ في «ما مضى».
+ */
+export function dayMonth(value: string | Date, zone: string | null, now: Date): string {
+  const date = at(value)
+  if (date === null) return ''
+  const p = localParts(date, zone)
+  return dm(p, p.year !== localParts(now, zone).year)
+}
+
+/**
+ * مدى أيّامٍ **وآخرُه داخلٌ فيه**: «21 إلى 27 سبتمبر»، و«28 سبتمبر إلى 4 أكتوبر»
+ * حين يعبر شهرًا، والسنةُ على الطرفين حين يعبر سنةً، وعلى آخره حين لا يكون في سنة `now`.
+ *
+ * **والنهايةُ آخرُ يومٍ لا الحدُّ الذي بعده** — كان عنوانُ التقرير يكتب الاثنين
+ * التالي («21 — 28») فيُقرأ أسبوعٌ ثمانيةَ أيّام. والمستدعي يسبقه بما يناسبه:
+ * «أسبوع …» أو «من …».
+ */
+export function dayRange(first: string | Date, last: string | Date, zone: string | null, now: Date): string {
+  const a = at(first)
+  const b = at(last)
+  if (a === null || b === null) return ''
+  const p = localParts(a, zone)
+  const q = localParts(b, zone)
+  const year = q.year !== localParts(now, zone).year
+  if (p.year !== q.year) return `${dm(p, true)} إلى ${dm(q, true)}`
+  if (p.month !== q.month) return `${dm(p, false)} إلى ${dm(q, year)}`
+  if (p.day === q.day) return dm(q, year)
+  return `${p.day} إلى ${dm(q, year)}`
+}
+
+/**
+ * أوّلُ الشهر بتوقيت المالك، لحظةً بـ UTC — **ليُقارَن بما يكتبه الدفتر**.
+ *
+ * مالكٌ في الرياض يفتح اللوحةَ الواحدةَ فجرَ الأوّل من أكتوبر: شهرُه بدأ قبل ساعة،
+ * و«الشهرُ» بـ UTC ما زال سبتمبر كلَّه. فيُخمَّن منتصفُ الليل ثمّ يُصحَّح مرّتين بما
+ * يقوله `Intl` — الإزاحةُ تتبدّل مع التوقيت الصيفيّ فلا تُثبَّت. و`null` يعني UTC.
+ */
+export function monthStart(now: Date, zone: string | null): Date {
+  const p = localParts(now, zone)
+  const wanted = Date.UTC(p.year, p.month - 1, 1)
+  let guess = wanted
+  for (let i = 0; i < 2 && zone !== null; i++) {
+    const seen = localParts(new Date(guess), zone)
+    guess += wanted - Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute)
+  }
+  return new Date(guess)
+}
+
 /** مفتاحُ اليوم `YYYY-MM-DD` بمنطقة المالك — به تُجمَع الصفوفُ تحت رؤوسها. */
 export function dayKey(value: string | Date, zone: string | null): string {
   const date = at(value)

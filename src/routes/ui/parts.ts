@@ -10,6 +10,7 @@ import { GLYPH_ICON, ICON } from './icons'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { RungState } from '../../lib/platform/readiness'
+import { counted, NOUNS } from '../../lib/format'
 
 /**
  * رقاقةُ الحال — **دالّةٌ واحدةٌ ورموزٌ مرسومة** (D-154).
@@ -57,8 +58,10 @@ export function fileName(name: string): string {
  * **ويُعطى نصًّا مهرَّبًا أو وسمًا موثوقًا**، لا سِمة: الرسمُ وسمٌ، وفي `title=""` يُطبَع حرفًا.
  */
 export function pathArrows(html: string): string {
+  // ‏و«←» بين علامتَي RLM (ر-1): بين كلمتين لاتينيّتين يأخذ السهمُ اتّجاهَهما، فيصير
+  // ‏«Instagram ← API setup ← Business login settings» مقطعًا لاتينيًّا واحدًا يُقرأ معكوسًا
   return html
-    .replaceAll('←', `<span class="arw" role="img" aria-label="ثمّ">${ICON.go}</span>`)
+    .replaceAll('←', `\u200F<span class="arw" role="img" aria-label="ثمّ">${ICON.go}</span>\u200F`)
     .replaceAll('→', `<span class="arw" role="img" aria-label="ثمّ">${ICON.back}</span>`)
 }
 
@@ -212,7 +215,8 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   const never = pulses.filter((p) => p.state === 'never')
   const head =
     bad.length > 0
-      ? status('bad', '▲', `${bad.length} دورةٌ متأخّرة أو ساقطة`)
+      // ‏والفعلُ قبل المعدود فلا يُطابَق مثنّاه (D-177): «تأخّرت أو سقطت دورتان» لا «2 دورةٌ متأخّرة»
+      ? status('bad', '▲', `تأخّرت أو سقطت ${counted(bad.length, NOUNS.cycle)}`)
       : never.length === pulses.length
         ? status('idle', '○', 'لم تدُر دورةٌ بعد')
         : status('ok', '●', 'الدوراتُ في مواعيدها')
@@ -228,7 +232,8 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
       return `<li class="ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
     })
     .join('')
-  return `<div class="card"><div class="card-head"><h2>هل الآلةُ تعمل؟</h2><div class="grow"></div>${head}</div>
+  // ‏و`id` مرساةُ حبّة النظام في الرأس و«افحص الآلة» في «خطوتك التالية»
+  return `<div class="card" id="machine"><div class="card-head"><h2>هل الآلةُ تعمل؟</h2><div class="grow"></div>${head}</div>
     <p class="hint">كلُّ دورةٍ تكتب نبضةً بعد أن تدور — ولو لم تجد شيئا. والتأخّرُ دورةٌ كاملةٌ تغيب،
       لا دقائقُ cron.</p>
     <ul class="ax">${rows}</ul></div>`

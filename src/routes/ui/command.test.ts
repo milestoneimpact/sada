@@ -113,6 +113,17 @@ describe('الفهرس — ولا فعلَ يقع من هنا', () => {
     expect(labels).toContain('امسح Drive')
     expect(labels).toContain('اربط قناةً جديدة')
   })
+
+  /*
+   * ‏**والأبوابُ الثلاثةُ إلى بطاقاتها لا إلى رأس اللوح** (الخطّة 5.1، ر-2): «اكتب» و«ارفع
+   * ‏فيديو» و«خطّة من ملفّ» كانت غائبةً، لأنّ الأفعالَ لا تقبل إلّا معرّفاتِ الأقسام.
+   */
+  it('و«اكتب» و«ارفع فيديو» و«خطّة من ملفّ» تنزل إلى بطاقاتها، في اللوحة وخارجها', () => {
+    for (const [label, anchor] of [['اكتب منشورًا من مصدر', 'write'], ['ارفع فيديو', 'videos'], ['خطّة من ملفّ', 'plan-import']]) {
+      expect(buildCommands({ onPanel: true }).find((c) => c.label === label)?.href).toBe(`#${anchor}`)
+      expect(buildCommands({ onPanel: false }).find((c) => c.label === label)?.href).toBe(`/panel#${anchor}`)
+    }
+  })
 })
 
 describe('المسوّدات — ثمانٍ لا كلُّها (D-101)', () => {

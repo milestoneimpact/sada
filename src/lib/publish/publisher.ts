@@ -26,6 +26,7 @@ import {
   PublishError, type PublishResult,
 } from './platforms'
 import { publishInstagram } from './instagram'
+import { isLinkedInPage } from '../channels'
 import { mediaUrl, signMediaToken } from '../media/link'
 import { publishTikTok } from './tiktok'
 import { publishYouTube } from './youtube'
@@ -160,7 +161,7 @@ export async function publishPost(
    * **والحارسُ لـ LinkedIn وحدها**: YouTube يحفظ قناتَه بنوع `org`
    * (`identity.ts`)، فكان كلُّ رفعٍ إليها يُردّ هنا بسببٍ يخصّ LinkedIn.
    */
-  if (post.platform === 'linkedin' && post.account_kind === 'org') {
+  if (isLinkedInPage({ platform: post.platform, kind: post.account_kind })) {
     return preflightFailed(
       db, post,
       'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +

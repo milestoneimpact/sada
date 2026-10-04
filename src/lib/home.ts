@@ -16,8 +16,11 @@
  */
 import type { Db } from './tokens'
 import type { ChannelView } from './channels'
+import type { Blocker } from './limits'
+import type { Pulse } from './ops/heartbeat'
 import { unsignedAccounts } from './channels'
-import { counted, NOUNS } from './format'
+import { counted, money, NOUNS, relativeTime } from './format'
+import { clock } from './time/zone'
 
 /** عدُّ المنشورات بحالها لكلّ منصّة — ومن القاعدة كلِّها لا من الستّين الأخيرة. */
 export interface PlatformCounts {
@@ -130,6 +133,24 @@ export function nextScheduled(counts: JourneyCounts): { platform: string; at: st
   return best
 }
 
+/**
+ * أوّلُ ما ينتظر في كلّ محطّة — **معرّفُ بطاقةٍ مرسومةٍ في «المنشورات»**.
+ *
+ * كانت المحطّاتُ الأربعُ كلُّها `#posts`: المحطّةُ تعرف العددَ ولا تعرف المكان،
+ * فينزل المالكُ إلى رأس لوحٍ طولُه آلافُ البكسلات (‏١٢٩٠px على الهاتف حتّى
+ * «اعتمد»، و‏٣٠٩٠ حتّى «جدوِل»). **والمعرّفُ من الستّين المرسومة نفسِها لا
+ * من استعلامٍ ثانٍ**: بطاقةٌ لم تُرسَم مرساةٌ لا تجد شيئًا فترتدّ إلى الرئيسيّة.
+ * وغيابُه يُبقي `#posts`. وهذا جسرٌ إلى روابط اللوح المفلترة (الخطّة 5.5/6).
+ */
+export interface HomeFirsts {
+  /** أوّلُ مسوّدةٍ تنتظر القرار — بترتيب اللوح، الأحدثُ أوّلًا. */
+  readonly waiting: string | null
+  /** أوّلُ معتمَدٍ بلا موعد. */
+  readonly unscheduled: string | null
+  /** أوّلُ مفتوحٍ بلا صورة. */
+  readonly withoutImage: string | null
+}
+
 /** ما تقرؤه الرئيسيّة — حقائقُ في اليد، ولا شيءَ يُحسَب مرّتين. */
 export interface HomeFacts {
   readonly channels: readonly ChannelView[]
@@ -140,9 +161,35 @@ export interface HomeFacts {
   readonly withoutImage: number
   readonly withImage: number
   readonly openSuggestions: number
+  readonly firsts: HomeFirsts
+  /** نبضُ الدورات (D-158) — ومنه يُعرف أنّ الإرسالَ توقّف والحبّةُ خضراء. */
+  readonly pulses: readonly Pulse[]
+  /** حاجزُ الكتابة المدفوعة — من `blockerFor('draft', …)` الذي يحكم به الزرُّ نفسُه. */
+  readonly blocker: Blocker | null
+  /** منطقةُ المالك من كعكته (D-173) — ومنها ساعةُ انفتاح السقف بتوقيته. */
+  readonly zone: string | null
 }
 
 export type StepState = 'done' | 'now' | 'waiting' | 'failed'
+
+/**
+ * مرساةُ بطاقةٍ في «المنشورات» — أو رأسُ اللوح إن لم تُعرَف.
+ *
+ * ‏`d-` البطاقةُ كلُّها، و`s-` نموذجُ جدولتها، و`i-` لوحُ صورتها. **وما لم يُرسَم
+ * منها على بطاقةٍ بعينها** (معتمَدٌ بلا قناةٍ لا نموذجَ جدولةٍ له) تنزل `show()`
+ * إلى البطاقة نفسِها (`panelScript.ts`) — فلا يرتدّ الرابطُ إلى الرئيسيّة.
+ */
+function cardAt(id: string | null, part: 'd' | 's' | 'i'): string {
+  return id === null ? '#posts' : `#${part}-${id}`
+}
+
+/**
+ * سجلُّ ما فشل على منصّة — **صفُّ الفشل بسببه وزرِّ إعادته**، لا رأسُ صفحتها.
+ * كان «افتح LinkedIn» يُنزل إلى رأسها وزرُّ «أعده» على بُعد ‏٩٠٩px (ر-8).
+ */
+function failedHref(platform: string): string {
+  return `/panel/channels/${encodeURIComponent(platform)}?filter=failed#history`
+}
 
 export interface JourneyStep {
   readonly key: 'source' | 'draft' | 'image' | 'approve' | 'schedule' | 'publish' | 'results'
@@ -182,28 +229,29 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
       ? { key: 'source', title: 'المصدر', state: 'now', note: `ينتظر التحليلَ ${counted(pending, NOUNS.source)}`, href: '#sources' }
       : { key: 'source', title: 'المصدر', state: 'done', note: `حُلّل ${counted(f.sources.analyzed, NOUNS.source)}`, href: '#sources' }
 
+  // ‏و«المسوّدة» محطّةُ الكتابة: بطاقتُها آخرُ اللوح (‏٥٢٩٢px على الهاتف)، و`#posts` يُنزل إلى أوّله
   const draft: JourneyStep = written > 0
-    ? { key: 'draft', title: 'المسوّدة', state: 'done', note: `كُتبت ${counted(written, NOUNS.draft)}`, href: '#posts' }
+    ? { key: 'draft', title: 'المسوّدة', state: 'done', note: `كُتبت ${counted(written, NOUNS.draft)}`, href: '#write' }
     : f.sources.analyzed > 0
-      ? { key: 'draft', title: 'المسوّدة', state: 'now', note: 'اكتب أوّلَ مسوّدةٍ من مصدرٍ محلَّل', href: '#posts' }
-      : { key: 'draft', title: 'المسوّدة', state: 'waiting', note: 'بعد تحليل مصدر', href: '#posts' }
+      ? { key: 'draft', title: 'المسوّدة', state: 'now', note: 'اكتب أوّلَ مسوّدةٍ من مصدرٍ محلَّل', href: '#write' }
+      : { key: 'draft', title: 'المسوّدة', state: 'waiting', note: 'بعد تحليل مصدر', href: '#write' }
 
   const image: JourneyStep = f.withoutImage > 0
-    ? { key: 'image', title: 'الصورة', state: 'now', note: `بلا صورة: ${counted(f.withoutImage, NOUNS.draft)}`, href: '#posts' }
+    ? { key: 'image', title: 'الصورة', state: 'now', note: `بلا صورة: ${counted(f.withoutImage, NOUNS.draft)}`, href: cardAt(f.firsts.withoutImage, 'i') }
     : f.withImage > 0
       ? { key: 'image', title: 'الصورة', state: 'done', note: `رُسمت ${counted(f.withImage, NOUNS.image)}`, href: '#posts' }
       : { key: 'image', title: 'الصورة', state: 'waiting', note: 'إنفوجرافيك من نصّ المنشور', href: '#posts' }
 
   // ‏والفاشلُ مرّ بالاعتماد والموعد قبل أن يسقط: القيدُ في القاعدة لا يُدخل الطابورَ بلا اعتماد
   const approve: JourneyStep = drafts > 0
-    ? { key: 'approve', title: 'الاعتماد', state: 'now', note: `تنتظر قرارك ${counted(drafts, NOUNS.draft)}`, href: '#posts' }
+    ? { key: 'approve', title: 'الاعتماد', state: 'now', note: `تنتظر قرارك ${counted(drafts, NOUNS.draft)}`, href: cardAt(f.firsts.waiting, 'd') }
     : approved + queued + published + failed > 0
       ? { key: 'approve', title: 'الاعتماد', state: 'done', note: 'لا شيءَ ينتظر قرارك', href: '#posts' }
       : { key: 'approve', title: 'الاعتماد', state: 'waiting', note: 'لا يُنشر شيءٌ قبل اعتمادك', href: '#posts' }
 
   // ‏و«تامّةٌ» بما جُدول ولو نُشر كلُّه: طابورٌ فارغٌ بعد النشر ليس «بعد الاعتماد»
   const schedule: JourneyStep = approved > 0
-    ? { key: 'schedule', title: 'الموعد', state: 'now', note: `بلا موعد: ${counted(approved, NOUNS.post)}`, href: '#posts' }
+    ? { key: 'schedule', title: 'الموعد', state: 'now', note: `بلا موعد: ${counted(approved, NOUNS.post)}`, href: cardAt(f.firsts.unscheduled, 's') }
     : queued > 0
       ? { key: 'schedule', title: 'الموعد', state: 'done', note: `جُدول ${counted(queued, NOUNS.post)}`, href: '#posts' }
       : published + failed > 0
@@ -216,7 +264,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
     ? {
         key: 'publish', title: 'النشر', state: 'failed',
         note: `فشل ${counted(sumRecent(c), NOUNS.post)} — والسببُ في صفحة المنصّة`,
-        href: `/panel/channels/${recent.platform}`,
+        href: failedHref(recent.platform),
       }
     : c.publishedWeek > 0
       ? { key: 'publish', title: 'النشر', state: 'done', note: `نُشر هذا الأسبوع ${counted(c.publishedWeek, NOUNS.post)}`, href: '#channels' }
@@ -229,7 +277,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
             ? {
                 key: 'publish', title: 'النشر', state: 'waiting',
                 note: `فشل ${counted(failed, NOUNS.post)} قبل أسبوعٍ فأكثر`,
-                href: `/panel/channels/${Object.entries(c.perPlatform).find(([, p]) => p.failed > 0)?.[0] ?? ''}`,
+                href: failedHref(Object.entries(c.perPlatform).find(([, p]) => p.failed > 0)?.[0] ?? ''),
               }
             : { key: 'publish', title: 'النشر', state: 'waiting', note: 'في موعده بعد الجدولة', href: '#channels' }
 
@@ -247,14 +295,82 @@ export interface NextAction {
   readonly text: string
   readonly label: string
   readonly href: string
+  /**
+   * المحطّةُ التي يتكلّم عنها الفعل — **ومنها تُميَّز المحطّةُ في الرحلة**.
+   * كانت أوّلَ «تنتظرك» بترتيبها: «المصدر — ينتظر التحليل» مميَّزةً والفعلُ
+   * فوقها يقول «فشل منشور». فلا تقول الرحلةُ غيرَ ما يقوله الفعل.
+   */
+  readonly step?: JourneyStep['key']
+}
+
+/**
+ * دورةُ الإرسال إن تأخّرت أو فشلت — **فلا يخرج منشورٌ مجدولٌ في موعده**.
+ *
+ * و`publish` لا تُحسَب هنا: فشلُ دفعتها فشلُ منشوراتٍ يقوله فرعُ الفشل بسببه،
+ * ولا موعدَ لها فلا تتأخّر. والإرسالُ وحده يعني «لا شيءَ يخرج» (D-158).
+ */
+function stalledDispatch(pulses: readonly Pulse[]): Pulse | null {
+  return pulses.find((p) => p.job === 'dispatch' && (p.state === 'late' || p.state === 'failed')) ?? null
+}
+
+/**
+ * حبّةُ النظام في الرأس — **من النبض لا من مفتاح الإيقاف وحده**.
+ *
+ * كانت `paused ? 'موقوف' : 'يعمل'`، فبقيت خضراءَ والدوراتُ متوقّفةٌ منذ ثلاثة
+ * أيّام، والإشارةُ الوحيدةُ في بطاقة «هل الآلةُ تعمل؟» على بُعد ثلاث شاشات.
+ * و`tone` صنفُ الحبّة: `on` و`off` (برتقاليّ) و`bad`.
+ */
+export function systemPill(paused: boolean, pulses: readonly Pulse[]): { readonly tone: 'on' | 'off' | 'bad'; readonly text: string } {
+  if (paused) return { tone: 'off', text: 'موقوف مؤقتا' }
+  if (stalledDispatch(pulses) !== null) return { tone: 'bad', text: 'النشر متوقّف' }
+  if (pulses.some((p) => p.state === 'late' || p.state === 'failed')) return { tone: 'off', text: 'يعمل بتأخّر' }
+  return { tone: 'on', text: 'يعمل' }
+}
+
+/**
+ * متى يُفتح سقفُ اليوم — **بتوقيت المالك، وUTC حين لا يُعرف**.
+ *
+ * والدفترُ يُجمَع بيوم UTC (`limits.ts`)، فالسقفُ يُفتح عند منتصف ليله. وقولُ
+ * «منتصف الليل UTC» وحده يُلزم المالكَ بحسابٍ في رأسه (الخطّة 8.2).
+ */
+function capReopens(now: Date, zone: string | null): string {
+  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+  return zone === null ? 'منتصفَ الليل بتوقيت UTC' : `الساعة ${clock(midnight, zone)} بتوقيتك`
+}
+
+/**
+ * لماذا زرُّ الكتابة معطَّل — **سببٌ وموضعُ إصلاحه** (الخطّة 7.1).
+ *
+ * كان الزرُّ مفعَّلًا والسقفُ بالغ: يُضغَط فيُردّ، ويُرمى المالكُ إلى رأس اللوح
+ * برسالةٍ «بلغ سقف الإنفاق» بلا ما يفعله. والحكمُ من `blockerFor('draft', …)`
+ * نفسِه الذي يحكم به النداء، فلا يفترق الزرُّ عن الحارس.
+ */
+export function writeBlock(
+  blocker: Blocker | null,
+  now: Date,
+  zone: string | null,
+): { readonly text: string; readonly label: string; readonly href: string } | null {
+  if (blocker === null) return null
+  if (blocker.kind === 'paused') {
+    return { text: 'النظامُ موقوفٌ بقرارك — فلا كتابة.', label: 'استأنف من الحدود', href: '#settings' }
+  }
+  if (blocker.kind === 'spend_cap') {
+    return {
+      text: `بلغتَ سقفَ الإنفاق اليوم: ${money(blocker.used)} من ${money(blocker.cap)}. يُفتح ${capReopens(now, zone)}.`,
+      label: 'ارفع السقف من الحدود',
+      href: '#c2',
+    }
+  }
+  return null
 }
 
 /**
  * **فعلٌ واحد** — والترتيبُ مكتوبٌ لا مُستنتَج:
- * ما يوقف النشرَ صامتًا (إذنٌ انتهى، حسابٌ بلا إذن، إيقاف، فشل)، ثمّ ما يفتح
- * الطريق (ربطُ منصّة، مصدر)، ثمّ ما ينتظر قرارك (مسوّدات، مواعيد).
+ * ما يوقف النشرَ صامتًا (إذنٌ انتهى، حسابٌ بلا إذن، إيقاف، إرسالٌ متوقّف، فشل)،
+ * ثمّ ما يوقف التوليد (سقفُ اليوم)، ثمّ ما يفتح الطريق (ربطُ منصّة، مصدر)،
+ * ثمّ ما ينتظر قرارك (مسوّدات، مواعيد).
  */
-export function nextAction(f: HomeFacts): NextAction {
+export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   const stale = f.channels.find((c) => c.state === 'needs_reauth')
   if (stale !== undefined) {
     return {
@@ -272,13 +388,37 @@ export function nextAction(f: HomeFacts): NextAction {
   if (f.paused) {
     return { tone: 'warn', text: 'النظامُ موقوفٌ بقرارك — لا مسحَ ولا تحليلَ ولا نشر.', label: 'استأنف من الإعدادات', href: '#settings' }
   }
+  /*
+   * ‏والإرسالُ المتوقّف قبل الفشل: الفشلُ يُرى بسببه، والتوقّفُ صامت — كانت الحبّةُ
+   * ‏خضراءَ و«خطوتك التالية» كما هي ودوراتُ النشر متوقّفةٌ منذ ثلاثة أيّام
+   */
+  const stall = stalledDispatch(f.pulses)
+  if (stall !== null) {
+    const when = stall.beat === null ? '' : relativeTime(stall.beat.at, now)
+    return {
+      tone: 'bad',
+      text: stall.state === 'failed'
+        ? `النشرُ المجدولُ متوقّف — فشل الإرسالُ آخرَ مرّة${when === '' ? '' : ` (${when})`}، فلا يخرج منشورٌ في موعده.`
+        : `النشرُ المجدولُ متوقّف — آخرُ مرّةٍ عمل فيها الإرسالُ ${when}، فلا يخرج منشورٌ في موعده.`,
+      label: 'افحص الآلة', href: '#machine', step: 'publish',
+    }
+  }
   // ‏وفشلُ الأسبوع وحده: القديمُ يبقى بسببه وزرِّ إعادته في صفحة منصّته، ولا يحجب كلَّ فعلٍ بعده
   const failure = recentFailure(f.counts)
   if (failure !== null) {
     const label = f.channels.find((c) => c.spec.id === failure.platform)?.spec.label ?? failure.platform
     return {
-      tone: 'bad', text: `فشل على ${label} ${counted(failure.n, NOUNS.post)} — والسببُ وزرُّ الإعادة في صفحتها.`,
-      label: `افتح ${label}`, href: `/panel/channels/${failure.platform}`,
+      tone: 'bad', text: `فشل على ${label} ${counted(failure.n, NOUNS.post)} — والسببُ وزرُّ الإعادة في سجلّها.`,
+      label: failure.n === 1 ? 'أصلح المنشور' : 'أصلح المنشورات', href: failedHref(failure.platform), step: 'publish',
+    }
+  }
+  // ‏وسقفُ اليوم لا يوقف النشر (D-169) ويوقف كلَّ ما يُولَّد: يُقال هنا لا في بلاطةٍ على بُعد شاشتين
+  if (f.blocker?.kind === 'spend_cap') {
+    return {
+      tone: 'warn',
+      text: `بلغ إنفاقُ اليوم سقفَه: ${money(f.blocker.used)} من ${money(f.blocker.cap)}. لا كتابةَ ولا صورةَ حتّى ${
+        capReopens(now, f.zone)}، والنشرُ ماضٍ في موعده.`,
+      label: 'ارفع السقف', href: '#c2',
     }
   }
   const linked = f.channels.some((c) => c.state === 'linked')
@@ -290,17 +430,24 @@ export function nextAction(f: HomeFacts): NextAction {
   // ‏و«لا مصدر» حين لا شيءَ أصلًا: المقطعُ والخطّةُ من ملفٍّ يكتبان بلا Drive (D-180، D-181)
   const written = drafts + approved + total(f.counts, 'queued') + total(f.counts, 'published') + total(f.counts, 'failed')
   if (f.sources.total === 0 && written === 0) {
-    return { tone: 'warn', text: 'لا مصدرَ بعد — ضع ملفًّا في مجلّد Drive المشترَك ثمّ امسحه.', label: 'اذهب إلى المصادر', href: '#sources' }
+    return { tone: 'warn', text: 'لا مصدرَ بعد — ضع ملفًّا في مجلّد Drive المشترَك ثمّ امسحه.', label: 'اذهب إلى المصادر', href: '#sources', step: 'source' }
   }
   const pending = f.sources.total - f.sources.analyzed
   if (drafts === 0 && f.sources.analyzed === 0 && pending > 0) {
-    return { tone: 'ok', text: `ينتظر التحليلَ ${counted(pending, NOUNS.source)} — ومنه تُكتب المسوّدات.`, label: 'حلّل مصدرًا', href: '#sources' }
+    return { tone: 'ok', text: `ينتظر التحليلَ ${counted(pending, NOUNS.source)} — ومنه تُكتب المسوّدات.`, label: 'حلّل مصدرًا', href: '#sources', step: 'source' }
   }
+  // ‏والزرُّ يُنزل إلى البطاقة التي يتكلّم عنها — الأولى بترتيب اللوح — لا إلى رأسه
   if (drafts > 0) {
-    return { tone: 'ok', text: `تنتظر قرارك ${counted(drafts, NOUNS.draft)} — ولا يُنشر شيءٌ قبله.`, label: 'راجع المسوّدات', href: '#posts' }
+    return {
+      tone: 'ok', text: `تنتظر قرارك ${counted(drafts, NOUNS.draft)} — ولا يُنشر شيءٌ قبله.`,
+      label: 'راجع المسوّدات', href: cardAt(f.firsts.waiting, 'd'), step: 'approve',
+    }
   }
   if (approved > 0) {
-    return { tone: 'ok', text: `معتمَدٌ بلا موعد: ${counted(approved, NOUNS.post)}.`, label: 'حدّد المواعيد', href: '#posts' }
+    return {
+      tone: 'ok', text: `معتمَدٌ بلا موعد: ${counted(approved, NOUNS.post)}.`,
+      label: 'حدّد المواعيد', href: cardAt(f.firsts.unscheduled, 's'), step: 'schedule',
+    }
   }
   const next = nextScheduled(f.counts)
   if (next !== null) {
@@ -311,7 +458,8 @@ export function nextAction(f: HomeFacts): NextAction {
   if (f.sources.total === 0) {
     return { tone: 'ok', text: 'لا شيءَ ينتظرك — ارفع مقطعًا أو استورد خطّةً لتبدأ دورةً جديدة.', label: 'ارفع مقطعًا', href: '#videos' }
   }
-  return { tone: 'ok', text: 'لا شيءَ ينتظرك — اكتب من مصدرٍ محلَّلٍ لتبدأ دورةً جديدة.', label: 'اكتب من مصدر', href: '#posts' }
+  // ‏وإلى بطاقة الكتابة نفسِها: `#posts` كان يُنزل إلى رأس اللوح، والبطاقةُ آخرُه
+  return { tone: 'ok', text: 'لا شيءَ ينتظرك — اكتب من مصدرٍ محلَّلٍ لتبدأ دورةً جديدة.', label: 'اكتب من مصدر', href: '#write', step: 'draft' }
 }
 
 export interface PlatformTile {

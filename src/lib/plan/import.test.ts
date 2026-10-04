@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import type { LinkedAccount } from '../channels'
 import type { UploadRow } from '../media/uploads'
-import { applyPlan, parseCsv, PLAN_TEMPLATE, readPlan, rowKey, zonedToUtc, type PlanFacts } from './import'
+import { applyPlan, dateOrder, parseCsv, PLAN_TEMPLATE, readPlan, readWhen, rowKey, type PlanFacts } from './import'
 
 const NOW = new Date('2026-10-03T08:00:00Z')
 
@@ -13,7 +13,7 @@ const account = (over: Partial<LinkedAccount>): LinkedAccount => ({
 })
 const upload = (over: Partial<UploadRow> = {}): UploadRow => ({
   id: 'up1', r2Key: 'upload/up1.mp4', name: 'قيادة المعالم.mp4', mime: 'video/mp4', bytes: 50_000_000,
-  width: 1080, height: 1920, durationMs: 42_000, status: 'ready', createdAt: '2026-10-02 10:00:00', platforms: [], ...over,
+  width: 1080, height: 1920, durationMs: 42_000, status: 'ready', createdAt: '2026-10-02 10:00:00', posts: [], ...over,
 })
 const facts = (over: Partial<PlanFacts> = {}): PlanFacts => ({
   accounts: [account({}), account({ id: 'acc-yt', platform: 'youtube', displayName: 'قناة عمر' })],
@@ -35,13 +35,45 @@ describe('parseCsv', () => {
   })
 })
 
-describe('zonedToUtc', () => {
+describe('readWhen', () => {
+  const utc = (date: string, time: string, zone = 'Asia/Riyadh', order: 'dmy' | 'mdy' = 'dmy'): string | null =>
+    readWhen(date, time, zone, order)?.at.toISOString() ?? null
+
   it('الرياض +3 بلا صيف، ولندن تتبع صيفَها، والتاريخُ الذي لا وجودَ له يُردّ', () => {
-    expect(zonedToUtc('2026-10-12', '09:30', 'Asia/Riyadh')!.toISOString()).toBe('2026-10-12T06:30:00.000Z')
-    expect(zonedToUtc('2026-07-01', '12:00', 'Europe/London')!.toISOString()).toBe('2026-07-01T11:00:00.000Z')
-    expect(zonedToUtc('2026-12-01', '12:00', 'Europe/London')!.toISOString()).toBe('2026-12-01T12:00:00.000Z')
-    expect(zonedToUtc('2026-02-31', '10:00', 'Asia/Riyadh')).toBeNull()
-    expect(zonedToUtc('12/10/2026', '10:00', 'Asia/Riyadh')).toBeNull()
+    expect(utc('2026-10-12', '09:30')).toBe('2026-10-12T06:30:00.000Z')
+    expect(utc('2026-07-01', '12:00', 'Europe/London')).toBe('2026-07-01T11:00:00.000Z')
+    expect(utc('2026-12-01', '12:00', 'Europe/London')).toBe('2026-12-01T12:00:00.000Z')
+    expect(utc('2026-02-31', '10:00')).toBeNull()
+  })
+
+  it('ما يكتبه Excel وSheets ولوحةُ المفاتيح العربيّة يُفهم (ر-5)', () => {
+    // ‏اليومُ أوّلًا كما في الإعداد العربيّ
+    expect(utc('9/10/2026', '9:30 AM')).toBe('2026-10-09T06:30:00.000Z')
+    expect(utc('09-10-2026', '09:30:00')).toBe('2026-10-09T06:30:00.000Z')
+    // ‏وإن زاد الثاني على 12 فهو اليوم، وملفٌّ أمريكيُّ الترتيب شهرٌ ثمّ يوم
+    expect(utc('10/13/2026', '9:30')).toBe('2026-10-13T06:30:00.000Z')
+    expect(utc('10/9/2026', '9:30 AM', 'Asia/Riyadh', 'mdy')).toBe('2026-10-09T06:30:00.000Z')
+    // ‏الأرقامُ العربيّة، و«ص» و«م» وPM
+    expect(utc('٢٠٢٦-١٠-٠٩', '١٠:٠٠')).toBe('2026-10-09T07:00:00.000Z')
+    expect(utc('2026-10-09', '9:00 م')).toBe('2026-10-09T18:00:00.000Z')
+    expect(utc('2026-10-09', '٩ مساءً')).toBe('2026-10-09T18:00:00.000Z')
+    expect(utc('2026-10-09', '12:15 ص')).toBe('2026-10-08T21:15:00.000Z')
+    expect(utc('2026-10-09', '12:15 PM')).toBe('2026-10-09T09:15:00.000Z')
+    // ‏وخليّةُ تاريخٍ تحمل وقتَها تكفي إن خلت خليّةُ الوقت
+    expect(utc('10/9/2026 9:30', '')).toBe('2026-09-10T06:30:00.000Z')
+    expect(utc('2026-10-09 00:00:00', '9:30')).toBe('2026-10-09T06:30:00.000Z')
+  })
+
+  it('وما لا يُفهم يُردّ ولا يُخمَّن', () => {
+    for (const [date, time] of [['2026-10-09', '9'], ['2026-10-09', '13:00 م'], ['13/13/2026', '9:30'], ['غدًا', '9:30'], ['2026-10-09', '25:00']]) {
+      expect(utc(date!, time!), `${date} ${time}`).toBeNull()
+    }
+  })
+
+  it('ترتيبُ الملفّ من صفوفه: يومٌ فوق 12 أوّلًا يحسمه، والافتراضُ اليومُ أوّلًا', () => {
+    expect(dateOrder(['10/9/2026', '10/13/2026'])).toBe('mdy')
+    expect(dateOrder(['10/9/2026', '13/10/2026'])).toBe('dmy')
+    expect(dateOrder(['10/9/2026', '2026-10-09'])).toBe('dmy')
   })
 })
 
@@ -84,6 +116,18 @@ describe('readPlan', () => {
     expect(rows[5]!.problems[0]).toContain('LinkedIn لا تنشر المقطعَ')
     expect(rows[6]!.problems).toEqual([])
     expect(rows[7]!.problems).toEqual(['مكرّرٌ للسطر 8'])
+  })
+
+  it('الموعدُ كما فُهم يُحمَل ولو مضى، والخطأُ بلغة المالك لا بصيغة مطوّر (ر-5)', () => {
+    const csv = 'التاريخ,الوقت,المنصة,النص\n10/9/2026,9:30 AM,linkedin,أوّل\n10/13/2026,9:30,linkedin,ثانٍ\n2026-10-09,بعد الظهر,linkedin,ثالث\n'
+    const rows = readPlan(csv, facts()).rows
+    // ‏ملفٌّ فيه «10/13» شهرٌ ثمّ يوم: «10/9» أكتوبر لا سبتمبر
+    expect(rows[0]).toMatchObject({ whenUtc: '2026-10-09T06:30', understoodUtc: '2026-10-09T06:30', local: '2026-10-09 09:30', problems: [] })
+    expect(rows[1]!.problems).toEqual([])
+    expect(rows[2]!.problems[0]).toBe('لم أفهم الموعد «2026-10-09 بعد الظهر» — اكتبه مثل 2026-10-09 و9:30')
+    // ‏وما مضى يُفهم ويُعرض ويُردّ بسببه
+    const past = readPlan('date,time,platform,text\n1/10/2026,9:00,linkedin,نصّ\n', facts()).rows[0]!
+    expect(past).toMatchObject({ whenUtc: null, understoodUtc: '2026-10-01T06:00', problems: ['الموعدُ مضى أو أقربُ من ربع ساعة'] })
   })
 
   it('الملفُّ كلُّه يُردّ: عنوانٌ ناقص، أو فارغ', () => {
@@ -135,6 +179,9 @@ describe('مراجعة D-182', () => {
     // ‏ومنطقةٌ في عمودها تغيّر الموعدَ فتغيّر المفتاح
     const c = readPlan('date,time,platform,text,zone\n2026-10-12,09:30,linkedin,نصّ,Europe/London\n', facts()).rows[0]!
     expect(await rowKey(c)).not.toBe(await rowKey(a))
+    // ‏والملفُّ نفسُه بعد أن أعاد Excel حفظَ تواريخه («12/10/2026» و«9:30 AM») مفتاحٌ واحد: لا منشورَ مكرّر
+    const excel = readPlan('date,time,platform,text\n12/10/2026,9:30 AM,linkedin,نصّ\n', facts()).rows[0]!
+    expect(await rowKey(excel)).toBe(await rowKey(a))
   })
 
   it('النصُّ نفسُه مجدولٌ في موعدٍ آخر يُردّ بموعده المحلّيّ، والموعدُ نفسُه ليس مكرّرًا', () => {

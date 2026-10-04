@@ -96,6 +96,30 @@ describe('ما يدخل التقرير', () => {
     expect(report.published).toBe(1)
   })
 
+  /**
+   * **والحدُّ بصيغة القاعدة لا بصيغة ISO.** العمودُ يكتبه `datetime('now')`
+   * بمسافة («2026-09-21 10:00:00»)، والحدُّ كان `toISOString()` بحرف `T`،
+   * والمسافةُ أصغرُ من `T` في المقارنة النصّيّة: فكان صفُّ الاثنين الأوّل
+   * خارجًا وصفُّ الاثنين التالي داخلًا — فمجموعٌ صوابُه 11 خرج 110.
+   */
+  it('اثنينُ الأسبوع يدخل والاثنينُ التالي لا يدخل — بالصيغة التي يكتبها SQLite', async () => {
+    const from = new Date('2026-09-21T00:00:00Z')
+    const to = new Date('2026-09-28T00:00:00Z')
+    published('mon', 'x', '2026-09-21 10:00:00')
+    published('sun', 'x', '2026-09-27 20:00:00')
+    published('next', 'x', '2026-09-28 01:00:00')
+    db.raw.exec(
+      `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, at)
+       VALUES ('m', 'x', 'post', 1, 1, 1, '2026-09-21 10:00:00'),
+              ('s', 'x', 'post', 1, 10, 10, '2026-09-27 20:00:00'),
+              ('n', 'x', 'post', 1, 100, 100, '2026-09-28 01:00:00')`,
+    )
+    const { report, posts } = await buildWeekly(db, from, to)
+    expect(posts.map((p) => p.id)).toEqual(['mon', 'sun'])
+    expect(report.published).toBe(2)
+    expect(report.spendUsd).toBe(11)
+  })
+
   it('ومسوّدةٌ لم تخرج لا تدخل — ولو كانت حالتُها تقول غير ذلك', async () => {
     db.raw.exec(
       `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
@@ -192,6 +216,21 @@ describe('الترتيبُ داخل النافذة', () => {
 
   it('وغيرُ المقيس لا يدخل الترتيب', () => {
     expect(topOf([post('a', null, null, null), post('b', null, null, null)])).toBeNull()
+  })
+
+  /**
+   * **وواحدٌ وحده يُرى ولو لم يُرتَّب.** كان التقريرُ يقول «لا ترتيب» فلا
+   * يعرف المالكُ أيُّ منشورٍ جلب ظهورَ أسبوعه — والقاعدةُ نفسُها لم تتغيّر.
+   */
+  it('والمنشورُ الوحيدُ يُحفَظ باسمه، ولا يُحفَظ حين يكون معه غيرُه', () => {
+    const lone = summarize([post('a', '72h', 1975, 58)], FROM, TO, 0)
+    expect(lone.top).toBeNull()
+    expect(lone.only?.id).toBe('a')
+    expect(lone.only?.impressions).toBe(1975)
+
+    const pair = summarize([post('a', '24h', 10, 1), post('b', null, null, null)], FROM, TO, 0)
+    expect(pair.only).toBeUndefined()
+    expect('only' in summarize([], FROM, TO, 0)).toBe(false)
   })
 })
 

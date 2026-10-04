@@ -270,6 +270,8 @@ writeAudited(
     current: stored,
     promoCapUsd: 20,
     now,
+    // ‏«هذا الشهر حتّى اليوم» تحت الرأس (ر-10)
+    month: { total: 7.62, utc: false },
     suggestions: [
       {
         postId: 'a', platform: 'x',

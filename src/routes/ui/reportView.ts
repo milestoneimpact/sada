@@ -20,11 +20,12 @@ import { escapeHtml } from './shell'
 import { platformLabel } from '../../lib/oauth/providers'
 import { historyBars } from './chart'
 import { toHijri } from '../../lib/analyze/hijri'
-import { money, relativeTime } from '../../lib/format'
-import type { PlatformSlice, StoredReport, WeeklyReport } from '../../lib/report/weekly'
+import { counted, money, NOUNS, relativeTime } from '../../lib/format'
+import type { PlatformSlice, ReportPost, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
 import { windowLabel } from '../../lib/metrics/job'
+import { dayMonth, dayRange } from '../../lib/time/zone'
 
 
 /** رقمٌ ومعه من كم صفٍّ جُمع — والفراغُ يُقال ولا يُصفَّر. */
@@ -38,6 +39,35 @@ function sum(label: string, value: number | null, from: number, of: number): str
 }
 
 /**
+ * «21 إلى 27 سبتمبر» — **والحدُّ الأعلى الاثنينُ التالي، فآخرُ يومٍ قبله** (خطّة
+ * التصميم ٥٫٨). كان العنوانُ «2026-09-21 — 2026-09-28» بحجم العنوان، فيُقرأ أسبوعٌ
+ * ثمانيةَ أيّام. والأسبوعُ أيّامٌ بـ UTC كما حدّه `weekBounds`، فلا منطقةَ تُزيحه.
+ */
+function weekOf(from: string, to: string, now: Date): string {
+  const a = Date.parse(from)
+  const b = Date.parse(to)
+  if (Number.isNaN(a) || Number.isNaN(b)) return `${from.slice(0, 10)} — ${to.slice(0, 10)}`
+  return dayRange(new Date(a), new Date(Math.max(a, b - 86_400_000)), null, now)
+}
+
+/** «21 سبتمبر» — أوّلُ الأسبوع وحده، لعمودٍ في «ما مضى» تبدأ مقاييسُه من خطٍّ واحد. */
+function weekStart(from: string, now: Date): string {
+  const a = Date.parse(from)
+  return Number.isNaN(a) ? '' : dayMonth(new Date(a), null, now)
+}
+
+/** رابطُ المنشور إلى سجلّه — **فرقمٌ في التقرير يوصل إلى صاحبه** (D-104). */
+function recordLink(post: ReportPost): string {
+  return `<a class="tap" href="/panel/journey/${escapeHtml(encodeURIComponent(post.id))}">سجلُّه</a>`
+}
+
+/** أوّلُ سطرٍ من المنشور، مقصوصًا — ما يكفي ليُعرَف أيُّها هو. */
+function firstLine(text: string): string {
+  const line = text.split('\n').find((l) => l.trim() !== '')?.trim() ?? ''
+  return line.length > 160 ? `${line.slice(0, 160)}…` : line
+}
+
+/**
  * صفُّ منصّةٍ في «ما خرج» — **صفٌّ لا بطاقةٌ في بطاقة** (D-140).
  *
  * كانت كلُّ منصّةٍ بطاقةً داخل البطاقة: شعارٌ واسمٌ في سطر، ورقاقةٌ في طرفه
@@ -46,10 +76,12 @@ function sum(label: string, value: number | null, from: number, of: number): str
  */
 function sliceCard(s: PlatformSlice): string {
   const logo = LOGOS[s.platform] ?? ''
+  // ‏والصفُّ يوصل إلى شاشة المنصّة (ر-7): مقاييسُ كلِّ منشورٍ هناك، وكان التقريرُ بلا رابطٍ واحد
   return `<div class="slice">
     <div class="plat-logo">${logo}</div>
     <div class="slice-id"><h3>${escapeHtml(platformLabel(s.platform))}</h3>
-      <span class="chip">${s.published} منشورا · قِيس ${s.measured}</span></div>
+      <span class="chip">${escapeHtml(counted(s.published, NOUNS.post))} · قِيس ${s.measured}</span>
+      <a class="tap" href="/panel/channels/${escapeHtml(s.platform)}">اعرض منشوراتها</a></div>
     <div class="stats">
       ${sum('ظهور', s.impressions, s.impressionsFrom, s.published)}
       ${sum('تفاعل', s.interactions, s.interactionsFrom, s.published)}
@@ -57,10 +89,25 @@ function sliceCard(s: PlatformSlice): string {
   </div>`
 }
 
+/**
+ * «هذا الشهر حتّى اليوم» تحت رأس النتائج (ر-10) — **حيٌّ لا من التقرير**: التقريرُ
+ * شهادةٌ على أسبوعٍ مضى، وهذا ما في الدفتر الآن. والرقمُ يفتح حدودَ الإنفاق.
+ */
+export interface MonthSpend {
+  readonly total: number
+  /** حُسب الشهرُ بـ UTC لأنّ منطقةَ المالك لم تصل — فيُقال. */
+  readonly utc: boolean
+}
+
+function monthLine(m: MonthSpend | undefined): string {
+  if (m === undefined) return ''
+  return `<div class="sub">هذا الشهر حتّى اليوم:
+    <a class="tap" href="/panel#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت UTC' : ''}</div>`
+}
+
 /** جسدُ تقريرٍ واحد. */
-export function reportBody(r: WeeklyReport, now: Date): string {
-  const span =
-    `${escapeHtml(r.from.slice(0, 10))} — ${escapeHtml(r.to.slice(0, 10))}`
+export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): string {
+  const span = `أسبوع ${escapeHtml(weekOf(r.from, r.to, now))}`
 
   /*
    * **والهجريُّ حيث الموسمُ معنًى — لا في كلّ تاريخ** (D-106).
@@ -83,19 +130,39 @@ export function reportBody(r: WeeklyReport, now: Date): string {
     : `<span class="pill" title="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
         >${escapeHtml(h.season)}</span>`
 
+  /*
+   * **ومنشورٌ وحيدٌ يُرى ولو لم يُرتَّب** (ر-7). كان الأسبوعُ بمنشورٍ واحدٍ يقول
+   * «لا ترتيب» ويسكت، فلا يعرف المالكُ أيُّ منشورٍ جلب ظهورَه. وقاعدةُ الترتيب
+   * كما هي: واحدٌ وحده ليس ترتيبًا، **لكنّه صاحبُ الرقم**. وتقريرٌ كُتب قبل
+   * الحقل `only` يبقى على فقرته.
+   */
+  const lone = r.top === null ? r.only : undefined
   const top =
-    r.top === null
+    lone !== undefined
+      ? `<div class="outcome ok">
+          <span class="k">${lone.window === null
+            ? 'لم يُقَس بعد'
+            : `في نافذة ${escapeHtml(windowLabel(lone.window))}`}</span>
+          <span class="v">${escapeHtml(firstLine(lone.text))} ${recordLink(lone)}</span>
+        </div>
+        ${lone.window === null ? '' : `<div class="stats">
+          ${sum('ظهور', lone.impressions, lone.impressions === null ? 0 : 1, 1)}
+          ${sum('تفاعل', lone.interactions, lone.interactions === null ? 0 : 1, 1)}
+        </div>`}
+        <p class="hint">خرج وحدَه هذا الأسبوع، <b>فلا ترتيب</b>: الترتيبُ يحتاج منشورَين
+          فأكثر في نافذةٍ واحدة.</p>`
+      : r.top === null
       ? `<p class="hint"><b>لا ترتيبَ في هذا الأسبوع.</b> الترتيبُ يقع داخل نافذةٍ
          واحدة، ويحتاج <b>اثنين فأكثر</b> فيها — وواحدٌ وحده ليس ترتيبا.</p>`
       : `<div class="outcome ok">
           <span class="k">الأوّلُ في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
           <span class="v">${escapeHtml(r.top.post.text.slice(0, 160))}${
             r.top.post.text.length > 160 ? '…' : ''
-          }</span>
+          } ${recordLink(r.top.post)}</span>
         </div>
         <p class="hint">رُتِّب <b>${
           r.top.basis === 'rate' ? 'بنسبة التفاعل إلى الظهور' : 'بعدد التفاعل'
-        }</b> بين <b>${r.top.cohort}</b> منشورات في النافذة نفسِها.${
+        }</b> بين <b>${escapeHtml(counted(r.top.cohort, NOUNS.post, 'gen'))}</b> في النافذة نفسِها.${
           r.top.basis === 'count'
             ? ' <b>والنسبةُ لم تُستعمَل</b> لأنّ الظهورَ ناقصٌ عند بعضهم، ' +
               'ونسبةٌ على ظهورٍ ناقصٍ تكافئ من لم يُقَس.'
@@ -114,8 +181,13 @@ export function reportBody(r: WeeklyReport, now: Date): string {
       <p class="lede">${
         r.published === 0
           ? 'لا منشورَ خرج في هذه المدّة.'
-          : `${r.published} منشورا خرجت، قِيس منها <b>${r.measured}</b>.`
+          // ‏والعددُ من «counted» (D-177): «خرج منشورٌ واحد، وقِيس» لا «1 منشورا خرجت»
+          : r.published === 1
+            ? `خرج منشورٌ واحد، ${r.measured === 1 ? 'وقِيس' : 'ولم يُقَس بعد'}.`
+            : `خرج ${escapeHtml(counted(r.published, NOUNS.post))}، قِيس ${
+              r.published === 2 ? 'منهما' : 'منها'} <b>${r.measured}</b>.`
       }</p>
+      ${monthLine(month)}
     </div>
   </div>
 
@@ -131,7 +203,7 @@ export function reportBody(r: WeeklyReport, now: Date): string {
   </div>
 
   <div class="card">
-    <h2>الأفضلُ داخل نافذته</h2>
+    <h2>${lone === undefined ? 'الأفضلُ داخل نافذته' : 'منشورُ الأسبوع'}</h2>
     ${top}
   </div>
 
@@ -152,6 +224,8 @@ export interface ReportScreenData {
   readonly suggestions: readonly OpenSuggestion[]
   readonly promoCapUsd: number
   readonly now: Date
+  /** «هذا الشهر حتّى اليوم» من الدفتر — يُرسَم تحت الرأس حين يُمرَّر (ر-10). */
+  readonly month?: MonthSpend
 }
 
 /** بطاقةُ توصيةٍ — **ومعها المبلغُ ومصدرُه، وزرّان لا زرُّ إنفاق.** */
@@ -192,8 +266,9 @@ export function reportScreen(d: ReportScreenData): string {
           <h1>لا تقريرَ بعد</h1>
           <p class="lede">يُكتب <b>فجرَ كلّ اثنين</b> عن الأسبوع الذي سبقه.
             ولا يُحسَب عند الفتح: هو <b>شهادةٌ على وقتٍ مضى</b>.</p>
+          ${monthLine(d.month)}
         </div></div>`
-      : reportBody(d.current.body, d.now)
+      : reportBody(d.current.body, d.now, d.month)
 
   const promo =
     d.promoCapUsd <= 0
@@ -202,7 +277,7 @@ export function reportScreen(d: ReportScreenData): string {
           <div class="outcome warn"><span class="k">لا سقفَ موضوع</span>
             <span class="v"><b>ولا مبلغَ يُقترَح بلا سقفٍ تضعه.</b>
               رقمٌ نؤلّفه نحن رقمٌ بلا مصدر — وهذه تقترح مالا لا كتابة.
-              ضع <span class="mono">سقفَ الترويج الأسبوعيّ</span> في الإعدادات
+              <a class="tap" href="/panel#c3">ضع سقفَ الترويج الأسبوعيّ</a>
               لتُكتَب التوصيات.</span></div>
         </div>`
       : d.suggestions.length === 0
@@ -226,7 +301,8 @@ export function reportScreen(d: ReportScreenData): string {
           <p class="hint">ما خرج أسبوعًا بأسبوع، <b>ومع كلّ عمودٍ عددُ المقيس</b> — فلا
             نسبةَ بين أسبوعين قِيس أحدُهما نصفَ قياس.</p>
           ${historyBars(d.reports.map((r) => ({
-            label: r.id, value: r.body.published, measured: r.body.measured, href: `/panel/report/${r.id}`,
+            label: weekStart(r.body.from, d.now) || r.id,
+            value: r.body.published, measured: r.body.measured, href: `/panel/report/${r.id}`,
           })))}
           <div class="scroll"><table>
             <thead><tr><th>الأسبوع</th><th>خرج</th><th>قِيس</th><th>أُنفق</th></tr></thead>
@@ -235,7 +311,7 @@ export function reportScreen(d: ReportScreenData): string {
                 (r) => `<tr>
                   <td data-label="الأسبوع"><a href="/panel/report/${escapeHtml(
                     r.id,
-                  )}">${escapeHtml(r.id)}</a></td>
+                  )}">${escapeHtml(weekOf(r.body.from, r.body.to, d.now))}</a></td>
                   <td data-label="خرج">${r.body.published}</td>
                   <td data-label="قِيس">${r.body.measured}</td>
                   <td data-label="أُنفق">${escapeHtml(money(r.body.spendUsd))}</td>

@@ -32,7 +32,7 @@ function fakeQueue() {
 }
 
 async function seedAccount(options: {
-  platform?: 'linkedin' | 'x'
+  platform?: 'linkedin' | 'x' | 'tiktok' | 'youtube' | 'instagram'
   status?: string
   name?: string
 } = {}): Promise<string> {
@@ -54,7 +54,7 @@ async function seedAccount(options: {
 }
 
 async function seedPost(options: {
-  platform?: 'linkedin' | 'x'
+  platform?: 'linkedin' | 'x' | 'tiktok' | 'youtube' | 'instagram'
   status?: string
   approved?: boolean
 } = {}): Promise<string> {
@@ -422,5 +422,62 @@ describe('منشورٌ بصورة', () => {
 
     expect(out.ok).toBe(true)
     expect((await readPost(post))?.['status']).toBe('queued')
+  })
+})
+
+/**
+ * **ومنشورٌ يعرف الناشرُ أنّه سيردّه لا يُجدوَل** (رحلتا R-2 وR-4).
+ *
+ * مسوّدةُ TikTok من مصدرٍ اعتُمدت وجُدولت بلا مقطع: «✓ جُدولت» على البطاقة، ثمّ ردّها
+ * الناشرُ عند موعدها بـ `no_clip`. فالسؤالُ نفسُه يُسأل الآن بمنصّات الناشر نفسِها.
+ */
+describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () => {
+  async function withMedia(post: string, mime: string, status = 'ready'): Promise<void> {
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key, status)
+         VALUES (?, ?, ?, ?, 100, '', 'm', ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), post, `m/${post}/${mime}`, mime, `m:${post}:${mime}:${status}`, status)
+      .run()
+  }
+
+  it('TikTok بلا مقطعٍ تُردّ بسببٍ يقول ما يُفعَل — وتبقى معتمَدة', async () => {
+    const post = await seedPost({ platform: 'tiktok' })
+    const account = await seedAccount({ platform: 'tiktok' })
+    const out = await schedulePost(db, post, account, SOON, NOW)
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('TikTok تحتاج مقطعًا')
+    expect((await readPost(post))?.['status']).toBe('approved')
+  })
+
+  it('وYouTube بصورةٍ وحدَها تُردّ كذلك، وبمقطعٍ جاهزٍ تُجدوَل', async () => {
+    const post = await seedPost({ platform: 'youtube' })
+    const account = await seedAccount({ platform: 'youtube' })
+    await withMedia(post, 'image/png')
+    await withMedia(post, 'video/mp4', 'rejected')
+    expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(false)
+
+    await withMedia(post, 'video/mp4')
+    const out = await schedulePost(db, post, account, SOON, NOW)
+    expect(out).toMatchObject({ ok: true, platform: 'youtube' })
+  })
+
+  it('وInstagram بلا وسيطٍ تُردّ، وبصورةٍ أو مقطعٍ تُجدوَل', async () => {
+    const bare = await seedPost({ platform: 'instagram' })
+    const account = await seedAccount({ platform: 'instagram' })
+    const out = await schedulePost(db, bare, account, SOON, NOW)
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('Instagram تحتاج صورةً أو مقطعًا')
+
+    const pictured = await seedPost({ platform: 'instagram' })
+    await withMedia(pictured, 'image/png')
+    expect((await schedulePost(db, pictured, account, SOON, NOW)).ok).toBe(true)
+  })
+
+  it('وLinkedIn وX نصٌّ يكفي — لا وسيطَ يُشترَط', async () => {
+    const post = await seedPost({ platform: 'x' })
+    const account = await seedAccount({ platform: 'x' })
+    expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)
   })
 })

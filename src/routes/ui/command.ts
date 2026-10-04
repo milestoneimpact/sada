@@ -209,8 +209,15 @@ export function buildCommands(
    * جوابُ «أين»، والفعلُ جوابُ «كيف»، **والثاني هو ما يُسأل**.
    *
    * ولا واحدةَ منها تفعل شيئا: كلُّها تنقل إلى حيث الزرُّ وحارسُه.
+   *
+   * **و`anchor` بطاقةٌ داخل اللوح لا اللوحُ كلُّه** (الخطّة 5.1): «اكتب» و«ارفع
+   * فيديو» و«خطّة من ملفّ» أبوابٌ في آخر «المنشورات»، ومرساةُ اللوح تُنزل إلى
+   * رأسه — فكانت ثلاثتُها غائبةً من اللوحة. و`show()` تفتح لوحَ البطاقة ثمّ تنزل إليها.
    */
   for (const a of [
+    { label: 'اكتب منشورًا من مصدر', note: 'من خلاصةِ مصدرٍ محلَّل — نداءٌ مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
+    { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
+    { label: 'خطّة من ملفّ', note: 'جدولُ Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
     { label: 'امسح Drive', note: 'يقرأ الملفّاتِ الجديدةَ — والزرُّ في المصادر', id: 'sources', alias: 'scan drive درايف مسح' },
     { label: 'ولّد خطّةَ الأسبوع', note: 'نداءٌ مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
     { label: 'اعتمد مسوّدة', note: 'القرارُ لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
@@ -222,7 +229,7 @@ export function buildCommands(
     if (section === undefined) continue
     out.push({
       label: a.label, note: a.note, group: 'الأفعال',
-      href: section.page ?? `${base}#${a.id}`,
+      href: section.page ?? `${base}#${a.anchor ?? a.id}`,
       icon: '', alias: a.alias,
     })
   }

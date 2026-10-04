@@ -28,6 +28,7 @@
  */
 import { escapeHtml } from './escape'
 import { money } from '../../lib/format'
+import { counted, NOUNS } from '../../lib/format'
 
 export function areaChart(series: { day: string; total: number }[]): string {
   if (series.length < 2) return '<div class="empty"><b>لا بيانات كافية بعد</b></div>'
@@ -88,7 +89,7 @@ export function areaChart(series: { day: string; total: number }[]): string {
   return `<div class="chart">
     <div class="plot">
     <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
-      aria-label="إنفاق ${series.length} يوما، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
+      aria-label="إنفاق ${counted(series.length, NOUNS.day, 'gen')}، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
       <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
         <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
@@ -153,7 +154,7 @@ export function barChart(
     .join('')
 
   return `<div class="chart bars" role="img"
-    aria-label="${escapeHtml(`${live.length} مزوّدا، مجموعُ إنفاقها ${show(total)}، وأعلاها ${live[0]!.label} بـ${show(live[0]!.value)}`)}">
+    aria-label="${escapeHtml(`${counted(live.length, NOUNS.service)}، والمجموعُ ${show(total)}، والأعلى ${live[0]!.label} بـ${show(live[0]!.value)}`)}">
     ${bars}
   </div>`
 }

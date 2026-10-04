@@ -20,9 +20,16 @@
  */
 import { blockerReason, checkAllowance } from '../limits'
 import type { Db } from '../tokens'
+import { missingMedia } from './media'
 
 export type ScheduleResult =
-  | { readonly ok: true; readonly at: string; readonly account: string }
+  | {
+      readonly ok: true
+      readonly at: string
+      readonly account: string
+      /** منصّةُ المنشور — يُقال بها التأكيد («جُدولت على TikTok»). وفارغةٌ لما ليس جدولة. */
+      readonly platform: string
+    }
   | { readonly ok: false; readonly reason: string }
 
 /** موعدٌ مقروءٌ من نموذج HTML: `datetime-local` بلا منطقة. يُقرأ UTC. */
@@ -80,6 +87,15 @@ export async function schedulePost(
     return { ok: false, reason: `حالتُه «${post.status}» — والجدولةُ للمعتمَد وحده` }
   }
 
+  // ‏ومنشورٌ يعرف الناشرُ أنّه سيردّه عند موعده لا يُجدوَل: TikTok وYouTube بلا مقطع،
+  // ‏وInstagram بلا صورةٍ ولا مقطع — «مجدولة» على بطاقته وعدٌ يُخلَف بعد أيّام
+  const { results: ready } = await db
+    .prepare("SELECT mime FROM media WHERE post_id = ? AND status = 'ready'")
+    .bind(postId)
+    .all<{ mime: string }>()
+  const lacking = missingMedia(post.platform, ready.map((m) => m.mime))
+  if (lacking !== null) return { ok: false, reason: lacking }
+
   const account = await db
     .prepare('SELECT id, platform, status, display_name FROM accounts WHERE id = ?')
     .bind(accountId)
@@ -114,7 +130,7 @@ export async function schedulePost(
     .bind(accountId, at, postId)
     .run()
 
-  return { ok: true, at, account: account.display_name }
+  return { ok: true, at, account: account.display_name, platform: post.platform }
 }
 
 /**
@@ -141,7 +157,7 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
     )
     .bind(postId)
     .run()
-  return { ok: true, at: '', account: '' }
+  return { ok: true, at: '', account: '', platform: '' }
 }
 
 /** ما يُعَدّ عالقًا: غادر إلى الطابور منذ ساعةٍ ولم تُكتب له محاولةٌ منذها. */
@@ -212,7 +228,7 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
     .bind(postId, cutoff, postId)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُه قبل الإعادة — أعد تحميل الصفحة' }
-  return { ok: true, at: '', account: '' }
+  return { ok: true, at: '', account: '', platform: '' }
 }
 
 export interface DuePost {

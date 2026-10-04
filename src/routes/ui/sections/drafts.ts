@@ -22,7 +22,12 @@
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
-import { PLATFORMS, type Platform, type PlatformSpec } from '../../../lib/draft/prompt'
+import { PLATFORMS, type PlatformSpec } from '../../../lib/draft/prompt'
+import type { PublishPlatform } from '../../../lib/oauth/providers'
+import { CAPTION_LIMIT } from '../../../lib/media/uploads'
+import { INFO_SIZE } from '../../../lib/image/infographic'
+import { CLIP_PLATFORMS } from '../../../lib/platform/needs'
+import { missingMedia } from '../../../lib/schedule/media'
 import { escapeHtml } from '../escape'
 import { whenTag } from '../time'
 import type { Peaks } from '../../../lib/schedule/peak'
@@ -38,7 +43,8 @@ import { LOGOS } from '../logos'
 import { ICON } from '../icons'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
-import { fileName, RUNG_MARK, status } from '../parts'
+import { fileName, glyph, RUNG_MARK, status } from '../parts'
+import { whyFailed } from '../../../lib/publish/reasons'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 
@@ -54,7 +60,36 @@ const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string
 
 /** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
 const LINES: Readonly<Record<string, number>> = {
-  linkedin: 12, x: 6, tiktok: 5, youtube: 8,
+  linkedin: 12, x: 6, tiktok: 5, youtube: 8, instagram: 5,
+}
+
+/**
+ * مواصفةُ البطاقة لكلّ منصّة منشور — **`PLATFORMS` للتي تُكتب لها مسوّدة، وInstagram
+ * بجوارها لا فيها**.
+ *
+ * Instagram لا تُكتب لها مسوّدةٌ من مصدر: لا تقبل نصًّا بلا وسيط، فلا مكانَ لها في
+ * قائمة «اكتب مسوّدة». لكنّ منشورَها يصل من «فيديوهاتك» ومن الخطّة، **فيُعرَض باسمه
+ * ويُجدوَل إلى حسابه**: الاسمُ من `platformLabel`، والحدُّ حدُّ `captionProblem` نفسُه.
+ * وكانت البطاقةُ تقرأ `PLATFORMS[d.platform]` فتعرضه «LinkedIn» بحدّ ‏3000.
+ */
+interface CardSpec {
+  readonly id: PublishPlatform
+  readonly label: string
+  readonly hardLimit: number
+}
+
+function specOf(p: PublishPlatform): CardSpec {
+  return p === 'instagram' ? { id: p, label: platformLabel(p), hardLimit: CAPTION_LIMIT.instagram } : PLATFORMS[p]
+}
+
+/** طولُ النصّ كما تعدّه منصّتُه — وInstagram بالمحرف كما يعدّ `captionProblem`. */
+function lengthOf(d: DraftRow): number {
+  return d.platform === 'instagram' ? d.text.length : postLength(d.text, d.platform)
+}
+
+/** أنواعُ الوسائط الجاهزة لمنشور — ما يسأل عنه `missingMedia` كما يسأله الناشر. */
+function readyMimes(d: DraftRow, media: readonly MediaView[]): string[] {
+  return media.filter((m) => m.postId === d.id && m.status === 'ready').map((m) => m.mime)
 }
 const LINE = 26
 const PAD = 28
@@ -106,12 +141,34 @@ function scheduler(
   now: Date,
   pageOnly: readonly string[],
   peaks: Peaks | undefined,
+  media: readonly MediaView[],
 ): string {
   const approved = d.status === 'approved' || d.status === 'edited'
+  // ‏والشريطُ مرساةٌ بحاله كلّها: «اعتمد» و«اسحب الموعد» و«أعده إلى المعتمَد» تعود إليه
+  // ‏لا إلى رأس اللوح — فيقع النظرُ على الخطوة التالية لا على ما قبلها بآلاف البكسلات
+  const anchor = `id="s-${escapeHtml(d.id)}"`
+
+  /*
+   * **والفاشلُ يقول سببَه وما يُفعَل في بطاقته** (رحلة R-8). كانت تقول «فشل النشر» بلا
+   * سببٍ ولا زرّ، والإعادةُ في صفحة المنصّة وحدَها. فالسببُ من `whyFailed` — جملةُ
+   * صفحة المنصّة نفسُها — والفعلُ فعلُها: «أعد الربط» حيث سقط الإذن، و«أعده إلى
+   * المعتمَد» حيث تصلح الإعادة؛ ثمّ يعود المالكُ إلى هذا الشريط نموذجَ جدولة.
+   */
+  if (d.status === 'failed') {
+    const why = whyFailed(d.failure ?? null, d.platform)
+    return `<div class="sched" ${anchor}>
+      <p class="np-why"><span class="i">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
+      <span class="grow"></span>
+      ${why.action === 'relink'
+        ? `<a class="btn p sm" href="/oauth/${escapeHtml(d.platform)}/start">أعد الربط</a>`
+        : ''}
+      ${why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink')}
+    </div>`
+  }
 
   if (d.status === 'queued') {
     const gone = d.dispatchedAt !== null
-    return `<div class="sched ${gone ? 'gone' : 'set'}">
+    return `<div class="sched ${gone ? 'gone' : 'set'}" ${anchor}>
       ${status(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
       <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
@@ -127,12 +184,25 @@ function scheduler(
 
   if (!approved) return ''
 
+  /*
+   * **ومنشورٌ يعرف الناشرُ أنّه سيردّه لا يُعرض له نموذجُ جدولة** — بالجملة نفسِها
+   * التي تردّ بها `schedulePost`. كان TikTok بلا مقطعٍ يُجدوَل فيُقال «مجدولة»، ثمّ
+   * يفشل عند موعده بـ `no_clip`.
+   */
+  const lacking = missingMedia(d.platform, readyMimes(d, media))
+  if (lacking !== null) {
+    return `<div class="sched none" ${anchor}>
+      ${status('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطعَ بعد' : 'لا صورةَ ولا مقطعَ بعد')}
+      <span class="ago">${escapeHtml(lacking)}. واعتُمد النصّ ويبقى.</span>
+    </div>`
+  }
+
   const fit = targets.filter((t) => t.platform === d.platform)
   if (fit.length === 0) {
     // **والسببُ يُقال كما هو**: «لا قناة» حيث القناةُ مربوطةٌ صفحةً كذبٌ
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
-      return `<div class="sched none">
+      return `<div class="sched none" ${anchor}>
         ${status('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
@@ -140,8 +210,8 @@ function scheduler(
         <a class="btn g sm" href="/panel/tasks">ما عليك</a>
       </div>`
     }
-    return `<div class="sched none">
-      ${status('warn', '!', `لا قناةَ ${escapeHtml(PLATFORMS[d.platform].label)} مربوطة`)}
+    return `<div class="sched none" ${anchor}>
+      ${status('warn', '!', `لا قناةَ ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
       <span class="grow"></span>
       <a class="btn g sm" href="#channels">اربط قناة</a>
@@ -149,7 +219,7 @@ function scheduler(
   }
 
   const id = d.id.slice(0, 8)
-  return `<form class="sched" method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+  return `<form class="sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     <div class="field"><label for="ac-${id}">الحساب</label>
       <select id="ac-${id}" name="account">${fit
@@ -170,6 +240,13 @@ function scheduler(
     </div>
     ${peakLine(peaks)}
   </form>`
+}
+
+/** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
+function requeueForm(id: string, primary: boolean): string {
+  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
+    <input type="hidden" name="id" value="${escapeHtml(id)}">
+    <button class="${primary ? 'p' : 'g'} sm" type="submit">أعده إلى المعتمَد</button></form>`
 }
 
 /**
@@ -300,8 +377,9 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
         ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
         : 'صورةٌ مولَّدة تصاحب المنشور'
     // ‏والأبعادُ المحفوظةُ تحجز المكانَ بنسبته الحقيقيّة (D-174)، وإلّا فمقاسُ الشريحة
-    const w = ready.width ?? SLIDE_SIZE[d.platform].width
-    const h = ready.height ?? SLIDE_SIZE[d.platform].height
+    const slide = d.platform === 'instagram' ? INFO_SIZE.instagram : SLIDE_SIZE[d.platform]
+    const w = ready.width ?? slide.width
+    const h = ready.height ?? slide.height
     const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string =>
       `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جارٍ التوليد…">
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
@@ -351,7 +429,8 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
   const rejected = mine.filter((m) => m.status === 'rejected').length
   if (!open) return ''
 
-  return `<div class="pic none">
+  // ‏و`i-` مرساةُ محطّة «الصورة» في الرئيسيّة: تنزل إلى الزرّ لا إلى رأس البطاقة (ر-3)
+  return `<div class="pic none" id="i-${escapeHtml(d.id)}">
     ${status('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">${INFO_CAPTION}</span>
@@ -445,20 +524,22 @@ function readyLines(ready: MediaReady): ReadyLines {
 const INFO_CAPTION = '<b>إنفوجرافيك من نصّ المنشور</b>: عنوانُه وأبعادُه وأرقامُه كما كُتبت، ولا يُخترَع فيه رقم.'
 
 /**
- * سِلالُ الفرز — **خمسٌ لا سبع**.
+ * سِلالُ الفرز — **ستٌّ لا سبع**.
  *
  * `approved` و `edited` حالان في القاعدة **وسؤالٌ واحدٌ عند المالك**:
  * «اعتُمدت، وتنتظر موعدا». والفرقُ بينهما (أعُدّلت قبل الاعتماد؟) يُقرأ
  * على البطاقة، **ولا يستحقّ تبويبا يقسم القائمة نصفين بلا سبب**.
  *
- * وكذلك `failed` مع `published`: كلتاهما «غادرت»، والفشلُ يُرى بشارته.
+ * **و`failed` لا تُخلَط بـ `published`** (رحلة R-8، الخطّة 5.6 و8.2): كانتا معًا تحت
+ * «غادرت»، فالمنشورُ الفاشلُ — وفيه فعلٌ باقٍ — بين منشوراتٍ نُشرت ولا فعلَ فيها.
  */
 function bucketOf(d: DraftRow): string {
   if (d.status === 'draft') return 'waiting'
   if (d.status === 'approved' || d.status === 'edited') return 'approved'
   if (d.status === 'queued') return 'queued'
   if (d.status === 'rejected') return 'rejected'
-  return 'gone'
+  if (d.status === 'failed') return 'failed'
+  return 'published'
 }
 
 const BUCKETS: readonly { readonly id: string; readonly label: string }[] = [
@@ -466,7 +547,8 @@ const BUCKETS: readonly { readonly id: string; readonly label: string }[] = [
   { id: 'waiting', label: 'تنتظر قرارك' },
   { id: 'approved', label: 'معتمَدة' },
   { id: 'queued', label: 'مجدولة' },
-  { id: 'gone', label: 'غادرت' },
+  { id: 'published', label: 'نُشرت' },
+  { id: 'failed', label: 'فشلت' },
   { id: 'rejected', label: 'مرفوضة' },
 ]
 
@@ -588,6 +670,8 @@ function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
   // **والشرطُ هو شرطُ المحرِّر نفسُه**: ملحوظةٌ حيث لا مربّعَ يُحرَّر
   // عتابٌ لا مراجعة. وشرطان متقاربان يفترقان بلا حارس
   if (d.status !== 'draft' && d.status !== 'approved' && d.status !== 'edited') return ''
+  // ‏ومقاييسُ الملحوظات (الوسومُ وطولُ الجملة) لم تُضبَط لـ Instagram — فلا تُخترَع لها
+  if (d.platform === 'instagram') return ''
   const notes: readonly ReviewNote[] = reviewText(d.text, d.platform, counted, hardLimit)
   if (notes.length === 0) return ''
 
@@ -619,7 +703,7 @@ function card(
   peaks: Readonly<Record<string, Peaks>>,
   lines: ReadyLines,
 ): string {
-  const spec = PLATFORMS[d.platform]
+  const spec = specOf(d.platform)
   // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
   // شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا
   const st =
@@ -628,9 +712,10 @@ function card(
       : (STATUS[d.status] ?? STATUS['draft']!)
   const open = d.status === 'draft'
   // بطاقةٌ فيها فعلٌ باقٍ ليست منتهية: المعتمَدُ ينتظر موعدا، والمجدولُ
-  // ينتظر ساعته — والرماديُّ للمرفوض والمنشور وحدهما
-  const live = open || d.status === 'approved' || d.status === 'edited' || d.status === 'queued'
-  const len = postLength(d.text, d.platform)
+  // ينتظر ساعته، والفاشلُ إعادتَه — والرماديُّ للمرفوض والمنشور وحدهما
+  const live = open || d.status === 'approved' || d.status === 'edited' || d.status === 'queued' ||
+    d.status === 'failed'
+  const len = lengthOf(d)
   // متغيّرٌ لا خاصّيّة: ارتفاعٌ مكتوبٌ في `style` لا تغلبه استفسارةُ وسط،
   // فيبقى الجوّالُ — حيث يلتفّ النصّ أضعافا — بمربّعٍ مقاسِ الشاشة العريضة
   const box = `--lines:${LINES[d.platform] ?? 9}`
@@ -674,7 +759,7 @@ function card(
            data-limit="${spec.hardLimit}" data-target="${ceilingOf(spec.hardLimit)}"
            data-count="${spec.id}"
            aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
-         <div class="draft-foot">
+         <div class="draft-foot act">
            <span class="count ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
              ><b>${len}</b> / ${spec.hardLimit}</span>
            <span class="grow"></span>
@@ -714,7 +799,7 @@ function card(
     ${editor}
     ${editDiff(d)}
     ${imagePane(d, media, lines)}
-    ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform])}
+    ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
     <div class="draft-meta">${meta}</div>
   </div>`
 }
@@ -722,7 +807,7 @@ function card(
 /** حسابٌ مربوطٌ يصلح وجهةً — والقائمةُ تُبنى من القنوات لا من ثابت. */
 export interface Target {
   readonly id: string
-  readonly platform: Platform
+  readonly platform: PublishPlatform
   readonly label: string
 }
 
@@ -765,6 +850,11 @@ export interface DraftsInput {
   /** أمزوّدُ مهمّة `draft` جاهز؟ زرٌّ لا ينادي أحدا لا يُعرض عاملا. */
   readonly ready: boolean
   /**
+   * حاجزُ الكتابة المدفوعة وسببُه وموضعُ إصلاحه (`writeBlock` في `lib/home.ts`) —
+   * فيُعطَّل الزرُّ والسببُ تحته، لا زرٌّ يُضغَط فيُردّ إلى رأس اللوح (ر-10).
+   */
+  readonly blocked?: { readonly text: string; readonly label: string; readonly href: string } | null
+  /**
    * منصّاتٌ حساباتُها الحيّةُ **صفحاتٌ لا أشخاص** (D-087).
    *
    * ولولا هذا لقيل «لا قناةَ مربوطة» وهي مربوطة — **وذاك كذبٌ يُرسل
@@ -795,6 +885,7 @@ export interface DraftsInput {
 export function draftsSection(input: DraftsInput): string {
   const { drafts, writable, now } = input
   const waiting = drafts.filter((d) => d.status === 'draft').length
+  const blocked = input.blocked ?? null
 
   // نموذجُ الكتابة: مصدرٌ ومنصّة، ونداءٌ واحد لكلٍّ. ولا كتابةَ آليّة —
   // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة
@@ -815,16 +906,21 @@ export function draftsSection(input: DraftsInput): string {
              )
                .map(
                  (spec) =>
-                   `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — حتّى ${
-                     spec.hardLimit} محرفا</option>`,
+                   // ‏ومنصّةُ المقطع تقول ذلك قبل أن يُدفَع ثمنُ الكتابة: نصُّها وصفٌ لا يُنشَر وحدَه
+                   `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — ${CLIP_PLATFORMS.has(spec.id)
+                     ? 'وصفُ مقطع (يحتاج مقطعًا)' : `حتّى ${spec.hardLimit} محرفا`}</option>`,
                )
                .join('')}</select></div>
            <div class="grow"></div>
-           <button class="p" type="submit"${input.ready ? '' : ' disabled'}>اكتب مسوّدة</button>
+           <button class="p" type="submit"${input.ready && blocked === null ? '' : ' disabled'}${
+             blocked === null ? '' : ' aria-describedby="dw-why"'}>اكتب مسوّدة</button>
          </form>
-         ${input.ready
-           ? ''
-           : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
+         ${blocked !== null
+           ? `<p class="hint" id="dw-why" style="margin:var(--s-2) 0 0">${escapeHtml(blocked.text)}
+                <a class="tap" href="${escapeHtml(blocked.href)}">${escapeHtml(blocked.label)}</a></p>`
+           : input.ready
+             ? ''
+             : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
 
   /*
    * لوحُ الاختصارات — **ولا يُعرض إلّا حيث تعمل**.
@@ -927,7 +1023,8 @@ function spreadBar(input: DraftsInput): string {
   const ready = input.drafts.filter(
     (d) =>
       (d.status === 'approved' || d.status === 'edited') &&
-      input.targets.some((t) => t.platform === d.platform),
+      input.targets.some((t) => t.platform === d.platform) &&
+      missingMedia(d.platform, readyMimes(d, input.media)) === null,
   ).length
   if (ready < 2) return ''
 

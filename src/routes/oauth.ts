@@ -12,7 +12,7 @@ import type { Env } from '../env'
 import { createPkce, randomToken } from '../lib/pkce'
 import { exchangeCode, OAuthError, type ClientCredentials } from '../lib/oauth/exchange'
 import { fetchIdentity } from '../lib/oauth/identity'
-import { PROVIDERS, redirectUri, type Platform } from '../lib/oauth/providers'
+import { platformLabel, PROVIDERS, redirectUri, type Platform } from '../lib/oauth/providers'
 import { readApp } from '../lib/oauth/apps'
 import { parseGranted, scopeSet, type ScopeMode } from '../lib/oauth/scopes'
 import { consumeState, saveState, StateError } from '../lib/oauth/state'
@@ -21,7 +21,8 @@ import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
 import { buildCommands } from './ui/command'
-import { connectedBody, refusedBody } from './ui/oauthResult'
+import { connectedBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
+import { setFlash } from './panel'
 
 /**
  * صفحةٌ لا سطرُ JSON.
@@ -50,20 +51,47 @@ function platformOf(value: string): Platform | null {
 }
 
 /**
- * يحوّل أخطاء OAuth المعروفة إلى استجابة بحالتها الصحيحة.
+ * ‏**بلا سرّين لا يبدأ الربط — فيُعاد المالكُ إلى حقليهما لا إلى سطر JSON** (ر-1).
  *
- * لا يُترك الخطأ ليصعد فيصير 500: «سرّ غير مضبوط» حالته 503، ورفض المنصة
- * 502، و`state` باطل 400. ومن لم يُعرف يُعاد رميه ليظهر في السجل كما هو.
+ * ‏كان «اربط» و«جرّب من جديد» و«أعد المحاولة» بعد حذف السرّين، أو من تبويبٍ قديم،
+ * ‏ينتهي بـ `{"error":"not_configured",…}` في المتصفّح (خطّة التصميم 7.11: لا JSON في وجه
+ * ‏المالك). فالوميضُ يقول لماذا، والتحويلُ إلى تبويب الإعداد حيث يُضبَطان — كما يعود
+ * ‏كلُّ فعلٍ إلى موضعه.
  */
-function oauthFailure(error: unknown): { body: Record<string, string>; status: 400 | 502 | 503 } {
-  if (error instanceof StateError) return { body: { error: 'invalid_state' }, status: 400 }
-  if (error instanceof OAuthError) {
-    if (error.status === 503) {
-      return { body: { error: 'not_configured', detail: error.message }, status: 503 }
-    }
-    return { body: { error: 'oauth_failed', detail: error.message }, status: 502 }
-  }
-  throw error
+async function toSetup(env: Env, request: Request, platform: Platform): Promise<Response> {
+  const label = platformLabel(platform)
+  await setFlash(env, request, {
+    kind: 'warn',
+    text: `لم يبدأ الربط: ينقص معرّفُ تطبيق ${label} وسرُّه. اضبطهما هنا، ثمّ «اربط ${label}».`,
+  })
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `/panel/channels/${encodeURIComponent(platform)}?tab=setup` },
+  })
+}
+
+/**
+ * ‏ما يُعرَض للمطوّر من عطلٍ لم نعرفه — **بلا ما يلي «?» في رابط**.
+ *
+ * ‏نصُّ `TypeError` من `fetch` يحمل الرابطَ أحيانًا، ورابطُ منصّةٍ قد يحمل رمزًا في
+ * ‏استعلامه؛ وهذه الصفحةُ ليست خلف دخول، والسجلُّ لا يحمل رمزًا (D-005).
+ */
+function devDetail(error: unknown): string {
+  const name = error instanceof Error ? error.name : typeof error
+  const message = error instanceof Error ? error.message : String(error)
+  return `${name}: ${message.replace(/\?\S*/g, '?…')}`.slice(0, 200)
+}
+
+/**
+ * ‏**سرّا التطبيق غيرُ مضبوطين — نوعٌ بذاته لا رقمُ حالة** (مراجعة ر-1).
+ *
+ * ‏كان يُرمى `OAuthError` بحالة 503 ويُعرَف من رقمه، **و503 من نهاية الرمز أو الهويّة
+ * ‏عند المنصّة يحمل الرقمَ نفسَه** (`postForm` و`fetchIdentity` يرميان حالةَ الردّ). فعطلٌ
+ * ‏عند LinkedIn أو X كان يُقال «ينقص السرّان» ويُرسَل المالكُ يعيد لصقَ سرّين سليمين —
+ * ‏وهي أوّلُ حركةٍ خاطئة. ولا يرث `OAuthError`: ليس ردًّا من منصّة.
+ */
+class NotConfigured extends Error {
+  override readonly name = 'NotConfigured'
 }
 
 /**
@@ -79,7 +107,7 @@ async function credentialsFor(env: Env, platform: Platform): Promise<ClientCrede
     env as unknown as Record<string, string | undefined>,
   )
   if (app === null) {
-    throw new OAuthError(`أسرار ${platform} غير مضبوطة — اضبطها من لوحة القنوات`, 503)
+    throw new NotConfigured(`أسرار ${platform} غير مضبوطة — اضبطها من لوحة القنوات`)
   }
   return { clientId: app.clientId, clientSecret: app.clientSecret }
 }
@@ -106,8 +134,12 @@ oauth.get('/oauth/:platform/start', async (c) => {
   try {
     creds = await credentialsFor(c.env, platform) // يفشل مبكرا إن نقص سر
   } catch (error) {
-    const failure = oauthFailure(error)
-    return c.json(failure.body, failure.status)
+    // ‏والطلبُ من اللوحة نفسِها فالكعكةُ تصل، والوميضُ يُقرأ في تبويب الإعداد
+    if (error instanceof NotConfigured) return toSetup(c.env, c.req.raw, platform)
+    // ‏والخزانةُ لا تُقرأ (قاعدةٌ أو مفتاح): صفحةٌ تقول ذلك، لا «Internal Server Error»
+    console.error({ route: 'oauth.start', platform, failed: devDetail(error) })
+    return resultPage('صدى — لم يبدأ الربط',
+      unreachedBody({ platform, stage: 'start', detail: devDetail(error) }), 502)
   }
 
   const uri = redirectUri(c.env.PUBLIC_BASE_URL, platform)
@@ -187,6 +219,8 @@ oauth.get('/oauth/:platform/callback', async (c) => {
   const state = c.req.query('state') ?? ''
   if (code.length === 0) return c.json({ error: 'missing_code' }, 400)
 
+  // ‏أين وقف: قبل الحفظ لم يُكتب شيء، وبعده قد يكون الحسابُ حُفظ بلا إذنه
+  let stage: 'reach' | 'save' = 'reach'
   try {
     const saved = await consumeState(c.env.KV, state)
     if (saved.platform !== platform) {
@@ -207,6 +241,7 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     })
 
     const identity = await fetchIdentity(provider, tokens.accessToken)
+    stage = 'save'
     const id = await upsertAccount(c.env.DB, identity)
     await saveTokens(c.env.DB, c.env.TOKEN_ENC_KEY, id, tokens)
 
@@ -231,7 +266,17 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     //
     // و`StateError` يبقى JSON: حالةٌ منتهيةٌ أو مزوَّرة ليست عطلَ ضبطٍ
     // يُشخَّص، وصفحةٌ لها تدعو إلى إعادةٍ لا تنفع.
-    if (error instanceof OAuthError && error.status !== 503) {
+    //
+    // ‏**وسرّان حُذفا بين الذهاب والعودة: صفحةٌ لا وميض** (مراجعة ر-1). العودةُ تحويلٌ من
+    // ‏نطاق المنصّة، وكعكةُ الجلسة `SameSite=Strict` لا تعبره — فوميضٌ هنا لا يُكتب، وتبويبُ
+    // ‏الإعداد بعده يُفتح بلا كعكةٍ على صفحة الدخول. والسببُ في السجلّ بلا قيمة.
+    if (error instanceof NotConfigured) {
+      console.error({ route: 'oauth.callback', platform, stage, failed: 'not_configured' })
+      return resultPage('صدى — لم يكتمل الربط', unconfiguredBody(platform), 503)
+    }
+    // ‏**وما فوق 499 من المنصّة عطلٌ عندها لا رفضٌ لمفتاحينا** — 503 من نهاية الرمز أو الهويّة،
+    // ‏أو ردٌّ لا يُقرأ: صفحةُ «لم نصل» بمحاولةٍ جديدة، لا مقارنةُ معرّفٍ تتّهم سرًّا سليمًا
+    if (error instanceof OAuthError && error.status < 500) {
       // ما أُرسل فعلا — يُقرأ من المصدر نفسِه لا يُعاد بناؤه.
       // **وقراءةٌ ثانيةٌ قد تُخالف الأولى** لو بُدّل السرُّ بين اللحظتين،
       // فتُعرَض قيمةٌ لم تُرسَل ويُطارَد وهم. ولا يُقرأ السرُّ أصلا.
@@ -257,7 +302,18 @@ oauth.get('/oauth/:platform/callback', async (c) => {
         502,
       )
     }
-    const failure = oauthFailure(error)
-    return c.json(failure.body, failure.status)
+    // ‏وحالةٌ منتهيةٌ أو مزوَّرة تبقى ردًّا لا صفحة: ليست عطلَ ضبطٍ يُشخَّص (D-046)
+    if (error instanceof StateError) return c.json({ error: 'invalid_state' }, 400)
+    /*
+     * ‏**وما لم نعرفه صفحةٌ لا «Internal Server Error»** (ر-1).
+     *
+     * ‏`TypeError` من `fetch` حين لا تُبلَغ نهايةُ الرمز أو الهويّة، أو 5xx منهما، أو عطلٌ في القاعدة:
+     * ‏كان يُعاد رميُه فيصل المالكَ سطرٌ نصّيٌّ بلا رابطٍ ولا رجوع — بعد أن وافق عند المنصّة،
+     * ‏والحالةُ استُهلكت فلا يُصلحه تحديث. فصفحةٌ تقول ما وقع وأين، وزرُّ محاولةٍ جديدة،
+     * ‏والتفصيلُ للمطوّر تحتها وفي السجلّ.
+     */
+    console.error({ route: 'oauth.callback', platform, stage, failed: devDetail(error) })
+    return resultPage('صدى — لم يكتمل الربط',
+      unreachedBody({ platform, stage, detail: devDetail(error) }), 502)
   }
 })

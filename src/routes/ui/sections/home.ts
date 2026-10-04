@@ -19,13 +19,19 @@ import { RUNG_MARK, status } from '../parts'
 
 const TILE_MARK: Readonly<Record<PlatformTile['tone'], string>> = { ok: '●', bad: '▲', warn: '◍', idle: '○' }
 
+/*
+ * ‏ومحطّةُ النشر تقول «فشلت» لا «ساقطة» (الخطّة 8.2): علامةُ السلّم المشتركة تبقى
+ * ‏لدرجاته ونقاطه، والمحطّةُ هنا منشورٌ فشل — والكلمةُ كلمةُ المالك
+ */
+const STEP_LABEL: Readonly<Partial<Record<JourneyStep['state'], string>>> = { failed: 'فشلت' }
+
 function step(s: JourneyStep, i: number, focus: number): string {
   const mark = RUNG_MARK[s.state]
   // ‏**وأوّلُ محطّةٍ تنتظرك وحدَها تُلوَّن أرضًا** — خمسُ بطاقاتٍ كهرمانيّة تُقرأ ضجيجًا
   return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
       <span class="j-n" aria-hidden="true">${i + 1}</span>
       <span class="j-body"><b>${escapeHtml(s.title)}</b>
-        ${status(mark.cls, mark.g, escapeHtml(mark.label))}
+        ${status(mark.cls, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}
         <span class="j-note">${escapeHtml(s.note)}</span></span></a></li>`
 }
 
@@ -44,10 +50,24 @@ function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
   </div>`
 }
 
+/**
+ * المحطّةُ المميَّزة — **ما يتكلّم عنه الفعلُ فوقها**، ثمّ الساقطة، ثمّ أوّلُ ما ينتظرك.
+ *
+ * كانت أوّلَ «تنتظرك» أو «فشلت» بترتيبها، فسبقت «المصدر» (تحليلٌ مدفوع) فشلَ منشورٍ
+ * يقوله الفعلُ فوقها — والرحلةُ تقول غيرَ ما يقوله الفعل.
+ */
+function focusOf(trip: readonly JourneyStep[], step: JourneyStep['key'] | undefined): number {
+  const live = (s: JourneyStep): boolean => s.state === 'now' || s.state === 'failed'
+  const named = step === undefined ? -1 : trip.findIndex((s) => s.key === step && live(s))
+  if (named >= 0) return named
+  const failed = trip.findIndex((s) => s.state === 'failed')
+  return failed >= 0 ? failed : trip.findIndex(live)
+}
+
 export function homeTop(f: HomeFacts, now: Date): string {
-  const next = nextAction(f)
+  const next = nextAction(f, now)
   const trip = journeySteps(f)
-  const focus = trip.findIndex((s) => s.state === 'now' || s.state === 'failed')
+  const focus = focusOf(trip, next.step)
   const built = f.channels.filter((c: ChannelView) => c.state !== 'unbuilt')
   const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
   const linked = built.filter((c) => platformTile(c).tone === 'ok').length

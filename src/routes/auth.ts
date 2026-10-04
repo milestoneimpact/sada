@@ -23,7 +23,7 @@ import {
 } from '../lib/security/webauthn'
 import {
   checkCsrf, clearedCookie, createPasskeySession, destroySession, loadSession,
-  promoteSession, sessionCookie, type Session,
+  promoteSession, safeNext, sessionCookie, type Session,
 } from '../lib/session'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt, reserveChallenge } from '../lib/security/gate'
@@ -340,7 +340,8 @@ auth.post('/panel/2fa/passkey', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: '2fa.passkey' }, c.req.raw)
   return new Response(null, {
     status: 303,
-    headers: { Location: '/panel', 'Set-Cookie': sessionCookie(promoted.id) },
+    // ‏إلى الصفحة التي طُلبت قبل الدخول، وقد حُفظت في الجلسة المعلَّقة (ر-11)
+    headers: { Location: safeNext(gate.session.record.next), 'Set-Cookie': sessionCookie(promoted.id) },
   })
 })
 
@@ -384,7 +385,8 @@ auth.post('/panel/2fa/totp', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: '2fa.totp' }, c.req.raw)
   return new Response(null, {
     status: 303,
-    headers: { Location: '/panel', 'Set-Cookie': sessionCookie(promoted.id) },
+    // ‏إلى الصفحة التي طُلبت قبل الدخول، وقد حُفظت في الجلسة المعلَّقة (ر-11)
+    headers: { Location: safeNext(gate.session.record.next), 'Set-Cookie': sessionCookie(promoted.id) },
   })
 })
 
@@ -436,6 +438,14 @@ auth.post('/panel/2fa/recovery', async (c) => {
   )
   return new Response(null, {
     status: 303,
+    /*
+     * ‏**إلى اللوحة لا إلى الصفحة المطلوبة — في هذا الباب وحده** (مراجعة ر-11).
+     *
+     * ‏التحذيرُ أعلاه وميض، ولا يقرؤه إلّا `/panel` وصفحةُ المنصّة؛ و`safeNext` يقبل
+     * ‏التقريرَ و«ما عليك» ورحلةَ منشورٍ وملفَّ القالب، فكان يصل المالكَ ما طلب ويسقط
+     * ‏التحذيرُ بعد دقيقةٍ بلا أن يُرى. **ومن فقد جهازه أحوجُ إلى «بقي N» منه إلى صفحته**:
+     * ‏يعرف كم بقي قبل أن ينفد آخرُ باب. والعاملان الآخران يعودان إلى ما طُلب.
+     */
     headers: { Location: '/panel', 'Set-Cookie': sessionCookie(promoted.id) },
   })
 })

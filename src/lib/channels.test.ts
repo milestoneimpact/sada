@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { CHANNELS, SETUP, listAccounts, viewChannels } from './channels'
+import { CHANNELS, isLinkedInPage, SETUP, listAccounts, viewChannels } from './channels'
 
 let db: FakeDb
 const ALL = (): boolean => true
@@ -103,6 +103,19 @@ describe('listAccounts', () => {
   it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE accounts')
     expect(await listAccounts(db)).toEqual([])
+  })
+})
+
+/*
+ * ‏**صفحةُ LinkedIn وحدَها ليست وجهة** (D-087): YouTube يحفظ قناتَه `org` دائمًا (`identity.ts`)،
+ * ‏وكان `kind !== 'org'` في جدولة المقطع والبطاقة والتوزيع يُسقطها كلَّها.
+ */
+describe('isLinkedInPage — القاعدةُ مرّةً لا شرطٌ في كلّ موضع', () => {
+  it('صفحةُ الشركة على LinkedIn وحدَها؛ وقناةُ YouTube وحسابُ LinkedIn الشخصيّ وجهتان', () => {
+    expect(isLinkedInPage({ platform: 'linkedin', kind: 'org' })).toBe(true)
+    expect(isLinkedInPage({ platform: 'linkedin', kind: 'member' })).toBe(false)
+    expect(isLinkedInPage({ platform: 'youtube', kind: 'org' })).toBe(false)
+    expect(isLinkedInPage({ platform: 'instagram', kind: 'member' })).toBe(false)
   })
 })
 

@@ -233,6 +233,29 @@ const INSTAGRAM_GUIDE: SetupGuide = {
     + 'تفتحه خوادمُ Meta لخمسَ عشرةَ دقيقة.',
 }
 
+/**
+ * رقمُ الخطوة التي يُلصَق فيها رابطُ العودة — **ويُقال تحت حقله** (ر-1).
+ *
+ * ‏كان تحت «رابطُ العودة» تنبيهُ `gotcha` أيًّا كان موضوعُه: «ولا منشورَ نصّيٌّ في
+ * ‏Instagram» و«صدى يطلب access_type=offline» — فيُقرأ تعليمةً عن الرابط الذي يُنسَخ.
+ * ‏والخطوةُ تُعرَف من نصّها لا من رقمٍ يُكتب بيدٍ فيتأخّر عن ترتيبها.
+ */
+export function callbackStep(guide: SetupGuide): number | null {
+  const i = guide.before.findIndex((b) => /(الصق|=)\s*رابطَ?\s*العودة/.test(b.what))
+  return i < 0 ? null : i + 1
+}
+
+/**
+ * ‏إلى حقل المعرّف في تبويب الإعداد — **حيث يُضبَط التطبيقُ فعلًا** (ر-1).
+ *
+ * ‏كان «اعرضها» ينزل إلى البطاقة في الصفحة نفسِها، ثمّ «اضبط سرّيه» يفتح تبويبَ
+ * ‏المنشورات، ثمّ «اضبط التطبيق» يفتح الإعداد: ثلاثُ ضغطاتٍ وتحميلان قبل أوّل حقل.
+ * ‏ورابطٌ واحدٌ تقرؤه البطاقةُ وصفحةُ الرفض و«ما عليك».
+ */
+export function setupHref(id: string): string {
+  return `/panel/channels/${encodeURIComponent(id)}?tab=setup#ci-${encodeURIComponent(id)}`
+}
+
 export const SETUP: Readonly<Record<string, SetupGuide>> = {
   instagram: INSTAGRAM_GUIDE,
   linkedin: {
@@ -392,6 +415,29 @@ export interface LinkedAccount {
    * صدر اللوحة (D-065) — الحقلُ واحد.
    */
   readonly expiresAt: string | null
+  /**
+   * أفي الصفّ إذنُ تجديد؟ — **وجودُ الرمز لا تاريخُه** (D-115): X تعطيه بلا موعد.
+   *
+   * ‏وهو ما يفرق «ينتهي الإذنُ اليوم» عن «يتجدّد وحده»: إذنُ وصول X يعيش ساعتين
+   * ‏وتجدّده الدورةُ قبل انتهائه، فكانت بطاقتُه برتقاليّةً أبدًا. و`undefined` لصفٍّ
+   * ‏لم يُقرأ منه هذا (اختباراتٌ أقدم) فيُعَدّ من إذن الوصول وحده كما كان.
+   */
+  readonly renewable?: boolean
+  /** متى ينتهي إذنُ التجديد — و`null` لتجديدٍ بلا موعد. */
+  readonly refreshExpiresAt?: string | null
+}
+
+/**
+ * ‏**صفحةُ شركةٍ على LinkedIn — وهي وحدَها لا تُختار وجهةً** (D-087).
+ *
+ * ‏السائقُ يبني `urn:li:person:` حرفًا (D-080)، فمنشورُ الصفحة يُردّ ساعةَ النشر. **و`org`
+ * ‏وحده ليس الصفحة**: YouTube يحفظ قناتَه بنوع `org` دائمًا (`identity.ts`)، فكان شرطُ
+ * ‏`kind !== 'org'` في جدولة المقطع وأهداف البطاقة والتوزيع يُسقط قنواتِ YouTube كلَّها —
+ * ‏«لا حسابَ متّصلًا» والقناةُ مربوطة. فالقاعدةُ هنا مرّةً، ويقرؤها الناشرُ واستيرادُ الخطّة
+ * ‏واللوحةُ جميعًا، ولا تُكتب شرطًا في كلّ موضع فيفترق موضعان.
+ */
+export function isLinkedInPage(a: { readonly platform: string; readonly kind: string }): boolean {
+  return a.platform === 'linkedin' && a.kind === 'org'
 }
 
 interface AccountRow {
@@ -402,6 +448,8 @@ interface AccountRow {
   status: string
   created_at: string
   expires_at: string | null
+  renewable: number | null
+  refresh_expires_at: string | null
 }
 
 /**
@@ -415,7 +463,8 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
     const { results } = await db
       .prepare(
         `SELECT a.id, a.platform, a.kind, a.display_name, a.status, a.created_at,
-                t.expires_at
+                t.expires_at, t.refresh_expires_at,
+                CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS renewable
            FROM accounts a
            LEFT JOIN tokens t ON t.account_id = a.id
           ORDER BY a.platform, a.created_at`,
@@ -430,6 +479,8 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
         row.status === 'needs_reauth' || row.status === 'revoked' ? row.status : 'active',
       createdAt: row.created_at,
       expiresAt: row.expires_at ?? null,
+      renewable: row.renewable === 1,
+      refreshExpiresAt: row.refresh_expires_at ?? null,
     }))
   } catch {
     return []
@@ -451,6 +502,56 @@ export function unsignedAccounts(view: {
 }): LinkedAccount[] {
   if (view.state !== 'linked') return []
   return view.accounts.filter((a) => a.status !== 'needs_reauth' && a.expiresAt === null)
+}
+
+/**
+ * حالُ الإذن **من الرمزين معًا** — حكمٌ واحدٌ تقرؤه البطاقةُ والبلاطة (خطّة التصميم 5.7).
+ *
+ * ‏كانت البطاقةُ تعدّ أيّامَ إذن الوصول وحده: X وYouTube «ينتهي الإذنُ اليوم» برتقاليّةً
+ * ‏وهما تتجدّدان وحدهما (`dueForRenewal`)، والبلاطةُ فوقهما «تحتاج تجديدا 0»، وصفحةُ X
+ * ‏«تنشر». فالموعدُ الذي يوجب يدَ المالك هو انتهاءُ **إذن التجديد** حين يكون، وانتهاءُ
+ * ‏إذن الوصول حين لا يكون — وهو جدولُ `token/expiry.ts` نفسُه.
+ */
+export type TokenHealth =
+  /** انتهى ولا تجديدَ ينقذه: النشرُ متوقّفٌ حتّى يُعاد الربط. */
+  | { readonly kind: 'expired'; readonly at: string }
+  /** ينتهي خلال أسبوعٍ ولا يتجدّد وحده بعده: يُعاد الربطُ قبل موعده. */
+  | { readonly kind: 'soon'; readonly days: number; readonly at: string }
+  /** إذنُ التجديد قائمٌ وإذنُ الوصول فات: الدورةُ لم تجدّده بعد. */
+  | { readonly kind: 'overdue'; readonly at: string }
+  /** يتجدّد وحده، وموعدُ إذن التجديد بعيدٌ أو لا موعدَ له. */
+  | { readonly kind: 'auto'; readonly days: number | null; readonly at: string | null }
+  /** صالحٌ أيّامًا، ولا تجديدَ معه. */
+  | { readonly kind: 'ok'; readonly days: number; readonly at: string }
+
+/** أسبوعٌ فأقلُّ تحذير — عتبةُ تنبيه صدر اللوحة الأولى (D-065). */
+export const RELINK_WARN_DAYS = 7
+
+/** ‏بقراءة `tokenDays` نفسِها: طابعُ SQLite أو ISO، وUTC ما لم يُقَل غيرُه. */
+function daysTo(at: string, now: Date): number | null {
+  const ms = Date.parse(at.replace(' ', 'T') + (at.endsWith('Z') ? '' : 'Z'))
+  return Number.isNaN(ms) ? null : Math.floor((ms - now.getTime()) / 86_400_000)
+}
+
+/** `null` حين لا إذنَ محفوظًا أو لا يُقرأ موعدُه — فلا يُقال شيء. */
+export function tokenHealth(
+  a: Pick<LinkedAccount, 'expiresAt' | 'renewable' | 'refreshExpiresAt'>,
+  now: Date,
+): TokenHealth | null {
+  if (a.expiresAt === null) return null
+  const access = daysTo(a.expiresAt, now)
+  if (access === null) return null
+  const refreshAt = a.refreshExpiresAt ?? null
+  const refresh = refreshAt === null ? null : daysTo(refreshAt, now)
+  // ‏وإذنُ تجديدٍ انتهى لا يجدّد شيئًا: يُعَدّ من إذن الوصول كأن لا تجديد
+  if (a.renewable === true && (refresh === null || refresh >= 0)) {
+    if (access < 0) return { kind: 'overdue', at: a.expiresAt }
+    if (refresh !== null && refresh <= RELINK_WARN_DAYS) return { kind: 'soon', days: refresh, at: refreshAt! }
+    return { kind: 'auto', days: refresh, at: refresh === null ? null : refreshAt }
+  }
+  if (access < 0) return { kind: 'expired', at: a.expiresAt }
+  if (access <= RELINK_WARN_DAYS) return { kind: 'soon', days: access, at: a.expiresAt }
+  return { kind: 'ok', days: access, at: a.expiresAt }
 }
 
 export type ChannelState =

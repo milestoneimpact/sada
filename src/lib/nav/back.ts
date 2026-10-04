@@ -7,7 +7,8 @@
  * `//evil` أو `https:` يصنع تحويلةً مفتوحةً من صفحةٍ داخل الجلسة.
  */
 const PLATFORMS = ['linkedin', 'x', 'youtube', 'tiktok', 'instagram'] as const
-const TABS = ['posts', 'waiting'] as const
+// ‏و«setup» لنموذجَي ضبط التطبيق (ر-1): الحفظُ والفحصُ والحذفُ تعود إلى الحقول لا إلى لوح القنوات
+const TABS = ['posts', 'waiting', 'setup'] as const
 
 /** قيمةُ الحقل لصفحة منصّةٍ وتبويبها — يكتبها العرضُ ويقرؤها `backTo`. */
 export function returnTo(platform: string, tab: (typeof TABS)[number]): string {

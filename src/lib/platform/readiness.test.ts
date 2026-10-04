@@ -105,6 +105,28 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(r.verdict.kind).toBe('bad')
   })
 
+  /*
+   * ‏**ر-8**: فشل ثمّ «أعده إلى المعتمَد» ثمّ «جدوِل» — صفُّ المحاولة الفاشلة باقٍ في
+   * ‏`publish_attempts`، والمنشورُ نفسُه في الطابور. كانت الصفحةُ تقول «لا تنشر».
+   */
+  it('فشل ثمّ أُعيد وجُدول: لا يُحكَم عليه بفشلٍ أصلحه المالك', () => {
+    for (const status of ['approved', 'queued']) {
+      const r = readiness({
+        view: viewOf([account()]), app, health: { a1: health() },
+        tally: tally({ queued: status === 'queued' ? 1 : 0 }),
+        posts: [post({ status, lastError: 'رُدّ 500', lastFailedAt: '2026-09-26 06:00:00' })], now,
+      })
+      expect(r.verdict.kind, status).not.toBe('bad')
+      expect(r.rungs.find((x) => x.key === 'publish')!.state, status).not.toBe('failed')
+    }
+    const queued = readiness({
+      view: viewOf([account()]), app, health: { a1: health() }, tally: tally({ queued: 1 }),
+      posts: [post({ status: 'queued', lastError: 'رُدّ 500', lastFailedAt: '2026-09-26 06:00:00' })], now,
+    })
+    expect(queued.rungs.find((x) => x.key === 'publish')!.note).toBe('1 مجدولٌ ينتظر موعدَه')
+    expect(queued.verdict).toEqual({ kind: 'ok', text: 'جاهزةٌ للنشر' })
+  })
+
   it('لا تطبيقَ ولا حساب: التطبيقُ هو «الآن» والحسابُ ينتظره', () => {
     const r = readiness({ view: viewOf([], false), app: undefined, health: {}, tally: tally(), posts: [], now })
     expect(r.rungs[0]!.state).toBe('now')

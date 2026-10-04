@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { OWNER_TASKS, ownerRows, pendingCount, type OwnerFacts, secretCommand } from './owner'
+import { OWNER_TASKS, ownerRows, pendingCount, taskDoc, type OwnerFacts, secretCommand } from './owner'
 
 const DOC = readFileSync(new URL('../../docs/MANUAL-TASKS.md', import.meta.url), 'utf8')
 
@@ -177,7 +177,8 @@ describe('قراراتُ المالك (D-130)', () => {
     const cap = before.find((r) => r.code === 'M-21')!
     expect(six.state).toBe(false)
     expect(six.measured).toBe('4 من 6 بطاقاتٍ مختارة')
-    expect(six.go).toBe('/panel#settings')
+    // ‏إلى منتقي البطاقات نفسِه، باسم الفعل (ر-1)
+    expect(six).toMatchObject({ go: '/panel#tiles', goLabel: 'اختر بطاقاتك' })
     expect(cap.state).toBe(false)
     expect(cap.measured).toBe('صفر — لا توصيةَ تُكتب')
 
@@ -206,5 +207,40 @@ describe('رمزُ المهمّة لا يتكرّر (D-166)', () => {
   it('كلُّ عنوانٍ في الوثيقة برمزٍ لا يحمله غيرُه', () => {
     const repeated = headings.filter((code, i) => headings.indexOf(code) !== i)
     expect(repeated).toEqual([])
+  })
+})
+
+/*
+ * ‏**مهامُّ الربط تحمل بابَها، والخطواتُ رابطٌ يُفتَح من الهاتف** (ر-1): كانت M-14 وM-15
+ * ‏وM-24 «عليك» بلا زرّ، وM-24 تقول «ينتظر سرّيك» بعد حفظهما.
+ */
+describe('مهامُّ الربط وخطواتُها (ر-1)', () => {
+  const row = (facts: OwnerFacts, code: string) => ownerRows(facts).find((r) => r.code === code)!
+
+  it('قبل السرّين: «اضبط» إلى حقل المعرّف، وبعدهما: «اربط» إلى المنصّة', () => {
+    for (const [code, platform, label] of [['M-24', 'instagram', 'Instagram'], ['M-14', 'tiktok', 'TikTok'], ['M-15', 'youtube', 'YouTube']] as const) {
+      expect(row(empty, code), code).toMatchObject({
+        state: false, go: `/panel/channels/${platform}?tab=setup#ci-${platform}`, goLabel: `اضبط ${label}`,
+        measured: 'ينقص سرّا التطبيق',
+      })
+      expect(row({ ...empty, appsConfigured: new Set([platform]) }, code), code).toMatchObject({
+        state: false, go: `/oauth/${platform}/start`, goLabel: `اربط ${label}`,
+        measured: 'سرّا التطبيق محفوظان — بقي «اربط»',
+      })
+      expect(row({ ...empty, appsConfigured: new Set([platform]), linked: new Set([platform]) }, code))
+        .toMatchObject({ state: true, measured: '' })
+    }
+    // ‏والجملةُ الثابتةُ لا تقول ما يتبدّل
+    expect(row(empty, 'M-24').ifLeft).not.toContain('سرّيك')
+  })
+
+  it('ولكلّ مهمّةٍ مرساةٌ في الوثيقة يقود إليها رابطُ خطواتها', () => {
+    for (const task of OWNER_TASKS) {
+      const anchor = taskDoc(task.code).split('#')[1]!
+      expect(anchor).toBe(task.code.toLowerCase())
+      // ‏وسطرٌ فارغٌ بعدها: بدونه يبتلع وسمُ HTML العنوانَ فيُعرَض «## M-…» حرفًا
+      expect(DOC, task.code).toMatch(new RegExp(`<a name="${anchor}"></a>\\n\\n##+ (?:✅\\s*)?${task.code}\\b`))
+    }
+    expect(taskDoc('M-24')).toBe('https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24')
   })
 })

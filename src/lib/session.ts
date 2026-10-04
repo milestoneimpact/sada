@@ -36,6 +36,33 @@ export const SESSION_TTL_SECONDS = 8 * 60 * 60
 /** بادئةُ مفاتيح الجلسات في KV — يُجرَد بها ويُبطَل. */
 const PREFIX = 'session:'
 
+/** الوجهةُ حين لا تُطلَب وجهة، أو تُطلَب وجهةٌ لا تُقبَل. */
+const HOME = '/panel'
+
+/**
+ * وجهةُ ما بعد الدخول — **مسارٌ في اللوحة وحدَها، أو الرئيسيّة** (الخطّة ر-11، 7.11).
+ *
+ * كان كلُّ توجيهٍ بعد الدخول `/panel` ثابتًا: من طلب «التقرير» وصل إلى الرئيسيّة
+ * وضغط مرّةً ثانية، ومرساةُ `#posts` تضيع بإرسال النموذج. والوجهةُ تأتي من نموذجٍ
+ * يكتبه المتصفّح، **فهي مدخلٌ لا يُوثَق به**: توجيهٌ إلى ما يُكتب فيه بابٌ مفتوحٌ
+ * إلى أيّ موقع (Open Redirect). فقائمةُ سماحٍ لا قائمةُ منع:
+ *
+ * - تبدأ بـ `/panel` ثمّ نهايةٌ أو `/` أو `?` أو `#` — فلا `/panelx` ولا مخطّط
+ *   (`https:`) ولا نطاقَ قبلها؛
+ * - ولا `//` ولا `\` في أيّ موضع: المتصفّحُ يقرأ `/\evil` و`//evil` نطاقًا؛
+ * - ولا محرفَ تحكّمٍ ولا مسافة: `Location` بسطرٍ جديدٍ ترويسةٌ ثانية؛
+ * - ولا `..`، ولا صفحتا الدخول والخروج — فلا حلقة؛
+ * - وطولُها محدود.
+ */
+export function safeNext(raw: string | null | undefined): string {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 512) return HOME
+  if (!/^\/panel(?:[/?#]|$)/.test(raw)) return HOME
+  if (raw.includes('//') || raw.includes('\\') || raw.includes('..')) return HOME
+  if (/[\u0000-\u0020\u007f]/.test(raw)) return HOME
+  if (/^\/panel\/(?:login|logout|2fa)(?:[/?#]|$)/.test(raw)) return HOME
+  return raw
+}
+
 export interface KvListKey {
   readonly name: string
 }
@@ -87,6 +114,13 @@ export interface SessionRecord {
    * عُرضت شاشةُ الرمز، لكفى طلبٌ مباشرٌ إلى `/panel/settings` لتخطّيها.
    */
   readonly pending: boolean
+  /**
+   * أين يعود المالكُ بعد العامل الثاني — **مسارٌ مُتحقَّقٌ منه بـ `safeNext`**.
+   *
+   * يُكتب في الجلسة المعلَّقة لا في عنوان `/panel/2fa`: الرابطُ يُنسَخ ويُعدَّل،
+   * والصفُّ في KV لا يكتبه إلّا الخادم. ويسقط عند الترقية.
+   */
+  readonly next?: string
 }
 
 export interface Session {
@@ -125,7 +159,7 @@ export async function createSession(
   adminToken: string | undefined,
   presentedToken: string,
   request?: Request,
-  options: { readonly pending?: boolean; readonly now?: Date } = {},
+  options: { readonly pending?: boolean; readonly now?: Date; readonly next?: string } = {},
 ): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' | 'denied' }> {
   // يُبنى طلبٌ صوريّ ليُفحص بالمنطق نفسه — الرمز يجيء من نموذجٍ لا ترويسة
   const probe = new Request('https://sada.local/panel/login', {
@@ -139,6 +173,7 @@ export async function createSession(
   const bind = await currentBind(adminToken)
   if (bind === null) return { error: 'disabled' }
 
+  const next = safeNext(options.next)
   return await write(store, {
     at: (options.now ?? new Date()).toISOString(),
     via: 'admin_token',
@@ -147,6 +182,8 @@ export async function createSession(
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
     pending: options.pending === true,
+    // ‏والوجهةُ للمعلَّقة وحدها: الكاملةُ تُوجَّه في ردّ الدخول نفسِه
+    ...(options.pending === true && next !== HOME ? { next } : {}),
   })
 }
 
@@ -209,8 +246,10 @@ export async function promoteSession(
   store: SessionStore,
   session: Session,
 ): Promise<{ id: string; record: SessionRecord }> {
+  // ‏والوجهةُ تُقرأ قبل الترقية وتسقط معها: جلسةٌ كاملةٌ لا تحمل وجهةً لا يقرؤها أحد
+  const { next: _next, ...rest } = session.record
   const written = await write(store, {
-    ...session.record,
+    ...rest,
     csrf: randomToken(32),
     pending: false,
   })
@@ -244,6 +283,7 @@ function parse(raw: string): SessionRecord | null {
       ip: typeof value.ip === 'string' ? value.ip : '',
       ua: typeof value.ua === 'string' ? value.ua : '',
       pending: value.pending,
+      ...(typeof value.next === 'string' ? { next: safeNext(value.next) } : {}),
     }
   } catch {
     return null
