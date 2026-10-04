@@ -605,7 +605,7 @@ describe('نضج العرض', () => {
     await seedSource('تقرير')
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('class="g"')
+    expect(html).toContain('class="st-ic"')
     expect(html).toContain('ينتظر')
   })
 
@@ -2244,7 +2244,8 @@ describe('شاشةُ المنصّة', () => {
     ).text()
     expect(html).toContain('w_member_social')
     expect(html).toContain('Share on LinkedIn')
-    expect(html).toContain('نطاقا ناقصا')
+    // ‏والعددُ بمعدوده (D-183): نطاقٌ واحدٌ ناقص — كان «1 نطاقا ناقصا»
+    expect(html).toContain('ينقص نطاقٌ واحد')
   })
 })
 

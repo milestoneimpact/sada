@@ -35,6 +35,16 @@
  * يمرّ: لا يسارَ فيه ولا يمين. و`linear-gradient(to left…)` و`translateX` و
  * `box-shadow` خارج الحارس: لا نظيرَ منطقيًّا لها في CSS بعد.
  *
+ * ## ولا تباعدَ على حرفٍ عربيّ (D-183)
+ *
+ * الحرفُ العربيُّ يتّصل بما بعده: **تباعدٌ موجبٌ يفكّ الوصل** («صــدى»)،
+ * **وسالبٌ يُلصق الحروفَ فوق مسافاتها المرسومة** — والخطُّ مصمَّمٌ بها. وقِيس
+ * ستّةُ مواضعَ سالبةٍ على عناوين عربيّة («صدى» نفسُها بينها). فكلُّ `letter-spacing`
+ * غيرِ صفريٍّ يردّ **إلّا في قاعدةٍ تكتب `direction:ltr`**: نصٌّ لاتينيٌّ معزول —
+ * شارةُ STAGING ورموزُ الاسترداد والرقمُ في بطاقة المؤشّر — والتضييقُ فيه صنعة.
+ * والصفرُ يمرّ: يُلغي تباعدًا موروثًا ولا يضيف واحدًا. و`audit_tokens` يحرس
+ * الموجبَ منذ D-149؛ وهذا يحرس الإشارتين.
+ *
  * الاستعمال:  node scripts/audit_rtl.mjs [--self-test]
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -92,6 +102,25 @@ export function physical(css, lineBase = 1) {
   return hits.sort((a, b) => a.i - b.i).map((h) => ({ line: at(h.i), decl: h.decl }))
 }
 
+/**
+ * كلُّ تباعدٍ غيرِ صفريٍّ في كتلةٍ لا تعلن `direction:ltr`: `{ line, decl }`.
+ * الكتلُ الداخليّةُ وحدَها، فقاعدةٌ داخل `@media` تُفحَص بذاتها.
+ */
+export function spacing(css, lineBase = 1) {
+  const text = blank(css)
+  const hits = []
+  const at = (i) => lineBase + (text.slice(0, i).match(/\n/g) ?? []).length
+  for (const block of text.matchAll(/\{([^{}]*)\}/g)) {
+    if (/(?<![\w-])direction\s*:\s*ltr/.test(block[1])) continue
+    for (const m of block[1].matchAll(/(?<![\w-])letter-spacing\s*:\s*([^;}]+)/g)) {
+      const v = m[1].trim()
+      if (/^-?0*\.?0+(?:px|em|rem)?$/.test(v) || v === 'normal') continue
+      hits.push({ line: at(block.index + 1 + m.index), decl: `letter-spacing:${v}` })
+    }
+  }
+  return hits
+}
+
 /** سِماتُ `style="…"` في وسم ملفّ، و`${…}` فيها صفر. */
 export function inlineStyles(code) {
   const out = []
@@ -127,8 +156,26 @@ if (process.argv.includes('--self-test')) {
     console.log(`  ✕ self-test: ردّ ${JSON.stringify(got)} والمطلوب ${JSON.stringify(want)} · الوسمُ ${inline.length} والمطلوب 2`)
     process.exit(1)
   }
+  const tracked = [
+    '.a{font-size:20px; letter-spacing:-.3px}',
+    '.b{letter-spacing:var(--ls-eyebrow)}',
+    '.c{letter-spacing:.06em; direction:ltr}',
+    '.d{letter-spacing:0}',
+    '/* letter-spacing:.2em في شرحٍ لا يُعَدّ */',
+    '@media(max-width:900px){.e{letter-spacing:-.6px}}',
+    '.f{direction: ltr; unicode-bidi:isolate; letter-spacing:-.03em}',
+    '.g{--ls-x:.1em; letter-spacing:normal}',
+  ].join('\n')
+  const spaced = spacing(tracked).map((h) => h.line)
+  const spacedInline = inlineStyles('x = `<b style="letter-spacing:.2em">`').flatMap((s) => spacing(`{${s.css}}`))
+  if (JSON.stringify(spaced) !== '[1,2,6]' || spacedInline.length !== 1) {
+    console.log(`  ✕ self-test: التباعدُ ردّ ${JSON.stringify(spaced)} والمطلوب [1,2,6] · الوسمُ ${spacedInline.length} والمطلوب 1`)
+    process.exit(1)
+  }
   console.log('  ✓ self-test: إحدى عشرةَ فيزيائيّةً مزروعةً تُمسَك بسطورها، وفي الوسم اثنتان،')
   console.log('    والمنطقيّةُ والمتناظرةُ والشرحُ والتدرّجُ تمرّ')
+  console.log('  ✓ self-test: ثلاثةُ تباعداتٍ على غير اللاتينيّ تُمسَك (سالبٌ وموجبٌ ورمز)، وفي الوسم واحد،')
+  console.log('    والصفرُ و«normal» واللاتينيُّ المعزولُ والشرحُ تمرّ')
   process.exit(0)
 }
 
@@ -143,13 +190,19 @@ function walk(dir) {
 }
 
 const found = []
+const tracked = []
 for (const sheet of SHEETS) {
-  for (const h of physical(readFileSync(join(ROOT, sheet), 'utf8'))) found.push(`${sheet}:${h.line}  ${h.decl}`)
+  const css = readFileSync(join(ROOT, sheet), 'utf8')
+  for (const h of physical(css)) found.push(`${sheet}:${h.line}  ${h.decl}`)
+  for (const h of spacing(css)) tracked.push(`${sheet}:${h.line}  ${h.decl}`)
 }
 for (const file of walk(join(ROOT, 'routes'))) {
   const short = file.slice(ROOT.length)
-  if (SHEETS.includes(short) || EXEMPT.has(short)) continue
+  if (SHEETS.includes(short)) continue
   for (const s of inlineStyles(readFileSync(file, 'utf8'))) {
+    // ‏والرسمُ المُعفى من الاتّجاه لا يُعفى من التباعد: نصُّه عربيٌّ كذلك
+    for (const h of spacing(`{${s.css}}`)) tracked.push(`${short}:${s.line}  style="${h.decl}"`)
+    if (EXEMPT.has(short)) continue
     for (const h of physical(s.css)) found.push(`${short}:${s.line}  style="${h.decl}"`)
   }
 }
@@ -157,9 +210,16 @@ for (const file of walk(join(ROOT, 'routes'))) {
 console.log('\n═══ خاصّيّةٌ فيزيائيّةٌ في ورقةٍ تُقرأ من اليمين ═══\n')
 if (found.length === 0) console.log('  ✓ كلُّ جانبٍ منطقيّ: بدايةُ السطر ونهايتُه، لا يمينُ الشاشة ويسارُها')
 for (const f of found) console.log(`  ✕ ${f}`)
+console.log('\n═══ تباعدُ حرفٍ بلا اتّجاهٍ لاتينيّ ═══\n')
+if (tracked.length === 0) console.log('  ✓ لا تباعدَ على العربيّة: ما بقي منه في قاعدةٍ تعلن «direction:ltr» وحدَها')
+for (const t of tracked) console.log(`  ✕ ${t}`)
 console.log('\n═══ ملفٌّ مُعفًى بسببه ═══\n')
 for (const [file, why] of EXEMPT) console.log(`  · ${file} — ${why}`)
 
+if (tracked.length > 0) {
+  console.log('\nوالبديلُ: حذفُ التباعد، أو «direction:ltr» في القاعدة نفسِها إن كان النصُّ لاتينيًّا معزولًا.\n')
+  process.exit(1)
+}
 if (found.length > 0) {
   console.log('\nوالبديلُ: «margin-inline-start/end» و«inset-inline» و«text-align:start/end».')
   console.log('ولا يُعفى ملفٌّ إلّا **بسطرٍ يقول لماذا لا ينطبق عليه اتّجاهُ السطر**.\n')

@@ -54,7 +54,7 @@ function lastAttemptLine(input: PlanInput): string {
   const glyph = kind === 'failed' ? '✕' : '!'
   const what = kind === 'failed' ? 'فشلت' : kind === 'blocked' ? 'أُوقفت' : 'لم تكفِ المادّة'
   return `<div class="lede-row" style="margin-top:var(--s-3)">
-      ${chip(cls, glyph, `آخرُ محاولةٍ ${what} منذ ${escapeHtml(relativeTime(a.at, input.now))}`)}
+      ${chip(cls, glyph, `آخرُ محاولةٍ ${what} ${escapeHtml(relativeTime(a.at, input.now))}`)}
       <span class="lede-note">${reason === '' ? 'بلا سببٍ مسجَّل — أعد المحاولة وسيُكتب السبب.' : escapeHtml(reason)}</span>
     </div>`
 }
@@ -102,7 +102,7 @@ export function planSection(input: PlanInput): string {
          * تحليل، **وعيّنةُ الرسم كانت نظاما يعمل**. فأظهرتها عيّنةُ
          * اليوم الأوّل.
          */
-        ? `<p class="hint" style="margin:var(--s-2) 0 0">${input.analyzed} مصدرا محلَّلا — والخطّةُ تحتاج اثنين على الأقلّ.</p>
+        ? `<p class="hint" style="margin:var(--s-2) 0 0">${input.analyzed === 0 ? 'لا مصدرَ محلَّلٌ بعد' : 'مصدرٌ واحدٌ محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ.</p>
            <a class="btn g sm" href="#sources" style="margin-top:var(--s-2)">حلّل مصادرك</a>`
         : ''
 
@@ -129,7 +129,7 @@ export function planSection(input: PlanInput): string {
     <div class="lede-row" style="margin:0 0 var(--s-3)">
       <span class="chip mono">أسبوعُ ${escapeHtml(plan.week)}</span>
       <span class="chip mono">${escapeHtml(plan.model)}</span>
-      <span class="ago">وُضعت منذ ${escapeHtml(relativeTime(plan.createdAt, now))}</span>
+      <span class="ago">وُضعت ${escapeHtml(relativeTime(plan.createdAt, now))}</span>
     </div>
 
     ${plan.plan.rationale === ''

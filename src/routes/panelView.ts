@@ -614,7 +614,7 @@ export function panelPage(d: PanelData): string {
           ? '<b>انتهى</b>'
           : e.daysLeft === 0
             ? '<b>ينتهي اليوم</b>'
-            : `يبقى <b>${e.daysLeft}</b> يوما`
+            : `يبقى <b>${counted(e.daysLeft, NOUNS.day)}</b>`
         const why = e.kind === 'refresh'
           ? ' — <b>ويوجب سقوطُه دورةَ إذنٍ بيدك</b>'
           : ''

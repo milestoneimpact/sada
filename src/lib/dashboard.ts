@@ -20,6 +20,7 @@
  * استعلامَ جديدا، ولا نداءَ مدفوعا، **ولا بطاقةً يكلّف عرضُها شيئا**.
  * فاختيارُ المالك لا يفتح بابَ إنفاق.
  */
+import { counted, NOUNS } from './format'
 
 /**
  * ما تحتاجه البطاقاتُ من بيانات اللوحة — **وهذا كلُّه**.
@@ -248,7 +249,7 @@ export const TILES: readonly TileSpec[] = [
       const sum = d.series.reduce((a, c) => a + c.total, 0)
       return {
         value: f.money(sum / d.series.length),
-        note: `على ${d.series.length} يوما`,
+        note: `على ${counted(d.series.length, NOUNS.day, 'gen')}`,
       }
     },
   },

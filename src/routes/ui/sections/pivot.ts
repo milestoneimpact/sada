@@ -10,6 +10,7 @@
  * واحد**. وزرٌّ لا يعمل بلا جافاسكربت زرٌّ يعمل خطأً (D-046).
  */
 import { escapeHtml } from '../escape'
+import { counted, NOUNS } from '../../../lib/format'
 import { pageHead } from '../parts'
 import { sectionLabel } from '../command'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
@@ -121,7 +122,7 @@ export function pivotPane(d: PivotView): string {
    * العطلَ في اللوح، **والسببُ في المدى غالبا** — فيُقال ويُعرَض الفعل.
    */
   const empty = `<div class="empty"><b>لا منشورَ في هذا المدى</b>
-    <p>المدى الحاليُّ ${escapeHtml(String(d.sinceDays))} يوما.
+    <p>المدى الحاليُّ ${escapeHtml(counted(d.sinceDays, NOUNS.day))}.
       وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.</p></div>`
 
   return `<section data-pane="pivot" hidden>

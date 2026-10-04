@@ -10,6 +10,7 @@ import { escapeHtml } from './escape'
 import { ICON } from './icons'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { BEIRUTI, INTER, REEM_KUFI } from '../../lib/ui/fonts'
+import { THEME } from './tokens'
 
 /**
  * الخطّان — **من أصلنا، وبوجهٍ واحدٍ لكلّ أسرة** (D-099).
@@ -118,8 +119,19 @@ export const ICON_BYTES = ICON_SVG
 
 export { escapeHtml }
 
+/**
+ * لونُ شريط المتصفّح — **بالوضع لا بلونٍ واحد** (D-183).
+ *
+ * كان ‏#1f2430 في الوضعين: شريطٌ حبريٌّ فوق صفحةٍ بورسلينيّة نهارًا، ولا
+ * يطابق أرضَ الليل ليلًا. فوسمان بشرط الوضع، وقيمتاهما أرضُ الصفحة من
+ * «THEME» نفسِه — لا رقمٌ يُنسَخ. ويحدّثهما سكربتُ الثيم حين يختار المالكُ
+ * وضعًا يخالف الجهاز (`THEME_BOOT` هنا و`THEME_SCRIPT` في `scripts.ts`).
+ */
+const THEME_COLOR = (['light', 'dark'] as const).map((mode) =>
+  `<meta name="theme-color" media="(prefers-color-scheme: ${mode})" content="${THEME[mode]['--bg']}" data-c="${THEME[mode]['--bg']}">`).join('\n')
+
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
-<meta name="theme-color" content="#1f2430">`
+${THEME_COLOR}`
 
 /**
  * سكربتُ الثيم — **يُنفَّذ قبل الرسم لا بعده**.
@@ -131,10 +143,15 @@ const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encod
  * والقراءةُ في `try` لأنّ `localStorage` يرمي في نافذةٍ خاصّة أو حين
  * يمنع المتصفّح تخزينَ المواقع — ونافذةٌ خاصّة يجب أن تفتح اللوحة، لا
  * أن تسقط على سطرٍ من الزينة.
+ *
+ * ووضعٌ مختارٌ يخالف الجهاز يلوّن شريطَ المتصفّح بلونه كذلك (D-183): الوسمان
+ * قبل السكربت في الرأس، فيُقرآن هنا قبل الرسم.
  */
 const THEME_BOOT = `
 try{var t=localStorage.getItem('sada-theme');
-if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
+if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;
+document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){
+m.content=t==='dark'?${JSON.stringify(THEME.dark['--bg'])}:${JSON.stringify(THEME.light['--bg'])};});}
 var d=localStorage.getItem('sada-density');
 if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 `

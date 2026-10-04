@@ -27,8 +27,8 @@ html{scroll-behavior:smooth;
 body{
   margin:0; background:var(--bg); color:var(--ink); direction:rtl;
   /* والترتيبُ ليس ذوقا: أوّلُ خطٍّ يملك المحرف يفوز به. و Inter لا
-     عربيّةَ فيه، فيأخذ اللاتينيَّ والرقمَ ويسقط إلى Tajawal في
-     العربيّة. ولو قُدّم Tajawal لأخذ اللاتينيَّ أيضا — وهو ليس
+     عربيّةَ فيه، فيأخذ اللاتينيَّ والرقمَ ويسقط إلى Beiruti في
+     العربيّة. ولو قُدّم Beiruti لأخذ اللاتينيَّ أيضا — وهو ليس
      أحسنَ فيه، والمعرّفاتُ عندنا لاتينيّةٌ كثيرة. */
   font-family:"Inter","Beiruti",system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:var(--t-base); line-height:var(--lh); -webkit-font-smoothing:antialiased;
@@ -46,7 +46,7 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
 .app,.doc,.wrap{position:relative; z-index:1}
 /* ── حلقةُ التركيز ────────────────────────────────────────────────────
    طبقتان: خطٌّ بلون الهويّة وحلقةٌ بلون السطح تحته. فعلى أرضٍ داكنةٍ
-   يُرى التركواز، وعليه نفسِه — زرٌّ أوّليٌّ مثلا — تُرى الحلقة. وحلقةٌ بلونٍ واحد
+   يُرى النحاس، وعليه نفسِه — زرٌّ أوّليٌّ مثلا — تُرى الحلقة. وحلقةٌ بلونٍ واحد
    تختفي على ما يوافقها، وهو أكثرُ ما يقع على الأزرار الأوّليّة. */
 :focus-visible{outline:2px solid var(--au); outline-offset:2px; border-radius:var(--r-xs);
   box-shadow:0 0 0 4px var(--surface)}
@@ -86,9 +86,12 @@ body::before{content:''; position:fixed; inset:0; pointer-events:none; z-index:0
    داخلَ مطويٍّ من أن يقلِب لفظَ أبيه. */
 details[open]>summary .lbl-open{display:none}
 details:not([open])>summary .lbl-close{display:none}
-/* والمَظهرُ معه واحدٌ: لونُ العلامة، وسهمٌ ينقلِب. والسهمُ زينةٌ لا
-   خبرٌ — لذلك لا يُقرأ بصوتٍ عالٍ، واللفظُ فوقه يقول ما يقوله السهم */
-.g-tog,.ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--brand);
+/* والمَظهرُ معه واحدٌ: حبرُ الرابط وخطٌّ تحته، وسهمٌ ينقلِب. والسهمُ زينةٌ لا
+   خبرٌ — لذلك لا يُقرأ بصوتٍ عالٍ، واللفظُ فوقه يقول ما يقوله السهم.
+   **وهو زرٌّ هادئ** (D-183): «--link» ليلًا و«--ink-2» متقاربان ضوءًا (‏١٫٠٨:١)،
+   ونهارًا هو حبرُ المتن — فالخطُّ تحته هو العلامة لا اللون */
+.g-tog,.ptog{flex:none; font-size:var(--t-sm); font-weight:600; color:var(--link);
+  text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:.3em;
   display:inline-flex; align-items:center; gap:var(--s-2)}
 /* **والسهمُ حدودٌ لا حرف** (D-167): كان «▾»، وليس في Beiruti ولا Inter ولا
    Reem Kufi المضمَّنة، فيُرسَم بخطّ النظام ويختلف من جهازٍ لآخر (N-7). والمثلّثُ
@@ -124,7 +127,7 @@ b,strong{font-weight:700}
    تكبيرُ النصّ يبدّل الشكلَ ويكسر السلّم. فتُمَدّ منطقةُ اللمس بطبقةٍ
    شفّافةٍ فوق الرابط: **لا ترى العينُ فرقا، ويرى الإصبعُ هدفا كاملا.**
    والعرضُ يمتدّ إلى ‏٤٤px حين يكون النصُّ أضيق منها. */
-.tap{position:relative; display:inline-block; min-width:var(--tap); text-align:center; color:var(--brand)}
+.tap{position:relative; display:inline-block; min-width:var(--tap); text-align:center; color:var(--link)}
 /* **والامتدادُ رأسيٌّ لا أفقيّ.**
    طبقةٌ أعرضُ من الرابط تخرج عن الصفحة فتصنع تمريرا أفقيّا — قِيس ‏١٢px
    عند ‏٣٢٠px، مصدرُها رابطُ «X» بعرض ‏١١ وطبقتُه ‏٤٤. فتُقصَر الطبقةُ على
@@ -149,17 +152,19 @@ b,strong{font-weight:700}
    الأقواسُ نفسها التي في رمز التبويب، مرسومةً لا مكتوبة. وكانت مربّعا
    فيه «صدى» بخمسةَ عشرَ بكسلا: **الحرفان يزدحمان في ستٍّ وثلاثين**،
    فيُقرأ المربّعُ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب. */
-/* والعلامةُ وحدها تجمع اللونين: زمرّدٌ يتحوّل ذهبا — ولا يتكرّر هذا
-   الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها */
+/* والعلامةُ وحدها تجمع اللونين: حبرٌ ونحاسٌ ثابتان في الوضعين (D-144) — ولا
+   يتكرّر هذا الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها. **وأرضُها الحبريّةُ على
+   أرض الليل ‏١٫٠٥:١ — تختفي**، فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
 .glyph{display:grid; place-items:center; flex:none; width:42px; height:42px; border-radius:var(--r);
   background:var(--glyph-bg); color:var(--glyph-fg);
-  box-shadow:var(--sh-1), 0 0 0 1px var(--line-strong)}
+  box-shadow:var(--sh-1), 0 0 0 1px var(--mark-ring)}
 /* نسبةٌ لا قياسٌ ثابت: العلامةُ نفسها تظهر بـ 38 في الرافدة و 50 في
    شاشة الدخول و 38 في الوثائق — وقياسٌ ثابتٌ يجعلها تسبح في الأكبر. */
 .glyph svg{width:56%; height:56%; display:block}
 .brand{min-width:0}
-.brand b{display:block; font-weight:700; line-height:var(--lh-tight); font-size:var(--t-lg);
-  letter-spacing:-.3px}
+/* ‏والاسمُ «صدى» بلا تضييق (D-183): التباعدُ — سالبًا أو موجبًا — يفكّ الوصلَ
+   العربيّ أو يُلصقه، والخطُّ مرسومٌ بمسافاته */
+.brand b{display:block; font-weight:700; line-height:var(--lh-tight); font-size:var(--t-lg)}
 .brand span{font-size:var(--t-xs); font-weight:600; letter-spacing:var(--ls-eyebrow);
   direction:ltr; unicode-bidi:isolate; display:inline-block; margin-top:var(--s-1);
   padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--ink-3);
@@ -262,7 +267,7 @@ details.ladder .verdict.bad{color:var(--bad)}
 }
 /* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
 .topbar .glyph.tb{display:none; width:30px; height:30px; border-radius:var(--r-sm)}
-.topbar h1{font-size:var(--t-md); font-weight:600; letter-spacing:-.1px; color:var(--ink-2)}
+.topbar h1{font-size:var(--t-md); font-weight:600; color:var(--ink-2)}
 .topbar .crumb{font-size:var(--t-xs); color:var(--ink-3); margin-top:1px}
 /* ‏والعنوانُ والنطاقُ يُقصّان لا يدفعان «خروج» خارج الشاشة (D-177): بعد رفع الحرف فاض
    الشريطُ ‏6px عند ‏320 — والزرُّ الذي خرج هو الذي يُطلَب حين يُطلَب */
@@ -409,7 +414,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 
 /* ── الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ المنصّات (D-177) ───────────────
    ثلاثُ طبقاتٍ تجيب ثلاثةَ أسئلةٍ قبل أيّ رقم مال. والفعلُ الواحدُ بلون حاله:
-   أحمرُ ما يوقف النشر، وكهرمانُ ما ينتظر، وحدٌّ أخضرُ لما يجري. */
+   أحمرُ ما يوقف النشر، وبرتقاليُّ ما ينتظر، وحدٌّ أخضرُ لما يجري. */
 .next{display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; margin-bottom:var(--s-3);
   padding:var(--s-4) var(--s-5); border-radius:var(--r-lg); background:var(--surface);
   border:1px solid var(--line); border-inline-start:4px solid var(--ok)}
@@ -441,8 +446,11 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 .pf .btn{margin-top:auto}
 .pf-head{display:flex; align-items:center; gap:var(--s-2); min-width:0}
 .pf-name{display:flex; flex-direction:column; min-width:0}
+/* ‏وحلقةٌ ليلًا (D-183): مربّعا X وTikTok على السطح الداكن ‏١٫٠٣ و‏١٫٠٥:١ —
+   يختفيان ويبقى رمزٌ أبيضُ يطفو. ونهارًا الحلقةُ شفّافة */
 .pf-logo{width:36px; height:36px; flex:none; display:grid; place-items:center;
-  border-radius:var(--r-sm); color:var(--pf-fg); background:var(--brand)}
+  border-radius:var(--r-sm); color:var(--pf-fg); background:var(--brand);
+  box-shadow:0 0 0 1px var(--logo-ring)}
 .pf-logo svg{width:18px; height:18px; display:block}
 .pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
 .pf[data-pf=x] .pf-logo{background:var(--pf-x)}
@@ -511,15 +519,17 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 
 /* ── بطاقةُ المؤشّر ────────────────────────────────────────── */
 .tile{display:flex; flex-direction:column; position:relative; overflow:hidden}
-/* خيطٌ بلون الهويّة على رأس المؤشّر — يربط الأربعةَ بعضَها ببعضٍ فتُقرأ صفّا
-   واحدا، ويميّزها عن بطاقات المحتوى تحتها. */
-.tile::before{content:''; position:absolute; inset-inline:0; top:0;
-  background:linear-gradient(90deg,transparent 4%,var(--au) 50%,transparent 96%); height:3px}
+/* وكان على رأس كلّ مؤشّرٍ خيطُ نحاسٍ («::before») يُخفيه شريطُ المؤشّرات منذ
+   D-143، فلم يبقَ إلّا على عدّاد المصادر المستعير للصنف — نحاسٌ بلا معنى. فحُذف
+   (D-183)؛ والصفُّ يربطه حدُّ الشريط النحاسيُّ في «.grid.tiles». */
 .tile .k{font-size:var(--t-sm); font-weight:600; color:var(--ink-2)}
-.tile .v{font-size:var(--t-2xl); font-weight:400; line-height:var(--lh-tight); letter-spacing:-.8px;
+.tile .v{font-size:var(--t-2xl); font-weight:400; line-height:var(--lh-tight);
   font-variant-numeric:tabular-nums; margin-top:var(--s-1);
-  /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته */
-  direction:ltr; unicode-bidi:isolate; text-align:end}
+  /* العزلُ يثبّت ترتيبَ الرقم ورمزِ العملة، والمحاذاةُ تُبقيه تحت لصيقته.
+     **والتضييقُ للرقم اللاتينيّ المعزول وحدَه، بنسبةٍ لا ببكسل** (D-183): كان
+     ‏-.8px ثمّ ‏-1.2px ثمّ ‏-.6px في ثلاث قواعد لثلاث رتب، ورتبةُ ‏٥٦ بلا قاعدة؛
+     و‏-.03em يتبع الحجمَ في كلّ رتبة. ووحدتُه العربيّة («em») تُعيده صفرًا */
+  direction:ltr; unicode-bidi:isolate; text-align:end; letter-spacing:-.03em}
 .tile .v em{font-style:normal; font-size:var(--t-base); color:var(--ink-3); letter-spacing:0;
   margin-inline-start:var(--s-0); font-weight:500}
 /* ── والمؤشّرُ الأوّل يقود بالقياس كما يقود باللون (D-117) ───────────
@@ -532,7 +542,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
 
    **ويشمل شبكةَ الثلاثة كذلك** (المزوّدون): القاعدةُ في الأوّليّة لا في
    العدد. */
-.grid>.tile:first-child .v{font-size:var(--t-3xl); color:var(--au); font-weight:400; letter-spacing:-1.2px}
+.grid>.tile:first-child .v{font-size:var(--t-3xl); color:var(--au); font-weight:400}
 .tile .n{font-size:var(--t-xs); color:var(--ink-3); margin-top:var(--s-2)}
 /* ── والرقمُ يصغر درجةً على الجوّال (D-136) — **وموضعُه بعد قاعدتَي الرقم** ──
    كُتب أوّلًا مع شبكة الزوجين أعلاه، **فغلبته «.tile .v» و«.grid>.tile:first-child
@@ -540,12 +550,11 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    قاعدةٌ تُقرأ صحيحةً وأثرُها صفر. أمسكها القياسُ في D-167، ويحرسها اختبارٌ
    يسأل الورقةَ عن الترتيب لا عن النصّ. */
 @media(max-width:900px){
-  .tiles .v{font-size:var(--t-xl); letter-spacing:-.6px}
+  .tiles .v{font-size:var(--t-xl)}
   .tiles>.tile:first-child .v{font-size:var(--t-2xl)}}
 
-/* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا كهرمان فيه
-   قطّ — الكهرمان يقع من ذهب الهوية على ΔE 7.2 فلا يُرى فرقُهما. والبلوغُ
-   حالةٌ لا مقدار، فيقفز إلى الأحمر (ΔE 19.8 عن الذهب) **ومعه نصّ**. */
+/* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا لونَ حالٍ فيه
+   قطّ — حتّى يبلغ. والبلوغُ حالةٌ لا مقدار، فيقفز إلى الأحمر **ومعه نصّ**. */
 .bar{height:4px; background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; margin-top:var(--s-3)}
 .bar i{display:block; height:100%; border-radius:var(--r-pill); background:var(--brand); transition:width var(--dur-3) var(--ease-out)}
 .bar i.f{background:var(--bad)}
@@ -564,7 +573,7 @@ table,.chip,.count,.ago,.money,.num,.n{font-variant-numeric:tabular-nums}
    الاتّجاه، والحبرُ يبقى حبرا. والصنفان يبقيان للاتّجاه لا للّون. */
 .delta.up,.delta.down{color:var(--ink-2)}
 .delta .ar{font-size:var(--t-xs); line-height:var(--lh-tight)}
-/* والسهمُ مرسومٌ بقياس رمز الرقاقة (D-167): ‏١٠px كـ«.st .g svg» */
+/* والسهمُ مرسومٌ بقياس رمز الرقاقة (D-167): ‏١٠px كـ«.st-ic svg» */
 .delta .ar svg{width:10px; height:10px; display:block}
 
 /* ══ الجداول ═════════════════════════════════════════════════ */
@@ -581,7 +590,7 @@ tbody tr:last-child td{border-bottom:0}
    الصفحة لا يُمرَّر — فالغلافُ حوله لا الصفحةُ كلُّها. */
 .pv-wrap{overflow-x:auto}
 /* رأسُ صفّ المنصّة رابطٌ إلى شاشتها — وهدفُ لمسٍ كاملٌ لا سطرُ نصّ (D-132) */
-.pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--brand);
+.pv th a{display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); color:var(--link);
   text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au); text-underline-offset:3px}
 @media(hover:hover){.pv th a:hover{text-decoration:underline}}
 /* زرُّ التنزيل وشرحُه في سطرٍ واحدٍ يلتفّ على الضيق (D-126) */
@@ -625,9 +634,12 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 /* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
 .st{display:inline-flex; align-items:center; gap:var(--s-1); padding:var(--s-0) var(--s-2); border-radius:var(--r-pill);
   font-size:var(--t-xs); font-weight:600; border:1px solid transparent; white-space:nowrap}
-/* الرمزُ مرسومٌ لا حرفٌ من خطّ النظام (D-154) */
-.st .g{display:inline-flex; line-height:1}
-.st .g svg{width:10px; height:10px; display:block}
+/* الرمزُ مرسومٌ لا حرفٌ من خطّ النظام (D-154). **واسمُه له وحدَه** (D-183): كان
+   «.g» — وهو صنفُ الزرّ الشبحيّ نفسُه، فلبس الرمزُ أرضَ الزرّ البيضاءَ وحبرَه
+   داخل كلّ حبّةٍ ملوّنة (‏٩٦ شارةً في الرئيسيّة). والرمزُ بلا أرضٍ ولا حدّ:
+   لونُه «currentColor» من حبّته */
+.st-ic{display:inline-flex; line-height:1}
+.st-ic svg{width:10px; height:10px; display:block}
 .st.ok{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 24%,transparent)}
 .st.warn{color:var(--warn); background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 28%,transparent)}
 .st.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
@@ -758,7 +770,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:1px solid var(-
 /* أزرارُ الصفوف عمودٌ واحدٌ لا حافّةٌ مسنّنة (D-136): عرضٌ أدنى واحد،
    والأطولُ يتجاوزه بحقّه. */
 .todo>li>a.btn,.todo>li>form .btn{background:transparent; border-color:transparent;
-  box-shadow:none; color:var(--brand); min-width:44px; padding-inline:var(--s-3); font-weight:600;
+  box-shadow:none; color:var(--link); min-width:44px; padding-inline:var(--s-3); font-weight:600;
   margin-block:-1px;
   /* منذ صار الحبرُ لونَ العلامة لا يفرّق اللونُ رابطًا عن نصّه (‏١٫١١:١)؛ فعلامةٌ لا لونيّة: خيطُ نحاسٍ تحته (D-149) */
   text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au)}
@@ -861,7 +873,10 @@ ul.plain li:last-child{margin-bottom:0}
 /* أسبوعٌ قِيس بعضُه — عمودُه مخطَّط، والرقمُ بجانبه يقول كم (D-127) */
 .bar-fill.part{background:repeating-linear-gradient(135deg,var(--brand) 0 6px,color-mix(in srgb,var(--brand) 45%,transparent) 6px 12px)}
 .history{margin-bottom:var(--s-4)}
-.history .bar-name{text-decoration:none; color:var(--brand); font-variant-numeric:tabular-nums}
+/* ‏رابطُ الأسبوع رابطٌ: بحبره وخطٍّ تحته (D-183) — كان بلون الحبر بلا خطّ،
+   فلا يفرّقه عن اسم أسبوعٍ لا يُفتَح إلّا المؤشّر */
+.history .bar-name{color:var(--link); font-variant-numeric:tabular-nums;
+  text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px}
 .bar-val{flex:none; min-width:70px; text-align:end; font-size:var(--t-sm);
   color:var(--ink); font-variant-numeric:tabular-nums}
 @media(max-width:560px){.bar-name{min-width:62px}}
@@ -884,10 +899,10 @@ ul.plain li:last-child{margin-bottom:0}
   background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2)}
 .ch.off .ch-logo{color:var(--ink-3)}
 .ch-logo svg{width:17px; height:17px; display:block}
-.ch-name{font-weight:700; font-size:var(--t-md); line-height:var(--lh-tight); letter-spacing:-.1px}
+.ch-name{font-weight:700; font-size:var(--t-md); line-height:var(--lh-tight)}
 .ch-name a{color:inherit; text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; text-decoration-color:var(--au)}
 @media(hover:hover){.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:3px}}
-.ch-name span{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3); letter-spacing:0}
+.ch-name span{display:block; font-size:var(--t-xs); font-weight:500; color:var(--ink-3)}
 .ch-note{font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh); margin:0}
 .ch-acc{display:flex; align-items:center; gap:var(--s-2); padding:var(--s-2) var(--s-3); border-radius:var(--r-sm);
   background:var(--surface-2); border:1px solid var(--line-soft); font-size:var(--t-sm)}
@@ -924,7 +939,7 @@ ul.plain li:last-child{margin-bottom:0}
   border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
 .guide .g-ic svg{width:15px; height:15px; display:block}
 .guide .g-t{min-width:0}
-.guide .g-t b{display:block; font-size:var(--t-md); font-weight:700; letter-spacing:-.15px}
+.guide .g-t b{display:block; font-size:var(--t-md); font-weight:700}
 .guide .g-t span{display:block; font-size:var(--t-sm); color:var(--ink-3); line-height:var(--lh);
   max-width:var(--measure)}
 .guide-body{padding:var(--s-2) var(--s-5) var(--s-5); border-top:1px solid var(--line-soft)}
@@ -1093,7 +1108,9 @@ ol.steps.wiz.nodot li::before{display:none}
 /* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
    — وهو ثلثُ الحدّ. */
 summary{min-height:var(--tap); display:flex; align-items:center}
-.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--brand);
+/* ‏والمطويُّ هنا زرٌّ هادئ كـ«.g-tog»: حبرُ الرابط وخطٌّ تحته (D-183) */
+.setup>summary{cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--link);
+  text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:.3em;
   list-style:none; padding:var(--s-2) 0}
 .setup>summary::-webkit-details-marker{display:none}
 /* والمطويُّ يشير إلى نهاية السطر لا إلى يمينه (D-167): كان «▸» — حرفًا من خطّ
@@ -1403,7 +1420,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .stat{display:inline-flex; align-items:baseline; gap:var(--s-2);
   font-size:var(--t-xs); color:var(--ink-3)}
 .stat b{font-size:var(--t-lg); font-weight:700; color:var(--ink);
-  font-variant-numeric:tabular-nums; letter-spacing:-.3px}
+  font-variant-numeric:tabular-nums}
 .stat .na{color:var(--ink-3); font-weight:400; cursor:help}
 
 /* سببُ الفشل بنصّه: «فشل» وحدها لا تُعالَج، والسببُ يُعالَج */
@@ -1424,8 +1441,8 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .wrap{max-width:1180px; margin:0 auto; padding:var(--s-6) var(--s-5) var(--s-16)}
 .auth{max-width:400px; margin:12vh auto}
 .auth .glyph{margin:0 auto var(--s-4); width:64px; height:64px; border-radius:var(--r-lg);
-  box-shadow:var(--sh-2), 0 0 0 1px var(--line-strong)}
-.auth h1{text-align:center; font-size:var(--t-2xl); margin:0 0 var(--s-1); letter-spacing:-.3px}
+  box-shadow:var(--sh-2), 0 0 0 1px var(--mark-ring)}
+.auth h1{text-align:center; font-size:var(--t-2xl); margin:0 0 var(--s-1)}
 .auth .lede{text-align:center; color:var(--ink-3); font-size:var(--t-sm); margin:0 0 var(--s-5)}
 .auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
 .auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
@@ -1581,8 +1598,8 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .doc{max-width:820px; margin:0 auto; padding:var(--s-10) var(--s-5) var(--s-16); background:var(--bg)}
 .doc header{border-bottom:1px solid var(--line); padding-bottom:var(--s-5); margin-bottom:var(--s-2)}
 .doc .glyph{width:38px; height:38px; margin-bottom:var(--s-3)}
-.doc h1{font-size:var(--t-2xl); letter-spacing:-.5px; margin:0 0 var(--s-2)}
-.doc h2{font-size:var(--t-lg); margin:var(--s-8) 0 var(--s-2); letter-spacing:-.2px}
+.doc h1{font-size:var(--t-2xl); margin:0 0 var(--s-2)}
+.doc h2{font-size:var(--t-lg); margin:var(--s-8) 0 var(--s-2)}
 .doc .lede{font-size:var(--t-lg); line-height:var(--lh); color:var(--ink-2);
   /* والصدرُ أضيقُ قياسا لا أوسع: قياسُه أكبر، فالوحدةُ ch أعرض معه —
      و 70ch عنده أعطت 88 محرفا عند القياس. والرقمُ مضبوطٌ على المقياس.
@@ -1592,7 +1609,7 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
 .doc ul{margin:0 0 var(--s-3); padding-inline-start:var(--s-5)}
 .doc li{font-size:var(--t-base); line-height:var(--lh-loose); color:var(--ink-2); margin-bottom:var(--s-2)}
 .doc b{color:var(--ink)}
-.doc a{color:var(--brand); text-underline-offset:3px}
+.doc a{color:var(--link); text-underline-offset:3px}
 .doc table{font-size:var(--t-sm)}
 .doc td b{font-weight:600}
 /* «ما لا يقع» أبرزُ ما في الصفحة: هو ما يبحث عنه المراجع أوّلا */
@@ -1707,9 +1724,9 @@ nav.back a{font-size:var(--t-sm); font-weight:600; color:var(--ink-2); text-deco
    تُقال بألوان الحال وحدها */
 .hint.ready{margin:var(--s-2) 0 0; display:flex; align-items:center;
   gap:var(--s-1) var(--s-2); flex-wrap:wrap; flex-basis:100%}
-/* ورابطُ الإصلاح بلون الهويّة كروابط الوثيقة — لا أزرقُ المتصفّح: الورقةُ
+/* ورابطُ الإصلاح بحبر الرابط كروابط الوثيقة — لا أزرقُ المتصفّح: الورقةُ
    لا تلوّن «a» عامّةً، فرابطٌ بلا قاعدةٍ يخرج بلونٍ لا يعرفه الثيمان */
-.hint.ready a{color:var(--brand); font-size:var(--t-xs); font-weight:600; text-underline-offset:3px}
+.hint.ready a{color:var(--link); font-size:var(--t-xs); font-weight:600; text-underline-offset:3px}
 
 [hidden]{display:none!important}
 
@@ -1841,7 +1858,6 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
   border-top:2px solid var(--au); border-radius:var(--r-lg); overflow:hidden; box-shadow:none}
 .grid.tiles>.tile{border:0; border-radius:0; box-shadow:none; background:var(--surface);
   background-image:none; padding:var(--s-5d) var(--s-5d)}
-.grid.tiles>.tile::before{display:none}
 @media(hover:hover){.todo>li>a.btn:hover,.todo>li>form .btn:hover{background:var(--brand-wash);
   border-color:transparent}}
 
@@ -2052,10 +2068,14 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
    يُعطَّل إلّا بمنع التقريب كلِّه، ومنعُه يخالف WCAG 1.4.4. وثمنُه أنّ
    الصفحةَ تقفز وتكبر عند كلّ لمسةِ حقل، ثمّ يُصغّرها المالكُ بإصبعين.
 
-   فيُرفَع الخطُّ إلى «--t-lg» (‏١٦px) على الشاشات اللمسيّة وحدها: القراءةُ
-   على مسافةِ ذراعٍ تحتاجه أصلا، والشاشةُ الواسعةُ تبقى على ‏١٤ حيث
-   الكثافةُ مطلوبة. **و«--t-base» أربعةَ عشرَ لا ستّةَ عشرَ** — جُرّبت
-   فلم يتبدّل شيء، والرمزُ الصحيح «--t-lg».
+   فيُرفَع خطُّ الحقل إلى «--t-lg» (‏١٧٫٥px) على الشاشات اللمسيّة وحدها، والشاشةُ
+   الواسعةُ تبقى على «--t-md» (‏١٥٫٥) حيث الكثافةُ مطلوبة. **و«--t-base» دون ‏١٦**
+   فلا يكفي، والرمزُ الصحيح «--t-lg».
+
+   **والزرُّ ليس حقلًا** (D-183): كان معها، فصار الزرُّ على الهاتف ‏١٧٫٥px أكبرَ
+   من الفقرة التي تشرحه، و«.sm» يبقى ‏١٤ بجانبه — تراتبٌ مقلوبٌ في السطر الواحد.
+   ولا يُقرّب Safari زرًّا، **وهدفُ اللمس ‏٤٤px من «min-height» لا من الخطّ**. فالزرُّ
+   على اللمس بقياسه على الحاسوب.
 
    و«pointer: coarse» أدقُّ من عرضِ الشاشة: لوحٌ بقلمٍ ليس هاتفا، وحاسوبٌ
    بشاشةٍ لمسيّةٍ ليس شاشةَ فأرة.
@@ -2064,7 +2084,7 @@ nav.tabs .lbl,.tile .k,th,.sec,.stat b,.cmdk-t b,.topbar h1,.slice h3{font-famil
    فتغلب المحدّدَ العارِيَ مهما كان الوسيط — وقد جُرّب فبقي ‏١٤. */
 @media(pointer:coarse){
   input[type=number],input[type=password],input[type=text],input[type=datetime-local],
-  input:not([type]),select,textarea,button,.btn{font-size:var(--t-lg)}
+  input:not([type]),select,textarea{font-size:var(--t-lg)}
   /* والمحدّداتُ الأخصُّ تُذكَر باسمها: قاعدةٌ عامّةٌ لا تغلب
      «.copy input» ولا «.sched select» مهما تأخّرت. وحقلُ لوحة الأوامر
      معها باسمه (D-167): الموضعُ يحرسه اليوم، والاسمُ يحرسه إن تبدّل نوعُه */

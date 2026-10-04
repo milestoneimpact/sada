@@ -705,7 +705,7 @@ function card(
         : ''}
       <div class="ch-logo sm">${LOGOS[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}
-        <span class="ago">منذ ${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
+        <span class="ago">${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
       <span class="grow"></span>
       ${status(st.cls, st.glyph, escapeHtml(st.text))}
     </div>

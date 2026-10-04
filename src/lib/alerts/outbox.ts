@@ -37,6 +37,7 @@
  */
 import { checkProviderUrl, guardedFetch } from '../ai/urlGuard'
 import type { Db } from '../tokens'
+import { counted, NOUNS } from '../format'
 
 /** حدثٌ يستحقّ أن يُوقظ المالك — **وثلاثةٌ لا رابعَ لها**. */
 export interface Alert {
@@ -69,7 +70,11 @@ export function tokenAlert(account: string, days: number, kind: string): Alert {
   return {
     kind: 'token',
     ref: `token:${account}:${kind}:${days}`,
-    body: `صدى — ${which} لحساب «${account}» ينتهي خلال ${days} يوما.` +
+    // ‏العتبةُ صفرٌ لإذنٍ انتهى فعلًا (`thresholdFor`) — فيُقال «انتهى» لا «ينتهي خلال 0 يومًا»،
+    // كما تقوله صفحةُ المنصّة للعتبة نفسِها
+    body: (days <= 0
+      ? `صدى — ${which} لحساب «${account}» انتهى.`
+      : `صدى — ${which} لحساب «${account}» ينتهي خلال ${counted(days, NOUNS.day, 'gen')}.`) +
       ' وسقوطُه يوقف النشرَ من هذا الحساب. أعد الإذنَ من لوحة صدى.',
   }
 }

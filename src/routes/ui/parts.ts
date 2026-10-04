@@ -51,10 +51,14 @@ export function glyph(g: string): string {
 /**
  * `cls` من ok · warn · bad · idle (أو فارغ)، و`g` حرفُ الحال، و`text`
  * HTML جاهزٌ (مهرَّبٌ عند من كتبه)، و`attrs` سِماتٌ تُلحَق بالرقاقة.
+ *
+ * **وصنفُ الرمز «st-ic» لا «g»** (D-183): «.g» صنفُ الزرّ الشبحيّ، فكان الرمزُ
+ * يلبس أرضَ الزرّ البيضاءَ وحبرَه داخل كلّ حبّةٍ ملوّنة — مربّعٌ أبيضُ في حبّةٍ
+ * برتقاليّة، ‏٩٦ مرّةً في الرئيسيّة.
  */
 export function status(cls: string, g: string, text: string, attrs = ''): string {
   const open = `<span class="st${cls === '' ? '' : ` ${cls}`}"${attrs === '' ? '' : ` ${attrs}`}>`
-  return `${open}<span class="g">${glyph(g)}</span>${text}</span>`
+  return `${open}<span class="st-ic">${glyph(g)}</span>${text}</span>`
 }
 
 /**

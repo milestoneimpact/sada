@@ -161,7 +161,7 @@ function suggestionCard(s: OpenSuggestion): string {
       <div class="plat-logo">${LOGOS[s.platform] ?? ''}</div>
       <h2>${escapeHtml(money(s.budgetUsd))}</h2>
       <div class="grow"></div>
-      <span class="ago">اقتُرح منذ ${escapeHtml(relativeTime(s.createdAt))}</span>
+      <span class="ago">اقتُرح ${escapeHtml(relativeTime(s.createdAt))}</span>
     </div>
     <p class="nm">${escapeHtml(s.text.slice(0, 200))}${s.text.length > 200 ? '…' : ''}</p>
     <div class="outcome"><span class="k">لماذا</span>
