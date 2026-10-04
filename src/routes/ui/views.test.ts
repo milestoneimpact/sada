@@ -39,7 +39,8 @@ import { SCRIPT } from './panelScript'
 import { imageReadiness, infographicReadiness, videoReadiness } from '../../lib/media/readiness'
 import { slideGate } from '../../lib/image/gate'
 import { videoCapGate } from '../../lib/limits'
-import { PRINT, THEME } from './tokens'
+import { CQ, PRINT, THEME, atLeast, below, narrower } from './tokens'
+import { nativePost } from './nativePost'
 import { channelsSection } from './channels'
 import { viewChannels } from '../../lib/channels'
 import { planSection } from './sections/plan'
@@ -179,10 +180,22 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(css.rule('.c5')['grid-template-columns']).toBe('repeat(5,1fr)')
   })
 
-  it('واسمُ المزوّد يأخذ سطرَه في الجوّال، والعلامةُ في الشريط هناك وحدَه', () => {
-    expect(css.rule('.prow .pn', '@media(max-width:720px)').flex).toBe('1 1 100%')
+  it('واسمُ المزوّد يأخذ سطرَه حين تضيق قائمتُه، والعلامةُ في الشريط حيث لا رافدة', () => {
+    // ‏بعرض القائمة لا بعرض الشاشة (مراجعة D-187): «sm» تركت الاسمَ ‏0px عند ‏600 و‏900
+    const narrow = `@container plist ${narrower('prow')}`
+    expect(css.rule('.plist').container).toBe('plist/inline-size')
+    expect(css.rule('.prow .pn', narrow).flex).toBe('1 1 100%')
+    expect(css.rule('.prow>summary', narrow)['flex-wrap']).toBe('wrap')
+    expect(css.rule('.prow .pm', narrow).display).toBe('none')
+    // ‏وقواعدُ اللفّ كلُّها في الحاوية وحدَها، وبعد قواعد الصفّ الأصليّة فلا تُدهَس بتساوي المحدّد
+    for (const s of ['.prow .pn', '.prow>summary', '.prow .pm', '.prow .pst', '.prow .pv']) {
+      expect(css.where(s), s).toEqual(['', narrow])
+      const order = css.rules().map((r) => `${r.at}|${r.selectors.join(',')}`)
+      expect(order.indexOf(`${narrow}|${s}`), s).toBeGreaterThan(order.indexOf(`|${s}`))
+    }
     expect(css.rule('.topbar .glyph.tb').display).toBe('none')
-    expect(css.rule('.topbar .glyph.tb', '@media(max-width:720px)').display).toBe('grid')
+    // ‏والعلامةُ في الشريط حيث لا رافدة: ما دون «md» كلُّه (D-187)
+    expect(css.rule('.topbar .glyph.tb', `@media${below('md')}`).display).toBe('grid')
   })
 })
 
@@ -253,7 +266,7 @@ describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
   it.each([
     ['الزرُّ الليليُّ تحت الجذر بمسافةٍ واحدة', ':root [data-theme="dark"]{--ink:#ebe9e3; --bg:#12141a}',
       [':root [data-theme="dark"]']],
-    ['الرافدةُ بثيمٍ ثالثٍ تحت الجذر', ':root .rail{--chrome:#14161c; --ink:#ebe9e3}', [':root .rail']],
+    ['الرافدةُ بثيمٍ ثالثٍ تحت الجذر', ':root .rail{--bg:#14161c; --ink:#ebe9e3}', [':root .rail']],
     ['تحت الجذر الليليّ في تفضيل النظام', '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{--surface:#000}}',
       ['@media(prefers-color-scheme:dark) :root:not([data-theme="light"]) .card']],
     ['ابنُ الجذر المباشر، والفراغُ حول الرابط لا يخفيه', ':root > body{--ink:#191b1f}', [':root>body']],
@@ -337,7 +350,7 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
  */
 describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
   it('كتلةُ الطباعة تعيد حبرَ النهار على محدّد الليل نفسِه', () => {
-    const DAY = { '--ink': '#191b1f', '--bg': '#ffffff', 'color-scheme': 'light' }
+    const DAY = { '--ink': THEME.light['--ink'], '--bg': '#ffffff', 'color-scheme': 'light' }
     for (const s of [':root', ':root:not([data-theme="light"])', ':root[data-theme="dark"]']) {
       expect(css.rule(s, '@media print'), s).toMatchObject(DAY)
     }
@@ -356,7 +369,7 @@ describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
 describe('ما مشاه Tab (D-125)', () => {
   it('حلقةُ محرّر المسوّدة ظلٌّ مقيسٌ لا لونٌ في مكان ظلّ', () => {
     expect(css.rule('.draft-text:focus')).toMatchObject({
-      outline: 'none', 'border-color': 'var(--brand)', 'box-shadow': '0 0 0 3px var(--ring)',
+      outline: 'none', 'border-color': 'var(--focus)', 'box-shadow': '0 0 0 3px var(--ring)',
     })
     expect(found((d) => d.prop === 'box-shadow' && d.value === 'var(--ring)')).toEqual([])
   })
@@ -704,7 +717,7 @@ describe('بطاقةُ الخطوات (D-137)', () => {
     expect(steps).toBeGreaterThan(card)
     expect(aside).toBeGreaterThan(steps)
     expect(outcome).toBeGreaterThan(aside)
-    expect(css.rule('.card.guide', '@media(min-width:901px)').display).toBe('grid')
+    expect(css.rule('.card.guide', `@media${atLeast('md')}`).display).toBe('grid')
   })
 })
 
@@ -716,10 +729,10 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBeUndefined()
     expect(css.rule('.page-head h1')).toMatchObject({ 'font-size': 'var(--t-h1)', 'line-height': 'var(--lh-h1)', 'font-weight': '600' })
     expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({ 'font-size': 'var(--t-display)', 'line-height': 'var(--lh-display)' })
-    // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148
-    expect(css.rule('.rail')).toMatchObject({ background: 'var(--chrome)', 'border-inline-start': '1px solid var(--line)' })
+    // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148، وعلى أرض الصفحة منذ D-187
+    expect(css.rule('.rail')).toMatchObject({ background: 'var(--bg)', 'border-inline-start': '1px solid var(--line)' })
     expect(css.rule('.rail')['background-image']).toBeUndefined()
-    expect(found((d) => d.value.includes('linear-gradient(180deg,var(--chrome)'))).toEqual([])
+    expect(found((d) => d.value.includes('linear-gradient(') && d.selectors.some((x) => x.startsWith('.rail')))).toEqual([])
   })
 })
 
@@ -758,9 +771,10 @@ describe('الطبعةُ الثالثة (D-143)', () => {
  */
 describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)', () => {
   it('الحبرُ لونُ البنية نهارًا وليلًا، والنحاسُ يجتاز نصّا', () => {
-    expect(css.rule(':root')).toMatchObject({ '--brand': '#1f2430', '--on-brand': '#f7f5ef', '--au': '#7f6128' })
+    // ‏والحبرُ حبرُ المتن نفسُه منذ D-187 (خطّة التصميم 3.2): كان ‏#1f2430 بجانب متنٍ ‏#191b1f
+    expect(css.rule(':root')).toMatchObject({ '--brand': '#16181d', '--on-brand': '#f7f5ef', '--au': '#7f6128' })
     // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار
-    const NIGHT = { '--brand': '#e9e6de', '--on-brand': '#12141a' }
+    const NIGHT = { '--brand': '#e9e6de', '--on-brand': '#16181d' }
     expect(css.rule(':root[data-theme="dark"]')).toMatchObject(NIGHT)
     expect(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)')).toMatchObject(NIGHT)
     // ‏الزمرّدُ المتقاعد لا يعود في قيمة — والتعليقُ الذي يؤرّخه لا يُسقط شيئًا
@@ -773,19 +787,21 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
       expect(Object.keys(css.rule('.rail', at)).filter((p) => p.startsWith('--')), at).toEqual([])
     }
     expect(css.where('.rail::after')).toEqual([])
-    // ‏والعلامةُ قيمةٌ واحدةٌ في كلّ ثيمٍ وفي الطباعة
-    expect(css.rule(':root')).toMatchObject({ '--glyph-bg': '#14161c', '--glyph-fg': '#e2c98f' })
-    for (const [prop, value] of [['--glyph-bg', '#14161c'], ['--glyph-fg', '#e2c98f']] as const) {
+    // ‏والعلامةُ قيمةٌ واحدةٌ في كلّ ثيمٍ وفي الطباعة — وذهبُها ذهبُ الليل لا ثالثٌ (D-187)
+    expect(css.rule(':root')).toMatchObject({ '--mark-bg': '#16181d', '--mark-fg': THEME.dark['--au'] })
+    for (const [prop, value] of [['--mark-bg', '#16181d'], ['--mark-fg', '#d2b57c']] as const) {
       expect(new Set(css.decls().filter((d) => d.prop === prop).map((d) => d.value)), prop).toEqual(new Set([value]))
     }
-    expect(css.rule('.glyph')).toMatchObject({ background: 'var(--glyph-bg)', color: 'var(--glyph-fg)' })
+    expect(css.rule('.glyph')).toMatchObject({ background: 'var(--mark-bg)', color: 'var(--mark-fg)' })
     expect(css.rule('nav.tabs a[aria-current=page]::before')).toMatchObject({ width: '2px', background: 'var(--au)' })
   })
-  it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ مسطّحة، والتنبيهاتُ سطحٌ بخيط', () => {
+  it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ بحدٍّ وظلٍّ خفيف، والتنبيهاتُ سطحٌ بخيط', () => {
     expect(css.rule('.p')).toMatchObject({ background: 'var(--brand)', color: 'var(--on-brand)' })
-    expect(css.rule('.card')).toMatchObject({ background: 'var(--surface)', border: '1px solid var(--line)' })
-    expect(css.rule('.card')['box-shadow']).toBeUndefined()
-    expect(css.rule('.flash')).toMatchObject({ background: 'var(--surface)', 'border-inline-start': '3px solid var(--line-strong)' })
+    // ‏مراجعةُ D-144 «بطاقةٌ مسطّحة» (D-187): الحدُّ أوضح والظلُّ الأوّل يسنده
+    expect(css.rule('.card')).toMatchObject({
+      background: 'var(--surface)', border: '1px solid var(--line)', 'box-shadow': 'var(--sh-1)', padding: 'var(--pad-card)',
+    })
+    expect(css.rule('.flash')).toMatchObject({ background: 'var(--surface)', 'border-inline-start': '3px solid var(--line)' })
     expect(css.rule('.flash.ok')['border-inline-start-color']).toBe('var(--ok)')
   })
   it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
@@ -820,7 +836,7 @@ describe('تصفيةُ الطبعات (D-148)', () => {
     expect(css.rule('.grid>.tile:first-child .v')['letter-spacing']).toBe('-.01em')
     expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-5)')
     expect(css.rule('nav.tabs a[aria-current=page]')).toMatchObject({
-      background: 'var(--surface-3)', color: 'var(--ink)', position: 'relative',
+      background: 'var(--selected)', color: 'var(--ink)', position: 'relative',
     })
     expect(found((d) => d.value.includes('radial-gradient(') && d.value.includes('var(--au)'))).toEqual([])
   })
@@ -835,7 +851,8 @@ describe('ما وراء المقاييس (D-149)', () => {
   it('الاتّجاه: هامشٌ منطقيٌّ واحد، وخيطُ القسم من البداية، وشريطُ المختار في النهاية، وسهمُ العودة إلى البداية', () => {
     expect(css.rule('.slice .stats')).toMatchObject({ margin: '0', 'margin-inline-start': 'auto', padding: '0', 'border-top': '0' })
     expect(precedes('.slice .stats', 'margin', 'margin-inline-start')).toBe(true)
-    expect(css.rule('.sec::after').background).toMatch(/^linear-gradient\(to left,var\(--au\)/)
+    // ‏وخيطُ القسم النحاسيُّ سقط مع ميزانيّة النحاس (D-187): لا قاعدةَ له في أيّ سياق
+    expect(css.where('.sec::after')).toEqual([])
     expect(css.rule('.cmdk-o[aria-selected="true"]')).toMatchObject({
       background: 'var(--surface-2)', 'box-shadow': 'inset -3px 0 0 var(--brand)',
     })
@@ -848,12 +865,14 @@ describe('ما وراء المقاييس (D-149)', () => {
   })
   it('الوصول: حشوُ التمرير تحت الشريط، والرابطُ الهادئ بخيطٍ لا بلونٍ وحدَه، وحقلُ الأوامر يقول «هنا»', () => {
     expect(css.rule('html')['scroll-padding-top']).toBe('calc(64px + var(--s-3))')
+    // ‏والخطُّ تحت الرابط الهادئ بلونه لا بالنحاس (D-187): لا نحاسَ تحت رابطٍ في أيّ قاعدة
     for (const s of ['.todo>li>a.btn', '.todo>li>form .btn']) {
-      expect(css.rule(s), s).toMatchObject({ 'text-decoration': 'underline', 'text-decoration-color': 'var(--au)' })
-      expect(precedes(s, 'text-decoration', 'text-decoration-color'), s).toBe(true)
+      expect(css.rule(s), s).toMatchObject({ 'text-decoration': 'underline', color: 'var(--link)' })
+      expect(css.rule(s)['text-decoration-color'], s).toBeUndefined()
     }
+    expect(found((d) => d.prop.startsWith('text-decoration') && d.value.includes('var(--au)'))).toEqual([])
     expect(css.rule('.pv th a')['text-decoration']).toBe('underline')
-    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 -2px 0 var(--au)')
+    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 -2px 0 var(--focus)')
     expect(css.where('.busy-note')).toContain('')
   })
   it('الرموز: لا زمرّدَ في الوهج بصيغة rgba، والتاريخُ في مفتاح الرسم معزول، والرقمُ المحلّيُّ غربيٌّ في كلّ ICU', () => {
@@ -1159,12 +1178,12 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
   it('رقمُ المؤشّر يصغر على الجوّال من الرمز لا بقاعدة (D-185)', () => {
     const phone = '@media(max-width:599px)'
     expect(css.rule(':root', phone)).toMatchObject({ '--t-display': '32px', '--t-h1': '24px', '--t-body': '17px' })
-    expect(css.rule('.tiles>.tile:first-child .v', '@media(max-width:900px)')['font-size']).toBeUndefined()
-    expect(css.rule('.tiles .v', '@media(max-width:900px)')['font-size']).toBeUndefined()
+    expect(css.rule('.tiles>.tile:first-child .v', `@media${below('md')}`)['font-size']).toBeUndefined()
+    expect(css.rule('.tiles .v', `@media${below('md')}`)['font-size']).toBeUndefined()
   })
 
   it('شريطُ الإبهام من السلّم، ولا حرفَ بالبكسل في الورقة كلّها', () => {
-    const bar = '@media(max-width:720px)'
+    const bar = `@media${below('md')}`
     // ‏نمطُ «caption» ‏13/20/600، والعدُّ يرثه من قاعدته الأولى (خطّة التصميم 5.3)
     expect(css.rule('nav.tabs > a[data-bar] span:not(.count)', bar)).toMatchObject({
       'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)', 'font-weight': '600',
@@ -1279,7 +1298,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(css.rule('.pf-logo')['box-shadow']).toBe('0 0 0 1px var(--logo-ring)')
     expect(css.rule('.glyph')['box-shadow']).toContain('0 0 0 1px var(--mark-ring)')
     expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a4e59', '#4a4e59'])
-    expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line-strong)'])
+    expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line)'])
   })
 
   it('الرابطُ والزرُّ الهادئ بحبر «--link» وخطٍّ تحته', () => {
@@ -1346,13 +1365,204 @@ describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا ي
     const act = css.where('.draft-foot.act')
     expect(act.length).toBeGreaterThan(0)
     for (const at of act) expect(css.rule('.draft-foot.act', at).bottom ?? '', at).toContain('var(--s-16)')
-    const wide = css.rule('.toast', ['', '@media(min-width:721px)'])
+    const wide = css.rule('.toast', ['', `@media${atLeast('md')}`])
     expect(wide.top).toBe('auto')
     expect(wide.bottom).toBe('var(--s-6)')
   })
 
   it('ونصُّ صفّ الخطّة يُكسَر حيث لزم، وخلايا الجوّال كلُّها', () => {
     expect(css.rule('.pi-text')['overflow-wrap']).toBe('anywhere')
-    expect(css.rule('.pi td', '@media(max-width:720px)')['overflow-wrap']).toBe('anywhere')
+    expect(css.rule('.pi td', `@media${below('sm')}`)['overflow-wrap']).toBe('anywhere')
+  })
+})
+
+/**
+ * المرحلة ٢أ من خطّة التصميم — الرموز (D-187): اللوحةُ المغلقة، والظلالُ الثلاثة،
+ * ونصفُ القطر بالدور، ونقاطُ الانكسار الثلاث، والنحاسُ في أدواره الثلاثة. يُسأل
+ * المصدرُ هنا، ويُقاس المرسومُ في `audit_design` (النحاسُ لكلّ شاشة) و`validate_contrast`
+ * (الأزواجُ) و`audit_tokens` (القائمةُ المغلقة).
+ */
+describe('المرحلة ٢أ — الرموز (D-187)', () => {
+  it('اللوحةُ من القسم 3.2 قيمةً قيمة في الوضعين', () => {
+    expect(THEME.light).toMatchObject({
+      '--bg': '#f6f5f1', '--surface': '#ffffff', '--surface-2': '#f1efe9', '--surface-3': '#e7e4dc',
+      '--line': '#d6d1c5', '--line-soft': '#e7e3da', '--field': '#8b8679',
+      '--ink': '#16181d', '--ink-2': '#40444c', '--ink-3': '#646871',
+      '--brand': '#16181d', '--brand-hover': '#2a2d34', '--brand-press': '#30333b', '--on-brand': '#f7f5ef',
+      '--link': '#24467e', '--selection': '#d3def2', '--au': '#7f6128',
+      '--ok': '#2d7a4f', '--ok-wash': '#edf6f0', '--bad': '#b3261e', '--bad-wash': '#fcefee',
+    })
+    expect(THEME.dark).toMatchObject({
+      '--line': '#343843', '--line-soft': '#262a32', '--field': '#676b76', '--ink-3': '#9ea2ac',
+      '--brand-hover': '#d9d5cb', '--brand-press': '#cdc8bc', '--on-brand': '#16181d',
+      '--selection': '#2b3b57', '--au': '#d2b57c', '--bad': '#f49595', '--bad-wash': '#2c1515', '--ok-wash': '#11251b',
+    })
+    // ‏ورموزُ ما قبل اللوحة لا تعود في أيّ سياق: لا سطحَ ثالثَ ولا حدَّ «أقوى» ولا مادّةَ ولا وهج
+    for (const gone of ['--chrome', '--line-strong', '--brand-soft', '--brand-wash', '--glow', '--hair', '--sheen', '--bloom']) {
+      expect(found((d) => d.prop === gone || d.value.includes(`var(${gone})`)), gone).toEqual([])
+    }
+  })
+
+  it('الحدُّ الوظيفيُّ للحقل والزرّ الثانويّ، والتركيزُ بحبر الرابط', () => {
+    expect(css.rule('select').border).toBe('1px solid var(--field)')
+    expect(css.rule('.g')['border-color']).toBe('var(--field)')
+    expect(css.rule(':focus-visible').outline).toBe('2px solid var(--focus)')
+    expect(css.rule(':root')['--ring']).toBe('color-mix(in srgb,var(--focus) 25%,transparent)')
+    expect(THEME.light['--focus']).toBe('var(--link)')
+  })
+
+  it('رموزُ التفاعل باسمها: التمريرُ والضغطُ والمحدَّدُ والتحديدُ والستارةُ والحوار', () => {
+    expect(css.rule('.g:hover', '@media(hover:hover)').background).toBe('var(--hover)')
+    expect(css.rule('.g:active:not(:disabled)').background).toBe('var(--press)')
+    expect(css.rule('.p:hover', '@media(hover:hover)').background).toBe('var(--brand-hover)')
+    expect(css.rule('.p:active:not(:disabled)').background).toBe('var(--brand-press)')
+    expect(css.rule('nav.tabs a[aria-current=page]').background).toBe('var(--selected)')
+    expect(css.rule('::selection')).toMatchObject({ background: 'var(--selection)', color: 'var(--ink)' })
+    expect(css.rule('.cmdk-veil').background).toBe('var(--scrim)')
+    expect(css.rule('.cmdk')).toMatchObject({ background: 'var(--dialog)', border: '1px solid var(--line)', 'box-shadow': 'var(--sh-3)' })
+    // ‏والستارةُ من الثيم لا ثابتةٌ في الجذر (كانت واحدةً للوضعين، D-105)
+    expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(22,24,29,.45)', 'rgba(0,0,0,.65)'])
+  })
+
+  it('ثلاثةُ ظلالٍ في الوضعين، والبطاقةُ التفاعليّةُ ترتفع بالثاني وحدَّها الوظيفيّ', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
+    }
+    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.03)')
+    expect(THEME.dark['--sh-3']).toBe('0 16px 40px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4)')
+    expect(css.rule('.ch:hover', '@media(hover:hover)')).toMatchObject({
+      'box-shadow': 'var(--sh-2)', 'border-color': 'var(--field)',
+    })
+    expect(css.where('.ch:hover')).toEqual(['@media(hover:hover)'])
+  })
+
+  it('نصفُ القطر من القائمة المغلقة، بالدور', () => {
+    const r = css.rule(':root')
+    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-pill']]).toEqual(['4px', '8px', '12px', '999px'])
+    const values = new Set(css.decls().filter((d) => d.prop === 'border-radius').map((d) => d.value))
+    expect([...values].filter((v) => !/^(0|50%|var\(--r-(inline|control|card|pill)\))$/.test(v))).toEqual([])
+    expect(css.rule('button')['border-radius']).toBe('var(--r-control)')
+    expect(css.rule('.card')['border-radius']).toBe('var(--r-card)')
+    expect(css.rule('.mono')['border-radius']).toBe('var(--r-inline)')
+  })
+
+  it('رموزُ التخطيط بقيمتيها، ونقاطُ الانكسار ثلاثٌ من «BP»', () => {
+    expect(css.rule(':root')).toMatchObject({
+      '--pad-card': 'var(--s-6d)', '--gap-card': 'var(--s-6d)', '--gap-section': 'var(--s-12d)', '--gutter': 'var(--s-8d)',
+    })
+    expect(css.rule(':root', `@media${below('sm')}`)).toMatchObject({
+      '--pad-card': 'var(--s-4)', '--gap-card': 'var(--s-4)', '--gap-section': 'var(--s-8)', '--gutter': 'var(--s-4)',
+    })
+    // ‏كلُّ استعلامِ عرضٍ في الورقة من «BP»: لا ‏720 ولا ‏960 ولا ‏1180
+    const widths = (kind: string): Set<number> => new Set(css.rules().flatMap((rule) =>
+      [...rule.at.matchAll(new RegExp(`${kind}[^@]*?(?:min|max)-width:(\\d+)px`, 'g'))].map((m) => Number(m[1]))))
+    const allowed = new Set(Object.values({ xs: 360, sm: 600, md: 900, lg: 1200 }).flatMap((v) => [v, v - 1]))
+    expect([...widths('@media')].filter((w) => !allowed.has(w))).toEqual([])
+    // ‏وحدُّ الحاوية من «CQ» وحدها (مراجعة D-187): الصفُّ يلتفّ بعرض قائمته لا بعرض الشاشة
+    expect([...widths('@container')].sort((a, b) => a - b)).toEqual([CQ.prow - 1, CQ.npRow - 1].sort((a, b) => a - b))
+    expect(SCRIPT).toContain(`matchMedia('${below('md')}')`)
+  })
+
+  it('النحاسُ في أدواره الثلاثة لا غير، بقيمته الكاملة', () => {
+    const copper = found((d) => /var\(--(au|mark-fg)\)/.test(d.value))
+    expect(copper).toEqual([
+      '.glyph{color:var(--mark-fg)}',
+      'nav.tabs a[aria-current=page]::before{background:var(--au)}',
+      '.grid>.tile:first-child .v{color:var(--au)}',
+    ])
+    // ‏والعلامةُ مرّةً في الشاشة: حيث الرافدةُ ظاهرةٌ يغيب بابُ اللوحة من شريط العودة
+    expect(css.rule('.app nav.back .home', `@media${atLeast('md')}`).display).toBe('none')
+  })
+})
+
+/**
+ * سلاسلُ الأصناف من الجذر إلى كلّ عنصرٍ يحمل الصنفَ `target` في وسمٍ مرسوم — لمطابقة
+ * المحدّد بالعنصر بلا متصفّح. والوسمُ من قوالبنا فهو مغلقٌ صحيحًا.
+ */
+function classChains(html: string, target: string): string[][][] {
+  const chains: string[][][] = []
+  const stack: string[][] = []
+  const VOID = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/i
+  for (const m of html.matchAll(/<(\/?)([a-z][a-z0-9-]*)([^>]*)>/gi)) {
+    const [, close, tag = '', attrs = ''] = m
+    if (close === '/') {
+      stack.pop()
+      continue
+    }
+    const cls = (/\bclass="([^"]*)"/.exec(attrs)?.[1] ?? '').split(/\s+/).filter(Boolean)
+    if (cls.includes(target)) chains.push([...stack, cls])
+    if (!VOID.test(tag) && !attrs.trimEnd().endsWith('/')) stack.push(cls)
+  }
+  return chains
+}
+
+/**
+ * القيمةُ التي تسري على عنصرٍ سلسلتُه هذه، من محدّداتِ أصنافٍ ومسافاتٍ وحدها («.a .b.c»)
+ * في المستوى الأعلى: الأخصُّ ثمّ الأخيرُ في المصدر. وما سوى ذلك من المحدّدات لا يُطابَق.
+ */
+function cascaded(chain: readonly string[][], prop: string): string | undefined {
+  let best: { spec: number; value: string } | undefined
+  for (const d of css.decls()) {
+    if (d.at !== '' || d.prop !== prop) continue
+    for (const sel of d.selectors) {
+      const parts = sel.split(' ')
+      if (!parts.every((p) => /^(\.[\w-]+)+$/.test(p))) continue
+      const want = parts.map((p) => p.slice(1).split('.'))
+      const has = (el: readonly string[] | undefined, cls: readonly string[]): boolean =>
+        el !== undefined && cls.every((c) => el.includes(c))
+      if (!has(chain.at(-1), want.at(-1) ?? [])) continue
+      let i = chain.length - 2
+      let ok = true
+      for (let k = want.length - 2; k >= 0 && ok; k--) {
+        while (i >= 0 && !has(chain[i], want[k] ?? [])) i--
+        ok = i >= 0
+        i--
+      }
+      const spec = want.flat().length
+      if (ok && (best === undefined || spec >= best.spec)) best = { spec, value: d.value }
+    }
+  }
+  return best?.value
+}
+
+describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
+  /**
+   * **ووصفُ YouTube أخو المسرح لا ابنُه**: «.np-desc» خارج «.np-stage» وعلى أرضه الداكنة،
+   * فكان وسمُه «--brand» ‏#16181d على ‏#0b0c10 — ‏١٫١٠:١ نهارًا، أسودَ على أسود. ولا عيّنةَ
+   * مرسومةً تفتح وصفًا بوسم، فيُسأل هنا كلُّ وسمٍ في الإطار الداكن عن لونه الساري.
+   */
+  it('كلُّ وسمٍ على الإطار الداكن بحبر المسرح — والوصفُ المطويُّ منه', () => {
+    const post = (platform: 'youtube' | 'tiktok' | 'linkedin'): string => nativePost({
+      platform, id: 'v1', author: { name: 'عمر', kind: 'member' }, when: '2 ي', media: null, poster: null,
+      metrics: null, variant: 'compact', text: 'عنوانٌ #قصير\nوصفٌ فيه #وسم و #tag',
+    })
+    const tube = classChains(post('youtube'), 'np-tag')
+    // ‏وسمُ العنوان على المسرح، ووسما الوصف في «.np-desc» خارجه
+    expect(tube.filter((c) => c.some((el) => el.includes('np-desc')))).toHaveLength(2)
+    expect(tube.filter((c) => c.some((el) => el.includes('np-stage')))).toHaveLength(1)
+    for (const chain of [...tube, ...classChains(post('tiktok'), 'np-tag')]) {
+      expect(cascaded(chain, 'color'), chain.map((el) => el.join('.')).join(' > ')).toBe('var(--np-on-stage)')
+    }
+    // ‏وعلى الإطار الفاتح يبقى الوسمُ بحبر العلامة
+    for (const chain of classChains(post('linkedin'), 'np-tag')) expect(cascaded(chain, 'color')).toBe('var(--brand)')
+    // ‏ولا سياقَ آخرَ يُعيد تلوينه — الطباعةُ ترسم المسرحَ أبيضَ بحبرٍ داكن من الرموز نفسِها
+    expect(found((d) => d.at !== '' && d.prop === 'color' && d.selectors.some((s) => /\.np-tag\b/.test(s)))).toEqual([])
+    expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#16181d', '#0b0c10'])
+  })
+
+  /**
+   * **وصفُّ المنشور ثلاثةُ أعمدةٍ حين تسعها قائمتُه وحدها**: بـ«md» عاد ثلاثةً عند ‏900 في ‏604px
+   * (الرافدةُ ‏256)، فصار عمودُ الأفعال ‏0px وفاضت الصفحةُ ‏154px. والحاويةُ «.np-list».
+   */
+  it('صفُّ المنشور يلتفّ بعرض قائمته لا بعرض الشاشة', () => {
+    const narrow = `@container np-list ${narrower('npRow')}`
+    // ‏**واسمُ الحاوية مفصولٌ عن شرطه**: «np-list(» دالّةٌ في CSS لا اسم، فيُسقط المتصفّحُ
+    // الكتلةَ كلَّها صامتًا — وقع هذا في كتابتها الأولى، والقياسُ لم يتغيّر بكسلًا
+    expect(css.rules().map((r) => r.at).filter((at) => /@container\s+[\w-]+\(/.test(at))).toEqual([])
+    expect(css.rule('.np-list').container).toBe('np-list/inline-size')
+    expect(css.rule('.np-row', narrow)['grid-template-columns']).toBe('minmax(0,1fr)')
+    for (const s of ['.np-row', '.np-when', '.np-under']) expect(css.where(s), s).toEqual(['', narrow])
+    // ‏والحدُّ يسع ما لا ينكمش: الوقتُ ‏8.5rem والإطارُ ‏555 وفجوتان ‏20 وأعرضُ فعلٍ مقيس ‏174
+    expect(CQ.npRow).toBeGreaterThanOrEqual(136 + 555 + 2 * 20 + 174)
   })
 })

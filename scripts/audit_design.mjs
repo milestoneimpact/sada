@@ -33,6 +33,21 @@ const MAX_TEAR = 24
 const MIN_TARGET = 44
 const MAX_LINE = 75
 
+/**
+ * **النحاسُ ثلاثةُ مواضعَ في الشاشة على الأكثر** (خطّة التصميم 3.2 · D-187).
+ *
+ * «الشاشة» الصفحةُ المرسومةُ كلُّها في كلّ مقاسٍ مدقَّق، لا ما يظهر منها: لوحُ اللوحة
+ * (`section[data-pane]`) شاشة، والعيّنةُ التي تجمع شاشاتٍ تعلّم كلًّا بـ`data-screen`،
+ * وما سواهما الصفحةُ كلُّها. و«الموضع» عنصرٌ ظاهرٌ لونُ نصّه أو أرضُه أو حدُّه أو
+ * خطُّه أو ظلُّه أو `fill` أو `stroke` فيه نحاس (`--au` أو شريطُ العلامة `--mark-fg`)،
+ * **ويُعدّ عند من يضعه لا عند من يرثه**: رسمُ العلامة بمساراته موضعٌ واحد، والرقمُ
+ * ووحدتُه موضعٌ واحد. وتُستثنى صفحةُ الدخول (`.auth`، القالب T6) لأنّها لحظةُ علامة.
+ *
+ * وكان في الرئيسيّة خمسةَ عشرَ موضعًا: العلامة، ومؤشّرُ القسم، ورأسُ شريط المؤشّرات،
+ * وأحدَ عشرَ خطًّا تحت أفعال «ما ينتظرك»، وأطولُ أعمدة الرسم.
+ */
+const MAX_COPPER = 3
+
 const pages = process.argv.slice(2)
 if (pages.length === 0) {
   console.error('استعمال: audit_design.mjs <ملف.html> [...]')
@@ -122,6 +137,81 @@ for (const file of pages) {
       await page.evaluate((d) => { document.documentElement.dataset.density = d }, density)
     }
     await page.waitForTimeout(300)
+
+    const copper = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement)
+      const probe = document.createElement('i')
+      document.body.appendChild(probe)
+      const norm = (v) => { probe.style.color = ''; probe.style.color = v; return getComputedStyle(probe).color }
+      const tones = new Set(['--au', '--mark-fg'].map((n) => root.getPropertyValue(n).trim()).filter((v) => v !== '').map(norm))
+      probe.remove()
+      const has = (v) => [...tones].some((c) => (v || '').includes(c))
+      const SHAPE = /^(path|circle|rect|line|polyline|polygon|ellipse|text)$/i
+      const ownText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() !== '')
+      // ‏الموروثُ يُصعَد به إلى من وضعه: أعلى سلفٍ يحمل القيمةَ نفسَها
+      const setter = (el, prop) => {
+        let n = el
+        const v = getComputedStyle(el)[prop]
+        while (n.parentElement && n.parentElement !== document.body && getComputedStyle(n.parentElement)[prop] === v) n = n.parentElement
+        return n
+      }
+      const count = (scope) => {
+        const hits = new Map()
+        const add = (el, why) => { if (!hits.has(el)) hits.set(el, why) }
+        for (const el of scope.querySelectorAll('*')) {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 && r.height === 0) continue
+          const cs = getComputedStyle(el)
+          if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
+          if (tones.has(cs.color) && ownText(el)) add(setter(el, 'color'), 'حبر')
+          if (SHAPE.test(el.tagName)) {
+            for (const p of ['fill', 'stroke']) {
+              if (!tones.has(cs[p])) continue
+              let n = setter(el, p)
+              if (tones.has(getComputedStyle(n).color)) n = setter(n, 'color')
+              add(n, p)
+            }
+          }
+          const faces = [[cs, '']]
+          for (const ps of ['::before', '::after']) {
+            const st = getComputedStyle(el, ps)
+            if (st.content !== 'none' && st.content !== 'normal' && st.display !== 'none') faces.push([st, ps])
+          }
+          for (const [st, ps] of faces) {
+            if (tones.has(st.backgroundColor)) add(el, `أرض${ps}`)
+            if (has(st.backgroundImage)) add(el, `تدرّج${ps}`)
+            if (has(st.boxShadow)) add(el, `ظلّ${ps}`)
+            for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+              if (st[`border${side}Style`] !== 'none' && Number.parseFloat(st[`border${side}Width`]) > 0 &&
+                tones.has(st[`border${side}Color`])) add(el, `حدّ${ps}`)
+            }
+            if (st.outlineStyle !== 'none' && Number.parseFloat(st.outlineWidth) > 0 && tones.has(st.outlineColor)) add(el, `إطار${ps}`)
+            if (st.textDecorationLine !== 'none' && tones.has(st.textDecorationColor) && (ps !== '' || ownText(el))) add(el, `خطّ${ps}`)
+          }
+        }
+        // ‏ومن كان سلفُه موضعًا فهو منه
+        const top = [...hits].filter(([el]) => {
+          for (let n = el.parentElement; n; n = n.parentElement) if (hits.has(n)) return false
+          return true
+        })
+        return top.map(([el, why]) => `${el.tagName.toLowerCase()}.${String(el.getAttribute('class') ?? '').trim().split(/\s+/)[0]}:${why}`)
+      }
+      if (document.querySelector('.auth') !== null) return { exempt: true, screens: [] }
+      const panes = [...document.querySelectorAll('section[data-pane]')]
+      const marked = panes.length > 0 ? panes : [...document.querySelectorAll('[data-screen]')]
+      const screens = []
+      if (marked.length === 0) {
+        screens.push({ name: '', hits: count(document.body) })
+      } else {
+        const was = marked.map((s) => s.hidden)
+        for (const s of marked) {
+          marked.forEach((o) => { o.hidden = o !== s })
+          screens.push({ name: s.dataset.pane ?? s.dataset.screen, hits: count(document.body) })
+        }
+        marked.forEach((o, i) => { o.hidden = was[i] })
+      }
+      return { exempt: false, screens }
+    })
 
     /*
      * **صفٌّ ممزَّقٌ يُقرأ عشوائيّةً** (D-111).
@@ -540,6 +630,7 @@ for (const file of pages) {
     findings[findings.length - 1].tails = shape.tails
     findings[findings.length - 1].hollow = shape.hollow
     findings[findings.length - 1].keyboard = keyboard
+    findings[findings.length - 1].copper = copper
     await page.close()
   }
 }
@@ -547,7 +638,9 @@ await browser.close()
 
 let failed = 0
 for (const f of findings) {
-  const issues = f.small.length + f.long.length + f.faint.length +
+  const copperOver = (f.copper?.screens ?? []).filter((s) => s.hits.length > MAX_COPPER)
+  const copperTop = Math.max(0, ...(f.copper?.screens ?? []).map((s) => s.hits.length))
+  const issues = copperOver.length + f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
     (f.holes ?? []).length + (f.orphans ?? []).length + (f.tails ?? []).length + (f.hollow ?? []).length +
     (f.keyboard?.unreached.length ?? 0) + (f.keyboard?.blind.length ?? 0) + (f.keyboard?.ringless.length ?? 0) +
@@ -557,9 +650,14 @@ for (const f of findings) {
   console.log(`\n═══ ${f.file} · ${f.label} (${f.width}px) ═══`)
   const kb = f.keyboard
   const kbNote = kb !== undefined && f.label === 'شاشة' ? ` · Tab بلغ ${kb.reached} من ${kb.expected}` : ''
+  const cuNote = f.copper?.exempt ? ' · النحاسُ: لحظةُ علامة (T6)' : ` · النحاسُ ≤ ${copperTop} في ${f.copper?.screens.length ?? 0} شاشة`
   if (issues === 0) {
-    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}${kbNote}`)
+    console.log(`  ✓ نظيف${(f.exempt ?? 0) > 0 ? ` · ${f.exempt} شبكةً معفاةً بـ ragged` : ''}${kbNote}${cuNote}`)
     continue
+  }
+  for (const c of copperOver) {
+    console.log(`  ✕ ${c.hits.length} مواضعَ نحاسٍ في الشاشة${c.name ? ` «${c.name}»` : ''} — والحدُّ ${MAX_COPPER}:`)
+    console.log(`      ${c.hits.join(' · ')}`)
   }
   if (kb !== undefined && kb.trapped) console.log('  ✕ مصيدةُ تركيز: Tab عاد إلى عنصرٍ مرّ به')
   if (kb !== undefined && kb.skipFirst === false) console.log('  ✕ أوّلُ Tab لا يبلغ رابطَ التخطّي')

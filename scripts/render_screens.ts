@@ -315,8 +315,10 @@ writeAudited(
     'صدى — معالجُ الربط',
     wizardCases
       .map(
-        (c) => `<h2 class="sec">${c.title}</h2>` +
-          channelsSection(soloX, now, [c.app], 'https://sada2.basserh.com'),
+        // ‏كلُّ حالٍ شاشةٌ مستقلّة في الحقيقة، فتُعلَّم ليعدّ «audit_design» نحاسَها وحدَها
+        // ‏لا الأربعَ معًا (ميزانيّةُ النحاس لكلّ شاشة، خطّة التصميم 3.2 · D-187)
+        (c, i) => `<section data-screen="wizard-${i + 1}"><h2 class="sec">${c.title}</h2>` +
+          channelsSection(soloX, now, [c.app], 'https://sada2.basserh.com') + '</section>',
       )
       .join(''),
   ),

@@ -1,5 +1,6 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
+import { below } from './tokens'
 
 /**
  * نصُّ اللوحة الجاري في المتصفّح.
@@ -96,14 +97,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   /*
    * ‏ومبدّلُ الثيم يُنقَل ولا يُنسَخ.
    *
-   * ‏ذيلُ الرافدة يُخفى دون ‏٩٦٠px، فكان الهاتفُ واللوحيُّ بلا مبدّل. ونسخةٌ
+   * ‏ذيلُ الرافدة يُخفى دون «md» (‏٩٠٠px، وكان ‏٩٦٠)، فكان الهاتفُ واللوحيُّ بلا مبدّل. ونسخةٌ
    * ‏ثانيةٌ في الوسم لا تعمل: سكربتُ الثيم يربط «#theme» الأوّلَ وحدَه. فالعنصرُ
    * ‏نفسُه — بمستمعيه — ينزل إلى آخر المحتوى في الضيّق، ويعود إلى الذيل في العريض.
    */
   var theme=document.getElementById('theme');
   var foot=theme&&theme.parentNode.classList.contains('rail-foot')?theme.parentNode:null;
   var content=document.getElementById('main');
-  var narrow=window.matchMedia?window.matchMedia('(max-width:960px)'):null;
+  var narrow=window.matchMedia?window.matchMedia('${below('md')}'):null;
   function seat(){
     if(narrow.matches){if(theme.parentNode!==content)content.appendChild(theme);}
     else if(theme.parentNode!==foot)foot.insertBefore(theme,foot.firstChild);

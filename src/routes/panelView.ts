@@ -422,11 +422,11 @@ export interface PanelAudit {
  * قمّةً كاذبة من قسمةٍ على صفر.
  */
 
-/** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة، والرقم بلون النصّ لا بلون العلامة. */
+/** درجةٌ مقياسُ مقدار: تدرّجُ هيئةٍ واحدة بدرجات الحبر الثلاث (D-187)، والرقم بلون النصّ لا بلون العلامة. */
 function worthCell(worth: number | null): string {
   if (worth === null) return chip('idle', '○', 'لم يُحلَّل')
   const p = Math.round(worth * 100)
-  const shade = worth >= 0.66 ? 'var(--brand)' : worth >= 0.33 ? 'var(--brand-soft)' : 'var(--ink-3)'
+  const shade = worth >= 0.66 ? 'var(--ink)' : worth >= 0.33 ? 'var(--ink-2)' : 'var(--ink-3)'
   return `<div class="worth" title="درجة الاستحقاق ${worth.toFixed(2)} من 1">
     <div class="track"><span class="fill" style="width:${p}%;background:${shade}"></span></div>
     <span class="val">${worth.toFixed(2)}</span></div>`
