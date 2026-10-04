@@ -18,6 +18,7 @@ import type { Db } from '../tokens'
 import { changedRows } from '../dbResult'
 import type { PublishPlatform } from '../oauth/providers'
 import { type PostMetricRow, type WindowName, metricsFor, widest } from '../metrics/job'
+import { dbNow } from '../schedule/job'
 
 /** نسخةُ البنية — تُحفظ مع الصفّ، فقارئٌ قديمٌ يعرف أنّه قديم. */
 export const REPORT_VERSION = 1
@@ -62,6 +63,13 @@ export interface WeeklyReport {
   readonly measured: number
   readonly platforms: readonly PlatformSlice[]
   readonly top: TopPost | null
+  /**
+   * المنشورُ الوحيد حين لم يخرج غيرُه — **فلا ترتيبَ، لكنّ صاحبَ الرقم يُرى.**
+   * كان التقريرُ يقول «لا ترتيب» ويسكت، والمالكُ لا يعرف أيُّ منشورٍ جلب
+   * ظهورَ أسبوعه. وقاعدةُ `top` كما هي: واحدٌ وحده ليس ترتيبا. والحقلُ
+   * اختياريٌّ فتقريرٌ كُتب قبله يُقرأ كما كُتب.
+   */
+  readonly only?: ReportPost
   readonly spendUsd: number
   /** ما لا يقوله الرقمُ وحده — يُكتب نصّا ولا يُترك ليُستنتَج. */
   readonly notes: readonly string[]
@@ -104,6 +112,12 @@ interface PublishedRow {
  * ولا تُقرأ من `posts.status`: صفٌّ حالتُه `published` يقول إنّه نُشر
  * ولا يقول **متى**. والوقتُ يُقرأ من `publish_attempts` — من المحاولة
  * التي نجحت، وهي الأثرُ الذي لا يُبدَّل (D-004).
+ *
+ * **والحدّان بصيغة القاعدة** (`dbNow`) لا بـ `toISOString()`: العمودُ يكتبه
+ * `datetime('now')` بمسافةٍ، والمقارنةُ نصّيّة، وحرفُ `T` بعد المسافة. فكان
+ * «2026-09-21T00:00:00.000Z» يُخرج كلَّ ما وقع يومَ الاثنين الأوّل ويُدخل
+ * ما وقع يومَ الاثنين التالي — فمنشوراتُ الاثنين وكلفتُه بعد الرابعة فجرًا لا
+ * تدخل تقريرًا قطّ. والتقاريرُ التي كُتبت قبل الإصلاح تبقى كما كُتبت.
  */
 async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> {
   try {
@@ -117,7 +131,7 @@ async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> 
          HAVING published_at >= ? AND published_at < ?
           ORDER BY published_at ASC`,
       )
-      .bind(from.toISOString(), to.toISOString())
+      .bind(dbNow(from), dbNow(to))
       .all<PublishedRow>()
     return results.map((r) => ({
       id: r.id,
@@ -133,12 +147,12 @@ async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> 
   }
 }
 
-/** ما أُنفق في المدّة — من الدفتر وحده (D-008). */
+/** ما أُنفق في المدّة — من الدفتر وحده (D-008)، وبحدَّي `publishedIn` نفسِهما. */
 async function spendIn(db: Db, from: Date, to: Date): Promise<number> {
   try {
     const row = await db
       .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE at >= ? AND at < ?')
-      .bind(from.toISOString(), to.toISOString())
+      .bind(dbNow(from), dbNow(to))
       .first<{ total: number | null }>()
     return row?.total ?? 0
   } catch {
@@ -249,6 +263,7 @@ export function summarize(
     measured,
     platforms,
     top: topOf(posts),
+    ...(posts.length === 1 ? { only: posts[0]! } : {}),
     spendUsd,
     notes,
   }

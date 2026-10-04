@@ -557,6 +557,55 @@ describe('رموز الاسترداد', () => {
     expect((await countRecoveryCodes(db)).unused).toBe(codes.length - 2)
   })
 
+  /*
+   * ‏**والوجهةُ تعبر العاملَ الثاني** (ر-11) — إلّا في هذا الباب (مراجعة ر-11). التحذيرُ
+   * ‏«دخلتَ برمز استرداد — بقي N» وميضٌ لا يقرؤه إلّا `/panel` وصفحةُ المنصّة، فكانت العودةُ
+   * ‏إلى التقرير تُسقطه بعد دقيقةٍ بلا أن يُرى. **فالتحذيرُ أولى من الصفحة المطلوبة.**
+   */
+  it('وتعود باللوحة لا بالصفحة المطلوبة — فيُرى «بقي N» ولا يسقط', async () => {
+    const setup = await loginWithToken()
+    await readCsrf(setup.cookie)
+    await enrollPasskey(setup.cookie)
+    const issued = await post('/panel/security/recovery/issue', setup.cookie)
+    const { codes } = (await issued.json()) as { codes: string[] }
+
+    const body = new FormData()
+    body.set('token', TOKEN)
+    body.set('next', '/panel/report')
+    const first = await app.request('/panel/login', { method: 'POST', body }, env)
+    expect(first.headers.get('Location')).toBe('/panel/2fa')
+    const cookie = (first.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const pendingCsrf = await readCsrf(cookie, '/panel/2fa')
+    const second = new FormData()
+    second.set('_csrf', pendingCsrf)
+    second.set('code', codes[0]!)
+    const done = await app.request('/panel/2fa/recovery', { method: 'POST', body: second, headers: { Cookie: cookie } }, env)
+    expect(done.status).toBe(303)
+    expect(done.headers.get('Location')).toBe('/panel')
+    const promoted = (done.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const panel = await (await app.request('/panel', { headers: { Cookie: promoted } }, env)).text()
+    expect(panel).toContain(`دخلتَ برمز استرداد — بقي ${codes.length - 1} منها`)
+  })
+
+  it('ورمزُ التطبيق يعود إلى الصفحة المطلوبة كما كان (ر-11)', async () => {
+    const setup = await loginWithToken()
+    await readCsrf(setup.cookie)
+    const secret = await enrollTotp(setup.cookie)
+
+    const body = new FormData()
+    body.set('token', TOKEN)
+    body.set('next', '/panel/report')
+    const first = await app.request('/panel/login', { method: 'POST', body }, env)
+    const cookie = (first.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    const pendingCsrf = await readCsrf(cookie, '/panel/2fa')
+    const second = new FormData()
+    second.set('_csrf', pendingCsrf)
+    second.set('code', await codeAt(secret, counterFor()))
+    const done = await app.request('/panel/2fa/totp', { method: 'POST', body: second, headers: { Cookie: cookie } }, env)
+    expect(done.status).toBe(303)
+    expect(done.headers.get('Location')).toBe('/panel/report')
+  })
+
   it('تُقرأ بلا حساسيّةٍ للشرطة وحالة الأحرف', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
@@ -794,7 +843,8 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
-    const html = await (await app.request('/panel/channels/x', { headers: { Cookie: 'x=y' } }, env)).text()
+    // ‏كعكةُ جلسةٍ سقطت — لا كعكةٌ غريبة: من لم يدخل قطّ لا يُقال له «انتهت» (ر-11)
+    const html = await (await app.request('/panel/channels/x', { headers: { Cookie: '__Host-sada_session=gone' } }, env)).text()
     expect(html).toContain('انتهت الجلسة')
     expect(html).toContain('id="pk-login"')
   })

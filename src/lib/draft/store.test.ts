@@ -8,14 +8,14 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { approveMany, decide, listDrafts, undoReject } from './store'
+import { approveMany, decide, listDrafts, undoApprove, undoReject } from './store'
 
 let db: FakeDb
 
 const LONG = 'ن'.repeat(300)
 
 async function seedDraft(options: {
-  platform?: 'linkedin' | 'x' | 'tiktok' | 'youtube'
+  platform?: 'linkedin' | 'x' | 'tiktok' | 'youtube' | 'instagram'
   text?: string
   status?: string
   hash?: string
@@ -116,6 +116,47 @@ describe('الاعتماد', () => {
   })
 })
 
+/**
+ * **«اعتمد» بلا لمسةٍ لا يكون تعديلًا** (رحلتا R-0 وR-2).
+ *
+ * المتصفّحُ يرسل مربّعَ النصّ بأسطر `\r\n`. فكانت مسوّدةُ LinkedIn تُعتمَد بلا لمسةٍ
+ * `edited` بأصلٍ محفوظ، ويُحفَظ النصُّ حاملًا `\r` — وهو ما يُنشَر. ومسوّدةُ X بستّة
+ * أسطرٍ يقول عدّادُها «279 / 280» تُردّ بـ «285 محرفا» ولا تُعتمَد أبدًا.
+ */
+describe('الأسطرُ كما يرسلها المتصفّح', () => {
+  const crlf = (text: string): string => text.replace(/\n/g, '\r\n')
+  const PARAS = ['فقرةٌ أولى عن الوقف وأثره.', 'فقرةٌ ثانية عن التعليم.', LONG].join('\n\n')
+
+  it('نصُّ المسوّدة نفسُه بأسطر CRLF يُعتمَد approved، بلا أصلٍ محفوظ ولا «\\r»', async () => {
+    const id = await seedDraft({ text: PARAS })
+    const out = await decide(db, id, { kind: 'approve', text: `${crlf(PARAS)}\r\n` }, 'omar')
+    expect(out).toEqual({ ok: true, status: 'approved' })
+
+    const [row] = await listDrafts(db)
+    expect(row?.status).toBe('approved')
+    expect(row?.originalText).toBeNull()
+    expect(row?.text).toBe(PARAS)
+    expect(row?.text.includes('\r')).toBe(false)
+  })
+
+  it('ومسوّدةُ X عند حدّها بستّة أسطرٍ تُقبَل — كلُّ سطرٍ محرفٌ واحد لا اثنان', async () => {
+    // ‏سبعةُ أسطرٍ من ‏39 محرفًا لاتينيًّا وستُّ فواصل: ‏279 بحساب X، وبـ CRLF ‏285
+    const text = Array.from({ length: 7 }, () => 'a'.repeat(39)).join('\n')
+    const id = await seedDraft({ platform: 'x', text })
+    const out = await decide(db, id, { kind: 'approve', text: crlf(text) }, 'omar')
+    expect(out).toEqual({ ok: true, status: 'approved' })
+  })
+
+  it('وتعديلٌ حقيقيٌّ بأسطر CRLF يبقى edited — والمحفوظُ بأسطر LF', async () => {
+    const id = await seedDraft({ text: PARAS })
+    const out = await decide(db, id, { kind: 'approve', text: crlf(`${PARAS}\nسطرٌ جديد`) }, 'omar')
+    expect(out).toEqual({ ok: true, status: 'edited' })
+    const [row] = await listDrafts(db)
+    expect(row?.text).toBe(`${PARAS}\nسطرٌ جديد`)
+    expect(row?.originalText).toBe(PARAS)
+  })
+})
+
 describe('الرفض', () => {
   it('يُعلَّم rejected بلا approved_at — فلا يفتح بابَ الطابور', async () => {
     const id = await seedDraft()
@@ -174,12 +215,17 @@ describe('العرض', () => {
  * TikTok تُعرض بشعار LinkedIn ولا تجد حساباتِها عند الجدولة.
  */
 describe('المنصّةُ تُقرأ كما كُتبت', () => {
-  it('المنصّاتُ الأربع ذهابا وإيابا', async () => {
+  /*
+   * **وInstagram خامستُها** (رحلة R-4): كانت تُقرأ من `PLATFORMS` — وهي ما تُكتب له
+   * مسوّدة — فمنشورُ Instagram من «فيديوهاتك» يُعرَض «LinkedIn» ويُسنَد إلى حسابها.
+   */
+  it('المنصّاتُ الخمس ذهابا وإيابا — وInstagram ليست LinkedIn', async () => {
     const ids = {
       linkedin: await seedDraft({ platform: 'linkedin' }),
       x: await seedDraft({ platform: 'x', text: 'نصٌّ قصير' }),
       tiktok: await seedDraft({ platform: 'tiktok' }),
       youtube: await seedDraft({ platform: 'youtube' }),
+      instagram: await seedDraft({ platform: 'instagram' }),
     }
     const list = await listDrafts(db)
     for (const [platform, id] of Object.entries(ids)) {
@@ -318,6 +364,66 @@ describe('التراجعُ عن الرفض', () => {
     const done = await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
     expect(done.ok).toBe(true)
     if (done.ok) expect(done.status).toBe('approved')
+  })
+})
+
+/**
+ * التراجعُ عن الاعتماد (الخطّة 7.8، رحلة R-0) — **قبل الجدولة وحدَها**.
+ *
+ * «ارفض» على بُعد ‏8px من «اعتمد»، والرفضُ وحدَه كان يُتراجَع عنه. فاعتمادٌ بالخطأ
+ * كان يُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة.
+ */
+describe('التراجعُ عن الاعتماد', () => {
+  it('يعيد المعتمَدةَ كما كُتبت مسوّدةً بلا صاحبِ قرارٍ ولا وقت', async () => {
+    const id = await seedDraft()
+    await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
+
+    expect(await undoApprove(db, id)).toEqual({ ok: true, status: 'draft' })
+    const row = await readPost(id)
+    expect(row?.['status']).toBe('draft')
+    expect(row?.['approved_by']).toBeNull()
+    expect(row?.['approved_at']).toBeNull()
+    expect(row?.['text']).toBe(LONG)
+  })
+
+  it('والمعتمَدةُ بعد تعديلٍ تعود بنصّها قبله — والأصلُ يُمحى، فلا يُقال «عُدّلت» على مسوّدة', async () => {
+    const id = await seedDraft()
+    await decide(db, id, { kind: 'approve', text: `${LONG} https://basserh.com` }, 'omar')
+
+    expect((await undoApprove(db, id)).ok).toBe(true)
+    const [row] = await listDrafts(db)
+    expect(row?.status).toBe('draft')
+    expect(row?.text).toBe(LONG)
+    expect(row?.originalText).toBeNull()
+    const url = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
+    expect(url.u).toBe(0)
+
+    // ‏والدورةُ تُكمَل: تُعتمَد بعدها كما كُتبت
+    const again = await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
+    expect(again).toEqual({ ok: true, status: 'approved' })
+  })
+
+  it('**والمجدولةُ لا تُسحب من هنا** — يُقال اسحب موعدَها أوّلًا', async () => {
+    const id = await seedDraft()
+    await decide(db, id, { kind: 'approve', text: LONG }, 'omar')
+    const account = crypto.randomUUID()
+    db.raw.prepare(
+      "INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, 'linkedin', 'member', 'e', 'عمر', 'active')",
+    ).run(account)
+    db.raw.prepare("UPDATE posts SET status = 'queued', account_id = ?, scheduled_at = '2030-01-01 09:00:00' WHERE id = ?").run(account, id)
+
+    const out = await undoApprove(db, id)
+    expect(out.ok).toBe(false)
+    if (!out.ok) expect(out.reason).toContain('اسحب موعدَها')
+    expect((await readPost(id))?.['status']).toBe('queued')
+  })
+
+  it('والمسوّدةُ والمرفوضةُ ومعرّفٌ لا وجودَ له تُردّ ولا ترمي', async () => {
+    const draft = await seedDraft()
+    const rejected = await seedDraft({ status: 'rejected' })
+    expect((await undoApprove(db, draft)).ok).toBe(false)
+    expect((await undoApprove(db, rejected)).ok).toBe(false)
+    expect((await undoApprove(db, 'لا-شيء')).ok).toBe(false)
   })
 })
 

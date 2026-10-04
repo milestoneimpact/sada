@@ -270,6 +270,55 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
     expect(await ledger()).toHaveLength(2)
   })
 
+  /*
+   * **والمرفوضةُ لا تسدّ الطريق** (رحلة R-2): كان «اكتب مسوّدة» بعد الرفض يقول «✓ سُوّدت
+   * هذه النسخة — لم يُنفَق شيء» ولا يكتب شيئًا، ولا صياغةَ أخرى إلّا بتعديل المستند.
+   */
+  it('بعد الرفض تُكتب صياغةٌ أخرى — والمرفوضةُ تبقى بكلفتها، والنقرةُ الثالثةُ لا تُنفق', async () => {
+    const id = await seed()
+    const first = await draftPost(deps(net()), id, 'linkedin')
+    expect(first.kind).toBe('drafted')
+    if (first.kind !== 'drafted') return
+    db.raw.prepare("UPDATE posts SET status = 'rejected' WHERE id = ?").run(first.postId)
+
+    const second = await draftPost(deps(net()), id, 'linkedin')
+    expect(second.kind).toBe('drafted')
+    if (second.kind !== 'drafted') return
+    expect(second.postId).not.toBe(first.postId)
+    expect(calls).toHaveLength(1)
+    // ‏كلفتان في الدفتر قبل المسوّدتين (D-008)، والمرفوضةُ صفٌّ باقٍ حرّر مفتاحَه
+    expect(await ledger()).toHaveLength(2)
+    const rows = db.raw
+      .prepare('SELECT id, status, idempotency_key AS k FROM posts ORDER BY created_at, id')
+      .all() as { id: string; status: string; k: string }[]
+    const key = draftKey(id, 'linkedin', 'md5:abc')
+    expect(rows.find((r) => r.id === first.postId)).toMatchObject({ status: 'rejected', k: `${key}:rejected:${first.postId}` })
+    expect(rows.find((r) => r.id === second.postId)).toMatchObject({ status: 'draft', k: key })
+
+    // ‏وحارسُ النقرة المزدوجة باقٍ: البديلةُ قائمةٌ فلا نداءَ ثالثًا
+    const third = await draftPost(deps(net()), id, 'linkedin')
+    expect(third).toEqual({ kind: 'already', postId: second.postId })
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(2)
+  })
+
+  it('ومرفوضةٌ أُعيدت بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها — ويُقال already', async () => {
+    const id = await seed()
+    const first = await draftPost(deps(net()), id, 'linkedin')
+    if (first.kind !== 'drafted') throw new Error(first.kind)
+    db.raw.prepare("UPDATE posts SET status = 'rejected' WHERE id = ?").run(first.postId)
+
+    // ‏التراجعُ يقع والنداءُ جارٍ: يُقلَب الحالُ قبل أن تصل الكتابة
+    const racing = (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      db.raw.prepare("UPDATE posts SET status = 'draft' WHERE id = ?").run(first.postId)
+      return net()(input as RequestInfo, init)
+    }) as unknown as typeof fetch
+    const out = await draftPost(deps(racing), id, 'linkedin')
+    expect(out).toEqual({ kind: 'already', postId: first.postId })
+    const keys = db.raw.prepare('SELECT idempotency_key AS k FROM posts').all() as { k: string }[]
+    expect(keys.map((r) => r.k)).toEqual([draftKey(id, 'linkedin', 'md5:abc')])
+  })
+
   it('نسخةٌ جديدة من المستند تُسوَّد من جديد بحقّ', async () => {
     const id = await seed()
     await draftPost(deps(net()), id, 'linkedin')

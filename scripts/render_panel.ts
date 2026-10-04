@@ -65,7 +65,13 @@ const data: PanelData = {
   usedSpend: 1.84,
   videoCap: 2,
   usedClips: 1,
-  spend30d: 23.41,
+  // ‏من الدفتر كلِّه (ر-10): X بكلفة نشره وقياسه بجانب الذكاء، والأعمدةُ تساوي المجموع
+  spendBy: [
+    { key: 'anthropic', label: 'Anthropic', calls: 47, total: 18.2 },
+    { key: 'deepseek', label: 'DeepSeek', calls: 12, total: 5.21 },
+    { key: 'x', label: 'X — النشر والقياس', calls: 9, total: 0.14 },
+  ],
+  spendMonth: { total: 7.62, utc: false },
   series: [
     { day: '2026-08-23', total: 0.4 }, { day: '2026-08-24', total: 1.1 },
     { day: '2026-08-25', total: 0.9 }, { day: '2026-08-26', total: 2.3 },
@@ -386,11 +392,12 @@ const data: PanelData = {
   // ‏مقاطعُ المالك (D-180): واحدٌ أُنشئ على YouTube وبقيت منصّتان، وآخرُ أفقيٌّ طويل، وثالثٌ لم يكتمل
   uploads: [
     { id: 'up1', r2Key: 'upload/up1.mp4', name: 'قيادة المعالم.mp4', mime: 'video/mp4', bytes: 58_200_000,
-      width: 1080, height: 1920, durationMs: 42_000, status: 'ready', createdAt: ago(3), platforms: ['youtube'] },
+      width: 1080, height: 1920, durationMs: 42_000, status: 'ready', createdAt: ago(3),
+      posts: [{ id: 'v1-youtube', platform: 'youtube', status: 'approved' }] },
     { id: 'up2', r2Key: 'upload/up2.mp4', name: 'ورشة الحوكمة — كاملة.mp4', mime: 'video/mp4', bytes: 412_000_000,
-      width: 1920, height: 1080, durationMs: 1_260_000, status: 'ready', createdAt: ago(26), platforms: [] },
+      width: 1920, height: 1080, durationMs: 1_260_000, status: 'ready', createdAt: ago(26), posts: [] },
     { id: 'up3', r2Key: 'upload/up3.mov', name: 'مقابلة.mov', mime: 'video/quicktime', bytes: 96_000_000,
-      width: null, height: null, durationMs: null, status: 'uploading', createdAt: ago(1), platforms: [] },
+      width: null, height: null, durationMs: null, status: 'uploading', createdAt: ago(1), posts: [] },
   ],
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063

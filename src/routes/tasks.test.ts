@@ -233,3 +233,23 @@ describe('قراراتُ المالك في «ما عليك» (D-130)', () => {
   })
 })
 
+
+describe('مهامُّ الربط في «ما عليك» (ر-1)', () => {
+  it('كلُّ مهمّةِ ربطٍ تحمل زرَّها، وكلُّ مفتوحةٍ رابطَ خطواتها', async () => {
+    const html = await open()
+    expect(html).toContain('href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
+    expect(html).toContain('href="/panel/channels/tiktok?tab=setup#ci-tiktok">اضبط TikTok</a>')
+    expect(html).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube">اضبط YouTube</a>')
+    expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24"')
+    expect(html).toContain('href="/panel#tiles">اختر بطاقاتك</a>')
+    // ‏واسمُ الوثيقة رابطٌ لا نصٌّ يُقرأ ولا يُفتَح
+    expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md"')
+  })
+
+  it('وبعد حفظ سرَّي Instagram يصير الزرُّ «اربط Instagram» ويقول ما قِيس', async () => {
+    const html = await open({ ...env, INSTAGRAM_APP_ID: 'ig-id', INSTAGRAM_APP_SECRET: 'ig-secret' })
+    expect(html).toContain('href="/oauth/instagram/start">اربط Instagram</a>')
+    expect(html).toContain('سرّا التطبيق محفوظان — بقي «اربط»')
+    expect(html).not.toContain('ig-secret')
+  })
+})

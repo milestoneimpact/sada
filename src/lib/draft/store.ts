@@ -19,18 +19,24 @@
  * المالك يلصق ما يشاء في مربّع النصّ. ونصٌّ فوق حدّ المنصّة يُرفض عند
  * النشر بعد أسابيع — فيُمسك عند الاعتماد لا عند الإرسال.
  */
-import { PLATFORMS, type Platform } from './prompt'
+import { PLATFORMS } from './prompt'
 import type { Db } from '../tokens'
+import type { PublishPlatform } from '../oauth/providers'
 import { containsUrl } from '../idempotency'
 import { estimatePostCost } from '../cost'
 import { postLength } from './length'
 import { captionProblem, isVideoPlatform } from '../media/uploads'
+import { briefError } from '../platform/screen'
 
 export type DraftStatus = 'draft' | 'approved' | 'edited' | 'rejected' | 'queued' | 'published' | 'failed'
 
 export interface DraftRow {
   readonly id: string
-  readonly platform: Platform
+  /**
+   * منصّةُ المنشور كما في القاعدة — **الخمسُ لا الأربعُ التي تُكتب لها مسوّدة**.
+   * فمنشورُ Instagram من «فيديوهاتك» أو من الخطّة يُعرَض باسمه ويُجدوَل إلى حسابه.
+   */
+  readonly platform: PublishPlatform
   readonly text: string
   readonly rationale: string | null
   readonly status: DraftStatus
@@ -66,6 +72,15 @@ export interface DraftRow {
    * يُشتَقّ منه في الشاشة ولا يُخزَّن.**
    */
   readonly originalText: string | null
+  /**
+   * سببُ آخرِ فشلٍ كما حفظه الناشر، مختصرًا (`briefError`) — **للفاشل وحدَه**، و`null`
+   * لما سواه. كانت بطاقةُ الفاشل في «المنشورات» تقول «فشل النشر» بلا سببٍ ولا زرّ
+   * (رحلة R-8)، والسببُ والإعادةُ في صفحة المنصّة وحدَها.
+   *
+   * **واختياريٌّ** لأنّ صفوفًا تُبنى في العرض بلا قاعدة (العيّناتُ والاختبارات)؛ وغيابُه
+   * يُقرأ «بلا سببٍ مسجَّل» كما يقرؤه `whyFailed`.
+   */
+  readonly failure?: string | null
 }
 
 interface Raw {
@@ -87,20 +102,30 @@ interface Raw {
   dispatched_at: string | null
   account_name: string | null
   original_text: string | null
+  fail_json: string | null
 }
 
 /**
- * منصّةُ الصفّ كما هي — **لا «x أو linkedin»**.
+ * منصّاتُ المنشور كلُّها — **وتقابل قيدَ `posts.platform` في 0022**.
+ */
+const POST_PLATFORMS: readonly PublishPlatform[] = ['linkedin', 'x', 'tiktok', 'youtube', 'instagram']
+
+/**
+ * منصّةُ الصفّ كما هي — **لا «x أو linkedin»، ولا «ما تُكتب له مسوّدةٌ أو linkedin»**.
  *
  * كان كلُّ ما ليس X يُقرأ LinkedIn، فمسوّدةُ TikTok أو YouTube تُعرض بشعار
- * LinkedIn، ويبحث المجدوِلُ عن حساباتِ LinkedIn فلا تُجدوَل أبدا.
+ * LinkedIn. ثمّ صار يُقرأ من `PLATFORMS` — وهي ما تُكتب له مسوّدة، وInstagram
+ * ليست فيها — **فبقي منشورُ Instagram من «فيديوهاتك» يُعرَض «LinkedIn»**، ويُعرَض
+ * له حسابُ LinkedIn وحده، ويسنده «وزّع المعتمَد» إليه، ثمّ تردّه `schedulePost`.
+ *
+ * **ولا منصّةَ تُفترَض لصفٍّ لا نعرف منصّتَه**: القيدُ في القاعدة يمنعه، وإن وقع
+ * فلا يُعرَض باسم منصّةٍ أخرى — يُترَك.
  */
-function platformOf(raw: string): Platform {
-  return raw in PLATFORMS ? (raw as Platform) : 'linkedin'
+function platformOf(raw: string): PublishPlatform | null {
+  return (POST_PLATFORMS as readonly string[]).includes(raw) ? (raw as PublishPlatform) : null
 }
 
-function toDraft(row: Raw): DraftRow {
-  const platform = platformOf(row.platform)
+function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
   return {
     id: row.id,
     platform,
@@ -123,6 +148,7 @@ function toDraft(row: Raw): DraftRow {
     dispatchedAt: row.dispatched_at,
     publishCost: estimatePostCost(platform, containsUrl(row.text)),
     originalText: row.original_text ?? null,
+    failure: row.status === 'failed' ? briefError(row.fail_json ?? null) : null,
   }
 }
 
@@ -140,7 +166,12 @@ export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
                 p.source_id, p.source_hash, p.approved_by, p.approved_at, p.created_at,
                 p.scheduled_at, p.dispatched_at, p.original_text,
                 s.name AS source_name, s.content_hash AS current_hash,
-                a.display_name AS account_name
+                a.display_name AS account_name,
+                -- ‏وسببُ آخرِ محاولةٍ فاشلةٍ للفاشل وحدَه: لا استعلامَ فرعيَّ لما لم يفشل
+                CASE WHEN p.status = 'failed' THEN
+                  (SELECT pa.response_json FROM publish_attempts pa
+                    WHERE pa.post_id = p.id AND pa.status = 'failed'
+                    ORDER BY pa.attempt_no DESC LIMIT 1) END AS fail_json
            FROM posts p
            LEFT JOIN sources s ON s.id = p.source_id
            LEFT JOIN accounts a ON a.id = p.account_id
@@ -149,7 +180,10 @@ export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
       )
       .bind(limit)
       .all<Raw>()
-    return results.map(toDraft)
+    return results.flatMap((row) => {
+      const platform = platformOf(row.platform)
+      return platform === null ? [] : [toDraft(row, platform)]
+    })
   } catch {
     // جدولٌ لم يُرحَّل بعد: لوحةٌ تُفتح خاليةً خيرٌ من لوحةٍ لا تُفتح
     return []
@@ -172,6 +206,11 @@ export type Decision =
 export type DecisionResult =
   | { readonly ok: true; readonly status: DraftStatus }
   | { readonly ok: false; readonly reason: string }
+
+/** نصٌّ بأسطر `\n` وحدها، بلا فراغٍ في طرفيه — كما يُعَدّ ويُقارَن ويُحفَظ ويُنشَر. */
+function lines(text: string): string {
+  return text.replace(/\r\n?/g, '\n').trim()
+}
 
 /** بَتٌّ واحد. و `by` اسمُ صاحب القرار — يُكتب مع القرار لا بعده. */
 export async function decide(
@@ -200,7 +239,15 @@ export async function decide(
     return { ok: true, status: 'rejected' }
   }
 
-  const text = decision.text.trim()
+  /*
+   * **والأسطرُ توحَّد قبل كلّ شيء** — قبل العدّ والمقارنة والحفظ.
+   *
+   * المتصفّحُ يرسل مربّعَ النصّ بأسطر `\r\n` أيًّا كان ما فيه. فكان «اعتمد» بلا لمسةٍ
+   * يقارن نصًّا بـ `\r\n` بمحفوظٍ بـ `\n` فيكتب `edited` ويحفظ الأصلَ، **ويُنشَر النصُّ
+   * حاملًا `\r`**، ويعدّ كلَّ سطرٍ محرفًا زائدًا: مسوّدةُ X بستّة أسطرٍ يقول عدّادُها
+   * «278 / 280» تُردّ بـ «284 محرفا» ولا تُعتمَد أبدًا.
+   */
+  const text = lines(decision.text)
   // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
   if (isVideoPlatform(row.platform)) {
     const why = captionProblem(row.platform, text)
@@ -221,7 +268,7 @@ export async function decide(
     }
   }
 
-  const status: DraftStatus = text === row.text.trim() ? 'approved' : 'edited'
+  const status: DraftStatus = text === lines(row.text) ? 'approved' : 'edited'
   // `approved_at` و `approved_by` معا في جملةٍ واحدة: اعتمادٌ بلا صاحبٍ
   // مسمّى قرارٌ لا يُراجَع بعد شهر
   /*
@@ -250,12 +297,13 @@ export async function decide(
 }
 
 /**
- * التراجعُ عن رفض — **وهو الفعلُ الوحيد الذي يُتراجَع عنه هنا** (D-100).
+ * التراجعُ عن رفض (D-100) — **ومعه التراجعُ عن الاعتماد** (`undoApprove` أدناه).
  *
- * ## لماذا الرفضُ وحدَه
+ * ## لماذا الرفضُ والاعتمادُ، ولا سحبُ الموعد
  *
  * الرفضُ عمودٌ واحدٌ يُقلَب: `rejected` ← `draft`، و`approved_by` يُمحى.
- * ولا يفقد شيئا في الطريق، ولا يحتاج قيمةً تُستعاد.
+ * ولا يفقد شيئا في الطريق، ولا يحتاج قيمةً تُستعاد. والاعتمادُ مثلُه: ما
+ * يُستعاد (النصُّ قبل التعديل) محفوظٌ في `original_text`.
  *
  * **وسحبُ الموعد ليس كذلك**: التراجعُ عنه يحتاج موعدا قد يكون مضى بينما
  * كان المالكُ يقرأ الإشعار — وإعادتُه تتخطّى حارسَ الجدولة الذي يمنع
@@ -282,6 +330,53 @@ export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
     .prepare("UPDATE posts SET status = 'draft', approved_by = NULL WHERE id = ?")
     .bind(id)
     .run()
+  return { ok: true, status: 'draft' }
+}
+
+/**
+ * التراجعُ عن اعتماد — **ما دام لم يُجدوَل** (الخطّة 7.8، ر-0).
+ *
+ * كان الرفضُ وحدَه يُتراجَع عنه. و«ارفض» على بُعد ‏8px من «اعتمد»، فضغطةٌ خاطئةٌ
+ * على الثاني كانت تُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة.
+ *
+ * **والتراجعُ يُعيد ما كان قبل الضغطة كلَّه**: الحالُ `draft`، و`approved_at`
+ * و`approved_by` يُمحيان، **والنصُّ يعود من `original_text` إن كان عُدِّل** — فالاعتمادُ
+ * هو الذي حفظ التعديل، والتراجعُ عنه تراجعٌ عنه. و`has_url` يُعاد حسابُه من النصّ
+ * العائد (D-069).
+ *
+ * **والشرطُ في جملة التحديث نفسِها**: إشعارٌ شاخ في تبويبٍ منسيّ لا يسحب
+ * منشورًا جُدول بعده — `queued` لا تطابق، فيُردّ.
+ */
+export async function undoApprove(db: Db, id: string): Promise<DecisionResult> {
+  const row = await db
+    .prepare('SELECT status, text, original_text FROM posts WHERE id = ?')
+    .bind(id)
+    .first<{ status: string; text: string; original_text: string | null }>()
+  if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
+  if (row.status !== 'approved' && row.status !== 'edited') {
+    return {
+      ok: false,
+      reason: row.status === 'queued'
+        ? 'جُدولت بعد الاعتماد — اسحب موعدَها أوّلًا'
+        : `حالتُها «${row.status}» — والتراجعُ عن الاعتماد قبل الجدولة وحدَه`,
+    }
+  }
+
+  // ‏والأصلُ يُمحى حين يعود النصُّ إليه وحدَه: معتمَدٌ بلا تعديلٍ يحمل أصلًا من تعديلٍ سبق
+  // ‏(أُعيد من الفشل فصار `approved`) يبقى أصلُه — فهو أثرُ ما كتبه النموذج (D-128)
+  const original = row.status === 'edited' ? row.original_text : null
+  const restore = original !== null
+  const text = original ?? row.text
+  const moved = await db
+    .prepare(
+      `UPDATE posts SET status = 'draft', approved_at = NULL, approved_by = NULL,
+              text = ?, has_url = ?, original_text = CASE WHEN ? = 1 THEN NULL ELSE original_text END
+        WHERE id = ? AND status IN ('approved', 'edited')
+        RETURNING id`,
+    )
+    .bind(text, containsUrl(text) ? 1 : 0, restore ? 1 : 0, id)
+    .first<{ id: string }>()
+  if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل التراجع — أعد تحميل الصفحة' }
   return { ok: true, status: 'draft' }
 }
 

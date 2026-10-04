@@ -11,13 +11,15 @@ const fmt = { money: (n: number) => `${n.toFixed(2)}$` }
 
 const src: TileSource = {
   paused: false,
+  pulses: [],
   autoEnqueue: true,
   slide: { missing: [] },
   analysisCap: 10,
   spendCap: 5,
   usedAnalyses: 6,
   usedSpend: 1.84,
-  spend30d: 23.41,
+  spendBy: [{ calls: 40, total: 18.2 }, { calls: 6, total: 5.21 }],
+  spendMonth: { total: 9.4, utc: false },
   series: [{ day: '09-01', total: 1 }, { day: '09-02', total: 3 }],
   sources: [{ analyzed: true, stale: false }, { analyzed: false, stale: false }],
   providers: [{ configured: true, calls: 40 }, { configured: false, calls: 0 }],
@@ -56,7 +58,7 @@ describe('الكتالوج', () => {
   it('ولا بطاقةَ تعطي NaN على لوحةٍ فارغة', () => {
     const empty: TileSource = {
       ...src,
-      usedAnalyses: 0, usedSpend: 0, spend30d: 0,
+      usedAnalyses: 0, usedSpend: 0, spendBy: [], spendMonth: { total: 0, utc: true },
       series: [], sources: [], providers: [], routing: [],
       drafts: [], targets: [], outbox: [], alertWebhook: '',
     }
@@ -159,6 +161,21 @@ describe('البطاقاتُ بأعيانها', () => {
     expect(spec?.of(withStale, fmt)).toMatchObject({ value: '1', note: '1 تنتظر تحليلا' })
   })
 
+  /*
+   * ‏مراجعة الرحلات: **«حالُ النظام» حكمُ الحبّة نفسُه.** كانت البطاقةُ «يعمل» من مفتاح الإيقاف وحده،
+   * ‏والحبّةُ في رأس الشاشة نفسِها «النشر متوقّف» من نبض الإرسال — جوابان متناقضان.
+   */
+  it('و«حالُ النظام» من النبض كحبّة الرأس — لا «يعمل» والإرسالُ متوقّف', () => {
+    const spec = TILES.find((t) => t.id === 'system_state')!
+    const stalled: TileSource = {
+      ...src,
+      pulses: [{ job: 'dispatch', label: 'الإرسال', state: 'late', beat: null, lateBy: 3 * 86_400 }],
+    }
+    expect(spec.of(stalled, fmt).value).toBe('النشر متوقّف')
+    expect(spec.of(src, fmt).value).toBe('يعمل')
+    expect(spec.of({ ...stalled, paused: true }, fmt).value).toBe('موقوف مؤقتا')
+  })
+
   it('وذروةُ الإنفاق أعلى يومٍ لا آخرُه', () => {
     const spec = TILES.find((t) => t.id === 'peak_spend_day')
     expect(spec?.of(src, fmt)).toMatchObject({ value: '3.00$', note: 'يوم 09-02' })
@@ -172,5 +189,40 @@ describe('مجدولٌ للنشر (D-134)', () => {
     const none = { ...src, drafts: [{ status: 'draft', scheduledAt: null }] }
     expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعدَ في الطابور' })
     expect(spec.of(src, fmt).note).toBe('له موعدٌ في الطابور')
+  })
+})
+
+describe('بطاقتا الإنفاق (ر-10)', () => {
+  const tile = (id: string) => TILES.find((t) => t.id === id)!
+
+  /** **«هذا الشهر» رقمٌ في اللوح لا يُستنتَج** — ورابعُ الافتراض. */
+  it('«إنفاق هذا الشهر» من أوّل الشهر، وفي الافتراض مكانَ «30 يومًا»', () => {
+    expect(DEFAULT_TILES).toContain('spend_month')
+    expect(DEFAULT_TILES).not.toContain('spend_30d')
+    const v = tile('spend_month').of(src, fmt)
+    expect(v.value).toBe('9.40$')
+    expect(v.note).toBe('منذ أوّل الشهر')
+    // ‏وحين غابت منطقةُ المالك يُقال إنّه بـ UTC ولا يُترك ليُظنّ بتوقيته
+    expect(tile('spend_month').of({ ...src, spendMonth: { total: 1, utc: true } }, fmt).note)
+      .toContain('UTC')
+  })
+
+  /** **ووصفُ «30 يومًا» صادق**: آخرُ ثلاثين يومًا، لا «المجموعُ الشهريّ». */
+  it('و«30 يومًا» تجمع الدفترَ كلَّه وتعدّه بعربيّةٍ صحيحة', () => {
+    expect(tile('spend_30d').why).not.toContain('الشهريّ')
+    const v = tile('spend_30d').of(src, fmt)
+    expect(v.value).toBe('23.41$')
+    expect(v.note).toBe('46 طلبًا إلى خدمتَين')
+    const one = tile('spend_30d').of({ ...src, spendBy: [{ calls: 6, total: 0.8 }] }, fmt)
+    expect(one.note).toBe('6 طلبات إلى خدمةٍ واحدة')
+  })
+
+  /** والعددُ ومعدودُه من `counted` في كلّ بطاقة (D-177). */
+  it('ولا «1 مزوّدا» ولا «30 يوما» في بطاقةٍ ولا في وصفها', () => {
+    for (const t of TILES) {
+      const v = t.of(src, fmt)
+      const text = `${t.label} ${t.why} ${v.value} ${v.em ?? ''} ${v.note ?? ''}`
+      expect(text, t.id).not.toMatch(/\d+ (منشورا|مزوّدا|دورةٌ|يوما|نداءً)(?![\u0621-\u064A])/)
+    }
   })
 })

@@ -28,7 +28,7 @@
 import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
 import { blamedScopes } from '../../lib/oauth/refusal'
 import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
-import { SETUP } from '../../lib/channels'
+import { callbackStep, SETUP, setupHref } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { pathArrows, status } from './parts'
@@ -182,6 +182,14 @@ export function refusedBody(d: RefusedData): string {
   const userDenied = d.reason === 'user_cancelled_login' || d.reason === 'access_denied' ||
     d.reason === 'user_cancelled_authorize'
   const guide = SETUP[d.platform]
+  /*
+   * ‏**بلغة كلّ منصّةٍ وإلى حقليها** (ر-1): كانت الصفحةُ تقول «تبويب Auth» لكلّ منصّة —
+   * ‏ولا تبويبَ بهذا الاسم عند Meta وTikTok وGoogle — وزرُّها «افتح الدليل والحقول» يقود
+   * ‏إلى لوح القنوات ولا حقلَ فيه. فالبوّابةُ من دليلها، والزرُّ إلى حقل المعرّف في الإعداد.
+   */
+  const portal = guide?.portalLabel ?? LABEL[d.platform]
+  const fields = setupHref(d.platform)
+  const step = guide === undefined ? null : callbackStep(guide)
 
   if (userDenied) {
     return `${head(
@@ -259,7 +267,7 @@ export function refusedBody(d: RefusedData): string {
             <button type="button" class="g sm" data-copy="sent-id">انسخ</button>
           </div>
           <div class="help"><span class="i">!</span><span class="t">
-            <b>إن خالف المعرّفَ في تبويب Auth فهذا تطبيقٌ آخر</b> — وهو وحده يفسّر
+            <b>إن خالف المعرّفَ في ${escapeHtml(portal)} فهذا تطبيقٌ آخر</b> — وهو وحده يفسّر
             الرفض. وإن طابقه، <b>فالسرُّ هو الخطأ</b>: ولّد سرّا جديدا والصقه.</span></div>
         </div>
         <div class="field cb">
@@ -272,13 +280,13 @@ export function refusedBody(d: RefusedData): string {
         </div>
       </div>`}
       <div class="outcome warn"><span class="k">ما يُفعَل</span>
-        <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من تبويب
-          <b>Auth</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
+        <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من
+          <b>${escapeHtml(portal)}</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
           <b>${pathArrows('صفحة المنصّة ← ضبطُ التطبيق ودليلُه')}</b>، ثمّ أعد الربط.
           <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
           المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
       <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">اضبط الأسرار</a>
+        <a class="btn p" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
       </div>
     </div>`
@@ -296,8 +304,9 @@ export function refusedBody(d: RefusedData): string {
       <h2>أوّلُ ما يُراجَع</h2>
       <ol class="steps">
         <li><span class="n">1</span><span class="body">
-          <span class="what">رابطُ العودة المسجَّل في البوّابة</span>
-          <span class="why">${guide === undefined ? '' : pathArrows(guide.gotcha)}</span></span></li>
+          <span class="what">رابطُ العودة المسجَّل في ${escapeHtml(portal)}</span>
+          <span class="why">يُطابَق حرفًا بحرف: شرطةٌ زائدةٌ في آخره أو http بدل https تُسقط الربط.${
+            step === null ? '' : ` وهو الخطوةُ ${step} من الدليل.`}</span></span></li>
         <li><span class="n">2</span><span class="body">
           <span class="what">Client ID و Client Secret</span>
           <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
@@ -306,7 +315,7 @@ export function refusedBody(d: RefusedData): string {
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
         <span class="v">${pathArrows(guide.failure)}</span></div>`}
       <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="/panel#channels">افتح الدليل والحقول</a>
+        <a class="btn p" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
         <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
       </div>
     </div>`
@@ -364,8 +373,10 @@ export function refusedBody(d: RefusedData): string {
     }</h2></div>
     <p class="hint">${
       named
-        ? 'سمّته المنصّةُ بعينه، <b>فهذا وحده ما ينقص</b>. وما عداه ممنوحٌ أصلا — ' +
-          'وتبويب Auth في بوّابتك يُظهر ما مُنح تحت <span class="mono">OAuth 2.0 scopes</span>.'
+        ? 'سمّته المنصّةُ بعينه، <b>فهذا وحده ما ينقص</b>. وما عداه ممنوحٌ أصلا' + (d.platform === 'linkedin'
+          // ‏و«تبويب Auth» اسمٌ عند LinkedIn وحدها — لا يُقال لمنصّةٍ لا تبويبَ فيها بهذا الاسم
+          ? ' — وتبويب Auth في بوّابتك يُظهر ما مُنح تحت <span class="mono">OAuth 2.0 scopes</span>.'
+          : '.')
         : 'المنصّةُ لم تسمِّ نطاقا في جوابها، <b>فكلُّها معروضة</b>. ' +
           'وأكثرُ ما يقع أن يكون النقصُ في المنتَج الذي يمنح النشر.'
     } والمنتَجُ يُمنَح <b>فورا بلا مراجعة</b>.</p>
@@ -426,5 +437,66 @@ export function refusedBody(d: RefusedData): string {
 
   <div class="row" style="margin-top:var(--s-4)">
     <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+  </div>`
+}
+
+/**
+ * ‏**سرّان حُذفا بين الذهاب والعودة: صفحةٌ لا وميض** (مراجعة ر-1).
+ *
+ * ‏في `/start` يكفي الوميض: الطلبُ من اللوحة نفسِها فتُرسَل كعكةُ الجلسة. أمّا العودةُ
+ * ‏فتحويلٌ من نطاق المنصّة، **وكعكةُ الجلسة `SameSite=Strict` لا تعبره** — فلا يُكتب
+ * ‏وميضٌ، ثمّ يُرسَل المالكُ إلى الإعداد بلا كلمة. فالسببُ هنا، وزرٌّ إلى حقلَي التطبيق
+ * ‏يُضغط من صفحتنا فتصل الكعكةُ معه. ولا يُذكر معرّفٌ ولا سرّ: «ينقص» لا قيمةَ معها.
+ */
+export function unconfiguredBody(platform: Platform): string {
+  const label = LABEL[platform]
+  return `${head(platform, 'لم يكتمل', 'لم يكتمل الربط',
+    `وافقت ${escapeHtml(label)}، ثمّ لم نجد عندنا معرّفَ تطبيقها وسرَّه — حُذفا بعد أن بدأ الربط. <b>ولم يُحفَظ شيء.</b>`)}
+  <div class="card">
+    <h2>ما يُفعَل</h2>
+    <p class="hint">اضبط المعرّفَ والسرَّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
+    <div class="row" style="margin-top:var(--s-3)">
+      <a class="btn p" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
+      <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+    </div>
+  </div>`
+}
+
+export interface UnreachedData {
+  readonly platform: Platform
+  /**
+   * ‏أين وقف: `start` قبل الذهاب إلى المنصّة، و`reach` في طريق الرمز أو الهويّة ولم
+   * ‏يُكتب شيء، و`save` بعد أن ردّت المنصّةُ وتعذّر الحفظُ عندنا.
+   */
+  readonly stage: 'start' | 'reach' | 'save'
+  /** ‏اسمُ العطل وسطرُه بلا استعلام رابط — للمطوّر وحده. */
+  readonly detail: string
+}
+
+/**
+ * ‏**عطلٌ لم نعرفه: صفحةٌ هادئةٌ لا «Internal Server Error»** (ر-1 · خطّة التصميم 7.11).
+ *
+ * ‏المالكُ وافق عند المنصّة ثمّ وصله سطرٌ نصّيٌّ بلا رابطٍ ولا رجوع، والحالةُ استُهلكت
+ * ‏فلا يصلحه رجوعٌ ولا تحديث. فالصفحةُ تقول ما وقع وما حُفظ، وزرُّها الأوّلُ محاولةٌ
+ * ‏جديدةٌ من البداية، والتفصيلُ تحت «للمطوّر» ليُرسَل كما هو.
+ */
+export function unreachedBody(d: UnreachedData): string {
+  const label = LABEL[d.platform]
+  const title = d.stage === 'save' ? 'لم يُحفَظ الربط' : d.stage === 'start' ? 'لم يبدأ الربط' : `لم نصل إلى ${label} الآن`
+  const lede = d.stage === 'save'
+    ? `وافقت ${escapeHtml(label)}، ثمّ تعذّر الحفظُ عندنا. <b>أعد المحاولة</b>؛ وإن ظهر الحسابُ «بلا إذن» فالمحاولةُ نفسُها تُصلحه.`
+    : d.stage === 'start'
+      ? 'تعذّرت قراءةُ ضبط التطبيق قبل الذهاب إلى المنصّة. <b>ولم يُحفَظ شيء.</b>'
+      : `انقطع الطريقُ إلى ${escapeHtml(label)} قبل أن يكتمل الربط. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.`
+  return `${head(d.platform, 'لم يكتمل', title, lede)}
+  <div class="card">
+    <h2>ما يُفعَل</h2>
+    <p class="hint">أعد المحاولة بعد دقيقة. فإن تكرّر هذا فأرسل إليّ ما تحت «للمطوّر» كما هو.</p>
+    <div class="row" style="margin-top:var(--s-3)">
+      <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      <a class="btn g" href="/panel/channels/${escapeHtml(d.platform)}">صفحة ${escapeHtml(label)}</a>
+    </div>
+    <details style="margin-top:var(--s-3)"><summary>للمطوّر</summary>
+      <p class="hint"><span class="mono">${escapeHtml(d.detail)}</span></p></details>
   </div>`
 }

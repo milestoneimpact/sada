@@ -29,7 +29,7 @@ import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platf
 import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import type { Platform } from '../../lib/oauth/providers'
-import { counted, money, NOUNS, relativeTime, shortAgo, untilTime } from '../../lib/format'
+import { counted, money, NOUNS, parseSqliteUtc, relativeTime, shortAgo, untilTime } from '../../lib/format'
 import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 import type { AppStatus } from '../../lib/oauth/apps'
 import type { PlatformNeeds } from '../../lib/platform/needs'
@@ -93,6 +93,14 @@ export interface PlatformScreenData {
 }
 
 const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
+
+/**
+ * ‏بطاقةُ «الكتابة من مصدر» في لوح المنشورات — **لا لوحُ المصادر** (ر-2).
+ *
+ * ‏كانت ثلاثةُ أزرارٍ هنا تقول «اكتب» وتفتح «#sources»: جدولُ ملفّاتٍ وزرُّ «مسح Drive»
+ * ‏ولا نموذجَ كتابة. والمرساةُ تفتح لوحَها ثمّ تنزل إليها (`panelScript` · show).
+ */
+const WRITE = '/panel#write'
 
 export function tabOf(raw: string | undefined, show: string | undefined): Tab {
   if (raw !== undefined && (TABS as readonly string[]).includes(raw)) return raw as Tab
@@ -223,6 +231,18 @@ function capabilityTable(rows: readonly Capability[]): string {
 function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): string {
   const when = (at: string | null, none: string): string =>
     at === null ? none : `<span title="${escapeHtml(at)} UTC">${escapeHtml(relativeTime(at, now))}</span>`
+  /*
+   * ‏**والموعدُ القادمُ يُعَدّ إلى الأمام** (ر-1): `relativeTime` للماضي وتحصر الفرقَ
+   * ‏بالصفر، فكان كلُّ انتهاءٍ قادمٍ «الآن» — «إذنُ الوصول ينتهي الآن · والتجديدُ الآن»
+   * ‏لحسابٍ سليمٍ بقي له 300 يوم، والسلّمُ فوقه يقول «صالحٌ 54 يومًا». والفعلُ يتبع الزمن.
+   */
+  const ends = (at: string): string => {
+    const date = parseSqliteUtc(at)
+    const past = date !== null && date.getTime() <= now.getTime()
+    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(at)} UTC">${escapeHtml(past
+      ? relativeTime(at, now)
+      : untilTime(at, now))}</span>`
+  }
   const alerts = (h?.alerts ?? []).slice(0, 5).map((al) =>
     `<li><span class="dot ${al.threshold === 0 ? 'bad' : 'warn'}"></span>
       <span>${al.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'} ${
@@ -234,8 +254,8 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
         <li><span class="dot ${h?.refreshedAt ? 'ok' : ''}"></span><span>${
           h?.refreshedAt ? `جُدّد آخرَ مرّةٍ ${when(h.refreshedAt, '')}` : 'لم يُجدَّد بعدُ — يُجدَّد قبل انتهائه بساعتين'}</span></li>
         <li><span class="dot"></span><span>${
-          h?.expiresAt ? `إذنُ الوصول ينتهي ${when(h.expiresAt, '')}` : 'لا إذنَ وصولٍ محفوظا'}${
-          h?.refreshExpiresAt ? ` · والتجديدُ ${when(h.refreshExpiresAt, '')}` : ''}</span></li>
+          h?.expiresAt ? `إذنُ الوصول ${ends(h.expiresAt)}` : 'لا إذنَ وصولٍ محفوظا'}${
+          h?.refreshExpiresAt ? ` · والتجديدُ ${ends(h.refreshExpiresAt)}` : ''}</span></li>
         ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
         ${alerts}
       </ul>`
@@ -320,7 +340,8 @@ function nextAction(d: PlatformScreenData, r: Readiness): { label: string; href:
     return { label: d.counts.waiting === 1 ? 'راجع المسوّدة' : `راجع ${d.counts.waiting} مسوّدات`, href: href(id, { tab: 'waiting' }) }
   }
   if (d.counts.ready > 0) return { label: 'جدوِل المعتمَد', href: href(id, { tab: 'waiting' }) }
-  if (d.needs?.drafts === true) return { label: 'اكتب منشورًا من مصدر', href: '/panel#sources' }
+  // ‏ونموذجُ الكتابة «#write» في لوح المنشورات، لا لوحُ المصادر الذي لا كتابةَ فيه (ر-2)
+  if (d.needs?.drafts === true) return { label: 'اكتب منشورًا من مصدر', href: WRITE }
   return null
 }
 
@@ -340,21 +361,29 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
   const last = d.tally.lastPublishedAt
   const next = nextAction(d, r)
   const initial = Array.from(name.trim())[0] ?? '؟'
-  return `<header class="acct ${ACCT_CLASS[spec.id] ?? ''}">
-    <div class="acct-cover" aria-hidden="true"><span class="acct-mark">${logo}</span></div>
-    <div class="acct-body">
-      <span class="acct-av" data-kind="${first?.kind === 'org' || spec.id === 'youtube' ? 'org' : 'member'}"
-        aria-hidden="true">${escapeHtml(initial)}</span>
-      <div class="acct-id">
-        <div class="eyebrow"><span class="ln"></span>${escapeHtml(spec.label)}</div>
-        <h1>${escapeHtml(name)}</h1>
-        <p class="acct-sub">${escapeHtml(kind)}${linked}${more}</p>
-        <ul class="acct-counts">
+  /*
+   * ‏**ومنصّةٌ بلا حسابٍ لا تُرسَم حسابًا** (ر-1): كان الرأسُ يقول الاسمَ ثلاثًا — حرفُ
+   * ‏«I» في دائرةِ صورة، ثمّ «Instagram» فوق العنوان، ثمّ العنوان — وتحته «0 نُشر · 0 في
+   * ‏الطابور · 0 فشل». فالصورةُ لحسابٍ قائم، والاسمُ مرّةً، والعدّاداتُ أصفارًا لا تُكتب.
+   */
+  const counts = c.published + c.queued + c.failed === 0
+    ? first === undefined ? '' : '<ul class="acct-counts"><li>لم يُنشر شيءٌ بعد</li></ul>'
+    : `<ul class="acct-counts">
           <li><b>${c.published}</b> نُشر</li>
           <li><b>${c.queued}</b> في الطابور</li>
           <li class="${c.failed > 0 ? 'bad' : ''}"><b>${c.failed}</b> فشل</li>
           <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
-        </ul>
+        </ul>`
+  return `<header class="acct ${ACCT_CLASS[spec.id] ?? ''}">
+    <div class="acct-cover" aria-hidden="true"><span class="acct-mark">${logo}</span></div>
+    <div class="acct-body">
+      ${first === undefined ? '' : `<span class="acct-av" data-kind="${first.kind === 'org' || spec.id === 'youtube' ? 'org' : 'member'}"
+        aria-hidden="true">${escapeHtml(initial)}</span>`}
+      <div class="acct-id">
+        ${first === undefined ? '' : `<div class="eyebrow"><span class="ln"></span>${escapeHtml(spec.label)}</div>`}
+        <h1>${escapeHtml(name)}</h1>
+        <p class="acct-sub">${escapeHtml(kind)}${linked}${more}</p>
+        ${counts}
       </div>
       <div class="acct-act">
         <span class="acct-verdict">${unsignedAccounts(d.view).length > 0
@@ -395,7 +424,7 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
   const token = r.rungs.find((x) => x.key === 'token')
   const clip = needs.media.kind === 'clip'
   const publishRung = r.rungs.find((x) => x.key === 'publish')
-  return [
+  const list: Station[] = [
     {
       title: 'الحسابُ والإذن',
       state: blocking !== undefined ? 'bad' : r.verdict.kind === 'ok' || token?.state === 'done' ? 'ok' : 'warn',
@@ -408,7 +437,7 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
       state: needs.drafts ? 'ok' : 'idle',
       rule: needs.text,
       now: needs.drafts ? 'يُكتب من مصدرٍ محلَّل' : 'لا تُكتب لها مسوّدةٌ بعد',
-      href: needs.drafts ? '/panel#sources' : setup,
+      href: needs.drafts ? WRITE : setup,
     },
     {
       title: 'القرار',
@@ -452,13 +481,21 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
       href: '#history',
     },
   ]
+  /*
+   * ‏**ولا خضرةَ على منصّةٍ لا تنشر أصلًا** (ر-1): بلا حسابٍ كانت «القرار: لا مسوّدةَ
+   * ‏تنتظرك» و«الصورة: لكلّ منشورٍ قادمٍ ما يلزمه» خضراوين، فيُقرأ «2 من 7 جاهزة» عن
+   * ‏منصّةٍ لن يخرج إليها شيء. فما بعد الأولى ينتظر الربط، وما فيه عددٌ يبقى عددُه.
+   */
+  if (d.view.accounts.length > 0) return list
+  return list.map((s, i): Station => i === 0 ? s : { ...s, state: 'idle', now: s.state === 'ok' ? 'بعد الربط' : s.now })
 }
 
 function needsStrip(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): string {
   const list = stations(d, r, needs)
   const ready = list.filter((s) => s.state === 'ok').length
+  const tally = d.view.accounts.length === 0 ? 'اربطها أوّلًا' : `${ready} من ${list.length} جاهزة`
   return `<section class="needs" aria-labelledby="needs-h">
-    <h2 class="needs-h" id="needs-h">ما تطلبه ${escapeHtml(needs.label)} <span class="ago">${ready} من ${list.length} جاهزة</span></h2>
+    <h2 class="needs-h" id="needs-h">ما تطلبه ${escapeHtml(needs.label)} <span class="ago">${tally}</span></h2>
     <ol class="needs-list">${list
       .map((s, i) => `<li class="${s.state}"><a href="${escapeHtml(s.href)}">
         <span class="needs-top"><span class="n" aria-hidden="true">${i + 1}</span>
@@ -635,7 +672,7 @@ function waitingSection(d: PlatformScreenData): string {
   )
   const empty = `<div class="empty"><b>لا شيءَ ينتظرك على ${escapeHtml(d.view.spec.label)}</b>
     <p>ما يُكتب من مصدرٍ محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.</p>
-    <a class="btn g sm" href="/panel#sources">اكتب من مصدر</a></div>`
+    <a class="btn g sm" href="${WRITE}">اكتب من مصدر</a></div>`
   return d.waiting.length === 0
     ? empty
     : `${drafts.length === 0 ? '' : `<h3 class="sec">تنتظر قرارك · ${drafts.length}</h3><div class="np-list">${drafts.map(row).join('')}</div>`}

@@ -165,7 +165,11 @@ export function readiness(input: ReadinessInput): Readiness {
         : { key: 'renew', title: 'التجديد', state: 'done', note: `جُدّد آخرَ مرّةٍ ${h.refreshedAt.slice(0, 16)}` }
 
   // ٥ · النشر — من المحاولات
-  const lastFailed = posts.find((p) => p.lastError !== null && p.publishedAt === null)
+  //
+  // ‏**والمنشورُ الفاشلُ الآنَ لا ما فشل يومًا** (ر-8): `lastError` آخرُ صفٍّ فاشلٍ في
+  // ‏`publish_attempts` ويبقى بعد «أعده إلى المعتمَد» والجدولة، فكانت الصفحةُ تقول
+  // ‏«لا تنشر» عن منشورٍ أصلحه المالكُ وعاد إلى الطابور. فالحالُ الحاليّةُ شرطٌ معه
+  const lastFailed = posts.find((p) => p.status === 'failed' && p.lastError !== null && p.publishedAt === null)
   let publishRung: Rung
   if (spec.stage === 'link') {
     publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: 'سائقُ الرفع لم يُبنَ لهذه المنصّة — تُربَط ولا تنشر' }

@@ -38,6 +38,11 @@ export interface SpreadDraft {
   readonly status: string
   /** أوّلُ سطرٍ يُعرَض في المعاينة، فيعرف المالكُ أيَّ منشورٍ يجدول. */
   readonly text: string
+  /**
+   * ما ينقصه من وسيطٍ ليُنشَر (`missingMedia`) — أو `null`. **ويُقال في المعاينة سببًا**
+   * لا يُترَك لـ `schedulePost` تردّه بعد الضغط: TikTok بلا مقطعٍ ليست «جاهزةً للتوزيع».
+   */
+  readonly lacking?: string | null
 }
 
 export interface SpreadTarget {
@@ -129,6 +134,11 @@ export function planSpread(
 
     if (slots.length >= SPREAD_MAX) {
       skipped.push({ postId: draft.id, preview, reason: `فوق حدِّ ${SPREAD_MAX} في المرّة` })
+      continue
+    }
+
+    if (draft.lacking !== undefined && draft.lacking !== null) {
+      skipped.push({ postId: draft.id, preview, reason: draft.lacking })
       continue
     }
 

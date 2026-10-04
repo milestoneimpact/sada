@@ -12,6 +12,8 @@
 import { describe, expect, it } from 'vitest'
 import { SCRIPT } from './ui/panelScript'
 import { xWeightedLength } from '../lib/draft/length'
+import { presetAt, PRESETS } from '../lib/time/local'
+import { cutTitle } from '../lib/media/uploads'
 
 /** يُنتزَع من النصّ المُرسَل ويُبنى دالّةً — فما يُختبَر هو ما يُشحَن. */
 function clientCounter(): (text: string) => number {
@@ -234,6 +236,32 @@ describe('المعاينة', () => {
  * **وزرٌّ يعمل خطأً أسوأُ من زرٍّ لا يعمل**: هذا يُشتكى منه، وذاك يُظنّ
  * به أنّ الصفحةَ فارغة.
  */
+/**
+ * ‏**ومرساةُ جزءٍ من بطاقةٍ تنزل إلى البطاقة حين لا يُرسَم الجزء** (ر-6): «#s-…» نموذجُ
+ * ‏الجدولة لا يُرسَم لمعتمَدٍ بلا قناة، و«#i-…» لوحُ الصورة لا يُرسَم لمن له صورة. ومرساةٌ
+ * ‏لا تجد شيئًا كانت ترتدّ إلى الرئيسيّة — فيُقرأ الرابطُ معطوبًا. فتُنتزَع الدالّةُ وتُشغَّل.
+ */
+describe('مرساةُ الجزء ترجع إلى بطاقتها', () => {
+  const fn = /function target\(id\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT)
+  const run = (ids: readonly string[], id: string): string | null => {
+    if (fn === null) throw new Error('لم تُعثَر target في نصّ اللوحة — أنُقلت؟')
+    const document = { getElementById: (x: string) => (ids.includes(x) ? { id: x } : null) }
+    const target = new Function('document', `${fn[0]}\nreturn target`)(document) as (id: string) => { id: string } | null
+    return target(id)?.id ?? null
+  }
+
+  it('الجزءُ إن رُسم، وإلّا بطاقتُه', () => {
+    expect(run(['d-p1', 's-p1'], 's-p1')).toBe('s-p1')
+    expect(run(['d-p1'], 's-p1')).toBe('d-p1')
+    expect(run(['d-p1'], 'i-p1')).toBe('d-p1')
+  })
+
+  it('ولا يُخترَع لغير الأجزاء — «#write» تُطلَب كما هي', () => {
+    expect(run(['d-rite'], 'write')).toBeNull()
+    expect(run(['write'], 'write')).toBe('write')
+  })
+})
+
 describe('الشريطُ لا يخطف إلّا المراسي', () => {
   it('يُصفّي الروابطَ إلى ما يبدأ بمرساة', () => {
     expect(SCRIPT).toContain("(a.getAttribute('href')||'').charAt(0)==='#'")
@@ -245,6 +273,139 @@ describe('الشريطُ لا يخطف إلّا المراسي', () => {
     expect(order).toBe(true)
     expect(SCRIPT).toContain('tabs.forEach(function(t){t.addEventListener')
     expect(SCRIPT).not.toContain('all.forEach(function(t){t.addEventListener')
+  })
+})
+
+/**
+ * **والإشعارُ يطفو ويُغلَق** (الخطّة 7.8، رحلتا R-4 وR-5).
+ *
+ * الفعلُ يعود إلى بطاقته في وسط اللوح، والإشعارُ كان في رأس المحتوى: «الملفُّ ليس
+ * UTF-8» عند ‏-5747px. فيُنتزَع سلوكُه من النصّ المُرسَل ويُشغَّل على صفحةٍ مصغَّرة
+ * بساعةٍ يملكها الاختبار — المهلةُ والإيقافُ والإغلاقُ والخطأُ الذي لا يذهب وحدَه.
+ */
+describe('الإشعارُ العائم', () => {
+  const block = /  var flashBox=document\.getElementById\('flash'\);[\s\S]*?\n {2}\}\n/.exec(SCRIPT)
+
+  function mount(kind: 'ok' | 'warn' | 'bad', undo = false, hash = '') {
+    const on: Record<string, () => void> = {}
+    const attrs: Record<string, string> = {}
+    const box = new Set<string>()
+    // ‏`attached`: أفي المنطقة الحيّة الآن — يُفصَل ليُعاد إدراجُه فيُعلَن، ويُفصَل حين يُغلَق
+    const state = {
+      attached: true, inserts: 0, appended: [] as Record<string, unknown>[],
+      focused: null as string | null, focusOpts: null as unknown, tabindex: null as string | null,
+    }
+    const flash = {
+      classList: { add: (c: string) => box.add(c) },
+      querySelector: () => note,
+      removeChild: () => { state.attached = false },
+      appendChild: () => { state.attached = true; state.inserts += 1 },
+    }
+    const note = {
+      classList: { contains: (c: string) => c === kind },
+      setAttribute: (k: string, v: string) => { attrs[k] = v },
+      appendChild: (c: Record<string, unknown>) => { state.appended.push(c) },
+      querySelector: (sel: string) => (sel === 'form' && undo ? {} : null),
+      addEventListener: (ev: string, fn: () => void) => { on[ev] = fn },
+      get parentNode() { return state.attached ? flash : null },
+    }
+    const card = {
+      tabIndex: -1,
+      setAttribute: (k: string, v: string) => { if (k === 'tabindex') state.tabindex = v },
+      focus: (o: unknown) => { state.focused = 'card'; state.focusOpts = o },
+    }
+    const document = {
+      getElementById: (id: string) => (id === 'flash' ? flash : null),
+      createElement: () => {
+        const el: Record<string, unknown> = {}
+        el['setAttribute'] = (k: string, v: string) => { el[k] = v }
+        el['addEventListener'] = (ev: string, fn: () => void) => { el[`on${ev}`] = fn }
+        return el
+      },
+    }
+    // ‏و`target` من السكربت نفسِه: «#s-…» و«#d-…» إلى البطاقة
+    const target = (id: string) => (id === 'd-p1' ? card : null)
+    // ‏ساعةٌ يملكها الاختبار: لا انتظارَ حقيقيّ، ولا مؤقّتَ يتسرّب إلى غيره
+    let clock = 0
+    let seq = 0
+    const timers = new Map<number, { at: number; fn: () => void }>()
+    const setT = (fn: () => void, ms: number): number => { seq += 1; timers.set(seq, { at: clock + ms, fn }); return seq }
+    const clearT = (id: number): void => { timers.delete(id) }
+    const advance = (ms: number): void => {
+      clock += ms
+      for (const [id, t] of [...timers]) if (t.at <= clock) { timers.delete(id); t.fn() }
+    }
+    new Function('document', 'setTimeout', 'clearTimeout', 'target', 'location', block![0])(
+      document, setT, clearT, target, { hash })
+    return { box, attrs, on, state, advance, shut: state.appended[0] as Record<string, unknown> }
+  }
+
+  it('يُنتزَع من النصّ المُرسَل', () => {
+    expect(block).not.toBeNull()
+  })
+
+  it('يطفو، ومعه «أغلق» يُغلقه — وبلا فعلٍ يذهب بعد ستّ ثوانٍ', () => {
+    const t = mount('ok')
+    expect([...t.box]).toEqual(['toast'])
+    expect(t.shut['textContent']).toBe('أغلق')
+    expect(t.shut['aria-label']).toBe('أغلق الإشعار')
+    t.advance(5999)
+    expect(t.state.attached).toBe(true)
+    t.advance(1)
+    expect(t.state.attached).toBe(false)
+
+    const closed = mount('warn')
+    ;(closed.shut['onclick'] as () => void)()
+    expect(closed.state.attached).toBe(false)
+  })
+
+  /*
+   * ‏مراجعة ر-0 · D-100: **«تراجَع» لا عدّادَ له.** كان يذهب بعد عشر ثوانٍ، وهو البابُ الوحيدُ إلى
+   * ‏رفضٍ خاطئ، ولوحُ المفاتيح يبلغه بعشرين Shift+Tab. فيبقى حتّى يُغلَق، ويُعلَن، ويعيد «أغلق»
+   * ‏التركيزَ إلى البطاقة بلا تمرير — لا إلى `body`.
+   */
+  it('وما فيه «تراجَع» لا يذهب وحدَه، ويُعاد إدراجُه فيُعلَن، و«أغلق» يعيد التركيزَ إلى البطاقة', () => {
+    const t = mount('ok', true, '#d-p1')
+    // ‏يُفصَل ثمّ يُدرَج بعد التحميل: إضافةٌ في المنطقة الحيّة يقرؤها قارئُ الشاشة
+    expect(t.state.attached).toBe(false)
+    t.advance(150)
+    expect(t.state.attached).toBe(true)
+    expect(t.state.inserts).toBe(1)
+    t.advance(600_000)
+    expect(t.state.attached).toBe(true)
+    expect(t.state.focused).toBeNull()
+    ;(t.shut['onclick'] as () => void)()
+    expect(t.state.attached).toBe(false)
+    expect(t.state.focused).toBe('card')
+    expect(t.state.focusOpts).toEqual({ preventScroll: true })
+    expect(t.state.tabindex).toBe('-1')
+  })
+
+  it('ويقف العدُّ ما دام المؤشّرُ أو التركيزُ عليه، ثمّ يبدأ من جديد', () => {
+    const t = mount('ok')
+    t.advance(5000)
+    t.on['mouseenter']!()
+    t.advance(60_000)
+    expect(t.state.attached).toBe(true)
+    t.on['mouseleave']!()
+    t.advance(5999)
+    expect(t.state.attached).toBe(true)
+    t.on['focusin']!()
+    t.advance(60_000)
+    expect(t.state.attached).toBe(true)
+    t.on['focusout']!()
+    t.advance(6000)
+    expect(t.state.attached).toBe(false)
+  })
+
+  it('**والخطأُ لا يذهب وحدَه** — يُعلَن تنبيهًا ويبقى حتّى يُغلَق', () => {
+    const t = mount('bad')
+    expect(t.attrs['role']).toBe('alert')
+    t.advance(600_000)
+    expect(t.state.attached).toBe(true)
+    expect(t.state.inserts).toBe(1)
+    ;(t.shut['onclick'] as () => void)()
+    expect(t.state.attached).toBe(false)
   })
 })
 
@@ -351,5 +512,61 @@ describe('شريطُ المواعيد في الصفحة', () => {
 
   it('وسقوطُ التنسيق المحلّيّ لا يُسقِط الصفحة', () => {
     expect(SCRIPT).toContain("catch(e){mirror.textContent='';}")
+  })
+})
+
+/**
+ * **وأزرارُ صفّ المقطع تحسب كما تحسب أزرارُ البطاقة** (ر-4).
+ *
+ * تلك تحسب في المتصفّح وتكتب UTC في صندوق، وهذه ترسل اسمَ الموعد ويحسبه الخادمُ بتوقيت
+ * المالك من كعكته. **ونسختان تفترقان بلا حارس** (D-071): «غدًا 9:00 ص» في موضعٍ يصير
+ * العاشرةَ في الآخر. فتُشغَّل الاثنتان بمنطقة بيئة الاختبار وتُقارَنان.
+ */
+describe('أزرارُ المقطع على الخادم توافق أزرارَ البطاقة في المتصفّح', () => {
+  const { preset } = clientPresets()
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  it('الأربعةُ نفسُها، والموعدُ نفسُه في كلّ ساعةٍ من اليوم', () => {
+    expect(PRESETS.map((p) => p.kind)).toEqual(['hour', 'tonight', 'tomorrow', 'sunday'])
+    for (let day = 4; day <= 10; day += 1) {
+      for (let hour = 0; hour < 24; hour += 1) {
+        const now = new Date(2026, 9, day, hour, 31, 0)
+        for (const { kind } of PRESETS) {
+          const client = preset(now, kind)!
+          const server = presetAt(kind, now, zone)!
+          // ‏والخادمُ بدقّة الدقيقة: «بعد ساعة» تُقصّ ثوانيها
+          expect(Math.abs(server.getTime() - client.getTime()), `${kind} يوم ${day} ساعة ${hour}`).toBeLessThan(60_000)
+        }
+      }
+    }
+  })
+})
+
+/** **وعدّادُ عنوان YouTube يعدّ كما يقصّ الرفع** (ر-4). */
+describe('عدّادُ عنوان YouTube', () => {
+  function ytLine(): (v: string) => string {
+    const fn = /function ytLine\(v\)\{[^\n]*\}/.exec(SCRIPT)
+    if (fn === null) throw new Error('لم يُعثَر على ytLine في نصّ اللوحة')
+    return new Function(`${fn[0]}\nreturn ytLine`)() as (v: string) => string
+  }
+
+  it('يتجاوز الحدَّ حيث يقصّ الخادمُ وحده', () => {
+    const line = ytLine()
+    for (const text of ['', 'قصير', `  ${'ع'.repeat(100)}  \nوصف`, `${'ع'.repeat(101)}\nوصف`, `${'كلمة '.repeat(30)}`, '\n\nسطرٌ بعد فراغ']) {
+      expect(line(text).length > 100, JSON.stringify(text.slice(0, 20))).toBe(cutTitle(text) !== null)
+    }
+  })
+
+  it('ويُخفى إن أُزيل اختيارُ YouTube، ويقول القصَّ بكلمة لا بلونٍ وحده', () => {
+    expect(SCRIPT).toContain("input[name=platform][value=youtube]")
+    expect(SCRIPT).toContain('يُقصّ عند')
+  })
+})
+
+describe('ملفُّ الخطّة يُقرأ فورَ اختياره (ر-5)', () => {
+  it('اسمُه في اللصيقة ثمّ يُرسَل النموذجُ بحارسه', () => {
+    expect(SCRIPT).toContain("document.querySelectorAll('input[data-plan-file]')")
+    expect(SCRIPT).toContain('pick.textContent=f.name')
+    expect(SCRIPT).toContain('form.requestSubmit()')
   })
 })

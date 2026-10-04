@@ -34,6 +34,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var head=document.getElementById('pane-title');
   // ‏ولا لوحَ فلا تبديل: سطرٌ يرمي هنا كان يُسقط ما بعده كلَّه (D-160)
   var first=panes.length>0?panes[0].dataset.pane:null;
+  // ‏ومرساةُ جزءٍ من بطاقة («#s-…» نموذجُ جدولتها، «#i-…» لوحُ صورتها) لا تُرسَم على كلّ
+  // ‏بطاقة: معتمَدٌ بلا قناةٍ لا نموذجَ له، ومن له صورةٌ لا زرَّ توليد. فتنزل إلى البطاقة
+  // ‏نفسِها «#d-…» — لا ترتدّ إلى الرئيسيّة فيُقرأ الرابطُ معطوبًا (D-046)
+  function target(id){
+    var el=document.getElementById(id);
+    if(!el&&/^[si]-./.test(id))el=document.getElementById('d-'+id.slice(2));
+    return el;
+  }
   function show(id,push,focus){
     if(first===null)return;
     // ‏ومرساةُ ما في اللوح تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى البطاقة
@@ -41,7 +49,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏بعد الرفع و«#plan-import» من المعاينة و«#write» تُخفي الألواحَ كلَّها
     // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
     var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
-    var card=isPane?null:document.getElementById(id);
+    var card=isPane?null:target(id);
     var host=card?card.closest('section[data-pane]'):null;
     if(card&&!host){
       // ‏ومرساةٌ خارجَ الألواح («#main» من رابط التخطّي) لا تبدّل اللوحَ المفتوح:
@@ -176,6 +184,58 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);}
     });
   });
+
+  /*
+   * ‏والإشعارُ يطفو ويُغلَق (الخطّة 7.8).
+   *
+   * ‏الفعلُ يعود إلى بطاقته في وسط اللوح، والإشعارُ في رأس المحتوى — فكان يُكتب حيث
+   * ‏لا يُرى: «الملفُّ ليس UTF-8» عند ‏-5747px، والمالكُ يرى البطاقةَ نفسَها كأنّ شيئًا
+   * ‏لم يقع. فيطفو هنا، ومعه «أغلق». ويختفي وحدَه بعد ستّ ثوانٍ، ويقف العدُّ ما دام
+   * ‏المؤشّرُ أو التركيزُ أو الإصبعُ عليه (WCAG 2.2.1). **والخطأُ لا يذهب وحدَه**: يبقى
+   * ‏حتّى يُغلَق، ويُعلَن تنبيهًا.
+   *
+   * ‏**وما فيه نموذجٌ لا يذهب وحدَه كذلك** (مراجعة ر-0 · D-100). «تراجَع» البابُ الوحيدُ إلى
+   * ‏رفضٍ خاطئ، و«ولا عدّادَ ثوانٍ» قرارٌ مكتوب: نافذتُه نافذةُ الإشعار. وكانت عشرُ ثوانٍ تنفد
+   * ‏قبل أن يبلغه لوحُ المفاتيح — عشرون Shift+Tab من البطاقة. **وما بقي يُعلَن**: نصٌّ جاء مع
+   * ‏الصفحة لا يقرؤه قارئُ الشاشة، فيُعاد إدراجُه في المنطقة الحيّة بعد التحميل. و«أغلق» يعيد
+   * ‏التركيزَ إلى البطاقة بلا تمرير، لا إلى رأس الصفحة.
+   *
+   * ‏**وموضعُه بعد ربط «data-busy»**: نموذجُ «تراجَع» يُفصَل لحظةً ليُعاد إدراجُه، و«querySelectorAll»
+   * ‏لا يرى ما فُصل — فلو سبقه لأُرسل «تراجَع» مرّتين بنقرتين.
+   */
+  var flashBox=document.getElementById('flash');
+  if(flashBox){
+    flashBox.classList.add('toast');
+    var note=flashBox.querySelector('.flash');
+    if(note){
+      var bad=note.classList.contains('bad');
+      var keep=bad||!!note.querySelector('form');
+      if(bad)note.setAttribute('role','alert');
+      var shut=document.createElement('button');
+      shut.type='button'; shut.className='g sm toast-x'; shut.textContent='أغلق';
+      shut.setAttribute('aria-label','أغلق الإشعار');
+      note.appendChild(shut);
+      var timer=0;
+      var drop=function(){clearTimeout(timer); if(note.parentNode)note.parentNode.removeChild(note);};
+      shut.addEventListener('click',function(){
+        drop();
+        var back=target((location.hash||'').slice(1))||document.getElementById('main');
+        if(back){if(back.tabIndex<0)back.setAttribute('tabindex','-1'); back.focus({preventScroll:true});}
+      });
+      if(keep){
+        flashBox.removeChild(note);
+        setTimeout(function(){flashBox.appendChild(note);},150);
+      }else{
+        var arm=function(){clearTimeout(timer); timer=setTimeout(drop,6000);};
+        var hold=function(){clearTimeout(timer);};
+        note.addEventListener('mouseenter',hold); note.addEventListener('mouseleave',arm);
+        note.addEventListener('focusin',hold); note.addEventListener('focusout',arm);
+        note.addEventListener('touchstart',hold,{passive:true});
+        note.addEventListener('touchend',arm,{passive:true});
+        arm();
+      }
+    }
+  }
 
   // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا
   // يمنع التمرير، وبدونها يؤخّره المتصفّحُ احتياطا
@@ -782,6 +842,45 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       vfile.disabled=false; vfile.value='';
       if(bar)bar.hidden=true;
     });
+  });
+
+  /*
+   * ‏ملفُّ الخطّة يُقرأ فورَ اختياره (ر-5، خطّة التصميم 7.6): كان اختيارُه لا يغيّر شيئًا في
+   * ‏الشاشة، ثمّ يلزم زرٌّ ثانٍ «اقرأ الخطّة». فاسمُه في اللصيقة، ثمّ يُرسَل النموذجُ بحارس
+   * ‏«مشغول» نفسِه. والزرُّ يبقى لمن لا سكربتَ عنده.
+   */
+  document.querySelectorAll('input[data-plan-file]').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var f=inp.files&&inp.files[0], form=inp.form;
+      if(!f||!form)return;
+      var pick=inp.parentNode.querySelector('[data-plan-name]');
+      if(pick)pick.textContent=f.name;
+      if(form.requestSubmit)form.requestSubmit();
+      else{var b=form.querySelector('button[type=submit]'); if(b)b.click();}
+    });
+  });
+
+  /*
+   * ‏عدّادُ عنوان YouTube (ر-4): السطرُ الأوّلُ من نصّ المقطع عنوانُه، ويُقصّ عند حدّه عند
+   * ‏الرفع. كان الحدُّ في عنصرٍ نائبٍ يختفي مع أوّل حرف، والقصُّ لا يُقال قبل النشر ولا بعده.
+   * ‏فيُعَدّ بقاعدة الرفع نفسِها (‹youtubeTitle›: السطرُ الأوّلُ بلا فراغ طرفيه)، والحدُّ من
+   * ‏‹data-yt-title› لا من رقمٍ هنا، ويختفي إن أُزيل اختيارُ YouTube.
+   */
+  function ytLine(v){return (v.trim().split('\\n')[0]||'').trim();}
+  document.querySelectorAll('textarea[data-yt-title]').forEach(function(t){
+    var out=t.parentNode.querySelector('[data-yt-count]'); if(!out)return;
+    var max=+t.dataset.ytTitle||0, form=t.form;
+    var yt=form?form.querySelector('input[name=platform][value=youtube]'):null;
+    function tick(){
+      var n=ytLine(t.value).length, over=n>max;
+      out.hidden=n===0||(yt!==null&&!yt.checked);
+      // ‏الرقمان معزولان (LRI…PDI): «57 / 100» في سطرٍ عربيٍّ تنقلب «100 / 57» بلا عزل
+      out.textContent='عنوانُ YouTube: \\u2066'+n+' / '+max+'\\u2069'+(over?' — يُقصّ عند '+max+' محرف':'');
+      out.className=over?'st warn':'ago';
+    }
+    t.addEventListener('input',tick);
+    if(yt)yt.addEventListener('change',tick);
+    tick();
   });
 })();
 `

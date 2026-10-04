@@ -53,6 +53,20 @@ describe('التوزيع — والمعروضُ هو المنفَّذ', () => {
 })
 
 describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
+  /*
+   * **ومنشورٌ ينقصه وسيطُه يُقال في المعاينة** — لا يُعطى خانةً تردّها `schedulePost`
+   * بعد الضغط، ولا يأخذ موعدَ غيره: الخانةُ التاليةُ لمن يصلح.
+   */
+  it('منشورٌ ينقصه مقطعُه يُردّ بسببه ولا يأخذ خانة', () => {
+    const list: SpreadDraft[] = [
+      { id: 'tt', platform: 'linkedin', status: 'approved', text: 'بلا مقطع', lacking: 'TikTok تحتاج مقطعًا' },
+      ...drafts(1, 'linkedin'),
+    ]
+    const { slots, skipped } = planSpread(list, TARGETS, START, 24, NOW)
+    expect(slots.map((s) => [s.postId, s.when])).toEqual([['p0', '2026-09-08T06:00']])
+    expect(skipped).toEqual([{ postId: 'tt', preview: 'بلا مقطع', reason: 'TikTok تحتاج مقطعًا' }])
+  })
+
   it('منشورٌ بلا قناةٍ لمنصّته يُردّ بسببه', () => {
     const mixed: SpreadDraft[] = [
       ...drafts(1, 'linkedin'),

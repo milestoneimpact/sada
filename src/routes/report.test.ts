@@ -76,7 +76,8 @@ describe('الباب', () => {
   it('لا يُفتَح بلا جلسة', async () => {
     const response = await app.request('/panel/report', {}, env)
     expect(response.status).toBe(401)
-    expect(await response.text()).toContain('انتهت الجلسة')
+    // ‏صفحةُ دخولٍ تعود إلى التقرير — و«انتهت الجلسة» لمن سقطت جلستُه وحده (ر-11)
+    expect(await response.text()).toContain('name="next" id="login-next" value="/panel/report"')
   })
 
   it('وأسبوعٌ بلا تقريرٍ يقولها ولا يخترع أرقاما', async () => {
@@ -100,7 +101,9 @@ describe('ما يُعرَض', () => {
     const cookie = await login()
     const body = await (await app.request('/panel/report', { headers: { Cookie: cookie } }, env)).text()
 
-    expect(body).toContain('2026-08-24')
+    // ‏والعنوانُ مدًى بأسماء الشهور وآخرُه الأحد (خطّة التصميم ٥٫٨): لا «2026-08-24 — 2026-08-31»
+    expect(body).toContain('أسبوع 24 إلى 30 أغسطس')
+    expect(body).not.toContain('2026-08-24 — 2026-08-31')
     // **والنافذةُ باسمها لا بمفتاح CHECK** (D-124): كان الاختبارُ يثبّت «24h»
     expect(body).toContain('الأوّلُ في نافذة 24 ساعة')
     expect(body).not.toContain('نافذة 24h')

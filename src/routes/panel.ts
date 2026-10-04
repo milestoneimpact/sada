@@ -21,7 +21,7 @@ const BUILTIN_DOCS: Readonly<Record<string, string>> = {
   anthropic: 'console.anthropic.com ← API Keys',
   gemini: 'aistudio.google.com/apikey',
 }
-import { dailySpend, spendByProvider, spendTodayFor } from '../lib/ai/spend'
+import { dailySpend, spendByProvider, spendRows, spendThisMonth, spendTodayFor } from '../lib/ai/spend'
 import { verifyKey } from '../lib/ai/verify'
 import { listModels } from '../lib/ai/models'
 import { cfAccountId, cfAccountOf } from '../lib/ai/cloudflare'
@@ -30,12 +30,12 @@ import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '
 import { analyzeSource } from '../lib/analyze/job'
 import { draftPost } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
-import { approveMany, decide, listDrafts, undoReject } from '../lib/draft/store'
+import { approveMany, decide, listDrafts, undoApprove, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
 import { applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts } from '../lib/plan/import'
-import { planImportScreen } from './ui/planImportView'
+import { planImportExpired, planImportScreen } from './ui/planImportView'
 import { counted, NOUNS } from '../lib/format'
-import { platformLabel } from '../lib/oauth/providers'
+import { platformLabel, type PublishPlatform } from '../lib/oauth/providers'
 import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
 import { parseRange, resolveRange } from '../lib/media/range'
 import { soloNav } from './ui/rail'
@@ -51,9 +51,10 @@ import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
 import { versionAge } from '../lib/oauth/version'
 import { requeue, schedulePost, unschedule } from '../lib/schedule/job'
+import { missingMedia } from '../lib/schedule/media'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
-import { attemptsLeft, kb, money } from '../lib/format'
+import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
@@ -86,15 +87,15 @@ function readSpan(raw: string | null): number {
 }
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
-  loadSession, readCookie, revokeSessions, sessionCookie, type Session,
+  loadSession, readCookie, revokeSessions, safeNext, sessionCookie, type Session,
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
-import { CHANNELS, listAccounts, viewChannels } from '../lib/channels'
+import { CHANNELS, isLinkedInPage, listAccounts, SETUP, viewChannels } from '../lib/channels'
 import { accountHealth, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
 import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
-import { zoneOf } from '../lib/time/zone'
+import { clock, dayLabel, localParts, zoneOf } from '../lib/time/zone'
 import { backTo } from '../lib/nav/back'
 import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
@@ -102,6 +103,8 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
+import { cutTitle, privateReach, scheduleFromUpload } from '../lib/media/uploads'
+import { momentLabel, presetAt } from '../lib/time/local'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { filterOf, platformScreen, tabOf } from './ui/platformView'
@@ -144,10 +147,25 @@ async function hasPasskeys(env: Env): Promise<boolean> {
   }
 }
 
-/** صفحةُ دخولٍ برسالة. تُستعمل حين تسقط الجلسة في منتصف عمل. */
-async function loginResponse(env: Env, error: string, status = 401): Promise<Response> {
+/**
+ * صفحةُ الدخول لطلبٍ بلا جلسة — **تعود بالمالك إلى ما طلبه، وتقول «انتهت» لمن انتهت جلستُه وحده**.
+ *
+ * كانت تُنادى برسالةٍ ثابتة «انتهت الجلسة» لكلّ طلبٍ بلا جلسة، فيقرؤها من لم يدخل قطّ
+ * تحذيرًا برتقاليًّا. فالكعكةُ هي الفرق: من أرسل كعكةً سقطت انتهت جلستُه، ومن لم يرسل
+ * شيئًا يدخل أوّلَ مرّة. **والوجهةُ مسارُ الطلب نفسُه** إن كان صفحةً تُفتَح (`GET`)،
+ * ليعود إليها بعد الدخول لا إلى الرئيسيّة (ر-11). وفعلٌ (`POST`) سقطت جلستُه لا يُعاد
+ * إرسالُه — فالرئيسيّة.
+ */
+async function loginResponse(env: Env, request: Request, status = 401): Promise<Response> {
   const passkeys = await hasPasskeys(env)
-  return page((nonce) => loginPage({ error, passkeys }, nonce), status)
+  const url = new URL(request.url)
+  const opened = request.method === 'GET'
+  const next = opened ? safeNext(`${url.pathname}${url.search}`) : '/panel'
+  const lapsed = readCookie(request.headers.get('Cookie'), COOKIE) !== null
+  const error = !lapsed
+    ? undefined
+    : opened ? 'انتهت الجلسة. ادخل لتكمل من حيث توقّفت.' : 'انتهت الجلسة — أعد الدخول.'
+  return page((nonce) => loginPage({ ...(error === undefined ? {} : { error }), passkeys, next }, nonce), status)
 }
 
 /**
@@ -156,7 +174,7 @@ async function loginResponse(env: Env, error: string, status = 401): Promise<Res
  * لو حُمل في `?msg=` لصنع رابطا يعرض رسالةً ملفّقة لمن يفتحه — «تمّ
  * الحذف» مثلا. وهنا لا يكتبه إلا الخادم، ويُقرأ مرّةً ويُمحى.
  */
-async function setFlash(env: Env, request: Request, flash: PanelFlash): Promise<void> {
+export async function setFlash(env: Env, request: Request, flash: PanelFlash): Promise<void> {
   const id = readCookie(request.headers.get('Cookie'), COOKIE)
   if (id === null) return
   await env.KV.put(`flash:${id}`, JSON.stringify(flash), { expirationTtl: 60 })
@@ -192,7 +210,7 @@ async function guardPost(c: {
 }): Promise<{ denied: Response } | { form: FormData; session: Session }> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) {
-    return { denied: await loginResponse(c.env, 'انتهت الجلسة — أعد الدخول.') }
+    return { denied: await loginResponse(c.env, c.req.raw) }
   }
   // **وهذا هو ما يجعل العامل الثاني عاملا لا سؤالا يُتخطّى**: جلسةٌ لم
   // تُتمّه لا تغيّر شيئا، ولو نُودي المسار مباشرةً بلا مرورٍ بالشاشة
@@ -236,6 +254,58 @@ async function guardPost(c: {
 /** كلّ فعلٍ يعود إلى القسم الذي انطلق منه — لا إلى رأس الصفحة. */
 function back(hash: string): Response {
   return new Response(null, { status: 303, headers: { Location: `/panel#${hash}` } })
+}
+
+/**
+ * **وفعلٌ على بطاقةٍ يعود إلى البطاقة نفسِها** — لا إلى رأس «المنشورات».
+ *
+ * كان كلُّ فعلٍ على بطاقة يعيد `#posts`: قِيس في رحلة R-4 على الهاتف ‏8467px تمريرًا
+ * من ‏13931 في البحث عن البطاقة بعد كلّ «جدوِل»، وبعد «اعتمد» كان نموذجُ الجدولة الذي
+ * يطلبه الإشعارُ عند ‏2405px. فـ`d-<id>` رأسُ البطاقة، و`s-<id>` شريطُ جدولتها حين
+ * تكون الخطوةُ التالية موعدًا. و`show()` في سكربت اللوحة تنزل إلى أيّ معرّفٍ في اللوح.
+ *
+ * **والمعرّفُ يُفحَص قبل أن يُكتب في العنوان** — كما في `requeue`: ما ليس معرّفًا يعود
+ * إلى اللوح.
+ */
+function toCard(part: 'd' | 's', id: string): Response {
+  return /^[0-9a-f-]{8,}$/.test(id) ? back(`${part}-${id}`) : back('posts')
+}
+
+/** ‏نافذةُ «المنشورات»: ما ترسمه اللوحةُ بطاقاتٍ، وما يوزَّع منه، وما يُنزَل إليه — عددٌ واحد. */
+const BOARD = 60
+
+/**
+ * ‏**ولا يُنزَل إلى بطاقةٍ لم تُرسَم** (مراجعة ر-8).
+ *
+ * ‏اللوحةُ ترسم أحدثَ ‏`BOARD` منشورًا بتاريخ إنشائها، والإعادةُ لا تمسّ التاريخ. فمنشورٌ فشل
+ * ‏قبل أسابيع — أو بعد خطّةٍ بمئتي صفّ — لا مرساةَ له، و`show()` لا تجد شيئًا فترتدّ إلى
+ * ‏الرئيسيّة وإشعارُها يقول «اختر له موعدًا» ولا نموذج. فالبطاقةُ إن كانت في النافذة نفسِها
+ * ‏التي تقرؤها اللوحة — **بـ`listDrafts` ذاتِها لا بعدٍّ يقاربها** — وإلّا فالمسارُ يختار غيرَها.
+ */
+async function onBoard(db: Env['DB'], id: string): Promise<boolean> {
+  return (await listDrafts(db, BOARD)).some((d) => d.id === id)
+}
+
+/** ‏رحلةُ المنشور — موضعٌ يُرسَم لكلّ منشورٍ أيًّا كان عمرُه (D-104). */
+function toJourney(id: string): Response {
+  return /^[0-9a-f-]{8,}$/.test(id)
+    ? new Response(null, { status: 303, headers: { Location: `/panel/journey/${id}` } })
+    : back('posts')
+}
+
+/**
+ * موعدٌ كما يقرؤه المالك — **بتوقيته، وUTC بجانبه نصًّا ثانويًّا** (الخطّة 8.2 و8.3).
+ *
+ * كان إشعارُ الجدولة «في 2026-10-05 06:00:00 UTC» لمن ضغط «غدا 9ص» في الرياض: الردُّ
+ * الوحيدُ على فعله ساعةٌ أخرى بالثواني، فيبدو ما حُفظ خطأً. **والمنطقةُ من كعكة
+ * `sada_tz`** (D-173)؛ وإن غابت قيل «بتوقيت UTC» صراحةً ولا يُفسَّر الوقتُ بمنطقةٍ مفترَضة.
+ */
+function ownerWhen(at: string, zone: string | null, now: Date): string {
+  const date = parseSqliteUtc(at)
+  if (date === null) return at
+  const year = localParts(date, zone).year !== localParts(now, zone).year
+  const local = `${dayLabel(date, zone, year)} ${clock(date, zone)}`
+  return zone === null ? `${local} بتوقيت UTC` : `${local} بتوقيتك (${clock(date, null)} UTC)`
 }
 
 interface SourceRow {
@@ -313,11 +383,7 @@ panel.get('/panel/pivot.csv', async (c) => {
 
 panel.get('/panel', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) {
-    const rp = relyingParty(c.env.PUBLIC_BASE_URL)
-    const factors = await factorState(c.env.DB, rp.id)
-    return page((nonce) => loginPage({ passkeys: factors.passkeys.length > 0 }, nonce), 200)
-  }
+  if (session === null) return loginResponse(c.env, c.req.raw, 200)
   // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
@@ -369,6 +435,8 @@ panel.get('/panel', async (c) => {
     spend = {}
   }
   const series = (await dailySpend(c.env.DB, 14)).map((d) => ({ day: d.day, total: d.total }))
+  // ‏«هذا الشهر» بتوقيت المالك من كعكة متصفّحه (D-173) — لا من إعدادٍ يُخزَّن
+  const spendMonth = await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date())
 
   // حال كلّ مزوّد: مدمَجا كان أو مضافا من اللوحة
   const stored = await listProviders(c.env.DB)
@@ -406,7 +474,7 @@ panel.get('/panel', async (c) => {
     }),
   )
   const routes = await readRoutes(c.env.DB)
-  const drafts = await listDrafts(c.env.DB, 60)
+  const drafts = await listDrafts(c.env.DB, BOARD)
   const media = await mediaFor(c.env.DB, drafts.map((d) => d.id))
 
   /*
@@ -539,6 +607,9 @@ panel.get('/panel', async (c) => {
       // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
       env: c.env.SADA_ENV,
       paused: allowance.settings.paused,
+      // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
+      draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
+      zone: zoneOf(c.req.header('Cookie') ?? null),
       autoEnqueue: allowance.settings.autoEnqueue,
       imageOverlay: allowance.settings.imageOverlay,
       // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
@@ -551,7 +622,9 @@ panel.get('/panel', async (c) => {
       usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
       videoCap: allowance.settings.dailyVideoCap,
       usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
-      spend30d: Object.values(spend).reduce((sum, e) => sum + (e?.total ?? 0), 0),
+      // ‏من الدفتر كلِّه والاسمُ من المزوّدين حيث وُجد (ر-10): X يُحاسَب على كلّ طلب
+      spendBy: spendRows(spend, Object.fromEntries(providerCards.map((p) => [p.name, p.label]))),
+      spendMonth,
       series,
       sources,
       providers: providerCards,
@@ -615,10 +688,10 @@ panel.get('/panel', async (c) => {
       targets: channels.flatMap((c) =>
         c.spec.built
           ? c.accounts
-              .filter((a) => a.status === 'active' && a.kind !== 'org')
+              .filter((a) => a.status === 'active' && !isLinkedInPage(a))
               .map((a) => ({
                 id: a.id,
-                platform: c.spec.id as 'linkedin' | 'x',
+                platform: c.spec.id as PublishPlatform,
                 label: `${a.displayName} · ${c.spec.label}`,
               }))
           : [],
@@ -636,7 +709,7 @@ panel.get('/panel', async (c) => {
           (c) =>
             c.spec.built &&
             c.accounts.some((a) => a.status === 'active') &&
-            !c.accounts.some((a) => a.status === 'active' && a.kind !== 'org'),
+            !c.accounts.some((a) => a.status === 'active' && !isLinkedInPage(a)),
         )
         .map((c) => c.spec.id),
       writableSources: sources
@@ -696,6 +769,16 @@ panel.get('/panel', async (c) => {
 })
 
 /**
+ * ‏`GET /panel/login` — **صفحةُ كلمةٍ خاطئةٍ أُعيد تحميلُها**.
+ *
+ * تُرسَم صفحةُ الدخول ردًّا على `POST /panel/login`، فيبقى عنوانُها في الشريط. وإعادةُ
+ * تحميلها على الهاتف، أو فتحُ التبويب من جديد، تطلبه `GET` — وكان `{"error":"not_found"}`
+ * خامًّا. فيعود إلى الصفحة التي طُلبت (`?next=` في عنوان النموذج)، أو إلى الرئيسيّة —
+ * وهناك صفحةُ الدخول إن لم تكن جلسة. ولا يُعاد إرسالُ كلمةٍ بإعادة التحميل.
+ */
+panel.get('/panel/login', (c) => c.redirect(safeNext(c.req.query('next')), 303))
+
+/**
  * الدخول — بحدٍّ للمحاولات.
  *
  * والتأخير قبل الردّ متصاعد لا رفضٌ فوريّ: زمنُ الردّ نفسه يخبر المخمّن
@@ -707,10 +790,14 @@ panel.post('/panel/login', async (c) => {
       ? 'الدخول موقوف مؤقتا: محاولاتٌ كثيرة من عناوين شتّى. انتظر ربع ساعة.'
       : 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
 
+  // ‏والوجهةُ قبل كلّ ردّ: كلُّ صفحةِ دخولٍ تُرسَم ثانيةً تحملها، فلا تضيع بكلمةٍ خاطئة (ر-11)
+  const form = await c.req.formData().catch(() => new FormData())
+  const next = safeNext(String(form.get('next') ?? '') || (c.req.query('next') ?? ''))
+
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
     return page(
-      (nonce) => loginPage({ error: blockedText(state.globalBlock), blocked: true }, nonce),
+      (nonce) => loginPage({ error: blockedText(state.globalBlock), blocked: true, next }, nonce),
       429,
     )
   }
@@ -720,12 +807,11 @@ panel.post('/panel/login', async (c) => {
   const reserved = await reserveAttempt(c.env.DB, c.req.raw)
   if (!reserved.allowed) {
     return page(
-      (nonce) => loginPage({ error: blockedText(false), blocked: true }, nonce),
+      (nonce) => loginPage({ error: blockedText(false), blocked: true, next }, nonce),
       429,
     )
   }
 
-  const form = await c.req.formData()
   // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
   // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
@@ -735,7 +821,7 @@ panel.post('/panel/login', async (c) => {
     c.env.ADMIN_TOKEN,
     String(form.get('token') ?? ''),
     c.req.raw,
-    { pending: factors.enforced },
+    { pending: factors.enforced, next },
   )
 
   if ('error' in result) {
@@ -746,6 +832,7 @@ panel.post('/panel/login', async (c) => {
             {
               error: 'كلمةُ الإدارة (ADMIN_TOKEN) غير مضبوطة على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
               passkeys: factors.passkeys.length > 0,
+              next,
             },
             nonce,
           ),
@@ -770,6 +857,7 @@ panel.post('/panel/login', async (c) => {
               : `كلمةُ الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
             blocked: after.blocked,
             passkeys: factors.passkeys.length > 0,
+            next,
           },
           nonce,
         ),
@@ -791,7 +879,8 @@ panel.post('/panel/login', async (c) => {
   return new Response(null, {
     status: 303,
     headers: {
-      Location: factors.enforced ? '/panel/2fa' : '/panel',
+      // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createSession`)، لا في العنوان
+      Location: factors.enforced ? '/panel/2fa' : next,
       'Set-Cookie': sessionCookie(result.id),
     },
   })
@@ -1070,6 +1159,7 @@ panel.post('/panel/channels/app', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
     return back('channels')
   }
+  const label = platformLabel(platform)
 
   const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
   let flash: PanelFlash
@@ -1086,9 +1176,10 @@ panel.post('/panel/channels/app', async (c) => {
     detail = result.unchanged ? 'unchanged' : 'saved'
     flash = {
       kind: 'ok',
+      // ‏باسم المنصّة لا بمعرّفها («أسرارُ tiktok»)، والفعلُ التالي باسمه كما على الزرّ
       text: result.unchanged
-        ? `أسرارُ ${platform} محفوظةٌ كما هي — السرُّ نفسه لم يتغيّر.`
-        : `حُفظت أسرارُ ${platform} مشفَّرة (${result.hint}). جرّب «اربط» الآن.`,
+        ? `أسرارُ ${label} محفوظةٌ كما هي — السرُّ نفسه لم يتغيّر.`
+        : `حُفظت أسرارُ ${label} مشفَّرة (${result.hint}). والخطوةُ التالية «اربط ${label}».`,
     }
   } catch (error) {
     detail = 'failed'
@@ -1101,8 +1192,17 @@ panel.post('/panel/channels/app', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('channels')
+  return toSetup(form)
 })
+
+/**
+ * ‏**أفعالُ ضبط التطبيق تعود إلى تبويب الإعداد** (ر-1) — من حقل `return` في النموذج،
+ * ‏كما يعود «أعده إلى المعتمَد». كانت تنتهي بلوح القنوات: الإشعارُ هناك، و«اربط» بعد
+ * ‏شاشتين، والحقلان لم يعودا على الصفحة إن ردّ الخادمُ القيمة.
+ */
+function toSetup(form: FormData): Response {
+  return new Response(null, { status: 303, headers: { Location: backTo(form.get('return'), '/panel#channels') } })
+}
 
 /** حذفُ التطبيق من الخزانة — ولا يمسّ ما في أسرار Worker. */
 /**
@@ -1131,12 +1231,13 @@ panel.post('/panel/channels/app/verify', async (c) => {
     platform,
     c.env as unknown as Record<string, string | undefined>,
   )
+  const label = platformLabel(platform)
   if (creds === null) {
     await setFlash(c.env, c.req.raw, {
       kind: 'bad',
-      text: `لا أسرارَ محفوظةً لـ ${platform} — احفظها أوّلا ثمّ افحص.`,
+      text: `لا أسرارَ محفوظةً لـ ${label} — احفظها أوّلا ثمّ افحص.`,
     })
-    return back('channels')
+    return toSetup(gate.form)
   }
 
   const verdict = await verifyAppCredentials(
@@ -1144,41 +1245,44 @@ panel.post('/panel/channels/app/verify', async (c) => {
     { clientId: creds.clientId, clientSecret: creds.clientSecret },
   )
 
-  // **ونصُّ المزوّد يُعرَض ولا يُبنى عليه حكم** (D-054)
-  const said =
-    verdict.kind === 'unsupported' || verdict.kind === 'inconclusive'
-      ? verdict.detail
-      : verdict.description === undefined
-        ? verdict.code
-        : `${verdict.code} — ${verdict.description}`
-
+  /*
+   * ‏**والإشعارُ بلغة المالك وبوّابةِ منصّته** (ر-1): كان يقول «تبويب Auth» لكلّ منصّة —
+   * ‏ولا تبويبَ بهذا الاسم عند Meta وTikTok وGoogle — ويكتب «**تعرفه**» بنجمتيه (الإشعارُ
+   * ‏يُهرَّب)، ويلصق `TypeError` خامًّا حين لا تُبلَغ المنصّة. فالبوّابةُ من دليلها،
+   * ‏ورمزُ المنصّة الخامُّ في سجلّ التدقيق (`detail`) لا في وجه المالك.
+   */
+  const portal = SETUP[platform]?.portalLabel ?? label
+  const plain = (text: string): string => text.replaceAll('**', '')
+  // ‏ونصُّ المنصّة يُعرَض ولا يُبنى عليه حكم (D-054) — وصفُها لا رمزُها
+  const said = verdict.kind === 'bad_secret' || verdict.kind === 'bad_client_id'
+    ? verdict.description === undefined ? '' : ` وردّت: «${verdict.description}».`
+    : ''
   let flash: PanelFlash
   if (verdict.kind === 'bad_secret') {
     flash = {
       kind: 'bad',
       text:
-        `السرُّ مرفوض. المعرّفُ ${creds.clientId} **تعرفه** ${platform}، ` +
-        `والسرُّ لا يوافقه — ردّت «${said}». ` +
-        'ولّد سرّا جديدا في تبويب Auth والصقه في اللحظة التي يظهر فيها.',
+        `السرُّ مرفوض: ${label} تعرف المعرّف ${creds.clientId} ولا تقبل السرَّ معه.${said} ` +
+        `انسخ السرَّ من جديد من ${portal} — أو ولّد سرًّا جديدًا هناك — والصقه في حقل Client Secret.`,
     }
   } else if (verdict.kind === 'bad_client_id') {
     flash = {
       kind: 'bad',
       text:
-        `المعرّفُ نفسُه مجهولٌ عند ${platform}: أُرسل ${creds.clientId} وردّت «${said}». ` +
-        'فهو تطبيقٌ آخرُ أو حرفٌ ساقط — انسخه من تبويب Auth.',
+        `المعرّفُ نفسُه مجهولٌ عند ${label}: أُرسل ${creds.clientId}.${said} فهو من تطبيقٍ آخر أو نقصه حرف — ` +
+        `انسخه من جديد من ${portal} والصقه في حقل Client ID.`,
     }
   } else if (verdict.kind === 'accepted') {
     flash = {
       kind: 'ok',
-      text:
-        `الزوجُ مقبولٌ عند ${platform} — جاز التوثيق («${said}»). ` +
-        'فإن بقي الربطُ يفشل فالعلّةُ ليست في المعرّف ولا في السرّ.',
+      text: `الزوجُ مقبولٌ عند ${label}. فإن بقي الربطُ يفشل فالعلّةُ ليست في المعرّف ولا في السرّ.`,
     }
   } else if (verdict.kind === 'unsupported') {
-    flash = { kind: 'warn', text: `لا فحصَ لهذه المنصّة: ${said}` }
+    flash = { kind: 'warn', text: `لا فحصَ لـ ${label}: ${plain(verdict.detail)}` }
+  } else if (verdict.unreachable === true) {
+    flash = { kind: 'warn', text: `لم نصل إلى ${label} الآن، فلم يُحسَم الفحص. أعد الفحص بعد دقيقة.` }
   } else {
-    flash = { kind: 'warn', text: `لم يُحسَم الفحص: ${said}. ولا يُدَّعى حكمٌ بلا دليل.` }
+    flash = { kind: 'warn', text: `لم يُحسَم الفحص: ${plain(verdict.detail)}` }
   }
 
   // **والأثرُ يُحفَظ ليقرأه المعالج** — نتيجةٌ تُنسى عند كلّ فتحةٍ
@@ -1190,7 +1294,7 @@ panel.post('/panel/channels/app/verify', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('channels')
+  return toSetup(gate.form)
 })
 
 panel.post('/panel/channels/app/delete', async (c) => {
@@ -1211,9 +1315,9 @@ panel.post('/panel/channels/app/delete', async (c) => {
   )
   await setFlash(c.env, c.req.raw, {
     kind: done ? 'ok' : 'bad',
-    text: done ? `حُذفت أسرارُ ${platform} من الخزانة.` : 'لا أسرارَ محفوظةً لهذه المنصّة.',
+    text: done ? `حُذفت أسرارُ ${platformLabel(platform)} من الخزانة.` : 'لا أسرارَ محفوظةً لهذه المنصّة.',
   })
-  return back('channels')
+  return toSetup(gate.form)
 })
 
 // ── الخطّة الأسبوعيّة ─────────────────────────────────────────────────
@@ -1370,7 +1474,8 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  // ‏والصورةُ المولَّدةُ في بطاقتها: كان المالكُ يعود إلى رأس اللوح والصورةُ عند ‏2442px
+  return toCard('d', id)
 }
 
 /**
@@ -1427,7 +1532,7 @@ panel.post('/panel/media/animate', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  return toCard('d', id)
 })
 
 /** رفضُ صورة — تبقى بكلفتها ولا تُحذف بايتاتُها. */
@@ -1435,6 +1540,11 @@ panel.post('/panel/media/reject', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const id = String(gate.form.get('id') ?? '')
+  // ‏والمعرّفُ معرّفُ الصورة، والعودةُ إلى بطاقة منشورها
+  const owner = await c.env.DB
+    .prepare('SELECT post_id FROM media WHERE id = ?')
+    .bind(id)
+    .first<{ post_id: string }>()
 
   const done = await rejectMedia(c.env.DB, id)
   await record(
@@ -1446,7 +1556,7 @@ panel.post('/panel/media/reject', async (c) => {
     kind: done ? 'ok' : 'bad',
     text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورةَ بهذه الحال.',
   })
-  return back('posts')
+  return owner === null ? back('posts') : toCard('d', owner.post_id)
 })
 
 /**
@@ -1468,7 +1578,7 @@ panel.post('/panel/media/reject', async (c) => {
  */
 panel.get('/panel/channels/:platform', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const id = c.req.param('platform')
@@ -1571,7 +1681,8 @@ async function ownerFacts(c: {
   }
 
   const accounts = await listAccounts(c.env.DB)
-  const apps = await appStatuses(c.env.DB, env, ['linkedin', 'x', 'youtube', 'tiktok'])
+  // ‏كلُّ منصّةٍ لها سرّان (D-142) — وكانت Instagram خارجها، فمهمّتُها لا تعرف أنّ سرّيها حُفظا
+  const apps = await appStatuses(c.env.DB, env)
   const ownerSettings = await readSettings(c.env.DB)
 
   let anyPublished = false
@@ -1623,7 +1734,7 @@ async function ownerFacts(c: {
  */
 panel.get('/panel/tasks', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const gates = gatesOf(await readGateFacts(c.env.DB))
@@ -1656,7 +1767,7 @@ panel.get('/panel/tasks', async (c) => {
  */
 panel.get('/panel/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const reports = await listReports(c.env.DB)
@@ -1667,6 +1778,8 @@ panel.get('/panel/report', async (c) => {
     suggestions: await openSuggestions(c.env.DB),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
+    // ‏ما أُنفق هذا الشهر حتّى اليوم، تحت الرأس (ر-10) — حيٌّ من الدفتر لا من التقرير
+    month: await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date()),
   })
 
   return page((nonce) =>
@@ -1683,7 +1796,7 @@ panel.get('/panel/report', async (c) => {
  */
 panel.get('/panel/journey/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const journey = await readJourney(c.env.DB, c.req.param('id'))
@@ -1705,7 +1818,7 @@ panel.get('/panel/journey/:id', async (c) => {
 /** تقريرُ أسبوعٍ بعينه — بمفتاحه، وهو أوّلُ يومٍ فيه. */
 panel.get('/panel/report/:week', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const stored = await readReport(c.env.DB, c.req.param('week'))
@@ -1718,6 +1831,7 @@ panel.get('/panel/report/:week', async (c) => {
     suggestions: await openSuggestions(c.env.DB),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
+    month: await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date()),
   })
 
   return page((nonce) =>
@@ -1844,7 +1958,7 @@ panel.post('/panel/drafts/write', async (c) => {
    */
   if (!(raw in PLATFORMS)) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
-    return back('posts')
+    return back('write')
   }
   const platform = raw as Platform
 
@@ -1861,7 +1975,8 @@ panel.post('/panel/drafts/write', async (c) => {
           text: `كُتبت مسوّدة ${PLATFORMS[platform].label} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
         }
       : outcome.kind === 'already'
-        ? { kind: 'ok', text: 'سُوّدت هذه النسخةُ لهذه المنصّة — لم يُنفَق شيء.' }
+        // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)
+        ? { kind: 'ok', text: `مسوّدةُ ${PLATFORMS[platform].label} من هذه النسخة موجودةٌ وهي هذه — لم يُنفَق شيء.` }
         : outcome.kind === 'blocked'
           ? { kind: 'warn', text: outcome.reason }
           : outcome.kind === 'not_analyzed'
@@ -1873,8 +1988,12 @@ panel.post('/panel/drafts/write', async (c) => {
     { actor: 'panel', action: 'draft.write', target: `${id}:${platform}`, detail: outcome.kind },
     c.req.raw,
   )
+  // ‏و«موجودةٌ وهي هذه» لمسوّدةٍ خارجَ النافذة — كُتبت من النسخة نفسِها قبل أسابيع — لا بطاقةَ لها:
+  // ‏فرحلتُها تُريها بنصّها وحالها، والإشعارُ لا يُكتب لصفحةٍ لا تقرؤه فيظهر بعدها في غير موضعه
+  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, outcome.postId))) return toJourney(outcome.postId)
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  // ‏والمسوّدةُ الجديدةُ في بطاقتها لا عند رأس اللوح، وما لم يُكتب يعود إلى نموذج الكتابة
+  return outcome.kind === 'drafted' || outcome.kind === 'already' ? toCard('d', outcome.postId) : back('write')
 })
 
 /**
@@ -1913,8 +2032,11 @@ panel.post('/panel/drafts/decide', async (c) => {
           kind: 'ok',
           text:
             result.status === 'edited'
-              ? 'اعتُمدت بنصّك بعد التعديل — اختر لها حسابا وموعدا لتدخل الطابور.'
-              : 'اعتُمدت كما كُتبت — اختر لها حسابا وموعدا لتدخل الطابور.',
+              ? 'اعتُمدت بنصّك بعد التعديل — اختر لها حسابًا وموعدًا.'
+              : 'اعتُمدت كما كُتبت — اختر لها حسابًا وموعدًا.',
+          // ‏والاعتمادُ يُتراجَع عنه كالرفض (الخطّة 7.8): «ارفض» على بُعد ‏8px من «اعتمد»،
+          // ‏والضغطةُ الخاطئةُ كانت تُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة
+          undo: { action: '/panel/drafts/undo-approve', id, label: 'تراجَع' },
         }
 
   await record(
@@ -1928,7 +2050,8 @@ panel.post('/panel/drafts/decide', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  // ‏المعتمَدةُ تنتظر موعدًا، فالعودةُ إلى شريط جدولتها؛ وما سواها إلى رأس بطاقتها
+  return toCard(result.ok && result.status !== 'rejected' ? 's' : 'd', id)
 })
 
 /**
@@ -1960,7 +2083,34 @@ panel.post('/panel/drafts/undo-reject', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  return toCard('d', id)
+})
+
+/**
+ * التراجعُ عن اعتماد (الخطّة 7.8) — **والحكمُ في `undoApprove`**: لا يُسحب ما جُدول،
+ * وإشعارٌ شاخ لا يقلب حالًا تبدّلت بعده. والمسارُ ينقل ويكتب السجلّ، **ولا يقرّر**.
+ */
+panel.post('/panel/drafts/undo-approve', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+
+  const id = String(gate.form.get('id') ?? '')
+  const result = await undoApprove(c.env.DB, id)
+
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'draft.undo_approve',
+      target: id,
+      detail: result.ok ? 'restored' : `refused:${result.reason}`,
+    },
+    c.req.raw,
+  )
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: 'عادت مسوّدةً تنتظر قرارك، بنصّها قبل الاعتماد.' }
+    : { kind: 'bad', text: `تعذّر التراجع: ${result.reason}` })
+  return toCard('d', id)
 })
 
 /**
@@ -2044,20 +2194,29 @@ panel.post('/panel/drafts/schedule', async (c) => {
   const form = gate.form
 
   const id = String(form.get('id') ?? '')
+  const now = new Date()
   const result = await schedulePost(
     c.env.DB,
     id,
     String(form.get('account') ?? ''),
     String(form.get('when') ?? ''),
-    new Date(),
+    now,
   )
 
-  const flash: PanelFlash = result.ok
+  let flash: PanelFlash = result.ok
     ? {
         kind: 'ok',
-        text: `جُدولت إلى ${result.account} في ${result.at} UTC. وتخرج في أوّل دورةٍ بعد موعدها.`,
+        text: `جُدولت على ${platformLabel(result.platform)} (${result.account}) ${
+          ownerWhen(result.at, zoneOf(c.req.header('Cookie') ?? null), now)}.`,
       }
     : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}` }
+
+  // ‏YouTube وTikTok يصلان خاصَّين (ر-4): يُقال في إشعار الجدولة، لا في صفحة المنصّة وحدها
+  const scheduled = result.ok
+    ? await c.env.DB.prepare('SELECT platform FROM posts WHERE id = ?').bind(id).first<{ platform: string }>()
+    : null
+  const reach = scheduled === null ? null : privateReach([scheduled.platform])
+  if (reach !== null) flash = { ...flash, text: `${flash.text} ${reach}` }
 
   await record(
     c.env.DB,
@@ -2070,7 +2229,8 @@ panel.post('/panel/drafts/schedule', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  // ‏المجدولةُ إلى بطاقتها وموعدُها فيها، والمردودةُ إلى نموذجها حيث يُصلَح ما رُدّ
+  return toCard(result.ok ? 'd' : 's', id)
 })
 
 /**
@@ -2094,6 +2254,21 @@ function readStart(raw: unknown, now: Date): Date {
 }
 
 /**
+ * ما ينقص كلَّ معتمَدٍ من وسيط — **بالدالّة التي تحكم بها `schedulePost`** وبطاقتُه.
+ * فالمعاينةُ تقول «TikTok تحتاج مقطعًا» بجانب المنشور، ولا تَعِد بخانةٍ يردّها التنفيذ.
+ */
+async function lackingOf(db: Env['DB'], drafts: readonly { id: string; platform: string; status: string }[]): Promise<Map<string, string>> {
+  const approved = drafts.filter((d) => d.status === 'approved' || d.status === 'edited')
+  const media = await mediaFor(db, approved.map((d) => d.id))
+  const out = new Map<string, string>()
+  for (const d of approved) {
+    const why = missingMedia(d.platform, media.filter((m) => m.postId === d.id && m.status === 'ready').map((m) => m.mime))
+    if (why !== null) out.set(d.id, why)
+  }
+  return out
+}
+
+/**
  * توزيعُ المعتمَد — **معاينةٌ أوّلا** (D-089).
  *
  * ولا يكتب هذا المسارُ شيئا. يقرأ ويحسب ويعرض، **والتنفيذُ في مسارٍ
@@ -2104,16 +2279,17 @@ panel.post('/panel/drafts/spread', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
-  const drafts = await listDrafts(c.env.DB, 60)
+  const drafts = await listDrafts(c.env.DB, BOARD)
   const accounts = await listAccounts(c.env.DB)
   const targets = accounts
-    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
 
   const now = new Date()
   const gap = readGap(gate.form.get('gap'))
+  const lacking = await lackingOf(c.env.DB, drafts)
   const plan = planSpread(
-    drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+    drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     readStart(gate.form.get('start'), now),
     gap,
@@ -2146,20 +2322,21 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   const now = new Date()
   const gap = readGap(gate.form.get('gap'))
 
-  const drafts = await listDrafts(c.env.DB, 60)
+  const drafts = await listDrafts(c.env.DB, BOARD)
   const accounts = await listAccounts(c.env.DB)
   const targets = accounts
-    .filter((a) => a.status === 'active' && a.kind !== 'org')
+    .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
 
   // **وما لم يُعرَض لا يُنفَّذ**: القائمةُ تُقصر على ما حمله النموذج
   // بترتيبه، فمسوّدةٌ اعتُمدت بين المعاينة والتنفيذ لا تدخل خِلسة
   const wantedSet = new Set(wanted)
+  const lacking = await lackingOf(c.env.DB, drafts)
   const plan = planSpread(
     drafts
       .filter((d) => wantedSet.has(d.id))
       .sort((a, b) => wanted.indexOf(a.id) - wanted.indexOf(b.id))
-      .map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text })),
+      .map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     readStart(gate.form.get('start'), now),
     gap,
@@ -2167,24 +2344,34 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   )
 
   let done = 0
+  let first: string | null = null
   const failed: string[] = []
   for (const slot of plan.slots) {
     const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date())
-    if (result.ok) done += 1
-    else failed.push(result.reason)
+    if (result.ok) {
+      done += 1
+      first ??= result.at
+    } else failed.push(result.reason)
   }
 
+  // ‏والعددُ بمعدوده (الخطّة 8.3)، وأوّلُ موعدٍ بتوقيت المالك لا بـ UTC (8.2)
+  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const said = first === null
+    ? ''
+    : done === 1
+      ? `جُدول منشورٌ واحد: ${ownerWhen(first, zone, now)}.`
+      : `جُدول ${counted(done, NOUNS.post)}، أوّلُها ${ownerWhen(first, zone, now)}.`
   const missing = wanted.length - plan.slots.length
   const flash: PanelFlash =
     done === 0
       ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed[0] ?? 'لم تعد أيُّ مسوّدةٍ صالحةً للجدولة.'}` }
       : failed.length === 0 && missing === 0
-        ? { kind: 'ok', text: `جُدول ${done} منشورا، كلُّ ${gap} ساعةً واحد.` }
+        ? { kind: 'ok', text: said }
         : {
             kind: 'warn',
             text:
-              `جُدول ${done} منشورا. ` +
-              (missing > 0 ? `و${missing} لم تعد صالحةً للجدولة. ` : '') +
+              `${said} ` +
+              (missing > 0 ? `و${missing === 1 ? 'واحدةٌ لم تعد صالحة' : `${missing} لم تعد صالحةً`} للجدولة. ` : '') +
               (failed.length > 0 ? `وردَّ ${failed.length}: ${failed[0]}` : ''),
           }
 
@@ -2221,14 +2408,22 @@ panel.post('/panel/drafts/unschedule', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   const to = backTo(gate.form.get('return'), '')
-  return to === '' ? back('posts') : new Response(null, { status: 303, headers: { Location: to } })
+  // ‏ومن اللوحة: المسحوبةُ إلى نموذج جدولتها — وهو ما يحتاجه من سحب ليغيّر الموعد
+  if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
+  return toCard(result.ok ? 's' : 'd', id)
 })
 
 /**
  * إعادةُ الفاشل أو العالق إلى «معتمَد» — والحارسُ في `requeue` لا هنا.
  *
- * ويعود المالكُ إلى بطاقته في المنشورات: صار معتمَدا ينتظر موعدا، وهناك
- * يُجدوَل.
+ * **وعند النجاح يذهب المالكُ إلى نموذج جدولته في المنشورات أيًّا كان مصدرُ الطلب**:
+ * صار معتمَدًا ينتظر موعدًا، ولا حقلَ موعدٍ في صفحة المنصّة. كان `return` يتقدّم
+ * فيعود إلى صفحةٍ يقول إشعارُها «اختر له موعدًا» ولا موعدَ فيها (رحلة R-8).
+ * وعند الردّ يعود إلى حيث كان، فيقرأ السببَ بجانب ما ضغط.
+ *
+ * ‏**إلّا منشورًا خارجَ النافذة** (مراجعة ر-8): «فشل قبل أسبوعٍ فأكثر» في صفحة المنصّة يُري
+ * ‏منشوراتٍ لا ترسمها اللوحة، والنزولُ إلى بطاقةٍ لم تُرسَم يرتدّ إلى الرئيسيّة. فيعود إلى
+ * ‏`return` كما كان قبل R-8 — وتبويبُ «تنتظر» يُريه معتمَدًا بلا موعد — وبلا `return` إلى رحلته.
  */
 panel.post('/panel/drafts/requeue', async (c) => {
   const gate = await guardPost(c)
@@ -2247,12 +2442,16 @@ panel.post('/panel/drafts/requeue', async (c) => {
     },
     c.req.raw,
   )
-  await setFlash(c.env, c.req.raw, result.ok
-    ? { kind: 'ok', text: 'عاد إلى المعتمَد بنصّه ومفتاحه — اختر له موعدا جديدا.' }
-    : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
   const to = backTo(gate.form.get('return'), '')
+  const card = result.ok && (await onBoard(c.env.DB, id))
+  // ‏ورحلةُ المنشور لا تقرأ الإشعار: لا يُكتب لها فيظهر بعدها في غير موضعه — وحالُه فيها «معتمَد»
+  if (result.ok && !card && to === '') return toJourney(id)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: 'عاد معتمَدًا بنصّه كما هو — اختر له موعدًا جديدًا.' }
+    : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
+  if (card) return toCard('s', id)
   if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
-  return result.ok && /^[0-9a-f-]{8,}$/.test(id) ? back(`d-${id}`) : back('posts')
+  return toCard('d', id)
 })
 
 // ── مقاطعُ المالك (D-180) ─────────────────────────────────────────────
@@ -2346,17 +2545,62 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
     detail: result.ok ? `created:${result.created.join(',')} skipped:${result.skipped.join(',')}` : `refused:${result.reason}`.slice(0, 200),
   }, c.req.raw)
   const label = (p: string): string => platformLabel(p)
+  // ‏عنوانُ YouTube فوق حدّه يُقصّ عند الرفع (ر-4): يُقال الآن بما سيُرفع، لا يُكتشف في القناة
+  const cut = result.ok && result.created.includes('youtube') ? cutTitle(String(gate.form.get('caption') ?? '')) : null
   await setFlash(c.env, c.req.raw, !result.ok
     ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
     : result.created.length === 0
       ? { kind: 'bad', text: `موجودٌ من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
       : {
-          kind: 'ok',
+          kind: cut === null ? 'ok' : 'warn',
           text: `أُنشئ على ${result.created.map(label).join(' و')}${gate.form.get('approve') === 'on'
-            ? ' معتمَدًا — حدّد موعدَه من «وزّع المعتمَد» أو من بطاقته.'
-            : ' مسوّدةً تنتظر اعتمادك.'}`,
+            ? ' معتمَدًا — جدوِله تحت المقطع بموعدٍ واحد، أو من بطاقة كلٍّ.'
+            : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
+            ? ''
+            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}`,
         })
-  return back('videos')
+  // ‏ويعود إلى صفّ المقطع نفسِه: عليه روابطُ منشوراته وزرُّ جدولتها
+  return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
+})
+
+/**
+ * «جدوِل منشوراتِه معًا» من صفّ المقطع (ر-4) — **الموعدُ يُحسب هنا بتوقيت المالك** من
+ * كعكة `sada_tz` (D-173)، والجدولةُ من `schedulePost` لكلّ منشورٍ في `scheduleFromUpload`
+ * (D-019). ولا طلبَ خارجيَّ ولا كلفة: الطابورُ يخرج بها في موعدها بمفاتيحها (D-004).
+ */
+panel.post('/panel/uploads/:id/schedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = c.req.param('id')
+  const now = new Date()
+  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const at = presetAt(String(gate.form.get('preset') ?? ''), now, zone)
+  const result = at === null ? null : await scheduleFromUpload(c.env.DB, {
+    uploadId: id,
+    shown: gate.form.getAll('post').map(String),
+    accounts: await listAccounts(c.env.DB),
+    at,
+    now,
+  })
+  const names = (list: readonly string[]): string => [...new Set(list)].map((p) => platformLabel(p)).join(' و')
+  const failed = result === null ? '' : result.failed.map((f) => `${platformLabel(f.platform)}: ${f.reason}`).join('؛ ')
+  const reach = result === null ? null : privateReach(result.scheduled)
+  const flash: PanelFlash = at === null || result === null
+    ? { kind: 'bad', text: 'لم يُجدوَل شيء: موعدٌ لا أعرفه — اختر أحدَ أزرار الموعد.' }
+    : result.scheduled.length === 0
+      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed === '' ? 'لا منشورَ معتمَدًا بلا موعدٍ من هذا المقطع الآن.' : `تعذّر ${failed}.`}` }
+      : {
+          kind: result.failed.length === 0 ? 'ok' : 'warn',
+          text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)} ${zone === null ? 'بتوقيت UTC' : 'بتوقيتك'}.`
+            + (failed === '' ? '' : ` وتعذّر ${failed}.`)
+            + (reach === null ? '' : ` ${reach}`),
+        }
+  await record(c.env.DB, {
+    actor: 'panel', action: 'upload.schedule', target: id,
+    detail: result === null ? 'refused:preset' : `scheduled:${result.scheduled.join(',')} failed:${result.failed.length}`,
+  }, c.req.raw)
+  await setFlash(c.env, c.req.raw, flash)
+  return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
 })
 
 // ── خطّتُك من ملفّ (D-181) ────────────────────────────────────────────
@@ -2384,7 +2628,7 @@ async function planFacts(env: Env, cookie: string | null, now: Date): Promise<Pl
 
 panel.get('/panel/plan-import/template.csv', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   return new Response(PLAN_TEMPLATE, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -2429,11 +2673,16 @@ panel.post('/panel/plan-import', async (c) => {
 
 panel.get('/panel/plan-import/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, 'انتهت الجلسة. ادخل من جديد.')
+  if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const id = c.req.param('id')
   const csv = await c.env.KV.get(`plan-import:${id}`)
-  if (csv === null) return c.text('انتهت مهلةُ هذه المعاينة (ساعتان) — ارفع الملفَّ من جديد.', 404)
+  if (csv === null) {
+    // ‏معاينةٌ تُركت مفتوحةً أكثرَ من ساعتين ثمّ حُدّثت: صفحةٌ بالرافدة وطريقٍ إلى الرفع، لا نصٌّ خامّ (7.11)
+    return page((nonce) =>
+      soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
+        planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
+  }
   const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
   return page((nonce) =>
     soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },

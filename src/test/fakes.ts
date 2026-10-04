@@ -28,6 +28,14 @@ export interface FakeDb extends Db {
   readonly raw: DatabaseSync
 }
 
+/**
+ * ‏**حدُّ D1 للمعاملات المربوطة في الاستعلام الواحد** — ‏100 (developers.cloudflare.com/d1/platform/limits).
+ *
+ * ‏‏node:sqlite يقبل عشراتِ الآلاف، فكان `IN (?,?,…)` بمعاملٍ لكلّ مقطعٍ يمرّ هنا أخضرَ ويرمي
+ * ‏في D1 بعد المقطع الحادي بعد المئة (مراجعة ر-5). فالقيدُ هنا كما هناك: عند التنفيذ، برسالته.
+ */
+export const D1_MAX_BOUND = 100
+
 export function fakeDb(): FakeDb {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys = ON')
@@ -35,20 +43,26 @@ export function fakeDb(): FakeDb {
 
   const prepare = (query: string): DbStatement => {
     let bound: unknown[] = []
+    const args = (): never[] => {
+      if (bound.length > D1_MAX_BOUND) {
+        throw new Error(`D1_ERROR: too many SQL variables (${bound.length} > ${D1_MAX_BOUND}): SQLITE_ERROR`)
+      }
+      return bound as never[]
+    }
     const statement: DbStatement = {
       bind(...values: unknown[]) {
         bound = values
         return statement
       },
       async first<T = unknown>() {
-        const row = db.prepare(query).get(...(bound as never[]))
+        const row = db.prepare(query).get(...args())
         return (row ?? null) as T | null
       },
       async all<T = unknown>() {
-        return { results: db.prepare(query).all(...(bound as never[])) as T[] }
+        return { results: db.prepare(query).all(...args()) as T[] }
       },
       async run() {
-        return db.prepare(query).run(...(bound as never[]))
+        return db.prepare(query).run(...args())
       },
     }
     return statement

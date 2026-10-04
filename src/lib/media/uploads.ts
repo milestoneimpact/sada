@@ -11,6 +11,9 @@
  * الطابور بحرّاسه كلّها: الاعتمادُ، والموعد، و`idempotency_key` (D-004).
  */
 import { atomically, type Db, type DbStatement } from '../tokens'
+import { isLinkedInPage, type LinkedAccount } from '../channels'
+import { schedulePost } from '../schedule/job'
+import { YT_TITLE_MAX, youtubeTitle } from '../publish/youtube'
 
 /** الأنواعُ التي تقبلها المنصّاتُ الثلاث أو بعضُها — وما سواها يُردّ قبل أن يُرفَع بايت. */
 export const UPLOAD_MIMES: ReadonlySet<string> = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
@@ -45,8 +48,17 @@ export interface UploadRow {
   readonly durationMs: number | null
   readonly status: 'uploading' | 'ready' | 'failed'
   readonly createdAt: string
-  /** المنصّاتُ التي أُنشئ عليها منشورٌ من هذا المقطع. */
-  readonly platforms: readonly string[]
+  /**
+   * المنشوراتُ التي أُنشئت من هذا المقطع (غيرُ المرفوضة)، الأحدثُ أوّلًا — بمعرّفاتها لا
+   * بأسماء منصّاتها وحدها: صفُّ المقطع يربط كلًّا ببطاقته، ويجدولها معًا (ر-4).
+   */
+  readonly posts: readonly UploadPost[]
+}
+
+export interface UploadPost {
+  readonly id: string
+  readonly platform: string
+  readonly status: string
 }
 
 export interface UploadMeta {
@@ -204,33 +216,60 @@ export async function abortUpload(db: Db, bucket: MultipartBucket, id: string): 
   await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ?`).bind(id).run()
 }
 
+/** ‏ترتيبُ المكتبة ونافذتُها — **نصٌّ واحدٌ للنداءين**: المقاطعُ ومنشوراتُها من النافذة نفسِها. */
+const LIBRARY = `SELECT id FROM uploads WHERE status != 'failed' ORDER BY created_at DESC, id LIMIT ?`
+
+interface LibraryRow {
+  id: string; r2_key: string; name: string; mime: string; bytes: number; width: number | null
+  height: number | null; duration_ms: number | null; status: UploadRow['status']; created_at: string
+}
+
 export async function listUploads(db: Db, limit = 20): Promise<UploadRow[]> {
+  let results: LibraryRow[]
   try {
-    const { results } = await db
+    results = (await db
       .prepare(
         // ‏ووقتُ المقطع وقتُ اكتماله إن اكتمل: «رُفع قبل ساعة» لا «بدأ رفعُه»
         `SELECT u.id, u.r2_key, u.name, u.mime, u.bytes, u.width, u.height, u.duration_ms, u.status,
-                COALESCE(u.ready_at, u.created_at) AS created_at,
-                (SELECT GROUP_CONCAT(DISTINCT p.platform) FROM media m JOIN posts p ON p.id = m.post_id
-                  WHERE m.upload_id = u.id AND p.status != 'rejected') AS platforms
-           FROM uploads u WHERE u.status != 'failed'
-          ORDER BY u.created_at DESC LIMIT ?`,
+                COALESCE(u.ready_at, u.created_at) AS created_at
+           FROM uploads u WHERE u.id IN (${LIBRARY})
+          ORDER BY u.created_at DESC, u.id`,
       )
       .bind(limit)
-      .all<{
-        id: string; r2_key: string; name: string; mime: string; bytes: number; width: number | null
-        height: number | null; duration_ms: number | null; status: UploadRow['status']; created_at: string
-        platforms: string | null
-      }>()
-    return results.map((r) => ({
-      id: r.id, r2Key: r.r2_key, name: r.name, mime: r.mime, bytes: r.bytes, width: r.width, height: r.height,
-      durationMs: r.duration_ms, status: r.status, createdAt: r.created_at,
-      platforms: r.platforms === null ? [] : r.platforms.split(','),
-    }))
+      .all<LibraryRow>()).results
   } catch {
     // ‏جدولٌ لم يُرحَّل بعد: اللوحةُ تُفتح بلا مكتبةٍ ولا تسقط
     return []
   }
+  /*
+   * ‏ومنشوراتُ هذه المقاطع في نداءٍ ثانٍ لا في عمودٍ مضموم: المعرّفُ والمنصّةُ والحالُ معًا، بترتيبها.
+   *
+   * ‏**والنافذةُ استعلامٌ فرعيٌّ لا معرّفاتٌ مربوطة** (مراجعة ر-5): كان `IN (?,?,…)` بمعاملٍ لكلّ
+   * ‏مقطع، وD1 لا يقبل أكثرَ من ‏100 معاملٍ مربوط — واستيرادُ الخطّة يطلب ‏200. فبعد المقطع
+   * ‏الحادي بعد المئة رمى الاستعلام، **وأفرغ `catch` المكتبةَ كلَّها**: كلُّ صفٍّ في الخطّة يذكر
+   * ‏مقطعًا قيل له «لا مقطعَ مرفوعًا» والمقاطعُ موجودة. **وتعثُّرُ هذا النداء وحدَه لا يُفرغها**:
+   * ‏المقاطعُ تُعرَض بلا روابط منشوراتها، والخطّةُ تجدها بأسمائها.
+   */
+  let made: { upload_id: string; id: string; platform: string; status: string }[] = []
+  if (results.length > 0) {
+    try {
+      made = (await db
+        .prepare(
+          `SELECT m.upload_id, p.id, p.platform, p.status FROM media m JOIN posts p ON p.id = m.post_id
+            WHERE m.upload_id IN (${LIBRARY}) AND p.status != 'rejected'
+            ORDER BY p.created_at DESC, p.id`,
+        )
+        .bind(limit)
+        .all<{ upload_id: string; id: string; platform: string; status: string }>()).results
+    } catch (error) {
+      console.error({ job: 'uploads.list', posts_failed: String(error).slice(0, 200) })
+    }
+  }
+  return results.map((r) => ({
+    id: r.id, r2Key: r.r2_key, name: r.name, mime: r.mime, bytes: r.bytes, width: r.width, height: r.height,
+    durationMs: r.duration_ms, status: r.status, createdAt: r.created_at,
+    posts: made.filter((m) => m.upload_id === r.id).map((m) => ({ id: m.id, platform: m.platform, status: m.status })),
+  }))
 }
 
 export type VideoPlatform = 'youtube' | 'tiktok' | 'instagram'
@@ -244,6 +283,29 @@ export interface VideoCheck {
 }
 
 /**
+ * **ما لا يُنشر للعامّة** — YouTube يُرفع `private` دائمًا (`YT_PRIVACY`)، وTikTok
+ * `SELF_ONLY` أو صندوقَ التطبيق. كان يُقال في صفحة المنصّة وحدها، وتقول بطاقةُ المقطع
+ * «Short ●» بالأخضر، فيجدول المالكُ وهو يظنّه سيُنشر للناس (ر-4). فيُقال حيث يقرّر:
+ * تحت المنصّة قبل الإنشاء، وفي صفّ الجدولة، وفي إشعار ما بعدهما.
+ */
+export const PRIVATE_REACH: Readonly<Record<'youtube' | 'tiktok', string>> = {
+  youtube: 'يصل قناتك خاصًّا — تنشره أنت من YouTube Studio',
+  tiktok: 'لا يراه غيرك حتّى تنشره أنت من تطبيق TikTok',
+}
+
+/** جملةٌ واحدةٌ لما يصل خاصًّا من هذه المنصّات — أو `null` إن لم يكن فيها YouTube ولا TikTok. */
+export function privateReach(platforms: readonly string[]): string | null {
+  const yt = platforms.includes('youtube')
+  const tt = platforms.includes('tiktok')
+  if (yt && tt) {
+    return 'YouTube وTikTok لا يُنشران للعامّة: الأوّلُ يصل قناتك خاصًّا فتنشره من YouTube Studio، والثاني لا يراه غيرك حتّى تنشره من تطبيق TikTok.'
+  }
+  if (yt) return `YouTube لا يُنشر للعامّة: ${PRIVATE_REACH.youtube}.`
+  if (tt) return `TikTok لا يُنشر للعامّة: ${PRIVATE_REACH.tiktok}.`
+  return null
+}
+
+/**
  * حدودُ المنصّات الثلاث **من وثائقها** (تُقرأ في D-180) — والمنصّةُ تفحص بعدنا،
  * فما هنا ليمنع رفعًا يُردّ لا ليحلّ محلّ فحصها. والمجهولُ (مدّةٌ لم يقرأها المتصفّح)
  * لا يمنع: يُقال «لم تُقرأ».
@@ -253,19 +315,20 @@ export function videoChecks(u: Pick<UploadRow, 'mime' | 'bytes' | 'width' | 'hei
   const vertical = u.width !== null && u.height !== null ? u.height >= u.width : null
   const nineSixteen = u.width !== null && u.height !== null && Math.abs(u.height / u.width - 16 / 9) < 0.03
 
-  const youtube: VideoCheck =
-    s !== null && s > 180
-      ? { platform: 'youtube', level: 'warn', note: 'أطولُ من ثلاث دقائق — يُنشر فيديو عاديًّا لا Short' }
-      : vertical === false
-        ? { platform: 'youtube', level: 'warn', note: 'أفقيّ — يُنشر فيديو عاديًّا لا Short' }
-        : { platform: 'youtube', level: 'ok', note: s === null ? 'Short إن كان رأسيًّا ودون ثلاث دقائق' : 'Short' }
+  // ‏YouTube وTikTok تنبيهٌ دائمًا لا أخضر: يصلان خاصَّين، والمالكُ ينشرهما بيده (PRIVATE_REACH)
+  const kind = s !== null && s > 180
+    ? 'أطولُ من ثلاث دقائق فيُنشر فيديو عاديًّا لا Short'
+    : vertical === false
+      ? 'أفقيٌّ فيُنشر فيديو عاديًّا لا Short'
+      : s === null ? 'Short إن كان رأسيًّا ودون ثلاث دقائق' : 'Short'
+  const youtube: VideoCheck = { platform: 'youtube', level: 'warn', note: `${kind} · ${PRIVATE_REACH.youtube}` }
 
   const tiktok: VideoCheck =
     s !== null && s > 600
       ? { platform: 'tiktok', level: 'block', note: 'أطولُ من عشر دقائق — حدُّ الرفع من الواجهة' }
       : s !== null && s < 3
         ? { platform: 'tiktok', level: 'block', note: 'أقصرُ من ثلاث ثوانٍ' }
-        : { platform: 'tiktok', level: 'ok', note: 'مسوّدةٌ في تطبيقك أو منشورٌ خاصّ حتّى تُجاز المراجعة' }
+        : { platform: 'tiktok', level: 'warn', note: PRIVATE_REACH.tiktok }
 
   const instagram: VideoCheck =
     u.mime === 'video/webm'
@@ -284,7 +347,7 @@ export function videoChecks(u: Pick<UploadRow, 'mime' | 'bytes' | 'width' | 'hei
 }
 
 /** حدُّ نصّ المقطع: TikTok وInstagram بالمحرف، وYouTube بالبايت لأنّ النصَّ وصفُه. */
-const CAPTION_LIMIT: Readonly<Record<'tiktok' | 'instagram', number>> = { tiktok: 2200, instagram: 2200 }
+export const CAPTION_LIMIT: Readonly<Record<'tiktok' | 'instagram', number>> = { tiktok: 2200, instagram: 2200 }
 export const YOUTUBE_DESCRIPTION_BYTES = 5000
 
 /**
@@ -353,7 +416,8 @@ export async function postsFromUpload(
     readonly by: string
   },
 ): Promise<PostsResult> {
-  const caption = input.caption.trim()
+  // ‏والأسطرُ «\n» وحدها: المتصفّحُ يرسل المربّعَ بـ «\r\n»، فكان الوصفُ يُنشَر حاملًا «\r»
+  const caption = input.caption.replace(/\r\n?/g, '\n').trim()
   if (caption === '') return { ok: false, reason: 'اكتب نصَّ المنشور — يُنشر وصفًا مع المقطع' }
   const row = await db
     .prepare('SELECT id, r2_key, mime, bytes, width, height, duration_ms, status FROM uploads WHERE id = ?')
@@ -408,4 +472,66 @@ export async function postsFromUpload(
     created.push(platform)
   }
   return { ok: true, created, skipped }
+}
+
+/**
+ * عنوانُ YouTube إن قُصّ (ر-4) — **بقاعدة الرفع نفسِها** (`youtubeTitle`)، فما يُقال هو ما
+ * يُرفع. كان السطرُ الأوّلُ يُقصّ عند ‏100 محرفٍ بلا إخبار، فلا يعرفه المالكُ إلّا من قناته.
+ * و«<» و«>» لا يبلغان هنا: `captionProblem` يردّهما قبل الإنشاء.
+ */
+export function cutTitle(caption: string): string | null {
+  const line = caption.trim().split('\n')[0]?.trim() ?? ''
+  return line.length > YT_TITLE_MAX ? youtubeTitle(caption) : null
+}
+
+export interface UploadSchedule {
+  readonly scheduled: readonly string[]
+  /** ما رُدّ بمنصّته وسببه — يُسمّى في الإشعار ولا يُجمَع في «تعثّر بعضُها». */
+  readonly failed: readonly { readonly platform: string; readonly reason: string }[]
+}
+
+/**
+ * منشوراتُ المقطع المعتمَدةُ إلى موعدٍ واحد (ر-4) — **بـ `schedulePost` واحدًا واحدًا**،
+ * كتوزيع المعتمَد: لا كتابةَ `queued` من هنا، فحرّاسُ الجدولة كلُّها في موضعها (D-019).
+ *
+ * كان المالكُ بعد «أنشئ المنشورات» يبحث عن ثلاث بطاقاتٍ متباعدة ويجدول كلًّا وحدها،
+ * و«وزّع المعتمَد» يخلطها بغيرها بفاصل ساعةٍ على الأقلّ. و`shown` معرّفاتُ ما عرضه صفُّ
+ * المقطع: **ما لم يُعرَض لا يُجدوَل** (D-182). والحسابُ يُحسب هنا ولا يُقرأ من النموذج:
+ * أوّلُ حسابٍ نشطٍ على المنصّة، وصفحةُ الشركة لا تُختار (D-087).
+ */
+export async function scheduleFromUpload(
+  db: Db,
+  input: {
+    readonly uploadId: string
+    readonly shown: readonly string[]
+    readonly accounts: readonly LinkedAccount[]
+    readonly at: Date
+    readonly now: Date
+  },
+): Promise<UploadSchedule> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id
+        WHERE m.upload_id = ? AND p.status IN ('approved', 'edited') ORDER BY p.created_at, p.id`,
+    )
+    .bind(input.uploadId)
+    .all<{ id: string; platform: string }>()
+  const when = input.at.toISOString().slice(0, 16)
+  const scheduled: string[] = []
+  const failed: { platform: string; reason: string }[] = []
+  // ‏بترتيب المنصّات الثابت لا بترتيب الكتابة: الإشعارُ يقول «YouTube وInstagram» كلَّ مرّة
+  const rank = (p: string): number => (VIDEO_PLATFORMS as readonly string[]).indexOf(p)
+  const wanted = results.filter((p) => input.shown.includes(p.id)).sort((a, b) => rank(a.platform) - rank(b.platform))
+  for (const post of wanted) {
+    // ‏وصفحةُ LinkedIn وحدَها تُستبعَد: قناةُ YouTube محفوظةٌ `org` وهي وجهةٌ صالحة
+    const account = input.accounts.find((a) => a.platform === post.platform && a.status === 'active' && !isLinkedInPage(a))
+    if (account === undefined) {
+      failed.push({ platform: post.platform, reason: 'لا حسابَ متّصلًا — اربطه أوّلًا' })
+      continue
+    }
+    const done = await schedulePost(db, post.id, account.id, when, input.now)
+    if (done.ok) scheduled.push(post.platform)
+    else failed.push({ platform: post.platform, reason: done.reason })
+  }
+  return { scheduled, failed }
 }

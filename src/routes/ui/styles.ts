@@ -328,6 +328,13 @@ details.ladder .verdict.bad{color:var(--bad)}
 .pill.off{color:var(--warn); background:var(--warn-wash);
   border-color:color-mix(in srgb,var(--warn) 34%,transparent)}
 .pill.off .led{background:var(--warn)}
+/* ‏وحبّةُ النظام في الرأس **رابطٌ إلى بطاقة الآلة**، وحالُها من النبض: «النشر متوقّف» حمراء.
+   والرابطُ بلا خطٍّ تحته — الحبّةُ شكلُه — وهدفُ لمسه يُمدّ بعنصرٍ زائفٍ كرقاقة الرحلة.
+   ولا تلتفّ: «النشر متوقّف» كانت تنكسر سطرين في ‏٣٩٠px، والعنوانُ قبلها هو الذي يُقصّ */
+.pill.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 34%,transparent)}
+.pill.bad .led{background:var(--bad)}
+a.pill{position:relative; text-decoration:none; white-space:nowrap; flex:none}
+a.pill::after{content:''; position:absolute; inset:50% 0 auto; height:var(--tap); transform:translateY(-50%)}
 
 .theme{display:inline-flex; padding:var(--s-0); gap:1px; border-radius:var(--r-pill);
   border:1px solid var(--line); background:var(--surface-2)}
@@ -365,6 +372,28 @@ details.ladder .verdict.bad{color:var(--bad)}
    و«@starting-style» تصف حالَ ما قبل الظهور — **بلا سطرِ JavaScript
    واحد**، ومتصفّحٌ لا يعرفها يُظهره ساكنا كما هو اليوم. */
 @starting-style{.flash{opacity:0; transform:translateY(-6px)}}
+/* ── والإشعارُ يطفو حين يعمل السكربت (الخطّة 5.9 و7.8) ─────────────────
+   كان في رأس المحتوى وحدَه، والفعلُ يعود إلى بطاقته في وسط اللوح — فبعد «اعتمد»
+   أو رفع خطّةٍ تُردّ كان الإشعارُ عند ‏-4445px، فوق الشاشة، **والمالكُ يرى البطاقةَ
+   كأنّ شيئًا لم يقع**. فيطفو أعلى الشاشة في الجوّال، وفي الزاوية السفليّة على الحاسوب.
+   **وبلا سكربتٍ يبقى في مكانه**: الصنفُ يضعه السكربتُ مع زرّ «أغلق» ومهلته، فلا
+   إشعارَ عائمٌ لا يُغلَق. والحاويةُ لا تأخذ النقر — ما فيها وحدَه يأخذه.
+
+   **وفي الجوّال تحت الشريط العلويّ لا فوق الشريط السفليّ** (مراجعة ر-0): أسفلُ الشاشة
+   مزدحمٌ بما يلتصق — صفُّ البتّ «.draft-foot.act» و«.pi-bar» و«.bulkbar» — فكان خطأُ «اعتمد»
+   يقع فوق «اعتمد» و«ارفض» نفسَيهما (‏694–764 فوق ‏720–780 عند ‏390)، ولا يذهب حتّى يُغلَق.
+   والأعلى لا يلتصق فيه إلّا الشريطُ (‏64px)، فيقع الإشعارُ تحته ولا يغطّي قرارًا. */
+.toast{position:fixed; z-index:45; inset-inline:var(--s-4);
+  top:calc(64px + var(--s-3));
+  display:flex; flex-direction:column; align-items:stretch; gap:var(--s-2); pointer-events:none}
+.toast > *{pointer-events:auto}
+.toast .flash{margin:0; box-shadow:var(--sh-3)}
+.toast .busy-note{margin:0; align-self:flex-start; padding:var(--s-2) var(--s-3); background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh-2)}
+.toast-x{flex:none; margin-inline-start:auto}
+@media(min-width:721px){
+  .toast{inset-inline-start:auto; inset-inline-end:var(--s-6); top:auto; bottom:var(--s-6); max-width:var(--measure)}
+}
 
 section[hidden]{display:none}
 
@@ -1178,8 +1207,9 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .vfile{position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
 .vup progress{flex:1 1 200px; height:10px; accent-color:var(--ok)}
 .vlist{display:flex; flex-direction:column; gap:var(--s-3)}
+/* ‏والصفُّ مرساةُ العودة بعد الإنشاء والجدولة (ر-4): يقف تحت الشريط الملتصق لا خلفَه، كالمسوّدة */
 .vrow{display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-3); border-radius:var(--r);
-  border:1px solid var(--line); background:var(--surface-2)}
+  border:1px solid var(--line); background:var(--surface-2); scroll-margin-block-start:var(--s-16)}
 .vmeta{display:flex; flex-direction:column; gap:var(--s-1)}
 .vrow > .st{align-self:flex-start}
 .vpfs{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); margin-bottom:var(--s-2)}
@@ -1195,8 +1225,18 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .pi td{vertical-align:top}
 .pi tr.bad td{background:var(--bad-wash)}
 .pi td .ago{display:block}
-.pi-text{max-width:var(--measure)}
+/* ‏**ورابطٌ بلا مسافةٍ يُكسَر ولا يُفيض** (مراجعة ر-5): «https://example.com/a/very/long/…» في نصّ
+   صفٍّ دفع صفحةَ المعاينة ‏101px جانبًا عند ‏390 و‏171 عند ‏320، فقُطع «اعتمد وجدوِل» الملتصق. وفي
+   الجوّال تصير الخلايا كتلًا بعرض البطاقة، فتُكسَر كلُّها؛ وفي العريض خليّةُ النصّ وحدَها — نثرٌ
+   يحتمل الكسر، والموعدُ والمنصّةُ لا يُضغَطان إلى حرفٍ في سطر */
+.pi-text{max-width:var(--measure); overflow-wrap:anywhere}
+@media(max-width:720px){.pi td{overflow-wrap:anywhere}}
 .pi-why{margin:0; padding-inline-start:var(--s-4); color:var(--bad); font-size:var(--t-small); line-height:var(--lh-small)}
+/* ‏وصفُّ «اعتمد وجدوِل» يلاصق أسفلَ الشاشة (القالب T4، ر-5): كان بعد ‏529px من التمرير بثلاثة صفوف،
+   ويبعد مع كلّ صفٍّ حتّى المئتين. و«sticky» لا «fixed»: يمضي مع البطاقة إذا انتهت */
+.pi-bar{position:sticky; bottom:var(--s-3); z-index:15; margin-top:var(--s-3); padding:var(--s-3);
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh-2)}
+@media(max-width:720px){.pi-bar{bottom:calc(var(--s-16) + env(safe-area-inset-bottom, 0px))}}
 .dcols > *{break-inside:avoid; margin-bottom:var(--s-3)}
 
 /* ── اختيارُ بطاقات اللوح (D-119) ─────────────────────────────────────
@@ -1372,9 +1412,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .art-row > .ago{flex:1 1 200px}
 /* شريطُ الجدولة — سطرٌ مميّزٌ عن جسم البطاقة: هو قرارٌ آخر غير الاعتماد،
    ودمجُه في الذيل يجعل الضغطتين تبدوان ضغطةً واحدة. */
+/* ‏وهو مرساةٌ يعود إليها «اعتمد» و«اسحب الموعد» (‏#s-…)، فيُترَك فوقه قدرُ الشريط الملتصق
+   كما يُترَك فوق البطاقة — ولا ينزل تحته */
 .sched{display:flex; align-items:flex-end; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2);
   padding:var(--s-3) var(--s-3); border-radius:var(--r); background:var(--surface-2);
-  border:1px solid var(--line-soft)}
+  border:1px solid var(--line-soft); scroll-margin-block-start:var(--s-16)}
 .sched.set{background:var(--ok-wash); border-color:transparent}
 .sched.gone{background:var(--warn-wash); border-color:transparent}
 .sched.none{background:var(--warn-wash); border-color:transparent; align-items:center}
@@ -1588,8 +1630,12 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
    * فيلتصق صفُّ البتّ **ما دامت بطاقتُه في الشاشة**، ويمضي معها إذا
    * مضت: **قرارٌ واحدٌ حاضرٌ في المرّة، ولا قصَّ ولا حبس**. و«sticky»
    * تفعلها بلا سطرٍ برمجيّ واحد.
+   *
+   * **وصفُّ البتّ وحدَه — «.act»** (رحلات R-3 وR-6 وR-9): كانت القاعدةُ على كلّ
+   * «.draft-foot»، فالتصق صفُّ البطاقة المقروءة («90 / 280 · اعتمدها …») بلا زرٍّ
+   * فيه، وغطّى رأسَها وحبّةَ «مجدولة» حين يدخل من أسفل الشاشة.
    */
-  .draft-foot{position:sticky; z-index:5;
+  .draft-foot.act{position:sticky; z-index:5;
     bottom:calc(var(--s-16) + env(safe-area-inset-bottom, 0px));
     background:var(--surface); border-radius:var(--r);
     padding:var(--s-2); margin-top:var(--s-2); box-shadow:var(--sh-2)}

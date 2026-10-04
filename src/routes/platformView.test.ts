@@ -230,3 +230,81 @@ describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () 
   })
 })
 
+
+/*
+ * ‏**ما وجدته رحلاتُ المالك على صفحة المنصّة** (خطّ الأساس، 2026-10-04).
+ */
+describe('رحلاتُ المالك على صفحة المنصّة', () => {
+  // ‏ر-2: «اكتب» يفتح نموذجَ الكتابة في لوح المنشورات، لا جدولَ المصادر الذي لا كتابةَ فيه
+  it('أزرارُ «اكتب» الثلاثةُ تقود إلى نموذج الكتابة لا إلى المصادر', () => {
+    const quiet = { waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0 }
+    // ‏حسابٌ بإذنٍ محفوظ: الزرُّ الأوّليّ «اكتب» لا «أعد الربط»
+    const signed = viewChannels([{ ...accounts[0]!, expiresAt: '2026-10-01 00:00:00' }], () => true).find((v) => v.spec.id === 'x')!
+    const head = screen({
+      view: signed, counts: quiet,
+      app: {
+        platform: 'x', source: 'vault', clientId: 'cid', hint: '••••', updatedAt: null, updatedBy: null,
+        secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'], verifiedAt: null, verifiedKind: 'accepted',
+      },
+      health: { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] } },
+    })
+    expect(head).toContain('<a class="btn p" href="/panel#write">اكتب منشورًا من مصدر</a>')
+    const empty = screen({ tab: 'waiting', waiting: [] })
+    expect(empty).toContain('<a class="btn g sm" href="/panel#write">اكتب من مصدر</a>')
+    for (const html of [head, empty, screen()]) expect(html).not.toContain('/panel#sources')
+  })
+
+  // ‏ر-1: «إذنُ الوصول ينتهي الآن · والتجديدُ الآن» لحسابٍ سليم — `relativeTime` للماضي وحده
+  it('سجلُّ الصحّة يعدّ الموعدَ القادمَ إلى الأمام، والفائتَ إلى الخلف', () => {
+    const live = screen({
+      tab: 'setup',
+      health: { a1: {
+        status: 'active', expiresAt: '2026-09-06 14:00:00', refreshExpiresAt: '2027-07-03 12:00:00',
+        refreshedAt: null, needsReauthAt: null, alerts: [],
+      } },
+    })
+    const log = live.slice(live.indexOf('سجلُّ صحّة الحساب'))
+    const text = log.slice(0, log.indexOf('</ul>')).replace(/<[^>]+>/g, '')
+    expect(text).toContain('إذنُ الوصول ينتهي بعد ساعتين · والتجديدُ ينتهي بعد 300 يومًا')
+    expect(text).not.toContain('الآن')
+    const lapsed = screen({
+      tab: 'setup',
+      health: { a1: {
+        status: 'active', expiresAt: '2026-09-06 10:00:00', refreshExpiresAt: null,
+        refreshedAt: null, needsReauthAt: null, alerts: [],
+      } },
+    })
+    expect(lapsed.replace(/<[^>]+>/g, '')).toContain('إذنُ الوصول انتهى قبل ساعتين')
+  })
+
+  // ‏ر-1: منصّةٌ بلا حساب لا تقول «2 من 7 جاهزة» ولا تعرض عدّاداتٍ أصفارًا ولا صورةَ حساب
+  it('منصّةٌ بلا حسابٍ مربوط: «اربطها أوّلًا»، ولا خضرةَ ولا أصفارَ ولا صورة', () => {
+    const bare = viewChannels([], () => false).find((v) => v.spec.id === 'instagram')!
+    const html = screen({
+      view: bare, needs: platformNeeds('instagram'),
+      tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
+      counts: { waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0 },
+      upcoming: [], history: { rows: [], next: null },
+    })
+    expect(html).toContain('اربطها أوّلًا')
+    expect(html).not.toMatch(/\d من 7 جاهزة/)
+    const stations = html.slice(html.indexOf('class="needs-list"'), html.indexOf('</ol>', html.indexOf('class="needs-list"')))
+    expect(stations.match(/<li class="ok">/g)).toBeNull()
+    expect(stations).toContain('بعد الربط')
+    expect(html).not.toContain('class="acct-counts"')
+    expect(html).not.toContain('class="acct-av"')
+    // ‏والاسمُ مرّةً: العنوانُ وحده، بلا سطرِ المنصّة فوقه
+    expect(html.match(/>Instagram</g)?.length ?? 0).toBeLessThanOrEqual(2)
+    expect(html).toContain('<h1>Instagram</h1>')
+  })
+
+  it('ومنصّةٌ مربوطةٌ لم تنشر بعدُ تقول ذلك سطرًا، لا ثلاثةَ أصفار', () => {
+    const html = screen({
+      counts: { waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0 },
+      tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
+    })
+    expect(html).toContain('<ul class="acct-counts"><li>لم يُنشر شيءٌ بعد</li></ul>')
+    expect(html).not.toContain('<b>0</b> نُشر')
+    expect(html).toContain('class="acct-av"')
+  })
+})

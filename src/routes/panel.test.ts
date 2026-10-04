@@ -155,6 +155,68 @@ describe('الدخول', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('أدخل كلمةَ الإدارة')
   })
+  /*
+   * ‏**ويعود المالكُ إلى ما طلبه لا إلى الرئيسيّة** (ر-11، الخطّة 7.11): كان كلُّ توجيهٍ بعد
+   * ‏الدخول `/panel` ثابتًا، فمن فتح «التقرير» من رابطٍ محفوظ ضغط مرّةً ثانية.
+   */
+  describe('العودةُ إلى الصفحة المطلوبة', () => {
+    async function signIn(next: string | null, path = '/panel/login'): Promise<Response> {
+      const body = new FormData()
+      body.set('token', TOKEN)
+      if (next !== null) body.set('next', next)
+      return await app.request(path, { method: 'POST', body }, env)
+    }
+
+    it('صفحةٌ تُطلَب بلا جلسة تحمل مسارَها في نموذج الدخول — ولا تقول «انتهت» لمن لم يدخل', async () => {
+      const response = await app.request('/panel/report?week=2026-09-28', {}, env)
+      expect(response.status).toBe(401)
+      const html = await response.text()
+      expect(html).toContain('name="next" id="login-next" value="/panel/report?week=2026-09-28"')
+      expect(html).toContain('action="/panel/login?next=%2Fpanel%2Freport%3Fweek%3D2026-09-28"')
+      expect(html).not.toContain('انتهت الجلسة')
+    })
+
+    it('ومن سقطت جلستُه يُقال له ذلك', async () => {
+      const html = await (await app.request('/panel/report', { headers: { Cookie: `${COOKIE}=gone` } }, env)).text()
+      expect(html).toContain('انتهت الجلسة. ادخل لتكمل من حيث توقّفت.')
+    })
+
+    it('والدخولُ يوجّه إليها، ومرساتُها معها', async () => {
+      expect((await signIn('/panel/report')).headers.get('Location')).toBe('/panel/report')
+      expect((await signIn('/panel#posts')).headers.get('Location')).toBe('/panel#posts')
+      // ‏ومن عنوان النموذج حين يغيب الحقل
+      expect((await signIn(null, '/panel/login?next=%2Fpanel%2Ftasks')).headers.get('Location')).toBe('/panel/tasks')
+      expect((await signIn(null)).headers.get('Location')).toBe('/panel')
+    })
+
+    it('**ولا توجيهَ خارج اللوحة** — الوجهةُ مدخلٌ من المتصفّح', async () => {
+      for (const evil of ['https://evil.example/panel', '//evil.example', '/\\evil.example', '/panel//evil.example', '/panelx']) {
+        expect((await signIn(evil)).headers.get('Location')).toBe('/panel')
+      }
+    })
+
+    it('وكلمةٌ خاطئةٌ تعيد رسمَ الصفحة بوجهتها — فالمحاولةُ الثانيةُ لا تفقدها', async () => {
+      const body = new FormData()
+      body.set('token', 'wrong')
+      body.set('next', '/panel/report')
+      const html = await (await app.request('/panel/login', { method: 'POST', body }, env)).text()
+      expect(html).toContain('value="/panel/report"')
+    })
+
+    /*
+     * ‏**و`GET /panel/login` لا يردّ JSON خامًّا** (ر-11): صفحةُ الكلمة الخاطئة تبقى على هذا
+     * ‏العنوان، وإعادةُ تحميلها على الهاتف تطلبه `GET`. فيعود إلى وجهته، ولا تُرسَل الكلمةُ ثانيةً.
+     */
+    it('وإعادةُ تحميل صفحة الدخول تعود إلى الوجهة لا إلى سطر JSON', async () => {
+      const plain = await app.request('/panel/login', {}, env)
+      expect(plain.status).toBe(303)
+      expect(plain.headers.get('Location')).toBe('/panel')
+      const back = await app.request('/panel/login?next=%2Fpanel%2Freport', {}, env)
+      expect(back.headers.get('Location')).toBe('/panel/report')
+      const evil = await app.request('/panel/login?next=%2F%2Fevil.example', {}, env)
+      expect(evil.headers.get('Location')).toBe('/panel')
+    })
+  })
 })
 
 describe('اللوحة لا تسرّب', () => {
@@ -452,7 +514,7 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     await submitTiles(cookie, ['drafts_waiting'])
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="k">تحليلات اليوم</div>')
-    expect(html).toContain('<div class="k">إنفاق 30 يوما</div>')
+    expect(html).toContain('<div class="k">إنفاق هذا الشهر</div>')
   })
 
   it('السقف يُحفظ ويُقرأ', async () => {
@@ -706,7 +768,9 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
     expect(html).toContain('<div class="grid tiles c3" style="margin-bottom:var(--s-3)">')
     // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
-    expect(screen).toContain('<ul class="acct-counts">')
+    expect(screen).toContain('<header class="acct acct-linkedin">')
+    // ‏ومنصّةٌ بلا حسابٍ لا تُكتب لها أصفار (ر-1): العدّاداتُ لحسابٍ قائم
+    expect(screen).not.toContain('<ul class="acct-counts">')
     for (const page of [html, screen]) {
       for (const m of page.matchAll(/<div class="grid (c[234])[^"]*">\s*<div class="card tile">/g)) {
         expect(m[0], 'شريطُ مؤشّراتٍ بلا tiles').toBe('')
@@ -725,7 +789,7 @@ describe('هندسةُ نظرة عامّة (D-136)', () => {
     const waiting = html.indexOf('<h2>ما ينتظرك</h2>', first)
     const happened = html.indexOf('<h2>ما وقع اليوم</h2>', waiting)
     const second = html.indexOf('<div class="stack">', happened)
-    const spend = html.indexOf('الإنفاق — 14 يوما', second)
+    const spend = html.indexOf('الإنفاق — 14 يومًا', second)
     const money = html.indexOf('أين يذهب المال', spend)
     expect(ov).toBeGreaterThan(0)
     // رصّتان (D-145): الأفعالُ ثمّ السجلُّ بطاقتين في الأولى، والمالُ في الثانية
@@ -2037,7 +2101,8 @@ describe('الجدولة من اللوحة', () => {
     body.set('id', post)
     const response = await app.request('/panel/drafts/requeue', withSession(cookie, { method: 'POST', body }), env)
     expect(response.status).toBe(303)
-    expect(response.headers.get('Location')).toBe(`/panel#d-${post}`)
+    // ‏إلى شريط جدولته لا إلى رأس بطاقته: صار معتمَدًا ينتظر موعدًا (رحلة R-8)
+    expect(response.headers.get('Location')).toBe(`/panel#s-${post}`)
     expect(
       (await db.prepare('SELECT status FROM posts WHERE id = ?').bind(post).first<{ status: string }>())?.status,
     ).toBe('approved')
@@ -2047,6 +2112,7 @@ describe('الجدولة من اللوحة', () => {
     expect(audit.results.map((r) => r.detail)).toEqual(['requeued'])
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain(`id="d-${post}"`)
+    expect(html).toMatch(new RegExp(`<form class="sched" id="s-${post}"`))
   })
 
   it('الجدولةُ بلا رمز CSRF تُردّ ولا تغيّر حالا', async () => {
@@ -2080,6 +2146,344 @@ describe('الجدولة من اللوحة', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('لا قناةَ LinkedIn مربوطة')
+  })
+})
+
+/**
+ * **الفعلُ على بطاقةٍ يعود إليها، والموعدُ بتوقيت المالك** (رحلات R-0 وR-2 وR-3 وR-4
+ * وR-6 وR-8 وR-9).
+ *
+ * كان كلُّ فعلٍ على بطاقة يعيد `#posts`، فيبحث المالكُ عن بطاقته من جديد: ‏8467px
+ * تمريرًا في رحلة R-4 على الهاتف. وكان إشعارُ الجدولة «06:00:00 UTC» لمن ضغط «غدا 9ص».
+ */
+describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوقيت المالك', () => {
+  type P = 'linkedin' | 'x' | 'tiktok' | 'youtube' | 'instagram'
+
+  async function seedPost(platform: P, status: string, text = 'ن'.repeat(300), key?: string): Promise<string> {
+    const id = crypto.randomUUID()
+    const approved = status !== 'draft' && status !== 'rejected'
+    await db
+      .prepare(
+        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at)
+         VALUES (?, ?, 'text', ?, ?, ?, ?, ?)`,
+      )
+      .bind(id, platform, text, status, key ?? `k-${id}`, approved ? 'panel:token' : null, approved ? '2026-09-08 07:00:00' : null)
+      .run()
+    return id
+  }
+
+  async function seedAccount(platform: P, name: string): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        'INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .bind(id, platform, 'member', id.slice(0, 8), name, 'active')
+      .run()
+    return id
+  }
+
+  async function withMedia(post: string, mime: string, model = 'upload'): Promise<string> {
+    const id = crypto.randomUUID()
+    await db
+      .prepare(
+        `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key, status, width, height)
+         VALUES (?, ?, ?, ?, 2048, '', ?, ?, 'ready', 1080, 1920)`,
+      )
+      .bind(id, post, `m/${id}`, mime, model, `m:${id}`)
+      .run()
+    return id
+  }
+
+  async function post(cookie: string, path: string, fields: Record<string, string | string[]>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) body.append(k, one)
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+
+  /** بطاقةُ المنشور من الصفحة — من رأسها إلى البطاقة التي تليها. */
+  function cardOf(html: string, id: string): string {
+    const start = html.indexOf(`id="d-${id}"`)
+    expect(start).toBeGreaterThan(-1)
+    const next = /<div class="draft(?: done)?" id="d-/g
+    next.lastIndex = start
+    const end = next.exec(html)?.index
+    return html.slice(start, end)
+  }
+
+  const where = (r: Response): string | null => r.headers.get('Location')
+
+  it('«اعتمد» إلى شريط جدولتها ومعه «تراجَع»، والتراجعُ يعيدها مسوّدةً إلى رأسها، و«ارفض» إلى رأسها', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    await seedAccount('linkedin', 'عمر')
+    const cookie = await login()
+
+    // ‏والمربّعُ يصل بأسطر CRLF كما يرسله المتصفّح — ولا يصير ذلك «تعديلًا» (R-0)
+    const approved = await post(cookie, '/panel/drafts/decide', { id, do: 'approve', text: `${'ن'.repeat(300)}\r\n` })
+    expect(where(approved)).toBe(`/panel#s-${id}`)
+    let html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('اعتُمدت كما كُتبت')
+    expect(html).toContain('action="/panel/drafts/undo-approve"')
+    expect(html).toMatch(new RegExp(`<form class="sched" id="s-${id}"`))
+
+    const undone = await post(cookie, '/panel/drafts/undo-approve', { id })
+    expect(where(undone)).toBe(`/panel#d-${id}`)
+    const row = await db.prepare('SELECT status, approved_at FROM posts WHERE id = ?').bind(id).first<Record<string, unknown>>()
+    expect(row).toEqual({ status: 'draft', approved_at: null })
+    html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('عادت مسوّدةً تنتظر قرارك')
+
+    const rejected = await post(cookie, '/panel/drafts/decide', { id, do: 'reject' })
+    expect(where(rejected)).toBe(`/panel#d-${id}`)
+    const audit = await db
+      .prepare("SELECT action FROM audit_log WHERE action LIKE 'draft.%' ORDER BY rowid")
+      .all<{ action: string }>()
+    expect(audit.results.map((r) => r.action)).toEqual(['draft.decide', 'draft.undo_approve', 'draft.decide'])
+  })
+
+  it('«جدوِل» إلى رأس بطاقتها والإشعارُ بتوقيت المالك ثمّ UTC، و«اسحب الموعد» إلى شريط جدولتها', async () => {
+    const id = await seedPost('linkedin', 'approved')
+    const account = await seedAccount('linkedin', 'عمر')
+    const cookie = await login()
+    const riyadh = `${cookie}; sada_tz=Asia%2FRiyadh`
+
+    // ‏الاثنين ‏4 مارس ‏2030 الساعةَ ‏06:00 UTC هي ‏09:00 في الرياض
+    const done = await app.request('/panel/drafts/schedule', withSession(riyadh, {
+      method: 'POST',
+      body: (() => { const b = new FormData(); b.set('id', id); b.set('account', account); b.set('when', '2030-03-04T06:00'); return b })(),
+    }), env)
+    expect(where(done)).toBe(`/panel#d-${id}`)
+    let html = await (await app.request('/panel', withSession(riyadh), env)).text()
+    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00 بتوقيتك (06:00 UTC).')
+    expect(html).not.toContain('أوّل دورة')
+
+    const pulled = await post(cookie, '/panel/drafts/unschedule', { id })
+    expect(where(pulled)).toBe(`/panel#s-${id}`)
+
+    // ‏وبلا كعكة المنطقة يُقال «بتوقيت UTC» صراحةً، ولا يُفسَّر الوقتُ بمنطقةٍ مفترَضة
+    await post(cookie, '/panel/drafts/schedule', { id, account, when: '2030-03-04T06:00' })
+    html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 06:00 بتوقيت UTC.')
+
+    // ‏والمردودةُ إلى نموذجها حيث يُصلَح ما رُدّ
+    await post(cookie, '/panel/drafts/unschedule', { id })
+    const past = await post(cookie, '/panel/drafts/schedule', { id, account, when: '2020-01-01T06:00' })
+    expect(where(past)).toBe(`/panel#s-${id}`)
+  })
+
+  it('«أعده إلى المعتمَد» من صفحة المنصّة إلى نموذج جدولته في المنشورات، والردُّ إلى حيث كان', async () => {
+    const id = await seedPost('linkedin', 'approved')
+    const account = await seedAccount('linkedin', 'عمر')
+    await db
+      .prepare("UPDATE posts SET status = 'failed', account_id = ?, scheduled_at = '2026-09-01 09:00:00' WHERE id = ?")
+      .bind(account, id)
+      .run()
+    const cookie = await login()
+
+    const ok = await post(cookie, '/panel/drafts/requeue', { id, return: 'platform:linkedin:waiting' })
+    expect(where(ok)).toBe(`/panel#s-${id}`)
+    const again = await post(cookie, '/panel/drafts/requeue', { id, return: 'platform:linkedin:waiting' })
+    expect(where(again)).toBe('/panel/channels/linkedin?tab=waiting')
+  })
+
+  /*
+   * ‏مراجعة ر-8: **لا نزولَ إلى بطاقةٍ لم تُرسَم.** اللوحةُ ترسم أحدثَ ستّين منشورًا، و«فشل قبل
+   * ‏أسبوعٍ فأكثر» في صفحة المنصّة يُري ما هو أقدم. كانت الإعادةُ تنزل إلى `#s-<id>` فلا تجده
+   * ‏`show()` وترتدّ إلى الرئيسيّة، وإشعارُها «اختر له موعدًا» ولا نموذج.
+   */
+  async function outOfBoard(id: string): Promise<void> {
+    await db.prepare("UPDATE posts SET created_at = '2026-08-01 00:00:00' WHERE id = ?").bind(id).run()
+    for (let i = 0; i < 60; i += 1) await seedPost('linkedin', 'rejected', `حشو ${i}`)
+  }
+
+  it('إعادةُ منشورٍ خارجَ الستّين إلى `return` حيث يُرى، وبلا `return` إلى رحلته — لا إلى الرئيسيّة', async () => {
+    const id = await seedPost('linkedin', 'approved')
+    const account = await seedAccount('linkedin', 'عمر')
+    await db
+      .prepare("UPDATE posts SET status = 'failed', account_id = ?, scheduled_at = '2026-08-01 09:00:00' WHERE id = ?")
+      .bind(account, id)
+      .run()
+    await outOfBoard(id)
+    const cookie = await login()
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).not.toContain(`id="d-${id}"`)
+
+    const ok = await post(cookie, '/panel/drafts/requeue', { id, return: 'platform:linkedin:waiting' })
+    expect(where(ok)).toBe('/panel/channels/linkedin?tab=waiting')
+    const waiting = await (await app.request('/panel/channels/linkedin?tab=waiting', withSession(cookie), env)).text()
+    expect(waiting).toContain('عاد معتمَدًا بنصّه كما هو')
+
+    // ‏وبلا `return`: رحلتُه تُرسَم لكلّ منشور، ولا يُكتب إشعارٌ لا تقرؤه فيظهر بعدها في غير موضعه
+    await db.prepare("UPDATE posts SET status = 'failed' WHERE id = ?").bind(id).run()
+    const bare = await post(cookie, '/panel/drafts/requeue', { id })
+    expect(where(bare)).toBe(`/panel/journey/${id}`)
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('approved')
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).not.toContain('عاد معتمَدًا')
+  })
+
+  it('و«اكتب مسوّدة» لنسخةٍ سُوّدت قبل الستّين إلى رحلة مسوّدتها، بلا إنفاق', async () => {
+    const source = await seedSource('تقرير الأثر')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
+      .run()
+    const existing = await seedPost('linkedin', 'draft', 'ن'.repeat(300), `draft:${source}:linkedin:md5:a`)
+    await outOfBoard(existing)
+    const cookie = await login()
+    const wrote = await post(cookie, '/panel/drafts/write', { id: source, platform: 'linkedin' })
+    expect(where(wrote)).toBe(`/panel/journey/${existing}`)
+    expect((await db.prepare('SELECT id FROM cost_ledger').all()).results).toHaveLength(0)
+  })
+
+  it('«اكتب مسوّدة» لنسخةٍ سُوّدت إلى بطاقتها بلا إنفاق، و«ارفض الصورة» إلى بطاقة منشورها', async () => {
+    const source = await seedSource('تقرير الأثر')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
+      .run()
+    // ‏مفتاحُ المسوّدة كما يكتبه `draftKey`: المصدرُ والمنصّةُ وبصمةُ النسخة
+    const existing = await seedPost('linkedin', 'draft', 'ن'.repeat(300), `draft:${source}:linkedin:md5:a`)
+    const cookie = await login()
+
+    const wrote = await post(cookie, '/panel/drafts/write', { id: source, platform: 'linkedin' })
+    expect(where(wrote)).toBe(`/panel#d-${existing}`)
+    expect((await db.prepare('SELECT id FROM cost_ledger').all()).results).toHaveLength(0)
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('موجودةٌ وهي هذه — لم يُنفَق شيء')
+
+    const picture = await withMedia(existing, 'image/png', 'infographic:steps')
+    const dropped = await post(cookie, '/panel/media/reject', { id: picture })
+    expect(where(dropped)).toBe(`/panel#d-${existing}`)
+
+    // ‏وما لم يُكتب يعود إلى نموذج الكتابة لا إلى رأس اللوح
+    const unknown = await post(cookie, '/panel/drafts/write', { id: source, platform: 'snapchat' })
+    expect(where(unknown)).toBe('/panel#write')
+  })
+
+  /*
+   * **منشورُ Instagram يُعرَض باسمه ويُجدوَل إلى حسابه** (رحلة R-4): كان يُعرَض «LinkedIn»
+   * بحدّ ‏3000، ولا يُعرَض له إلّا حسابُ LinkedIn، ويسنده «وزّع المعتمَد» إليه.
+   */
+  it('منشورُ Instagram من «فيديوهاتك»: باسمه وحسابه وحدَه، ويُجدوَل، ويوزّعه التوزيعُ على حسابه', async () => {
+    const ig = await seedPost('instagram', 'approved', 'وصفُ المقطع')
+    await withMedia(ig, 'video/mp4')
+    const li = await seedPost('linkedin', 'approved', 'منشورٌ مكتوب\nوسطرٌ ثانٍ')
+    const igAccount = await seedAccount('instagram', 'omar.sada')
+    const liAccount = await seedAccount('linkedin', 'عمر')
+    const cookie = await login()
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const card = cardOf(html, ig)
+    expect(card).toContain('Instagram')
+    expect(card).not.toContain('LinkedIn')
+    expect(card).toContain('/ 2200')
+    expect(card).toContain(`value="${igAccount}"`)
+    expect(card).not.toContain(`value="${liAccount}"`)
+
+    // ‏والمعاينةُ والتنفيذُ يسندانه إلى حسابه
+    const shown = await (await post(cookie, '/panel/drafts/spread', { start: '2030-03-04T06:00', gap: '24' })).text()
+    expect(shown).not.toContain('لا قناةَ مربوطةً لمنصّته')
+    await post(cookie, '/panel/drafts/spread/apply', { start: '2030-03-04T06:00', gap: '24', post: [ig, li] })
+    const rows = await db
+      .prepare('SELECT id, status, account_id FROM posts ORDER BY scheduled_at')
+      .all<{ id: string; status: string; account_id: string }>()
+    expect(rows.results).toEqual([
+      { id: ig, status: 'queued', account_id: igAccount },
+      { id: li, status: 'queued', account_id: liAccount },
+    ])
+    const flash = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(flash).toContain('جُدول منشوران، أوّلُها الاثنين 4 مارس 2030 06:00 بتوقيت UTC.')
+  })
+
+  /*
+   * **ومنصّةُ المقطع بلا مقطعٍ لا يُعرَض لها نموذجُ جدولة** (رحلتا R-2 وR-4): كانت
+   * مسوّدةُ TikTok تُجدوَل فيُقال «مجدولة»، ثمّ يردّها الناشرُ عند موعدها بـ `no_clip`.
+   */
+  it('TikTok معتمَدةٌ بلا مقطعٍ تقول ما ينقصها مكانَ النموذج، وقائمةُ الكتابة تقول «يحتاج مقطعًا»', async () => {
+    const tt = await seedPost('tiktok', 'approved', 'وصفٌ قصير')
+    await seedAccount('tiktok', 'omar.sada')
+    const source = await seedSource('تقرير الأثر')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
+      .run()
+    const cookie = await login()
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const card = cardOf(html, tt)
+    expect(card).toContain('TikTok تحتاج مقطعًا')
+    expect(card).toContain(`id="s-${tt}"`)
+    expect(card).not.toContain('action="/panel/drafts/schedule"')
+    expect(html).toContain('TikTok — وصفُ مقطع (يحتاج مقطعًا)')
+    expect(html).toContain('LinkedIn — حتّى 3000 محرفا')
+  })
+
+  /*
+   * **والفاشلُ في «المنشورات» يقول سببَه وما يُفعَل** (رحلة R-8): كانت بطاقتُه «فشل
+   * النشر» بلا سببٍ ولا زرّ، ومخلوطةً تحت «غادرت» بالمنشور الذي نُشر.
+   */
+  it('الفاشلُ بسببه و«أعده إلى المعتمَد» في بطاقته، وتبويبُه «فشلت» لا «غادرت»', async () => {
+    const id = await seedPost('linkedin', 'approved')
+    const account = await seedAccount('linkedin', 'عمر')
+    await db
+      .prepare("UPDATE posts SET status = 'failed', account_id = ?, scheduled_at = '2026-09-01 09:00:00' WHERE id = ?")
+      .bind(account, id)
+      .run()
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+         VALUES (?, ?, ?, 1, '{}', ?, 'failed')`,
+      )
+      .bind(crypto.randomUUID(), id, `k-${id}`, JSON.stringify({ error: 'unexpected_error', preflight: true }))
+      .run()
+    const relinked = await seedPost('x', 'approved', 'منشورٌ على X')
+    const xAccount = await seedAccount('x', '@omar')
+    await db
+      .prepare("UPDATE posts SET status = 'failed', account_id = ?, scheduled_at = '2026-09-01 09:00:00' WHERE id = ?")
+      .bind(xAccount, relinked)
+      .run()
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+         VALUES (?, ?, ?, 1, '{}', ?, 'failed')`,
+      )
+      .bind(crypto.randomUUID(), relinked, `k-${relinked}`, JSON.stringify({ error: 'token_expired', preflight: true }))
+      .run()
+    const cookie = await login()
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const card = cardOf(html, id)
+    expect(card).toContain('data-status="failed"')
+    expect(card).toContain('عطلٌ لم يُتوقَّع عندنا قبل الإرسال')
+    expect(card).toContain('action="/panel/drafts/requeue"')
+    // ‏وحيث سقط الإذنُ فالفعلُ الأوّلُ «أعد الربط»، والإعادةُ بعده
+    const x = cardOf(html, relinked)
+    expect(x).toContain('انتهى الإذنُ قبل الإرسال')
+    expect(x).toContain('href="/oauth/x/start"')
+    expect(x).toContain('action="/panel/drafts/requeue"')
+    expect(html).toMatch(/data-bucket="failed"[^>]*>فشلت<span class="count">2</)
+    expect(html).toMatch(/data-bucket="published"[^>]*>نُشرت<span class="count">0</)
+    expect(html).not.toContain('>غادرت<')
+
+    const back = await post(cookie, '/panel/drafts/requeue', { id })
+    expect(where(back)).toBe(`/panel#s-${id}`)
+  })
+
+  /*
+   * **وشريطُ البطاقة يلتصق حيث فيه قرار** (رحلات R-3 وR-6 وR-9): كان صفُّ البطاقة
+   * المقروءة يلتصق بأسفل الهاتف بلا زرٍّ فيه، ويغطّي رأسَ البطاقة وحبّةَ حالها.
+   */
+  it('صفُّ البتّ وحدَه ملتصق — والبطاقةُ المقروءةُ ساكنة', async () => {
+    const open = await seedPost('linkedin', 'draft')
+    const read = await seedPost('x', 'rejected', 'نصٌّ رُفض على X')
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(cardOf(html, open)).toContain('<div class="draft-foot act">')
+    expect(cardOf(html, read)).not.toContain('draft-foot act')
+
+    const href = /<link rel="stylesheet" href="([^"]+)"/.exec(html)?.[1] ?? ''
+    const css = await (await app.request(href, {}, env)).text()
+    expect(css).toContain('.draft-foot.act{position:sticky')
+    expect(css).not.toMatch(/\.draft-foot\{position:sticky/)
   })
 })
 
@@ -2425,6 +2829,92 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     )
     expect(response.status).toBe(403)
     expect(db.raw.prepare('SELECT platform FROM oauth_apps').all()).toHaveLength(0)
+  })
+})
+
+/*
+ * ‏**ر-1 · ضبطُ التطبيق يعود إلى موضعه** (خطّ الأساس، 2026-10-04): «احفظ» و«افحص الزوج»
+ * ‏و«احذف» كانت ترمي المالكَ إلى لوح القنوات، والإشعارُ باسم المنصّة الصغير «tiktok»،
+ * ‏ورسائلُ الفحص تقول «تبويب Auth» لكلّ منصّةٍ وتكتب «**تعرفه**» وTypeError خامًّا.
+ */
+describe('ضبطُ التطبيق يعود إلى تبويب الإعداد (ر-1)', () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => { globalThis.fetch = realFetch })
+
+  function form(over: Record<string, string> = {}): FormData {
+    const body = new FormData()
+    body.set('platform', 'tiktok')
+    body.set('return', 'platform:tiktok:setup')
+    body.set('client_id', 'tt-key-123')
+    body.set('client_secret', 'tt-secret-سرّيّ')
+    for (const [k, v] of Object.entries(over)) body.set(k, v)
+    return body
+  }
+
+  it('«احفظ» يعود إلى الإعداد، والإشعارُ باسم المنصّة، و«اربط TikTok» أوّلُ ما في الرأس', async () => {
+    const cookie = await login()
+    const saved = await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body: form() }), env)
+    expect(saved.status).toBe(303)
+    expect(saved.headers.get('location')).toBe('/panel/channels/tiktok?tab=setup')
+    const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+    expect(page).toContain('حُفظت أسرارُ TikTok مشفَّرة')
+    expect(page).not.toContain('أسرارُ tiktok')
+    expect(page).toContain('<a class="btn p" href="/oauth/tiktok/start">اربط TikTok</a>')
+    expect(page).not.toContain('tt-secret')
+  })
+
+  it('والفراغُ يُردّ في الإعداد نفسِه، والحقلان على الصفحة التي يعود إليها', async () => {
+    const cookie = await login()
+    const saved = await app.request('/panel/channels/app',
+      withSession(cookie, { method: 'POST', body: form({ client_id: '   ' }) }), env)
+    expect(saved.headers.get('location')).toBe('/panel/channels/tiktok?tab=setup')
+    const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+    expect(page).toContain('class="flash bad"')
+    expect(page).toContain('id="ci-tiktok"')
+    expect(page).toContain('pattern="\\S.*"')
+  })
+
+  it('و«افحص الزوج» بلا شبكة يقول «لم نصل» لا TypeError، ويعود إلى الإعداد', async () => {
+    const cookie = await login()
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body: form() }), env)
+    await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)
+    globalThis.fetch = (async () => { throw new TypeError('network disabled for https://open.tiktokapis.com') }) as unknown as typeof fetch
+    const probed = await app.request('/panel/channels/app/verify', withSession(cookie, { method: 'POST', body: form() }), env)
+    expect(probed.headers.get('location')).toBe('/panel/channels/tiktok?tab=setup')
+    const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+    expect(page).toContain('لم نصل إلى TikTok الآن، فلم يُحسَم الفحص. أعد الفحص بعد دقيقة.')
+    expect(page).not.toContain('TypeError')
+  })
+
+  it('و«السرُّ مرفوض» بلغة بوّابة المنصّة، بلا «تبويب Auth» ولا نجمتين', async () => {
+    const cookie = await login()
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body: form() }), env)
+    await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)
+    globalThis.fetch = (async () => Response.json({ error: 'invalid_client', error_description: 'bad secret' }, { status: 401 })) as unknown as typeof fetch
+    await app.request('/panel/channels/app/verify', withSession(cookie, { method: 'POST', body: form() }), env)
+    const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+    const flash = page.slice(page.indexOf('class="flash'), page.indexOf('</div>', page.indexOf('class="flash')))
+    expect(flash).toContain('السرُّ مرفوض: TikTok تعرف المعرّف tt-key-123')
+    expect(flash).toContain('TikTok for Developers')
+    expect(flash).not.toContain('تبويب Auth')
+    expect(flash).not.toContain('**')
+    // ‏والدليلُ مفتوحٌ بعد الرفض: الحقلان و«افحص الزوج» لا يختبئان خلف ضغطة
+    expect(page).toMatch(/<details class="guide" open>/)
+  })
+
+  it('و«احذف» يعود إلى الإعداد كذلك', async () => {
+    const cookie = await login()
+    await app.request('/panel/channels/app', withSession(cookie, { method: 'POST', body: form() }), env)
+    const gone = await app.request('/panel/channels/app/delete', withSession(cookie, { method: 'POST', body: form() }), env)
+    expect(gone.headers.get('location')).toBe('/panel/channels/tiktok?tab=setup')
+    expect(db.raw.prepare('SELECT platform FROM oauth_apps').all()).toHaveLength(0)
+  })
+
+  it('و«return» حرٌّ لا يصنع تحويلةً مفتوحة', async () => {
+    const cookie = await login()
+    const saved = await app.request('/panel/channels/app',
+      withSession(cookie, { method: 'POST', body: form({ return: '//evil.example' }) }), env)
+    expect(saved.headers.get('location')).toBe('/panel#channels')
   })
 })
 
@@ -3200,6 +3690,79 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(home).toContain('قريبًا:')
     expect(home).not.toContain('data-pf="snapchat"')
   })
+  /*
+   * ‏**المحطّةُ تنزل إلى البطاقة التي تعدّها، والبطاقةُ مرسومةٌ بمرساتها** (ر-0، ر-3، ر-6).
+   * ‏كانت المحطّاتُ كلُّها `#posts` والمسوّدةُ المنتظرةُ ثانيةُ اللوح بعد منشورٍ مجدول.
+   */
+  it('محطّتا «الاعتماد» و«الصورة» إلى المسوّدة نفسِها، و«المسوّدة» إلى بطاقة الكتابة', async () => {
+    await seedPost('draft')
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const id = (await db.prepare(`SELECT id FROM posts WHERE status = 'draft'`).first<{ id: string }>())!.id
+    const trip = html.slice(html.indexOf('<ol class="trip">'), html.indexOf('</ol>', html.indexOf('<ol class="trip">')))
+    expect(trip).toContain(`href="#d-${id}"`)
+    expect(trip).toContain(`href="#i-${id}"`)
+    expect(trip).toContain('href="#write"')
+    // ‏والمراسي موجودةٌ في اللوح: البطاقةُ ولوحُ صورتها وبطاقةُ الكتابة
+    expect(html).toContain(`id="d-${id}"`)
+    expect(html).toContain(`id="i-${id}"`)
+    expect(html).toContain('id="write"')
+  })
+
+  it('والمحطّةُ المميَّزةُ ما يقوله الفعل — «فشلت» لا «المصدر» قبلها', async () => {
+    await seedSource('لم يُحلَّل')
+    const id = crypto.randomUUID()
+    await db
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at, scheduled_at)
+                VALUES (?, 'x', 'text', 'نصّ', 'failed', ?, 'omar', datetime('now'), datetime('now'))`)
+      .bind(id, `k-${id}`)
+      .run()
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const focused = /<li data-state="(\w+)" data-focus>[\s\S]*?<b>([^<]+)<\/b>/.exec(html)
+    expect(focused?.[1]).toBe('failed')
+    expect(focused?.[2]).toBe('النشر')
+    expect(html).toContain('فشلت')
+    expect(html).not.toContain('ساقطة</span>')
+    // ‏والفعلُ إلى صفّ الفشل بسببه وزرّه (ر-8)
+    expect(html).toContain('href="/panel/channels/x?filter=failed#history">أصلح المنشور</a>')
+  })
+
+  it('وحبّةُ النظام من النبض: إرسالٌ توقّف منذ أيّام يُقال في الرأس وفي «خطوتك التالية»', async () => {
+    db.raw.exec(`INSERT INTO heartbeats (job, at, outcome) VALUES ('dispatch', datetime('now', '-3 days'), 'ok')`)
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    expect(html).toMatch(/<a class="pill bad" href="#machine"[^>]*><i class="led"><\/i>النشر متوقّف<\/a>/)
+    expect(html).toContain('id="machine"')
+    const next = html.slice(html.indexOf('<div class="next"'), html.indexOf('<div class="card home-card">'))
+    expect(next).toContain('href="#machine"')
+    expect(next).toContain('قبل 3 أيّام')
+  })
+
+  it('وسقفُ اليوم: الفعلُ إلى حقل السقف، وزرُّ الكتابة معطَّلٌ وسببُه تحته (ر-10)', async () => {
+    const source = await seedSource('تقرير الأثر')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
+      .run()
+    await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 6.06 })
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const next = html.slice(html.indexOf('<div class="next"'), html.indexOf('<div class="card home-card">'))
+    expect(next).toContain('href="#c2"')
+    expect(next).toContain('6.06$ من 5.00$')
+    expect(html).toContain('id="c2"')
+    // ‏والزرُّ لا يُضغَط فيُردّ: معطَّلٌ، وسببُه مربوطٌ به وفيه موضعُ إصلاحه
+    expect(html).toMatch(/<button class="p" type="submit" disabled aria-describedby="dw-why">اكتب مسوّدة<\/button>/)
+    const why = html.slice(html.indexOf('id="dw-why"'), html.indexOf('</p>', html.indexOf('id="dw-why"')))
+    expect(why).toContain('بلغتَ سقفَ الإنفاق اليوم: 6.06$ من 5.00$')
+    expect(why).toContain('href="#c2"')
+  })
+
+  it('ورأسُ «المنشورات» فيه الأبوابُ الثلاثة إلى بطاقاتها', async () => {
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const head = html.slice(html.indexOf('<section data-pane="posts"'), html.indexOf('</div>', html.indexOf('<div class="aside">', html.indexOf('<section data-pane="posts"'))))
+    for (const [anchor, label] of [['write', 'اكتب من مصدر'], ['videos', 'ارفع فيديو'], ['plan-import', 'خطّة من ملفّ']] as const) {
+      expect(head).toContain(`href="#${anchor}">${label}</a>`)
+      expect(html).toContain(`id="${anchor}"`)
+    }
+  })
 })
 
 describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على المنصّات الثلاث (D-180)', () => {
@@ -3267,7 +3830,8 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
       })(),
     }), env)
     expect(posts.status).toBe(303)
-    expect(posts.headers.get('Location')).toBe('/panel#videos')
+    // ‏ويعود إلى صفّ المقطع نفسِه لا إلى رأس القسم
+    expect(posts.headers.get('Location')).toBe(`/panel#v-${started.id}`)
     const rows = db.raw.prepare(
       `SELECT p.platform, p.status FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = ? ORDER BY p.platform`,
     ).all(started.id) as { platform: string; status: string }[]
@@ -3276,6 +3840,143 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
       { platform: 'tiktok', status: 'approved' },
       { platform: 'youtube', status: 'approved' },
     ])
+  })
+
+  /** يرفع مقطعًا رأسيًّا قصيرًا عبر المسارات الثلاثة ويعيد معرّفَه. */
+  async function uploaded(cookie: string): Promise<string> {
+    env['MEDIA'] = multipartBucket()
+    const form = (fields: Record<string, string | Blob>): FormData => {
+      const f = new FormData()
+      for (const [k, v] of Object.entries(fields)) f.set(k, v)
+      return f
+    }
+    const started = await (await app.request('/panel/uploads/start', withSession(cookie, {
+      method: 'POST', body: form({ name: 'قيادة.mp4', mime: 'video/mp4', bytes: '12', width: '1080', height: '1920', duration_ms: '42000' }),
+    }), env)).json() as { id: string }
+    const part = await (await app.request(`/panel/uploads/${started.id}/part`, withSession(cookie, {
+      method: 'POST', body: form({ n: '1', chunk: new Blob([new Uint8Array(12)]) }),
+    }), env)).json() as { part: unknown }
+    await app.request(`/panel/uploads/${started.id}/complete`, withSession(cookie, {
+      method: 'POST', body: form({ parts: JSON.stringify([part.part]) }),
+    }), env)
+    return started.id
+  }
+
+  async function create(cookie: string, id: string, caption: string, platforms = ['youtube', 'tiktok', 'instagram']): Promise<void> {
+    const f = new FormData()
+    f.set('caption', caption)
+    f.set('approve', 'on')
+    for (const p of platforms) f.append('platform', p)
+    await app.request(`/panel/uploads/${id}/posts`, withSession(cookie, { method: 'POST', body: f }), env)
+  }
+
+  it('YouTube وTikTok يُقالان خاصَّين تحت المنصّة قبل الإنشاء، لا «Short ●» بالأخضر (ر-4)', async () => {
+    const cookie = await login()
+    await uploaded(cookie)
+    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(page).toContain('Short · يصل قناتك خاصًّا — تنشره أنت من YouTube Studio')
+    expect(page).toContain('لا يراه غيرك حتّى تنشره أنت من تطبيق TikTok')
+    // ‏والعنوانُ يُقال فوق الحقل ويُعَدّ تحته
+    expect(page).toContain('سطرُه الأوّل عنوانُ YouTube حتّى 100 محرف')
+    expect(page).toMatch(/<textarea id="vc-[^"]+" name="caption"[^>]*data-yt-title="100"/)
+    expect(page).toContain('data-yt-count hidden')
+  })
+
+  it('بعد الإنشاء: رابطٌ لكلّ منشورٍ إلى بطاقته، و«أُنشئت كلُّها»، وجدولتُها معًا بتوقيت المالك (ر-4)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
+      ('acc-ig', 'instagram', 'member', 'ig', 'omar', 'active')`).run()
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    await create(cookie, id, 'المعلمُ نقطةُ قرار')
+    const posts = db.raw.prepare(
+      `SELECT p.id, p.platform FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = ? ORDER BY p.platform`,
+    ).all(id) as { id: string; platform: string }[]
+
+    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/schedule`)))
+    for (const p of posts) expect(row).toContain(`href="#d-${p.id}"`)
+    expect(row).toContain('معتمَدٌ بلا موعد')
+    expect(row).toContain('أُنشئت كلُّها')
+    expect(row).not.toContain('وما بقي لا يوافق')
+    expect(row).toContain('جدوِل منشوراتِ YouTube وTikTok وInstagram معًا بتوقيتك:')
+    expect(row).toContain('name="preset" value="tomorrow"')
+    expect(row).toContain('YouTube وTikTok لا يُنشران للعامّة')
+
+    // ‏«غدًا 9:00 ص» بتوقيت الرياض: كلٌّ إلى حساب منصّته، وما بلا حسابٍ يُسمّى ولا يُسقط غيرَه
+    const f = new FormData()
+    for (const p of posts) f.append('post', p.id)
+    f.set('preset', 'tomorrow')
+    const done = await app.request(`/panel/uploads/${id}/schedule`, withSession(`${cookie}; sada_tz=Asia%2FRiyadh`, { method: 'POST', body: f }), env)
+    expect(done.status).toBe(303)
+    expect(done.headers.get('Location')).toBe(`/panel#v-${id}`)
+    const after = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all() as
+      { platform: string; status: string; account_id: string | null; scheduled_at: string | null }[]
+    expect(after.map((r) => [r.platform, r.status, r.account_id])).toEqual([
+      ['instagram', 'queued', 'acc-ig'], ['tiktok', 'approved', null], ['youtube', 'queued', 'acc-yt'],
+    ])
+    // ‏التاسعةُ صباحًا بالرياض السادسةُ بـ UTC — أيًّا كانت ساعةُ الاختبار
+    expect(after[0]!.scheduled_at).toMatch(/ 06:00:00$/)
+    expect(after[0]!.scheduled_at).toBe(after[2]!.scheduled_at)
+    const flash = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(flash).toMatch(/جُدول على YouTube وInstagram [^<]* 09:00 بتوقيتك\./)
+    expect(flash).toContain('وتعذّر TikTok: لا حسابَ متّصلًا — اربطه أوّلًا.')
+    expect(flash).toContain('YouTube لا يُنشر للعامّة')
+    expect(flash).not.toContain('UTC.')
+  })
+
+  it('عنوانُ YouTube فوق حدّه يُقال بما سيُرفع بعد الإنشاء (ر-4)', async () => {
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    await create(cookie, id, `${'كلمة '.repeat(30)}\nوصف`, ['youtube'])
+    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(page).toContain('وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «')
+  })
+
+  it('والجدولةُ من بطاقة المنشور تقول إنّ YouTube يصل خاصًّا، وInstagram لا (ر-4)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
+      ('acc-ig', 'instagram', 'member', 'ig', 'omar', 'active')`).run()
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    await create(cookie, id, 'المعلمُ نقطةُ قرار', ['youtube', 'instagram'])
+    const when = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 16)
+    const flashFor = async (platform: string, account: string): Promise<string> => {
+      const post = db.raw.prepare(`SELECT id FROM posts WHERE platform = ?`).get(platform) as { id: string }
+      const f = new FormData()
+      f.set('id', post.id)
+      f.set('account', account)
+      f.set('when', when)
+      await app.request('/panel/drafts/schedule', withSession(cookie, { method: 'POST', body: f }), env)
+      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      // ‏الإشعارُ وحده لا الصفحة: نصُّ «جُدولت…» يُختبَر في موضعه، وهنا ما يُلحَق به
+      const at = html.indexOf('<div id="flash"')
+      return html.slice(at, html.indexOf('</div>', html.indexOf('جُدولت', at)))
+    }
+    // ‏وقناةُ YouTube (`org` كما يحفظها الربط) وجهةٌ في نموذج بطاقتها، لا «الصفحةُ مربوطة» (D-087)
+    const ytPost = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'youtube'`).get() as { id: string }
+    const board = await (await app.request('/panel', withSession(cookie), env)).text()
+    const ytCard = board.slice(board.indexOf(`id="d-${ytPost.id}"`), board.indexOf('</form>', board.indexOf(`id="s-${ytPost.id}"`)))
+    expect(ytCard).toContain('<option value="acc-yt">قناة عمر · YouTube</option>')
+    expect(ytCard).not.toContain('Community Management API')
+    const yt = await flashFor('youtube', 'acc-yt')
+    expect(yt).toContain('جُدولت')
+    expect(yt).toContain('YouTube لا يُنشر للعامّة: يصل قناتك خاصًّا')
+    const ig = await flashFor('instagram', 'acc-ig')
+    expect(ig).toContain('جُدولت')
+    expect(ig).not.toContain('لا يُنشر للعامّة')
+  })
+
+  it('موعدٌ لا تعرفه الأزرارُ لا يجدول شيئًا', async () => {
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    await create(cookie, id, 'نصّ', ['instagram'])
+    const f = new FormData()
+    f.set('preset', 'yesterday')
+    const r = await app.request(`/panel/uploads/${id}/schedule`, withSession(cookie, { method: 'POST', body: f }), env)
+    expect(r.status).toBe(303)
+    expect((db.raw.prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'`).get() as { n: number }).n).toBe(0)
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).toContain('موعدٌ لا أعرفه')
   })
 })
 
@@ -3318,6 +4019,47 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     expect((await app.request(to, withSession(cookie), env)).status).toBe(404)
   })
 
+  it('حقلُ الملفّ موصولٌ بسكربت القراءة الفوريّة، وزرُّ «اقرأ الخطّة» باقٍ لمن لا سكربتَ عنده (ر-5)', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const card = html.slice(html.indexOf('action="/panel/plan-import"'), html.indexOf('</form>', html.indexOf('action="/panel/plan-import"')))
+    expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV)</span>')
+    expect(card).toMatch(/<input type="file" name="file"[^>]*data-plan-file>/)
+    // ‏الاختيارُ هو الفعل؛ والزرُّ لمن لا سكربتَ عنده وحده، فلا يُضغط زرٌّ داكنٌ قبل اختيار الملفّ
+    expect(card).toContain('<noscript><button class="g" type="submit">اقرأ الخطّة</button></noscript>')
+    expect(card).toContain('<label class="btn p vpick">')
+  })
+
+  it('معاينةٌ انتهت مهلتُها صفحةٌ بالرافدة وزرٍّ إلى الرفع، لا نصٌّ خامّ (ر-5)', async () => {
+    const cookie = await login()
+    const r = await app.request(`/panel/plan-import/${crypto.randomUUID()}`, withSession(cookie), env)
+    expect(r.status).toBe(404)
+    expect(r.headers.get('Content-Type')).toContain('text/html')
+    const html = await r.text()
+    expect(html).toContain('<aside class="rail">')
+    expect(html).toContain('انتهت مهلةُ هذه المعاينة')
+    expect(html).toContain('<a class="btn p" href="/panel#plan-import">ارفع الملفّ من جديد</a>')
+  })
+
+  it('المعاينةُ على الهاتف: لكلّ خليّةٍ لصيقتُها، والمنصّةُ باسمها، والموعدُ كما فُهم، والاعتمادُ ملتصقٌ بالأسفل (ر-5)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+    const cookie = await login()
+    const csv = 'التاريخ,الوقت,المنصة,النص\n10/9/2027,9:30 AM,linkedin,أوّل\n10/13/2027,9:30,لينكدإن,ثانٍ\n'
+    const body = new FormData()
+    body.set('file', new Blob([csv], { type: 'text/csv' }), 'plan.csv')
+    const to = (await app.request('/panel/plan-import', withSession(cookie, { method: 'POST', body }), env)).headers.get('Location')!
+    const preview = await (await app.request(to, withSession(`${cookie}; sada_tz=Asia%2FRiyadh`), env)).text()
+    for (const label of ['الموعد', 'المنصّة', 'النصّ', 'المقطع', 'الحال']) expect(preview).toContain(`data-label="${label}"`)
+    // ‏«10/9» في ملفٍّ فيه «10/13» أكتوبرُ لا سبتمبر — ويُقال بالعربيّة
+    expect(preview).toContain('السبت 9 أكتوبر 2027 09:30')
+    expect(preview).toContain('<span class="ago">السطر 2</span>')
+    expect(preview).toContain('>LinkedIn<span class="ago">')
+    expect(preview).not.toContain('>linkedin<')
+    expect(preview).not.toContain('Asia/Riyadh')
+    expect(preview).toContain('<div class="row pi-bar">')
+    expect(preview).toContain('اعتمد وجدوِل منشورَين')
+  })
+
   it('ملفٌّ بغير UTF-8 (Windows-1256 من Excel) يُردّ باسم الصيغة التي تُصلحه ولا يُعايَن', async () => {
     const cookie = await login()
     const body = new FormData()
@@ -3335,7 +4077,8 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     const cookie = await login()
     const r = await app.request('/panel/plan-import/template.csv', withSession(cookie), env)
     expect(r.headers.get('Content-Type')).toBe('text/csv; charset=utf-8')
-    expect(await r.text()).toContain('date,time,platform,text,video')
+    // ‏والعناوينُ بالعربيّة: يقرؤها المالكُ في جدوله، والقراءةُ تقبلها
+    expect(await r.text()).toContain('التاريخ,الوقت,المنصة,النص,المقطع')
   })
 })
 

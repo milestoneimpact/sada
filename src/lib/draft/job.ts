@@ -5,7 +5,7 @@
  *
  *   ١ · اقرأ المصدر وخلاصته
  *   ٢ · إن لم يُحلَّل — لا مادّة تُكتب منها
- *   ٣ · إن سُوِّدت هذه النسخةُ لهذه المنصّة — اخرج بلا نداء (D-008)
+ *   ٣ · إن سُوِّدت هذه النسخةُ لهذه المنصّة ولم تُرفَض — اخرج بلا نداء (D-008)
  *   ٤ · **افحص الإيقاف والسقفين وسقفَ المزوّد** — قبل أيّ نداء
  *   ٥ · نادِ المزوّد الموجَّه لمهمّة `draft`
  *   ٦ · **سجّل الكلفة**
@@ -29,7 +29,7 @@ import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
 import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
-import type { Db } from '../tokens'
+import { atomically, type Db, type DbStatement } from '../tokens'
 import {
   DRAFT_SCHEMA, parseDraft, PLATFORMS, systemPrompt, userPrompt,
   type Platform, type SourceBrief,
@@ -43,7 +43,7 @@ export type DraftOutcome =
       readonly length: number
       readonly cost: number
     }
-  /** سُوِّدت هذه النسخةُ لهذه المنصّة — لا نداء ولا كلفة. */
+  /** سُوِّدت هذه النسخةُ لهذه المنصّة ولم تُرفَض — لا نداء ولا كلفة. */
   | { readonly kind: 'already'; readonly postId: string }
   /** منعه الإيقاف أو سقف. قرارٌ نُفِّذ لا فشل. */
   | { readonly kind: 'blocked'; readonly reason: string }
@@ -132,12 +132,21 @@ export async function draftPost(
   }
 
   // ٣ · أسُوِّدت هذه النسخةُ لهذه المنصّة؟
+  /*
+   * **والمرفوضةُ لا تُعدّ** — كما في الصور (D-087 · D-088) ومقاطع المالك.
+   *
+   * كان المفتاحُ يُطابَق أيًّا كانت حالُ المنشور: من رفض مسوّدةً ثمّ ضغط «اكتب مسوّدة»
+   * قيل له «✓ سُوّدت هذه النسخة — لم يُنفَق شيء» ولم يُكتب شيء، **ولا طريقَ إلى صياغةٍ
+   * أخرى إلّا بتعديل المستند في Drive**. فالمرفوضُ يبقى صفًّا بكلفته، ويُحرَّر مفتاحُه
+   * لحظةَ تُكتب البديلة (الخطوة ٧) لا قبلها. **وحارسُ النقرة المزدوجة باقٍ**: ما دامت
+   * البديلةُ قائمةً بالمفتاح نفسه، فالضغطةُ التالية `already`.
+   */
   const key = draftKey(row.id, platform, hash)
   const existing = await deps.db
-    .prepare('SELECT id FROM posts WHERE idempotency_key = ?')
+    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
     .bind(key)
-    .first<{ id: string }>()
-  if (existing !== null) return { kind: 'already', postId: existing.id }
+    .first<{ id: string; status: string }>()
+  if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
 
   // ٤ · الحارس العامّ قبل أيّ نداء
   const allowance = await checkAllowance(deps.db, 'draft')
@@ -256,8 +265,17 @@ export async function draftPost(
 
   // ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد
   const postId = crypto.randomUUID()
+  const statements: DbStatement[] = []
+  if (existing !== null) {
+    // ‏المرفوضُ يُحرِّر مفتاحَه في المعاملة نفسِها — **وشرطُ الحال فيها**: مرفوضةٌ أُعيدت
+    // ‏بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها، فيصطدم الإدراجُ بالقيد ويُقال `already`
+    statements.push(deps.db
+      .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id
+                 WHERE id = ? AND status = 'rejected'`)
+      .bind(existing.id))
+  }
   try {
-    await deps.db
+    statements.push(deps.db
       .prepare(
         `INSERT INTO posts
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
@@ -279,8 +297,8 @@ export async function draftPost(
         // X». فكان يُحسَب عند النشر (بعد الاعتماد) ولا يُعرَض قطّ (D-069)
         containsUrl(draft.draft.text) ? 1 : 0,
         key,
-      )
-      .run()
+      ))
+    await atomically(deps.db, statements)
   } catch (error) {
     // سباقٌ على المفتاح نفسه: الآخرُ سبق، وهذا ليس فشلا
     const message = error instanceof Error ? error.message : ''

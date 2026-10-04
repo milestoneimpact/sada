@@ -9,8 +9,10 @@ import {
   destroySession,
   listSessions,
   loadSession,
+  promoteSession,
   readCookie,
   revokeSessions,
+  safeNext,
   sessionCookie,
   SESSION_TTL_SECONDS,
 } from './session'
@@ -114,6 +116,45 @@ const validSession = async (
   request: Request,
   adminToken: string | undefined,
 ): Promise<boolean> => (await loadSession(store, request, adminToken)) !== null
+
+/**
+ * ‏**وجهةُ ما بعد الدخول قائمةُ سماح** (ر-11): المسارُ يأتي من نموذجٍ يكتبه المتصفّح،
+ * ‏فتوجيهٌ إلى ما يُكتب فيه بابٌ إلى أيّ موقع. وما لا يُقبَل يعود إلى الرئيسيّة.
+ */
+describe('safeNext', () => {
+  it('يقبل صفحاتِ اللوحة بمساراتها وأسئلتها ومراسيها', () => {
+    for (const ok of ['/panel', '/panel/report', '/panel#posts', '/panel?rows=platform&m=count', '/panel/channels/x?filter=failed#history']) {
+      expect(safeNext(ok)).toBe(ok)
+    }
+  })
+
+  it('ويردّ كلَّ ما يخرج من الأصل أو يلتفّ عليه', () => {
+    for (const bad of [
+      undefined, null, '', 'https://evil.example/panel', '//evil.example/panel', '/\\evil.example',
+      '/panel//evil.example', '/panel/\\evil', '/panelx', '/panel.evil.example', 'javascript:alert(1)',
+      '/panel/../admin', '/panel\r\nSet-Cookie: x=1', '/panel /x', '/panel/login', '/panel/logout', '/panel/2fa',
+      `/panel/${'a'.repeat(600)}`,
+    ]) {
+      expect(safeNext(bad)).toBe('/panel')
+    }
+  })
+
+  it('والجلسةُ المعلَّقة تحمل وجهتَها، والترقيةُ تُسقطها', async () => {
+    const made = await createSession(kv, TOKEN, TOKEN, undefined, { pending: true, next: '/panel/report' })
+    if ('error' in made) throw new Error('لم تُفتح')
+    const loaded = await loadSession(kv, withCookie(`${COOKIE}=${made.id}`), TOKEN)
+    expect(loaded?.record.next).toBe('/panel/report')
+    const promoted = await promoteSession(kv, loaded!)
+    expect(promoted.record.next).toBeUndefined()
+    // ‏ووجهةٌ مرفوضةٌ لا تُكتب، والكاملةُ لا تحملها أصلًا
+    const evil = await createSession(kv, TOKEN, TOKEN, undefined, { pending: true, next: '//evil.example' })
+    if ('error' in evil) throw new Error('لم تُفتح')
+    expect(evil.record.next).toBeUndefined()
+    const full = await createSession(kv, TOKEN, TOKEN, undefined, { next: '/panel/report' })
+    if ('error' in full) throw new Error('لم تُفتح')
+    expect(full.record.next).toBeUndefined()
+  })
+})
 
 describe('صلاحيّةُ الجلسة', () => {
   it('كعكة جلسةٍ قائمة تُقبل', async () => {

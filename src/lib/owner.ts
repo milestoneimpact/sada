@@ -17,6 +17,7 @@
  * هنا»** — ولا علامةَ صحٍّ على ما لم يُتحقَّق منه (D-061).
  */
 import { slideGate } from './image/gate'
+import { setupHref } from './channels'
 
 /** ماذا يفتح إنجازُ المهمّة — وبه تُرتَّب، لا بترقيمها. */
 export type Unblocks =
@@ -58,10 +59,41 @@ export interface OwnerTask {
   /**
    * أين يُتَّخذ القرار — **رابطٌ إلى موضعه لا شرحٌ له** (D-130). مهمّةٌ
    * ثمنُها ضغطةٌ في اللوحة تحمل بابَها، كما تحمل مهمّةُ السرّ أمرَها.
+   *
+   * ‏**ودالّةٌ حين يتبدّل البابُ بالحال** (ر-1): مهمّةُ الربط بابُها الضبطُ قبل السرّين
+   * ‏والربطُ بعدهما — وزرٌّ واحدٌ ثابتٌ يكذب في إحدى الحالين.
    */
-  readonly go?: string
+  readonly go?: string | ((facts: OwnerFacts) => string)
   /** اسمُ الباب على الزرّ — **فزرّان باسمٍ واحدٍ إلى بابين يكذبان** (D-122). */
-  readonly goLabel?: string
+  readonly goLabel?: string | ((facts: OwnerFacts) => string)
+}
+
+/**
+ * ‏الوثيقةُ معروضةً على GitHub — **تُفتَح من الهاتف**، ومرساةُ كلّ مهمّةٍ اسمُها (ر-1).
+ *
+ * ‏كانت الشاشةُ تقول «كلُّ مهمّةٍ لها صفحةٌ في docs/MANUAL-TASKS.md» نصًّا بلا رابط، والعناصرُ
+ * ‏الستّةُ هناك وحدها. والمرساةُ `<a name="m-24">` مكتوبةٌ فوق كلّ عنوان، وحارسٌ يُبقيها.
+ */
+export const TASKS_DOC = 'https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md'
+
+export function taskDoc(code: string): string {
+  return `${TASKS_DOC}#${code.toLowerCase()}`
+}
+
+/**
+ * ‏مهمّةُ ربطِ منصّة — **بابُها وحالُها من السرّين والحساب** (ر-1).
+ *
+ * ‏كانت M-14 وM-15 وM-24 «عليك» بلا زرّ، وM-24 تقول «ينتظر سرّيك» بعد حفظهما. فالبابُ
+ * ‏حقلُ المعرّف قبل السرّين، و«اربط» بعدهما — كما على بطاقة القناة.
+ */
+function linkTask(platform: string, label: string): Pick<OwnerTask, 'go' | 'goLabel' | 'evidence'> {
+  const ready = (f: OwnerFacts): boolean => f.appsConfigured.has(platform)
+  return {
+    go: (f) => (ready(f) ? `/oauth/${platform}/start` : setupHref(platform)),
+    goLabel: (f) => (ready(f) ? `اربط ${label}` : `اضبط ${label}`),
+    evidence: (f) =>
+      f.linked.has(platform) ? '' : ready(f) ? 'سرّا التطبيق محفوظان — بقي «اربط»' : 'ينقص سرّا التطبيق',
+  }
 }
 
 /** أمرُ ضبطِ سرٍّ واحد — بصيغة `MANUAL-TASKS.md` حرفًا. */
@@ -179,6 +211,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'والمقاطعُ الرأسيّةُ تُولَّد ولا تجد أين تذهب.',
     unblocks: 'capability',
     done: (f) => f.linked.has('youtube'),
+    ...linkTask('youtube', 'YouTube'),
   },
   {
     code: 'M-14',
@@ -186,15 +219,18 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     ifLeft: 'كسابقتها — والمقاطعُ تُولَّد ولا تجد أين تذهب.',
     unblocks: 'capability',
     done: (f) => f.linked.has('tiktok'),
+    ...linkTask('tiktok', 'TikTok'),
   },
   {
     code: 'M-24',
     title: 'ربطُ Instagram',
+    // ‏وحالُ السرّين في «ما قِيس» لا هنا: جملةٌ ثابتةٌ تقول «ينتظر سرّيك» بعد حفظهما
     ifLeft:
-      'لا شيءَ ينكسر — **والسائقُ مبنيٌّ وينتظر سرّيك**، ' +
-      'فالصورُ والمقاطعُ لا تُنشَر على Instagram.',
+      'لا شيءَ ينكسر — **والسائقُ مبنيٌّ**، ' +
+      'والصورُ والمقاطعُ لا تُنشَر على Instagram حتّى تربطه.',
     unblocks: 'capability',
     done: (f) => f.linked.has('instagram'),
+    ...linkTask('instagram', 'Instagram'),
   },
   {
     code: 'M-20',
@@ -205,8 +241,9 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     done: (f) => f.tilesChosen >= 6,
     evidence: (f) => `${f.tilesChosen} من 6 بطاقاتٍ مختارة`,
-    go: '/panel#settings',
-    goLabel: 'افتح الحدود',
+    // ‏إلى منتقي البطاقات نفسِه، لا رأسِ «الحدود» (ر-1)
+    go: '/panel#tiles',
+    goLabel: 'اختر بطاقاتك',
   },
   {
     code: 'M-21',
@@ -295,20 +332,26 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
   },
 ]
 
-export interface OwnerRow extends OwnerTask {
+export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {
   /** `true` تمّت · `false` لم تتمّ · `null` **لا يُعرَف من هنا**. */
   readonly state: boolean | null
   /** ما قِيس — أو فراغٌ إن لم يكن للمهمّة قياسٌ يُعرَض. */
   readonly measured: string
+  /** البابُ واسمُه محسوبَين من الحقائق. */
+  readonly go?: string
+  readonly goLabel?: string
 }
 
 /** يقرأ الحالَ لكلّ مهمّة — والترتيبُ: ما لم يتمّ أوّلا، ثمّ ما لا يُعرَف. */
 export function ownerRows(facts: OwnerFacts): OwnerRow[] {
   const weight: Record<Unblocks, number> = { gate: 0, guard: 1, capability: 2 }
-  return OWNER_TASKS.map((t) => ({
+  const at = (v: string | ((f: OwnerFacts) => string)): string => (typeof v === 'function' ? v(facts) : v)
+  return OWNER_TASKS.map(({ go, goLabel, ...t }): OwnerRow => ({
     ...t,
     state: t.done(facts),
     measured: t.evidence === undefined ? '' : t.evidence(facts),
+    ...(go === undefined ? {} : { go: at(go) }),
+    ...(goLabel === undefined ? {} : { goLabel: at(goLabel) }),
   })).sort((a, b) => {
     const rank = (r: OwnerRow): number => (r.state === false ? 0 : r.state === null ? 1 : 2)
     return rank(a) - rank(b) || weight[a.unblocks] - weight[b.unblocks]

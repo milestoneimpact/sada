@@ -21,6 +21,8 @@
  * فاختيارُ المالك لا يفتح بابَ إنفاق.
  */
 import { counted, NOUNS } from './format'
+import { systemPill } from './home'
+import type { Pulse } from './ops/heartbeat'
 
 /**
  * ما تحتاجه البطاقاتُ من بيانات اللوحة — **وهذا كلُّه**.
@@ -31,6 +33,11 @@ import { counted, NOUNS } from './format'
  */
 export interface TileSource {
   readonly paused: boolean
+  /**
+   * ‏نبضُ الدورات — **ومنه حكمُ «حالُ النظام» كما تحكم به حبّةُ الرأس** (مراجعة الرحلات). كانت البطاقةُ
+   * ‏«يعمل» من مفتاح الإيقاف وحده، والحبّةُ فوقها «النشر متوقّف» من النبض: جوابان متناقضان في شاشة.
+   */
+  readonly pulses: readonly Pulse[]
   readonly autoEnqueue: boolean
   /**
    * ما ينقص الشريحةَ — من `slideGate` (D-163). كان `browserToken` يعدّ
@@ -41,7 +48,13 @@ export interface TileSource {
   readonly spendCap: number
   readonly usedAnalyses: number
   readonly usedSpend: number
-  readonly spend30d: number
+  /**
+   * إنفاقُ ثلاثين يومًا **من الدفتر كلِّه**، صفًّا لكلّ جهة — لا من مزوّدي الذكاء
+   * وحدهم: كان التعليقُ يعدّ نداءاتِ الذكاء والرقمُ فوقه يجمع X معها.
+   */
+  readonly spendBy: readonly { readonly calls: number; readonly total: number }[]
+  /** ما أُنفق منذ أوّل الشهر بتوقيت المالك — و`utc` حين غابت منطقتُه فحُسب بـ UTC. */
+  readonly spendMonth: { readonly total: number; readonly utc: boolean }
   readonly series: readonly { day: string; total: number }[]
   readonly sources: readonly { analyzed: boolean; stale: boolean }[]
   readonly providers: readonly { configured: boolean; calls: number }[]
@@ -97,8 +110,8 @@ const stillWaiting = (d: TileSource): number =>
 /**
  * الكتالوج — **مرتَّبٌ كما يُعرَض في شاشة الاختيار**.
  *
- * والأربعُ الأولى هي التي كانت مكتوبةً في الشيفرة، فمن لم يختر شيئا
- * رآها كما كانت. **ولا شاشةَ فارغةً في أوّل يوم.**
+ * والأربعُ الأولى هي الافتراض (`DEFAULT_TILES`)، فمن لم يختر شيئا
+ * رآها. **ولا شاشةَ فارغةً في أوّل يوم.**
  */
 export const TILES: readonly TileSpec[] = [
   {
@@ -141,14 +154,33 @@ export const TILES: readonly TileSpec[] = [
     },
   },
   {
-    id: 'spend_30d',
-    label: 'إنفاق 30 يوما',
-    why: 'المجموعُ الشهريُّ، ومَن أنفقه.',
+    /*
+     * **«هذا الشهر» رقمٌ لا يُستنتَج** (ر-10). كانت «إنفاق 30 يوما» في مكانه،
+     * ووصفُها «المجموعُ الشهريّ» وهي آخرُ ثلاثين يومًا متحرّكة — فيدخل فيها
+     * من الشهر الماضي، ولا رقمَ لـ«هذا الشهر» في اللوحة كلِّها.
+     */
+    id: 'spend_month',
+    label: 'إنفاق هذا الشهر',
+    why: 'ما أُنفق منذ أوّل الشهر بتوقيتك، على الكتابة والصور والنشر معًا.',
     of: (d, f) => ({
-      value: f.money(d.spend30d),
-      note: `${d.providers.filter((p) => p.calls > 0).length} مزوّدا نشطا · ${
-        d.providers.reduce((sum, p) => sum + p.calls, 0)} نداءً`,
+      value: f.money(d.spendMonth.total),
+      note: d.spendMonth.utc ? 'منذ أوّل الشهر بتوقيت UTC' : 'منذ أوّل الشهر',
     }),
+  },
+  {
+    id: 'spend_30d',
+    label: 'إنفاق 30 يومًا',
+    why: 'آخرُ ثلاثين يومًا متّصلة، وعلى كم خدمةٍ توزّعت.',
+    of: (d, f) => {
+      const calls = d.spendBy.reduce((sum, s) => sum + s.calls, 0)
+      return {
+        value: f.money(d.spendBy.reduce((sum, s) => sum + s.total, 0)),
+        // ‏والعددُ من «counted» (D-177): «6 طلبات إلى خدمتَين» لا «1 مزوّدا نشطا · 6 نداءً»
+        note: calls === 0
+          ? 'لا طلبَ مدفوعًا في 30 يومًا'
+          : `${counted(calls, NOUNS.request)} إلى ${counted(d.spendBy.length, NOUNS.service, 'gen')}`,
+      }
+    },
   },
   {
     id: 'drafts_waiting',
@@ -256,11 +288,12 @@ export const TILES: readonly TileSpec[] = [
   {
     id: 'system_state',
     label: 'حالُ النظام',
-    why: 'مفتاحُ الإيقاف والإدراجُ الآليّ ومفتاحُ المتصفّح في بطاقةٍ واحدة.',
+    why: 'أتدور الدوراتُ — من نبضها كحبّة الرأس — ومعها مفتاحُ الإيقاف والإدراجُ الآليّ ومفتاحُ المتصفّح.',
     of: (d) => {
       const on = [!d.paused, d.autoEnqueue, d.slide.missing.length === 0].filter(Boolean).length
+      // ‏والحكمُ حكمُ الحبّة نفسُه (`systemPill`): لا «يعمل» هنا و«النشر متوقّف» فوقها
       return {
-        value: d.paused ? 'موقوف' : 'يعمل',
+        value: systemPill(d.paused, d.pulses).text,
         note: `${on} من 3 مفاتيحَ مرفوعة`,
       }
     },
@@ -276,9 +309,12 @@ export const TILES: readonly TileSpec[] = [
   },
 ]
 
-/** الأربعُ التي كانت مكتوبةً في الشيفرة — **وهي الافتراض**. */
+/**
+ * الأربعُ الافتراضيّة — **و«هذا الشهر» رابعتُها مكانَ «30 يومًا»** (ر-10): من
+ * اختار «30 يومًا» بقيت له، ومن لم يختر شيئًا يرى شهرَه.
+ */
 export const DEFAULT_TILES: readonly string[] = [
-  'analyses_today', 'spend_today', 'sources_analyzed', 'spend_30d',
+  'analyses_today', 'spend_today', 'sources_analyzed', 'spend_month',
 ]
 
 /** أقلُّ ما يُعرَض وأكثرُه — **وصفٌّ من سبعٍ لا يُقرأ صفّا**. */

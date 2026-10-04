@@ -11,9 +11,10 @@
  * نفسِه مرّتين لا يصنع منشورًا مكرّرًا.
  */
 import { atomically, type Db, type DbStatement } from '../tokens'
-import type { LinkedAccount } from '../channels'
+import { isLinkedInPage, type LinkedAccount } from '../channels'
 import { postLength } from '../draft/length'
 import { localParts, validZone } from '../time/zone'
+import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
 
@@ -100,26 +101,86 @@ export function parseCsvRecords(input: string): { readonly cells: string[]; read
 }
 
 /**
- * لحظةٌ محلّيّةٌ في منطقةٍ إلى UTC — **بالمنطقة لا بإزاحةٍ ثابتة**: الإزاحةُ تتبدّل مع
- * التوقيت الصيفيّ في مناطق المالك المحتملة. تُخمَّن ثمّ تُصحَّح مرّتين بما يقوله `Intl`.
+ * الأرقامُ العربيّةُ والفارسيّةُ لاتينيّة، وعلاماتُ الاتّجاه والتشكيلُ تُمحى. Excel العربيُّ
+ * و«لوحةُ المفاتيح العربيّة» يكتبان «٢٠٢٦-١٠-٠٩» و«٩:٠٠ م»، وكانا يُردّان «غيرَ مفهومَين».
  */
-export function zonedToUtc(date: string, time: string, zone: string): Date | null {
-  const d = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date.trim())
-  const t = /^(\d{1,2}):(\d{2})$/.exec(time.trim())
-  if (d === null || t === null) return null
-  const [y, mo, da, h, mi] = [Number(d[1]), Number(d[2]), Number(d[3]), Number(t[1]), Number(t[2])]
-  if (mo < 1 || mo > 12 || da < 1 || da > 31 || h > 23 || mi > 59) return null
-  const wanted = Date.UTC(y, mo - 1, da, h, mi)
-  let guess = wanted
-  for (let i = 0; i < 2; i++) {
-    const p = localParts(new Date(guess), zone)
-    const seen = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute)
-    guess += wanted - seen
+function latin(s: string): string {
+  return s
+    .replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x06f0))
+    .replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069\u064B-\u0652]/g, '')
+    .trim()
+}
+
+/** ترتيبُ اليوم والشهر في «10/9/2026» — للملفّ كلِّه، لا لكلّ صفٍّ وحده. */
+export type DateOrder = 'dmy' | 'mdy'
+
+const SLASHED = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})$/
+
+/**
+ * ترتيبُ الملفّ من صفوفه (D-182): **اليومُ أوّلًا كما في الإعداد العربيّ**، إلّا أن يكون
+ * في الملفّ تاريخٌ ثانيه فوق 12 ولا تاريخَ أوّلُه فوقها — فذاك ملفٌّ حُفظ بإعدادٍ أمريكيّ
+ * («10/13/2026»)، وصفوفُه كلُّها شهرٌ ثمّ يوم. والمعاينةُ تقول التاريخَ بالعربيّة
+ * («الجمعة 9 أكتوبر») فيرى المالكُ ما فُهم قبل أن يعتمد.
+ */
+export function dateOrder(dates: readonly string[]): DateOrder {
+  let dayFirst = false
+  let monthFirst = false
+  for (const raw of dates) {
+    const m = SLASHED.exec(latin(raw).split(/[ T]/)[0] ?? '')
+    if (m === null) continue
+    if (Number(m[1]) > 12) dayFirst = true
+    if (Number(m[2]) > 12) monthFirst = true
   }
-  const check = localParts(new Date(guess), zone)
-  // ‏تاريخٌ لا وجودَ له (31 فبراير) يتحرّك عند `Date.UTC` — فيُردّ ولا يُصحَّح بصمت
-  if (check.year !== y || check.month !== mo || check.day !== da || check.hour !== h || check.minute !== mi) return null
-  return new Date(guess)
+  return monthFirst && !dayFirst ? 'mdy' : 'dmy'
+}
+
+/** «2026-10-09» و«9/10/2026» و«٩-١٠-٢٠٢٦» إلى أجزائها — و`null` لما لا يُفهم. */
+function readDate(raw: string, order: DateOrder): { y: number; mo: number; d: number } | null {
+  const s = latin(raw)
+  const iso = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(s)
+  if (iso !== null) return { y: Number(iso[1]), mo: Number(iso[2]), d: Number(iso[3]) }
+  const m = SLASHED.exec(s)
+  if (m === null) return null
+  const [a, b] = [Number(m[1]), Number(m[2])]
+  const y = m[3]!.length === 2 ? 2000 + Number(m[3]) : Number(m[3])
+  // ‏وإن زاد الثاني على 12 فهو اليومُ أيًّا كان ترتيبُ الملفّ
+  const monthFirst = b > 12 || (order === 'mdy' && a <= 12)
+  return monthFirst ? { y, mo: a, d: b } : { y, mo: b, d: a }
+}
+
+/** «9:30» و«09:30:00» و«9:30 PM» و«9:00 م» و«٩ مساءً» إلى ساعةٍ ودقيقة بنظام 24. */
+function readTime(raw: string): { h: number; mi: number } | null {
+  const s = latin(raw).toLowerCase().replace(/\s+/g, ' ')
+  const m = /^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm|a\.m\.|p\.m\.|ص|صباحا|صباح|م|مساءا|مساء)?$/.exec(s)
+  if (m === null) return null
+  const h = Number(m[1])
+  const mi = m[2] === undefined ? 0 : Number(m[2])
+  if (mi > 59) return null
+  const meridiem = m[3]
+  // ‏ساعةٌ وحدها بلا «ص» ولا «م» لا تُفهم: «9» صباحٌ أم مساء؟
+  if (meridiem === undefined) return m[2] === undefined || h > 23 ? null : { h, mi }
+  if (h > 12) return null
+  const pm = meridiem.startsWith('p') || meridiem.startsWith('م')
+  return { h: (h % 12) + (pm ? 12 : 0), mi }
+}
+
+/**
+ * موعدُ الصفّ كما فهمه صدى: `local` بلا منطقة (`YYYY-MM-DD HH:MM`، ومنه المفتاح)،
+ * و`at` اللحظةُ بمنطقته. **وخليّةُ التاريخ قد تحمل وقتًا** («10/9/2026 9:30» من عمود
+ * تاريخٍ ووقت في Excel): يُؤخذ إن خلت خليّةُ الوقت، وإلّا فخليّةُ الوقت أولى.
+ */
+export function readWhen(
+  date: string, time: string, zone: string | null, order: DateOrder = 'dmy',
+): { readonly local: string; readonly at: Date } | null {
+  const [datePart = '', ...rest] = latin(date).split(/[ T]+/)
+  const d = readDate(datePart, order)
+  const t = readTime(time.trim() === '' ? rest.join(' ') : time)
+  if (d === null || t === null) return null
+  const at = localToUtc(d.y, d.mo, d.d, t.h, t.mi, zone)
+  if (at === null) return null
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return { local: `${d.y}-${two(d.mo)}-${two(d.d)} ${two(t.h)}:${two(t.mi)}`, at }
 }
 
 export interface PlanRow {
@@ -134,8 +195,15 @@ export interface PlanRow {
   readonly zoneCell: string
   readonly text: string
   readonly video: string
-  /** الموعدُ بصيغة الجدولة (`YYYY-MM-DDTHH:MM` بـ UTC). */
+  /** الموعدُ بصيغة الجدولة (`YYYY-MM-DDTHH:MM` بـ UTC) — و`null` إن لم يُفهم أو مضى. */
   readonly whenUtc: string | null
+  /**
+   * الموعدُ كما فُهم ولو مضى (`YYYY-MM-DDTHH:MM` بـ UTC) — تعرضه المعاينةُ بالعربيّة
+   * («الجمعة 9 أكتوبر 09:30»)، فيرى المالكُ أنّ «10/9» قُرئت أكتوبر لا سبتمبر قبل أن يعتمد.
+   */
+  readonly understoodUtc: string | null
+  /** الموعدُ المحلّيُّ بصيغةٍ واحدة (`YYYY-MM-DD HH:MM`) أيًّا كانت كتابتُه — ومنه المفتاح. */
+  readonly local: string | null
   readonly accountId: string | null
   readonly accountName: string | null
   readonly uploadId: string | null
@@ -199,6 +267,7 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
     return i < 0 ? '' : (r[i] ?? '').trim()
   }
   const seen = new Map<string, number>()
+  const order = dateOrder(body.map(({ cells }) => cell(cells, 'date')))
   const rows = body.map(({ cells: r, line }): PlanRow => {
     const problems: string[] = []
     const platformRaw = cell(r, 'platform')
@@ -215,8 +284,9 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
     if (zone === '') problems.push(`منطقةٌ زمنيّةٌ لا أعرفها: «${zoneRaw}» — مثل Asia/Riyadh`)
 
     let whenUtc: string | null = null
-    const at = zone === '' ? null : zonedToUtc(date, time, zone)
-    if (at === null) problems.push(`موعدٌ غيرُ مفهوم: «${date} ${time}» — التاريخ YYYY-MM-DD والوقت HH:MM`)
+    const when = zone === '' ? null : readWhen(date, time, zone, order)
+    const at = when?.at ?? null
+    if (at === null) problems.push(`لم أفهم الموعد «${`${date} ${time}`.trim()}» — اكتبه مثل 2026-10-09 و9:30`)
     else if (at.getTime() <= facts.now.getTime() + 15 * 60_000) problems.push('الموعدُ مضى أو أقربُ من ربع ساعة')
     else whenUtc = at.toISOString().slice(0, 16)
 
@@ -251,11 +321,10 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
 
     // ‏الحسابُ: أوّلُ حسابٍ نشطٍ على المنصّة — وبلا حسابٍ لا موعد. وصفحةُ الشركة على
     // LinkedIn لا تُختار (D-087): النشرُ باسمها لم يُبنَ، فمنشورُها يُردّ ساعةَ النشر
-    const page = (a: LinkedAccount): boolean => a.platform === 'linkedin' && a.kind === 'org'
     const account = platform === null ? undefined
-      : facts.accounts.find((a) => a.platform === platform && a.status === 'active' && !page(a))
+      : facts.accounts.find((a) => a.platform === platform && a.status === 'active' && !isLinkedInPage(a))
     if (platform !== null && account === undefined) {
-      problems.push(facts.accounts.some((a) => a.platform === platform && a.status === 'active' && page(a))
+      problems.push(facts.accounts.some((a) => a.platform === platform && a.status === 'active' && isLinkedInPage(a))
         ? 'المتّصلُ على LinkedIn صفحةُ شركة — والنشرُ باسمها لم يُبنَ بعد؛ اربط حسابَك الشخصيّ'
         : `لا حسابَ متّصلًا على ${LABEL[platform]} — اربطه أوّلًا`)
     }
@@ -277,6 +346,7 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
 
     return {
       line, platform, platformRaw, date, time, zone, zoneCell: zoneRaw, text, video, whenUtc,
+      understoodUtc: at === null ? null : at.toISOString().slice(0, 16), local: when?.local ?? null,
       accountId: account?.id ?? null, accountName: account?.displayName ?? null, uploadId, problems,
     }
   })
@@ -290,9 +360,12 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
  * ونُشر كلُّ صفٍّ مرّتين (D-182). والمنطقةُ تدخل المفتاحَ إن كتبها الملفّ وحده.
  */
 export async function rowKey(row: PlanRow): Promise<string> {
-  // ‏«2026-10-2» و«9:30» كـ«2026-10-02» و«09:30»: صيغتان لموعدٍ واحد
+  // ‏«2026-10-2» و«9:30» و«2/10/2026» و«9:30 ص» موعدٌ واحد: المفتاحُ من الموعد كما فُهم بلا منطقة.
+  // ‏فملفٌّ أعاد Excel حفظَ تواريخه بصيغةٍ أخرى لا يصنع منشوراتٍ مكرّرة. وصيغتُه «2026-10-02|09:30»
+  // ‏هي صيغةُ المفتاح قبلها، فما اعتُمد من قبل يبقى مفتاحُه
   const pad = (s: string): string => s.trim().replace(/(^|[-:])(\d)(?=$|[-:])/g, '$10$2')
-  const raw = [row.platform, pad(row.date), pad(row.time), row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
+  const [day, clock] = row.local === null ? [pad(row.date), pad(row.time)] : row.local.split(' ')
+  const raw = [row.platform, day, clock, row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   return `plan:${[...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
 }
@@ -385,9 +458,12 @@ export async function applyPlan(
   return out
 }
 
-/** نموذجُ الملفّ — العنوانُ وصفّان يُريان الصيغة، ويُفتح في Excel وGoogle Sheets. */
+/**
+ * نموذجُ الملفّ — العنوانُ وصفّان يُريان الصيغة، ويُفتح في Excel وGoogle Sheets.
+ * **والعناوينُ بالعربيّة**: المالكُ يقرؤها في جدوله، والقراءةُ تقبلها بالعربيّة والإنجليزيّة.
+ */
 export const PLAN_TEMPLATE = '﻿' + [
-  'date,time,platform,text,video',
-  '2026-10-12,09:30,linkedin,"المعلمُ ليس نقطةً على الخطّ الزمنيّ — هو نقطةُ قرار.",',
-  '2026-10-13,18:00,youtube,"ثلاثُ طبقاتٍ للحوكمة في دقيقة",قيادة المعالم.mp4',
+  'التاريخ,الوقت,المنصة,النص,المقطع',
+  '2026-10-12,09:30,LinkedIn,"المعلمُ ليس نقطةً على الخطّ الزمنيّ — هو نقطةُ قرار.",',
+  '2026-10-13,18:00,YouTube,"ثلاثُ طبقاتٍ للحوكمة في دقيقة",قيادة المعالم.mp4',
 ].join('\r\n') + '\r\n'

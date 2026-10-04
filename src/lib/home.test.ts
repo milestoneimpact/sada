@@ -2,7 +2,11 @@
 import { describe, expect, it } from 'vitest'
 import { viewChannels, type LinkedAccount } from './channels'
 import { counted, NOUNS } from './format'
-import { journeyCounts, journeySteps, nextAction, platformTile, type HomeFacts, type PlatformCounts } from './home'
+import {
+  journeyCounts, journeySteps, nextAction, platformTile, systemPill, writeBlock,
+  type HomeFacts, type PlatformCounts,
+} from './home'
+import { pulses, type Heartbeat } from './ops/heartbeat'
 import { fakeDb } from '../test/fakes'
 
 const acc = (over: Partial<LinkedAccount>): LinkedAccount => ({
@@ -20,8 +24,20 @@ const facts = (over: Partial<HomeFacts> = {}): HomeFacts => ({
   withoutImage: 0,
   withImage: 0,
   openSuggestions: 0,
+  firsts: { waiting: null, unscheduled: null, withoutImage: null },
+  pulses: [],
+  blocker: null,
+  zone: null,
   ...over,
 })
+
+const NOW = new Date('2026-10-04T12:00:00Z')
+/** نبضُ الدورات كلِّها في موعدها، إلّا ما يُبدَّل منه. */
+const beats = (over: Partial<Record<Heartbeat['job'], Partial<Heartbeat>>> = {}): ReturnType<typeof pulses> =>
+  pulses((['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report'] as const).map((job) => ({
+    job, at: '2026-10-04 11:55:00', outcome: 'ok' as const, detail: null, ...over[job],
+  })), NOW)
+const FAILED = '/panel/channels/x?filter=failed#history'
 
 describe('counted', () => {
   it('واحدٌ بوصفه، واثنان بالمثنّى، والجمعُ إلى عشرة، والتمييزُ بعدها', () => {
@@ -46,7 +62,9 @@ describe('nextAction', () => {
     const f = facts({ counts: { perPlatform: { linkedin: counts({ draft: 3 }), x: counts({ failed: 1 }) }, publishedWeek: 0 } })
     const a = nextAction(f)
     expect(a.tone).toBe('bad')
-    expect(a.href).toBe('/panel/channels/x')
+    // ‏إلى صفّ الفشل بسببه وزرِّ إعادته، لا إلى رأس صفحة المنصّة (ر-8)
+    expect(a.href).toBe(FAILED)
+    expect(a.label).toBe('أصلح المنشور')
     expect(a.text).toContain('منشورٌ واحد')
   })
 
@@ -70,7 +88,7 @@ describe('nextAction', () => {
     expect(nextAction(old)).toMatchObject({ tone: 'ok', label: 'راجع المسوّدات' })
     const fresh = facts({ counts: { perPlatform: { linkedin: counts({ draft: 2 }), x: counts({ failed: 3, recentFailed: 1 }) }, publishedWeek: 0 } })
     const a = nextAction(fresh)
-    expect(a).toMatchObject({ tone: 'bad', href: '/panel/channels/x' })
+    expect(a).toMatchObject({ tone: 'bad', href: FAILED })
     expect(a.text).toContain('منشورٌ واحد')
   })
 
@@ -86,6 +104,101 @@ describe('nextAction', () => {
     const idle = nextAction(facts({ sources: none, counts: { perPlatform: { youtube: counts({ published: 4 }) }, publishedWeek: 0 } }))
     expect(idle).toMatchObject({ tone: 'ok', href: '#videos' })
     expect(idle.text).not.toContain('مصدرٍ محلَّل')
+  })
+})
+
+/**
+ * ‏**والزرُّ والمحطّةُ ينزلان إلى البطاقة لا إلى رأس اللوح** (ر-0، ر-2، ر-3، ر-6): كانت
+ * ‏أربعُ محطّاتٍ كلُّها `#posts`، و«اعتمد» على بُعد ‏١٢٩٠px و«جدوِل» على ‏٣٠٩٠ على الهاتف.
+ */
+describe('المحطّاتُ والفعلُ إلى البطاقة نفسِها', () => {
+  const busy = {
+    perPlatform: { linkedin: counts({ draft: 2, approved: 1 }), x: counts({ queued: 1, nextAt: '2026-10-05 09:00:00' }) },
+    publishedWeek: 0,
+  }
+  const firsts = { waiting: 'p-wait', unscheduled: 'p-ok', withoutImage: 'p-bare' }
+
+  it('«الاعتماد» إلى أوّل مسوّدةٍ تنتظر، و«الموعد» إلى نموذج جدولة أوّل معتمَد، و«الصورة» إلى لوح صورته', () => {
+    const by = Object.fromEntries(journeySteps(facts({ counts: busy, withoutImage: 2, firsts })).map((s) => [s.key, s.href]))
+    expect(by['approve']).toBe('#d-p-wait')
+    expect(by['schedule']).toBe('#s-p-ok')
+    expect(by['image']).toBe('#i-p-bare')
+    // ‏و«المسوّدة» محطّةُ الكتابة: إلى بطاقتها في آخر اللوح
+    expect(by['draft']).toBe('#write')
+  })
+
+  it('وبطاقةٌ لم تُرسَم (خارج الستّين) تُبقي رأسَ اللوح — لا مرساةً لا تجد شيئًا', () => {
+    const by = Object.fromEntries(journeySteps(facts({ counts: busy, withoutImage: 2 })).map((s) => [s.key, s.href]))
+    expect(by['approve']).toBe('#posts')
+    expect(by['schedule']).toBe('#posts')
+    expect(by['image']).toBe('#posts')
+  })
+
+  it('والفعلُ يقصد البطاقةَ نفسَها ويسمّي محطّتَه', () => {
+    expect(nextAction(facts({ counts: busy, firsts }))).toMatchObject({ href: '#d-p-wait', step: 'approve' })
+    const ready = { perPlatform: { linkedin: counts({ approved: 1 }) }, publishedWeek: 0 }
+    expect(nextAction(facts({ counts: ready, firsts }))).toMatchObject({ href: '#s-p-ok', step: 'schedule' })
+    // ‏ولا شيءَ ينتظر: «اكتب من مصدر» إلى بطاقة الكتابة لا إلى رأس اللوح
+    const idle = { perPlatform: { linkedin: counts({ published: 3 }) }, publishedWeek: 0 }
+    expect(nextAction(facts({ counts: idle }))).toMatchObject({ label: 'اكتب من مصدر', href: '#write', step: 'draft' })
+  })
+})
+
+/**
+ * ‏**الإرسالُ المتوقّف يُقال في الشاشة الأولى** (الخطّة 5.5/7، 5.9): كانت الحبّةُ «يعمل»
+ * ‏خضراءَ والدوراتُ متوقّفةٌ منذ ثلاثة أيّام، و«خطوتك التالية» كما هي.
+ */
+describe('حبّةُ النظام ونبضُ الإرسال', () => {
+  const stale = beats({ dispatch: { at: '2026-10-01 12:00:00' } })
+
+  it('الإرسالُ المتأخّر يوقف النشرَ — حبّةٌ حمراء وفعلٌ قبل الفشل', () => {
+    expect(systemPill(false, stale)).toEqual({ tone: 'bad', text: 'النشر متوقّف' })
+    const f = facts({ pulses: stale, counts: { perPlatform: { x: counts({ failed: 1 }) }, publishedWeek: 0 } })
+    const a = nextAction(f, NOW)
+    expect(a).toMatchObject({ tone: 'bad', href: '#machine', label: 'افحص الآلة' })
+    expect(a.text).toContain('قبل 3 أيّام')
+  })
+
+  it('وفشلُ آخر إرسالٍ مثلُه — والإيقافُ بقرارك يسبقهما', () => {
+    const failed = beats({ dispatch: { outcome: 'failed' } })
+    expect(nextAction(facts({ pulses: failed }), NOW)).toMatchObject({ tone: 'bad', href: '#machine' })
+    expect(systemPill(true, failed)).toEqual({ tone: 'off', text: 'موقوف مؤقتا' })
+    expect(nextAction(facts({ pulses: failed, paused: true }), NOW).href).toBe('#settings')
+  })
+
+  it('ودورةٌ أخرى تتأخّر لا تقول «النشر متوقّف» — ولا تبقى «يعمل» صامتة', () => {
+    const scan = beats({ scan: { at: '2026-09-30 03:00:00' } })
+    expect(systemPill(false, scan)).toEqual({ tone: 'off', text: 'يعمل بتأخّر' })
+    expect(nextAction(facts({ pulses: scan }), NOW).href).not.toBe('#machine')
+    expect(systemPill(false, beats())).toEqual({ tone: 'on', text: 'يعمل' })
+    // ‏ودفعةُ نشرٍ فشلت فشلُ منشورٍ يقوله فرعُ الفشل بسببه، لا توقّفٌ للإرسال
+    expect(systemPill(false, beats({ publish: { outcome: 'failed' } })).text).not.toBe('النشر متوقّف')
+  })
+})
+
+/** ‏**سقفُ اليوم في «خطوتك التالية» وتحت زرّ الكتابة**، وساعةُ انفتاحه بتوقيت المالك (ر-10). */
+describe('سقفُ الإنفاق اليوميّ', () => {
+  const cap = { kind: 'spend_cap', used: 6.06, cap: 5 } as const
+
+  it('فعلٌ برتقاليٌّ إلى حقل السقف، وساعةُ الانفتاح بتوقيتك', () => {
+    const a = nextAction(facts({ blocker: cap, zone: 'Asia/Riyadh' }), NOW)
+    expect(a).toMatchObject({ tone: 'warn', href: '#c2', label: 'ارفع السقف' })
+    expect(a.text).toContain('6.06$ من 5.00$')
+    // ‏منتصفُ ليل UTC هو الثالثةُ فجرًا في الرياض
+    expect(a.text).toContain('الساعة 03:00 بتوقيتك')
+    expect(nextAction(facts({ blocker: cap }), NOW).text).toContain('منتصفَ الليل بتوقيت UTC')
+  })
+
+  it('والفشلُ الحديثُ يسبقه — السقفُ لا يوقف النشر', () => {
+    const f = facts({ blocker: cap, counts: { perPlatform: { x: counts({ failed: 1 }) }, publishedWeek: 0 } })
+    expect(nextAction(f, NOW).href).toBe(FAILED)
+  })
+
+  it('وسببُ تعطيل زرّ الكتابة من الحاجز نفسِه', () => {
+    expect(writeBlock(null, NOW, null)).toBeNull()
+    expect(writeBlock(cap, NOW, 'Asia/Riyadh')).toMatchObject({ href: '#c2' })
+    expect(writeBlock(cap, NOW, 'Asia/Riyadh')!.text).toContain('يُفتح الساعة 03:00 بتوقيتك')
+    expect(writeBlock({ kind: 'paused' }, NOW, null)).toMatchObject({ href: '#settings' })
   })
 })
 
@@ -107,7 +220,7 @@ describe('journeySteps', () => {
     expect(by['source']!.note).toBe('ينتظر التحليلَ مصدران')
     expect(by['approve']!).toMatchObject({ state: 'now', note: 'تنتظر قرارك مسوّدتان' })
     expect(by['schedule']!).toMatchObject({ state: 'now', note: 'بلا موعد: منشورٌ واحد' })
-    expect(by['publish']!).toMatchObject({ state: 'failed', href: '/panel/channels/x' })
+    expect(by['publish']!).toMatchObject({ state: 'failed', href: FAILED })
     expect(by['results']!.state).toBe('waiting')
   })
 
@@ -141,7 +254,7 @@ describe('journeySteps', () => {
       counts: { perPlatform: { x: counts({ failed: 2, recentFailed: 0 }) }, publishedWeek: 0 },
     }))
     const publish = old.find((s) => s.key === 'publish')!
-    expect(publish).toMatchObject({ state: 'waiting', href: '/panel/channels/x', note: 'فشل منشوران قبل أسبوعٍ فأكثر' })
+    expect(publish).toMatchObject({ state: 'waiting', href: FAILED, note: 'فشل منشوران قبل أسبوعٍ فأكثر' })
     expect(old.some((s) => s.state === 'failed')).toBe(false)
     const fresh = journeySteps(facts({
       counts: { perPlatform: { x: counts({ failed: 2, recentFailed: 1 }) }, publishedWeek: 0 },
@@ -183,7 +296,7 @@ describe('journeyCounts', () => {
 
     const c = await journeyCounts(db, now)
     expect(c.perPlatform['x']).toMatchObject({ failed: 3, recentFailed: 1 })
-    expect(nextAction(facts({ counts: c }))).toMatchObject({ tone: 'bad', href: '/panel/channels/x' })
+    expect(nextAction(facts({ counts: c }))).toMatchObject({ tone: 'bad', href: FAILED })
 
     // ‏ويمضي الأسبوعُ على الحديث فتهدأ الرئيسيّة
     const later = await journeyCounts(db, new Date('2026-10-12T12:00:00Z'))

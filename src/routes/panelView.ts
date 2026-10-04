@@ -32,6 +32,7 @@ import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow, status as chip } from './ui/parts'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
+import type { SpendRow } from '../lib/ai/spend'
 import { ICON } from './ui/icons'
 import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
@@ -41,7 +42,8 @@ import { railHtml } from './ui/rail'
 import { videosSection } from './ui/sections/videos'
 import { planImportCard } from './ui/planImportView'
 import type { UploadRow } from '../lib/media/uploads'
-import type { JourneyCounts } from '../lib/home'
+import { systemPill, writeBlock, type JourneyCounts } from '../lib/home'
+import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
 
@@ -57,7 +59,26 @@ export interface LoginState {
   readonly blocked?: boolean
   /** أثمّة مفاتيحُ مرورٍ مسجَّلة؟ فيُعرض بابُها قبل حقل الرمز. */
   readonly passkeys?: boolean
+  /**
+   * الصفحةُ التي طُلبت — مسارٌ مرَّ بـ `safeNext` — يعود إليها المالكُ بعد الدخول (ر-11).
+   * وبلا قيمةٍ فالرئيسيّة.
+   */
+  readonly next?: string
 }
+
+/**
+ * ‏والمرساةُ لا تصل إلى الخادم أصلًا: `/panel#posts` يُطلَب `/panel`. فتُلحَق بالوجهة هنا،
+ * ‏في الحقل وفي عنوان النموذج معًا — فإعادةُ تحميل صفحةِ كلمةٍ خاطئة (`GET /panel/login`)
+ * ‏تعود بها كذلك. والخادمُ يتحقّق منها بعد ذلك كما يتحقّق من غيرها (`safeNext`).
+ */
+const NEXT_SCRIPT = `
+(function(){
+  var f=document.getElementById('login-next');
+  if(!f||!location.hash||f.value.indexOf('#')>=0)return;
+  f.value=f.value+location.hash;
+  if(f.form)f.form.setAttribute('action','/panel/login?next='+encodeURIComponent(f.value));
+})();
+`
 
 /**
  * سكربتُ الدخول بمفتاح مرور.
@@ -97,7 +118,9 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
           authenticatorData:b64u(r.authenticatorData),
           clientDataJSON:b64u(r.clientDataJSON), signature:b64u(r.signature)})});
     }).then(function(r){
-      if(r.ok){location.href='/panel'; return;}
+      // ‏والوجهةُ من الحقل الذي كتبه الخادمُ وأُلحقت به المرساة — لا «/panel» ثابتة (ر-11)
+      if(r.ok){var nx=document.getElementById('login-next');
+        location.href=nx&&nx.value.charAt(0)==='/'?nx.value:'/panel'; return;}
       return sadaPk.fail(r);
     }).catch(function(err){reset(sadaPk.why(err));});
   });
@@ -119,6 +142,8 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
            <span class="ic">${glyph(state.blocked === true ? '✕' : '!')}</span>
            <span>${escapeHtml(state.error)}</span></div>`
   const disabled = state.blocked === true ? ' disabled' : ''
+  const next = state.next ?? '/panel'
+  const action = next === '/panel' ? '/panel/login' : `/panel/login?next=${encodeURIComponent(next)}`
   return shell(
     'صدى — الدخول',
     `<div class="wrap"><div class="auth">
@@ -132,7 +157,8 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
       ${note}
       <div class="card">
         ${passkey}
-        <form method="POST" action="/panel/login">
+        <form method="POST" action="${escapeHtml(action)}">
+          <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
           <div class="field"><label for="t">كلمةُ الإدارة <span class="mono">ADMIN_TOKEN</span></label>
             <input id="t" type="password" name="token" dir="ltr" autocomplete="current-password"
                    required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
@@ -140,12 +166,12 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
         </form>
       </div>
       ${state.blocked === true
-        ? '<p class="lede"><a href="/panel">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>'
+        ? `<p class="lede"><a href="${escapeHtml(next)}">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>`
         : ''}
       <footer style="border:0;justify-content:center">الجلسة 8 ساعات</footer>
     </div></div>`,
     nonce,
-    state.passkeys === true ? LOGIN_SCRIPT : '',
+    `${NEXT_SCRIPT}${state.passkeys === true ? LOGIN_SCRIPT : ''}`,
   )
 }
 
@@ -242,7 +268,10 @@ export interface PanelData {
   /** سقفُ المقاطع اليوميّ بالعدد (D-168)، وما عُدَّ منها في الدفتر اليوم. */
   readonly videoCap: number
   readonly usedClips: number
-  readonly spend30d: number
+  /** إنفاقُ ثلاثين يومًا من الدفتر كلِّه، صفًّا لكلّ جهةٍ باسمها — الذكاءُ والنشرُ معًا. */
+  readonly spendBy: readonly SpendRow[]
+  /** منذ أوّل الشهر بتوقيت المالك، و`utc` حين غابت منطقتُه (ر-10). */
+  readonly spendMonth: { readonly total: number; readonly utc: boolean }
   readonly series: { day: string; total: number }[]
   readonly sources: PanelSource[]
   readonly providers: PanelProvider[]
@@ -340,6 +369,14 @@ export interface PanelData {
    * والسرُّ هو الرمز، ولا يمرّ من هنا (D-005).
    */
   readonly cfAccountId: string | null
+  /**
+   * حاجزُ الكتابة المدفوعة — `blockerFor('draft', …)` الذي يحكم به النداءُ نفسُه.
+   * ومنه يُعطَّل زرُّ «اكتب مسوّدة» بسببه، ويُقال السقفُ في «خطوتك التالية».
+   * واختياريٌّ: الشاشاتُ المرسومةُ للتدقيق لا تكتب.
+   */
+  readonly draftBlocker?: Blocker | null
+  /** منطقةُ المالك من كعكة `sada_tz` (D-173) — ومنها ساعةُ انفتاح السقف بتوقيته. */
+  readonly zone?: string | null
 }
 
 export interface PanelFactors {
@@ -538,7 +575,7 @@ function tilePicker(d: PanelData): string {
         <span>${escapeHtml(spec.why.replaceAll('**', ''))}</span></span>
     </label>`
   }).join('')
-  return `<div class="card" style="margin-top:var(--s-3)"><h2>بطاقاتُ لوحك</h2>
+  return `<div class="card" id="tiles" style="margin-top:var(--s-3)"><h2>بطاقاتُ لوحك</h2>
     <p class="hint">ما تراه تحت «اليوم بالأرقام» في الرئيسيّة. اختر من ${TILE_MIN} إلى ${TILE_MAX}،
       وترتيبُها ترتيبُ هذه القائمة.</p>
     <form method="POST" action="/panel/settings">
@@ -647,9 +684,13 @@ export function panelPage(d: PanelData): string {
            }</div>`
   }</div>`
 
-  const state = d.paused
-    ? '<span class="pill off"><i class="led"></i>موقوف مؤقتا</span>'
-    : '<span class="pill on"><i class="led"></i>يعمل</span>'
+  /*
+   * ‏**والحبّةُ من النبض لا من مفتاح الإيقاف وحده**، ورابطٌ إلى بطاقة الآلة: كانت
+   * ‏«يعمل» خضراءَ والإرسالُ متوقّفٌ منذ ثلاثة أيّام، والجوابُ على بُعد ثلاث شاشات
+   */
+  const pill = systemPill(d.paused, d.pulses)
+  const state = `<a class="pill ${pill.tone}" href="#machine"
+    aria-label="${escapeHtml(`حالُ النظام: ${pill.text} — افتح «هل الآلةُ تعمل؟»`)}"><i class="led"></i>${escapeHtml(pill.text)}</a>`
 
   const scanBtn = `<form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">
       <button class="g sm" type="submit">مسح Drive الآن</button></form>`
@@ -767,6 +808,11 @@ export function panelPage(d: PanelData): string {
     security: d.sessions.length > 1 ? d.sessions.length : 0,
   }
 
+  // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
+  const bare = (x: DraftRow): boolean =>
+    (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
+    && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
+
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
@@ -816,10 +862,18 @@ ${flash}
     counts: d.journey,
     paused: d.paused,
     sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
-    withoutImage: d.drafts.filter((x) => (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
-      && !d.media.some((m) => m.postId === x.id && m.status === 'ready')).length,
+    withoutImage: d.drafts.filter(bare).length,
     withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
     openSuggestions: d.openSuggestions,
+    // ‏والأولى من الستّين المرسومة بترتيب اللوح — فالمرساةُ تجد بطاقتَها
+    firsts: {
+      waiting: d.drafts.find((x) => x.status === 'draft')?.id ?? null,
+      unscheduled: d.drafts.find((x) => x.status === 'approved' || x.status === 'edited')?.id ?? null,
+      withoutImage: d.drafts.find(bare)?.id ?? null,
+    },
+    pulses: d.pulses,
+    blocker: d.draftBlocker ?? null,
+    zone: d.zone ?? null,
   }, d.now)}
   <h2 class="home-sub">اليوم بالأرقام</h2>
   ${tileRow(d)}
@@ -848,15 +902,17 @@ ${flash}
       ${machineCard(d.pulses, d.now)}
     </div>
     <div class="stack">
-      <div class="card"><h2>الإنفاق — 14 يوما</h2>
-        <p class="hint">كلّ المزوّدين، بالدولار</p>${areaChart(d.series)}
+      <div class="card"><h2>الإنفاق — 14 يومًا</h2>
+        <p class="hint">كلّ الخدمات، بالدولار</p>${areaChart(d.series)}
 </div>
+      ${/* ‏والأعمدةُ من الدفتر كلِّه لا من مزوّدي الذكاء (ر-10): كانت كلفةُ X تغيب
+           عنها والمجموعُ فوقها يحسبها، فلا تساوي الأعمدةُ المجموع */ ''}
       <div class="card">
         <div class="card-head"><h2>أين يذهب المال</h2><div class="grow"></div>
-          <span class="st idle">30 يوما</span></div>
-        <p class="hint">إنفاقُ كلّ مزوّدٍ على حدة، <b>والأطولُ أكبرُها كلفة</b>. واضبط سقفَ اليوم
-          من «الحدود» إن جاوز أحدُها ما تريد.</p>
-        ${barChart(d.providers.map((p) => ({ label: p.label, value: p.spend })), { unit: 'money' })}
+          <span class="st idle">30 يومًا</span></div>
+        <p class="hint">إنفاقُ كلّ خدمةٍ على حدة، الكتابةُ والصورُ والنشرُ معًا، <b>والأطولُ أكبرُها كلفة</b>.
+          واضبط سقفَ اليوم من «الحدود» إن جاوز أحدُها ما تريد.</p>
+        ${barChart(d.spendBy.map((r) => ({ label: r.label, value: r.total })), { unit: 'money' })}
       </div>
     </div>
   </div>
@@ -907,7 +963,15 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="posts" hidden>
-  ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>')}
+  ${/*
+    * ‏**والأبوابُ الثلاثةُ في الشاشة الأولى** — جسرٌ إلى «منشور جديد ▾» (الخطّة 5.6). كانت
+    * ‏«اكتب مسوّدة» في الشاشة التاسعة على الهاتف، فضغط المالكُ «اعتمد» على مسوّدةٍ قديمة
+    * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
+    */''}
+  ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>',
+    `<a class="btn p sm" href="#write">اكتب من مصدر</a>
+     <a class="btn g sm" href="#videos">ارفع فيديو</a>
+     <a class="btn g sm" href="#plan-import">خطّة من ملفّ</a>`)}
   ${draftsSection({
     drafts: d.drafts,
     writable: d.writableSources,
@@ -919,10 +983,11 @@ ${pivotPane(d.pivot)}
     earliest: new Date(d.now.getTime() + 15 * 60_000).toISOString().slice(0, 16),
     now: d.now,
     ready: d.draftReady,
+    blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null),
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
   })}
-  ${videosSection(d.uploads, d.now)}
+  ${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)))}
   ${planImportCard()}
   <div style="margin-top:var(--s-3)">${planSection({
     plan: d.plan,

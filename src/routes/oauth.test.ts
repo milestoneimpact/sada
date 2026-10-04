@@ -11,6 +11,8 @@ import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { saveApp } from '../lib/oauth/apps'
 import { PHASE_0_SECRETS } from '../env'
+import { COOKIE } from '../lib/session'
+import { refusedBody } from './ui/oauthResult'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const realFetch = globalThis.fetch
@@ -143,11 +145,28 @@ describe('GET /oauth/:platform/start', () => {
     expect(location.searchParams.get('client_id')).toBeNull()
   })
 
-  it('يرد 503 حين ينقص سر، ولا يذكر قيمة', async () => {
-    const response = await app.request('/oauth/x/start', {}, { ...env, X_CLIENT_SECRET: '' })
-    expect(response.status).toBe(503)
+  /*
+   * ‏**ولا سطرَ JSON في وجه المالك** (ر-1 · خطّة التصميم 7.11): كان `{"error":"not_configured"}`.
+   * ‏فالتحويلُ إلى حقلَي التطبيق في تبويب الإعداد، ووميضٌ يقول لماذا.
+   */
+  it('حين ينقص سرٌّ يعود إلى تبويب الإعداد بوميضٍ يقول لماذا، ولا يذكر قيمة', async () => {
+    const response = await app.request('/oauth/x/start', { headers: { Cookie: `${COOKIE}=s1` } },
+      { ...env, X_CLIENT_SECRET: '' })
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('/panel/channels/x?tab=setup')
+    expect(response.headers.get('content-type') ?? '').not.toContain('json')
     const body = await response.text()
     expect(body).not.toContain('x-secret')
+    const flash = JSON.parse(String(await kv.get('flash:s1'))) as { kind: string; text: string }
+    expect(flash.kind).toBe('warn')
+    expect(flash.text).toContain('«اربط X»')
+    expect(flash.text).not.toContain('x-id')
+  })
+
+  it('وInstagram بلا سرّين كذلك — لا 503 ولا JSON', async () => {
+    const response = await app.request('/oauth/instagram/start', {}, env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('/panel/channels/instagram?tab=setup')
   })
 })
 
@@ -358,6 +377,84 @@ describe('GET /oauth/:platform/callback', () => {
     })
     await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
     expect(kv.size()).toBe(0)
+  })
+
+  /*
+   * ‏ر-1: نهايةُ الرمز لا تُبلَغ (`TypeError` من `fetch`) — كان «Internal Server Error» نصًّا
+   * ‏بعد أن وافق المالكُ عند المنصّة، والحالةُ استُهلكت فلا يصلحه تحديث.
+   */
+  it('وعطلُ الشبكة صفحةٌ تقول ما وقع وتعيد المحاولة — لا «Internal Server Error»', async () => {
+    const { state } = await startAndCaptureState('x')
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      throw new TypeError(`network disabled for ${String(input)}?access_token=سرّ`)
+    }) as unknown as typeof fetch
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    expect(response.status).toBe(502)
+    expect(response.headers.get('Content-Type')).toContain('text/html')
+    const body = await response.text()
+    expect(body).toContain('لم نصل إلى X الآن')
+    expect(body).toContain('ولم يُحفَظ شيء')
+    expect(body).toContain('<a class="btn p" href="/oauth/x/start">أعد المحاولة</a>')
+    expect(body).toContain('<summary>للمطوّر</summary>')
+    expect(body).toContain('TypeError: network disabled for https://api.x.com/2/oauth2/token?…')
+    // ‏ولا ما يلي «?» في رابطٍ قد يحمل رمزًا
+    expect(body).not.toContain('access_token=')
+    const count = db.raw.prepare('SELECT count(*) AS n FROM tokens').get() as { n: number }
+    expect(count.n).toBe(0)
+  })
+
+  /*
+   * ‏مراجعة ر-1: **«ينقص السرّان» نوعٌ لا رقمُ حالة.** كان كلُّ `OAuthError` بحالة 503 يُقرأ
+   * ‏سرّين محذوفين، و503 من نهاية الرمز أو الهويّة عند المنصّة يحمل الرقمَ نفسَه — فيُرسَل
+   * ‏المالكُ يعيد لصقَ سرّين سليمين. والعطلُ عندها صفحةُ «لم نصل» بسببه، لا تبويبُ الإعداد.
+   */
+  it('503 من نهاية الرمز عطلٌ عند المنصّة: «لم نصل» بسببه، لا «ينقص السرّان» ولا وميض', async () => {
+    const { state } = await startAndCaptureState('x')
+    globalThis.fetch = fakeFetch({ [X.tokenUrl]: { status: 503, json: { error: 'temporarily_unavailable' } } })
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
+      { headers: { Cookie: `${COOKIE}=s1` } }, env)
+    expect(response.status).toBe(502)
+    expect(response.headers.get('location')).toBeNull()
+    const body = await response.text()
+    expect(body).toContain('لم نصل إلى X الآن')
+    expect(body).toContain('OAuthError: x: رفض نهاية الرمز (temporarily_unavailable)')
+    expect(body).not.toContain('ينقص')
+    expect(body).not.toContain('x-secret')
+    expect(await kv.get('flash:s1')).toBeNull()
+  })
+
+  it('و503 من نهاية الهويّة كذلك — بعد رمزٍ صحيح، ولا يُحفظ شيء', async () => {
+    const { state } = await startAndCaptureState('x')
+    globalThis.fetch = fakeFetch({
+      [X.tokenUrl]: { json: { access_token: 'x-access', expires_in: 7200 } },
+      [X.identityUrl]: { status: 503, json: {} },
+    })
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    expect(response.status).toBe(502)
+    const body = await response.text()
+    expect(body).toContain('لم نصل إلى X الآن')
+    expect(body).not.toContain('x-access')
+    const count = db.raw.prepare('SELECT count(*) AS n FROM tokens').get() as { n: number }
+    expect(count.n).toBe(0)
+  })
+
+  /*
+   * ‏وسرّان حُذفا بين الذهاب والعودة: **صفحةٌ لا وميض**. العودةُ تحويلٌ من نطاق المنصّة،
+   * ‏وكعكةُ الجلسة `SameSite=Strict` لا تعبره — فالوميضُ لا يُكتب في المتصفّح الحقيقيّ،
+   * ‏والسببُ يجب أن يُقرأ في الصفحة نفسِها، ومعه زرٌّ إلى حقلَي التطبيق.
+   */
+  it('سرّان حُذفا قبل العودة: صفحةٌ تقول ذلك وزرٌّ إلى حقليهما، بلا قيمةٍ ولا وميض', async () => {
+    const { state } = await startAndCaptureState('x')
+    globalThis.fetch = fakeFetch({})
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
+      { headers: { Cookie: `${COOKIE}=s1` } }, { ...env, X_CLIENT_SECRET: '' })
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Content-Type')).toContain('text/html')
+    const body = await response.text()
+    expect(body).toContain('لم نجد عندنا معرّفَ تطبيقها وسرَّه')
+    expect(body).toContain('<a class="btn p" href="/panel/channels/x?tab=setup#ci-x">اضبط المعرّف والسرّ</a>')
+    expect(body).not.toContain('x-id')
+    expect(await kv.get('flash:s1')).toBeNull()
   })
 
   it('يربط حساب X بمعرفه لا باسمه', async () => {
@@ -804,5 +901,30 @@ describe('/health و /ready', () => {
     const body = (await (await app.request('/ready', {}, noFolder)).json()) as ReadyBody
     expect(body.phase_1).toBe(false)
     expect(body.drive_folder).toBe(false)
+  })
+})
+
+/*
+ * ‏ر-1: صفحةُ «لم يكتمل الربط» كانت تقود إلى لوح القنوات ولا حقلَ فيه، وتقول «تبويب Auth»
+ * ‏لكلّ منصّة، وتشرح رابطَ العودة بتنبيهٍ عن غيره («ولا منشورَ نصّيٌّ في Instagram»).
+ */
+describe('صفحةُ الرفض بلغة كلّ منصّةٍ وإلى حقليها', () => {
+  it('رفضٌ عامّ: «اضبط المعرّف والسرّ» إلى حقل المعرّف، ورابطُ العودة بخطوته', () => {
+    const html = refusedBody({ platform: 'instagram', reason: 'invalid_request', requested: [], identityRetry: false })
+    expect(html).toContain('<a class="btn p" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط المعرّف والسرّ</a>')
+    expect(html).not.toContain('افتح الدليل والحقول')
+    expect(html).not.toContain('REELS')
+    expect(html).toContain('رابطُ العودة المسجَّل في Meta for Developers')
+    expect(html).toContain('وهو الخطوةُ 3 من الدليل.')
+  })
+
+  it('وinvalid_client عند TikTok لا يذكر «تبويب Auth»', () => {
+    const html = refusedBody({
+      platform: 'tiktok', reason: 'invalid_client', requested: [], identityRetry: false,
+      sent: { clientId: 'tt-key', redirectUri: 'https://sada2.basserh.com/oauth/tiktok/callback' },
+    })
+    expect(html).not.toContain('تبويب Auth')
+    expect(html).toContain('TikTok for Developers')
+    expect(html).toContain('href="/panel/channels/tiktok?tab=setup#ci-tiktok"')
   })
 })

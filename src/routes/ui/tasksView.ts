@@ -17,7 +17,7 @@
  */
 import { escapeHtml } from './shell'
 import { sectionLabel } from './command'
-import { secretCommand, type OwnerRow, type Unblocks } from '../../lib/owner'
+import { secretCommand, taskDoc, TASKS_DOC, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
 import { status } from './parts'
 
@@ -79,6 +79,11 @@ function row(r: OwnerRow, env: string): string {
         ? ''
         : `<a class="btn g sm" style="margin-top:var(--s-2)" href="${escapeHtml(r.go)}"${
             r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
+      ${/*
+         * ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها، وكانت
+         * ‏الشاشةُ تسمّيها ولا تفتحها — فلا تُبلَغ من الهاتف. ولا تُعرَض لما تمّ.
+         */ ''}${r.state === true ? '' : `<div class="sub"><a class="tap" href="${escapeHtml(taskDoc(r.code))}"
+        target="_blank" rel="noopener noreferrer" aria-label="خطواتُ ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
     </td>
     <td data-label="تفتح">
       ${status(opens.cls, '◆', opens.label)}
@@ -197,7 +202,8 @@ export function tasksScreen(d: TasksScreenData): string {
   <div class="card">
     <h2>وأين الخطوات</h2>
     <p class="hint">كلُّ مهمّةٍ لها صفحةٌ بالعناصر الستّة في
-      <span class="mono">docs/MANUAL-TASKS.md</span> — بأسماء الأزرار كما تراها
+      <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"><span
+        class="mono">docs/MANUAL-TASKS.md</span></a> — بأسماء الأزرار كما تراها
       على الشاشة، وعلامةِ النجاح، وما يُقرأ أوّلا إن فشلت.
       <b>ومعرِّفٌ هنا بلا صفحةٍ هناك يُسقط CI</b>، فلا يبقى عنوانٌ بلا خطوات.</p>
   </div>`
