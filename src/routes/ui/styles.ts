@@ -1275,6 +1275,13 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .vpf-b{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-1); min-width:0}
 /* ‏وسببُ المنصّة جملةٌ لا لصيقة: يلتفّ ولا يدفع الصفحةَ ‏19px عند ‏320 */
 .vpf-b .st{white-space:normal; max-width:100%}
+/* ‏وسطرُ الشرح تحت المنصّة (D-190) نصٌّ عاديّ لا لصيقة: المربّعُ كلُّه «label» بوزن ‏600، فكان
+   «Google لم تُجِز تطبيقك بعد» يُقرأ عنوانًا ثانيًا بجانب اسم المنصّة */
+.vpf-b .ago{font-weight:400}
+/* ‏«صف المقطع بجملة» (D-190): نموذجُ الكتابة فوق نموذج الإنشاء ويفصلهما خطٌّ خفيف، وحقولُ
+   المنصّات بعده متتابعةٌ بفجوةٍ من السلّم — كانت حقلًا واحدًا لا يحتاجها */
+.vcap{display:flex; flex-direction:column; gap:var(--s-2); padding-bottom:var(--s-3); border-bottom:var(--bd-soft)}
+.vcaps{display:flex; flex-direction:column; gap:var(--s-3); margin-bottom:var(--s-2)}
 .vapprove{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); font-size:var(--t-small); line-height:var(--lh-small)}
 .vapprove input{margin:0}
 /* ── معاينةُ الخطّة (D-181): الصفُّ ذو المشكلة بأرضٍ حمراءَ خفيفة، ومشكلاتُه قائمةٌ بجانبه ── */

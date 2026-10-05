@@ -24,7 +24,12 @@ import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type PlatformSpec } from '../../../lib/draft/prompt'
 import type { PublishPlatform } from '../../../lib/oauth/providers'
-import { CAPTION_LIMIT } from '../../../lib/media/uploads'
+import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
+import { IDEA_MAX } from '../../../lib/draft/job'
+import type { LinkState } from '../../../lib/channels'
+import { button } from '../components/button'
+import { field } from '../components/field'
+import { linkLine, pickLine } from '../reach'
 import { INFO_SIZE } from '../../../lib/image/infographic'
 import { CLIP_PLATFORMS } from '../../../lib/platform/needs'
 import { missingMedia } from '../../../lib/schedule/media'
@@ -883,6 +888,70 @@ export interface DraftsInput {
    * فيعود الزرُّ يُضغَط ليُقال بعد الدفع ما كان يُعرَف قبله.
    */
   readonly mediaReady: MediaReady
+  /**
+   * حالُ ربط كلّ منصّة (D-190) — فيُقال تحت LinkedIn وX في «اكتب من فكرتك» أمتّصلةٌ هي،
+   * ويُترك غيرُ المتّصل بلا تأشير. واختياريّ: الغائبُ «لا يُعرف» فلا يُقال شيء.
+   */
+  readonly links?: Readonly<Record<string, LinkState>>
+}
+
+/** المنصّاتُ التي تُكتب لها مسوّدةٌ من فكرة — **المكتوبةُ وحدَها**: نصُّ المقطع له صفُّ المقطع. */
+const IDEA_PLATFORMS = ['linkedin', 'x'] as const
+
+/**
+ * «اكتب من فكرتك» (D-190) — **جملةٌ أو كلماتٌ قليلة ← مسوّدةٌ لكلّ منصّةٍ تختارها**.
+ *
+ * قال المالك: «يُفترض أن تكون الكتابةُ أسهل، وتنشأ من نصٍّ أو كلماتٍ بسيطة». وكانت لا تبدأ
+ * إلّا من مستندٍ في Drive حُلّل، بمنصّةٍ واحدةٍ في كلّ ضغطة. فهنا حقلٌ واحدٌ ومربّعٌ لكلّ
+ * منصّةٍ مكتوبة، **ونداءٌ لكلّ منصّةٍ مختارة** بوصفها وحدّها (`draftFromIdea`)، والكلفةُ
+ * قبل المسوّدة. والزرُّ معطَّلٌ وسببُه تحته حين لا يُكتب الآن — بحكم النداء نفسِه.
+ */
+function ideaCard(input: DraftsInput): string {
+  const blocked = input.blocked ?? null
+  const why = blocked !== null
+    ? { text: blocked.text, label: blocked.label, href: blocked.href }
+    : input.ready
+      ? null
+      : { text: 'مزوّدُ مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
+  const boxes = IDEA_PLATFORMS.map((p) => {
+    const link = input.links?.[p]
+    // ‏غيرُ المتّصل لا يُؤشَّر: تُكتب مسوّدتُه إن اختاره، ولا تُجدوَل حتّى يربطه
+    const checked = link === undefined || link === 'linked'
+    return `<label class="vpf">
+        <input type="checkbox" name="platform" value="${p}"${checked ? ' checked' : ''}>
+        <span class="vpf-b"><b>${escapeHtml(PLATFORMS[p].label)}</b>
+          ${link === undefined ? '' : linkLine(p, link, PRIVATE_ONLY)}
+          <span class="ago">${p === 'x'
+            ? `فكرةٌ واحدةٌ في ${PLATFORMS.x.hardLimit} محرفًا`
+            : `فقراتٌ قصيرةٌ حتّى ${PLATFORMS.linkedin.hardLimit} محرف`}</span></span>
+      </label>`
+  }).join('')
+  return `<div class="card mt-3" id="idea">
+    <div class="card-head"><h2>اكتب من فكرتك</h2></div>
+    <p class="hint">جملةٌ أو كلماتٌ قليلة، ونكتب منها لكلّ منصّةٍ مسوّدتَها بطولها ونبرتها.
+      <b>وتقرؤها وتعتمدها أنت</b> — لا يُنشر شيءٌ قبل ذلك.</p>
+    <form method="POST" action="/panel/drafts/idea" data-busy="جارٍ كتابة المسوّدات…">
+      ${field({
+        id: 'di-text',
+        label: 'فكرتك أو كلماتك',
+        hint: 'مثل: «الحوكمةُ لا تبطئ القرار، تحميه» — أو كلماتٌ متفرّقة: «قيادة، ثقة، أوّل مئة يوم».',
+        control: `<textarea name="idea" rows="3" required maxlength="${IDEA_MAX}"></textarea>`,
+      })}
+      <div class="vpfs mt-3" role="group" aria-label="اكتب لـ">${boxes}</div>
+      ${pickLine('تُكتب مسوّدتُها ولا تُجدوَل')}
+      <div class="row">
+        <span class="ago">نداءٌ لكلّ منصّةٍ تختارها، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.</span>
+        <span class="grow"></span>
+        ${button({
+          label: 'اكتب المسوّدات',
+          variant: 'primary',
+          type: 'submit',
+          ...(why === null ? {} : { disabled: { id: 'di-why', reason: why.text } }),
+        })}
+      </div>
+      ${why === null ? '' : `<a class="tap" href="${escapeHtml(why.href)}">${escapeHtml(why.label)}</a>`}
+    </form>
+  </div>`
 }
 
 export function draftsSection(input: DraftsInput): string {
@@ -955,8 +1024,8 @@ export function draftsSection(input: DraftsInput): string {
     drafts.length === 0
       ? emptyState({
           title: 'لا مسوّدات بعد',
-          html: 'اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
-          action: '<a class="btn btn-primary btn-sm" href="#write">اكتب من مصدر</a>',
+          html: 'اكتب واحدةً من فكرتك أو من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
+          action: button({ label: 'اكتب من فكرتك', variant: 'primary', size: 'sm', href: '#idea' }),
         })
       : `<div class="dcols">${drafts
           .map((d) =>
@@ -1006,6 +1075,8 @@ export function draftsSection(input: DraftsInput): string {
   ${keys}
   ${list}
   ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}
+
+  ${ideaCard(input)}
 
   <div class="card mt-3" id="write">
     <div class="card-head"><h2>الكتابة من مصدر</h2></div>

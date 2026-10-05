@@ -162,6 +162,27 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent='…';}
     });
   });
+  /*
+   * ‏ولا إرسالَ بلا منصّة (D-190): غيرُ المتّصلة لا تُؤشَّر، فقد تكون المربّعاتُ كلُّها فارغة،
+   * ‏وردُّ الخادم «اختر منصّةً» يعود بحقلٍ فارغ فيضيع ما كُتب. فيُمنع هنا ويُقال السببُ في
+   * ‏موضعه — **ويُسجَّل قبل معالج «مشغول»**: ذاك يقرأ ‹defaultPrevented› فلا يبقى النموذجُ مشغولًا.
+   */
+  document.querySelectorAll('form').forEach(function(f){
+    var boxes=f.querySelectorAll('input[type=checkbox][name=platform]:not([disabled])');
+    if(!boxes.length)return;
+    var msg=f.querySelector('[data-pick-msg]');
+    f.addEventListener('submit',function(e){
+      if(Array.prototype.some.call(boxes,function(b){return b.checked;})){if(msg)msg.hidden=true; return;}
+      e.preventDefault();
+      if(msg){msg.hidden=false; msg.textContent='اختر منصّةً واحدةً على الأقلّ — وغيرُ المتّصلة تُختار ولا تُجدوَل حتّى تربطها.';}
+      boxes[0].focus();
+    });
+  });
+  // ‏وEnter في عنوان YouTube لا يُرسل «أنشئ المنشورات» (D-190): كان تعديلُ العنوان ثمّ Enter
+  // ‏يُنشئ منشوراتِ كلِّ منصّةٍ مؤشَّرة قبل أن تُقرأ حقولُها تحته
+  document.querySelectorAll('input[name=title_youtube]').forEach(function(i){
+    i.addEventListener('keydown',function(e){if(e.key==='Enter')e.preventDefault();});
+  });
   // زرٌّ مضغوط لا يُضغط مرّتين — نداءٌ مدفوع لا يُكرَّر بنقرةٍ عصبيّة.
   //
   // والنصُّ يبقى وتُضاف دوّامة: كان النصُّ يُستبدَل فيضيع ما كان
@@ -885,6 +906,24 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     t.addEventListener('input',tick);
     if(yt)yt.addEventListener('change',tick);
     tick();
+  });
+
+  /*
+   * ‏عدّادُ نصّ كلّ منصّة (D-190) — **بقاعدة الإنشاء نفسِها** (‹captionProblem›): TikTok وInstagram
+   * ‏بالمحرف بعد طيّ الطرفين، ووصفُ YouTube بالبايت. والحدُّ من ‹data-cap-limit› لا من رقمٍ هنا.
+   * ‏كان الحدُّ لا يُقال، والخطأُ يظهر بعد أن يُردّ الإنشاءُ كلُّه بإشعارٍ في رأس الصفحة.
+   */
+  var enc=typeof TextEncoder==='function'?new TextEncoder():null;
+  function capLen(v,bytes){return bytes&&enc?enc.encode(v).length:v.length;}
+  document.querySelectorAll('textarea[data-cap-limit]').forEach(function(t){
+    var out=t.parentNode.querySelector('[data-cap-count]'); if(!out)return;
+    var max=+t.dataset.capLimit||0, bytes=t.dataset.capUnit==='bytes';
+    function tick(){
+      var n=capLen(t.value.trim(),bytes), over=n>max;
+      out.textContent='\u2066'+n+' / '+max+'\u2069 '+(bytes?'بايت':'محرف')+(over?' — أطولُ ممّا تقبله المنصّة':'');
+      out.className=over?'st warn':'ago';
+    }
+    t.addEventListener('input',tick); tick();
   });
 })();
 `

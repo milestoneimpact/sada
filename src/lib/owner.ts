@@ -127,6 +127,15 @@ export interface OwnerFacts {
    * **يُحسَب من الرقم نفسِه ومن التاريخ** — لا يُكتب بيد.
    */
   readonly linkedInVersionDue: boolean
+  /**
+   * منصّاتٌ قلب المالكُ نشرَها علنيًّا بعد الإجازة (D-190) — `youtube` و`tiktok`.
+   *
+   * **دليلٌ لا حكم**: الإجازةُ تقع عند المنصّة ولا تُقرأ من هنا، والقلبُ قرارُ المالك.
+   * فيُقال في «ما قِيس» ولا يُعلَّم به «تمّت» (D-061). واختياريٌّ: الغائبُ «لا شيءَ قُلب».
+   */
+  readonly publicReach?: ReadonlySet<string>
+  /** قُلب علنيُّ TikTok ولا حسابَ نشطًا بـ `video.publish` — فيصل الصندوقَ لا الحساب (D-190). */
+  readonly tiktokNoScope?: boolean
 }
 
 /**
@@ -231,6 +240,38 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     done: (f) => f.linked.has('instagram'),
     ...linkTask('instagram', 'Instagram'),
+  },
+  // ‏مراجعتا النشر العلنيّ (D-190): المقطعُ يُرفع ويُنشر اليوم — خاصًّا. والإجازةُ تفتح العامّ
+  {
+    code: 'M-28',
+    title: 'إجازةُ Google لتطبيقك على YouTube — ليُنشر المقطعُ للعامّة',
+    ifLeft:
+      'لا شيءَ ينكسر — **ويصل كلُّ مقطعٍ قناتَك خاصًّا**، فتنشره أنت من YouTube Studio ' +
+      'واحدًا واحدًا. ويبقى ربطُ YouTube يسقط كلَّ سبعة أيّام ما دام التطبيقُ في وضع الاختبار.',
+    unblocks: 'capability',
+    // ‏الإجازةُ عند Google لا تُقرأ من هنا؛ والقلبُ بعدها قرارُك في «الإعداد»
+    done: () => null,
+    evidence: (f) => (f.publicReach?.has('youtube') === true
+      ? 'النشرُ العلنيُّ مقلوبٌ بقرارك'
+      : 'النشرُ خاصٌّ — يُقلَب في «الإعداد» بعد الإجازة'),
+    go: '/panel/channels/youtube?tab=setup#reach',
+    goLabel: 'افتح إعداد YouTube',
+  },
+  {
+    code: 'M-29',
+    title: 'إجازةُ TikTok للنشر المباشر — ليُنشر المقطعُ للعامّة',
+    ifLeft:
+      'لا شيءَ ينكسر — **ولا يرى المقطعَ غيرُك** حتّى تنشره أنت من تطبيق TikTok، ' +
+      'واحدًا واحدًا. تأجيلٌ لا خطر.',
+    unblocks: 'capability',
+    done: () => null,
+    evidence: (f) => (f.publicReach?.has('tiktok') === true
+      ? f.tiktokNoScope === true
+        ? 'النشرُ العلنيُّ مقلوبٌ، وحسابُك بلا video.publish — يصل الصندوقَ حتّى تربطه من جديد'
+        : 'النشرُ العلنيُّ مقلوبٌ بقرارك'
+      : 'النشرُ خاصٌّ — يُقلَب في «الإعداد» بعد الإجازة'),
+    go: '/panel/channels/tiktok?tab=setup#reach',
+    goLabel: 'افتح إعداد TikTok',
   },
   {
     code: 'M-20',

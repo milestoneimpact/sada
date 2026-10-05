@@ -47,6 +47,22 @@ import { bytesClip, tiktokChunks, type Clip } from './clip'
 const INBOX_INIT = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/'
 const DIRECT_INIT = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
 const STATUS_FETCH = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/'
+const CREATOR_INFO = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/'
+
+/**
+ * **مَن يرى المنشورَ المباشر** (D-190).
+ *
+ * تطبيقٌ لم يُجَز لا ينشر إلّا `SELF_ONLY` — فكان ذلك ثابتًا هنا. وبعد إجازة Content Posting
+ * API (M-29) يقلب المالكُ «النشرَ العلنيّ»، **فتُسأل TikTok أوّلًا عمّا يسمح به هذا الحساب**
+ * (`creator_info`، وإرشاداتُهم توجبه قبل كلّ نشر): `PUBLIC_TO_EVERYONE` إن عُرض، وإلّا
+ * **أضيقُ ما عُرض** — حسابٌ خاصٌّ لا يُعرض فيه العامّ، ولا يُختار له أوسعُ ممّا عُرف.
+ */
+const NARROWEST: readonly string[] = ['SELF_ONLY', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR']
+
+export function pickPrivacy(offered: readonly string[]): string {
+  if (offered.includes('PUBLIC_TO_EVERYONE')) return 'PUBLIC_TO_EVERYONE'
+  return NARROWEST.find((level) => offered.includes(level)) ?? 'SELF_ONLY'
+}
 
 /** أقصى ما يقبله الوصفُ عند TikTok — مقروءٌ من وثيقتهم. */
 export const TIKTOK_CAPTION_MAX = 2200
@@ -84,6 +100,27 @@ export interface TikTokOutcome extends PublishResult {
    * وهو ينتظره في صندوق التطبيق.
    */
   readonly inbox: boolean
+  /** ما طُلب فعلًا — `SELF_ONLY` ما لم يُقلَب العلنيّ، و`null` للصندوق (لا خيارَ فيه). */
+  readonly privacy: string | null
+}
+
+/**
+ * ما يُقال للمالك عن نشرٍ نجح **ولم يقع كما قرّره** (D-190) — أو `null`.
+ *
+ * ‏١ · الصندوق: لا نصَّ يُرسَل معه (نهايتُه لا تقبل وصفًا)، فالنصُّ الذي راجعه المالكُ يُلصق
+ *     بيده حين ينشره من التطبيق. ويُقال لماذا وصل الصندوقَ إن كان قد قلب العلنيّ.
+ * ‏٢ · نشرٌ مباشرٌ قُلب له العلنيُّ ولم يُعرض `PUBLIC_TO_EVERYONE`: نُشر بأضيقِ ما عُرض.
+ */
+export function tiktokNote(out: Pick<TikTokOutcome, 'inbox' | 'privacy'>, wantedPublic: boolean): string | null {
+  if (out.inbox) {
+    return wantedPublic
+      ? 'وصل صندوقَ تطبيق TikTok لا حسابَك، وبلا نصّه: حسابُك بلا video.publish ولو قُلب العلنيّ — انشره من التطبيق والصق نصَّه، واربط TikTok من جديد لتمنحه'
+      : 'وصل صندوقَ تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
+  }
+  if (wantedPublic && out.privacy !== null && out.privacy !== 'PUBLIC_TO_EVERYONE') {
+    return `نُشر بـ ${out.privacy} لا للعامّة: حسابُك على TikTok لم يعرض النشرَ للجميع`
+  }
+  return null
 }
 
 /**
@@ -98,6 +135,8 @@ export async function publishTikTok(
   caption: string,
   direct: boolean,
   fetchImpl: typeof fetch = fetch,
+  /** العلنيُّ بقرار المالك بعد الإجازة (D-190) — ولا يمسّ الصندوق: النشرُ هناك بيده. */
+  options: { readonly public?: boolean } = {},
 ): Promise<TikTokOutcome> {
   const clip = 'read' in input ? input : bytesClip(input)
   const size = clip.size
@@ -112,8 +151,28 @@ export async function publishTikTok(
     chunk_size: chunkSize,
     total_chunk_count: count,
   }
+  /*
+   * ‏والسؤالُ قبل التهيئة لا بعدها: لا يُفتح رفعٌ ثمّ يُكتشف أنّ الحسابَ لا يقبل ما طُلب.
+   * ‏وسقوطُه يُردّ بسببه — **ولا يُنشر خاصًّا بصمتٍ من قلب العلنيّ**: المالكُ قرّر غيرَه.
+   */
+  let privacy: string | null = direct ? 'SELF_ONLY' : null
+  if (direct && options.public === true) {
+    const asked = await fetchImpl(CREATOR_INFO, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' },
+      body: '{}',
+    })
+    if (!asked.ok) {
+      throw new PublishError(`tiktok: لم تُقرأ خياراتُ الحساب (${await detail(asked)})`, asked.status, retryable(asked.status))
+    }
+    const info = (await asked.json()) as { data?: { privacy_level_options?: unknown } }
+    const offered = Array.isArray(info.data?.privacy_level_options)
+      ? (info.data!.privacy_level_options as unknown[]).map(String)
+      : []
+    privacy = pickPrivacy(offered)
+  }
   const request = direct
-    ? { post_info: { title, privacy_level: 'SELF_ONLY' }, source_info: source }
+    ? { post_info: { title, privacy_level: privacy }, source_info: source }
     : { source_info: source }
 
   // ١ — التهيئة: تعطي معرّفَ النشر وعنوانَ الدفع
@@ -197,7 +256,8 @@ export async function publishTikTok(
   return {
     platformPostId: publishId,
     inbox: !direct,
-    request: { direct, size, title_length: title.length },
+    privacy,
+    request: { direct, size, title_length: title.length, privacy_level: privacy },
     response: { publish_id: publishId, status: state },
   }
 }

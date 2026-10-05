@@ -373,8 +373,8 @@ export const CHANNELS: readonly ChannelSpec[] = [
     // (`escapeHtml`)، فوسمٌ فيه يُعرَض حرفا للمالك (D-093)
     note:
       'الربطُ والنشرُ مبنيّان. ويصل المقطعُ صندوقَ تطبيقك فتنشره بيدك — ' +
-      'وذلك يعمل بمجرّد الربط. والنشرُ المباشرُ باسمك يحتاج نطاق video.publish ' +
-      'بعد مراجعةِ محتوى من TikTok.',
+      'وذلك يعمل بمجرّد الربط. والنشرُ المباشرُ باسمك يحتاج نطاق video.publish، ' +
+      'ولا يراه غيرُك حتّى تُجيز TikTok تطبيقك ثمّ تقلب «النشر العلنيّ» من «الإعداد».',
   },
   {
     id: 'threads',
@@ -395,9 +395,9 @@ export const CHANNELS: readonly ChannelSpec[] = [
     // ونصٌّ صِرفٌ بلا وسم — الحقلُ يُهرَّب في أربعة مواضع (D-093)
     note:
       'الربطُ والرفعُ مبنيّان. ويصل المقطعُ قناتَك خاصّا فتنشره بيدك — ' +
-      'ومقاطعُ Shorts رأسيّةٌ بخمسَ عشرةَ ثانية، وهي ما يولّده صدى. ' +
       'ونطاقُ الرفع حسّاسٌ عند Google، فتُقفَل مرفوعاتُ المشاريع غير ' +
-      'المُجازة على خاصّ مهما طُلب.',
+      'المُجازة على خاصّ مهما طُلب. فإذا أُجيز تطبيقُك قلبتَ «النشر العلنيّ» من «الإعداد». ' +
+      'ويصير المقطعُ Short وحده إن كان رأسيًّا أو مربّعًا وأقصرَ من ثلاث دقائق.',
   },
 ]
 
@@ -450,6 +450,27 @@ interface AccountRow {
   expires_at: string | null
   renewable: number | null
   refresh_expires_at: string | null
+}
+
+/**
+ * حالُ ربط المنصّة **حيث تُعرَض للاختيار** (D-190): مربّعُ المنصّة في صفّ المقطع، وفي
+ * «اكتب من فكرتك». كان TikTok يُعرض هناك مؤشَّرًا وتحته «لا يراه غيرك حتّى تنشره» وهو غيرُ
+ * متّصلٍ أصلًا — فيُنشأ منشورٌ لا يُجدوَل ولا يُقال لماذا إلّا عند الجدولة.
+ *
+ * وحكمُ «متّصل» حكمُ الجدولة نفسُه (`scheduleFromUpload` والوجهات): حسابٌ نشطٌ ليس صفحةَ
+ * LinkedIn. و`relink` حين لا نشطَ ويوجد ما يحتاج إعادةَ ربط — فالفعلُ غيرُ «اربط».
+ */
+export type LinkState = 'linked' | 'relink' | 'none'
+
+export function linkStates(accounts: readonly LinkedAccount[]): Readonly<Record<string, LinkState>> {
+  const out: Record<string, LinkState> = {}
+  for (const spec of CHANNELS) {
+    const mine = accounts.filter((a) => a.platform === spec.id && a.status !== 'revoked' && !isLinkedInPage(a))
+    out[spec.id] = mine.some((a) => a.status === 'active')
+      ? 'linked'
+      : mine.some((a) => a.status === 'needs_reauth') ? 'relink' : 'none'
+  }
+  return out
 }
 
 /**

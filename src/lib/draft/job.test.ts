@@ -12,8 +12,8 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { draftKey, draftPost, type DraftDeps } from './job'
-import { PLATFORMS, parseDraft } from './prompt'
+import { draftFromIdea, draftKey, draftPost, ideaKey, ideaProblem, normalizeIdea, type DraftDeps } from './job'
+import { PLATFORMS, parseDraft, systemPrompt } from './prompt'
 import { writeSetting } from '../settings'
 import { writeRoute } from '../ai/routes'
 
@@ -186,6 +186,8 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     const book = await ledger()
     expect(book).toHaveLength(1)
     expect(book[0]?.total).toBeGreaterThan(0)
+    // ‏وما دُفع يُعاد مع الفشل ليُقال في الإشعار (مراجعة D-190)
+    if (out.kind === 'failed') expect(out.cost).toBeCloseTo(book[0]!.total, 9)
 
     const { results } = await db.prepare('SELECT id FROM posts').all()
     expect(results).toHaveLength(0)
@@ -205,6 +207,8 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     expect(book).toHaveLength(1)
     expect(book[0]?.operation).toBe('draft:linkedin:claude-opus-5')
     expect(book[0]?.total).toBeGreaterThan(0)
+    // ‏والمبتورُ كذلك: كلفتُه تُعاد من `writeOnce` مع الفشل
+    if (out.kind === 'failed') expect(out.cost).toBeCloseTo(book[0]!.total, 9)
     expect((await db.prepare('SELECT id FROM posts').all()).results).toHaveLength(0)
   })
 
@@ -232,6 +236,8 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     const out = await draftPost(deps(net({ status: 500 })), id, 'x')
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(true)
+    // ‏لا نداءَ حوسِب عليه: لا كلفةَ تُقال
+    if (out.kind === 'failed') expect(out.cost).toBeUndefined()
     expect(await ledger()).toHaveLength(0)
   })
 })
@@ -394,5 +400,81 @@ describe('حدودُ المنصّتين', () => {
       PLATFORMS.x,
     )
     expect(over.ok).toBe(false)
+  })
+})
+
+describe('من فكرة المالك (D-190)', () => {
+  const IDEA = 'الحوكمةُ لا تبطئ القرار، تحميه'
+  const system = (): string => {
+    const body = calls[0]!.body as { system?: { text: string }[] }
+    return body.system?.[0]?.text ?? ''
+  }
+  const user = (): string => {
+    const body = calls[0]!.body as { messages?: { content: string }[] }
+    return body.messages?.[0]?.content ?? ''
+  }
+
+  it('مسوّدةٌ بحالة draft بلا مصدر، ومفتاحُها بصمةُ الفكرة ومنصّتُها، والكلفةُ قبلها باسم الفكرة', async () => {
+    const out = await draftFromIdea(deps(net()), `  ${IDEA}  `, 'linkedin')
+    expect(out.kind).toBe('drafted')
+    if (out.kind !== 'drafted') return
+    const key = await ideaKey(IDEA, 'linkedin')
+    expect(key).toMatch(/^idea:[0-9a-f]{32}:linkedin$/)
+    const row = db.raw.prepare('SELECT status, source_id, idempotency_key, model, cost_usd FROM posts WHERE id = ?').get(out.postId) as Record<string, unknown>
+    expect(row).toMatchObject({ status: 'draft', source_id: null, idempotency_key: key, model: 'claude-opus-5' })
+    expect(row['cost_usd']).toBe(out.cost)
+    const rows = await ledger()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ provider: 'anthropic', operation: 'draft:linkedin:claude-opus-5' })
+    expect(db.raw.prepare('SELECT ref_id FROM cost_ledger').get()).toEqual({ ref_id: key.slice(0, key.lastIndexOf(':')) })
+    // ‏الفكرةُ بكلماتها مادّةُ الكتابة، ووصفُ المنصّة نفسُه، والقيدُ على ما لم يقله
+    expect(user()).toContain(IDEA)
+    expect(system()).toContain('فكرةُ المالك بكلماته')
+    expect(system()).toContain(PLATFORMS.linkedin.guide.split('\n')[0]!)
+    expect(system()).toContain('ولا قصّةً شخصيّة')
+  })
+
+  it('والفكرةُ نفسُها مرّةً ثانيةً لا تُنادي — ولو اختلف فراغُها — ولمنصّةٍ أخرى تُنادي', async () => {
+    await draftFromIdea(deps(net()), IDEA, 'linkedin')
+    const again = await draftFromIdea(deps(net()), IDEA.replace(' ', '   '), 'linkedin')
+    expect(again.kind).toBe('already')
+    expect(calls).toHaveLength(0)
+    const x = await draftFromIdea(deps(net({ draft: { text: 'ن'.repeat(200), rationale: 'ر' } })), IDEA, 'x')
+    expect(x.kind).toBe('drafted')
+    expect(await ledger()).toHaveLength(2)
+  })
+
+  it('والمرفوضةُ تُحرِّر مفتاحَها: الضغطةُ التالية تكتب بديلةً', async () => {
+    const first = await draftFromIdea(deps(net()), IDEA, 'linkedin')
+    if (first.kind !== 'drafted') throw new Error('لم تُكتب')
+    db.raw.exec(`UPDATE posts SET status = 'rejected' WHERE id = '${first.postId}'`)
+    const second = await draftFromIdea(deps(net()), IDEA, 'linkedin')
+    expect(second.kind).toBe('drafted')
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(2)
+  })
+
+  it('الإيقافُ يمنع النداء، وفكرةٌ فارغةٌ أو طويلةٌ تُردّ قبله', async () => {
+    await writeSetting(db, 'paused', 'true', 'test')
+    expect(await draftFromIdea(deps(net()), IDEA, 'linkedin')).toMatchObject({ kind: 'blocked' })
+    await writeSetting(db, 'paused', 'false', 'test')
+    expect(await draftFromIdea(deps(net()), ' قا ', 'linkedin')).toMatchObject({ kind: 'failed', retryable: false })
+    expect(await draftFromIdea(deps(net()), 'ف'.repeat(1001), 'linkedin')).toMatchObject({ kind: 'failed', retryable: false })
+    expect(calls).toHaveLength(0)
+    expect(await ledger()).toHaveLength(0)
+    expect(ideaProblem('قيادة، ثقة')).toBeNull()
+    expect(normalizeIdea(' أ\n\tب ')).toBe('أ ب')
+  })
+
+  it('ونصٌّ فوق حدّ X يُردّ بعد أن سُجّلت كلفتُه — ولا مسوّدة', async () => {
+    const out = await draftFromIdea(deps(net({ draft: { text: 'ن'.repeat(400), rationale: 'ر' } })), IDEA, 'x')
+    expect(out).toMatchObject({ kind: 'failed', retryable: true })
+    expect(await ledger()).toHaveLength(1)
+    expect(out.kind === 'failed' ? out.cost : null).toBeCloseTo((await ledger())[0]!.total, 9)
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
+  })
+
+  it('ووصفُ المصدر كما كان حرفًا — الفكرةُ بابٌ ثانٍ لا تعديلٌ للأوّل', () => {
+    expect(systemPrompt(PLATFORMS.linkedin)).toContain('إلّا ما ورد في الخلاصة')
+    expect(systemPrompt(PLATFORMS.linkedin)).not.toContain('فكرةُ المالك')
   })
 })

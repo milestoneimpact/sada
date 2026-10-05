@@ -254,6 +254,29 @@ export async function grantedScopes(
   }
 }
 
+/**
+ * نطاقاتُ الحسابات **النشطة** على منصّة — بالعمود الصريح نفسِه، بلا فكّ رمز.
+ *
+ * ويقرؤها حكمُ «من يرى المقطع» (D-190): TikTok يصل الصندوقَ ما لم يكن في حسابٍ نشطٍ
+ * `video.publish` — **وهو حكمُ الناشر نفسُه** (`canUploadMedia`)، فلا يُقال «للعامّة»
+ * لما سيُرسَل إلى الصندوق. وحسابٌ سقط إذنُه لا يُعَدّ: لا يُنشر منه شيء.
+ */
+export async function activeScopes(db: Db, platform: Platform): Promise<string[]> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT t.scopes AS scopes
+           FROM tokens t JOIN accounts a ON a.id = t.account_id
+          WHERE a.platform = ? AND a.status = 'active'`,
+      )
+      .bind(platform)
+      .all<{ scopes: string | null }>()
+    return results.map((r) => r.scopes ?? '')
+  } catch {
+    return []
+  }
+}
+
 /** سجلُّ صحّة حسابٍ واحد — من `accounts` و`tokens` و`token_alerts` (D-129). */
 export interface AccountHealth {
   readonly status: string

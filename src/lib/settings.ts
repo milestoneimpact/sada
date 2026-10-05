@@ -58,6 +58,16 @@ export interface Settings {
    * أغلى ما يُنادى — البابَ الوحيدَ بلا حدّ. وحدٌّ يُعرَف خيرٌ من حدٍّ يُفترَض.
    */
   readonly dailyVideoCap: number
+  /**
+   * أيُنشَر المقطعُ على YouTube وTikTok للعامّة؟ (D-190)
+   *
+   * **وافتراضُهما خاصّ**: Google تقفل ما يُرفع من مشروعٍ لم يُجَز على `private` مهما
+   * طُلب، وTikTok لا يقبل من تطبيقٍ لم يُجَز إلّا `SELF_ONLY`. فطلبُ «علنيّ» قبل الإجازة
+   * يُردّ أو يُتجاهَل، **والمالكُ يُقال له «علنيّ» وهو خاصّ**. فيقلبه المالكُ بيده بعد
+   * أن تصله الإجازة (M-28 وM-29)، ولا يُستنتَج من شيء.
+   */
+  readonly youtubePublic: boolean
+  readonly tiktokPublic: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -74,6 +84,9 @@ export const DEFAULTS: Settings = {
    * بسعرٍ مجهول — حدٌّ معروفٌ يرفعه المالكُ بيده إن احتاج.
    */
   dailyVideoCap: 2,
+  // ‏خاصّان حتّى يُجازا — والقلبُ قرارُ المالك بعد الإجازة لا قبلها (D-190)
+  youtubePublic: false,
+  tiktokPublic: false,
   // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
   alertWebhook: '',
   // والأربعُ التي كانت مكتوبةً في الشيفرة — **فلا شاشةَ فارغةً في أوّل يوم**
@@ -110,6 +123,8 @@ export const SETTING_KEYS = [
   'image_overlay',
   'alert_webhook',
   'dashboard_tiles',
+  'youtube_public',
+  'tiktok_public',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -131,6 +146,8 @@ export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
   image_overlay: 'تركيب النصّ على الصورة',
   alert_webhook: 'قناة التنبيهات',
   dashboard_tiles: 'بطاقات اللوح',
+  youtube_public: 'النشر العلنيّ على YouTube',
+  tiktok_public: 'النشر العلنيّ على TikTok',
 }
 
 export function isSettingKey(key: string): key is SettingKey {
@@ -198,6 +215,9 @@ export async function readSettings(db: Db): Promise<Settings> {
     ),
     // ‏وغيابُ الصفّ يعود إلى الافتراض المحافظ لا إلى اللانهاية — ولا ترحيلَ له
     dailyVideoCap: wholeClips(map.get('daily_video_cap')),
+    // ‏بالمطابقة الحرفيّة كمفاتيح الخطر: غيابٌ أو فسادٌ يعني «خاصّ» (D-190)
+    youtubePublic: map.get('youtube_public') === 'true',
+    tiktokPublic: map.get('tiktok_public') === 'true',
   }
 }
 
@@ -217,7 +237,8 @@ export async function writeSetting(
   updatedBy: string,
 ): Promise<WriteResult> {
   let stored: string
-  if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay') {
+  if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay' ||
+      key === 'youtube_public' || key === 'tiktok_public') {
     stored = raw === 'true' ? 'true' : 'false'
   } else if (key === 'alert_webhook') {
     /*

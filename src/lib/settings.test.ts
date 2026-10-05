@@ -182,3 +182,22 @@ describe('أسماءُ الإعدادات (D-134)', () => {
     expect(settingLabel('draft-42')).toBe('draft-42')
   })
 })
+
+/*
+ * ‏**مَن يرى مقاطع YouTube وTikTok** (D-190): خاصٌّ حتّى يقلبه المالكُ بعد الإجازة. ويُقرأ كمفاتيح
+ * ‏الخطر: «true» وحدها تقلبه، والغيابُ والفسادُ خاصّ — نشرٌ للعامّة لا يقع بقيمةٍ لم تُفهَم.
+ */
+describe('النشرُ العلنيّ بعد الإجازة (D-190)', () => {
+  it('خاصٌّ بالافتراض، و«true» وحدها تقلبه، ويُعاد خاصًّا', async () => {
+    expect(await readSettings(db)).toMatchObject({ youtubePublic: false, tiktokPublic: false })
+    expect(DEFAULTS).toMatchObject({ youtubePublic: false, tiktokPublic: false })
+    await writeSetting(db, 'youtube_public', 'yes', 'panel')
+    expect((await readSettings(db)).youtubePublic).toBe(false)
+    expect((await writeSetting(db, 'youtube_public', 'true', 'panel')).stored).toBe('true')
+    expect(await readSettings(db)).toMatchObject({ youtubePublic: true, tiktokPublic: false })
+    await writeSetting(db, 'tiktok_public', 'true', 'panel')
+    await writeSetting(db, 'youtube_public', 'false', 'panel')
+    expect(await readSettings(db)).toMatchObject({ youtubePublic: false, tiktokPublic: true })
+    expect(settingLabel('tiktok_public')).toBe('النشر العلنيّ على TikTok')
+  })
+})

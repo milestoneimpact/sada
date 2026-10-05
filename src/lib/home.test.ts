@@ -100,9 +100,10 @@ describe('nextAction', () => {
       .toMatchObject({ tone: 'ok', label: 'راجع المسوّدات' })
     expect(nextAction(facts({ sources: none, counts: { perPlatform: { youtube: counts({ approved: 1 }) }, publishedWeek: 0 } })).label)
       .toBe('حدّد المواعيد')
-    // ‏ونُشر كلُّه بلا مصدر: الدورةُ الجديدةُ من مقطعٍ لا «من مصدرٍ محلَّل»
+    // ‏ونُشر كلُّه بلا مصدر: الدورةُ الجديدةُ من فكرةٍ أو مقطع لا «من مصدرٍ محلَّل» (D-190)
     const idle = nextAction(facts({ sources: none, counts: { perPlatform: { youtube: counts({ published: 4 }) }, publishedWeek: 0 } }))
-    expect(idle).toMatchObject({ tone: 'ok', href: '#videos' })
+    expect(idle).toMatchObject({ tone: 'ok', href: '#idea' })
+    expect(idle.text).toContain('ارفع مقطعًا')
     expect(idle.text).not.toContain('مصدرٍ محلَّل')
   })
 })
@@ -138,9 +139,9 @@ describe('المحطّاتُ والفعلُ إلى البطاقة نفسِها',
     expect(nextAction(facts({ counts: busy, firsts }))).toMatchObject({ href: '#d-p-wait', step: 'approve' })
     const ready = { perPlatform: { linkedin: counts({ approved: 1 }) }, publishedWeek: 0 }
     expect(nextAction(facts({ counts: ready, firsts }))).toMatchObject({ href: '#s-p-ok', step: 'schedule' })
-    // ‏ولا شيءَ ينتظر: «اكتب من مصدر» إلى بطاقة الكتابة لا إلى رأس اللوح
+    // ‏ولا شيءَ ينتظر: «اكتب من فكرة» إلى بطاقتها لا إلى رأس اللوح — أقصرُ الأبواب، ولا يحتاج مصدرًا (D-190)
     const idle = { perPlatform: { linkedin: counts({ published: 3 }) }, publishedWeek: 0 }
-    expect(nextAction(facts({ counts: idle }))).toMatchObject({ label: 'اكتب من مصدر', href: '#write', step: 'draft' })
+    expect(nextAction(facts({ counts: idle }))).toMatchObject({ label: 'اكتب من فكرة', href: '#idea', step: 'draft' })
   })
 })
 

@@ -44,7 +44,9 @@ import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
 import { videosSection } from './ui/sections/videos'
 import { planImportCard } from './ui/planImportView'
-import type { UploadRow } from '../lib/media/uploads'
+import type { Reach, UploadRow } from '../lib/media/uploads'
+import type { VideoCaptions } from '../lib/media/captions'
+import type { LinkState } from '../lib/channels'
 import { systemPill, writeBlock, type JourneyCounts } from '../lib/home'
 import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
@@ -344,6 +346,12 @@ export interface PanelData {
   readonly journey: JourneyCounts
   /** مقاطعُ المالك المرفوعة (D-180) — أحدثُها أوّلًا. */
   readonly uploads: readonly UploadRow[]
+  /** نصوصٌ كُتبت لمقاطع لم تُنشأ منشوراتُها كلُّها بعد (KV، D-190) — مفتاحُها معرّفُ المقطع. */
+  readonly captions?: Readonly<Record<string, VideoCaptions>>
+  /** حالُ ربط كلّ منصّة — يُقال حيث تُختار (D-190). */
+  readonly links?: Readonly<Record<string, LinkState>>
+  /** مَن يرى مقاطع YouTube وTikTok: قرارُ المالك بعد الإجازة (D-190). */
+  readonly reach?: Reach
   /**
    * رموزٌ تقترب من الانتهاء — **تُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح.**
    *
@@ -971,7 +979,8 @@ ${pivotPane(d.pivot)}
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
   ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>',
-    `<a class="btn btn-primary btn-sm" href="#write">اكتب من مصدر</a>
+    `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
+     <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
      <a class="btn btn-secondary btn-sm" href="#videos">ارفع فيديو</a>
      <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
   ${draftsSection({
@@ -988,8 +997,15 @@ ${pivotPane(d.pivot)}
     blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null),
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
+    ...(d.links === undefined ? {} : { links: d.links }),
   })}
-  ${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)))}
+  ${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
+    ...(d.links === undefined ? {} : { links: d.links }),
+    ...(d.reach === undefined ? {} : { reach: d.reach }),
+    ...(d.captions === undefined ? {} : { captions: d.captions }),
+    // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
+    writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
+  })}
   ${planImportCard()}
   <div class="mt-3">${planSection({
     plan: d.plan,

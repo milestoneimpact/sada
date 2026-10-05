@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { CHANNELS, isLinkedInPage, SETUP, listAccounts, viewChannels } from './channels'
+import { CHANNELS, isLinkedInPage, linkStates, SETUP, listAccounts, viewChannels } from './channels'
 
 let db: FakeDb
 const ALL = (): boolean => true
@@ -197,5 +197,26 @@ describe('عقدُ `note` — نصٌّ يُقرأ لا وسمٌ يُعرَض', (
       expect(spec.note, spec.id).not.toContain('**')
       expect(spec.note, spec.id).not.toContain('`')
     }
+  })
+})
+
+/*
+ * ‏**حالُ الربط حيث تُختار المنصّة** (D-190): بحكم الجدولة نفسِه — حسابٌ نشطٌ ليس صفحةَ LinkedIn.
+ */
+describe('linkStates — أمتّصلةٌ هي، بحكم الجدولة', () => {
+  it('متّصلة، أو انقطع ربطُها، أو لا حساب — وصفحةُ الشركة وحدَها لا تُعدّ', async () => {
+    await seed('youtube')
+    await seed('x', 'needs_reauth')
+    await seed('linkedin', 'active', 'org')
+    await seed('instagram', 'revoked')
+    const states = linkStates(await listAccounts(db))
+    expect(states['youtube']).toBe('linked')
+    expect(states['x']).toBe('relink')
+    expect(states['linkedin']).toBe('none')
+    expect(states['instagram']).toBe('none')
+    expect(states['tiktok']).toBe('none')
+    // ‏وحسابٌ نشطٌ يغلب آخرَ انقطع على المنصّة نفسِها
+    await seed('x', 'active')
+    expect(linkStates(await listAccounts(db))['x']).toBe('linked')
   })
 })

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { PublishError } from './platforms'
-import { publishTikTok, TIKTOK_CAPTION_MAX } from './tiktok'
+import { pickPrivacy, publishTikTok, TIKTOK_CAPTION_MAX } from './tiktok'
 
 const CLIP = { bytes: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]), mime: 'video/mp4' }
 
@@ -179,5 +179,61 @@ describe('سقوطُ سؤال الحال لا يُسقِط رفعا وقع', () 
   it('ومعالجةٌ لم تنتهِ بعد نجاحٌ كذلك — البايتاتُ وصلت', async () => {
     const out = await publishTikTok('tok', CLIP, 'و', false, net({ status: 'PROCESSING_UPLOAD' }))
     expect(out.platformPostId).toBe('pub-1')
+  })
+})
+
+/*
+ * ‏**مَن يرى المنشورَ المباشر** (D-190): `SELF_ONLY` ما لم يقلب المالكُ العلنيَّ بعد الإجازة.
+ * ‏وإذا قلبه سُئلت TikTok أوّلًا عمّا يسمح به الحساب — والصندوقُ لا خيارَ فيه فلا يُسأل.
+ */
+describe('العلنيُّ بعد الإجازة', () => {
+  function withCreator(options: { offered?: string[]; status?: number } = {}): typeof fetch {
+    const inner = net()
+    return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/creator_info/')) {
+        calls.push({ url, method: init?.method ?? 'GET', headers: {}, body: null })
+        if ((options.status ?? 200) !== 200) {
+          return new Response(JSON.stringify({ error: { code: 'access_token_invalid' } }), { status: options.status ?? 500 })
+        }
+        return Response.json({ data: { privacy_level_options: options.offered ?? ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'] }, error: { code: 'ok' } })
+      }
+      return inner(input as RequestInfo, init)
+    }) as unknown as typeof fetch
+  }
+  const initBody = (): { post_info?: { privacy_level?: string } } =>
+    calls.find((c) => c.url.includes('/video/init/'))!.body as { post_info?: { privacy_level?: string } }
+
+  it('بلا قلبٍ: SELF_ONLY ولا سؤال — كما كان', async () => {
+    const out = await publishTikTok('tok', CLIP, 'وصف', true, withCreator())
+    expect(calls.some((c) => c.url.includes('/creator_info/'))).toBe(false)
+    expect(initBody().post_info?.privacy_level).toBe('SELF_ONLY')
+    expect(out.privacy).toBe('SELF_ONLY')
+  })
+
+  it('بالقلب: يُسأل الحسابُ قبل التهيئة، وPUBLIC_TO_EVERYONE إن عُرض', async () => {
+    const out = await publishTikTok('tok', CLIP, 'وصف', true, withCreator(), { public: true })
+    expect(calls[0]!.url).toContain('/creator_info/query/')
+    expect(initBody().post_info?.privacy_level).toBe('PUBLIC_TO_EVERYONE')
+    expect(out).toMatchObject({ privacy: 'PUBLIC_TO_EVERYONE', request: { privacy_level: 'PUBLIC_TO_EVERYONE' } })
+  })
+
+  it('وحسابٌ لا يُعرض فيه العامّ: أضيقُ ما عُرض، لا أوسعُه', async () => {
+    await publishTikTok('tok', CLIP, 'وصف', true, withCreator({ offered: ['FOLLOWER_OF_CREATOR', 'MUTUAL_FOLLOW_FRIENDS'] }), { public: true })
+    expect(initBody().post_info?.privacy_level).toBe('MUTUAL_FOLLOW_FRIENDS')
+    expect(pickPrivacy(['FOLLOWER_OF_CREATOR', 'SELF_ONLY'])).toBe('SELF_ONLY')
+    expect(pickPrivacy([])).toBe('SELF_ONLY')
+  })
+
+  it('وسؤالٌ رُدّ يُسقط النشرَ بسببه — ولا يُفتح رفعٌ ولا يُنشر خاصًّا بصمت', async () => {
+    await expect(publishTikTok('tok', CLIP, 'وصف', true, withCreator({ status: 401 }), { public: true }))
+      .rejects.toThrow(PublishError)
+    expect(calls.some((c) => c.url.includes('/init/'))).toBe(false)
+  })
+
+  it('والصندوقُ لا خيارَ فيه: لا سؤالَ ولا مستوى', async () => {
+    const out = await publishTikTok('tok', CLIP, 'وصف', false, withCreator(), { public: true })
+    expect(calls.some((c) => c.url.includes('/creator_info/'))).toBe(false)
+    expect(out.privacy).toBeNull()
   })
 })

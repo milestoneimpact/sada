@@ -454,12 +454,18 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
     const label = f.channels.find((c) => c.spec.id === next.platform)?.spec.label ?? next.platform
     return { tone: 'ok', text: `كلُّ شيءٍ على المسار — والتالي على ${label}.`, label: `افتح ${label}`, href: `/panel/channels/${next.platform}` }
   }
-  // ‏و«اكتب من مصدر» وعدٌ لا يُوفى بلا مصدر: فالدورةُ الجديدةُ من مقطعٍ يُرفَع
-  if (f.sources.total === 0) {
-    return { tone: 'ok', text: 'لا شيءَ ينتظرك — ارفع مقطعًا أو استورد خطّةً لتبدأ دورةً جديدة.', label: 'ارفع مقطعًا', href: '#videos' }
+  /*
+   * ‏**والدورةُ الجديدةُ من فكرة** (D-190): «اكتب من فكرتك» لا يحتاج مصدرًا ولا تحليلًا — جملةٌ
+   * ‏تكفي — فهو أقصرُ الأبواب، وكان الفعلُ «اكتب من مصدر» يَعِد بما لا يُوفى بلا مصدرٍ محلَّل.
+   * ‏وإلى البطاقة نفسِها: `#posts` كان يُنزل إلى رأس اللوح، والبطاقةُ في آخره.
+   */
+  return {
+    tone: 'ok',
+    text: f.sources.total === 0
+      ? 'لا شيءَ ينتظرك — اكتب فكرتك بجملة، أو ارفع مقطعًا، لتبدأ دورةً جديدة.'
+      : 'لا شيءَ ينتظرك — اكتب فكرتك بجملة، أو من مصدرٍ محلَّل، لتبدأ دورةً جديدة.',
+    label: 'اكتب من فكرة', href: '#idea', step: 'draft',
   }
-  // ‏وإلى بطاقة الكتابة نفسِها: `#posts` كان يُنزل إلى رأس اللوح، والبطاقةُ آخرُه
-  return { tone: 'ok', text: 'لا شيءَ ينتظرك — اكتب من مصدرٍ محلَّلٍ لتبدأ دورةً جديدة.', label: 'اكتب من مصدر', href: '#write', step: 'draft' }
 }
 
 export interface PlatformTile {

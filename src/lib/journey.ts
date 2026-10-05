@@ -118,6 +118,27 @@ function slideSaid(note: string | null, headline: string | null): string {
  * في بعض (منشورٌ له ثلاثُ صورٍ وأربعُ محاولاتٍ يعطي اثنتَي عشرةَ صفّا)،
  * **ثمّ يُفكّ الضربُ في الشيفرة** — وذاك أطولُ وأخطأ.
  */
+/**
+ * سطرُ النشر الناجح — معرّفُه، **ومستوى الخصوصيّة الذي طُلب فعلًا وملاحظةُ ما لم يقع كما
+ * قُرّر** (D-190). يحفظهما الناشرُ في جواب المحاولة، و«رحلةُ المنشور» هي ما تحيل إليه M-29
+ * حين يُسأل «لماذا لم يظهر للعامّة».
+ */
+function published(id: string | null, json: string | null): string {
+  const parts = [id ?? 'بلا معرّفٍ من المنصّة']
+  if (json !== null) {
+    try {
+      const v = JSON.parse(json) as { request?: { privacy_level?: unknown; privacy?: unknown; direct?: unknown }; note?: unknown }
+      const level = v.request?.privacy_level ?? v.request?.privacy
+      if (typeof level === 'string' && level !== '') parts.push(`طُلب ${level}`)
+      else if (v.request?.direct === false) parts.push('إلى صندوق التطبيق')
+      if (typeof v.note === 'string' && v.note !== '') parts.push(v.note)
+    } catch {
+      // ‏جوابٌ لا يُقرأ لا يُسقط الرحلة: يبقى المعرّفُ وحدَه
+    }
+  }
+  return parts.join(' · ')
+}
+
 export async function readJourney(db: Db, postId: string): Promise<Journey | null> {
   const post = await db
     .prepare(
@@ -227,11 +248,13 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
   // في الأولَيَين، وهي التي تُقرأ حين يُسأل «لماذا تأخّر»
   const { results: attempts } = await db
     .prepare(
-      `SELECT attempt_no, status, platform_post_id, at FROM publish_attempts
+      `SELECT attempt_no, status, platform_post_id, at,
+              CASE WHEN status = 'succeeded' THEN response_json END AS response_json
+         FROM publish_attempts
         WHERE post_id = ? ORDER BY attempt_no`,
     )
     .bind(postId)
-    .all<{ attempt_no: number; status: string; platform_post_id: string | null; at: string }>()
+    .all<{ attempt_no: number; status: string; platform_post_id: string | null; at: string; response_json: string | null }>()
     .catch(() => ({ results: [] as never[] }))
 
   for (const a of attempts) {
@@ -241,7 +264,7 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
       kind: 'publish',
       title: ok ? shape.title : `محاولةٌ ${a.attempt_no} — ${shape.title}`,
       at: a.at,
-      detail: ok ? (a.platform_post_id ?? 'بلا معرّفٍ من المنصّة') : shape.detail,
+      detail: ok ? published(a.platform_post_id, a.response_json) : shape.detail,
       cost: null, model: null,
       state: ok ? 'done' : a.status === 'sent' ? 'pending' : 'failed',
     })

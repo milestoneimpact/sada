@@ -29,7 +29,7 @@ import { pathArrows } from './ui/parts'
 export const legal = new Hono<{ Bindings: Env }>()
 
 /** تاريخُ آخر تعديلٍ جوهريّ — يُرفع باليد حين يتبدّل ما تصفه الوثيقة. */
-const UPDATED = '2026-09-06'
+const UPDATED = '2026-10-05'
 
 /**
  * جهةُ التشغيل والتواصل.
@@ -67,7 +67,7 @@ const DATA: readonly Row[] = [
     howLong: 'حتّى يحذفها المشغّل',
   },
   {
-    what: 'معرّفُ حسابك على LinkedIn أو X واسمُ العرض',
+    what: 'معرّفُ حسابك على المنصّة التي تربطها واسمُ العرض',
     from: 'نقطةُ الهويّة في المنصّة بعد إذنك الصريح',
     why: 'معرفةُ الحساب الذي يُنشر إليه، وعرضُه في اللوحة',
     where: 'Cloudflare D1',
@@ -79,6 +79,22 @@ const DATA: readonly Row[] = [
     why: 'النشرُ نيابةً عنك بعد موافقتك على كلّ منشور',
     where: 'D1 — <b>مشفَّرةً بـ <span class="nb">AES-GCM</span></b>، ومفتاحُها في أسرار Worker وحدها',
     howLong: 'حتّى يُفصَل الحساب أو ينتهي الإذن',
+  },
+  {
+    // ‏مقاطعُ المالك (D-180 · D-190): تُرفع إلى R2 وتُنشر من هناك — وسياسةٌ لا تذكرها تُسقط مراجعةَ YouTube وTikTok
+    what: 'المقاطعُ التي يرفعها المشغّل',
+    from: 'لوحةُ صدى — يرفعها المشغّل بنفسه',
+    why: 'نشرُها على YouTube وTikTok وInstagram بعد أن يعتمد كلَّ منشور',
+    where: 'Cloudflare R2',
+    howLong: 'حتّى يحذفها المشغّل',
+  },
+  {
+    // ‏نصوصُ المقطع (D-190): `captions:<مقطع>` في KV يومًا، ويتجدّد بكلّ حفظٍ من «أنشئ المنشورات»
+    what: 'وصفُ المقطع والنصوصُ المكتوبة له',
+    from: 'جملةٌ يكتبها المشغّل، وما يولّده النموذج منها',
+    why: 'مراجعتُها وتحريرُها قبل إنشاء المنشورات، وألّا يُدفع ثمنُ الوصف نفسِه مرّتين',
+    where: 'Cloudflare KV — ومعها اسمُ النموذج وكلفتُه، بلا سرّ',
+    howLong: 'يومٌ واحد من آخر حفظ',
   },
   {
     what: 'نصُّ المنشورات وحالاتُها ومحاولاتُ النشر',
@@ -107,7 +123,7 @@ const NEVER: readonly string[] = [
   'لا نقرأ منشوراتِ غيرك ولا رسائلَك ولا قائمةَ من تتّصل بهم.',
   'لا نبيع بياناتك ولا نؤجّرها ولا نشاركها مع معلن.',
   'لا إعلاناتٍ ولا تتبّعٍ ولا تحليلاتِ طرفٍ ثالث في أيّ صفحة.',
-  'لا نُرسل بياناتِ حسابك على LinkedIn أو X إلى أيّ مزوّد ذكاءٍ اصطناعيّ — النصُّ يُكتب من مستنداتك <b>قبل</b> أن يمسّ حسابك، ولا تعود بياناتُ المنصّة إليه.',
+  'لا نُرسل بياناتِ حسابك على أيّ منصّةٍ إلى مزوّد ذكاءٍ اصطناعيّ — النصُّ يُكتب من مستنداتك وكلماتك <b>قبل</b> أن يمسّ حسابك، ولا تعود بياناتُ المنصّة إليه.',
   'لا نشرَ آليّ: لا يخرج منشورٌ إلّا بعد أن يعتمده المشغّل بيده، والقاعدةُ نفسها ترفض غيرَ ذلك.',
 ]
 
@@ -138,25 +154,36 @@ function policyBody(env: Env, base: string): string {
 
   ${section('١ · ما صدى', `<p>صدى نظامٌ يقرأ مستنداتٍ من مجلّد Google Drive يملكه مشغّلُها،
     ويستعين بنماذج لغويّة لتلخيصها وصياغة منشورات منها، ثمّ — <b>بعد موافقةٍ بشريّة على كلّ
-    منشور</b> — ينشرها على حسابات المشغّل نفسه في LinkedIn و X.</p>
+    منشور</b> — ينشرها على حسابات المشغّل نفسه في LinkedIn و X و YouTube و TikTok و Instagram،
+    ومعها مقاطعُ يرفعها المشغّل بنفسه.</p>
     <p><b>وليس لصدى مستخدمون.</b> لا تسجيلَ حساب، ولا زوّارَ لهم ملفّات، ولا خدمةً تُقدَّم
     لأحدٍ غير مشغّلها الواحد. فما تصفه هذه الوثيقة هو معالجةُ بيانات ذلك الشخص ومستنداته
-    وحسابَيه.</p>`)}
+    وحساباته على المنصّات التي يربطها.</p>`)}
 
   ${section('٢ · ما يُعالَج بالضبط', `<div class="scroll"><table>
     <thead><tr><th>ما يُعالَج</th><th>من أين</th><th>لماذا</th><th>أين يُخزَّن</th><th>كم يبقى</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`)}
 
-  ${section('٣ · بياناتُ LinkedIn و X', `<p>حين تربط حسابك، تطلب صدى أضيقَ ما يكفي:</p>
+  ${section('٣ · بياناتُ المنصّات', `<p>حين تربط حسابك، تطلب صدى أضيقَ ما يكفي:</p>
     <ul>
       <li><b>LinkedIn</b> — <span class="mono">openid</span> و <span class="mono">profile</span>
         لمعرفة الحساب، و <span class="mono">w_member_social</span> للنشر عليه.</li>
       <li><b>X</b> — <span class="mono">tweet.read</span> و <span class="mono">tweet.write</span>
-        و <span class="mono">users.read</span> و <span class="mono">offline.access</span>.</li>
+        و <span class="mono">users.read</span> و <span class="mono">offline.access</span>،
+        و <span class="mono">media.write</span> لرفع الصورة مع المنشور.</li>
+      <li><b>YouTube</b> — <span class="mono">youtube.readonly</span> لمعرفة القناة، و
+        <span class="mono">youtube.upload</span> لرفع مقاطع المشغّل إليها.</li>
+      <li><b>TikTok</b> — <span class="mono">user.info.basic</span> لمعرفة الحساب، و
+        <span class="mono">video.upload</span> و <span class="mono">video.publish</span> لنشر مقاطعه.</li>
+      <li><b>Instagram</b> — <span class="mono">instagram_business_basic</span> لمعرفة الحساب الاحترافيّ، و
+        <span class="mono">instagram_business_content_publish</span> لنشر الصور والمقاطع عليه — وحدهما.</li>
     </ul>
     <p>ولا يُستعمل شيءٌ منها في غير ما ذُكر. <b>ولا تُرسَل بياناتُ المنصّة إلى أيّ طرفٍ ثالث</b>
-      — ومزوّدو الذكاء الاصطناعيّ يرون نصوصَ مستنداتِ المشغّل وحدها، ولا يرون حسابَه ولا رمزَه
-      ولا شيئا من المنصّة.</p>`)}
+      — ومزوّدو الذكاء الاصطناعيّ يرون ما يكتبه المشغّل وحدَه: نصوصَ مستنداته، وفكرتَه، ووصفَه
+      لمقطعه، ولا يرون حسابَه ولا رمزَه ولا شيئا من المنصّة.</p>
+    <p><b>ويستعمل صدى خدماتِ YouTube API</b> لرفع المقاطع إلى قناة المشغّل. وباستعماله مع YouTube
+      توافق على <a class="tap" href="https://www.youtube.com/t/terms">شروط خدمة YouTube</a>، وتسري على
+      ما يمرّ بـ Google <a class="tap" href="https://policies.google.com/privacy">سياسةُ خصوصيّة Google</a>.</p>`)}
 
   ${section('٤ · ما لا يقع', `<ul class="never">${NEVER.map((n) => `<li>${n}</li>`).join('')}</ul>`)}
 
@@ -173,6 +200,8 @@ function policyBody(env: Env, base: string): string {
     <ul>
       <li>LinkedIn: <span class="mono">${pathArrows('Settings → Data privacy → Permitted services')}</span></li>
       <li>X: <span class="mono">${pathArrows('Settings → Security and account access → Apps and sessions')}</span></li>
+      <li>YouTube وGoogle: <a class="tap" href="https://security.google.com/settings/security/permissions">صفحةُ أذونات حساب Google</a></li>
+      <li>TikTok وInstagram: من إعدادات الأمان في التطبيق، حيث التطبيقاتُ المربوطةُ بحسابك.</li>
     </ul>
     <p>وسحبُ الإذن يُبطل الرموز فورا عند المنصّة، ويوقف كلَّ نشرٍ لاحق.</p>`)}
 
@@ -202,8 +231,10 @@ function termsBody(env: Env, base: string): string {
     يُنشر منها شيءٌ قبل أن يقرأه المشغّل ويعتمده بيده.</b> والمشغّل هو المسؤول وحده عن كلّ ما
     يُنشر باسمه، وعن موافقته لشروط المنصّة التي يُنشر عليها.</p>`)}
 
-  ${section('٣ · احترامُ شروط المنصّات', `<p>يلتزم استعمالُ صدى بشروط LinkedIn و X ومعدّلاتِ
-    طلباتهما. ولا تُستعمل لجمع بياناتٍ ولا لنشرٍ آليٍّ بلا مراجعة ولا لتجاوز حدٍّ.</p>`)}
+  ${section('٣ · احترامُ شروط المنصّات', `<p>يلتزم استعمالُ صدى بشروط LinkedIn و X و YouTube و TikTok
+    و Instagram ومعدّلاتِ طلباتها. ولا تُستعمل لجمع بياناتٍ ولا لنشرٍ آليٍّ بلا مراجعة ولا لتجاوز حدٍّ.</p>
+    <p>ومن يستعمل صدى مع YouTube يوافق على <a class="tap" href="https://www.youtube.com/t/terms">شروط خدمة
+      YouTube</a>.</p>`)}
 
   ${section('٤ · بلا ضمان', `<p>تُقدَّم الأداة كما هي، ولا ضمانَ لتوافرٍ ولا لخلوٍّ من عطل.</p>`)}
 
