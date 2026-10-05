@@ -394,7 +394,7 @@ describe('GET /oauth/:platform/callback', () => {
     const body = await response.text()
     expect(body).toContain('لم نصل إلى X الآن')
     expect(body).toContain('ولم يُحفَظ شيء')
-    expect(body).toContain('<a class="btn p" href="/oauth/x/start">أعد المحاولة</a>')
+    expect(body).toContain('<a class="btn btn-primary" href="/oauth/x/start">أعد المحاولة</a>')
     expect(body).toContain('<summary>للمطوّر</summary>')
     expect(body).toContain('TypeError: network disabled for https://api.x.com/2/oauth2/token?…')
     // ‏ولا ما يلي «?» في رابطٍ قد يحمل رمزًا
@@ -452,7 +452,7 @@ describe('GET /oauth/:platform/callback', () => {
     expect(response.headers.get('Content-Type')).toContain('text/html')
     const body = await response.text()
     expect(body).toContain('لم نجد عندنا معرّفَ تطبيقها وسرَّه')
-    expect(body).toContain('<a class="btn p" href="/panel/channels/x?tab=setup#ci-x">اضبط المعرّف والسرّ</a>')
+    expect(body).toContain('<a class="btn btn-primary" href="/panel/channels/x?tab=setup#ci-x">اضبط المعرّف والسرّ</a>')
     expect(body).not.toContain('x-id')
     expect(await kv.get('flash:s1')).toBeNull()
   })
@@ -911,7 +911,7 @@ describe('/health و /ready', () => {
 describe('صفحةُ الرفض بلغة كلّ منصّةٍ وإلى حقليها', () => {
   it('رفضٌ عامّ: «اضبط المعرّف والسرّ» إلى حقل المعرّف، ورابطُ العودة بخطوته', () => {
     const html = refusedBody({ platform: 'instagram', reason: 'invalid_request', requested: [], identityRetry: false })
-    expect(html).toContain('<a class="btn p" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط المعرّف والسرّ</a>')
+    expect(html).toContain('<a class="btn btn-primary" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط المعرّف والسرّ</a>')
     expect(html).not.toContain('افتح الدليل والحقول')
     expect(html).not.toContain('REELS')
     expect(html).toContain('رابطُ العودة المسجَّل في Meta for Developers')

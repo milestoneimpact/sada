@@ -174,8 +174,8 @@ describe('العيبُ المزروع يُرى', () => {
  */
 describe('العيبُ يُلحَق بالورقة فيُرى', () => {
   it.each([
-    ['قائمةٌ لاحقةٌ تغيّر وزنَ رقم المؤشّر', '.grid .x,.tile .v{font-weight:600}',
-      (c: Sheet) => c.rule('.tile .v')['font-weight'], '400', '600'],
+    ['قائمةٌ لاحقةٌ تغيّر وزنَ رقم المؤشّر', '.grid .x,.tile .kv-v{font-weight:600}',
+      (c: Sheet) => c.rule('.tile .kv-v')['font-weight'], '400', '600'],
     ['مسافةٌ تهرّب لونَ التحذير إلى نزول الإنفاق', '.delta.down{ color:var(--warn)}',
       (c: Sheet) => c.rule('.delta.down').color, 'var(--ink-2)', 'var(--warn)'],
     ['رمزٌ يُعاد على الرافدة فتصير ثيمًا ثالثًا', '.rail{--bg:#14161c}',

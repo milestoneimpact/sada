@@ -8,7 +8,7 @@
  */
 import { escapeHtml, shell } from './panelView'
 import { GLYPH_SVG } from './ui/shell'
-import { glyph } from './ui/parts'
+import { notice, noticeText } from './ui/components/toast'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 
 export interface SecondFactorData {
@@ -71,8 +71,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
   const note =
     d.error === null
       ? ''
-      : `<div class="flash bad" role="alert"><span class="ic">${glyph('✕')}</span>
-         <span>${escapeHtml(d.error)}</span></div>`
+      : noticeText('bad', d.error)
 
   const passkey = !d.hasPasskey
     ? ''
@@ -80,9 +79,9 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
              data-challenge="${escapeHtml(d.challenge)}" data-rpid="${escapeHtml(d.rpId)}">
          ${hidden}
          <input type="hidden" name="assertion" value="">
-         <button class="p" id="pk-btn" type="button">الدخول بمفتاح المرور</button>
+         <button class="btn btn-primary" id="pk-btn" type="button">الدخول بمفتاح المرور</button>
        </form>
-       <div class="n" id="pk-note" role="status" aria-live="polite"></div>`
+       <div class="note" id="pk-note" role="status" aria-live="polite"></div>`
 
   const totp = !d.hasTotp
     ? ''
@@ -93,7 +92,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
            <input id="code" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
                   pattern="[0-9 ]{6,8}" maxlength="8" required
                   ${d.hasPasskey ? '' : 'autofocus'}></div>
-         <button class="${d.hasPasskey ? 'g' : 'p'}" type="submit">تأكيد</button>
+         <button class="btn ${d.hasPasskey ? 'btn-secondary' : 'btn-primary'}" type="submit">تأكيد</button>
        </form>`
 
   const recovery = !d.hasRecovery
@@ -104,17 +103,16 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
            <div class="field"><label for="rc">رمز الاسترداد</label>
              <input id="rc" name="code" dir="ltr" autocomplete="off" spellcheck="false"
                     placeholder="XXXXX-XXXXX" required></div>
-           <button class="g" type="submit">استخدم الرمز</button>
+           <button class="btn btn-secondary" type="submit">استخدم الرمز</button>
          </form>
-         <div class="n">يُستهلك مرّةً واحدة، ولا يُقرأ من القاعدة بعد توليده.</div>
+         <div class="note">يُستهلك مرّةً واحدة، ولا يُقرأ من القاعدة بعد توليده.</div>
        </details>`
 
   const nothing =
     d.hasPasskey || d.hasTotp
       ? ''
-      : `<div class="flash warn"><span class="ic">${glyph('!')}</span>
-         <span>لا عاملَ ثانٍ مضبوطا — وهذا لا ينبغي أن يقع.
-               أعد الدخول، وإن تكرّر فبدّل <span class="mono">ADMIN_TOKEN</span>.</span></div>`
+      : notice({ tone: 'warn', html: `لا عاملَ ثانٍ مضبوطا — وهذا لا ينبغي أن يقع.
+               أعد الدخول، وإن تكرّر فبدّل <span class="mono">ADMIN_TOKEN</span>.` })
 
   return shell(
     'صدى — العامل الثاني',
@@ -126,8 +124,8 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
       <div class="card">${passkey}${totp}</div>
       ${recovery}
       <form method="POST" action="/panel/2fa/cancel" class="cancel">
-        ${hidden}<button class="g sm" type="submit">إلغاء والعودة</button></form>
-      <footer style="border:0;justify-content:center">${escapeHtml(d.rpId)}</footer>
+        ${hidden}<button class="btn btn-secondary btn-sm" type="submit">إلغاء والعودة</button></form>
+      <footer>${escapeHtml(d.rpId)}</footer>
     </div></div>`,
     nonce,
     SCRIPT,

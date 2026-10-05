@@ -267,24 +267,26 @@ for (const file of pages) {
      * فتُقرأ الشاشةُ لوحةَ عدّاداتٍ لا شاشةَ عمل.
      *
      * **وهذه تُحرَس ولا تُستفتى**: تقارن قياسَ خطٍّ بقياسِ خطّ داخل
-     * صنفٍ واحد (`.tile .v`) — **ولا رأيَ لأحدٍ في أيُّهما أكبر**. وهو
+     * صنفٍ واحد (`.tile .kv-v`) — **ولا رأيَ لأحدٍ في أيُّهما أكبر**. وهو
      * الفرقُ عن نسبة الشرح التي رُفض حَرسُها (D-113).
      */
     const ranks = await page.evaluate(() => {
       const out = []
+      let checked = 0
       for (const s of document.querySelectorAll('section[data-pane]')) {
         const was = s.hidden
         s.hidden = false
-        const vs = [...s.querySelectorAll('.tile .v')]
+        const vs = [...s.querySelectorAll('.tile .kv-v')]
           .filter((e) => e.getBoundingClientRect().height > 0)
           .map((e) => Math.round(Number.parseFloat(getComputedStyle(e).fontSize)))
         s.hidden = was
         if (vs.length < 2) continue
+        checked += 1
         const top = Math.max(...vs)
         const tied = vs.filter((v) => v === top).length
         if (tied > 1) out.push({ pane: s.dataset.pane, tied, total: vs.length, top })
       }
-      return out
+      return { rows: out, checked }
     })
 
     /*
@@ -624,7 +626,8 @@ for (const file of pages) {
     findings[findings.length - 1].torn = torn.rows
     findings[findings.length - 1].exempt = torn.exempt
     findings[findings.length - 1].labels = labels
-    findings[findings.length - 1].ranks = ranks
+    findings[findings.length - 1].ranks = ranks.rows
+    findings[findings.length - 1].ranksChecked = ranks.checked
     findings[findings.length - 1].holes = shape.holes
     findings[findings.length - 1].orphans = shape.orphans
     findings[findings.length - 1].tails = shape.tails
@@ -729,6 +732,18 @@ for (const f of findings) {
       console.log(`      ${String(c.cls).slice(0, 34)} — ${c.ratio}:1 (الحدّ ${c.min}) «${c.text}»`)
     }
   }
+}
+/*
+ * **وحارسٌ لم يَقِس شيئًا لا يقول «نظيف»** (مراجعةُ D-189): أُعيدت تسميةُ «.tile .v» إلى
+ * «.tile .kv-v» في الوسم ولم تبلغ هذا الملفّ، فكان كلُّ لوحٍ يقع في «vs.length < 2» والحارسُ
+ * أخضرُ لا يقيس. فإن لم يَقِس لوحًا واحدًا في العيّنات كلّها ردّ.
+ */
+const ranksChecked = findings.reduce((n, f) => n + (f.ranksChecked ?? 0), 0)
+if (ranksChecked === 0) {
+  console.log('\n  ✕ حارسُ «الرقم الأوّل» (D-103) لم يَقِس لوحًا واحدًا: محدّدُه «.tile .kv-v» لا يطابق شيئًا')
+  failed += 1
+} else {
+  console.log(`\n  · حارسُ «الرقم الأوّل» قاس ${ranksChecked} لوحًا في العيّنات`)
 }
 console.log(`\nالمجموع: ${failed} ملحوظة`)
 process.exit(failed > 0 ? 1 : 0)

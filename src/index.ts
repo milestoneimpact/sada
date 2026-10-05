@@ -37,6 +37,7 @@ import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { auth } from './routes/auth'
+import { notFoundResponse, serverErrorResponse } from './routes/errors'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -391,7 +392,13 @@ app.get('/favicon.ico', (c) =>
   }),
 )
 
-app.notFound((c) => c.json({ error: 'not_found' }, 404))
+/**
+ * ‏٤٠٤ و‏٥٠٠ (خطّة التصميم 7.11 · D-189) — **صفحةٌ بالقالب نفسِه لمن يطلب HTML**، وJSON لغيره.
+ * كان كلُّ مسارٍ لا وجودَ له يردّ `{"error":"not_found"}` في وجه المالك، وكلُّ استثناءٍ يردّ
+ * «Internal Server Error» بالإنجليزيّة. والحكمُ بترويسة `Accept` في `routes/errors.ts`.
+ */
+app.notFound((c) => notFoundResponse(c.req.raw))
+app.onError((error, c) => serverErrorResponse(c.req.raw, error))
 
 /**
  * مستهلك طابور النشر.

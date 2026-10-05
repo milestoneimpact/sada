@@ -43,12 +43,14 @@ import { LOGOS } from '../logos'
 import { ICON } from '../icons'
 import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
-import { fileName, glyph, RUNG_MARK, status } from '../parts'
+import { fileName, glyph, RUNG_MARK } from '../parts'
+import { count, statusBadge, type Tone } from '../components/badge'
+import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 
-const STATUS: Readonly<Record<string, { cls: string; glyph: string; text: string }>> = {
+const STATUS: Readonly<Record<string, { cls: Tone; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
   approved: { cls: 'ok', glyph: '●', text: 'معتمَدة' },
   edited: { cls: 'ok', glyph: '●', text: 'معتمَدة بعد تعديل' },
@@ -157,10 +159,10 @@ function scheduler(
   if (d.status === 'failed') {
     const why = whyFailed(d.failure ?? null, d.platform)
     return `<div class="sched" ${anchor}>
-      <p class="np-why"><span class="i">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
+      <p class="np-why"><span class="np-why-ic">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
       <span class="grow"></span>
       ${why.action === 'relink'
-        ? `<a class="btn p sm" href="/oauth/${escapeHtml(d.platform)}/start">أعد الربط</a>`
+        ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(d.platform)}/start">أعد الربط</a>`
         : ''}
       ${why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink')}
     </div>`
@@ -169,7 +171,7 @@ function scheduler(
   if (d.status === 'queued') {
     const gone = d.dispatchedAt !== null
     return `<div class="sched ${gone ? 'gone' : 'set'}" ${anchor}>
-      ${status(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
+      ${statusBadge(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
       <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
       <span class="grow"></span>
@@ -178,7 +180,7 @@ function scheduler(
         : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
              data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…">
              <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-             <button class="g sm" type="submit">اسحب الموعد</button></form>`}
+             <button class="btn btn-secondary btn-sm" type="submit">اسحب الموعد</button></form>`}
     </div>`
   }
 
@@ -192,7 +194,7 @@ function scheduler(
   const lacking = missingMedia(d.platform, readyMimes(d, media))
   if (lacking !== null) {
     return `<div class="sched none" ${anchor}>
-      ${status('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطعَ بعد' : 'لا صورةَ ولا مقطعَ بعد')}
+      ${statusBadge('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطعَ بعد' : 'لا صورةَ ولا مقطعَ بعد')}
       <span class="ago">${escapeHtml(lacking)}. واعتُمد النصّ ويبقى.</span>
     </div>`
   }
@@ -203,18 +205,18 @@ function scheduler(
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
       return `<div class="sched none" ${anchor}>
-        ${status('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
+        ${statusBadge('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
         <span class="grow"></span>
-        <a class="btn g sm" href="/panel/tasks">ما عليك</a>
+        <a class="btn btn-secondary btn-sm" href="/panel/tasks">ما عليك</a>
       </div>`
     }
     return `<div class="sched none" ${anchor}>
-      ${status('warn', '!', `لا قناةَ ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
+      ${statusBadge('warn', '!', `لا قناةَ ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
       <span class="grow"></span>
-      <a class="btn g sm" href="#channels">اربط قناة</a>
+      <a class="btn btn-secondary btn-sm" href="#channels">اربط قناة</a>
     </div>`
   }
 
@@ -229,11 +231,11 @@ function scheduler(
       <input id="wh-${id}" name="when" type="datetime-local" data-when
         min="${escapeHtml(earliest)}" required></div>
     <span class="grow"></span>
-    <button class="p sm" type="submit">جدوِل</button>
+    <button class="btn btn-primary btn-sm" type="submit">جدوِل</button>
     <div class="quick" data-quick="wh-${id}">
       ${QUICK.map(
         (q) =>
-          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+          `<button class="btn btn-secondary btn-sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
       ).join('')}
       <span class="grow"></span>
       <span class="mirror mono" data-mirror="wh-${id}"></span>
@@ -246,7 +248,7 @@ function scheduler(
 function requeueForm(id: string, primary: boolean): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
-    <button class="${primary ? 'p' : 'g'} sm" type="submit">أعده إلى المعتمَد</button></form>`
+    <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
 }
 
 /**
@@ -305,7 +307,7 @@ function slideLine(m: MediaView): string {
     // ‏والإنفوجرافيك يُقال بشكله ومن أين جاء محتواه — لا «على الصورة» ولا تحذير
     const kind = INFO_KIND[m.model.slice('infographic:'.length)] ?? ''
     return `<div class="pic-foot">
-        ${status('ok', '●', `إنفوجرافيك${kind === '' ? '' : ` · ${escapeHtml(kind)}`}`)}
+        ${statusBadge('ok', '●', `إنفوجرافيك${kind === '' ? '' : ` · ${escapeHtml(kind)}`}`)}
         <span class="ago">${m.note === null || m.note === ''
           ? 'المحتوى من نصّ المنشور بصياغة نموذج الكتابة، ولا رقمَ فيه لا يرد في النصّ.'
           : escapeHtml(m.note)}</span>
@@ -316,14 +318,14 @@ function slideLine(m: MediaView): string {
     return m.headline === null
       ? ''
       : `<div class="pic-foot">
-           ${status('ok', '●', 'على الصورة')}
+           ${statusBadge('ok', '●', 'على الصورة')}
            <span class="ago">«${escapeHtml(m.headline)}»</span>
          </div>`
   }
   const off = m.note.endsWith(OVERLAY_OFF)
   const offered = m.headline === null ? '' : ` — والعنوانُ المقترح «${escapeHtml(m.headline)}»`
   return `<div class="pic-foot">
-      ${off ? status('idle', '○', 'بلا نصٍّ فوقها') : status('warn', '!', 'بلا نصٍّ فوقها')}
+      ${off ? statusBadge('idle', '○', 'بلا نصٍّ فوقها') : statusBadge('warn', '!', 'بلا نصٍّ فوقها')}
       <span class="ago">عند التوليد: ${escapeHtml(m.note)}${offered}</span>
     </div>`
 }
@@ -359,7 +361,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
     return `<div class="pic">
       <video src="/panel/media/${escapeHtml(owned.id)}" controls preload="metadata" playsinline${dims}></video>
       <div class="pic-foot">
-        ${status('ok', '●', 'مقطعُك كما رفعتَه')}
+        ${statusBadge('ok', '●', 'مقطعُك كما رفعتَه')}
         <span class="chip mono">${kb(owned.bytes)}</span>
         ${owned.width !== null && owned.height !== null
           ? `<span class="chip mono">${owned.width}×${owned.height}</span>` : ''}
@@ -385,7 +387,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
-         <button class="g sm" type="submit"${blocked ? ' disabled' : ''}
+         <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' disabled' : ''}
            title="تُرفَض هذه بعد أن يمرّ التوليدُ بحرّاسه، فلا يبقى المنشورُ بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
@@ -404,14 +406,14 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
               ? `<form class="inline" method="POST" action="/panel/media/animate"
                    data-busy="جارٍ التحريك…">
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-               <button class="g sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
               : ''}
              ${info
                ? `${regen('infographic', 'ولّد إنفوجرافيك بديلًا', lines.infoBlocked)}${regen('illustration', 'بدّلها صورةً فنّيّة', lines.imageBlocked)}`
                : `${regen('illustration', 'ولّد صورةً بديلة', lines.imageBlocked)}${regen('infographic', 'بدّلها إنفوجرافيك', lines.infoBlocked)}`}
              <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
-               <button class="g sm" type="submit">ارفض الصورة</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit">ارفض الصورة</button></form>`
           : ''}
       </div>
       ${slideLine(ready)}
@@ -419,7 +421,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
-             ${status('ok', '●', `مقطعٌ رأسيّ 15ث`)}
+             ${statusBadge('ok', '●', `مقطعٌ رأسيّ 15ث`)}
              <span class="chip mono">${kb(clip.bytes)}</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}
@@ -431,14 +433,14 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
 
   // ‏و`i-` مرساةُ محطّة «الصورة» في الرئيسيّة: تنزل إلى الزرّ لا إلى رأس البطاقة (ر-3)
   return `<div class="pic none" id="i-${escapeHtml(d.id)}">
-    ${status('idle', '○', `${
+    ${statusBadge('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">${INFO_CAPTION}</span>
     <span class="grow"></span>
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…">
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
       <input type="hidden" name="style" value="infographic">
-      <button class="p sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
+      <button class="btn btn-primary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
     ${lines.info}
     <details class="art">
       <summary>أو صورةٌ فنّيّة</summary>
@@ -447,7 +449,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
         <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
           <input type="hidden" name="id" value="${escapeHtml(d.id)}">
           <input type="hidden" name="style" value="illustration">
-          <button class="g sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
+          <button class="btn btn-secondary btn-sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
         ${lines.image}
       </div>
     </details>
@@ -481,7 +483,7 @@ function readyLine(line: MediaLine): string {
   const dots = line.dots
     .map((dot) => {
       const mark = RUNG_MARK[dot.state]
-      return status(mark.cls, mark.g, escapeHtml(dot.title),
+      return statusBadge(mark.cls, mark.g, escapeHtml(dot.title),
         `title="${escapeHtml(`${mark.label} — ${dot.note}`)}"`)
     })
     .join('')
@@ -589,9 +591,10 @@ function editDiff(d: DraftRow): string {
 function filterTabs(drafts: readonly DraftRow[]): string {
   const tabs = BUCKETS.map((b) => {
     const n = b.id === 'all' ? drafts.length : drafts.filter((d) => bucketOf(d) === b.id).length
-    return `<button type="button" class="ftab${b.id === 'all' ? ' on' : ''}"
+    // ‏تبويبُ فرزٍ بلغة التنقّل (D-189) — وحالُه في «aria-pressed» لا في صنف
+    return `<button type="button" class="tab-item"
       data-bucket="${b.id}" aria-pressed="${b.id === 'all'}"
-      >${escapeHtml(b.label)}<span class="count">${n}</span></button>`
+      >${escapeHtml(b.label)}${count(n)}</button>`
   }).join('')
   /*
    * **وفرزٌ ثانٍ بالمنصّة، وترتيب** (D-127) — بشرطَي D-062 نفسيهما:
@@ -601,9 +604,9 @@ function filterTabs(drafts: readonly DraftRow[]): string {
    */
   const platforms = [...new Set(drafts.map((d) => d.platform))]
   const ptabs = [
-    `<button type="button" class="ftab on" data-platform-tab="all" aria-pressed="true">كلُّ المنصّات<span class="count">${drafts.length}</span></button>`,
-    ...platforms.map((p) => `<button type="button" class="ftab" data-platform-tab="${escapeHtml(p)}" aria-pressed="false"
-      >${escapeHtml(platformLabel(p))}<span class="count">${drafts.filter((d) => d.platform === p).length}</span></button>`),
+    `<button type="button" class="tab-item" data-platform-tab="all" aria-pressed="true">كلُّ المنصّات${count(drafts.length)}</button>`,
+    ...platforms.map((p) => `<button type="button" class="tab-item" data-platform-tab="${escapeHtml(p)}" aria-pressed="false"
+      >${escapeHtml(platformLabel(p))}${count(drafts.filter((d) => d.platform === p).length)}</button>`),
   ].join('')
   const order = `<label class="order"><span class="sub">الترتيب</span>
     <select id="draft-order" aria-label="ترتيبُ المسوّدات">
@@ -611,8 +614,8 @@ function filterTabs(drafts: readonly DraftRow[]): string {
       <option value="old">الأقدم أوّلًا</option>
       <option value="cost">الأغلى نشرًا أوّلًا</option>
     </select></label>`
-  return `<nav class="ftabs" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>
-  <nav class="ftabs ftabs-2" id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden>${ptabs}<span class="grow"></span>${order}</nav>`
+  return `<nav class="tab-bar" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>
+  <nav class="tab-bar tab-sub" id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden>${ptabs}<span class="grow"></span>${order}</nav>`
 }
 
 /**
@@ -676,7 +679,7 @@ function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
   if (notes.length === 0) return ''
 
   return `<details class="notes">
-    <summary>${status('idle', '◍', `${
+    <summary>${statusBadge('idle', '◍', `${
       notes.length} ملحوظةً على الصياغة`)}
       <span class="ago">تُقرأ ولا تمنع — والقرارُ لك</span></summary>
     <ul class="plain">${notes
@@ -708,7 +711,7 @@ function card(
   // شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا
   const st =
     d.status === 'queued' && d.dispatchedAt !== null
-      ? { cls: 'warn', glyph: '↑', text: 'في الطريق' }
+      ? { cls: 'warn' as const, glyph: '↑', text: 'في الطريق' }
       : (STATUS[d.status] ?? STATUS['draft']!)
   const open = d.status === 'draft'
   // بطاقةٌ فيها فعلٌ باقٍ ليست منتهية: المعتمَدُ ينتظر موعدا، والمجدولُ
@@ -737,9 +740,9 @@ function card(
      */
     d.publishCost === 0
       ? ''
-      : status(d.publishCost >= 0.1 ? 'warn' : '', d.publishCost >= 0.1 ? '!' : '●',
+      : statusBadge(d.publishCost >= 0.1 ? 'warn' : '', d.publishCost >= 0.1 ? '!' : '●',
           `نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}`),
-    d.stale ? status('warn', '▲', 'المصدر تغيّر بعدها') : '',
+    d.stale ? statusBadge('warn', '▲', 'المصدر تغيّر بعدها') : '',
     /*
      * **ورابطُ الرحلة على كلّ بطاقة** (D-104): الرحلةُ تُسأل عن منشورٍ
      * بعينه، **والسؤالُ يقع وأنت تنظر إليه** — لا بعد أن تبحث عن معرّفه.
@@ -760,16 +763,16 @@ function card(
            data-count="${spec.id}"
            aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
          <div class="draft-foot act">
-           <span class="count ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
+           <span class="draft-len ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
              ><b>${len}</b> / ${spec.hardLimit}</span>
            <span class="grow"></span>
-           <button class="g sm" type="submit" name="do" value="reject">ارفض</button>
-           <button class="p sm" type="submit" name="do" value="approve">اعتمد</button>
+           <button class="btn btn-secondary btn-sm" type="submit" name="do" value="reject">ارفض</button>
+           <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button>
          </div>
        </form>
        ${preview(d, spec.label)}`
     : `<div class="draft-text ro" style="${box}" data-ro>${escapeHtml(d.text)}</div>
-       <div class="draft-foot"><span class="count"><b>${len}</b> / ${spec.hardLimit}</span>
+       <div class="draft-foot"><span class="draft-len"><b>${len}</b> / ${spec.hardLimit}</span>
          <span class="grow"></span>
          ${d.approvedBy === null
            ? ''
@@ -789,11 +792,11 @@ function card(
                aria-label="حدّد هذه المسوّدة للاعتماد الجماعيّ">
            </label>`
         : ''}
-      <div class="ch-logo sm">${LOGOS[d.platform] ?? ''}</div>
+      <div class="ch-logo ch-logo-sm">${LOGOS[d.platform] ?? ''}</div>
       <div class="ch-name">${escapeHtml(spec.label)}
         <span class="ago">${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
       <span class="grow"></span>
-      ${status(st.cls, st.glyph, escapeHtml(st.text))}
+      ${statusBadge(st.cls, st.glyph, escapeHtml(st.text))}
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
@@ -891,10 +894,12 @@ export function draftsSection(input: DraftsInput): string {
   // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة
   const writer =
     writable.length === 0
-      ? `<div class="empty"><b>لا مصدر جاهزا للكتابة</b>
-           <p>الكتابةُ تنطلق من خلاصةِ تحليلٍ لا من المستند نفسه.
-              حلّل مصدرا أوّلا ثمّ عد.</p>
-           <a class="btn g sm" href="#sources">اذهب إلى المصادر</a></div>`
+      ? emptyState({
+          title: 'لا مصدر جاهزا للكتابة',
+          html: `الكتابةُ تنطلق من خلاصةِ تحليلٍ لا من المستند نفسه.
+              حلّل مصدرا أوّلا ثمّ عد.`,
+          action: '<a class="btn btn-secondary btn-sm" href="#sources">اذهب إلى المصادر</a>',
+        })
       : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…">
            <div class="field"><label for="dw-src">المصدر</label>
              <select id="dw-src" name="id">${writable
@@ -912,15 +917,15 @@ export function draftsSection(input: DraftsInput): string {
                )
                .join('')}</select></div>
            <div class="grow"></div>
-           <button class="p" type="submit"${input.ready && blocked === null ? '' : ' disabled'}${
+           <button class="btn btn-primary" type="submit"${input.ready && blocked === null ? '' : ' disabled'}${
              blocked === null ? '' : ' aria-describedby="dw-why"'}>اكتب مسوّدة</button>
          </form>
          ${blocked !== null
-           ? `<p class="hint" id="dw-why" style="margin:var(--s-2) 0 0">${escapeHtml(blocked.text)}
+           ? `<p class="hint m-0 mt-2" id="dw-why">${escapeHtml(blocked.text)}
                 <a class="tap" href="${escapeHtml(blocked.href)}">${escapeHtml(blocked.label)}</a></p>`
            : input.ready
              ? ''
-             : '<p class="hint" style="margin:var(--s-2) 0 0">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
+             : '<p class="hint m-0 mt-2">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
 
   /*
    * لوحُ الاختصارات — **ولا يُعرض إلّا حيث تعمل**.
@@ -939,7 +944,7 @@ export function draftsSection(input: DraftsInput): string {
       <span class="row-k"><kbd>S</kbd> الجدولة</span>
       <span class="row-k"><kbd>?</kbd> هذا اللوح</span>
     </div>
-    <p class="hint" style="padding:0 var(--s-3) var(--s-3); margin:0">
+    <p class="hint m-0 keys-hint">
       <b>وتُقاس بموضع المفتاح لا بحرفه</b> — فتعمل بالتخطيط العربيّ كما
       تعمل بالإنجليزيّ. ولا تعمل وأنت داخل مربّع كتابة.</p>
   </details>`
@@ -948,9 +953,11 @@ export function draftsSection(input: DraftsInput): string {
   const lines = readyLines(input.mediaReady)
   const list =
     drafts.length === 0
-      ? `<div class="empty"><b>لا مسوّدات بعد</b>
-           <p>اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.</p>
-           <a class="btn p sm" href="#write">اكتب من مصدر</a></div>`
+      ? emptyState({
+          title: 'لا مسوّدات بعد',
+          html: 'اكتب واحدةً من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
+          action: '<a class="btn btn-primary btn-sm" href="#write">اكتب من مصدر</a>',
+        })
       : `<div class="dcols">${drafts
           .map((d) =>
             card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines))
@@ -972,11 +979,11 @@ export function draftsSection(input: DraftsInput): string {
    */
   const bulk = `<form id="bulk" class="bulkbar" method="POST"
       action="/panel/drafts/approve-many" data-busy="جارٍ الاعتماد…" hidden>
-    ${status('ok', '●', `<b data-bulk-n>0</b> محدَّدة`)}
+    ${statusBadge('ok', '●', `<b data-bulk-n>0</b> محدَّدة`)}
     <span class="ago" data-bulk-cost></span>
     <span class="grow"></span>
-    <button type="button" class="g sm" data-bulk-clear>ألغِ التحديد</button>
-    <button class="p sm" type="submit">اعتمدها كما كُتبت</button>
+    <button type="button" class="btn btn-secondary btn-sm" data-bulk-clear>ألغِ التحديد</button>
+    <button class="btn btn-primary btn-sm" type="submit">اعتمدها كما كُتبت</button>
   </form>`
 
   /*
@@ -988,8 +995,8 @@ export function draftsSection(input: DraftsInput): string {
    */
   return `${bulk}
   <div class="lede-row">
-    <h3 class="sec" style="margin:0; border:0; padding:0">المسوّدات</h3>
-    ${status(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
+    <h3 class="sec bare">المسوّدات</h3>
+    ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
       <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
@@ -998,11 +1005,9 @@ export function draftsSection(input: DraftsInput): string {
   ${filterTabs(drafts)}
   ${keys}
   ${list}
-  <div class="empty" id="draft-none" hidden>
-    <b>لا مسوّدةَ في هذا الفرز</b>
-    <p>غيّر التبويبَ أعلاه، أو اختر «الكلّ».</p></div>
+  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}
 
-  <div class="card" id="write" style="margin-top:var(--s-3)">
+  <div class="card mt-3" id="write">
     <div class="card-head"><h2>الكتابة من مصدر</h2></div>
     <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
       <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
@@ -1031,7 +1036,7 @@ function spreadBar(input: DraftsInput): string {
   return `<form class="card" method="POST" action="/panel/drafts/spread">
     <div class="card-head"><h2>وزّع المعتمَد</h2>
       <div class="grow"></div>
-      ${status('ok', '●', `${ready} جاهزةً للتوزيع`)}</div>
+      ${statusBadge('ok', '●', `${ready} جاهزةً للتوزيع`)}</div>
     <p class="hint">موعدٌ للأولى وفاصلٌ بين كلِّ اثنتين — <b>ويُعرَض الجدولُ كاملا
       قبل أن يقع منه شيء</b>.</p>
     <div class="row">
@@ -1042,12 +1047,12 @@ function spreadBar(input: DraftsInput): string {
         <input id="sp-gap" name="gap" type="number" inputmode="numeric"
           min="1" max="168" value="24" required></div>
       <span class="grow"></span>
-      <button class="p" type="submit">اعرض الجدول</button>
+      <button class="btn btn-primary" type="submit">اعرض الجدول</button>
     </div>
     <div class="quick" data-quick="sp-start">
       ${QUICK.map(
         (q) =>
-          `<button class="g sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
+          `<button class="btn btn-secondary btn-sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
       ).join('')}
       <span class="grow"></span>
       <span class="mirror mono" data-mirror="sp-start"></span>

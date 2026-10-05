@@ -13,16 +13,17 @@ import {
 } from '../../../lib/media/uploads'
 import { YT_TITLE_MAX } from '../../../lib/publish/youtube'
 import { PRESETS } from '../../../lib/time/local'
-import { status } from '../parts'
+import { statusBadge, type Tone } from '../components/badge'
+import { emptyState } from '../components/empty'
 
-const MARK: Readonly<Record<VideoCheck['level'], { cls: string; g: string }>> = {
+const MARK: Readonly<Record<VideoCheck['level'], { cls: Tone; g: string }>> = {
   ok: { cls: 'ok', g: '●' },
   warn: { cls: 'warn', g: '!' },
   block: { cls: 'bad', g: '▲' },
 }
 
 /** حالُ منشور المقطع على صفّه — بكلمات بطاقته في «المنشورات»، والرابطُ إليها. */
-const POST_STATE: Readonly<Record<string, { cls: string; g: string; text: string }>> = {
+const POST_STATE: Readonly<Record<string, { cls: Tone; g: string; text: string }>> = {
   draft: { cls: 'idle', g: '○', text: 'مسوّدةٌ تنتظر قرارك' },
   approved: { cls: 'ok', g: '●', text: 'معتمَدٌ بلا موعد' },
   edited: { cls: 'ok', g: '●', text: 'معتمَدٌ بلا موعد' },
@@ -56,11 +57,11 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null): string
     // ‏رفعٌ جارٍ في نافذةٍ أخرى أو انقطع — لا يُستأنف؛ يُلغى ويُرفع من جديد، وما تُرك يُلغى وحده بعد ساعات
     return `<div class="vrow">
       <div class="vmeta"><b><bdi>${escapeHtml(u.name)}</bdi></b><span class="ago">${meta}</span></div>
-      ${status('warn', '!', 'لم يكتمل رفعُه')}
+      ${statusBadge('warn', '!', 'لم يكتمل رفعُه')}
       <form class="row" method="POST" action="/panel/uploads/${escapeHtml(u.id)}/abort" data-busy="جارٍ الإلغاء…">
         <input type="hidden" name="from" value="library">
         <span class="ago">إن انقطع رفعُه فألغِه ثمّ ارفعه من جديد — ويُلغى وحده بعد ${STALE_UPLOAD_HOURS} ساعات.</span>
-        <button class="g" type="submit" aria-label="${escapeHtml(`ألغِ رفع ${u.name}`)}">ألغِ</button>
+        <button class="btn btn-secondary" type="submit" aria-label="${escapeHtml(`ألغِ رفع ${u.name}`)}">ألغِ</button>
       </form>
     </div>`
   }
@@ -77,7 +78,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null): string
             aria-label="${escapeHtml(`افتح منشورَ ${platformLabel(p)}`)}">افتح منشورَه</a>`
       return `<div class="vpf">
         <span class="vpf-b"><b>${escapeHtml(platformLabel(p))}</b>
-          ${status(st.cls, st.g, escapeHtml(st.text))}
+          ${statusBadge(st.cls, st.g, escapeHtml(st.text))}
           ${link}</span>
       </div>`
     }
@@ -85,7 +86,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null): string
     return `<label class="vpf">
         <input type="checkbox" name="platform" value="${p}"${blocked ? ' disabled' : ' checked'}>
         <span class="vpf-b"><b>${escapeHtml(platformLabel(p))}</b>
-          ${status(MARK[c.level].cls, MARK[c.level].g, escapeHtml(c.note))}</span>
+          ${statusBadge(MARK[c.level].cls, MARK[c.level].g, escapeHtml(c.note))}</span>
       </label>`
   }).join('')
   const isOpen = (p: string): boolean => postOf(p) === undefined && checks.find((x) => x.platform === p)!.level !== 'block'
@@ -113,7 +114,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null): string
           <div class="row">
             <label class="vapprove"><input type="checkbox" name="approve" checked> اعتمده الآن — كتبتُه أنا</label>
             <span class="grow"></span>
-            <button class="p" type="submit">أنشئ المنشورات</button>
+            <button class="btn btn-primary" type="submit">أنشئ المنشورات</button>
           </div>`
         : `<p class="hint">${hint}</p>`}
     </form>
@@ -139,7 +140,7 @@ function scheduleAll(u: UploadRow): string {
       ${ready.map((p) => `<input type="hidden" name="post" value="${escapeHtml(p.id)}">`).join('')}
       <div class="row">
         <span class="ago">${escapeHtml(ready.length === 1 ? `جدوِل منشورَ ${names} بتوقيتك:` : `جدوِل منشوراتِ ${names} معًا بتوقيتك:`)}</span>
-        ${PRESETS.map((q) => `<button class="g sm" type="submit" name="preset" value="${q.kind}"
+        ${PRESETS.map((q) => `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${q.kind}"
           aria-label="${escapeHtml(`جدوِل ${q.label}`)}">${escapeHtml(q.label)}</button>`).join('')}
       </div>
       ${reach === null ? '' : `<span class="ago">${escapeHtml(reach)}</span>`}
@@ -148,19 +149,19 @@ function scheduleAll(u: UploadRow): string {
 
 /** و`cards` معرّفاتُ بطاقات «المنشورات» في الصفحة — و`null` حين لا تُعرف فيُربط كلُّ منشور. */
 export function videosSection(uploads: readonly UploadRow[], now: Date, cards: ReadonlySet<string> | null = null): string {
-  return `<div class="card" id="videos" style="margin-top:var(--s-3)">
+  return `<div class="card mt-3" id="videos">
     <div class="card-head"><h2>فيديوهاتك</h2><div class="grow"></div>
       <span class="ago">ترفعه مرّةً، ويُنشر على YouTube وTikTok وInstagram</span></div>
     <p class="hint"><b>صدّره هكذا فيقبله الثلاث</b>: MP4 (H.264 وصوت AAC)، رأسيٌّ 1080×1920 بثلاثين إطارًا،
       بين ثلاث ثوانٍ وثلاث دقائق، وأقلُّ من 300MB — واختر «تحسين للويب» إن وُجد.</p>
     <div class="vup">
-      <label class="btn p vpick">اختر مقطعًا وارفعه
+      <label class="btn btn-primary vpick">اختر مقطعًا وارفعه
         <input type="file" id="vfile" class="vfile" accept="video/mp4,video/quicktime,video/webm"></label>
       <progress id="vup-bar" max="100" value="0" hidden></progress>
       <span class="ago" id="vup-msg" aria-live="polite"></span>
     </div>
     ${uploads.length === 0
-      ? '<div class="empty"><b>لا مقطعَ بعد</b><p>ارفع مقطعًا، ثمّ اكتب نصَّه واختر منصّاته.</p></div>'
+      ? emptyState({ title: 'لا مقطعَ بعد', html: 'ارفع مقطعًا، ثمّ اكتب نصَّه واختر منصّاته.' })
       : `<div class="vlist">${uploads.map((u) => row(u, now, cards)).join('')}</div>`}
   </div>`
 }

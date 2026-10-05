@@ -18,6 +18,7 @@ import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
   type Dimension, type Measure, type PivotTable,
 } from '../../../lib/pivot'
+import { emptyState } from '../components/empty'
 
 export interface PivotView {
   readonly table: PivotTable
@@ -121,9 +122,11 @@ export function pivotPane(d: PivotView): string {
    * **وجدولٌ فارغٌ يقول لماذا.** «لا نتائج» وحدَها تترك المالكَ يظنّ
    * العطلَ في اللوح، **والسببُ في المدى غالبا** — فيُقال ويُعرَض الفعل.
    */
-  const empty = `<div class="empty"><b>لا منشورَ في هذا المدى</b>
-    <p>المدى الحاليُّ ${escapeHtml(counted(d.sinceDays, NOUNS.day))}.
-      وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.</p></div>`
+  const empty = emptyState({
+    title: 'لا منشورَ في هذا المدى',
+    html: `المدى الحاليُّ ${escapeHtml(counted(d.sinceDays, NOUNS.day))}.
+      وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.`,
+  })
 
   return `<section data-pane="pivot" hidden>
   ${pageHead('القياس', sectionLabel('pivot'), 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
@@ -137,18 +140,18 @@ export function pivotPane(d: PivotView): string {
         MEASURES.map((m) => ({ v: m, t: MEASURE_LABEL[m] })))}
       ${picker('pv-d', 'days', 'المدى', String(d.sinceDays),
         SPANS.map((s) => ({ v: String(s.days), t: s.label })))}
-      <button class="p" type="submit">اعرض</button>
+      <button class="btn btn-primary" type="submit">اعرض</button>
     </form>
   </div>
 
-  <div class="card" style="margin-top:var(--s-3)">
+  <div class="card mt-3">
     <div class="split">
       <h2>${escapeHtml(MEASURE_LABEL[d.measure])} — ${
         escapeHtml(DIMENSION_LABEL[d.rows])}${
         d.cols === null ? '' : ` × ${escapeHtml(DIMENSION_LABEL[d.cols])}`}</h2>
-      <div class="row acts"><span class="n">${escapeHtml(String(t.facts))} منشورا${
+      <div class="row acts"><span class="note">${escapeHtml(String(t.facts))} منشورا${
         d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
-      ${t.rowKeys.length === 0 ? '' : `<a class="btn g sm" href="${
+      ${t.rowKeys.length === 0 ? '' : `<a class="btn btn-secondary btn-sm" href="${
         escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>`}</div>
     </div>
     ${t.rowKeys.length === 0 ? '' : `<p class="hint">ملفُّ CSV يحمل ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</p>`}

@@ -90,8 +90,8 @@ describe('المساحة — والسؤالُ «كيف تغيّر»', () => {
   it('يرسم محورا وشبكةً — لا خطّا معلَّقا في فراغ', () => {
     const html = areaChart(series)
     expect(html).toContain('class="grid-l"')
-    expect(html).toContain('class="axis y"')
-    expect(html).toContain('class="axis x"')
+    expect(html).toContain('class="axis axis-y"')
+    expect(html).toContain('class="axis axis-x"')
   })
 
   /** **الرسمُ يتمدّد والحرفُ لا** (D-153): لا `<text>` في SVG، والحدُّ لا يتمدّد، والذروةُ HTML. */

@@ -43,10 +43,14 @@ import { escapeHtml } from './escape'
 import { setupPane } from './channels'
 import { LOGOS } from './logos'
 // وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
-import { fileName, glyph, pathArrows, RUNG_MARK, status } from './parts'
+import { fileName, glyph, pathArrows, RUNG_MARK } from './parts'
+import { statusBadge } from './components/badge'
+import { notice, toastRegion } from './components/toast'
+import { tabs } from './components/tabs'
 import { readiness, type Readiness } from '../../lib/platform/readiness'
 import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
 import { returnTo } from '../../lib/nav/back'
+import { emptyState } from './components/empty'
 
 /** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -168,7 +172,7 @@ function requeueForm(id: string, primary: boolean, platform: string): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
     <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'waiting'))}">
-    <button class="${primary ? 'p' : 'g'} sm" type="submit">أعده إلى المعتمَد</button></form>`
+    <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
 }
 
 /** كلفةُ المنشور كلُّها: عمودُه وما في الدفتر باسمه. */
@@ -203,13 +207,13 @@ function capabilityTable(rows: readonly Capability[]): string {
         <td data-label="يفتح"><span class="nm">${escapeHtml(row.spec.enables)}</span></td>
         <td data-label="الحال">${
           on
-            ? status('ok', '●', 'ممنوح')
-            : status('bad', '▲', 'ناقص')
+            ? statusBadge('ok', '●', 'ممنوح')
+            : statusBadge('bad', '▲', 'ناقص')
         }</td>
         <td data-label="مصدرُه">${
           on
             ? '<span class="ago">—</span>'
-            : `<span class="sub" style="margin:0"><b>${escapeHtml(row.spec.grantedBy)}</b><br>
+            : `<span class="sub m-0"><b>${escapeHtml(row.spec.grantedBy)}</b><br>
                ${portalPath(row.spec.where)}</span>`
         }</td>
       </tr>`
@@ -273,15 +277,15 @@ export function readinessLadder(r: Readiness): string {
       const mark = RUNG_MARK[rung.state]
       const act = rung.action === undefined || rung.state === 'done' || rung.state === 'waiting'
         ? ''
-        : `<a class="btn ${rung.state === 'failed' ? 'p' : 'g'} sm" href="${escapeHtml(rung.action.href)}">${escapeHtml(rung.action.label)}</a>`
+        : `<a class="btn ${rung.state === 'failed' ? 'btn-primary' : 'btn-secondary'} btn-sm" href="${escapeHtml(rung.action.href)}">${escapeHtml(rung.action.label)}</a>`
       return `<li class="${mark.cls}${rung === r.next ? ' at' : ''}">
-        <span class="n" aria-hidden="true">${i + 1}</span>
+        <span class="step-n" aria-hidden="true">${i + 1}</span>
         <span class="body">
           <span class="what">${escapeHtml(rung.title)}</span>
           <span class="why">${escapeHtml(rung.note)}</span>
         </span>
         ${act}
-        ${status(mark.cls, mark.g, mark.label)}
+        ${statusBadge(mark.cls, mark.g, mark.label)}
       </li>`
     })
     .join('')
@@ -290,7 +294,7 @@ export function readinessLadder(r: Readiness): string {
   return `<details class="card ladder"${all ? '' : ' open'}>
     <summary class="card-head">
       <h2>أتنشر الآن؟</h2><div class="grow"></div>
-      ${status(
+      ${statusBadge(
         r.verdict.kind,
         r.verdict.kind === 'ok' ? '●' : r.verdict.kind === 'bad' ? '▲' : r.verdict.kind === 'warn' ? '◍' : '○',
         r.verdict.kind === 'ok' ? 'تعمل' : r.verdict.kind === 'bad' ? 'لا تنشر' : r.verdict.kind === 'warn' ? 'تنتظرك' : 'تنتظر',
@@ -314,7 +318,7 @@ const ACCT_CLASS: Readonly<Record<string, string>> = {
 /** الحكمُ الواحد في الرأس — **من السلّم لا من حال الربط**: «مربوطة» فوق «لا تنشر» تناقض. */
 function verdictChip(r: Readiness): string {
   const k = r.verdict.kind
-  return status(
+  return statusBadge(
     k,
     k === 'ok' ? '●' : k === 'bad' ? '▲' : k === 'warn' ? '◍' : '○',
     k === 'ok' ? 'تنشر' : k === 'bad' ? 'لا تنشر' : k === 'warn' ? 'تنتظرك' : 'تنتظر',
@@ -388,10 +392,10 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
       <div class="acct-act">
         <span class="acct-verdict">${unsignedAccounts(d.view).length > 0
           // ‏والشارةُ تقرأ الصفَّ كما تقرؤه بطاقةُ القناة (D-166)
-          ? status('bad', '▲', 'مربوطة بلا إذن')
+          ? statusBadge('bad', '▲', 'مربوطة بلا إذن')
           : verdictChip(r)}
           <a class="tap" href="${escapeHtml(href(spec.id, { tab: 'setup' }))}">التفاصيل</a></span>
-        ${next === null ? '' : `<a class="btn p" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>`}
+        ${next === null ? '' : `<a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>`}
       </div>
     </div>
   </header>`
@@ -498,7 +502,7 @@ function needsStrip(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): 
     <h2 class="needs-h" id="needs-h">ما تطلبه ${escapeHtml(needs.label)} <span class="ago">${tally}</span></h2>
     <ol class="needs-list">${list
       .map((s, i) => `<li class="${s.state}"><a href="${escapeHtml(s.href)}">
-        <span class="needs-top"><span class="n" aria-hidden="true">${i + 1}</span>
+        <span class="needs-top"><span class="step-n" aria-hidden="true">${i + 1}</span>
           <b>${escapeHtml(s.title)}</b><span class="needs-g">${glyph(STATION_G[s.state])}</span></span>
         <span class="needs-rule">${escapeHtml(s.rule)}</span>
         <span class="needs-now">${escapeHtml(s.now)}</span></a></li>`)
@@ -517,19 +521,20 @@ function tabsNav(d: PlatformScreenData, r: Readiness): string {
     media: id === 'youtube' ? 'Shorts' : clip || id === 'instagram' ? 'الشبكة' : 'الوسائط',
     setup: 'الإعداد',
   }
-  const count: Readonly<Record<Tab, string>> = {
-    posts: `<span class="count">${d.counts.queued + d.counts.published + d.counts.failed}</span>`,
-    waiting: `<span class="count">${d.counts.waiting + d.counts.ready}</span>`,
-    media: '',
-    setup: r.verdict.kind === 'bad' ? '<span class="count">!</span>' : '',
+  const n: Readonly<Record<Tab, number | '!' | undefined>> = {
+    posts: d.counts.queued + d.counts.published + d.counts.failed,
+    waiting: d.counts.waiting + d.counts.ready,
+    media: undefined,
+    setup: r.verdict.kind === 'bad' ? '!' : undefined,
   }
-  return `<nav class="ftabs" aria-label="أقسامُ صفحة المنصّة">${TABS.map((t) => {
-    const on = t === d.tab
-    // ‏والفشلُ يُنبَّه عليه في فرز «ما نُشر» بعدده، لا بتلوين مجموع المنشورات
-    const bad = t === 'setup' && r.verdict.kind === 'bad'
-    return `<a class="ftab${on ? ' on' : ''}${bad ? ' bad' : ''}" href="${escapeHtml(t === 'posts' ? href(id) : href(id, { tab: t }))}"${
-      on ? ' aria-current="page"' : ''}>${label[t]}${count[t]}</a>`
-  }).join('')}</nav>`
+  // ‏تبويباتٌ من العُدّة (D-189): روابطُ بـ«aria-current»، والفشلُ يُنبَّه عليه في «الإعداد» بنغمته
+  return tabs('أقسامُ صفحة المنصّة', TABS.map((t) => ({
+    label: label[t],
+    href: t === 'posts' ? href(id) : href(id, { tab: t }),
+    current: t === d.tab,
+    ...(n[t] === undefined ? {} : { count: n[t] }),
+    bad: t === 'setup' && r.verdict.kind === 'bad',
+  })))
 }
 
 // ── ٤ · القادم ────────────────────────────────────────────────────────
@@ -539,12 +544,12 @@ function upcomingSection(d: PlatformScreenData): string {
     const at = row.scheduledAt ?? row.createdAt
     const q = classifyQueued(row, d.now)
     const state = q.kind === 'upcoming'
-      ? status('ok', '◍', 'مجدول')
+      ? statusBadge('ok', '◍', 'مجدول')
       : q.kind === 'late'
-        ? status('warn', '!', `تأخّر ${q.minutes} د`)
+        ? statusBadge('warn', '!', `تأخّر ${q.minutes} د`)
         : q.kind === 'sending'
-          ? status('warn', '◍', 'في الطريق')
-          : status('bad', '▲', 'عالق')
+          ? statusBadge('warn', '◍', 'في الطريق')
+          : statusBadge('bad', '▲', 'عالق')
     const under = `
       ${row.accountName === null ? '' : `<span class="np-acc">${escapeHtml(row.accountName)}</span>`}
       ${q.kind === 'late' ? '<p class="hint">حلّ موعدُه ولم تُرسله الدورةُ بعد — تدور كلَّ ربع ساعة.</p>' : ''}
@@ -554,7 +559,7 @@ function upcomingSection(d: PlatformScreenData): string {
           ? `<form class="inline" method="POST" action="/panel/drafts/unschedule" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(row.id)}">
                <input type="hidden" name="return" value="${escapeHtml(returnTo(d.view.spec.id, 'waiting'))}">
-               <button class="g sm" type="submit">اسحبه من الطابور</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit">اسحبه من الطابور</button></form>`
           : ''}
       ${journeyLink(row.id)}`
     return npRow(
@@ -566,8 +571,7 @@ function upcomingSection(d: PlatformScreenData): string {
   })
   return `<h3 class="sec" id="upcoming">القادم · ${d.upcoming.length}</h3>
     ${rows.length === 0
-      ? `<div class="empty"><b>لا شيءَ مجدولٌ على ${escapeHtml(d.view.spec.label)}</b>
-         <p>ما تعتمده وتجدوله يظهر هنا بموعده، الأقربُ أوّلًا.</p></div>`
+      ? emptyState({ title: `لا شيءَ مجدولٌ على ${d.view.spec.label}`, html: 'ما تعتمده وتجدوله يظهر هنا بموعده، الأقربُ أوّلًا.' })
       : `<div class="np-list">${rows.join('')}</div>`}`
 }
 
@@ -593,15 +597,15 @@ function historyRow(d: PlatformScreenData, row: TimelineRow): string {
     under = `${resultLine(d, row)}
       ${link === null
         ? '<span class="ago">نُشر، ولا يُبنى رابطُه من معرّفه لهذه المنصّة.</span>'
-        : `<a class="btn g sm" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
+        : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
              aria-label="${escapeHtml(`افتحه على ${d.view.spec.label} — منشورُ ${dayLabel(row.publishedAt ?? row.sortAt, d.zone, false)} ${clock(row.publishedAt ?? row.sortAt, d.zone)}`)}"
              >${ICON.external} افتحه على ${escapeHtml(d.view.spec.label)}</a>`}
       <span class="ago">${cost > 0 ? `كلّف ${money(cost)} · ` : ''}${row.tries > 1 ? `بعد ${row.tries} محاولات · ` : ''}</span>${journeyLink(row.id)}`
   } else {
     const why = whyFailed(row.failure, platform)
-    under = `<p class="np-why"><span class="i">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
+    under = `<p class="np-why"><span class="np-why-ic">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
       ${why.action === 'relink'
-        ? `<a class="btn p sm" href="/oauth/${escapeHtml(platform)}/start">أعد الربط</a>${requeueForm(row.id, false, platform)}`
+        ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(platform)}/start">أعد الربط</a>${requeueForm(row.id, false, platform)}`
         : why.action === 'requeue' || why.action === 'open'
           ? requeueForm(row.id, true, platform)
           : ''}
@@ -609,7 +613,7 @@ function historyRow(d: PlatformScreenData, row: TimelineRow): string {
   }
   return npRow(
     row.id,
-    whenCol(at, d.zone, { state: published ? status('ok', '●', 'نُشر') : status('bad', '▲', 'فشل') }),
+    whenCol(at, d.zone, { state: published ? statusBadge('ok', '●', 'نُشر') : statusBadge('bad', '▲', 'فشل') }),
     frame(d, row, shortAgo(at, d.now)),
     under,
     published ? '' : 'failed',
@@ -623,12 +627,15 @@ function historySection(d: PlatformScreenData): string {
     { f: 'published', label: 'نُشر', n: d.counts.published },
     { f: 'failed', label: 'فشل', n: d.counts.failed },
   ]
-  const nav = `<nav class="ftabs ftabs-2" aria-label="فرزُ ما نُشر">${filters
+  const nav = tabs('فرزُ ما نُشر', filters
     .filter((x) => x.f === 'all' || x.n > 0)
-    .map((x) => `<a class="ftab${x.f === d.filter ? ' on' : ''}${x.f === 'failed' ? ' bad' : ''}"
-      href="${escapeHtml(x.f === 'all' ? href(id, {}, '#history') : href(id, { filter: x.f }, '#history'))}"${
-        x.f === d.filter ? ' aria-current="page"' : ''}>${x.label}<span class="count">${x.n}</span></a>`)
-    .join('')}</nav>`
+    .map((x) => ({
+      label: x.label,
+      href: x.f === 'all' ? href(id, {}, '#history') : href(id, { filter: x.f }, '#history'),
+      current: x.f === d.filter,
+      count: x.n,
+      bad: x.f === 'failed',
+    })), { sub: true })
 
   let day = ''
   const parts: string[] = []
@@ -643,12 +650,14 @@ function historySection(d: PlatformScreenData): string {
   }
   const older = d.history.next === null
     ? ''
-    : `<a class="btn g" href="${escapeHtml(href(id, d.filter === 'all' ? { before: d.history.next } : { filter: d.filter, before: d.history.next }, '#history'))}">أقدم</a>`
+    : `<a class="btn btn-secondary" href="${escapeHtml(href(id, d.filter === 'all' ? { before: d.history.next } : { filter: d.filter, before: d.history.next }, '#history'))}">أقدم</a>`
   return `<h3 class="sec" id="history">حتّى الآن · ما نُشر</h3>
     ${nav}
     ${parts.length === 0
-      ? `<div class="empty"><b>${d.filter === 'failed' ? 'لا فشلَ مسجَّل' : `لم يُنشر شيءٌ على ${escapeHtml(d.view.spec.label)} بعد`}</b>
-         <p>ما يُنشر يظهر هنا تحت يومه، بنتيجته ورابطه وكلفته.</p></div>`
+      ? emptyState({
+          title: d.filter === 'failed' ? 'لا فشلَ مسجَّل' : `لم يُنشر شيءٌ على ${d.view.spec.label} بعد`,
+          html: 'ما يُنشر يظهر هنا تحت يومه، بنتيجته ورابطه وكلفته.',
+        })
       : `<div class="np-list">${parts.join('')}</div>${older}`}`
 }
 
@@ -662,17 +671,19 @@ function waitingSection(d: PlatformScreenData): string {
     whenCol(r.createdAt, d.zone, {
       day: true,
       rel: `كُتبت ${relativeTime(r.createdAt, d.now)}`,
-      state: r.status === 'draft' ? status('warn', '◍', 'تنتظر قرارك') : status('idle', '○', 'معتمَدةٌ بلا موعد'),
+      state: r.status === 'draft' ? statusBadge('warn', '◍', 'تنتظر قرارك') : statusBadge('idle', '○', 'معتمَدةٌ بلا موعد'),
     }),
     frame(d, r, r.status === 'draft' ? 'مسوّدة' : 'معتمَدة'),
     `${r.sourceName === null ? '' : `<span class="ago">من «${fileName(r.sourceName)}»</span>`}
-     <a class="btn ${r.status === 'draft' ? 'p' : 'g'} sm" href="/panel#d-${escapeHtml(encodeURIComponent(r.id))}">${
+     <a class="btn ${r.status === 'draft' ? 'btn-primary' : 'btn-secondary'} btn-sm" href="/panel#d-${escapeHtml(encodeURIComponent(r.id))}">${
        r.status === 'draft' ? 'راجعها واعتمدها' : 'جدوِلها'}</a>
      ${journeyLink(r.id)}`,
   )
-  const empty = `<div class="empty"><b>لا شيءَ ينتظرك على ${escapeHtml(d.view.spec.label)}</b>
-    <p>ما يُكتب من مصدرٍ محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.</p>
-    <a class="btn g sm" href="${WRITE}">اكتب من مصدر</a></div>`
+  const empty = emptyState({
+    title: `لا شيءَ ينتظرك على ${d.view.spec.label}`,
+    html: 'ما يُكتب من مصدرٍ محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.',
+    action: `<a class="btn btn-secondary btn-sm" href="${WRITE}">اكتب من مصدر</a>`,
+  })
   return d.waiting.length === 0
     ? empty
     : `${drafts.length === 0 ? '' : `<h3 class="sec">تنتظر قرارك · ${drafts.length}</h3><div class="np-list">${drafts.map(row).join('')}</div>`}
@@ -687,16 +698,16 @@ function mediaSection(d: PlatformScreenData): string {
     const { media, poster } = mediaOf(d.media[row.id])
     if (media === null) return []
     const badge = row.status === 'queued'
-      ? status('ok', '◍', escapeHtml(clock(row.scheduledAt ?? row.createdAt, d.zone)))
+      ? statusBadge('ok', '◍', escapeHtml(clock(row.scheduledAt ?? row.createdAt, d.zone)))
       : row.status === 'failed'
-        ? status('bad', '▲', 'فشل')
-        : status('ok', '●', escapeHtml(shortAgo(row.publishedAt ?? row.sortAt, d.now)))
+        ? statusBadge('bad', '▲', 'فشل')
+        : statusBadge('ok', '●', escapeHtml(shortAgo(row.publishedAt ?? row.sortAt, d.now)))
     return [npTile({ id: row.id, media, poster, badge, dim: row.status === 'queued' })]
   })
   const bare = all.length - tiles.length
   const shape = d.needs?.media.kind === 'clip' ? 'np-grid-clip' : d.view.spec.id === 'instagram' ? 'np-grid-ig' : ''
   return tiles.length === 0
-    ? `<div class="empty"><b>لا وسائطَ بعد</b><p>الصورُ والمقاطعُ التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.</p></div>`
+    ? emptyState({ title: 'لا وسائطَ بعد', html: 'الصورُ والمقاطعُ التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.' })
     : `<p class="hint">لها وسيط: ${counted(tiles.length, NOUNS.post)}${bare > 0 ? ` · و${bare} بلا وسيطٍ لا تظهر هنا` : ''}.
          المجدولُ خافت، ويفتح كلُّ مربّعٍ منشورَه في الخطّ الزمنيّ.</p>
        <div class="np-grid${shape === '' ? '' : ` ${shape}`}">${tiles.join('')}</div>`
@@ -719,10 +730,10 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
           <span class="chip">${a.kind === 'org' ? (spec.id === 'youtube' ? 'قناة' : 'صفحةٌ أو شركة') : 'حسابٌ شخصيّ'}</span>
           <div class="grow"></div>
           ${a.status === 'needs_reauth'
-            ? status('bad', '▲', 'جدّد الإذن')
+            ? statusBadge('bad', '▲', 'جدّد الإذن')
             : missing === 0
-              ? status('ok', '●', 'كلُّ النطاقات ممنوحة')
-              : status('warn', '!', `ينقص ${counted(missing, NOUNS.scope)}`)}
+              ? statusBadge('ok', '●', 'كلُّ النطاقات ممنوحة')
+              : statusBadge('warn', '!', `ينقص ${counted(missing, NOUNS.scope)}`)}
         </div>
         <details${missing > 0 || granted === '' ? ' open' : ''}><summary>ما يستطيعه هذا الحساب</summary>
         <p class="hint">${
@@ -741,13 +752,15 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
   return `${readinessLadder(r)}
     <h3 class="sec">الحساباتُ وما تستطيعه</h3>
     ${accounts.length === 0
-      ? `<div class="empty"><b>لا حسابَ مربوطا</b>
-         <p>${state === 'awaiting_owner'
-           ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
-           : 'زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة.'}</p></div>`
+      ? emptyState({
+          title: 'لا حسابَ مربوطا',
+          html: state === 'awaiting_owner'
+            ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
+            : 'زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة.',
+        })
       : accountBlocks}
     ${state === 'linked' && unsignedAccounts(d.view).length === 0
-      ? `<div class="acct-more"><a class="btn g" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a></div>`
+      ? `<div class="acct-more"><a class="btn btn-secondary" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a></div>`
       : ''}
     ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n${setup}`}`
 }
@@ -774,8 +787,8 @@ export function platformScreen(d: PlatformScreenData): string {
         (<span class="mono">chat/completions</span>)، فسائقٌ واحدٌ يغطّي مَن لم يُخترَع بعد.
         <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b> — فحقلُ «عنوان API» لا يكفيها،
         <b>ولوحةٌ تعرض حقلا يوهم بأنّه يكفي تكذب</b>.</p>
-      <div class="outcome warn"><span class="k">ما ينقص</span>
-        <span class="v">${escapeHtml(spec.note)}</span></div>
+      <div class="outcome warn"><span class="kv-k">ما ينقص</span>
+        <span class="kv-v">${escapeHtml(spec.note)}</span></div>
     </div>`
   }
 
@@ -792,10 +805,11 @@ export function platformScreen(d: PlatformScreenData): string {
       : d.tab === 'media'
         ? mediaSection(d)
         : `${upcomingSection(d)}${historySection(d)}`
-  const flash = `<div id="flash" role="status" aria-live="polite">${d.flash === null
+  // ‏الإشعارُ مكوّنُه (D-189)، والخطأُ يُعلَن تنبيهًا ويبقى حتّى يُغلَق (7.8)
+  const flash = toastRegion(d.flash === null
     ? ''
-    : `<div class="flash ${d.flash.kind}"><span class="ic">${glyph(d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲')}</span>
-         <span>${escapeHtml(d.flash.text)}</span></div>`}</div>`
+    : notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad',
+        g: d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲' }))
   return `${flash}${head}
   ${d.tab === 'setup' ? '' : needsStrip(d, r, d.needs)}
   ${tabsNav(d, r)}

@@ -110,6 +110,7 @@ import { expiringTokens } from '../lib/token/expiry'
 import { filterOf, platformScreen, tabOf } from './ui/platformView'
 import { fingerprint } from '../lib/security/digest'
 import { injectCsrf, soloPage } from './ui/shell'
+import { notFoundResponse } from './errors'
 import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
@@ -1583,7 +1584,8 @@ panel.get('/panel/channels/:platform', async (c) => {
 
   const id = c.req.param('platform')
   const spec = CHANNELS.find((ch) => ch.id === id)
-  if (spec === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
+  // ‏صفحةٌ لا نصٌّ خامّ (D-189): رابطٌ قديمٌ إلى منصّةٍ يفتح الرافدةَ وبابَ الرئيسيّة
+  if (spec === undefined) return notFoundResponse(c.req.raw, 'لا منصّةَ بهذا الاسم')
 
   const accounts = await listAccounts(c.env.DB)
   // **لكلّ منصّةٍ لها سرّان** (D-142) — لا لمنصّتين، وإلّا بقيت شاشةُ
@@ -1597,7 +1599,7 @@ panel.get('/panel/channels/:platform', async (c) => {
     present.has(name) || (c.env[name as keyof Env] as string | undefined) !== undefined,
   )
   const view = views.find((v) => v.spec.id === id)
-  if (view === undefined) return c.text('لا منصّةَ بهذا الاسم', 404)
+  if (view === undefined) return notFoundResponse(c.req.raw, 'لا منصّةَ بهذا الاسم')
 
   const now = new Date()
 
@@ -1800,12 +1802,7 @@ panel.get('/panel/journey/:id', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const journey = await readJourney(c.env.DB, c.req.param('id'))
-  if (journey === null) {
-    return new Response('لا منشور بهذا المعرّف', {
-      status: 404,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    })
-  }
+  if (journey === null) return notFoundResponse(c.req.raw, 'لا منشورَ بهذا المعرّف')
 
   const body = journeyBody(journey, new Date())
   return page((nonce) =>
@@ -1822,7 +1819,7 @@ panel.get('/panel/report/:week', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const stored = await readReport(c.env.DB, c.req.param('week'))
-  if (stored === null) return c.text('لا تقريرَ لهذا الأسبوع', 404)
+  if (stored === null) return notFoundResponse(c.req.raw, 'لا تقريرَ لهذا الأسبوع')
 
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({

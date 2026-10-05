@@ -52,7 +52,7 @@ export function spreadScreen(d: SpreadScreenData): string {
         : `<ul class="plain">${skipped
             .map((s) => `<li><b>${escapeHtml(s.preview)}</b> — ${escapeHtml(s.reason)}</li>`)
             .join('')}</ul>`}
-      <p><a class="btn g" href="/panel#posts">${ICON.back}عُد إلى المسوّدات</a></p>
+      <p><a class="btn btn-secondary" href="/panel#posts">${ICON.back}عُد إلى المسوّدات</a></p>
     </section>`
   }
 
@@ -88,8 +88,8 @@ export function spreadScreen(d: SpreadScreenData): string {
       <input type="hidden" name="gap" value="${String(d.gap)}">
       ${slots.map((s) => `<input type="hidden" name="post" value="${escapeHtml(s.postId)}">`).join('')}
       <div class="row">
-        <button class="p" type="submit">اعتمد التوزيع</button>
-        <a class="btn g" href="/panel#posts">تراجَع</a>
+        <button class="btn btn-primary" type="submit">اعتمد التوزيع</button>
+        <a class="btn btn-secondary" href="/panel#posts">تراجَع</a>
       </div>
     </form>
   </section>`

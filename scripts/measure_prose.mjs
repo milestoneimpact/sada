@@ -78,12 +78,12 @@ for (const file of files) {
   })
 
   /*
-   * **وأوّلُ جوابٍ في الصفحة**: صدرُ المؤشّر `.tile .v` — وهو الرقمُ الذي
+   * **وأوّلُ جوابٍ في الصفحة**: صدرُ المؤشّر `.tile .kv-v` — وهو الرقمُ الذي
    * جاء المالكُ من أجله. ولا يُحتسَب كلُّ نصٍّ رقميّ: شارةُ عدٍّ في
    * الشريط الجانبيّ رقمٌ ولا تجيب شيئا.
    */
   const answer = await page.evaluate(() => {
-    const tiles = [...document.querySelectorAll('section[data-pane]:not([hidden]) .tile .v')]
+    const tiles = [...document.querySelectorAll('section[data-pane]:not([hidden]) .tile .kv-v')]
     if (tiles.length === 0) return null
     const at = () => ({
       top: Math.round(tiles[0].getBoundingClientRect().top + scrollY),
@@ -95,7 +95,7 @@ for (const file of files) {
      * وحدَه يُخفي أسوأَ ما يقع.** فيُقالان معا ويُسمّى كلٌّ بشرطه.
      */
     const withFlash = at()
-    const flashes = [...document.querySelectorAll('.flash')]
+    const flashes = [...document.querySelectorAll('.toast-note')]
     for (const f of flashes) f.style.display = 'none'
     const bare = at()
     for (const f of flashes) f.style.display = ''

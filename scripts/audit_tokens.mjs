@@ -126,7 +126,8 @@ for (const file of files) {
   }
   for (const m of code.matchAll(/border-radius:\s*([^;}]*)/g)) {
     const v = m[1].trim()
-    if (/^(0|50%|var\(--r-[a-z]+\))$/.test(v)) continue
+    // ‏والقطرُ لكلّ زاوية (الورقةُ السفليّة ‏١٦ في زاويتيها العلويّتين) — كلُّ جزءٍ من القائمة
+    if (v.split(/\s+/).every((part) => /^(0|50%|var\(--r-[a-z]+\))$/.test(part))) continue
     literalRadius.push([`border-radius:${v}`.slice(0, 58), file.slice(SRC.length)])
   }
 }
@@ -143,7 +144,7 @@ const radiusVariants = [...new Set(radiusTokens.values())].sort((a, b) => parseF
 const COPPER_HOMES = new Map([
   ['.glyph', 'العلامة'],
   ['nav.tabs a[aria-current=page]::before', 'مؤشّرُ القسم الحاليّ'],
-  ['.grid>.tile:first-child .v', 'الرقمُ البطل'],
+  ['.grid>.tile:first-child .kv-v', 'الرقمُ البطل'],
 ])
 const COPPER = /var\(--(au|mark-fg)\)/
 const brass = []
@@ -348,14 +349,46 @@ for (const file of files) {
 /**
  * ── قيمُ px الحرفيّة في الورقة: سقفٌ يمنع الرجوع (خطّة التصميم 10.2) ────────────
  * كانت ‏399 قيمةً (التعليقاتُ ممحوّة)، والهدفُ ‏60 أو أقلّ (الحدودُ وما في حكمها) بعد
- * المكوّنات (المرحلة ٢ب) ونقل الأقسام إليها (٢ج). **والسقفُ هنا ما بلغته المرحلةُ ٢أ**:
- * رقمٌ يزيد يردّ، ورقمٌ ينقص يُخفَض السقفُ إليه في الطلب نفسِه.
+ * المكوّنات (المرحلة ٢ب) ونقل الأقسام إليها (٢ج). **والسقفُ هنا ما بلغته المرحلةُ ٢ب** (D-189):
+ * ‏365 ← 40 — الحدُّ والخيطُ رموزٌ (`--bd` و`--stroke`)، والأيقونةُ أربعةُ مقاسات، والمقاسُ من السلّم،
+ * والعتبةُ بالـrem (تتبع حرفَ المستخدم، WCAG 1.4.4). وما بقي حدودٌ بكسلٌ واحد وقصٌّ لقارئ الشاشة
+ * وتغبيشٌ وخطوطُ الأسبوع الناقص. رقمٌ يزيد يردّ، ورقمٌ ينقص يُخفَض السقفُ إليه في الطلب نفسِه.
  */
-const PX_MAX = 365
+const PX_MAX = 40
 const PX_TARGET = 60
 const sheetPx = (strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
   .match(/(?<![\w.-])-?\d*\.?\d+px\b/g) ?? []).length
 const pxOver = sheetPx > PX_MAX ? [`${sheetPx} قيمةَ px حرفيّةً في styles.ts — والسقفُ ${PX_MAX} (الهدفُ ${PX_TARGET})`] : []
+
+/**
+ * ── مقاسُ الأيقونة من أربعة (خطّة التصميم 3.4 · D-189) ──────────────────────────────
+ * كانت اثنا عشرَ مقاسًا (‏١٤ و‏١٥ و‏١٦ و‏١٧ و‏١٨ و‏٢٠ و‏٢٢ و‏٢٣ و‏٢٦ و‏٢٩ و‏٤٠ و‏١em) — مقاسٌ لكلّ قاعدة.
+ * فكلُّ عرضٍ أو ارتفاعٍ يُعطى لـ`svg` في الورقة رمزٌ من الأربعة (`--icon-xs|sm|md|lg`)،
+ * **أو نسبةٌ من مربّعه** (شعارُ المنصّة نصفُ مربّعه، والعلامةُ ‏٥٦٪، والرسمُ البيانيّ كلُّه)،
+ * أو سطرٌ في المستثنى أدناه باسمه وسببه.
+ */
+const ICON_SIZE_EXEMPT = new Map([
+  ['.arw svg', 'سهمُ المسار حرفٌ في جملةٍ يُقرأ — يتبع حرفَ السطر («1em»)'],
+  ['.acct-mark svg', 'شعارُ المنصّة على غلاف الحساب علامةٌ زخرفيّةٌ لغيرِنا لا أيقونة («--s-10»)'],
+])
+const iconSizes = []
+let iconRules = 0
+{
+  const sheet = strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
+  for (const m of sheet.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim().split('\n').pop().trim()
+    if (!/(^|[\s>,])svg(\b|$)/.test(sel)) continue
+    for (const d of m[2].split(';')) {
+      const [prop, ...rest] = d.split(':')
+      if (!/^(width|height|inline-size|block-size)$/.test(prop?.trim() ?? '')) continue
+      iconRules += 1
+      const v = rest.join(':').trim()
+      if (/^var\(--icon-(xs|sm|md|lg)\)$/.test(v) || /^\d+%$/.test(v)) continue
+      if (ICON_SIZE_EXEMPT.has(sel)) continue
+      iconSizes.push(`${sel} { ${prop.trim()}:${v} }`)
+    }
+  }
+}
 
 const literalTime = []
 for (const file of files) {
@@ -652,6 +685,10 @@ console.log('\n═══ عرضٌ يُكتب رقمًا في استعلام ═�
 if (literalBreakpoints.length === 0) console.log('  ✓ كلُّ نقطةِ انكسارٍ من BP، وكلُّ حدِّ حاويةٍ من CQ')
 for (const [rule, where] of literalBreakpoints) console.log(`  ✕ ${rule}  —  ${where}`)
 
+console.log('\n═══ مقاسُ الأيقونة خارج الأربعة ═══\n')
+if (iconSizes.length === 0) console.log(`  ✓ ${iconRules} تصريحًا كلُّها من --icon-xs|sm|md|lg أو نسبةٌ من مربّعها (ومستثنًى ${ICON_SIZE_EXEMPT.size} باسمه)`)
+for (const i of iconSizes) console.log(`  ✕ ${i}`)
+
 console.log('\n═══ قيمُ px الحرفيّة في الورقة ═══\n')
 if (pxOver.length === 0) console.log(`  ✓ ${sheetPx} من سقف ${PX_MAX} (الهدفُ ${PX_TARGET})`)
 for (const p of pxOver) console.log(`  ✕ ${p}`)
@@ -680,7 +717,7 @@ console.log(
 )
 
 const total = ghosts.length + orphans.length + literalTime.length + literalRadius.length + brass.length + spaced.length +
-  looseShadows.length + literalBreakpoints.length + pxOver.length +
+  looseShadows.length + literalBreakpoints.length + pxOver.length + iconSizes.length +
   backticks.length + strayIcons.length + dupVars.length + unusedIcons.length
 if (total === 0) process.exit(0)
 

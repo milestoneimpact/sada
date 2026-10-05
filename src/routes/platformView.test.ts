@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { filterOf, platformScreen, readinessLadder, tabOf, type PlatformScreenData } from './ui/platformView'
-import { status } from './ui/parts'
+import { statusBadge, type Tone } from './ui/components/badge'
 import { viewChannels, type LinkedAccount } from '../lib/channels'
 import { platformNeeds } from '../lib/platform/needs'
 import type { TimelineRow } from '../lib/platform/timeline'
@@ -223,10 +223,10 @@ describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () 
       verdict: { kind: 'bad', text: 'لا تنشر' },
       next: null,
     })
-    const want: [string, string, string][] = [
+    const want: [Tone, string, string][] = [
       ['ok', '●', 'تامّة'], ['warn', '◍', 'تنتظرك'], ['idle', '○', 'تنتظر'], ['bad', '▲', 'ساقطة'],
     ]
-    for (const [cls, glyph, label] of want) expect(html).toContain(status(cls, glyph, label))
+    for (const [cls, glyph, label] of want) expect(html).toContain(statusBadge(cls, glyph, label))
   })
 })
 
@@ -248,9 +248,9 @@ describe('رحلاتُ المالك على صفحة المنصّة', () => {
       },
       health: { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] } },
     })
-    expect(head).toContain('<a class="btn p" href="/panel#write">اكتب منشورًا من مصدر</a>')
+    expect(head).toContain('<a class="btn btn-primary" href="/panel#write">اكتب منشورًا من مصدر</a>')
     const empty = screen({ tab: 'waiting', waiting: [] })
-    expect(empty).toContain('<a class="btn g sm" href="/panel#write">اكتب من مصدر</a>')
+    expect(empty).toContain('<a class="btn btn-secondary btn-sm" href="/panel#write">اكتب من مصدر</a>')
     for (const html of [head, empty, screen()]) expect(html).not.toContain('/panel#sources')
   })
 

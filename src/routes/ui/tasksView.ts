@@ -19,16 +19,16 @@ import { escapeHtml } from './shell'
 import { sectionLabel } from './command'
 import { secretCommand, taskDoc, TASKS_DOC, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
-import { status } from './parts'
+import { statusBadge, type Tone } from './components/badge'
 
-const MARK: Readonly<Record<string, { g: string; cls: string; label: string }>> = {
+const MARK: Readonly<Record<string, { g: string; cls: Tone; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تمّت' },
   todo: { g: '◍', cls: 'warn', label: 'عليك' },
   unknown: { g: '?', cls: 'idle', label: 'لا يُعرَف من هنا' },
 }
 
 /** ماذا تفتح — **والحارسُ يسبق القدرة**: معطَّلٌ منه يُطمئن كذبا. */
-const OPENS: Readonly<Record<Unblocks, { label: string; cls: string; why: string }>> = {
+const OPENS: Readonly<Record<Unblocks, { label: string; cls: Tone; why: string }>> = {
   gate: {
     label: 'بوّابة', cls: 'bad',
     why: 'مرحلةٌ لا تُجتاز بدونها — يقف المشروعُ عندها',
@@ -57,10 +57,10 @@ function commandBox(r: OwnerRow, env: string): string {
   const text = r.secrets.map((n) => secretCommand(n, env)).join('\n')
   return `<div class="cmd">
       <label class="sub" for="${escapeHtml(id)}">من جذر المستودع، بعد <span class="mono">npx wrangler login</span>:</label>
-      <div class="row" style="gap:var(--s-2)">
+      <div class="row gap-2">
         <textarea class="mono cmd-text" id="${escapeHtml(id)}" rows="${r.secrets.length}" readonly
                   spellcheck="false">${escapeHtml(text)}</textarea>
-        <button class="g sm" type="button" data-copy="${escapeHtml(id)}">انسخ الأمر</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-copy="${escapeHtml(id)}">انسخ الأمر</button>
       </div>
     </div>`
 }
@@ -77,7 +77,7 @@ function row(r: OwnerRow, env: string): string {
       ${commandBox(r, env)}
       ${r.go === undefined || r.state === true
         ? ''
-        : `<a class="btn g sm" style="margin-top:var(--s-2)" href="${escapeHtml(r.go)}"${
+        : `<a class="btn btn-secondary btn-sm mt-2" href="${escapeHtml(r.go)}"${
             r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
       ${/*
          * ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها، وكانت
@@ -86,11 +86,11 @@ function row(r: OwnerRow, env: string): string {
         target="_blank" rel="noopener noreferrer" aria-label="خطواتُ ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
     </td>
     <td data-label="تفتح">
-      ${status(opens.cls, '◆', opens.label)}
+      ${statusBadge(opens.cls, '◆', opens.label)}
       <div class="sub">${bold(opens.why)}</div>
     </td>
     <td data-label="الحال">
-      ${status(mark.cls, mark.g, mark.label)}
+      ${statusBadge(mark.cls, mark.g, mark.label)}
       ${/*
          * **و«تمّت» وحدها تكذب على مهمّةٍ دوريّة** (D-072): مراجعةٌ لم
          * تقع بعدُ وليست مستحقّةً ليست «تمّت» — فيُقال ما قِيس، كما
@@ -107,7 +107,7 @@ function row(r: OwnerRow, env: string): string {
  * تحت كلّ بندٍ ما بُني عليه الحكم — «linkedin: 3 · x: 0» تقول ما ينقص
  * بلا كلمة.
  */
-const ITEM_MARK: Readonly<Record<ItemState, { g: string; cls: string; label: string }>> = {
+const ITEM_MARK: Readonly<Record<ItemState, { g: string; cls: Tone; label: string }>> = {
   met: { g: '●', cls: 'ok', label: 'تحقّق' },
   unmet: { g: '○', cls: 'idle', label: 'لم يتحقّق' },
   unmeasured: { g: '?', cls: 'warn', label: 'لا يُقاس من هنا' },
@@ -122,18 +122,18 @@ function gateCard(g: Gate): string {
           <span class="what">${bold(i.text)}</span>
           <span class="why">${escapeHtml(i.evidence)}</span>
         </span>
-        ${status(mark.cls, mark.g, mark.label)}
+        ${statusBadge(mark.cls, mark.g, mark.label)}
       </li>`
     })
     .join('')
 
-  return `<div class="card" style="margin-bottom:var(--s-3)">
+  return `<div class="card mb-3">
     <div class="card-head">
       <h2>المرحلة ${escapeHtml(g.phase)} · ${escapeHtml(g.title)}</h2>
       <div class="grow"></div>
       ${g.passed
-        ? status('ok', '●', 'اجتِيزت')
-        : status('idle', '○', 'لم تُجتَز')}
+        ? statusBadge('ok', '●', 'اجتِيزت')
+        : statusBadge('idle', '○', 'لم تُجتَز')}
     </div>
     <ol class="steps wiz nodot">${items}</ol>
   </div>`
@@ -183,10 +183,10 @@ export function tasksScreen(d: TasksScreenData): string {
     </table></div>
   </div>
 
-  <div class="lede-row" style="margin-top:var(--s-6)">
-    <h3 class="sec" style="margin:0; border:0; padding:0">بوّاباتُ المراحل</h3>
+  <div class="lede-row mt-6">
+    <h3 class="sec bare">بوّاباتُ المراحل</h3>
     <span class="grow"></span>
-    ${status(d.phase === null ? 'ok' : 'warn', d.phase === null ? '●' : '◍', `${
+    ${statusBadge(d.phase === null ? 'ok' : 'warn', d.phase === null ? '●' : '◍', `${
       d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}`)}
   </div>
 

@@ -11,20 +11,20 @@ import { counted, NOUNS } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { PRIVATE_REACH } from '../../lib/media/uploads'
 import { momentLabel } from '../../lib/time/local'
-import { status } from './parts'
+import { statusBadge } from './components/badge'
 
 /** بطاقةُ الاستيراد في لوح المنشورات. */
 export function planImportCard(): string {
-  return `<div class="card" id="plan-import" style="margin-top:var(--s-3)">
+  return `<div class="card mt-3" id="plan-import">
     <div class="card-head"><h2>خطّتُك من ملفّ</h2><div class="grow"></div>
       <a class="tap" href="/panel/plan-import/template.csv" download>نزّل النموذج</a></div>
     <p class="hint">املأ جدولًا بأعمدة <b>التاريخ والوقت والمنصّة والنصّ</b> (والمقطعُ باسمه في «فيديوهاتك»)،
       واحفظه CSV من Excel أو Google Sheets، ثمّ ارفعه هنا. <b>يُعرض عليك صفًّا صفًّا بمشكلاته، ولا يُجدوَل
       شيءٌ قبل أن تعتمده</b> — وحتّى ${MAX_PLAN_ROWS} صفّ في الملفّ.</p>
     <form class="row" method="POST" action="/panel/plan-import" enctype="multipart/form-data" data-busy="جارٍ القراءة…">
-      ${/* ‏ويُقرأ الملفُّ فورَ اختياره (سكربت اللوحة، 7.6) واسمُه في اللصيقة؛ والزرُّ لمن لا سكربتَ عنده */ ''}<label class="btn p vpick"><span data-plan-name>اختر ملفّ الخطّة (CSV)</span>
+      ${/* ‏ويُقرأ الملفُّ فورَ اختياره (سكربت اللوحة، 7.6) واسمُه في اللصيقة؛ والزرُّ لمن لا سكربتَ عنده */ ''}<label class="btn btn-primary vpick"><span data-plan-name>اختر ملفّ الخطّة (CSV)</span>
         <input type="file" name="file" class="vfile" accept=".csv,text/csv" required data-plan-file></label>
-      <noscript><button class="g" type="submit">اقرأ الخطّة</button></noscript>
+      <noscript><button class="btn btn-secondary" type="submit">اقرأ الخطّة</button></noscript>
     </form>
   </div>`
 }
@@ -57,7 +57,7 @@ function rowHtml(r: PlanRow, now: Date): string {
     <td class="pi-text" data-label="النصّ">${escapeHtml(r.text.length > 140 ? `${r.text.slice(0, 139)}…` : r.text)}</td>
     <td data-label="المقطع">${r.video === '' ? '—' : `<bdi>${escapeHtml(r.video)}</bdi>`}</td>
     <td data-label="الحال">${ok
-      ? `${status('ok', '●', 'جاهز')}${reach === null ? '' : `<span class="ago">${escapeHtml(reach)}</span>`}`
+      ? `${statusBadge('ok', '●', 'جاهز')}${reach === null ? '' : `<span class="ago">${escapeHtml(reach)}</span>`}`
       : `<ul class="pi-why">${r.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>`}</td>
   </tr>`
 }
@@ -78,7 +78,7 @@ export function planImportExpired(): string {
   return `<header class="page-head"><div class="eyebrow"><span class="ln"></span>خطّتُك من ملفّ</div>
       <h1>انتهت مهلةُ هذه المعاينة</h1>
       <p class="lede">تبقى المعاينةُ ساعتين، ثمّ تُمحى ولا يُجدوَل منها شيء. ارفع الملفَّ من جديد لتراه بحاله الآن.</p></header>
-    <div class="card"><a class="btn p" href="/panel#plan-import">ارفع الملفّ من جديد</a></div>`
+    <div class="card"><a class="btn btn-primary" href="/panel#plan-import">ارفع الملفّ من جديد</a></div>`
 }
 
 /** صفحةُ المعاينة — والزرُّ يُرسم حين يكون في الملفّ صفٌّ واحدٌ سليمٌ على الأقلّ. */
@@ -95,7 +95,7 @@ export function planImportScreen(id: string, read: PlanRead, now: Date = new Dat
           blocked === 0 ? '' : `، ويحتاج ${escapeHtml(counted(blocked, NOUNS.row))} إصلاحًا في الملفّ ثمّ يُرفع من جديد`}.`}</p></header>
     ${read.fileProblems.length > 0
       ? `<div class="card"><ul class="pi-why">${read.fileProblems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
-          <a class="btn g" href="/panel#plan-import">ارجع وارفع ملفًّا آخر</a></div>`
+          <a class="btn btn-secondary" href="/panel#plan-import">ارجع وارفع ملفًّا آخر</a></div>`
       : `<div class="card">
         <p class="hint">المواعيدُ بتوقيتك كما فهمها صدى — راجعها قبل أن تعتمد.</p>
         <div class="scroll"><table class="pi">
@@ -110,8 +110,8 @@ export function planImportScreen(id: string, read: PlanRead, now: Date = new Dat
                    ? 'يُعتمَد منشورٌ واحد ويُجدوَل في موعده. أتابع؟'
                    : `يُعتمَد ${counted(ready, NOUNS.post)} ويُجدوَل كلٌّ في موعده. أتابع؟`)}">
                  <input type="hidden" name="lines" value="${escapeHtml(readyLines(read).join(','))}">
-                 <button class="p" type="submit">اعتمد وجدوِل ${escapeHtml(counted(ready, NOUNS.post, 'acc'))}</button></form>`}
-          <a class="btn g" href="/panel#plan-import">إلغاء</a>
+                 <button class="btn btn-primary" type="submit">اعتمد وجدوِل ${escapeHtml(counted(ready, NOUNS.post, 'acc'))}</button></form>`}
+          <a class="btn btn-secondary" href="/panel#plan-import">إلغاء</a>
         </div>
       </div>`}`
 }

@@ -31,7 +31,8 @@ import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
 import { callbackStep, SETUP, setupHref } from '../../lib/channels'
 import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
-import { pathArrows, status } from './parts'
+import { pathArrows } from './parts'
+import { statusBadge } from './components/badge'
 import { counted, NOUNS } from '../../lib/format'
 
 // القاموسُ واحدٌ في lib/oauth/providers (D-151)
@@ -58,13 +59,13 @@ function scopeRows(platform: Platform, granted: ReadonlySet<string>): string {
         <td data-label="يفتح"><span class="nm">${escapeHtml(spec.enables)}</span></td>
         <td data-label="الحال">${
           on
-            ? status('ok', '●', 'ممنوح')
-            : status('bad', '▲', 'ناقص')
+            ? statusBadge('ok', '●', 'ممنوح')
+            : statusBadge('bad', '▲', 'ناقص')
         }</td>
         <td data-label="مصدرُه">${
           on
             ? '<span class="ago">—</span>'
-            : `<span class="sub" style="margin:0"><b>${escapeHtml(spec.grantedBy)}</b><br>
+            : `<span class="sub m-0"><b>${escapeHtml(spec.grantedBy)}</b><br>
                ${pathArrows(escapeHtml(spec.where))}</span>`
         }</td>
       </tr>`
@@ -90,21 +91,21 @@ export function connectedBody(d: ConnectedData): string {
 
   const verdict =
     missing.length === 0
-      ? `<div class="outcome"><span class="k">تمّ</span><span class="v">
+      ? `<div class="outcome"><span class="kv-k">تمّ</span><span class="kv-v">
          كلُّ النطاقات ممنوحة. <b>يستطيع صدى أن ينشر باسم هذا الحساب</b> —
          بعد موافقتك على كلّ منشورٍ على حدة.</span></div>`
       : canPublish
-        ? `<div class="outcome warn"><span class="k">ينقص</span><span class="v">
+        ? `<div class="outcome warn"><span class="kv-k">ينقص</span><span class="kv-v">
            النشرُ يعمل، <b>ولم يُمنَح ${counted(missing.length, NOUNS.scope)}</b> — وما يفتحه لا يعمل.
            والجدولُ تحت يقول أيَّها ومَن يمنحه.</span></div>`
-        : `<div class="outcome warn"><span class="k">مربوطٌ ولا ينشر</span><span class="v">
+        : `<div class="outcome warn"><span class="kv-k">مربوطٌ ولا ينشر</span><span class="kv-v">
            <b>الهويّةُ مقروءة، والنشرُ غيرُ ممكن</b> — نطاقُ النشر لم يُمنَح.
            والحسابُ محفوظٌ كما هو: أضف المنتَجَ في البوّابة ثمّ اضغط «جدّد الإذن»،
            ولا تُعِد بناء التطبيق.</span></div>`
 
   const refresh = d.hasRefresh
-    ? status('ok', '●', 'يُجدَّد تلقائيّا')
-    : `${status('warn', '!', `بلا تجديدٍ تلقائيّ`)}`
+    ? statusBadge('ok', '●', 'يُجدَّد تلقائيّا')
+    : `${statusBadge('warn', '!', `بلا تجديدٍ تلقائيّ`)}`
 
   return `${head(
     d.platform,
@@ -116,7 +117,7 @@ export function connectedBody(d: ConnectedData): string {
 
   ${verdict}
 
-  <div class="card" style="margin-top:var(--s-4)">
+  <div class="card mt-4">
     <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
       <div class="grow"></div>${refresh}</div>
     <p class="hint">وقتُ انتهاء الإذن: <span class="mono">${escapeHtml(
@@ -130,11 +131,11 @@ export function connectedBody(d: ConnectedData): string {
       <tbody>${scopeRows(d.platform, granted)}</tbody></table></div>
   </div>
 
-  <div class="row" style="margin-top:var(--s-4)">
-    <a class="btn p" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
+  <div class="row mt-4">
+    <a class="btn btn-primary" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
       LABEL[d.platform],
     )}</a>
-    <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+    <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
   </div>`
 }
 
@@ -202,9 +203,9 @@ export function refusedBody(d: RefusedData): string {
       <h2>لا شيءَ يحتاج إصلاحا</h2>
       <p class="hint">هذا قرارُك لا عطلٌ في الضبط. وزرُّ الربط في لوح القنوات
         يعمل كما كان متى شئت.</p>
-      <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
-        <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+      <div class="row mt-3">
+        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
+        <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
       </div>
     </div>`
   }
@@ -238,23 +239,23 @@ export function refusedBody(d: RefusedData): string {
       <p class="hint">النطاقاتُ تُفحَص <b>قبل</b> شاشة الإذن، وقد مرّت.
         <b>فلا تفتّش في تبويب Products</b> — العطلُ في زوج المفاتيح وحده.</p>
       <ol class="steps">
-        <li><span class="n">1</span><span class="body">
+        <li><span class="step-n">1</span><span class="body">
           <span class="what">أأُعيد إنشاءُ التطبيق؟</span>
           <span class="why"><b>هذا أشيعُ سبب.</b> تطبيقٌ جديدٌ معرّفُه جديدٌ وسرُّه
             جديد — وصدى يحمل زوجَ التطبيق القديم.</span></span></li>
-        <li><span class="n">2</span><span class="body">
+        <li><span class="step-n">2</span><span class="body">
           <span class="what">أأُعيد توليدُ السرّ؟</span>
           <span class="why">سرٌّ يُولَّد من جديد <b>يُبطل السابق فورا</b>،
             والمعرّفُ يبقى كما هو — فيبدو أنّ شيئا لم يتغيّر.</span></span></li>
-        <li><span class="n">3</span><span class="body">
+        <li><span class="step-n">3</span><span class="body">
           <span class="what">أَلُصق السرُّ في حقل المعرّف أو العكس؟</span>
           <span class="why">الحقلان متجاوران، والقيمتان طويلتان متشابهتان
             في الشكل.</span></span></li>
       </ol>
       ${d.description === undefined ? '' : `<div class="outcome warn">
-        <span class="k">وهذا نصُّ ${LABEL[d.platform]} حرفا</span>
-        <span class="v"><span class="mono">${escapeHtml(d.description)}</span></span></div>`}
-      ${d.sent === undefined ? '' : `<div class="card" style="margin-top:var(--s-3)">
+        <span class="kv-k">وهذا نصُّ ${LABEL[d.platform]} حرفا</span>
+        <span class="kv-v"><span class="mono">${escapeHtml(d.description)}</span></span></div>`}
+      ${d.sent === undefined ? '' : `<div class="card mt-3">
         <h2>وهذا ما أرسله صدى — قارنه بما في البوّابة</h2>
         <p class="hint"><b>القيمتان علنيّتان</b>: المعرّفُ معروضٌ في البوّابة نفسِها،
           والرابطُ يظهر في شريط العنوان عند كلّ دورة. <b>ولا يُعرَض السرُّ هنا</b> —
@@ -264,9 +265,9 @@ export function refusedBody(d: RefusedData): string {
           <div class="copy">
             <input id="sent-id" class="mono" dir="ltr" value="${escapeHtml(d.sent.clientId)}" readonly
               aria-label="معرّف التطبيق الذي أُرسل">
-            <button type="button" class="g sm" data-copy="sent-id">انسخ</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy="sent-id">انسخ</button>
           </div>
-          <div class="help"><span class="i">!</span><span class="t">
+          <div class="help"><span class="help-ic">!</span><span class="help-t">
             <b>إن خالف المعرّفَ في ${escapeHtml(portal)} فهذا تطبيقٌ آخر</b> — وهو وحده يفسّر
             الرفض. وإن طابقه، <b>فالسرُّ هو الخطأ</b>: ولّد سرّا جديدا والصقه.</span></div>
         </div>
@@ -275,19 +276,19 @@ export function refusedBody(d: RefusedData): string {
           <div class="copy">
             <input id="sent-cb" class="mono" dir="ltr" value="${escapeHtml(d.sent.redirectUri)}" readonly
               aria-label="رابط العودة الذي أُرسل">
-            <button type="button" class="g sm" data-copy="sent-cb">انسخ</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy="sent-cb">انسخ</button>
           </div>
         </div>
       </div>`}
-      <div class="outcome warn"><span class="k">ما يُفعَل</span>
-        <span class="v">انسخ <b>Client ID</b> و <b>Client Secret</b> من
+      <div class="outcome warn"><span class="kv-k">ما يُفعَل</span>
+        <span class="kv-v">انسخ <b>Client ID</b> و <b>Client Secret</b> من
           <b>${escapeHtml(portal)}</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
           <b>${pathArrows('صفحة المنصّة ← ضبطُ التطبيق ودليلُه')}</b>، ثمّ أعد الربط.
           <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
           المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
-      <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
-        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      <div class="row mt-3">
+        <a class="btn btn-primary" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
+        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
       </div>
     </div>`
   }
@@ -303,20 +304,20 @@ export function refusedBody(d: RefusedData): string {
     <div class="card">
       <h2>أوّلُ ما يُراجَع</h2>
       <ol class="steps">
-        <li><span class="n">1</span><span class="body">
+        <li><span class="step-n">1</span><span class="body">
           <span class="what">رابطُ العودة المسجَّل في ${escapeHtml(portal)}</span>
           <span class="why">يُطابَق حرفًا بحرف: شرطةٌ زائدةٌ في آخره أو http بدل https تُسقط الربط.${
             step === null ? '' : ` وهو الخطوةُ ${step} من الدليل.`}</span></span></li>
-        <li><span class="n">2</span><span class="body">
+        <li><span class="step-n">2</span><span class="body">
           <span class="what">Client ID و Client Secret</span>
           <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
             يعطي هذا الردَّ نفسه.</span></span></li>
       </ol>
-      ${guide === undefined ? '' : `<div class="outcome warn"><span class="k">إن فشل</span>
-        <span class="v">${pathArrows(guide.failure)}</span></div>`}
-      <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
-        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      ${guide === undefined ? '' : `<div class="outcome warn"><span class="kv-k">إن فشل</span>
+        <span class="kv-v">${pathArrows(guide.failure)}</span></div>`}
+      <div class="row mt-3">
+        <a class="btn btn-primary" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
+        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
       </div>
     </div>`
   }
@@ -344,7 +345,7 @@ export function refusedBody(d: RefusedData): string {
         <td data-label="النطاق"><span class="mono">${escapeHtml(s.name)}</span></td>
         <td data-label="يفتح">${escapeHtml(s.enables)}</td>
         <td data-label="مَن يمنحه"><span class="nm">${escapeHtml(s.grantedBy)}</span>
-          <div class="sub" style="margin-top:var(--s-1)">${pathArrows(escapeHtml(s.where))}</div></td>
+          <div class="sub mt-1">${pathArrows(escapeHtml(s.where))}</div></td>
       </tr>`,
     )
     .join('')
@@ -362,12 +363,12 @@ export function refusedBody(d: RefusedData): string {
         'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
   )}
 
-  <div class="outcome warn"><span class="k">أين العلّة</span><span class="v">
+  <div class="outcome warn"><span class="kv-k">أين العلّة</span><span class="kv-v">
     النطاقُ يُمنَح <b>بمنتَجٍ يُضاف في بوّابة المنصّة</b>، لا بمفتاحٍ يُكتب هنا.
     والجدولُ تحت يقول ما طُلب ومَن يمنح كلَّ واحدٍ منه.
     <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.</span></div>
 
-  <div class="card" style="margin-top:var(--s-4)">
+  <div class="card mt-4">
     <div class="card-head"><h2>${
       named ? 'النطاقُ الناقص ومَن يمنحه' : 'ما طُلب في هذه المحاولة'
     }</h2></div>
@@ -386,7 +387,7 @@ export function refusedBody(d: RefusedData): string {
   </div>
 
   ${identityBlocked
-    ? `<div class="card" style="margin-top:var(--s-4)">
+    ? `<div class="card mt-4">
       <div class="card-head"><h2>ولا يفيدك ربطُ الهويّة وحدها هنا</h2></div>
       <p class="hint"><b>الناقصُ هو نطاقُ الهويّة نفسه</b> — فمحاولةٌ تطلبه وحده
         تُردّ بالردّ نفسه. والمنتَجُ الذي يمنحه
@@ -395,31 +396,31 @@ export function refusedBody(d: RefusedData): string {
     </div>`
     : !offerIdentity
     ? ''
-    : `<div class="card" style="margin-top:var(--s-4)">
+    : `<div class="card mt-4">
       <div class="card-head"><h2>ولا تنتظر البوّابة لتربط</h2></div>
       <p class="hint">يمكن الربطُ <b>بالهويّة وحدها</b> الآن: يُحفَظ الحساب ويظهر باسمه،
         <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَجُ الناقص ثمّ تضغط «جدّد الإذن».
         وصدى يقرأ ما مُنح فعلا، فلن يحاول نشرا يعرف أنّه سيُردّ.</p>
-      <div class="row" style="margin-top:var(--s-3)">
-        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
+      <div class="row mt-3">
+        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
           >اربط الهويّة وحدها</a>
-        <a class="btn g" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
       </div>
     </div>`}
 
   ${!identityBlocked
     ? ''
-    : `<div class="row" style="margin-top:var(--s-4)">
-        <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+    : `<div class="row mt-4">
+        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
       </div>`}
 
   ${guide === undefined
     ? ''
-    : `<div class="card guide" style="margin-top:var(--s-4)">
+    : `<div class="card guide mt-4">
       <div class="card-head"><h2>الخطواتُ في ${escapeHtml(guide.portalLabel)}</h2></div>
       <ol class="steps">${guide.before
         .map(
-          (b, i) => `<li><span class="n">${i + 1}</span><span class="body">
+          (b, i) => `<li><span class="step-n">${i + 1}</span><span class="body">
             <span class="what">${pathArrows(b.what)}</span><span class="why">${pathArrows(b.why)}</span></span></li>`,
         )
         .join('')}</ol>
@@ -428,15 +429,15 @@ export function refusedBody(d: RefusedData): string {
        * بجانب الخطوات على العريض لا تحتها — كانت البطاقةُ جوفاءَ نصفِها.
        */''}
       <div class="guide-aside">
-        <a class="btn g sm" href="${escapeHtml(guide.portal)}" target="_blank"
+        <a class="btn btn-secondary btn-sm" href="${escapeHtml(guide.portal)}" target="_blank"
           rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
-        <div class="outcome"><span class="k">إن نجح</span>
-          <span class="v">${pathArrows(guide.success)}</span></div>
+        <div class="outcome"><span class="kv-k">إن نجح</span>
+          <span class="kv-v">${pathArrows(guide.success)}</span></div>
       </div>
     </div>`}
 
-  <div class="row" style="margin-top:var(--s-4)">
-    <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+  <div class="row mt-4">
+    <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
   </div>`
 }
 
@@ -455,9 +456,9 @@ export function unconfiguredBody(platform: Platform): string {
   <div class="card">
     <h2>ما يُفعَل</h2>
     <p class="hint">اضبط المعرّفَ والسرَّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
-    <div class="row" style="margin-top:var(--s-3)">
-      <a class="btn p" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
-      <a class="btn g" href="/panel#channels">لوحُ القنوات</a>
+    <div class="row mt-3">
+      <a class="btn btn-primary" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
+      <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
     </div>
   </div>`
 }
@@ -492,11 +493,11 @@ export function unreachedBody(d: UnreachedData): string {
   <div class="card">
     <h2>ما يُفعَل</h2>
     <p class="hint">أعد المحاولة بعد دقيقة. فإن تكرّر هذا فأرسل إليّ ما تحت «للمطوّر» كما هو.</p>
-    <div class="row" style="margin-top:var(--s-3)">
-      <a class="btn p" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
-      <a class="btn g" href="/panel/channels/${escapeHtml(d.platform)}">صفحة ${escapeHtml(label)}</a>
+    <div class="row mt-3">
+      <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+      <a class="btn btn-secondary" href="/panel/channels/${escapeHtml(d.platform)}">صفحة ${escapeHtml(label)}</a>
     </div>
-    <details style="margin-top:var(--s-3)"><summary>للمطوّر</summary>
+    <details class="mt-3"><summary>للمطوّر</summary>
       <p class="hint"><span class="mono">${escapeHtml(d.detail)}</span></p></details>
   </div>`
 }

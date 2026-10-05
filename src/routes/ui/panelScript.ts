@@ -143,14 +143,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     return total;
   }
   document.querySelectorAll('textarea.draft-text').forEach(function(t){
-    var out=t.parentNode.querySelector('.count'); if(!out)return;
+    var out=t.parentNode.querySelector('.draft-len'); if(!out)return;
     var b=out.querySelector('b'); var lim=+t.dataset.limit||0; var tgt=+t.dataset.target||0;
     // و LinkedIn على عدّ المحارف: لا قاعدةَ وزنٍ منشورةً لها فلا تُخترَع
     var weighted=t.dataset.count==='x';
     function tick(){
       var v=t.value.trim();
       var n=weighted?xLen(v):v.length; if(b)b.textContent=n;
-      out.className='count'+(n>lim?' bad':n>tgt?' warn':'');
+      out.className='draft-len'+(n>lim?' bad':n>tgt?' warn':'');
     }
     t.addEventListener('input',tick); tick();
   });
@@ -176,10 +176,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       // ‏الإرسالُ الثاني يُمنَع بعلَمٍ لا بتعطيل الزرّ المضغوط: زرٌّ يُعطَّل يُسقط
       // ‏التركيزَ إلى body ولا يُقرأ. والنموذجُ يقول «مشغول» ورسالتُه تُعلَن (D-149)
       if(f.getAttribute('aria-busy')==='true'){e.preventDefault(); return;}
+      // ‏ومن ألغى التأكيدَ أو منعه المعطّلُ لم يُرسِل — فلا يبقى النموذجُ «مشغولًا» بأزرارٍ معطّلة (D-189)
+      if(e.defaultPrevented)return;
       var b=pressed||f.querySelector('button[type=submit]')||f.querySelector('button');
       f.setAttribute('aria-busy','true');
       f.querySelectorAll('button').forEach(function(x){if(x!==b)x.disabled=true;});
-      if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-disabled','true');
+      // ‏والزرُّ المضغوطُ «مشغولٌ» بسِمته (خطّة التصميم 7.1): دوّارةُ «.btn[aria-busy]» والعرضُ ثابت
+      if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-busy','true'); b.setAttribute('aria-disabled','true');
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
       var st=document.getElementById('flash');
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);}
@@ -207,13 +210,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var flashBox=document.getElementById('flash');
   if(flashBox){
     flashBox.classList.add('toast');
-    var note=flashBox.querySelector('.flash');
+    var note=flashBox.querySelector('.toast-note');
     if(note){
       var bad=note.classList.contains('bad');
       var keep=bad||!!note.querySelector('form');
       if(bad)note.setAttribute('role','alert');
       var shut=document.createElement('button');
-      shut.type='button'; shut.className='g sm toast-x'; shut.textContent='أغلق';
+      shut.type='button'; shut.className='btn btn-secondary btn-sm toast-x'; shut.textContent='أغلق';
       shut.setAttribute('aria-label','أغلق الإشعار');
       note.appendChild(shut);
       var timer=0;
@@ -330,7 +333,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
           bucket=b.dataset.bucket;
           ftabs.querySelectorAll('button[data-bucket]').forEach(function(o){
             var on=o===b;
-            o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
+            o.setAttribute('aria-pressed',String(on));
           });
           refilter();
         });
@@ -343,7 +346,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
           platform=b.dataset.platformTab;
           ptabs.querySelectorAll('button[data-platform-tab]').forEach(function(o){
             var on=o===b;
-            o.classList.toggle('on',on); o.setAttribute('aria-pressed',String(on));
+            o.setAttribute('aria-pressed',String(on));
           });
           refilter();
         });

@@ -9,7 +9,8 @@ import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
-import { RUNG_MARK, bar, pathArrows, status as chip } from '../parts'
+import { RUNG_MARK, bar, pathArrows } from '../parts'
+import { statusBadge } from '../components/badge'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -60,7 +61,6 @@ function modelPicker(options: {
   readonly task?: 'text' | 'image' | 'video'
   /** أتُملأ حقولُ السعر ممّا يعطيه الفهرس؟ */
   readonly fillsPrice?: boolean
-  readonly width?: string
 }): string {
   const id = escapeHtml(options.id)
   const current = escapeHtml(options.current)
@@ -68,17 +68,16 @@ function modelPicker(options: {
     options.task === undefined ? '' : ` data-task="${options.task}"`
   }${options.fillsPrice === true ? ' data-price="1"' : ''}>
     <label for="${id}">النموذج</label>
-    <div class="row" style="gap:var(--s-1);flex-wrap:nowrap">
-      <select id="${id}" name="model" class="mp-sel"
-              style="width:${options.width ?? '190px'};direction:ltr">
+    <div class="row gap-1 nowrap">
+      <select id="${id}" name="model" class="mp-sel w-m" dir="ltr">
         ${options.current === ''
           ? '<option value="" selected>— اختر نموذجا —</option>'
           : `<option value="${current}" selected>${current}</option>`}
         <option value="__manual__">اكتبه يدويّا…</option>
       </select>
-      <button type="button" class="g sm mp-load" title="يجلب القائمةَ من عند المزوّد الآن">حدّث</button>
+      <button type="button" class="btn btn-secondary btn-sm mp-load" title="يجلب القائمةَ من عند المزوّد الآن">حدّث</button>
     </div>
-    <div class="sub mp-note" style="margin:var(--s-1) 0 0;min-height:1em"></div>
+    <div class="sub mp-note m-0 mt-1"></div>
   </div>`
 }
 
@@ -132,21 +131,21 @@ export function providersSection(d: PanelData): ProvidersMarkup {
    * وكان الجوابُ يحتاج مسحَ ستّ بطاقاتٍ وجدولا في آخر اللوح. **ورقمٌ
    * أعلى الصفحة ليس زينة**: من لا يرى أنّ مفتاحا لم يُختبر لا يختبره.
    */
-  const strip = `<div class="grid tiles c3" style="margin-bottom:var(--s-3)">
-    <div class="card tile"><div class="k">مزوّدون جاهزون</div>
-      <div class="v">${ready.length}<em> / ${d.providers.length}</em></div>
+  const strip = `<div class="grid tiles c3 mb-3">
+    <div class="card tile"><div class="kv-k">مزوّدون جاهزون</div>
+      <div class="kv-v">${ready.length}<em> / ${d.providers.length}</em></div>
       ${bar(ready.length, Math.max(1, d.providers.length))}
-      <div class="n">${untested === 0
+      <div class="note">${untested === 0
         ? 'وكلُّ مفاتيحهم اختُبرت'
         : `<b>${untested}</b> منها لم يُختبر مفتاحُه بعد — افتح صفَّه واضغط «اختبر»`}</div></div>
-    <div class="card tile"><div class="k">إنفاقُ اليوم على الذكاء</div>
-      <div class="v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
+    <div class="card tile"><div class="kv-k">إنفاقُ اليوم على الذكاء</div>
+      <div class="kv-v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
       ${bar(spentToday, d.spendCap)}
-      <div class="n">مجموعُ ما أنفقه المزوّدون اليوم · يُصفَّر منتصفَ الليل UTC</div></div>
-    <div class="card tile"><div class="k">مهامٌّ جاهزة</div>
-      <div class="v">${tasksReady}<em> / ${d.routing.length}</em></div>
+      <div class="note">مجموعُ ما أنفقه المزوّدون اليوم · يُصفَّر منتصفَ الليل UTC</div></div>
+    <div class="card tile"><div class="kv-k">مهامٌّ جاهزة</div>
+      <div class="kv-v">${tasksReady}<em> / ${d.routing.length}</em></div>
       ${bar(tasksReady, Math.max(1, d.routing.length))}
-      <div class="n">مهمّةٌ بلا مزوّدٍ جاهزٍ تقف عند أوّل نداء</div></div>
+      <div class="note">مهمّةٌ بلا مزوّدٍ جاهزٍ تقف عند أوّل نداء</div></div>
   </div>`
 
   /**
@@ -161,12 +160,12 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     const locked = p.source === 'worker_secret'
 
     const status = !p.configured
-      ? chip('bad', '✕', 'لا مفتاح')
+      ? statusBadge('bad', '✕', 'لا مفتاح')
       : !p.enabled
-        ? chip('warn', '▲', 'معطَّل')
+        ? statusBadge('warn', '▲', 'معطَّل')
         : p.verifiedAt === null
-          ? chip('idle', '○', 'لم يُختبر')
-          : `${chip('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(p.verifiedAt)} UTC"`)}`
+          ? statusBadge('idle', '○', 'لم يُختبر')
+          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(p.verifiedAt)} UTC"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
@@ -184,77 +183,76 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       </summary>
 
       <div class="pbody">
-        <div class="row" style="margin-bottom:var(--s-3)">
+        <div class="row mb-3">
           ${p.configured ? `
           <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جارٍ الاختبار…">
             <input type="hidden" name="provider" value="${id}">
-            <button class="p sm" type="submit">اختبر المفتاح</button></form>` : ''}
+            <button class="btn btn-primary btn-sm" type="submit">اختبر المفتاح</button></form>` : ''}
           ${locked ? '' : `
           <form class="inline" method="POST" action="/panel/providers/toggle">
             <input type="hidden" name="provider" value="${id}">
             <input type="hidden" name="enabled" value="${p.enabled ? 'false' : 'true'}">
-            <button class="g sm" type="submit">${p.enabled ? 'تعطيل' : 'تفعيل'}</button></form>`}
+            <button class="btn btn-secondary btn-sm" type="submit">${p.enabled ? 'تعطيل' : 'تفعيل'}</button></form>`}
           <div class="grow"></div>
           ${p.builtin ? '' : `
           <form class="inline" method="POST" action="/panel/providers/delete"
                 data-confirm="حذف ${escapeHtml(p.label)}؟ لا يُسترجَع.">
             <input type="hidden" name="provider" value="${id}">
-            <button class="d sm" type="submit">حذف</button></form>`}
+            <button class="btn btn-danger btn-sm" type="submit">حذف</button></form>`}
         </div>
 
         <div class="pgrid">
-          <div><div class="k">المفتاح</div>
+          <div><div class="kv-k">المفتاح</div>
             ${p.hint === null
               ? p.secretName === null
-                ? '<div class="sub" style="margin:0">لا مفتاح محفوظ بعد</div>'
-                : `<div class="sub" style="margin:0">أو ضعه سرّا: <span class="mono">${escapeHtml(p.secretName)}</span><br>${pathArrows(escapeHtml(p.howToGet))}</div>`
+                ? '<div class="sub m-0">لا مفتاح محفوظ بعد</div>'
+                : `<div class="sub m-0">أو ضعه سرّا: <span class="mono">${escapeHtml(p.secretName)}</span><br>${pathArrows(escapeHtml(p.howToGet))}</div>`
               : `<span class="mono">${escapeHtml(p.hint)}</span>`}</div>
-          <div><div class="k">العنوان</div>
+          <div><div class="kv-k">العنوان</div>
             <span class="mono">${escapeHtml(p.baseUrl ?? '—')}</span></div>
-          <div><div class="k">السعر</div>
-            <div class="sub" style="margin:0">${priceNote}</div></div>
-          <div><div class="k">30 يوما</div>
-            <div class="sub" style="margin:0">${money(p.spend)} · ${p.calls} نداء${
+          <div><div class="kv-k">السعر</div>
+            <div class="sub m-0">${priceNote}</div></div>
+          <div><div class="kv-k">30 يوما</div>
+            <div class="sub m-0">${money(p.spend)} · ${p.calls} نداء${
               p.dailyCap === null ? '' : ` · سقفُه ${money(p.dailyCap)}`}</div></div>
         </div>
 
         ${locked
-          ? `<div class="outcome"><span class="k">محميّ</span><span class="v">مفتاح هذا المزوّد في
+          ? `<div class="outcome"><span class="kv-k">محميّ</span><span class="kv-v">مفتاح هذا المزوّد في
                <b>أسرار Worker</b> — لا يُبدَّل من هنا، وهو أأمن موضع.
                ولتبديله: ${pathArrows('لوحة Cloudflare ← Variables and Secrets')}.</span></div>`
-          : `<form class="row" method="POST" action="/panel/providers/key" data-busy="جارٍ الحفظ…"
-                   style="margin-top:var(--s-3)">
+          : `<form class="row mt-3" method="POST" action="/panel/providers/key" data-busy="جارٍ الحفظ…"
+                  >
                <input type="hidden" name="provider" value="${id}">
-               <div class="field" style="flex:1;min-width:180px">
+               <div class="field grow-field">
                  <label for="k-${id}">${p.hint === null ? 'أضف المفتاح' : 'استبدل المفتاح'}</label>
-                 <input id="k-${id}" type="password" name="key" dir="ltr" required autocomplete="off"
-                        style="width:100%"></div>
-               <button class="p" type="submit" style="align-self:flex-end">حفظ المفتاح</button>
+                 <input class="w-full" id="k-${id}" type="password" name="key" dir="ltr" required autocomplete="off"
+                       ></div>
+               <button class="btn btn-primary self-end" type="submit">حفظ المفتاح</button>
              </form>`}
 
-        <form class="row" method="POST" action="/panel/providers/add" style="margin-top:var(--s-3)">
+        <form class="row mt-3" method="POST" action="/panel/providers/add">
           <input type="hidden" name="name" value="${id}">
           <input type="hidden" name="label" value="${escapeHtml(p.label)}">
           ${p.builtin ? '' : `<div class="field"><label for="u-${id}">العنوان</label>
-            <input id="u-${id}" name="base_url" dir="ltr" value="${escapeHtml(p.baseUrl ?? '')}"
-                   style="width:220px" required></div>`}
+            <input class="w-m" id="u-${id}" name="base_url" dir="ltr" value="${escapeHtml(p.baseUrl ?? '')}"
+                   required></div>`}
           ${modelPicker({
             id: `m-${p.name}`,
             provider: p.name,
             current: p.model ?? '',
             fillsPrice: true,
-            width: '190px',
           })}
           <div class="field"><label for="pi-${id}">سعر الدخول /M</label>
-            <input id="pi-${id}" type="number" step="0.01" min="0" name="price_in"
-                   value="${p.priceIn ?? ''}" style="width:90px"></div>
+            <input class="w-xs" id="pi-${id}" type="number" step="0.01" min="0" name="price_in"
+                   value="${p.priceIn ?? ''}"></div>
           <div class="field"><label for="po-${id}">سعر الخروج /M</label>
-            <input id="po-${id}" type="number" step="0.01" min="0" name="price_out"
-                   value="${p.priceOut ?? ''}" style="width:90px"></div>
+            <input class="w-xs" id="po-${id}" type="number" step="0.01" min="0" name="price_out"
+                   value="${p.priceOut ?? ''}"></div>
           <div class="field"><label for="dc-${id}">سقفه اليوميّ ($)</label>
-            <input id="dc-${id}" type="number" step="0.5" min="0" max="100" name="daily_cap"
-                   value="${p.dailyCap ?? ''}" placeholder="عامّ" style="width:90px"></div>
-          <button class="g sm" type="submit" style="align-self:flex-end">حفظ</button>
+            <input class="w-xs" id="dc-${id}" type="number" step="0.5" min="0" max="100" name="daily_cap"
+                   value="${p.dailyCap ?? ''}" placeholder="عامّ"></div>
+          <button class="btn btn-secondary btn-sm self-end" type="submit">حفظ</button>
         </form>
       </div>
     </details>`
@@ -347,7 +345,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
   ]
 
   const presetChips = PRESETS.map((preset) =>
-    `<button type="button" class="g sm preset" data-name="${escapeHtml(preset.name)}"
+    `<button type="button" class="btn btn-secondary btn-sm preset" data-name="${escapeHtml(preset.name)}"
        data-label="${escapeHtml(preset.label)}" data-url="${escapeHtml(preset.url)}"
        data-model="${escapeHtml(preset.model)}">${escapeHtml(preset.label)}</button>`,
   ).join('')
@@ -355,7 +353,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
   const presetRows = PRESETS.map((preset) =>
     `<tr>
        <td><div class="nm">${escapeHtml(preset.label)}</div>
-           <div class="sub" style="margin:0">${escapeHtml(preset.note)}</div></td>
+           <div class="sub m-0">${escapeHtml(preset.note)}</div></td>
        <td><span class="mono">${pathArrows(escapeHtml(preset.keyFrom))}</span></td>
      </tr>`,
   ).join('')
@@ -382,52 +380,52 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <div class="guide-body">
     <form method="POST" action="/panel/providers/add" id="add-provider"
           data-confirm="سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان. أتؤكّد؟">
-      <ol class="steps" style="margin-top:var(--s-4)">
-        <li><span class="n">1</span><span class="body">
+      <ol class="steps mt-4">
+        <li><span class="step-n">1</span><span class="body">
           <span class="what">اختر مزوّدا</span>
           <span class="why">تُملأ الحقولُ وحدَها. ومزوّدٌ ليس هنا: املأها يدويّا —
             وعنوانُه ينتهي بـ <span class="mono">/v1</span> عند أكثرهم.</span>
-          <span class="row" style="margin-top:var(--s-2)">${presetChips}</span></span></li>
+          <span class="row mt-2">${presetChips}</span></span></li>
 
-        <li><span class="n">2</span><span class="body">
+        <li><span class="step-n">2</span><span class="body">
           <span class="what">راجع البيانات ثمّ أضف</span>
           <span class="why"><b>العنوان يُفحَص قبل الحفظ</b>: https وحدها، ولا عناوين داخليّة،
             ولا قالبٌ لم يُملأ — خطأٌ مطبعيٌّ في المضيف يرسل مفتاحَك إلى حيث لا تريد.</span>
-          <span class="row" style="margin-top:var(--s-3)">
+          <span class="row mt-3">
             <span class="field"><label for="np">الاسم (لاتينيّ)</label>
-              <input id="np" name="name" dir="ltr" required placeholder="deepseek" style="width:140px"></span>
+              <input class="w-s" id="np" name="name" dir="ltr" required placeholder="deepseek"></span>
             <span class="field"><label for="nl">الاسم المعروض</label>
-              <input id="nl" name="label" placeholder="DeepSeek" style="width:140px"></span>
-            <span class="field" style="flex:1;min-width:220px"><label for="nu">العنوان (https)</label>
-              <input id="nu" name="base_url" dir="ltr" required placeholder="https://api.deepseek.com/v1"
-                     style="width:100%"></span>
+              <input class="w-s" id="nl" name="label" placeholder="DeepSeek"></span>
+            <span class="field grow-field"><label for="nu">العنوان (https)</label>
+              <input class="w-full" id="nu" name="base_url" dir="ltr" required placeholder="https://api.deepseek.com/v1"
+                    ></span>
           </span>
-          <span class="row" style="margin-top:var(--s-2)">
+          <span class="row mt-2">
             <span class="field"><label for="nm">النموذج (مبدئيّ)</label>
-              <input id="nm" name="model" dir="ltr" placeholder="deepseek-chat" style="width:170px"></span>
+              <input class="w-m" id="nm" name="model" dir="ltr" placeholder="deepseek-chat"></span>
             <span class="field"><label for="ni">سعر الدخول /M</label>
-              <input id="ni" type="number" step="0.01" min="0" name="price_in" style="width:100px"></span>
+              <input class="w-xs" id="ni" type="number" step="0.01" min="0" name="price_in"></span>
             <span class="field"><label for="no">سعر الخروج /M</label>
-              <input id="no" type="number" step="0.01" min="0" name="price_out" style="width:100px"></span>
-            <button class="p" type="submit" style="align-self:flex-end">أضف</button>
+              <input class="w-xs" id="no" type="number" step="0.01" min="0" name="price_out"></span>
+            <button class="btn btn-primary self-end" type="submit">أضف</button>
           </span>
           ${d.cfAccountId === null
-            ? `<span class="outcome warn"><span class="k">Cloudflare</span><span class="v">
+            ? `<span class="outcome warn"><span class="kv-k">Cloudflare</span><span class="kv-v">
                 عنوانُه يحمل <b>معرّفَ حسابك</b> في المسار، و<span class="mono">CF_AI_ACCOUNT_ID</span>
                 غيرُ مضبوطٍ في هذه البيئة — <b>فالقالبُ يبقى ظاهرا ولن يُحفَظ</b>.
                 اضبطه في <span class="mono">wrangler.toml</span> ليُملأ وحده.</span></span>`
-            : `<span class="outcome"><span class="k">Cloudflare</span><span class="v">
+            : `<span class="outcome"><span class="kv-k">Cloudflare</span><span class="kv-v">
                 عنوانُه مُلئ بمعرّف حسابك وحدَه، <b>وهو يكفي للثلاثة</b>: النصُّ يُنادى عليه،
                 <b>والصورةُ والفهرسُ يُشتقّان منه</b>
                 (<span class="mono">/ai/run</span> و <span class="mono">/ai/models/search</span>)
                 — فلا تُدخِل عنوانا ثانيا.</span></span>`}</span></li>
 
-        <li><span class="n">3</span><span class="body">
+        <li><span class="step-n">3</span><span class="body">
           <span class="what">ضع المفتاح في صفّه، ثمّ «اختبر» و«حدّث»</span>
           <span class="why">بعد الإضافة يظهر صفُّه في القائمة أعلاه. <b>«اختبر»</b> يقول أيعمل المفتاح،
             <b>و«حدّث»</b> يجلب قائمةَ نماذجه الآن فتختار منها بدل أن تكتب اسما —
             <b>والفهرسُ لا يُجلَب قبل حفظ المفتاح</b>: هو نداءٌ باسمك عندهم.</span>
-          <span class="scroll" style="margin-top:var(--s-3)"><table>
+          <span class="scroll mt-3"><table>
             <thead><tr><th>المزوّد</th><th>موضعُ المفتاح عندهم</th></tr></thead>
             <tbody>${presetRows}</tbody></table></span>
           <span class="why">وصلاحيّةُ مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
@@ -446,28 +444,27 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       <td><div class="nm">${escapeHtml(TASK_LABEL[r.task] ?? r.task)}</div>
           <div class="sub">${pathArrows(escapeHtml(r.why))}</div></td>
       <td data-label="المزوّد والنموذج">
-        <form class="row" method="POST" action="/panel/routes" style="gap:var(--s-2)">
+        <form class="row gap-2" method="POST" action="/panel/routes">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
-          <select name="provider" class="mp-provider" style="width:130px">${providerOptions(r.provider)}</select>
+          <select name="provider" class="mp-provider w-s">${providerOptions(r.provider)}</select>
           ${modelPicker({
             id: `rm-${r.task}`,
             provider: r.provider,
             current: r.model,
             task: TASK_MODELS[r.task] ?? ('text' as const),
-            width: '190px',
           })}
-          <button class="g sm" type="submit">حفظ</button>
+          <button class="btn btn-secondary btn-sm" type="submit">حفظ</button>
         </form>
       </td>
       <td data-label="الحال">${r.ready
-        ? chip('ok', '●', 'جاهز')
+        ? statusBadge('ok', '●', 'جاهز')
         : r.pending !== undefined
           // ينتظرك ولا يسقط — بعلامة النقطة وكلمتها، فيقول الجدولُ ما يقوله الزرّ
-          ? chip('warn', RUNG_MARK.now.g, escapeHtml(r.pending),
+          ? statusBadge('warn', RUNG_MARK.now.g, escapeHtml(r.pending),
               `title="${escapeHtml(`${RUNG_MARK.now.label} — ${r.pending}`)}"`)
           : r.implemented
-            ? chip('bad', '✕', 'مزوّده غير جاهز')
-            : chip('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
+            ? statusBadge('bad', '✕', 'مزوّده غير جاهز')
+            : statusBadge('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
 
   return { strip, rows, add, routing }
 }

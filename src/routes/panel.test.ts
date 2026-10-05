@@ -484,7 +484,7 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
      * مكتوبةٌ في شاشة الاختيار، **فنصٌّ موجودٌ لا يعني بطاقةً معروضة** —
      * وأوّلُ صياغةٍ لهذا الاختبار سقطت بهذا بالذات.
      */
-    const k = (label: string): string => `<div class="k">${label}</div>`
+    const k = (label: string): string => `<div class="kv-k">${label}</div>`
     const before = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(before).toContain(k('تحليلات اليوم'))
     expect(before).not.toContain(k('ذروةُ الإنفاق'))
@@ -513,8 +513,8 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     const cookie = await login()
     await submitTiles(cookie, ['drafts_waiting'])
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('<div class="k">تحليلات اليوم</div>')
-    expect(html).toContain('<div class="k">إنفاق هذا الشهر</div>')
+    expect(html).toContain('<div class="kv-k">تحليلات اليوم</div>')
+    expect(html).toContain('<div class="kv-k">إنفاق هذا الشهر</div>')
   })
 
   it('السقف يُحفظ ويُقرأ', async () => {
@@ -715,7 +715,7 @@ describe('اللون يتبع المرجع لا الذوق', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     // لا صنف تحذيرٍ في المقياس؛ الأحمر وحده هو القفزة المسموحة
     expect(html).not.toContain('<i class="w"')
-    expect(await stylesheet(cookie)).toContain('.bar i.f{background:var(--bad)}')
+    expect(await stylesheet(cookie)).toContain('.bar i.full{background:var(--bad)}')
   })
 
   it('بلوغُ السقف يحمل نصّا لا لونا وحده', async () => {
@@ -764,8 +764,9 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
   it('القنواتُ والمزوّدون وشاشةُ المنصّة يحملون tiles، ولا شريطَ بلاه', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('<div class="grid tiles c4" style="margin-bottom:var(--s-4)">')
-    expect(html).toContain('<div class="grid tiles c3" style="margin-bottom:var(--s-3)">')
+    // ‏والهامشُ صنفٌ من السلّم لا سِمةُ «style» (D-189)
+    expect(html).toContain('<div class="grid tiles c4 mb-4">')
+    expect(html).toContain('<div class="grid tiles c3 mb-3">')
     // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
     expect(screen).toContain('<header class="acct acct-linkedin">')
@@ -784,7 +785,7 @@ describe('هندسةُ نظرة عامّة (D-136)', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="grid tiles c4">')
-    const ov = html.indexOf('<div class="ov"')
+    const ov = html.indexOf('<div class="ov ')
     const first = html.indexOf('<div class="stack">', ov)
     const waiting = html.indexOf('<h2>ما ينتظرك</h2>', first)
     const happened = html.indexOf('<h2>ما وقع اليوم</h2>', waiting)
@@ -2859,7 +2860,7 @@ describe('ضبطُ التطبيق يعود إلى تبويب الإعداد (ر-
     const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
     expect(page).toContain('حُفظت أسرارُ TikTok مشفَّرة')
     expect(page).not.toContain('أسرارُ tiktok')
-    expect(page).toContain('<a class="btn p" href="/oauth/tiktok/start">اربط TikTok</a>')
+    expect(page).toContain('<a class="btn btn-primary" href="/oauth/tiktok/start">اربط TikTok</a>')
     expect(page).not.toContain('tt-secret')
   })
 
@@ -2869,7 +2870,7 @@ describe('ضبطُ التطبيق يعود إلى تبويب الإعداد (ر-
       withSession(cookie, { method: 'POST', body: form({ client_id: '   ' }) }), env)
     expect(saved.headers.get('location')).toBe('/panel/channels/tiktok?tab=setup')
     const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
-    expect(page).toContain('class="flash bad"')
+    expect(page).toContain('class="toast-note bad"')
     expect(page).toContain('id="ci-tiktok"')
     expect(page).toContain('pattern="\\S.*"')
   })
@@ -2893,7 +2894,7 @@ describe('ضبطُ التطبيق يعود إلى تبويب الإعداد (ر-
     globalThis.fetch = (async () => Response.json({ error: 'invalid_client', error_description: 'bad secret' }, { status: 401 })) as unknown as typeof fetch
     await app.request('/panel/channels/app/verify', withSession(cookie, { method: 'POST', body: form() }), env)
     const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
-    const flash = page.slice(page.indexOf('class="flash'), page.indexOf('</div>', page.indexOf('class="flash')))
+    const flash = page.slice(page.indexOf('class="toast-note'), page.indexOf('</div>', page.indexOf('class="toast-note')))
     expect(flash).toContain('السرُّ مرفوض: TikTok تعرف المعرّف tt-key-123')
     expect(flash).toContain('TikTok for Developers')
     expect(flash).not.toContain('تبويب Auth')
@@ -3319,11 +3320,11 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
   }
   /** رقمُ «مهامٌّ جاهزة» في شريط المزوّدين. */
   const tasksReady = (html: string): number =>
-    Number(/مهامٌّ جاهزة<\/div>\s*<div class="v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
-  const IMAGE_BUTTON_OFF = '<button class="g sm" type="submit" disabled>ولّد صورةً فنّيّة</button>'
-  const IMAGE_BUTTON_ON = '<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>'
-  const INFO_BUTTON_OFF = '<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
-  const INFO_BUTTON_ON = '<button class="p sm" type="submit">ولّد إنفوجرافيك</button>'
+    Number(/مهامٌّ جاهزة<\/div>\s*<div class="kv-v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
+  const IMAGE_BUTTON_OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>'
+  const IMAGE_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>'
+  const INFO_BUTTON_OFF = '<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
+  const INFO_BUTTON_ON = '<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>'
 
   it('صورٌ إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطةُ المزوّد تامّة، والجدولُ «جاهز»، والقيمةُ لا تظهر', async () => {
     await upsertProvider(db, {
@@ -3454,7 +3455,7 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0002'
     const html = await panelHtml()
     expect(html).toContain('title="تامّة — من أسرار Worker"')
-    expect(html).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
     expect(routeRow(html, 'الفيديو — تحريكُ الصورة')).toContain('جاهز')
     expect(html).not.toContain('cf-ai-secret-value-0002')
   })
@@ -3485,7 +3486,7 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     const html = await panelHtml()
     expect(html).toContain('title="تنتظرك — برابط Worker وحده"')
     // ينتظرك ولا يسقط: الزرُّ يعمل
-    expect(html).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
     const row = routeRow(html, 'الفيديو — تحريكُ الصورة')
     expect(row).not.toContain('st ok')
     expect(row).not.toContain('مزوّده غير جاهز')
@@ -3588,8 +3589,8 @@ describe('سقفُ المقاطع اليوميّ في اللوحة (D-168)', () 
     recordCost(db, {
       provider: 'cloudflare', operation: 'video:alibaba/hh1-i2v:price_unverified', units: 1, unitCost: 0,
     })
-  const OFF = '<button class="g sm" type="submit" disabled>حرّكها فيديو</button>'
-  const ON = '<button class="g sm" type="submit">حرّكها فيديو</button>'
+  const OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>'
+  const ON = '<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>'
 
   beforeEach(() => {
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
@@ -3749,7 +3750,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(next).toContain('6.06$ من 5.00$')
     expect(html).toContain('id="c2"')
     // ‏والزرُّ لا يُضغَط فيُردّ: معطَّلٌ، وسببُه مربوطٌ به وفيه موضعُ إصلاحه
-    expect(html).toMatch(/<button class="p" type="submit" disabled aria-describedby="dw-why">اكتب مسوّدة<\/button>/)
+    expect(html).toMatch(/<button class="btn btn-primary" type="submit" disabled aria-describedby="dw-why">اكتب مسوّدة<\/button>/)
     const why = html.slice(html.indexOf('id="dw-why"'), html.indexOf('</p>', html.indexOf('id="dw-why"')))
     expect(why).toContain('بلغتَ سقفَ الإنفاق اليوم: 6.06$ من 5.00$')
     expect(why).toContain('href="#c2"')
@@ -3817,7 +3818,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(bucket.stored.get(`upload/${started.id}.mp4`)).toBe(1)
 
     const page = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(page).toContain('<div class="card" id="videos"')
+    expect(page).toContain('<div class="card mt-3" id="videos"')
     expect(page).toContain('قيادة.mp4')
     expect(page).toContain('<bdi dir="ltr">0:42</bdi> · <bdi dir="ltr">1080×1920</bdi>')
 
@@ -4026,8 +4027,8 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV)</span>')
     expect(card).toMatch(/<input type="file" name="file"[^>]*data-plan-file>/)
     // ‏الاختيارُ هو الفعل؛ والزرُّ لمن لا سكربتَ عنده وحده، فلا يُضغط زرٌّ داكنٌ قبل اختيار الملفّ
-    expect(card).toContain('<noscript><button class="g" type="submit">اقرأ الخطّة</button></noscript>')
-    expect(card).toContain('<label class="btn p vpick">')
+    expect(card).toContain('<noscript><button class="btn btn-secondary" type="submit">اقرأ الخطّة</button></noscript>')
+    expect(card).toContain('<label class="btn btn-primary vpick">')
   })
 
   it('معاينةٌ انتهت مهلتُها صفحةٌ بالرافدة وزرٍّ إلى الرفع، لا نصٌّ خامّ (ر-5)', async () => {
@@ -4038,7 +4039,7 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     const html = await r.text()
     expect(html).toContain('<aside class="rail">')
     expect(html).toContain('انتهت مهلةُ هذه المعاينة')
-    expect(html).toContain('<a class="btn p" href="/panel#plan-import">ارفع الملفّ من جديد</a>')
+    expect(html).toContain('<a class="btn btn-primary" href="/panel#plan-import">ارفع الملفّ من جديد</a>')
   })
 
   it('المعاينةُ على الهاتف: لكلّ خليّةٍ لصيقتُها، والمنصّةُ باسمها، والموعدُ كما فُهم، والاعتمادُ ملتصقٌ بالأسفل (ر-5)', async () => {
@@ -4128,5 +4129,28 @@ describe('الوسيطُ يُبثّ بمداه (D-182)', () => {
     const out = await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { Range: 'bytes=500-' } }), env)
     expect(out.status).toBe(416)
     expect(out.headers.get('Content-Range')).toBe('bytes */100')
+  })
+})
+
+/**
+ * ‏صفحةٌ لا نصٌّ خامّ (D-189): رابطٌ قديمٌ إلى منصّةٍ أو أسبوعٍ أو منشورٍ لا وجودَ له يفتح صفحةَ
+ * ‏٤٠٤ بالرافدة وبابِ الرئيسيّة، وجملتُه تقول ما لم يُوجَد.
+ */
+describe('‏٤٠٤ داخل اللوحة صفحةٌ لا نصّ (D-189)', () => {
+  it('منصّةٌ وأسبوعٌ ومنشورٌ لا وجودَ لها', async () => {
+    const cookie = await login()
+    const html = { Accept: 'text/html' }
+    for (const [path, said] of [
+      ['/panel/channels/myspace', 'لا منصّةَ بهذا الاسم'],
+      ['/panel/report/1999-01-04', 'لا تقريرَ لهذا الأسبوع'],
+      ['/panel/journey/nope', 'لا منشورَ بهذا المعرّف'],
+    ] as const) {
+      const res = await app.request(path, withSession(cookie, { headers: html }), env)
+      expect(res.status, path).toBe(404)
+      expect(res.headers.get('Content-Type'), path).toContain('text/html')
+      const page = await res.text()
+      expect(page, path).toContain(said)
+      expect(page, path).toContain('<h1 class="empty-t">هذه الصفحة غير موجودة</h1>')
+    }
   })
 })

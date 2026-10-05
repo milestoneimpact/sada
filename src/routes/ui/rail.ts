@@ -13,6 +13,7 @@
 import { CHANNELS } from '../../lib/channels'
 import { commandMore, SECTIONS } from './command'
 import { ICON } from './icons'
+import { count } from './components/badge'
 import { LOGOS } from './logos'
 import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch, wordmark } from './shell'
 
@@ -39,7 +40,8 @@ export function railHtml(input: RailInput): string {
     const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
     lastGroup = s.group
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
-    const count = counts[s.id] ?? 0
+    // ‏والعددُ مكوّنُه (D-189)، ويعني «ينتظرك» وحدَها (خطّة التصميم 5.1)
+    const n = counts[s.id] ?? 0
     /*
      * **وسمةُ الشريط تُقرأ من الجدول** (D-107): الرافدةُ نفسُها تصير
      * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى**.
@@ -51,7 +53,7 @@ export function railHtml(input: RailInput): string {
       ? `<span>${s.short ?? s.label}</span>`
       : `<span class="wide">${s.short ?? s.label}</span><span class="tight">${escapeHtml(s.tight)}</span>`
     return `${head}<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
-      count > 0 ? `<span class="count">${count}</span>` : ''
+      n > 0 ? count(n) : ''
     }</a>${after}`
   }).join('\n    ')
 

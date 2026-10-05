@@ -51,7 +51,7 @@ for (const file of files) {
 
       // ١ · أداةٌ تُطبَع
       const chrome = []
-      for (const el of document.querySelectorAll('.rail, .topbar, .theme, .skip, nav.tabs, button, .btn, form, footer:not(.doc footer)')) {
+      for (const el of document.querySelectorAll('.rail, .topbar, .seg, .skip, nav.tabs, button, .btn, form, footer:not(.doc footer)')) {
         if (seen(el)) chrome.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 20)}`)
       }
 

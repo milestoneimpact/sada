@@ -46,7 +46,7 @@ async function home(cookie: string): Promise<string> {
 
 /** قيمةُ بطاقةٍ بوسمها لا باسمها — الاسمُ مكتوبٌ في شاشة الاختيار أيضًا. */
 function tile(html: string, label: string): { value: string; note: string } | null {
-  const m = new RegExp(`<div class="k">${label}</div>\\s*<div class="v">([^<]+)</div>[\\s\\S]*?<div class="n">([^<]+)</div>`)
+  const m = new RegExp(`<div class="kv-k">${label}</div>\\s*<div class="kv-v">([^<]+)</div>[\\s\\S]*?<div class="note">([^<]+)</div>`)
     .exec(html)
   return m === null ? null : { value: m[1]!.trim(), note: m[2]!.trim() }
 }

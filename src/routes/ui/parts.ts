@@ -6,32 +6,21 @@
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
 import { escapeHtml } from './escape'
-import { GLYPH_ICON, ICON } from './icons'
+import { glyph, ICON } from './icons'
+import { statusBadge, type Tone } from './components/badge'
+import { card } from './components/card'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { RungState } from '../../lib/platform/readiness'
 import { counted, NOUNS } from '../../lib/format'
 
 /**
- * رقاقةُ الحال — **دالّةٌ واحدةٌ ورموزٌ مرسومة** (D-154).
- *
- * كانت `<span class="st …"><span class="g">●</span>…</span>` تُكتب يدًا
- * ‏٦٥ مرّةً في عشرة ملفّات، ورمزُها حرفٌ (● ○ ▲ ✓ ✕ ◍ ◔ ↑ ◆ !) ليس في أيّ
- * وجهٍ مضمَّن، فيسقط إلى خطّ النظام ويختلف من جهازٍ لآخر (التدقيقُ الثالث).
- * هنا يُرسَم SVG بـ`currentColor`، **والحرفُ يبقى مفتاحَه** في جداول الحال، فما
- * لا رسمَ له يُطبَع حرفًا كما كان. **والرسمُ من `icon()` في `icons.ts`** (D-185):
- * شبكةُ ‏٢٤ وثخانةُ ‏١٫٨ كسائر الأيقونات، لا جدولٌ ثانٍ بثخاناتٍ أربع.
+ * الرمزُ وحدَه بلا شارة (D-167) — **وبيتُه اليومَ `icons.ts`** بجانب جدوله (D-189)، ويُعاد
+ * تصديرُه من هنا لمن اعتاد استيرادَه. وشارةُ الحال صارت مكوّنًا: `statusBadge()` في
+ * `components/badge.ts` — كانت `status()` هنا، وكانت الحبّةُ ورمزُها (بصنف «g») تُكتب يدًا ‏٦٥
+ * مرّةً في عشرة ملفّات قبلها (D-154).
  */
-/**
- * الرمزُ وحدَه بلا رقاقة — **لما يقول حالًا أو اتّجاهًا خارج «.st»** (D-167).
- *
- * سهمُ الفرق عن الأمس، وعلامةُ «آخرُ فشل» في شاشة المنصّة: كانا يكتبان الحرفَ
- * في الوسم فيسقط إلى خطّ النظام، والرقاقةُ بجانبهما مرسومة. فالرسمُ من هنا،
- * وحارسُ `audit_classes` يُسقط CI على حرفٍ منها في وسمٍ خارج هذا الملفّ.
- */
-export function glyph(g: string): string {
-  return GLYPH_ICON[g] ?? escapeHtml(g)
-}
+export { glyph } from './icons'
 
 /**
  * اسمُ ملفٍّ في جملةٍ عربيّة — **معزولًا وبلا امتداده** (خطّة التصميم 4.4/8 · D-185).
@@ -66,26 +55,13 @@ export function pathArrows(html: string): string {
 }
 
 /**
- * `cls` من ok · warn · bad · idle (أو فارغ)، و`g` حرفُ الحال، و`text`
- * HTML جاهزٌ (مهرَّبٌ عند من كتبه)، و`attrs` سِماتٌ تُلحَق بالرقاقة.
- *
- * **وصنفُ الرمز «st-ic» لا «g»** (D-183): «.g» صنفُ الزرّ الشبحيّ، فكان الرمزُ
- * يلبس أرضَ الزرّ البيضاءَ وحبرَه داخل كلّ حبّةٍ ملوّنة — مربّعٌ أبيضُ في حبّةٍ
- * برتقاليّة، ‏٩٦ مرّةً في الرئيسيّة.
- */
-export function status(cls: string, g: string, text: string, attrs = ''): string {
-  const open = `<span class="st${cls === '' ? '' : ` ${cls}`}"${attrs === '' ? '' : ` ${attrs}`}>`
-  return `${open}<span class="st-ic">${glyph(g)}</span>${text}</span>`
-}
-
-/**
  * علامةُ الدرجة — مع كلمتها لا وحدَها (D-043).
  *
  * كانت في `platformView.ts` لسلّم المنصّة وحده (D-158). **ونقاطُ الجاهزيّة
  * تحت زرَّي الصورة والمقطع تقرأ الحالَ نفسَها** (D-163)، فنسخةٌ ثانيةٌ هناك
  * كانت تفترق عن الأولى عند أوّل رمزٍ يُبدَّل.
  */
-export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: string; label: string }>> = {
+export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: Tone; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تامّة' },
   now: { g: '◍', cls: 'warn', label: 'تنتظرك' },
   waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
@@ -127,7 +103,7 @@ export function bar(used: number, cap: number, label = 'بلغ السقف'): str
   const p = pct(used, cap)
   const full = p >= 100
   const done = label !== 'بلغ السقف'
-  return `<div class="bar"><i class="${full ? (done ? 'done' : 'f') : ''}" style="width:${p}%"></i></div>` +
+  return `<div class="bar"><i class="${full ? (done ? 'done' : 'full') : ''}" style="width:${p}%"></i></div>` +
     (full
       ? `<div class="cap${done ? ' done' : ''}"><span class="st-ic">${glyph(done ? '●' : '▲')}</span>${escapeHtml(label)}</div>`
       : '')
@@ -169,7 +145,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
         .map((r) => {
           const ok = r.status !== null && r.status >= 200 && r.status < 300
           return `<li class="ax-r">
-            ${status(ok ? 'ok' : 'bad', ok ? '↑' : '✕', escapeHtml(ALERT_KIND[r.kind] ?? r.kind))}
+            ${statusBadge(ok ? 'ok' : 'bad', ok ? '↑' : '✕', escapeHtml(ALERT_KIND[r.kind] ?? r.kind))}
             <span class="ax-b">${escapeHtml(r.body.slice(0, 70))}${r.body.length > 70 ? '…' : ''}</span>
             <span class="grow"></span>
             ${r.error === null
@@ -193,7 +169,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
         <input id="hook" name="value" type="url" class="mono" dir="ltr" inputmode="url"
           placeholder="https://hooks.slack.com/services/…"
           value="${escapeHtml(webhook)}"></div>
-      <button class="g" type="submit">احفظ</button>
+      <button class="btn btn-secondary" type="submit">احفظ</button>
     </form>
     <p class="hint">يعمل مع Slack و Discord و Telegram وأيِّ عنوانٍ يقبل
       <span class="mono">POST</span> بحقل <span class="mono">text</span>.
@@ -216,26 +192,31 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   const head =
     bad.length > 0
       // ‏والفعلُ قبل المعدود فلا يُطابَق مثنّاه (D-177): «تأخّرت أو سقطت دورتان» لا «2 دورةٌ متأخّرة»
-      ? status('bad', '▲', `تأخّرت أو سقطت ${counted(bad.length, NOUNS.cycle)}`)
+      ? statusBadge('bad', '▲', `تأخّرت أو سقطت ${counted(bad.length, NOUNS.cycle)}`)
       : never.length === pulses.length
-        ? status('idle', '○', 'لم تدُر دورةٌ بعد')
-        : status('ok', '●', 'الدوراتُ في مواعيدها')
+        ? statusBadge('idle', '○', 'لم تدُر دورةٌ بعد')
+        : statusBadge('ok', '●', 'الدوراتُ في مواعيدها')
   const rows = pulses
     .map((p) => {
       const mark =
-        p.state === 'ok' ? status('ok', '●', 'في موعدها')
-        : p.state === 'late' ? status('bad', '▲', `تأخّرت ${Math.round(p.lateBy / 60)} دقيقة`)
-        : p.state === 'failed' ? status('bad', '✕', 'سقطت')
-        : status('idle', '○', 'لم تدُر بعد')
+        p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
+        : p.state === 'late' ? statusBadge('bad', '▲', `تأخّرت ${Math.round(p.lateBy / 60)} دقيقة`)
+        : p.state === 'failed' ? statusBadge('bad', '✕', 'سقطت')
+        : statusBadge('idle', '○', 'لم تدُر بعد')
       const when = p.beat === null ? '' : `<span class="ago">${escapeHtml(relativeTime(p.beat.at, now))}</span>`
       const detail = p.beat?.detail == null ? '' : `<span class="ax-b">${escapeHtml(p.beat.detail)}</span>`
       return `<li class="ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
     })
     .join('')
-  // ‏و`id` مرساةُ حبّة النظام في الرأس و«افحص الآلة» في «خطوتك التالية»
-  return `<div class="card" id="machine"><div class="card-head"><h2>هل الآلةُ تعمل؟</h2><div class="grow"></div>${head}</div>
-    <p class="hint">كلُّ دورةٍ تكتب نبضةً بعد أن تدور — ولو لم تجد شيئا. والتأخّرُ دورةٌ كاملةٌ تغيب،
+  // ‏و`id` مرساةُ حبّة النظام في الرأس و«افحص الآلة» في «خطوتك التالية». والبطاقةُ من العُدّة
+  // ‏(D-189): عنوانٌ وحالُه في طرف الرأس
+  return card({
+    id: 'machine',
+    title: 'هل الآلةُ تعمل؟',
+    action: head,
+    body: `<p class="hint">كلُّ دورةٍ تكتب نبضةً بعد أن تدور — ولو لم تجد شيئا. والتأخّرُ دورةٌ كاملةٌ تغيب،
       لا دقائقُ cron.</p>
-    <ul class="ax">${rows}</ul></div>`
+    <ul class="ax">${rows}</ul>`,
+  })
 }
 
