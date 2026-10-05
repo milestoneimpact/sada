@@ -140,10 +140,10 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): stri
   const top =
     lone !== undefined
       ? `<div class="outcome ok">
-          <span class="k">${lone.window === null
+          <span class="kv-k">${lone.window === null
             ? 'لم يُقَس بعد'
             : `في نافذة ${escapeHtml(windowLabel(lone.window))}`}</span>
-          <span class="v">${escapeHtml(firstLine(lone.text))} ${recordLink(lone)}</span>
+          <span class="kv-v">${escapeHtml(firstLine(lone.text))} ${recordLink(lone)}</span>
         </div>
         ${lone.window === null ? '' : `<div class="stats">
           ${sum('ظهور', lone.impressions, lone.impressions === null ? 0 : 1, 1)}
@@ -155,8 +155,8 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): stri
       ? `<p class="hint"><b>لا ترتيبَ في هذا الأسبوع.</b> الترتيبُ يقع داخل نافذةٍ
          واحدة، ويحتاج <b>اثنين فأكثر</b> فيها — وواحدٌ وحده ليس ترتيبا.</p>`
       : `<div class="outcome ok">
-          <span class="k">الأوّلُ في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
-          <span class="v">${escapeHtml(r.top.post.text.slice(0, 160))}${
+          <span class="kv-k">الأوّلُ في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
+          <span class="kv-v">${escapeHtml(r.top.post.text.slice(0, 160))}${
             r.top.post.text.length > 160 ? '…' : ''
           } ${recordLink(r.top.post)}</span>
         </div>
@@ -170,8 +170,8 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): stri
         }</p>`
 
   const notes = r.notes
-    .map((n) => `<div class="outcome warn"><span class="k">يُقال</span>
-      <span class="v">${escapeHtml(n)}</span></div>`)
+    .map((n) => `<div class="outcome warn"><span class="kv-k">يُقال</span>
+      <span class="kv-v">${escapeHtml(n)}</span></div>`)
     .join('')
 
   return `<div class="page-head">
@@ -209,7 +209,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): stri
 
   ${notes === '' ? '' : `<div class="card"><h2>ما لا يقوله الرقمُ وحده</h2>${notes}</div>`}
 
-  <p class="hint" style="margin:var(--s-4) 0 0">
+  <p class="hint m-0 mt-4">
     هذا التقريرُ <b>كُتب مرّةً ولا يُعاد حسابُه</b>: المقاييسُ تتراكم بعد الأسبوع،
     وإعادةُ الحساب تبدّل رقمَه بأثرٍ رجعيّ — فلا يُعرَف أنَما الحصادُ أم أُعيد الحساب.
     ${
@@ -230,7 +230,7 @@ export interface ReportScreenData {
 
 /** بطاقةُ توصيةٍ — **ومعها المبلغُ ومصدرُه، وزرّان لا زرُّ إنفاق.** */
 function suggestionCard(s: OpenSuggestion): string {
-  return `<div class="card" style="margin-bottom:var(--s-3)">
+  return `<div class="card mb-3">
     <div class="card-head">
       <div class="plat-logo">${LOGOS[s.platform] ?? ''}</div>
       <h2>${escapeHtml(money(s.budgetUsd))}</h2>
@@ -238,8 +238,8 @@ function suggestionCard(s: OpenSuggestion): string {
       <span class="ago">اقتُرح ${escapeHtml(relativeTime(s.createdAt))}</span>
     </div>
     <p class="nm">${escapeHtml(s.text.slice(0, 200))}${s.text.length > 200 ? '…' : ''}</p>
-    <div class="outcome"><span class="k">لماذا</span>
-      <span class="v">${escapeHtml(s.reason)}</span></div>
+    <div class="outcome"><span class="kv-k">لماذا</span>
+      <span class="kv-v">${escapeHtml(s.reason)}</span></div>
     <form method="post" action="/panel/report/promote" class="row">
       <input type="hidden" name="post_id" value="${escapeHtml(s.postId)}">
       ${/*
@@ -248,8 +248,8 @@ function suggestionCard(s: OpenSuggestion): string {
         * حدٍّ، لا يُعرَف أيُّهما الأوّليّ. والقبولُ أوّليٌّ لأنّه ما يُنتظَر،
         * والرفضُ ثانويٌّ — **ولا أحمرَ عليه**: رفضُ توصيةٍ رأيٌ لا خطر.
         */''}
-      <button type="submit" name="decision" value="accepted" class="p">أقبل</button>
-      <button type="submit" name="decision" value="rejected" class="g">أرفض</button>
+      <button type="submit" name="decision" value="accepted" class="btn btn-primary">أقبل</button>
+      <button type="submit" name="decision" value="rejected" class="btn btn-secondary">أرفض</button>
       <span class="grow"></span>
       <span class="ago">وقبولُك <b>تسجيلُ رأيٍ لا أمرُ إنفاق</b> — لا مسارَ
         إعلاناتٍ في صدى أصلا.</span>
@@ -274,8 +274,8 @@ export function reportScreen(d: ReportScreenData): string {
     d.promoCapUsd <= 0
       ? `<div class="card">
           <h2>توصيةُ الترويج</h2>
-          <div class="outcome warn"><span class="k">لا سقفَ موضوع</span>
-            <span class="v"><b>ولا مبلغَ يُقترَح بلا سقفٍ تضعه.</b>
+          <div class="outcome warn"><span class="kv-k">لا سقفَ موضوع</span>
+            <span class="kv-v"><b>ولا مبلغَ يُقترَح بلا سقفٍ تضعه.</b>
               رقمٌ نؤلّفه نحن رقمٌ بلا مصدر — وهذه تقترح مالا لا كتابة.
               <a class="tap" href="/panel#c3">ضع سقفَ الترويج الأسبوعيّ</a>
               لتُكتَب التوصيات.</span></div>

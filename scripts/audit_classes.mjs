@@ -169,9 +169,97 @@ export function classesOf(code) {
  * **وحدُّه**: حرفٌ يُحفَظ في متغيّرٍ ثمّ يُقحَم (`const g = '▲'` ثمّ `${g}`)
  * يمرّ — تتبُّعُ القيمة عبر المتغيّرات ليس عملَ حارسٍ نصّيّ. و`lib/` لا يُقرأ.
  */
+/**
+ * ── سِمةُ «style» للمسافة (خطّة التصميم 3.3 · D-189) ───────────────────────────────
+ *
+ * كانت ‏٨٩ سِمةً في الوسم تكتب هامشًا أو حشوًا أو فجوةً بيدها، **وسِمةٌ لا يراها مدقّقُ
+ * الورقة ولا يقلبها الثيم ولا تعرفها الكثافة**، وبابُها في السياسة غيرُ باب الوسم (D-150).
+ * فصارت أصنافًا من السلّم (`mt-3` و`gap-2` و`w-m`…). **والحارسُ يقرأ الجزءَ الثابت** من
+ * السِّمة (ما خرج عن `${…}`): العرضُ المحسوبُ من بيانٍ (`width:${pct}%`) والمتغيّرُ
+ * (`--lines:9`) والموضعُ في الرسم يمرّ، والهامشُ والحشوُ والفجوةُ والعرضُ بالبكسل يردّ.
+ */
+export function inlineSpacing(code) {
+  const out = []
+  for (const m of code.matchAll(/\sstyle="([^"]*)"/g)) {
+    const fixed = stripExpressions(m[1])
+    const why = /(^|;)\s*(margin|padding|gap|row-gap|column-gap)[\w-]*\s*:/.test(fixed)
+      ? 'مسافةٌ في السِّمة'
+      : /(^|;)\s*(min-|max-)?width\s*:\s*\d+px/.test(fixed) ? 'عرضٌ بالبكسل في السِّمة' : null
+    if (why !== null) out.push({ line: code.slice(0, m.index).split('\n').length, why, style: m[1].slice(0, 48) })
+  }
+  return out
+}
+
+/**
+ * ── محدّدٌ في نصٍّ برمجيٍّ يسمّي صنفًا لا قاعدةَ له (مراجعةُ D-189) ─────────────────────
+ *
+ * أعادت المرحلةُ ٢ب تسميةَ الأصناف في سِمات `class` والورقة، **ولم تبلغ المحدّداتِ في
+ * `scripts/`**: `audit_design` يقرأ `.tile .v` فلا يجد شيئًا فيقول «لا تعادل» على كلّ لوح،
+ * و`meter.ts` يقرأ `.flash` فتُسجَّل كلُّ خطوةٍ في الرحلات «بلا إشعار»، و`audit_print` يقرأ
+ * `.theme` فلا يرى المبدّلَ مطبوعًا. **محدّدٌ لا يطابق شيئًا لا يردّ — يُطفئ الحارسَ بصمت.**
+ *
+ * فيُقرأ النصُّ الخامُ لا الشجرة (سكربتُ اللوحة نصٌّ داخل قالب): كلُّ حرفيّةٍ تُعطى لـ
+ * `querySelector(All)` و`closest` و`matches` و`locator` و`waitForSelector` و`$`/`$$`/`$eval`،
+ * ولـ`classList.contains`؛ وتُمحى منها `${…}` وما بين `[…]` (قيمُ السِّمات فيها نقاط)، ثمّ
+ * كلُّ `.اسم` فيها يجب أن يكون في `STYLE` أو مقبضًا في `HOOKS` أو في `SELECTOR_EXEMPT` بسببه.
+ */
+const CALL = /(?:\b(?:querySelector(?:All)?|closest|matches|locator|waitForSelector)|\.\$\$?(?:eval)?)\(\s*(['"`])/g
+const CONTAINS = /classList\.contains\(\s*(['"`])/g
+
+/** الحرفيّةُ من موضعها حتّى قوسها المطابق — و`${…}` علامةُ «محسوب»؛ ‏null إن لم تُغلَق. */
+function literalAt(code, i, quote) {
+  let out = ''
+  for (let j = i; j < code.length;) {
+    const ch = code[j]
+    if (ch === '\\') { out += code[j + 1] ?? ''; j += 2; continue }
+    if (ch === quote) return out
+    if (ch === '\n' && quote !== '`') return null
+    if (quote === '`' && ch === '$' && code[j + 1] === '{') {
+      let depth = 1
+      j += 2
+      while (j < code.length && depth > 0) {
+        if (code[j] === '{') depth += 1
+        else if (code[j] === '}') depth -= 1
+        j += 1
+      }
+      out += DYN
+      continue
+    }
+    out += ch
+    j += 1
+  }
+  return null
+}
+const DYN = '\u0001'
+
+/** يعيد `[{ line, cls, sel }]`: كلَّ صنفٍ يسمّيه محدّدٌ أو `classList.contains` في النصّ. */
+export function selectorClasses(code) {
+  const out = []
+  const lineAt = (i) => code.slice(0, i).split('\n').length
+  for (const m of code.matchAll(CALL)) {
+    const sel = literalAt(code, m.index + m[0].length, m[1])
+    if (sel === null) continue
+    const bare = sel.replace(/\[[^\]]*\]/g, ' ').replace(/(['"])(?:(?!\1).)*\1/g, ' ')
+    // ‏صنفٌ يلاصقه `${…}` (`.row-${kind}`) محسوبٌ لا اسم — لا يُحكَم عليه
+    for (const c of bare.matchAll(/\.(-?[_a-zA-Z][\w-]*)(\u0001)?/g)) {
+      if (c[2] === undefined) out.push({ line: lineAt(m.index), cls: c[1], sel: sel.replaceAll(DYN, '…').slice(0, 56) })
+    }
+  }
+  for (const m of code.matchAll(CONTAINS)) {
+    const cls = literalAt(code, m.index + m[0].length, m[1])
+    if (cls !== null && /^-?[_a-zA-Z][\w-]*$/.test(cls)) out.push({ line: lineAt(m.index), cls, sel: `classList.contains('${cls}')` })
+  }
+  return out
+}
+
+/** صنفٌ يُبحث عنه ولا قاعدةَ له **قصدًا** — ومعه سببُه. */
+const SELECTOR_EXEMPT = new Map([
+  ['ragged', 'إعفاءُ الشبكة الممزَّقة في audit_design: يُعَدّ ويُطبَع عددُه، ولا يُكتب في الوسم اليوم (D-124)'],
+])
+
 const SYSTEM_GLYPHS = new Set(['▾', '▸', '▲', '▼', '←', '→', '⌘'])
 const ARROWS = new Set(['←', '→'])
-const GLYPH_HOME = /ui\/(parts|icons)\.ts$/
+const GLYPH_HOME = /ui\/(parts|icons|components\/badge)\.ts$/
 
 /** الكيانُ والهروبُ يُفَكّان: `&larr;` حرفٌ كما لو كُتب. */
 function decode(text) {
@@ -283,6 +371,43 @@ if (process.argv.includes('--self-test')) {
     process.exit(1)
   }
   console.log('  ✓ self-test: تسعةُ حروفٍ مزروعةٍ تُمسَك بسطورها، والمفتاحُ والشرحُ وفاصلُ المسار تمرّ')
+
+  // ‏والسِّمةُ: خمسٌ مزروعةٌ تردّ، وأربعٌ محسوبةٌ أو متغيّرةٌ تمرّ (D-189)
+  const styled = [
+    '<div class="card" style="margin-top:var(--s-3)">',
+    '<p style="padding:0 var(--s-3); color:red">',
+    '<div class="row" style="gap:var(--s-2)">',
+    '<input style="width:90px">',
+    '<div style="--lines:9; margin:${m}">',
+    '<i style="width:${pct.toFixed(1)}%"></i>',
+    '<span style="left:${px(x)};top:${py(y)}">',
+    '<textarea style="${box}">',
+    '<i style="background:color-mix(in srgb,var(--brand) ${t}%,transparent)">',
+  ].join('\n')
+  const caught = inlineSpacing(styled).map((h) => h.line)
+  if (JSON.stringify(caught) !== JSON.stringify([1, 2, 3, 4, 5])) {
+    console.log(`  ✕ self-test: style="" — ردّ ${JSON.stringify(caught)} والمطلوب [1,2,3,4,5]`)
+    process.exit(1)
+  }
+  console.log('  ✓ self-test: خمسُ سِماتِ مسافةٍ مزروعةٍ تُمسَك، والمحسوبُ من البيان يمرّ')
+
+  // ‏والمحدّدُ الشائخ: الستّةُ التي فاتت إعادةَ التسمية في ٢ب تُمسَك بأسمائها، والسليمُ يمرّ
+  const selectors = [
+    "document.querySelectorAll('#flash .flash, .flash[role=\"alert\"]')",
+    "const vs = [...s.querySelectorAll('.tile .v')]",
+    "page.locator('.card.tile').filter({ has: page.locator('.k', { hasText: /x/ }) })",
+    "const s = `var b=f.querySelector('button.p'); if(el.classList.contains('gone')){}`",
+    "el.closest(`.row-${kind} a[href$=\".png\"]`)",
+    "await page.$$eval('[data-pane] .tile .kv-v, a[title=\"a.b\"]', (e) => e)",
+    "el.matches(':focus-visible'); el.closest('a'); matches(secret, step)",
+  ].join('\n')
+  const named = selectorClasses(selectors).map((h) => `${h.line}:${h.cls}`)
+  const wantNamed = ['1:flash', '1:flash', '2:tile', '2:v', '3:card', '3:tile', '3:k', '4:p', '6:tile', '6:kv-v', '4:gone']
+  if (JSON.stringify(named) !== JSON.stringify(wantNamed)) {
+    console.log(`  ✕ self-test: المحدّد — قرأ ${JSON.stringify(named)} والمطلوب ${JSON.stringify(wantNamed)}`)
+    process.exit(1)
+  }
+  console.log('  ✓ self-test: المحدّدُ في الشجرة وفي سكربتٍ داخل قالب يُقرأ، وقيمُ السِّمات و${…} لا تُعدّ أصنافًا')
   process.exit(0)
 }
 
@@ -304,13 +429,13 @@ for (const file of walk(ROUTES)) {
  */
 const handChips = []
 for (const file of walk(ROUTES)) {
-  if (file.endsWith('/parts.ts') || file === STYLES) continue
+  if (file.endsWith('/parts.ts') || file.endsWith('/components/badge.ts') || file === STYLES) continue
   const code = readFileSync(file, 'utf8')
   const n = (code.match(/<span class="(?:g|st-ic)">/g) ?? []).length
   if (n > 0) handChips.push([file.slice(ROOT.length), n])
 }
 console.log('\n═══ رقاقةُ حالٍ مكتوبةٌ يدًا ═══\n')
-if (handChips.length === 0) console.log('  ✓ كلُّ رقاقةٍ من status()')
+if (handChips.length === 0) console.log('  ✓ كلُّ شارةٍ من statusBadge()')
 for (const [where, n] of handChips) console.log(`  ✕ ${where}  ×${n}`)
 
 /* ── حرفٌ من خطّ النظام في الوسم (D-167) — والشرحُ عند rawGlyphs ─── */
@@ -330,7 +455,20 @@ const proseTotal = [...proseArrows.values()].reduce((a, b) => a + b, 0)
 console.log(`\n  · سهمٌ في نصٍّ لا يلاصق وسمًا (يُطبَع ولا يردّ): ${proseTotal} في ${proseArrows.size} ملفّات`)
 for (const [where, n] of proseArrows) console.log(`      ${where}  ×${n}`)
 
-let bad = handChips.length + glyphHits.length
+/* ── سِمةُ «style» للمسافة (D-189) — والشرحُ عند inlineSpacing ─── */
+const inlineHits = []
+let inlineKept = 0
+for (const file of walk(ROUTES)) {
+  if (file === STYLES) continue
+  const code = readFileSync(file, 'utf8')
+  inlineKept += (code.match(/\sstyle="[^"]+"/g) ?? []).length
+  for (const h of inlineSpacing(code)) inlineHits.push(`${file.slice(ROOT.length)}:${h.line}  ${h.why} — style="${h.style}"`)
+}
+console.log('\n═══ سِمةُ style="" للمسافة ═══\n')
+if (inlineHits.length === 0) console.log(`  ✓ لا هامشَ ولا حشوَ ولا فجوةَ ولا عرضَ بالبكسل في سِمة (${inlineKept - inlineHits.length} سِمةً محسوبةً من البيان باقية)`)
+for (const h of inlineHits) console.log(`  ✕ ${h}`)
+
+let bad = handChips.length + glyphHits.length + inlineHits.length
 console.log('\n═══ صنفٌ يُكتب ولا يُرسَم ═══\n')
 for (const [cls, files] of [...used].sort()) {
   if (defined.has(cls)) continue
@@ -339,6 +477,40 @@ for (const [cls, files] of [...used].sort()) {
   console.log(`  ✕ .${cls}  ←  ${[...files].join(' · ')}`)
 }
 if (bad === 0) console.log('  ✓ كلُّ صنفٍ في الوسم له قاعدة')
+
+/* ── محدّدٌ يسمّي صنفًا لا قاعدةَ له (مراجعةُ D-189) — والشرحُ عند selectorClasses ─── */
+const SCRIPTS = new URL('../scripts/', import.meta.url).pathname
+const SELF = new URL(import.meta.url).pathname
+function walkCode(dir) {
+  const out = []
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) out.push(...walkCode(path))
+    else if (/\.(ts|mjs|js)$/.test(name)) out.push(path)
+  }
+  return out
+}
+const staleSel = []
+const selExemptSeen = new Set()
+let selCount = 0
+// ‏والمدقّقُ نفسُه لا يُقرأ: عيوبُه المزروعةُ في «--self-test» محدّداتٌ شائخةٌ قصدًا
+for (const file of [...walkCode(ROOT), ...walkCode(SCRIPTS)]) {
+  if (file === SELF) continue
+  for (const h of selectorClasses(readFileSync(file, 'utf8'))) {
+    selCount += 1
+    if (defined.has(h.cls) || HOOKS.has(h.cls)) continue
+    if (SELECTOR_EXEMPT.has(h.cls)) { selExemptSeen.add(h.cls); continue }
+    staleSel.push(`${file.slice(file.startsWith(SCRIPTS) ? SCRIPTS.length - 'scripts/'.length : ROOT.length - 'src/'.length)}:${h.line}  .${h.cls}  ←  «${h.sel}»`)
+  }
+}
+console.log('\n═══ محدّدٌ في نصٍّ برمجيٍّ يسمّي صنفًا لا قاعدةَ له ═══\n')
+if (staleSel.length === 0) console.log(`  ✓ كلُّ صنفٍ في ${selCount} محدّدًا (src/ وscripts/) له قاعدةٌ أو مقبضٌ مُعفًى`)
+for (const h of staleSel) console.log(`  ✕ ${h}`)
+for (const [cls, why] of SELECTOR_EXEMPT) {
+  const alive = selExemptSeen.has(cls)
+  console.log(`  ${alive ? '·' : '✕'} .${cls} — ${why}${alive ? '' : ' — **ولم يعد يُبحَث عنه: احذفه من القائمة**'}`)
+}
+const selStale = staleSel.length + [...SELECTOR_EXEMPT.keys()].filter((c) => !selExemptSeen.has(c)).length
 
 console.log('\n═══ مقبضٌ مُعفًى بسببه ═══\n')
 let stale = 0
@@ -380,9 +552,57 @@ for (let i = 0; i < css.length; i++) {
   }
 }
 const twice = [...seen].filter(([, n]) => n > 1)
+
+/**
+ * ── لا صنفَ من حرفٍ واحد، وتعدادُ الصيغ (خطّة التصميم 7 · D-189) ───────────────────────
+ *
+ * «.p» و«.g» و«.d» للأزرار، و«.k» و«.v» و«.n» للصق والقيمة والملحوظة، و«.i» و«.t» و«.f» و«.x»
+ * و«.y» — **أحدَ عشرَ صنفًا من حرفٍ واحد**، و«.g» منها اصطدم مرّةً برمز الحال (D-183). وصارت
+ * عائلاتٍ بادئتُها اسمُ مكوّنها، **فحرفٌ واحدٌ يُكتب في الورقة أو الوسم يردّ**.
+ *
+ * والتعدادُ سقفٌ لا هدف: سطوحٌ بقاعدتها (أرضٌ ونصفُ قطر البطاقة) وحبوبٌ بنصّ لصيقة. العُدّةُ
+ * تعرّف أربعَ صيغ بطاقةٍ وشارتين (`components/`)، **والأقسامُ تُنقَل إليها في ٢ج** فينزل السقفُ
+ * حتّى يبلغهما — ورقمٌ يزيد على سقفه يردّ، ورقمٌ ينقص يُخفَض سقفُه في الطلب نفسِه.
+ */
+const oneLetter = [...new Set([...defined, ...used.keys()])].filter((c) => c.length === 1).sort()
+const CARD_MAX = 29
+const BADGE_MAX = 6
+const surfaces = new Set()
+const pills = new Set()
+{
+  let d = 0
+  let start = 0
+  for (let i = 0; i < css.length; i++) {
+    if (css[i] === '{') { if (d === 0) start = i; d += 1 }
+    else if (css[i] === '}') {
+      d -= 1
+      if (d !== 0) continue
+      const head = css.slice(css.lastIndexOf('}', start - 1) + 1, start).trim().replace(/\s+/g, ' ')
+      if (head.startsWith('@')) continue
+      const decl = Object.fromEntries(css.slice(start + 1, i).split(';').map((x) => x.split(':'))
+        .filter((x) => x.length > 1).map(([k, ...v]) => [k.trim(), v.join(':').trim()]))
+      const bg = decl.background ?? decl['background-color']
+      if (decl['border-radius'] === 'var(--r-card)' && bg !== undefined && !/transparent|none/.test(bg)) surfaces.add(head)
+      if (decl['border-radius'] === 'var(--r-pill)' && /--t-(caption|code|small)/.test(decl['font-size'] ?? '')) pills.add(head)
+    }
+  }
+}
+const census = [
+  ...(surfaces.size > CARD_MAX ? [`سطوحٌ بقاعدتها ${surfaces.size} — والسقفُ ${CARD_MAX}`] : []),
+  ...(pills.size > BADGE_MAX ? [`حبوبٌ بقاعدتها ${pills.size} — والسقفُ ${BADGE_MAX}`] : []),
+]
 console.log('═══ محدّدٌ يُعلَن مرّتين ═══\n')
 if (twice.length === 0) console.log('  ✓ كلُّ محدّدٍ في المستوى الأعلى يُعلَن مرّةً')
 for (const [sel, n] of twice) console.log(`  ✕ ${sel}  —  ${n} مرّات`)
 
-console.log(`\nالمجموع: ${bad} صنفا بلا قاعدة · ${stale} إعفاءً شاخ · ${twice.length} محدّدًا مكرّرًا\n`)
-process.exit(bad + stale + twice.length === 0 ? 0 : 1)
+console.log('\n═══ صنفٌ من حرفٍ واحد ═══\n')
+if (oneLetter.length === 0) console.log('  ✓ لا صنفَ من حرفٍ واحد في الورقة ولا في الوسم')
+for (const c of oneLetter) console.log(`  ✕ .${c}`)
+
+console.log('\n═══ تعدادُ الصيغ (سقفٌ يمنع الرجوع) ═══\n')
+console.log(`  ${surfaces.size > CARD_MAX ? '✕' : '·'} سطوحٌ بقاعدتها: ${surfaces.size} من سقف ${CARD_MAX} — والعُدّةُ أربعُ صيغ (card · card-interactive · card-inset · card-alert)`)
+console.log(`  ${pills.size > BADGE_MAX ? '✕' : '·'} حبوبٌ بقاعدتها: ${pills.size} من سقف ${BADGE_MAX} — ${[...pills].join(' · ')}`)
+
+const fails = bad + stale + twice.length + oneLetter.length + census.length + selStale
+console.log(`\nالمجموع: ${bad} صنفا بلا قاعدة · ${stale} إعفاءً شاخ · ${twice.length} محدّدًا مكرّرًا · ${oneLetter.length} من حرفٍ واحد · ${census.length} فوق سقفه · ${selStale} محدّدًا شائخًا\n`)
+process.exit(fails === 0 ? 0 : 1)

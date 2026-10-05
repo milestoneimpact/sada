@@ -16,10 +16,11 @@ import { tasksScreen } from './tasksView'
 import { commandMore, commandTrigger } from './command'
 import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
-import { loginPage } from '../panelView'
+import { loginPage, worthCell } from '../panelView'
 import { STYLE } from './styles'
 import { sheet, type Decl, type Sheet } from '../../test/css'
-import { bar, fileName, glyph, pathArrows, status } from './parts'
+import { bar, fileName, glyph, pathArrows } from './parts'
+import { statusBadge } from './components/badge'
 import { refusedBody } from './oauthResult'
 import { backNav, ICON_BYTES, shell, soloPage } from './shell'
 import { soloNav } from './rail'
@@ -110,8 +111,8 @@ describe('زرّا التوصية لهما درجة', () => {
         reason: 'لأنّه الأوّل', createdAt: '2026-09-05 09:00:00',
       }],
     })
-    expect(html).toContain('value="accepted" class="p"')
-    expect(html).toContain('value="rejected" class="g"')
+    expect(html).toContain('value="accepted" class="btn btn-primary"')
+    expect(html).toContain('value="rejected" class="btn btn-secondary"')
     expect(html).not.toContain('ghost')
   })
 })
@@ -369,7 +370,7 @@ describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
 describe('ما مشاه Tab (D-125)', () => {
   it('حلقةُ محرّر المسوّدة ظلٌّ مقيسٌ لا لونٌ في مكان ظلّ', () => {
     expect(css.rule('.draft-text:focus')).toMatchObject({
-      outline: 'none', 'border-color': 'var(--focus)', 'box-shadow': '0 0 0 3px var(--ring)',
+      outline: 'none', 'border-color': 'var(--focus)', 'box-shadow': '0 0 0 var(--ring-w) var(--ring)',
     })
     expect(found((d) => d.prop === 'box-shadow' && d.value === 'var(--ring)')).toEqual([])
   })
@@ -405,8 +406,8 @@ describe('من المحطّة إلى موضعها (D-126)', () => {
       ],
     }, new Date('2026-09-06T09:00:00Z'))
     // ‏والسهمُ مرسومٌ يشير إلى نهاية السطر، لا حرفٌ من خطّ النظام (D-167)
-    expect(html).toContain(`<a class="btn g sm stop-go" href="/panel#sources">المصادر${ICON.go}</a>`)
-    expect(html).toContain(`<a class="btn g sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel#sources">المصادر${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
     expect(html).not.toContain('\u2190')
   })
 })
@@ -571,7 +572,7 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
 
   it('رُكّب: «على الصورة» والعنوانُ، و alt يحمله', () => {
     const html = card('', 'أثرٌ يُقاس')
-    expect(html).toContain(status('ok', '●', 'على الصورة'))
+    expect(html).toContain(statusBadge('ok', '●', 'على الصورة'))
     expect(html).toContain('«أثرٌ يُقاس»')
     expect(html).toContain('alt="صورةٌ مولَّدة وعليها: أثرٌ يُقاس"')
     expect(html).not.toContain('بلا نصٍّ فوقها')
@@ -579,7 +580,7 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
 
   it('سقط: «بلا نصٍّ فوقها» تحذيرًا، والسببُ مؤرَّخًا، والعنوانُ المقترح', () => {
     const html = card(NO_KEY, 'أثرٌ يُقاس')
-    expect(html).toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(html).toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
     expect(html).toContain(`عند التوليد: ${NO_KEY}`)
     expect(html).toContain('والعنوانُ المقترح «أثرٌ يُقاس»')
     // وما لم يُرسَم لا يُقال في alt إنّه عليها
@@ -593,8 +594,8 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
   it('أُطفئ التركيب: رقاقةٌ ساكنة لا تحذير — ولو سبقه سقوطُ الموجز', () => {
     for (const note of [OFF, `لا مزوّدَ للكتابة (writer)؛ ${OFF}`]) {
       const html = card(note, null)
-      expect(html).toContain(status('idle', '○', 'بلا نصٍّ فوقها'))
-      expect(html).not.toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+      expect(html).toContain(statusBadge('idle', '○', 'بلا نصٍّ فوقها'))
+      expect(html).not.toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
     }
   })
 
@@ -607,13 +608,13 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
     const noise = `تعذّر الموجزُ البصريّ: anthropic: 400 ${'{"type":"error"} '.repeat(30)}`
     const off = noteOf({ brief: null, detail: noise }, { reason: OFF })
     const quiet = card(off, 'أثرٌ يُقاس')
-    expect(quiet).toContain(status('idle', '○', 'بلا نصٍّ فوقها'))
-    expect(quiet).not.toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(quiet).toContain(statusBadge('idle', '○', 'بلا نصٍّ فوقها'))
+    expect(quiet).not.toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
     expect(quiet).toContain(`؛ ${OFF}`)
 
     const missing = noteOf({ brief: null, detail: noise }, { reason: NO_KEY })
     const loud = card(missing, 'أثرٌ يُقاس')
-    expect(loud).toContain(status('warn', '!', 'بلا نصٍّ فوقها'))
+    expect(loud).toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
     expect(loud).toContain(`؛ ${NO_KEY}`)
   })
 
@@ -665,9 +666,9 @@ describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
  * والشريطُ وعلامتُه تحته لونٌ واحد.
  */
 describe('شريطُ المقدار (D-134)', () => {
-  it('السقفُ المبلوغ أحمرُ f، والاكتمالُ done — وكلاهما بنصّ', () => {
+  it('السقفُ المبلوغ أحمرُ full، والاكتمالُ done — وكلاهما بنصّ', () => {
     const capped = bar(10, 10)
-    expect(capped).toContain('<i class="f"')
+    expect(capped).toContain('<i class="full"')
     expect(capped).toContain('بلغ السقف')
     expect(capped).not.toContain('done')
 
@@ -709,7 +710,7 @@ describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
 describe('بطاقةُ الخطوات (D-137)', () => {
   it('الخطواتُ ثمّ جانبٌ فيه البابُ و«إن نجح»', () => {
     const html = refusedBody({ platform: 'linkedin', reason: 'unauthorized_scope_error', requested: scopeSet('linkedin'), identityRetry: true })
-    const card = html.indexOf('<div class="card guide"')
+    const card = html.indexOf('<div class="card guide')
     const steps = html.indexOf('<ol class="steps">', card)
     const aside = html.indexOf('<div class="guide-aside">', steps)
     const outcome = html.indexOf('<div class="outcome">', aside)
@@ -728,9 +729,9 @@ describe('الطبعةُ الثانية (D-139)', () => {
     expect(css.rule(':root')['--t-4xl']).toBeUndefined()
     expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBeUndefined()
     expect(css.rule('.page-head h1')).toMatchObject({ 'font-size': 'var(--t-h1)', 'line-height': 'var(--lh-h1)', 'font-weight': '600' })
-    expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({ 'font-size': 'var(--t-display)', 'line-height': 'var(--lh-display)' })
+    expect(css.rule('.grid>.tile:first-child .kv-v')).toMatchObject({ 'font-size': 'var(--t-display)', 'line-height': 'var(--lh-display)' })
     // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148، وعلى أرض الصفحة منذ D-187
-    expect(css.rule('.rail')).toMatchObject({ background: 'var(--bg)', 'border-inline-start': '1px solid var(--line)' })
+    expect(css.rule('.rail')).toMatchObject({ background: 'var(--bg)', 'border-inline-start': 'var(--bd)' })
     expect(css.rule('.rail')['background-image']).toBeUndefined()
     expect(found((d) => d.value.includes('linear-gradient(') && d.selectors.some((x) => x.startsWith('.rail')))).toEqual([])
   })
@@ -758,9 +759,9 @@ describe('الطبعةُ الثالثة (D-143)', () => {
   it('شريطُ المؤشّرات سطحٌ واحد، والرقمُ رقيق، والفعلُ الهادئ يبقى هدفَ لمس', () => {
     expect(css.rule('.grid.tiles')).toMatchObject({ gap: '1px', background: 'var(--line)' })
     expect(css.rule('.grid.tiles>.tile')).toMatchObject({ border: '0', 'border-radius': '0', 'box-shadow': 'none' })
-    expect(css.rule('.tile .v')).toMatchObject({ 'font-size': 'var(--t-h1)', 'font-weight': '400' })
+    expect(css.rule('.tile .kv-v')).toMatchObject({ 'font-size': 'var(--t-h1)', 'font-weight': '400' })
     for (const s of ['.todo>li>a.btn', '.todo>li>form .btn']) {
-      expect(css.rule(s), s).toMatchObject({ background: 'transparent', 'min-width': '44px' })
+      expect(css.rule(s), s).toMatchObject({ background: 'transparent', 'min-width': 'var(--tap)' })
     }
   })
 })
@@ -793,16 +794,18 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
       expect(new Set(css.decls().filter((d) => d.prop === prop).map((d) => d.value)), prop).toEqual(new Set([value]))
     }
     expect(css.rule('.glyph')).toMatchObject({ background: 'var(--mark-bg)', color: 'var(--mark-fg)' })
-    expect(css.rule('nav.tabs a[aria-current=page]::before')).toMatchObject({ width: '2px', background: 'var(--au)' })
+    expect(css.rule('nav.tabs a[aria-current=page]::before')).toMatchObject({ width: 'var(--stroke)', background: 'var(--au)' })
   })
   it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ بحدٍّ وظلٍّ خفيف، والتنبيهاتُ سطحٌ بخيط', () => {
-    expect(css.rule('.p')).toMatchObject({ background: 'var(--brand)', color: 'var(--on-brand)' })
+    expect(css.rule('.btn-primary')).toMatchObject({ background: 'var(--brand)', color: 'var(--on-brand)' })
     // ‏مراجعةُ D-144 «بطاقةٌ مسطّحة» (D-187): الحدُّ أوضح والظلُّ الأوّل يسنده
     expect(css.rule('.card')).toMatchObject({
-      background: 'var(--surface)', border: '1px solid var(--line)', 'box-shadow': 'var(--sh-1)', padding: 'var(--pad-card)',
+      background: 'var(--surface)', border: 'var(--bd)', 'box-shadow': 'var(--sh-1)', padding: 'var(--pad-card)',
     })
-    expect(css.rule('.flash')).toMatchObject({ background: 'var(--surface)', 'border-inline-start': '3px solid var(--line)' })
-    expect(css.rule('.flash.ok')['border-inline-start-color']).toBe('var(--ok)')
+    // ‏والإشعارُ صيغةُ «card-alert» (D-189): حافّةٌ ‏٤px بلون الحال، والسطحُ والحدُّ والظلُّ الأوّل
+    expect(css.rule('.toast-note')).toMatchObject({ background: 'var(--surface)', 'border-inline-start': 'var(--s-1) solid var(--line)' })
+    expect(css.rule('.toast-note.ok')['border-inline-start-color']).toBe('var(--ok)')
+    expect(css.rule('.card-alert')['border-inline-start']).toBe('var(--s-1) solid var(--ok)')
   })
   it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
     expect(ICON_BYTES).toContain('c9a962')
@@ -825,15 +828,15 @@ describe('تصفيةُ الطبعات (D-148)', () => {
   it('البطاقةُ والرافدةُ والمؤشّرُ الأوّل كلٌّ بقاعدةٍ واحدة تحمل آخرَ قيمة', () => {
     // ‏تعريفُ audit_classes نفسُه: القاعدةُ في المستوى الأعلى محدّدُها كاملًا هذا
     const count = (sel: string): number => css.rules().filter((r) => r.at === '' && r.selectors.join(',') === sel).length
-    for (const sel of ['.card', '.rail', '.p', '.flash', '.tile .v', '.grid>.tile:first-child .v', '.rail-head', 'nav.tabs a[aria-current=page]']) {
+    for (const sel of ['.card', '.rail', '.btn-primary', '.toast-note', '.tile .kv-v', '.grid>.tile:first-child .kv-v', '.rail-head', 'nav.tabs a[aria-current=page]']) {
       expect(count(sel), sel).toBe(1)
     }
-    expect(css.rule('.grid>.tile:first-child .v')).toMatchObject({
+    expect(css.rule('.grid>.tile:first-child .kv-v')).toMatchObject({
       'font-size': 'var(--t-display)', color: 'var(--au)', 'font-weight': '400',
     })
     // ‏والتضييقُ بنسبةٍ على الرقم البطل وحدَه (‏-.01em، خطّة التصميم 4.3)، لا ببكسلٍ لكلّ رتبة
-    expect(css.rule('.tile .v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '0' })
-    expect(css.rule('.grid>.tile:first-child .v')['letter-spacing']).toBe('-.01em')
+    expect(css.rule('.tile .kv-v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '0' })
+    expect(css.rule('.grid>.tile:first-child .kv-v')['letter-spacing']).toBe('-.01em')
     expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-5)')
     expect(css.rule('nav.tabs a[aria-current=page]')).toMatchObject({
       background: 'var(--selected)', color: 'var(--ink)', position: 'relative',
@@ -854,7 +857,7 @@ describe('ما وراء المقاييس (D-149)', () => {
     // ‏وخيطُ القسم النحاسيُّ سقط مع ميزانيّة النحاس (D-187): لا قاعدةَ له في أيّ سياق
     expect(css.where('.sec::after')).toEqual([])
     expect(css.rule('.cmdk-o[aria-selected="true"]')).toMatchObject({
-      background: 'var(--surface-2)', 'box-shadow': 'inset -3px 0 0 var(--brand)',
+      background: 'var(--surface-2)', 'box-shadow': 'inset calc(-1 * var(--ring-w)) 0 0 var(--brand)',
     })
     expect(css.where('.cmdk-g')).toContain('')
     for (const at of css.where('.cmdk-g')) expect(css.rule('.cmdk-g', at)['letter-spacing'], at).toBeUndefined()
@@ -864,7 +867,7 @@ describe('ما وراء المقاييس (D-149)', () => {
     expect(backNav('/panel#channels', 'القنوات')).not.toMatch(/[\u2190\u2192]/)
   })
   it('الوصول: حشوُ التمرير تحت الشريط، والرابطُ الهادئ بخيطٍ لا بلونٍ وحدَه، وحقلُ الأوامر يقول «هنا»', () => {
-    expect(css.rule('html')['scroll-padding-top']).toBe('calc(64px + var(--s-3))')
+    expect(css.rule('html')['scroll-padding-top']).toBe('calc(var(--topbar) + var(--s-3))')
     // ‏والخطُّ تحت الرابط الهادئ بلونه لا بالنحاس (D-187): لا نحاسَ تحت رابطٍ في أيّ قاعدة
     for (const s of ['.todo>li>a.btn', '.todo>li>form .btn']) {
       expect(css.rule(s), s).toMatchObject({ 'text-decoration': 'underline', color: 'var(--link)' })
@@ -872,7 +875,7 @@ describe('ما وراء المقاييس (D-149)', () => {
     }
     expect(found((d) => d.prop.startsWith('text-decoration') && d.value.includes('var(--au)'))).toEqual([])
     expect(css.rule('.pv th a')['text-decoration']).toBe('underline')
-    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 -2px 0 var(--focus)')
+    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 calc(-1 * var(--stroke)) 0 var(--focus)')
     expect(css.where('.busy-note')).toContain('')
   })
   it('الرموز: لا زمرّدَ في الوهج بصيغة rgba، والتاريخُ في مفتاح الرسم معزول، والرقمُ المحلّيُّ غربيٌّ في كلّ ICU', () => {
@@ -892,9 +895,11 @@ describe('شريطُ العودة (D-140)', () => {
     const back = html.indexOf(`${ICON.back}القنوات`)
     expect(home).toBeGreaterThan(0)
     expect(back).toBeGreaterThan(home)
-    expect(html).toContain('<span class="glyph sm">')
+    expect(html).toContain('<span class="glyph glyph-sm">')
     for (const s of ['nav.back .home', 'nav.back .home .glyph']) expect(css.rule(s).flex, s).toBe('none')
-    expect(css.rule('.glyph.sm svg')).toMatchObject({ width: '17px', height: '17px' })
+    // ‏والعلامةُ الصغيرةُ مربّعٌ من السلّم (‏٣٢)، ورسمُها نسبةٌ منه كالكبيرة (D-189)
+    expect(css.rule('.glyph-sm')).toMatchObject({ width: 'var(--s-8)', height: 'var(--s-8)' })
+    expect(css.rule('.glyph svg')).toMatchObject({ width: '56%', height: '56%' })
   })
 })
 
@@ -906,7 +911,7 @@ describe('شريطُ العودة (D-140)', () => {
 describe('العيّناتُ لا تنسخ الإطار (D-140)', () => {
   it.each(['render_screens.ts', 'render_panel.ts', 'render_legal.ts'])('%s بلا وسمِ إطارٍ مكتوبٍ بيد', (name) => {
     const src = readFileSync(new URL(`../../../scripts/${name}`, import.meta.url), 'utf8')
-    for (const tag of ['<nav class="back"', 'class="rail"', 'class="topbar"', 'class="theme"', 'class="rail-head"']) {
+    for (const tag of ['<nav class="back"', 'class="rail"', 'class="topbar"', 'class="theme"', 'class="seg"', 'class="rail-head"']) {
       expect(src, `${name} يكتب ${tag} بدل استدعاء مصدره`).not.toContain(tag)
     }
   })
@@ -962,7 +967,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
 describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
   // ‏و«↓» معها منذ D-185: سهمُ الفرق عن الأمس سهمٌ لا مثلّث («▲» يعني «ساقط» في الحال)
   it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '↓', '!'])('الحرفُ %s يُرسَم بمواصفة icon() بلون النصّ', (g) => {
-    const html = status('ok', g, 'نصّ')
+    const html = statusBadge('ok', g, 'نصّ')
     // ‏شبكةُ ‏٢٤ وثخانةُ ‏١٫٨ بلا تعبئة — مواصفةُ الأيقونات نفسُها (D-103 · D-185)
     expect(html).toContain('<span class="st ok"><span class="st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"')
     expect(html).not.toContain(g)
@@ -979,8 +984,8 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
   })
 
   it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
-    expect(status('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="st-ic">&lt;</span>x</span>')
-    expect(status('', '●', 'x')).toContain('<span class="st"><span class="st-ic"><svg')
+    expect(statusBadge('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="st-ic">&lt;</span>x</span>')
+    expect(statusBadge('', '●', 'x')).toContain('<span class="st"><span class="st-ic"><svg')
   })
 })
 
@@ -1028,10 +1033,10 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(info)
     expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
     expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
-    expect(box).toContain(status('ok', '●', 'المتصفّح', 'title="تامّة — يصوّر الصفحة"'))
-    expect(box).toContain(status('ok', '●', 'الصياغة', 'title="تامّة — نموذجُ الكتابة يستخرج المحتوى"'))
-    expect(box).toContain(status('ok', '●', 'الحدود', 'title="تامّة — مفتوحةٌ اليوم"'))
-    expect(box).toContain(status('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
+    expect(box).toContain(statusBadge('ok', '●', 'المتصفّح', 'title="تامّة — يصوّر الصفحة"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'title="تامّة — نموذجُ الكتابة يستخرج المحتوى"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'title="تامّة — مفتوحةٌ اليوم"'))
+    expect(box).toContain(statusBadge('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
     expect(box).toContain('<b>إنفوجرافيك من نصّ المنشور</b>')
     // ‏والزرّان يرسلان نمطَهما — والدالّةُ تأخذ الإنفوجرافيك حين يغيب
     expect(box).toContain('<input type="hidden" name="style" value="infographic">')
@@ -1044,9 +1049,9 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
       infographic: infographicReadiness({ blocker: null, browser: { key: false, account: true }, briefReady: true }),
     }
     const html = section([draft('d1')], { mediaReady: noBrowser })
-    expect(html).toContain('<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(html).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
     expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
-    expect(html).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
     // ‏ونموذجُ الكتابة الساقطُ ينتظرك ولا يُعطِّل: المحتوى من النصّ مباشرةً
     const noWriter = {
@@ -1054,14 +1059,14 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
       infographic: infographicReadiness({ blocker: null, browser: { key: true, account: true }, briefReady: false }),
     }
     const plain = section([draft('d1')], { mediaReady: noWriter })
-    expect(plain).toContain('<button class="p sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(plain).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
     expect(plain).toContain('<span class="ago">المحتوى من النصّ مباشرةً</span>')
   })
 
   it('وسطرُ المقطع بعد «حرّكها فيديو» — ولا زرَّ ولا سطرَ حين يوجد مقطع', () => {
     const noClip = section([draft('d1')], { media: [picture('d1')] })
     expect(noClip).toContain('حرّكها فيديو')
-    expect(noClip.indexOf(status('ok', '●', 'المفتاح', 'title="تامّة — من أسرار Worker"')))
+    expect(noClip.indexOf(statusBadge('ok', '●', 'المفتاح', 'title="تامّة — من أسرار Worker"')))
       .toBeGreaterThan(noClip.indexOf('حرّكها فيديو'))
 
     const withClip = section([draft('d1')], { media: [picture('d1'), picture('d1', 'video/mp4')] })
@@ -1091,19 +1096,19 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
       video: videoReadiness({ face: 'none', blocker: null, clips: videoCapGate(0, 2) }),
     }
     const empty = section([draft('d1')], { mediaReady: blocked })
-    expect(empty).toContain('<button class="p sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
-    expect(empty).toContain('<button class="g sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
+    expect(empty).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
     expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
 
     const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
-    expect(pictured).toContain('<button class="g sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(pictured).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
     expect(pictured).toContain('<span class="ago">لا مفتاحَ لـ Workers AI</span>')
 
     // وما ينتظرك لا يعطّل: الصورةُ تخرج بلا عنوان، والزرُّ يعمل
     const waiting = section([draft('d1')], {
       mediaReady: withImage(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true })),
     })
-    expect(waiting).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
+    expect(waiting).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
     expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
   })
 
@@ -1114,16 +1119,16 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
   it('وسقفُ المقاطع يُعطِّل «حرّكها فيديو» وسببُه بجانبه — وتحته يقول كم بقي', () => {
     const full = { ...READY, video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(2, 2) }) }
     const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
-    expect(html).toContain('<button class="g sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
     expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
     // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
     const other = section([draft('d2')], { mediaReady: full })
-    expect(other).toContain('<button class="p sm" type="submit">ولّد إنفوجرافيك</button>')
-    expect(other).toContain('<button class="g sm" type="submit">ولّد صورةً فنّيّة</button>')
+    expect(other).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(other).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
     const under = section([draft('d1')], { media: [picture('d1')] })
-    expect(under).toContain('<button class="g sm" type="submit">حرّكها فيديو</button>')
-    expect(under).toContain(status('ok', '●', 'المقاطع', 'title="تامّة — بقي 2 من 2 اليوم"'))
+    expect(under).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
+    expect(under).toContain(statusBadge('ok', '●', 'المقاطع', 'title="تامّة — بقي 2 من 2 اليوم"'))
   })
 
   it('واسمُ المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
@@ -1144,8 +1149,8 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
   })
 
   it('وسببُ السطر لا يمتدّ مئتي بكسل: قاعدةُ «بلا صورة» على ابنها المباشر وحده', () => {
-    expect(css.rule('.pic.none > .ago').flex).toBe('1 1 200px')
-    expect(css.rule('.art-row > .ago').flex).toBe('1 1 200px')
+    expect(css.rule('.pic.none > .ago').flex).toBe('1 1 12.5rem')
+    expect(css.rule('.art-row > .ago').flex).toBe('1 1 12.5rem')
     expect(css.rules().some((r) => r.selectors.includes('.pic.none .ago'))).toBe(false)
     expect(Object.keys(css.rule('.hint.ready')).length).toBeGreaterThan(0)
     // والورقةُ لا تلوّن «a» عامّةً — فرابطُ الإصلاح بلا قاعدته يخرج أزرقَ المتصفّح (رُئي في اللقطة)
@@ -1189,10 +1194,12 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
       'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)', 'font-weight': '600',
     })
     expect(css.rule('nav.tabs .count', bar)).toMatchObject({ 'min-width': 'var(--s-5)', padding: '0 var(--s-1)' })
-    expect(css.rule('nav.tabs .count')).toMatchObject({ 'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)' })
+    // ‏والعددُ مكوّنُ «Count» (D-189): قاعدتُه واحدةٌ يرثها العددُ في الرافدة والشريط والتبويب
+    expect(css.rule('.count')).toMatchObject({ 'font-size': 'var(--t-caption)', 'line-height': 'var(--lh-caption)', 'font-weight': '600' })
     expect(found((d) => d.prop === 'font-size' && /^\d/.test(d.value))).toEqual([])
     // ‏وحشوُ المحتوى فوق الشريط رتبةٌ لا مجموعُ رتبتين (‏٨٠ خارجَ السلّم)
-    expect(css.rule('.content', bar)['padding-bottom']).toMatch(/^calc\(var\(--s-16\) \+ env\(/)
+    expect(css.rule('.content', bar)['padding-bottom']).toBe('calc(var(--s-16) + var(--safe-b))')
+    expect(css.rule(':root')['--safe-b']).toBe('env(safe-area-inset-bottom,0px)')
   })
 
   it('لا حرفَ رمزٍ في «content»: سهمُ الطيّ مثلّثٌ من حدود، والمطويُّ يشير إلى نهاية السطر', () => {
@@ -1216,13 +1223,17 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(commandTrigger()).toContain('<kbd class="kbd">Ctrl K</kbd>')
     expect(commandTrigger()).not.toContain('⌘')
     expect('command' in ICON).toBe(false)
-    for (const s of ['.btn>svg', 'nav.back a>svg', 'a.chip>svg', '.arw svg']) {
-      expect(css.rule(s), s).toMatchObject({ width: '1em', height: '1em' })
-    }
+    // ‏والرمزُ بمقاسٍ من أربعة (خطّة التصميم 3.4 · D-189): ‏٢٠ في الزرّ، و‏١٦ بجوار نصٍّ ‏١٥،
+    // ‏و‏١٤ في الرقاقة — وسهمُ المسار وحدَه بقدر حرف السطر («1em»)
+    expect(css.rule('.btn>svg')).toMatchObject({ width: 'var(--icon-md)', height: 'var(--icon-md)' })
+    expect(css.rule('nav.back a>svg')).toMatchObject({ width: 'var(--icon-sm)', height: 'var(--icon-sm)' })
+    expect(css.rule('a.chip>svg')).toMatchObject({ width: 'var(--icon-xs)', height: 'var(--icon-xs)' })
+    expect(css.rule('.arw svg')).toMatchObject({ width: '1em', height: '1em' })
     expect(css.where('.cmdk-open svg')).toEqual([])
-    expect(css.rule('.cmdk-open>svg')).toMatchObject({ width: '16px', height: '16px' })
+    expect(css.rule('.cmdk-open>svg')).toMatchObject({ width: 'var(--icon-sm)', height: 'var(--icon-sm)' })
     // ‏وأيقونةُ الحال ‏١٤ داخل الشارة وبجوار السطر الصغير (خطّة التصميم 3.4)
-    for (const s of ['.delta .ar svg', '.why .i svg', '.st-ic svg']) expect(css.rule(s), s).toMatchObject({ width: '14px', height: '14px' })
+    for (const s of ['.delta .ar svg', '.why-ic svg', '.st-ic svg']) expect(css.rule(s), s).toMatchObject({ width: 'var(--icon-xs)', height: 'var(--icon-xs)' })
+    expect(css.rule(':root')).toMatchObject({ '--icon-xs': '14px', '--icon-sm': '16px', '--icon-md': '20px', '--icon-lg': '24px' })
   })
 
   it('وسهمُ المسار في الأدلّة مرسومٌ عند العرض لا حرفًا (D-185)', () => {
@@ -1267,7 +1278,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
   })
 
   it('رمزُ الحال باسمه: لا أرضَ له ولا حدّ، ولا يلبس صنفَ الزرّ الشبحيّ', () => {
-    const html = status('warn', '!', 'تنتظرك')
+    const html = statusBadge('warn', '!', 'تنتظرك')
     expect(html).toContain('<span class="st-ic">')
     expect(html).not.toMatch(/class="g"/)
     // ‏ولا قاعدةَ في أيّ سياقٍ تعطي الرمزَ أرضًا أو حدًّا أو لونًا غيرَ لون حبّته
@@ -1358,10 +1369,11 @@ describe('لا رمزَ خارج زوج Plex في نصٍّ يُكتب بعد ا�
 describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا يُفيض الخطّة (مراجعة ر-0 ور-5)', () => {
   it('في الجوّال يطفو الإشعارُ تحت الشريط العلويّ لا حيث يلتصق صفُّ البتّ، وفي العريض في الزاوية', () => {
     const phone = css.rule('.toast')
-    expect(phone.top).toBe('calc(64px + var(--s-3))')
+    expect(phone.top).toBe('calc(var(--topbar) + var(--s-3))')
     expect(phone.bottom).toBeUndefined()
-    // ‏و64px ارتفاعُ الشريط العلويّ نفسُه؛ وصفُّ البتّ يلتصق بالأسفل
-    expect(css.rule('.topbar')['min-height']).toBe('64px')
+    // ‏و«--topbar» ارتفاعُ الشريط العلويّ نفسُه (‏٦٤)؛ وصفُّ البتّ يلتصق بالأسفل
+    expect(css.rule('.topbar')['min-height']).toBe('var(--topbar)')
+    expect(css.rule(':root')['--topbar']).toBe('64px')
     const act = css.where('.draft-foot.act')
     expect(act.length).toBeGreaterThan(0)
     for (const at of act) expect(css.rule('.draft-foot.act', at).bottom ?? '', at).toContain('var(--s-16)')
@@ -1404,22 +1416,26 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
   })
 
   it('الحدُّ الوظيفيُّ للحقل والزرّ الثانويّ، والتركيزُ بحبر الرابط', () => {
-    expect(css.rule('select').border).toBe('1px solid var(--field)')
-    expect(css.rule('.g')['border-color']).toBe('var(--field)')
-    expect(css.rule(':focus-visible').outline).toBe('2px solid var(--focus)')
+    expect(css.rule('select').border).toBe('var(--bd-field)')
+    expect(css.rule(':root')['--bd-field']).toBe('1px solid var(--field)')
+    expect(css.rule('.btn-secondary')['border-color']).toBe('var(--field)')
+    expect(css.rule(':focus-visible').outline).toBe('var(--stroke) solid var(--focus)')
     expect(css.rule(':root')['--ring']).toBe('color-mix(in srgb,var(--focus) 25%,transparent)')
     expect(THEME.light['--focus']).toBe('var(--link)')
   })
 
   it('رموزُ التفاعل باسمها: التمريرُ والضغطُ والمحدَّدُ والتحديدُ والستارةُ والحوار', () => {
-    expect(css.rule('.g:hover', '@media(hover:hover)').background).toBe('var(--hover)')
-    expect(css.rule('.g:active:not(:disabled)').background).toBe('var(--press)')
-    expect(css.rule('.p:hover', '@media(hover:hover)').background).toBe('var(--brand-hover)')
-    expect(css.rule('.p:active:not(:disabled)').background).toBe('var(--brand-press)')
+    expect(css.rule('.btn-secondary:hover', '@media(hover:hover)').background).toBe('var(--hover)')
+    expect(css.rule('.btn-secondary:active:not(:disabled)').background).toBe('var(--press)')
+    expect(css.rule('.btn-primary:hover', '@media(hover:hover)').background).toBe('var(--brand-hover)')
+    expect(css.rule('.btn-primary:active:not(:disabled)').background).toBe('var(--brand-press)')
     expect(css.rule('nav.tabs a[aria-current=page]').background).toBe('var(--selected)')
     expect(css.rule('::selection')).toMatchObject({ background: 'var(--selection)', color: 'var(--ink)' })
     expect(css.rule('.cmdk-veil').background).toBe('var(--scrim)')
-    expect(css.rule('.cmdk')).toMatchObject({ background: 'var(--dialog)', border: '1px solid var(--line)', 'box-shadow': 'var(--sh-3)' })
+    expect(css.rule('.cmdk')).toMatchObject({ background: 'var(--dialog)', border: 'var(--bd)', 'box-shadow': 'var(--sh-3)' })
+    // ‏والحوارُ من العُدّة على السطح نفسِه فوق الستارة نفسِها (خطّة التصميم 3.7 و7.9 · D-189)
+    expect(css.rule('.dlg')).toMatchObject({ background: 'var(--dialog)', border: 'var(--bd)', 'box-shadow': 'var(--sh-3)' })
+    expect(css.rule('.dlg::backdrop').background).toBe('var(--scrim)')
     // ‏والستارةُ من الثيم لا ثابتةٌ في الجذر (كانت واحدةً للوضعين، D-105)
     expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(22,24,29,.45)', 'rgba(0,0,0,.65)'])
   })
@@ -1438,9 +1454,11 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
 
   it('نصفُ القطر من القائمة المغلقة، بالدور', () => {
     const r = css.rule(':root')
-    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-pill']]).toEqual(['4px', '8px', '12px', '999px'])
+    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '8px', '12px', '16px', '999px'])
+    // ‏وكلُّ زاويةٍ من القائمة: الورقةُ السفليّة ‏١٦ في زاويتيها العلويّتين وصفرٌ في السفليّتين (D-189)
     const values = new Set(css.decls().filter((d) => d.prop === 'border-radius').map((d) => d.value))
-    expect([...values].filter((v) => !/^(0|50%|var\(--r-(inline|control|card|pill)\))$/.test(v))).toEqual([])
+    expect([...values].filter((v) => !v.split(' ').every((p) => /^(0|50%|var\(--r-(inline|control|card|sheet|pill)\))$/.test(p)))).toEqual([])
+    expect(css.rule('.dlg.sheet', '@media(max-width:599px)')['border-radius']).toBe('var(--r-sheet) var(--r-sheet) 0 0')
     expect(css.rule('button')['border-radius']).toBe('var(--r-control)')
     expect(css.rule('.card')['border-radius']).toBe('var(--r-card)')
     expect(css.rule('.mono')['border-radius']).toBe('var(--r-inline)')
@@ -1468,7 +1486,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(copper).toEqual([
       '.glyph{color:var(--mark-fg)}',
       'nav.tabs a[aria-current=page]::before{background:var(--au)}',
-      '.grid>.tile:first-child .v{color:var(--au)}',
+      '.grid>.tile:first-child .kv-v{color:var(--au)}',
     ])
     // ‏والعلامةُ مرّةً في الشاشة: حيث الرافدةُ ظاهرةٌ يغيب بابُ اللوحة من شريط العودة
     expect(css.rule('.app nav.back .home', `@media${atLeast('md')}`).display).toBe('none')
@@ -1564,5 +1582,54 @@ describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
     for (const s of ['.np-row', '.np-when', '.np-under']) expect(css.where(s), s).toEqual(['', narrow])
     // ‏والحدُّ يسع ما لا ينكمش: الوقتُ ‏8.5rem والإطارُ ‏555 وفجوتان ‏20 وأعرضُ فعلٍ مقيس ‏174
     expect(CQ.npRow).toBeGreaterThanOrEqual(136 + 555 + 2 * 20 + 174)
+  })
+})
+
+describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
+  /**
+   * **ومقياسُ الاستحقاق بعرض درجته**: صنفُ التخطيط «.fill» (حقلٌ يأخذ ما بقي من صفّه) حمل
+   * «min-width:min(12em,100%)!important» واسمَ عنصر المقياس نفسَه، فغلب عرضَ الدرجة: ‏0.86 و0.61
+   * ممتلئتان على ‏1440، و0.61 ترسم ‏76٪ على ‏390. فصار «grow-field»، ولا قاعدةَ تحدّ عرضَ المقياس.
+   */
+  it('عنصرُ المقياس عرضُه نسبةُ درجته وحدَها — لا حدَّ أدنى ولا أقصى ولا «flex» من صنفٍ آخر', () => {
+    const WIDTH = ['width', 'min-width', 'max-width', 'inline-size', 'min-inline-size', 'max-inline-size', 'flex', 'flex-basis', 'flex-grow']
+    for (const [worth, pct] of [[0.61, 61], [0.86, 86], [0.05, 5], [1, 100]] as const) {
+      const html = worthCell(worth)
+      expect(html).toContain(`<span class="fill" style="width:${pct}%;`)
+      const chains = classChains(html, 'fill')
+      expect(chains).toHaveLength(1)
+      for (const prop of WIDTH) expect(cascaded(chains[0] ?? [], prop), `${worth} ${prop}`).toBeUndefined()
+    }
+    // ‏ولا سياقَ (وسائطُ أو حاوية) يسمّي «.fill» خارج المقياس
+    expect(found((d) => d.selectors.some((sel) => /\.fill(?![\w-])/.test(sel) && !/\.worth\b/.test(sel)))).toEqual([])
+    // ‏والحقلُ الممتدّ باسمه
+    expect(css.rule('.grow-field')['min-width']).toMatch(/^min\(12em,100%\)/)
+  })
+
+  /**
+   * **وشريطُ التبويب يلتفّ ولا يتمرّر**: كان «overflow-x:auto» بشريطٍ مخفيّ، فحاويةُ التمرير
+   * تقصّ المحورين — حلقةُ التركيز خطّان — وغاب «فشلت» و«مرفوضة» على حاسوبٍ ‏900 خلف حافّةٍ لا
+   * تبلغها العجلة، و«الإعداد !» عن الهاتف بلا أثر. والهندسةُ في «audit_mobile» (٨) على ستّة عروض.
+   */
+  it('شريطُ التبويب يلتفّ في كلّ سياق: لا تمريرَ ولا شريطَ مخفيًّا يقصّ تبويبًا أو حلقتَه', () => {
+    expect(css.rule('.tab-bar')['flex-wrap']).toBe('wrap')
+    expect(found((d) => d.selectors.some((sel) => /\.tab-(bar|sub|item)\b/.test(sel)) &&
+      (/^overflow/.test(d.prop) || d.prop === 'scrollbar-width'))).toEqual([])
+    // ‏والفرعيُّ يرث الالتفافَ ولا يعيد كتابته
+    expect(css.rule('.tab-sub')['flex-wrap']).toBeUndefined()
+  })
+
+  /**
+   * **وشريطُ العودة يلتفّ قبل أن يُغطّى نصُّه**: اتّسع المقطعُ (‏١٤٤ ← ‏١٦٣px) فانكمش رابطُ العودة
+   * عند ‏٣٢٠ إلى ‏٤٩px ونصُّه ‏٨٦ — «المنشو» تحت المبدّل. فالمبدّلُ ينزل سطرًا إلى طرفه حين لا
+   * يسعهما سطر، وحشوُه على الهاتف ‏٨ كما كان. والقياسُ في «audit_mobile» (٧).
+   */
+  it('شريطُ العودة يلتفّ، والمبدّلُ في طرف سطره، وحشوُه على الهاتف أضيق', () => {
+    expect(css.rule('nav.back')['flex-wrap']).toBe('wrap')
+    expect(css.rule('nav.back .seg')['margin-inline-start']).toBe('auto')
+    expect(css.rule('nav.back .seg button', `@media${below('sm')}`)['padding-inline']).toBe('var(--s-2)')
+    // ‏ولا يُفرض على رابط العودة حدٌّ أقصى يقصّ نصَّه
+    expect(found((d) => d.selectors.some((sel) => sel.startsWith('nav.back a')) &&
+      /^(max-width|overflow|text-overflow|white-space)$/.test(d.prop))).toEqual([])
   })
 })

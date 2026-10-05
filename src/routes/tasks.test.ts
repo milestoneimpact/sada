@@ -204,7 +204,7 @@ describe('وشريطُ الرموز المقتربة', () => {
     const html = await panel()
     expect(html).toContain('إذنُ التجديد')
     expect(html).toContain('يوجب سقوطُه دورةَ إذنٍ بيدك')
-    expect(html).toContain('class="flash bad"')
+    expect(html).toContain('class="toast-note bad"')
   })
 })
 

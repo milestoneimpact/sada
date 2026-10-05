@@ -8,7 +8,8 @@ import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../escape'
 import { actionLabel, targetLabel } from '../../../lib/audit'
-import { pathArrows, status } from '../parts'
+import { pathArrows } from '../parts'
+import { statusBadge } from '../components/badge'
 
 
 
@@ -43,20 +44,20 @@ export function securitySection(d: PanelData): SecurityMarkup {
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
     <td data-label="فُتحت"><span title="${escapeHtml(x.at)} UTC">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td data-label="">${x.current
-      ? status('ok', '●', 'جلستك')
+      ? statusBadge('ok', '●', 'جلستك')
       : `<form class="inline" method="POST" action="/panel/sessions/revoke"
              data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
            <input type="hidden" name="handle" value="${escapeHtml(x.handle)}">
-           <button class="d sm" type="submit">أبطلها</button></form>`}</td>
+           <button class="btn btn-danger btn-sm" type="submit">أبطلها</button></form>`}</td>
   </tr>`).join('')
 
   const passkeys = d.factors.passkeys.map((k) => `<tr>
     <td><div class="nm">${escapeHtml(k.label)}</div></td>
     <td data-label="سُجّل"><span title="${escapeHtml(k.createdAt)} UTC">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
-      ? status('idle', '○', 'لم يُستعمل')
+      ? statusBadge('idle', '○', 'لم يُستعمل')
       : `<span title="${escapeHtml(k.lastUsedAt)} UTC">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
-    <td><button class="d sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
+    <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
           data-label="${escapeHtml(k.label)}">احذف</button></td>
   </tr>`).join('')
 

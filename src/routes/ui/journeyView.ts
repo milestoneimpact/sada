@@ -18,6 +18,7 @@ import { money, relativeTime } from '../../lib/format'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import type { Journey, Station } from '../../lib/journey'
+import { emptyState } from './components/empty'
 
 /**
  * رمزُ المحطّة — **من المصدر الواحد** (D-103).
@@ -82,7 +83,7 @@ function stationRow(s: Station, now: Date, platform: string): string {
       <p class="stop-d">${escapeHtml(s.detail)}</p>
       <div class="stop-meta">${when}${cost}${
         s.model === null ? '' : `<span class="chip mono">${escapeHtml(s.model)}</span>`
-      }<a class="btn g sm stop-go" href="${escapeHtml(go.href)}">${escapeHtml(go.label)}${ICON.go}</a></div>
+      }<a class="btn btn-secondary btn-sm stop-go" href="${escapeHtml(go.href)}">${escapeHtml(go.label)}${ICON.go}</a></div>
     </div>
   </li>`
 }
@@ -117,10 +118,10 @@ export function journeyBody(j: Journey, now: Date): string {
 
   <h3 class="sec">المحطّات</h3>
   ${j.stations.length === 0
-    ? '<div class="empty"><b>لا محطّاتٍ بعد</b><p>لم يُسجَّل لهذا المنشور شيءٌ في القاعدة.</p></div>'
+    ? emptyState({ title: 'لا محطّاتٍ بعد', html: 'لم يُسجَّل لهذا المنشور شيءٌ في القاعدة.' })
     : `<ol class="journey">${stops}</ol>`}
 
-  <div class="split" style="margin-top:var(--s-5)">
+  <div class="split mt-5">
     <p><b>ومجموعُ الدفتر ${escapeHtml(money(j.spent))}</b> — من
       <span class="mono">cost_ledger</span> لا من جمع المحطّات. والدفترُ يُكتَب
       <b>قبل</b> أن يُعدّ النداءُ ناجحا، فنداءٌ دُفع ثمنُه ثمّ فشل يبقى

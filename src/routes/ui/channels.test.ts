@@ -64,7 +64,7 @@ describe('حالُ الإذن من الرمزين معًا (خطّة التصم�
     const html = channelsSection(viewChannels([x], () => true), now)
     expect(html).not.toContain('ينتهي الإذن اليوم')
     expect(html).toContain('يتجدّد تلقائيًّا')
-    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="v">0</)
+    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="kv-v">0</)
   })
 
   it('والتحذيرُ حين يقترب موعدُ إذن التجديد — والبلاطةُ تعدّه', () => {
@@ -72,7 +72,7 @@ describe('حالُ الإذن من الرمزين معًا (خطّة التصم�
     expect(tokenHealth(near, now)).toMatchObject({ kind: 'soon', days: 3 })
     const html = channelsSection(viewChannels([near], () => true), now)
     expect(html).toContain('يبقى 3 أيّام للإذن')
-    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="v">1</)
+    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="kv-v">1</)
   })
 
   it('وبلا تجديدٍ يُعَدّ من إذن الوصول كما كان', () => {
@@ -89,9 +89,9 @@ describe('حالُ الإذن من الرمزين معًا (خطّة التصم�
 describe('«ما ينتظرك الآن» يفتح الضبطَ ويبقي الجاهزةَ للربط', () => {
   it('الناقصةُ سرّيها: «اضبط Instagram» إلى حقل المعرّف في الإعداد، لا «اعرضها»', () => {
     const html = channelsSection(viewChannels([], () => false), now)
-    expect(html).toContain('<a class="btn g sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
+    expect(html).toContain('<a class="btn btn-secondary btn-sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
     // ‏وزرُّ البطاقة إلى الموضع نفسِه باسمه
-    expect(html).toContain('<a class="btn p sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
+    expect(html).toContain('<a class="btn btn-primary btn-sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
     expect(html).not.toContain('اعرضها')
     expect(html).not.toContain('اضبط سرّيه')
   })
@@ -100,7 +100,7 @@ describe('«ما ينتظرك الآن» يفتح الضبطَ ويبقي الج
     const html = channelsSection(viewChannels([], (n) => n.startsWith('TIKTOK')), now)
     const todo = html.slice(html.indexOf('ما ينتظرك الآن'), html.indexOf('</ul>', html.indexOf('ما ينتظرك الآن')))
     expect(todo).toContain('<b>TikTok</b>')
-    expect(todo).toContain('<a class="btn p sm" href="/oauth/tiktok/start">اربط TikTok</a>')
+    expect(todo).toContain('<a class="btn btn-primary btn-sm" href="/oauth/tiktok/start">اربط TikTok</a>')
   })
 })
 

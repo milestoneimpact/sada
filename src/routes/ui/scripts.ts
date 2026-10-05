@@ -196,7 +196,7 @@ export const IMG_SCRIPT = `
     var b=document.createElement('b'); b.textContent='تعذّر عرضُ الصورة';
     var t=document.createElement('span'); t.className='ago';
     t.textContent='لم يصل الملفّ من المخزن. افتحه وحده، فإن لم يُفتح فولّد صورةً بديلة.';
-    var a=document.createElement('a'); a.className='btn g sm'; a.href=img.currentSrc||img.src;
+    var a=document.createElement('a'); a.className='btn btn-secondary btn-sm'; a.href=img.currentSrc||img.src;
     a.target='_blank'; a.rel='noopener noreferrer'; a.textContent='افتح الملفّ';
     box.append(b,t,a); img.replaceWith(box);
   }
@@ -225,3 +225,30 @@ export const TZ_SCRIPT = `
 })();
 `
 
+
+/**
+ * سلوكُ العُدّة (D-189) — **ما لا يقوله الوسمُ وحدَه**.
+ *
+ * ١ · **المعطّلُ بـ`aria-disabled` لا يُضغَط** (خطّة التصميم 7.1): يبقى في ترتيب التركيز فيُقرأ
+ *     سببُه المربوط، **ويُمنع فعلُه هنا** في طور الالتقاط — نقرًا وEnter ومسافةً وإرسالَ نموذج —
+ *     والخادمُ يمنعه كذلك (لا يُعوَّل على السكربت وحدَه).
+ * ٢ · **الحوارُ يُفتَح من زرّه ويعود التركيزُ إليه** (7.9): `data-dialog-open="<id>"` يفتح
+ *     `<dialog>` بـ`showModal()` (التركيزُ محبوسٌ وEsc يغلق، من المتصفّح)، والنقرُ على الستارة
+ *     يغلقه، والإغلاقُ يعيد التركيزَ إلى الزرّ الذي فتحه — لا إلى رأس الصفحة.
+ */
+export const KIT_SCRIPT = `
+(function(){
+  var dead=function(t){return t&&t.closest?t.closest('[aria-disabled="true"]'):null;};
+  document.addEventListener('click',function(e){
+    if(dead(e.target)){e.preventDefault(); e.stopImmediatePropagation();}},true);
+  document.addEventListener('submit',function(e){
+    if(e.submitter&&e.submitter.getAttribute('aria-disabled')==='true'){e.preventDefault(); e.stopImmediatePropagation();}},true);
+  document.querySelectorAll('[data-dialog-open]').forEach(function(b){
+    var d=document.getElementById(b.getAttribute('data-dialog-open'));
+    if(!d||typeof d.showModal!=='function')return;
+    b.addEventListener('click',function(){d.showModal();});
+    d.addEventListener('close',function(){b.focus();});
+    d.addEventListener('click',function(e){if(e.target===d)d.close('cancel');});
+  });
+})();
+`

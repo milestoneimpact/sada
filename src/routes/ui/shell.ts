@@ -8,6 +8,7 @@
 import { commandPalette, commandTrigger, type Command } from './command'
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
+import { segmented } from './components/tabs'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { THEME } from './tokens'
@@ -169,11 +170,12 @@ if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 
 
 
+/** مبدّلُ الكثافة — مقطعٌ من العُدّة (D-189)، وسكربتُه يقرأ «data-density» كما كان. */
 export function densitySwitch(): string {
-  return `<div class="theme" id="density" role="group" aria-label="كثافة العرض">
-    <button type="button" data-density="cozy" aria-pressed="true">مريح</button>
-    <button type="button" data-density="compact" aria-pressed="false">مضغوط</button>
-  </div>`
+  return segmented('كثافة العرض', 'density', [
+    { value: 'cozy', label: 'مريح', pressed: true },
+    { value: 'compact', label: 'مضغوط' },
+  ], 'density')
 }
 
 /**
@@ -234,18 +236,22 @@ export function backNav(href: string, label: string): string {
    * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
   return `<nav class="back" aria-label="مسارُ العودة">
-    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph sm">${GLYPH_SVG}</span>${wordmark(false)}</a>
+    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph glyph-sm">${GLYPH_SVG}</span>${wordmark(false)}</a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
 }
 
+/**
+ * مبدّلُ الثيم — مقطعٌ من العُدّة (D-189). **ونصُّه يُطابَق حرفًا** حيث يُنزَع من ذيل الرافدة
+ * في الصفحة المستقلّة (`soloPage`)، فهو دالّةٌ واحدةٌ لا وسمان.
+ */
 export function themeSwitch(): string {
-  return `<div class="theme" id="theme" role="group" aria-label="سمة العرض">
-    <button type="button" data-theme="light" aria-pressed="false">نهاريّ</button>
-    <button type="button" data-theme="dark" aria-pressed="false">ليليّ</button>
-    <button type="button" data-theme="system" aria-pressed="true">النظام</button>
-  </div>`
+  return segmented('سمة العرض', 'theme', [
+    { value: 'light', label: 'نهاريّ' },
+    { value: 'dark', label: 'ليليّ' },
+    { value: 'system', label: 'النظام', pressed: true },
+  ], 'theme')
 }
 
 /**

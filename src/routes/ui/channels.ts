@@ -24,7 +24,8 @@ import { ICON } from './icons'
 import { escapeHtml } from './escape'
 import { LOGOS } from './logos'
 import { counted, NOUNS, relativeTime } from '../../lib/format'
-import { glyph, pathArrows, status } from './parts'
+import { glyph, pathArrows } from './parts'
+import { statusBadge, type Tone } from './components/badge'
 import { returnTo } from '../../lib/nav/back'
 
 const KIND: Readonly<Record<string, string>> = {
@@ -62,7 +63,7 @@ const KIND: Readonly<Record<string, string>> = {
  * والرمزُ **مع النصّ لا وحدَه**: لونٌ أو شكلٌ بلا كلمةٍ لا يُقرأ بصوتٍ
  * عالٍ، ولا يفرزه من لا يميّز الألوان (D-043).
  */
-const STEP_MARK: Readonly<Record<Step['state'], { g: string; cls: string; label: string }>> = {
+const STEP_MARK: Readonly<Record<Step['state'], { g: string; cls: Tone; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تمّت' },
   now: { g: '◍', cls: 'warn', label: 'الآن' },
   waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
@@ -76,12 +77,12 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
     .map((step) => {
       const mark = STEP_MARK[step.state]
       return `<li class="${mark.cls}${step.state === 'now' ? ' at' : ''}">
-        <span class="n" aria-hidden="true">${step.n}</span>
+        <span class="step-n" aria-hidden="true">${step.n}</span>
         <span class="body">
           <span class="what">${escapeHtml(step.title)}</span>
           <span class="why">${step.proof.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</span>
         </span>
-        ${status(mark.cls, mark.g, mark.label)}
+        ${statusBadge(mark.cls, mark.g, mark.label)}
       </li>`
     })
     .join('')
@@ -100,7 +101,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
    * ما تمّ لا يزاحم ما لم يتمّ.
    */
   if (w.linked) {
-    return `<details class="guide" style="margin-bottom:var(--s-3)">
+    return `<details class="guide mb-3">
       <summary>
         <span class="g-ic">${ICON.guide}</span>
         <span class="g-t"><b>الطريقُ إلى الربط — تمّ كلُّه</b>
@@ -116,7 +117,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
     ? '<b>الطريق.</b>'
     : `<b>أنت عند الخطوة ${w.current} من ${w.steps.length}.</b>`
 
-  return `<div class="card" style="margin-bottom:var(--s-3)">
+  return `<div class="card mb-3">
     <div class="card-head"><h2>الطريقُ إلى الربط</h2><div class="grow"></div>
       <span class="chip">${tally}</span></div>
     <p class="hint">${head}</p>
@@ -147,8 +148,8 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   const wizard = wizardStrip(view, app)
 
   if (app.source === 'worker_secret') {
-    return `${wizard}<div class="guide"><div class="guide-body" style="border-top:0">
-      <div class="help"><span class="i">i</span><span class="t">
+    return `${wizard}<div class="guide"><div class="guide-body">
+      <div class="help"><span class="help-ic">i</span><span class="help-t">
         <b>مضبوطٌ من أسرار Worker — وسرُّ البيئة يغلب الخزانة دائما.</b>
         فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو —
         <span class="mono">${escapeHtml(app.secretNames[1])}</span>.</span></div>
@@ -157,7 +158,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
       <form method="POST" action="/panel/channels/app/verify" data-busy="جارٍ الفحص…">
         <input type="hidden" name="platform" value="${escapeHtml(view.spec.id)}">
         <input type="hidden" name="return" value="${escapeHtml(returnTo(view.spec.id, 'setup'))}">
-        <button class="g sm" type="submit">افحص الزوج</button>
+        <button class="btn btn-secondary btn-sm" type="submit">افحص الزوج</button>
         <span class="ago">يسأل المنصّةَ أتقبل هذا الزوج — بلا دورةِ إذن، وبلا
           إذنِ وصولٍ يُنتَج.</span>
       </form>
@@ -166,7 +167,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
 
   const steps = guide.before
     .map(
-      (b, i) => `<li><span class="n">${i + 1}</span>
+      (b, i) => `<li><span class="step-n">${i + 1}</span>
         <span class="body"><span class="what">${pathArrows(b.what)}</span>
         <span class="why">${pathArrows(b.why)}</span></span></li>`,
     )
@@ -174,7 +175,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
 
   const saved =
     app.source === 'vault'
-      ? `<div class="help"><span class="i">${glyph('✓')}</span><span class="t">
+      ? `<div class="help"><span class="help-ic">${glyph('✓')}</span><span class="help-t">
          <b>محفوظ.</b> المعرّف <span class="mono">${escapeHtml(app.clientId ?? '')}</span> ·
          السرّ <span class="mono">${escapeHtml(app.hint ?? '')}</span>
          ${app.updatedBy === null ? '' : `· بدّله ${escapeHtml(app.updatedBy)}`}</span></div>`
@@ -201,7 +202,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
     <div class="guide-body">
       ${saved}
 
-      <a class="btn g sm portal" href="${escapeHtml(guide.portal)}" target="_blank"
+      <a class="btn btn-secondary btn-sm portal" href="${escapeHtml(guide.portal)}" target="_blank"
         rel="noopener noreferrer">${ICON.external} افتح ${escapeHtml(guide.portalLabel)}</a>
 
       <ol class="steps">${steps}</ol>
@@ -209,16 +210,16 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         * ‏**والتنبيهُ بعد الخطوات بعنوانه، لا تحت لصيقة الرابط** (ر-1): تحتها يُقرأ
         * ‏تعليمةً عن الرابط، وأكثرُه عن غيره (نوعُ المنشور، ومعاملاتٌ في الشيفرة).
         */ ''}
-      <div class="help"><span class="i">!</span><span class="t"><b>انتبه.</b> ${pathArrows(guide.gotcha)}</span></div>
+      <div class="help"><span class="help-ic">!</span><span class="help-t"><b>انتبه.</b> ${pathArrows(guide.gotcha)}</span></div>
 
       <div class="field cb">
         <label for="cb-${id}">رابطُ العودة</label>
-        <div class="help" id="cb-${id}-h"><span class="i">؟</span><span class="t">انسخه بزرّ «انسخ»${
+        <div class="help" id="cb-${id}-h"><span class="help-ic">؟</span><span class="help-t">انسخه بزرّ «انسخ»${
           step === null ? '' : ` والصقه في الخطوة ${step} أعلاه`}.</span></div>
         <div class="copy">
           <input id="cb-${id}" class="mono" dir="ltr" value="${escapeHtml(callback)}" readonly
             aria-label="رابط العودة — للنسخ" aria-describedby="cb-${id}-h">
-          <button type="button" class="g sm" data-copy="cb-${id}">انسخ</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-copy="cb-${id}">انسخ</button>
         </div>
       </div>
 
@@ -230,8 +231,8 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           */ ''}<input type="hidden" name="return" value="${escapeHtml(returnTo(id, 'setup'))}">
         <div class="field">
           <label for="ci-${id}">Client ID</label>
-          <div class="help" id="ci-${id}-h"><span class="i">؟</span>
-            <span class="t">${pathArrows(guide.whereId)}</span></div>
+          <div class="help" id="ci-${id}-h"><span class="help-ic">؟</span>
+            <span class="help-t">${pathArrows(guide.whereId)}</span></div>
           <input id="ci-${id}" name="client_id" dir="ltr" required pattern="\\S.*"
             title="الصق المعرّف — الفراغُ وحدَه لا يكفي" aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
@@ -245,7 +246,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
             * السرُّ حرفا حرفا**، والرسالةُ تتّهم السرَّ وهو سليم.
             */ ''}${app.clientId === null
             ? ''
-            : `<div class="help"><span class="i">!</span><span class="t">
+            : `<div class="help"><span class="help-ic">!</span><span class="help-t">
                 <b>هذا المعرّفُ محفوظٌ من قبل — والسرُّ أدناه يبدأ فارغا دائما.</b>
                 فإن كنتَ تنسخ السرَّ من <b>تطبيقٍ آخر</b> (أنشأتَه حديثا مثلا)
                 <b>فبدّل المعرّفَ معه</b>: سرٌّ صحيحٌ على معرّفٍ قديم يُردّ
@@ -253,8 +254,8 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         </div>
         <div class="field">
           <label for="cs-${id}">Client Secret</label>
-          <div class="help" id="cs-${id}-h"><span class="i">؟</span>
-            <span class="t">${pathArrows(guide.whereSecret)}</span></div>
+          <div class="help" id="cs-${id}-h"><span class="help-ic">؟</span>
+            <span class="help-t">${pathArrows(guide.whereSecret)}</span></div>
           <input id="cs-${id}" name="client_secret" type="password" dir="ltr" required pattern="\\S.*"
             title="الصق السرّ — الفراغُ وحدَه لا يكفي"
             aria-describedby="cs-${id}-h"
@@ -262,25 +263,25 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
             autocomplete="off" spellcheck="false">
           ${app.hint === null
             ? ''
-            : `<div class="help"><span class="i">i</span><span class="t">
+            : `<div class="help"><span class="help-ic">i</span><span class="help-t">
                 المحفوظُ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
                 <b>قارنه بأوّل السرّ وآخرِه في ${escapeHtml(guide.portalLabel)}</b> قبل أن تكتب.
                 فإن طابق فالسرُّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
         </div>
         <div class="ch-foot">
-          <button class="p" type="submit">احفظ</button>
+          <button class="btn btn-primary" type="submit">احفظ</button>
           ${app.source === 'none'
             ? ''
-            : `<button class="g sm" type="submit" formaction="/panel/channels/app/verify"
+            : `<button class="btn btn-secondary btn-sm" type="submit" formaction="/panel/channels/app/verify"
                  formnovalidate>افحص الزوج</button>`}
           <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
           <span class="grow"></span>
           ${app.source === 'vault'
-            ? `<button class="d sm" type="submit" formaction="/panel/channels/app/delete" formnovalidate
+            ? `<button class="btn btn-danger btn-sm" type="submit" formaction="/panel/channels/app/delete" formnovalidate
                  data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
             : ''}
         </div>
-        ${app.source === 'none' ? '' : `<div class="sub" style="margin-top:var(--s-2)">
+        ${app.source === 'none' ? '' : `<div class="sub mt-2">
           <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا —
           <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بمسار
           <span class="mono">client_credentials</span> الذي <b>لا منحةَ فيه تُفحَص</b>،
@@ -289,10 +290,10 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           تُنفَق فلسا.</div>`}
       </form>
 
-      <div class="outcome"><span class="k">إن نجح</span>
-        <span class="v">${pathArrows(guide.success)}</span></div>
-      <div class="outcome warn"><span class="k">إن فشل</span>
-        <span class="v">${pathArrows(guide.failure)}</span></div>
+      <div class="outcome"><span class="kv-k">إن نجح</span>
+        <span class="kv-v">${pathArrows(guide.success)}</span></div>
+      <div class="outcome warn"><span class="kv-k">إن فشل</span>
+        <span class="kv-v">${pathArrows(guide.failure)}</span></div>
     </div>
   </details>`
 }
@@ -307,16 +308,16 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   const unsigned = unsignedAccounts(view)
   const badge =
     unsigned.length > 0
-      ? status('bad', '▲', 'مربوطة بلا إذن')
+      ? statusBadge('bad', '▲', 'مربوطة بلا إذن')
       : state === 'linked'
-        ? status('ok', '●', 'مربوطة')
+        ? statusBadge('ok', '●', 'مربوطة')
       : state === 'needs_reauth'
-        ? status('bad', '▲', 'تحتاج تجديدا')
+        ? statusBadge('bad', '▲', 'تحتاج تجديدا')
         : state === 'connectable'
-          ? status('idle', '○', 'جاهزةٌ للربط')
+          ? statusBadge('idle', '○', 'جاهزةٌ للربط')
           : state === 'awaiting_owner'
-            ? status('warn', '!', 'تنتظرك')
-            : status('idle', '○', 'لم تُبنَ')
+            ? statusBadge('warn', '!', 'تنتظرك')
+            : statusBadge('idle', '○', 'لم تُبنَ')
 
   const rows = accounts
     .map(
@@ -326,11 +327,11 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         ${a.status === 'needs_reauth'
           ? ''
           : a.expiresAt === null
-            ? status('bad', '▲', 'بلا إذنٍ محفوظ', 'title="لا صفَّ في tokens لهذا الحساب — أعد الربط"')
+            ? statusBadge('bad', '▲', 'بلا إذنٍ محفوظ', 'title="لا صفَّ في tokens لهذا الحساب — أعد الربط"')
             : tokenDays(a.expiresAt, now, a)}
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
-          ? status('bad', '▲', 'جدّد الإذن')
+          ? statusBadge('bad', '▲', 'جدّد الإذن')
           : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">رُبط ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
@@ -343,7 +344,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   // يعرف مالكُها ذلك **قبل** أن يربط، لا بعد أوّل جدولةٍ تُردّ
   const stageNote =
     spec.stage === 'link'
-      ? `<div class="why warn"><span class="i">${glyph('◍')}</span><span class="t">
+      ? `<div class="why warn"><span class="why-ic">${glyph('◍')}</span><span class="why-t">
          <b>تُربَط ولا تنشر بعد.</b> دورةُ الإذن مبنيّةٌ لها، وسائقُ الرفع لم يُبنَ —
          فيُحفَظ الحساب وتُقرأ نطاقاتُه، <b>ولا تُكتب لها مسوّدة</b>.</span></div>`
       : ''
@@ -363,15 +364,15 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
   // المنصّة، فهو رابطٌ لا نموذج — ولا رمز CSRF على انتقالٍ لا يغيّر شيئا
   const action =
     state === 'connectable'
-      ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
+      ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
       : state === 'needs_reauth'
-        ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start"
+        ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start"
               aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
         : state === 'linked' && unsigned.length > 0
-          ? `<a class="btn p sm" href="/oauth/${escapeHtml(spec.id)}/start"
+          ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start"
                 aria-label="أعد ربط ${escapeHtml(spec.label)}">أعد الربط</a>`
         : state === 'linked'
-          ? `<a class="btn g sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
+          ? `<a class="btn btn-secondary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
           : state === 'awaiting_owner'
             /*
              * **وزرٌّ يقود إلى الضبط لا شارةٌ تصفه** (D-111).
@@ -380,7 +381,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
              * المانعَ ولا تفتح بابَه**. ولمّا انتقل الدليلُ إلى شاشة
              * المنصّة صار للمانع موضعٌ يُقصَد، **فيُقصَد**.
              */
-            ? `<a class="btn p sm" href="${escapeHtml(setupHref(spec.id))}">اضبط ${escapeHtml(spec.label)}</a>`
+            ? `<a class="btn btn-primary btn-sm" href="${escapeHtml(setupHref(spec.id))}">اضبط ${escapeHtml(spec.label)}</a>`
             /*
              * ‏**جملةٌ لا شارة** (D-185): الحالُ «لم تُبنَ» في رأس البطاقة، وهذا سببُها.
              * ‏وكانت شارةً ثانيةً بالحال نفسِه — والشارةُ لصيقةٌ ‏١٣px «لا جُمَل» (خطّة التصميم 4.3)
@@ -402,7 +403,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
     <p class="ch-note">${note}</p>
     <div class="ch-foot">${action}
       <span class="grow"></span>
-      <a class="btn g sm" href="/panel/channels/${escapeHtml(spec.id)}">شاشةُ ${escapeHtml(
+      <a class="btn btn-secondary btn-sm" href="/panel/channels/${escapeHtml(spec.id)}">شاشةُ ${escapeHtml(
         spec.label,
       )}</a></div>
   </div>`
@@ -433,12 +434,12 @@ export function tokenDays(
     : `title="ينتهي إذنُ الوصول ${escapeHtml(expiresAt)} UTC"`
   switch (h.kind) {
     case 'expired':
-      return status('bad', '▲', 'انتهى الإذن', title)
+      return statusBadge('bad', '▲', 'انتهى الإذن', title)
     case 'soon':
       // ‏والعددُ بمعدوده (D-183): كان «يبقى 2 يومان» و«الإذن 9 يوما»
-      return status('warn', '◍', h.days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(h.days, NOUNS.day)} للإذن`, title)
+      return statusBadge('warn', '◍', h.days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(h.days, NOUNS.day)} للإذن`, title)
     case 'overdue':
-      return status('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(h.at)} UTC وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
+      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(h.at)} UTC وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
     case 'auto':
       return `<span class="chip" ${title}>يتجدّد تلقائيًّا</span>`
     case 'ok':
@@ -482,9 +483,9 @@ export function channelsSection(
     ? ''
     // ‏بلا إطارٍ مكتوبٍ بلون التحذير (D-183): كان «border-color:var(--warn)» في
     // ‏الوسم، يُقرأ ذهبًا في الليل ويُسقط لونًا خارج الورقة. والحالُ في حبّتها
-    : `<div class="card" style="margin-bottom:var(--s-4)">
+    : `<div class="card mb-4">
         <div class="card-head"><h2>ما ينتظرك الآن</h2><div class="grow"></div>
-          ${status('warn', '!', counted(urgent.length, NOUNS.channel))}</div>
+          ${statusBadge('warn', '!', counted(urgent.length, NOUNS.channel))}</div>
         <ul class="todo">${urgent.map((v) => `<li>
           <span class="dot ${v.state === 'needs_reauth' || unsignedOf(v) ? 'bad' : 'warn'}"></span>
           <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
@@ -495,12 +496,12 @@ export function channelsSection(
                 ? 'سرّا التطبيق محفوظان، <b>وبقي أن تربط حسابك</b>.'
                 : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
           ${v.state === 'needs_reauth' || unsignedOf(v)
-            ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
+            ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
                   aria-label="${v.state === 'needs_reauth' ? 'جدّد إذن' : 'أعد ربط'} ${escapeHtml(v.spec.label)}">${
                   v.state === 'needs_reauth' ? 'جدّد الإذن' : 'أعد الربط'}</a>`
             : v.state === 'connectable'
-              ? `<a class="btn p sm" href="/oauth/${escapeHtml(v.spec.id)}/start">اربط ${escapeHtml(v.spec.label)}</a>`
-              : `<a class="btn g sm" href="${escapeHtml(setupHref(v.spec.id))}">اضبط ${escapeHtml(v.spec.label)}</a>`}
+              ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(v.spec.id)}/start">اربط ${escapeHtml(v.spec.label)}</a>`
+              : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(setupHref(v.spec.id))}">اضبط ${escapeHtml(v.spec.label)}</a>`}
         </li>`).join('')}</ul>
       </div>`
 
@@ -520,29 +521,29 @@ export function channelsSection(
     v.accounts.map((a) => tokenHealth(a, now)?.kind ?? '')
   const stopped = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).includes('expired')).length
   const renew = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).some((k) => k === 'expired' || k === 'soon')).length
-  const strip = `<div class="grid tiles c4" style="margin-bottom:var(--s-4)">
-    <div class="card tile"><div class="k">مربوطة وتعمل</div>
-      <div class="v">${count('linked')}<em> / ${built.length}</em></div>
-      <div class="n">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>
-    <div class="card tile"><div class="k">تحتاج تجديدا</div>
-      <div class="v">${renew}</div>
-      <div class="n">${renew === 0
+  const strip = `<div class="grid tiles c4 mb-4">
+    <div class="card tile"><div class="kv-k">مربوطة وتعمل</div>
+      <div class="kv-v">${count('linked')}<em> / ${built.length}</em></div>
+      <div class="note">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>
+    <div class="card tile"><div class="kv-k">تحتاج تجديدا</div>
+      <div class="kv-v">${renew}</div>
+      <div class="note">${renew === 0
         ? 'ولا إذنَ انتهى'
         : stopped > 0
           ? '<b>النشرُ عليها متوقّفٌ حتّى تجدّد</b>'
           : 'يقترب موعدُ إذنها — جدّده قبله'}</div></div>
-    <div class="card tile"><div class="k">تنتظر ضبطا</div>
-      <div class="v">${count('awaiting_owner') + count('connectable')}</div>
-      <div class="n">ينقصها سرٌّ أو ربطُ حساب</div></div>
-    <div class="card tile"><div class="k">لم يُبنَ سائقُها</div>
-      <div class="v">${rest.length}</div>
-      <div class="n">تُعرَض لتُعرَف، ولا زرَّ لا يعمل</div></div>
+    <div class="card tile"><div class="kv-k">تنتظر ضبطا</div>
+      <div class="kv-v">${count('awaiting_owner') + count('connectable')}</div>
+      <div class="note">ينقصها سرٌّ أو ربطُ حساب</div></div>
+    <div class="card tile"><div class="kv-k">لم يُبنَ سائقُها</div>
+      <div class="kv-v">${rest.length}</div>
+      <div class="note">تُعرَض لتُعرَف، ولا زرَّ لا يعمل</div></div>
   </div>`
 
   return `${strip}${waiting}<div class="lede-row">
-    <h3 class="sec" style="margin:0; border:0; padding:0">القنوات المبنيّة</h3>
+    <h3 class="sec bare">القنوات المبنيّة</h3>
     <span class="grow"></span>
-    ${status(linked === 0 ? 'warn' : 'ok', linked === 0 ? '!' : '●', `${linked} من ${built.length} مربوطة`)}
+    ${statusBadge(linked === 0 ? 'warn' : 'ok', linked === 0 ? '!' : '●', `${linked} من ${built.length} مربوطة`)}
     <span class="lede-note"><b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
       خطوتان في كلّ طريقٍ تقعان في بوّابة المنصّة ولا تُقرآن من هنا،
       وبرهانُهما نجاحُ ما بعدهما. ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة،
@@ -562,7 +563,7 @@ export function channelsSection(
    * **وتبقى كاملةً لمن فتحها**: الأسماءُ والسببُ ورابطُ الشاشة — ولا
    * يُحذَف شيء.
    */ ''}
-  <details class="unbuilt" style="margin-top:var(--s-5)">
+  <details class="unbuilt mt-5">
     <summary>
       <b>لم تُبنَ بعد</b>
       <span class="chip">${rest.length}</span>

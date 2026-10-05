@@ -234,7 +234,7 @@ export class Meter {
   async readFlash(): Promise<string> {
     return this.page
       .evaluate(() =>
-        Array.from(document.querySelectorAll('#flash .flash, .flash[role="alert"], .flash'))
+        Array.from(document.querySelectorAll('#flash .toast-note, .toast-note[role="alert"]'))
           .map((el) => (el.textContent ?? '').trim().replace(/\s+/g, ' '))
           .filter((t) => t !== '')
           .join(' | '),

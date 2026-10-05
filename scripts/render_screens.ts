@@ -25,6 +25,7 @@ import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { loginPage } from '../src/routes/panelView'
 import { secondFactorPage } from '../src/routes/authView'
+import { notFoundPage, serverErrorPage } from '../src/routes/ui/errorView'
 import type { Journey } from '../src/lib/journey'
 import { platformNeeds } from '../src/lib/platform/needs'
 import type { PlatformCounts, TimelineRow } from '../src/lib/platform/timeline'
@@ -417,4 +418,9 @@ writeAudited(
   ),
 )
 
-console.log('رُسمت ثلاثَ عشرةَ في /tmp')
+// ‏صفحتا الخطأ (خطّة التصميم 7.11 · D-189): من دالّتيهما اللتين يخدمهما Worker، لا نسخةٌ هنا —
+// ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare
+writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّةَ بهذا الاسم'))
+writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
+
+console.log('رُسمت خمسَ عشرةَ في /tmp')

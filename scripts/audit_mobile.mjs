@@ -19,6 +19,9 @@
  * | خطُّ الحقول | ≥ ‏١٦px | سلوكُ Safari: ما دونه يُقرِّب الصفحة |
  * | التمريرُ الأفقيّ | صفر عند ‏٣٢٠px وحتّى ‏٩٦٠ | WCAG 1.4.10 (Reflow) |
  * | فعلٌ مقصوصٌ في حاويةٍ تقصّ | صفر | يُرى ولا يُضغَط — والصفحةُ لا تفيض (مراجعة D-187) |
+ * | نصٌّ خارج صندوقه أو تحت جاره في شريط العودة | صفر | «المنشو» تحت مبدّل الثيم (مراجعة D-189) |
+ * | تبويبٌ أو حلقةُ تركيزه خارج ما يُرى | صفر | WCAG 2.4.7 و2.4.11 — وشريطٌ مخفيٌّ لا يُرى (مراجعة D-189) |
+ * | مقياسُ الاستحقاق بطول رقمه | ±1٪ | ‏0.61 رُسمت ممتلئة (مراجعة D-189) |
  * | `100vh` مكشوفة | ممنوعة | ارتفاعُ iOS يشمل شريطَ المتصفّح |
  * | `:hover` بلا حراسة | ممنوعة | لا hover على اللمس — فيعلق |
  * | وزنُ الصفحة | سقفٌ مُعلَن | Core Web Vitals |
@@ -52,8 +55,10 @@ const WIDTHS = [320, 360, 390, 430, 768]
  * و‏١٤٤٠ مقاسٌ واحد** — فمرّ فيضُ صفحات المنصّات ‏154px عند ‏900 و‏960، وقصُّ «تفاصيل» في صفّ
  * المزوّد ‏67px عند ‏600، ولم يرهما مدقّق. وتُرسَم بنافذةِ حاسوبٍ لا بلمس: المؤشّرُ الدقيق
  * أشدُّ على الفيض (حقلُ اللمس يُقيَّد بعرض أبيه)، وأهدافُ اللمس وخطُّ الحقول تبقى للهاتف.
+ * **و‏١٠٢٤ و‏١٤٤٠ للتبويب** (مراجعة D-189): فرزُ المسوّدات كان يغيب خلف حافّةٍ مخفيّةٍ من ‏900
+ * إلى ‏1030، و‏١٤٤٠ العرضُ الذي يُرسَم عليه كلُّ شيءٍ في `audit_design`.
  */
-const WIDE = [600, 720, 900, 960]
+const WIDE = [600, 720, 900, 960, 1024, 1440]
 
 /** أدنى هدفِ لمس — Apple HIG. وهو أشدُّ من ‏٢٤ عند WCAG 2.5.8، وهو المراد. */
 const TAP = 44
@@ -310,6 +315,126 @@ for (const file of files) {
           const cut = s.scrollWidth - s.clientWidth
           if (cut > 0) out.push({ kind: 'clip', what: `«${s.textContent.trim()}»`, detail: `مقصوصةٌ ${cut}px` })
         }
+        /*
+         * ٧ · **نصٌّ يخرج من صندوقه أو يغطّيه جارُه في شريط العودة** (مراجعةُ D-189).
+         *
+         * اتّسع مقطعُ الثيم في ٢ب فانكمش رابطُ العودة عند ‏٣٢٠ إلى ‏٤٩px ونصُّه ‏٨٦: خرج النصُّ
+         * من صندوقه إلى اليسار **فرُسم تحت المبدّل** — «المنشو» — والصفحةُ لا تفيض، ولا شيءَ
+         * يقصّ، والرابطُ نفسُه داخل الشريط. فلم يره (١) ولا (٦) ولا (٥). فيُقاس نصُّ كلِّ ابنٍ
+         * ظاهرٍ في الشريط على صندوقه، وكلُّ ابنين على تقاطعهما.
+         */
+        for (const nav of document.querySelectorAll('nav.back')) {
+          const kids = [...nav.children].filter((k) => shown(k) && !k.classList.contains('grow'))
+          for (const k of kids) {
+            if ((k.textContent || '').trim() === '') continue
+            const range = document.createRange()
+            range.selectNodeContents(k)
+            const t = range.getBoundingClientRect()
+            const b = k.getBoundingClientRect()
+            const spill = Math.max(b.left - t.left, t.right - b.right)
+            if (spill > 1) {
+              out.push({ kind: 'spill', what: `«${k.textContent.trim().replace(/\s+/g, ' ').slice(0, 18)}»`, detail: `نصُّه خارج صندوقه بـ${Math.round(spill)}px` })
+            }
+          }
+          for (let i = 0; i < kids.length; i++) {
+            for (let j = i + 1; j < kids.length; j++) {
+              const a = kids[i].getBoundingClientRect()
+              const c = kids[j].getBoundingClientRect()
+              const w = Math.min(a.right, c.right) - Math.max(a.left, c.left)
+              const h = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top)
+              if (w > 1 && h > 1) {
+                out.push({ kind: 'spill', what: `${key(kids[i])} × ${key(kids[j])}`, detail: `يتراكبان ${Math.round(w)}px` })
+              }
+            }
+          }
+        }
+        /*
+         * ٨ · **تبويبٌ أو حلقةُ تركيزه مقصوصة** (مراجعةُ D-189).
+         *
+         * كان «.tab-bar» حاويةَ تمريرٍ بشريطٍ مخفيّ: «الإعداد !» خارج الهاتف بلا أثر، و«فشلت»
+         * و«مرفوضة» خلف حافّةٍ لا تبلغها عجلةُ الفأرة على ‏900، وحلقةُ التركيز خطّان (حاويةُ
+         * التمرير تقصّ المحورين). **ولم يره (٦)**: يقف عند أوّل حاويةٍ تتمرّر، فما يتمرّر عنده
+         * لا يُقصّ. فهنا يُقاس كلُّ تبويبٍ وحلقتُه — مركَّزًا كما تركّزه لوحةُ المفاتيح، وبسُمكها المحسوب —
+         * على كلّ حاويةٍ تقصّ فوقه أيًّا كانت، وعلى عرض النافذة. والتبويبُ في ترتيب التركيز.
+         */
+        // ‏سُمكُ الحلقة خارج الصندوق: الخطُّ بإزاحته، والظلُّ الخارجيُّ بانتشاره وتغبيشه
+        const ringOf = (el) => {
+          const cs = getComputedStyle(el)
+          const outline = cs.outlineStyle === 'none' ? 0 : parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth)
+          const shadows = cs.boxShadow === 'none' ? [] : cs.boxShadow.split(/,(?![^(]*\))/)
+          const spread = shadows.filter((x) => !/inset/.test(x)).map((x) => {
+            const n = [...x.matchAll(/(-?[\d.]+)px/g)].map((m) => Number(m[1]))
+            return Math.max(Math.abs(n[0] ?? 0), Math.abs(n[1] ?? 0)) + (n[2] ?? 0) + (n[3] ?? 0)
+          })
+          return Math.max(outline, 0, ...spread)
+        }
+        const was = document.activeElement
+        let tabsSeen = 0
+        let ringsMeasured = 0
+        for (const it of document.querySelectorAll('.tab-bar .tab-item')) {
+          if (!shown(it)) continue
+          tabsSeen += 1
+          const label = `«${(it.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 18)}»`
+          if (it.tabIndex < 0 && it.closest('[role=tablist]') === null) {
+            out.push({ kind: 'tabcut', what: label, detail: 'خارج ترتيب التركيز' })
+          }
+          let L = 0
+          let R = document.documentElement.clientWidth
+          let T = -Infinity
+          let B = Infinity
+          for (let p = it.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+            const cs = getComputedStyle(p)
+            if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue
+            const pr = p.getBoundingClientRect()
+            // ‏والمحورُ بقيمته المحسوبة: «overflow-x:auto» يُحسَب معه الآخرُ «auto» فيقصّ المحورين
+            // ‏(وهذا ما قصّ الحلقةَ أعلاه وأسفلَه)، و«clip» وحدَه لا يمسّ الآخر
+            if (cs.overflowX !== 'visible') {
+              L = Math.max(L, pr.left + parseFloat(cs.borderLeftWidth))
+              R = Math.min(R, pr.right - parseFloat(cs.borderRightWidth))
+            }
+            if (cs.overflowY !== 'visible') {
+              T = Math.max(T, pr.top + parseFloat(cs.borderTopWidth))
+              B = Math.min(B, pr.bottom - parseFloat(cs.borderBottomWidth))
+            }
+          }
+          const r = it.getBoundingClientRect()
+          const cut = Math.max(L - r.left, r.right - R, T - r.top, r.bottom - B)
+          if (cut > 1) {
+            out.push({ kind: 'tabcut', what: label, detail: `خارج ما يُرى بـ${Math.round(cut)}px` })
+            continue
+          }
+          it.focus({ focusVisible: true, preventScroll: true })
+          if (document.activeElement !== it || !it.matches(':focus-visible')) {
+            out.push({ kind: 'tabcut', what: label, detail: 'لا يأخذ التركيزَ أو لا يُظهر حلقته' })
+            continue
+          }
+          ringsMeasured += 1
+          const ring = ringOf(it)
+          const ringCut = Math.max(L - (r.left - ring), r.right + ring - R, T - (r.top - ring), r.bottom + ring - B)
+          if (ring > 0 && ringCut > 1) {
+            out.push({ kind: 'tabcut', what: label, detail: `حلقةُ تركيزه مقصوصةٌ ${Math.round(ringCut)}px من ${Math.round(ring)}` })
+          }
+        }
+        if (was instanceof HTMLElement) was.focus()
+        else document.activeElement?.blur?.()
+        // ‏ومقياسٌ لم يَقِس لا يقول «نظيف» (درسُ المحدّدات الشائخة): تبويبٌ ظاهرٌ بلا حلقةٍ مقيسة يردّ
+        if (tabsSeen > 0 && ringsMeasured === 0) out.push({ kind: 'tabcut', what: 'tab-bar', detail: `${tabsSeen} تبويبًا ولم تُقَس حلقةٌ واحدة` })
+        /*
+         * ٩ · **مقياسٌ يرسم غيرَ رقمه** (مراجعةُ D-189): صنفُ تخطيطٍ اسمُه «fill» بحدٍّ أدنى
+         * «!important» لبس عنصرَ مقياس الاستحقاق، فرُسمت ‏0.61 ممتلئةً على ‏1440 و‏76٪ على ‏390 —
+         * والرقمُ بجانبها صحيح. فيُقاس الطولُ المرسومُ على المسار مقابلَ الرقم المكتوب.
+         */
+        for (const w of document.querySelectorAll('.worth')) {
+          const track = w.querySelector('.track')
+          const fill = w.querySelector('.fill')
+          const val = Number.parseFloat(w.querySelector('.val')?.textContent ?? '')
+          if (!track || !fill || !Number.isFinite(val) || !shown(track)) continue
+          const tw = track.getBoundingClientRect().width
+          const drawn = fill.getBoundingClientRect().width
+          if (Math.abs(drawn - val * tw) > Math.max(1.5, tw * 0.01)) {
+            out.push({ kind: 'meter', what: `«${val.toFixed(2)}»`, detail: `مرسومٌ ${Math.round(drawn)} من ${Math.round(tw)}px والمطلوبُ ${Math.round(val * tw)}` })
+          }
+        }
         // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
         for (const t of document.querySelectorAll('svg text')) {
           if (!shown(t)) continue
@@ -375,6 +500,9 @@ for (const file of files) {
     overflow: 'تمريرٌ أفقيّ',
     cut: 'فعلٌ مقصوصٌ في حاويةٍ تقصّ',
     clip: 'تسميةٌ مقصوصةٌ في شريط الإبهام',
+    spill: 'نصٌّ خارج صندوقه أو تحت جاره في شريط العودة',
+    tabcut: 'تبويبٌ أو حلقةُ تركيزه مقصوصة',
+    meter: 'مقياسٌ يرسم غيرَ رقمه',
     tap: 'هدفُ لمسٍ أصغرُ من ٤٤px',
     zoom: 'حقلٌ يُقرِّبه iOS',
     vh: 'ارتفاعٌ ثابتٌ لا ديناميّ',

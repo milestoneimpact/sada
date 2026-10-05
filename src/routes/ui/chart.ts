@@ -29,9 +29,10 @@
 import { escapeHtml } from './escape'
 import { money } from '../../lib/format'
 import { counted, NOUNS } from '../../lib/format'
+import { emptyState } from './components/empty'
 
 export function areaChart(series: { day: string; total: number }[]): string {
-  if (series.length < 2) return '<div class="empty"><b>لا بيانات كافية بعد</b></div>'
+  if (series.length < 2) return emptyState({ title: 'لا بيانات كافية بعد' })
 
   // مساحةٌ للمحور وأرقامه، لا رسمٌ مقصوصٌ إلى حافّة البطاقة
   const w = 640
@@ -69,7 +70,7 @@ export function areaChart(series: { day: string; total: number }[]): string {
   }).join('')
   const tickLabels = [0, 0.5, 1].map((t) => {
     const value = max * t
-    return `<span class="axis y" style="top:${py(y(value))};right:${px(w - padStart + 8)}">${value.toFixed(1)}</span>`
+    return `<span class="axis axis-y" style="top:${py(y(value))};right:${px(w - padStart + 8)}">${value.toFixed(1)}</span>`
   }).join('')
 
   const peakIndex = series.reduce((best, d, i) => (d.total > series[best]!.total ? i : best), 0)
@@ -79,8 +80,8 @@ export function areaChart(series: { day: string; total: number }[]): string {
 
   // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
   const label = (d: { day: string }): string => d.day.slice(5)
-  const dates = `<span class="axis x" style="left:${px(x(0))};top:${py(h - 8)}">${label(first)}</span>
-    <span class="axis x end" style="right:${px(w - x(series.length - 1))};top:${py(h - 8)}">${label(last)}</span>`
+  const dates = `<span class="axis axis-x" style="left:${px(x(0))};top:${py(h - 8)}">${label(first)}</span>
+    <span class="axis axis-x end" style="right:${px(w - x(series.length - 1))};top:${py(h - 8)}">${label(last)}</span>`
   const peakDot = `<i class="peak" style="left:${px(x(peakIndex))};top:${py(y(peak.total))}" aria-hidden="true"></i>`
 
   const total = series.reduce((sum, d) => sum + d.total, 0)
@@ -127,7 +128,7 @@ export function barChart(
 ): string {
   const live = rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)
   if (live.length === 0) {
-    return '<div class="empty"><b>لا إنفاق بعد</b><p>لم يُنادَ مزوّدٌ مدفوعٌ في هذه المدّة.</p></div>'
+    return emptyState({ title: 'لا إنفاق بعد', html: 'لم يُنادَ مزوّدٌ مدفوعٌ في هذه المدّة.' })
   }
 
   const max = Math.max(...live.map((r) => r.value))

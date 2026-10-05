@@ -213,7 +213,7 @@ const R2stop: Journey = {
   plan: { today: '8', target: '4' },
   async run({ page, m, stack }) {
     // ‏ما في الشاشة الأولى من الرئيسيّة: أفيها بابٌ إلى «اكتب»؟
-    const homeCtas = await page.evaluate(() => Array.from(document.querySelectorAll('a.btn, button.p, a.p'))
+    const homeCtas = await page.evaluate(() => Array.from(document.querySelectorAll('a.btn, button.btn-primary, a.btn-primary'))
       .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight })
       .map((el) => (el.textContent ?? '').trim().replace(/\s+/g, ' ')).filter((t) => t !== ''))
     m.note(`أزرارُ الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
@@ -230,7 +230,7 @@ const R2stop: Journey = {
       const seen: { text: string; disabled: boolean }[] = await page.evaluate(({ top, bottom, marked }) => {
         const vh = window.innerHeight
         const goal = /اكتب|أنشئ|جديد|اعتمد/
-        return Array.from(document.querySelectorAll('button.p, a.btn.p, button[type="submit"]'))
+        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, button[type="submit"]'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
             return r.height > 0 && r.top >= top && r.bottom <= vh - bottom && getComputedStyle(el).visibility !== 'hidden'
@@ -491,10 +491,10 @@ const R10: Journey = {
       return { success: ok, verified: `وُجد «هذا الشهر» · القاعدة $${month.toFixed(2)}` }
     }
     // ‏وإلّا: أقربُ ما في الرئيسيّة — بلاطةُ «إنفاق 30 يومًا»
-    const tile = visible(page.locator('.card.tile').filter({ has: page.locator('.k', { hasText: /إنفاق 30/ }) })).first()
+    const tile = visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: /إنفاق 30/ }) })).first()
     const seen = await m.look(tile, 'بلاطة «إنفاق 30 يوما» (أقربُ ما يوجد)', { key: true })
-    const shown = seen ? ((await tile.locator('.v').textContent()) ?? '').replace(/\s+/g, ' ').trim() : '—'
-    const today = ((await visible(page.locator('.card.tile').filter({ has: page.locator('.k', { hasText: 'إنفاق اليوم' }) })).first().locator('.v').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
+    const shown = seen ? ((await tile.locator('.kv-v').textContent()) ?? '').replace(/\s+/g, ' ').trim() : '—'
+    const today = ((await visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: 'إنفاق اليوم' }) })).first().locator('.kv-v').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
     m.note(`المعروض: «إنفاق 30 يوما» = ${shown} · «إنفاق اليوم» = ${today} · ولا سقفَ شهريّ يُقارَن به`)
     return {
       success: false,
