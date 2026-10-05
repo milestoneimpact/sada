@@ -570,3 +570,37 @@ describe('ملفُّ الخطّة يُقرأ فورَ اختياره (ر-5)', ()
     expect(SCRIPT).toContain('form.requestSubmit()')
   })
 })
+
+/*
+ * ‏**مراجعةُ D-190**: المربّعاتُ قد تكون كلُّها فارغة (غيرُ المتّصلة لا تُؤشَّر) فيُمنع الإرسالُ
+ * ‏هنا بسببه — **قبل معالج «مشغول»** الذي يقرأ `defaultPrevented`؛ وEnter في عنوان YouTube لا
+ * ‏يُنشئ؛ وعدّادُ كلّ حقلٍ يعدّ كما يعدّ الخادم (`captionProblem`).
+ */
+describe('حرّاسُ «أنشئ» و«اكتب» (مراجعة D-190)', () => {
+  it('الإرسالُ بلا منصّةٍ يُمنع ويُقال في موضعه — مسجَّلًا قبل «مشغول»', () => {
+    const guard = SCRIPT.indexOf("input[type=checkbox][name=platform]:not([disabled])")
+    expect(guard).toBeGreaterThan(0)
+    expect(guard).toBeLessThan(SCRIPT.indexOf("document.querySelectorAll('form[data-busy]')"))
+    expect(SCRIPT).toContain("f.querySelector('[data-pick-msg]')")
+    expect(SCRIPT).toContain('اختر منصّةً واحدةً على الأقلّ')
+  })
+
+  it('وEnter في عنوان YouTube لا يُرسل النموذج', () => {
+    expect(SCRIPT).toContain("document.querySelectorAll('input[name=title_youtube]')")
+    expect(SCRIPT).toContain("if(e.key==='Enter')e.preventDefault();")
+  })
+
+  it('وعدّادُ نصّ كلّ منصّةٍ يعدّ كما يعدّ الخادم: المحرفُ لـ TikTok وInstagram والبايتُ لوصف YouTube', () => {
+    const enc = /var enc=[^\n]*\n/.exec(SCRIPT)
+    const fn = /function capLen\(v,bytes\)\{[^\n]*\}/.exec(SCRIPT)
+    expect(enc).not.toBeNull()
+    expect(fn).not.toBeNull()
+    const capLen = new Function(`${enc![0]}${fn![0]}; return capLen;`)() as (v: string, bytes: boolean) => number
+    for (const text of ['', 'نصّ', 'أوّلُ مئة يوم 👇 #قيادة', 'ن'.repeat(2300)]) {
+      const t = text.trim()
+      expect(capLen(t, false)).toBe(t.length)
+      expect(capLen(t, true)).toBe(new TextEncoder().encode(t).length)
+    }
+    expect(SCRIPT).toContain("document.querySelectorAll('textarea[data-cap-limit]')")
+  })
+})

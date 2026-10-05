@@ -9,7 +9,7 @@ import { escapeHtml } from './escape'
 import { MAX_PLAN_ROWS, type PlanRead, type PlanRow } from '../../lib/plan/import'
 import { counted, NOUNS } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
-import { PRIVATE_REACH } from '../../lib/media/uploads'
+import { PRIVATE_ONLY, PRIVATE_REACH, TIKTOK_NO_SCOPE, tiktokNeedsScope, type Reach } from '../../lib/media/uploads'
 import { momentLabel } from '../../lib/time/local'
 import { statusBadge } from './components/badge'
 
@@ -45,11 +45,15 @@ function when(r: PlanRow, now: Date): string {
  * تكتب اللصيقةَ فوق كلّ خليّة (7.5)، وكانت بطاقاتٍ من «3» و«2026-10-07 12:00» و«Asia/Riyadh»
  * بلا اسمٍ لشيء. والخليّةُ الأولى الموعدُ ورقمُ سطره تحته: هي رأسُ البطاقة.
  */
-function rowHtml(r: PlanRow, now: Date): string {
+function rowHtml(r: PlanRow, now: Date, reachNow: Reach): string {
   const ok = r.problems.length === 0
   // ‏المنطقةُ تُقال إن كتبها الملفّ وحده؛ وما سواها «بتوقيتك» مرّةً فوق الجدول
   const zone = r.zoneCell === '' ? '' : `<span class="ago">بتوقيت <bdi dir="ltr">${escapeHtml(r.zone || r.zoneCell)}</bdi></span>`
-  const reach = ok && (r.platform === 'youtube' || r.platform === 'tiktok') ? PRIVATE_REACH[r.platform] : null
+  // ‏ويسكت حين قلب المالكُ النشرَ علنيًّا بعد الإجازة (D-190)
+  // ‏وTikTok المقلوبُ بلا `video.publish` صندوقٌ بحكم الناشر — يُقال بسببه (مراجعة D-190)
+  const reach = ok && (r.platform === 'youtube' || r.platform === 'tiktok') && !reachNow[r.platform]
+    ? r.platform === 'tiktok' && tiktokNeedsScope(reachNow) ? TIKTOK_NO_SCOPE : PRIVATE_REACH[r.platform]
+    : null
   return `<tr${ok ? '' : ' class="bad"'}>
     <td data-label="الموعد">${when(r, now)}${zone}<span class="ago">السطر ${r.line}</span></td>
     <td data-label="المنصّة">${escapeHtml(r.platform === null ? r.platformRaw || '—' : platformLabel(r.platform))}${
@@ -82,7 +86,7 @@ export function planImportExpired(): string {
 }
 
 /** صفحةُ المعاينة — والزرُّ يُرسم حين يكون في الملفّ صفٌّ واحدٌ سليمٌ على الأقلّ. */
-export function planImportScreen(id: string, read: PlanRead, now: Date = new Date()): string {
+export function planImportScreen(id: string, read: PlanRead, now: Date = new Date(), reach: Reach = PRIVATE_ONLY): string {
   const ready = read.rows.filter((r) => r.problems.length === 0).length
   const blocked = read.rows.length - ready
   return `<header class="page-head"><div class="eyebrow"><span class="ln"></span>خطّتُك من ملفّ</div>
@@ -100,7 +104,7 @@ export function planImportScreen(id: string, read: PlanRead, now: Date = new Dat
         <p class="hint">المواعيدُ بتوقيتك كما فهمها صدى — راجعها قبل أن تعتمد.</p>
         <div class="scroll"><table class="pi">
           <thead><tr><th>الموعد</th><th>المنصّة</th><th>النصّ</th><th>المقطع</th><th>الحال</th></tr></thead>
-          <tbody>${read.rows.map((r) => rowHtml(r, now)).join('')}</tbody></table></div>
+          <tbody>${read.rows.map((r) => rowHtml(r, now, reach)).join('')}</tbody></table></div>
         <p class="ago">الصفوفُ ذاتُ المشكلات لا تُجدوَل، ويبقى الملفُّ عندك لتصلحه.</p>
         ${/* ‏وصفُّ الأفعال يلاصق أسفلَ الشاشة (القالب T4): مئتا صفٍّ لا تُبعد «اعتمد» عن الإبهام */ ''}<div class="row pi-bar">
           ${ready === 0

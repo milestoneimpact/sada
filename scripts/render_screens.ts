@@ -175,6 +175,20 @@ writeAudited(
   { 'm-tt': fixtureImage(1080, 1920, 280) },
 )
 
+/*
+ * ‏**«مَن يرى ما تنشره» في إعداد YouTube** (D-190): مفتاحُ النشر العلنيّ بعد الإجازة — خاصٌّ بالافتراض.
+ * ‏يُرسم ليُقاس: البطاقةُ وزرُّها الأوّليّ وسطرُ «ما عليك لتُجاز» على الهاتف.
+ */
+writeAudited(
+  '/tmp/screen-yt-setup.html',
+  page('صدى — YouTube · الإعداد', platformScreen({
+    ...base, view: yt, tab: 'setup', health: {},
+    tally: tally0, counts: counts(), needs: platformNeeds('youtube'),
+    upcoming: [], history: { rows: [], next: null }, metrics: {}, media: {},
+    reachPublic: false,
+  })),
+)
+
 writeAudited(
   '/tmp/screen-link-only.html',
   page('صدى — YouTube', platformScreen({

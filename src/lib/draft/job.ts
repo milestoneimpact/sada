@@ -11,6 +11,9 @@
  *   ٦ · **سجّل الكلفة**
  *   ٧ · اكتب المسوّدة بحالة `draft`
  *
+ * والرابعةُ إلى السادسة في `writer.ts` مرّةً لا هنا (D-190): **وبابٌ ثانٍ يقرؤها** —
+ * `draftFromIdea`، المسوّدةُ من فكرة المالك بكلماته بدل خلاصة مصدر.
+ *
  * والسادسة قبل السابعة عمدا: النداء وقع وحوسِب عليه سواء نجحت الكتابة أم
  * لا. وسجلٌّ أقلّ من الحقيقة أسوأ من سجلٍّ أعلى منها — الأوّل يُطمئن كذبا.
  * **والسادسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ: مبتورًا
@@ -20,20 +23,14 @@
  * والقاعدةُ نفسها ترفض `queued` بلا `approved_at` — فلو أخطأتُ في كلّ
  * سطرٍ هنا لبقي ذلك القيدُ قائما.
  */
-import { recordCost } from '../cost'
-import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { costOf, getProvider, resolveKey } from '../providers'
-import { routeFor } from '../ai/routes'
 import { containsUrl } from '../idempotency'
-import { chatCompletion } from '../ai/openaiCompat'
-import { anthropicChat } from '../ai/anthropic'
-import { portableSchema } from '../ai/portableSchema'
-import { spentOf, type Spent } from '../ai/spent'
+import { digest } from '../security/digest'
 import { atomically, type Db, type DbStatement } from '../tokens'
 import {
-  DRAFT_SCHEMA, parseDraft, PLATFORMS, systemPrompt, userPrompt,
-  type Platform, type SourceBrief,
+  DRAFT_SCHEMA, ideaPrompt, parseDraft, PLATFORMS, systemPrompt, userPrompt,
+  type Draft, type Platform, type PlatformSpec, type SourceBrief,
 } from './prompt'
+import { writeOnce, type WriterDeps } from './writer'
 
 export type DraftOutcome =
   | {
@@ -49,16 +46,11 @@ export type DraftOutcome =
   | { readonly kind: 'blocked'; readonly reason: string }
   /** لا خلاصةَ لهذا المصدر بعد — يُحلَّل أوّلا. */
   | { readonly kind: 'not_analyzed'; readonly reason: string }
-  | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean }
+  /** و`cost` ما دُفع في الدفتر قبل أن يُردّ الجواب (D-164) — يُقال في الإشعار ولا يُسكَت عنه. */
+  | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean; readonly cost?: number }
 
-export interface DraftDeps {
-  readonly db: Db
-  readonly encKey: string
-  /** أسرارُ Worker — تغلب الخزانة دائما (D-030). */
-  readonly workerSecrets: Readonly<Record<string, string | undefined>>
-  /** للاختبار وحده: نداءٌ مزيَّف بدل الشبكة. */
-  readonly fetchImpl?: typeof fetch
-}
+/** ما تحتاجه الكتابة — وهو ما يحتاجه نداؤها الواحد (`writer.ts`). */
+export type DraftDeps = WriterDeps
 
 interface SourceRow {
   id: string
@@ -148,134 +140,67 @@ export async function draftPost(
     .first<{ id: string; status: string }>()
   if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
 
-  // ٤ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db, 'draft')
-  if (allowance.blocker !== null) {
-    return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
-  }
+  // ٤ إلى ٦ · الحارسُ والمزوّدُ والنداءُ والكلفة — في موضعها الواحد (`writer.ts`)
+  const out = await writeOnce(deps, {
+    system: systemPrompt(spec),
+    user: userPrompt(brief),
+    schema: DRAFT_SCHEMA,
+    operation: `draft:${platform}`,
+    refId: row.id,
+  })
+  if (out.kind !== 'written') return out
 
-  // المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const route = await routeFor(deps.db, 'draft')
+  // القراءةُ بعد التسجيل: نصٌّ مشوَّه لا يُلغي كلفةً وقعت — ويُقال ما دُفع فيه
+  const draft = readDraft(out.text, spec)
+  if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
 
-  const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${route.provider}`, retryable: false }
-  }
-
-  // وسقفُ المزوّد بعد الحارس العامّ لا قبله: مَن قدّم التفصيل على الجملة
-  // قال «المزوّد متاح» ونظامُه موقوف
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
-
-  const secretName = provider.builtin
-    ? provider.name === 'anthropic'
-      ? 'ANTHROPIC_API_KEY'
-      : provider.name === 'gemini'
-        ? 'GEMINI_API_KEY'
-        : undefined
-    : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) {
-    return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
-  }
-
-  // خطوةُ الكلفة (٦) تُعرَّف قبل النداء: يحتاجها الجوابُ الناجح، والجوابُ
-  // الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
-  const charge = async (spent: Spent): Promise<number> => {
-    const priced = costOf(provider, spent)
-    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
-    await recordCost(deps.db, {
-      provider: provider.name,
-      operation: `draft:${platform}:${spent.model}`,
-      units,
-      // سعرُ الوحدة مشتقٌّ لا مفترَض: مزوّدٌ بلا سعرٍ مضبوط يعطي صفرا
-      unitCost: units === 0 ? 0 : priced.total / units,
-      refId: row.id,
-    })
-    return priced.total
-  }
-
-  // ٥ · النداء — بلهجة المزوّد
-  let text: string
-  let spent: Spent
-  try {
-    if (provider.kind === 'anthropic') {
-      const result = await anthropicChat({
-        apiKey: resolved.key,
-        model: route.model,
-        system: systemPrompt(spec),
-        user: userPrompt(brief),
-        // المحمولُ لا الخامّ (D-164): `minLength` يُطوى وصفًا، وحدُّه في `parseDraft`
-        schema: portableSchema(DRAFT_SCHEMA),
-        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-      })
-      text = result.text
-      spent = result
-    } else {
-      if (provider.baseUrl === null) {
-        return { kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false }
-      }
-      const result = await chatCompletion(
-        {
-          baseUrl: provider.baseUrl,
-          apiKey: resolved.key,
-          model: route.model,
-          system: systemPrompt(spec),
-          user: userPrompt(brief),
-          json: true,
-        },
-        deps.fetchImpl ?? fetch,
-      )
-      text = result.text
-      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
-    }
-  } catch (error) {
-    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
-    const late = spentOf(error)
-    if (late !== null) await charge(late)
-    const retryable =
-      typeof error === 'object' && error !== null && 'retryable' in error
-        ? Boolean((error as { retryable: unknown }).retryable)
-        : true
-    return {
-      kind: 'failed',
-      reason: error instanceof Error ? error.message : 'نداءٌ فشل',
-      retryable,
-    }
-  }
-
-  // ٦ · **الكلفة قبل الكتابة** — النداءُ وقع وحوسِب عليه
-  const cost = await charge(spent)
-  const ran = spent.model
-
-  // القراءةُ بعد التسجيل: نصٌّ مشوَّه لا يُلغي كلفةً وقعت
+  // ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد
+  return insertDraft(deps.db, {
+    platform, key, existing, sourceId: row.id, sourceHash: hash, refs: [row.id],
+    model: out.model, cost: out.cost, draft: draft.draft,
+  })
+}
+/** يقرأ جوابَ النموذج منشورًا — **بعد أن سُجّلت كلفتُه**، فنصٌّ مشوَّهٌ لا يُلغي ما وقع. */
+function readDraft(text: string, spec: PlatformSpec): { ok: true; draft: Draft } | { ok: false; reason: string } {
   let parsedJson: unknown
   try {
     parsedJson = JSON.parse(text)
   } catch {
-    return { kind: 'failed', reason: 'جوابُ النموذج ليس JSON صالحا', retryable: true }
+    return { ok: false, reason: 'جوابُ النموذج ليس JSON صالحا' }
   }
-  const draft = parseDraft(parsedJson, spec)
-  if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true }
+  return parseDraft(parsedJson, spec)
+}
 
-  // ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد
+interface NewDraft {
+  readonly platform: Platform
+  readonly key: string
+  /** صفٌّ بالمفتاح نفسِه — مرفوضٌ يُحرَّر مفتاحُه في المعاملة نفسِها، أو `null`. */
+  readonly existing: { readonly id: string; readonly status: string } | null
+  readonly sourceId: string | null
+  readonly sourceHash: string | null
+  readonly refs: readonly string[]
+  readonly model: string
+  readonly cost: number
+  readonly draft: Draft
+}
+
+/**
+ * ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد. **ومشتركةٌ بين البابين**: المصدرُ
+ * والفكرة يكتبان الصفَّ نفسَه بالقيود نفسِها، فلا يفترق ما يُحرَّر به المرفوضُ بينهما.
+ */
+async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
   const postId = crypto.randomUUID()
   const statements: DbStatement[] = []
-  if (existing !== null) {
+  if (input.existing !== null) {
     // ‏المرفوضُ يُحرِّر مفتاحَه في المعاملة نفسِها — **وشرطُ الحال فيها**: مرفوضةٌ أُعيدت
     // ‏بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها، فيصطدم الإدراجُ بالقيد ويُقال `already`
-    statements.push(deps.db
+    statements.push(db
       .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id
                  WHERE id = ? AND status = 'rejected'`)
-      .bind(existing.id))
+      .bind(input.existing.id))
   }
   try {
-    statements.push(deps.db
+    statements.push(db
       .prepare(
         `INSERT INTO posts
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
@@ -284,39 +209,120 @@ export async function draftPost(
       )
       .bind(
         postId,
-        platform,
-        row.id,
-        hash,
-        ran,
-        cost,
-        draft.draft.text,
-        JSON.stringify([row.id]),
-        draft.draft.rationale,
+        input.platform,
+        input.sourceId,
+        input.sourceHash,
+        input.model,
+        input.cost,
+        input.draft.text,
+        JSON.stringify(input.refs),
+        input.draft.rationale,
         // **صفرٌ كان مكتوبا هنا حرفا** — و`ARCHITECTURE.md §٤` تقول إنّه
         // «يُحسَب بالشيفرة لا بالنموذج ويُعرَض في اللوحة مع تكلفته على
         // X». فكان يُحسَب عند النشر (بعد الاعتماد) ولا يُعرَض قطّ (D-069)
-        containsUrl(draft.draft.text) ? 1 : 0,
-        key,
+        containsUrl(input.draft.text) ? 1 : 0,
+        input.key,
       ))
-    await atomically(deps.db, statements)
+    await atomically(db, statements)
   } catch (error) {
     // سباقٌ على المفتاح نفسه: الآخرُ سبق، وهذا ليس فشلا
     const message = error instanceof Error ? error.message : ''
     if (message.includes('UNIQUE')) {
-      const won = await deps.db
+      const won = await db
         .prepare('SELECT id FROM posts WHERE idempotency_key = ?')
-        .bind(key)
+        .bind(input.key)
         .first<{ id: string }>()
       if (won !== null) return { kind: 'already', postId: won.id }
     }
-    return { kind: 'failed', reason: `تعذّرت كتابة المسوّدة: ${message}`, retryable: false }
+    return { kind: 'failed', reason: `تعذّرت كتابة المسوّدة: ${message}`, retryable: false, cost: input.cost }
   }
 
   return {
     kind: 'drafted',
     postId,
-    platform,
-    length: draft.draft.text.length,
-    cost,
+    platform: input.platform,
+    length: input.draft.text.length,
+    cost: input.cost,
   }
+}
+
+// ── من فكرة المالك (D-190) ─────────────────────────────────────────────
+
+/** أقصرُ فكرةٍ تُكتب منها مسوّدة، وأطولُها — بالمحرف بعد طيّ الفراغ. */
+export const IDEA_MIN = 4
+export const IDEA_MAX = 1000
+
+/**
+ * الفكرةُ كما تُوزَن — **مطويّةَ الفراغ**: «الحوكمة  تحمي» و«الحوكمة تحمي» فكرةٌ واحدة،
+ * وضغطةٌ ثانيةٌ بمسافةٍ زائدة لا تصنع نداءً ثانيًا ولا مسوّدةً ثانية.
+ */
+export function normalizeIdea(raw: string): string {
+  return raw.normalize('NFC').replace(/\s+/gu, ' ').trim()
+}
+
+/** ما يمنع الفكرةَ قبل أيّ نداء — أو `null`. ويقرؤه المسارُ قبل أن يدور على المنصّات. */
+export function ideaProblem(raw: string): string | null {
+  const idea = normalizeIdea(raw)
+  if (idea.length < IDEA_MIN) return 'اكتب فكرتك بجملةٍ أو كلماتٍ قليلة أوّلًا'
+  if (idea.length > IDEA_MAX) return `الفكرةُ أطولُ من ${IDEA_MAX} محرف — اختصرها في جملٍ قليلة`
+  return null
+}
+
+/**
+ * مفتاحُ عدم التكرار للفكرة (D-004) — **بصمتُها ومنصّتُها**، لا نصُّها.
+ *
+ * فالفكرةُ نفسُها للمنصّة نفسِها لا تُكتب مرّتين ما دامت مسوّدتُها قائمة، والقاعدةُ هي
+ * التي تفصل (`UNIQUE`). وبصمةٌ لا نصّ: المفتاحُ يُقرأ في سجلّ النشر وصفوف المحاولات،
+ * وفكرةُ المالك لا تُنسَخ إلى كلّ موضعٍ يُطبَع فيه المفتاح.
+ */
+export async function ideaKey(idea: string, platform: Platform): Promise<string> {
+  const bytes = await digest(normalizeIdea(idea))
+  const hex = Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')
+  return `idea:${hex}:${platform}`
+}
+
+/**
+ * مسوّدةٌ من فكرة المالك — **البابُ نفسُه بمادّةٍ أخرى** (D-190).
+ *
+ * قال المالك: «يُفترض أن تكون الكتابةُ أسهل، وتنشأ من نصٍّ أو كلماتٍ بسيطة». وكانت لا تبدأ
+ * إلّا من مستندٍ في Drive حُلّل. فالفكرةُ هنا مادّةُ الكتابة بدل الخلاصة، **وكلُّ ما سواها
+ * كما هو**: وصفُ المنصّة وحدُّها، والحارسُ وسقفاه وسقفُ المزوّد، والكلفةُ قبل المسوّدة،
+ * والحالُ `draft` وحدها، والمرفوضُ يُحرِّر مفتاحَه.
+ */
+export async function draftFromIdea(
+  deps: DraftDeps,
+  rawIdea: string,
+  platform: Platform,
+): Promise<DraftOutcome> {
+  const spec = PLATFORMS[platform]
+  const idea = normalizeIdea(rawIdea)
+  const problem = ideaProblem(idea)
+  if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
+
+  // أكُتبت هذه الفكرةُ لهذه المنصّة ولم تُرفَض؟ — لا نداءَ ولا كلفة
+  const key = await ideaKey(idea, platform)
+  const existing = await deps.db
+    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
+    .bind(key)
+    .first<{ id: string; status: string }>()
+  if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
+
+  // ‏والدفترُ يُنسَب إلى الفكرة ببصمتها لا إلى المنشور (كالمصدر): كلفةُ الكتابة في
+  // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
+  const out = await writeOnce(deps, {
+    system: systemPrompt(spec, 'idea'),
+    user: ideaPrompt(idea),
+    schema: DRAFT_SCHEMA,
+    operation: `draft:${platform}`,
+    refId: key.slice(0, key.lastIndexOf(':')),
+  })
+  if (out.kind !== 'written') return out
+
+  const draft = readDraft(out.text, spec)
+  if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
+
+  return insertDraft(deps.db, {
+    platform, key, existing, sourceId: null, sourceHash: null, refs: [],
+    model: out.model, cost: out.cost, draft: draft.draft,
+  })
 }

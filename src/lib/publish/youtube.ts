@@ -37,6 +37,10 @@
  * له «نُشر» ثمّ لا يجده على قناته يظنّ العطلَ عندنا — وهي قاعدةُ صندوق
  * TikTok نفسُها (D-092).
  *
+ * **وبعد الإجازة `public` بقرار المالك** (D-190): تُجاز مراجعةُ YouTube API Services
+ * (M-28) فيقلب «النشرَ العلنيّ» في صفحة YouTube، ويُمرَّر هنا `public`. ولا يُستنتَج من
+ * شيء: لا ردَّ من Google يقول «أُجيز»، وطلبُ `public` قبلها يُقفَل خاصًّا بلا خبر.
+ *
  * ## وحصّةُ اليوم تُقال ولا تُكتشَف
  *
  * كان `videos.insert` يكلّف ‏١٦٠٠ وحدة (ستُّ رفعاتٍ يوميًّا). **وتبدّل مرّتين**
@@ -69,8 +73,9 @@ export const YT_DESCRIPTION_MAX = 5000
  */
 export const YT_CATEGORY = '22'
 
-/** السرّيّةُ المطلوبة — من `schemas.VideoStatus.privacyStatus.enum`. */
+/** السرّيّةُ المطلوبة — من `schemas.VideoStatus.privacyStatus.enum`. والعلنيّةُ بعد الإجازة (D-190). */
 export const YT_PRIVACY = 'private'
+export const YT_PUBLIC = 'public'
 
 /**
  * عنوانٌ صالح — **ولا زاويّتان فيه**.
@@ -86,6 +91,24 @@ export function youtubeTitle(text: string): string {
   const cut = clean.slice(0, YT_TITLE_MAX - 1)
   const space = cut.lastIndexOf(' ')
   return `${(space > YT_TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`
+}
+
+/**
+ * الوصفُ الذي يُرفع — **ما بعد سطر العنوان، لا النصُّ كلُّه** (D-190).
+ *
+ * كان الوصفُ النصَّ كلَّه، فبدأ وصفُ كلِّ مقطعٍ على YouTube بعنوانه مكرّرًا، وحقلُ «وصف
+ * YouTube» الذي راجعه المالكُ ليس فيه عنوان. فيُفرَّق النصُّ بالقاعدة التي يُجمع بها
+ * (`youtubeText`): سطرُه الأوّلُ عنوانٌ وما بعده وصف — **حين يُرفع ذلك السطرُ عنوانًا كما
+ * هو**. أمّا سطرٌ يُقصّ عند ‏100 أو يُنزَع منه «<>» أو نصٌّ من سطرٍ واحد فيبقى النصُّ كلُّه
+ * وصفًا كما كان: جملةٌ قُصّ عنوانُها لا تضيع، ولا يُرفع وصفٌ فارغ.
+ */
+export function youtubeDescription(text: string): string {
+  const whole = text.trim()
+  const cut = whole.indexOf('\n')
+  if (cut === -1) return whole
+  const head = whole.slice(0, cut).trim()
+  const rest = whole.slice(cut + 1).trim()
+  return rest !== '' && head !== '' && youtubeTitle(whole) === head ? rest : whole
 }
 
 export interface YouTubeOutcome extends PublishResult {
@@ -124,16 +147,20 @@ export async function publishYouTube(
   input: Clip | Upload,
   text: string,
   fetchImpl: typeof fetch = fetch,
+  /** `public` بقرار المالك بعد إجازة Google (D-190) — والافتراضُ خاصّ. */
+  options: { readonly public?: boolean } = {},
 ): Promise<YouTubeOutcome> {
   const clip = 'read' in input ? input : bytesClip(input)
   const size = clip.size
   if (size === 0) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
 
   const title = youtubeTitle(text)
-  const description = text.trim().slice(0, YT_DESCRIPTION_MAX)
+  // ‏والعنوانُ لا يتكرّر في أوّل الوصف (D-190): ما راجعه المالكُ في حقل الوصف هو ما يُرفع
+  const description = youtubeDescription(text).slice(0, YT_DESCRIPTION_MAX)
+  const privacy = options.public === true ? YT_PUBLIC : YT_PRIVACY
   const meta = {
     snippet: { title, description, categoryId: YT_CATEGORY },
-    status: { privacyStatus: YT_PRIVACY, selfDeclaredMadeForKids: false },
+    status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
   }
 
   // ١ — التهيئة: الوصفُ وحده، ولا بايتات. والحجمُ والنوعُ يُعلَنان في
@@ -218,8 +245,8 @@ export async function publishYouTube(
 
   return {
     platformPostId: id,
-    private: true,
-    request: { size, title_length: title.length, privacy: YT_PRIVACY },
+    private: privacy === YT_PRIVACY,
+    request: { size, title_length: title.length, privacy },
     response: { id },
   }
 }

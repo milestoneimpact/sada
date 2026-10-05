@@ -28,8 +28,9 @@ import {
 import { publishInstagram } from './instagram'
 import { isLinkedInPage } from '../channels'
 import { mediaUrl, signMediaToken } from '../media/link'
-import { publishTikTok } from './tiktok'
+import { publishTikTok, tiktokNote } from './tiktok'
 import { publishYouTube } from './youtube'
+import { readSettings } from '../settings'
 
 // ‏منصّاتُ المقاطع من جدول المطلوب (D-096 · D-172): الناشرُ والشاشةُ يقرآنها من موضعٍ واحد
 
@@ -347,6 +348,12 @@ export async function publishPost(
   // محاولةٍ من الطابور ترفع الصورةَ ثانية، **و X يحاسب على الرفع**.
   // فالإعادةُ تعيد استعمالَه ولا تدفع مرّتين (D-004).
   let result: PublishResult
+  /*
+   * ‏**وما طُبّق فعلًا يُحفظ ويُقال** (D-190): مستوى الخصوصيّة الذي طُلب، والصندوقُ أو
+   * ‏المستوى الأضيق حين لم يقع ما قرّره المالك. كان يُحسب عند النشر ثمّ يُرمى، فيقول صفُّ
+   * ‏المقطع «يُنشر للعامّة» والمقطعُ `SELF_ONLY` أو في الصندوق، ولا أثرَ يُرجَع إليه.
+   */
+  let note: string | null = null
   try {
     let mediaId = image?.platform_media_id ?? null
 
@@ -457,10 +464,16 @@ export async function publishPost(
         unitCost: 0,
         refId: post.id,
       })
-      const out =
-        post.platform === 'tiktok'
-          ? await publishTikTok(tokens.accessToken, clip, post.text, direct, fetchImpl)
-          : await publishYouTube(tokens.accessToken, clip, post.text, fetchImpl)
+      // ‏ومَن يرى المقطع من قرار المالك بعد الإجازة لا من ثابت (D-190) — والافتراضُ خاصّ
+      const reach = await readSettings(db)
+      let out: PublishResult
+      if (post.platform === 'tiktok') {
+        const tiktok = await publishTikTok(tokens.accessToken, clip, post.text, direct, fetchImpl, { public: reach.tiktokPublic })
+        note = tiktokNote(tiktok, reach.tiktokPublic)
+        out = tiktok
+      } else {
+        out = await publishYouTube(tokens.accessToken, clip, post.text, fetchImpl, { public: reach.youtubePublic })
+      }
       await db
         .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
         .bind(out.platformPostId, image!.id)
@@ -497,14 +510,25 @@ export async function publishPost(
     return { kind: 'failed', reason: failure.reason, retryable: failure.retryable }
   }
 
-  // ٦ — ما وقع فعلا
+  // ٦ — ما وقع فعلا، **وللمقطع ما طُلب معه** (الخصوصيّةُ والباب) وملاحظةُ ما لم يقع كما قُرّر
+  const response = typeof result.response === 'object' && result.response !== null && !Array.isArray(result.response)
+    ? { ...(result.response as Record<string, unknown>) }
+    : { response: result.response }
   await db
     .prepare(
       `UPDATE publish_attempts
           SET status = 'succeeded', platform_post_id = ?, response_json = ?
         WHERE id = ?`,
     )
-    .bind(result.platformPostId, JSON.stringify(result.response), attemptId)
+    .bind(
+      result.platformPostId,
+      JSON.stringify({
+        ...response,
+        ...(CLIP_PLATFORMS.has(post.platform) ? { request: result.request } : {}),
+        ...(note === null ? {} : { note }),
+      }),
+      attemptId,
+    )
     .run()
   await markPublished(db, post.id, result.platformPostId)
 

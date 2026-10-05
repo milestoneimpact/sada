@@ -34,3 +34,23 @@ describe('صفُّ المقطع بعد الإنشاء', () => {
     expect(html).toContain('مجدول')
   })
 })
+
+/*
+ * ‏**«نُشر» وحدَها لا تكفي** (مراجعة D-190): مقطعٌ وصل صندوقَ TikTok بلا نصّه، أو نُشر بأضيق
+ * ‏ممّا قرّره المالك، يُقال تحت منصّته بما قاله الناشرُ — لا علامةَ نجاحٍ خضراءَ وحدَها.
+ */
+describe('ما قاله الناشرُ عن نشرٍ لم يقع كما قُرّر', () => {
+  it('ملاحظةُ الناشر تحت المنشور المنشور، ولا شيءَ لغيره', () => {
+    const note = 'وصل صندوقَ تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
+    const html = videosSection([{
+      ...UP,
+      posts: [
+        { id: 'p-tt', platform: 'tiktok', status: 'published', note },
+        { id: 'p-yt', platform: 'youtube', status: 'published', note: null },
+        { id: 'p-ig', platform: 'instagram', status: 'draft' },
+      ],
+    }], NOW)
+    expect(html).toContain(note)
+    expect(html.match(/بلا نصّه/g)).toHaveLength(1)
+  })
+})

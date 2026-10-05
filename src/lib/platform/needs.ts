@@ -60,7 +60,11 @@ function ratio(w: number, h: number): string {
   return `${w}:${h}`
 }
 
-export function platformNeeds(platform: Platform): PlatformNeeds {
+/**
+ * و`isPublic` قرارُ المالك بعد إجازة المنصّة (D-190): YouTube وTikTok يصلان خاصَّين ما دام
+ * تطبيقُه لم يُجَز، فإن قلب العلنيَّ قالت المحطّةُ ذلك ولم تبقَ «تنشره بيدك».
+ */
+export function platformNeeds(platform: Platform, isPublic = false): PlatformNeeds {
   const measured = MEASURED.has(platform)
   const measure = !measured
     ? 'لا يُقاس لهذه المنصّة بعد'
@@ -87,17 +91,19 @@ export function platformNeeds(platform: Platform): PlatformNeeds {
     text: platform === 'x'
       ? `حتّى ${spec.hardLimit} محرفٍ موزون`
       : platform === 'youtube'
-        ? `السطرُ الأوّل عنوانٌ حتّى 100، والكلُّ حتّى ${spec.hardLimit}`
+        ? `السطرُ الأوّل عنوانٌ حتّى 100، وما بعده وصفٌ حتّى ${spec.hardLimit}`
         : `حتّى ${spec.hardLimit} محرف`,
     limit: spec.hardLimit,
     media: clip
       ? { kind: 'clip', required: true, spec: `مقطعٌ رأسيٌّ إلزاميّ ${ratio(size.width, size.height)} حتّى ${MAX_SECONDS}ث`, width: size.width, height: size.height }
       : { kind: 'image', required: false, spec: `اختياريّة ${size.width}×${size.height} (${ratio(size.width, size.height)})`, width: size.width, height: size.height },
-    publish: platform === 'tiktok'
-      ? 'يصل صندوقَ تطبيقك ثمّ تنشره بيدك'
-      : platform === 'youtube'
-        ? 'يُرفع إلى قناتك خاصًّا ثمّ تنشره بيدك'
-        : 'علنيٌّ فورَ موعده',
+    publish: clip && isPublic
+      ? 'علنيٌّ فورَ موعده — بعد إجازة تطبيقك'
+      : platform === 'tiktok'
+        ? 'يصل صندوقَ تطبيقك ثمّ تنشره بيدك'
+        : platform === 'youtube'
+          ? 'يُرفع إلى قناتك خاصًّا ثمّ تنشره بيدك'
+          : 'علنيٌّ فورَ موعده',
     cost: platform === 'x'
       ? `${money(X_PRICE_PER_POST)} للمنشور، و${money(X_PRICE_PER_POST_WITH_URL)} إن كان فيه رابط`
       : 'بلا رسم',

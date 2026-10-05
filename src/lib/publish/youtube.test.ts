@@ -8,8 +8,9 @@
 import { describe, expect, it } from 'vitest'
 import { PublishError } from './platforms'
 import {
-  publishYouTube, youtubeTitle, YT_CATEGORY, YT_DESCRIPTION_MAX, YT_PRIVACY, YT_TITLE_MAX,
+  publishYouTube, youtubeDescription, youtubeTitle, YT_CATEGORY, YT_DESCRIPTION_MAX, YT_PRIVACY, YT_PUBLIC, YT_TITLE_MAX,
 } from './youtube'
+import { youtubeText } from '../media/uploads'
 
 const CLIP = { bytes: new Uint8Array([1, 2, 3, 4, 5, 6]), mime: 'video/mp4' }
 const SESSION = 'https://upload.googleapis.com/session/abc'
@@ -112,14 +113,44 @@ describe('الخطوتان — وصفٌ ثمّ بايتات', () => {
     const out = await publishYouTube('tok', CLIP, 'عنوان', net())
     expect(out.private).toBe(true)
   })
+
+  it('وللعامّة حين قلبه المالكُ بعد الإجازة (D-190) — ويُقال إنّه ليس خاصًّا', async () => {
+    const out = await publishYouTube('tok', CLIP, 'عنوان', net(), { public: true })
+    const meta = calls[0]!.body as { status: { privacyStatus: string } }
+    expect(meta.status.privacyStatus).toBe(YT_PUBLIC)
+    expect(out.private).toBe(false)
+    expect(out.request).toMatchObject({ privacy: 'public' })
+  })
 })
 
 describe('العنوان — يُقصّ ويُنقّى قبل النداء', () => {
-  it('أوّلُ سطرٍ عنوانٌ، والنصُّ كلُّه وصف', async () => {
+  /*
+   * ‏**والعنوانُ لا يتكرّر في أوّل الوصف** (مراجعة D-190): كان الوصفُ النصَّ كلَّه، فبدأ وصفُ كلِّ
+   * ‏مقطعٍ بعنوانه، وحقلُ «وصف YouTube» الذي راجعه المالكُ ليس فيه عنوان.
+   */
+  it('أوّلُ سطرٍ عنوانٌ، وما بعده وصف — بلا العنوان مكرّرًا', async () => {
     await publishYouTube('tok', CLIP, 'الحوكمةُ تسبق السرعة\n\nوهذا شرحُها.', net())
     const meta = calls[0]!.body as { snippet: { title: string; description: string } }
     expect(meta.snippet.title).toBe('الحوكمةُ تسبق السرعة')
-    expect(meta.snippet.description).toContain('وهذا شرحُها.')
+    expect(meta.snippet.description).toBe('وهذا شرحُها.')
+  })
+
+  it('ونصٌّ من حقلَي المقطع يُرفع كما حُرّر: العنوانُ عنوانًا والوصفُ وصفًا', async () => {
+    const text = youtubeText('القيادةُ في أوّل مئة يوم', 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts')
+    await publishYouTube('tok', CLIP, text, net())
+    const meta = calls[0]!.body as { snippet: { title: string; description: string } }
+    expect(meta.snippet).toMatchObject({
+      title: 'القيادةُ في أوّل مئة يوم',
+      description: 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts',
+    })
+  })
+
+  it('وعنوانٌ يُقصّ أو نصٌّ من سطرٍ واحدٍ يبقى وصفُه النصَّ كلَّه — لا تضيع جملةٌ ولا يُرفع وصفٌ فارغ', () => {
+    expect(youtubeDescription('عنوانٌ وحده')).toBe('عنوانٌ وحده')
+    const long = `${'كلمة '.repeat(30).trim()}\nوالباقي`
+    expect(youtubeDescription(long)).toBe(long)
+    expect(youtubeDescription('أ <ب>\nوصف')).toBe('أ <ب>\nوصف')
+    expect(youtubeDescription('عنوان\nوصفٌ بسطرٍ واحد')).toBe('وصفٌ بسطرٍ واحد')
   })
 
   /**

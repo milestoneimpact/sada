@@ -9,6 +9,8 @@ import { saveTokens, upsertAccount } from '../tokens'
 import { X, LINKEDIN } from '../oauth/providers'
 import { fakeDb, fakeFetch, type FakeDb } from '../../test/fakes'
 import { publishPost } from './publisher'
+import { writeSetting } from '../settings'
+import { readJourney } from '../journey'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const NOW = () => new Date('2026-09-08T09:00:00.000Z')
@@ -565,6 +567,83 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
     expect(row.total).toBe(0)
   })
 
+  /*
+   * ‏**وعلنيُّ TikTok من إعداده هو** (مراجعة D-190): كان اختبارُ القلب لـ YouTube وحدَه، فتمرّ
+   * ‏الاختباراتُ كلُّها لو مُرّر `youtubePublic` إلى TikTok أو أُسقط الخيار.
+   */
+  it('ومَن يرى مقطعَ TikTok إعدادُه هو: لا creator_info بالافتراض ولا بقلب YouTube، وللجميع بقلبه', async () => {
+    const CREATOR = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/'
+    const postId = await seedTikTok({ scopes: 'user.info.basic video.upload video.publish' })
+    const routes = { ...TIKTOK_OK, [CREATOR]: { json: { data: { privacy_level_options: ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'] }, error: { code: 'ok' } } } }
+    const level = (f: ReturnType<typeof fakeFetch>): string =>
+      (JSON.parse(f.calls.find((c) => c.url === INIT_DIRECT)!.body) as { post_info: { privacy_level: string } }).post_info.privacy_level
+    const again = (): void => {
+      db.raw.exec(`DELETE FROM publish_attempts; UPDATE posts SET status = 'queued' WHERE id = '${postId}'`)
+    }
+
+    const first = fakeFetch(routes)
+    await publishPost({ ...deps(first), bucket: clipBucket }, { postId })
+    expect(first.calls.some((c) => c.url === CREATOR)).toBe(false)
+    expect(level(first)).toBe('SELF_ONLY')
+
+    again()
+    await writeSetting(db, 'youtube_public', 'true', 'test')
+    const youtubeOnly = fakeFetch(routes)
+    await publishPost({ ...deps(youtubeOnly), bucket: clipBucket }, { postId })
+    expect(youtubeOnly.calls.some((c) => c.url === CREATOR)).toBe(false)
+    expect(level(youtubeOnly)).toBe('SELF_ONLY')
+
+    again()
+    await writeSetting(db, 'tiktok_public', 'true', 'test')
+    const flipped = fakeFetch(routes)
+    await publishPost({ ...deps(flipped), bucket: clipBucket }, { postId })
+    const order = flipped.calls.map((c) => c.url)
+    expect(order.indexOf(CREATOR)).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf(CREATOR)).toBeLessThan(order.indexOf(INIT_DIRECT))
+    expect(level(flipped)).toBe('PUBLIC_TO_EVERYONE')
+  })
+
+  /*
+   * ‏**وما طُبّق فعلًا يُحفظ ويُقال** (مراجعة D-190): حسابٌ خاصٌّ لا يعرض العامّ فيُنشر
+   * ‏`SELF_ONLY` — وكان ذلك يُرمى بعد النشر، فلا أثرَ في القاعدة ولا في رحلة المنشور.
+   */
+  it('حسابٌ لا يعرض العامّ يُنشر بأضيق ما عُرض — والمستوى والملاحظةُ في المحاولة وفي الرحلة', async () => {
+    const CREATOR = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/'
+    const postId = await seedTikTok({ scopes: 'user.info.basic video.upload video.publish' })
+    await writeSetting(db, 'tiktok_public', 'true', 'test')
+    const f = fakeFetch({
+      ...TIKTOK_OK,
+      [CREATOR]: { json: { data: { privacy_level_options: ['FOLLOWER_OF_CREATOR', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'] }, error: { code: 'ok' } } },
+    })
+    expect((await publishPost({ ...deps(f), bucket: clipBucket }, { postId })).kind).toBe('published')
+    const row = db.raw.prepare(`SELECT response_json FROM publish_attempts WHERE post_id = ? AND status = 'succeeded'`)
+      .get(postId) as { response_json: string }
+    const saved = JSON.parse(row.response_json) as { publish_id: string; request: { privacy_level: string; direct: boolean }; note: string }
+    expect(saved.publish_id).toBe('pub-9')
+    expect(saved.request).toMatchObject({ privacy_level: 'SELF_ONLY', direct: true })
+    expect(saved.note).toContain('SELF_ONLY لا للعامّة')
+    const journey = await readJourney(db, postId)
+    const published = journey!.stations.find((x) => x.kind === 'publish')!
+    expect(published.detail).toContain('طُلب SELF_ONLY')
+    expect(published.detail).toContain('لا للعامّة')
+  })
+
+  /*
+   * ‏**والصندوقُ لا يُرسَل إليه نصّ** (مراجعة D-190): النصُّ المدفوعُ الذي راجعه المالكُ لا يصل
+   * ‏TikTok، فيُقال بعد النشر «بلا نصّه — الصقه»، لا «نُشر» وحدَها.
+   */
+  it('والصندوقُ يُقال بعد النشر: وصل بلا نصّه — ولماذا إن كان العلنيُّ مقلوبًا', async () => {
+    const postId = await seedTikTok()
+    await writeSetting(db, 'tiktok_public', 'true', 'test')
+    await publishPost({ ...deps(fakeFetch(TIKTOK_OK)), bucket: clipBucket }, { postId })
+    const row = db.raw.prepare(`SELECT response_json FROM publish_attempts WHERE post_id = ? AND status = 'succeeded'`)
+      .get(postId) as { response_json: string }
+    const saved = JSON.parse(row.response_json) as { request: { direct: boolean; privacy_level: string | null }; note: string }
+    expect(saved.request).toMatchObject({ direct: false, privacy_level: null })
+    expect(saved.note).toContain('بلا نصّه')
+    expect(saved.note).toContain('video.publish')
+  })
+
   it('ورمزٌ بلا نطاقِ رفعٍ يُردّ قبل النداء ويُسمّى الناقص', async () => {
     const postId = await seedTikTok({ scopes: 'user.info.basic' })
     const f = fakeFetch(TIKTOK_OK)
@@ -723,6 +802,28 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     expect(outcome.kind).toBe('failed')
     if (outcome.kind === 'failed') expect(outcome.reason).toContain('youtube.upload')
     expect(f.seen).toHaveLength(0)
+  })
+
+  /*
+   * ‏**ومَن يرى المقطع قرارُ المالك بعد الإجازة** (D-190): خاصٌّ بالافتراض، وعلنيٌّ حين يقلبه.
+   * ‏والإعدادُ يُقرأ عند النشر لا عند الجدولة — فمقطعٌ جُدول قبل الإجازة يخرج بقرار يومه.
+   */
+  it('خاصٌّ بالافتراض، وللعامّة بعد أن يقلب المالكُ «النشر العلنيّ»', async () => {
+    const postId = await seedYouTube()
+    const bodies: string[] = []
+    const capture = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = input.toString()
+      if (url.startsWith(SESSION)) return Response.json({ id: 'vid-7' })
+      bodies.push(String(init?.body ?? ''))
+      return new Response('', { status: 200, headers: { Location: SESSION } })
+    }) as typeof fetch
+    await publishPost({ ...deps(capture), bucket: clipBucket }, { postId })
+    expect(JSON.parse(bodies[0]!).status.privacyStatus).toBe('private')
+
+    db.raw.exec(`DELETE FROM publish_attempts; UPDATE posts SET status = 'queued' WHERE id = '${postId}'`)
+    await writeSetting(db, 'youtube_public', 'true', 'test')
+    await publishPost({ ...deps(capture), bucket: clipBucket }, { postId })
+    expect(JSON.parse(bodies[1]!).status.privacyStatus).toBe('public')
   })
 
   it('ونداءُ الرفع يُسجَّل موسوما بمزوّده — لا باسمٍ ثابت (D-008)', async () => {

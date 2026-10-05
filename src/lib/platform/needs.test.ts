@@ -29,4 +29,12 @@ describe('الجدولُ من مصادره', () => {
     expect(platformNeeds('tiktok').publish).toContain('صندوقَ تطبيقك')
     expect(platformNeeds('linkedin').cost).toBe('بلا رسم')
   })
+
+  it('وبعد أن يقلب المالكُ العلنيَّ لا تبقى «تنشره بيدك» (D-190)', () => {
+    expect(platformNeeds('youtube').publish).toContain('خاصًّا')
+    expect(platformNeeds('youtube', true).publish).toContain('علنيٌّ فورَ موعده')
+    expect(platformNeeds('tiktok', true).publish).toContain('علنيٌّ فورَ موعده')
+    // ‏ولا يمسّ ما ليس مقطعًا: LinkedIn علنيٌّ كما كان
+    expect(platformNeeds('linkedin', true).publish).toBe('علنيٌّ فورَ موعده')
+  })
 })

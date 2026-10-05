@@ -28,7 +28,7 @@ import { cfAccountId, cfAccountOf } from '../lib/ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate } from '../lib/image/gate'
 import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '../lib/media/readiness'
 import { analyzeSource } from '../lib/analyze/job'
-import { draftPost } from '../lib/draft/job'
+import { draftFromIdea, draftPost, ideaProblem, type DraftOutcome } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
 import { approveMany, decide, listDrafts, undoApprove, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
@@ -91,8 +91,8 @@ import {
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
-import { CHANNELS, isLinkedInPage, listAccounts, SETUP, viewChannels } from '../lib/channels'
-import { accountHealth, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
+import { CHANNELS, isLinkedInPage, linkStates, listAccounts, SETUP, viewChannels } from '../lib/channels'
+import { accountHealth, activeScopes, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
 import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
 import { clock, dayLabel, localParts, zoneOf } from '../lib/time/zone'
@@ -103,7 +103,10 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
-import { cutTitle, privateReach, scheduleFromUpload } from '../lib/media/uploads'
+import {
+  cutTitle, privateReach, reachOf, scheduleFromUpload, tiktokNeedsScope, VIDEO_PLATFORMS, type Reach,
+} from '../lib/media/uploads'
+import { captionIssues, captionsFor, readCaptions, saveCaptions, type VideoCaptions } from '../lib/media/captions'
 import { momentLabel, presetAt } from '../lib/time/local'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
@@ -250,6 +253,15 @@ async function guardPost(c: {
   }
 
   return { form, session }
+}
+
+/**
+ * مَن يرى المقطع الآن (D-190) — **قرارُ المالك ونطاقُ حساب TikTok النشط معًا**، بحكم الناشر
+ * نفسِه (`canUploadMedia`). موضعٌ واحدٌ لكلّ ما يقول «للعامّة» أو «خاصّ»: صفُّ المقطع وصفحةُ
+ * المنصّة وإشعارا الجدولة ومعاينةُ الخطّة — فلا يقرأ أحدُها الإعدادَ وحدَه.
+ */
+async function reachNow(db: Env['DB']): Promise<Reach> {
+  return reachOf(await readSettings(db), await activeScopes(db, 'tiktok'))
 }
 
 /** كلّ فعلٍ يعود إلى القسم الذي انطلق منه — لا إلى رأس الصفحة. */
@@ -517,7 +529,8 @@ panel.get('/panel', async (c) => {
   const configured = new Set(
     apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames),
   )
-  const channels = viewChannels(await listAccounts(c.env.DB), (name) => {
+  const accountsNow = await listAccounts(c.env.DB)
+  const channels = viewChannels(accountsNow, (name) => {
     if (configured.has(name)) return true
     const value = c.env[name as keyof Env]
     return typeof value === 'string' && value.length > 0
@@ -529,6 +542,16 @@ panel.get('/panel', async (c) => {
   // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
   const journey = await journeyCounts(c.env.DB, new Date())
   const uploads = await listUploads(c.env.DB)
+  /*
+   * ‏**ونصوصُ المقاطع المكتوبة من KV** (D-190) — لما بقي فيه ما يُنشأ وحدَه: مقطعٌ أُنشئ على
+   * ‏منصّاته كلِّها لا حقولَ له، فلا يُقرأ. قراءةٌ لكلّ مقطعٍ مفتوح، وهي قليلةٌ عادةً.
+   */
+  const captions: Record<string, VideoCaptions> = {}
+  for (const u of uploads) {
+    if (u.status !== 'ready' || VIDEO_PLATFORMS.every((p) => u.posts.some((x) => x.platform === p))) continue
+    const found = await readCaptions(c.env.KV, u.id)
+    if (found !== null) captions[u.id] = found
+  }
   // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
   const facts = await ownerFacts(c)
   const ownerPending = pendingCount(facts)
@@ -603,6 +626,8 @@ panel.get('/panel', async (c) => {
   const expiring = (await expiringTokens(c.env.DB, new Date())).map((e) => ({
     platform: e.platform, displayName: e.displayName, kind: e.kind, daysLeft: e.daysLeft,
   }))
+  // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
+  const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, 'tiktok'))
   return page((nonce) =>
     panelPage({
       // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
@@ -761,6 +786,10 @@ panel.get('/panel', async (c) => {
       openSuggestions: openCount,
       journey,
       uploads,
+      captions,
+      // ‏أمتّصلةٌ كلُّ منصّة، ومَن يرى المقطع — حيث تُختار المنصّة (D-190)
+      links: linkStates(accountsNow),
+      reach: videoReach,
       promoCap: allowance.settings.weeklyPromoCapUsd,
       ownerPending,
       expiring,
@@ -1044,6 +1073,24 @@ panel.post('/panel/settings', async (c) => {
           text: `اخترتَ ${asked} — وحُفظت ${n}. والحدُّ من ${TILE_MIN} إلى ${TILE_MAX}،`
             + ' وما دون الأدنى يعود إلى الأربع الأصليّة.',
         }
+  } else if (key === 'youtube_public' || key === 'tiktok_public') {
+    // ‏مَن يرى المقطع (D-190) — يُقال بما سيقع لا بـ«true»
+    const name = key === 'youtube_public' ? 'YouTube' : 'TikTok'
+    // ‏وTikTok بحكم الناشر: قلبٌ بلا `video.publish` يبقى صندوقًا — يُقال الآن لا بعد أوّل مقطع
+    const noScope = key === 'tiktok_public' && result.stored === 'true'
+      && tiktokNeedsScope(await reachNow(c.env.DB))
+    flash = noScope
+      ? {
+          kind: 'warn',
+          text: 'قُلب النشرُ على TikTok للعامّة، وحسابُك المربوط بلا video.publish — فيصل كلُّ مقطعٍ صندوقَ تطبيقك'
+            + ' بلا نصّه حتّى تربطه من جديد وتمنحه («اربط حسابا آخر» في الإعداد، بالحساب نفسِه).',
+        }
+      : result.stored === 'true'
+      ? { kind: 'ok', text: `صار النشرُ على ${name} للعامّة — يُطلب لكلّ مقطعٍ في موعده.` }
+      : {
+          kind: 'ok',
+          text: `عاد النشرُ على ${name} خاصًّا — تنشر المقاطعَ أنت ${key === 'youtube_public' ? 'من YouTube Studio' : 'من تطبيق TikTok'}.`,
+        }
   } else if (result.clamped) {
     flash = {
       kind: 'warn',
@@ -1054,6 +1101,9 @@ panel.post('/panel/settings', async (c) => {
   }
 
   await setFlash(c.env, c.req.raw, flash)
+  // ‏ومفتاحٌ في صفحة منصّةٍ يعود إليها لا إلى «الحدود» (D-172 · D-190): من قائمةٍ مغلقة
+  const to = backTo(form.get('return'), '')
+  if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return back('settings')
 })
 
@@ -1610,7 +1660,13 @@ panel.get('/panel/channels/:platform', async (c) => {
   const platform = id as Platform
   const tab = tabOf(c.req.query('tab'), c.req.query('show'))
   const filter = filterOf(c.req.query('filter'), c.req.query('show'))
-  const needs = publishes ? platformNeeds(platform) : null
+  // ‏ومَن يرى المقطع على YouTube وTikTok قرارُ المالك بعد الإجازة (D-190) — يُقرأ هنا ويُقلَب في «الإعداد»
+  // ‏والمحطّةُ بما سيقع (حكمُ الناشر: TikTok بلا `video.publish` صندوقٌ)، والمفتاحُ بقرار المالك
+  const reach = platform === 'youtube' || platform === 'tiktok' ? await reachNow(c.env.DB) : null
+  const clipReach = reach === null || (platform !== 'youtube' && platform !== 'tiktok')
+    ? undefined
+    : platform === 'tiktok' ? reach.tiktokWanted === true : reach.youtube
+  const needs = publishes ? platformNeeds(platform, reach !== null && reach[platform as 'youtube' | 'tiktok']) : null
   // ‏وكلُّ قراءةٍ لما يُعرض في تبويبها — الإعدادُ لا يقرأ الخطَّ الزمنيّ ولا العكس
   const timeline = publishes && tab !== 'setup'
   const [posts, tally, counts, upcomingRows, historyPage, waitingRows] = await Promise.all([
@@ -1658,6 +1714,8 @@ panel.get('/panel/channels/:platform', async (c) => {
     zone: zoneOf(c.req.header('Cookie') ?? null),
     // ‏ووميضُ الفعل يُقرأ حيث عاد المالك، لا في لوحٍ لم يفتحه
     flash: await takeFlash(c.env, c.req.raw),
+    ...(clipReach === undefined ? {} : { reachPublic: clipReach }),
+    ...(platform === 'tiktok' && reach !== null ? { reachNoScope: tiktokNeedsScope(reach) } : {}),
   })
   return page((nonce) =>
     // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا
@@ -1728,6 +1786,13 @@ async function ownerFacts(c: {
     // قراراتُ المالك تُقاس من الإعدادات نفسِها لا من يد (D-130)
     tilesChosen: chosenTiles(ownerSettings.dashboardTiles).length,
     promoCapUsd: ownerSettings.weeklyPromoCapUsd,
+    // ‏والقلبُ دليلٌ لا حكم: الإجازةُ عند المنصّة (D-190)
+    publicReach: new Set([
+      ...(ownerSettings.youtubePublic ? ['youtube'] : []),
+      ...(ownerSettings.tiktokPublic ? ['tiktok'] : []),
+    ]),
+    // ‏وقلبٌ بلا `video.publish` يبقى صندوقًا — بحكم الناشر (D-190)
+    tiktokNoScope: tiktokNeedsScope(reachOf(ownerSettings, await activeScopes(c.env.DB, 'tiktok'))),
   }
 }
 
@@ -1978,7 +2043,12 @@ panel.post('/panel/drafts/write', async (c) => {
           ? { kind: 'warn', text: outcome.reason }
           : outcome.kind === 'not_analyzed'
             ? { kind: 'warn', text: outcome.reason }
-            : { kind: 'bad', text: `تعذّرت الكتابة: ${outcome.reason}` }
+            : {
+                kind: 'bad',
+                text: `تعذّرت الكتابة: ${outcome.reason}${outcome.cost === undefined
+                  ? ''
+                  : ` — ودُفع ثمنُ المحاولة المردودة ${money(outcome.cost)}، والإعادةُ تدفع ثانيةً`}`,
+              }
 
   await record(
     c.env.DB,
@@ -1991,6 +2061,97 @@ panel.post('/panel/drafts/write', async (c) => {
   await setFlash(c.env, c.req.raw, flash)
   // ‏والمسوّدةُ الجديدةُ في بطاقتها لا عند رأس اللوح، وما لم يُكتب يعود إلى نموذج الكتابة
   return outcome.kind === 'drafted' || outcome.kind === 'already' ? toCard('d', outcome.postId) : back('write')
+})
+
+/**
+ * «اكتب من فكرتك» (D-190) — **جملةٌ أو كلماتٌ ← مسوّدةٌ لكلّ منصّةٍ مكتوبةٍ اختارها المالك**.
+ *
+ * نداءٌ لكلّ منصّةٍ بـ `draftFromIdea`، بحرّاس `draftPost` كلِّها (`writer.ts`): الإيقافُ
+ * والسقفان وسقفُ المزوّد، والكلفةُ قبل المسوّدة، ومفتاحٌ من بصمة الفكرة ومنصّتها. وحاجزٌ
+ * بلغه الأوّلُ يوقف الثاني فلا يُسأل مرّتين. **ثمّ يعود المالكُ إلى أوّل بطاقةٍ جديدة**،
+ * لا إلى رأس اللوح — ومعه ما لا يُجدوَل منها لأنّ منصّتَه غيرُ متّصلة.
+ */
+const IDEA_PLATFORMS: readonly Platform[] = ['linkedin', 'x']
+
+panel.post('/panel/drafts/idea', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+  const idea = String(form.get('idea') ?? '')
+  const asked = form.getAll('platform').map(String)
+  const chosen = IDEA_PLATFORMS.filter((p) => asked.includes(p))
+  if (chosen.length === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اختر منصّةً واحدةً على الأقلّ — LinkedIn أو X.' })
+    return back('idea')
+  }
+
+  // ‏فكرةٌ فارغةٌ أو طويلة تُردّ مرّةً قبل أيّ نداء، لا مرّةً لكلّ منصّة
+  const problem = ideaProblem(idea)
+  if (problem !== null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: problem })
+    return back('idea')
+  }
+
+  const deps = { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> }
+  const done: { platform: Platform; outcome: DraftOutcome }[] = []
+  for (const platform of chosen) {
+    const outcome = await draftFromIdea(deps, idea, platform)
+    done.push({ platform, outcome })
+    // ‏حاجزٌ (إيقافٌ أو سقف) يحجز الثانيةَ كما حجز الأولى — فلا يُسأل مرّتين
+    if (outcome.kind === 'blocked') break
+  }
+  await record(
+    c.env.DB,
+    { actor: 'panel', action: 'draft.idea', target: chosen.join(','), detail: done.map((d) => `${d.platform}:${d.outcome.kind}`).join(' ') },
+    c.req.raw,
+  )
+
+  const label = (p: string): string => platformLabel(p)
+  const names = (list: readonly { platform: string }[]): string => list.map((x) => label(x.platform)).join(' و')
+  const drafted = done.filter((d): d is { platform: Platform; outcome: Extract<DraftOutcome, { kind: 'drafted' }> } => d.outcome.kind === 'drafted')
+  const already = done.filter((d): d is { platform: Platform; outcome: Extract<DraftOutcome, { kind: 'already' }> } => d.outcome.kind === 'already')
+  const stopped = done.filter((d) => d.outcome.kind === 'blocked' || d.outcome.kind === 'failed' || d.outcome.kind === 'not_analyzed')
+  const spent = drafted.reduce((sum, d) => sum + d.outcome.cost, 0)
+  // ‏ما كُتب لمنصّةٍ غيرِ متّصلة يُعتمَد ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
+  const links = linkStates(await listAccounts(c.env.DB))
+  const unlinked = [...drafted, ...already].filter((d) => links[d.platform] !== 'linked')
+  const parts: string[] = []
+  if (drafted.length > 0) {
+    parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدةُ' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
+  }
+  if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدةُ' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودةٌ — لم يُنفَق عليها شيء.`)
+  for (const d of stopped) {
+    const why = (d.outcome as { reason: string }).reason
+    // ‏ومحاولةٌ رُدّ جوابُها بعد أن دُفع ثمنُه تُقال بكلفتها: كان الرقمُ الوحيدُ في الإشعار أقلَّ ممّا أُنفق
+    const paid = d.outcome.kind === 'failed' ? d.outcome.cost : undefined
+    parts.push(d.outcome.kind === 'blocked'
+      ? `${why}.`
+      : `تعذّرت ${label(d.platform)}: ${why}${paid === undefined ? '' : ` — ودُفع ثمنُ المحاولة المردودة ${money(paid)}، والإعادةُ تدفع ثانيةً`}.`)
+  }
+  if (unlinked.length > 0) parts.push(`ولا حسابَ متّصلًا على ${names(unlinked)}: تُعتمَد ولا تُجدوَل حتّى تربطه.`)
+  const flash: PanelFlash = {
+    kind: stopped.some((d) => d.outcome.kind === 'failed')
+      ? (drafted.length + already.length > 0 ? 'warn' : 'bad')
+      : stopped.length > 0 || unlinked.length > 0 ? 'warn' : 'ok',
+    text: parts.join(' '),
+  }
+
+  /*
+   * ‏إلى أوّل بطاقةٍ جديدة — وما كُتب من قبل خارجَ النافذة إلى رحلته (كـ «اكتب مسوّدة»)، **حين
+   * ‏لا شيءَ غيرُه يُقال**: رحلةُ المنشور لا تقرأ الإشعار، فكان فشلُ X المدفوعُ و«لا حسابَ
+   * ‏متّصلًا» يضيعان مع قديمٍ لـ LinkedIn خارجَ اللوح. وما يُقال يعود إلى البطاقة إن كانت في
+   * ‏اللوح، وإلّا إلى «اكتب من فكرتك» حيث يُقرأ.
+   */
+  const first = drafted[0]?.outcome.postId ?? already[0]?.outcome.postId
+  if (first === undefined) {
+    await setFlash(c.env, c.req.raw, flash)
+    return back('idea')
+  }
+  const onlyAlready = drafted.length === 0 && stopped.length === 0 && unlinked.length === 0
+  const shown = await onBoard(c.env.DB, first)
+  if (onlyAlready && !shown) return toJourney(first)
+  await setFlash(c.env, c.req.raw, flash)
+  return shown ? toCard('d', first) : back('idea')
 })
 
 /**
@@ -2212,7 +2373,8 @@ panel.post('/panel/drafts/schedule', async (c) => {
   const scheduled = result.ok
     ? await c.env.DB.prepare('SELECT platform FROM posts WHERE id = ?').bind(id).first<{ platform: string }>()
     : null
-  const reach = scheduled === null ? null : privateReach([scheduled.platform])
+  // ‏ويسكت حين قلب المالكُ النشرَ علنيًّا بعد الإجازة (D-190)
+  const reach = scheduled === null ? null : privateReach([scheduled.platform], await reachNow(c.env.DB))
   if (reach !== null) flash = { ...flash, text: `${flash.text} ${reach}` }
 
   await record(
@@ -2526,35 +2688,137 @@ panel.post('/panel/uploads/:id/abort', async (c) => {
   return Response.json({ ok: true })
 })
 
+/**
+ * «اكتب النصوص» من صفّ المقطع (D-190) — **نداءٌ واحدٌ بضغطة المالك**، بحرّاس الكتابة كلِّها
+ * (`captionsFor` ← `writeOnce`)، والكلفةُ في الدفتر قبل أن تُعرَض النصوص. ولا يُنشأ منشور:
+ * تُحفظ النصوصُ يومًا في KV وتُرسم في حقولٍ يحرّرها، ثمّ «أنشئ المنشورات» كما كان.
+ */
+panel.post('/panel/uploads/:id/captions', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = c.req.param('id')
+  const out = await captionsFor(
+    {
+      db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, kv: c.env.KV,
+      workerSecrets: c.env as unknown as Record<string, string | undefined>,
+    },
+    id,
+    String(gate.form.get('about') ?? ''),
+    // ‏«أعد كتابتها» تحمل `at` النصوص التي على الشاشة: تُكتب من جديد مرّةً، وإعادتُها لا تُكلّف
+    String(gate.form.get('replace') ?? ''),
+  )
+  await record(c.env.DB, {
+    actor: 'panel', action: 'upload.captions', target: id,
+    detail: out.kind === 'written' ? `written · ${money(out.captions.cost)}` : out.kind === 'already' ? 'already' : `${out.kind}:${out.reason}`.slice(0, 200),
+  }, c.req.raw)
+  const flash: PanelFlash = out.kind === 'written'
+    ? {
+        kind: Object.keys(captionIssues(out.captions)).length === 0 ? 'ok' : 'warn',
+        text: `كُتبت نصوصُ YouTube وTikTok وInstagram — الكلفة ${money(out.captions.cost)}. راجعها تحت المقطع ثمّ «أنشئ المنشورات».${
+          Object.keys(captionIssues(out.captions)).length === 0 ? '' : ' وفي بعضها ما يُصلَح قبل الإنشاء — والسببُ تحت حقله.'}`,
+      }
+    : out.kind === 'already'
+      ? { kind: 'ok', text: 'النصوصُ من هذا الوصف مكتوبةٌ وهي هذه — لم يُنفَق شيء. ولنصوصٍ أخرى «أعد كتابتها» من صفّ المقطع.' }
+      : out.kind === 'blocked'
+        ? { kind: 'warn', text: out.reason }
+        // ‏وما دُفع في المحاولة المردودة يُقال: «تعذّرت» وحدَها تُري أقلَّ ممّا أُنفق
+        : {
+            kind: 'bad',
+            text: `تعذّرت كتابة النصوص: ${out.reason}${out.cost === undefined
+              ? ''
+              : ` — وكلّفت المحاولةُ ${money(out.cost)}، والإعادةُ تدفع ثانيةً`}`,
+          }
+  await setFlash(c.env, c.req.raw, flash)
+  return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
+})
+
 panel.post('/panel/uploads/:id/posts', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const id = c.req.param('id')
+  const form = gate.form
+  /*
+   * ‏**نصٌّ لكلّ منصّةٍ حين كُتبت النصوص** (D-190): الحقولُ الأربعةُ من صفّ المقطع، وما لم
+   * ‏يُرسَم منها (منصّةٌ أُنشئ منشورُها) يبقى بما حُفظ. ونموذجٌ قديمٌ بلا `per_platform` يمرّ
+   * ‏بنصّه الواحد كما كان.
+   */
+  const perPlatform = form.get('per_platform') === '1'
+  const cached = perPlatform ? await readCaptions(c.env.KV, id) : null
+  /*
+   * ‏**ومَن كتبها يصل مع النموذج** (D-190): الحقولُ لكلّ منصّةٍ لا تُرسم إلّا لنصوصٍ كتبها
+   * ‏النموذج، فإن انتهى يومُها في KV أو سقطت قراءتُها لم تصر نصوصَ المالك. فالمحفوظُ أوّلًا،
+   * ‏ثمّ اسمُ النموذج المرسوم مع الحقول بنمطٍ ضيّق، وإلّا علامةٌ تقول «آليٌّ مجهولُ المصدر».
+   */
+  const sent = String(form.get('caption_model') ?? '')
+  const model = cached?.model
+    ?? (!perPlatform ? undefined : /^[\w.:/-]{1,80}$/.test(sent) && sent !== 'owner' ? sent : 'captions:unknown')
+  const pick = (name: string, prev: string): string => {
+    const v = form.get(name)
+    return v === null ? prev : String(v)
+  }
+  const texts = {
+    youtubeTitle: pick('title_youtube', cached?.youtubeTitle ?? ''),
+    youtubeDescription: pick('caption_youtube', cached?.youtubeDescription ?? ''),
+    tiktok: pick('caption_tiktok', cached?.tiktok ?? ''),
+    instagram: pick('caption_instagram', cached?.instagram ?? ''),
+  }
   const result = await postsFromUpload(c.env.DB, {
     uploadId: id,
-    platforms: gate.form.getAll('platform').map(String),
-    caption: String(gate.form.get('caption') ?? ''),
-    approve: gate.form.get('approve') === 'on',
+    platforms: form.getAll('platform').map(String),
+    ...(perPlatform
+      ? {
+          captions: { youtube: texts.youtubeDescription, tiktok: texts.tiktok, instagram: texts.instagram },
+          title: texts.youtubeTitle,
+        }
+      : { caption: String(form.get('caption') ?? '') }),
+    approve: form.get('approve') === 'on',
     by: gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+    // ‏مَن كتبها: النموذجُ وراجعها المالك — فيُقرأ في رحلة المنشور
+    ...(model === undefined ? {} : { model }),
+    /*
+     * ‏**وحصّتُه من كلفة الكتابة** (D-190): نداءٌ واحدٌ كتب للمنصّات الثلاث، فلكلّ منشورٍ ثلثُه
+     * ‏في `cost_usd` — كمسوّدة المصدر والفكرة — والدفترُ باسم المقطع فلا يُعَدّ مرّتين. كان
+     * ‏`0` بجانب اسم النموذج في محطّة «كُتبت المسوّدة»، وكلفتُها لا تُرى إلّا في مجموع اليوم.
+     */
+    ...(cached === null ? {} : { cost: cached.cost / VIDEO_PLATFORMS.length }),
   })
+  /*
+   * ‏وما حرّره المالكُ يبقى في حقوله: إنشاءٌ رُدّ لا يُعيده إلى ما كُتب له — **ولو انتهى يومُ
+   * ‏المحفوظ**: كان الحفظُ مشروطًا به، فيعود الصفُّ إلى مربّعٍ واحدٍ فارغ وتضيع الحقولُ الأربعة.
+   */
+  if (perPlatform) {
+    try {
+      await saveCaptions(c.env.KV, id, cached !== null
+        ? { ...cached, ...texts }
+        : { about: '', ...texts, model: model ?? 'captions:unknown', cost: 0, at: new Date().toISOString() })
+    } catch (error) {
+      // ‏المنشوراتُ كُتبت أو رُدّت بسببها — وحفظُ الحقول تحسينٌ لا يُسقط الإشعار
+      console.error({ job: 'upload.posts', captions_save_failed: String(error).slice(0, 200) })
+    }
+  }
   await record(c.env.DB, {
     actor: 'panel', action: 'upload.posts', target: id,
     detail: result.ok ? `created:${result.created.join(',')} skipped:${result.skipped.join(',')}` : `refused:${result.reason}`.slice(0, 200),
   }, c.req.raw)
   const label = (p: string): string => platformLabel(p)
   // ‏عنوانُ YouTube فوق حدّه يُقصّ عند الرفع (ر-4): يُقال الآن بما سيُرفع، لا يُكتشف في القناة
-  const cut = result.ok && result.created.includes('youtube') ? cutTitle(String(gate.form.get('caption') ?? '')) : null
+  const cut = result.ok && !perPlatform && result.created.includes('youtube') ? cutTitle(String(form.get('caption') ?? '')) : null
+  // ‏ومنصّةٌ غيرُ متّصلةٍ يُنشأ منشورُها ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
+  const links = result.ok ? linkStates(await listAccounts(c.env.DB)) : {}
+  const unlinked = result.ok ? result.created.filter((p) => links[p] !== 'linked') : []
   await setFlash(c.env, c.req.raw, !result.ok
     ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
     : result.created.length === 0
       ? { kind: 'bad', text: `موجودٌ من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
       : {
-          kind: cut === null ? 'ok' : 'warn',
-          text: `أُنشئ على ${result.created.map(label).join(' و')}${gate.form.get('approve') === 'on'
+          kind: cut === null && unlinked.length === 0 ? 'ok' : 'warn',
+          text: `أُنشئ على ${result.created.map(label).join(' و')}${form.get('approve') === 'on'
             ? ' معتمَدًا — جدوِله تحت المقطع بموعدٍ واحد، أو من بطاقة كلٍّ.'
             : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
             ? ''
-            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}`,
+            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0
+            ? ''
+            : ` ولا حسابَ متّصلًا على ${unlinked.map(label).join(' و')}: لا يُجدوَل حتّى تربطه.`}`,
         })
   // ‏ويعود إلى صفّ المقطع نفسِه: عليه روابطُ منشوراته وزرُّ جدولتها
   return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
@@ -2581,7 +2845,7 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   })
   const names = (list: readonly string[]): string => [...new Set(list)].map((p) => platformLabel(p)).join(' و')
   const failed = result === null ? '' : result.failed.map((f) => `${platformLabel(f.platform)}: ${f.reason}`).join('؛ ')
-  const reach = result === null ? null : privateReach(result.scheduled)
+  const reach = result === null ? null : privateReach(result.scheduled, await reachNow(c.env.DB))
   const flash: PanelFlash = at === null || result === null
     ? { kind: 'bad', text: 'لم يُجدوَل شيء: موعدٌ لا أعرفه — اختر أحدَ أزرار الموعد.' }
     : result.scheduled.length === 0
@@ -2681,9 +2945,10 @@ panel.get('/panel/plan-import/:id', async (c) => {
         planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
   }
   const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
+  const reach = await reachNow(c.env.DB)
   return page((nonce) =>
     soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
-      injectCsrf(planImportScreen(id, read), session.record.csrf), nonce, '',
+      injectCsrf(planImportScreen(id, read, new Date(), reach), session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })

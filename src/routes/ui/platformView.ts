@@ -28,7 +28,7 @@ import { SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
 import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platform/screen'
 import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
-import type { Platform } from '../../lib/oauth/providers'
+import { platformLabel, type Platform } from '../../lib/oauth/providers'
 import { counted, money, NOUNS, parseSqliteUtc, relativeTime, shortAgo, untilTime } from '../../lib/format'
 import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 import type { AppStatus } from '../../lib/oauth/apps'
@@ -51,6 +51,8 @@ import { readiness, type Readiness } from '../../lib/platform/readiness'
 import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
 import { returnTo } from '../../lib/nav/back'
 import { emptyState } from './components/empty'
+import { button } from './components/button'
+import { card } from './components/card'
 
 /** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -94,6 +96,16 @@ export interface PlatformScreenData {
   /** وميضُ آخر فعلٍ عاد إلى هذه الصفحة. */
   readonly flash: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
   readonly now: Date
+  /**
+   * أيُنشَر للعامّة؟ (D-190) — لـ YouTube وTikTok وحدهما، قرارُ المالك بعد الإجازة.
+   * وغيابُه: منصّةٌ لا خيارَ فيها (تنشر للعامّة دائمًا أو لا تنشر مقطعًا).
+   */
+  readonly reachPublic?: boolean
+  /**
+   * لـ TikTok: قُلب العلنيُّ ولا حسابَ نشطًا بـ `video.publish` (D-190) — فالناشرُ يرسل إلى
+   * صندوق التطبيق، وتقول البطاقةُ ذلك بدل «للعامّة».
+   */
+  readonly reachNoScope?: boolean
 }
 
 const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
@@ -715,6 +727,60 @@ function mediaSection(d: PlatformScreenData): string {
 
 // ── تبويب «الإعداد» ───────────────────────────────────────────────────
 
+/**
+ * «مَن يرى ما تنشره» (D-190) — **مفتاحُ النشر العلنيّ يقلبه المالكُ بعد الإجازة**.
+ *
+ * YouTube يُقفل ما يُرفع من مشروعٍ لم يُجَز على «خاصّ» مهما طُلب، وTikTok لا يقبل من تطبيقٍ
+ * لم يُجَز إلّا `SELF_ONLY`. فكان «خاصّ» ثابتًا في السائقين، والمالكُ يسأل «لماذا لا أنشر
+ * على YouTube؟» ولا جوابَ في شاشته. فالجوابُ هنا والمفتاحُ بجانبه: افتراضُه خاصّ، **ولا
+ * يُقلَب من شيءٍ غير يده** — لا ردَّ من المنصّة يقول «أُجيز».
+ */
+function reachCard(platform: 'youtube' | 'tiktok', isPublic: boolean, noScope = false): string {
+  const who = platform === 'youtube' ? 'Google' : 'TikTok'
+  const where = platform === 'youtube' ? 'من YouTube Studio' : 'من تطبيق TikTok'
+  const why = platform === 'youtube'
+    ? 'Google تقفل ما يُرفع من تطبيقٍ لم تُجِزه على «خاصّ» مهما طُلب.'
+    : 'TikTok لا تقبل من تطبيقٍ لم تُجِزه للنشر المباشر إلّا منشورًا لا يراه غيرُك.'
+  const after = platform === 'youtube'
+    ? 'فيُنشر كلُّ مقطعٍ للعامّة في موعده.'
+    : 'فيُنشر للعامّة إن سمح حسابُك بذلك، وإلّا فبأضيق ما يسمح به.'
+  // ‏وTikTok «للعامّة إن سمح حسابُك» لا مطلقًا: حسابٌ خاصٌّ لا يُعرض فيه العامّ (D-190)
+  const flipped = platform === 'youtube'
+    ? 'يُنشر كلُّ مقطعٍ على YouTube للعامّة في موعده.'
+    : 'يُطلب لكلّ مقطعٍ على TikTok النشرُ للعامّة في موعده، إن سمح حسابُك بذلك، وإلّا فبأضيق ما يسمح به.'
+  const body = isPublic && noScope
+    ? `<p class="hint"><b>قلبتَ النشرَ العلنيّ، وحسابُ TikTok المربوط لم يُمنح <bdi dir="ltr">video.publish</bdi></b>
+         — فيصل كلُّ مقطعٍ صندوقَ تطبيقك بلا نصّه، لا حسابَك، حتّى تمنحه. اضغط «اربط حسابا آخر» أعلاه
+         وادخل بالحساب نفسِه ووافق على النشر المباشر: يُحدَّث الحسابُ نفسُه ولا يُضاف ثانٍ.</p>`
+    : isPublic
+    ? `<p class="hint">${flipped}
+         <b>وإن لم تكن ${who} قد أجازت تطبيقك</b> فسيصل خاصًّا رغم ذلك — أعده خاصًّا حتّى تُجاز.</p>`
+    : `<p class="hint">${why} فيصل كلُّ مقطعٍ خاصًّا، وتنشره أنت ${where}.
+         <b>وبعد أن تُجيز ${who} تطبيقَك</b> اقلب هذا، ${after}
+         <a class="tap" href="/panel/tasks">ما عليك لتُجاز</a></p>`
+  const confirm = isPublic
+    ? `يعود كلُّ مقطعٍ على ${platformLabel(platform)} خاصًّا تنشره أنت ${where}. أتمضي؟`
+    : `أأجازت ${who} تطبيقك؟ قبل الإجازة يصل المقطعُ خاصًّا مهما طُلب. من الآن يُطلب لكلّ مقطعٍ على ${platformLabel(platform)} النشرُ للعامّة.`
+  return `<h3 class="sec" id="reach">مَن يرى ما تنشره</h3>
+    ${card({
+      title: `النشرُ العلنيّ — بعد إجازة ${who}`,
+      action: isPublic && noScope
+        ? statusBadge('warn', '!', 'يصل الصندوق')
+        : isPublic ? statusBadge('ok', '●', 'للعامّة') : statusBadge('warn', '!', 'خاصّ'),
+      body: `${body}
+      <form class="inline" method="POST" action="/panel/settings" data-confirm="${escapeHtml(confirm)}" data-busy="جارٍ الحفظ…">
+        <input type="hidden" name="key" value="${platform}_public">
+        <input type="hidden" name="value" value="${isPublic ? 'false' : 'true'}">
+        <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'setup'))}">
+        ${button({
+          label: isPublic ? 'أعده خاصًّا' : 'انشر للعامّة',
+          variant: isPublic ? 'secondary' : 'primary',
+          type: 'submit',
+        })}
+      </form>`,
+    })}`
+}
+
 function setupSection(d: PlatformScreenData, r: Readiness): string {
   const { spec, state, accounts } = d.view
   const platform = spec.id as Platform
@@ -761,6 +827,9 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
       : accountBlocks}
     ${state === 'linked' && unsignedAccounts(d.view).length === 0
       ? `<div class="acct-more"><a class="btn btn-secondary" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a></div>`
+      : ''}
+    ${(spec.id === 'youtube' || spec.id === 'tiktok') && d.reachPublic !== undefined
+      ? reachCard(spec.id, d.reachPublic, d.reachNoScope === true)
       : ''}
     ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n${setup}`}`
 }

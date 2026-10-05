@@ -244,3 +244,15 @@ describe('مهامُّ الربط وخطواتُها (ر-1)', () => {
     expect(taskDoc('M-24')).toBe('https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24')
   })
 })
+
+/*
+ * ‏**ودليلُ M-29 بحكم الناشر** (مراجعة D-190): قلبُ العلنيّ وحسابٌ بلا `video.publish` يبقى
+ * ‏صندوقًا، فلا يُقال «مقلوبٌ بقرارك» وحدَها كأنّ الإجازةَ عملت.
+ */
+describe('دليلُ M-29', () => {
+  const m29 = OWNER_TASKS.find((t) => t.code === 'M-29')!
+  it('القلبُ بلا النطاق يُقال صندوقًا، وبالنطاق قرارًا', () => {
+    expect(m29.evidence!({ ...empty, publicReach: new Set(['tiktok']), tiktokNoScope: true })).toContain('بلا video.publish')
+    expect(m29.evidence!({ ...empty, publicReach: new Set(['tiktok']) })).toBe('النشرُ العلنيُّ مقلوبٌ بقرارك')
+  })
+})

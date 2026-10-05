@@ -14,6 +14,7 @@ import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { CHANNELS } from '../lib/channels'
+import { ideaKey } from '../lib/draft/job'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -3871,12 +3872,20 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     await app.request(`/panel/uploads/${id}/posts`, withSession(cookie, { method: 'POST', body: f }), env)
   }
 
-  it('YouTube وTikTok يُقالان خاصَّين تحت المنصّة قبل الإنشاء، لا «Short ●» بالأخضر (ر-4)', async () => {
+  it('YouTube وTikTok يُقالان خاصَّين تحت المنصّة قبل الإنشاء، لا «Short ●» بالأخضر (ر-4 · D-190)', async () => {
+    // ‏المتّصلُ وحدَه يُقال مَن يرى ما يُنشر عليه — وغيرُ المتّصل «غير متّصل» أوّلًا
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
+      ('acc-tt', 'tiktok', 'member', 'tt', 'omar', 'active')`).run()
     const cookie = await login()
     await uploaded(cookie)
     const page = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(page).toContain('Short · يصل قناتك خاصًّا — تنشره أنت من YouTube Studio')
-    expect(page).toContain('لا يراه غيرك حتّى تنشره أنت من تطبيق TikTok')
+    expect(page).toContain('متّصل · يصل خاصًّا')
+    expect(page).toContain('Google لم تُجِز تطبيقك بعد — تنشره أنت من YouTube Studio.')
+    expect(page).toContain('متّصل · لا يراه غيرك')
+    expect(page).toContain('TikTok لم تُجِز تطبيقك بعد — تنشره أنت من تطبيق TikTok.')
+    // ‏والـ Short يقرّره YouTube وحدَه، فيُقال ما سيكون وسببُه
+    expect(page).toContain('يصير Short وحده لأنّه رأسيّ وأقصر من ثلاث دقائق')
     // ‏والعنوانُ يُقال فوق الحقل ويُعَدّ تحته
     expect(page).toContain('سطرُه الأوّل عنوانُ YouTube حتّى 100 محرف')
     expect(page).toMatch(/<textarea id="vc-[^"]+" name="caption"[^>]*data-yt-title="100"/)
@@ -4152,5 +4161,545 @@ describe('‏٤٠٤ داخل اللوحة صفحةٌ لا نصّ (D-189)', () =>
       expect(page, path).toContain(said)
       expect(page, path).toContain('<h1 class="empty-t">هذه الصفحة غير موجودة</h1>')
     }
+  })
+})
+
+/*
+ * ‏**الكتابةُ أسهل، والمقطعُ يُكتب له، والمنصّةُ غيرُ المتّصلة تُقال** (D-190).
+ *
+ * ‏قال المالك: «يُفترض أن تكون الكتابةُ أسهل، وتنشأ من نصٍّ أو كلماتٍ بسيطة وشرحِ المقطع، ويكون
+ * ‏موائمًا مع المنصّة. ولماذا لا أستطيع أن أنشر في YouTube؟ وTikTok غيرُ متّصلٍ يجب أن يكون واضحًا.»
+ */
+describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والربطُ والعلنيّةُ حيث تُختار المنصّة (D-190)', () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => { globalThis.fetch = realFetch })
+
+  /** ‏Anthropic وحده — والجوابُ بحسب ما يُطلب: نصوصُ مقطعٍ أو منشور. */
+  function anthropic(answer: (body: string) => unknown): { calls: string[] } {
+    const calls: string[] = []
+    globalThis.fetch = (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const request = input instanceof Request ? input : null
+      const url = request !== null ? request.url : String(input)
+      if (!url.includes('api.anthropic.com')) throw new Error(`نداء غير متوقّع: ${url}`)
+      const body = request !== null ? await request.clone().text() : String(init?.body ?? '')
+      calls.push(body)
+      return new Response(JSON.stringify({
+        id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-opus-5', stop_reason: 'end_turn',
+        content: [{ type: 'text', text: JSON.stringify(answer(body)) }],
+        usage: { input_tokens: 800, output_tokens: 300 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+    return { calls }
+  }
+
+  async function post(cookie: string, path: string, fields: Record<string, string | string[]>): Promise<Response> {
+    const body = new FormData()
+    for (const [k, v] of Object.entries(fields)) {
+      for (const one of Array.isArray(v) ? v : [v]) body.append(k, one)
+    }
+    return app.request(path, withSession(cookie, { method: 'POST', body }), env)
+  }
+  const where = (r: Response): string | null => r.headers.get('Location')
+  const ledger = (): { operation: string; ref_id: string | null }[] =>
+    db.raw.prepare('SELECT operation, ref_id FROM cost_ledger ORDER BY at').all() as { operation: string; ref_id: string | null }[]
+
+  function multipartBucket() {
+    return {
+      async createMultipartUpload(key: string) { return this.resumeMultipartUpload(key, `mp-${key}`) },
+      resumeMultipartUpload(_key: string, uploadId: string) {
+        return {
+          uploadId,
+          async uploadPart(n: number, value: ArrayBuffer) { return { partNumber: n, etag: `e${n}-${value.byteLength}` } },
+          async complete() { return {} },
+          async abort() {},
+        }
+      },
+    }
+  }
+
+  async function uploaded(cookie: string): Promise<string> {
+    env['MEDIA'] = multipartBucket()
+    const form = (fields: Record<string, string | Blob>): FormData => {
+      const f = new FormData()
+      for (const [k, v] of Object.entries(fields)) f.set(k, v)
+      return f
+    }
+    const started = await (await app.request('/panel/uploads/start', withSession(cookie, {
+      method: 'POST', body: form({ name: 'قيادة.mp4', mime: 'video/mp4', bytes: '12', width: '1080', height: '1920', duration_ms: '42000' }),
+    }), env)).json() as { id: string }
+    const part = await (await app.request(`/panel/uploads/${started.id}/part`, withSession(cookie, {
+      method: 'POST', body: form({ n: '1', chunk: new Blob([new Uint8Array(12)]) }),
+    }), env)).json() as { part: unknown }
+    await app.request(`/panel/uploads/${started.id}/complete`, withSession(cookie, {
+      method: 'POST', body: form({ parts: JSON.stringify([part.part]) }),
+    }), env)
+    return started.id
+  }
+
+  const POST_TEXT = { text: 'الحوكمةُ لا تبطئ القرار، تحميه. '.repeat(4), rationale: 'زاويةُ الحماية لا البطء.' }
+
+  describe('«اكتب من فكرتك»', () => {
+    it('الرأسُ يفتح البطاقة، والبطاقةُ تقول LinkedIn متّصلًا وX غيرَ متّصلٍ بلا تأشير', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const html = await (await app.request('/panel', withSession(await login()), env)).text()
+      const head = html.slice(html.indexOf('<section data-pane="posts"'), html.indexOf('</div>', html.indexOf('<div class="aside">', html.indexOf('<section data-pane="posts"'))))
+      expect(head).toContain('href="#idea">اكتب من فكرة</a>')
+      const card = html.slice(html.indexOf('id="idea"'), html.indexOf('id="write"'))
+      expect(card).toContain('<h2>اكتب من فكرتك</h2>')
+      expect(card).toContain('<label for="di-text">فكرتك أو كلماتك</label>')
+      expect(card).toContain('<input type="checkbox" name="platform" value="linkedin" checked>')
+      expect(card).toContain('<input type="checkbox" name="platform" value="x">')
+      expect(card).toContain('غير متّصل')
+      expect(card).toContain('href="/panel/channels/x"')
+      expect(card).toMatch(/<button class="btn btn-primary" type="submit"><span>اكتب المسوّدات<\/span><\/button>/)
+    })
+
+    it('ضغطةٌ واحدة: مسوّدةٌ لكلّ منصّة، والكلفةُ قبلها، والعودةُ إلى أوّل بطاقةٍ جديدة — وما لا يُجدوَل يُقال', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const net = anthropic((body) => (body.includes('منشور X') ? { text: 'الحوكمةُ تحمي القرار ولا تبطئه، وتُريك ما تقرّر قبل أن تقرّره.', rationale: 'ر' } : POST_TEXT))
+      const cookie = await login()
+      const r = await post(cookie, '/panel/drafts/idea', { idea: 'الحوكمةُ لا تبطئ القرار، تحميه', platform: ['linkedin', 'x'] })
+      expect(net.calls).toHaveLength(2)
+      expect(net.calls[0]).toContain('الحوكمةُ لا تبطئ القرار، تحميه')
+      const rows = db.raw.prepare(`SELECT id, platform, status, source_id, idempotency_key FROM posts ORDER BY platform`).all() as
+        { id: string; platform: string; status: string; source_id: string | null; idempotency_key: string }[]
+      expect(rows.map((x) => [x.platform, x.status, x.source_id])).toEqual([['linkedin', 'draft', null], ['x', 'draft', null]])
+      expect(rows.every((x) => /^idea:[0-9a-f]{32}:(linkedin|x)$/.test(x.idempotency_key))).toBe(true)
+      expect(ledger().map((x) => x.operation)).toEqual(['draft:linkedin:claude-opus-5', 'draft:x:claude-opus-5'])
+      const linkedin = rows.find((x) => x.platform === 'linkedin')!
+      expect(where(r)).toBe(`/panel#d-${linkedin.id}`)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('كُتبت من فكرتك مسوّدتا LinkedIn وX')
+      expect(page).toContain('ولا حسابَ متّصلًا على X: تُعتمَد ولا تُجدوَل حتّى تربطه.')
+
+      // ‏والضغطةُ الثانيةُ بالفكرة نفسِها لا تُنادي ولا تُكلّف
+      const again = await post(cookie, '/panel/drafts/idea', { idea: 'الحوكمةُ  لا تبطئ القرار، تحميه ', platform: 'linkedin' })
+      expect(net.calls).toHaveLength(2)
+      expect(ledger()).toHaveLength(2)
+      expect(where(again)).toBe(`/panel#d-${linkedin.id}`)
+    })
+
+    it('بلا منصّةٍ أو بفكرةٍ فارغة يُردّ قبل أيّ نداء، والإيقافُ يحجز — والزرُّ معطَّلٌ وسببُه تحته', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const net = anthropic(() => POST_TEXT)
+      const cookie = await login()
+      expect(where(await post(cookie, '/panel/drafts/idea', { idea: 'فكرةٌ كاملة' }))).toBe('/panel#idea')
+      expect(where(await post(cookie, '/panel/drafts/idea', { idea: ' ', platform: 'linkedin' }))).toBe('/panel#idea')
+      await writeSetting(db, 'paused', 'true', 'test')
+      expect(where(await post(cookie, '/panel/drafts/idea', { idea: 'فكرةٌ كاملة', platform: ['linkedin', 'x'] }))).toBe('/panel#idea')
+      expect(net.calls).toHaveLength(0)
+      expect(ledger()).toHaveLength(0)
+      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      const card = html.slice(html.indexOf('id="idea"'), html.indexOf('id="write"'))
+      expect(card).toContain('aria-disabled="true" aria-describedby="di-why"')
+      expect(card).toContain('النظامُ موقوفٌ بقرارك')
+    })
+
+    it('ومزوّدُ الكتابة غيرُ مضبوط: الزرُّ معطَّلٌ ويقول أين يُضبط', async () => {
+      const html = await (await app.request('/panel', withSession(await login()), env)).text()
+      const card = html.slice(html.indexOf('id="idea"'), html.indexOf('id="write"'))
+      expect(card).toContain('مزوّدُ مهمّة الكتابة غير جاهز.')
+      expect(card).toContain('href="#providers"')
+    })
+  })
+
+  describe('«اكتب النصوص» لمقطعٍ، ونصٌّ لكلّ منصّة', () => {
+    const CAPTIONS = {
+      youtube_title: 'القيادةُ في أوّل مئة يوم',
+      youtube_description: 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts',
+      tiktok: 'أوّلُ مئة يوم تكتب ما بعدها. #قيادة #إدارة #حوكمة',
+      instagram: 'من أين يبدأ القائد؟\n\n#قيادة #إدارة #حوكمة',
+    }
+
+    it('صفُّ المقطع يقول من لم يُربط بلا تأشير، ويعرض «صف المقطع بجملة» — ونصًّا واحدًا بيدك كما كان', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
+      expect(row).toContain(`action="/panel/uploads/${id}/captions"`)
+      expect(row).toContain('صف المقطع بجملة')
+      for (const p of ['youtube', 'tiktok', 'instagram']) {
+        expect(row).toContain(`<input type="checkbox" name="platform" value="${p}">`)
+        expect(row).toContain(`href="/panel/channels/${p}"`)
+      }
+      expect(row).toContain('غير متّصل')
+      expect(row).toContain('Reel')
+      expect(row).toContain('name="caption"')
+      expect(row).not.toContain('name="per_platform"')
+    })
+
+    it('نداءٌ واحدٌ ← حقولُ المنصّات مملوءة، والكلفةُ قبلها — ثمّ «أنشئ» بنصّ كلّ منصّة، والضغطةُ الثانيةُ لا تُكلّف', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active')`).run()
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const net = anthropic(() => CAPTIONS)
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      const wrote = await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة في أوّل مئة يوم' })
+      expect(where(wrote)).toBe(`/panel#v-${id}`)
+      expect(net.calls).toHaveLength(1)
+      expect(ledger()).toEqual([{ operation: 'captions:claude-opus-5', ref_id: id }])
+      expect(kv.ttlOf(`captions:${id}`)).toBe(86_400)
+
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('كُتبت نصوصُ YouTube وTikTok وInstagram — الكلفة')
+      const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
+      expect(row).toContain('value="لقاءٌ عن القيادة في أوّل مئة يوم"')
+      expect(row).toContain('<input type="hidden" name="per_platform" value="1">')
+      expect(row).toContain('name="title_youtube" maxlength="100" value="القيادةُ في أوّل مئة يوم"')
+      expect(row).toContain('أوّلُ مئة يوم تكتب ما بعدها. #قيادة #إدارة #حوكمة</textarea>')
+      expect(row).toContain('اعتمده الآن — راجعتُ النصوص')
+      expect(row).toContain('أعد كتابتها')
+      // ‏المتّصلُ مؤشَّر، وغيرُ المتّصل لا
+      expect(row).toContain('<input type="checkbox" name="platform" value="youtube" checked>')
+      expect(row).toContain('<input type="checkbox" name="platform" value="tiktok">')
+
+      // ‏الضغطةُ الثانيةُ بالوصف نفسِه: لا نداءَ ولا كلفة
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة في أوّل مئة يوم' })
+      expect(net.calls).toHaveLength(1)
+      expect(ledger()).toHaveLength(1)
+
+      const made = await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['youtube', 'tiktok'], approve: 'on',
+        title_youtube: 'القيادةُ في أوّل مئة يوم', caption_youtube: 'ما يقرّره القائدُ أوّلًا.\r\n\r\n#قيادة #Shorts',
+        caption_tiktok: 'نصُّ TikTok بعد أن عدّلتُه', caption_instagram: CAPTIONS.instagram,
+      })
+      expect(where(made)).toBe(`/panel#v-${id}`)
+      const posts = db.raw.prepare(`SELECT platform, text, model, status FROM posts ORDER BY platform`).all() as
+        { platform: string; text: string; model: string; status: string }[]
+      expect(posts).toEqual([
+        { platform: 'tiktok', text: 'نصُّ TikTok بعد أن عدّلتُه', model: 'claude-opus-5', status: 'approved' },
+        { platform: 'youtube', text: 'القيادةُ في أوّل مئة يوم\n\nما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts', model: 'claude-opus-5', status: 'approved' },
+      ])
+      const after = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(after).toContain('ولا حسابَ متّصلًا على TikTok: لا يُجدوَل حتّى تربطه.')
+      // ‏وInstagram باقٍ بنصّه المكتوب لا يضيع
+      const left = after.slice(after.indexOf(`id="v-${id}"`), after.indexOf('</form>', after.indexOf(`/panel/uploads/${id}/posts`)))
+      expect(left).toContain('من أين يبدأ القائد؟')
+      expect(left).not.toContain('name="title_youtube"')
+    })
+
+    it('وإنشاءٌ رُدّ يُبقي ما حرّره المالكُ في حقوله', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => CAPTIONS)
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['tiktok'], approve: 'on',
+        title_youtube: 'عنواني أنا', caption_youtube: 'وصفي', caption_tiktok: '', caption_instagram: 'نصّي',
+      })
+      expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('لم يُنشأ منشور: TikTok: النصُّ فارغ')
+      expect(page).toContain('value="عنواني أنا"')
+      expect(page).toContain('نصّي</textarea>')
+    })
+
+    it('والإيقافُ يحجز «اكتب النصوص» قبل النداء', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const net = anthropic(() => CAPTIONS)
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await writeSetting(db, 'paused', 'true', 'test')
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      expect(net.calls).toHaveLength(0)
+      expect(ledger()).toHaveLength(0)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf(`/panel/uploads/${id}/posts`))
+      expect(row).toContain(`aria-describedby="vw-${id}"`)
+    })
+  })
+
+  describe('«انشر للعامّة» بعد الإجازة', () => {
+    it('في إعداد YouTube: خاصٌّ بالافتراض، وقلبُه يعود إلى الصفحة نفسِها ويُسكت «يصل خاصًّا» في صفّ المقطع', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active')`).run()
+      const cookie = await login()
+      const setup = await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text()
+      expect(setup).toContain('id="reach"')
+      expect(setup).toContain('النشرُ العلنيّ — بعد إجازة Google')
+      expect(setup).toContain('<input type="hidden" name="key" value="youtube_public">')
+      expect(setup).toContain('<input type="hidden" name="value" value="true">')
+      expect(setup).toContain('انشر للعامّة')
+
+      const r = await post(cookie, '/panel/settings', { key: 'youtube_public', value: 'true', return: 'platform:youtube:setup' })
+      expect(where(r)).toBe('/panel/channels/youtube?tab=setup')
+      expect((await readSettings(db)).youtubePublic).toBe(true)
+      const after = await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text()
+      expect(after).toContain('صار النشرُ على YouTube للعامّة')
+      expect(after).toContain('أعده خاصًّا')
+      // ‏ومحطّةُ «النشر» في صفحة المنصّة لا تبقى «خاصًّا ثمّ تنشره بيدك»
+      const posts = await (await app.request('/panel/channels/youtube', withSession(cookie), env)).text()
+      expect(posts).not.toContain('يُرفع إلى قناتك خاصًّا')
+
+      const id = await uploaded(cookie)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
+      expect(row).toContain('متّصل · يُنشر للعامّة')
+      expect(row).not.toContain('يصل خاصًّا')
+      // ‏وصفحةُ Instagram لا مفتاحَ فيها: تنشر للعامّة دائمًا
+      const ig = await (await app.request('/panel/channels/instagram?tab=setup', withSession(cookie), env)).text()
+      expect(ig).not.toContain('id="reach"')
+    })
+
+    it('وإشعارُ جدولة المقطع يسكت عن YouTube بعد القلب، ويبقى لـ TikTok', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+        ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
+        ('acc-tt', 'tiktok', 'member', 'tt', 'omar', 'active')`).run()
+      await writeSetting(db, 'youtube_public', 'true', 'test')
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/posts`, { caption: 'المعلمُ نقطةُ قرار', approve: 'on', platform: ['youtube', 'tiktok'] })
+      const shown = (db.raw.prepare('SELECT id FROM posts').all() as { id: string }[]).map((x) => x.id)
+      await post(cookie, `/panel/uploads/${id}/schedule`, { preset: 'tomorrow', post: shown })
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('جُدول على YouTube وTikTok')
+      expect(page).not.toContain('YouTube لا يُنشر للعامّة')
+      expect(page).toContain('TikTok لا يُنشر للعامّة')
+    })
+  })
+
+  /*
+   * ‏**مراجعةُ D-190** — ما وُجد بعد البناء: «أعد كتابتها» لا تكتب، والاعتمادُ مؤشَّرٌ على نصّ
+   * ‏النموذج، ومَن كتبها يضيع بانتهاء يومها، وكلفتُها لا تصل منشوراتها، وTikTok «للعامّة» وهو
+   * ‏صندوق، والحدودُ لا تُقال قبل «أنشئ»، وإشعارُ الفكرة يضيع، وما دُفع في المردود لا يُقال.
+   */
+  describe('مراجعةُ D-190', () => {
+    const CAPTIONS = {
+      youtube_title: 'القيادةُ في أوّل مئة يوم',
+      youtube_description: 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts',
+      tiktok: 'أوّلُ مئة يوم تكتب ما بعدها. #قيادة #إدارة #حوكمة',
+      instagram: 'من أين يبدأ القائد؟\n\n#قيادة #إدارة #حوكمة',
+    }
+    const rowOf = (page: string, id: string): string =>
+      page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
+    const tiktokAccount = async (scopes: string): Promise<void> => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-tt', 'tiktok', 'member', 'tt', 'omar', 'active')`).run()
+      db.raw.prepare(`INSERT INTO tokens (account_id, access_enc, access_iv, expires_at, scopes) VALUES ('acc-tt', 'e', 'i', '2026-12-01T00:00:00Z', ?)`).run(scopes)
+    }
+
+    it('«أعد كتابتها» تحمل at ما على الشاشة فتكتب مرّةً — وإعادتُها لا تُكلّف، والاعتمادُ غيرُ مؤشَّر', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const net = anthropic(() => ({ ...CAPTIONS, tiktok: '' }))
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      const at = (JSON.parse((await kv.get(`captions:${id}`))!) as { at: string }).at
+      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      expect(row).toContain(`<input type="hidden" name="replace" value="${at}">`)
+      expect(row).toContain('<input type="hidden" name="caption_model" value="claude-opus-5">')
+      // ‏ونصُّ النموذج لا يُعتمَد بالافتراض (D-009): المربّعُ يؤشّره المالكُ بيده
+      expect(row).toContain('<input type="checkbox" name="approve"> اعتمده الآن — راجعتُ النصوص')
+
+      net.calls.length = 0
+      anthropic(() => CAPTIONS)
+      const again = anthropic(() => CAPTIONS)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة', replace: at })
+      expect(again.calls).toHaveLength(1)
+      expect(ledger()).toHaveLength(2)
+      expect((JSON.parse((await kv.get(`captions:${id}`))!) as { tiktok: string }).tiktok).toBe(CAPTIONS.tiktok)
+      // ‏والنموذجُ نفسُه مرّةً ثانية: `at` قديمٌ فلا نداء
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة', replace: at })
+      expect(again.calls).toHaveLength(1)
+      expect(ledger()).toHaveLength(2)
+      expect(await (await app.request('/panel', withSession(cookie), env)).text()).toContain('ولنصوصٍ أخرى «أعد كتابتها» من صفّ المقطع')
+    })
+
+    it('والمنشوراتُ من النصوص تحمل حصّتَها من كلفة كتابتها، ومحطّةُ الكتابة تقولها', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => CAPTIONS)
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      const paid = (db.raw.prepare('SELECT total FROM cost_ledger').get() as { total: number }).total
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['youtube', 'tiktok', 'instagram'],
+        title_youtube: CAPTIONS.youtube_title, caption_youtube: CAPTIONS.youtube_description,
+        caption_tiktok: CAPTIONS.tiktok, caption_instagram: CAPTIONS.instagram, caption_model: 'claude-opus-5',
+      })
+      const rows = db.raw.prepare('SELECT id, model, cost_usd, status FROM posts').all() as { id: string; model: string; cost_usd: number; status: string }[]
+      expect(rows).toHaveLength(3)
+      // ‏بلا تأشيرٍ تُنشأ مسوّداتٍ تنتظر قرارَه
+      expect(rows.every((r) => r.status === 'draft' && r.model === 'claude-opus-5')).toBe(true)
+      const sum = rows.reduce((n, r) => n + r.cost_usd, 0)
+      expect(sum).toBeCloseTo(paid, 9)
+      expect(rows[0]!.cost_usd).toBeGreaterThan(0)
+      const journey = await (await app.request(`/panel/journey/${rows[0]!.id}`, withSession(cookie), env)).text()
+      expect(journey).toContain('claude-opus-5')
+    })
+
+    it('ويومُ النصوص إن انتهى قبل «أنشئ»: المردودُ يبقى في حقوله، والمنشأُ منسوبٌ إلى النموذج لا إلى المالك', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => CAPTIONS)
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      await kv.delete(`captions:${id}`)
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['tiktok'], caption_model: 'claude-opus-5',
+        title_youtube: 'عنواني أنا', caption_youtube: 'وصفي', caption_tiktok: '', caption_instagram: 'نصّي',
+      })
+      expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
+      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      expect(row).toContain('value="عنواني أنا"')
+      expect(row).toContain('نصّي</textarea>')
+
+      await kv.delete(`captions:${id}`)
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['tiktok'], caption_model: 'claude-opus-5', caption_tiktok: 'نصُّ TikTok',
+      })
+      expect(db.raw.prepare('SELECT platform, model FROM posts').all()).toEqual([{ platform: 'tiktok', model: 'claude-opus-5' }])
+      // ‏واسمٌ لا يُقبل لا يصير «owner»
+      await kv.delete(`captions:${id}`)
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['instagram'], caption_model: '<script>', caption_instagram: 'نصّ Instagram',
+      })
+      expect(db.raw.prepare(`SELECT model FROM posts WHERE platform = 'instagram'`).get()).toEqual({ model: 'captions:unknown' })
+    })
+
+    it('ونصوصٌ فوق حدودها: الإشعارُ تحذيرٌ، والسببُ تحت حقله، و«أنشئ» يُردّ بالسببين — والحدُّ والعدّادُ في كلّ حقل', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => ({ ...CAPTIONS, youtube_title: 'ع'.repeat(120), tiktok: 'ن'.repeat(2300) }))
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('وفي بعضها ما يُصلَح قبل الإنشاء')
+      const row = rowOf(page, id)
+      const title = row.slice(row.indexOf(`for="vyt-${id}"`), row.indexOf(`for="vyd-${id}"`))
+      expect(title).toContain('YouTube تقبل 100')
+      expect(title).toContain('aria-invalid="true"')
+      const tiktok = row.slice(row.indexOf(`for="vtt-${id}"`), row.indexOf(`for="vig-${id}"`))
+      expect(tiktok).toContain('TikTok تقبل 2200')
+      expect(tiktok).toContain('حتّى 2200 محرف')
+      expect(tiktok).toContain('data-cap-limit="2200" data-cap-unit="chars"')
+      expect(row).toContain('data-cap-limit="5000" data-cap-unit="bytes"')
+      expect(row).toContain('data-cap-count')
+
+      await post(cookie, `/panel/uploads/${id}/posts`, {
+        per_platform: '1', platform: ['youtube', 'tiktok'],
+        title_youtube: 'ع'.repeat(120), caption_youtube: 'وصف', caption_tiktok: 'ن'.repeat(2300),
+      })
+      expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
+      const after = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(after).toContain('YouTube تقبل 100')
+      expect(after).toMatch(/لم يُنشأ منشور: [^<]*YouTube تقبل 100[^<]*TikTok: النصُّ 2300 محرفًا/)
+    })
+
+    it('وجوابٌ مردودٌ بعد أن دُفع: الإشعارُ يقول كلفتَه وأنّ الإعادةَ تدفع', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => 'ليس كائنا')
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      expect(ledger()).toHaveLength(1)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('تعذّرت كتابة النصوص')
+      expect(page).toContain('وكلّفت المحاولةُ')
+      expect(page).toContain('والإعادةُ تدفع ثانيةً')
+    })
+
+    /*
+     * ‏**وTikTok بحكم الناشر** (مراجعة D-190): قلبُ العلنيّ وحسابٌ بلا `video.publish` يُرسَل
+     * ‏مقطعُه إلى الصندوق — وكانت أربعةُ مواضع تقول «يُنشر للعامّة» وإشعارُ الجدولة يسكت.
+     */
+    it('علنيُّ TikTok المقلوبُ بلا video.publish يقول الصندوقَ في كلّ موضع — وبالنطاق يقول «للعامّة»', async () => {
+      await tiktokAccount('user.info.basic,video.upload')
+      const cookie = await login()
+      const flip = await post(cookie, '/panel/settings', { key: 'tiktok_public', value: 'true', return: 'platform:tiktok:setup' })
+      expect(where(flip)).toBe('/panel/channels/tiktok?tab=setup')
+      const setup = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+      expect(setup).toContain('حسابُك المربوط بلا video.publish')
+      expect(setup).toContain('يصل الصندوق')
+      expect(setup).toContain('أعده خاصًّا')
+      const needs = await (await app.request('/panel/channels/tiktok', withSession(cookie), env)).text()
+      expect(needs).toContain('يصل صندوقَ تطبيقك ثمّ تنشره بيدك')
+      expect(needs).not.toContain('علنيٌّ فورَ موعده')
+
+      const id = await uploaded(cookie)
+      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      expect(row).not.toContain('يُنشر للعامّة')
+      expect(row).toContain('متّصل · يصل صندوقَك')
+      expect(row).toContain('href="/panel/channels/tiktok?tab=setup"')
+      // ‏والنصُّ لا يصل الصندوق: يُقال تحت الحقل الواحد
+      expect(row).toContain('وTikTok يصله المقطعُ بلا النصّ')
+
+      await post(cookie, `/panel/uploads/${id}/posts`, { caption: 'المعلمُ نقطةُ قرار', approve: 'on', platform: ['tiktok'] })
+      const shown = (db.raw.prepare('SELECT id FROM posts').all() as { id: string }[]).map((x) => x.id)
+      await post(cookie, `/panel/uploads/${id}/schedule`, { preset: 'tomorrow', post: shown })
+      const scheduled = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(scheduled).toContain('جُدول على TikTok')
+      expect(scheduled).toContain('قلبتَ النشرَ العلنيّ وحسابُك المربوط بلا video.publish')
+
+      // ‏وبالنطاق: «للعامّة» كما قرّر، ولا ملاحظةَ صندوق
+      db.raw.prepare(`UPDATE tokens SET scopes = 'user.info.basic video.upload video.publish' WHERE account_id = 'acc-tt'`).run()
+      const id2 = await uploaded(cookie)
+      const direct = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id2)
+      expect(direct).toContain('متّصل · يُنشر للعامّة')
+      expect(direct).not.toContain('بلا النصّ')
+    })
+
+    it('وقلبُ العلنيّ بلا النطاق يُقال تحذيرًا عند القلب نفسِه', async () => {
+      await tiktokAccount('user.info.basic video.upload')
+      const cookie = await login()
+      await post(cookie, '/panel/settings', { key: 'tiktok_public', value: 'true', return: 'platform:tiktok:setup' })
+      const page = await (await app.request('/panel/channels/tiktok?tab=setup', withSession(cookie), env)).text()
+      expect(page).toContain('قُلب النشرُ على TikTok للعامّة، وحسابُك المربوط بلا video.publish')
+      expect(page).not.toContain('صار النشرُ على TikTok للعامّة')
+    })
+
+    it('ونصُّ TikTok المكتوبُ يُقال إنّه لا يصل الصندوق، ومعه زرُّ نسخه', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => CAPTIONS)
+      await tiktokAccount('user.info.basic video.upload')
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
+      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      const tiktok = row.slice(row.indexOf(`for="vtt-${id}"`), row.indexOf(`for="vig-${id}"`))
+      expect(tiktok).toContain('يصل المقطعُ صندوقَ تطبيق TikTok بلا هذا النصّ')
+      expect(tiktok).toContain(`data-copy="vtt-${id}"`)
+    })
+
+    it('وما يُختار بلا تأشير: السطرُ يقول الحكمَ قبل الضغط، وموضعُ السبب في النموذجين', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const cookie = await login()
+      const id = await uploaded(cookie)
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const card = page.slice(page.indexOf('id="idea"'), page.indexOf('id="write"'))
+      expect(card).toContain('اختر منصّةً — وغيرُ المتّصلة تُكتب مسوّدتُها ولا تُجدوَل حتّى تربطها.')
+      expect(card).toContain('data-pick-msg')
+      const row = rowOf(page, id)
+      expect(row).toContain('اختر منصّةً — وغيرُ المتّصلة يُنشأ منشورُها ولا يُجدوَل حتّى تربطها.')
+      expect(row).toContain('data-pick-msg')
+    })
+
+    /*
+     * ‏**وإشعارُ الفكرة لا يضيع** (مراجعة D-190): مسوّدةُ LinkedIn القديمةُ خارجَ اللوح كانت تُرسل
+     * ‏المالكَ إلى رحلتها قبل أن يُكتب الإشعار، فيضيع فشلُ X المدفوعُ معها.
+     */
+    it('فكرةٌ مسوّدتُها القديمةُ خارجَ اللوح وX رُدّ بعد أن دُفع: الإشعارُ يُقرأ ويقول الكلفة', async () => {
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      const idea = 'الحوكمةُ لا تبطئ القرار، تحميه'
+      const old = '00000000-0000-4000-8000-000000000001'
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+      db.raw.prepare(`INSERT INTO posts (id, account_id, platform, type, text, status, idempotency_key, approved_by, approved_at, scheduled_at, created_at)
+        VALUES (?, 'acc-li', 'linkedin', 'text', 'قديم', 'published', ?, 'o', '2026-01-01 00:00:00', '2026-01-02 00:00:00', '2026-01-01 00:00:00')`).run(old, await ideaKey(idea, 'linkedin'))
+      for (let i = 0; i < 61; i++) {
+        db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'x', 'text', 'ن', 'draft', ?)`)
+          .run(`fill-${i}`, `fill:${i}`)
+      }
+      const net = anthropic(() => ({ text: 'ن'.repeat(400), rationale: 'ر' }))
+      const cookie = await login()
+      const r = await post(cookie, '/panel/drafts/idea', { idea, platform: ['linkedin', 'x'] })
+      expect(net.calls).toHaveLength(1)
+      expect(ledger()).toHaveLength(1)
+      expect(where(r)).toBe('/panel#idea')
+      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(page).toContain('تعذّرت X')
+      expect(page).toContain('ودُفع ثمنُ المحاولة المردودة')
+    })
   })
 })

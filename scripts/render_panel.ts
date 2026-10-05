@@ -9,7 +9,8 @@
  */
 import { fixtureImage, writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
-import { viewChannels, type LinkedAccount } from '../src/lib/channels'
+import { linkStates, viewChannels, type LinkedAccount } from '../src/lib/channels'
+import { PRIVATE_ONLY } from '../src/lib/media/uploads'
 import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
 import { imageProviderGate, slideGate } from '../src/lib/image/gate'
@@ -399,6 +400,22 @@ const data: PanelData = {
     { id: 'up3', r2Key: 'upload/up3.mov', name: 'مقابلة.mov', mime: 'video/quicktime', bytes: 96_000_000,
       width: null, height: null, durationMs: null, status: 'uploading', createdAt: ago(1), posts: [] },
   ],
+  /*
+   * ‏**ونصوصٌ كُتبت لمقطعٍ أُنشئ على YouTube وحدَه** (D-190): فتُرسَم حقولُ TikTok وInstagram مملوءةً
+   * ‏ليُقاس طولُها على الهاتف، وتحت YouTube «متّصل · يصل خاصًّا»، وتحت الآخرين «غير متّصل — اربطه».
+   */
+  captions: {
+    up1: {
+      about: 'لقاءٌ عن قيادة المعالم: كيف يُقرأ المشروعُ بمعالمه لا بمهامّه',
+      youtubeTitle: 'قيادةُ المعالم: اقرأ مشروعك بمعالمه لا بمهامّه',
+      youtubeDescription: 'المعلمُ نقطةُ قرارٍ لا تاريخٌ في جدول. في هذا المقطع: كيف تختار معالمَك، ومن يقرّر أنّ المعلمَ تحقّق.\n\n#قيادة #إدارة_المشاريع #Shorts',
+      tiktok: 'مشروعك ليس قائمةَ مهامّ 👇\n#قيادة #إدارة_المشاريع #معالم',
+      instagram: 'المعلمُ نقطةُ قرار، لا تاريخٌ في جدول.\n\nمن يقرّر أنّه تحقّق؟ وبأيّ رقم؟\n\n#قيادة #إدارة_المشاريع #معالم',
+      model: 'claude-opus-5', cost: 0.012, at: new Date(now.getTime() - 10 * 60_000).toISOString(),
+    },
+  },
+  links: { ...linkStates(accounts), youtube: 'linked' },
+  reach: PRIVATE_ONLY,
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
   cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
