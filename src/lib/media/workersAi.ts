@@ -38,11 +38,45 @@
  * نداءٍ حقيقيّ هو الذي يؤكّده** — كما قيل في سائق Gemini قبله.
  */
 
-import { cfRunUrl } from '../ai/cloudflare'
+import { cfRunAnyUrl, cfRunUrl, isWorkersAiModel } from '../ai/cloudflare'
 
 /** ما يكفي من واجهة `env.AI`، حتّى تُختبَر الوحدةُ بلا Worker. */
 export interface AiBinding {
-  run(model: string, input: Record<string, unknown>): Promise<unknown>
+  /** والخيارُ الثالث لرابط `env.AI`: نماذجُ الطرف الثالث تحتاج بوّابةً (`gateway`). */
+  run(model: string, input: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>
+}
+
+/** بوّابةُ AI Gateway لنماذج الطرف الثالث — `default` تُنشأ وحدها عند أوّل نداء. */
+export const GATEWAY = { gateway: { id: 'default' } } as const
+
+/**
+ * سببُ الردّ بكلام المالك (D-188) — **والرمزُ ونصُّ Cloudflare بعده لمن يشخّص**. كان يُقال
+ * «Workers AI (REST) ردّ 400» وحده، فلا يُعرف أهو طلبٌ خاطئ أم رصيدٌ ناقص أم مفتاحٌ بلا إذن.
+ * ونصُّ Cloudflare يُقصّ وتُحذف منه الروابط: قد يعيد رابطَ الصورة الموقَّع الذي أرسلناه.
+ */
+async function refusal(response: Response): Promise<string> {
+  const why =
+    response.status === 400 ? 'رفضت Cloudflare الطلب'
+    : response.status === 401 || response.status === 403 ? 'مفتاحُ Cloudflare لا يملك إذنَ Workers AI'
+    : response.status === 402 ? 'لا رصيدَ في AI Gateway لنماذج الطرف الثالث'
+    : response.status === 404 ? 'النموذجُ غيرُ متاحٍ لهذا الحساب'
+    : response.status === 429 ? 'كثرةُ الطلبات — يُعاد بعد قليل'
+    : response.status >= 500 ? 'عطلٌ عند Cloudflare — يُعاد بعد قليل'
+    : 'ردٌّ غيرُ متوقَّع'
+  let detail = ''
+  try {
+    const body = (await response.json()) as { errors?: { code?: unknown; message?: unknown }[] }
+    const first = body.errors?.[0]
+    if (first !== undefined) {
+      const message = typeof first.message === 'string'
+        ? first.message.replace(/https?:\/\/\S+/g, '‹رابط›').slice(0, 160)
+        : ''
+      detail = [first.code === undefined ? '' : String(first.code), message].filter((x) => x !== '').join(': ')
+    }
+  } catch {
+    // جسدٌ ليس JSON: يكفي الرمز
+  }
+  return `${why} (${response.status}${detail === '' ? '' : ` — ${detail}`})`
 }
 
 /**
@@ -59,27 +93,26 @@ export function restBinding(
   return {
     async run(model, input) {
       // **والعنوانُ من `cfRunUrl` لا يُكتب هنا** (D-081): كُتب في هذا
-      // الملفّ وفي غيرِه، فأُصلح أحدُهما وبقي الآخرُ ينادي نهايةً لا تُخدَم
+      // الملفّ وفي غيرِه، فأُصلح أحدُهما وبقي الآخرُ ينادي نهايةً لا تُخدَم.
+      // ونموذجُ الطرف الثالث نهايتُه الجامعة وجسدُه غلاف (D-188) — مسارُ `‎/run/{model}` يردّه ‏400
+      const own = isWorkersAiModel(model)
       const response = await fetchImpl(
-        cfRunUrl(accountId, model),
+        own ? cfRunUrl(accountId, model) : cfRunAnyUrl(accountId),
         {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiToken}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(input),
+          body: JSON.stringify(own ? input : { model, input }),
         },
       )
 
       if (!response.ok) {
         // الرمزُ يقرّر الإعادة. و 429 و 5xx تُعاد، وما عداهما لا
         const retryable = response.status === 429 || response.status >= 500
-        // ولا يُقرأ الجسدُ كاملا: قد يحمل قيَما لا تُسجَّل
-        throw new AiError(
-          `Workers AI (REST) ردّ ${response.status}`,
-          retryable,
-        )
+        // ولا يُقرأ الجسدُ كاملا: أوّلُ خطأٍ وحده، مقصوصًا وبلا روابط
+        throw new AiError(await refusal(response), retryable)
       }
 
       const contentType = response.headers.get('Content-Type') ?? ''
@@ -90,8 +123,11 @@ export function restBinding(
       // غلافُ Cloudflare: { success, result, errors }. ويُفَضّ إلى `result`
       // ليتّحد شكلُ الجوابين — فالمنادي لا يعرف بأيّ وجهٍ نُودي
       if (payload['success'] === false) {
-        throw new AiError('Workers AI (REST) ردّ فشلا', false)
+        throw new AiError('رفضت Cloudflare الطلب (success:false)', false)
       }
+      // ‏وجوابُ النهاية الجامعة شكلُ النموذج نفسُه ({ state, result: { video } }) بلا غلاف `success`:
+      // فلا يُفَضّ، وإلّا ضاعت `state` وبقي `{ video }` بلا رأسه (D-188)
+      if (!('success' in payload)) return payload
       const result = payload['result']
       return result === undefined ? payload : result
     },
@@ -169,6 +205,7 @@ export async function generateImage(
   } catch (error) {
     // خطأُ الرابط لا يحمل حالةً كـ HTTP، فيُقرأ نصُّه — وهو الاستثناء
     // الوحيد لقاعدة «الرمز لا النصّ»، لأنّه لا رمزَ أصلا
+    if (error instanceof AiError) throw error
     const detail = error instanceof Error ? error.message : 'عطل'
     const retryable = /capacity|429|3040|timeout|rate/i.test(detail)
     throw new AiError(`Workers AI: ${detail}`, retryable)
@@ -231,14 +268,18 @@ export async function generateVideo(
 ): Promise<GeneratedVideo> {
   let raw: unknown
   try {
-    raw = await ai.run(model, {
+    // ‏ومخطّطُ «صورة ← فيديو» لا يعرف `ratio` (النسبةُ نسبةُ الصورة): يُرسَل لنموذج النصّ وحده
+    const input: Record<string, unknown> = {
       image: request.imageUrl,
       prompt: request.prompt,
       duration: clampDuration(request.durationSeconds ?? MAX_SECONDS),
-      ratio: request.ratio ?? '9:16',
       resolution: request.resolution ?? '720P',
-    })
+    }
+    if (model.includes('t2v')) input['ratio'] = request.ratio ?? '9:16'
+    raw = await ai.run(model, input, isWorkersAiModel(model) ? undefined : GATEWAY)
   } catch (error) {
+    // ‏خطأُ وجه REST يحمل حكمَه وسببَه بكلام المالك (D-188) — يمرّ كما هو ولا يُغلَّف ثانيةً
+    if (error instanceof AiError) throw error
     const detail = error instanceof Error ? error.message : 'عطل'
     const retryable = /capacity|429|3040|timeout|rate/i.test(detail)
     throw new AiError(`Workers AI: ${detail}`, retryable)

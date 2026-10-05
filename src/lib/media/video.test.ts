@@ -140,12 +140,12 @@ describe('التوليد', () => {
     expect(row).toMatchObject({ mime: 'video/mp4', model: VIDEO_MODELS.fromImage, bytes: 2048 })
   })
 
-  it('ويطلب رأسيّا ٩:١٦ بخمسَ عشرةَ ثانية', async () => {
+  it('ويطلب خمسَ عشرةَ ثانية، والنسبةُ نسبةُ الصورة (مخطّطُ «صورة ← فيديو» بلا `ratio`، D-188)', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const a = ai(OK_VIDEO)
     await animateForPost(deps(a), 'p1')
-    expect(a.calls[0]!.input['ratio']).toBe('9:16')
+    expect(a.calls[0]!.input).not.toHaveProperty('ratio')
     expect(a.calls[0]!.input['duration']).toBe(15)
     expect(a.calls[0]!.model).toBe(VIDEO_MODELS.fromImage)
   })
