@@ -80,11 +80,14 @@ describe('الفيديو', () => {
   })
 
   /** الرأسيُّ هو الأصل: Shorts و Reels و TikTok كلُّها رأسيّة. */
-  it('والرأسيُّ 9:16 هو الأصل — خطٌّ واحدٌ يخدم ثلاث منصّات', async () => {
+  it('و«صورة ← فيديو» بلا `ratio` — النسبةُ نسبةُ الصورة؛ ونموذجُ النصّ وحده يأخذها، والرأسيُّ أصلُه', async () => {
     const a = ai(ok)
     await generateVideo(a, { imageUrl: 'https://s/1.png', prompt: 'ن' })
-    expect(a.calls[0]!.input['ratio']).toBe('9:16')
+    expect(a.calls[0]!.input).not.toHaveProperty('ratio')
     expect(a.calls[0]!.input['resolution']).toBe('720P')
+    const t = ai(ok)
+    await generateVideo(t, { imageUrl: 'https://s/1.png', prompt: 'ن' }, VIDEO_MODELS.fromText)
+    expect(t.calls[0]!.input['ratio']).toBe('9:16')
   })
 
   it('والمدّةُ تُقصّ عندنا لا تُترك لتُردّ عند المزوّد', () => {
@@ -213,17 +216,62 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
       })
     }) as unknown as typeof fetch
 
-  it('ينادي حسابا بعينه ويحمل الرمزَ في الترويسة وحدها', async () => {
+  it('ينادي حسابا بعينه ويحمل الرمزَ في الترويسة وحدها — ونموذجُ Workers AI على `‎/run/@cf/…`', async () => {
     seen.length = 0
     const ai = restBinding('acc-1', 'tok-1', stub({ json: { success: true, result: { a: 1 } } }))
-    await ai.run('alibaba/hh1-i2v', { prompt: 'ن' })
+    await ai.run('@cf/leonardo/lucid-origin', { prompt: 'ن' })
 
     expect(seen[0]!.url).toBe(
-      'https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run/alibaba/hh1-i2v',
+      'https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run/@cf/leonardo/lucid-origin',
     )
+    expect(JSON.parse(seen[0]!.body)).toEqual({ prompt: 'ن' })
     expect(seen[0]!.auth).toBe('Bearer tok-1')
     // **ولا يُسرَّب في الجسد** (D-005)
     expect(seen[0]!.body).not.toContain('tok-1')
+  })
+
+  /**
+   * ‏D-188: كان «حرّكها فيديو» ينادي `‎/ai/run/alibaba/hh1-i2v` فيُردّ ‏400 في كلّ مرّة. نموذجُ الطرف
+   * الثالث نهايتُه الجامعة `‎/ai/run` وجسدُه غلاف `{ model, input }`، وجوابُه شكلُ النموذج بلا `success`.
+   */
+  it('ونموذجُ الطرف الثالث على `‎/ai/run` بغلاف { model, input }، وجوابُه يُعاد كما هو', async () => {
+    seen.length = 0
+    const reply = { state: 'Completed', result: { video: 'https://example.com/v.mp4' }, gatewayMetadata: { keySource: 'Unified' } }
+    const ai = restBinding('acc-1', 'tok-1', stub({ json: reply }))
+    const out = await ai.run('alibaba/hh1-i2v', { image: 'https://x/m/t', prompt: 'ن' })
+
+    expect(seen[0]!.url).toBe('https://api.cloudflare.com/client/v4/accounts/acc-1/ai/run')
+    expect(JSON.parse(seen[0]!.body)).toEqual({ model: 'alibaba/hh1-i2v', input: { image: 'https://x/m/t', prompt: 'ن' } })
+    expect(out).toEqual(reply)
+    // ‏ومن جوابٍ كهذا يأخذ `generateVideo` الرابطَ
+    const video = await generateVideo(ai, { imageUrl: 'https://x/m/t', prompt: 'ن' })
+    expect(video.url).toBe('https://example.com/v.mp4')
+  })
+
+  it('وسببُ الردّ بكلام المالك ومعه رمزُ Cloudflare، بلا الرابط الموقَّع', async () => {
+    const ai = restBinding('a', 't', stub({
+      status: 400,
+      json: { success: false, errors: [{ code: 5006, message: 'invalid image url https://sada2.basserh.com/m/SECRET-TOKEN' }] },
+    }))
+    const err = (await ai.run('alibaba/hh1-i2v', {}).catch((e: unknown) => e)) as Error
+    expect(err.message).toContain('رفضت Cloudflare الطلب (400 — 5006: invalid image url ‹رابط›)')
+    expect(err.message).not.toContain('SECRET-TOKEN')
+    // ‏ويمرّ من `generateVideo` بحكمه وسببه كما هو، لا «Workers AI: Workers AI (REST)…»
+    const viaVideo = (await generateVideo(ai, { imageUrl: 'https://x/m/t', prompt: 'ن' }).catch((e: unknown) => e)) as Error
+    expect(viaVideo.message.startsWith('رفضت Cloudflare الطلب')).toBe(true)
+  })
+
+  it('و«صورة ← فيديو» بلا `ratio` (ليست في مخطّطه)، والرابطُ يُنادى ببوّابةٍ لنموذج الطرف الثالث', async () => {
+    const calls: { model: string; input: Record<string, unknown>; options?: Record<string, unknown> }[] = []
+    const binding = {
+      async run(model: string, input: Record<string, unknown>, options?: Record<string, unknown>) {
+        calls.push({ model, input, ...(options === undefined ? {} : { options }) })
+        return { state: 'Completed', result: { video: 'https://example.com/v.mp4' } }
+      },
+    }
+    await generateVideo(binding, { imageUrl: 'https://x/m/t', prompt: 'ن', ratio: '9:16' })
+    expect(calls[0]!.input).not.toHaveProperty('ratio')
+    expect(calls[0]!.options).toEqual({ gateway: { id: 'default' } })
   })
 
   /** يُفَضّ الغلافُ ليتّحد شكلُ الوجهين — فالمنادي لا يعرف بأيّهما نُودي. */

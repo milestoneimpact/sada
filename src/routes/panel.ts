@@ -1519,7 +1519,7 @@ panel.post('/panel/media/animate', async (c) => {
             }
           : outcome.kind === 'blocked'
             ? { kind: 'warn', text: outcome.reason }
-            : { kind: 'bad', text: `تعذّر التحريك: ${outcome.reason}` }
+            : { kind: 'bad', text: `تعذّر تحريك الصورة: ${outcome.reason}` }
 
   await record(
     c.env.DB,

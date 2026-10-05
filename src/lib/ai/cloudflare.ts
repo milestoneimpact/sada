@@ -104,7 +104,25 @@ export function cfModelsUrl(accountId: string): string {
   return `${aiRoot(accountId)}/models/search?per_page=100`
 }
 
-/** نهايةُ `‎/ai/run` — وهي وحدها التي تولّد الصور. */
+/**
+ * نهايةُ `‎/ai/run/@cf/…` — **لنماذج Workers AI وحدها** (`@cf/`)، والجسدُ مدخلاتُ النموذج كما هي.
+ *
+ * ونماذجُ الطرف الثالث (`alibaba/hh1-i2v` وأخواتها) لا تُخدَم من هذا المسار: كان ينادي
+ * `‎/ai/run/alibaba/hh1-i2v` فيُردّ ‏400 على كلّ تحريك (D-188). نهايتُها `cfRunAnyUrl`.
+ */
 export function cfRunUrl(accountId: string, model: string): string {
   return `${aiRoot(accountId)}/run/${model}`
+}
+
+/**
+ * النهايةُ الجامعة `‎/ai/run` — **لكلّ نموذج**، والجسدُ غلافٌ `{ model, input }`، وتمرّ بـ AI Gateway
+ * وفوترته الموحّدة. وهي وحدها التي تخدم نماذجَ الطرف الثالث.
+ */
+export function cfRunAnyUrl(accountId: string): string {
+  return `${aiRoot(accountId)}/run`
+}
+
+/** نموذجُ Workers AI نفسِه (`@cf/…`)، لا نموذجُ طرفٍ ثالثٍ يمرّ بالبوّابة. */
+export function isWorkersAiModel(model: string): boolean {
+  return model.startsWith('@cf/')
 }
