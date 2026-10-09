@@ -453,9 +453,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ── الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ المنصّات (D-177) ───────────────
    ثلاثُ طبقاتٍ تجيب ثلاثةَ أسئلةٍ قبل أيّ رقم مال. والفعلُ الواحدُ بلون حاله:
    أحمرُ ما يوقف النشر، وبرتقاليُّ ما ينتظر، وحدٌّ أخضرُ لما يجري. */
-.next{display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; margin-bottom:var(--gap-card);
-  padding:var(--s-4) var(--s-5); border-radius:var(--r-card); background:var(--surface);
-  border:var(--bd); border-inline-start:var(--s-1) solid var(--ok); box-shadow:var(--sh-1)}
+.next{display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; margin-bottom:var(--gap-card)}
 .next[data-tone=warn]{border-inline-start-color:var(--warn); background:var(--warn-wash)}
 .next[data-tone=bad]{border-inline-start-color:var(--bad); background:var(--bad-wash)}
 .next-body{flex:1 1 16rem; min-width:0}
@@ -467,8 +465,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .trip{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-2);
   grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))}
 .trip a{display:flex; flex-direction:column; gap:var(--s-2); height:100%; min-height:var(--tap);
-  padding:var(--s-3); border-radius:var(--r-card); border:var(--bd);
-  background:var(--surface-2); color:inherit; text-decoration:none}
+  padding:var(--s-3); border:var(--bd); background:var(--surface-2)}
 .trip li[data-state=done] a{background:var(--surface)}
 .trip li[data-state=now] a{border-color:var(--warn)}
 .trip li[data-state=now][data-focus] a{background:var(--warn-wash)}
@@ -480,8 +477,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .j-body b{font-size:var(--t-ui); line-height:var(--lh-ui)}
 .j-note{font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
 .pfgrid{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fill,minmax(11.75rem,1fr))}
-.pf{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2); padding:var(--s-3);
-  border-radius:var(--r-card); border:var(--bd); background:var(--surface); box-shadow:var(--sh-1)}
+.pf{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2)}
 .pf .btn{margin-top:auto}
 .pf-head{display:flex; align-items:center; gap:var(--s-2); min-width:0}
 .pf-name{display:flex; flex-direction:column; min-width:0}
@@ -502,7 +498,6 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   .j-body{flex-direction:row; flex-wrap:wrap; align-items:center; column-gap:var(--s-2)}
   .j-note{flex-basis:100%}
   .pfgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .next{padding:var(--s-4)}
   .next .btn{flex:1 1 100%}
 }
 .stack{display:grid; gap:var(--gap-card); align-content:start}
@@ -548,6 +543,17 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .card-alert[data-tone=bad]{border-inline-start-color:var(--bad)}
 /* ‏ورأسُها: عنوانٌ بنمط «h3» في كلّ مستوى، ثمّ جملةٌ واحدةٌ بحبر «--ink-2» */
 .card-head h3{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+/* ‏حشوُ ما نُقل إلى البطاقة من مكوّنٍ يسبقها في الورقة (٢ج): قاعدتُه قبل «.card» فيغلبه
+   «--pad-card» بالترتيب، فيُثبَّت هنا بمحدّدٍ مركّبٍ لا بإعادة إعلان الصنف */
+.card-alert.next{padding:var(--s-4) var(--s-5)}
+@media${below('sm')}{.card-alert.next{padding:var(--s-4)}}
+.card.pf{padding:var(--s-3)}
+/* ‏و«.card > p» قاعدةٌ عامّةٌ لفقرة البطاقة (هامشٌ وحرفٌ صغيرٌ وحبرٌ ثانٍ) — وفقراتُ هذه
+   المكوّنات لها قياسُها في قواعدها، فلا ترثها حين صارت بطاقة. والسهمُ في الرحلة وبابُ
+   «ما تطلبه» سطحان ثانيان بلا ظلّ كما كانا */
+.card.ch > .ch-note, .card.draft > .draft-why{margin-top:0}
+.card.keys > .hint{color:var(--ink)}
+.trip a.card-interactive, .needs-list a.card-interactive{box-shadow:none}
 .card-desc{margin:calc(-1 * var(--s-2)) 0 var(--s-3); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 /* عنوانُ القسم: خيطٌ رماديٌّ يمتدّ تحته، وفوقه فاصلُ الأقسام («--gap-section»: ‏٤٨ ثمّ
    ‏٣٢ على الجوّال). وكان يبدؤه خيطٌ نحاسيٌّ قصير، فيُعدّ موضعًا في كلّ قسم — سبعةَ عشرَ
@@ -988,8 +994,7 @@ ul.plain li:last-child{margin-bottom:0}
 .lede-note{font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small); flex-basis:100%}
 @media${atLeast('lg')}{.lede-note{flex-basis:auto; text-align:end}}
 
-.ch{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
-  border:var(--bd); border-radius:var(--r-card); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
+.ch{display:flex; flex-direction:column; gap:var(--s-3); padding:var(--s-4)}
 .ch.off{background:var(--surface-2); box-shadow:none; border-style:dashed}
 .ch-top{display:flex; align-items:center; gap:var(--s-3)}
 .ch-logo{width:var(--s-8); height:var(--s-8); border-radius:var(--r-control); flex:none; display:grid; place-items:center;
@@ -1264,8 +1269,8 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .vup progress{flex:1 1 12.5rem; height:var(--s-3); accent-color:var(--ok)}
 .vlist{display:flex; flex-direction:column; gap:var(--s-3)}
 /* ‏والصفُّ مرساةُ العودة بعد الإنشاء والجدولة (ر-4): يقف تحت الشريط الملتصق لا خلفَه، كالمسوّدة */
-.vrow{display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-3); border-radius:var(--r-card);
-  border:var(--bd); background:var(--surface-2); scroll-margin-block-start:var(--s-16)}
+.vrow{display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-3);
+  border:var(--bd); scroll-margin-block-start:var(--s-16)}
 .vmeta{display:flex; flex-direction:column; gap:var(--s-1)}
 .vrow > .st{align-self:flex-start}
 .vpfs{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fit,minmax(min(12.5rem,100%),1fr)); margin-bottom:var(--s-2)}
@@ -1309,12 +1314,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .tgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(16.25rem,1fr));
   gap:var(--s-2)}
 .tpick{display:flex; align-items:flex-start; gap:var(--s-3); cursor:pointer;
-  padding:var(--s-3); border:var(--bd); border-radius:var(--r-card);
-  background:var(--surface-2); min-height:var(--tap);
+  padding:var(--s-3); border:var(--bd); min-height:var(--tap);
   transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
 @media(hover:hover){.tpick:hover{background:var(--surface-3)}}
 /* والمختارةُ تُعرَف بحدٍّ لا بأرضيّةٍ ملوّنة: أرضيّةٌ تحت نصٍّ تخفض تباينَه */
-.tpick.on{border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
+.tpick:has(input:checked){border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
 /* **والهامشُ يُصرَّح به كلُّه**: المتصفّحُ يضع لصندوق الاختيار ٣px من
    عنده، **وهي خارج السلّم** — فيُضبَط الأربعةُ لا الأعلى وحدَه */
 .tpick input{flex:none; margin:var(--s-1) 0 0; width:var(--icon-sm); height:var(--icon-sm);
@@ -1323,9 +1327,8 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .tpick .tp-t b{display:block; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .tpick .tp-t span{display:block; font-size:var(--t-small); color:var(--ink-2);
   line-height:var(--lh-small); margin-top:var(--s-1)}
-.draft{display:flex; flex-direction:column; gap:var(--s-3); background:var(--surface);
-  scroll-margin-block-start:var(--s-16);
-  border:var(--bd); border-radius:var(--r-card); padding:var(--s-4) var(--s-4); box-shadow:var(--sh-1)}
+.draft{display:flex; flex-direction:column; gap:var(--s-3); padding:var(--s-4);
+  scroll-margin-block-start:var(--s-16)}
 .draft.done{background:var(--surface-2); box-shadow:none}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}
 /* ══ مسرحُ القرار (D-100) ═══════════════════════════════════════════
@@ -1386,8 +1389,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* ── لوحُ الاختصارات ─────────────────────────────────────────────
    مطويٌّ بالافتراض: من لا يعرفها لا يحتاج أن يراها في كلّ فتحة، ومن
    يعرفها لا يقرؤها. **ويُفتَح بالمفتاح نفسِه الذي يسأل عنه.** */
-.keys{margin:0 0 var(--s-3); border:var(--bd); border-radius:var(--r-card);
-  background:var(--surface-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.keys{margin:0 0 var(--s-3); padding:0; border:var(--bd); font-size:var(--t-small); line-height:var(--lh-small)}
 .keys>summary{cursor:pointer; list-style:none; padding:var(--s-2) var(--s-3);
   min-height:var(--tap); display:flex; align-items:center; gap:var(--s-2);
   color:var(--ink-2); font-weight:600}
@@ -1475,8 +1477,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 /* ‏وهو مرساةٌ يعود إليها «اعتمد» و«اسحب الموعد» (‏#s-…)، فيُترَك فوقه قدرُ الشريط الملتصق
    كما يُترَك فوق البطاقة — ولا ينزل تحته */
 .sched{display:flex; align-items:flex-end; gap:var(--s-2); flex-wrap:wrap; margin-top:var(--s-2);
-  padding:var(--s-3) var(--s-3); border-radius:var(--r-card); background:var(--surface-2);
-  border:var(--bd-soft); scroll-margin-block-start:var(--s-16)}
+  padding:var(--s-3); border:var(--bd-soft); scroll-margin-block-start:var(--s-16)}
 .sched.set{background:var(--ok-wash); border-color:transparent}
 .sched.gone{background:var(--warn-wash); border-color:transparent}
 .sched.none{background:var(--warn-wash); border-color:transparent; align-items:center}
@@ -1826,8 +1827,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 /* ── ما لم يُبنَ: سطرٌ يُطوى (D-111) ──────────────────────────────────
    ثلاثُ بطاقاتٍ ‏١٥٩px لتقول «غيرُ مدعومة» تُعطي الغائبَ وزنَ الحاضر.
    والسطرُ يقول العددَ والأسماءَ — وذاك كلُّ ما يُحتاج قبل الفتح. */
-.unbuilt{border:var(--bd-dash); border-radius:var(--r-card);
-  background:var(--surface-2)}
+.unbuilt{padding:0; border:var(--bd-dash)}
 .unbuilt>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
   padding:var(--s-3) var(--s-4); list-style:none; min-height:var(--tap)}
 .unbuilt>summary::-webkit-details-marker{display:none}
@@ -1843,8 +1843,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 .ax{margin:var(--s-3) 0 0; padding:0; list-style:none;
   display:flex; flex-direction:column; gap:var(--s-2)}
 .ax-r{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
-  padding:var(--s-2); border:var(--bd-soft); border-radius:var(--r-card);
-  background:var(--surface-2)}
+  padding:var(--s-2); border:var(--bd-soft)}
 /* ‏والمتنُ يلتفّ ولا يُقصّ (D-185): يُقتضَب في الخادم إلى سبعين حرفًا، فقصُّه بالنقاط
    فوق ذلك يُخفي آخرَ ما بقي — وبحرف ‏١٤ صار يُقصّ ‏٩٥px («measure_text») */
 .ax-b{min-width:0; flex:1 1 14rem; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
@@ -2037,8 +2036,7 @@ nav.back .seg{margin-inline-start:auto}
    زخرفٌ مخفيّ. وصورةُ الحساب حرفٌ أوّل تتداخل مع الغلاف بـ translate لا
    بهامشٍ سالب. ونسبةُ الغلاف تختلف كما تختلف عند المنصّات، ولا غلافَ في
    Instagram وTikTok. */
-.acct{background-color:var(--surface); border:var(--bd); border-radius:var(--r-card);
-  overflow:hidden; margin-bottom:var(--s-5); box-shadow:var(--sh-1)}
+.acct{padding:0; overflow:hidden; margin-bottom:var(--s-5)}
 .acct-cover{position:relative; block-size:7.5rem; background-color:var(--surface-2);
   border-block-end:var(--bd)}
 .acct-x .acct-cover{block-size:9rem}
@@ -2074,9 +2072,7 @@ nav.back .seg{margin-inline-start:auto}
   line-height:var(--lh-h2); font-weight:600}
 .needs-list{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-2); margin:0; padding:0; list-style:none}
 .needs-list a{display:flex; flex-direction:column; gap:var(--s-1); block-size:100%; min-block-size:var(--tap);
-  padding:var(--s-3); border:var(--bd); border-radius:var(--r-card); background-color:var(--surface);
-  color:var(--ink); text-decoration:none}
-@media(hover:hover){.needs-list a:hover{border-color:var(--field)}}
+  padding:var(--s-3); color:var(--ink)}
 .needs-top{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small)}
 .needs-top .step-n{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2);
   font-variant-numeric:tabular-nums}

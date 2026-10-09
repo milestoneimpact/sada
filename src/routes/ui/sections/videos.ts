@@ -209,7 +209,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
   ].filter((x) => x !== '').join(' · ')
   if (u.status === 'uploading') {
     // ‏رفعٌ جارٍ في نافذةٍ أخرى أو انقطع — لا يُستأنف؛ يُلغى ويُرفع من جديد، وما تُرك يُلغى وحده بعد ساعات
-    return `<div class="vrow">
+    return `<div class="card card-inset vrow">
       <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
       ${statusBadge('warn', '!', 'لم يكتمل رفعُه')}
       <form class="row" method="POST" action="/panel/uploads/${escapeHtml(u.id)}/abort" data-busy="جارٍ الإلغاء…">
@@ -270,7 +270,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
   const hint = made.length === VIDEO_PLATFORMS.length
     ? 'أُنشئت كلُّها — وكلٌّ في بطاقته تحت «المنشورات».'
     : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدودَ منصّته.'
-  return `<div class="vrow" id="v-${id}">
+  return `<div class="card card-inset vrow" id="v-${id}">
     <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
     ${open ? captionForm(u, cap, ctx, now) : ''}
     <form method="POST" action="/panel/uploads/${id}/posts" data-busy="جارٍ الإنشاء…">

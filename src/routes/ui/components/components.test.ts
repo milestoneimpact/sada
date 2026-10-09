@@ -323,3 +323,18 @@ describe('سلوكُ العُدّة (KIT_SCRIPT)', () => {
     expect(t.focused()).toBe(true)
   })
 })
+
+describe('نقلُ الأقسام إلى البطاقة (٢ج)', () => {
+  // ‏السطحُ وحدُّه ونصفُ قطره وظلُّه من صيغة البطاقة، لا من قاعدة المكوّن — فقاعدةٌ تعيد
+  // إعلانَها تعيد السطحَ الثلاثين، و«audit_classes» يعدّها
+  const MOVED = ['.next', '.pf', '.ch', '.draft', '.vrow', '.tpick', '.sched', '.keys', '.unbuilt', '.ax-r', '.acct']
+  it.each(MOVED)('%s لا يعيد إعلانَ السطح ولا نصفِ القطر ولا الظلّ', (sel) => {
+    const r = css.rule(sel)
+    expect(Object.keys(r).length).toBeGreaterThan(0)
+    for (const p of ['background', 'background-color', 'border-radius', 'box-shadow']) expect(r[p]).toBeUndefined()
+  })
+  it('بطاقةُ لوحك المختارةُ تُرى بمربّعها لا بصنفٍ من الخادم', () => {
+    expect(css.where('.tpick.on')).toEqual([])
+    expect(css.rule('.tpick:has(input:checked)')['border-color']).toBeDefined()
+  })
+})

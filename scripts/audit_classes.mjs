@@ -565,7 +565,7 @@ const twice = [...seen].filter(([, n]) => n > 1)
  * حتّى يبلغهما — ورقمٌ يزيد على سقفه يردّ، ورقمٌ ينقص يُخفَض سقفُه في الطلب نفسِه.
  */
 const oneLetter = [...new Set([...defined, ...used.keys()])].filter((c) => c.length === 1).sort()
-const CARD_MAX = 29
+const CARD_MAX = 16
 const BADGE_MAX = 6
 const surfaces = new Set()
 const pills = new Set()
@@ -600,6 +600,8 @@ if (oneLetter.length === 0) console.log('  ✓ لا صنفَ من حرفٍ وا�
 for (const c of oneLetter) console.log(`  ✕ .${c}`)
 
 console.log('\n═══ تعدادُ الصيغ (سقفٌ يمنع الرجوع) ═══\n')
+// ‏`LIST=1` يطبع السطوحَ نفسَها: ما يُنقل إلى العُدّة في الطلب التالي
+if (process.env.LIST) console.log([...surfaces].join('\n'))
 console.log(`  ${surfaces.size > CARD_MAX ? '✕' : '·'} سطوحٌ بقاعدتها: ${surfaces.size} من سقف ${CARD_MAX} — والعُدّةُ أربعُ صيغ (card · card-interactive · card-inset · card-alert)`)
 console.log(`  ${pills.size > BADGE_MAX ? '✕' : '·'} حبوبٌ بقاعدتها: ${pills.size} من سقف ${BADGE_MAX} — ${[...pills].join(' · ')}`)
 

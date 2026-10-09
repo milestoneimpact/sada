@@ -390,7 +390,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
 
   // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
   // والشاشةُ تقول ماذا نُشر وما فشل ولماذا — وهما سؤالان لا واحد
-  return `<div class="ch${state === 'unbuilt' ? ' off' : ''}" id="ch-${escapeHtml(spec.id)}">
+  return `<div class="card ch${state === 'unbuilt' ? ' off' : ''}" id="ch-${escapeHtml(spec.id)}">
     <div class="ch-top">
       <div class="ch-logo">${logo}</div>
       <div class="ch-name"><a class="tap" href="/panel/channels/${escapeHtml(spec.id)}"
@@ -563,7 +563,7 @@ export function channelsSection(
    * **وتبقى كاملةً لمن فتحها**: الأسماءُ والسببُ ورابطُ الشاشة — ولا
    * يُحذَف شيء.
    */ ''}
-  <details class="unbuilt mt-5">
+  <details class="card card-inset unbuilt mt-5">
     <summary>
       <b>لم تُبنَ بعد</b>
       <span class="chip">${rest.length}</span>

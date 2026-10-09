@@ -163,7 +163,7 @@ function scheduler(
    */
   if (d.status === 'failed') {
     const why = whyFailed(d.failure ?? null, d.platform)
-    return `<div class="sched" ${anchor}>
+    return `<div class="card card-inset sched" ${anchor}>
       <p class="np-why"><span class="np-why-ic">${glyph('▲')}</span>${escapeHtml(why.text)}</p>
       <span class="grow"></span>
       ${why.action === 'relink'
@@ -175,7 +175,7 @@ function scheduler(
 
   if (d.status === 'queued') {
     const gone = d.dispatchedAt !== null
-    return `<div class="sched ${gone ? 'gone' : 'set'}" ${anchor}>
+    return `<div class="card card-inset sched ${gone ? 'gone' : 'set'}" ${anchor}>
       ${statusBadge(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
       <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
@@ -198,7 +198,7 @@ function scheduler(
    */
   const lacking = missingMedia(d.platform, readyMimes(d, media))
   if (lacking !== null) {
-    return `<div class="sched none" ${anchor}>
+    return `<div class="card card-inset sched none" ${anchor}>
       ${statusBadge('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطعَ بعد' : 'لا صورةَ ولا مقطعَ بعد')}
       <span class="ago">${escapeHtml(lacking)}. واعتُمد النصّ ويبقى.</span>
     </div>`
@@ -209,7 +209,7 @@ function scheduler(
     // **والسببُ يُقال كما هو**: «لا قناة» حيث القناةُ مربوطةٌ صفحةً كذبٌ
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
-      return `<div class="sched none" ${anchor}>
+      return `<div class="card card-inset sched none" ${anchor}>
         ${statusBadge('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
@@ -217,7 +217,7 @@ function scheduler(
         <a class="btn btn-secondary btn-sm" href="/panel/tasks">ما عليك</a>
       </div>`
     }
-    return `<div class="sched none" ${anchor}>
+    return `<div class="card card-inset sched none" ${anchor}>
       ${statusBadge('warn', '!', `لا قناةَ ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
       <span class="grow"></span>
@@ -226,7 +226,7 @@ function scheduler(
   }
 
   const id = d.id.slice(0, 8)
-  return `<form class="sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     <div class="field"><label for="ac-${id}">الحساب</label>
       <select id="ac-${id}" name="account">${fit
@@ -785,7 +785,7 @@ function card(
                d.approvedBy,
              )}</span>`}</div>`
 
-  return `<div class="draft${live ? '' : ' done'}" id="d-${escapeHtml(d.id)}" data-draft="${escapeHtml(d.id)}"
+  return `<div class="card draft${live ? '' : ' done'}" id="d-${escapeHtml(d.id)}" data-draft="${escapeHtml(d.id)}"
     data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     ${notesPane(d, len, spec.hardLimit)}
@@ -1003,7 +1003,7 @@ export function draftsSection(input: DraftsInput): string {
    * مسوّدةَ فيها **يَعِد بما لا يقع**. وهو مخفيٌّ في الوثيقة ويُظهره
    * السكربتُ — لأنّها كلَّها لا تعمل بدونه.
    */
-  const keys = `<details class="keys" id="keys" hidden>
+  const keys = `<details class="card card-inset keys" id="keys" hidden>
     <summary>اختصاراتُ لوحة المفاتيح <span class="grow"></span><kbd>?</kbd></summary>
     <div class="rows">
       <span class="row-k"><kbd>J</kbd><kbd>K</kbd> التنقّل</span>

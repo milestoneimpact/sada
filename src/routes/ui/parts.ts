@@ -144,7 +144,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
     : `<ul class="ax">${rows
         .map((r) => {
           const ok = r.status !== null && r.status >= 200 && r.status < 300
-          return `<li class="ax-r">
+          return `<li class="card card-inset ax-r">
             ${statusBadge(ok ? 'ok' : 'bad', ok ? '↑' : '✕', escapeHtml(ALERT_KIND[r.kind] ?? r.kind))}
             <span class="ax-b">${escapeHtml(r.body.slice(0, 70))}${r.body.length > 70 ? '…' : ''}</span>
             <span class="grow"></span>
@@ -205,7 +205,7 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
         : statusBadge('idle', '○', 'لم تدُر بعد')
       const when = p.beat === null ? '' : `<span class="ago">${escapeHtml(relativeTime(p.beat.at, now))}</span>`
       const detail = p.beat?.detail == null ? '' : `<span class="ax-b">${escapeHtml(p.beat.detail)}</span>`
-      return `<li class="ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
+      return `<li class="card card-inset ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
     })
     .join('')
   // ‏و`id` مرساةُ حبّة النظام في الرأس و«افحص الآلة» في «خطوتك التالية». والبطاقةُ من العُدّة

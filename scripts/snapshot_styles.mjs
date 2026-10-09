@@ -16,13 +16,16 @@
  * يُشغَّل يدًا عند كلّ دمجٍ أو نقلٍ في `styles.ts`.
  */
 import { chromium } from 'playwright'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, existsSync } from 'node:fs'
 const out = process.argv[2]
 if (!out) { console.error('الاستعمال: node scripts/snapshot_styles.mjs <out.json> [full]'); process.exit(2) }
 const FULL = process.argv[3] === 'full'
 const ONLY = (process.env.ONLY || '').split(',').filter(Boolean)
-const pages0 = ['panel','panel-first','screen-tasks','screen-wizard','screen-report','screen-linkedin','screen-refused','screen-journey','screen-spread','screen-login','screen-2fa','privacy','screen-x','screen-connected','screen-link-only','screen-unbuilt','login','login-err','2fa','doc']
-const pages = ONLY.length ? pages0.filter((p) => ONLY.some((o) => o.split('@')[0] === p)) : pages0
+const pages0 = ['panel','panel-first','screen-tasks','screen-wizard','screen-report','screen-linkedin','screen-refused','screen-journey','screen-spread','screen-login','screen-2fa','privacy','screen-x','screen-connected','screen-link-only','screen-unbuilt','login','login-err','2fa','doc','screen-li-setup','screen-yt-setup','screen-instagram','screen-tiktok','screen-404','screen-500']
+// ‏عيّنةٌ لم يرسمها `render` (أُعيدت تسميتُها أو سقطت) تُتخطّى ويُقال اسمُها، لا تُسقط اللقطةَ كلَّها
+const missing = pages0.filter((p) => !existsSync(`/tmp/${p}.html`))
+if (missing.length) console.error(`تُتخطّى (لم تُرسَم): ${missing.join(' · ')}`)
+const pages = (ONLY.length ? pages0.filter((p) => ONLY.some((o) => o.split('@')[0] === p)) : pages0).filter((p) => !missing.includes(p))
 const modes0 = [[1440,'light'],[1440,'dark'],[390,'light'],[2000,'light']]
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const snap = {}

@@ -29,7 +29,7 @@ const STEP_LABEL: Readonly<Partial<Record<JourneyStep['state'], string>>> = { fa
 function step(s: JourneyStep, i: number, focus: number): string {
   const mark = RUNG_MARK[s.state]
   // ‏**وأوّلُ محطّةٍ تنتظرك وحدَها تُلوَّن أرضًا** — خمسُ بطاقاتٍ كهرمانيّة تُقرأ ضجيجًا
-  return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
+  return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a class="card card-interactive" href="${escapeHtml(s.href)}">
       <span class="j-n" aria-hidden="true">${i + 1}</span>
       <span class="j-body"><b>${escapeHtml(s.title)}</b>
         ${statusBadge(mark.cls, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}
@@ -40,7 +40,7 @@ function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
   const meta = t.tone === 'ok'
     ? nextAt === null ? 'لا شيءَ مجدولٌ عليها' : `التالي ${untilTime(nextAt, now)}`
     : t.tone === 'bad' ? 'النشرُ عليها متوقّف' : t.tone === 'warn' ? 'ضغطةٌ واحدةٌ تربطها' : 'سرّا التطبيق أوّلًا'
-  return `<div class="pf" data-pf="${escapeHtml(t.id)}">
+  return `<div class="card pf" data-pf="${escapeHtml(t.id)}">
     <div class="pf-head"><span class="pf-logo">${LOGOS[t.id] ?? ''}</span>
       <span class="pf-name"><b>${escapeHtml(t.label)}</b>
         ${t.account === null ? '' : `<span class="ago"><bdi>${escapeHtml(t.account)}</bdi></span>`}</span></div>
@@ -72,7 +72,7 @@ export function homeTop(f: HomeFacts, now: Date): string {
   const built = f.channels.filter((c: ChannelView) => c.state !== 'unbuilt')
   const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
   const linked = built.filter((c) => platformTile(c).tone === 'ok').length
-  return `<div class="next" data-tone="${next.tone}">
+  return `<div class="card card-alert next" data-tone="${next.tone}">
     <div class="next-body"><span class="next-k">خطوتُك التالية</span>
       <p class="next-t">${escapeHtml(next.text)}</p></div>
     <a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>
