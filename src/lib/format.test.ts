@@ -109,3 +109,13 @@ describe('untilTime و shortAgo (D-172)', () => {
     expect(shortAgo('2026-08-20 12:00:00', now)).toBe('20 أغسطس')
   })
 })
+
+describe('المدّةُ بأكبر وحدةٍ تصدق (D-194)', () => {
+  it('دقائقُ ثمّ ساعاتٌ ثمّ أيّام — لا «48599 دقيقة»', async () => {
+    const { duration } = await import('./format')
+    expect(duration(48599 * 60)).toBe('34 يومًا')
+    expect(duration(120 * 60)).toBe('ساعتَين')
+    expect(duration(5 * 60)).toBe('5 دقائق')
+    expect(duration(30)).toBe('دقيقةً واحدة')
+  })
+})

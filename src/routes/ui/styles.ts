@@ -461,21 +461,53 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .next-t{margin:var(--s-1) 0 0; font-size:var(--t-h3); font-weight:600; line-height:var(--lh-h3)}
 .home-card{margin-bottom:var(--gap-card)}
 .home-sub{margin:var(--s-5) 0 var(--s-3); font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
-/* المحطّاتُ السبع («.trip» لا «.journey»: ذاك سجلُّ المنشور الواحد) صفٌّ واحدٌ على العريض، وتلتفّ حين يضيق، وعمودٌ في الجوّال */
-.trip{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-2);
-  grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))}
-.trip a{display:flex; flex-direction:column; gap:var(--s-2); height:100%; min-height:var(--tap);
-  padding:var(--s-3); border:var(--bd); background:var(--surface-2)}
-.trip li[data-state=done] a{background:var(--surface)}
-.trip li[data-state=now] a{border-color:var(--warn)}
-.trip li[data-state=now][data-focus] a{background:var(--warn-wash)}
-.trip li[data-state=failed] a{border-color:var(--bad); background:var(--bad-wash)}
-@media(hover:hover){.trip a:hover{border-color:var(--brand)}}
-.j-n{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2);
-  font-variant-numeric:tabular-nums}
-.j-body{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-1)}
-.j-body b{font-size:var(--t-ui); line-height:var(--lh-ui)}
-.j-note{font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
+/* ── القمعُ وشريطُ الأسبوع (D-194) ─────────────────────────────────────────────────
+   القمعُ صفوفٌ: اسمُ المحطّة وحالُها، ثمّ شريطٌ بطول ما مرّ بها (حبرٌ واحد: قياسٌ لا هويّة)،
+   ثمّ العدد. **والمميَّزةُ وحدَها بلون حالها** فلا تُقرأ سبعُ محطّاتٍ برتقاليّةٍ ضجيجًا. */
+.home-pair{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,3fr) minmax(0,2fr); margin-bottom:var(--gap-card)}
+.home-pair > .home-card{margin-bottom:0}
+/* ‏وتحت العريض عمودٌ واحد — وبعد قاعدتها في الورقة، فلا يغلبها الترتيب */
+@media${below('lg')}{.home-pair{grid-template-columns:minmax(0,1fr)}}
+.home-side{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card)}
+.grid.tiles + .home-pair{margin-top:var(--gap-card)}
+.home-side > .home-card{margin-bottom:0}
+/* ‏والمنصّاتُ في العمود الجانبيّ صفوفٌ لا بطاقات (D-194): شعارٌ واسمٌ وحالٌ وزرٌّ في سطر */
+.home-side .pfgrid{grid-template-columns:1fr; gap:var(--s-1)}
+.home-side .pf{flex-direction:row; flex-wrap:wrap; align-items:center; column-gap:var(--s-3); row-gap:var(--s-1);
+  padding:var(--s-2); border:0; box-shadow:none; background:var(--surface-2)}
+.home-side .pf-head{flex:1 1 8rem; min-width:0}
+.home-side .pf .btn{margin:0; flex:none}
+.home-side .pf > .ago{display:none}
+.funnel{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-1)}
+.funnel a{display:grid; grid-template-columns:9rem minmax(0,1fr) 2.5rem; grid-template-areas:"t bar n" "t note note";
+  column-gap:var(--s-3); row-gap:var(--s-0); align-items:center; padding:var(--s-1) var(--s-2); border-radius:var(--r-control);
+  color:inherit; text-decoration:none; min-height:var(--tap)}
+@media(hover:hover){.funnel a:hover{background:var(--hover)}}
+.funnel li[data-focus] a{background:var(--surface-2)}
+.fn-t{grid-area:t; display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-0)}
+.fn-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.fn-bar{grid-area:bar; display:flex; justify-content:flex-start; height:var(--s-3); border-radius:var(--r-control); background:var(--surface-3); overflow:hidden}
+.fn-bar > span{display:block; flex:none; height:100%; width:var(--w); border-radius:var(--r-control); background:var(--ink-2)}
+.funnel li[data-focus][data-state=now] .fn-bar > span{background:var(--warn)}
+.funnel li[data-focus][data-state=failed] .fn-bar > span,.funnel li[data-state=failed] .fn-bar > span{background:var(--bad)}
+.fn-n{grid-area:n; text-align:end; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+.fn-note{grid-area:note; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.wk{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
+.wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
+  border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
+.wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--brand)}
+.wk-d{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+.wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
+.wk-dot{width:var(--s-2); height:var(--s-2); border-radius:50%; background:var(--ink-3)}
+.wk-dot[data-pf=linkedin]{background:var(--pf-linkedin)}
+.wk-dot[data-pf=x]{background:var(--pf-x); box-shadow:0 0 0 var(--stroke) var(--logo-ring)}
+.wk-dot[data-pf=instagram]{background:var(--pf-instagram)}
+.wk-dot[data-pf=tiktok]{background:var(--pf-tiktok); box-shadow:0 0 0 var(--stroke) var(--logo-ring)}
+.wk-dot[data-pf=youtube]{background:var(--pf-youtube)}
+.machine-more > summary{cursor:pointer; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); min-height:var(--tap); display:flex; align-items:center}
+.wk-hint{margin:var(--s-3) 0 0}
+.wk-c{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .pfgrid{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fill,minmax(11.75rem,1fr))}
 .pf{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2)}
 .pf .btn{margin-top:auto}
@@ -493,10 +525,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .pf[data-pf=tiktok] .pf-logo{background:var(--pf-tiktok)}
 .pf[data-pf=youtube] .pf-logo{background:var(--pf-youtube)}
 @media${below('sm')}{
-  .trip{grid-template-columns:1fr}
-  .trip a{flex-direction:row; align-items:center; padding:var(--s-2) var(--s-3)}
-  .j-body{flex-direction:row; flex-wrap:wrap; align-items:center; column-gap:var(--s-2)}
-  .j-note{flex-basis:100%}
+  .funnel a{grid-template-columns:6.5rem minmax(0,1fr) 2rem}
+  .wk li{min-height:6.5rem}
   .pfgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .next .btn{flex:1 1 100%}
 }
@@ -552,7 +582,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    المكوّنات لها قياسُها في قواعدها، فلا ترثها حين صارت بطاقة. والسهمُ في الرحلة وبابُ
    «ما تطلبه» سطحان ثانيان بلا ظلّ كما كانا */
 .card.keys > .hint{color:var(--ink)}
-.trip a.card-interactive, .needs-list a.card-interactive{box-shadow:none}
+.needs-list a.card-interactive{box-shadow:none}
 /* ‏والدليلُ إفصاحٌ بلا حشو (رأسُه وجسدُه يحملانه)، إلّا دليلَ نتيجة الربط فهو بطاقةٌ بحشوها
    وظلّها على السطح الثاني كما كان. وشبكةُ المؤشّرات بطاقةٌ خيوطُها فجوةُ ‏1px على أرض «--line» */
 .card-inset.guide{padding:0}

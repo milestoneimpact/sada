@@ -1,5 +1,5 @@
 /**
- * رأسُ الرئيسيّة (D-177): **خطوتُك التالية، ثمّ الرحلة، ثمّ المنصّات**.
+ * رأسُ الرئيسيّة (D-177 · D-194): **خطوتُك التالية، ثمّ القمعُ وشريطُ الأسبوع، ثمّ المنصّات**.
  *
  * ثلاثُ طبقاتٍ تجيب ثلاثةَ أسئلةٍ بترتيبها: ماذا أفعل الآن؟ أين أنا من الرحلة؟
  * وأيُّ منصّةٍ متّصلةٌ وأيُّها لا؟ وما تحتها (ما ينتظرك، وما وقع، والمال، وصحّةُ
@@ -13,7 +13,9 @@ import {
   journeySteps, nextAction, platformTile,
   type HomeFacts, type JourneyStep, type PlatformTile,
 } from '../../../lib/home'
-import { untilTime } from '../../../lib/format'
+import { parseSqliteUtc, untilTime } from '../../../lib/format'
+import { localParts } from '../../../lib/time/zone'
+
 import { LOGOS } from '../logos'
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
@@ -26,14 +28,53 @@ const TILE_MARK: Readonly<Record<PlatformTile['tone'], string>> = { ok: '●', b
  */
 const STEP_LABEL: Readonly<Partial<Record<JourneyStep['state'], string>>> = { failed: 'فشلت' }
 
-function step(s: JourneyStep, i: number, focus: number): string {
+/**
+ * القمع (D-194): **سبعُ محطّاتٍ أشرطةً بطولِ ما مرّ بكلٍّ منها** — بدل سبع بطاقاتٍ متساوية تُقرأ
+ * كلُّها «تنتظر». والطولُ نسبةٌ إلى أكبرها، والمحطّةُ المميَّزة (ما يتكلّم عنه الفعلُ فوقها) وحدَها
+ * بلون حالها؛ والباقي حبرٌ واحد (قياسٌ لا هويّة). والصفُّ كلُّه رابطٌ إلى موضع المحطّة.
+ */
+function leg(s: JourneyStep, i: number, focus: number, max: number): string {
   const mark = RUNG_MARK[s.state]
-  // ‏**وأوّلُ محطّةٍ تنتظرك وحدَها تُلوَّن أرضًا** — خمسُ بطاقاتٍ كهرمانيّة تُقرأ ضجيجًا
-  return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a class="card card-interactive" href="${escapeHtml(s.href)}">
-      <span class="j-n" aria-hidden="true">${i + 1}</span>
-      <span class="j-body"><b>${escapeHtml(s.title)}</b>
-        ${statusBadge(mark.cls, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}
-        <span class="j-note">${escapeHtml(s.note)}</span></span></a></li>`
+  const w = max === 0 ? 0 : Math.max(s.count === 0 ? 0 : 4, Math.round((s.count / max) * 100))
+  return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
+      <span class="fn-t"><b>${escapeHtml(s.title)}</b>${statusBadge(mark.cls, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}</span>
+      <span class="fn-bar" aria-hidden="true"><span style="--w:${w}%"></span></span>
+      <span class="fn-n num">${s.count}</span>
+      <span class="fn-note">${escapeHtml(s.note)}</span></a></li>`
+}
+
+const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+
+/**
+ * شريطُ الأسبوع (D-194): سبعةُ أيّامٍ من اليوم **بتوقيت المالك**، وفي كلٍّ نقطةٌ بلون منصّتها لكلّ
+ * منشورٍ مجدول. واللونُ هويّةُ المنصّة لا قيمة، **والعددُ مكتوبٌ** فلا يُقرأ اللونُ وحدَه.
+ */
+function week(items: readonly { platform: string; at: string }[], now: Date, zone: string | null): string {
+  const key = (d: Date): string => { const p = localParts(d, zone); return `${p.year}-${p.month}-${p.day}` }
+  const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() + i * 86_400_000))
+  const by = new Map<string, string[]>()
+  for (const it of items) {
+    const at = parseSqliteUtc(it.at)
+    if (at === null || at.getTime() < now.getTime() - 3_600_000) continue
+    const k = key(at)
+    by.set(k, [...(by.get(k) ?? []), it.platform])
+  }
+  const total = days.reduce((n, d) => n + (by.get(key(d))?.length ?? 0), 0)
+  const cols = days.map((d, i) => {
+    const p = localParts(d, zone)
+    const pfs = by.get(key(d)) ?? []
+    return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${i === 0 ? 'اليوم' : WEEKDAYS[p.weekday]}</span>
+      <span class="wk-n num">${p.day}</span>
+      <span class="wk-dots" aria-label="${pfs.length} منشور">${pfs.slice(0, 6).map((pf) =>
+        `<span class="wk-dot" data-pf="${escapeHtml(pf)}" title="${escapeHtml(pf)}"></span>`).join('')}</span>
+      <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span></li>`
+  }).join('')
+  return `<div class="card home-card">
+    <div class="card-head"><h2>هذا الأسبوع</h2><div class="grow"></div>
+      <span class="ago">مجدولٌ ${total}</span></div>
+    <ol class="wk">${cols}</ol>
+    <p class="hint wk-hint">${total === 0 ? 'لا شيءَ مجدولٌ في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلُّ نقطةٍ منشورٌ بلون منصّته.'}</p>
+  </div>`
 }
 
 function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
@@ -65,7 +106,7 @@ function focusOf(trip: readonly JourneyStep[], step: JourneyStep['key'] | undefi
   return failed >= 0 ? failed : trip.findIndex(live)
 }
 
-export function homeTop(f: HomeFacts, now: Date): string {
+export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
   const focus = focusOf(trip, next.step)
@@ -77,13 +118,16 @@ export function homeTop(f: HomeFacts, now: Date): string {
       <p class="next-t">${escapeHtml(next.text)}</p></div>
     <a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>
   </div>
+  ${kpis}
 
-  <div class="card home-card">
-    <div class="card-head"><h2>رحلةُ المنشور</h2><div class="grow"></div>
-      <span class="ago">اضغط أيَّ محطّةٍ لتذهب إليها</span></div>
-    <ol class="trip">${trip.map((s, i) => step(s, i, focus)).join('')}</ol>
-  </div>
-
+  <div class="home-pair">
+    <div class="card home-card">
+      <div class="card-head"><h2>رحلةُ المنشور</h2><div class="grow"></div>
+        <span class="ago">كم مرّ بكلّ محطّة</span></div>
+      <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
+    </div>
+    <div class="home-side">
+    ${week(f.scheduled ?? [], now, f.zone)}
   <div class="card home-card">
     <div class="card-head"><h2>المنصّات</h2><div class="grow"></div>
       <span class="ago">متّصلة ${linked} من ${built.length}</span></div>
@@ -91,5 +135,7 @@ export function homeTop(f: HomeFacts, now: Date): string {
       .map((c) => tile(platformTile(c), f.counts.perPlatform[c.spec.id]?.nextAt ?? null, now))
       .join('')}</div>
     ${soon.length === 0 ? '' : `<p class="hint">قريبًا: ${soon.map(escapeHtml).join(' · ')}</p>`}
+  </div>
+    </div>
   </div>`
 }
