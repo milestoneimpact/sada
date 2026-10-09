@@ -1575,6 +1575,22 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 .auth h1{text-align:center; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-1)}
 .auth .lede{text-align:center; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); margin:0 0 var(--s-5)}
 .auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
+/* ── صفحةُ الهبوط (D-193): شاشةٌ واحدةٌ على الهاتف، وزرٌّ أوّليٌّ واحد ─────────────── */
+.land{max-width:32rem; margin:8vh auto 0; text-align:center}
+.land .glyph{margin:0 auto var(--s-4); width:var(--s-16); height:var(--s-16); border-radius:var(--r-card)}
+.land h1{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-2)}
+.land-lede{margin:0 auto var(--s-5); color:var(--ink-2); font-size:var(--t-body); line-height:var(--lh-body); max-width:var(--measure)}
+.land-cta{width:100%; justify-content:center}
+.land-steps{list-style:none; margin:var(--s-6) 0 0; padding:0; display:grid; gap:var(--s-3); text-align:start}
+.land-steps li{display:flex; gap:var(--s-3); align-items:flex-start}
+.land-steps li > span:last-child{display:flex; flex-direction:column; gap:var(--s-0)}
+.land-steps b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.land-steps li > span:last-child > span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.land-n{flex:none; display:grid; place-items:center; width:var(--s-8); height:var(--s-8); border-radius:50%;
+  background:var(--surface-2); font-weight:600; font-size:var(--t-small)}
+.land-pfs{list-style:none; margin:var(--s-6) 0 0; padding:0; display:flex; justify-content:center; gap:var(--s-4); color:var(--ink-2)}
+.land-pf svg{width:var(--icon-lg); height:var(--icon-lg)}
+.land-foot{margin-top:var(--s-6); display:flex; justify-content:center; gap:var(--s-4); font-size:var(--t-small)}
 .auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
 .auth button{width:100%; justify-content:center; padding:var(--s-3)}
 .auth .card form + form{margin-top:var(--s-3)}

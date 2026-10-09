@@ -18,7 +18,7 @@ import { tasksScreen } from '../src/routes/ui/tasksView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
-import { soloPage } from '../src/routes/ui/shell'
+import { shell, soloPage } from '../src/routes/ui/shell'
 import { soloNav } from '../src/routes/ui/rail'
 import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
@@ -26,6 +26,7 @@ import { spreadScreen } from '../src/routes/ui/spreadView'
 import { loginPage } from '../src/routes/panelView'
 import { secondFactorPage } from '../src/routes/authView'
 import { notFoundPage, serverErrorPage } from '../src/routes/ui/errorView'
+import { landingBody } from '../src/routes/landing'
 import type { Journey } from '../src/lib/journey'
 import { platformNeeds } from '../src/lib/platform/needs'
 import type { PlatformCounts, TimelineRow } from '../src/lib/platform/timeline'
@@ -434,6 +435,8 @@ writeAudited(
 
 // ‏صفحتا الخطأ (خطّة التصميم 7.11 · D-189): من دالّتيهما اللتين يخدمهما Worker، لا نسخةٌ هنا —
 // ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare
+// ‏صفحةُ الهبوط على الجذر (D-193)
+writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody(), 'n', '', { indexable: true }))
 writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّةَ بهذا الاسم'))
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
