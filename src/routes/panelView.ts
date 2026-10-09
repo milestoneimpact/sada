@@ -124,9 +124,20 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
           authenticatorData:b64u(r.authenticatorData),
           clientDataJSON:b64u(r.clientDataJSON), signature:b64u(r.signature)})});
     }).then(function(r){
-      // ‏والوجهةُ من الحقل الذي كتبه الخادمُ وأُلحقت به المرساة — لا «/panel» ثابتة (ر-11)
+      // ‏والوجهةُ من الحقل الذي كتبه الخادمُ وأُلحقت به المرساة — لا «/panel» ثابتة (ر-11).
+      // **وصفحةُ الدخول تُرسَم على عنوان الوجهة نفسِه**: «location.href» إلى العنوان نفسِه بمرساةٍ
+      // انتقالٌ داخل الوثيقة لا تحميل، فتبقى الدوّارةُ والكعكةُ مكتوبة حتّى يُحدِّث المالكُ بيده
+      // (الجلسة ب، المهمّة ١). فالوجهةُ نفسُها تُعاد تحميلًا، وغيرُها يحلّ محلّ الدخول في السجلّ،
+      // وبعد ثماني ثوانٍ بلا انتقالٍ رابطٌ يُضغط بدل دوّارةٍ بلا نهاية
       if(r.ok){var nx=document.getElementById('login-next');
-        location.href=nx&&nx.value.charAt(0)==='/'?nx.value:'/panel'; return;}
+        var to=nx&&nx.value.charAt(0)==='/'&&nx.value.charAt(1)!=='/'?nx.value:'/panel';
+        btn.textContent='تمّ'; if(note)note.textContent='تمّ — تُفتح لوحتك…';
+        setTimeout(function(){if(!note)return; note.textContent='';
+          var a=document.createElement('a'); a.href=to; a.textContent='لم تُفتح؟ افتح لوحتك';
+          note.appendChild(a);},8000);
+        if(to.split('#')[0]===location.pathname+location.search)location.reload();
+        else location.replace(to);
+        return;}
       return sadaPk.fail(r);
     }).catch(function(err){reset(sadaPk.why(err));});
   });

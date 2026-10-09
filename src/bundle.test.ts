@@ -107,7 +107,9 @@ function browserGlobals(document: Record<string, unknown>): Record<string, unkno
   }
   return {
     window, document, localStorage: storage, sessionStorage: storage,
-    location: { href: `${ORIGIN}/panel`, hash: '', pathname: '/panel', search: '' },
+    location: { href: `${ORIGIN}/panel`, hash: '', pathname: '/panel', search: '', reloads: 0,
+      // ‏صفحةُ الدخول على عنوان الوجهة نفسِه: الانتقالُ إليه إعادةُ تحميل (الجلسة ب)
+      reload(this: { reloads: number }) { this.reloads += 1 }, replace(this: { href: string }, u: string) { this.href = u } },
     history: { replaceState() {} }, navigator: {},
     setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: () => 0, btoa, atob, console,
@@ -197,7 +199,7 @@ describe('الحزمةُ المشحونة', () => {
     clicks[0]!()
     await vi.waitFor(() => expect(replies).toHaveLength(2), { timeout: 3000 })
     await vi.waitFor(() =>
-      expect((globals['location'] as { href: string }).href).toBe('/panel'), { timeout: 3000 })
+      expect((globals['location'] as { reloads: number }).reloads).toBe(1), { timeout: 3000 })
 
     expect(replies.map((r) => [r.path, r.status])).toEqual([
       ['/panel/passkey/challenge', 200],
