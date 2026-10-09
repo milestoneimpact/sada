@@ -565,7 +565,7 @@ const twice = [...seen].filter(([, n]) => n > 1)
  * حتّى يبلغهما — ورقمٌ يزيد على سقفه يردّ، ورقمٌ ينقص يُخفَض سقفُه في الطلب نفسِه.
  */
 const oneLetter = [...new Set([...defined, ...used.keys()])].filter((c) => c.length === 1).sort()
-const CARD_MAX = 16
+const CARD_MAX = 13
 const BADGE_MAX = 6
 const surfaces = new Set()
 const pills = new Set()

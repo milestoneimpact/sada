@@ -718,7 +718,7 @@ describe('بطاقةُ الخطوات (D-137)', () => {
     expect(steps).toBeGreaterThan(card)
     expect(aside).toBeGreaterThan(steps)
     expect(outcome).toBeGreaterThan(aside)
-    expect(css.rule('.card.guide', `@media${atLeast('md')}`).display).toBe('grid')
+    expect(css.rule('.card.guide:not(.card-inset)', `@media${atLeast('md')}`).display).toBe('grid')
   })
 })
 

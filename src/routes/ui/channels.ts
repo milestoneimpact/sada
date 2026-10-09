@@ -101,7 +101,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
    * ما تمّ لا يزاحم ما لم يتمّ.
    */
   if (w.linked) {
-    return `<details class="guide mb-3">
+    return `<details class="card card-inset guide mb-3">
       <summary>
         <span class="g-ic">${ICON.guide}</span>
         <span class="g-t"><b>الطريقُ إلى الربط — تمّ كلُّه</b>
@@ -148,7 +148,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   const wizard = wizardStrip(view, app)
 
   if (app.source === 'worker_secret') {
-    return `${wizard}<div class="guide"><div class="guide-body">
+    return `${wizard}<div class="card card-inset guide"><div class="guide-body">
       <div class="help"><span class="help-ic">i</span><span class="help-t">
         <b>مضبوطٌ من أسرار Worker — وسرُّ البيئة يغلب الخزانة دائما.</b>
         فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو —
@@ -191,7 +191,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   const rejected = app.verifiedKind === 'bad_secret' || app.verifiedKind === 'bad_client_id'
   const open = fresh || rejected || (view.accounts.length === 0 && app.verifiedKind !== 'accepted')
   const step = callbackStep(guide)
-  return `${wizard}<details class="guide"${open ? ' open' : ''}>
+  return `${wizard}<details class="card card-inset guide"${open ? ' open' : ''}>
     <summary>
       <span class="g-ic">${ICON.guide}</span>
       <span class="g-t"><b>${fresh ? 'دليلُ ضبط التطبيق' : 'الدليل وتبديلُ الأسرار'}</b>
@@ -521,7 +521,7 @@ export function channelsSection(
     v.accounts.map((a) => tokenHealth(a, now)?.kind ?? '')
   const stopped = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).includes('expired')).length
   const renew = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).some((k) => k === 'expired' || k === 'soon')).length
-  const strip = `<div class="grid tiles c4 mb-4">
+  const strip = `<div class="card grid tiles c4 mb-4">
     <div class="card tile"><div class="kv-k">مربوطة وتعمل</div>
       <div class="kv-v">${count('linked')}<em> / ${built.length}</em></div>
       <div class="note">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>

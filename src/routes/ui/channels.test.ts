@@ -134,11 +134,11 @@ describe('دليلُ الضبط', () => {
   })
 
   it('ويبقى الدليلُ مفتوحًا حتّى يُربَط حسابٌ أو يجوز الفحص — و«افحص الزوج» ظاهر', () => {
-    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••' })).toMatch(/<details class="guide" open>/)
-    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••', verifiedKind: 'accepted' })).not.toMatch(/<details class="guide" open>/)
+    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••' })).toMatch(/<details class="card card-inset guide" open>/)
+    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••', verifiedKind: 'accepted' })).not.toMatch(/<details class="card card-inset guide" open>/)
     expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••', verifiedKind: 'bad_secret' },
-      [acc({ platform: 'tiktok' })])).toMatch(/<details class="guide" open>/)
-    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••' }, [acc({ platform: 'tiktok' })])).not.toMatch(/<details class="guide" open>/)
+      [acc({ platform: 'tiktok' })])).toMatch(/<details class="card card-inset guide" open>/)
+    expect(pane('tiktok', { source: 'vault', clientId: 'k', hint: '••' }, [acc({ platform: 'tiktok' })])).not.toMatch(/<details class="card card-inset guide" open>/)
   })
 })
 

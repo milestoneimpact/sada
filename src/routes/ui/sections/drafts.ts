@@ -649,7 +649,7 @@ function filterTabs(drafts: readonly DraftRow[]): string {
  */
 function preview(d: DraftRow, target: string): string {
   const [first = '', ...rest] = d.text.split('\n')
-  return `<div class="pv" data-pv="${escapeHtml(d.id)}">
+  return `<div class="card card-inset pv" data-pv="${escapeHtml(d.id)}">
     <div class="pv-head">
       <span class="pv-dot" aria-hidden="true"></span>
       <span class="pv-who">${escapeHtml(target)}</span>
