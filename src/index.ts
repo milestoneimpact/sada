@@ -31,6 +31,7 @@ import { ICON_BYTES } from './routes/ui/shell'
 import { assets } from './routes/assets'
 import { fonts } from './routes/fonts'
 import { legal } from './routes/legal'
+import { landing } from './routes/landing'
 import { verify } from './routes/verify'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
@@ -361,6 +362,7 @@ app.route('/', assets)
 app.route('/', fonts)
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
+app.route('/', landing)
 app.route('/', verify)
 app.route('/', media)
 app.route('/', oauth)
