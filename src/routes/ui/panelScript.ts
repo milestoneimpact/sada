@@ -45,6 +45,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   }
   function show(id,push,focus){
     if(first===null)return;
+    var asked=id;
     // ‏ومرساةُ ما في اللوح تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى البطاقة
     // ‏لا إلى رأس لوحٍ طولُه آلافُ البكسلات. وكانت «#d-…» وحدَها، فـ«#videos»
     // ‏بعد الرفع و«#plan-import» من المعاينة و«#write» تُخفي الألواحَ كلَّها
@@ -69,10 +70,30 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         if(sp&&head){head.textContent=sp.textContent; document.title=sp.textContent+' — صدى';}
       }else{t.removeAttribute('aria-current');}
     });
+    // ‏وفي اللوح أقسامٌ («المنشورات»: المسوّداتُ واكتب والفيديو والخطّة، D-195): يظهر القسمُ الذي
+    // ‏يحوي المرساةَ — «#idea» تفتح «اكتب» و«#d-…» تفتح «المسوّدات» — أو الأوّلُ حين تُطلَب اللوحةُ نفسُها
+    var subs=pane?pane.querySelectorAll('[data-sub]'):[];
+    if(subs.length>0){
+      var on=card?(card.hasAttribute('data-sub')?card:card.closest('[data-sub]')):null;
+      if(!on)on=subs[0];
+      Array.prototype.forEach.call(subs,function(s){s.hidden=s!==on;});
+      Array.prototype.forEach.call(pane.querySelectorAll('#posts-sub a'),function(t){
+        if(t.getAttribute('href')==='#'+on.id)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
+      // ‏والقسمُ نفسُه مرساةُ تبويبه: لا ينزل إليه فوق الشريط، بل يبقى الشريطُ ظاهرًا
+      if(card===on){if(push&&history.replaceState)history.replaceState(null,'','#'+asked);
+        var bar=document.getElementById('posts-sub'); if(bar&&focus)bar.scrollIntoView({block:'nearest'}); return;}
+    }
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
     // ‏و«tabindex=-1» لما لا يُركَّز عليه وحدَه: حقلٌ أو زرٌّ يُعلَّم به يخرج من ترتيب Tab
+    // ‏وما في طيّةٍ مغلقة («تفاصيلُ» بطاقة المسوّدة، D-195) تُفتح طيّاتُه قبل النزول إليه
+    if(card){for(var dt=card.parentElement;dt;dt=dt.parentElement){if(dt.tagName==='DETAILS')dt.open=true;}}
     if(card&&host){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.scrollIntoView({block:'start'});
-      card.focus({preventScroll:true}); return;}
+      card.focus({preventScroll:true});
+      // ‏وما فوق البطاقة يتبدّل طولُه حتّى يكتمل التحميل (الخطوطُ وسكربتُ الفرز والصور)، فتنزل البطاقةُ
+      // ‏عن رأس الشاشة بعد النزول إليها: ‏١٥٥١px على الهاتف لـ«#d-…» (D-195). فتُعاد مرّةً بعد التحميل
+      if(document.readyState!=='complete'){var again=card;
+        window.addEventListener('load',function(){again.scrollIntoView({block:'start'});},{once:true});}
+      return;}
     if(focus&&pane){var hd=pane.querySelector('h1,h2');
       if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
   }

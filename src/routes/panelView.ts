@@ -19,7 +19,8 @@ import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
-import { draftsSection, type MediaView, type Target } from './ui/sections/drafts'
+import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
+import { tabs } from './ui/components/tabs'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
 import { planSection } from './ui/sections/plan'
@@ -645,6 +646,29 @@ function todayList(d: PanelData): string {
         : `<ul class="todo">${rows}</ul>${more}`}</div>`
 }
 
+/**
+ * «المنشورات» أربعةُ تبويبات (D-195): **المسوّدات** (الاعتمادُ والجدولة)، و**اكتب** (من فكرةٍ ومن مصدر)،
+ * و**الفيديو**، و**الخطّة**. كان اللوحُ صفحةً واحدةً بستّ مهامّ: ‏١٨ شاشةً على الهاتف والكتابةُ في التاسعة.
+ *
+ * والتبويبُ رابطٌ إلى قسمه (`#sub-…`)، **وكلُّ مرساةٍ قديمة تفتح قسمَها** (`#idea` و`#write` و`#videos`
+ * و`#plan-import` و`#d-…`) — يقرأ `show()` القسمَ الذي يحوي المرساة. وبلا سكربتٍ تظهر الأقسامُ كلُّها.
+ */
+function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, videos: string, plan: string): string {
+  const waiting = d.drafts.filter((x) => x.status === 'draft').length
+  const failed = d.drafts.filter((x) => x.status === 'failed').length
+  const nav = tabs('أقسامُ المنشورات', [
+    { label: 'المسوّدات', href: '#sub-list', current: true, ...(waiting + failed > 0 ? { count: waiting + failed, bad: failed > 0 } : {}) },
+    { label: 'اكتب', href: '#sub-write' },
+    { label: 'الفيديو', href: '#sub-videos', ...(d.uploads.length > 0 ? { count: d.uploads.length } : {}) },
+    { label: 'الخطّة', href: '#sub-plan' },
+  ], { id: 'posts-sub' })
+  return `${nav}
+  <div data-sub id="sub-list">${drafts.list}</div>
+  <div data-sub id="sub-write">${drafts.write}</div>
+  <div data-sub id="sub-videos">${videos}</div>
+  <div data-sub id="sub-plan">${plan}</div>`
+}
+
 export function panelPage(d: PanelData): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
@@ -995,7 +1019,7 @@ ${pivotPane(d.pivot)}
      <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
      <a class="btn btn-secondary btn-sm" href="#videos">ارفع فيديو</a>
      <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
-  ${draftsSection({
+  ${postsTabs(d, draftsParts({
     drafts: d.drafts,
     writable: d.writableSources,
     targets: d.targets,
@@ -1010,15 +1034,13 @@ ${pivotPane(d.pivot)}
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
     ...(d.links === undefined ? {} : { links: d.links }),
-  })}
-  ${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
+  }), videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
     ...(d.links === undefined ? {} : { links: d.links }),
     ...(d.reach === undefined ? {} : { reach: d.reach }),
     ...(d.captions === undefined ? {} : { captions: d.captions }),
     // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
     writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
-  })}
-  ${planImportCard()}
+  }), `${planImportCard()}
   <div class="mt-3">${planSection({
     plan: d.plan,
     names: Object.fromEntries(d.sources.map((s) => [s.id, s.name])),
@@ -1027,7 +1049,7 @@ ${pivotPane(d.pivot)}
     now: d.now,
     // من الخمسين صفًّا المحمَّلة أصلًا للأمان — لا استعلامَ جديد (D-157)
     lastAttempt: d.audit.find((a) => a.action === 'plan.generate') ?? null,
-  })}</div>
+  })}</div>`)}
 </section>
 
 <section data-pane="settings" hidden>
