@@ -168,6 +168,8 @@ export interface HomeFacts {
   readonly blocker: Blocker | null
   /** منطقةُ المالك من كعكته (D-173) — ومنها ساعةُ انفتاح السقف بتوقيته. */
   readonly zone: string | null
+  /** ما جُدول ولم يُنشر بعد — منصّتُه وموعدُه (UTC)، لشريط الأسبوع (D-194). */
+  readonly scheduled?: readonly { readonly platform: string; readonly at: string }[]
 }
 
 export type StepState = 'done' | 'now' | 'waiting' | 'failed'
@@ -198,6 +200,11 @@ export interface JourneyStep {
   /** سطرٌ واحدٌ تحت العنوان: العددُ بعربيّةٍ صحيحة وما يعنيه. */
   readonly note: string
   readonly href: string
+  /**
+   * كم مرّ بالمحطّة — **طولُ شريطها في القمع** (D-194). المصادرُ كلُّها، ثمّ ما كُتب، ثمّ ما
+   * رُسمت صورتُه، ثمّ ما اعتُمد فما بعده، ثمّ ما جُدول فما بعده، ثمّ ما نُشر، ثمّ ما ينتظر من النتائج.
+   */
+  readonly count: number
 }
 
 /**
@@ -206,6 +213,8 @@ export interface JourneyStep {
  * فالمحطّةُ «تنتظرك» حين فيها ما يحتاج قرارك، و«تامّة» حين مرّ بها شيء،
  * و«تنتظر» حين لم يصلها شيءٌ بعد. والنشرُ وحده «يسقط»: منشورٌ فشل.
  */
+type Leg = Omit<JourneyStep, 'count'>
+
 export function journeySteps(f: HomeFacts): JourneyStep[] {
   const c = f.counts
   const drafts = total(c, 'draft')
@@ -221,7 +230,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
    * ‏و«لا مصدر» لا تنتظرك حين في الرحلة منشورات: المقطعُ المرفوع والخطّةُ من ملفٍّ
    * يكتبان بلا Drive (D-180، D-181)، فمحطّةٌ «تنتظرك» قبلها تخطف التركيزَ ممّا ينتظر فعلًا
    */
-  const source: JourneyStep = f.sources.total === 0
+  const source: Leg = f.sources.total === 0
     ? written > 0
       ? { key: 'source', title: 'المصدر', state: 'done', note: 'لا ملفّ في Drive — وهو اختياريّ', href: '#sources' }
       : { key: 'source', title: 'المصدر', state: 'now', note: 'لا ملفّ بعد — امسح مجلّد Drive', href: '#sources' }
@@ -230,27 +239,27 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
       : { key: 'source', title: 'المصدر', state: 'done', note: `حُلّل ${counted(f.sources.analyzed, NOUNS.source)}`, href: '#sources' }
 
   // ‏و«المسوّدة» محطّةُ الكتابة: بطاقتُها آخرُ اللوح (‏٥٢٩٢px على الهاتف)، و`#posts` يُنزل إلى أوّله
-  const draft: JourneyStep = written > 0
+  const draft: Leg = written > 0
     ? { key: 'draft', title: 'المسوّدة', state: 'done', note: `كُتبت ${counted(written, NOUNS.draft)}`, href: '#write' }
     : f.sources.analyzed > 0
       ? { key: 'draft', title: 'المسوّدة', state: 'now', note: 'اكتب أوّلَ مسوّدةٍ من مصدرٍ محلَّل', href: '#write' }
       : { key: 'draft', title: 'المسوّدة', state: 'waiting', note: 'بعد تحليل مصدر', href: '#write' }
 
-  const image: JourneyStep = f.withoutImage > 0
+  const image: Leg = f.withoutImage > 0
     ? { key: 'image', title: 'الصورة', state: 'now', note: `بلا صورة: ${counted(f.withoutImage, NOUNS.draft)}`, href: cardAt(f.firsts.withoutImage, 'i') }
     : f.withImage > 0
       ? { key: 'image', title: 'الصورة', state: 'done', note: `رُسمت ${counted(f.withImage, NOUNS.image)}`, href: '#posts' }
       : { key: 'image', title: 'الصورة', state: 'waiting', note: 'إنفوجرافيك من نصّ المنشور', href: '#posts' }
 
   // ‏والفاشلُ مرّ بالاعتماد والموعد قبل أن يسقط: القيدُ في القاعدة لا يُدخل الطابورَ بلا اعتماد
-  const approve: JourneyStep = drafts > 0
+  const approve: Leg = drafts > 0
     ? { key: 'approve', title: 'الاعتماد', state: 'now', note: `تنتظر قرارك ${counted(drafts, NOUNS.draft)}`, href: cardAt(f.firsts.waiting, 'd') }
     : approved + queued + published + failed > 0
       ? { key: 'approve', title: 'الاعتماد', state: 'done', note: 'لا شيءَ ينتظر قرارك', href: '#posts' }
       : { key: 'approve', title: 'الاعتماد', state: 'waiting', note: 'لا يُنشر شيءٌ قبل اعتمادك', href: '#posts' }
 
   // ‏و«تامّةٌ» بما جُدول ولو نُشر كلُّه: طابورٌ فارغٌ بعد النشر ليس «بعد الاعتماد»
-  const schedule: JourneyStep = approved > 0
+  const schedule: Leg = approved > 0
     ? { key: 'schedule', title: 'الموعد', state: 'now', note: `بلا موعد: ${counted(approved, NOUNS.post)}`, href: cardAt(f.firsts.unscheduled, 's') }
     : queued > 0
       ? { key: 'schedule', title: 'الموعد', state: 'done', note: `جُدول ${counted(queued, NOUNS.post)}`, href: '#posts' }
@@ -260,7 +269,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
 
   // ‏والسقوطُ بفشل الأسبوع وحده — كما في «خطوتك التالية»، فلا تقول المحطّةُ غيرَ ما يقوله الفعل
   const recent = recentFailure(c)
-  const publish: JourneyStep = recent !== null
+  const publish: Leg = recent !== null
     ? {
         key: 'publish', title: 'النشر', state: 'failed',
         note: `فشل ${counted(sumRecent(c), NOUNS.post)} — والسببُ في صفحة المنصّة`,
@@ -281,13 +290,18 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
               }
             : { key: 'publish', title: 'النشر', state: 'waiting', note: 'في موعده بعد الجدولة', href: '#channels' }
 
-  const results: JourneyStep = f.openSuggestions > 0
+  const results: Leg = f.openSuggestions > 0
     ? { key: 'results', title: 'النتائج', state: 'now', note: `تنتظر قرارك ${counted(f.openSuggestions, NOUNS.suggestion)}`, href: '/panel/report' }
     : published > 0
       ? { key: 'results', title: 'النتائج', state: 'done', note: 'التقريرُ الأسبوعيّ', href: '/panel/report' }
       : { key: 'results', title: 'النتائج', state: 'waiting', note: 'بعد أوّل نشر', href: '/panel/report' }
 
-  return [source, draft, image, approve, schedule, publish, results]
+  const counts: Readonly<Record<JourneyStep['key'], number>> = {
+    source: f.sources.total, draft: written, image: f.withImage,
+    approve: approved + queued + published + failed, schedule: queued + published + failed,
+    publish: published, results: f.openSuggestions,
+  }
+  return [source, draft, image, approve, schedule, publish, results].map((s) => ({ ...s, count: counts[s.key] }))
 }
 
 export interface NextAction {

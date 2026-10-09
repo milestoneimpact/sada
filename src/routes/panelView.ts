@@ -895,9 +895,10 @@ ${flash}
     pulses: d.pulses,
     blocker: d.draftBlocker ?? null,
     zone: d.zone ?? null,
-  }, d.now)}
-  <h2 class="home-sub">اليوم بالأرقام</h2>
-  ${tileRow(d)}
+    scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
+      .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
+  // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
+  }, d.now, `<h2 class="home-sub">اليوم بالأرقام</h2>${tileRow(d)}`)}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ

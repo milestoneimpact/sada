@@ -3678,12 +3678,12 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     await seedPost('draft')
     await seedPost('draft')
     const html = await (await app.request('/panel', withSession(await login()), env)).text()
-    const home = html.slice(html.indexOf('<section data-pane="overview"'), html.indexOf('<h2 class="home-sub">'))
+    const home = html.slice(html.indexOf('<section data-pane="overview"'), html.indexOf('<div class="ov mt-3">'))
     expect(home).toContain('خطوتُك التالية')
     // ‏لا منصّةَ متّصلة: الفعلُ الأوّلُ الربطُ لا المسوّدات
     expect(home).toContain('اربط أوّلَ منصّة')
     expect(home).toContain('تنتظر قرارك مسوّدتان')
-    expect(home).toContain('<ol class="trip">')
+    expect(home).toContain('<ol class="funnel">')
     expect((home.match(/<li data-state=/g) ?? []).length).toBe(7)
     for (const label of ['LinkedIn', 'X', 'Instagram', 'TikTok', 'YouTube']) {
       expect(home).toContain(`<b>${label}</b>`)
@@ -3700,7 +3700,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     await seedPost('draft')
     const html = await (await app.request('/panel', withSession(await login()), env)).text()
     const id = (await db.prepare(`SELECT id FROM posts WHERE status = 'draft'`).first<{ id: string }>())!.id
-    const trip = html.slice(html.indexOf('<ol class="trip">'), html.indexOf('</ol>', html.indexOf('<ol class="trip">')))
+    const trip = html.slice(html.indexOf('<ol class="funnel">'), html.indexOf('</ol>', html.indexOf('<ol class="funnel">')))
     expect(trip).toContain(`href="#d-${id}"`)
     expect(trip).toContain(`href="#i-${id}"`)
     expect(trip).toContain('href="#write"')

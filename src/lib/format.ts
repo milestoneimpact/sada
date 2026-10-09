@@ -144,6 +144,18 @@ export function counted(n: number, noun: Noun, kase: Case = 'nom'): string {
   return `${n} ${noun.many}`
 }
 
+/**
+ * مدّةٌ بأكبر وحدةٍ تصدق (D-194): «٣٣ يومًا» لا «‏48599 دقيقة»، و«ساعتين» لا «‏120 دقيقة».
+ * دون الساعة دقائق، ودون يومين ساعات، وما فوقها أيّام. والحالةُ النحويّةُ لمن يسبقها فعل.
+ */
+export function duration(seconds: number, kase: Case = 'acc'): string {
+  const m = Math.max(1, Math.round(seconds / 60))
+  if (m < 60) return counted(m, NOUNS.minute, kase)
+  const h = Math.round(m / 60)
+  if (h < 48) return counted(h, NOUNS.hour, kase)
+  return counted(Math.round(h / 24), NOUNS.day, kase)
+}
+
 /** المعدوداتُ التي تتكرّر في اللوحة — في موضعٍ واحدٍ لا في كلّ جملة. */
 export const NOUNS = {
   draft: { one: 'مسوّدةٌ واحدة', two: 'مسوّدتان', few: 'مسوّدات', many: 'مسوّدة' },
@@ -151,6 +163,8 @@ export const NOUNS = {
   source: { one: 'مصدرٌ واحد', two: 'مصدران', few: 'مصادر', many: 'مصدرًا' },
   image: { one: 'صورةٌ واحدة', two: 'صورتان', few: 'صور', many: 'صورة' },
   suggestion: { one: 'توصيةٌ واحدة', two: 'توصيتان', few: 'توصيات', many: 'توصية' },
+  minute: { one: 'دقيقةٌ واحدة', two: 'دقيقتان', few: 'دقائق', many: 'دقيقةً', oneAcc: 'دقيقةً واحدة', oneGen: 'دقيقةٍ واحدة', twoObl: 'دقيقتَين' },
+  hour: { one: 'ساعةٌ واحدة', two: 'ساعتان', few: 'ساعات', many: 'ساعةً', oneAcc: 'ساعةً واحدة', oneGen: 'ساعةٍ واحدة', twoObl: 'ساعتَين' },
   day: { one: 'يومٌ واحد', two: 'يومان', few: 'أيّام', many: 'يومًا', oneAcc: 'يومًا واحدًا', oneGen: 'يومٍ واحد', twoObl: 'يومين' },
   request: { one: 'طلبٌ واحد', two: 'طلبان', few: 'طلبات', many: 'طلبًا', oneAcc: 'طلبًا واحدًا', oneGen: 'طلبٍ واحد', twoObl: 'طلبَين' },
   service: { one: 'خدمةٌ واحدة', two: 'خدمتان', few: 'خدمات', many: 'خدمةً', oneAcc: 'خدمةً واحدة', oneGen: 'خدمةٍ واحدة', twoObl: 'خدمتَين' },

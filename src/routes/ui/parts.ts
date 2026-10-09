@@ -12,7 +12,7 @@ import { card } from './components/card'
 import type { Pulse } from '../../lib/ops/heartbeat'
 import { relativeTime } from '../../lib/format'
 import type { RungState } from '../../lib/platform/readiness'
-import { counted, NOUNS } from '../../lib/format'
+import { counted, duration, NOUNS } from '../../lib/format'
 
 /**
  * الرمزُ وحدَه بلا شارة (D-167) — **وبيتُه اليومَ `icons.ts`** بجانب جدوله (D-189)، ويُعاد
@@ -200,23 +200,27 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
     .map((p) => {
       const mark =
         p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
-        : p.state === 'late' ? statusBadge('bad', '▲', `تأخّرت ${Math.round(p.lateBy / 60)} دقيقة`)
+        : p.state === 'late' ? statusBadge('bad', '▲', `تأخّرت ${duration(p.lateBy)}`)
         : p.state === 'failed' ? statusBadge('bad', '✕', 'سقطت')
         : statusBadge('idle', '○', 'لم تدُر بعد')
       const when = p.beat === null ? '' : `<span class="ago">${escapeHtml(relativeTime(p.beat.at, now))}</span>`
       const detail = p.beat?.detail == null ? '' : `<span class="ax-b">${escapeHtml(p.beat.detail)}</span>`
       return `<li class="card card-inset ax-r">${mark}<span>${escapeHtml(p.label)} ${when}</span>${detail}</li>`
     })
-    .join('')
+  // ‏والمتأخّرةُ وحدَها ظاهرةً، والكلُّ تحت «كلُّ الدورات» (D-194)
+  const late = pulses.map((p) => p.state === 'failed' || p.state === 'late')
   // ‏و`id` مرساةُ حبّة النظام في الرأس و«افحص الآلة» في «خطوتك التالية». والبطاقةُ من العُدّة
   // ‏(D-189): عنوانٌ وحالُه في طرف الرأس
   return card({
     id: 'machine',
     title: 'هل الآلةُ تعمل؟',
     action: head,
-    body: `<p class="hint">كلُّ دورةٍ تكتب نبضةً بعد أن تدور — ولو لم تجد شيئا. والتأخّرُ دورةٌ كاملةٌ تغيب،
-      لا دقائقُ cron.</p>
-    <ul class="ax">${rows}</ul>`,
+    // ‏**والسليمةُ سطرٌ يُفتح** (D-194): كانت ثلثَ الرئيسيّة وكلُّها «في موعدها». تُفتح وحدَها حين يتأخّر شيء
+    body: bad.length > 0
+      ? `<ul class="ax">${rows.filter((_, i) => late[i]).join('')}</ul>
+    ${late.every(Boolean) ? '' : `<details class="machine-more"><summary>الدوراتُ الأخرى</summary>
+      <ul class="ax mt-3">${rows.filter((_, i) => !late[i]).join('')}</ul></details>`}`
+      : `<details class="machine-more"><summary>تفاصيلُ الدورات</summary><ul class="ax mt-3">${rows.join('')}</ul></details>`,
   })
 }
 

@@ -325,3 +325,15 @@ describe('platformTile', () => {
     expect(platformTile(tiktok).button).toMatchObject({ label: 'أكمل الإعداد', href: '/panel/channels/tiktok?tab=setup' })
   })
 })
+
+describe('لوحةُ القيادة: القمعُ وشريطُ الأسبوع (D-194)', () => {
+  it('كلُّ محطّةٍ تحمل كم مرّ بها — والاعتمادُ يعدّ ما بعده', () => {
+    const steps = journeySteps(facts({
+      sources: { total: 3, analyzed: 1 }, withImage: 4, openSuggestions: 2,
+      counts: { perPlatform: { linkedin: counts({ draft: 5, approved: 2, queued: 3, published: 4, failed: 1 }) }, publishedWeek: 4 },
+    }))
+    expect(Object.fromEntries(steps.map((s) => [s.key, s.count]))).toEqual({
+      source: 3, draft: 15, image: 4, approve: 10, schedule: 8, publish: 4, results: 2,
+    })
+  })
+})
