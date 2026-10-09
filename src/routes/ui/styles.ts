@@ -1361,6 +1361,10 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .draft{display:flex; flex-direction:column; gap:var(--s-3); padding:var(--s-4);
   scroll-margin-block-start:var(--s-16)}
 .draft.done{background:var(--surface-2); box-shadow:none}
+.draft-more > summary{cursor:pointer; min-height:var(--tap); display:flex; align-items:center; gap:var(--s-2);
+  color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+.draft-more[open] > summary{margin-bottom:var(--s-2)}
+.draft-more > * + *{margin-top:var(--s-3)}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}
 /* ══ مسرحُ القرار (D-100) ═══════════════════════════════════════════
    ── صندوقُ التحديد ───────────────────────────────────────────────

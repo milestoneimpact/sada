@@ -54,6 +54,11 @@ function navItem(page: Page, label: string): Locator {
   return visible(page.locator('aside.rail nav.tabs a').filter({ hasText: label })).first()
 }
 
+/** تبويبٌ داخل «المنشورات» (D-195): المسوّدات · اكتب · الفيديو · الخطّة. */
+function subTab(page: Page, label: string): Locator {
+  return visible(page.locator('#posts-sub a').filter({ hasText: label })).first()
+}
+
 function button(scope: Page | Locator, name: string | RegExp): Locator {
   return visible(scope.getByRole('button', { name, exact: typeof name === 'string' })).first()
 }
@@ -184,6 +189,7 @@ const R2: Journey = {
   async run({ page, m, stack }) {
     const before = new Set(all<{ id: string }>(stack, 'SELECT id FROM posts').map((r) => r.id))
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await m.tap(subTab(page, 'اكتب'), 'تبويبُ «اكتب»')
     const card = page.locator('form[action="/panel/drafts/write"]')
     await m.look(visible(page.getByRole('heading', { name: 'الكتابة من مصدر' })), 'عنوان «الكتابة من مصدر»')
     const sources = await card.locator('select[name="id"] option').allTextContents()
@@ -306,6 +312,7 @@ const R4: Journey = {
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await m.tap(subTab(page, 'الفيديو'), 'تبويبُ «الفيديو»')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
     // ‏بالاسم العربيّ كما يرفعه المالك — والبايتاتُ تُمرَّر لا المسار (Playwright يُسقط مسارًا غيرَ لاتينيّ)

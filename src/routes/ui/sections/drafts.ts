@@ -774,8 +774,7 @@ function card(
            <button class="btn btn-secondary btn-sm" type="submit" name="do" value="reject">ارفض</button>
            <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button>
          </div>
-       </form>
-       ${preview(d, spec.label)}`
+       </form>`
     : `<div class="draft-text ro" style="${box}" data-ro>${escapeHtml(d.text)}</div>
        <div class="draft-foot"><span class="draft-len"><b>${len}</b> / ${spec.hardLimit}</span>
          <span class="grow"></span>
@@ -805,10 +804,19 @@ function card(
     </div>
     ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
     ${editor}
-    ${editDiff(d)}
-    ${imagePane(d, media, lines)}
-    ${scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
-    <div class="draft-meta">${meta}</div>
+    ${/*
+      * ‏**البطاقةُ تُبقي ظاهرًا ما يُبَتّ به وحدَه** (D-195): المسوّدةُ نصُّها وزرّاها، والمعتمَدةُ نصُّها وموعدُها.
+      * ‏والباقي (المعاينةُ، والصورة، والفرق، والكلفة) تحت سطرٍ يُفتح — كانت البطاقةُ الواحدة شاشتين على الهاتف.
+      * ‏ومرساةٌ إلى ما في داخله («#i-…» من الرئيسيّة) تفتحه (`show()`)
+      */''}
+    ${open ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
+    <details class="draft-more"><summary>${open ? 'المعاينةُ والصورةُ والموعد' : 'الصورةُ والتفاصيل'}</summary>
+      ${open ? preview(d, spec.label) : ''}
+      ${editDiff(d)}
+      ${imagePane(d, media, lines)}
+      ${open ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media) : ''}
+      <div class="draft-meta">${meta}</div>
+    </details>
   </div>`
 }
 
@@ -954,7 +962,16 @@ function ideaCard(input: DraftsInput): string {
   </div>`
 }
 
+/**
+ * اللوحُ قسمان (D-195): **المسوّداتُ** (ما ينتظر قرارك والتوزيعُ والفرز) و**الكتابة** (من فكرةٍ ومن مصدر)
+ * — يُرسَم كلٌّ في تبويبه من تبويبات «المنشورات». و`draftsSection` يجمعهما كما كان لمن يريد اللوحَ كلَّه.
+ */
 export function draftsSection(input: DraftsInput): string {
+  const parts = draftsParts(input)
+  return `${parts.list}\n\n  ${parts.write}`
+}
+
+export function draftsParts(input: DraftsInput): { readonly list: string; readonly write: string } {
   const { drafts, writable, now } = input
   const waiting = drafts.filter((d) => d.status === 'draft').length
   const blocked = input.blocked ?? null
@@ -1020,7 +1037,7 @@ export function draftsSection(input: DraftsInput): string {
 
   // سطرا الجاهزيّة يُبنيان هنا مرّةً، والبطاقاتُ تأخذهما نصًّا (D-163)
   const lines = readyLines(input.mediaReady)
-  const list =
+  const cards =
     drafts.length === 0
       ? emptyState({
           title: 'لا مسوّدات بعد',
@@ -1062,7 +1079,7 @@ export function draftsSection(input: DraftsInput): string {
    * المسوّداتُ المنتظرة، ثمّ التوزيعُ إن كان له ما يُوزَّع، ثمّ الكتابةُ من
    * مصدر، والخطّةُ بعدها في اللوح.
    */
-  return `${bulk}
+  const list = `${bulk}
   <div class="lede-row">
     <h3 class="sec bare">المسوّدات</h3>
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
@@ -1073,10 +1090,10 @@ export function draftsSection(input: DraftsInput): string {
   ${spreadBar(input)}
   ${filterTabs(drafts)}
   ${keys}
-  ${list}
-  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}
+  ${cards}
+  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}`
 
-  ${ideaCard(input)}
+  const write = `${ideaCard(input)}
 
   <div class="card mt-3" id="write">
     <div class="card-head"><h2>الكتابة من مصدر</h2></div>
@@ -1084,6 +1101,7 @@ export function draftsSection(input: DraftsInput): string {
       <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
     ${writer}
   </div>`
+  return { list, write }
 }
 
 /**
