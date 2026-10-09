@@ -323,3 +323,28 @@ describe('سلوكُ العُدّة (KIT_SCRIPT)', () => {
     expect(t.focused()).toBe(true)
   })
 })
+
+describe('نقلُ الأقسام إلى البطاقة (٢ج)', () => {
+  // ‏السطحُ وحدُّه ونصفُ قطره وظلُّه من صيغة البطاقة، لا من قاعدة المكوّن — فقاعدةٌ تعيد
+  // إعلانَها تعيد السطحَ الثلاثين، و«audit_classes» يعدّها
+  const MOVED = ['.next', '.pf', '.ch', '.draft', '.vrow', '.tpick', '.sched', '.keys', '.unbuilt', '.ax-r', '.acct', '.pv', '.guide']
+  it.each(MOVED)('%s لا يعيد إعلانَ السطح ولا نصفِ القطر ولا الظلّ', (sel) => {
+    const r = css.rule(sel)
+    expect(Object.keys(r).length).toBeGreaterThan(0)
+    for (const p of ['background', 'background-color', 'border-radius', 'box-shadow']) expect(r[p]).toBeUndefined()
+  })
+  it('شبكةُ المؤشّرات بطاقةٌ بلا نصف قطرٍ ولا ظلٍّ من قاعدتها، وأرضُها خيوطُ الفجوة', () => {
+    const r = css.rule('.grid.tiles')
+    expect(r['border-radius']).toBeUndefined()
+    expect(r['box-shadow']).toBeUndefined()
+    expect(r.background).toBe('var(--line)')
+  })
+  it('فقرةُ البطاقة العامّة لا تصيب فقراتِ ما نُقل، وبوزنها القديم', () => {
+    expect(css.where('.card > p')).toEqual([])
+    expect(css.rule('.card:where(:not(.ch,.draft,.pv)) > p').margin).toBeDefined()
+  })
+  it('بطاقةُ لوحك المختارةُ تُرى بمربّعها لا بصنفٍ من الخادم', () => {
+    expect(css.where('.tpick.on')).toEqual([])
+    expect(css.rule('.tpick:has(input:checked)')['border-color']).toBeDefined()
+  })
+})

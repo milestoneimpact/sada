@@ -390,7 +390,7 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
           <li class="${c.failed > 0 ? 'bad' : ''}"><b>${c.failed}</b> فشل</li>
           <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
         </ul>`
-  return `<header class="acct ${ACCT_CLASS[spec.id] ?? ''}">
+  return `<header class="card acct ${ACCT_CLASS[spec.id] ?? ''}">
     <div class="acct-cover" aria-hidden="true"><span class="acct-mark">${logo}</span></div>
     <div class="acct-body">
       ${first === undefined ? '' : `<span class="acct-av" data-kind="${first.kind === 'org' || spec.id === 'youtube' ? 'org' : 'member'}"
@@ -513,7 +513,7 @@ function needsStrip(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): 
   return `<section class="needs" aria-labelledby="needs-h">
     <h2 class="needs-h" id="needs-h">ما تطلبه ${escapeHtml(needs.label)} <span class="ago">${tally}</span></h2>
     <ol class="needs-list">${list
-      .map((s, i) => `<li class="${s.state}"><a href="${escapeHtml(s.href)}">
+      .map((s, i) => `<li class="${s.state}"><a class="card card-interactive" href="${escapeHtml(s.href)}">
         <span class="needs-top"><span class="step-n" aria-hidden="true">${i + 1}</span>
           <b>${escapeHtml(s.title)}</b><span class="needs-g">${glyph(STATION_G[s.state])}</span></span>
         <span class="needs-rule">${escapeHtml(s.rule)}</span>

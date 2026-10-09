@@ -131,7 +131,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
    * وكان الجوابُ يحتاج مسحَ ستّ بطاقاتٍ وجدولا في آخر اللوح. **ورقمٌ
    * أعلى الصفحة ليس زينة**: من لا يرى أنّ مفتاحا لم يُختبر لا يختبره.
    */
-  const strip = `<div class="grid tiles c3 mb-3">
+  const strip = `<div class="card grid tiles c3 mb-3">
     <div class="card tile"><div class="kv-k">مزوّدون جاهزون</div>
       <div class="kv-v">${ready.length}<em> / ${d.providers.length}</em></div>
       ${bar(ready.length, Math.max(1, d.providers.length))}
@@ -177,7 +177,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           <span class="pk">${p.kind === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'}${
             p.builtin ? ' · مدمَج' : ''}${locked ? ' · سرّ Worker' : ''}</span></span>
         <span class="pm mono">${escapeHtml(p.model ?? '—')}</span>
-        <span class="pv">${money(p.spendToday)}<i>اليوم</i></span>
+        <span class="card card-inset pv">${money(p.spendToday)}<i>اليوم</i></span>
         <span class="pst">${status}</span>
         <span class="ptog"><span class="lbl-open">تفاصيل</span><span class="lbl-close">إغلاق</span></span>
       </summary>
@@ -369,7 +369,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
    * فصار كلُّ إرشادٍ **في الخطوة التي يُحتاج فيها**: العنوانُ وحارسُه في
    * الثانية، وموضعُ المفتاح عندهم في الثالثة.
    */
-  const add = `<details class="guide">
+  const add = `<details class="card card-inset guide">
     <summary>
       <span class="g-ic">${ICON.add}</span>
       <span class="g-t"><b>أضف مزوّدا</b>

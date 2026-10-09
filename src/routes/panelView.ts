@@ -562,7 +562,7 @@ function tileRow(d: PanelData): string {
       ${v.delta === true ? deltaOf(d.series) : ''}
       ${v.note === undefined ? '' : `<div class="note">${escapeHtml(v.note)}</div>`}</div>`
   })
-  return `<div class="grid tiles ${cols}">${cards.join('')}</div>`
+  return `<div class="card grid tiles ${cols}">${cards.join('')}</div>`
 }
 
 /**
@@ -579,7 +579,7 @@ function tilePicker(d: PanelData): string {
   const chosen = new Set(chosenTiles(d.dashboardTiles).map((t) => t.id))
   const boxes = TILES.map((spec) => {
     const on = chosen.has(spec.id)
-    return `<label class="tpick${on ? ' on' : ''}">
+    return `<label class="card card-inset tpick">
       <input type="checkbox" name="tile" value="${escapeHtml(spec.id)}"${on ? ' checked' : ''}>
       <span class="tp-t"><b>${escapeHtml(spec.label)}</b>
         <span>${escapeHtml(spec.why.replaceAll('**', ''))}</span></span>

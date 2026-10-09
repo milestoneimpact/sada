@@ -89,7 +89,7 @@ describe('صفحةُ حساب', () => {
 
   it('وسبعُ محطّاتٍ فيما تطلبه المنصّة، بقواعدها من الثوابت', () => {
     const html = screen()
-    expect((html.match(/<li class="(ok|warn|bad|idle)"><a href=/g) ?? []).length).toBe(7)
+    expect((html.match(/<li class="(ok|warn|bad|idle)"><a class="card card-interactive" href=/g) ?? []).length).toBe(7)
     expect(html).toContain('حتّى 280 محرفٍ موزون')
   })
 

@@ -157,7 +157,7 @@ export function pivotPane(d: PivotView): string {
     ${t.rowKeys.length === 0 ? '' : `<p class="hint">ملفُّ CSV يحمل ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</p>`}
     ${t.rowKeys.length === 0
       ? empty
-      : `<div class="pv-wrap"><table class="pv">
+      : `<div class="pv-wrap"><table class="card card-inset pv">
           <thead>${head}</thead><tbody>${body}${foot}</tbody></table></div>`}
     ${t.rowKeys.length === 0 ? '' : `<p class="hint">خليّةٌ فارغةٌ تعني
       <b>لا منشورَ في تقاطعها</b> — لا صفرا. وصفرٌ يُكتب صفرا.</p>`}
