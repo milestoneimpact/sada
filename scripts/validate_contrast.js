@@ -17,7 +17,9 @@
  * |---|---|---|
  * | نسبةُ WCAG 2.x | أيُقرأ النصّ؟ — المعيارُ المُلزِم | يردّ |
  * | APCA Lc ‏0.0.98G-4g | أيُقرأ بحجمه ووزنه؟ — استشاريٌّ مرشَّحٌ لـ WCAG 3 | يردّ على ثمانية أزواجٍ على البطاقة، ويُطبَع على السطحين الداخليّين |
- * | ΔE_OK | أيتمايز لونان بالعين؟ | يردّ على النحاس مقابل التحذير |
+ * | ΔE_OK | أيتمايز لونان بالعين؟ | يردّ على الذهب مقابل التحذير، وشريطِ العلامة مقابل الرابط والحال والذهب |
+ * | عمى الألوان (Machado 2009) | أيتمايز لونان عند من لا يميّز الأحمرَ من الأخضر؟ | يردّ على أزواج الحال الثلاثة (نقاطُ الرافدة لونٌ بلا كلمة)، ويُطبَع الباقي |
+ * | إشباعُ النعناع (D-196) | أعاد النعناعُ القاسي من باب؟ | يردّ على كلّ رمزٍ في أسرته، في الثيمين وفي `:root` كلِّه |
  *
  * **وΔE هنا ΔE_OK**: المسافةُ في فضاء OKLab مضروبةً في ‏١٠٠، وعتبةُ الإدراك نحو
  * ‏٢. ولا يُقارَن برقم CIEDE2000 — الصيغتان تعطيان للزوج نفسِه رقمين مختلفين
@@ -26,11 +28,11 @@
  *
  * ولا اعتماديّةَ: الصيغُ الثلاث مكتوبةٌ هنا من مراجعها.
  */
-import { PRINT, THEME } from '../src/routes/ui/tokens.ts'
+import { MARK, MOMENT, PRINT, THEME, TOKENS } from '../src/routes/ui/tokens.ts'
 
 /** قيمةُ الرمز بعد حلّ `var(--x)` في الوضع نفسِه — `--link` نهارًا هو `--brand`. */
 function value(tokens, name, depth = 0) {
-  const raw = tokens[`--${name}`]
+  const raw = tokens[`--${name}`] ?? MARK[`--${name}`]
   if (raw === undefined || depth > 4) return undefined
   const ref = /^var\(--([a-z0-9-]+)\)$/.exec(raw)
   return ref === null ? raw : value(tokens, ref[1], depth + 1)
@@ -133,9 +135,18 @@ const PAIRS = [
   ['on-brand', 'brand', 4.5, 'نصُّ الزرّ الأوّليّ'],
   ['on-brand', 'brand-hover', 4.5, 'نصُّ الزرّ الأوّليّ عند التمرير'],
   ['on-brand', 'brand-press', 4.5, 'نصُّ الزرّ الأوّليّ عند الضغط'],
-  // ‏والنحاسُ يحمل الرقمَ البطل فيُقاس نصًّا
-  ['au', 'surface', 4.5, 'النحاسُ نصًّا على البطاقة'],
-  ['au', 'bg', 4.5, 'النحاسُ نصًّا على الأرض'],
+  // ‏**وحبرُ العلامة نصٌّ أيضًا** (D-196): الوسمُ في إطار المنصّة الفاتح، ورقمُ الخطوة، ورمزُ
+  // ‏الإرشاد، وشريطُ العودة عند التمرير. كان لا يُقاس إلّا تعبئةً، فمرّ «--brand» تركوازيٌّ ليليٌّ
+  // ‏على البطاقة ‏٢٫٨٣:١ في مقترحٍ كامل ولم يمسكه شيء — **أمسكه audit_design على الصفحة**
+  ['brand', 'surface', 4.5, 'حبرُ العلامة نصًّا على البطاقة (الوسم، ورقمُ الخطوة)'],
+  ['brand', 'surface-2', 4.5, 'حبرُ العلامة نصًّا على السطح الداخليّ (رمزُ الإرشاد)'],
+  ['brand', 'bg', 4.5, 'حبرُ العلامة على الأرض (شريطُ العودة عند التمرير)'],
+  ['brand', 'surface-3', 3, 'تعبئةُ المقياس على مجراه (WCAG 1.4.11)'],
+  // ‏ورمزُ القسم الحاليّ في الرافدة بحبر الرابط على المحدَّد — رمزٌ لا نصّ (D-196)
+  ['link', 'surface-3', 3, 'رمزُ القسم الحاليّ على المحدَّد'],
+  // ‏والذهبُ يحمل الرقمَ البطل فيُقاس نصًّا
+  ['au', 'surface', 4.5, 'الذهبُ نصًّا على البطاقة'],
+  ['au', 'bg', 4.5, 'الذهبُ نصًّا على الأرض'],
   // ── الحال: على البطاقة والأرض وأرضِه وحدها (3.2) ───────────────────
   ['ok', 'surface', 4.5, 'حالةُ «جيّد» على البطاقة'],
   ['warn', 'surface', 4.5, 'حالةُ «تحذير» على البطاقة'],
@@ -194,12 +205,19 @@ const APCA_SHOWN = [
  * **والتمايزُ ليس تباينًا**: لونان بنسبة ‏١٫٠٣:١ قد يتمايزان بالصبغة، ولونان
  * بنسبةٍ عالية قد يُقرآن معنًى واحدًا. فيُقاس الفرقُ نفسُه — والنحاسُ
  * والتحذيرُ كانا على ‏٢٫٨ فيُقرأ أحدُهما الآخر (D-183).
+ *
+ * **وشريطُ العلامة لا يساوي رمزًا آخر** (D-196): `audit_design` يعدّ «الذهب» بقيمة `--au`
+ * و`--mark-fg` حرفًا، فرابطٌ بلون الشريط يصير كلُّه موضعَ ذهب، وحالٌ بلونه تُقرأ هويّة.
  */
 const DELTA_MIN = [
-  ['au', 'warn', 9.5, 'النحاسُ مقابل التحذير'],
+  ['au', 'warn', 9.5, 'الذهبُ مقابل التحذير'],
+  ['mark-fg', 'link', 7.5, 'شريطُ العلامة مقابل الرابط'],
+  ['mark-fg', 'ok', 7.5, 'شريطُ العلامة مقابل «جيّد»'],
+  ['mark-fg', 'au', 7.5, 'شريطُ العلامة مقابل الذهب'],
 ]
 /** وما يُطبَع بنسبته وفرقه معًا: درجتا الحبر، والرابطُ والمتن، والتحذيرُ والخطر (3.2). */
 const DELTA_SHOWN = [
+  ['ok', 'link', '«جيّد» مقابل الرابط (الحالُ ليست الهويّة)'],
   ['warn', 'bad', 'التحذيرُ مقابل الخطر (يُدعَم برمزٍ وكلمة)'],
   ['ink-2', 'ink-3', 'الثانويّ مقابل الخافت (يُدرَك بلا مقارنة)'],
   ['link', 'ink', 'الرابطُ مقابل المتن (والخطُّ تحته هو العلامة)'],
@@ -224,6 +242,78 @@ const BANNED = [
   ['warn', 'surface-3'], ['ok', 'surface-3'], ['bad', 'surface-3'],
   ['ink-3', 'surface-3'],
   ['brand', 'np-stage'],
+]
+
+// ── عمى الألوان: Machado وOliveira وFernandes ‏(2009)، بالشدّة الكاملة ────────────
+/**
+ * **ونقاطُ الرافدة لونٌ بلا كلمة**: «جيّد» و«تحذير» و«خطر» نقاطٌ ‏٨px وعنوانٌ لا يظهر إلّا
+ * بالتمرير (`.plat-list .dot` و`.todo .dot`). فيُقاس فرقُ كلّ زوجٍ منها بعد محاكاة العمى الأحمر
+ * (protan) والأخضر (deutan) — وكان الأخضرُ المقترح و«خطر» ‏٢٫٩ عند الثاني. **والأزواجُ الثلاثة
+ * لا زوجٌ واحد** (مراجعة D-196): كان «جيّد» و«تحذير» يُطبَعان ولا يردّان، فنزلا بـ«جيّد» D-196
+ * من ‏٧٫٣ إلى ‏٣٫٨ عند الأوّل نهارًا و‏٣٫١ عند الثاني ليلًا وطُبع «✓» — ونقطةُ «ينتظر أسرارًا»
+ * بجانب «متّصل» في الرافدة كلَّ يوم. والأزواجُ الأخرى يُطبَع فرقُها: الرمزُ والكلمة يحملانها.
+ * والمصفوفاتُ على الضوء الخطّيّ، والفرقُ ΔE_OK بعد المحاكاة.
+ */
+const MACHADO = {
+  protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+  deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
+  tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]],
+}
+function simulate(c, kind) {
+  const lin = c.map((v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 })
+  const out = MACHADO[kind].map((r) => Math.min(1, Math.max(0, r[0] * lin[0] + r[1] * lin[1] + r[2] * lin[2])))
+  return out.map((v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055))
+}
+const CVD_MIN = [
+  ['ok', 'bad', 5, '«جيّد» مقابل «خطر» — نقاطُ الرافدة'],
+  ['ok', 'warn', 5, '«جيّد» مقابل «تحذير» — نقاطُ الرافدة'],
+  ['warn', 'bad', 5, '«تحذير» مقابل «خطر» — نقاطُ الرافدة'],
+]
+const CVD_SHOWN = [
+  ['ok', 'au', '«جيّد» مقابل الذهب'], ['ok', 'link', '«جيّد» مقابل الرابط'],
+  ['au', 'warn', 'الذهبُ مقابل التحذير'], ['link', 'ink-2', 'الرابطُ مقابل الثانويّ (والخطُّ تحته)'],
+]
+
+// ── إشباعُ النعناع (D-196 · D-053) ───────────────────────────────────────
+/**
+ * النعناعُ القاسي ‏(H ‏١٧٧°، C ‏٠٫١٢٢) لا يعود بابًا خلفيًّا: **كلُّ رمزٍ في أسرته** (هيولى ‏١٦٥°
+ * إلى ‏١٩٥°) إشباعُه ‏٠٫٠٩٠ فأقلّ وبُعدُه عن شريط العلامة ‏٧٫٥ فأكثر — الشريطُ وحده بقيمته.
+ * **و`--brand` ليس من أسرته الفاتحة قطّ** (L ‏٦٠ فأعلى): زرٌّ نعناعيٌّ على الداكن هو ما رُدّ
+ * في D-049. والإشباعُ والهيولى من OKLCH.
+ */
+const MINT_HUE = [165, 195]
+const MINT_C_MAX = 0.09
+
+/**
+ * ‏**وما في `:root` خارج الثيمين يُفحَص كذلك** (مراجعة D-196): كان الفحصُ يقرأ مفاتيحَ `THEME`
+ * وحدها، فمرّ «--moment-accent» بقيمة الشريط حرفًا (‏C ‏٠٫١٢٢، ΔE_OK صفر) — اسمٌ ثانٍ للنعناع يُنادى
+ * به نصٌّ على أبيض ‏١٫٨٩:١ ولا يُمسَك. فتُقرأ الورقةُ المولَّدةُ نفسُها (`TOKENS`): كلُّ رمزٍ بقيمةٍ
+ * مصمتةٍ في الكتلة الأولى ليس من مفاتيح الثيم. **والشريطُ وحده مستثنًى بسببه**: هو النعناعُ بقيمته.
+ */
+const MINT_ALLOWED = new Map([['--mark-fg', 'شريطُ العلامة نفسُه — النعناعُ بقيمته في موضعه الوحيد']])
+const ROOT_EXTRA = (() => {
+  const first = /:root\{([\s\S]*?)\n\}/.exec(TOKENS)?.[1] ?? ''
+  const out = []
+  for (const m of first.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
+    if (m[1] in THEME.light) continue
+    out.push([m[1], m[2].trim()])
+  }
+  return out
+})()
+function oklch(c) {
+  const [l, a, b] = oklab(c)
+  return [l * 100, Math.hypot(a, b), ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360]
+}
+
+/**
+ * ‏**ولحظةُ العلامة تُقاس مرّةً** (ثابتةٌ في الثيمين): الشريطُ على أرضه، والنصُّ على العمق
+ * عاجيٌّ أو «نعناعٌ فاتح» — الشعارُ اللاتينيّ ‏١٤px يحتاج Lc ‏٧٥ كالثانويّ — والخيطُ رمزٌ لا نصّ.
+ */
+const MOMENT_PAIRS = [
+  [MARK['--mark-fg'], MARK['--mark-bg'], 7.5, null, 'شريطُ العلامة على أرضها (أيقونةُ التطبيق)'],
+  [MOMENT.ink, MOMENT.ground, 7, 90, 'الاسمُ والشعارُ العربيّ على العمق'],
+  [MOMENT.soft, MOMENT.ground, 4.5, 75, 'السطرُ اللاتينيّ والفوقيّة على العمق'],
+  [MOMENT.gold, MOMENT.ground, 3, null, 'خيطُ الذهب على العمق (رمز)'],
 ]
 
 const THEMES = [
@@ -286,6 +376,36 @@ for (const [name, mode, tokens] of THEMES) {
     console.log(`  · ΔE_OK ${deltaEok(a, b).toFixed(1)} · ${ratio(a, b).toFixed(2)}:1  ${label}`)
   }
 
+  console.log('  · عمى الألوان (ΔE_OK بعد المحاكاة: protan · deutan · tritan)')
+  for (const [x, y, min, label] of CVD_MIN) {
+    const [a, b] = [rgb(value(tokens, x)), rgb(value(tokens, y))]
+    if (a === null || b === null) { missing(x, y); continue }
+    const [p, d, t] = ['protan', 'deutan', 'tritan'].map((k) => deltaEok(simulate(a, k), simulate(b, k)))
+    const pass = Math.min(p, d) >= min
+    gated += 1
+    if (!pass) failures += 1
+    console.log(`  ${pass ? '✓' : '✕'} ${p.toFixed(1)} · ${d.toFixed(1)} · ${t.toFixed(1)} (≥${min} عند الأوّلين)  ${label}`)
+  }
+  for (const [x, y, label] of CVD_SHOWN) {
+    const [a, b] = [rgb(value(tokens, x)), rgb(value(tokens, y))]
+    if (a === null || b === null) continue
+    const [p, d, t] = ['protan', 'deutan', 'tritan'].map((k) => deltaEok(simulate(a, k), simulate(b, k)))
+    console.log(`  · ${p.toFixed(1)} · ${d.toFixed(1)} · ${t.toFixed(1)}  ${label}`)
+  }
+
+  const mint = rgb(MARK['--mark-fg'])
+  const family = Object.keys(tokens).filter((k) => k.startsWith('--')).map((k) => [k, rgb(value(tokens, k.slice(2)))])
+    .filter(([, c]) => c !== null).map(([k, c]) => [k, c, oklch(c)])
+    .filter(([, , [, C, H]]) => C > 0.02 && H >= MINT_HUE[0] && H <= MINT_HUE[1])
+  for (const [k, c, [L, C]] of family) {
+    const d = deltaEok(c, mint)
+    const brandy = k === '--brand' && L >= 60
+    const pass = C <= MINT_C_MAX && d >= 7.5 && !brandy
+    gated += 1
+    if (!pass) failures += 1
+    console.log(`  ${pass ? '✓' : '✕'} نعناع: ${k} C ${C.toFixed(3)} (≤${MINT_C_MAX}) · ΔE_OK ${d.toFixed(1)} من الشريط (≥7.5)${brandy ? ' · زرٌّ نعناعيّ' : ''}`)
+  }
+
   for (const [fg, bg, label] of DECOR) {
     const [a, b] = [rgb(value(tokens, fg)), rgb(value(tokens, bg))]
     if (a === null || b === null) { missing(fg, bg); continue }
@@ -299,8 +419,48 @@ for (const [name, mode, tokens] of THEMES) {
   console.log(`  · ما لا يقع (يُطبَع، ويمسكه audit_design على الصفحة المرسومة، والوسمَ على المسرح views.test): ${banned.join(' · ')}`)
 }
 
+console.log('\n── لحظةُ العلامة والعلامة (ثابتتان في الثيمين) ──')
+for (const [fg, bg, min, lcMin, label] of MOMENT_PAIRS) {
+  const [a, b] = [rgb(fg), rgb(bg)]
+  if (a === null || b === null) { console.log(`  ✕ ليس لونًا مصمتًا: ${fg} أو ${bg}`); failures += 1; continue }
+  const v = ratio(a, b)
+  const lc = Math.abs(apca(a, b))
+  const pass = v >= min && (lcMin === null || lc >= lcMin)
+  gated += 1
+  if (!pass) failures += 1
+  console.log(`  ${pass ? '✓' : '✕'} ${v.toFixed(2)}:1 (≥${min}) · Lc ${lc.toFixed(1)}${lcMin === null ? '' : ` (≥${lcMin})`}  ${label}  ${fg} / ${bg}`)
+}
+for (const [label, c] of [['الصدى', MOMENT.echo], ['الشريط', MOMENT.ribbon], ['الوجهُ المضاء', MOMENT.lit]]) {
+  console.log(`  · ${ratio(rgb(c), rgb(MOMENT.ground)).toFixed(2)}:1  زينة: ${label} على العمق  ${c}`)
+}
+
+// ‏وإشباعُ النعناع في «:root» خارج الثيمين — والإحالةُ تُحَلّ: «--x:var(--mark-fg)» اسمٌ ثانٍ كالقيمة حرفًا
+const extra = new Map(ROOT_EXTRA)
+const resolveRoot = (raw, depth = 0) => {
+  const ref = /^var\(--([a-z0-9-]+)\)$/.exec(raw)
+  if (ref === null || depth > 4) return raw
+  const next = extra.get(`--${ref[1]}`) ?? THEME.light[`--${ref[1]}`]
+  return next === undefined ? raw : resolveRoot(next, depth + 1)
+}
+const mintRoot = rgb(MARK['--mark-fg'])
+for (const [k, raw] of ROOT_EXTRA) {
+  const c = rgb(resolveRoot(raw))
+  if (c === null) continue
+  const [, C, H] = oklch(c)
+  if (!(C > 0.02 && H >= MINT_HUE[0] && H <= MINT_HUE[1])) continue
+  if (MINT_ALLOWED.has(k)) {
+    console.log(`  · نعناع: ${k} مستثنًى — ${MINT_ALLOWED.get(k)}`)
+    continue
+  }
+  const d = deltaEok(c, mintRoot)
+  const pass = C <= MINT_C_MAX && d >= 7.5
+  gated += 1
+  if (!pass) failures += 1
+  console.log(`  ${pass ? '✓' : '✕'} نعناع في :root: ${k} C ${C.toFixed(3)} (≤${MINT_C_MAX}) · ΔE_OK ${d.toFixed(1)} من الشريط (≥7.5)`)
+}
+
 if (failures > 0) {
   console.error(`\n✕ ${failures} زوجا دون الحدّ. لا يُدفع ثيمٌ لا يُقرأ.`)
   process.exit(1)
 }
-console.log(`\n✓ ${gated} فحصًا في الأوضاع الثلاثة تجتاز حدودَ WCAG وAPCA وΔE_OK (جدولُ خطّة التصميم 3.2).`)
+console.log(`\n✓ ${gated} فحصًا في الأوضاع الثلاثة ولحظةِ العلامة تجتاز حدودَ WCAG وAPCA وΔE_OK وعمى الألوان وإشباعِ النعناع (خطّة التصميم 3.2 · D-196).`)

@@ -46,7 +46,9 @@ export function notFoundPage(nonce: string, path: string, detail?: string): stri
  */
 export function serverErrorPage(nonce: string, requestId: string, retry: string | null): string {
   const tail = 'فإن تكرّر فأرسل إليّ ما تحت «للمطوّر» كما هو.'
-  const body = `${emptyState({
+  // ‏**ولا نقشَ في صفحة الخطأ** (BRAND §٥، مراجعة D-196): الأرضُ العميقةُ والنعناعُ يُقرآن «تمّ» حيث لا شيءَ تمّ.
+  // ‏ولا جذرَ لها يميّزها، فـ`data-no-echo` يعلّمها ويردّ `audit_design` نقشًا تحته
+  const body = `<div data-no-echo="500">${emptyState({
     heading: 1,
     // ‏مثلّثُ التنبيه من جدول الحال — لا درعُ «الأمان»: الرمزُ اسمُ معناه (D-103)
     icon: GLYPH_ICON['▲'] ?? '',
@@ -59,7 +61,7 @@ export function serverErrorPage(nonce: string, requestId: string, retry: string 
       : button({ label: 'أعد المحاولة', variant: 'primary', href: retry }),
   })}
   <details class="setup mt-3"><summary>للمطوّر</summary>
-    <div class="setup-body"><p class="hint m-0">رقمُ الطلب: <span class="mono">${escapeHtml(requestId)}</span></p></div></details>`
+    <div class="setup-body"><p class="hint m-0">رقمُ الطلب: <span class="mono">${escapeHtml(requestId)}</span></p></div></details></div>`
   return soloPage('صدى — خطأٌ في الخادم', HOME, body, nonce, '', buildCommands({ onPanel: false }),
     railHtml({ inPanel: false }))
 }
