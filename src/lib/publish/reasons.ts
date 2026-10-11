@@ -22,6 +22,7 @@ export interface FailReason {
 /** الرموزُ التي يكتبها الناشرُ قبل الإرسال — **ويحرس الاختبارُ أنّها كلُّها هنا**. */
 export const REASONS: Readonly<Record<string, FailReason>> = {
   no_tokens: { text: 'لا إذنَ محفوظا لهذا الحساب — أعد ربطه ثمّ أعد المنشور', action: 'relink' },
+  account_disconnected: { text: 'فُصل الحسابُ من اللوحة قبل موعده، فلم يُنشَر. اربطه من جديد ثمّ أعد المنشور', action: 'relink' },
   token_expired: { text: 'انتهى الإذنُ قبل الإرسال — جدّده ثمّ أعد المنشور', action: 'relink' },
   token_expired_retry: { text: 'انتهى الإذنُ وتعذّر تجديدُه الآن — يُعاد وحده بعد التجديد', action: 'none' },
   missing_publish_scope: { text: 'الحسابُ لم يمنح إذنَ النشر — أعد الربط ووافق عليه', action: 'relink' },

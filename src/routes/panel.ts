@@ -48,7 +48,8 @@ import { animateForPost, bindingFor, videoFace } from '../lib/media/video'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
-import { LINKEDIN_VERSION, PROVIDERS, redirectUri as callbackUri } from '../lib/oauth/providers'
+import { LINKEDIN_VERSION, PLATFORM_IDS, PROVIDERS, redirectUri as callbackUri, type Platform as LinkPlatform } from '../lib/oauth/providers'
+import { disconnectAccount, findLinked, REVOKE_PAGE } from '../lib/oauth/disconnect'
 import { versionAge } from '../lib/oauth/version'
 import { requeue, schedulePost, unschedule } from '../lib/schedule/job'
 import { missingMedia } from '../lib/schedule/media'
@@ -1254,6 +1255,58 @@ panel.post('/panel/channels/app', async (c) => {
 function toSetup(form: FormData): Response {
   return new Response(null, { status: 303, headers: { Location: backTo(form.get('return'), '/panel#channels') } })
 }
+
+/**
+ * ‏**«افصل الحساب»** (D-197): ما وعدت به صفحةُ الخصوصيّة في بندها السادس.
+ *
+ * ‏المعرّفُ والمنصّةُ من النموذج، ويُطابَق الاثنان في القاعدة: معرّفٌ على غير منصّته يُردّ.
+ * ‏والرموزُ تُحذف ولو فشل الإبطالُ عند المنصّة، والسجلُّ يحمل النتيجةَ لا قيمةً منها.
+ * ‏والإشعارُ يقول ما وقع وما بقي على المالك بيده.
+ */
+panel.post('/panel/channels/disconnect', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+
+  const platform = (PLATFORM_IDS as readonly string[]).includes(String(form.get('platform') ?? ''))
+    ? (String(form.get('platform')) as LinkPlatform)
+    : null
+  const id = String(form.get('account') ?? '')
+  const target = platform === null || id === '' || id.length > 200 ? null : await findLinked(c.env.DB, id, platform)
+  if (target === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا حسابَ مربوطًا بهذا المعرّف على هذه المنصّة، فلم يُفصَل شيء.' })
+    return toSetup(form)
+  }
+
+  const app = await readApp(c.env.DB, c.env.TOKEN_ENC_KEY, target.platform, c.env as unknown as Record<string, string | undefined>)
+  const result = await disconnectAccount(c.env.DB, c.env.TOKEN_ENC_KEY, target, app)
+  await record(
+    c.env.DB,
+    {
+      actor: 'panel',
+      action: 'account.disconnect',
+      target: target.id,
+      detail: `remote=${result.remote} · stopped=${result.stopped}`,
+    },
+    c.req.raw,
+  )
+
+  const label = platformLabel(target.platform)
+  const page = REVOKE_PAGE[target.platform]
+  const stopped = result.stopped === 0
+    ? 'ولم يكن عليه منشورٌ مجدول.'
+    : `وأُوقف ${result.stopped} من منشوراته المجدولة فصار «فشل» بسبب الفصل، ولن يُنشَر منها شيء.`
+  const remote = result.remote === 'revoked'
+    ? `وأبطلت ${label} الإذنَ عندها.`
+    : result.remote === 'failed'
+      ? `وتعذّر إبطالُ الإذن عند ${label}، فاسحبه بيدك من «${page.label}».`
+      : `ولا نداءَ إبطالٍ يُنادى عند ${label} لهذا الحساب، فاسحب الإذنَ بيدك من «${page.label}».`
+  await setFlash(c.env, c.req.raw, {
+    kind: result.remote === 'revoked' ? 'ok' : 'warn',
+    text: `فُصل «${target.displayName}» وحُذفت رموزُه من القاعدة. ${stopped} ${remote}`,
+  })
+  return toSetup(form)
+})
 
 /** حذفُ التطبيق من الخزانة — ولا يمسّ ما في أسرار Worker. */
 /**

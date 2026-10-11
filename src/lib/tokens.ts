@@ -184,12 +184,13 @@ export async function markActive(db: Db, id: string): Promise<void> {
 }
 
 export async function markNeedsReauth(db: Db, id: string): Promise<void> {
+  // ‏وحسابٌ فصله المالكُ يبقى مفصولًا (D-197): لا يعود «جدّد الإذن» برسالةٍ متأخّرة
   // **ويُختَم وقتُ السقوط مرّةً** (D-131): تعليمٌ ثانٍ لحسابٍ ساقطٍ لا يبدّل التاريخ
   await db
     .prepare(
       `UPDATE accounts SET status = 'needs_reauth',
               needs_reauth_at = COALESCE(needs_reauth_at, datetime('now'))
-        WHERE id = ?`,
+        WHERE id = ? AND status != 'revoked'`,
     )
     .bind(id)
     .run()

@@ -236,6 +236,10 @@ export async function publishPost(
     return preflightFailed(db, post, 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور')
   }
 
+  // ‏**حسابٌ فصله المالكُ لا يُنشَر عليه ولا يُعلَّم «جدّد الإذن»** (D-197): رسالةٌ كانت في
+  // ‏الطابور قبل الفصل تصل هنا، و`no_tokens` كان سيعيد الحسابَ المفصول إلى اللوحة
+  if (post.account_status === 'revoked') return preflightFailed(db, post, 'account_disconnected')
+
   const tokens = await loadTokens(db, encKey, post.account_id)
   if (tokens === null) {
     await markNeedsReauth(db, post.account_id)
