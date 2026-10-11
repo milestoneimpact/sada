@@ -53,6 +53,8 @@ import { returnTo } from '../../lib/nav/back'
 import { emptyState } from './components/empty'
 import { button } from './components/button'
 import { card } from './components/card'
+import { dialog } from './components/dialog'
+import { REVOKE_PAGE } from '../../lib/oauth/disconnect'
 
 /** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -781,12 +783,46 @@ function reachCard(platform: 'youtube' | 'tiktok', isPublic: boolean, noScope = 
     })}`
 }
 
+/**
+ * ‏**«افصل الحساب»** (D-197): زرٌّ خطِرٌ يفتح حوارًا أصليًّا يقول ما سيقع قبل أن يقع.
+ *
+ * ‏النموذجُ خارج الحوار (حوارُ العُدّة نموذجُ `method="dialog"`، والنماذجُ لا تتداخل)،
+ * ‏وزرُّ التأكيد يُرسله بسِمة `form`. والمعرّفُ رقمُ البطاقة لا معرّفُ الحساب: ذاك فيه «:».
+ */
+function disconnectBlock(platform: Platform, accountId: string, name: string, index: number): string {
+  const dlg = `dc-${platform}-${index}`
+  const formId = `${dlg}-f`
+  const page = REVOKE_PAGE[platform]
+  const label = platformLabel(platform)
+  return `<form id="${formId}" method="POST" action="/panel/channels/disconnect" data-busy="جارٍ الفصل…">
+      <input type="hidden" name="platform" value="${escapeHtml(platform)}">
+      <input type="hidden" name="account" value="${escapeHtml(accountId)}">
+      <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'setup'))}">
+    </form>
+    <div class="acct-more">${button({
+      label: 'افصل الحساب', variant: 'danger', size: 'sm',
+      attrs: `data-dialog-open="${dlg}" aria-haspopup="dialog" aria-controls="${dlg}"`,
+    })}</div>
+    ${dialog({
+      id: dlg,
+      title: `افصل «${name}» عن صدى؟`,
+      body: `<ul>
+        <li>تُحذف رموزُ الوصول والتجديد لهذا الحساب من قاعدة صدى، ولا تُستردّ.</li>
+        <li>كلُّ منشورٍ مجدولٍ عليه يتوقّف ويصير «فشل» بسبب الفصل، ولا يُنشَر منه شيء.</li>
+        <li>يحاول صدى إبطالَ الإذن عند ${escapeHtml(label)} أيضًا، ويُحذف ما عنده ولو تعذّر ذلك.</li>
+        <li>واسحب التطبيقَ بيدك من <a class="tap" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.label)}</a> لتطمئنّ.</li>
+      </ul>
+      <p class="hint">والربطُ من جديد ممكنٌ متى شئت بزرّ الربط.</p>`,
+      actions: button({ label: 'افصل واحذف الرموز', variant: 'danger', type: 'submit', attrs: `form="${formId}"` }),
+    })}`
+}
+
 function setupSection(d: PlatformScreenData, r: Readiness): string {
   const { spec, state, accounts } = d.view
   const platform = spec.id as Platform
   const guide = SETUP[spec.id]
   const accountBlocks = accounts
-    .map((a) => {
+    .map((a, i) => {
       const granted = d.scopes[a.id] ?? ''
       const rows = capabilities(platform, granted)
       const missing = rows.filter((x) => !x.granted).length
@@ -811,6 +847,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
         }</p>
         ${capabilityTable(rows)}</details>
         ${healthLog(d.health[a.id], a.createdAt, d.now)}
+        ${disconnectBlock(platform, a.id, a.displayName, i)}
       </div>`
     })
     .join('')
