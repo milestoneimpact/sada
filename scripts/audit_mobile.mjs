@@ -22,6 +22,10 @@
  * | نصٌّ خارج صندوقه أو تحت جاره في شريط العودة | صفر | «المنشو» تحت مبدّل الثيم (مراجعة D-189) |
  * | تبويبٌ أو حلقةُ تركيزه خارج ما يُرى | صفر | WCAG 2.4.7 و2.4.11 — وشريطٌ مخفيٌّ لا يُرى (مراجعة D-189) |
  * | مقياسُ الاستحقاق بطول رقمه | ±1٪ | ‏0.61 رُسمت ممتلئة (مراجعة D-189) |
+ * | الاسمُ المرسومُ بنسبة رسمه | ±5٪ | «صدى» ‏16×16 في شريط العودة (مراجعة D-196) |
+ * | السطرُ اللاتينيُّ في اللحظة | سطرٌ واحدٌ في طرف القفل | التفّ بين ‏900 و‏1103 وتحت ‏350 (مراجعة D-196) |
+ * | الفعلُ الأوّلُ وحقلُه في الشاشة الأولى | ‏375×548 · ‏320×568 · ‏844×390 · ‏667×375 | الحقلُ تحت الطيّة على iPhone SE (مراجعة D-196) |
+ * | رمزُ اللحظة واسمُها في الألوان القسريّة | ‏3:1 على الأرض تحتهما | أسودُ على العمق ‏1.46:1 (مراجعة D-196) |
  * | `100vh` مكشوفة | ممنوعة | ارتفاعُ iOS يشمل شريطَ المتصفّح |
  * | `:hover` بلا حراسة | ممنوعة | لا hover على اللمس — فيعلق |
  * | وزنُ الصفحة | سقفٌ مُعلَن | Core Web Vitals |
@@ -435,6 +439,45 @@ for (const file of files) {
             out.push({ kind: 'meter', what: `«${val.toFixed(2)}»`, detail: `مرسومٌ ${Math.round(drawn)} من ${Math.round(tw)}px والمطلوبُ ${Math.round(val * tw)}` })
           }
         }
+        /*
+         * ١٠ · **اسمٌ مسحوق** (مراجعة D-196): «nav.back a>svg» طابق «.wordmark» في باب اللوحة فرُسم ‏16×16 —
+         * مسارٌ نسبتُه ‏3.2:1 شريطًا ارتفاعُه ‏5px بين ‏600 و‏899. فكلُّ اسمٍ مرسومٍ بنسبة رسمه (±5٪).
+         */
+        for (const w of document.querySelectorAll('svg.wordmark')) {
+          if (!shown(w)) continue
+          const vb = w.viewBox?.baseVal
+          if (!vb || vb.height === 0) continue
+          const b = w.getBoundingClientRect()
+          const want = vb.width / vb.height
+          const got = b.width / b.height
+          if (Math.abs(got - want) / want > 0.05) {
+            out.push({ kind: 'mark', what: `${w.parentElement ? key(w.parentElement) : ''} svg.wordmark`, detail: `${Math.round(b.width)}×${Math.round(b.height)} بنسبة ${got.toFixed(2)} والرسمُ ${want.toFixed(2)}` })
+          }
+        }
+        /*
+         * ١١ · **السطرُ اللاتينيُّ في لحظة العلامة سطرٌ واحدٌ في طرف القفل** (مراجعة D-196): كان يلتفّ سطرين بين
+         * ‏900 و‏1103 وتحت ‏350، والملتفُّ يمتدّ بعرض اللوحة فيُصفّ يسارًا تحت قفلٍ مصفوفٍ يمينًا — ولا شيءَ يفيض.
+         */
+        for (const en of document.querySelectorAll('.moment-en')) {
+          if (!shown(en)) continue
+          const range = document.createRange()
+          range.selectNodeContents(en)
+          const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size
+          if (lines > 1) out.push({ kind: 'moment', what: '.moment-en', detail: `يلتفّ ${lines} أسطر` })
+          const m = en.closest('.moment')
+          const id = m?.querySelector('.moment-id')
+          if (m && id && shown(id)) {
+            const cs = getComputedStyle(m)
+            const box = m.getBoundingClientRect()
+            const r = range.getBoundingClientRect()
+            const inner = [box.left + parseFloat(cs.paddingLeft), box.right - parseFloat(cs.paddingRight)]
+            if (r.left < inner[0] - 1 || r.right > inner[1] + 4) {
+              out.push({ kind: 'moment', what: '.moment-en', detail: `يخرج من اللوحة ${Math.round(Math.max(inner[0] - r.left, r.right - inner[1]))}px` })
+            }
+            const gap = Math.abs(r.right - id.getBoundingClientRect().right)
+            if (gap > 6) out.push({ kind: 'moment', what: '.moment-en', detail: `طرفُه عن طرف القفل ${Math.round(gap)}px` })
+          }
+        }
         // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
         for (const t of document.querySelectorAll('svg text')) {
           if (!shown(t)) continue
@@ -453,6 +496,76 @@ for (const file of files) {
       if (ALLOWED.has(hit.what)) continue
       notes.push({ ...hit, width })
     }
+    await page.close()
+  }
+
+  /*
+   * ١٢ · **الفعلُ الأوّلُ وحقلُه في الشاشة الأولى** على الشاشات القصيرة (مراجعة D-196): شريطُ اللحظة ‏256px
+   * دفع حقلَ الدخول وزرَّه تحت الطيّة في ‏375×548 (iPhone SE بشريط Safari)، والهاتفُ أفقيًّا (‏844×390) لم
+   * يُظهر إلّا الشريطَ والعنوان — ولا مقاسَ هنا كان أقصرَ من ‏844. ففي صفحات «.auth»: أوّلُ زرٍّ أوّليٍّ ظاهر،
+   * وحقلُ نموذجه إن كان يُرسله، في الشاشة الأولى بلا تمرير؛ **وفي القائم كذلك أوّلُ حقلٍ وزرُّ إرساله**.
+   */
+  for (const [w, h] of [[375, 548], [320, 568], [844, 390], [667, 375]]) {
+    const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+    await page.goto(`file://${file}`)
+    await page.waitForTimeout(150)
+    const misses = await page.evaluate((portrait) => {
+      const auth = document.querySelector('.auth')
+      if (auth === null) return []
+      window.scrollTo(0, 0)
+      const visible = (el) => { const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
+      const inFirst = (el) => { const b = el.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight }
+      const label = (el) => el.id ? `#${el.id}` : `«${(el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 24)}»`
+      const FIELD = 'input:not([type=hidden]):not([disabled]),select,textarea'
+      const want = []
+      const primary = [...auth.querySelectorAll('.btn-primary')].find(visible)
+      if (primary) {
+        want.push(primary)
+        const form = primary.type === 'submit' ? primary.form : null
+        const field = form ? [...form.querySelectorAll(FIELD)].find(visible) : undefined
+        if (field) want.push(field)
+      }
+      if (portrait) {
+        const field = [...auth.querySelectorAll(FIELD)].find((f) => visible(f) && !f.closest('details:not([open])'))
+        const submit = field?.form ? [...field.form.querySelectorAll('[type=submit]')].find(visible) : undefined
+        if (field) want.push(field)
+        if (submit) want.push(submit)
+      }
+      return [...new Set(want)].filter((el) => !inFirst(el)).map((el) => `${label(el)} عند ${Math.round(el.getBoundingClientRect().top)}–${Math.round(el.getBoundingClientRect().bottom)} من ${innerHeight}`)
+    }, h > w)
+    for (const m of misses) notes.push({ kind: 'fold', what: `${w}×${h}`, detail: m, width: w })
+    await page.close()
+  }
+
+  /*
+   * ١٣ · **لحظةُ العلامة في الألوان القسريّة** (مراجعة D-196): أرضُ النقش سمةُ «fill» لا تُفرَض، وأرضُ «.moment»
+   * ورمزُها يُفرَضان — فرُسم الرمزُ أسودَ على الأرض العميقة ‏1.46:1 في التباين العالي الفاتح. فيُقاس الرمزُ
+   * والاسمُ على الأرض التي تحتهما فعلًا (أرضُ النقش الظاهر، أو أرضُ اللحظة) في الوضعين: ‏3:1 للرسم.
+   */
+  for (const [scheme, width] of [['light', 390], ['light', 1440], ['dark', 390], ['dark', 1440]]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.emulateMedia({ forcedColors: 'active', colorScheme: scheme })
+    await page.goto(`file://${file}`)
+    await page.waitForTimeout(150)
+    const low = await page.evaluate(() => {
+      const m = document.querySelector('.moment')
+      if (m === null) return []
+      const rgbOf = (v) => (v.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+      const lum = ([r, g, b]) => [r, g, b].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 })
+        .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0)
+      const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+      const shownEcho = [...m.querySelectorAll('.echo')].find((e) => e.getBoundingClientRect().width > 0)
+      const rect = shownEcho?.querySelector('rect')
+      const ground = rect ? getComputedStyle(rect).fill : getComputedStyle(m).backgroundColor
+      const out = []
+      const glyph = m.querySelector('.moment-glyph path')
+      if (glyph) out.push(['الرمز', getComputedStyle(glyph).stroke])
+      const word = m.querySelector('.wordmark path')
+      if (word) out.push(['الاسم', getComputedStyle(word).fill])
+      return out.map(([what, c]) => [what, ratio(rgbOf(c), rgbOf(ground)), c, ground]).filter(([, r]) => r < 3)
+        .map(([what, r, c, g]) => `${what} ${r.toFixed(2)}:1 (${c} على ${g})`)
+    })
+    for (const l of low) notes.push({ kind: 'forced', what: `${scheme} ${width}`, detail: l, width })
     await page.close()
   }
 
@@ -509,6 +622,10 @@ for (const file of files) {
     hover: 'تعليقٌ يعلق على اللمس',
     weight: 'وزنٌ فوق السقف',
     svgtext: 'حرفٌ في SVG يُقلَّص مع الرسم',
+    mark: 'اسمٌ مرسومٌ بغير نسبته',
+    moment: 'السطرُ اللاتينيُّ في لحظة العلامة',
+    fold: 'الفعلُ الأوّلُ أو حقلُه تحت الطيّة على شاشةٍ قصيرة',
+    forced: 'لحظةُ العلامة دون ‏3:1 في الألوان القسريّة',
   }
 
   console.log(`\n═══ ${name} · ${kb}KB خامًا · ${gz}KB gzip ═══`)

@@ -28,7 +28,7 @@
  * والثالثةُ عينُ ما يُحرَس منه: **رمزٌ لا يستعمله إلّا اختبارُه ميّت**،
  * والاختبارُ يبقيه حيًّا في الظاهر.
  *
- * الاستعمال:  node scripts/audit_tokens.mjs  [--self-test: يزرع ظلالًا مغبَّشةً ويتأكّد أنّها تُمسَك]
+ * الاستعمال:  node scripts/audit_tokens.mjs  [--self-test: يزرع ظلالًا مغبَّشةً وذهبًا باسمٍ ثانٍ ويتأكّد أنّها تُمسَك]
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import ts from 'typescript'
@@ -134,45 +134,85 @@ for (const file of files) {
 const radiusVariants = [...new Set(radiusTokens.values())].sort((a, b) => parseFloat(a) - parseFloat(b))
 
 /**
- * ── ميزانيّةُ النحاس: ثلاثةُ أدوارٍ لا رابعَ لها (خطّة التصميم 3.2 · D-187) ─────
+ * ── ميزانيّةُ الذهب: ثلاثةُ أدوارٍ لا رابعَ لها (خطّة التصميم 3.2 · D-187 · D-196) ─────
+ * (وكان اسمُه «النحاس» حتّى لوحة الهويّة، والقاعدةُ هي هي.)
  * كان سقفًا عدديًّا (D-156: حبرٌ لرقمٍ واحد ونداءاتٌ دون ‏١٥) — **وخمسةَ عشرَ نداءً
  * تحت السقف صارت خمسةَ عشرَ موضعًا في الرئيسيّة**: خيطُ كلّ قسم وخطُّ كلّ رابطٍ هادئ.
- * فالسؤالُ اليوم «أين» لا «كم»: النحاسُ (`--au` وشريطُ العلامة `--mark-fg`) لا يقع إلّا
+ * فالسؤالُ اليوم «أين» لا «كم»: الذهبُ (`--au` وشريطُ العلامة `--mark-fg`) لا يقع إلّا
  * في الأدوار الثلاثة، **وقيمةً كاملة** لا في تدرّجٍ ولا مزيج، وفي خاصّةِ حبرٍ أو أرضٍ لا
  * في حدٍّ ولا خطٍّ تحت رابطٍ ولا ظلّ. ويعدّ `audit_design` المواضعَ في كلّ شاشةٍ مرسومة.
  */
 const COPPER_HOMES = new Map([
   ['.glyph', 'العلامة'],
+  // ‏والرمزُ في لحظة العلامة هو العلامةُ نفسُها، لا دورٌ رابع: يقع في القالب T6 وحده بلا «.glyph» فوق
+  // ‏النموذج، و«audit_design» يعدّ اللحظةَ موضعًا واحدًا (مراجعة D-196: كان يُنادى باسمٍ ثانٍ فلا يُعَدّ)
+  ['.moment-glyph', 'العلامة'],
   ['nav.tabs a[aria-current=page]::before', 'مؤشّرُ القسم الحاليّ'],
   ['.grid>.tile:first-child .kv-v', 'الرقمُ البطل'],
 ])
-const COPPER = /var\(--(au|mark-fg)\)/
-const brass = []
-let brassCount = 0
-for (const file of files) {
-  if (NOT_USAGE.test(file)) continue
-  const code = strip(readFileSync(file, 'utf8'))
-  const short = file.slice(SRC.length)
-  if (!/ui\/styles\.ts$/.test(file)) {
-    // ‏ولا نحاسَ خارج الورقة: سمةُ «style» في وسمٍ لا يراها هذا الحارس ولا يعدّها
-    if (COPPER.test(code)) brass.push(`نحاسٌ خارج الورقة — ${short}`)
-    continue
-  }
-  for (const m of code.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
-    const sel = m[1].trim().split('\n').pop().trim()
-    for (const d of m[2].split(';')) {
-      if (!COPPER.test(d)) continue
-      brassCount += 1
-      const [prop, ...rest] = d.split(':')
-      const val = rest.join(':').trim()
-      if (!COPPER_HOMES.has(sel)) brass.push(`${sel} — ليس من الأدوار الثلاثة`)
-      else if (!/^(color|background|background-color)$/.test(prop.trim()) || !/^var\(--(au|mark-fg)\)$/.test(val)) {
-        brass.push(`${sel} { ${d.trim()} } — النحاسُ حبرٌ أو أرضٌ بقيمته الكاملة`)
+const GOLD_BASE = ['--au', '--mark-fg']
+
+/**
+ * ‏**والذهبُ يُعرَف بقيمته لا باسمه** (مراجعة D-196): كان الحارسُ يطابق «var(--au|--mark-fg)» حرفًا،
+ * فـ«--moment-accent» بقيمة الشريط نفسِها مرّ منه ومن اختبار الأدوار معًا، وزُرع «.next-t» بلونه نصًّا
+ * نعناعيًّا على أبيض ‏١٫٨٩:١ فلم يسقط شيء. فكلُّ رمزٍ قيمتُه قيمةُ ذهبٍ في أيّ كتلة، أو إحالةٌ إلى رمزٍ
+ * ذهبيّ، **ذهبٌ هو أيضًا** — ويردّ تعريفُه نفسُه: لا اسمَ ثانيًا للذهب، فاسمان يفترقان عند أوّل تعديل.
+ * والتصريحاتُ من الورقة المولَّدة (`TOKENS`، القيَمُ محلولة) ومن مصادر الورقة (`style=""` وما في `styles.ts`).
+ */
+function goldNames(decls) {
+  const values = new Set(decls.filter(([n, v]) => GOLD_BASE.includes(n) && /^#[0-9a-f]{3,8}$/i.test(v)).map(([, v]) => v.toLowerCase()))
+  const names = new Set(GOLD_BASE)
+  for (let grew = true; grew;) {
+    grew = false
+    for (const [n, v] of decls) {
+      if (names.has(n)) continue
+      const ref = /^var\(\s*(--[a-z0-9-]+)\s*\)$/.exec(v)
+      if (values.has(v.toLowerCase()) || (ref !== null && names.has(ref[1]))) {
+        names.add(n)
+        grew = true
       }
     }
   }
+  return names
 }
-if (brassCount > COPPER_HOMES.size) brass.push(`النحاسُ ${brassCount} تصريحًا — والأدوارُ ${COPPER_HOMES.size}`)
+
+/** ‏ما خالف ميزانيّةَ الذهب: `sheets` مصادرُ ممحوّةُ التعليقات، و`tokensCss` الورقةُ المولَّدة. */
+function goldFindings(sheets, tokensCss) {
+  const decls = []
+  for (const code of [tokensCss, ...sheets.map((x) => x.code)]) {
+    for (const m of code.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}`'"]+)/g)) decls.push([m[1], m[2].trim()])
+  }
+  const gold = goldNames(decls)
+  const out = []
+  const aliases = [...gold].filter((n) => !GOLD_BASE.includes(n))
+  for (const a of aliases) out.push(`${a} اسمٌ ثانٍ للذهب — يُنادى «${GOLD_BASE.join('» أو «')}» بأسمائهما`)
+  const any = new RegExp(`var\\(\\s*(${[...gold].map((n) => n.replace(/-/g, '\\-')).join('|')})\\s*\\)`)
+  let count = 0
+  for (const { short, code } of sheets) {
+    if (!/ui\/styles\.ts$/.test(short)) {
+      // ‏ولا ذهبَ خارج الورقة: سمةُ «style» في وسمٍ لا يراها هذا الحارس ولا يعدّها
+      if (any.test(code)) out.push(`ذهبٌ خارج الورقة — ${short}`)
+      continue
+    }
+    for (const m of code.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim().split('\n').pop().trim()
+      for (const d of m[2].split(';')) {
+        if (!any.test(d)) continue
+        const [prop, ...rest] = d.split(':')
+        // ‏وتعريفُ الاسم الثاني نفسُه رُدّ أعلاه — لا يُعَدّ تصريحًا
+        if (prop.trim().startsWith('--')) continue
+        count += 1
+        const val = rest.join(':').trim()
+        if (!COPPER_HOMES.has(sel)) out.push(`${sel} — ليس من الأدوار الثلاثة`)
+        else if (!/^(color|background|background-color)$/.test(prop.trim()) || !/^var\(--(au|mark-fg)\)$/.test(val)) {
+          out.push(`${sel} { ${d.trim()} } — الذهبُ حبرٌ أو أرضٌ بقيمته الكاملة`)
+        }
+      }
+    }
+  }
+  if (count > COPPER_HOMES.size) out.push(`الذهبُ ${count} تصريحًا — والمواضعُ ${COPPER_HOMES.size}`)
+  return { findings: out, count }
+}
 
 /**
  * ── الارتفاعُ ثلاثةُ ظلالٍ لا رابعَ لها (خطّة التصميم 3.3 · D-187) ─────────────
@@ -324,8 +364,43 @@ if (process.argv.includes('--self-test')) {
     process.exit(1)
   }
   console.log(`  ✓ self-test الظلال: ${want.length} مزروعًا أُمسِك، والحلقاتُ الحادّةُ والثلاثةُ مرّت`)
+
+  /*
+   * ‏**والذهبُ باسمٍ ثانٍ** (مراجعة D-196): النعناعُ بقيمته حرفًا تحت اسمٍ آخر، والذهبُ بإحالة،
+   * وإحالةٌ إلى إحالة — كلُّها تُعَدّ ذهبًا، وتعريفُها يردّ، ونداؤها خارج الأدوار يردّ.
+   * وما يمرّ: الأدوارُ الأربعةُ بأسمائها، و«--mark-bg» (ليس ذهبًا) ولو جاور الشريط.
+   */
+  const goldTokens = ':root{\n  --au:#7b5e20;\n  --mark-bg:#0b2f31; --mark-fg:#4cd1b6;\n  --moment-accent:#4cd1b6;\n' +
+    '  --brass:var(--au); --brass-2:var(--brass);\n}\n:root[data-theme="dark"]{\n  --au:#c9a96a;\n  --night-gold:#C9A96A;\n}'
+  const goldSheet = [
+    '.glyph{background:var(--mark-bg); color:var(--mark-fg)}',
+    '.moment-glyph{color:var(--mark-fg)}',
+    'nav.tabs a[aria-current=page]::before{background:var(--au)}',
+    '.grid>.tile:first-child .kv-v{color:var(--au)}',
+    '.next-t{font-weight:600; color:var(--moment-accent)}',
+    '.chip{border-color:var(--brass-2)}',
+    '.kv{color:var( --night-gold )}',
+  ].join('\n')
+  const gold = goldFindings([{ short: 'routes/ui/styles.ts', code: goldSheet }, { short: 'routes/x.ts', code: '`<b style="color:var(--brass)">`' }], goldTokens).findings
+  const goldWant = [
+    '--moment-accent اسمٌ ثانٍ', '--brass اسمٌ ثانٍ', '--brass-2 اسمٌ ثانٍ', '--night-gold اسمٌ ثانٍ',
+    'ذهبٌ خارج الورقة — routes/x.ts', '.next-t — ليس من الأدوار', '.chip — ليس من الأدوار', '.kv — ليس من الأدوار',
+    'الذهبُ 7 تصريحًا',
+  ]
+  const goldMissed = goldWant.filter((w) => !gold.some((g) => g.startsWith(w)))
+  const goldExtra = gold.filter((g) => !goldWant.some((w) => g.startsWith(w)))
+  if (goldMissed.length > 0 || goldExtra.length > 0) {
+    console.log(`  ✕ self-test الذهب: فاته ${JSON.stringify(goldMissed)} · واتّهم ${JSON.stringify(goldExtra)}`)
+    process.exit(1)
+  }
+  console.log(`  ✓ self-test الذهب: ${goldWant.length} مزروعًا أُمسِك (اسمٌ ثانٍ بالقيمة وبالإحالة)، والأدوارُ الأربعةُ مرّت`)
   process.exit(0)
 }
+
+const { TOKENS } = await import('../src/routes/ui/tokens.ts')
+const { findings: brass, count: brassCount } = goldFindings(files
+  .filter((file) => !NOT_USAGE.test(file))
+  .map((file) => ({ short: file.slice(SRC.length), code: strip(readFileSync(file, 'utf8')) })), TOKENS)
 
 const looseShadows = shadowFindings(files
   .filter((file) => !NOT_USAGE.test(file) && !/\/image\//.test(file))
@@ -669,8 +744,8 @@ for (const [k, where] of sharedIcons) {
 }
 
 console.log('\n═══ زمنٌ يُكتب حرفا لا رمزا ═══\n')
-console.log('\n═══ ميزانيّةُ النحاس ═══\n')
-if (brass.length === 0) console.log(`  ✓ ${brassCount} تصريحاتٍ في الأدوار الثلاثة: ${[...COPPER_HOMES.values()].join(' · ')}`)
+console.log('\n═══ ميزانيّةُ الذهب ═══\n')
+if (brass.length === 0) console.log(`  ✓ ${brassCount} تصريحاتٍ في الأدوار الثلاثة: ${[...new Set(COPPER_HOMES.values())].join(' · ')}، ولا اسمَ ثانيًا للذهب`)
 for (const b of brass) console.log(`  ✕ ${b}`)
 
 console.log('\n═══ نصفُ قطرٍ خارج القائمة المغلقة ═══\n')

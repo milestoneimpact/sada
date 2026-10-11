@@ -152,10 +152,10 @@ b,strong{font-weight:600}
    الأقواسُ نفسها التي في رمز التبويب، مرسومةً لا مكتوبة. وكانت مربّعا
    فيه «صدى» بخمسةَ عشرَ بكسلا: **الحرفان يزدحمان في ستٍّ وثلاثين**،
    فيُقرأ المربّعُ لطخةً — وهي عينُ العلّة التي مُنعت في رمز التبويب. */
-/* والعلامةُ وحدها تجمع اللونين: حبرٌ ونحاسٌ ثابتان في الوضعين (D-144) — ولا
-   يتكرّر هذا الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها، **وهي أوّلُ مواضع النحاس
-   الثلاثة في الشاشة** (D-187). **وأرضُها الحبريّةُ على
-   أرض الليل ‏١٫٠٥:١ — تختفي**، فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
+/* والعلامةُ وحدها تجمع اللونين: نعناعٌ على عمقٍ ثابتان في الوضعين («MARK»، D-196؛ وكانا حبرًا
+   ونحاسًا منذ D-144) — ولا يتكرّر هذا الجمعُ في موضعٍ آخر، فيبقى للعلامة معناها، **وهي أوّلُ
+   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقةُ على أرض الليل ‏١٫٣٦:١ — تذوب**،
+   فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
 .glyph{display:grid; place-items:center; flex:none; width:var(--s-10); height:var(--s-10); border-radius:var(--r-card);
   background:var(--mark-bg); color:var(--mark-fg);
   box-shadow:var(--sh-1), 0 0 0 1px var(--mark-ring)}
@@ -185,12 +185,14 @@ nav.tabs .tight{display:none}
 @media(hover:hover){nav.tabs a:hover{background:var(--hover); color:var(--ink)}}
 /* والحاليُّ يُعلَّم **بحدٍّ ولونٍ ووزن**: أرضيّةٌ خافتةٌ وحدها تختفي في
    وضع التباين العالي، وخطٌّ على الحافّة يبقى. **والرافدةُ ‏٤٠٠ والحاليُّ وحده ‏٦٠٠**
-   (D-185): رافدةٌ كلُّها ثخينةٌ تنافس المحتوى على العين. **والخطُّ نحاسيّ: ثاني
-   مواضع النحاس الثلاثة** (D-187)، وفي شريط الجوّال مخفيٌّ حتّى المرحلة ٢ب. */
+   (D-185): رافدةٌ كلُّها ثخينةٌ تنافس المحتوى على العين. **والخطُّ ذهبيّ: ثاني
+   مواضع الذهب الثلاثة** (D-187 · D-196)، وفي شريط الجوّال مخفيٌّ حتّى المرحلة ٢ب.
+   **ورمزُ الحاليّ بحبر الرابط** (D-196): نهارًا كان التركوازُ لا يُرى إلّا في الأزرار والروابط،
+   فالهويّةُ في الصفحة تُقرأ زرًّا داكنًا على ورق. والرمزُ ليس نصًّا (‏3:1 على المحدَّد) ولا ذهبًا */
 nav.tabs a[aria-current=page]{background:var(--selected); color:var(--ink); position:relative; font-weight:600}
 nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block:var(--s-2);
   inset-inline-start:0; border-radius:var(--r-pill); width:var(--stroke); background:var(--au)}
-nav.tabs a[aria-current=page] svg{opacity:1}
+nav.tabs a[aria-current=page] svg{opacity:1; color:var(--link)}
 nav.tabs .count{margin-inline-start:auto}
 nav.tabs a[aria-current=page] .count{background:var(--ink); color:var(--surface)}
 /* ── فرعُ المنصّات ────────────────────────────────────────────────────
@@ -302,6 +304,10 @@ details.ladder .verdict.bad{color:var(--bad)}
    عناوينُ بطاقاتٍ ‏٢٠ ولا شيءَ بينهما — تراتبٌ مقلوب. والجوّالُ ‏٢٤ من الرمز نفسِه */
 .page-head h1{font-size:var(--t-h1); font-weight:600; line-height:var(--lh-h1);
   letter-spacing:0; margin:0}
+/* ‏**وتحته خطٌّ قصيرٌ بحبر الرابط** كما تحت عناوين لوحة الهويّة (D-196): ‏٢٤ في ‏٢، في أوّل السطر.
+   رمزُ قسمٍ لا رابط، ولا يُعدّ ذهبًا — والذهبُ لمواضعه الثلاثة */
+.page-head h1::after{content:''; display:block; width:var(--s-6); height:var(--stroke); margin-top:var(--s-2);
+  border-radius:var(--r-pill); background:var(--link)}
 .page-head .lede{margin:var(--s-3) 0 0; font-size:var(--t-body); line-height:var(--lh-body);
   color:var(--ink-2); max-width:var(--measure)}
 .page-head .aside{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
@@ -496,7 +502,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
   border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
 .wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--brand)}
-.wk-d{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.wk-d{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2)}
 .wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
 .wk-dot{width:var(--s-2); height:var(--s-2); border-radius:50%; background:var(--ink-3)}
@@ -598,11 +604,12 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   border-bottom:var(--bd-soft); position:relative; font-size:var(--t-ui);
   line-height:var(--lh-ui); font-weight:600}
 
-/* ── ميزانيّةُ النحاس: ثلاثةُ مواضعَ في الشاشة لا رابعَ لها (خطّة التصميم 3.2 · D-187) ──
-   العلامةُ («.glyph»)، ومؤشّرُ القسم الحاليّ في الرافدة، والرقمُ البطل أدناه. **وكان في
+/* ── ميزانيّةُ الذهب: ثلاثةُ مواضعَ في الشاشة لا رابعَ لها (خطّة التصميم 3.2 · D-187 · D-196) ──
+   (وكان اسمُها «النحاس» حتّى لوحة الهويّة.) العلامةُ («.glyph»، و«.moment-glyph» في لحظتها)، ومؤشّرُ
+   القسم الحاليّ في الرافدة، والرقمُ البطل أدناه. **وكان في
    الرئيسيّة خمسةَ عشرَ موضعًا** (D-156 قصرَه على حبرٍ لرقمٍ واحد وخيوط، والخيوطُ تكاثرت):
    خيطُ كلّ قسم، ورأسُ شريط المؤشّرات، وخطٌّ تحت كلّ رابطٍ هادئ، وأطولُ أعمدة الرسم،
-   ورافدةُ الدليل، وحلقةُ التركيز، ووهجُ المسوّدة المنتظرة، ووهجُ الأرض. **فصار النحاسُ
+   ورافدةُ الدليل، وحلقةُ التركيز، ووهجُ المسوّدة المنتظرة، ووهجُ الأرض. **فصار الذهبُ
    لا يقع على حدّ بطاقةٍ ولا خطّ رابطٍ ولا شريطِ رسمٍ ولا حالٍ ولا وهج**، ويعدّه
    «audit_design» في كلّ شاشةٍ مرسومة و«audit_tokens» في الورقة. */
 
@@ -632,9 +639,77 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 
    **ويشمل شبكةَ الثلاثة كذلك** (المزوّدون): القاعدةُ في الأوّليّة لا في
    العدد. */
-/* ‏وهو ثالثُ مواضع النحاس: رقمٌ واحدٌ في الشاشة (D-187) */
+/* ‏وهو ثالثُ مواضع الذهب: رقمٌ واحدٌ في الشاشة (D-187 · D-196) */
 .grid>.tile:first-child .kv-v{font-size:var(--t-display); line-height:var(--lh-display); color:var(--au);
   font-weight:400; direction:ltr; letter-spacing:-.01em}
+/* ══ لحظةُ العلامة: الدخولُ والعاملُ الثاني (D-196 · نقشُ الصدى) ═════════════════════
+   السطحُ العميقُ ثابتٌ في الثيمين كأرض العلامة، والنموذجُ على أرض الثيم بجانبه. **والنقشُ
+   في لوحته وحدها**: لا يمرّ خلف حقلٍ ولا نصّ، ولا يتحرّك. على الجوّال شريطٌ فوق النموذج،
+   ومن «md» لوحةٌ قائمةٌ في أوّل السطر (يمينًا) والنموذجُ في وسط ما بقي. **والقفلُ كما في
+   اللوحة**: الاسمُ ثمّ الرمز في الشيفرة، فيقع الرمزُ يسارَه — الشعارُ لا يُقلَب مع الاتّجاه.
+   **والنصُّ على العمق عاجيٌّ و«نعناعٌ فاتح» لا نعناع** (‏Lc ‏٦٣ لحرفٍ صغير) */
+/* ‏**والشريطُ بارتفاعه لا بنصيب الشاشة** (مراجعة D-196): الصفّان كانا ضمنيَّين فوزّعت «min-height»
+   فراغَها عليهما، فطال الشريطُ ‏٣٤٩px في ‏768×1024 والنموذجُ تحته */
+.auth-split{display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto 1fr; min-height:100vh; min-height:100dvh}
+.auth-split .auth{margin:var(--s-8) auto}
+/* ‏والشريطُ تحت النصّ لا خلفه: الارتفاعُ الأدنى يترك له ربعَ الشريط الأسفل (‏٢٥٦ في ‏٣٩٠).
+   **وهو حاويةٌ يُسأل عرضُها** («moment»): السطرُ اللاتينيُّ يتباعد بقدر ما يسعه هو لا الشاشة */
+.moment{container:moment / inline-size; position:relative; overflow:hidden; isolation:isolate; background:var(--moment-ground);
+  color:var(--moment-ink); padding:var(--s-6) var(--gutter); min-height:calc(var(--s-16) * 4);
+  display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-1)}
+.moment .echo{position:absolute; inset:0; z-index:-1; pointer-events:none}
+.moment .echo svg{display:block; width:100%; height:100%}
+.moment .echo.wide{display:none}
+.moment-id{display:flex; align-items:center; gap:var(--s-4); margin-bottom:var(--s-3)}
+.moment-name{display:flex; flex-direction:column; align-items:center; gap:var(--s-1)}
+.moment .wordmark{height:var(--s-6); color:var(--moment-ink)}
+.moment-sada{direction:ltr; font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600;
+  letter-spacing:var(--ls-brand); margin-inline-end:calc(-1 * var(--ls-brand)); color:var(--moment-ink)}
+/* ‏والرمزُ هنا العلامةُ نفسُها بلونها («--mark-fg») — لا اسمٌ ثانٍ يفلت من عدّ الذهب (مراجعة D-196) */
+.moment-glyph{display:block; height:var(--s-10); aspect-ratio:4/3; color:var(--mark-fg)}
+.moment-glyph svg{display:block; width:100%; height:100%}
+.moment-line{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--moment-ink)}
+/* ‏والسطرُ اللاتينيُّ يلزم أوّلَ السطر (يمينًا) لا يسارَ «ltr»، **وسطرٌ واحدٌ لا يلتفّ** (مراجعة D-196): كان
+   يلتفّ سطرين بين ‏900 و‏1103 وتحت ‏350، والملتفُّ يمتدّ بعرض العمود فيُصفّ يسارًا تحت قفلٍ مصفوفٍ يمينًا.
+   فتباعدُه بقدر حاويته: «--ls-brand» حيث يسعه، ثمّ «--ls-eyebrow»، ثمّ بلا تباعد — **والتباعدُ الأخيرُ
+   يُعوَّض** كما في «SADA» فيلتقي طرفُه بطرف القفل. **ويُكتب بحالته ويُكبَّر هنا**، وقارئُ الشاشة لا يسمعه:
+   ترجمةُ السطر العربيّ قبله حرفًا */
+.moment-en{margin:0; align-self:flex-start; max-width:100%; direction:ltr; text-align:end; white-space:nowrap;
+  text-transform:uppercase; font-size:var(--t-small); line-height:var(--lh-small); font-weight:400;
+  letter-spacing:var(--ls-brand); margin-inline-end:calc(-1 * var(--ls-brand)); color:var(--moment-soft)}
+@container moment ${narrower('momentBrand')}{
+  .moment-en{direction:ltr; letter-spacing:var(--ls-eyebrow); margin-inline-end:calc(-1 * var(--ls-eyebrow))}
+}
+@container moment ${narrower('momentEyebrow')}{
+  .moment-en{letter-spacing:0; margin-inline-end:0}
+}
+/* ‏**وعلى الشاشة القصيرة القفلُ وحده** (مراجعة D-196): الشريطُ ‏٢٥٦px أيًّا كان الارتفاع دفع الحقلَ وزرَّه
+   تحت الطيّة في ‏375×548 (iPhone SE بشريط Safari)، ولم يُبقِ الهاتفُ أفقيًّا (‏844×390) إلّا الشريطَ
+   والعنوان. فتحت ‏٤٠rem ارتفاعًا يسقط النقشُ والسطران، ويبقى القفلُ شريطًا عميقًا بقدره —
+   **والفعلُ الأوّلُ وحقلُه في الشاشة الأولى**، ويقيسه «audit_mobile» في المقاسات الأربعة القصيرة */
+@media${below('md')} and (max-height:40rem){
+  .moment{min-height:0; padding-block:var(--s-4)}
+  .moment .echo,.moment-line,.moment-en{display:none}
+  .moment-id{margin-bottom:0}
+  .auth-split .auth{margin:var(--s-4) auto}
+}
+@media${atLeast('md')}{
+  .auth-split{grid-template-columns:minmax(0,5fr) minmax(0,7fr); grid-template-rows:none}
+  .auth-split .auth{margin:16vh auto}
+  /* ‏والقفلُ في الثلث الأعلى والشريطُ يصعد إليه من الأسفل (مراجعة D-196: كان بينهما فراغٌ ميّت):
+     صفّان مرنان قبل القفل وبعده بنسبة ‏٢ إلى ‏٥، لا مسافةٌ خارج السلّم */
+  .moment{display:grid; grid-template-rows:minmax(0,2fr) auto auto auto minmax(0,5fr); justify-items:start;
+    align-content:stretch; padding:var(--s-12); gap:var(--s-2)}
+  .moment-id{grid-row:2} .moment-line{grid-row:3} .moment-en{grid-row:4}
+  .moment .echo.wide{display:block}
+  .moment .echo.narrow{display:none}
+  .moment-glyph{height:var(--s-16)}
+  .moment .wordmark{height:var(--s-10)}
+  .moment-line{font-size:var(--t-body); line-height:var(--lh-body)}
+}
+/* ‏والورقُ أبيضُ بلا لحظة (D-125): النموذجُ وحدَه يُطبَع */
+@media print{.moment{display:none} .auth-split{display:block}}
+
 /* ── والرقمُ يصغر درجةً على الجوّال (D-136) — **من الرمز لا بقاعدة** (D-185) ──
    كانت قاعدةً بعد قاعدتَي الرقم، فغلبتها مرّةً بتساوي المحدّد (D-167). وصار السلّمُ
    يتبدّل تحت ‏600px («--t-display» ‏٣٢ و«--t-h1» ‏٢٤)، فلا قاعدةَ يُخشى ترتيبُها. */
@@ -795,7 +870,9 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
 /* ‏والرمزُ في الزرّ ‏٢٠ (خطّة التصميم 3.4)، وفي سهم العودة ‏١٦ بجوار نصٍّ ‏١٥، وفي الرقاقة ‏١٤.
    **وSVG بلا قياسٍ في حاويةٍ مرنة يُرسَم ‏٠×‏٠** (D-167): هكذا غاب سهمُ «افتح في Drive» مرّة */
 .btn>svg,.btn-icon svg{width:var(--icon-md); height:var(--icon-md); flex:none}
-nav.back a>svg{width:var(--icon-sm); height:var(--icon-sm); flex:none}
+/* ‏**والاسمُ ليس أيقونة** (مراجعة D-196): «a>svg» كان يطابق «.wordmark» في بابِ اللوحة فيسحقه ‏١٦×١٦ —
+   مسارٌ نسبتُه ‏٣٫٢:١ يُرسَم شريطًا ارتفاعُه ‏٥px بين ‏600 و‏899؛ ويقيس «audit_mobile» نسبةَ كلّ اسمٍ مرسوم */
+nav.back a>svg:not(.wordmark){width:var(--icon-sm); height:var(--icon-sm); flex:none}
 a.chip>svg{width:var(--icon-xs); height:var(--icon-xs); flex:none; vertical-align:-.125em}
 /* ── المعطّل: «aria-disabled» يبقى في ترتيب التركيز فيُقرأ سببُه (خطّة التصميم 7.1) ──
    و«disabled» الأصليُّ للنماذج التي لم تُنقَل بعد. وكلاهما نصفُ شفافيّة، والسببُ نصٌّ تحته
@@ -1559,7 +1636,9 @@ nav.back{display:flex; flex-wrap:wrap; align-items:center; padding:var(--s-3) 0 
   border-bottom:var(--bd-soft); margin-bottom:var(--s-4); gap:var(--s-4)}
 nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2); text-decoration:none;
   display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); min-width:var(--tap)}
-@media(hover:hover){nav.back a:hover{color:var(--brand)}}
+/* ‏والتمريرُ لونٌ **وخطّ** (D-196): الحبرُ الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا، فاللونُ وحدَه لا يُرى */
+@media(hover:hover){nav.back a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:var(--ul-off);
+  text-decoration-thickness:var(--ul)}}
 
 .plat-logo{width:var(--s-12); height:var(--s-12); border-radius:var(--r-control); flex:none; display:grid; place-items:center;
   background:var(--surface); border:var(--bd); color:var(--ink);
@@ -2347,6 +2426,10 @@ nav.back .seg{margin-inline-start:auto}
   nav.tabs a[aria-current=page]{outline:var(--ul) solid Highlight; outline-offset:calc(-1 * var(--ul))}
   .st,.count,.toast-note,.card-alert{border-color:CanvasText}
   :focus-visible{outline-color:Highlight}
+  /* ‏**ولحظةُ العلامة بألوانها** (مراجعة D-196): النقشُ يرسم أرضَه سمةً لا تُفرَض («fill» في SVG)،
+     وأرضُ «.moment» تُفرَض Canvas ورمزُها CanvasText — فرُسم الرمزُ أسودَ على أرض النقش العميقة ‏١٫٤٦:١
+     في التباين العالي الفاتح. وأزواجُها مقيسةٌ في «MOMENT_PAIRS» (‏٧٫٥٨ فأكثر)، فتبقى كما هي */
+  .moment{forced-color-adjust:none}
 }
 
 /* ══ الحقولُ على اللمس ═══════════════════════════════════════════

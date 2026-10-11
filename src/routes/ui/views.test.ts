@@ -17,6 +17,11 @@ import { commandMore, commandTrigger } from './command'
 import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage, worthCell } from '../panelView'
+import { secondFactorPage } from '../authView'
+import { landingPage } from '../landing'
+import { runInNewContext } from 'node:vm'
+import { THEME_SCRIPT } from './scripts'
+import { serverErrorPage } from './errorView'
 import { STYLE } from './styles'
 import { sheet, type Decl, type Sheet } from '../../test/css'
 import { bar, fileName, glyph, pathArrows } from './parts'
@@ -40,7 +45,7 @@ import { SCRIPT } from './panelScript'
 import { imageReadiness, infographicReadiness, videoReadiness } from '../../lib/media/readiness'
 import { slideGate } from '../../lib/image/gate'
 import { videoCapGate } from '../../lib/limits'
-import { CQ, PRINT, THEME, atLeast, below, narrower } from './tokens'
+import { CQ, MARK, MOMENT, PRINT, THEME, atLeast, below, narrower } from './tokens'
 import { nativePost } from './nativePost'
 import { channelsSection } from './channels'
 import { viewChannels } from '../../lib/channels'
@@ -772,10 +777,10 @@ describe('الطبعةُ الثالثة (D-143)', () => {
  */
 describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)', () => {
   it('الحبرُ لونُ البنية نهارًا وليلًا، والنحاسُ يجتاز نصّا', () => {
-    // ‏والحبرُ حبرُ المتن نفسُه منذ D-187 (خطّة التصميم 3.2): كان ‏#1f2430 بجانب متنٍ ‏#191b1f
-    expect(css.rule(':root')).toMatchObject({ '--brand': '#16181d', '--on-brand': '#f7f5ef', '--au': '#7f6128' })
-    // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار
-    const NIGHT = { '--brand': '#e9e6de', '--on-brand': '#16181d' }
+    // ‏والزرُّ «الأخضرُ العميق» من لوحة الهويّة نهارًا، والذهبُ برونزٌ على هيولاه (D-196)
+    expect(css.rule(':root')).toMatchObject({ '--brand': '#0b2f31', '--on-brand': '#faf6f0', '--au': '#7b5e20' })
+    // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار — رملٌ بحبرٍ عميق
+    const NIGHT = { '--brand': '#e8e1d6', '--on-brand': '#0b2f31' }
     expect(css.rule(':root[data-theme="dark"]')).toMatchObject(NIGHT)
     expect(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)')).toMatchObject(NIGHT)
     // ‏الزمرّدُ المتقاعد لا يعود في قيمة — والتعليقُ الذي يؤرّخه لا يُسقط شيئًا
@@ -788,11 +793,23 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
       expect(Object.keys(css.rule('.rail', at)).filter((p) => p.startsWith('--')), at).toEqual([])
     }
     expect(css.where('.rail::after')).toEqual([])
-    // ‏والعلامةُ قيمةٌ واحدةٌ في كلّ ثيمٍ وفي الطباعة — وذهبُها ذهبُ الليل لا ثالثٌ (D-187)
-    expect(css.rule(':root')).toMatchObject({ '--mark-bg': '#16181d', '--mark-fg': THEME.dark['--au'] })
-    for (const [prop, value] of [['--mark-bg', '#16181d'], ['--mark-fg', '#d2b57c']] as const) {
+    // ‏والعلامةُ قيمةٌ واحدةٌ في كلّ ثيمٍ وفي الطباعة: **نعناعٌ على عمق** كأيقونة التطبيق في اللوحة
+    // ‏(D-196، وكانت حبرًا ونحاسًا). **ولا تساوي رمزًا آخر**: الذهبُ يُعَدّ بقيمتها، فرابطٌ أو حالٌ
+    // ‏بلونها يصير موضعَ ذهب — وذهبان لا ثلاثة، فليست ذهبًا أصلًا. والبُعدُ ΔE_OK في validate_contrast
+    expect(css.rule(':root')).toMatchObject({ '--mark-bg': MARK['--mark-bg'], '--mark-fg': MARK['--mark-fg'] })
+    expect(MARK).toEqual({ '--mark-bg': '#0b2f31', '--mark-fg': '#4cd1b6' })
+    for (const [prop, value] of Object.entries(MARK)) {
       expect(new Set(css.decls().filter((d) => d.prop === prop).map((d) => d.value)), prop).toEqual(new Set([value]))
     }
+    for (const mode of ['light', 'dark'] as const) {
+      for (const k of ['--link', '--ok', '--au', '--brand', '--selected', '--selection'] as const) {
+        expect(THEME[mode][k], `${mode} ${k}`).not.toBe(MARK['--mark-fg'])
+      }
+    }
+    // ‏**ولا رمزَ في الورقة كلِّها بقيمته أو بإحالةٍ إليه** (مراجعة D-196): كان الفحصُ على مفاتيح «THEME» وحدها،
+    // ‏فمرّ «--moment-accent» في «:root» بقيمة الشريط حرفًا — ونصٌّ بلونه على أبيض ‏١٫٨٩:١ لم يُسقط شيئًا
+    expect(found((d) => d.prop.startsWith('--') && d.prop !== '--mark-fg' &&
+      (d.value.toLowerCase() === MARK['--mark-fg'] || /^var\(\s*--mark-fg\s*\)$/.test(d.value)))).toEqual([])
     expect(css.rule('.glyph')).toMatchObject({ background: 'var(--mark-bg)', color: 'var(--mark-fg)' })
     expect(css.rule('nav.tabs a[aria-current=page]::before')).toMatchObject({ width: 'var(--stroke)', background: 'var(--au)' })
   })
@@ -808,9 +825,10 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     expect(css.rule('.card-alert')['border-inline-start']).toBe('var(--s-1) solid var(--ok)')
   })
   it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
-    expect(ICON_BYTES).toContain('c9a962')
-    expect(ICON_BYTES).toContain('14161c')
-    expect(ICON_BYTES).not.toContain('82c69e')
+    // ‏أيقونةُ التطبيق في اللوحة: مربّعٌ «أخضرُ عميق» مصمتٌ وشريطٌ نعناعيّ — لونا العلامة نفسُهما (D-196)
+    expect(ICON_BYTES).toContain(`fill="${MARK['--mark-bg']}"`)
+    expect(ICON_BYTES).toContain(`stroke="${MARK['--mark-fg']}"`)
+    expect(ICON_BYTES).not.toMatch(/linearGradient|c9a962|14161c|82c69e/)
     const html = shell('ت', '<p>x</p>', 'n1')
     // ‏وسمان بشرط الوضع من أرض الصفحة، لا حبرُ الهويّة في الوضعين (D-183)
     expect(html).toContain(`<meta name="theme-color" media="(prefers-color-scheme: light)" content="${THEME.light['--bg']}"`)
@@ -1226,7 +1244,7 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     // ‏والرمزُ بمقاسٍ من أربعة (خطّة التصميم 3.4 · D-189): ‏٢٠ في الزرّ، و‏١٦ بجوار نصٍّ ‏١٥،
     // ‏و‏١٤ في الرقاقة — وسهمُ المسار وحدَه بقدر حرف السطر («1em»)
     expect(css.rule('.btn>svg')).toMatchObject({ width: 'var(--icon-md)', height: 'var(--icon-md)' })
-    expect(css.rule('nav.back a>svg')).toMatchObject({ width: 'var(--icon-sm)', height: 'var(--icon-sm)' })
+    expect(css.rule('nav.back a>svg:not(.wordmark)')).toMatchObject({ width: 'var(--icon-sm)', height: 'var(--icon-sm)' })
     expect(css.rule('a.chip>svg')).toMatchObject({ width: 'var(--icon-xs)', height: 'var(--icon-xs)' })
     expect(css.rule('.arw svg')).toMatchObject({ width: '1em', height: '1em' })
     expect(css.where('.cmdk-open svg')).toEqual([])
@@ -1288,7 +1306,10 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
 
   it('التحذيرُ برتقاليٌّ بعيدٌ عن النحاس، ولا إطارَ مكتوبًا بلونه في الوسم', () => {
     expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fdf4ec'])
-    expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f08a3c', '#2a1b0f'])
+    // ‏**مجمَّدان** (D-196): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
+    // ‏(ΔE_OK ‏٩٫٥)؛ وأرضُ النهار والتحذيرُ عليها على الحدّ (‏4.5:1). من يدفئ الأرضَ أو يُميل التحذيرَ يبدّل هنا
+    expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f2823b', '#231206'])
+    expect(THEME.light['--bg']).toBe('#f9f4ec')
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
@@ -1308,12 +1329,12 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
   it('مربّعُ المنصّة والعلامةُ بحلقةٍ ليلًا، ونهارًا كما كانا', () => {
     expect(css.rule('.pf-logo')['box-shadow']).toBe('0 0 0 1px var(--logo-ring)')
     expect(css.rule('.glyph')['box-shadow']).toContain('0 0 0 1px var(--mark-ring)')
-    expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a4e59', '#4a4e59'])
+    expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a6362', '#4a6362'])
     expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line)'])
   })
 
   it('الرابطُ والزرُّ الهادئ بحبر «--link» وخطٍّ تحته', () => {
-    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#cbced4', '#b0c8f0'])
+    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#cad3d3', '#8ee0d0'])
     for (const s of ['.g-tog', '.setup>summary', '.history .bar-name', '.todo>li>a.btn']) {
       expect(css.rule(s), s).toMatchObject({ color: 'var(--link)', 'text-decoration': 'underline' })
     }
@@ -1396,18 +1417,20 @@ describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا ي
  */
 describe('المرحلة ٢أ — الرموز (D-187)', () => {
   it('اللوحةُ من القسم 3.2 قيمةً قيمة في الوضعين', () => {
+    // ‏اللوحةُ من لوحة الهويّة (D-196 · docs/BRAND.md): ورقٌ على رمل نهارًا، وأرضُ الغلاف ليلًا
     expect(THEME.light).toMatchObject({
-      '--bg': '#f6f5f1', '--surface': '#ffffff', '--surface-2': '#f1efe9', '--surface-3': '#e7e4dc',
-      '--line': '#d6d1c5', '--line-soft': '#e7e3da', '--field': '#8b8679',
-      '--ink': '#16181d', '--ink-2': '#40444c', '--ink-3': '#646871',
-      '--brand': '#16181d', '--brand-hover': '#2a2d34', '--brand-press': '#30333b', '--on-brand': '#f7f5ef',
-      '--link': '#24467e', '--selection': '#d3def2', '--au': '#7f6128',
-      '--ok': '#2d7a4f', '--ok-wash': '#edf6f0', '--bad': '#b3261e', '--bad-wash': '#fcefee',
+      '--bg': '#f9f4ec', '--surface': '#ffffff', '--surface-2': '#f1efeb', '--surface-3': '#e8e1d6',
+      '--line': '#d9d2c6', '--line-soft': '#e7e3db', '--field': '#718383',
+      '--ink': '#0a2021', '--ink-2': '#364748', '--ink-3': '#5a6969',
+      '--brand': '#0b2f31', '--brand-hover': '#113b3d', '--brand-press': '#154445', '--on-brand': '#faf6f0',
+      '--link': '#0e6b66', '--selection': '#cceae7', '--au': '#7b5e20',
+      '--ok': '#0e4304', '--ok-wash': '#edf8eb', '--bad': '#b3261e', '--bad-wash': '#fcefee',
     })
     expect(THEME.dark).toMatchObject({
-      '--line': '#343843', '--line-soft': '#262a32', '--field': '#676b76', '--ink-3': '#9ea2ac',
-      '--brand-hover': '#d9d5cb', '--brand-press': '#cdc8bc', '--on-brand': '#16181d',
-      '--selection': '#2b3b57', '--au': '#d2b57c', '--bad': '#f49595', '--bad-wash': '#2c1515', '--ok-wash': '#11251b',
+      '--bg': '#020f11', '--surface': '#041a1c', '--surface-2': '#082528', '--surface-3': '#0b2f31',
+      '--line': '#1e383a', '--line-soft': '#11282a', '--field': '#657b7b', '--ink-3': '#92a0a0',
+      '--brand': '#e8e1d6', '--brand-hover': '#dfd8cc', '--brand-press': '#d8d0c3', '--on-brand': '#0b2f31',
+      '--selection': '#103f3b', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#271111', '--ok-wash': '#0f1c0f',
     })
     // ‏ورموزُ ما قبل اللوحة لا تعود في أيّ سياق: لا سطحَ ثالثَ ولا حدَّ «أقوى» ولا مادّةَ ولا وهج
     for (const gone of ['--chrome', '--line-strong', '--brand-soft', '--brand-wash', '--glow', '--hair', '--sheen', '--bloom']) {
@@ -1437,14 +1460,14 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(css.rule('.dlg')).toMatchObject({ background: 'var(--dialog)', border: 'var(--bd)', 'box-shadow': 'var(--sh-3)' })
     expect(css.rule('.dlg::backdrop').background).toBe('var(--scrim)')
     // ‏والستارةُ من الثيم لا ثابتةٌ في الجذر (كانت واحدةً للوضعين، D-105)
-    expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(22,24,29,.45)', 'rgba(0,0,0,.65)'])
+    expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(6,26,28,.48)', 'rgba(1,8,9,.7)'])
   })
 
   it('ثلاثةُ ظلالٍ في الوضعين، والبطاقةُ التفاعليّةُ ترتفع بالثاني وحدَّها الوظيفيّ', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
     }
-    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.03)')
+    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(11,40,42,.07), 0 1px 1px rgba(11,40,42,.04)')
     expect(THEME.dark['--sh-3']).toBe('0 16px 40px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4)')
     expect(css.rule('.ch:hover', '@media(hover:hover)')).toMatchObject({
       'box-shadow': 'var(--sh-2)', 'border-color': 'var(--field)',
@@ -1477,16 +1500,23 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     const allowed = new Set(Object.values({ xs: 360, sm: 600, md: 900, lg: 1200 }).flatMap((v) => [v, v - 1]))
     expect([...widths('@media')].filter((w) => !allowed.has(w))).toEqual([])
     // ‏وحدُّ الحاوية من «CQ» وحدها (مراجعة D-187): الصفُّ يلتفّ بعرض قائمته لا بعرض الشاشة
-    expect([...widths('@container')].sort((a, b) => a - b)).toEqual([CQ.prow - 1, CQ.npRow - 1].sort((a, b) => a - b))
+    expect([...widths('@container')].sort((a, b) => a - b)).toEqual(Object.values(CQ).map((v) => v - 1).sort((a, b) => a - b))
     expect(SCRIPT).toContain(`matchMedia('${below('md')}')`)
   })
 
   it('النحاسُ في أدواره الثلاثة لا غير، بقيمته الكاملة', () => {
+    // ‏**والذهبُ بقيمته لا باسمه** (مراجعة D-196): كلُّ رمزٍ قيمتُه ذهبٌ أو إحالةٌ إليه ذهبٌ، فلا اسمَ ثانيًا له
+    const values = new Set(css.decls().filter((d) => d.prop === '--au' || d.prop === '--mark-fg').map((d) => d.value.toLowerCase()))
+    const aliases = css.decls().filter((d) => d.prop.startsWith('--') && d.prop !== '--au' && d.prop !== '--mark-fg' &&
+      (values.has(d.value.toLowerCase()) || /^var\(\s*--(au|mark-fg)\s*\)$/.test(d.value))).map((d) => d.prop)
+    expect(aliases).toEqual([])
     const copper = found((d) => /var\(--(au|mark-fg)\)/.test(d.value))
     expect(copper).toEqual([
       '.glyph{color:var(--mark-fg)}',
       'nav.tabs a[aria-current=page]::before{background:var(--au)}',
       '.grid>.tile:first-child .kv-v{color:var(--au)}',
+      // ‏والعلامةُ في لحظتها هي العلامة: دورٌ واحدٌ بمحدّدين، في القالب T6 وحده
+      '.moment-glyph{color:var(--mark-fg)}',
     ])
     // ‏والعلامةُ مرّةً في الشاشة: حيث الرافدةُ ظاهرةٌ يغيب بابُ اللوحة من شريط العودة
     expect(css.rule('.app nav.back .home', `@media${atLeast('md')}`).display).toBe('none')
@@ -1565,7 +1595,7 @@ describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
     for (const chain of classChains(post('linkedin'), 'np-tag')) expect(cascaded(chain, 'color')).toBe('var(--brand)')
     // ‏ولا سياقَ آخرَ يُعيد تلوينه — الطباعةُ ترسم المسرحَ أبيضَ بحبرٍ داكن من الرموز نفسِها
     expect(found((d) => d.at !== '' && d.prop === 'color' && d.selectors.some((s) => /\.np-tag\b/.test(s)))).toEqual([])
-    expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#16181d', '#0b0c10'])
+    expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#0b2f31', '#0b0c10'])
   })
 
   /**
@@ -1631,5 +1661,178 @@ describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
     // ‏ولا يُفرض على رابط العودة حدٌّ أقصى يقصّ نصَّه
     expect(found((d) => d.selectors.some((sel) => sel.startsWith('nav.back a')) &&
       /^(max-width|overflow|text-overflow|white-space)$/.test(d.prop))).toEqual([])
+  })
+})
+
+/**
+ * الهويّةُ من لوحتها (D-196 · docs/BRAND.md): ما تبدّل في الورقة مع الرموز — القمعُ بحبرٍ واحد
+ * والمميَّزةُ وحدَها بلون حالها، ورمزُ القسم الحاليّ وخطُّ العنوان بحبر الرابط، والقفلُ كما في اللوحة،
+ * ولحظةُ العلامة في القالب T6 وحده.
+ */
+describe('الهويّةُ من لوحتها (D-196)', () => {
+  it('القمعُ حبرٌ واحد، والمحطّةُ المميَّزةُ وحدَها بلون حالها — لا أرضَ تحذيرٍ على سطحٍ رمليّ (D-194 · D-196)', () => {
+    expect(css.rule('.fn-bar > span').background).toBe('var(--ink-2)')
+    expect(css.rule('.funnel li[data-focus][data-state=now] .fn-bar > span').background).toBe('var(--warn)')
+    expect(css.rule('.funnel li[data-state=now] a')).toEqual({})
+  })
+
+  it('رمزُ القسم الحاليّ وخطُّ عنوان الصفحة بحبر الرابط — لا ذهبَ رابعًا', () => {
+    expect(css.rule('nav.tabs a[aria-current=page] svg').color).toBe('var(--link)')
+    expect(css.rule('.page-head h1::after')).toMatchObject({ width: 'var(--s-6)', height: 'var(--stroke)', background: 'var(--link)' })
+    // ‏وتمريرُ شريط العودة لونٌ وخطّ: الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا
+    expect(css.rule('nav.back a:hover', '@media(hover:hover)')['text-decoration']).toBe('underline')
+  })
+
+  it('القفلُ كما في اللوحة: الاسمُ أوّلًا في الشيفرة فيقع الرمزُ يسارَه', () => {
+    const order = (html: string): boolean => html.indexOf('class="wordmark"') < html.indexOf('class="glyph')
+    expect(order(backNav('/panel', 'اللوحة'))).toBe(true)
+    const login = loginPage({}, 'n')
+    expect(login.indexOf('class="wordmark"')).toBeLessThan(login.indexOf('class="moment-glyph"'))
+  })
+
+  it('لحظةُ العلامة في الدخول مرّةً، بلا رمزٍ ثانٍ فوق النموذج، ومخفيّةٌ في الورق', () => {
+    const login = loginPage({}, 'n')
+    expect(login.match(/class="moment"/g)).toHaveLength(1)
+    expect(login).not.toContain('<div class="glyph">')
+    expect(login).toContain('أصوات اليوم .. لقرارات أفضل')
+    expect(css.rule('.moment', '@media print').display).toBe('none')
+    // ‏والنصُّ على العمق عاجيٌّ و«نعناعٌ فاتح» لا نعناع (‏Lc ‏٦٣ لحرفٍ صغير)
+    expect(css.rule('.moment-en').color).toBe('var(--moment-soft)')
+    expect(css.rule('.moment-line').color).toBe('var(--moment-ink)')
+    expect(css.rule(':root')).toMatchObject({ '--moment-soft': '#a7e9db', '--moment-ink': '#f4faf9' })
+    expect(css.rule(':root')['--moment-accent']).toBeUndefined()
+    expect(css.rule('.moment-glyph').color).toBe('var(--mark-fg)')
+  })
+})
+
+/** صفحاتُ لحظة العلامة بوجوهها كلِّها — القالب T6. */
+const T6_PAGES: ReadonlyArray<readonly [string, string]> = [
+  ['صفحة الهبوط (D-193)', landingPage('n')],
+  ['الدخول بمفتاح', loginPage({ passkeys: true }, 'n')],
+  ['الدخول بكلمة الإدارة', loginPage({}, 'n')],
+  ['الدخول موقوفًا', loginPage({ blocked: true, error: 'موقوف' }, 'n')],
+  ['العامل الثاني كاملًا', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true, hasTotp: true, hasRecovery: true, error: 'رمزٌ غير صحيح' }, 'n')],
+  ['العامل الثاني برمزٍ وحده', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: false, hasTotp: true, hasRecovery: false, error: null }, 'n')],
+  ['العامل الثاني بلا عامل', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: false, hasTotp: false, hasRecovery: false, error: null }, 'n')],
+]
+
+/**
+ * أسلافُ كلّ عنصرٍ يحقّق `hit` في وسمٍ مرسوم — اسمُ الوسم وسماتُه، من الجذر إليه. والوسمُ من
+ * قوالبنا فهو مغلقٌ صحيحًا (كـ`classChains`).
+ */
+function ancestry(html: string, hit: (tag: string, attrs: string) => boolean): Array<Array<{ tag: string, attrs: string }>> {
+  const out: Array<Array<{ tag: string, attrs: string }>> = []
+  const stack: Array<{ tag: string, attrs: string }> = []
+  const VOID = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr|path|rect|circle)$/i
+  for (const m of html.matchAll(/<(\/?)([a-z][a-z0-9-]*)([^>]*)>/gi)) {
+    const [, close, tag = '', attrs = ''] = m
+    if (close === '/') {
+      stack.pop()
+      continue
+    }
+    if (hit(tag, attrs)) out.push([...stack])
+    if (!VOID.test(tag) && !attrs.trimEnd().endsWith('/')) stack.push({ tag: tag.toLowerCase(), attrs })
+  }
+  return out
+}
+
+/**
+ * ‏**مراجعةُ D-196: ما كان يُحرَس في `npm run audit` وحده يُحرَس هنا** — لحظتان داخل نموذج العامل الثاني
+ * اجتازتا `npm run ci` كلَّه (‏2434 اختبارًا)، وقاعدةُ الموضع لا تحتاج متصفّحًا. وما يلي ممّا وجدته المراجعة.
+ */
+describe('مراجعةُ الهويّة (D-196)', () => {
+  it('لحظةٌ واحدةٌ في كلّ صفحة T6، ابنٌ مباشرٌ لـ.auth-split، ولا نقشَ في سطح عمل', () => {
+    const WORK = /^(form|table|dialog|nav|fieldset)$/
+    const WORK_ATTR = /\brole="(alert|status|dialog)"|\bclass="[^"]*\b(toast|toast-note|card-alert|kv-v)\b/
+    for (const [name, html] of T6_PAGES) {
+      expect(html.match(/class="moment"/g), name).toHaveLength(1)
+      const parents = classChains(html, 'moment').map((chain) => chain.at(-2))
+      expect(parents, name).toEqual([['auth-split']])
+      // ‏والنقشُ بعلامته على الـsvg نفسِه أو بغلافه — لا يقع في نموذجٍ ولا جدولٍ ولا تنبيهٍ ولا حال
+      const echoes = ancestry(html, (tag, attrs) => /\bdata-echo=/.test(attrs) || /\bclass="echo\b/.test(attrs))
+      expect(echoes.length, name).toBeGreaterThan(0)
+      for (const chain of echoes) {
+        const bad = chain.filter((a) => WORK.test(a.tag) || WORK_ATTR.test(a.attrs)).map((a) => a.tag)
+        expect(bad, name).toEqual([])
+        expect(chain.some((a) => /\bclass="moment"/.test(a.attrs)), name).toBe(true)
+      }
+      // ‏ولا حقلَ ولا نموذجَ داخل اللحظة: «لا شيءَ خلف حقل»
+      const inMoment = ancestry(html, (tag) => /^(form|input|select|textarea|table|button)$/i.test(tag))
+        .filter((chain) => chain.some((a) => /\bclass="moment"/.test(a.attrs)))
+      expect(inMoment, name).toEqual([])
+    }
+  })
+
+  it('صفحةُ ‏500 معلَّمةٌ سطحًا لا نقشَ فيه، فيردّ الحارسُ نقشًا تحتها', () => {
+    const page = serverErrorPage('n', 'r-1', null)
+    expect(page).toContain('<div data-no-echo="500">')
+    expect(page.indexOf('data-no-echo')).toBeLessThan(page.indexOf('حدث خطأ من جهتنا'))
+  })
+
+  it('السطرُ اللاتينيُّ زينةٌ لقارئ الشاشة كـ«SADA»، ويُكتب بحالته وتكبّره الورقة', () => {
+    const login = loginPage({}, 'n')
+    const en = /<p class="moment-en"([^>]*)>([^<]*)<\/p>/.exec(login)
+    expect(en?.[1]).toContain('aria-hidden="true"')
+    expect(en?.[1]).toContain('lang="en"')
+    expect(en?.[2]).not.toBe(en?.[2]?.toUpperCase())
+    expect(css.rule('.moment-en')['text-transform']).toBe('uppercase')
+    expect(login).toMatch(/class="moment-sada" aria-hidden="true"/)
+  })
+
+  it('السطرُ اللاتينيُّ سطرٌ واحدٌ يتباعد بقدر لوحته، والشريطُ بارتفاعه لا بنصيب الشاشة', () => {
+    expect(css.rule('.moment-en')).toMatchObject({ 'white-space': 'nowrap', 'text-align': 'end', 'letter-spacing': 'var(--ls-brand)' })
+    expect(css.rule('.moment-en', `@container moment ${narrower('momentBrand')}`)['letter-spacing']).toBe('var(--ls-eyebrow)')
+    expect(css.rule('.moment-en', `@container moment ${narrower('momentEyebrow')}`)['letter-spacing']).toBe('0')
+    expect(css.rule('.auth-split')['grid-template-rows']).toBe('auto 1fr')
+    for (const sel of ['.moment .echo', '.moment-line', '.moment-en']) {
+      expect(css.rule(sel, `@media${below('md')} and (max-height:40rem)`).display, sel).toBe('none')
+    }
+    expect(css.rule('.moment', `@media${below('md')} and (max-height:40rem)`)['min-height']).toBe('0')
+  })
+
+  it('لحظةُ العلامة بألوانها في التباين العالي: أرضُ النقش سمةٌ لا تُفرَض، فلا يُفرَض رمزُها', () => {
+    expect(css.rule('.moment', '@media(forced-colors:active)')['forced-color-adjust']).toBe('none')
+  })
+
+  it('اسمُ القفل في شريط العودة ليس أيقونة: «a>svg» لا يسحقه ‏16×16', () => {
+    const iconRules = found((d) => d.prop === 'width' && d.selectors.some((sel) => /^nav\.back a>svg/.test(sel)))
+    expect(iconRules.length).toBeGreaterThan(0)
+    for (const r of iconRules) expect(r).toContain(':not(.wordmark)')
+    expect(backNav('/panel', 'اللوحة')).toMatch(/<a class="home"[^>]*><svg class="wordmark"/)
+  })
+
+  it('شريطُ المتصفّح بأرض اللحظة دون «md» في صفحتَي اللحظة، وسكربتا الثيم لا يكتبان فوقه', () => {
+    const tag = `<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
+    for (const [name, html] of T6_PAGES) {
+      expect(html, name).toContain(tag)
+      // ‏الأوّلُ المطابِق هو الساري: يسبق وسمَي الوضعين
+      expect(html.indexOf(tag), name).toBeLessThan(html.indexOf('<meta name="theme-color" media="(prefers-color-scheme'))
+    }
+    expect(shell('ت', '<p>x</p>', 'n1')).not.toContain(MOMENT.ground)
+    // ‏ويُشغَّل سكربتُ الإقلاع بوضعٍ مختار: وسما الوضعين يتبعانه، ووسمُ اللحظة كما هو
+    const html = loginPage({}, 'n')
+    const boot = /<script nonce="n">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? ''
+    expect(boot).toContain('sada-theme')
+    const metas = [...html.matchAll(/<meta name="theme-color"([^>]*)>/g)].map(([, a = '']) => ({
+      media: /media="([^"]*)"/.exec(a)?.[1] ?? '', content: /content="([^"]*)"/.exec(a)?.[1] ?? '',
+      dataset: /data-c="([^"]*)"/.test(a) ? { c: /data-c="([^"]*)"/.exec(a)?.[1] } : {},
+    }))
+    const doc = {
+      documentElement: { dataset: {} as Record<string, string> },
+      querySelectorAll: (sel: string) => metas.filter((m) => !sel.includes('[data-c]') || m.dataset.c !== undefined),
+      getElementById: () => null,
+    }
+    for (const [script, run] of [
+      [boot, () => runInNewContext(boot, { document: doc, localStorage: { getItem: (k: string) => (k === 'sada-theme' ? 'dark' : null) } })],
+    ] as const) {
+      expect(script.length).toBeGreaterThan(0)
+      run()
+    }
+    expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.dark['--bg'], THEME.dark['--bg']])
+    // ‏ومبدّلُ الثيم كذلك: «ليليّ» ثمّ «النظام»
+    const box = { querySelectorAll: () => [] }
+    const doc2 = { ...doc, getElementById: () => box }
+    runInNewContext(THEME_SCRIPT, { document: doc2, localStorage: { getItem: () => 'light', setItem() {}, removeItem() {} } })
+    expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.light['--bg'], THEME.light['--bg']])
   })
 })

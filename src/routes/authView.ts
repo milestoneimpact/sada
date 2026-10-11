@@ -7,7 +7,7 @@
  * يُثبت عاملَه الثاني بعد.
  */
 import { escapeHtml, shell } from './panelView'
-import { GLYPH_SVG } from './ui/shell'
+import { brandMoment } from './ui/moment'
 import { notice, noticeText } from './ui/components/toast'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 
@@ -116,8 +116,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
 
   return shell(
     'صدى — العامل الثاني',
-    `<div class="wrap"><div class="auth">
-      <div class="glyph">${GLYPH_SVG}</div>
+    `<div class="auth-split">${brandMoment()}<div class="wrap"><div class="auth">
       <h1>خطوةٌ أخيرة</h1>
       <p class="lede">أثبتَّ كلمةَ الإدارة. وبقي ما يثبت أنّك أنت.</p>
       ${note}${nothing}
@@ -126,8 +125,9 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
       <form method="POST" action="/panel/2fa/cancel" class="cancel">
         ${hidden}<button class="btn btn-secondary btn-sm" type="submit">إلغاء والعودة</button></form>
       <footer>${escapeHtml(d.rpId)}</footer>
-    </div></div>`,
+    </div></div></div>`,
     nonce,
     SCRIPT,
+    { moment: true },
   )
 }

@@ -29,6 +29,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
+import { brandMoment } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
@@ -162,8 +163,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
   const action = next === '/panel' ? '/panel/login' : `/panel/login?next=${encodeURIComponent(next)}`
   return shell(
     'صدى — الدخول',
-    `<div class="wrap"><div class="auth">
-      <div class="glyph">${GLYPH_SVG}</div>
+    `<div class="auth-split">${brandMoment()}<div class="wrap"><div class="auth">
       <h1>لوحة التحكّم</h1>
       <p class="lede">${state.blocked === true
         ? 'الدخولُ موقوفٌ مؤقتًا لحماية اللوحة'
@@ -185,9 +185,10 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
         ? `<p class="lede"><a href="${escapeHtml(next)}">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>`
         : ''}
       <footer>الجلسة 8 ساعات</footer>
-    </div></div>`,
+    </div></div></div>`,
     nonce,
     `${NEXT_SCRIPT}${state.passkeys === true ? LOGIN_SCRIPT : ''}`,
+    { moment: true },
   )
 }
 

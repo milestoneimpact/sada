@@ -13,7 +13,8 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { htmlHeaders } from '../lib/security/headers'
 import { loadSession } from '../lib/session'
-import { shell, GLYPH_SVG } from './ui/shell'
+import { shell } from './ui/shell'
+import { brandMoment } from './ui/moment'
 import { LOGOS } from './ui/logos'
 
 export const landing = new Hono<{ Bindings: Env }>()
@@ -34,15 +35,25 @@ export function landingBody(): string {
     `<li><span class="land-n" aria-hidden="true">${['١', '٢', '٣'][i]}</span><span><b>${t}</b><span>${l}</span></span></li>`).join('')
   const pfs = PLATFORMS.map(([k, label]) =>
     `<li class="land-pf" role="img" aria-label="${label}" title="${label}">${LOGOS[k] ?? ''}</li>`).join('')
-  return `<div class="wrap"><main class="land">
-  <div class="glyph">${GLYPH_SVG}</div>
+  // ‏**والبابُ لحظةُ العلامة** (D-196): السطحُ العميقُ والنقشُ بجانب المحتوى لا خلفَه، كالدخول —
+  // ‏لحظةٌ واحدةٌ ابنٌ مباشرٌ لـ«.auth-split»، والرمزُ فيها فلا يُكرَّر فوق الاسم. والمحتوى كما كان.
+  return `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="land">
   <h1>صدى</h1>
   <p class="land-lede">تضع ملفّاتك، وصدى يكتب ويصمّم ويجدول — والقرارُ الأخيرُ لك.</p>
   <a class="btn btn-primary land-cta" href="/panel">ادخل إلى لوحتك</a>
   <ol class="land-steps">${steps}</ol>
   <ul class="land-pfs" aria-label="المنصّات">${pfs}</ul>
   <footer class="land-foot"><a class="tap" href="/privacy">سياسة الخصوصيّة</a><a class="tap" href="/terms">شروط الاستعمال</a></footer>
-</main></div>`
+</main></div></div>`
+}
+
+/** الصفحةُ كاملةً بغلافها — لحظةُ العلامة تطلب شريطَ المتصفّح بأرضها (`moment`). */
+export function landingPage(nonce: string): string {
+  return shell('صدى', landingBody(), nonce, '', {
+      indexable: true,
+      moment: true,
+      description: 'صدى: تضع ملفّاتك، وهو يكتب ويصمّم ويجدول على LinkedIn وX وYouTube وTikTok وInstagram — والقرارُ الأخيرُ لك.',
+    })
 }
 
 landing.get('/', async (c) => {
@@ -51,10 +62,7 @@ landing.get('/', async (c) => {
   }
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
   return new Response(
-    shell('صدى', landingBody(), nonce, '', {
-      indexable: true,
-      description: 'صدى: تضع ملفّاتك، وهو يكتب ويصمّم ويجدول على LinkedIn وX وYouTube وTikTok وInstagram — والقرارُ الأخيرُ لك.',
-    }),
+    landingPage(nonce),
     { headers: { ...htmlHeaders(nonce), 'Cache-Control': 'no-store', Vary: 'Cookie' } },
   )
 })

@@ -11,7 +11,7 @@ import { ICON } from './icons'
 import { segmented } from './components/tabs'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
-import { THEME } from './tokens'
+import { MARK, MOMENT, THEME, below } from './tokens'
 
 /**
  * الخطّ — **زوجُ Plex من أصلنا** (D-099 · D-185).
@@ -61,20 +61,18 @@ const FONT_PRELOAD = FACES
  * محتوًى تُوسَّع لتسمح به. و data: URI يعبر `img-src 'self' data:`
  * القائمة أصلا، ويظهر قبل أن يكتمل تحميل الصفحة.
  *
- * **والشكلُ من الهويّة لا من الذوق**: شريطُ صدى نفسه، بتدرّجه من
- * النحاس الداكن إلى الشمبانيا على أرضٍ من حبر (D-144). وحروفٌ في رمزٍ بستّةَ عشرَ بكسلا تُقرأ لطخةً —
- * والشريطُ يُقرأ عند كلّ قياس.
+ * **والشكلُ من الهويّة لا من الذوق**: أيقونةُ التطبيق في لوحة الهويّة — شريطُ صدى «أخضرُ
+ * فاتح» على مربّعٍ «أخضرَ عميق» مصمت (D-196)، **بلونَي العلامة نفسَيهما** (`MARK`)، فالتبويبُ
+ * والرافدةُ هويّةٌ واحدة. وكان تدرّجًا نحاسيًّا على حبر (D-144). **ومسطّحٌ بلا تدرّج**: التدرّجُ
+ * عند ‏١٦px لطخة، ونسخةُ المتصفّح المبسّطةُ من الأصل المتّجه تصل مع M-26. وحروفٌ في رمزٍ بستّةَ
+ * عشرَ بكسلا تُقرأ لطخةً — والشريطُ يُقرأ عند كلّ قياس.
  */
 const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
 
 const ICON_SVG = [
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48">',
-  '<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0">',
-  '<stop offset="0" stop-color="#6e5a33"/><stop offset=".55" stop-color="#c9a962"/>',
-  '<stop offset="1" stop-color="#f0dcae"/>',
-  '</linearGradient></defs>',
-  '<rect width="64" height="48" rx="11" fill="#14161c"/>',
-  '<path d="' + RIBBON + '" fill="none" stroke="url(#g)" stroke-width="11" ',
+  `<rect width="64" height="48" rx="11" fill="${MARK['--mark-bg']}"/>`,
+  `<path d="${RIBBON}" fill="none" stroke="${MARK['--mark-fg']}" stroke-width="11" `,
   'stroke-linecap="round"/>',
   '</svg>',
 ].join('')
@@ -142,6 +140,16 @@ export { escapeHtml }
 const THEME_COLOR = (['light', 'dark'] as const).map((mode) =>
   `<meta name="theme-color" media="(prefers-color-scheme: ${mode})" content="${THEME[mode]['--bg']}" data-c="${THEME[mode]['--bg']}">`).join('\n')
 
+/**
+ * ‏**وفي صفحتَي اللحظة يبدأ الشريطُ بلونها** (مراجعة D-196): دون «md» تبدأ صفحةُ الدخول والعاملِ الثاني
+ * بشريط اللحظة العميق في الثيمين، فكان شريطُ المتصفّح رمليًّا فوق كتلةٍ عميقة — فاصلٌ في لحظة العلامة
+ * الوحيدة. فوسمٌ ثالثٌ يسبق الوسمين (الأوّلُ المطابِق هو الساري) بشرط العرض، **وبلا «data-c»**: سكربتا
+ * الثيم يقرآن ما يحمل «data-c» وحده، فاختيارُ «ليليّ» لا يكتب فوقه — وأرضُ اللحظة واحدةٌ في الوضعين.
+ * ومن «md» فصاعدًا اللحظةُ لوحةٌ جانبيّة، فيعود الوسمان. (Safari ‏26 يأخذ اللونَ من أرض الصفحة لا من
+ * الوسم، فلا يصله هذا.)
+ */
+const MOMENT_COLOR = `<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
+
 const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
 ${THEME_COLOR}`
 
@@ -162,7 +170,7 @@ ${THEME_COLOR}`
 const THEME_BOOT = `
 try{var t=localStorage.getItem('sada-theme');
 if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;
-document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){
+document.querySelectorAll('meta[name="theme-color"][data-c]').forEach(function(m){
 m.content=t==='dark'?${JSON.stringify(THEME.dark['--bg'])}:${JSON.stringify(THEME.light['--bg'])};});}
 var d=localStorage.getItem('sada-density');
 if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
@@ -236,7 +244,7 @@ export function backNav(href: string, label: string): string {
    * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
   return `<nav class="back" aria-label="مسارُ العودة">
-    <a class="home" href="/panel" aria-label="صدى — اللوحة"><span class="glyph glyph-sm">${GLYPH_SVG}</span>${wordmark(false)}</a>
+    <a class="home" href="/panel" aria-label="صدى — اللوحة">${wordmark(false)}<span class="glyph glyph-sm">${GLYPH_SVG}</span></a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${themeSwitch()}
   </nav>`
@@ -300,6 +308,8 @@ export function shell(
     commands?: readonly Command[]
     /** صفحةُ اللوحة وحدَها تحمل سكربتَها أصلًا ببصمة (D-153) */
     panelScript?: boolean
+    /** صفحتا لحظة العلامة (القالب T6): شريطُ المتصفّح بأرض اللحظة دون «md» (`MOMENT_COLOR`) */
+    moment?: boolean
   } = {},
 ): string {
   const safeNonce = escapeHtml(nonce)
@@ -310,7 +320,7 @@ export function shell(
       ? ''
       : `\n<meta name="description" content="${escapeHtml(options.description)}">`
   }
-<title>${escapeHtml(title)}</title>
+<title>${escapeHtml(title)}</title>${options.moment === true ? `\n${MOMENT_COLOR}` : ''}
 ${FAVICON}
 <script nonce="${safeNonce}">${THEME_BOOT}</script>
 ${FONT_PRELOAD}
