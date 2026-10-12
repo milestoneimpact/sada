@@ -21,6 +21,7 @@ import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } fr
 import type { Peaks } from '../lib/schedule/peak'
 import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
+import { earliestLocal } from './ui/when'
 import { tabs } from './ui/components/tabs'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
@@ -1035,7 +1036,7 @@ ${pivotPane(d.pivot)}
     * ‏«اكتب مسوّدة» في الشاشة التاسعة على الهاتف، فضغط المالكُ «اعتمد» على مسوّدةٍ قديمة
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
-  ${pageHead('التحرير', sectionLabel('posts'), 'ما اقترحه صدى للأسبوع، وما كتبه ينتظر قرارك. <b>ولا يمرّ نصٌّ إلى قناةٍ قبل أن تعتمده أو تعدّله.</b>',
+  ${pageHead('التحرير', sectionLabel('posts'), '<b>لا يُنشر نصٌّ قبل أن تعتمده.</b>',
     `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
      <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
      <a class="btn btn-secondary btn-sm" href="#videos">ارفع فيديو</a>
@@ -1048,7 +1049,7 @@ ${pivotPane(d.pivot)}
     media: d.media,
     // أدنى موعدٍ يقبله المتصفّح: ربعُ ساعةٍ من الآن. ودورةُ الإرسال تدور
     // كلَّ ربع، فموعدٌ أقرب من ذلك يعد بدقّةٍ لا نملكها
-    earliest: new Date(d.now.getTime() + 15 * 60_000).toISOString().slice(0, 16),
+    earliest: earliestLocal(d.now, d.zone ?? null),
     now: d.now,
     ready: d.draftReady,
     blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null),

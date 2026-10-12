@@ -43,8 +43,25 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     if(!el&&/^[si]-./.test(id))el=document.getElementById('d-'+id.slice(2));
     return el;
   }
+  /*
+   * ‏**والمحرّرُ لا يُفتَح إلّا بطلب** (D-199). كان «?open=<id>» يبقى في العنوان بعد كلّ فعلٍ من المحرّر،
+   * ‏فالتحميلُ والرجوعُ والتنقّلُ بين الألواح يفتحه من جديد والمالكُ لم يطلبه. فيُرفَع من العنوان بعد أن
+   * ‏يُرسَم (والأفعالُ فيه تعيده بـ«from=editor»)، ويُطوى المحرّرُ متى انتقل المالكُ إلى غيره.
+   */
+  function shutEditor(){
+    var ed=document.getElementById('ed'); if(!ed)return;
+    var split=ed.parentElement, listEl=split&&split.querySelector('.posts-list');
+    if(listEl&&split.classList.contains('posts-split')){
+      while(listEl.firstChild)split.parentNode.insertBefore(listEl.firstChild,split);
+      split.parentNode.removeChild(split);
+    }else ed.parentNode.removeChild(ed);
+  }
+  if(/[?&]open=/.test(location.search)&&history.replaceState){
+    history.replaceState(null,'',location.pathname+location.search.replace(/([?&])open=[^&]*&?/,'$1').replace(/[?&]$/,'')+location.hash);
+  }
   function show(id,push,focus){
     if(first===null)return;
+    if(focus&&!/^ed(-|$)/.test(id))shutEditor();
     var asked=id;
     // ‏ومرساةُ ما في اللوح تفتح لوحَها ثمّ تنزل إليها: فعلٌ يعود إلى البطاقة
     // ‏لا إلى رأس لوحٍ طولُه آلافُ البكسلات. وكانت «#d-…» وحدَها، فـ«#videos»
@@ -759,20 +776,19 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   });
 
   /*
-   * «الموعدُ يُكتب UTC ويُقرأ بتوقيت المالك» (D-089).
+   * «الموعدُ يُكتب ويُقرأ بتوقيت المالك» (D-089 · D-199).
    *
-   * الخادمُ يقرأ الصندوقَ UTC ولا يعرف منطقةَ أحد — وهذا صواب: منطقةٌ
-   * تُخزَّن في إعدادٍ تُنسى فتكذب بعد سفرٍ أو تحوّلٍ صيفيّ. فالتحويلُ
-   * هنا، حيث المنطقةُ معروفةٌ يقينا وتُقرأ لحظتَها.
+   * الصندوقُ ‹local› بساعة المتصفّح، والخادمُ يحوّله بمنطقة كعكته («readWhen»)،
+   * وهي منطقةُ المتصفّح نفسِه تُكتب عند كلّ تحميل. فلا يرى المالكُ UTC ولا يحوّل في رأسه.
    *
    * «والدوالُّ الثلاثُ خالصة»: تأخذ لحظةً وتردّ لحظةً، ولا تمسّ صفحةً
    * ولا شبكة. فهي تُنتزَع من هذا النصّ عينِه وتُختبَر — كما يُنتزَع
    * العدّاد (D-071). ونسخةٌ ثانيةٌ في الاختبار تفترق بلا حارس.
    */
   function pad2(n){return (n<10?'0':'')+n;}
-  function utcBox(d){
-    return d.getUTCFullYear()+'-'+pad2(d.getUTCMonth()+1)+'-'+pad2(d.getUTCDate())
-      +'T'+pad2(d.getUTCHours())+':'+pad2(d.getUTCMinutes());
+  function localBox(d){
+    return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())
+      +'T'+pad2(d.getHours())+':'+pad2(d.getMinutes());
   }
   function localAt(now,days,hour){
     var d=new Date(now.getTime());
@@ -795,14 +811,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   function boxToDate(v){
     var m=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(v||'');
     if(!m)return null;
-    var d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));
+    var d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
     /*
      * «والشكلُ ليس صحّة»: «2026-13-40T99:99» يوافق النمطَ، و«Date.UTC»
      * يدحرجه إلى فبراير ٢٠٢٧ — «فتقول المرآةُ تاريخا واثقا لا علاقةَ له
      * بما كُتب». فيُقارَن الذهابُ بالإياب: ما لم يُعِد الرقمَ نفسَه فليس
      * لحظةً، وصمتٌ خيرٌ من رقمٍ يُصدَّق.
      */
-    return utcBox(d)===v.slice(0,16)?d:null;
+    return localBox(d)===v.slice(0,16)?d:null;
   }
 
   document.querySelectorAll('.quick').forEach(function(bar){
@@ -814,19 +830,18 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var at=boxToDate(field.value);
       if(at===null){mirror.textContent='';return;}
       /*
-       * «والرقمان حاضران معا»: الصندوقُ UTC والمرآةُ محلّيّة. ومَن
-       * أظهر واحدا وأخفى الآخر جعل المالكَ يحوّل ذهنيّا كما كان.
+       * والمرآةُ تقول ما اختاره الزرُّ بالكلام، والصندوقُ في طيّة «موعدٌ آخر» (D-199).
        */
       try{
         mirror.textContent='= '+at.toLocaleString('ar-u-nu-latn',{weekday:'long',day:'numeric',
-          month:'long',hour:'numeric',minute:'2-digit'})+' بتوقيتك';
+          month:'long',hour:'numeric',minute:'2-digit'});
       }catch(e){mirror.textContent='';}
     }
     bar.querySelectorAll('[data-preset]').forEach(function(btn){
       btn.addEventListener('click',function(){
         var at=preset(new Date(),btn.dataset.preset);
         if(at===null)return;
-        field.value=utcBox(at);
+        field.value=localBox(at);
         reflect();
       });
     });

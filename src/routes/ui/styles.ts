@@ -1463,7 +1463,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pc-body{display:flex; align-items:flex-start; gap:var(--s-4)}
 .pc-text{flex:1; min-width:0; margin:0; font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink);
-  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden}
+  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden}
 .pc-thumb{flex:none; width:var(--s-16); height:var(--s-16); border-radius:var(--r-control);
   object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
 .pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;
@@ -1718,6 +1718,28 @@ summary{min-height:var(--tap); display:flex; align-items:center}
   border-top:var(--bd)}
 .quick .mirror{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
   direction:rtl; unicode-bidi:isolate}
+/* ── الطيّ (D-199): ما يُبَتّ به ظاهر، وما سواه يُطلَب ─────────────────────────────────
+   شريطُ الجدولة سطرُ أزرارٍ و«جدوِل»، والحقلُ الحرُّ في «موعدٌ آخر». */
+.sched .quick{margin-top:0; padding-top:0; border-top:0}
+.sched .quick .mirror:empty{display:none}
+.sched .quick .mirror{flex-basis:100%}
+.sched-more{flex:1 0 100%}
+.sched-more > summary,.spread > summary{cursor:pointer; min-height:var(--tap); display:flex; align-items:center; gap:var(--s-2);
+  color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+.sched-more[open] > summary{margin-bottom:var(--s-2)}
+.sched-more > * + *{margin-top:var(--s-2)}
+/* «وزّع المعتمَد» سطرٌ هادئ: شارةُ العدد و«وزّعها»، والنموذجُ تحته حين يُطلَب */
+.spread{padding:var(--s-1) var(--s-4); margin-bottom:var(--s-3)}
+.spread > summary{color:var(--ink)}
+.spread-go{pointer-events:none}
+.spread[open] .spread-go{visibility:hidden}
+.spread-form{display:flex; flex-direction:column; gap:var(--s-3); padding-block:var(--s-2) var(--s-3)}
+/* «؟» جملةُ القيد حين تُطلَب: زرٌّ دائريٌّ بحجم اللمس، والجملةُ سطرٌ كاملٌ تحته */
+.why-tip{flex:none}
+.why-tip > summary{cursor:pointer; display:grid; place-items:center; width:var(--tap); height:var(--tap);
+  border-radius:50%; border:var(--bd); color:var(--ink-2); font-weight:600}
+@media(hover:hover){.why-tip > summary:hover{background:var(--surface-2)}}
+.lede-row:has(.why-tip[open]) .why-tip{flex-basis:100%; order:9}
 /* لوحُ المراجعة — مطويٌّ عمدا (D-090): ملحوظاتُ ذوقٍ لا تزاحم النصَّ
    حتّى تُطلَب، «ولا شارةَ حمراء» فتُقرأ عطلا. */
 .notes{margin-bottom:var(--s-2); border:var(--bd);
