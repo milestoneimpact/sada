@@ -2600,7 +2600,8 @@ panel.post('/panel/drafts/spread', async (c) => {
   const plan = planSpread(
     drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
-    readStart(gate.form.get('start'), now),
+    // ‏وأوّلُ موعدٍ بتوقيت المالك من اللوحة (`local`، D-199)، أو `start` بـ UTC كما يُرسله شريطُ الشاشة
+    readStart(readWhen(gate.form, zoneOf(c.req.header('Cookie') ?? null), now) || gate.form.get('start'), now),
     gap,
     now,
   )

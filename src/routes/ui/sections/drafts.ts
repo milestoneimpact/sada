@@ -36,6 +36,7 @@ import { CLIP_PLATFORMS } from '../../../lib/platform/needs'
 import { missingMedia } from '../../../lib/schedule/media'
 import { escapeHtml } from '../escape'
 import { whenTag } from '../time'
+import { whenField } from '../when'
 import type { Peaks } from '../../../lib/schedule/peak'
 import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
 import { momentLabel } from '../../../lib/time/local'
@@ -233,27 +234,37 @@ function scheduler(
     </div>`
   }
 
+  /*
+   * ‏**والظاهرُ سطرٌ واحد** (D-199): الحسابُ إن تعدّد، وأزرارُ الموعد بتوقيت المالك، و«جدوِل». والحقلُ
+   * ‏الحرُّ في طيّة «موعدٌ آخر» بتوقيته (`local` تقرؤه `readWhen` بمنطقة كعكته)، فلا يرى المالكُ حقلَ
+   * ‏‹mm/dd/yyyy› ولا كلمةَ UTC ما لم يطلبهما. والمرآةُ تقول ما اختاره الزرّ.
+   */
   const id = d.id.slice(0, 8)
-  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
-    <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-    <div class="field"><label for="ac-${id}">الحساب</label>
+  const account = fit.length === 1
+    ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">`
+    : `<div class="field"><label for="ac-${id}">الحساب</label>
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
-        .join('')}</select></div>
-    <div class="field"><label for="wh-${id}">الموعد (UTC)</label>
-      <input id="wh-${id}" name="when" type="datetime-local" data-when
-        min="${escapeHtml(earliest)}" required></div>
-    <span class="grow"></span>
-    <button class="btn btn-primary btn-sm" type="submit">جدوِل</button>
+        .join('')}</select></div>`
+  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+    <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+    ${account}
     <div class="quick" data-quick="wh-${id}">
       ${QUICK.map(
         (q) =>
           `<button class="btn btn-secondary btn-sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
       ).join('')}
       <span class="grow"></span>
-      <span class="mirror mono" data-mirror="wh-${id}"></span>
+      ${fit.length === 1 ? `<span class="ago">على <bdi>${escapeHtml(fit[0]!.label)}</bdi></span>` : ''}
+      <button class="btn btn-primary btn-sm" type="submit">جدوِل</button>
+      <span class="mirror" data-mirror="wh-${id}"></span>
     </div>
-    ${peakLine(peaks)}
+    <details class="sched-more"><summary>موعدٌ آخر</summary>
+      <div class="field"><label for="wh-${id}">اليوم والساعة بتوقيتك</label>
+        <input id="wh-${id}" name="local" type="datetime-local" data-when data-local
+          min="${escapeHtml(earliest)}"></div>
+      ${peakLine(peaks)}
+    </details>
   </form>`
 }
 
@@ -1136,16 +1147,22 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    * المسوّداتُ المنتظرة، ثمّ التوزيعُ إن كان له ما يُوزَّع، ثمّ الكتابةُ من
    * مصدر، والخطّةُ بعدها في اللوح.
    */
+  /*
+   * ‏**والفرزُ أوّلًا تحت تبويبات القسم، قبل أيّ نموذج** (D-199): كان «وزّع المعتمَد» نموذجًا كاملًا يتصدّر
+   * ‏القائمة وتبويباتُ الفرز تحته. فصار السطرُ: العنوانُ وعددُ ما ينتظر و«؟» تحمل جملةَ القيد، ثمّ الفرز،
+   * ‏ثمّ التوزيعُ سطرًا مطويًّا، ثمّ البطاقات.
+   */
   const list = `${bulk}
   <div class="lede-row">
     <h3 class="sec bare">المسوّدات</h3>
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
-    <span class="lede-note">الاعتمادُ يفتح بابَ الطابور ولا يعبره:
-      <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</span>
+    <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
+      <p class="hint m-0">الاعتمادُ يفتح بابَ الطابور ولا يعبره: <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</p>
+    </details>
   </div>
-  ${spreadBar(input)}
   ${filterTabs(drafts)}
+  ${spreadBar(input)}
   ${keys}
   ${cards}
   ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}`
@@ -1179,29 +1196,23 @@ function spreadBar(input: DraftsInput): string {
   ).length
   if (ready < 2) return ''
 
-  return `<form class="card" method="POST" action="/panel/drafts/spread">
-    <div class="card-head"><h2>وزّع المعتمَد</h2>
-      <div class="grow"></div>
-      ${statusBadge('ok', '●', `${ready} جاهزةً للتوزيع`)}</div>
-    <p class="hint">موعدٌ للأولى وفاصلٌ بين كلِّ اثنتين — <b>ويُعرَض الجدولُ كاملا
-      قبل أن يقع منه شيء</b>.</p>
-    <div class="row">
-      <div class="field"><label for="sp-start">أوّلُ موعد (UTC)</label>
-        <input id="sp-start" name="start" type="datetime-local" data-when
-          min="${escapeHtml(input.earliest)}" required></div>
-      <div class="field"><label for="sp-gap">الفاصل (ساعة)</label>
-        <input id="sp-gap" name="gap" type="number" inputmode="numeric"
-          min="1" max="168" value="24" required></div>
-      <span class="grow"></span>
-      <button class="btn btn-primary" type="submit">اعرض الجدول</button>
-    </div>
-    <div class="quick" data-quick="sp-start">
-      ${QUICK.map(
-        (q) =>
-          `<button class="btn btn-secondary btn-sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
-      ).join('')}
-      <span class="grow"></span>
-      <span class="mirror mono" data-mirror="sp-start"></span>
-    </div>
-  </form>`
+  /*
+   * ‏**سطرٌ هادئٌ لا نموذجٌ يتصدّر القائمة** (D-199): «2 جاهزةٌ للتوزيع · وزّعها» طيّةٌ مغلقة، وتحتها
+   * ‏أوّلُ موعدٍ بأزرارٍ يحسبها الخادمُ بتوقيت المالك (`whenField` المحرّر نفسُه) والفاصل. فلا حقلَ
+   * ‏‹mm/dd/yyyy› ولا UTC في أوّل ما يراه، ويُعرَض الجدولُ كاملًا قبل أن يقع منه شيء كما كان.
+   */
+  return `<details class="card card-inset spread" id="spread">
+    <summary>${statusBadge('ok', '●', `${ready} جاهزةٌ للتوزيع`)}<span class="grow"></span><span class="btn btn-secondary btn-sm spread-go">وزّعها</span></summary>
+    <form id="spread-form" class="spread-form" method="POST" action="/panel/drafts/spread">
+      ${whenField('spread-form', input.zone ?? null, input.now, undefined, 'أوّلُ موعد')}
+      <div class="row">
+        <div class="field"><label for="sp-gap">بين كلِّ اثنتين (ساعة)</label>
+          <input id="sp-gap" name="gap" type="number" inputmode="numeric"
+            min="1" max="168" value="24" required></div>
+        <span class="grow"></span>
+        <button class="btn btn-primary" type="submit">اعرض الجدول</button>
+      </div>
+      <p class="hint m-0">يُعرَض الجدولُ كاملًا قبل أن يقع منه شيء.</p>
+    </form>
+  </details>`
 }

@@ -420,13 +420,13 @@ describe('الإشعارُ العائم', () => {
  * **ونسخةٌ ثانيةٌ في الاختبار تفترق بلا حارس** (D-071).
  */
 function clientPresets(): {
-  utcBox: (d: Date) => string
+  localBox: (d: Date) => string
   preset: (now: Date, kind: string) => Date | null
   boxToDate: (v: string) => Date | null
 } {
   const parts = [
     /function pad2\(n\)\{[\s\S]*?\}\n/.exec(SCRIPT),
-    /function utcBox\(d\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
+    /function localBox\(d\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
     /function localAt\(now,days,hour\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
     /function preset\(now,kind\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
     /function boxToDate\(v\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
@@ -435,12 +435,12 @@ function clientPresets(): {
     throw new Error('لم تُعثَر دوالُّ المواعيد في نصّ اللوحة — أنُقلت أم أُعيدت تسميتُها؟')
   }
   return new Function(
-    `${parts.map((p) => p![0]).join('')}\nreturn {utcBox:utcBox,preset:preset,boxToDate:boxToDate};`,
+    `${parts.map((p) => p![0]).join('')}\nreturn {localBox:localBox,preset:preset,boxToDate:boxToDate};`,
   )() as ReturnType<typeof clientPresets>
 }
 
 describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
-  const { utcBox, preset, boxToDate } = clientPresets()
+  const { localBox, preset, boxToDate } = clientPresets()
 
   it('«بعد ساعة» ساعةٌ بالضبط', () => {
     const now = new Date('2026-09-07T10:17:33Z')
@@ -478,8 +478,8 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
     expect(after.getHours()).toBe(20)
   })
 
-  it('والصندوقُ يُكتب UTC — والصيغةُ هي التي يقرؤها الخادم', () => {
-    const box = utcBox(new Date(Date.UTC(2026, 8, 7, 6, 5)))
+  it('والصندوقُ يُكتب بتوقيت المتصفّح (D-199) — والصيغةُ هي التي يقرؤها الخادم', () => {
+    const box = localBox(new Date(2026, 8, 7, 6, 5))
     expect(box).toBe('2026-09-07T06:05')
     expect(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(box)).toBe(true)
   })
@@ -487,7 +487,7 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
   it('وما كُتب يُقرأ كما كُتب — ذهابا وإيابا', () => {
     for (const kind of ['hour', 'tonight', 'tomorrow', 'sunday']) {
       const at = preset(new Date(2026, 8, 7, 14, 22, 0), kind)!
-      const back = boxToDate(utcBox(at))!
+      const back = boxToDate(localBox(at))!
       // الصندوقُ بدقّة الدقيقة، فالثواني تسقط ولا شيءَ غيرها
       expect(Math.abs(back.getTime() - at.getTime())).toBeLessThan(60_000)
     }
@@ -503,7 +503,7 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
 describe('شريطُ المواعيد في الصفحة', () => {
   it('الأزرارُ تملأ الحقلَ الذي يُرسَل — لا حقلا آخر', () => {
     expect(SCRIPT).toContain("document.getElementById(bar.dataset.quick)")
-    expect(SCRIPT).toContain('field.value=utcBox(at)')
+    expect(SCRIPT).toContain('field.value=localBox(at)')
   })
 
   it('والمرآةُ تُحدَّث على الكتابة اليدويّة كذلك', () => {

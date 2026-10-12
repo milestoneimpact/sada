@@ -3217,11 +3217,13 @@ describe('توزيعُ المعتمَد على أيّام', () => {
     const cookie = await login()
 
     const one = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(one).not.toContain('وزّع المعتمَد')
+    expect(one).not.toContain('id="spread"')
 
     await seedApproved()
     const two = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(two).toContain('وزّع المعتمَد')
+    // ‏سطرٌ مطويٌّ لا نموذجٌ مفتوح (D-199)
+    expect(two).toContain('<details class="card card-inset spread" id="spread">')
+    expect(two).toContain('2 جاهزةٌ للتوزيع')
   })
 
   it('ويُسجَّل في الدفتر ما وقع — لا ما طُلب', async () => {
@@ -3244,6 +3246,90 @@ describe('توزيعُ المعتمَد على أيّام', () => {
       .first<{ target: string; detail: string }>()
     expect(audit?.target).toBe('2')
     expect(audit?.detail).toBe('done:2')
+  })
+
+  /*
+   * ‏**مطويّةٌ، والأساسُ أوّلًا** (D-199): المحرّرُ لا يُفتَح إلّا بـ«?open=»، و«وزّع المعتمَد» سطرٌ مطويّ،
+   * ‏والفرزُ قبله، ولا UTC ولا ‹mm/dd› فيما يراه المالكُ قبل أن يفتح شيئًا.
+   */
+  describe('الطيّ (D-199)', () => {
+    /** ما يُرى من قسم «المسوّدات» قبل أيّ نقرة: بلا طيّاتٍ مغلقة ولا مخفيٍّ ولا سكربت ولا وسوم. */
+    function seen(html: string): string {
+      let part = html.slice(html.indexOf('id="sub-list"'), html.indexOf('id="sub-write"'))
+      part = part.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '')
+      const shut = /<details(?![^>]*\sopen)[^>]*>(?:(?!<details)[\s\S])*?<\/details>/g
+      for (let before = ''; before !== part;) { before = part; part = part.replace(shut, '') }
+      return part
+    }
+
+    it('المحرّرُ مغلقٌ ما لم يُطلَب بـ«?open=»', async () => {
+      const id = await seedApproved()
+      await seedAccount()
+      const cookie = await login()
+      const plain = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(plain).not.toContain('id="ed"')
+      expect(plain).not.toContain('posts-split')
+      const asked = await (await app.request(`/panel?open=${id}`, withSession(cookie), env)).text()
+      expect(asked).toContain('id="ed"')
+    })
+
+    it('و«?open=» يُرفَع من العنوان بعد الرسم، والمحرّرُ يُطوى بالتنقّل عنه', async () => {
+      const { SCRIPT } = await import('./ui/panelScript')
+      expect(SCRIPT).toContain('function shutEditor()')
+      expect(SCRIPT).toContain('if(focus&&!/^ed(-|$)/.test(id))shutEditor();')
+      expect(SCRIPT).toMatch(/history\.replaceState\(null,'',location\.pathname\+location\.search\.replace\(\/\(\[\?&\]\)open=/)
+    })
+
+    it('و«وزّع المعتمَد» سطرٌ مطويٌّ تحت الفرز، ونموذجُه لا يُرى قبل فتحه', async () => {
+      await seedApproved()
+      await seedApproved()
+      await seedAccount()
+      const cookie = await login()
+      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      const fold = html.slice(html.indexOf('id="spread"'), html.indexOf('</details>', html.indexOf('id="spread"')))
+      expect(html).toContain('<details class="card card-inset spread" id="spread">')
+      expect(fold).toContain('وزّعها')
+      expect(fold).toContain('name="preset"')
+      expect(html.indexOf('id="draft-filter"')).toBeLessThan(html.indexOf('id="spread"'))
+      expect(seen(html)).not.toContain('action="/panel/drafts/spread"')
+    })
+
+    it('ولا UTC ولا ‹mm/dd› ولا حقلُ تاريخٍ فيما يُرى قبل الفتح', async () => {
+      await seedApproved()
+      await seedApproved()
+      await seedAccount()
+      const cookie = await login()
+      const view = seen(await (await app.request('/panel', withSession(cookie), env)).text())
+      expect(view).toContain('جدوِل')
+      expect(view).not.toContain('UTC')
+      expect(view.toLowerCase()).not.toContain('mm/dd')
+      expect(view).not.toContain('type="datetime-local"')
+    })
+
+    it('والطيُّ يُفتَح ولا يُسقط شيئًا: الحقلُ الحرُّ في «موعدٌ آخر» بتوقيت المالك', async () => {
+      const id = await seedApproved()
+      await seedAccount()
+      const cookie = await login()
+      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      const form = html.slice(html.indexOf(`id="s-${id}"`), html.indexOf('</form>', html.indexOf(`id="s-${id}"`)))
+      expect(form).toContain('<details class="sched-more"><summary>موعدٌ آخر</summary>')
+      expect(form).toContain('name="local" type="datetime-local"')
+      expect(form).not.toContain('(UTC)')
+      expect(form).toContain('name="_csrf"')
+    })
+
+    it('والتوزيعُ يقرأ أوّلَ موعدٍ زرًّا بتوقيت المالك', async () => {
+      await seedApproved()
+      await seedApproved()
+      await seedAccount()
+      const cookie = await login()
+      const body = new FormData()
+      body.set('preset', 'tomorrow')
+      body.set('gap', '24')
+      const res = await app.request('/panel/drafts/spread', withSession(cookie, { method: 'POST', body }), env)
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('كلُّ 24 ساعةً')
+    })
   })
 })
 
@@ -4078,7 +4164,9 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     const ytPost = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'youtube'`).get() as { id: string }
     const board = await (await app.request('/panel', withSession(cookie), env)).text()
     const ytCard = board.slice(board.indexOf(`id="d-${ytPost.id}"`), board.indexOf('</form>', board.indexOf(`id="s-${ytPost.id}"`)))
-    expect(ytCard).toContain('<option value="acc-yt">قناة عمر · YouTube</option>')
+    // ‏وحسابٌ واحدٌ سطرٌ لا قائمة (D-199)
+    expect(ytCard).toContain('<input type="hidden" name="account" value="acc-yt">')
+    expect(ytCard).toContain('على <bdi>قناة عمر · YouTube</bdi>')
     expect(ytCard).not.toContain('Community Management API')
     const yt = await flashFor('youtube', 'acc-yt')
     expect(yt).toContain('جُدولت')
