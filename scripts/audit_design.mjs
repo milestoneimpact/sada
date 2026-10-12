@@ -531,6 +531,10 @@ for (const file of pages) {
         for (const el of document.querySelectorAll(sel)) {
           if (el.__kb === undefined) el.__kb = `e${n += 1}`
           if (el.disabled || el.closest('[inert], [hidden], [data-palette]') !== null) continue
+          // ‏ومجموعةُ الأزرار الدائريّة وقفةٌ واحدةٌ لـ Tab وأسهمٌ بين أفرادها (HTML): المحدَّدُ منها يُبلَغ، وأخواتُه
+          // ‏بالأسهم لا بـ Tab. فلا يُعَدّ غيرُ المحدَّد «لا يُبلَغ» حين في مجموعته محدَّد («متى يُنشر؟»، D-198)
+          if (el.type === 'radio' && !el.checked && el.name !== '' &&
+            [...document.querySelectorAll('input[type=radio]')].some((o) => o.name === el.name && o.form === el.form && o.checked)) continue
           const r = el.getBoundingClientRect()
           // ورابطُ التخطّي مقصوصٌ حتّى يُركَّز — مرئيٌّ بالقصد لا بالصندوق
           if (!(r.width > 0 && r.height > 0) && !el.classList.contains('skip')) continue

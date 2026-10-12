@@ -463,18 +463,11 @@ const R9: Journey = {
     const was = status(stack, id)?.scheduled_at
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     await m.tap(button(page.locator('#posts, main'), /^مجدولة/), 'تبويب «مجدولة»')
-    const pull = page.locator(`form[action="/panel/drafts/unschedule"]:has(input[name="id"][value="${id}"])`)
-    await m.tap(button(pull, 'اسحب الموعد'), '«اسحب الموعد»', { key: true })
-    m.mark('unscheduled')
-    m.note(`لا «غيّر الموعد»: التغييرُ سحبٌ ثمّ جدولةٌ من جديد · بعد السحب: ${status(stack, id)?.status ?? '—'}`)
-    const form = scheduleForm(page, id)
-    if ((await visible(form).count()) === 0) {
-      // ‏التبويبُ «مجدولة» لا يعرضه بعد السحب — يعود إلى «الكلّ»
-      const allTab = button(page.locator('#posts, main'), /^الكلّ/)
-      if ((await allTab.count()) > 0) await m.tap(allTab, 'تبويب «الكلّ»')
-    }
-    await m.tap(button(form, 'الأحد 9ص'), '«الأحد 9ص»')
-    await m.tap(button(form, 'جدوِل'), '«جدوِل»')
+    // ‏«افتح» على بطاقتها ← المحرّرُ المركّز، و«الأحد 9:00 ص» بتوقيت المالك، و«غيّر الموعد» بلا سحبٍ (D-198)
+    await m.tap(visible(page.locator(`#d-${id} a[data-edit]`)).first(), '«افتح» على المجدولة', { key: true })
+    await m.tap(visible(page.locator('#ed label.when-opt').filter({ hasText: 'الأحد' })).first(), '«الأحد 9:00 ص»')
+    await m.tap(button(page.locator('#ed'), 'غيّر الموعد'), '«غيّر الموعد»')
+    m.mark('rescheduled')
     const row = status(stack, id)
     return {
       success: row?.status === 'queued' && row.scheduled_at !== was,

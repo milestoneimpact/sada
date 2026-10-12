@@ -20,6 +20,7 @@ import { channelsSection } from './ui/channels'
 import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
+import { editorPane } from './ui/sections/editor'
 import { tabs } from './ui/components/tabs'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
@@ -304,6 +305,8 @@ export interface PanelData {
   }[]
   readonly knownProviders: { name: string; label: string }[]
   readonly drafts: readonly DraftRow[]
+  /** المنشورُ المفتوحُ في المحرّر المركّز (`?open=<id>`، D-198) — أو لا شيء. */
+  readonly editing?: DraftRow | null
   /**
    * ساعاتُ الذروة لكلّ منصّةٍ في المسوّدات (D-106) — **مقيسةٌ أو صامتة**.
    *
@@ -655,6 +658,23 @@ function todayList(d: PanelData): string {
  * و`#plan-import` و`#d-…`) — يقرأ `show()` القسمَ الذي يحوي المرساة. وبلا سكربتٍ تظهر الأقسامُ كلُّها.
  */
 function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, videos: string, plan: string): string {
+  /*
+   * ‏**والمحرّرُ المركّز بجوار القائمة في قسمها** (D-198): لا تبويبَ خامس ولا صفحةٌ ثانية. لوحٌ ‏560px
+   * ‏على الحاسوب، وشاشةٌ كاملةٌ على الهاتف، وبلا `?open=` تبقى القائمةُ كما رسمها D-195.
+   */
+  const ed = d.editing ?? null
+  const list = ed === null
+    ? drafts.list
+    : `<div class="posts-split"><div class="posts-list">${drafts.list}</div>${editorPane({
+        draft: ed,
+        media: d.media,
+        targets: d.targets,
+        pageOnly: d.pageOnly,
+        peaks: d.peaks?.[ed.platform],
+        mediaReady: d.mediaReady,
+        zone: d.zone ?? null,
+        now: d.now,
+      })}</div>`
   const waiting = d.drafts.filter((x) => x.status === 'draft').length
   const failed = d.drafts.filter((x) => x.status === 'failed').length
   const nav = tabs('أقسامُ المنشورات', [
@@ -664,7 +684,7 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
     { label: 'الخطّة', href: '#sub-plan' },
   ], { id: 'posts-sub' })
   return `${nav}
-  <div data-sub id="sub-list">${drafts.list}</div>
+  <div data-sub id="sub-list">${list}</div>
   <div data-sub id="sub-write">${drafts.write}</div>
   <div data-sub id="sub-videos">${videos}</div>
   <div data-sub id="sub-plan">${plan}</div>`
@@ -1035,6 +1055,8 @@ ${pivotPane(d.pivot)}
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
     ...(d.links === undefined ? {} : { links: d.links }),
+    editing: d.editing?.id ?? null,
+    zone: d.zone ?? null,
   }), videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
     ...(d.links === undefined ? {} : { links: d.links }),
     ...(d.reach === undefined ? {} : { reach: d.reach }),

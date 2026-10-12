@@ -160,6 +160,39 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
   return { ok: true, at: '', account: '', platform: '' }
 }
 
+/**
+ * «غيّر الموعد» (D-198) — **الموعدُ وحدَه، بلا سحبٍ وجدولةٍ من جديد**. والحارسُ حارسُ الجدولة:
+ * لا ماضٍ، ولا ما غادر إلى الطابور، ولا حسابٌ سقط إذنُه. والسببُ بكلام المالك لا بمعرّف الحال.
+ */
+export async function reschedulePost(db: Db, postId: string, when: string, now: Date): Promise<ScheduleResult> {
+  const row = await db
+    .prepare(
+      `SELECT p.platform, p.status, p.dispatched_at, a.status AS account_status, a.display_name
+         FROM posts p LEFT JOIN accounts a ON a.id = p.account_id WHERE p.id = ?`,
+    )
+    .bind(postId)
+    .first<{ platform: string; status: string; dispatched_at: string | null; account_status: string | null; display_name: string | null }>()
+  if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
+  if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
+  if (row.dispatched_at !== null) return { ok: false, reason: 'غادر إلى الطابور، ولا يُغيَّر موعدُه من هناك' }
+  if (row.account_status !== null && row.account_status !== 'active') {
+    return { ok: false, reason: `${row.display_name ?? 'الحساب'}: إذنُ الحساب لا يعمل، فجدّد إذنه أوّلًا` }
+  }
+  const at = parseWhen(when)
+  if (at === null) return { ok: false, reason: 'موعدٌ غير مفهوم' }
+  if (at <= dbNow(now)) return { ok: false, reason: 'الموعدُ في الماضي' }
+  const moved = await db
+    .prepare(
+      `UPDATE posts SET scheduled_at = ?
+        WHERE id = ? AND status = 'queued' AND dispatched_at IS NULL
+        RETURNING id`,
+    )
+    .bind(at, postId)
+    .first<{ id: string }>()
+  if (moved === null) return { ok: false, reason: 'تغيّرت حالُه قبل التغيير، فأعد تحميل الصفحة' }
+  return { ok: true, at, account: row.display_name ?? '', platform: row.platform }
+}
+
 /** ما يُعَدّ عالقًا: غادر إلى الطابور منذ ساعةٍ ولم تُكتب له محاولةٌ منذها. */
 export const STUCK_MINUTES = 60
 

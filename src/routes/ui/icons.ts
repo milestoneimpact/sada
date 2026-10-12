@@ -140,6 +140,8 @@ export const ICON = {
   views: icon('<path d="M5 20v-6M11 20V9M17 20V4"/>'),
   globe: icon('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/>'),
   play: icon('<path d="M8 5v14l11-7z"/>'),
+  /** إغلاقُ المحرّر المركّز (D-198) — يعود إلى القائمة. */
+  close: icon('<path d="M6 6l12 12M18 6 6 18"/>'),
 } as const
 
 /**
