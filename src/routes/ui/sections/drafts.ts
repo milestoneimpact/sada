@@ -21,13 +21,14 @@
  */
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
-import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
+import { reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type PlatformSpec } from '../../../lib/draft/prompt'
 import type { PublishPlatform } from '../../../lib/oauth/providers'
 import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
 import { IDEA_MAX } from '../../../lib/draft/job'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
+import { menu, menuAction, menuItem } from '../components/menu'
 import { field } from '../components/field'
 import { linkLine, pickLine } from '../reach'
 import { INFO_SIZE } from '../../../lib/image/infographic'
@@ -36,7 +37,8 @@ import { missingMedia } from '../../../lib/schedule/media'
 import { escapeHtml } from '../escape'
 import { whenTag } from '../time'
 import type { Peaks } from '../../../lib/schedule/peak'
-import { kb, money, relativeTime } from '../../../lib/format'
+import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
+import { momentLabel } from '../../../lib/time/local'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -65,10 +67,16 @@ const STATUS: Readonly<Record<string, { cls: Tone; glyph: string; text: string }
   failed: { cls: 'bad', glyph: '▲', text: 'فشل النشر' },
 }
 
-/** أسطرُ المربّع — لكلّ منصّةٍ قدرُ نصّها، فلا فائضٌ ولا فراغ. */
-const LINES: Readonly<Record<string, number>> = {
-  linkedin: 12, x: 6, tiktok: 5, youtube: 8, instagram: 5,
+/**
+ * حبّةُ الحال — **و`queued` حالان لا حال**: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
+ * شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا. والبطاقةُ والمحرّرُ يقرآنها من هنا (D-198).
+ */
+export function statusOf(d: DraftRow): { readonly cls: Tone; readonly glyph: string; readonly text: string } {
+  return d.status === 'queued' && d.dispatchedAt !== null
+    ? { cls: 'warn', glyph: '↑', text: 'في الطريق' }
+    : (STATUS[d.status] ?? STATUS['draft']!)
 }
+
 
 /**
  * مواصفةُ البطاقة لكلّ منصّة منشور — **`PLATFORMS` للتي تُكتب لها مسوّدة، وInstagram
@@ -85,17 +93,17 @@ interface CardSpec {
   readonly hardLimit: number
 }
 
-function specOf(p: PublishPlatform): CardSpec {
+export function specOf(p: PublishPlatform): CardSpec {
   return p === 'instagram' ? { id: p, label: platformLabel(p), hardLimit: CAPTION_LIMIT.instagram } : PLATFORMS[p]
 }
 
 /** طولُ النصّ كما تعدّه منصّتُه — وInstagram بالمحرف كما يعدّ `captionProblem`. */
-function lengthOf(d: DraftRow): number {
+export function lengthOf(d: DraftRow): number {
   return d.platform === 'instagram' ? d.text.length : postLength(d.text, d.platform)
 }
 
 /** أنواعُ الوسائط الجاهزة لمنشور — ما يسأل عنه `missingMedia` كما يسأله الناشر. */
-function readyMimes(d: DraftRow, media: readonly MediaView[]): string[] {
+export function readyMimes(d: DraftRow, media: readonly MediaView[]): string[] {
   return media.filter((m) => m.postId === d.id && m.status === 'ready').map((m) => m.mime)
 }
 const LINE = 26
@@ -250,7 +258,7 @@ function scheduler(
 }
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
-function requeueForm(id: string, primary: boolean): string {
+export function requeueForm(id: string, primary: boolean): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
     <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
@@ -347,7 +355,7 @@ function slideLine(m: MediaView): string {
  * **وتحت الزرّين سطرُ جاهزيّة** (D-163): ما ستقوله الدالّةُ بعد الضغط يُقال
  * قبله. وزرٌّ تسقط نقطتُه يُعطَّل وسببُه بجانبه — لا زرٌّ يُضغَط فيُردّ.
  */
-function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines): string {
+export function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines, caption: string = INFO_CAPTION): string {
   const open = d.status === 'draft' || d.status === 'approved' || d.status === 'edited'
   const mine = media.filter((m) => m.postId === d.id)
   // الصورةُ والمقطعُ صفّان في `media` يفترقان بالنوع — لا جدولَ ثانٍ
@@ -440,7 +448,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
   return `<div class="pic none" id="i-${escapeHtml(d.id)}">
     ${statusBadge('idle', '○', `${
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
-    <span class="ago">${INFO_CAPTION}</span>
+    <span class="ago">${caption}</span>
     <span class="grow"></span>
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…">
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
@@ -462,7 +470,7 @@ function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines):
 }
 
 /** ما يُبنى مرّةً للّوح كلِّه — والبطاقاتُ تأخذه ولا تحسبه. */
-interface ReadyLines {
+export interface ReadyLines {
   /** سطرُ الإنفوجرافيك (D-174) — وهو الزرُّ الأوّل. */
   readonly info: string
   readonly infoBlocked: boolean
@@ -509,7 +517,7 @@ function readyLine(line: MediaLine): string {
  * كلامين متعاكسين. فيتبع الوصفُ نقطةَ «النصُّ فوقها»: غائبةٌ حين يُطفأ، وتامّةٌ
  * حين يُركَّب، وتنتظرك حين ينقصها شيء.
  */
-function readyLines(ready: MediaReady): ReadyLines {
+export function readyLines(ready: MediaReady): ReadyLines {
   const overlay = ready.image.dots.find((dot) => dot.key === 'overlay')
   return {
     info: readyLine(ready.infographic),
@@ -656,7 +664,7 @@ function preview(d: DraftRow, target: string): string {
       <span class="grow"></span>
       <span class="ago">معاينة</span>
     </div>
-    <p class="pv-body"><b data-pv-first>${escapeHtml(first)}</b><span data-pv-rest>${
+    <p class="pv-body" data-post-text><b data-pv-first>${escapeHtml(first)}</b><span data-pv-rest>${
       rest.length === 0 ? '' : escapeHtml('\n' + rest.join('\n'))
     }</span></p>
     <p class="pv-note">تقريبٌ لا محاكاة: السطرُ الأوّل ما يُقرأ أوّلا.
@@ -674,7 +682,7 @@ function preview(d: DraftRow, target: string): string {
  * **ولا شارةَ حمراء**: هذه ملحوظاتُ ذوقٍ لا أخطاءُ نظام. ولونٌ يقول
  * «عطل» على «ما رأيكم؟» يجعل المالكَ يتجاهل اللونَ حين يعني عطلا حقّا.
  */
-function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
+export function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
   // **والشرطُ هو شرطُ المحرِّر نفسُه**: ملحوظةٌ حيث لا مربّعَ يُحرَّر
   // عتابٌ لا مراجعة. وشرطان متقاربان يفترقان بلا حارس
   if (d.status !== 'draft' && d.status !== 'approved' && d.status !== 'edited') return ''
@@ -701,6 +709,64 @@ function notesPane(d: DraftRow, counted: number, hardLimit: number): string {
   </details>`
 }
 
+/** موعدٌ بتوقيت المالك، و«UTC» معلنةً حين لم تصل منطقتُه. */
+function ownerMoment(at: string, zone: string | null, now: Date): string {
+  const date = parseSqliteUtc(at)
+  if (date === null) return at
+  return `${momentLabel(date, zone, now)}${zone === null ? ' UTC' : ''}`
+}
+
+/** شعارُ المنصّة على أرض لونها ‏24px (D-198) — في البطاقة المختصرة والمحرّر. */
+export function platformMark(p: string): string {
+  return `<span class="pc-logo" data-pf="${escapeHtml(p)}" aria-hidden="true">${LOGOS[p] ?? ''}</span>`
+}
+
+/** مَن كتبها — **باسم الخدمة لا بمعرّف النموذج** (D-198)، والمعرّفُ تحت «التفاصيل» في المحرّر وحدَها. */
+export function writerName(model: string | null): string {
+  if (model === null || model === '') return 'غيرُ مسجَّل'
+  if (model === 'owner' || model === 'upload') return 'أنت'
+  const m = model.toLowerCase()
+  if (m.startsWith('claude')) return 'Claude'
+  if (m.startsWith('deepseek')) return 'DeepSeek'
+  if (m.startsWith('gemini')) return 'Gemini'
+  if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3')) return 'GPT'
+  if (m.startsWith('plan')) return 'خطّتك من ملفّ'
+  return 'نموذجُ الكتابة'
+}
+
+/** مَن قرّر — **«أنت» لا «panel:passkey»** (D-198): المعرّفُ كان يُطبع على البطاقة كما هو. */
+export function deciderText(by: string | null): string {
+  if (by === null) return ''
+  if (by === 'panel:passkey') return 'أنت بمفتاح المرور'
+  if (by === 'panel:token') return 'أنت بكلمة الإدارة'
+  if (by.startsWith('panel')) return 'أنت'
+  if (by.startsWith('plan')) return 'أنت باعتماد الخطّة'
+  return 'غيرُك'
+}
+
+/** أوّلُ كلماتِ المنشور اسمًا لزرّه: «عدّل» على عشر بطاقاتٍ عشرُ وجهاتٍ باسمٍ واحد لقارئ الشاشة. */
+function snippet(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length <= 48 ? flat : `${flat.slice(0, 48)}…`
+}
+
+/** رابطُ المحرّر المركّز لمنشور (D-198): يُرسَم على الخادم بجوار القائمة. */
+export function editorHref(id: string): string {
+  return `/panel?open=${encodeURIComponent(id)}#ed`
+}
+
+/**
+ * البطاقةُ المختصرة (D-198) — **رأسٌ وثلاثةُ أسطرٍ وفعلٌ واحد، ‏320px أو أقلّ**.
+ *
+ * كانت البطاقةُ تحمل مربّعَ تحريرٍ باثني عشرَ سطرًا وسببَ الزاوية وشريطَ جدولةٍ ظاهرًا: ‏٥٠٠ إلى ‏٧٠٠px
+ * للواحدة، فلا يُرى على الحاسوب غيرُ ثلاث. فصار ظاهرُها ما يُبَتّ به وحدَه (D-195): الشعارُ والحسابُ
+ * والحال، والنصُّ في ثلاثة أسطر، وصورةٌ مصغّرةٌ ‏64px، و[اعتمد] [عدّل] [⋯]. **والتحريرُ في المحرّر**
+ * (`?open=<id>`)، و«اعتمد» هنا يعتمد المحفوظَ كما هو كـ«اعتمدها كما كُتبت».
+ *
+ * **والطيّةُ باقيةٌ بما فيها** (المعاينةُ والصورةُ والجدولةُ والكلفة): مرساتا `#s-…` و`#i-…` تفتحانها
+ * كما في D-195، فلا يسقط رابطٌ ولا نموذج. والمنشورُ المفتوحُ في المحرّر بلا طيّة: ما فيها هناك،
+ * ومعرّفٌ مكرَّرٌ في الصفحة مرساةٌ تنزل إلى غير موضعها.
+ */
 function card(
   d: DraftRow,
   now: Date,
@@ -710,113 +776,100 @@ function card(
   pageOnly: readonly string[],
   peaks: Readonly<Record<string, Peaks>>,
   lines: ReadyLines,
+  editing: string | null,
+  zone: string | null,
 ): string {
   const spec = specOf(d.platform)
-  // `queued` حالان لا حال: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
-  // شريطٍ يقول «غادرت» تناقضٌ يُقرأ عطلا
-  const st =
-    d.status === 'queued' && d.dispatchedAt !== null
-      ? { cls: 'warn' as const, glyph: '↑', text: 'في الطريق' }
-      : (STATUS[d.status] ?? STATUS['draft']!)
+  const st = statusOf(d)
   const open = d.status === 'draft'
   // بطاقةٌ فيها فعلٌ باقٍ ليست منتهية: المعتمَدُ ينتظر موعدا، والمجدولُ
   // ينتظر ساعته، والفاشلُ إعادتَه — والرماديُّ للمرفوض والمنشور وحدهما
   const live = open || d.status === 'approved' || d.status === 'edited' || d.status === 'queued' ||
     d.status === 'failed'
-  const len = lengthOf(d)
-  // متغيّرٌ لا خاصّيّة: ارتفاعٌ مكتوبٌ في `style` لا تغلبه استفسارةُ وسط،
-  // فيبقى الجوّالُ — حيث يلتفّ النصّ أضعافا — بمربّعٍ مقاسِ الشاشة العريضة
-  const box = `--lines:${LINES[d.platform] ?? 9}`
+  const here = editing === d.id
+  // ‏والمعتمَدةُ بلا موعدٍ نموذجُ جدولتها ظاهرٌ (D-198 · ر-4): الخطوةُ التالية فيها موعد، فلا تُطوى
+  const ready = d.status === 'approved' || d.status === 'edited'
+  const id = escapeHtml(d.id)
+
+  /*
+   * ‏ما تحت النصّ سطرٌ واحد: المجدولةُ والفاشلةُ شريطُهما المختصرُ ظاهرًا (موعدُها و«اسحب الموعد»، أو سببُها
+   * ‏و«أعده»)، كما أبقاهما D-195، والمعتمَدةُ نموذجُ جدولتها في الطيّة، والمسوّدةُ سطرُ مصدرها إن تغيّر.
+   */
+  const line = d.status === 'failed'
+    ? `<p class="pc-line" data-tone="bad">${statusBadge('bad', '▲', 'لم يُنشر')}<span>سببُه وزرُّ إعادته في «الموعدُ والتفاصيل».</span></p>`
+    : ''
+  // ‏وموعدُ المجدولة في سطر الحساب قصيرًا بـ UTC، وبتوقيتك في شريطها تحت الطيّة
+  const when = d.status === 'queued' && d.scheduledAt !== null
+    ? `موعدُها ${ownerMoment(d.scheduledAt, zone, now)}`
+    : relativeTime(d.createdAt, now)
+
+  const thumb = media.find((m) => m.postId === d.id && m.status === 'ready' && !m.mime.startsWith('video/'))
+  const pic = thumb === undefined
+    ? ''
+    : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
+
+  const more: string[] = []
+  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true }))
+  more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [
-    // ‏واسمُ الملفّ معزولٌ (خطّة التصميم 4.4/8): «تقرير الأثر السنويّ 2026.docx» كان يُقرأ «docx.2026»
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
-    d.model === null ? '' : `<span class="chip mono">${escapeHtml(d.model)}</span>`,
+    d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
     `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
-     * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك.
-     *
-     * `ARCHITECTURE.md §٤` تقول إنّ `has_url` «يُعرَض في اللوحة مع
-     * تكلفته على X» منذ أوّل يوم. **ولم يُعرَض قطّ**: كان يُحسَب عند
-     * النشر — بعد الاعتماد بأسابيع — ويُكتب صفرا حرفا في المسوّدة.
-     *
-     * ورابطٌ على X ثلاثةَ عشرَ ضعفا (D-003 · D-069): يُعلَّم تحذيرا
-     * ليُرى قبل النقر لا بعده. و LinkedIn بلا رسمٍ فلا يُعرَض شيء.
+     * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك. ورابطٌ على X ثلاثةَ عشرَ
+     * ضعفا (D-003 · D-069): يُعلَّم تحذيرا ليُرى قبل النقر لا بعده.
      */
     d.publishCost === 0
       ? ''
       : statusBadge(d.publishCost >= 0.1 ? 'warn' : '', d.publishCost >= 0.1 ? '!' : '●',
           `نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}`),
-    d.stale ? statusBadge('warn', '▲', 'المصدر تغيّر بعدها') : '',
-    /*
-     * **ورابطُ الرحلة على كلّ بطاقة** (D-104): الرحلةُ تُسأل عن منشورٍ
-     * بعينه، **والسؤالُ يقع وأنت تنظر إليه** — لا بعد أن تبحث عن معرّفه.
-     */
-    `<a class="chip" href="/panel/journey/${escapeHtml(d.id)}"
-       title="من الملفّ إلى الأثر — كلُّ ما وقع لهذا المنشور">الرحلة ${ICON.go}</a>`,
-  ]
-    .filter((x) => x !== '')
-    .join('')
+    d.approvedBy === null ? '' : `<span class="chip">${d.status === 'rejected' ? 'رفضها' : 'اعتمدها'} ${escapeHtml(deciderText(d.approvedBy))}</span>`,
+  ].filter((x) => x !== '').join('')
 
-  // مربّعٌ يُحرَّر ونصٌّ يُقرأ: البَتُّ مفتوحٌ للمسوّدة وحدها، وما بُتّ فيه
-  // يبقى معروضا ولا يُحذف — كلفتُه وقعت، وما دُفع ثمنُه يُرى
-  const editor = open
-    ? `<form method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
-         <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-         <textarea name="text" class="draft-text" style="${box}"
-           data-limit="${spec.hardLimit}" data-target="${ceilingOf(spec.hardLimit)}"
-           data-count="${spec.id}"
-           aria-label="نصّ المنشور">${escapeHtml(d.text)}</textarea>
-         <div class="draft-foot act">
-           <span class="draft-len ${len > spec.hardLimit ? 'bad' : len > ceilingOf(spec.hardLimit) ? 'warn' : ''}"
-             ><b>${len}</b> / ${spec.hardLimit}</span>
-           <span class="grow"></span>
-           <button class="btn btn-secondary btn-sm" type="submit" name="do" value="reject">ارفض</button>
-           <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button>
-         </div>
-       </form>`
-    : `<div class="draft-text ro" style="${box}" data-ro>${escapeHtml(d.text)}</div>
-       <div class="draft-foot"><span class="draft-len"><b>${len}</b> / ${spec.hardLimit}</span>
-         <span class="grow"></span>
-         ${d.approvedBy === null
-           ? ''
-           : `<span class="ago">${d.status === 'rejected' ? 'رفضها' : 'اعتمدها'} ${escapeHtml(
-               d.approvedBy,
-             )}</span>`}</div>`
-
-  return `<div class="card draft${live ? '' : ' done'}" id="d-${escapeHtml(d.id)}" data-draft="${escapeHtml(d.id)}"
+  return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}
     data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
-    ${notesPane(d, len, spec.hardLimit)}
     <div class="draft-top">
       ${open
         ? `<label class="pick" title="حدّدها للاعتماد الجماعيّ">
-             <input type="checkbox" form="bulk" name="id" value="${escapeHtml(d.id)}"
+             <input type="checkbox" form="bulk" name="id" value="${id}"
                data-pick data-cost="${d.publishCost}"
                aria-label="حدّد هذه المسوّدة للاعتماد الجماعيّ">
            </label>`
         : ''}
-      <div class="ch-logo ch-logo-sm">${LOGOS[d.platform] ?? ''}</div>
-      <div class="ch-name">${escapeHtml(spec.label)}
-        <span class="ago">${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
-      <span class="grow"></span>
+      ${platformMark(d.platform)}
+      <div class="pc-who"><b><bdi>${escapeHtml(d.accountName ?? spec.label)}</bdi></b><span class="pc-when">${
+        d.accountName === null ? '' : `${escapeHtml(spec.label)} · `}<bdi>${escapeHtml(when)}</bdi></span></div>
       ${statusBadge(st.cls, st.glyph, escapeHtml(st.text))}
     </div>
-    ${d.rationale === null || d.rationale === '' ? '' : `<p class="draft-why">${escapeHtml(d.rationale)}</p>`}
-    ${editor}
-    ${/*
-      * ‏**البطاقةُ تُبقي ظاهرًا ما يُبَتّ به وحدَه** (D-195): المسوّدةُ نصُّها وزرّاها، والمعتمَدةُ نصُّها وموعدُها.
-      * ‏والباقي (المعاينةُ، والصورة، والفرق، والكلفة) تحت سطرٍ يُفتح — كانت البطاقةُ الواحدة شاشتين على الهاتف.
-      * ‏ومرساةٌ إلى ما في داخله («#i-…» من الرئيسيّة) تفتحه (`show()`)
-      */''}
-    ${open ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
-    <details class="draft-more"><summary>${open ? 'المعاينةُ والصورةُ والموعد' : 'الصورةُ والتفاصيل'}</summary>
+    <div class="pc-body"><p class="pc-text" dir="auto" data-post-text>${escapeHtml(d.text.replace(/\s*\n\s*/g, ' '))}</p>${pic}</div>
+    ${line}
+    ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media) : ''}
+    <div class="pc-foot">
+      ${open
+        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
+             <input type="hidden" name="id" value="${id}">
+             <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button></form>`
+        : ''}
+      <a class="btn btn-secondary btn-sm" href="${escapeHtml(editorHref(d.id))}" data-edit
+        aria-label="${escapeHtml(`${open ? 'عدّل' : 'افتح'}: ${snippet(d.text)} (${specOf(d.platform).label}، ${relativeTime(d.createdAt, now)})`)}">${open ? 'عدّل' : 'افتح'}</a>
+      <span class="grow"></span>
+      ${d.stale && open
+        // ‏والمصدرُ الذي تغيّر بعدها مكانَ العدّاد: سطرٌ مستقلٌّ كان يمدّ البطاقةَ فوق ‏320px على الهاتف
+        ? statusBadge('warn', '▲', 'المصدر تغيّر بعدها')
+        : `<span class="draft-len"><b>${lengthOf(d)}</b> / ${spec.hardLimit}</span>`}
+      ${menu({ label: 'أفعالٌ أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
+    </div>
+    ${here
+      ? '<p class="pc-line"><span class="ago">مفتوحةٌ في المحرّر بجوارها.</span></p>'
+      : `<details class="draft-more"><summary>${open ? 'المعاينةُ والصورةُ والموعد' : 'الموعدُ والصورةُ والتفاصيل'}</summary>
       ${open ? preview(d, spec.label) : ''}
       ${editDiff(d)}
       ${imagePane(d, media, lines)}
-      ${open ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media) : ''}
+      ${ready ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
       <div class="draft-meta">${meta}</div>
-    </details>
+    </details>`}
   </div>`
 }
 
@@ -901,6 +954,10 @@ export interface DraftsInput {
    * ويُترك غيرُ المتّصل بلا تأشير. واختياريّ: الغائبُ «لا يُعرف» فلا يُقال شيء.
    */
   readonly links?: Readonly<Record<string, LinkState>>
+  /** منطقةُ المالك من كعكته (D-173): موعدُ المجدولة على بطاقتها بتوقيته. */
+  readonly zone?: string | null
+  /** معرّفُ المنشور المفتوح في المحرّر المركّز (D-198) — بطاقتُه بلا طيّة، وما فيها هناك. */
+  readonly editing?: string | null
 }
 
 /** المنصّاتُ التي تُكتب لها مسوّدةٌ من فكرة — **المكتوبةُ وحدَها**: نصُّ المقطع له صفُّ المقطع. */
@@ -1026,7 +1083,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
       <span class="row-k"><kbd>J</kbd><kbd>K</kbd> التنقّل</span>
       <span class="row-k"><kbd>A</kbd> اعتمد</span>
       <span class="row-k"><kbd>R</kbd> ارفض</span>
-      <span class="row-k"><kbd>E</kbd> حرّر النصّ</span>
+      <span class="row-k"><kbd>E</kbd> افتحها في المحرّر</span>
       <span class="row-k"><kbd>S</kbd> الجدولة</span>
       <span class="row-k"><kbd>?</kbd> هذا اللوح</span>
     </div>
@@ -1046,7 +1103,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
         })
       : `<div class="dcols">${drafts
           .map((d) =>
-            card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines))
+            card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines, input.editing ?? null, input.zone ?? null))
           .join('')}</div>`
 
   /*

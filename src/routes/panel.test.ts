@@ -2207,7 +2207,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
   function cardOf(html: string, id: string): string {
     const start = html.indexOf(`id="d-${id}"`)
     expect(start).toBeGreaterThan(-1)
-    const next = /<div class="card draft(?: done)?" id="d-/g
+    const next = /<div class="card draft pc(?: done)?" id="d-/g
     next.lastIndex = start
     const end = next.exec(html)?.index
     return html.slice(start, end)
@@ -2474,18 +2474,128 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
    * **وشريطُ البطاقة يلتصق حيث فيه قرار** (رحلات R-3 وR-6 وR-9): كان صفُّ البطاقة
    * المقروءة يلتصق بأسفل الهاتف بلا زرٍّ فيه، ويغطّي رأسَ البطاقة وحبّةَ حالها.
    */
-  it('صفُّ البتّ وحدَه ملتصق — والبطاقةُ المقروءةُ ساكنة', async () => {
+  it('البطاقةُ المختصرة (D-198): «اعتمد» و«عدّل» على المسوّدة وحدَها، والمقروءةُ «افتح» بلا اعتماد', async () => {
     const open = await seedPost('linkedin', 'draft')
     const read = await seedPost('x', 'rejected', 'نصٌّ رُفض على X')
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(cardOf(html, open)).toContain('<div class="draft-foot act">')
-    expect(cardOf(html, read)).not.toContain('draft-foot act')
+    const draft = cardOf(html, open)
+    expect(draft).toContain('<div class="pc-foot">')
+    expect(draft).toContain('value="approve"')
+    expect(draft).toMatch(new RegExp(`href="/panel\\?open=${open}#ed" data-edit\\s+aria-label="عدّل: [^"]+">عدّل</a>`))
+    // ‏والنصُّ ثلاثةُ أسطرٍ تُقرأ، لا مربّعٌ يُحرَّر: التحريرُ في المحرّر
+    expect(draft).toContain('class="pc-text"')
+    expect(draft).not.toContain('<textarea')
+    const done = cardOf(html, read)
+    expect(done).not.toContain('value="approve"')
+    expect(done).toMatch(/aria-label="افتح: نصٌّ رُفض على X \(X، [^"]+\)">افتح<\/a>/)
+  })
 
-    const href = /<link rel="stylesheet" href="([^"]+)"/.exec(html)?.[1] ?? ''
-    const css = await (await app.request(href, {}, env)).text()
-    expect(css).toContain('.draft-foot.act{position:sticky')
-    expect(css).not.toMatch(/\.draft-foot\{position:sticky/)
+  /**
+   * **المحرّرُ المركّز** (D-198): `?open=<id>` يرسمه في قسم «المسوّدات» نفسِه بجوار القائمة، والتبويباتُ
+   * الأربعةُ كما هي (D-195). والإغلاقُ رابطٌ إلى بطاقته، و«التفاصيل» مطويّة، والمعرّفُ يُفحَص قبل أن يُسأل عنه.
+   */
+  it('المحرّرُ يُفتح بـ?open= ويُغلق إلى بطاقته، والتبويباتُ الأربعةُ باقية، والتفاصيلُ مطويّة', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    await db.prepare("UPDATE posts SET model = 'claude-opus-5', approved_by = NULL WHERE id = ?").bind(id).run()
+    await seedAccount('linkedin', 'عمر')
+    const cookie = await login()
+    const html = await (await app.request(`/panel?open=${id}`, withSession(cookie), env)).text()
+    expect(html).toContain('<div class="posts-split">')
+    expect(html).toContain(`<aside class="card ed" id="ed" aria-labelledby="ed-t" data-post="${id}">`)
+    // ‏والمحرّرُ داخل «المسوّدات» لا تبويبٌ خامس
+    const list = html.slice(html.indexOf('id="sub-list"'), html.indexOf('id="sub-write"'))
+    expect(list).toContain('id="ed"')
+    expect((html.match(/href="#sub-/g) ?? []).length).toBe(4)
+    expect(html).toContain(`href="/panel#d-${id}" aria-label="أغلق المنشور وارجع إلى القائمة"`)
+    expect(html).toContain('<details class="ed-more" id="ed-details"><summary>التفاصيل</summary>')
+    expect(html).not.toMatch(/<details class="ed-more"[^>]*\sopen/)
+    // ‏ومن كتبها باسم الخدمة، والمعرّفُ تحت «التفاصيل» وحدَها لا في الرأس
+    const details = html.slice(html.indexOf('id="ed-details"'))
+    expect(details).toContain('Claude')
+    const head = html.slice(html.indexOf('<div class="ed-head">'), html.indexOf('<div class="ed-body">'))
+    expect(head).not.toContain('claude-opus-5')
+    // ‏وبطاقتُه في القائمة معلَّمةٌ وبلا طيّة: ما فيها في المحرّر، ولا معرّفَ يتكرّر
+    expect(cardOf(html, id)).toContain('aria-current="true"')
+    expect(cardOf(html, id)).not.toContain('draft-more')
+    expect(html).toContain('<textarea id="ed-txt" name="text" form="ed-form"')
+    expect(html).toContain('value="approve-schedule"')
+    expect(html).toContain('value="save"')
+
+    // ‏ومعرّفٌ لا يصحّ لا يُسأل عنه، ولا محرّر
+    const bad = await (await app.request('/panel?open=%3Cscript%3E', withSession(cookie), env)).text()
+    expect(bad).not.toContain('id="ed"')
+    expect(bad).not.toContain('<script>')
+    const none = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(none).not.toContain('posts-split')
+  })
+
+  it('«احفظ» يكتب النصّ ولا يعتمده ويعود إلى المحرّر، ثمّ «اعتمد» منه يعتمده «بعد تعديل» إلى موعده', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const cookie = await login()
+    const edited = `${'م'.repeat(120)}\r\nسطرٌ أُضيف`
+    const saved = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', text: edited })
+    expect(where(saved)).toBe(`/panel?open=${id}#ed`)
+    let row = await db.prepare('SELECT status, text, original_text, approved_at FROM posts WHERE id = ?').bind(id).first<Record<string, unknown>>()
+    expect(row).toEqual({ status: 'draft', text: `${'م'.repeat(120)}\nسطرٌ أُضيف`, original_text: 'ن'.repeat(300), approved_at: null })
+
+    // ‏ونصٌّ قصيرٌ يُردّ بفحص الاعتماد نفسِه، ولا يُكتب
+    const short = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', text: 'قصير' })
+    expect(where(short)).toBe(`/panel?open=${id}#ed`)
+    expect((await db.prepare('SELECT text FROM posts WHERE id = ?').bind(id).first<{ text: string }>())?.text).toContain('سطرٌ أُضيف')
+
+    // ‏والاعتمادُ بالمحفوظ نفسِه «بعد تعديل»: المقارنةُ بالأصل لا بالمحفوظ
+    const approved = await post(cookie, '/panel/drafts/decide', { id, do: 'approve', from: 'editor', text: edited })
+    expect(where(approved)).toBe(`/panel?open=${id}#ed-when`)
+    row = await db.prepare('SELECT status, original_text FROM posts WHERE id = ?').bind(id).first<Record<string, unknown>>()
+    expect(row).toEqual({ status: 'edited', original_text: 'ن'.repeat(300) })
+  })
+
+  it('«اعتمد» على البطاقة المختصرة بلا مربّع يعتمد المحفوظَ كما كُتب ويعود إلى شريط جدولتها', async () => {
+    const id = await seedPost('x', 'draft', 'نصٌّ كما كتبه النموذج على X، وطولُه يكفي ليكون منشورًا يُقرأ.')
+    const cookie = await login()
+    const r = await post(cookie, '/panel/drafts/decide', { id, do: 'approve' })
+    expect(where(r)).toBe(`/panel#s-${id}`)
+    const row = await db.prepare('SELECT status, text FROM posts WHERE id = ?').bind(id).first<Record<string, unknown>>()
+    expect(row).toEqual({ status: 'approved', text: 'نصٌّ كما كتبه النموذج على X، وطولُه يكفي ليكون منشورًا يُقرأ.' })
+  })
+
+  it('«اعتمد وجدوِل» بتوقيت المالك: «غدًا 9:00 ص» في الرياض السادسةُ UTC، ويعود إلى بطاقته', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const account = await seedAccount('linkedin', 'عمر')
+    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
+    // ‏والمحرّرُ يقول المنطقةَ ويحسب الأزرارَ بها
+    const html = await (await app.request(`/panel?open=${id}`, withSession(cookie), env)).text()
+    expect(html).toContain('بتوقيتك (<bdi dir="ltr">Asia/Riyadh</bdi>)')
+    expect(html).toContain('<input type="radio" name="preset" value="tomorrow" form="ed-form" checked>')
+    expect(html).not.toContain('الموعد (UTC)')
+
+    const r = await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account, preset: 'tomorrow', text: 'ن'.repeat(300) })
+    expect(where(r)).toBe(`/panel#d-${id}`)
+    const row = await db.prepare('SELECT status, account_id, scheduled_at FROM posts WHERE id = ?').bind(id).first<Record<string, string>>()
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['account_id']).toBe(account)
+    expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
+
+    // ‏و«غيّر الموعد» يبدّل الموعدَ وحدَه بيومٍ وساعةٍ بتوقيته
+    const moved = await post(cookie, '/panel/drafts/reschedule', { id, from: 'editor', preset: 'custom', local: '2031-01-05T21:30' })
+    expect(where(moved)).toBe(`/panel#d-${id}`)
+    const after = await db.prepare('SELECT status, scheduled_at FROM posts WHERE id = ?').bind(id).first<Record<string, string>>()
+    expect(after).toEqual({ status: 'queued', scheduled_at: '2031-01-05 18:30:00' })
+    // ‏وموعدٌ لا يُفهم يعود إلى موعده في المحرّر ولا يُمسّ المحفوظ
+    const bad = await post(cookie, '/panel/drafts/reschedule', { id, from: 'editor', preset: 'custom', local: '' })
+    expect(where(bad)).toBe(`/panel?open=${id}#ed-when`)
+    expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at).toBe('2031-01-05 18:30:00')
+  })
+
+  it('ومردودُ «اعتمد وجدوِل» بلا حسابٍ يبقى معتمَدًا ويعود إلى موعده في المحرّر', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const cookie = await login()
+    const r = await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account: '', preset: 'tomorrow', text: 'ن'.repeat(300) })
+    expect(where(r)).toBe(`/panel?open=${id}#ed-when`)
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('approved')
+    const html = await (await app.request(`/panel?open=${id}`, withSession(cookie), env)).text()
+    expect(html).toContain('اعتُمدت، وتعذّرت جدولتُها')
   })
 })
 
@@ -3169,7 +3279,8 @@ describe('لوحُ المراجعة في اللوحة', () => {
     const id = await seedDraft(DIRTY)
     const cookie = await login()
 
-    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    // ‏والملحوظاتُ في المحرّر المركّز تحت مربّعه (D-198)، لا على البطاقة المختصرة
+    const html = await (await app.request(`/panel?open=${id}`, { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('ملحوظةً على الصياغة')
     expect(html).toContain('تُقرأ ولا تمنع')
 

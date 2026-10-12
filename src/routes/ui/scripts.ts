@@ -239,6 +239,37 @@ export const TZ_SCRIPT = `
  */
 export const KIT_SCRIPT = `
 (function(){
+  /*
+   * ‏**القائمةُ المنسدلة** («menu()»، D-198): «details» يفتحها ويغلقها بلا سكربت، وهنا ما يتوقّعه
+   * ‏من اعتاد القوائم: النقرُ خارجها يغلقها، وEsc يغلقها ويعيد التركيزَ إلى زرّها، وفتحُ واحدةٍ يغلق أختها.
+   */
+  var menus=function(){return Array.prototype.slice.call(document.querySelectorAll('details.menu[open]'));};
+  document.addEventListener('click',function(e){
+    menus().forEach(function(m){if(!m.contains(e.target))m.open=false;});});
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    menus().forEach(function(m){m.open=false; var s=m.querySelector('summary'); if(s&&m.contains(document.activeElement))s.focus();});});
+  document.querySelectorAll('details.menu').forEach(function(m){
+    m.addEventListener('toggle',function(){if(m.open)menus().forEach(function(o){if(o!==m)o.open=false;});});});
+  /*
+   * ‏و[تحرير | معاينة] في المحرّر (D-198): بلا سكربتٍ يظهر الاثنان واحدًا تحت الآخر، وبه واحدٌ في المرّة.
+   * ‏والمعاينةُ تتبع المربّع نصًّا (textContent لا innerHTML): ما يكتبه المالكُ لا يصير وسمًا.
+   */
+  var seg=document.getElementById('ed-seg');
+  if(seg){
+    var views=document.querySelectorAll('#ed [data-view]');
+    var pick=function(v){
+      Array.prototype.forEach.call(views,function(x){x.hidden=x.getAttribute('data-view')!==v;});
+      Array.prototype.forEach.call(seg.querySelectorAll('button[data-view-pick]'),function(b){
+        b.setAttribute('aria-pressed',String(b.getAttribute('data-view-pick')===v));});
+      if(v==='preview'){var box=document.getElementById('ed-txt'), body=document.querySelector('#ed [data-view=preview] .np-text');
+        if(box&&body&&box.tagName==='TEXTAREA'&&(box.dataset.count==='x'||box.dataset.count==='linkedin'))body.textContent=box.value;}
+    };
+    seg.hidden=false;
+    seg.querySelectorAll('button[data-view-pick]').forEach(function(b){
+      b.addEventListener('click',function(){pick(b.getAttribute('data-view-pick'));});});
+    pick('edit');
+  }
   var dead=function(t){return t&&t.closest?t.closest('[aria-disabled="true"]'):null;};
   document.addEventListener('click',function(e){
     if(dead(e.target)){e.preventDefault(); e.stopImmediatePropagation();}},true);

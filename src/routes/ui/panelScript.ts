@@ -100,7 +100,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   tabs.forEach(function(t){t.addEventListener('click',function(e){
     e.preventDefault(); show(t.getAttribute('href').slice(1),true,true);
   });});
-  show((location.hash||'').slice(1)||first,false,false);
+  // ‏و«?open=…» بلا مرساةٍ (رابطٌ كُتب يدًا) يفتح قسمَ المحرّر، لا الرئيسيّةَ والمحرّرُ مخفيٌّ خلفها (D-198)
+  show((location.hash||'').slice(1)||(document.getElementById('ed')?'sub-list':first),false,false);
   /*
    * ‏والمرساةُ تُتبَع من أيّ مكان (D-105).
    *
@@ -463,6 +464,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var list=visible(); if(here<0||!list[here])return false;
       var el=list[here].querySelector(sel);
       if(!el)return false;
+      // ‏وما في طيّةٍ مغلقة (شريطُ الجدولة في «الموعدُ والصورة»، D-198) تُفتح طيّتُه قبل التركيز عليه
+      for(var up=el.parentElement;up;up=up.parentElement){if(up.tagName==='DETAILS'&&!up.classList.contains('menu'))up.open=true;}
       el.focus(); if(el.tagName!=='TEXTAREA'&&el.tagName!=='SELECT')el.click();
       return true;
     }
@@ -478,7 +481,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         case 'KeyK': mark(here<=0?0:here-1); break;
         case 'KeyA': did=press('button[value="approve"]'); break;
         case 'KeyR': did=press('button[value="reject"]'); break;
-        case 'KeyE': did=press('textarea.draft-text'); break;
+        case 'KeyE': did=press('[data-edit]'); break;
         case 'KeyS': did=press('.sched select'); break;
         case 'Slash': {
           var help=document.getElementById('keys');

@@ -341,7 +341,7 @@ describe('التراجعُ عن الرفض', () => {
 
     const back = await undoReject(db, id)
     expect(back.ok).toBe(false)
-    if (!back.ok) expect(back.reason).toContain('approved')
+    if (!back.ok) expect(back.reason).toContain('اعتُمدت من قبل')
   })
 
   it('ومسوّدةٌ لم تُبَتّ لا يُتراجَع عنها', async () => {
@@ -458,7 +458,7 @@ describe('البَتُّ الجماعيّ', () => {
     expect(result.done).toEqual([good])
     expect(result.failed).toHaveLength(1)
     expect(result.failed[0]?.id).toBe(gone)
-    expect(result.failed[0]?.reason).toContain('rejected')
+    expect(result.failed[0]?.reason).toContain('رُفضت من قبل')
   })
 
   it('ومعرّفٌ لا وجودَ له يُسمَّى ولا يرمي', async () => {

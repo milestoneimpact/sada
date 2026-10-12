@@ -159,6 +159,20 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
  * فيه يصطدم بحدّ المعالجة قبل أن يُفيد.
  */
 export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
+  return selectDrafts(db, '', [], limit)
+}
+
+/**
+ * منشورٌ واحدٌ بمعرّفه، أيًّا كان عمرُه (D-198) — **المحرّرُ يفتح ما لم تبلغه الستّون**.
+ * بالاستعلام نفسِه الذي تقرأ به القائمةُ بطاقاتِها، فلا يفترق ما يُرى هنا عمّا يُرى هناك.
+ */
+export async function getDraft(db: Db, id: string): Promise<DraftRow | null> {
+  if (id === '') return null
+  const [row] = await selectDrafts(db, 'p.id = ?', [id], 1)
+  return row ?? null
+}
+
+async function selectDrafts(db: Db, where: string, values: readonly unknown[], limit: number): Promise<DraftRow[]> {
   try {
     const { results } = await db
       .prepare(
@@ -174,11 +188,12 @@ export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
                     ORDER BY pa.attempt_no DESC LIMIT 1) END AS fail_json
            FROM posts p
            LEFT JOIN sources s ON s.id = p.source_id
-           LEFT JOIN accounts a ON a.id = p.account_id
+           LEFT JOIN accounts a ON a.id = p.account_id${where === '' ? '' : `
+          WHERE ${where}`}
           ORDER BY p.created_at DESC
           LIMIT ?`,
       )
-      .bind(limit)
+      .bind(...values, limit)
       .all<Raw>()
     return results.flatMap((row) => {
       const platform = platformOf(row.platform)
@@ -220,15 +235,15 @@ export async function decide(
   by: string,
 ): Promise<DecisionResult> {
   const row = await db
-    .prepare('SELECT id, platform, status, text FROM posts WHERE id = ?')
+    .prepare('SELECT id, platform, status, text, original_text FROM posts WHERE id = ?')
     .bind(id)
-    .first<{ id: string; platform: string; status: string; text: string }>()
+    .first<{ id: string; platform: string; status: string; text: string; original_text: string | null }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
 
   // ما غادر المسوّدةَ لا يُبَتّ فيه ثانية: منشورٌ نُشر لا يُعتمد، ومصفوفٌ
   // في الطابور لا يُرفض من هنا — وسحبُه بابُه `unschedule`، وقبل الإرسال وحده
   if (row.status !== 'draft') {
-    return { ok: false, reason: `حالتُها «${row.status}» — والبَتُّ للمسوّدة وحدها` }
+    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'لم تعد مسوّدة'}، والبَتُّ للمسوّدة وحدها` }
   }
 
   if (decision.kind === 'reject') {
@@ -248,27 +263,13 @@ export async function decide(
    * «278 / 280» تُردّ بـ «284 محرفا» ولا تُعتمَد أبدًا.
    */
   const text = lines(decision.text)
-  // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
-  if (isVideoPlatform(row.platform)) {
-    const why = captionProblem(row.platform, text)
-    if (why !== null) return { ok: false, reason: why }
-  }
-  if (!isVideoPlatform(row.platform)) {
-    const spec = PLATFORMS[row.platform === 'x' ? 'x' : 'linkedin']
-    if (text.length < 40) return { ok: false, reason: 'النصّ أقصر من أن يكون منشورا' }
-    // الطولُ يُفحص هنا أيضا: المالك يلصق ما يشاء، ونصٌّ فوق الحدّ يُرفض عند
-    // النشر بعد أسابيع — فيُمسك عند الاعتماد لا عند الإرسال
-    // وبحساب المنصّة كذلك (D-071): المالكُ يلصق رابطا فيُردّ رفضا كاذبا
-    const counted = postLength(text, spec.id)
-    if (counted > spec.hardLimit) {
-      return {
-        ok: false,
-        reason: `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`,
-      }
-    }
-  }
+  const refused = textProblem(row.platform, text)
+  if (refused !== null) return { ok: false, reason: refused }
 
-  const status: DraftStatus = text === lines(row.text) ? 'approved' : 'edited'
+  // ‏والمقارنةُ بما كُتب أوّلًا (D-198): نصٌّ حُفظ بـ«احفظ» صار `text` وأصلُه في `original_text`،
+  // ‏فيُقارَن بالأصل، وإلّا اعتُمد المعدَّلُ «كما كُتب» وضاع فرقُه (D-128)
+  const status: DraftStatus = text === lines(row.original_text ?? row.text) ? 'approved' : 'edited'
+
   // `approved_at` و `approved_by` معا في جملةٍ واحدة: اعتمادٌ بلا صاحبٍ
   // مسمّى قرارٌ لا يُراجَع بعد شهر
   /*
@@ -323,7 +324,7 @@ export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
     .first<{ id: string; status: string }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
   if (row.status !== 'rejected') {
-    return { ok: false, reason: `حالتُها «${row.status}» — والتراجعُ عن الرفض وحدَه` }
+    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجعُ عن الرفض وحدَه` }
   }
 
   await db
@@ -358,7 +359,7 @@ export async function undoApprove(db: Db, id: string): Promise<DecisionResult> {
       ok: false,
       reason: row.status === 'queued'
         ? 'جُدولت بعد الاعتماد — اسحب موعدَها أوّلًا'
-        : `حالتُها «${row.status}» — والتراجعُ عن الاعتماد قبل الجدولة وحدَه`,
+        : `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجعُ عن الاعتماد قبل الجدولة وحدَه`,
     }
   }
 
@@ -432,4 +433,53 @@ export async function approveMany(
   }
 
   return { done, failed }
+}
+
+/** حالُ المنشور بكلام المالك (D-198) — كان الردُّ يقول «حالتُها «queued»». */
+const STATUS_WORD: Readonly<Record<string, string>> = {
+  approved: 'اعتُمدت من قبل', edited: 'اعتُمدت من قبل', rejected: 'رُفضت من قبل',
+  queued: 'مجدولةٌ الآن', published: 'نُشرت', failed: 'فشل نشرُها',
+}
+
+/**
+ * ما يُردّ عليه النصّ قبل أن يُحفَظ أو يُعتمَد — **فحصٌ واحدٌ للبابين** (D-198).
+ * «احفظ» بابٌ ثانٍ يكتب النصّ، وبابٌ يكتب بلا الفحص نفسِه يحفظ ما سيُردّ عند الاعتماد.
+ */
+function textProblem(platform: string, text: string): string | null {
+  // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
+  if (isVideoPlatform(platform)) return captionProblem(platform, text)
+  const spec = PLATFORMS[platform === 'x' ? 'x' : 'linkedin']
+  if (text.length < 40) return 'النصّ أقصر من أن يكون منشورا'
+  // الطولُ يُفحص هنا أيضا وبحساب المنصّة (D-071): نصٌّ فوق الحدّ يُرفض عند النشر بعد أسابيع
+  const counted = postLength(text, spec.id)
+  if (counted > spec.hardLimit) return `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`
+  return null
+}
+
+/**
+ * «احفظ» في المحرّر (D-198) — **يكتب النصّ ولا يعتمده**.
+ *
+ * والحالُ تبقى `draft` (D-009: لا يمرّ شيءٌ إلى الطابور بلا اعتماد)، **والأصلُ يُحفَظ عند أوّل
+ * تعديلٍ ولا يُكتب ثانية** (D-128) فيبقى الفرقُ يُقرأ بعد الاعتماد، و`has_url` يُعاد حسابُه (D-069).
+ */
+export async function saveText(db: Db, id: string, raw: string): Promise<DecisionResult> {
+  const row = await db
+    .prepare('SELECT id, platform, status, text FROM posts WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; platform: string; status: string; text: string }>()
+  if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
+  if (row.status !== 'draft') return { ok: false, reason: 'لم تعد مسوّدة، والحفظُ للمسوّدة وحدها' }
+  const text = lines(raw)
+  const refused = textProblem(row.platform, text)
+  if (refused !== null) return { ok: false, reason: refused }
+  if (text === lines(row.text)) return { ok: true, status: 'draft' }
+  const moved = await db
+    .prepare(
+      `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?)
+        WHERE id = ? AND status = 'draft' RETURNING id`,
+    )
+    .bind(text, containsUrl(text) ? 1 : 0, row.text, id)
+    .first<{ id: string }>()
+  if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل الحفظ، فأعد تحميل الصفحة' }
+  return { ok: true, status: 'draft' }
 }

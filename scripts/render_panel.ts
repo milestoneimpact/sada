@@ -481,4 +481,15 @@ writeAudited('/tmp/panel-first.html', panelPage({
   // ‏واليومُ الأوّل لا نشرَ فيه ولا موعد: المسوّداتُ كلُّها تنتظر
   journey: { perPlatform: { linkedin: { draft: data.drafts.length, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 },
 }))
+/*
+ * ‏**والمحرّرُ المركّزُ وضعٌ يُشحَن فيُرسَم ليُدقَّق** (D-198): `?open=<id>` بجوار القائمة. مسوّدةٌ
+ * ‏بصورتها (الاعتمادُ والحفظُ والموعدُ بتوقيت المالك)، ومجدولةٌ («غيّر الموعد»).
+ */
+const pick = (id: string): (typeof data.drafts)[number] => data.drafts.find((d) => d.id === id)!
+writeAudited('/tmp/panel-editor.html', panelPage({ ...data, zone: 'Asia/Riyadh', editing: pick('d1') }), {
+  m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
+})
+writeAudited('/tmp/panel-editor-queued.html', panelPage({ ...data, zone: 'Asia/Riyadh', editing: pick('d5') }), {
+  m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
+})
 console.log('رُسمت')

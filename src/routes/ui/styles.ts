@@ -1443,6 +1443,123 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .draft-more[open] > summary{margin-bottom:var(--s-2)}
 .draft-more > * + *{margin-top:var(--s-3)}
 .draft-top{display:flex; align-items:center; gap:var(--s-3)}
+
+/* ── البطاقةُ المختصرة (D-198): رأسٌ وثلاثةُ أسطرٍ وفعلٌ واحد، ‏320px أو أقلّ ─────────────────
+   **والنصُّ هو البطل**: نمطُ المتن بحبره، وكلُّ ما سواه أخفتُ منه. */
+.pc{gap:var(--s-3); padding:var(--s-4) var(--s-4) var(--s-3)}
+.pc[aria-current=true]{border-color:var(--ink)}
+.pc-logo{flex:none; display:grid; place-items:center; width:var(--s-6); height:var(--s-6); border-radius:var(--r-inline);
+  color:var(--pf-fg); background:var(--surface-3); box-shadow:inset 0 0 0 var(--ul) var(--logo-ring)}
+.pc-logo svg{width:60%; height:60%; display:block}
+.pc-logo[data-pf=linkedin]{background:var(--pf-linkedin)}
+.pc-logo[data-pf=x]{background:var(--pf-x)}
+.pc-logo[data-pf=instagram]{background:var(--pf-instagram)}
+.pc-logo[data-pf=tiktok]{background:var(--pf-tiktok)}
+.pc-logo[data-pf=youtube]{background:var(--pf-youtube)}
+.pc-who{display:flex; flex-direction:column; min-width:0; flex:1}
+.pc-who b,.pc-who h2{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pc-when{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pc-body{display:flex; align-items:flex-start; gap:var(--s-4)}
+.pc-text{flex:1; min-width:0; margin:0; font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink);
+  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden}
+.pc-thumb{flex:none; width:var(--s-16); height:var(--s-16); border-radius:var(--r-control);
+  object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
+.pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;
+  font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.pc-line[data-tone=bad]{color:var(--bad)}
+.pc-foot{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); padding-top:var(--s-3); border-top:var(--bd-soft)}
+
+/* ── القائمةُ المنسدلة («menu()»، D-198): «⋯» على البطاقة والمحرّر ─────────────────────── */
+.menu{position:relative; display:inline-block}
+/* ‏والمطويّةُ لا لوحَ لها: اللوحُ المطلقُ يخرج من صندوق «details» المطويّ فيُقاس ولا يُبلَغ */
+.menu:not([open]) > .menu-list{display:none}
+.menu > summary{list-style:none}
+.menu > summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute; z-index:30; top:calc(100% + var(--s-1)); inset-inline-end:0;
+  width:max-content; min-width:min(15rem, calc(100vw - 2 * var(--s-4))); max-width:min(22rem, calc(100vw - 2 * var(--s-4)));
+  display:flex; flex-direction:column; gap:var(--s-0); padding:var(--s-1);
+  background:var(--dialog); border:var(--bd); border-radius:var(--r-control); box-shadow:var(--sh-3)}
+.menu-caret{display:inline-flex}
+.menu-form{display:block; margin:0}
+.menu-item{display:flex; align-items:center; justify-content:flex-start; gap:var(--s-3); width:100%;
+  min-height:var(--tap); padding:var(--s-2) var(--s-3); border:0; border-radius:var(--r-control);
+  background:transparent; color:var(--ink); text-align:start; text-decoration:none; white-space:normal; font:inherit; cursor:pointer}
+@media(hover:hover){.menu-item:hover{background:var(--hover)}}
+.menu-item > svg{width:var(--icon-md); height:var(--icon-md); flex:none; color:var(--ink-2)}
+.menu-t{display:flex; flex-direction:column; min-width:0}
+.menu-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.menu-t span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.menu-danger .menu-t b{color:var(--bad)}
+
+/* ── المحرّرُ المركّز (D-198): لوحٌ ‏560px بجوار القائمة، وشاشةٌ كاملةٌ دون «lg» ────────────── */
+.ed{display:flex; flex-direction:column; padding:0; min-width:0; scroll-margin-block-start:var(--s-4)}
+.ed-head{display:flex; align-items:center; gap:var(--s-3); padding-block:var(--s-3); padding-inline:var(--s-5) var(--s-4);
+  border-bottom:var(--bd-soft); background:var(--surface); border-start-start-radius:var(--r-card); border-start-end-radius:var(--r-card)}
+.ed-head .pc-who h2,.ed-head .pc-when{white-space:normal; overflow:visible}
+.ed-body{display:flex; flex-direction:column; gap:var(--s-5); padding:var(--s-5)}
+.ed-views{display:flex; flex-direction:column; gap:var(--s-3)}
+.ed-view{min-width:0}
+.ed-x{flex:none}
+.ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
+.ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
+.ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
+.draft-text.ed-txt{height:auto; min-height:calc(8 * var(--lh-body) + var(--s-6)); max-height:60vh; field-sizing:content}
+.ed-read{margin:0; max-width:var(--measure); white-space:pre-wrap; overflow-wrap:anywhere;
+  font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink)}
+.ed-sec{display:flex; flex-direction:column; gap:var(--s-3); padding-top:var(--s-5); border-top:var(--bd-soft);
+  scroll-margin-block-start:var(--s-4)}
+.ed-sec > p{margin:0}
+.ed-sec-head{display:flex; align-items:center; gap:var(--s-2) var(--s-3); flex-wrap:wrap}
+.ed-sec-head h3{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+.ed-sec .pic{margin-top:0}
+.ed-more > summary{display:flex; align-items:center; gap:var(--s-2); min-height:var(--tap); cursor:pointer;
+  font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
+.ed-note{margin:0; max-width:none; padding:var(--s-3) var(--s-4); border-radius:var(--r-control);
+  border-inline-start:var(--s-1) solid var(--warn); background:var(--warn-wash); color:var(--ink);
+  font-size:var(--t-small); line-height:var(--lh-small)}
+.ed-note[data-tone=bad]{border-inline-start-color:var(--bad); background:var(--bad-wash)}
+.ed-on{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
+.ed-on b{color:var(--ink)}
+.ed-more{border-top:var(--bd-soft); padding-top:var(--s-2)}
+.ed-kv{display:grid; grid-template-columns:minmax(7rem,max-content) minmax(0,1fr); gap:var(--s-2) var(--s-4); margin:var(--s-2) 0 var(--s-3)}
+.ed-kv dt{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.ed-kv dd{margin:0; min-width:0; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink); overflow-wrap:anywhere}
+/* ‏والشريطُ ثابتٌ في أسفل اللوح: الفعلُ في متناول الإبهام مهما طال النصّ */
+.ed-bar{position:sticky; bottom:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2);
+  padding:var(--s-3) var(--s-5); padding-bottom:calc(var(--s-3) + var(--safe-b)); background:var(--surface); border-top:var(--bd);
+  border-end-start-radius:var(--r-card); border-end-end-radius:var(--r-card)}
+
+/* ── «متى يُنشر؟»: أزرارٌ بتوقيت المالك أو يومٌ وساعة ────────────────────────────────────── */
+.ed-when{border:0; margin:0; padding:0; min-width:0; display:flex; flex-direction:column; gap:var(--s-2)}
+.ed-when legend{padding:0; margin-bottom:var(--s-1); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
+.when-opts{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,9rem),1fr)); gap:var(--s-2)}
+.when-opt{display:flex; align-items:flex-start; gap:var(--s-2); min-height:var(--tap); padding:var(--s-2) var(--s-3);
+  border:var(--bd-field); border-radius:var(--r-control); background:var(--surface); cursor:pointer}
+.when-opt input{flex:none; margin:var(--s-1) 0 0; accent-color:var(--brand)}
+.when-opt > span{display:flex; flex-direction:column; min-width:0}
+.when-opt b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.when-opt small{font-size:var(--t-small); line-height:var(--lh-small); font-weight:400; color:var(--ink-2)}
+.when-opt:has(input:checked){border-color:var(--ink); background:var(--selected)}
+.when-custom{display:none}
+.ed-when:has(input[value=custom]:checked) .when-custom{display:block}
+@supports not selector(:has(*)){.when-custom{display:block}}
+
+/* ‏اللوحُ بجوار القائمة على العريض: القائمةُ تأخذ ما بقي، واللوحُ ‏26 إلى ‏35rem لاصقٌ بارتفاع الشاشة */
+.posts-list{min-width:0}
+@media${atLeast('lg')}{
+  .posts-split{display:grid; grid-template-columns:minmax(0,1fr) minmax(26rem,35rem); gap:var(--s-6); align-items:start}
+  .posts-split .dcols{columns:1}
+  .posts-split .ed{position:sticky; top:var(--s-4); max-height:calc(100dvh - var(--s-8)); overflow:auto; overscroll-behavior:contain}
+  .posts-split .ed-head{position:sticky; top:0; z-index:6}
+}
+/* ‏ودونه يأخذ اللوحُ الشاشةَ كلَّها فوق القائمة، والإغلاقُ يعيد إليها */
+@media${below('lg')}{
+  .posts-split .ed{position:fixed; inset:0; z-index:60; border-radius:0; border:0; overflow:auto; overscroll-behavior:contain}
+  .posts-split .ed-head{position:sticky; top:0; z-index:6; border-radius:0}
+  .posts-split .ed-bar{border-radius:0}
+}
 /* ══ مسرحُ القرار (D-100) ═══════════════════════════════════════════
    ── صندوقُ التحديد ───────────────────────────────────────────────
    اللصيقةُ هي الهدفُ لا الصندوق: صندوقُ المتصفّح ثلاثةَ عشرَ بكسلا،
@@ -1528,11 +1645,7 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .draft-text{width:100%; box-sizing:border-box; font:inherit; font-size:var(--t-body);
   line-height:var(--lh-body); color:var(--ink); background:var(--bg); border:var(--bd);
   border-radius:var(--r-control); padding:var(--s-3) var(--s-4); resize:vertical;
-  white-space:pre-wrap; word-break:break-word; overflow-y:auto;
-  height:calc(var(--lines) * var(--lh-body) + var(--s-6) + var(--s-1))}
-/* المقروءُ يأخذ قدرَ نصّه بسقف: مربّعٌ ثابتٌ تحت نصٍّ قصير فراغٌ بلا سبب،
-   وتحت نصٍّ طويل تمريرٌ في نصٍّ لا يُحرَّر. */
-.draft-text[data-ro]{height:auto; max-height:calc(var(--lines) * var(--lh-body) + var(--s-6) + var(--s-1))}
+  white-space:pre-wrap; word-break:break-word; overflow-y:auto}
 .draft-text:focus{outline:none; border-color:var(--focus); box-shadow:0 0 0 var(--ring-w) var(--ring)}
 /* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
    على نصٍّ لا يُحرَّر يعد بما لا يقع. */
@@ -1864,8 +1977,6 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 /* والشريطُ السفليُّ للجوّال وحدَه: في المكتب تبقى الرافدةُ عمودا */
 @media${atLeast('md')}{.cmdk-open.more{display:none}}
 @media${below('sm')}{
-  .draft-text{height:calc((var(--lines) + 6) * 26px + 28px)}
-  .draft-text[data-ro]{height:auto; max-height:calc((var(--lines) + 6) * 26px + 28px)}
   .scroll{overflow:visible; margin:0}
   /* **والجدولُ المحوريُّ مستثنًى** (D-151): أعمدتُه أرقامٌ تُقارَن، وتكديسُها
      يُسقط رؤوسَها؛ فيبقى جدولًا ويتمرّر في .pv-wrap كما صُمّم. */

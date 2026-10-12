@@ -199,7 +199,9 @@ for (const file of files) {
           const text = norm(child.textContent ?? '')
           if (text.split(' ').length < 7) continue
           // **وما يُحرَّر ليس نسخةً**: نصُّ مسوّدةٍ في محرّرها بيانٌ لا كلام
-          if (node.closest('textarea, input, [data-palette]') !== null) continue
+          // ‏وكذلك نصُّه مقروءًا (`data-post-text`، D-198): البطاقةُ المختصرة تعرض ثلاثةَ أسطرٍ منه، والمعاينةُ
+          // ‏والمحرّرُ يعرضانه كاملًا. منشورٌ واحدٌ في ثلاثة مواضع بيانٌ يتكرّر لا جملةٌ كُتبت مرّتين
+          if (node.closest('textarea, input, [data-palette], [data-post-text]') !== null) continue
           const bag = nodesByText.get(text) ?? []
           bag.push(pathOf(node))
           nodesByText.set(text, bag)

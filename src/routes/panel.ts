@@ -30,7 +30,7 @@ import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '
 import { analyzeSource } from '../lib/analyze/job'
 import { draftFromIdea, draftPost, ideaProblem, type DraftOutcome } from '../lib/draft/job'
 import { PLATFORMS, type Platform } from '../lib/draft/prompt'
-import { approveMany, decide, listDrafts, undoApprove, undoReject } from '../lib/draft/store'
+import { approveMany, decide, getDraft, listDrafts, saveText, undoApprove, undoReject } from '../lib/draft/store'
 import { journeyCounts } from '../lib/home'
 import { applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts } from '../lib/plan/import'
 import { planImportExpired, planImportScreen } from './ui/planImportView'
@@ -51,7 +51,7 @@ import { verifyAppCredentials } from '../lib/oauth/verify'
 import { LINKEDIN_VERSION, PLATFORM_IDS, PROVIDERS, redirectUri as callbackUri, type Platform as LinkPlatform } from '../lib/oauth/providers'
 import { disconnectAccount, findLinked, REVOKE_PAGE } from '../lib/oauth/disconnect'
 import { versionAge } from '../lib/oauth/version'
-import { requeue, schedulePost, unschedule } from '../lib/schedule/job'
+import { requeue, reschedulePost, schedulePost, unschedule, type ScheduleResult } from '../lib/schedule/job'
 import { missingMedia } from '../lib/schedule/media'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../lib/schedule/spread'
 import { scanDrive } from '../lib/drive/job'
@@ -108,7 +108,7 @@ import {
   cutTitle, privateReach, reachOf, scheduleFromUpload, tiktokNeedsScope, VIDEO_PLATFORMS, type Reach,
 } from '../lib/media/uploads'
 import { captionIssues, captionsFor, readCaptions, saveCaptions, type VideoCaptions } from '../lib/media/captions'
-import { momentLabel, presetAt } from '../lib/time/local'
+import { localToUtc, momentLabel, presetAt } from '../lib/time/local'
 import { currentPhase, gatesOf, readGateFacts } from '../lib/gates'
 import { expiringTokens } from '../lib/token/expiry'
 import { filterOf, platformScreen, tabOf } from './ui/platformView'
@@ -282,7 +282,39 @@ function back(hash: string): Response {
  * إلى اللوح.
  */
 function toCard(part: 'd' | 's', id: string): Response {
-  return /^[0-9a-f-]{8,}$/.test(id) ? back(`${part}-${id}`) : back('posts')
+  return POST_ID.test(id) ? back(`${part}-${id}`) : back('posts')
+}
+
+/** معرّفُ منشورٍ كما يُكتب في العنوان — وما سواه لا يُكتب. */
+const POST_ID = /^[0-9a-f-]{8,}$/
+
+/**
+ * ‏**وفعلٌ من المحرّر يعود إلى المحرّر** (D-198): `?open=<id>` والمرساةُ قسمُه فيه («#ed» رأسُه،
+ * ‏«#ed-when» موعدُه). والمعرّفُ يُفحَص كما في `toCard`.
+ */
+function toEditor(id: string, part: 'ed' | 'ed-when' = 'ed'): Response {
+  return POST_ID.test(id)
+    ? new Response(null, { status: 303, headers: { Location: `/panel?open=${id}#${part}` } })
+    : back('posts')
+}
+
+/** أجاء النموذجُ من المحرّر؟ حقلٌ مخفيٌّ فيه وحدَه، فالبطاقةُ والإشعارُ يعودان كما كانا. */
+function fromEditor(form: FormData): boolean {
+  return form.get('from') === 'editor'
+}
+
+/**
+ * ‏الموعدُ من نموذج المحرّر (D-198) — **زرٌّ تحسبه الخادمُ بتوقيت المالك، أو يومٌ وساعةٌ بتوقيته**،
+ * ‏ثمّ `when` بـ UTC كما يرسله شريطُ البطاقة. فالجدولةُ تقرأ صيغةً واحدة، ولا يُحسَب في رأس أحد.
+ */
+function readWhen(form: FormData, zone: string | null, now: Date): string {
+  const preset = String(form.get('preset') ?? '')
+  const iso = (d: Date | null): string => d === null ? '' : d.toISOString().slice(0, 16)
+  if (preset !== '' && preset !== 'custom') return iso(presetAt(preset, now, zone))
+  const local = String(form.get('local') ?? '')
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local)
+  if (preset === 'custom' || m !== null) return m === null ? '' : iso(localToUtc(+m[1]!, +m[2]!, +m[3]!, +m[4]!, +m[5]!, zone))
+  return String(form.get('when') ?? '')
 }
 
 /** ‏نافذةُ «المنشورات»: ما ترسمه اللوحةُ بطاقاتٍ، وما يوزَّع منه، وما يُنزَل إليه — عددٌ واحد. */
@@ -489,7 +521,15 @@ panel.get('/panel', async (c) => {
   )
   const routes = await readRoutes(c.env.DB)
   const drafts = await listDrafts(c.env.DB, BOARD)
-  const media = await mediaFor(c.env.DB, drafts.map((d) => d.id))
+  /*
+   * ‏**والمحرّرُ المركّزُ من العنوان** (D-198): `?open=<id>` يرسم المنشورَ بجوار القائمة، فيُفتح برابطٍ
+   * ‏ويُحفَظ ويعمل بلا سكربت. والمعرّفُ يُفحَص قبل أن يُسأل عنه، ومنشورٌ أقدمُ من الستّين يُقرأ وحدَه.
+   */
+  const openId = q.get('open') ?? ''
+  const editing = POST_ID.test(openId)
+    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, openId))
+    : null
+  const media = await mediaFor(c.env.DB, [...new Set([...drafts.map((d) => d.id), ...(editing === null ? [] : [editing.id])])])
 
   /*
    * **وذروةُ المنصّات التي في المسوّدات وحدَها** (D-106).
@@ -509,7 +549,7 @@ panel.get('/panel', async (c) => {
     }[] }))
 
   const peaks: Record<string, Peaks> = {}
-  for (const platform of [...new Set(drafts.map((d) => d.platform))]) {
+  for (const platform of [...new Set([...drafts, ...(editing === null ? [] : [editing])].map((d) => d.platform))]) {
     peaks[platform] = await readPeaks(c.env.DB, platform)
   }
   const plan = await latestPlan(c.env.DB)
@@ -681,6 +721,7 @@ panel.get('/panel', async (c) => {
       }),
       knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
       drafts,
+      editing,
       media: media.map((m) => ({
         id: m.id,
         postId: m.postId,
@@ -2220,14 +2261,53 @@ panel.post('/panel/drafts/decide', async (c) => {
 
   const id = String(form.get('id') ?? '')
   const wants = String(form.get('do') ?? '')
-  // النصُّ المرسَل هو المعروض: تُقارنه `decide` بالمحفوظ فتعرف
-  // أعُتمد كما كُتب أم بعد تعديل — والحالةُ تُستنتَج ولا تُسأل
+  const editor = fromEditor(form)
+  const now = new Date()
+  const zone = zoneOf(c.req.header('Cookie') ?? null)
+
+  /*
+   * ‏«احفظ» في المحرّر (D-198): النصُّ يُكتب والمسوّدةُ تبقى تنتظر قرارك، **والفحصُ فحصُ الاعتماد**
+   * ‏(`saveText`)، فلا يُحفَظ ما سيُردّ عند الاعتماد. ويعود إلى المحرّر نفسِه.
+   */
+  if (wants === 'save') {
+    const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
+    await record(c.env.DB, { actor: 'panel', action: 'draft.save', target: id, detail: saved.ok ? 'saved' : `refused:${saved.reason}` }, c.req.raw)
+    await setFlash(c.env, c.req.raw, saved.ok
+      ? { kind: 'ok', text: 'حُفظ النصّ، وما زالت تنتظر قرارك.' }
+      : { kind: 'bad', text: `لم يُحفظ: ${saved.reason}` })
+    return editor ? toEditor(id) : toCard('d', id)
+  }
+
+  /*
+   * ‏النصُّ المرسَل هو المعروض: تُقارنه `decide` بالمحفوظ فتعرف أعُتمد كما كُتب أم بعد تعديل.
+   * ‏**و«اعتمد» على البطاقة المختصرة بلا مربّع** (D-198): البطاقةُ تعرض ثلاثةَ أسطرٍ لا مربّعًا،
+   * ‏فيُعتمَد المحفوظُ كما هو، كما في «اعتمدها كما كُتبت» (`approveMany`).
+   */
+  let text = ''
+  if (wants !== 'reject') {
+    const sent = form.get('text')
+    text = sent === null
+      ? (await c.env.DB.prepare('SELECT text FROM posts WHERE id = ?').bind(id).first<{ text: string }>())?.text ?? ''
+      : String(sent)
+  }
   const result = await decide(
     c.env.DB,
     id,
-    wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text: String(form.get('text') ?? '') },
+    wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text },
     gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
   )
+
+  /*
+   * ‏«اعتمد وجدوِل» (D-198): بعد الاعتماد وحده، **وبـ`schedulePost` نفسِها** بحسابها وموعدها من
+   * ‏النموذج، فالحارسُ واحد (D-019) والاعتمادُ مسجَّلٌ قبلها (D-009).
+   */
+  let scheduled: ScheduleResult | null = null
+  if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
+    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now)
+    await record(c.env.DB, {
+      actor: 'panel', action: 'draft.schedule', target: id, detail: scheduled.ok ? scheduled.at : `refused:${scheduled.reason}`,
+    }, c.req.raw)
+  }
 
   const flash: PanelFlash = !result.ok
     ? { kind: 'bad', text: result.reason }
@@ -2239,16 +2319,23 @@ panel.post('/panel/drafts/decide', async (c) => {
           // واحدٌ يُقلَب، فلا يحتاج سؤالا قبله ويكفيه بابٌ بعده
           undo: { action: '/panel/drafts/undo-reject', id, label: 'تراجَع' },
         }
-      : {
-          kind: 'ok',
-          text:
-            result.status === 'edited'
-              ? 'اعتُمدت بنصّك بعد التعديل — اختر لها حسابًا وموعدًا.'
-              : 'اعتُمدت كما كُتبت — اختر لها حسابًا وموعدًا.',
-          // ‏والاعتمادُ يُتراجَع عنه كالرفض (الخطّة 7.8): «ارفض» على بُعد ‏8px من «اعتمد»،
-          // ‏والضغطةُ الخاطئةُ كانت تُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة
-          undo: { action: '/panel/drafts/undo-approve', id, label: 'تراجَع' },
-        }
+      : scheduled !== null && scheduled.ok
+        ? {
+            kind: 'ok',
+            text: `اعتُمدت وجُدولت على ${platformLabel(scheduled.platform)} (${scheduled.account}) ${ownerWhen(scheduled.at, zone, now)}.`,
+          }
+        : scheduled !== null
+          ? { kind: 'warn', text: `اعتُمدت، وتعذّرت جدولتُها: ${scheduled.reason}` }
+          : {
+              kind: 'ok',
+              text:
+                result.status === 'edited'
+                  ? 'اعتُمدت بنصّك بعد التعديل — اختر لها حسابًا وموعدًا.'
+                  : 'اعتُمدت كما كُتبت — اختر لها حسابًا وموعدًا.',
+              // ‏والاعتمادُ يُتراجَع عنه كالرفض (الخطّة 7.8): «ارفض» على بُعد ‏8px من «اعتمد»،
+              // ‏والضغطةُ الخاطئةُ كانت تُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة
+              undo: { action: '/panel/drafts/undo-approve', id, label: 'تراجَع' },
+            }
 
   await record(
     c.env.DB,
@@ -2261,7 +2348,15 @@ panel.post('/panel/drafts/decide', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  // ‏المعتمَدةُ تنتظر موعدًا، فالعودةُ إلى شريط جدولتها؛ وما سواها إلى رأس بطاقتها
+  /*
+   * ‏ومن المحرّر (D-198): المردودةُ والمعتمَدةُ بلا موعدٍ إلى المحرّر نفسِه (موعدُها فيه)، والمجدولةُ
+   * ‏والمرفوضةُ إلى بطاقتها في القائمة. ومن البطاقة كما كان: المعتمَدةُ إلى شريط جدولتها.
+   */
+  if (editor) {
+    if (!result.ok) return toEditor(id)
+    if (result.status === 'rejected' || scheduled?.ok === true) return toCard('d', id)
+    return toEditor(id, 'ed-when')
+  }
   return toCard(result.ok && result.status !== 'rejected' ? 's' : 'd', id)
 })
 
@@ -2410,7 +2505,8 @@ panel.post('/panel/drafts/schedule', async (c) => {
     c.env.DB,
     id,
     String(form.get('account') ?? ''),
-    String(form.get('when') ?? ''),
+    // ‏و«when» بـ UTC من شريط البطاقة، أو زرٌّ ويومٌ بتوقيت المالك من المحرّر (D-198)
+    readWhen(form, zoneOf(c.req.header('Cookie') ?? null), now),
     now,
   )
 
@@ -2442,6 +2538,7 @@ panel.post('/panel/drafts/schedule', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   // ‏المجدولةُ إلى بطاقتها وموعدُها فيها، والمردودةُ إلى نموذجها حيث يُصلَح ما رُدّ
+  if (fromEditor(form) && !result.ok) return toEditor(id, 'ed-when')
   return toCard(result.ok ? 'd' : 's', id)
 })
 
@@ -2623,6 +2720,27 @@ panel.post('/panel/drafts/unschedule', async (c) => {
   // ‏ومن اللوحة: المسحوبةُ إلى نموذج جدولتها — وهو ما يحتاجه من سحب ليغيّر الموعد
   if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return toCard(result.ok ? 's' : 'd', id)
+})
+
+/**
+ * «غيّر الموعد» من المحرّر (D-198) — **الموعدُ وحدَه، بلا سحبٍ وجدولةٍ من جديد** (`reschedulePost`).
+ * والموعدُ من النموذج كما في «اعتمد وجدوِل» (`readWhen`): زرٌّ بتوقيت المالك، أو يومٌ وساعة.
+ */
+panel.post('/panel/drafts/reschedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+  const id = String(form.get('id') ?? '')
+  const now = new Date()
+  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'draft.reschedule', target: id, detail: result.ok ? result.at : `refused:${result.reason}`,
+  }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
+    : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
+  return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
 })
 
 /**
