@@ -96,7 +96,8 @@ import { CHANNELS, isLinkedInPage, linkStates, listAccounts, SETUP, viewChannels
 import { accountHealth, activeScopes, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
 import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
-import { clock, dayLabel, localParts, zoneOf } from '../lib/time/zone'
+import { clock, dayLabel, localParts } from '../lib/time/zone'
+import { ownerZone } from '../lib/time/ownerZone'
 import { backTo } from '../lib/nav/back'
 import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
@@ -351,7 +352,7 @@ function ownerWhen(at: string, zone: string | null, now: Date): string {
   if (date === null) return at
   const year = localParts(date, zone).year !== localParts(now, zone).year
   const local = `${dayLabel(date, zone, year)} ${clock(date, zone)}`
-  return zone === null ? `${local} بتوقيت UTC` : `${local} بتوقيتك (${clock(date, null)} UTC)`
+  return zone === null ? `${local} بتوقيت غرينتش` : `${local} بتوقيتك (${clock(date, null)} UTC)`
 }
 
 interface SourceRow {
@@ -482,7 +483,7 @@ panel.get('/panel', async (c) => {
   }
   const series = (await dailySpend(c.env.DB, 14)).map((d) => ({ day: d.day, total: d.total }))
   // ‏«هذا الشهر» بتوقيت المالك من كعكة متصفّحه (D-173) — لا من إعدادٍ يُخزَّن
-  const spendMonth = await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date())
+  const spendMonth = await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date())
 
   // حال كلّ مزوّد: مدمَجا كان أو مضافا من اللوحة
   const stored = await listProviders(c.env.DB)
@@ -669,6 +670,7 @@ panel.get('/panel', async (c) => {
   }))
   // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
   const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, 'tiktok'))
+  const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   return page((nonce) =>
     panelPage({
       // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
@@ -676,7 +678,7 @@ panel.get('/panel', async (c) => {
       paused: allowance.settings.paused,
       // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
       draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
-      zone: zoneOf(c.req.header('Cookie') ?? null),
+      zone: ownZone,
       autoEnqueue: allowance.settings.autoEnqueue,
       imageOverlay: allowance.settings.imageOverlay,
       // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
@@ -1805,7 +1807,7 @@ panel.get('/panel/channels/:platform', async (c) => {
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
     // ‏ويومُ المالك من كعكة متصفّحه، لا من إعدادٍ يُخزَّن (D-173)
-    zone: zoneOf(c.req.header('Cookie') ?? null),
+    zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     // ‏ووميضُ الفعل يُقرأ حيث عاد المالك، لا في لوحٍ لم يفتحه
     flash: await takeFlash(c.env, c.req.raw),
     ...(clipReach === undefined ? {} : { reachPublic: clipReach }),
@@ -1940,7 +1942,7 @@ panel.get('/panel/report', async (c) => {
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
     // ‏ما أُنفق هذا الشهر حتّى اليوم، تحت الرأس (ر-10) — حيٌّ من الدفتر لا من التقرير
-    month: await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date()),
+    month: await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date()),
   })
 
   return page((nonce) =>
@@ -1987,7 +1989,7 @@ panel.get('/panel/report/:week', async (c) => {
     suggestions: await openSuggestions(c.env.DB),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
-    month: await spendThisMonth(c.env.DB, zoneOf(c.req.header('Cookie') ?? null), new Date()),
+    month: await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date()),
   })
 
   return page((nonce) =>
@@ -2263,7 +2265,7 @@ panel.post('/panel/drafts/decide', async (c) => {
   const wants = String(form.get('do') ?? '')
   const editor = fromEditor(form)
   const now = new Date()
-  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
 
   /*
    * ‏«احفظ» في المحرّر (D-198): النصُّ يُكتب والمسوّدةُ تبقى تنتظر قرارك، **والفحصُ فحصُ الاعتماد**
@@ -2501,12 +2503,13 @@ panel.post('/panel/drafts/schedule', async (c) => {
 
   const id = String(form.get('id') ?? '')
   const now = new Date()
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const result = await schedulePost(
     c.env.DB,
     id,
     String(form.get('account') ?? ''),
     // ‏و«when» بـ UTC من شريط البطاقة، أو زرٌّ ويومٌ بتوقيت المالك من المحرّر (D-198)
-    readWhen(form, zoneOf(c.req.header('Cookie') ?? null), now),
+    readWhen(form, zone, now),
     now,
   )
 
@@ -2514,7 +2517,7 @@ panel.post('/panel/drafts/schedule', async (c) => {
     ? {
         kind: 'ok',
         text: `جُدولت على ${platformLabel(result.platform)} (${result.account}) ${
-          ownerWhen(result.at, zoneOf(c.req.header('Cookie') ?? null), now)}.`,
+          ownerWhen(result.at, zone, now)}.`,
       }
     : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}` }
 
@@ -2601,7 +2604,7 @@ panel.post('/panel/drafts/spread', async (c) => {
     drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     // ‏وأوّلُ موعدٍ بتوقيت المالك من اللوحة (`local`، D-199)، أو `start` بـ UTC كما يُرسله شريطُ الشاشة
-    readStart(readWhen(gate.form, zoneOf(c.req.header('Cookie') ?? null), now) || gate.form.get('start'), now),
+    readStart(readWhen(gate.form, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), now) || gate.form.get('start'), now),
     gap,
     now,
   )
@@ -2665,7 +2668,7 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   }
 
   // ‏والعددُ بمعدوده (الخطّة 8.3)، وأوّلُ موعدٍ بتوقيت المالك لا بـ UTC (8.2)
-  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const said = first === null
     ? ''
     : done === 1
@@ -2733,7 +2736,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   const form = gate.form
   const id = String(form.get('id') ?? '')
   const now = new Date()
-  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now)
   await record(c.env.DB, {
     actor: 'panel', action: 'draft.reschedule', target: id, detail: result.ok ? result.at : `refused:${result.reason}`,
@@ -3006,7 +3009,7 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   if ('denied' in gate) return gate.denied
   const id = c.req.param('id')
   const now = new Date()
-  const zone = zoneOf(c.req.header('Cookie') ?? null)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const at = presetAt(String(gate.form.get('preset') ?? ''), now, zone)
   const result = at === null ? null : await scheduleFromUpload(c.env.DB, {
     uploadId: id,
@@ -3024,7 +3027,7 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
       ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed === '' ? 'لا منشورَ معتمَدًا بلا موعدٍ من هذا المقطع الآن.' : `تعذّر ${failed}.`}` }
       : {
           kind: result.failed.length === 0 ? 'ok' : 'warn',
-          text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)} ${zone === null ? 'بتوقيت UTC' : 'بتوقيتك'}.`
+          text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)} ${zone === null ? 'بتوقيت غرينتش' : 'بتوقيتك'}.`
             + (failed === '' ? '' : ` وتعذّر ${failed}.`)
             + (reach === null ? '' : ` ${reach}`),
         }
@@ -3053,7 +3056,7 @@ async function planFacts(env: Env, cookie: string | null, now: Date): Promise<Pl
     accounts: await listAccounts(env.DB),
     uploads: await listUploads(env.DB, 200),
     now,
-    zone: zoneOf(cookie) ?? DEFAULT_ZONE,
+    zone: (await ownerZone(env.DB, cookie)) ?? DEFAULT_ZONE,
     publishable: new Set(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id)),
     scheduled,
   }

@@ -223,7 +223,7 @@ const R2stop: Journey = {
       .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight })
       .map((el) => (el.textContent ?? '').trim().replace(/\s+/g, ' ')).filter((t) => t !== ''))
     m.note(`أزرارُ الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
-    const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE idempotency_key LIKE 'draft:%' AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
+    const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     const goal = /اكتب|أنشئ|جديد|اعتمد/
     const screens: string[] = []
@@ -273,11 +273,20 @@ const R2stop: Journey = {
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }))
     const target = page.locator('[data-journey-hit]').first()
     await m.tap(target, `«${stopAt.label}» — أوّلُ ما وافق المقصد`, { key: true })
+    /*
+     * ‏منذ D-195 أوّلُ ما يوافق المقصدَ بابٌ لا فعل: «اكتب من فكرة» ينزل إلى نموذجها. فيمضي المالكُ
+     * ‏فيما وصل إليه، يكتب فكرتَه ويضغط زرَّه — ولا يُحسَب نجاحًا إن ضغط «اعتمد» على مسوّدةٍ قديمة.
+     */
+    const idea = visible(page.locator('form[action="/panel/drafts/idea"]')).first()
+    if ((await idea.count()) > 0) {
+      await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمةُ لا تبطئ القرار، تحميه', 'كتابة الفكرة')
+      await m.tap(button(idea, 'اكتب المسوّدات'), '«اكتب المسوّدات»')
+    }
     const made = drafts()
     const approvedOld = status(stack, stack.seeded.posts.draft)?.status
     return {
-      success: made > 0,
-      verified: `مسوّداتٌ جديدةٌ من المصدر: ${made} · والمسوّدةُ القديمة (قبل 5 ساعات) صارت: ${approvedOld ?? '—'}`,
+      success: made > 0 && approvedOld === 'draft',
+      verified: `مسوّداتٌ جديدة (من مصدرٍ أو فكرة): ${made} · والمسوّدةُ القديمة (قبل 5 ساعات) صارت: ${approvedOld ?? '—'}`,
     }
   },
 }
@@ -463,10 +472,8 @@ const R9: Journey = {
     const was = status(stack, id)?.scheduled_at
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     await m.tap(button(page.locator('#posts, main'), /^مجدولة/), 'تبويب «مجدولة»')
-    // ‏«افتح» على بطاقتها ← المحرّرُ المركّز، و«الأحد 9:00 ص» بتوقيت المالك، و«غيّر الموعد» بلا سحبٍ (D-198)
-    await m.tap(visible(page.locator(`#d-${id} a[data-edit]`)).first(), '«افتح» على المجدولة', { key: true })
-    await m.tap(visible(page.locator('#ed label.when-opt').filter({ hasText: 'الأحد' })).first(), '«الأحد 9:00 ص»')
-    await m.tap(button(page.locator('#ed'), 'غيّر الموعد'), '«غيّر الموعد»')
+    // ‏«انقلها إلى» على بطاقتها نفسِها (D-200): «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح المحرّر
+    await m.tap(button(page.locator(`#d-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة', { key: true })
     m.mark('rescheduled')
     const row = status(stack, id)
     return {

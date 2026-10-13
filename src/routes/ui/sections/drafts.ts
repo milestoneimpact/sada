@@ -39,7 +39,7 @@ import { whenTag } from '../time'
 import { whenField } from '../when'
 import type { Peaks } from '../../../lib/schedule/peak'
 import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
-import { momentLabel } from '../../../lib/time/local'
+import { momentLabel, PRESETS } from '../../../lib/time/local'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -139,6 +139,20 @@ const QUICK: readonly { kind: string; label: string }[] = [
   { kind: 'tomorrow', label: 'غدا 9ص' },
   { kind: 'sunday', label: 'الأحد 9ص' },
 ]
+
+/**
+ * ‏«انقلها إلى» على بطاقة المجدولة نفسِها، خارجَ الطيّة (D-200) — **ضغطةٌ واحدة تغيّر الموعد** بلا فتح المحرّر.
+ * ‏كلُّ زرٍّ يرسل `preset` إلى `reschedule`، فيحسبه الخادمُ بتوقيت المالك كما يحسب أزرارَ المحرّر،
+ * ‏والموعدُ وحدَه يتغيّر (`reschedulePost`) فلا سحبَ ولا جدولةَ من جديد. ولـ«موعدٍ آخر» المحرّرُ كما كان.
+ */
+function quickMove(id: string): string {
+  const buttons = PRESETS.map((p) =>
+    `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
+  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…"
+      role="group" aria-label="انقل الموعد إلى">
+      <input type="hidden" name="id" value="${escapeHtml(id)}">
+      <span class="ago">انقلها إلى</span>${buttons}</form>`
+}
 
 /**
  * شريطُ الجدولة — ولا يظهر إلّا حيث يعمل.
@@ -856,6 +870,7 @@ function card(
     </div>
     <div class="pc-body"><p class="pc-text" dir="auto" data-post-text>${escapeHtml(d.text.replace(/\s*\n\s*/g, ' '))}</p>${pic}</div>
     ${line}
+    ${d.status === 'queued' && d.dispatchedAt === null ? quickMove(d.id) : ''}
     ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media) : ''}
     <div class="pc-foot">
       ${open
