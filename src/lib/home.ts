@@ -20,7 +20,7 @@ import type { Blocker } from './limits'
 import type { Pulse } from './ops/heartbeat'
 import { unsignedAccounts } from './channels'
 import { counted, money, NOUNS, relativeTime } from './format'
-import { clock } from './time/zone'
+import { clock, zoneNote } from './time/zone'
 
 /** عدُّ المنشورات بحالها لكلّ منصّة — ومن القاعدة كلِّها لا من الستّين الأخيرة. */
 export interface PlatformCounts {
@@ -342,14 +342,14 @@ export function systemPill(paused: boolean, pulses: readonly Pulse[]): { readonl
 }
 
 /**
- * متى يُفتح سقفُ اليوم — **بتوقيت المالك، وUTC حين لا يُعرف**.
+ * متى يُفتح سقفُ اليوم — **بتوقيت المالك، والرياض حين لا يُعرف** (D-201).
  *
  * والدفترُ يُجمَع بيوم UTC (`limits.ts`)، فالسقفُ يُفتح عند منتصف ليله. وقولُ
  * «منتصف الليل UTC» وحده يُلزم المالكَ بحسابٍ في رأسه (الخطّة 8.2).
  */
 function capReopens(now: Date, zone: string | null): string {
   const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
-  return zone === null ? 'منتصفَ الليل بتوقيت UTC' : `الساعة ${clock(midnight, zone)} بتوقيتك`
+  return `الساعة ${clock(midnight, zone)}${zoneNote(zone)}`
 }
 
 /**

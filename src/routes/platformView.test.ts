@@ -58,15 +58,17 @@ describe('صفحةُ حساب', () => {
     const html = screen()
     expect(html).toContain('الأحد 6 سبتمبر 2026')
     expect(html).not.toContain('السبت 5 سبتمبر 2026')
-    // والساعةُ المحلّيّةُ كبيرة، وUTC نصٌّ تحتها لا في title
+    // والساعةُ المحلّيّةُ كبيرة، ولا UTC تحتها (D-201): منطقتُه هو فلا تُسمّى
     expect(html).toContain('<b class="np-clock">01:30</b>')
-    expect(html).toContain('22:30 UTC')
+    expect(html).not.toContain('22:30 UTC')
   })
 
-  it('وبلا كعكةِ منطقةٍ تُجمَع الأيّامُ بـ UTC ويُقال ذلك', () => {
+  it('وبلا كعكةِ منطقةٍ تُجمَع الأيّامُ بتوقيت الرياض ويُقال ذلك (D-201)', () => {
     const html = screen({ zone: null })
-    expect(html).toContain('السبت 5 سبتمبر 2026')
-    expect(html).toContain('بتوقيت UTC')
+    expect(html).toContain('الأحد 6 سبتمبر 2026')
+    expect(html).toContain('<b class="np-clock">01:30</b>')
+    expect(html).toContain('بتوقيت الرياض')
+    expect(html).not.toContain('UTC')
   })
 
   it('والفاشلُ في يومه ومعه سببُه بالعربيّة وفعلُه — لا رمزُ الناشر', () => {

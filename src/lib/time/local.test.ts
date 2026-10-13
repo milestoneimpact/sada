@@ -7,10 +7,10 @@ const NOW = new Date('2026-10-04T08:00:00Z')
 const iso = (d: Date | null): string | null => d?.toISOString().slice(0, 16) ?? null
 
 describe('localToUtc', () => {
-  it('بالمنطقة لا بإزاحةٍ ثابتة، وUTC حين لا منطقة، وما لا وجودَ له يُردّ', () => {
+  it('بالمنطقة لا بإزاحةٍ ثابتة، والرياض حين لا منطقة (D-201)، وما لا وجودَ له يُردّ', () => {
     expect(iso(localToUtc(2026, 10, 12, 9, 30, 'Asia/Riyadh'))).toBe('2026-10-12T06:30')
     expect(iso(localToUtc(2026, 7, 1, 12, 0, 'Europe/London'))).toBe('2026-07-01T11:00')
-    expect(iso(localToUtc(2026, 7, 1, 12, 0, null))).toBe('2026-07-01T12:00')
+    expect(iso(localToUtc(2026, 7, 1, 12, 0, null))).toBe('2026-07-01T09:00')
     expect(localToUtc(2026, 2, 31, 10, 0, 'Asia/Riyadh')).toBeNull()
     // ‏ساعةٌ في فجوة الصيف بلندن (29 مارس 2026، من 1:00 إلى 2:00) لا تُصحَّح بصمت
     expect(localToUtc(2026, 3, 29, 1, 30, 'Europe/London')).toBeNull()
@@ -23,8 +23,8 @@ describe('presetAt — الأزرارُ الأربعة بتوقيت المالك
     // ‏اليومُ أحد: فالأحدُ القادم لا اليوم
     expect(iso(presetAt('sunday', NOW, 'Asia/Riyadh'))).toBe('2026-10-11T06:00')
     expect(iso(presetAt('sunday', new Date('2026-10-03T08:00:00Z'), 'Asia/Riyadh'))).toBe('2026-10-04T06:00')
-    // ‏وبلا منطقةٍ يُحسب بـ UTC
-    expect(iso(presetAt('tomorrow', NOW, null))).toBe('2026-10-05T09:00')
+    // ‏وبلا منطقةٍ يُحسب بتوقيت الرياض (D-201)
+    expect(iso(presetAt('tomorrow', NOW, null))).toBe('2026-10-05T06:00')
   })
 
   it('«الليلة 8:00 م» الليلةَ ما لم تمضِ الثامنة، وإلّا فالغد — واليومُ يومُ المالك لا يومُ UTC', () => {

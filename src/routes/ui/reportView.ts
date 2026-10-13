@@ -95,14 +95,14 @@ function sliceCard(s: PlatformSlice): string {
  */
 export interface MonthSpend {
   readonly total: number
-  /** حُسب الشهرُ بـ UTC لأنّ منطقةَ المالك لم تصل — فيُقال. */
+  /** حُسب الشهرُ بتوقيت الرياض لأنّ منطقةَ المالك لم تصل، فيُقال (D-201). */
   readonly utc: boolean
 }
 
 function monthLine(m: MonthSpend | undefined): string {
   if (m === undefined) return ''
   return `<div class="sub">هذا الشهر حتّى اليوم:
-    <a class="tap" href="/panel#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت UTC' : ''}</div>`
+    <a class="tap" href="/panel#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت الرياض' : ''}</div>`
 }
 
 /** جسدُ تقريرٍ واحد. */

@@ -93,7 +93,7 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
     kind: 'budget',
     ref: `budget:${day}`,
     body: `صدى — بلغ إنفاقُ اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +
-      ' وما بعده يُردّ حتّى منتصف الليل UTC أو حتّى تَرفع السقف.',
+      ' وما بعده يُردّ حتّى الثالثة فجرًا بتوقيت الرياض أو حتّى تَرفع السقف.',
   }
 }
 

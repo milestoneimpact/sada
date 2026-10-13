@@ -37,7 +37,7 @@ import {
   classifyQueued, type HistoryFilter, type HistoryPage, type PlatformCounts, type TimelineRow,
 } from '../../lib/platform/timeline'
 import { whyFailed } from '../../lib/publish/reasons'
-import { clock, dayKey, dayLabel } from '../../lib/time/zone'
+import { clock, dayKey, dayLabel, stamp } from '../../lib/time/zone'
 import { ICON } from './icons'
 import { escapeHtml } from './escape'
 import { setupPane } from './channels'
@@ -93,7 +93,7 @@ export interface PlatformScreenData {
   readonly app: AppStatus | undefined
   /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروضُ للنسخ. */
   readonly baseUrl: string
-  /** منطقةُ المالك من كعكة متصفّحه، أو `null` فالأيّامُ بـ UTC (D-173). */
+  /** منطقةُ المالك من كعكة متصفّحه، أو `null` فالأيّامُ بتوقيت الرياض (D-201). */
   readonly zone: string | null
   /** وميضُ آخر فعلٍ عاد إلى هذه الصفحة. */
   readonly flash: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
@@ -150,13 +150,12 @@ function mediaOf(items: readonly PostMedia[] | undefined): { media: NpMedia | nu
   return { media: null, poster: null }
 }
 
-/** سطرُ الوقت خارج الإطار: الساعةُ بتوقيت المالك كبيرةً، وUTC تحتها نصًّا لا في `title`. */
+/** سطرُ الوقت خارج الإطار: الساعةُ بتوقيت المالك كبيرةً، و«بتوقيت الرياض» تحتها حين هي احتياط (D-201). */
 function whenCol(value: string, zone: string | null, opts: { day?: boolean; rel?: string | undefined; state: string }): string {
   const local = clock(value, zone)
-  const utc = clock(value, null)
   return `${opts.day === true ? `<span class="np-dayl">${escapeHtml(dayLabel(value, zone, false))}</span>` : ''}
     <b class="np-clock">${escapeHtml(local)}</b>
-    <span class="np-utc">${zone === null ? 'UTC' : `${escapeHtml(utc)} UTC`}</span>
+    ${zone === null ? '<span class="np-utc">بتوقيت الرياض</span>' : ''}
     ${opts.rel === undefined ? '' : `<span class="ago">${escapeHtml(opts.rel)}</span>`}
     ${opts.state}`
 }
@@ -248,7 +247,7 @@ function capabilityTable(rows: readonly Capability[]): string {
  */
 function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): string {
   const when = (at: string | null, none: string): string =>
-    at === null ? none : `<span title="${escapeHtml(at)} UTC">${escapeHtml(relativeTime(at, now))}</span>`
+    at === null ? none : `<span title="${escapeHtml(stamp(at, null))}">${escapeHtml(relativeTime(at, now))}</span>`
   /*
    * ‏**والموعدُ القادمُ يُعَدّ إلى الأمام** (ر-1): `relativeTime` للماضي وتحصر الفرقَ
    * ‏بالصفر، فكان كلُّ انتهاءٍ قادمٍ «الآن» — «إذنُ الوصول ينتهي الآن · والتجديدُ الآن»
@@ -257,7 +256,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
   const ends = (at: string): string => {
     const date = parseSqliteUtc(at)
     const past = date !== null && date.getTime() <= now.getTime()
-    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(at)} UTC">${escapeHtml(past
+    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(stamp(at, null))}">${escapeHtml(past
       ? relativeTime(at, now)
       : untilTime(at, now))}</span>`
   }
@@ -902,7 +901,7 @@ export function platformScreen(d: PlatformScreenData): string {
   const head = accountHeader(d, r)
   // ‏وما ينتظر يُقال في زرّ الرأس وعددِ التبويب، لا في شريطٍ ثالثٍ يدفع المنشوراتِ إلى الأسفل
   const zoneNote = d.zone === null && (d.tab === 'posts' || d.tab === 'waiting')
-    ? '<p class="hint">الأيّامُ والساعاتُ بتوقيت UTC — يُعرف توقيتُك من الفتحة التالية.</p>'
+    ? '<p class="hint">الأيّامُ والساعاتُ بتوقيت الرياض.</p>'
     : ''
   const body = d.tab === 'setup'
     ? setupSection(d, r)

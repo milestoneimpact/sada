@@ -394,7 +394,7 @@ const journey: Journey = {
     // وما على الصورة يُقال في محطّتها (D-162) — فيدخل المعجمَ والفيضَ كسائرها
     { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثرٌ يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
     { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'panel:passkey — عُدّل السطرُ الأخير', cost: null, model: null, state: 'done' },
-    { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ UTC على عمر عبدالحميد', cost: null, model: null, state: 'done' },
+    { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ بتوقيت الرياض على عمر عبدالحميد', cost: null, model: null, state: 'done' },
     { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولةُ الأولى — نجحت', cost: 0, model: null, state: 'done' },
     { kind: 'metrics', title: 'قياسُ ‏٢٤ ساعة', at: null, detail: 'أوّلُ قياسٍ بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
   ],

@@ -115,11 +115,11 @@ describe('هذا الشهر تحت الرأس (ر-10)', () => {
     expect(html).toMatch(/<div class="sub">هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">0\.390\$<\/a><\/div>/)
   })
 
-  it('ويُرسَم ولو لم يُكتب تقريرٌ بعد، ويقول UTC حين غابت منطقةُ المالك', () => {
+  it('ويُرسَم ولو لم يُكتب تقريرٌ بعد، ويقول «بتوقيت الرياض» حين غابت منطقةُ المالك (D-201)', () => {
     const html = reportScreen({
       reports: [], current: null, suggestions: [], promoCapUsd: 0, now: NOW, month: { total: 0, utc: true },
     })
-    expect(html).toContain('href="/panel#c2">0.00$</a> بتوقيت UTC')
+    expect(html).toContain('href="/panel#c2">0.00$</a> بتوقيت الرياض')
   })
 })
 

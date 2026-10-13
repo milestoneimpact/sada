@@ -1,6 +1,6 @@
 /** يومُ المالك من كعكته (D-173) — والمنطقةُ الفاسدة لا تُسقط شيئا. */
 import { describe, expect, it } from 'vitest'
-import { clock, dayKey, dayLabel, dayMonth, dayRange, monthStart, validZone, zoneOf } from './zone'
+import { clock, dayKey, dayLabel, dayMonth, dayRange, monthStart, validZone, zoneOf, FALLBACK_ZONE, zoneNote, stamp } from './zone'
 
 describe('المنطقة', () => {
   it('تُقبل ما يقبله Intl، ويُردّ ما سواه', () => {
@@ -22,7 +22,7 @@ describe('المنطقة', () => {
 describe('اليوم', () => {
   it('ليلُ UTC صباحُ الرياض — فيقع في يومه لا في يوم UTC', () => {
     expect(dayKey('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('2026-09-06')
-    expect(dayKey('2026-09-05 22:30:00', null)).toBe('2026-09-05')
+    expect(dayKey('2026-09-05 22:30:00', null)).toBe('2026-09-06')
     expect(dayLabel('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('الأحد 6 سبتمبر 2026')
     expect(clock('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('01:30')
   })
@@ -63,8 +63,20 @@ describe('أوّلُ الشهر بتوقيت المالك', () => {
   it('الرياض: منتصفُ ليل الأوّل بتوقيتها، أي 21:00 من آخر الشهر قبله بـ UTC', () => {
     expect(monthStart(new Date('2026-09-30T22:00:00Z'), 'Asia/Riyadh').toISOString())
       .toBe('2026-09-30T21:00:00.000Z')
+    // ‏وبلا منطقةٍ فالرياضُ نفسُها (D-201)، لا شهرُ UTC
     expect(monthStart(new Date('2026-09-30T22:00:00Z'), null).toISOString())
-      .toBe('2026-09-01T00:00:00.000Z')
+      .toBe('2026-09-30T21:00:00.000Z')
+  })
+})
+
+describe('الاحتياطُ بتوقيت الرياض لا غرينتش (D-201)', () => {
+  it('أوّلُ زيارةٍ: 06:00Z تُرى 09:00 ويُقال «بتوقيت الرياض»', () => {
+    expect(FALLBACK_ZONE).toBe('Asia/Riyadh')
+    expect(clock('2026-10-05 06:00:00', null)).toBe('09:00')
+    expect(zoneNote(null)).toBe(' بتوقيت الرياض')
+    expect(zoneNote('Asia/Riyadh')).toBe('')
+    expect(stamp('2026-10-05 06:00:00', null)).toBe('2026-10-05 09:00 بتوقيت الرياض')
+    expect(stamp('2026-10-05T06:00:00.000Z', 'Europe/London')).toBe('2026-10-05 07:00')
   })
 
   it('ونيويورك عبر التوقيت الصيفيّ: الإزاحةُ تُقرأ ولا تُثبَّت', () => {

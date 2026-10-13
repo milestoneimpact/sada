@@ -28,6 +28,15 @@
  */
 import { escapeHtml } from './escape'
 import { parseSqliteUtc } from '../../lib/format'
+import { FALLBACK_ZONE, stamp } from '../../lib/time/zone'
+
+/*
+ * ## وبتوقيت الرياض لا بـ UTC (D-201)
+ *
+ * كان الوسمُ يكتب `UTC` نصًّا. والمالكُ في المملكة قال: «الوقتُ بتوقيت المملكة، وليس
+ * غرينتش». فيُكتب الوقتُ بتوقيت الرياض معلنًا، ولا يزيد النصُّ البرمجيُّ سطرًا إلّا
+ * لمتصفّحٍ في منطقةٍ أخرى. والتخزينُ باقٍ UTC.
+ */
 
 /**
  * وسمُ موعد — **`UTC` مكتوبةٌ فيه، والمحلّيُّ يُضاف إليه**.
@@ -41,10 +50,10 @@ export function whenTag(value: string | null, opts: { readonly label?: string } 
   if (date === null) return escapeHtml(value)
 
   const iso = date.toISOString()
-  const utc = `${iso.slice(0, 10)} ${iso.slice(11, 16)}`
+  const said = stamp(date, FALLBACK_ZONE)
   const head = opts.label === undefined ? '' : `${escapeHtml(opts.label)} `
   return `${head}<time class="when-t" datetime="${iso}" data-when-utc>` +
-    `<b>${escapeHtml(utc)}</b> <span class="tz">UTC</span></time>`
+    `<b>${escapeHtml(said)}</b> <span class="tz">بتوقيت الرياض</span></time>`
 }
 
 /**
@@ -64,6 +73,7 @@ export const TIME_SCRIPT = `
   if(tags.length===0)return;
   var tz='';
   try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
+  if(tz==='${FALLBACK_ZONE}')return;
   tags.forEach(function(t){
     var at=new Date(t.getAttribute('datetime'));
     if(isNaN(at.getTime()))return;

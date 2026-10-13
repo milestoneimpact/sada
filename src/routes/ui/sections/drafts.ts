@@ -40,6 +40,7 @@ import { whenField } from '../when'
 import type { Peaks } from '../../../lib/schedule/peak'
 import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
 import { momentLabel, PRESETS } from '../../../lib/time/local'
+import { clock, zoneNote } from '../../../lib/time/zone'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -172,6 +173,7 @@ function scheduler(
   pageOnly: readonly string[],
   peaks: Peaks | undefined,
   media: readonly MediaView[],
+  zone: string | null,
 ): string {
   const approved = d.status === 'approved' || d.status === 'edited'
   // ‏والشريطُ مرساةٌ بحاله كلّها: «اعتمد» و«اسحب الموعد» و«أعده إلى المعتمَد» تعود إليه
@@ -277,7 +279,7 @@ function scheduler(
       <div class="field"><label for="wh-${id}">اليوم والساعة بتوقيتك</label>
         <input id="wh-${id}" name="local" type="datetime-local" data-when data-local
           min="${escapeHtml(earliest)}"></div>
-      ${peakLine(peaks)}
+      ${peakLine(peaks, zone, now)}
     </details>
   </form>`
 }
@@ -299,7 +301,7 @@ export function requeueForm(id: string, primary: boolean): string {
  * والساعةُ تُقال بوسمها فتصير سطرين كسائر المواعيد — **فلا رقمٌ بلا
  * منطقةٍ في شاشةٍ كلُّها بمنطقتين**.
  */
-function peakLine(peaks: Peaks | undefined): string {
+function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): string {
   if (peaks === undefined) return ''
   if (peaks.hours.length === 0) {
     return peaks.why === null
@@ -309,10 +311,10 @@ function peakLine(peaks: Peaks | undefined): string {
   }
   const said = peaks.hours
     .map((h) => `<span class="chip mono" title="وسيطُ التفاعل ${h.median} في ${h.posts} منشورات"
-      >${String(h.hour).padStart(2, '0')}:00</span>`)
+      >${clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)}</span>`)
     .join('')
   return `<p class="hint peak"><b>أعلى تفاعلٍ قِيس</b> عند ${said}
-    <span class="ago">بـ UTC · من ${peaks.samples} منشوراتٍ نُشرت وقِيست — خبرٌ لا أمر.</span></p>`
+    <span class="ago">${zone === null ? 'بتوقيت الرياض · ' : ''}من ${peaks.samples} منشوراتٍ نُشرت وقِيست — خبرٌ لا أمر.</span></p>`
 }
 
 /**
@@ -734,11 +736,11 @@ export function notesPane(d: DraftRow, counted: number, hardLimit: number): stri
   </details>`
 }
 
-/** موعدٌ بتوقيت المالك، و«UTC» معلنةً حين لم تصل منطقتُه. */
+/** موعدٌ بتوقيت المالك، و«بتوقيت الرياض» حين لم تصل منطقتُه (D-201). */
 function ownerMoment(at: string, zone: string | null, now: Date): string {
   const date = parseSqliteUtc(at)
   if (date === null) return at
-  return `${momentLabel(date, zone, now)}${zone === null ? ' UTC' : ''}`
+  return `${momentLabel(date, zone, now)}${zoneNote(zone)}`
 }
 
 /** شعارُ المنصّة على أرض لونها ‏24px (D-198) — في البطاقة المختصرة والمحرّر. */
@@ -871,7 +873,7 @@ function card(
     <div class="pc-body"><p class="pc-text" dir="auto" data-post-text>${escapeHtml(d.text.replace(/\s*\n\s*/g, ' '))}</p>${pic}</div>
     ${line}
     ${d.status === 'queued' && d.dispatchedAt === null ? quickMove(d.id) : ''}
-    ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media) : ''}
+    ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone) : ''}
     <div class="pc-foot">
       ${open
         ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
@@ -893,7 +895,7 @@ function card(
       ${open ? preview(d, spec.label) : ''}
       ${editDiff(d)}
       ${imagePane(d, media, lines)}
-      ${ready ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media)}
+      ${ready ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone)}
       <div class="draft-meta">${meta}</div>
     </details>`}
   </div>`

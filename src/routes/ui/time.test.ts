@@ -9,11 +9,11 @@ import { TIME_SCRIPT, whenTag } from './time'
 import { STYLE } from './styles'
 import { sheet } from '../../test/css'
 
-describe('وسمُ الموعد — والـUTC مكتوبةٌ في الوسم', () => {
-  it('**يحمل UTC نصّا لا في title وحدَه**', () => {
+describe('وسمُ الموعد — بتوقيت الرياض مكتوبًا في الوسم (D-201)', () => {
+  it('**يحمل وقتَ الرياض نصًّا، لا UTC**', () => {
     const html = whenTag('2026-09-08 19:30:00')
-    expect(html).toContain('2026-09-08 19:30')
-    expect(html).toContain('UTC')
+    expect(html).toContain('<b>2026-09-08 22:30</b> <span class="tz">بتوقيت الرياض</span>')
+    expect(html).not.toContain('UTC</span>')
   })
 
   /** **و`datetime` بصيغة ISO**: هي التي يقرؤها `Date` في كلّ متصفّح. */

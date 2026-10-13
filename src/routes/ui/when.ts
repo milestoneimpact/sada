@@ -4,7 +4,7 @@
  * ‏في ملفٍّ وحدَه لأنّ المحرّرَ يقرأ من `sections/drafts` و«المسوّداتُ» تقرؤه، وحلقةٌ بينهما يردّها `audit_cycles`.
  */
 import type { Peaks } from '../../lib/schedule/peak'
-import { clock, dayLabel, localParts } from '../../lib/time/zone'
+import { clock, dayLabel, localParts, zoneNote } from '../../lib/time/zone'
 import { presetAt, PRESETS } from '../../lib/time/local'
 import { escapeHtml } from './escape'
 import { field } from './components/field'
@@ -21,14 +21,14 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
   if (peaks === undefined || peaks.hours.length === 0) return ''
   const said = peaks.hours.map((h) =>
     clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)).join(' · ')
-  return `<p class="hint m-0">أعلى تفاعلٍ قِيس عندك: <bdi>${escapeHtml(said)}</bdi>${zone === null ? ' بتوقيت غرينتش' : ''}، من ${peaks.samples} منشوراتٍ قِيست.</p>`
+  return `<p class="hint m-0">أعلى تفاعلٍ قِيس عندك: <bdi>${escapeHtml(said)}</bdi>${zoneNote(zone)}، من ${peaks.samples} منشوراتٍ قِيست.</p>`
 }
 
 /**
  * «متى يُنشر؟» — **أزرارٌ يحسبها الخادمُ بتوقيت المالك، أو يومٌ وساعة**.
  *
  * وتحت كلّ زرٍّ يومُه أو ساعتُه محسوبةً الآن، فيُقرأ ما سيُختار قبل الضغط. والحقلُ الحرُّ يُفسَّر
- * بمنطقة المالك من كعكته (D-173)، وبالمنطقة المحفوظة إن غابت (D-200)، **وبتوقيت غرينتش معلنًا** في أوّل زيارةٍ حقًّا.
+ * بمنطقة المالك من كعكته (D-173)، وبالمنطقة المحفوظة إن غابت (D-200)، **وبتوقيت الرياض معلنًا** في أوّل زيارةٍ حقًّا (D-201).
  */
 export function whenField(form: string, zone: string | null, now: Date, peaks: Peaks | undefined, legend = 'متى يُنشر؟'): string {
   const opts = PRESETS.map((p) => {
@@ -39,14 +39,14 @@ export function whenField(form: string, zone: string | null, now: Date, peaks: P
   }).join('')
   return `<fieldset class="ed-when">
     <legend>${escapeHtml(legend)}</legend>
-    <p class="hint m-0">${zone === null ? 'بتوقيت غرينتش في هذه الزيارة الأولى، ومن الفتحة التالية بتوقيتك.' : `بتوقيتك (<bdi dir="ltr">${escapeHtml(zone)}</bdi>)`}</p>
+    ${zone === null ? '<p class="hint m-0">بتوقيت الرياض.</p>' : ''}
     <div class="when-opts">${opts}
       <label class="when-opt"><input type="radio" name="preset" value="custom" form="${form}">
         <span><b>موعدٌ آخر</b><small>تختار اليوم والساعة</small></span></label>
     </div>
     <div class="when-custom">${field({
       id: `${form}-local`,
-      label: zone === null ? 'اليوم والساعة (بتوقيت غرينتش)' : 'اليوم والساعة',
+      label: zone === null ? 'اليوم والساعة (بتوقيت الرياض)' : 'اليوم والساعة',
       control: `<input type="datetime-local" name="local" form="${form}" min="${escapeHtml(earliestLocal(now, zone))}">`,
     })}</div>
     ${peakLine(peaks, zone, now)}

@@ -4,6 +4,7 @@
  * وقاموسُ الأفعال هنا **ناقصٌ عمدا**: فعلٌ لا اسمَ له بالعربيّة يُعرض
  * باسمه الحرفيّ لا بـ«غير معروف». سجلٌّ يُخفي ما لا يفهمه ليس سجلّا.
  */
+import { stamp } from '../../../lib/time/zone'
 import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../escape'
@@ -42,7 +43,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
       x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${
       x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : ''}</div>
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
-    <td data-label="فُتحت"><span title="${escapeHtml(x.at)} UTC">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
+    <td data-label="فُتحت"><span title="${escapeHtml(stamp(x.at, null))}">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td data-label="">${x.current
       ? statusBadge('ok', '●', 'جلستك')
       : `<form class="inline" method="POST" action="/panel/sessions/revoke"
@@ -53,16 +54,16 @@ export function securitySection(d: PanelData): SecurityMarkup {
 
   const passkeys = d.factors.passkeys.map((k) => `<tr>
     <td><div class="nm">${escapeHtml(k.label)}</div></td>
-    <td data-label="سُجّل"><span title="${escapeHtml(k.createdAt)} UTC">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
+    <td data-label="سُجّل"><span title="${escapeHtml(stamp(k.createdAt, null))}">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
       ? statusBadge('idle', '○', 'لم يُستعمل')
-      : `<span title="${escapeHtml(k.lastUsedAt)} UTC">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
+      : `<span title="${escapeHtml(stamp(k.lastUsedAt, null))}">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
     <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
           data-label="${escapeHtml(k.label)}">احذف</button></td>
   </tr>`).join('')
 
   const audit = d.audit.map((a) => `<tr>
-    <td><span title="${escapeHtml(a.at)} UTC">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
+    <td><span title="${escapeHtml(stamp(a.at, null))}">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
     <td data-label="الفعل"><div class="nm">${escapeHtml(actionLabel(a.action))}</div>
       <div class="mono">${escapeHtml(a.action)}</div></td>
     <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}

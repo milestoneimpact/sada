@@ -10,6 +10,7 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
@@ -498,7 +499,7 @@ function sourceRow(s: PanelSource, now: Date): string {
         <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
-    <td data-label="آخر ظهور"><span title="${escapeHtml(s.lastSeenAt)} UTC">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
+    <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, null))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
     <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row acts">${acts}</div>`}</td>
   </tr>`
 }
@@ -647,7 +648,7 @@ function todayList(d: PanelData): string {
   return `<div class="card"><h2>ما وقع اليوم</h2>
       <p class="hint">يُروى ممّا قُرئ — ولا يُفتَح له استعلام</p>
       ${rows === ''
-        ? emptyState({ title: 'لم يقع شيءٌ بعد', html: 'منذ منتصف الليل UTC.' })
+        ? emptyState({ title: 'لم يقع شيءٌ بعد', html: 'منذ الثالثة فجرًا بتوقيت الرياض.' })
         : `<ul class="todo">${rows}</ul>${more}`}</div>`
 }
 
@@ -1146,7 +1147,7 @@ ${pivotPane(d.pivot)}
   <div class="card mt-3"><h2>الإدراج الآليّ</h2>
     <div class="split">
       <p>${d.autoEnqueue
-        ? `مرفوع: المسح اليوميّ (3 فجرا UTC) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
+        ? `مرفوع: المسح اليوميّ (السادسة صباحًا بتوقيت الرياض) يُدرج ما تغيّر في طابور الفهم، بما بقي من سقف اليوم لا بما وجد. وما يفيض يُترك لغد.`
         : `مطفأ: المسح يرصد ما تغيّر ولا يحلّل شيئا حتّى تضغط «حلّل الآن». ورفعُه يجعل الخطّ كاملا — مستندٌ تعدّله يظهر محلَّلا في اللوحة صباحا.`}</p>
       <form class="inline" method="POST" action="/panel/settings"
             data-confirm="${d.autoEnqueue
@@ -1294,7 +1295,7 @@ ${pivotPane(d.pivot)}
 </section>
 
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
-  <span class="mono">${escapeHtml(d.now.toISOString().slice(0, 16).replace('T', ' '))} UTC</span></footer>
+  <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
 </main>
 </div>
 </div>`

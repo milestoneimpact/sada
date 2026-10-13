@@ -122,7 +122,7 @@ export const TILES: readonly TileSpec[] = [
       value: String(d.usedAnalyses),
       em: `/ ${d.analysisCap}`,
       bar: { used: d.usedAnalyses, cap: d.analysisCap },
-      note: 'يُصفَّر عند منتصف الليل UTC',
+      note: 'يُصفَّر عند الثالثة فجرًا بتوقيت الرياض',
     }),
   },
   {
@@ -164,7 +164,7 @@ export const TILES: readonly TileSpec[] = [
     why: 'ما أُنفق منذ أوّل الشهر بتوقيتك، على الكتابة والصور والنشر معًا.',
     of: (d, f) => ({
       value: f.money(d.spendMonth.total),
-      note: d.spendMonth.utc ? 'منذ أوّل الشهر بتوقيت UTC' : 'منذ أوّل الشهر',
+      note: d.spendMonth.utc ? 'منذ أوّل الشهر بتوقيت الرياض' : 'منذ أوّل الشهر',
     }),
   },
   {
