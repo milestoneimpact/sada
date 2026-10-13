@@ -297,13 +297,13 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
   const stop = by('R-2·stop', 'phone')
   const ok = by('R-2', 'phone')
   if (stop !== undefined) {
-    lines.push('', '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
+    lines.push('', stop.success ? '## ر-2 على الهاتف: أين يقف مالكٌ يبحث عن «اكتب»' : '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
     lines.push('مالكٌ يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرٍّ رئيسيٍّ يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
     for (const n of stop.notes.filter((x) => x.startsWith('شاشة'))) lines.push(`- ${n}`)
     for (const n of stop.notes.filter((x) => !x.startsWith('شاشة') && !x.startsWith('⚠'))) lines.push(`- ${n}`)
     lines.push(`- **وما وقع حين ضغطه:** ${stop.verified}. والإشعار: ${stop.flashes.map((f) => `«${f}»`).join(' · ') || '—'}`)
     if (ok !== undefined) {
-      lines.push(`- **والمسارُ الذي يعمل** (ر-2): ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة) حتّى «اكتب مسوّدة» ثمّ «اعتمد» — والبطاقةُ في آخر «المنشورات» تحت المسوّدات كلّها.`)
+      lines.push(`- **والمسارُ الذي يعمل** (ر-2): ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة) من تبويب «اكتب» حتّى «اكتب مسوّدة» ثمّ «اعتمد».`)
     }
   }
 
