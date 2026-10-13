@@ -202,9 +202,10 @@ describe('بطاقتا الإنفاق (ر-10)', () => {
     const v = tile('spend_month').of(src, fmt)
     expect(v.value).toBe('9.40$')
     expect(v.note).toBe('منذ أوّل الشهر')
-    // ‏وحين غابت منطقةُ المالك يُقال إنّه بـ UTC ولا يُترك ليُظنّ بتوقيته
-    expect(tile('spend_month').of({ ...src, spendMonth: { total: 1, utc: true } }, fmt).note)
-      .toContain('UTC')
+    // ‏وحين غابت منطقةُ المالك يُحسَب بتوقيت الرياض ويُقال (D-201)، ولا «UTC» في وجهه
+    const note = tile('spend_month').of({ ...src, spendMonth: { total: 1, utc: true } }, fmt).note
+    expect(note).toBe('منذ أوّل الشهر بتوقيت الرياض')
+    expect(note).not.toContain('UTC')
   })
 
   /** **ووصفُ «30 يومًا» صادق**: آخرُ ثلاثين يومًا، لا «المجموعُ الشهريّ». */

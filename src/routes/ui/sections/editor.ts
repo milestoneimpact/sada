@@ -23,6 +23,7 @@ import type { Peaks } from '../../../lib/schedule/peak'
 import { missingMedia } from '../../../lib/schedule/media'
 import { CLIP_PLATFORMS } from '../../../lib/platform/needs'
 import { money, parseSqliteUtc, relativeTime } from '../../../lib/format'
+import { zoneNote } from '../../../lib/time/zone'
 import { momentLabel, presetAt } from '../../../lib/time/local'
 import { whyFailed } from '../../../lib/publish/reasons'
 import { escapeHtml } from '../escape'
@@ -52,11 +53,11 @@ export interface EditorInput {
 
 
 
-/** موعدٌ بتوقيت المالك، و«UTC» معلنةً حين لم تصل منطقتُه. */
+/** موعدٌ بتوقيت المالك، و«بتوقيت الرياض» حين لم تصل منطقتُه (D-201). */
 function ownerTime(at: string | null, zone: string | null, now: Date): string {
   const date = at === null ? null : parseSqliteUtc(at)
   if (date === null) return ''
-  return `${momentLabel(date, zone, now)}${zone === null ? ' UTC' : ''}`
+  return `${momentLabel(date, zone, now)}${zoneNote(zone)}`
 }
 
 

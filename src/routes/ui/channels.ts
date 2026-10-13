@@ -17,6 +17,7 @@
  * سرّ، **ولا شيء** حيث لم يُبنَ سائق. وزرٌّ يُعرض ثمّ يقول «غير مدعوم»
  * أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا في نضج النظام.
  */
+import { stamp } from '../../lib/time/zone'
 import { callbackStep, SETUP, setupHref, tokenHealth, unsignedAccounts, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { wizardFor, type Step } from '../../lib/oauth/wizard'
@@ -332,7 +333,7 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? statusBadge('bad', '▲', 'جدّد الإذن')
-          : `<span class="ago" title="${escapeHtml(a.createdAt)} UTC">رُبط ${escapeHtml(
+          : `<span class="ago" title="${escapeHtml(stamp(a.createdAt, null))}">رُبط ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
       </div>`,
@@ -430,8 +431,8 @@ export function tokenDays(
   const h = tokenHealth({ expiresAt, ...renew }, now)
   if (h === null || expiresAt === null) return ''
   const title = renew.renewable === true
-    ? `title="يتجدّد إذنُ الوصول وحده${h.kind === 'auto' && h.at === null ? '' : ` حتّى ${escapeHtml(h.at ?? '')} UTC`}"`
-    : `title="ينتهي إذنُ الوصول ${escapeHtml(expiresAt)} UTC"`
+    ? `title="يتجدّد إذنُ الوصول وحده${h.kind === 'auto' && h.at === null ? '' : ` حتّى ${escapeHtml(stamp(h.at ?? '', null))}`}"`
+    : `title="ينتهي إذنُ الوصول ${escapeHtml(stamp(expiresAt, null))}"`
   switch (h.kind) {
     case 'expired':
       return statusBadge('bad', '▲', 'انتهى الإذن', title)
@@ -439,7 +440,7 @@ export function tokenDays(
       // ‏والعددُ بمعدوده (D-183): كان «يبقى 2 يومان» و«الإذن 9 يوما»
       return statusBadge('warn', '◍', h.days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(h.days, NOUNS.day)} للإذن`, title)
     case 'overdue':
-      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(h.at)} UTC وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
+      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(stamp(h.at, null))} وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
     case 'auto':
       return `<span class="chip" ${title}>يتجدّد تلقائيًّا</span>`
     case 'ok':

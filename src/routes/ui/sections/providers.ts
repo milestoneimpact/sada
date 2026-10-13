@@ -5,6 +5,7 @@
  * ما حوله. ومنطقُه لم يتبدّل — بناءُ نصٍّ محضٌ من بياناتٍ جاهزة، فلا
  * قاعدةَ يقرأها ولا حارسَ يمرّ به.
  */
+import { stamp } from '../../../lib/time/zone'
 import { money, relativeTime } from '../../../lib/format'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
@@ -141,7 +142,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <div class="card tile"><div class="kv-k">إنفاقُ اليوم على الذكاء</div>
       <div class="kv-v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
       ${bar(spentToday, d.spendCap)}
-      <div class="note">مجموعُ ما أنفقه المزوّدون اليوم · يُصفَّر منتصفَ الليل UTC</div></div>
+      <div class="note">مجموعُ ما أنفقه المزوّدون اليوم · يُصفَّر الثالثةَ فجرًا بتوقيت الرياض</div></div>
     <div class="card tile"><div class="kv-k">مهامٌّ جاهزة</div>
       <div class="kv-v">${tasksReady}<em> / ${d.routing.length}</em></div>
       ${bar(tasksReady, Math.max(1, d.routing.length))}
@@ -165,7 +166,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         ? statusBadge('warn', '▲', 'معطَّل')
         : p.verifiedAt === null
           ? statusBadge('idle', '○', 'لم يُختبر')
-          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(p.verifiedAt)} UTC"`)}`
+          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(stamp(p.verifiedAt, null))}"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'

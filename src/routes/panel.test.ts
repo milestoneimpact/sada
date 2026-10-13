@@ -661,7 +661,8 @@ describe('نضج العرض', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toMatch(/الآن|قبل /)
-    expect(html).toContain('UTC')
+    // ‏والدقيقُ في title بتوقيت الرياض لا UTC (D-201)
+    expect(html).toMatch(/title="\d{4}-\d\d-\d\d \d\d:\d\d بتوقيت الرياض"/)
   })
 
   it('الحالة تحمل رمزا ونصّا — لا لونا وحده', async () => {
@@ -2256,7 +2257,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     }), env)
     expect(where(done)).toBe(`/panel#d-${id}`)
     let html = await (await app.request('/panel', withSession(riyadh), env)).text()
-    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00 بتوقيتك (06:00 UTC).')
+    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00.')
     expect(html).not.toContain('أوّل دورة')
 
     const pulled = await post(cookie, '/panel/drafts/unschedule', { id })
@@ -2265,13 +2266,13 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     // ‏وبلا كعكة المنطقة تُقرأ المنطقةُ التي حُفظت من آخر كعكة (D-200)، لا «UTC»
     await post(cookie, '/panel/drafts/schedule', { id, account, when: '2030-03-04T06:00' })
     html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00 بتوقيتك (06:00 UTC).')
-    // ‏ولا يُفسَّر الوقتُ بمنطقةٍ مفترَضة حين لم تُعرف قطّ: «بتوقيت غرينتش» صراحةً
+    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00.')
+    // ‏وحين لم تُعرف منطقةٌ قطّ فبتوقيت الرياض معلنًا (D-201): 06:00Z هي 09:00 بالرياض
     await db.prepare("DELETE FROM settings WHERE key = 'owner_tz'").run()
     await post(cookie, '/panel/drafts/unschedule', { id })
     await post(cookie, '/panel/drafts/schedule', { id, account, when: '2030-03-04T06:00' })
     html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 06:00 بتوقيت غرينتش.')
+    expect(html).toContain('جُدولت على LinkedIn (عمر) الاثنين 4 مارس 2030 09:00 بتوقيت الرياض.')
 
     // ‏والمردودةُ إلى نموذجها حيث يُصلَح ما رُدّ
     await post(cookie, '/panel/drafts/unschedule', { id })
@@ -2399,7 +2400,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
       { id: li, status: 'queued', account_id: liAccount },
     ])
     const flash = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(flash).toContain('جُدول منشوران، أوّلُها الاثنين 4 مارس 2030 06:00 بتوقيت غرينتش.')
+    expect(flash).toContain('جُدول منشوران، أوّلُها الاثنين 4 مارس 2030 09:00 بتوقيت الرياض.')
   })
 
   /*
@@ -2572,7 +2573,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     const cookie = `${await login()}; sada_tz=Asia/Riyadh`
     // ‏والمحرّرُ يقول المنطقةَ ويحسب الأزرارَ بها
     const html = await (await app.request(`/panel?open=${id}`, withSession(cookie), env)).text()
-    expect(html).toContain('بتوقيتك (<bdi dir="ltr">Asia/Riyadh</bdi>)')
+    expect(html).not.toContain('بتوقيت الرياض.</p>')
     expect(html).toContain('<input type="radio" name="preset" value="tomorrow" form="ed-form" checked>')
     expect(html).not.toContain('الموعد (UTC)')
 
@@ -2611,19 +2612,21 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
   })
 
-  it('وبلا كعكةٍ تُقرأ المنطقةُ المحفوظة، ولا «UTC» في أوّل زيارةٍ حقًّا (D-200)', async () => {
+  it('وبلا كعكةٍ تُقرأ المنطقةُ المحفوظة، وأوّلُ زيارةٍ حقًّا بتوقيت الرياض لا غرينتش (D-200 · D-201)', async () => {
     const id = await seedPost('linkedin', 'draft')
     await seedAccount('linkedin', 'عمر')
     const bare = await login()
     // ‏أوّلُ زيارةٍ حقًّا: لا كعكةَ ولا منطقةَ عُرفت
     const first = await (await app.request(`/panel?open=${id}`, withSession(bare), env)).text()
-    expect(first).toContain('بتوقيت غرينتش في هذه الزيارة الأولى')
+    expect(first).toContain('<p class="hint m-0">بتوقيت الرياض.</p>')
+    expect(first).toContain('اليوم والساعة (بتوقيت الرياض)')
+    expect(first).not.toContain('غرينتش')
     expect(first).not.toContain('لم تصل منطقتُك')
     // ‏ثمّ تصل الكعكةُ مرّة، فتُحفظ وتُقرأ حين تغيب
     await app.request('/panel', withSession(`${bare}; sada_tz=Asia%2FRiyadh`), env)
     const later = await (await app.request(`/panel?open=${id}`, withSession(bare), env)).text()
-    expect(later).toContain('بتوقيتك (<bdi dir="ltr">Asia/Riyadh</bdi>)')
-    expect(later).not.toContain('بتوقيت غرينتش')
+    expect(later).not.toContain('بتوقيت الرياض.</p>')
+    expect(later).not.toContain('غرينتش')
   })
 
   it('ومردودُ «اعتمد وجدوِل» بلا حسابٍ يبقى معتمَدًا ويعود إلى موعده في المحرّر', async () => {
@@ -4164,7 +4167,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(after[0]!.scheduled_at).toMatch(/ 06:00:00$/)
     expect(after[0]!.scheduled_at).toBe(after[2]!.scheduled_at)
     const flash = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(flash).toMatch(/جُدول على YouTube وInstagram [^<]* 09:00 بتوقيتك\./)
+    expect(flash).toMatch(/جُدول على YouTube وInstagram [^<]* 09:00\./)
     expect(flash).toContain('وتعذّر TikTok: لا حسابَ متّصلًا — اربطه أوّلًا.')
     expect(flash).toContain('YouTube لا يُنشر للعامّة')
     expect(flash).not.toContain('UTC.')

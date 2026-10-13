@@ -13,7 +13,7 @@
 import { atomically, type Db, type DbStatement } from '../tokens'
 import { isLinkedInPage, type LinkedAccount } from '../channels'
 import { postLength } from '../draft/length'
-import { localParts, validZone } from '../time/zone'
+import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
@@ -22,8 +22,8 @@ import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChec
 export const MAX_PLAN_BYTES = 512 * 1024
 export const MAX_PLAN_ROWS = 200
 
-/** المنطقةُ حين لا يذكرها الملفّ ولا المتصفّح. */
-export const DEFAULT_ZONE = 'Asia/Riyadh'
+/** المنطقةُ حين لا يذكرها الملفّ ولا المتصفّح — منطقةُ العرض الاحتياطيّة نفسُها (D-201). */
+export const DEFAULT_ZONE = FALLBACK_ZONE
 
 export type PlanPlatform = 'linkedin' | 'x' | 'youtube' | 'tiktok' | 'instagram'
 

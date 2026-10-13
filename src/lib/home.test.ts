@@ -181,13 +181,16 @@ describe('حبّةُ النظام ونبضُ الإرسال', () => {
 describe('سقفُ الإنفاق اليوميّ', () => {
   const cap = { kind: 'spend_cap', used: 6.06, cap: 5 } as const
 
-  it('فعلٌ برتقاليٌّ إلى حقل السقف، وساعةُ الانفتاح بتوقيتك', () => {
+  it('فعلٌ برتقاليٌّ إلى حقل السقف، وساعةُ الانفتاح بتوقيت المالك أو الرياض (D-201)', () => {
     const a = nextAction(facts({ blocker: cap, zone: 'Asia/Riyadh' }), NOW)
     expect(a).toMatchObject({ tone: 'warn', href: '#c2', label: 'ارفع السقف' })
     expect(a.text).toContain('6.06$ من 5.00$')
     // ‏منتصفُ ليل UTC هو الثالثةُ فجرًا في الرياض
-    expect(a.text).toContain('الساعة 03:00 بتوقيتك')
-    expect(nextAction(facts({ blocker: cap }), NOW).text).toContain('منتصفَ الليل بتوقيت UTC')
+    expect(a.text).toContain('الساعة 03:00،')
+    // ‏وبلا منطقةٍ معروفةٍ فبتوقيت الرياض معلنًا، لا UTC
+    const first = nextAction(facts({ blocker: cap }), NOW).text
+    expect(first).toContain('الساعة 03:00 بتوقيت الرياض')
+    expect(first).not.toContain('UTC')
   })
 
   it('والفشلُ الحديثُ يسبقه — السقفُ لا يوقف النشر', () => {
@@ -198,7 +201,7 @@ describe('سقفُ الإنفاق اليوميّ', () => {
   it('وسببُ تعطيل زرّ الكتابة من الحاجز نفسِه', () => {
     expect(writeBlock(null, NOW, null)).toBeNull()
     expect(writeBlock(cap, NOW, 'Asia/Riyadh')).toMatchObject({ href: '#c2' })
-    expect(writeBlock(cap, NOW, 'Asia/Riyadh')!.text).toContain('يُفتح الساعة 03:00 بتوقيتك')
+    expect(writeBlock(cap, NOW, 'Asia/Riyadh')!.text).toContain('يُفتح الساعة 03:00.')
     expect(writeBlock({ kind: 'paused' }, NOW, null)).toMatchObject({ href: '#settings' })
   })
 })

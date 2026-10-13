@@ -96,7 +96,7 @@ import { CHANNELS, isLinkedInPage, linkStates, listAccounts, SETUP, viewChannels
 import { accountHealth, activeScopes, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
 import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
-import { clock, dayLabel, localParts } from '../lib/time/zone'
+import { clock, dayLabel, localParts, zoneNote } from '../lib/time/zone'
 import { ownerZone } from '../lib/time/ownerZone'
 import { backTo } from '../lib/nav/back'
 import { metricsFor } from '../lib/metrics/job'
@@ -345,14 +345,14 @@ function toJourney(id: string): Response {
  *
  * كان إشعارُ الجدولة «في 2026-10-05 06:00:00 UTC» لمن ضغط «غدا 9ص» في الرياض: الردُّ
  * الوحيدُ على فعله ساعةٌ أخرى بالثواني، فيبدو ما حُفظ خطأً. **والمنطقةُ من كعكة
- * `sada_tz`** (D-173)؛ وإن غابت قيل «بتوقيت UTC» صراحةً ولا يُفسَّر الوقتُ بمنطقةٍ مفترَضة.
+ * `sada_tz`** (D-173)؛ وإن غابت فبتوقيت الرياض وتُقال صراحةً (D-201).
  */
 function ownerWhen(at: string, zone: string | null, now: Date): string {
   const date = parseSqliteUtc(at)
   if (date === null) return at
   const year = localParts(date, zone).year !== localParts(now, zone).year
   const local = `${dayLabel(date, zone, year)} ${clock(date, zone)}`
-  return zone === null ? `${local} بتوقيت غرينتش` : `${local} بتوقيتك (${clock(date, null)} UTC)`
+  return `${local}${zoneNote(zone)}`
 }
 
 interface SourceRow {
@@ -3027,7 +3027,7 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
       ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed === '' ? 'لا منشورَ معتمَدًا بلا موعدٍ من هذا المقطع الآن.' : `تعذّر ${failed}.`}` }
       : {
           kind: result.failed.length === 0 ? 'ok' : 'warn',
-          text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)} ${zone === null ? 'بتوقيت غرينتش' : 'بتوقيتك'}.`
+          text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)}${zoneNote(zone)}.`
             + (failed === '' ? '' : ` وتعذّر ${failed}.`)
             + (reach === null ? '' : ` ${reach}`),
         }

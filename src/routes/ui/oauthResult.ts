@@ -25,6 +25,7 @@
  * تُعرض بعد أن يُخزَّن الرمزُ مشفّرا، ولا تحمل منه شيئا: اسمُ الحساب
  * وحالُ النطاقات لا أكثر (D-005).
  */
+import { stamp } from '../../lib/time/zone'
 import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
 import { blamedScopes } from '../../lib/oauth/refusal'
 import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
@@ -121,8 +122,8 @@ export function connectedBody(d: ConnectedData): string {
     <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
       <div class="grow"></div>${refresh}</div>
     <p class="hint">وقتُ انتهاء الإذن: <span class="mono">${escapeHtml(
-      d.expiresAt.slice(0, 16).replace('T', ' '),
-    )}</span> UTC.
+      stamp(d.expiresAt.slice(0, 16).replace('T', ' '), null),
+    )}</span>.
       ${d.hasRefresh
         ? 'ويُجدَّد قبل انتهائه بلا تدخّل.'
         : '<b>ولا إذنَ تجديدٍ معه</b> — فسيتوقّف النشرُ عند انتهائه حتّى تُعيد الربط.'}</p>

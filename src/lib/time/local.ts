@@ -9,7 +9,7 @@
 import { clock, dayLabel, localParts } from './zone'
 
 /**
- * لحظةٌ محلّيّة إلى UTC، و`null` للمنطقة يعني UTC. وتاريخٌ لا وجودَ له (31 فبراير)
+ * لحظةٌ محلّيّة إلى UTC، و`null` للمنطقة يعني الرياض (D-201). وتاريخٌ لا وجودَ له (31 فبراير)
  * أو ساعةٌ تقع في فجوة التوقيت الصيفيّ تُردّ `null` ولا تُصحَّح بصمت.
  */
 export function localToUtc(
@@ -18,11 +18,9 @@ export function localToUtc(
   if (mo < 1 || mo > 12 || d < 1 || d > 31 || h < 0 || h > 23 || mi < 0 || mi > 59) return null
   const wanted = Date.UTC(y, mo - 1, d, h, mi)
   let guess = wanted
-  if (zone !== null) {
-    for (let i = 0; i < 2; i++) {
-      const p = localParts(new Date(guess), zone)
-      guess += wanted - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute)
-    }
+  for (let i = 0; i < 2; i++) {
+    const p = localParts(new Date(guess), zone)
+    guess += wanted - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute)
   }
   const check = localParts(new Date(guess), zone)
   if (check.year !== y || check.month !== mo || check.day !== d || check.hour !== h || check.minute !== mi) return null
