@@ -828,6 +828,12 @@ describe('رؤوسُ الألواح (D-137)', () => {
     }
     expect(html).toContain('<h1>النتائج</h1>')
     // ‏والمراسي القديمةُ أقسامٌ في ألواحها الجديدة — فالروابطُ المحفوظةُ تصل
+    // ‏و«المكتبة» ثلاثةُ تبويبات (D-206)، والفيديو فيها لا في «المنشورات»
+    const lib = html.slice(html.indexOf('id="library-sub"'), html.indexOf('</nav>', html.indexOf('id="library-sub"')))
+    expect([...lib.matchAll(/<span>([^<]+)<\/span>/g)].map((m) => m[1])).toEqual(['المصادر', 'الفيديو', 'الصور'])
+    const libPane = html.slice(html.indexOf('<section data-pane="library"'), html.indexOf('</section>', html.indexOf('<section data-pane="library"')))
+    expect(libPane).toContain('<div data-sub id="sub-videos">')
+    expect(libPane).toContain('<div data-sub id="sub-images">')
     for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
       expect(html, old).toContain(`<div data-sub id="${old}">`)
     }
@@ -1468,8 +1474,10 @@ describe('سجلّ التدقيق — من فعل ماذا', () => {
   it('يظهر في اللوحة بأسمائه العربيّة', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('سجلّ التدقيق')
-    expect(html).toContain('فُتحت جلسة')
+    // ‏في تبويب «سجلّ النشاط» من «الإعدادات» (خطّة التصميم 5.8 · D-206)
+    const log = html.slice(html.indexOf('<div data-sub id="activity">'))
+    expect(log).toContain('<h2>سجلّ النشاط</h2>')
+    expect(log).toContain('فُتحت جلسة')
   })
 
   it('عطلٌ في السجلّ لا يُسقط الفعل — الإعدادُ يُحفظ ولو لم يُسجَّل', async () => {
@@ -2559,7 +2567,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
    * **المحرّرُ المركّز** (D-198): `?open=<id>` يرسمه في قسم «المسوّدات» نفسِه بجوار القائمة، والتبويباتُ
    * الأربعةُ كما هي (D-195). والإغلاقُ رابطٌ إلى بطاقته، و«التفاصيل» مطويّة، والمعرّفُ يُفحَص قبل أن يُسأل عنه.
    */
-  it('المحرّرُ يُفتح بـ?open= ويُغلق إلى بطاقته، والتبويباتُ الأربعةُ باقية، والتفاصيلُ مطويّة', async () => {
+  it('المحرّرُ يُفتح بـ?open= ويُغلق إلى بطاقته، والتبويباتُ الثلاثةُ باقية، والتفاصيلُ مطويّة', async () => {
     const id = await seedPost('linkedin', 'draft')
     await db.prepare("UPDATE posts SET model = 'claude-opus-5', approved_by = NULL WHERE id = ?").bind(id).run()
     await seedAccount('linkedin', 'عمر')
@@ -2570,7 +2578,9 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     // ‏والمحرّرُ داخل «المسوّدات» لا تبويبٌ خامس
     const list = html.slice(html.indexOf('id="sub-list"'), html.indexOf('id="sub-write"'))
     expect(list).toContain('id="ed"')
-    expect((html.match(/href="#sub-/g) ?? []).length).toBe(4)
+    // ‏ثلاثةُ تبويباتٍ في «المنشورات» بعد أن صار الفيديو في «المكتبة» (D-206)
+    const bar = html.slice(html.indexOf('id="posts-sub"'), html.indexOf('</nav>', html.indexOf('id="posts-sub"')))
+    expect((bar.match(/href="#sub-/g) ?? []).length).toBe(3)
     expect(html).toContain(`href="/panel#d-${id}" aria-label="أغلق المنشور وارجع إلى القائمة"`)
     expect(html).toContain('<details class="ed-more" id="ed-details"><summary>التفاصيل</summary>')
     expect(html).not.toMatch(/<details class="ed-more"[^>]*\sopen/)

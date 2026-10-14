@@ -1422,6 +1422,13 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .pc-body{display:flex; align-items:flex-start; gap:var(--s-4)}
 .pc-text{flex:1; min-width:0; margin:0; font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink);
   overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden}
+/* ‏«المكتبة ← الصور» (D-206): شبكةٌ تملأ عرضَها، والصورةُ كاملةٌ لا مقصوصة (contain · D-170) */
+.lib-grid{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,11.75rem),1fr)); margin-top:var(--s-3)}
+.lib-img{display:flex; flex-direction:column; gap:var(--s-2); color:var(--ink); text-decoration:none}
+.lib-img img{width:100%; height:auto; aspect-ratio:1; object-fit:contain; border-radius:var(--r-control);
+  background:var(--surface-2); border:var(--bd-soft)}
+@media(hover:hover){.lib-img:hover img{border-color:var(--ink-3)}}
+.lib-cap{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .pc-thumb{flex:none; width:var(--s-16); height:var(--s-16); border-radius:var(--r-control);
   object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
 .pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;

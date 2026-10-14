@@ -99,7 +99,7 @@ export function todayFeed(i: TodayInput): { items: readonly TodayItem[]; more: n
     if (!sameDay(a.at, day) || QUIET_ACTIONS.test(a.action)) continue
     const what = actionLabel(a.action)
     const on = a.target === null ? '' : ` — ${targetLabel(a.target)}`
-    out.push({ at: a.at, kind: BAD_ACTIONS.test(a.action) ? 'bad' : 'note', text: `${what}${on}`, go: '#security', goLabel: 'الأمان' })
+    out.push({ at: a.at, kind: BAD_ACTIONS.test(a.action) ? 'bad' : 'note', text: `${what}${on}`, go: '#activity', goLabel: 'سجلّ النشاط' })
   }
 
   // الأحدثُ أوّلًا، وما بلا ساعةٍ آخرًا — يُعرَف يومُه لا وقتُه

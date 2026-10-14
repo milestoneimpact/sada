@@ -48,6 +48,7 @@ import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
 import { videosSection } from './ui/sections/videos'
+import { imagesGallery } from './ui/sections/library'
 import { planImportCard } from './ui/planImportView'
 import type { Reach, UploadRow } from '../lib/media/uploads'
 import type { VideoCaptions } from '../lib/media/captions'
@@ -612,7 +613,7 @@ function todayList(d: PanelData): string {
  * والتبويبُ رابطٌ إلى قسمه (`#sub-…`)، **وكلُّ مرساةٍ قديمة تفتح قسمَها** (`#idea` و`#write` و`#videos`
  * و`#plan-import` و`#d-…`) — يقرأ `show()` القسمَ الذي يحوي المرساة. وبلا سكربتٍ تظهر الأقسامُ كلُّها.
  */
-function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, videos: string, plan: string): string {
+function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, plan: string): string {
   /*
    * ‏**والمحرّرُ المركّز بجوار القائمة في قسمها** (D-198): لا تبويبَ خامس ولا صفحةٌ ثانية. لوحٌ ‏560px
    * ‏على الحاسوب، وشاشةٌ كاملةٌ على الهاتف، وبلا `?open=` تبقى القائمةُ كما رسمها D-195.
@@ -635,13 +636,11 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
   const nav = tabs('أقسامُ المنشورات', [
     { label: 'المسوّدات', href: '#sub-list', current: true, ...(waiting + failed > 0 ? { count: waiting + failed, bad: failed > 0 } : {}) },
     { label: 'اكتب', href: '#sub-write' },
-    { label: 'الفيديو', href: '#sub-videos', ...(d.uploads.length > 0 ? { count: d.uploads.length } : {}) },
     { label: 'الخطّة', href: '#sub-plan' },
   ], { id: 'posts-sub' })
   return `${nav}
   <div data-sub id="sub-list">${list}</div>
   <div data-sub id="sub-write">${drafts.write}</div>
-  <div data-sub id="sub-videos">${videos}</div>
   <div data-sub id="sub-plan">${plan}</div>`
 }
 
@@ -655,7 +654,21 @@ function settingsTabs(missing: number): string {
     { label: 'الإنفاقُ والحدود', href: '#limits', current: true },
     { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
     { label: 'الأمان', href: '#security' },
+    { label: 'سجلّ النشاط', href: '#activity' },
   ], { id: 'settings-sub' })
+}
+
+/**
+ * «المكتبة» ثلاثةُ تبويبات (خطّة التصميم 5.8 · D-206): **المصادر · الفيديو · الصور** — المادّةُ الخامّ في وجهةٍ
+ * واحدة. كان الفيديو تبويبًا في «المنشورات» بين الكتابة والخطّة، والصورُ لا تُرى إلّا داخل بطاقة مسوّدتها.
+ * والعددُ «ينتظرك» في المصادر (غيرُ المحلَّل)، وعددُ ما هناك في الفيديو والصور.
+ */
+function libraryTabs(pending: number, videos: number, images: number): string {
+  return tabs('أقسامُ المكتبة', [
+    { label: 'المصادر', href: '#sources', current: true, ...(pending > 0 ? { count: pending } : {}) },
+    { label: 'الفيديو', href: '#sub-videos', ...(videos > 0 ? { count: videos } : {}) },
+    { label: 'الصور', href: '#sub-images', ...(images > 0 ? { count: images } : {}) },
+  ], { id: 'library-sub' })
 }
 
 export function panelPage(d: PanelData): string {
@@ -663,6 +676,8 @@ export function panelPage(d: PanelData): string {
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
   const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
+  // ‏والصورُ الجاهزةُ وحدَها في «المكتبة ← الصور» (D-206): المرفوضةُ لا تُعرض مادّةً
+  const libraryImages = d.media.filter((m) => m.status === 'ready' && m.mime.startsWith('image/'))
 
   // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
   // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
@@ -944,7 +959,8 @@ ${flash}
 ${pivotPane(d.pivot)}
 
 <section data-pane="library" hidden>
-  ${pageHead('Google Drive', sectionLabel('library'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ. ومقاطعُك في تبويب «الفيديو» من «المنشورات».')}
+  ${pageHead('المادّة', sectionLabel('library'), 'ما يُبنى منه كلُّ منشور: ملفّاتُ Drive، ومقاطعُك، والصورُ المولَّدة. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${libraryTabs(pending, d.uploads.length, libraryImages.length)}
   <div data-sub id="sources">
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
@@ -954,6 +970,15 @@ ${pivotPane(d.pivot)}
   <div class="card"><div class="card-head"><h2>ملفّاتُ مجلّدك</h2><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
   </div>
+  <div data-sub id="sub-videos">${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
+    ...(d.links === undefined ? {} : { links: d.links }),
+    ...(d.reach === undefined ? {} : { reach: d.reach }),
+    ...(d.captions === undefined ? {} : { captions: d.captions }),
+    zone: d.zone ?? null,
+    // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
+    writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
+  })}</div>
+  <div data-sub id="sub-images">${imagesGallery(libraryImages, d.drafts)}</div>
 </section>
 
 
@@ -991,13 +1016,6 @@ ${pivotPane(d.pivot)}
     ...(d.links === undefined ? {} : { links: d.links }),
     editing: d.editing?.id ?? null,
     zone: d.zone ?? null,
-  }), videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
-    ...(d.links === undefined ? {} : { links: d.links }),
-    ...(d.reach === undefined ? {} : { reach: d.reach }),
-    ...(d.captions === undefined ? {} : { captions: d.captions }),
-    zone: d.zone ?? null,
-    // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
-    writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
   }), `${planImportCard()}
   <div class="mt-3">${planSection({
     plan: d.plan,
@@ -1164,7 +1182,7 @@ ${pivotPane(d.pivot)}
   <div class="mt-3">${addCard}</div>
 </div>
 <div data-sub id="security">
-  <p class="hint">العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
+  <p class="hint">العاملُ الثاني، والجلساتُ المفتوحة، وكلمةُ الإدارة. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0
@@ -1245,7 +1263,9 @@ ${pivotPane(d.pivot)}
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
   </div>
 
-  <div class="card mt-3"><h2>سجلّ التدقيق</h2>
+</div>
+<div data-sub id="activity">
+  <div class="card"><h2>سجلّ النشاط</h2>
     <p class="hint">آخر ${d.audit.length} فعلٍ مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاحٌ قطّ.</p>
     ${d.audit.length === 0
       ? emptyState({ title: 'لا شيء بعد', html: 'أوّل فعلٍ في اللوحة يظهر هنا.' })

@@ -345,9 +345,9 @@ const data: PanelData = {
   ], new Date()),
   today: {
     items: [
-      { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#security', goLabel: 'الأمان' },
-      { at: ago(0.7), kind: 'note', text: 'تغيير إعداد — سقف الترويج الأسبوعيّ', go: '#security', goLabel: 'الأمان' },
-      { at: ago(1), kind: 'note', text: 'تبديل مفتاح — Anthropic', go: '#security', goLabel: 'الأمان' },
+      { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#activity', goLabel: 'سجلّ النشاط' },
+      { at: ago(0.7), kind: 'note', text: 'تغيير إعداد — سقف الترويج الأسبوعيّ', go: '#activity', goLabel: 'سجلّ النشاط' },
+      { at: ago(1), kind: 'note', text: 'تبديل مفتاح — Anthropic', go: '#activity', goLabel: 'سجلّ النشاط' },
       { at: ago(3), kind: 'ok', text: 'اعتمدتَ مسوّدةً لـLinkedIn', go: '#posts', goLabel: 'المنشورات' },
       { at: null, kind: 'ok', text: 'نُشر منشورٌ على LinkedIn', go: '/panel/channels/linkedin', goLabel: 'شاشةُ LinkedIn' },
       { at: null, kind: 'bad', text: 'فشل النشرُ على X', go: '/panel/channels/x', goLabel: 'شاشةُ X' },
