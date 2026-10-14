@@ -284,7 +284,8 @@ describe('الشريطُ لا يخطف إلّا المراسي', () => {
  * بساعةٍ يملكها الاختبار — المهلةُ والإيقافُ والإغلاقُ والخطأُ الذي لا يذهب وحدَه.
  */
 describe('الإشعارُ العائم', () => {
-  const block = /  var flashBox=document\.getElementById\('flash'\);[\s\S]*?\n {2}\}\n/.exec(SCRIPT)
+  // ‏حتّى نداء «armToast» للإشعار الذي جاء مع الصفحة (D-207: صار دالّةً يُعاد تسليحُها بعد فعلٍ بلا تحميل)
+  const block = /  var flashBox=document\.getElementById\('flash'\);[\s\S]*?if\(note0\)armToast\(note0,false\);\n {2}\}\n/.exec(SCRIPT)
 
   function mount(kind: 'ok' | 'warn' | 'bad', undo = false, hash = '') {
     const on: Record<string, () => void> = {}
@@ -602,5 +603,29 @@ describe('حرّاسُ «أنشئ» و«اكتب» (مراجعة D-190)', () => 
       expect(capLen(t, true)).toBe(new TextEncoder().encode(t).length)
     }
     expect(SCRIPT).toContain("document.querySelectorAll('textarea[data-cap-limit]')")
+  })
+})
+
+/**
+ * **أفعالُ البطاقة بلا تحميل** (D-207) — والمتصفّحُ الحقيقيُّ يقيسها `npm run swap`. وهنا ما لا يجوز أن يرجع:
+ * طلبٌ يُعاد إرسالُه بعد أن خرج، أو تحويلٌ يُتبَع آليًّا فيُقرأ ردُّه صفحةً غيرَ اللوحة.
+ */
+describe('أفعالُ البطاقة بلا تحميل (D-207)', () => {
+  const block = /document\.addEventListener\('submit',function\(e\)\{[\s\S]*?\n {2}\}\);/.exec(SCRIPT)?.[0] ?? ''
+
+  it('يُنتزَع من النصّ المُرسَل، ولا يعمل إلّا على «data-swap» وما لم يُمنع', () => {
+    expect(block).toContain("f.hasAttribute('data-swap')")
+    expect(block).toContain('e.defaultPrevented')
+  })
+
+  it('**ولا إرسالَ ثانيًا**: التحويلُ يُقرأ يدويًّا، والسقوطُ يعيد تحميلَ اللوحة بـGET', () => {
+    expect(block).toContain("redirect:'manual'")
+    expect(block).toContain("fetch('/panel',{credentials:'same-origin'})")
+    expect(block).not.toMatch(/\.submit\(|submit\.call/)
+    expect(block).toContain('location.reload()')
+  })
+
+  it('وردٌّ ليس لوحةً (جلسةٌ انتهت) يُفتح كما هو', () => {
+    expect(block).toContain("if(!doc.querySelector('section[data-pane]')){location.href=res.url; return;}")
   })
 })

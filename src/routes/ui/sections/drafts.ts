@@ -837,7 +837,7 @@ function card(
     : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
 
   const more: string[] = []
-  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true }))
+  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true }))
   more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [
@@ -877,7 +877,7 @@ function card(
     ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone) : ''}
     <div class="pc-foot">
       ${open
-        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
+        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…" data-swap>
              <input type="hidden" name="id" value="${id}">
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button></form>`
         : ''}

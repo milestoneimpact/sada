@@ -30,7 +30,8 @@
     "mobile": "node scripts/audit_mobile.mjs /tmp/panel.html /tmp/panel-first.html /tmp/panel-editor.html /tmp/panel-editor-queued.html /tmp/screen-tasks.html /tmp/screen-wizard.html /tmp/screen-report.html /tmp/screen-linkedin.html /tmp/screen-li-setup.html /tmp/screen-x.html /tmp/screen-tiktok.html /tmp/screen-link-only.html /tmp/screen-yt-setup.html /tmp/screen-instagram.html /tmp/screen-unbuilt.html /tmp/screen-refused.html /tmp/screen-journey.html /tmp/screen-spread.html /tmp/screen-login.html /tmp/screen-2fa.html /tmp/screen-404.html /tmp/screen-landing.html /tmp/screen-500.html /tmp/privacy.html",
     "fonts": "node scripts/embed_ui_font.mjs",
     "journeys": "tsx scripts/journeys/count_steps.ts",
-    "journeys:serve": "tsx scripts/journeys/server.ts"
+    "journeys:serve": "tsx scripts/journeys/server.ts",
+    "swap": "tsx scripts/journeys/swap_check.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260903.1",

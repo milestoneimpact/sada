@@ -154,9 +154,10 @@ const R1: Journey = {
   title: 'ربط منصّة جديدة (Instagram أوّل مرّة) — حتّى مغادرة الموقع إلى OAuth',
   plan: { today: '16', target: '5' },
   async run({ page, m, stack, leftSite }) {
-    await m.tap(visible(page.locator('a[href="/panel/channels/instagram?tab=setup"]')).first(), 'بطاقة Instagram «أكمل الإعداد»')
-    await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
+    // ‏و«أكمل الإعداد» ينزل إلى حقل المعرّف نفسِه (D-205: `setupHref`)، فلا تُضغط «اضبط التطبيق» إلّا إن لم يظهر
+    await m.tap(visible(page.locator('a[href^="/panel/channels/instagram?tab=setup"]')).first(), 'بطاقة Instagram «أكمل الإعداد»')
     const id = page.locator('#ci-instagram')
+    if (!(await id.isVisible())) await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
     await m.type(id, '1234567890123456', 'لصق «Client ID» (من Meta)', { pasted: true })
     await m.type(page.locator('#cs-instagram'), 'local0fake0instagram0secret00000', 'لصق «Client Secret»', { pasted: true })
     await m.tap(button(page.locator('form[action="/panel/channels/app"]').filter({ has: id }), 'احفظ'), '«احفظ»')

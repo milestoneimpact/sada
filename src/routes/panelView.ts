@@ -710,7 +710,7 @@ export function panelPage(d: PanelData): string {
           html: pathArrows(escapeHtml(d.flash.text)),
           ...(d.flash.undo === undefined ? {} : {
             action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
-                        data-busy="جارٍ…">
+                        data-busy="جارٍ…" data-swap>
                     <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
                     <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
                   </form>`,

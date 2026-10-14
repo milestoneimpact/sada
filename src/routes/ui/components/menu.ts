@@ -51,13 +51,15 @@ export function menuAction(input: {
   readonly blocked?: string
   /** سطرٌ تحت بندٍ يعمل: ما ينتظرك فيه، أو كم بقي منه اليوم. */
   readonly note?: string
+  /** يُرسَل بلا تحميل وتُبدَّل بطاقتُه (D-207) — لما ينتهي في بطاقةٍ بمعرّفها `d-…`. */
+  readonly swap?: boolean
 }): string {
   const hidden = Object.entries(input.fields)
     .map(([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}">`).join('')
   const line = input.blocked ?? input.note
   const why = line === undefined ? '' : `<span>${escapeHtml(line)}</span>`
   return `<form class="menu-form" method="POST" action="${escapeHtml(input.action)}" data-busy="${escapeHtml(input.busy ?? 'جارٍ…')}"${
-    input.confirm === undefined ? '' : ` data-confirm="${escapeHtml(input.confirm)}"`}>${hidden}<button class="menu-item${
+    input.confirm === undefined ? '' : ` data-confirm="${escapeHtml(input.confirm)}"`}${input.swap === true ? ' data-swap' : ''}>${hidden}<button class="menu-item${
     input.danger === true ? ' menu-danger' : ''}" type="submit"${input.blocked === undefined ? '' : ' disabled'}><span class="menu-t"><b>${
     escapeHtml(input.label)}</b>${why}</span></button></form>`
 }

@@ -31,3 +31,13 @@ describe('«المكتبة ← الصور» (D-206)', () => {
     expect(html).not.toContain('<script>')
   })
 })
+
+describe('النماذجُ التي تُرسَل بلا تحميل (D-207)', () => {
+  it('«اعتمد» على البطاقة و«ارفض» في قائمتها يحملان data-swap، والنموذجُ يبقى POST عاديًّا بلا سكربت', async () => {
+    const { menuAction } = await import('../components/menu')
+    const html = menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: 'p1', do: 'reject' }, swap: true })
+    expect(html).toContain('method="POST" action="/panel/drafts/decide"')
+    expect(html).toContain(' data-swap>')
+    expect(menuAction({ label: 'س', action: '/x', fields: {} })).not.toContain('data-swap')
+  })
+})
