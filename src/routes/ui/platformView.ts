@@ -24,7 +24,7 @@
  *
  * وفيها ما ينقص بالضبط، لا «قريبا». **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
  */
-import { SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
+import { channelHealth, SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
 import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platform/screen'
 import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
@@ -347,11 +347,11 @@ function verdictChip(r: Readiness): string {
 function nextAction(d: PlatformScreenData, r: Readiness): { label: string; href: string } | null {
   const id = d.view.spec.id
   const label = d.view.spec.label
-  const unsigned = unsignedAccounts(d.view).length > 0
-  if (d.view.state === 'connectable') return { label: `اربط ${label}`, href: `/oauth/${id}/start` }
-  if (d.view.state === 'needs_reauth') return { label: 'جدّد الإذن', href: `/oauth/${id}/start` }
-  if (unsigned) return { label: 'أعد الربط', href: `/oauth/${id}/start` }
-  if (d.view.state === 'awaiting_owner') return { label: 'اضبط التطبيق', href: href(id, { tab: 'setup' }, '#setup') }
+  // ‏وما يمنع النشرَ من جهة الربط فعلُه فعلُ بطاقة «الحسابات» نفسُه (D-205): حكمٌ واحدٌ وزرٌّ واحد
+  const h = channelHealth(d.view, d.now)
+  if (h.button !== null && h.kind !== 'connected') {
+    return { label: h.kind === 'connectable' ? `اربط ${label}` : h.button.label, href: h.button.href }
+  }
   if (r.next?.action !== undefined && r.next.state === 'failed') return r.next.action
   if (d.counts.waiting > 0) {
     return { label: d.counts.waiting === 1 ? 'راجع المسوّدة' : `راجع ${d.counts.waiting} مسوّدات`, href: href(id, { tab: 'waiting' }) }
@@ -364,6 +364,7 @@ function nextAction(d: PlatformScreenData, r: Readiness): { label: string; href:
 
 function accountHeader(d: PlatformScreenData, r: Readiness): string {
   const { spec, accounts } = d.view
+  const health = channelHealth(d.view, d.now)
   const logo = LOGOS[spec.id] ?? ''
   const first = accounts[0]
   const name = first?.displayName ?? spec.label
@@ -403,9 +404,9 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
         ${counts}
       </div>
       <div class="acct-act">
-        <span class="acct-verdict">${unsignedAccounts(d.view).length > 0
-          // ‏والشارةُ تقرأ الصفَّ كما تقرؤه بطاقةُ القناة (D-166)
-          ? statusBadge('bad', '▲', 'مربوطة بلا إذن')
+        <span class="acct-verdict">${health.kind !== 'connected'
+          // ‏والشارةُ حكمُ بطاقة «الحسابات» نفسُه ما دام الربطُ هو المانع (D-166 · D-205)، وإلّا فحالُ النشر
+          ? statusBadge(health.tone, health.tone === 'bad' ? '▲' : health.tone === 'warn' ? '!' : '○', health.label)
           : verdictChip(r)}
           <a class="tap" href="${escapeHtml(href(spec.id, { tab: 'setup' }))}">التفاصيل</a></span>
         ${next === null ? '' : `<a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>`}

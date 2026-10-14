@@ -37,7 +37,7 @@ import { gatesOf, type GateFacts } from '../../lib/gates'
 import { journeyBody, stationHref } from './journeyView'
 import { noteOf } from '../../lib/image/job'
 import { driveFileUrl } from '../../lib/drive/sync'
-import { tokenDays } from './channels'
+import { channelHealth } from '../../lib/channels'
 import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
 import { panelPage } from '../panelView'
@@ -441,21 +441,20 @@ describe('«افتح في Drive» لا يُبنى من نصّ (D-126)', () => {
   })
 })
 
-describe('عدُّ الأيّام على البطاقة (D-126)', () => {
+describe('حالُ المنصّة من موعد ربطها (D-126 · D-205)', () => {
   const now = new Date('2026-09-12T12:00:00Z')
-  it('أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوقُ رقاقةٌ هادئة، ولا رمزَ لا شيء', () => {
-    expect(tokenDays(null, now)).toBe('')
-    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('st bad')
-    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('انتهى الإذن')
-    expect(tokenDays('2026-09-12 20:00:00', now)).toContain('ينتهي الإذن اليوم')
-    // ‏والعددُ بمعدوده (D-183): كانت «يبقى 2 يومان» و«الإذن 48 يوما»
-    expect(tokenDays('2026-09-14 12:00:00', now)).toContain('يبقى يومان للإذن')
-    expect(tokenDays('2026-09-17 12:00:00', now)).toContain('يبقى 5 أيّام للإذن')
-    expect(tokenDays('2026-09-19 12:00:00', now)).toContain('st warn')
-    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('<span class="chip"')
-    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('الإذن 48 يومًا')
-    expect(tokenDays('2026-09-21 12:00:00', now)).toContain('الإذن 9 أيّام')
-    expect(tokenDays('not-a-date', now)).toBe('')
+  const at = (expiresAt: string | null) => channelHealth(viewChannels([{
+    id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+    createdAt: '2026-09-01 00:00:00', expiresAt,
+  }], () => true).find((v) => v.spec.id === 'linkedin')!, now)
+  it('أسبوعٌ فأقلُّ «تحتاج إعادةَ ربط» بعدده، وما انتهى «منقطعة»، وما فوقُ «متّصلة»', () => {
+    expect(at(null)).toMatchObject({ kind: 'broken', label: 'منقطعة' })
+    expect(at('2026-09-10 00:00:00')).toMatchObject({ kind: 'broken', tone: 'bad' })
+    expect(at('2026-09-12 20:00:00').label).toBe('تحتاج إعادةَ ربطٍ اليوم')
+    expect(at('2026-09-14 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال يومين')
+    expect(at('2026-09-17 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال 5 أيّام')
+    expect(at('2026-09-19 12:00:00')).toMatchObject({ kind: 'expiring', tone: 'warn' })
+    expect(at('2026-09-21 12:00:00')).toMatchObject({ kind: 'connected', label: 'متّصلة' })
   })
 })
 
@@ -976,8 +975,8 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(html).toContain('<a href="/panel#posts" data-bar>')
     expect(html).toContain('<a href="/panel/tasks">')
     expect(html).toContain('<a href="/panel#accounts" aria-current="true">')
-    expect(html).toMatch(/<a href="\/panel\/channels\/linkedin" aria-current="page">/)
-    expect(html).not.toContain('/panel/channels/snapchat')
+    // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (D-205): الرافدةُ سبعة
+    expect(html).not.toContain('class="plat"')
     expect((html.match(/id="theme"/g) ?? []).length).toBe(1)
 
     const tasks = soloPage('صدى — مهامّ', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, soloNav('tasks'))
@@ -1257,7 +1256,7 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
 
   it('لا حرفَ رمزٍ في «content»: سهمُ الطيّ مثلّثٌ من حدود، والمطويُّ يشير إلى نهاية السطر', () => {
     expect(found((d) => d.prop === 'content' && /[▾▸▲▼←→⌘]|\\2[05]/.test(d.value))).toEqual([])
-    for (const s of ['.g-tog::after', 'details.plat>summary::after']) {
+    for (const s of ['.g-tog::after']) {
       expect(css.rule(s), s).toMatchObject({
         content: "''", 'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid',
       })
@@ -1350,7 +1349,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
       createdAt: '2026-09-01 00:00:00', expiresAt: null,
     }], () => true), now)
-    expect(html).toContain('ما ينتظرك الآن')
+    expect(html).toContain('data-health="broken"')
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
@@ -1379,10 +1378,11 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
 
   it('«قبل …» لا تُسبَق بـ«منذ»: الجملةُ من relativeTime كاملة', () => {
     const now = new Date('2026-09-06T09:00:00Z')
-    const channels = channelsSection(viewChannels([{
-      id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+    // ‏حسابان فتُرسم صفوفُهما بموعد ربطهما (D-205: الحسابُ الواحدُ اسمُه في رأس البطاقة)
+    const channels = channelsSection(viewChannels(['a1', 'a2'].map((id) => ({
+      id, platform: 'linkedin' as const, kind: 'member' as const, displayName: 'عمر', status: 'active' as const,
       createdAt: '2026-09-06 08:36:00', expiresAt: '2026-11-01 00:00:00',
-    }], () => true), now)
+    })), () => true), now)
     const plan = planSection({
       plan: null, names: {}, ready: true, analyzed: 1, now,
       lastAttempt: { at: '2026-09-06 08:36:00', detail: 'failed: انقطع' },

@@ -18,7 +18,7 @@ import type { Db } from './tokens'
 import type { ChannelView } from './channels'
 import type { Blocker } from './limits'
 import type { Pulse } from './ops/heartbeat'
-import { unsignedAccounts } from './channels'
+import { channelHealth, unsignedAccounts } from './channels'
 import { counted, money, NOUNS, relativeTime } from './format'
 import { clock, zoneNote } from './time/zone'
 
@@ -498,18 +498,14 @@ export interface PlatformTile {
  * حالٌ واحدٌ وزرٌّ واحد لكلّ منصّة — **من حال القناة نفسِه** الذي يقرؤه لوحُ المنصّات.
  * والمحفوظةُ بلا إذنٍ تُقال حمراءَ لا خضراء (D-166).
  */
-export function platformTile(v: ChannelView): PlatformTile {
+export function platformTile(v: ChannelView, now: Date): PlatformTile {
   const id = v.spec.id
   const active = v.accounts.find((a) => a.status === 'active') ?? v.accounts[0]
-  const base = { id, label: v.spec.label, account: active?.displayName ?? null, linkOnly: v.spec.stage === 'link' }
-  if (v.state === 'needs_reauth' || unsignedAccounts(v).length > 0) {
-    return { ...base, tone: 'bad', status: 'تحتاج تجديدًا', button: { label: 'جدّد الإذن', href: `/oauth/${id}/start`, primary: true } }
+  // ‏والحالُ والزرُّ من `channelHealth` (D-205) — الحكمُ نفسُه الذي تقرؤه بطاقةُ «الحسابات»
+  const h = channelHealth(v, now)
+  return {
+    id, label: v.spec.label, account: active?.displayName ?? null, linkOnly: v.spec.stage === 'link',
+    tone: h.tone, status: h.label,
+    button: h.button ?? { label: 'افتح', href: `/panel/channels/${id}`, primary: false },
   }
-  if (v.state === 'linked') {
-    return { ...base, tone: 'ok', status: 'متّصلة', button: { label: 'افتح', href: `/panel/channels/${id}`, primary: false } }
-  }
-  if (v.state === 'connectable') {
-    return { ...base, tone: 'warn', status: 'جاهزةٌ للربط', button: { label: 'اربط', href: `/oauth/${id}/start`, primary: true } }
-  }
-  return { ...base, tone: 'idle', status: 'تحتاج إعدادًا', button: { label: 'أكمل الإعداد', href: `/panel/channels/${id}?tab=setup`, primary: false } }
 }

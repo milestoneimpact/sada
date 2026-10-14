@@ -196,22 +196,6 @@ nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block
 nav.tabs a[aria-current=page] svg{opacity:1; color:var(--link)}
 nav.tabs .count{margin-inline-start:auto}
 nav.tabs a[aria-current=page] .count{background:var(--ink); color:var(--surface)}
-/* ── فرعُ المنصّات ────────────────────────────────────────────────────
-   شاشاتُ المنصّات كانت لا تُبلَغ إلّا من بطاقةٍ في لوحٍ آخر، فمن لم
-   يفتحه لم يعرف أنّها موجودة. وهي التي يُسأل فيها كلَّ يوم. */
-details.plat{margin:0}
-details.plat>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
-  padding:var(--s-2) var(--s-3); border-radius:var(--r-control); min-height:var(--tap);
-  font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--ink-2); list-style:none}
-details.plat>summary::-webkit-details-marker{display:none}
-@media(hover:hover){details.plat>summary:hover{background:var(--hover); color:var(--ink)}}
-details.plat>summary svg{width:var(--icon-sm); height:var(--icon-sm); flex:none; opacity:.7}
-/* سهمٌ يدور: الحالُ يُرى بلا نصّ، وهو تكرارٌ لما يقوله الانفتاحُ نفسه */
-details.plat>summary::after{content:''; margin-inline-start:auto; font-size:var(--t-caption);
-  width:0; height:0; border-inline:.3em solid transparent; border-block-start:.4em solid;
-  color:var(--ink-3); transition:transform var(--dur-2) var(--ease)}
-details.plat[open]>summary::after{transform:rotate(180deg)}
-.plat-list{display:flex; flex-direction:column; gap:1px; padding:var(--s-1) 0 var(--s-2)}
 /* سلّمُ الجاهزيّة (D-158): بطاقةٌ تُطوى حين تتمّ درجاتُها كلُّها */
 details.ladder>summary{cursor:pointer; list-style:none; margin-bottom:0}
 details.ladder>summary::-webkit-details-marker{display:none}
@@ -220,20 +204,6 @@ details.ladder ol.steps.wiz li .btn{flex:none}
 details.ladder ol.steps.wiz li.at .why{color:var(--ink-2)}
 details.ladder .verdict{margin:0 0 var(--s-2); font-weight:600; color:var(--ink)}
 details.ladder .verdict.bad{color:var(--bad)}
-/* بإزاحةٍ تقول «هذه تحت تلك» — والقائمةُ المسطّحة تُقرأ سبعةَ أقسام */
-.plat-list a{padding-inline-start:var(--s-8)}
-.plat-list .pl{width:var(--icon-sm); height:var(--icon-sm); flex:none; display:grid; place-items:center;
-  color:var(--ink-3)}
-.plat-list .pl svg{width:var(--icon-sm); height:var(--icon-sm); display:block}
-@media(hover:hover){.plat-list a:hover .pl{color:var(--ink-2)}}
-/* الحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء. ومعها title — واللونُ وحده
-   لا يقول شيئا لمن لا يفرزه */
-.plat-list .dot{width:var(--dot); height:var(--dot); border-radius:50%; flex:none;
-  margin-inline-start:auto; background:var(--ink-3)}
-.plat-list .dot.ok{background:var(--ok)}
-.plat-list .dot.warn{background:var(--warn)}
-.plat-list .dot.bad{background:var(--bad)}
-.plat-list .dot.idle{background:transparent; border:var(--bd-field)}
 
 .rail-foot{margin-top:auto; padding:var(--s-3); border-top:var(--bd-soft);
   border-top-color:var(--line-soft)}
@@ -1088,12 +1058,15 @@ ul.plain li:last-child{margin-bottom:0}
 .lede-note{font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small); flex-basis:100%}
 @media${atLeast('lg')}{.lede-note{flex-basis:auto; text-align:end}}
 
-.ch{display:flex; flex-direction:column; gap:var(--s-3); padding:var(--s-4)}
-.ch.off{background:var(--surface-2); box-shadow:none; border-style:dashed}
+.ch{display:flex; flex-direction:column; gap:var(--s-3); padding:var(--s-4); position:relative}
+/* ‏البطاقةُ كلُّها بابُ شاشة المنصّة (خطّة التصميم 5.7 · D-205): الاسمُ يمدّ نفسَه عليها، والفعلُ فوقه */
+.ch-go::after{content:''; position:absolute; inset:0}
+.ch-go:focus-visible{outline:none}
+.ch-go:focus-visible::after{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
+.ch-foot,.ch-acc{position:relative; z-index:1}
 .ch-top{display:flex; align-items:center; gap:var(--s-3)}
 .ch-logo{width:var(--s-8); height:var(--s-8); border-radius:var(--r-control); flex:none; display:grid; place-items:center;
   background:var(--surface-2); border:var(--bd); color:var(--ink-2)}
-.ch.off .ch-logo{color:var(--ink-3)}
 .ch-logo svg{width:50%; height:50%; display:block}
 .ch-name{font-weight:600; font-size:var(--t-h3); line-height:var(--lh-h3)}
 .ch-name a{color:inherit; text-decoration:underline; text-underline-offset:var(--ul-off); text-decoration-thickness:var(--ul)}
@@ -1850,8 +1823,6 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);
     scrollbar-width:thin}
   nav.tabs .lbl{display:none}
-  /* شريطٌ صفٌّ واحد: «المنصّات» المفتوحة كانت تمدّه إلى ‏٣٧٠px فيبدأ المحتوى عند ‏٧٥٠ (D-151) */
-  details.plat{display:none}
   nav.tabs a{white-space:nowrap; padding:var(--s-2) var(--s-3)}
   nav.tabs .count{margin-inline-start:var(--s-1)}
   .rail-foot{display:none}
@@ -2073,19 +2044,6 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 .card:where(:not(.ch,.draft,.pv)) > p{margin:var(--s-3) 0 0; font-size:var(--t-small); color:var(--ink-2);
   line-height:var(--lh-small); max-width:var(--measure)}
 .card:where(:not(.ch,.draft,.pv)) > h2 + p{margin-top:var(--s-2)}
-
-/* ── ما لم يُبنَ: سطرٌ يُطوى (D-111) ──────────────────────────────────
-   ثلاثُ بطاقاتٍ ‏١٥٩px لتقول «غيرُ مدعومة» تُعطي الغائبَ وزنَ الحاضر.
-   والسطرُ يقول العددَ والأسماءَ — وذاك كلُّ ما يُحتاج قبل الفتح. */
-.unbuilt{padding:0; border:var(--bd-dash)}
-.unbuilt>summary{display:flex; align-items:center; gap:var(--s-3); cursor:pointer;
-  padding:var(--s-3) var(--s-4); list-style:none; min-height:var(--tap)}
-.unbuilt>summary::-webkit-details-marker{display:none}
-.unbuilt>summary b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
-.unbuilt .names{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.unbuilt-body{padding:0 var(--s-4) var(--s-4); border-top:var(--bd)}
-.unbuilt-body .hint{margin:var(--s-3) 0}
 
 /* ── صندوقُ التنبيهات (D-109) ─────────────────────────────────────────
    صفٌّ لكلّ ما خرج: حالُه ومتنُه ورمزُ الردّ. **والحالُ لونٌ ورمزٌ ونصّ**
@@ -2539,7 +2497,7 @@ nav.back .seg{margin-inline-start:auto}
   /* ‏والحدُّ الشفّافُ يُرسَم بلون النصّ في هذا الوضع — فيُمحى بلون الأرض، ويبقى خطُّ المختار وحدَه */
   .tab-item{border-bottom-color:Canvas}
   .tab-item[aria-current=page],.tab-item[aria-selected=true],.tab-item[aria-pressed=true]{border-bottom-color:Highlight}
-  nav.tabs a[aria-current=page]::before,.plat-list .dot,.todo .dot,.pill .led,.bar i,.bar-fill,.worth .fill{
+  nav.tabs a[aria-current=page]::before,.todo .dot,.pill .led,.bar i,.bar-fill,.worth .fill{
     forced-color-adjust:none; background:CanvasText}
   nav.tabs a[aria-current=page]{outline:var(--ul) solid Highlight; outline-offset:calc(-1 * var(--ul))}
   .st,.count,.toast-note,.card-alert{border-color:CanvasText}

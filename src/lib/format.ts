@@ -170,6 +170,7 @@ export const NOUNS = {
   service: { one: 'خدمةٌ واحدة', two: 'خدمتان', few: 'خدمات', many: 'خدمةً', oneAcc: 'خدمةً واحدة', oneGen: 'خدمةٍ واحدة', twoObl: 'خدمتَين' },
   cycle: { one: 'دورةٌ واحدة', two: 'دورتان', few: 'دورات', many: 'دورةً', oneAcc: 'دورةً واحدة', oneGen: 'دورةٍ واحدة', twoObl: 'دورتَين' },
   channel: { one: 'قناةٌ واحدة', two: 'قناتان', few: 'قنوات', many: 'قناةً' },
+  account: { one: 'حسابٌ واحد', two: 'حسابان', few: 'حسابات', many: 'حسابًا' },
   scope: { one: 'نطاقٌ واحد', two: 'نطاقان', few: 'نطاقات', many: 'نطاقًا' },
   row: { one: 'صفٌّ واحد', two: 'صفّان', few: 'صفوف', many: 'صفًّا', oneAcc: 'صفًّا واحدًا', oneGen: 'صفٍّ واحد', twoObl: 'صفَّين' },
 } as const satisfies Readonly<Record<string, Noun>>

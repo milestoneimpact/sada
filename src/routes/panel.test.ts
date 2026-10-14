@@ -768,7 +768,8 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     // ‏والهامشُ صنفٌ من السلّم لا سِمةُ «style» (D-189)
-    expect(html).toContain('<div class="card grid tiles c4 mb-4">')
+    // ‏و«الحسابات» ثلاثُ بلاطات (D-205): متّصلة · تحتاج إعادةَ ربط · تحتاج إعدادًا
+    expect(html).toContain('<div class="card grid tiles c3 mb-4">')
     expect(html).toContain('<div class="card grid tiles c3 mb-3">')
     // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
@@ -1514,13 +1515,15 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
     for (const id of ['snapchat', 'instagram', 'tiktok', 'threads', 'youtube']) {
       expect(html).not.toContain(`/oauth/${id}/start`)
     }
-    expect(html).toContain('يحتاج سائقا')
+    // ‏وما لم يُبنَ سطرُ «قريبًا» في آخر «الحسابات» (D-205)
+    expect(html).toContain('<p class="hint mt-5">قريبًا: ')
   })
 
   it('بلا أسرار: تُسمّى الأسرار الناقصة ومهمّتها، ولا يُعرض زرّ', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('LINKEDIN_CLIENT_ID')
+    // ‏وأسماءُ أسرار Worker خلف «للمطوّر» في شاشة المنصّة، لا على البطاقة (خطّة التصميم 5.7 · D-205)
+    expect(html).toContain('aria-label="أكمل الإعداد LinkedIn"')
     /*
      * **واللوحُ يُسمّي المانعَ ويفتح بابَه** (D-111).
      *
@@ -2995,7 +2998,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     expect(before).toContain('ضبطُ التطبيق ودليلُه')
     expect(before).toContain('id="setup"')
     // ‏وزرُّ الرأس يذهب إليه من أيّ تبويب (D-172)
-    expect(before).toContain('href="/panel/channels/youtube?tab=setup#setup"')
+    expect(before).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube"')
     expect(before).toContain('oauth/youtube/callback')
 
     const body = new FormData()
@@ -3813,7 +3816,9 @@ describe('مربوطةٌ بلا إذن تُقال في كلّ موضع (D-166)',
   it('الرافدةُ حمراءُ ونظرةٌ عامّة تقول ما ينتظرك', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(html).toMatch(/<span class="dot bad" title="مربوطة بلا إذن">/)
+    // ‏والرافدةُ تعدّها على «الحسابات» من الحكم الواحد (D-205)، والبطاقةُ تقول «منقطعة»
+    expect(html).toMatch(/<a href="#accounts"[^>]*>[\s\S]*?<span>الحسابات<\/span><span class="count">1<\/span><\/a>/)
+    expect(html).toContain('id="ch-linkedin" data-health="broken"')
     expect(html).toContain('LinkedIn: الحسابُ محفوظٌ بلا إذن')
     expect(html).toContain('href="/panel/channels/linkedin"')
   })
@@ -3821,7 +3826,7 @@ describe('مربوطةٌ بلا إذن تُقال في كلّ موضع (D-166)',
   it('وشاشةُ المنصّة: الشارةُ والزرُّ الأوّل «أعد الربط»', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel/channels/linkedin', { headers: { Cookie: cookie } }, env)).text()
-    expect(html).toContain('مربوطة بلا إذن')
+    expect(html).toContain('منقطعة') // ‏حكمُ بطاقة «الحسابات» نفسُه (D-205)
     expect(html).toContain('>أعد الربط</a>')
     expect(html).not.toContain('>اربط حسابا آخر</a>')
   })

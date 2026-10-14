@@ -8,7 +8,7 @@
  * والحكمُ كلُّه في `lib/home.ts` نقيًّا مختبَرًا؛ وهنا رسمٌ وتهريبٌ فحسب.
  */
 import { escapeHtml } from '../escape'
-import type { ChannelView } from '../../../lib/channels'
+import { byNeed, type ChannelView } from '../../../lib/channels'
 import {
   journeySteps, nextAction, platformTile,
   type HomeFacts, type JourneyStep, type PlatformTile,
@@ -112,7 +112,7 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   const focus = focusOf(trip, next.step)
   const built = f.channels.filter((c: ChannelView) => c.state !== 'unbuilt')
   const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
-  const linked = built.filter((c) => platformTile(c).tone === 'ok').length
+  const linked = built.filter((c) => platformTile(c, now).tone === 'ok').length
   return `<div class="card card-alert next" data-tone="${next.tone}">
     <div class="next-body"><span class="next-k">خطوتُك التالية</span>
       <p class="next-t">${escapeHtml(next.text)}</p></div>
@@ -131,8 +131,8 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   <div class="card home-card">
     <div class="card-head"><h2>المنصّات</h2><div class="grow"></div>
       <span class="ago">متّصلة ${linked} من ${built.length}</span></div>
-    <div class="pfgrid">${built
-      .map((c) => tile(platformTile(c), f.counts.perPlatform[c.spec.id]?.nextAt ?? null, now))
+    <div class="pfgrid">${byNeed(built, now)
+      .map((c) => tile(platformTile(c, now), f.counts.perPlatform[c.spec.id]?.nextAt ?? null, now))
       .join('')}</div>
     ${soon.length === 0 ? '' : `<p class="hint">قريبًا: ${soon.map(escapeHtml).join(' · ')}</p>`}
   </div>

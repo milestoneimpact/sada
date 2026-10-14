@@ -629,3 +629,70 @@ export function viewChannels(
     return { spec, state, accounts: mine, missing }
   })
 }
+
+/**
+ * **حالٌ واحدةٌ لكلّ منصّة، من الرمزين معًا** (خطّة التصميم 5.7 · D-205).
+ *
+ * كانت البطاقةُ تجمع حالين: شارةَ القناة («مربوطة» خضراء، من `state` وحدَه) وشارةَ كلّ حسابٍ تحتها
+ * («انتهى الإذن» حمراء، من `tokenHealth`). فيقرأ المالكُ «مربوطة» و«انتهى الإذن» على منصّةٍ واحدة،
+ * ولا يدري أيّهما يصدّق. والرئيسيّةُ والرافدةُ تحكمان كلٌّ بشرطه. **فالحكمُ هنا مرّةً**، ويُقرأ منه كلُّ
+ * موضعٍ يقول حالَ منصّة: بطاقةُ «الحسابات» وترتيبُها، وبلاطاتُها، وصفُّ الرئيسيّة، ونقطةُ الرافدة، وعددُها.
+ *
+ * - `broken` منقطعة: إذنٌ سُحب أو انتهى ولا تجديدَ معه، أو حسابٌ محفوظٌ بلا إذن. **النشرُ متوقّف**.
+ * - `expiring` تحتاج إعادةَ ربطٍ خلال أيّام: إذنٌ لا يتجدّد وحده ويقترب موعدُه (`RELINK_WARN_DAYS`).
+ * - `setup` تحتاج إعدادًا: ينقص سرّا التطبيق. · `connectable` جاهزةٌ للربط. · `connected` متّصلة.
+ * - `unbuilt` قريبًا: لا سائقَ لها.
+ *
+ * ولا تُذكر فيها «إذنُ التجديد» ولا «إذنُ الوصول» (خطّة التصميم 8.2): ذاك تفصيلُ شاشة المنصّة.
+ */
+export type ChannelHealthKind = 'broken' | 'expiring' | 'setup' | 'connectable' | 'connected' | 'unbuilt'
+
+export interface ChannelHealth {
+  readonly kind: ChannelHealthKind
+  readonly tone: 'ok' | 'bad' | 'warn' | 'idle'
+  readonly label: string
+  /** الفعلُ الواحد — `null` لما لم يُبنَ. */
+  readonly button: { readonly label: string; readonly href: string; readonly primary: boolean } | null
+  /** للمنقطعة والقريبة انتهاؤها: أقلُّ ما بقي من أيّام. */
+  readonly days?: number
+}
+
+/** ترتيبُ الحاجة (خطّة التصميم 5.7): المنقطعةُ، ثمّ ما يحتاج فعلًا، ثمّ المتّصلة، ثمّ القريبة. */
+export const HEALTH_ORDER: readonly ChannelHealthKind[] = ['broken', 'expiring', 'setup', 'connectable', 'connected', 'unbuilt']
+
+function inDays(days: number): string {
+  if (days <= 0) return 'اليوم'
+  if (days === 1) return 'خلال يوم'
+  if (days === 2) return 'خلال يومين'
+  if (days <= 10) return `خلال ${days} أيّام`
+  return `خلال ${days} يومًا`
+}
+
+export function channelHealth(v: ChannelView, now: Date): ChannelHealth {
+  const id = encodeURIComponent(v.spec.id)
+  const relink = { label: 'أعد الربط', href: `/oauth/${id}/start`, primary: true }
+  if (v.state === 'unbuilt') return { kind: 'unbuilt', tone: 'idle', label: 'قريبًا', button: null }
+  if (v.state === 'awaiting_owner') {
+    return { kind: 'setup', tone: 'warn', label: 'تحتاج إعدادًا', button: { label: 'أكمل الإعداد', href: setupHref(v.spec.id), primary: true } }
+  }
+  if (v.state === 'connectable') {
+    return { kind: 'connectable', tone: 'warn', label: 'جاهزةٌ للربط', button: { label: 'اربط', href: `/oauth/${id}/start`, primary: true } }
+  }
+  const health = v.accounts.map((a) => tokenHealth(a, now))
+  if (v.state === 'needs_reauth' || unsignedAccounts(v).length > 0 || health.some((h) => h?.kind === 'expired')) {
+    return { kind: 'broken', tone: 'bad', label: 'منقطعة', button: relink }
+  }
+  const soon = health.flatMap((h) => (h?.kind === 'soon' ? [h.days] : []))
+  if (soon.length > 0) {
+    const days = Math.min(...soon)
+    return { kind: 'expiring', tone: 'warn', label: `تحتاج إعادةَ ربطٍ ${inDays(days)}`, button: relink, days }
+  }
+  return { kind: 'connected', tone: 'ok', label: 'متّصلة', button: { label: 'افتح', href: `/panel/channels/${id}`, primary: false } }
+}
+
+/** المنصّاتُ بترتيب الحاجة — وما تساوى بقي بترتيب السجلّ. */
+export function byNeed(views: readonly ChannelView[], now: Date): ChannelView[] {
+  const rank = (v: ChannelView): number => HEALTH_ORDER.indexOf(channelHealth(v, now).kind)
+  return views.map((v, i) => ({ v, i, r: rank(v) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.v)
+}
+

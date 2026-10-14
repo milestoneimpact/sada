@@ -15,7 +15,7 @@ import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
-import { unsignedAccounts, type ChannelView } from '../lib/channels'
+import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
@@ -505,53 +505,6 @@ function sourceRow(s: PanelSource, now: Date): string {
 }
 
 /** أيقوناتُ الرافدة. `currentColor` فتتبع حالَ العنصر والثيم معا. */
-/**
- * فرعُ المنصّات في الرافدة.
- *
- * وشاشاتُ المنصّات (D-046) كانت لا تُبلَغ إلّا من بطاقةٍ في لوح
- * القنوات — **فمن لم يفتح اللوحَ لم يعرف أنّها موجودة**. وهي الشاشاتُ
- * التي يُسأل فيها كلَّ يومٍ «ماذا نُشر»، فموضعُها الرافدة.
- *
- * ومطويٌّ افتراضا حيث لا قناةَ مربوطة، مفتوحٌ حيث توجد: **رافدةٌ تفتح
- * سبعةَ أسماءٍ لمن لم يربط شيئا تزحم بلا أن تفيد.**
- *
- * والحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء، والنقطةُ تُقرأ بلمحة. ومعها
- * `title` لقارئ الشاشة — واللونُ وحده لا يقول شيئا.
- */
-function platformNav(views: readonly ChannelView[]): string {
-  const built = views.filter((v) => v.spec.built)
-  const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
-  // ‏وما لم يُبنَ سائقُه لا يُعرض في الرافدة (D-177): سبعُ منصّاتٍ اثنتان منها لا تعمل
-  // كانت تُقرأ وعدًا. ومكانُها سطرُ «قريبًا» في الرئيسيّة
-  const shown = views.filter((v) => v.state !== 'unbuilt')
-
-  const row = (v: ChannelView): string => {
-    // ‏والنقطةُ تقرأ الصفَّ لا الكلمة (D-166): مربوطةٌ بلا إذنٍ حمراءُ لا خضراء
-    const unsigned = unsignedAccounts(v).length > 0
-    const dot =
-      unsigned ? 'bad'
-      : v.state === 'linked' ? 'ok'
-      : v.state === 'needs_reauth' ? 'bad'
-      : v.state === 'awaiting_owner' ? 'warn'
-      : 'idle'
-    const title =
-      unsigned ? 'مربوطة بلا إذن'
-      : v.state === 'linked' ? 'مربوطة'
-      : v.state === 'needs_reauth' ? 'تحتاج تجديدا'
-      : v.state === 'awaiting_owner' ? 'تنتظرك'
-      : v.state === 'connectable' ? 'جاهزةٌ للربط'
-      : 'لم يُبنَ سائقُها'
-    return `<a href="/panel/channels/${escapeHtml(v.spec.id)}">
-      <span class="pl">${LOGOS[v.spec.id] ?? ''}</span>
-      <span>${escapeHtml(v.spec.label)}</span>
-      <span class="dot ${dot}" title="${escapeHtml(title)}"></span></a>`
-  }
-
-  return `<details class="plat"${anyLinked ? ' open' : ''}>
-    <summary>${ICON.channels}<span>المنصّات</span></summary>
-    <div class="plat-list">${shown.map(row).join('')}</div>
-  </details>`
-}
 
 
 
@@ -722,29 +675,16 @@ export function panelPage(d: PanelData): string {
    * والتجديدُ يُعرَض `bad` والوصولُ `warn`: **الأوّلُ يوجب يدَك،
    * والثاني يُصلحه النظامُ وحده** — ولا يُسوَّى بينهما فيُقرآن سواء.
    */
-  const expiring = d.expiring.length === 0 ? '' : notice({
-    tone: d.expiring.some((e) => e.kind === 'refresh') ? 'bad' : 'warn', alert: true, g: '!',
-    html: `${d.expiring
-      .slice(0, 3)
-      .map((e) => {
-        const what = e.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'
-        const when = e.daysLeft < 0
-          ? '<b>انتهى</b>'
-          : e.daysLeft === 0
-            ? '<b>ينتهي اليوم</b>'
-            : `يبقى <b>${counted(e.daysLeft, NOUNS.day)}</b>`
-        // ‏والثخينُ للأرقام والأسماء وحدها (خطّة التصميم 4.4/5) — لا لجملةٍ وسط الشرح
-        const why = e.kind === 'refresh'
-          ? ' — ويوجب سقوطُه دورةَ إذنٍ بيدك'
-          : ''
-        // ‏والحسابُ معزول (4.4/6): «لـ@omar_ah (X)» كانت تُرسَم «(X)@omar_ah»
-        return `${what} لـ<b><bdi>${escapeHtml(e.displayName)}</bdi></b>
-                (<bdi>${escapeHtml(platformLabel(e.platform))}</bdi>): ${when}${why}`
-      })
-      .join(' · ')
-  }${
-    d.expiring.length > 3 ? ` · <b>و${d.expiring.length - 3} غيرُها</b>` : ''
-  } <a class="tap" href="#channels">جدّد الإذن</a>` })
+  // ‏**ومن الحكم الواحد** (D-205): كان الشريطُ يقرأ استعلامَه بعتبته وكلماته («إذنُ الوصول»، «إذنُ التجديد»)،
+  // ‏فيقول «يبقى 6 أيّام» عن منصّةٍ تقول بطاقتُها «متّصلة». فصار سطرًا واحدًا بحال كلّ منصّةٍ تحتاج يدَك، وزرًّا واحدًا
+  const needy = d.channels
+    .map((v) => ({ v, h: channelHealth(v, d.now) }))
+    .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
+  const expiring = needy.length === 0 ? '' : notice({
+    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+    html: `${needy.slice(0, 3)
+      .map(({ v, h }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>: ${escapeHtml(h.label)}`)
+      .join(' · ')}${needy.length > 3 ? ` · <b>و${needy.length - 3} غيرُها</b>` : ''} <a class="tap" href="#channels">افتح الحسابات</a>` })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(
@@ -882,7 +822,8 @@ export function panelPage(d: PanelData): string {
     posts: waitingDrafts,
     // ‏**وكلُّ عددٍ في الرافدة يعني «ينتظرك»** (D-177): كان عددُ القنوات وحدَه «كم مربوطة»،
     // فقرأ المالكُ «2» على القنوات كما يقرؤه على المسوّدات — شيئين ينتظرانه
-    accounts: d.channels.filter((c) => c.state === 'needs_reauth' || unsignedAccounts(c).length > 0).length,
+    // ‏والمنقطعةُ وما يقترب انقطاعُه، من الحكم الواحد (D-205)
+    accounts: d.channels.filter((c) => ['broken', 'expiring'].includes(channelHealth(c, d.now).kind)).length,
     results: d.openSuggestions,
     tasks: d.ownerPending,
     // ‏والإعداداتُ تجمع ما كان في ثلاثة ألواح (D-204): مزوّدٌ بلا مفتاح، وجلساتٌ مفتوحةٌ غيرُ هذه
@@ -898,7 +839,7 @@ export function panelPage(d: PanelData): string {
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
-${railHtml({ inPanel: true, counts, afterChannels: platformNav(d.channels), env: d.env })}
+${railHtml({ inPanel: true, counts, env: d.env })}
 
 <div class="main">
 <header class="topbar">
@@ -1018,8 +959,8 @@ ${pivotPane(d.pivot)}
 
 
 <section data-pane="accounts" hidden>
-  ${pageHead('النشر', sectionLabel('accounts'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
-  <div data-sub id="channels">${channelsSection(d.channels, d.now, d.apps, d.baseUrl, d.zone ?? null)}</div>
+  ${pageHead('النشر', sectionLabel('accounts'), 'منصّاتُك وحالُ كلٍّ منها، <b>وما يحتاج يدَك أوّلًا</b>. والبطاقةُ تفتح صفحةَ الحساب: ما نُشر عليه، وما يأتي، وإعدادُه.')}
+  <div data-sub id="channels">${channelsSection(d.channels, d.now)}</div>
 </section>
 
 <section data-pane="posts" hidden>
