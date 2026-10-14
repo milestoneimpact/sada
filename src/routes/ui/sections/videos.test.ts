@@ -27,6 +27,16 @@ describe('صفُّ المقطع بعد الإنشاء', () => {
     expect(html).not.toContain('value="p-tt"')
   })
 
+  it('وأوّلَ زيارةٍ «بتوقيت الرياض» والمنطقةُ تُرسَل مع الأزرار (D-202)', () => {
+    const html = videosSection([UP], NOW, null, { zone: null })
+    expect(html).toContain('جدوِل منشورَ YouTube بتوقيت الرياض:')
+    expect(html).not.toContain('بتوقيتك')
+    expect(html).toContain('<input type="hidden" name="tz" value="Asia/Riyadh">')
+    const known = videosSection([UP], NOW, null, { zone: 'Europe/London' })
+    expect(known).toContain('جدوِل منشورَ YouTube بتوقيتك:')
+    expect(known).toContain('value="Europe/London"')
+  })
+
   it('ومنشورٌ لا بطاقةَ له في الصفحة يُذكر بحاله بلا رابطٍ يرتدّ إلى الرئيسيّة', () => {
     const html = videosSection([UP], NOW, new Set(['p-yt']))
     expect(html).toContain('href="#d-p-yt"')

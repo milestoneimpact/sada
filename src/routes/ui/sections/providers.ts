@@ -166,7 +166,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         ? statusBadge('warn', '▲', 'معطَّل')
         : p.verifiedAt === null
           ? statusBadge('idle', '○', 'لم يُختبر')
-          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(stamp(p.verifiedAt, null))}"`)}`
+          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'

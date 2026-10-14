@@ -168,6 +168,18 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(html).toContain('<tr class="urgent">')
   })
 
+  it('ورمزٌ بين علامتَي اقتباسٍ خلفيّتين في المهمّة يُرسَم رمزًا لا علاماتٍ يراها المالك (D-202)', () => {
+    const html = tasksScreen({
+      phase: null, gates: [], env: 'staging',
+      rows: [{
+        code: 'M-99', title: 'مهمّة', ifLeft: 'يُسجَّل `price_unverified` بصفر', unblocks: 'gate',
+        state: false, measured: '', done: () => false,
+      } as never],
+    })
+    expect(html).toContain('<bdi class="mono" dir="ltr">price_unverified</bdi>')
+    expect(html).not.toContain('`')
+  })
+
   it('والفرقُ عن أمس حبرٌ لا حالة — إنفاقٌ نزل ليس تحذيرا', () => {
     for (const s of ['.delta.up', '.delta.down']) expect(css.rule(s).color, s).toBe('var(--ink-2)')
     // ‏ولا في سياقٍ آخر ولا في محدّدٍ أخصّ: «.x .delta.down» تحذيرٌ كذلك
@@ -333,6 +345,9 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
     expect(audit('anthropic')).toContain('<span class="chip">Anthropic</span>')
     expect(audit('x')).toContain('<span class="chip">X</span>')
     expect(audit('d-42')).toContain('<span class="chip">d-42</span>')
+    // ‏والفعلُ بالعربيّة وحدَه، ومفتاحُه في العنوان لمن سأل لا سطرًا تحته (D-202)
+    expect(audit('x')).not.toContain('<div class="mono">provider.key</div>')
+    expect(audit('x')).toContain('title="provider.key"')
   })
 
   /**
@@ -899,7 +914,9 @@ describe('ما وراء المقاييس (D-149)', () => {
   it('الرموز: لا زمرّدَ في الوهج بصيغة rgba، والتاريخُ في مفتاح الرسم معزول، والرقمُ المحلّيُّ غربيٌّ في كلّ ICU', () => {
     expect(found((d) => /rgba\(18,98,62|rgba\(130,198,158/i.test(d.value))).toEqual([])
     const chart = readFileSync(new URL('./chart.ts', import.meta.url), 'utf8')
-    expect(chart).toContain('· <span class="mono">${escapeHtml(peak.day.slice(5))}</span>')
+    // ‏والتاريخُ «14 أكتوبر» لا «10-14» (D-202)
+    expect(chart).toContain('· ${escapeHtml(dayKeyLabel(peak.day))}')
+    expect(chart).not.toContain('.slice(5)')
     const time = readFileSync(new URL('./time.ts', import.meta.url), 'utf8')
     expect(time).toContain("toLocaleString('ar-u-nu-latn'")
   })

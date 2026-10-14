@@ -22,7 +22,8 @@
 import type { ChannelView } from '../channels'
 import type { AppStatus } from '../oauth/apps'
 import type { AccountHealth, PlatformPost, PlatformTally } from './screen'
-import { counted, NOUNS, parseSqliteUtc } from '../format'
+import { counted, NOUNS, parseSqliteUtc, relativeTime } from '../format'
+import { whyFailed } from '../publish/reasons'
 
 export type RungState = 'done' | 'now' | 'waiting' | 'failed'
 export type RungKey = 'app' | 'account' | 'token' | 'renew' | 'publish'
@@ -181,11 +182,12 @@ export function readiness(input: ReadinessInput): Readiness {
   ) {
     publishRung = {
       key: 'publish', title: 'النشر', state: 'failed',
-      note: `آخرُ محاولةٍ فشلت: ${lastFailed.lastError ?? ''}`,
+      // ‏بما يقوله «لماذا فشل» في البطاقة نفسِها، لا الرمزُ الخامّ ولا «Internal Server Error» (D-202)
+      note: `آخرُ محاولةٍ فشلت: ${whyFailed(lastFailed.lastError ?? null, id).text}`,
       action: { label: 'افتح المنشور', href: `/panel/journey/${lastFailed.id}` },
     }
   } else if (tally.lastPublishedAt !== null) {
-    publishRung = { key: 'publish', title: 'النشر', state: 'done', note: `${tally.published} نُشر، آخرُها ${tally.lastPublishedAt.slice(0, 16)}` }
+    publishRung = { key: 'publish', title: 'النشر', state: 'done', note: `${tally.published} نُشر، آخرُها ${relativeTime(tally.lastPublishedAt, now)}` }
   } else if (tally.queued > 0) {
     publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: `${tally.queued} مجدولٌ ينتظر موعدَه` }
   } else {

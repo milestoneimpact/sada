@@ -96,7 +96,7 @@ import { CHANNELS, isLinkedInPage, linkStates, listAccounts, SETUP, viewChannels
 import { accountHealth, activeScopes, grantedScopes, platformPosts, platformTally } from '../lib/platform/screen'
 import { CLIP_PLATFORMS, platformNeeds } from '../lib/platform/needs'
 import { history, platformCounts, postCosts, readCursor, upcoming, waiting } from '../lib/platform/timeline'
-import { clock, dayLabel, localParts, zoneNote } from '../lib/time/zone'
+import { clock, dayLabel, localParts, validZone, zoneNote } from '../lib/time/zone'
 import { ownerZone } from '../lib/time/ownerZone'
 import { backTo } from '../lib/nav/back'
 import { metricsFor } from '../lib/metrics/job'
@@ -308,7 +308,10 @@ function fromEditor(form: FormData): boolean {
  * ‏الموعدُ من نموذج المحرّر (D-198) — **زرٌّ تحسبه الخادمُ بتوقيت المالك، أو يومٌ وساعةٌ بتوقيته**،
  * ‏ثمّ `when` بـ UTC كما يرسله شريطُ البطاقة. فالجدولةُ تقرأ صيغةً واحدة، ولا يُحسَب في رأس أحد.
  */
-function readWhen(form: FormData, zone: string | null, now: Date): string {
+function readWhen(form: FormData, cookieZone: string | null, now: Date): string {
+  // ‏الحقلُ يُقرأ بالمنطقة التي قالتها لصيقتُه (D-202): «بتوقيت الرياض» في أوّل زيارة
+  // ‏تعني الرياض وإن كتب المتصفّحُ كعكتَه بين العرض والإرسال
+  const zone = validZone(String(form.get('tz') ?? '')) ?? cookieZone
   const preset = String(form.get('preset') ?? '')
   const iso = (d: Date | null): string => d === null ? '' : d.toISOString().slice(0, 16)
   if (preset !== '' && preset !== 'custom') return iso(presetAt(preset, now, zone))
@@ -3009,7 +3012,8 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   if ('denied' in gate) return gate.denied
   const id = c.req.param('id')
   const now = new Date()
-  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  // ‏بالمنطقة التي قالها السطرُ فوق الأزرار (D-202)، وإلّا منطقةُ المالك
+  const zone = validZone(String(gate.form.get('tz') ?? '')) ?? await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const at = presetAt(String(gate.form.get('preset') ?? ''), now, zone)
   const result = at === null ? null : await scheduleFromUpload(c.env.DB, {
     uploadId: id,
@@ -3121,9 +3125,11 @@ panel.get('/panel/plan-import/:id', async (c) => {
   }
   const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
   const reach = await reachNow(c.env.DB)
+  // ‏«بتوقيت الرياض» حين لا منطقةَ عُرفت: هي ما قرأ به `planFacts` الأيّامَ (D-202)
+  const fallback = (await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) === null
   return page((nonce) =>
     soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
-      injectCsrf(planImportScreen(id, read, new Date(), reach), session.record.csrf), nonce, '',
+      injectCsrf(planImportScreen(id, read, new Date(), reach, fallback), session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })

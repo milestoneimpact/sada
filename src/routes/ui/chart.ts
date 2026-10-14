@@ -28,6 +28,7 @@
  */
 import { escapeHtml } from './escape'
 import { money } from '../../lib/format'
+import { dayKeyLabel } from '../../lib/time/zone'
 import { counted, NOUNS } from '../../lib/format'
 import { emptyState } from './components/empty'
 
@@ -79,7 +80,7 @@ export function areaChart(series: { day: string; total: number }[]): string {
   const first = series[0]!
 
   // اليومان الطرفان وحدهما: محورٌ بأربعةَ عشرَ تاريخا يزدحم فلا يُقرأ
-  const label = (d: { day: string }): string => d.day.slice(5)
+  const label = (d: { day: string }): string => dayKeyLabel(d.day)
   const dates = `<span class="axis axis-x" style="left:${px(x(0))};top:${py(h - 8)}">${label(first)}</span>
     <span class="axis axis-x end" style="right:${px(w - x(series.length - 1))};top:${py(h - 8)}">${label(last)}</span>`
   const peakDot = `<i class="peak" style="left:${px(x(peakIndex))};top:${py(y(peak.total))}" aria-hidden="true"></i>`
@@ -106,7 +107,7 @@ export function areaChart(series: { day: string; total: number }[]): string {
     <div class="legend">
       <span>المجموع <b>${money(total)}</b></span>
       <span>المتوسّط اليوميّ <b>${money(average)}</b></span>
-      <span>الذروة <b>${money(peak.total)}</b> · <span class="mono">${escapeHtml(peak.day.slice(5))}</span></span>
+      <span>الذروة <b>${money(peak.total)}</b> · ${escapeHtml(dayKeyLabel(peak.day))}</span>
     </div>
   </div>`
 }

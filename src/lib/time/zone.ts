@@ -34,6 +34,13 @@ const MONTHS = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
 ] as const
 
+/** «14 أكتوبر» من مفتاح يومٍ `YYYY-MM-DD` — يومٌ عُدّ من قبلُ بمنطقته، فلا تحويلَ هنا (D-202). */
+export function dayKeyLabel(key: string): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(key)
+  const month = m === null ? undefined : MONTHS[Number(m[1]) - 1]
+  return m === null || month === undefined ? key : `${Number(m[2])} ${month}`
+}
+
 /** منطقةٌ صالحة أو `null` — **والصلاحُ ما يقبله `Intl`، لا شكلُ النصّ وحده**. */
 export function validZone(raw: string | null | undefined): string | null {
   if (raw === null || raw === undefined) return null

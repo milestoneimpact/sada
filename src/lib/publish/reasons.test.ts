@@ -36,3 +36,12 @@ describe('القاموس', () => {
     expect(whyFailed('حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد', 'linkedin').action).toBe('none')
   })
 })
+
+describe('جملُ HTTP بالعربيّة (D-202)', () => {
+  it('«Internal Server Error» تُقال عطلًا في خادمها، واسمُ المنصّة كما يُقرأ', () => {
+    expect(whyFailed('linkedin: Internal Server Error', 'linkedin').text).toBe('ردّته LinkedIn: عطلٌ في خادمها (500)')
+    expect(whyFailed('Service Unavailable', 'youtube').text).toBe('ردّته YouTube: خدمتُها متوقّفةٌ مؤقّتًا (503)')
+    // ‏وما لا نعرفه يبقى كما جاء
+    expect(whyFailed('x: duplicate content', 'x').text).toBe('ردّته X: duplicate content')
+  })
+})

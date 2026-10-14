@@ -1063,6 +1063,7 @@ ${pivotPane(d.pivot)}
     ...(d.links === undefined ? {} : { links: d.links }),
     ...(d.reach === undefined ? {} : { reach: d.reach }),
     ...(d.captions === undefined ? {} : { captions: d.captions }),
+    zone: d.zone ?? null,
     // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
     writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
   }), `${planImportCard()}
@@ -1086,7 +1087,7 @@ ${pivotPane(d.pivot)}
     <div class="split">
       <p>${d.paused
         ? 'النظام موقوف: لا نداء مدفوع ولا مسح ولا نشر. والقيد في الشيفرة لا في هذه الصفحة.'
-        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude، وفي الطابور و Cron معا.'}</p>
+        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude، وفي الطابور والدورة المجدولة معًا.'}</p>
       <form class="inline" method="POST" action="/panel/settings"
             data-confirm="${d.paused ? 'استئناف عمل النظام؟' : 'إيقاف النظام كلّه؟ سيتوقّف المسح والتحليل والنشر حتّى تستأنفه.'}">
         <input type="hidden" name="key" value="paused">

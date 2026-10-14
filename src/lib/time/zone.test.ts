@@ -1,6 +1,6 @@
 /** يومُ المالك من كعكته (D-173) — والمنطقةُ الفاسدة لا تُسقط شيئا. */
 import { describe, expect, it } from 'vitest'
-import { clock, dayKey, dayLabel, dayMonth, dayRange, monthStart, validZone, zoneOf, FALLBACK_ZONE, zoneNote, stamp } from './zone'
+import { clock, dayKey, dayLabel, dayMonth, dayRange, monthStart, validZone, zoneOf, FALLBACK_ZONE, zoneNote, stamp, dayKeyLabel } from './zone'
 
 describe('المنطقة', () => {
   it('تُقبل ما يقبله Intl، ويُردّ ما سواه', () => {
@@ -85,5 +85,13 @@ describe('الاحتياطُ بتوقيت الرياض لا غرينتش (D-201)
       .toBe('2026-03-01T05:00:00.000Z')
     expect(monthStart(new Date('2026-04-15T12:00:00Z'), 'America/New_York').toISOString())
       .toBe('2026-04-01T04:00:00.000Z')
+  })
+})
+
+describe('مفتاحُ اليوم بالكلام (D-202)', () => {
+  it('«2026-10-01» تُقرأ «1 أكتوبر»، وما ليس مفتاحًا يبقى', () => {
+    expect(dayKeyLabel('2026-10-01')).toBe('1 أكتوبر')
+    expect(dayKeyLabel('2026-12-14')).toBe('14 ديسمبر')
+    expect(dayKeyLabel('x')).toBe('x')
   })
 })
