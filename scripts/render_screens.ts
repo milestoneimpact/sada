@@ -60,9 +60,9 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
 const page = (
   title: string,
   body: string,
-  active = title.includes('التقرير') ? 'report' : title.includes('مهامُّ') ? 'tasks' : 'channels',
+  active = title.includes('النتائج') ? 'results' : title.includes('مهامُّ') ? 'tasks' : 'accounts',
 ): string =>
-  soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
+  soloPage(title, { href: '/panel#channels', label: 'الحسابات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
 
 // ── صفحاتُ المنصّات: صفحةُ حساب (D-172) ─────────────────────────────
 const tt = views.find((v) => v.spec.id === 'tiktok')!
@@ -281,7 +281,7 @@ const stored: StoredReport = {
 
 writeAudited(
   '/tmp/screen-report.html',
-  page('صدى — التقرير الأسبوعيّ', reportScreen({
+  page('صدى — النتائج', reportScreen({
     reports: [stored],
     current: stored,
     promoCapUsd: 20,

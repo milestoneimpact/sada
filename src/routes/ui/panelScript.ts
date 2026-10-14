@@ -94,11 +94,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var on=card?(card.hasAttribute('data-sub')?card:card.closest('[data-sub]')):null;
       if(!on)on=subs[0];
       Array.prototype.forEach.call(subs,function(s){s.hidden=s!==on;});
-      Array.prototype.forEach.call(pane.querySelectorAll('#posts-sub a'),function(t){
+      Array.prototype.forEach.call(pane.querySelectorAll(':scope>nav.tab-bar a'),function(t){
         if(t.getAttribute('href')==='#'+on.id)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
       // ‏والقسمُ نفسُه مرساةُ تبويبه: لا ينزل إليه فوق الشريط، بل يبقى الشريطُ ظاهرًا
       if(card===on){if(push&&history.replaceState)history.replaceState(null,'','#'+asked);
-        var bar=document.getElementById('posts-sub'); if(bar&&focus)bar.scrollIntoView({block:'nearest'}); return;}
+        var bar=pane.querySelector(':scope>nav.tab-bar'); if(bar&&focus)bar.scrollIntoView({block:'nearest'}); return;}
     }
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
     // ‏و«tabindex=-1» لما لا يُركَّز عليه وحدَه: حقلٌ أو زرٌّ يُعلَّم به يخرج من ترتيب Tab

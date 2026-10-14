@@ -20,7 +20,7 @@ import { saveTokens, upsertAccount } from '../lib/tokens'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
-import { buildCommands } from './ui/command'
+import { buildCommands, sectionLabel } from './ui/command'
 import { connectedBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
 import { setFlash } from './panel'
 
@@ -36,8 +36,8 @@ import { setFlash } from './panel'
 function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
   // القالبُ الواحد (D-151): علامةٌ وعودةٌ و⌘K وثيمٌ كسائر الشاشات المستقلّة
   const nonce = makeNonce()
-  const html = soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, nonce, '',
-    buildCommands({ onPanel: false }), soloNav('channels'))
+  const html = soloPage(title, { href: '/panel#channels', label: sectionLabel('accounts') }, body, nonce, '',
+    buildCommands({ onPanel: false }), soloNav('accounts'))
   return new Response(html, { status, headers: htmlHeaders(nonce) })
 }
 

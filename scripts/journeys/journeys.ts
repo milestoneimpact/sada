@@ -417,7 +417,7 @@ const R7: Journey = {
   title: 'رؤية النتائج (تقرير الأسبوع)',
   plan: { today: '4', target: '1' },
   async run({ page, m, stack }) {
-    await m.tap(navItem(page, 'التقرير'), '«التقرير» في التنقّل')
+    await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
     const report = q<{ id: string; body_json: string }>(stack, 'SELECT id, body_json FROM reports ORDER BY id DESC LIMIT 1')
     // ‏الرقمُ الذي يُقرأ: مرّاتُ الظهور في التقرير
     const impressions = report === undefined ? null : JSON.stringify(JSON.parse(report.body_json)).match(/"impressions":(\d+)/)?.[1] ?? null
@@ -522,7 +522,7 @@ const R11: Journey = {
     m.note(`بعد الدخول: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
     const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')
     if (session && landed.pathname !== '/panel/report') {
-      await m.tap(navItem(page, 'التقرير'), '«التقرير» — لأنّ الدخول لم يُعِد إلى الصفحة المطلوبة')
+      await m.tap(navItem(page, 'النتائج'), '«النتائج» — لأنّ الدخول لم يُعِد إلى الصفحة المطلوبة')
     }
     const at = new URL(page.url()).pathname
     return { success: session && at === '/panel/report', verified: `جلسة ${session ? 'مفتوحة' : 'لا'} · الصفحة ${at}` }

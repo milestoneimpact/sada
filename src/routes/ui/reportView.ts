@@ -24,6 +24,7 @@ import { counted, money, NOUNS, relativeTime } from '../../lib/format'
 import type { PlatformSlice, ReportPost, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
+import { resultsTabs } from './results'
 import { windowLabel } from '../../lib/metrics/job'
 import { dayMonth, dayRange } from '../../lib/time/zone'
 
@@ -320,5 +321,5 @@ export function reportScreen(d: ReportScreenData): string {
               .join('')}</tbody></table></div>
         </div>`
 
-  return `${head}${promo}${past}`
+  return `${resultsTabs('week')}${head}${promo}${past}`
 }

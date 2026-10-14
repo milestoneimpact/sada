@@ -130,16 +130,19 @@ export interface Section {
  * لا تجد قسما تبدو ناقصةَ الفهرسة لا معطوبة، فلا يُشتكى منها.
  */
 export const SECTIONS: readonly Section[] = [
-  { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، والرحلة، والمنصّات', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
-  { id: 'sources', label: 'المصادر', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'sources drive scan درايف ملفات' },
-  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan مسودات خطه', bar: true, tight: 'منشورات' },
-  { id: 'channels', label: 'القنوات', note: 'ربطُ الحسابات وحالُ أذوناتها', icon: ICON.channels, group: 'العمل', alias: 'channels accounts link حسابات لينكدإن تويتر يوتيوب تيكتوك', bar: true },
-  { id: 'pivot', label: 'الجدول المحوريّ', note: 'تختار الصفوفَ والأعمدةَ والقياس — وتقارن بنظرة', icon: ICON.pivot, group: 'العمل', alias: 'pivot table analysis لوح محوري جدول تحليل مقارنه', short: 'اللوح' },
-  { id: 'report', label: 'التقرير الأسبوعيّ', note: 'ما نُشر وما كلّف وما أعاد', icon: ICON.report, group: 'العمل', alias: 'report weekly تقرير اسبوعي', short: 'التقرير', bar: true, page: '/panel/report' },
-  { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', bar: true, page: '/panel/tasks' },
-  { id: 'providers', label: 'المزوّدون', note: 'المفاتيحُ والتوجيهُ والأسعار', icon: ICON.providers, group: 'الضبط', alias: 'providers keys models مفاتيح نماذج انثروبيك جيميناي' },
-  { id: 'settings', label: 'الحدود', note: 'سقفُ الإنفاق وعددُ التحليلات', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget ميزانيه اعدادات سقف' },
-  { id: 'security', label: 'الأمان', note: 'الجلساتُ والمفاتيحُ وسجلُّ التدقيق', icon: ICON.security, group: 'الضبط', alias: 'security sessions passkeys جلسات مفاتيح مرور' },
+  /*
+   * ‏**خمسُ وجهاتٍ ثمّ اثنتان** (خطّة التصميم 5.1 · D-204): كانت عشرةً في الرافدة، ستّةٌ منها لوحُ
+   * ‏ضبطٍ يُفتح نادرًا. فالمصادرُ صارت «المكتبة»، والتقريرُ والجدولُ المحوريُّ «النتائج»، والقنواتُ
+   * ‏«الحسابات»، والحدودُ والمزوّدون والأمانُ تبويباتٌ في «الإعدادات». **والمراسي القديمة تبقى**:
+   * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها الجديدة.
+   */
+  { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
+  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والكتابةُ والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
+  { id: 'library', label: 'المكتبة', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true },
+  { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وتحليلٌ مفصّل', icon: ICON.report, group: 'العمل', alias: 'results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
+  { id: 'accounts', label: 'الحسابات', note: 'ربطُ المنصّات وحالُ كلٍّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك' },
+  { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاقُ والحدود، وخدماتُ الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات' },
 ]
 
 /**
@@ -218,12 +221,12 @@ export function buildCommands(
     { label: 'اكتب منشورًا من مصدر', note: 'من خلاصةِ مصدرٍ محلَّل — نداءٌ مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
     { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
     { label: 'خطّة من ملفّ', note: 'جدولُ Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
-    { label: 'امسح Drive', note: 'يقرأ الملفّاتِ الجديدةَ — والزرُّ في المصادر', id: 'sources', alias: 'scan drive درايف مسح' },
+    { label: 'امسح Drive', note: 'يقرأ الملفّاتِ الجديدةَ — والزرُّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
     { label: 'ولّد خطّةَ الأسبوع', note: 'نداءٌ مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
     { label: 'اعتمد مسوّدة', note: 'القرارُ لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
-    { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'channels', alias: 'connect account oauth ربط حساب' },
-    { label: 'بدّل سقفَ الإنفاق', note: 'الحدُّ اليوميّ وعددُ التحليلات', id: 'settings', alias: 'budget cap spend ميزانيه انفاق سقف' },
-    { label: 'راجع الجلسات', note: 'ما هو مفتوحٌ الآن، وإنهاؤه', id: 'security', alias: 'sessions revoke' },
+    { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
+    { label: 'بدّل سقفَ الإنفاق', note: 'الحدُّ اليوميّ وعددُ التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
+    { label: 'راجع الجلسات', note: 'ما هو مفتوحٌ الآن، وإنهاؤه', id: 'settings', anchor: 'security', alias: 'sessions revoke' },
   ]) {
     const section = SECTIONS.find((s) => s.id === a.id)
     if (section === undefined) continue

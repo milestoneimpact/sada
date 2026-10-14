@@ -692,6 +692,19 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
   <div data-sub id="sub-plan">${plan}</div>`
 }
 
+/**
+ * «الإعدادات» ثلاثةُ تبويبات (خطّة التصميم 5.8 · D-204): كانت ثلاثةَ ألواحٍ في الرافدة — «الحدود»
+ * و«المزوّدون» و«الأمان» — تُفتح نادرًا وتأخذ ثلاثةَ أسطرٍ ممّا يُفتح كلَّ يوم. **والمراسي القديمة
+ * أسماءُ أقسامها**: `#settings` يفتح الأوّل، و`#providers` و`#security` قسمَيهما.
+ */
+function settingsTabs(missing: number): string {
+  return tabs('أقسامُ الإعدادات', [
+    { label: 'الإنفاقُ والحدود', href: '#limits', current: true },
+    { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
+    { label: 'الأمان', href: '#security' },
+  ], { id: 'settings-sub' })
+}
+
 export function panelPage(d: PanelData): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
@@ -865,15 +878,15 @@ export function panelPage(d: PanelData): string {
    * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
    */
   const counts: Readonly<Record<string, number>> = {
-    sources: pending,
+    library: pending,
     posts: waitingDrafts,
     // ‏**وكلُّ عددٍ في الرافدة يعني «ينتظرك»** (D-177): كان عددُ القنوات وحدَه «كم مربوطة»،
     // فقرأ المالكُ «2» على القنوات كما يقرؤه على المسوّدات — شيئين ينتظرانه
-    channels: d.channels.filter((c) => c.state === 'needs_reauth' || unsignedAccounts(c).length > 0).length,
-    report: d.openSuggestions,
+    accounts: d.channels.filter((c) => c.state === 'needs_reauth' || unsignedAccounts(c).length > 0).length,
+    results: d.openSuggestions,
     tasks: d.ownerPending,
-    providers: missing,
-    security: d.sessions.length > 1 ? d.sessions.length : 0,
+    // ‏والإعداداتُ تجمع ما كان في ثلاثة ألواح (D-204): مزوّدٌ بلا مفتاح، وجلساتٌ مفتوحةٌ غيرُ هذه
+    settings: missing + (d.sessions.length > 1 ? d.sessions.length : 0),
   }
 
   // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
@@ -989,8 +1002,9 @@ ${flash}
 
 ${pivotPane(d.pivot)}
 
-<section data-pane="sources" hidden>
-  ${pageHead('Google Drive', sectionLabel('sources'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+<section data-pane="library" hidden>
+  ${pageHead('Google Drive', sectionLabel('library'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ. ومقاطعُك في تبويب «الفيديو» من «المنشورات».')}
+  <div data-sub id="sources">
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -998,37 +1012,14 @@ ${pivotPane(d.pivot)}
     */''}
   <div class="card"><div class="card-head"><h2>ملفّاتُ مجلّدك</h2><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
+  </div>
 </section>
 
-<section data-pane="providers" hidden>
-  ${pageHead('الذكاء', sectionLabel('providers'), 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
-  ${providerStrip}
 
-  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
-      <span class="st idle">القرار</span></div>
-    <p class="hint">أيّ مزوّدٍ ونموذجٍ ينفّذ كلَّ مهمّة. <b>والنموذجُ يُختار من درجٍ يُملأ من عندهم</b> —
-      اضغط «حدّث» بجانبه.</p>
-    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
-      <tbody>${routingRows}</tbody></table></div>
-    <div class="sub mt-3">والافتراضُ في الشيفرة يعمل حتّى تختار —
-      فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
-  </div>
 
-  <div class="card mt-3">
-    <div class="card-head"><h2>المفاتيحُ المضبوطة</h2><div class="grow"></div>
-      <span class="st idle">${d.providers.length} مزوّدا</span></div>
-    <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
-      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
-      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
-    ${providerRows}
-  </div>
-
-  <div class="mt-3">${addCard}</div>
-</section>
-
-<section data-pane="channels" hidden>
-  ${pageHead('النشر', sectionLabel('channels'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
-  ${channelsSection(d.channels, d.now, d.apps, d.baseUrl, d.zone ?? null)}
+<section data-pane="accounts" hidden>
+  ${pageHead('النشر', sectionLabel('accounts'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
+  <div data-sub id="channels">${channelsSection(d.channels, d.now, d.apps, d.baseUrl, d.zone ?? null)}</div>
 </section>
 
 <section data-pane="posts" hidden>
@@ -1080,7 +1071,10 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
+  ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوفُ الإنفاق تُطبَّق قبل أيّ نداءٍ مدفوع</b>، والمفاتيحُ لا تُعرض كاملة، والدخولُ بعاملين.')}
+  ${settingsTabs(missing)}
+  <div data-sub id="limits">
+  <p class="hint">مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.</p>
   ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
        يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
        لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
@@ -1202,10 +1196,34 @@ ${pivotPane(d.pivot)}
           في متغيّراته — <b>واللقطةُ تُنادى على حسابٍ بعينه</b>، فلا يقع نداءٌ ولا كلفة،
           وتخرج الصورةُ بلا عنوان. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
-</section>
+</div>
+<div data-sub id="providers">
+  <p class="hint">أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.</p>
+  ${providerStrip}
 
-<section data-pane="security" hidden>
-  ${pageHead('الدخول', sectionLabel('security'), 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
+  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
+      <span class="st idle">القرار</span></div>
+    <p class="hint">أيّ مزوّدٍ ونموذجٍ ينفّذ كلَّ مهمّة. <b>والنموذجُ يُختار من درجٍ يُملأ من عندهم</b> —
+      اضغط «حدّث» بجانبه.</p>
+    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
+      <tbody>${routingRows}</tbody></table></div>
+    <div class="sub mt-3">والافتراضُ في الشيفرة يعمل حتّى تختار —
+      فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-head"><h2>المفاتيحُ المضبوطة</h2><div class="grow"></div>
+      <span class="st idle">${d.providers.length} مزوّدا</span></div>
+    <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
+    ${providerRows}
+  </div>
+
+  <div class="mt-3">${addCard}</div>
+</div>
+<div data-sub id="security">
+  <p class="hint">العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0
@@ -1294,7 +1312,10 @@ ${pivotPane(d.pivot)}
           <thead><tr><th>متى</th><th>الفعل</th><th>على ماذا</th><th>العنوان</th></tr></thead>
           <tbody>${auditRows}</tbody></table></div>`}
   </div>
+</div>
 </section>
+
+
 
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
   <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>

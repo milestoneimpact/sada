@@ -23,7 +23,7 @@ export interface RailInput {
   /** في اللوحة: المرساةُ وحدَها. وخارجها: مسارُ اللوحة قبلها. */
   readonly inPanel: boolean
   readonly counts?: Readonly<Record<string, number>>
-  /** ما يُرسَم تحت «القنوات» — أزرارُ المنصّات في اللوحة. */
+  /** ما يُرسَم تحت «الحسابات» — أزرارُ المنصّات في اللوحة. */
   readonly afterChannels?: string
   readonly env?: 'staging' | 'production'
   /**
@@ -47,7 +47,7 @@ export function railHtml(input: RailInput): string {
      * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى**.
      */
     const attrs = `${s.bar === true ? ' data-bar' : ''}${input.active === s.id ? ` aria-current="${input.parent === true ? 'true' : 'page'}"` : ''}`
-    const after = s.id === 'channels' ? (input.afterChannels ?? '') : ''
+    const after = s.id === 'accounts' ? (input.afterChannels ?? '') : ''
     // ‏والاسمُ الأقصرُ للشريط الضيّق بجانبه، ويُبدَّل بينهما في الورقة لا في السكربت (D-185)
     const label = s.tight === undefined
       ? `<span>${s.short ?? s.label}</span>`
@@ -90,6 +90,6 @@ function platformLinks(current?: string): string {
 export function soloNav(active: string, platform?: string): string {
   return railHtml({
     active, inPanel: false, parent: platform !== undefined,
-    ...(active === 'channels' ? { afterChannels: platformLinks(platform) } : {}),
+    ...(active === 'accounts' ? { afterChannels: platformLinks(platform) } : {}),
   })
 }

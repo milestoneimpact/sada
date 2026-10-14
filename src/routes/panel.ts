@@ -1820,9 +1820,9 @@ panel.get('/panel/channels/:platform', async (c) => {
   return page((nonce) =>
     // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا
     // ‏`_csrf` فيردّهما `guardPost` بـ403، والدليلُ يسكن هذه الصفحة منذ D-111
-    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: 'القنوات' },
+    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: sectionLabel('accounts') },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('channels', spec.id)),
+      buildCommands({ onPanel: false }), soloNav('accounts', spec.id)),
   )
 })
 
@@ -1950,8 +1950,8 @@ panel.get('/panel/report', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage('صدى — التقرير الأسبوعيّ', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('report')),
+    soloPage(`صدى — ${sectionLabel('results')}`, { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
 
@@ -1997,8 +1997,8 @@ panel.get('/panel/report/:week', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: sectionLabel('report') }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('report')),
+    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: sectionLabel('results') }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
 

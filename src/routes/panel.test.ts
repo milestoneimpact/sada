@@ -355,7 +355,8 @@ describe('اللوحُ المحوريّ (D-120)', () => {
     const cookie = await login()
     seed()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('data-pane="pivot"')
+    expect(html).toContain('data-pane="results"')
+    expect(html).toContain('<div data-sub id="pivot">')
     expect(html).toContain('table class="card card-inset pv"')
     // صفّان: منصّتان — **والاسمُ كما يُقرأ لا كما في القاعدة** (D-123):
     // كان الاختبارُ يثبّت `linkedin` خاما، فثبّت العيبَ الذي كان يجب أن يمسكه
@@ -816,13 +817,19 @@ describe('رؤوسُ الألواح (D-137)', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     const panes = html.split('<section data-pane="').slice(1)
-    expect(panes.length).toBeGreaterThanOrEqual(8)
+    // ‏ستّةُ ألواح (D-204): الرئيسيّةُ والمنشوراتُ والمكتبةُ والنتائجُ والحساباتُ والإعدادات
+    expect(panes.map((p) => p.slice(0, p.indexOf('"')))).toEqual(
+      ['overview', 'results', 'library', 'accounts', 'posts', 'settings'])
     for (const p of panes) {
       const name = p.slice(0, p.indexOf('"'))
       const h1s = (p.match(/<h1[\s>]/g) ?? []).length
       expect(h1s, name).toBe(name === 'overview' ? 0 : 1)
     }
-    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+    expect(html).toContain('<h1>النتائج</h1>')
+    // ‏والمراسي القديمةُ أقسامٌ في ألواحها الجديدة — فالروابطُ المحفوظةُ تصل
+    for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
+      expect(html, old).toContain(`<div data-sub id="${old}">`)
+    }
   })
 })
 
@@ -1494,7 +1501,8 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
   it('يعرض المبنيَّ وغيرَ المبنيّ معا', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('data-pane="channels"')
+    expect(html).toContain('data-pane="accounts"')
+    expect(html).toContain('<div data-sub id="channels">')
     for (const name of ['LinkedIn', 'Snapchat', 'Instagram', 'TikTok', 'YouTube']) {
       expect(html).toContain(name)
     }

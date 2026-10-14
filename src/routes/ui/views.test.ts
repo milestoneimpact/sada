@@ -714,7 +714,10 @@ describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
       { day: '2026-09-02', platform: 'linkedin', account: 'b', status: 'failed', costUsd: 0.2, week: '2026-W36', month: '2026-09' },
     ] as never
     const html = pivotPane({ rows: 'platform', cols: 'status', measure: 'count', sinceDays: 30, table: pivot(rows, { rows: 'platform', cols: 'status', measure: 'count' }), capped: false, cap: 5000 } as never)
-    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+    expect(html).toContain('<h1>النتائج</h1>')
+    // ‏والجدولُ تبويبُ «تحليلٌ مفصّل» في «النتائج»، ومرساتُه القديمةُ قسمُه (D-204)
+    expect(html).toContain('<a class="tab-item" href="#pivot" aria-current="page"><span>تحليلٌ مفصّل</span></a>')
+    expect(html).toContain('<div data-sub id="pivot">')
     const split = html.indexOf('<div class="split">')
     const acts = html.indexOf('<div class="row acts">', split)
     const csv = html.indexOf('نزّل الجدولَ CSV', acts)
@@ -967,18 +970,18 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
    * الجوّال، والقسمُ معلَّمٌ في الوسم، والثيمُ مرّةً واحدة.
    */
   it('soloPage برافدته: قسمُه معلَّم، ومساراتُه إلى اللوحة، والمنصّةُ الحاليّةُ تحته، والثيمُ لا يتكرّر', () => {
-    const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'القنوات' }, '<p>x</p>', 'n', '', undefined,
-      soloNav('channels', 'linkedin'))
+    const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'الحسابات' }, '<p>x</p>', 'n', '', undefined,
+      soloNav('accounts', 'linkedin'))
     expect(html).toContain('<aside class="rail">')
     expect(html).toContain('<a href="/panel#posts" data-bar>')
-    expect(html).toContain('<a href="/panel/tasks" data-bar>')
-    expect(html).toContain('<a href="/panel#channels" data-bar aria-current="true">')
+    expect(html).toContain('<a href="/panel/tasks">')
+    expect(html).toContain('<a href="/panel#accounts" aria-current="true">')
     expect(html).toMatch(/<a href="\/panel\/channels\/linkedin" aria-current="page">/)
     expect(html).not.toContain('/panel/channels/snapchat')
     expect((html.match(/id="theme"/g) ?? []).length).toBe(1)
 
     const tasks = soloPage('صدى — مهامّ', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, soloNav('tasks'))
-    expect(tasks).toContain('<a href="/panel/tasks" data-bar aria-current="page">')
+    expect(tasks).toContain('<a href="/panel/tasks" aria-current="page">')
     expect(tasks).not.toContain('class="plat"')
   })
 
