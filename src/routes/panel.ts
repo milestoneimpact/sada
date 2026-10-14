@@ -120,6 +120,7 @@ import { spreadScreen } from './ui/spreadView'
 import { relyingParty } from '../lib/security/rp'
 import { record, recentAudit } from '../lib/audit'
 import { pulses, readHeartbeats } from '../lib/ops/heartbeat'
+import { modelName } from '../lib/ai/modelName'
 import { loginPage, panelPage, type PanelFlash, type PanelSource } from './panelView'
 
 export const panel = new Hono<{ Bindings: Env }>()
@@ -3376,6 +3377,8 @@ panel.post('/panel/providers/models', async (c) => {
     models: catalog.models.map((m) => ({
       id: m.id,
       label: m.label,
+      // ‏الاسمُ المقروء (D-203): المعرّفُ قيمةُ الخيار وتلميحُه لا نصُّه
+      name: modelName(m.id),
       task: m.task,
       priceIn: m.priceIn,
       priceOut: m.priceOut,

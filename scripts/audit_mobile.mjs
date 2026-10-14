@@ -23,7 +23,7 @@
  * | تبويبٌ أو حلقةُ تركيزه خارج ما يُرى | صفر | WCAG 2.4.7 و2.4.11 — وشريطٌ مخفيٌّ لا يُرى (مراجعة D-189) |
  * | مقياسُ الاستحقاق بطول رقمه | ±1٪ | ‏0.61 رُسمت ممتلئة (مراجعة D-189) |
  * | الاسمُ المرسومُ بنسبة رسمه | ±5٪ | «صدى» ‏16×16 في شريط العودة (مراجعة D-196) |
- * | السطرُ اللاتينيُّ في اللحظة | سطرٌ واحدٌ في طرف القفل | التفّ بين ‏900 و‏1103 وتحت ‏350 (مراجعة D-196) |
+ * | حرفٌ لاتينيٌّ في العلامة | صفر في اللحظة وعلامة الرافدة | «SADA · STAGING» والسطرُ الإنجليزيّ (D-203) |
  * | الفعلُ الأوّلُ وحقلُه في الشاشة الأولى | ‏375×548 · ‏320×568 · ‏844×390 · ‏667×375 | الحقلُ تحت الطيّة على iPhone SE (مراجعة D-196) |
  * | رمزُ اللحظة واسمُها في الألوان القسريّة | ‏3:1 على الأرض تحتهما | أسودُ على العمق ‏1.46:1 (مراجعة D-196) |
  * | `100vh` مكشوفة | ممنوعة | ارتفاعُ iOS يشمل شريطَ المتصفّح |
@@ -455,27 +455,18 @@ for (const file of files) {
           }
         }
         /*
-         * ١١ · **السطرُ اللاتينيُّ في لحظة العلامة سطرٌ واحدٌ في طرف القفل** (مراجعة D-196): كان يلتفّ سطرين بين
-         * ‏900 و‏1103 وتحت ‏350، والملتفُّ يمتدّ بعرض اللوحة فيُصفّ يسارًا تحت قفلٍ مصفوفٍ يمينًا — ولا شيءَ يفيض.
+         * ١١ · **العلامةُ «صدى» وحدها** (D-203، قرارُ المالك): لا حرفَ لاتينيٌّ ظاهرٌ في لحظة العلامة ولا في
+         * علامة الرافدة. كان فيهما «SADA» و«SADA · STAGING» والسطرُ الإنجليزيّ بعد الشعار العربيّ.
          */
-        for (const en of document.querySelectorAll('.moment-en')) {
-          if (!shown(en)) continue
-          const range = document.createRange()
-          range.selectNodeContents(en)
-          const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size
-          if (lines > 1) out.push({ kind: 'moment', what: '.moment-en', detail: `يلتفّ ${lines} أسطر` })
-          const m = en.closest('.moment')
-          const id = m?.querySelector('.moment-id')
-          if (m && id && shown(id)) {
-            const cs = getComputedStyle(m)
-            const box = m.getBoundingClientRect()
-            const r = range.getBoundingClientRect()
-            const inner = [box.left + parseFloat(cs.paddingLeft), box.right - parseFloat(cs.paddingRight)]
-            if (r.left < inner[0] - 1 || r.right > inner[1] + 4) {
-              out.push({ kind: 'moment', what: '.moment-en', detail: `يخرج من اللوحة ${Math.round(Math.max(inner[0] - r.left, r.right - inner[1]))}px` })
+        for (const box of document.querySelectorAll('.moment, .rail .brand')) {
+          if (!shown(box)) continue
+          const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT)
+          for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+            const el = t.parentElement
+            if (!el || !shown(el) || el.closest('svg')) continue
+            if (/[A-Za-z]/.test(t.textContent ?? '')) {
+              out.push({ kind: 'moment', what: key(el), detail: `حرفٌ لاتينيٌّ في العلامة: «${(t.textContent ?? '').trim().slice(0, 40)}»` })
             }
-            const gap = Math.abs(r.right - id.getBoundingClientRect().right)
-            if (gap > 6) out.push({ kind: 'moment', what: '.moment-en', detail: `طرفُه عن طرف القفل ${Math.round(gap)}px` })
           }
         }
         // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
@@ -623,7 +614,7 @@ for (const file of files) {
     weight: 'وزنٌ فوق السقف',
     svgtext: 'حرفٌ في SVG يُقلَّص مع الرسم',
     mark: 'اسمٌ مرسومٌ بغير نسبته',
-    moment: 'السطرُ اللاتينيُّ في لحظة العلامة',
+    moment: 'حرفٌ لاتينيٌّ في العلامة',
     fold: 'الفعلُ الأوّلُ أو حقلُه تحت الطيّة على شاشةٍ قصيرة',
     forced: 'لحظةُ العلامة دون ‏3:1 في الألوان القسريّة',
   }

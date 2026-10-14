@@ -980,6 +980,17 @@ describe('خزانة المفاتيح في اللوحة', () => {
       expect(urls[0]).toContain('generativelanguage.googleapis.com')
     })
 
+    it('ويحمل لكلّ معرّفٍ اسمًا يقرؤه المالك (D-203)، والمعرّفُ قيمةٌ لا نصّ', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      stub({ models: [{ name: 'models/gemini-2.5-flash', displayName: 'Flash' }] })
+      const body = (await (await post(cookie, '/panel/providers/models', { provider: 'gemini' })).json()) as { models: { id: string; name: string }[] }
+      expect(body.models[0]).toMatchObject({ id: 'gemini-2.5-flash', name: 'Gemini · السريع (2.5 Flash)' })
+      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      expect(html).toContain('<option value="claude-opus-5" title="claude-opus-5" selected>Claude · الأقوى (Opus 5)</option>')
+      expect(html).not.toMatch(/<option value="claude-opus-5"[^>]*>claude-opus-5</)
+    })
+
     it('و**المفتاحُ لا يظهر في الجواب ولا في العنوان**', async () => {
       const cookie = await login()
       await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
@@ -1606,16 +1617,21 @@ describe('الثيم النهاريّ', () => {
     expect(html).toContain(`src="${uiScript().path}"`)
   })
 
-  /** **العلامةُ تقول بيئتَها** (D-151): كانت «STAGING» ثابتةً حتّى في الإنتاج. */
-  it('العلامةُ تحمل اسمَ البيئة من SADA_ENV لا ثابتًا', async () => {
+  /**
+   * **العلامةُ «صدى» وحدها** (D-203): كانت «SADA · STAGING» في القفل. والتجريبيّةُ وحدها تحمل شارةً
+   * عربيّةً بجانب الاسم من SADA_ENV (D-151)، والإنتاجُ بلا شارة.
+   */
+  it('العلامةُ «صدى» وحدها، وشارةُ «تجريبيّ» في التجريبيّة وحدها', async () => {
     const cookie = await login()
     const staging = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(staging).toContain('SADA · STAGING')
+    const brandOf = (html: string): string => /<div class="brand">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? ''
+    expect(brandOf(staging)).toContain('<span>تجريبيّ</span>')
+    expect(staging).not.toContain('SADA')
     const production = await (
       await app.request('/panel', withSession(cookie), { ...env, SADA_ENV: 'production' })
     ).text()
-    expect(production).toContain('SADA · PRODUCTION')
-    expect(production).not.toContain('STAGING')
+    expect(brandOf(production)).not.toContain('<span')
+    expect(production).not.toMatch(/SADA|STAGING|PRODUCTION|تجريبيّ<\/span>/)
   })
 
   /** **سببُ فشل الخطّة يُحفَظ ويُقرأ** (D-157): «failed» وحدَها كانت في السجلّ، والفلاشُ يزول. */

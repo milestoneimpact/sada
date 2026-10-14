@@ -37,6 +37,8 @@ export interface PlanInput {
   /** كم مصدرا محلَّلا — أقلُّ من اثنين لا يصنع أسبوعا. */
   readonly analyzed: number
   readonly now: Date
+  /** ‏منطقةُ المالك (D-203): الموعدُ مخزَّنٌ بـ UTC ويُقرأ بها، و`null` «بتوقيت الرياض» */
+  readonly zone?: string | null
   /** آخرُ ضغطةٍ على «خطّط الأسبوع» من سجلّ التدقيق — وسببُها إن فشلت (D-157) */
   readonly lastAttempt?: { readonly at: string; readonly detail: string | null } | null
 }
@@ -64,12 +66,13 @@ function lastAttemptLine(input: PlanInput): string {
 function row(
   item: StoredPlan['plan']['items'][number],
   names: Readonly<Record<string, string>>,
+  zone: string | null,
 ): string {
   const name = names[item.sourceId] ?? '— مصدرٌ حُذف —'
   const gone = names[item.sourceId] === undefined
   return `<tr>
     <td data-label="متى"><b>${escapeHtml(dayName(item.day))}</b>
-      <div class="mono">${escapeHtml(stamp(`${item.day} ${item.time}`, null))}</div></td>
+      <div class="mono">${escapeHtml(stamp(`${item.day} ${item.time}`, zone))}</div></td>
     <td data-label="المنصّة"><span class="chip">${escapeHtml(platformLabel(item.platform))}</span></td>
     <td data-label="المصدر"><div class="nm">${escapeHtml(name)}</div>
       <div class="sub">${escapeHtml(item.angle)}</div>
@@ -142,7 +145,7 @@ export function planSection(input: PlanInput): string {
 
     <div class="scroll"><table>
       <thead><tr><th>متى</th><th>المنصّة</th><th>المصدر والزاوية</th><th></th></tr></thead>
-      <tbody>${plan.plan.items.map((i) => row(i, input.names)).join('')}</tbody>
+      <tbody>${plan.plan.items.map((i) => row(i, input.names, input.zone ?? null)).join('')}</tbody>
     </table></div>
 
     ${lastAttemptLine(input)}

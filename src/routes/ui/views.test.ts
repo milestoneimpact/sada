@@ -997,6 +997,21 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(html).toContain('YouTube')
     expect(html).not.toMatch(/>youtube</)
   })
+
+  it('موعدُ البند بمنطقة المالك حين تُعرف (D-203)، والبندُ مخزَّنٌ بـ UTC', async () => {
+    const { planSection } = await import('./sections/plan')
+    const input = {
+      plan: {
+        id: 'w', week: '2026-09-13', model: 'm', status: 'draft' as const, createdAt: '2026-09-12 08:00',
+        plan: { rationale: 'ر', items: [
+          { sourceId: 's', platform: 'x' as const, angle: 'ز', day: '2026-09-14', time: '09:00', why: 'س' },
+        ] },
+      },
+      names: { s: 'مصدر' }, ready: true, analyzed: 2, now: new Date('2026-09-13T00:00:00Z'),
+    }
+    expect(planSection({ ...input, zone: 'America/New_York' })).toContain('<div class="mono">2026-09-14 05:00</div>')
+    expect(planSection(input)).toContain('<div class="mono">2026-09-14 12:00 بتوقيت الرياض</div>')
+  })
 })
 
 describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
@@ -1714,9 +1729,8 @@ describe('الهويّةُ من لوحتها (D-196)', () => {
     expect(login).toContain('أصوات اليوم .. لقرارات أفضل')
     expect(css.rule('.moment', '@media print').display).toBe('none')
     // ‏والنصُّ على العمق عاجيٌّ و«نعناعٌ فاتح» لا نعناع (‏Lc ‏٦٣ لحرفٍ صغير)
-    expect(css.rule('.moment-en').color).toBe('var(--moment-soft)')
     expect(css.rule('.moment-line').color).toBe('var(--moment-ink)')
-    expect(css.rule(':root')).toMatchObject({ '--moment-soft': '#a7e9db', '--moment-ink': '#f4faf9' })
+    expect(css.rule(':root')).toMatchObject({ '--moment-ink': '#f4faf9' })
     expect(css.rule(':root')['--moment-accent']).toBeUndefined()
     expect(css.rule('.moment-glyph').color).toBe('var(--mark-fg)')
   })
@@ -1786,22 +1800,19 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     expect(page.indexOf('data-no-echo')).toBeLessThan(page.indexOf('حدث خطأ من جهتنا'))
   })
 
-  it('السطرُ اللاتينيُّ زينةٌ لقارئ الشاشة كـ«SADA»، ويُكتب بحالته وتكبّره الورقة', () => {
+  it('العلامةُ «صدى» وحدها في اللحظة (D-203): لا «SADA» ولا سطرٌ إنجليزيّ، والشعارُ العربيُّ باقٍ', () => {
     const login = loginPage({}, 'n')
-    const en = /<p class="moment-en"([^>]*)>([^<]*)<\/p>/.exec(login)
-    expect(en?.[1]).toContain('aria-hidden="true"')
-    expect(en?.[1]).toContain('lang="en"')
-    expect(en?.[2]).not.toBe(en?.[2]?.toUpperCase())
-    expect(css.rule('.moment-en')['text-transform']).toBe('uppercase')
-    expect(login).toMatch(/class="moment-sada" aria-hidden="true"/)
+    expect(login).not.toContain('moment-sada')
+    expect(login).not.toContain('moment-en')
+    expect(login).not.toMatch(/SADA|Today|better decisions/)
+    expect(login).toContain('<p class="moment-line">أصوات اليوم .. لقرارات أفضل</p>')
+    expect(css.where('.moment-en')).toEqual([])
+    expect(css.where('.moment-sada')).toEqual([])
   })
 
-  it('السطرُ اللاتينيُّ سطرٌ واحدٌ يتباعد بقدر لوحته، والشريطُ بارتفاعه لا بنصيب الشاشة', () => {
-    expect(css.rule('.moment-en')).toMatchObject({ 'white-space': 'nowrap', 'text-align': 'end', 'letter-spacing': 'var(--ls-brand)' })
-    expect(css.rule('.moment-en', `@container moment ${narrower('momentBrand')}`)['letter-spacing']).toBe('var(--ls-eyebrow)')
-    expect(css.rule('.moment-en', `@container moment ${narrower('momentEyebrow')}`)['letter-spacing']).toBe('0')
+  it('الشريطُ بارتفاعه لا بنصيب الشاشة', () => {
     expect(css.rule('.auth-split')['grid-template-rows']).toBe('auto 1fr')
-    for (const sel of ['.moment .echo', '.moment-line', '.moment-en']) {
+    for (const sel of ['.moment .echo', '.moment-line']) {
       expect(css.rule(sel, `@media${below('md')} and (max-height:40rem)`).display, sel).toBe('none')
     }
     expect(css.rule('.moment', `@media${below('md')} and (max-height:40rem)`)['min-height']).toBe('0')

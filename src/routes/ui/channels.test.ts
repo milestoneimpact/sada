@@ -160,3 +160,14 @@ describe('مسارُ البوّابة يُقرأ من اليمين', () => {
     }
   })
 })
+
+describe('عناوينُ الوقت بمنطقة المالك (D-203)', () => {
+  it('تُختَم بمنطقته حين تُعرف، وبالرياض معلنةً حين لا تُعرف', () => {
+    const views = viewChannels([acc({})], () => true)
+    const ny = channelsSection(views, now, [], '', 'America/New_York')
+    expect(ny).toContain('title="ينتهي إذنُ الوصول 2026-10-31 20:00"')
+    expect(ny).toContain('title="2026-08-31 20:00"')
+    const riyadh = channelsSection(views, now)
+    expect(riyadh).toContain('title="ينتهي إذنُ الوصول 2026-11-01 03:00 بتوقيت الرياض"')
+  })
+})

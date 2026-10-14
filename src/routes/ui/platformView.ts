@@ -245,9 +245,9 @@ function capabilityTable(rows: readonly Capability[]): string {
  * القاعدة — `accounts` و`tokens` و`token_alerts` — **ولا محطّةَ تُخترَع**:
  * حسابٌ لم يُجدَّد قطّ يُقال فيه ذلك، لا يُرسَم له تاريخٌ فارغ.
  */
-function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): string {
+function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zone: string | null): string {
   const when = (at: string | null, none: string): string =>
-    at === null ? none : `<span title="${escapeHtml(stamp(at, null))}">${escapeHtml(relativeTime(at, now))}</span>`
+    at === null ? none : `<span title="${escapeHtml(stamp(at, zone))}">${escapeHtml(relativeTime(at, now))}</span>`
   /*
    * ‏**والموعدُ القادمُ يُعَدّ إلى الأمام** (ر-1): `relativeTime` للماضي وتحصر الفرقَ
    * ‏بالصفر، فكان كلُّ انتهاءٍ قادمٍ «الآن» — «إذنُ الوصول ينتهي الآن · والتجديدُ الآن»
@@ -256,7 +256,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date): s
   const ends = (at: string): string => {
     const date = parseSqliteUtc(at)
     const past = date !== null && date.getTime() <= now.getTime()
-    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(stamp(at, null))}">${escapeHtml(past
+    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(stamp(at, zone))}">${escapeHtml(past
       ? relativeTime(at, now)
       : untilTime(at, now))}</span>`
   }
@@ -845,7 +845,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
               : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدرُ في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
         }</p>
         ${capabilityTable(rows)}</details>
-        ${healthLog(d.health[a.id], a.createdAt, d.now)}
+        ${healthLog(d.health[a.id], a.createdAt, d.now, d.zone)}
         ${disconnectBlock(platform, a.id, a.displayName, i)}
       </div>`
     })

@@ -736,7 +736,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         sel.appendChild(ph);
         keep.forEach(function(m){
           var o=document.createElement('option');
-          o.value=m.id; o.textContent=m.label||m.id;
+          o.value=m.id; o.textContent=m.name||m.label||m.id; o.title=m.id;
           if(m.priceIn!==null&&m.priceIn!==undefined)o.dataset.pin=String(m.priceIn);
           if(m.priceOut!==null&&m.priceOut!==undefined)o.dataset.pout=String(m.priceOut);
           sel.appendChild(o);
