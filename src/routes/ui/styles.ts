@@ -166,8 +166,9 @@ b,strong{font-weight:600}
 /* ‏والاسمُ «صدى» مسارٌ لا حرف (D-185): الكوفيُّ في الاسم وحده، بلا ملفّ خطّ. وارتفاعُه
    ارتفاعُ حروفه حين كانت تُرسَم بحجم ‏١٨ — والعرضُ يتبع نسبةَ المسار */
 .wordmark{display:block; height:14px; width:auto; flex:none}
-.brand span{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; letter-spacing:var(--ls-eyebrow);
-  direction:ltr; unicode-bidi:isolate; display:inline-block; margin-top:var(--s-1);
+/* ‏والعلامةُ «صدى» وحدها (D-203)، وفي التجريبيّة وحدها شارةٌ عربيّةٌ صغيرةٌ بجانبها لا جزءٌ منها */
+.brand span{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600;
+  display:inline-block; margin-top:var(--s-1);
   padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--ink-2);
   border:var(--bd)}
 
@@ -653,7 +654,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .auth-split{display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto 1fr; min-height:100vh; min-height:100dvh}
 .auth-split .auth{margin:var(--s-8) auto}
 /* ‏والشريطُ تحت النصّ لا خلفه: الارتفاعُ الأدنى يترك له ربعَ الشريط الأسفل (‏٢٥٦ في ‏٣٩٠).
-   **وهو حاويةٌ يُسأل عرضُها** («moment»): السطرُ اللاتينيُّ يتباعد بقدر ما يسعه هو لا الشاشة */
+   وهو حاويةٌ («moment») يُسأل عرضُها */
 .moment{container:moment / inline-size; position:relative; overflow:hidden; isolation:isolate; background:var(--moment-ground);
   color:var(--moment-ink); padding:var(--s-6) var(--gutter); min-height:calc(var(--s-16) * 4);
   display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-1)}
@@ -663,33 +664,17 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .moment-id{display:flex; align-items:center; gap:var(--s-4); margin-bottom:var(--s-3)}
 .moment-name{display:flex; flex-direction:column; align-items:center; gap:var(--s-1)}
 .moment .wordmark{height:var(--s-6); color:var(--moment-ink)}
-.moment-sada{direction:ltr; font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600;
-  letter-spacing:var(--ls-brand); margin-inline-end:calc(-1 * var(--ls-brand)); color:var(--moment-ink)}
 /* ‏والرمزُ هنا العلامةُ نفسُها بلونها («--mark-fg») — لا اسمٌ ثانٍ يفلت من عدّ الذهب (مراجعة D-196) */
 .moment-glyph{display:block; height:var(--s-10); aspect-ratio:4/3; color:var(--mark-fg)}
 .moment-glyph svg{display:block; width:100%; height:100%}
 .moment-line{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--moment-ink)}
-/* ‏والسطرُ اللاتينيُّ يلزم أوّلَ السطر (يمينًا) لا يسارَ «ltr»، **وسطرٌ واحدٌ لا يلتفّ** (مراجعة D-196): كان
-   يلتفّ سطرين بين ‏900 و‏1103 وتحت ‏350، والملتفُّ يمتدّ بعرض العمود فيُصفّ يسارًا تحت قفلٍ مصفوفٍ يمينًا.
-   فتباعدُه بقدر حاويته: «--ls-brand» حيث يسعه، ثمّ «--ls-eyebrow»، ثمّ بلا تباعد — **والتباعدُ الأخيرُ
-   يُعوَّض** كما في «SADA» فيلتقي طرفُه بطرف القفل. **ويُكتب بحالته ويُكبَّر هنا**، وقارئُ الشاشة لا يسمعه:
-   ترجمةُ السطر العربيّ قبله حرفًا */
-.moment-en{margin:0; align-self:flex-start; max-width:100%; direction:ltr; text-align:end; white-space:nowrap;
-  text-transform:uppercase; font-size:var(--t-small); line-height:var(--lh-small); font-weight:400;
-  letter-spacing:var(--ls-brand); margin-inline-end:calc(-1 * var(--ls-brand)); color:var(--moment-soft)}
-@container moment ${narrower('momentBrand')}{
-  .moment-en{direction:ltr; letter-spacing:var(--ls-eyebrow); margin-inline-end:calc(-1 * var(--ls-eyebrow))}
-}
-@container moment ${narrower('momentEyebrow')}{
-  .moment-en{letter-spacing:0; margin-inline-end:0}
-}
 /* ‏**وعلى الشاشة القصيرة القفلُ وحده** (مراجعة D-196): الشريطُ ‏٢٥٦px أيًّا كان الارتفاع دفع الحقلَ وزرَّه
    تحت الطيّة في ‏375×548 (iPhone SE بشريط Safari)، ولم يُبقِ الهاتفُ أفقيًّا (‏844×390) إلّا الشريطَ
    والعنوان. فتحت ‏٤٠rem ارتفاعًا يسقط النقشُ والسطران، ويبقى القفلُ شريطًا عميقًا بقدره —
    **والفعلُ الأوّلُ وحقلُه في الشاشة الأولى**، ويقيسه «audit_mobile» في المقاسات الأربعة القصيرة */
 @media${below('md')} and (max-height:40rem){
   .moment{min-height:0; padding-block:var(--s-4)}
-  .moment .echo,.moment-line,.moment-en{display:none}
+  .moment .echo,.moment-line{display:none}
   .moment-id{margin-bottom:0}
   .auth-split .auth{margin:var(--s-4) auto}
 }
@@ -698,9 +683,9 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   .auth-split .auth{margin:16vh auto}
   /* ‏والقفلُ في الثلث الأعلى والشريطُ يصعد إليه من الأسفل (مراجعة D-196: كان بينهما فراغٌ ميّت):
      صفّان مرنان قبل القفل وبعده بنسبة ‏٢ إلى ‏٥، لا مسافةٌ خارج السلّم */
-  .moment{display:grid; grid-template-rows:minmax(0,2fr) auto auto auto minmax(0,5fr); justify-items:start;
+  .moment{display:grid; grid-template-rows:minmax(0,2fr) auto auto minmax(0,5fr); justify-items:start;
     align-content:stretch; padding:var(--s-12); gap:var(--s-2)}
-  .moment-id{grid-row:2} .moment-line{grid-row:3} .moment-en{grid-row:4}
+  .moment-id{grid-row:2} .moment-line{grid-row:3}
   .moment .echo.wide{display:block}
   .moment .echo.narrow{display:none}
   .moment-glyph{height:var(--s-16)}

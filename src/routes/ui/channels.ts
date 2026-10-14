@@ -300,7 +300,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
 }
 
 /** بطاقةُ قناةٍ واحدة. */
-function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: string): string {
+function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: string, zone: string | null): string {
   const { spec, state, accounts, missing } = view
   const logo = LOGOS[spec.id] ?? ''
 
@@ -329,11 +329,11 @@ function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: st
           ? ''
           : a.expiresAt === null
             ? statusBadge('bad', '▲', 'بلا إذنٍ محفوظ', 'title="لا صفَّ في tokens لهذا الحساب — أعد الربط"')
-            : tokenDays(a.expiresAt, now, a)}
+            : tokenDays(a.expiresAt, now, a, zone)}
         <span class="grow"></span>
         ${a.status === 'needs_reauth'
           ? statusBadge('bad', '▲', 'جدّد الإذن')
-          : `<span class="ago" title="${escapeHtml(stamp(a.createdAt, null))}">رُبط ${escapeHtml(
+          : `<span class="ago" title="${escapeHtml(stamp(a.createdAt, zone))}">رُبط ${escapeHtml(
               relativeTime(a.createdAt, now),
             )}</span>`}
       </div>`,
@@ -427,12 +427,14 @@ export function tokenDays(
   expiresAt: string | null,
   now: Date,
   renew: Pick<LinkedAccount, 'renewable' | 'refreshExpiresAt'> = {},
+  /** ‏منطقةُ المالك لعنوان التحويم (D-203)، و`null` تقول «بتوقيت الرياض» */
+  zone: string | null = null,
 ): string {
   const h = tokenHealth({ expiresAt, ...renew }, now)
   if (h === null || expiresAt === null) return ''
   const title = renew.renewable === true
-    ? `title="يتجدّد إذنُ الوصول وحده${h.kind === 'auto' && h.at === null ? '' : ` حتّى ${escapeHtml(stamp(h.at ?? '', null))}`}"`
-    : `title="ينتهي إذنُ الوصول ${escapeHtml(stamp(expiresAt, null))}"`
+    ? `title="يتجدّد إذنُ الوصول وحده${h.kind === 'auto' && h.at === null ? '' : ` حتّى ${escapeHtml(stamp(h.at ?? '', zone))}`}"`
+    : `title="ينتهي إذنُ الوصول ${escapeHtml(stamp(expiresAt, zone))}"`
   switch (h.kind) {
     case 'expired':
       return statusBadge('bad', '▲', 'انتهى الإذن', title)
@@ -440,7 +442,7 @@ export function tokenDays(
       // ‏والعددُ بمعدوده (D-183): كان «يبقى 2 يومان» و«الإذن 9 يوما»
       return statusBadge('warn', '◍', h.days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(h.days, NOUNS.day)} للإذن`, title)
     case 'overdue':
-      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(stamp(h.at, null))} وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
+      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(stamp(h.at, zone))} وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
     case 'auto':
       return `<span class="chip" ${title}>يتجدّد تلقائيًّا</span>`
     case 'ok':
@@ -453,6 +455,8 @@ export function channelsSection(
   now: Date,
   apps: readonly AppStatus[] = [],
   base = '',
+  /** ‏منطقةُ المالك لعناوين الوقت (D-203): كانت تُمرَّر `null` فتقول الرياض ولو عُرفت */
+  zone: string | null = null,
 ): string {
   const byPlatform = new Map(apps.map((a) => [String(a.platform), a]))
   const built = views.filter((v) => v.spec.built)
@@ -551,7 +555,7 @@ export function channelsSection(
       مهما كانت القنواتُ مربوطة.</span>
   </div>
 
-  <div class="grid c2">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base)).join('')}</div>
+  <div class="grid c2">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base, zone)).join('')}</div>
 
   ${/*
    * **وما لم يُبنَ سطرٌ يُطوى لا شبكةُ بطاقات** (D-111).
@@ -575,7 +579,7 @@ export function channelsSection(
     <div class="unbuilt-body">
       <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —
         <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</p>
-      <div class="grid c3">${rest.map((v) => card(v, now, undefined, base)).join('')}</div>
+      <div class="grid c3">${rest.map((v) => card(v, now, undefined, base, zone)).join('')}</div>
     </div>
   </details>`
 }

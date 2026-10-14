@@ -59,7 +59,7 @@ export function railHtml(input: RailInput): string {
 
   return `<aside class="rail">
   <div class="rail-head">
-    <div class="brand">${wordmark(true)}${input.env === undefined ? '' : `<span>SADA · ${input.env === 'production' ? 'PRODUCTION' : 'STAGING'}</span>`}</div>
+    <div class="brand">${wordmark(true)}${input.env === undefined || input.env === 'production' ? '' : '<span>تجريبيّ</span>'}</div>
     <div class="glyph">${GLYPH_SVG}</div>
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">

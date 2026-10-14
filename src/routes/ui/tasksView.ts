@@ -74,8 +74,8 @@ function row(r: OwnerRow, env: string): string {
   const opens = OPENS[r.unblocks]
   return `<tr class="${key === 'todo' && r.unblocks === 'gate' ? 'urgent' : ''}">
     <td data-label="المهمّة">
-      <div class="nm"><span class="mono">${escapeHtml(r.code)}</span>
-        · ${escapeHtml(r.title)}</div>
+      ${/* ‏**العنوانُ أوّلًا والرمزُ صغيرٌ بعده** (D-203): كان «M-16» أبرزَ ما في الصفّ */ ''}<div class="nm">${escapeHtml(r.title)}
+        <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></div>
       <div class="sub">${bold(r.ifLeft)}</div>
       ${commandBox(r, env)}
       ${r.go === undefined || r.state === true
@@ -194,8 +194,8 @@ export function tasksScreen(d: TasksScreenData): string {
   </div>
 
   <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
-    <span class="mono">docs/PLAN.md</span> يقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
-    سابقتها ويُسجَّل ذلك في <span class="mono">STATUS.md</span>» —
+    خطّةُ المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
+    سابقتها ويُسجَّل ذلك في سجلّ الحال» —
     <b>وسجلٌّ يُكتب بيدٍ يشيخ</b>، وقد شاخ. فكلُّ بندٍ هنا استعلامٌ على ما وقع،
     <b>ومعه دليلُه</b>. <b>وبندٌ لا يُقاس يُبقي بوّابتَه غيرَ مجتازة</b> —
     فبوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
@@ -205,8 +205,8 @@ export function tasksScreen(d: TasksScreenData): string {
   <div class="card">
     <h2>وأين الخطوات</h2>
     <p class="hint">كلُّ مهمّةٍ لها صفحةٌ بالعناصر الستّة في
-      <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"><span
-        class="mono">docs/MANUAL-TASKS.md</span></a> — بأسماء الأزرار كما تراها
+      <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"
+        title="docs/MANUAL-TASKS.md">دليلِ المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
       على الشاشة، وعلامةِ النجاح، وما يُقرأ أوّلا إن فشلت.
       <b>ومعرِّفٌ هنا بلا صفحةٍ هناك يُسقط CI</b>، فلا يبقى عنوانٌ بلا خطوات.</p>
   </div>`

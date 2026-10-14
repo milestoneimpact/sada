@@ -7,6 +7,7 @@
  */
 import { stamp } from '../../../lib/time/zone'
 import { money, relativeTime } from '../../../lib/format'
+import { modelName } from '../../../lib/ai/modelName'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
@@ -70,10 +71,10 @@ function modelPicker(options: {
   }${options.fillsPrice === true ? ' data-price="1"' : ''}>
     <label for="${id}">النموذج</label>
     <div class="row gap-1 nowrap">
-      <select id="${id}" name="model" class="mp-sel w-m" dir="ltr">
+      <select id="${id}" name="model" class="mp-sel w-m">
         ${options.current === ''
           ? '<option value="" selected>— اختر نموذجا —</option>'
-          : `<option value="${current}" selected>${current}</option>`}
+          : `<option value="${current}" title="${current}" selected>${escapeHtml(modelName(options.current))}</option>`}
         <option value="__manual__">اكتبه يدويّا…</option>
       </select>
       <button type="button" class="btn btn-secondary btn-sm mp-load" title="يجلب القائمةَ من عند المزوّد الآن">حدّث</button>

@@ -1028,7 +1028,7 @@ ${pivotPane(d.pivot)}
 
 <section data-pane="channels" hidden>
   ${pageHead('النشر', sectionLabel('channels'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
-  ${channelsSection(d.channels, d.now, d.apps, d.baseUrl)}
+  ${channelsSection(d.channels, d.now, d.apps, d.baseUrl, d.zone ?? null)}
 </section>
 
 <section data-pane="posts" hidden>
@@ -1073,6 +1073,7 @@ ${pivotPane(d.pivot)}
     ready: d.planReady,
     analyzed: d.sources.filter((s) => s.analyzed).length,
     now: d.now,
+    zone: d.zone ?? null,
     // من الخمسين صفًّا المحمَّلة أصلًا للأمان — لا استعلامَ جديد (D-157)
     lastAttempt: d.audit.find((a) => a.action === 'plan.generate') ?? null,
   })}</div>`)}

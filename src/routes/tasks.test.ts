@@ -253,3 +253,14 @@ describe('مهامُّ الربط في «ما عليك» (ر-1)', () => {
     expect(html).not.toContain('ig-secret')
   })
 })
+
+describe('«ما عليك» بلغة المالك (D-203)', () => {
+  it('العنوانُ أوّلُ الصفّ والرمزُ صغيرٌ بعده، ولا مسارَ ملفٍّ نصًّا ظاهرًا', async () => {
+    const html = await open()
+    expect(html).not.toMatch(/<span class="mono">M-\d+<\/span>/)
+    expect(html).toMatch(/<small class="ago"><bdi dir="ltr">M-\d+<\/bdi><\/small>/)
+    const shown = html.replace(/<[^>]*>/g, ' ')
+    expect(shown).not.toMatch(/docs\/|STATUS\.md|PLAN\.md|MANUAL-TASKS\.md/)
+    expect(html).toContain('title="docs/MANUAL-TASKS.md">دليلِ المهامّ اليدويّة</a>')
+  })
+})
