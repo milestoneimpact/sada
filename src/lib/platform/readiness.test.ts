@@ -92,6 +92,21 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(pub.action?.href).toBe('/panel/journey/p1')
   })
 
+  it('وجوابُ المنصّة يُقال بالعربيّة، وآخرُ نشرٍ نسبيًّا لا بساعة UTC (D-202)', () => {
+    const failed = readiness({
+      view: viewOf([account()]), app, health: { a1: health() },
+      tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }),
+      posts: [post({ status: 'failed', lastError: 'linkedin: Internal Server Error', createdAt: '2026-09-25 00:00:00' })], now,
+    }).rungs.find((x) => x.key === 'publish')!
+    expect(failed.note).toContain('عطلٌ في خادمها (500)')
+    expect(failed.note).not.toContain('Internal Server Error')
+    const done = readiness({
+      view: viewOf([account()]), app, health: { a1: health() },
+      tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }), posts: [], now,
+    }).rungs.find((x) => x.key === 'publish')!
+    expect(done.note).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+  })
+
   it('كُتب قبل آخر نشرٍ ثمّ فشل بعده: النشرُ ساقطٌ بوقت الفشل لا بوقت الكتابة', () => {
     const r = readiness({
       view: viewOf([account()]), app, health: { a1: health() },

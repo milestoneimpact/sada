@@ -40,6 +40,31 @@ export const REASONS: Readonly<Record<string, FailReason>> = {
 /** البادئةُ التي يكتبها الناشرُ قبل جواب المنصّة: «x: …» و«linkedin: …». */
 const PLATFORM_PREFIX: ReadonlySet<string> = new Set(['x', 'linkedin', 'youtube', 'tiktok', 'instagram'])
 
+/** أسماءُ المنصّات كما يقرؤها المالك — لا مفتاحُها في القاعدة («youtube»). */
+const LABELS: Readonly<Record<string, string>> = {
+  x: 'X', linkedin: 'LinkedIn', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
+}
+
+/**
+ * ‏جملُ HTTP الإنجليزيّة كما تردّها المنصّة («Internal Server Error») تُقال بالعربيّة (D-202)،
+ * وما سواها يبقى كما جاء: نصُّ المنصّة دليلٌ لا يُخترَع بدلَه.
+ */
+const HTTP_PHRASES: Readonly<Record<string, string>> = {
+  'internal server error': 'عطلٌ في خادمها (500)',
+  'bad gateway': 'عطلٌ عابرٌ في بوّابتها (502)',
+  'service unavailable': 'خدمتُها متوقّفةٌ مؤقّتًا (503)',
+  'gateway timeout': 'انقضت مهلتُها قبل أن تجيب (504)',
+  'too many requests': 'طلباتٌ كثيرةٌ في وقتٍ قصير (429)',
+  'unauthorized': 'رفضت الإذن (401)',
+  'forbidden': 'منعت الطلب (403)',
+  'not found': 'لم تجد ما طُلب (404)',
+  'bad request': 'رفضت الطلبَ كما أُرسل (400)',
+}
+
+function says(detail: string): string {
+  return HTTP_PHRASES[detail.replace(/[.\s]+$/, '').toLowerCase()] ?? detail
+}
+
 /**
  * يقرأ نصَّ الفشل كما حفظه الناشر: رمزٌ، أو رمزٌ ثمّ «:» وتفصيل، أو جملةٌ
  * عربيّةٌ كتبها الحارسُ نفسُه، أو جوابُ المنصّة.
@@ -60,16 +85,16 @@ export function whyFailed(raw: string | null, platform: Platform | string): Fail
         : known
     }
   }
-  const label = platform === 'x' ? 'X' : platform === 'linkedin' ? 'LinkedIn' : platform
+  const label = LABELS[platform] ?? platform
   /*
    * ‏**ونداءٌ ردّته المنصّةُ يُعاد** (D-176): الناشرُ يكتب «x: تعذّر رفع الوسيط (…)»،
    * وكانت جملةً عربيّةً فتُقال كما هي **بلا فعل** — فوقف المالكُ أمام منشورٍ فاشلٍ
    * لا يعرف لماذا ولا ما يفعل. فالبادئةُ اسمُ المنصّة تُرفع، ويُعرض «أعده إلى المعتمَد».
    */
   if (code !== null && PLATFORM_PREFIX.has(code[1]!) && (code[2]?.trim() ?? '') !== '') {
-    return { text: `ردّته ${label}: ${code[2]!.trim()}`, action: 'requeue' }
+    return { text: `ردّته ${label}: ${says(code[2]!.trim())}`, action: 'requeue' }
   }
   // ‏جملةٌ عربيّةٌ كتبها حارسٌ عندنا (حسابُ الصفحة مثلًا) تُقال كما هي
   if (/[؀-ۿ]/.test(text)) return { text, action: 'none' }
-  return { text: `ردّته ${label}: ${text}`, action: 'requeue' }
+  return { text: `ردّته ${label}: ${says(text)}`, action: 'requeue' }
 }

@@ -44,7 +44,10 @@ const OPENS: Readonly<Record<Unblocks, { label: string; cls: Tone; why: string }
 }
 
 function bold(text: string): string {
-  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  // ‏و`رمزٌ` بين علامتَي اقتباسٍ خلفيّتين يُرسَم رمزًا لا علاماتٍ يراها المالك (D-202)
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<bdi class="mono" dir="ltr">$1</bdi>')
 }
 
 /**

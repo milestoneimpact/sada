@@ -821,6 +821,22 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     return localBox(d)===v.slice(0,16)?d:null;
   }
 
+  /*
+   * «الساعةُ بالمنطقة التي قالتها اللصيقة» (D-202): لحظةٌ وهميّةٌ ساعتُها المحلّيّة ساعةُ ‹data-zone›،
+   * فتحسب الأزرارُ «غدًا 9ص» بتوقيت الرياض في أوّل زيارةٍ كما يقرؤها الخادم.
+   */
+  function zoneNow(zone){
+    var now=new Date();
+    if(!zone)return now;
+    try{
+      var p={};
+      new Intl.DateTimeFormat('en-US',{timeZone:zone,hourCycle:'h23',year:'numeric',month:'numeric',
+        day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'}).formatToParts(now)
+        .forEach(function(x){p[x.type]=+x.value;});
+      return new Date(p.year,p.month-1,p.day,p.hour%24,p.minute,p.second);
+    }catch(e){return now;}
+  }
+
   document.querySelectorAll('.quick').forEach(function(bar){
     var field=document.getElementById(bar.dataset.quick);
     var mirror=bar.parentNode.querySelector('[data-mirror="'+bar.dataset.quick+'"]');
@@ -839,7 +855,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }
     bar.querySelectorAll('[data-preset]').forEach(function(btn){
       btn.addEventListener('click',function(){
-        var at=preset(new Date(),btn.dataset.preset);
+        var at=preset(zoneNow(field.dataset.zone),btn.dataset.preset);
         if(at===null)return;
         field.value=localBox(at);
         reflect();

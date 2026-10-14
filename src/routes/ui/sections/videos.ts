@@ -16,6 +16,7 @@ import { ABOUT_MAX, captionIssues, type VideoCaptions } from '../../../lib/media
 import type { LinkState } from '../../../lib/channels'
 import { YT_TITLE_MAX } from '../../../lib/publish/youtube'
 import { PRESETS } from '../../../lib/time/local'
+import { FALLBACK_ZONE } from '../../../lib/time/zone'
 import { statusBadge, type Tone } from '../components/badge'
 import { button } from '../components/button'
 import { emptyState } from '../components/empty'
@@ -59,6 +60,8 @@ export interface VideoContext {
   readonly links?: Readonly<Record<string, LinkState>>
   /** مَن يرى المقطع: قرارُ المالك بعد الإجازة، والافتراضُ خاصّ. */
   readonly reach?: Reach
+  /** منطقةُ المالك: `null` أوّلَ زيارةٍ فتُقال «بتوقيت الرياض» وتُرسَل مع الأزرار (D-202). */
+  readonly zone?: string | null
   /** نصوصٌ كُتبت لكلّ مقطع (KV، يومًا) — مفتاحُها معرّفُ المقطع. */
   readonly captions?: Readonly<Record<string, VideoCaptions>>
   /**
@@ -287,7 +290,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
           </div>`
         : `<p class="hint">${hint}</p>`}
     </form>
-    ${scheduleAll(u, ctx.reach ?? PRIVATE_ONLY)}
+    ${scheduleAll(u, ctx.reach ?? PRIVATE_ONLY, ctx.zone)}
   </div>`
 }
 
@@ -299,16 +302,18 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
  * بتوقيت المالك من كعكته (D-173)، فلا UTC في وجهه ولا حقلٌ يُترجَم في رأسه. والمعرّفاتُ
  * في النموذج ما عُرض هنا وحده، والحسابُ يُحسب على الخادم (D-182).
  */
-function scheduleAll(u: UploadRow, reachNow: Reach): string {
+function scheduleAll(u: UploadRow, reachNow: Reach, zone?: string | null): string {
   const ready = u.posts.filter((p) => p.status === 'approved' || p.status === 'edited')
   if (ready.length === 0) return ''
   const platforms = VIDEO_PLATFORMS.filter((p) => ready.some((x) => x.platform === p))
   const names = platforms.map(platformLabel).join(' و')
   const reach = privateReach(platforms, reachNow)
+  const where = zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'
   return `<form method="POST" action="/panel/uploads/${escapeHtml(u.id)}/schedule" data-busy="جارٍ الجدولة…">
+      ${zone === undefined ? '' : `<input type="hidden" name="tz" value="${escapeHtml(zone ?? FALLBACK_ZONE)}">`}
       ${ready.map((p) => `<input type="hidden" name="post" value="${escapeHtml(p.id)}">`).join('')}
       <div class="row">
-        <span class="ago">${escapeHtml(ready.length === 1 ? `جدوِل منشورَ ${names} بتوقيتك:` : `جدوِل منشوراتِ ${names} معًا بتوقيتك:`)}</span>
+        <span class="ago">${escapeHtml(ready.length === 1 ? `جدوِل منشورَ ${names} ${where}:` : `جدوِل منشوراتِ ${names} معًا ${where}:`)}</span>
         ${PRESETS.map((q) => `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${q.kind}"
           aria-label="${escapeHtml(`جدوِل ${q.label}`)}">${escapeHtml(q.label)}</button>`).join('')}
       </div>

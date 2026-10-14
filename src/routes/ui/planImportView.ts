@@ -86,7 +86,9 @@ export function planImportExpired(): string {
 }
 
 /** صفحةُ المعاينة — والزرُّ يُرسم حين يكون في الملفّ صفٌّ واحدٌ سليمٌ على الأقلّ. */
-export function planImportScreen(id: string, read: PlanRead, now: Date = new Date(), reach: Reach = PRIVATE_ONLY): string {
+export function planImportScreen(
+  id: string, read: PlanRead, now: Date = new Date(), reach: Reach = PRIVATE_ONLY, fallback = false,
+): string {
   const ready = read.rows.filter((r) => r.problems.length === 0).length
   const blocked = read.rows.length - ready
   return `<header class="page-head"><div class="eyebrow"><span class="ln"></span>خطّتُك من ملفّ</div>
@@ -101,7 +103,7 @@ export function planImportScreen(id: string, read: PlanRead, now: Date = new Dat
       ? `<div class="card"><ul class="pi-why">${read.fileProblems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
           <a class="btn btn-secondary" href="/panel#plan-import">ارجع وارفع ملفًّا آخر</a></div>`
       : `<div class="card">
-        <p class="hint">المواعيدُ بتوقيتك كما فهمها صدى — راجعها قبل أن تعتمد.</p>
+        <p class="hint">المواعيدُ ${fallback ? 'بتوقيت الرياض' : 'بتوقيتك'} كما فهمها صدى — راجعها قبل أن تعتمد.</p>
         <div class="scroll"><table class="pi">
           <thead><tr><th>الموعد</th><th>المنصّة</th><th>النصّ</th><th>المقطع</th><th>الحال</th></tr></thead>
           <tbody>${read.rows.map((r) => rowHtml(r, now, reach)).join('')}</tbody></table></div>

@@ -43,7 +43,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
       x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${
       x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : ''}</div>
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
-    <td data-label="فُتحت"><span title="${escapeHtml(stamp(x.at, null))}">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
+    <td data-label="فُتحت"><span title="${escapeHtml(stamp(x.at, d.zone ?? null))}">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td data-label="">${x.current
       ? statusBadge('ok', '●', 'جلستك')
       : `<form class="inline" method="POST" action="/panel/sessions/revoke"
@@ -54,18 +54,17 @@ export function securitySection(d: PanelData): SecurityMarkup {
 
   const passkeys = d.factors.passkeys.map((k) => `<tr>
     <td><div class="nm">${escapeHtml(k.label)}</div></td>
-    <td data-label="سُجّل"><span title="${escapeHtml(stamp(k.createdAt, null))}">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
+    <td data-label="سُجّل"><span title="${escapeHtml(stamp(k.createdAt, d.zone ?? null))}">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
       ? statusBadge('idle', '○', 'لم يُستعمل')
-      : `<span title="${escapeHtml(stamp(k.lastUsedAt, null))}">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
+      : `<span title="${escapeHtml(stamp(k.lastUsedAt, d.zone ?? null))}">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
     <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
           data-label="${escapeHtml(k.label)}">احذف</button></td>
   </tr>`).join('')
 
   const audit = d.audit.map((a) => `<tr>
-    <td><span title="${escapeHtml(stamp(a.at, null))}">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
-    <td data-label="الفعل"><div class="nm">${escapeHtml(actionLabel(a.action))}</div>
-      <div class="mono">${escapeHtml(a.action)}</div></td>
+    <td><span title="${escapeHtml(stamp(a.at, d.zone ?? null))}">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
+    <td data-label="الفعل"><div class="nm" title="${escapeHtml(a.action)}">${escapeHtml(actionLabel(a.action))}</div></td>
     <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}
       ${a.detail === null ? '' : `<div class="sub">${pathArrows(escapeHtml(a.detail))}</div>`}</td>
     <td data-label="العنوان"><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>

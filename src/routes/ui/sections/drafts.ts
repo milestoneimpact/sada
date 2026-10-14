@@ -40,7 +40,7 @@ import { whenField } from '../when'
 import type { Peaks } from '../../../lib/schedule/peak'
 import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
 import { momentLabel, PRESETS } from '../../../lib/time/local'
-import { clock, zoneNote } from '../../../lib/time/zone'
+import { clock, FALLBACK_ZONE, zoneNote } from '../../../lib/time/zone'
 /*
  * **وشعارُ المنصّة من مصدره الواحد** (D-103 · D-123).
  *
@@ -276,9 +276,10 @@ function scheduler(
       <span class="mirror" data-mirror="wh-${id}"></span>
     </div>
     <details class="sched-more"><summary>موعدٌ آخر</summary>
-      <div class="field"><label for="wh-${id}">اليوم والساعة بتوقيتك</label>
-        <input id="wh-${id}" name="local" type="datetime-local" data-when data-local
+      <div class="field"><label for="wh-${id}">${zone === null ? 'اليوم والساعة بتوقيت الرياض' : 'اليوم والساعة بتوقيتك'}</label>
+        <input id="wh-${id}" name="local" type="datetime-local" data-when data-local data-zone="${escapeHtml(zone ?? FALLBACK_ZONE)}"
           min="${escapeHtml(earliest)}"></div>
+      <input type="hidden" name="tz" value="${escapeHtml(zone ?? FALLBACK_ZONE)}">
       ${peakLine(peaks, zone, now)}
     </details>
   </form>`

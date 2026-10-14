@@ -2135,6 +2135,36 @@ describe('الجدولة من اللوحة', () => {
     expect(response.status).toBe(403)
   })
 
+  it('أوّلُ زيارةٍ: الحقلُ «بتوقيت الرياض» ويُقرأ بالرياض وإن وصلت كعكةُ منطقةٍ أخرى (D-202)', async () => {
+    const post = await seedApproved()
+    const account = await seedAccount()
+    const cookie = await login()
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('اليوم والساعة بتوقيت الرياض')
+    expect(html).not.toContain('اليوم والساعة بتوقيتك')
+    expect(html).toContain('<input type="hidden" name="tz" value="Asia/Riyadh">')
+
+    const year = new Date().getUTCFullYear() + 1
+    const body = new FormData()
+    body.set('id', post)
+    body.set('account', account)
+    body.set('tz', 'Asia/Riyadh')
+    body.set('local', `${year}-03-10T09:00`)
+    // ‏المتصفّحُ كتب كعكتَه بين العرض والإرسال، واللصيقةُ قالت الرياض
+    await app.request('/panel/drafts/schedule', withSession(`${cookie}; sada_tz=America%2FNew_York`, { method: 'POST', body }), env)
+    const row = await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(post).first<{ scheduled_at: string }>()
+    expect(row?.scheduled_at.slice(0, 16)).toBe(`${year}-03-10 06:00`)
+  })
+
+  it('ومنطقةٌ معروفة: «بتوقيتك» والحقلُ يحملها', async () => {
+    await seedApproved()
+    await seedAccount()
+    const cookie = `${await login()}; sada_tz=Europe%2FLondon`
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('اليوم والساعة بتوقيتك')
+    expect(html).toContain('<input type="hidden" name="tz" value="Europe/London">')
+  })
+
   it('لا نموذجَ جدولةٍ حيث لا قناة — بل جملةٌ تقول لماذا', async () => {
     await seedApproved()
     const cookie = await login()
@@ -4147,7 +4177,8 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(row).toContain('معتمَدٌ بلا موعد')
     expect(row).toContain('أُنشئت كلُّها')
     expect(row).not.toContain('وما بقي لا يوافق')
-    expect(row).toContain('جدوِل منشوراتِ YouTube وTikTok وInstagram معًا بتوقيتك:')
+    // ‏بلا كعكةٍ ولا منطقةٍ محفوظة: الأزرارُ بتوقيت الرياض وتقوله (D-202)
+    expect(row).toContain('جدوِل منشوراتِ YouTube وTikTok وInstagram معًا بتوقيت الرياض:')
     expect(row).toContain('name="preset" value="tomorrow"')
     expect(row).toContain('YouTube وTikTok لا يُنشران للعامّة')
 
