@@ -46,6 +46,7 @@ import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
 import { generateForPost, mediaFor, rejectMedia } from '../lib/image/job'
 import { animateForPost, bindingFor, videoFace } from '../lib/media/video'
+import { NO_CREDIT } from '../lib/media/workersAi'
 import { approvePlan, latestPlan, planWeek } from '../lib/plan/job'
 import { APP_PLATFORMS, appStatuses, deleteApp, readApp, recordVerification, saveApp } from '../lib/oauth/apps'
 import { verifyAppCredentials } from '../lib/oauth/verify'
@@ -1685,7 +1686,11 @@ panel.post('/panel/media/animate', async (c) => {
             }
           : outcome.kind === 'blocked'
             ? { kind: 'warn', text: outcome.reason }
-            : { kind: 'bad', text: `تعذّر تحريك الصورة: ${outcome.reason}` }
+            // ‏نفادُ الرصيد مهمّةٌ لا عطل (D-214): يُقال ما تفعله، والتفصيلُ في «ما عليك»
+            : outcome.reason.startsWith(NO_CREDIT)
+              ? { kind: 'warn', text: 'لم يُحرَّك المقطع: رصيدُ AI Gateway نفد. أضِف رصيدًا من لوحة Cloudflare، ' +
+                  'والخطواتُ في «ما عليك» تحت «رصيدُ AI Gateway». ولم يُصرف شيء.' }
+              : { kind: 'bad', text: `تعذّر تحريك الصورة: ${outcome.reason}` }
 
   await record(
     c.env.DB,
@@ -1883,7 +1888,23 @@ async function ownerFacts(c: {
     // كما سبق
   }
 
+  // ‏رصيدُ AI Gateway من آخر «حرّكها فيديو» (D-214): السجلُّ يحفظ السببَ، فلا عمودَ ولا ترحيل
+  let gatewayCredit: 'short' | 'ok' | undefined
+  try {
+    const row = await c.env.DB
+      .prepare(
+        `SELECT detail FROM audit_log WHERE action = 'media.animate'
+            AND (detail LIKE 'generated%' OR detail LIKE 'failed:%')
+          ORDER BY at DESC, rowid DESC LIMIT 1`,
+      )
+      .first<{ detail: string | null }>()
+    if (row !== null) gatewayCredit = (row.detail ?? '').includes(NO_CREDIT) ? 'short' : 'ok'
+  } catch {
+    // كما سبق: لا يُقرأ فلا يُعرَف
+  }
+
   return {
+    ...(gatewayCredit === undefined ? {} : { gatewayCredit }),
     secrets: new Set(
       ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
        'GOOGLE_SA_JSON', 'CF_AI_TOKEN', 'CF_BROWSER_TOKEN'].filter(has),

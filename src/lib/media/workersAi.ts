@@ -50,6 +50,13 @@ export interface AiBinding {
 export const GATEWAY = { gateway: { id: 'default' } } as const
 
 /**
+ * ‏**نفادُ الرصيد مهمّةُ مالكٍ لا عطل** (D-214): العبارةُ مرّةً هنا، فيعرفها سجلُّ «media.animate»
+ * ومهمّةُ M-30 ورسالةُ اللوحة بالنصّ نفسِه. وجهُ REST يقولها بـ 402، والرابطُ `env.AI` بنصّ
+ * Cloudflare («2021: Insufficient balance») لأنّه يرمي خطأً لا ردًّا.
+ */
+export const NO_CREDIT = 'لا رصيدَ في AI Gateway لنماذج الطرف الثالث'
+
+/**
  * سببُ الردّ بكلام المالك (D-188) — **والرمزُ ونصُّ Cloudflare بعده لمن يشخّص**. كان يُقال
  * «Workers AI (REST) ردّ 400» وحده، فلا يُعرف أهو طلبٌ خاطئ أم رصيدٌ ناقص أم مفتاحٌ بلا إذن.
  * ونصُّ Cloudflare يُقصّ وتُحذف منه الروابط: قد يعيد رابطَ الصورة الموقَّع الذي أرسلناه.
@@ -58,7 +65,7 @@ async function refusal(response: Response): Promise<string> {
   const why =
     response.status === 400 ? 'رفضت Cloudflare الطلب'
     : response.status === 401 || response.status === 403 ? 'مفتاحُ Cloudflare لا يملك إذنَ Workers AI'
-    : response.status === 402 ? 'لا رصيدَ في AI Gateway لنماذج الطرف الثالث'
+    : response.status === 402 ? NO_CREDIT
     : response.status === 404 ? 'النموذجُ غيرُ متاحٍ لهذا الحساب'
     : response.status === 429 ? 'كثرةُ الطلبات — يُعاد بعد قليل'
     : response.status >= 500 ? 'عطلٌ عند Cloudflare — يُعاد بعد قليل'
@@ -207,6 +214,7 @@ export async function generateImage(
     // الوحيد لقاعدة «الرمز لا النصّ»، لأنّه لا رمزَ أصلا
     if (error instanceof AiError) throw error
     const detail = error instanceof Error ? error.message : 'عطل'
+    if (/Insufficient balance|\b402\b/i.test(detail)) throw new AiError(`${NO_CREDIT} (${detail.slice(0, 160)})`, false)
     const retryable = /capacity|429|3040|timeout|rate/i.test(detail)
     throw new AiError(`Workers AI: ${detail}`, retryable)
   }
@@ -281,6 +289,7 @@ export async function generateVideo(
     // ‏خطأُ وجه REST يحمل حكمَه وسببَه بكلام المالك (D-188) — يمرّ كما هو ولا يُغلَّف ثانيةً
     if (error instanceof AiError) throw error
     const detail = error instanceof Error ? error.message : 'عطل'
+    if (/Insufficient balance|\b402\b/i.test(detail)) throw new AiError(`${NO_CREDIT} (${detail.slice(0, 160)})`, false)
     const retryable = /capacity|429|3040|timeout|rate/i.test(detail)
     throw new AiError(`Workers AI: ${detail}`, retryable)
   }

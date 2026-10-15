@@ -137,6 +137,11 @@ export interface OwnerFacts {
   readonly publicReach?: ReadonlySet<string>
   /** قُلب علنيُّ TikTok ولا حسابَ نشطًا بـ `video.publish` — فيصل الصندوقَ لا الحساب (D-190). */
   readonly tiktokNoScope?: boolean
+  /**
+   * رصيدُ AI Gateway من آخر «حرّكها فيديو» في سجلّ النشاط (D-214): `short` إن ردّت بنفاد الرصيد،
+   * و`ok` إن ولّدت. **والغائبُ «لم يُجرَّب»**: لا يُعرف الرصيدُ من هنا قبل أوّل نداء.
+   */
+  readonly gatewayCredit?: 'short' | 'ok'
 }
 
 /**
@@ -172,6 +177,23 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
       'ويحرسه سقفُ المقاطع بعددها وحده: مقطعان في اليوم ما لم ترفعه، بثمنٍ لا يُعرَف.',
     unblocks: 'guard',
     done: (f) => f.videoPriced,
+  },
+  {
+    code: 'M-30',
+    title: 'رصيدُ AI Gateway لتحريك الصورة فيديو',
+    ifLeft:
+      'لا تحريكَ للصور إلى فيديو، وكلُّ ما سواه يعمل: الكتابةُ والصورُ والنشر. ' +
+      '**تأجيلٌ لا خطر**، ولا يُصرف شيءٌ دونك.',
+    unblocks: 'capability',
+    // ‏الرصيدُ عند Cloudflare لا يُقرأ؛ آخرُ نداءٍ هو الدليل، وقبله «لا يُعرَف» (D-061)
+    done: (f) => (f.gatewayCredit === undefined ? null : f.gatewayCredit === 'ok'),
+    evidence: (f) => (f.gatewayCredit === 'short'
+      ? 'آخرُ «حرّكها فيديو» ردّت بنفاد الرصيد'
+      : f.gatewayCredit === 'ok'
+        ? 'آخرُ «حرّكها فيديو» ولّدت مقطعًا'
+        : 'لم يُجرَّب التحريكُ بعد — والرصيدُ لا يُقرأ من هنا'),
+    go: 'https://dash.cloudflare.com/?to=/:account/ai/ai-gateway',
+    goLabel: 'افتح AI Gateway',
   },
   {
     code: 'M-18',
