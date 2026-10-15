@@ -256,3 +256,14 @@ describe('دليلُ M-29', () => {
     expect(m29.evidence!({ ...empty, publicReach: new Set(['tiktok']) })).toBe('النشرُ العلنيُّ مقلوبٌ بقرارك')
   })
 })
+
+/** ‏**M-30 من آخر نداء** (D-214): قبل أوّل تحريكٍ «لا يُعرَف»، لا «لم تتمّ» (D-061). */
+describe('M-30 رصيدُ AI Gateway', () => {
+  const m30 = OWNER_TASKS.find((t) => t.code === 'M-30')!
+  it('لم يُجرَّب ← لا يُعرَف، ونفد ← لم تتمّ، وولّد ← تمّت', () => {
+    expect(m30.done(empty)).toBeNull()
+    expect(m30.done({ ...empty, gatewayCredit: 'short' })).toBe(false)
+    expect(m30.done({ ...empty, gatewayCredit: 'ok' })).toBe(true)
+    expect(m30.evidence!({ ...empty, gatewayCredit: 'short' })).toContain('نفاد الرصيد')
+  })
+})
