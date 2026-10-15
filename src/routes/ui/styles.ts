@@ -1866,7 +1866,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
    * فتُقلَب القاعدة: **يُذكَر ما يبقى لا ما يُخفى**. وعنصرٌ يُضاف غدا
    * إلى الرافدة لا يتسلّل إلى الشريط لأنّه من نوعٍ لم يُعدَّد.
    */
-  nav.tabs > :not(a[data-bar]):not(.cmdk-open){display:none}
+  nav.tabs > :not(a[data-bar]):not(.cmdk-open):not(.more-sheet){display:none}
   /*
    * **والرابطُ و«المزيد» قاعدةٌ واحدة.**
    *
@@ -1874,7 +1874,8 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
    * ‏٢٠ — لأنّ قاعدةَ العرض كُتبت لـ «a» وحدَها. **وخانةٌ في صفٍّ واحدٍ
    * تُصاغ مرّتين تفترق مرّةً.**
    */
-  nav.tabs > a[data-bar],nav.tabs > .cmdk-open{
+  nav.tabs > details.more-sheet{flex:1 1 0; min-width:0; display:flex}
+  nav.tabs > a[data-bar],nav.tabs > .cmdk-open,nav.tabs > details.more-sheet > summary{
     flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--s-0);
     align-items:center; justify-content:center; padding:var(--s-1) var(--s-0);
     min-height:var(--tap); border-radius:var(--r-control); text-align:center}
@@ -1882,10 +1883,10 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
      السلّم كلِّه. ولم يرَهما مدقّقُ السلّم لأنّه لم يرسم إلّا ‏١٤٤٠، حيث لا شريطَ
      إبهام. **وصارت نمطَ «caption»** (D-185 · خطّة التصميم 5.3): ‏١٣px بوزن ‏٦٠٠ وسطرِ
      ‏٢٠، والرمزُ ‏٢٤. ويحرس «audit_mobile» القصَّ عند ‏٣٢٠ و‏٣٩٠. */
-  nav.tabs > a[data-bar] span:not(.count),nav.tabs > .cmdk-open span{
+  nav.tabs > a[data-bar] span:not(.count),nav.tabs > .cmdk-open span,nav.tabs > details.more-sheet > summary span:not(.count){
     font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; width:100%; display:block;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  nav.tabs > a[data-bar] svg,nav.tabs > .cmdk-open svg{
+  nav.tabs > a[data-bar] svg,nav.tabs > .cmdk-open svg,nav.tabs > details.more-sheet > summary svg{
     width:var(--icon-lg); height:var(--icon-lg); opacity:.75}
   /* ‏والاسمُ الأقصرُ للشريط تحت ‏360px وحدَه (خطّة التصميم 5.3) — «منشورات» بلا «ال» */
   nav.tabs > a[data-bar] span.tight{display:none}
@@ -1896,8 +1897,40 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
   nav.tabs a[aria-current=page]::before{display:none}
   /* ‏والقسمُ الأبُ (D-178) يُلوَّن في الشريط: المنصّةُ المعلَّمةُ تحته مخفيّةٌ هنا */
   nav.tabs a[aria-current=true]{background:var(--selected); color:var(--ink)}
-  .cmdk-open.more{border:0; background:none; color:var(--ink-2)}
-  .cmdk-open:not(.more){display:none}
+  .cmdk-open:not(.more-panel .cmdk-open){display:none}
+  /* ‏«المزيد» ورقةٌ فوق الشريط (D-208): زرُّها خانةٌ كأخواتها، وما فيها صفوفٌ بهدف اللمس وأعدادِها */
+  details.more-sheet > summary{list-style:none; cursor:pointer; color:var(--ink-2); position:relative}
+  details.more-sheet > summary::-webkit-details-marker{display:none}
+  details.more-sheet[open] > summary{background:var(--selected); color:var(--ink)}
+  .more-panel{position:fixed; inset-inline:0; bottom:calc(var(--s-16) + var(--safe-b)); z-index:41;
+    display:flex; flex-direction:column; gap:var(--s-1); padding:var(--s-3);
+    background:var(--surface); border-top:var(--bd); box-shadow:var(--sh-3); border-radius:var(--r-sheet) var(--r-sheet) 0 0}
+  .more-panel a,.more-panel .cmdk-open{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap);
+    padding:var(--s-2) var(--s-3); border:0; background:none; color:var(--ink); text-align:start;
+    font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+  .more-panel svg{width:var(--icon-md); height:var(--icon-md); flex:none}
+  nav.tabs .more-panel .count{position:static; margin-inline-start:auto}
+  nav.tabs .more-panel .cmdk-open{width:100%; justify-content:flex-start}
+  nav.tabs .more-panel .cmdk-open span{display:inline}
+  /* ‏«منشور جديد» العائم (5.3 · D-208): ‏56px فوق الشريط بـ16px، في طرف السطر، والقائمةُ تنفتح فوقه */
+  details.fab{display:block; position:fixed; z-index:39; inset-inline-end:var(--s-4);
+    bottom:calc(var(--s-16) + var(--safe-b) + var(--s-4))}
+  details.fab > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--s-2);
+    min-height:calc(var(--s-12) + var(--s-2)); padding:0 var(--s-5); border-radius:var(--r-sheet); box-shadow:var(--sh-3);
+    background:var(--brand); color:var(--on-brand); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+  details.fab > summary::-webkit-details-marker{display:none}
+  details.fab > summary svg{width:var(--icon-lg); height:var(--icon-lg)}
+  .fab-menu{position:absolute; bottom:calc(100% + var(--s-2)); inset-inline-end:0; min-width:max-content;
+    display:flex; flex-direction:column; padding:var(--s-2); background:var(--surface); border:var(--bd);
+    border-radius:var(--r-card); box-shadow:var(--sh-3)}
+  .fab-menu a{display:flex; align-items:center; min-height:var(--tap); padding:var(--s-2) var(--s-3);
+    color:var(--ink); font-size:var(--t-ui); line-height:var(--lh-ui); text-decoration:none}
+  /* ‏ولا يغطّي شيئًا: حشوٌ بقدر الزرّ فوق حشو الشريط، ويختفي في الكتابة والمحرّر والألواح الأخرى */
+  body:has(details.fab) .content > footer{margin-bottom:var(--s-16)}
+  /* ‏ولا في «المنشورات»: رأسُها يحمل الأبوابَ الأربعة، والزرُّ فوق «اكتب المسوّدات» ابتلع ضغطتَها في ر-2·stop —
+     الحقلُ يفقد التركيز عند اللمس فيعود الزرُّ تحت الإصبع. فيختفي ما دام في نموذجٍ تركيز، لا في الحقل وحدَه */
+  body[data-pane]:not([data-pane=overview]):not([data-pane=library]) details.fab,
+  body:has(#ed) details.fab,body:has(form:focus-within) details.fab{display:none}
   /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز.
      والشريطُ ‏٥٢px (هدفٌ ‏٤٤ وحشوٌ ‏٨)، **فـ«--s-16» تتركه ‏١٢ فوقه** — وكان
      ‏٦٤ + ‏١٦ = ‏٨٠، رقمًا خارج السلّم أمسكه مدقّقُ السلّم عند ‏٣٩٠ (D-167) */
@@ -1960,7 +1993,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
   nav.tabs > a[data-bar] span.tight{display:block}
 }
 /* والشريطُ السفليُّ للجوّال وحدَه: في المكتب تبقى الرافدةُ عمودا */
-@media${atLeast('md')}{.cmdk-open.more{display:none}}
+@media${atLeast('md')}{details.more-sheet,details.fab{display:none}}
 @media${below('sm')}{
   .scroll{overflow:visible; margin:0}
   /* **والجدولُ المحوريُّ مستثنًى** (D-151): أعمدتُه أرقامٌ تُقارَن، وتكديسُها

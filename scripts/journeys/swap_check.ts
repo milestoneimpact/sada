@@ -52,6 +52,43 @@ try {
   await page.locator(`#d-${draft.id} button[value="approve"]`).waitFor()
   check(status() === 'draft', `تراجَع عن الرفض: الحالُ في القاعدة ${status()}`)
   check(loads === 0, `تراجَع عن الرفض: تحميلاتُ الصفحة ${loads}`)
+
+  // ‏ثمّ الجدولةُ من البطاقة المبدَّلة نفسِها: «غدًا 9ص» زرٌّ يربطه السكربت، فإن لم يُعَد ربطُه على
+  // ‏البطاقة الجديدة لم يملأ الحقلَ ورُدّت «جدوِل» (D-207: wire)
+  await card.locator('form[data-swap] button[value="approve"]').click()
+  const sched = page.locator(`form[action="/panel/drafts/schedule"]:has(input[name="id"][value="${draft.id}"])`)
+  await sched.waitFor({ state: 'attached' })
+  await page.evaluate((id) => { for (let el = document.querySelector(`form[action="/panel/drafts/schedule"]:has(input[name="id"][value="${id}"])`)?.parentElement; el; el = el.parentElement) if (el.tagName === 'DETAILS') (el as HTMLDetailsElement).open = true }, draft.id)
+  await sched.locator('[data-preset]').first().click()
+  const filled = await sched.locator('input[type="datetime-local"]').inputValue()
+  check(filled !== '', `«${await sched.locator('[data-preset]').first().textContent()}» يملأ الحقلَ على البطاقة المبدَّلة (${filled})`)
+  await sched.locator('button[type="submit"]').last().click()
+  await page.locator(`#d-${draft.id} form[action="/panel/drafts/reschedule"]`).waitFor()
+  const at1 = (stack.db.raw.prepare('SELECT scheduled_at FROM posts WHERE id = ?').get(draft.id) as { scheduled_at: string | null }).scheduled_at
+  check(status() === 'queued' && at1 !== null, `جدوِل: ${status()} ${at1}`)
+  check(loads === 0, `جدوِل: تحميلاتُ الصفحة ${loads}`)
+
+  const move = page.locator(`#d-${draft.id} form[action="/panel/drafts/reschedule"] button[name="preset"]`).last()
+  await move.click()
+  await page.waitForFunction((args) => !!document.querySelector(`#d-${args.id}`) && args.before !== null, { id: draft.id, before: at1 })
+  await page.waitForLoadState('networkidle')
+  const at2 = (stack.db.raw.prepare('SELECT scheduled_at FROM posts WHERE id = ?').get(draft.id) as { scheduled_at: string | null }).scheduled_at
+  check(at2 !== null && at2 !== at1, `انقلها: ${at1} ← ${at2}`)
+  check(loads === 0, `انقلها: تحميلاتُ الصفحة ${loads}`)
+
+  page.once('dialog', (d) => { void d.accept() })
+  // ‏و«اسحب الموعد» في طيّة البطاقة — تُفتح كما يفتحها المالك
+  await page.locator(`#d-${draft.id} details.draft-more > summary`).click()
+  await page.locator(`#d-${draft.id} form[action="/panel/drafts/unschedule"] button`).click()
+  await page.locator(`#d-${draft.id} form[action="/panel/drafts/schedule"]`).waitFor({ state: 'attached' })
+  check(status() === 'approved', `اسحب الموعد: ${status()}`)
+  check(loads === 0, `اسحب الموعد: تحميلاتُ الصفحة ${loads}`)
+  // ‏والفرزُ بعد التبديل لا يعيد البطاقةَ القديمة: «reorder» تُلحق ما في قائمتها
+  const sorter = page.locator('#draft-order')
+  if (await sorter.count()) {
+    await page.evaluate(() => { const s = document.getElementById('draft-order') as HTMLSelectElement; s.value = 'old'; s.dispatchEvent(new Event('change')) })
+  } else check(false, 'لا منتقيَ فرزٍ بالمعرّف draft-order')
+  check((await page.locator(`[id="d-${draft.id}"]`).count()) === 1, 'بعد الفرز: بطاقةٌ واحدةٌ بمعرّفها، لا نسخةٌ قديمةٌ معها')
 } finally {
   await browser.close()
   await stack.close()

@@ -149,7 +149,7 @@ const QUICK: readonly { kind: string; label: string }[] = [
 function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
     `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
-  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…"
+  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…" data-swap
       role="group" aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <span class="ago">انقلها إلى</span>${buttons}</form>`
@@ -208,7 +208,7 @@ function scheduler(
       ${gone
         ? '<span class="ago">ولا تُستردّ من هناك</span>'
         : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
-             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…">
+             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…" data-swap>
              <input type="hidden" name="id" value="${escapeHtml(d.id)}">
              <button class="btn btn-secondary btn-sm" type="submit">اسحب الموعد</button></form>`}
     </div>`
@@ -262,7 +262,7 @@ function scheduler(
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>`
-  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…" data-swap>
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     ${account}
     <div class="quick" data-quick="wh-${id}">

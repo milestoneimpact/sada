@@ -10,7 +10,7 @@
  * (`#posts`) وفي الصفحة المستقلّة بمساراتها (`/panel#posts`) — **والقسمُ الحاليُّ
  * معلَّمٌ في الوسم** فلا ينتظر سكربتًا ليُعرَف.
  */
-import { commandMore, SECTIONS } from './command'
+import { SECTIONS } from './command'
 import { ICON } from './icons'
 import { count } from './components/badge'
 import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch, wordmark } from './shell'
@@ -27,6 +27,29 @@ export interface RailInput {
    * لا `"page"` — فلا تُعلَن صفحتان حاليّتان، ويُلوَّن في شريط الجوّال وحدَه حيث لا تحته.
    */
   readonly parent?: boolean
+}
+
+/**
+ * «المزيد» على الهاتف — **قائمةٌ لا بحث** (خطّة التصميم 5.3 · D-208).
+ *
+ * كان زرًّا يفتح لوحةَ الأوامر: من أراد «الإعدادات» من هاتفه كتب اسمَها. فصار `<details>` يعمل بلا سكربت، فيه ما
+ * ليس في الشريط من `SECTIONS` بأعدادها (الحسابات · ما عليك · الإعدادات)، ثمّ «بحثٌ وأوامر». وعددُه مجموعُ ما فيه،
+ * فلا يختفي «ينتظرك» تحت زرٍّ لا رقمَ عليه. وعلى الحاسوب لا يُرسم: الرافدةُ تحمل السبعة.
+ */
+function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): string {
+  const rest = SECTIONS.filter((s) => s.bar !== true)
+  const total = rest.reduce((n, s) => n + (counts[s.id] ?? 0), 0)
+  const links = rest.map((s) => {
+    const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
+    const n = counts[s.id] ?? 0
+    return `<a href="${escapeHtml(href)}"${input.active === s.id ? ' aria-current="page"' : ''}>${s.icon}<span>${escapeHtml(s.label)}</span>${n > 0 ? count(n) : ''}</a>`
+  }).join('')
+  return `<details class="more-sheet">
+    <summary>${ICON.more}<span>المزيد</span>${total > 0 ? count(total) : ''}</summary>
+    <div class="more-panel">${links}
+      <button type="button" class="cmdk-open" aria-haspopup="dialog" aria-controls="cmdk">${ICON.search}<span>بحثٌ وأوامر</span></button>
+    </div>
+  </details>`
 }
 
 export function railHtml(input: RailInput): string {
@@ -59,7 +82,7 @@ export function railHtml(input: RailInput): string {
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
-    ${commandMore()}
+    ${moreSheet(input, counts)}
   </nav>
   <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>`

@@ -834,6 +834,10 @@ describe('رؤوسُ الألواح (D-137)', () => {
     const libPane = html.slice(html.indexOf('<section data-pane="library"'), html.indexOf('</section>', html.indexOf('<section data-pane="library"')))
     expect(libPane).toContain('<div data-sub id="sub-videos">')
     expect(libPane).toContain('<div data-sub id="sub-images">')
+    // ‏و«منشور جديد» العائمُ بأبواب الكتابة الأربعة (D-208)، ومراسيها في اللوحة نفسِها
+    const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
+    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#idea', '#write', '#videos', '#plan-import'])
+    for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
     for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
       expect(html, old).toContain(`<div data-sub id="${old}">`)
     }

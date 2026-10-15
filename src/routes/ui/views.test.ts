@@ -13,7 +13,8 @@ import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
 import { draftsSection } from './sections/drafts'
 import { tasksScreen } from './tasksView'
-import { commandMore, commandTrigger } from './command'
+import { commandTrigger } from './command'
+import { railHtml } from './rail'
 import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage, worthCell } from '../panelView'
@@ -149,8 +150,9 @@ describe('الرمزُ يقول ما يعنيه', () => {
   })
 
   it('و«المزيد» نقاطٌ لا زائد — الزائدُ يقول «أنشئ»', () => {
-    expect(commandMore()).toContain(ICON.more)
-    expect(commandMore()).not.toContain(ICON.add)
+    const more = railHtml({ inPanel: true }).split('<details class="more-sheet">')[1] ?? ''
+    expect(more).toContain(ICON.more)
+    expect(more).not.toContain(ICON.add)
   })
 })
 

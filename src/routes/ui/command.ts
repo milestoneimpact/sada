@@ -273,19 +273,6 @@ export function commandTrigger(): string {
     ${ICON.search}<span>بحثٌ وأوامر</span><kbd class="kbd">Ctrl K</kbd></button>`
 }
 
-/**
- * «المزيد» في شريط الجوّال (D-107) — **وهو الزرُّ نفسُه بوجهٍ آخر**.
- *
- * خمسةُ أقسامٍ في الشريط وتسعةٌ في النظام. **وقائمةُ «مزيد» ثانيةٌ تُبنى
- * لأربعةٍ تبقى قائمةٌ تشيخ**: قسمٌ يُضاف غدا يدخل الرافدةَ واللوحةَ ولا
- * يدخلها. **واللوحةُ تفهرس التسعةَ أصلا** — فالمزيدُ بابُها لا قائمةٌ
- * ثالثة.
- */
-export function commandMore(): string {
-  return `<button type="button" class="cmdk-open more" hidden
-    aria-haspopup="dialog" aria-controls="cmdk">
-    ${ICON.more}<span>المزيد</span></button>`
-}
 
 /**
  * جسدُ اللوحة — **كلُّ مدخلٍ مرسومٌ، والعميلُ يُخفي ويُظهر**.

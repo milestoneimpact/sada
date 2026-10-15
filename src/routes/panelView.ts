@@ -18,7 +18,7 @@ import { pivotPane, type PivotView } from './ui/sections/pivot'
 import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
+import { buildCommands, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
@@ -671,6 +671,22 @@ function libraryTabs(pending: number, videos: number, images: number): string {
   ], { id: 'library-sub' })
 }
 
+/**
+ * «منشور جديد» عائمٌ على الهاتف (خطّة التصميم 5.3 · D-208) — **ظاهرٌ حيث يُبدأ العمل**: الرئيسيّةُ والمكتبة. ولا في
+ * «المنشورات»: رأسُها يحمل الأبوابَ الأربعة نفسَها، وكان الزرُّ فوق «اكتب المسوّدات» يبتلع ضغطتَها (ر-2·stop).
+ *
+ * على الحاسوب أبوابُ الكتابة الأربعة في رأس «المنشورات»؛ وعلى الهاتف كانت في رأس لوحٍ يُبلَغ بضغطتين. فصارت زرًّا
+ * فوق الشريط في طرف السطر، يفتح قائمةً بالأبواب الأربعة نفسِها. وهو `<details>` يعمل بلا سكربت، ويختفي حين يُكتب
+ * في نموذج (`form:focus-within`) وحين يُفتح المحرّر، وفي الألواح الأخرى.
+ */
+function fabNew(): string {
+  const items = [
+    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], ['#videos', 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
+  ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
+  return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
+    <div class="fab-menu">${items}</div></details>`
+}
+
 export function panelPage(d: PanelData): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
@@ -1278,6 +1294,7 @@ ${pivotPane(d.pivot)}
 
 
 
+${fabNew()}
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
   <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
 </main>

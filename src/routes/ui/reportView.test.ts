@@ -159,3 +159,36 @@ describe('العددُ ومعدودُه (D-177)', () => {
     expect(label).not.toMatch(BAD_COUNT)
   })
 })
+
+describe('ثلاثةُ أرقامٍ بفرقها في رأس «النتائج» (D-208)', () => {
+  const week = (impressions: number | null, interactions: number | null, spendUsd: number) => ({
+    version: 1, from: '2026-10-05', to: '2026-10-12', published: 2, measured: 2,
+    platforms: [{ platform: 'x', published: 2, measured: 2, impressions, impressionsFrom: 2, interactions, interactionsFrom: 2 }],
+    top: null, spendUsd, notes: [],
+  }) as never
+
+  it('الظهورُ والتفاعلُ والإنفاقُ بفرقها عن الأسبوع الذي قبله، كلمةً لا لونًا', async () => {
+    const { weekKpis } = await import('./reportView')
+    const html = weekKpis(week(1200, 30, 1.5), week(1000, 40, 1.5))
+    expect(html).toContain('<div class="kv-k">الظهور</div><div class="kv-v">1,200</div><div class="note">أكثرُ بـ20٪ من الأسبوع الماضي</div>')
+    expect(html).toContain('أقلُّ بـ25٪ من الأسبوع الماضي')
+    expect(html).toContain('كالأسبوع الماضي')
+  })
+
+  it('وما لم يُقَس يقول ذلك، ولا فرقَ بلا أسبوعٍ قبله', async () => {
+    const { weekKpis } = await import('./reportView')
+    const html = weekKpis(week(null, null, 0), null)
+    expect(html).toContain('<div class="kv-v">لم يُقَس</div>')
+    expect(html).toContain('لا أسبوعَ قبله يُقارَن به')
+    expect(weekKpis(week(null, 5, 0), week(10, 5, 0))).toContain('لا يُقارَن: أحدُ الأسبوعين لم يُقَس')
+  })
+
+  it('والشاشةُ تقارن التقريرَ الحاليَّ بالذي بعده في القائمة', () => {
+    const reports = [
+      { id: '2026-W42', body: week(1200, 30, 2), createdAt: '' },
+      { id: '2026-W41', body: week(600, 30, 2), createdAt: '' },
+    ] as never as StoredReport[]
+    const html = reportScreen({ reports, current: reports[0]!, suggestions: [], promoCapUsd: 0, now: new Date('2026-10-13T08:00:00Z') })
+    expect(html).toContain('أكثرُ بـ100٪ من الأسبوع الماضي')
+  })
+})
