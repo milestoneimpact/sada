@@ -74,7 +74,7 @@ function row(r: OwnerRow, env: string): string {
   const opens = OPENS[r.unblocks]
   return `<tr class="${key === 'todo' && r.unblocks === 'gate' ? 'urgent' : ''}">
     <td data-label="المهمّة">
-      ${/* ‏**العنوانُ أوّلًا والرمزُ صغيرٌ بعده** (D-203): كان «M-16» أبرزَ ما في الصفّ */ ''}<div class="nm">${escapeHtml(r.title)}
+      ${/* ‏**العنوانُ أوّلًا والرمزُ صغيرٌ بعده** (D-203): كان «M-16» أبرزَ ما في الصفّ */ ''}<div class="nm">${bold(r.title)}
         <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></div>
       <div class="sub">${bold(r.ifLeft)}</div>
       ${commandBox(r, env)}

@@ -35,8 +35,8 @@ export interface PivotView {
 /** المدى بالأيّام — **وخياراتٌ معدودةٌ خيرٌ من حقلٍ يقبل أيَّ رقم**. */
 const SPANS: readonly { readonly days: number; readonly label: string }[] = [
   { days: 7, label: 'أسبوع' },
-  { days: 30, label: '30 يوما' },
-  { days: 90, label: '90 يوما' },
+  { days: 30, label: '30 يومًا' },
+  { days: 90, label: '90 يومًا' },
   { days: 365, label: 'سنة' },
 ]
 
@@ -152,7 +152,7 @@ export function pivotPane(d: PivotView): string {
       <h2>${escapeHtml(MEASURE_LABEL[d.measure])} — ${
         escapeHtml(DIMENSION_LABEL[d.rows])}${
         d.cols === null ? '' : ` × ${escapeHtml(DIMENSION_LABEL[d.cols])}`}</h2>
-      <div class="row acts"><span class="note">${escapeHtml(String(t.facts))} منشورا${
+      <div class="row acts"><span class="note">${escapeHtml(counted(t.facts, NOUNS.post))}${
         d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
       ${t.rowKeys.length === 0 ? '' : `<a class="btn btn-secondary btn-sm" href="${
         escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>`}</div>

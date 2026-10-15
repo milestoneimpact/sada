@@ -31,7 +31,7 @@ export interface TimelineView {
   readonly now: Date
 }
 
-const SPAN_LABEL: Readonly<Record<Span, string>> = { 14: 'أسبوعان', 30: '30 يوما', 90: '90 يوما' }
+const SPAN_LABEL: Readonly<Record<Span, string>> = { 14: 'أسبوعان', 30: '30 يومًا', 90: '90 يومًا' }
 
 function href(span: Span, shift: number): string {
   const q = new URLSearchParams({ span: String(span) })
@@ -80,11 +80,12 @@ function rowHtml(row: GanttRow, isPlan: boolean, d: TimelineView): string {
   const tiers = row.tiers
     .map((t) => `<div class="gt-tier">${t.map((b) => barHtml(b, isPlan, d.zone)).join('')}</div>`)
     .join('')
-  return `<li class="gt-row">
+  // ‏صفُّ رسمٍ لا فقرة (D-213): `div` بدور القائمة، فلا يقيسه مدقّقُ طول السطر كأنّه نصٌّ يُقرأ
+  return `<div class="gt-row" role="listitem">
     <div class="gt-lab"><span class="gt-name">${escapeHtml(row.label)}</span>
       <span class="gt-n">${escapeHtml(isPlan ? counted(row.count, NOUNS.plan) : counted(row.count, NOUNS.post))}</span></div>
     <div class="gt-track">${now}${tiers}</div>
-  </li>`
+  </div>`
 }
 
 function axis(d: TimelineView): string {
@@ -144,7 +145,7 @@ export function timelineScreen(d: TimelineView): string {
     const isPlan = g.key === 'plans'
     return `<section class="gt-grp" aria-label="${escapeHtml(g.label)}">
       <h3 class="gt-gh">${escapeHtml(g.label)}</h3>
-      <ul class="gt-rows">${g.rows.map((r) => rowHtml(r, isPlan, d)).join('')}</ul>
+      <div class="gt-rows" role="list">${g.rows.map((r) => rowHtml(r, isPlan, d)).join('')}</div>
     </section>`
   }).join('')
 

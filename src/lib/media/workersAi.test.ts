@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  AiError, IMAGE_MODELS, MAX_SECONDS, MIN_SECONDS, VIDEO_MODELS,
+  AiError, IMAGE_MODELS, NO_CREDIT, MAX_SECONDS, MIN_SECONDS, VIDEO_MODELS,
   clampDuration, fetchVideoBytes, generateImage, generateVideo, restBinding,
   type AiBinding,
 } from './workersAi'
@@ -302,5 +302,28 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
   it('ولا يظهر الرمزُ في رسالة الخطأ', async () => {
     const ai = restBinding('a', 'super-secret', stub({ status: 403, json: {} }))
     await expect(ai.run('m', {})).rejects.toThrow(/^(?!.*super-secret).*$/)
+  })
+})
+
+/**
+ * ‏**نفادُ الرصيد بالنصّ الواحد من الوجهين** (D-214): الرابطُ يرمي «2021: Insufficient balance»
+ * ووجهُ REST يردّ 402، والمهمّةُ M-30 ورسالةُ اللوحة تعرفانه بـ `NO_CREDIT` وحدَها.
+ */
+describe('نفادُ رصيد AI Gateway', () => {
+  it('من الرابط: يُقال بالعبارة الواحدة، ولا يُعاد', async () => {
+    const err = await generateVideo(throwing('AiError: 2021: Insufficient balance'), { imageUrl: 'https://s/1.png', prompt: 'ن' })
+      .catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(AiError)
+    expect((err as AiError).message.startsWith(NO_CREDIT)).toBe(true)
+    expect((err as AiError).retryable).toBe(false)
+  })
+
+  it('ومن وجه REST: ‏402 بالعبارة نفسِها', async () => {
+    const f = (async () => new Response(JSON.stringify({ errors: [{ code: 2021, message: 'Insufficient balance' }] }),
+      { status: 402, headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch
+    const err = await generateVideo(restBinding('acc', 't', f), { imageUrl: 'https://s/1.png', prompt: 'ن' })
+      .catch((e: unknown) => e)
+    expect((err as AiError).message.startsWith(NO_CREDIT)).toBe(true)
+    expect((err as AiError).retryable).toBe(false)
   })
 })
