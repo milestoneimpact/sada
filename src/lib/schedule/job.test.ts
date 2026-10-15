@@ -183,7 +183,7 @@ describe('السحب', () => {
     expect(row?.['account_id']).toBeNull()
   })
 
-  it('بعد الإرسال يُردّ — ولا يُستردّ من الطابور', async () => {
+  it('بعد الإرسال يُردّ — ولا يُستردّ بعد الإرسال', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     await schedulePost(db, post, account, SOON, NOW)
@@ -191,7 +191,7 @@ describe('السحب', () => {
 
     const out = await unschedule(db, post)
     expect(out.ok).toBe(false)
-    if (!out.ok) expect(out.reason).toContain('الطابور')
+    if (!out.ok) expect(out.reason).toContain('بعد الإرسال')
     expect((await readPost(post))?.['status']).toBe('queued')
   })
 

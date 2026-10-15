@@ -65,7 +65,7 @@ export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: Tone; label
   done: { g: '●', cls: 'ok', label: 'تامّة' },
   now: { g: '◍', cls: 'warn', label: 'تنتظرك' },
   waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
-  failed: { g: '▲', cls: 'bad', label: 'ساقطة' },
+  failed: { g: '▲', cls: 'bad', label: 'فشلت' },
 }
 
 /**

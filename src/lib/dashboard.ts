@@ -202,7 +202,7 @@ export const TILES: readonly TileSpec[] = [
     of: (d) => {
       const n = d.drafts.filter((x) => x.scheduledAt !== null).length
       // **والصفرُ لا «له موعد»**: الملاحظةُ تتبع الرقم لا القالب (D-134)
-      return { value: String(n), note: n === 0 ? 'لا موعدَ في الطابور' : 'له موعدٌ في الطابور' }
+      return { value: String(n), note: n === 0 ? 'لا موعدَ مجدول' : 'له موعدٌ مجدول' }
     },
   },
   {

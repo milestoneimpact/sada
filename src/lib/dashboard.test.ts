@@ -184,11 +184,11 @@ describe('البطاقاتُ بأعيانها', () => {
 
 /** الملاحظةُ تتبع الرقم: صفرٌ مجدولٌ «لا موعدَ»، لا «له موعد» (D-134). */
 describe('مجدولٌ للنشر (D-134)', () => {
-  it('صفرٌ يقول «لا موعدَ في الطابور»', () => {
+  it('صفرٌ يقول «لا موعدَ مجدول»', () => {
     const spec = TILES.find((t) => t.id === 'scheduled')!
     const none = { ...src, drafts: [{ status: 'draft', scheduledAt: null }] }
-    expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعدَ في الطابور' })
-    expect(spec.of(src, fmt).note).toBe('له موعدٌ في الطابور')
+    expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعدَ مجدول' })
+    expect(spec.of(src, fmt).note).toBe('له موعدٌ مجدول')
   })
 })
 

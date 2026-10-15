@@ -226,7 +226,7 @@ describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () 
       next: null,
     })
     const want: [Tone, string, string][] = [
-      ['ok', '●', 'تامّة'], ['warn', '◍', 'تنتظرك'], ['idle', '○', 'تنتظر'], ['bad', '▲', 'ساقطة'],
+      ['ok', '●', 'تامّة'], ['warn', '◍', 'تنتظرك'], ['idle', '○', 'تنتظر'], ['bad', '▲', 'فشلت'],
     ]
     for (const [cls, glyph, label] of want) expect(html).toContain(statusBadge(cls, glyph, label))
   })
