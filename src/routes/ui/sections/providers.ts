@@ -143,7 +143,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <div class="card tile"><div class="kv-k">إنفاقُ اليوم على الذكاء</div>
       <div class="kv-v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
       ${bar(spentToday, d.spendCap)}
-      <div class="note">مجموعُ ما أنفقه المزوّدون اليوم · يُصفَّر الثالثةَ فجرًا بتوقيت الرياض</div></div>
+      <div class="note">مجموعُ ما أنفقته خدماتُ الكتابة والصور اليوم · يُصفَّر الثالثةَ فجرًا بتوقيت الرياض</div></div>
     <div class="card tile"><div class="kv-k">مهامٌّ جاهزة</div>
       <div class="kv-v">${tasksReady}<em> / ${d.routing.length}</em></div>
       ${bar(tasksReady, Math.max(1, d.routing.length))}
@@ -214,7 +214,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
             <span class="mono">${escapeHtml(p.baseUrl ?? '—')}</span></div>
           <div><div class="kv-k">السعر</div>
             <div class="sub m-0">${priceNote}</div></div>
-          <div><div class="kv-k">30 يوما</div>
+          <div><div class="kv-k">30 يومًا</div>
             <div class="sub m-0">${money(p.spend)} · ${p.calls} نداء${
               p.dailyCap === null ? '' : ` · سقفُه ${money(p.dailyCap)}`}</div></div>
         </div>

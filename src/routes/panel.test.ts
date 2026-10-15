@@ -3774,7 +3774,7 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     await seedDraft()
     const none = await panelHtml()
     expect(none).toContain(INFO_BUTTON_OFF)
-    expect(none).toContain('title="ساقطة — بلا مفتاح المتصفّح"')
+    expect(none).toContain('title="فشلت — بلا مفتاح المتصفّح"')
 
     env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0002'
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'

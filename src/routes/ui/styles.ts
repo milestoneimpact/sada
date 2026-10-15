@@ -747,8 +747,8 @@ tbody tr:last-child td{border-bottom:0}
 .gt-axis{position:sticky; top:0; z-index:1; background:var(--surface); border-bottom:var(--bd); min-height:var(--s-8)}
 .gt-axis .gt-track{min-height:calc(var(--s-8) + var(--s-4))}
 .gt-tick{position:absolute; bottom:var(--s-1); transform:translateX(50%); white-space:nowrap;
-  font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-variant-numeric:tabular-nums}
-.gt-tick.major{color:var(--ink); font-weight:600}
+  font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-weight:600; font-variant-numeric:tabular-nums}
+.gt-tick.major{color:var(--ink)}
 .gt-tick:first-child{transform:none}
 .gt-tick.gt-today{top:0; bottom:auto; color:var(--brand); font-weight:600}
 .gt-grp{margin-top:var(--s-4)}
@@ -758,12 +758,12 @@ tbody tr:last-child td{border-bottom:0}
 .gt-lab{display:flex; flex-direction:column; justify-content:center; min-width:0; padding:var(--s-1) 0;
   position:sticky; inset-inline-start:0; z-index:1; background:var(--surface)}
 .gt-name{font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.gt-n{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.gt-n{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-weight:600}
 .gt-track{position:relative; padding:var(--s-1) 0; min-width:0}
 .gt-tier{position:relative; height:var(--s-6); margin:var(--s-1) 0}
 .gt-bar{position:absolute; top:0; bottom:0; min-inline-size:var(--s-2); display:flex; align-items:center; overflow:hidden;
   border-radius:var(--r-inline); border:1px solid var(--line); background:var(--surface-2); color:var(--ink);
-  text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption)}
+  text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600}
 .gt-bar.ok{background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
 .gt-bar.warn{background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .gt-bar.bad{background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 45%,transparent)}

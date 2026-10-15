@@ -471,7 +471,7 @@ export function worthCell(worth: number | null): string {
     <span class="val">${worth.toFixed(2)}</span></div>`
 }
 
-function sourceRow(s: PanelSource, now: Date): string {
+function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const pending = !s.analyzed || s.stale
   const status = s.stale
     ? statusBadge('warn', '▲', 'تغيّر بعد التحليل')
@@ -510,7 +510,7 @@ function sourceRow(s: PanelSource, now: Date): string {
         <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
-    <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, null))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
+    <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
     <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row acts">${acts}</div>`}</td>
   </tr>`
 }
@@ -843,7 +843,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
        </div>
        <div class="scroll"><table>
          <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th></th></tr></thead>
-         <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now)).join('')}</tbody>
+         <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
        </table></div>`
 
   const { strip: providerStrip, rows: providerRows, add: addCard, routing: routingRows } =
@@ -1137,7 +1137,7 @@ ${pivotPane(d.pivot)}
   ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوفُ الإنفاق تُطبَّق قبل أيّ نداءٍ مدفوع</b>، والمفاتيحُ لا تُعرض كاملة، والدخولُ بعاملين.')}
   ${settingsTabs(missing)}
   <div data-sub id="limits">
-  <p class="hint">مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.</p>
+  <p class="hint">مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والنشر المجدول معًا.</p>
   ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
        يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
        لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
@@ -1145,7 +1145,7 @@ ${pivotPane(d.pivot)}
     <div class="split">
       <p>${d.paused
         ? 'النظام موقوف: لا نداء مدفوع ولا مسح ولا نشر. والقيد في الشيفرة لا في هذه الصفحة.'
-        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude، وفي الطابور والدورة المجدولة معًا.'}</p>
+        : 'الإيقاف يمنع كلّ نداء مدفوع فورا — قبل أن يُلمس Drive أو Claude، وفي النشر المجدول معًا.'}</p>
       <form class="inline" method="POST" action="/panel/settings"
             data-confirm="${d.paused ? 'استئناف عمل النظام؟' : 'إيقاف النظام كلّه؟ سيتوقّف المسح والتحليل والنشر حتّى تستأنفه.'}">
         <input type="hidden" name="key" value="paused">

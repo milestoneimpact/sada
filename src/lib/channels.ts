@@ -329,7 +329,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     stage: 'publish',
     secrets: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
     task: 'M-02',
-    note: 'النشرُ باسمك أو باسم صفحة. ويحتاج موافقةَ LinkedIn على Community Management API (M-03) للصفحات.',
+    note: 'النشرُ باسمك أو باسم صفحة. ويحتاج موافقةَ LinkedIn على Community Management API للصفحات.',
   },
   {
     id: 'x',
