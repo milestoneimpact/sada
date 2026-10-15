@@ -283,6 +283,28 @@ function scheduler(
   </form>`
 }
 
+/*
+ * ‏**الاعتمادُ يعرض الموعد** (D-217): مسوّدةٌ لها حسابٌ واحدٌ يناسبها ولا ينقصها وسيطٌ تُعتمَد وتُجدوَل
+ * ‏بضغطةٍ واحدة — «اعتمد · غدًا 9:00 ص» — بالمسار نفسِه الذي يسلكه المحرّر (`approve-schedule`، D-198)،
+ * ‏و«اعتمد» وحدَه ثانويٌّ بجوارها. والموعدُ مكتوبٌ على الزرّ نفسِه فلا يُجدوَل شيءٌ لم يُقرأ، والسحبُ
+ * ‏في شريط المجدولة الذي تنزل إليه. وحيث تعدّد الحسابُ أو نقص الوسيطُ يبقى «اعتمد» وحده كما كان.
+ */
+export const APPROVE_AT = PRESETS.find((p) => p.kind === 'tomorrow')!
+
+function decideForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string {
+  const id = escapeHtml(d.id)
+  const fit = targets.filter((t) => t.platform === d.platform)
+  const oneStep = fit.length === 1 && missingMedia(d.platform, readyMimes(d, media)) === null
+  return `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…" data-swap>
+             <input type="hidden" name="id" value="${id}">${oneStep
+    ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
+             <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
+             <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule"
+               title="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
+             <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد فقط</button>`
+    : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button>'}</form>`
+}
+
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
 export function requeueForm(id: string, primary: boolean): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
@@ -881,9 +903,7 @@ function card(
     ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone) : ''}
     <div class="pc-foot">
       ${open
-        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…" data-swap>
-             <input type="hidden" name="id" value="${id}">
-             <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button></form>`
+        ? decideForm(d, targets, media)
         : ''}
       <a class="btn btn-secondary btn-sm" href="${escapeHtml(editorHref(d.id))}" data-edit
         aria-label="${escapeHtml(`${open ? 'عدّل' : 'افتح'}: ${snippet(d.text)} (${specOf(d.platform).label}، ${relativeTime(d.createdAt, now)})`)}">${open ? 'عدّل' : 'افتح'}</a>

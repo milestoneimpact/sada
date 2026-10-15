@@ -192,6 +192,14 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
     </div>
   </div>
   ${kpis}
+  ${/*
+   * ‏**والمنشورُ الذي جلب الأسبوعَ أوّلًا** (D-217): الملخّصُ ثمّ صاحبُ الرقم، ثمّ «ما خرج» صفًّا
+   * ‏لكلّ منصّة. كان تحت جدول المنصّات، والمالكُ يفتح التقرير ليعرف أيَّ منشورٍ يكرّر.
+   */ ''}<div class="card">
+    <h2>${lone === undefined ? 'الأفضلُ داخل نافذته' : 'منشورُ الأسبوع'}</h2>
+    ${top}
+  </div>
+
   <div class="card">
     <div class="card-head">
       <h2>ما خرج</h2>
@@ -201,11 +209,6 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
     </div>
     ${r.platforms.length === 0 ? '' : `<div class="slices">${r.platforms.map(sliceCard).join('')}</div>`}
     ${r.platforms.length === 0 ? '<p class="hint">لا شيءَ يُعرَض — ولا أصفارَ تُختلَق.</p>' : ''}
-  </div>
-
-  <div class="card">
-    <h2>${lone === undefined ? 'الأفضلُ داخل نافذته' : 'منشورُ الأسبوع'}</h2>
-    ${top}
   </div>
 
   ${notes === '' ? '' : `<div class="card"><h2>ما لا يقوله الرقمُ وحده</h2>${notes}</div>`}

@@ -285,6 +285,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
             <label class="vapprove"><input type="checkbox" name="approve"${cap === undefined ? ' checked' : ''}> ${cap === undefined
               ? 'اعتمده الآن — كتبتُه أنا'
               : 'اعتمده الآن — راجعتُ النصوص'}</label>
+            ${whenPick(u.id, ctx.zone)}
             <span class="grow"></span>
             <button class="btn btn-primary" type="submit">أنشئ المنشورات</button>
           </div>`
@@ -302,6 +303,19 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
  * بتوقيت المالك من كعكته (D-173)، فلا UTC في وجهه ولا حقلٌ يُترجَم في رأسه. والمعرّفاتُ
  * في النموذج ما عُرض هنا وحده، والحسابُ يُحسب على الخادم (D-182).
  */
+/*
+ * ‏**الإنشاءُ يعرض الجدولة** (D-217): «متى؟» بجوار «اعتمده الآن» فيُنشأ المنشورُ ويُجدوَل في ضغطةٍ
+ * ‏واحدة، بأزرار الموعد نفسِها تحت المقطع (`scheduleFromUpload`). و«لاحقًا» افتراضيّة: مقطعٌ عامٌّ لا
+ * ‏يُجدوَل بموعدٍ لم يختره المالك، ولا يُقرأ الموعدُ إلّا مع الاعتماد.
+ */
+function whenPick(id: string, zone?: string | null): string {
+  const fid = `vwhen-${escapeHtml(id.slice(0, 8))}`
+  return `<label class="vapprove" for="${fid}">متى؟
+      <select id="${fid}" name="preset"><option value="">لاحقًا</option>${PRESETS
+        .map((q) => `<option value="${q.kind}">${escapeHtml(q.label)}</option>`).join('')}</select></label>${
+    zone === undefined ? '' : `<input type="hidden" name="tz" value="${escapeHtml(zone ?? FALLBACK_ZONE)}">`}`
+}
+
 function scheduleAll(u: UploadRow, reachNow: Reach, zone?: string | null): string {
   const ready = u.posts.filter((p) => p.status === 'approved' || p.status === 'edited')
   if (ready.length === 0) return ''

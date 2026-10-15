@@ -4273,6 +4273,47 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(flash).not.toContain('UTC.')
   })
 
+  it('«متى؟» مع «اعتمده الآن»: يُنشأ ويُجدوَل في ضغطةٍ واحدة، ولمنصّات هذا الإنشاء وحدها (D-217)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
+      ('acc-ig', 'instagram', 'member', 'ig', 'omar', 'active')`).run()
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    expect(page).toContain('<option value="">لاحقًا</option>')
+    // ‏معتمَدٌ قبلُ على Instagram بلا موعد: لا يجرّه إنشاءُ YouTube إلى موعده
+    await create(cookie, id, 'قبلُ', ['instagram'])
+    const f = new FormData()
+    f.set('caption', 'المعلمُ نقطةُ قرار')
+    f.set('approve', 'on')
+    f.set('preset', 'tomorrow')
+    f.set('tz', 'Asia/Riyadh')
+    f.append('platform', 'youtube')
+    await app.request(`/panel/uploads/${id}/posts`, withSession(cookie, { method: 'POST', body: f }), env)
+    const rows = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all() as
+      { platform: string; status: string; account_id: string | null; scheduled_at: string | null }[]
+    expect(rows.map((r) => [r.platform, r.status, r.account_id])).toEqual([
+      ['instagram', 'approved', null], ['youtube', 'queued', 'acc-yt'],
+    ])
+    expect(rows[1]!.scheduled_at).toMatch(/ 06:00:00$/)
+    const flash = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    expect(flash).toMatch(/أُنشئ على YouTube وجُدول [^<]*09:00/)
+  })
+
+  it('«متى؟» بلا اعتماد لا يجدول شيئًا (D-217)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active')`).run()
+    const cookie = await login()
+    const id = await uploaded(cookie)
+    const f = new FormData()
+    f.set('caption', 'نصّ')
+    f.set('preset', 'tomorrow')
+    f.append('platform', 'youtube')
+    await app.request(`/panel/uploads/${id}/posts`, withSession(cookie, { method: 'POST', body: f }), env)
+    const row = db.raw.prepare(`SELECT status, scheduled_at FROM posts`).get() as { status: string; scheduled_at: string | null }
+    expect(row).toEqual({ status: 'draft', scheduled_at: null })
+  })
+
   it('عنوانُ YouTube فوق حدّه يُقال بما سيُرفع بعد الإنشاء (ر-4)', async () => {
     const cookie = await login()
     const id = await uploaded(cookie)

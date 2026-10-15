@@ -91,6 +91,8 @@ describe('التقريرُ يوصل (ر-7)', () => {
     const html = reportBody(old, NOW)
     expect(html).toContain('لا ترتيبَ في هذا الأسبوع')
     expect(html).toContain('<h2>الأفضلُ داخل نافذته</h2>')
+    // ‏وصاحبُ الرقم قبل جدول المنصّات (D-217)
+    expect(html.indexOf('الأفضلُ داخل نافذته')).toBeLessThan(html.indexOf('<h2>ما خرج</h2>'))
   })
 
   it('والأوّلُ في الترتيب يوصل إلى سجلّه كذلك', () => {
