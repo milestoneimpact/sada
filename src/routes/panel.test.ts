@@ -168,6 +168,13 @@ describe('الدخول', () => {
       return await app.request(path, { method: 'POST', body }, env)
     }
 
+    // ‏والمرساةُ تعود (D-210): سكربتُ الدخول يُلحقها بـ«next»، والخادمُ يوجّه إليها كما هي
+    it('«next» بمرساة بطاقةٍ يعود إليها بعد الدخول، والسكربتُ يُلحقها', async () => {
+      const response = await signIn('/panel#d-0f6c1d2e-aaaa-bbbb-cccc-1234567890ab')
+      expect(response.headers.get('Location')).toBe('/panel#d-0f6c1d2e-aaaa-bbbb-cccc-1234567890ab')
+      // ‏وإلحاقُ المرساة في المتصفّح يقيسه `npm run swap` (الجلسةُ انتهت وسط فعل)
+    })
+
     it('صفحةٌ تُطلَب بلا جلسة تحمل مسارَها في نموذج الدخول — ولا تقول «انتهت» لمن لم يدخل', async () => {
       const response = await app.request('/panel/report?week=2026-09-28', {}, env)
       expect(response.status).toBe(401)

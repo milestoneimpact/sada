@@ -98,6 +98,13 @@ const NEXT_SCRIPT = `
  * ونداءٌ واحدٌ إلى أصلنا، ولا شيء غيره — و`connect-src 'self'` تفرضه.
  */
 const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
+/*
+ * ‏**والمرساةُ تعود بعد الدخول** (خطّة التصميم 7.11 · D-210): الخادمُ لا يرى ما بعد «#»، فكان «next» يحمل «/panel»
+ * ‏ومن انتهت جلستُه على بطاقةٍ (#d-…) أو لوحٍ (#settings) يعود إلى الرئيسيّة. فتُلحَق المرساةُ هنا — مرساةٌ بسيطةٌ وحدَها،
+ * ‏و«safeNext» في الخادم يحكم ما يُقبل كما كان.
+ */
+(function(){var nx=document.getElementById('login-next');
+  if(nx&&nx.value.indexOf('#')<0&&/^#[A-Za-z0-9_-]{1,80}$/.test(location.hash))nx.value+=location.hash;})();
 (function(){
   var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var btn=document.getElementById('pk-login');

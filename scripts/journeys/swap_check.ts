@@ -116,6 +116,17 @@ try {
   await restore.click()
   check(await page.locator('textarea#ed-txt').inputValue() === typed, 'استعده: النصُّ عاد إلى الحقل')
   check(await page.evaluate((k) => localStorage.getItem(k) !== null, `sada-draft:${other.id}`), 'ويبقى في الجهاز حتّى يُحفظ')
+
+  // ‏**الجلسةُ انتهت وسط فعل** (7.11 · D-210): يُفتح الدخولُ، و«next» يحمل مرساةَ البطاقة فيعود إليها
+  stack.db.raw.prepare("UPDATE posts SET status = 'draft' WHERE id = ?").run(draft.id)
+  await page.goto(`${stack.url}/panel#d-${draft.id}`)
+  await page.waitForLoadState('networkidle')
+  await page.context().clearCookies()
+  await page.locator(`#d-${draft.id} form[data-swap] button[value="approve"]`).click()
+  await page.locator('#login-next').waitFor({ state: 'attached' })
+  const nextVal = await page.locator('#login-next').inputValue()
+  check(nextVal.endsWith(`#d-${draft.id}`), `انتهت الجلسة: الدخولُ يعيد إلى البطاقة (next=${nextVal.slice(0, 24)}…)`)
+  check(status() === 'draft', `ولم يقع الفعلُ بلا جلسة: ${status()}`)
 } finally {
   await browser.close()
   await stack.close()
