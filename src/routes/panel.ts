@@ -104,6 +104,9 @@ import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
+import { timelineScreen, timelineTitle } from './ui/timelineView'
+import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
+import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
 import { tasksScreen } from './ui/tasksView'
 import {
@@ -1963,6 +1966,36 @@ panel.get('/panel/report', async (c) => {
 
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('results')}`, { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('results')),
+  )
+})
+
+/**
+ * الخطُّ الزمنيّ للمحفظة (D-212) — **تبويبٌ ثالثٌ في «النتائج»**.
+ *
+ * المدى والنافذةُ من العنوان بقوائم سماح (`readSpan` و`readShift`)، **فما لا يُعرَف يعود
+ * إلى افتراضه** ولا يُسقط الصفحة. والأيّامُ بمنطقة المالك (D-201): يومُ الرياض يبدأ قبل
+ * يوم غرينتش بثلاث ساعات، ومنشورُ الثانية فجرًا يقع في يومه لا في أمسه.
+ */
+panel.get('/panel/timeline', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+
+  const q = new URL(c.req.url).searchParams
+  const span = readGanttSpan(q.get('span'))
+  const shift = readShift(q.get('at'))
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const now = new Date()
+  const win = windowOf(now, zone, span, shift)
+  const loaded = await loadGantt(c.env.DB, win.from, win.to)
+  const body = timelineScreen({
+    chart: gantt(loaded, win, now, zone),
+    span, shift, capped: loaded.capped, cap: GANTT_CAP, zone, now,
+  })
+
+  return page((nonce) =>
+    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, body, nonce, '',
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })

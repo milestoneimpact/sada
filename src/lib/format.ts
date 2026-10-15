@@ -172,5 +172,6 @@ export const NOUNS = {
   channel: { one: 'قناةٌ واحدة', two: 'قناتان', few: 'قنوات', many: 'قناةً' },
   account: { one: 'حسابٌ واحد', two: 'حسابان', few: 'حسابات', many: 'حسابًا' },
   scope: { one: 'نطاقٌ واحد', two: 'نطاقان', few: 'نطاقات', many: 'نطاقًا' },
+  plan: { one: 'خطّةٌ واحدة', two: 'خطّتان', few: 'خطط', many: 'خطّةً' },
   row: { one: 'صفٌّ واحد', two: 'صفّان', few: 'صفوف', many: 'صفًّا', oneAcc: 'صفًّا واحدًا', oneGen: 'صفٍّ واحد', twoObl: 'صفَّين' },
 } as const satisfies Readonly<Record<string, Noun>>

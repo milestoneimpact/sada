@@ -237,6 +237,11 @@ export function buildCommands(
       icon: '', alias: a.alias,
     })
   }
+  // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
+  out.push({
+    label: 'الخطّ الزمنيّ للمحفظة', note: 'كلُّ منشورٍ شريطٌ على الأيّام — في النتائج', group: 'الأفعال',
+    href: '/panel/timeline', icon: '', alias: 'gantt timeline portfolio roadmap غانت جانت خط زمني محفظه',
+  })
 
   /*
    * **والمسوّدةُ تذهب إلى رحلتها لا إلى قائمتها** (D-104).
