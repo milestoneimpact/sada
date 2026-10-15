@@ -15,10 +15,10 @@ import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
-import { unsignedAccounts, type ChannelView } from '../lib/channels'
+import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channels'
 import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
-import { buildCommands, commandMore, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
+import { buildCommands, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
 import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
@@ -47,7 +47,9 @@ import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
+import { panelHref, type PaneId } from '../lib/nav/panes'
 import { videosSection } from './ui/sections/videos'
+import { imagesGallery } from './ui/sections/library'
 import { planImportCard } from './ui/planImportView'
 import type { Reach, UploadRow } from '../lib/media/uploads'
 import type { VideoCaptions } from '../lib/media/captions'
@@ -97,6 +99,13 @@ const NEXT_SCRIPT = `
  * ونداءٌ واحدٌ إلى أصلنا، ولا شيء غيره — و`connect-src 'self'` تفرضه.
  */
 const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
+/*
+ * ‏**والمرساةُ تعود بعد الدخول** (خطّة التصميم 7.11 · D-210): الخادمُ لا يرى ما بعد «#»، فكان «next» يحمل «/panel»
+ * ‏ومن انتهت جلستُه على بطاقةٍ (#d-…) أو لوحٍ (#settings) يعود إلى الرئيسيّة. فتُلحَق المرساةُ هنا — مرساةٌ بسيطةٌ وحدَها،
+ * ‏و«safeNext» في الخادم يحكم ما يُقبل كما كان.
+ */
+(function(){var nx=document.getElementById('login-next');
+  if(nx&&nx.value.indexOf('#')<0&&/^#[A-Za-z0-9_-]{1,80}$/.test(location.hash))nx.value+=location.hash;})();
 (function(){
   var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var btn=document.getElementById('pk-login');
@@ -505,53 +514,6 @@ function sourceRow(s: PanelSource, now: Date): string {
 }
 
 /** أيقوناتُ الرافدة. `currentColor` فتتبع حالَ العنصر والثيم معا. */
-/**
- * فرعُ المنصّات في الرافدة.
- *
- * وشاشاتُ المنصّات (D-046) كانت لا تُبلَغ إلّا من بطاقةٍ في لوح
- * القنوات — **فمن لم يفتح اللوحَ لم يعرف أنّها موجودة**. وهي الشاشاتُ
- * التي يُسأل فيها كلَّ يومٍ «ماذا نُشر»، فموضعُها الرافدة.
- *
- * ومطويٌّ افتراضا حيث لا قناةَ مربوطة، مفتوحٌ حيث توجد: **رافدةٌ تفتح
- * سبعةَ أسماءٍ لمن لم يربط شيئا تزحم بلا أن تفيد.**
- *
- * والحالُ نقطةٌ لا نصّ: الاسمُ هو المقروء، والنقطةُ تُقرأ بلمحة. ومعها
- * `title` لقارئ الشاشة — واللونُ وحده لا يقول شيئا.
- */
-function platformNav(views: readonly ChannelView[]): string {
-  const built = views.filter((v) => v.spec.built)
-  const anyLinked = built.some((v) => v.state === 'linked' || v.state === 'needs_reauth')
-  // ‏وما لم يُبنَ سائقُه لا يُعرض في الرافدة (D-177): سبعُ منصّاتٍ اثنتان منها لا تعمل
-  // كانت تُقرأ وعدًا. ومكانُها سطرُ «قريبًا» في الرئيسيّة
-  const shown = views.filter((v) => v.state !== 'unbuilt')
-
-  const row = (v: ChannelView): string => {
-    // ‏والنقطةُ تقرأ الصفَّ لا الكلمة (D-166): مربوطةٌ بلا إذنٍ حمراءُ لا خضراء
-    const unsigned = unsignedAccounts(v).length > 0
-    const dot =
-      unsigned ? 'bad'
-      : v.state === 'linked' ? 'ok'
-      : v.state === 'needs_reauth' ? 'bad'
-      : v.state === 'awaiting_owner' ? 'warn'
-      : 'idle'
-    const title =
-      unsigned ? 'مربوطة بلا إذن'
-      : v.state === 'linked' ? 'مربوطة'
-      : v.state === 'needs_reauth' ? 'تحتاج تجديدا'
-      : v.state === 'awaiting_owner' ? 'تنتظرك'
-      : v.state === 'connectable' ? 'جاهزةٌ للربط'
-      : 'لم يُبنَ سائقُها'
-    return `<a href="/panel/channels/${escapeHtml(v.spec.id)}">
-      <span class="pl">${LOGOS[v.spec.id] ?? ''}</span>
-      <span>${escapeHtml(v.spec.label)}</span>
-      <span class="dot ${dot}" title="${escapeHtml(title)}"></span></a>`
-  }
-
-  return `<details class="plat"${anyLinked ? ' open' : ''}>
-    <summary>${ICON.channels}<span>المنصّات</span></summary>
-    <div class="plat-list">${shown.map(row).join('')}</div>
-  </details>`
-}
 
 
 
@@ -659,7 +621,7 @@ function todayList(d: PanelData): string {
  * والتبويبُ رابطٌ إلى قسمه (`#sub-…`)، **وكلُّ مرساةٍ قديمة تفتح قسمَها** (`#idea` و`#write` و`#videos`
  * و`#plan-import` و`#d-…`) — يقرأ `show()` القسمَ الذي يحوي المرساة. وبلا سكربتٍ تظهر الأقسامُ كلُّها.
  */
-function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, videos: string, plan: string): string {
+function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, plan: string): string {
   /*
    * ‏**والمحرّرُ المركّز بجوار القائمة في قسمها** (D-198): لا تبويبَ خامس ولا صفحةٌ ثانية. لوحٌ ‏560px
    * ‏على الحاسوب، وشاشةٌ كاملةٌ على الهاتف، وبلا `?open=` تبقى القائمةُ كما رسمها D-195.
@@ -682,21 +644,114 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
   const nav = tabs('أقسامُ المنشورات', [
     { label: 'المسوّدات', href: '#sub-list', current: true, ...(waiting + failed > 0 ? { count: waiting + failed, bad: failed > 0 } : {}) },
     { label: 'اكتب', href: '#sub-write' },
-    { label: 'الفيديو', href: '#sub-videos', ...(d.uploads.length > 0 ? { count: d.uploads.length } : {}) },
     { label: 'الخطّة', href: '#sub-plan' },
   ], { id: 'posts-sub' })
   return `${nav}
   <div data-sub id="sub-list">${list}</div>
   <div data-sub id="sub-write">${drafts.write}</div>
-  <div data-sub id="sub-videos">${videos}</div>
   <div data-sub id="sub-plan">${plan}</div>`
 }
 
-export function panelPage(d: PanelData): string {
+/**
+ * «الإعدادات» ثلاثةُ تبويبات (خطّة التصميم 5.8 · D-204): كانت ثلاثةَ ألواحٍ في الرافدة — «الحدود»
+ * و«المزوّدون» و«الأمان» — تُفتح نادرًا وتأخذ ثلاثةَ أسطرٍ ممّا يُفتح كلَّ يوم. **والمراسي القديمة
+ * أسماءُ أقسامها**: `#settings` يفتح الأوّل، و`#providers` و`#security` قسمَيهما.
+ */
+function settingsTabs(missing: number): string {
+  return tabs('أقسامُ الإعدادات', [
+    { label: 'الإنفاقُ والحدود', href: '#limits', current: true },
+    { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
+    { label: 'الأمان', href: '#security' },
+    { label: 'سجلّ النشاط', href: '#activity' },
+    { label: 'للمطوّر', href: '#dev' },
+  ], { id: 'settings-sub' })
+}
+
+/**
+ * «للمطوّر» (خطّة التصميم 5.7 و5.8 · D-209): **ما لا يحتاجه المالكُ كلَّ يوم ويحتاجه حين يضبط**. البيئةُ والنطاق،
+ * ورابطُ العودة لكلّ منصّة كما يُلصق في بوّابتها، وأسماءُ أسرار Worker الناقصة — **أسماءٌ لا قيَم**، ولا يُقرأ سرٌّ هنا.
+ * كانت أسماءُ الأسرار على بطاقة «الحسابات» فرُفعت عنها في D-205؛ فهذا موضعُها.
+ */
+function devPane(d: PanelData): string {
+  const built = d.channels.filter((v) => v.spec.built)
+  const rows = built.map((v) => `<tr><th scope="row">${escapeHtml(v.spec.label)}</th>
+      <td dir="ltr" class="mono">${escapeHtml(`${d.baseUrl}/oauth/${v.spec.id}/callback`)}</td>
+      <td>${v.missing.length === 0 ? 'لا ينقص شيء' : v.missing.map((m) => `<span class="mono">${escapeHtml(m)}</span>`).join(' · ')}</td></tr>`).join('')
+  return `<div class="card"><h2>البيئة</h2>
+    <div class="scroll"><table><tbody>
+      <tr><th scope="row">البيئة</th><td>${d.env === 'production' ? 'الإنتاج' : 'التجريبيّة'}</td></tr>
+      <tr><th scope="row">النطاق</th><td dir="ltr" class="mono">${escapeHtml(d.rpId)}</td></tr>
+      <tr><th scope="row">العنوان</th><td dir="ltr" class="mono">${escapeHtml(d.baseUrl)}</td></tr>
+    </tbody></table></div></div>
+  <div class="card mt-3"><h2>المنصّات</h2>
+    <p class="hint">رابطُ العودة يُلصق حرفًا في بوّابة كلّ منصّة — <b>ولا يُخلَط النطاقان</b>. والأسرارُ أسماؤها وحدها؛
+      تُضبط بـ<span class="mono">wrangler secret put</span> أو من شاشة المنصّة.</p>
+    <div class="scroll"><table><thead><tr><th>المنصّة</th><th>رابطُ العودة</th><th>أسرارُ Worker الناقصة</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`
+}
+
+/**
+ * «المكتبة» ثلاثةُ تبويبات (خطّة التصميم 5.8 · D-206): **المصادر · الفيديو · الصور** — المادّةُ الخامّ في وجهةٍ
+ * واحدة. كان الفيديو تبويبًا في «المنشورات» بين الكتابة والخطّة، والصورُ لا تُرى إلّا داخل بطاقة مسوّدتها.
+ * والعددُ «ينتظرك» في المصادر (غيرُ المحلَّل)، وعددُ ما هناك في الفيديو والصور.
+ */
+function libraryTabs(pending: number, videos: number, images: number): string {
+  return tabs('أقسامُ المكتبة', [
+    { label: 'المصادر', href: '#sources', current: true, ...(pending > 0 ? { count: pending } : {}) },
+    { label: 'الفيديو', href: '#sub-videos', ...(videos > 0 ? { count: videos } : {}) },
+    { label: 'الصور', href: '#sub-images', ...(images > 0 ? { count: images } : {}) },
+  ], { id: 'library-sub' })
+}
+
+/**
+ * «منشور جديد» عائمٌ على الهاتف (خطّة التصميم 5.3 · D-208) — **ظاهرٌ حيث يُبدأ العمل**: الرئيسيّةُ والمكتبة. ولا في
+ * «المنشورات»: رأسُها يحمل الأبوابَ الأربعة نفسَها، وكان الزرُّ فوق «اكتب المسوّدات» يبتلع ضغطتَها (ر-2·stop).
+ *
+ * على الحاسوب أبوابُ الكتابة الأربعة في رأس «المنشورات»؛ وعلى الهاتف كانت في رأس لوحٍ يُبلَغ بضغطتين. فصارت زرًّا
+ * فوق الشريط في طرف السطر، يفتح قائمةً بالأبواب الأربعة نفسِها. وهو `<details>` يعمل بلا سكربت، ويختفي حين يُكتب
+ * في نموذج (`form:focus-within`) وحين يُفتح المحرّر، وفي الألواح الأخرى.
+ */
+function fabNew(): string {
+  const items = [
+    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
+  ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
+  return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
+    <div class="fab-menu">${items}</div></details>`
+}
+
+/**
+ * يُبقي من الصفحة ألواحَ `keep` وحدَها (D-211) — **وبعدّ العمق لا بتعبيرٍ نمطيّ**: في «المنشورات» `<section class="ed-sec">`
+ * داخل اللوح، فأوّلُ `</section>` بعد رأس اللوح ليس نهايتَه.
+ */
+export function keepPanes(html: string, keep: ReadonlySet<string>): string {
+  let out = ''
+  let i = 0
+  const open = /<section data-pane="([a-z]+)"/g
+  for (let m = open.exec(html); m !== null; m = open.exec(html)) {
+    if (m.index < i) continue
+    out += html.slice(i, m.index)
+    let depth = 0
+    let j = m.index
+    const tag = /<section\b|<\/section>/g
+    tag.lastIndex = m.index
+    for (let t = tag.exec(html); t !== null; t = tag.exec(html)) {
+      depth += t[0] === '</section>' ? -1 : 1
+      if (depth === 0) { j = t.index + '</section>'.length; break }
+    }
+    if (keep.has(m[1]!)) out += html.slice(m.index, j)
+    i = j
+    open.lastIndex = j
+  }
+  return out + html.slice(i)
+}
+
+export function panelPage(d: PanelData, only: PaneId | null = null): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
   const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
+  // ‏والصورُ الجاهزةُ وحدَها في «المكتبة ← الصور» (D-206): المرفوضةُ لا تُعرض مادّةً
+  const libraryImages = d.media.filter((m) => m.status === 'ready' && m.mime.startsWith('image/'))
 
   // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
   // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
@@ -709,29 +764,16 @@ export function panelPage(d: PanelData): string {
    * والتجديدُ يُعرَض `bad` والوصولُ `warn`: **الأوّلُ يوجب يدَك،
    * والثاني يُصلحه النظامُ وحده** — ولا يُسوَّى بينهما فيُقرآن سواء.
    */
-  const expiring = d.expiring.length === 0 ? '' : notice({
-    tone: d.expiring.some((e) => e.kind === 'refresh') ? 'bad' : 'warn', alert: true, g: '!',
-    html: `${d.expiring
-      .slice(0, 3)
-      .map((e) => {
-        const what = e.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'
-        const when = e.daysLeft < 0
-          ? '<b>انتهى</b>'
-          : e.daysLeft === 0
-            ? '<b>ينتهي اليوم</b>'
-            : `يبقى <b>${counted(e.daysLeft, NOUNS.day)}</b>`
-        // ‏والثخينُ للأرقام والأسماء وحدها (خطّة التصميم 4.4/5) — لا لجملةٍ وسط الشرح
-        const why = e.kind === 'refresh'
-          ? ' — ويوجب سقوطُه دورةَ إذنٍ بيدك'
-          : ''
-        // ‏والحسابُ معزول (4.4/6): «لـ@omar_ah (X)» كانت تُرسَم «(X)@omar_ah»
-        return `${what} لـ<b><bdi>${escapeHtml(e.displayName)}</bdi></b>
-                (<bdi>${escapeHtml(platformLabel(e.platform))}</bdi>): ${when}${why}`
-      })
-      .join(' · ')
-  }${
-    d.expiring.length > 3 ? ` · <b>و${d.expiring.length - 3} غيرُها</b>` : ''
-  } <a class="tap" href="#channels">جدّد الإذن</a>` })
+  // ‏**ومن الحكم الواحد** (D-205): كان الشريطُ يقرأ استعلامَه بعتبته وكلماته («إذنُ الوصول»، «إذنُ التجديد»)،
+  // ‏فيقول «يبقى 6 أيّام» عن منصّةٍ تقول بطاقتُها «متّصلة». فصار سطرًا واحدًا بحال كلّ منصّةٍ تحتاج يدَك، وزرًّا واحدًا
+  const needy = d.channels
+    .map((v) => ({ v, h: channelHealth(v, d.now) }))
+    .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
+  const expiring = needy.length === 0 ? '' : notice({
+    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+    html: `${needy.slice(0, 3)
+      .map(({ v, h }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>: ${escapeHtml(h.label)}`)
+      .join(' · ')}${needy.length > 3 ? ` · <b>و${needy.length - 3} غيرُها</b>` : ''} <a class="tap" href="#channels">افتح الحسابات</a>` })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(
@@ -742,7 +784,7 @@ export function panelPage(d: PanelData): string {
           html: pathArrows(escapeHtml(d.flash.text)),
           ...(d.flash.undo === undefined ? {} : {
             action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
-                        data-busy="جارٍ…">
+                        data-busy="جارٍ…" data-swap>
                     <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
                     <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
                   </form>`,
@@ -865,15 +907,16 @@ export function panelPage(d: PanelData): string {
    * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
    */
   const counts: Readonly<Record<string, number>> = {
-    sources: pending,
+    library: pending,
     posts: waitingDrafts,
     // ‏**وكلُّ عددٍ في الرافدة يعني «ينتظرك»** (D-177): كان عددُ القنوات وحدَه «كم مربوطة»،
     // فقرأ المالكُ «2» على القنوات كما يقرؤه على المسوّدات — شيئين ينتظرانه
-    channels: d.channels.filter((c) => c.state === 'needs_reauth' || unsignedAccounts(c).length > 0).length,
-    report: d.openSuggestions,
+    // ‏والمنقطعةُ وما يقترب انقطاعُه، من الحكم الواحد (D-205)
+    accounts: d.channels.filter((c) => ['broken', 'expiring'].includes(channelHealth(c, d.now).kind)).length,
+    results: d.openSuggestions,
     tasks: d.ownerPending,
-    providers: missing,
-    security: d.sessions.length > 1 ? d.sessions.length : 0,
+    // ‏والإعداداتُ تجمع ما كان في ثلاثة ألواح (D-204): مزوّدٌ بلا مفتاح، وجلساتٌ مفتوحةٌ غيرُ هذه
+    settings: missing + (d.sessions.length > 1 ? d.sessions.length : 0),
   }
 
   // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
@@ -885,7 +928,8 @@ export function panelPage(d: PanelData): string {
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
-${railHtml({ inPanel: true, counts, afterChannels: platformNav(d.channels), env: d.env })}
+${/* ‏وفي صفحة لوحٍ مستقلّ (D-211) روابطُ الرئيسيّة والمنشورات مساراتٌ إلى «/panel»، ولوحُها معلَّم */''}
+${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">
@@ -896,7 +940,7 @@ ${railHtml({ inPanel: true, counts, afterChannels: platformNav(d.channels), env:
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">الرئيسيّة</h1>
+  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${commandTrigger()}
@@ -989,8 +1033,10 @@ ${flash}
 
 ${pivotPane(d.pivot)}
 
-<section data-pane="sources" hidden>
-  ${pageHead('Google Drive', sectionLabel('sources'), 'ما رآه صدى في مجلّدك، وما استحقّ منه نشرا. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+<section data-pane="library" hidden>
+  ${pageHead('المادّة', sectionLabel('library'), 'ما يُبنى منه كلُّ منشور: ملفّاتُ Drive، ومقاطعُك، والصورُ المولَّدة. <b>والتحليلُ نداءٌ مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${libraryTabs(pending, d.uploads.length, libraryImages.length)}
+  <div data-sub id="sources">
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -998,37 +1044,23 @@ ${pivotPane(d.pivot)}
     */''}
   <div class="card"><div class="card-head"><h2>ملفّاتُ مجلّدك</h2><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
+  </div>
+  <div data-sub id="sub-videos">${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
+    ...(d.links === undefined ? {} : { links: d.links }),
+    ...(d.reach === undefined ? {} : { reach: d.reach }),
+    ...(d.captions === undefined ? {} : { captions: d.captions }),
+    zone: d.zone ?? null,
+    // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
+    writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
+  })}</div>
+  <div data-sub id="sub-images">${imagesGallery(libraryImages, d.drafts)}</div>
 </section>
 
-<section data-pane="providers" hidden>
-  ${pageHead('الذكاء', sectionLabel('providers'), 'أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.')}
-  ${providerStrip}
 
-  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
-      <span class="st idle">القرار</span></div>
-    <p class="hint">أيّ مزوّدٍ ونموذجٍ ينفّذ كلَّ مهمّة. <b>والنموذجُ يُختار من درجٍ يُملأ من عندهم</b> —
-      اضغط «حدّث» بجانبه.</p>
-    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
-      <tbody>${routingRows}</tbody></table></div>
-    <div class="sub mt-3">والافتراضُ في الشيفرة يعمل حتّى تختار —
-      فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
-  </div>
 
-  <div class="card mt-3">
-    <div class="card-head"><h2>المفاتيحُ المضبوطة</h2><div class="grow"></div>
-      <span class="st idle">${d.providers.length} مزوّدا</span></div>
-    <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
-      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
-      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
-    ${providerRows}
-  </div>
-
-  <div class="mt-3">${addCard}</div>
-</section>
-
-<section data-pane="channels" hidden>
-  ${pageHead('النشر', sectionLabel('channels'), 'ما يُنشَر عليه، وما ينتظر ضبطا، وما لم يُبنَ له سائقٌ بعد. <b>ولكلّ قناةٍ شاشتُها</b> — فيها ما نُشر عليها وما تستطيعه.')}
-  ${channelsSection(d.channels, d.now, d.apps, d.baseUrl, d.zone ?? null)}
+<section data-pane="accounts" hidden>
+  ${pageHead('النشر', sectionLabel('accounts'), 'منصّاتُك وحالُ كلٍّ منها، <b>وما يحتاج يدَك أوّلًا</b>. والبطاقةُ تفتح صفحةَ الحساب: ما نُشر عليه، وما يأتي، وإعدادُه.')}
+  <div data-sub id="channels">${channelsSection(d.channels, d.now)}</div>
 </section>
 
 <section data-pane="posts" hidden>
@@ -1040,7 +1072,7 @@ ${pivotPane(d.pivot)}
   ${pageHead('التحرير', sectionLabel('posts'), '<b>لا يُنشر نصٌّ قبل أن تعتمده.</b>',
     `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
      <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
-     <a class="btn btn-secondary btn-sm" href="#videos">ارفع فيديو</a>
+     <a class="btn btn-secondary btn-sm" href="${panelHref('videos')}">ارفع فيديو</a>
      <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
@@ -1059,13 +1091,6 @@ ${pivotPane(d.pivot)}
     ...(d.links === undefined ? {} : { links: d.links }),
     editing: d.editing?.id ?? null,
     zone: d.zone ?? null,
-  }), videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
-    ...(d.links === undefined ? {} : { links: d.links }),
-    ...(d.reach === undefined ? {} : { reach: d.reach }),
-    ...(d.captions === undefined ? {} : { captions: d.captions }),
-    zone: d.zone ?? null,
-    // ‏«اكتب النصوص» بحكم «اكتب المسوّدات» نفسِه: المزوّدُ والحاجزُ واحد (D-190)
-    writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
   }), `${planImportCard()}
   <div class="mt-3">${planSection({
     plan: d.plan,
@@ -1080,7 +1105,10 @@ ${pivotPane(d.pivot)}
 </section>
 
 <section data-pane="settings" hidden>
-  ${pageHead('الضبط', sectionLabel('settings'), 'مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.')}
+  ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوفُ الإنفاق تُطبَّق قبل أيّ نداءٍ مدفوع</b>، والمفاتيحُ لا تُعرض كاملة، والدخولُ بعاملين.')}
+  ${settingsTabs(missing)}
+  <div data-sub id="limits">
+  <p class="hint">مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والطابور والجدولة معًا.</p>
   ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
        يحدّ إنفاقَه، ثمّ ما يطلقه بلا أمر، ثمّ ما يُخبر عنه، ثمّ الشكل. وتعليقٌ هنا
        لا في HTML: ذاك يُشحَن مع كلّ فتحة (D-166) */ ''}
@@ -1202,10 +1230,34 @@ ${pivotPane(d.pivot)}
           في متغيّراته — <b>واللقطةُ تُنادى على حسابٍ بعينه</b>، فلا يقع نداءٌ ولا كلفة،
           وتخرج الصورةُ بلا عنوان. وتفصيلُه في «ما عليك».</span></div>`}
   </div>
-</section>
+</div>
+<div data-sub id="providers">
+  <p class="hint">أيُّ نموذجٍ ينفّذ كلَّ مهمّة، وكم أنفق. <b>وأسرارُ Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاحٌ كاملا هنا.</p>
+  ${providerStrip}
 
-<section data-pane="security" hidden>
-  ${pageHead('الدخول', sectionLabel('security'), 'العاملُ الثاني، والجلساتُ المفتوحة، وسجلُّ ما وقع. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.')}
+  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
+      <span class="st idle">القرار</span></div>
+    <p class="hint">أيّ مزوّدٍ ونموذجٍ ينفّذ كلَّ مهمّة. <b>والنموذجُ يُختار من درجٍ يُملأ من عندهم</b> —
+      اضغط «حدّث» بجانبه.</p>
+    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
+      <tbody>${routingRows}</tbody></table></div>
+    <div class="sub mt-3">والافتراضُ في الشيفرة يعمل حتّى تختار —
+      فنظامٌ بجدولٍ فارغ يعمل ولا ينتظر أن يُملأ.</div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-head"><h2>المفاتيحُ المضبوطة</h2><div class="grow"></div>
+      <span class="st idle">${d.providers.length} مزوّدا</span></div>
+    <p class="hint"><b>أسرارُ Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاحٌ كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
+    ${providerRows}
+  </div>
+
+  <div class="mt-3">${addCard}</div>
+</div>
+<div data-sub id="security">
+  <p class="hint">العاملُ الثاني، والجلساتُ المفتوحة، وكلمةُ الإدارة. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسةٍ حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
     ${d.sessions.length === 0
@@ -1286,7 +1338,10 @@ ${pivotPane(d.pivot)}
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
   </div>
 
-  <div class="card mt-3"><h2>سجلّ التدقيق</h2>
+</div>
+<div data-sub id="dev">${devPane(d)}</div>
+<div data-sub id="activity">
+  <div class="card"><h2>سجلّ النشاط</h2>
     <p class="hint">آخر ${d.audit.length} فعلٍ مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاحٌ قطّ.</p>
     ${d.audit.length === 0
       ? emptyState({ title: 'لا شيء بعد', html: 'أوّل فعلٍ في اللوحة يظهر هنا.' })
@@ -1294,16 +1349,22 @@ ${pivotPane(d.pivot)}
           <thead><tr><th>متى</th><th>الفعل</th><th>على ماذا</th><th>العنوان</th></tr></thead>
           <tbody>${auditRows}</tbody></table></div>`}
   </div>
+</div>
 </section>
 
+
+
+${fabNew()}
 <footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
   <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
 </main>
 </div>
 </div>`
 
+  // ‏و«/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره (D-211: ‏166KB كانت الصفحة، والخطّةُ ‏90)
+  const kept = keepPanes(body, new Set<string>(only === null ? ['overview', 'posts'] : [only]))
   return shell(
-    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, '',
-    { commands: buildCommands({ onPanel: true, drafts: d.drafts }), panelScript: true },
+    only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(kept, d.csrf), d.nonce, '',
+    { commands: buildCommands({ onPanel: only === null, drafts: d.drafts }), panelScript: true },
   )
 }

@@ -13,6 +13,7 @@ import { escapeHtml } from '../escape'
 import { counted, NOUNS } from '../../../lib/format'
 import { pageHead } from '../parts'
 import { sectionLabel } from '../command'
+import { resultsTabs } from '../results'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
@@ -128,11 +129,13 @@ export function pivotPane(d: PivotView): string {
       وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.`,
   })
 
-  return `<section data-pane="pivot" hidden>
-  ${pageHead('القياس', sectionLabel('pivot'), 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
+  return `<section data-pane="results" hidden>
+  ${pageHead('القياس', sectionLabel('results'), 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
+  ${resultsTabs('pivot')}
+  <div data-sub id="pivot">
 
   <div class="card">
-    <form class="row pv-form" method="GET" action="/panel">
+    <form class="row pv-form" method="GET" action="/panel/analysis">
       ${picker('pv-r', 'rows', 'الصفوف', d.rows, dims)}
       ${picker('pv-c', 'cols', 'الأعمدة', d.cols ?? 'none',
         [{ v: 'none', t: 'بلا أعمدة' }, ...dims])}
@@ -162,5 +165,6 @@ export function pivotPane(d: PivotView): string {
     ${t.rowKeys.length === 0 ? '' : `<p class="hint">خليّةٌ فارغةٌ تعني
       <b>لا منشورَ في تقاطعها</b> — لا صفرا. وصفرٌ يُكتب صفرا.</p>`}
   </div>
+</div>
 </section>`
 }

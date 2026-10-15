@@ -26,6 +26,7 @@
  * وحالُ النطاقات لا أكثر (D-005).
  */
 import { stamp } from '../../lib/time/zone'
+import { panelHref } from '../../lib/nav/panes'
 import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
 import { blamedScopes } from '../../lib/oauth/refusal'
 import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
@@ -136,7 +137,7 @@ export function connectedBody(d: ConnectedData): string {
     <a class="btn btn-primary" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
       LABEL[d.platform],
     )}</a>
-    <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
+    <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
   </div>`
 }
 
@@ -206,7 +207,7 @@ export function refusedBody(d: RefusedData): string {
         يعمل كما كان متى شئت.</p>
       <div class="row mt-3">
         <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
-        <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
+        <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
       </div>
     </div>`
   }
@@ -438,7 +439,7 @@ export function refusedBody(d: RefusedData): string {
     </div>`}
 
   <div class="row mt-4">
-    <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
+    <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
   </div>`
 }
 
@@ -459,7 +460,7 @@ export function unconfiguredBody(platform: Platform): string {
     <p class="hint">اضبط المعرّفَ والسرَّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
     <div class="row mt-3">
       <a class="btn btn-primary" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
-      <a class="btn btn-secondary" href="/panel#channels">لوحُ القنوات</a>
+      <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
     </div>
   </div>`
 }

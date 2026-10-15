@@ -327,7 +327,7 @@ describe('سلوكُ العُدّة (KIT_SCRIPT)', () => {
 describe('نقلُ الأقسام إلى البطاقة (٢ج)', () => {
   // ‏السطحُ وحدُّه ونصفُ قطره وظلُّه من صيغة البطاقة، لا من قاعدة المكوّن — فقاعدةٌ تعيد
   // إعلانَها تعيد السطحَ الثلاثين، و«audit_classes» يعدّها
-  const MOVED = ['.next', '.pf', '.ch', '.draft', '.vrow', '.tpick', '.sched', '.keys', '.unbuilt', '.ax-r', '.acct', '.pv', '.guide']
+  const MOVED = ['.next', '.pf', '.ch', '.draft', '.vrow', '.tpick', '.sched', '.keys', '.ax-r', '.acct', '.pv', '.guide']
   it.each(MOVED)('%s لا يعيد إعلانَ السطح ولا نصفِ القطر ولا الظلّ', (sel) => {
     const r = css.rule(sel)
     expect(Object.keys(r).length).toBeGreaterThan(0)

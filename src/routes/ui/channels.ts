@@ -18,7 +18,7 @@
  * أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا في نضج النظام.
  */
 import { stamp } from '../../lib/time/zone'
-import { callbackStep, SETUP, setupHref, tokenHealth, unsignedAccounts, type ChannelView, type LinkedAccount } from '../../lib/channels'
+import { byNeed, callbackStep, channelHealth, SETUP, setupHref, tokenHealth, type ChannelHealthKind, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
 import { wizardFor, type Step } from '../../lib/oauth/wizard'
 import { ICON } from './icons'
@@ -299,287 +299,98 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   </details>`
 }
 
-/** بطاقةُ قناةٍ واحدة. */
-function card(view: ChannelView, now: Date, app: AppStatus | undefined, base: string, zone: string | null): string {
-  const { spec, state, accounts, missing } = view
+/**
+ * بطاقةُ منصّةٍ واحدة — **حالٌ واحدةٌ وزرٌّ واحد، والبطاقةُ كلُّها بابُ شاشتها** (خطّة التصميم 5.7 · D-205).
+ *
+ * كانت تحمل شارتين متعارضتين (القناةُ «مربوطة» والحسابُ تحتها «انتهى الإذن») وزرّين («جدّد الإذن» و«شاشةُ
+ * LinkedIn»)، وأسماءَ أسرار Worker في جملتها. فصارت: الشعارُ والاسمُ والحسابُ في `<bdi>`، ثمّ حكمُ
+ * `channelHealth` وحدَه، ثمّ جملةُ ما يقع، ثمّ فعلٌ واحد. واسمُ المنصّة رابطٌ يمدّ نفسَه على البطاقة،
+ * والفعلُ فوقه فلا يبتلعه. وتفصيلُ الحساب والإذن في شاشة المنصّة.
+ */
+function card(view: ChannelView, now: Date): string {
+  const { spec, accounts } = view
+  const h = channelHealth(view, now)
   const logo = LOGOS[spec.id] ?? ''
-
-  // **والصفُّ لا الكلمة** (D-159): حسابٌ «مربوطٌ» بلا صفّ `tokens` كان
-  // يُعرَض أخضرَ ثمّ يسقط أوّلُ منشورٍ في الطابور. وهو حالُ LinkedIn على staging
-  const unsigned = unsignedAccounts(view)
-  const badge =
-    unsigned.length > 0
-      ? statusBadge('bad', '▲', 'مربوطة بلا إذن')
-      : state === 'linked'
-        ? statusBadge('ok', '●', 'مربوطة')
-      : state === 'needs_reauth'
-        ? statusBadge('bad', '▲', 'تحتاج تجديدا')
-        : state === 'connectable'
-          ? statusBadge('idle', '○', 'جاهزةٌ للربط')
-          : state === 'awaiting_owner'
-            ? statusBadge('warn', '!', 'تنتظرك')
-            : statusBadge('idle', '○', 'لم تُبنَ')
+  const badge = statusBadge(h.tone, TONE_GLYPH[h.tone], h.label)
 
   const rows = accounts
-    .map(
-      (a) => `<div class="ch-acc">
+    .map((a) => `<div class="ch-acc">
         <span class="who"><bdi>${escapeHtml(a.displayName)}</bdi></span>
         <span class="chip">${escapeHtml(KIND[a.kind] ?? a.kind)}</span>
-        ${a.status === 'needs_reauth'
-          ? ''
-          : a.expiresAt === null
-            ? statusBadge('bad', '▲', 'بلا إذنٍ محفوظ', 'title="لا صفَّ في tokens لهذا الحساب — أعد الربط"')
-            : tokenDays(a.expiresAt, now, a, zone)}
         <span class="grow"></span>
-        ${a.status === 'needs_reauth'
-          ? statusBadge('bad', '▲', 'جدّد الإذن')
-          : `<span class="ago" title="${escapeHtml(stamp(a.createdAt, zone))}">رُبط ${escapeHtml(
-              relativeTime(a.createdAt, now),
-            )}</span>`}
-      </div>`,
-    )
+        <span class="ago">رُبط ${escapeHtml(relativeTime(a.createdAt, now))}</span>
+      </div>`)
     .join('')
 
-  // ما يُقال ولمَ: كلُّ حالٍ لها جملتُها، ولا تُترك حالٌ بلا تفسير
-  // **والمرتبةُ تُقال قبل كلّ شيء**: منصّةٌ تُربَط ولا تنشر يجب أن
-  // يعرف مالكُها ذلك **قبل** أن يربط، لا بعد أوّل جدولةٍ تُردّ
+  // **والمرتبةُ تُقال قبل كلّ شيء**: منصّةٌ تُربَط ولا تنشر يعرف مالكُها ذلك قبل أن يربط
   const stageNote =
     spec.stage === 'link'
       ? `<div class="why warn"><span class="why-ic">${glyph('◍')}</span><span class="why-t">
-         <b>تُربَط ولا تنشر بعد.</b> دورةُ الإذن مبنيّةٌ لها، وسائقُ الرفع لم يُبنَ —
-         فيُحفَظ الحساب وتُقرأ نطاقاتُه، <b>ولا تُكتب لها مسوّدة</b>.</span></div>`
+         <b>تُربَط ولا تنشر بعد.</b> يُحفَظ الحساب، <b>ولا تُكتب لها مسوّدة</b> حتّى يُبنى سائقُ الرفع.</span></div>`
       : ''
 
-  const note =
-    state === 'awaiting_owner'
-      ? `ينقص سرّا التطبيق. <b>اضبطهما في شاشة ${escapeHtml(spec.label)}</b> — أو من
-         أسرار Worker باسمَي
-         <span class="mono">${missing.map(escapeHtml).join('</span> و <span class="mono">')}</span>.`
-      : state === 'needs_reauth'
-        ? 'إذنُ الوصول انتهى أو سُحب. <b>والنشر متوقّفٌ على هذه القناة حتّى تُجدّده</b> — ويقع صامتا لولا هذا التنبيه.'
-        : unsigned.length > 0
-          ? `الحسابُ محفوظٌ <b>ولا إذنَ وصولٍ معه</b> — أوّلُ منشورٍ مجدولٍ سيسقط. أعد الربطَ ليُحفَظ الإذن.`
-          : escapeHtml(spec.note)
+  const note: Record<ChannelHealthKind, string> = {
+    broken: `انقطع الربط، <b>والنشرُ على ${escapeHtml(spec.label)} متوقّفٌ حتّى تعيد ربطها</b>.`,
+    expiring: '<b>تعمل الآن، وتنقطع ما لم تُعِد ربطها.</b> والمجدولُ عليها يبقى في موعده.',
+    setup: `ينقص التطبيق. <b>أكمل إعدادَه مرّةً واحدة</b> ثمّ اربط حسابك.`,
+    connectable: 'التطبيقُ مضبوط، <b>وبقي أن تربط حسابك</b>.',
+    connected: escapeHtml(spec.note),
+    unbuilt: escapeHtml(spec.note),
+  }
 
-  // زرُّ الربط لا يُعرض إلا حيث يعمل. و «اربط» فعلٌ يغادر اللوحة إلى
-  // المنصّة، فهو رابطٌ لا نموذج — ولا رمز CSRF على انتقالٍ لا يغيّر شيئا
-  const action =
-    state === 'connectable'
-      ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط ${escapeHtml(spec.label)}</a>`
-      : state === 'needs_reauth'
-        ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start"
-              aria-label="جدّد إذن ${escapeHtml(spec.label)}">جدّد الإذن</a>`
-        : state === 'linked' && unsigned.length > 0
-          ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start"
-                aria-label="أعد ربط ${escapeHtml(spec.label)}">أعد الربط</a>`
-        : state === 'linked'
-          ? `<a class="btn btn-secondary btn-sm" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a>`
-          : state === 'awaiting_owner'
-            /*
-             * **وزرٌّ يقود إلى الضبط لا شارةٌ تصفه** (D-111).
-             *
-             * كانت شارةً جامدةً تقول «بلا سرٍّ لا يبدأ الربط» — **تصف
-             * المانعَ ولا تفتح بابَه**. ولمّا انتقل الدليلُ إلى شاشة
-             * المنصّة صار للمانع موضعٌ يُقصَد، **فيُقصَد**.
-             */
-            ? `<a class="btn btn-primary btn-sm" href="${escapeHtml(setupHref(spec.id))}">اضبط ${escapeHtml(spec.label)}</a>`
-            /*
-             * ‏**جملةٌ لا شارة** (D-185): الحالُ «لم تُبنَ» في رأس البطاقة، وهذا سببُها.
-             * ‏وكانت شارةً ثانيةً بالحال نفسِه — والشارةُ لصيقةٌ ‏١٣px «لا جُمَل» (خطّة التصميم 4.3)
-             */
-            : '<span class="ago">يحتاج سائقا يُكتب له</span>'
+  const action = h.button === null
+    ? ''
+    : `<a class="btn ${h.button.primary ? 'btn-primary' : 'btn-secondary'} btn-sm" href="${escapeHtml(h.button.href)}"
+         aria-label="${escapeHtml(`${h.button.label} ${spec.label}`)}">${escapeHtml(h.button.label)}</a>`
 
-  // اسمُ القناة رابطٌ إلى شاشتها: البطاقةُ تقول «أمربوطةٌ أم لا»،
-  // والشاشةُ تقول ماذا نُشر وما فشل ولماذا — وهما سؤالان لا واحد
-  return `<div class="card ch${state === 'unbuilt' ? ' off' : ''}" id="ch-${escapeHtml(spec.id)}">
+  return `<div class="card ch" id="ch-${escapeHtml(spec.id)}" data-health="${h.kind}">
     <div class="ch-top">
       <div class="ch-logo">${logo}</div>
-      <div class="ch-name"><a class="tap" href="/panel/channels/${escapeHtml(spec.id)}"
-        >${escapeHtml(spec.label)}</a>
-        <span>${accounts.length === 0 ? 'لا حساب' : `${accounts.length} حساب`}</span></div>
+      <div class="ch-name"><a class="ch-go" href="/panel/channels/${escapeHtml(spec.id)}">${escapeHtml(spec.label)}</a>
+        <span>${accounts.length === 0 ? 'لا حساب'
+          : accounts.length === 1 ? `<bdi>${escapeHtml(accounts[0]!.displayName)}</bdi>`
+          : escapeHtml(counted(accounts.length, NOUNS.account))}</span></div>
       <span class="grow"></span>${badge}
     </div>
-    ${rows}
+    ${accounts.length > 1 ? rows : ''}
     ${stageNote}
-    <p class="ch-note">${note}</p>
-    <div class="ch-foot">${action}
-      <span class="grow"></span>
-      <a class="btn btn-secondary btn-sm" href="/panel/channels/${escapeHtml(spec.id)}">شاشةُ ${escapeHtml(
-        spec.label,
-      )}</a></div>
+    <p class="ch-note">${note[h.kind]}</p>
+    ${action === '' ? '' : `<div class="ch-foot">${action}</div>`}
   </div>`
 }
 
-/**
- * **عدُّ الأيّام على البطاقة** (D-126) — **من الرمزين معًا** (خطّة التصميم 5.7).
- *
- * تنبيهُ صدر اللوحة يقول «يبقى ‏٧ أيّام» حين يعبر الرمزُ عتبةً (D-065)،
- * **والبطاقةُ التي تصف الحسابَ نفسَه كانت لا تقوله** — والحقلُ في القاعدة.
- * فيُقرأ من الحقل نفسِه: أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوق ذلك
- * رقاقةٌ هادئة. ولا إذنَ محفوظًا — لا شيء، لا «غير معروف».
- *
- * ‏**وما يتجدّد وحده رقاقةٌ هادئة** (ر-1): كانت X وYouTube «ينتهي الإذن اليوم» برتقاليّةً
- * ‏وإذنُ وصولهما ساعتان تجدّدهما الدورةُ، والبلاطةُ فوقهما «تحتاج تجديدا 0». والحكمُ من
- * ‏`tokenHealth` في `lib/channels` مرّةً، تقرؤه البطاقةُ والبلاطة. و`renew` غائبٌ يعني
- * ‏إذنَ الوصول وحده كما كان.
- */
-export function tokenDays(
-  expiresAt: string | null,
-  now: Date,
-  renew: Pick<LinkedAccount, 'renewable' | 'refreshExpiresAt'> = {},
-  /** ‏منطقةُ المالك لعنوان التحويم (D-203)، و`null` تقول «بتوقيت الرياض» */
-  zone: string | null = null,
-): string {
-  const h = tokenHealth({ expiresAt, ...renew }, now)
-  if (h === null || expiresAt === null) return ''
-  const title = renew.renewable === true
-    ? `title="يتجدّد إذنُ الوصول وحده${h.kind === 'auto' && h.at === null ? '' : ` حتّى ${escapeHtml(stamp(h.at ?? '', zone))}`}"`
-    : `title="ينتهي إذنُ الوصول ${escapeHtml(stamp(expiresAt, zone))}"`
-  switch (h.kind) {
-    case 'expired':
-      return statusBadge('bad', '▲', 'انتهى الإذن', title)
-    case 'soon':
-      // ‏والعددُ بمعدوده (D-183): كان «يبقى 2 يومان» و«الإذن 9 يوما»
-      return statusBadge('warn', '◍', h.days === 0 ? 'ينتهي الإذن اليوم' : `يبقى ${counted(h.days, NOUNS.day)} للإذن`, title)
-    case 'overdue':
-      return statusBadge('warn', '◍', 'تأخّر التجديد', `title="انتهى إذنُ الوصول ${escapeHtml(stamp(h.at, zone))} وإذنُ التجديد قائم — تجدّده الدورةُ القادمة"`)
-    case 'auto':
-      return `<span class="chip" ${title}>يتجدّد تلقائيًّا</span>`
-    case 'ok':
-      return `<span class="chip" ${title}>الإذن ${counted(h.days, NOUNS.day)}</span>`
-  }
-}
+const TONE_GLYPH = { ok: '●', bad: '▲', warn: '!', idle: '○' } as const
 
+
+/**
+ * لوحُ «الحسابات» (خطّة التصميم 5.7 · D-205): **بطاقةٌ لكلّ منصّةٍ مبنيّة بترتيب الحاجة**، فالمنقطعةُ أوّلُ
+ * ما يُرى، ثمّ ما يحتاج إعدادًا أو ربطًا، ثمّ المتّصلة. وكانت فوقها بطاقةُ «ما ينتظرك الآن» تعيد ما في
+ * البطاقات بكلماتٍ أخرى، وبلاطةٌ وشارةٌ تعدّان المربوطَ مرّتين — **والحقيقةُ تُقال مرّةً** (5.9). وما لم
+ * يُبنَ سطرُ «قريبًا» في آخر الصفحة.
+ */
 export function channelsSection(
   views: readonly ChannelView[],
   now: Date,
-  apps: readonly AppStatus[] = [],
-  base = '',
-  /** ‏منطقةُ المالك لعناوين الوقت (D-203): كانت تُمرَّر `null` فتقول الرياض ولو عُرفت */
-  zone: string | null = null,
 ): string {
-  const byPlatform = new Map(apps.map((a) => [String(a.platform), a]))
-  const built = views.filter((v) => v.spec.built)
+  const built = byNeed(views.filter((v) => v.spec.built), now)
   const rest = views.filter((v) => !v.spec.built)
-  const linked = built.filter((v) => v.state === 'linked' || v.state === 'needs_reauth').length
-
-  /**
-   * **ما ينتظرك الآن — فوق كلّ شيء** (D-084).
-   *
-   * رمزُ X انتهى فتوقّف النشرُ عليها، **والتنبيهُ كان في وسط تمريرٍ من
-   * ثلاثة آلاف بكسل**. وعطلٌ صامتٌ لا يُرى ليس أهونَ من عطلٍ لا يُكتشَف:
-   * كلاهما ينتهي بمنشورٍ لم يخرج.
-   *
-   * وترتيبُه بالضرر لا بالأبجديّة: **ما يوقف نشرا قائما قبل ما يمنع
-   * نشرا لم يبدأ**.
-   */
-  const unsignedOf = (v: ChannelView): boolean => unsignedAccounts(v).length > 0
-  /*
-   * ‏**والجاهزةُ للربط تبقى في القائمة** (ر-1): بعد حفظ سرَّي TikTok خرجت منها، وزرُّ
-   * ‏«اربط TikTok» على بُعد شاشتين. وهي آخرُها: لا نشرَ قائمٌ يتوقّف بتركها.
-   */
-  const urgent = [
-    ...built.filter((v) => v.state === 'needs_reauth'),
-    ...built.filter(unsignedOf),
-    ...built.filter((v) => v.state === 'awaiting_owner'),
-    ...built.filter((v) => v.state === 'connectable'),
-  ]
-  const waiting = urgent.length === 0
-    ? ''
-    // ‏بلا إطارٍ مكتوبٍ بلون التحذير (D-183): كان «border-color:var(--warn)» في
-    // ‏الوسم، يُقرأ ذهبًا في الليل ويُسقط لونًا خارج الورقة. والحالُ في حبّتها
-    : `<div class="card mb-4">
-        <div class="card-head"><h2>ما ينتظرك الآن</h2><div class="grow"></div>
-          ${statusBadge('warn', '!', counted(urgent.length, NOUNS.channel))}</div>
-        <ul class="todo">${urgent.map((v) => `<li>
-          <span class="dot ${v.state === 'needs_reauth' || unsignedOf(v) ? 'bad' : 'warn'}"></span>
-          <span><b>${escapeHtml(v.spec.label)}</b> — ${v.state === 'needs_reauth'
-            ? 'إذنُ الوصول انتهى أو سُحب، <b>والنشرُ عليها متوقّف</b>.'
-            : unsignedOf(v)
-              ? 'الحسابُ محفوظٌ <b>ولا إذنَ وصولٍ معه</b> — أوّلُ منشورٍ مجدولٍ سيسقط.'
-              : v.state === 'connectable'
-                ? 'سرّا التطبيق محفوظان، <b>وبقي أن تربط حسابك</b>.'
-                : 'ينقص سرّا التطبيق، فلا يبدأ الربط.'}</span>
-          ${v.state === 'needs_reauth' || unsignedOf(v)
-            ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(v.spec.id)}/start"
-                  aria-label="${v.state === 'needs_reauth' ? 'جدّد إذن' : 'أعد ربط'} ${escapeHtml(v.spec.label)}">${
-                  v.state === 'needs_reauth' ? 'جدّد الإذن' : 'أعد الربط'}</a>`
-            : v.state === 'connectable'
-              ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(v.spec.id)}/start">اربط ${escapeHtml(v.spec.label)}</a>`
-              : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(setupHref(v.spec.id))}">اضبط ${escapeHtml(v.spec.label)}</a>`}
-        </li>`).join('')}</ul>
-      </div>`
-
-  /**
-   * شريطُ الحال — **أربعُ حالاتٍ في نظرة**.
-   *
-   * وكان الجوابُ عن «أين أنا؟» يحتاج مسحَ أربعِ بطاقاتٍ في شبكة، كلٌّ
-   * منها بطولِ معالجٍ كامل.
-   */
-  const count = (state: string): number => views.filter((v) => v.state === state).length
-  /*
-   * ‏**والبلاطةُ تعدّ ما تعدّه البطاقة** (خطّة التصميم 5.7): قناةٌ سقط إذنُها، أو انتهى
-   * ‏ولا تجديدَ معه، أو يقترب موعدُه ولا يتجدّد وحده — حكمُ `tokenHealth` نفسُه.
-   * ‏وكانت تعدّ `needs_reauth` وحده، فتقول «0» تحت بطاقةٍ تقول «انتهى الإذن».
-   */
-  const healthOf = (v: ChannelView): string[] =>
-    v.accounts.map((a) => tokenHealth(a, now)?.kind ?? '')
-  const stopped = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).includes('expired')).length
-  const renew = built.filter((v) => v.state === 'needs_reauth' || healthOf(v).some((k) => k === 'expired' || k === 'soon')).length
-  const strip = `<div class="card grid tiles c4 mb-4">
-    <div class="card tile"><div class="kv-k">مربوطة وتعمل</div>
-      <div class="kv-v">${count('linked')}<em> / ${built.length}</em></div>
-      <div class="note">مبنيٌّ لها سائقُ نشرٍ وحسابُها قائم</div></div>
-    <div class="card tile"><div class="kv-k">تحتاج تجديدا</div>
-      <div class="kv-v">${renew}</div>
-      <div class="note">${renew === 0
-        ? 'ولا إذنَ انتهى'
-        : stopped > 0
-          ? '<b>النشرُ عليها متوقّفٌ حتّى تجدّد</b>'
-          : 'يقترب موعدُ إذنها — جدّده قبله'}</div></div>
-    <div class="card tile"><div class="kv-k">تنتظر ضبطا</div>
-      <div class="kv-v">${count('awaiting_owner') + count('connectable')}</div>
-      <div class="note">ينقصها سرٌّ أو ربطُ حساب</div></div>
-    <div class="card tile"><div class="kv-k">لم يُبنَ سائقُها</div>
-      <div class="kv-v">${rest.length}</div>
-      <div class="note">تُعرَض لتُعرَف، ولا زرَّ لا يعمل</div></div>
+  const kinds = built.map((v) => channelHealth(v, now).kind)
+  const n = (...k: ChannelHealthKind[]): number => kinds.filter((x) => k.includes(x)).length
+  const relink = n('broken', 'expiring')
+  const strip = `<div class="card grid tiles c3 mb-4">
+    <div class="card tile"><div class="kv-k">متّصلة</div>
+      <div class="kv-v">${n('connected')}<em> / ${built.length}</em></div>
+      <div class="note">تنشر الآن بلا فعلٍ منك</div></div>
+    <div class="card tile"><div class="kv-k">تحتاج إعادةَ ربط</div>
+      <div class="kv-v">${relink}</div>
+      <div class="note">${relink === 0 ? 'ولا ربطَ يقترب انقطاعُه' : n('broken') > 0
+        ? '<b>النشرُ متوقّفٌ على المنقطعة</b>' : 'تعمل الآن، وتنقطع بعد أيّام'}</div></div>
+    <div class="card tile"><div class="kv-k">تحتاج إعدادًا</div>
+      <div class="kv-v">${n('setup', 'connectable')}</div>
+      <div class="note">تطبيقٌ يُضبط أو حسابٌ يُربط</div></div>
   </div>`
 
-  return `${strip}${waiting}<div class="lede-row">
-    <h3 class="sec bare">القنوات المبنيّة</h3>
-    <span class="grow"></span>
-    ${statusBadge(linked === 0 ? 'warn' : 'ok', linked === 0 ? '!' : '●', `${linked} من ${built.length} مربوطة`)}
-    <span class="lede-note"><b>ولا علامةَ صحٍّ على ما لم يُتحقَّق منه</b>:
-      خطوتان في كلّ طريقٍ تقعان في بوّابة المنصّة ولا تُقرآن من هنا،
-      وبرهانُهما نجاحُ ما بعدهما. ولا يُنشر منشورٌ بلا موافقةٍ مسجّلة،
-      مهما كانت القنواتُ مربوطة.</span>
-  </div>
-
-  <div class="grid c2">${built.map((v) => card(v, now, byPlatform.get(v.spec.id), base, zone)).join('')}</div>
-
-  ${/*
-   * **وما لم يُبنَ سطرٌ يُطوى لا شبكةُ بطاقات** (D-111).
-   *
-   * قِيست ثلاثُ بطاقاتٍ ‏١٥٩px لكلٍّ — **‏٤٧٧px لتقول «غيرُ مدعومة»**.
-   * وهي أعلى ما يمكن أن تُعطى معلومةٌ سلبيّةٌ من وزن: البطاقةُ في هذه
-   * الصفحة **وحدةُ قناةٍ تُربَط**، ومنصّةٌ لا تُربَط تأخذ شكلَ ما يُربَط
-   * فتُقرأ خياراً معطَّلا لا شيئاً غيرَ موجود.
-   *
-   * **وتبقى كاملةً لمن فتحها**: الأسماءُ والسببُ ورابطُ الشاشة — ولا
-   * يُحذَف شيء.
-   */ ''}
-  <details class="card card-inset unbuilt mt-5">
-    <summary>
-      <b>لم تُبنَ بعد</b>
-      <span class="chip">${rest.length}</span>
-      <span class="names">${rest.map((v) => escapeHtml(v.spec.label)).join(' · ')}</span>
-      <span class="grow"></span>
-      <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
-    </summary>
-    <div class="unbuilt-body">
-      <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة —
-        <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b>، فحقلُ «عنوان API» لا يكفيها.</p>
-      <div class="grid c3">${rest.map((v) => card(v, now, undefined, base, zone)).join('')}</div>
-    </div>
-  </details>`
+  return `${strip}
+  <div class="grid c2">${built.map((v) => card(v, now)).join('')}</div>
+  ${rest.length === 0 ? '' : `<p class="hint mt-5">قريبًا: ${rest.map((v) => escapeHtml(v.spec.label)).join(' و')}</p>`}`
 }

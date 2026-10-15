@@ -310,22 +310,23 @@ describe('journeyCounts', () => {
 })
 
 describe('platformTile', () => {
+  const NOW = new Date('2026-09-20T12:00:00Z')
   it('حالٌ واحدٌ وزرٌّ واحد لكلّ حال', () => {
     const [li] = viewChannels([acc({})], () => true)
-    expect(platformTile(li!)).toMatchObject({ tone: 'ok', status: 'متّصلة', account: 'عمر', button: { label: 'افتح' } })
+    expect(platformTile(li!, NOW)).toMatchObject({ tone: 'ok', status: 'متّصلة', account: 'عمر', button: { label: 'افتح' } })
 
     const [stale] = viewChannels([acc({ status: 'needs_reauth' })], () => true)
-    expect(platformTile(stale!).button).toMatchObject({ label: 'جدّد الإذن', href: '/oauth/linkedin/start', primary: true })
+    expect(platformTile(stale!, NOW).button).toMatchObject({ label: 'أعد الربط', href: '/oauth/linkedin/start', primary: true })
 
     // ‏محفوظةٌ بلا إذن (بلا صفٍّ في tokens) حمراءُ لا خضراء (D-166)
     const [unsigned] = viewChannels([acc({ expiresAt: null })], () => true)
-    expect(platformTile(unsigned!).tone).toBe('bad')
+    expect(platformTile(unsigned!, NOW).tone).toBe('bad')
 
     const views = viewChannels([], (name) => name.startsWith('X_'))
     const x = views.find((v) => v.spec.id === 'x')!
-    expect(platformTile(x).button.label).toBe('اربط')
+    expect(platformTile(x, NOW).button.label).toBe('اربط')
     const tiktok = views.find((v) => v.spec.id === 'tiktok')!
-    expect(platformTile(tiktok).button).toMatchObject({ label: 'أكمل الإعداد', href: '/panel/channels/tiktok?tab=setup' })
+    expect(platformTile(tiktok, NOW).button).toMatchObject({ label: 'أكمل الإعداد', href: '/panel/channels/tiktok?tab=setup#ci-tiktok' })
   })
 })
 

@@ -149,7 +149,7 @@ const QUICK: readonly { kind: string; label: string }[] = [
 function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
     `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
-  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…"
+  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…" data-swap
       role="group" aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <span class="ago">انقلها إلى</span>${buttons}</form>`
@@ -208,7 +208,7 @@ function scheduler(
       ${gone
         ? '<span class="ago">ولا تُستردّ من هناك</span>'
         : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
-             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…">
+             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…" data-swap>
              <input type="hidden" name="id" value="${escapeHtml(d.id)}">
              <button class="btn btn-secondary btn-sm" type="submit">اسحب الموعد</button></form>`}
     </div>`
@@ -262,7 +262,7 @@ function scheduler(
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>`
-  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…">
+  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…" data-swap>
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     ${account}
     <div class="quick" data-quick="wh-${id}">
@@ -837,7 +837,7 @@ function card(
     : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
 
   const more: string[] = []
-  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true }))
+  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true }))
   more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [
@@ -877,7 +877,7 @@ function card(
     ${ready ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone) : ''}
     <div class="pc-foot">
       ${open
-        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
+        ? `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…" data-swap>
              <input type="hidden" name="id" value="${id}">
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button></form>`
         : ''}

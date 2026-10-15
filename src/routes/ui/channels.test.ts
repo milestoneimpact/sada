@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { callbackStep, SETUP, tokenHealth, viewChannels, type LinkedAccount } from '../../lib/channels'
-import { channelsSection, setupPane, tokenDays } from './channels'
+import { channelsSection, setupPane } from './channels'
 import { pathArrows } from './parts'
 import type { AppStatus } from '../../lib/oauth/apps'
 
@@ -14,30 +14,22 @@ const acc = (over: Partial<LinkedAccount>): LinkedAccount => ({
 })
 
 describe('حسابٌ مربوطٌ بلا صفّ tokens', () => {
-  it('يُعرَض «مربوطة بلا إذن» ويدخل «ما ينتظرك الآن» بزرّ «أعد الربط»', () => {
+  it('يُعرَض «منقطعة» بزرّ «أعد الربط» — لا «مربوطة» خضراء (D-166 · D-205)', () => {
     const html = channelsSection(viewChannels([acc({ expiresAt: null })], () => true), now)
-    expect(html).toContain('مربوطة بلا إذن')
-    expect(html).toContain('بلا إذنٍ محفوظ')
-    expect(html).toContain('ما ينتظرك الآن')
-    expect(html).toContain('أعد ربط LinkedIn')
-    expect(html).not.toContain('اربط حسابا آخر')
+    expect(html).toContain('data-health="broken"')
+    expect(html).toContain('aria-label="أعد الربط LinkedIn"')
   })
 
-  it('وبصفٍّ صالحٍ يبقى «مربوطة» ولا ينتظر شيءٌ منه', () => {
+  it('وبصفٍّ صالحٍ «متّصلة» وزرُّها «افتح» إلى شاشتها', () => {
     const html = channelsSection(viewChannels([acc({})], () => true), now)
-    expect(html).toContain('>مربوطة<')
-    expect(html).not.toContain('مربوطة بلا إذن')
-    // ‏وما ينتظر هو المنصّاتُ الجاهزةُ للربط وحدها (ر-1) — لا LinkedIn
-    const todo = html.slice(html.indexOf('ما ينتظرك الآن'), html.indexOf('</ul>', html.indexOf('ما ينتظرك الآن')))
-    expect(todo).not.toContain('<b>LinkedIn</b>')
-    expect(html).toContain('اربط حسابا آخر')
+    expect(html).toContain('data-health="connected"')
+    expect(html).toContain('href="/panel/channels/linkedin"')
+    expect(html).toContain('aria-label="افتح LinkedIn"')
   })
 
-  it('والحسابُ الذي يحتاج تجديدًا لا يُعَدّ مرّتين', () => {
+  it('والحسابُ الذي يحتاج تجديدًا وبلا صفٍّ لا يُعَدّ مرّتين', () => {
     const html = channelsSection(viewChannels([acc({ status: 'needs_reauth', expiresAt: null })], () => true), now)
-    expect(html).toContain('تحتاج تجديدا')
-    expect(html).not.toContain('مربوطة بلا إذن')
-    expect((html.match(/ما ينتظرك الآن/g) ?? []).length).toBe(1)
+    expect(html).toMatch(/تحتاج إعادةَ ربط<\/div>\s*<div class="kv-v">1</)
   })
 })
 
@@ -53,26 +45,22 @@ describe('حالُ الإذن من الرمزين معًا (خطّة التصم�
 
   it('ما يتجدّد وحده رقاقةٌ هادئة، لا «ينتهي الإذن اليوم» برتقاليّة', () => {
     expect(tokenHealth(x, now)).toMatchObject({ kind: 'auto' })
-    const chip = tokenDays(x.expiresAt, now, x)
-    expect(chip).toContain('يتجدّد تلقائيًّا')
-    expect(chip).not.toContain('st warn')
     // ‏وX بلا موعدٍ لإذن تجديده: يتجدّد كذلك
     expect(tokenHealth({ ...x, refreshExpiresAt: null }, now)).toEqual({ kind: 'auto', days: null, at: null })
   })
 
-  it('والبطاقةُ والبلاطةُ لا تتعارضان: لا تحذيرَ تحت «تحتاج تجديدا 0»', () => {
+  it('والبطاقةُ والبلاطةُ لا تتعارضان: ما يتجدّد وحده «متّصلة» و«تحتاج إعادةَ ربط 0» (D-205)', () => {
     const html = channelsSection(viewChannels([x], () => true), now)
-    expect(html).not.toContain('ينتهي الإذن اليوم')
-    expect(html).toContain('يتجدّد تلقائيًّا')
-    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="kv-v">0</)
+    expect(html).toContain('data-health="connected"')
+    expect(html).toMatch(/تحتاج إعادةَ ربط<\/div>\s*<div class="kv-v">0</)
   })
 
-  it('والتحذيرُ حين يقترب موعدُ إذن التجديد — والبلاطةُ تعدّه', () => {
+  it('والتحذيرُ حين يقترب انقطاعُ الربط — والبلاطةُ تعدّه', () => {
     const near = { ...x, refreshExpiresAt: '2026-09-30 12:00:00' }
     expect(tokenHealth(near, now)).toMatchObject({ kind: 'soon', days: 3 })
     const html = channelsSection(viewChannels([near], () => true), now)
-    expect(html).toContain('يبقى 3 أيّام للإذن')
-    expect(html).toMatch(/تحتاج تجديدا<\/div>\s*<div class="kv-v">1</)
+    expect(html).toContain('تحتاج إعادةَ ربطٍ خلال 3 أيّام')
+    expect(html).toMatch(/تحتاج إعادةَ ربط<\/div>\s*<div class="kv-v">1</)
   })
 
   it('وبلا تجديدٍ يُعَدّ من إذن الوصول كما كان', () => {
@@ -86,21 +74,16 @@ describe('حالُ الإذن من الرمزين معًا (خطّة التصم�
   })
 })
 
-describe('«ما ينتظرك الآن» يفتح الضبطَ ويبقي الجاهزةَ للربط', () => {
-  it('الناقصةُ سرّيها: «اضبط Instagram» إلى حقل المعرّف في الإعداد، لا «اعرضها»', () => {
+describe('الفعلُ الواحد يفتح الضبطَ أو الربط (D-111 · D-205)', () => {
+  it('الناقصةُ سرّيها: «أكمل الإعداد» إلى حقل المعرّف في الإعداد', () => {
     const html = channelsSection(viewChannels([], () => false), now)
-    expect(html).toContain('<a class="btn btn-secondary btn-sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
-    // ‏وزرُّ البطاقة إلى الموضع نفسِه باسمه
-    expect(html).toContain('<a class="btn btn-primary btn-sm" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
+    expect(html).toContain('href="/panel/channels/instagram?tab=setup#ci-instagram"\n         aria-label="أكمل الإعداد Instagram">أكمل الإعداد</a>')
     expect(html).not.toContain('اعرضها')
-    expect(html).not.toContain('اضبط سرّيه')
   })
 
-  it('والجاهزةُ للربط تبقى فيها بزرٍّ أوّليٍّ «اربط TikTok»', () => {
+  it('والجاهزةُ للربط بزرٍّ أوّليٍّ «اربط»', () => {
     const html = channelsSection(viewChannels([], (n) => n.startsWith('TIKTOK')), now)
-    const todo = html.slice(html.indexOf('ما ينتظرك الآن'), html.indexOf('</ul>', html.indexOf('ما ينتظرك الآن')))
-    expect(todo).toContain('<b>TikTok</b>')
-    expect(todo).toContain('<a class="btn btn-primary btn-sm" href="/oauth/tiktok/start">اربط TikTok</a>')
+    expect(html).toContain('<a class="btn btn-primary btn-sm" href="/oauth/tiktok/start"\n         aria-label="اربط TikTok">اربط</a>')
   })
 })
 
@@ -161,13 +144,42 @@ describe('مسارُ البوّابة يُقرأ من اليمين', () => {
   })
 })
 
-describe('عناوينُ الوقت بمنطقة المالك (D-203)', () => {
-  it('تُختَم بمنطقته حين تُعرف، وبالرياض معلنةً حين لا تُعرف', () => {
-    const views = viewChannels([acc({})], () => true)
-    const ny = channelsSection(views, now, [], '', 'America/New_York')
-    expect(ny).toContain('title="ينتهي إذنُ الوصول 2026-10-31 20:00"')
-    expect(ny).toContain('title="2026-08-31 20:00"')
-    const riyadh = channelsSection(views, now)
-    expect(riyadh).toContain('title="ينتهي إذنُ الوصول 2026-11-01 03:00 بتوقيت الرياض"')
+describe('بطاقةُ «الحسابات» تقول حالًا واحدة (D-205)', () => {
+  /*
+   * ‏كانت البطاقةُ تقول «مربوطة» خضراءَ في رأسها و«انتهى الإذن» حمراءَ تحتها لحسابٍ واحد. فالحالُ
+   * ‏من `channelHealth` وحدَه، ولا شارةَ حالٍ ثانيةٌ في البطاقة، ولا «إذنُ الوصول» ولا «إذنُ التجديد».
+   */
+  it('حسابٌ انتهى إذنُه بلا تجديد: «منقطعة» وحدَها، وزرُّها «أعد الربط»', () => {
+    const views = viewChannels([acc({ expiresAt: '2026-08-01 00:00:00' })], () => true)
+    const html = channelsSection(views, now)
+    const li = html.slice(html.indexOf('id="ch-linkedin"'), html.indexOf('id="ch-', html.indexOf('id="ch-linkedin"') + 1))
+    expect(li).toContain('data-health="broken"')
+    expect(li).toContain('منقطعة')
+    expect(li).not.toContain('مربوطة')
+    expect(li).not.toContain('انتهى الإذن')
+    expect(li).toContain('href="/oauth/linkedin/start"')
+    expect((li.match(/class="btn /g) ?? []).length).toBe(1)
+  })
+
+  it('ولا «إذن الوصول» ولا «إذن التجديد» في اللوح', () => {
+    const html = channelsSection(viewChannels([acc({})], () => true), now)
+    expect(html).not.toMatch(/إذنُ? ?(الوصول|التجديد)/)
+  })
+
+  it('والمنقطعةُ أوّلًا، ثمّ ما يحتاج إعدادًا، ثمّ المتّصلة', () => {
+    const views = viewChannels([
+      acc({}),
+      acc({ id: 'x:1', platform: 'x', status: 'needs_reauth' }),
+    ], (name) => !name.startsWith('TIKTOK_'))
+    const html = channelsSection(views, now)
+    const order = [...html.matchAll(/data-health="([a-z]+)"/g)].map((m) => m[1])
+    expect(order[0]).toBe('broken')
+    expect(order.indexOf('connected')).toBeGreaterThan(order.lastIndexOf('setup'))
+  })
+
+  it('وما لم يُبنَ سطرُ «قريبًا» لا بطاقات', () => {
+    const html = channelsSection(viewChannels([], () => true), now)
+    expect(html).toMatch(/<p class="hint mt-5">قريبًا: /)
+    expect(html).not.toContain('data-health="unbuilt"')
   })
 })

@@ -24,6 +24,7 @@ import { counted, money, NOUNS, relativeTime } from '../../lib/format'
 import type { PlatformSlice, ReportPost, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
+import { resultsTabs } from './results'
 import { windowLabel } from '../../lib/metrics/job'
 import { dayMonth, dayRange } from '../../lib/time/zone'
 
@@ -106,7 +107,7 @@ function monthLine(m: MonthSpend | undefined): string {
 }
 
 /** جسدُ تقريرٍ واحد. */
-export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): string {
+export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis = ''): string {
   const span = `أسبوع ${escapeHtml(weekOf(r.from, r.to, now))}`
 
   /*
@@ -190,7 +191,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend): stri
       ${monthLine(month)}
     </div>
   </div>
-
+  ${kpis}
   <div class="card">
     <div class="card-head">
       <h2>ما خرج</h2>
@@ -257,6 +258,45 @@ function suggestionCard(s: OpenSuggestion): string {
   </div>`
 }
 
+/** مجموعُ مقياسٍ على المنصّات — و`null` حين لم يُقَس في أيٍّ منها، لا صفر. */
+function total(r: WeeklyReport, k: 'impressions' | 'interactions'): number | null {
+  const vals = r.platforms.map((p) => p[k]).filter((v): v is number => v !== null)
+  return vals.length === 0 ? null : vals.reduce((a, b) => a + b, 0)
+}
+
+/** الفرقُ عن الأسبوع الذي قبله، كلمةً لا لونًا: الزيادةُ في الإنفاق ليست «خيرًا» ولا «شرًّا» بذاتها. */
+function delta(cur: number | null, prev: number | null, hasPrev: boolean): string {
+  if (!hasPrev) return 'لا أسبوعَ قبله يُقارَن به'
+  if (cur === null || prev === null) return 'لا يُقارَن: أحدُ الأسبوعين لم يُقَس'
+  if (prev === 0) return cur === 0 ? 'كالأسبوع الماضي' : 'والأسبوعُ الماضي صفر'
+  const pct = Math.round(((cur - prev) / prev) * 100)
+  if (pct === 0) return 'كالأسبوع الماضي'
+  return `${pct > 0 ? 'أكثرُ' : 'أقلُّ'} بـ${Math.abs(pct)}٪ من الأسبوع الماضي`
+}
+
+/**
+ * **ثلاثةُ أرقامٍ بفرقها** (خطّة التصميم 5.8 · D-208): الظهورُ والتفاعلُ والإنفاق، كلٌّ بفرقه عن التقرير الذي قبله.
+ * كان الرأسُ يقول ما خرج وما قِيس، والأرقامُ متفرّقةٌ في صفوف المنصّات والإنفاقُ رقاقةٌ في بطاقة — فسؤالُ «أأحسنتُ هذا
+ * الأسبوع؟» يُجاب بالجمع في الرأس. ولا رقمَ يُخترع: ما لم يُقَس يقول «لم يُقَس»، والفرقُ بلا أسبوعٍ قبله يقول ذلك.
+ */
+export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {
+  const tile = (k: string, v: string, note: string): string =>
+    `<div class="card tile"><div class="kv-k">${k}</div><div class="kv-v">${v}</div><div class="note">${escapeHtml(note)}</div></div>`
+  const num = (n: number | null): string => (n === null ? 'لم يُقَس' : n.toLocaleString('en-US'))
+  const imp = total(cur, 'impressions'), act = total(cur, 'interactions')
+  return `<div class="card grid tiles c3 mb-4">
+    ${tile('الظهور', num(imp), delta(imp, prev === null ? null : total(prev, 'impressions'), prev !== null))}
+    ${tile('التفاعل', num(act), delta(act, prev === null ? null : total(prev, 'interactions'), prev !== null))}
+    ${tile('الإنفاق', escapeHtml(money(cur.spendUsd)), delta(cur.spendUsd, prev?.spendUsd ?? null, prev !== null))}
+  </div>`
+}
+
+/** التقريرُ الذي قبله في القائمة (الأحدثُ أوّلًا) — و`null` إن لم يكن، أو لم يُعرف موضعُه. */
+function previousOf(reports: readonly StoredReport[], id: string): WeeklyReport | null {
+  const i = reports.findIndex((x) => x.id === id)
+  return i < 0 ? null : reports[i + 1]?.body ?? null
+}
+
 /** الشاشةُ كاملةً: تقريرُ الأسبوع، ثمّ التوصيات، ثمّ ما مضى. */
 export function reportScreen(d: ReportScreenData): string {
   const head =
@@ -268,7 +308,8 @@ export function reportScreen(d: ReportScreenData): string {
             ولا يُحسَب عند الفتح: هو <b>شهادةٌ على وقتٍ مضى</b>.</p>
           ${monthLine(d.month)}
         </div></div>`
-      : reportBody(d.current.body, d.now, d.month)
+      // ‏والأسبوعُ الذي قبله التقريرُ التالي في القائمة (الأحدثُ أوّلًا) — لا استعلامَ جديد
+      : reportBody(d.current.body, d.now, d.month, weekKpis(d.current.body, previousOf(d.reports, d.current.id)))
 
   const promo =
     d.promoCapUsd <= 0
@@ -320,5 +361,5 @@ export function reportScreen(d: ReportScreenData): string {
               .join('')}</tbody></table></div>
         </div>`
 
-  return `${head}${promo}${past}`
+  return `${resultsTabs('week')}${head}${promo}${past}`
 }

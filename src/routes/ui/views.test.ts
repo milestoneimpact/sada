@@ -13,7 +13,8 @@ import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
 import { draftsSection } from './sections/drafts'
 import { tasksScreen } from './tasksView'
-import { commandMore, commandTrigger } from './command'
+import { commandTrigger } from './command'
+import { railHtml } from './rail'
 import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage, worthCell } from '../panelView'
@@ -37,7 +38,7 @@ import { gatesOf, type GateFacts } from '../../lib/gates'
 import { journeyBody, stationHref } from './journeyView'
 import { noteOf } from '../../lib/image/job'
 import { driveFileUrl } from '../../lib/drive/sync'
-import { tokenDays } from './channels'
+import { channelHealth } from '../../lib/channels'
 import { securitySection } from './sections/security'
 import { PROVIDERS } from '../../lib/ai/registry'
 import { panelPage } from '../panelView'
@@ -149,8 +150,9 @@ describe('الرمزُ يقول ما يعنيه', () => {
   })
 
   it('و«المزيد» نقاطٌ لا زائد — الزائدُ يقول «أنشئ»', () => {
-    expect(commandMore()).toContain(ICON.more)
-    expect(commandMore()).not.toContain(ICON.add)
+    const more = railHtml({ inPanel: true }).split('<details class="more-sheet">')[1] ?? ''
+    expect(more).toContain(ICON.more)
+    expect(more).not.toContain(ICON.add)
   })
 })
 
@@ -411,7 +413,7 @@ describe('ما مشاه Tab (D-125)', () => {
  */
 describe('من المحطّة إلى موضعها (D-126)', () => {
   it('كلُّ نوعٍ يقود إلى حيث يُفعَل به شيء', () => {
-    expect(stationHref('source', 'x')).toEqual({ href: '/panel#sources', label: 'المصادر' })
+    expect(stationHref('source', 'x')).toEqual({ href: '/panel/library#sources', label: 'المكتبة' })
     expect(stationHref('decision', 'x').href).toBe('/panel#posts')
     expect(stationHref('publish', 'linkedin')).toEqual({ href: '/panel/channels/linkedin', label: 'شاشةُ LinkedIn' })
     expect(stationHref('metrics', 'a b').href).toBe('/panel/channels/a%20b')
@@ -426,7 +428,7 @@ describe('من المحطّة إلى موضعها (D-126)', () => {
       ],
     }, new Date('2026-09-06T09:00:00Z'))
     // ‏والسهمُ مرسومٌ يشير إلى نهاية السطر، لا حرفٌ من خطّ النظام (D-167)
-    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel#sources">المصادر${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/library#sources">المكتبة${ICON.go}</a>`)
     expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
     expect(html).not.toContain('\u2190')
   })
@@ -441,21 +443,20 @@ describe('«افتح في Drive» لا يُبنى من نصّ (D-126)', () => {
   })
 })
 
-describe('عدُّ الأيّام على البطاقة (D-126)', () => {
+describe('حالُ المنصّة من موعد ربطها (D-126 · D-205)', () => {
   const now = new Date('2026-09-12T12:00:00Z')
-  it('أسبوعٌ فأقلُّ تحذير، وما انتهى خطر، وما فوقُ رقاقةٌ هادئة، ولا رمزَ لا شيء', () => {
-    expect(tokenDays(null, now)).toBe('')
-    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('st bad')
-    expect(tokenDays('2026-09-10 00:00:00', now)).toContain('انتهى الإذن')
-    expect(tokenDays('2026-09-12 20:00:00', now)).toContain('ينتهي الإذن اليوم')
-    // ‏والعددُ بمعدوده (D-183): كانت «يبقى 2 يومان» و«الإذن 48 يوما»
-    expect(tokenDays('2026-09-14 12:00:00', now)).toContain('يبقى يومان للإذن')
-    expect(tokenDays('2026-09-17 12:00:00', now)).toContain('يبقى 5 أيّام للإذن')
-    expect(tokenDays('2026-09-19 12:00:00', now)).toContain('st warn')
-    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('<span class="chip"')
-    expect(tokenDays('2026-10-30 12:00:00', now)).toContain('الإذن 48 يومًا')
-    expect(tokenDays('2026-09-21 12:00:00', now)).toContain('الإذن 9 أيّام')
-    expect(tokenDays('not-a-date', now)).toBe('')
+  const at = (expiresAt: string | null) => channelHealth(viewChannels([{
+    id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+    createdAt: '2026-09-01 00:00:00', expiresAt,
+  }], () => true).find((v) => v.spec.id === 'linkedin')!, now)
+  it('أسبوعٌ فأقلُّ «تحتاج إعادةَ ربط» بعدده، وما انتهى «منقطعة»، وما فوقُ «متّصلة»', () => {
+    expect(at(null)).toMatchObject({ kind: 'broken', label: 'منقطعة' })
+    expect(at('2026-09-10 00:00:00')).toMatchObject({ kind: 'broken', tone: 'bad' })
+    expect(at('2026-09-12 20:00:00').label).toBe('تحتاج إعادةَ ربطٍ اليوم')
+    expect(at('2026-09-14 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال يومين')
+    expect(at('2026-09-17 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال 5 أيّام')
+    expect(at('2026-09-19 12:00:00')).toMatchObject({ kind: 'expiring', tone: 'warn' })
+    expect(at('2026-09-21 12:00:00')).toMatchObject({ kind: 'connected', label: 'متّصلة' })
   })
 })
 
@@ -714,7 +715,10 @@ describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
       { day: '2026-09-02', platform: 'linkedin', account: 'b', status: 'failed', costUsd: 0.2, week: '2026-W36', month: '2026-09' },
     ] as never
     const html = pivotPane({ rows: 'platform', cols: 'status', measure: 'count', sinceDays: 30, table: pivot(rows, { rows: 'platform', cols: 'status', measure: 'count' }), capped: false, cap: 5000 } as never)
-    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+    expect(html).toContain('<h1>النتائج</h1>')
+    // ‏والجدولُ تبويبُ «تحليلٌ مفصّل» في «النتائج»، ومرساتُه القديمةُ قسمُه (D-204)
+    expect(html).toContain('<a class="tab-item" href="#pivot" aria-current="page"><span>تحليلٌ مفصّل</span></a>')
+    expect(html).toContain('<div data-sub id="pivot">')
     const split = html.indexOf('<div class="split">')
     const acts = html.indexOf('<div class="row acts">', split)
     const csv = html.indexOf('نزّل الجدولَ CSV', acts)
@@ -967,18 +971,18 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
    * الجوّال، والقسمُ معلَّمٌ في الوسم، والثيمُ مرّةً واحدة.
    */
   it('soloPage برافدته: قسمُه معلَّم، ومساراتُه إلى اللوحة، والمنصّةُ الحاليّةُ تحته، والثيمُ لا يتكرّر', () => {
-    const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'القنوات' }, '<p>x</p>', 'n', '', undefined,
-      soloNav('channels', 'linkedin'))
+    const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'الحسابات' }, '<p>x</p>', 'n', '', undefined,
+      soloNav('accounts', 'linkedin'))
     expect(html).toContain('<aside class="rail">')
     expect(html).toContain('<a href="/panel#posts" data-bar>')
-    expect(html).toContain('<a href="/panel/tasks" data-bar>')
-    expect(html).toContain('<a href="/panel#channels" data-bar aria-current="true">')
-    expect(html).toMatch(/<a href="\/panel\/channels\/linkedin" aria-current="page">/)
-    expect(html).not.toContain('/panel/channels/snapchat')
+    expect(html).toContain('<a href="/panel/tasks">')
+    expect(html).toContain('<a href="/panel/accounts" aria-current="true">')
+    // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (D-205): الرافدةُ سبعة
+    expect(html).not.toContain('class="plat"')
     expect((html.match(/id="theme"/g) ?? []).length).toBe(1)
 
     const tasks = soloPage('صدى — مهامّ', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, soloNav('tasks'))
-    expect(tasks).toContain('<a href="/panel/tasks" data-bar aria-current="page">')
+    expect(tasks).toContain('<a href="/panel/tasks" aria-current="page">')
     expect(tasks).not.toContain('class="plat"')
   })
 
@@ -1254,7 +1258,7 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
 
   it('لا حرفَ رمزٍ في «content»: سهمُ الطيّ مثلّثٌ من حدود، والمطويُّ يشير إلى نهاية السطر', () => {
     expect(found((d) => d.prop === 'content' && /[▾▸▲▼←→⌘]|\\2[05]/.test(d.value))).toEqual([])
-    for (const s of ['.g-tog::after', 'details.plat>summary::after']) {
+    for (const s of ['.g-tog::after']) {
       expect(css.rule(s), s).toMatchObject({
         content: "''", 'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid',
       })
@@ -1347,7 +1351,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
       createdAt: '2026-09-01 00:00:00', expiresAt: null,
     }], () => true), now)
-    expect(html).toContain('ما ينتظرك الآن')
+    expect(html).toContain('data-health="broken"')
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
@@ -1376,10 +1380,11 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
 
   it('«قبل …» لا تُسبَق بـ«منذ»: الجملةُ من relativeTime كاملة', () => {
     const now = new Date('2026-09-06T09:00:00Z')
-    const channels = channelsSection(viewChannels([{
-      id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+    // ‏حسابان فتُرسم صفوفُهما بموعد ربطهما (D-205: الحسابُ الواحدُ اسمُه في رأس البطاقة)
+    const channels = channelsSection(viewChannels(['a1', 'a2'].map((id) => ({
+      id, platform: 'linkedin' as const, kind: 'member' as const, displayName: 'عمر', status: 'active' as const,
       createdAt: '2026-09-06 08:36:00', expiresAt: '2026-11-01 00:00:00',
-    }], () => true), now)
+    })), () => true), now)
     const plan = planSection({
       plan: null, names: {}, ready: true, analyzed: 1, now,
       lastAttempt: { at: '2026-09-06 08:36:00', detail: 'failed: انقطع' },

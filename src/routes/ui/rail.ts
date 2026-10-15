@@ -10,11 +10,9 @@
  * (`#posts`) وفي الصفحة المستقلّة بمساراتها (`/panel#posts`) — **والقسمُ الحاليُّ
  * معلَّمٌ في الوسم** فلا ينتظر سكربتًا ليُعرَف.
  */
-import { CHANNELS } from '../../lib/channels'
-import { commandMore, SECTIONS } from './command'
+import { SECTIONS } from './command'
 import { ICON } from './icons'
 import { count } from './components/badge'
-import { LOGOS } from './logos'
 import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch, wordmark } from './shell'
 
 export interface RailInput {
@@ -23,14 +21,35 @@ export interface RailInput {
   /** في اللوحة: المرساةُ وحدَها. وخارجها: مسارُ اللوحة قبلها. */
   readonly inPanel: boolean
   readonly counts?: Readonly<Record<string, number>>
-  /** ما يُرسَم تحت «القنوات» — أزرارُ المنصّات في اللوحة. */
-  readonly afterChannels?: string
   readonly env?: 'staging' | 'production'
   /**
    * القسمُ أبٌ لصفحةٍ معلَّمةٍ تحته (منصّةٌ في «القنوات»): يُعلَّم `aria-current="true"`
    * لا `"page"` — فلا تُعلَن صفحتان حاليّتان، ويُلوَّن في شريط الجوّال وحدَه حيث لا تحته.
    */
   readonly parent?: boolean
+}
+
+/**
+ * «المزيد» على الهاتف — **قائمةٌ لا بحث** (خطّة التصميم 5.3 · D-208).
+ *
+ * كان زرًّا يفتح لوحةَ الأوامر: من أراد «الإعدادات» من هاتفه كتب اسمَها. فصار `<details>` يعمل بلا سكربت، فيه ما
+ * ليس في الشريط من `SECTIONS` بأعدادها (الحسابات · ما عليك · الإعدادات)، ثمّ «بحثٌ وأوامر». وعددُه مجموعُ ما فيه،
+ * فلا يختفي «ينتظرك» تحت زرٍّ لا رقمَ عليه. وعلى الحاسوب لا يُرسم: الرافدةُ تحمل السبعة.
+ */
+function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): string {
+  const rest = SECTIONS.filter((s) => s.bar !== true)
+  const total = rest.reduce((n, s) => n + (counts[s.id] ?? 0), 0)
+  const links = rest.map((s) => {
+    const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
+    const n = counts[s.id] ?? 0
+    return `<a href="${escapeHtml(href)}"${input.active === s.id ? ' aria-current="page"' : ''}>${s.icon}<span>${escapeHtml(s.label)}</span>${n > 0 ? count(n) : ''}</a>`
+  }).join('')
+  return `<details class="more-sheet">
+    <summary>${ICON.more}<span>المزيد</span>${total > 0 ? count(total) : ''}</summary>
+    <div class="more-panel">${links}
+      <button type="button" class="cmdk-open" aria-haspopup="dialog" aria-controls="cmdk">${ICON.search}<span>بحثٌ وأوامر</span></button>
+    </div>
+  </details>`
 }
 
 export function railHtml(input: RailInput): string {
@@ -47,14 +66,13 @@ export function railHtml(input: RailInput): string {
      * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى**.
      */
     const attrs = `${s.bar === true ? ' data-bar' : ''}${input.active === s.id ? ` aria-current="${input.parent === true ? 'true' : 'page'}"` : ''}`
-    const after = s.id === 'channels' ? (input.afterChannels ?? '') : ''
     // ‏والاسمُ الأقصرُ للشريط الضيّق بجانبه، ويُبدَّل بينهما في الورقة لا في السكربت (D-185)
     const label = s.tight === undefined
       ? `<span>${s.short ?? s.label}</span>`
       : `<span class="wide">${s.short ?? s.label}</span><span class="tight">${escapeHtml(s.tight)}</span>`
     return `${head}<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
       n > 0 ? count(n) : ''
-    }</a>${after}`
+    }</a>`
   }).join('\n    ')
 
   return `<aside class="rail">
@@ -64,32 +82,16 @@ export function railHtml(input: RailInput): string {
   </div>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
-    ${commandMore()}
+    ${moreSheet(input, counts)}
   </nav>
   <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
 </aside>`
 }
 
-/**
- * المنصّاتُ المبنيّةُ روابطَ — **ليتنقّل المالكُ بينها من صفحة المنصّة نفسِها**
- * (D-178). بلا نقاطِ حالٍ هنا: الصفحةُ المستقلّةُ لا تقرأ القنوات، والحالُ في
- * الرئيسيّة وفي رأس كلّ صفحة. والمنصّةُ الحاليّةُ معلَّمة.
- */
-function platformLinks(current?: string): string {
-  const rows = CHANNELS.filter((c) => c.stage !== 'none')
-    .map((c) => `<a href="/panel/channels/${escapeHtml(c.id)}"${c.id === current ? ' aria-current="page"' : ''}>
-      <span class="pl">${LOGOS[c.id] ?? ''}</span><span>${escapeHtml(c.label)}</span></a>`)
-    .join('')
-  return `<details class="plat" open>
-    <summary>${ICON.channels}<span>المنصّات</span></summary>
-    <div class="plat-list">${rows}</div>
-  </details>`
-}
-
 /** رافدةُ الصفحة المستقلّة — بقسمها معلَّمًا، ومساراتُها إلى اللوحة، ومنصّتُها إن كانت. */
 export function soloNav(active: string, platform?: string): string {
   return railHtml({
+    // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (خطّة التصميم 5.1 · D-205): سبعةٌ في الرافدة، والمنصّاتُ في لوحها
     active, inPanel: false, parent: platform !== undefined,
-    ...(active === 'channels' ? { afterChannels: platformLinks(platform) } : {}),
   })
 }

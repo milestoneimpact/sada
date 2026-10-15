@@ -11,9 +11,10 @@
  *     يجد في الخادم ما لا يجده في اليد، وهي علّةُ عدّاد D-071 نفسُها.
  */
 import { describe, expect, it } from 'vitest'
+import { railHtml } from './rail'
 import { uiScript } from '../../lib/ui/asset'
 import {
-  buildCommands, commandMore, commandPalette, commandTrigger, COMMAND_SCRIPT,
+  buildCommands, commandPalette, commandTrigger, COMMAND_SCRIPT,
   DRAFT_CAP, normalize, searchKey, SECTIONS,
 } from './command'
 import { shell } from './shell'
@@ -101,9 +102,9 @@ describe('الفهرس — ولا فعلَ يقع من هنا', () => {
   })
 
   /** **وصفحةٌ مستقلّةٌ مسارُها مسارٌ في الحالين** — ولا مرساةَ لها. */
-  it('وصفحةُ التقرير مسارٌ في اللوحة وخارجَها سواء', () => {
+  it('و«النتائج» مسارُ التقرير في اللوحة وخارجَها سواء (D-204)', () => {
     for (const onPanel of [true, false]) {
-      const r = buildCommands({ onPanel }).find((c) => c.label === 'التقرير الأسبوعيّ')!
+      const r = buildCommands({ onPanel }).find((c) => c.label === 'النتائج')!
       expect(r.href).toBe('/panel/report')
     }
   })
@@ -168,10 +169,12 @@ describe('المسوّدات — ثمانٍ لا كلُّها (D-101)', () => {
 
 describe('مفتاحُ البحث — يُطبَّع مرّةً في الخادم', () => {
   it('يجمع الاسمَ والسطرَ والمجموعةَ والمرادفَ اللاتينيّ', () => {
-    const c = buildCommands().find((x) => x.label === 'المصادر')!
+    const c = buildCommands().find((x) => x.label === 'المكتبة')!
     const k = searchKey(c)
     expect(k).toContain('drive')
-    expect(k).toContain(normalize('المصادر'))
+    expect(k).toContain(normalize('المكتبة'))
+    // ‏والاسمُ القديمُ مرادفٌ يُبحث به (D-204): من كتب «المصادر» يجد المكتبة
+    expect(k).toContain(normalize('مصادر'))
   })
 
   it('وهو مطبوعٌ لا خام — فالمقارنةُ لا تطبع مع كلّ ضغطة', () => {
@@ -217,15 +220,21 @@ describe('النصُّ البرمجيّ — وقواعدُ اللوحة تُوَ
  * قائمةٌ ثانيةٌ تُبنى للشريط **تشيخ وحدَها**: قسمٌ يُضاف غدا يدخل الرافدةَ
  * واللوحةَ ولا يدخلها، **ولا حارسَ يمسك غيابا**.
  */
-describe('شريطُ الجوّال — خمسةٌ في اليد وتسعةٌ في اللوحة', () => {
-  it('**وخمسةٌ لا أقلّ ولا أكثر**', () => {
-    expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(5)
+describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ وجهاتٍ و«المزيد» (D-204)', () => {
+  it('**وأربعُ وجهاتٍ لا أقلّ ولا أكثر**، والخامسةُ «المزيد»', () => {
+    expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
+  })
+
+  /** والرافدةُ سبعةُ عناصر (خطّة التصميم 5.1): الوجهاتُ الخمس، ثمّ «ما عليك» و«الإعدادات». */
+  it('**وسبعةٌ في الرافدة** بترتيب الخطّة', () => {
+    expect(SECTIONS.map((s) => s.label)).toEqual(
+      ['الرئيسيّة', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
   })
 
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
   it('وهي أقسامُ العمل اليوميّ', () => {
     const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
-    expect(bar).toEqual(['overview', 'posts', 'channels', 'report', 'tasks'])
+    expect(bar).toEqual(['overview', 'posts', 'library', 'results'])
   })
 
   /**
@@ -244,11 +253,18 @@ describe('شريطُ الجوّال — خمسةٌ في اليد وتسعةٌ ف
     expect(COMMAND_SCRIPT).toContain(".querySelectorAll('.cmdk-open')")
     expect(COMMAND_SCRIPT).not.toContain("getElementById('cmdk-open')")
     expect(commandTrigger()).toContain('class="cmdk-open"')
-    expect(commandMore()).toContain('class="cmdk-open more"')
+    expect(railHtml({ inPanel: true })).toContain('<button type="button" class="cmdk-open" aria-haspopup="dialog"')
   })
 
-  it('و«المزيد» مخفيٌّ حتّى يعمل النصُّ كأخيه', () => {
-    expect(commandMore()).toContain('hidden')
+  /** و«المزيد» قائمةٌ لا بحث (خطّة التصميم 5.3 · D-208): ما ليس في الشريط بأعداده، ويعمل بلا سكربت. */
+  it('و«المزيد» ورقةٌ فيها الحساباتُ وما عليك والإعدادات، وعددُها مجموعُها', () => {
+    const html = railHtml({ inPanel: true, counts: { accounts: 1, tasks: 4, settings: 0 } })
+    const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
+    expect(sheet).toContain('<summary>')
+    expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/accounts', '/panel/tasks', '/panel/settings'])
+    expect(sheet).toContain('بحثٌ وأوامر')
+    expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })
 })
 

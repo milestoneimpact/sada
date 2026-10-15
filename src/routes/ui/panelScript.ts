@@ -1,6 +1,7 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
 import { below } from './tokens'
+import { MOVED_ANCHORS, MOVED_PREFIXES } from '../../lib/nav/panes'
 
 /**
  * نصُّ اللوحة الجاري في المتصفّح.
@@ -59,6 +60,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   if(/[?&]open=/.test(location.search)&&history.replaceState){
     history.replaceState(null,'',location.pathname+location.search.replace(/([?&])open=[^&]*&?/,'$1').replace(/[?&]$/,'')+location.hash);
   }
+  var MOVED=${JSON.stringify(MOVED_ANCHORS)}, MOVED_P=${JSON.stringify(MOVED_PREFIXES)};
+  function movedPath(id){
+    if(Object.prototype.hasOwnProperty.call(MOVED,id))return MOVED[id];
+    for(var i=0;i<MOVED_P.length;i++)if(id.indexOf(MOVED_P[i][0])===0)return MOVED_P[i][1];
+    return null;
+  }
   function show(id,push,focus){
     if(first===null)return;
     if(focus&&!/^ed(-|$)/.test(id))shutEditor();
@@ -69,6 +76,10 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
     var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
     var card=isPane?null:target(id);
+    // ‏ومرساةٌ لوحُها في صفحةٍ أخرى (D-211): «/panel#settings» المحفوظةُ تذهب إلى «/panel/settings#settings»، والخريطةُ
+    // ‏من «lib/nav/panes» نفسِها التي يقرؤها الخادم. عند التحميل استبدالٌ لا يُبقي خطوةً ميّتةً في الرجوع
+    if(!isPane&&!card&&id){var to=movedPath(id);
+      if(to&&to!==location.pathname){if(push||focus)location.assign(to+'#'+id); else location.replace(to+'#'+id); return;}}
     var host=card?card.closest('section[data-pane]'):null;
     if(card&&!host){
       // ‏ومرساةٌ خارجَ الألواح («#main» من رابط التخطّي) لا تبدّل اللوحَ المفتوح:
@@ -79,6 +90,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     if(host)id=host.dataset.pane;
     var found=false, pane=null;
     panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m){found=true; pane=p;}});
+    // ‏واللوحُ المفتوحُ سِمةٌ على الجسد: الزرُّ العائمُ يظهر في اثنين منها وحدهما (D-208)
+    if(found)document.body.setAttribute('data-pane',id);
     if(!found){if(id!==first)show(first,push,focus); return;}
     tabs.forEach(function(t){
       var m=t.getAttribute('href')==='#'+id;
@@ -94,11 +107,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var on=card?(card.hasAttribute('data-sub')?card:card.closest('[data-sub]')):null;
       if(!on)on=subs[0];
       Array.prototype.forEach.call(subs,function(s){s.hidden=s!==on;});
-      Array.prototype.forEach.call(pane.querySelectorAll('#posts-sub a'),function(t){
+      Array.prototype.forEach.call(pane.querySelectorAll(':scope>nav.tab-bar a'),function(t){
         if(t.getAttribute('href')==='#'+on.id)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
       // ‏والقسمُ نفسُه مرساةُ تبويبه: لا ينزل إليه فوق الشريط، بل يبقى الشريطُ ظاهرًا
       if(card===on){if(push&&history.replaceState)history.replaceState(null,'','#'+asked);
-        var bar=document.getElementById('posts-sub'); if(bar&&focus)bar.scrollIntoView({block:'nearest'}); return;}
+        var bar=pane.querySelector(':scope>nav.tab-bar'); if(bar&&focus)bar.scrollIntoView({block:'nearest'}); return;}
     }
     if(push&&history.replaceState)history.replaceState(null,'','#'+id);
     // ‏و«tabindex=-1» لما لا يُركَّز عليه وحدَه: حقلٌ أو زرٌّ يُعلَّم به يخرج من ترتيب Tab
@@ -195,12 +208,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   });
 
   // تأكيدٌ قبل فعلٍ يوقف النظام كلّه
-  document.querySelectorAll('form[data-confirm]').forEach(function(f){
+  // ‏والربطُ لكلّ عنصرٍ دالّةٌ يُنادى بها عند التحميل ولما يُبدَّل بلا تحميل (D-207: «wire»)
+  function bindConfirm(f){
     f.addEventListener('submit',function(e){
       if(!confirm(f.dataset.confirm)){e.preventDefault(); return;}
       var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent='…';}
     });
-  });
+  }
+  document.querySelectorAll('form[data-confirm]').forEach(bindConfirm);
   /*
    * ‏ولا إرسالَ بلا منصّة (D-190): غيرُ المتّصلة لا تُؤشَّر، فقد تكون المربّعاتُ كلُّها فارغة،
    * ‏وردُّ الخادم «اختر منصّةً» يعود بحقلٍ فارغ فيضيع ما كُتب. فيُمنع هنا ويُقال السببُ في
@@ -227,7 +242,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   // والنصُّ يبقى وتُضاف دوّامة: كان النصُّ يُستبدَل فيضيع ما كان
   // مكتوبا، ويسأل الضاغطُ نفسَه ماذا ضغط. والنداءُ مدفوع فالسؤال ليس
   // هيّنا. والزرُّ المضغوط وحده يدور، لا كلُّ أزرار النموذج.
-  document.querySelectorAll('form[data-busy]').forEach(function(f){
+  function bindBusy(f){
     var pressed=null;
     f.querySelectorAll('button').forEach(function(b){
       b.addEventListener('click',function(){pressed=b;});
@@ -247,7 +262,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var st=document.getElementById('flash');
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);}
     });
-  });
+  }
+  document.querySelectorAll('form[data-busy]').forEach(bindBusy);
 
   /*
    * ‏والإشعارُ يطفو ويُغلَق (الخطّة 7.8).
@@ -268,38 +284,195 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
    * ‏لا يرى ما فُصل — فلو سبقه لأُرسل «تراجَع» مرّتين بنقرتين.
    */
   var flashBox=document.getElementById('flash');
-  if(flashBox){
-    flashBox.classList.add('toast');
-    var note=flashBox.querySelector('.toast-note');
-    if(note){
-      var bad=note.classList.contains('bad');
-      var keep=bad||!!note.querySelector('form');
-      if(bad)note.setAttribute('role','alert');
-      var shut=document.createElement('button');
-      shut.type='button'; shut.className='btn btn-secondary btn-sm toast-x'; shut.textContent='أغلق';
-      shut.setAttribute('aria-label','أغلق الإشعار');
-      note.appendChild(shut);
-      var timer=0;
-      var drop=function(){clearTimeout(timer); if(note.parentNode)note.parentNode.removeChild(note);};
-      shut.addEventListener('click',function(){
-        drop();
-        var back=target((location.hash||'').slice(1))||document.getElementById('main');
-        if(back){if(back.tabIndex<0)back.setAttribute('tabindex','-1'); back.focus({preventScroll:true});}
-      });
-      if(keep){
+  // ‏والإشعارُ يُسلَّح بدالّة (D-207): يُستدعى عند التحميل، ويُستدعى لإشعارٍ جاء مع فعلٍ بلا تحميل
+  function armToast(note,fresh){
+    var bad=note.classList.contains('bad');
+    var keep=bad||!!note.querySelector('form');
+    if(bad)note.setAttribute('role','alert');
+    var shut=document.createElement('button');
+    shut.type='button'; shut.className='btn btn-secondary btn-sm toast-x'; shut.textContent='أغلق';
+    shut.setAttribute('aria-label','أغلق الإشعار');
+    note.appendChild(shut);
+    var timer=0;
+    var drop=function(){clearTimeout(timer); if(note.parentNode)note.parentNode.removeChild(note);};
+    shut.addEventListener('click',function(){
+      drop();
+      var back=target((location.hash||'').slice(1))||document.getElementById('main');
+      if(back){if(back.tabIndex<0)back.setAttribute('tabindex','-1'); back.focus({preventScroll:true});}
+    });
+    if(keep){
+      if(!fresh){
         flashBox.removeChild(note);
         setTimeout(function(){flashBox.appendChild(note);},150);
-      }else{
-        var arm=function(){clearTimeout(timer); timer=setTimeout(drop,6000);};
-        var hold=function(){clearTimeout(timer);};
-        note.addEventListener('mouseenter',hold); note.addEventListener('mouseleave',arm);
-        note.addEventListener('focusin',hold); note.addEventListener('focusout',arm);
-        note.addEventListener('touchstart',hold,{passive:true});
-        note.addEventListener('touchend',arm,{passive:true});
-        arm();
       }
+    }else{
+      var arm=function(){clearTimeout(timer); timer=setTimeout(drop,6000);};
+      var hold=function(){clearTimeout(timer);};
+      note.addEventListener('mouseenter',hold); note.addEventListener('mouseleave',arm);
+      note.addEventListener('focusin',hold); note.addEventListener('focusout',arm);
+      note.addEventListener('touchstart',hold,{passive:true});
+      note.addEventListener('touchend',arm,{passive:true});
+      arm();
     }
   }
+  if(flashBox){
+    flashBox.classList.add('toast');
+    var note0=flashBox.querySelector('.toast-note');
+    if(note0)armToast(note0,false);
+  }
+
+  /*
+   * ‏**أفعالُ البطاقة بلا تحميل** (خطّة التصميم 7.8 و11.5(و) · D-207).
+   *
+   * ‏«اعتمد» و«ارفض» و«تراجَع» كانت تعيد رسمَ الصفحة كلِّها وتنزل إلى البطاقة بمرساتها: ثانيةٌ من البياض على
+   * ‏الهاتف لكلّ قرار، والقرارُ اليوميُّ عشرةُ قرارات. فالنموذجُ المعلَّم «data-swap» يُرسَل بـfetch إلى المسار
+   * ‏نفسِه، **والخادمُ لا يتغيّر**: يُنفّذ ويضع الإشعارَ ويحوّل إلى اللوحة كما كان، فيُقرأ ردُّه صفحةً وتُنقل منها
+   * ‏ثلاثةُ أشياء: البطاقةُ نفسُها، وأعدادُ الرافدة والتبويبات، والإشعارُ بـ«تراجَع» (وحكمُه في الخادم: لا تراجعَ
+   * ‏بعد محاولة نشر، D-004). **وكلُّ ما يخرج عن المتوقَّع يعود إلى الإرسال العاديّ** — ردٌّ ليس لوحةً (جلسةٌ
+   * ‏انتهت فصفحةُ الدخول) يُفتح كما هو، وما سقط بعد خروج الطلب يعيد تحميلَ اللوحة بـGET ولا يُعيد الإرسال.
+   */
+  // ‏ما يُربط على عنصرٍ بعينه يُربط من جديد على ما يُبدَّل بلا تحميل — وإلّا جاءت البطاقةُ بزرّ «غدًا 9ص»
+  // ‏لا يفعل شيئًا، ونموذجٍ يُرسَل مرّتين بنقرتين. وبترتيب التحميل: التأكيدُ قبل «مشغول» (يقرأ defaultPrevented)
+  function wire(root){
+    root.querySelectorAll('form[data-confirm]').forEach(bindConfirm);
+    root.querySelectorAll('form[data-busy]').forEach(bindBusy);
+    root.querySelectorAll('.quick').forEach(bindQuick);
+  }
+  // ‏و«المزيد» يُغلق بعد اختيارٍ منه، وبضغطةٍ خارجه، وبـEsc — ورقةٌ تبقى مفتوحةً فوق اللوح الذي فُتح تحتها تحجبه (D-208)
+  document.querySelectorAll('details.more-sheet,details.fab').forEach(function(m){
+    m.querySelectorAll('a,button').forEach(function(x){x.addEventListener('click',function(){m.open=false;});});
+    document.addEventListener('click',function(e){if(m.open&&!m.contains(e.target))m.open=false;});
+    m.addEventListener('keydown',function(e){if(m.open&&e.key==='Escape'){m.open=false; var s=m.querySelector('summary'); if(s)s.focus();}});
+  });
+  function unbusy(f){
+    f.removeAttribute('aria-busy');
+    f.querySelectorAll('button').forEach(function(x){x.disabled=false;
+      if(x.getAttribute('data-busy-on')){x.removeAttribute('data-busy-on'); x.removeAttribute('aria-busy');
+        x.removeAttribute('aria-disabled'); x.removeAttribute('aria-label');}});
+    if(flashBox)flashBox.querySelectorAll('.busy-note').forEach(function(n){n.remove();});
+  }
+  // ‏إشعارٌ يُرسم في المتصفّح — بالأصناف نفسِها التي يرسمها الخادم (components/toast)
+  // ‏واسمُها غيرُ «say»: سكربتُ مفاتيح المرور بعدها يعلن «var say» في النطاق نفسِه فيغلبها (أمسكه الفحصُ الحيّ)
+  function toastSay(tone,text){
+    if(!flashBox)return;
+    var n=document.createElement('div'); n.className='toast-note '+tone;
+    var t=document.createElement('span'); t.className='toast-t'; t.textContent=text; n.appendChild(t);
+    flashBox.innerHTML=''; flashBox.appendChild(n); armToast(n,true);
+  }
+  function fail(text){toastSay('bad',text);}
+
+  /*
+   * ‏**بلا اتّصال** (خطّة التصميم 7.11): لا عملَ بلا اتّصال ولا Service Worker — اللوحةُ «no-store» عمدًا، وقرارُ نشرٍ
+   * ‏لا يُؤجَّل إلى عودة الشبكة. فشريطٌ واحدٌ محايد أعلى المحتوى، **وأزرارُ الإرسال تُعطَّل بسببٍ مكتوب**، ثمّ «عاد
+   * ‏الاتّصال» وتعود الأزرارُ التي عطّلها هو وحدَها. ولا يُرسَل شيءٌ تلقائيًّا.
+   */
+  var offBar=null;
+  function setOffline(off){
+    var main=document.getElementById('main'); if(!main)return;
+    if(off){
+      if(!offBar){
+        offBar=document.createElement('div'); offBar.className='outcome warn mb-3'; offBar.setAttribute('role','status');
+        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v">لا اتّصالَ بالإنترنت. ما تكتبه في المحرّر محفوظٌ على هذا الجهاز، والأزرارُ تعود حين يعود الاتّصال.</span>';
+        main.insertBefore(offBar,main.firstChild);
+      }
+      document.querySelectorAll('form[method=POST] button[type=submit],button[type=submit][form]').forEach(function(b){
+        if(b.disabled)return; b.disabled=true; b.setAttribute('data-off','1'); b.title='بلا اتّصال';});
+    }else{
+      if(offBar){offBar.remove(); offBar=null;}
+      document.querySelectorAll('button[data-off]').forEach(function(b){b.disabled=false; b.removeAttribute('data-off'); b.removeAttribute('title');});
+    }
+  }
+  window.addEventListener('offline',function(){setOffline(true);});
+  window.addEventListener('online',function(){setOffline(false); toastSay('ok','عاد الاتّصال.');});
+  if(navigator.onLine===false)setOffline(true);
+
+  /*
+   * ‏**نصُّ المحرّر محفوظٌ على الجهاز** (7.11): كلَّ ثانيتين من الكتابة في «sada-draft:<id>»، ونصُّ المنشور وحدَه. فإن
+   * ‏عاد المالكُ ونصُّ الجهاز غيرُ نصّ الخادم قيل له متى كتبه وخُيّر؛ وإن تساويا (حُفظ) مُحي. ولا يُرسل شيئًا وحدَه.
+   */
+  var edT=document.getElementById('ed-txt'), edBox=document.getElementById('ed');
+  if(edT&&edT.tagName==='TEXTAREA'&&edBox&&edBox.dataset.post){
+    var dKey='sada-draft:'+edBox.dataset.post, kept=null;
+    try{kept=JSON.parse(localStorage.getItem(dKey)||'null');}catch(e){kept=null;}
+    if(kept&&typeof kept.t==='string'){
+      if(kept.t===edT.value){try{localStorage.removeItem(dKey);}catch(e){}}
+      else{
+        var at='';
+        try{at=new Date(kept.at).toLocaleTimeString('ar-u-nu-latn',{hour:'numeric',minute:'2-digit'});}catch(e){}
+        var row=document.createElement('p'); row.className='hint'; row.setAttribute('role','status');
+        row.appendChild(document.createTextNode('لديك نصٌّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
+        var take=document.createElement('button'); take.type='button'; take.className='btn btn-secondary btn-sm'; take.textContent='استعده';
+        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-quiet btn-sm'; drop.textContent='تجاهله';
+        row.appendChild(take); row.appendChild(document.createTextNode(' ')); row.appendChild(drop);
+        edT.parentNode.insertBefore(row,edT);
+        take.addEventListener('click',function(){edT.value=kept.t; edT.dispatchEvent(new Event('input')); row.remove(); edT.focus();});
+        drop.addEventListener('click',function(){try{localStorage.removeItem(dKey);}catch(e){} row.remove(); edT.focus();});
+      }
+    }
+    var dTimer=0;
+    edT.addEventListener('input',function(){
+      clearTimeout(dTimer);
+      dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
+    });
+  }
+  function countsFrom(doc){
+    document.querySelectorAll('nav.tabs a,nav.tab-bar a').forEach(function(a){
+      var h=a.getAttribute('href'); if(!h)return;
+      var o=null;
+      doc.querySelectorAll('nav.tabs a,nav.tab-bar a').forEach(function(x){if(!o&&x.getAttribute('href')===h)o=x;});
+      if(!o)return;
+      var n=a.querySelector('.count'), m=o.querySelector('.count');
+      if(n&&m)n.replaceWith(document.importNode(m,true));
+      else if(n)n.remove();
+      else if(m)a.appendChild(document.importNode(m,true));
+    });
+  }
+  document.addEventListener('submit',function(e){
+    var f=e.target;
+    if(!(f instanceof HTMLFormElement)||!f.hasAttribute('data-swap')||e.defaultPrevented)return;
+    if(!window.fetch||!window.DOMParser)return;
+    e.preventDefault();
+    var sb=e.submitter||null;
+    var body=new FormData(f); if(sb&&sb.name)body.append(sb.name,sb.value);
+    var id=String(body.get('id')||'');
+    // ‏**والطلبُ لا يُكرَّر أبدًا** (D-004 روحًا): التحويلُ يُقرأ يدويًّا، ثمّ تُجلب اللوحةُ بـGET منفصل. فإن سقط شيءٌ
+    // ‏بعد أن خرج الطلب فالبديلُ إعادةُ تحميل اللوحة (GET) تُري الحالَ الحقيقيّة — لا إرسالٌ ثانٍ لما قد نُفّذ
+    fetch(f.action,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'}).then(function(r){
+      if(r.type!=='opaqueredirect'&&!(r.status>=300&&r.status<400))throw new Error('status '+r.status);
+      return fetch('/panel',{credentials:'same-origin'});
+    }).then(function(r){
+      if(!r.ok)throw new Error('panel '+r.status);
+      return r.text().then(function(html){return {html:html,url:r.url};});
+    }).then(function(res){
+      // ‏وورقةُ الردّ تُنزَع قبل القراءة: نونسُها غيرُ نونس هذه الصفحة فيرفضها CSP في السجلّ، ولا حاجةَ بها
+      var doc=new DOMParser().parseFromString(res.html.replace(/<style[\\s\\S]*?<\\/style>/g,''),'text/html');
+      if(!doc.querySelector('section[data-pane]')){location.href=res.url; return;}
+      var mine=document.getElementById('d-'+id), theirs=doc.getElementById('d-'+id);
+      if(mine){
+        var fresh=theirs?document.importNode(theirs,true):null;
+        // ‏وقائمةُ الفرز تحمل البطاقةَ الجديدة لا القديمة: «reorder» تعيد إلحاقَ ما في القائمة، فبطاقةٌ
+        // ‏مفصولةٌ تبقى فيها كانت تعود إلى الصفحة نسخةً ثانية
+        var at=cards.indexOf(mine);
+        if(fresh){fresh.hidden=mine.hidden; mine.replaceWith(fresh); if(at>=0)cards[at]=fresh; wire(fresh);}
+        else{mine.remove(); if(at>=0)cards.splice(at,1);}
+      }
+      countsFrom(doc);
+      var nf=doc.getElementById('flash');
+      if(flashBox&&nf){
+        flashBox.innerHTML='';
+        var n=nf.querySelector('.toast-note');
+        if(n){n=document.importNode(n,true); flashBox.appendChild(n); wire(n); armToast(n,true);}
+      }
+      // ‏والتركيزُ إلى البطاقة بلا تمرير — لا إلى رأس الصفحة، ولا يضيع مع النموذج الذي ذهب
+      var card=document.getElementById('d-'+id);
+      if(card){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.focus({preventScroll:true});}
+    }).catch(function(err){
+      if(window.console)console.warn('swap',err);
+      // ‏وبلا اتّصال لم يخرج الطلب: يعود الزرُّ، ويُقال ذلك في موضع الإشعار، وما كُتب باقٍ (خطّة التصميم 7.11)
+      if(navigator.onLine===false){unbusy(f); fail('لم يُحفظ. تحقّق من الاتّصال ثمّ أعد المحاولة.'); return;}
+      location.hash='d-'+id; location.reload();
+    });
+  });
 
   // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا
   // يمنع التمرير، وبدونها يؤخّره المتصفّحُ احتياطا
@@ -837,7 +1010,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }catch(e){return now;}
   }
 
-  document.querySelectorAll('.quick').forEach(function(bar){
+  function bindQuick(bar){
     var field=document.getElementById(bar.dataset.quick);
     var mirror=bar.parentNode.querySelector('[data-mirror="'+bar.dataset.quick+'"]');
     if(!field)return;
@@ -863,7 +1036,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     });
     field.addEventListener('input',reflect);
     reflect();
-  });
+  }
+  document.querySelectorAll('.quick').forEach(bindQuick);
 
   /*
    * ── رفعُ المقطع قطعًا (D-180) ─────────────────────────────────────

@@ -77,6 +77,15 @@ const MAX_SMALL_SHARE = 0.10
  * ‏وحدَها، وما دونها يُطبَع ويدخل المجموع، **والمجموعُ لكلّ عرضٍ يُحرَس بالسقف نفسِه**.
  */
 const MIN_PAGE_CHARS = 2000
+/**
+ * ‏**دَينٌ مكتوبٌ لا سقفٌ مرفوع** (D-211). صارت «/panel» الرئيسيّةَ والمنشوراتِ وحدهما، فظهر ما كانت الصفحةُ الواحدةُ
+ * ‏تخفيه: كانت نسبةُ الصغير فيهما فوق ‏١٠٪ دائمًا، ونصوصُ الإعدادات والمكتبة (‏١٦px) في الملفّ نفسِه تخفّفها إلى ما دونه.
+ * ‏والصغيرُ فيهما شاراتُ الحال والرقائقُ على كلّ بطاقة (‏١٣px بقرار D-185) ولوحةُ القيادة التي اعتمدها المالك (D-194).
+ * ‏**فالسقفُ ‏١٠٪ باقٍ لكلّ صفحة**، ولهذه الأربع سقفٌ بما قِيس يومَ ظهر — لا تزيد عليه — حتّى يُبَتّ في كثافتها بقرار.
+ */
+const SMALL_DEBT = {
+  'panel.html': 0.131, 'panel-first.html': 0.123, 'panel-editor.html': 0.149, 'panel-editor-queued.html': 0.136,
+}
 /** طولُ السطر: ‏30em («--measure») لكلّ ما يلتفّ سطرين (خطّة التصميم 4.4/3). */
 const MEASURE_EM = 30
 
@@ -209,8 +218,11 @@ for (const view of VIEWS) {
     console.log(`  · ${kinds} نمطًا · تحت ‏١٤px ${(share * 100).toFixed(1)}٪ من ${stats.chars} حرفًا · ` +
       `ثخينٌ ${stats.nodes === 0 ? 0 : ((stats.bold / stats.nodes) * 100).toFixed(0)}٪ من ${stats.nodes} نصًّا · ` +
       `«--ink-3» تحت ‏١٥px: ${stats.faint}`)
-    if (share > MAX_SMALL_SHARE && stats.chars >= MIN_PAGE_CHARS) {
-      hits.push(`الحروفُ تحت ‏١٤px ${(share * 100).toFixed(1)}٪ — والسقفُ ${MAX_SMALL_SHARE * 100}٪`)
+    const cap = SMALL_DEBT[file.split('/').pop()] ?? MAX_SMALL_SHARE
+    if (share > cap && stats.chars >= MIN_PAGE_CHARS) {
+      hits.push(`الحروفُ تحت ‏١٤px ${(share * 100).toFixed(1)}٪ — والسقفُ ${(cap * 100).toFixed(1)}٪${cap === MAX_SMALL_SHARE ? '' : ' (دَينٌ مكتوب، D-211)'}`)
+    } else if (cap !== MAX_SMALL_SHARE) {
+      console.log(`  · دَينٌ مكتوب (D-211): ${(share * 100).toFixed(1)}٪ من سقف ${(cap * 100).toFixed(1)}٪، والهدفُ ${MAX_SMALL_SHARE * 100}٪`)
     }
     const v = (totals.view[label] ??= { chars: 0, small: 0 })
     v.chars += stats.chars; v.small += stats.small

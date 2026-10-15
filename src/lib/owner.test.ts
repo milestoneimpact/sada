@@ -178,7 +178,7 @@ describe('قراراتُ المالك (D-130)', () => {
     expect(six.state).toBe(false)
     expect(six.measured).toBe('4 من 6 بطاقاتٍ مختارة')
     // ‏إلى منتقي البطاقات نفسِه، باسم الفعل (ر-1)
-    expect(six).toMatchObject({ go: '/panel#tiles', goLabel: 'اختر بطاقاتك' })
+    expect(six).toMatchObject({ go: '/panel/settings#tiles', goLabel: 'اختر بطاقاتك' })
     expect(cap.state).toBe(false)
     expect(cap.measured).toBe('صفر — لا توصيةَ تُكتب')
 

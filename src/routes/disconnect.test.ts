@@ -200,7 +200,7 @@ describe('افصل الحساب', () => {
     const account = await seedLinked()
     const cookie = await login()
     const response = await post(cookie, { platform: 'x', account, return: 'https://evil.example/' })
-    expect(response.headers.get('Location')).toBe('/panel#channels')
+    expect(response.headers.get('Location')).toBe('/panel/accounts#channels')
   })
 
   it('YouTube يُبطل عند Google برمز التجديد', async () => {

@@ -17,6 +17,7 @@
  * هنا»** — ولا علامةَ صحٍّ على ما لم يُتحقَّق منه (D-061).
  */
 import { slideGate } from './image/gate'
+import { panelHref } from './nav/panes'
 import { setupHref } from './channels'
 
 /** ماذا يفتح إنجازُ المهمّة — وبه تُرتَّب، لا بترقيمها. */
@@ -283,7 +284,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     done: (f) => f.tilesChosen >= 6,
     evidence: (f) => `${f.tilesChosen} من 6 بطاقاتٍ مختارة`,
     // ‏إلى منتقي البطاقات نفسِه، لا رأسِ «الحدود» (ر-1)
-    go: '/panel#tiles',
+    go: panelHref('tiles'),
     goLabel: 'اختر بطاقاتك',
   },
   {
@@ -295,7 +296,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     done: (f) => f.promoCapUsd > 0,
     evidence: (f) => (f.promoCapUsd > 0 ? `السقفُ ${f.promoCapUsd}$ في الأسبوع` : 'صفر — لا توصيةَ تُكتب'),
-    go: '/panel#settings',
+    go: panelHref('settings'),
     goLabel: 'افتح الحدود',
   },
   {

@@ -14,6 +14,7 @@
  * حالٌ طبيعيّ.
  */
 import { escapeHtml } from './shell'
+import { panelHref } from '../../lib/nav/panes'
 import { money, relativeTime } from '../../lib/format'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -50,7 +51,7 @@ export function stationHref(kind: Station['kind'], platform: string): { href: st
   switch (kind) {
     case 'source':
     case 'analysis':
-      return { href: '/panel#sources', label: 'المصادر' }
+      return { href: panelHref('sources'), label: 'المكتبة' }
     case 'publish':
     case 'metrics':
       return { href: `/panel/channels/${encodeURIComponent(platform)}`, label: `شاشةُ ${platformLabel(platform)}` }

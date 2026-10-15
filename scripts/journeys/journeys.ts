@@ -54,9 +54,9 @@ function navItem(page: Page, label: string): Locator {
   return visible(page.locator('aside.rail nav.tabs a').filter({ hasText: label })).first()
 }
 
-/** تبويبٌ داخل «المنشورات» (D-195): المسوّدات · اكتب · الفيديو · الخطّة. */
+/** تبويبٌ داخل وجهة (D-195 · D-204 · D-206): المنشورات والمكتبة والنتائج والإعدادات — شريطُ اللوح الظاهر. */
 function subTab(page: Page, label: string): Locator {
-  return visible(page.locator('#posts-sub a').filter({ hasText: label })).first()
+  return visible(page.locator('section[data-pane]:not([hidden]) > nav.tab-bar a').filter({ hasText: label })).first()
 }
 
 function button(scope: Page | Locator, name: string | RegExp): Locator {
@@ -154,9 +154,10 @@ const R1: Journey = {
   title: 'ربط منصّة جديدة (Instagram أوّل مرّة) — حتّى مغادرة الموقع إلى OAuth',
   plan: { today: '16', target: '5' },
   async run({ page, m, stack, leftSite }) {
-    await m.tap(visible(page.locator('a[href="/panel/channels/instagram?tab=setup"]')).first(), 'بطاقة Instagram «أكمل الإعداد»')
-    await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
+    // ‏و«أكمل الإعداد» ينزل إلى حقل المعرّف نفسِه (D-205: `setupHref`)، فلا تُضغط «اضبط التطبيق» إلّا إن لم يظهر
+    await m.tap(visible(page.locator('a[href^="/panel/channels/instagram?tab=setup"]')).first(), 'بطاقة Instagram «أكمل الإعداد»')
     const id = page.locator('#ci-instagram')
+    if (!(await id.isVisible())) await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
     await m.type(id, '1234567890123456', 'لصق «Client ID» (من Meta)', { pasted: true })
     await m.type(page.locator('#cs-instagram'), 'local0fake0instagram0secret00000', 'لصق «Client Secret»', { pasted: true })
     await m.tap(button(page.locator('form[action="/panel/channels/app"]').filter({ has: id }), 'احفظ'), '«احفظ»')
@@ -320,7 +321,7 @@ const R4: Journey = {
   },
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await m.tap(navItem(page, 'المكتبة'), '«المكتبة» في التنقّل')
     await m.tap(subTab(page, 'الفيديو'), 'تبويبُ «الفيديو»')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
@@ -417,7 +418,7 @@ const R7: Journey = {
   title: 'رؤية النتائج (تقرير الأسبوع)',
   plan: { today: '4', target: '1' },
   async run({ page, m, stack }) {
-    await m.tap(navItem(page, 'التقرير'), '«التقرير» في التنقّل')
+    await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
     const report = q<{ id: string; body_json: string }>(stack, 'SELECT id, body_json FROM reports ORDER BY id DESC LIMIT 1')
     // ‏الرقمُ الذي يُقرأ: مرّاتُ الظهور في التقرير
     const impressions = report === undefined ? null : JSON.stringify(JSON.parse(report.body_json)).match(/"impressions":(\d+)/)?.[1] ?? null
@@ -522,7 +523,7 @@ const R11: Journey = {
     m.note(`بعد الدخول: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
     const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')
     if (session && landed.pathname !== '/panel/report') {
-      await m.tap(navItem(page, 'التقرير'), '«التقرير» — لأنّ الدخول لم يُعِد إلى الصفحة المطلوبة')
+      await m.tap(navItem(page, 'النتائج'), '«النتائج» — لأنّ الدخول لم يُعِد إلى الصفحة المطلوبة')
     }
     const at = new URL(page.url()).pathname
     return { success: session && at === '/panel/report', verified: `جلسة ${session ? 'مفتوحة' : 'لا'} · الصفحة ${at}` }

@@ -174,37 +174,36 @@ describe('وشريطُ الرموز المقتربة', () => {
        VALUES ('a1', 'x', 'member', 'e1', '@omar')`,
     )
     db.raw.exec(
-      `INSERT INTO tokens (account_id, access_enc, access_iv, expires_at,
+      // ‏وموعدُ تجديدٍ بلا رمزِ تجديدٍ حالٌ لا تقع: فالتجديدُ يُبذَر برمزه (D-205)
+      `INSERT INTO tokens (account_id, access_enc, access_iv, refresh_enc, refresh_iv, expires_at,
                            refresh_expires_at, scopes)
-       VALUES ('a1', 'x', 'y', '${kind === 'access' ? at : new Date(Date.now() + 90 * 86_400_000).toISOString()}',
+       VALUES ('a1', 'x', 'y', ${kind === 'refresh' ? "'r', 'v'" : 'NULL, NULL'},
+               '${kind === 'access' ? at : new Date(Date.now() + 90 * 86_400_000).toISOString()}',
                ${kind === 'refresh' ? `'${at}'` : 'NULL'}, 'tweet.write')`,
     )
   }
 
   it('لا شريطَ حيث لا رمزَ يقترب', async () => {
-    expect(await panel()).not.toContain('إذنُ التجديد')
-  })
-
-  /** **يُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح** — قد لا تُفتَح قبل أن يقع. */
-  it('وإذنُ وصولٍ قريبٌ يُعرَض تحذيرا', async () => {
-    seed(4, 'access')
-    const html = await panel()
-    expect(html).toContain('إذنُ الوصول')
-    expect(html).toContain('@omar')
+    expect(await panel()).not.toContain('افتح الحسابات')
   })
 
   /**
-   * **ولا يُسوَّى بين الرمزين.**
-   *
-   * سقوطُ الوصول يُصلحه النظامُ وحده، **وسقوطُ التجديد يوجب يدَ
-   * المالك** — فيُعرَض أشدّ، ويُقال ذلك نصّا لا بلونٍ وحده.
+   * **يُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح** — قد لا تُفتَح قبل أن يقع.
+   * **وبكلمة البطاقة نفسِها** (D-205): لا «إذنُ الوصول» ولا «إذنُ التجديد»، بل حالُ المنصّة ومتى تنقطع.
    */
-  it('ورمزُ تجديدٍ يُعرَض أشدَّ ويُقال أنّه يوجب يدَك', async () => {
+  it('وإذنُ وصولٍ قريبٌ بلا تجديد: «تحتاج إعادةَ ربطٍ» بعدد الأيّام', async () => {
+    seed(4, 'access')
+    const html = await panel()
+    expect(html).toMatch(/<b><bdi>X<\/bdi><\/b>: تحتاج إعادةَ ربطٍ خلال [34] أيّام/)
+    expect(html).toContain('class="toast-note warn"')
+    expect(html).not.toContain('إذنُ الوصول')
+  })
+
+  it('وإذنُ تجديدٍ قريب: الحكمُ نفسُه، فالربطُ ينقطع بانقضائه', async () => {
     seed(2, 'refresh')
     const html = await panel()
-    expect(html).toContain('إذنُ التجديد')
-    expect(html).toContain('يوجب سقوطُه دورةَ إذنٍ بيدك')
-    expect(html).toContain('class="toast-note bad"')
+    expect(html).toMatch(/<b><bdi>X<\/bdi><\/b>: تحتاج إعادةَ ربطٍ خلال (يوم|يومين)/)
+    expect(html).not.toContain('إذنُ التجديد')
   })
 })
 
@@ -229,7 +228,7 @@ describe('قراراتُ المالك في «ما عليك» (D-130)', () => {
     expect(html).toContain('4 من 6 بطاقاتٍ مختارة')
     expect(html).toContain('M-21')
     expect(html).toContain('صفر — لا توصيةَ تُكتب')
-    expect(html).toContain('href="/panel#settings">افتح الحدود</a>')
+    expect(html).toContain('href="/panel/settings#settings">افتح الحدود</a>')
   })
 })
 
@@ -241,7 +240,7 @@ describe('مهامُّ الربط في «ما عليك» (ر-1)', () => {
     expect(html).toContain('href="/panel/channels/tiktok?tab=setup#ci-tiktok">اضبط TikTok</a>')
     expect(html).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube">اضبط YouTube</a>')
     expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24"')
-    expect(html).toContain('href="/panel#tiles">اختر بطاقاتك</a>')
+    expect(html).toContain('href="/panel/settings#tiles">اختر بطاقاتك</a>')
     // ‏واسمُ الوثيقة رابطٌ لا نصٌّ يُقرأ ولا يُفتَح
     expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md"')
   })

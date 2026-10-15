@@ -10,7 +10,7 @@ import { fixtureImage, writeAudited } from './writeAudited'
 import { viewChannels, type LinkedAccount } from '../src/lib/channels'
 import { scopeSet } from '../src/lib/oauth/scopes'
 import { platformScreen } from '../src/routes/ui/platformView'
-import { channelsSection } from '../src/routes/ui/channels'
+import { channelsSection, setupPane } from '../src/routes/ui/channels'
 import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
@@ -60,9 +60,9 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
 const page = (
   title: string,
   body: string,
-  active = title.includes('التقرير') ? 'report' : title.includes('مهامُّ') ? 'tasks' : 'channels',
+  active = title.includes('النتائج') ? 'results' : title.includes('مهامُّ') ? 'tasks' : 'accounts',
 ): string =>
-  soloPage(title, { href: '/panel#channels', label: 'القنوات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
+  soloPage(title, { href: '/panel#channels', label: 'الحسابات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
 
 // ── صفحاتُ المنصّات: صفحةُ حساب (D-172) ─────────────────────────────
 const tt = views.find((v) => v.spec.id === 'tiktok')!
@@ -281,7 +281,7 @@ const stored: StoredReport = {
 
 writeAudited(
   '/tmp/screen-report.html',
-  page('صدى — التقرير الأسبوعيّ', reportScreen({
+  page('صدى — النتائج', reportScreen({
     reports: [stored],
     current: stored,
     promoCapUsd: 20,
@@ -334,7 +334,8 @@ writeAudited(
         // ‏كلُّ حالٍ شاشةٌ مستقلّة في الحقيقة، فتُعلَّم ليعدّ «audit_design» نحاسَها وحدَها
         // ‏لا الأربعَ معًا (ميزانيّةُ النحاس لكلّ شاشة، خطّة التصميم 3.2 · D-187)
         (c, i) => `<section data-screen="wizard-${i + 1}"><h2 class="sec">${c.title}</h2>` +
-          channelsSection(soloX, now, [c.app], 'https://sada2.basserh.com') + '</section>',
+          // ‏والمعالجُ لوحُ الضبط نفسُه (`setupPane`) — بطاقةُ «الحسابات» لا تتبدّل بحال التطبيق بعد D-205
+          setupPane(soloX.find((v) => v.spec.id === 'x')!, c.app, 'https://sada2.basserh.com') + '</section>',
       )
       .join(''),
   ),

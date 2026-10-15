@@ -3,6 +3,7 @@
  * والصفحة تُقرأ كنصٍّ كما يراها المتصفّح.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { everyPane } from '../test/panelPages'
 import { toBase64 } from '../lib/crypto'
 import { fingerprint } from '../lib/security/digest'
 import { readSettings, writeSetting } from '../lib/settings'
@@ -168,6 +169,13 @@ describe('الدخول', () => {
       return await app.request(path, { method: 'POST', body }, env)
     }
 
+    // ‏والمرساةُ تعود (D-210): سكربتُ الدخول يُلحقها بـ«next»، والخادمُ يوجّه إليها كما هي
+    it('«next» بمرساة بطاقةٍ يعود إليها بعد الدخول، والسكربتُ يُلحقها', async () => {
+      const response = await signIn('/panel#d-0f6c1d2e-aaaa-bbbb-cccc-1234567890ab')
+      expect(response.headers.get('Location')).toBe('/panel#d-0f6c1d2e-aaaa-bbbb-cccc-1234567890ab')
+      // ‏وإلحاقُ المرساة في المتصفّح يقيسه `npm run swap` (الجلسةُ انتهت وسط فعل)
+    })
+
     it('صفحةٌ تُطلَب بلا جلسة تحمل مسارَها في نموذج الدخول — ولا تقول «انتهت» لمن لم يدخل', async () => {
       const response = await app.request('/panel/report?week=2026-09-28', {}, env)
       expect(response.status).toBe(401)
@@ -238,7 +246,7 @@ describe('اللوحة لا تسرّب', () => {
   it('اسم ملفٍّ يحمل HTML يُهرَب ولا يُحقَن', async () => {
     await seedSource('<img src=x onerror=alert(1)>تقرير')
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).not.toContain('<img src=x onerror')
     expect(html).toContain('&lt;img src=x onerror')
   })
@@ -247,7 +255,7 @@ describe('اللوحة لا تسرّب', () => {
 describe('ما تعرضه اللوحة', () => {
   it('تعرض حال «يعمل» وتقرأ السقوف من القاعدة', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('يعمل')
     expect(html).toContain('لوحة التحكّم')
     expect(html).toContain('سقف التحليل')
@@ -256,7 +264,7 @@ describe('ما تعرضه اللوحة', () => {
   it('تعرض المصادر وحالها', async () => {
     await seedSource('تقرير الأثر')
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('تقرير الأثر')
     expect(html).toContain('ينتظر')
   })
@@ -268,7 +276,7 @@ describe('ما تعرضه اللوحة', () => {
       .bind(crypto.randomUUID(), id, 'خلاصة', JSON.stringify({ hash: 'md5:قديم', themes: [] }), 0.8)
       .run()
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('تغيّر بعد التحليل')
   })
 
@@ -285,7 +293,7 @@ describe('ما تعرضه اللوحة', () => {
       )
       .run()
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('خلاصةٌ عربية للمصدر')
     expect(html).toContain('رقمٌ من الميدان')
     expect(html).toContain('الوقف')
@@ -304,7 +312,7 @@ describe('ما تعرضه اللوحة', () => {
 
   it('تسمّي السرّ الناقص لمزوّدٍ غير مضبوط', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('ANTHROPIC_API_KEY')
     expect(html).toContain('لا مفتاح')
   })
@@ -354,8 +362,9 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   it('يبني الجدولَ من القاعدة ويعرضه', async () => {
     const cookie = await login()
     seed()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('data-pane="pivot"')
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    expect(html).toContain('data-pane="results"')
+    expect(html).toContain('<div data-sub id="pivot">')
     expect(html).toContain('table class="card card-inset pv"')
     // صفّان: منصّتان — **والاسمُ كما يُقرأ لا كما في القاعدة** (D-123):
     // كان الاختبارُ يثبّت `linkedin` خاما، فثبّت العيبَ الذي كان يجب أن يمسكه
@@ -372,7 +381,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   it('ويُنزَّل CSV بالعرض نفسِه، ولصاحب الجلسة وحدَه', async () => {
     const cookie = await login()
     seed()
-    const html = await (await app.request('/panel?rows=platform&cols=status', withSession(cookie), env)).text()
+    const html = await (await app.request('/panel/analysis?rows=platform&cols=status', withSession(cookie), env)).text()
     expect(html).toContain('href="/panel/pivot.csv?rows=platform&amp;cols=status&amp;m=count&amp;days=30" download')
 
     const res = await app.request('/panel/pivot.csv?rows=platform&cols=status&m=count&days=30', withSession(cookie), env)
@@ -402,7 +411,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   it('ومسوّدةٌ لم تُربَط بعدُ لا تسقط من الجدول', async () => {
     const cookie = await login()
     seed()
-    const url = '/panel?rows=status&cols=none&m=count&days=30'
+    const url = '/panel/analysis?rows=status&cols=none&m=count&days=30'
     const html = await (await app.request(url, withSession(cookie), env)).text()
     expect(html).toContain('<th scope="row">تنتظر قرارك</th>')
   })
@@ -411,7 +420,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   it('والعنوانُ يغيّر محاورَه', async () => {
     const cookie = await login()
     seed()
-    const url = '/panel?rows=status&cols=none&m=success_rate&days=90'
+    const url = '/panel/analysis?rows=status&cols=none&m=success_rate&days=90'
     const html = await (await app.request(url, withSession(cookie), env)).text()
     expect(html).toContain('<option value="status" selected>')
     expect(html).toContain('<option value="success_rate" selected>')
@@ -429,7 +438,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   it('وقيمةٌ مخترَعةٌ في العنوان لا تُسقط اللوحة', async () => {
     const cookie = await login()
     seed()
-    const url = '/panel?rows=DROP+TABLE&cols=%27%3B--&m=؟&days=99999'
+    const url = '/panel/analysis?rows=DROP+TABLE&cols=%27%3B--&m=؟&days=99999'
     const response = await app.request(url, withSession(cookie), env)
     expect(response.status).toBe(200)
     const html = await response.text()
@@ -442,7 +451,7 @@ describe('اللوحُ المحوريّ (D-120)', () => {
   /** وجدولٌ فارغٌ يقول لماذا — **لا «لا نتائج» وحدَها**. */
   it('ولا منشورَ يعطي سببا لا صمتا', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('لا منشورَ في هذا المدى')
   })
 })
@@ -460,7 +469,7 @@ describe('الأزرار تغيّر القاعدة فعلا', () => {
     expect((await submit(cookie, 'paused', 'true')).status).toBe(303)
     expect((await readSettings(db)).paused).toBe(true)
 
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('موقوف مؤقتا')
     expect(html).toContain('استئناف العمل')
   })
@@ -659,7 +668,7 @@ describe('نضج العرض', () => {
   it('الوقت نسبيّ والدقيق في title — لا طابعٌ خام وحده', async () => {
     await seedSource('تقرير')
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toMatch(/الآن|قبل /)
     // ‏والدقيقُ في title بتوقيت الرياض لا UTC (D-201)
     expect(html).toMatch(/title="\d{4}-\d\d-\d\d \d\d:\d\d بتوقيت الرياض"/)
@@ -675,14 +684,14 @@ describe('نضج العرض', () => {
 
   it('حالة الفراغ تحمل الفعل لا وصف الغياب وحده', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('لا مصادر بعد')
     expect(html).toContain('/panel/scan')
   })
 
   it('الإيقاف يسأل قبل أن يقع', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('data-confirm')
   })
 
@@ -765,9 +774,10 @@ describe('رقمٌ واحدٌ في الواجهة (D-147)', () => {
 describe('شريطُ المؤشّرات واحد (D-146)', () => {
   it('القنواتُ والمزوّدون وشاشةُ المنصّة يحملون tiles، ولا شريطَ بلاه', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     // ‏والهامشُ صنفٌ من السلّم لا سِمةُ «style» (D-189)
-    expect(html).toContain('<div class="card grid tiles c4 mb-4">')
+    // ‏و«الحسابات» ثلاثُ بلاطات (D-205): متّصلة · تحتاج إعادةَ ربط · تحتاج إعدادًا
+    expect(html).toContain('<div class="card grid tiles c3 mb-4">')
     expect(html).toContain('<div class="card grid tiles c3 mb-3">')
     // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
@@ -814,22 +824,53 @@ describe('هندسةُ نظرة عامّة (D-136)', () => {
 describe('رؤوسُ الألواح (D-137)', () => {
   it('لكلّ لوحٍ h1 واحدٌ، ونظرةٌ عامّة بلا رأسٍ قصدًا', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    const panes = html.split('<section data-pane="').slice(1)
-    expect(panes.length).toBeGreaterThanOrEqual(8)
-    for (const p of panes) {
-      const name = p.slice(0, p.indexOf('"'))
-      const h1s = (p.match(/<h1[\s>]/g) ?? []).length
-      expect(h1s, name).toBe(name === 'overview' ? 0 : 1)
+    // ‏**كلُّ مسارٍ يحمل ألواحَه وحدَها** (D-211): الرئيسيّةُ والمنشوراتُ في «/panel»، وكلُّ لوحٍ آخر في مساره
+    const PAGES: Record<string, string[]> = {
+      '/panel': ['overview', 'posts'], '/panel/library': ['library'], '/panel/accounts': ['accounts'],
+      '/panel/settings': ['settings'], '/panel/analysis': ['results'],
     }
-    expect(html).toContain('<h1>الجدول المحوريّ</h1>')
+    for (const [path, want] of Object.entries(PAGES)) {
+      const page = await (await app.request(path, withSession(cookie), env)).text()
+      expect([...page.matchAll(/<section data-pane="([a-z]+)"/g)].map((m) => m[1]), path).toEqual(want)
+    }
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    // ‏والرأسُ يُعدّ في كلّ صفحةٍ على حدة: آخرُ لوحٍ في صفحةٍ لا يمتدّ إلى رأس التي بعدها
+    for (const path of Object.keys(PAGES)) {
+      const page = await (await app.request(path, withSession(cookie), env)).text()
+      const body = page.slice(0, page.indexOf('<footer>'))
+      for (const p of body.split('<section data-pane="').slice(1)) {
+        const name = p.slice(0, p.indexOf('"'))
+        const h1s = (p.match(/<h1[\s>]/g) ?? []).length
+        expect(h1s, `${path} ${name}`).toBe(name === 'overview' ? 0 : 1)
+      }
+    }
+    expect(html).toContain('<h1>النتائج</h1>')
+    // ‏والمراسي القديمةُ أقسامٌ في ألواحها الجديدة — فالروابطُ المحفوظةُ تصل
+    // ‏و«المكتبة» ثلاثةُ تبويبات (D-206)، والفيديو فيها لا في «المنشورات»
+    const lib = html.slice(html.indexOf('id="library-sub"'), html.indexOf('</nav>', html.indexOf('id="library-sub"')))
+    expect([...lib.matchAll(/<span>([^<]+)<\/span>/g)].map((m) => m[1])).toEqual(['المصادر', 'الفيديو', 'الصور'])
+    const libPane = html.slice(html.indexOf('<section data-pane="library"'), html.indexOf('</section>', html.indexOf('<section data-pane="library"')))
+    expect(libPane).toContain('<div data-sub id="sub-videos">')
+    expect(libPane).toContain('<div data-sub id="sub-images">')
+    // ‏و«منشور جديد» العائمُ بأبواب الكتابة الأربعة (D-208)، ومراسيها في اللوحة نفسِها
+    const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
+    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#idea', '#write', '/panel/library#videos', '#plan-import'])
+    for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
+    // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
+    const dev = html.slice(html.indexOf('<div data-sub id="dev">'), html.indexOf('<div data-sub id="activity">'))
+    expect(dev).toMatch(/\/oauth\/linkedin\/callback/)
+    expect(dev).toContain('LINKEDIN_CLIENT_ID')
+    expect(dev).not.toMatch(/secret[^<]*=/i)
+    for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
+      expect(html, old).toContain(`<div data-sub id="${old}">`)
+    }
   })
 })
 
 describe('مفتاح الإدراج الآليّ في اللوحة', () => {
   it('يظهر مطفأ ويشرح ما يقع إن رُفع', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('الإدراج الآليّ')
     expect(html).toContain('رفع الإدراج الآليّ')
     expect(html).toContain('مطفأ')
@@ -837,7 +878,7 @@ describe('مفتاح الإدراج الآليّ في اللوحة', () => {
 
   it('يسأل قبل رفعه ويذكر الحدّ في السؤال — فلا يُرفع بلا علم', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('سيبدأ إنفاقٌ يوميّ بلا أمرٍ منك')
     expect(html).toContain('data-confirm')
   })
@@ -850,7 +891,7 @@ describe('مفتاح الإدراج الآليّ في اللوحة', () => {
     await app.request('/panel/settings', withSession(cookie, { method: 'POST', body }), env)
     expect((await readSettings(db)).autoEnqueue).toBe(true)
 
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('رُفع الإدراج الآليّ')
     expect(html).toContain('إطفاء')
   })
@@ -986,7 +1027,7 @@ describe('خزانة المفاتيح في اللوحة', () => {
       stub({ models: [{ name: 'models/gemini-2.5-flash', displayName: 'Flash' }] })
       const body = (await (await post(cookie, '/panel/providers/models', { provider: 'gemini' })).json()) as { models: { id: string; name: string }[] }
       expect(body.models[0]).toMatchObject({ id: 'gemini-2.5-flash', name: 'Gemini · السريع (2.5 Flash)' })
-      const html = await (await app.request('/panel', withSession(cookie), env)).text()
+      const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(html).toContain('<option value="claude-opus-5" title="claude-opus-5" selected>Claude · الأقوى (Opus 5)</option>')
       expect(html).not.toMatch(/<option value="claude-opus-5"[^>]*>claude-opus-5</)
     })
@@ -1021,7 +1062,7 @@ describe('خزانة المفاتيح في اللوحة', () => {
   it('سرُّ Worker لا يُدار من اللوحة — ولا يُقنَّع ولا يُعرض', async () => {
     const cookie = await login()
     const withSecret = { ...env, ANTHROPIC_API_KEY: 'sk-ant-سرّ-في-الورَكر' }
-    const html = await (await app.request('/panel', withSession(cookie), withSecret)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), withSecret)))
     expect(html).toContain('سرّ Worker')
     expect(html).toContain('لا يُبدَّل من هنا')
     expect(html).not.toContain('sk-ant-سرّ')
@@ -1118,7 +1159,7 @@ describe('**مزوّدٌ يُضاف من اللوحة كاملا**', () => {
 
   it('التأكيد يعرض ما سيُرسَل قبل أن يُرسَل', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('سيُرسَل مفتاحك ونصّ مستنداتك إلى هذا العنوان')
   })
 })
@@ -1340,7 +1381,7 @@ describe('جرد الأجهزة في اللوحة', () => {
   it('يعرض الجلسات ويعلّم الحاليّة', async () => {
     const cookie = await login()
     await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('الأجهزة المفتوحة')
     expect(html).toContain('هذا الجهاز')
     expect(html).toContain('/panel/sessions/revoke')
@@ -1373,7 +1414,7 @@ describe('جرد الأجهزة في اللوحة', () => {
     const other = await login()
     const mine = await login()
     const otherId = other.split('=')[1]!
-    const html = await (await app.request('/panel', withSession(mine), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(mine), env)))
     expect(html).not.toContain(otherId)
     expect(html).toContain(`name="handle" value="${await fingerprint(otherId)}"`)
 
@@ -1389,7 +1430,7 @@ describe('جرد الأجهزة في اللوحة', () => {
     const body = new FormData()
     body.set('handle', await fingerprint(otherId))
     await app.request('/panel/sessions/revoke', withSession(mine, { method: 'POST', body }), env)
-    expect(await (await app.request('/panel', { headers: { Cookie: other } }, env)).text()).toContain(
+    expect(await (await everyPane((p) => app.request(p, { headers: { Cookie: other } }, env)))).toContain(
       'name="token"',
     )
     const { results } = await db
@@ -1459,9 +1500,11 @@ describe('سجلّ التدقيق — من فعل ماذا', () => {
 
   it('يظهر في اللوحة بأسمائه العربيّة', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('سجلّ التدقيق')
-    expect(html).toContain('فُتحت جلسة')
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    // ‏في تبويب «سجلّ النشاط» من «الإعدادات» (خطّة التصميم 5.8 · D-206)
+    const log = html.slice(html.indexOf('<div data-sub id="activity">'))
+    expect(log).toContain('<h2>سجلّ النشاط</h2>')
+    expect(log).toContain('فُتحت جلسة')
   })
 
   it('عطلٌ في السجلّ لا يُسقط الفعل — الإعدادُ يُحفظ ولو لم يُسجَّل', async () => {
@@ -1493,8 +1536,9 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
 
   it('يعرض المبنيَّ وغيرَ المبنيّ معا', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('data-pane="channels"')
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    expect(html).toContain('data-pane="accounts"')
+    expect(html).toContain('<div data-sub id="channels">')
     for (const name of ['LinkedIn', 'Snapchat', 'Instagram', 'TikTok', 'YouTube']) {
       expect(html).toContain(name)
     }
@@ -1502,17 +1546,19 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
 
   it('**لا زرَّ ربطٍ لما لم يُبنَ** — وزرٌّ يقول «غير مدعوم» أسوأ من غيابه', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     for (const id of ['snapchat', 'instagram', 'tiktok', 'threads', 'youtube']) {
       expect(html).not.toContain(`/oauth/${id}/start`)
     }
-    expect(html).toContain('يحتاج سائقا')
+    // ‏وما لم يُبنَ سطرُ «قريبًا» في آخر «الحسابات» (D-205)
+    expect(html).toContain('<p class="hint mt-5">قريبًا: ')
   })
 
   it('بلا أسرار: تُسمّى الأسرار الناقصة ومهمّتها، ولا يُعرض زرّ', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('LINKEDIN_CLIENT_ID')
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
+    // ‏وأسماءُ أسرار Worker خلف «للمطوّر» في شاشة المنصّة، لا على البطاقة (خطّة التصميم 5.7 · D-205)
+    expect(html).toContain('aria-label="أكمل الإعداد LinkedIn"')
     /*
      * **واللوحُ يُسمّي المانعَ ويفتح بابَه** (D-111).
      *
@@ -1543,7 +1589,7 @@ describe('القنوات — سجلٌّ صادق لا وعدٌ بما لا يق�
   it('الحسابُ المربوط يُعرض باسمه', async () => {
     await seedAccount('linkedin')
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toContain('عمر عبدالحميد')
     expect(html).toContain('مربوطة')
   })
@@ -2548,7 +2594,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
    * **المحرّرُ المركّز** (D-198): `?open=<id>` يرسمه في قسم «المسوّدات» نفسِه بجوار القائمة، والتبويباتُ
    * الأربعةُ كما هي (D-195). والإغلاقُ رابطٌ إلى بطاقته، و«التفاصيل» مطويّة، والمعرّفُ يُفحَص قبل أن يُسأل عنه.
    */
-  it('المحرّرُ يُفتح بـ?open= ويُغلق إلى بطاقته، والتبويباتُ الأربعةُ باقية، والتفاصيلُ مطويّة', async () => {
+  it('المحرّرُ يُفتح بـ?open= ويُغلق إلى بطاقته، والتبويباتُ الثلاثةُ باقية، والتفاصيلُ مطويّة', async () => {
     const id = await seedPost('linkedin', 'draft')
     await db.prepare("UPDATE posts SET model = 'claude-opus-5', approved_by = NULL WHERE id = ?").bind(id).run()
     await seedAccount('linkedin', 'عمر')
@@ -2559,7 +2605,9 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     // ‏والمحرّرُ داخل «المسوّدات» لا تبويبٌ خامس
     const list = html.slice(html.indexOf('id="sub-list"'), html.indexOf('id="sub-write"'))
     expect(list).toContain('id="ed"')
-    expect((html.match(/href="#sub-/g) ?? []).length).toBe(4)
+    // ‏ثلاثةُ تبويباتٍ في «المنشورات» بعد أن صار الفيديو في «المكتبة» (D-206)
+    const bar = html.slice(html.indexOf('id="posts-sub"'), html.indexOf('</nav>', html.indexOf('id="posts-sub"')))
+    expect((bar.match(/href="#sub-/g) ?? []).length).toBe(3)
     expect(html).toContain(`href="/panel#d-${id}" aria-label="أغلق المنشور وارجع إلى القائمة"`)
     expect(html).toContain('<details class="ed-more" id="ed-details"><summary>التفاصيل</summary>')
     expect(html).not.toMatch(/<details class="ed-more"[^>]*\sopen/)
@@ -2891,7 +2939,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
 
     const TECH = /\bname="(client_id|client_secret|key|base_url|model|token|code)"/
     const pages = [
-      await (await app.request('/panel', withSession(cookie), env)).text(),
+      await (await everyPane((p) => app.request(p, withSession(cookie), env))),
       await (await app.request('/panel/channels/youtube?tab=setup', withSession(cookie), env)).text(),
     ]
     const inputs = pages.flatMap((html) => [...html.matchAll(/<input\b[^>]*>/g)].map((m) => m[0]))
@@ -2987,7 +3035,7 @@ describe('ضبطُ التطبيق من اللوحة', () => {
     expect(before).toContain('ضبطُ التطبيق ودليلُه')
     expect(before).toContain('id="setup"')
     // ‏وزرُّ الرأس يذهب إليه من أيّ تبويب (D-172)
-    expect(before).toContain('href="/panel/channels/youtube?tab=setup#setup"')
+    expect(before).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube"')
     expect(before).toContain('oauth/youtube/callback')
 
     const body = new FormData()
@@ -3113,7 +3161,7 @@ describe('ضبطُ التطبيق يعود إلى تبويب الإعداد (ر-
     const cookie = await login()
     const saved = await app.request('/panel/channels/app',
       withSession(cookie, { method: 'POST', body: form({ return: '//evil.example' }) }), env)
-    expect(saved.headers.get('location')).toBe('/panel#channels')
+    expect(saved.headers.get('location')).toBe('/panel/accounts#channels')
   })
 })
 
@@ -3523,7 +3571,7 @@ describe('توجيهُ كلِّ مهمّةٍ يُحفَظ لا يُعرَض وح
 
   it('ويُعرَض لكلِّ مهمّةٍ اسمٌ عربيّ — لا مفتاحٌ خام', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    const html = await (await everyPane((p) => app.request(p, { headers: { Cookie: cookie } }, env)))
     expect(html).toContain('الخطّة — منطقُ الأسبوع')
     expect(html).toContain('الفيديو — تحريكُ الصورة')
   })
@@ -3536,7 +3584,7 @@ describe('توجيهُ كلِّ مهمّةٍ يُحفَظ لا يُعرَض وح
 describe('ترتيبُ بطاقات الحدود (D-126)', () => {
   it('الإيقافُ ثمّ السقوفُ ثمّ الإدراجُ ثمّ التنبيهاتُ ثمّ البطاقاتُ ثمّ الصورة', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     const pane = html.slice(html.indexOf('<section data-pane="settings"'))
     const at = (marker: string): number => {
       const i = pane.indexOf(marker)
@@ -3595,8 +3643,9 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
       .bind(id, postId, `image/${postId}/${id}`, `image:${postId}:${id}`)
       .run()
   }
+  // ‏والتوجيهُ والمزوّدون في «الإعدادات» (D-211)، ونقاطُ الجاهزيّة في «/panel»
   const panelHtml = async (): Promise<string> =>
-    (await app.request('/panel', withSession(await login()), env)).text()
+    everyPane(async (p) => app.request(p, withSession(await login()), env))
   /** صفُّ المهمّة في جدول التوجيه — من اسمها إلى آخر خليّته. */
   const routeRow = (html: string, label: string): string => {
     const at = html.indexOf(`<div class="nm">${label}</div>`)
@@ -3804,8 +3853,10 @@ describe('مربوطةٌ بلا إذن تُقال في كلّ موضع (D-166)',
 
   it('الرافدةُ حمراءُ ونظرةٌ عامّة تقول ما ينتظرك', async () => {
     const cookie = await login()
-    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(html).toMatch(/<span class="dot bad" title="مربوطة بلا إذن">/)
+    const html = await (await everyPane((p) => app.request(p, { headers: { Cookie: cookie } }, env)))
+    // ‏والرافدةُ تعدّها على «الحسابات» من الحكم الواحد (D-205)، والبطاقةُ تقول «منقطعة»
+    expect(html).toMatch(/<a href="\/panel\/accounts"[^>]*>[\s\S]*?<span>الحسابات<\/span><span class="count">1<\/span><\/a>/)
+    expect(html).toContain('id="ch-linkedin" data-health="broken"')
     expect(html).toContain('LinkedIn: الحسابُ محفوظٌ بلا إذن')
     expect(html).toContain('href="/panel/channels/linkedin"')
   })
@@ -3813,7 +3864,7 @@ describe('مربوطةٌ بلا إذن تُقال في كلّ موضع (D-166)',
   it('وشاشةُ المنصّة: الشارةُ والزرُّ الأوّل «أعد الربط»', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel/channels/linkedin', { headers: { Cookie: cookie } }, env)).text()
-    expect(html).toContain('مربوطة بلا إذن')
+    expect(html).toContain('منقطعة') // ‏حكمُ بطاقة «الحسابات» نفسُه (D-205)
     expect(html).toContain('>أعد الربط</a>')
     expect(html).not.toContain('>اربط حسابا آخر</a>')
   })
@@ -3836,7 +3887,7 @@ describe('رأسُ كلّ لوحٍ اسمُه في الرافدة (D-166)', () =
   it('كلُّ لوحٍ في الصفحة رأسُه من SECTIONS، وشاشةُ «ما عليك» كذلك', async () => {
     const { SECTIONS } = await import('./ui/command')
     const cookie = await login()
-    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    const html = await (await everyPane((p) => app.request(p, { headers: { Cookie: cookie } }, env)))
     const panes = [...html.matchAll(/<section data-pane="([a-z]+)"[^>]*>([\s\S]*?)<\/section>/g)]
     expect(panes.length).toBeGreaterThan(5)
     for (const [, id, body] of panes) {
@@ -3886,12 +3937,12 @@ describe('سقفُ المقاطع اليوميّ في اللوحة (D-168)', () 
     await seedPictured()
     const cookie = await login()
     await clipToday()
-    const under = await (await app.request('/panel', withSession(cookie), env)).text()
+    const under = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(under).toContain('title="تامّة — بقي 1 من 2 اليوم"')
     expect(under).toContain(ON)
 
     await clipToday()
-    const over = await (await app.request('/panel', withSession(cookie), env)).text()
+    const over = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(over).toContain(OFF)
     expect(over).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
     const pane = over.slice(over.indexOf('<section data-pane="settings"'))
@@ -4029,7 +4080,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
       .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
       .run()
     await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 6.06 })
-    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
     const next = html.slice(html.indexOf('<div class="card card-alert next"'), html.indexOf('<div class="card home-card">'))
     expect(next).toContain('href="#c2"')
     expect(next).toContain('6.06$ من 5.00$')
@@ -4042,10 +4093,11 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
   })
 
   it('ورأسُ «المنشورات» فيه الأبوابُ الثلاثة إلى بطاقاتها', async () => {
-    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
     const head = html.slice(html.indexOf('<section data-pane="posts"'), html.indexOf('</div>', html.indexOf('<div class="aside">', html.indexOf('<section data-pane="posts"'))))
     for (const [anchor, label] of [['write', 'اكتب من مصدر'], ['videos', 'ارفع فيديو'], ['plan-import', 'خطّة من ملفّ']] as const) {
-      expect(head).toContain(`href="#${anchor}">${label}</a>`)
+      // ‏و«ارفع فيديو» إلى «المكتبة» بمسارها (D-211)، والبقيّةُ مراسٍ في «/panel»
+      expect(head).toContain(`href="${anchor === 'videos' ? '/panel/library#videos' : `#${anchor}`}">${label}</a>`)
       expect(html).toContain(`id="${anchor}"`)
     }
   })
@@ -4102,7 +4154,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(done.status).toBe(200)
     expect(bucket.stored.get(`upload/${started.id}.mp4`)).toBe(1)
 
-    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(page).toContain('<div class="card mt-3" id="videos"')
     expect(page).toContain('قيادة.mp4')
     expect(page).toContain('<bdi dir="ltr">0:42</bdi> · <bdi dir="ltr">1080×1920</bdi>')
@@ -4117,7 +4169,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     }), env)
     expect(posts.status).toBe(303)
     // ‏ويعود إلى صفّ المقطع نفسِه لا إلى رأس القسم
-    expect(posts.headers.get('Location')).toBe(`/panel#v-${started.id}`)
+    expect(posts.headers.get('Location')).toBe(`/panel/library#v-${started.id}`)
     const rows = db.raw.prepare(
       `SELECT p.platform, p.status FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = ? ORDER BY p.platform`,
     ).all(started.id) as { platform: string; status: string }[]
@@ -4163,7 +4215,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
       ('acc-tt', 'tiktok', 'member', 'tt', 'omar', 'active')`).run()
     const cookie = await login()
     await uploaded(cookie)
-    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(page).toContain('متّصل · يصل خاصًّا')
     expect(page).toContain('Google لم تُجِز تطبيقك بعد — تنشره أنت من YouTube Studio.')
     expect(page).toContain('متّصل · لا يراه غيرك')
@@ -4187,7 +4239,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
       `SELECT p.id, p.platform FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = ? ORDER BY p.platform`,
     ).all(id) as { id: string; platform: string }[]
 
-    const page = await (await app.request('/panel', withSession(cookie), env)).text()
+    const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/schedule`)))
     for (const p of posts) expect(row).toContain(`href="#d-${p.id}"`)
     expect(row).toContain('معتمَدٌ بلا موعد')
@@ -4204,7 +4256,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     f.set('preset', 'tomorrow')
     const done = await app.request(`/panel/uploads/${id}/schedule`, withSession(`${cookie}; sada_tz=Asia%2FRiyadh`, { method: 'POST', body: f }), env)
     expect(done.status).toBe(303)
-    expect(done.headers.get('Location')).toBe(`/panel#v-${id}`)
+    expect(done.headers.get('Location')).toBe(`/panel/library#v-${id}`)
     const after = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all() as
       { platform: string; status: string; account_id: string | null; scheduled_at: string | null }[]
     expect(after.map((r) => [r.platform, r.status, r.account_id])).toEqual([
@@ -4213,7 +4265,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     // ‏التاسعةُ صباحًا بالرياض السادسةُ بـ UTC — أيًّا كانت ساعةُ الاختبار
     expect(after[0]!.scheduled_at).toMatch(/ 06:00:00$/)
     expect(after[0]!.scheduled_at).toBe(after[2]!.scheduled_at)
-    const flash = await (await app.request('/panel', withSession(cookie), env)).text()
+    const flash = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(flash).toMatch(/جُدول على YouTube وInstagram [^<]* 09:00\./)
     expect(flash).toContain('وتعذّر TikTok: لا حسابَ متّصلًا — اربطه أوّلًا.')
     expect(flash).toContain('YouTube لا يُنشر للعامّة')
@@ -4604,7 +4656,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
       const cookie = await login()
       const id = await uploaded(cookie)
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
       expect(row).toContain(`action="/panel/uploads/${id}/captions"`)
       expect(row).toContain('صف المقطع بجملة')
@@ -4625,12 +4677,12 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       const cookie = await login()
       const id = await uploaded(cookie)
       const wrote = await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة في أوّل مئة يوم' })
-      expect(where(wrote)).toBe(`/panel#v-${id}`)
+      expect(where(wrote)).toBe(`/panel/library#v-${id}`)
       expect(net.calls).toHaveLength(1)
       expect(ledger()).toEqual([{ operation: 'captions:claude-opus-5', ref_id: id }])
       expect(kv.ttlOf(`captions:${id}`)).toBe(86_400)
 
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(page).toContain('كُتبت نصوصُ YouTube وTikTok وInstagram — الكلفة')
       const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
       expect(row).toContain('value="لقاءٌ عن القيادة في أوّل مئة يوم"')
@@ -4653,14 +4705,14 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
         title_youtube: 'القيادةُ في أوّل مئة يوم', caption_youtube: 'ما يقرّره القائدُ أوّلًا.\r\n\r\n#قيادة #Shorts',
         caption_tiktok: 'نصُّ TikTok بعد أن عدّلتُه', caption_instagram: CAPTIONS.instagram,
       })
-      expect(where(made)).toBe(`/panel#v-${id}`)
+      expect(where(made)).toBe(`/panel/library#v-${id}`)
       const posts = db.raw.prepare(`SELECT platform, text, model, status FROM posts ORDER BY platform`).all() as
         { platform: string; text: string; model: string; status: string }[]
       expect(posts).toEqual([
         { platform: 'tiktok', text: 'نصُّ TikTok بعد أن عدّلتُه', model: 'claude-opus-5', status: 'approved' },
         { platform: 'youtube', text: 'القيادةُ في أوّل مئة يوم\n\nما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts', model: 'claude-opus-5', status: 'approved' },
       ])
-      const after = await (await app.request('/panel', withSession(cookie), env)).text()
+      const after = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(after).toContain('ولا حسابَ متّصلًا على TikTok: لا يُجدوَل حتّى تربطه.')
       // ‏وInstagram باقٍ بنصّه المكتوب لا يضيع
       const left = after.slice(after.indexOf(`id="v-${id}"`), after.indexOf('</form>', after.indexOf(`/panel/uploads/${id}/posts`)))
@@ -4679,7 +4731,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
         title_youtube: 'عنواني أنا', caption_youtube: 'وصفي', caption_tiktok: '', caption_instagram: 'نصّي',
       })
       expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(page).toContain('لم يُنشأ منشور: TikTok: النصُّ فارغ')
       expect(page).toContain('value="عنواني أنا"')
       expect(page).toContain('نصّي</textarea>')
@@ -4694,7 +4746,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
       expect(net.calls).toHaveLength(0)
       expect(ledger()).toHaveLength(0)
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf(`/panel/uploads/${id}/posts`))
       expect(row).toContain(`aria-describedby="vw-${id}"`)
     })
@@ -4722,7 +4774,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       expect(posts).not.toContain('يُرفع إلى قناتك خاصًّا')
 
       const id = await uploaded(cookie)
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/posts`)))
       expect(row).toContain('متّصل · يُنشر للعامّة')
       expect(row).not.toContain('يصل خاصًّا')
@@ -4774,7 +4826,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       const id = await uploaded(cookie)
       await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
       const at = (JSON.parse((await kv.get(`captions:${id}`))!) as { at: string }).at
-      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      const row = rowOf(await (await everyPane((p) => app.request(p, withSession(cookie), env))), id)
       expect(row).toContain(`<input type="hidden" name="replace" value="${at}">`)
       expect(row).toContain('<input type="hidden" name="caption_model" value="claude-opus-5">')
       // ‏ونصُّ النموذج لا يُعتمَد بالافتراض (D-009): المربّعُ يؤشّره المالكُ بيده
@@ -4791,7 +4843,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة', replace: at })
       expect(again.calls).toHaveLength(1)
       expect(ledger()).toHaveLength(2)
-      expect(await (await app.request('/panel', withSession(cookie), env)).text()).toContain('ولنصوصٍ أخرى «أعد كتابتها» من صفّ المقطع')
+      expect(await (await everyPane((p) => app.request(p, withSession(cookie), env)))).toContain('ولنصوصٍ أخرى «أعد كتابتها» من صفّ المقطع')
     })
 
     it('والمنشوراتُ من النصوص تحمل حصّتَها من كلفة كتابتها، ومحطّةُ الكتابة تقولها', async () => {
@@ -4829,7 +4881,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
         title_youtube: 'عنواني أنا', caption_youtube: 'وصفي', caption_tiktok: '', caption_instagram: 'نصّي',
       })
       expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
-      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      const row = rowOf(await (await everyPane((p) => app.request(p, withSession(cookie), env))), id)
       expect(row).toContain('value="عنواني أنا"')
       expect(row).toContain('نصّي</textarea>')
 
@@ -4852,7 +4904,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       const cookie = await login()
       const id = await uploaded(cookie)
       await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(page).toContain('وفي بعضها ما يُصلَح قبل الإنشاء')
       const row = rowOf(page, id)
       const title = row.slice(row.indexOf(`for="vyt-${id}"`), row.indexOf(`for="vyd-${id}"`))
@@ -4870,7 +4922,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
         title_youtube: 'ع'.repeat(120), caption_youtube: 'وصف', caption_tiktok: 'ن'.repeat(2300),
       })
       expect(db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get()).toEqual({ n: 0 })
-      const after = await (await app.request('/panel', withSession(cookie), env)).text()
+      const after = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(after).toContain('YouTube تقبل 100')
       expect(after).toMatch(/لم يُنشأ منشور: [^<]*YouTube تقبل 100[^<]*TikTok: النصُّ 2300 محرفًا/)
     })
@@ -4906,7 +4958,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       expect(needs).not.toContain('علنيٌّ فورَ موعده')
 
       const id = await uploaded(cookie)
-      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      const row = rowOf(await (await everyPane((p) => app.request(p, withSession(cookie), env))), id)
       expect(row).not.toContain('يُنشر للعامّة')
       expect(row).toContain('متّصل · يصل صندوقَك')
       expect(row).toContain('href="/panel/channels/tiktok?tab=setup"')
@@ -4916,14 +4968,14 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       await post(cookie, `/panel/uploads/${id}/posts`, { caption: 'المعلمُ نقطةُ قرار', approve: 'on', platform: ['tiktok'] })
       const shown = (db.raw.prepare('SELECT id FROM posts').all() as { id: string }[]).map((x) => x.id)
       await post(cookie, `/panel/uploads/${id}/schedule`, { preset: 'tomorrow', post: shown })
-      const scheduled = await (await app.request('/panel', withSession(cookie), env)).text()
+      const scheduled = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       expect(scheduled).toContain('جُدول على TikTok')
       expect(scheduled).toContain('قلبتَ النشرَ العلنيّ وحسابُك المربوط بلا video.publish')
 
       // ‏وبالنطاق: «للعامّة» كما قرّر، ولا ملاحظةَ صندوق
       db.raw.prepare(`UPDATE tokens SET scopes = 'user.info.basic video.upload video.publish' WHERE account_id = 'acc-tt'`).run()
       const id2 = await uploaded(cookie)
-      const direct = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id2)
+      const direct = rowOf(await (await everyPane((p) => app.request(p, withSession(cookie), env))), id2)
       expect(direct).toContain('متّصل · يُنشر للعامّة')
       expect(direct).not.toContain('بلا النصّ')
     })
@@ -4944,7 +4996,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       const cookie = await login()
       const id = await uploaded(cookie)
       await post(cookie, `/panel/uploads/${id}/captions`, { about: 'لقاءٌ عن القيادة' })
-      const row = rowOf(await (await app.request('/panel', withSession(cookie), env)).text(), id)
+      const row = rowOf(await (await everyPane((p) => app.request(p, withSession(cookie), env))), id)
       const tiktok = row.slice(row.indexOf(`for="vtt-${id}"`), row.indexOf(`for="vig-${id}"`))
       expect(tiktok).toContain('يصل المقطعُ صندوقَ تطبيق TikTok بلا هذا النصّ')
       expect(tiktok).toContain(`data-copy="vtt-${id}"`)
@@ -4954,7 +5006,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
       const cookie = await login()
       const id = await uploaded(cookie)
-      const page = await (await app.request('/panel', withSession(cookie), env)).text()
+      const page = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
       const card = page.slice(page.indexOf('id="idea"'), page.indexOf('id="write"'))
       expect(card).toContain('اختر منصّةً — وغيرُ المتّصلة تُكتب مسوّدتُها ولا تُجدوَل حتّى تربطها.')
       expect(card).toContain('data-pick-msg')
