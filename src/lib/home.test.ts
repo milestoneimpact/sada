@@ -184,7 +184,7 @@ describe('سقفُ الإنفاق اليوميّ', () => {
   it('فعلٌ برتقاليٌّ إلى حقل السقف، وساعةُ الانفتاح بتوقيت المالك أو الرياض (D-201)', () => {
     const a = nextAction(facts({ blocker: cap, zone: 'Asia/Riyadh' }), NOW)
     expect(a).toMatchObject({ tone: 'warn', href: '#c2', label: 'ارفع السقف' })
-    expect(a.text).toContain('6.06$ من 5.00$')
+    expect(a.text).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
     // ‏منتصفُ ليل UTC هو الثالثةُ فجرًا في الرياض
     expect(a.text).toContain('الساعة 03:00،')
     // ‏وبلا منطقةٍ معروفةٍ فبتوقيت الرياض معلنًا، لا UTC

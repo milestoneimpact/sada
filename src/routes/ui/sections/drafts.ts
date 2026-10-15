@@ -21,7 +21,7 @@
  */
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
-import { reviewText, type ReviewNote } from '../../../lib/draft/review'
+import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type PlatformSpec } from '../../../lib/draft/prompt'
 import type { PublishPlatform } from '../../../lib/oauth/providers'
 import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
@@ -134,12 +134,8 @@ const PAD = 28
  * ومرآةٌ تحته تقرأ ما في الصندوق وتقوله بتوقيت المالك. **فالرقمان
  * حاضران معا**، ولا يُصدَّق أحدُهما على حساب الآخر.
  */
-const QUICK: readonly { kind: string; label: string }[] = [
-  { kind: 'hour', label: 'بعد ساعة' },
-  { kind: 'tonight', label: 'الليلة 8م' },
-  { kind: 'tomorrow', label: 'غدا 9ص' },
-  { kind: 'sunday', label: 'الأحد 9ص' },
-]
+// ‏كانت هنا قائمةٌ ثانيةٌ بأسماءٍ أقصر («غدا 9ص») فقرأ المالكُ في الصفحة نفسِها «غدا 9ص» على بطاقةٍ و«الأحد 9:00 ص»
+// ‏على جارتها (D-215). فالأسماءُ من `PRESETS` وحدَها، كما في «انقلها إلى» وتحت المقطع.
 
 /**
  * ‏«انقلها إلى» على بطاقة المجدولة نفسِها، خارجَ الطيّة (D-200) — **ضغطةٌ واحدة تغيّر الموعد** بلا فتح المحرّر.
@@ -266,7 +262,7 @@ function scheduler(
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     ${account}
     <div class="quick" data-quick="wh-${id}">
-      ${QUICK.map(
+      ${PRESETS.map(
         (q) =>
           `<button class="btn btn-secondary btn-sm" type="button" data-preset="${q.kind}">${escapeHtml(q.label)}</button>`,
       ).join('')}
@@ -585,15 +581,30 @@ function bucketOf(d: DraftRow): string {
   return 'published'
 }
 
-const BUCKETS: readonly { readonly id: string; readonly label: string }[] = [
-  { id: 'all', label: 'الكلّ' },
-  { id: 'waiting', label: 'تنتظر قرارك' },
-  { id: 'approved', label: 'معتمَدة' },
-  { id: 'queued', label: 'مجدولة' },
-  { id: 'published', label: 'نُشرت' },
-  { id: 'failed', label: 'فشلت' },
-  { id: 'rejected', label: 'مرفوضة' },
+/**
+ * ‏**ما فيه فعلٌ باقٍ أوّلًا، وما انتهى في «الأرشيف»** (D-215). كان الافتراضُ «الكلّ» بالأحدث أوّلًا، فجاورت
+ * ‏المسوّدةُ التي تنتظر القرارَ منشورًا نُشر قبل أسبوعٍ وآخرَ مرفوضًا. والسؤالُ الذي يُفتَح له اللوح «ما الذي
+ * ‏ينتظرني؟»، فالافتراضُ «قيد العمل» مرتّبًا بالإلحاح: ما فشل، ثمّ ما ينتظر قرارك، ثمّ المعتمَدُ بلا موعد، ثمّ
+ * ‏المجدول. و«نُشرت» و«مرفوضة» سلّةٌ واحدة لا فعلَ فيها. والعددُ معروضٌ ولو صفرًا (D-062).
+ */
+const BUCKETS: readonly { readonly id: string; readonly label: string; readonly of: readonly string[] | null }[] = [
+  { id: 'active', label: 'قيد العمل', of: ['failed', 'waiting', 'approved', 'queued'] },
+  { id: 'waiting', label: 'تنتظر قرارك', of: ['waiting'] },
+  { id: 'failed', label: 'فشلت', of: ['failed'] },
+  { id: 'approved', label: 'معتمَدة', of: ['approved'] },
+  { id: 'queued', label: 'مجدولة', of: ['queued'] },
+  { id: 'archive', label: 'الأرشيف', of: ['published', 'rejected'] },
+  { id: 'all', label: 'الكلّ', of: null },
 ]
+
+/** ‏رتبةُ الإلحاح — الأصغرُ أوّلًا، وفي الرتبة الواحدة الأحدثُ أوّلًا. */
+const URGENCY: Readonly<Record<string, number>> = { failed: 0, waiting: 1, approved: 2, queued: 3, published: 4, rejected: 5 }
+
+/** ‏المسوّداتُ بترتيب اللوح الافتراضيّ — يرسمه الخادمُ فلا تقفز البطاقاتُ حين يصل السكربت. */
+export function byUrgency(drafts: readonly DraftRow[]): DraftRow[] {
+  const at = (d: DraftRow) => Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0
+  return [...drafts].sort((a, b) => (URGENCY[bucketOf(a)]! - URGENCY[bucketOf(b)]!) || at(b) - at(a))
+}
 
 /**
  * تبويباتُ الفرز — **وشرطا D-062 يُوَرَّثان**: العددُ معروضٌ دائما ولو
@@ -631,10 +642,10 @@ function editDiff(d: DraftRow): string {
 
 function filterTabs(drafts: readonly DraftRow[]): string {
   const tabs = BUCKETS.map((b) => {
-    const n = b.id === 'all' ? drafts.length : drafts.filter((d) => bucketOf(d) === b.id).length
+    const n = b.of === null ? drafts.length : drafts.filter((d) => b.of!.includes(bucketOf(d))).length
     // ‏تبويبُ فرزٍ بلغة التنقّل (D-189) — وحالُه في «aria-pressed» لا في صنف
     return `<button type="button" class="tab-item"
-      data-bucket="${b.id}" aria-pressed="${b.id === 'all'}"
+      data-bucket="${b.id}" data-of="${b.of === null ? '' : b.of.join(' ')}" aria-pressed="${b.id === 'active'}"
       >${escapeHtml(b.label)}${count(n)}</button>`
   }).join('')
   /*
@@ -651,7 +662,8 @@ function filterTabs(drafts: readonly DraftRow[]): string {
   ].join('')
   const order = `<label class="order"><span class="sub">الترتيب</span>
     <select id="draft-order" aria-label="ترتيبُ المسوّدات">
-      <option value="new" selected>الأحدث أوّلًا</option>
+      <option value="urgent" selected>الأهمّ أوّلًا</option>
+      <option value="new">الأحدث أوّلًا</option>
       <option value="old">الأقدم أوّلًا</option>
       <option value="cost">الأغلى نشرًا أوّلًا</option>
     </select></label>`
@@ -856,7 +868,7 @@ function card(
   ].filter((x) => x !== '').join('')
 
   return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}
-    data-status="${escapeHtml(bucketOf(d))}" data-platform="${escapeHtml(d.platform)}"
+    data-status="${escapeHtml(bucketOf(d))}" data-rank="${URGENCY[bucketOf(d)] ?? 9}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     <div class="draft-top">
       ${open
@@ -887,7 +899,10 @@ function card(
       ${d.stale && open
         // ‏والمصدرُ الذي تغيّر بعدها مكانَ العدّاد: سطرٌ مستقلٌّ كان يمدّ البطاقةَ فوق ‏320px على الهاتف
         ? statusBadge('warn', '▲', 'المصدر تغيّر بعدها')
-        : `<span class="draft-len"><b>${lengthOf(d)}</b> / ${spec.hardLimit}</span>`}
+        // ‏والعدّادُ حين يقترب النصُّ من حدّه وحدَه (D-215): «184 / 3000» على كلّ بطاقةٍ رقمٌ لا يُبتّ فيه بشيء
+        : lengthOf(d) > ceilingOf(spec.hardLimit)
+          ? `<span class="draft-len ${lengthOf(d) > spec.hardLimit ? 'bad' : 'warn'}"><b>${lengthOf(d)}</b> / ${spec.hardLimit}</span>`
+          : ''}
       ${menu({ label: 'أفعالٌ أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
     </div>
     ${here
@@ -1130,7 +1145,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
           html: 'اكتب واحدةً من فكرتك أو من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
           action: button({ label: 'اكتب من فكرتك', variant: 'primary', size: 'sm', href: '#idea' }),
         })
-      : `<div class="dcols">${drafts
+      : `<div class="dcols">${byUrgency(drafts)
           .map((d) =>
             card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines, input.editing ?? null, input.zone ?? null))
           .join('')}</div>`

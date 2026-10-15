@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
-import { draftsSection } from './sections/drafts'
+import { byUrgency, draftsSection } from './sections/drafts'
 import { tasksScreen } from './tasksView'
 import { commandTrigger } from './command'
 import { railHtml } from './rail'
@@ -484,9 +484,11 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
     expect(html).not.toContain('data-platform-tab="tiktok"')
   })
 
-  it('والترتيبُ قائمةٌ افتراضُها الأحدث، والبطاقةُ تحمل مفتاحَيه', () => {
+  it('والترتيبُ قائمةٌ افتراضُها الأهمّ أوّلًا (D-215)، والبطاقةُ تحمل مفاتيحَه', () => {
     expect(html).toContain('<select id="draft-order"')
-    expect(html).toContain('<option value="new" selected>')
+    expect(html).toContain('<option value="urgent" selected>')
+    expect(html).toContain('<option value="new">')
+    expect(html).toMatch(/data-rank="\d"/)
     expect(html).toContain(`data-created="${Date.parse('2026-09-06T09:00:00Z')}" data-cost="0.05"`)
   })
 
@@ -1538,7 +1540,6 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect([...widths('@media')].filter((w) => !allowed.has(w))).toEqual([])
     // ‏وحدُّ الحاوية من «CQ» وحدها (مراجعة D-187): الصفُّ يلتفّ بعرض قائمته لا بعرض الشاشة
     expect([...widths('@container')].sort((a, b) => a - b)).toEqual(Object.values(CQ).map((v) => v - 1).sort((a, b) => a - b))
-    expect(SCRIPT).toContain(`matchMedia('${below('md')}')`)
   })
 
   it('النحاسُ في أدواره الثلاثة لا غير، بقيمته الكاملة', () => {
@@ -1867,5 +1868,23 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     const doc2 = { ...doc, getElementById: () => box }
     runInNewContext(THEME_SCRIPT, { document: doc2, localStorage: { getItem: () => 'light', setItem() {}, removeItem() {} } })
     expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.light['--bg'], THEME.light['--bg']])
+  })
+})
+
+describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)', () => {
+  const at = (h: number) => `2026-09-06 ${String(h).padStart(2, '0')}:00:00`
+  const row = (id: string, status: string, h: number) => ({ id, status, createdAt: at(h) }) as unknown as Parameters<typeof byUrgency>[0][number]
+
+  it('ما فشل، ثمّ ما ينتظر، ثمّ المعتمَد، ثمّ المجدول، ثمّ ما انتهى — والأحدثُ أوّلًا في الرتبة', () => {
+    const out = byUrgency([
+      row('pub', 'published', 9), row('q', 'queued', 9), row('ok', 'approved', 9),
+      row('old', 'draft', 1), row('new', 'draft', 8), row('rej', 'rejected', 9), row('bad', 'failed', 2),
+    ]).map((d) => d.id)
+    expect(out).toEqual(['bad', 'new', 'old', 'ok', 'q', 'pub', 'rej'])
+  })
+
+  it('«قيد العمل» افتراضٌ يحمل سلالَه، و«الأرشيف» يجمع ما نُشر وما رُفض', () => {
+    expect(SCRIPT).toContain("var bucket='active'")
+    expect(SCRIPT).toContain("bucketOf.indexOf(c.dataset.status)")
   })
 })

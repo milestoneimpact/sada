@@ -1,6 +1,5 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
-import { below } from './tokens'
 import { MOVED_ANCHORS, MOVED_PREFIXES } from '../../lib/nav/panes'
 
 /**
@@ -145,26 +144,6 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   window.addEventListener('hashchange',function(){
     show((location.hash||'').slice(1)||first,false,true);
   });
-
-  /*
-   * ‏ومبدّلُ الثيم يُنقَل ولا يُنسَخ.
-   *
-   * ‏ذيلُ الرافدة يُخفى دون «md» (‏٩٠٠px، وكان ‏٩٦٠)، فكان الهاتفُ واللوحيُّ بلا مبدّل. ونسخةٌ
-   * ‏ثانيةٌ في الوسم لا تعمل: سكربتُ الثيم يربط «#theme» الأوّلَ وحدَه. فالعنصرُ
-   * ‏نفسُه — بمستمعيه — ينزل إلى آخر المحتوى في الضيّق، ويعود إلى الذيل في العريض.
-   */
-  var theme=document.getElementById('theme');
-  var foot=theme&&theme.parentNode.classList.contains('rail-foot')?theme.parentNode:null;
-  var content=document.getElementById('main');
-  var narrow=window.matchMedia?window.matchMedia('${below('md')}'):null;
-  function seat(){
-    if(narrow.matches){if(theme.parentNode!==content)content.appendChild(theme);}
-    else if(theme.parentNode!==foot)foot.insertBefore(theme,foot.firstChild);
-  }
-  if(foot&&content&&narrow){
-    seat();
-    if(narrow.addEventListener)narrow.addEventListener('change',seat);
-  }
 
   // ‏وزرُّ النسخ (D-126) في u.js الذي تحمله كلُّ صفحة، لا هنا: نسختان في
   // ‏اللوحة تربطان بالزرّ مستمعَين، فيبقى «نُسخ» عليه لا يعود (D-160)
@@ -532,23 +511,26 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ── الفرز ───────────────────────────────────────────
     // الشريحةُ مخفيّةٌ في الوثيقة وتُظهَر هنا: تبويبٌ لا يرشّح بلا
     // سكربتٍ يُقرأ عطلا، والغائبُ لا يُعِد بشيء
-    var bucket='all';
+    // ‏والافتراضُ «قيد العمل» بالأهمّ أوّلًا (D-215): ما انتهى في «الأرشيف»
+    var bucket='active', bucketOf=['failed','waiting','approved','queued'];
     // والمنصّةُ والترتيبُ فرزٌ ثانٍ وثالث (D-127) — بالقاعدة نفسِها: افتراضُهما
     // «الكلّ» و«الأحدث»، وما يُخفى يُلغى تحديدُه
-    var platform='all', order='new';
+    var platform='all', order='urgent';
     var ptabs=document.getElementById('draft-platform');
     var orderSel=document.getElementById('draft-order');
     function reorder(){
       if(!cards.length)return;
       var parent=cards[0].parentNode; if(!parent)return;
       var key=function(c){return order==='cost'?parseFloat(c.dataset.cost||'0')||0:parseFloat(c.dataset.created||'0')||0;};
-      var sorted=cards.slice().sort(function(a,b){var d=key(b)-key(a); return order==='old'?-d:d;});
+      var sorted=cards.slice().sort(function(a,b){
+        if(order==='urgent'){var r=(+a.dataset.rank||0)-(+b.dataset.rank||0); if(r)return r;}
+        var d=key(b)-key(a); return order==='old'?-d:d;});
       sorted.forEach(function(c){parent.appendChild(c);});
     }
     function refilter(){
       var shown=0;
       cards.forEach(function(c){
-        var on = (bucket==='all' || c.dataset.status===bucket) && (platform==='all' || c.dataset.platform===platform);
+        var on = (bucketOf===null || bucketOf.indexOf(c.dataset.status)>=0) && (platform==='all' || c.dataset.platform===platform);
         c.hidden=!on; if(on)shown++;
         // صندوقٌ مخفيٌّ يبقى مرسَلا مع النموذج — فيُعتمَد ما لا يُرى
         if(!on){
@@ -563,7 +545,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       ftabs.hidden=false;
       ftabs.querySelectorAll('button[data-bucket]').forEach(function(b){
         b.addEventListener('click',function(){
-          bucket=b.dataset.bucket;
+          bucket=b.dataset.bucket; bucketOf=b.dataset.of?b.dataset.of.split(' '):null;
           ftabs.querySelectorAll('button[data-bucket]').forEach(function(o){
             var on=o===b;
             o.setAttribute('aria-pressed',String(on));
@@ -586,6 +568,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       });
     }
     if(orderSel){orderSel.addEventListener('change',function(){order=orderSel.value; reorder();});}
+    refilter();
+    // ‏رابطٌ إلى بطاقةٍ في «الأرشيف» (‎/panel#d-…‎ من الخطّ الزمنيّ أو إشعار) يفتح «الكلّ» فلا يصل إلى بطاقةٍ مخفيّة
+    (function(){
+      var h=location.hash.slice(1); if(!h||!ftabs)return;
+      var t=document.getElementById(h); if(!t)return;
+      var card=t.closest?t.closest('[data-draft]'):null;
+      if(card&&card.hidden){var all=ftabs.querySelector('button[data-bucket="all"]'); if(all)all.click(); t.scrollIntoView();}
+    })();
 
     // ── شريطُ البَتِّ الجماعيّ ───────────────────────────
     // والكلفةُ المعروضةُ ثمنُ النشر لا ثمنُ الكتابة (D-069): الأوّلُ
@@ -598,7 +588,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(n)n.textContent=String(on.length);
       if(c){
         var sum=0; on.forEach(function(b){sum+=parseFloat(b.dataset.cost||'0')||0;});
-        c.textContent = sum>0 ? 'ثمنُ نشرها ‎'+sum.toFixed(4)+'$' : '';
+        c.textContent = sum>0 ? 'ثمنُ نشرها \u2066'+sum.toFixed(4)+'$\u2069' : '';
       }
       bulkForm.hidden=on.length===0;
     }

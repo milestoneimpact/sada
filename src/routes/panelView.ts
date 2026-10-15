@@ -31,7 +31,7 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
+import { accountMenu, escapeHtml, GLYPH_SVG, injectCsrf, shell } from './ui/shell'
 import { brandMoment } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
@@ -945,8 +945,7 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} 
   <div class="grow"></div>
   ${commandTrigger()}
   ${state}
-  <form class="inline" method="POST" action="/panel/logout">
-    <button class="btn btn-secondary btn-sm" type="submit">خروج</button></form>
+  ${accountMenu({ logout: true })}
 </header>
 
 <main id="main" class="content">
@@ -1355,7 +1354,8 @@ ${pivotPane(d.pivot)}
 
 
 ${fabNew()}
-<footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
+${/* ‏والذيلُ اسمٌ وساعة (D-215): «كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم» جملةٌ للمطوّر لا للمالك */''}
+<footer><span>صدى</span>
   <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
 </main>
 </div>

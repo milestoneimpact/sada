@@ -205,8 +205,6 @@ details.ladder ol.steps.wiz li.at .why{color:var(--ink-2)}
 details.ladder .verdict{margin:0 0 var(--s-2); font-weight:600; color:var(--ink)}
 details.ladder .verdict.bad{color:var(--bad)}
 
-.rail-foot{margin-top:auto; padding:var(--s-3); border-top:var(--bd-soft);
-  border-top-color:var(--line-soft)}
 
 /* ── الشريط العلويّ ────────────────────────────────────────── */
 .main{min-width:0; display:flex; flex-direction:column}
@@ -1519,6 +1517,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .menu-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .menu-t span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .menu-danger .menu-t b{color:var(--bad)}
+/* ‏قائمةُ الحساب (D-215): السمةُ والكثافةُ مقطعان في سطرين، وتحتهما الجلساتُ والخروج */
+.menu-seg{display:flex; align-items:center; justify-content:space-between; gap:var(--s-3);
+  padding:var(--s-2) var(--s-3); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+/* ‏والفاصلُ تحت آخر مقطع لا فوق البند: البندُ مدوَّرُ الزوايا، فحدٌّ عليه يُرسم قوسًا */
+.menu-seg + .menu-seg{padding-bottom:var(--s-3); margin-bottom:var(--s-1); border-bottom:var(--bd-soft)}
 
 /* ── المحرّرُ المركّز (D-198): لوحٌ ‏560px بجوار القائمة، وشاشةٌ كاملةٌ دون «lg» ────────────── */
 .ed{display:flex; flex-direction:column; padding:0; min-width:0; scroll-margin-block-start:var(--s-4)}
@@ -1894,7 +1897,6 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
   nav.tabs .lbl{display:none}
   nav.tabs a{white-space:nowrap; padding:var(--s-2) var(--s-3)}
   nav.tabs .count{margin-inline-start:var(--s-1)}
-  .rail-foot{display:none}
   /* ‏والحافّتان من «--gutter» (‏١٦ على الجوّال و‏٣٢ فوقه)، والأعلى رتبةٌ أضيق */
   .content{padding-top:var(--s-4)}
 }

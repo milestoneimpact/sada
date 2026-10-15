@@ -13,7 +13,7 @@
 import { SECTIONS } from './command'
 import { ICON } from './icons'
 import { count } from './components/badge'
-import { densitySwitch, escapeHtml, GLYPH_SVG, themeSwitch, wordmark } from './shell'
+import { escapeHtml, GLYPH_SVG, wordmark } from './shell'
 
 export interface RailInput {
   /** القسمُ الحاليّ — يُعلَّم `aria-current`. */
@@ -84,7 +84,7 @@ export function railHtml(input: RailInput): string {
     ${tabs}
     ${moreSheet(input, counts)}
   </nav>
-  <div class="rail-foot">${themeSwitch()}${densitySwitch()}</div>
+  ${/* ‏والسمةُ والكثافةُ في قائمة الحساب أعلى الصفحة (D-215) — لا ذيلَ يُرى دائمًا */''}
 </aside>`
 }
 

@@ -2476,7 +2476,8 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     const card = cardOf(html, ig)
     expect(card).toContain('Instagram')
     expect(card).not.toContain('LinkedIn')
-    expect(card).toContain('/ 2200')
+    // ‏والعدّادُ لا يظهر على البطاقة إلّا قربَ الحدّ (D-215)، فالمنصّةُ من سمتها
+    expect(card).toContain('data-platform="instagram"')
     expect(card).toContain(`value="${igAccount}"`)
     expect(card).not.toContain(`value="${liAccount}"`)
 
@@ -2562,7 +2563,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect(x).toContain('href="/oauth/x/start"')
     expect(x).toContain('action="/panel/drafts/requeue"')
     expect(html).toMatch(/data-bucket="failed"[^>]*>فشلت<span class="count">2</)
-    expect(html).toMatch(/data-bucket="published"[^>]*>نُشرت<span class="count">0</)
+    expect(html).toMatch(/data-bucket="archive"[^>]*>الأرشيف<span class="count">0</)
     expect(html).not.toContain('>غادرت<')
 
     const back = await post(cookie, '/panel/drafts/requeue', { id })
@@ -4083,12 +4084,12 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
     const next = html.slice(html.indexOf('<div class="card card-alert next"'), html.indexOf('<div class="card home-card">'))
     expect(next).toContain('href="#c2"')
-    expect(next).toContain('6.06$ من 5.00$')
+    expect(next).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
     expect(html).toContain('id="c2"')
     // ‏والزرُّ لا يُضغَط فيُردّ: معطَّلٌ، وسببُه مربوطٌ به وفيه موضعُ إصلاحه
     expect(html).toMatch(/<button class="btn btn-primary" type="submit" disabled aria-describedby="dw-why">اكتب مسوّدة<\/button>/)
     const why = html.slice(html.indexOf('id="dw-why"'), html.indexOf('</p>', html.indexOf('id="dw-why"')))
-    expect(why).toContain('بلغتَ سقفَ الإنفاق اليوم: 6.06$ من 5.00$')
+    expect(why).toContain('بلغتَ سقفَ الإنفاق اليوم: ⁦6.06$⁩ من ⁦5.00$⁩')
     expect(why).toContain('href="#c2"')
   })
 
