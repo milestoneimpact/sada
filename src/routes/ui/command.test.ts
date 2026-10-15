@@ -262,7 +262,7 @@ describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ و�
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
-    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#accounts', '/panel/tasks', '#settings'])
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/accounts', '/panel/tasks', '/panel/settings'])
     expect(sheet).toContain('بحثٌ وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })

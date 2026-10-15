@@ -127,6 +127,28 @@ try {
   const nextVal = await page.locator('#login-next').inputValue()
   check(nextVal.endsWith(`#d-${draft.id}`), `انتهت الجلسة: الدخولُ يعيد إلى البطاقة (next=${nextVal.slice(0, 24)}…)`)
   check(status() === 'draft', `ولم يقع الفعلُ بلا جلسة: ${status()}`)
+
+  // ‏**المراسي القديمة تصل إلى صفحاتها** (D-211): رابطٌ محفوظٌ «/panel#providers» يُفتح في «/panel/settings»
+  await page.goto(`${stack.url}/panel/login`)
+  await page.locator('input[name="token"]').fill((await import('./server')).LOCAL_ADMIN_TOKEN)
+  await page.locator('form button[type="submit"]').first().click()
+  await page.waitForLoadState('networkidle')
+  for (const [from, to, shown] of [
+    ['/panel#providers', '/panel/settings', '#providers'], ['/panel#ch-x', '/panel/accounts', '#ch-x'],
+    ['/panel#sources', '/panel/library', '#sources'], ['/panel#pivot', '/panel/analysis', '#pivot'],
+  ] as const) {
+    await page.goto(`${stack.url}${from}`)
+    await page.waitForURL((u) => u.pathname === to, { timeout: 10000 }).catch(() => undefined)
+    await page.waitForLoadState('networkidle')
+    const u = new URL(page.url())
+    check(u.pathname === to && await page.locator(shown).isVisible(), `«${from}» ← ${u.pathname}${u.hash} وقسمُه ظاهر`)
+  }
+  // ‏ورابطٌ داخل «/panel» إلى لوحٍ انتقل («مراجعة المصادر» في الرئيسيّة) ينقل إليه
+  await page.goto(`${stack.url}/panel`)
+  await page.waitForLoadState('networkidle')
+  await page.locator('a[href="#sources"]').first().click()
+  await page.waitForURL((u) => u.pathname === '/panel/library', { timeout: 10000 }).catch(() => undefined)
+  check(new URL(page.url()).pathname === '/panel/library', `«مراجعة المصادر» ← ${new URL(page.url()).pathname}`)
 } finally {
   await browser.close()
   await stack.close()

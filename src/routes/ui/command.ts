@@ -138,11 +138,11 @@ export const SECTIONS: readonly Section[] = [
    */
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
   { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والكتابةُ والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
-  { id: 'library', label: 'المكتبة', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true },
+  { id: 'library', label: 'المكتبة', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true, page: '/panel/library' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وتحليلٌ مفصّل', icon: ICON.report, group: 'العمل', alias: 'results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
-  { id: 'accounts', label: 'الحسابات', note: 'ربطُ المنصّات وحالُ كلٍّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك' },
+  { id: 'accounts', label: 'الحسابات', note: 'ربطُ المنصّات وحالُ كلٍّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
-  { id: 'settings', label: 'الإعدادات', note: 'الإنفاقُ والحدود، وخدماتُ الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات' },
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاقُ والحدود، وخدماتُ الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings' },
 ]
 
 /**
@@ -232,7 +232,8 @@ export function buildCommands(
     if (section === undefined) continue
     out.push({
       label: a.label, note: a.note, group: 'الأفعال',
-      href: section.page ?? `${base}#${a.anchor ?? a.id}`,
+      // ‏ولوحٌ بمساره (D-211): المرساةُ داخل صفحته، لا في «/panel»
+      href: section.page === undefined ? `${base}#${a.anchor ?? a.id}` : `${section.page}${a.anchor === undefined ? '' : `#${a.anchor}`}`,
       icon: '', alias: a.alias,
     })
   }

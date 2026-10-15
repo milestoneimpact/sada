@@ -228,7 +228,7 @@ describe('قراراتُ المالك في «ما عليك» (D-130)', () => {
     expect(html).toContain('4 من 6 بطاقاتٍ مختارة')
     expect(html).toContain('M-21')
     expect(html).toContain('صفر — لا توصيةَ تُكتب')
-    expect(html).toContain('href="/panel#settings">افتح الحدود</a>')
+    expect(html).toContain('href="/panel/settings#settings">افتح الحدود</a>')
   })
 })
 
@@ -240,7 +240,7 @@ describe('مهامُّ الربط في «ما عليك» (ر-1)', () => {
     expect(html).toContain('href="/panel/channels/tiktok?tab=setup#ci-tiktok">اضبط TikTok</a>')
     expect(html).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube">اضبط YouTube</a>')
     expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24"')
-    expect(html).toContain('href="/panel#tiles">اختر بطاقاتك</a>')
+    expect(html).toContain('href="/panel/settings#tiles">اختر بطاقاتك</a>')
     // ‏واسمُ الوثيقة رابطٌ لا نصٌّ يُقرأ ولا يُفتَح
     expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md"')
   })

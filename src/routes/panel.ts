@@ -40,6 +40,7 @@ import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload,
 import { parseRange, resolveRange } from '../lib/media/range'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
+import { panelHref, type PaneId } from '../lib/nav/panes'
 import { readPeaks, type Peaks } from '../lib/schedule/peak'
 import { readJourney } from '../lib/journey'
 import { journeyBody } from './ui/journeyView'
@@ -269,7 +270,8 @@ async function reachNow(db: Env['DB']): Promise<Reach> {
 
 /** كلّ فعلٍ يعود إلى القسم الذي انطلق منه — لا إلى رأس الصفحة. */
 function back(hash: string): Response {
-  return new Response(null, { status: 303, headers: { Location: `/panel#${hash}` } })
+  // ‏والمسارُ من مصدرٍ واحد (D-211): «providers» تعود إلى «/panel/settings»، والبطاقةُ إلى «/panel»
+  return new Response(null, { status: 303, headers: { Location: panelHref(hash) } })
 }
 
 /**
@@ -432,7 +434,17 @@ panel.get('/panel/pivot.csv', async (c) => {
   })
 })
 
-panel.get('/panel', async (c) => {
+/**
+ * ‏اللوحةُ صفحاتٌ بمساراتها (D-211): «/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره. والمعالجُ واحد —
+ * ‏البياناتُ نفسُها والحرّاسُ أنفسُهم — ويُرسم منه اللوحُ المطلوب وحدَه.
+ */
+panel.get('/panel/library', (c) => panelRoute(c, 'library'))
+panel.get('/panel/accounts', (c) => panelRoute(c, 'accounts'))
+panel.get('/panel/settings', (c) => panelRoute(c, 'settings'))
+panel.get('/panel/analysis', (c) => panelRoute(c, 'results'))
+panel.get('/panel', (c) => panelRoute(c, null))
+
+async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): Promise<Response> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw, 200)
   // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
@@ -842,9 +854,9 @@ panel.get('/panel', async (c) => {
       ownerPending,
       expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    }),
+    }, only),
   )
-})
+}
 
 /**
  * ‏`GET /panel/login` — **صفحةُ كلمةٍ خاطئةٍ أُعيد تحميلُها**.
@@ -1300,7 +1312,7 @@ panel.post('/panel/channels/app', async (c) => {
  * ‏شاشتين، والحقلان لم يعودا على الصفحة إن ردّ الخادمُ القيمة.
  */
 function toSetup(form: FormData): Response {
-  return new Response(null, { status: 303, headers: { Location: backTo(form.get('return'), '/panel#channels') } })
+  return new Response(null, { status: 303, headers: { Location: backTo(form.get('return'), panelHref('channels')) } })
 }
 
 /**
@@ -1820,7 +1832,7 @@ panel.get('/panel/channels/:platform', async (c) => {
   return page((nonce) =>
     // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا
     // ‏`_csrf` فيردّهما `guardPost` بـ403، والدليلُ يسكن هذه الصفحة منذ D-111
-    soloPage(`صدى — ${spec.label}`, { href: '/panel#channels', label: sectionLabel('accounts') },
+    soloPage(`صدى — ${spec.label}`, { href: panelHref('channels'), label: sectionLabel('accounts') },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('accounts', spec.id)),
   )
@@ -3121,7 +3133,7 @@ panel.get('/panel/plan-import/:id', async (c) => {
   if (csv === null) {
     // ‏معاينةٌ تُركت مفتوحةً أكثرَ من ساعتين ثمّ حُدّثت: صفحةٌ بالرافدة وطريقٍ إلى الرفع، لا نصٌّ خامّ (7.11)
     return page((nonce) =>
-      soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
+      soloPage('صدى — معاينةُ الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
         planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
   }
   const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
@@ -3129,7 +3141,7 @@ panel.get('/panel/plan-import/:id', async (c) => {
   // ‏«بتوقيت الرياض» حين لا منطقةَ عُرفت: هي ما قرأ به `planFacts` الأيّامَ (D-202)
   const fallback = (await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) === null
   return page((nonce) =>
-    soloPage('صدى — معاينةُ الخطّة', { href: '/panel#plan-import', label: 'المنشورات' },
+    soloPage('صدى — معاينةُ الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
       injectCsrf(planImportScreen(id, read, new Date(), reach, fallback), session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )

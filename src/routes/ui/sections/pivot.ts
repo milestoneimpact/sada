@@ -135,7 +135,7 @@ export function pivotPane(d: PivotView): string {
   <div data-sub id="pivot">
 
   <div class="card">
-    <form class="row pv-form" method="GET" action="/panel#pivot">
+    <form class="row pv-form" method="GET" action="/panel/analysis">
       ${picker('pv-r', 'rows', 'الصفوف', d.rows, dims)}
       ${picker('pv-c', 'cols', 'الأعمدة', d.cols ?? 'none',
         [{ v: 'none', t: 'بلا أعمدة' }, ...dims])}

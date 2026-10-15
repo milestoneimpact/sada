@@ -459,6 +459,15 @@ const data: PanelData = {
 writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
+/*
+ * ‏**وكلُّ لوحٍ في مساره عيّنةٌ تُدقَّق** (D-211): صارت «/panel» الرئيسيّةَ والمنشوراتِ وحدهما، فلو بقيت العيّنةُ واحدةً
+ * ‏لخرجت المكتبةُ والحساباتُ والإعداداتُ والتحليلُ من كلّ مدقّقٍ صامتةً — ألواحٌ تُشحَن ولا يراها حارس.
+ */
+for (const pane of ['library', 'accounts', 'settings', 'results'] as const) {
+  writeAudited(`/tmp/panel-${pane}.html`, panelPage(data, pane), {
+    m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
+  })
+}
 
 /*
  * **ولوحُ اليوم الأوّل وضعٌ ثانٍ يُشحَن — فيُرسَم ليُدقَّق** (D-108).
@@ -469,7 +478,7 @@ writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data), {
  * فتُرسَم صورةٌ ثانيةٌ لنظامٍ ناقص: مصادرُ بلا تحليل، ولا قناةَ حيّة،
  * ولا خطّة — **وهي الحالُ التي يفتح فيها المالكُ لوحتَه أوّلَ مرّة**.
  */
-writeAudited('/tmp/panel-first.html', panelPage({
+const first = {
   ...data,
   sources: data.sources.map((s) => ({ ...s, analyzed: false, summary: null, worth: null })),
   channels: viewChannels(
@@ -480,7 +489,10 @@ writeAudited('/tmp/panel-first.html', panelPage({
   drafts: data.drafts.map((d) => ({ ...d, status: 'draft' as const })),
   // ‏واليومُ الأوّل لا نشرَ فيه ولا موعد: المسوّداتُ كلُّها تنتظر
   journey: { perPlatform: { linkedin: { draft: data.drafts.length, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 },
-}))
+}
+writeAudited('/tmp/panel-first.html', panelPage(first))
+// ‏واليومُ الأوّل في «الحسابات» وجهٌ ثانٍ لها: كلُّ منصّةٍ منقطعةٌ أو تنتظر إعدادًا
+writeAudited('/tmp/panel-first-accounts.html', panelPage(first, 'accounts'))
 /*
  * ‏**والمحرّرُ المركّزُ وضعٌ يُشحَن فيُرسَم ليُدقَّق** (D-198): `?open=<id>` بجوار القائمة. مسوّدةٌ
  * ‏بصورتها (الاعتمادُ والحفظُ والموعدُ بتوقيت المالك)، ومجدولةٌ («غيّر الموعد»).

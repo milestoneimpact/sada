@@ -279,7 +279,7 @@ describe('ونموذجُ Cloudflare في اللوحة', () => {
     const scoped = cfAccount === undefined ? env : { ...env, CF_AI_ACCOUNT_ID: cfAccount }
     const login = await app.request('/panel/login', { method: 'POST', body }, scoped)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
-    return (await app.request('/panel', { headers: { Cookie: cookie } }, scoped)).text()
+    return (await app.request('/panel/settings', { headers: { Cookie: cookie } }, scoped)).text()
   }
 
   it('يُعرَض، ومعرّفُ الحساب يُملأ وحده حين يُعرَف', async () => {
@@ -323,7 +323,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
       env,
     )
     // الإشعارُ يُقرأ من الصفحة التالية كما يقرؤه المالك
-    return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    return (await app.request('/panel/settings', { headers: { Cookie: cookie } }, env)).text()
   }
 
   it('«السرُّ مرفوض» حين تردّ المنصّةُ invalid_client — ومعه المعرّفُ', async () => {

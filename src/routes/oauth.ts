@@ -8,6 +8,7 @@
  * ولا يقبل `state` مرتين.
  */
 import { Hono } from 'hono'
+import { panelHref } from '../lib/nav/panes'
 import type { Env } from '../env'
 import { createPkce, randomToken } from '../lib/pkce'
 import { exchangeCode, OAuthError, type ClientCredentials } from '../lib/oauth/exchange'
@@ -36,7 +37,7 @@ import { setFlash } from './panel'
 function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
   // القالبُ الواحد (D-151): علامةٌ وعودةٌ و⌘K وثيمٌ كسائر الشاشات المستقلّة
   const nonce = makeNonce()
-  const html = soloPage(title, { href: '/panel#channels', label: sectionLabel('accounts') }, body, nonce, '',
+  const html = soloPage(title, { href: panelHref('channels'), label: sectionLabel('accounts') }, body, nonce, '',
     buildCommands({ onPanel: false }), soloNav('accounts'))
   return new Response(html, { status, headers: htmlHeaders(nonce) })
 }

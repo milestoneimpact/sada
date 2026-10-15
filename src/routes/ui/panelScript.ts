@@ -1,6 +1,7 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
 import { below } from './tokens'
+import { MOVED_ANCHORS, MOVED_PREFIXES } from '../../lib/nav/panes'
 
 /**
  * نصُّ اللوحة الجاري في المتصفّح.
@@ -59,6 +60,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   if(/[?&]open=/.test(location.search)&&history.replaceState){
     history.replaceState(null,'',location.pathname+location.search.replace(/([?&])open=[^&]*&?/,'$1').replace(/[?&]$/,'')+location.hash);
   }
+  var MOVED=${JSON.stringify(MOVED_ANCHORS)}, MOVED_P=${JSON.stringify(MOVED_PREFIXES)};
+  function movedPath(id){
+    if(Object.prototype.hasOwnProperty.call(MOVED,id))return MOVED[id];
+    for(var i=0;i<MOVED_P.length;i++)if(id.indexOf(MOVED_P[i][0])===0)return MOVED_P[i][1];
+    return null;
+  }
   function show(id,push,focus){
     if(first===null)return;
     if(focus&&!/^ed(-|$)/.test(id))shutEditor();
@@ -69,6 +76,10 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
     var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
     var card=isPane?null:target(id);
+    // ‏ومرساةٌ لوحُها في صفحةٍ أخرى (D-211): «/panel#settings» المحفوظةُ تذهب إلى «/panel/settings#settings»، والخريطةُ
+    // ‏من «lib/nav/panes» نفسِها التي يقرؤها الخادم. عند التحميل استبدالٌ لا يُبقي خطوةً ميّتةً في الرجوع
+    if(!isPane&&!card&&id){var to=movedPath(id);
+      if(to&&to!==location.pathname){if(push||focus)location.assign(to+'#'+id); else location.replace(to+'#'+id); return;}}
     var host=card?card.closest('section[data-pane]'):null;
     if(card&&!host){
       // ‏ومرساةٌ خارجَ الألواح («#main» من رابط التخطّي) لا تبدّل اللوحَ المفتوح:

@@ -47,6 +47,7 @@ import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
 import { railHtml } from './ui/rail'
+import { panelHref, type PaneId } from '../lib/nav/panes'
 import { videosSection } from './ui/sections/videos'
 import { imagesGallery } from './ui/sections/library'
 import { planImportCard } from './ui/planImportView'
@@ -712,13 +713,39 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  */
 function fabNew(): string {
   const items = [
-    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], ['#videos', 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
+    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
   return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
 }
 
-export function panelPage(d: PanelData): string {
+/**
+ * يُبقي من الصفحة ألواحَ `keep` وحدَها (D-211) — **وبعدّ العمق لا بتعبيرٍ نمطيّ**: في «المنشورات» `<section class="ed-sec">`
+ * داخل اللوح، فأوّلُ `</section>` بعد رأس اللوح ليس نهايتَه.
+ */
+export function keepPanes(html: string, keep: ReadonlySet<string>): string {
+  let out = ''
+  let i = 0
+  const open = /<section data-pane="([a-z]+)"/g
+  for (let m = open.exec(html); m !== null; m = open.exec(html)) {
+    if (m.index < i) continue
+    out += html.slice(i, m.index)
+    let depth = 0
+    let j = m.index
+    const tag = /<section\b|<\/section>/g
+    tag.lastIndex = m.index
+    for (let t = tag.exec(html); t !== null; t = tag.exec(html)) {
+      depth += t[0] === '</section>' ? -1 : 1
+      if (depth === 0) { j = t.index + '</section>'.length; break }
+    }
+    if (keep.has(m[1]!)) out += html.slice(m.index, j)
+    i = j
+    open.lastIndex = j
+  }
+  return out + html.slice(i)
+}
+
+export function panelPage(d: PanelData, only: PaneId | null = null): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
@@ -901,7 +928,8 @@ export function panelPage(d: PanelData): string {
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
-${railHtml({ inPanel: true, counts, env: d.env })}
+${/* ‏وفي صفحة لوحٍ مستقلّ (D-211) روابطُ الرئيسيّة والمنشورات مساراتٌ إلى «/panel»، ولوحُها معلَّم */''}
+${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">
@@ -912,7 +940,7 @@ ${railHtml({ inPanel: true, counts, env: d.env })}
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">الرئيسيّة</h1>
+  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${commandTrigger()}
@@ -1044,7 +1072,7 @@ ${pivotPane(d.pivot)}
   ${pageHead('التحرير', sectionLabel('posts'), '<b>لا يُنشر نصٌّ قبل أن تعتمده.</b>',
     `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
      <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
-     <a class="btn btn-secondary btn-sm" href="#videos">ارفع فيديو</a>
+     <a class="btn btn-secondary btn-sm" href="${panelHref('videos')}">ارفع فيديو</a>
      <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
@@ -1333,8 +1361,10 @@ ${fabNew()}
 </div>
 </div>`
 
+  // ‏و«/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره (D-211: ‏166KB كانت الصفحة، والخطّةُ ‏90)
+  const kept = keepPanes(body, new Set<string>(only === null ? ['overview', 'posts'] : [only]))
   return shell(
-    'صدى — لوحة التحكّم', injectCsrf(body, d.csrf), d.nonce, '',
-    { commands: buildCommands({ onPanel: true, drafts: d.drafts }), panelScript: true },
+    only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(kept, d.csrf), d.nonce, '',
+    { commands: buildCommands({ onPanel: only === null, drafts: d.drafts }), panelScript: true },
   )
 }

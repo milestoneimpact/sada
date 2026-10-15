@@ -413,7 +413,7 @@ describe('ما مشاه Tab (D-125)', () => {
  */
 describe('من المحطّة إلى موضعها (D-126)', () => {
   it('كلُّ نوعٍ يقود إلى حيث يُفعَل به شيء', () => {
-    expect(stationHref('source', 'x')).toEqual({ href: '/panel#sources', label: 'المصادر' })
+    expect(stationHref('source', 'x')).toEqual({ href: '/panel/library#sources', label: 'المكتبة' })
     expect(stationHref('decision', 'x').href).toBe('/panel#posts')
     expect(stationHref('publish', 'linkedin')).toEqual({ href: '/panel/channels/linkedin', label: 'شاشةُ LinkedIn' })
     expect(stationHref('metrics', 'a b').href).toBe('/panel/channels/a%20b')
@@ -428,7 +428,7 @@ describe('من المحطّة إلى موضعها (D-126)', () => {
       ],
     }, new Date('2026-09-06T09:00:00Z'))
     // ‏والسهمُ مرسومٌ يشير إلى نهاية السطر، لا حرفٌ من خطّ النظام (D-167)
-    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel#sources">المصادر${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/library#sources">المكتبة${ICON.go}</a>`)
     expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
     expect(html).not.toContain('\u2190')
   })
@@ -976,7 +976,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(html).toContain('<aside class="rail">')
     expect(html).toContain('<a href="/panel#posts" data-bar>')
     expect(html).toContain('<a href="/panel/tasks">')
-    expect(html).toContain('<a href="/panel#accounts" aria-current="true">')
+    expect(html).toContain('<a href="/panel/accounts" aria-current="true">')
     // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (D-205): الرافدةُ سبعة
     expect(html).not.toContain('class="plat"')
     expect((html.match(/id="theme"/g) ?? []).length).toBe(1)

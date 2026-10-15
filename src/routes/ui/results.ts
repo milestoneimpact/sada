@@ -10,6 +10,6 @@ import { tabs } from './components/tabs'
 export function resultsTabs(current: 'week' | 'pivot'): string {
   return tabs('أقسامُ النتائج', [
     { label: 'هذا الأسبوع', href: '/panel/report', ...(current === 'week' ? { current: true } : {}) },
-    { label: 'تحليلٌ مفصّل', href: current === 'pivot' ? '#pivot' : '/panel#pivot', ...(current === 'pivot' ? { current: true } : {}) },
+    { label: 'تحليلٌ مفصّل', href: current === 'pivot' ? '#pivot' : '/panel/analysis', ...(current === 'pivot' ? { current: true } : {}) },
   ], { id: 'results-sub' })
 }
