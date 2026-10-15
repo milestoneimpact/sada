@@ -655,7 +655,31 @@ function settingsTabs(missing: number): string {
     { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
     { label: 'الأمان', href: '#security' },
     { label: 'سجلّ النشاط', href: '#activity' },
+    { label: 'للمطوّر', href: '#dev' },
   ], { id: 'settings-sub' })
+}
+
+/**
+ * «للمطوّر» (خطّة التصميم 5.7 و5.8 · D-209): **ما لا يحتاجه المالكُ كلَّ يوم ويحتاجه حين يضبط**. البيئةُ والنطاق،
+ * ورابطُ العودة لكلّ منصّة كما يُلصق في بوّابتها، وأسماءُ أسرار Worker الناقصة — **أسماءٌ لا قيَم**، ولا يُقرأ سرٌّ هنا.
+ * كانت أسماءُ الأسرار على بطاقة «الحسابات» فرُفعت عنها في D-205؛ فهذا موضعُها.
+ */
+function devPane(d: PanelData): string {
+  const built = d.channels.filter((v) => v.spec.built)
+  const rows = built.map((v) => `<tr><th scope="row">${escapeHtml(v.spec.label)}</th>
+      <td dir="ltr" class="mono">${escapeHtml(`${d.baseUrl}/oauth/${v.spec.id}/callback`)}</td>
+      <td>${v.missing.length === 0 ? 'لا ينقص شيء' : v.missing.map((m) => `<span class="mono">${escapeHtml(m)}</span>`).join(' · ')}</td></tr>`).join('')
+  return `<div class="card"><h2>البيئة</h2>
+    <div class="scroll"><table><tbody>
+      <tr><th scope="row">البيئة</th><td>${d.env === 'production' ? 'الإنتاج' : 'التجريبيّة'}</td></tr>
+      <tr><th scope="row">النطاق</th><td dir="ltr" class="mono">${escapeHtml(d.rpId)}</td></tr>
+      <tr><th scope="row">العنوان</th><td dir="ltr" class="mono">${escapeHtml(d.baseUrl)}</td></tr>
+    </tbody></table></div></div>
+  <div class="card mt-3"><h2>المنصّات</h2>
+    <p class="hint">رابطُ العودة يُلصق حرفًا في بوّابة كلّ منصّة — <b>ولا يُخلَط النطاقان</b>. والأسرارُ أسماؤها وحدها؛
+      تُضبط بـ<span class="mono">wrangler secret put</span> أو من شاشة المنصّة.</p>
+    <div class="scroll"><table><thead><tr><th>المنصّة</th><th>رابطُ العودة</th><th>أسرارُ Worker الناقصة</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`
 }
 
 /**
@@ -1280,6 +1304,7 @@ ${pivotPane(d.pivot)}
   </div>
 
 </div>
+<div data-sub id="dev">${devPane(d)}</div>
 <div data-sub id="activity">
   <div class="card"><h2>سجلّ النشاط</h2>
     <p class="hint">آخر ${d.audit.length} فعلٍ مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاحٌ قطّ.</p>

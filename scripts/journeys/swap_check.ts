@@ -89,6 +89,33 @@ try {
     await page.evaluate(() => { const s = document.getElementById('draft-order') as HTMLSelectElement; s.value = 'old'; s.dispatchEvent(new Event('change')) })
   } else check(false, 'لا منتقيَ فرزٍ بالمعرّف draft-order')
   check((await page.locator(`[id="d-${draft.id}"]`).count()) === 1, 'بعد الفرز: بطاقةٌ واحدةٌ بمعرّفها، لا نسخةٌ قديمةٌ معها')
+
+  // ‏**بلا اتّصال** (7.11): شريطٌ واحد، وأزرارُ الإرسال معطَّلة، ثمّ «عاد الاتّصال» وتعود
+  await page.context().setOffline(true)
+  await page.locator('#main > .outcome[role="status"]').waitFor()
+  const off = await page.locator('form[method="POST"] button[type="submit"][data-off]').count()
+  check(off > 0, `بلا اتّصال: الشريطُ ظاهر، و${off} زرًّا معطَّلًا`)
+  await page.context().setOffline(false)
+  await page.locator('#flash .toast-note.ok').filter({ hasText: 'عاد الاتّصال' }).waitFor()
+  check((await page.locator('button[data-off]').count()) === 0 && (await page.locator('#main > .outcome[role="status"]').count()) === 0,
+    'عاد الاتّصال: الشريطُ ذهب والأزرارُ عادت')
+
+  // ‏**نصُّ المحرّر محفوظٌ على الجهاز** (7.11): يُكتب، ويُعاد التحميل بلا حفظ، فيُعرض «استعده»
+  // ‏والمحرّرُ يكتب في المسوّدة وحدها: تُعاد العيّنةُ مسوّدةً في القاعدة المحلّيّة قبل الخطوة
+  const other = { id: draft.id }
+  stack.db.raw.prepare("UPDATE posts SET status = 'draft' WHERE id = ?").run(other.id)
+  await page.goto(`${stack.url}/panel?open=${other.id}#ed`)
+  await page.waitForLoadState('networkidle')
+  const typed = 'نصٌّ كُتب ولم يُحفظ — اختبار الجهاز'
+  await page.locator('textarea#ed-txt').fill(typed)
+  await page.waitForTimeout(2300)
+  await page.goto(`${stack.url}/panel?open=${other.id}#ed`)
+  await page.waitForLoadState('networkidle')
+  const restore = page.getByRole('button', { name: 'استعده' })
+  check(await restore.isVisible(), 'بعد إعادة التحميل: «لديك نصٌّ لم يُحفظ» و«استعده»')
+  await restore.click()
+  check(await page.locator('textarea#ed-txt').inputValue() === typed, 'استعده: النصُّ عاد إلى الحقل')
+  check(await page.evaluate((k) => localStorage.getItem(k) !== null, `sada-draft:${other.id}`), 'ويبقى في الجهاز حتّى يُحفظ')
 } finally {
   await browser.close()
   await stack.close()

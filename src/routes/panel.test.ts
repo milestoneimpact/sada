@@ -838,6 +838,11 @@ describe('رؤوسُ الألواح (D-137)', () => {
     const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
     expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#idea', '#write', '#videos', '#plan-import'])
     for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
+    // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
+    const dev = html.slice(html.indexOf('<div data-sub id="dev">'), html.indexOf('<div data-sub id="activity">'))
+    expect(dev).toMatch(/\/oauth\/linkedin\/callback/)
+    expect(dev).toContain('LINKEDIN_CLIENT_ID')
+    expect(dev).not.toMatch(/secret[^<]*=/i)
     for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
       expect(html, old).toContain(`<div data-sub id="${old}">`)
     }

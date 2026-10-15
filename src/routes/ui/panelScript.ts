@@ -333,6 +333,77 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     document.addEventListener('click',function(e){if(m.open&&!m.contains(e.target))m.open=false;});
     m.addEventListener('keydown',function(e){if(m.open&&e.key==='Escape'){m.open=false; var s=m.querySelector('summary'); if(s)s.focus();}});
   });
+  function unbusy(f){
+    f.removeAttribute('aria-busy');
+    f.querySelectorAll('button').forEach(function(x){x.disabled=false;
+      if(x.getAttribute('data-busy-on')){x.removeAttribute('data-busy-on'); x.removeAttribute('aria-busy');
+        x.removeAttribute('aria-disabled'); x.removeAttribute('aria-label');}});
+    if(flashBox)flashBox.querySelectorAll('.busy-note').forEach(function(n){n.remove();});
+  }
+  // ‏إشعارٌ يُرسم في المتصفّح — بالأصناف نفسِها التي يرسمها الخادم (components/toast)
+  // ‏واسمُها غيرُ «say»: سكربتُ مفاتيح المرور بعدها يعلن «var say» في النطاق نفسِه فيغلبها (أمسكه الفحصُ الحيّ)
+  function toastSay(tone,text){
+    if(!flashBox)return;
+    var n=document.createElement('div'); n.className='toast-note '+tone;
+    var t=document.createElement('span'); t.className='toast-t'; t.textContent=text; n.appendChild(t);
+    flashBox.innerHTML=''; flashBox.appendChild(n); armToast(n,true);
+  }
+  function fail(text){toastSay('bad',text);}
+
+  /*
+   * ‏**بلا اتّصال** (خطّة التصميم 7.11): لا عملَ بلا اتّصال ولا Service Worker — اللوحةُ «no-store» عمدًا، وقرارُ نشرٍ
+   * ‏لا يُؤجَّل إلى عودة الشبكة. فشريطٌ واحدٌ محايد أعلى المحتوى، **وأزرارُ الإرسال تُعطَّل بسببٍ مكتوب**، ثمّ «عاد
+   * ‏الاتّصال» وتعود الأزرارُ التي عطّلها هو وحدَها. ولا يُرسَل شيءٌ تلقائيًّا.
+   */
+  var offBar=null;
+  function setOffline(off){
+    var main=document.getElementById('main'); if(!main)return;
+    if(off){
+      if(!offBar){
+        offBar=document.createElement('div'); offBar.className='outcome warn mb-3'; offBar.setAttribute('role','status');
+        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v">لا اتّصالَ بالإنترنت. ما تكتبه في المحرّر محفوظٌ على هذا الجهاز، والأزرارُ تعود حين يعود الاتّصال.</span>';
+        main.insertBefore(offBar,main.firstChild);
+      }
+      document.querySelectorAll('form[method=POST] button[type=submit],button[type=submit][form]').forEach(function(b){
+        if(b.disabled)return; b.disabled=true; b.setAttribute('data-off','1'); b.title='بلا اتّصال';});
+    }else{
+      if(offBar){offBar.remove(); offBar=null;}
+      document.querySelectorAll('button[data-off]').forEach(function(b){b.disabled=false; b.removeAttribute('data-off'); b.removeAttribute('title');});
+    }
+  }
+  window.addEventListener('offline',function(){setOffline(true);});
+  window.addEventListener('online',function(){setOffline(false); toastSay('ok','عاد الاتّصال.');});
+  if(navigator.onLine===false)setOffline(true);
+
+  /*
+   * ‏**نصُّ المحرّر محفوظٌ على الجهاز** (7.11): كلَّ ثانيتين من الكتابة في «sada-draft:<id>»، ونصُّ المنشور وحدَه. فإن
+   * ‏عاد المالكُ ونصُّ الجهاز غيرُ نصّ الخادم قيل له متى كتبه وخُيّر؛ وإن تساويا (حُفظ) مُحي. ولا يُرسل شيئًا وحدَه.
+   */
+  var edT=document.getElementById('ed-txt'), edBox=document.getElementById('ed');
+  if(edT&&edT.tagName==='TEXTAREA'&&edBox&&edBox.dataset.post){
+    var dKey='sada-draft:'+edBox.dataset.post, kept=null;
+    try{kept=JSON.parse(localStorage.getItem(dKey)||'null');}catch(e){kept=null;}
+    if(kept&&typeof kept.t==='string'){
+      if(kept.t===edT.value){try{localStorage.removeItem(dKey);}catch(e){}}
+      else{
+        var at='';
+        try{at=new Date(kept.at).toLocaleTimeString('ar-u-nu-latn',{hour:'numeric',minute:'2-digit'});}catch(e){}
+        var row=document.createElement('p'); row.className='hint'; row.setAttribute('role','status');
+        row.appendChild(document.createTextNode('لديك نصٌّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
+        var take=document.createElement('button'); take.type='button'; take.className='btn btn-secondary btn-sm'; take.textContent='استعده';
+        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-quiet btn-sm'; drop.textContent='تجاهله';
+        row.appendChild(take); row.appendChild(document.createTextNode(' ')); row.appendChild(drop);
+        edT.parentNode.insertBefore(row,edT);
+        take.addEventListener('click',function(){edT.value=kept.t; edT.dispatchEvent(new Event('input')); row.remove(); edT.focus();});
+        drop.addEventListener('click',function(){try{localStorage.removeItem(dKey);}catch(e){} row.remove(); edT.focus();});
+      }
+    }
+    var dTimer=0;
+    edT.addEventListener('input',function(){
+      clearTimeout(dTimer);
+      dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
+    });
+  }
   function countsFrom(doc){
     document.querySelectorAll('nav.tabs a,nav.tab-bar a').forEach(function(a){
       var h=a.getAttribute('href'); if(!h)return;
@@ -386,6 +457,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(card){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.focus({preventScroll:true});}
     }).catch(function(err){
       if(window.console)console.warn('swap',err);
+      // ‏وبلا اتّصال لم يخرج الطلب: يعود الزرُّ، ويُقال ذلك في موضع الإشعار، وما كُتب باقٍ (خطّة التصميم 7.11)
+      if(navigator.onLine===false){unbusy(f); fail('لم يُحفظ. تحقّق من الاتّصال ثمّ أعد المحاولة.'); return;}
       location.hash='d-'+id; location.reload();
     });
   });
