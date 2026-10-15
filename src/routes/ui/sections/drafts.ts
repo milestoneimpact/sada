@@ -19,6 +19,8 @@
  * (D-009)، والطابورُ نفسه ينتظر قناةً مربوطة. **وزرٌّ يقول «انشر» ثمّ لا
  * ينشر أسوأ من غيابه.**
  */
+import { deciderText } from '../../../lib/decider'
+export { deciderText }
 import type { DraftRow } from '../../../lib/draft/store'
 import { postLength } from '../../../lib/draft/length'
 import { reviewText, type ReviewNote } from '../../../lib/draft/review'
@@ -201,7 +203,7 @@ function scheduler(
   if (d.status === 'queued') {
     const gone = d.dispatchedAt !== null
     return `<div class="card card-inset sched ${gone ? 'gone' : 'set'}" ${anchor}>
-      ${statusBadge(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'غادرت إلى الطابور' : 'مجدولة')}
+      ${statusBadge(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'قيد النشر' : 'مجدولة')}
       <span class="when mono">${whenTag(d.scheduledAt)}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
       <span class="grow"></span>
@@ -237,7 +239,7 @@ function scheduler(
       return `<div class="card card-inset sched none" ${anchor}>
         ${statusBadge('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
-          أو انتظر موافقةَ <span class="mono">Community Management API</span> (M-03).</span>
+          أو انتظر موافقةَ <span class="mono">Community Management API</span>.</span>
         <span class="grow"></span>
         <a class="btn btn-secondary btn-sm" href="/panel/tasks">ما عليك</a>
       </div>`
@@ -762,16 +764,6 @@ export function writerName(model: string | null): string {
   return 'نموذجُ الكتابة'
 }
 
-/** مَن قرّر — **«أنت» لا «panel:passkey»** (D-198): المعرّفُ كان يُطبع على البطاقة كما هو. */
-export function deciderText(by: string | null): string {
-  if (by === null) return ''
-  if (by === 'panel:passkey') return 'أنت بمفتاح المرور'
-  if (by === 'panel:token') return 'أنت بكلمة الإدارة'
-  if (by.startsWith('panel')) return 'أنت'
-  if (by.startsWith('plan')) return 'أنت باعتماد الخطّة'
-  return 'غيرُك'
-}
-
 /** أوّلُ كلماتِ المنشور اسمًا لزرّه: «عدّل» على عشر بطاقاتٍ عشرُ وجهاتٍ باسمٍ واحد لقارئ الشاشة. */
 function snippet(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim()
@@ -1176,7 +1168,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
-      <p class="hint m-0">الاعتمادُ يفتح بابَ الطابور ولا يعبره: <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</p>
+      <p class="hint m-0">الاعتمادُ يجيز النشرَ ولا ينشر وحدَه: <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</p>
     </details>
   </div>
   ${filterTabs(drafts)}

@@ -23,6 +23,8 @@ import { soloNav } from '../src/routes/ui/rail'
 import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
+import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
+import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
 import { secondFactorPage } from '../src/routes/authView'
 import { notFoundPage, serverErrorPage } from '../src/routes/ui/errorView'
@@ -98,7 +100,7 @@ const liUpcoming = [
   row({ id: 'u2', status: 'queued', scheduledAt: ago(0.5), sortAt: ago(0.5),
     text: 'موعدٌ حلّ ولم تُرسله الدورةُ بعد — والصفُّ يقول ذلك بدقائقه.' }),
   row({ id: 'u3', status: 'queued', scheduledAt: ago(3), dispatchedAt: ago(2.5), sortAt: ago(3),
-    text: 'غادر إلى الطابور ولم يعُد جوابُه — فيُقال «عالق» ومعه طريقُ الإعادة.' }),
+    text: 'أُرسل للنشر ولم يعُد جوابُه — فيُقال «عالق» ومعه طريقُ الإعادة.' }),
 ]
 const liHistory = [
   row({ id: 'p1', status: 'published', platformPostId: 'urn:li:share:7311', publishedAt: ago(19), sortAt: ago(19), tries: 1,
@@ -394,7 +396,7 @@ const journey: Journey = {
     { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاويةُ الوقت لا زاويةُ المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
     // وما على الصورة يُقال في محطّتها (D-162) — فيدخل المعجمَ والفيضَ كسائرها
     { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثرٌ يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
-    { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'panel:passkey — عُدّل السطرُ الأخير', cost: null, model: null, state: 'done' },
+    { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'النصُّ المعتمَد نصُّك أنت · أنت بمفتاح المرور', cost: null, model: null, state: 'done' },
     { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ بتوقيت الرياض على عمر عبدالحميد', cost: null, model: null, state: 'done' },
     { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولةُ الأولى — نجحت', cost: 0, model: null, state: 'done' },
     { kind: 'metrics', title: 'قياسُ ‏٢٤ ساعة', at: null, detail: 'أوّلُ قياسٍ بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
@@ -442,3 +444,26 @@ writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace'
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
 console.log('رُسمت خمسَ عشرةَ في /tmp')
+
+// ‏الخطُّ الزمنيّ للمحفظة (D-212) عيّنةٌ مدقَّقة (D-213): صفحةٌ لا يرسمها شيءٌ لا يقرؤها حارس
+{
+  const zone = 'Asia/Riyadh'
+  const win = windowOf(now, zone, 30, 0)
+  const post = (id: string, platform: string, accountId: string, account: string, status: string,
+    createdAt: string, approvedAt: string | null, scheduledAt: string | null, publishedAt: string | null) =>
+    ({ id, platform, accountId, account, status, text: `منشورُ ${id}: قيادةُ القيمة لا تُقاس بالمخرجات`, createdAt, approvedAt, scheduledAt, publishedAt })
+  const posts = [
+    post('t1', 'linkedin', 'a1', 'عمر عبدالحميد', 'published', '2026-08-28 08:00:00', '2026-08-29 10:00:00', '2026-08-31 06:00:00', '2026-08-31 06:00:04'),
+    post('t2', 'linkedin', 'a1', 'عمر عبدالحميد', 'queued', '2026-09-03 09:00:00', '2026-09-04 12:00:00', '2026-09-08 06:00:00', null),
+    post('t3', 'x', 'a3', '@omar_ah', 'failed', '2026-09-01 07:00:00', '2026-09-01 08:00:00', '2026-09-02 06:00:00', null),
+    post('t4', 'x', 'a3', '@omar_ah', 'draft', '2026-09-04 15:00:00', null, null, null),
+    post('t5', 'tiktok', '', '', 'draft', '2026-09-05 11:00:00', null, null, null),
+  ]
+  const plans = [{ id: 'w1', weekStart: '2026-08-31', status: 'approved' }]
+  writeAudited(
+    '/tmp/screen-timeline.html',
+    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, timelineScreen({
+      chart: gantt({ posts, plans }, win, now, zone), span: 30, shift: 0, capped: false, cap: 1500, zone, now,
+    }), 'n', '', buildCommands({ onPanel: false }), soloNav('results')),
+  )
+}

@@ -147,7 +147,7 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولا' }
   if (row.dispatched_at !== null) {
-    return { ok: false, reason: 'غادر إلى الطابور — ولا يُستردّ من هناك' }
+    return { ok: false, reason: 'أُرسل للنشر — ولا يُستردّ بعد الإرسال' }
   }
 
   // يعود `approved` لا `draft`: الاعتمادُ وقع ولا يُمحى بسحب موعد
@@ -174,7 +174,7 @@ export async function reschedulePost(db: Db, postId: string, when: string, now: 
     .first<{ platform: string; status: string; dispatched_at: string | null; account_status: string | null; display_name: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
-  if (row.dispatched_at !== null) return { ok: false, reason: 'غادر إلى الطابور، ولا يُغيَّر موعدُه من هناك' }
+  if (row.dispatched_at !== null) return { ok: false, reason: 'أُرسل للنشر، ولا يُغيَّر موعدُه بعد الإرسال' }
   if (row.account_status !== null && row.account_status !== 'active') {
     return { ok: false, reason: `${row.display_name ?? 'الحساب'}: إذنُ الحساب لا يعمل، فجدّد إذنه أوّلًا` }
   }
@@ -226,8 +226,8 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
       ok: false,
       reason: row.status === 'queued'
         ? row.dispatched_at === null
-          ? 'ينتظر موعدَه ولم يفشل — اسحبه من الطابور إن أردت تغييره'
-          : `غادر إلى الطابور منذ أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابَ المنصّة`
+          ? 'ينتظر موعدَه ولم يفشل — ألغِ الجدولة إن أردت تغييره'
+          : `أُرسل للنشر قبل أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابَ المنصّة`
         : `حالتُه «${row.status}» — والإعادةُ للفاشل أو العالق وحده`,
     }
   }

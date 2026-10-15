@@ -29,7 +29,7 @@ import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platf
 import { permalink } from '../../lib/platform/screen'
 import { capabilities, type Capability } from '../../lib/oauth/scopes'
 import { platformLabel, type Platform } from '../../lib/oauth/providers'
-import { counted, money, NOUNS, parseSqliteUtc, relativeTime, shortAgo, untilTime } from '../../lib/format'
+import { counted, duration, money, NOUNS, parseSqliteUtc, relativeTime, shortAgo, untilTime } from '../../lib/format'
 import { widest, windowLabel, type PostMetricRow } from '../../lib/metrics/job'
 import type { AppStatus } from '../../lib/oauth/apps'
 import type { PlatformNeeds } from '../../lib/platform/needs'
@@ -388,7 +388,7 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
     ? first === undefined ? '' : '<ul class="acct-counts"><li>لم يُنشر شيءٌ بعد</li></ul>'
     : `<ul class="acct-counts">
           <li><b>${c.published}</b> نُشر</li>
-          <li><b>${c.queued}</b> في الطابور</li>
+          <li><b>${c.queued}</b> مجدول</li>
           <li class="${c.failed > 0 ? 'bad' : ''}"><b>${c.failed}</b> فشل</li>
           <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
         </ul>`
@@ -568,12 +568,12 @@ function upcomingSection(d: PlatformScreenData): string {
       ${row.accountName === null ? '' : `<span class="np-acc">${escapeHtml(row.accountName)}</span>`}
       ${q.kind === 'late' ? '<p class="hint">حلّ موعدُه ولم تُرسله الدورةُ بعد — تدور كلَّ ربع ساعة.</p>' : ''}
       ${q.kind === 'stuck'
-        ? `<p class="hint">غادر إلى الطابور منذ ${q.minutes} دقيقةً ولم يعُد جوابُه.</p>${requeueForm(row.id, true, d.view.spec.id)}`
+        ? `<p class="hint">أُرسل للنشر قبل ${duration(q.minutes * 60)} ولم يعُد جوابُ المنصّة.</p>${requeueForm(row.id, true, d.view.spec.id)}`
         : row.dispatchedAt === null
           ? `<form class="inline" method="POST" action="/panel/drafts/unschedule" data-busy="جارٍ…">
                <input type="hidden" name="id" value="${escapeHtml(row.id)}">
                <input type="hidden" name="return" value="${escapeHtml(returnTo(d.view.spec.id, 'waiting'))}">
-               <button class="btn btn-secondary btn-sm" type="submit">اسحبه من الطابور</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit">ألغِ الجدولة</button></form>`
           : ''}
       ${journeyLink(row.id)}`
     return npRow(

@@ -22,6 +22,7 @@
  * تقول «لا يُقاس أصلا» — **والفرقُ بينهما هو الفرقُ بين منشورٍ فاشلٍ
  * ومنشورٍ لا نعرف عنه**.
  */
+import { deciderText } from './decider'
 import type { Db } from './tokens'
 import { kb } from './format'
 
@@ -91,7 +92,7 @@ const DECISION: Readonly<Record<string, { title: string; detail: string }>> = {
 const ATTEMPT: Readonly<Record<string, { title: string; detail: string }>> = {
   succeeded: { title: 'نُشرت', detail: '' },
   sent: { title: 'أُرسلت ولم يعد الجواب', detail: 'طلبٌ غادر إلى المنصّة، وردُّها لم يُسجَّل' },
-  failed: { title: 'لم تنجح', detail: 'ردّت المنصّةُ بخطأ — والطابورُ يعيد المحاولة' },
+  failed: { title: 'لم تنجح', detail: 'ردّت المنصّةُ بخطأ — وصدى يعيد المحاولة' },
   skipped_duplicate: {
     title: 'تُخطّيت — مكرَّرة',
     detail: 'المفتاحُ نفسُه نُشر من قبل، فلم يُدفَع ثمنُه مرّتين',
@@ -225,7 +226,7 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
     stations.push({
       kind: 'decision', title: shape.title,
       at: post.approved_at,
-      detail: post.approved_by === null ? shape.detail : `${shape.detail} · ${post.approved_by}`,
+      detail: post.approved_by === null ? shape.detail : `${shape.detail} · ${deciderText(post.approved_by)}`,
       cost: null, model: null,
       state: post.status === 'rejected' ? 'failed' : 'done',
     })
@@ -235,7 +236,7 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
   if (post.scheduled_at !== null) {
     stations.push({
       kind: 'schedule',
-      title: post.dispatched_at === null ? 'مجدولة' : 'غادرت إلى الطابور',
+      title: post.dispatched_at === null ? 'مجدولة' : 'قيد النشر',
       at: post.dispatched_at ?? post.scheduled_at,
       detail: post.account_name === null ? 'بلا حساب' : `إلى ${post.account_name}`,
       cost: null, model: null,

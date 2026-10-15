@@ -18,6 +18,7 @@
  * ويُنفَّذ على تلك وحدها. فمسوّدةٌ اعتُمدت بين المعاينة والتنفيذ لا
  * تدخل الجدولَ خِلسةً، **ومسوّدةٌ خرجت منه تُردّ بسببها**.
  */
+import { counted, NOUNS } from '../../lib/format'
 import { stamp } from '../../lib/time/zone'
 import { escapeHtml } from './shell'
 import { ICON } from './icons'
@@ -58,7 +59,7 @@ export function spreadScreen(d: SpreadScreenData): string {
   }
 
   return `<section class="card">
-    <h2>هذا ما سيقع — ${slots.length} منشورا</h2>
+    <h2>هذا ما سيقع — ${counted(slots.length, NOUNS.post)}</h2>
     <p class="hint">كلُّ ${d.gap} ساعةً منشور، ابتداءً من
       <b class="mono">${escapeHtml(stamp(d.start.replace('T', ' '), null))}</b>.
       <b>ولا يقع منه شيءٌ حتّى تضغط «اعتمد التوزيع»</b>.</p>

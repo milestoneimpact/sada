@@ -30,8 +30,8 @@ export const CADENCE: Readonly<Record<Job, { readonly label: string; readonly ev
   metrics: { label: 'قياسُ المنشورات', everySeconds: 60 * 60 },
   scan: { label: 'مسحُ Drive', everySeconds: 24 * 60 * 60 },
   alerts: { label: 'تنبيهاتُ الانتهاء', everySeconds: 24 * 60 * 60 },
-  report: { label: 'التقريرُ الأسبوعيّ', everySeconds: 7 * 24 * 60 * 60 },
-  publish: { label: 'النشرُ من الطابور', everySeconds: null },
+  report: { label: 'النتائجُ الأسبوعيّة', everySeconds: 7 * 24 * 60 * 60 },
+  publish: { label: 'النشرُ في الموعد', everySeconds: null },
 }
 
 export const JOBS: readonly Job[] = ['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report']
