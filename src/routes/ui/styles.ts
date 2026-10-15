@@ -726,6 +726,68 @@ tbody tr:last-child td{border-bottom:0}
 .pv-form{flex-wrap:wrap; align-items:flex-end; gap:var(--s-3)}
 .pv-form .field{flex:1 1 9.5rem; min-width:0}
 .pv-form button{flex:none}
+/* ‏الخطُّ الزمنيّ للمحفظة (D-212): عمودُ أسماءٍ ثابتٌ ومسارٌ تُرسَم فيه الأشرطةُ بنسبٍ منطقيّة.
+   ‏والحدُّ الأدنى للعرض يحفظ يومًا مقروءًا؛ وما ضاق عنه يُمرَّر داخلَ إطاره لا الصفحة. */
+.gt-form{flex-wrap:wrap; align-items:flex-end; gap:var(--s-3)}
+.gt-form .field{flex:0 1 11rem; min-width:0}
+.gt-form button{flex:none}
+.gt-wrap{overflow-x:auto; margin-top:var(--s-3)}
+.gt{min-inline-size:48rem}
+.gt-axis,.gt-row{display:grid; grid-template-columns:11rem 1fr; gap:var(--s-3); align-items:stretch}
+.gt-axis{position:sticky; top:0; z-index:1; background:var(--surface); border-bottom:var(--bd); min-height:var(--s-8)}
+.gt-axis .gt-track{min-height:calc(var(--s-8) + var(--s-4))}
+.gt-tick{position:absolute; bottom:var(--s-1); transform:translateX(50%); white-space:nowrap;
+  font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-variant-numeric:tabular-nums}
+.gt-tick.major{color:var(--ink); font-weight:600}
+.gt-tick:first-child{transform:none}
+.gt-tick.gt-today{top:0; bottom:auto; color:var(--brand); font-weight:600}
+.gt-grp{margin-top:var(--s-4)}
+.gt-gh{margin:0 0 var(--s-1); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
+.gt-rows{list-style:none; margin:0; padding:0}
+.gt-row{border-bottom:var(--bd-soft); max-width:none}
+.gt-lab{display:flex; flex-direction:column; justify-content:center; min-width:0; padding:var(--s-1) 0;
+  position:sticky; inset-inline-start:0; z-index:1; background:var(--surface)}
+.gt-name{font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.gt-n{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.gt-track{position:relative; padding:var(--s-1) 0; min-width:0}
+.gt-tier{position:relative; height:var(--s-6); margin:var(--s-1) 0}
+.gt-bar{position:absolute; top:0; bottom:0; min-inline-size:var(--s-2); display:flex; align-items:center; overflow:hidden;
+  border-radius:var(--r-inline); border:1px solid var(--line); background:var(--surface-2); color:var(--ink);
+  text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption)}
+.gt-bar.ok{background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.gt-bar.warn{background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.gt-bar.bad{background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.gt-bar.pending{background:color-mix(in srgb,var(--brand) 12%,transparent); border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
+.gt-bar.idle{color:var(--ink-2); border-style:dashed}
+.gt-bar.open{border-inline-end-style:dashed}
+.gt-bar.cut-s{border-start-start-radius:0; border-end-start-radius:0; border-inline-start-width:0}
+.gt-bar.cut-e{border-start-end-radius:0; border-end-end-radius:0; border-inline-end-width:0}
+.gt-wait{position:absolute; top:0; bottom:0; inset-inline-end:0}
+.gt-bar.ok .gt-wait{background:color-mix(in srgb,var(--ok) 26%,transparent)}
+.gt-bar.warn .gt-wait{background:color-mix(in srgb,var(--warn) 26%,transparent)}
+.gt-bar.bad .gt-wait{background:color-mix(in srgb,var(--bad) 26%,transparent)}
+.gt-bar.pending .gt-wait,.gt-bar.idle .gt-wait{background:color-mix(in srgb,var(--ink-3) 22%,transparent)}
+.gt-txt{position:relative; padding:0 var(--s-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.gt-mark{position:absolute; top:50%; width:var(--s-2); height:var(--s-2); transform:translate(50%,-50%) rotate(45deg);
+  background:var(--ink-3); pointer-events:none}
+.gt-mark.ok{background:var(--ok)}
+.gt-mark.warn{background:var(--warn)}
+.gt-mark.bad{background:var(--bad)}
+.gt-mark.pending{background:var(--brand)}
+.gt-now{position:absolute; top:0; bottom:0; width:2px; transform:translateX(50%); background:var(--brand); opacity:.55; pointer-events:none}
+.gt-legend{align-items:center}
+.gt-key{display:inline-flex; align-items:center; gap:var(--s-1)}
+.gt-sw{display:inline-block; width:var(--s-4); height:var(--s-3); border-radius:var(--r-inline); border:1px solid var(--line); background:var(--surface-2)}
+.gt-sw.ok{background:var(--ok-wash); border-color:var(--ok)}
+.gt-sw.warn{background:var(--warn-wash); border-color:var(--warn)}
+.gt-sw.bad{background:var(--bad-wash); border-color:var(--bad)}
+.gt-sw.pending{background:color-mix(in srgb,var(--brand) 12%,transparent); border-color:var(--brand)}
+.gt-sw.idle{border-style:dashed}
+.gt-sw.split{background:color-mix(in srgb,var(--warn) 26%,var(--warn-wash)); border-color:var(--warn)}
+.gt-sw.mark{width:var(--s-2); height:var(--s-2); transform:rotate(45deg); background:var(--ink-2); border:0}
+@media(hover:hover){.gt-bar:hover{border-color:var(--ink-2)}}
+.gt-bar:focus-visible{outline:var(--ring-w) solid var(--ring); outline-offset:1px; z-index:2}
+@media${below('md')}{.gt{min-inline-size:40rem} .gt-axis,.gt-row{grid-template-columns:7.5rem 1fr}}
 .nm{font-weight:600}
 /* «nm» تُستعمَل span وتُستعمَل فقرةً. والفقرةُ بلا قاعدةِ هامشٍ
    ترث 14px من المتصفّح — **خارجَ السلّم**، ولا تظهر في grep لأنّها
