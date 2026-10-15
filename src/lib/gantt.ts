@@ -199,18 +199,24 @@ function snippet(text: string): string {
 /**
  * يرصّ الأشرطةَ طوابق: **كلُّ شريطٍ في أوّل طابقٍ انتهى آخرُه قبله**.
  * والفجوةُ نصفُ نقطةٍ مئويّة، فلا يلتصق شريطان فيُقرآ واحدًا.
+ *
+ * ‏**والشريطُ يُرصّ بعرض إصبعٍ على الأقلّ** (D-217): على الهاتف يُرسم ‏44px (`MIN_SPAN` من
+ * المسار ‏~500px)، فشريطٌ أقصرُ يُرصّ بعرضه المرسوم لا الزمنيّ، وإلّا غطّى جارَه في الطابق.
  */
+export const MIN_SPAN = 9
+
 function stack(bars: readonly GanttBar[]): GanttBar[][] {
   const tiers: GanttBar[][] = []
   const ends: number[] = []
   for (const bar of [...bars].sort((a, b) => a.start - b.start || a.end - b.end)) {
     const i = ends.findIndex((e) => e + 0.5 <= bar.start)
+    const end = Math.max(bar.end, bar.mark ?? bar.end, bar.start + MIN_SPAN)
     if (i < 0) {
       tiers.push([bar])
-      ends.push(Math.max(bar.end, bar.mark ?? bar.end))
+      ends.push(end)
     } else {
       tiers[i]!.push(bar)
-      ends[i] = Math.max(bar.end, bar.mark ?? bar.end)
+      ends[i] = end
     }
   }
   return tiers
