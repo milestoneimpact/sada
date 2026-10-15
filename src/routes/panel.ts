@@ -3047,7 +3047,7 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
   }, c.req.raw)
   const label = (p: string): string => platformLabel(p)
   /*
-   * ‏**وموعدُ «متى؟» مع الاعتماد وحدَه** (D-217): ما أُنشئ الآن معتمَدًا يُجدوَل بـ`scheduleFromUpload`
+   * ‏**وموعدُ «متى؟» مع الاعتماد وحدَه** (D-218): ما أُنشئ الآن معتمَدًا يُجدوَل بـ`scheduleFromUpload`
    * ‏نفسِها التي تجدول من صفّ المقطع، مقصورةً على منصّات هذا الإنشاء.
    */
   const now = new Date()

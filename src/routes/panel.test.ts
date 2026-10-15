@@ -4273,7 +4273,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(flash).not.toContain('UTC.')
   })
 
-  it('«متى؟» مع «اعتمده الآن»: يُنشأ ويُجدوَل في ضغطةٍ واحدة، ولمنصّات هذا الإنشاء وحدها (D-217)', async () => {
+  it('«متى؟» مع «اعتمده الآن»: يُنشأ ويُجدوَل في ضغطةٍ واحدة، ولمنصّات هذا الإنشاء وحدها (D-218)', async () => {
     await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
       ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active'),
       ('acc-ig', 'instagram', 'member', 'ig', 'omar', 'active')`).run()
@@ -4300,7 +4300,7 @@ describe('فيديوهاتك: من الملفّ إلى منشوراتٍ على �
     expect(flash).toMatch(/أُنشئ على YouTube وجُدول [^<]*09:00/)
   })
 
-  it('«متى؟» بلا اعتماد لا يجدول شيئًا (D-217)', async () => {
+  it('«متى؟» بلا اعتماد لا يجدول شيئًا (D-218)', async () => {
     await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
       ('acc-yt', 'youtube', 'org', 'yt', 'قناة عمر', 'active')`).run()
     const cookie = await login()

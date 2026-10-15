@@ -143,7 +143,7 @@ describe('شعارُ المسوّدة من مصدره الواحد', () => {
   })
 })
 
-describe('الاعتمادُ يعرض الموعد (D-217)', () => {
+describe('الاعتمادُ يعرض الموعد (D-218)', () => {
   const d: DraftRow = {
     id: 'd1', platform: 'linkedin', text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
