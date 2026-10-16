@@ -37,6 +37,23 @@ export const COPY_SCRIPT = `
 `
 
 /**
+ * **تأكيدُ الزرّ** (D-218) — في كلّ صفحة، **للزرّ وحدَه**.
+ *
+ * «احذف» في دليل ضبط المنصّة يحمل «data-confirm» على الزرّ لا على النموذج (النموذجُ نفسُه يحفظ ويفحص)، وصفحةُ المنصّة
+ * لا تحمل سكربتَ اللوحة أصلًا — **فكان يحذف السرَّ المحفوظ بضغطةٍ بلا سؤال**. والنموذجُ ذو «data-confirm» يسأل عنه
+ * سكربتُ اللوحة؛ فهذا للأزرار وحدها، فلا يُسأل المالكُ مرّتين.
+ */
+export const CONFIRM_SCRIPT = `
+(function(){
+  document.querySelectorAll('button[data-confirm]').forEach(function(b){
+    b.addEventListener('click',function(e){
+      if(!confirm(b.dataset.confirm)){e.preventDefault(); e.stopImmediatePropagation();}
+    });
+  });
+})();
+`
+
+/**
  * مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل.
  *
  * **ولونُ شريط المتصفّح معه** (D-183): وسما «theme-color» بشرط الوضع، فاختيارٌ

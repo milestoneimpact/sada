@@ -160,7 +160,8 @@ const R1: Journey = {
     if (!(await id.isVisible())) await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
     await m.type(id, '1234567890123456', 'لصق «Client ID» (من Meta)', { pasted: true })
     await m.type(page.locator('#cs-instagram'), 'local0fake0instagram0secret00000', 'لصق «Client Secret»', { pasted: true })
-    await m.tap(button(page.locator('form[action="/panel/channels/app"]').filter({ has: id }), 'احفظ'), '«احفظ»')
+    // ‏و«احفظ» في شريط المساعد الملتصق، للنموذج بسِمة «form» (D-218)
+    await m.tap(visible(page.locator('button[form="app-instagram"]').filter({ hasText: 'احفظ' })).first(), '«احفظ»')
     m.mark('app_saved')
     const saved = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM oauth_apps WHERE platform = 'instagram'")?.n ?? 0
     if (saved === 0) return { success: false, verified: 'oauth_apps: لا صفّ لـ instagram بعد «احفظ»' }

@@ -95,6 +95,22 @@ describe('دليلُ الضبط', () => {
   const pane = (platform: string, over: Partial<AppStatus> = {}, accounts: LinkedAccount[] = []): string =>
     setupPane(viewChannels(accounts, () => false).find((v) => v.spec.id === platform)!, app(platform, over), 'https://sada2.basserh.com')
 
+  it('سرُّ Worker الغالب: يُقال أين يُبدَّل، واسمُ المتغيّر خلف «للمطوّر» وحدَه (D-218)', () => {
+    const html = pane('linkedin', { source: 'worker_secret', clientId: 'cid', secretNames: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'] })
+    const dev = html.indexOf('<details class="setup mt-2"><summary>للمطوّر</summary>')
+    expect(dev).toBeGreaterThan(-1)
+    expect(html.indexOf('LINKEDIN_CLIENT_SECRET')).toBeGreaterThan(dev)
+    expect(html.slice(dev)).toContain('wrangler secret put LINKEDIN_CLIENT_SECRET')
+  })
+
+  it('وشريطُ أفعال المساعد يلتصق في أسفله، والحاويةُ لا تحبسه (D-218)', async () => {
+    const { sheet } = await import('../../test/css')
+    const { STYLE } = await import('./styles')
+    const css = sheet(STYLE)
+    expect(css.rule('.guide .wiz-bar')).toMatchObject({ position: 'sticky', bottom: '0' })
+    expect(css.rule('.guide').overflow).toBe('clip')
+  })
+
   it('النموذجان يعودان إلى تبويب الإعداد، والحقلان يردّان الفراغَ وحده', () => {
     const html = pane('instagram')
     expect(html).toContain('<input type="hidden" name="return" value="platform:instagram:setup">')
