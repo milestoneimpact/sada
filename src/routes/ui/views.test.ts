@@ -143,6 +143,37 @@ describe('شعارُ المسوّدة من مصدره الواحد', () => {
   })
 })
 
+describe('الاعتمادُ يعرض الموعد (D-218)', () => {
+  const d: DraftRow = {
+    id: 'd1', platform: 'linkedin', text: 'نصّ', rationale: null, status: 'draft', model: null,
+    cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
+    approvedAt: null, createdAt: '2026-09-05 09:00:00', scheduledAt: null,
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: null
+  }
+  const section = (targets: { id: string; platform: 'linkedin'; label: string }[]): string =>
+    draftsSection({
+      drafts: [d], media: [], targets, earliest: '2026-09-06T09:15',
+      writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
+      mediaReady: READY,
+    })
+
+  it('حسابٌ واحدٌ يناسبها: «اعتمد · غدًا» أوّلًا بحسابه وموعده، و«اعتمد فقط» بجوارها', () => {
+    const html = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }])
+    expect(html).toContain('value="approve-schedule"')
+    expect(html).toContain('name="account" value="a1"')
+    expect(html).toContain('name="preset" value="tomorrow"')
+    expect(html).toContain('اعتمد · غدًا 9:00 ص')
+    expect(html.indexOf('approve-schedule')).toBeLessThan(html.indexOf('value="approve"'))
+  })
+
+  it('لا حسابَ أو حسابان: «اعتمد» وحده كما كان، فلا يُختار عن المالك', () => {
+    expect(section([])).not.toContain('approve-schedule')
+    const two = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }, { id: 'a2', platform: 'linkedin', label: 'الشركة' }])
+    expect(two).not.toContain('approve-schedule')
+    expect(two).toContain('value="approve">اعتمد</button>')
+  })
+})
+
 describe('الرمزُ يقول ما يعنيه', () => {
   it('زرُّ البحث عدسةٌ لا شبكةُ «نظرة عامّة»', () => {
     expect(commandTrigger()).toContain(ICON.search)

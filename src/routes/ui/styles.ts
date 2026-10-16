@@ -436,6 +436,18 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .next-t{margin:var(--s-1) 0 0; font-size:var(--t-h3); font-weight:600; line-height:var(--lh-h3)}
 .home-card{margin-bottom:var(--gap-card)}
 .home-sub{margin:var(--s-5) 0 var(--s-3); font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
+/* ‏مكتبُ اليوم (D-216): ما ينتظر قرارك بفعله، ثمّ التشغيلُ والكلفةُ مطويّين في آخر الرئيسيّة */
+.desk{margin-top:var(--gap-card)}
+.desk-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
+.desk-row{display:flex; flex-direction:column; gap:var(--s-2); padding-block:var(--s-3); border-top:var(--bd-soft)}
+.desk-row:first-child{border-top:0; padding-top:0}
+.desk-head{display:flex; align-items:center; gap:var(--s-2); min-width:0}
+.desk-head b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.desk-text{margin:0; max-width:var(--measure); color:var(--ink); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.desk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2)}
+.home-ops > summary{display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; cursor:pointer; list-style:none; min-height:var(--tap)}
+.home-ops > summary::-webkit-details-marker{display:none}
+.home-ops > summary h2{margin:0}
 /* ── القمعُ وشريطُ الأسبوع (D-194) ─────────────────────────────────────────────────
    القمعُ صفوفٌ: اسمُ المحطّة وحالُها، ثمّ شريطٌ بطول ما مرّ بها (حبرٌ واحد: قياسٌ لا هويّة)،
    ثمّ العدد. **والمميَّزةُ وحدَها بلون حالها** فلا تُقرأ سبعُ محطّاتٍ برتقاليّةٍ ضجيجًا. */
@@ -2059,6 +2071,8 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 }
 /* والشريطُ السفليُّ للجوّال وحدَه: في المكتب تبقى الرافدةُ عمودا */
 @media${atLeast('md')}{details.more-sheet,details.fab{display:none}}
+/* ‏«منشور جديد» في الترويسة على العريض، والعائمُ مكانه على الضيّق (D-216) */
+@media${below('md')}{details[data-tb-new]{display:none}}
 @media${below('sm')}{
   .scroll{overflow:visible; margin:0}
   /* **والجدولُ المحوريُّ مستثنًى** (D-151): أعمدتُه أرقامٌ تُقارَن، وتكديسُها

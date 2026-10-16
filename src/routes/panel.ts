@@ -3046,6 +3046,32 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
     detail: result.ok ? `created:${result.created.join(',')} skipped:${result.skipped.join(',')}` : `refused:${result.reason}`.slice(0, 200),
   }, c.req.raw)
   const label = (p: string): string => platformLabel(p)
+  /*
+   * ‏**وموعدُ «متى؟» مع الاعتماد وحدَه** (D-218): ما أُنشئ الآن معتمَدًا يُجدوَل بـ`scheduleFromUpload`
+   * ‏نفسِها التي تجدول من صفّ المقطع، مقصورةً على منصّات هذا الإنشاء.
+   */
+  const now = new Date()
+  const zone = validZone(String(form.get('tz') ?? '')) ?? await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const at = result.ok && result.created.length > 0 && form.get('approve') === 'on'
+    ? presetAt(String(form.get('preset') ?? ''), now, zone)
+    : null
+  const planned = at === null ? null : await scheduleFromUpload(c.env.DB, {
+    uploadId: id,
+    shown: (await c.env.DB
+      .prepare(`SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id WHERE m.upload_id = ?`)
+      .bind(id).all<{ id: string; platform: string }>()).results
+      .filter((r) => (result.ok ? result.created as readonly string[] : []).includes(r.platform)).map((r) => r.id),
+    accounts: await listAccounts(c.env.DB),
+    at,
+    now,
+  })
+  const plannedReach = planned === null ? null : privateReach(planned.scheduled, await reachNow(c.env.DB))
+  if (planned !== null) {
+    await record(c.env.DB, {
+      actor: 'panel', action: 'upload.schedule', target: id,
+      detail: `scheduled:${planned.scheduled.join(',')} failed:${planned.failed.length}`,
+    }, c.req.raw)
+  }
   // ‏عنوانُ YouTube فوق حدّه يُقصّ عند الرفع (ر-4): يُقال الآن بما سيُرفع، لا يُكتشف في القناة
   const cut = result.ok && !perPlatform && result.created.includes('youtube') ? cutTitle(String(form.get('caption') ?? '')) : null
   // ‏ومنصّةٌ غيرُ متّصلةٍ يُنشأ منشورُها ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
@@ -3056,12 +3082,14 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
     : result.created.length === 0
       ? { kind: 'bad', text: `موجودٌ من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
       : {
-          kind: cut === null && unlinked.length === 0 ? 'ok' : 'warn',
-          text: `أُنشئ على ${result.created.map(label).join(' و')}${form.get('approve') === 'on'
-            ? ' معتمَدًا — جدوِله تحت المقطع بموعدٍ واحد، أو من بطاقة كلٍّ.'
-            : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
+          kind: cut === null && unlinked.length === 0 && (planned === null || planned.failed.length === 0) ? 'ok' : 'warn',
+          text: `أُنشئ على ${result.created.map(label).join(' و')}${planned !== null && at !== null && planned.scheduled.length > 0
+            ? ` وجُدول ${momentLabel(at, zone, now)}${zoneNote(zone)}.${planned.failed.length === 0 ? '' : ` وتعذّرت جدولةُ ${planned.failed.map((f) => `${label(f.platform)}: ${f.reason}`).join('؛ ')}.`}${plannedReach === null ? '' : ` ${plannedReach}`}`
+            : form.get('approve') === 'on'
+              ? ' معتمَدًا — جدوِله تحت المقطع بموعدٍ واحد، أو من بطاقة كلٍّ.'
+              : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
             ? ''
-            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0
+            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0 || planned !== null
             ? ''
             : ` ولا حسابَ متّصلًا على ${unlinked.map(label).join(' و')}: لا يُجدوَل حتّى تربطه.`}`,
         })
