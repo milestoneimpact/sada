@@ -168,12 +168,15 @@ export function dayLabel(value: string | Date, zone: string | null, withYear = t
   return `${DAYS[p.weekday]} ${p.day} ${MONTHS[p.month - 1]}${withYear ? ` ${p.year}` : ''}`
 }
 
-/** «09:05» بمنطقة المالك. */
+/**
+ * «9:05 ص» و«9:00 م» بمنطقة المالك (خطّة التصميم ٨٫٣، D-220): ساعةٌ من اثنتي عشرة بلا صفرٍ
+ * في أوّلها، والظهرُ «12:00 م» ومنتصفُ الليل «12:00 ص». كانت «21:00» و«09:00» يقرؤها المالكُ حسابًا.
+ */
 export function clock(value: string | Date, zone: string | null): string {
   const date = at(value)
   if (date === null) return ''
   const p = localParts(date, zone)
-  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
+  return `${p.hour % 12 === 0 ? 12 : p.hour % 12}:${String(p.minute).padStart(2, '0')} ${p.hour < 12 ? 'ص' : 'م'}`
 }
 
 /** «2026-10-13 09:00» بمنطقة المالك، و«بتوقيت الرياض» بعده إن كانت احتياطًا — لعنوانٍ يُحوَّم عليه. */

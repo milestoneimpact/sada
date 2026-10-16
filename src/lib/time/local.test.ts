@@ -48,7 +48,7 @@ describe('presetAt — الأزرارُ الأربعة بتوقيت المالك
 
 describe('momentLabel', () => {
   it('اليومُ والساعةُ بمنطقة المالك، والسنةُ إن لم تكن سنتَه', () => {
-    expect(momentLabel(new Date('2026-10-05T06:00:00Z'), 'Asia/Riyadh', NOW)).toBe('الاثنين 5 أكتوبر 09:00')
-    expect(momentLabel(new Date('2027-01-03T06:00:00Z'), 'Asia/Riyadh', NOW)).toBe('الأحد 3 يناير 2027 09:00')
+    expect(momentLabel(new Date('2026-10-05T06:00:00Z'), 'Asia/Riyadh', NOW)).toBe('الاثنين 5 أكتوبر 9:00 ص')
+    expect(momentLabel(new Date('2027-01-03T06:00:00Z'), 'Asia/Riyadh', NOW)).toBe('الأحد 3 يناير 2027 9:00 ص')
   })
 })

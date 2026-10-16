@@ -1,79 +1,49 @@
 /**
- * الوقتُ بوجهين (D-106) — **وأهمُّ ما يُحرَس هنا ما يبقى بلا JavaScript.**
+ * وسمُ الموعد (D-106 · D-201 · D-220) — **سطرٌ واحدٌ بمنطقة المالك، يُكتب على الخادم**.
  *
- * ميزةٌ تحوّل في المتصفّح تُقاس بما تتركه حين لا يعمل التحويل: **رقمٌ
- * بلا منطقةٍ أسوأُ من رقمٍ بمنطقةٍ واحدة**، لأنّ القارئ يحسبه بتوقيته.
+ * كان الوسمُ يكتب الرياضَ ثمّ يزيد سكربتٌ سطرًا بصيغةٍ ثانية. فصار الخادمُ يكتبه بالمنطقة
+ * من الكعكة، ويقول «بتوقيتك»، أو «بتوقيت الرياض» حين لا منطقة.
  */
 import { describe, expect, it } from 'vitest'
-import { TIME_SCRIPT, whenTag } from './time'
+import { whenTag } from './time'
 import { STYLE } from './styles'
 import { sheet } from '../../test/css'
 
-describe('وسمُ الموعد — بتوقيت الرياض مكتوبًا في الوسم (D-201)', () => {
-  it('**يحمل وقتَ الرياض نصًّا، لا UTC**', () => {
-    const html = whenTag('2026-09-08 19:30:00')
-    expect(html).toContain('<b>2026-09-08 22:30</b> <span class="tz">بتوقيت الرياض</span>')
-    expect(html).not.toContain('UTC</span>')
+const NOW = new Date('2026-09-01T09:00:00Z')
+
+describe('وسمُ الموعد', () => {
+  it('بلا منطقة: وقتُ الرياض بـ «ص» و«م» ويُقال ذلك، لا UTC', () => {
+    const html = whenTag('2026-09-08 19:30:00', { now: NOW })
+    expect(html).toContain('<b>الثلاثاء 8 سبتمبر 10:30 م</b> <span class="tz">بتوقيت الرياض</span>')
+    expect(html).not.toContain('UTC')
   })
 
-  /** **و`datetime` بصيغة ISO**: هي التي يقرؤها `Date` في كلّ متصفّح. */
-  it('ويحمل ISO في datetime ليقرأه المتصفّحُ وقارئُ الشاشة', () => {
+  it('وبمنطقة المالك: وقتُه هو، ويُقال «بتوقيتك»', () => {
+    const html = whenTag('2026-09-08 19:30:00', { zone: 'Europe/Berlin', now: NOW })
+    expect(html).toContain('<b>الثلاثاء 8 سبتمبر 9:30 م</b> <span class="tz">بتوقيتك</span>')
+  })
+
+  it('والسنةُ حين لا تكون سنةَ الآن', () => {
+    expect(whenTag('2027-01-03 06:00:00', { now: NOW })).toContain('الأحد 3 يناير 2027 9:00 ص')
+  })
+
+  it('ويحمل ISO في datetime ليقرأه قارئُ الشاشة', () => {
     expect(whenTag('2026-09-08 19:30:00')).toContain('datetime="2026-09-08T19:30:00.000Z"')
   })
 
-  it('ولا شيءَ لموعدٍ غائب — ولا سطرٌ فارغٌ يُقرأ عطلا', () => {
+  it('ولا شيءَ لموعدٍ غائب', () => {
     expect(whenTag(null)).toBe('')
   })
 
-  /** نصٌّ لا يُقرأ تاريخا يُعرَض كما هو مُهرَّبا — ولا يُخمَّن له معنى. */
-  it('وقيمةٌ لا تُقرأ تاريخا تُعرَض حرفا مُهرَّبا', () => {
+  it('وقيمةٌ لا تُقرأ تاريخًا تُعرَض حرفًا مُهرَّبًا', () => {
     expect(whenTag('<b>ليس تاريخا</b>')).toBe('&lt;b&gt;ليس تاريخا&lt;/b&gt;')
   })
 
   it('واللافتةُ تسبق الرقمَ حين تُطلَب', () => {
     expect(whenTag('2026-09-08 19:30:00', { label: 'موعدُه' })).toContain('موعدُه <time')
   })
-})
 
-describe('نصُّ التحويل — وقواعدُ اللوحة تُوَرَّث', () => {
-  it('يُبنى دالّةً بلا خطأ صياغة', () => {
-    expect(() => new Function(TIME_SCRIPT)).not.toThrow()
-  })
-
-  /** **ولا `innerHTML`** (D-071): تُبنى العقدُ ويُكتب النصُّ بـ textContent. */
-  it('ولا يبني وسما في المتصفّح', () => {
-    const bare = TIME_SCRIPT.replace(/^\s*\/\/.*$/gm, ' ')
-    expect(bare).not.toContain('innerHTML')
-    expect(bare).toContain('textContent')
-  })
-
-  /**
-   * **ويزيد ولا يستبدل.**
-   *
-   * `appendChild` تُبقي الـUTC وتضيف تحتها؛ ومسحُ المحتوى ثمّ كتابةُ
-   * المحلّيّ **يمحو الصيغةَ التي في القاعدة والتقارير** — وهي التي
-   * تُنسَخ وتُقارَن.
-   */
-  it('**ويضيف السطرَ ولا يمحو الأوّل**', () => {
-    expect(TIME_SCRIPT).toContain('appendChild')
-    expect(TIME_SCRIPT).not.toContain('textContent=said;')
-  })
-
-  /** **وفشلُ التحويل لا يمحو شيئا** — متصفّحٌ بلا Intl عربيّةٍ يُبقي UTC. */
-  it('وحين يعجز يعود ولا يترك فراغا', () => {
-    expect(TIME_SCRIPT).toContain("if(said==='')return;")
-  })
-
-  it('وسمةُ الوسم هي المرساة — فتبديلُ اسمها يُمسَك هنا', () => {
-    expect(TIME_SCRIPT).toContain('time[data-when-utc]')
-    expect(whenTag('2026-09-08 19:30:00')).toContain('data-when-utc')
-  })
-})
-
-describe('والصنفُ معرَّفٌ في الأنماط — لا يسقط صامتا', () => {
-  it('when-t و when-local لهما قواعدُ', () => {
-    const css = sheet(STYLE)
-    expect(css.where('.when-t')).toContain('')
-    expect(css.where('.when-local')).toContain('')
+  it('والصنفُ معرَّفٌ في الأنماط', () => {
+    expect(sheet(STYLE).where('.when-t')).toContain('')
   })
 })

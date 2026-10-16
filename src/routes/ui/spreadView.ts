@@ -30,14 +30,16 @@ export interface SpreadScreenData {
   readonly start: string
   readonly gap: number
   readonly csrf: string
+  /** منطقةُ المالك من كعكته (D-173)، و`null` الرياض. */
+  readonly zone?: string | null
 }
 
-function row(index: number, when: string, label: string, preview: string): string {
+function row(index: number, when: string, label: string, preview: string, zone: string | null): string {
   return `<tr>
     <td class="mono">${index + 1}</td>
     <td><div class="nm">${escapeHtml(preview)}</div></td>
     <td><span class="chip">${escapeHtml(label)}</span></td>
-    <td class="when">${whenTag(when.replace('T', ' '))}</td>
+    <td class="when">${whenTag(when.replace('T', ' '), { zone })}</td>
   </tr>`
 }
 
@@ -67,7 +69,7 @@ export function spreadScreen(d: SpreadScreenData): string {
     <div class="scroll"><table>
       <thead><tr><th>#</th><th>المنشور</th><th>الحساب</th><th>الموعد</th></tr></thead>
       <tbody>${slots
-        .map((s, i) => row(i, s.when, s.accountLabel, s.preview))
+        .map((s, i) => row(i, s.when, s.accountLabel, s.preview, d.zone ?? null))
         .join('')}</tbody>
     </table></div>
 

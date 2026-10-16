@@ -1,6 +1,7 @@
 /** يومُ المالك من كعكته (D-173) — والمنطقةُ الفاسدة لا تُسقط شيئا. */
 import { describe, expect, it } from 'vitest'
 import { clock, dayKey, dayLabel, dayMonth, dayRange, monthStart, validZone, zoneOf, FALLBACK_ZONE, zoneNote, stamp, dayKeyLabel } from './zone'
+import { localToUtc } from './local'
 
 describe('المنطقة', () => {
   it('تُقبل ما يقبله Intl، ويُردّ ما سواه', () => {
@@ -24,7 +25,7 @@ describe('اليوم', () => {
     expect(dayKey('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('2026-09-06')
     expect(dayKey('2026-09-05 22:30:00', null)).toBe('2026-09-06')
     expect(dayLabel('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('الأحد 6 سبتمبر 2026')
-    expect(clock('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('01:30')
+    expect(clock('2026-09-05 22:30:00', 'Asia/Riyadh')).toBe('1:30 ص')
   })
 
   it('وحدُّ منتصف الليل في نيويورك عبر التوقيت الصيفيّ', () => {
@@ -72,7 +73,7 @@ describe('أوّلُ الشهر بتوقيت المالك', () => {
 describe('الاحتياطُ بتوقيت الرياض لا غرينتش (D-201)', () => {
   it('أوّلُ زيارةٍ: 06:00Z تُرى 09:00 ويُقال «بتوقيت الرياض»', () => {
     expect(FALLBACK_ZONE).toBe('Asia/Riyadh')
-    expect(clock('2026-10-05 06:00:00', null)).toBe('09:00')
+    expect(clock('2026-10-05 06:00:00', null)).toBe('9:00 ص')
     expect(zoneNote(null)).toBe(' بتوقيت الرياض')
     expect(zoneNote('Asia/Riyadh')).toBe('')
     expect(stamp('2026-10-05 06:00:00', null)).toBe('2026-10-05 09:00 بتوقيت الرياض')
@@ -93,5 +94,26 @@ describe('مفتاحُ اليوم بالكلام (D-202)', () => {
     expect(dayKeyLabel('2026-10-01')).toBe('1 أكتوبر')
     expect(dayKeyLabel('2026-12-14')).toBe('14 ديسمبر')
     expect(dayKeyLabel('x')).toBe('x')
+  })
+})
+
+describe('صيغةُ وقتٍ واحدة بحالاتها الثلاث (خطّة التصميم §11.4، D-220)', () => {
+  it('الرياض: «ص» و«م» والثانيةَ عشرة ظهرًا لا صفرًا', () => {
+    expect(clock('2026-10-12T06:30:00Z', 'Asia/Riyadh')).toBe('9:30 ص')
+    expect(clock('2026-10-12T09:00:00Z', 'Asia/Riyadh')).toBe('12:00 م')
+    expect(clock('2026-10-12T21:05:00Z', 'Asia/Riyadh')).toBe('12:05 ص')
+  })
+
+  it('برلين ليلةَ 25 أكتوبر 2026: الساعةُ المكرَّرةُ تُحسم بثبات، وفجوةُ الربيع تُردّ', () => {
+    const a = localToUtc(2026, 10, 25, 2, 30, 'Europe/Berlin')
+    expect(a).not.toBeNull()
+    expect(localToUtc(2026, 10, 25, 2, 30, 'Europe/Berlin')?.getTime()).toBe(a!.getTime())
+    expect(clock(a!, 'Europe/Berlin')).toBe('2:30 ص')
+    expect(localToUtc(2026, 3, 29, 2, 30, 'Europe/Berlin')).toBeNull()
+  })
+
+  it('بلا كعكةٍ: الرياض', () => {
+    expect(zoneOf(null)).toBeNull()
+    expect(clock('2026-10-12T15:00:00Z', zoneOf(null))).toBe('6:00 م')
   })
 })

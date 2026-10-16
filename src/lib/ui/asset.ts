@@ -36,7 +36,6 @@
 import { STYLE } from '../../routes/ui/styles'
 import { SCRIPT as PANEL_SCRIPT } from '../../routes/ui/panelScript'
 import { COMMAND_SCRIPT } from '../../routes/ui/command'
-import { TIME_SCRIPT } from '../../routes/ui/time'
 import { CONFIRM_SCRIPT, COPY_SCRIPT, DENSITY_SCRIPT, IMG_SCRIPT, KIT_SCRIPT, THEME_SCRIPT, TZ_SCRIPT } from '../../routes/ui/scripts'
 
 /**
@@ -134,7 +133,7 @@ let panel: ScriptAsset | null = null
 /** ما تحمله كلُّ صفحة: الثيمُ والكثافةُ والنسخُ وسلوكُ العُدّة ولوحةُ الأوامر والوقت. */
 export function uiScript(): ScriptAsset {
   if (ui === null) {
-    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT + TIME_SCRIPT)
+    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT)
     ui = { path: `/a/u.${fingerprint(body)}.js`, body }
   }
   return ui
