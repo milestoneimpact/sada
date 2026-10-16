@@ -52,8 +52,19 @@ export function kb(bytes: number): string {
   return `${Math.round(bytes / 1024)}KB`
 }
 
-/** مبلغٌ بدقّةٍ تناسب حجمه: الكسور الصغيرة تُفقَد بالتقريب إلى منزلتين. */
+/**
+ * مبلغٌ بدقّةٍ تناسب حجمه: الكسور الصغيرة تُفقَد بالتقريب إلى منزلتين.
+ *
+ * **ومعزولًا باتّجاهه** (D-215): «0.061$» في سطرٍ عربيٍّ يقلبه المتصفّح فيُرى «$0.061»، وبطاقةُ
+ * `.money` تعزله فتُرى «0.061$» — فقرأ المالكُ الرقمَ نفسَه بصيغتين في صفحتين. والعزلُ هنا (LRI … PDI)
+ * يصل كلَّ موضع: الإشعارَ والرسمَ وسطرَ «المستهلَك اليوم» والقناة، بلا وسمٍ ولا صنف.
+ */
 export function money(value: number): string {
+  return `\u2066${moneyDigits(value)}\u2069`
+}
+
+/** المبلغُ بلا عزل — لما يُقرأ آلةً أو يُحسب طولُه. */
+export function moneyDigits(value: number): string {
   if (value === 0) return '0.00$'
   if (value < 0.01) return `${value.toFixed(4)}$`
   if (value < 1) return `${value.toFixed(3)}$`

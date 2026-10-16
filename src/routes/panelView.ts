@@ -31,7 +31,7 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
+import { accountMenu, escapeHtml, GLYPH_SVG, injectCsrf, shell } from './ui/shell'
 import { brandMoment } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
@@ -46,6 +46,8 @@ import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { homeTop } from './ui/sections/home'
+import { deskQueue } from './ui/sections/desk'
+import { menu, menuItem } from './ui/components/menu'
 import { railHtml } from './ui/rail'
 import { panelHref, type PaneId } from '../lib/nav/panes'
 import { videosSection } from './ui/sections/videos'
@@ -711,6 +713,22 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  * فوق الشريط في طرف السطر، يفتح قائمةً بالأبواب الأربعة نفسِها. وهو `<details>` يعمل بلا سكربت، ويختفي حين يُكتب
  * في نموذج (`form:focus-within`) وحين يُفتح المحرّر، وفي الألواح الأخرى.
  */
+/**
+ * ‏**«منشور جديد» على الحاسوب أيضًا** (D-216): كان الزرُّ العائم على الهاتف وحدَه، وعلى الحاسوب أربعةُ أزرار بدءٍ داخل
+ * ‏«المنشورات» فقط. فصار في الترويسة من كلّ صفحة، بالبدايات الأربع نفسِها، ومساراتُها إلى «/panel» لتصل من أيّ لوح.
+ */
+function topNew(): string {
+  return menu({
+    label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new',
+    items: [
+      menuItem({ label: 'من فكرة', note: 'جملةٌ أو كلمات', href: '/panel#idea' }),
+      menuItem({ label: 'من مصدر', note: 'ملفٌّ محلَّلٌ من Drive', href: '/panel#write' }),
+      menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
+      menuItem({ label: 'خطّةٌ من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
+    ],
+  })
+}
+
 function fabNew(): string {
   const items = [
     ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
@@ -906,17 +924,14 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
    * **الرافدةُ تُرسَم من جدول الأقسام** (D-105)، وفي `rail.ts` منذ صارت لكلّ
    * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
    */
+  /*
+   * ‏**عددان لا ستّة** (D-216): كانت الرافدةُ تقول «الإعدادات 4» و«ما عليك 6» و«المكتبة 1» و«المزيد 7» ولا تقول ماذا
+   * ‏تعدّ، فكانت «ما ينتظرك» تُقال في خمسة أماكن. فبقي ما يوجب يدَ المالك اليوم وحدَه: المسوّداتُ التي تنتظر قرارَه
+   * ‏والفاشلةُ (كما في «ينتظر قرارك»)، والحساباتُ المنقطعة. والباقي يُقال في صفحته.
+   */
   const counts: Readonly<Record<string, number>> = {
-    library: pending,
-    posts: waitingDrafts,
-    // ‏**وكلُّ عددٍ في الرافدة يعني «ينتظرك»** (D-177): كان عددُ القنوات وحدَه «كم مربوطة»،
-    // فقرأ المالكُ «2» على القنوات كما يقرؤه على المسوّدات — شيئين ينتظرانه
-    // ‏والمنقطعةُ وما يقترب انقطاعُه، من الحكم الواحد (D-205)
-    accounts: d.channels.filter((c) => ['broken', 'expiring'].includes(channelHealth(c, d.now).kind)).length,
-    results: d.openSuggestions,
-    tasks: d.ownerPending,
-    // ‏والإعداداتُ تجمع ما كان في ثلاثة ألواح (D-204): مزوّدٌ بلا مفتاح، وجلساتٌ مفتوحةٌ غيرُ هذه
-    settings: missing + (d.sessions.length > 1 ? d.sessions.length : 0),
+    posts: waitingDrafts + d.drafts.filter((x) => x.status === 'failed').length,
+    accounts: d.channels.filter((c) => channelHealth(c, d.now).kind === 'broken').length,
   }
 
   // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
@@ -943,10 +958,10 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} 
   <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
+  ${topNew()}
   ${commandTrigger()}
   ${state}
-  <form class="inline" method="POST" action="/panel/logout">
-    <button class="btn btn-secondary btn-sm" type="submit">خروج</button></form>
+  ${accountMenu({ logout: true })}
 </header>
 
 <main id="main" class="content">
@@ -989,7 +1004,8 @@ ${flash}
     scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
       .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
   // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
-  }, d.now, `<h2 class="home-sub">اليوم بالأرقام</h2>${tileRow(d)}`)}
+  // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
+  }, d.now, `${deskQueue(d.drafts, d.now)}<h2 class="home-sub">اليوم بالأرقام</h2>${tileRow(d)}`)}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
@@ -1011,7 +1027,19 @@ ${flash}
           : `<ul class="todo">${todo}</ul>`}
         <div class="row mt-3">${scanBtn}
           <a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a></div></div>
+    </div>
+    <div class="stack">
       ${todayList(d)}
+    </div>
+  </div>
+  ${/*
+   * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
+   * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
+   */''}
+  <details class="card home-ops mt-3" id="ops">
+    <summary><h2>التشغيلُ والكلفة</h2><span class="grow"></span><span class="ago">الدورات، والإنفاق 14 يومًا، وأين يذهب المال</span></summary>
+  <div class="ov mt-3">
+    <div class="stack">
       ${machineCard(d.pulses, d.now)}
     </div>
     <div class="stack">
@@ -1029,6 +1057,7 @@ ${flash}
       </div>
     </div>
   </div>
+  </details>
 </section>
 
 ${pivotPane(d.pivot)}
@@ -1355,7 +1384,8 @@ ${pivotPane(d.pivot)}
 
 
 ${fabNew()}
-<footer><span>صدى — كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم</span>
+${/* ‏والذيلُ اسمٌ وساعة (D-215): «كلّ زرٍّ هنا يحرسه قيدٌ مُختبَر في الخادم» جملةٌ للمطوّر لا للمالك */''}
+<footer><span>صدى</span>
   <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
 </main>
 </div>

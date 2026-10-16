@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kb, money, parseSqliteUtc, relativeTime, attemptsLeft, shortAgo, untilTime } from './format'
+import { kb, money, moneyDigits, parseSqliteUtc, relativeTime, attemptsLeft, shortAgo, untilTime } from './format'
 
 const NOW = new Date('2026-09-05T12:00:00Z')
 
@@ -67,11 +67,12 @@ describe('money — دقّةٌ تناسب الحجم', () => {
     [0.42, '0.420$'],
     [12.5, '12.50$'],
   ])('%d → %s', (value, expected) => {
-    expect(money(value)).toBe(expected)
+    expect(moneyDigits(value)).toBe(expected)
+    expect(money(value)).toBe(`\u2066${expected}\u2069`)
   })
 
   it('لا يُفقِد كسرا صغيرا بالتقريب — وهو حال أوّل نداء', () => {
-    expect(money(0.0004231)).not.toBe('0.00$')
+    expect(moneyDigits(0.0004231)).not.toBe('0.00$')
   })
 })
 

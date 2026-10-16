@@ -113,7 +113,7 @@ export async function login(page: Page, url: string): Promise<void> {
 /** يجدول منشورًا معتمَدًا من بطاقته: «غدًا 9ص» ثمّ «جدوِل» — كما يفعل المالك. */
 async function scheduleTomorrow(j: JourneyContext, postId: string, label: string, key = false): Promise<void> {
   const form = scheduleForm(j.page, postId)
-  await j.m.tap(button(form, 'غدا 9ص'), `${label}: «غدًا 9ص»`, { key })
+  await j.m.tap(button(form, 'غدًا 9:00 ص'), `${label}: «غدًا 9:00 ص»`, { key })
   await j.m.tap(button(form, 'جدوِل'), `${label}: «جدوِل»`)
 }
 

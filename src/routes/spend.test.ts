@@ -73,7 +73,7 @@ describe('«هذا الشهر» في الرئيسيّة (ر-10)', () => {
     const html = await home(`${cookie}; sada_tz=UTC`)
     const month = tile(html, 'إنفاق هذا الشهر')
     expect(month).not.toBeNull()
-    expect(month!.value).toBe('0.827$')
+    expect(month!.value).toBe('⁦0.827$⁩')
     expect(month!.note).toBe('منذ أوّل الشهر')
     expect(html).not.toContain('المجموعُ الشهريّ')
   })
@@ -85,7 +85,7 @@ describe('«هذا الشهر» في الرئيسيّة (ر-10)', () => {
   it('وبلا منطقةٍ من المتصفّح يحسب بتوقيت الرياض ويقوله', async () => {
     await seedLedger()
     const month = tile(await home(await login()), 'إنفاق هذا الشهر')
-    expect(month!.value).toBe('1.27$')
+    expect(month!.value).toBe('⁦1.27$⁩')
     expect(month!.note).toBe('منذ أوّل الشهر بتوقيت الرياض')
   })
 })
@@ -102,7 +102,7 @@ describe('«أين يذهب المال» من الدفتر كلِّه (ر-10)', 
 
     const names = [...html.matchAll(/<span class="bar-name">([^<]+)<\/span>/g)].map((m) => m[1])
     expect(names).toContain('X — النشر والقياس')
-    const values = [...html.matchAll(/<span class="bar-val money">([\d.]+)\$<\/span>/g)].map((m) => Number(m[1]))
+    const values = [...html.matchAll(/<span class="bar-val money">\u2066?([\d.]+)\$\u2069?<\/span>/g)].map((m) => Number(m[1]))
     const ledger = db.raw
       .prepare("SELECT sum(total) AS t FROM cost_ledger WHERE at >= datetime('now', '-30 days')")
       .get() as { t: number }
@@ -174,6 +174,6 @@ describe('«النتائج» توصل (ر-7)', () => {
       headers: { Cookie: `${await login()}; sada_tz=Asia%2FRiyadh` },
     }, env)).text()
     expect(body).toContain('لا تقريرَ بعد')
-    expect(body).toMatch(/هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">0\.390\$<\/a><\/div>/)
+    expect(body).toMatch(/هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">\u20660\.390\$\u2069<\/a><\/div>/)
   })
 })

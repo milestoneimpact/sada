@@ -9,6 +9,7 @@ import { commandPalette, commandTrigger, type Command } from './command'
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
 import { segmented } from './components/tabs'
+import { menu, menuAction, menuItem } from './components/menu'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { MARK, MOMENT, THEME, below } from './tokens'
@@ -178,6 +179,26 @@ if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
 
 
 
+/**
+ * ‏**قائمةُ الحساب** (D-215): السمةُ والكثافةُ والجلساتُ والخروج خلف زرٍّ واحد.
+ *
+ * ‏كانت «خروج» أوّلَ ما تراه العينُ في ترويسة الهاتف وهو أندرُ أفعال اليوم، ومبدّلا السمة والكثافة ظاهرَين
+ * ‏دائمًا في ذيل الرافدة. فالإطارُ كان أعلى صوتًا من المحتوى. ومبدّلٌ واحدٌ في الصفحة لا اثنان (سكربتُ الثيم
+ * ‏يربط `#theme` الأوّلَ وحدَه)، فالقائمةُ هي مسكنُه الوحيد. و«خروج» نموذجٌ يحتاج رمزَ CSRF، فلا يُرسَم إلّا
+ * ‏حيث يُحقَن (`logout`).
+ */
+export function accountMenu(options: { readonly logout?: boolean } = {}): string {
+  return menu({
+    label: 'الحساب والعرض', variant: 'icon', size: 'sm', icon: ICON.account, id: 'acct',
+    items: [
+      `<div class="menu-seg"><span>السمة</span>${themeSwitch()}</div>`,
+      `<div class="menu-seg"><span>الكثافة</span>${densitySwitch()}</div>`,
+      menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
+      ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جارٍ الخروج…' })] : []),
+    ],
+  })
+}
+
 /** مبدّلُ الكثافة — مقطعٌ من العُدّة (D-189)، وسكربتُه يقرأ «data-density» كما كان. */
 export function densitySwitch(): string {
   return segmented('كثافة العرض', 'density', [
@@ -226,7 +247,7 @@ export function soloPage(
     `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        ${rail === undefined
          ? `<div class="wrap">${inner}</div>`
-         : `<div class="app">${rail.replace(themeSwitch(), '')}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
+         : `<div class="app">${rail}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -246,7 +267,7 @@ export function backNav(href: string, label: string): string {
   return `<nav class="back" aria-label="مسارُ العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة">${wordmark(false)}<span class="glyph glyph-sm">${GLYPH_SVG}</span></a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
-    <span class="grow"></span>${commandTrigger()}${themeSwitch()}
+    <span class="grow"></span>${commandTrigger()}${accountMenu()}
   </nav>`
 }
 
