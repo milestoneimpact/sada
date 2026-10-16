@@ -152,8 +152,11 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
     return `${wizard}<div class="card card-inset guide"><div class="guide-body">
       <div class="help"><span class="help-ic">i</span><span class="help-t">
         <b>مضبوطٌ من أسرار Worker — وسرُّ البيئة يغلب الخزانة دائما.</b>
-        فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو —
-        <span class="mono">${escapeHtml(app.secretNames[1])}</span>.</span></div>
+        فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو، في أسرار Worker.</span></div>
+      ${/* ‏واسمُ المتغيّر خلف «للمطوّر» (خطّة التصميم 5.7 · D-218): المالكُ يعرف أين يُبدَّل، والاسمُ لمن يكتب الأمر */''}
+      <details class="setup mt-2"><summary>للمطوّر</summary>
+        <p class="ch-note">السرّان: <span class="mono">${escapeHtml(app.secretNames[0])}</span> و<span class="mono">${escapeHtml(app.secretNames[1])}</span>
+          — <span class="mono">wrangler secret put ${escapeHtml(app.secretNames[1])}</span></p></details>
       ${app.clientId === null ? '' : `<p class="ch-note">المعرّف الحاليّ:
         <span class="mono">${escapeHtml(app.clientId)}</span></p>`}
       <form method="POST" action="/panel/channels/app/verify" data-busy="جارٍ الفحص…">
@@ -224,7 +227,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         </div>
       </div>
 
-      <form method="POST" action="/panel/channels/app" data-busy="جارٍ الحفظ…">
+      <form method="POST" action="/panel/channels/app" data-busy="جارٍ الحفظ…" id="app-${escapeHtml(id)}">
         <input type="hidden" name="platform" value="${escapeHtml(id)}">
         ${/*
           * ‏**والفعلُ يعود إلى هذا التبويب** (ر-1): كان «احفظ» و«افحص الزوج» و«احذف» تنتهي
@@ -262,25 +265,13 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
             aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
             autocomplete="off" spellcheck="false">
+          <div class="mt-2"><span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span></div>
           ${app.hint === null
             ? ''
             : `<div class="help"><span class="help-ic">i</span><span class="help-t">
                 المحفوظُ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
                 <b>قارنه بأوّل السرّ وآخرِه في ${escapeHtml(guide.portalLabel)}</b> قبل أن تكتب.
                 فإن طابق فالسرُّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
-        </div>
-        <div class="ch-foot">
-          <button class="btn btn-primary" type="submit">احفظ</button>
-          ${app.source === 'none'
-            ? ''
-            : `<button class="btn btn-secondary btn-sm" type="submit" formaction="/panel/channels/app/verify"
-                 formnovalidate>افحص الزوج</button>`}
-          <span class="ago">يُشفَّر قبل أن يُحفظ، ولا يُعرض بعدها إلّا مقنَّعا.</span>
-          <span class="grow"></span>
-          ${app.source === 'vault'
-            ? `<button class="btn btn-danger btn-sm" type="submit" formaction="/panel/channels/app/delete" formnovalidate
-                 data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
-            : ''}
         </div>
         ${app.source === 'none' ? '' : `<div class="sub mt-2">
           <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا —
@@ -295,6 +286,22 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         <span class="kv-v">${pathArrows(guide.success)}</span></div>
       <div class="outcome warn"><span class="kv-k">إن فشل</span>
         <span class="kv-v">${pathArrows(guide.failure)}</span></div>
+      ${/*
+        * ‏**شريطُ الأفعال آخرَ الدليل لا آخرَ النموذج** (T4 · D-218): الملتصقُ لا يغادر أباه، والنموذجُ تحت الخطوات،
+        * ‏فكان الشريطُ خارج الشاشة ما دام المالكُ يقرأ. فصار ابنَ الدليل كلِّه، وأزرارُه للنموذج بسِمة «form».
+        */''}
+        <div class="ch-foot wiz-bar">
+          <button class="btn btn-primary" type="submit" form="app-${escapeHtml(id)}">احفظ</button>
+          ${app.source === 'none'
+            ? ''
+            : `<button class="btn btn-secondary btn-sm" type="submit" form="app-${escapeHtml(id)}" formaction="/panel/channels/app/verify"
+                 formnovalidate>افحص الزوج</button>`}
+          <span class="grow"></span>
+          ${app.source === 'vault'
+            ? `<button class="btn btn-danger btn-sm" type="submit" form="app-${escapeHtml(id)}" formaction="/panel/channels/app/delete" formnovalidate
+                 data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
+            : ''}
+        </div>
     </div>
   </details>`
 }

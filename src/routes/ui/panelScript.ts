@@ -223,7 +223,10 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   // هيّنا. والزرُّ المضغوط وحده يدور، لا كلُّ أزرار النموذج.
   function bindBusy(f){
     var pressed=null;
-    f.querySelectorAll('button').forEach(function(b){
+    // ‏وأزرارُه التي خارجَه بسِمة «form» (شريطُ المساعد، D-218) منه: تُعلَّم مضغوطةً وتُعطَّل كأخواتها
+    var btns=function(){var l=Array.prototype.slice.call(f.querySelectorAll('button'));
+      if(f.id)l=l.concat(Array.prototype.slice.call(document.querySelectorAll('button[form="'+f.id+'"]')));return l;};
+    btns().forEach(function(b){
       b.addEventListener('click',function(){pressed=b;});
     });
     f.addEventListener('submit',function(e){
@@ -232,9 +235,9 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(f.getAttribute('aria-busy')==='true'){e.preventDefault(); return;}
       // ‏ومن ألغى التأكيدَ أو منعه المعطّلُ لم يُرسِل — فلا يبقى النموذجُ «مشغولًا» بأزرارٍ معطّلة (D-189)
       if(e.defaultPrevented)return;
-      var b=pressed||f.querySelector('button[type=submit]')||f.querySelector('button');
+      var b=pressed||btns()[0]||null;
       f.setAttribute('aria-busy','true');
-      f.querySelectorAll('button').forEach(function(x){if(x!==b)x.disabled=true;});
+      btns().forEach(function(x){if(x!==b)x.disabled=true;});
       // ‏والزرُّ المضغوطُ «مشغولٌ» بسِمته (خطّة التصميم 7.1): دوّارةُ «.btn[aria-busy]» والعرضُ ثابت
       if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-busy','true'); b.setAttribute('aria-disabled','true');
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
