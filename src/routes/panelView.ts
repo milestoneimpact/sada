@@ -31,7 +31,7 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { accountMenu, escapeHtml, GLYPH_SVG, injectCsrf, shell } from './ui/shell'
+import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
 import { brandMoment } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
@@ -655,13 +655,16 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
 }
 
 /**
- * «الإعدادات» ثلاثةُ تبويبات (خطّة التصميم 5.8 · D-204): كانت ثلاثةَ ألواحٍ في الرافدة — «الحدود»
+ * «الإعدادات» بأقسامها السبعة كما في خطّة التصميم 5.8 (D-204 · D-221): كانت ثلاثةَ ألواحٍ في الرافدة — «الحدود»
  * و«المزوّدون» و«الأمان» — تُفتح نادرًا وتأخذ ثلاثةَ أسطرٍ ممّا يُفتح كلَّ يوم. **والمراسي القديمة
- * أسماءُ أقسامها**: `#settings` يفتح الأوّل، و`#providers` و`#security` قسمَيهما.
+ * أسماءُ أقسامها**: `#settings` يفتح الأوّل، و`#limits` و`#providers` و`#security` أقسامَها.
+ * و«المظهر» و«النظام» أوّلًا (D-221): السمةُ والكثافةُ وبطاقاتُ اللوح، ثمّ «هل الآلةُ تعمل؟» نُقلت من الرئيسيّة.
  */
 function settingsTabs(missing: number): string {
   return tabs('أقسامُ الإعدادات', [
-    { label: 'الإنفاقُ والحدود', href: '#limits', current: true },
+    { label: 'المظهر', href: '#appearance', current: true },
+    { label: 'النظام', href: '#system' },
+    { label: 'الإنفاقُ والحدود', href: '#limits' },
     { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
     { label: 'الأمان', href: '#security' },
     { label: 'سجلّ النشاط', href: '#activity' },
@@ -815,7 +818,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
    * ‏«يعمل» خضراءَ والإرسالُ متوقّفٌ منذ ثلاثة أيّام، والجوابُ على بُعد ثلاث شاشات
    */
   const pill = systemPill(d.paused, d.pulses)
-  const state = `<a class="pill ${pill.tone}" href="#machine"
+  const state = `<a class="pill ${pill.tone}" href="${panelHref('machine')}"
     aria-label="${escapeHtml(`حالُ النظام: ${pill.text} — افتح «هل الآلةُ تعمل؟»`)}"><i class="led"></i>${escapeHtml(pill.text)}</a>`
 
   const scanBtn = `<form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">
@@ -880,7 +883,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
     })
   }
   if (d.paused) {
-    items.push({ kind: 'warn', text: 'النظام موقوفٌ مؤقّتا — لا مسح ولا تحليل ولا نشر.', go: '#settings', label: 'استأنف' })
+    items.push({ kind: 'warn', text: 'النظام موقوفٌ مؤقّتا — لا مسح ولا تحليل ولا نشر.', go: '#limits', label: 'استأنف' })
   }
   if (!d.factors.enforced) {
     items.push({
@@ -1037,15 +1040,14 @@ ${flash}
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
   <details class="card home-ops mt-3" id="ops">
-    <summary><h2>التشغيلُ والكلفة</h2><span class="grow"></span><span class="ago">الدورات، والإنفاق 14 يومًا، وأين يذهب المال</span></summary>
+    <summary><h2>الكلفة</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال</span></summary>
   <div class="ov mt-3">
-    <div class="stack">
-      ${machineCard(d.pulses, d.now)}
-    </div>
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يومًا</h2>
         <p class="hint">كلّ الخدمات، بالدولار</p>${areaChart(d.series)}
 </div>
+    </div>
+    <div class="stack">
       ${/* ‏والأعمدةُ من الدفتر كلِّه لا من مزوّدي الذكاء (ر-10): كانت كلفةُ X تغيب
            عنها والمجموعُ فوقها يحسبها، فلا تساوي الأعمدةُ المجموع */ ''}
       <div class="card">
@@ -1136,6 +1138,19 @@ ${pivotPane(d.pivot)}
 <section data-pane="settings" hidden>
   ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوفُ الإنفاق تُطبَّق قبل أيّ نداءٍ مدفوع</b>، والمفاتيحُ لا تُعرض كاملة، والدخولُ بعاملين.')}
   ${settingsTabs(missing)}
+  <div data-sub id="appearance">
+  <p class="hint">كيف تبدو اللوحةُ لك. <b>والسمةُ والكثافةُ تُحفظان في هذا المتصفّح وحده</b>، وبطاقاتُ اللوح في حسابك.</p>
+  <div class="card"><h2>السمةُ والكثافة</h2>
+    <div class="split"><p><b>السمة</b>: «النظام» يتبع جهازَك نهارًا وليلًا.</p>${themeSwitch(false)}</div>
+    <hr>
+    <div class="split"><p><b>الكثافة</b>: «مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p>${densitySwitch(false)}</div>
+  </div>
+  ${tilePicker(d)}
+  </div>
+  <div data-sub id="system">
+  <p class="hint">هل يدور صدى في مواعيده. <b>والإيقافُ المؤقّت في «الإنفاقُ والحدود»</b>.</p>
+  ${machineCard(d.pulses, d.now)}
+  </div>
   <div data-sub id="limits">
   <p class="hint">مفتاحُ الإيقاف وسقوفُ اليوم. <b>تُطبَّق قبل أيّ نداءٍ مدفوع</b>، في اللوحة والنشر المجدول معًا.</p>
   ${/* الترتيبُ بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظامَ أوّلًا، ثمّ ما
@@ -1222,8 +1237,6 @@ ${pivotPane(d.pivot)}
   </div>
 
   ${alertChannel(d.alertWebhook, d.outbox)}
-
-  ${tilePicker(d)}
 
   <div class="card mt-3"><h2>النصُّ فوق الصورة</h2>
     <div class="split">

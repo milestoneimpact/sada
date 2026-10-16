@@ -164,7 +164,7 @@ describe('حبّةُ النظام ونبضُ الإرسال', () => {
     const failed = beats({ dispatch: { outcome: 'failed' } })
     expect(nextAction(facts({ pulses: failed }), NOW)).toMatchObject({ tone: 'bad', href: '#machine' })
     expect(systemPill(true, failed)).toEqual({ tone: 'off', text: 'موقوف مؤقتا' })
-    expect(nextAction(facts({ pulses: failed, paused: true }), NOW).href).toBe('#settings')
+    expect(nextAction(facts({ pulses: failed, paused: true }), NOW).href).toBe('#limits')
   })
 
   it('ودورةٌ أخرى تتأخّر لا تقول «النشر متوقّف» — ولا تبقى «يعمل» صامتة', () => {
@@ -202,7 +202,7 @@ describe('سقفُ الإنفاق اليوميّ', () => {
     expect(writeBlock(null, NOW, null)).toBeNull()
     expect(writeBlock(cap, NOW, 'Asia/Riyadh')).toMatchObject({ href: '#c2' })
     expect(writeBlock(cap, NOW, 'Asia/Riyadh')!.text).toContain('يُفتح الساعة 3:00 ص.')
-    expect(writeBlock({ kind: 'paused' }, NOW, null)).toMatchObject({ href: '#settings' })
+    expect(writeBlock({ kind: 'paused' }, NOW, null)).toMatchObject({ href: '#limits' })
   })
 })
 

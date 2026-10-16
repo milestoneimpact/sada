@@ -63,7 +63,7 @@ export interface MediaLine {
   readonly blocked: boolean
 }
 
-const LIMITS = { label: 'افتح الحدود', href: '#settings' } as const
+const LIMITS = { label: 'افتح الحدود', href: '#limits' } as const
 const PROVIDERS = { label: 'افتح المزوّدين', href: '#providers' } as const
 const TASKS = { label: 'ما عليك', href: '/panel/tasks' } as const
 
