@@ -28,7 +28,7 @@
  */
 import { escapeHtml } from './escape'
 import { parseSqliteUtc } from '../../lib/format'
-import { FALLBACK_ZONE, stamp } from '../../lib/time/zone'
+import { momentLabel } from '../../lib/time/local'
 
 /*
  * ## وبتوقيت الرياض لا بـ UTC (D-201)
@@ -39,57 +39,26 @@ import { FALLBACK_ZONE, stamp } from '../../lib/time/zone'
  */
 
 /**
- * وسمُ موعد — **`UTC` مكتوبةٌ فيه، والمحلّيُّ يُضاف إليه**.
+ * وسمُ موعد — **بمنطقة المالك على الخادم، ولا سكربتَ يزيد سطرًا** (D-220).
  *
- * و`datetime` بصيغة ISO لأنّها الصيغةُ التي يقرؤها `Date` في كلّ متصفّح،
- * **ولأنّ قارئ الشاشة يقرؤها تاريخا لا سلسلةَ أرقام**.
+ * كان الوسمُ يكتب الرياضَ ثمّ يزيد سكربتٌ (`TIME_SCRIPT`) سطرًا بصيغة المتصفّح لمن
+ * ليس فيها: **مصدران للصيغة** («09:00» هنا و«9:00 م» هناك)، وسطران للموعد الواحد.
+ * والمنطقةُ اليومَ في يد الخادم من كعكة `sada_tz` (D-173)، فيُكتب سطرٌ واحدٌ بها،
+ * ويُقال «بتوقيتك» أو «بتوقيت الرياض» حين تكون احتياطًا.
+ *
+ * و`datetime` بصيغة ISO لأنّ قارئ الشاشة يقرؤها تاريخًا لا سلسلةَ أرقام.
  */
-export function whenTag(value: string | null, opts: { readonly label?: string } = {}): string {
+export function whenTag(
+  value: string | null,
+  opts: { readonly label?: string; readonly zone?: string | null; readonly now?: Date } = {},
+): string {
   if (value === null) return ''
   const date = parseSqliteUtc(value)
   if (date === null) return escapeHtml(value)
 
-  const iso = date.toISOString()
-  const said = stamp(date, FALLBACK_ZONE)
+  const zone = opts.zone ?? null
+  const said = momentLabel(date, zone, opts.now ?? new Date())
   const head = opts.label === undefined ? '' : `${escapeHtml(opts.label)} `
-  return `${head}<time class="when-t" datetime="${iso}" data-when-utc>` +
-    `<b>${escapeHtml(said)}</b> <span class="tz">بتوقيت الرياض</span></time>`
+  return `${head}<time class="when-t" datetime="${date.toISOString()}">` +
+    `<b>${escapeHtml(said)}</b> <span class="tz">${zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'}</span></time>`
 }
-
-/**
- * يقلب كلَّ وسمِ موعدٍ إلى سطرين: `UTC` كما هو، ثمّ المحلّيُّ تحته.
- *
- * **ولا `innerHTML`** (D-071): تُبنى العقدُ بـ `createElement` ويُكتب
- * النصُّ بـ `textContent`. والوسمُ يحمل تاريخا من الخادم لا من مستخدِم،
- * **لكنّ القاعدةَ لا تُخرَق لأنّ المصدرَ آمنُ اليوم** — فمصدرٌ يتبدّل غدا
- * لا يجد ثغرةً تنتظره.
- *
- * **وفشلُ `toLocaleString` لا يمحو شيئا**: متصفّحٌ بلا `Intl` عربيّةٍ
- * يُبقي `UTC` وحدها — وهي صحيحة.
- */
-export const TIME_SCRIPT = `
-(function(){
-  var tags=document.querySelectorAll('time[data-when-utc]');
-  if(tags.length===0)return;
-  var tz='';
-  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
-  if(tz==='${FALLBACK_ZONE}')return;
-  tags.forEach(function(t){
-    var at=new Date(t.getAttribute('datetime'));
-    if(isNaN(at.getTime()))return;
-    var said='';
-    try{
-      said=at.toLocaleString('ar-u-nu-latn',{weekday:'long',day:'numeric',month:'long',
-        hour:'numeric',minute:'2-digit'});
-    }catch(e){return;}
-    if(said==='')return;
-    var line=document.createElement('span');
-    line.className='when-local';
-    // ‏«بتوقيتك» لا اسمُ المنطقة: المالكُ يعرف أين هو، واسمٌ مثل
-    // ‏Asia/Riyadh يُقرأ إعدادَ خادمٍ لا وقتَ إنسان. ويبقى في العنوان لمن سأل
-    line.textContent=said+' بتوقيتك';
-    if(tz!=='')line.title=tz;
-    t.appendChild(line);
-  });
-})();
-`

@@ -955,7 +955,8 @@ describe('ما وراء المقاييس (D-149)', () => {
     expect(chart).toContain('· ${escapeHtml(dayKeyLabel(peak.day))}')
     expect(chart).not.toContain('.slice(5)')
     const time = readFileSync(new URL('./time.ts', import.meta.url), 'utf8')
-    expect(time).toContain("toLocaleString('ar-u-nu-latn'")
+    // ‏ولا صيغةَ ثانيةٌ في المتصفّح (D-220): الوقتُ يُكتب على الخادم بمنطقة المالك
+    expect(time).not.toContain('toLocaleString')
   })
 })
 

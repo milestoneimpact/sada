@@ -2670,18 +2670,19 @@ panel.post('/panel/drafts/spread', async (c) => {
   const now = new Date()
   const gap = readGap(gate.form.get('gap'))
   const lacking = await lackingOf(c.env.DB, drafts)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const plan = planSpread(
     drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     // ‏وأوّلُ موعدٍ بتوقيت المالك من اللوحة (`local`، D-199)، أو `start` بـ UTC كما يُرسله شريطُ الشاشة
-    readStart(readWhen(gate.form, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), now) || gate.form.get('start'), now),
+    readStart(readWhen(gate.form, zone, now) || gate.form.get('start'), now),
     gap,
     now,
   )
 
   const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
   return page((nonce) =>
-    soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf }), nonce, '',
+    soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf, zone }), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })

@@ -200,7 +200,7 @@ function scheduler(
     const gone = d.dispatchedAt !== null
     return `<div class="card card-inset sched ${gone ? 'gone' : 'set'}" ${anchor}>
       ${statusBadge(gone ? 'warn' : 'ok', gone ? '↑' : '◔', gone ? 'قيد النشر' : 'مجدولة')}
-      <span class="when mono">${whenTag(d.scheduledAt)}</span>
+      <span class="when mono">${whenTag(d.scheduledAt, { zone, now })}</span>
       ${d.accountName === null ? '' : `<span class="chip">${escapeHtml(d.accountName)}</span>`}
       <span class="grow"></span>
       ${gone

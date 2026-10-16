@@ -2198,8 +2198,6 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
    الذي يُنسَخ ويُقارَن. */
 .when-t{display:inline-flex; flex-direction:column; gap:1px; vertical-align:middle}
 .when-t .tz{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-weight:600}
-.when-local{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-family:inherit;
-  direction:rtl; white-space:nowrap}
 
 /* سطرُ الذروة — خبرٌ لا أمر، فبلا زرٍّ ولا لونِ حالة (D-043) */
 .hint.peak{margin-top:var(--s-2); display:flex; align-items:center;
