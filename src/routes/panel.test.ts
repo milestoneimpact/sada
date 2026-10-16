@@ -3594,9 +3594,11 @@ describe('ترتيبُ بطاقات الحدود (D-126)', () => {
     }
     const order = [
       'value="paused"', 'value="daily_analysis_cap"', 'value="daily_video_cap"', 'value="weekly_promo_cap_usd"',
-      'value="auto_enqueue"', 'value="alert_webhook"', 'value="dashboard_tiles"', 'value="image_overlay"',
+      'value="auto_enqueue"', 'value="alert_webhook"', 'value="image_overlay"',
     ].map(at)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
+    // ‏وبطاقاتُ اللوح انتقلت إلى «المظهر» قبل الحدود (D-221)
+    expect(at('value="dashboard_tiles"')).toBeLessThan(at('<div data-sub id="limits">'))
   })
 })
 
@@ -3713,7 +3715,7 @@ describe('نقاطُ الجاهزيّة في اللوحة (D-163)', () => {
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain(IMAGE_BUTTON_OFF)
     expect(html).toContain(INFO_BUTTON_OFF)
-    expect(html).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
+    expect(html).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
   })
 
   /*
@@ -3945,7 +3947,7 @@ describe('سقفُ المقاطع اليوميّ في اللوحة (D-168)', () 
     await clipToday()
     const over = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(over).toContain(OFF)
-    expect(over).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
+    expect(over).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     const pane = over.slice(over.indexOf('<section data-pane="settings"'))
     const form = pane.slice(pane.indexOf('value="daily_video_cap"'), pane.indexOf('</form>', pane.indexOf('value="daily_video_cap"')))
     expect(form).toContain('value="2"')
@@ -4067,8 +4069,10 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
   it('وحبّةُ النظام من النبض: إرسالٌ توقّف منذ أيّام يُقال في الرأس وفي «خطوتك التالية»', async () => {
     db.raw.exec(`INSERT INTO heartbeats (job, at, outcome) VALUES ('dispatch', datetime('now', '-3 days'), 'ok')`)
     const html = await (await app.request('/panel', withSession(await login()), env)).text()
-    expect(html).toMatch(/<a class="pill bad" href="#machine"[^>]*><i class="led"><\/i>النشر متوقّف<\/a>/)
-    expect(html).toContain('id="machine"')
+    expect(html).toMatch(/<a class="pill bad" href="\/panel\/settings#machine"[^>]*><i class="led"><\/i>النشر متوقّف<\/a>/)
+    // ‏والبطاقةُ في «النظام» بالإعدادات (D-221)، والمرساةُ تُتبَع إليها
+    expect(html).not.toContain('id="machine"')
+    expect(await (await app.request('/panel/settings', withSession(await login()), env)).text()).toContain('id="machine"')
     const next = html.slice(html.indexOf('<div class="card card-alert next"'), html.indexOf('<div class="card home-card">'))
     expect(next).toContain('href="#machine"')
     expect(next).toContain('قبل 3 أيّام')
@@ -5082,5 +5086,21 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       expect(page).toContain('تعذّرت X')
       expect(page).toContain('ودُفع ثمنُ المحاولة المردودة')
     })
+  })
+})
+
+describe('«المظهر» و«النظام» في الإعدادات (D-221)', () => {
+  it('سبعةُ أقسامٍ بترتيب الخطّة، والمبدّلان بلا معرّفٍ ثانٍ، والآلةُ في «النظام»', async () => {
+    const html = await (await app.request('/panel/settings', withSession(await login()), env)).text()
+    const order = ['#appearance', '#system', '#limits', '#providers', '#security', '#activity', '#dev'].map((h) => html.indexOf(`href="${h}"`))
+    expect(order.every((i) => i > -1)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    const appearance = html.slice(html.indexOf('<div data-sub id="appearance">'), html.indexOf('<div data-sub id="system">'))
+    expect(appearance).toContain('data-theme="dark"')
+    expect(appearance).toContain('data-density="compact"')
+    expect(appearance).toContain('value="dashboard_tiles"')
+    expect((html.match(/id="theme"/g) ?? []).length).toBeLessThanOrEqual(1)
+    const system = html.slice(html.indexOf('<div data-sub id="system">'), html.indexOf('<div data-sub id="limits">'))
+    expect(system).toContain('id="machine"')
   })
 })

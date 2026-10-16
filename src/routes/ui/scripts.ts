@@ -63,8 +63,10 @@ export const CONFIRM_SCRIPT = `
  */
 export const THEME_SCRIPT = `
 (function(){
+  // ‏ونسخةُ «المظهر» في الإعدادات تُربط مع نسخة القائمة (D-221): الأزرارُ كلُّها لا الصندوقُ الأوّل
   var box=document.getElementById('theme');
   if(!box)return;
+  var all=function(){return document.querySelectorAll('.seg button[data-theme]');};
   var bar=function(v){
     var ms=document.querySelectorAll('meta[name="theme-color"][data-c]'),own={};
     ms.forEach(function(m){own[/dark/.test(m.media)?'dark':'light']=m.dataset.c;});
@@ -80,13 +82,13 @@ export const THEME_SCRIPT = `
       if(v==='system')delete document.documentElement.dataset.theme;
       else document.documentElement.dataset.theme=v;
     }
-    box.querySelectorAll('button').forEach(function(b){
+    all().forEach(function(b){
       b.setAttribute('aria-pressed',String(b.dataset.theme===v));});
   };
   var saved='system';
   try{saved=localStorage.getItem('sada-theme')||'system';}catch(e){}
   apply(saved);
-  box.querySelectorAll('button').forEach(function(b){
+  all().forEach(function(b){
     b.addEventListener('click',function(){apply(b.dataset.theme);});});
 })();
 `
@@ -102,8 +104,10 @@ export const THEME_SCRIPT = `
  */
 export const DENSITY_SCRIPT = `
 (function(){
+  // ‏ونسخةُ «المظهر» في الإعدادات تُربط مع نسخة القائمة (D-221): الأزرارُ كلُّها لا الصندوقُ الأوّل
   var box=document.getElementById('density');
   if(!box)return;
+  var all=function(){return document.querySelectorAll('.seg button[data-density]');};
   var apply=function(v){
     try{
       if(v==='compact'){localStorage.setItem('sada-density',v);
@@ -114,13 +118,13 @@ export const DENSITY_SCRIPT = `
       if(v==='compact')document.documentElement.dataset.density=v;
       else delete document.documentElement.dataset.density;
     }
-    box.querySelectorAll('button').forEach(function(b){
+    all().forEach(function(b){
       b.setAttribute('aria-pressed',String(b.dataset.density===v));});
   };
   var saved='cozy';
   try{saved=localStorage.getItem('sada-density')||'cozy';}catch(e){}
   apply(saved);
-  box.querySelectorAll('button').forEach(function(b){
+  all().forEach(function(b){
     b.addEventListener('click',function(){apply(b.dataset.density);});});
 })();
 `

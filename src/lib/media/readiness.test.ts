@@ -42,7 +42,7 @@ describe('سطرُ «ولّد صورة» — بترتيب generateForPost', () =
     const line = image({ blocker: { kind: 'paused' } })
     expect(line.dots[0]).toMatchObject({
       key: 'limits', state: 'failed', note: 'موقوفٌ بقرارك',
-      action: { label: 'افتح الحدود', href: '#settings' },
+      action: { label: 'افتح الحدود', href: '#limits' },
     })
     expect(line.next).toBe(line.dots[0])
     expect(line.blocked).toBe(true)
@@ -137,7 +137,7 @@ describe('سطرُ «حرّكها فيديو» — بترتيب animateForPost',
     const line = video('env', null, videoCapGate(2, 2))
     expect(line.next).toMatchObject({
       key: 'clips', state: 'failed', note: 'بلغ سقفَ المقاطع اليوميّ',
-      action: { label: 'افتح الحدود', href: '#settings' },
+      action: { label: 'افتح الحدود', href: '#limits' },
     })
     expect(line.blocked).toBe(true)
     // وصفرٌ قرارٌ لا بلوغ

@@ -200,11 +200,11 @@ export function accountMenu(options: { readonly logout?: boolean } = {}): string
 }
 
 /** مبدّلُ الكثافة — مقطعٌ من العُدّة (D-189)، وسكربتُه يقرأ «data-density» كما كان. */
-export function densitySwitch(): string {
+export function densitySwitch(withId = true): string {
   return segmented('كثافة العرض', 'density', [
     { value: 'cozy', label: 'مريح', pressed: true },
     { value: 'compact', label: 'مضغوط' },
-  ], 'density')
+  ], withId ? 'density' : undefined)
 }
 
 /**
@@ -275,12 +275,12 @@ export function backNav(href: string, label: string): string {
  * مبدّلُ الثيم — مقطعٌ من العُدّة (D-189). **ونصُّه يُطابَق حرفًا** حيث يُنزَع من ذيل الرافدة
  * في الصفحة المستقلّة (`soloPage`)، فهو دالّةٌ واحدةٌ لا وسمان.
  */
-export function themeSwitch(): string {
+export function themeSwitch(withId = true): string {
   return segmented('سمة العرض', 'theme', [
     { value: 'light', label: 'نهاريّ' },
     { value: 'dark', label: 'ليليّ' },
     { value: 'system', label: 'النظام', pressed: true },
-  ], 'theme')
+  ], withId ? 'theme' : undefined)
 }
 
 /**

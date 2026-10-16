@@ -366,7 +366,7 @@ export function writeBlock(
 ): { readonly text: string; readonly label: string; readonly href: string } | null {
   if (blocker === null) return null
   if (blocker.kind === 'paused') {
-    return { text: 'النظامُ موقوفٌ بقرارك — فلا كتابة.', label: 'استأنف من الحدود', href: '#settings' }
+    return { text: 'النظامُ موقوفٌ بقرارك — فلا كتابة.', label: 'استأنف من الحدود', href: '#limits' }
   }
   if (blocker.kind === 'spend_cap') {
     return {
@@ -400,7 +400,7 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
     }
   }
   if (f.paused) {
-    return { tone: 'warn', text: 'النظامُ موقوفٌ بقرارك — لا مسحَ ولا تحليلَ ولا نشر.', label: 'استأنف من الإعدادات', href: '#settings' }
+    return { tone: 'warn', text: 'النظامُ موقوفٌ بقرارك — لا مسحَ ولا تحليلَ ولا نشر.', label: 'استأنف من الإعدادات', href: '#limits' }
   }
   /*
    * ‏والإرسالُ المتوقّف قبل الفشل: الفشلُ يُرى بسببه، والتوقّفُ صامت — كانت الحبّةُ

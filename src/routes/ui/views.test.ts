@@ -1186,7 +1186,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const empty = section([draft('d1')], { mediaReady: blocked })
     expect(empty).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
     expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
-    expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#settings">افتح الحدود</a>')
+    expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
 
     const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
     expect(pictured).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
@@ -1208,7 +1208,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const full = { ...READY, video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(2, 2) }) }
     const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
-    expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#settings">افتح الحدود</a>')
+    expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
     const other = section([draft('d2')], { mediaReady: full })
     expect(other).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
@@ -1897,7 +1897,8 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.dark['--bg'], THEME.dark['--bg']])
     // ‏ومبدّلُ الثيم كذلك: «ليليّ» ثمّ «النظام»
     const box = { querySelectorAll: () => [] }
-    const doc2 = { ...doc, getElementById: () => box }
+    // ‏والأزرارُ تُقرأ من الوثيقة كلِّها (D-221): لا زرَّ في هذا الشبه
+    const doc2 = { ...doc, getElementById: () => box, querySelectorAll: (sel: string) => (sel.includes('button') ? [] : doc.querySelectorAll(sel)) }
     runInNewContext(THEME_SCRIPT, { document: doc2, localStorage: { getItem: () => 'light', setItem() {}, removeItem() {} } })
     expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.light['--bg'], THEME.light['--bg']])
   })
