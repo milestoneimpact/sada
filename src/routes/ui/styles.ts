@@ -1160,7 +1160,11 @@ ul.plain li:last-child{margin-bottom:0}
 
    وهذا ليس تجميلا: **الوزنُ البصريُّ هو ما يُقرَأ**، وما لا يُرى لا
    يُنفَّذ — ومهمّةٌ لم تُنفَّذ في البوّابة تظهر عندنا خطأً غامضا. */
-.guide{margin-top:var(--s-4); border:var(--bd); overflow:hidden; position:relative}
+.guide{margin-top:var(--s-4); border:var(--bd); overflow:clip; position:relative}
+/* ‏**شريطُ أفعال المساعد ثابتٌ في أسفله** (T4 · خطّة التصميم 5.4 · D-218): «احفظ» و«افحص الزوج» كانا تحت شاشاتٍ من
+   الشرح على الهاتف. والحاويةُ «clip» لا «hidden»: الثانيةُ تجعلها حاويةَ تمريرٍ فلا يلتصق ما فيها */
+.guide .wiz-bar{position:sticky; bottom:0; z-index:2; background:var(--surface-2);
+  padding-block:var(--s-3); border-top:var(--bd)}
 /* ‏وكانت على حافّته رافدةٌ نحاسيّة («::before»)، فسقطت (D-187): حافّةٌ ملوّنةٌ خامسة،
    ونحاسٌ على حدّ بطاقة. والدليلُ يفصله سطحُه الداخليّ وحدُّه. */
 .guide>summary{cursor:pointer; list-style:none; display:flex; align-items:center;
@@ -1938,6 +1942,8 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
    * تُصاغ مرّتين تفترق مرّةً.**
    */
   nav.tabs > details.more-sheet{flex:1 1 0; min-width:0; display:flex}
+  /* ‏وعلى الهاتف فوق شريط الإبهام لا تحته (D-218) */
+  .guide .wiz-bar{bottom:calc(var(--s-16) + var(--safe-b))}
   nav.tabs > a[data-bar],nav.tabs > .cmdk-open,nav.tabs > details.more-sheet > summary{
     flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--s-0);
     align-items:center; justify-content:center; padding:var(--s-1) var(--s-0);
