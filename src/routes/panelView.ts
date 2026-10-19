@@ -732,6 +732,23 @@ function topNew(): string {
   })
 }
 
+/**
+ * ‏**بابٌ واحدٌ للإنشاء** (D-223، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
+ * ‏المالكُ أربعةَ خيارات قبل أن يعرف ماذا يريد. فصار زرًّا واحدًا يسأل «من أين تبدأ؟». وعلى العريض لا يُرسم:
+ * ‏زرُّ الترويسة (`topNew`) نفسُه ظاهرٌ هناك، فلا زرّان بالاسم نفسِه في شاشةٍ واحدة.
+ */
+function headNew(): string {
+  return menu({
+    label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-head-new',
+    items: [
+      menuItem({ label: 'من فكرة', note: 'جملةٌ أو كلمات', href: '#idea' }),
+      menuItem({ label: 'من مصدر', note: 'ملفٌّ محلَّلٌ من Drive', href: '#write' }),
+      menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
+      menuItem({ label: 'خطّةٌ من ملفّ', note: 'CSV لأسابيع', href: '#plan-import' }),
+    ],
+  })
+}
+
 function fabNew(): string {
   const items = [
     ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
@@ -1021,8 +1038,11 @@ ${flash}
    * عند ‏٩٦٥ — ‏٣٥٠px من الأرض الفارغة تحته. والاثنتان شيئان: أفعالٌ تنتظر
    * وسجلٌّ وقع. فلكلٍّ بطاقتُها، والعمودُ الأوّل رصّةٌ كالثاني.
    */''}
-  <div class="ov mt-3">
-    <div class="stack">
+  ${/*
+   * ‏**قاعدةُ الحذف** (D-223، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
+   * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
+   */''}
+  <div class="mt-3">
       <div class="card"><h2>ما ينتظرك</h2>
         <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
         ${todo === ''
@@ -1030,17 +1050,14 @@ ${flash}
           : `<ul class="todo">${todo}</ul>`}
         <div class="row mt-3">${scanBtn}
           <a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a></div></div>
-    </div>
-    <div class="stack">
-      ${todayList(d)}
-    </div>
   </div>
   ${/*
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
   <details class="card home-ops mt-3" id="ops">
-    <summary><h2>الكلفة</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال</span></summary>
+    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال، وسجلُّ اليوم</span></summary>
+  <div class="mt-3">${todayList(d)}</div>
   <div class="ov mt-3">
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يومًا</h2>
@@ -1101,10 +1118,7 @@ ${pivotPane(d.pivot)}
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
   ${pageHead('التحرير', sectionLabel('posts'), '<b>لا يُنشر نصٌّ قبل أن تعتمده.</b>',
-    `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
-     <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
-     <a class="btn btn-secondary btn-sm" href="${panelHref('videos')}">ارفع فيديو</a>
-     <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
+    headNew())}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
     writable: d.writableSources,

@@ -1551,6 +1551,8 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .ed-x{flex:none}
 .ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
 .ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
+/* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-223) */
+.ed-saved{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
 .draft-text.ed-txt{height:auto; min-height:calc(8 * var(--lh-body) + var(--s-6)); max-height:60vh; field-sizing:content}
 .ed-read{margin:0; max-width:var(--measure); white-space:pre-wrap; overflow-wrap:anywhere;
@@ -2079,6 +2081,8 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 @media${atLeast('md')}{details.more-sheet,details.fab{display:none}}
 /* ‏«منشور جديد» في الترويسة على العريض، والعائمُ مكانه على الضيّق (D-216) */
 @media${below('md')}{details[data-tb-new]{display:none}}
+/* ‏وبابُ «المنشورات» الواحدُ على الضيّق وحدَه: على العريض يكفي زرُّ الترويسة (D-223) */
+@media${atLeast('md')}{details[data-head-new]{display:none}}
 @media${below('sm')}{
   .scroll{overflow:visible; margin:0}
   /* **والجدولُ المحوريُّ مستثنًى** (D-151): أعمدتُه أرقامٌ تُقارَن، وتكديسُها

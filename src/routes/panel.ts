@@ -2343,6 +2343,13 @@ panel.post('/panel/drafts/decide', async (c) => {
    */
   if (wants === 'save') {
     const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
+    /*
+     * ‏**والحفظُ التلقائيّ** (D-223، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
+     * ‏فيُردّ عليه بسطرٍ لا بتحويل: لا إشعارَ يملأ الشاشة كلَّ جملة، ولا سطرَ تدقيقٍ لكلّ توقّف. والفحصُ فحصُ الاعتماد نفسُه.
+     */
+    if (form.get('auto') === '1') {
+      return saved.ok ? c.json({ ok: true }) : c.json({ ok: false, reason: saved.reason }, 422)
+    }
     await record(c.env.DB, { actor: 'panel', action: 'draft.save', target: id, detail: saved.ok ? 'saved' : `refused:${saved.reason}` }, c.req.raw)
     await setFlash(c.env, c.req.raw, saved.ok
       ? { kind: 'ok', text: 'حُفظ النصّ، وما زالت تنتظر قرارك.' }

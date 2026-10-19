@@ -396,6 +396,30 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       clearTimeout(dTimer);
       dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
     });
+    /*
+     * ‏**ويُحفظ على الخادم وحدَه** (D-223): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
+     * ‏«حُفظ» بجوار العنوان. فلا يُرى زرُّ «احفظ» بعد أن يعمل هذا؛ وبلا سكربت يبقى الزرُّ كما كان.
+     */
+    var edF=document.getElementById('ed-form');
+    if(edF&&edF.getAttribute('action')==='/panel/drafts/decide'&&window.fetch){
+      var mark=document.createElement('span'); mark.className='ed-saved'; mark.setAttribute('role','status');
+      var lbl=edBox.querySelector('.ed-label .grow'); if(lbl)lbl.parentNode.insertBefore(mark,lbl);
+      document.querySelectorAll('button[form="ed-form"][value="save"]').forEach(function(b){b.hidden=true;});
+      var sTimer=0, last=edT.value, flight=null;
+      var push=function(){
+        if(edT.value===last)return;
+        var v=edT.value, body=new FormData(edF); body.set('do','save'); body.set('auto','1'); body.set('text',v);
+        mark.textContent='جارٍ الحفظ…';
+        flight=fetch(edF.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){
+          return r.json().then(function(j){
+            if(r.ok&&j.ok){last=v; mark.textContent='حُفظ'; try{if(edT.value===v)localStorage.removeItem(dKey);}catch(e){}}
+            else mark.textContent='لم يُحفظ: '+(j.reason||'');
+          });
+        }).catch(function(){mark.textContent=navigator.onLine===false?'لم يُحفظ: لا اتّصال':'لم يُحفظ';});
+      };
+      edT.addEventListener('input',function(){clearTimeout(sTimer); mark.textContent=''; sTimer=setTimeout(push,1500);});
+      edT.addEventListener('blur',function(){clearTimeout(sTimer); push();});
+    }
   }
   function countsFrom(doc){
     document.querySelectorAll('nav.tabs a,nav.tab-bar a').forEach(function(a){
