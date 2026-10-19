@@ -5104,3 +5104,17 @@ describe('«المظهر» و«النظام» في الإعدادات (D-221)', 
     expect(system).toContain('id="machine"')
   })
 })
+
+describe('شريطُ اليوم الأوّل (D-224)', () => {
+  it('أعلى الرئيسيّة حتّى يُفهَم أوّلُ مصدر، ثمّ يختفي', async () => {
+    const cookie = await login()
+    const before = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(before).toContain('<div class="first-band" aria-hidden="true">')
+    expect(before).toContain('data-echo="deep"')
+    const source = await seedSource('تقرير الأثر')
+    await db.prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'ملخّص', JSON.stringify({ hash: 'md5:a', themes: [] }), 7).run()
+    const after = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(after).not.toContain('class="first-band"')
+  })
+})

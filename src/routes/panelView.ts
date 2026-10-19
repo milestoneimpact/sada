@@ -32,7 +32,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
-import { brandMoment } from './ui/moment'
+import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
@@ -988,6 +988,7 @@ ${flash}
     * المنصّاتُ الخمس. والمالُ وصحّةُ الدورات بعدها — كانت أوّلَ الشاشة فقال
     * المالك «لا أجد المراحل».
     */''}
+  ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${homeTop({
     channels: d.channels,
     counts: d.journey,
