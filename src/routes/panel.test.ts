@@ -2649,6 +2649,19 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect(row).toEqual({ status: 'edited', original_text: 'ن'.repeat(300) })
   })
 
+  it('والحفظُ التلقائيّ (D-223): «auto=1» يُجاب بسطرٍ لا بتحويل، وبفحص الاعتماد نفسِه', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const cookie = await login()
+    const ok = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', auto: '1', text: 'م'.repeat(150) })
+    expect(ok.status).toBe(200)
+    expect(await ok.json()).toEqual({ ok: true })
+    expect((await db.prepare('SELECT status, text FROM posts WHERE id = ?').bind(id).first<Record<string, string>>())).toEqual({ status: 'draft', text: 'م'.repeat(150) })
+    const short = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', auto: '1', text: 'قصير' })
+    expect(short.status).toBe(422)
+    expect(((await short.json()) as { ok: boolean }).ok).toBe(false)
+    expect((await db.prepare('SELECT text FROM posts WHERE id = ?').bind(id).first<{ text: string }>())?.text).toBe('م'.repeat(150))
+  })
+
   it('«اعتمد» على البطاقة المختصرة بلا مربّع يعتمد المحفوظَ كما كُتب ويعود إلى شريط جدولتها', async () => {
     const id = await seedPost('x', 'draft', 'نصٌّ كما كتبه النموذج على X، وطولُه يكفي ليكون منشورًا يُقرأ.')
     const cookie = await login()
@@ -2684,6 +2697,26 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     const bad = await post(cookie, '/panel/drafts/reschedule', { id, from: 'editor', preset: 'custom', local: '' })
     expect(where(bad)).toBe(`/panel?open=${id}#ed-when`)
     expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at).toBe('2031-01-05 18:30:00')
+  })
+
+  it('والسحبُ في الخطّ الزمنيّ (D-223): المجدولُ قابلٌ للسحب، والنقلُ يعود إلى نافذته', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const account = await seedAccount('linkedin', 'عمر')
+    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
+    const soon = new Date(Date.now() + 2 * 864e5)
+    const local = new Date(soon.getTime() + 3 * 3600e3).toISOString().slice(0, 16)
+    await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account, preset: 'custom', local, text: 'ن'.repeat(300) })
+    const html = await (await app.request('/panel/timeline?span=14', withSession(cookie), env)).text()
+    expect(html).toContain(`data-move="${id}"`)
+    expect(html).toContain('<form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden><input type="hidden" name="_csrf"')
+    const when = new Date(soon.getTime() + 864e5).toISOString().slice(0, 16)
+    const r = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: '/panel/timeline?span=14' })
+    expect(where(r)).toBe('/panel/timeline?span=14')
+    expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at)
+      .toBe(`${when.replace('T', ' ')}:00`)
+    // ‏ورجوعٌ إلى غير الخطّ الزمنيّ لا يُتّبع
+    const odd = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: 'https://evil.example/' })
+    expect(where(odd)).toBe(`/panel#d-${id}`)
   })
 
   it('«انقلها إلى» على بطاقة المجدولة: ضغطةٌ واحدة تغيّر الموعدَ بتوقيت المالك (D-200)', async () => {

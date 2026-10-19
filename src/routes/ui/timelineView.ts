@@ -15,6 +15,7 @@ import { pageHead } from './parts'
 import { sectionLabel } from './command'
 import { resultsTabs } from './results'
 import { emptyState } from './components/empty'
+import { notice, toastRegion } from './components/toast'
 import { dayRange, stamp } from '../../lib/time/zone'
 import {
   PLAN_LABEL, SHIFT_LIMIT, SPANS, STATUS_LABEL,
@@ -29,6 +30,7 @@ export interface TimelineView {
   readonly cap: number
   readonly zone: string | null
   readonly now: Date
+  readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
 const SPAN_LABEL: Readonly<Record<Span, string>> = { 14: 'أسبوعان', 30: '30 يومًا', 90: '90 يومًا' }
@@ -71,8 +73,12 @@ function barHtml(bar: GanttBar, isPlan: boolean, zone: string | null): string {
   const mark = bar.mark === null
     ? ''
     : `<i class="gt-mark ${bar.tone}" style="inset-inline-start:${bar.mark}%" aria-hidden="true"></i>`
-  return `<a class="${cls}" href="${escapeHtml(bar.href)}" style="${place(bar.start, bar.end)}"
-    title="${escapeHtml(text)}" aria-label="${escapeHtml(text)}">${wait}${label}</a>${mark}`
+  // ‏**المجدولُ يُسحَب** (D-223، من Later): شريطُه يحمل معرّفَه وموعدَه، فيُنقل بالسحب يومًا أو أكثر بساعته نفسِها
+  const move = !isPlan && bar.status === 'queued' && bar.at !== null
+    ? ` data-move="${escapeHtml(bar.id)}" data-at="${escapeHtml(bar.at)}"`
+    : ''
+  return `<a class="${cls}" href="${escapeHtml(bar.href)}" style="${place(bar.start, bar.end)}"${move}
+    title="${escapeHtml(text)}${move === '' ? '' : ' · اسحبه لتغيير اليوم'}" aria-label="${escapeHtml(text)}">${wait}${label}</a>${mark}`
 }
 
 function rowHtml(row: GanttRow, isPlan: boolean, d: TimelineView): string {
@@ -155,9 +161,13 @@ export function timelineScreen(d: TimelineView): string {
       أو اكتب مسوّدةً من «المنشورات» فتظهر هنا من يومِ كتابتها.`,
   })
 
-  return `${resultsTabs('timeline')}
+  const flash = toastRegion(d.flash === undefined || d.flash === null
+    ? ''
+    : notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad',
+        g: d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲' }))
+  return `${flash}${resultsTabs('timeline')}
   ${pageHead('المحفظة', 'الخطّ الزمنيّ', `كلُّ منشورٍ في كلّ حسابٍ شريطٌ من كتابته إلى خروجه، والخططُ الأسبوعيّةُ فوقها.
-    <b>والشريطُ رابطٌ إلى رحلته</b> — وما طال منه قرارٌ تأخّر أو جدولٌ ازدحم.`)}
+    <b>والشريطُ رابطٌ إلى رحلته</b>، والمجدولُ يُسحَب إلى يومٍ آخر.`)}
   ${controls(d)}
   <div class="card mt-3">
     <div class="split">
@@ -169,7 +179,10 @@ export function timelineScreen(d: TimelineView): string {
     ${c.groups.length === 0
       ? empty
       : `${legend()}
-    <div class="gt-wrap"><div class="gt">${axis(d)}${groups}</div></div>
+    <div class="gt-wrap"><div class="gt" data-days="${c.days}">${axis(d)}${groups}</div></div>
+    <form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden>
+      <input type="hidden" name="id"><input type="hidden" name="when">
+      <input type="hidden" name="from" value="timeline"><input type="hidden" name="back" value="${escapeHtml(href(d.span, d.shift))}"></form>
     <p class="hint">التواريخُ ${d.zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'}. والشريطُ المفتوحُ الطرفِ يمتدّ خارجَ النافذة،
       والمتقطّعُ مسوّدةٌ لم يُقرَّر فيها فنهايتُه «الآن».</p>`}
   </div>`
@@ -179,3 +192,37 @@ export function timelineScreen(d: TimelineView): string {
 export function timelineTitle(): string {
   return `صدى — ${sectionLabel('results')} · الخطّ الزمنيّ`
 }
+
+/**
+ * ‏**سحبُ المجدول إلى يومٍ آخر** (D-223، من Later): كان تغييرُ الموعد ستَّ خطوات (ر-9). فالشريطُ المعلَّم `data-move`
+ * ‏يُسحَب أفقيًّا، ويُحسَب الفرقُ أيّامًا كاملة من عرض اليوم في المسار، والساعةُ تبقى. وعند الإفلات يُرسَل نموذجُ
+ * ‏`reschedule` نفسُه بـ`when` (UTC)، **والخادمُ الحَكَم** بحرّاسه كما في المحرّر. ونقرةٌ بلا سحبٍ تفتح الرحلةَ كما كانت.
+ */
+export const TIMELINE_SCRIPT = `(function(){
+  var gt=document.querySelector('.gt[data-days]'), form=document.getElementById('gt-move');
+  if(!gt||!form)return;
+  var days=+gt.getAttribute('data-days')||1, rtl=getComputedStyle(gt).direction==='rtl';
+  gt.querySelectorAll('a[data-move]').forEach(function(a){
+    var x0=0, moved=0, on=false, id=0;
+    var track=a.closest('.gt-track');
+    a.addEventListener('pointerdown',function(e){if(e.button!==0)return; on=true; moved=0; x0=e.clientX; id=e.pointerId;});
+    a.addEventListener('pointermove',function(e){
+      if(!on||e.pointerId!==id)return;
+      var dx=e.clientX-x0; if(Math.abs(dx)>4&&!a.hasPointerCapture(id))a.setPointerCapture(id);
+      var w=track?track.getBoundingClientRect().width/days:40;
+      moved=Math.round((rtl?-dx:dx)/w);
+      a.style.translate=dx+'px 0';
+    });
+    var end=function(){
+      if(!on)return; on=false; a.style.translate='';
+      if(moved===0)return;
+      var at=new Date(a.getAttribute('data-at').replace(' ','T')+(/Z|[+-]\\d\\d:?\\d\\d$/.test(a.getAttribute('data-at'))?'':'Z'));
+      if(isNaN(at.getTime()))return;
+      form.elements.namedItem('id').value=a.getAttribute('data-move');
+      form.elements.namedItem('when').value=new Date(at.getTime()+moved*864e5).toISOString().slice(0,16);
+      form.submit();
+    };
+    a.addEventListener('pointerup',end); a.addEventListener('pointercancel',function(){moved=0; end();});
+    a.addEventListener('click',function(e){if(moved!==0){e.preventDefault();}});
+  });
+})();`

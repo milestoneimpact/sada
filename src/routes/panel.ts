@@ -105,7 +105,7 @@ import { metricsFor } from '../lib/metrics/job'
 import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
-import { timelineScreen, timelineTitle } from './ui/timelineView'
+import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
@@ -2013,10 +2013,11 @@ panel.get('/panel/timeline', async (c) => {
   const body = timelineScreen({
     chart: gantt(loaded, win, now, zone),
     span, shift, capped: loaded.capped, cap: GANTT_CAP, zone, now,
+    flash: await takeFlash(c.env, c.req.raw),
   })
 
   return page((nonce) =>
-    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, TIMELINE_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
@@ -2822,6 +2823,9 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
+  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-223) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
+  const back = String(form.get('back') ?? '')
+  if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
 })
 
