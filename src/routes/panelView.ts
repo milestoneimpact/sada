@@ -826,6 +826,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
 
   const sourcesTable = d.sources.length === 0
     ? emptyState({
+        echo: true,
         title: 'لا مصادر بعد',
         html: 'صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.',
         action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جارٍ المسح…">

@@ -157,9 +157,13 @@ const GOLD_PROBE = () => {
   for (let t = walker.nextNode(); t; t = walker.nextNode()) {
     if (t.textContent.trim() === '' || t.parentElement === null) continue
     const host = t.parentElement
-    if (host.closest('.echo, [data-echo], script, style, [aria-hidden="true"]') !== null) continue
-    const cs = getComputedStyle(host)
-    if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
+    // ‏والقائمةُ المنسدلة طافيةٌ فوق الصفحة لا فيها، والتدقيقُ يفتح كلَّ «details» قبل القياس
+    if (host.closest('.echo, [data-echo], script, style, [aria-hidden="true"], details.menu') !== null) continue
+    // ‏والظاهرُ بسلفه لا بنفسه: قائمةٌ مطويّةٌ بشفافيّة صفرٍ على أبيها نصُّها ليس على الشاشة
+    if (!host.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue
+    // ‏وما في «details» مطويّةٍ يُعطي النطاقُ له مستطيلًا وصاحبُه بلا صندوق: يُصدَّق الصاحب
+    const own = host.getBoundingClientRect()
+    if (own.width === 0 || own.height === 0) continue
     const range = document.createRange()
     range.selectNodeContents(t)
     for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) visibleText.push({ r, host })
@@ -180,6 +184,8 @@ const GOLD_PROBE = () => {
       const step = 8 / (Math.hypot(m.a, m.b) || 1)
       for (let i = 0, at = 0; at <= len + step; i += 1, at = i * step) {
         const pt = path.getPointAtLength(Math.min(at, len)).matrixTransform(m)
+        // ‏وما خرج عن صندوق الرسم مقصوصٌ لا يُرى (`slice`): الطرفان ممدودان خارج الإطار عمدًا
+        if (pt.x < box.left || pt.x > box.right || pt.y < box.top || pt.y > box.bottom) continue
         for (const { r, host } of visibleText) {
           const dx = Math.max(r.left - pt.x, 0, pt.x - r.right)
           const dy = Math.max(r.top - pt.y, 0, pt.y - r.bottom)
