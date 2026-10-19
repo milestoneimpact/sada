@@ -356,7 +356,7 @@ export interface PanelData {
   /** قيمة `nonce` لهذا الردّ وحده. */
   readonly nonce: string
   readonly sessions: PanelSession[]
-  /** المنظّماتُ كلُّها وما النشطةُ منها (D-226) — حسابُ الدخول يدير الكلّ. */
+  /** المنظّماتُ كلُّها وما النشطةُ منها (D-225) — حسابُ الدخول يدير الكلّ. */
   readonly orgs?: readonly OrgRow[]
   readonly org?: string
   readonly audit: PanelAudit[]
@@ -678,7 +678,7 @@ function settingsTabs(missing: number): string {
 }
 
 /**
- * «المنظّمات» (D-226): حسابُ الدخول الحاليّ حسابُ المشغّل — يرى كلَّ المنظّمات وينشئها وينتقل بينها.
+ * «المنظّمات» (D-225): حسابُ الدخول الحاليّ حسابُ المشغّل — يرى كلَّ المنظّمات وينشئها وينتقل بينها.
  * وصلاحيّاتُ كلّ منظّمةٍ والحساباتُ الإشرافيّة في المرحلة الثانية (وثيقةُ الرؤية §الوصول).
  */
 function orgsPane(d: PanelData): string {
