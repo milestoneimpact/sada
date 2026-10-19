@@ -120,10 +120,26 @@ for (const file of readdirSync(MIG).filter((n) => n.endsWith('.sql')).sort()) {
   }
 }
 
+/**
+ * عمودا المستأجر (D-224) — **مُعفَيان ما دامت السقّاطةُ تعدّ جملًا بلا منظّمة**.
+ *
+ * أُضيفا لكلّ جدول عملٍ في ترحيلٍ واحد، ويُقرآن جدولًا جدولًا كلّما حُوِّلت
+ * جملُه إلى `org_id`. والإعفاءُ **ليس «سيُقرأ لاحقا»**: هو مربوطٌ بعددٍ في
+ * `tenancy-baseline.json` يحرسه `audit_tenancy`، **وينتهي وحدَه حين يصل جدولُه
+ * صفرًا** — فعمودٌ لا يُقرأ بعدها يسقط هنا كأيّ عمود. و`brands` يُعفى ما بقي
+ * في المستودع كلّه جملةٌ بلا منظّمة: هو ما تُقرأ به المنظّمةُ حين تُقيَّد.
+ */
+const tenancy = JSON.parse(readFileSync(new URL('./tenancy-baseline.json', import.meta.url), 'utf8'))
+const tenancyLeft = Object.values(tenancy).reduce((a, b) => a + b, 0)
+const tenancyPending = (table, col) =>
+  (col === 'org_id' || col === 'brand_id') &&
+  ((tenancy[table] ?? 0) > 0 || (table === 'brands' && tenancyLeft > 0))
+
 const findings = []
 for (const { table, col, file } of columns) {
   if (dropped.has(table) || opaque.has(table)) continue
   if (ALLOWED.has(`${table}.${col}`)) continue
+  if (tenancyPending(table, col)) continue
   const word = new RegExp(`\\b${col}\\b`)
   if (!word.test(allSql)) findings.push({ table, col, file, why: 'لا يُذكَر في أيّ جملة' })
   else if (!word.test(readText)) findings.push({ table, col, file, why: 'يُكتَب ولا يُقرأ' })

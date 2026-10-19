@@ -121,6 +121,11 @@ export interface SessionRecord {
    * والصفُّ في KV لا يكتبه إلّا الخادم. ويسقط عند الترقية.
    */
   readonly next?: string
+  /**
+   * المنظّمةُ النشطة (D-225) — وغيابُها منظّمةُ المالك. يكتبها `setActiveOrg` وحدَه،
+   * بعد أن يتحقّق المسارُ أنّها موجودة.
+   */
+  readonly org?: string
 }
 
 export interface Session {
@@ -284,6 +289,7 @@ function parse(raw: string): SessionRecord | null {
       ua: typeof value.ua === 'string' ? value.ua : '',
       pending: value.pending,
       ...(typeof value.next === 'string' ? { next: safeNext(value.next) } : {}),
+      ...(typeof value.org === 'string' && value.org.length > 0 ? { org: value.org } : {}),
     }
   } catch {
     return null
@@ -322,6 +328,18 @@ export async function loadSession(
   }
 
   return { id, record }
+}
+
+/**
+ * يبدّل المنظّمةَ النشطة في الجلسة نفسِها (D-225).
+ *
+ * **بالمعرّف نفسِه** لا بمعرّفٍ جديد: لا صلاحيّةَ تُكتسب هنا — الجلسةُ كاملةٌ
+ * أصلا، وجلسةُ المشغّل ترى كلَّ المنظّمات. والكتابةُ تجدّد مهلتَها الثماني ساعات.
+ */
+export async function setActiveOrg(store: SessionStore, session: Session, org: string): Promise<Session> {
+  const record: SessionRecord = { ...session.record, org }
+  await store.put(sessionKey(session.id), JSON.stringify(record), { expirationTtl: SESSION_TTL_SECONDS })
+  return { id: session.id, record }
 }
 
 export async function destroySession(store: SessionStore, request: Request): Promise<void> {
