@@ -1,0 +1,23 @@
+{
+  "accounts": 23,
+  "alert_outbox": 4,
+  "audit_log": 3,
+  "content_items": 7,
+  "cost_ledger": 14,
+  "media": 29,
+  "media_claims": 4,
+  "metrics": 5,
+  "oauth_apps": 7,
+  "plans": 8,
+  "posts": 62,
+  "promotion_suggestions": 4,
+  "providers": 8,
+  "publish_attempts": 28,
+  "reports": 4,
+  "settings": 4,
+  "sources": 12,
+  "task_routes": 2,
+  "token_alerts": 4,
+  "tokens": 10,
+  "uploads": 11
+}

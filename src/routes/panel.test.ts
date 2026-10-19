@@ -792,7 +792,7 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
   })
 })
 
-describe('هندسةُ نظرة عامّة (D-136 · D-224)', () => {
+describe('هندسةُ نظرة عامّة (D-136 · D-225)', () => {
   it('«ما ينتظرك» وحدَه بعرض اللوح، والسجلُّ والمالُ مطويّان معًا، والمؤشّراتُ موسومة', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
@@ -803,7 +803,7 @@ describe('هندسةُ نظرة عامّة (D-136 · D-224)', () => {
     const spend = html.indexOf('الإنفاق — 14 يومًا', happened)
     const money = html.indexOf('أين يذهب المال', spend)
     expect(waiting).toBeGreaterThan(0)
-    // ‏قاعدةُ الحذف (D-224): السجلُّ لا قرار، فهو تحت «الكلفة وما وقع» المطويّة لا بجوار «ما ينتظرك»
+    // ‏قاعدةُ الحذف (D-225): السجلُّ لا قرار، فهو تحت «الكلفة وما وقع» المطويّة لا بجوار «ما ينتظرك»
     expect(ops).toBeGreaterThan(waiting)
     expect(happened).toBeGreaterThan(ops)
     expect(spend).toBeGreaterThan(happened)
@@ -2649,7 +2649,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect(row).toEqual({ status: 'edited', original_text: 'ن'.repeat(300) })
   })
 
-  it('والحفظُ التلقائيّ (D-224): «auto=1» يُجاب بسطرٍ لا بتحويل، وبفحص الاعتماد نفسِه', async () => {
+  it('والحفظُ التلقائيّ (D-225): «auto=1» يُجاب بسطرٍ لا بتحويل، وبفحص الاعتماد نفسِه', async () => {
     const id = await seedPost('linkedin', 'draft')
     const cookie = await login()
     const ok = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', auto: '1', text: 'م'.repeat(150) })
@@ -2699,7 +2699,7 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at).toBe('2031-01-05 18:30:00')
   })
 
-  it('والسحبُ في الخطّ الزمنيّ (D-224): المجدولُ قابلٌ للسحب، والنقلُ يعود إلى نافذته', async () => {
+  it('والسحبُ في الخطّ الزمنيّ (D-225): المجدولُ قابلٌ للسحب، والنقلُ يعود إلى نافذته', async () => {
     const id = await seedPost('linkedin', 'draft')
     const account = await seedAccount('linkedin', 'عمر')
     const cookie = `${await login()}; sada_tz=Asia/Riyadh`
@@ -4126,7 +4126,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(why).toContain('href="#c2"')
   })
 
-  it('ورأسُ «المنشورات» بابٌ واحدٌ يفتح البداياتِ الأربع إلى بطاقاتها (D-224)', async () => {
+  it('ورأسُ «المنشورات» بابٌ واحدٌ يفتح البداياتِ الأربع إلى بطاقاتها (D-225)', async () => {
     const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
     const at = html.indexOf('<section data-pane="posts"')
     const head = html.slice(at, html.indexOf('</details>', html.indexOf('data-head-new', at)))

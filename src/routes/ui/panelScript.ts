@@ -397,7 +397,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
     });
     /*
-     * ‏**ويُحفظ على الخادم وحدَه** (D-224): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
+     * ‏**ويُحفظ على الخادم وحدَه** (D-225): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
      * ‏«حُفظ» بجوار العنوان. فلا يُرى زرُّ «احفظ» بعد أن يعمل هذا؛ وبلا سكربت يبقى الزرُّ كما كان.
      */
     var edF=document.getElementById('ed-form');
@@ -442,7 +442,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var body=new FormData(f); if(sb&&sb.name)body.append(sb.name,sb.value);
     var id=String(body.get('id')||'');
     /*
-     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-224، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
+     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-225، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
      * ‏ثمّ تُبدَّل ببطاقة الخادم حين يصل. والخادمُ يبقى الحَكَم: إن رفض أو انقطع الاتّصالُ عادت البطاقةُ كما كانت وقيل السبب.
      */
     var opt=sb&&sb.getAttribute('data-optimistic'), held=document.getElementById('d-'+id);
