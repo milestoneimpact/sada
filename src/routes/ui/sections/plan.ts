@@ -146,7 +146,7 @@ export function planSection(input: PlanInput): string {
       : `<p class="draft-why mb-4">${escapeHtml(plan.plan.rationale)}</p>`}
 
     <div class="scroll"><table>
-      <thead><tr><th>متى</th><th>المنصّة</th><th>المصدر والزاوية</th><th></th></tr></thead>
+      <thead><tr><th>متى</th><th>المنصّة</th><th>المصدر والزاوية</th><th><span class="vh">الإجراء</span></th></tr></thead>
       <tbody>${plan.plan.items.map((i) => row(i, input.names, input.zone ?? null)).join('')}</tbody>
     </table></div>
 

@@ -178,7 +178,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
   const action = next === '/panel' ? '/panel/login' : `/panel/login?next=${encodeURIComponent(next)}`
   return shell(
     'صدى — الدخول',
-    `<div class="auth-split">${brandMoment()}<div class="wrap"><div class="auth">
+    `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
       <h1>لوحة التحكّم</h1>
       <p class="lede">${state.blocked === true
         ? 'الدخولُ موقوفٌ مؤقتًا لحماية اللوحة'
@@ -200,7 +200,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
         ? `<p class="lede"><a href="${escapeHtml(next)}">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>`
         : ''}
       <footer>الجلسة 8 ساعات</footer>
-    </div></div></div>`,
+    </main></div></div>`,
     nonce,
     `${NEXT_SCRIPT}${state.passkeys === true ? LOGIN_SCRIPT : ''}`,
     { moment: true },
@@ -899,7 +899,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
            <span class="note">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
        </div>
        <div class="scroll"><table>
-         <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th></th></tr></thead>
+         <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th><span class="vh">الإجراء</span></th></tr></thead>
          <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
        </table></div>`
 
@@ -1360,7 +1360,7 @@ ${pivotPane(d.pivot)}
     ${d.sessions.length === 0
       ? emptyState({ title: 'لا جلسات محفوظة', html: 'قد يكون التخزين لا يدعم الجرد في هذه البيئة.' })
       : `<div class="scroll"><table>
-          <thead><tr><th>الجهاز</th><th>فُتحت</th><th></th></tr></thead>
+          <thead><tr><th>الجهاز</th><th>فُتحت</th><th><span class="vh">الإجراء</span></th></tr></thead>
           <tbody>${sessionRows}</tbody></table></div>`}
     <hr>
     <div class="split">
@@ -1383,7 +1383,7 @@ ${pivotPane(d.pivot)}
     ${d.factors.passkeys.length === 0
       ? emptyState({ title: 'لا مفاتيح بعد' })
       : `<div class="scroll"><table>
-          <thead><tr><th>المفتاح</th><th>سُجّل</th><th>آخر استعمال</th><th></th></tr></thead>
+          <thead><tr><th>المفتاح</th><th>سُجّل</th><th>آخر استعمال</th><th><span class="vh">الإجراء</span></th></tr></thead>
           <tbody>${passkeyRows}</tbody></table></div>`}
     <div class="row mt-3">
       <div class="field"><label for="pk-label">اسمُ الجهاز</label>

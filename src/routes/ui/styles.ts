@@ -67,9 +67,11 @@ code,kbd,samp,pre{font-family:inherit}
    وكان عند right:-9999px، **فامتدّ المستند إلى 10389px** وصار الجوّالُ
    يُسحَب جانبا. وهي علّةٌ لا تُرى: العنصرُ نفسه غيرُ مرئيّ، وأثرُه
    شريطُ تمريرٍ أفقيّ يظنّه الناظر عيبا في التخطيط.
-   والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض. */
-.skip{position:absolute; width:1px; height:1px; overflow:hidden;
-  clip-path:inset(50%); white-space:nowrap;
+   والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض.
+   **والقصُّ نفسُه لما يُقرأ ولا يُرى** («.vh»): اسمُ عمودِ الأفعال في الجدول (axe «empty-table-header»). */
+.skip,.vh{position:absolute; width:1px; height:1px; overflow:hidden;
+  clip-path:inset(50%); white-space:nowrap}
+.skip{
   background:var(--brand); color:var(--on-brand);
   padding:var(--s-3) var(--s-4); border-radius:var(--r-control); z-index:99; font-weight:600}
 /* وحين يظهر يصير هدفا كاملا: من يتنقّل بلوحة المفاتيح على لوحٍ لمسيّ

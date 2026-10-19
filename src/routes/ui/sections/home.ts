@@ -65,7 +65,7 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
     const pfs = by.get(key(d)) ?? []
     return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${i === 0 ? 'اليوم' : WEEKDAYS[p.weekday]}</span>
       <span class="wk-n num">${p.day}</span>
-      <span class="wk-dots" aria-label="${pfs.length} منشور">${pfs.slice(0, 6).map((pf) =>
+      <span class="wk-dots" role="img" aria-label="${pfs.length} منشور">${pfs.slice(0, 6).map((pf) =>
         `<span class="wk-dot" data-pf="${escapeHtml(pf)}" title="${escapeHtml(pf)}"></span>`).join('')}</span>
       <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span></li>`
   }).join('')

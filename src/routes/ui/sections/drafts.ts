@@ -149,7 +149,7 @@ function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
     `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
   return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…" data-swap
-      role="group" aria-label="انقل الموعد إلى">
+      aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <span class="ago">انقلها إلى</span>${buttons}</form>`
 }
@@ -1201,7 +1201,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    */
   const list = `${bulk}
   <div class="lede-row">
-    <h3 class="sec bare">المسوّدات</h3>
+    <h2 class="sec bare">المسوّدات</h2>
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>

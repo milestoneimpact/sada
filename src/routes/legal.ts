@@ -143,7 +143,7 @@ function policyBody(env: Env, base: string): string {
       <td data-label="كم يبقى">${r.howLong}</td></tr>`,
   ).join('')
 
-  return `<div class="doc">
+  return `<main class="doc">
   <header>
     <div class="glyph">${GLYPH_SVG}</div>
     <h1>سياسةُ الخصوصيّة</h1>
@@ -220,12 +220,12 @@ function policyBody(env: Env, base: string): string {
        <a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
   <footer><a class="tap" href="/terms">شروط الاستعمال</a></footer>
-</div>`
+</main>`
 }
 
 function termsBody(env: Env, base: string): string {
   const { entity, contact } = operator(env)
-  return `<div class="doc">
+  return `<main class="doc">
   <header>
     <div class="glyph">${GLYPH_SVG}</div>
     <h1>شروطُ الاستعمال</h1>
@@ -252,7 +252,7 @@ function termsBody(env: Env, base: string): string {
     : `<p><a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
   <footer><a class="tap" href="/privacy">سياسة الخصوصيّة</a></footer>
-</div>`
+</main>`
 }
 
 /** `nonce` جديدٌ لكلّ ردّ — كما في اللوحة سواء. */

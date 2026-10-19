@@ -16,12 +16,12 @@ import { echo } from './echo'
 import { GLYPH_SVG, wordmark } from './shell'
 
 export function brandMoment(): string {
-  return `<div class="moment">
+  return `<aside class="moment" aria-label="صدى">
     <span class="echo wide">${echo({ width: 600, height: 900, tone: 'deep', crest: 0.62, level: 0.55, scale: 1.4 })}</span>
     <span class="echo narrow">${echo({ width: 390, height: 240, tone: 'deep', crest: 0.1, level: 0.7, scale: 1.1, density: 3, align: 'xMinYMax' })}</span>
     <div class="moment-id"><span class="moment-name">${wordmark(true)}</span><span class="moment-glyph">${GLYPH_SVG}</span></div>
     <p class="moment-line">أصوات اليوم .. لقرارات أفضل</p>
-  </div>`
+  </aside>`
 }
 
 /**
