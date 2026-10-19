@@ -299,10 +299,10 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
              <input type="hidden" name="id" value="${id}">${oneStep
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
-             <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule"
+             <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule" data-optimistic="اعتُمدت وجُدولت"
                title="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
-             <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد فقط</button>`
-    : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button>'}</form>`
+             <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد فقط</button>`
+    : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}</form>`
 }
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
@@ -863,7 +863,7 @@ function card(
     : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
 
   const more: string[] = []
-  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true }))
+  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true, optimistic: 'رُفضت' }))
   more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [

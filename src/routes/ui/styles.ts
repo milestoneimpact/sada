@@ -1551,6 +1551,10 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .ed-x{flex:none}
 .ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
 .ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
+/* ‏**النتيجةُ قبل الردّ** (D-223): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
+[data-pending]{position:relative}
+[data-pending] > :not(.pending-tag){opacity:.55; transition:opacity var(--dur-1)}
+[data-pending] > .pending-tag{position:absolute; z-index:1; inset-block-start:var(--s-3); inset-inline-end:var(--s-3); opacity:1}
 /* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-223) */
 .ed-saved{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}

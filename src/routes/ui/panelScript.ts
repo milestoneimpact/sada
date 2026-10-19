@@ -441,6 +441,15 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var sb=e.submitter||null;
     var body=new FormData(f); if(sb&&sb.name)body.append(sb.name,sb.value);
     var id=String(body.get('id')||'');
+    /*
+     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-223، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
+     * ‏ثمّ تُبدَّل ببطاقة الخادم حين يصل. والخادمُ يبقى الحَكَم: إن رفض أو انقطع الاتّصالُ عادت البطاقةُ كما كانت وقيل السبب.
+     */
+    var opt=sb&&sb.getAttribute('data-optimistic'), held=document.getElementById('d-'+id);
+    var tag=null;
+    if(opt&&held){held.setAttribute('data-pending',opt); tag=document.createElement('span'); tag.className='st ok pending-tag';
+      tag.setAttribute('role','status'); tag.textContent=opt; held.appendChild(tag);}
+    var undoOpt=function(){if(held)held.removeAttribute('data-pending'); if(tag)tag.remove();};
     // ‏**والطلبُ لا يُكرَّر أبدًا** (D-004 روحًا): التحويلُ يُقرأ يدويًّا، ثمّ تُجلب اللوحةُ بـGET منفصل. فإن سقط شيءٌ
     // ‏بعد أن خرج الطلب فالبديلُ إعادةُ تحميل اللوحة (GET) تُري الحالَ الحقيقيّة — لا إرسالٌ ثانٍ لما قد نُفّذ
     fetch(f.action,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'}).then(function(r){
@@ -475,6 +484,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }).catch(function(err){
       if(window.console)console.warn('swap',err);
       // ‏وبلا اتّصال لم يخرج الطلب: يعود الزرُّ، ويُقال ذلك في موضع الإشعار، وما كُتب باقٍ (خطّة التصميم 7.11)
+      undoOpt();
       if(navigator.onLine===false){unbusy(f); fail('لم يُحفظ. تحقّق من الاتّصال ثمّ أعد المحاولة.'); return;}
       location.hash='d-'+id; location.reload();
     });
