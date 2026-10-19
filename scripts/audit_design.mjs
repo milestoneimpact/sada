@@ -149,7 +149,48 @@ const GOLD_PROBE = () => {
   const stray = [...document.querySelectorAll('.moment')].filter((m) => !m.parentElement?.classList.contains('auth-split'))
     .map((m) => `لحظةٌ خارج «.auth-split»: ${m.parentElement ? where(m.parentElement) : 'body'}`)
   const moments = document.querySelectorAll('.moment').length
-  if (document.querySelector('.auth') !== null) return { exempt: true, screens: [], misplaced, moments, crowded, stray }
+  // ‏**والحارسُ الثالث: النقشُ يتنفّس** (BRAND §٩ · D-222): لا نقطةَ من مسارٍ ظاهرٍ في النقش، كلَّ ‏8px بـ`getPointAtLength`،
+  // ‏على أقلَّ من ‏24px من مستطيل نصٍّ ظاهر. والنصُّ عقدُ نصٍّ لها صندوقٌ وليست مخفيّةً، وما في النقش نفسِه ليس نصًّا عليه
+  const AIR = 24
+  const visibleText = []
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (t.textContent.trim() === '' || t.parentElement === null) continue
+    const host = t.parentElement
+    if (host.closest('.echo, [data-echo], script, style, [aria-hidden="true"]') !== null) continue
+    const cs = getComputedStyle(host)
+    if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
+    const range = document.createRange()
+    range.selectNodeContents(t)
+    for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) visibleText.push({ r, host })
+  }
+  const near = []
+  // ‏وصفحةُ الدخول (T6) مستثناة: نقشُها خلف القفل عمدًا (D-196)، والحارسُ لما يأتي بعدها
+  for (const svg of document.querySelector('.auth') !== null ? [] : document.querySelectorAll('svg[data-echo], .echo svg')) {
+    const box = svg.getBoundingClientRect()
+    if (box.width === 0 || box.height === 0 || getComputedStyle(svg).visibility === 'hidden') continue
+    let closest = Infinity
+    let by = null
+    for (const path of svg.querySelectorAll('path, line, polyline, circle, ellipse')) {
+      if (typeof path.getTotalLength !== 'function') continue
+      const m = path.getScreenCTM()
+      if (m === null) continue
+      // ‏والطولُ بوحدات الرسم لا بالبكسل: الخطوةُ ‏8px على الشاشة، والنقطةُ الأخيرةُ تُقاس
+      const len = path.getTotalLength()
+      const step = 8 / (Math.hypot(m.a, m.b) || 1)
+      for (let i = 0, at = 0; at <= len + step; i += 1, at = i * step) {
+        const pt = path.getPointAtLength(Math.min(at, len)).matrixTransform(m)
+        for (const { r, host } of visibleText) {
+          const dx = Math.max(r.left - pt.x, 0, pt.x - r.right)
+          const dy = Math.max(r.top - pt.y, 0, pt.y - r.bottom)
+          const d = Math.hypot(dx, dy)
+          if (d < closest) { closest = d; by = host }
+        }
+      }
+    }
+    if (closest < AIR && by !== null) near.push(`نقشٌ على ${Math.round(closest)}px من نصّ «${by.textContent.trim().slice(0, 24)}» (${where(by)}) — والحدُّ ${AIR}px`)
+  }
+  if (document.querySelector('.auth') !== null) return { exempt: true, screens: [], misplaced, moments, crowded, stray, near }
   const panes = [...document.querySelectorAll('section[data-pane]')]
   const marked = panes.length > 0 ? panes : [...document.querySelectorAll('[data-screen]')]
   const screens = []
@@ -163,7 +204,7 @@ const GOLD_PROBE = () => {
     }
     marked.forEach((o, i) => { o.hidden = was[i] })
   }
-  return { exempt: false, screens, misplaced, moments, crowded, stray }
+  return { exempt: false, screens, misplaced, moments, crowded, stray, near }
 }
 
 const selfTest = process.argv.includes('--self-test')
@@ -185,7 +226,7 @@ if (selfTest) {
   const ECHO = '<svg viewBox="0 0 10 10" fill="none" aria-hidden="true" data-echo="light"><path d="M0 5h10" stroke="currentColor"/></svg>'
   const MARK = '<span class="glyph glyph-sm"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12h18" stroke="currentColor" stroke-width="2"/></svg></span>'
   const over = (g) => g.screens.some((x) => x.hits.length > MAX_GOLD)
-  const clean = (g) => !over(g) && g.misplaced.length === 0 && g.crowded.length === 0 && g.stray.length === 0
+  const clean = (g) => !over(g) && g.misplaced.length === 0 && g.crowded.length === 0 && g.stray.length === 0 && g.near.length === 0
   const plants = [
     ['بلا زرع', '', clean],
     ['خمسُ علاماتٍ في «section.moment»', `<section class="moment">${MARK.repeat(5)}</section>`, (g) => over(g) && g.stray.length === 1],
@@ -196,6 +237,7 @@ if (selfTest) {
     ['نقشٌ في «.card-alert»', `<div class="card card-alert"><span class="echo">${ECHO}</span>تمّ النشر</div>`, (g) => g.misplaced.includes('div.card')],
     ['«echo()» مكشوفًا في خليّة', `<table><tbody><tr><td>${ECHO}</td></tr></tbody></table>`, (g) => g.misplaced.includes('table.')],
     ['نقشٌ في صفحة ‏٥٠٠', `<div data-no-echo="500">${ECHO}</div>`, (g) => g.misplaced.includes('div.')],
+    ['نقشٌ ملاصقٌ لعنوان (الحارسُ الثالث)', `<div style="position:relative;width:200px"><svg viewBox="0 0 200 20" width="200" height="20" fill="none" aria-hidden="true" data-echo="light" style="display:block"><path d="M0 10h200" stroke="currentColor"/></svg><p style="margin:0">صدى</p></div>`, (g) => g.near.length > 0],
   ]
   let missed = 0
   for (const [name, html, caught] of plants) {
@@ -207,7 +249,7 @@ if (selfTest) {
     const ok = caught(g)
     if (!ok) missed += 1
     const top = Math.max(0, ...g.screens.map((x) => x.hits.length))
-    console.log(`  ${ok ? '✓' : '✕'} ${name} — ذهب ${top} · ${[...g.misplaced, ...g.crowded, ...g.stray].join(' · ') || 'لا ملحوظة'}`)
+    console.log(`  ${ok ? '✓' : '✕'} ${name} — ذهب ${top} · ${[...g.misplaced, ...g.crowded, ...g.stray, ...g.near].join(' · ') || 'لا ملحوظة'}`)
     await page.close()
   }
   await browser.close()
@@ -737,7 +779,7 @@ for (const f of findings) {
   const goldOver = (f.gold?.screens ?? []).filter((s) => s.hits.length > MAX_GOLD)
   const goldTop = Math.max(0, ...(f.gold?.screens ?? []).map((s) => s.hits.length))
   const momentOver = (f.gold?.moments ?? 0) > 1 ? 1 : 0
-  const momentPlace = [...(f.gold?.crowded ?? []), ...(f.gold?.stray ?? [])]
+  const momentPlace = [...(f.gold?.crowded ?? []), ...(f.gold?.stray ?? []), ...(f.gold?.near ?? [])]
   const issues = goldOver.length + (f.gold?.misplaced ?? []).length + momentOver + momentPlace.length + f.small.length + f.long.length + f.faint.length +
     (f.torn ?? []).length + (f.labels ?? []).length + (f.ranks ?? []).length +
     (f.holes ?? []).length + (f.orphans ?? []).length + (f.tails ?? []).length + (f.hollow ?? []).length +
