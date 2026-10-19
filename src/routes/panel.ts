@@ -74,6 +74,7 @@ import { chosenTiles, TILE_MAX, TILE_MIN } from '../lib/dashboard'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../lib/pivot'
 import { FACT_CAP, loadFacts } from '../lib/pivotStore'
 import { todayFeed } from '../lib/today'
+import { activeOrg, createOrg, listOrgs, orgExists } from '../lib/tenancy'
 import type { PivotView } from './ui/sections/pivot'
 
 /**
@@ -90,7 +91,7 @@ function readSpan(raw: string | null): number {
 }
 import {
   checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
-  loadSession, readCookie, revokeSessions, safeNext, sessionCookie, type Session,
+  loadSession, readCookie, revokeSessions, safeNext, sessionCookie, setActiveOrg, type Session,
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { factorState } from '../lib/security/factors'
@@ -575,6 +576,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   }
   const plan = await latestPlan(c.env.DB)
   const sessions = await listSessions(c.env.KV, session.id)
+  const orgs = await listOrgs(c.env.DB)
   const audit = await recentAudit(c.env.DB, 50)
   const beats = await readHeartbeats(c.env.DB)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
@@ -827,6 +829,8 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       csrf: session.record.csrf,
       nonce,
       sessions,
+      orgs,
+      org: activeOrg(session.record),
       audit,
       // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
       today: todayFeed({ now: new Date(), audit, drafts, facts: loaded.facts }),
@@ -1020,6 +1024,44 @@ panel.post('/panel/sessions/revoke', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: 'session.revoke', target: handle }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُبطلت الجلسة.' })
   return back('security')
+})
+
+/**
+ * منظّمةٌ جديدة (D-226) — **من حساب الدخول الحاليّ، وهو حسابُ المشغّل**.
+ * تُنشأ ومعها علامتُها الأولى، ولا تُفتح تلقائيًّا: الانتقالُ إليها فعلٌ مستقلّ.
+ */
+panel.post('/panel/orgs', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const result = await createOrg(c.env.DB, {
+    name: String(gate.form.get('name') ?? ''),
+    kind: String(gate.form.get('kind') ?? ''),
+  })
+  if (!result.ok) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: result.reason === 'name' ? 'اكتب اسمًا للمنظّمة، ثمانين حرفًا أو أقلّ.' : 'اختر نوع المنظّمة من القائمة.',
+    })
+    return back('orgs')
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُنشئت المنظّمة. انتقل إليها حين تريد العمل فيها.' })
+  return back('orgs')
+})
+
+/** الانتقالُ إلى منظّمة — **ولا يُقبَل معرّفٌ لا يوجد**. */
+panel.post('/panel/orgs/switch', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = String(gate.form.get('org') ?? '')
+  if (!(await orgExists(c.env.DB, org))) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم أجد هذه المنظّمة.' })
+    return back('orgs')
+  }
+  await setActiveOrg(c.env.KV, gate.session, org)
+  await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلتَ إلى المنظّمة.' })
+  return back('orgs')
 })
 
 /** إبطالُ كلّ الجلسات إلّا جلسةَ الفاعل. */
@@ -2345,7 +2387,7 @@ panel.post('/panel/drafts/decide', async (c) => {
   if (wants === 'save') {
     const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
     /*
-     * ‏**والحفظُ التلقائيّ** (D-225، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
+     * ‏**والحفظُ التلقائيّ** (D-226، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
      * ‏فيُردّ عليه بسطرٍ لا بتحويل: لا إشعارَ يملأ الشاشة كلَّ جملة، ولا سطرَ تدقيقٍ لكلّ توقّف. والفحصُ فحصُ الاعتماد نفسُه.
      */
     if (form.get('auto') === '1') {
@@ -2823,7 +2865,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-225) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
+  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-226) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
   const back = String(form.get('back') ?? '')
   if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')

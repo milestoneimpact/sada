@@ -289,7 +289,7 @@ export const KIT_SCRIPT = `
         if(box&&body&&box.tagName==='TEXTAREA'&&(box.dataset.count==='x'||box.dataset.count==='linkedin'))body.textContent=box.value;}
     };
     /*
-     * ‏**والمعاينةُ ظاهرةٌ دائمًا على العريض** (D-225، من Canva وLater): النصُّ والمنشورُ بشكله واحدًا تحت الآخر،
+     * ‏**والمعاينةُ ظاهرةٌ دائمًا على العريض** (D-226، من Canva وLater): النصُّ والمنشورُ بشكله واحدًا تحت الآخر،
      * ‏والمعاينةُ تتبع كلَّ حرف. وعلى الضيّق يبقى المفتاح: الشاشةُ لا تتّسع للاثنين.
      */
     var box0=document.getElementById('ed-txt'), wide=window.matchMedia('(min-width: ${BP.md}px)');

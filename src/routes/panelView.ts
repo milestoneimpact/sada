@@ -61,6 +61,7 @@ import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
 import { emptyState } from './ui/components/empty'
+import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, type OrgRow } from '../lib/tenancy'
 
 export { escapeHtml, injectCsrf, shell }
 
@@ -355,6 +356,9 @@ export interface PanelData {
   /** قيمة `nonce` لهذا الردّ وحده. */
   readonly nonce: string
   readonly sessions: PanelSession[]
+  /** المنظّماتُ كلُّها وما النشطةُ منها (D-226) — حسابُ الدخول يدير الكلّ. */
+  readonly orgs?: readonly OrgRow[]
+  readonly org?: string
   readonly audit: PanelAudit[]
   /** «ما وقع اليوم» — مرويٌّ ممّا في اليد (D-127). */
   readonly today: { readonly items: readonly TodayItem[]; readonly more: number }
@@ -666,10 +670,41 @@ function settingsTabs(missing: number): string {
     { label: 'النظام', href: '#system' },
     { label: 'الإنفاقُ والحدود', href: '#limits' },
     { label: 'خدماتُ الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
+    { label: 'المنظّمات', href: '#orgs' },
     { label: 'الأمان', href: '#security' },
     { label: 'سجلّ النشاط', href: '#activity' },
     { label: 'للمطوّر', href: '#dev' },
   ], { id: 'settings-sub' })
+}
+
+/**
+ * «المنظّمات» (D-226): حسابُ الدخول الحاليّ حسابُ المشغّل — يرى كلَّ المنظّمات وينشئها وينتقل بينها.
+ * وصلاحيّاتُ كلّ منظّمةٍ والحساباتُ الإشرافيّة في المرحلة الثانية (وثيقةُ الرؤية §الوصول).
+ */
+function orgsPane(d: PanelData): string {
+  const orgs = d.orgs ?? []
+  const rows = orgs.map((o) => {
+    const current = o.id === d.org
+    const action = current
+      ? statusBadge('ok', '●', 'النشطة')
+      : `<form class="inline" method="POST" action="/panel/orgs/switch">
+          <input type="hidden" name="org" value="${escapeHtml(o.id)}">
+          <button class="btn" type="submit">انتقل إليها</button></form>`
+    return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td>${action}</td></tr>`
+  }).join('')
+  const kinds = ORG_KINDS.map((k) => `<option value="${k}">${ORG_KIND_LABEL[k]}</option>`).join('')
+  return `<div class="card"><h2>منظّماتك</h2>
+    <p class="hint">تدير كلَّ المنظّمات من حسابك هذا. <b>وبيانات كلّ منظّمةٍ معزولةٌ عن غيرها</b>.</p>
+    <div class="scroll"><table><thead><tr><th>المنظّمة</th><th>النوع</th><th>العلامات</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>
+  <div class="card mt-3"><h2>منظّمةٌ جديدة</h2>
+    <form method="POST" action="/panel/orgs">
+      <div class="field"><label for="org-name">الاسم</label>
+        <input id="org-name" name="name" required maxlength="${ORG_NAME_MAX}"></div>
+      <div class="field"><label for="org-kind">النوع</label>
+        <select id="org-kind" name="kind">${kinds}</select></div>
+      <button class="btn btn-primary" type="submit">أنشئ المنظّمة</button>
+    </form></div>`
 }
 
 /**
@@ -733,7 +768,7 @@ function topNew(): string {
 }
 
 /**
- * ‏**بابٌ واحدٌ للإنشاء** (D-225، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
+ * ‏**بابٌ واحدٌ للإنشاء** (D-226، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
  * ‏المالكُ أربعةَ خيارات قبل أن يعرف ماذا يريد. فصار زرًّا واحدًا يسأل «من أين تبدأ؟». وعلى العريض لا يُرسم:
  * ‏زرُّ الترويسة (`topNew`) نفسُه ظاهرٌ هناك، فلا زرّان بالاسم نفسِه في شاشةٍ واحدة.
  */
@@ -1040,7 +1075,7 @@ ${flash}
    * وسجلٌّ وقع. فلكلٍّ بطاقتُها، والعمودُ الأوّل رصّةٌ كالثاني.
    */''}
   ${/*
-   * ‏**قاعدةُ الحذف** (D-225، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
+   * ‏**قاعدةُ الحذف** (D-226، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
    * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
    */''}
   <div class="mt-3">
@@ -1312,6 +1347,9 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="mt-3">${addCard}</div>
+</div>
+<div data-sub id="orgs">
+  ${orgsPane(d)}
 </div>
 <div data-sub id="security">
   <p class="hint">العاملُ الثاني، والجلساتُ المفتوحة، وكلمةُ الإدارة. <b>والأذوناتُ مشفّرةٌ في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
