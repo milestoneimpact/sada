@@ -26,7 +26,7 @@ export const MOVED_ANCHORS: Readonly<Record<string, string>> = {
   'sub-videos': PANE_PATH.library, 'sub-images': PANE_PATH.library, vfile: PANE_PATH.library,
   accounts: PANE_PATH.accounts, channels: PANE_PATH.accounts,
   settings: PANE_PATH.settings, limits: PANE_PATH.settings, providers: PANE_PATH.settings,
-  security: PANE_PATH.settings, activity: PANE_PATH.settings, dev: PANE_PATH.settings,
+  security: PANE_PATH.settings, orgs: PANE_PATH.settings, activity: PANE_PATH.settings, dev: PANE_PATH.settings,
   factors: PANE_PATH.settings, tiles: PANE_PATH.settings,
   appearance: PANE_PATH.settings, system: PANE_PATH.settings, machine: PANE_PATH.settings,
   results: PANE_PATH.results, pivot: PANE_PATH.results,

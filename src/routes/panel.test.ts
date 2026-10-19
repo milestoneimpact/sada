@@ -5104,3 +5104,54 @@ describe('«المظهر» و«النظام» في الإعدادات (D-221)', 
     expect(system).toContain('id="machine"')
   })
 })
+
+/**
+ * حسابُ الدخول يدير كلَّ المنظّمات (D-225): يرى قائمتَها، وينشئ منظّمةً بعلامتها
+ * الأولى، وينتقل إليها — **ولا ينتقل إلى معرّفٍ لا يوجد**.
+ */
+describe('المنظّمات من حساب الدخول', () => {
+  it('منظّمةُ المالك ظاهرةٌ ونشطة', async () => {
+    const cookie = await login()
+    const html = await everyPane((p) => app.request(p, withSession(cookie), env))
+    expect(html).toContain('منظّماتك')
+    expect(html).toContain('منظّمتي')
+    expect(html).toContain('النشطة')
+  })
+
+  it('ينشئ منظّمةً ومعها علامتُها، ثمّ ينتقل إليها', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('name', 'وكالة الأفق')
+    body.set('kind', 'agency')
+    const made = await app.request('/panel/orgs', withSession(cookie, { method: 'POST', body }), env)
+    expect(made.status).toBe(303)
+    const org = db.raw.prepare("SELECT id FROM orgs WHERE name = 'وكالة الأفق'").get() as { id: string }
+    const brands = db.raw.prepare('SELECT COUNT(*) AS n FROM brands WHERE org_id = ?').get(org.id) as { n: number }
+    expect(brands.n).toBe(1)
+
+    const to = new FormData()
+    to.set('org', org.id)
+    const switched = await app.request('/panel/orgs/switch', withSession(cookie, { method: 'POST', body: to }), env)
+    expect(switched.status).toBe(303)
+    const id = cookie.split('=')[1]!
+    expect(JSON.parse((await kv.get(`session:${id}`))!).org).toBe(org.id)
+  })
+
+  it('لا ينتقل إلى منظّمةٍ غير موجودة', async () => {
+    const cookie = await login()
+    const to = new FormData()
+    to.set('org', 'org_missing')
+    await app.request('/panel/orgs/switch', withSession(cookie, { method: 'POST', body: to }), env)
+    const id = cookie.split('=')[1]!
+    expect(JSON.parse((await kv.get(`session:${id}`))!).org).toBeUndefined()
+  })
+
+  it('يرفض اسمًا فارغًا', async () => {
+    const cookie = await login()
+    const body = new FormData()
+    body.set('name', '   ')
+    body.set('kind', 'agency')
+    await app.request('/panel/orgs', withSession(cookie, { method: 'POST', body }), env)
+    expect((db.raw.prepare('SELECT COUNT(*) AS n FROM orgs').get() as { n: number }).n).toBe(1)
+  })
+})
