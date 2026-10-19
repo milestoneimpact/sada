@@ -115,6 +115,7 @@ export function planSection(input: PlanInput): string {
     return `<div class="card">
       <div class="card-head"><h2>الخطّة الأسبوعيّة</h2><div class="grow"></div>${generate}</div>
       ${emptyState({
+        echo: true,
         title: 'لا خطّةَ بعد',
         html: `نداءٌ واحدٌ يقرأ خلاصاتِ ما حُلِّل، ويقول ما يستحقّ النشر هذا الأسبوع
            وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابةُ زرٌّ لكلّ بند.`,

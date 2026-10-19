@@ -7,6 +7,7 @@
  * والكتلةُ في الوسط بعرضٍ أقصى ‏30em. **والفعلُ ثانويٌّ ما لم يُطلَب أوّليًّا**: الحالةُ
  * الفارغةُ داخل تبويبٍ في صفحةٍ لها أوّليُّها تُبقي الميزانيّةَ واحدًا (7.1).
  */
+import { echo } from '../echo'
 import { escapeHtml } from '../escape'
 
 export interface EmptyInput {
@@ -25,12 +26,22 @@ export interface EmptyInput {
    * وإلّا فسطرٌ بنمط «h3» لا يدخل مخطّطَ العناوين (الحالةُ الفارغةُ داخل قسمٍ له عنوانُه).
    */
   readonly heading?: 1
+  /**
+   * ‏**نقشُ الصدى بالنغمة الفاتحة** بدل الأيقونة (BRAND §٥ · D-223): ‏160×96، صدًى واحدٌ وشريطٌ بشفافيّة ‏0.07
+   * ‏بحبر `--ink-3`. للحالات الفارغة الستّ التي تقول «لا شيءَ بعد» حيث يبدأ المالك، و‏404 — **لا** لفرزٍ
+   * ‏لم يُبقِ شيئًا ولا لرقمٍ ولا لسطح عمل. وبينه وبين العنوان ‏24px (الحارسُ الثالث، D-222).
+   */
+  readonly echo?: true
 }
+
+/** النقشُ نفسُه في كلّ حالةٍ فارغة — حتميٌّ، فيُحسب مرّة. */
+const EMPTY_ECHO = echo({ width: 160, height: 96, tone: 'light', density: 1, ribbon: true })
 
 export function emptyState(input: EmptyInput): string {
   const attrs = `${input.id === undefined ? '' : ` id="${escapeHtml(input.id)}"`}${input.hidden === true ? ' hidden' : ''}`
   return `<div class="empty"${attrs}>${
-    input.icon === undefined ? '' : `<span class="empty-ic" aria-hidden="true">${input.icon}</span>`
+    input.echo === true ? `<span class="empty-echo" aria-hidden="true">${EMPTY_ECHO}</span>`
+    : input.icon === undefined ? '' : `<span class="empty-ic" aria-hidden="true">${input.icon}</span>`
   }${input.heading === 1
     ? `<h1 class="empty-t">${escapeHtml(input.title)}</h1>`
     : `<p class="empty-t">${escapeHtml(input.title)}</p>`}${

@@ -986,6 +986,8 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why{max-width:var(--measure);
   background:transparent; border-radius:var(--r-card)}
 .empty-t{margin:0 auto var(--s-1); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
 .empty-p{margin:0 auto var(--s-3); font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
+.empty-echo{display:block; width:160px; height:96px; margin:0 auto var(--s-6); color:var(--ink-3)}
+.empty-echo svg{width:100%; height:100%; display:block}
 .empty-ic{display:inline-flex; margin-bottom:var(--s-2); color:var(--ink-3)}
 .empty-ic svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
 
