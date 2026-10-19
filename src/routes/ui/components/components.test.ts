@@ -348,3 +348,16 @@ describe('نقلُ الأقسام إلى البطاقة (٢ج)', () => {
     expect(css.rule('.tpick:has(input:checked)')['border-color']).toBeDefined()
   })
 })
+
+describe('نقشُ الصدى في الحالة الفارغة (D-223)', () => {
+  it('النغمةُ الفاتحةُ ‏160×96 بدل الأيقونة، وبلا ذهبٍ ولا أرض، ومرّةً واحدة', () => {
+    const html = emptyState({ echo: true, icon: '<svg id="x"></svg>', title: 'لا مسوّدات بعد' })
+    expect(html).toContain('<span class="empty-echo" aria-hidden="true"><svg')
+    expect(html).toContain('data-echo="light"')
+    expect(html).toContain('viewBox="0 0 160 96"')
+    expect(html).not.toContain('id="x"')
+    expect(html).not.toContain('<rect')
+    expect((html.match(/data-echo=/g) ?? []).length).toBe(1)
+    expect(emptyState({ title: 'لا مسوّدةَ في هذا الفرز' })).not.toContain('data-echo')
+  })
+})

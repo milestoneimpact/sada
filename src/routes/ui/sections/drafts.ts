@@ -1153,6 +1153,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
   const cards =
     drafts.length === 0
       ? emptyState({
+          echo: true,
           title: 'لا مسوّدات بعد',
           html: 'اكتب واحدةً من فكرتك أو من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
           action: button({ label: 'اكتب من فكرتك', variant: 'primary', size: 'sm', href: '#idea' }),

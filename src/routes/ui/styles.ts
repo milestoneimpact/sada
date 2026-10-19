@@ -767,7 +767,7 @@ tbody tr:last-child td{border-bottom:0}
 .gt-bar.ok{background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
 .gt-bar.warn{background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .gt-bar.bad{background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
-/* ‏المجدولُ يُسحَب أفقيًّا إلى يومٍ آخر (D-223): مقبضٌ ظاهر، والتمريرُ العموديُّ يبقى للإصبع */
+/* ‏المجدولُ يُسحَب أفقيًّا إلى يومٍ آخر (D-224): مقبضٌ ظاهر، والتمريرُ العموديُّ يبقى للإصبع */
 .gt-bar[data-move]{cursor:grab; touch-action:pan-y}
 .gt-bar.pending{background:color-mix(in srgb,var(--brand) 12%,transparent); border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
 .gt-bar.idle{color:var(--ink-2); border-style:dashed}
@@ -988,6 +988,8 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why{max-width:var(--measure);
   background:transparent; border-radius:var(--r-card)}
 .empty-t{margin:0 auto var(--s-1); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
 .empty-p{margin:0 auto var(--s-3); font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
+.empty-echo{display:block; width:10rem; height:6rem; margin:0 auto var(--s-6); color:var(--ink-3)}
+.empty-echo svg{width:100%; height:100%; display:block}
 .empty-ic{display:inline-flex; margin-bottom:var(--s-2); color:var(--ink-3)}
 .empty-ic svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
 
@@ -1553,11 +1555,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .ed-x{flex:none}
 .ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
 .ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
-/* ‏**النتيجةُ قبل الردّ** (D-223): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
+/* ‏**النتيجةُ قبل الردّ** (D-224): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
 [data-pending]{position:relative}
 [data-pending] > :not(.pending-tag){opacity:.55; transition:opacity var(--dur-1)}
 [data-pending] > .pending-tag{position:absolute; z-index:1; inset-block-start:var(--s-3); inset-inline-end:var(--s-3); opacity:1}
-/* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-223) */
+/* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-224) */
 .ed-saved{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
 .draft-text.ed-txt{height:auto; min-height:calc(8 * var(--lh-body) + var(--s-6)); max-height:60vh; field-sizing:content}
@@ -2087,7 +2089,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 @media${atLeast('md')}{details.more-sheet,details.fab{display:none}}
 /* ‏«منشور جديد» في الترويسة على العريض، والعائمُ مكانه على الضيّق (D-216) */
 @media${below('md')}{details[data-tb-new]{display:none}}
-/* ‏وبابُ «المنشورات» الواحدُ على الضيّق وحدَه: على العريض يكفي زرُّ الترويسة (D-223) */
+/* ‏وبابُ «المنشورات» الواحدُ على الضيّق وحدَه: على العريض يكفي زرُّ الترويسة (D-224) */
 @media${atLeast('md')}{details[data-head-new]{display:none}}
 @media${below('sm')}{
   .scroll{overflow:visible; margin:0}
