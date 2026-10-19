@@ -10,7 +10,7 @@
 import { button } from './components/button'
 import { emptyState } from './components/empty'
 import { escapeHtml } from './escape'
-import { GLYPH_ICON, ICON } from './icons'
+import { GLYPH_ICON } from './icons'
 import { railHtml } from './rail'
 import { soloPage } from './shell'
 import { buildCommands } from './command'
@@ -25,7 +25,7 @@ export function notFoundPage(nonce: string, path: string, detail?: string): stri
   const said = detail === undefined ? '' : `${escapeHtml(detail)}. `
   const body = emptyState({
     heading: 1,
-    icon: ICON.search,
+    echo: true,
     title: 'هذه الصفحة غير موجودة',
     html: `${said}ربّما نُقلت، أو كُتب رابطُها بخطأ: <bdi class="mono">${escapeHtml(path)}</bdi>.
       ابدأ من الرئيسيّة، أو ابحث عمّا تريد بـ <kbd class="kbd">Ctrl K</kbd>.`,

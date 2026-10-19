@@ -856,6 +856,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
     <h3 class="sec">الحساباتُ وما تستطيعه</h3>
     ${accounts.length === 0
       ? emptyState({
+          echo: true,
           title: 'لا حسابَ مربوطا',
           html: state === 'awaiting_owner'
             ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'

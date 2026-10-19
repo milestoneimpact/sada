@@ -354,7 +354,7 @@ export function videosSection(
       <span class="ago" id="vup-msg" aria-live="polite"></span>
     </div>
     ${uploads.length === 0
-      ? emptyState({ title: 'لا مقطعَ بعد', html: 'ارفع مقطعًا، ثمّ صفه بجملةٍ نكتب منها نصوصَه، واختر منصّاته.' })
+      ? emptyState({ echo: true, title: 'لا مقطعَ بعد', html: 'ارفع مقطعًا، ثمّ صفه بجملةٍ نكتب منها نصوصَه، واختر منصّاته.' })
       : `<div class="vlist">${uploads.map((u) => row(u, now, cards, ctx)).join('')}</div>`}
   </div>`
 }

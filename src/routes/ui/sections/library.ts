@@ -27,6 +27,7 @@ function snippet(text: string): string {
 export function imagesGallery(images: readonly MediaView[], drafts: readonly GalleryDraft[]): string {
   if (images.length === 0) {
     return emptyState({
+      echo: true,
       title: 'لا صورةَ بعد',
       html: 'تُولَّد الصورةُ من بطاقة المسوّدة في «المنشورات» — <b>وهي نداءٌ مدفوع</b>، فلا تقع وحدَها.',
     })
