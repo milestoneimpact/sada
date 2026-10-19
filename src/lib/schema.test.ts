@@ -174,3 +174,33 @@ describe('أرقامُ الترحيلات تسلسلٌ لا يتكرّر', () =>
       .toEqual(names.map((_, i) => `${String(i + 1).padStart(4, '0')}_`))
   })
 })
+
+/**
+ * **كلُّ صفٍّ قائمٍ يُنسَب إلى المالك الحاليّ** (D-223).
+ *
+ * أُضيف `org_id` و`brand_id` بقيمةٍ افتراضيّةٍ هي منظّمةُ المالك وعلامتُه. فصفٌّ
+ * يُكتَب بالشيفرة الحاليّة — التي لا تعرف المنظّمة بعد — يقع في منظّمته لا في فراغ.
+ */
+describe('أساسُ تعدّد المستأجرين', () => {
+  it('منظّمةُ المالك وعلامتُه موجودتان', () => {
+    const db = fakeDb()
+    const org = db.raw.prepare("SELECT kind FROM orgs WHERE id = 'org_owner'").get() as { kind: string } | undefined
+    const brand = db.raw.prepare("SELECT org_id FROM brands WHERE id = 'brand_owner'").get() as { org_id: string } | undefined
+    expect(org?.kind).toBe('individual')
+    expect(brand?.org_id).toBe('org_owner')
+  })
+
+  it('صفٌّ يُكتَب بلا منظّمةٍ يُنسَب إلى المالك', () => {
+    const db = fakeDb()
+    db.raw.prepare("INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 'f1', 'n', 'text/plain', 'h')").run()
+    const row = db.raw.prepare("SELECT org_id, brand_id FROM sources WHERE id = 's1'").get() as { org_id: string; brand_id: string }
+    expect(row).toEqual({ org_id: 'org_owner', brand_id: 'brand_owner' })
+  })
+
+  it('جداولُ العمل كلُّها تحمل org_id', () => {
+    const tables = ['accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
+      'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger', 'audit_log',
+      'reports', 'token_alerts', 'media_claims', 'alert_outbox', 'oauth_apps', 'uploads', 'media']
+    for (const t of tables) expect(schemaOf(t), t).toContain('org_id')
+  })
+})
