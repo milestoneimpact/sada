@@ -73,7 +73,7 @@ function barHtml(bar: GanttBar, isPlan: boolean, zone: string | null): string {
   const mark = bar.mark === null
     ? ''
     : `<i class="gt-mark ${bar.tone}" style="inset-inline-start:${bar.mark}%" aria-hidden="true"></i>`
-  // ‏**المجدولُ يُسحَب** (D-226، من Later): شريطُه يحمل معرّفَه وموعدَه، فيُنقل بالسحب يومًا أو أكثر بساعته نفسِها
+  // ‏**المجدولُ يُسحَب** (D-227، من Later): شريطُه يحمل معرّفَه وموعدَه، فيُنقل بالسحب يومًا أو أكثر بساعته نفسِها
   const move = !isPlan && bar.status === 'queued' && bar.at !== null
     ? ` data-move="${escapeHtml(bar.id)}" data-at="${escapeHtml(bar.at)}"`
     : ''
@@ -194,7 +194,7 @@ export function timelineTitle(): string {
 }
 
 /**
- * ‏**سحبُ المجدول إلى يومٍ آخر** (D-226، من Later): كان تغييرُ الموعد ستَّ خطوات (ر-9). فالشريطُ المعلَّم `data-move`
+ * ‏**سحبُ المجدول إلى يومٍ آخر** (D-227، من Later): كان تغييرُ الموعد ستَّ خطوات (ر-9). فالشريطُ المعلَّم `data-move`
  * ‏يُسحَب أفقيًّا، ويُحسَب الفرقُ أيّامًا كاملة من عرض اليوم في المسار، والساعةُ تبقى. وعند الإفلات يُرسَل نموذجُ
  * ‏`reschedule` نفسُه بـ`when` (UTC)، **والخادمُ الحَكَم** بحرّاسه كما في المحرّر. ونقرةٌ بلا سحبٍ تفتح الرحلةَ كما كانت.
  */

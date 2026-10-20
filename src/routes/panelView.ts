@@ -32,7 +32,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
-import { brandMoment } from './ui/moment'
+import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
@@ -768,7 +768,7 @@ function topNew(): string {
 }
 
 /**
- * ‏**بابٌ واحدٌ للإنشاء** (D-226، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
+ * ‏**بابٌ واحدٌ للإنشاء** (D-227، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
  * ‏المالكُ أربعةَ خيارات قبل أن يعرف ماذا يريد. فصار زرًّا واحدًا يسأل «من أين تبدأ؟». وعلى العريض لا يُرسم:
  * ‏زرُّ الترويسة (`topNew`) نفسُه ظاهرٌ هناك، فلا زرّان بالاسم نفسِه في شاشةٍ واحدة.
  */
@@ -1040,6 +1040,7 @@ ${flash}
     * المنصّاتُ الخمس. والمالُ وصحّةُ الدورات بعدها — كانت أوّلَ الشاشة فقال
     * المالك «لا أجد المراحل».
     */''}
+  ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${homeTop({
     channels: d.channels,
     counts: d.journey,
@@ -1075,7 +1076,7 @@ ${flash}
    * وسجلٌّ وقع. فلكلٍّ بطاقتُها، والعمودُ الأوّل رصّةٌ كالثاني.
    */''}
   ${/*
-   * ‏**قاعدةُ الحذف** (D-226، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
+   * ‏**قاعدةُ الحذف** (D-227، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
    * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
    */''}
   <div class="mt-3">
