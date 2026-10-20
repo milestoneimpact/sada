@@ -897,11 +897,13 @@ export function platformScreen(d: PlatformScreenData): string {
       <div class="aside"><div class="plat-logo lg">${logo}</div></div>
     </div>
     <div class="card">
-      <h2>لماذا لا يكفي أن يُضاف من اللوحة</h2>
-      <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
-        (<span class="mono">chat/completions</span>)، فسائق واحد يغطّي مَن لم يُخترَع بعد.
-        <b>والمنصّات الاجتماعيّة لا لهجة لها مشتركة</b> — فحقل «عنوان API» لا يكفيها،
-        <b>ولوحة تعرض حقلا يوهم بأنّه يكفي تكذب</b>.</p>
+      <h2>لماذا لا تُضاف من اللوحة</h2>
+      <p class="hint">لكلّ منصّةٍ طريقتُها في النشر، فتُبنى في صدى واحدةً واحدة.
+        <b>وحقلٌ في اللوحة يوهم بأنّه يكفي لا يكفي</b>، فلا نعرضه.</p>
+      <details class="setup mt-2"><summary>للمطوّر</summary>
+        <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
+          (<span class="mono">chat/completions</span>)، فسائقٌ واحد يغطّيهم. والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة.</p>
+      </details>
       <div class="outcome warn"><span class="kv-k">ما ينقص</span>
         <span class="kv-v">${escapeHtml(spec.note)}</span></div>
     </div>`
@@ -931,6 +933,6 @@ export function platformScreen(d: PlatformScreenData): string {
   ${zoneNote}
   ${body}
   ${d.tab === 'posts' || d.tab === 'waiting'
-    ? '<p class="np-note">المعاينة ببنية المنصّة وخطّ صدى، لا لقطة منها. والنصّ مختصر هنا للتصفّح؛ والطيّ عند المنصّة لم يُقَس فلا يُرسم.</p>'
+    ? '<p class="np-note">المعاينة ببنية المنصّة وخطّ صدى، لا لقطة منها، والنصّ مختصر هنا للتصفّح.</p>'
     : ''}`
 }

@@ -642,7 +642,7 @@ function todayList(d: PanelData): string {
     .join('')
   const more = d.today.more === 0 ? '' : `<p class="hint">و${d.today.more} غيرُها اليوم — في سجلّ الأمان.</p>`
   return `<div class="card"><h2>ما وقع اليوم</h2>
-      <p class="hint">يُروى ممّا قُرئ — ولا يُفتَح له استعلام</p>
+      <p class="hint">من سجلّ النشاط، منذ الثالثة فجرًا بتوقيت الرياض</p>
       ${rows === ''
         ? emptyState({ title: 'لم يقع شيء بعد', html: 'منذ الثالثة فجرًا بتوقيت الرياض.' })
         : `<ul class="todo">${rows}</ul>${more}`}</div>`
@@ -814,7 +814,8 @@ function headNew(): string {
 
 function fabNew(): string {
   const items = [
-    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّة من ملفّ'],
+    // ‏بمسار «/panel» لا بمرساةٍ وحدها: الزرُّ في كلّ صفحة، و«#idea» في «المكتبة» لا هدفَ لها (EASE-PLAN أ-1)
+    ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
   return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
@@ -1341,19 +1342,16 @@ ${pivotPane(d.pivot)}
       d.slide.missing.length === 0
       ? '<div class="sub mt-3">مفتاح المتصفّح ومعرّف الحساب مضبوطان.'
         + ' وكلّ لقطة تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
-      : d.slide.missing.includes('key')
-        ? `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
-          <span class="mono">CF_BROWSER_TOKEN</span> غير مضبوط في أسرار Worker${
-            d.slide.missing.includes('account')
-              ? '، ومعه <span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّراته'
-              : ''}،
-          <b>فلا يقع نداء ولا كلفة</b> — وتخرج الصورة بلا عنوان مهما كان هذا المفتاح مرفوعا.
-          وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
-          <b>وهي غير صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`
-        : `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
-          مفتاح المتصفّح في أسرار Worker، و<span class="mono">CF_AI_ACCOUNT_ID</span> غير مضبوط
-          في متغيّراته — <b>واللقطة تُنادى على حساب بعينه</b>، فلا يقع نداء ولا كلفة،
-          وتخرج الصورة بلا عنوان. وتفصيلُه في «ما عليك».</span></div>`}
+      : `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
+          ${d.slide.missing.includes('key')
+            ? (d.slide.missing.includes('account') ? 'مفتاحُ المتصفّح ومعرّفُ الحساب' : 'مفتاحُ المتصفّح')
+            : 'معرّفُ الحساب'}،
+          <b>فلا يقع نداءٌ ولا كلفة</b>، وتخرج الصورة بلا عنوان. وخطواتُه في «ما عليك».</span></div>
+        <details class="setup mt-2"><summary>للمطوّر</summary>
+          <p class="hint">${d.slide.missing.includes('key')
+            ? '<span class="mono">CF_BROWSER_TOKEN</span> في أسرار Worker، وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span> لا صلاحيّة Workers AI. '
+            : ''}${d.slide.missing.includes('account') ? '<span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّرات Worker.' : ''}</p>
+        </details>`}
   </div>
 </div>
 <div data-sub id="providers">
@@ -1461,10 +1459,12 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="card mt-3"><h2>إبطال كلّ الجلسات</h2>
-    <p class="hint m-0"><b>تدوير <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
-      فهو لم يعد كلمة تُكتب في الدخول، لكنّ كلّ جلسة مربوطة ببصمته وتُفحص في كلّ طلب — جلسة البريد ومفتاح المرور معا.
-      فإن شككت في تسرّب فبدّله
-      بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
+    <p class="hint m-0"><b>إن شككت في تسرّب فأغلق كلّ الجلسات الآن</b> من «الأجهزة المفتوحة» أعلاه،
+      وادخل ثانيةً بالبريد أو بمفتاح المرور. ولا حاجة إلى انتظار انتهاء الجلسات.</p>
+    <details class="setup mt-2"><summary>للمطوّر</summary>
+      <p class="hint">وتدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلَّ الجلسات على كلّ جهاز معًا، لأنّ كلّ جلسةٍ مربوطةٌ ببصمته:
+        <span class="mono">wrangler secret put ADMIN_TOKEN</span>.</p>
+    </details>
   </div>
 
 </div>

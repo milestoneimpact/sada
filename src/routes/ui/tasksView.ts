@@ -58,14 +58,14 @@ function commandBox(r: OwnerRow, env: string): string {
   if (r.secrets === undefined || r.secrets.length === 0 || r.state === true) return ''
   const id = `cmd-${r.code}`
   const text = r.secrets.map((n) => secretCommand(n, env)).join('\n')
-  return `<div class="cmd">
+  return `<details class="setup cmd"><summary>للمطوّر</summary>
       <label class="sub" for="${escapeHtml(id)}">من جذر المستودع، بعد <span class="mono">npx wrangler login</span>:</label>
       <div class="row gap-2">
         <textarea class="mono cmd-text" id="${escapeHtml(id)}" rows="${r.secrets.length}" readonly
                   spellcheck="false">${escapeHtml(text)}</textarea>
         <button class="btn btn-secondary btn-sm" type="button" data-copy="${escapeHtml(id)}">انسخ الأمر</button>
       </div>
-    </div>`
+    </details>`
 }
 
 function row(r: OwnerRow, env: string): string {

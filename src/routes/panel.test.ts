@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { codeFrom, emailLogin, fakeMailer, requestCode } from '../test/emailLogin'
 import { CODE_SENT_NOTE } from './panelView'
-import { everyPane } from '../test/panelPages'
+import { everyPane, PANEL_PAGES } from '../test/panelPages'
+import { anchorPath } from '../lib/nav/panes'
 import { toBase64 } from '../lib/crypto'
 import { fingerprint } from '../lib/security/digest'
 import { readSettings, writeSetting } from '../lib/settings'
@@ -862,7 +863,7 @@ describe('رؤوس الألواح (D-137)', () => {
     expect(libPane).toContain('<div data-sub id="sub-images">')
     // ‏و«منشور جديد» العائمُ بأبواب الكتابة الأربعة (D-208)، ومراسيها في اللوحة نفسِها
     const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
-    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#idea', '#write', '/panel/library#videos', '#plan-import'])
+    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel/library#videos', '/panel#plan-import'])
     for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
     // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
     const dev = html.slice(html.indexOf('<div data-sub id="dev">'), html.indexOf('<div data-sub id="activity">'))
@@ -3744,15 +3745,18 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0001'
     const html = await panelHtml()
     expect(html).toContain('<span class="ago">بلا معرّف حساب Cloudflare</span>')
-    expect(html).toContain('<span class="mono">CF_AI_ACCOUNT_ID</span> غير مضبوط')
-    expect(html).not.toContain('<span class="mono">CF_BROWSER_TOKEN</span> غير مضبوط')
+    expect(html).toContain('<span class="kv-v">\n          معرّفُ الحساب،')
+    expect(html).toContain('<span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّرات Worker')
+    expect(html).not.toContain('<span class="mono">CF_BROWSER_TOKEN</span> في أسرار')
     expect(html).not.toContain('مضبوطان')
     expect(html).not.toContain('سرّ-المتصفّح-0001')
   })
 
   it('وبطاقة «النصّ فوق الصورة» بفروعها الثلاثة — لا تقول «مضبوط» إلّا للاثنين', async () => {
     const none = await panelHtml()
-    expect(none).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غير مضبوط في أسرار Worker، ومعه')
+    expect(none).toContain('مفتاحُ المتصفّح ومعرّفُ الحساب،')
+    // ‏والأسماءُ تحت «للمطوّر» لا في وجه المالك
+    expect(none).toMatch(/<summary>للمطوّر<\/summary>\s*<p class="hint"><span class="mono">CF_BROWSER_TOKEN<\/span>/)
 
     env['CF_BROWSER_TOKEN'] = 'b-0001'
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
@@ -3761,7 +3765,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     // ومسافاتٌ وحدها غيابٌ كما هي عند `composeSlide`
     env['CF_BROWSER_TOKEN'] = '   '
     const blank = await panelHtml()
-    expect(blank).toContain('<span class="mono">CF_BROWSER_TOKEN</span> غير مضبوط في أسرار Worker،')
+    expect(blank).toContain('<span class="mono">CF_BROWSER_TOKEN</span> في أسرار Worker')
     expect(blank).not.toContain('مضبوطان')
   })
 
@@ -5306,5 +5310,30 @@ describe('الدخول برمز البريد (D-245)', () => {
   it('والجلسة ثلاثة أيّام', async () => {
     const response = await emailLogin(app, env)
     expect(response.headers.get('Set-Cookie')).toContain(`Max-Age=${3 * 24 * 60 * 60}`)
+  })
+})
+
+describe('لا رابطَ ميّتًا داخل اللوحة (EASE-PLAN أ-1)', () => {
+  it('كلُّ مرساةٍ في كلّ صفحةٍ تصل إلى معرّفٍ موجود — في صفحتها أو في الصفحة التي انتقل إليها', async () => {
+    const cookie = await login()
+    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/timeline']
+    const html = new Map<string, string>()
+    for (const p of pages) html.set(p, await (await app.request(p, withSession(cookie), env)).text())
+    const ids = (page: string): Set<string> =>
+      new Set([...(html.get(page) ?? '').matchAll(/\s(?:id|data-pane)="([^"]+)"/g)].map((m) => m[1]!))
+
+    const dead: string[] = []
+    for (const [page, body] of html) {
+      for (const m of body.matchAll(/href="((?:\/panel[^"#?]*)?)(?:\?[^"#]*)?#([^"]+)"/g)) {
+        const [, path, anchor] = m
+        if (anchor === undefined || anchor === 'main') continue
+        const here = path === '' || path === undefined ? page : path
+        // ‏مرساةٌ في /panel انتقلت إلى صفحةٍ أخرى تُتبَع كما يتبعها الخادمُ والمتصفّح
+        const target = here === '/panel' && !ids('/panel').has(anchor) ? (anchorPath(anchor) ?? here) : here
+        if (!html.has(target)) continue
+        if (!ids(target).has(anchor)) dead.push(`${page}: href="${path ?? ''}#${anchor}" ← لا #${anchor} في ${target}`)
+      }
+    }
+    expect(dead).toEqual([])
   })
 })
