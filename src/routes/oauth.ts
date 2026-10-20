@@ -17,12 +17,14 @@ import { platformLabel, PROVIDERS, redirectUri, type Platform } from '../lib/oau
 import { readApp } from '../lib/oauth/apps'
 import { parseGranted, scopeSet, type ScopeMode } from '../lib/oauth/scopes'
 import { consumeState, saveState, StateError } from '../lib/oauth/state'
-import { saveTokens, upsertAccount } from '../lib/tokens'
+import { AccountElsewhere, saveTokens, upsertAccount } from '../lib/tokens'
+import { loadSession } from '../lib/session'
+import { activeOrg, OWNER_ORG } from '../lib/tenancy'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
-import { connectedBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
+import { connectedBody, elsewhereBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
 import { setFlash } from './panel'
 
 /**
@@ -124,6 +126,12 @@ function scopeModeOf(raw: string | undefined): ScopeMode {
   return raw === 'identity' ? 'identity' : 'full'
 }
 
+/** منظّمةُ من بدأ الربط؛ وبلا جلسةٍ (نداءُ طرفيّة) فالمالك (D-229). */
+async function startingOrg(env: Env, request: Request): Promise<string> {
+  const session = await loadSession(env.KV, request, env.ADMIN_TOKEN)
+  return session === null ? OWNER_ORG : activeOrg(session.record)
+}
+
 oauth.get('/oauth/:platform/start', async (c) => {
   const platform = platformOf(c.req.param('platform'))
   if (platform === null) return c.json({ error: 'unknown_platform' }, 404)
@@ -155,6 +163,7 @@ oauth.get('/oauth/:platform/start', async (c) => {
     // ما طُلب في **هذه** الدورة يُحفظ معها: صفحةُ التشخيص تعرضه، وما
     // يُسجَّل في القاعدة يُبنى عليه — والحارسُ يقرأ من القاعدة
     scopes: scopes.join(' '),
+    org: await startingOrg(c.env, c.req.raw),
   })
 
   const url = new URL(provider.authorizeUrl)
@@ -243,7 +252,7 @@ oauth.get('/oauth/:platform/callback', async (c) => {
 
     const identity = await fetchIdentity(provider, tokens.accessToken)
     stage = 'save'
-    const id = await upsertAccount(c.env.DB, identity)
+    const id = await upsertAccount(c.env.DB, saved.org ?? OWNER_ORG, identity)
     await saveTokens(c.env.DB, c.env.TOKEN_ENC_KEY, id, tokens)
 
     // لا رمزَ في الصفحة ولا في عنوانها: اسمٌ وحالُ نطاقاتٍ لا أكثر
@@ -271,6 +280,10 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     // ‏**وسرّان حُذفا بين الذهاب والعودة: صفحةٌ لا وميض** (مراجعة ر-1). العودةُ تحويلٌ من
     // ‏نطاق المنصّة، وكعكةُ الجلسة `SameSite=Strict` لا تعبره — فوميضٌ هنا لا يُكتب، وتبويبُ
     // ‏الإعداد بعده يُفتح بلا كعكةٍ على صفحة الدخول. والسببُ في السجلّ بلا قيمة.
+    if (error instanceof AccountElsewhere) {
+      console.warn({ route: 'oauth.callback', platform, stage, failed: 'account_elsewhere' })
+      return resultPage('صدى — لم يكتمل الربط', elsewhereBody(platform, error.displayName), 400)
+    }
     if (error instanceof NotConfigured) {
       console.error({ route: 'oauth.callback', platform, stage, failed: 'not_configured' })
       return resultPage('صدى — لم يكتمل الربط', unconfiguredBody(platform), 503)

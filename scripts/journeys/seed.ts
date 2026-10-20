@@ -67,10 +67,10 @@ export async function seed(
   await saveApp(db, encKey, 'youtube', '000000-local.apps.googleusercontent.com', 'GOCSPX-local-fake-secret', 'seed')
 
   // ── الحسابات ──────────────────────────────────────────────────────────
-  const linkedin = await upsertAccount(db, { platform: 'linkedin', kind: 'member', externalId: 'li-local-omar', displayName: 'عمر' })
-  const x = await upsertAccount(db, { platform: 'x', kind: 'member', externalId: '1700000000000000000', displayName: 'omar_sada' })
+  const linkedin = await upsertAccount(db, 'org_owner', { platform: 'linkedin', kind: 'member', externalId: 'li-local-omar', displayName: 'عمر' })
+  const x = await upsertAccount(db, 'org_owner', { platform: 'x', kind: 'member', externalId: '1700000000000000000', displayName: 'omar_sada' })
   // ‏والقناةُ `org` كما يحفظها الربطُ الحقيقيّ (`identity.ts`) — بذرةٌ بـ`member` أخفت إسقاطَها من الجدولة
-  const youtube = await upsertAccount(db, { platform: 'youtube', kind: 'org', externalId: 'UClocal0omar', displayName: 'عمر — القناة' })
+  const youtube = await upsertAccount(db, 'org_owner', { platform: 'youtube', kind: 'org', externalId: 'UClocal0omar', displayName: 'عمر — القناة' })
   const tokens = {
     [linkedin]: { scopes: 'openid profile w_member_social', life: 55 * DAY, refresh: null },
     [x]: { scopes: 'tweet.read tweet.write users.read offline.access media.write', life: 2 * HOUR, refresh: 'local-fake-x-refresh' },

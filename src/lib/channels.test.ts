@@ -78,16 +78,22 @@ describe('السجلّ', () => {
 })
 
 describe('listAccounts', () => {
+  it('منظّمةٌ لا ترى حساباتِ غيرها (D-229)', async () => {
+    await seed('linkedin')
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    expect(await listAccounts(db, 'org_b')).toEqual([])
+  })
+
   it('يقرأ ما رُبط', async () => {
     await seed('linkedin')
-    const rows = await listAccounts(db)
+    const rows = await listAccounts(db, 'org_owner')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ platform: 'linkedin', displayName: 'عمر', status: 'active' })
   })
 
   it('ويحمل موعدَ انتهاء الرمز من جانبه — و`null` حين لا رمز (D-126)', async () => {
     await seed('linkedin')
-    const bare = await listAccounts(db)
+    const bare = await listAccounts(db, 'org_owner')
     expect(bare[0]!.expiresAt).toBeNull()
     await db
       .prepare(
@@ -96,13 +102,13 @@ describe('listAccounts', () => {
       )
       .bind(bare[0]!.id)
       .run()
-    const withToken = await listAccounts(db)
+    const withToken = await listAccounts(db, 'org_owner')
     expect(withToken[0]!.expiresAt).toBe('2026-09-20 00:00:00')
   })
 
   it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE accounts')
-    expect(await listAccounts(db)).toEqual([])
+    expect(await listAccounts(db, 'org_owner')).toEqual([])
   })
 })
 
@@ -133,7 +139,7 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
 
   it('حسابٌ مربوط: مربوطة', async () => {
     await seed('linkedin')
-    const views = viewChannels(await listAccounts(db), ALL)
+    const views = viewChannels(await listAccounts(db, 'org_owner'), ALL)
     const linkedin = views.find((v) => v.spec.id === 'linkedin')
     expect(linkedin?.state).toBe('linked')
     expect(linkedin?.accounts).toHaveLength(1)
@@ -142,19 +148,19 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
   it('**رمزٌ انتهى يغلب المربوط** — لأنّه يوقف النشر صامتا', async () => {
     await seed('linkedin', 'active', 'member', 'الأوّل')
     await seed('linkedin', 'needs_reauth', 'org', 'الصفحة')
-    const view = viewChannels(await listAccounts(db), ALL).find((v) => v.spec.id === 'linkedin')
+    const view = viewChannels(await listAccounts(db, 'org_owner'), ALL).find((v) => v.spec.id === 'linkedin')
     expect(view?.state).toBe('needs_reauth')
   })
 
   it('**والمربوطُ يغلب نقصَ السرّ** — الحسابُ قائمٌ والمالك يريد أن يعرف', async () => {
     await seed('linkedin')
-    const view = viewChannels(await listAccounts(db), NONE).find((v) => v.spec.id === 'linkedin')
+    const view = viewChannels(await listAccounts(db, 'org_owner'), NONE).find((v) => v.spec.id === 'linkedin')
     expect(view?.state).toBe('linked')
   })
 
   it('المسحوبُ لا يُعدّ حسابا', async () => {
     await seed('x', 'revoked')
-    const view = viewChannels(await listAccounts(db), ALL).find((v) => v.spec.id === 'x')
+    const view = viewChannels(await listAccounts(db, 'org_owner'), ALL).find((v) => v.spec.id === 'x')
     expect(view?.accounts).toHaveLength(0)
     expect(view?.state).toBe('connectable')
   })
@@ -171,7 +177,7 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
 
   it('لا يخلط حساب منصّةٍ بأخرى', async () => {
     await seed('x')
-    const views = viewChannels(await listAccounts(db), ALL)
+    const views = viewChannels(await listAccounts(db, 'org_owner'), ALL)
     expect(views.find((v) => v.spec.id === 'x')?.accounts).toHaveLength(1)
     expect(views.find((v) => v.spec.id === 'linkedin')?.accounts).toHaveLength(0)
   })
@@ -209,7 +215,7 @@ describe('linkStates — أمتّصلةٌ هي، بحكم الجدولة', () =>
     await seed('x', 'needs_reauth')
     await seed('linkedin', 'active', 'org')
     await seed('instagram', 'revoked')
-    const states = linkStates(await listAccounts(db))
+    const states = linkStates(await listAccounts(db, 'org_owner'))
     expect(states['youtube']).toBe('linked')
     expect(states['x']).toBe('relink')
     expect(states['linkedin']).toBe('none')
@@ -217,6 +223,6 @@ describe('linkStates — أمتّصلةٌ هي، بحكم الجدولة', () =>
     expect(states['tiktok']).toBe('none')
     // ‏وحسابٌ نشطٌ يغلب آخرَ انقطع على المنصّة نفسِها
     await seed('x', 'active')
-    expect(linkStates(await listAccounts(db))['x']).toBe('linked')
+    expect(linkStates(await listAccounts(db, 'org_owner'))['x']).toBe('linked')
   })
 })
