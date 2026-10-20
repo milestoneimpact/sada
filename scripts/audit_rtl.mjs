@@ -48,10 +48,11 @@
  * الاستعمال:  node scripts/audit_rtl.mjs [--self-test]
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { sheetFiles } from './sheet.mjs'
 import { join } from 'node:path'
 
 const ROOT = new URL('../src/', import.meta.url).pathname
-const SHEETS = ['routes/ui/styles.ts', 'routes/ui/tokens.ts']
+const SHEETS = [...sheetFiles(ROOT).map((f) => f.slice(ROOT.length)), 'routes/ui/tokens.ts']
 
 /** ملفّاتٌ يُعفى وسمُها — **وبسطرٍ يقول لماذا**. */
 const EXEMPT = new Map([

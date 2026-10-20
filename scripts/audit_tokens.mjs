@@ -31,6 +31,7 @@
  * الاستعمال:  node scripts/audit_tokens.mjs  [--self-test: يزرع ظلالًا مغبَّشةً وذهبًا باسمٍ ثانٍ ويتأكّد أنّها تُمسَك]
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { SHEET_RE, sheetSource } from './sheet.mjs'
 import ts from 'typescript'
 import { join } from 'node:path'
 
@@ -189,7 +190,7 @@ function goldFindings(sheets, tokensCss) {
   const any = new RegExp(`var\\(\\s*(${[...gold].map((n) => n.replace(/-/g, '\\-')).join('|')})\\s*\\)`)
   let count = 0
   for (const { short, code } of sheets) {
-    if (!/ui\/styles\.ts$/.test(short)) {
+    if (!SHEET_RE.test(short)) {
       // ‏ولا ذهبَ خارج الورقة: سمةُ «style» في وسمٍ لا يراها هذا الحارس ولا يعدّها
       if (any.test(code)) out.push(`ذهبٌ خارج الورقة — ${short}`)
       continue
@@ -431,7 +432,7 @@ for (const file of files) {
  */
 const PX_MAX = 40
 const PX_TARGET = 60
-const sheetPx = (strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
+const sheetPx = (strip(sheetSource(SRC))
   .match(/(?<![\w.-])-?\d*\.?\d+px\b/g) ?? []).length
 const pxOver = sheetPx > PX_MAX ? [`${sheetPx} قيمةَ px حرفيّةً في styles.ts — والسقفُ ${PX_MAX} (الهدفُ ${PX_TARGET})`] : []
 
@@ -449,7 +450,7 @@ const ICON_SIZE_EXEMPT = new Map([
 const iconSizes = []
 let iconRules = 0
 {
-  const sheet = strip(readFileSync(`${SRC}routes/ui/styles.ts`, 'utf8'))
+  const sheet = strip(sheetSource(SRC))
   for (const m of sheet.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     const sel = m[1].trim().split('\n').pop().trim()
     if (!/(^|[\s>,])svg(\b|$)/.test(sel)) continue

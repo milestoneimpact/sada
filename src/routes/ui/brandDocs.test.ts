@@ -7,7 +7,7 @@
  * الفحص الذي يطبعه، والوصفُ من الملفّ الذي يرسمه، والنسبةُ من القسم الذي قاسها.
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { OWNER_TASKS } from '../../lib/owner'
 import { echo } from './echo'
@@ -15,6 +15,10 @@ import { MARK, THEME } from './tokens'
 
 const ROOT = new URL('../../../', import.meta.url)
 const read = (path: string): string => readFileSync(new URL(path, ROOT), 'utf8')
+/** مصدرُ ورقة الأنماط بتعليقاته: `styles.ts` ووحداتُه بترتيبها (`scripts/split_styles.mjs`). */
+const STYLE_SOURCE = [read('src/routes/ui/styles.ts'),
+  ...readdirSync(new URL('src/routes/ui/styles/', ROOT)).filter((f) => /^\d\d-[a-z]+\.ts$/.test(f)).sort()
+    .map((f) => read(`src/routes/ui/styles/${f}`))].join('\n')
 /** علامةُ الاتّجاه قبل الأرقام (U+200F) لا تُقرأ — تُمحى قبل المطابقة. */
 const plain = (s: string): string => s.replace(/‏/g, '')
 /** ما بين عنوانين — من أوّل سطرٍ يطابق `from` إلى أوّل سطرٍ يطابق `to` بعده (أو النهاية). */
@@ -136,7 +140,7 @@ describe('وثائقُ D-196 تقول ما تفعله الشيفرة (مراجع
   })
 
   it('شرحُ «.glyph» بلون العلامة اليوم ونسبتِه المحسوبة، وميزانيّةُ الذهب باسمها', () => {
-    const styles = read('src/routes/ui/styles.ts')
+    const styles = STYLE_SOURCE
     const lum = (hex: string): number => {
       const v = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255)
         .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
