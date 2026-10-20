@@ -129,25 +129,25 @@ async function rows(db: Db, sql: string, ...binds: unknown[]): Promise<TimelineR
 }
 
 /** المجدولُ بموعده تصاعديًّا — **الأقربُ أوّلا**. */
-export function upcoming(db: Db, platform: Platform, limit = 60): Promise<TimelineRow[]> {
+export function upcoming(db: Db, org: string, platform: Platform, limit = 60): Promise<TimelineRow[]> {
   return rows(
     db,
     `SELECT ${COLUMNS} ${JOINS}
-      WHERE p.platform = ? AND p.status = 'queued'
+      WHERE p.platform = ? AND p.org_id = ? AND p.status = 'queued'
       ORDER BY p.scheduled_at ASC, p.id ASC LIMIT ?`,
-    platform, limit,
+    platform, org, limit,
   )
 }
 
 /** ما ينتظر المالك: مسوّداتٌ تنتظر القرار، ومعتمَدٌ بلا موعد — الأقدمُ أوّلا. */
-export function waiting(db: Db, platform: Platform, limit = 40): Promise<TimelineRow[]> {
+export function waiting(db: Db, org: string, platform: Platform, limit = 40): Promise<TimelineRow[]> {
   return rows(
     db,
     `SELECT ${COLUMNS} ${JOINS}
-      WHERE p.platform = ?
+      WHERE p.platform = ? AND p.org_id = ?
         AND (p.status = 'draft' OR (p.status IN ('approved', 'edited') AND p.scheduled_at IS NULL))
       ORDER BY CASE p.status WHEN 'draft' THEN 0 ELSE 1 END, p.created_at ASC LIMIT ?`,
-    platform, limit,
+    platform, org, limit,
   )
 }
 
@@ -174,6 +174,7 @@ export interface HistoryPage {
  */
 export async function history(
   db: Db,
+  org: string,
   platform: Platform,
   filter: HistoryFilter,
   cursor: { at: string; id: string } | null,
@@ -183,10 +184,10 @@ export async function history(
   const found = await rows(
     db,
     `SELECT * FROM (SELECT ${COLUMNS} ${JOINS}
-        WHERE p.platform = ? AND p.status IN ${statuses})
+        WHERE p.platform = ? AND p.org_id = ? AND p.status IN ${statuses})
       WHERE ? IS NULL OR sort_at < ? OR (sort_at = ? AND id < ?)
       ORDER BY sort_at DESC, id DESC LIMIT ?`,
-    platform, cursor?.at ?? null, cursor?.at ?? null, cursor?.at ?? null, cursor?.id ?? null, limit + 1,
+    platform, org, cursor?.at ?? null, cursor?.at ?? null, cursor?.at ?? null, cursor?.id ?? null, limit + 1,
   )
   const page = found.slice(0, limit)
   const last = page[page.length - 1]
@@ -234,7 +235,7 @@ export interface PlatformCounts {
 }
 
 /** أعدادُ المنصّة في استعلامٍ واحد — لشريط «ما تطلبه» والتبويبات. */
-export async function platformCounts(db: Db, platform: Platform, clip: boolean): Promise<PlatformCounts> {
+export async function platformCounts(db: Db, org: string, platform: Platform, clip: boolean): Promise<PlatformCounts> {
   try {
     const row = await db
       .prepare(
@@ -246,9 +247,9 @@ export async function platformCounts(db: Db, platform: Platform, clip: boolean):
                 coalesce(sum(status IN ('draft', 'approved', 'edited', 'queued') AND NOT EXISTS (
                   SELECT 1 FROM media m WHERE m.post_id = posts.id AND m.status = 'ready'
                      AND m.mime LIKE ?)), 0) AS missing_media
-           FROM posts WHERE platform = ?`,
+           FROM posts WHERE platform = ? AND org_id = ?`,
       )
-      .bind(clip ? 'video/%' : 'image/%', platform)
+      .bind(clip ? 'video/%' : 'image/%', platform, org)
       .first<Record<string, number>>()
     return {
       waiting: row?.['waiting'] ?? 0,
