@@ -61,6 +61,14 @@ import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
+import { issueCode, verifyCode } from '../lib/security/loginCode'
+import { canReceiveCode, OWNER_EMAIL } from '../lib/ownerEmail'
+
+/** من قرّر — بطريق الدخول (D-245): `panel:token` للجلسات القديمة وحدَها. */
+function deciderOf(via: string): string {
+  return via === 'passkey' ? 'panel:passkey' : via === 'email_code' ? 'panel:email' : 'panel:token'
+}
+import { sendText } from '../lib/mail/send'
 import {
   costOf, deleteProvider, getProvider, listProviders, markVerified,
   normalizeName, resolveKey, saveKey, setEnabled, upsertProvider,
@@ -90,7 +98,7 @@ function readSpan(raw: string | null): number {
   return SPAN_DAYS.has(n) ? n : 30
 }
 import {
-  checkCsrf, clearedCookie, COOKIE, createSession, destroySession, listSessions,
+  checkCsrf, clearedCookie, COOKIE, createEmailSession, destroySession, listSessions,
   loadSession, readCookie, revokeSessions, safeNext, sessionCookie, setActiveOrg, type Session,
 } from '../lib/session'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
@@ -872,7 +880,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
 }
 
 /**
- * ‏`GET /panel/login` — **صفحةُ كلمةٍ خاطئةٍ أُعيد تحميلُها**.
+ * ‏`GET /panel/login` — **صفحةُ رمزٍ خاطئٍ أُعيد تحميلُها**.
  *
  * تُرسَم صفحةُ الدخول ردًّا على `POST /panel/login`، فيبقى عنوانُها في الشريط. وإعادةُ
  * تحميلها على الهاتف، أو فتحُ التبويب من جديد، تطلبه `GET` — وكان `{"error":"not_found"}`
@@ -882,10 +890,60 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
 panel.get('/panel/login', (c) => c.redirect(safeNext(c.req.query('next')), 303))
 
 /**
- * الدخول — بحدٍّ للمحاولات.
+ * طلبُ رمز الدخول (D-245) — **الردُّ واحدٌ لكلّ عنوان**.
+ *
+ * من كتب عنوانًا غيرَ عنوان المالك يرى ما يراه المالك: «إن كان بريدَ المالك
+ * فقد أُرسل». فلا يُعرف من الردّ أيُّ العناوين يفتح، ولا يُرسَل إليه شيء.
+ * والسقفُ (رسالةٌ في الدقيقة، خمسٌ في الساعة) صامتٌ كذلك، ويُسجَّل في التدقيق.
+ */
+panel.post('/panel/login/code', async (c) => {
+  const form = await c.req.formData().catch(() => new FormData())
+  const next = safeNext(String(form.get('next') ?? '') || (c.req.query('next') ?? ''))
+  const passkeys = await hasPasskeys(c.env)
+  // ‏«عنوان آخر أو رمز جديد» يعود إلى خطوة البريد
+  if (form.get('again') !== null) {
+    return page((nonce) => loginPage({ passkeys, next }, nonce), 200)
+  }
+
+  const state = await attemptState(c.env.KV, c.req.raw)
+  if (state.blocked) {
+    return page(
+      (nonce) => loginPage({ error: 'تجاوزت حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true, next }, nonce),
+      429,
+    )
+  }
+
+  const who = canReceiveCode(String(form.get('email') ?? ''))
+  if (who !== null) {
+    const issued = await issueCode(c.env.KV, who.email)
+    if (issued.ok) {
+      const sent = await sendText(
+        c.env.EMAIL,
+        who.email,
+        'رمز الدخول إلى صدى',
+        `رمز الدخول إلى صدى: ${issued.code}\n\nصالح عشر دقائق ولمرّة واحدة.\n` +
+          `إن لم تطلبه فتجاهل الرسالة، ولا يدخل أحد بلا الرمز.\n\n${c.env.PUBLIC_BASE_URL}`,
+      )
+      // ‏والرمزُ لا يُكتب في التدقيق: ما أُرسل وما لم يُرسَل وسببُه وحده
+      await record(
+        c.env.DB,
+        sent.sent
+          ? { actor: 'anonymous', action: 'login.code.sent' }
+          : { actor: 'anonymous', action: 'login.code.unsent', detail: sent.reason },
+        c.req.raw,
+      )
+    } else {
+      await record(c.env.DB, { actor: 'anonymous', action: 'login.code.capped', detail: issued.reason }, c.req.raw)
+    }
+  }
+  return page((nonce) => loginPage({ step: 'code', next }, nonce), 200)
+})
+
+/**
+ * الدخول برمز البريد — بحدٍّ للمحاولات.
  *
  * والتأخير قبل الردّ متصاعد لا رفضٌ فوريّ: زمنُ الردّ نفسه يخبر المخمّن
- * أنّه مُنع فيبدّل عنوانه ويستأنف.
+ * أنّه مُنع فيبدّل عنوانه ويستأنف. وفوقه الرمزُ نفسُه يسقط بعد خمسٍ خاطئة.
  */
 panel.post('/panel/login', async (c) => {
   const blockedText = (global: boolean): string =>
@@ -893,60 +951,36 @@ panel.post('/panel/login', async (c) => {
       ? 'الدخول موقوف مؤقتا: محاولات كثيرة من عناوين شتّى. انتظر ربع ساعة.'
       : 'تجاوزت حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
 
-  // ‏والوجهةُ قبل كلّ ردّ: كلُّ صفحةِ دخولٍ تُرسَم ثانيةً تحملها، فلا تضيع بكلمةٍ خاطئة (ر-11)
+  // ‏والوجهةُ قبل كلّ ردّ: كلُّ صفحةِ دخولٍ تُرسَم ثانيةً تحملها، فلا تضيع برمزٍ خاطئ (ر-11)
   const form = await c.req.formData().catch(() => new FormData())
   const next = safeNext(String(form.get('next') ?? '') || (c.req.query('next') ?? ''))
 
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
     return page(
-      (nonce) => loginPage({ error: blockedText(state.globalBlock), blocked: true, next }, nonce),
+      (nonce) => loginPage({ error: blockedText(state.globalBlock), blocked: true, step: 'code', next }, nonce),
       429,
     )
   }
 
   // ‏والحجزُ قبل الفحص (D-161): طلباتٌ متزامنةٌ تمرّ كلُّها من قراءة KV قبل أن
-  // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن تُقارَن كلمتُها
+  // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن يُقارَن رمزُها
   const reserved = await reserveAttempt(c.env.DB, c.req.raw)
   if (!reserved.allowed) {
     return page(
-      (nonce) => loginPage({ error: blockedText(false), blocked: true, next }, nonce),
+      (nonce) => loginPage({ error: blockedText(false), blocked: true, step: 'code', next }, nonce),
       429,
     )
   }
 
-  // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
-  // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
-  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
-  const factors = await factorState(c.env.DB, rp.id)
-  const result = await createSession(
-    c.env.KV,
-    c.env.ADMIN_TOKEN,
-    String(form.get('token') ?? ''),
-    c.req.raw,
-    { pending: factors.enforced, next },
-  )
-
-  if ('error' in result) {
-    if (result.error === 'disabled') {
-      return page(
-        (nonce) =>
-          loginPage(
-            {
-              error: 'كلمة الإدارة (ADMIN_TOKEN) غير مضبوطة على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
-              passkeys: factors.passkeys.length > 0,
-              next,
-            },
-            nonce,
-          ),
-        401,
-      )
-    }
+  // ‏صاحبُ الرمز المالكُ اليوم: الرمزُ الوحيد المخزَّن رمزُه (`canReceiveCode`)
+  const who = canReceiveCode(OWNER_EMAIL)!
+  const verdict = await verifyCode(c.env.KV, who.email, String(form.get('code') ?? ''))
+  if (!verdict.ok) {
     const after = await recordFailure(c.env.KV, c.req.raw)
-    // المحاولةُ المرفوضة تُسجَّل: تكرارُها من عنوانٍ واحد هو ما يُقرأ لاحقا
     await record(
       c.env.DB,
-      { actor: 'anonymous', action: 'login.denied', detail: `المحاولة ${after.attempts}` },
+      { actor: 'anonymous', action: 'login.denied', detail: `${verdict.reason} · المحاولة ${after.attempts}` },
       c.req.raw,
     )
     const wait = delayMs(after.attempts)
@@ -957,8 +991,33 @@ panel.post('/panel/login', async (c) => {
           {
             error: after.blocked
               ? blockedText(after.globalBlock)
-              : `كلمة الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
+              : verdict.reason === 'wrong'
+                ? `الرمز غير صحيح — ${attemptsLeft(after.remaining)}.`
+                : 'الرمز غير صحيح أو انتهت مهلته. اطلب رمزًا جديدًا.',
             blocked: after.blocked,
+            step: 'code',
+            next,
+          },
+          nonce,
+        ),
+      401,
+    )
+  }
+
+  // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
+  // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
+  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
+  const factors = await factorState(c.env.DB, rp.id)
+  const result = await createEmailSession(c.env.KV, c.env.ADMIN_TOKEN, who, c.req.raw, {
+    pending: factors.enforced,
+    next,
+  })
+  if ('error' in result) {
+    return page(
+      (nonce) =>
+        loginPage(
+          {
+            error: '`ADMIN_TOKEN` غير مضبوط على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
             passkeys: factors.passkeys.length > 0,
             next,
           },
@@ -975,14 +1034,14 @@ panel.post('/panel/login', async (c) => {
     {
       actor: 'panel',
       action: factors.enforced ? 'session.pending' : 'session.open',
-      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'بعامل واحد',
+      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'برمز البريد',
     },
     c.req.raw,
   )
   return new Response(null, {
     status: 303,
     headers: {
-      // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createSession`)، لا في العنوان
+      // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createEmailSession`)، لا في العنوان
       Location: factors.enforced ? '/panel/2fa' : next,
       'Set-Cookie': sessionCookie(result.id),
     },
@@ -1330,7 +1389,7 @@ panel.post('/panel/channels/app', async (c) => {
   }
   const label = platformLabel(platform)
 
-  const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
+  const by = deciderOf(gate.session.record.via)
   let flash: PanelFlash
   let detail: string
   try {
@@ -2438,7 +2497,7 @@ panel.post('/panel/drafts/decide', async (c) => {
     c.env.DB, activeOrg(gate.session.record),
     id,
     wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text },
-    gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+    deciderOf(gate.session.record.via),
   )
 
   /*
@@ -2600,7 +2659,7 @@ panel.post('/panel/drafts/approve-many', async (c) => {
   const result = await approveMany(
     c.env.DB, activeOrg(gate.session.record),
     ids,
-    gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+    deciderOf(gate.session.record.via),
   )
 
   // **والمتعثّرُ يُسمَّى بسببه**: حصيلةٌ تقول «فشل بعضُها» تجعل المالك
@@ -3093,7 +3152,7 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
         }
       : { caption: String(form.get('caption') ?? '') }),
     approve: form.get('approve') === 'on',
-    by: gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
+    by: deciderOf(gate.session.record.via),
     // ‏مَن كتبها: النموذجُ وراجعها المالك — فيُقرأ في رحلة المنشور
     ...(model === undefined ? {} : { model }),
     /*
@@ -3316,7 +3375,7 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
   }
   const now = new Date()
   const read = readPlan(csv, await planFacts(c.env, activeOrg(gate.session.record), c.req.header('Cookie') ?? null, now))
-  const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
+  const by = deciderOf(gate.session.record.via)
   // ‏ما عرضته المعاينةُ جاهزًا وحده (D-182) — والزرُّ وعدَ بعدده
   const shown = new Set(String(gate.form.get('lines') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 1))
   if (shown.size === 0) {

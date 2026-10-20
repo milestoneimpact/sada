@@ -58,6 +58,11 @@ export interface Env {
   readonly KV: KVNamespace
   readonly PUBLISH_QUEUE: Queue
   readonly GENERATE_QUEUE: Queue
+  /**
+   * ربطُ `send_email` لرمز الدخول (D-245) — مقيَّدٌ بعنوان المالك في `wrangler.toml`.
+   * وغيابُه لا يفتح شيئا: لا رمزَ يُرسَل، والدخولُ بمفتاح المرور باقٍ.
+   */
+  readonly EMAIL?: import('./lib/mail/send').MailBinding
 
   // أسرار Worker
   readonly TOKEN_ENC_KEY: string

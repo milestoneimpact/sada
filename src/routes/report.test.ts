@@ -5,6 +5,7 @@
  * بلا سقف، وصفرا مكان فراغ، وزرَّ إنفاق.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { writeSetting } from '../lib/settings'
 import { COOKIE } from '../lib/session'
@@ -37,9 +38,7 @@ beforeEach(() => {
 })
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
   const page = await app.request('/panel', { headers: { Cookie: cookie } }, env)
   csrf = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''

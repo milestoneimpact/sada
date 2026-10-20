@@ -41,7 +41,7 @@ export function securitySection(d: PanelData): SecurityMarkup {
   const sessions = d.sessions.map((x) => `<tr>
     <td><div class="nm">${escapeHtml(shortUa(x.ua))}${
       x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${
-      x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : ''}</div>
+      x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : x.via === 'email_code' ? ' <span class="chip">رمز البريد</span>' : ''}</div>
       <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
     <td data-label="فُتحت"><span title="${escapeHtml(stamp(x.at, d.zone ?? null))}">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
     <td data-label="">${x.current

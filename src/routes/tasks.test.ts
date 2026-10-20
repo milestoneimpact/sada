@@ -5,6 +5,7 @@
  * اشتقاقٌ يُختبَر على قيمٍ مؤلَّفة يمرّ على وهم.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
@@ -26,9 +27,7 @@ beforeEach(() => {
 })
 
 async function open(scoped = env): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const login = await app.request('/panel/login', { method: 'POST', body }, scoped)
+  const login = await emailLogin(app, scoped)
   const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
   return (await app.request('/panel/tasks', { headers: { Cookie: cookie } }, scoped)).text()
 }
@@ -96,9 +95,7 @@ describe('ولا علامة صحّ على ما لم يُتحقَّق منه', ()
 
 describe('والرابط في اللوحة', () => {
   it('يظهر ويحمل عدد ما عليك', async () => {
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const login = await app.request('/panel/login', { method: 'POST', body }, env)
+    const login = await emailLogin(app, env)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('href="/panel/tasks"')
@@ -160,9 +157,7 @@ describe('وبوّابات المراحل تُقاس', () => {
 
 describe('وشريط الرموز المقتربة', () => {
   async function panel(): Promise<string> {
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const login = await app.request('/panel/login', { method: 'POST', body }, env)
+    const login = await emailLogin(app, env)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
   }

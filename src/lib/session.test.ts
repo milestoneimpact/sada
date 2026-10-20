@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fingerprint } from './security/digest'
 import { fakeKv } from '../test/fakes'
+import { OWNER_EMAIL } from './ownerEmail'
 import {
   checkCsrf,
   clearedCookie,
   COOKIE,
-  createSession,
+  createEmailSession,
   destroySession,
   listSessions,
   loadSession,
@@ -18,6 +19,7 @@ import {
 } from './session'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
+const WHO = { email: OWNER_EMAIL, role: 'owner' } as const
 const OTHER = 'Zz9qW8vY1nMtB6oS3uXgA7dC5eI2kH0f'
 let kv: ReturnType<typeof fakeKv>
 
@@ -33,10 +35,7 @@ function withCookie(value: string, headers: Record<string, string> = {}): Reques
 
 /** يفتح جلسةً ويعيد معرّفها — أو يرمي، فالاختبار الذي يبتلع لا يختبر. */
 async function open(headers: Record<string, string> = {}): Promise<string> {
-  const result = await createSession(
-    kv,
-    TOKEN,
-    TOKEN,
+  const result = await createEmailSession(kv, TOKEN, WHO,
     new Request('https://sada2.basserh.com/panel/login', { method: 'POST', headers }),
   )
   if (!('id' in result)) throw new Error('توقّعنا جلسة')
@@ -60,38 +59,41 @@ describe('readCookie', () => {
   })
 })
 
-describe('createSession', () => {
+describe('createEmailSession', () => {
   it('الرمز الصحيح يعطي جلسة', async () => {
-    const result = await createSession(kv, TOKEN, TOKEN)
+    const result = await createEmailSession(kv, TOKEN, WHO)
     expect('id' in result).toBe(true)
     if ('id' in result) expect(result.id).toMatch(/^[0-9a-f-]{36}$/)
   })
 
-  it('الرمز الخطأ يُرفض ولا يُنشئ شيئا', async () => {
-    expect(await createSession(kv, TOKEN, 'wrong')).toEqual({ error: 'denied' })
-    expect(kv.size()).toBe(0)
+  it('تحمل البريد والدور، وطريقَ فتحها (D-245)', async () => {
+    const made = await createEmailSession(kv, TOKEN, WHO)
+    if ('error' in made) throw new Error('لم تُفتح')
+    expect(made.record).toMatchObject({ via: 'email_code', email: OWNER_EMAIL, role: 'owner' })
+    const loaded = await loadSession(kv, withCookie(`${COOKIE}=${made.id}`), TOKEN)
+    expect(loaded?.record).toMatchObject({ via: 'email_code', email: OWNER_EMAIL, role: 'owner' })
   })
 
   it('بلا ADMIN_TOKEN المسار مقفل لا مفتوح', async () => {
-    expect(await createSession(kv, undefined, 'anything')).toEqual({ error: 'disabled' })
-    expect(await createSession(kv, '', 'anything')).toEqual({ error: 'disabled' })
+    expect(await createEmailSession(kv, undefined, WHO)).toEqual({ error: 'disabled' })
+    expect(await createEmailSession(kv, '', WHO)).toEqual({ error: 'disabled' })
     expect(kv.size()).toBe(0)
   })
 
   it('يتسامح مع مسافة حول الرمز — كما يفعل الحارس', async () => {
-    expect('id' in (await createSession(kv, `${TOKEN}\n`, TOKEN))).toBe(true)
+    expect('id' in (await createEmailSession(kv, `${TOKEN}\n`, WHO))).toBe(true)
   })
 
   it('كلّ جلسة معرّف جديد', async () => {
-    const first = await createSession(kv, TOKEN, TOKEN)
-    const second = await createSession(kv, TOKEN, TOKEN)
+    const first = await createEmailSession(kv, TOKEN, WHO)
+    const second = await createEmailSession(kv, TOKEN, WHO)
     if (!('id' in first) || !('id' in second)) throw new Error('توقّعنا جلستين')
     expect(first.id).not.toBe(second.id)
   })
 
   it('لكلّ جلسة سرّ CSRF خاصّ بها', async () => {
-    const first = await createSession(kv, TOKEN, TOKEN)
-    const second = await createSession(kv, TOKEN, TOKEN)
+    const first = await createEmailSession(kv, TOKEN, WHO)
+    const second = await createEmailSession(kv, TOKEN, WHO)
     if (!('id' in first) || !('id' in second)) throw new Error('توقّعنا جلستين')
     expect(first.record.csrf).not.toBe(second.record.csrf)
     expect(first.record.csrf.length).toBeGreaterThanOrEqual(32)
@@ -140,17 +142,17 @@ describe('safeNext', () => {
   })
 
   it('والجلسة المعلَّقة تحمل وجهتَها، والترقية تُسقطها', async () => {
-    const made = await createSession(kv, TOKEN, TOKEN, undefined, { pending: true, next: '/panel/report' })
+    const made = await createEmailSession(kv, TOKEN, WHO, undefined, { pending: true, next: '/panel/report' })
     if ('error' in made) throw new Error('لم تُفتح')
     const loaded = await loadSession(kv, withCookie(`${COOKIE}=${made.id}`), TOKEN)
     expect(loaded?.record.next).toBe('/panel/report')
     const promoted = await promoteSession(kv, loaded!)
     expect(promoted.record.next).toBeUndefined()
     // ‏ووجهةٌ مرفوضةٌ لا تُكتب، والكاملةُ لا تحملها أصلًا
-    const evil = await createSession(kv, TOKEN, TOKEN, undefined, { pending: true, next: '//evil.example' })
+    const evil = await createEmailSession(kv, TOKEN, WHO, undefined, { pending: true, next: '//evil.example' })
     if ('error' in evil) throw new Error('لم تُفتح')
     expect(evil.record.next).toBeUndefined()
-    const full = await createSession(kv, TOKEN, TOKEN, undefined, { next: '/panel/report' })
+    const full = await createEmailSession(kv, TOKEN, WHO, undefined, { next: '/panel/report' })
     if ('error' in full) throw new Error('لم تُفتح')
     expect(full.record.next).toBeUndefined()
   })
@@ -307,7 +309,8 @@ describe('قيود الكعكة — وهي ما يجعلها كعكة لا ثغ�
 
   it('لها مهلة انتهاء — لا كعكة دائمة', () => {
     expect(sessionCookie('abc')).toContain(`Max-Age=${SESSION_TTL_SECONDS}`)
-    expect(SESSION_TTL_SECONDS).toBeLessThanOrEqual(24 * 60 * 60)
+    // ‏ثلاثةُ أيّامٍ بطلب المالك (D-245)، لا أكثر
+    expect(SESSION_TTL_SECONDS).toBe(3 * 24 * 60 * 60)
   })
 
   it('الصفّ في KV ينتهي بمهلته هو أيضا — لا يُترك للأبد', async () => {

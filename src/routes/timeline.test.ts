@@ -3,6 +3,7 @@
  * المزيّفة، وأنّ كلَّ شريطٍ رابطٌ إلى رحلته، وأنّ العنوانَ لا يُسقط الصفحة.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { COOKIE } from '../lib/session'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
@@ -58,9 +59,7 @@ beforeEach(() => {
 })
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   return (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
 }
 

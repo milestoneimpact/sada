@@ -6,6 +6,7 @@
  * فوقه يحسبها، و«النتائج» بلا رابطٍ واحد.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { recordCost } from '../lib/cost'
 import { money } from '../lib/format'
@@ -34,9 +35,7 @@ beforeEach(() => {
 })
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   return (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
 }
 

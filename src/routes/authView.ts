@@ -118,7 +118,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
     'صدى — العامل الثاني',
     `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
       <h1>خطوة أخيرة</h1>
-      <p class="lede">أثبتّ كلمة الإدارة. وبقي ما يثبت أنّك أنت.</p>
+      <p class="lede">أثبتّ بريدك. وبقي ما يثبت أنّك أنت.</p>
       ${note}${nothing}
       <div class="card">${passkey}${totp}</div>
       ${recovery}
