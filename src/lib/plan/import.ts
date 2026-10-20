@@ -443,10 +443,14 @@ export async function applyPlan(
       postId = crypto.randomUUID()
       statements.push(db
         .prepare(
-          `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, rationale)
-           VALUES (?, ?, 'text', ?, 'approved', ?, 'owner', ?, ?, 'من خطّةٍ مستورَدة')`,
+          `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, rationale,
+                              org_id, brand_id)
+           VALUES (?, ?, 'text', ?, 'approved', ?, 'owner', ?, ?, 'من خطّةٍ مستورَدة',
+                   -- ‏منظّمةُ الحساب الذي يُنشر منه وعلامتُه
+                   coalesce((SELECT org_id FROM accounts WHERE id = ?), 'org_owner'),
+                   coalesce((SELECT brand_id FROM accounts WHERE id = ?), 'brand_owner'))`,
         )
-        .bind(postId, row.platform, row.text, key, by, dbNow(now)))
+        .bind(postId, row.platform, row.text, key, by, dbNow(now), row.accountId, row.accountId))
       if (row.uploadId !== null && upload !== null) statements.push(uploadMediaRow(db, postId, row.uploadId, upload))
       await atomically(db, statements)
     }

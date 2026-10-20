@@ -156,8 +156,8 @@ export async function saveMetrics(
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO metrics (post_id, window, impressions, reactions, comments, shares, clicks, pulled_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `INSERT INTO metrics (post_id, window, impressions, reactions, comments, shares, clicks, pulled_at, org_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), (SELECT org_id FROM posts WHERE id = ?1))
        ON CONFLICT (post_id, window) DO UPDATE SET
          impressions = excluded.impressions,
          reactions   = excluded.reactions,

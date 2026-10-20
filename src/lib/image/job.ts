@@ -271,8 +271,8 @@ export function noteOf(
  */
 const INSERT_IMAGE =
   `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
-                      note, headline, width, height)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                      note, headline, width, height, org_id)
+   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, (SELECT org_id FROM posts WHERE id = ?2))`
 
 /**
  * ما يُقال حين تردّ بوّابةُ المزوّد — **ونصوصُ ما كان قائمًا باقيةٌ حرفًا**:

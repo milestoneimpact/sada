@@ -101,6 +101,7 @@ const positive = (n: number | null): number | null =>
  */
 export async function startUpload(
   db: Db,
+  org: string,
   bucket: MultipartBucket,
   meta: UploadMeta,
   id: string = crypto.randomUUID(),
@@ -116,11 +117,11 @@ export async function startUpload(
   const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: meta.mime } })
   await db
     .prepare(
-      `INSERT INTO uploads (id, r2_key, name, mime, bytes, width, height, duration_ms, status, multipart_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploading', ?)`,
+      `INSERT INTO uploads (id, r2_key, name, mime, bytes, width, height, duration_ms, status, multipart_id, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?)`,
     )
     .bind(id, key, cleanName(meta.name), meta.mime, Math.round(meta.bytes),
-      positive(meta.width), positive(meta.height), positive(meta.durationMs), upload.uploadId)
+      positive(meta.width), positive(meta.height), positive(meta.durationMs), upload.uploadId, org)
     .run()
   return { ok: true, id, partBytes: PART_BYTES, parts: Math.ceil(meta.bytes / PART_BYTES) }
 }
@@ -502,8 +503,9 @@ export function uploadMediaRow(db: Db, postId: string, uploadId: string, u: Uplo
   return db
     .prepare(
       `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key,
-                          width, height, upload_id, duration_ms)
-       VALUES (?, ?, ?, ?, ?, '', 'upload', 0, 'ready', ?, ?, ?, ?, ?)`,
+                          width, height, upload_id, duration_ms, org_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, '', 'upload', 0, 'ready', ?6, ?7, ?8, ?9, ?10,
+               (SELECT org_id FROM posts WHERE id = ?2))`,
     )
     .bind(crypto.randomUUID(), postId, u.r2_key, u.mime, u.bytes, `upload:${uploadId}:${postId}`,
       u.width, u.height, uploadId, u.duration_ms)
@@ -604,12 +606,15 @@ export async function postsFromUpload(
     }
     statements.push(db
       .prepare(
-        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, cost_usd, approved_by, approved_at)
-         VALUES (?, ?, 'text', ?, ?, ?, ?, ?, ?, ${input.approve ? "datetime('now')" : 'NULL'})`,
+        `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, cost_usd, approved_by, approved_at,
+                            org_id, brand_id)
+         VALUES (?, ?, 'text', ?, ?, ?, ?, ?, ?, ${input.approve ? "datetime('now')" : 'NULL'},
+                 -- ‏منظّمةُ المقطع المرفوع وعلامتُه
+                 (SELECT org_id FROM uploads WHERE id = ?), (SELECT brand_id FROM uploads WHERE id = ?))`,
       )
       .bind(postId, platform, textOf(platform), input.approve ? 'approved' : 'draft', key, input.model ?? 'owner',
         Number.isFinite(input.cost) && (input.cost ?? 0) > 0 ? input.cost : 0,
-        input.approve ? input.by : null))
+        input.approve ? input.by : null, row.id, row.id))
     // ‏المنشورُ ووسيطُه معًا أو لا شيء: خطأٌ بينهما كان يترك منشورًا بلا مقطعه ومفتاحُه محجوز
     statements.push(uploadMediaRow(db, postId, row.id, media))
     await atomically(db, statements)

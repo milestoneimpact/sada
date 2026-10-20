@@ -194,7 +194,7 @@ describe('وشريطُ الرموز المقتربة', () => {
   it('وإذنُ وصولٍ قريبٌ بلا تجديد: «تحتاج إعادةَ ربطٍ» بعدد الأيّام', async () => {
     seed(4, 'access')
     const html = await panel()
-    // ‏الشريطُ يسمّي ويحيل، والحالُ بأيّامها في البلاطة مرّةً (D-233)
+    // ‏الشريطُ يسمّي ويحيل، والحالُ بأيّامها في البلاطة مرّةً (D-234)
     expect(html).toContain('<b><bdi>X</bdi></b> تحتاج يدَك.')
     expect(html).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادةَ ربطٍ خلال [34] أيّام/)
     expect(html).toContain('class="toast-note warn"')

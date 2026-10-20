@@ -204,8 +204,11 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
       .prepare(
         `INSERT INTO posts
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
-            source_refs, rationale, has_url, status, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?)`,
+            source_refs, rationale, has_url, status, idempotency_key, org_id, brand_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?,
+                 -- ‏المسوّدةُ لمنظّمة مصدرها وعلامته
+                 coalesce((SELECT org_id FROM sources WHERE id = ?), 'org_owner'),
+                 coalesce((SELECT brand_id FROM sources WHERE id = ?), 'brand_owner'))`,
       )
       .bind(
         postId,
@@ -222,6 +225,8 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
         // X». فكان يُحسَب عند النشر (بعد الاعتماد) ولا يُعرَض قطّ (D-069)
         containsUrl(input.draft.text) ? 1 : 0,
         input.key,
+        input.sourceId,
+        input.sourceId,
       ))
     await atomically(db, statements)
   } catch (error) {
