@@ -298,12 +298,12 @@ describe('journeyCounts', () => {
     // ‏بلا محاولة: يُؤرَّخ بموعده — قديم
     post('bare', '2026-09-10 09:00:00', '2026-09-09 00:00:00')
 
-    const c = await journeyCounts(db, now)
+    const c = await journeyCounts(db, 'org_owner', now)
     expect(c.perPlatform['x']).toMatchObject({ failed: 3, recentFailed: 1 })
     expect(nextAction(facts({ counts: c }))).toMatchObject({ tone: 'bad', href: FAILED })
 
     // ‏ويمضي الأسبوعُ على الحديث فتهدأ الرئيسيّة
-    const later = await journeyCounts(db, new Date('2026-10-12T12:00:00Z'))
+    const later = await journeyCounts(db, 'org_owner', new Date('2026-10-12T12:00:00Z'))
     expect(later.perPlatform['x']).toMatchObject({ failed: 3, recentFailed: 0 })
     expect(nextAction(facts({ counts: later })).tone).toBe('ok')
   })

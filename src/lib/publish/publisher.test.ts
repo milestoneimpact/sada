@@ -622,7 +622,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
     expect(saved.publish_id).toBe('pub-9')
     expect(saved.request).toMatchObject({ privacy_level: 'SELF_ONLY', direct: true })
     expect(saved.note).toContain('SELF_ONLY لا للعامّة')
-    const journey = await readJourney(db, postId)
+    const journey = await readJourney(db, 'org_owner', postId)
     const published = journey!.stations.find((x) => x.kind === 'publish')!
     expect(published.detail).toContain('طُلب SELF_ONLY')
     expect(published.detail).toContain('لا للعامّة')
