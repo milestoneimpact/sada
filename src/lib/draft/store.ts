@@ -158,21 +158,28 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
  * والجدولُ لا يُقرأ كلُّه: صفوفُه تنمو بلا حدّ، وسحبُها إلى Worker ليُفرز
  * فيه يصطدم بحدّ المعالجة قبل أن يُفيد.
  */
-export async function listDrafts(db: Db, limit = 60): Promise<DraftRow[]> {
-  return selectDrafts(db, '', [], limit)
+export async function listDrafts(db: Db, org: string, limit = 60): Promise<DraftRow[]> {
+  return selectDrafts(db, org, '', [], limit)
 }
 
 /**
  * منشورٌ واحدٌ بمعرّفه، أيًّا كان عمرُه (D-198) — **المحرّرُ يفتح ما لم تبلغه الستّون**.
  * بالاستعلام نفسِه الذي تقرأ به القائمةُ بطاقاتِها، فلا يفترق ما يُرى هنا عمّا يُرى هناك.
  */
-export async function getDraft(db: Db, id: string): Promise<DraftRow | null> {
+export async function getDraft(db: Db, org: string, id: string): Promise<DraftRow | null> {
   if (id === '') return null
-  const [row] = await selectDrafts(db, 'p.id = ?', [id], 1)
+  const [row] = await selectDrafts(db, org, 'p.id = ?', [id], 1)
   return row ?? null
 }
 
-async function selectDrafts(db: Db, where: string, values: readonly unknown[], limit: number): Promise<DraftRow[]> {
+/** منشوراتُ المنظّمة وحدها (D-230): معرّفُ منشورٍ من منظّمةٍ أخرى لا يُرى ولا يُفتح. */
+async function selectDrafts(
+  db: Db,
+  org: string,
+  where: string,
+  values: readonly unknown[],
+  limit: number,
+): Promise<DraftRow[]> {
   try {
     const { results } = await db
       .prepare(
@@ -188,12 +195,12 @@ async function selectDrafts(db: Db, where: string, values: readonly unknown[], l
                     ORDER BY pa.attempt_no DESC LIMIT 1) END AS fail_json
            FROM posts p
            LEFT JOIN sources s ON s.id = p.source_id
-           LEFT JOIN accounts a ON a.id = p.account_id${where === '' ? '' : `
-          WHERE ${where}`}
+           LEFT JOIN accounts a ON a.id = p.account_id
+          WHERE p.org_id = ?${where === '' ? '' : ` AND ${where}`}
           ORDER BY p.created_at DESC
           LIMIT ?`,
       )
-      .bind(...values, limit)
+      .bind(org, ...values, limit)
       .all<Raw>()
     return results.flatMap((row) => {
       const platform = platformOf(row.platform)
@@ -230,13 +237,14 @@ function lines(text: string): string {
 /** بَتٌّ واحد. و `by` اسمُ صاحب القرار — يُكتب مع القرار لا بعده. */
 export async function decide(
   db: Db,
+  org: string,
   id: string,
   decision: Decision,
   by: string,
 ): Promise<DecisionResult> {
   const row = await db
-    .prepare('SELECT id, platform, status, text, original_text FROM posts WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT id, platform, status, text, original_text FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org)
     .first<{ id: string; platform: string; status: string; text: string; original_text: string | null }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
 
@@ -248,8 +256,8 @@ export async function decide(
 
   if (decision.kind === 'reject') {
     await db
-      .prepare("UPDATE posts SET status = 'rejected', approved_by = ? WHERE id = ?")
-      .bind(by, id)
+      .prepare("UPDATE posts SET status = 'rejected', approved_by = ? WHERE id = ? AND org_id = ?")
+      .bind(by, id, org)
       .run()
     return { ok: true, status: 'rejected' }
   }
@@ -290,9 +298,9 @@ export async function decide(
       `UPDATE posts SET text = ?, has_url = ?, status = ?, approved_by = ?,
               approved_at = datetime('now'),
               original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END
-        WHERE id = ?`,
+        WHERE id = ? AND org_id = ?`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, id)
+    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, id, org)
     .run()
   return { ok: true, status }
 }
@@ -317,10 +325,10 @@ export async function decide(
  * آخر — أو رُفضت في تبويبٍ ثانٍ ثمّ أُعيدت — **لا يُقلَب حالُها بضغطةٍ
  * على إشعارٍ شاخ**.
  */
-export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
+export async function undoReject(db: Db, org: string, id: string): Promise<DecisionResult> {
   const row = await db
-    .prepare('SELECT id, status FROM posts WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT id, status FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org)
     .first<{ id: string; status: string }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
   if (row.status !== 'rejected') {
@@ -328,8 +336,8 @@ export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
   }
 
   await db
-    .prepare("UPDATE posts SET status = 'draft', approved_by = NULL WHERE id = ?")
-    .bind(id)
+    .prepare("UPDATE posts SET status = 'draft', approved_by = NULL WHERE id = ? AND org_id = ?")
+    .bind(id, org)
     .run()
   return { ok: true, status: 'draft' }
 }
@@ -348,10 +356,10 @@ export async function undoReject(db: Db, id: string): Promise<DecisionResult> {
  * **والشرطُ في جملة التحديث نفسِها**: إشعارٌ شاخ في تبويبٍ منسيّ لا يسحب
  * منشورًا جُدول بعده — `queued` لا تطابق، فيُردّ.
  */
-export async function undoApprove(db: Db, id: string): Promise<DecisionResult> {
+export async function undoApprove(db: Db, org: string, id: string): Promise<DecisionResult> {
   const row = await db
-    .prepare('SELECT status, text, original_text FROM posts WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT status, text, original_text FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org)
     .first<{ status: string; text: string; original_text: string | null }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
   if (row.status !== 'approved' && row.status !== 'edited') {
@@ -372,10 +380,10 @@ export async function undoApprove(db: Db, id: string): Promise<DecisionResult> {
     .prepare(
       `UPDATE posts SET status = 'draft', approved_at = NULL, approved_by = NULL,
               text = ?, has_url = ?, original_text = CASE WHEN ? = 1 THEN NULL ELSE original_text END
-        WHERE id = ? AND status IN ('approved', 'edited')
+        WHERE id = ? AND org_id = ? AND status IN ('approved', 'edited')
         RETURNING id`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, restore ? 1 : 0, id)
+    .bind(text, containsUrl(text) ? 1 : 0, restore ? 1 : 0, id, org)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل التراجع — أعد تحميل الصفحة' }
   return { ok: true, status: 'draft' }
@@ -412,6 +420,7 @@ export interface BulkResult {
  */
 export async function approveMany(
   db: Db,
+  org: string,
   ids: readonly string[],
   by: string,
 ): Promise<BulkResult> {
@@ -420,14 +429,14 @@ export async function approveMany(
 
   for (const id of ids) {
     const row = await db
-      .prepare('SELECT text FROM posts WHERE id = ?')
-      .bind(id)
+      .prepare('SELECT text FROM posts WHERE id = ? AND org_id = ?')
+      .bind(id, org)
       .first<{ text: string }>()
     if (row === null) {
       failed.push({ id, reason: 'لا مسوّدة بهذا المعرّف' })
       continue
     }
-    const result = await decide(db, id, { kind: 'approve', text: row.text }, by)
+    const result = await decide(db, org, id, { kind: 'approve', text: row.text }, by)
     if (result.ok) done.push(id)
     else failed.push({ id, reason: result.reason })
   }
@@ -462,10 +471,10 @@ function textProblem(platform: string, text: string): string | null {
  * والحالُ تبقى `draft` (D-009: لا يمرّ شيءٌ إلى الطابور بلا اعتماد)، **والأصلُ يُحفَظ عند أوّل
  * تعديلٍ ولا يُكتب ثانية** (D-128) فيبقى الفرقُ يُقرأ بعد الاعتماد، و`has_url` يُعاد حسابُه (D-069).
  */
-export async function saveText(db: Db, id: string, raw: string): Promise<DecisionResult> {
+export async function saveText(db: Db, org: string, id: string, raw: string): Promise<DecisionResult> {
   const row = await db
-    .prepare('SELECT id, platform, status, text FROM posts WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT id, platform, status, text FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org)
     .first<{ id: string; platform: string; status: string; text: string }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
   if (row.status !== 'draft') return { ok: false, reason: 'لم تعد مسوّدة، والحفظُ للمسوّدة وحدها' }
@@ -476,9 +485,9 @@ export async function saveText(db: Db, id: string, raw: string): Promise<Decisio
   const moved = await db
     .prepare(
       `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?)
-        WHERE id = ? AND status = 'draft' RETURNING id`,
+        WHERE id = ? AND org_id = ? AND status = 'draft' RETURNING id`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, row.text, id)
+    .bind(text, containsUrl(text) ? 1 : 0, row.text, id, org)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل الحفظ، فأعد تحميل الصفحة' }
   return { ok: true, status: 'draft' }

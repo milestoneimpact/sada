@@ -340,8 +340,8 @@ const BOARD = 60
  * ‏الرئيسيّة وإشعارُها يقول «اختر له موعدًا» ولا نموذج. فالبطاقةُ إن كانت في النافذة نفسِها
  * ‏التي تقرؤها اللوحة — **بـ`listDrafts` ذاتِها لا بعدٍّ يقاربها** — وإلّا فالمسارُ يختار غيرَها.
  */
-async function onBoard(db: Env['DB'], id: string): Promise<boolean> {
-  return (await listDrafts(db, BOARD)).some((d) => d.id === id)
+async function onBoard(db: Env['DB'], org: string, id: string): Promise<boolean> {
+  return (await listDrafts(db, org, BOARD)).some((d) => d.id === id)
 }
 
 /** ‏رحلةُ المنشور — موضعٌ يُرسَم لكلّ منشورٍ أيًّا كان عمرُه (D-104). */
@@ -542,14 +542,14 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
     }),
   )
   const routes = await readRoutes(c.env.DB)
-  const drafts = await listDrafts(c.env.DB, BOARD)
+  const drafts = await listDrafts(c.env.DB, activeOrg(session.record), BOARD)
   /*
    * ‏**والمحرّرُ المركّزُ من العنوان** (D-198): `?open=<id>` يرسم المنشورَ بجوار القائمة، فيُفتح برابطٍ
    * ‏ويُحفَظ ويعمل بلا سكربت. والمعرّفُ يُفحَص قبل أن يُسأل عنه، ومنشورٌ أقدمُ من الستّين يُقرأ وحدَه.
    */
   const openId = q.get('open') ?? ''
   const editing = POST_ID.test(openId)
-    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, openId))
+    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, activeOrg(session.record), openId))
     : null
   const media = await mediaFor(c.env.DB, [...new Set([...drafts.map((d) => d.id), ...(editing === null ? [] : [editing.id])])])
 
@@ -2265,7 +2265,7 @@ panel.post('/panel/drafts/write', async (c) => {
   )
   // ‏و«موجودةٌ وهي هذه» لمسوّدةٍ خارجَ النافذة — كُتبت من النسخة نفسِها قبل أسابيع — لا بطاقةَ لها:
   // ‏فرحلتُها تُريها بنصّها وحالها، والإشعارُ لا يُكتب لصفحةٍ لا تقرؤه فيظهر بعدها في غير موضعه
-  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, outcome.postId))) return toJourney(outcome.postId)
+  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, activeOrg(gate.session.record), outcome.postId))) return toJourney(outcome.postId)
   await setFlash(c.env, c.req.raw, flash)
   // ‏والمسوّدةُ الجديدةُ في بطاقتها لا عند رأس اللوح، وما لم يُكتب يعود إلى نموذج الكتابة
   return outcome.kind === 'drafted' || outcome.kind === 'already' ? toCard('d', outcome.postId) : back('write')
@@ -2356,7 +2356,7 @@ panel.post('/panel/drafts/idea', async (c) => {
     return back('idea')
   }
   const onlyAlready = drafted.length === 0 && stopped.length === 0 && unlinked.length === 0
-  const shown = await onBoard(c.env.DB, first)
+  const shown = await onBoard(c.env.DB, activeOrg(gate.session.record), first)
   if (onlyAlready && !shown) return toJourney(first)
   await setFlash(c.env, c.req.raw, flash)
   return shown ? toCard('d', first) : back('idea')
@@ -2384,7 +2384,7 @@ panel.post('/panel/drafts/decide', async (c) => {
    * ‏(`saveText`)، فلا يُحفَظ ما سيُردّ عند الاعتماد. ويعود إلى المحرّر نفسِه.
    */
   if (wants === 'save') {
-    const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
+    const saved = await saveText(c.env.DB, activeOrg(gate.session.record), id, String(form.get('text') ?? ''))
     await record(c.env.DB, { actor: 'panel', action: 'draft.save', target: id, detail: saved.ok ? 'saved' : `refused:${saved.reason}` }, c.req.raw)
     await setFlash(c.env, c.req.raw, saved.ok
       ? { kind: 'ok', text: 'حُفظ النصّ، وما زالت تنتظر قرارك.' }
@@ -2405,7 +2405,7 @@ panel.post('/panel/drafts/decide', async (c) => {
       : String(sent)
   }
   const result = await decide(
-    c.env.DB,
+    c.env.DB, activeOrg(gate.session.record),
     id,
     wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text },
     gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
@@ -2486,7 +2486,7 @@ panel.post('/panel/drafts/undo-reject', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await undoReject(c.env.DB, id)
+  const result = await undoReject(c.env.DB, activeOrg(gate.session.record), id)
 
   const flash: PanelFlash = result.ok
     ? { kind: 'ok', text: 'عادت مسوّدةً تنتظر قرارك.' }
@@ -2515,7 +2515,7 @@ panel.post('/panel/drafts/undo-approve', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await undoApprove(c.env.DB, id)
+  const result = await undoApprove(c.env.DB, activeOrg(gate.session.record), id)
 
   await record(
     c.env.DB,
@@ -2568,7 +2568,7 @@ panel.post('/panel/drafts/approve-many', async (c) => {
   }
 
   const result = await approveMany(
-    c.env.DB,
+    c.env.DB, activeOrg(gate.session.record),
     ids,
     gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
   )
@@ -2703,7 +2703,7 @@ panel.post('/panel/drafts/spread', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
-  const drafts = await listDrafts(c.env.DB, BOARD)
+  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
   const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
@@ -2748,7 +2748,7 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   const now = new Date()
   const gap = readGap(gate.form.get('gap'))
 
-  const drafts = await listDrafts(c.env.DB, BOARD)
+  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
   const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
@@ -2890,7 +2890,7 @@ panel.post('/panel/drafts/requeue', async (c) => {
     c.req.raw,
   )
   const to = backTo(gate.form.get('return'), '')
-  const card = result.ok && (await onBoard(c.env.DB, id))
+  const card = result.ok && (await onBoard(c.env.DB, activeOrg(gate.session.record), id))
   // ‏ورحلةُ المنشور لا تقرأ الإشعار: لا يُكتب لها فيظهر بعدها في غير موضعه — وحالُه فيها «معتمَد»
   if (result.ok && !card && to === '') return toJourney(id)
   await setFlash(c.env, c.req.raw, result.ok
