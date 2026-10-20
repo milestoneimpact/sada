@@ -63,6 +63,8 @@ import { platformLabel } from '../lib/oauth/providers'
 import { emptyState } from './ui/components/empty'
 import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, OWNER_ORG, type OrgRow } from '../lib/tenancy'
 
+import { OWNER_EMAIL } from '../lib/ownerEmail'
+
 export { escapeHtml, injectCsrf, shell }
 
 
@@ -80,7 +82,14 @@ export interface LoginState {
    * وبلا قيمةٍ فالرئيسيّة.
    */
   readonly next?: string
+  /**
+   * الخطوة (D-245): `email` يطلب العنوان، و`code` يطلب الرمزَ بعد «أُرسل إن كان العنوانُ للمالك».
+   */
+  readonly step?: 'email' | 'code'
 }
+
+/** ما يُقال بعد طلب الرمز — **لكلّ عنوان**، فلا يُعرف منه أيُّ العناوين للمالك. */
+export const CODE_SENT_NOTE = 'إن كان هذا البريد بريد المالك فقد أُرسل إليه رمز من ستّة أرقام، صالح عشر دقائق.'
 
 /**
  * ‏والمرساةُ لا تصل إلى الخادم أصلًا: `/panel#posts` يُطلَب `/panel`. فتُلحَق بالوجهة هنا،
@@ -92,7 +101,7 @@ const NEXT_SCRIPT = `
   var f=document.getElementById('login-next');
   if(!f||!location.hash||f.value.indexOf('#')>=0)return;
   f.value=f.value+location.hash;
-  if(f.form)f.form.setAttribute('action','/panel/login?next='+encodeURIComponent(f.value));
+  if(f.form)f.form.setAttribute('action',(f.form.getAttribute('action')||'/panel/login').split('?')[0]+'?next='+encodeURIComponent(f.value));
 })();
 `
 
@@ -116,7 +125,7 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   if(!btn)return;
   var label=btn.textContent;
   if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true;
-    if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — ادخل بكلمة الإدارة.'; return;}
+    if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — ادخل برمز البريد.'; return;}
   // ‏والتركيزُ يعود إلى الزرّ: زرٌّ عُطّل يفقده، فـEnter بعد نافذةٍ أُغلقت لا يفعل شيئًا
   var reset=function(msg){btn.disabled=false; btn.removeAttribute('aria-busy');
     btn.textContent=label; if(note)note.textContent=msg; try{btn.focus();}catch(e){}};
@@ -162,47 +171,64 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 `
 
 export function loginPage(state: LoginState = {}, nonce = ''): string {
+  const step = state.step ?? 'email'
   const passkey =
-    state.passkeys !== true || state.blocked === true
+    state.passkeys !== true || state.blocked === true || step === 'code'
       ? ''
       : `<button class="btn btn-primary" id="pk-login" type="button">الدخول بمفتاح المرور</button>
          <div class="note" id="pk-note" role="status" aria-live="polite"></div>
-         <div class="or">أو بكلمة الإدارة</div>`
+         <div class="or">أو برمز إلى بريدك</div>`
 
   const note =
     state.error === undefined
-      ? ''
+      ? step === 'code' ? noticeText('ok', CODE_SENT_NOTE, true) : ''
       : noticeText(state.blocked === true ? 'bad' : 'warn', state.error, true)
   const disabled = state.blocked === true ? ' disabled' : ''
   const next = state.next ?? '/panel'
-  const action = next === '/panel' ? '/panel/login' : `/panel/login?next=${encodeURIComponent(next)}`
+  const path = step === 'code' ? '/panel/login' : '/panel/login/code'
+  const action = next === '/panel' ? path : `${path}?next=${encodeURIComponent(next)}`
+  const form = step === 'code'
+    ? `<form method="POST" action="${escapeHtml(action)}">
+          <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
+          <div class="field"><label for="c">رمز الدخول</label>
+            <input id="c" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
+                   pattern="[0-9 ]{6,8}" maxlength="8" required autofocus${disabled}></div>
+          <button class="btn btn-primary" type="submit"${disabled}>دخول</button>
+        </form>
+        <form method="POST" action="/panel/login/code" class="cancel">
+          <input type="hidden" name="next" value="${escapeHtml(next)}">
+          <button class="btn btn-secondary btn-sm" type="submit" name="again" value="1"${disabled}>عنوان آخر أو رمز جديد</button>
+        </form>`
+    : `<form method="POST" action="${escapeHtml(action)}">
+          <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
+          <div class="field"><label for="e">البريد</label>
+            <input id="e" type="email" name="email" dir="ltr" autocomplete="email"
+                   required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
+          <button class="btn btn-primary" type="submit"${disabled}>أرسل الرمز</button>
+        </form>`
   return shell(
     'صدى — الدخول',
     `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
       <h1>لوحة التحكّم</h1>
       <p class="lede">${state.blocked === true
         ? 'الدخول موقوف مؤقتًا لحماية اللوحة'
-        : state.passkeys === true
-          ? 'ادخل بمفتاح المرور، أو بكلمة الإدارة'
-          : 'أدخل كلمة الإدارة للمتابعة'}</p>
+        : step === 'code'
+          ? 'اكتب الرمز الذي وصل بريدك'
+          : state.passkeys === true
+            ? 'ادخل بمفتاح المرور، أو برمز إلى بريدك'
+            : 'اكتب بريدك ليصلك رمز الدخول'}</p>
       ${note}
       <div class="card">
         ${passkey}
-        <form method="POST" action="${escapeHtml(action)}">
-          <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
-          <div class="field"><label for="t">كلمة الإدارة <span class="mono">ADMIN_TOKEN</span></label>
-            <input id="t" type="password" name="token" dir="ltr" autocomplete="current-password"
-                   required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
-          <button class="btn btn-primary" type="submit"${disabled}>دخول</button>
-        </form>
+        ${form}
       </div>
       ${state.blocked === true
         ? `<p class="lede"><a href="${escapeHtml(next)}">حدّث الصفحة</a> بعد ربع ساعة لتعيد المحاولة.</p>`
         : ''}
-      <footer>الجلسة 8 ساعات</footer>
+      <footer>الجلسة 3 أيّام</footer>
     </main></div></div>`,
     nonce,
-    `${NEXT_SCRIPT}${state.passkeys === true ? LOGIN_SCRIPT : ''}`,
+    `${NEXT_SCRIPT}${state.passkeys === true && step === 'email' ? LOGIN_SCRIPT : ''}`,
     { moment: true },
   )
 }
@@ -368,7 +394,7 @@ export interface PanelData {
   readonly pulses: readonly Pulse[]
   /** النطاق الذي تُوقَّع عليه المفاتيح — يُعرض ليُعرف أنّه ليس الآخر. */
   readonly rpId: string
-  readonly via: 'admin_token' | 'passkey'
+  readonly via: 'admin_token' | 'passkey' | 'email_code'
   readonly factors: PanelFactors
   readonly channels: readonly ChannelView[]
   /** حالُ تطبيقَي OAuth — بلا سرٍّ ولا فكِّ تشفير. */
@@ -439,7 +465,7 @@ export interface PanelSession {
   readonly at: string
   readonly ip: string
   readonly ua: string
-  readonly via: 'admin_token' | 'passkey'
+  readonly via: 'admin_token' | 'passkey' | 'email_code'
   readonly current: boolean
 }
 
@@ -944,7 +970,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
   if (!d.factors.enforced) {
     items.push({
       kind: 'warn',
-      text: 'لا عامل ثان: كلمة الإدارة وحدَها تفتح اللوحة.',
+      text: 'لا عامل ثان: رمز البريد وحدَه يفتح اللوحة.',
       go: '#security',
       label: 'سجّل مفتاحا',
     })
@@ -1359,9 +1385,10 @@ ${pivotPane(d.pivot)}
   ${orgsPane(d)}
 </div>
 <div data-sub id="security">
-  <p class="hint">العامل الثاني، والجلسات المفتوحة، وكلمة الإدارة. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
+  <p class="hint">العامل الثاني، والجلسات المفتوحة، وتدوير ADMIN_TOKEN. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
-    <p class="hint">كلّ جلسة حيّة الآن. والجلسة 8 ساعات ثمّ تنتهي وحدها.</p>
+    <p class="hint">كلّ جلسة حيّة الآن. والجلسة 3 أيّام ثمّ تنتهي وحدها.</p>
+    <p class="hint">بريد المالك <span class="mono" dir="ltr">${escapeHtml(OWNER_EMAIL)}</span> — ثابت في الشيفرة، لا يُعدَّل ولا يُحذف من اللوحة.</p>
     ${d.sessions.length === 0
       ? emptyState({ title: 'لا جلسات محفوظة', html: 'قد يكون التخزين لا يدعم الجرد في هذه البيئة.' })
       : `<div class="scroll"><table>
@@ -1378,8 +1405,8 @@ ${pivotPane(d.pivot)}
 
   <div class="card mt-3" id="factors"><h2>العامل الثاني</h2>
     <p class="hint">${d.factors.enforced
-      ? 'مفعَّل: كلمة الإدارة وحدَها لا تفتح اللوحة — يليها ما يثبت أنّك أنت.'
-      : '<b>غير مفعَّل.</b> كلمة الإدارة وحدَها تفتح كلّ شيء. سجّل مفتاح مرور أو اضبط رمز تطبيق.'}</p>
+      ? 'مفعَّل: رمز البريد وحدَه لا يفتح اللوحة — يليه ما يثبت أنّك أنت.'
+      : '<b>غير مفعَّل.</b> رمز البريد وحدَه يفتح كلّ شيء. سجّل مفتاح مرور أو اضبط رمز تطبيق.'}</p>
 
     <h3 class="sec">مفاتيح المرور</h3>
     <p class="hint">مقاومة للتصيّد بالبناء: المفتاح موقَّع على
@@ -1433,10 +1460,10 @@ ${pivotPane(d.pivot)}
     <div class="note" id="rc-msg" role="status" aria-live="polite"></div>
   </div>
 
-  <div class="card mt-3"><h2>كلمة الإدارة</h2>
+  <div class="card mt-3"><h2>إبطال كلّ الجلسات</h2>
     <p class="hint m-0"><b>تدوير <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
-      فالجلسة مربوطة ببصمة كلمة الإدارة التي فتحتها، وتُفحص في كلّ طلب — وجلسة مفتاح المرور كذلك.
-      فإن شككت في تسرّب فبدّل كلمة الإدارة
+      فهو لم يعد كلمة تُكتب في الدخول، لكنّ كلّ جلسة مربوطة ببصمته وتُفحص في كلّ طلب — جلسة البريد ومفتاح المرور معا.
+      فإن شككت في تسرّب فبدّله
       بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
   </div>
 

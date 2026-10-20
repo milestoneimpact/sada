@@ -2,7 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM"],
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    // ‏`cloudflare:email` لا يوجد خارج Worker: بديلُه الصوريّ في الاختبار (D-245)
+    "paths": { "cloudflare:email": ["./src/test/cloudflareEmail.ts"] }
   },
   "include": ["src/**/*.test.ts", "src/test/**/*.ts", "vitest.config.ts"]
 }

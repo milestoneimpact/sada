@@ -3,6 +3,8 @@
  * والصفحة تُقرأ كنصٍّ كما يراها المتصفّح.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { codeFrom, emailLogin, fakeMailer, requestCode } from '../test/emailLogin'
+import { CODE_SENT_NOTE } from './panelView'
 import { everyPane } from '../test/panelPages'
 import { toBase64 } from '../lib/crypto'
 import { fingerprint } from '../lib/security/digest'
@@ -42,9 +44,7 @@ beforeEach(() => {
 let csrf = ''
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   expect(response.status).toBe(303)
   const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
 
@@ -80,14 +80,16 @@ describe('الدخول', () => {
     expect(response.status).toBe(200)
     const html = await response.text()
     // يُفحص السلوك لا الصياغة: حقلُ رمزٍ حاضر، وتنقّلُ اللوحة غائب
-    expect(html).toContain('name="token"')
+    expect(html).toContain('name="email"')
+    expect(html).not.toContain('name="token"')
     expect(html).not.toContain('nav class="tabs"')
     expect(html).not.toContain('/panel/settings')
   })
 
   it('رمز خطأ يردّ 401 ولا يُنشئ جلسة', async () => {
+    await requestCode(app, env)
     const body = new FormData()
-    body.set('token', 'wrong')
+    body.set('code', '000000x')
     const response = await app.request('/panel/login', { method: 'POST', body }, env)
     expect(response.status).toBe(401)
     expect(response.headers.get('Set-Cookie')).toBeNull()
@@ -98,7 +100,7 @@ describe('الدخول', () => {
   it('يعدّ المحاولات ويحظر بعد خمس', async () => {
     const attempt = async (): Promise<Response> => {
       const body = new FormData()
-      body.set('token', 'wrong')
+      body.set('code', 'wrong')
       return app.request('/panel/login', { method: 'POST', body }, env)
     }
     for (let i = 0; i < 4; i += 1) expect((await attempt()).status).toBe(401)
@@ -112,36 +114,30 @@ describe('الدخول', () => {
   it('الحظر يمنع حتّى الرمز الصحيح — ولا يُنشئ جلسة', async () => {
     for (let i = 0; i < 5; i += 1) {
       const bad = new FormData()
-      bad.set('token', 'wrong')
+      bad.set('code', 'wrong')
       await app.request('/panel/login', { method: 'POST', body: bad }, env)
     }
-    const good = new FormData()
-    good.set('token', TOKEN)
-    const response = await app.request('/panel/login', { method: 'POST', body: good }, env)
+    const response = await emailLogin(app, env)
     expect(response.status).toBe(429)
     expect(response.headers.get('Set-Cookie')).toBeNull()
   })
 
   it('النجاح يمحو العدّ — مَن أخطأ ثمّ أصاب لا يبقى محسوبا', async () => {
     const bad = new FormData()
-    bad.set('token', 'wrong')
+    bad.set('code', 'wrong')
     await app.request('/panel/login', { method: 'POST', body: bad }, env)
     await login()
     expect(kv.ttlOf('login-attempts:unknown')).toBeNull()
   })
 
   it('بلا ADMIN_TOKEN اللوحة مقفلة لا مفتوحة', async () => {
-    const body = new FormData()
-    body.set('token', 'anything')
-    const response = await app.request('/panel/login', { method: 'POST', body }, { ...env, ADMIN_TOKEN: '' })
+    const response = await emailLogin(app, { ...env, ADMIN_TOKEN: '' })
     expect(response.status).toBe(401)
     expect(await response.text()).toContain('مقفلة')
   })
 
   it('الرمز الصحيح يعطي كعكة بقيودها الثلاثة', async () => {
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const response = await app.request('/panel/login', { method: 'POST', body }, env)
+    const response = await emailLogin(app, env)
     const cookie = response.headers.get('Set-Cookie') ?? ''
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Strict')
@@ -155,7 +151,7 @@ describe('الدخول', () => {
     const cookie = await login()
     await app.request('/panel/logout', withSession(cookie, { method: 'POST' }), env)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('أدخل كلمة الإدارة')
+    expect(html).toContain('اكتب بريدك ليصلك رمز الدخول')
   })
   /*
    * ‏**ويعود المالكُ إلى ما طلبه لا إلى الرئيسيّة** (ر-11، الخطّة 7.11): كان كلُّ توجيهٍ بعد
@@ -163,10 +159,7 @@ describe('الدخول', () => {
    */
   describe('العودة إلى الصفحة المطلوبة', () => {
     async function signIn(next: string | null, path = '/panel/login'): Promise<Response> {
-      const body = new FormData()
-      body.set('token', TOKEN)
-      if (next !== null) body.set('next', next)
-      return await app.request(path, { method: 'POST', body }, env)
+      return await emailLogin(app, env, { path, ...(next === null ? {} : { next }) })
     }
 
     // ‏والمرساةُ تعود (D-210): سكربتُ الدخول يُلحقها بـ«next»، والخادمُ يوجّه إليها كما هي
@@ -181,7 +174,7 @@ describe('الدخول', () => {
       expect(response.status).toBe(401)
       const html = await response.text()
       expect(html).toContain('name="next" id="login-next" value="/panel/report?week=2026-09-28"')
-      expect(html).toContain('action="/panel/login?next=%2Fpanel%2Freport%3Fweek%3D2026-09-28"')
+      expect(html).toContain('action="/panel/login/code?next=%2Fpanel%2Freport%3Fweek%3D2026-09-28"')
       expect(html).not.toContain('انتهت الجلسة')
     })
 
@@ -204,9 +197,9 @@ describe('الدخول', () => {
       }
     })
 
-    it('وكلمة خاطئة تعيد رسم الصفحة بوجهتها — فالمحاولة الثانية لا تفقدها', async () => {
+    it('ورمز خاطئ يعيد رسم الصفحة بوجهتها — فالمحاولة الثانية لا تفقدها', async () => {
       const body = new FormData()
-      body.set('token', 'wrong')
+      body.set('code', 'wrong')
       body.set('next', '/panel/report')
       const html = await (await app.request('/panel/login', { method: 'POST', body }, env)).text()
       expect(html).toContain('value="/panel/report"')
@@ -1358,7 +1351,8 @@ describe('CSRF — طبقة في الخادم لا في المتصفّح وحد�
     )
     expect(response.status).toBe(303)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('name="token"')
+    expect(html).toContain('name="email"')
+    expect(html).not.toContain('name="token"')
   })
 })
 
@@ -1371,7 +1365,8 @@ describe('تدوير ADMIN_TOKEN يُبطل الجلسات', () => {
 
     const rotated = { ...env, ADMIN_TOKEN: 'Zz9qW8vY1nMtB6oS3uXgA7dC5eI2kH0f' }
     const html = await (await app.request('/panel', withSession(cookie), rotated)).text()
-    expect(html).toContain('name="token"')
+    expect(html).toContain('name="email"')
+    expect(html).not.toContain('name="token"')
     expect(html).not.toContain('nav class="tabs"')
   })
 
@@ -1416,7 +1411,7 @@ describe('جرد الأجهزة في اللوحة', () => {
       'nav class="tabs"',
     )
     expect(await (await app.request('/panel', { headers: { Cookie: other } }, env)).text()).toContain(
-      'name="token"',
+      'name="email"',
     )
   })
 
@@ -1446,7 +1441,7 @@ describe('جرد الأجهزة في اللوحة', () => {
     body.set('handle', await fingerprint(otherId))
     await app.request('/panel/sessions/revoke', withSession(mine, { method: 'POST', body }), env)
     expect(await (await everyPane((p) => app.request(p, { headers: { Cookie: other } }, env)))).toContain(
-      'name="token"',
+      'name="email"',
     )
     const { results } = await db
       .prepare("SELECT target FROM audit_log WHERE action = 'session.revoke'")
@@ -1485,7 +1480,7 @@ describe('سجلّ التدقيق — من فعل ماذا', () => {
 
   it('يسجّل المحاولة المرفوضة — وتكرارُها هو ما يُقرأ لاحقا', async () => {
     const body = new FormData()
-    body.set('token', 'wrong')
+    body.set('code', 'wrong')
     await app.request('/panel/login', { method: 'POST', body }, env)
     expect(await actions()).toContain('login.denied')
   })
@@ -1591,9 +1586,7 @@ describe('القنوات — سجلّ صادق لا وعد بما لا يقع', 
       LINKEDIN_CLIENT_ID: 'id',
       LINKEDIN_CLIENT_SECRET: 'secret',
     }
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const login2 = await app.request('/panel/login', { method: 'POST', body }, withSecrets)
+    const login2 = await emailLogin(app, withSecrets)
     const cookie = (login2.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const html = await (
       await app.request('/panel', { headers: { Cookie: cookie } }, withSecrets)
@@ -2054,7 +2047,7 @@ describe('الكتابة من اللوحة', () => {
       .bind(postId)
       .first<Record<string, unknown>>()
     expect(row?.['status']).toBe('approved')
-    expect(row?.['approved_by']).toBe('panel:token')
+    expect(row?.['approved_by']).toBe('panel:email')
     expect(row?.['approved_at']).not.toBeNull()
 
     const audit = await db
@@ -5262,5 +5255,45 @@ describe('شريط اليوم الأوّل (D-227)', () => {
       .bind(crypto.randomUUID(), source, 'ملخّص', JSON.stringify({ hash: 'md5:a', themes: [] }), 7).run()
     const after = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(after).not.toContain('class="first-band"')
+  })
+})
+
+describe('الدخول برمز البريد (D-245)', () => {
+  it('عنوان غير المالك يرى الردّ نفسه ولا يُرسَل إليه شيء', async () => {
+    const mailer = fakeMailer()
+    const scoped = { ...env, EMAIL: mailer }
+    const ask = async (email: string): Promise<string> => {
+      const body = new FormData()
+      body.set('email', email)
+      return (await app.request('/panel/login/code', { method: 'POST', body }, scoped)).text()
+    }
+    const stranger = await ask('stranger@example.com')
+    expect(mailer.sent).toHaveLength(0)
+    expect(stranger).toContain(CODE_SENT_NOTE)
+    const owner = await ask('MilestonesImpact@gmail.com')
+    expect(mailer.sent).toHaveLength(1)
+    expect(owner).toContain(CODE_SENT_NOTE)
+    expect(mailer.sent[0]!.to).toBe('milestonesimpact@gmail.com')
+    expect(mailer.sent[0]!.from).toBe('noreply@basserh.com')
+    // ‏والرمزُ لا يُكتب في سجلّ التدقيق
+    const code = codeFrom(mailer.sent[0]!)
+    const rows = await db.prepare('SELECT detail FROM audit_log').all<{ detail: string | null }>()
+    expect(JSON.stringify(rows.results)).not.toContain(code)
+  })
+
+  it('وطلب ثان في الدقيقة نفسها لا يرسل', async () => {
+    const mailer = fakeMailer()
+    const scoped = { ...env, EMAIL: mailer }
+    for (let i = 0; i < 2; i += 1) {
+      const body = new FormData()
+      body.set('email', 'milestonesimpact@gmail.com')
+      await app.request('/panel/login/code', { method: 'POST', body }, scoped)
+    }
+    expect(mailer.sent).toHaveLength(1)
+  })
+
+  it('والجلسة ثلاثة أيّام', async () => {
+    const response = await emailLogin(app, env)
+    expect(response.headers.get('Set-Cookie')).toContain(`Max-Age=${3 * 24 * 60 * 60}`)
   })
 })

@@ -2,6 +2,7 @@
  * صفحةُ الهبوط على الجذر (D-193): بابٌ لمن لا جلسةَ له، وتحويلٌ مباشرٌ لمن له جلسة.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv } from '../test/fakes'
 import { app } from '../index'
@@ -17,9 +18,7 @@ beforeEach(() => {
 })
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const r = await app.request('/panel/login', { method: 'POST', body }, env)
+  const r = await emailLogin(app, env)
   expect(r.status).toBe(303)
   return (r.headers.get('Set-Cookie') ?? '').split(';')[0]!
 }

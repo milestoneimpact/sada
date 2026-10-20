@@ -328,9 +328,13 @@ describe('رموز الليل على الجذر وحدَه (D-124)', () => {
 })
 
 describe('صفحة الدخول تقول ما تطلب بالعربيّة', () => {
-  it('اللصيقة «كلمة الإدارة» واسم السرّ بجانبها', () => {
+  it('خطوة البريد ثمّ خطوة الرمز — ولا حقل لكلمة الإدارة (D-245)', () => {
     const html = loginPage({}, 'n')
-    expect(html).toContain('كلمة الإدارة <span class="mono">ADMIN_TOKEN</span>')
+    expect(html).toContain('<label for="e">البريد</label>')
+    expect(html).not.toContain('ADMIN_TOKEN')
+    const code = loginPage({ step: 'code' }, 'n')
+    expect(code).toContain('<label for="c">رمز الدخول</label>')
+    expect(code).toContain('autocomplete="one-time-code"')
   })
 })
 

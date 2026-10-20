@@ -24,6 +24,7 @@ import { toBase64 } from './lib/crypto'
 import { fromBase64Url, toBase64Url } from './lib/security/bytes'
 import { fakeAuthenticator } from './test/authenticator'
 import { fakeDb, fakeKv } from './test/fakes'
+import { emailLogin } from './test/emailLogin'
 
 interface Worker {
   fetch(request: Request, env: unknown, ctx: unknown): Promise<Response>
@@ -52,6 +53,8 @@ beforeAll(async () => {
     conditions: ['workerd', 'worker', 'browser'],
     keepNames: true,
     external: ['__STATIC_CONTENT_MANIFEST', 'cloudflare:*', 'node:*'],
+    // ‏`cloudflare:email` لا يوجد في Node: بديلُه الصوريّ يُحزَم مكانه، وغيرُه يبقى خارجًا (D-245)
+    alias: { 'cloudflare:email': join(__dirname, 'test', 'cloudflareEmail.ts') },
     logLevel: 'silent',
   })
   dir = mkdtempSync(join(tmpdir(), 'sada-bundle-'))
@@ -266,11 +269,7 @@ describe('الحزمة المشحونة', () => {
 
   it('أصلا اللوحة يُشغَّلان في وثيقة فارغة بلا خطأ', async () => {
     const e = env()
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const login = await worker.fetch(
-      new Request(`${ORIGIN}/panel/login`, { method: 'POST', body }), e, CTX,
-    )
+    const login = await emailLogin({ request: (p, init, scoped) => worker.fetch(new Request(`${ORIGIN}${p}`, init), scoped, CTX) }, e)
     expect(login.status).toBe(303)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const html = await (await worker.fetch(

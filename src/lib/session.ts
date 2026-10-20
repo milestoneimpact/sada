@@ -20,7 +20,7 @@
  * البابَ أُغلق، وجلسةُ السارق حيّةٌ ثماني ساعات.
  */
 import { fingerprint, randomToken, sameSecret } from './security/digest'
-import { authorizeAdmin } from './adminAuth'
+import { OWNER_EMAIL, type Role } from './ownerEmail'
 
 /**
  * `__Host-` بادئةٌ ذاتُ معنى عند المتصفّح لا مجرّد اسم.
@@ -30,8 +30,11 @@ import { authorizeAdmin } from './adminAuth'
  * تضييقِ المسار، لأنّ المسار لا يمنع شيئا أصلا (المسارات كلّها لنا).
  */
 export const COOKIE = '__Host-sada_session'
-/** ثمانُ ساعات: يومُ عملٍ واحد. أطول من ذلك يجعل جهازا منسيّا بابا مفتوحا. */
-export const SESSION_TTL_SECONDS = 8 * 60 * 60
+/**
+ * ثلاثةُ أيّام (D-245) — بطلب المالك: الدخولُ برمز بريدٍ أثقلُ من كلمة، فلا يُطلب كلَّ يوم.
+ * وتدويرُ `ADMIN_TOKEN` و«أنهِ الجلسات» يُغلقانها قبل ذلك متى شئت.
+ */
+export const SESSION_TTL_SECONDS = 3 * 24 * 60 * 60
 
 /** بادئةُ مفاتيح الجلسات في KV — يُجرَد بها ويُبطَل. */
 const PREFIX = 'session:'
@@ -91,7 +94,7 @@ export interface SessionStore {
 }
 
 /** كيف فُتحت الجلسة. */
-export type SessionVia = 'admin_token' | 'passkey'
+export type SessionVia = 'email_code' | 'passkey' | 'admin_token'
 
 export interface SessionRecord {
   /** متى فُتحت — ISO. */
@@ -126,6 +129,9 @@ export interface SessionRecord {
    * بعد أن يتحقّق المسارُ أنّها موجودة.
    */
   readonly org?: string
+  /** من دخل ودورُه (D-245) — المالكُ اليوم، والمدعوّون لاحقا. والغائبُ جلسةٌ قديمةٌ للمالك. */
+  readonly email?: string
+  readonly role?: Role
 }
 
 export interface Session {
@@ -154,39 +160,32 @@ async function currentBind(adminToken: string | undefined): Promise<string | nul
 }
 
 /**
- * يبدّل كلمةُ الإدارة بجلسة.
+ * جلسةٌ فُتحت برمز البريد (D-245) — **بعد أن قُبل الرمز**، فلا فحصَ هنا.
  *
- * يُعيد استعمال `authorizeAdmin` نفسه لا فحصا موازيا: منطق مقارنةٍ ثانٍ
- * يعني موضعا ثانيا يُخطئ فيه أحد، ومقارنةً قد تفقد ثبات الزمن.
+ * والتحقّقُ في `verifyCode` وحده: موضعٌ ثانٍ للمقارنة موضعٌ ثانٍ يُخطئ فيه أحد.
+ * وتُعلَّق إن كان ثمّة عاملٌ ثانٍ، كما كانت جلسةُ كلمة الإدارة.
  */
-export async function createSession(
+export async function createEmailSession(
   store: SessionStore,
   adminToken: string | undefined,
-  presentedToken: string,
+  who: { readonly email: string; readonly role: Role },
   request?: Request,
   options: { readonly pending?: boolean; readonly now?: Date; readonly next?: string } = {},
-): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' | 'denied' }> {
-  // يُبنى طلبٌ صوريّ ليُفحص بالمنطق نفسه — الرمز يجيء من نموذجٍ لا ترويسة
-  const probe = new Request('https://sada.local/panel/login', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${presentedToken}` },
-  })
-  const verdict = await authorizeAdmin(adminToken, probe)
-  if (verdict.kind === 'disabled') return { error: 'disabled' }
-  if (verdict.kind !== 'ok') return { error: 'denied' }
-
+): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' }> {
   const bind = await currentBind(adminToken)
   if (bind === null) return { error: 'disabled' }
 
   const next = safeNext(options.next)
   return await write(store, {
     at: (options.now ?? new Date()).toISOString(),
-    via: 'admin_token',
+    via: 'email_code',
     bind,
     csrf: randomToken(32),
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
     pending: options.pending === true,
+    email: who.email,
+    role: who.role,
     // ‏والوجهةُ للمعلَّقة وحدها: الكاملةُ تُوجَّه في ردّ الدخول نفسِه
     ...(options.pending === true && next !== HOME ? { next } : {}),
   })
@@ -236,6 +235,8 @@ export async function createPasskeySession(
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
     pending: false,
+    email: OWNER_EMAIL,
+    role: 'owner',
   }
   return await write(store, record)
 }
@@ -282,7 +283,7 @@ function parse(raw: string): SessionRecord | null {
     if (typeof value.pending !== 'boolean') return null
     return {
       at: typeof value.at === 'string' ? value.at : '',
-      via: value.via === 'passkey' ? 'passkey' : 'admin_token',
+      via: value.via === 'passkey' || value.via === 'email_code' ? value.via : 'admin_token',
       bind: value.bind,
       csrf: value.csrf,
       ip: typeof value.ip === 'string' ? value.ip : '',
@@ -290,6 +291,8 @@ function parse(raw: string): SessionRecord | null {
       pending: value.pending,
       ...(typeof value.next === 'string' ? { next: safeNext(value.next) } : {}),
       ...(typeof value.org === 'string' && value.org.length > 0 ? { org: value.org } : {}),
+      email: typeof value.email === 'string' ? value.email : OWNER_EMAIL,
+      role: 'owner',
     }
   } catch {
     return null
@@ -334,7 +337,7 @@ export async function loadSession(
  * يبدّل المنظّمةَ النشطة في الجلسة نفسِها (D-225).
  *
  * **بالمعرّف نفسِه** لا بمعرّفٍ جديد: لا صلاحيّةَ تُكتسب هنا — الجلسةُ كاملةٌ
- * أصلا، وجلسةُ المشغّل ترى كلَّ المنظّمات. والكتابةُ تجدّد مهلتَها الثماني ساعات.
+ * أصلا، وجلسةُ المشغّل ترى كلَّ المنظّمات. والكتابةُ تجدّد مهلتَها الثلاثة أيّام.
  */
 export async function setActiveOrg(store: SessionStore, session: Session, org: string): Promise<Session> {
   const record: SessionRecord = { ...session.record, org }

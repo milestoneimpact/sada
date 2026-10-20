@@ -3,6 +3,7 @@
  * يوقّع توقيعا حقيقيّا بـ ECDSA.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin, requestCode } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { readSettings } from '../lib/settings'
 import { countRecoveryCodes, listPasskeys, totpState } from '../lib/security/factors'
@@ -38,9 +39,7 @@ beforeEach(() => {
 
 /** يدخل بالرمز ويعيد الكعكة ووجهةَ إعادة التوجيه. */
 async function loginWithToken(): Promise<{ cookie: string; location: string }> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   expect(response.status).toBe(303)
   return {
     cookie: (response.headers.get('Set-Cookie') ?? '').split(';')[0]!,
@@ -316,7 +315,7 @@ describe('إتمام العامل الثاني بمفتاح مرور', () => {
     expect(promoted).not.toBe(cookie)
     // والمعرّفُ القديم بطل: لا يفتح شيئا
     expect(await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text())
-      .toContain('name="token"')
+      .toContain('name="email"')
   })
 })
 
@@ -569,10 +568,7 @@ describe('رموز الاسترداد', () => {
     const issued = await post('/panel/security/recovery/issue', setup.cookie)
     const { codes } = (await issued.json()) as { codes: string[] }
 
-    const body = new FormData()
-    body.set('token', TOKEN)
-    body.set('next', '/panel/report')
-    const first = await app.request('/panel/login', { method: 'POST', body }, env)
+    const first = await emailLogin(app, env, { next: '/panel/report' })
     expect(first.headers.get('Location')).toBe('/panel/2fa')
     const cookie = (first.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const pendingCsrf = await readCsrf(cookie, '/panel/2fa')
@@ -592,10 +588,7 @@ describe('رموز الاسترداد', () => {
     await readCsrf(setup.cookie)
     const secret = await enrollTotp(setup.cookie)
 
-    const body = new FormData()
-    body.set('token', TOKEN)
-    body.set('next', '/panel/report')
-    const first = await app.request('/panel/login', { method: 'POST', body }, env)
+    const first = await emailLogin(app, env, { next: '/panel/report' })
     const cookie = (first.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const pendingCsrf = await readCsrf(cookie, '/panel/2fa')
     const second = new FormData()
@@ -705,7 +698,7 @@ describe('تدوير الرمز يُبطل جلسة مفتاح المرور أي
 
     const rotated = { ...env, ADMIN_TOKEN: 'Zz9qW8vY1nMtB6oS3uXgA7dC5eI2kH0f' }
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, rotated)).text()
-    expect(html).toContain('name="token"')
+    expect(html).toContain('name="email"')
   })
 })
 
@@ -824,19 +817,22 @@ describe('D-161 — إحكام باب الدخول', () => {
     expect(await stale.text()).toContain('انتهت صلاحية الصفحة')
   })
 
-  it('كلمة إدارة خاطئة لا تُخفي باب المفتاح، وتقول ما بقي بعربيّة صحيحة', async () => {
+  it('رمز بريد خاطئ يقول ما بقي بعربيّة صحيحة، وباب المفتاح في خطوة البريد', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
 
+    await requestCode(app, env)
     const body = new FormData()
-    body.set('token', 'wrong-token-wrong-token-wrong-tok')
+    body.set('code', '000000')
     const response = await app.request('/panel/login', { method: 'POST', body }, env)
     const html = await response.text()
     expect(response.status).toBe(401)
-    expect(html).toContain('id="pk-login"')
-    expect(html).toContain('كلمة الإدارة غير صحيحة — بقيت 4 محاولات.')
-    expect(html).not.toContain('رمز غير صحيح')
+    expect(html).toMatch(/الرمز غير صحيح — بقيت 4 محاولات\.|الرمز غير صحيح أو انتهت مهلته/)
+    const again = new FormData()
+    again.set('again', '1')
+    const back = await (await app.request('/panel/login/code', { method: 'POST', body: again }, env)).text()
+    expect(back).toContain('id="pk-login"')
   })
 
   it('وجلسة انتهت في منتصف عمل تعيد صفحة دخول ببابه كذلك', async () => {

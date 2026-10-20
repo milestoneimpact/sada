@@ -68,6 +68,13 @@ binding = "AI"
 binding = "MEDIA"
 bucket_name = "sada-media-staging"
 
+# رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
+# **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
+# ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
+[[env.staging.send_email]]
+name = "EMAIL"
+destination_address = "milestonesimpact@gmail.com"
+
 [[env.staging.kv_namespaces]]
 binding = "KV"
 id = "7c4ec65867924a869da8c13146745d2a"
@@ -130,6 +137,13 @@ binding = "AI"
 [[env.production.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "sada-media"
+
+# رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
+# **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
+# ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
+[[env.production.send_email]]
+name = "EMAIL"
+destination_address = "milestonesimpact@gmail.com"
 
 [[env.production.kv_namespaces]]
 binding = "KV"

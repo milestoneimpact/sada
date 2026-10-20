@@ -6,6 +6,7 @@
  * والثلاثةُ معا تجعل مالكا يقف بلا ما يفعل.
  */
 import { beforeEach, describe, expect, it } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { checkProviderUrl } from '../lib/ai/urlGuard'
 import { OAuthError } from '../lib/oauth/exchange'
@@ -274,10 +275,8 @@ describe('٣ · عنوان فيه قالب لم يُملأ', () => {
 
 describe('ونموذج Cloudflare في اللوحة', () => {
   async function panelBody(cfAccount?: string): Promise<string> {
-    const body = new FormData()
-    body.set('token', TOKEN)
     const scoped = cfAccount === undefined ? env : { ...env, CF_AI_ACCOUNT_ID: cfAccount }
-    const login = await app.request('/panel/login', { method: 'POST', body }, scoped)
+    const login = await emailLogin(app, scoped)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     return (await app.request('/panel/settings', { headers: { Cookie: cookie } }, scoped)).text()
   }
@@ -304,9 +303,7 @@ describe('ونموذج Cloudflare في اللوحة', () => {
 
 describe('فحص الزوج من اللوحة — الأداة التي تُنهي التخمين', () => {
   async function login(): Promise<string> {
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const response = await app.request('/panel/login', { method: 'POST', body }, env)
+    const response = await emailLogin(app, env)
     const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const page = await app.request('/panel', { headers: { Cookie: cookie } }, env)
     csrf = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
@@ -400,9 +397,7 @@ describe('فحص الزوج من اللوحة — الأداة التي تُنه
 
   it('وبلا أسرار محفوظة يُقال ذلك ولا يُنادى أحد', async () => {
     const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
-    const body = new FormData()
-    body.set('token', TOKEN)
-    const login = await app.request('/panel/login', { method: 'POST', body }, bare)
+    const login = await emailLogin(app, bare)
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const page = await app.request('/panel', { headers: { Cookie: cookie } }, bare)
     const token = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''

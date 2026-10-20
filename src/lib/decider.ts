@@ -5,6 +5,7 @@
 export function deciderText(by: string | null): string {
   if (by === null) return ''
   if (by === 'panel:passkey') return 'أنت بمفتاح المرور'
+  if (by === 'panel:email') return 'أنت برمز البريد'
   if (by === 'panel:token') return 'أنت بكلمة الإدارة'
   if (by.startsWith('panel')) return 'أنت'
   if (by.startsWith('plan')) return 'أنت باعتماد الخطّة'

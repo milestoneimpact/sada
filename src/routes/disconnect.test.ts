@@ -3,6 +3,7 @@
  * فشل الإبطال، والمنشوراتُ المجدولة، وسجلُّ التدقيق بلا قيمة رمز، والزرُّ في الصفحة.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { saveTokens } from '../lib/tokens'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
@@ -46,9 +47,7 @@ function stubFetch(status: number | 'throw'): void {
 }
 
 async function login(): Promise<string> {
-  const body = new FormData()
-  body.set('token', TOKEN)
-  const response = await app.request('/panel/login', { method: 'POST', body }, env)
+  const response = await emailLogin(app, env)
   const cookie = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
   const page = await app.request('/panel', { headers: { Cookie: cookie } }, env)
   csrf = /name="_csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''

@@ -152,6 +152,18 @@ export interface OwnerFacts {
  */
 export const OWNER_TASKS: readonly OwnerTask[] = [
   {
+    code: 'M-31',
+    title: 'Email Routing على basserh.com — ليصل رمز الدخول',
+    ifLeft:
+      'لا يصل رمز الدخول، **ولا باب إلى اللوحة إلّا مفتاح المرور**. ' +
+      'ومن لا مفتاح له على هذه البيئة لا يدخل حتّى تتمّ — قفل لا ثغرة.',
+    unblocks: 'gate',
+    // ‏التحقّقُ من العنوان عند Cloudflare لا يُقرأ من هنا؛ ووصولُ الرمز هو الدليل (D-061)
+    done: () => null,
+    go: 'https://dash.cloudflare.com/?to=/:account/:zone/email/routing',
+    goLabel: 'افتح Email Routing',
+  },
+  {
     code: 'M-02',
     title: 'زوج أسرار LinkedIn يجوز فحصُه',
     ifLeft:
@@ -333,7 +345,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     code: 'M-12',
     title: 'مفتاح مرور (Passkey) على كلّ بيئة',
     ifLeft:
-      'كلمة الإدارة (`ADMIN_TOKEN`) وحدَها تحرس اللوحة — **وكلمة تُسرَّب تفتح كلّ شيء**، ' +
+      'رمز البريد وحدَه يحرس اللوحة — **وبريد يُخترَق يفتح كلّ شيء**، ' +
       'ولا عامل ثان يردّه.',
     unblocks: 'guard',
     // يُقرأ من `webauthn_credentials`، ولا يُمرَّر هنا بعد
