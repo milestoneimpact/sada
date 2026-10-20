@@ -171,3 +171,36 @@ describe('ما يحمي الرموز', () => {
     await expect(loadTokens(db, KEY, id)).resolves.toBeTruthy()
   })
 })
+
+describe('مفتاحُ المنظّمة (D-238)', () => {
+  it('رمزُ منظّمةٍ أخرى يُشفَّر بمفتاحٍ مشتقٍّ فلا يُفكّ بالأصل، ويُقرأ بمسارِه', async () => {
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    const id = await upsertAccount(db, 'org_b', { ...IDENTITY, externalId: 'urn:li:person:b' })
+    await saveTokens(db, KEY, id, TOKENS)
+    expect((await loadTokens(db, KEY, id))?.accessToken).toBe(TOKENS.accessToken)
+
+    const row = db.raw.prepare('SELECT access_enc, access_iv, org_id FROM tokens WHERE account_id = ?').get(id) as {
+      access_enc: string
+      access_iv: string
+      org_id: string
+    }
+    expect(row.org_id).toBe('org_b')
+    const { importKey, open, tokenContext } = await import('./crypto')
+    await expect(
+      open(await importKey(KEY), { ciphertext: row.access_enc, iv: row.access_iv }, tokenContext(id, 'access')),
+    ).rejects.toThrow()
+  })
+
+  it('ورمزُ المالك بالمفتاح الأصل كما كان، فلا يُعاد تشفيرُ ما حُفظ', async () => {
+    const id = await upsertAccount(db, 'org_owner', IDENTITY)
+    await saveTokens(db, KEY, id, TOKENS)
+    const row = db.raw.prepare('SELECT access_enc, access_iv FROM tokens WHERE account_id = ?').get(id) as {
+      access_enc: string
+      access_iv: string
+    }
+    const { importKey, open, tokenContext } = await import('./crypto')
+    expect(
+      await open(await importKey(KEY), { ciphertext: row.access_enc, iv: row.access_iv }, tokenContext(id, 'access')),
+    ).toBe(TOKENS.accessToken)
+  })
+})

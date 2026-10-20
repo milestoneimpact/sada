@@ -70,6 +70,33 @@ export async function importKey(keyMaterial: string): Promise<CryptoKey> {
  * @param context معرّف الحقل وصاحبه، مثل `account:lnkd_7:access`.
  *                القيمة نفسها مطلوبة عند فكّ التشفير.
  */
+/**
+ * مفتاحُ منظّمةٍ مشتقٌّ من المفتاح الأصل (D-238) — HKDF-SHA256 والمنظّمةُ في `info`.
+ * فرمزٌ شُفِّر لمنظّمةٍ لا يُفكّ بمفتاح غيرها ولو اتّحد الأصل، ولا سرَّ جديدًا يُدار.
+ */
+export async function deriveKey(keyMaterial: string, label: string): Promise<CryptoKey> {
+  const raw = fromBase64(keyMaterial)
+  if (raw.byteLength !== KEY_BYTES) {
+    throw new CryptoError(
+      `TOKEN_ENC_KEY يجب أن يكون ${KEY_BYTES} بايت، ووُجد ${raw.byteLength}`,
+    )
+  }
+  if (label.length === 0) throw new CryptoError('اسمُ المفتاح المشتقّ مطلوب')
+  const base = await crypto.subtle.importKey('raw', raw as BufferSource, 'HKDF', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: encoder.encode('sada:org-key:v1') as BufferSource,
+      info: encoder.encode(label) as BufferSource,
+    },
+    base,
+    { name: 'AES-GCM', length: KEY_BYTES * 8 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
 export async function seal(
   key: CryptoKey,
   plaintext: string,
