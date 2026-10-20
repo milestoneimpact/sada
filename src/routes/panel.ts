@@ -1044,7 +1044,7 @@ panel.post('/panel/orgs', async (c) => {
     })
     return back('orgs')
   }
-  await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id }, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id, org: result.id }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُنشئت المنظّمة. انتقل إليها حين تريد العمل فيها.' })
   return back('orgs')
 })
@@ -1059,7 +1059,7 @@ panel.post('/panel/orgs/switch', async (c) => {
     return back('orgs')
   }
   await setActiveOrg(c.env.KV, gate.session, org)
-  await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org }, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org, org }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلتَ إلى المنظّمة.' })
   return back('orgs')
 })
@@ -2015,7 +2015,7 @@ panel.get('/panel/report', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const reports = await listReports(c.env.DB)
+  const reports = await listReports(c.env.DB, activeOrg(session.record))
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({
     reports,
@@ -2091,12 +2091,12 @@ panel.get('/panel/report/:week', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const stored = await readReport(c.env.DB, c.req.param('week'))
+  const stored = await readReport(c.env.DB, activeOrg(session.record), c.req.param('week'))
   if (stored === null) return notFoundResponse(c.req.raw, 'لا تقريرَ لهذا الأسبوع')
 
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({
-    reports: await listReports(c.env.DB),
+    reports: await listReports(c.env.DB, activeOrg(session.record)),
     current: stored,
     suggestions: await openSuggestions(c.env.DB),
     promoCapUsd: settings.weeklyPromoCapUsd,

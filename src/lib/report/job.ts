@@ -7,6 +7,7 @@
  */
 import type { Db } from '../tokens'
 import { readSettings } from '../settings'
+import { OWNER_ORG } from '../tenancy'
 import { buildWeekly, saveWeekly, weekBounds, type WeeklyReport } from './weekly'
 import { pick, saveSuggestion, type PromoteOutcome } from './promote'
 
@@ -20,10 +21,11 @@ export interface WeeklyOutcome {
   readonly suggested: boolean
 }
 
+// ‏الدورةُ لمنظّمة المالك وحدها حتى تمرّ المجدولاتُ على المنظّمات (D-227)
 export async function runWeekly(db: Db, now: Date): Promise<WeeklyOutcome> {
   const { from, to, id } = weekBounds(now)
   const { report, posts } = await buildWeekly(db, from, to)
-  const written = await saveWeekly(db, id, report)
+  const written = await saveWeekly(db, OWNER_ORG, id, report)
 
   const settings = await readSettings(db)
   const promotion = pick(posts, settings.weeklyPromoCapUsd)

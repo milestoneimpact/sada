@@ -241,33 +241,41 @@ describe('الحفظُ شهادة', () => {
    */
   it('أوّلُ كتابةٍ هي الشهادة، والثانيةُ لا تدهسها', async () => {
     const first = summarize([], FROM, TO, 1.5)
-    expect(await saveWeekly(db, '2026-08-24', first)).toBe(true)
+    expect(await saveWeekly(db, 'org_owner', '2026-08-24', first)).toBe(true)
 
     const later = summarize([], FROM, TO, 99)
-    expect(await saveWeekly(db, '2026-08-24', later)).toBe(false)
+    expect(await saveWeekly(db, 'org_owner', '2026-08-24', later)).toBe(false)
 
-    const stored = await readReport(db, '2026-08-24')
+    const stored = await readReport(db, 'org_owner', '2026-08-24')
     expect(stored?.body.spendUsd).toBe(1.5)
   })
 
   it('ويُقرأ بنسخته — فقارئٌ يجد رقما لا يعرفه يقول ذلك', async () => {
-    await saveWeekly(db, '2026-08-24', summarize([], FROM, TO, 0))
-    const stored = await readReport(db, '2026-08-24')
+    await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
+    const stored = await readReport(db, 'org_owner', '2026-08-24')
     expect(stored?.body.version).toBe(1)
   })
 
   it('وجسدٌ فاسدٌ يُسقَط وحده ولا يُسقط القائمة', async () => {
-    await saveWeekly(db, '2026-08-24', summarize([], FROM, TO, 0))
+    await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
     db.raw.exec(
       `INSERT INTO reports (id, from_at, to_at, body_json)
        VALUES ('2026-08-17', '2026-08-17T00:00:00Z', '2026-08-24T00:00:00Z', '{oops')`,
     )
-    const list = await listReports(db)
+    const list = await listReports(db, 'org_owner')
     expect(list.map((r) => r.id)).toEqual(['2026-08-24'])
   })
 
+  it('منظّمةٌ لا ترى تقاريرَ غيرها (D-227)', async () => {
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
+    expect(await listReports(db, 'org_b')).toEqual([])
+    expect(await readReport(db, 'org_b', '2026-08-24')).toBeNull()
+    expect(await readReport(db, 'org_owner', '2026-08-24')).not.toBeNull()
+  })
+
   it('ولا تقريرَ بهذا المفتاح يعود null لا عطلا', async () => {
-    expect(await readReport(db, 'لا-شيء')).toBeNull()
+    expect(await readReport(db, 'org_owner', 'لا-شيء')).toBeNull()
   })
 })
 
