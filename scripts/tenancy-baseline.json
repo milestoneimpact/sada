@@ -1,5 +1,5 @@
 {
-  "accounts": 23,
+  "accounts": 19,
   "alert_outbox": 4,
   "audit_log": 2,
   "content_items": 7,
@@ -18,6 +18,6 @@
   "sources": 12,
   "task_routes": 2,
   "token_alerts": 4,
-  "tokens": 10,
+  "tokens": 9,
   "uploads": 11
 }

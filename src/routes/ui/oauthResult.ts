@@ -465,6 +465,21 @@ export function unconfiguredBody(platform: Platform): string {
   </div>`
 }
 
+/** الحسابُ مربوطٌ في منظّمةٍ أخرى (D-229): لم يُنقَل ولم يُحفَظ رمز. */
+export function elsewhereBody(platform: Platform, displayName: string): string {
+  const label = LABEL[platform]
+  return `${head(platform, 'لم يكتمل', 'الحسابُ مربوطٌ في منظّمةٍ أخرى',
+    `وافقت ${escapeHtml(label)} على «${escapeHtml(displayName)}»، وهو مربوطٌ من قبلُ في منظّمةٍ أخرى. <b>ولم يُنقَل منها ولم يُحفَظ شيء.</b>`)}
+  <div class="card">
+    <h2>ما يُفعَل</h2>
+    <p class="hint">انتقل إلى المنظّمة التي تملكه من الإعدادات، أو افصله منها أوّلًا ثمّ اربطه هنا.</p>
+    <div class="row mt-3">
+      <a class="btn btn-primary" href="${panelHref('orgs')}">المنظّمات</a>
+      <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+    </div>
+  </div>`
+}
+
 export interface UnreachedData {
   readonly platform: Platform
   /**

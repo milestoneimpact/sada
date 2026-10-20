@@ -7,6 +7,7 @@
 import { importKey, open, seal, tokenContext } from './crypto'
 import type { TokenResponse } from './oauth/exchange'
 import type { Platform } from './oauth/providers'
+import { changedRows } from './dbResult'
 
 /** ما يكفي D1 من واجهة، حتى تُختبر الوحدة على SQLite حقيقي. */
 export interface Db {
@@ -57,18 +58,37 @@ export function accountId(identity: AccountIdentity): string {
   return `${identity.platform}:${identity.kind}:${identity.externalId}`
 }
 
-export async function upsertAccount(db: Db, identity: AccountIdentity): Promise<string> {
+/** الحسابُ مربوطٌ في منظّمةٍ أخرى: لا يُنقَل منها صامتًا (D-229). */
+export class AccountElsewhere extends Error {
+  override readonly name = 'AccountElsewhere'
+  constructor(readonly displayName: string) {
+    super(`${displayName} مربوطٌ في منظّمةٍ أخرى`)
+  }
+}
+
+/**
+ * يربط الحسابَ بالمنظّمة. **والحسابُ الخارجيُّ لمنظّمةٍ واحدة**: ربطُه من
+ * منظّمةٍ أخرى يُرفَض ولا يُنقَل، وإلّا انتقلت رموزُه ومنشوراتُه المجدولة
+ * إلى من ربطه أخيرًا بلا علم الأولى.
+ */
+export async function upsertAccount(
+  db: Db,
+  org: string,
+  identity: AccountIdentity,
+): Promise<string> {
   const id = accountId(identity)
-  await db
+  const result = await db
     .prepare(
-      `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
-       VALUES (?, ?, ?, ?, ?, 'active')
+      `INSERT INTO accounts (id, org_id, platform, kind, external_id, display_name, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'active')
        ON CONFLICT (platform, kind, external_id)
        DO UPDATE SET display_name = excluded.display_name, status = 'active',
-                     needs_reauth_at = NULL`,
+                     needs_reauth_at = NULL
+        WHERE accounts.org_id = excluded.org_id`,
     )
-    .bind(id, identity.platform, identity.kind, identity.externalId, identity.displayName)
+    .bind(id, org, identity.platform, identity.kind, identity.externalId, identity.displayName)
     .run()
+  if (!changedRows(result)) throw new AccountElsewhere(identity.displayName)
   return id
 }
 

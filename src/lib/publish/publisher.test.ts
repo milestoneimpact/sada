@@ -35,7 +35,7 @@ async function seedPost(options: {
   status?: string
   kind?: 'member' | 'org'
 }): Promise<string> {
-  const accountId = await upsertAccount(db, {
+  const accountId = await upsertAccount(db, 'org_owner', {
     platform: options.platform,
     kind: options.kind ?? 'member',
     externalId: options.platform === 'x' ? '4242' : 'abc',
@@ -492,7 +492,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
   }
 
   async function seedTikTok(options: { scopes?: string; clip?: boolean } = {}): Promise<string> {
-    const accountId = await upsertAccount(db, {
+    const accountId = await upsertAccount(db, 'org_owner', {
       platform: 'tiktok',
       kind: 'member',
       externalId: 'tt-1',
@@ -718,7 +718,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
   const SESSION = 'https://upload.googleapis.com/session/abc'
 
   async function seedYouTube(options: { scopes?: string; clip?: boolean } = {}): Promise<string> {
-    const accountId = await upsertAccount(db, {
+    const accountId = await upsertAccount(db, 'org_owner', {
       platform: 'youtube',
       kind: 'member',
       externalId: 'yt-1',
@@ -841,7 +841,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
   const BASE = 'https://sada2.basserh.com'
 
   async function seedInstagram(options: { media?: 'image' | 'video' | 'none' } = {}) {
-    const accountId = await upsertAccount(db, {
+    const accountId = await upsertAccount(db, 'org_owner', {
       platform: 'instagram',
       kind: 'member',
       externalId: '17841400000000000',
