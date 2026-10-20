@@ -318,7 +318,7 @@ function card(view: ChannelView, now: Date): string {
   const { spec, accounts } = view
   const h = channelHealth(view, now)
   const logo = LOGOS[spec.id] ?? ''
-  const badge = statusBadge(h.tone, TONE_GLYPH[h.tone], h.label)
+  const badge = statusBadge(h.tone, TONE_GLYPH[h.tone], h.label, `data-fact="${escapeHtml(spec.id)}:${h.kind}"`)
 
   const rows = accounts
     .map((a) => `<div class="ch-acc">

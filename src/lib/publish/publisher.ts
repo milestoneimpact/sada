@@ -98,8 +98,8 @@ async function preflightFailed(
     await db
       .prepare(
         `INSERT INTO publish_attempts
-           (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'failed')`,
+           (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'failed', (SELECT org_id FROM posts WHERE id = ?2))`,
       )
       .bind(
         crypto.randomUUID(),
@@ -317,8 +317,8 @@ export async function publishPost(
   await db
     .prepare(
       `INSERT INTO publish_attempts
-         (id, post_id, idempotency_key, attempt_no, request_json, status)
-       VALUES (?, ?, ?, ?, ?, 'sent')`,
+         (id, post_id, idempotency_key, attempt_no, request_json, status, org_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', (SELECT org_id FROM posts WHERE id = ?2))`,
     )
     .bind(
       attemptId,

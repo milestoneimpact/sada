@@ -236,7 +236,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   // وهي كلفةٌ وقعت، فتبقى في الدفتر بمعرّف الأسبوع
   await deps.db.prepare("DELETE FROM plans WHERE week_start = ?").bind(week).run()
   await deps.db
-    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status) VALUES (?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id) VALUES (?, ?, ?, ?, ?, \'org_owner\')')
     .bind(planId, week, JSON.stringify(read.plan), ran, 'draft')
     .run()
 

@@ -1389,6 +1389,15 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
+  it('وحالُ المنصّة تُقال مرّةً في البطاقة بـ`data-fact` (D-235)', () => {
+    const now = new Date('2026-09-27T12:00:00Z')
+    const html = channelsSection(viewChannels([{
+      id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: null,
+    }], () => true), now)
+    expect(html.match(/data-fact="linkedin:broken"/g)).toHaveLength(1)
+  })
+
   it('الزرُّ والحقلُ على اللمس بقياسهما على الحاسوب — والحقلُ ‏١٦ في كلّ عرض (D-185)', () => {
     const TOUCH = '@media(pointer:coarse)'
     for (const s of ['button', '.btn', 'textarea']) expect(css.rule(s, TOUCH)['font-size'], s).toBeUndefined()
@@ -1922,7 +1931,7 @@ describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)'
   })
 })
 
-describe('مراحلُ الانتظار الطويل (7.11 · D-235)', () => {
+describe('مراحلُ الانتظار الطويل (7.11 · D-236)', () => {
   it('الكتابةُ والصورةُ والمقطعُ بمراحلَ مسمّاة، والسكربتُ يقف عند آخرها ويقول «ابقَ في الصفحة» بعد عشر ثوانٍ', async () => {
     const { STAGES, stagesAttr } = await import('./components/stages')
     for (const s of Object.values(STAGES)) {

@@ -43,7 +43,7 @@ const META = { name: 'C:\\clips\\قيادة.mp4', mime: 'video/mp4', bytes: PART
 describe('الرفع', () => {
   it('يبدأ ويقبل القطعَ بأطوالها ويجمعها، والاسمُ بلا مسار', async () => {
     const r2 = multipart()
-    const start = await startUpload(db, r2.bucket, META, 'u1')
+    const start = await startUpload(db, 'org_owner', r2.bucket, META, 'u1')
     expect(start).toEqual({ ok: true, id: 'u1', partBytes: PART_BYTES, parts: 3 })
 
     expect(await uploadPart(db, r2.bucket, 'u1', 4, new ArrayBuffer(10))).toMatchObject({ ok: false })
@@ -66,8 +66,8 @@ describe('الرفع', () => {
 
   it('النوعُ والحجمُ يُفحصان قبل أن يُفتح رفعٌ في R2', async () => {
     const r2 = multipart()
-    expect(await startUpload(db, r2.bucket, { ...META, mime: 'video/x-msvideo' })).toMatchObject({ ok: false })
-    expect(await startUpload(db, r2.bucket, { ...META, bytes: MAX_UPLOAD_BYTES + 1 })).toMatchObject({ ok: false })
+    expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, mime: 'video/x-msvideo' })).toMatchObject({ ok: false })
+    expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: MAX_UPLOAD_BYTES + 1 })).toMatchObject({ ok: false })
     expect(r2.parts.size).toBe(0)
     expect(await listUploads(db)).toEqual([])
   })
@@ -89,7 +89,7 @@ describe('حدودُ المنصّات', () => {
 describe('منشوراتٌ من مقطع', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
-    await startUpload(db, r2.bucket, { ...META, bytes: 10 }, id)
+    await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
     await uploadPart(db, r2.bucket, id, 1, new ArrayBuffer(10))
     await completeUpload(db, r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
   }
@@ -164,8 +164,8 @@ describe('منشوراتٌ من مقطع', () => {
 describe('الرفعُ المتروك (D-182)', () => {
   it('ما بقي «يُرفع» أكثرَ من ستّ ساعات يُلغى في R2 ويُعلَّم فاشلًا، والحديثُ يبقى', async () => {
     const r2 = multipart()
-    await startUpload(db, r2.bucket, META, 'old')
-    await startUpload(db, r2.bucket, META, 'new')
+    await startUpload(db, 'org_owner', r2.bucket, META, 'old')
+    await startUpload(db, 'org_owner', r2.bucket, META, 'new')
     db.raw.exec(`UPDATE uploads SET created_at = datetime('now', '-7 hours') WHERE id = 'old'`)
     expect(await expireStaleUploads(db, r2.bucket, new Date())).toBe(1)
     expect(r2.aborted).toEqual(['upload/old.mp4'])
@@ -234,7 +234,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
 describe('نصٌّ لكلّ منصّة (D-190)', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
-    await startUpload(db, r2.bucket, { ...META, bytes: 10 }, id)
+    await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
     await uploadPart(db, r2.bucket, id, 1, new ArrayBuffer(10))
     await completeUpload(db, r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
   }
@@ -348,7 +348,7 @@ describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
 
   async function three(): Promise<string[]> {
     const r2 = multipart()
-    await startUpload(db, r2.bucket, { ...META, bytes: 10 }, 'u1')
+    await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, 'u1')
     await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(10))
     await completeUpload(db, r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
     for (const id of ['yt', 'ig']) {
@@ -391,7 +391,7 @@ describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
 describe('مكتبةٌ فوق المئة (مراجعة ر-5)', () => {
   async function library(extra: number): Promise<void> {
     const r2 = multipart()
-    await startUpload(db, r2.bucket, { ...META, bytes: 10 }, 'u1')
+    await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, 'u1')
     await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(10))
     await completeUpload(db, r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
     await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'instagram'], caption: 'نصّ', approve: false, by: 'o' })

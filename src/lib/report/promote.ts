@@ -124,8 +124,8 @@ export async function saveSuggestion(db: Db, candidate: Candidate): Promise<bool
   try {
     const result = await db
       .prepare(
-        `INSERT INTO promotion_suggestions (post_id, suggested_budget, currency, reason)
-         VALUES (?, ?, 'USD', ?)
+        `INSERT INTO promotion_suggestions (post_id, suggested_budget, currency, reason, org_id)
+         VALUES (?1, ?2, 'USD', ?3, (SELECT org_id FROM posts WHERE id = ?1))
          ON CONFLICT(post_id) DO NOTHING`,
       )
       .bind(candidate.post.id, candidate.budgetUsd, candidate.reason)

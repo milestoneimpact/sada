@@ -83,7 +83,7 @@ const TO = new Date('2026-08-31T00:00:00Z')
 describe('ما يدخل التقرير', () => {
   it('يقرأ وقتَ النشر من المحاولة الناجحة لا من حالة الصفّ', async () => {
     published('p1', 'x', '2026-08-25T10:00:00.000Z')
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(1)
   })
 
@@ -92,7 +92,7 @@ describe('ما يدخل التقرير', () => {
     published('early', 'x', '2026-08-23T23:59:59.000Z')
     published('edge', 'x', '2026-08-24T00:00:00.000Z')
     published('late', 'x', '2026-08-31T00:00:00.000Z')
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(1)
   })
 
@@ -114,7 +114,7 @@ describe('ما يدخل التقرير', () => {
               ('s', 'x', 'post', 1, 10, 10, '2026-09-27 20:00:00'),
               ('n', 'x', 'post', 1, 100, 100, '2026-09-28 01:00:00')`,
     )
-    const { report, posts } = await buildWeekly(db, from, to)
+    const { report, posts } = await buildWeekly(db, 'org_owner', from, to)
     expect(posts.map((p) => p.id)).toEqual(['mon', 'sun'])
     expect(report.published).toBe(2)
     expect(report.spendUsd).toBe(11)
@@ -127,7 +127,7 @@ describe('ما يدخل التقرير', () => {
        VALUES ('ghost', 'a-x', 'x', 'text', 'ن', '2026-08-25T10:00:00Z', 'published',
                'k-ghost', 'omar', '2026-08-25T10:00:00Z')`,
     )
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(0)
   })
 })
@@ -142,7 +142,7 @@ describe('و`null` ليست صفرا', () => {
   it('مجموعُ ظهورٍ كلُّه غيرُ مقيسٍ يعود null لا صفرا', async () => {
     published('l1', 'linkedin', '2026-08-25T10:00:00.000Z')
     measured('l1', '24h', { impressions: null, reactions: 4 })
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     const li = report.platforms.find((p) => p.platform === 'linkedin')!
     expect(li.impressions).toBeNull()
     expect(li.interactions).toBe(4)
@@ -153,7 +153,7 @@ describe('و`null` ليست صفرا', () => {
     published('x2', 'x', '2026-08-26T10:00:00.000Z')
     measured('x1', '24h', { impressions: 100, reactions: 5 })
     // x2 لم يُقَس بعد
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     const x = report.platforms.find((p) => p.platform === 'x')!
     expect(x.published).toBe(2)
     expect(x.measured).toBe(1)
@@ -163,12 +163,12 @@ describe('و`null` ليست صفرا', () => {
 
   it('وما لم يُقَس يُقال نصّا ولا يُترك ليُستنتَج', async () => {
     published('x1', 'x', '2026-08-25T10:00:00.000Z')
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.notes.join(' ')).toContain('لم يُقَس بعد')
   })
 
   it('وأسبوعٌ بلا منشورٍ يقولها ولا يعرض أصفارا', async () => {
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(0)
     expect(report.platforms).toEqual([])
     expect(report.notes.join(' ')).toContain('لا منشورَ خرج')
@@ -286,7 +286,7 @@ describe('الإنفاق', () => {
        VALUES ('c1', 'x', 'post', 1, 0.5, 0.5, '2026-08-25T10:00:00.000Z'),
               ('c2', 'x', 'post', 1, 9.0, 9.0, '2026-09-02T10:00:00.000Z')`,
     )
-    const { report } = await buildWeekly(db, FROM, TO)
+    const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.spendUsd).toBe(0.5)
   })
 })

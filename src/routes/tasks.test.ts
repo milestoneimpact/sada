@@ -194,7 +194,9 @@ describe('وشريطُ الرموز المقتربة', () => {
   it('وإذنُ وصولٍ قريبٌ بلا تجديد: «تحتاج إعادةَ ربطٍ» بعدد الأيّام', async () => {
     seed(4, 'access')
     const html = await panel()
-    expect(html).toMatch(/<b><bdi>X<\/bdi><\/b>: تحتاج إعادةَ ربطٍ خلال [34] أيّام/)
+    // ‏الشريطُ يسمّي ويحيل، والحالُ بأيّامها في البلاطة مرّةً (D-235)
+    expect(html).toContain('<b><bdi>X</bdi></b> تحتاج يدَك.')
+    expect(html).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادةَ ربطٍ خلال [34] أيّام/)
     expect(html).toContain('class="toast-note warn"')
     expect(html).not.toContain('إذنُ الوصول')
   })
@@ -202,7 +204,7 @@ describe('وشريطُ الرموز المقتربة', () => {
   it('وإذنُ تجديدٍ قريب: الحكمُ نفسُه، فالربطُ ينقطع بانقضائه', async () => {
     seed(2, 'refresh')
     const html = await panel()
-    expect(html).toMatch(/<b><bdi>X<\/bdi><\/b>: تحتاج إعادةَ ربطٍ خلال (يوم|يومين)/)
+    expect(html).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادةَ ربطٍ خلال (يوم|يومين)/)
     expect(html).not.toContain('إذنُ التجديد')
   })
 })

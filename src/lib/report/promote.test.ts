@@ -4,7 +4,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { writeSetting } from '../settings'
-import { runWeekly } from './job'
+import { runWeekly, runWeeklyAll } from './job'
+import { readReport } from './weekly'
 import {
   MAX_SHARE, MIN_COHORT, OUTLIER_FACTOR,
   decide, openSuggestions, pick, saveSuggestion,
@@ -186,6 +187,14 @@ describe('الدورةُ الأسبوعيّة', () => {
     expect(again.written).toBe(false)
     const rows = db.raw.prepare('SELECT count(*) AS n FROM reports').get() as { n: number }
     expect(rows.n).toBe(1)
+  })
+
+  it('ولكلّ منظّمةٍ تقريرُها، ولا ترى تقريرَ غيرها (D-234)', async () => {
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    const all = await runWeeklyAll(db, new Date('2026-09-06T04:17:00Z'))
+    expect(all.map((o) => o.id).sort()).toEqual(['2026-08-24', '2026-08-24.org_b'])
+    expect(await readReport(db, 'org_b', '2026-08-24')).toBeNull()
+    expect(await readReport(db, 'org_b', '2026-08-24.org_b')).not.toBeNull()
   })
 
   /** **ولا مسارَ إنفاقٍ في المستودع أصلا** — أقوى من شرطٍ في الشيفرة. */

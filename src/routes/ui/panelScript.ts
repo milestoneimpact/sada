@@ -243,7 +243,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
       var st=document.getElementById('flash');
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);
-        // ‏ومراحلُ الانتظار الطويل (7.11 · D-235): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
+        // ‏ومراحلُ الانتظار الطويل (7.11 · D-236): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
         var stages=(f.dataset.stages||'').split('|').filter(Boolean);
         if(stages.length){var i=0, t0=Date.now(), stay=' ابقَ في الصفحة حتّى ينتهي، فمغادرتُها تقطعه.';
           var tick=function(){if(!p.isConnected)return; i=Math.min(i+1,stages.length-1);
@@ -403,7 +403,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
     });
     /*
-     * ‏**ويُحفظ على الخادم وحدَه** (D-232): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
+     * ‏**ويُحفظ على الخادم وحدَه** (D-233): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
      * ‏«حُفظ» بجوار العنوان. فلا يُرى زرُّ «احفظ» بعد أن يعمل هذا؛ وبلا سكربت يبقى الزرُّ كما كان.
      */
     var edF=document.getElementById('ed-form');
@@ -448,7 +448,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var body=new FormData(f); if(sb&&sb.name)body.append(sb.name,sb.value);
     var id=String(body.get('id')||'');
     /*
-     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-232، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
+     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-233، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
      * ‏ثمّ تُبدَّل ببطاقة الخادم حين يصل. والخادمُ يبقى الحَكَم: إن رفض أو انقطع الاتّصالُ عادت البطاقةُ كما كانت وقيل السبب.
      */
     var opt=sb&&sb.getAttribute('data-optimistic'), held=document.getElementById('d-'+id);
@@ -497,7 +497,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   });
 
   /*
-   * ‏**الحدودُ تُحفظ وحدَها** (D-232، من Notion): حقلُ الرقم في نموذجٍ معلَّم «data-autosave» يُرسَل حين يتغيّر بـ«auto=1»،
+   * ‏**الحدودُ تُحفظ وحدَها** (D-233، من Notion): حقلُ الرقم في نموذجٍ معلَّم «data-autosave» يُرسَل حين يتغيّر بـ«auto=1»،
    * ‏ويُقال ما حُفظ بجواره («حُفظ 5» أو القيمةُ بعد قصّها إلى المدى). ويُخفى «حفظ» حين يعمل هذا، ويبقى بلا سكربت.
    */
   document.querySelectorAll('form[data-autosave]').forEach(function(f){

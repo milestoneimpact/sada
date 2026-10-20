@@ -179,15 +179,16 @@ export async function disconnectAccount(
       db
         .prepare(
           `INSERT INTO publish_attempts
-             (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+             (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
            VALUES (?, ?, ?,
              (SELECT coalesce(max(attempt_no), 0) + 1 FROM publish_attempts WHERE post_id = ?),
-             ?, ?, 'failed')`,
+             ?, ?, 'failed', ?)`,
         )
         .bind(
           crypto.randomUUID(), post.id, post.idempotency_key, post.id,
           JSON.stringify({ platform: target.platform, preflight: true }),
           JSON.stringify({ error: 'account_disconnected', preflight: true }),
+          target.org,
         ),
       db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND status = 'queued'`).bind(post.id),
     )

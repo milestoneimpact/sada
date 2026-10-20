@@ -191,8 +191,8 @@ export async function analyzeSource(
     })
     await deps.db
       .prepare(
-        `INSERT INTO content_items (id, source_id, summary, themes_json, worth_score)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO content_items (id, source_id, summary, themes_json, worth_score, org_id, brand_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, (SELECT org_id FROM sources WHERE id = ?2), (SELECT brand_id FROM sources WHERE id = ?2))`,
       )
       .bind(crypto.randomUUID(), source.id, analysis.summary, themes, analysis.worth_score)
       .run()
