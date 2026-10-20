@@ -185,7 +185,7 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
     if (journey.startLoggedOut === true) {
       await page.goto(`${stack.url}/panel/report`)
     } else {
-      await login(page, stack.url)
+      await login(page, stack)
     }
     await page.waitForLoadState('networkidle')
     await m.start(journey.startLoggedOut === true ? 'صفحة الدخول' : 'الرئيسيّة')

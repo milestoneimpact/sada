@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs'
 import type { Locator, Page } from 'playwright'
 import { Blocked, Meter } from './meter'
 import type { Stack } from './server'
-import { LOCAL_ADMIN_TOKEN } from './server'
+import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
+import { codeFrom } from '../../src/test/emailLogin'
 
 export interface Verdict {
   readonly success: boolean
@@ -102,11 +103,20 @@ function scheduleForm(page: Page, postId: string): Locator {
   return page.locator(`form[action="/panel/drafts/schedule"]:has(input[name="id"][value="${postId}"])`)
 }
 
-/** الدخولُ بكلمة الإدارة — تمهيدٌ لا يُعدّ إلّا في ر-11. */
-export async function login(page: Page, url: string): Promise<void> {
-  await page.goto(`${url}/panel`)
-  await page.locator('input[name="token"]').fill(LOCAL_ADMIN_TOKEN)
-  await page.locator('form button[type="submit"]').first().click()
+/** آخرُ رمز دخولٍ وصل «الصندوق» — يُقرأ من الرسالة كما يقرؤه المالك (D-245). */
+export function lastCode(stack: Pick<Stack, 'mail'>): string {
+  const last = stack.mail[stack.mail.length - 1]
+  return last === undefined ? '' : codeFrom(last)
+}
+
+/** الدخولُ برمز البريد — تمهيدٌ لا يُعدّ إلّا في ر-11. */
+export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail'>): Promise<void> {
+  if (!/\/panel/.test(page.url())) await page.goto(`${stack.url}/panel`)
+  await page.locator('input[name="email"]').fill(OWNER_EMAIL)
+  await page.locator('form[action^="/panel/login/code"] button[type="submit"]').first().click()
+  await page.locator('input[name="code"]').waitFor()
+  await page.locator('input[name="code"]').fill(lastCode(stack))
+  await page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first().click()
   await page.waitForLoadState('networkidle')
 }
 
@@ -518,8 +528,10 @@ const R11: Journey = {
   plan: { today: 'يُقاس', target: '2' },
   startLoggedOut: true,
   async run({ page, m, stack }) {
-    await m.type(page.locator('input[name="token"]'), LOCAL_ADMIN_TOKEN, 'لصق كلمة الإدارة', { pasted: true })
-    await m.tap(page.locator('form button[type="submit"]').first(), '«ادخل»', { key: true })
+    await m.type(page.locator('input[name="email"]'), OWNER_EMAIL, 'كتابة البريد', { pasted: true })
+    await m.tap(page.locator('form[action^="/panel/login/code"] button[type="submit"]').first(), '«أرسل الرمز»')
+    await m.type(page.locator('input[name="code"]'), lastCode(stack), 'لصق الرمز من البريد', { pasted: true })
+    await m.tap(page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first(), '«ادخل»', { key: true })
     const landed = new URL(page.url())
     m.note(`بعد الدخول: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
     const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')

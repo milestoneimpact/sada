@@ -12,7 +12,7 @@ const stack = await startServer({ port: 8792 })
 const browser = await chromium.launch({ executablePath: CHROMIUM })
 try {
   const page = await browser.newPage()
-  await login(page, stack.url)
+  await login(page, stack)
   for (const path of ['/panel', '/panel/library', '/panel/accounts', '/panel/settings', '/panel/analysis', '/panel/report', '/panel/tasks']) {
     const res = await page.request.get(`${stack.url}${path}`)
     const body = await res.body()

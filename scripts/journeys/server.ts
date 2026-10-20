@@ -19,6 +19,7 @@
  * **ولا سرَّ حقيقيًّا هنا**: `ADMIN_TOKEN` ثابتٌ للاختبار، و`TOKEN_ENC_KEY` يُولَّد
  * في كلّ تشغيل، ومفاتيحُ المزوّدين نصوصٌ مزيَّفة لا تفتح شيئًا.
  */
+import { registerHooks } from 'node:module'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
@@ -28,6 +29,18 @@ import { toBase64 } from '../../src/lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../../src/test/fakes'
 import { fakeAi, heldQueue, installNetwork, memoryBucket, type NetCall } from './fakes'
 import { seed, type Seeded } from './seed'
+import type { EmailMessage } from '../../src/test/cloudflareEmail'
+
+// ‏`cloudflare:email` وحدةٌ في Worker وحدَه (D-245): يُستبدَل ببديل الاختبار نفسِه الذي في `vitest.config.ts`،
+// ‏فرمزُ الدخول يُبنى ويُحفظ في `stack.mail` ولا يُرسَل
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier === 'cloudflare:email') {
+      return { url: new URL('../../src/test/cloudflareEmail.ts', import.meta.url).href, shortCircuit: true }
+    }
+    return next(specifier, context)
+  },
+})
 
 /** كلمةُ الإدارة المحلّيّة — للاختبار وحده، ولا تصلح لبيئةٍ حقيقيّة. */
 export const LOCAL_ADMIN_TOKEN = 'local-journeys-admin-7Qm2Xc9Lp4Vt8Rb'
@@ -43,6 +56,8 @@ export interface Stack {
   publishQueue: ReturnType<typeof heldQueue>
   generateQueue: ReturnType<typeof heldQueue>
   seeded: Seeded
+  /** ما «أُرسل» من بريد — ومنه يُقرأ رمزُ الدخول كما يقرؤه المالك من صندوقه. */
+  readonly mail: EmailMessage[]
   readonly calls: NetCall[]
   /** أخطاءُ الخادم (500) — تُعرض في التقرير ولا تُبتلَع. */
   readonly errors: { at: string; path: string; message: string }[]
@@ -158,11 +173,13 @@ export async function startServer(options: StartOptions = {}): Promise<Stack> {
     url: origin,
     port,
     ...state,
+    mail: [],
     calls: network.calls,
     errors,
     async reset() {
       Object.assign(stack, await fresh())
       network.calls.length = 0
+      stack.mail.length = 0
     },
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -176,6 +193,7 @@ export async function startServer(options: StartOptions = {}): Promise<Stack> {
     DRIVE_FOLDER_ID: 'local-drive-folder',
     DB: stack.db,
     KV: stack.kv,
+    EMAIL: { async send(message: EmailMessage) { stack.mail.push(message) } },
     MEDIA: stack.bucket,
     PUBLISH_QUEUE: stack.publishQueue,
     GENERATE_QUEUE: stack.generateQueue,
@@ -223,7 +241,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const port = Number(process.env['PORT'] ?? 8787)
   const stack = await startServer({ port })
   console.log(`صدى — نسخة محلّيّة: ${stack.url}/panel`)
-  console.log(`كلمة الإدارة المحلّيّة: ${LOCAL_ADMIN_TOKEN}`)
+  console.log('الدخول: milestonesimpact@gmail.com ثمّ «أرسل الرمز» — والرمزُ يُطبع هنا')
+  const push = stack.mail.push.bind(stack.mail)
+  stack.mail.push = (...m) => { for (const x of m) console.log(`رمز الدخول: ${/\b(\d{6})\b/.exec(new TextDecoder().decode(Uint8Array.from(atob((x.raw.split('\r\n\r\n')[1] ?? '').replace(/\s+/g, '')), (c) => c.charCodeAt(0))))?.[1] ?? '؟'}`); return push(...m) }
   console.log('المزوّدون مزيَّفون، والشبكة الخارجيّة مقطوعة. Ctrl+C للإيقاف.')
   const stop = () => {
     void stack.close().then(() => process.exit(0))
