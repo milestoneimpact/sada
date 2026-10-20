@@ -4,7 +4,7 @@
  * لا رمز خام يعبر من هنا إلى D1، ولا رمز مشفر يعبر إلى خارج هذه الوحدة إلا
  * مفكوكا لمن طلبه صراحة (D-005). ولا تُسجل قيمة رمز في أي مسار.
  */
-import { importKey, open, seal, tokenContext } from './crypto'
+import { deriveKey, importKey, open, seal, tokenContext } from './crypto'
 import type { TokenResponse } from './oauth/exchange'
 import type { Platform } from './oauth/providers'
 import { changedRows } from './dbResult'
@@ -92,6 +92,14 @@ export async function upsertAccount(
   return id
 }
 
+/**
+ * مفتاحُ رموز المنظّمة (D-238): المالكُ بالمفتاح الأصل فلا يُعاد تشفيرُ رمزٍ قائم،
+ * وغيرُه بمفتاحٍ مشتقٍّ باسمه. والاسمُ حرفيٌّ هنا لا من `tenancy`، وإلّا دارت الحلقة.
+ */
+async function orgKey(encKey: string, org: string): Promise<CryptoKey> {
+  return org === 'org_owner' ? importKey(encKey) : deriveKey(encKey, org)
+}
+
 /** يشفر الرموز ويكتبها. يستبدل ما كان للحساب نفسه. */
 export async function saveTokens(
   db: Db,
@@ -99,7 +107,13 @@ export async function saveTokens(
   id: string,
   tokens: TokenResponse,
 ): Promise<void> {
-  const key = await importKey(encKey)
+  // ‏منظّمةُ الحساب تُكتب مع الرمز، فالفكُّ يقرأ المفتاحَ الذي شُفِّر به
+  const owner = await db
+    .prepare('SELECT org_id FROM accounts WHERE id = ?')
+    .bind(id)
+    .first<{ org_id: string }>()
+  const org = owner?.org_id ?? 'org_owner'
+  const key = await orgKey(encKey, org)
   const access = await seal(key, tokens.accessToken, tokenContext(id, 'access'))
   const refresh =
     tokens.refreshToken === null
@@ -110,9 +124,10 @@ export async function saveTokens(
     .prepare(
       `INSERT INTO tokens
          (account_id, access_enc, access_iv, refresh_enc, refresh_iv,
-          expires_at, refresh_expires_at, scopes, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          expires_at, refresh_expires_at, scopes, updated_at, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT (account_id) DO UPDATE SET
+         org_id = excluded.org_id,
          access_enc = excluded.access_enc,
          access_iv = excluded.access_iv,
          refresh_enc = excluded.refresh_enc,
@@ -131,6 +146,7 @@ export async function saveTokens(
       tokens.expiresAt,
       tokens.refreshExpiresAt,
       tokens.scopes,
+      org,
     )
     .run()
 }
@@ -143,6 +159,7 @@ interface TokenRow {
   expires_at: string
   refresh_expires_at: string | null
   scopes: string
+  org_id: string
 }
 
 /** يقرأ الرموز ويفك تشفيرها. يعيد `null` إن لم يكن للحساب رمز. */
@@ -154,14 +171,14 @@ export async function loadTokens(
   const row = await db
     .prepare(
       `SELECT access_enc, access_iv, refresh_enc, refresh_iv,
-              expires_at, refresh_expires_at, scopes
+              expires_at, refresh_expires_at, scopes, org_id
          FROM tokens WHERE account_id = ?`,
     )
     .bind(id)
     .first<TokenRow>()
   if (row === null) return null
 
-  const key = await importKey(encKey)
+  const key = await orgKey(encKey, row.org_id)
   const accessToken = await open(
     key,
     { ciphertext: row.access_enc, iv: row.access_iv },

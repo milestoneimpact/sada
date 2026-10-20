@@ -1931,7 +1931,7 @@ describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)'
   })
 })
 
-describe('مراحلُ الانتظار الطويل (7.11 · D-237)', () => {
+describe('مراحلُ الانتظار الطويل (7.11 · D-238)', () => {
   it('الكتابةُ والصورةُ والمقطعُ بمراحلَ مسمّاة، والسكربتُ يقف عند آخرها ويقول «ابقَ في الصفحة» بعد عشر ثوانٍ', async () => {
     const { STAGES, stagesAttr } = await import('./components/stages')
     for (const s of Object.values(STAGES)) {
