@@ -52,6 +52,9 @@ for (const file of files) {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
     }, theme)
     await page.waitForTimeout(250)
+    // ‏**والصعودُ يُنهى قبل الفحص** (D-246): بطاقةٌ في منتصف صعودها نصفُ شفّافة، فيقرأ axe تباينَ ما فيها
+    // ‏أقلَّ ممّا يستقرّ عليه. فيُفحَص الحالُ الأخير، والوميضُ المتكرّر يبقى كما هو
+    await page.evaluate(() => { for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations !== Infinity) a.finish() })
 
     const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze()
     const name = `${file.split('/').pop()}${theme === null ? '' : ' · ليليّ'}`

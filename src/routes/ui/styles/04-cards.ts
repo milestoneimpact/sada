@@ -157,7 +157,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    على سطح يُقرأ زينةً لا بنية. والحشو رمز دوره («--pad-card»: ‏٢٤ ثمّ ‏١٦ على الجوّال). */
 .card{background:var(--surface); border:var(--bd); border-radius:var(--r-card);
   padding:var(--pad-card); box-shadow:var(--sh-1);
-  transition:box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
+  transition:box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+  animation:rise var(--dur-3) var(--ease-rise) both}
 /* بطاقةُ القناة والمسوّدة تحملان فعلا، فترتفعان قليلا عند التحويم: الظلُّ الثاني
    والحدّ الوظيفيّ (خطّة التصميم 7.3). وبطاقات العرض لا ترتفع: حركة بلا فعل خلفها
    تَعِد بما لا يقع. **وكانت قاعدتين** (الثانية آخر الورقة بالظلّ الثالث تغلب
@@ -191,7 +192,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .card-head h3{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 /* ‏حشوُ ما نُقل إلى البطاقة من مكوّنٍ يسبقها في الورقة (٢ج): قاعدتُه قبل «.card» فيغلبه
    «--pad-card» بالترتيب، فيُثبَّت هنا بمحدّد مركّب لا بإعادة إعلان الصنف */
-.card-alert.next{padding:var(--s-4) var(--s-5)}
+.card-alert.next{padding:var(--s-5) var(--s-6); border-radius:var(--r-hero)}
 @media${below('sm')}{.card-alert.next{padding:var(--s-4)}}
 .card.pf{padding:var(--s-3)}
 /* ‏و«.card > p» قاعدةٌ عامّةٌ لفقرة البطاقة (هامشٌ وحرفٌ صغيرٌ وحبرٌ ثانٍ) — وفقراتُ هذه

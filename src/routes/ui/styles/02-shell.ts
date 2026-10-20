@@ -6,11 +6,11 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
 .app{display:grid; grid-template-columns:var(--rail-w) 1fr; min-height:100vh; min-height:100dvh}
 
 /* ── الرافدة ───────────────────────────────────────────────── */
-.rail{background:var(--bg); border-inline-start:var(--bd); display:flex;
+.rail{background:var(--surface); border-inline-start:var(--bd); display:flex;
   flex-direction:column; position:sticky; top:0; height:100dvh; overflow-y:auto; color:var(--ink)}
 /* وكان على الحافّة الداخليّة خيطُ ذهبٍ (::after)؛ نزعته الطبعةُ الرابعة، فلا
    قاعدة له (D-144 · D-148). */
-.rail-head{padding:var(--s-6) var(--s-5) var(--s-5); display:flex; align-items:center; gap:var(--s-3)}
+.rail-head{padding:var(--s-6) var(--s-5) var(--s-4); display:flex; align-items:center; gap:var(--s-3)}
 /* ‏مبدّلُ المنظّمة تحت العلامة (‏scope.ts): اسمُها ثمّ نوعُها وعلاماتُها، وقائمتُه بعرض الرافدة */
 .scope{display:block; margin:0 var(--s-3) var(--s-2)}
 .scope-btn{display:flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-2) var(--s-3);
@@ -29,9 +29,9 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
    فيُقرأ المربّع لطخةً — وهي عين العلّة التي مُنعت في رمز التبويب. */
 /* والعلامةُ وحدها تجمع اللونين: نعناعٌ على عمقٍ ثابتان في الوضعين («MARK»، D-196؛ وكانا حبرًا
    ونحاسًا منذ D-144) — ولا يتكرّر هذا الجمع في موضع آخر، فيبقى للعلامة معناها، **وهي أوّل
-   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٦:١ — تذوب**،
+   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٤:١ — تذوب**،
    فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
-.glyph{display:grid; place-items:center; flex:none; width:var(--s-10); height:var(--s-10); border-radius:var(--r-card);
+.glyph{display:grid; place-items:center; flex:none; width:var(--s-10); height:var(--s-10); border-radius:var(--r-control);
   background:var(--mark-bg); color:var(--mark-fg);
   box-shadow:var(--sh-1), 0 0 0 1px var(--mark-ring)}
 /* نسبةٌ لا قياسٌ ثابت: العلامةُ نفسها تظهر بـ 38 في الرافدة و 50 في
@@ -47,7 +47,9 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
   padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--ink-2);
   border:var(--bd)}
 
-nav.tabs{padding:var(--s-1) var(--s-3) var(--s-4); display:flex; flex-direction:column; gap:1px}
+/* ‏«منشور جديد» في الرافدة (D-246): أبرز ما فيها، بعرضها، تحت مبدّل المنظّمة كما في التصميم المعتمد */
+.rail-new{margin:var(--s-2) var(--s-3) var(--s-1)}
+nav.tabs{padding:var(--s-1) var(--s-3) var(--s-4); display:flex; flex-direction:column; gap:var(--s-0)}
 nav.tabs .lbl{font-size:var(--t-caption); line-height:var(--lh-caption); padding:var(--s-4) var(--s-2) var(--s-1); color:var(--ink-2);
   font-weight:600}
 nav.tabs .sep{display:none}
@@ -66,6 +68,7 @@ nav.tabs .tight{display:none}
    **ورمزُ الحاليّ بحبر الرابط** (D-196): نهارًا كان التركوازُ لا يُرى إلّا في الأزرار والروابط،
    فالهويّة في الصفحة تُقرأ زرًّا داكنًا على ورق. والرمز ليس نصًّا (‏3:1 على المحدَّد) ولا ذهبًا */
 nav.tabs a[aria-current=page]{background:var(--selected); color:var(--ink); position:relative; font-weight:600}
+/* ‏والحاليّ بأرض الهويّة الخافتة «--selected» (D-246)، والحدّ يبقى لوضع التباين العالي */
 nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block:var(--s-2);
   inset-inline-start:0; border-radius:var(--r-pill); width:var(--stroke); background:var(--au)}
 nav.tabs a[aria-current=page] svg{opacity:1; color:var(--link)}

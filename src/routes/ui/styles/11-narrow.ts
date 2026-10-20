@@ -9,6 +9,7 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
 @media${below('md')}{
   .app{grid-template-columns:1fr}
   .rail{position:static; height:auto; border-inline-start:0; border-bottom:var(--bd)}
+  .rail-new{display:none}
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);
     scrollbar-width:thin}
   nav.tabs .lbl{display:none}

@@ -71,7 +71,11 @@ describe('الزرّ (7.1)', () => {
   })
 
   it('الضغط بلا إزاحة بكسل، والتركيز حلقة مرئيّة بحبر التركيز', () => {
-    expect(css.decls().filter((d) => d.selectors.some((s) => /:active/.test(s)) && d.prop === 'transform')).toEqual([])
+    // ‏والضغطةُ تصغيرٌ لا إزاحة منذ D-246: «scale» لا يهزّ الصفّ، والإزاحةُ ممنوعةٌ كما كانت
+    const press = css.decls().filter((d) => d.selectors.some((s) => /:active/.test(s)) && d.prop === 'transform')
+    expect(press.map((d) => d.value).filter((v) => v !== 'scale(.97)' && v !== 'none')).toEqual([])
+    expect(press.some((d) => d.at === '' && d.value === 'scale(.97)')).toBe(true)
+    expect(press.filter((d) => d.value === 'none').every((d) => d.at.includes('prefers-reduced-motion'))).toBe(true)
     expect(css.rule(':focus-visible')).toMatchObject({ outline: 'var(--stroke) solid var(--focus)', 'outline-offset': 'var(--stroke)' })
     expect(css.rule('.btn-primary:active:not(:disabled)').background).toBe('var(--brand-press)')
   })

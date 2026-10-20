@@ -10,8 +10,12 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
   border:var(--bd-clear); padding:var(--s-2) var(--s-4); min-height:var(--tap);
   min-width:var(--tap); box-sizing:border-box; display:inline-flex; align-items:center;
   justify-content:center; gap:var(--s-2); text-decoration:none; white-space:nowrap;
-  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
   border-radius:var(--r-control)}
+/* ‏والضغطة تصغير خفيف لا إزاحة (D-246): «scale» لا يهزّ الصفّ لأنّه لا يغيّر التخطيط */
+.btn:active:not(:disabled):not([aria-disabled="true"]){transform:scale(.97)}
+@media(hover:hover){.btn-primary:hover,.btn-secondary:hover{box-shadow:var(--sh-2)}}
 /* ‏الأوّليّ: فعلٌ واحدٌ في كلّ منطقة، بتمريرٍ وضغطٍ مسمّيين (D-187) */
 .btn-primary{background:var(--brand); color:var(--on-brand)}
 .btn-primary:active:not(:disabled){background:var(--brand-press)}
@@ -71,7 +75,7 @@ form.inline{display:inline; margin:0}
 /* اللصيقةُ نمطُ «ui» بحبر المتن (D-185 · خطّة التصميم 7.6): كانت ‏١٢٫٥ خافتةً فوق
    حقل ‏١٥٫٥ — تُقرأ هامشًا، وهي سؤال الحقل */
 label{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
-input[type=number],input[type=password],input[type=text],input[type=datetime-local],
+input[type=number],input[type=password],input[type=text],input[type=email],input[type=datetime-local],
 input:not([type]),select,textarea{
   background:var(--surface); border:var(--bd-field); border-radius:var(--r-control);
   color:var(--ink); padding:var(--s-2) var(--s-3); font:inherit; font-size:var(--t-input);

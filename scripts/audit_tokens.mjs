@@ -114,7 +114,8 @@ for (const file of files) {
  * ‏4 و8 و12 و16 و999 و‏50٪ لا غير — رمزٌ بقيمةٍ خارجها يردّ، وقطرٌ يُكتب بغير رمزٍ
  * منها أو ‏50٪ أو صفرٍ يردّ.
  */
-const RADIUS_SET = new Set(['4px', '8px', '12px', '16px', '999px'])
+// ‏والزرّ ‏10 والبطاقة ‏14 والبطل ‏20 منذ إعادة البناء (D-246)
+const RADIUS_SET = new Set(['4px', '10px', '14px', '16px', '20px', '999px'])
 const literalRadius = []
 const radiusTokens = new Map()
 for (const file of files) {
