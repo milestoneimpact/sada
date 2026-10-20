@@ -1389,7 +1389,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
-  it('وحالُ المنصّة تُقال مرّةً في البطاقة بـ`data-fact` (D-236)', () => {
+  it('وحالُ المنصّة تُقال مرّةً في البطاقة بـ`data-fact` (D-235)', () => {
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
