@@ -602,6 +602,25 @@ describe('الأفعال — واللوحة ليست طريقا جانبيّا �
     expect(cost.n).toBe(0)
   })
 
+  it('والحدودُ تُحفظ وحدَها (D-232): «auto=1» يُجاب بالقيمة المحفوظة، مقصوصةً إلى المدى', async () => {
+    const cookie = await login()
+    const ok = await post(cookie, '/panel/settings', { key: 'daily_spend_cap_usd', value: '7.5', auto: '1' })
+    expect(ok.status).toBe(200)
+    expect(await ok.json()).toMatchObject({ ok: true, stored: '7.5' })
+    const big = await post(cookie, '/panel/settings', { key: 'daily_spend_cap_usd', value: '9999', auto: '1' })
+    expect(((await big.json()) as { stored: string }).stored).toBe('100')
+    const html = await (await app.request('/panel/settings', withSession(cookie), env)).text()
+    expect(html).toContain('<form class="row" method="POST" action="/panel/settings" data-autosave>')
+  })
+
+  it('وسكربتُ التبديل يجلب «المنشورات» وحدَها (D-232)', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel?swap=posts', withSession(cookie), env)).text()
+    expect(html).toContain('<section data-pane="posts"')
+    expect(html).not.toContain('<section data-pane="overview"')
+    expect(html).toContain('id="flash"')
+  })
+
   it('بلا جلسة لا فعل — لا مسحا ولا تحليلا', async () => {
     const body = new FormData()
     body.set('id', 'x')
@@ -792,28 +811,24 @@ describe('شريطُ المؤشّرات واحد (D-146)', () => {
   })
 })
 
-describe('هندسةُ نظرة عامّة (D-136)', () => {
-  it('القائمةُ في عمود، والمالُ رصّةً في الآخر، والمؤشّراتُ موسومة', async () => {
+describe('هندسةُ نظرة عامّة (D-136 · D-232)', () => {
+  it('«ما ينتظرك» وحدَه بعرض اللوح، والسجلُّ والمالُ مطويّان معًا، والمؤشّراتُ موسومة', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="card grid tiles c4">')
-    const ov = html.indexOf('<div class="ov ')
-    const first = html.indexOf('<div class="stack">', ov)
-    const waiting = html.indexOf('<h2>ما ينتظرك</h2>', first)
-    const happened = html.indexOf('<h2>ما وقع اليوم</h2>', waiting)
-    const second = html.indexOf('<div class="stack">', happened)
-    const spend = html.indexOf('الإنفاق — 14 يومًا', second)
+    const waiting = html.indexOf('<h2>ما ينتظرك</h2>')
+    const ops = html.indexOf('id="ops"', waiting)
+    const happened = html.indexOf('<h2>ما وقع اليوم</h2>', ops)
+    const spend = html.indexOf('الإنفاق — 14 يومًا', happened)
     const money = html.indexOf('أين يذهب المال', spend)
-    expect(ov).toBeGreaterThan(0)
-    // رصّتان (D-145): الأفعالُ ثمّ السجلُّ بطاقتين في الأولى، والمالُ في الثانية
-    expect(first).toBeGreaterThan(ov)
-    expect(waiting).toBeGreaterThan(first)
-    expect(happened).toBeGreaterThan(waiting)
-    expect(second).toBeGreaterThan(happened)
-    expect(spend).toBeGreaterThan(second)
+    expect(waiting).toBeGreaterThan(0)
+    // ‏قاعدةُ الحذف (D-232): السجلُّ لا قرار، فهو تحت «الكلفة وما وقع» المطويّة لا بجوار «ما ينتظرك»
+    expect(ops).toBeGreaterThan(waiting)
+    expect(happened).toBeGreaterThan(ops)
+    expect(spend).toBeGreaterThan(happened)
     expect(money).toBeGreaterThan(spend)
+    expect(html.slice(waiting, ops)).not.toContain('ما وقع اليوم')
     expect(html).not.toContain('<h3 class="sec">ما وقع اليوم</h3>')
-    expect(html).not.toContain('<div class="grid c2" style="margin-top:var(--s-3)">')
   })
 })
 
@@ -2653,6 +2668,19 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     expect(row).toEqual({ status: 'edited', original_text: 'ن'.repeat(300) })
   })
 
+  it('والحفظُ التلقائيّ (D-232): «auto=1» يُجاب بسطرٍ لا بتحويل، وبفحص الاعتماد نفسِه', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const cookie = await login()
+    const ok = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', auto: '1', text: 'م'.repeat(150) })
+    expect(ok.status).toBe(200)
+    expect(await ok.json()).toEqual({ ok: true })
+    expect((await db.prepare('SELECT status, text FROM posts WHERE id = ?').bind(id).first<Record<string, string>>())).toEqual({ status: 'draft', text: 'م'.repeat(150) })
+    const short = await post(cookie, '/panel/drafts/decide', { id, do: 'save', from: 'editor', auto: '1', text: 'قصير' })
+    expect(short.status).toBe(422)
+    expect(((await short.json()) as { ok: boolean }).ok).toBe(false)
+    expect((await db.prepare('SELECT text FROM posts WHERE id = ?').bind(id).first<{ text: string }>())?.text).toBe('م'.repeat(150))
+  })
+
   it('«اعتمد» على البطاقة المختصرة بلا مربّع يعتمد المحفوظَ كما كُتب ويعود إلى شريط جدولتها', async () => {
     const id = await seedPost('x', 'draft', 'نصٌّ كما كتبه النموذج على X، وطولُه يكفي ليكون منشورًا يُقرأ.')
     const cookie = await login()
@@ -2688,6 +2716,26 @@ describe('الفعلُ يعود إلى بطاقته، والموعدُ بتوق�
     const bad = await post(cookie, '/panel/drafts/reschedule', { id, from: 'editor', preset: 'custom', local: '' })
     expect(where(bad)).toBe(`/panel?open=${id}#ed-when`)
     expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at).toBe('2031-01-05 18:30:00')
+  })
+
+  it('والسحبُ في الخطّ الزمنيّ (D-232): المجدولُ قابلٌ للسحب، والنقلُ يعود إلى نافذته', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    const account = await seedAccount('linkedin', 'عمر')
+    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
+    const soon = new Date(Date.now() + 2 * 864e5)
+    const local = new Date(soon.getTime() + 3 * 3600e3).toISOString().slice(0, 16)
+    await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account, preset: 'custom', local, text: 'ن'.repeat(300) })
+    const html = await (await app.request('/panel/timeline?span=14', withSession(cookie), env)).text()
+    expect(html).toContain(`data-move="${id}"`)
+    expect(html).toContain('<form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden><input type="hidden" name="_csrf"')
+    const when = new Date(soon.getTime() + 864e5).toISOString().slice(0, 16)
+    const r = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: '/panel/timeline?span=14' })
+    expect(where(r)).toBe('/panel/timeline?span=14')
+    expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at)
+      .toBe(`${when.replace('T', ' ')}:00`)
+    // ‏ورجوعٌ إلى غير الخطّ الزمنيّ لا يُتّبع
+    const odd = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: 'https://evil.example/' })
+    expect(where(odd)).toBe(`/panel#d-${id}`)
   })
 
   it('«انقلها إلى» على بطاقة المجدولة: ضغطةٌ واحدة تغيّر الموعدَ بتوقيت المالك (D-200)', async () => {
@@ -4097,12 +4145,15 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(why).toContain('href="#c2"')
   })
 
-  it('ورأسُ «المنشورات» فيه الأبوابُ الثلاثة إلى بطاقاتها', async () => {
+  it('ورأسُ «المنشورات» بابٌ واحدٌ يفتح البداياتِ الأربع إلى بطاقاتها (D-232)', async () => {
     const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
-    const head = html.slice(html.indexOf('<section data-pane="posts"'), html.indexOf('</div>', html.indexOf('<div class="aside">', html.indexOf('<section data-pane="posts"'))))
-    for (const [anchor, label] of [['write', 'اكتب من مصدر'], ['videos', 'ارفع فيديو'], ['plan-import', 'خطّة من ملفّ']] as const) {
-      // ‏و«ارفع فيديو» إلى «المكتبة» بمسارها (D-211)، والبقيّةُ مراسٍ في «/panel»
-      expect(head).toContain(`href="${anchor === 'videos' ? '/panel/library#videos' : `#${anchor}`}">${label}</a>`)
+    const at = html.indexOf('<section data-pane="posts"')
+    const head = html.slice(at, html.indexOf('</details>', html.indexOf('data-head-new', at)))
+    expect(head.match(/class="btn btn-primary/g) ?? []).toHaveLength(1)
+    for (const [anchor, label] of [['idea', 'من فكرة'], ['write', 'من مصدر'], ['videos', 'فيديو'], ['plan-import', 'خطّةٌ من ملفّ']] as const) {
+      // ‏و«فيديو» إلى «المكتبة» بمسارها (D-211)، والبقيّةُ مراسٍ في «/panel»
+      expect(head).toContain(`href="${anchor === 'videos' ? '/panel/library#videos' : `#${anchor}`}"`)
+      expect(head).toContain(`<b>${label}</b>`)
       expect(html).toContain(`id="${anchor}"`)
     }
   })
@@ -4629,7 +4680,7 @@ describe('الكتابةُ من فكرةٍ ومن وصف المقطع، والر
       env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
       const html = await (await app.request('/panel', withSession(await login()), env)).text()
       const head = html.slice(html.indexOf('<section data-pane="posts"'), html.indexOf('</div>', html.indexOf('<div class="aside">', html.indexOf('<section data-pane="posts"'))))
-      expect(head).toContain('href="#idea">اكتب من فكرة</a>')
+      expect(head).toContain('href="#idea"')
       const card = html.slice(html.indexOf('id="idea"'), html.indexOf('id="write"'))
       expect(card).toContain('<h2>اكتب من فكرتك</h2>')
       expect(card).toContain('<label for="di-text">فكرتك أو كلماتك</label>')

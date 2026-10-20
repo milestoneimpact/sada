@@ -50,7 +50,7 @@ function sqlTime(d: Date): string {
  * ناجحة لا آخرُها: إعادةٌ بعد نجاحٍ تُسجَّل `skipped_duplicate`، والنجاحُ واحد.
  * **والضمُّ أيسر**: مسوّدةٌ بلا حسابٍ تبقى في الصفّ (درسُ `pivotStore`).
  */
-export async function loadGantt(db: Db, from: Date, to: Date): Promise<GanttLoad> {
+export async function loadGantt(db: Db, org: string, from: Date, to: Date): Promise<GanttLoad> {
   const a = sqlTime(from)
   const b = sqlTime(to)
   let rows: PostRow[] = []
@@ -73,7 +73,7 @@ export async function loadGantt(db: Db, from: Date, to: Date): Promise<GanttLoad
                                                      AS published_at
              FROM posts p
              LEFT JOIN accounts a ON a.id = p.account_id
-            WHERE p.created_at < ?
+            WHERE p.org_id = ? AND p.created_at < ?
          )
          WHERE coalesce(published_at, scheduled_at,
                         CASE WHEN status = 'draft' THEN datetime('now') END,
@@ -81,7 +81,7 @@ export async function loadGantt(db: Db, from: Date, to: Date): Promise<GanttLoad
          ORDER BY created_at
          LIMIT ?`,
       )
-      .bind(b, a, GANTT_CAP + 1)
+      .bind(org, b, a, GANTT_CAP + 1)
       .all<PostRow>()
     rows = result.results
     const planResult = await db

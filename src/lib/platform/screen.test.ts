@@ -82,6 +82,18 @@ function seedAttempt(
     )
 }
 
+describe('المنظّمة (D-231)', () => {
+  it('شاشةُ المنصّة لا ترى منشوراتِ منظّمةٍ أخرى ولا حساباتها', async () => {
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    const account = await seedAccount('linkedin')
+    seedPost({ id: 'p1', platform: 'linkedin', accountId: account, status: 'draft' })
+    expect(await platformPosts(db, 'org_b', 'linkedin')).toEqual([])
+    expect((await platformTally(db, 'org_b', 'linkedin')).drafts).toBe(0)
+    expect(await accountHealth(db, 'org_b', 'linkedin')).toEqual({})
+    expect(await platformPosts(db, 'org_owner', 'linkedin')).toHaveLength(1)
+  })
+})
+
 describe('الرابط — يُبنى ولا يُخزَّن', () => {
   it('LinkedIn يُبنى من URN', () => {
     expect(permalink('linkedin', 'urn:li:share:99')).toContain('linkedin.com/feed/update/')
@@ -127,7 +139,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
       at: '2026-09-06T11:00:00Z',
     })
 
-    const [post] = await platformPosts(db, 'linkedin')
+    const [post] = await platformPosts(db, 'org_owner', 'linkedin')
     expect(post!.platformPostId).toBe('urn:li:share:7')
     expect(post!.publishedAt).toBe('2026-09-06T11:00:00Z')
     expect(post!.accountName).toBe('عمر')
@@ -154,7 +166,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
       at: '2026-09-06T11:00:00Z',
     })
 
-    const [post] = await platformPosts(db, 'linkedin')
+    const [post] = await platformPosts(db, 'org_owner', 'linkedin')
     expect(post!.publishedAt).toBe('2026-09-06T11:00:00Z')
     expect(post!.lastError).toBe('Not enough permissions')
   })
@@ -163,7 +175,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     const account = await seedAccount('x')
     seedPost({ id: 'p1', platform: 'x', accountId: account, status: 'failed' })
     seedAttempt('p1', 'failed', { response: JSON.stringify({ detail: 'ن'.repeat(600) }) })
-    const [post] = await platformPosts(db, 'x')
+    const [post] = await platformPosts(db, 'org_owner', 'x')
     expect(post!.lastError!.length).toBeLessThanOrEqual(240)
   })
 
@@ -171,7 +183,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     const account = await seedAccount('x')
     seedPost({ id: 'p1', platform: 'x', accountId: account, status: 'failed' })
     seedAttempt('p1', 'failed', { response: 'Bad Gateway' })
-    const [post] = await platformPosts(db, 'x')
+    const [post] = await platformPosts(db, 'org_owner', 'x')
     expect(post!.lastError).toBe('Bad Gateway')
   })
 
@@ -181,13 +193,13 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     seedPost({ id: 'p1', platform: 'linkedin', accountId: li, status: 'draft' })
     seedPost({ id: 'p2', platform: 'x', accountId: x, status: 'draft' })
 
-    expect((await platformPosts(db, 'linkedin')).map((p) => p.id)).toEqual(['p1'])
-    expect((await platformPosts(db, 'x')).map((p) => p.id)).toEqual(['p2'])
+    expect((await platformPosts(db, 'org_owner', 'linkedin')).map((p) => p.id)).toEqual(['p1'])
+    expect((await platformPosts(db, 'org_owner', 'x')).map((p) => p.id)).toEqual(['p2'])
   })
 
   it('ومسوّدةٌ بلا حسابٍ تُعرَض — الكتابةُ تسبق الربط', async () => {
     seedPost({ id: 'p1', platform: 'linkedin', accountId: null, status: 'draft' })
-    const [post] = await platformPosts(db, 'linkedin')
+    const [post] = await platformPosts(db, 'org_owner', 'linkedin')
     expect(post!.accountName).toBeNull()
   })
 })
@@ -205,8 +217,8 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
       seedPost({ id: `p${i}`, platform: 'x', accountId: account, status: 'published' })
       seedAttempt(`p${i}`, 'succeeded', { platformPostId: String(1000 + i) })
     }
-    expect(await platformPosts(db, 'x')).toHaveLength(60)
-    expect((await platformTally(db, 'x')).published).toBe(70)
+    expect(await platformPosts(db, 'org_owner', 'x')).toHaveLength(60)
+    expect((await platformTally(db, 'org_owner', 'x')).published).toBe(70)
   })
 
   it('ويفرز الحالات ويجمع الكلفة', async () => {
@@ -216,7 +228,7 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
     seedPost({ id: 'c', platform: 'linkedin', accountId: account, status: 'failed', cost: 0.01 })
     seedPost({ id: 'd', platform: 'linkedin', accountId: null, status: 'draft', cost: 0.04 })
 
-    const tally = await platformTally(db, 'linkedin')
+    const tally = await platformTally(db, 'org_owner', 'linkedin')
     expect(tally).toMatchObject({ published: 1, queued: 1, failed: 1, drafts: 1 })
     expect(tally.spend).toBeCloseTo(0.1)
   })
@@ -228,14 +240,14 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
     seedPost({ id: 'p2', platform: 'x', accountId: account, status: 'published' })
     seedAttempt('p2', 'succeeded', { platformPostId: '2', at: '2026-09-04T08:00:00Z' })
 
-    expect((await platformTally(db, 'x')).lastPublishedAt).toBe('2026-09-04T08:00:00Z')
+    expect((await platformTally(db, 'org_owner', 'x')).lastPublishedAt).toBe('2026-09-04T08:00:00Z')
   })
 
   it('ومنصّةٌ بلا صفوف تعطي أصفارا لا عطلا', async () => {
-    expect(await platformTally(db, 'x')).toMatchObject({
+    expect(await platformTally(db, 'org_owner', 'x')).toMatchObject({
       published: 0, queued: 0, failed: 0, drafts: 0, lastPublishedAt: null,
     })
-    expect(await platformPosts(db, 'x')).toEqual([])
+    expect(await platformPosts(db, 'org_owner', 'x')).toEqual([])
   })
 })
 
@@ -248,12 +260,12 @@ describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح �
          VALUES (?, 'x', 'y', '2026-12-01T00:00:00Z', 'openid profile')`,
       )
       .run(account)
-    expect(await grantedScopes(db, 'linkedin')).toEqual({ [account]: 'openid profile' })
+    expect(await grantedScopes(db, 'org_owner', 'linkedin')).toEqual({ [account]: 'openid profile' })
   })
 
   it('وحسابٌ بلا رمزٍ لا يظهر — ولا يُختلَق له نطاق', async () => {
     await seedAccount('linkedin')
-    expect(await grantedScopes(db, 'linkedin')).toEqual({})
+    expect(await grantedScopes(db, 'org_owner', 'linkedin')).toEqual({})
   })
 })
 
@@ -263,7 +275,7 @@ describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح �
 describe('accountHealth', () => {
   it('حسابٌ بلا رمزٍ يُقال فيه ذلك، وبرمزٍ يُقرأ موعدُه وتجديدُه وتنبيهاتُه', async () => {
     const id = await seedAccount('linkedin')
-    const bare = await accountHealth(db, 'linkedin')
+    const bare = await accountHealth(db, 'org_owner', 'linkedin')
     expect(bare[id]).toMatchObject({ status: 'active', expiresAt: null, refreshedAt: null, alerts: [] })
 
     db.raw.exec(
@@ -275,12 +287,12 @@ describe('accountHealth', () => {
        VALUES ('${id}', 'access', 7, '2026-10-01 00:00:00', '2026-09-24 03:00:00'),
               ('${id}', 'refresh', 1, '2027-01-01 00:00:00', '2026-12-31 03:00:00')`,
     )
-    const h = (await accountHealth(db, 'linkedin'))[id]!
+    const h = (await accountHealth(db, 'org_owner', 'linkedin'))[id]!
     expect(h.expiresAt).toBe('2026-10-01 00:00:00')
     expect(h.refreshExpiresAt).toBe('2027-01-01 00:00:00')
     expect(h.refreshedAt).toBe('2026-09-10 03:00:00')
     expect(h.alerts.map((a) => `${a.kind}:${a.threshold}`)).toEqual(['refresh:1', 'access:7'])
-    expect(await accountHealth(db, 'x')).toEqual({})
+    expect(await accountHealth(db, 'org_owner', 'x')).toEqual({})
   })
 })
 
@@ -290,21 +302,21 @@ describe('accountHealth', () => {
 describe('needs_reauth_at', () => {
   it('يُختَم عند أوّل تعليمٍ ولا يتبدّل بتعليمٍ ثانٍ، ويُمحى بإعادة الربط', async () => {
     const id = await seedAccount('linkedin')
-    expect((await accountHealth(db, 'linkedin'))[id]!.needsReauthAt).toBeNull()
+    expect((await accountHealth(db, 'org_owner', 'linkedin'))[id]!.needsReauthAt).toBeNull()
 
     await markNeedsReauth(db, id)
-    const first = (await accountHealth(db, 'linkedin'))[id]!
+    const first = (await accountHealth(db, 'org_owner', 'linkedin'))[id]!
     expect(first.status).toBe('needs_reauth')
     expect(first.needsReauthAt).not.toBeNull()
 
     db.raw.exec(`UPDATE accounts SET needs_reauth_at = '2026-09-01 00:00:00' WHERE id = '${id}'`)
     await markNeedsReauth(db, id)
-    expect((await accountHealth(db, 'linkedin'))[id]!.needsReauthAt).toBe('2026-09-01 00:00:00')
+    expect((await accountHealth(db, 'org_owner', 'linkedin'))[id]!.needsReauthAt).toBe('2026-09-01 00:00:00')
 
     const row = db.raw.prepare('SELECT platform, kind, external_id, display_name FROM accounts WHERE id = ?').get(id) as
       { platform: 'linkedin'; kind: 'member' | 'org'; external_id: string; display_name: string }
     await upsertAccount(db, 'org_owner', { id, platform: row.platform, kind: row.kind, externalId: row.external_id, displayName: row.display_name } as never)
-    const back = (await accountHealth(db, 'linkedin'))[id]!
+    const back = (await accountHealth(db, 'org_owner', 'linkedin'))[id]!
     expect(back.status).toBe('active')
     expect(back.needsReauthAt).toBeNull()
   })

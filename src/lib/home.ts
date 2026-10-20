@@ -58,7 +58,7 @@ const WEEK_MS = 7 * 86_400_000
  * و`approved` يجمع `approved` و`edited`: سؤالٌ واحدٌ عند المالك (D-062).
  * وجدولٌ لم يُرحَّل يُقرأ صفرًا: الرئيسيّةُ تُفتح خاليةً ولا تسقط.
  */
-export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
+export async function journeyCounts(db: Db, org: string, now: Date): Promise<JourneyCounts> {
   try {
     const since = new Date(now.getTime() - WEEK_MS).toISOString().slice(0, 19).replace('T', ' ')
     /*
@@ -74,9 +74,9 @@ export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
                       (SELECT MAX(pa.at) FROM publish_attempts pa
                         WHERE pa.post_id = posts.id AND pa.status = 'failed'),
                       scheduled_at, created_at) >= ? THEN 1 ELSE 0 END) AS recent
-           FROM posts GROUP BY platform, status`,
+           FROM posts WHERE org_id = ? GROUP BY platform, status`,
       )
-      .bind(since)
+      .bind(since, org)
       .all<{ platform: string; status: string; n: number; next_at: string | null; recent: number | null }>()
     const perPlatform: Record<string, PlatformCounts> = {}
     for (const row of results) {
@@ -91,8 +91,11 @@ export async function journeyCounts(db: Db, now: Date): Promise<JourneyCounts> {
       }
     }
     const week = await db
-      .prepare(`SELECT COUNT(DISTINCT post_id) AS n FROM publish_attempts WHERE status = 'succeeded' AND at >= ?`)
-      .bind(since)
+      .prepare(
+        `SELECT COUNT(DISTINCT pa.post_id) AS n FROM publish_attempts pa JOIN posts p ON p.id = pa.post_id
+          WHERE p.org_id = ? AND pa.status = 'succeeded' AND pa.at >= ?`,
+      )
+      .bind(org, since)
       .first<{ n: number }>()
     return { perPlatform, publishedWeek: week?.n ?? 0 }
   } catch {
@@ -492,7 +495,7 @@ export interface PlatformTile {
   readonly button: { readonly label: string; readonly href: string; readonly primary: boolean }
   /** يربط ولا ينشر (مرتبة `link`). */
   readonly linkOnly: boolean
-  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-231). */
+  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-233). */
   readonly fact: string
 }
 

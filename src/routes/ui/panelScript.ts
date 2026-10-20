@@ -396,6 +396,30 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       clearTimeout(dTimer);
       dTimer=setTimeout(function(){try{localStorage.setItem(dKey,JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000);
     });
+    /*
+     * ‏**ويُحفظ على الخادم وحدَه** (D-232): بعد ثانيةٍ ونصف من آخر حرف يُرسل النصُّ بـ«do=save» و«auto=1»، ويُقال
+     * ‏«حُفظ» بجوار العنوان. فلا يُرى زرُّ «احفظ» بعد أن يعمل هذا؛ وبلا سكربت يبقى الزرُّ كما كان.
+     */
+    var edF=document.getElementById('ed-form');
+    if(edF&&edF.getAttribute('action')==='/panel/drafts/decide'&&window.fetch){
+      var mark=document.createElement('span'); mark.className='ed-saved'; mark.setAttribute('role','status');
+      var lbl=edBox.querySelector('.ed-label .grow'); if(lbl)lbl.parentNode.insertBefore(mark,lbl);
+      document.querySelectorAll('button[form="ed-form"][value="save"]').forEach(function(b){b.hidden=true;});
+      var sTimer=0, last=edT.value, flight=null;
+      var push=function(){
+        if(edT.value===last)return;
+        var v=edT.value, body=new FormData(edF); body.set('do','save'); body.set('auto','1'); body.set('text',v);
+        mark.textContent='جارٍ الحفظ…';
+        flight=fetch(edF.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){
+          return r.json().then(function(j){
+            if(r.ok&&j.ok){last=v; mark.textContent='حُفظ'; try{if(edT.value===v)localStorage.removeItem(dKey);}catch(e){}}
+            else mark.textContent='لم يُحفظ: '+(j.reason||'');
+          });
+        }).catch(function(){mark.textContent=navigator.onLine===false?'لم يُحفظ: لا اتّصال':'لم يُحفظ';});
+      };
+      edT.addEventListener('input',function(){clearTimeout(sTimer); mark.textContent=''; sTimer=setTimeout(push,1500);});
+      edT.addEventListener('blur',function(){clearTimeout(sTimer); push();});
+    }
   }
   function countsFrom(doc){
     document.querySelectorAll('nav.tabs a,nav.tab-bar a').forEach(function(a){
@@ -417,18 +441,27 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var sb=e.submitter||null;
     var body=new FormData(f); if(sb&&sb.name)body.append(sb.name,sb.value);
     var id=String(body.get('id')||'');
+    /*
+     * ‏**النتيجةُ تُرى قبل ردّ الخادم** (D-232، من Linear): البطاقةُ تقول ما ضُغط («اعتُمدت»، «رُفضت») في اللحظة نفسِها،
+     * ‏ثمّ تُبدَّل ببطاقة الخادم حين يصل. والخادمُ يبقى الحَكَم: إن رفض أو انقطع الاتّصالُ عادت البطاقةُ كما كانت وقيل السبب.
+     */
+    var opt=sb&&sb.getAttribute('data-optimistic'), held=document.getElementById('d-'+id);
+    var tag=null;
+    if(opt&&held){held.setAttribute('data-pending',opt); tag=document.createElement('span'); tag.className='st ok pending-tag';
+      tag.setAttribute('role','status'); tag.textContent=opt; held.appendChild(tag);}
+    var undoOpt=function(){if(held)held.removeAttribute('data-pending'); if(tag)tag.remove();};
     // ‏**والطلبُ لا يُكرَّر أبدًا** (D-004 روحًا): التحويلُ يُقرأ يدويًّا، ثمّ تُجلب اللوحةُ بـGET منفصل. فإن سقط شيءٌ
     // ‏بعد أن خرج الطلب فالبديلُ إعادةُ تحميل اللوحة (GET) تُري الحالَ الحقيقيّة — لا إرسالٌ ثانٍ لما قد نُفّذ
     fetch(f.action,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'}).then(function(r){
       if(r.type!=='opaqueredirect'&&!(r.status>=300&&r.status<400))throw new Error('status '+r.status);
-      return fetch('/panel',{credentials:'same-origin'});
+      return fetch('/panel?swap=posts',{credentials:'same-origin'});
     }).then(function(r){
       if(!r.ok)throw new Error('panel '+r.status);
       return r.text().then(function(html){return {html:html,url:r.url};});
     }).then(function(res){
       // ‏وورقةُ الردّ تُنزَع قبل القراءة: نونسُها غيرُ نونس هذه الصفحة فيرفضها CSP في السجلّ، ولا حاجةَ بها
       var doc=new DOMParser().parseFromString(res.html.replace(/<style[\\s\\S]*?<\\/style>/g,''),'text/html');
-      if(!doc.querySelector('section[data-pane]')){location.href=res.url; return;}
+      if(!doc.querySelector('section[data-pane]')){location.href=res.url.replace(/[?]swap=posts$/,''); return;}
       var mine=document.getElementById('d-'+id), theirs=doc.getElementById('d-'+id);
       if(mine){
         var fresh=theirs?document.importNode(theirs,true):null;
@@ -451,9 +484,33 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }).catch(function(err){
       if(window.console)console.warn('swap',err);
       // ‏وبلا اتّصال لم يخرج الطلب: يعود الزرُّ، ويُقال ذلك في موضع الإشعار، وما كُتب باقٍ (خطّة التصميم 7.11)
+      undoOpt();
       if(navigator.onLine===false){unbusy(f); fail('لم يُحفظ. تحقّق من الاتّصال ثمّ أعد المحاولة.'); return;}
       location.hash='d-'+id; location.reload();
     });
+  });
+
+  /*
+   * ‏**الحدودُ تُحفظ وحدَها** (D-232، من Notion): حقلُ الرقم في نموذجٍ معلَّم «data-autosave» يُرسَل حين يتغيّر بـ«auto=1»،
+   * ‏ويُقال ما حُفظ بجواره («حُفظ 5» أو القيمةُ بعد قصّها إلى المدى). ويُخفى «حفظ» حين يعمل هذا، ويبقى بلا سكربت.
+   */
+  document.querySelectorAll('form[data-autosave]').forEach(function(f){
+    if(!window.fetch)return;
+    var inp=f.querySelector('input[name="value"]'), btn=f.querySelector('button[type="submit"]');
+    if(!inp)return;
+    if(btn)btn.hidden=true;
+    var mark=document.createElement('span'); mark.className='ed-saved self-center'; mark.setAttribute('role','status'); f.appendChild(mark);
+    var last=inp.value;
+    var push=function(){
+      if(inp.value===last||!inp.checkValidity()){if(!inp.checkValidity())mark.textContent='خارج المدى';return;}
+      var body=new FormData(f); body.set('auto','1'); mark.textContent='جارٍ الحفظ…';
+      fetch(f.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+        if(j&&j.stored!==undefined){inp.value=j.stored; last=inp.value;}
+        mark.textContent=j&&j.ok?'حُفظ':'لم يُحفظ'+(j&&j.text?': '+j.text:'');
+      }).catch(function(){mark.textContent=navigator.onLine===false?'لم يُحفظ: لا اتّصال':'لم يُحفظ';});
+    };
+    inp.addEventListener('change',push);
+    f.addEventListener('submit',function(e){e.preventDefault(); push();});
   });
 
   // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا

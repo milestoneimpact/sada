@@ -55,11 +55,11 @@ async function seedPost(status = 'draft'): Promise<string> {
 
 describe('رحلةُ المنشور', () => {
   it('معرّفٌ لا وجودَ له يعطي null — لا رحلةً فارغة', async () => {
-    expect(await readJourney(db, 'لا-شيء')).toBeNull()
+    expect(await readJourney(db, 'org_owner', 'لا-شيء')).toBeNull()
   })
 
   it('**ولا محطّةَ تُخترَع**: مسوّدةٌ لم تُنشَر لا محطّةَ نشرٍ لها', async () => {
-    const j = await readJourney(db, await seedPost())
+    const j = await readJourney(db, 'org_owner', await seedPost())
     expect(j).not.toBeNull()
     const kinds = j!.stations.map((s) => s.kind)
     expect(kinds).toContain('source')
@@ -70,7 +70,7 @@ describe('رحلةُ المنشور', () => {
   })
 
   it('والكتابةُ تحمل نموذجَها وكلفتَها — وقد وقعت', async () => {
-    const j = await readJourney(db, await seedPost())
+    const j = await readJourney(db, 'org_owner', await seedPost())
     const draft = j!.stations.find((s) => s.kind === 'draft')!
     expect(draft.model).toBe('claude-opus-5')
     expect(draft.cost).toBeCloseTo(0.012)
@@ -78,7 +78,7 @@ describe('رحلةُ المنشور', () => {
   })
 
   it('والقرارُ يُسمّى بلسان المالك لا باسم العمود', async () => {
-    const j = await readJourney(db, await seedPost('rejected'))
+    const j = await readJourney(db, 'org_owner', await seedPost('rejected'))
     const decision = j!.stations.find((s) => s.kind === 'decision')!
     expect(decision.title).toBe('رفضتَها')
     expect(decision.state).toBe('failed')
@@ -99,7 +99,7 @@ describe('رحلةُ المنشور', () => {
       )
       .bind(postId).run()
 
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     const m = j!.stations.find((s) => s.kind === 'metrics')!
     expect(m.detail).not.toContain('ظهور')
     expect(m.detail).toContain('تفاعل 4')
@@ -115,7 +115,7 @@ describe('رحلةُ المنشور', () => {
          VALUES (?, '24h', NULL, NULL, NULL, NULL)`,
       )
       .bind(postId).run()
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     expect(j!.stations.find((s) => s.kind === 'metrics')!.detail).toContain('لا تُقاس')
   })
 
@@ -140,7 +140,7 @@ describe('رحلةُ المنشور', () => {
         )
         .run()
     }
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     const pub = j!.stations.filter((s) => s.kind === 'publish')
     expect(pub).toHaveLength(3)
     expect(pub[0]!.state).toBe('failed')
@@ -164,7 +164,7 @@ describe('رحلةُ المنشور', () => {
          VALUES (?, ?, ?, 1, '{}', 'sent')`,
       )
       .bind(crypto.randomUUID(), postId, `k-${postId}-1`).run()
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     const pub = j!.stations.find((s) => s.kind === 'publish')!
     expect(pub.state).toBe('pending')
     // ‏واسمُ العمود لا يُعرَض حرفا: `sent` ليست كلمةً يقرأها مالك
@@ -187,7 +187,7 @@ describe('رحلةُ المنشور', () => {
         )
         .bind(crypto.randomUUID(), total, total, postId).run()
     }
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     // ٠٫٠٨٢ من الدفتر، بينما محطّةُ الكتابة وحدَها ٠٫٠١٢
     expect(j!.spent).toBeCloseTo(0.082)
     const stationSum = j!.stations.reduce((s, x) => s + (x.cost ?? 0), 0)
@@ -214,7 +214,7 @@ describe('رحلةُ المنشور', () => {
     await seed('fell', 'لا مفتاحَ متصفّحٍ مضبوط', 'أثرٌ يُقاس')
     await seed('old', null, null)
 
-    const images = (await readJourney(db, postId))!.stations.filter((s) => s.kind === 'image')
+    const images = (await readJourney(db, 'org_owner', postId))!.stations.filter((s) => s.kind === 'image')
     expect(images.map((s) => s.detail)).toEqual([
       '145KB · وعليها «أثرٌ يُقاس»',
       '145KB · بلا نصٍّ فوقها: لا مفتاحَ متصفّحٍ مضبوط',
@@ -227,7 +227,7 @@ describe('رحلةُ المنشور', () => {
   it('وجدولٌ لم يُرحَّل لا يرمي — الرحلةُ تُقرأ ناقصةً لا تسقط', async () => {
     const postId = await seedPost()
     await db.raw.prepare('DROP TABLE metrics').run()
-    const j = await readJourney(db, postId)
+    const j = await readJourney(db, 'org_owner', postId)
     expect(j).not.toBeNull()
     expect(j!.stations.some((s) => s.kind === 'draft')).toBe(true)
   })
