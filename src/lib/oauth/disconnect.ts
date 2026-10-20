@@ -117,18 +117,28 @@ export interface DisconnectTarget {
   readonly id: string
   readonly platform: Platform
   readonly displayName: string
+  /** منظّمةُ الحساب: لا يُفصَل حسابُ منظّمةٍ من شاشة غيرها (D-229). */
+  readonly org: string
 }
 
 /**
  * حسابٌ يُفصَل **بمعرّفه ومنصّته معًا**، وغيرُ مفصولٍ قبلُ. فمعرّفٌ لحسابٍ على منصّةٍ
  * غيرِ الصفحة التي ضُغط فيها الزرّ يُردّ، ولا يُفصَل حسابٌ لم يُقصَد.
  */
-export async function findLinked(db: Db, id: string, platform: Platform): Promise<DisconnectTarget | null> {
+export async function findLinked(
+  db: Db,
+  org: string,
+  id: string,
+  platform: Platform,
+): Promise<DisconnectTarget | null> {
   const row = await db
-    .prepare(`SELECT id, platform, display_name FROM accounts WHERE id = ? AND platform = ? AND status != 'revoked'`)
-    .bind(id, platform)
+    .prepare(
+      `SELECT id, platform, display_name FROM accounts
+        WHERE id = ? AND platform = ? AND org_id = ? AND status != 'revoked'`,
+    )
+    .bind(id, platform, org)
     .first<{ id: string; platform: Platform; display_name: string }>()
-  return row === null ? null : { id: row.id, platform: row.platform, displayName: row.display_name }
+  return row === null ? null : { id: row.id, platform: row.platform, displayName: row.display_name, org }
 }
 
 export interface DisconnectResult {
@@ -160,7 +170,9 @@ export async function disconnectAccount(
 
   const statements = [
     db.prepare('DELETE FROM tokens WHERE account_id = ?').bind(target.id),
-    db.prepare(`UPDATE accounts SET status = 'revoked', needs_reauth_at = NULL WHERE id = ?`).bind(target.id),
+    db
+      .prepare(`UPDATE accounts SET status = 'revoked', needs_reauth_at = NULL WHERE id = ? AND org_id = ?`)
+      .bind(target.id, target.org),
   ]
   for (const post of queued.results) {
     statements.push(

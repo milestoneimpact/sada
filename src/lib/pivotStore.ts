@@ -53,7 +53,7 @@ export interface FactLoad {
  * التي تنتظر قرارَ المالك، أي أهمُّ ما في الجدول. فالضمُّ أيسرُ
  * (`LEFT JOIN`)، والاسمُ وحدَه هو الذي يغيب فيُقرأ «—».
  */
-export async function loadFacts(db: Db, sinceDays: number): Promise<FactLoad> {
+export async function loadFacts(db: Db, org: string, sinceDays: number): Promise<FactLoad> {
   let rows: Row[] = []
   try {
     const result = await db
@@ -72,11 +72,11 @@ export async function loadFacts(db: Db, sinceDays: number): Promise<FactLoad> {
                                                    AS cost
            FROM posts p
            LEFT JOIN accounts a ON a.id = p.account_id
-          WHERE p.scheduled_at >= datetime('now', ?)
+          WHERE p.org_id = ? AND p.scheduled_at >= datetime('now', ?)
           ORDER BY p.scheduled_at DESC
           LIMIT ?`,
       )
-      .bind(`-${Math.max(1, Math.floor(sinceDays))} days`, FACT_CAP + 1)
+      .bind(org, `-${Math.max(1, Math.floor(sinceDays))} days`, FACT_CAP + 1)
       .all<Row>()
     rows = result.results
   } catch {

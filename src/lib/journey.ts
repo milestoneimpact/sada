@@ -140,7 +140,7 @@ function published(id: string | null, json: string | null): string {
   return parts.join(' · ')
 }
 
-export async function readJourney(db: Db, postId: string): Promise<Journey | null> {
+export async function readJourney(db: Db, org: string, postId: string): Promise<Journey | null> {
   const post = await db
     .prepare(
       `SELECT p.id, p.platform, p.text, p.status, p.model, p.cost_usd, p.rationale,
@@ -155,9 +155,9 @@ export async function readJourney(db: Db, postId: string): Promise<Journey | nul
                 SELECT id FROM content_items
                  WHERE source_id = p.source_id ORDER BY extracted_at DESC LIMIT 1)
          LEFT JOIN accounts a ON a.id = p.account_id
-        WHERE p.id = ?`,
+        WHERE p.id = ? AND p.org_id = ?`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .first<PostRow>()
     .catch(() => null)
   if (post === null) return null

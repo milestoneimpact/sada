@@ -474,12 +474,12 @@ export function linkStates(accounts: readonly LinkedAccount[]): Readonly<Record<
 }
 
 /**
- * الحسابات المربوطة.
+ * الحسابات المربوطة — للمنظّمة وحدها (D-229).
  *
  * وجدولٌ لا يُقرأ لا يُسقط اللوحة: تُعاد قائمةٌ فارغة، فيُعرض «لا قناة
  * مربوطة» — وهو الحال الصحيح حين لا نعرف، لا رسالةُ عطل.
  */
-export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
+export async function listAccounts(db: Db, org: string): Promise<LinkedAccount[]> {
   try {
     const { results } = await db
       .prepare(
@@ -488,8 +488,10 @@ export async function listAccounts(db: Db): Promise<LinkedAccount[]> {
                 CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS renewable
            FROM accounts a
            LEFT JOIN tokens t ON t.account_id = a.id
+          WHERE a.org_id = ?
           ORDER BY a.platform, a.created_at`,
       )
+      .bind(org)
       .all<AccountRow>()
     return results.map((row) => ({
       id: row.id,

@@ -125,12 +125,12 @@ describe('منشوراتٌ من مقطع', () => {
     await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
     const first = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok'").get() as { id: string }
     // ‏وصفٌ قصيرٌ سليم يُعتمَد: شرطُ «أربعين محرفًا» لمنشورٍ مكتوب لا لوصف مقطع
-    expect(await decide(db, first.id, { kind: 'reject' }, 'o')).toMatchObject({ ok: true })
+    expect(await decide(db, 'org_owner', first.id, { kind: 'reject' }, 'o')).toMatchObject({ ok: true })
     expect((await listUploads(db))[0]!.posts).toEqual([])
     const again = await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
     expect(again).toEqual({ ok: true, created: ['tiktok'], skipped: [] })
     const second = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok' AND status = 'draft'").get() as { id: string }
-    expect(await decide(db, second.id, { kind: 'approve', text: 'ثلاث طبقات للحوكمة' }, 'o')).toEqual({ ok: true, status: 'approved' })
+    expect(await decide(db, 'org_owner', second.id, { kind: 'approve', text: 'ثلاث طبقات للحوكمة' }, 'o')).toEqual({ ok: true, status: 'approved' })
   })
 
   it('منشورٌ بلا مقطعه (كتابةٌ انقطعت) يُكمَّل بالضغطة الثانية ولا يُكرَّر', async () => {

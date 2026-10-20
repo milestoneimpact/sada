@@ -121,6 +121,7 @@ export function briefError(raw: string | null): string | null {
  */
 export async function platformPosts(
   db: Db,
+  org: string,
   platform: Platform,
   limit = 60,
 ): Promise<PlatformPost[]> {
@@ -144,11 +145,11 @@ export async function platformPosts(
                   ORDER BY pa.at DESC LIMIT 1) AS last_failed_at
            FROM posts p
            LEFT JOIN accounts a ON a.id = p.account_id
-          WHERE p.platform = ?
+          WHERE p.platform = ? AND p.org_id = ?
           ORDER BY coalesce(p.scheduled_at, p.created_at) DESC
           LIMIT ?`,
       )
-      .bind(platform, limit)
+      .bind(platform, org, limit)
       .all<PostRow>()
 
     return results.map((row) => ({
@@ -187,7 +188,7 @@ export interface PlatformTally {
  * فالشاشةُ تعرض ستّين منشورا وتعدّ **كلَّ** ما مضى: عدٌّ من الصفحة
  * المعروضة يقول «نُشر ثلاثة» وقد نُشرت مئة.
  */
-export async function platformTally(db: Db, platform: Platform): Promise<PlatformTally> {
+export async function platformTally(db: Db, org: string, platform: Platform): Promise<PlatformTally> {
   const empty: PlatformTally = {
     published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null,
   }
@@ -202,10 +203,10 @@ export async function platformTally(db: Db, platform: Platform): Promise<Platfor
            coalesce(sum(cost_usd), 0) AS spend,
            (SELECT max(pa.at) FROM publish_attempts pa
               JOIN posts p2 ON p2.id = pa.post_id
-             WHERE p2.platform = ? AND pa.status = 'succeeded') AS last_published_at
-         FROM posts WHERE platform = ?`,
+             WHERE p2.platform = ? AND p2.org_id = ? AND pa.status = 'succeeded') AS last_published_at
+         FROM posts WHERE platform = ? AND org_id = ?`,
       )
-      .bind(platform, platform)
+      .bind(platform, org, platform, org)
       .first<{
         published: number | null
         queued: number | null
@@ -237,6 +238,7 @@ export async function platformTally(db: Db, platform: Platform): Promise<Platfor
  */
 export async function grantedScopes(
   db: Db,
+  org: string,
   platform: Platform,
 ): Promise<Record<string, string>> {
   try {
@@ -244,9 +246,9 @@ export async function grantedScopes(
       .prepare(
         `SELECT t.account_id AS id, t.scopes AS scopes
            FROM tokens t JOIN accounts a ON a.id = t.account_id
-          WHERE a.platform = ?`,
+          WHERE a.platform = ? AND a.org_id = ?`,
       )
-      .bind(platform)
+      .bind(platform, org)
       .all<{ id: string; scopes: string }>()
     return Object.fromEntries(results.map((r) => [r.id, r.scopes ?? '']))
   } catch {
@@ -261,15 +263,15 @@ export async function grantedScopes(
  * `video.publish` — **وهو حكمُ الناشر نفسُه** (`canUploadMedia`)، فلا يُقال «للعامّة»
  * لما سيُرسَل إلى الصندوق. وحسابٌ سقط إذنُه لا يُعَدّ: لا يُنشر منه شيء.
  */
-export async function activeScopes(db: Db, platform: Platform): Promise<string[]> {
+export async function activeScopes(db: Db, org: string, platform: Platform): Promise<string[]> {
   try {
     const { results } = await db
       .prepare(
         `SELECT t.scopes AS scopes
            FROM tokens t JOIN accounts a ON a.id = t.account_id
-          WHERE a.platform = ? AND a.status = 'active'`,
+          WHERE a.platform = ? AND a.org_id = ? AND a.status = 'active'`,
       )
-      .bind(platform)
+      .bind(platform, org)
       .all<{ scopes: string | null }>()
     return results.map((r) => r.scopes ?? '')
   } catch {
@@ -296,6 +298,7 @@ export interface AccountHealth {
  */
 export async function accountHealth(
   db: Db,
+  org: string,
   platform: Platform,
 ): Promise<Record<string, AccountHealth>> {
   try {
@@ -304,9 +307,9 @@ export async function accountHealth(
         `SELECT a.id, a.status, a.needs_reauth_at, t.expires_at, t.refresh_expires_at, t.refreshed_at
            FROM accounts a
            LEFT JOIN tokens t ON t.account_id = a.id
-          WHERE a.platform = ?`,
+          WHERE a.platform = ? AND a.org_id = ?`,
       )
-      .bind(platform)
+      .bind(platform, org)
       .all<{ id: string; status: string; needs_reauth_at: string | null; expires_at: string | null; refresh_expires_at: string | null; refreshed_at: string | null }>()
     const out: Record<string, AccountHealth> = {}
     for (const r of rows) {
@@ -320,11 +323,11 @@ export async function accountHealth(
       .prepare(
         `SELECT al.account_id, al.kind, al.threshold, al.at
            FROM token_alerts al JOIN accounts a ON a.id = al.account_id
-          WHERE a.platform = ?
+          WHERE a.platform = ? AND a.org_id = ?
           ORDER BY al.at DESC
           LIMIT 40`,
       )
-      .bind(platform)
+      .bind(platform, org)
       .all<{ account_id: string; kind: 'access' | 'refresh'; threshold: number; at: string }>()
     for (const al of alerts) {
       const h = out[al.account_id]

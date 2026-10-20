@@ -32,7 +32,7 @@ async function seedPublished(o: {
   agoHours: number
   scopes?: string
 }): Promise<string> {
-  const accountId = await upsertAccount(db, {
+  const accountId = await upsertAccount(db, 'org_owner', {
     platform: o.platform,
     kind: 'member',
     externalId: o.platform === 'x' ? '4242' : 'abc',
@@ -186,7 +186,7 @@ describe('ما حان قياسُه', () => {
   })
 
   it('ومنشورٌ بلا معرّفٍ عند المنصّة لا يُقاس — لا شيءَ يُسأل عنه', async () => {
-    const accountId = await upsertAccount(db, {
+    const accountId = await upsertAccount(db, 'org_owner', {
       platform: 'x', kind: 'member', externalId: '4242', displayName: 'عمر',
     })
     db.raw

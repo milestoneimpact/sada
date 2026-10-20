@@ -269,8 +269,8 @@ async function guardPost(c: {
  * نفسِه (`canUploadMedia`). موضعٌ واحدٌ لكلّ ما يقول «للعامّة» أو «خاصّ»: صفُّ المقطع وصفحةُ
  * المنصّة وإشعارا الجدولة ومعاينةُ الخطّة — فلا يقرأ أحدُها الإعدادَ وحدَه.
  */
-async function reachNow(db: Env['DB']): Promise<Reach> {
-  return reachOf(await readSettings(db), await activeScopes(db, 'tiktok'))
+async function reachNow(db: Env['DB'], org: string): Promise<Reach> {
+  return reachOf(await readSettings(db), await activeScopes(db, org, 'tiktok'))
 }
 
 /** كلّ فعلٍ يعود إلى القسم الذي انطلق منه — لا إلى رأس الصفحة. */
@@ -340,8 +340,8 @@ const BOARD = 60
  * ‏الرئيسيّة وإشعارُها يقول «اختر له موعدًا» ولا نموذج. فالبطاقةُ إن كانت في النافذة نفسِها
  * ‏التي تقرؤها اللوحة — **بـ`listDrafts` ذاتِها لا بعدٍّ يقاربها** — وإلّا فالمسارُ يختار غيرَها.
  */
-async function onBoard(db: Env['DB'], id: string): Promise<boolean> {
-  return (await listDrafts(db, BOARD)).some((d) => d.id === id)
+async function onBoard(db: Env['DB'], org: string, id: string): Promise<boolean> {
+  return (await listDrafts(db, org, BOARD)).some((d) => d.id === id)
 }
 
 /** ‏رحلةُ المنشور — موضعٌ يُرسَم لكلّ منشورٍ أيًّا كان عمرُه (D-104). */
@@ -425,7 +425,7 @@ panel.get('/panel/pivot.csv', async (c) => {
     measure: readMeasure(q.get('m') ?? undefined, 'count'),
   }
   const days = readSpan(q.get('days'))
-  const loaded = await loadFacts(c.env.DB, days)
+  const loaded = await loadFacts(c.env.DB, activeOrg(session.record), days)
   const body = toCsv(pivot(loaded.facts, spec), spec)
   return new Response(body, {
     status: 200,
@@ -470,7 +470,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   const pivotCols = readCols(q.get('cols') ?? undefined)
   const pivotMeasure = readMeasure(q.get('m') ?? undefined, 'count')
   const pivotDays = readSpan(q.get('days'))
-  const loaded = await loadFacts(c.env.DB, pivotDays)
+  const loaded = await loadFacts(c.env.DB, activeOrg(session.record), pivotDays)
   const pivotView: PivotView = {
     table: pivot(loaded.facts, { rows: pivotRows, cols: pivotCols, measure: pivotMeasure }),
     rows: pivotRows,
@@ -542,14 +542,14 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
     }),
   )
   const routes = await readRoutes(c.env.DB)
-  const drafts = await listDrafts(c.env.DB, BOARD)
+  const drafts = await listDrafts(c.env.DB, activeOrg(session.record), BOARD)
   /*
    * ‏**والمحرّرُ المركّزُ من العنوان** (D-198): `?open=<id>` يرسم المنشورَ بجوار القائمة، فيُفتح برابطٍ
    * ‏ويُحفَظ ويعمل بلا سكربت. والمعرّفُ يُفحَص قبل أن يُسأل عنه، ومنشورٌ أقدمُ من الستّين يُقرأ وحدَه.
    */
   const openId = q.get('open') ?? ''
   const editing = POST_ID.test(openId)
-    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, openId))
+    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, activeOrg(session.record), openId))
     : null
   const media = await mediaFor(c.env.DB, [...new Set([...drafts.map((d) => d.id), ...(editing === null ? [] : [editing.id])])])
 
@@ -593,7 +593,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   const configured = new Set(
     apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames),
   )
-  const accountsNow = await listAccounts(c.env.DB)
+  const accountsNow = await listAccounts(c.env.DB, activeOrg(session.record))
   const channels = viewChannels(accountsNow, (name) => {
     if (configured.has(name)) return true
     const value = c.env[name as keyof Env]
@@ -604,7 +604,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
   const openCount = (await openSuggestions(c.env.DB)).length
   // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
-  const journey = await journeyCounts(c.env.DB, new Date())
+  const journey = await journeyCounts(c.env.DB, activeOrg(session.record), new Date())
   const uploads = await listUploads(c.env.DB)
   /*
    * ‏**ونصوصُ المقاطع المكتوبة من KV** (D-190) — لما بقي فيه ما يُنشأ وحدَه: مقطعٌ أُنشئ على
@@ -617,7 +617,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
     if (found !== null) captions[u.id] = found
   }
   // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
-  const facts = await ownerFacts(c)
+  const facts = await ownerFacts(c, activeOrg(session.record))
   const ownerPending = pendingCount(facts)
 
   /*
@@ -691,7 +691,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
     platform: e.platform, displayName: e.displayName, kind: e.kind, daysLeft: e.daysLeft,
   }))
   // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
-  const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, 'tiktok'))
+  const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, activeOrg(session.record), 'tiktok'))
   const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   return page((nonce) =>
     panelPage({
@@ -862,7 +862,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       ownerPending,
       expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-229): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
+    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-232): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
     }, only, q.get('swap') === 'posts'),
   )
 }
@@ -1185,7 +1185,7 @@ panel.post('/panel/settings', async (c) => {
     const name = key === 'youtube_public' ? 'YouTube' : 'TikTok'
     // ‏وTikTok بحكم الناشر: قلبٌ بلا `video.publish` يبقى صندوقًا — يُقال الآن لا بعد أوّل مقطع
     const noScope = key === 'tiktok_public' && result.stored === 'true'
-      && tiktokNeedsScope(await reachNow(c.env.DB))
+      && tiktokNeedsScope(await reachNow(c.env.DB, activeOrg(gate.session.record)))
     flash = noScope
       ? {
           kind: 'warn',
@@ -1207,7 +1207,7 @@ panel.post('/panel/settings', async (c) => {
     flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
-  // ‏**والحفظُ التلقائيّ في الحدود** (D-229): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
+  // ‏**والحفظُ التلقائيّ في الحدود** (D-232): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
   // ‏(وقد تُقصّ إلى المدى) لا بتحويلٍ يعيد رسمَ الصفحة. والفحصُ والقصُّ والتدقيقُ قبله كما هي.
   if (form.get('auto') === '1') return c.json({ ok: flash.kind !== 'bad', text: flash.text, stored: result.stored })
   await setFlash(c.env, c.req.raw, flash)
@@ -1381,7 +1381,7 @@ panel.post('/panel/channels/disconnect', async (c) => {
     ? (String(form.get('platform')) as LinkPlatform)
     : null
   const id = String(form.get('account') ?? '')
-  const target = platform === null || id === '' || id.length > 200 ? null : await findLinked(c.env.DB, id, platform)
+  const target = platform === null || id === '' || id.length > 200 ? null : await findLinked(c.env.DB, activeOrg(gate.session.record), id, platform)
   if (target === null) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا حسابَ مربوطًا بهذا المعرّف على هذه المنصّة، فلم يُفصَل شيء.' })
     return toSetup(form)
@@ -1803,7 +1803,7 @@ panel.get('/panel/channels/:platform', async (c) => {
   // ‏صفحةٌ لا نصٌّ خامّ (D-189): رابطٌ قديمٌ إلى منصّةٍ يفتح الرافدةَ وبابَ الرئيسيّة
   if (spec === undefined) return notFoundResponse(c.req.raw, 'لا منصّةَ بهذا الاسم')
 
-  const accounts = await listAccounts(c.env.DB)
+  const accounts = await listAccounts(c.env.DB, activeOrg(session.record))
   // **لكلّ منصّةٍ لها سرّان** (D-142) — لا لمنصّتين، وإلّا بقيت شاشةُ
   // YouTube تعد بدليلٍ لا يأتي
   const apps = await appStatuses(
@@ -1828,7 +1828,7 @@ panel.get('/panel/channels/:platform', async (c) => {
   const filter = filterOf(c.req.query('filter'), c.req.query('show'))
   // ‏ومَن يرى المقطع على YouTube وTikTok قرارُ المالك بعد الإجازة (D-190) — يُقرأ هنا ويُقلَب في «الإعداد»
   // ‏والمحطّةُ بما سيقع (حكمُ الناشر: TikTok بلا `video.publish` صندوقٌ)، والمفتاحُ بقرار المالك
-  const reach = platform === 'youtube' || platform === 'tiktok' ? await reachNow(c.env.DB) : null
+  const reach = platform === 'youtube' || platform === 'tiktok' ? await reachNow(c.env.DB, activeOrg(session.record)) : null
   const clipReach = reach === null || (platform !== 'youtube' && platform !== 'tiktok')
     ? undefined
     : platform === 'tiktok' ? reach.tiktokWanted === true : reach.youtube
@@ -1836,19 +1836,19 @@ panel.get('/panel/channels/:platform', async (c) => {
   // ‏وكلُّ قراءةٍ لما يُعرض في تبويبها — الإعدادُ لا يقرأ الخطَّ الزمنيّ ولا العكس
   const timeline = publishes && tab !== 'setup'
   const [posts, tally, counts, upcomingRows, historyPage, waitingRows] = await Promise.all([
-    publishes ? platformPosts(c.env.DB, platform, 60) : Promise.resolve([]),
+    publishes ? platformPosts(c.env.DB, activeOrg(session.record), platform, 60) : Promise.resolve([]),
     publishes
-      ? platformTally(c.env.DB, platform)
+      ? platformTally(c.env.DB, activeOrg(session.record), platform)
       : Promise.resolve({ published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null }),
-    platformCounts(c.env.DB, platform, CLIP_PLATFORMS.has(platform)),
-    timeline && tab !== 'waiting' ? upcoming(c.env.DB, platform) : Promise.resolve([]),
+    platformCounts(c.env.DB, activeOrg(session.record), platform, CLIP_PLATFORMS.has(platform)),
+    timeline && tab !== 'waiting' ? upcoming(c.env.DB, activeOrg(session.record), platform) : Promise.resolve([]),
     timeline && tab !== 'waiting'
-      ? history(c.env.DB, platform, tab === 'media' ? 'all' : filter, readCursor(c.req.query('before')))
+      ? history(c.env.DB, activeOrg(session.record), platform, tab === 'media' ? 'all' : filter, readCursor(c.req.query('before')))
       : Promise.resolve({ rows: [], next: null }),
-    timeline && tab === 'waiting' ? waiting(c.env.DB, platform) : Promise.resolve([]),
+    timeline && tab === 'waiting' ? waiting(c.env.DB, activeOrg(session.record), platform) : Promise.resolve([]),
   ])
   // والنطاقاتُ تُقرأ لكلّ ما يُربَط: هي جوابُ «ماذا يستطيع هذا الحساب»
-  const scopes = spec.stage === 'none' || tab !== 'setup' ? {} : await grantedScopes(c.env.DB, platform)
+  const scopes = spec.stage === 'none' || tab !== 'setup' ? {} : await grantedScopes(c.env.DB, activeOrg(session.record), platform)
 
   const shown = [...upcomingRows, ...historyPage.rows, ...waitingRows].map((p) => p.id)
   // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
@@ -1872,7 +1872,7 @@ panel.get('/panel/channels/:platform', async (c) => {
     history: historyPage,
     waiting: waitingRows,
     // سجلُّ صحّة الحساب من صفوفه لا من حال (D-129) — ويُقرأ للسلّم في كلّ تبويب
-    health: spec.stage === 'none' ? {} : await accountHealth(c.env.DB, platform),
+    health: spec.stage === 'none' ? {} : await accountHealth(c.env.DB, activeOrg(session.record), platform),
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
@@ -1899,14 +1899,14 @@ panel.get('/panel/channels/:platform', async (c) => {
  */
 async function ownerFacts(c: {
   env: Env
-}): Promise<OwnerFacts> {
+}, org: string): Promise<OwnerFacts> {
   const env = c.env as unknown as Record<string, string | undefined>
   const has = (name: string): boolean => {
     const v = env[name]
     return typeof v === 'string' && v.trim() !== ''
   }
 
-  const accounts = await listAccounts(c.env.DB)
+  const accounts = await listAccounts(c.env.DB, org)
   // ‏كلُّ منصّةٍ لها سرّان (D-142) — وكانت Instagram خارجها، فمهمّتُها لا تعرف أنّ سرّيها حُفظا
   const apps = await appStatuses(c.env.DB, env)
   const ownerSettings = await readSettings(c.env.DB)
@@ -1974,7 +1974,7 @@ async function ownerFacts(c: {
       ...(ownerSettings.tiktokPublic ? ['tiktok'] : []),
     ]),
     // ‏وقلبٌ بلا `video.publish` يبقى صندوقًا — بحكم الناشر (D-190)
-    tiktokNoScope: tiktokNeedsScope(reachOf(ownerSettings, await activeScopes(c.env.DB, 'tiktok'))),
+    tiktokNoScope: tiktokNeedsScope(reachOf(ownerSettings, await activeScopes(c.env.DB, org, 'tiktok'))),
   }
 }
 
@@ -1988,7 +1988,7 @@ panel.get('/panel/tasks', async (c) => {
 
   const gates = gatesOf(await readGateFacts(c.env.DB))
   const body = tasksScreen({
-    rows: ownerRows(await ownerFacts(c)),
+    rows: ownerRows(await ownerFacts(c, activeOrg(session.record))),
     gates,
     phase: currentPhase(gates),
     env: c.env.SADA_ENV,
@@ -2055,7 +2055,7 @@ panel.get('/panel/timeline', async (c) => {
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const now = new Date()
   const win = windowOf(now, zone, span, shift)
-  const loaded = await loadGantt(c.env.DB, win.from, win.to)
+  const loaded = await loadGantt(c.env.DB, activeOrg(session.record), win.from, win.to)
   const body = timelineScreen({
     chart: gantt(loaded, win, now, zone),
     span, shift, capped: loaded.capped, cap: GANTT_CAP, zone, now,
@@ -2079,7 +2079,7 @@ panel.get('/panel/journey/:id', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const journey = await readJourney(c.env.DB, c.req.param('id'))
+  const journey = await readJourney(c.env.DB, activeOrg(session.record), c.req.param('id'))
   if (journey === null) return notFoundResponse(c.req.raw, 'لا منشورَ بهذا المعرّف')
 
   const body = journeyBody(journey, new Date())
@@ -2270,7 +2270,7 @@ panel.post('/panel/drafts/write', async (c) => {
   )
   // ‏و«موجودةٌ وهي هذه» لمسوّدةٍ خارجَ النافذة — كُتبت من النسخة نفسِها قبل أسابيع — لا بطاقةَ لها:
   // ‏فرحلتُها تُريها بنصّها وحالها، والإشعارُ لا يُكتب لصفحةٍ لا تقرؤه فيظهر بعدها في غير موضعه
-  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, outcome.postId))) return toJourney(outcome.postId)
+  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, activeOrg(gate.session.record), outcome.postId))) return toJourney(outcome.postId)
   await setFlash(c.env, c.req.raw, flash)
   // ‏والمسوّدةُ الجديدةُ في بطاقتها لا عند رأس اللوح، وما لم يُكتب يعود إلى نموذج الكتابة
   return outcome.kind === 'drafted' || outcome.kind === 'already' ? toCard('d', outcome.postId) : back('write')
@@ -2326,7 +2326,7 @@ panel.post('/panel/drafts/idea', async (c) => {
   const stopped = done.filter((d) => d.outcome.kind === 'blocked' || d.outcome.kind === 'failed' || d.outcome.kind === 'not_analyzed')
   const spent = drafted.reduce((sum, d) => sum + d.outcome.cost, 0)
   // ‏ما كُتب لمنصّةٍ غيرِ متّصلة يُعتمَد ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
-  const links = linkStates(await listAccounts(c.env.DB))
+  const links = linkStates(await listAccounts(c.env.DB, activeOrg(gate.session.record)))
   const unlinked = [...drafted, ...already].filter((d) => links[d.platform] !== 'linked')
   const parts: string[] = []
   if (drafted.length > 0) {
@@ -2361,7 +2361,7 @@ panel.post('/panel/drafts/idea', async (c) => {
     return back('idea')
   }
   const onlyAlready = drafted.length === 0 && stopped.length === 0 && unlinked.length === 0
-  const shown = await onBoard(c.env.DB, first)
+  const shown = await onBoard(c.env.DB, activeOrg(gate.session.record), first)
   if (onlyAlready && !shown) return toJourney(first)
   await setFlash(c.env, c.req.raw, flash)
   return shown ? toCard('d', first) : back('idea')
@@ -2389,9 +2389,9 @@ panel.post('/panel/drafts/decide', async (c) => {
    * ‏(`saveText`)، فلا يُحفَظ ما سيُردّ عند الاعتماد. ويعود إلى المحرّر نفسِه.
    */
   if (wants === 'save') {
-    const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
+    const saved = await saveText(c.env.DB, activeOrg(gate.session.record), id, String(form.get('text') ?? ''))
     /*
-     * ‏**والحفظُ التلقائيّ** (D-229، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
+     * ‏**والحفظُ التلقائيّ** (D-232، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
      * ‏فيُردّ عليه بسطرٍ لا بتحويل: لا إشعارَ يملأ الشاشة كلَّ جملة، ولا سطرَ تدقيقٍ لكلّ توقّف. والفحصُ فحصُ الاعتماد نفسُه.
      */
     if (form.get('auto') === '1') {
@@ -2417,7 +2417,7 @@ panel.post('/panel/drafts/decide', async (c) => {
       : String(sent)
   }
   const result = await decide(
-    c.env.DB,
+    c.env.DB, activeOrg(gate.session.record),
     id,
     wants === 'reject' ? { kind: 'reject' } : { kind: 'approve', text },
     gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
@@ -2498,7 +2498,7 @@ panel.post('/panel/drafts/undo-reject', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await undoReject(c.env.DB, id)
+  const result = await undoReject(c.env.DB, activeOrg(gate.session.record), id)
 
   const flash: PanelFlash = result.ok
     ? { kind: 'ok', text: 'عادت مسوّدةً تنتظر قرارك.' }
@@ -2527,7 +2527,7 @@ panel.post('/panel/drafts/undo-approve', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await undoApprove(c.env.DB, id)
+  const result = await undoApprove(c.env.DB, activeOrg(gate.session.record), id)
 
   await record(
     c.env.DB,
@@ -2580,7 +2580,7 @@ panel.post('/panel/drafts/approve-many', async (c) => {
   }
 
   const result = await approveMany(
-    c.env.DB,
+    c.env.DB, activeOrg(gate.session.record),
     ids,
     gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token',
   )
@@ -2650,7 +2650,7 @@ panel.post('/panel/drafts/schedule', async (c) => {
     ? await c.env.DB.prepare('SELECT platform FROM posts WHERE id = ?').bind(id).first<{ platform: string }>()
     : null
   // ‏ويسكت حين قلب المالكُ النشرَ علنيًّا بعد الإجازة (D-190)
-  const reach = scheduled === null ? null : privateReach([scheduled.platform], await reachNow(c.env.DB))
+  const reach = scheduled === null ? null : privateReach([scheduled.platform], await reachNow(c.env.DB, activeOrg(gate.session.record)))
   if (reach !== null) flash = { ...flash, text: `${flash.text} ${reach}` }
 
   await record(
@@ -2715,8 +2715,8 @@ panel.post('/panel/drafts/spread', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
-  const drafts = await listDrafts(c.env.DB, BOARD)
-  const accounts = await listAccounts(c.env.DB)
+  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
+  const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
@@ -2760,8 +2760,8 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   const now = new Date()
   const gap = readGap(gate.form.get('gap'))
 
-  const drafts = await listDrafts(c.env.DB, BOARD)
-  const accounts = await listAccounts(c.env.DB)
+  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
+  const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
@@ -2869,7 +2869,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-229) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
+  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-232) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
   const back = String(form.get('back') ?? '')
   if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
@@ -2905,7 +2905,7 @@ panel.post('/panel/drafts/requeue', async (c) => {
     c.req.raw,
   )
   const to = backTo(gate.form.get('return'), '')
-  const card = result.ok && (await onBoard(c.env.DB, id))
+  const card = result.ok && (await onBoard(c.env.DB, activeOrg(gate.session.record), id))
   // ‏ورحلةُ المنشور لا تقرأ الإشعار: لا يُكتب لها فيظهر بعدها في غير موضعه — وحالُه فيها «معتمَد»
   if (result.ok && !card && to === '') return toJourney(id)
   await setFlash(c.env, c.req.raw, result.ok
@@ -3119,11 +3119,11 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
       .prepare(`SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id WHERE m.upload_id = ?`)
       .bind(id).all<{ id: string; platform: string }>()).results
       .filter((r) => (result.ok ? result.created as readonly string[] : []).includes(r.platform)).map((r) => r.id),
-    accounts: await listAccounts(c.env.DB),
+    accounts: await listAccounts(c.env.DB, activeOrg(gate.session.record)),
     at,
     now,
   })
-  const plannedReach = planned === null ? null : privateReach(planned.scheduled, await reachNow(c.env.DB))
+  const plannedReach = planned === null ? null : privateReach(planned.scheduled, await reachNow(c.env.DB, activeOrg(gate.session.record)))
   if (planned !== null) {
     await record(c.env.DB, {
       actor: 'panel', action: 'upload.schedule', target: id,
@@ -3133,7 +3133,7 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
   // ‏عنوانُ YouTube فوق حدّه يُقصّ عند الرفع (ر-4): يُقال الآن بما سيُرفع، لا يُكتشف في القناة
   const cut = result.ok && !perPlatform && result.created.includes('youtube') ? cutTitle(String(form.get('caption') ?? '')) : null
   // ‏ومنصّةٌ غيرُ متّصلةٍ يُنشأ منشورُها ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
-  const links = result.ok ? linkStates(await listAccounts(c.env.DB)) : {}
+  const links = result.ok ? linkStates(await listAccounts(c.env.DB, activeOrg(gate.session.record))) : {}
   const unlinked = result.ok ? result.created.filter((p) => links[p] !== 'linked') : []
   await setFlash(c.env, c.req.raw, !result.ok
     ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
@@ -3171,13 +3171,13 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   const result = at === null ? null : await scheduleFromUpload(c.env.DB, {
     uploadId: id,
     shown: gate.form.getAll('post').map(String),
-    accounts: await listAccounts(c.env.DB),
+    accounts: await listAccounts(c.env.DB, activeOrg(gate.session.record)),
     at,
     now,
   })
   const names = (list: readonly string[]): string => [...new Set(list)].map((p) => platformLabel(p)).join(' و')
   const failed = result === null ? '' : result.failed.map((f) => `${platformLabel(f.platform)}: ${f.reason}`).join('؛ ')
-  const reach = result === null ? null : privateReach(result.scheduled, await reachNow(c.env.DB))
+  const reach = result === null ? null : privateReach(result.scheduled, await reachNow(c.env.DB, activeOrg(gate.session.record)))
   const flash: PanelFlash = at === null || result === null
     ? { kind: 'bad', text: 'لم يُجدوَل شيء: موعدٌ لا أعرفه — اختر أحدَ أزرار الموعد.' }
     : result.scheduled.length === 0
@@ -3205,12 +3205,12 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
 
 const PLAN_TTL = 2 * 60 * 60
 
-async function planFacts(env: Env, cookie: string | null, now: Date): Promise<PlanFacts> {
+async function planFacts(env: Env, org: string, cookie: string | null, now: Date): Promise<PlanFacts> {
   const { results: scheduled } = await env.DB
     .prepare(`SELECT platform, text, scheduled_at AS at FROM posts WHERE status = 'queued' AND scheduled_at IS NOT NULL LIMIT 1000`)
     .all<{ platform: string; text: string; at: string }>()
   return {
-    accounts: await listAccounts(env.DB),
+    accounts: await listAccounts(env.DB, org),
     uploads: await listUploads(env.DB, 200),
     now,
     zone: (await ownerZone(env.DB, cookie)) ?? DEFAULT_ZONE,
@@ -3276,8 +3276,8 @@ panel.get('/panel/plan-import/:id', async (c) => {
       soloPage('صدى — معاينةُ الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
         planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
   }
-  const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, new Date()))
-  const reach = await reachNow(c.env.DB)
+  const read = readPlan(csv, await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date()))
+  const reach = await reachNow(c.env.DB, activeOrg(session.record))
   // ‏«بتوقيت الرياض» حين لا منطقةَ عُرفت: هي ما قرأ به `planFacts` الأيّامَ (D-202)
   const fallback = (await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) === null
   return page((nonce) =>
@@ -3297,7 +3297,7 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
     return back('plan-import')
   }
   const now = new Date()
-  const read = readPlan(csv, await planFacts(c.env, c.req.header('Cookie') ?? null, now))
+  const read = readPlan(csv, await planFacts(c.env, activeOrg(gate.session.record), c.req.header('Cookie') ?? null, now))
   const by = gate.session.record.via === 'passkey' ? 'panel:passkey' : 'panel:token'
   // ‏ما عرضته المعاينةُ جاهزًا وحده (D-182) — والزرُّ وعدَ بعدده
   const shown = new Set(String(gate.form.get('lines') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 1))

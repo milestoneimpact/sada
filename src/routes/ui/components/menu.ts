@@ -53,7 +53,7 @@ export function menuAction(input: {
   readonly note?: string
   /** يُرسَل بلا تحميل وتُبدَّل بطاقتُه (D-207) — لما ينتهي في بطاقةٍ بمعرّفها `d-…`. */
   readonly swap?: boolean
-  /** ما تقوله البطاقةُ فورَ الضغط قبل ردّ الخادم (D-229)، مع `swap` وحدَه. */
+  /** ما تقوله البطاقةُ فورَ الضغط قبل ردّ الخادم (D-232)، مع `swap` وحدَه. */
   readonly optimistic?: string
 }): string {
   const hidden = Object.entries(input.fields)
