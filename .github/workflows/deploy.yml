@@ -103,6 +103,19 @@ jobs:
       # الاستئذان قبل دهس Worker أُنشئ من اللوحة — و sada-api-staging منها —
       # يُتخطى في CI بغياب طرفية تفاعلية. فإن توقف النشر منتظرا جوابا،
       # فالمهلة هي ما يكشفه، والعلاج CI=true لا علم غير موجود.
+      # طوابيرُ الإنتاج تُنشأ إن غابت، فلا أداةَ لها في اللوحة الموصولة.
+      # والأمرُ لا يُعاد على طابورٍ قائم: يُسأل عنه أوّلاً.
+      - name: الطوابير
+        if: env.TARGET == 'production'
+        run: |
+          for q in sada-publish sada-generate sada-publish-dlq; do
+            if npx wrangler queues info "$q" >/dev/null 2>&1; then
+              echo "قائم: $q"
+            else
+              npx wrangler queues create "$q"
+            fi
+          done
+
       - name: النشر
         run: npx wrangler deploy --env "$TARGET"
 
