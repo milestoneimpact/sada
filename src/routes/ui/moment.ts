@@ -23,3 +23,15 @@ export function brandMoment(): string {
     <p class="moment-line">أصوات اليوم .. لقرارات أفضل</p>
   </div>`
 }
+
+/**
+ * ‏**شريطُ اليوم الأوّل** (BRAND §٥ · D-226): النغمةُ العميقةُ أعلى الرئيسيّة بارتفاع ‏10rem (‏160px) وأربعة أصداء،
+ * ‏**حتّى يُفهَم أوّلُ مصدر** — فمصدرٌ لم يُحلَّل لا يُكتب منه بعد، واليومُ الأوّلُ قائمٌ ما لم يُكتب شيء.
+ * * ‏بلا نصٍّ عليه ولا فوقه (الحارسُ الثالث، D-222)، و`aria-hidden` كلُّه. **وبلا خيطٍ ذهبيّ**: الأصداءُ النعناعيّةُ موضعُ
+ * ‏ذهبٍ واحد، والخيطُ في الليل موضعٌ ثانٍ يتجاوز ميزانيّةَ الثلاثة.
+ * ‏وليس «.moment»: تلك لحظةُ T6 بجانب النموذج، وهذا شريطٌ في سطح اللوحة يختفي.
+ */
+export function firstBand(): string {
+  return `<div class="first-band" aria-hidden="true"><span class="echo">${
+    echo({ width: 1200, height: 160, tone: 'deep', crest: 0.72, level: 0.5, scale: 1.1, density: 4, hairline: false, align: 'xMaxYMid' })}</span></div>`
+}
