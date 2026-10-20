@@ -5,7 +5,7 @@
  */
 import type { Peaks } from '../../lib/schedule/peak'
 import { clock, dayLabel, localParts, zoneNote } from '../../lib/time/zone'
-import { presetAt, PRESETS } from '../../lib/time/local'
+import { momentLabel, nextPeak, presetAt, PRESETS } from '../../lib/time/local'
 import { escapeHtml } from './escape'
 import { field } from './components/field'
 
@@ -31,10 +31,17 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
  * بمنطقة المالك من كعكته (D-173)، وبالمنطقة المحفوظة إن غابت (D-200)، **وبتوقيت الرياض معلنًا** في أوّل زيارةٍ حقًّا (D-201).
  */
 export function whenField(form: string, zone: string | null, now: Date, peaks: Peaks | undefined, legend = 'متى يُنشر؟'): string {
-  const opts = PRESETS.map((p) => {
+  // ‏«أقرب ذروة» أوّلُ الخيارات ومختارُها حين قِيست الذروة — كـ«Next Available» في Buffer،
+  // لكن من تفاعل جمهور المالك لا من فتحاتٍ ثابتة. ولم تُقَس؟ يبقى «غدًا 9:00 ص».
+  const best = peaks?.hours[0]
+  const peakAt = best === undefined ? null : nextPeak(best.hour, now)
+  const peakOpt = peakAt === null ? '' : `<label class="when-opt"><input type="radio" name="preset" value="peak-${best!.hour}" form="${form}" checked>
+      <span><b>أقرب ذروة</b><small>${escapeHtml(momentLabel(peakAt, zone, now))}</small></span></label>`
+  const opts = peakOpt + PRESETS.map((p) => {
     const at = presetAt(p.kind, now, zone)
     const sub = at === null ? '' : p.kind === 'hour' ? clock(at, zone) : dayLabel(at, zone, false)
-    return `<label class="when-opt"><input type="radio" name="preset" value="${p.kind}" form="${form}"${p.kind === 'tomorrow' ? ' checked' : ''}>
+    const checked = peakAt === null && p.kind === 'tomorrow'
+    return `<label class="when-opt"><input type="radio" name="preset" value="${p.kind}" form="${form}"${checked ? ' checked' : ''}>
       <span><b>${escapeHtml(p.label)}</b><small>${escapeHtml(sub)}</small></span></label>`
   }).join('')
   return `<fieldset class="ed-when">

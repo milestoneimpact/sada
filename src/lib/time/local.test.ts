@@ -44,6 +44,17 @@ describe('presetAt — الأزرارُ الأربعة بتوقيت المالك
     }
     expect(presetAt('yesterday', NOW, 'Asia/Riyadh')).toBeNull()
   })
+
+  it('«أقرب ذروة» أوّلُ ساعة ذروةٍ قادمة، ولا أقربَ من ربع ساعة، والساعةُ الخارجةُ لا تصير موعدًا', () => {
+    expect(iso(presetAt('peak-15', new Date('2026-10-04T08:00:00Z'), 'Asia/Riyadh'))).toBe('2026-10-04T15:00')
+    // ‏مضت الذروةُ اليوم: فالغد
+    expect(iso(presetAt('peak-6', new Date('2026-10-04T08:00:00Z'), 'Asia/Riyadh'))).toBe('2026-10-05T06:00')
+    // ‏بعد عشر دقائق أقربُ من دورة الإرسال: فالغد أيضًا
+    expect(iso(presetAt('peak-15', new Date('2026-10-04T14:50:00Z'), null))).toBe('2026-10-05T15:00')
+    expect(iso(presetAt('peak-15', new Date('2026-10-04T14:45:00Z'), null))).toBe('2026-10-04T15:00')
+    expect(presetAt('peak-24', NOW, null)).toBeNull()
+    expect(presetAt('peak-', NOW, null)).toBeNull()
+  })
 })
 
 describe('momentLabel', () => {

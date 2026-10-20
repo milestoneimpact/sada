@@ -41,8 +41,24 @@ export const PRESETS: readonly { readonly kind: Preset; readonly label: string }
   { kind: 'sunday', label: 'الأحد 9:00 ص' },
 ]
 
-/** «بعد ساعة» و«غدًا 9:00 ص» … إلى لحظة — بتوقيت المالك، ولا يقع في الماضي أبدًا. */
+/**
+ * «أقرب ذروة» — أوّلُ لحظةٍ قادمةٍ على ساعة ذروةٍ قيست (UTC)، ولا أقربَ من ربع ساعة:
+ * فدورةُ الإرسال تدور كلَّ ربع، وموعدٌ بعد دقيقتين يسبق الدورةَ أو يلحقها متأخّرًا.
+ */
+export function nextPeak(hourUtc: number, now: Date): Date | null {
+  if (!Number.isInteger(hourUtc) || hourUtc < 0 || hourUtc > 23) return null
+  const at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hourUtc))
+  if (at.getTime() < now.getTime() + 15 * 60_000) at.setUTCDate(at.getUTCDate() + 1)
+  return at
+}
+
+/**
+ * «بعد ساعة» و«غدًا 9:00 ص» … إلى لحظة — بتوقيت المالك، ولا يقع في الماضي أبدًا.
+ * و`peak-<ساعة UTC>` هو «أقرب ذروة» (`nextPeak`)، يُرسَم حين قِيست ذروةٌ عند المالك.
+ */
 export function presetAt(kind: string, now: Date, zone: string | null): Date | null {
+  const peak = /^peak-(\d{1,2})$/.exec(kind)
+  if (peak !== null) return nextPeak(+peak[1]!, now)
   // ‏والدقيقةُ أدقُّ ما تقبله الجدولة: «بعد ساعة» تُقصّ ثوانيها
   if (kind === 'hour') return new Date(Math.floor((now.getTime() + 3_600_000) / 60_000) * 60_000)
   const today = localParts(now, zone)
