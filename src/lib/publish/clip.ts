@@ -53,12 +53,12 @@ export async function bucketClip(bucket: RangeBucket, key: string, mime: string)
     mime,
     read: async (offset, length) => {
       const part = await bucket.get(key, { range: { offset, length } })
-      if (part === null) throw new Error(`clip: اختفى الكائنُ أثناء القراءة (${key})`)
+      if (part === null) throw new Error(`clip: اختفى الكائن أثناء القراءة (${key})`)
       const bytes = new Uint8Array(await part.arrayBuffer())
       if (bytes.length === length) return bytes
       // ‏دلوٌ يتجاهل المدى يعيد الكائنَ كلَّه — فيُقصّ منه ما طُلب
       if (bytes.length >= offset + length) return bytes.subarray(offset, offset + length)
-      throw new Error(`clip: قطعةٌ أقصرُ ممّا طُلب (${bytes.length} من ${length})`)
+      throw new Error(`clip: قطعة أقصر ممّا طُلب (${bytes.length} من ${length})`)
     },
   }
 }

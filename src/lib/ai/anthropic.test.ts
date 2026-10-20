@@ -41,38 +41,38 @@ async function thrown(fetchImpl: typeof fetch): Promise<AnthropicError> {
   return error as AnthropicError
 }
 
-describe('D-164 · الخطأُ بعد 200 يحمل استهلاكَه', () => {
-  it('البترُ عند max_tokens: يُعاد، ومعه ما استُهلك', async () => {
+describe('D-164 · الخطأ بعد 200 يحمل استهلاكَه', () => {
+  it('البتر عند max_tokens: يُعاد، ومعه ما استُهلك', async () => {
     const error = await thrown(net({ stop: 'max_tokens' }))
     expect(error.retryable).toBe(true)
     expect(error.spent).toEqual(SPENT)
   })
 
-  it('والرفضُ: لا يُعاد، ومعه ما استُهلك', async () => {
+  it('والرفض: لا يُعاد، ومعه ما استُهلك', async () => {
     const error = await thrown(net({ stop: 'refusal' }))
     expect(error.status).toBe(422)
     expect(error.retryable).toBe(false)
     expect(error.spent).toEqual(SPENT)
   })
 
-  it('وجوابٌ بلا كتلةِ نصّ', async () => {
+  it('وجواب بلا كتلة نصّ', async () => {
     const error = await thrown(net({ content: [] }))
     expect(error.spent).toEqual(SPENT)
   })
 
-  it('**وما لم يصل لا استهلاكَ فيه**: 500 بلا spent', async () => {
+  it('**وما لم يصل لا استهلاك فيه**: 500 بلا spent', async () => {
     const error = await thrown(net({ status: 500 }))
     expect(error.spent).toBeUndefined()
   })
 
-  it('والنجاحُ يعيد الأسماءَ نفسها', async () => {
+  it('والنجاح يعيد الأسماء نفسها', async () => {
     const result = await anthropicChat({ ...CALL, fetchImpl: net() })
     expect(result).toEqual({ text: '{"a":1}', ...SPENT })
   })
 })
 
 describe('المخطّط', () => {
-  it('يصل كما أُعطي في output_config.format — والتحميلُ شأنُ المنادي', async () => {
+  it('يصل كما أُعطي في output_config.format — والتحميل شأن المنادي', async () => {
     const schema = { type: 'object', properties: {}, required: [], additionalProperties: false }
     await anthropicChat({ ...CALL, schema, fetchImpl: net() })
     const config = bodies[0]?.['output_config'] as { format?: { type: string; schema: unknown } }

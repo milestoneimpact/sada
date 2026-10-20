@@ -22,7 +22,7 @@ function orgOf(table: string, where: string): string {
 }
 
 describe('الوراثة', () => {
-  it('كلفةُ منشورٍ لمنظّمته، وما لا مرجعَ له للمالك', async () => {
+  it('كلفة منشور لمنظّمته، وما لا مرجع له للمالك', async () => {
     const owned = await recordCost(db, { provider: 'x', operation: 'publish', units: 1, unitCost: 0.01, refId: 'p_b' })
     const loose = await recordCost(db, { provider: 'x', operation: 'publish', units: 1, unitCost: 0.01 })
     expect(orgOf('cost_ledger', `id = '${owned}'`)).toBe('org_b')
@@ -30,8 +30,8 @@ describe('الوراثة', () => {
   })
 })
 
-describe('مسارُ الملفّ (D-236)', () => {
-  it('ملفُّ المالك بمساره القائم، وملفُّ غيره تحت سابقته', async () => {
+describe('مسار الملفّ (D-236)', () => {
+  it('ملفّ المالك بمساره القائم، وملفّ غيره تحت سابقته', async () => {
     const { objectKey, orgOfPost } = await import('./tenancy')
     expect(objectKey('org_owner', 'img/p/m.png')).toBe('img/p/m.png')
     expect(objectKey('org_b', 'img/p/m.png')).toBe('org/org_b/img/p/m.png')

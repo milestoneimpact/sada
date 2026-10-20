@@ -249,17 +249,17 @@ function localStamp(dbAt: string, zone: string): string {
  */
 export function readPlan(csv: string, facts: PlanFacts): PlanRead {
   const table = parseCsvRecords(csv)
-  if (table.length === 0) return { rows: [], fileProblems: ['الملفُّ فارغ'] }
+  if (table.length === 0) return { rows: [], fileProblems: ['الملفّ فارغ'] }
   const header = table[0]!.cells.map((h) => COLUMNS[norm(h)] ?? COLUMNS[h.trim()] ?? null)
   const missing = (['date', 'time', 'platform', 'text'] as const).filter((c) => !header.includes(c))
   if (missing.length > 0) {
     const names = { date: 'date / التاريخ', time: 'time / الوقت', platform: 'platform / المنصة', text: 'text / النص' }
-    return { rows: [], fileProblems: [`أعمدةٌ ناقصة في السطر الأوّل: ${missing.map((m) => names[m]).join('، ')}`] }
+    return { rows: [], fileProblems: [`أعمدة ناقصة في السطر الأوّل: ${missing.map((m) => names[m]).join('، ')}`] }
   }
   const body = table.slice(1)
-  if (body.length === 0) return { rows: [], fileProblems: ['لا صفوفَ تحت العنوان'] }
+  if (body.length === 0) return { rows: [], fileProblems: ['لا صفوف تحت العنوان'] }
   if (body.length > MAX_PLAN_ROWS) {
-    return { rows: [], fileProblems: [`${body.length} صفًّا — والحدُّ ${MAX_PLAN_ROWS} في الملفّ الواحد. قسّمه ملفّين`] }
+    return { rows: [], fileProblems: [`${body.length} صفًّا — والحدّ ${MAX_PLAN_ROWS} في الملفّ الواحد. قسّمه ملفّين`] }
   }
 
   const cell = (r: string[], k: 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone'): string => {
@@ -279,37 +279,37 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
     const zoneRaw = cell(r, 'zone')
     const zone = zoneRaw === '' ? facts.zone : (validZone(zoneRaw) ?? '')
 
-    if (platform === null) problems.push(platformRaw === '' ? 'المنصّةُ فارغة' : `منصّةٌ لا أعرفها: «${platformRaw}»`)
+    if (platform === null) problems.push(platformRaw === '' ? 'المنصّة فارغة' : `منصّة لا أعرفها: «${platformRaw}»`)
     else if (!facts.publishable.has(platform)) problems.push(`${LABEL[platform]} لا ينشر لها صدى بعد`)
-    if (zone === '') problems.push(`منطقةٌ زمنيّةٌ لا أعرفها: «${zoneRaw}» — مثل Asia/Riyadh`)
+    if (zone === '') problems.push(`منطقة زمنيّة لا أعرفها: «${zoneRaw}» — مثل Asia/Riyadh`)
 
     let whenUtc: string | null = null
     const when = zone === '' ? null : readWhen(date, time, zone, order)
     const at = when?.at ?? null
     if (at === null) problems.push(`لم أفهم الموعد «${`${date} ${time}`.trim()}» — اكتبه مثل 2026-10-09 و9:30`)
-    else if (at.getTime() <= facts.now.getTime() + 15 * 60_000) problems.push('الموعدُ مضى أو أقربُ من ربع ساعة')
+    else if (at.getTime() <= facts.now.getTime() + 15 * 60_000) problems.push('الموعد مضى أو أقرب من ربع ساعة')
     else whenUtc = at.toISOString().slice(0, 16)
 
     // ‏ملفٌّ حُفظ بترميز Windows-1256 يُقرأ محارفَ بديلة — والمسارُ يردّه، وهذا حارسٌ ثانٍ
     if ([text, video, platformRaw].some((x) => x.includes('\uFFFD'))) {
-      problems.push('محارفُ تالفة — احفظ الملفّ بصيغة «CSV UTF-8» ثمّ ارفعه')
+      problems.push('محارف تالفة — احفظ الملفّ بصيغة «CSV UTF-8» ثمّ ارفعه')
     }
-    if (text === '') problems.push('النصُّ فارغ')
+    if (text === '') problems.push('النصّ فارغ')
     else if (platform !== null && isVideoPlatform(platform)) {
       // ‏وصفُ YouTube يُردّ بعد رفع المقطع فتضيع حصّةُ يومه (D-182): يُقال الآن لا بعد ساعات
       const why = captionProblem(platform, text)
       if (why !== null) problems.push(why)
     } else if (platform !== null) {
       const length = platform === 'x' ? postLength(text, 'x') : text.length
-      if (length > TEXT_LIMIT[platform]) problems.push(`النصُّ ${length} محرفًا و${LABEL[platform]} تقبل ${TEXT_LIMIT[platform]}`)
+      if (length > TEXT_LIMIT[platform]) problems.push(`النصّ ${length} محرفًا و${LABEL[platform]} تقبل ${TEXT_LIMIT[platform]}`)
     }
 
     // ‏المقطعُ يُطابَق باسمه في «فيديوهاتك» — الأحدثُ إن تكرّر الاسم
     let uploadId: string | null = null
     if (video !== '') {
       const found = facts.uploads.find((u) => u.status === 'ready' && norm(u.name) === norm(video))
-      if (found === undefined) problems.push(`لا مقطعَ مرفوعًا باسم «${video}» — ارفعه في «فيديوهاتك» أوّلًا`)
-      else if (platform === 'linkedin' || platform === 'x') problems.push(`${LABEL[platform]} لا تنشر المقطعَ من صدى بعد — اتركه فارغًا`)
+      if (found === undefined) problems.push(`لا مقطع مرفوعًا باسم «${video}» — ارفعه في «فيديوهاتك» أوّلًا`)
+      else if (platform === 'linkedin' || platform === 'x') problems.push(`${LABEL[platform]} لا تنشر المقطع من صدى بعد — اتركه فارغًا`)
       else if (platform !== null) {
         const check = videoChecks(found).find((c) => c.platform === (platform as VideoPlatform))
         if (check?.level === 'block') problems.push(`المقطع: ${check.note}`)
@@ -325,8 +325,8 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
       : facts.accounts.find((a) => a.platform === platform && a.status === 'active' && !isLinkedInPage(a))
     if (platform !== null && account === undefined) {
       problems.push(facts.accounts.some((a) => a.platform === platform && a.status === 'active' && isLinkedInPage(a))
-        ? 'المتّصلُ على LinkedIn صفحةُ شركة — والنشرُ باسمها لم يُبنَ بعد؛ اربط حسابَك الشخصيّ'
-        : `لا حسابَ متّصلًا على ${LABEL[platform]} — اربطه أوّلًا`)
+        ? 'المتّصل على LinkedIn صفحة شركة — والنشر باسمها لم يُبن بعد؛ اربط حسابَك الشخصيّ'
+        : `لا حساب متّصلًا على ${LABEL[platform]} — اربطه أوّلًا`)
     }
 
     // ‏النصُّ نفسُه مجدولٌ على المنصّة نفسِها في موعدٍ آخر: الملفُّ نفسُه من منطقةٍ أخرى،
@@ -335,13 +335,13 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
       const at = `${whenUtc.replace('T', ' ')}:00`
       const twin = (facts.scheduled ?? []).find((s) => s.platform === platform && s.at !== at && norm(s.text) === norm(text))
       if (twin !== undefined) {
-        problems.push(`النصُّ نفسُه مجدولٌ على ${LABEL[platform]} في ${localStamp(twin.at, zone === '' ? facts.zone : zone)} — اسحبه أوّلًا أو غيّر النصّ`)
+        problems.push(`النصّ نفسُه مجدول على ${LABEL[platform]} في ${localStamp(twin.at, zone === '' ? facts.zone : zone)} — اسحبه أوّلًا أو غيّر النصّ`)
       }
     }
 
     const dupKey = [platform, whenUtc, norm(text), norm(video)].join('|')
     const first = seen.get(dupKey)
-    if (first !== undefined) problems.push(`مكرّرٌ للسطر ${first}`)
+    if (first !== undefined) problems.push(`مكرّر للسطر ${first}`)
     else seen.set(dupKey, line)
 
     return {
@@ -379,7 +379,7 @@ export interface ApplyOutcome {
 
 /** حالُ منشورٍ موجودٍ بالمفتاح نفسِه — يقولها المنادي كما هي لا «كان مجدولًا» لكلّ حال. */
 const EXISTING: Readonly<Record<string, string>> = {
-  queued: 'مجدولٌ من قبل',
+  queued: 'مجدول من قبل',
   published: 'نُشر من قبل',
   failed: 'فشل نشرُه من قبل — أعده من بطاقته',
 }
@@ -417,7 +417,7 @@ export async function applyPlan(
       .first<{ id: string; status: string }>()
     const upload = row.uploadId === null ? null : await readyUpload(db, row.uploadId)
     if (row.uploadId !== null && upload === null) {
-      out.push({ line: row.line, result: 'failed', reason: 'المقطعُ لم يعد جاهزًا' })
+      out.push({ line: row.line, result: 'failed', reason: 'المقطع لم يعد جاهزًا' })
       continue
     }
 
@@ -445,8 +445,8 @@ export async function applyPlan(
         .prepare(
           `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, rationale,
                               org_id, brand_id)
-           VALUES (?, ?, 'text', ?, 'approved', ?, 'owner', ?, ?, 'من خطّةٍ مستورَدة',
-                   -- ‏منظّمةُ الحساب الذي يُنشر منه وعلامتُه
+           VALUES (?, ?, 'text', ?, 'approved', ?, 'owner', ?, ?, 'من خطّة مستورَدة',
+                   -- ‏منظّمة الحساب الذي يُنشر منه وعلامتُه
                    coalesce((SELECT org_id FROM accounts WHERE id = ?), 'org_owner'),
                    coalesce((SELECT brand_id FROM accounts WHERE id = ?), 'brand_owner'))`,
         )
@@ -468,6 +468,6 @@ export async function applyPlan(
  */
 export const PLAN_TEMPLATE = '﻿' + [
   'التاريخ,الوقت,المنصة,النص,المقطع',
-  '2026-10-12,09:30,LinkedIn,"المعلمُ ليس نقطةً على الخطّ الزمنيّ — هو نقطةُ قرار.",',
-  '2026-10-13,18:00,YouTube,"ثلاثُ طبقاتٍ للحوكمة في دقيقة",قيادة المعالم.mp4',
+  '2026-10-12,09:30,LinkedIn,"المعلم ليس نقطةً على الخطّ الزمنيّ — هو نقطة قرار.",',
+  '2026-10-13,18:00,YouTube,"ثلاث طبقات للحوكمة في دقيقة",قيادة المعالم.mp4',
 ].join('\r\n') + '\r\n'

@@ -189,7 +189,7 @@ function journeyLink(id: string): string {
 }
 
 function requeueForm(id: string, primary: boolean, platform: string): string {
-  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
+  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جار…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
     <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'waiting'))}">
     <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
@@ -269,18 +269,18 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zo
   }
   const alerts = (h?.alerts ?? []).slice(0, 5).map((al) =>
     `<li><span class="dot ${al.threshold === 0 ? 'bad' : 'warn'}"></span>
-      <span>${al.kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'} ${
+      <span>${al.kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'} ${
         al.threshold === 0 ? 'انتهى' : `يقترب — بقي ${al.threshold} ${al.threshold === 1 ? 'يوم' : 'أيّام'}`}
       <span class="ago">${escapeHtml(relativeTime(al.at, now))}</span></span></li>`).join('')
-  return `<h3 class="sec">سجلُّ صحّة الحساب</h3>
+  return `<h3 class="sec">سجلّ صحّة الحساب</h3>
       <ul class="todo health">
         <li><span class="dot ok"></span><span>رُبط ${when(linkedAt, '—')}</span></li>
         <li><span class="dot ${h?.refreshedAt ? 'ok' : ''}"></span><span>${
-          h?.refreshedAt ? `جُدّد آخرَ مرّةٍ ${when(h.refreshedAt, '')}` : 'لم يُجدَّد بعدُ — يُجدَّد قبل انتهائه بساعتين'}</span></li>
+          h?.refreshedAt ? `جُدّد آخر مرّة ${when(h.refreshedAt, '')}` : 'لم يُجدَّد بعد — يُجدَّد قبل انتهائه بساعتين'}</span></li>
         <li><span class="dot"></span><span>${
-          h?.expiresAt ? `إذنُ الوصول ${ends(h.expiresAt)}` : 'لا إذنَ وصولٍ محفوظا'}${
-          h?.refreshExpiresAt ? ` · والتجديدُ ${ends(h.refreshExpiresAt)}` : ''}</span></li>
-        ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشرُ متوقّفٌ عليه منذها</span></li>` : ''}
+          h?.expiresAt ? `إذن الوصول ${ends(h.expiresAt)}` : 'لا إذن وصول محفوظا'}${
+          h?.refreshExpiresAt ? ` · والتجديد ${ends(h.refreshExpiresAt)}` : ''}</span></li>
+        ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشر متوقّف عليه منذها</span></li>` : ''}
         ${alerts}
       </ul>`
 }
@@ -322,7 +322,7 @@ export function readinessLadder(r: Readiness): string {
       <span class="st idle">${done} من ${r.rungs.length}</span>
     </summary>
     <p class="verdict ${r.verdict.kind}">${escapeHtml(r.verdict.text)}</p>
-    <p class="hint">كلُّ درجةٍ تُحسَب من صفٍّ في القاعدة لا من كلمة: الإذنُ من موعد انتهائه، والتجديدُ من آخر مرّةٍ وقع، والنشرُ من آخر محاولة.</p>
+    <p class="hint">كلّ درجة تُحسَب من صفّ في القاعدة لا من كلمة: الإذن من موعد انتهائه، والتجديد من آخر مرّة وقع، والنشر من آخر محاولة.</p>
     <ol class="steps wiz">${rows}</ol>
   </details>`
 }
@@ -376,12 +376,12 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
   const first = accounts[0]
   const name = first?.displayName ?? spec.label
   const kind = first === undefined
-    ? 'لا حسابَ مربوط'
-    : spec.id === 'youtube' ? 'قناة' : first.kind === 'org' ? 'صفحةٌ أو شركة' : 'حسابٌ شخصيّ'
+    ? 'لا حساب مربوط'
+    : spec.id === 'youtube' ? 'قناة' : first.kind === 'org' ? 'صفحة أو شركة' : 'حساب شخصيّ'
   const linked = first === undefined
     ? ''
     : ` · رُبط ${escapeHtml(dayLabel(first.createdAt, d.zone))}`
-  const more = accounts.length > 1 ? ` · و${accounts.length - 1} ${accounts.length === 2 ? 'حسابٌ آخر' : 'حساباتٍ أخرى'}` : ''
+  const more = accounts.length > 1 ? ` · و${accounts.length - 1} ${accounts.length === 2 ? 'حساب آخر' : 'حسابات أخرى'}` : ''
   const c = d.counts
   const last = d.tally.lastPublishedAt
   const next = nextAction(d, r)
@@ -392,12 +392,12 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
    * ‏الطابور · 0 فشل». فالصورةُ لحسابٍ قائم، والاسمُ مرّةً، والعدّاداتُ أصفارًا لا تُكتب.
    */
   const counts = c.published + c.queued + c.failed === 0
-    ? first === undefined ? '' : '<ul class="acct-counts"><li>لم يُنشر شيءٌ بعد</li></ul>'
+    ? first === undefined ? '' : '<ul class="acct-counts"><li>لم يُنشر شيء بعد</li></ul>'
     : `<ul class="acct-counts">
           <li><b>${c.published}</b> نُشر</li>
           <li><b>${c.queued}</b> مجدول</li>
           <li class="${c.failed > 0 ? 'bad' : ''}"><b>${c.failed}</b> فشل</li>
-          <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
+          <li>${last === null ? 'لم يُنشر شيء بعد' : `آخر نشر ${escapeHtml(relativeTime(last, d.now))}`}</li>
         </ul>`
   return `<header class="card acct ${ACCT_CLASS[spec.id] ?? ''}">
     <div class="acct-cover" aria-hidden="true"><span class="echo acct-echo">${COVER_ECHO}</span><span class="acct-mark">${logo}</span></div>
@@ -452,7 +452,7 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
   const publishRung = r.rungs.find((x) => x.key === 'publish')
   const list: Station[] = [
     {
-      title: 'الحسابُ والإذن',
+      title: 'الحساب والإذن',
       state: blocking !== undefined ? 'bad' : r.verdict.kind === 'ok' || token?.state === 'done' ? 'ok' : 'warn',
       rule: needs.account,
       now: blocking?.note ?? token?.note ?? r.verdict.text,
@@ -462,14 +462,14 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
       title: 'النصّ',
       state: needs.drafts ? 'ok' : 'idle',
       rule: needs.text,
-      now: needs.drafts ? 'يُكتب من مصدرٍ محلَّل' : 'لا تُكتب لها مسوّدةٌ بعد',
+      now: needs.drafts ? 'يُكتب من مصدر محلَّل' : 'لا تُكتب لها مسوّدة بعد',
       href: needs.drafts ? WRITE : setup,
     },
     {
       title: 'القرار',
       state: c.waiting > 0 ? 'warn' : 'ok',
-      rule: 'لا يُنشر شيءٌ بلا اعتمادك',
-      now: c.waiting > 0 ? `${c.waiting} تنتظر قرارك` : 'لا مسوّدةَ تنتظرك',
+      rule: 'لا يُنشر شيء بلا اعتمادك',
+      now: c.waiting > 0 ? `${c.waiting} تنتظر قرارك` : 'لا مسوّدة تنتظرك',
       href: waitingHref,
     },
     {
@@ -478,14 +478,14 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
       rule: needs.media.spec,
       now: c.missingMedia > 0
         ? `${c.missingMedia} ${clip ? 'بلا مقطع' : 'بلا صورة'}`
-        : 'لكلّ منشورٍ قادمٍ ما يلزمه',
+        : 'لكلّ منشور قادم ما يلزمه',
       href: waitingHref,
     },
     {
       title: 'الموعد',
       state: c.ready > 0 ? 'warn' : c.queued > 0 ? 'ok' : 'idle',
-      rule: 'بتوقيتك، وتُرسله الدورةُ كلَّ ربع ساعة',
-      now: c.ready > 0 ? `${c.ready} معتمَدةٌ بلا موعد` : c.queued > 0 ? `${c.queued} مجدولة` : 'لا موعدَ قادم',
+      rule: 'بتوقيتك، وتُرسله الدورة كلّ ربع ساعة',
+      now: c.ready > 0 ? `${c.ready} معتمَدة بلا موعد` : c.queued > 0 ? `${c.queued} مجدولة` : 'لا موعد قادم',
       href: c.ready > 0 ? waitingHref : '#upcoming',
     },
     {
@@ -493,17 +493,17 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
       state: publishRung?.state === 'failed' ? 'bad' : c.published > 0 ? 'ok' : 'idle',
       rule: `${needs.publish} · ${needs.cost}`,
       now: publishRung?.state === 'failed'
-        ? 'آخرُ محاولةٍ فشلت'
+        ? 'آخر محاولة فشلت'
         : d.tally.lastPublishedAt !== null
           ? `${c.published} نُشر · آخرُه ${relativeTime(d.tally.lastPublishedAt, d.now)}`
-          : c.queued > 0 ? `${c.queued} ينتظر موعدَه` : 'لا منشورَ بعد',
+          : c.queued > 0 ? `${c.queued} ينتظر موعدَه` : 'لا منشور بعد',
       href: '#history',
     },
     {
       title: 'الأثر',
       state: needs.measured ? 'ok' : 'idle',
       rule: needs.measure,
-      now: needs.measured ? 'يُقرأ تحت كلّ منشورٍ نُشر' : 'تُقرأ النتيجةُ على المنصّة نفسِها',
+      now: needs.measured ? 'يُقرأ تحت كلّ منشور نُشر' : 'تُقرأ النتيجة على المنصّة نفسِها',
       href: '#history',
     },
   ]
@@ -550,7 +550,7 @@ function tabsNav(d: PlatformScreenData, r: Readiness): string {
     setup: r.verdict.kind === 'bad' ? '!' : undefined,
   }
   // ‏تبويباتٌ من العُدّة (D-189): روابطُ بـ«aria-current»، والفشلُ يُنبَّه عليه في «الإعداد» بنغمته
-  return tabs('أقسامُ صفحة المنصّة', TABS.map((t) => ({
+  return tabs('أقسام صفحة المنصّة', TABS.map((t) => ({
     label: label[t],
     href: t === 'posts' ? href(id) : href(id, { tab: t }),
     current: t === d.tab,
@@ -574,14 +574,14 @@ function upcomingSection(d: PlatformScreenData): string {
           : statusBadge('bad', '▲', 'عالق')
     const under = `
       ${row.accountName === null ? '' : `<span class="np-acc">${escapeHtml(row.accountName)}</span>`}
-      ${q.kind === 'late' ? '<p class="hint">حلّ موعدُه ولم تُرسله الدورةُ بعد — تدور كلَّ ربع ساعة.</p>' : ''}
+      ${q.kind === 'late' ? '<p class="hint">حلّ موعدُه ولم تُرسله الدورة بعد — تدور كلّ ربع ساعة.</p>' : ''}
       ${q.kind === 'stuck'
-        ? `<p class="hint">أُرسل للنشر قبل ${duration(q.minutes * 60)} ولم يعُد جوابُ المنصّة.</p>${requeueForm(row.id, true, d.view.spec.id)}`
+        ? `<p class="hint">أُرسل للنشر قبل ${duration(q.minutes * 60)} ولم يعُد جواب المنصّة.</p>${requeueForm(row.id, true, d.view.spec.id)}`
         : row.dispatchedAt === null
-          ? `<form class="inline" method="POST" action="/panel/drafts/unschedule" data-busy="جارٍ…">
+          ? `<form class="inline" method="POST" action="/panel/drafts/unschedule" data-busy="جار…">
                <input type="hidden" name="id" value="${escapeHtml(row.id)}">
                <input type="hidden" name="return" value="${escapeHtml(returnTo(d.view.spec.id, 'waiting'))}">
-               <button class="btn btn-secondary btn-sm" type="submit">ألغِ الجدولة</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit">ألغ الجدولة</button></form>`
           : ''}
       ${journeyLink(row.id)}`
     return npRow(
@@ -593,7 +593,7 @@ function upcomingSection(d: PlatformScreenData): string {
   })
   return `<h3 class="sec" id="upcoming">القادم · ${d.upcoming.length}</h3>
     ${rows.length === 0
-      ? emptyState({ title: `لا شيءَ مجدولٌ على ${d.view.spec.label}`, html: 'ما تعتمده وتجدوله يظهر هنا بموعده، الأقربُ أوّلًا.' })
+      ? emptyState({ title: `لا شيء مجدول على ${d.view.spec.label}`, html: 'ما تعتمده وتجدوله يظهر هنا بموعده، الأقرب أوّلًا.' })
       : `<div class="np-list">${rows.join('')}</div>`}`
 }
 
@@ -602,9 +602,9 @@ function upcomingSection(d: PlatformScreenData): string {
 function resultLine(d: PlatformScreenData, row: TimelineRow): string {
   if (d.needs?.measured !== true) return '<span class="ago">لا يُقاس لهذه المنصّة بعد</span>'
   const m = widest(d.metrics[row.id] ?? [])
-  if (m === null) return '<span class="ago">لم يُقَس بعد — أوّلُ قياسٍ بعد 24 ساعةً من النشر</span>'
+  if (m === null) return '<span class="ago">لم يُقَس بعد — أوّل قياس بعد 24 ساعةً من النشر</span>'
   const v = (n: number | null): string => n === null ? '<span title="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
-  return `<span class="np-result">نافذةُ ${escapeHtml(windowLabel(m.window))}:
+  return `<span class="np-result">نافذة ${escapeHtml(windowLabel(m.window))}:
     تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}</span>`
 }
 
@@ -620,7 +620,7 @@ function historyRow(d: PlatformScreenData, row: TimelineRow): string {
       ${link === null
         ? '<span class="ago">نُشر، ولا يُبنى رابطُه من معرّفه لهذه المنصّة.</span>'
         : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
-             aria-label="${escapeHtml(`افتحه على ${d.view.spec.label} — منشورُ ${dayLabel(row.publishedAt ?? row.sortAt, d.zone, false)} ${clock(row.publishedAt ?? row.sortAt, d.zone)}`)}"
+             aria-label="${escapeHtml(`افتحه على ${d.view.spec.label} — منشور ${dayLabel(row.publishedAt ?? row.sortAt, d.zone, false)} ${clock(row.publishedAt ?? row.sortAt, d.zone)}`)}"
              >${ICON.external} افتحه على ${escapeHtml(d.view.spec.label)}</a>`}
       <span class="ago">${cost > 0 ? `كلّف ${money(cost)} · ` : ''}${row.tries > 1 ? `بعد ${row.tries} محاولات · ` : ''}</span>${journeyLink(row.id)}`
   } else {
@@ -649,7 +649,7 @@ function historySection(d: PlatformScreenData): string {
     { f: 'published', label: 'نُشر', n: d.counts.published },
     { f: 'failed', label: 'فشل', n: d.counts.failed },
   ]
-  const nav = tabs('فرزُ ما نُشر', filters
+  const nav = tabs('فرز ما نُشر', filters
     .filter((x) => x.f === 'all' || x.n > 0)
     .map((x) => ({
       label: x.label,
@@ -677,7 +677,7 @@ function historySection(d: PlatformScreenData): string {
     ${nav}
     ${parts.length === 0
       ? emptyState({
-          title: d.filter === 'failed' ? 'لا فشلَ مسجَّل' : `لم يُنشر شيءٌ على ${d.view.spec.label} بعد`,
+          title: d.filter === 'failed' ? 'لا فشل مسجَّل' : `لم يُنشر شيء على ${d.view.spec.label} بعد`,
           html: 'ما يُنشر يظهر هنا تحت يومه، بنتيجته ورابطه وكلفته.',
         })
       : `<div class="np-list">${parts.join('')}</div>${older}`}`
@@ -693,7 +693,7 @@ function waitingSection(d: PlatformScreenData): string {
     whenCol(r.createdAt, d.zone, {
       day: true,
       rel: `كُتبت ${relativeTime(r.createdAt, d.now)}`,
-      state: r.status === 'draft' ? statusBadge('warn', '◍', 'تنتظر قرارك') : statusBadge('idle', '○', 'معتمَدةٌ بلا موعد'),
+      state: r.status === 'draft' ? statusBadge('warn', '◍', 'تنتظر قرارك') : statusBadge('idle', '○', 'معتمَدة بلا موعد'),
     }),
     frame(d, r, r.status === 'draft' ? 'مسوّدة' : 'معتمَدة'),
     `${r.sourceName === null ? '' : `<span class="ago">من «${fileName(r.sourceName)}»</span>`}
@@ -702,14 +702,14 @@ function waitingSection(d: PlatformScreenData): string {
      ${journeyLink(r.id)}`,
   )
   const empty = emptyState({
-    title: `لا شيءَ ينتظرك على ${d.view.spec.label}`,
-    html: 'ما يُكتب من مصدرٍ محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.',
+    title: `لا شيء ينتظرك على ${d.view.spec.label}`,
+    html: 'ما يُكتب من مصدر محلَّل يظهر هنا بهيئته على المنصّة، وتعتمده من بطاقته.',
     action: `<a class="btn btn-secondary btn-sm" href="${WRITE}">اكتب من مصدر</a>`,
   })
   return d.waiting.length === 0
     ? empty
     : `${drafts.length === 0 ? '' : `<h3 class="sec">تنتظر قرارك · ${drafts.length}</h3><div class="np-list">${drafts.map(row).join('')}</div>`}
-       ${ready.length === 0 ? '' : `<h3 class="sec">معتمَدةٌ بلا موعد · ${ready.length}</h3><div class="np-list">${ready.map(row).join('')}</div>`}`
+       ${ready.length === 0 ? '' : `<h3 class="sec">معتمَدة بلا موعد · ${ready.length}</h3><div class="np-list">${ready.map(row).join('')}</div>`}`
 }
 
 // ── تبويب «الوسائط» ───────────────────────────────────────────────────
@@ -729,9 +729,9 @@ function mediaSection(d: PlatformScreenData): string {
   const bare = all.length - tiles.length
   const shape = d.needs?.media.kind === 'clip' ? 'np-grid-clip' : d.view.spec.id === 'instagram' ? 'np-grid-ig' : ''
   return tiles.length === 0
-    ? emptyState({ title: 'لا وسائطَ بعد', html: 'الصورُ والمقاطعُ التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.' })
-    : `<p class="hint">لها وسيط: ${counted(tiles.length, NOUNS.post)}${bare > 0 ? ` · و${bare} بلا وسيطٍ لا تظهر هنا` : ''}.
-         المجدولُ خافت، ويفتح كلُّ مربّعٍ منشورَه في الخطّ الزمنيّ.</p>
+    ? emptyState({ title: 'لا وسائط بعد', html: 'الصور والمقاطع التي تُنشر أو تُجدوَل تظهر هنا شبكةً كما في صفحة حسابك.' })
+    : `<p class="hint">لها وسيط: ${counted(tiles.length, NOUNS.post)}${bare > 0 ? ` · و${bare} بلا وسيط لا تظهر هنا` : ''}.
+         المجدول خافت، ويفتح كلّ مربّع منشورَه في الخطّ الزمنيّ.</p>
        <div class="np-grid${shape === '' ? '' : ` ${shape}`}">${tiles.join('')}</div>`
 }
 
@@ -749,36 +749,36 @@ function reachCard(platform: 'youtube' | 'tiktok', isPublic: boolean, noScope = 
   const who = platform === 'youtube' ? 'Google' : 'TikTok'
   const where = platform === 'youtube' ? 'من YouTube Studio' : 'من تطبيق TikTok'
   const why = platform === 'youtube'
-    ? 'Google تقفل ما يُرفع من تطبيقٍ لم تُجِزه على «خاصّ» مهما طُلب.'
-    : 'TikTok لا تقبل من تطبيقٍ لم تُجِزه للنشر المباشر إلّا منشورًا لا يراه غيرُك.'
+    ? 'Google تقفل ما يُرفع من تطبيق لم تُجِزه على «خاصّ» مهما طُلب.'
+    : 'TikTok لا تقبل من تطبيق لم تُجِزه للنشر المباشر إلّا منشورًا لا يراه غيرُك.'
   const after = platform === 'youtube'
-    ? 'فيُنشر كلُّ مقطعٍ للعامّة في موعده.'
+    ? 'فيُنشر كلّ مقطع للعامّة في موعده.'
     : 'فيُنشر للعامّة إن سمح حسابُك بذلك، وإلّا فبأضيق ما يسمح به.'
   // ‏وTikTok «للعامّة إن سمح حسابُك» لا مطلقًا: حسابٌ خاصٌّ لا يُعرض فيه العامّ (D-190)
   const flipped = platform === 'youtube'
-    ? 'يُنشر كلُّ مقطعٍ على YouTube للعامّة في موعده.'
-    : 'يُطلب لكلّ مقطعٍ على TikTok النشرُ للعامّة في موعده، إن سمح حسابُك بذلك، وإلّا فبأضيق ما يسمح به.'
+    ? 'يُنشر كلّ مقطع على YouTube للعامّة في موعده.'
+    : 'يُطلب لكلّ مقطع على TikTok النشر للعامّة في موعده، إن سمح حسابُك بذلك، وإلّا فبأضيق ما يسمح به.'
   const body = isPublic && noScope
-    ? `<p class="hint"><b>قلبتَ النشرَ العلنيّ، وحسابُ TikTok المربوط لم يُمنح <bdi dir="ltr">video.publish</bdi></b>
-         — فيصل كلُّ مقطعٍ صندوقَ تطبيقك بلا نصّه، لا حسابَك، حتّى تمنحه. اضغط «اربط حسابا آخر» أعلاه
-         وادخل بالحساب نفسِه ووافق على النشر المباشر: يُحدَّث الحسابُ نفسُه ولا يُضاف ثانٍ.</p>`
+    ? `<p class="hint"><b>قلبت النشر العلنيّ، وحساب TikTok المربوط لم يُمنح <bdi dir="ltr">video.publish</bdi></b>
+         — فيصل كلّ مقطع صندوق تطبيقك بلا نصّه، لا حسابَك، حتّى تمنحه. اضغط «اربط حسابا آخر» أعلاه
+         وادخل بالحساب نفسِه ووافق على النشر المباشر: يُحدَّث الحساب نفسُه ولا يُضاف ثان.</p>`
     : isPublic
     ? `<p class="hint">${flipped}
          <b>وإن لم تكن ${who} قد أجازت تطبيقك</b> فسيصل خاصًّا رغم ذلك — أعده خاصًّا حتّى تُجاز.</p>`
-    : `<p class="hint">${why} فيصل كلُّ مقطعٍ خاصًّا، وتنشره أنت ${where}.
+    : `<p class="hint">${why} فيصل كلّ مقطع خاصًّا، وتنشره أنت ${where}.
          <b>وبعد أن تُجيز ${who} تطبيقَك</b> اقلب هذا، ${after}
          <a class="tap" href="/panel/tasks">ما عليك لتُجاز</a></p>`
   const confirm = isPublic
-    ? `يعود كلُّ مقطعٍ على ${platformLabel(platform)} خاصًّا تنشره أنت ${where}. أتمضي؟`
-    : `أأجازت ${who} تطبيقك؟ قبل الإجازة يصل المقطعُ خاصًّا مهما طُلب. من الآن يُطلب لكلّ مقطعٍ على ${platformLabel(platform)} النشرُ للعامّة.`
+    ? `يعود كلّ مقطع على ${platformLabel(platform)} خاصًّا تنشره أنت ${where}. أتمضي؟`
+    : `أأجازت ${who} تطبيقك؟ قبل الإجازة يصل المقطع خاصًّا مهما طُلب. من الآن يُطلب لكلّ مقطع على ${platformLabel(platform)} النشر للعامّة.`
   return `<h3 class="sec" id="reach">مَن يرى ما تنشره</h3>
     ${card({
-      title: `النشرُ العلنيّ — بعد إجازة ${who}`,
+      title: `النشر العلنيّ — بعد إجازة ${who}`,
       action: isPublic && noScope
         ? statusBadge('warn', '!', 'يصل الصندوق')
         : isPublic ? statusBadge('ok', '●', 'للعامّة') : statusBadge('warn', '!', 'خاصّ'),
       body: `${body}
-      <form class="inline" method="POST" action="/panel/settings" data-confirm="${escapeHtml(confirm)}" data-busy="جارٍ الحفظ…">
+      <form class="inline" method="POST" action="/panel/settings" data-confirm="${escapeHtml(confirm)}" data-busy="جار الحفظ…">
         <input type="hidden" name="key" value="${platform}_public">
         <input type="hidden" name="value" value="${isPublic ? 'false' : 'true'}">
         <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'setup'))}">
@@ -802,7 +802,7 @@ function disconnectBlock(platform: Platform, accountId: string, name: string, in
   const formId = `${dlg}-f`
   const page = REVOKE_PAGE[platform]
   const label = platformLabel(platform)
-  return `<form id="${formId}" method="POST" action="/panel/channels/disconnect" data-busy="جارٍ الفصل…">
+  return `<form id="${formId}" method="POST" action="/panel/channels/disconnect" data-busy="جار الفصل…">
       <input type="hidden" name="platform" value="${escapeHtml(platform)}">
       <input type="hidden" name="account" value="${escapeHtml(accountId)}">
       <input type="hidden" name="return" value="${escapeHtml(returnTo(platform, 'setup'))}">
@@ -815,12 +815,12 @@ function disconnectBlock(platform: Platform, accountId: string, name: string, in
       id: dlg,
       title: `افصل «${name}» عن صدى؟`,
       body: `<ul>
-        <li>تُحذف رموزُ الوصول والتجديد لهذا الحساب من قاعدة صدى، ولا تُستردّ.</li>
-        <li>كلُّ منشورٍ مجدولٍ عليه يتوقّف ويصير «فشل» بسبب الفصل، ولا يُنشَر منه شيء.</li>
-        <li>يحاول صدى إبطالَ الإذن عند ${escapeHtml(label)} أيضًا، ويُحذف ما عنده ولو تعذّر ذلك.</li>
-        <li>واسحب التطبيقَ بيدك من <a class="tap" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.label)}</a> لتطمئنّ.</li>
+        <li>تُحذف رموز الوصول والتجديد لهذا الحساب من قاعدة صدى، ولا تُستردّ.</li>
+        <li>كلّ منشور مجدول عليه يتوقّف ويصير «فشل» بسبب الفصل، ولا يُنشَر منه شيء.</li>
+        <li>يحاول صدى إبطال الإذن عند ${escapeHtml(label)} أيضًا، ويُحذف ما عنده ولو تعذّر ذلك.</li>
+        <li>واسحب التطبيق بيدك من <a class="tap" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.label)}</a> لتطمئنّ.</li>
       </ul>
-      <p class="hint">والربطُ من جديد ممكنٌ متى شئت بزرّ الربط.</p>`,
+      <p class="hint">والربط من جديد ممكن متى شئت بزرّ الربط.</p>`,
       actions: button({ label: 'افصل واحذف الرموز', variant: 'danger', type: 'submit', attrs: `form="${formId}"` }),
     })}`
 }
@@ -837,21 +837,21 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
       return `<div class="card acct-card">
         <div class="card-head">
           <h2>${escapeHtml(a.displayName)}</h2>
-          <span class="chip">${a.kind === 'org' ? (spec.id === 'youtube' ? 'قناة' : 'صفحةٌ أو شركة') : 'حسابٌ شخصيّ'}</span>
+          <span class="chip">${a.kind === 'org' ? (spec.id === 'youtube' ? 'قناة' : 'صفحة أو شركة') : 'حساب شخصيّ'}</span>
           <div class="grow"></div>
           ${a.status === 'needs_reauth'
             ? statusBadge('bad', '▲', 'جدّد الإذن')
             : missing === 0
-              ? statusBadge('ok', '●', 'كلُّ النطاقات ممنوحة')
+              ? statusBadge('ok', '●', 'كلّ النطاقات ممنوحة')
               : statusBadge('warn', '!', `ينقص ${counted(missing, NOUNS.scope)}`)}
         </div>
         <details${missing > 0 || granted === '' ? ' open' : ''}><summary>ما يستطيعه هذا الحساب</summary>
         <p class="hint">${
           granted === ''
-            ? '<b>لا نطاقاتٍ مسجّلة لهذا الحساب.</b> وهذا يقع إن رُبط قبل أن تُسجَّل النطاقات — أعِد الربط ليُقرأ ما مُنح.'
+            ? '<b>لا نطاقات مسجّلة لهذا الحساب.</b> وهذا يقع إن رُبط قبل أن تُسجَّل النطاقات — أعِد الربط ليُقرأ ما مُنح.'
             : missing === 0
-              ? 'يستطيع هذا الحسابُ كلَّ ما يحتاجه صدى.'
-              : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدرُ في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
+              ? 'يستطيع هذا الحساب كلّ ما يحتاجه صدى.'
+              : '<b>ما نقص طُلب ولم يُمنَح</b> — والمصدر في العمود الأخير، وكلُّه في بوّابة المنصّة لا هنا.'
         }</p>
         ${capabilityTable(rows)}</details>
         ${healthLog(d.health[a.id], a.createdAt, d.now, d.zone)}
@@ -861,14 +861,14 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
     .join('')
   const setup = guide === undefined ? '' : setupPane(d.view, d.app, d.baseUrl)
   return `${readinessLadder(r)}
-    <h3 class="sec">الحساباتُ وما تستطيعه</h3>
+    <h3 class="sec">الحسابات وما تستطيعه</h3>
     ${accounts.length === 0
       ? emptyState({
           echo: true,
-          title: 'لا حسابَ مربوطا',
+          title: 'لا حساب مربوطا',
           html: state === 'awaiting_owner'
-            ? 'ينقص سرّا التطبيق — واضبطهما من «ضبطُ التطبيق» أسفلَ هذه الصفحة.'
-            : 'زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة.',
+            ? 'ينقص سرّا التطبيق — واضبطهما من «ضبط التطبيق» أسفل هذه الصفحة.'
+            : 'زرّ الربط في رأس الصفحة يفتح شاشة الإذن عند المنصّة.',
         })
       : accountBlocks}
     ${state === 'linked' && unsignedAccounts(d.view).length === 0
@@ -877,7 +877,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
     ${(spec.id === 'youtube' || spec.id === 'tiktok') && d.reachPublic !== undefined
       ? reachCard(spec.id, d.reachPublic, d.reachNoScope === true)
       : ''}
-    ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبطُ التطبيق ودليلُه</h3>\n${setup}`}`
+    ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبط التطبيق ودليلُه</h3>\n${setup}`}`
 }
 
 // ── الصفحة ────────────────────────────────────────────────────────────
@@ -890,7 +890,7 @@ export function platformScreen(d: PlatformScreenData): string {
   if (spec.stage === 'none' || d.needs === null) {
     return `<div class="page-head">
       <div class="txt">
-        <div class="eyebrow"><span class="ln"></span>منصّةٌ لم تُبنَ</div>
+        <div class="eyebrow"><span class="ln"></span>منصّة لم تُبن</div>
         <h1>${escapeHtml(spec.label)}</h1>
         <p class="lede">${escapeHtml(spec.note)}</p>
       </div>
@@ -899,9 +899,9 @@ export function platformScreen(d: PlatformScreenData): string {
     <div class="card">
       <h2>لماذا لا يكفي أن يُضاف من اللوحة</h2>
       <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
-        (<span class="mono">chat/completions</span>)، فسائقٌ واحدٌ يغطّي مَن لم يُخترَع بعد.
-        <b>والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة</b> — فحقلُ «عنوان API» لا يكفيها،
-        <b>ولوحةٌ تعرض حقلا يوهم بأنّه يكفي تكذب</b>.</p>
+        (<span class="mono">chat/completions</span>)، فسائق واحد يغطّي مَن لم يُخترَع بعد.
+        <b>والمنصّات الاجتماعيّة لا لهجة لها مشتركة</b> — فحقل «عنوان API» لا يكفيها،
+        <b>ولوحة تعرض حقلا يوهم بأنّه يكفي تكذب</b>.</p>
       <div class="outcome warn"><span class="kv-k">ما ينقص</span>
         <span class="kv-v">${escapeHtml(spec.note)}</span></div>
     </div>`
@@ -911,7 +911,7 @@ export function platformScreen(d: PlatformScreenData): string {
   const head = accountHeader(d, r)
   // ‏وما ينتظر يُقال في زرّ الرأس وعددِ التبويب، لا في شريطٍ ثالثٍ يدفع المنشوراتِ إلى الأسفل
   const zoneNote = d.zone === null && (d.tab === 'posts' || d.tab === 'waiting')
-    ? '<p class="hint">الأيّامُ والساعاتُ بتوقيت الرياض.</p>'
+    ? '<p class="hint">الأيّام والساعات بتوقيت الرياض.</p>'
     : ''
   const body = d.tab === 'setup'
     ? setupSection(d, r)
@@ -931,6 +931,6 @@ export function platformScreen(d: PlatformScreenData): string {
   ${zoneNote}
   ${body}
   ${d.tab === 'posts' || d.tab === 'waiting'
-    ? '<p class="np-note">المعاينةُ ببنية المنصّة وخطّ صدى، لا لقطةٌ منها. والنصُّ مختصرٌ هنا للتصفّح؛ والطيُّ عند المنصّة لم يُقَس فلا يُرسم.</p>'
+    ? '<p class="np-note">المعاينة ببنية المنصّة وخطّ صدى، لا لقطة منها. والنصّ مختصر هنا للتصفّح؛ والطيّ عند المنصّة لم يُقَس فلا يُرسم.</p>'
     : ''}`
 }

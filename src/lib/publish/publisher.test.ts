@@ -260,7 +260,7 @@ describe('الفشل', () => {
    * `needs_reauth` عندئذٍ يوقف نشرَه كلَّه لأجل دقائق**، ويُعلِّم
    * المالكَ أن يتجاهل طلبَ إذنٍ لا حاجةَ إليه.
    */
-  it('ورمزٌ منتهٍ ومعه رمزُ تجديدٍ يُعاد ولا يُعلَّم الحساب', async () => {
+  it('ورمز منته ومعه رمز تجديد يُعاد ولا يُعلَّم الحساب', async () => {
     const postId = await seedPost({ platform: 'x' })
     // **ويُحفَظ بالتشفير الحقيقيّ**: بايتاتٌ مزيّفةٌ لا تُفكّ، فتُقرأ
     // «لا إذنَ محفوظ» ويمرّ الاختبارُ على فرعٍ آخر غير الذي يفحصه
@@ -286,7 +286,7 @@ describe('الفشل', () => {
    * كان الردُّ `missing_publish_scope` وحدَه: يقول إنّ نطاقا نقص ولا
    * يقول أيَّه — والمالكُ لا يملك أن يمنح ما لا يعرف اسمَه (D-067).
    */
-  it('ورفضُ النطاق يسمّي الناقصَ لا يشير إليه', async () => {
+  it('ورفض النطاق يسمّي الناقص لا يشير إليه', async () => {
     const postId = await seedPost({ platform: 'x' })
     // نطاقٌ واحدٌ ممنوح، والباقي ناقص
     await saveTokens(db, KEY, 'x:member:4242', {
@@ -325,7 +325,7 @@ describe('الفشل', () => {
  * وأنّ إعادةَ المحاولة لا ترفع مرّتين. والأولى تحمي المالكَ ممّا لم
  * يعتمده، والثانية تحمي جيبَه.
  */
-describe('النشرُ بصورة (D-040)', () => {
+describe('النشر بصورة (D-040)', () => {
   async function seedWithImage(platform: 'x' | 'linkedin'): Promise<{ postId: string; key: string }> {
     const postId = await seedPost({ platform })
     const key = `img/${postId}/a.png`
@@ -348,7 +348,7 @@ describe('النشرُ بصورة (D-040)', () => {
     }
   }
 
-  it('**لا يُنشر النصُّ وحده حين لا دلو** — ولا يُرسَل طلب', async () => {
+  it('**لا يُنشر النصّ وحده حين لا دلو** — ولا يُرسَل طلب', async () => {
     const { postId } = await seedWithImage('x')
     const f = fakeFetch(X_OK)
     const outcome = await publishPost(deps(f), { postId })
@@ -358,7 +358,7 @@ describe('النشرُ بصورة (D-040)', () => {
     expect(f.calls).toHaveLength(0)
   })
 
-  it('وبايتاتٌ مفقودةٌ توقف النشر ولا تُعاد', async () => {
+  it('وبايتات مفقودة توقف النشر ولا تُعاد', async () => {
     const { postId } = await seedWithImage('x')
     const f = fakeFetch(X_OK)
     const outcome = await publishPost({ ...deps(f), bucket: bucket(false) }, { postId })
@@ -411,7 +411,7 @@ describe('النشرُ بصورة (D-040)', () => {
     expect(again.calls.map((c) => c.url)).toEqual([X.postUrl])
   })
 
-  it('ويسجّل نداءَ الرفع في الدفتر بصفرٍ مُعلَّم — لا يُخترَع سعرٌ ولا يُسكَت', async () => {
+  it('ويسجّل نداء الرفع في الدفتر بصفر مُعلَّم — لا يُخترَع سعر ولا يُسكَت', async () => {
     const { postId } = await seedWithImage('x')
     await publishPost(
       {
@@ -433,7 +433,7 @@ describe('النشرُ بصورة (D-040)', () => {
     expect(rows[0]?.total).toBe(0)
   })
 
-  it('LinkedIn: تهيئةٌ ثمّ PUT ثمّ نشرٌ بمعرّف الصورة', async () => {
+  it('LinkedIn: تهيئة ثمّ PUT ثمّ نشر بمعرّف الصورة', async () => {
     const { postId } = await seedWithImage('linkedin')
     const seen: string[] = []
     const impl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -459,7 +459,7 @@ describe('النشرُ بصورة (D-040)', () => {
     expect(seen).toEqual([LINKEDIN.uploadUrl, 'https://up.li/abc', LINKEDIN.postUrl])
   })
 
-  it('وصورةٌ مرفوضةٌ لا تُرفَع — الرفضُ مخرجٌ لا حائط', async () => {
+  it('وصورة مرفوضة لا تُرفَع — الرفض مخرج لا حائط', async () => {
     const { postId } = await seedWithImage('x')
     await db.prepare("UPDATE media SET status = 'rejected' WHERE post_id = ?").bind(postId).run()
     const f = fakeFetch(X_OK)
@@ -478,7 +478,7 @@ describe('النشرُ بصورة (D-040)', () => {
  * `video.upload` يوصل المقطعَ صندوقَ التطبيق، و`video.publish` ينشر
  * مباشرةً بعد إجازةٍ تستغرق أسابيع.
  */
-describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
+describe('TikTok — المقطع يصل، والباب يُقال', () => {
   const INIT_INBOX = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/'
   const INIT_DIRECT = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
   const UPLOAD = 'https://up.tiktok/x'
@@ -509,7 +509,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
                             idempotency_key, approved_by, approved_at)
          VALUES (?, ?, 'tiktok', 'text', ?, '2026-09-08T09:00:00Z', 'queued', ?, 'omar', '2026-09-07T10:00:00Z')`,
       )
-      .run(postId, accountId, 'وصفُ المقطع', `draft:src:tiktok:${postId}`)
+      .run(postId, accountId, 'وصف المقطع', `draft:src:tiktok:${postId}`)
 
     if (options.clip !== false) {
       await db
@@ -545,7 +545,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
     expect(f.calls[0]!.url).toBe(INIT_DIRECT)
   })
 
-  it('**ولا نشرَ بلا مقطع** — ولا يُرسَل طلبٌ ولا تُسجَّل كلفة', async () => {
+  it('**ولا نشر بلا مقطع** — ولا يُرسَل طلب ولا تُسجَّل كلفة', async () => {
     const postId = await seedTikTok({ clip: false })
     const f = fakeFetch(TIKTOK_OK)
     const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
@@ -557,7 +557,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
     expect(ledger.n).toBe(0)
   })
 
-  it('ونداءُ الرفع يُسجَّل موسوما — لم يُقرأ لهم سعرٌ بعد (D-008)', async () => {
+  it('ونداء الرفع يُسجَّل موسوما — لم يُقرأ لهم سعر بعد (D-008)', async () => {
     const postId = await seedTikTok()
     await publishPost({ ...deps(fakeFetch(TIKTOK_OK)), bucket: clipBucket }, { postId })
     const row = db.raw
@@ -571,7 +571,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
    * ‏**وعلنيُّ TikTok من إعداده هو** (مراجعة D-190): كان اختبارُ القلب لـ YouTube وحدَه، فتمرّ
    * ‏الاختباراتُ كلُّها لو مُرّر `youtubePublic` إلى TikTok أو أُسقط الخيار.
    */
-  it('ومَن يرى مقطعَ TikTok إعدادُه هو: لا creator_info بالافتراض ولا بقلب YouTube، وللجميع بقلبه', async () => {
+  it('ومَن يرى مقطع TikTok إعدادُه هو: لا creator_info بالافتراض ولا بقلب YouTube، وللجميع بقلبه', async () => {
     const CREATOR = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/'
     const postId = await seedTikTok({ scopes: 'user.info.basic video.upload video.publish' })
     const routes = { ...TIKTOK_OK, [CREATOR]: { json: { data: { privacy_level_options: ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'] }, error: { code: 'ok' } } } }
@@ -607,7 +607,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
    * ‏**وما طُبّق فعلًا يُحفظ ويُقال** (مراجعة D-190): حسابٌ خاصٌّ لا يعرض العامّ فيُنشر
    * ‏`SELF_ONLY` — وكان ذلك يُرمى بعد النشر، فلا أثرَ في القاعدة ولا في رحلة المنشور.
    */
-  it('حسابٌ لا يعرض العامّ يُنشر بأضيق ما عُرض — والمستوى والملاحظةُ في المحاولة وفي الرحلة', async () => {
+  it('حساب لا يعرض العامّ يُنشر بأضيق ما عُرض — والمستوى والملاحظة في المحاولة وفي الرحلة', async () => {
     const CREATOR = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/'
     const postId = await seedTikTok({ scopes: 'user.info.basic video.upload video.publish' })
     await writeSetting(db, 'tiktok_public', 'true', 'test')
@@ -632,7 +632,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
    * ‏**والصندوقُ لا يُرسَل إليه نصّ** (مراجعة D-190): النصُّ المدفوعُ الذي راجعه المالكُ لا يصل
    * ‏TikTok، فيُقال بعد النشر «بلا نصّه — الصقه»، لا «نُشر» وحدَها.
    */
-  it('والصندوقُ يُقال بعد النشر: وصل بلا نصّه — ولماذا إن كان العلنيُّ مقلوبًا', async () => {
+  it('والصندوق يُقال بعد النشر: وصل بلا نصّه — ولماذا إن كان العلنيّ مقلوبًا', async () => {
     const postId = await seedTikTok()
     await writeSetting(db, 'tiktok_public', 'true', 'test')
     await publishPost({ ...deps(fakeFetch(TIKTOK_OK)), bucket: clipBucket }, { postId })
@@ -644,7 +644,7 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
     expect(saved.note).toContain('video.publish')
   })
 
-  it('ورمزٌ بلا نطاقِ رفعٍ يُردّ قبل النداء ويُسمّى الناقص', async () => {
+  it('ورمز بلا نطاق رفع يُردّ قبل النداء ويُسمّى الناقص', async () => {
     const postId = await seedTikTok({ scopes: 'user.info.basic' })
     const f = fakeFetch(TIKTOK_OK)
     const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
@@ -661,8 +661,8 @@ describe('TikTok — المقطعُ يصل، والبابُ يُقال', () => {
  * منشورُ LinkedIn حُرّكت صورتُه فيديو (D-052) يصير أحدثُ وسيطه **مقطعا**
  * — فكان يُرفَع مقطعٌ إلى نهايةِ صور، فيُردّ بخطأٍ لا يقول لماذا.
  */
-describe('نوعُ الوسيط يُشترَط', () => {
-  it('LinkedIn يأخذ الصورةَ ولو كان المقطعُ أحدثَ منها', async () => {
+describe('نوع الوسيط يُشترَط', () => {
+  it('LinkedIn يأخذ الصورة ولو كان المقطع أحدث منها', async () => {
     const postId = await seedPost({ platform: 'linkedin' })
     await db
       .prepare(
@@ -711,7 +711,7 @@ describe('نوعُ الوسيط يُشترَط', () => {
  * **و YouTube تقفل مرفوعاتِه على `private` مهما طُلب** — فيُقال ذلك بدل
  * أن يُبحَث عنه على القناة علنا. وهي قاعدةُ صندوق TikTok نفسُها.
  */
-describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال', () => {
+describe('YouTube — المقطع يصل، والخصوصيّة تُقال', () => {
   const INIT =
     'https://www.googleapis.com/upload/youtube/v3/videos' +
     '?uploadType=resumable&part=snippet,status'
@@ -722,7 +722,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
       platform: 'youtube',
       kind: 'member',
       externalId: 'yt-1',
-      displayName: 'قناةُ عمر',
+      displayName: 'قناة عمر',
     })
     await saveTokens(db, KEY, accountId, {
       ...LIVE_TOKENS,
@@ -735,7 +735,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
                             idempotency_key, approved_by, approved_at)
          VALUES (?, ?, 'youtube', 'text', ?, '2026-09-08T09:00:00Z', 'queued', ?, 'omar', '2026-09-07T10:00:00Z')`,
       )
-      .run(postId, accountId, 'الحوكمةُ تسبق السرعة\n\nوهذا شرحُها.', `draft:src:yt:${postId}`)
+      .run(postId, accountId, 'الحوكمة تسبق السرعة\n\nوهذا شرحُها.', `draft:src:yt:${postId}`)
 
     if (options.clip !== false) {
       await db
@@ -770,7 +770,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     return impl
   }
 
-  it('يرفع المقطعَ ويُسجَّل معرّفُ الفيديو', async () => {
+  it('يرفع المقطع ويُسجَّل معرّف الفيديو', async () => {
     const postId = await seedYouTube()
     const f = net()
     const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
@@ -780,7 +780,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     expect(f.seen[1]).toBe(SESSION)
   })
 
-  it('**ولا رفعَ بلا مقطع** — ولا يُرسَل طلبٌ ولا تُسجَّل كلفة', async () => {
+  it('**ولا رفع بلا مقطع** — ولا يُرسَل طلب ولا تُسجَّل كلفة', async () => {
     const postId = await seedYouTube({ clip: false })
     const f = net()
     const outcome = await publishPost({ ...deps(f), bucket: clipBucket }, { postId })
@@ -792,7 +792,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     expect(ledger.n).toBe(0)
   })
 
-  it('ورمزٌ بلا نطاق الرفع يُردّ قبل النداء ويُسمّى الناقص', async () => {
+  it('ورمز بلا نطاق الرفع يُردّ قبل النداء ويُسمّى الناقص', async () => {
     const postId = await seedYouTube({
       scopes: 'https://www.googleapis.com/auth/youtube.readonly',
     })
@@ -808,7 +808,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
    * ‏**ومَن يرى المقطع قرارُ المالك بعد الإجازة** (D-190): خاصٌّ بالافتراض، وعلنيٌّ حين يقلبه.
    * ‏والإعدادُ يُقرأ عند النشر لا عند الجدولة — فمقطعٌ جُدول قبل الإجازة يخرج بقرار يومه.
    */
-  it('خاصٌّ بالافتراض، وللعامّة بعد أن يقلب المالكُ «النشر العلنيّ»', async () => {
+  it('خاصّ بالافتراض، وللعامّة بعد أن يقلب المالك «النشر العلنيّ»', async () => {
     const postId = await seedYouTube()
     const bodies: string[] = []
     const capture = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -826,7 +826,7 @@ describe('YouTube — المقطعُ يصل، والخصوصيّةُ تُقال'
     expect(JSON.parse(bodies[1]!).status.privacyStatus).toBe('public')
   })
 
-  it('ونداءُ الرفع يُسجَّل موسوما بمزوّده — لا باسمٍ ثابت (D-008)', async () => {
+  it('ونداء الرفع يُسجَّل موسوما بمزوّده — لا باسم ثابت (D-008)', async () => {
     const postId = await seedYouTube()
     await publishPost({ ...deps(net()), bucket: clipBucket }, { postId })
     const row = db.raw
@@ -859,7 +859,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
          VALUES (?, ?, 'instagram', 'image', ?, '2026-09-08T09:00:00Z', 'queued', ?,
                  'omar', '2026-09-07T10:00:00Z')`,
       )
-      .run(postId, accountId, 'الحوكمةُ تسبق السرعة', `draft:src:ig:${postId}`)
+      .run(postId, accountId, 'الحوكمة تسبق السرعة', `draft:src:ig:${postId}`)
 
     const kind = options.media ?? 'image'
     if (kind !== 'none') {
@@ -897,7 +897,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
     return impl
   }
 
-  it('ينشر صورةً برابطٍ موقَّعٍ لا ببايتات', async () => {
+  it('ينشر صورةً برابط موقَّع لا ببايتات', async () => {
     const postId = await seedInstagram()
     const f = net()
     const outcome = await publishPost(
@@ -911,7 +911,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
   })
 
   /** **ومقطعٌ يُرسَل REELS ويُستطلَع** — والنوعُ من `mime` لا من إعداد. */
-  it('ومقطعٌ يُرسَل REELS', async () => {
+  it('ومقطع يُرسَل REELS', async () => {
     const postId = await seedInstagram({ media: 'video' })
     const f = net()
     const outcome = await publishPost(
@@ -923,7 +923,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
   })
 
   /** **ولا منشورَ نصّيٌّ فيها** — ويُردّ قبل أن تُنادى المنصّة. */
-  it('وبلا وسيطٍ يُردّ ولا يُنادى شيء', async () => {
+  it('وبلا وسيط يُردّ ولا يُنادى شيء', async () => {
     const postId = await seedInstagram({ media: 'none' })
     const f = net()
     const outcome = await publishPost(
@@ -935,7 +935,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
   })
 
   /** **ولا يُدَّعى عطلُ منصّةٍ لنقصٍ عندنا**: يُسمّى ما نقص. */
-  it('وبلا عنوانِ موقعٍ يُقال ما نقص ولا يُنادى شيء', async () => {
+  it('وبلا عنوان موقع يُقال ما نقص ولا يُنادى شيء', async () => {
     const postId = await seedInstagram()
     const f = net()
     const outcome = await publishPost({ ...deps(f), bucket }, { postId })
@@ -944,7 +944,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
     expect(f.seen).toHaveLength(0)
   })
 
-  it('والنداءُ يُسجَّل في الدفتر قبل أن يُعدّ ناجحا (D-008)', async () => {
+  it('والنداء يُسجَّل في الدفتر قبل أن يُعدّ ناجحا (D-008)', async () => {
     const postId = await seedInstagram()
     await publishPost({ ...deps(net()), bucket, baseUrl: BASE }, { postId })
     const row = db.raw
@@ -959,7 +959,7 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
  * D-159 · سقوطٌ قبل الإرسال يُكتب كما يُكتب سقوطٌ بعده.
  */
 describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () => {
-  it('بلا رمزٍ محفوظ: محاولةٌ failed بعلامة preflight والمنشورُ failed', async () => {
+  it('بلا رمز محفوظ: محاولة failed بعلامة preflight والمنشور failed', async () => {
     const postId = await seedPost({ platform: 'x' })
     db.raw.prepare('DELETE FROM tokens').run()
     const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId })
@@ -974,7 +974,7 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
     expect(post.status).toBe('failed')
   })
 
-  it('ورمزٌ منتهٍ بلا تجديد كذلك، أمّا القابلُ للإعادة فلا صفَّ له', async () => {
+  it('ورمز منته بلا تجديد كذلك، أمّا القابل للإعادة فلا صفّ له', async () => {
     const postId = await seedPost({ platform: 'x' })
     db.raw.prepare(`UPDATE tokens SET expires_at = '2026-09-08T09:01:00Z'`).run()
     await publishPost(deps(fakeFetch(X_OK)), { postId })
@@ -991,7 +991,7 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
     expect(db.raw.prepare('SELECT count(*) AS n FROM publish_attempts WHERE post_id = ?').get(retryId)).toEqual({ n: 0 })
   })
 
-  it('ونقصُ النطاق يُكتب باسم الناقص', async () => {
+  it('ونقص النطاق يُكتب باسم الناقص', async () => {
     const postId = await seedPost({ platform: 'x' })
     db.raw.prepare(`UPDATE tokens SET scopes = 'users.read'`).run()
     const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId })
@@ -1007,16 +1007,16 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
  * **حارسُ «حساب الصفحة» لـ LinkedIn وحدها.** YouTube يحفظ قناتَه بنوع
  * `org`، فكان كلُّ رفعٍ إليها يُردّ بسببٍ يخصّ صفحاتِ LinkedIn.
  */
-describe('حسابُ الصفحة', () => {
-  it('صفحةُ LinkedIn تُردّ قبل الإرسال بسببها', async () => {
+describe('حساب الصفحة', () => {
+  it('صفحة LinkedIn تُردّ قبل الإرسال بسببها', async () => {
     const post = await seedPost({ platform: 'linkedin', kind: 'org' })
     const outcome = await publishPost(deps(fakeFetch({})), { postId: post })
     expect(outcome.kind).toBe('failed')
     const row = db.raw.prepare("SELECT response_json FROM publish_attempts WHERE post_id = ?").get(post) as { response_json: string }
-    expect(row.response_json).toContain('حسابُ صفحة')
+    expect(row.response_json).toContain('حساب صفحة')
   })
 
-  it('وحسابٌ من نوع org على منصّةٍ أخرى لا يُردّ بسبب LinkedIn', async () => {
+  it('وحساب من نوع org على منصّة أخرى لا يُردّ بسبب LinkedIn', async () => {
     const post = await seedPost({ platform: 'x', kind: 'org' })
     const outcome = await publishPost(deps(fakeFetch(X_OK)), { postId: post })
     expect(outcome).toEqual({ kind: 'published', platformPostId: 'tweet-1' })

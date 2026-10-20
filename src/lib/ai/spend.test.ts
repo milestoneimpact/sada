@@ -9,7 +9,7 @@ beforeEach(() => {
 })
 
 describe('spendByProvider', () => {
-  it('دفترٌ فارغ يعطي كائنا فارغا لا عطلا', async () => {
+  it('دفتر فارغ يعطي كائنا فارغا لا عطلا', async () => {
     expect(await spendByProvider(db)).toEqual({})
   })
 
@@ -40,7 +40,7 @@ describe('spendByProvider', () => {
   })
 })
 
-describe('dailySpend — سلسلةٌ للرسم', () => {
+describe('dailySpend — سلسلة للرسم', () => {
   it('يملأ الأيّام الخالية بصفر — لا فجوة ترسم خطّا يكذب', async () => {
     const series = await dailySpend(db, 14)
     expect(series).toHaveLength(14)
@@ -67,7 +67,7 @@ describe('dailySpend — سلسلةٌ للرسم', () => {
     expect(series[series.length - 1]!.total).toBeCloseTo(0.215, 10)
   })
 
-  it('دفترٌ لا يُقرأ يعطي سلسلة أصفار لا عطلا', async () => {
+  it('دفتر لا يُقرأ يعطي سلسلة أصفار لا عطلا', async () => {
     db.raw.exec('DROP TABLE cost_ledger')
     const series = await dailySpend(db, 5)
     expect(series).toHaveLength(5)

@@ -18,7 +18,7 @@ const accounts: LinkedAccount[] = [
 const view = viewChannels(accounts, () => true).find((v) => v.spec.id === 'x')!
 
 const row = (over: Partial<TimelineRow> & Pick<TimelineRow, 'id' | 'status'>): TimelineRow => ({
-  text: `نصُّ ${over.id}`, scheduledAt: null, createdAt: '2026-09-05 00:00:00', dispatchedAt: null,
+  text: `نصّ ${over.id}`, scheduledAt: null, createdAt: '2026-09-05 00:00:00', dispatchedAt: null,
   accountName: '@omar', accountKind: 'member', sourceName: null, platformPostId: null, publishedAt: null,
   failedAt: null, failure: null, tries: 0, lastTryAt: null, openTries: 0, hasMedia: false, costUsd: 0,
   sortAt: '2026-09-05 00:00:00', ...over,
@@ -46,15 +46,15 @@ function screen(over: Partial<PlatformScreenData> = {}): string {
   })
 }
 
-describe('صفحةُ حساب', () => {
-  it('القادمُ قبل ما نُشر، وكلٌّ بعنوانه', () => {
+describe('صفحة حساب', () => {
+  it('القادم قبل ما نُشر، وكلّ بعنوانه', () => {
     const html = screen()
     expect(html.indexOf('id="upcoming"')).toBeGreaterThan(0)
     expect(html.indexOf('id="upcoming"')).toBeLessThan(html.indexOf('id="history"'))
     expect(html).toContain('id="p-u1"')
   })
 
-  it('ورأسُ اليوم بتوقيت المالك — 22:30 UTC هو الأحدُ في الرياض لا السبت', () => {
+  it('ورأس اليوم بتوقيت المالك — 22:30 UTC هو الأحد في الرياض لا السبت', () => {
     const html = screen()
     expect(html).toContain('الأحد 6 سبتمبر 2026')
     expect(html).not.toContain('السبت 5 سبتمبر 2026')
@@ -63,7 +63,7 @@ describe('صفحةُ حساب', () => {
     expect(html).not.toContain('22:30 UTC')
   })
 
-  it('وبلا كعكةِ منطقةٍ تُجمَع الأيّامُ بتوقيت الرياض ويُقال ذلك (D-201)', () => {
+  it('وبلا كعكة منطقة تُجمَع الأيّام بتوقيت الرياض ويُقال ذلك (D-201)', () => {
     const html = screen({ zone: null })
     expect(html).toContain('الأحد 6 سبتمبر 2026')
     expect(html).toContain('<b class="np-clock">1:30 ص</b>')
@@ -71,43 +71,43 @@ describe('صفحةُ حساب', () => {
     expect(html).not.toContain('UTC')
   })
 
-  it('والفاشلُ في يومه ومعه سببُه بالعربيّة وفعلُه — لا رمزُ الناشر', () => {
+  it('والفاشل في يومه ومعه سببُه بالعربيّة وفعلُه — لا رمز الناشر', () => {
     const html = screen()
-    expect(html).toContain('انتهى الإذنُ قبل الإرسال')
+    expect(html).toContain('انتهى الإذن قبل الإرسال')
     expect(html).not.toContain('token_expired')
     expect(html).toContain('action="/panel/drafts/requeue"')
     expect(html).toContain('value="platform:x:waiting"')
   })
 
-  it('والمنشورُ برابطه عند المنصّة', () => {
+  it('والمنشور برابطه عند المنصّة', () => {
     expect(screen()).toContain('https://x.com/i/web/status/1874')
   })
 
-  it('ومعاينةٌ ببنية المنصّة لكلّ صفّ، بلا رقمٍ مخترَع', () => {
+  it('ومعاينة ببنية المنصّة لكلّ صفّ، بلا رقم مخترَع', () => {
     const html = screen()
     expect(html).toContain('class="np np-x np-compact"')
     expect(html).not.toContain('<b>0</b>')
   })
 
-  it('وسبعُ محطّاتٍ فيما تطلبه المنصّة، بقواعدها من الثوابت', () => {
+  it('وسبع محطّات فيما تطلبه المنصّة، بقواعدها من الثوابت', () => {
     const html = screen()
     expect((html.match(/<li class="(ok|warn|bad|idle)"><a class="card card-interactive" href=/g) ?? []).length).toBe(7)
-    expect(html).toContain('حتّى 280 محرفٍ موزون')
+    expect(html).toContain('حتّى 280 محرف موزون')
   })
 
-  it('والإعدادُ في تبويبه لا في صدر الصفحة', () => {
+  it('والإعداد في تبويبه لا في صدر الصفحة', () => {
     expect(screen()).not.toContain('أتنشر الآن؟')
     expect(screen({ tab: 'setup' })).toContain('أتنشر الآن؟')
   })
 
-  it('وغلافُ الحساب نقشُ الصدى الفاتح خلف شعار المنصّة، مخفيٌّ عن قارئ الشاشة (D-229)', () => {
+  it('وغلاف الحساب نقش الصدى الفاتح خلف شعار المنصّة، مخفيّ عن قارئ الشاشة (D-229)', () => {
     const cover = /<div class="acct-cover" aria-hidden="true">([\s\S]*?)<\/div>/.exec(screen())?.[1] ?? ''
     expect(cover).toContain('acct-echo')
     expect(cover).toContain('data-echo="light"')
     expect(cover).toContain('acct-mark')
   })
 
-  it('و`?show=` القديم يُترجَم ولا يُكسَر رابطٌ محفوظ', () => {
+  it('و`?show=` القديم يُترجَم ولا يُكسَر رابط محفوظ', () => {
     expect(tabOf(undefined, 'drafts')).toBe('waiting')
     expect(tabOf('setup', undefined)).toBe('setup')
     expect(tabOf('لا-شيء', undefined)).toBe('posts')
@@ -116,15 +116,15 @@ describe('صفحةُ حساب', () => {
   })
 })
 
-describe('والوسائطُ تُعرَض لا يُقال إنّ هناك وسيطا', () => {
-  it('الصورةُ في موضعها من الإطار ومن مسارٍ خلف الجلسة', () => {
+describe('والوسائط تُعرَض لا يُقال إنّ هناك وسيطا', () => {
+  it('الصورة في موضعها من الإطار ومن مسار خلف الجلسة', () => {
     const html = screen({ media: { u1: [{ id: 'm1', mime: 'image/png', status: 'ready', note: '' }] } })
     expect(html).toContain('src="/panel/media/m1"')
     // ‏الشريحةُ المركّبة بمقاس المنصّة: النسبةُ معلومةٌ فتُحجَز قبل التحميل
     expect(html).toContain('width="1200" height="675"')
   })
 
-  it('والمقطعُ video بلا تشغيلٍ آليّ، وغلافُه الصورةُ التي حُرّك منها', () => {
+  it('والمقطع video بلا تشغيل آليّ، وغلافُه الصورة التي حُرّك منها', () => {
     const html = screen({
       media: { u1: [
         { id: 'v1', mime: 'video/mp4', status: 'ready', note: null },
@@ -135,13 +135,13 @@ describe('والوسائطُ تُعرَض لا يُقال إنّ هناك وسي
     expect(html).not.toContain('autoplay')
   })
 
-  it('والمرفوضةُ لا تُرسم في الإطار', () => {
+  it('والمرفوضة لا تُرسم في الإطار', () => {
     const html = screen({ media: { u1: [{ id: 'm9', mime: 'image/png', status: 'rejected', note: '' }] } })
     expect(html).not.toContain('/panel/media/m9')
   })
 })
 
-describe('الدليلُ يسكن شاشةَ المنصّة', () => {
+describe('الدليل يسكن شاشة المنصّة', () => {
   const app = {
     platform: 'x' as const, source: 'none' as const,
     clientId: null, hint: null, updatedAt: null, updatedBy: null,
@@ -149,10 +149,10 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
     verifiedAt: null, verifiedKind: null,
   }
 
-  it('**وبلا تطبيقٍ مضبوطٍ يُعرَض الدليلُ هنا**', () => {
+  it('**وبلا تطبيق مضبوط يُعرَض الدليل هنا**', () => {
     const html = screen({ app, tab: 'setup' })
-    expect(html).toContain('ضبطُ التطبيق ودليلُه')
-    expect(html).toContain('دليلُ ضبط التطبيق')
+    expect(html).toContain('ضبط التطبيق ودليلُه')
+    expect(html).toContain('دليل ضبط التطبيق')
     // **ورابطُ العودة يُعرَض للنسخ حيث يُضبَط** — لا في لوحٍ آخر
     expect(html).toContain('oauth/x/callback')
   })
@@ -163,9 +163,9 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
    * حالُ التطبيق تُقرأ لمنصّتين، فشاشاتُ YouTube وTikTok وInstagram
    * تصل بلا `app` — **وكانت تنتهي بعنوان «ضبطُ التطبيق» تحته لا شيء**.
    */
-  it('وبلا حالِ تطبيقٍ لا عنوانَ يعد بدليلٍ لا يأتي', () => {
+  it('وبلا حال تطبيق لا عنوان يعد بدليل لا يأتي', () => {
     const html = screen({ app: undefined, tab: 'setup' })
-    expect(html).not.toContain('ضبطُ التطبيق ودليلُه')
+    expect(html).not.toContain('ضبط التطبيق ودليلُه')
   })
 
   /** **ولا تُعيد الشاشةُ المالكَ إلى اللوح** — كانت تقول «الدليلُ هناك». */
@@ -173,7 +173,7 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
     expect(screen({ app, tab: 'setup' })).not.toContain('افتح الدليل')
   })
 
-  it('وبلا حالِ تطبيقٍ لا يُعرَض شيءٌ ولا يرمي', () => {
+  it('وبلا حال تطبيق لا يُعرَض شيء ولا يرمي', () => {
     expect(() => screen({ app: undefined })).not.toThrow()
   })
 })
@@ -181,15 +181,15 @@ describe('الدليلُ يسكن شاشةَ المنصّة', () => {
 /**
  * سجلُّ صحّة الحساب (D-129): ترويسةٌ بجسدٍ دائم، وما لم يقع يُقال لا يُرسَم.
  */
-describe('سجلُّ صحّة الحساب', () => {
-  it('بلا سجلٍّ: رُبط، ولم يُجدَّد بعد، ولا إذنَ محفوظا', () => {
+describe('سجلّ صحّة الحساب', () => {
+  it('بلا سجلّ: رُبط، ولم يُجدَّد بعد، ولا إذن محفوظا', () => {
     const html = screen({ tab: 'setup' })
-    expect(html).toContain('<h3 class="sec">سجلُّ صحّة الحساب</h3>')
-    expect(html).toContain('لم يُجدَّد بعدُ')
-    expect(html).toContain('لا إذنَ وصولٍ محفوظا')
+    expect(html).toContain('<h3 class="sec">سجلّ صحّة الحساب</h3>')
+    expect(html).toContain('لم يُجدَّد بعد')
+    expect(html).toContain('لا إذن وصول محفوظا')
   })
 
-  it('وبسجلٍّ: آخرُ تجديدٍ وموعدُ الانتهاء والتنبيهاتُ بأسمائها', () => {
+  it('وبسجلّ: آخر تجديد وموعد الانتهاء والتنبيهات بأسمائها', () => {
     const html = screen({
       tab: 'setup',
       health: {
@@ -200,20 +200,20 @@ describe('سجلُّ صحّة الحساب', () => {
         },
       },
     })
-    expect(html).toContain('جُدّد آخرَ مرّةٍ')
-    expect(html).toContain('إذنُ الوصول ينتهي')
-    expect(html).toContain('إذنُ الوصول يقترب — بقي 7 أيّام')
-    expect(html).toContain('إذنُ التجديد انتهى')
+    expect(html).toContain('جُدّد آخر مرّة')
+    expect(html).toContain('إذن الوصول ينتهي')
+    expect(html).toContain('إذن الوصول يقترب — بقي 7 أيّام')
+    expect(html).toContain('إذن التجديد انتهى')
     expect(html).toContain('<span class="dot bad"></span>')
   })
 })
 
-describe('ختمُ السقوط في سجلّ الصحّة (D-131)', () => {
-  it('حسابٌ ساقطٌ يقول متى سقط، والقائمُ لا يقول شيئا', () => {
+describe('ختم السقوط في سجلّ الصحّة (D-131)', () => {
+  it('حساب ساقط يقول متى سقط، والقائم لا يقول شيئا', () => {
     const base = { status: 'needs_reauth', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, alerts: [] }
     const dropped = screen({ tab: 'setup', health: { a1: { ...base, needsReauthAt: '2026-09-10 03:00:00' } } })
     expect(dropped).toContain('سقط الإذن')
-    expect(dropped).toContain('والنشرُ متوقّفٌ عليه منذها')
+    expect(dropped).toContain('والنشر متوقّف عليه منذها')
     const fine = screen({ tab: 'setup', health: { a1: { ...base, status: 'active', needsReauthAt: null } } })
     expect(fine).not.toContain('سقط الإذن')
   })
@@ -223,8 +223,8 @@ describe('ختمُ السقوط في سجلّ الصحّة (D-131)', () => {
  * علامةُ الدرجة انتقلت إلى `parts` (D-163) — ونقاطُ المسوّدات تقرؤها كذلك.
  * **والسلّمُ يُرسَم كما كان**: الحالاتُ الأربعُ برمزها ولونها وكلمتها.
  */
-describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () => {
-  it('السلّمُ ما زال يرسم ●/◍/○/▲ بكلماتها بعد النقل', () => {
+describe('علامة الدرجة من مصدرها الواحد (D-163)', () => {
+  it('السلّم ما زال يرسم ●/◍/○/▲ بكلماتها بعد النقل', () => {
     const html = readinessLadder({
       rungs: (['done', 'now', 'waiting', 'failed'] as const).map((state, i) => ({
         key: 'app' as const, title: `درجة ${i}`, state, note: 'ما وقع',
@@ -243,9 +243,9 @@ describe('علامةُ الدرجة من مصدرها الواحد (D-163)', () 
 /*
  * ‏**ما وجدته رحلاتُ المالك على صفحة المنصّة** (خطّ الأساس، 2026-10-04).
  */
-describe('رحلاتُ المالك على صفحة المنصّة', () => {
+describe('رحلات المالك على صفحة المنصّة', () => {
   // ‏ر-2: «اكتب» يفتح نموذجَ الكتابة في لوح المنشورات، لا جدولَ المصادر الذي لا كتابةَ فيه
-  it('أزرارُ «اكتب» الثلاثةُ تقود إلى نموذج الكتابة لا إلى المصادر', () => {
+  it('أزرار «اكتب» الثلاثة تقود إلى نموذج الكتابة لا إلى المصادر', () => {
     const quiet = { waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0 }
     // ‏حسابٌ بإذنٍ محفوظ: الزرُّ الأوّليّ «اكتب» لا «أعد الربط»
     const signed = viewChannels([{ ...accounts[0]!, expiresAt: '2026-10-01 00:00:00' }], () => true).find((v) => v.spec.id === 'x')!
@@ -264,7 +264,7 @@ describe('رحلاتُ المالك على صفحة المنصّة', () => {
   })
 
   // ‏ر-1: «إذنُ الوصول ينتهي الآن · والتجديدُ الآن» لحسابٍ سليم — `relativeTime` للماضي وحده
-  it('سجلُّ الصحّة يعدّ الموعدَ القادمَ إلى الأمام، والفائتَ إلى الخلف', () => {
+  it('سجلّ الصحّة يعدّ الموعد القادم إلى الأمام، والفائت إلى الخلف', () => {
     const live = screen({
       tab: 'setup',
       health: { a1: {
@@ -272,9 +272,9 @@ describe('رحلاتُ المالك على صفحة المنصّة', () => {
         refreshedAt: null, needsReauthAt: null, alerts: [],
       } },
     })
-    const log = live.slice(live.indexOf('سجلُّ صحّة الحساب'))
+    const log = live.slice(live.indexOf('سجلّ صحّة الحساب'))
     const text = log.slice(0, log.indexOf('</ul>')).replace(/<[^>]+>/g, '')
-    expect(text).toContain('إذنُ الوصول ينتهي بعد ساعتين · والتجديدُ ينتهي بعد 300 يومًا')
+    expect(text).toContain('إذن الوصول ينتهي بعد ساعتين · والتجديد ينتهي بعد 300 يومًا')
     expect(text).not.toContain('الآن')
     const lapsed = screen({
       tab: 'setup',
@@ -283,11 +283,11 @@ describe('رحلاتُ المالك على صفحة المنصّة', () => {
         refreshedAt: null, needsReauthAt: null, alerts: [],
       } },
     })
-    expect(lapsed.replace(/<[^>]+>/g, '')).toContain('إذنُ الوصول انتهى قبل ساعتين')
+    expect(lapsed.replace(/<[^>]+>/g, '')).toContain('إذن الوصول انتهى قبل ساعتين')
   })
 
   // ‏ر-1: منصّةٌ بلا حساب لا تقول «2 من 7 جاهزة» ولا تعرض عدّاداتٍ أصفارًا ولا صورةَ حساب
-  it('منصّةٌ بلا حسابٍ مربوط: «اربطها أوّلًا»، ولا خضرةَ ولا أصفارَ ولا صورة', () => {
+  it('منصّة بلا حساب مربوط: «اربطها أوّلًا»، ولا خضرة ولا أصفار ولا صورة', () => {
     const bare = viewChannels([], () => false).find((v) => v.spec.id === 'instagram')!
     const html = screen({
       view: bare, needs: platformNeeds('instagram'),
@@ -307,19 +307,19 @@ describe('رحلاتُ المالك على صفحة المنصّة', () => {
     expect(html).toContain('<h1>Instagram</h1>')
   })
 
-  it('ومنصّةٌ مربوطةٌ لم تنشر بعدُ تقول ذلك سطرًا، لا ثلاثةَ أصفار', () => {
+  it('ومنصّة مربوطة لم تنشر بعد تقول ذلك سطرًا، لا ثلاثة أصفار', () => {
     const html = screen({
       counts: { waiting: 0, ready: 0, queued: 0, published: 0, failed: 0, missingMedia: 0 },
       tally: { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPublishedAt: null },
     })
-    expect(html).toContain('<ul class="acct-counts"><li>لم يُنشر شيءٌ بعد</li></ul>')
+    expect(html).toContain('<ul class="acct-counts"><li>لم يُنشر شيء بعد</li></ul>')
     expect(html).not.toContain('<b>0</b> نُشر')
     expect(html).toContain('class="acct-av"')
   })
 })
 
-describe('سجلُّ الصحّة بمنطقة المالك (D-203)', () => {
-  it('عنوانُ التحويم بمنطقته لا بالرياض حين تُعرف', () => {
+describe('سجلّ الصحّة بمنطقة المالك (D-203)', () => {
+  it('عنوان التحويم بمنطقته لا بالرياض حين تُعرف', () => {
     const health = { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] } } as const
     const ny = screen({ tab: 'setup', zone: 'America/New_York', health })
     expect(ny).toContain('title="2026-09-30 20:00"')

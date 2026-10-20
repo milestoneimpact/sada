@@ -62,7 +62,7 @@ const yt = views.find((v) => v.spec.id === 'youtube')!
 const page = (
   title: string,
   body: string,
-  active = title.includes('النتائج') ? 'results' : title.includes('مهامُّ') ? 'tasks' : 'accounts',
+  active = title.includes('النتائج') ? 'results' : title.includes('مهامّ') ? 'tasks' : 'accounts',
 ): string =>
   soloPage(title, { href: '/panel#channels', label: 'الحسابات' }, body, 'n', '', buildCommands({ onPanel: false }), soloNav(active))
 
@@ -96,19 +96,19 @@ const tally0 = { published: 0, queued: 0, failed: 0, drafts: 0, spend: 0, lastPu
 
 const liUpcoming = [
   row({ id: 'u1', status: 'queued', scheduledAt: soon(26), sortAt: soon(26),
-    text: 'تقريرُ الإغلاق ليس وثيقةً إداريّة — هو آخرُ فرصةٍ لتحويل ما تعلّمناه إلى شيءٍ يُقرأ بعدنا.\n\n#إدارة_المشاريع #الأثر' }),
+    text: 'تقرير الإغلاق ليس وثيقةً إداريّة — هو آخر فرصة لتحويل ما تعلّمناه إلى شيء يُقرأ بعدنا.\n\n#إدارة_المشاريع #الأثر' }),
   row({ id: 'u2', status: 'queued', scheduledAt: ago(0.5), sortAt: ago(0.5),
-    text: 'موعدٌ حلّ ولم تُرسله الدورةُ بعد — والصفُّ يقول ذلك بدقائقه.' }),
+    text: 'موعد حلّ ولم تُرسله الدورة بعد — والصفّ يقول ذلك بدقائقه.' }),
   row({ id: 'u3', status: 'queued', scheduledAt: ago(3), dispatchedAt: ago(2.5), sortAt: ago(3),
-    text: 'أُرسل للنشر ولم يعُد جوابُه — فيُقال «عالق» ومعه طريقُ الإعادة.' }),
+    text: 'أُرسل للنشر ولم يعُد جوابُه — فيُقال «عالق» ومعه طريق الإعادة.' }),
 ]
 const liHistory = [
   row({ id: 'p1', status: 'published', platformPostId: 'urn:li:share:7311', publishedAt: ago(19), sortAt: ago(19), tries: 1,
-    text: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهًا يُصرف على ما لا يُحرّك المعلم التالي.\n\n#القيادة #المشاريع' }),
+    text: 'قيادة القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثر ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهًا يُصرف على ما لا يُحرّك المعلم التالي.\n\n#القيادة #المشاريع' }),
   row({ id: 'p3', status: 'failed', failedAt: ago(50), sortAt: ago(50), tries: 1, accountName: 'بصائر للاستشارات', accountKind: 'org',
-    failure: 'token_expired', text: 'ثلاثةُ أسئلةٍ قبل أن تبدأ مشروعا: مَن يقرّر أنّه نجح؟ ومتى؟ وبأيّ رقم؟' }),
+    failure: 'token_expired', text: 'ثلاثة أسئلة قبل أن تبدأ مشروعا: مَن يقرّر أنّه نجح؟ ومتى؟ وبأيّ رقم؟' }),
   row({ id: 'p6', status: 'published', platformPostId: 'urn:li:share:7290', publishedAt: ago(75), sortAt: ago(75), tries: 2,
-    text: 'المعلمُ الذي لا يُقاس لا يُدار. والذي يُقاس ولا يُقرأ لا يُدار كذلك.' }),
+    text: 'المعلم الذي لا يُقاس لا يُدار. والذي يُقاس ولا يُقرأ لا يُدار كذلك.' }),
 ]
 
 writeAudited(
@@ -152,9 +152,9 @@ writeAudited(
     counts: counts({ queued: 1, published: 1 }),
     needs: platformNeeds('x'),
     upcoming: [row({ id: 'x2', status: 'queued', scheduledAt: soon(5), sortAt: soon(5), accountName: '@omar_ah',
-      text: 'فكرةٌ واحدةٌ كاملة في منشورٍ واحد. والقِصَرُ هنا قوّةٌ لا نقص. #قيادة' })],
+      text: 'فكرة واحدة كاملة في منشور واحد. والقِصَر هنا قوّة لا نقص. #قيادة' })],
     history: { rows: [row({ id: 'x1', status: 'published', platformPostId: '1874', publishedAt: ago(30), sortAt: ago(30),
-      accountName: '@omar_ah', text: 'المعلمُ الذي لا يُقاس لا يُدار.' })], next: null },
+      accountName: '@omar_ah', text: 'المعلم الذي لا يُقاس لا يُدار.' })], next: null },
     metrics: { x1: [{ window: '24h', impressions: 1204, reactions: 31, comments: 4, shares: 2, pulledAt: ago(6) }] },
     media: { x2: [{ id: 'm-x', mime: 'image/png', status: 'ready', note: '' }] },
   })),
@@ -169,9 +169,9 @@ writeAudited(
     counts: counts({ queued: 1, missingMedia: 1 }),
     needs: platformNeeds('tiktok'),
     upcoming: [row({ id: 't1', status: 'queued', scheduledAt: soon(50), sortAt: soon(50),
-      text: 'سطرٌ يُغري بالمشاهدة ولا يشرح ما سيُرى. #مشاريع #قيادة' })],
+      text: 'سطر يُغري بالمشاهدة ولا يشرح ما سيُرى. #مشاريع #قيادة' })],
     history: { rows: [row({ id: 't0', status: 'failed', failedAt: ago(20), sortAt: ago(20), tries: 1,
-      failure: 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها', text: 'منشورٌ بلا مقطع يُردّ قبل الإرسال.' })], next: null },
+      failure: 'no_clip: لا مقطع لهذا المنشور — ولّد صورةً ثمّ حرّكها', text: 'منشور بلا مقطع يُردّ قبل الإرسال.' })], next: null },
     metrics: {},
     media: { t1: [{ id: 'm-tt', mime: 'image/png', status: 'ready', note: '' }] },
   })),
@@ -199,7 +199,7 @@ writeAudited(
     tally: tally0, counts: counts({ queued: 1 }),
     needs: platformNeeds('youtube'),
     upcoming: [row({ id: 'y1', status: 'queued', scheduledAt: soon(30), sortAt: soon(30),
-      text: 'عنوانُ المقطع في السطر الأوّل\n\nوالوصفُ بعده لا يظهر إلّا لمن فتحه.' })],
+      text: 'عنوان المقطع في السطر الأوّل\n\nوالوصف بعده لا يظهر إلّا لمن فتحه.' })],
     history: { rows: [], next: null }, metrics: {},
     media: { y1: [{ id: 'm-yt', mime: 'image/png', status: 'ready', note: '' }] },
   })),
@@ -220,7 +220,7 @@ writeAudited(
     ...base, view: ig, tab: 'waiting', health: {}, tally: tally0, counts: counts({ waiting: 1 }),
     needs: platformNeeds('instagram'), upcoming: [], history: { rows: [], next: null }, metrics: {}, media: {},
     waiting: [row({ id: 'i1', status: 'draft', sourceName: 'رؤية 2026.docx',
-      text: 'تعليقٌ على صورةٍ لم تُولَّد بعد — والإطارُ يقول إنّ Instagram لا تنشر بلا صورة.' })],
+      text: 'تعليق على صورة لم تُولَّد بعد — والإطار يقول إنّ Instagram لا تنشر بلا صورة.' })],
   })),
 )
 
@@ -256,7 +256,7 @@ const reportPost = (
   id: string, platform: 'linkedin' | 'x',
   impressions: number | null, interactions: number,
 ): ReportPost => ({
-  id, platform, text: `نصُّ المنشور ${id} — سطرٌ يُقرأ كما يُعرَض في الشاشة.`,
+  id, platform, text: `نصّ المنشور ${id} — سطر يُقرأ كما يُعرَض في الشاشة.`,
   publishedAt: '2026-08-26T10:00:00.000Z', window: '24h', impressions, interactions,
 })
 
@@ -293,10 +293,10 @@ writeAudited(
     suggestions: [
       {
         postId: 'a', platform: 'x',
-        text: 'منشورُ a المرشَّح للترويج — سطرٌ يُقرأ كما يُعرَض في التقرير.',
+        text: 'منشور a المرشَّح للترويج — سطر يُقرأ كما يُعرَض في التقرير.',
         budgetUsd: 10, currency: 'USD',
-        reason: 'تفاعلُه 96 — 4.6× وسيطَ نافذة ‏٢٤ ساعة (3 منشورات). ' +
-          'والمبلغُ 10$ نصفُ سقفٍ وضعتَه (20$)، ولا يُنفَق حتّى تقبله.',
+        reason: 'تفاعلُه 96 — 4.6× وسيط نافذة ‏٢٤ ساعة (3 منشورات). ' +
+          'والمبلغ 10$ نصف سقف وضعتَه (20$)، ولا يُنفَق حتّى تقبله.',
         createdAt: '2026-08-31T04:14:00.000Z',
       },
     ],
@@ -321,18 +321,18 @@ const soloX = viewChannels(
 )
 
 const wizardCases: { title: string; app: AppStatus }[] = [
-  { title: 'محفوظٌ ولم يُفحَص', app: app({}) },
+  { title: 'محفوظ ولم يُفحَص', app: app({}) },
   { title: 'فُحص فرُدّ السرّ', app: app({ verifiedKind: 'bad_secret', verifiedAt: ago(1) }) },
-  { title: 'ومعرّفٌ لا تعرفه المنصّة', app: app({ verifiedKind: 'bad_client_id', verifiedAt: ago(1) }) },
-  { title: 'وجاز الفحصُ ولم يُربَط بعد', app: app({ verifiedKind: 'accepted', verifiedAt: ago(1) }) },
+  { title: 'ومعرّف لا تعرفه المنصّة', app: app({ verifiedKind: 'bad_client_id', verifiedAt: ago(1) }) },
+  { title: 'وجاز الفحص ولم يُربَط بعد', app: app({ verifiedKind: 'accepted', verifiedAt: ago(1) }) },
 ]
 
 writeAudited(
   '/tmp/screen-wizard.html',
   page(
-    'صدى — معالجُ الربط',
+    'صدى — معالج الربط',
     // ‏العيّنةُ أربعُ حالاتٍ في صفحة، ولكلّ صفحةٍ عنوانٌ أوّل (axe «page-has-heading-one»)
-    '<h1 class="sec">معالجُ الربط في أربع حالات</h1>' + wizardCases
+    '<h1 class="sec">معالج الربط في أربع حالات</h1>' + wizardCases
       .map(
         // ‏كلُّ حالٍ شاشةٌ مستقلّة في الحقيقة، فتُعلَّم ليعدّ «audit_design» نحاسَها وحدَها
         // ‏لا الأربعَ معًا (ميزانيّةُ النحاس لكلّ شاشة، خطّة التصميم 3.2 · D-187)
@@ -360,7 +360,7 @@ const GATE_FIXTURE: GateFacts = {
 writeAudited(
   '/tmp/screen-tasks.html',
   page(
-    'صدى — مهامُّ المالك',
+    'صدى — مهامّ المالك',
     tasksScreen({
       env: 'staging',
       rows: ownerRows({
@@ -372,7 +372,7 @@ writeAudited(
         appsVerified: new Set(['linkedin']),
         anyPublished: false,
         videoPriced: false,
-        linkedInVersionDue: true,   // D-072: حالٌ وسطى تُرسَم لتُقاس
+        linkedInVersionDue: true,   // D-072: حال وسطى تُرسَم لتُقاس
               tilesChosen: 4, promoCapUsd: 0,
       }),
       // حالٌ وسطى في البوّابات كذلك: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس
@@ -390,37 +390,37 @@ writeAudited(
 // الثلاثة. **وشاشةٌ لا تُرسَم لا تُقاس، وما لا يُقاس يشيخ صامتا.**
 const journey: Journey = {
   postId: 'p1', platform: 'linkedin', status: 'published', spent: 0.0723,
-  text: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباهٌ يُصرف على ما لا يُحرّك المعلمَ التالي.',
+  text: 'قيادة القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثر ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباه يُصرف على ما لا يُحرّك المعلم التالي.',
   stations: [
-    { kind: 'source', title: 'ملفٌّ في Drive', at: ago(200), detail: 'منهجية إدارة المشروعات للقادة — الإطار الأول', cost: null, model: null, state: 'done' },
-    { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاقٌ ‏٠٫٨٦: مادّةٌ أصيلة وفيها إطارٌ قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
-    { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاويةُ الوقت لا زاويةُ المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
+    { kind: 'source', title: 'ملفّ في Drive', at: ago(200), detail: 'منهجية إدارة المشروعات للقادة — الإطار الأول', cost: null, model: null, state: 'done' },
+    { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاق ‏٠٫٨٦: مادّة أصيلة وفيها إطار قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
+    { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاوية الوقت لا زاوية المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
     // وما على الصورة يُقال في محطّتها (D-162) — فيدخل المعجمَ والفيضَ كسائرها
-    { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثرٌ يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
-    { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'النصُّ المعتمَد نصُّك أنت · أنت بمفتاح المرور', cost: null, model: null, state: 'done' },
+    { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثر يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
+    { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'النصّ المعتمَد نصُّك أنت · أنت بمفتاح المرور', cost: null, model: null, state: 'done' },
     { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ بتوقيت الرياض على عمر عبدالحميد', cost: null, model: null, state: 'done' },
-    { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولةُ الأولى — نجحت', cost: 0, model: null, state: 'done' },
-    { kind: 'metrics', title: 'قياسُ ‏٢٤ ساعة', at: null, detail: 'أوّلُ قياسٍ بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
+    { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولة الأولى — نجحت', cost: 0, model: null, state: 'done' },
+    { kind: 'metrics', title: 'قياس ‏٢٤ ساعة', at: null, detail: 'أوّل قياس بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
   ],
 }
 writeAudited(
   '/tmp/screen-journey.html',
-  soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' }, journeyBody(journey, now), 'n', '',
+  soloPage('صدى — رحلة منشور', { href: '/panel#posts', label: 'المنشورات' }, journeyBody(journey, now), 'n', '',
     buildCommands({ onPanel: false }), soloNav('posts')),
 )
 
 writeAudited(
   '/tmp/screen-spread.html',
-  soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({
+  soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({
        start: '2026-09-08T06:00', gap: 24, csrf: 'c',
        plan: {
          slots: [
-           { postId: 'p1', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-08T06:00', preview: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.' },
-           { postId: 'p2', accountId: 'a3', accountLabel: '@omar_ah', platform: 'x', when: '2026-09-09T06:00', preview: 'ثلاثةُ دروسٍ من مراجعة محفظةٍ كاملة — وأحدُها كلّفنا سنة.' },
-           { postId: 'p3', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-10T06:00', preview: 'تقريرُ الإغلاق ليس وثيقةً إداريّة.' },
+           { postId: 'p1', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-08T06:00', preview: 'قيادة القيمة لا تُقاس بالمخرجات بل بالمعالم.' },
+           { postId: 'p2', accountId: 'a3', accountLabel: '@omar_ah', platform: 'x', when: '2026-09-09T06:00', preview: 'ثلاثة دروس من مراجعة محفظة كاملة — وأحدُها كلّفنا سنة.' },
+           { postId: 'p3', accountId: 'a1', accountLabel: 'عمر عبدالحميد', platform: 'linkedin', when: '2026-09-10T06:00', preview: 'تقرير الإغلاق ليس وثيقةً إداريّة.' },
          ],
          skipped: [
-           { postId: 'p4', preview: 'مسوّدةٌ لـ TikTok', reason: 'لا قناةَ TikTok مربوطة' },
+           { postId: 'p4', preview: 'مسوّدة لـ TikTok', reason: 'لا قناة TikTok مربوطة' },
          ],
        },
      }), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
@@ -432,7 +432,7 @@ writeAudited(
   '/tmp/screen-2fa.html',
   secondFactorPage(
     { csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true,
-      hasTotp: true, hasRecovery: true, error: 'رمزٌ غير صحيح — بقيت محاولتان.' },
+      hasTotp: true, hasRecovery: true, error: 'رمز غير صحيح — بقيت محاولتان.' },
     'n',
   ),
 )
@@ -441,10 +441,10 @@ writeAudited(
 // ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare
 // ‏صفحةُ الهبوط على الجذر (D-193)
 writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody(), 'n', '', { indexable: true }))
-writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّةَ بهذا الاسم'))
+writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّة بهذا الاسم'))
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
-console.log('رُسمت خمسَ عشرةَ في /tmp')
+console.log('رُسمت خمس عشرة في /tmp')
 
 // ‏الخطُّ الزمنيّ للمحفظة (D-212) عيّنةٌ مدقَّقة (D-213): صفحةٌ لا يرسمها شيءٌ لا يقرؤها حارس
 {
@@ -452,7 +452,7 @@ console.log('رُسمت خمسَ عشرةَ في /tmp')
   const win = windowOf(now, zone, 30, 0)
   const post = (id: string, platform: string, accountId: string, account: string, status: string,
     createdAt: string, approvedAt: string | null, scheduledAt: string | null, publishedAt: string | null) =>
-    ({ id, platform, accountId, account, status, text: `منشورُ ${id}: قيادةُ القيمة لا تُقاس بالمخرجات`, createdAt, approvedAt, scheduledAt, publishedAt })
+    ({ id, platform, accountId, account, status, text: `منشور ${id}: قيادة القيمة لا تُقاس بالمخرجات`, createdAt, approvedAt, scheduledAt, publishedAt })
   const posts = [
     post('t1', 'linkedin', 'a1', 'عمر عبدالحميد', 'published', '2026-08-28 08:00:00', '2026-08-29 10:00:00', '2026-08-31 06:00:00', '2026-08-31 06:00:04'),
     post('t2', 'linkedin', 'a1', 'عمر عبدالحميد', 'queued', '2026-09-03 09:00:00', '2026-09-04 12:00:00', '2026-09-08 06:00:00', null),

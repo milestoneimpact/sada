@@ -31,20 +31,20 @@ function net(status: number, body: BodyInit, type: string): typeof fetch {
 }
 
 describe('ما يُرسَل', () => {
-  it('ينادي نهايةَ التصوير على حساب المالك', async () => {
+  it('ينادي نهاية التصوير على حساب المالك', async () => {
     await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1, 2]), 'image/jpeg') })
     expect(sent[0]!.url).toBe(
       `https://api.cloudflare.com/client/v4/accounts/${CALL.accountId}/browser-rendering/screenshot`,
     )
   })
 
-  it('و**الرمزُ في الترويسة لا في العنوان** — فلا يُسجَّل في وسيط', async () => {
+  it('و**الرمز في الترويسة لا في العنوان** — فلا يُسجَّل في وسيط', async () => {
     await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1]), 'image/jpeg') })
     expect(sent[0]!.auth).toBe('Bearer cfut_secret')
     expect(sent[0]!.url).not.toContain('cfut_secret')
   })
 
-  it('ويرسل المقاسَ المطلوب لا يترك المتصفّحَ يختاره', async () => {
+  it('ويرسل المقاس المطلوب لا يترك المتصفّح يختاره', async () => {
     await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1]), 'image/jpeg') })
     expect(sent[0]!.body['viewport']).toEqual({ width: 1200, height: 628 })
   })
@@ -55,14 +55,14 @@ describe('ما يُرسَل', () => {
    * تعطي خطّا بديلا: `font-display: block` تُخفي النصَّ، **فتخرج شريحةٌ
    * بلا عنوان**.
    */
-  it('و**ينتظر `networkidle0`** — لا لقطةَ قبل أن يُرسَم الخطّ', async () => {
+  it('و**ينتظر `networkidle0`** — لا لقطة قبل أن يُرسَم الخطّ', async () => {
     await screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array([1]), 'image/jpeg') })
     expect(sent[0]!.body['gotoOptions']).toMatchObject({ waitUntil: 'networkidle0' })
   })
 })
 
 describe('ما يُقرأ — شكلان لا واحد', () => {
-  it('بايتاتٌ خامّةٌ تُقبَل', async () => {
+  it('بايتات خامّة تُقبَل', async () => {
     const out = await screenshotSlide({
       ...CALL,
       fetchImpl: net(200, new Uint8Array([137, 80]), 'image/jpeg'),
@@ -71,7 +71,7 @@ describe('ما يُقرأ — شكلان لا واحد', () => {
     expect(out.mime).toBe('image/jpeg')
   })
 
-  it('وغلافُ Cloudflare يُفَضّ إلى `screenshot`', async () => {
+  it('وغلاف Cloudflare يُفَضّ إلى `screenshot`', async () => {
     const out = await screenshotSlide({
       ...CALL,
       fetchImpl: net(200, JSON.stringify({ success: true, result: { screenshot: 'AQI=' } }), 'application/json'),
@@ -79,7 +79,7 @@ describe('ما يُقرأ — شكلان لا واحد', () => {
     expect(out.bytes.length).toBe(2)
   })
 
-  it('و`success: false` فشلٌ ولو كانت ٢٠٠', async () => {
+  it('و`success: false` فشل ولو كانت ٢٠٠', async () => {
     await expect(
       screenshotSlide({
         ...CALL,
@@ -88,20 +88,20 @@ describe('ما يُقرأ — شكلان لا واحد', () => {
     ).rejects.toThrow(SlideError)
   })
 
-  it('ولقطةٌ فارغةٌ لا تُقبَل صورةً', async () => {
+  it('ولقطة فارغة لا تُقبَل صورةً', async () => {
     await expect(
       screenshotSlide({ ...CALL, fetchImpl: net(200, new Uint8Array(), 'image/jpeg') }),
     ).rejects.toThrow('فارغة')
   })
 })
 
-describe('الفشلُ يُصنَّف بالرمز لا بالنصّ', () => {
+describe('الفشل يُصنَّف بالرمز لا بالنصّ', () => {
   /**
    * **والاسمُ يُقال بوجهيه**: اللوحةُ تقول «Browser Run» والوثيقةُ
    * «Browser Rendering». ومن قرأ رسالةً باسمٍ وبحث في القائمة بالآخر لم
    * يجده — وقد وقع فعلا.
    */
-  it('٤٠٣ تقول الصلاحيّةَ المطلوبة بالاسمين — وهي غيرُ صلاحيّة Workers AI', async () => {
+  it('٤٠٣ تقول الصلاحيّة المطلوبة بالاسمين — وهي غير صلاحيّة Workers AI', async () => {
     const said = await screenshotSlide({
       ...CALL,
       fetchImpl: net(403, '{}', 'application/json'),
@@ -120,13 +120,13 @@ describe('الفشلُ يُصنَّف بالرمز لا بالنصّ', () => {
     )
   })
 
-  it('وبلا حسابٍ أو رمزٍ لا نداء', async () => {
+  it('وبلا حساب أو رمز لا نداء', async () => {
     const fetchImpl = net(200, new Uint8Array([1]), 'image/jpeg')
-    await expect(screenshotSlide({ ...CALL, apiToken: ' ', fetchImpl })).rejects.toThrow('غيرُ مضبوط')
+    await expect(screenshotSlide({ ...CALL, apiToken: ' ', fetchImpl })).rejects.toThrow('غير مضبوط')
     expect(sent).toHaveLength(0)
   })
 
-  it('و**صفحةٌ فوق الحدّ تُردّ عندنا** — لا تُرسَل لتُردّ بخطأٍ لا يقول السبب', async () => {
+  it('و**صفحة فوق الحدّ تُردّ عندنا** — لا تُرسَل لتُردّ بخطأ لا يقول السبب', async () => {
     const fetchImpl = net(200, new Uint8Array([1]), 'image/jpeg')
     await expect(
       screenshotSlide({ ...CALL, html: 'x'.repeat(MAX_HTML_BYTES + 1), fetchImpl }),
@@ -134,7 +134,7 @@ describe('الفشلُ يُصنَّف بالرمز لا بالنصّ', () => {
     expect(sent).toHaveLength(0)
   })
 
-  it('وعطلُ الشبكة يُعاد', async () => {
+  it('وعطل الشبكة يُعاد', async () => {
     const fail = (async () => {
       throw new Error('reset')
     }) as unknown as typeof fetch

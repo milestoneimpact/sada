@@ -56,9 +56,9 @@ export const DIMENSION_LABEL: Readonly<Record<Dimension, string>> = {
 
 export const MEASURE_LABEL: Readonly<Record<Measure, string>> = {
   count: 'العدد',
-  success_rate: 'نسبةُ النجاح',
+  success_rate: 'نسبة النجاح',
   cost: 'الكلفة',
-  attempts: 'متوسّطُ المحاولات',
+  attempts: 'متوسّط المحاولات',
 }
 
 /** بلا موعد — **ويُسمّى ولا يُحذَف**: منشورٌ بلا جدولةٍ حقيقةٌ تُقاس. */

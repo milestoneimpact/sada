@@ -14,13 +14,13 @@ const empty: GateFacts = {
 const gate = (f: GateFacts, phase: string) => gatesOf(f).find((g) => g.phase === phase)!
 
 describe('لا تُجتاز بقول', () => {
-  it('بلا شيءٍ: لا بوّابةَ مجتازة', () => {
+  it('بلا شيء: لا بوّابة مجتازة', () => {
     expect(gatesOf(empty).every((g) => !g.passed)).toBe(true)
     expect(currentPhase(gatesOf(empty))).toBe('٠')
   })
 
   /** **منصّةٌ واحدةٌ لا تكفي**: البوّابةُ تقول «على كلّ منصّة». */
-  it('ومنصّةٌ واحدةٌ لا تجتاز بوّابةَ المرحلة ٠', () => {
+  it('ومنصّة واحدة لا تجتاز بوّابة المرحلة ٠', () => {
     const half: GateFacts = {
       ...empty,
       publishedPerPlatform: { linkedin: 3 },
@@ -37,19 +37,19 @@ describe('لا تُجتاز بقول', () => {
   })
 
   /** **ومنشورٌ بلا سطرٍ في الدفتر لا يجتاز** — D-008 شرطٌ لا زينة. */
-  it('ونشرٌ بلا سطرٍ في الدفتر لا يجتاز', () => {
+  it('ونشر بلا سطر في الدفتر لا يجتاز', () => {
     const noLedger: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3, x: 1 } }
     expect(gate(noLedger, '٠').passed).toBe(false)
   })
 
-  it('وأربعةٌ من خمسةٍ لا تجتاز بوّابةَ المرحلة ١', () => {
+  it('وأربعة من خمسة لا تجتاز بوّابة المرحلة ١', () => {
     const four: GateFacts = { ...empty, plans: 1, scheduledPublished: 4 }
     expect(gate(four, '١').passed).toBe(false)
     expect(gate({ ...four, scheduledPublished: 5 }, '١').passed).toBe(true)
   })
 })
 
-describe('وبندُ التنبيه صار يُقاس', () => {
+describe('وبند التنبيه صار يُقاس', () => {
   /**
    * **كان `unmeasured`** — وسببُه أنّ التنبيه كان يُتصوَّر بريدا لا
    * نقرؤه. **فنُقل إلى حيث يُقاس** (D-065)، ولا يبقى في البوّابة بندٌ
@@ -62,21 +62,21 @@ describe('وبندُ التنبيه صار يُقاس', () => {
     orgAccounts: 1,
   }
 
-  it('بلا تنبيهٍ سُجّل: البوّابةُ لا تُجتاز، والبندُ «لم يتحقّق» لا «لا يُقاس»', () => {
+  it('بلا تنبيه سُجّل: البوّابة لا تُجتاز، والبند «لم يتحقّق» لا «لا يُقاس»', () => {
     const g = gate(almost, '٢')
     expect(g.passed).toBe(false)
     expect(g.items.some((i) => i.state === 'unmeasured')).toBe(false)
     expect(g.items.filter((i) => i.state === 'unmet')).toHaveLength(1)
   })
 
-  it('وبتنبيهٍ سُجّل تُجتاز', () => {
+  it('وبتنبيه سُجّل تُجتاز', () => {
     expect(gate({ ...almost, weekAlertFired: true }, '٢').passed).toBe(true)
   })
 })
 
-describe('وبندٌ سلبيٌّ يُجتاز بالصفر', () => {
+describe('وبند سلبيّ يُجتاز بالصفر', () => {
   /** «ولم يُنفَق شيء» شرطٌ سلبيّ — وأيُّ صفٍّ يُسقط البوّابة (D-006). */
-  it('إنفاقُ ترويجٍ يُسقط بوّابةَ المرحلة ٣ ولو تمّ الباقي', () => {
+  it('إنفاق ترويج يُسقط بوّابة المرحلة ٣ ولو تمّ الباقي', () => {
     const clean: GateFacts = { ...empty, reports: 1, suggestions: 1 }
     expect(gate(clean, '٣').passed).toBe(true)
 
@@ -86,8 +86,8 @@ describe('وبندٌ سلبيٌّ يُجتاز بالصفر', () => {
   })
 })
 
-describe('ولكلّ بندٍ دليلُه لا حكمُه وحده', () => {
-  it('يُعرَض الرقمُ الذي بُني عليه الحكم', () => {
+describe('ولكلّ بند دليلُه لا حكمُه وحده', () => {
+  it('يُعرَض الرقم الذي بُني عليه الحكم', () => {
     const f: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3 } }
     const first = gate(f, '٠').items[0]!
     expect(first.evidence).toContain('LinkedIn: 3')
@@ -95,18 +95,18 @@ describe('ولكلّ بندٍ دليلُه لا حكمُه وحده', () => {
   })
 })
 
-describe('والقراءةُ من قاعدةٍ حقيقيّة', () => {
+describe('والقراءة من قاعدة حقيقيّة', () => {
   let db: FakeDb
   beforeEach(() => { db = fakeDb() })
 
-  it('قاعدةٌ فارغةٌ تعطي أصفارا ولا تسقط', async () => {
+  it('قاعدة فارغة تعطي أصفارا ولا تسقط', async () => {
     const f = await readGateFacts(db)
     expect(f.plans).toBe(0)
     expect(f.publishedPerPlatform).toEqual({})
     expect(gatesOf(f).every((g) => !g.passed)).toBe(true)
   })
 
-  it('ومنشورٌ خرج فعلا يُعَدّ لمنصّته', async () => {
+  it('ومنشور خرج فعلا يُعَدّ لمنصّته', async () => {
     db.raw.exec(
       `INSERT INTO accounts (id, platform, kind, external_id, display_name)
        VALUES ('a-x', 'x', 'member', 'e', 'عمر')`,
@@ -129,7 +129,7 @@ describe('والقراءةُ من قاعدةٍ حقيقيّة', () => {
   })
 
   /** ومحاولةٌ فاشلةٌ ليست نشرا — والبوّابةُ لا تُخدَع بصفٍّ حالتُه تقول ذلك. */
-  it('ومحاولةٌ فاشلةٌ لا تُعَدّ نشرا', async () => {
+  it('ومحاولة فاشلة لا تُعَدّ نشرا', async () => {
     db.raw.exec(
       `INSERT INTO accounts (id, platform, kind, external_id, display_name)
        VALUES ('a-x', 'x', 'member', 'e', 'عمر')`,

@@ -182,7 +182,7 @@ export function reviewText(
   if (fillers.length > 0) {
     notes.push({
       kind: 'filler',
-      text: 'حشوٌ يملأ ولا يقول — احذفه ولن ينقص المعنى',
+      text: 'حشو يملأ ولا يقول — احذفه ولن ينقص المعنى',
       hits: fillers,
     })
   }
@@ -191,7 +191,7 @@ export function reviewText(
   if (cliches.length > 0) {
     notes.push({
       kind: 'cliche',
-      text: 'خاتمةٌ استُهلكت — والسؤالُ الخاصُّ بالموضوع يُجاب، والعامُّ يُتجاوَز',
+      text: 'خاتمة استُهلكت — والسؤال الخاصّ بالموضوع يُجاب، والعامّ يُتجاوَز',
       hits: cliches,
     })
   }
@@ -220,7 +220,7 @@ export function reviewText(
   if (repeated.length > 0) {
     notes.push({
       kind: 'repeat',
-      text: 'كلمةٌ تتكرّر — والتكرارُ يُضعف ما يُراد تأكيدُه',
+      text: 'كلمة تتكرّر — والتكرار يُضعف ما يُراد تأكيدُه',
       hits: repeated.slice(0, 5),
     })
   }
@@ -239,7 +239,7 @@ export function reviewText(
   if (counted > near) {
     notes.push({
       kind: 'ceiling',
-      text: `${counted} من ${hardLimit} — قريبٌ من سقف المنصّة، فلا مساحةَ لتعديلك`,
+      text: `${counted} من ${hardLimit} — قريب من سقف المنصّة، فلا مساحة لتعديلك`,
       hits: [],
     })
   }

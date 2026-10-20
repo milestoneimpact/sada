@@ -48,7 +48,7 @@ function reply(body: unknown, status = 400): { fetch: typeof fetch; seen: Reques
 }
 
 describe('ما قِيس من LinkedIn', () => {
-  it('«Client authentication failed» تعني أنّ السرَّ هو الخطأ', async () => {
+  it('«Client authentication failed» تعني أنّ السرّ هو الخطأ', async () => {
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.badSecret, 401).fetch)
     expect(out.kind).toBe('bad_secret')
     if (out.kind !== 'bad_secret') return
@@ -58,12 +58,12 @@ describe('ما قِيس من LinkedIn', () => {
   /**
    * **والفرقُ بين الحقلين يُقال، لا يُترك للمالك أن يفتّش فيهما معا.**
    */
-  it('و«invalid_client_id» تعني أنّ المعرّفَ هو الخطأ', async () => {
+  it('و«invalid_client_id» تعني أنّ المعرّف هو الخطأ', async () => {
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.badId, 400).fetch)
     expect(out.kind).toBe('bad_client_id')
   })
 
-  it('ونجاحٌ يعني أنّ الزوجَ جاز — ولا يُقرأ الجسدُ فيه', async () => {
+  it('ونجاح يعني أنّ الزوج جاز — ولا يُقرأ الجسد فيه', async () => {
     const { fetch } = reply({ access_token: 'APP-TOKEN-NOT-OURS' }, 200)
     const out = await verifyAppCredentials(LINKEDIN, CREDS, fetch)
     expect(out.kind).toBe('accepted')
@@ -78,7 +78,7 @@ describe('ما قِيس من LinkedIn', () => {
    * يفحص الرمزَ أوّلا. واختبارٌ يثبّت أنّ ذلك الجوابَ **لا يُقرأ
    * جوازا**، فلا يعود أحدٌ إلى ذلك المسار ظانّا أنّه يميّز.
    */
-  it('وجوابُ مسارِ الرمز لا يُقرأ حكما على الزوج', async () => {
+  it('وجواب مسار الرمز لا يُقرأ حكما على الزوج', async () => {
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.codeFirst).fetch)
     /*
      * **واسمُ هذا الاختبار كان أصدقَ من توكيده** (D-076).
@@ -93,12 +93,12 @@ describe('ما قِيس من LinkedIn', () => {
   })
 })
 
-describe('وخطأُ المنتَج يُسمَّى ولا يُقرأ جوازا', () => {
+describe('وخطأ المنتَج يُسمَّى ولا يُقرأ جوازا', () => {
   /**
    * **الجوابُ الذي كلّف الليلة.** كان يُصنَّف `accepted` بالاستدلال،
    * فتخضرّ الخطوةُ على سرٍّ ترفضه المنصّةُ في منحة الرمز.
    */
-  it('«لا يملك منحةَ رموز التطبيقات» لا يُعدّ جوازا', async () => {
+  it('«لا يملك منحة رموز التطبيقات» لا يُعدّ جوازا', async () => {
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.noAppTokens, 403).fetch)
     expect(out.kind).toBe('inconclusive')
   })
@@ -108,13 +108,13 @@ describe('وخطأُ المنتَج يُسمَّى ولا يُقرأ جوازا'
     const out = await verifyAppCredentials(LINKEDIN, CREDS, reply(REAL.noAppTokens, 403).fetch)
     if (out.kind !== 'inconclusive') return
     expect(out.detail).toContain('رموز التطبيقات')
-    expect(out.detail).toContain('نجاحُ الربط')
+    expect(out.detail).toContain('نجاح الربط')
   })
 })
 
 describe('وما لم يُقَس لا يُدَّعى', () => {
   /** Google مقيسٌ أنّه يردّ الصيغةَ قبل التوثيق — فلا يُنادى أصلا. */
-  it('لا فحصَ لـ YouTube، ويُقال السبب', async () => {
+  it('لا فحص لـ YouTube، ويُقال السبب', async () => {
     const dead = (async () => { throw new Error('يجب ألّا يُنادى') }) as unknown as typeof fetch
     const out = await verifyAppCredentials(YOUTUBE, CREDS, dead)
     expect(out.kind).toBe('unsupported')
@@ -123,17 +123,17 @@ describe('وما لم يُقَس لا يُدَّعى', () => {
     expect(PROBE_UNAVAILABLE.youtube).toBeDefined()
   })
 
-  it('وعطلُ شبكةٍ ليس حكما على الزوج', async () => {
+  it('وعطل شبكة ليس حكما على الزوج', async () => {
     const dead = (async () => { throw new Error('ECONNRESET') }) as unknown as typeof fetch
     expect((await verifyAppCredentials(LINKEDIN, CREDS, dead)).kind).toBe('inconclusive')
   })
 
-  it('وجوابٌ ليس JSON لا يُفسَّر', async () => {
+  it('وجواب ليس JSON لا يُفسَّر', async () => {
     const html = (async () => new Response('<html>', { status: 502 })) as unknown as typeof fetch
     expect((await verifyAppCredentials(LINKEDIN, CREDS, html)).kind).toBe('inconclusive')
   })
 
-  it('وجوابٌ بلا رمزِ خطأٍ لا يُفسَّر', async () => {
+  it('وجواب بلا رمز خطأ لا يُفسَّر', async () => {
     expect((await verifyAppCredentials(LINKEDIN, CREDS, reply({ msg: 'x' }).fetch)).kind)
       .toBe('inconclusive')
   })
@@ -150,7 +150,7 @@ describe('وما يُرسَل', () => {
     expect(body.get('code_verifier')).toBeNull()
   })
 
-  it('ويحترم صيغةَ التوثيق عند كلّ مزوّد', async () => {
+  it('ويحترم صيغة التوثيق عند كلّ مزوّد', async () => {
     const basic = reply(REAL.badSecret, 401)
     await verifyAppCredentials(X, CREDS, basic.fetch)
     expect((basic.seen[0]!.headers as Record<string, string>)['Authorization'])

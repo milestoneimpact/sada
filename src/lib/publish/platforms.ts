@@ -183,7 +183,7 @@ export async function uploadLinkedInImage(
   const target = body.value?.uploadUrl
   const imageUrn = body.value?.image
   if (typeof target !== 'string' || typeof imageUrn !== 'string' || imageUrn.length === 0) {
-    throw new PublishError('linkedin: تهيئةٌ بلا عنوان رفعٍ أو معرّف صورة', 502, false)
+    throw new PublishError('linkedin: تهيئة بلا عنوان رفع أو معرّف صورة', 502, false)
   }
 
   const put = await fetchImpl(target, {
@@ -248,7 +248,7 @@ export async function uploadXMedia(
   // وقارئٌ يعرف واحدا يسقط إن تبدّلت النهاية تحتنا
   const id = body.data?.id ?? body.media_id_string
   if (typeof id !== 'string' || id.length === 0) {
-    throw new PublishError('x: رفعٌ نجح بلا معرّف وسيط', 502, false)
+    throw new PublishError('x: رفع نجح بلا معرّف وسيط', 502, false)
   }
   return id
 }

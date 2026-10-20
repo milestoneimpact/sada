@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BASE_HEADERS, htmlHeaders, makeNonce } from './headers'
 
 describe('makeNonce', () => {
-  it('لا يتكرّر — وثابتٌ مشترك يُبطل السياسة كلَّها', () => {
+  it('لا يتكرّر — وثابت مشترك يُبطل السياسة كلَّها', () => {
     const seen = new Set(Array.from({ length: 200 }, () => makeNonce()))
     expect(seen.size).toBe(200)
   })
@@ -17,7 +17,7 @@ describe('makeNonce', () => {
   })
 })
 
-describe('السياسة — قائمةُ سماحٍ من العدم', () => {
+describe('السياسة — قائمة سماح من العدم', () => {
   const csp = (): string => htmlHeaders('N0NCE')['Content-Security-Policy'] ?? ''
 
   it('تبدأ بالمنع الكامل ثمّ تفتح بالاسم', () => {
@@ -52,7 +52,7 @@ describe('السياسة — قائمةُ سماحٍ من العدم', () => {
    * يمرّ على سياسةٍ فُتح فيها أصلٌ آخرُ غدا. **وما يُحرَس هو القاعدة، لا
    * المثالُ الذي كسرها.**
    */
-  it('**لا أصلَ خارجيًّا**: كلُّ ما استُثني من none هو self أو data', () => {
+  it('**لا أصل خارجيًّا**: كلّ ما استُثني من none هو self أو data', () => {
     expect(csp()).not.toMatch(/https?:\/\//)
   })
 
@@ -69,7 +69,7 @@ describe('ترويسات الصفحة', () => {
     expect(headers['Content-Security-Policy']).toContain("frame-ancestors 'none'")
   })
 
-  it('لا تُخزَّن في متصفّحٍ مشترك', () => {
+  it('لا تُخزَّن في متصفّح مشترك', () => {
     expect(htmlHeaders('x')['Cache-Control']).toContain('no-store')
   })
 
@@ -82,25 +82,25 @@ describe('ترويسات الصفحة', () => {
 })
 
 describe('الترويسات الأساس', () => {
-  it('HSTS بسنةٍ وبالنطاقات الفرعيّة', () => {
+  it('HSTS بسنة وبالنطاقات الفرعيّة', () => {
     const hsts = BASE_HEADERS['Strict-Transport-Security'] ?? ''
     expect(hsts).toContain('max-age=31536000')
     expect(hsts).toContain('includeSubDomains')
   })
 
-  it('**بلا preload** — التزامٌ لا يُتَّخذ عرَضا، ولا يُقبل من نطاقٍ فرعيّ', () => {
+  it('**بلا preload** — التزام لا يُتَّخذ عرَضا، ولا يُقبل من نطاق فرعيّ', () => {
     expect(BASE_HEADERS['Strict-Transport-Security']).not.toContain('preload')
   })
 
-  it('nosniff — فردُّ JSON لا يُفسَّر HTML', () => {
+  it('nosniff — فردّ JSON لا يُفسَّر HTML', () => {
     expect(BASE_HEADERS['X-Content-Type-Options']).toBe('nosniff')
   })
 
-  it('لا مُحيل يُسرَّب إلى موقعٍ خارجيّ', () => {
+  it('لا مُحيل يُسرَّب إلى موقع خارجيّ', () => {
     expect(BASE_HEADERS['Referrer-Policy']).toBe('no-referrer')
   })
 
-  it('أبوابٌ لا تُستعمل تُغلق', () => {
+  it('أبواب لا تُستعمل تُغلق', () => {
     const policy = BASE_HEADERS['Permissions-Policy'] ?? ''
     for (const feature of ['camera', 'microphone', 'geolocation', 'payment']) {
       expect(policy).toContain(`${feature}=()`)

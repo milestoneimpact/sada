@@ -54,9 +54,9 @@ function num(value: unknown): number | null {
 function classify(status: number): MetricsError {
   if (status === 404) return new MetricsError('المنشور غير موجود عند المنصّة', 404, false)
   if (status === 401 || status === 403) {
-    return new MetricsError('الإذن مرفوض أو ينقصه نطاقُ القراءة', status, false)
+    return new MetricsError('الإذن مرفوض أو ينقصه نطاق القراءة', status, false)
   }
-  if (status === 429) return new MetricsError('بلغ حدَّ المنصّة', 429, true)
+  if (status === 429) return new MetricsError('بلغ حدّ المنصّة', 429, true)
   if (status >= 500) return new MetricsError('المنصّة متعبة', status, true)
   return new MetricsError(`ردّت المنصّة ${status}`, status, status >= 500)
 }
@@ -80,7 +80,7 @@ async function getJson(
   try {
     return (await response.json()) as Record<string, unknown>
   } catch {
-    throw new MetricsError('جوابُ المنصّة ليس JSON', 502, true)
+    throw new MetricsError('جواب المنصّة ليس JSON', 502, true)
   }
 }
 

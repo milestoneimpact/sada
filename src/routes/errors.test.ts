@@ -16,8 +16,8 @@ const env = { SADA_ENV: 'staging' } as unknown as Record<string, unknown>
 
 afterEach(() => { vi.restoreAllMocks() })
 
-describe('‏٤٠٤ — صفحةٌ بالقالب نفسِه لا JSON', () => {
-  it('المتصفّحُ يرى صفحةً عربيّةً بالرافدة وبابِ الرئيسيّة، وبسياسة المحتوى', async () => {
+describe('‏٤٠٤ — صفحة بالقالب نفسِه لا JSON', () => {
+  it('المتصفّح يرى صفحةً عربيّةً بالرافدة وباب الرئيسيّة، وبسياسة المحتوى', async () => {
     const res = await app.request('/panel/old-anchor-page', HTML, env)
     expect(res.status).toBe(404)
     expect(res.headers.get('Content-Type')).toContain('text/html')
@@ -42,13 +42,13 @@ describe('‏٤٠٤ — صفحةٌ بالقالب نفسِه لا JSON', () => {
     expect(wantsHtml(new Request('https://x/api/a', HTML))).toBe(false)
   })
 
-  it('وجملةُ المسار الذي عرف ما لم يجده تُقال مع الرابط', async () => {
-    const html = await notFoundResponse(new Request('https://x/panel/channels/zz', HTML), 'لا منصّةَ بهذا الاسم').text()
-    expect(html).toContain('لا منصّةَ بهذا الاسم. ربّما نُقلت')
+  it('وجملة المسار الذي عرف ما لم يجده تُقال مع الرابط', async () => {
+    const html = await notFoundResponse(new Request('https://x/panel/channels/zz', HTML), 'لا منصّة بهذا الاسم').text()
+    expect(html).toContain('لا منصّة بهذا الاسم. ربّما نُقلت')
   })
 })
 
-describe('‏٥٠٠ — هادئةٌ برقم الطلب، ولا رسالةَ استثناءٍ في الوجه', () => {
+describe('‏٥٠٠ — هادئة برقم الطلب، ولا رسالة استثناء في الوجه', () => {
   function boom(): Hono {
     const mini = new Hono()
     mini.get('/x', () => { throw new Error('D1_ERROR: no such column secret_path') })
@@ -57,7 +57,7 @@ describe('‏٥٠٠ — هادئةٌ برقم الطلب، ولا رسالةَ �
     return mini
   }
 
-  it('المتصفّحُ يرى «حدث خطأ من جهتنا، لا منك» و«أعد المحاولة» إلى المسار نفسِه، ورقمَ الطلب تحت «للمطوّر»', async () => {
+  it('المتصفّح يرى «حدث خطأ من جهتنا، لا منك» و«أعد المحاولة» إلى المسار نفسِه، ورقم الطلب تحت «للمطوّر»', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await boom().request('/x?tab=setup', { headers: { ...HTML.headers, 'cf-ray': '8f1e2d3c4b5a6978-FRA' } })
     expect(res.status).toBe(500)
@@ -78,7 +78,7 @@ describe('‏٥٠٠ — هادئةٌ برقم الطلب، ولا رسالةَ �
     expect(line).toMatchObject({ event: 'unhandled_error', id: '8f1e2d3c4b5a6978-FRA', path: '/x', message: 'D1_ERROR: no such column secret_path' })
   })
 
-  it('ونموذجٌ سقط لا يُعاد بضغطة (قد يُرسَل مرّتين): البابُ إلى الرئيسيّة', async () => {
+  it('ونموذج سقط لا يُعاد بضغطة (قد يُرسَل مرّتين): الباب إلى الرئيسيّة', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const html = await (await boom().request('/x', { method: 'POST', ...HTML })).text()
     expect(html).toContain('<a class="btn btn-primary" href="/panel"><span>الرئيسيّة</span></a>')
@@ -89,7 +89,7 @@ describe('‏٥٠٠ — هادئةٌ برقم الطلب، ولا رسالةَ �
    * ‏ولا تقول «لم يُحفَظ شيء» بعد كتابة (مراجعةُ D-189): نموذجٌ يكتب صفًّا صفًّا (`applyPlan`)
    * ‏أو يكتب ثمّ يسقط في `setFlash` قد تمّ بعضُه قبل الاستثناء. **وهنا يكتب فعلًا ثمّ يسقط.**
    */
-  it('ونموذجٌ كتب بعضَ ما طلب ثمّ سقط: «ربّما تمّ بعضُ ما طلبتَ» وتحقّق قبل أن تعيد — لا «لم يُحفَظ»', async () => {
+  it('ونموذج كتب بعض ما طلب ثمّ سقط: «ربّما تمّ بعض ما طلبت» وتحقّق قبل أن تعيد — لا «لم يُحفَظ»', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const written: string[] = []
     const mini = new Hono()
@@ -101,17 +101,17 @@ describe('‏٥٠٠ — هادئةٌ برقم الطلب، ولا رسالةَ �
     expect(res.status).toBe(500)
     expect(written).toEqual(['row-1'])
     const html = await res.text()
-    expect(html).toContain('<p class="empty-p"><b>ربّما تمّ بعضُ ما طلبتَ قبل الخطأ.</b> افتح الصفحةَ التي كنتَ فيها وتحقّق ممّا حُفظ قبل أن تعيده، فإن تكرّر فأرسل إليّ ما تحت «للمطوّر» كما هو.</p>')
+    expect(html).toContain('<p class="empty-p"><b>ربّما تمّ بعض ما طلبت قبل الخطأ.</b> افتح الصفحة التي كنت فيها وتحقّق ممّا حُفظ قبل أن تعيده، فإن تكرّر فأرسل إليّ ما تحت «للمطوّر» كما هو.</p>')
     expect(html).not.toContain('لم يُحفَظ')
     expect(html).not.toContain('أعد المحاولة بعد دقيقة')
     for (const method of ['PUT', 'DELETE'] as const) {
       const other = await (await mini.request('/y', { method, ...HTML })).text()
-      expect(other, method).toContain('ربّما تمّ بعضُ ما طلبتَ')
+      expect(other, method).toContain('ربّما تمّ بعض ما طلبت')
       expect(other, method).not.toContain('لم يُحفَظ')
     }
   })
 
-  it('وما رُمي بحاله عمدًا («HTTPException») يمرّ بحاله — لا ‏٥٠٠ ولا سطرَ عطلٍ في السجلّ', async () => {
+  it('وما رُمي بحاله عمدًا («HTTPException») يمرّ بحاله — لا ‏٥٠٠ ولا سطر عطل في السجلّ', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const mini = new Hono()
     mini.get('/big', () => { throw new HTTPException(413, { message: 'كبير' }) })

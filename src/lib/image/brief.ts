@@ -213,7 +213,7 @@ export async function askWriter(
   const route = await routeFor(deps.db, 'draft')
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
-    return { text: null, cost: 0, detail: `لا مزوّدَ للكتابة (${route.provider})`, called: false }
+    return { text: null, cost: 0, detail: `لا مزوّد للكتابة (${route.provider})`, called: false }
   }
 
   /*
@@ -297,7 +297,7 @@ export async function askWriter(
     return {
       text: null,
       cost: late === null ? 0 : await charge(late),
-      detail: error instanceof Error ? error.message : 'نداءٌ فشل',
+      detail: error instanceof Error ? error.message : 'نداء فشل',
       called: true,
     }
   }
@@ -325,13 +325,13 @@ export async function visualBrief(
     return {
       brief: null,
       cost: answer.cost,
-      detail: answer.called ? `تعذّر الموجزُ البصريّ: ${answer.detail}` : answer.detail,
+      detail: answer.called ? `تعذّر الموجز البصريّ: ${answer.detail}` : answer.detail,
     }
   }
   const brief = parseBrief(answer.text)
   return {
     brief,
     cost: answer.cost,
-    detail: brief === null ? 'جوابُ الموجز ليس بالشكل المتوقَّع' : 'موجزٌ بصريّ',
+    detail: brief === null ? 'جواب الموجز ليس بالشكل المتوقَّع' : 'موجز بصريّ',
   }
 }

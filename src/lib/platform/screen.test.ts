@@ -83,7 +83,7 @@ function seedAttempt(
 }
 
 describe('المنظّمة (D-231)', () => {
-  it('شاشةُ المنصّة لا ترى منشوراتِ منظّمةٍ أخرى ولا حساباتها', async () => {
+  it('شاشة المنصّة لا ترى منشورات منظّمة أخرى ولا حساباتها', async () => {
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     const account = await seedAccount('linkedin')
     seedPost({ id: 'p1', platform: 'linkedin', accountId: account, status: 'draft' })
@@ -100,7 +100,7 @@ describe('الرابط — يُبنى ولا يُخزَّن', () => {
     expect(permalink('linkedin', 'urn:li:share:99')).toContain('urn%3Ali%3Ashare%3A99')
   })
 
-  it('و X من رقمٍ محض', () => {
+  it('و X من رقم محض', () => {
     expect(permalink('x', '1874')).toBe('https://x.com/i/web/status/1874')
   })
 
@@ -110,7 +110,7 @@ describe('الرابط — يُبنى ولا يُخزَّن', () => {
    * **وغيابُ الرابط أصدقُ من كسره**: رابطٌ مبنيٌّ على تخمينٍ يفتح صفحةَ
    * خطأ عند المنصّة، فيظنّ المالكُ أنّ منشوره حُذف.
    */
-  it('وما لا يوافق الشكلَ يعيد لا شيء — لا رابطا مخمَّنا', () => {
+  it('وما لا يوافق الشكل يعيد لا شيء — لا رابطا مخمَّنا', () => {
     expect(permalink('linkedin', '99')).toBeNull()
     expect(permalink('linkedin', 'share:99')).toBeNull()
     expect(permalink('x', 'urn:li:share:99')).toBeNull()
@@ -119,7 +119,7 @@ describe('الرابط — يُبنى ولا يُخزَّن', () => {
     expect(permalink('x', '   ')).toBeNull()
   })
 
-  it('ورقمُ Instagram لا يُفتَح على x.com', () => {
+  it('ورقم Instagram لا يُفتَح على x.com', () => {
     expect(permalink('instagram', '17912345678901234')).toBeNull()
     expect(permalink('tiktok', '7312345678901234567')).toBeNull()
   })
@@ -131,7 +131,7 @@ describe('الرابط — يُبنى ولا يُخزَّن', () => {
 })
 
 describe('المنشورات — تُقرأ من محاولاتها', () => {
-  it('الوقتُ والرابطُ من آخر محاولةٍ ناجحة', async () => {
+  it('الوقت والرابط من آخر محاولة ناجحة', async () => {
     const account = await seedAccount('linkedin')
     seedPost({ id: 'p1', platform: 'linkedin', accountId: account, status: 'published' })
     seedAttempt('p1', 'succeeded', {
@@ -152,7 +152,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
    * فلو قُرئ الفشلُ وحده لبدا المنشورُ فاشلا وهو منشور، ولو قُرئ النجاحُ
    * وحده لضاع سببٌ يُحتاج إليه.
    */
-  it('ويحمل الفشلَ والنجاحَ معا حين اجتمعا', async () => {
+  it('ويحمل الفشل والنجاح معا حين اجتمعا', async () => {
     const account = await seedAccount('linkedin')
     seedPost({ id: 'p1', platform: 'linkedin', accountId: account, status: 'published' })
     seedAttempt('p1', 'failed', {
@@ -171,7 +171,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     expect(post!.lastError).toBe('Not enough permissions')
   })
 
-  it('وسببُ الفشل يُختصَر ولا يُعرَض جسمُ جوابٍ كامل', async () => {
+  it('وسبب الفشل يُختصَر ولا يُعرَض جسم جواب كامل', async () => {
     const account = await seedAccount('x')
     seedPost({ id: 'p1', platform: 'x', accountId: account, status: 'failed' })
     seedAttempt('p1', 'failed', { response: JSON.stringify({ detail: 'ن'.repeat(600) }) })
@@ -179,7 +179,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     expect(post!.lastError!.length).toBeLessThanOrEqual(240)
   })
 
-  it('وجوابٌ ليس JSON يُؤخذ كما هو لا يُبتلَع', async () => {
+  it('وجواب ليس JSON يُؤخذ كما هو لا يُبتلَع', async () => {
     const account = await seedAccount('x')
     seedPost({ id: 'p1', platform: 'x', accountId: account, status: 'failed' })
     seedAttempt('p1', 'failed', { response: 'Bad Gateway' })
@@ -197,7 +197,7 @@ describe('المنشورات — تُقرأ من محاولاتها', () => {
     expect((await platformPosts(db, 'org_owner', 'x')).map((p) => p.id)).toEqual(['p2'])
   })
 
-  it('ومسوّدةٌ بلا حسابٍ تُعرَض — الكتابةُ تسبق الربط', async () => {
+  it('ومسوّدة بلا حساب تُعرَض — الكتابة تسبق الربط', async () => {
     seedPost({ id: 'p1', platform: 'linkedin', accountId: null, status: 'draft' })
     const [post] = await platformPosts(db, 'org_owner', 'linkedin')
     expect(post!.accountName).toBeNull()
@@ -233,7 +233,7 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
     expect(tally.spend).toBeCloseTo(0.1)
   })
 
-  it('وآخرُ نشرٍ من المحاولات لا من الصفوف', async () => {
+  it('وآخر نشر من المحاولات لا من الصفوف', async () => {
     const account = await seedAccount('x')
     seedPost({ id: 'p1', platform: 'x', accountId: account, status: 'published' })
     seedAttempt('p1', 'succeeded', { platformPostId: '1', at: '2026-09-01T08:00:00Z' })
@@ -243,7 +243,7 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
     expect((await platformTally(db, 'org_owner', 'x')).lastPublishedAt).toBe('2026-09-04T08:00:00Z')
   })
 
-  it('ومنصّةٌ بلا صفوف تعطي أصفارا لا عطلا', async () => {
+  it('ومنصّة بلا صفوف تعطي أصفارا لا عطلا', async () => {
     expect(await platformTally(db, 'org_owner', 'x')).toMatchObject({
       published: 0, queued: 0, failed: 0, drafts: 0, lastPublishedAt: null,
     })
@@ -251,8 +251,8 @@ describe('الحصاد — يُحسَب من كلّ الصفوف لا من ال�
   })
 })
 
-describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح تشفير', () => {
-  it('تُعاد لكلّ حسابٍ بمعرّفه', async () => {
+describe('النطاقات الممنوحة — تُقرأ بلا مفتاح تشفير', () => {
+  it('تُعاد لكلّ حساب بمعرّفه', async () => {
     const account = await seedAccount('linkedin')
     db.raw
       .prepare(
@@ -263,7 +263,7 @@ describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح �
     expect(await grantedScopes(db, 'org_owner', 'linkedin')).toEqual({ [account]: 'openid profile' })
   })
 
-  it('وحسابٌ بلا رمزٍ لا يظهر — ولا يُختلَق له نطاق', async () => {
+  it('وحساب بلا رمز لا يظهر — ولا يُختلَق له نطاق', async () => {
     await seedAccount('linkedin')
     expect(await grantedScopes(db, 'org_owner', 'linkedin')).toEqual({})
   })
@@ -273,7 +273,7 @@ describe('النطاقاتُ الممنوحة — تُقرأ بلا مفتاح �
  * سجلُّ صحّة الحساب (D-129) — **من صفوفه، ولا محطّةَ تُخترَع**.
  */
 describe('accountHealth', () => {
-  it('حسابٌ بلا رمزٍ يُقال فيه ذلك، وبرمزٍ يُقرأ موعدُه وتجديدُه وتنبيهاتُه', async () => {
+  it('حساب بلا رمز يُقال فيه ذلك، وبرمز يُقرأ موعدُه وتجديدُه وتنبيهاتُه', async () => {
     const id = await seedAccount('linkedin')
     const bare = await accountHealth(db, 'org_owner', 'linkedin')
     expect(bare[id]).toMatchObject({ status: 'active', expiresAt: null, refreshedAt: null, alerts: [] })
@@ -300,7 +300,7 @@ describe('accountHealth', () => {
  * ختمُ السقوط (D-131): يُختَم مرّةً عند التعليم، ويُمحى عند إعادة الربط.
  */
 describe('needs_reauth_at', () => {
-  it('يُختَم عند أوّل تعليمٍ ولا يتبدّل بتعليمٍ ثانٍ، ويُمحى بإعادة الربط', async () => {
+  it('يُختَم عند أوّل تعليم ولا يتبدّل بتعليم ثان، ويُمحى بإعادة الربط', async () => {
     const id = await seedAccount('linkedin')
     expect((await accountHealth(db, 'org_owner', 'linkedin'))[id]!.needsReauthAt).toBeNull()
 

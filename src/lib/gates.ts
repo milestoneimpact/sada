@@ -105,21 +105,21 @@ export function gatesOf(f: GateFacts): Gate[] {
       title: 'التأسيس',
       items: [
         item(
-          'منشورٌ نصّيٌّ واحدٌ على كلّ منصّة من لوحة صدى',
+          'منشور نصّيّ واحد على كلّ منصّة من لوحة صدى',
           bothPublished ? 'met' : 'unmet',
           PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.publishedPerPlatform, p)}`).join(' · '),
         ),
         item(
-          'وسطرٌ في `cost_ledger` لكلٍّ منهما',
+          'وسطر في `cost_ledger` لكلّ منهما',
           bothLedger ? 'met' : 'unmet',
           PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.ledgerPerPlatform, p)}`).join(' · '),
         ),
         // ومفتاحُ التفرّد **يحرسه القيدُ في القاعدة** لا استعلامٌ هنا:
         // عمودُ `idempotency_key` فريدٌ منذ `0001_init` (D-004)
         item(
-          'وبمفتاحِ منعِ التكرار — يحرسه قيدُ التفرّد في المخطّط',
+          'وبمفتاح منع التكرار — يحرسه قيد التفرّد في المخطّط',
           'met',
-          'قيدٌ في القاعدة منذ أوّل ترحيل — لا يُخالَف',
+          'قيد في القاعدة منذ أوّل ترحيل — لا يُخالَف',
         ),
       ],
       passed: false,
@@ -129,12 +129,12 @@ export function gatesOf(f: GateFacts): Gate[] {
       title: 'الذكاء',
       items: [
         item(
-          'خطّةٌ أسبوعيّةٌ مولَّدةٌ من ملفّات Drive',
+          'خطّة أسبوعيّة مولَّدة من ملفّات Drive',
           f.plans > 0 ? 'met' : 'unmet',
           `${f.plans} خطّة`,
         ),
         item(
-          'وخمسةُ منشوراتٍ معتمدةٍ نُشرت في مواعيدها بلا تدخّل',
+          'وخمسة منشورات معتمدة نُشرت في مواعيدها بلا تدخّل',
           f.scheduledPublished >= 5 ? 'met' : 'unmet',
           `${f.scheduledPublished} من 5 — جُدوِلت ثمّ خرجت`,
         ),
@@ -146,25 +146,25 @@ export function gatesOf(f: GateFacts): Gate[] {
       title: 'الصور والصفحات',
       items: [
         item(
-          'منشورٌ بصورةٍ على كلّ منصّة',
+          'منشور بصورة على كلّ منصّة',
           bothWithMedia ? 'met' : 'unmet',
           PLATFORMS.map((p) => `${platformLabel(p)}: ${n(f.publishedWithMedia, p)}`).join(' · '),
         ),
         item(
-          'ومنشورٌ على صفحة الشركة',
+          'ومنشور على صفحة الشركة',
           f.orgAccounts > 0 && n(f.publishedPerPlatform, 'linkedin') > 0 ? 'met' : 'unmet',
-          `${f.orgAccounts} حسابَ صفحةٍ مربوط`,
+          `${f.orgAccounts} حساب صفحة مربوط`,
         ),
         /**
          * **صار يُقاس**: التنبيهُ يُسجَّل صفّا عند العتبة (D-065)،
          * فالسؤالُ «أوقع؟» يُجاب من القاعدة لا يُفترَض.
          */
         item(
-          'وتنبيهُ انتهاء رمزٍ سُجّل قبل أسبوع من الانتهاء',
+          'وتنبيه انتهاء رمز سُجّل قبل أسبوع من الانتهاء',
           f.weekAlertFired ? 'met' : 'unmet',
           f.weekAlertFired
-            ? 'صفٌّ في `token_alerts` عند عتبة السبعة'
-            : 'لم يقع بعد — ولا رمزَ بلغ العتبة',
+            ? 'صفّ في `token_alerts` عند عتبة السبعة'
+            : 'لم يقع بعد — ولا رمز بلغ العتبة',
         ),
       ],
       passed: false,
@@ -174,12 +174,12 @@ export function gatesOf(f: GateFacts): Gate[] {
       title: 'القياس',
       items: [
         item(
-          'تقريرٌ أسبوعيٌّ وصل',
+          'تقرير أسبوعيّ وصل',
           f.reports > 0 ? 'met' : 'unmet',
           `${f.reports} تقرير`,
         ),
         item(
-          'وتوصيةُ ترويجٍ ظهرت مع تكلفتها',
+          'وتوصية ترويج ظهرت مع تكلفتها',
           f.suggestions > 0 ? 'met' : 'unmet',
           `${f.suggestions} توصية`,
         ),
@@ -190,9 +190,9 @@ export function gatesOf(f: GateFacts): Gate[] {
          * من ترويج. وأيُّ صفٍّ فيه **يُسقط البوّابة** (D-006).
          */
         item(
-          'ولم يُنفَق شيءٌ على ترويج',
+          'ولم يُنفَق شيء على ترويج',
           f.promoSpend === 0 ? 'met' : 'unmet',
-          f.promoSpend === 0 ? 'الدفترُ خالٍ من ترويج' : `أُنفق ${f.promoSpend}$ — يُسقط البوّابة`,
+          f.promoSpend === 0 ? 'الدفتر خال من ترويج' : `أُنفق ${f.promoSpend}$ — يُسقط البوّابة`,
         ),
       ],
       passed: false,

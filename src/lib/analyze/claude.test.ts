@@ -39,7 +39,7 @@ const ANALYSIS = {
   summary: 'خلاصة المصدر بالعربية.',
   themes: ['الوقف', 'الأثر'],
   worth_score: 0.72,
-  worth_reason: 'رقمٌ من الميدان لا يتكرّر.',
+  worth_reason: 'رقم من الميدان لا يتكرّر.',
   audience: 'مديرو الجمعيات',
   angles: ['من الرقم إلى القرار'],
 }
@@ -155,7 +155,7 @@ describe('analyzeText — ما يُعاد وما لا يُعاد', () => {
     }
   })
 
-  it('جوابٌ مبتور يُعاد — قد يتمّ في المحاولة التالية', async () => {
+  it('جواب مبتور يُعاد — قد يتمّ في المحاولة التالية', async () => {
     const f = fakeAnthropic(okReply({ stop_reason: 'max_tokens' }))
     try {
       await analyzeText({ apiKey: 'sk-test', fetchImpl: f }, INPUT)
@@ -165,7 +165,7 @@ describe('analyzeText — ما يُعاد وما لا يُعاد', () => {
     }
   })
 
-  it('جوابٌ ليس JSON رغم المخطّط يُعطَّل ولا يُكتب نصّا خاما', async () => {
+  it('جواب ليس JSON رغم المخطّط يُعطَّل ولا يُكتب نصّا خاما', async () => {
     const f = fakeAnthropic(okReply({ content: [{ type: 'text', text: 'ليس json' }] }))
     await expect(analyzeText({ apiKey: 'sk-test', fetchImpl: f }, INPUT)).rejects.toBeInstanceOf(
       AnalyzeError,
@@ -180,7 +180,7 @@ describe('analyzeText — ما يُعاد وما لا يُعاد', () => {
  * `usage`، وقد حوسِب عليه. وكان الخطأُ يُرمى بلا استهلاكه، فيعود المنادي
  * `failed` قبل خطوة الكلفة ولا يرى الدفترُ شيئا.
  */
-describe('D-164 · الخطأُ بعد 200 يحمل استهلاكَه', () => {
+describe('D-164 · الخطأ بعد 200 يحمل استهلاكَه', () => {
   const SPENT = { inputTokens: 1200, outputTokens: 300, cachedInputTokens: 900, model: MODEL }
 
   async function thrown(f: typeof fetch): Promise<AnalyzeError> {
@@ -193,21 +193,21 @@ describe('D-164 · الخطأُ بعد 200 يحمل استهلاكَه', () => {
   }
 
   it.each([
-    ['البترُ عند max_tokens', { stop_reason: 'max_tokens' }],
-    ['والرفضُ لسياسة المحتوى', { stop_reason: 'refusal', content: [] }],
-    ['وجوابٌ بلا كتلةِ نصّ', { content: [] }],
-    ['والـJSON الفاسدُ رغم المخطّط', { content: [{ type: 'text', text: '{"summary":"' }] }],
+    ['البتر عند max_tokens', { stop_reason: 'max_tokens' }],
+    ['والرفض لسياسة المحتوى', { stop_reason: 'refusal', content: [] }],
+    ['وجواب بلا كتلة نصّ', { content: [] }],
+    ['والـJSON الفاسد رغم المخطّط', { content: [{ type: 'text', text: '{"summary":"' }] }],
   ])('%s: معه ما استُهلك', async (_name, overrides) => {
     const error = await thrown(fakeAnthropic(okReply(overrides)))
     expect(error.spent).toEqual(SPENT)
   })
 
-  it('**وما لم يصل لا استهلاكَ فيه**: 500 بلا spent', async () => {
+  it('**وما لم يصل لا استهلاك فيه**: 500 بلا spent', async () => {
     const error = await thrown(fakeAnthropic({ status: 500, body: { type: 'error', error: { type: 'x', message: 'x' } } }))
     expect(error.spent).toBeUndefined()
   })
 
-  it('وغيابُ المفتاح لم يُرسل شيئا: بلا spent', async () => {
+  it('وغياب المفتاح لم يُرسل شيئا: بلا spent', async () => {
     const error = await analyzeText({ apiKey: '', fetchImpl: fakeAnthropic(okReply()) }, INPUT).then(
       () => null,
       (caught: unknown) => caught,

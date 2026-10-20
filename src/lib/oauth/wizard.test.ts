@@ -36,7 +36,7 @@ describe('ما لا يُعرَف لا تُوضَع عليه علامة', () => {
    * ولوحةٌ تضع عليه علامةَ صحٍّ تكذب في أخطر موضع: يبحث المالكُ في
    * غيره وهو العطل.
    */
-  it('رابطُ العودة «لا يُعرَف» حتّى ينجح الربط', () => {
+  it('رابط العودة «لا يُعرَف» حتّى ينجح الربط', () => {
     expect(at(wizardFor(view(0), app()), 2)).toBe('unknowable')
     expect(at(wizardFor(view(0), app({ verifiedKind: 'accepted' })), 2)).toBe('unknowable')
     // ولا يثبت إلّا بالربط نفسِه
@@ -47,7 +47,7 @@ describe('ما لا يُعرَف لا تُوضَع عليه علامة', () => {
    * **وسرٌّ يُلصَق لتطبيقٍ لم يُنشَأ يُحفَظ كما يُحفَظ الصحيح.**
    * فوجودُ صفٍّ في الخزانة لا يثبت أنّ التطبيق قائم.
    */
-  it('وحفظُ المعرّف لا يثبت أنّ التطبيق قائم', () => {
+  it('وحفظ المعرّف لا يثبت أنّ التطبيق قائم', () => {
     expect(at(wizardFor(view(0), app()), 1)).toBe('unknowable')
     expect(at(wizardFor(view(0), app({ verifiedKind: 'accepted' })), 1)).toBe('done')
   })
@@ -66,8 +66,8 @@ describe('ما لا يُعرَف لا تُوضَع عليه علامة', () => {
   })
 })
 
-describe('والطريقُ يتقدّم بما ثبت', () => {
-  it('بلا أسرارٍ: الأولى هي الآن، والباقي ينتظر', () => {
+describe('والطريق يتقدّم بما ثبت', () => {
+  it('بلا أسرار: الأولى هي الآن، والباقي ينتظر', () => {
     const w = wizardFor(view(0), app({ source: 'none', clientId: null }))
     expect(at(w, 1)).toBe('now')
     expect(at(w, 3)).toBe('waiting')
@@ -75,21 +75,21 @@ describe('والطريقُ يتقدّم بما ثبت', () => {
     expect(w.current).toBe(1)
   })
 
-  it('وبأسرارٍ لم تُفحَص: الثالثةُ هي الآن', () => {
+  it('وبأسرار لم تُفحَص: الثالثة هي الآن', () => {
     const w = wizardFor(view(0), app())
     expect(at(w, 3)).toBe('now')
     expect(w.current).toBe(3)
     expect(w.steps[2]!.proof).toContain('افحص الزوج')
   })
 
-  it('وبفحصٍ جائز: الرابعةُ هي الآن', () => {
+  it('وبفحص جائز: الرابعة هي الآن', () => {
     const w = wizardFor(view(0), app({ verifiedKind: 'accepted', verifiedAt: 'x' }))
     expect(at(w, 3)).toBe('done')
     expect(at(w, 4)).toBe('now')
     expect(w.current).toBe(4)
   })
 
-  it('وبربطٍ قائم: تمّ كلُّ شيء', () => {
+  it('وبربط قائم: تمّ كلّ شيء', () => {
     const w = wizardFor(view(2), app({ verifiedKind: 'accepted', verifiedAt: 'x' }))
     expect(w.steps.every((s) => s.state === 'done')).toBe(true)
     expect(w.current).toBeNull()
@@ -97,27 +97,27 @@ describe('والطريقُ يتقدّم بما ثبت', () => {
   })
 })
 
-describe('والرفضُ يوقف ما بعده', () => {
+describe('والرفض يوقف ما بعده', () => {
   /** دورةُ إذنٍ تنتهي بالرفض نفسِه ليست محاولة — هي إضاعةُ دقيقة. */
-  it('سرٌّ مرفوضٌ يُبقي الرابعةَ منتظِرةً لا «الآن»', () => {
+  it('سرّ مرفوض يُبقي الرابعة منتظِرةً لا «الآن»', () => {
     const w = wizardFor(view(0), app({ verifiedKind: 'bad_secret', verifiedAt: 'x' }))
     expect(at(w, 3)).toBe('failed')
     expect(at(w, 4)).toBe('waiting')
-    expect(w.steps[3]!.proof).toContain('دورةٌ تنتهي بالرفض')
+    expect(w.steps[3]!.proof).toContain('دورة تنتهي بالرفض')
     expect(w.current).toBe(3)
   })
 
   /** **ومعرّفٌ مجهولٌ يُسقط الأولى لا الثالثة** — فيُفتَّش حيث العطل. */
-  it('ومعرّفٌ مجهولٌ يُسقط الخطوةَ الأولى', () => {
+  it('ومعرّف مجهول يُسقط الخطوة الأولى', () => {
     const w = wizardFor(view(0), app({ verifiedKind: 'bad_client_id', verifiedAt: 'x' }))
     expect(at(w, 1)).toBe('failed')
     expect(w.current).toBe(1)
-    expect(w.steps[0]!.proof).toContain('تطبيقٌ آخر')
+    expect(w.steps[0]!.proof).toContain('تطبيق آخر')
   })
 })
 
-describe('وسرُّ Worker يمرّ كما يمرّ سرُّ الخزانة', () => {
-  it('لا أثرَ فحصٍ له، فيبقى «الآن» على الفحص', () => {
+describe('وسرّ Worker يمرّ كما يمرّ سرّ الخزانة', () => {
+  it('لا أثر فحص له، فيبقى «الآن» على الفحص', () => {
     const w = wizardFor(view(0), app({ source: 'worker_secret', hint: null }))
     expect(at(w, 3)).toBe('now')
   })

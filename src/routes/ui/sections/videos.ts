@@ -33,9 +33,9 @@ const MARK: Readonly<Record<VideoCheck['level'], { cls: Tone; g: string }>> = {
 
 /** حالُ منشور المقطع على صفّه — بكلمات بطاقته في «المنشورات»، والرابطُ إليها. */
 const POST_STATE: Readonly<Record<string, { cls: Tone; g: string; text: string }>> = {
-  draft: { cls: 'idle', g: '○', text: 'مسوّدةٌ تنتظر قرارك' },
-  approved: { cls: 'ok', g: '●', text: 'معتمَدٌ بلا موعد' },
-  edited: { cls: 'ok', g: '●', text: 'معتمَدٌ بلا موعد' },
+  draft: { cls: 'idle', g: '○', text: 'مسوّدة تنتظر قرارك' },
+  approved: { cls: 'ok', g: '●', text: 'معتمَد بلا موعد' },
+  edited: { cls: 'ok', g: '●', text: 'معتمَد بلا موعد' },
   queued: { cls: 'warn', g: '◔', text: 'مجدول' },
   published: { cls: 'ok', g: '✓', text: 'نُشر' },
   failed: { cls: 'bad', g: '▲', text: 'فشل نشرُه' },
@@ -43,7 +43,7 @@ const POST_STATE: Readonly<Record<string, { cls: Tone; g: string; text: string }
 
 /** مدّةٌ كما تُقرأ: «0:42» و«3:05». */
 function clock(ms: number | null): string {
-  if (ms === null) return 'مدّةٌ لم تُقرأ'
+  if (ms === null) return 'مدّة لم تُقرأ'
   const s = Math.round(ms / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
@@ -113,23 +113,23 @@ function captionForm(u: UploadRow, cap: VideoCaptions | undefined, ctx: VideoCon
       ? { text: w.blocked.text, label: w.blocked.label, href: w.blocked.href }
       : w.ready
         ? null
-        : { text: 'مزوّدُ الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
+        : { text: 'مزوّد الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
   const control = `<input type="text" name="about" required maxlength="${ABOUT_MAX}"
-      placeholder="مثل: لقاءٌ عن القيادة في أوّل مئة يوم"${cap === undefined ? '' : ` value="${escapeHtml(cap.about)}"`}>`
+      placeholder="مثل: لقاء عن القيادة في أوّل مئة يوم"${cap === undefined ? '' : ` value="${escapeHtml(cap.about)}"`}>`
   // ‏«أعد كتابتها» تحمل `at` ما على الشاشة (D-190): الوصفُ نفسُه يُكتب منه من جديد مرّةً، وإعادةُ
   // ‏إرسال النموذج نفسِه بعدها تحمل `at` قديمًا فتعود «مكتوبةً» بلا نداءٍ ولا كلفة
-  return `<form class="vcap" method="POST" action="/panel/uploads/${id}/captions" data-busy="جارٍ كتابة النصوص…" ${stagesAttr('captions')}>
+  return `<form class="vcap" method="POST" action="/panel/uploads/${id}/captions" data-busy="جار كتابة النصوص…" ${stagesAttr('captions')}>
       ${cap === undefined ? '' : `<input type="hidden" name="replace" value="${escapeHtml(cap.at)}">`}
       ${field({
         id: `va-${u.id}`,
         label: 'صف المقطع بجملة',
-        hint: 'ما فيه، وعمّ يتحدّث — ونكتب منه عنوانَ YouTube ووصفَه ونصَّي TikTok وInstagram.',
+        hint: 'ما فيه، وعمّ يتحدّث — ونكتب منه عنوان YouTube ووصفَه ونصَّي TikTok وInstagram.',
         control,
       })}
       <div class="row">
         <span class="ago">${cap === undefined
-          ? 'نداءٌ واحد، وكلفتُه تُسجَّل قبل أن تراها. أو اكتب النصَّ بيدك أدناه بلا كلفة.'
-          : escapeHtml(`كُتبت ${relativeTime(cap.at.replace('T', ' ').slice(0, 19), now)} · الكلفة ${money(cap.cost)} — راجعها وعدّلها قبل أن تُنشئ. و«أعد كتابتها» نداءٌ جديدٌ بكلفته يستبدلها.`)}</span>
+          ? 'نداء واحد، وكلفتُه تُسجَّل قبل أن تراها. أو اكتب النصّ بيدك أدناه بلا كلفة.'
+          : escapeHtml(`كُتبت ${relativeTime(cap.at.replace('T', ' ').slice(0, 19), now)} · الكلفة ${money(cap.cost)} — راجعها وعدّلها قبل أن تُنشئ. و«أعد كتابتها» نداء جديد بكلفته يستبدلها.`)}</span>
         <span class="grow"></span>
         ${button({
           label: cap === undefined ? 'اكتب النصوص' : 'أعد كتابتها',
@@ -170,7 +170,7 @@ function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: VideoPlat
     parts.push(field({
       id: `vyd-${u.id}`,
       label: 'وصف YouTube',
-      hint: `حتّى ${YOUTUBE_DESCRIPTION_BYTES} بايت، والحرفُ العربيُّ بايتان — ويُرفع كما هو، والعنوانُ لا يتكرّر في أوّله.`,
+      hint: `حتّى ${YOUTUBE_DESCRIPTION_BYTES} بايت، والحرف العربيّ بايتان — ويُرفع كما هو، والعنوان لا يتكرّر في أوّله.`,
       control: `<textarea name="caption_youtube" rows="4"${bytes.attrs}>${escapeHtml(cap.youtubeDescription)}</textarea>${bytes.out}`,
       ...(issues.youtube === undefined ? {} : { error: issues.youtube }),
     }))
@@ -185,7 +185,7 @@ function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: VideoPlat
       id,
       label: `نصّ ${platformLabel(p)}`,
       hint: inbox
-        ? `حتّى ${CAPTION_LIMIT[p]} محرف. <b>ويصل المقطعُ صندوقَ تطبيق TikTok بلا هذا النصّ</b> — انسخه والصقه هناك حين تنشره.`
+        ? `حتّى ${CAPTION_LIMIT[p]} محرف. <b>ويصل المقطع صندوق تطبيق TikTok بلا هذا النصّ</b> — انسخه والصقه هناك حين تنشره.`
         : `حتّى ${CAPTION_LIMIT[p]} محرف.`,
       control: `<textarea name="caption_${p}" rows="4"${chars.attrs}>${escapeHtml(cap[p])}</textarea>${chars.out}${inbox
         ? `<button class="btn btn-secondary btn-sm" type="button" data-copy="${escapeHtml(id)}"
@@ -216,10 +216,10 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
     return `<div class="card card-inset vrow">
       <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
       ${statusBadge('warn', '!', 'لم يكتمل رفعُه')}
-      <form class="row" method="POST" action="/panel/uploads/${escapeHtml(u.id)}/abort" data-busy="جارٍ الإلغاء…">
+      <form class="row" method="POST" action="/panel/uploads/${escapeHtml(u.id)}/abort" data-busy="جار الإلغاء…">
         <input type="hidden" name="from" value="library">
         <span class="ago">إن انقطع رفعُه فألغِه ثمّ ارفعه من جديد — ويُلغى وحده بعد ${STALE_UPLOAD_HOURS} ساعات.</span>
-        <button class="btn btn-secondary" type="submit" aria-label="${escapeHtml(`ألغِ رفع ${u.name}`)}">ألغِ</button>
+        <button class="btn btn-secondary" type="submit" aria-label="${escapeHtml(`ألغ رفع ${u.name}`)}">ألغ</button>
       </form>
     </div>`
   }
@@ -233,7 +233,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
       // ‏لبطاقةٍ في الصفحة وحدها: «المنشورات» أحدثُ ستّين، ومرساةٌ لا بطاقةَ لها ترتدّ إلى الرئيسيّة
       const st = POST_STATE[post.status] ?? { cls: 'idle', g: '○', text: post.status }
       const link = cards !== null && !cards.has(post.id) ? '' : `<a class="tap" href="#d-${escapeHtml(post.id)}"
-            aria-label="${escapeHtml(`افتح منشورَ ${platformLabel(p)}`)}">افتح منشورَه</a>`
+            aria-label="${escapeHtml(`افتح منشور ${platformLabel(p)}`)}">افتح منشورَه</a>`
       // ‏«نُشر» وحدَها لا تكفي حين لم يقع كما قُرّر (D-190): الصندوقُ بلا نصّه، أو مستوًى أضيق
       const note = post.status === 'published' && typeof post.note === 'string' && post.note !== ''
         ? statusBadge('warn', '!', escapeHtml(post.note))
@@ -257,12 +257,12 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
   // ‏لحسابٍ مربوطٍ بلا `video.publish` وحدَه: غيرُ المربوط لا يُعرف بابُه بعد
   const tiktokInbox = ctx.links?.['tiktok'] === 'linked' && ctx.reach?.tiktokInbox === true
   const inboxNote = isOpen('tiktok') && tiktokInbox
-    ? ' وTikTok يصله المقطعُ بلا النصّ: تلصقه أنت حين تنشره من التطبيق.'
+    ? ' وTikTok يصله المقطع بلا النصّ: تلصقه أنت حين تنشره من التطبيق.'
     : ''
-  const shared = `<div class="field"><label for="vc-${id}">نصُّ المنشور</label>
+  const shared = `<div class="field"><label for="vc-${id}">نصّ المنشور</label>
       <span class="ago" id="vh-${id}">${escapeHtml(`${yt
-        ? `سطرُه الأوّل عنوانُ YouTube حتّى ${YT_TITLE_MAX} محرف وما بعده وصفُه، والنصُّ كلُّه وصفٌ على TikTok وInstagram.`
-        : 'النصُّ كلُّه وصفٌ على كلّ منصّة.'}${inboxNote}`)}</span>
+        ? `سطرُه الأوّل عنوان YouTube حتّى ${YT_TITLE_MAX} محرف وما بعده وصفُه، والنصّ كلُّه وصف على TikTok وInstagram.`
+        : 'النصّ كلُّه وصف على كلّ منصّة.'}${inboxNote}`)}</span>
       <textarea id="vc-${id}" name="caption" rows="3" required
         aria-describedby="vh-${id}${yt ? ` vt-${id}` : ''}"${yt ? ` data-yt-title="${YT_TITLE_MAX}"` : ''}></textarea>
       ${yt ? `<span class="ago" id="vt-${id}" data-yt-count hidden></span>` : ''}</div>`
@@ -272,12 +272,12 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
    */
   const made = VIDEO_PLATFORMS.filter((p) => postOf(p) !== undefined)
   const hint = made.length === VIDEO_PLATFORMS.length
-    ? 'أُنشئت كلُّها — وكلٌّ في بطاقته تحت «المنشورات».'
-    : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدودَ منصّته.'
+    ? 'أُنشئت كلُّها — وكلّ في بطاقته تحت «المنشورات».'
+    : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدود منصّته.'
   return `<div class="card card-inset vrow" id="v-${id}">
     <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
     ${open ? captionForm(u, cap, ctx, now) : ''}
-    <form method="POST" action="/panel/uploads/${id}/posts" data-busy="جارٍ الإنشاء…">
+    <form method="POST" action="/panel/uploads/${id}/posts" data-busy="جار الإنشاء…">
       <div class="vpfs" role="group" aria-label="أنشئ على">${boxes}</div>
       ${open ? PICK_LINE : ''}
       ${open
@@ -285,7 +285,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
           <div class="row">
             <label class="vapprove"><input type="checkbox" name="approve"${cap === undefined ? ' checked' : ''}> ${cap === undefined
               ? 'اعتمده الآن — كتبتُه أنا'
-              : 'اعتمده الآن — راجعتُ النصوص'}</label>
+              : 'اعتمده الآن — راجعت النصوص'}</label>
             ${whenPick(u.id, ctx.zone)}
             <span class="grow"></span>
             <button class="btn btn-primary" type="submit">أنشئ المنشورات</button>
@@ -324,11 +324,11 @@ function scheduleAll(u: UploadRow, reachNow: Reach, zone?: string | null): strin
   const names = platforms.map(platformLabel).join(' و')
   const reach = privateReach(platforms, reachNow)
   const where = zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'
-  return `<form method="POST" action="/panel/uploads/${escapeHtml(u.id)}/schedule" data-busy="جارٍ الجدولة…">
+  return `<form method="POST" action="/panel/uploads/${escapeHtml(u.id)}/schedule" data-busy="جار الجدولة…">
       ${zone === undefined ? '' : `<input type="hidden" name="tz" value="${escapeHtml(zone ?? FALLBACK_ZONE)}">`}
       ${ready.map((p) => `<input type="hidden" name="post" value="${escapeHtml(p.id)}">`).join('')}
       <div class="row">
-        <span class="ago">${escapeHtml(ready.length === 1 ? `جدوِل منشورَ ${names} ${where}:` : `جدوِل منشوراتِ ${names} معًا ${where}:`)}</span>
+        <span class="ago">${escapeHtml(ready.length === 1 ? `جدوِل منشور ${names} ${where}:` : `جدوِل منشورات ${names} معًا ${where}:`)}</span>
         ${PRESETS.map((q) => `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${q.kind}"
           aria-label="${escapeHtml(`جدوِل ${q.label}`)}">${escapeHtml(q.label)}</button>`).join('')}
       </div>
@@ -346,8 +346,8 @@ export function videosSection(
   return `<div class="card mt-3" id="videos">
     <div class="card-head"><h2>فيديوهاتك</h2><div class="grow"></div>
       <span class="ago">ترفعه مرّةً، ويُنشر على YouTube وTikTok وInstagram</span></div>
-    <p class="hint"><b>صدّره هكذا فيقبله الثلاث</b>: MP4 (H.264 وصوت AAC)، رأسيٌّ 1080×1920 بثلاثين إطارًا،
-      بين ثلاث ثوانٍ وثلاث دقائق، وأقلُّ من 300MB — واختر «تحسين للويب» إن وُجد.</p>
+    <p class="hint"><b>صدّره هكذا فيقبله الثلاث</b>: MP4 (H.264 وصوت AAC)، رأسيّ 1080×1920 بثلاثين إطارًا،
+      بين ثلاث ثوان وثلاث دقائق، وأقلّ من 300MB — واختر «تحسين للويب» إن وُجد.</p>
     <div class="vup">
       <label class="btn btn-primary vpick">اختر مقطعًا وارفعه
         <input type="file" id="vfile" class="vfile" accept="video/mp4,video/quicktime,video/webm"></label>
@@ -355,7 +355,7 @@ export function videosSection(
       <span class="ago" id="vup-msg" aria-live="polite"></span>
     </div>
     ${uploads.length === 0
-      ? emptyState({ echo: true, title: 'لا مقطعَ بعد', html: 'ارفع مقطعًا، ثمّ صفه بجملةٍ نكتب منها نصوصَه، واختر منصّاته.' })
+      ? emptyState({ echo: true, title: 'لا مقطع بعد', html: 'ارفع مقطعًا، ثمّ صفه بجملة نكتب منها نصوصَه، واختر منصّاته.' })
       : `<div class="vlist">${uploads.map((u) => row(u, now, cards, ctx)).join('')}</div>`}
   </div>`
 }

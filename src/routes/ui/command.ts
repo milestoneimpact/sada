@@ -137,12 +137,12 @@ export const SECTIONS: readonly Section[] = [
    * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها الجديدة.
    */
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
-  { id: 'posts', label: 'المنشورات', note: 'المسوّداتُ والكتابةُ والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
-  { id: 'library', label: 'المكتبة', note: 'ملفّاتُ Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true, page: '/panel/library' },
-  { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وتحليلٌ مفصّل', icon: ICON.report, group: 'العمل', alias: 'results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
-  { id: 'accounts', label: 'الحسابات', note: 'ربطُ المنصّات وحالُ كلٍّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
-  { id: 'tasks', label: 'ما عليك', note: 'المهامُّ اليدويّةُ التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
-  { id: 'settings', label: 'الإعدادات', note: 'الإنفاقُ والحدود، وخدماتُ الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings' },
+  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
+  { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true, page: '/panel/library' },
+  { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
+  { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
+  { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings' },
 ]
 
 /**
@@ -154,7 +154,7 @@ export const SECTIONS: readonly Section[] = [
  */
 export function sectionLabel(id: string): string {
   const section = SECTIONS.find((s) => s.id === id)
-  if (section === undefined) throw new Error(`لا لوحَ باسم ${id} في SECTIONS`)
+  if (section === undefined) throw new Error(`لا لوح باسم ${id} في SECTIONS`)
   return section.label
 }
 
@@ -218,15 +218,15 @@ export function buildCommands(
    * رأسه — فكانت ثلاثتُها غائبةً من اللوحة. و`show()` تفتح لوحَ البطاقة ثمّ تنزل إليها.
    */
   for (const a of [
-    { label: 'اكتب منشورًا من مصدر', note: 'من خلاصةِ مصدرٍ محلَّل — نداءٌ مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
+    { label: 'اكتب منشورًا من مصدر', note: 'من خلاصة مصدر محلَّل — نداء مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
     { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
-    { label: 'خطّة من ملفّ', note: 'جدولُ Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
-    { label: 'امسح Drive', note: 'يقرأ الملفّاتِ الجديدةَ — والزرُّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
-    { label: 'ولّد خطّةَ الأسبوع', note: 'نداءٌ مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
-    { label: 'اعتمد مسوّدة', note: 'القرارُ لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
+    { label: 'خطّة من ملفّ', note: 'جدول Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
+    { label: 'امسح Drive', note: 'يقرأ الملفّات الجديدة — والزرّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
+    { label: 'ولّد خطّة الأسبوع', note: 'نداء مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
+    { label: 'اعتمد مسوّدة', note: 'القرار لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
     { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
-    { label: 'بدّل سقفَ الإنفاق', note: 'الحدُّ اليوميّ وعددُ التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
-    { label: 'راجع الجلسات', note: 'ما هو مفتوحٌ الآن، وإنهاؤه', id: 'settings', anchor: 'security', alias: 'sessions revoke' },
+    { label: 'بدّل سقف الإنفاق', note: 'الحدّ اليوميّ وعدد التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
+    { label: 'راجع الجلسات', note: 'ما هو مفتوح الآن، وإنهاؤه', id: 'settings', anchor: 'security', alias: 'sessions revoke' },
   ]) {
     const section = SECTIONS.find((s) => s.id === a.id)
     if (section === undefined) continue
@@ -239,7 +239,7 @@ export function buildCommands(
   }
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
-    label: 'الخطّ الزمنيّ للمحفظة', note: 'كلُّ منشورٍ شريطٌ على الأيّام — في النتائج', group: 'الأفعال',
+    label: 'الخطّ الزمنيّ للمحفظة', note: 'كلّ منشور شريط على الأيّام — في النتائج', group: 'الأفعال',
     href: '/panel/timeline', icon: '', alias: 'gantt timeline portfolio roadmap غانت جانت خط زمني محفظه',
   })
 
@@ -276,7 +276,7 @@ export function searchKey(c: Command): string {
 export function commandTrigger(): string {
   return `<button type="button" class="cmdk-open" hidden
     aria-haspopup="dialog" aria-controls="cmdk">
-    ${ICON.search}<span>بحثٌ وأوامر</span><kbd class="kbd">Ctrl K</kbd></button>`
+    ${ICON.search}<span>بحث وأوامر</span><kbd class="kbd">Ctrl K</kbd></button>`
 }
 
 
@@ -306,7 +306,7 @@ export function commandPalette(cmds: readonly Command[]): string {
   }).join('')
 
   return `<div class="cmdk-veil" id="cmdk" hidden>
-  <div class="cmdk" role="dialog" aria-modal="true" aria-label="لوحةُ الأوامر">
+  <div class="cmdk" role="dialog" aria-modal="true" aria-label="لوحة الأوامر">
     <div class="cmdk-in">
       <input id="cmdk-q" type="text" autocomplete="off" spellcheck="false"
         role="combobox" aria-expanded="true" aria-controls="cmdk-l" aria-autocomplete="list"
@@ -314,10 +314,10 @@ export function commandPalette(cmds: readonly Command[]): string {
       <kbd class="kbd">Esc</kbd>
     </div>
     <ul class="cmdk-l" id="cmdk-l" role="listbox" aria-label="النتائج">${rows}</ul>
-    <p class="cmdk-none" id="cmdk-none" role="status" hidden>لا شيءَ بهذا الاسم.</p>
+    <p class="cmdk-none" id="cmdk-none" role="status" hidden>لا شيء بهذا الاسم.</p>
     <div class="cmdk-foot"><span><kbd class="kbd">↑↓</kbd> تنقّل</span>
       <span><kbd class="kbd">Enter</kbd> اذهب</span>
-      <b>ولا يقع فعلٌ من هنا — تنقلك إلى موضعه</b></div>
+      <b>ولا يقع فعل من هنا — تنقلك إلى موضعه</b></div>
   </div>
 </div>`
 }

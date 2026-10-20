@@ -209,7 +209,7 @@ export async function animateForPost(
   const now = (deps.now ?? (() => new Date()))()
 
   if (deps.ai === undefined) {
-    return { kind: 'blocked', reason: 'رابطُ Workers AI غير مضبوط في هذه البيئة' }
+    return { kind: 'blocked', reason: 'رابط Workers AI غير مضبوط في هذه البيئة' }
   }
 
   // ١ — الحارسُ قبل النداء لا بعده (D-019). والإيقافُ قرارُ المالك
@@ -241,7 +241,7 @@ export async function animateForPost(
     .first<ImageRow>()
     .catch(() => null)
   if (image === null) {
-    return { kind: 'blocked', reason: 'لا صورةَ معتمَدةً لهذا المنشور — ولّدها أوّلا' }
+    return { kind: 'blocked', reason: 'لا صورة معتمَدةً لهذا المنشور — ولّدها أوّلا' }
   }
 
   /*
@@ -352,7 +352,7 @@ export async function animateForPost(
     await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
-      reason: `تعذّر حفظُ البايتات: ${error instanceof Error ? error.message : 'عطل'}`,
+      reason: `تعذّر حفظ البايتات: ${error instanceof Error ? error.message : 'عطل'}`,
       retryable: true,
     }
   }

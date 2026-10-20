@@ -62,7 +62,7 @@ export const KICKER_MAX = 24
  *
  * وهنا لا في `job.ts`: الواجهةُ تقرؤه، واستيرادُ المهمّة يجرّ سائقيها معه.
  */
-export const OVERLAY_OFF = 'تركيبُ النصّ مُطفأٌ من الإعدادات'
+export const OVERLAY_OFF = 'تركيب النصّ مُطفأ من الإعدادات'
 
 export interface SlideInput {
   /** بايتاتُ الصورة المولَّدة — تُضمَّن `data:`، ولا تُطلَب من رابط. */
@@ -120,7 +120,7 @@ html,body{width:${size.width}px;height:${size.height}px;overflow:hidden;backgrou
 /* الصورةُ تملأ ولا تُشوَّه: cover يقصّ ولا يمطّ */
 .s img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 /* حجابٌ من جهة النصّ — ونصٌّ على صورةٍ بلا حجابٍ يُقرأ أحيانا ولا يُقرأ
-   أحيانا، تبعا لما رسمه النموذج. والحجابُ يجعله يُقرأ دائما */
+   أحيانا، تبعا لما رسمه النموذج. والحجاب يجعله يُقرأ دائما */
 .v{position:absolute;inset:0;
   background:linear-gradient(270deg,${GROUND}f2 0%,${GROUND}e0 34%,${GROUND}66 62%,transparent 88%)}
 .t{position:absolute;inset-block:0;inset-inline-start:0;width:66%;
@@ -128,7 +128,7 @@ html,body{width:${size.width}px;height:${size.height}px;overflow:hidden;backgrou
   padding:0 ${Math.round(size.width * 0.055)}px}
 /* الفوقيّةُ لاتينيّةٌ في كتلةٍ عربيّة: **تُعزَل ولا يُقلَب اتّجاهُها
    بالكتلة**. و«unicode-bidi: isolate» تجعل حروفَها تُقرأ يسارا-يمينا
-   وموضعَها يتبع الكتلةَ — فتحاذي العنوانَ على الحافّة نفسِها. وبلا
+   وموضعَها يتبع الكتلة — فتحاذي العنوان على الحافّة نفسِها. وبلا
    العزل تنجرف إلى الحافّة المقابلة، فيبدو السطران كتلتين لا كتلة */
 .k{font-weight:600;font-size:22px;letter-spacing:5px;text-transform:uppercase;
   color:${BRAND};unicode-bidi:isolate;margin-bottom:16px}

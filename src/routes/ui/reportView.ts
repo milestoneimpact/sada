@@ -150,13 +150,13 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
           ${sum('ظهور', lone.impressions, lone.impressions === null ? 0 : 1, 1)}
           ${sum('تفاعل', lone.interactions, lone.interactions === null ? 0 : 1, 1)}
         </div>`}
-        <p class="hint">خرج وحدَه هذا الأسبوع، <b>فلا ترتيب</b>: الترتيبُ يحتاج منشورَين
-          فأكثر في نافذةٍ واحدة.</p>`
+        <p class="hint">خرج وحدَه هذا الأسبوع، <b>فلا ترتيب</b>: الترتيب يحتاج منشورَين
+          فأكثر في نافذة واحدة.</p>`
       : r.top === null
-      ? `<p class="hint"><b>لا ترتيبَ في هذا الأسبوع.</b> الترتيبُ يقع داخل نافذةٍ
-         واحدة، ويحتاج <b>اثنين فأكثر</b> فيها — وواحدٌ وحده ليس ترتيبا.</p>`
+      ? `<p class="hint"><b>لا ترتيب في هذا الأسبوع.</b> الترتيب يقع داخل نافذة
+         واحدة، ويحتاج <b>اثنين فأكثر</b> فيها — وواحد وحده ليس ترتيبا.</p>`
       : `<div class="outcome ok">
-          <span class="kv-k">الأوّلُ في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
+          <span class="kv-k">الأوّل في نافذة ${escapeHtml(windowLabel(r.top.window))}</span>
           <span class="kv-v">${escapeHtml(r.top.post.text.slice(0, 160))}${
             r.top.post.text.length > 160 ? '…' : ''
           } ${recordLink(r.top.post)}</span>
@@ -165,8 +165,8 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
           r.top.basis === 'rate' ? 'بنسبة التفاعل إلى الظهور' : 'بعدد التفاعل'
         }</b> بين <b>${escapeHtml(counted(r.top.cohort, NOUNS.post, 'gen'))}</b> في النافذة نفسِها.${
           r.top.basis === 'count'
-            ? ' <b>والنسبةُ لم تُستعمَل</b> لأنّ الظهورَ ناقصٌ عند بعضهم، ' +
-              'ونسبةٌ على ظهورٍ ناقصٍ تكافئ من لم يُقَس.'
+            ? ' <b>والنسبة لم تُستعمَل</b> لأنّ الظهور ناقص عند بعضهم، ' +
+              'ونسبة على ظهور ناقص تكافئ من لم يُقَس.'
             : ''
         }</p>`
 
@@ -177,14 +177,14 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
 
   return `<div class="page-head">
     <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>تقريرٌ أسبوعيّ</div>
+      <div class="eyebrow"><span class="ln"></span>تقرير أسبوعيّ</div>
       <h1>${span}</h1>${season}
       <p class="lede">${
         r.published === 0
-          ? 'لا منشورَ خرج في هذه المدّة.'
+          ? 'لا منشور خرج في هذه المدّة.'
           // ‏والعددُ من «counted» (D-177): «خرج منشورٌ واحد، وقِيس» لا «1 منشورا خرجت»
           : r.published === 1
-            ? `خرج منشورٌ واحد، ${r.measured === 1 ? 'وقِيس' : 'ولم يُقَس بعد'}.`
+            ? `خرج منشور واحد، ${r.measured === 1 ? 'وقِيس' : 'ولم يُقَس بعد'}.`
             : `خرج ${escapeHtml(counted(r.published, NOUNS.post))}، قِيس ${
               r.published === 2 ? 'منهما' : 'منها'} <b>${r.measured}</b>.`
       }</p>
@@ -196,7 +196,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
    * ‏**والمنشورُ الذي جلب الأسبوعَ أوّلًا** (D-218): الملخّصُ ثمّ صاحبُ الرقم، ثمّ «ما خرج» صفًّا
    * ‏لكلّ منصّة. كان تحت جدول المنصّات، والمالكُ يفتح التقرير ليعرف أيَّ منشورٍ يكرّر.
    */ ''}<div class="card">
-    <h2>${lone === undefined ? 'الأفضلُ داخل نافذته' : 'منشورُ الأسبوع'}</h2>
+    <h2>${lone === undefined ? 'الأفضل داخل نافذته' : 'منشور الأسبوع'}</h2>
     ${top}
   </div>
 
@@ -208,16 +208,16 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
         أُنفق ${escapeHtml(money(r.spendUsd))}</span>
     </div>
     ${r.platforms.length === 0 ? '' : `<div class="slices">${r.platforms.map(sliceCard).join('')}</div>`}
-    ${r.platforms.length === 0 ? '<p class="hint">لا شيءَ يُعرَض — ولا أصفارَ تُختلَق.</p>' : ''}
+    ${r.platforms.length === 0 ? '<p class="hint">لا شيء يُعرَض — ولا أصفار تُختلَق.</p>' : ''}
   </div>
 
-  ${notes === '' ? '' : `<div class="card"><h2>ما لا يقوله الرقمُ وحده</h2>${notes}</div>`}
+  ${notes === '' ? '' : `<div class="card"><h2>ما لا يقوله الرقم وحده</h2>${notes}</div>`}
 
   <p class="hint m-0 mt-4">
-    هذا التقريرُ <b>كُتب مرّةً ولا يُعاد حسابُه</b>: المقاييسُ تتراكم بعد الأسبوع،
-    وإعادةُ الحساب تبدّل رقمَه بأثرٍ رجعيّ — فلا يُعرَف أنَما الحصادُ أم أُعيد الحساب.
+    هذا التقرير <b>كُتب مرّةً ولا يُعاد حسابُه</b>: المقاييس تتراكم بعد الأسبوع،
+    وإعادة الحساب تبدّل رقمَه بأثر رجعيّ — فلا يُعرَف أنَما الحصاد أم أُعيد الحساب.
     ${
-      r.version === 1 ? '' : `<b>نسخةُ البنية ${r.version}.</b>`
+      r.version === 1 ? '' : `<b>نسخة البنية ${r.version}.</b>`
     }
   </p>`
 }
@@ -255,8 +255,8 @@ function suggestionCard(s: OpenSuggestion): string {
       <button type="submit" name="decision" value="accepted" class="btn btn-primary">أقبل</button>
       <button type="submit" name="decision" value="rejected" class="btn btn-secondary">أرفض</button>
       <span class="grow"></span>
-      <span class="ago">وقبولُك <b>تسجيلُ رأيٍ لا أمرُ إنفاق</b> — لا مسارَ
-        إعلاناتٍ في صدى أصلا.</span>
+      <span class="ago">وقبولُك <b>تسجيل رأي لا أمر إنفاق</b> — لا مسار
+        إعلانات في صدى أصلا.</span>
     </form>
   </div>`
 }
@@ -269,12 +269,12 @@ function total(r: WeeklyReport, k: 'impressions' | 'interactions'): number | nul
 
 /** الفرقُ عن الأسبوع الذي قبله، كلمةً لا لونًا: الزيادةُ في الإنفاق ليست «خيرًا» ولا «شرًّا» بذاتها. */
 function delta(cur: number | null, prev: number | null, hasPrev: boolean): string {
-  if (!hasPrev) return 'لا أسبوعَ قبله يُقارَن به'
-  if (cur === null || prev === null) return 'لا يُقارَن: أحدُ الأسبوعين لم يُقَس'
-  if (prev === 0) return cur === 0 ? 'كالأسبوع الماضي' : 'والأسبوعُ الماضي صفر'
+  if (!hasPrev) return 'لا أسبوع قبله يُقارَن به'
+  if (cur === null || prev === null) return 'لا يُقارَن: أحد الأسبوعين لم يُقَس'
+  if (prev === 0) return cur === 0 ? 'كالأسبوع الماضي' : 'والأسبوع الماضي صفر'
   const pct = Math.round(((cur - prev) / prev) * 100)
   if (pct === 0) return 'كالأسبوع الماضي'
-  return `${pct > 0 ? 'أكثرُ' : 'أقلُّ'} بـ${Math.abs(pct)}٪ من الأسبوع الماضي`
+  return `${pct > 0 ? 'أكثر' : 'أقلّ'} بـ${Math.abs(pct)}٪ من الأسبوع الماضي`
 }
 
 /**
@@ -305,10 +305,10 @@ export function reportScreen(d: ReportScreenData): string {
   const head =
     d.current === null
       ? `<div class="page-head"><div class="txt">
-          <div class="eyebrow"><span class="ln"></span>تقريرٌ أسبوعيّ</div>
-          <h1>لا تقريرَ بعد</h1>
-          <p class="lede">يُكتب <b>فجرَ كلّ اثنين</b> عن الأسبوع الذي سبقه.
-            ولا يُحسَب عند الفتح: هو <b>شهادةٌ على وقتٍ مضى</b>.</p>
+          <div class="eyebrow"><span class="ln"></span>تقرير أسبوعيّ</div>
+          <h1>لا تقرير بعد</h1>
+          <p class="lede">يُكتب <b>فجر كلّ اثنين</b> عن الأسبوع الذي سبقه.
+            ولا يُحسَب عند الفتح: هو <b>شهادة على وقت مضى</b>.</p>
           ${monthLine(d.month)}
         </div></div>`
       // ‏والأسبوعُ الذي قبله التقريرُ التالي في القائمة (الأحدثُ أوّلًا) — لا استعلامَ جديد
@@ -317,22 +317,22 @@ export function reportScreen(d: ReportScreenData): string {
   const promo =
     d.promoCapUsd <= 0
       ? `<div class="card">
-          <h2>توصيةُ الترويج</h2>
-          <div class="outcome warn"><span class="kv-k">لا سقفَ موضوع</span>
-            <span class="kv-v"><b>ولا مبلغَ يُقترَح بلا سقفٍ تضعه.</b>
-              رقمٌ نؤلّفه نحن رقمٌ بلا مصدر — وهذه تقترح مالا لا كتابة.
-              <a class="tap" href="/panel#c3">ضع سقفَ الترويج الأسبوعيّ</a>
+          <h2>توصية الترويج</h2>
+          <div class="outcome warn"><span class="kv-k">لا سقف موضوع</span>
+            <span class="kv-v"><b>ولا مبلغ يُقترَح بلا سقف تضعه.</b>
+              رقم نؤلّفه نحن رقم بلا مصدر — وهذه تقترح مالا لا كتابة.
+              <a class="tap" href="/panel#c3">ضع سقف الترويج الأسبوعيّ</a>
               لتُكتَب التوصيات.</span></div>
         </div>`
       : d.suggestions.length === 0
         ? `<div class="card">
-            <h2>توصيةُ الترويج</h2>
-            <p class="hint">لا توصيةَ تنتظر. والسقفُ الموضوع
+            <h2>توصية الترويج</h2>
+            <p class="hint">لا توصية تنتظر. والسقف الموضوع
               <b>${escapeHtml(money(d.promoCapUsd))}</b> أسبوعيّا، ولا يُنفَق منه
-              شيءٌ بلا قبولك.</p>
+              شيء بلا قبولك.</p>
           </div>`
         : `<div class="card">
-            <div class="card-head"><h2>توصيةُ الترويج</h2><div class="grow"></div>
+            <div class="card-head"><h2>توصية الترويج</h2><div class="grow"></div>
               <span class="chip">${d.suggestions.length} تنتظر بتّك</span></div>
             ${d.suggestions.map(suggestionCard).join('')}
           </div>`
@@ -342,8 +342,8 @@ export function reportScreen(d: ReportScreenData): string {
       ? ''
       : `<div class="card">
           <h2>ما مضى</h2>
-          <p class="hint">ما خرج أسبوعًا بأسبوع، <b>ومع كلّ عمودٍ عددُ المقيس</b> — فلا
-            نسبةَ بين أسبوعين قِيس أحدُهما نصفَ قياس.</p>
+          <p class="hint">ما خرج أسبوعًا بأسبوع، <b>ومع كلّ عمود عدد المقيس</b> — فلا
+            نسبة بين أسبوعين قِيس أحدُهما نصف قياس.</p>
           ${historyBars(d.reports.map((r) => ({
             label: weekStart(r.body.from, d.now) || r.id,
             value: r.body.published, measured: r.body.measured, href: `/panel/report/${r.id}`,

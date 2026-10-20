@@ -95,13 +95,13 @@ function mediaFigure(input: NativePostInput, stage: boolean): string {
   if (m.mime.startsWith('video/')) {
     const poster = input.poster === null ? '' : ` poster="/panel/media/${escapeHtml(encodeURIComponent(input.poster))}"`
     return `<video src="${escapeHtml(src)}"${poster} preload="metadata" muted playsinline
-      aria-label="المقطعُ المولَّد لهذا المنشور"></video>`
+      aria-label="المقطع المولَّد لهذا المنشور"></video>`
   }
   const size = !stage && m.composed && (input.platform === 'linkedin' || input.platform === 'x')
     ? SLIDE_SIZE[input.platform]
     : null
   const dims = size === null ? '' : ` width="${size.width}" height="${size.height}"`
-  return `<img src="${escapeHtml(src)}" alt="الصورةُ المولَّدة لهذا المنشور" loading="lazy" data-media${dims}>`
+  return `<img src="${escapeHtml(src)}" alt="الصورة المولَّدة لهذا المنشور" loading="lazy" data-media${dims}>`
 }
 
 function linkedin(input: NativePostInput): string {
@@ -164,7 +164,7 @@ function stage(input: NativePostInput): string {
       ${media}
       ${clip ? '' : `<span class="np-noclip">${input.media === null
         ? 'لا يُنشر بلا مقطع'
-        : 'صورةٌ لا مقطع — ولا يُنشر حتّى تُحرَّك'}</span>`}
+        : 'صورة لا مقطع — ولا يُنشر حتّى تُحرَّك'}</span>`}
       <span class="np-scrim" aria-hidden="true"></span>
       <ul class="np-rail" aria-hidden="true">
         <li>${avatar(input)}</li>
@@ -193,7 +193,7 @@ export function nativePost(input: NativePostInput): string {
         ? instagram(input)
         : stage(input)
   return `<figure class="np ${CLASS[input.platform]}${input.variant === 'compact' ? ' np-compact' : ''}" data-np="${escapeHtml(input.id)}"
-    aria-label="معاينةُ منشور ${LABEL[input.platform]}">${body}</figure>`
+    aria-label="معاينة منشور ${LABEL[input.platform]}">${body}</figure>`
 }
 
 /**
@@ -230,7 +230,7 @@ export function npTile(input: {
       : `<img src="/panel/media/${escapeHtml(encodeURIComponent(input.poster))}" alt="" loading="lazy" data-media>`
     : `<img src="${escapeHtml(src)}" alt="" loading="lazy" data-media>`
   return `<a class="np-tile${input.dim ? ' dim' : ''}" href="#p-${escapeHtml(input.id)}"
-      aria-label="افتح المنشورَ في الخطّ الزمنيّ">${body}
+      aria-label="افتح المنشور في الخطّ الزمنيّ">${body}
     ${video ? `<span class="np-play" aria-hidden="true">${ICON.play}</span>` : ''}
     <span class="np-badge">${input.badge}</span></a>`
 }

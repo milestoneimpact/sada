@@ -129,7 +129,7 @@ export function barChart(
 ): string {
   const live = rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)
   if (live.length === 0) {
-    return emptyState({ title: 'لا إنفاق بعد', html: 'لم يُنادَ مزوّدٌ مدفوعٌ في هذه المدّة.' })
+    return emptyState({ title: 'لا إنفاق بعد', html: 'لم يُناد مزوّد مدفوع في هذه المدّة.' })
   }
 
   const max = Math.max(...live.map((r) => r.value))
@@ -156,7 +156,7 @@ export function barChart(
     .join('')
 
   return `<div class="chart bars" role="img"
-    aria-label="${escapeHtml(`${counted(live.length, NOUNS.service)}، والمجموعُ ${show(total)}، والأعلى ${live[0]!.label} بـ${show(live[0]!.value)}`)}">
+    aria-label="${escapeHtml(`${counted(live.length, NOUNS.service)}، والمجموع ${show(total)}، والأعلى ${live[0]!.label} بـ${show(live[0]!.value)}`)}">
     ${bars}
   </div>`
 }

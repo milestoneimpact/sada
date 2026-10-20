@@ -37,7 +37,7 @@ describe('الجدول', () => {
    * يجعل جدولا فارغا يُقرأ فشلا تامّا** — نسبةُ نجاحٍ صفر في خانةٍ لم
    * يُنشَر فيها شيءٌ أصلا.
    */
-  it('وخليّةٌ لا صفوفَ فيها تعود null لا صفرا', () => {
+  it('وخليّة لا صفوف فيها تعود null لا صفرا', () => {
     const t = pivot([f({ platform: 'x' })], { rows: 'platform', cols: 'status', measure: 'success_rate' })
     expect(t.cells[0]?.[0]).toBe(100)
     const t2 = pivot([], { rows: 'platform', cols: null, measure: 'count' })
@@ -51,7 +51,7 @@ describe('الجدول', () => {
    * صفٌّ فيه خليّتان: واحدةٌ ‏١٠٠٪ من منشورٍ واحد، وأخرى ‏٠٪ من تسعة.
    * **فالمجموعُ ‏١٠٪ لا ‏٥٠٪** — ومنشورٌ واحدٌ لا يزن كتسعة.
    */
-  it('ومجموعُ الصفّ يُحسَب من الخام لا من متوسّطات الخلايا', () => {
+  it('ومجموع الصفّ يُحسَب من الخام لا من متوسّطات الخلايا', () => {
     const rows: Fact[] = [
       f({ platform: 'x', status: 'a', succeeded: true }),
       ...Array.from({ length: 9 }, () => f({ platform: 'x', status: 'b', succeeded: false })),
@@ -62,13 +62,13 @@ describe('الجدول', () => {
     expect(t.grand).toBe(10)
   })
 
-  it('وبلا محورٍ ثانٍ يبقى عمودٌ واحد', () => {
+  it('وبلا محور ثان يبقى عمود واحد', () => {
     const t = pivot([f({}), f({ platform: 'x' })], { rows: 'platform', cols: null, measure: 'count' })
     expect(t.colKeys).toEqual([''])
     expect(t.cells).toEqual([[1], [1]])
   })
 
-  it('والكلفةُ تُجمَع، والمحاولاتُ تُتوسَّط', () => {
+  it('والكلفة تُجمَع، والمحاولات تُتوسَّط', () => {
     const rows = [f({ cost: 1.5, attempts: 1 }), f({ cost: 2.25, attempts: 3 })]
     expect(pivot(rows, { rows: 'platform', cols: null, measure: 'cost' }).grand).toBeCloseTo(3.75)
     expect(pivot(rows, { rows: 'platform', cols: null, measure: 'attempts' }).grand).toBe(2)
@@ -76,7 +76,7 @@ describe('الجدول', () => {
 })
 
 describe('الترتيب', () => {
-  it('الزمنُ يصعد', () => {
+  it('الزمن يصعد', () => {
     const t = pivot(
       [f({ day: '2026-09-09' }), f({ day: '2026-09-01' }), f({ day: '2026-09-05' })],
       { rows: 'day', cols: null, measure: 'count' },
@@ -94,7 +94,7 @@ describe('الترتيب', () => {
   })
 
   /** **و«بلا موعد» تُذيَّل**: حقيقةٌ تُقال ولا تتصدّر. */
-  it('و«بلا موعد» آخرُ الصفوف مهما كثرت', () => {
+  it('و«بلا موعد» آخر الصفوف مهما كثرت', () => {
     const t = pivot(
       [f({ day: '' }), f({ day: '' }), f({ day: '' }), f({ day: '2026-09-01' })],
       { rows: 'day', cols: null, measure: 'count' },
@@ -103,8 +103,8 @@ describe('الترتيب', () => {
   })
 })
 
-describe('الأسبوعُ والشهر', () => {
-  it('الأسبوعُ يبدأ الاثنين', () => {
+describe('الأسبوع والشهر', () => {
+  it('الأسبوع يبدأ الاثنين', () => {
     // ‏٢٠٢٦-٠٩-٠٧ اثنين، و‏٢٠٢٦-٠٩-١٣ أحدٌ — فهما أسبوعٌ واحد
     const t = pivot(
       [f({ day: '2026-09-07' }), f({ day: '2026-09-13' }), f({ day: '2026-09-14' })],
@@ -115,7 +115,7 @@ describe('الأسبوعُ والشهر', () => {
     expect(t.cells[1]).toEqual([1])
   })
 
-  it('والشهرُ سبعةُ محارف', () => {
+  it('والشهر سبعة محارف', () => {
     const t = pivot(
       [f({ day: '2026-09-30' }), f({ day: '2026-10-01' })],
       { rows: 'month', cols: null, measure: 'count' },
@@ -124,7 +124,7 @@ describe('الأسبوعُ والشهر', () => {
   })
 
   /** وتاريخٌ لا يُقرأ لا يُسقط الجدول — **يُذيَّل بلا مفتاح**. */
-  it('وتاريخٌ فاسدٌ لا يُسقط الجدول', () => {
+  it('وتاريخ فاسد لا يُسقط الجدول', () => {
     const t = pivot([f({ day: 'ليس تاريخا' }), f({ day: '2026-09-07' })],
       { rows: 'week', cols: null, measure: 'count' })
     expect(t.rowKeys).toContain(NO_KEY)
@@ -133,38 +133,38 @@ describe('الأسبوعُ والشهر', () => {
 })
 
 describe('ما يأتي من الشبكة', () => {
-  it('بُعدٌ لا يُعرَف يعود إلى افتراضه', () => {
+  it('بُعد لا يُعرَف يعود إلى افتراضه', () => {
     expect(readDimension('platform', 'status')).toBe('platform')
     expect(readDimension('DROP TABLE', 'status')).toBe('status')
     expect(readDimension(undefined, 'day')).toBe('day')
   })
 
-  it('و«none» عمودٌ واحدٌ لا عطل', () => {
+  it('و«none» عمود واحد لا عطل', () => {
     expect(readCols('none')).toBeNull()
     expect(readCols('')).toBeNull()
     expect(readCols('ما لا يُعرَف')).toBeNull()
     expect(readCols('week')).toBe('week')
   })
 
-  it('وقياسٌ لا يُعرَف يعود إلى افتراضه', () => {
+  it('وقياس لا يُعرَف يعود إلى افتراضه', () => {
     expect(readMeasure('cost', 'count')).toBe('cost')
     expect(readMeasure('؟', 'count')).toBe('count')
   })
 
   /** **وكلُّ بُعدٍ له لصيقة** — وبُعدٌ يُضاف بلا اسمٍ يُعرَض معرِّفا. */
-  it('ولا بُعدَ ولا قياسَ بلا اسمٍ عربيّ', async () => {
+  it('ولا بُعد ولا قياس بلا اسم عربيّ', async () => {
     const { DIMENSION_LABEL, MEASURE_LABEL } = await import('./pivot')
     for (const d of DIMENSIONS) expect(DIMENSION_LABEL[d], d).toBeTruthy()
     for (const m of MEASURES) expect(MEASURE_LABEL[m], m).toBeTruthy()
   })
 })
 
-describe('نصُّ الخليّة', () => {
-  it('الفراغُ فراغٌ لا صفر', () => {
+describe('نصّ الخليّة', () => {
+  it('الفراغ فراغ لا صفر', () => {
     for (const m of MEASURES) expect(cellText(null, m)).toBe('')
   })
 
-  it('ولكلّ قياسٍ وحدتُه في الخليّة', () => {
+  it('ولكلّ قياس وحدتُه في الخليّة', () => {
     expect(cellText(3, 'count')).toBe('3')
     expect(cellText(66.6, 'success_rate')).toBe('67٪')
     expect(cellText(1.5, 'cost')).toBe('1.50$')
@@ -184,7 +184,7 @@ describe('CSV — ما يُعرَض يُنزَّل', () => {
     f({ platform: 'x', status: 'published', day: '2026-09-02', cost: 0.25 }),
   ]
 
-  it('يطابق الجدولَ خليّةً خليّة، بالأسماء لا بالمفاتيح', () => {
+  it('يطابق الجدول خليّةً خليّة، بالأسماء لا بالمفاتيح', () => {
     const spec = { rows: 'platform', cols: 'status', measure: 'count' } as const
     const table = pivot(facts, spec)
     const csv = toCsv(table, spec)
@@ -205,7 +205,7 @@ describe('CSV — ما يُعرَض يُنزَّل', () => {
     expect(csv).not.toContain('linkedin')
   })
 
-  it('وبلا محورٍ ثانٍ عمودٌ واحدٌ ولا صفَّ مجاميع', () => {
+  it('وبلا محور ثان عمود واحد ولا صفّ مجاميع', () => {
     const spec = { rows: 'platform', cols: null, measure: 'cost' } as const
     const csv = toCsv(pivot(facts, spec), spec)
     const lines = csv.slice(1).trimEnd().split('\r\n')
@@ -214,7 +214,7 @@ describe('CSV — ما يُعرَض يُنزَّل', () => {
     expect(lines.some((l) => l.startsWith('الكلّ'))).toBe(false)
   })
 
-  it('والخليّةُ التي تبدأ بصيغةٍ تُعقَّم، وما فيه فاصلٌ يُحاط', () => {
+  it('والخليّة التي تبدأ بصيغة تُعقَّم، وما فيه فاصل يُحاط', () => {
     const spec = { rows: 'account', cols: null, measure: 'count' } as const
     const table = pivot([
       f({ account: '=HYPERLINK("x")' }), f({ account: 'a,b' }), f({ account: '-1' }),

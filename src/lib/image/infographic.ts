@@ -276,8 +276,8 @@ export async function infographicSpec(deps: BriefDeps, postText: string, refId?:
     spec: infoFromText(postText),
     cost: answer.cost,
     detail: answer.text === null
-      ? `المحتوى من نصّ المنشور مباشرةً — تعذّر نموذجُ الكتابة: ${answer.detail}`
-      : 'المحتوى من نصّ المنشور مباشرةً — جوابُ النموذج لم يوافق الشكل',
+      ? `المحتوى من نصّ المنشور مباشرةً — تعذّر نموذج الكتابة: ${answer.detail}`
+      : 'المحتوى من نصّ المنشور مباشرةً — جواب النموذج لم يوافق الشكل',
   }
 }
 
@@ -419,7 +419,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:#0c121c}
 .dot{flex:none;display:grid;place-items:center;width:${px(64)};height:${px(64)};border-radius:50%;border:2px solid #d6b880;
   font-family:'Inter',sans-serif;font-weight:600;font-size:${px(20)};color:#d6b880;background:#111a28}
 /* ‏والأرقامُ تملأ لوحَها: بطاقتان أو ثلاثٌ في وسطٍ فارغٍ تُقرأ ناقصة، فتمتدّ الصفوفُ
-   بالتساوي إلى سقفٍ لا تتجاوزه، والرقمُ في وسط بطاقته */
+   بالتساوي إلى سقف لا تتجاوزه، والرقم في وسط بطاقته */
 .sta{flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr;gap:${px(18)};max-height:${px(wide ? 560 : 760)}}
 .sta .card{align-items:flex-start;justify-content:center}
 .txt{display:flex;flex-direction:column;gap:${px(10)}}

@@ -24,8 +24,8 @@ async function login(): Promise<string> {
   return (r.headers.get('Set-Cookie') ?? '').split(';')[0]!
 }
 
-describe('صفحةُ الهبوط على الجذر (D-193)', () => {
-  it('بلا جلسة: صفحةٌ لا ‏٤٠٤، وزرٌّ أوّليٌّ واحدٌ إلى اللوحة', async () => {
+describe('صفحة الهبوط على الجذر (D-193)', () => {
+  it('بلا جلسة: صفحة لا ‏٤٠٤، وزرّ أوّليّ واحد إلى اللوحة', async () => {
     const r = await app.request('/', {}, env)
     expect(r.status).toBe(200)
     const html = await r.text()
@@ -35,13 +35,13 @@ describe('صفحةُ الهبوط على الجذر (D-193)', () => {
     expect(html).toContain('href="/privacy"')
     expect(html).toContain('href="/terms"')
   })
-  it('ولا تُخزَّن في ذاكرةٍ مشتركة: الردُّ يختلف بالكعكة', async () => {
+  it('ولا تُخزَّن في ذاكرة مشتركة: الردّ يختلف بالكعكة', async () => {
     const r = await app.request('/', {}, env)
     expect(r.headers.get('Cache-Control')).toBe('no-store')
     expect(r.headers.get('Vary')).toBe('Cookie')
     expect(r.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'")
   })
-  it('ولا نموذجَ فيها، ولا سكربتَ إلّا سكربتَي الغلاف بـ`nonce` ومن أصلنا وحدَه', async () => {
+  it('ولا نموذج فيها، ولا سكربت إلّا سكربتَي الغلاف بـ`nonce` ومن أصلنا وحدَه', async () => {
     const html = await (await app.request('/', {}, env)).text()
     expect(html).not.toMatch(/<form/)
     for (const tag of html.match(/<script[^>]*>/g) ?? []) {
@@ -50,14 +50,14 @@ describe('صفحةُ الهبوط على الجذر (D-193)', () => {
       if (src !== undefined) expect(src).toMatch(/^\/a\//)
     }
   })
-  it('ومن معه جلسةٌ سارية يذهب إلى لوحته مباشرةً (‏303)', async () => {
+  it('ومن معه جلسة سارية يذهب إلى لوحته مباشرةً (‏303)', async () => {
     const cookie = await login()
     const r = await app.request('/', { headers: { Cookie: cookie } }, env)
     expect(r.status).toBe(303)
     expect(r.headers.get('Location')).toBe('/panel')
     expect(r.headers.get('Cache-Control')).toBe('no-store')
   })
-  it('وكعكةٌ قديمةٌ لا جلسةَ خلفها ترى الصفحةَ لا حلقةَ تحويل', async () => {
+  it('وكعكة قديمة لا جلسة خلفها ترى الصفحة لا حلقة تحويل', async () => {
     const r = await app.request('/', { headers: { Cookie: '__Host-sada_session=gone' } }, env)
     expect(r.status).toBe(200)
   })

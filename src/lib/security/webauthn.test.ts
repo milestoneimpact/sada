@@ -51,7 +51,7 @@ describe('newChallenge', () => {
 })
 
 describe('readAuthData', () => {
-  it('يرفض ما قَصُر عن أقلّ طولٍ ممكن', () => {
+  it('يرفض ما قَصُر عن أقلّ طول ممكن', () => {
     expect(readAuthData(new Uint8Array(36))).toBeNull()
   })
 
@@ -65,20 +65,20 @@ describe('readAuthData', () => {
 })
 
 describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', () => {
-  it('توقيعٌ صحيح يمرّ', async () => {
+  it('توقيع صحيح يمرّ', async () => {
     const challenge = newChallenge()
     const result = await verifyAssertion(await assertion(challenge), stored(), expected(challenge))
     expect(result.ok).toBe(true)
   })
 
-  it('**تحدٍّ آخر يُرفض** — وهو ما يمنع إعادة الإرسال', async () => {
+  it('**تحدّ آخر يُرفض** — وهو ما يمنع إعادة الإرسال', async () => {
     const signed = await assertion(newChallenge())
     const result = await verifyAssertion(signed, stored(), expected(newChallenge()))
     expect(result).toMatchObject({ ok: false })
     if (!result.ok) expect(result.reason).toContain('التحدّي')
   })
 
-  it('**أصلٌ آخر يُرفض** — وهو ما يجعلها مقاومةً للتصيّد', async () => {
+  it('**أصل آخر يُرفض** — وهو ما يجعلها مقاومةً للتصيّد', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge)
     const result = await verifyAssertion(signed, stored(), {
@@ -90,7 +90,7 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
     if (!result.ok) expect(result.reason).toContain('الأصل')
   })
 
-  it('**نطاقٌ آخر يُرفض** — فمفتاح التجريب لا يفتح الإنتاج', async () => {
+  it('**نطاق آخر يُرفض** — فمفتاح التجريب لا يفتح الإنتاج', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge)
     const result = await verifyAssertion(signed, stored(), {
@@ -99,10 +99,10 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
       rpId: 'sada.basserh.com',
     })
     expect(result).toMatchObject({ ok: false })
-    if (!result.ok) expect(result.reason).toContain('نطاقٍ آخر')
+    if (!result.ok) expect(result.reason).toContain('نطاق آخر')
   })
 
-  it('نوعٌ خطأ يُرفض — توقيعُ تسجيلٍ لا يصلح دخولا', async () => {
+  it('نوع خطأ يُرفض — توقيع تسجيل لا يصلح دخولا', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { type: 'webauthn.create' })
     expect(await verifyAssertion(signed, stored(), expected(challenge))).toMatchObject({
@@ -110,7 +110,7 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
     })
   })
 
-  it('بلا حضورِ مستخدمٍ يُرفض', async () => {
+  it('بلا حضور مستخدم يُرفض', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { userPresent: false })
     const result = await verifyAssertion(signed, stored(), expected(challenge))
@@ -118,7 +118,7 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
     if (!result.ok) expect(result.reason).toContain('حضور')
   })
 
-  it('توقيعٌ مبدَّل بايتا يُرفض', async () => {
+  it('توقيع مبدَّل بايتا يُرفض', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge)
     const last = signed.signature.length - 1
@@ -128,7 +128,7 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
     })
   })
 
-  it('مفتاحٌ عامٌّ آخر يُرفض', async () => {
+  it('مفتاح عامّ آخر يُرفض', async () => {
     const other = await fakeAuthenticator()
     const challenge = newChallenge()
     const signed = await assertion(challenge)
@@ -140,7 +140,7 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
     expect(result).toMatchObject({ ok: false })
   })
 
-  it('مفتاحٌ محفوظٌ مشوَّه يُقال عنه ذلك ولا يُبتلَع', async () => {
+  it('مفتاح محفوظ مشوَّه يُقال عنه ذلك ولا يُبتلَع', async () => {
     const challenge = newChallenge()
     const result = await verifyAssertion(
       await assertion(challenge),
@@ -153,14 +153,14 @@ describe('verifyAssertion — التوقيع حقيقيّ لا محاكاة', ()
 })
 
 describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ', () => {
-  it('عدّادٌ يتقدّم يمرّ', async () => {
+  it('عدّاد يتقدّم يمرّ', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 5 })
     const result = await verifyAssertion(signed, stored(3), expected(challenge))
     expect(result).toMatchObject({ ok: true, signCount: 5 })
   })
 
-  it('**عدّادٌ لم يتقدّم يُرفض** — نسخةٌ ثانية تُستعمل بالتوازي', async () => {
+  it('**عدّاد لم يتقدّم يُرفض** — نسخة ثانية تُستعمل بالتوازي', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 3 })
     const result = await verifyAssertion(signed, stored(3), expected(challenge))
@@ -168,7 +168,7 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     if (!result.ok) expect(result.reason).toContain('مستنسَخا')
   })
 
-  it('وعدّادٌ تراجع يُرفض كذلك', async () => {
+  it('وعدّاد تراجع يُرفض كذلك', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 2 })
     expect(await verifyAssertion(signed, stored(9), expected(challenge))).toMatchObject({
@@ -176,7 +176,7 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     })
   })
 
-  it('**عدّادٌ تقدّم ثمّ عاد صفرا يُرفض** — وهو عينُ ما وُضع الفحص له', async () => {
+  it('**عدّاد تقدّم ثمّ عاد صفرا يُرفض** — وهو عين ما وُضع الفحص له', async () => {
     // مفتاحٌ بلغ عدّاده خمسا لا يعود إلى الصفر من نفسه. وكان `&&` يُسقط
     // الفحص هنا، ثمّ يكتب `touchPasskey` الصفرَ فوق الخمسة فيمحو الأثر
     const challenge = newChallenge()
@@ -186,7 +186,7 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     if (!result.ok) expect(result.reason).toContain('مستنسَخا')
   })
 
-  it('وأوّلُ استعمالٍ لمتوثِّقٍ يعدّ يمرّ — محفوظٌ صفر ووارِدٌ واحد', async () => {
+  it('وأوّل استعمال لمتوثِّق يعدّ يمرّ — محفوظ صفر ووارِد واحد', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 1 })
     expect(await verifyAssertion(signed, stored(0), expected(challenge))).toMatchObject({
@@ -194,7 +194,7 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     })
   })
 
-  it('**صفرٌ لا يُحاسَب** — متوثِّقاتٌ كثيرة لا تعدّ أصلا', async () => {
+  it('**صفر لا يُحاسَب** — متوثِّقات كثيرة لا تعدّ أصلا', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge, { signCount: 0 })
     expect(await verifyAssertion(signed, stored(0), expected(challenge))).toMatchObject({
@@ -202,7 +202,7 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
     })
   })
 
-  it('ومحفوظٌ صفرٌ مع وارِدٍ صفرٍ يمرّ مرارا', async () => {
+  it('ومحفوظ صفر مع وارِد صفر يمرّ مرارا', async () => {
     for (let i = 0; i < 3; i += 1) {
       const challenge = newChallenge()
       const signed = await assertion(challenge, { signCount: 0 })
@@ -229,7 +229,7 @@ describe('verifyRegistration', () => {
     }
   }
 
-  it('تسجيلٌ صحيح يمرّ', async () => {
+  it('تسجيل صحيح يمرّ', async () => {
     const challenge = newChallenge()
     const result = await verifyRegistration(
       { ...(await registration(challenge)), publicKey: fromBase64Url(key.publicKey), alg: ES256 },
@@ -238,7 +238,7 @@ describe('verifyRegistration', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('**بلا مفتاحٍ عامٍّ من المتصفّح يُقال السبب** — لا يفشل صامتا', async () => {
+  it('**بلا مفتاح عامّ من المتصفّح يُقال السبب** — لا يفشل صامتا', async () => {
     const challenge = newChallenge()
     const result = await verifyRegistration(
       { ...(await registration(challenge)), publicKey: null, alg: ES256 },
@@ -248,7 +248,7 @@ describe('verifyRegistration', () => {
     if (!result.ok) expect(result.reason).toContain('متصفّح أحدث')
   })
 
-  it('خوارزميّةٌ غير مدعومة تُرفض بالاسم', async () => {
+  it('خوارزميّة غير مدعومة تُرفض بالاسم', async () => {
     const challenge = newChallenge()
     const result = await verifyRegistration(
       { ...(await registration(challenge)), publicKey: fromBase64Url(key.publicKey), alg: -8 },
@@ -258,7 +258,7 @@ describe('verifyRegistration', () => {
     if (!result.ok) expect(result.reason).toContain('-8')
   })
 
-  it('نوعُ «دخول» لا يصلح تسجيلا', async () => {
+  it('نوع «دخول» لا يصلح تسجيلا', async () => {
     const challenge = newChallenge()
     const signed = await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID })
     const result = await verifyRegistration(
@@ -273,7 +273,7 @@ describe('verifyRegistration', () => {
     expect(result).toMatchObject({ ok: false })
   })
 
-  it('مفتاحٌ عامٌّ لا يُقرأ يُرفض عند التسجيل لا عند أوّل دخول', async () => {
+  it('مفتاح عامّ لا يُقرأ يُرفض عند التسجيل لا عند أوّل دخول', async () => {
     const challenge = newChallenge()
     const result = await verifyRegistration(
       {
@@ -300,7 +300,7 @@ describe('بيانات العميل الفاسدة', () => {
     expect(result).toMatchObject({ ok: false })
   })
 
-  it('بيانات متوثِّقٍ أقصر ممّا يجب تُرفض', async () => {
+  it('بيانات متوثِّق أقصر ممّا يجب تُرفض', async () => {
     const challenge = newChallenge()
     const signed = await assertion(challenge)
     const result = await verifyAssertion(

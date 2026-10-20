@@ -86,7 +86,7 @@ export const YT_PUBLIC = 'public'
 export function youtubeTitle(text: string): string {
   const line = text.trim().split('\n')[0]?.trim() ?? ''
   const clean = line.replace(/[<>]/g, '').trim()
-  if (clean === '') return 'منشورٌ من صدى'
+  if (clean === '') return 'منشور من صدى'
   if (clean.length <= YT_TITLE_MAX) return clean
   const cut = clean.slice(0, YT_TITLE_MAX - 1)
   const space = cut.lastIndexOf(' ')
@@ -152,7 +152,7 @@ export async function publishYouTube(
 ): Promise<YouTubeOutcome> {
   const clip = 'read' in input ? input : bytesClip(input)
   const size = clip.size
-  if (size === 0) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
+  if (size === 0) throw new PublishError('youtube: مقطع فارغ', 400, false)
 
   const title = youtubeTitle(text)
   // ‏والعنوانُ لا يتكرّر في أوّل الوصف (D-190): ما راجعه المالكُ في حقل الوصف هو ما يُرفع
@@ -180,7 +180,7 @@ export async function publishYouTube(
     throw new PublishError(
       // **وحصّةُ اليوم تُقال حين تقع** — بلا رقمٍ تبدّل مرّتين (D-179)
       why === 'quotaExceeded'
-        ? 'youtube: بلغت حصّةَ اليوم عند Google — أعد غدا'
+        ? 'youtube: بلغت حصّة اليوم عند Google — أعد غدا'
         : `youtube: رُدّت التهيئة (${why})`,
       init.status,
       retryable(init.status),
@@ -189,7 +189,7 @@ export async function publishYouTube(
 
   const session = init.headers.get('Location')
   if (session === null || session === '') {
-    throw new PublishError('youtube: تهيئةٌ بلا ترويسة Location', 502, false)
+    throw new PublishError('youtube: تهيئة بلا ترويسة Location', 502, false)
   }
 
   // ٢ — دفعُ البايتات على عنوان الجلسة. **ولا إذنَ فيه**: العنوانُ نفسُه
@@ -208,7 +208,7 @@ export async function publishYouTube(
   const maxRounds = Math.ceil(size / YOUTUBE_CHUNK) * 3
   while (start < size) {
     if (++rounds > maxRounds) {
-      throw new PublishError('youtube: لم يتقدّم الرفعُ بعد دوراتٍ كثيرة — يُعاد لاحقًا', 503, true)
+      throw new PublishError('youtube: لم يتقدّم الرفع بعد دورات كثيرة — يُعاد لاحقًا', 503, true)
     }
     const end = Math.min(size, start + YOUTUBE_CHUNK)
     const whole = start === 0 && end === size
@@ -224,10 +224,10 @@ export async function publishYouTube(
     const saved = /bytes=0-(\d+)/.exec(put.headers.get('Range') ?? '')
     start = saved === null ? 0 : Number(saved[1]) + 1
   }
-  if (put === null) throw new PublishError('youtube: مقطعٌ فارغ', 400, false)
+  if (put === null) throw new PublishError('youtube: مقطع فارغ', 400, false)
   if (put.status === 308) {
     // ‏حفظت Google البايتاتِ كلَّها ولم تُغلق الجلسة: ليس رفضًا — يُعاد
-    throw new PublishError('youtube: اكتمل الرفعُ ولم يُغلَق — يُعاد', 503, true)
+    throw new PublishError('youtube: اكتمل الرفع ولم يُغلَق — يُعاد', 503, true)
   }
   if (!put.ok) {
     throw new PublishError(
@@ -240,7 +240,7 @@ export async function publishYouTube(
   const body = (await put.json()) as { id?: unknown }
   const id = body.id
   if (typeof id !== 'string' || id === '') {
-    throw new PublishError('youtube: رفعٌ نجح بلا معرّفِ فيديو', 502, false)
+    throw new PublishError('youtube: رفع نجح بلا معرّف فيديو', 502, false)
   }
 
   return {

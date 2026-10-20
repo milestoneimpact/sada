@@ -24,7 +24,7 @@ function rangedBucket(size: number) {
 }
 
 describe('tiktokChunks', () => {
-  it('ما دون القطعة مرّةً واحدة، وما فوقها floor والأخيرةُ تمتصّ الباقي', () => {
+  it('ما دون القطعة مرّةً واحدة، وما فوقها floor والأخيرة تمتصّ الباقي', () => {
     expect(tiktokChunks(3 * MB)).toEqual({ chunkSize: 3 * MB, count: 1 })
     expect(tiktokChunks(TIKTOK_CHUNK)).toEqual({ chunkSize: TIKTOK_CHUNK, count: 1 })
     expect(tiktokChunks(100 * MB)).toEqual({ chunkSize: TIKTOK_CHUNK, count: 3 })
@@ -32,7 +32,7 @@ describe('tiktokChunks', () => {
 })
 
 describe('bucketClip', () => {
-  it('يقرأ الحجمَ من الرأس والقطعةَ بمداها — لا الكائنَ كلَّه', async () => {
+  it('يقرأ الحجم من الرأس والقطعة بمداها — لا الكائن كلَّه', async () => {
     const bucket = rangedBucket(100 * MB)
     const clip = await bucketClip(bucket, 'video/p/m.mp4', 'video/mp4')
     expect(clip!.size).toBe(100 * MB)
@@ -41,7 +41,7 @@ describe('bucketClip', () => {
     expect(bucket.asked).toEqual([{ offset: 32 * MB, length: 4 * MB }])
   })
 
-  it('ودلوٌ بلا رأسٍ يُقرأ كاملًا مرّة، وغيابُ الكائن null', async () => {
+  it('ودلو بلا رأس يُقرأ كاملًا مرّة، وغياب الكائن null', async () => {
     const whole = { async get() { return { async arrayBuffer() { return new Uint8Array([1, 2, 3, 4]).buffer } } } }
     const clip = await bucketClip(whole, 'k', 'video/mp4')
     expect(Array.from(await clip!.read(1, 2))).toEqual([2, 3])
@@ -50,7 +50,7 @@ describe('bucketClip', () => {
 })
 
 describe('publishTikTok قطعًا', () => {
-  it('مقطعُ ‏100MB: ثلاثُ قطعٍ بترتيبها، والأخيرةُ تمتصّ الباقي، والتهيئةُ تعلن العدد', async () => {
+  it('مقطع ‏100MB: ثلاث قطع بترتيبها، والأخيرة تمتصّ الباقي، والتهيئة تعلن العدد', async () => {
     const bucket = rangedBucket(100 * MB)
     const clip = (await bucketClip(bucket, 'k', 'video/mp4'))!
     const calls: { url: string; init: RequestInit }[] = []
@@ -77,7 +77,7 @@ describe('publishTikTok قطعًا', () => {
 })
 
 describe('publishYouTube قطعًا', () => {
-  it('ما قبل الأخيرة يُجاب بـ ‏308 فيُكمَل، والأخيرةُ تعيد المعرّف', async () => {
+  it('ما قبل الأخيرة يُجاب بـ ‏308 فيُكمَل، والأخيرة تعيد المعرّف', async () => {
     const size = YOUTUBE_CHUNK * 2 + 1000
     const clip = (await bucketClip(rangedBucket(size), 'k', 'video/mp4'))!
     const puts: Record<string, string>[] = []
@@ -99,7 +99,7 @@ describe('publishYouTube قطعًا', () => {
     ])
   })
 
-  it('ومن حيث حفظت Google: قطعةٌ حُفظ بعضُها تُستأنَف من حدّها، وغيابُ Range يعيد من الصفر (D-182)', async () => {
+  it('ومن حيث حفظت Google: قطعة حُفظ بعضُها تُستأنَف من حدّها، وغياب Range يعيد من الصفر (D-182)', async () => {
     const MBs = 1024 * 1024
     const size = YOUTUBE_CHUNK + 1000
     const clip = (await bucketClip(rangedBucket(size), 'k', 'video/mp4'))!
@@ -123,7 +123,7 @@ describe('publishYouTube قطعًا', () => {
     expect((failure as { retryable: boolean }).retryable).toBe(true)
   })
 
-  it('والمقطعُ الصغيرُ طلبٌ واحدٌ بلا Content-Range كما كان', async () => {
+  it('والمقطع الصغير طلب واحد بلا Content-Range كما كان', async () => {
     let put: Record<string, string> = {}
     const fetchImpl = (async (_url: string, init: RequestInit = {}) => {
       if (init.method === 'POST') return new Response(null, { status: 200, headers: { Location: 'https://upload.google/s' } })

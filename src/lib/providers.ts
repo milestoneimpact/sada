@@ -189,7 +189,7 @@ export async function saveKey(
       `UPDATE providers SET
          key_enc = ?, key_iv = ?, hint = ?, fingerprint = ?,
          updated_by = ?, updated_at = datetime('now'),
-         -- مفتاحٌ جديد لم يُختبر: الشهادة السابقة لا تشهد له
+         -- مفتاح جديد لم يُختبر: الشهادة السابقة لا تشهد له
          verified_at = CASE WHEN fingerprint = ? THEN verified_at ELSE NULL END
        WHERE name = ?`,
     )

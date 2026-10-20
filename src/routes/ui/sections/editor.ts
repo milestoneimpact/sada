@@ -86,9 +86,9 @@ function scheduleBlock(d: DraftRow, input: EditorInput): { readonly text: string
   }
   if (input.targets.some((t) => t.platform === d.platform)) return null
   if (input.pageOnly.includes(d.platform)) {
-    return { text: 'الصفحةُ مربوطة، والنشرُ باسمها لم يُبنَ بعد. اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: '/panel/tasks' }
+    return { text: 'الصفحة مربوطة، والنشر باسمها لم يُبن بعد. اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: '/panel/tasks' }
   }
-  return { text: `لا قناةَ ${specOf(d.platform).label} مربوطة، ويبقى النصُّ حتّى تُربَط.`, label: 'اربط قناة', href: '#channels' }
+  return { text: `لا قناة ${specOf(d.platform).label} مربوطة، ويبقى النصّ حتّى تُربَط.`, label: 'اربط قناة', href: '#channels' }
 }
 
 type Stage = 'waiting' | 'ready' | 'scheduled' | 'published' | 'failed' | 'rejected'
@@ -114,7 +114,7 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
   const from = '<input type="hidden" name="from" value="editor">'
 
   if (stage === 'waiting') {
-    const forms = `<form id="ed-form" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…">
+    const forms = `<form id="ed-form" method="POST" action="/panel/drafts/decide" data-busy="جار…">
       <input type="hidden" name="id" value="${id}">${from}</form>`
     const canSchedule = block === null
     const submit = (label: string, value: string, variant: 'primary' | 'secondary' | 'quiet'): string =>
@@ -129,7 +129,7 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
   }
   if (stage === 'ready') {
     if (block !== null) return { forms: '', section: sec('الموعد', blockLine), bar: '' }
-    const forms = `<form id="ed-sched" method="POST" action="/panel/drafts/schedule" data-busy="جارٍ الجدولة…">
+    const forms = `<form id="ed-sched" method="POST" action="/panel/drafts/schedule" data-busy="جار الجدولة…">
       <input type="hidden" name="id" value="${id}">${from}</form>`
     return {
       forms,
@@ -143,11 +143,11 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
     if (d.dispatchedAt !== null) {
       return { forms: '', section: sec('الموعد', `<p class="ed-on">خرجت إلى المنصّة ${escapeHtml(relativeTime(d.dispatchedAt, input.now))}${on}، ولا تُستردّ من هناك.</p>`), bar: '' }
     }
-    const forms = `<form id="ed-resched" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…">
+    const forms = `<form id="ed-resched" method="POST" action="/panel/drafts/reschedule" data-busy="جار…">
       <input type="hidden" name="id" value="${id}">${from}</form>`
     return {
       forms,
-      section: sec('الموعد', `<p class="ed-on">مجدولةٌ <b>${escapeHtml(at)}</b>${on}.</p>${whenField('ed-resched', input.zone, input.now, input.peaks)}`),
+      section: sec('الموعد', `<p class="ed-on">مجدولة <b>${escapeHtml(at)}</b>${on}.</p>${whenField('ed-resched', input.zone, input.now, input.peaks)}`),
       bar: button({ label: 'غيّر الموعد', variant: 'primary', type: 'submit', attrs: 'form="ed-resched"' }),
     }
   }
@@ -162,7 +162,7 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
     return {
       forms: '',
       section: '',
-      bar: `<form class="inline" method="POST" action="/panel/drafts/undo-reject" data-busy="جارٍ…"><input type="hidden" name="id" value="${id}">${
+      bar: `<form class="inline" method="POST" action="/panel/drafts/undo-reject" data-busy="جار…"><input type="hidden" name="id" value="${id}">${
         button({ label: 'أعدها مسوّدة', variant: 'primary', type: 'submit' })}</form>`,
     }
   }
@@ -188,10 +188,10 @@ function details(d: DraftRow, input: EditorInput): string {
   if (d.rationale !== null && d.rationale !== '') rows.push(['لماذا هذه الزاوية؟', escapeHtml(d.rationale)])
   if (d.sourceName !== null) rows.push(['المصدر', `${fileName(d.sourceName)}${d.stale ? ' <span class="ago">(تغيّر بعد كتابتها)</span>' : ''}`])
   const writer = writerName(d.model)
-  rows.push(['كتبها', `${escapeHtml(writer)}${d.model !== null && writer !== 'أنت' && writer !== 'غيرُ مسجَّل' ? ` <span class="ago"><bdi dir="ltr">${escapeHtml(d.model)}</bdi></span>` : ''}`])
-  rows.push(['كلفةُ الكتابة', d.cost === 0 ? 'بلا كلفة' : `<span class="mono">${escapeHtml(money(d.cost))}</span>`])
+  rows.push(['كتبها', `${escapeHtml(writer)}${d.model !== null && writer !== 'أنت' && writer !== 'غير مسجَّل' ? ` <span class="ago"><bdi dir="ltr">${escapeHtml(d.model)}</bdi></span>` : ''}`])
+  rows.push(['كلفة الكتابة', d.cost === 0 ? 'بلا كلفة' : `<span class="mono">${escapeHtml(money(d.cost))}</span>`])
   if (d.publishCost > 0) {
-    rows.push(['كلفةُ النشر', `<span class="mono">${escapeHtml(money(d.publishCost))}</span>${d.publishCost >= 0.1 ? ' <span class="ago">(فيها رابط)</span>' : ''}`])
+    rows.push(['كلفة النشر', `<span class="mono">${escapeHtml(money(d.publishCost))}</span>${d.publishCost >= 0.1 ? ' <span class="ago">(فيها رابط)</span>' : ''}`])
   }
   const decider = deciderText(d.approvedBy)
   if (decider !== '') {
@@ -203,7 +203,7 @@ function details(d: DraftRow, input: EditorInput): string {
   const list = rows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${v}</dd>`).join('')
   return `<details class="ed-more" id="ed-details"><summary>التفاصيل</summary>
     <dl class="ed-kv">${list}</dl>
-    <a class="tap" href="/panel/journey/${encodeURIComponent(d.id)}">رحلةُ المنشور من الملفّ إلى الأثر</a>
+    <a class="tap" href="/panel/journey/${encodeURIComponent(d.id)}">رحلة المنشور من الملفّ إلى الأثر</a>
   </details>`
 }
 
@@ -237,11 +237,11 @@ export function editorPane(input: EditorInput): string {
   }
   if (stage === 'ready') more.push(menuAction({ label: 'أعدها مسوّدة', action: '/panel/drafts/undo-approve', fields: { id: d.id } }))
   if (stage === 'scheduled' && d.dispatchedAt === null) {
-    more.push(menuAction({ label: 'اسحب الموعد', action: '/panel/drafts/unschedule', fields: { id: d.id }, confirm: 'سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟' }))
+    more.push(menuAction({ label: 'اسحب الموعد', action: '/panel/drafts/unschedule', fields: { id: d.id }, confirm: 'سحب الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟' }))
   }
   // ‏والنسخُ من المربّع نفسِه (`COPY_SCRIPT` يحدّد حقلًا بمعرّفه)، فللمسوّدة وحدَها
   if (stage === 'waiting') more.push('<button class="menu-item" type="button" data-copy="ed-txt"><span class="menu-t"><b>انسخ النصّ</b></span></button>')
-  more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${encodeURIComponent(d.id)}` }))
+  more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${encodeURIComponent(d.id)}` }))
 
   const editable = stage === 'waiting'
   const counter = `<span class="draft-len${len > spec.hardLimit ? ' bad' : len > ceilingOf(spec.hardLimit) ? ' warn' : ''}"><b>${len}</b> / ${spec.hardLimit}</span>`
@@ -272,7 +272,7 @@ export function editorPane(input: EditorInput): string {
   })
   // ‏ووصفُ الإنفوجرافيك هنا بجملته لا بجملة البطاقة: الطيّةُ في القائمة تقولها لكلّ مسوّدة
   const pic = imagePane(d, input.media, readyLines(input.mediaReady),
-    '<b>إنفوجرافيك يُرسم من النصّ أعلاه</b> بعنوانه وأرقامه كما هي، بلا رقمٍ من خارجه.')
+    '<b>إنفوجرافيك يُرسم من النصّ أعلاه</b> بعنوانه وأرقامه كما هي، بلا رقم من خارجه.')
   return `<aside class="card ed" id="ed" aria-labelledby="ed-t" data-post="${escapeHtml(d.id)}">
     ${forms}
     <div class="ed-head">
@@ -280,7 +280,7 @@ export function editorPane(input: EditorInput): string {
       <div class="pc-who"><h2 id="ed-t"><bdi>${escapeHtml(who)}</bdi></h2><span class="pc-when">${
         d.accountName === null ? '' : `${escapeHtml(spec.label)} · `}${escapeHtml(stageTime(d, input.zone, input.now))}</span></div>
       ${statusBadge(st.cls, st.glyph, escapeHtml(st.text))}
-      ${menu({ label: 'أفعالٌ أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
+      ${menu({ label: 'أفعال أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
       <a class="btn btn-icon btn-sm ed-x" href="${escapeHtml(close)}" aria-label="أغلق المنشور وارجع إلى القائمة" title="أغلق">${ICON.close}</a>
     </div>
     <div class="ed-body">

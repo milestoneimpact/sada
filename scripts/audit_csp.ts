@@ -85,5 +85,5 @@ for (const [path, file] of pages) {
 }
 await browser.close()
 server.close()
-console.log(total === 0 ? 'csp: لا شيءَ ممنوع' : `csp: ${total} ممنوعًا — يراه المالك مكسورًا ولا يراه أيُّ حارسٍ آخر`)
+console.log(total === 0 ? 'csp: لا شيء ممنوع' : `csp: ${total} ممنوعًا — يراه المالك مكسورًا ولا يراه أيّ حارس آخر`)
 process.exit(total === 0 ? 0 : 1)

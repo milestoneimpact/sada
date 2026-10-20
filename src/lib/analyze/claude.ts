@@ -83,7 +83,7 @@ export async function analyzeText(
   const client = new Anthropic({
     apiKey: deps.apiKey,
     ...(deps.fetchImpl === undefined ? {} : { fetch: deps.fetchImpl }),
-    maxRetries: 0, // الطابور يعيد المحاولة، فإعادةٌ داخل النداء تضاعف الكلفة بلا علم
+    maxRetries: 0, // الطابور يعيد المحاولة، فإعادة داخل النداء تضاعف الكلفة بلا علم
   })
 
   let message: Anthropic.Message
@@ -93,7 +93,7 @@ export async function analyzeText(
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
       output_config: {
-        effort: 'medium', // حكمٌ على نصّ، لا برهان: `high` ينفق بلا مقابل هنا
+        effort: 'medium', // حكم على نصّ، لا برهان: `high` ينفق بلا مقابل هنا
         format: { type: 'json_schema', schema: ANALYSIS_SCHEMA },
       },
       system: [

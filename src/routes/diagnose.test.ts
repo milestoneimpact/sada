@@ -36,7 +36,7 @@ beforeEach(() => {
   }
 })
 
-describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', () => {
+describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () => {
   /**
    * **أشدُّ العُطل إرباكا: نصفُ الدورة نجح.**
    *
@@ -45,7 +45,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
    * المالكُ أين يفتّش** — ويفتّش في المنتَجات والنطاقات، وليس فيها
    * العطل.
    */
-  it('invalid_client يُعرَض صفحةً تسمّي السببَ وتقول ما يُفعَل', async () => {
+  it('invalid_client يُعرَض صفحةً تسمّي السبب وتقول ما يُفعَل', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
@@ -63,7 +63,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
       const body = await response.text()
       expect(body).toContain('invalid_client')
       // يسمّي السببَ الأشيع صراحةً
-      expect(body).toContain('أأُعيد إنشاءُ التطبيق؟')
+      expect(body).toContain('أأُعيد إنشاء التطبيق؟')
       // **ويصرف عن التفتيش في الموضع الخطأ**
       expect(body).toContain('لا تفتّش في تبويب Products')
       // ولا يُعرَض سطرُ JSON
@@ -80,7 +80,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
    * **وهي الساقُ التي تفشل بعد أن ينجح كلُّ شيءٍ قبلها**، فأحوجُ ما
    * تكون إلى بيان. وبلا وصفٍ لا يُفرَّق بين سرٍّ خاطئ ومعرّفٍ خاطئ.
    */
-  it('ووصفُ المنصّة يُعرَض حرفا — وكان يُرمى', async () => {
+  it('ووصف المنصّة يُعرَض حرفا — وكان يُرمى', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: {
         status: 401,
@@ -112,7 +112,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
    * والقيمتان علنيّتان — المعرّفُ معروضٌ في بوّابة المنصّة، والرابطُ
    * يظهر في شريط العنوان عند كلّ دورة.
    */
-  it('ويُعرَض ما أُرسل: المعرّفُ ورابطُ العودة', async () => {
+  it('ويُعرَض ما أُرسل: المعرّف ورابط العودة', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
@@ -139,7 +139,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
    * هذه الصفحةُ ليست خلف جلسة: **من أتمّ إذنا عند المنصّة يبلغها**.
    * وقناعُ السرّ يكشف أوّلَه وآخرَه، فموضعُه لوحُ القنوات خلف الدخول.
    */
-  it('ولا يظهر السرُّ ولا قناعُه في صفحةٍ ليست خلف دخول', async () => {
+  it('ولا يظهر السرّ ولا قناعُه في صفحة ليست خلف دخول', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
@@ -161,13 +161,13 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
     }
   })
 
-  it('ورمزُ المزوّد يُحمَل حقلا لا يُستخرَج من نصّ عربيّ', () => {
+  it('ورمز المزوّد يُحمَل حقلا لا يُستخرَج من نصّ عربيّ', () => {
     const error = new OAuthError('linkedin: رفض نهاية الرمز (invalid_client)', 401, 'invalid_client')
     expect(error.code).toBe('invalid_client')
   })
 
   /** سرٌّ غيرُ مضبوطٍ عطلُ تشغيلٍ لا رفضُ منصّة — ويبقى JSON بحالته. */
-  it('وسرٌّ ناقصٌ يبقى 503 ولا يُلبَس ثوبَ الرفض', async () => {
+  it('وسرّ ناقص يبقى 503 ولا يُلبَس ثوب الرفض', async () => {
     const response = await app.request(
       '/oauth/linkedin/callback?code=c&state=s',
       {},
@@ -177,7 +177,7 @@ describe('١ · رفضُ نهاية الرمز يُشخَّص في صفحة', ()
   })
 })
 
-describe('٢ · رمزُ التبويب', () => {
+describe('٢ · رمز التبويب', () => {
   /**
    * **الصيغةُ كانت `data:image/svg+xml;utf8,` — و«;utf8» ليست معاملا.**
    *
@@ -185,13 +185,13 @@ describe('٢ · رمزُ التبويب', () => {
    * الخادمُ ٤٠٤ يحمل `Cross-Origin-Resource-Policy: same-origin`،
    * **فظهر في الكونسول حظرٌ يبدو عطلَ أمنٍ وهو حرفان في نصّ**.
    */
-  it('الوثيقةُ تحمل data URI بمعامل charset صحيح', async () => {
+  it('الوثيقة تحمل data URI بمعامل charset صحيح', async () => {
     const body = await (await app.request('/panel', {}, env)).text()
     expect(body).toContain('data:image/svg+xml;charset=utf-8,')
     expect(body).not.toContain('svg+xml;utf8,')
   })
 
-  it('و/favicon.ico له مسارٌ يردّ صورةً لا 404', async () => {
+  it('و/favicon.ico له مسار يردّ صورةً لا 404', async () => {
     const response = await app.request('/favicon.ico', {}, env)
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toContain('image/svg+xml')
@@ -199,7 +199,7 @@ describe('٢ · رمزُ التبويب', () => {
   })
 
   /** والرمزُ علامةٌ عامّة — فيُسمَح بها عبر الأصول، كمسار الوسائط. */
-  it('ويحمل CORP يسمح — والتوسعةُ على هذا المسار وحده', async () => {
+  it('ويحمل CORP يسمح — والتوسعة على هذا المسار وحده', async () => {
     const icon = await app.request('/favicon.ico', {}, env)
     expect(icon.headers.get('Cross-Origin-Resource-Policy')).toBe('cross-origin')
 
@@ -208,7 +208,7 @@ describe('٢ · رمزُ التبويب', () => {
   })
 })
 
-describe('وعطبٌ أكبرُ كشفه الاختبارُ نفسُه', () => {
+describe('وعطب أكبر كشفه الاختبار نفسُه', () => {
   /**
    * **الطبقةُ العامّة كانت تدهس ما يضعه المسار.**
    *
@@ -220,12 +220,12 @@ describe('وعطبٌ أكبرُ كشفه الاختبارُ نفسُه', () => {
    * والاختبارُ هنا لا يفحص الوسائط، **يفحص أنّ المسار يغلب الطبقة** —
    * فأيُّ ترويسةٍ يضعها مسارٌ من بعدُ تخرج كما وُضعت.
    */
-  it('ما يضعه المسارُ يغلب ما تملؤه الطبقةُ العامّة', async () => {
+  it('ما يضعه المسار يغلب ما تملؤه الطبقة العامّة', async () => {
     const icon = await app.request('/favicon.ico', {}, env)
     expect(icon.headers.get('Cross-Origin-Resource-Policy')).toBe('cross-origin')
   })
 
-  it('وما لا يضعه مسارٌ يُملأ من الطبقة كما كان', async () => {
+  it('وما لا يضعه مسار يُملأ من الطبقة كما كان', async () => {
     const health = await app.request('/health', {}, env)
     expect(health.headers.get('Strict-Transport-Security')).toContain('max-age=31536000')
     expect(health.headers.get('X-Content-Type-Options')).toBe('nosniff')
@@ -241,7 +241,7 @@ describe('وعطبٌ أكبرُ كشفه الاختبارُ نفسُه', () => {
   })
 })
 
-describe('٣ · عنوانٌ فيه قالبٌ لم يُملأ', () => {
+describe('٣ · عنوان فيه قالب لم يُملأ', () => {
   /**
    * **يمرّ الحارسَ ثمّ يفشل عند أوّل نداء.**
    *
@@ -255,10 +255,10 @@ describe('٣ · عنوانٌ فيه قالبٌ لم يُملأ', () => {
     )
     expect(verdict.ok).toBe(false)
     if (verdict.ok) return
-    expect(verdict.reason).toContain('قالبٌ لم يُملأ')
+    expect(verdict.reason).toContain('قالب لم يُملأ')
   })
 
-  it('والعنوانُ نفسُه مملوءا يمرّ', () => {
+  it('والعنوان نفسُه مملوءا يمرّ', () => {
     const verdict = checkProviderUrl(
       'https://api.cloudflare.com/client/v4/accounts/c6ea7ba30984d494a1a78efea6ddc9a0/ai/v1',
     )
@@ -267,12 +267,12 @@ describe('٣ · عنوانٌ فيه قالبٌ لم يُملأ', () => {
     expect(verdict.host).toBe('api.cloudflare.com')
   })
 
-  it('ولا يُردّ عنوانٌ سليمٌ بلا قوسين', () => {
+  it('ولا يُردّ عنوان سليم بلا قوسين', () => {
     expect(checkProviderUrl('https://api.groq.com/openai/v1').ok).toBe(true)
   })
 })
 
-describe('ونموذجُ Cloudflare في اللوحة', () => {
+describe('ونموذج Cloudflare في اللوحة', () => {
   async function panelBody(cfAccount?: string): Promise<string> {
     const body = new FormData()
     body.set('token', TOKEN)
@@ -282,7 +282,7 @@ describe('ونموذجُ Cloudflare في اللوحة', () => {
     return (await app.request('/panel/settings', { headers: { Cookie: cookie } }, scoped)).text()
   }
 
-  it('يُعرَض، ومعرّفُ الحساب يُملأ وحده حين يُعرَف', async () => {
+  it('يُعرَض، ومعرّف الحساب يُملأ وحده حين يُعرَف', async () => {
     const body = await panelBody('acc-123')
     expect(body).toContain('Cloudflare')
     expect(body).toContain('accounts/acc-123/ai/v1')
@@ -290,19 +290,19 @@ describe('ونموذجُ Cloudflare في اللوحة', () => {
   })
 
   /** واللوحةُ تعرف المعرّف — فلا يُطلَب من المالك أن يبحث عنه. */
-  it('وبلا معرّفٍ يبقى القالبُ ظاهرا ويُقال إنّه لن يُحفَظ', async () => {
+  it('وبلا معرّف يبقى القالب ظاهرا ويُقال إنّه لن يُحفَظ', async () => {
     const body = await panelBody()
     expect(body).toContain('{ACCOUNT_ID}')
     expect(body).toContain('لن يُحفَظ')
   })
 
   /** والمفتاحُ رمزُ Cloudflare لا مفتاحُ مزوّدٍ آخر — ويُقال. */
-  it('ويُقال أيُّ مفتاحٍ يلزم', async () => {
+  it('ويُقال أيّ مفتاح يلزم', async () => {
     expect(await panelBody('acc-123')).toContain('Workers AI · Read')
   })
 })
 
-describe('فحصُ الزوج من اللوحة — الأداةُ التي تُنهي التخمين', () => {
+describe('فحص الزوج من اللوحة — الأداة التي تُنهي التخمين', () => {
   async function login(): Promise<string> {
     const body = new FormData()
     body.set('token', TOKEN)
@@ -326,7 +326,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     return (await app.request('/panel/settings', { headers: { Cookie: cookie } }, env)).text()
   }
 
-  it('«السرُّ مرفوض» حين تردّ المنصّةُ invalid_client — ومعه المعرّفُ', async () => {
+  it('«السرّ مرفوض» حين تردّ المنصّة invalid_client — ومعه المعرّف', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: {
         status: 401,
@@ -335,7 +335,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     })
     try {
       const body = await probe(await login())
-      expect(body).toContain('السرُّ مرفوض')
+      expect(body).toContain('السرّ مرفوض')
       expect(body).toContain('Client authentication failed')
       expect(body).toContain('li-id')
     } finally {
@@ -344,7 +344,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
   })
 
   /** **والمعرّفُ يُفرَد عن السرّ** — فلا يفتّش المالكُ في الحقلين معا. */
-  it('و«المعرّفُ مجهول» حين تردّ invalid_client_id', async () => {
+  it('و«المعرّف مجهول» حين تردّ invalid_client_id', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: {
         status: 400,
@@ -356,7 +356,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     })
     try {
       const body = await probe(await login())
-      expect(body).toContain('المعرّفُ نفسُه مجهول')
+      expect(body).toContain('المعرّف نفسُه مجهول')
     } finally {
       globalThis.fetch = realFetch
     }
@@ -369,14 +369,14 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     })
     try {
       const body = await probe(await login())
-      expect(body).toContain('الزوجُ مقبول')
+      expect(body).toContain('الزوج مقبول')
       expect(body).toContain('ليست في المعرّف ولا في السرّ')
     } finally {
       globalThis.fetch = realFetch
     }
   })
 
-  it('ولا يُدَّعى حكمٌ حين لا يُفهَم الجواب', async () => {
+  it('ولا يُدَّعى حكم حين لا يُفهَم الجواب', async () => {
     globalThis.fetch = (async () =>
       new Response('<html>', { status: 502 })) as unknown as typeof fetch
     try {
@@ -387,7 +387,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
   })
 
   /** **ولا يُسرَّب السرُّ في إشعارٍ يُعرَض ويُسجَّل** (D-005). */
-  it('ولا يظهر السرُّ في الإشعار', async () => {
+  it('ولا يظهر السرّ في الإشعار', async () => {
     globalThis.fetch = fakeFetch({
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
@@ -398,7 +398,7 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
     }
   })
 
-  it('وبلا أسرارٍ محفوظةٍ يُقال ذلك ولا يُنادى أحد', async () => {
+  it('وبلا أسرار محفوظة يُقال ذلك ولا يُنادى أحد', async () => {
     const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
     const body = new FormData()
     body.set('token', TOKEN)
@@ -416,6 +416,6 @@ describe('فحصُ الزوج من اللوحة — الأداةُ التي تُ
       bare,
     )
     const after = await (await app.request('/panel', { headers: { Cookie: cookie } }, bare)).text()
-    expect(after).toContain('لا أسرارَ محفوظة')
+    expect(after).toContain('لا أسرار محفوظة')
   })
 })

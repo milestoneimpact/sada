@@ -39,16 +39,16 @@ beforeEach(() => {
   db.raw.exec(
     `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status, idempotency_key,
                         approved_by, approved_at, created_at)
-     VALUES ('pub', 'a-li', 'linkedin', 'text', 'ثلاثةُ دروسٍ من مراجعة المحفظة', '${at(-3)}', 'published', 'k1',
+     VALUES ('pub', 'a-li', 'linkedin', 'text', 'ثلاثة دروس من مراجعة المحفظة', '${at(-3)}', 'published', 'k1',
              'omar', '${at(-4)}', '${at(-6)}'),
-            ('next', 'a-x', 'x', 'text', 'جملةٌ حادّةٌ عن الأثر', '${at(7)}', 'queued', 'k2',
+            ('next', 'a-x', 'x', 'text', 'جملة حادّة عن الأثر', '${at(7)}', 'queued', 'k2',
              'omar', '${at(-1)}', '${at(-2)}'),
-            ('old', 'a-x', 'x', 'text', 'منشورٌ قديم', '${at(-80)}', 'published', 'k4',
+            ('old', 'a-x', 'x', 'text', 'منشور قديم', '${at(-80)}', 'published', 'k4',
              'omar', '${at(-81)}', '${at(-82)}')`,
   )
   db.raw.exec(
     `INSERT INTO posts (id, account_id, platform, type, text, status, idempotency_key, created_at)
-     VALUES ('wait', NULL, 'linkedin', 'text', 'مسوّدةٌ <تنتظر>', 'draft', 'k3', '${at(-40)}')`,
+     VALUES ('wait', NULL, 'linkedin', 'text', 'مسوّدة <تنتظر>', 'draft', 'k3', '${at(-40)}')`,
   )
   db.raw.exec(
     `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at)
@@ -70,7 +70,7 @@ describe('الخطّ الزمنيّ', () => {
     expect(response.status).toBe(401)
   })
 
-  it('يرسم المحفظةَ: المنصّاتُ وحساباتُها، وكلُّ شريطٍ رابطٌ إلى رحلته', async () => {
+  it('يرسم المحفظة: المنصّات وحساباتُها، وكلّ شريط رابط إلى رحلته', async () => {
     const cookie = await login()
     const response = await app.request('/panel/timeline', { headers: { Cookie: cookie } }, env)
     expect(response.status).toBe(200)
@@ -84,14 +84,14 @@ describe('الخطّ الزمنيّ', () => {
     // ‏والمسوّدةُ القديمةُ بلا قرارٍ تُرى — وهي أهمُّ ما يُرى — بلا حسابٍ ومهرَّبة
     expect(html).toContain('href="/panel/journey/wait"')
     expect(html).toContain('لم يُربَط بحساب')
-    expect(html).toContain('مسوّدةٌ &lt;تنتظر&gt;')
-    expect(html).not.toContain('مسوّدةٌ <تنتظر>')
+    expect(html).toContain('مسوّدة &lt;تنتظر&gt;')
+    expect(html).not.toContain('مسوّدة <تنتظر>')
     // ‏وما انتهى قبل النافذة لا يدخلها
     expect(html).not.toContain('/panel/journey/old')
     expect(html).toMatch(/<b>3<\/b>في النافذة/)
   })
 
-  it('المدى والنافذةُ من العنوان، وما لا يُعرَف يعود إلى افتراضه', async () => {
+  it('المدى والنافذة من العنوان، وما لا يُعرَف يعود إلى افتراضه', async () => {
     const cookie = await login()
     const back = await (await app.request('/panel/timeline?span=90&at=-1', { headers: { Cookie: cookie } }, env)).text()
     expect(back).toContain('/panel/journey/old')

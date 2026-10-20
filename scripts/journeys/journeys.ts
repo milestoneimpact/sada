@@ -73,7 +73,7 @@ function link(scope: Page | Locator, name: string | RegExp): Locator {
  * و`#i-…`): والمالكُ يقرأ «الاعتماد» ولا يقرأ الرابط.
  */
 function station(page: Page, title: string): Locator {
-  const trip = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'رحلةُ المنشور' }) })
+  const trip = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'رحلة المنشور' }) })
   return visible(trip.getByRole('link', { name: new RegExp(`^${title}(\\s|$)`) })).first()
 }
 
@@ -125,7 +125,7 @@ async function scheduleTomorrow(j: JourneyContext, postId: string, label: string
 function crlf(m: Meter, stack: Stack, id: string): void {
   const row = q<{ status: string; text: string; original_text: string | null }>(stack, 'SELECT status, text, original_text FROM posts WHERE id = ?', id)
   if (row?.status === 'edited' && row.original_text !== null && row.text.replace(/\r\n/g, '\n') === row.original_text.trim()) {
-    m.note('⚠ عطل: اعتُمدت بلا أيّ تعديل فكُتبت «edited» وحُفظ «original_text» — النصُّ عاد من ‹textarea› بأسطر CRLF ولا يُوحَّد قبل المقارنة في decide() (src/lib/draft/store.ts). والإشعار يقول «بنصّك بعد التعديل»')
+    m.note('⚠ عطل: اعتُمدت بلا أيّ تعديل فكُتبت «edited» وحُفظ «original_text» — النصّ عاد من ‹textarea› بأسطر CRLF ولا يُوحَّد قبل المقارنة في decide() (src/lib/draft/store.ts). والإشعار يقول «بنصّك بعد التعديل»')
   }
 }
 
@@ -191,13 +191,13 @@ const R2: Journey = {
   async run({ page, m, stack }) {
     const before = new Set(all<{ id: string }>(stack, 'SELECT id FROM posts').map((r) => r.id))
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
-    await m.tap(subTab(page, 'اكتب'), 'تبويبُ «اكتب»')
+    await m.tap(subTab(page, 'اكتب'), 'تبويب «اكتب»')
     const card = page.locator('form[action="/panel/drafts/write"]')
     await m.look(visible(page.getByRole('heading', { name: 'الكتابة من مصدر' })), 'عنوان «الكتابة من مصدر»')
     const sources = await card.locator('select[name="id"] option').allTextContents()
-    m.note(`قائمةُ المصدر فيها ${sources.length} خيار: ${sources.join(' · ')} — والمصدران في Drive بالاسم نفسه، والمحلَّلُ وحده يظهر`)
+    m.note(`قائمة المصدر فيها ${sources.length} خيار: ${sources.join(' · ')} — والمصدران في Drive بالاسم نفسه، والمحلَّل وحده يظهر`)
     const platform = await card.locator('select[name="platform"]').inputValue()
-    m.note(`المنصّةُ المختارةُ سلفًا: ${platform} — فلا اختيارَ يلزم لـ LinkedIn`)
+    m.note(`المنصّة المختارة سلفًا: ${platform} — فلا اختيار يلزم لـ LinkedIn`)
     await m.tap(button(card, 'اكتب مسوّدة'), '«اكتب مسوّدة»', { key: true })
     m.mark('drafted')
     const fresh = all<{ id: string; status: string }>(stack, "SELECT id, status FROM posts WHERE status = 'draft'").filter((r) => !before.has(r.id))
@@ -207,7 +207,7 @@ const R2: Journey = {
     const row = status(stack, id)
     crlf(m, stack, id)
     const cost = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM cost_ledger WHERE operation LIKE 'draft:linkedin:%' AND at >= datetime('now', '-5 minutes')")?.n ?? 0
-    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `مسوّدةٌ جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
+    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `مسوّدة جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
   },
 }
 
@@ -217,14 +217,14 @@ const R2: Journey = {
  */
 const R2stop: Journey = {
   id: 'R-2·stop',
-  title: 'كتابة منشور من مصدر — حيث يقف مالكٌ يمرّر بحثًا عن «اكتب»',
+  title: 'كتابة منشور من مصدر — حيث يقف مالك يمرّر بحثًا عن «اكتب»',
   plan: { today: '8', target: '4' },
   async run({ page, m, stack }) {
     // ‏ما في الشاشة الأولى من الرئيسيّة: أفيها بابٌ إلى «اكتب»؟
     const homeCtas = await page.evaluate(() => Array.from(document.querySelectorAll('a.btn, button.btn-primary, a.btn-primary'))
       .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight })
       .map((el) => (el.textContent ?? '').trim().replace(/\s+/g, ' ')).filter((t) => t !== ''))
-    m.note(`أزرارُ الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
+    m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
     const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     const goal = /اكتب|أنشئ|جديد|اعتمد/
@@ -269,26 +269,26 @@ const R2stop: Journey = {
     }
     for (const s of screens) m.note(s)
     m.note(`«اكتب مسوّدة» تظهر في الشاشة ${writeAt ?? '—'} من أعلى «المنشورات»`)
-    if (stopAt === null) return { success: false, verified: 'لا زرَّ يوافق المقصد في الشاشات' }
-    m.note(`أوّلُ زرٍّ رئيسيٍّ يوافق المقصد: «${stopAt.label}» في الشاشة ${stopAt.screen}`)
+    if (stopAt === null) return { success: false, verified: 'لا زرّ يوافق المقصد في الشاشات' }
+    m.note(`أوّل زرّ رئيسيّ يوافق المقصد: «${stopAt.label}» في الشاشة ${stopAt.screen}`)
     // ‏يعود إلى حيث وقف ويضغطه
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior }))
     const target = page.locator('[data-journey-hit]').first()
-    await m.tap(target, `«${stopAt.label}» — أوّلُ ما وافق المقصد`, { key: true })
+    await m.tap(target, `«${stopAt.label}» — أوّل ما وافق المقصد`, { key: true })
     /*
      * ‏منذ D-195 أوّلُ ما يوافق المقصدَ بابٌ لا فعل: «اكتب من فكرة» ينزل إلى نموذجها. فيمضي المالكُ
      * ‏فيما وصل إليه، يكتب فكرتَه ويضغط زرَّه — ولا يُحسَب نجاحًا إن ضغط «اعتمد» على مسوّدةٍ قديمة.
      */
     const idea = visible(page.locator('form[action="/panel/drafts/idea"]')).first()
     if ((await idea.count()) > 0) {
-      await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمةُ لا تبطئ القرار، تحميه', 'كتابة الفكرة')
+      await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمة لا تبطئ القرار، تحميه', 'كتابة الفكرة')
       await m.tap(button(idea, 'اكتب المسوّدات'), '«اكتب المسوّدات»')
     }
     const made = drafts()
     const approvedOld = status(stack, stack.seeded.posts.draft)?.status
     return {
       success: made > 0 && approvedOld === 'draft',
-      verified: `مسوّداتٌ جديدة (من مصدرٍ أو فكرة): ${made} · والمسوّدةُ القديمة (قبل 5 ساعات) صارت: ${approvedOld ?? '—'}`,
+      verified: `مسوّدات جديدة (من مصدر أو فكرة): ${made} · والمسوّدة القديمة (قبل 5 ساعات) صارت: ${approvedOld ?? '—'}`,
     }
   },
 }
@@ -296,7 +296,7 @@ const R2stop: Journey = {
 const R3: Journey = {
   id: 'R-3',
   title: 'إضافة صورة إلى منشور (إنفوجرافيك)',
-  plan: { today: '3 (توليدٌ فقط)', target: '2' },
+  plan: { today: '3 (توليد فقط)', target: '2' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
     await m.tap(station(page, 'الصورة'), 'محطّة «الصورة» في الرئيسيّة')
@@ -304,7 +304,7 @@ const R3: Journey = {
     await m.tap(button(gen, 'ولّد إنفوجرافيك'), '«ولّد إنفوجرافيك»', { key: true })
     const media = q<{ n: number; bytes: number }>(stack, "SELECT COUNT(*) AS n, MAX(bytes) AS bytes FROM media WHERE post_id = ? AND status = 'ready'", id)
     const shown = await visible(page.locator(`img[src^="/panel/media/"]`)).count()
-    return { success: (media?.n ?? 0) > 0, verified: `media ready = ${media?.n ?? 0} (${media?.bytes ?? 0} بايت) · صورٌ معروضة ${shown}` }
+    return { success: (media?.n ?? 0) > 0, verified: `media ready = ${media?.n ?? 0} (${media?.bytes ?? 0} بايت) · صور معروضة ${shown}` }
   },
 }
 
@@ -318,12 +318,12 @@ const R4: Journey = {
       stack.db.raw.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, 'member', ?, ?, 'active')`)
         .run(`${platform}:member:${ext}`, platform, ext, name)
     }
-    return 'أُضيف حسابا TikTok وInstagram (غيرُ مربوطين في staging) لتُقاس رحلةُ الثلاث كاملة'
+    return 'أُضيف حسابا TikTok وInstagram (غير مربوطين في staging) لتُقاس رحلة الثلاث كاملة'
   },
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
     await m.tap(navItem(page, 'المكتبة'), '«المكتبة» في التنقّل')
-    await m.tap(subTab(page, 'الفيديو'), 'تبويبُ «الفيديو»')
+    await m.tap(subTab(page, 'الفيديو'), 'تبويب «الفيديو»')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
     // ‏بالاسم العربيّ كما يرفعه المالك — والبايتاتُ تُمرَّر لا المسار (Playwright يُسقط مسارًا غيرَ لاتينيّ)
@@ -339,27 +339,27 @@ const R4: Journey = {
     }
     m.mark('uploaded')
     const upload = all<{ id: string; width: number | null; height: number | null; duration_ms: number | null }>(stack, 'SELECT id, width, height, duration_ms FROM uploads').find((r) => !known.has(r.id))!
-    m.note(`المقطع: ${upload.width ?? '?'}×${upload.height ?? '?'} · المدّة ${upload.duration_ms ?? 'غيرُ مقروءة'}`)
+    m.note(`المقطع: ${upload.width ?? '?'}×${upload.height ?? '?'} · المدّة ${upload.duration_ms ?? 'غير مقروءة'}`)
     const form = page.locator(`form[action="/panel/uploads/${upload.id}/posts"]`)
     for (const p of ['youtube', 'tiktok', 'instagram']) {
       const box = form.locator(`input[name="platform"][value="${p}"]`)
       if ((await box.count()) === 0) continue
-      if (await box.isDisabled()) m.note(`مربّعُ ${p} معطَّل`)
+      if (await box.isDisabled()) m.note(`مربّع ${p} معطَّل`)
       else if (!(await box.isChecked())) await m.tap(box, `تعليم ${p}`)
     }
-    await m.type(form.locator('textarea[name="caption"]'), 'الإطار الأوّل في دقيقة: كيف نعرّف المعلَم قبل أن يبدأ العمل', 'نصّ المنشور (سطره الأوّل عنوانُ YouTube)')
+    await m.type(form.locator('textarea[name="caption"]'), 'الإطار الأوّل في دقيقة: كيف نعرّف المعلَم قبل أن يبدأ العمل', 'نصّ المنشور (سطره الأوّل عنوان YouTube)')
     const approve = form.locator('input[name="approve"]')
     if ((await approve.count()) > 0 && !(await approve.isChecked())) await m.tap(approve, '«اعتمده الآن»')
     await m.tap(button(form, 'أنشئ المنشورات'), '«أنشئ المنشورات»')
     m.mark('posts_created')
     const posts = all<{ id: string; platform: string; status: string }>(stack,
       `SELECT p.id, p.platform, p.status FROM posts p JOIN media me ON me.post_id = p.id WHERE me.upload_id = ? ORDER BY p.platform`, upload.id)
-    m.note(`منشوراتٌ أُنشئت: ${posts.map((p) => `${p.platform}:${p.status}`).join(' · ') || '—'}`)
+    m.note(`منشورات أُنشئت: ${posts.map((p) => `${p.platform}:${p.status}`).join(' · ') || '—'}`)
     // ‏ثمّ يجدول كلَّ واحدٍ من بطاقته — لا «جدوِل للثلاث»
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» للجدولة')
     for (const p of posts) {
       if ((await scheduleForm(page, p.id).count()) === 0) {
-        m.note(`لا نموذجَ جدولةٍ لـ ${p.platform}`)
+        m.note(`لا نموذج جدولة لـ ${p.platform}`)
         continue
       }
       await scheduleTomorrow({ page, m, stack, assets, leftSite: [] }, p.id, p.platform)
@@ -369,7 +369,7 @@ const R4: Journey = {
     const ig = posts.find((p) => p.platform === 'instagram')
     if (ig !== undefined && status(stack, ig.id)?.status !== 'queued') {
       const offered = await scheduleForm(page, ig.id).locator('select[name="account"] option').allTextContents().catch(() => [])
-      m.note(`⚠ عطل: منشورُ Instagram (من المقطع) لا يُجدوَل من بطاقته — قائمةُ «الحساب» فيها ${offered.join(' · ') || '—'}، والخادمُ يردّ «المنشور لـ instagram والحساب في linkedin». السبب: platformOf() في src/lib/draft/store.ts تقرأ كلَّ منصّةٍ ليست في PLATFORMS (ومنها instagram) LinkedIn، فتُعرض البطاقةُ LinkedIn ويُعرض حسابُ LinkedIn — و«وزّع المعتمَد» يقرأ القائمةَ نفسَها`)
+      m.note(`⚠ عطل: منشور Instagram (من المقطع) لا يُجدوَل من بطاقته — قائمة «الحساب» فيها ${offered.join(' · ') || '—'}، والخادم يردّ «المنشور لـ instagram والحساب في linkedin». السبب: platformOf() في src/lib/draft/store.ts تقرأ كلّ منصّة ليست في PLATFORMS (ومنها instagram) LinkedIn، فتُعرض البطاقة LinkedIn ويُعرض حساب LinkedIn — و«وزّع المعتمَد» يقرأ القائمة نفسَها`)
     }
     return { success: posts.length === 3 && queued === 3, verified: `${posts.length} منشورات · مجدولة ${queued} (${after.join(' · ')})` }
   },
@@ -390,13 +390,13 @@ const R5: Journey = {
     // ‏الملفُّ يُقرأ حين يُختار؛ و«اقرأ الخطّة» تُضغط إن بقيت ظاهرةً بعده لا قبله
     const read = button(form, 'اقرأ الخطّة')
     if ((await read.count()) > 0) await m.tap(read, '«اقرأ الخطّة»')
-    else m.note('قُرئ الملفُّ حين اختير — بلا «اقرأ الخطّة»')
+    else m.note('قُرئ الملفّ حين اختير — بلا «اقرأ الخطّة»')
     m.mark('previewed')
     const approve = visible(page.locator('form[action$="/approve"] button[type="submit"]')).first()
     const label = ((await approve.textContent().catch(() => '')) ?? '').trim()
     await m.tap(approve, `«${label || 'اعتمد وجدوِل'}»`)
     const after = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
-    return { success: after - before === 3, verified: `منشوراتٌ مجدولةٌ جديدة: ${after - before} من 3 أسطر` }
+    return { success: after - before === 3, verified: `منشورات مجدولة جديدة: ${after - before} من 3 أسطر` }
   },
 }
 
@@ -426,7 +426,7 @@ const R7: Journey = {
     const figure = impressions === null ? null : visible(page.getByText(new RegExp(`${Number(impressions).toLocaleString('en-US').replace(/,/g, '[,٬]?')}`))).first()
     const seen = figure === null ? false : await m.look(figure, `رقم الظهور (${impressions})`, { key: true })
     if (!seen) await m.look(visible(page.locator('h1')).first(), 'عنوان الصفحة', { key: true })
-    return { success: seen, verified: report === undefined ? 'لا تقرير في القاعدة' : `تقرير ${report.id} · الظهور ${impressions ?? '—'} ${seen ? 'معروضٌ' : 'غيرُ معروض'}` }
+    return { success: seen, verified: report === undefined ? 'لا تقرير في القاعدة' : `تقرير ${report.id} · الظهور ${impressions ?? '—'} ${seen ? 'معروض' : 'غير معروض'}` }
   },
 }
 
@@ -501,20 +501,20 @@ const R10: Journey = {
     }
     // ‏وإلّا: أقربُ ما في الرئيسيّة — بلاطةُ «إنفاق 30 يومًا»
     const tile = visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: /إنفاق 30/ }) })).first()
-    const seen = await m.look(tile, 'بلاطة «إنفاق 30 يوما» (أقربُ ما يوجد)', { key: true })
+    const seen = await m.look(tile, 'بلاطة «إنفاق 30 يوما» (أقرب ما يوجد)', { key: true })
     const shown = seen ? ((await tile.locator('.kv-v').textContent()) ?? '').replace(/\s+/g, ' ').trim() : '—'
     const today = ((await visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: 'إنفاق اليوم' }) })).first().locator('.kv-v').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
-    m.note(`المعروض: «إنفاق 30 يوما» = ${shown} · «إنفاق اليوم» = ${today} · ولا سقفَ شهريّ يُقارَن به`)
+    m.note(`المعروض: «إنفاق 30 يوما» = ${shown} · «إنفاق اليوم» = ${today} · ولا سقف شهريّ يُقارَن به`)
     return {
       success: false,
-      verified: `لا رقمَ «هذا الشهر» في اللوحة — أقربُه «30 يومًا» ($${d30.toFixed(2)}) وهو غيرُ الشهر ($${month.toFixed(2)})`,
+      verified: `لا رقم «هذا الشهر» في اللوحة — أقربُه «30 يومًا» ($${d30.toFixed(2)}) وهو غير الشهر ($${month.toFixed(2)})`,
     }
   },
 }
 
 const R11: Journey = {
   id: 'R-11',
-  title: 'الدخول من الهاتف (من رابطٍ محفوظ إلى «التقرير»)',
+  title: 'الدخول من الهاتف (من رابط محفوظ إلى «التقرير»)',
   plan: { today: 'يُقاس', target: '2' },
   startLoggedOut: true,
   async run({ page, m, stack }) {

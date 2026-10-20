@@ -21,7 +21,7 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
   if (peaks === undefined || peaks.hours.length === 0) return ''
   const said = peaks.hours.map((h) =>
     clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)).join(' · ')
-  return `<p class="hint m-0">أعلى تفاعلٍ قِيس عندك: <bdi>${escapeHtml(said)}</bdi>${zoneNote(zone)}، من ${peaks.samples} منشوراتٍ قِيست.</p>`
+  return `<p class="hint m-0">أعلى تفاعل قِيس عندك: <bdi>${escapeHtml(said)}</bdi>${zoneNote(zone)}، من ${peaks.samples} منشورات قِيست.</p>`
 }
 
 /**
@@ -49,7 +49,7 @@ export function whenField(form: string, zone: string | null, now: Date, peaks: P
     ${zone === null ? '<p class="hint m-0">بتوقيت الرياض.</p>' : ''}
     <div class="when-opts">${opts}
       <label class="when-opt"><input type="radio" name="preset" value="custom" form="${form}">
-        <span><b>موعدٌ آخر</b><small>تختار اليوم والساعة</small></span></label>
+        <span><b>موعد آخر</b><small>تختار اليوم والساعة</small></span></label>
     </div>
     <div class="when-custom">${field({
       id: `${form}-local`,

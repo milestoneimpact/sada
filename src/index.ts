@@ -687,7 +687,7 @@ async function alertTick(env: Env): Promise<void> {
   try {
     const items = await expiringTokens(env.DB, new Date())
     if (items.length === 0) {
-      await beat(env.DB, 'alerts', 'ok', 'لا إذنَ يقترب')
+      await beat(env.DB, 'alerts', 'ok', 'لا إذن يقترب')
       return
     }
     const out = await recordAlerts(env.DB, items)
@@ -720,7 +720,7 @@ async function alertTick(env: Env): Promise<void> {
   } catch (error) {
     console.log({
       job: 'alert-outbox',
-      failed: String(error).replace(/https?:\/\/\S+/gi, '«عنوانٌ مُزال»'),
+      failed: String(error).replace(/https?:\/\/\S+/gi, '«عنوان مُزال»'),
     })
   }
 }

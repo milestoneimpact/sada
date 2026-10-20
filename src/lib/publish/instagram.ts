@@ -111,7 +111,7 @@ export async function publishInstagram(
 ): Promise<InstagramOutcome> {
   if (media.url === '') {
     throw new PublishError(
-      'instagram: لا وسيطَ — وInstagram لا تقبل منشورا نصّيّا',
+      'instagram: لا وسيط — وInstagram لا تقبل منشورا نصّيّا',
       400, false,
     )
   }
@@ -125,14 +125,14 @@ export async function publishInstagram(
   const created = await post(`${GRAPH}/${userId}/media`, accessToken, fields, fetchImpl)
   if (!created.ok) {
     throw new PublishError(
-      `instagram: تعذّر إنشاءُ الحاوية — ${await metaError(created)}`,
+      `instagram: تعذّر إنشاء الحاوية — ${await metaError(created)}`,
       created.status, classify(created.status),
     )
   }
   const container = (await created.json()) as ContainerReply
   const creationId = typeof container.id === 'string' ? container.id : ''
   if (creationId === '') {
-    throw new PublishError('instagram: ردٌّ بلا معرّفِ حاوية', 502, true)
+    throw new PublishError('instagram: ردّ بلا معرّف حاوية', 502, true)
   }
 
   // ── ٢ · تُستطلَع حتّى تجهز ──────────────────────────────────────────
@@ -155,7 +155,7 @@ export async function publishInstagram(
        */
       if (code === 'ERROR') {
         throw new PublishError(
-          `instagram: فشل ترميزُ المقطع — ${String(state.status ?? code)}`,
+          `instagram: فشل ترميز المقطع — ${String(state.status ?? code)}`,
           422, false,
         )
       }
@@ -184,7 +184,7 @@ export async function publishInstagram(
      * يمنع إعادةَ المحاولة**، وادّعاءُ الفشل قد يُكرّر منشورا —
      * فيُقال إنّه غيرُ مؤكَّدٍ ولا يُعاد (`retryable: false`).
      */
-    throw new PublishError('instagram: نُشر بلا معرّفٍ يُؤكّده', 502, false)
+    throw new PublishError('instagram: نُشر بلا معرّف يُؤكّده', 502, false)
   }
 
   return {

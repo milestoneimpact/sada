@@ -40,7 +40,7 @@ const TOP_ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 function writerReply(): Response {
   return new Response(JSON.stringify({
     model: 'w-1',
-    choices: [{ message: { content: JSON.stringify({ subject: 'folded brass sheets', headline: 'أثرٌ يُقاس', kicker: 'Measured Impact' }) }, finish_reason: 'stop' }],
+    choices: [{ message: { content: JSON.stringify({ subject: 'folded brass sheets', headline: 'أثر يُقاس', kicker: 'Measured Impact' }) }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 100, completion_tokens: 20 },
   }), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
@@ -122,7 +122,7 @@ async function seedPost(options: { status?: string; text?: string; platform?: st
     .bind(
       id,
       options.platform ?? 'linkedin',
-      options.text ?? 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.',
+      options.text ?? 'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره. وهذا ما يقيسه التقرير.',
       options.status ?? 'draft',
       `k-${id}`,
       options.status === 'approved' ? 'panel:token' : null,
@@ -195,7 +195,7 @@ describe('المسار الكامل', () => {
     expect((await ledger())[0]?.operation).toContain('image:linkedin')
   })
 
-  it('المفتاحُ في ترويسة لا في العنوان — فلا يُسجَّل في وسيط', async () => {
+  it('المفتاح في ترويسة لا في العنوان — فلا يُسجَّل في وسيط', async () => {
     await generateForPost(deps(net()), await seedPost())
     expect(calls[0]?.url).not.toContain('AIza-test')
     expect(calls[0]?.headers['x-goog-api-key']).toBe('AIza-test')
@@ -218,7 +218,7 @@ describe('المسار الكامل', () => {
   })
 
   /** **ولا عربيّةَ في وصفٍ لا يقرؤها** — إلّا سياقَ الاحتياط مُعلَّما. */
-  it('والوصفُ إنجليزيٌّ كلُّه — فالنموذجُ لا يقرأ غيرها', async () => {
+  it('والوصف إنجليزيّ كلُّه — فالنموذج لا يقرأ غيرها', async () => {
     await generateForPost(deps(net()), await seedPost())
     const sent = calls[0]?.body as { contents?: { parts?: { text?: string }[] }[] }
     const prompt = sent.contents?.[0]?.parts?.[0]?.text ?? ''
@@ -231,7 +231,7 @@ describe('المسار الكامل', () => {
   })
 })
 
-describe('**بايتاتٌ يتيمةٌ أرخص من صفٍّ يكذب**', () => {
+describe('**بايتات يتيمة أرخص من صفّ يكذب**', () => {
   it('حين يفشل الرفع لا يُكتب صفّ', async () => {
     const post = await seedPost()
     const out = await generateForPost(deps(net(), bucket({ failPut: true })), post)
@@ -243,7 +243,7 @@ describe('**بايتاتٌ يتيمةٌ أرخص من صفٍّ يكذب**', () =
     expect(await ledger()).toHaveLength(1)
   })
 
-  it('وكلُّ صفٍّ مكتوبٍ له بايتاتٌ فعلا', async () => {
+  it('وكلّ صفّ مكتوب له بايتات فعلا', async () => {
     const post = await seedPost()
     const b = bucket()
     await generateForPost(deps(net(), b), post)
@@ -254,7 +254,7 @@ describe('**بايتاتٌ يتيمةٌ أرخص من صفٍّ يكذب**', () =
 })
 
 describe('D-008 · الكلفة قبل ما بعدها', () => {
-  it('تُسجَّل حتّى حين تتجاوز الصورةُ سقفَ الحجم', async () => {
+  it('تُسجَّل حتّى حين تتجاوز الصورة سقف الحجم', async () => {
     const post = await seedPost()
     // صورةٌ فوق خمسة ميغابايت
     const huge = btoa('x'.repeat(6 * 1024 * 1024))
@@ -265,14 +265,14 @@ describe('D-008 · الكلفة قبل ما بعدها', () => {
     expect(await mediaFor(db, [post])).toHaveLength(0)
   })
 
-  it('ولا تُسجَّل حين يفشل النداءُ نفسه — لا نداءَ لا حساب', async () => {
+  it('ولا تُسجَّل حين يفشل النداء نفسه — لا نداء لا حساب', async () => {
     const out = await generateForPost(deps(net({ status: 500 })), await seedPost())
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(true)
     expect(await ledger()).toHaveLength(0)
   })
 
-  it('ومنعُ السياسة لا يُعاد — فلا يُدفع ثمنُ رفضٍ مؤكّد', async () => {
+  it('ومنع السياسة لا يُعاد — فلا يُدفع ثمن رفض مؤكّد', async () => {
     const out = await generateForPost(
       deps(net({ payload: { promptFeedback: { blockReason: 'SAFETY' } } })),
       await seedPost(),
@@ -281,7 +281,7 @@ describe('D-008 · الكلفة قبل ما بعدها', () => {
     if (out.kind === 'failed') expect(out.retryable).toBe(false)
   })
 
-  it('وجوابٌ نصّيٌّ مكان الصورة يُنقَل كما هو', async () => {
+  it('وجواب نصّيّ مكان الصورة يُنقَل كما هو', async () => {
     const out = await generateForPost(
       deps(net({ payload: { candidates: [{ content: { parts: [{ text: 'لا أستطيع رسم هذا' }] } }] } })),
       await seedPost(),
@@ -291,8 +291,8 @@ describe('D-008 · الكلفة قبل ما بعدها', () => {
   })
 })
 
-describe('لا توليدَ مرّتين', () => {
-  it('النقرةُ الثانية لا تنادي ولا تُنفق', async () => {
+describe('لا توليد مرّتين', () => {
+  it('النقرة الثانية لا تنادي ولا تُنفق', async () => {
     const post = await seedPost()
     const b = bucket()
     const first = await generateForPost(deps(net(), b), post)
@@ -304,7 +304,7 @@ describe('لا توليدَ مرّتين', () => {
     expect(await ledger()).toHaveLength(1)
   })
 
-  it('ونصٌّ عدّله المالك يعطي مفتاحا جديدا', async () => {
+  it('ونصّ عدّله المالك يعطي مفتاحا جديدا', async () => {
     const post = await seedPost()
     expect(await imageKey(post, 'نصّ')).not.toBe(await imageKey(post, 'نصّ آخر'))
   })
@@ -316,7 +316,7 @@ describe('لا توليدَ مرّتين', () => {
    * يقرآن «لا» كلاهما **ويدفعان كلاهما**، ثمّ يُردّ أحدُهما عند الكتابة
    * — والقيدُ منع الصفَّ المكرّر **بعد** أن وقع الدفعُ المكرّر.
    */
-  it('ونداءٌ جارٍ يمنع الثانيَ قبل أن يُنفِق', async () => {
+  it('ونداء جار يمنع الثاني قبل أن يُنفِق', async () => {
     const post = await seedPost()
     const row = db.raw.prepare('SELECT text FROM posts WHERE id = ?').get(post) as { text: string }
     const key = await imageKey(post, row.text)
@@ -332,7 +332,7 @@ describe('لا توليدَ مرّتين', () => {
   })
 
   /** **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة عشرَ دقائق.** */
-  it('وفشلُ النداء يحرّر حجزَه فتُقبل الإعادة', async () => {
+  it('وفشل النداء يحرّر حجزَه فتُقبل الإعادة', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net({ status: 500 })), post)
     expect(first.kind).toBe('failed')
@@ -343,7 +343,7 @@ describe('لا توليدَ مرّتين', () => {
 })
 
 describe('الحارس قبل النداء', () => {
-  it('الإيقافُ يمنع، ولا يُرسَل شيء', async () => {
+  it('الإيقاف يمنع، ولا يُرسَل شيء', async () => {
     await writeSetting(db, 'paused', 'true', 'test')
     const out = await generateForPost(deps(net()), await seedPost())
 
@@ -403,13 +403,13 @@ describe('الرفض', () => {
 })
 
 describe('الوصف', () => {
-  it('يأخذ الجملةَ الأولى لا النصَّ كلَّه — فلا تزدحم الصورة', () => {
-    const long = `${'الجملةُ الأولى تحمل الفكرة كلَّها'}. ${'ن'.repeat(2000)}`
+  it('يأخذ الجملة الأولى لا النصّ كلَّه — فلا تزدحم الصورة', () => {
+    const long = `${'الجملة الأولى تحمل الفكرة كلَّها'}. ${'ن'.repeat(2000)}`
     expect(topicOf(long).length).toBeLessThanOrEqual(220)
-    expect(topicOf(long)).toContain('الجملةُ الأولى')
+    expect(topicOf(long)).toContain('الجملة الأولى')
   })
 
-  it('ولكلّ منصّةٍ نسبتُها', () => {
+  it('ولكلّ منصّة نسبتُها', () => {
     const li = imagePrompt({ topic: 'الوقف', platform: 'linkedin' })
     const x = imagePrompt({ topic: 'الوقف', platform: 'x' })
     expect(li).toContain('1.91:1')
@@ -424,8 +424,8 @@ describe('الوصف', () => {
  * يُنادى Gemini على كلّ حال. فمن وجّه الصورَ إلى Cloudflare أُرسل اسمُ
  * نموذجِها إلى عنوان Google — **فردّت ٤٠٥**.
  */
-describe('توجيهُ الصور يُطاع (D-079)', () => {
-  it('ووجهةُ Cloudflare تُنادى عندها لا عند Google', async () => {
+describe('توجيه الصور يُطاع (D-079)', () => {
+  it('ووجهة Cloudflare تُنادى عندها لا عند Google', async () => {
     await upsertProvider(db, {
       name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
       model: '@cf/black-forest-labs/flux-1-schnell',
@@ -465,7 +465,7 @@ describe('توجيهُ الصور يُطاع (D-079)', () => {
  * وهي تحسينٌ لا شرط. **فكلُّ سببِ سقوطٍ يُبقي الصورةَ كما هي** — ومنشورٌ
  * بصورةٍ نظيفةٍ خيرٌ من منشورٍ بلا صورة، وهي قاعدةُ الموجز البصريّ (D-083).
  */
-describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُبقي الصورة', () => {
+describe('الشريحة فوق الصورة — وكلّ سقوط يُبقي الصورة', () => {
   /** بايتاتُ اللقطة كما يعيدها المتصفّح — تُميَّز عن بايتات المولّد. */
   const SHOT = new Uint8Array([9, 9, 9, 9, 9, 9])
   const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -494,7 +494,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
               message: {
                 content: JSON.stringify({
                   subject: 'folded brass sheets',
-                  headline: 'أثرٌ يُقاس',
+                  headline: 'أثر يُقاس',
                   kicker: 'Measured Impact',
                 }),
               },
@@ -530,7 +530,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
 
   const READY = { CF_AI_ACCOUNT_ID: 'acc', CF_BROWSER_TOKEN: 'cfut_browser' }
 
-  it('يركّب النصَّ ويرفع **اللقطةَ** لا الصورةَ الخام', async () => {
+  it('يركّب النصّ ويرفع **اللقطة** لا الصورة الخام', async () => {
     await seedWriter()
     const b = bucket()
     const out = await generateForPost(slideDeps(twoLane(), b, READY), await seedPost())
@@ -540,7 +540,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(calls.some((c) => c.url.includes('browser-rendering/screenshot'))).toBe(true)
   })
 
-  it('و**كلفةُ اللقطة تُسجَّل** — نداءٌ مدفوعٌ لا يُخفى (D-008)', async () => {
+  it('و**كلفة اللقطة تُسجَّل** — نداء مدفوع لا يُخفى (D-008)', async () => {
     await seedWriter()
     await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
     const ops = (await ledger(true)).map((e) => e.operation)
@@ -549,7 +549,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(ops.some((o) => o.startsWith('image:'))).toBe(true)
   })
 
-  it('وسقوطُ التصوير يُبقي الصورةَ الخام — لا منشورَ بلا صورة', async () => {
+  it('وسقوط التصوير يُبقي الصورة الخام — لا منشور بلا صورة', async () => {
     await seedWriter()
     const b = bucket()
     const out = await generateForPost(
@@ -563,7 +563,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect((await ledger()).some((e) => e.operation.startsWith('slide:'))).toBe(false)
   })
 
-  it('و**بلا رمزِ المتصفّح لا نداءَ أصلا** — الغيابُ ليس عطلا', async () => {
+  it('و**بلا رمز المتصفّح لا نداء أصلا** — الغياب ليس عطلا', async () => {
     await seedWriter()
     await generateForPost(
       slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }),
@@ -572,13 +572,13 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
   })
 
-  it('وبلا عنوانٍ في الموجز لا شريحة — ولا نصَّ يُخترَع', async () => {
+  it('وبلا عنوان في الموجز لا شريحة — ولا نصّ يُخترَع', async () => {
     // لا مزوّدَ كتابةٍ ⇒ لا موجزَ ⇒ لا عنوان
     await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
     expect(calls.some((c) => c.url.includes('browser-rendering'))).toBe(false)
   })
 
-  it('وإطفاءُ التركيب من الإعدادات يُحترَم', async () => {
+  it('وإطفاء التركيب من الإعدادات يُحترَم', async () => {
     await seedWriter()
     await writeSetting(db, 'image_overlay', 'false', 'test')
     await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
@@ -592,7 +592,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
    * بلا عنوان، وصورةٌ فوق الحدّ، ولقطةٌ سقطت. فالمالكُ يرى صورةً بلا
    * نصّ **ويُصلِح في مكانٍ سليم**.
    */
-  it('وسببُ السقوط يُعاد مع المخرَج — لا صمت', async () => {
+  it('وسبب السقوط يُعاد مع المخرَج — لا صمت', async () => {
     await seedWriter()
     const out = await generateForPost(
       slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }),
@@ -603,7 +603,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(out.note).toContain('CF_BROWSER_TOKEN')
   })
 
-  it('وحين تُركَّب الشريحةُ فلا سبب — الفراغُ يعني أنّ كلَّ شيءٍ تمّ', async () => {
+  it('وحين تُركَّب الشريحة فلا سبب — الفراغ يعني أنّ كلّ شيء تمّ', async () => {
     await seedWriter()
     const out = await generateForPost(slideDeps(twoLane(), bucket(), READY), await seedPost())
     expect(out.kind).toBe('generated')
@@ -611,7 +611,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     expect(out.note).toBe('')
   })
 
-  it('وسقوطُ التصوير يُسمّى — لا يُخلَط بالغياب', async () => {
+  it('وسقوط التصوير يُسمّى — لا يُخلَط بالغياب', async () => {
     await seedWriter()
     const out = await generateForPost(
       slideDeps(twoLane({ shotStatus: 500 }), bucket(), READY),
@@ -619,7 +619,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
     )
     expect(out.kind).toBe('generated')
     if (out.kind !== 'generated') return
-    expect(out.note).toContain('تعذّر تصويرُ الشريحة')
+    expect(out.note).toContain('تعذّر تصوير الشريحة')
   })
 
   /**
@@ -628,17 +628,17 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
    * كان السببُ والعنوانُ يُقالان في الوميض مرّةً ثمّ يُرميان: البطاقةُ بعد
    * التحديث لا تعرف أرُكّب النصُّ أم سقط. فالصفُّ يُسأل هنا لا المخرَج.
    */
-  describe('والصفُّ يحفظ ما قيل عن الشريحة (D-162)', () => {
-    it('رُكّب: السببُ فراغٌ والعنوانُ هو المرسوم', async () => {
+  describe('والصفّ يحفظ ما قيل عن الشريحة (D-162)', () => {
+    it('رُكّب: السبب فراغ والعنوان هو المرسوم', async () => {
       await seedWriter()
       const post = await seedPost()
       await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
       const [row] = await mediaFor(db, [post])
       expect(row!.note).toBe('')
-      expect(row!.headline).toBe('أثرٌ يُقاس')
+      expect(row!.headline).toBe('أثر يُقاس')
     })
 
-    it('وسقوطُ التركيب يُحفَظ كما قيل في الوميض — والعنوانُ المقترحُ معه', async () => {
+    it('وسقوط التركيب يُحفَظ كما قيل في الوميض — والعنوان المقترح معه', async () => {
       await seedWriter()
       const post = await seedPost()
       const out = await generateForPost(slideDeps(twoLane(), bucket(), { CF_AI_ACCOUNT_ID: 'acc' }), post)
@@ -646,14 +646,14 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       const [row] = await mediaFor(db, [post])
       expect(row!.note).toBe(out.note)
       expect(row!.note).toContain('CF_BROWSER_TOKEN')
-      expect(row!.headline).toBe('أثرٌ يُقاس')
+      expect(row!.headline).toBe('أثر يُقاس')
     })
 
     /*
      * **وبلا موجزٍ لا صورةٌ فنّيّةٌ أصلا** (D-174): كانت تُرسم بوصفٍ عامٍّ لا يمتّ
      * إلى النصّ. فتُردّ بسببها، ولا نداءَ صورة، ولا صفّ، والإنفوجرافيك يُقال بديلًا.
      */
-    it('وبلا موجزٍ لا صورةٌ فنّيّة: يُردّ بسببه ولا يُنادى نموذجُ الصورة', async () => {
+    it('وبلا موجز لا صورة فنّيّة: يُردّ بسببه ولا يُنادى نموذج الصورة', async () => {
       const post = await seedPost()
       const out = await generateForPost(slideDeps(twoLane(), bucket(), READY), post)
       expect(out.kind).toBe('failed')
@@ -662,7 +662,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       expect(calls.some((c) => c.url.includes('generativelanguage'))).toBe(false)
     })
 
-    it('والإطفاءُ يُحفَظ بلفظه — فتقرؤه البطاقةُ قرارًا لا عطلا', async () => {
+    it('والإطفاء يُحفَظ بلفظه — فتقرؤه البطاقة قرارًا لا عطلا', async () => {
       await seedWriter()
       await writeSetting(db, 'image_overlay', 'false', 'test')
       const post = await seedPost()
@@ -671,7 +671,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       expect(row!.note!.endsWith(OVERLAY_OFF)).toBe(true)
     })
 
-    it('وسببٌ يطول بلا حدٍّ يُقصّ عند الكتابة — والوميضُ يقول المقصوصَ نفسَه', async () => {
+    it('وسبب يطول بلا حدّ يُقصّ عند الكتابة — والوميض يقول المقصوص نفسَه', async () => {
       await seedWriter()
       const lane = twoLane()
       const endless: typeof fetch = (async (input: unknown, init?: RequestInit) => {
@@ -707,13 +707,13 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
       }) as typeof fetch
     }
 
-    it('وموجزٌ سقط بخطأٍ طويل: يُردّ بسببه مقصوصًا، والصورةُ القائمةُ لا تُمَسّ', async () => {
+    it('وموجز سقط بخطأ طويل: يُردّ بسببه مقصوصًا، والصورة القائمة لا تُمَسّ', async () => {
       await seedWriter()
       const post = await seedPost()
       const out = await generateForPost(slideDeps(briefFails(400), bucket(), READY), post)
       expect(out.kind).toBe('failed')
       if (out.kind === 'failed') {
-        expect(out.reason.startsWith('لم تُولَّد الصورةُ الفنّيّة — تعذّر الموجزُ البصريّ')).toBe(true)
+        expect(out.reason.startsWith('لم تُولَّد الصورة الفنّيّة — تعذّر الموجز البصريّ')).toBe(true)
         expect(out.retryable).toBe(true)
       }
       expect(await mediaFor(db, [post])).toHaveLength(0)
@@ -730,7 +730,7 @@ describe('الشريحةُ فوق الصورة — وكلُّ سقوطٍ يُب�
  *
  * **فمن رفض صورةً لم يستطع توليدَ بديلٍ لها أبدا.**
  */
-describe('المرفوضةُ لا تسدّ الطريق', () => {
+describe('المرفوضة لا تسدّ الطريق', () => {
   it('يولّد بديلا بعد الرفض — ولا يقول «وُلّدت»', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
@@ -748,7 +748,7 @@ describe('المرفوضةُ لا تسدّ الطريق', () => {
     expect((again as { mediaId: string }).mediaId).not.toBe((first as { mediaId: string }).mediaId)
   })
 
-  it('و**الصفُّ المرفوضُ يبقى بكلفته** — الدفترُ لا يُمحى', async () => {
+  it('و**الصفّ المرفوض يبقى بكلفته** — الدفتر لا يُمحى', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
     await rejectMedia(db, (first as { mediaId: string }).mediaId)
@@ -762,7 +762,7 @@ describe('المرفوضةُ لا تسدّ الطريق', () => {
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
   })
 
-  it('ورفضٌ ثانٍ لصفٍّ مرفوضٍ يُردّ — ولا يُوسَم مفتاحُه مرّتين', async () => {
+  it('ورفض ثان لصفّ مرفوض يُردّ — ولا يُوسَم مفتاحُه مرّتين', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
     const id = (first as { mediaId: string }).mediaId
@@ -783,8 +783,8 @@ describe('المرفوضةُ لا تسدّ الطريق', () => {
  * كان «ارفض» ثمّ «ولّد»: والأولى تقع ولو سقطت الثانيةُ عند سقف، فيبقى
  * المنشورُ بلا صورة.
  */
-describe('صورةٌ بديلة', () => {
-  it('تُرفَض القائمةُ ويُولَّد بديلُها في نداءٍ واحد', async () => {
+describe('صورة بديلة', () => {
+  it('تُرفَض القائمة ويُولَّد بديلُها في نداء واحد', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
     const old = (first as { mediaId: string }).mediaId
@@ -795,7 +795,7 @@ describe('صورةٌ بديلة', () => {
     expect(row!.status).toBe('rejected')
   })
 
-  it('وحارسٌ يردّ التوليدَ لا يمسّ القائمة', async () => {
+  it('وحارس يردّ التوليد لا يمسّ القائمة', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
     const old = (first as { mediaId: string }).mediaId
@@ -806,7 +806,7 @@ describe('صورةٌ بديلة', () => {
     expect(row!.status).toBe('ready')
   })
 
-  it('ولا تُستبدَل صورةُ منشورٍ آخر', async () => {
+  it('ولا تُستبدَل صورة منشور آخر', async () => {
     const a = await seedPost()
     const b = await seedPost({ platform: 'x' })
     const first = await generateForPost(deps(net()), a)
@@ -831,8 +831,8 @@ describe('صورةٌ بديلة', () => {
  * **والحارسُ يُبنى على الحال لا على الاسم**: الاسمُ يُصلَح بترحيل،
  * والحالُ صحيحةٌ في كلّ صفٍّ منذ ‏0010.
  */
-describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-088)', () => {
-  it('لا يقول «وُلّدت» على صفٍّ مرفوضٍ مفتاحُه نظيف', async () => {
+describe('صفّ رُفض قبل الوسم — ولا يكذب أخضر (D-088)', () => {
+  it('لا يقول «وُلّدت» على صفّ مرفوض مفتاحُه نظيف', async () => {
     const post = await seedPost({ platform: 'x' })
     const first = await generateForPost(deps(net()), post)
     expect(first.kind).toBe('generated')
@@ -841,7 +841,7 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
     // **رفضٌ بالكاتب القديم**: الحالُ تتغيّر والمفتاحُ يبقى — كما في كلّ
     // صفٍّ رُفض قبل D-087
     await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
-    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    const key = await imageKey(post, 'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره. وهذا ما يقيسه التقرير.')
     await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
 
     const again = await generateForPost(deps(net()), post)
@@ -849,12 +849,12 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
     expect((again as { mediaId: string }).mediaId).not.toBe(id)
   })
 
-  it('ويبقى الصفُّ القديمُ بكلفته — الدفترُ لا يُمحى', async () => {
+  it('ويبقى الصفّ القديم بكلفته — الدفتر لا يُمحى', async () => {
     const post = await seedPost({ platform: 'x' })
     const first = await generateForPost(deps(net()), post)
     const id = (first as { mediaId: string }).mediaId
     await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
-    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    const key = await imageKey(post, 'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره. وهذا ما يقيسه التقرير.')
     await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
     await generateForPost(deps(net()), post)
 
@@ -872,12 +872,12 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
    * مسارٌ نادرٌ لا يمرّ فيه أحدٌ حتّى يمرّ، وكان نسخةً حرفيّةً من الأوّل.
    * فإن افترقا كُتب صفٌّ بلا سببه، وقالت البطاقةُ عنه ما لم يُسجَّل.
    */
-  it('والصفُّ المُعادُ بعد تحرير الاسم يحمل سببَه', async () => {
+  it('والصفّ المُعاد بعد تحرير الاسم يحمل سببَه', async () => {
     const post = await seedPost({ platform: 'x' })
     const first = await generateForPost(deps(net()), post)
     const id = (first as { mediaId: string }).mediaId
     await db.prepare("UPDATE media SET status = 'rejected' WHERE id = ?").bind(id).run()
-    const key = await imageKey(post, 'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره. وهذا ما يقيسه التقرير.')
+    const key = await imageKey(post, 'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره. وهذا ما يقيسه التقرير.')
     await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
 
     const again = await generateForPost(deps(net()), post)
@@ -893,7 +893,7 @@ describe('صفٌّ رُفض قبل الوسم — ولا يكذب أخضر (D-08
  * و`String(null)` كانت ستطبع «بلا نصٍّ فوقها: null» على كلّ صورةٍ قديمة.
  */
 describe('mediaFor يفرّق NULL عن الفراغ (D-162)', () => {
-  it('صفٌّ بالأعمدة التسعة القديمة: note و headline كلاهما null', async () => {
+  it('صفّ بالأعمدة التسعة القديمة: note و headline كلاهما null', async () => {
     const post = await seedPost()
     await db
       .prepare(
@@ -911,11 +911,11 @@ describe('mediaFor يفرّق NULL عن الفراغ (D-162)', () => {
 /**
  * D-157 · السببُ الذي يُصلحه المالك يُقال أوّلا.
  */
-describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
+describe('ترتيب أسباب سقوط الشريحة (D-157)', () => {
   const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
   const image = { bytes: new Uint8Array([1, 2, 3]), mime: 'image/png', model: 'm' }
 
-  it('بلا مفتاحٍ وبلا عنوان: يُقال المفتاحُ لا العنوان', async () => {
+  it('بلا مفتاح وبلا عنوان: يُقال المفتاح لا العنوان', async () => {
     const out = await composeSlide(
       { db, bucket: bucket(), encKey: ENC, workerSecrets: {} },
       { image, platform: 'linkedin', headline: '', kicker: '' },
@@ -925,7 +925,7 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(out.reason).not.toContain('بلا عنوان')
   })
 
-  it('والإعدادُ المطفأ يسبق المفتاح', async () => {
+  it('والإعداد المطفأ يسبق المفتاح', async () => {
     await writeSetting(db, 'image_overlay', '0', 'test')
     const out = await composeSlide(
       { db, bucket: bucket(), encKey: ENC, workerSecrets: {} },
@@ -934,7 +934,7 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(out.reason).toContain('مُطفأ')
   })
 
-  it('وبالمفتاح وبلا عنوان: العنوانُ هو السبب', async () => {
+  it('وبالمفتاح وبلا عنوان: العنوان هو السبب', async () => {
     const out = await composeSlide(
       { db, bucket: bucket(), encKey: ENC, workerSecrets: { CF_AI_ACCOUNT_ID: 'a', CF_BROWSER_TOKEN: 't' } },
       { image, platform: 'linkedin', headline: '', kicker: '' },
@@ -942,11 +942,11 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(out.reason).toContain('بلا عنوان')
   })
 
-  it('noteOf يقدّم سقوطَ الموجز على ما ترتّب عليه', () => {
-    expect(noteOf({ brief: null, detail: 'لا مزوّدَ للكتابة' }, { reason: 'بلا عنوانٍ في الموجز' }))
-      .toBe('لا مزوّدَ للكتابة؛ بلا عنوانٍ في الموجز')
-    expect(noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'الصورةُ فوق حدِّ الضمّ' }))
-      .toBe('الصورةُ فوق حدِّ الضمّ')
+  it('noteOf يقدّم سقوط الموجز على ما ترتّب عليه', () => {
+    expect(noteOf({ brief: null, detail: 'لا مزوّد للكتابة' }, { reason: 'بلا عنوان في الموجز' }))
+      .toBe('لا مزوّد للكتابة؛ بلا عنوان في الموجز')
+    expect(noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'الصورة فوق حدّ الضمّ' }))
+      .toBe('الصورة فوق حدّ الضمّ')
     expect(noteOf({ brief: null, detail: 'سقط' }, { reason: '' })).toBe('')
   })
 
@@ -954,7 +954,7 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
    * **والحدُّ يُقسَم ولا يُقصّ من الذيل** (D-162): السببُ الثاني كاملٌ دائمًا،
    * والأوّلُ يأخذ ما بقي — وقصُّه معلَّمٌ بـ«…» لا ذيلٌ مبتورٌ يُقرأ كاملا.
    */
-  it('noteOf تحفظ السببَ الثاني كاملًا وتقصّ الأوّل إلى ما بقي من ‏300', () => {
+  it('noteOf تحفظ السبب الثاني كاملًا وتقصّ الأوّل إلى ما بقي من ‏300', () => {
     const reason = 'r'.repeat(10)
     // ‏288 + «؛ » + ‏10 = ‏300 تمامًا: يتّسع بلا قصّ
     const fits = noteOf({ brief: null, detail: 'd'.repeat(288) }, { reason })
@@ -969,7 +969,7 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
     expect(off.endsWith(`…؛ ${OVERLAY_OFF}`)).toBe(true)
   })
 
-  it('وسببٌ وحدَه فوق الحدّ يُقصّ معلَّمًا — ولا يتّسع لسقوطٍ قبله', () => {
+  it('وسبب وحدَه فوق الحدّ يُقصّ معلَّمًا — ولا يتّسع لسقوط قبله', () => {
     const lone = noteOf({ brief: { headline: 'x' }, detail: '' }, { reason: 'ض'.repeat(2000) })
     expect(lone).toBe(`${'ض'.repeat(NOTE_MAX - 1)}…`)
     // لا مكانَ للأوّل: «؛» في الرأس بلا ما قبلها أسوأُ من إسقاطه
@@ -981,8 +981,8 @@ describe('ترتيبُ أسباب سقوط الشريحة (D-157)', () => {
 /**
  * D-163 · **القرارُ نقيٌّ، والدالّةُ والنقطةُ تناديانه معًا**.
  */
-describe('slideGate — حكمُ الشريحة بترتيب composeSlide', () => {
-  it('الإطفاءُ يسبق البيئة، والمفتاحُ والحسابُ حالٌ واحدة، و`missing` يسمّي الغائب', () => {
+describe('slideGate — حكم الشريحة بترتيب composeSlide', () => {
+  it('الإطفاء يسبق البيئة، والمفتاح والحساب حال واحدة، و`missing` يسمّي الغائب', () => {
     expect(slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }))
       .toEqual({ state: 'off', missing: ['key', 'account'] })
     expect(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true }))
@@ -993,7 +993,7 @@ describe('slideGate — حكمُ الشريحة بترتيب composeSlide', () =
       .toEqual({ state: 'ready', missing: [] })
   })
 
-  it('ومسافاتٌ وحدها غيابٌ عند composeSlide — فلا يقول اللوحُ «مضبوط» ولا تُنادى', async () => {
+  it('ومسافات وحدها غياب عند composeSlide — فلا يقول اللوح «مضبوط» ولا تُنادى', async () => {
     const out = await composeSlide(
       { db, bucket: bucket(), encKey: '', workerSecrets: { CF_AI_ACCOUNT_ID: '   ', CF_BROWSER_TOKEN: 't' } },
       { image: { bytes: new Uint8Array([1]), mime: 'image/png', model: 'm' }, platform: 'linkedin', headline: 'عنوان', kicker: '' },
@@ -1003,7 +1003,7 @@ describe('slideGate — حكمُ الشريحة بترتيب composeSlide', () =
   })
 })
 
-describe('imageSecretName — اسمُ السرّ يتبع المزوّد', () => {
+describe('imageSecretName — اسم السرّ يتبع المزوّد', () => {
   it('Gemini المدمَج ← GEMINI_API_KEY، وCloudflare ← CF_AI_TOKEN، والمضاف ← لا سرّ', () => {
     expect(imageSecretName({ name: 'gemini', builtin: true })).toBe('GEMINI_API_KEY')
     expect(imageSecretName({ name: 'cloudflare', builtin: false })).toBe('CF_AI_TOKEN')
@@ -1016,7 +1016,7 @@ describe('imageSecretName — اسمُ السرّ يتبع المزوّد', () =
  * D-163 · **ما يُعرَف قبل الدفع يُسأل قبل الدفع**: كان السائقُ والحسابُ يُكتشفان
  * داخل النداء، بعد الحجز وبعد أن سُجّل ثمنُ الموجز.
  */
-describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)', () => {
+describe('بوّابة المزوّد قبل الحجز والموجز (D-163)', () => {
   const ENC = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 
   /** مزوّدُ كتابةٍ بمفتاحٍ وعنوانٍ يردّ موجزًا — فعلى الشيفرة القديمة يُدفَع ثمنُه. */
@@ -1038,7 +1038,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
       if (url.includes('api.writer.test')) {
         return new Response(JSON.stringify({
           model: 'w-1',
-          choices: [{ message: { content: '{"subject":"folded brass","headline":"أثرٌ يُقاس"}' }, finish_reason: 'stop' }],
+          choices: [{ message: { content: '{"subject":"folded brass","headline":"أثر يُقاس"}' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 100, completion_tokens: 20 },
         }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
@@ -1053,7 +1053,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
     model: '@cf/black-forest-labs/flux-1-schnell', ...(baseUrl === undefined ? {} : { baseUrl }),
   }, 'test')
 
-  it('Cloudflare بمفتاحٍ وبلا حساب: يُردّ قبل الموجز — ولا صفَّ في الدفتر', async () => {
+  it('Cloudflare بمفتاح وبلا حساب: يُردّ قبل الموجز — ولا صفّ في الدفتر', async () => {
     await seedWriter()
     await cloudflare()
     await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
@@ -1067,7 +1067,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
     expect(await ledger()).toHaveLength(0)
   })
 
-  it('ومتغيّرُ الحساب مسافاتٍ يرجع إلى عنوان البطاقة — كما يفعل المقطع', async () => {
+  it('ومتغيّر الحساب مسافات يرجع إلى عنوان البطاقة — كما يفعل المقطع', async () => {
     await seedWriter()
     await cloudflare('https://api.cloudflare.com/client/v4/accounts/card-acc/ai/v1')
     await writeRoute(db, 'image', 'cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'test')
@@ -1079,7 +1079,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
     expect(calls.some((c) => c.url.includes('/accounts/card-acc/ai/run/'))).toBe(true)
   })
 
-  it('ومزوّدٌ لا سائقَ صورةٍ له: يُردّ قبل أن يُرسَل مفتاحُه إلى Google', async () => {
+  it('ومزوّد لا سائق صورة له: يُردّ قبل أن يُرسَل مفتاحُه إلى Google', async () => {
     await seedWriter()
     // مفتاحُ Anthropic في الخزنة — وكان يُفكّ ويُرسَل إلى عنوان Google بعد الموجز
     await saveKey(db, ENC, 'anthropic', 'sk-ant-vault-secret-0001', 'test')
@@ -1094,7 +1094,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
     expect(await ledger()).toHaveLength(0)
   })
 
-  it('تطابق: مزوّدُ الصورة معطَّل — الدالّةُ تعود «معطَّل»، والنقطةُ ساقطةٌ «معطَّلٌ بقرارك»', async () => {
+  it('تطابق: مزوّد الصورة معطَّل — الدالّة تعود «معطَّل»، والنقطة ساقطة «معطَّل بقرارك»', async () => {
     await setEnabled(db, 'gemini', false, 'test')
     const out = await generateForPost(deps(net()), await seedPost())
     expect(out.kind).toBe('blocked')
@@ -1110,7 +1110,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
       blocker: null, provider: { label: record.label, refusal },
       slide: slideGate({ overlay: false, hasBrowserKey: false, hasAccount: false }), briefReady: true,
     })
-    expect(line.next).toMatchObject({ key: 'provider', state: 'failed', note: 'Gemini معطَّلٌ بقرارك' })
+    expect(line.next).toMatchObject({ key: 'provider', state: 'failed', note: 'Gemini معطَّل بقرارك' })
     expect(line.blocked).toBe(true)
   })
 })
@@ -1120,7 +1120,7 @@ describe('بوّابةُ المزوّد قبل الحجز والموجز (D-163)
  * ولا يُنادى نموذجُ الصور.
  */
 describe('الإنفوجرافيك', () => {
-  const INFO_POST = 'المعلم ليس نقطة على الخط الزمني.\n\nيُعاد تعريفه بخمسة أبعاد: قرار، توقيت، تحكّم، قياس، قيمة.\n\nوالنتيجة: حوكمةٌ تُقاس بالمعالم.'
+  const INFO_POST = 'المعلم ليس نقطة على الخط الزمني.\n\nيُعاد تعريفه بخمسة أبعاد: قرار، توقيت، تحكّم، قياس، قيمة.\n\nوالنتيجة: حوكمة تُقاس بالمعالم.'
   const BROWSER = { CF_AI_ACCOUNT_ID: 'acc', CF_BROWSER_TOKEN: 'cfut_browser' }
   const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xd9])
 
@@ -1137,10 +1137,10 @@ describe('الإنفوجرافيك', () => {
       if (url.includes('api.writer.test')) {
         if (options.writer === 'fails') throw new Error('انقطع')
         const spec = options.writer === 'fabricates'
-          ? { kind: 'stats', title: 'أرقامٌ مخترَعة', kicker: '', items: [{ label: 'أ', value: '85%', note: '' }, { label: 'ب', value: '12', note: '' }], secondary: null, takeaway: '' }
-          : { kind: 'pillars', kicker: 'Milestone Governance', title: 'المعلم نقطةُ قيادة', items: [
+          ? { kind: 'stats', title: 'أرقام مخترَعة', kicker: '', items: [{ label: 'أ', value: '85%', note: '' }, { label: 'ب', value: '12', note: '' }], secondary: null, takeaway: '' }
+          : { kind: 'pillars', kicker: 'Milestone Governance', title: 'المعلم نقطة قيادة', items: [
               { label: 'قرار', value: '', note: '' }, { label: 'توقيت', value: '', note: '' }, { label: 'قياس', value: '', note: '' }],
-            secondary: null, takeaway: 'حوكمةٌ تُقاس بالمعالم' }
+            secondary: null, takeaway: 'حوكمة تُقاس بالمعالم' }
         return new Response(JSON.stringify({
           model: 'w-1', choices: [{ message: { content: JSON.stringify(spec) }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 300, completion_tokens: 120 },
@@ -1154,20 +1154,20 @@ describe('الإنفوجرافيك', () => {
     return { db, bucket: bucket(), encKey: TOP_ENC, workerSecrets: secrets, fetchImpl }
   }
 
-  it('يُرسم من محتوى النصّ ويُحفَظ بأبعاده، ولا يُنادى نموذجُ الصور', async () => {
+  it('يُرسم من محتوى النصّ ويُحفَظ بأبعاده، ولا يُنادى نموذج الصور', async () => {
     const post = await seedPost({ text: INFO_POST })
     const out = await generate(infoDeps(lane()), post)
     expect(out.kind).toBe('generated')
     const [row] = await mediaFor(db, [post])
     expect(row!.model).toBe('infographic:pillars')
     expect([row!.width, row!.height]).toEqual([1080, 1350])
-    expect(row!.headline).toBe('المعلم نقطةُ قيادة')
+    expect(row!.headline).toBe('المعلم نقطة قيادة')
     expect(JSON.parse(row!.prompt).items).toHaveLength(3)
     expect(calls.some((c) => c.url.includes('generativelanguage') || c.url.includes('/ai/run/'))).toBe(false)
     // ‏والصفحةُ المصوَّرةُ تحمل كلماتِ المنشور
     const shot = calls.find((c) => c.url.includes('browser-rendering'))!
     expect(String(shot.body)).toContain('"width":1080')
-    expect(String(shot.body)).toContain('المعلم نقطةُ قيادة')
+    expect(String(shot.body)).toContain('المعلم نقطة قيادة')
     const ops = (await ledger(true)).map((e) => e.operation)
     expect(ops).toContain('infographic:w-1')
     expect(ops).toContain('infographic:linkedin')
@@ -1181,7 +1181,7 @@ describe('الإنفوجرافيك', () => {
     expect(await ledger(true)).toHaveLength(0)
   })
 
-  it('وسقوطُ نموذج الكتابة لا يُخرج صورةً عامّة: المحتوى من النصّ نفسِه، ويُقال ذلك', async () => {
+  it('وسقوط نموذج الكتابة لا يُخرج صورةً عامّة: المحتوى من النصّ نفسِه، ويُقال ذلك', async () => {
     const post = await seedPost({ text: INFO_POST })
     const out = await generate(infoDeps(lane({ writer: 'fails' })), post)
     expect(out.kind).toBe('generated')
@@ -1190,7 +1190,7 @@ describe('الإنفوجرافيك', () => {
     expect(JSON.parse(row!.prompt).items.map((i: { label: string }) => i.label)).toEqual(['قرار', 'توقيت', 'تحكّم', 'قياس', 'قيمة'])
   })
 
-  it('**ورقمٌ اخترعه النموذجُ لا يصل إلى الصورة**', async () => {
+  it('**ورقم اخترعه النموذج لا يصل إلى الصورة**', async () => {
     const post = await seedPost({ text: INFO_POST })
     await generate(infoDeps(lane({ writer: 'fabricates' })), post)
     const [row] = await mediaFor(db, [post])
@@ -1198,16 +1198,16 @@ describe('الإنفوجرافيك', () => {
     expect(row!.model).not.toBe('infographic:stats')
   })
 
-  it('وسقوطُ التصوير يُردّ ويحرّر حجزَه، ولا صفّ', async () => {
+  it('وسقوط التصوير يُردّ ويحرّر حجزَه، ولا صفّ', async () => {
     const post = await seedPost({ text: INFO_POST })
     const out = await generate(infoDeps(lane({ shot: 500 })), post)
     expect(out.kind).toBe('failed')
-    if (out.kind === 'failed') expect(out.reason).toContain('تعذّر تصويرُ الإنفوجرافيك')
+    if (out.kind === 'failed') expect(out.reason).toContain('تعذّر تصوير الإنفوجرافيك')
     expect(await mediaFor(db, [post])).toHaveLength(0)
     expect((await generate(infoDeps(lane()), post)).kind).toBe('generated')
   })
 
-  it('ومنشورُ TikTok رأسيٌّ 9:16 لا بمقاس LinkedIn', async () => {
+  it('ومنشور TikTok رأسيّ 9:16 لا بمقاس LinkedIn', async () => {
     const post = await seedPost({ text: INFO_POST, platform: 'tiktok' })
     await generate(infoDeps(lane()), post)
     const [row] = await mediaFor(db, [post])

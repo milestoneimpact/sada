@@ -48,7 +48,7 @@ describe('readCookie', () => {
     ['كعكة واحدة', `${COOKIE}=abc`, 'abc'],
     ['بين كعكتين', `other=1; ${COOKIE}=abc; third=2`, 'abc'],
     ['مع مسافات', ` ${COOKIE}=abc `, 'abc'],
-    ['اسمٌ آخر', 'other=abc', null],
+    ['اسم آخر', 'other=abc', null],
     ['بلا قيمة', `${COOKIE}=`, null],
     ['بلا ترويسة', '', null],
   ])('%s', (_name, header, expected) => {
@@ -78,18 +78,18 @@ describe('createSession', () => {
     expect(kv.size()).toBe(0)
   })
 
-  it('يتسامح مع مسافةٍ حول الرمز — كما يفعل الحارس', async () => {
+  it('يتسامح مع مسافة حول الرمز — كما يفعل الحارس', async () => {
     expect('id' in (await createSession(kv, `${TOKEN}\n`, TOKEN))).toBe(true)
   })
 
-  it('كلّ جلسة معرّفٌ جديد', async () => {
+  it('كلّ جلسة معرّف جديد', async () => {
     const first = await createSession(kv, TOKEN, TOKEN)
     const second = await createSession(kv, TOKEN, TOKEN)
     if (!('id' in first) || !('id' in second)) throw new Error('توقّعنا جلستين')
     expect(first.id).not.toBe(second.id)
   })
 
-  it('لكلّ جلسةٍ سرُّ CSRF خاصٌّ بها', async () => {
+  it('لكلّ جلسة سرّ CSRF خاصّ بها', async () => {
     const first = await createSession(kv, TOKEN, TOKEN)
     const second = await createSession(kv, TOKEN, TOKEN)
     if (!('id' in first) || !('id' in second)) throw new Error('توقّعنا جلستين')
@@ -97,7 +97,7 @@ describe('createSession', () => {
     expect(first.record.csrf.length).toBeGreaterThanOrEqual(32)
   })
 
-  it('لا يُخزَّن كلمةُ الإدارة في الجلسة — بصمته فقط', async () => {
+  it('لا يُخزَّن كلمة الإدارة في الجلسة — بصمته فقط', async () => {
     const id = await open()
     const raw = (await kv.get(`session:${id}`)) ?? ''
     expect(raw).not.toContain(TOKEN)
@@ -122,13 +122,13 @@ const validSession = async (
  * ‏فتوجيهٌ إلى ما يُكتب فيه بابٌ إلى أيّ موقع. وما لا يُقبَل يعود إلى الرئيسيّة.
  */
 describe('safeNext', () => {
-  it('يقبل صفحاتِ اللوحة بمساراتها وأسئلتها ومراسيها', () => {
+  it('يقبل صفحات اللوحة بمساراتها وأسئلتها ومراسيها', () => {
     for (const ok of ['/panel', '/panel/report', '/panel#posts', '/panel?rows=platform&m=count', '/panel/channels/x?filter=failed#history']) {
       expect(safeNext(ok)).toBe(ok)
     }
   })
 
-  it('ويردّ كلَّ ما يخرج من الأصل أو يلتفّ عليه', () => {
+  it('ويردّ كلّ ما يخرج من الأصل أو يلتفّ عليه', () => {
     for (const bad of [
       undefined, null, '', 'https://evil.example/panel', '//evil.example/panel', '/\\evil.example',
       '/panel//evil.example', '/panel/\\evil', '/panelx', '/panel.evil.example', 'javascript:alert(1)',
@@ -139,7 +139,7 @@ describe('safeNext', () => {
     }
   })
 
-  it('والجلسةُ المعلَّقة تحمل وجهتَها، والترقيةُ تُسقطها', async () => {
+  it('والجلسة المعلَّقة تحمل وجهتَها، والترقية تُسقطها', async () => {
     const made = await createSession(kv, TOKEN, TOKEN, undefined, { pending: true, next: '/panel/report' })
     if ('error' in made) throw new Error('لم تُفتح')
     const loaded = await loadSession(kv, withCookie(`${COOKIE}=${made.id}`), TOKEN)
@@ -156,13 +156,13 @@ describe('safeNext', () => {
   })
 })
 
-describe('صلاحيّةُ الجلسة', () => {
-  it('كعكة جلسةٍ قائمة تُقبل', async () => {
+describe('صلاحيّة الجلسة', () => {
+  it('كعكة جلسة قائمة تُقبل', async () => {
     const id = await open()
     expect(await validSession(kv, withCookie(`${COOKIE}=${id}`), TOKEN)).toBe(true)
   })
 
-  it('معرّفٌ مخترَع يُرفض — القيمة في KV لا في الكعكة', async () => {
+  it('معرّف مخترَع يُرفض — القيمة في KV لا في الكعكة', async () => {
     expect(
       await validSession(kv, withCookie(`${COOKIE}=${crypto.randomUUID()}`), TOKEN),
     ).toBe(false)
@@ -182,8 +182,8 @@ describe('صلاحيّةُ الجلسة', () => {
   })
 })
 
-describe('الربط بالاعتماد — تدويرُ الرمز يُبطل الجلسات', () => {
-  it('جلسةٌ فُتحت برمزٍ تسقط حين يُبدَّل الرمز', async () => {
+describe('الربط بالاعتماد — تدوير الرمز يُبطل الجلسات', () => {
+  it('جلسة فُتحت برمز تسقط حين يُبدَّل الرمز', async () => {
     const id = await open()
     const request = withCookie(`${COOKIE}=${id}`)
     expect(await validSession(kv, request, TOKEN)).toBe(true)
@@ -197,12 +197,12 @@ describe('الربط بالاعتماد — تدويرُ الرمز يُبطل �
     expect(await validSession(kv, request, TOKEN)).toBe(false)
   })
 
-  it('رفعُ الرمز كلّه يُبطلها كذلك — الغياب يُغلق لا يفتح', async () => {
+  it('رفع الرمز كلّه يُبطلها كذلك — الغياب يُغلق لا يفتح', async () => {
     const id = await open()
     expect(await validSession(kv, withCookie(`${COOKIE}=${id}`), undefined)).toBe(false)
   })
 
-  it('صفٌّ من صيغةٍ قديمة بلا bind لا يُقبل', async () => {
+  it('صفّ من صيغة قديمة بلا bind لا يُقبل', async () => {
     const id = crypto.randomUUID()
     await kv.put(`session:${id}`, JSON.stringify({ at: '2026-01-01T00:00:00Z' }))
     expect(await validSession(kv, withCookie(`${COOKIE}=${id}`), TOKEN)).toBe(false)
@@ -219,14 +219,14 @@ describe('checkCsrf', () => {
     expect(await checkCsrf(session, session.record.csrf)).toBe(true)
   })
 
-  it('رمزٌ فارغ يُرفض — والفراغ ليس تطابقا', async () => {
+  it('رمز فارغ يُرفض — والفراغ ليس تطابقا', async () => {
     const id = await open()
     const session = await loadSession(kv, withCookie(`${COOKIE}=${id}`), TOKEN)
     if (session === null) throw new Error('توقّعنا جلسة')
     expect(await checkCsrf(session, '')).toBe(false)
   })
 
-  it('رمزُ جلسةٍ أخرى يُرفض — لكلّ جلسةٍ سرُّها', async () => {
+  it('رمز جلسة أخرى يُرفض — لكلّ جلسة سرُّها', async () => {
     const mine = await open()
     const theirs = await open()
     const a = await loadSession(kv, withCookie(`${COOKIE}=${mine}`), TOKEN)
@@ -237,7 +237,7 @@ describe('checkCsrf', () => {
 })
 
 describe('جرد الجلسات وإبطالها', () => {
-  it('يعرض كلّ جلسةٍ حيّة، وتُعلَّم الحاليّة', async () => {
+  it('يعرض كلّ جلسة حيّة، وتُعلَّم الحاليّة', async () => {
     const mine = await open({ 'CF-Connecting-IP': '203.0.113.9' })
     await open()
     const list = await listSessions(kv, mine)
@@ -255,7 +255,7 @@ describe('جرد الجلسات وإبطالها', () => {
     expect(JSON.stringify(list)).not.toContain(second)
   })
 
-  it('الإبطالُ بالبصمة يصيب جلسةً واحدةً ويُعيد صفرا لبصمةٍ لا يعرفها (D-150)', async () => {
+  it('الإبطال بالبصمة يصيب جلسةً واحدةً ويُعيد صفرا لبصمة لا يعرفها (D-150)', async () => {
     const first = await open()
     const second = await open()
     expect(await revokeSessions(kv, { onlyHandle: 'ffffffffffffffff' })).toBe(0)
@@ -283,7 +283,7 @@ describe('جرد الجلسات وإبطالها', () => {
     expect(await kv.get('login-attempts:1.2.3.4')).toBe('3')
   })
 
-  it('مخزنٌ بلا list يعطي جردا فارغا ولا يسقط', async () => {
+  it('مخزن بلا list يعطي جردا فارغا ولا يسقط', async () => {
     const { list: _ignored, ...noList } = kv
     expect(await listSessions(noList, null)).toEqual([])
     expect(await revokeSessions(noList, {})).toBe(0)

@@ -47,7 +47,7 @@ function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): 
   return `<details class="more-sheet">
     <summary>${ICON.more}<span>المزيد</span>${total > 0 ? count(total) : ''}</summary>
     <div class="more-panel">${links}
-      <button type="button" class="cmdk-open" aria-haspopup="dialog" aria-controls="cmdk">${ICON.search}<span>بحثٌ وأوامر</span></button>
+      <button type="button" class="cmdk-open" aria-haspopup="dialog" aria-controls="cmdk">${ICON.search}<span>بحث وأوامر</span></button>
     </div>
   </details>`
 }
@@ -84,7 +84,7 @@ export function railHtml(input: RailInput): string {
     ${tabs}
     ${moreSheet(input, counts)}
   </nav>
-  ${/* ‏والسمةُ والكثافةُ في قائمة الحساب أعلى الصفحة (D-215) — لا ذيلَ يُرى دائمًا */''}
+  ${/* ‏والسمة والكثافة في قائمة الحساب أعلى الصفحة (D-215) — لا ذيل يُرى دائمًا */''}
 </aside>`
 }
 

@@ -108,11 +108,11 @@ export async function startUpload(
   id: string = crypto.randomUUID(),
 ): Promise<StartResult> {
   if (!UPLOAD_MIMES.has(meta.mime)) {
-    return { ok: false, reason: 'نوعٌ لا تقبله المنصّات — صدّره MP4 (H.264 وصوت AAC)' }
+    return { ok: false, reason: 'نوع لا تقبله المنصّات — صدّره MP4 (H.264 وصوت AAC)' }
   }
-  if (!Number.isFinite(meta.bytes) || meta.bytes <= 0) return { ok: false, reason: 'ملفٌّ فارغ' }
+  if (!Number.isFinite(meta.bytes) || meta.bytes <= 0) return { ok: false, reason: 'ملفّ فارغ' }
   if (meta.bytes > MAX_UPLOAD_BYTES) {
-    return { ok: false, reason: `أكبرُ من ${MAX_UPLOAD_BYTES / 1024 / 1024}MB — صدّره بدقّة 1080p وجودةٍ أقلّ` }
+    return { ok: false, reason: `أكبر من ${MAX_UPLOAD_BYTES / 1024 / 1024}MB — صدّره بدقّة 1080p وجودة أقلّ` }
   }
   const key = objectKey(org, `upload/${id}.${extension(meta.mime)}`)
   const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: meta.mime } })
@@ -154,14 +154,14 @@ export async function uploadPart(
 ): Promise<{ ok: true; part: { partNumber: number; etag: string } } | { ok: false; reason: string }> {
   const row = await pending(db, id)
   if (row === null || row.status !== 'uploading' || row.multipart_id === null) {
-    return { ok: false, reason: 'لا رفعَ جاريًا بهذا المعرّف' }
+    return { ok: false, reason: 'لا رفع جاريًا بهذا المعرّف' }
   }
   const parts = Math.ceil(row.bytes / PART_BYTES)
   if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > parts) {
-    return { ok: false, reason: 'رقمُ قطعةٍ خارج المقطع' }
+    return { ok: false, reason: 'رقم قطعة خارج المقطع' }
   }
   const expected = partNumber < parts ? PART_BYTES : row.bytes - PART_BYTES * (parts - 1)
-  if (body.byteLength !== expected) return { ok: false, reason: 'طولُ القطعة غيرُ ما أُعلن' }
+  if (body.byteLength !== expected) return { ok: false, reason: 'طول القطعة غير ما أُعلن' }
   const part = await bucket.resumeMultipartUpload(row.r2_key, row.multipart_id).uploadPart(partNumber, body)
   return { ok: true, part }
 }
@@ -175,12 +175,12 @@ export async function completeUpload(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const row = await pending(db, id)
   if (row === null || row.status !== 'uploading' || row.multipart_id === null) {
-    return { ok: false, reason: 'لا رفعَ جاريًا بهذا المعرّف' }
+    return { ok: false, reason: 'لا رفع جاريًا بهذا المعرّف' }
   }
   const count = Math.ceil(row.bytes / PART_BYTES)
   const numbers = new Set(parts.map((p) => p.partNumber))
   if (parts.length !== count || numbers.size !== count || parts.some((p) => typeof p.etag !== 'string' || p.etag === '')) {
-    return { ok: false, reason: 'قطعٌ ناقصة — أعد الرفع' }
+    return { ok: false, reason: 'قطع ناقصة — أعد الرفع' }
   }
   await bucket.resumeMultipartUpload(row.r2_key, row.multipart_id)
     .complete([...parts].sort((a, b) => a.partNumber - b.partNumber))
@@ -357,7 +357,7 @@ export function tiktokNeedsScope(reach: Reach): boolean {
 }
 
 /** ما يُقال حين قُلب العلنيّ ونقص النطاق — في صفّ المقطع وإشعار الجدولة والإعداد بنصٍّ واحد. */
-export const TIKTOK_NO_SCOPE = 'يصل صندوقَ تطبيقك لا حسابَك: قلبتَ النشرَ العلنيّ وحسابُك المربوط بلا video.publish — اربطه من جديد وامنحه'
+export const TIKTOK_NO_SCOPE = 'يصل صندوق تطبيقك لا حسابَك: قلبت النشر العلنيّ وحسابُك المربوط بلا video.publish — اربطه من جديد وامنحه'
 
 /**
  * جملةٌ واحدةٌ لما يصل خاصًّا من هذه المنصّات — أو `null` إن لم يكن فيها ما يصل خاصًّا:
@@ -369,8 +369,8 @@ export function privateReach(platforms: readonly string[], reach: Reach = PRIVAT
   const noScope = tiktokNeedsScope(reach)
   if (yt && tt) {
     return noScope
-      ? `YouTube وTikTok لا يُنشران للعامّة: الأوّلُ يصل قناتك خاصًّا فتنشره من YouTube Studio، والثاني ${TIKTOK_NO_SCOPE}.`
-      : 'YouTube وTikTok لا يُنشران للعامّة: الأوّلُ يصل قناتك خاصًّا فتنشره من YouTube Studio، والثاني لا يراه غيرك حتّى تنشره من تطبيق TikTok.'
+      ? `YouTube وTikTok لا يُنشران للعامّة: الأوّل يصل قناتك خاصًّا فتنشره من YouTube Studio، والثاني ${TIKTOK_NO_SCOPE}.`
+      : 'YouTube وTikTok لا يُنشران للعامّة: الأوّل يصل قناتك خاصًّا فتنشره من YouTube Studio، والثاني لا يراه غيرك حتّى تنشره من تطبيق TikTok.'
   }
   if (yt) return `YouTube لا يُنشر للعامّة: ${PRIVATE_REACH.youtube}.`
   if (tt) return `TikTok لا يُنشر للعامّة: ${noScope ? TIKTOK_NO_SCOPE : PRIVATE_REACH.tiktok}.`
@@ -419,18 +419,18 @@ export function videoChecks(u: Pick<UploadRow, 'mime' | 'bytes' | 'width' | 'hei
 
   const tiktok: VideoCheck =
     s !== null && s > 600
-      ? { platform: 'tiktok', level: 'block', note: 'أطولُ من عشر دقائق — حدُّ الرفع من الواجهة' }
+      ? { platform: 'tiktok', level: 'block', note: 'أطول من عشر دقائق — حدّ الرفع من الواجهة' }
       : s !== null && s < 3
-        ? { platform: 'tiktok', level: 'block', note: 'أقصرُ من ثلاث ثوانٍ' }
+        ? { platform: 'tiktok', level: 'block', note: 'أقصر من ثلاث ثوان' }
         : { platform: 'tiktok', level: 'ok', note: '' }
 
   const instagram: VideoCheck =
     u.mime === 'video/webm'
       ? { platform: 'instagram', level: 'block', note: 'WebM لا يُقبل — صدّره MP4' }
       : u.bytes > 300 * 1024 * 1024
-        ? { platform: 'instagram', level: 'block', note: 'أكبرُ من ‏300MB' }
+        ? { platform: 'instagram', level: 'block', note: 'أكبر من ‏300MB' }
         : s !== null && (s < 3 || s > 900)
-          ? { platform: 'instagram', level: 'block', note: 'بين ثلاث ثوانٍ وخمسَ عشرةَ دقيقة' }
+          ? { platform: 'instagram', level: 'block', note: 'بين ثلاث ثوان وخمس عشرة دقيقة' }
           : u.width !== null && u.width > 1920
             ? { platform: 'instagram', level: 'block', note: 'عرضُه فوق 1920px — صدّره 1080×1920' }
             : u.width !== null && !nineSixteen
@@ -451,17 +451,17 @@ export const YOUTUBE_DESCRIPTION_BYTES = 5000
  * أو حمل «<» و«>»، فتضيع حصّةُ يومه — فيُقال قبل الاعتماد.
  */
 export function captionProblem(platform: VideoPlatform, text: string): string | null {
-  if (text.trim() === '') return 'النصُّ فارغ'
+  if (text.trim() === '') return 'النصّ فارغ'
   // ‏وYouTube يُقاس على ما يُرفع وصفًا (`youtubeDescription`): العنوانُ له حدُّه في `titleProblem`
   const t = platform === 'youtube' ? youtubeDescription(text) : text.trim()
   if (platform === 'youtube') {
     const bytes = new TextEncoder().encode(t).length
-    if (bytes > YOUTUBE_DESCRIPTION_BYTES) return `النصُّ ${bytes} بايتًا وYouTube تقبل ${YOUTUBE_DESCRIPTION_BYTES} — والحرفُ العربيُّ بايتان`
+    if (bytes > YOUTUBE_DESCRIPTION_BYTES) return `النصّ ${bytes} بايتًا وYouTube تقبل ${YOUTUBE_DESCRIPTION_BYTES} — والحرف العربيّ بايتان`
     if (/[<>]/.test(t)) return 'YouTube لا تقبل «<» ولا «>» في الوصف'
     return null
   }
   const limit = CAPTION_LIMIT[platform]
-  return t.length > limit ? `النصُّ ${t.length} محرفًا و${platform === 'tiktok' ? 'TikTok' : 'Instagram'} تقبل ${limit}` : null
+  return t.length > limit ? `النصّ ${t.length} محرفًا و${platform === 'tiktok' ? 'TikTok' : 'Instagram'} تقبل ${limit}` : null
 }
 
 /**
@@ -479,8 +479,8 @@ export function youtubeText(title: string, description: string): string {
 /** ما يمنع عنوانَ YouTube — أو `null`. **ويُقال قبل الإنشاء**: عنوانٌ يُقصّ عند الرفع يُكتشَف في القناة. */
 export function titleProblem(title: string): string | null {
   const t = title.trim()
-  if (t === '') return 'اكتب عنوانَ YouTube'
-  if (t.length > YT_TITLE_MAX) return `عنوانُ YouTube ‏${t.length} محرفًا وYouTube تقبل ${YT_TITLE_MAX}`
+  if (t === '') return 'اكتب عنوان YouTube'
+  if (t.length > YT_TITLE_MAX) return `عنوان YouTube ‏${t.length} محرفًا وYouTube تقبل ${YT_TITLE_MAX}`
   if (/[<>]/.test(t)) return 'YouTube لا تقبل «<» ولا «>» في العنوان'
   return null
 }
@@ -550,7 +550,7 @@ export async function postsFromUpload(
   const clean = (t: string): string => t.replace(/\r\n?/g, '\n').trim()
   const perPlatform = input.captions !== undefined
   const caption = clean(input.caption ?? '')
-  if (!perPlatform && caption === '') return { ok: false, reason: 'اكتب نصَّ المنشور — يُنشر وصفًا مع المقطع' }
+  if (!perPlatform && caption === '') return { ok: false, reason: 'اكتب نصّ المنشور — يُنشر وصفًا مع المقطع' }
   const textOf = (p: VideoPlatform): string => !perPlatform
     ? caption
     : p === 'youtube'
@@ -560,13 +560,13 @@ export async function postsFromUpload(
     .prepare('SELECT id, r2_key, mime, bytes, width, height, duration_ms, status FROM uploads WHERE id = ?')
     .bind(input.uploadId)
     .first<{ id: string; r2_key: string; mime: string; bytes: number; width: number | null; height: number | null; duration_ms: number | null; status: string }>()
-  if (row === null || row.status !== 'ready') return { ok: false, reason: 'المقطعُ لم يكتمل رفعُه' }
+  if (row === null || row.status !== 'ready') return { ok: false, reason: 'المقطع لم يكتمل رفعُه' }
 
   const checks = videoChecks({ mime: row.mime, bytes: row.bytes, width: row.width, height: row.height, durationMs: row.duration_ms })
   const wanted = VIDEO_PLATFORMS.filter((p) => input.platforms.includes(p))
   if (wanted.length === 0) return { ok: false, reason: 'اختر منصّةً واحدةً على الأقلّ' }
   const allowed = wanted.filter((p) => checks.find((c) => c.platform === p)?.level !== 'block')
-  if (allowed.length === 0) return { ok: false, reason: 'المقطعُ لا يوافق حدودَ ما اخترت — والسببُ تحت كلّ منصّة' }
+  if (allowed.length === 0) return { ok: false, reason: 'المقطع لا يوافق حدود ما اخترت — والسبب تحت كلّ منصّة' }
 
   // ‏ولكلّ منصّةٍ سببُها باسمها حين تختلف نصوصُها — «النصُّ فارغ» وحدَها لا تقول أيَّها
   const label = (p: VideoPlatform): string => (p === 'youtube' ? 'YouTube' : p === 'tiktok' ? 'TikTok' : 'Instagram')
@@ -575,7 +575,7 @@ export async function postsFromUpload(
       if (!perPlatform) return { p, why: captionProblem(p, caption) }
       const title = p === 'youtube' ? titleProblem(input.title ?? '') : null
       if (title !== null) return { p, why: title }
-      const why = textOf(p) === '' ? 'النصُّ فارغ' : captionProblem(p, textOf(p))
+      const why = textOf(p) === '' ? 'النصّ فارغ' : captionProblem(p, textOf(p))
       return { p, why: why === null ? null : `${label(p)}: ${why}` }
     })
     .filter((x): x is { p: VideoPlatform; why: string } => x.why !== null)
@@ -610,7 +610,7 @@ export async function postsFromUpload(
         `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, cost_usd, approved_by, approved_at,
                             org_id, brand_id)
          VALUES (?, ?, 'text', ?, ?, ?, ?, ?, ?, ${input.approve ? "datetime('now')" : 'NULL'},
-                 -- ‏منظّمةُ المقطع المرفوع وعلامتُه
+                 -- ‏منظّمة المقطع المرفوع وعلامتُه
                  (SELECT org_id FROM uploads WHERE id = ?), (SELECT brand_id FROM uploads WHERE id = ?))`,
       )
       .bind(postId, platform, textOf(platform), input.approve ? 'approved' : 'draft', key, input.model ?? 'owner',
@@ -676,7 +676,7 @@ export async function scheduleFromUpload(
     // ‏وصفحةُ LinkedIn وحدَها تُستبعَد: قناةُ YouTube محفوظةٌ `org` وهي وجهةٌ صالحة
     const account = input.accounts.find((a) => a.platform === post.platform && a.status === 'active' && !isLinkedInPage(a))
     if (account === undefined) {
-      failed.push({ platform: post.platform, reason: 'لا حسابَ متّصلًا — اربطه أوّلًا' })
+      failed.push({ platform: post.platform, reason: 'لا حساب متّصلًا — اربطه أوّلًا' })
       continue
     }
     const done = await schedulePost(db, post.id, account.id, when, input.now)

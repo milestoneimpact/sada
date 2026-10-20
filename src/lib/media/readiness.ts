@@ -76,17 +76,17 @@ const TASKS = { label: 'ما عليك', href: '/panel/tasks' } as const
 function blockerNote(b: Blocker, label: string): string {
   switch (b.kind) {
     case 'paused':
-      return 'موقوفٌ بقرارك'
+      return 'موقوف بقرارك'
     case 'analysis_cap':
-      return 'بلغ سقفَ التحليل اليوميّ'
+      return 'بلغ سقف التحليل اليوميّ'
     case 'spend_cap':
-      return 'بلغ سقفَ الإنفاق اليوميّ'
+      return 'بلغ سقف الإنفاق اليوميّ'
     case 'provider_cap':
       return `بلغ ${label} سقفَه اليوميّ`
     case 'provider_disabled':
-      return `${label} معطَّلٌ بقرارك`
+      return `${label} معطَّل بقرارك`
     case 'video_cap':
-      return b.cap === 0 ? 'سقفُ المقاطع صفرٌ بقرارك' : 'بلغ سقفَ المقاطع اليوميّ'
+      return b.cap === 0 ? 'سقف المقاطع صفر بقرارك' : 'بلغ سقف المقاطع اليوميّ'
   }
 }
 
@@ -97,7 +97,7 @@ function blockerNote(b: Blocker, label: string): string {
  * واحدٌ للنداءات المدفوعة كلِّها. فتقوله النقطةُ كما هو، ولو قُرئ غريبًا.
  */
 function limitsDot(blocker: Blocker | null): Dot {
-  if (blocker === null) return { key: 'limits', title: 'الحدود', state: 'done', note: 'مفتوحةٌ اليوم' }
+  if (blocker === null) return { key: 'limits', title: 'الحدود', state: 'done', note: 'مفتوحة اليوم' }
   const provider = blocker.kind === 'provider_cap' || blocker.kind === 'provider_disabled'
   return {
     key: 'limits',
@@ -113,15 +113,15 @@ function providerDot(label: string, refusal: ImageRefusal | null): Dot {
   if (refusal === null) return { key: 'provider', title: 'المزوّد', state: 'done', note: label }
   switch (refusal.kind) {
     case 'missing':
-      return failed('المزوّدُ الموجَّهُ غيرُ موجود')
+      return failed('المزوّد الموجَّه غير موجود')
     case 'cannot_image':
       return failed(`${label} لا يولّد صورًا`)
     case 'blocked':
       return failed(blockerNote(refusal.blocker, label))
     case 'no_key':
-      return failed(`لا مفتاحَ لـ ${label}`)
+      return failed(`لا مفتاح لـ ${label}`)
     case 'no_account':
-      return failed('لا معرّفَ حسابٍ لـ Cloudflare')
+      return failed('لا معرّف حساب لـ Cloudflare')
   }
 }
 
@@ -134,7 +134,7 @@ function providerDot(label: string, refusal: ImageRefusal | null): Dot {
  * بعدُ لا يُقال له «لا مزوّدَ يصوغ العنوان» فيصلح ما لا يُصلح شيئًا.
  */
 function overlayDot(slide: SlideGate, briefReady: boolean): Dot | null {
-  const title = 'النصُّ فوقها'
+  const title = 'النصّ فوقها'
   if (slide.state === 'off') return null
   if (slide.state === 'unset') {
     return slide.missing.includes('key')
@@ -142,7 +142,7 @@ function overlayDot(slide: SlideGate, briefReady: boolean): Dot | null {
       : { key: 'overlay', title, state: 'now', note: 'بلا معرّف حساب Cloudflare', action: TASKS }
   }
   if (!briefReady) {
-    return { key: 'overlay', title, state: 'now', note: 'لا مزوّدَ يصوغ العنوان', action: PROVIDERS }
+    return { key: 'overlay', title, state: 'now', note: 'لا مزوّد يصوغ العنوان', action: PROVIDERS }
   }
   return { key: 'overlay', title, state: 'done', note: 'يُركَّب العنوان' }
 }
@@ -191,7 +191,7 @@ export function infographicReadiness(i: {
       ? { key: 'browser', title: 'المتصفّح', state: 'failed', note: 'بلا معرّف حساب Cloudflare', action: TASKS }
       : { key: 'browser', title: 'المتصفّح', state: 'done', note: 'يصوّر الصفحة' }
   const writer: Dot = i.briefReady
-    ? { key: 'writer', title: 'الصياغة', state: 'done', note: 'نموذجُ الكتابة يستخرج المحتوى' }
+    ? { key: 'writer', title: 'الصياغة', state: 'done', note: 'نموذج الكتابة يستخرج المحتوى' }
     : { key: 'writer', title: 'الصياغة', state: 'now', note: 'المحتوى من النصّ مباشرةً', action: PROVIDERS }
   return lineOf([limitsDot(i.blocker), browser, writer])
 }
@@ -222,7 +222,7 @@ function keyDot(face: VideoFace): Dot {
     case 'binding':
       return { key: 'key', title, state: 'now', note: 'برابط Worker وحده', action: PROVIDERS }
     case 'none':
-      return { key: 'key', title, state: 'failed', note: 'لا مفتاحَ لـ Workers AI', action: PROVIDERS }
+      return { key: 'key', title, state: 'failed', note: 'لا مفتاح لـ Workers AI', action: PROVIDERS }
   }
 }
 

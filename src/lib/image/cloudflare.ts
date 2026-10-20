@@ -74,7 +74,7 @@ function decodeBase64(value: string): Uint8Array {
  */
 export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
   const prompt = call.prompt.trim()
-  if (prompt.length === 0) throw new ImageError('وصفٌ فارغ', 400, false)
+  if (prompt.length === 0) throw new ImageError('وصف فارغ', 400, false)
   // **والقصُّ هنا لا عند المزوّد**: ٢٠٤٨ حدُّه المقيس، وطلبٌ فوقه يُردّ
   // بخطأٍ لا يقول إنّ السببَ الطول
   const text = prompt.length > CF_PROMPT_MAX ? prompt.slice(0, CF_PROMPT_MAX) : prompt
@@ -85,7 +85,7 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
       ? null
       : restBinding(call.accountId.trim(), call.apiToken.trim(), call.fetchImpl ?? fetch))
   if (binding === null) {
-    throw new ImageError('حسابُ Cloudflare أو مفتاحُه غيرُ مضبوط', 503, false)
+    throw new ImageError('حساب Cloudflare أو مفتاحُه غير مضبوط', 503, false)
   }
 
   let out: unknown
@@ -108,16 +108,16 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
 
   const image = (out as { image?: unknown } | null)?.image
   if (typeof image !== 'string' || image.length === 0) {
-    throw new ImageError('جوابٌ بلا حقل `image`', 502, false)
+    throw new ImageError('جواب بلا حقل `image`', 502, false)
   }
 
   let bytes: Uint8Array
   try {
     bytes = decodeBase64(image)
   } catch {
-    throw new ImageError('حقلُ `image` ليس base64 صالحا', 502, false)
+    throw new ImageError('حقل `image` ليس base64 صالحا', 502, false)
   }
-  if (bytes.length === 0) throw new ImageError('صورةٌ فارغة', 502, false)
+  if (bytes.length === 0) throw new ImageError('صورة فارغة', 502, false)
 
   return { bytes, mime: 'image/jpeg', model: call.model }
 }

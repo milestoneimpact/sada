@@ -21,7 +21,7 @@ describe('base32', () => {
     expect(fromBase32(`${encoded}======`)).toEqual(bytes)
   })
 
-  it('يرمي على محرفٍ غريب — لا يبتلعه فيصير سرّا آخر', () => {
+  it('يرمي على محرف غريب — لا يبتلعه فيصير سرّا آخر', () => {
     expect(() => fromBase32('ABC!')).toThrow()
     // ١ و ٨ و ٩ و ٠ ليست من الأبجديّة قصدا: تُخلط بحروفٍ تشبهها
     expect(() => fromBase32('ABC1')).toThrow()
@@ -55,26 +55,26 @@ describe('verifyTotp', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('رمزُ الخطوة السابقة يمرّ — الساعاتُ تنحرف', async () => {
+  it('رمز الخطوة السابقة يمرّ — الساعات تنحرف', async () => {
     const previous = await codeAt(RFC, counterFor(at(1111111111)) - 1n)
     expect((await verifyTotp(RFC, previous, { now: at(1111111111) })).ok).toBe(true)
   })
 
-  it('رمزٌ من بعيدٍ يُرفض', async () => {
+  it('رمز من بعيد يُرفض', async () => {
     expect((await verifyTotp(RFC, '050471', { now: at(1111120000) })).ok).toBe(false)
   })
 
-  it('ما ليس ستّةَ أرقامٍ يُرفض قبل أيّ حساب', async () => {
+  it('ما ليس ستّة أرقام يُرفض قبل أيّ حساب', async () => {
     for (const bad of ['', '12345', '1234567', 'abcdef', '12 34 5a']) {
       expect((await verifyTotp(RFC, bad, { now: at(1111111111) })).ok).toBe(false)
     }
   })
 
-  it('يتسامح مع مسافةٍ في الوسط — كما يُنسَخ من التطبيق', async () => {
+  it('يتسامح مع مسافة في الوسط — كما يُنسَخ من التطبيق', async () => {
     expect((await verifyTotp(RFC, '050 471', { now: at(1111111111) })).ok).toBe(true)
   })
 
-  it('**رمزٌ استُعمل لا يُقبل ثانية** — ولو بقي من نافذته ثوانٍ', async () => {
+  it('**رمز استُعمل لا يُقبل ثانية** — ولو بقي من نافذته ثوان', async () => {
     const first = await verifyTotp(RFC, '050471', { now: at(1111111111) })
     if (!first.ok) throw new Error('توقّعنا قبولا')
     const second = await verifyTotp(RFC, '050471', {
@@ -84,7 +84,7 @@ describe('verifyTotp', () => {
     expect(second.ok).toBe(false)
   })
 
-  it('ولا يُقبل رمزٌ من خطوةٍ أقدم من آخر ما استُعمل', async () => {
+  it('ولا يُقبل رمز من خطوة أقدم من آخر ما استُعمل', async () => {
     const step = counterFor(at(1111111111))
     const previous = await codeAt(RFC, step - 1n)
     expect((await verifyTotp(RFC, previous, { now: at(1111111111), lastStep: step })).ok).toBe(

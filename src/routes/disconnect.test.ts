@@ -131,7 +131,7 @@ describe('افصل الحساب', () => {
     for (const r of calls) expect(r.url).not.toContain('SECRET')
   })
 
-  it('فشلُ الإبطال عند المنصّة لا يُبقي الرموز، والإشعارُ يقول ما بقي على المالك', async () => {
+  it('فشل الإبطال عند المنصّة لا يُبقي الرموز، والإشعار يقول ما بقي على المالك', async () => {
     stubFetch('throw')
     const account = await seedLinked()
     const cookie = await login()
@@ -139,11 +139,11 @@ describe('افصل الحساب', () => {
     expect(response.status).toBe(303)
     expect(await tokenRows(account)).toBe(0)
     const page = await (await app.request('/panel/channels/x?tab=setup', { headers: { Cookie: cookie } }, env)).text()
-    expect(page).toContain('تعذّر إبطالُ الإذن عند X')
+    expect(page).toContain('تعذّر إبطال الإذن عند X')
     expect(page).toContain('حُذفت رموزُه')
   })
 
-  it('المنشوراتُ المجدولة تصير «فشل» بسبب الفصل ولا يُنشَر منها شيء', async () => {
+  it('المنشورات المجدولة تصير «فشل» بسبب الفصل ولا يُنشَر منها شيء', async () => {
     stubFetch(500)
     const account = await seedLinked()
     const queued = await seedQueued(account)
@@ -169,7 +169,7 @@ describe('افصل الحساب', () => {
     expect(acct?.status).toBe('revoked')
   })
 
-  it('سجلُّ التدقيق يحمل الفصلَ بلا قيمة رمز', async () => {
+  it('سجلّ التدقيق يحمل الفصل بلا قيمة رمز', async () => {
     stubFetch(200)
     const account = await seedLinked()
     const cookie = await login()
@@ -185,7 +185,7 @@ describe('افصل الحساب', () => {
     expect(rows.results[0]!.detail).toContain('remote=revoked')
   })
 
-  it('معرّفٌ على غير منصّته يُردّ ولا يُفصَل', async () => {
+  it('معرّف على غير منصّته يُردّ ولا يُفصَل', async () => {
     stubFetch(200)
     const account = await seedLinked('x')
     const cookie = await login()
@@ -195,7 +195,7 @@ describe('افصل الحساب', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('حقلُ العودة الحرّ لا يصنع تحويلةً مفتوحة', async () => {
+  it('حقل العودة الحرّ لا يصنع تحويلةً مفتوحة', async () => {
     stubFetch(200)
     const account = await seedLinked()
     const cookie = await login()
@@ -213,8 +213,8 @@ describe('افصل الحساب', () => {
   })
 })
 
-describe('زرُّ الفصل في الصفحة', () => {
-  it('لكلّ حسابٍ مربوطٍ زرٌّ خطِرٌ وحوارٌ يقول ما سيقع', async () => {
+describe('زرّ الفصل في الصفحة', () => {
+  it('لكلّ حساب مربوط زرّ خطِر وحوار يقول ما سيقع', async () => {
     const account = await seedLinked()
     const cookie = await login()
     const page = await (await app.request('/panel/channels/x?tab=setup', { headers: { Cookie: cookie } }, env)).text()
@@ -223,13 +223,13 @@ describe('زرُّ الفصل في الصفحة', () => {
     expect(page).toMatch(/class="btn btn-danger btn-sm"[^>]*data-dialog-open="dc-x-0"/)
     expect(page).toContain('<dialog class="dlg" id="dc-x-0"')
     expect(page).toContain('form="dc-x-0-f"')
-    expect(page).toContain('تُحذف رموزُ الوصول والتجديد')
+    expect(page).toContain('تُحذف رموز الوصول والتجديد')
     expect(page).toContain('https://x.com/settings/connected_apps')
     // ‏والنموذجُ يحمل رمزَ CSRF كأيّ نموذجٍ في الصفحة
     expect(page).toMatch(/id="dc-x-0-f"[^>]*>\s*<input type="hidden" name="_csrf"/)
   })
 
-  it('الحسابُ المفصول لا يظهر بعد الفصل', async () => {
+  it('الحساب المفصول لا يظهر بعد الفصل', async () => {
     stubFetch(200)
     const account = await seedLinked()
     const cookie = await login()

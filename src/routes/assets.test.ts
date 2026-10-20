@@ -13,24 +13,24 @@ import { panelScript, STYLE_BODY, STYLE_PATH, stripCss, stripJs, uiScript } from
 
 const env = {} as never
 
-describe('مسارُ الأنماط', () => {
-  it('يُسلّم الورقةَ بمسارها', async () => {
+describe('مسار الأنماط', () => {
+  it('يُسلّم الورقة بمسارها', async () => {
     const res = await assets.request(STYLE_PATH, {}, env)
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('text/css; charset=utf-8')
     expect(await res.text()).toBe(STYLE_BODY)
   })
 
-  it('**والتخبئةُ دائمة** — وبدونها لا معنى للبصمة', async () => {
+  it('**والتخبئة دائمة** — وبدونها لا معنى للبصمة', async () => {
     const res = await assets.request(STYLE_PATH, {}, env)
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
   })
 
   it.each([
-    ['بصمةٌ خاطئة', '/a/s.00000000.css'],
+    ['بصمة خاطئة', '/a/s.00000000.css'],
     ['بلا بصمة', '/a/s.css'],
-    ['مسارٌ مخترَع', '/a/anything.js'],
-    ['صعودٌ في المسار', '/a/..%2F..%2Fpanel'],
+    ['مسار مخترَع', '/a/anything.js'],
+    ['صعود في المسار', '/a/..%2F..%2Fpanel'],
   ])('٤٠٤ — %s', async (_name, path) => {
     expect((await assets.request(path, {}, env)).status).toBe(404)
   })
@@ -39,7 +39,7 @@ describe('مسارُ الأنماط', () => {
    * **والبصمةُ تتبع المحتوى.** لو ثبتت على تبديلٍ في الأنماط لبقي
    * المتصفّحُ على ورقةٍ قديمة **سنةً كاملة** — فالتخبئةُ `immutable`.
    */
-  it('البصمةُ تتبدّل بتبدّل المحتوى', () => {
+  it('البصمة تتبدّل بتبدّل المحتوى', () => {
     expect(STYLE_PATH).toMatch(/^\/a\/s\.[0-9a-f]{8}\.css$/)
   })
 })
@@ -65,24 +65,24 @@ describe('مسارا السكربت', () => {
     expect(await res.text()).toBe(body)
   })
 
-  it('وبصمةٌ خاطئةٌ للسكربت ‏٤٠٤', async () => {
+  it('وبصمة خاطئة للسكربت ‏٤٠٤', async () => {
     expect((await assets.request('/a/u.00000000.js', {}, env)).status).toBe(404)
     expect((await assets.request('/a/p.00000000.js', {}, env)).status).toBe(404)
   })
 
-  it('والعامُّ يُبنى دالّةً بلا خطأ صياغة، واللوحةُ كذلك', () => {
+  it('والعامّ يُبنى دالّةً بلا خطأ صياغة، واللوحة كذلك', () => {
     expect(() => new Function(uiScript().body)).not.toThrow()
     expect(() => new Function(panelScript().body)).not.toThrow()
   })
 })
 
-describe('نزعُ التعليقات', () => {
-  it('**لا تعليقَ في الورقة المشحونة** — ولا في المصدر يُحذَف', () => {
+describe('نزع التعليقات', () => {
+  it('**لا تعليق في الورقة المشحونة** — ولا في المصدر يُحذَف', () => {
     expect(STYLE_BODY).not.toContain('/*')
     expect(STYLE_BODY).not.toContain('*/')
   })
 
-  it('والقواعدُ تبقى — النزعُ لا يقصّ محدّدا', () => {
+  it('والقواعد تبقى — النزع لا يقصّ محدّدا', () => {
     for (const rule of [':root{', '.draft{', '.bulkbar{', '@media', '--brand:', '.pv{']) {
       expect(STYLE_BODY).toContain(rule)
     }
@@ -94,7 +94,7 @@ describe('نزعُ التعليقات', () => {
    * والحدُّ هنا **أدنى** لا أعلى: يسقط الاختبارُ لو عاد النزعُ لا يعمل
    * (نُقلت التعليقاتُ إلى شكلٍ لا يُمسَك مثلا).
    */
-  it('ويوفّر أكثرَ من ثلث ما يُشحَن', async () => {
+  it('ويوفّر أكثر من ثلث ما يُشحَن', async () => {
     const { STYLE } = await import('./ui/styles')
     expect(STYLE_BODY.length).toBeLessThan(STYLE.length * 0.67)
   })
@@ -107,12 +107,12 @@ describe('نزعُ التعليقات', () => {
  * `https?:\/\/`. **ونزعٌ بالموضع يقصّ التعبيرَ فيسقط النصُّ كلُّه** —
  * خطأُ صياغةٍ يُبيّض الصفحة.
  */
-describe('نزعُ تعليقات السكربت', () => {
-  it('ينزع سطرَ التعليق', () => {
-    expect(stripJs('  // شرحٌ\nvar a=1;')).toBe('var a=1;')
+describe('نزع تعليقات السكربت', () => {
+  it('ينزع سطر التعليق', () => {
+    expect(stripJs('  // شرح\nvar a=1;')).toBe('var a=1;')
   })
 
-  it('**ولا يمسّ شرطتين داخل تعبيرٍ نمطيّ**', () => {
+  it('**ولا يمسّ شرطتين داخل تعبير نمطيّ**', () => {
     const source = 'var RE=/https?:\\/\\/\\S+/gu;'
     expect(stripJs(source)).toBe(source)
   })
@@ -122,13 +122,13 @@ describe('نزعُ تعليقات السكربت', () => {
     expect(stripJs(source)).toBe(source)
   })
 
-  it('وينزع تعليقَ الكتلة', () => {
-    expect(stripJs('/* شرحٌ\n طويل */\nvar a=1;')).toBe('var a=1;')
+  it('وينزع تعليق الكتلة', () => {
+    expect(stripJs('/* شرح\n طويل */\nvar a=1;')).toBe('var a=1;')
   })
 })
 
-describe('نزعُ تعليقات الأنماط', () => {
-  it('ينزع الكتلةَ ويُبقي القاعدة', () => {
+describe('نزع تعليقات الأنماط', () => {
+  it('ينزع الكتلة ويُبقي القاعدة', () => {
     expect(stripCss('/* لماذا */\n.a{color:red}')).toBe('.a{color:red}')
   })
 

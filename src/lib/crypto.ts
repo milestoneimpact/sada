@@ -81,7 +81,7 @@ export async function deriveKey(keyMaterial: string, label: string): Promise<Cry
       `TOKEN_ENC_KEY يجب أن يكون ${KEY_BYTES} بايت، ووُجد ${raw.byteLength}`,
     )
   }
-  if (label.length === 0) throw new CryptoError('اسمُ المفتاح المشتقّ مطلوب')
+  if (label.length === 0) throw new CryptoError('اسم المفتاح المشتقّ مطلوب')
   const base = await crypto.subtle.importKey('raw', raw as BufferSource, 'HKDF', false, ['deriveKey'])
   return crypto.subtle.deriveKey(
     {

@@ -18,25 +18,25 @@ const ok = (): typeof fetch =>
 
 const HOOK = 'https://hooks.example.com/t/abc'
 
-describe('لا سرَّ في المتن — والحدُّ يُفرَض قبل النداء', () => {
+describe('لا سرّ في المتن — والحدّ يُفرَض قبل النداء', () => {
   it.each([
     ['JWT', 'صدى — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 انتهى'],
     ['Bearer', 'صدى — Bearer abc123xyz'],
-    ['مفتاحُ مزوّد', 'صدى — sk-proj1234567890abcd'],
-    ['اسمُ سرّ', 'صدى — تحقّق من client_secret'],
+    ['مفتاح مزوّد', 'صدى — sk-proj1234567890abcd'],
+    ['اسم سرّ', 'صدى — تحقّق من client_secret'],
     ['ADMIN_TOKEN', 'صدى — ADMIN_TOKEN غير مضبوط'],
   ])('يمسك %s', (_l, body) => {
     expect(looksSecret(body)).toBe(true)
   })
 
   it('ولا يمسك متنا سليما', () => {
-    expect(looksSecret(tokenAlert('صفحةُ صدى', 7, 'refresh').body)).toBe(false)
+    expect(looksSecret(tokenAlert('صفحة صدى', 7, 'refresh').body)).toBe(false)
     expect(looksSecret(publishAlert('p1', 'linkedin', 3).body)).toBe(false)
     expect(looksSecret(budgetAlert('2026-09-09', 5, 5).body)).toBe(false)
   })
 
   /** **ولا يُعدّ فشلا يُعاد**: إعادةُ المحاولة تُعيد إرسالَ السرّ. */
-  it('**ومتنٌ يحمل سرّا لا يُنادى أصلا**', async () => {
+  it('**ومتن يحمل سرّا لا يُنادى أصلا**', async () => {
     const f = ok()
     const r = await sendAlerts(db, HOOK, [{ kind: 'token', ref: 'x', body: 'Bearer zzz' }], f)
     expect(f).not.toHaveBeenCalled()
@@ -48,20 +48,20 @@ describe('لا سرَّ في المتن — والحدُّ يُفرَض قبل �
   })
 })
 
-describe('نصُّ تنبيه الإذن بعدده (D-184)', () => {
-  it('يومٌ واحد، وسبعةُ أيّام، والصفرُ «انتهى» لا «خلال 0 يومًا»', () => {
-    expect(tokenAlert('ح', 1, 'access').body).toContain('ينتهي خلال يومٍ واحد.')
+describe('نصّ تنبيه الإذن بعدده (D-184)', () => {
+  it('يوم واحد، وسبعة أيّام، والصفر «انتهى» لا «خلال 0 يومًا»', () => {
+    expect(tokenAlert('ح', 1, 'access').body).toContain('ينتهي خلال يوم واحد.')
     expect(tokenAlert('ح', 7, 'access').body).toContain('ينتهي خلال 7 أيّام.')
     const gone = tokenAlert('ح', 0, 'refresh')
-    expect(gone.body).toContain('إذنُ التجديد لحساب «ح» انتهى.')
+    expect(gone.body).toContain('إذن التجديد لحساب «ح» انتهى.')
     expect(gone.body).not.toMatch(/0 يوم/)
     expect(gone.ref).toBe('token:ح:refresh:0')
   })
 })
 
-describe('ولا يُرسَل حدثٌ مرّتين (D-004)', () => {
-  it('والثانيةُ تُتخطّى بالقيد لا بالشيفرة', async () => {
-    const a = tokenAlert('صفحةُ صدى', 7, 'refresh')
+describe('ولا يُرسَل حدث مرّتين (D-004)', () => {
+  it('والثانية تُتخطّى بالقيد لا بالشيفرة', async () => {
+    const a = tokenAlert('صفحة صدى', 7, 'refresh')
     const f = ok()
     expect((await sendAlerts(db, HOOK, [a], f)).sent).toBe(1)
     const again = await sendAlerts(db, HOOK, [a], f)
@@ -81,7 +81,7 @@ describe('ولا يُرسَل حدثٌ مرّتين (D-004)', () => {
     ['token', () => tokenAlert('ح', 7, 'refresh'), () => tokenAlert('ح', 1, 'refresh')],
     ['publish', () => publishAlert('p1', 'linkedin', 3), () => publishAlert('p2', 'linkedin', 3)],
     ['budget', () => budgetAlert('2026-09-09', 5, 5), () => budgetAlert('2026-09-10', 5, 5)],
-  ])('ومفتاحُ %s يُبنى من الحدث نفسِه', (_k, same, other) => {
+  ])('ومفتاح %s يُبنى من الحدث نفسِه', (_k, same, other) => {
     expect(same().ref).toBe(same().ref)
     expect(same().ref).not.toBe(other().ref)
   })
@@ -108,7 +108,7 @@ describe('ولا يُرسَل حدثٌ مرّتين (D-004)', () => {
   })
 })
 
-describe('والعنوانُ يُحرَس بحارس المزوّدين نفسِه', () => {
+describe('والعنوان يُحرَس بحارس المزوّدين نفسِه', () => {
   it.each([
     ['http://localhost:8787/hook'],
     ['http://169.254.169.254/latest/meta-data'],
@@ -122,17 +122,17 @@ describe('والعنوانُ يُحرَس بحارس المزوّدين نفسِ
   })
 
   /** **ولا صمتٌ يُظنّ نجاحا**: بلا عنوانٍ يُقال ذلك نصّا. */
-  it('وبلا عنوانٍ يقول ذلك ولا يصمت', async () => {
+  it('وبلا عنوان يقول ذلك ولا يصمت', async () => {
     const r = await sendAlerts(db, '', [budgetAlert('د', 1, 1)], ok())
-    expect(r.why).toContain('لا عنوانَ')
+    expect(r.why).toContain('لا عنوان')
     expect(r.sent).toBe(0)
   })
 })
 
-describe('والمتنُ يقول ما وقع ويُحيل إلى اللوحة', () => {
-  it('ولا يحمل رابطا موقَّعا ولا معرّفَ جلسة', async () => {
+describe('والمتن يقول ما وقع ويُحيل إلى اللوحة', () => {
+  it('ولا يحمل رابطا موقَّعا ولا معرّف جلسة', async () => {
     for (const a of [
-      tokenAlert('صفحةُ صدى', 1, 'refresh'),
+      tokenAlert('صفحة صدى', 1, 'refresh'),
       publishAlert('p1', 'linkedin', 3),
       budgetAlert('2026-09-09', 5.2, 5),
     ]) {
@@ -149,7 +149,7 @@ describe('والمتنُ يقول ما وقع ويُحيل إلى اللوحة',
     expect(typeof body.text).toBe('string')
   })
 
-  it('وردٌّ غيرُ ناجحٍ يُسجَّل برمزه لا بـ«تعذّر»', async () => {
+  it('وردّ غير ناجح يُسجَّل برمزه لا بـ«تعذّر»', async () => {
     const f = vi.fn(async () => new Response('no', { status: 404 })) as unknown as typeof fetch
     const r = await sendAlerts(db, HOOK, [budgetAlert('د', 1, 1)], f)
     expect(r.failed).toBe(1)
@@ -167,8 +167,8 @@ describe('والمتنُ يقول ما وقع ويُحيل إلى اللوحة',
  * يحوّل إلى `169.254.169.254`، و`fetch` يتبعه من تحتنا** — وهي بعينها
  * الحالُ التي كُتب الحارسُ ليمنعها.
  */
-describe('ولا يُتبَع تحويلٌ إلى الداخل', () => {
-  it('**وردٌّ ٣٠٢ إلى عنوانٍ داخليٍّ يُسجَّل عطلا ولا يُنادى**', async () => {
+describe('ولا يُتبَع تحويل إلى الداخل', () => {
+  it('**وردّ ٣٠٢ إلى عنوان داخليّ يُسجَّل عطلا ولا يُنادى**', async () => {
     const f = vi.fn(async () => new Response(null, {
       status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' },
     })) as unknown as typeof fetch
@@ -186,8 +186,8 @@ describe('ولا يُتبَع تحويلٌ إلى الداخل', () => {
  * عنوانُ القناة اعتمادٌ لا عنوان: رمزُ Slack في مساره، **ومن ملكه أرسل
  * باسمك**. ونصُّ العطل يُخزَّن في `alert_outbox.error` **ويُعرَض في اللوحة**.
  */
-describe('ولا سرَّ في نصّ عطلٍ يُخزَّن', () => {
-  it('**والعنوانُ يُمحى من نصّ العطل**', async () => {
+describe('ولا سرّ في نصّ عطل يُخزَّن', () => {
+  it('**والعنوان يُمحى من نصّ العطل**', async () => {
     const f = vi.fn(async () => {
       throw new Error('تعذّر: https://hooks.slack.com/services/T00/B00/SECRET123')
     }) as unknown as typeof fetch
@@ -199,7 +199,7 @@ describe('ولا سرَّ في نصّ عطلٍ يُخزَّن', () => {
   })
 
   /** **وما ليس عنوانا يبقى مقروءا** — والمحوُ لا يمحو السبب. */
-  it('ويبقى سببُ العطل مقروءا', async () => {
+  it('ويبقى سبب العطل مقروءا', async () => {
     const f = vi.fn(async () => new Response('no', { status: 503 })) as unknown as typeof fetch
     await sendAlerts(db, HOOK, [budgetAlert('2026-09-09', 5, 5)], f)
     const row = await db.prepare('SELECT error FROM alert_outbox').first<{ error: string }>()

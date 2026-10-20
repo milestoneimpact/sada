@@ -86,7 +86,7 @@ function csvHref(d: PivotView): string {
 function rowHead(dim: Dimension, key: string): string {
   const label = escapeHtml(keyLabel(dim, key))
   if (dim !== 'platform' || !(key in PLATFORM_LABEL)) return label
-  return `<a href="/panel/channels/${escapeHtml(key)}" title="شاشةُ ${label}">${label}</a>`
+  return `<a href="/panel/channels/${escapeHtml(key)}" title="شاشة ${label}">${label}</a>`
 }
 
 export function pivotPane(d: PivotView): string {
@@ -124,13 +124,13 @@ export function pivotPane(d: PivotView): string {
    * العطلَ في اللوح، **والسببُ في المدى غالبا** — فيُقال ويُعرَض الفعل.
    */
   const empty = emptyState({
-    title: 'لا منشورَ في هذا المدى',
-    html: `المدى الحاليُّ ${escapeHtml(counted(d.sinceDays, NOUNS.day))}.
-      وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدولَ يومَ موعدها.`,
+    title: 'لا منشور في هذا المدى',
+    html: `المدى الحاليّ ${escapeHtml(counted(d.sinceDays, NOUNS.day))}.
+      وسّعه، أو اعتمد مسوّدةً من «المنشورات» فتدخل الجدول يوم موعدها.`,
   })
 
   return `<section data-pane="results" hidden>
-  ${pageHead('القياس', sectionLabel('results'), 'تختار الصفوفَ والأعمدةَ والقياس، فيُعاد بناءُ الجدول. <b>والعنوانُ يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
+  ${pageHead('القياس', sectionLabel('results'), 'تختار الصفوف والأعمدة والقياس، فيُعاد بناء الجدول. <b>والعنوان يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
   ${resultsTabs('pivot')}
   <div data-sub id="pivot">
 
@@ -153,17 +153,17 @@ export function pivotPane(d: PivotView): string {
         escapeHtml(DIMENSION_LABEL[d.rows])}${
         d.cols === null ? '' : ` × ${escapeHtml(DIMENSION_LABEL[d.cols])}`}</h2>
       <div class="row acts"><span class="note">${escapeHtml(counted(t.facts, NOUNS.post))}${
-        d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
+        d.capped ? ` · بلغ السقف (${escapeHtml(String(d.cap))}) فطُوي ما قبله` : ''}</span>
       ${t.rowKeys.length === 0 ? '' : `<a class="btn btn-secondary btn-sm" href="${
-        escapeHtml(csvHref(d))}" download>نزّل الجدولَ CSV</a>`}</div>
+        escapeHtml(csvHref(d))}" download>نزّل الجدول CSV</a>`}</div>
     </div>
-    ${t.rowKeys.length === 0 ? '' : `<p class="hint">ملفُّ CSV يحمل ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</p>`}
+    ${t.rowKeys.length === 0 ? '' : `<p class="hint">ملفّ CSV يحمل ما تراه هنا حرفًا — بالأسماء لا بالمفاتيح، ويفتح في Excel بالعربيّة.</p>`}
     ${t.rowKeys.length === 0
       ? empty
       : `<div class="pv-wrap"><table class="card card-inset pv">
           <thead>${head}</thead><tbody>${body}${foot}</tbody></table></div>`}
-    ${t.rowKeys.length === 0 ? '' : `<p class="hint">خليّةٌ فارغةٌ تعني
-      <b>لا منشورَ في تقاطعها</b> — لا صفرا. وصفرٌ يُكتب صفرا.</p>`}
+    ${t.rowKeys.length === 0 ? '' : `<p class="hint">خليّة فارغة تعني
+      <b>لا منشور في تقاطعها</b> — لا صفرا. وصفر يُكتب صفرا.</p>`}
   </div>
 </div>
 </section>`

@@ -66,7 +66,7 @@ export interface SendResult {
  * ما وُصف**، ولا تُقبَل قطعةٌ حرّةٌ من نداءٍ خارجيّ.
  */
 export function tokenAlert(account: string, days: number, kind: string): Alert {
-  const which = kind === 'refresh' ? 'إذنُ التجديد' : 'إذنُ الوصول'
+  const which = kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'
   return {
     kind: 'token',
     ref: `token:${account}:${kind}:${days}`,
@@ -75,7 +75,7 @@ export function tokenAlert(account: string, days: number, kind: string): Alert {
     body: (days <= 0
       ? `صدى — ${which} لحساب «${account}» انتهى.`
       : `صدى — ${which} لحساب «${account}» ينتهي خلال ${counted(days, NOUNS.day, 'gen')}.`) +
-      ' وسقوطُه يوقف النشرَ من هذا الحساب. أعد الإذنَ من لوحة صدى.',
+      ' وسقوطُه يوقف النشر من هذا الحساب. أعد الإذن من لوحة صدى.',
   }
 }
 
@@ -83,7 +83,7 @@ export function publishAlert(postId: string, platform: string, attempts: number)
   return {
     kind: 'publish',
     ref: `publish:${postId}`,
-    body: `صدى — منشورٌ على ${platform} لم يُنشَر بعد ${attempts} محاولات،` +
+    body: `صدى — منشور على ${platform} لم يُنشَر بعد ${attempts} محاولات،` +
       ' وفات موعدُه ولا يُعاد. راجعه في لوحة صدى.',
   }
 }
@@ -92,7 +92,7 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
   return {
     kind: 'budget',
     ref: `budget:${day}`,
-    body: `صدى — بلغ إنفاقُ اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +
+    body: `صدى — بلغ إنفاق اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +
       ' وما بعده يُردّ حتّى الثالثة فجرًا بتوقيت الرياض أو حتّى تَرفع السقف.',
   }
 }
@@ -105,8 +105,8 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
  */
 const SECRETISH = [
   /\bey[A-Za-z0-9_-]{16,}\b/,          // JWT
-  /\b[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{20,}/, // رمزٌ منقوط
-  /\bsk-[A-Za-z0-9]{12,}/i,            // مفاتيحُ المزوّدين
+  /\b[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{20,}/, // رمز منقوط
+  /\bsk-[A-Za-z0-9]{12,}/i,            // مفاتيح المزوّدين
   /\bBearer\s+\S+/i,
   /client_secret|refresh_token|access_token|ADMIN_TOKEN|TOKEN_ENC_KEY/i,
 ]
@@ -128,7 +128,7 @@ export async function sendAlerts(
   fetchImpl: typeof fetch = fetch,
 ): Promise<SendResult> {
   if (webhook.trim() === '') {
-    return { sent: 0, skipped: alerts.length, failed: 0, why: 'لا عنوانَ قناةٍ مضبوط' }
+    return { sent: 0, skipped: alerts.length, failed: 0, why: 'لا عنوان قناة مضبوط' }
   }
   const verdict = checkProviderUrl(webhook)
   if (!verdict.ok) {
@@ -144,7 +144,7 @@ export async function sendAlerts(
      * المحاولة تُعيد إرسالَ السرّ**. فيُسجَّل ولا يُنادى.
      */
     if (looksSecret(a.body)) {
-      await mark(db, a, null, 'المتنُ يحمل ما يشبه سرّا — لم يُنادَ')
+      await mark(db, a, null, 'المتن يحمل ما يشبه سرّا — لم يُناد')
       failed += 1
       continue
     }
@@ -181,11 +181,11 @@ export async function sendAlerts(
         // ‏«text» هو الحقلُ الذي يقرؤه Slack وDiscord وأكثرُ ما سواهما
         body: JSON.stringify({ text: a.body }),
       }, fetchImpl)
-      await mark(db, a, res.status, res.ok ? null : `ردّت القناةُ ${res.status}`)
+      await mark(db, a, res.status, res.ok ? null : `ردّت القناة ${res.status}`)
       if (res.ok) sent += 1
       else failed += 1
     } catch (e) {
-      await mark(db, a, null, e instanceof Error ? e.message : 'نداءٌ لم يعد بجواب')
+      await mark(db, a, null, e instanceof Error ? e.message : 'نداء لم يعد بجواب')
       failed += 1
     }
   }
@@ -207,7 +207,7 @@ export async function sendAlerts(
  * وسطران يُغلقان بابا لا أستطيع أن أشهد أنّه مغلق.
  */
 function redact(text: string): string {
-  return text.replace(/https?:\/\/\S+/gi, '«عنوانٌ مُزال»')
+  return text.replace(/https?:\/\/\S+/gi, '«عنوان مُزال»')
 }
 
 async function mark(

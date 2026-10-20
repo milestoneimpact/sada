@@ -97,7 +97,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
 
   const recovery = !d.hasRecovery
     ? ''
-    : `<details class="rec"><summary>فقدتُ جهازي — استعمل رمز استرداد</summary>
+    : `<details class="rec"><summary>فقدت جهازي — استعمل رمز استرداد</summary>
          <form method="POST" action="/panel/2fa/recovery">
            ${hidden}
            <div class="field"><label for="rc">رمز الاسترداد</label>
@@ -111,14 +111,14 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
   const nothing =
     d.hasPasskey || d.hasTotp
       ? ''
-      : notice({ tone: 'warn', html: `لا عاملَ ثانٍ مضبوطا — وهذا لا ينبغي أن يقع.
+      : notice({ tone: 'warn', html: `لا عامل ثان مضبوطا — وهذا لا ينبغي أن يقع.
                أعد الدخول، وإن تكرّر فبدّل <span class="mono">ADMIN_TOKEN</span>.` })
 
   return shell(
     'صدى — العامل الثاني',
     `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
-      <h1>خطوةٌ أخيرة</h1>
-      <p class="lede">أثبتَّ كلمةَ الإدارة. وبقي ما يثبت أنّك أنت.</p>
+      <h1>خطوة أخيرة</h1>
+      <p class="lede">أثبتّ كلمة الإدارة. وبقي ما يثبت أنّك أنت.</p>
       ${note}${nothing}
       <div class="card">${passkey}${totp}</div>
       ${recovery}

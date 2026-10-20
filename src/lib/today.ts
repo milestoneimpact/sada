@@ -79,19 +79,19 @@ export function todayFeed(i: TodayInput): { items: readonly TodayItem[]; more: n
   for (const f of i.facts) {
     if (f.day !== day) continue
     if (f.succeeded) {
-      out.push({ at: null, kind: 'ok', text: `نُشر منشورٌ على ${platformLabel(f.platform)}`, go: `/panel/channels/${f.platform}`, goLabel: `شاشةُ ${platformLabel(f.platform)}` })
+      out.push({ at: null, kind: 'ok', text: `نُشر منشور على ${platformLabel(f.platform)}`, go: `/panel/channels/${f.platform}`, goLabel: `شاشة ${platformLabel(f.platform)}` })
     } else if (f.status === 'failed') {
-      out.push({ at: null, kind: 'bad', text: `فشل النشرُ على ${platformLabel(f.platform)}`, go: `/panel/channels/${f.platform}`, goLabel: `شاشةُ ${platformLabel(f.platform)}` })
+      out.push({ at: null, kind: 'bad', text: `فشل النشر على ${platformLabel(f.platform)}`, go: `/panel/channels/${f.platform}`, goLabel: `شاشة ${platformLabel(f.platform)}` })
     }
   }
 
   for (const d of i.drafts) {
     const name = platformLabel(d.platform)
     if (d.approvedAt !== null && sameDay(d.approvedAt, day)) {
-      if (d.status === 'rejected') out.push({ at: d.approvedAt, kind: 'note', text: `رفضتَ مسوّدةً لـ${name}`, go: '#posts', goLabel: 'المنشورات' })
-      else out.push({ at: d.approvedAt, kind: 'ok', text: `اعتمدتَ مسوّدةً لـ${name}`, go: '#posts', goLabel: 'المنشورات' })
+      if (d.status === 'rejected') out.push({ at: d.approvedAt, kind: 'note', text: `رفضت مسوّدةً لـ${name}`, go: '#posts', goLabel: 'المنشورات' })
+      else out.push({ at: d.approvedAt, kind: 'ok', text: `اعتمدت مسوّدةً لـ${name}`, go: '#posts', goLabel: 'المنشورات' })
     } else if (sameDay(d.createdAt, day)) {
-      out.push({ at: d.createdAt, kind: 'note', text: `كُتبت مسوّدةٌ لـ${name} تنتظر قرارك`, go: '#posts', goLabel: 'المنشورات' })
+      out.push({ at: d.createdAt, kind: 'note', text: `كُتبت مسوّدة لـ${name} تنتظر قرارك`, go: '#posts', goLabel: 'المنشورات' })
     }
   }
 

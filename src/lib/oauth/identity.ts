@@ -54,7 +54,7 @@ export async function fetchIdentity(
     const id = first?.['id']
     if (typeof id !== 'string' || id.length === 0) {
       throw new OAuthError(
-        'youtube: لا قناةَ على هذا الحساب — أنشئ قناةً ثمّ أعد الربط',
+        'youtube: لا قناة على هذا الحساب — أنشئ قناةً ثمّ أعد الربط',
         502,
       )
     }

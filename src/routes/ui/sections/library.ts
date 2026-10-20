@@ -28,22 +28,22 @@ export function imagesGallery(images: readonly MediaView[], drafts: readonly Gal
   if (images.length === 0) {
     return emptyState({
       echo: true,
-      title: 'لا صورةَ بعد',
-      html: 'تُولَّد الصورةُ من بطاقة المسوّدة في «المنشورات» — <b>وهي نداءٌ مدفوع</b>، فلا تقع وحدَها.',
+      title: 'لا صورة بعد',
+      html: 'تُولَّد الصورة من بطاقة المسوّدة في «المنشورات» — <b>وهي نداء مدفوع</b>، فلا تقع وحدَها.',
     })
   }
   const byId = new Map(drafts.map((d) => [d.id, d]))
   const cells = images.map((m) => {
     const d = byId.get(m.postId)
-    const alt = d === undefined ? 'صورةُ منشور' : `صورةُ منشور ${platformLabel(d.platform)}`
+    const alt = d === undefined ? 'صورة منشور' : `صورة منشور ${platformLabel(d.platform)}`
     return `<a class="lib-img" href="#d-${escapeHtml(m.postId)}">
       <img src="/panel/media/${escapeHtml(m.id)}" alt="${escapeHtml(alt)}" loading="lazy" width="320" height="320">
       <span class="lib-cap">${d === undefined
-        ? 'مسوّدةٌ لم تعد في القائمة'
+        ? 'مسوّدة لم تعد في القائمة'
         : `<b>${escapeHtml(platformLabel(d.platform))}</b> · ${escapeHtml(snippet(d.text))}`}</span>
     </a>`
   }).join('')
   // ‏بلا بطاقةٍ حولها: صورتان في بطاقةٍ بعرض الشاشة تتركان ثلثيها أرضًا فارغة (مدقّقُ «الجوفاء»، D-137)
-  return `<p class="hint">الصورةُ تفتح بطاقةَ مسوّدتها، <b>وهناك تُعاد أو تُرفض أو تُحرَّك</b>.</p>
+  return `<p class="hint">الصورة تفتح بطاقة مسوّدتها، <b>وهناك تُعاد أو تُرفض أو تُحرَّك</b>.</p>
     <div class="lib-grid">${cells}</div>`
 }

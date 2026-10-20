@@ -40,8 +40,8 @@ const beats = (over: Partial<Record<Heartbeat['job'], Partial<Heartbeat>>> = {})
 const FAILED = '/panel/channels/x?filter=failed#history'
 
 describe('counted', () => {
-  it('واحدٌ بوصفه، واثنان بالمثنّى، والجمعُ إلى عشرة، والتمييزُ بعدها', () => {
-    expect(counted(1, NOUNS.draft)).toBe('مسوّدةٌ واحدة')
+  it('واحد بوصفه، واثنان بالمثنّى، والجمع إلى عشرة، والتمييز بعدها', () => {
+    expect(counted(1, NOUNS.draft)).toBe('مسوّدة واحدة')
     expect(counted(2, NOUNS.post)).toBe('منشوران')
     expect(counted(5, NOUNS.source)).toBe('5 مصادر')
     expect(counted(11, NOUNS.post)).toBe('11 منشورًا')
@@ -50,7 +50,7 @@ describe('counted', () => {
 })
 
 describe('nextAction', () => {
-  it('الإذنُ المنتهي أوّلًا — وزرُّه يجدّد مباشرةً', () => {
+  it('الإذن المنتهي أوّلًا — وزرُّه يجدّد مباشرةً', () => {
     const f = facts({
       channels: viewChannels([acc({ status: 'needs_reauth' })], () => true),
       counts: { perPlatform: { linkedin: counts({ draft: 4 }) }, publishedWeek: 0 },
@@ -58,21 +58,21 @@ describe('nextAction', () => {
     expect(nextAction(f)).toMatchObject({ tone: 'bad', href: '/oauth/linkedin/start' })
   })
 
-  it('والفشلُ قبل المسوّدات، ويفتح صفحةَ منصّته', () => {
+  it('والفشل قبل المسوّدات، ويفتح صفحة منصّته', () => {
     const f = facts({ counts: { perPlatform: { linkedin: counts({ draft: 3 }), x: counts({ failed: 1 }) }, publishedWeek: 0 } })
     const a = nextAction(f)
     expect(a.tone).toBe('bad')
     // ‏إلى صفّ الفشل بسببه وزرِّ إعادته، لا إلى رأس صفحة المنصّة (ر-8)
     expect(a.href).toBe(FAILED)
     expect(a.label).toBe('أصلح المنشور')
-    expect(a.text).toContain('منشورٌ واحد')
+    expect(a.text).toContain('منشور واحد')
   })
 
-  it('ولا منصّةَ متّصلة: اربط أوّلًا', () => {
-    expect(nextAction(facts({ channels: viewChannels([], () => true) })).label).toBe('اربط أوّلَ منصّة')
+  it('ولا منصّة متّصلة: اربط أوّلًا', () => {
+    expect(nextAction(facts({ channels: viewChannels([], () => true) })).label).toBe('اربط أوّل منصّة')
   })
 
-  it('ثمّ المسوّداتُ بعددٍ صحيح، ثمّ المواعيد، ثمّ «على المسار»', () => {
+  it('ثمّ المسوّدات بعدد صحيح، ثمّ المواعيد، ثمّ «على المسار»', () => {
     expect(nextAction(facts({ counts: { perPlatform: { linkedin: counts({ draft: 2 }) }, publishedWeek: 0 } })).text)
       .toContain('مسوّدتان')
     expect(nextAction(facts({ counts: { perPlatform: { linkedin: counts({ approved: 3 }) }, publishedWeek: 0 } })).label)
@@ -83,16 +83,16 @@ describe('nextAction', () => {
     expect(calm).toMatchObject({ tone: 'ok', href: '/panel/channels/linkedin' })
   })
 
-  it('والفشلُ القديمُ لا يحجب ما بعده — يُحمِّر فشلُ الأسبوع وحده', () => {
+  it('والفشل القديم لا يحجب ما بعده — يُحمِّر فشل الأسبوع وحده', () => {
     const old = facts({ counts: { perPlatform: { linkedin: counts({ draft: 2 }), x: counts({ failed: 3, recentFailed: 0 }) }, publishedWeek: 0 } })
     expect(nextAction(old)).toMatchObject({ tone: 'ok', label: 'راجع المسوّدات' })
     const fresh = facts({ counts: { perPlatform: { linkedin: counts({ draft: 2 }), x: counts({ failed: 3, recentFailed: 1 }) }, publishedWeek: 0 } })
     const a = nextAction(fresh)
     expect(a).toMatchObject({ tone: 'bad', href: FAILED })
-    expect(a.text).toContain('منشورٌ واحد')
+    expect(a.text).toContain('منشور واحد')
   })
 
-  it('و«لا مصدر» حين لا شيءَ أصلًا — والمقطعُ والخطّةُ يكتبان بلا Drive', () => {
+  it('و«لا مصدر» حين لا شيء أصلًا — والمقطع والخطّة يكتبان بلا Drive', () => {
     const none = { total: 0, analyzed: 0 }
     expect(nextAction(facts({ sources: none }))).toMatchObject({ tone: 'warn', href: '#sources' })
     // ‏مسوّداتٌ من مقطعٍ مرفوع: تُراجَع، لا «اذهب إلى المصادر»
@@ -104,7 +104,7 @@ describe('nextAction', () => {
     const idle = nextAction(facts({ sources: none, counts: { perPlatform: { youtube: counts({ published: 4 }) }, publishedWeek: 0 } }))
     expect(idle).toMatchObject({ tone: 'ok', href: '#idea' })
     expect(idle.text).toContain('ارفع مقطعًا')
-    expect(idle.text).not.toContain('مصدرٍ محلَّل')
+    expect(idle.text).not.toContain('مصدر محلَّل')
   })
 })
 
@@ -112,14 +112,14 @@ describe('nextAction', () => {
  * ‏**والزرُّ والمحطّةُ ينزلان إلى البطاقة لا إلى رأس اللوح** (ر-0، ر-2، ر-3، ر-6): كانت
  * ‏أربعُ محطّاتٍ كلُّها `#posts`، و«اعتمد» على بُعد ‏١٢٩٠px و«جدوِل» على ‏٣٠٩٠ على الهاتف.
  */
-describe('المحطّاتُ والفعلُ إلى البطاقة نفسِها', () => {
+describe('المحطّات والفعل إلى البطاقة نفسِها', () => {
   const busy = {
     perPlatform: { linkedin: counts({ draft: 2, approved: 1 }), x: counts({ queued: 1, nextAt: '2026-10-05 09:00:00' }) },
     publishedWeek: 0,
   }
   const firsts = { waiting: 'p-wait', unscheduled: 'p-ok', withoutImage: 'p-bare' }
 
-  it('«الاعتماد» إلى أوّل مسوّدةٍ تنتظر، و«الموعد» إلى نموذج جدولة أوّل معتمَد، و«الصورة» إلى لوح صورته', () => {
+  it('«الاعتماد» إلى أوّل مسوّدة تنتظر، و«الموعد» إلى نموذج جدولة أوّل معتمَد، و«الصورة» إلى لوح صورته', () => {
     const by = Object.fromEntries(journeySteps(facts({ counts: busy, withoutImage: 2, firsts })).map((s) => [s.key, s.href]))
     expect(by['approve']).toBe('#d-p-wait')
     expect(by['schedule']).toBe('#s-p-ok')
@@ -128,14 +128,14 @@ describe('المحطّاتُ والفعلُ إلى البطاقة نفسِها',
     expect(by['draft']).toBe('#write')
   })
 
-  it('وبطاقةٌ لم تُرسَم (خارج الستّين) تُبقي رأسَ اللوح — لا مرساةً لا تجد شيئًا', () => {
+  it('وبطاقة لم تُرسَم (خارج الستّين) تُبقي رأس اللوح — لا مرساةً لا تجد شيئًا', () => {
     const by = Object.fromEntries(journeySteps(facts({ counts: busy, withoutImage: 2 })).map((s) => [s.key, s.href]))
     expect(by['approve']).toBe('#posts')
     expect(by['schedule']).toBe('#posts')
     expect(by['image']).toBe('#posts')
   })
 
-  it('والفعلُ يقصد البطاقةَ نفسَها ويسمّي محطّتَه', () => {
+  it('والفعل يقصد البطاقة نفسَها ويسمّي محطّتَه', () => {
     expect(nextAction(facts({ counts: busy, firsts }))).toMatchObject({ href: '#d-p-wait', step: 'approve' })
     const ready = { perPlatform: { linkedin: counts({ approved: 1 }) }, publishedWeek: 0 }
     expect(nextAction(facts({ counts: ready, firsts }))).toMatchObject({ href: '#s-p-ok', step: 'schedule' })
@@ -149,10 +149,10 @@ describe('المحطّاتُ والفعلُ إلى البطاقة نفسِها',
  * ‏**الإرسالُ المتوقّف يُقال في الشاشة الأولى** (الخطّة 5.5/7، 5.9): كانت الحبّةُ «يعمل»
  * ‏خضراءَ والدوراتُ متوقّفةٌ منذ ثلاثة أيّام، و«خطوتك التالية» كما هي.
  */
-describe('حبّةُ النظام ونبضُ الإرسال', () => {
+describe('حبّة النظام ونبض الإرسال', () => {
   const stale = beats({ dispatch: { at: '2026-10-01 12:00:00' } })
 
-  it('الإرسالُ المتأخّر يوقف النشرَ — حبّةٌ حمراء وفعلٌ قبل الفشل', () => {
+  it('الإرسال المتأخّر يوقف النشر — حبّة حمراء وفعل قبل الفشل', () => {
     expect(systemPill(false, stale)).toEqual({ tone: 'bad', text: 'النشر متوقّف' })
     const f = facts({ pulses: stale, counts: { perPlatform: { x: counts({ failed: 1 }) }, publishedWeek: 0 } })
     const a = nextAction(f, NOW)
@@ -160,14 +160,14 @@ describe('حبّةُ النظام ونبضُ الإرسال', () => {
     expect(a.text).toContain('قبل 3 أيّام')
   })
 
-  it('وفشلُ آخر إرسالٍ مثلُه — والإيقافُ بقرارك يسبقهما', () => {
+  it('وفشل آخر إرسال مثلُه — والإيقاف بقرارك يسبقهما', () => {
     const failed = beats({ dispatch: { outcome: 'failed' } })
     expect(nextAction(facts({ pulses: failed }), NOW)).toMatchObject({ tone: 'bad', href: '#machine' })
     expect(systemPill(true, failed)).toEqual({ tone: 'off', text: 'موقوف مؤقتا' })
     expect(nextAction(facts({ pulses: failed, paused: true }), NOW).href).toBe('#limits')
   })
 
-  it('ودورةٌ أخرى تتأخّر لا تقول «النشر متوقّف» — ولا تبقى «يعمل» صامتة', () => {
+  it('ودورة أخرى تتأخّر لا تقول «النشر متوقّف» — ولا تبقى «يعمل» صامتة', () => {
     const scan = beats({ scan: { at: '2026-09-30 03:00:00' } })
     expect(systemPill(false, scan)).toEqual({ tone: 'off', text: 'يعمل بتأخّر' })
     expect(nextAction(facts({ pulses: scan }), NOW).href).not.toBe('#machine')
@@ -178,10 +178,10 @@ describe('حبّةُ النظام ونبضُ الإرسال', () => {
 })
 
 /** ‏**سقفُ اليوم في «خطوتك التالية» وتحت زرّ الكتابة**، وساعةُ انفتاحه بتوقيت المالك (ر-10). */
-describe('سقفُ الإنفاق اليوميّ', () => {
+describe('سقف الإنفاق اليوميّ', () => {
   const cap = { kind: 'spend_cap', used: 6.06, cap: 5 } as const
 
-  it('فعلٌ برتقاليٌّ إلى حقل السقف، وساعةُ الانفتاح بتوقيت المالك أو الرياض (D-201)', () => {
+  it('فعل برتقاليّ إلى حقل السقف، وساعة الانفتاح بتوقيت المالك أو الرياض (D-201)', () => {
     const a = nextAction(facts({ blocker: cap, zone: 'Asia/Riyadh' }), NOW)
     expect(a).toMatchObject({ tone: 'warn', href: '#c2', label: 'ارفع السقف' })
     expect(a.text).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
@@ -193,12 +193,12 @@ describe('سقفُ الإنفاق اليوميّ', () => {
     expect(first).not.toContain('UTC')
   })
 
-  it('والفشلُ الحديثُ يسبقه — السقفُ لا يوقف النشر', () => {
+  it('والفشل الحديث يسبقه — السقف لا يوقف النشر', () => {
     const f = facts({ blocker: cap, counts: { perPlatform: { x: counts({ failed: 1 }) }, publishedWeek: 0 } })
     expect(nextAction(f, NOW).href).toBe(FAILED)
   })
 
-  it('وسببُ تعطيل زرّ الكتابة من الحاجز نفسِه', () => {
+  it('وسبب تعطيل زرّ الكتابة من الحاجز نفسِه', () => {
     expect(writeBlock(null, NOW, null)).toBeNull()
     expect(writeBlock(cap, NOW, 'Asia/Riyadh')).toMatchObject({ href: '#c2' })
     expect(writeBlock(cap, NOW, 'Asia/Riyadh')!.text).toContain('يُفتح الساعة 3:00 ص.')
@@ -207,13 +207,13 @@ describe('سقفُ الإنفاق اليوميّ', () => {
 })
 
 describe('journeySteps', () => {
-  it('سبعٌ بترتيبها، وكلُّها رابط', () => {
+  it('سبع بترتيبها، وكلُّها رابط', () => {
     const steps = journeySteps(facts())
     expect(steps.map((s) => s.key)).toEqual(['source', 'draft', 'image', 'approve', 'schedule', 'publish', 'results'])
     for (const s of steps) expect(s.href).not.toBe('')
   })
 
-  it('ما ينتظرك «تنتظرك»، والفشلُ يسقط، وما لم يصله شيءٌ «تنتظر»', () => {
+  it('ما ينتظرك «تنتظرك»، والفشل يسقط، وما لم يصله شيء «تنتظر»', () => {
     const steps = journeySteps(facts({
       sources: { total: 3, analyzed: 1 },
       counts: { perPlatform: { linkedin: counts({ draft: 2, approved: 1 }), x: counts({ failed: 1 }) }, publishedWeek: 0 },
@@ -221,14 +221,14 @@ describe('journeySteps', () => {
     }))
     const by = Object.fromEntries(steps.map((s) => [s.key, s]))
     expect(by['source']!.state).toBe('now')
-    expect(by['source']!.note).toBe('ينتظر التحليلَ مصدران')
+    expect(by['source']!.note).toBe('ينتظر التحليل مصدران')
     expect(by['approve']!).toMatchObject({ state: 'now', note: 'تنتظر قرارك مسوّدتان' })
-    expect(by['schedule']!).toMatchObject({ state: 'now', note: 'بلا موعد: منشورٌ واحد' })
+    expect(by['schedule']!).toMatchObject({ state: 'now', note: 'بلا موعد: منشور واحد' })
     expect(by['publish']!).toMatchObject({ state: 'failed', href: FAILED })
     expect(by['results']!.state).toBe('waiting')
   })
 
-  it('«المصدر» تامّةٌ حين في الرحلة منشوراتٌ بلا Drive، و«تنتظرك» حين لا شيء', () => {
+  it('«المصدر» تامّة حين في الرحلة منشورات بلا Drive، و«تنتظرك» حين لا شيء', () => {
     const none = { total: 0, analyzed: 0 }
     const empty = Object.fromEntries(journeySteps(facts({ sources: none })).map((s) => [s.key, s]))
     expect(empty['source']!).toMatchObject({ state: 'now', href: '#sources' })
@@ -239,12 +239,12 @@ describe('journeySteps', () => {
     expect(fed['approve']!.state).toBe('now')
   })
 
-  it('«الموعد» تامّةٌ بعد نشر كلِّ ما جُدول — لا «بعد الاعتماد»', () => {
+  it('«الموعد» تامّة بعد نشر كلّ ما جُدول — لا «بعد الاعتماد»', () => {
     const by = Object.fromEntries(journeySteps(facts({
       counts: { perPlatform: { linkedin: counts({ published: 5 }) }, publishedWeek: 2 },
     })).map((s) => [s.key, s]))
     expect(by['approve']!.state).toBe('done')
-    expect(by['schedule']!).toMatchObject({ state: 'done', note: 'لا موعدَ قادم — مضى ما جُدول' })
+    expect(by['schedule']!).toMatchObject({ state: 'done', note: 'لا موعد قادم — مضى ما جُدول' })
     expect(by['publish']!.state).toBe('done')
     // ‏والمجدولُ يُعدّ بعدده ما دام في الطابور
     const queued = journeySteps(facts({
@@ -253,17 +253,17 @@ describe('journeySteps', () => {
     expect(queued).toMatchObject({ state: 'done', note: 'جُدول منشوران' })
   })
 
-  it('والنشرُ لا يسقط بفشلٍ قديم — يُذكَر ولا يُحمِّر', () => {
+  it('والنشر لا يسقط بفشل قديم — يُذكَر ولا يُحمِّر', () => {
     const old = journeySteps(facts({
       counts: { perPlatform: { x: counts({ failed: 2, recentFailed: 0 }) }, publishedWeek: 0 },
     }))
     const publish = old.find((s) => s.key === 'publish')!
-    expect(publish).toMatchObject({ state: 'waiting', href: FAILED, note: 'فشل منشوران قبل أسبوعٍ فأكثر' })
+    expect(publish).toMatchObject({ state: 'waiting', href: FAILED, note: 'فشل منشوران قبل أسبوع فأكثر' })
     expect(old.some((s) => s.state === 'failed')).toBe(false)
     const fresh = journeySteps(facts({
       counts: { perPlatform: { x: counts({ failed: 2, recentFailed: 1 }) }, publishedWeek: 0 },
     })).find((s) => s.key === 'publish')!
-    expect(fresh).toMatchObject({ state: 'failed', note: 'فشل منشورٌ واحد — والسببُ في صفحة المنصّة' })
+    expect(fresh).toMatchObject({ state: 'failed', note: 'فشل منشور واحد — والسبب في صفحة المنصّة' })
   })
 })
 
@@ -271,7 +271,7 @@ describe('journeySteps', () => {
 describe('journeyCounts', () => {
   const now = new Date('2026-10-03T12:00:00Z')
 
-  it('يعدّ الفاشلَ كلَّه، والحديثَ منه بآخر محاولةٍ فاشلةٍ في سبعة أيّام', async () => {
+  it('يعدّ الفاشل كلَّه، والحديث منه بآخر محاولة فاشلة في سبعة أيّام', async () => {
     const db = fakeDb()
     db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
       VALUES ('a1', 'x', 'member', 'abc', 'عمر', 'active')`)
@@ -311,7 +311,7 @@ describe('journeyCounts', () => {
 
 describe('platformTile', () => {
   const NOW = new Date('2026-09-20T12:00:00Z')
-  it('حالٌ واحدٌ وزرٌّ واحد لكلّ حال', () => {
+  it('حال واحد وزرّ واحد لكلّ حال', () => {
     const [li] = viewChannels([acc({})], () => true)
     expect(platformTile(li!, NOW)).toMatchObject({ tone: 'ok', status: 'متّصلة', account: 'عمر', button: { label: 'افتح' } })
 
@@ -330,8 +330,8 @@ describe('platformTile', () => {
   })
 })
 
-describe('لوحةُ القيادة: القمعُ وشريطُ الأسبوع (D-194)', () => {
-  it('كلُّ محطّةٍ تحمل كم مرّ بها — والاعتمادُ يعدّ ما بعده', () => {
+describe('لوحة القيادة: القمع وشريط الأسبوع (D-194)', () => {
+  it('كلّ محطّة تحمل كم مرّ بها — والاعتماد يعدّ ما بعده', () => {
     const steps = journeySteps(facts({
       sources: { total: 3, analyzed: 1 }, withImage: 4, openSuggestions: 2,
       counts: { perPlatform: { linkedin: counts({ draft: 5, approved: 2, queued: 3, published: 4, failed: 1 }) }, publishedWeek: 4 },

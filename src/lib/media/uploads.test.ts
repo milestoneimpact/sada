@@ -41,7 +41,7 @@ beforeEach(() => { db = fakeDb() })
 const META = { name: 'C:\\clips\\قيادة.mp4', mime: 'video/mp4', bytes: PART_BYTES * 2 + 10, width: 1080, height: 1920, durationMs: 42_000 }
 
 describe('الرفع', () => {
-  it('يبدأ ويقبل القطعَ بأطوالها ويجمعها، والاسمُ بلا مسار', async () => {
+  it('يبدأ ويقبل القطع بأطوالها ويجمعها، والاسم بلا مسار', async () => {
     const r2 = multipart()
     const start = await startUpload(db, 'org_owner', r2.bucket, META, 'u1')
     expect(start).toEqual({ ok: true, id: 'u1', partBytes: PART_BYTES, parts: 3 })
@@ -64,7 +64,7 @@ describe('الرفع', () => {
     expect(row).toMatchObject({ id: 'u1', name: 'قيادة.mp4', status: 'ready', durationMs: 42_000, posts: [] })
   })
 
-  it('النوعُ والحجمُ يُفحصان قبل أن يُفتح رفعٌ في R2', async () => {
+  it('النوع والحجم يُفحصان قبل أن يُفتح رفع في R2', async () => {
     const r2 = multipart()
     expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, mime: 'video/x-msvideo' })).toMatchObject({ ok: false })
     expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: MAX_UPLOAD_BYTES + 1 })).toMatchObject({ ok: false })
@@ -73,8 +73,8 @@ describe('الرفع', () => {
   })
 })
 
-describe('حدودُ المنصّات', () => {
-  it('رأسيٌّ ‏42 ثانية: يوافق الثلاث، وأفقيٌّ طويلٌ فيديو عاديٌّ على YouTube ويُمنع على TikTok', () => {
+describe('حدود المنصّات', () => {
+  it('رأسيّ ‏42 ثانية: يوافق الثلاث، وأفقيّ طويل فيديو عاديّ على YouTube ويُمنع على TikTok', () => {
     // ‏يوافق الثلاث — ومَن يرى المقطع ليس من الحدود (D-190): يُقال من إعداد المالك بجانبها
     expect(videoChecks(META).map((c) => c.level)).toEqual(['ok', 'ok', 'ok'])
     const long = videoChecks({ ...META, width: 1920, height: 1080, durationMs: 700_000 })
@@ -86,7 +86,7 @@ describe('حدودُ المنصّات', () => {
   })
 })
 
-describe('منشوراتٌ من مقطع', () => {
+describe('منشورات من مقطع', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
@@ -94,9 +94,9 @@ describe('منشوراتٌ من مقطع', () => {
     await completeUpload(db, r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
   }
 
-  it('منشورٌ لكلّ منصّة، كلُّها على كائنٍ واحد، والاعتمادُ باسم المالك، والضغطةُ الثانيةُ لا تكرّر', async () => {
+  it('منشور لكلّ منصّة، كلُّها على كائن واحد، والاعتماد باسم المالك، والضغطة الثانية لا تكرّر', async () => {
     await ready()
-    const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'المعلمُ نقطةُ قرار', approve: true, by: 'omar' })
+    const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'المعلم نقطة قرار', approve: true, by: 'omar' })
     expect(out).toEqual({ ok: true, created: ['youtube', 'tiktok', 'instagram'], skipped: [] })
     const rows = db.raw.prepare(
       `SELECT p.platform, p.status, p.approved_by, m.r2_key, m.upload_id FROM posts p JOIN media m ON m.post_id = p.id ORDER BY p.platform`,
@@ -110,7 +110,7 @@ describe('منشوراتٌ من مقطع', () => {
     expect((await listUploads(db))[0]!.posts.map((p) => p.platform).sort()).toEqual(['instagram', 'tiktok', 'youtube'])
   })
 
-  it('بلا نصٍّ أو بلا منصّةٍ أو قبل اكتمال الرفع يُردّ، وبلا اعتمادٍ يبقى مسوّدة', async () => {
+  it('بلا نصّ أو بلا منصّة أو قبل اكتمال الرفع يُردّ، وبلا اعتماد يبقى مسوّدة', async () => {
     expect(await postsFromUpload(db, { uploadId: 'none', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
     await ready()
     expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: '  ', approve: true, by: 'o' })).toMatchObject({ ok: false })
@@ -120,7 +120,7 @@ describe('منشوراتٌ من مقطع', () => {
     expect(row).toEqual({ status: 'draft', approved_at: null })
   })
 
-  it('المرفوضُ يُحرَّر مفتاحُه ويُنشأ من جديد، ولا يُعدّ «أُنشئ» في المكتبة (D-182)', async () => {
+  it('المرفوض يُحرَّر مفتاحُه ويُنشأ من جديد، ولا يُعدّ «أُنشئ» في المكتبة (D-182)', async () => {
     await ready()
     await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
     const first = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok'").get() as { id: string }
@@ -133,7 +133,7 @@ describe('منشوراتٌ من مقطع', () => {
     expect(await decide(db, 'org_owner', second.id, { kind: 'approve', text: 'ثلاث طبقات للحوكمة' }, 'o')).toEqual({ ok: true, status: 'approved' })
   })
 
-  it('منشورٌ بلا مقطعه (كتابةٌ انقطعت) يُكمَّل بالضغطة الثانية ولا يُكرَّر', async () => {
+  it('منشور بلا مقطعه (كتابة انقطعت) يُكمَّل بالضغطة الثانية ولا يُكرَّر', async () => {
     await ready()
     await db.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model) VALUES ('half', 'youtube', 'text', 'نصّ', 'draft', 'upload:u1:youtube', 'owner')`).run()
     expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: false, by: 'o' }))
@@ -141,7 +141,7 @@ describe('منشوراتٌ من مقطع', () => {
     expect(db.raw.prepare("SELECT upload_id FROM media WHERE post_id = 'half'").all()).toEqual([{ upload_id: 'u1' }])
   })
 
-  it('المنشورُ ووسيطُه معًا أو لا شيء: وسيطٌ يُردّ لا يترك منشورًا يتيمًا', async () => {
+  it('المنشور ووسيطُه معًا أو لا شيء: وسيط يُردّ لا يترك منشورًا يتيمًا', async () => {
     await ready()
     // ‏مفتاحُ الوسيط محجوزٌ مسبقًا — فيُردّ صفُّه، ومعه يُرجَع المنشور
     db.raw.exec(`CREATE TRIGGER boom BEFORE INSERT ON media BEGIN SELECT RAISE(ABORT, 'boom'); END`)
@@ -149,11 +149,11 @@ describe('منشوراتٌ من مقطع', () => {
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
   })
 
-  it('نصٌّ فوق حدّ منصّةٍ يُردّ قبل أن يُكتب شيء — ووصفُ YouTube بالبايت وبلا «<>»', async () => {
+  it('نصّ فوق حدّ منصّة يُردّ قبل أن يُكتب شيء — ووصف YouTube بالبايت وبلا «<>»', async () => {
     expect(captionProblem('youtube', 'قبل -> بعد')).toContain('«<»')
     expect(captionProblem('youtube', 'ع'.repeat(2600))).toContain('5200 بايتًا')
     expect(captionProblem('tiktok', 'a'.repeat(2201))).toContain('TikTok تقبل 2200')
-    expect(captionProblem('instagram', 'وصفٌ قصير')).toBeNull()
+    expect(captionProblem('instagram', 'وصف قصير')).toBeNull()
     await ready()
     const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok'], caption: 'قبل -> بعد', approve: true, by: 'o' })
     expect(out).toMatchObject({ ok: false })
@@ -161,8 +161,8 @@ describe('منشوراتٌ من مقطع', () => {
   })
 })
 
-describe('الرفعُ المتروك (D-182)', () => {
-  it('ما بقي «يُرفع» أكثرَ من ستّ ساعات يُلغى في R2 ويُعلَّم فاشلًا، والحديثُ يبقى', async () => {
+describe('الرفع المتروك (D-182)', () => {
+  it('ما بقي «يُرفع» أكثر من ستّ ساعات يُلغى في R2 ويُعلَّم فاشلًا، والحديث يبقى', async () => {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, META, 'old')
     await startUpload(db, 'org_owner', r2.bucket, META, 'new')
@@ -178,7 +178,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
    * ‏**YouTube يقرّر الـ Short وحدَه** — لا علَمَ في الواجهة. فيُقال للمالك ما سيقع بسببه:
    * ‏رأسيٌّ أو مربّعٌ لا يزيد على ثلاث دقائق Short، وما سواه فيديو عاديّ، والمجهولُ مجهول.
    */
-  it('سطرُ YouTube يقول Short أو فيديو عاديًّا وسببَه — وInstagram «Reel»', () => {
+  it('سطر YouTube يقول Short أو فيديو عاديًّا وسببَه — وInstagram «Reel»', () => {
     const [yt, tt, ig] = videoChecks(META)
     expect(yt).toMatchObject({ level: 'ok', note: 'يصير Short وحده لأنّه رأسيّ وأقصر من ثلاث دقائق' })
     expect(tt).toMatchObject({ level: 'ok', note: '' })
@@ -195,7 +195,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
     expect(videoChecks(META).some((c) => c.note.includes('خاصّ'))).toBe(false)
   })
 
-  it('جملةٌ واحدةٌ لما يصل خاصًّا، ولا شيءَ لـ Instagram وحده', () => {
+  it('جملة واحدة لما يصل خاصًّا، ولا شيء لـ Instagram وحده', () => {
     expect(privateReach(['youtube', 'tiktok', 'instagram'])).toContain('YouTube وTikTok لا يُنشران للعامّة')
     expect(privateReach(['youtube'])).toBe('YouTube لا يُنشر للعامّة: يصل قناتك خاصًّا — تنشره أنت من YouTube Studio.')
     expect(privateReach(['instagram'])).toBeNull()
@@ -204,7 +204,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
   const DIRECT = ['user.info.basic video.upload video.publish']
   const INBOX = ['user.info.basic,video.upload']
 
-  it('وتسكت عمّا قلبه المالكُ علنيًّا بعد الإجازة — وتبقى للآخر', () => {
+  it('وتسكت عمّا قلبه المالك علنيًّا بعد الإجازة — وتبقى للآخر', () => {
     const youtubeOn = reachOf({ youtubePublic: true, tiktokPublic: false }, DIRECT)
     expect(privateReach(['youtube'], youtubeOn)).toBeNull()
     expect(privateReach(['youtube', 'tiktok'], youtubeOn)).toBe('TikTok لا يُنشر للعامّة: لا يراه غيرك حتّى تنشره أنت من تطبيق TikTok.')
@@ -216,7 +216,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
    * ‏مقطعُه إلى الصندوق ويُتجاهل العلنيّ (`canUploadMedia` في الناشر). كان `reachOf` يقرأ
    * ‏`tiktok_public` وحده فيقول «يُنشر للعامّة» ويسكت إشعارُ الجدولة.
    */
-  it('علنيُّ TikTok المقلوبُ بلا video.publish ليس علنيًّا — ويُقال الصندوقُ وسببُه', () => {
+  it('علنيّ TikTok المقلوب بلا video.publish ليس علنيًّا — ويُقال الصندوق وسببُه', () => {
     const inbox = reachOf({ youtubePublic: false, tiktokPublic: true }, INBOX)
     expect(inbox).toEqual({ youtube: false, tiktok: false, tiktokInbox: true, tiktokWanted: true })
     expect(privateReach(['tiktok'], inbox)).toBe(`TikTok لا يُنشر للعامّة: ${TIKTOK_NO_SCOPE}.`)
@@ -231,7 +231,7 @@ describe('ما يصل خاصًّا يُقال حيث يقرّر المالك (ر
   })
 })
 
-describe('نصٌّ لكلّ منصّة (D-190)', () => {
+describe('نصّ لكلّ منصّة (D-190)', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
@@ -242,29 +242,29 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
     (db.raw.prepare('SELECT platform, text FROM posts').all() as { platform: string; text: string }[]).map((r) => [r.platform, r.text]),
   )
 
-  it('كلُّ منصّةٍ بنصّها، وعنوانُ YouTube سطرُه الأوّل ثمّ الوصف — ومن كتبها يُحفظ', async () => {
+  it('كلّ منصّة بنصّها، وعنوان YouTube سطرُه الأوّل ثمّ الوصف — ومن كتبها يُحفظ', async () => {
     await ready()
     const out = await postsFromUpload(db, {
       uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], approve: true, by: 'o', model: 'claude-opus-5',
-      title: 'القيادةُ في أوّل مئة يوم',
-      captions: { youtube: 'ما يقرّره القائدُ أوّلًا.\r\n\r\n#قيادة #Shorts', tiktok: 'أوّلُ مئة يوم 👇 #قيادة', instagram: 'من أين تبدأ؟\n\n#قيادة #إدارة' },
+      title: 'القيادة في أوّل مئة يوم',
+      captions: { youtube: 'ما يقرّره القائد أوّلًا.\r\n\r\n#قيادة #Shorts', tiktok: 'أوّل مئة يوم 👇 #قيادة', instagram: 'من أين تبدأ؟\n\n#قيادة #إدارة' },
     })
     expect(out).toEqual({ ok: true, created: ['youtube', 'tiktok', 'instagram'], skipped: [] })
     expect(texts()).toEqual({
-      youtube: 'القيادةُ في أوّل مئة يوم\n\nما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts',
-      tiktok: 'أوّلُ مئة يوم 👇 #قيادة',
+      youtube: 'القيادة في أوّل مئة يوم\n\nما يقرّره القائد أوّلًا.\n\n#قيادة #Shorts',
+      tiktok: 'أوّل مئة يوم 👇 #قيادة',
       instagram: 'من أين تبدأ؟\n\n#قيادة #إدارة',
     })
     expect(new Set((db.raw.prepare('SELECT model FROM posts').all() as { model: string }[]).map((r) => r.model))).toEqual(new Set(['claude-opus-5']))
   })
 
-  it('نصٌّ فارغٌ لمنصّةٍ اختيرت يُردّ باسمها، وعنوانٌ فارغٌ أو طويلٌ أو بزاويّةٍ كذلك — ولا يُكتب شيء', async () => {
+  it('نصّ فارغ لمنصّة اختيرت يُردّ باسمها، وعنوان فارغ أو طويل أو بزاويّة كذلك — ولا يُكتب شيء', async () => {
     await ready()
     const base = { uploadId: 'u1', approve: true, by: 'o' } as const
     expect(await postsFromUpload(db, { ...base, platforms: ['tiktok'], captions: { tiktok: '  ' } }))
-      .toEqual({ ok: false, reason: 'TikTok: النصُّ فارغ' })
+      .toEqual({ ok: false, reason: 'TikTok: النصّ فارغ' })
     expect(await postsFromUpload(db, { ...base, platforms: ['youtube'], title: '', captions: { youtube: 'وصف' } }))
-      .toEqual({ ok: false, reason: 'اكتب عنوانَ YouTube' })
+      .toEqual({ ok: false, reason: 'اكتب عنوان YouTube' })
     expect((await postsFromUpload(db, { ...base, platforms: ['youtube'], title: 'ع'.repeat(101), captions: { youtube: 'وصف' } })))
       .toMatchObject({ ok: false, reason: expect.stringContaining('YouTube تقبل 100') })
     expect(await postsFromUpload(db, { ...base, platforms: ['youtube'], title: 'أ <ب>', captions: { youtube: '' } }))
@@ -278,7 +278,7 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
     expect(texts()).toEqual({ youtube: 'عنوان' })
   })
 
-  it('والعنوانُ والوصفُ يُجمعان كما يُفرَّقان عند الرفع', () => {
+  it('والعنوان والوصف يُجمعان كما يُفرَّقان عند الرفع', () => {
     expect(youtubeText(' عنوان\nمكسور ', ' وصف ')).toBe('عنوان مكسور\n\nوصف')
     expect(youtubeText('عنوان', '')).toBe('عنوان')
     expect(titleProblem('ع'.repeat(100))).toBeNull()
@@ -288,9 +288,9 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
    * ‏**وحدُّ الوصف على الوصف** (مراجعة D-190): العنوانُ لا يتكرّر في الوصف المرفوع، فلا يُحسب
    * ‏معه — كان وصفٌ من ‏4990 بايتًا يُردّ لأنّ عنوانَه أضاف ستّين، والمالكُ يرى ‏4990 في حقله.
    */
-  it('حدُّ ‏5000 بايت يُقاس على الوصف وحده، والعنوانُ بحدّه', () => {
+  it('حدّ ‏5000 بايت يُقاس على الوصف وحده، والعنوان بحدّه', () => {
     const desc = 'ن'.repeat(2495) // ‏4990 بايتًا
-    expect(captionProblem('youtube', youtubeText('عنوانٌ من ستّين بايتًا تقريبًا', desc))).toBeNull()
+    expect(captionProblem('youtube', youtubeText('عنوان من ستّين بايتًا تقريبًا', desc))).toBeNull()
     expect(captionProblem('youtube', youtubeText('عنوان', `${desc}نننننن`))).toContain('5002 بايتًا')
     // ‏ونصٌّ من سطرٍ واحدٍ وصفُه كلُّه كما كان
     expect(captionProblem('youtube', 'ن'.repeat(2501))).toContain('5002 بايتًا')
@@ -300,7 +300,7 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
    * ‏**وكلفةُ الكتابة على منشوراتها** (مراجعة D-190): نداءٌ واحدٌ كتب للمنصّات الثلاث، فكان
    * ‏المنشورُ يُكتب `model=claude-…` و`cost_usd=0` — ورحلتُه تقول «كُتبت» بصفرٍ دولار.
    */
-  it('وما قاله الناشرُ عن نشرٍ لم يقع كما قُرّر يُقرأ مع منشورات المقطع — للمنشور وحدَه', async () => {
+  it('وما قاله الناشر عن نشر لم يقع كما قُرّر يُقرأ مع منشورات المقطع — للمنشور وحدَه', async () => {
     await ready()
     await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok', 'instagram'], caption: 'نصّ', approve: true, by: 'o' })
     const tt = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'tiktok'`).get() as { id: string }
@@ -313,7 +313,7 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
     expect(posts.find((p) => p.platform === 'instagram')!.note).toBeNull()
   })
 
-  it('ومن كتبها بنموذجٍ يحمل حصّتَه من كلفة الكتابة في cost_usd', async () => {
+  it('ومن كتبها بنموذج يحمل حصّتَه من كلفة الكتابة في cost_usd', async () => {
     await ready()
     await postsFromUpload(db, {
       uploadId: 'u1', platforms: ['youtube', 'tiktok'], approve: false, by: 'o', model: 'claude-x', cost: 0.03 / 3,
@@ -327,9 +327,9 @@ describe('نصٌّ لكلّ منصّة (D-190)', () => {
   })
 })
 
-describe('عنوانُ YouTube يُقال إن قُصّ (ر-4)', () => {
-  it('سطرٌ أوّلُ فوق ‏100 محرف يُقال بما سيُرفع، وما دونه لا يُقال', () => {
-    expect(cutTitle('عنوانٌ قصير\nوالوصفُ طويل')).toBeNull()
+describe('عنوان YouTube يُقال إن قُصّ (ر-4)', () => {
+  it('سطر أوّل فوق ‏100 محرف يُقال بما سيُرفع، وما دونه لا يُقال', () => {
+    expect(cutTitle('عنوان قصير\nوالوصف طويل')).toBeNull()
     expect(cutTitle(`${'ع'.repeat(100)}\nوصف`)).toBeNull()
     const cut = cutTitle(`${'كلمة '.repeat(30)}\nوصف`)!
     expect(cut.endsWith('…')).toBe(true)
@@ -337,7 +337,7 @@ describe('عنوانُ YouTube يُقال إن قُصّ (ر-4)', () => {
   })
 })
 
-describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
+describe('منشورات المقطع تُجدوَل معًا (ر-4)', () => {
   const ACCOUNTS: LinkedAccount[] = [
     // ‏قناةُ YouTube تُحفَظ `org` دائمًا (`identity.ts`) — وهي وجهةٌ، لا صفحةُ شركة (D-087)
     { id: 'yt', platform: 'youtube', kind: 'org', displayName: 'قناة عمر', status: 'active', createdAt: '2026-09-01 00:00:00', expiresAt: null },
@@ -359,11 +359,11 @@ describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
     return (await listUploads(db))[0]!.posts.map((p) => p.id)
   }
 
-  it('كلُّ منشورٍ عُرض إلى حساب منصّته في الموعد نفسِه، وما بلا حسابٍ يُسمّى بسببه', async () => {
+  it('كلّ منشور عُرض إلى حساب منصّته في الموعد نفسِه، وما بلا حساب يُسمّى بسببه', async () => {
     const shown = await three()
     const out = await scheduleFromUpload(db, { uploadId: 'u1', shown, accounts: ACCOUNTS, at: AT, now: NOW })
     expect([...out.scheduled].sort()).toEqual(['instagram', 'youtube'])
-    expect(out.failed).toEqual([{ platform: 'tiktok', reason: 'لا حسابَ متّصلًا — اربطه أوّلًا' }])
+    expect(out.failed).toEqual([{ platform: 'tiktok', reason: 'لا حساب متّصلًا — اربطه أوّلًا' }])
     const rows = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all()
     expect(rows).toEqual([
       { platform: 'instagram', status: 'queued', account_id: 'ig', scheduled_at: '2026-10-05 06:00:00' },
@@ -372,7 +372,7 @@ describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
     ])
   })
 
-  it('ما لم يُعرَض لا يُجدوَل، والمجدولُ لا يُجدوَل مرّتين', async () => {
+  it('ما لم يُعرَض لا يُجدوَل، والمجدول لا يُجدوَل مرّتين', async () => {
     const shown = await three()
     const yt = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'youtube'`).get() as { id: string }
     const out = await scheduleFromUpload(db, { uploadId: 'u1', shown: [yt.id], accounts: ACCOUNTS, at: AT, now: NOW })
@@ -388,7 +388,7 @@ describe('منشوراتُ المقطع تُجدوَل معًا (ر-4)', () => {
  * ‏مقطع، وD1 لا يقبل أكثرَ من ‏100 — واستيرادُ الخطّة يطلب ‏200. فرمى الاستعلامُ بعد المقطع الحادي بعد
  * ‏المئة، وأعاد `catch` مكتبةً فارغة، فقيل لكلّ صفٍّ «لا مقطعَ مرفوعًا». و`fakeDb` يحمل حدَّ D1 الآن.
  */
-describe('مكتبةٌ فوق المئة (مراجعة ر-5)', () => {
+describe('مكتبة فوق المئة (مراجعة ر-5)', () => {
   async function library(extra: number): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, 'u1')
@@ -407,7 +407,7 @@ describe('مكتبةٌ فوق المئة (مراجعة ر-5)', () => {
     }
   }
 
-  it('‏١٢١ مقطعًا بنافذة الخطّة (200): كلُّها، ومنشوراتُ أقدمِها معه', async () => {
+  it('‏١٢١ مقطعًا بنافذة الخطّة (200): كلُّها، ومنشورات أقدمِها معه', async () => {
     await library(120)
     const all = await listUploads(db, 200)
     expect(all).toHaveLength(121)
@@ -420,7 +420,7 @@ describe('مكتبةٌ فوق المئة (مراجعة ر-5)', () => {
     expect(board.some((u) => u.id === 'u1')).toBe(false)
   })
 
-  it('وتعثُّرُ قراءة المنشورات وحدَها لا يُفرغ المكتبة — تُعرَض بلا روابطها', async () => {
+  it('وتعثُّر قراءة المنشورات وحدَها لا يُفرغ المكتبة — تُعرَض بلا روابطها', async () => {
     await library(3)
     const broken = {
       ...db,

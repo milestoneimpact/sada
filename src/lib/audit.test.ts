@@ -29,12 +29,12 @@ describe('record', () => {
     })
   })
 
-  it('يعمل بلا طلب — نداءُ Cron لا ترويسات له', async () => {
+  it('يعمل بلا طلب — نداء Cron لا ترويسات له', async () => {
     await record(db, { actor: 'cron', action: 'drive.scan' })
     expect((await recentAudit(db))[0]?.ip).toBeNull()
   })
 
-  it('**لا يرمي حين يتعذّر الكتابة** — الفعلُ وقع، والسجلّ وحده ناقص', async () => {
+  it('**لا يرمي حين يتعذّر الكتابة** — الفعل وقع، والسجلّ وحده ناقص', async () => {
     db.raw.exec('DROP TABLE audit_log')
     await expect(record(db, { actor: 'panel', action: 'settings.write' })).resolves.toBeUndefined()
   })
@@ -50,10 +50,10 @@ describe('record', () => {
 
 describe('recentAudit', () => {
   it('الأحدث أوّلا', async () => {
-    for (const action of ['أوّل', 'ثانٍ', 'ثالث']) {
+    for (const action of ['أوّل', 'ثان', 'ثالث']) {
       await record(db, { actor: 'panel', action })
     }
-    expect((await recentAudit(db)).map((r) => r.action)).toEqual(['ثالث', 'ثانٍ', 'أوّل'])
+    expect((await recentAudit(db)).map((r) => r.action)).toEqual(['ثالث', 'ثان', 'أوّل'])
   })
 
   it('يحترم الحدّ ويقصّه إلى مدى معقول', async () => {
@@ -63,14 +63,14 @@ describe('recentAudit', () => {
     expect(await recentAudit(db, 9999)).toHaveLength(10)
   })
 
-  it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
+  it('جدول لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE audit_log')
     expect(await recentAudit(db)).toEqual([])
   })
 })
 
 describe('targetLabel (D-134)', () => {
-  it('مفتاحُ الإعداد اسمٌ، والمزوّدُ اسمُه، والمنصّةُ اسمُها، وما سواها بحرفه', () => {
+  it('مفتاح الإعداد اسم، والمزوّد اسمُه، والمنصّة اسمُها، وما سواها بحرفه', () => {
     expect(targetLabel('dashboard_tiles')).toBe('بطاقات اللوح')
     expect(targetLabel('anthropic')).toBe('Anthropic')
     expect(targetLabel('linkedin')).toBe('LinkedIn')

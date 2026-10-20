@@ -44,7 +44,7 @@ export function checkProviderUrl(raw: string): UrlVerdict {
   }
 
   if (url.protocol !== 'https:') {
-    return { ok: false, reason: 'https وحدها — المفتاح لا يُرسل على اتّصالٍ غير مشفَّر' }
+    return { ok: false, reason: 'https وحدها — المفتاح لا يُرسل على اتّصال غير مشفَّر' }
   }
   if (url.username !== '' || url.password !== '') {
     return { ok: false, reason: 'لا اعتمادات في العنوان — المفتاح يُرسل في ترويسة' }
@@ -53,7 +53,7 @@ export function checkProviderUrl(raw: string): UrlVerdict {
   const host = url.hostname
   for (const blocked of BLOCKED_HOSTS) {
     if (blocked.test(host)) {
-      return { ok: false, reason: `عنوانٌ داخليّ (${host}) — المزوّد خارجيّ لا داخل الشبكة` }
+      return { ok: false, reason: `عنوان داخليّ (${host}) — المزوّد خارجيّ لا داخل الشبكة` }
     }
   }
   // مضيفٌ بلا نقطة ليس اسم نطاقٍ عامّ: `metadata` أو `db` أسماءُ داخلٍ
@@ -74,7 +74,7 @@ export function checkProviderUrl(raw: string): UrlVerdict {
   if (/[{}]/.test(trimmed)) {
     return {
       ok: false,
-      reason: 'في العنوان قالبٌ لم يُملأ — استبدل ما بين القوسين بقيمته',
+      reason: 'في العنوان قالب لم يُملأ — استبدل ما بين القوسين بقيمته',
     }
   }
 
@@ -128,7 +128,7 @@ export async function guardedFetch(
       throw new Error(
         hop === 0
           ? `العنوان مرفوض: ${verdict.reason}`
-          : `تحويلٌ إلى عنوانٍ مرفوض بعد ${hop} قفزة: ${verdict.reason}`,
+          : `تحويل إلى عنوان مرفوض بعد ${hop} قفزة: ${verdict.reason}`,
       )
     }
 
@@ -138,7 +138,7 @@ export async function guardedFetch(
 
     const next = res.headers.get('location')
     if (next === null || next.trim() === '') {
-      throw new Error(`تحويلٌ ${res.status} بلا عنوانٍ يُتبَع`)
+      throw new Error(`تحويل ${res.status} بلا عنوان يُتبَع`)
     }
     /*
      * **والنسبيُّ يُحلّ على ما سبقه** — لا على الأصل.
@@ -150,8 +150,8 @@ export async function guardedFetch(
     try {
       target = new URL(next, verdict.url).toString()
     } catch {
-      throw new Error('عنوانُ التحويل غير صالح')
+      throw new Error('عنوان التحويل غير صالح')
     }
   }
-  throw new Error(`تحويلٌ يزيد على ${MAX_HOPS} قفزات — سلسلةٌ لا يقصدها مزوّد`)
+  throw new Error(`تحويل يزيد على ${MAX_HOPS} قفزات — سلسلة لا يقصدها مزوّد`)
 }

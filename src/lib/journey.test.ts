@@ -22,7 +22,7 @@ async function seedPost(status = 'draft'): Promise<string> {
   await db
     .prepare(
       `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
-       VALUES (?, 'linkedin', 'org', 'x', 'صفحةُ صدى', 'active')`,
+       VALUES (?, 'linkedin', 'org', 'x', 'صفحة صدى', 'active')`,
     )
     .bind(accountId).run()
 
@@ -40,7 +40,7 @@ async function seedPost(status = 'draft'): Promise<string> {
       `INSERT INTO posts (id, platform, account_id, source_id, model, cost_usd, type,
                           text, status, idempotency_key, rationale,
                           approved_at, approved_by, scheduled_at)
-       VALUES (?, 'linkedin', ?, ?, 'claude-opus-5', 0.012, 'text', ?, ?, ?, 'الوقفُ موسمُه',
+       VALUES (?, 'linkedin', ?, ?, 'claude-opus-5', 0.012, 'text', ?, ?, ?, 'الوقف موسمُه',
                ?, ?, ?)`,
     )
     .bind(
@@ -53,12 +53,12 @@ async function seedPost(status = 'draft'): Promise<string> {
   return postId
 }
 
-describe('رحلةُ المنشور', () => {
-  it('معرّفٌ لا وجودَ له يعطي null — لا رحلةً فارغة', async () => {
+describe('رحلة المنشور', () => {
+  it('معرّف لا وجود له يعطي null — لا رحلةً فارغة', async () => {
     expect(await readJourney(db, 'org_owner', 'لا-شيء')).toBeNull()
   })
 
-  it('**ولا محطّةَ تُخترَع**: مسوّدةٌ لم تُنشَر لا محطّةَ نشرٍ لها', async () => {
+  it('**ولا محطّة تُخترَع**: مسوّدة لم تُنشَر لا محطّة نشر لها', async () => {
     const j = await readJourney(db, 'org_owner', await seedPost())
     expect(j).not.toBeNull()
     const kinds = j!.stations.map((s) => s.kind)
@@ -69,7 +69,7 @@ describe('رحلةُ المنشور', () => {
     expect(kinds).not.toContain('schedule')
   })
 
-  it('والكتابةُ تحمل نموذجَها وكلفتَها — وقد وقعت', async () => {
+  it('والكتابة تحمل نموذجَها وكلفتَها — وقد وقعت', async () => {
     const j = await readJourney(db, 'org_owner', await seedPost())
     const draft = j!.stations.find((s) => s.kind === 'draft')!
     expect(draft.model).toBe('claude-opus-5')
@@ -77,7 +77,7 @@ describe('رحلةُ المنشور', () => {
     expect(draft.detail).toContain('الوقف')
   })
 
-  it('والقرارُ يُسمّى بلسان المالك لا باسم العمود', async () => {
+  it('والقرار يُسمّى بلسان المالك لا باسم العمود', async () => {
     const j = await readJourney(db, 'org_owner', await seedPost('rejected'))
     const decision = j!.stations.find((s) => s.kind === 'decision')!
     expect(decision.title).toBe('رفضتَها')
@@ -90,7 +90,7 @@ describe('رحلةُ المنشور', () => {
    * LinkedIn لا يعطي الظهورَ لمنشور عضو، فالعمودُ `null`. **وعرضُها صفرا
    * يقول «نُشرت فلم يرها أحد»** — وهو اتّهامٌ للمنشور بما لا يُعرَف عنه.
    */
-  it('**والظهورُ null لا يُعرَض صفرا**', async () => {
+  it('**والظهور null لا يُعرَض صفرا**', async () => {
     const postId = await seedPost('published')
     await db
       .prepare(
@@ -107,7 +107,7 @@ describe('رحلةُ المنشور', () => {
     expect(m.detail).toContain('مشاركة 0')
   })
 
-  it('ونافذةٌ لا تعطي شيئا تقول ذلك ولا تُعرَض فارغة', async () => {
+  it('ونافذة لا تعطي شيئا تقول ذلك ولا تُعرَض فارغة', async () => {
     const postId = await seedPost('published')
     await db
       .prepare(
@@ -125,7 +125,7 @@ describe('رحلةُ المنشور', () => {
    * منشورٌ نجح من الثالثة قصّتُه في الأولَيَين، **وهي التي تُقرأ حين
    * يُسأل «لماذا تأخّر»**.
    */
-  it('وكلُّ محاولةِ نشرٍ محطّةٌ — لا آخرُها وحدَها', async () => {
+  it('وكلّ محاولة نشر محطّة — لا آخرُها وحدَها', async () => {
     const postId = await seedPost('published')
     for (const [n, status] of [[1, 'failed'], [2, 'failed'], [3, 'succeeded']] as const) {
       await db
@@ -177,7 +177,7 @@ describe('رحلةُ المنشور', () => {
    * الدفترُ يُكتَب **قبل** أن يُعدَّ النداءُ ناجحا، فنداءٌ دُفع ثمنُه ثمّ
    * فشل يبقى فيه **ولا محطّةَ له**. **والفرقُ هو ما دُفع بلا أثر.**
    */
-  it('والمجموعُ من cost_ledger — ويشمل ما دُفع بلا أثر', async () => {
+  it('والمجموع من cost_ledger — ويشمل ما دُفع بلا أثر', async () => {
     const postId = await seedPost()
     for (const total of [0.012, 0.04, 0.03]) {
       await db
@@ -199,7 +199,7 @@ describe('رحلةُ المنشور', () => {
    * صورتي بلا عنوان» يجد الجوابَ هنا لا في سجلّ الأمان مقصوصًا. وصفٌّ أقدمُ
    * من الحفظ لا يُدّعى عنه شيء.
    */
-  it('ومحطّةُ الصورة تقول ما عليها أو لماذا بلا نصّ — ومتى', async () => {
+  it('ومحطّة الصورة تقول ما عليها أو لماذا بلا نصّ — ومتى', async () => {
     const postId = await seedPost()
     const seed = async (id: string, note: string | null, headline: string | null): Promise<void> => {
       await db
@@ -210,21 +210,21 @@ describe('رحلةُ المنشور', () => {
         )
         .bind(id, postId, `img/${id}.jpg`, `k-${id}`, note, headline).run()
     }
-    await seed('drawn', '', 'أثرٌ يُقاس')
-    await seed('fell', 'لا مفتاحَ متصفّحٍ مضبوط', 'أثرٌ يُقاس')
+    await seed('drawn', '', 'أثر يُقاس')
+    await seed('fell', 'لا مفتاح متصفّح مضبوط', 'أثر يُقاس')
     await seed('old', null, null)
 
     const images = (await readJourney(db, 'org_owner', postId))!.stations.filter((s) => s.kind === 'image')
     expect(images.map((s) => s.detail)).toEqual([
-      '145KB · وعليها «أثرٌ يُقاس»',
-      '145KB · بلا نصٍّ فوقها: لا مفتاحَ متصفّحٍ مضبوط',
+      '145KB · وعليها «أثر يُقاس»',
+      '145KB · بلا نصّ فوقها: لا مفتاح متصفّح مضبوط',
       '145KB',
     ])
     // وكان `at` فيها null والختمُ في الصفّ
     expect(images.every((s) => s.at === '2026-09-02 08:00:00')).toBe(true)
   })
 
-  it('وجدولٌ لم يُرحَّل لا يرمي — الرحلةُ تُقرأ ناقصةً لا تسقط', async () => {
+  it('وجدول لم يُرحَّل لا يرمي — الرحلة تُقرأ ناقصةً لا تسقط', async () => {
     const postId = await seedPost()
     await db.raw.prepare('DROP TABLE metrics').run()
     const j = await readJourney(db, 'org_owner', postId)

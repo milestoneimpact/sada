@@ -30,7 +30,7 @@ export function solidPng(width: number, height: number, rgb: readonly [number, n
   const header = Buffer.alloc(13)
   header.writeUInt32BE(width, 0)
   header.writeUInt32BE(height, 4)
-  header[8] = 8 // عمقُ اللون
+  header[8] = 8 // عمق اللون
   header[9] = 2 // RGB
   const row = Buffer.alloc(1 + width * 3)
   const rows: Buffer[] = []
@@ -208,16 +208,16 @@ function sentencesOf(text: string): string[] {
 }
 
 const LINKEDIN_DRAFT = [
-  'الإطار الأوّل ليس وثيقةً تُحفظ في درج؛ هو اتّفاقٌ على ما يعنيه «تمّ» قبل أن يبدأ العمل.',
+  'الإطار الأوّل ليس وثيقةً تُحفظ في درج؛ هو اتّفاق على ما يعنيه «تمّ» قبل أن يبدأ العمل.',
   '',
-  'في كلّ مشروعٍ تعثّر رأيتُه، لم يكن السببُ نقصَ الجهد، بل غيابَ تعريفٍ مشترك للمعلَم: متى نعدّه منجزًا، ومن يشهد على ذلك، وما الذي يُسلَّم معه.',
+  'في كلّ مشروع تعثّر رأيتُه، لم يكن السبب نقص الجهد، بل غياب تعريف مشترك للمعلَم: متى نعدّه منجزًا، ومن يشهد على ذلك، وما الذي يُسلَّم معه.',
   '',
-  'ثلاثةُ أسئلةٍ نطرحها اليوم عند كلّ معلَم:',
-  'ما المخرَجُ الذي يُرى ويُقاس؟',
-  'من يملك قرارَ القبول؟',
+  'ثلاثة أسئلة نطرحها اليوم عند كلّ معلَم:',
+  'ما المخرَج الذي يُرى ويُقاس؟',
+  'من يملك قرار القبول؟',
   'وما الذي يتوقّف إن تأخّر؟',
   '',
-  'حين أجبنا عنها كتابةً قبل التنفيذ، صار الاجتماعُ الأسبوعيّ عشرَ دقائق بدل ساعة، لأنّ الخلاف حُسم قبل أن يقع.',
+  'حين أجبنا عنها كتابةً قبل التنفيذ، صار الاجتماع الأسبوعيّ عشر دقائق بدل ساعة، لأنّ الخلاف حُسم قبل أن يقع.',
   '',
   'كيف تعرّفون «تمّ» في فرقكم؟',
   '',
@@ -225,16 +225,16 @@ const LINKEDIN_DRAFT = [
 ].join('\n')
 
 const X_DRAFT =
-  'المعلَمُ ليس تاريخًا في الجدول، بل اتّفاقٌ مكتوب على معنى «تمّ»: ما المخرَج، ومن يقبله، وما الذي يتوقّف إن تأخّر. ' +
-  'ثلاثةُ أسئلةٍ قبل التنفيذ توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع'
+  'المعلَم ليس تاريخًا في الجدول، بل اتّفاق مكتوب على معنى «تمّ»: ما المخرَج، ومن يقبله، وما الذي يتوقّف إن تأخّر. ' +
+  'ثلاثة أسئلة قبل التنفيذ توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع'
 
 const VIDEO_DRAFT =
-  'الإطار الأوّل في دقيقة: ثلاثةُ أسئلةٍ تحسم معنى «تمّ» قبل أن يبدأ العمل — المخرَج، ومن يقبله، وما يتوقّف إن تأخّر. ' +
+  'الإطار الأوّل في دقيقة: ثلاثة أسئلة تحسم معنى «تمّ» قبل أن يبدأ العمل — المخرَج، ومن يقبله، وما يتوقّف إن تأخّر. ' +
   'شاهد حتى النهاية، واكتب لنا كيف تعرّفون المعلَم في فرقكم. #إدارة_المشاريع #الحوكمة'
 
 /** مسوّدةٌ عربيّةٌ واقعيّة بحسب المنصّة التي يذكرها الوصفُ النظاميّ. */
 function draftFor(system: string): { text: string; rationale: string } {
-  const rationale = 'بُني المنشورُ على فكرة المصدر المركزيّة: تعريفُ المعلَم قبل التنفيذ، بأسئلته الثلاثة كما وردت.'
+  const rationale = 'بُني المنشور على فكرة المصدر المركزيّة: تعريف المعلَم قبل التنفيذ، بأسئلته الثلاثة كما وردت.'
   if (/TikTok|YouTube|مقطع/i.test(system) && !/LinkedIn/.test(system)) return { text: VIDEO_DRAFT, rationale }
   if (/منشور LinkedIn|LinkedIn/.test(system) && !/\bX\b|تغريدة/.test(system)) return { text: LINKEDIN_DRAFT, rationale }
   if (/\bX\b|تغريدة|280/.test(system)) return { text: X_DRAFT, rationale }
@@ -244,7 +244,7 @@ function draftFor(system: string): { text: string; rationale: string } {
 /** محتوى الإنفوجرافيك **من نصّ المنشور نفسِه** — كما يُطلب من النموذج. */
 function infographicFor(user: string): Record<string, unknown> {
   const parts = sentencesOf(user)
-  const title = clipWords(parts[0] ?? 'تعريفُ المعلَم قبل التنفيذ', 56)
+  const title = clipWords(parts[0] ?? 'تعريف المعلَم قبل التنفيذ', 56)
   const items = (parts.length >= 4 ? parts.slice(1, 4) : ['المخرَج الذي يُقاس', 'من يملك القبول', 'ما يتوقّف إن تأخّر'])
     .map((s) => ({ label: clipWords(s, 24), value: '', note: clipWords(s, 76) }))
   return {
@@ -283,7 +283,7 @@ export function fillSchema(schema: unknown): unknown {
       return null
     default: {
       const min = typeof s['minLength'] === 'number' ? s['minLength'] : 0
-      const base = 'المعلَمُ اتّفاقٌ مكتوب على معنى «تمّ» قبل أن يبدأ العمل'
+      const base = 'المعلَم اتّفاق مكتوب على معنى «تمّ» قبل أن يبدأ العمل'
       return base.length >= min ? base : base.padEnd(min, ' ـ')
     }
   }
@@ -429,7 +429,7 @@ export function fakeAi(delayMs: number) {
     async run(model: string): Promise<unknown> {
       await sleep(delayMs)
       if (/video|veo|wan|ltx/i.test(model)) {
-        throw new Error('journeys: تحريكُ الفيديو غيرُ مُحاكى في النسخة المحلّيّة')
+        throw new Error('journeys: تحريك الفيديو غير مُحاكى في النسخة المحلّيّة')
       }
       return { image: Buffer.from(solidPng(1024, 1024, [70, 52, 30])).toString('base64') }
     },

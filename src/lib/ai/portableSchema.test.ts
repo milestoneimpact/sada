@@ -35,13 +35,13 @@ describe.each([
     }
   })
 
-  it('ولا كلمةَ خارج السبع في أيّ عقدة', () => {
+  it('ولا كلمة خارج السبع في أيّ عقدة', () => {
     for (const node of nodes(portable)) {
       for (const key of Object.keys(node)) expect(KEPT).toContain(key)
     }
   })
 
-  it('وكلُّ كائنٍ مغلقٌ، وكلُّ حقلٍ فيه مطلوب — شرطُ الوضع الصارم', () => {
+  it('وكلّ كائن مغلق، وكلّ حقل فيه مطلوب — شرط الوضع الصارم', () => {
     const objects = nodes(portable).filter((node) => node['type'] === 'object')
     expect(objects.length).toBeGreaterThan(0)
     for (const node of objects) {
@@ -50,15 +50,15 @@ describe.each([
     }
   })
 
-  it('ولا يمسّ الأصل — الثابتُ يبقى كما كُتب', () => {
+  it('ولا يمسّ الأصل — الثابت يبقى كما كُتب', () => {
     const before = JSON.stringify(schema)
     portableSchema(schema)
     expect(JSON.stringify(schema)).toBe(before)
   })
 })
 
-describe('والقيدُ يُطوى وصفًا لا يُحذف', () => {
-  it('حدُّ الزاوية وسقفُ البنود يراهما النموذجُ في الوصف', () => {
+describe('والقيد يُطوى وصفًا لا يُحذف', () => {
+  it('حدّ الزاوية وسقف البنود يراهما النموذج في الوصف', () => {
     const portable = portableSchema(PLAN_SCHEMA)
     const items = (portable['properties'] as Record<string, Node>)['items']!
     expect(items['description']).toContain('maxItems: 6')
@@ -67,32 +67,32 @@ describe('والقيدُ يُطوى وصفًا لا يُحذف', () => {
     expect(angle['description']).toContain('minLength: 10')
   })
 
-  it('والمنصّةُ تبقى قيمًا مسمّاةً — enum شكلٌ لا حدّ', () => {
+  it('والمنصّة تبقى قيمًا مسمّاةً — enum شكل لا حدّ', () => {
     const portable = portableSchema(PLAN_SCHEMA)
     const items = (portable['properties'] as Record<string, Node>)['items']!
     const platform = ((items['items'] as Node)['properties'] as Record<string, Node>)['platform']!
     expect(platform['enum']).toEqual(['linkedin', 'x'])
   })
 
-  it('ووصفٌ قائمٌ يبقى، والمطويُّ يُلحَق به', () => {
+  it('ووصف قائم يبقى، والمطويّ يُلحَق به', () => {
     const out = portableSchema({
       type: 'object',
-      properties: { a: { type: 'string', description: 'سطرٌ واحد', maxLength: 80 } },
+      properties: { a: { type: 'string', description: 'سطر واحد', maxLength: 80 } },
       required: ['a'],
       additionalProperties: false,
     })
     const a = (out['properties'] as Record<string, Node>)['a']!
-    expect(a['description']).toBe('سطرٌ واحد\n\n{maxLength: 80}')
+    expect(a['description']).toBe('سطر واحد\n\n{maxLength: 80}')
   })
 
-  it('وكائنٌ بلا additionalProperties يُغلَق', () => {
+  it('وكائن بلا additionalProperties يُغلَق', () => {
     const out = portableSchema({ type: 'object', properties: { a: { type: 'string' } }, required: ['a'] })
     expect(out['additionalProperties']).toBe(false)
   })
 })
 
-describe('وما لا يُحمَل يُرفض بسببٍ — في الاختبار لا عند أوّل نداء', () => {
-  it('حقلٌ اختياريّ: الوضعُ الصارم يشترط الكلّ', () => {
+describe('وما لا يُحمَل يُرفض بسبب — في الاختبار لا عند أوّل نداء', () => {
+  it('حقل اختياريّ: الوضع الصارم يشترط الكلّ', () => {
     expect(() =>
       portableSchema({
         type: 'object',
@@ -103,13 +103,13 @@ describe('وما لا يُحمَل يُرفض بسببٍ — في الاختبا
     ).toThrow(/اختياريّ \(b\)/)
   })
 
-  it('ومطلوبٌ لا تعريفَ له', () => {
+  it('ومطلوب لا تعريف له', () => {
     expect(() =>
       portableSchema({ type: 'object', properties: {}, required: ['ghost'], additionalProperties: false }),
     ).toThrow(/ghost/)
   })
 
-  it('وحقلٌ اختياريٌّ في كائنٍ متداخل يُسمّى بموضعه', () => {
+  it('وحقل اختياريّ في كائن متداخل يُسمّى بموضعه', () => {
     expect(() =>
       portableSchema({
         type: 'object',
@@ -125,11 +125,11 @@ describe('وما لا يُحمَل يُرفض بسببٍ — في الاختبا
     ).toThrow(/\$\.list\[\]/)
   })
 
-  it('وبنيةٌ كـanyOf لا تُطوى نصًّا — تُرفض', () => {
+  it('وبنية كـanyOf لا تُطوى نصًّا — تُرفض', () => {
     expect(() => portableSchema({ anyOf: [{ type: 'string' }, { type: 'null' }] })).toThrow(/anyOf/)
   })
 
-  it('وكائنٌ مفتوحٌ لا يُغلَق بصمت', () => {
+  it('وكائن مفتوح لا يُغلَق بصمت', () => {
     expect(() =>
       portableSchema({ type: 'object', properties: {}, required: [], additionalProperties: true }),
     ).toThrow(/additionalProperties/)

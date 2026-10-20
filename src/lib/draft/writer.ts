@@ -70,7 +70,7 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
-    return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${route.provider}`, retryable: false }
+    return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
   }
 
   // ٣ · وسقفُ المزوّد بعد الحارس العامّ لا قبله: مَن قدّم التفصيل على الجملة
@@ -156,7 +156,7 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
         : true
     return {
       kind: 'failed',
-      reason: error instanceof Error ? error.message : 'نداءٌ فشل',
+      reason: error instanceof Error ? error.message : 'نداء فشل',
       retryable,
       ...(paid === null ? {} : { cost: paid }),
     }

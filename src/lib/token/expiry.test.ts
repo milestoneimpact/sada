@@ -14,7 +14,7 @@ let db: FakeDb
 function account(id: string, platform = 'linkedin', status = 'active'): void {
   db.raw.exec(
     `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
-     VALUES ('${id}', '${platform}', 'member', 'e-${id}', 'حسابُ ${id}', '${status}')`,
+     VALUES ('${id}', '${platform}', 'member', 'e-${id}', 'حساب ${id}', '${status}')`,
   )
 }
 
@@ -40,7 +40,7 @@ function token(
 beforeEach(() => { db = fakeDb() })
 
 describe('العتبة', () => {
-  it('سبعةٌ ثمّ واحد، وما بعدهما لا يُنبَّه عليه', () => {
+  it('سبعة ثمّ واحد، وما بعدهما لا يُنبَّه عليه', () => {
     expect(thresholdFor(30)).toBeNull()
     expect(thresholdFor(8)).toBeNull()
     expect(thresholdFor(7)).toBe(7)
@@ -57,13 +57,13 @@ describe('العتبة', () => {
 })
 
 describe('ما يُلتقَط', () => {
-  it('رمزٌ بعيدٌ لا يُلتقَط', async () => {
+  it('رمز بعيد لا يُلتقَط', async () => {
     account('a1')
     token('a1', inDays(40), inDays(300))
     expect(await expiringTokens(db, NOW)).toEqual([])
   })
 
-  it('ورمزٌ قريبٌ يُلتقَط بنوعه', async () => {
+  it('ورمز قريب يُلتقَط بنوعه', async () => {
     account('a1')
     token('a1', inDays(3), null, false)
     const items = await expiringTokens(db, NOW)
@@ -77,7 +77,7 @@ describe('ما يُلتقَط', () => {
    * سقوطُ الوصول يُصلحه التجديدُ آليّا، **وسقوطُ التجديد يوجب دورةَ
    * إذنٍ بيد المالك** — فيُعرَض أوّلا.
    */
-  it('والتجديدُ يسبق الوصولَ عند تساوي الأيّام', async () => {
+  it('والتجديد يسبق الوصول عند تساوي الأيّام', async () => {
     account('a1')
     // وبعد الانتهاء يجتمعان: قبله يُسكَت الوصولُ لأنّه يُجدَّد (D-115)
     token('a1', inDays(-2), inDays(-2))
@@ -85,21 +85,21 @@ describe('ما يُلتقَط', () => {
     expect(items.map((i) => i.kind)).toEqual(['refresh', 'access'])
   })
 
-  it('والأقربُ أوّلا', async () => {
+  it('والأقرب أوّلا', async () => {
     account('a1'); account('a2', 'x')
     token('a1', inDays(6), null, false)
     token('a2', inDays(1), null, false)
     expect((await expiringTokens(db, NOW)).map((i) => i.accountId)).toEqual(['a2', 'a1'])
   })
 
-  it('وحسابٌ مُبطَلٌ لا يُنبَّه عليه', async () => {
+  it('وحساب مُبطَل لا يُنبَّه عليه', async () => {
     account('a1', 'linkedin', 'revoked')
     token('a1', inDays(1), null, false)
     expect(await expiringTokens(db, NOW)).toEqual([])
   })
 
   /** ورمزُ تجديدٍ لا وجودَ له (X أحيانا) لا يُختلَق له تاريخ. */
-  it('ولا إذنَ تجديدٍ لا يُنبَّه عليه', async () => {
+  it('ولا إذن تجديد لا يُنبَّه عليه', async () => {
     account('a1')
     token('a1', inDays(2), null, false)
     const items = await expiringTokens(db, NOW)
@@ -120,9 +120,9 @@ describe('ما يُلتقَط', () => {
    * يُطفَأ بفعلٍ صحيحٍ يُعلَّم المالكُ أن يتجاهله، **ثمّ يتجاهل معه
    * بلاغَ التجديد الذي يوجب يدَه**.
    */
-  it('ووصولٌ له رمزُ تجديدٍ لا يُنبَّه عليه', async () => {
+  it('ووصول له رمز تجديد لا يُنبَّه عليه', async () => {
     account('a1', 'x')
-    token('a1', inDays(0), null)          // ساعاتٌ تبقى — وله refresh_enc
+    token('a1', inDays(0), null)          // ساعات تبقى — وله refresh_enc
     expect(await expiringTokens(db, NOW)).toEqual([])
   })
 
@@ -142,7 +142,7 @@ describe('ما يُلتقَط', () => {
   })
 
   /** **وحسابٌ بلا رمز تجديدٍ يبقى منبَّها عليه**: لا سبيلَ آليّ له. */
-  it('ووصولٌ بلا رمز تجديدٍ يبقى منبَّها عليه', async () => {
+  it('ووصول بلا رمز تجديد يبقى منبَّها عليه', async () => {
     account('a1', 'x')
     token('a1', inDays(2), null, false)
     const items = await expiringTokens(db, NOW)
@@ -159,7 +159,7 @@ describe('ما يُلتقَط', () => {
    * وقال البلاغُ إنّ X «ستنتهي» **وقد جُدِّدت للتوّ** — ولا يُطفئه تجديد،
    * لأنّ رمزَها يعيش ساعتين والدورةُ تلتقطه قبل ساعتين.
    */
-  it('وحالُ staging الحيّة: X لا تُنبِّه قبل انتهائها', async () => {
+  it('وحال staging الحيّة: X لا تُنبِّه قبل انتهائها', async () => {
     account('li', 'linkedin'); account('x2', 'x')
     token('li', '2026-11-05T20:00:13.142Z', '2027-09-06T20:00:13.142Z')
     token('x2', '2026-09-10T19:00:15.658Z', null)
@@ -167,7 +167,7 @@ describe('ما يُلتقَط', () => {
   })
 
   /** وتاريخٌ فاسدٌ لا يُسقط الدورة ولا يُنبَّه عليه بالخطأ. */
-  it('وتاريخٌ لا يُقرأ يُتخطّى ولا يُسقط البقيّة', async () => {
+  it('وتاريخ لا يُقرأ يُتخطّى ولا يُسقط البقيّة', async () => {
     account('a1'); account('a2', 'x')
     token('a1', 'ليس تاريخا', null, false)
     token('a2', inDays(1), null, false)
@@ -176,9 +176,9 @@ describe('ما يُلتقَط', () => {
   })
 })
 
-describe('والأثرُ يُكتب مرّةً', () => {
+describe('والأثر يُكتب مرّةً', () => {
   /** دورةٌ يوميّةٌ لا تكتب سبعةَ صفوفٍ لرمزٍ واحد بين العتبتين. */
-  it('إعادةُ الدورة لا تكرّر الصفّ', async () => {
+  it('إعادة الدورة لا تكرّر الصفّ', async () => {
     account('a1')
     token('a1', inDays(3), null, false)
     const items = await expiringTokens(db, NOW)
@@ -191,7 +191,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   })
 
   /** **والعتبةُ جزءٌ من المفتاح**: تنبيهُ السبعة غيرُ تنبيه الواحد. */
-  it('وعتبةٌ أقربُ تُكتب صفّا ثانيا', async () => {
+  it('وعتبة أقرب تُكتب صفّا ثانيا', async () => {
     account('a1')
     const expiry = inDays(3)
     token('a1', expiry, null, false)
@@ -208,7 +208,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   })
 
   /** وبندُ بوّابة المرحلة ٢ يُقرأ من الصفّ لا يُفترَض. */
-  it('و«أوقع تنبيهُ الأسبوع؟» يُجاب من القاعدة', async () => {
+  it('و«أوقع تنبيه الأسبوع؟» يُجاب من القاعدة', async () => {
     account('a1')
     expect(await anyWeekAlert(db)).toBe(false)
 
@@ -218,7 +218,7 @@ describe('والأثرُ يُكتب مرّةً', () => {
   })
 
   /** وتنبيهُ يومٍ واحدٍ وحده لا يُجيز بندَ الأسبوع. */
-  it('وتنبيهُ اليوم الواحد لا يُجيز بندَ الأسبوع', async () => {
+  it('وتنبيه اليوم الواحد لا يُجيز بند الأسبوع', async () => {
     account('a1')
     token('a1', inDays(0), null, false)
     await recordAlerts(db, await expiringTokens(db, NOW))

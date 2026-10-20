@@ -94,7 +94,7 @@ export const NO_APP_TOKENS = 'not allowed to create application tokens'
 export const PROBE_UNAVAILABLE: Readonly<Partial<Record<Platform, string>>> = {
   youtube:
     'Google يردّ «unsupported_grant_type» قبل أن يوثّق العميل — ' +
-    'فلا يميّز هذا الفحصُ عنده بين سرٍّ صحيحٍ وخاطئ. وضبطُه يُتحقَّق منه بالربط.',
+    'فلا يميّز هذا الفحص عنده بين سرّ صحيح وخاطئ. وضبطُه يُتحقَّق منه بالربط.',
 }
 
 /** سقوطُ توثيقٍ: السرُّ لا يوافق معرّفا تعرفه المنصّة. */
@@ -154,11 +154,11 @@ export async function verifyAppCredentials(
       description = failure.error_description.slice(0, 300)
     }
   } catch {
-    return { kind: 'inconclusive', detail: `جوابٌ ليس JSON (${response.status})` }
+    return { kind: 'inconclusive', detail: `جواب ليس JSON (${response.status})` }
   }
 
   if (code === 'unknown') {
-    return { kind: 'inconclusive', detail: `جوابٌ بلا رمزِ خطأ (${response.status})` }
+    return { kind: 'inconclusive', detail: `جواب بلا رمز خطأ (${response.status})` }
   }
 
   if (ID_FAILURES.has(code)) {
@@ -193,18 +193,18 @@ export async function verifyAppCredentials(
     return {
       kind: 'inconclusive',
       detail:
-        'هذا التطبيقُ لا يملك منحةَ «رموز التطبيقات» عند المنصّة — ' +
-        '**فالفحصُ لا يستطيع الحكمَ على زوجك أصلا**، لا سلبا ولا إيجابا. ' +
-        'وهذا ليس عيبا في السرّ ولا في المعرّف. **والبرهانُ الوحيدُ نجاحُ الربط** — ' +
-        'فاضغط «اربط» ودع المنصّةَ تحكم.',
+        'هذا التطبيق لا يملك منحة «رموز التطبيقات» عند المنصّة — ' +
+        '**فالفحص لا يستطيع الحكم على زوجك أصلا**، لا سلبا ولا إيجابا. ' +
+        'وهذا ليس عيبا في السرّ ولا في المعرّف. **والبرهان الوحيد نجاح الربط** — ' +
+        'فاضغط «اربط» ودع المنصّة تحكم.',
     }
   }
 
   return {
     kind: 'inconclusive',
     detail:
-      `المنصّةُ ردّت «${code}»${description === undefined ? '' : ` — ${description}`}. ` +
-      'وهذا ليس حكما على الزوج: لا يقول إنّه سليمٌ ولا إنّه مرفوض. ' +
-      'والبرهانُ الوحيدُ نجاحُ الربط.',
+      `المنصّة ردّت «${code}»${description === undefined ? '' : ` — ${description}`}. ` +
+      'وهذا ليس حكما على الزوج: لا يقول إنّه سليم ولا إنّه مرفوض. ' +
+      'والبرهان الوحيد نجاح الربط.',
   }
 }

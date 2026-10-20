@@ -188,7 +188,7 @@ async function selectDrafts(
                 p.scheduled_at, p.dispatched_at, p.original_text,
                 s.name AS source_name, s.content_hash AS current_hash,
                 a.display_name AS account_name,
-                -- ‏وسببُ آخرِ محاولةٍ فاشلةٍ للفاشل وحدَه: لا استعلامَ فرعيَّ لما لم يفشل
+                -- ‏وسبب آخر محاولة فاشلة للفاشل وحدَه: لا استعلام فرعيّ لما لم يفشل
                 CASE WHEN p.status = 'failed' THEN
                   (SELECT pa.response_json FROM publish_attempts pa
                     WHERE pa.post_id = p.id AND pa.status = 'failed'
@@ -251,7 +251,7 @@ export async function decide(
   // ما غادر المسوّدةَ لا يُبَتّ فيه ثانية: منشورٌ نُشر لا يُعتمد، ومصفوفٌ
   // في الطابور لا يُرفض من هنا — وسحبُه بابُه `unschedule`، وقبل الإرسال وحده
   if (row.status !== 'draft') {
-    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'لم تعد مسوّدة'}، والبَتُّ للمسوّدة وحدها` }
+    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'لم تعد مسوّدة'}، والبَتّ للمسوّدة وحدها` }
   }
 
   if (decision.kind === 'reject') {
@@ -332,7 +332,7 @@ export async function undoReject(db: Db, org: string, id: string): Promise<Decis
     .first<{ id: string; status: string }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
   if (row.status !== 'rejected') {
-    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجعُ عن الرفض وحدَه` }
+    return { ok: false, reason: `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجع عن الرفض وحدَه` }
   }
 
   await db
@@ -367,7 +367,7 @@ export async function undoApprove(db: Db, org: string, id: string): Promise<Deci
       ok: false,
       reason: row.status === 'queued'
         ? 'جُدولت بعد الاعتماد — اسحب موعدَها أوّلًا'
-        : `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجعُ عن الاعتماد قبل الجدولة وحدَه`,
+        : `${STATUS_WORD[row.status] ?? 'ما زالت مسوّدة'}، والتراجع عن الاعتماد قبل الجدولة وحدَه`,
     }
   }
 
@@ -447,7 +447,7 @@ export async function approveMany(
 /** حالُ المنشور بكلام المالك (D-198) — كان الردُّ يقول «حالتُها «queued»». */
 const STATUS_WORD: Readonly<Record<string, string>> = {
   approved: 'اعتُمدت من قبل', edited: 'اعتُمدت من قبل', rejected: 'رُفضت من قبل',
-  queued: 'مجدولةٌ الآن', published: 'نُشرت', failed: 'فشل نشرُها',
+  queued: 'مجدولة الآن', published: 'نُشرت', failed: 'فشل نشرُها',
 }
 
 /**
@@ -477,7 +477,7 @@ export async function saveText(db: Db, org: string, id: string, raw: string): Pr
     .bind(id, org)
     .first<{ id: string; platform: string; status: string; text: string }>()
   if (row === null) return { ok: false, reason: 'لا مسوّدة بهذا المعرّف' }
-  if (row.status !== 'draft') return { ok: false, reason: 'لم تعد مسوّدة، والحفظُ للمسوّدة وحدها' }
+  if (row.status !== 'draft') return { ok: false, reason: 'لم تعد مسوّدة، والحفظ للمسوّدة وحدها' }
   const text = lines(raw)
   const refused = textProblem(row.platform, text)
   if (refused !== null) return { ok: false, reason: refused }

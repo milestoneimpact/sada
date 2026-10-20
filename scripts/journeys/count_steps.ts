@@ -122,8 +122,8 @@ function makePlan(path: string): void {
   const day = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
   const rows = [
     'date,time,platform,text',
-    `${day},09:30,linkedin,"المعلَمُ اتّفاقٌ مكتوب على معنى «تمّ» قبل أن يبدأ العمل — ثلاثةُ أسئلةٍ تحسمه."`,
-    `${day},12:00,x,"ثلاثةُ أسئلةٍ قبل كلّ معلَم توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع"`,
+    `${day},09:30,linkedin,"المعلَم اتّفاق مكتوب على معنى «تمّ» قبل أن يبدأ العمل — ثلاثة أسئلة تحسمه."`,
+    `${day},12:00,x,"ثلاثة أسئلة قبل كلّ معلَم توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع"`,
     `${day},18:00,linkedin,"من الاجتماع الطويل إلى المراجعة القصيرة: ما الذي تغيّر حين عرّفنا «تمّ» كتابةً؟"`,
   ]
   writeFileSync(path, `${rows.join('\n')}\n`)
@@ -146,7 +146,7 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
   const leftPage = (url: URL) => ({
     status: 200,
     contentType: 'text/html; charset=utf-8',
-    body: `<!doctype html><html dir="rtl" lang="ar"><meta name="viewport" content="width=device-width"><body style="font:16px sans-serif;padding:24px"><h1>غادر الموقع</h1><p>إلى <b>${url.origin}</b></p><code style="word-break:break-all">${url.pathname}</code><p>(أوقفه القياس: هنا تبدأ موافقةُ المنصّة)</p></body></html>`,
+    body: `<!doctype html><html dir="rtl" lang="ar"><meta name="viewport" content="width=device-width"><body style="font:16px sans-serif;padding:24px"><h1>غادر الموقع</h1><p>إلى <b>${url.origin}</b></p><code style="word-break:break-all">${url.pathname}</code><p>(أوقفه القياس: هنا تبدأ موافقة المنصّة)</p></body></html>`,
   })
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url())
@@ -197,7 +197,7 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
   await m.shot('النتيجة').catch(() => undefined)
   const ms = m.elapsed()
   await context.close()
-  if (pageErrors.length > 0) m.note(`أخطاءُ الصفحة: ${pageErrors.slice(0, 3).join(' · ')}`)
+  if (pageErrors.length > 0) m.note(`أخطاء الصفحة: ${pageErrors.slice(0, 3).join(' · ')}`)
 
   return {
     id: journey.id,
@@ -264,7 +264,7 @@ function comparison(results: readonly JourneyResult[], base: { startedAt: string
     `${arrow(ok(a), ok(b))} · ${arrow(a?.steps, b?.steps)} · ${arrow(a?.loads, b?.loads)} · ${arrow(a === undefined ? undefined : `${a.scrollPx}px`, b === undefined ? undefined : `${b.scrollPx}px`)} · ${arrow(a === undefined ? undefined : yes(a.firstScreen), b === undefined ? undefined : yes(b.firstScreen))} · ${arrow(a === undefined ? undefined : `${a.klmSec}ث`, b === undefined ? undefined : `${b.klmSec}ث`)}`
   const lines: string[] = []
   lines.push('', '## قبل ← بعد', '')
-  lines.push(`خطُّ الأساس: \`${path}\` (شُغِّل في ${base.startedAt.slice(0, 16).replace('T', ' ')} UTC). كلُّ خانة «قبل ← بعد»، والتحقّقُ من القاعدة نفسُه في التشغيلين. «✗ توقّف» رحلةٌ لم تبلغ هدفَها (هدفٌ غيرُ ظاهر أو زرٌّ معطَّل).`, '')
+  lines.push(`خطّ الأساس: \`${path}\` (شُغِّل في ${base.startedAt.slice(0, 16).replace('T', ' ')} UTC). كلّ خانة «قبل ← بعد»، والتحقّق من القاعدة نفسُه في التشغيلين. «✗ توقّف» رحلة لم تبلغ هدفَها (هدف غير ظاهر أو زرّ معطَّل).`, '')
   lines.push('| الرحلة | الهاتف: نجاح · خطوات · تحميل · تمرير · شاشة أولى · KLM | الحاسوب: نجاح · خطوات · تحميل · تمرير · شاشة أولى · KLM |')
   lines.push('|---|---|---|')
   for (const id of ids) {
@@ -278,9 +278,9 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
   const by = (id: string, vp: string) => results.find((r) => r.id === id && r.viewport.startsWith(vp))
   const cell = (r: JourneyResult | undefined, f: (r: JourneyResult) => string) => (r === undefined ? '—' : f(r))
   const lines: string[] = []
-  lines.push(baseline === null ? '# قياسُ الرحلات — الواجهة الحاليّة (خطُّ الأساس)' : '# قياسُ الرحلات — الواجهة الحاليّة مقابل خطّ الأساس', '')
-  lines.push(`شُغِّل في ${started.toISOString().slice(0, 16).replace('T', ' ')} UTC على نسخةٍ محلّيّةٍ حيّة (\`npm run journeys\`): SQLite بكلّ الترحيلات، وبذرةٌ على شكل staging، ومزوّدون مزيَّفون بلا شبكة. الهاتف 390×844 لمسٌ @2x، والحاسوب 1440×900.`, '')
-  lines.push('**الخطوات** أفعالُ المالك (نقرةٌ، اختيارٌ من قائمة، لصقٌ أو كتابة، ملفّ، تأكيد). **التمرير** بالبكسل حتّى يظهر كلُّ هدف فوق الشريط السفليّ. **الشاشة الأولى**: أكان الفعلُ الحاسمُ ظاهرًا بلا تمريرٍ حين بلغ صفحتَه. **النجاح** من القاعدة لا من رسالة الصفحة. **KLM** تقديرٌ لزمن الإنسان (تفكيرٌ وإشارةٌ لكلّ فعل + سحبات + زمن التطبيق المقيس)، والنموذجُ المزيَّف يجيب في 0.8ث لا في عشرات الثواني.', '')
+  lines.push(baseline === null ? '# قياس الرحلات — الواجهة الحاليّة (خطّ الأساس)' : '# قياس الرحلات — الواجهة الحاليّة مقابل خطّ الأساس', '')
+  lines.push(`شُغِّل في ${started.toISOString().slice(0, 16).replace('T', ' ')} UTC على نسخة محلّيّة حيّة (\`npm run journeys\`): SQLite بكلّ الترحيلات، وبذرة على شكل staging، ومزوّدون مزيَّفون بلا شبكة. الهاتف 390×844 لمس @2x، والحاسوب 1440×900.`, '')
+  lines.push('**الخطوات** أفعال المالك (نقرة، اختيار من قائمة، لصق أو كتابة، ملفّ، تأكيد). **التمرير** بالبكسل حتّى يظهر كلّ هدف فوق الشريط السفليّ. **الشاشة الأولى**: أكان الفعل الحاسم ظاهرًا بلا تمرير حين بلغ صفحتَه. **النجاح** من القاعدة لا من رسالة الصفحة. **KLM** تقدير لزمن الإنسان (تفكير وإشارة لكلّ فعل + سحبات + زمن التطبيق المقيس)، والنموذج المزيَّف يجيب في 0.8ث لا في عشرات الثواني.', '')
   lines.push('| الرحلة | الخطة: اليوم ← الهدف | الهاتف: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM | الحاسوب: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM |')
   lines.push('|---|---|---|---|')
   for (const id of ids) {
@@ -297,25 +297,25 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
   const stop = by('R-2·stop', 'phone')
   const ok = by('R-2', 'phone')
   if (stop !== undefined) {
-    lines.push('', stop.success ? '## ر-2 على الهاتف: أين يقف مالكٌ يبحث عن «اكتب»' : '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
-    lines.push('مالكٌ يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرٍّ رئيسيٍّ يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
+    lines.push('', stop.success ? '## ر-2 على الهاتف: أين يقف مالك يبحث عن «اكتب»' : '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
+    lines.push('مالك يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرّ رئيسيّ يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
     for (const n of stop.notes.filter((x) => x.startsWith('شاشة'))) lines.push(`- ${n}`)
     for (const n of stop.notes.filter((x) => !x.startsWith('شاشة') && !x.startsWith('⚠'))) lines.push(`- ${n}`)
     lines.push(`- **وما وقع حين ضغطه:** ${stop.verified}. والإشعار: ${stop.flashes.map((f) => `«${f}»`).join(' · ') || '—'}`)
     if (ok !== undefined) {
-      lines.push(`- **والمسارُ الذي يعمل** (ر-2): ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة) من تبويب «اكتب» حتّى «اكتب مسوّدة» ثمّ «اعتمد».`)
+      lines.push(`- **والمسار الذي يعمل** (ر-2): ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة) من تبويب «اكتب» حتّى «اكتب مسوّدة» ثمّ «اعتمد».`)
     }
   }
 
   lines.push('', '## البذرة وما افتُرض', '')
-  lines.push('- **من staging (قراءةً فقط):** مصدران باسم «الإطار_الأول_Milestone» (مستند Google وعرض شرائح)، حُلّل المستندُ منهما — **وأيُّهما حُلّل في staging لم يُذكر، فاختير المستند**؛ حسابات LinkedIn «عمر» وX وYouTube نشطة؛ YouTube «edited» معتمَد بمقطع المالك؛ X منشور (في الأسبوع التامّ الأخير، ومعه مقاييسُ 24س و72س وتقريرُ الاثنين مولَّدًا بـ `runWeekly`)؛ LinkedIn مرفوض؛ مقطعٌ جاهز.')
-  lines.push('- **ما أُضيف لتُقاس رحلاتٌ لا مادّةَ لها في staging:** مسوّدةُ LinkedIn تنتظر القرار (ر-0 ور-3)؛ منشورُ LinkedIn فشل بـ 500 ثلاثَ مرّات (ر-8)؛ منشورُ X مجدولٌ بعد ثلاثة أيّام (ر-9)؛ صفوفُ `cost_ledger` هذا الشهر وصفٌّ من الشهر الماضي (ر-10). ولـ ر-4 وحدها يُضاف حسابا TikTok وInstagram.')
-  lines.push('- **المزوّدون:** Anthropic مزيَّفٌ بجوابٍ عربيٍّ حتميّ وبـ `usage` معقول فيُسجَّل في `cost_ledger` بسعر المزوّد كما في الشيفرة؛ وBrowser Rendering يرسم صفحةَ الإنفوجرافيك الحقيقيّة بـ Chromium محلّيّ؛ وكلُّ عنوانٍ خارجيٍّ آخر مقطوع (في الخادم وفي المتصفّح).')
+  lines.push('- **من staging (قراءةً فقط):** مصدران باسم «الإطار_الأول_Milestone» (مستند Google وعرض شرائح)، حُلّل المستند منهما — **وأيُّهما حُلّل في staging لم يُذكر، فاختير المستند**؛ حسابات LinkedIn «عمر» وX وYouTube نشطة؛ YouTube «edited» معتمَد بمقطع المالك؛ X منشور (في الأسبوع التامّ الأخير، ومعه مقاييس 24س و72س وتقرير الاثنين مولَّدًا بـ `runWeekly`)؛ LinkedIn مرفوض؛ مقطع جاهز.')
+  lines.push('- **ما أُضيف لتُقاس رحلات لا مادّة لها في staging:** مسوّدة LinkedIn تنتظر القرار (ر-0 ور-3)؛ منشور LinkedIn فشل بـ 500 ثلاث مرّات (ر-8)؛ منشور X مجدول بعد ثلاثة أيّام (ر-9)؛ صفوف `cost_ledger` هذا الشهر وصفّ من الشهر الماضي (ر-10). ولـ ر-4 وحدها يُضاف حسابا TikTok وInstagram.')
+  lines.push('- **المزوّدون:** Anthropic مزيَّف بجواب عربيّ حتميّ وبـ `usage` معقول فيُسجَّل في `cost_ledger` بسعر المزوّد كما في الشيفرة؛ وBrowser Rendering يرسم صفحة الإنفوجرافيك الحقيقيّة بـ Chromium محلّيّ؛ وكلّ عنوان خارجيّ آخر مقطوع (في الخادم وفي المتصفّح).')
   lines.push('- **المنطقة الزمنيّة** للمتصفّح Asia/Riyadh، واللغة ar.', '')
 
   const findings = findingsOf(results)
   if (findings.length > 0) {
-    lines.push('', '## أعطالٌ كشفها التشغيلُ الحيّ', '')
+    lines.push('', '## أعطال كشفها التشغيل الحيّ', '')
     for (const f of findings) lines.push(`- ${f.text} _(${f.journeys.join('، ')})_`)
   }
   lines.push('', '## ما وُجد في كلّ رحلة', '')
@@ -323,12 +323,12 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
     for (const r of results.filter((x) => x.id === id)) {
       lines.push(`### ${r.id} · ${r.viewport.split(' ')[0]} — ${r.success ? 'نجحت' : 'لم تنجح'}`, '')
       lines.push(`- **التحقّق:** ${r.verified}${r.error === null ? '' : ` · **${r.error}**`}`)
-      lines.push(`- **الأرقام:** ${r.steps} خطوات (${r.taps} لمسة) · ${r.loads} تحميل صفحة · ${r.scrollPx}px تمريرًا (${r.screens} شاشة، ${r.swipes} سحبة) · الفعلُ الحاسم «${r.keyControl ?? '—'}» ${r.firstScreen === null ? '' : r.firstScreen ? 'في الشاشة الأولى' : 'تحت الشاشة الأولى'} · ${(r.ms / 1000).toFixed(1)}ث آليًّا (${(r.systemMs / 1000).toFixed(1)}ث انتظارًا للتطبيق) · KLM ≈ ${r.klmSec}ث`)
+      lines.push(`- **الأرقام:** ${r.steps} خطوات (${r.taps} لمسة) · ${r.loads} تحميل صفحة · ${r.scrollPx}px تمريرًا (${r.screens} شاشة، ${r.swipes} سحبة) · الفعل الحاسم «${r.keyControl ?? '—'}» ${r.firstScreen === null ? '' : r.firstScreen ? 'في الشاشة الأولى' : 'تحت الشاشة الأولى'} · ${(r.ms / 1000).toFixed(1)}ث آليًّا (${(r.systemMs / 1000).toFixed(1)}ث انتظارًا للتطبيق) · KLM ≈ ${r.klmSec}ث`)
       if (Object.keys(r.milestones).length > 0) lines.push(`- **محطّات:** ${Object.entries(r.milestones).map(([k, v]) => `${k} بعد ${v} خطوات`).join(' · ')}`)
       const path = r.detail.map((s) => `${s.kind === 'look' ? '👁 ' : ''}${s.label}${s.scrolledPx > 0 ? ` (↓${s.scrolledPx}px)` : ''}${s.loaded ? ' ⟳' : ''}`).join(' ← ')
       lines.push(`- **المسار:** ${path || '—'}`)
       if (r.flashes.length > 0) lines.push(`- **الإشعارات:** ${r.flashes.map((f) => `«${f}»`).join(' · ')}`)
-      if (r.disabled.length > 0) lines.push(`- **معطَّلٌ في الشاشة:** ${r.disabled.map((d) => `«${d}»`).join(' · ')}`)
+      if (r.disabled.length > 0) lines.push(`- **معطَّل في الشاشة:** ${r.disabled.map((d) => `«${d}»`).join(' · ')}`)
       if (r.dialogs.length > 0) lines.push(`- **حوارات:** ${r.dialogs.map((d) => `«${d}»`).join(' · ')}`)
       if (r.leftSite.length > 0) lines.push(`- **غادر إلى:** ${r.leftSite.map((u) => new URL(u).origin + new URL(u).pathname).join(' · ')}`)
       for (const n of r.notes) lines.push(`- ${n}`)

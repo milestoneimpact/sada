@@ -7,7 +7,7 @@ import { todayFeed, TODAY_CAP } from './today'
 const now = new Date('2026-09-12T15:00:00Z')
 
 describe('ما وقع اليوم', () => {
-  it('يصفّي إلى يوم UTC، ويسمّي المنصّةَ والفعلَ بالاسم لا بالمفتاح', () => {
+  it('يصفّي إلى يوم UTC، ويسمّي المنصّة والفعل بالاسم لا بالمفتاح', () => {
     const { items, more } = todayFeed({
       now,
       audit: [
@@ -30,23 +30,23 @@ describe('ما وقع اليوم', () => {
     })
     expect(more).toBe(0)
     expect(items.map((x) => x.text)).toEqual([
-      'كُتبت مسوّدةٌ لـX تنتظر قرارك',
-      'اعتمدتَ مسوّدةً لـLinkedIn',
+      'كُتبت مسوّدة لـX تنتظر قرارك',
+      'اعتمدت مسوّدةً لـLinkedIn',
       'محاولة دخول مرفوضة',
       'تبديل مفتاح — Anthropic',
-      'رفضتَ مسوّدةً لـX',
-      'نُشر منشورٌ على LinkedIn',
-      'فشل النشرُ على X',
+      'رفضت مسوّدةً لـX',
+      'نُشر منشور على LinkedIn',
+      'فشل النشر على X',
     ])
     expect(items.find((x) => x.text.startsWith('فشل'))!.kind).toBe('bad')
     expect(items.find((x) => x.text.startsWith('محاولة'))!.kind).toBe('bad')
-    expect(items.find((x) => x.text.startsWith('نُشر'))).toMatchObject({ at: null, kind: 'ok', go: '/panel/channels/linkedin', goLabel: 'شاشةُ LinkedIn' })
+    expect(items.find((x) => x.text.startsWith('نُشر'))).toMatchObject({ at: null, kind: 'ok', go: '/panel/channels/linkedin', goLabel: 'شاشة LinkedIn' })
     expect(items.some((x) => x.text.includes('جلسة'))).toBe(false)
     expect(JSON.stringify(items)).not.toContain('linkedin»')
   })
 
   /** ضغطتا «احفظ» على البطاقات سطرٌ واحدٌ بعدده — والمختلفُ لا يُطوى (D-134). */
-  it('والفعلُ الواحدُ مرّتين سطرٌ واحدٌ بعدده، ومفتاحُ الإعداد اسمٌ', () => {
+  it('والفعل الواحد مرّتين سطر واحد بعدده، ومفتاح الإعداد اسم', () => {
     const { items } = todayFeed({
       now,
       audit: [
@@ -65,11 +65,11 @@ describe('ما وقع اليوم', () => {
     expect(JSON.stringify(items)).not.toContain('dashboard_tiles')
   })
 
-  it('ويومٌ بلا شيء قائمةٌ فارغة — لا «لا يُعرَف»', () => {
+  it('ويوم بلا شيء قائمة فارغة — لا «لا يُعرَف»', () => {
     expect(todayFeed({ now, audit: [], drafts: [], facts: [] })).toEqual({ items: [], more: 0 })
   })
 
-  it('والسقفُ يُقال عددًا لا يُصمَت عنه', () => {
+  it('والسقف يُقال عددًا لا يُصمَت عنه', () => {
     const audit = Array.from({ length: TODAY_CAP + 5 }, (_, n) => ({
       at: `2026-09-12 0${Math.min(9, n)}:${String(n).padStart(2, '0')}:00`, action: 'settings.write', target: `k${n}`, detail: null,
     }))

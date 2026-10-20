@@ -20,7 +20,7 @@ import { writeRoute } from '../ai/routes'
 let db: FakeDb
 let calls: { url: string; body: unknown }[]
 
-const OK = { text: 'ن'.repeat(300), rationale: 'زاويةُ الأثر لا زاويةُ الإعلان.' }
+const OK = { text: 'ن'.repeat(300), rationale: 'زاوية الأثر لا زاوية الإعلان.' }
 
 /** يزيّف Anthropic وحده — ولا نداءَ آخر في هذا المسار. */
 function net(options: { draft?: unknown; status?: number; usage?: Record<string, number>; stop?: string } = {}) {
@@ -71,7 +71,7 @@ async function seed(hash = 'md5:abc'): Promise<string> {
     .bind(
       crypto.randomUUID(),
       id,
-      'خلاصةٌ عربية عن أثر الوقف في التعليم.',
+      'خلاصة عربية عن أثر الوقف في التعليم.',
       JSON.stringify({ hash, themes: ['الوقف', 'التعليم'] }),
       0.82,
     )
@@ -152,7 +152,7 @@ describe('المسار الكامل', () => {
     expect(row?.has_url).toBe(1)
   })
 
-  it('ونصٌّ بلا رابطٍ يبقى صفرا', async () => {
+  it('ونصّ بلا رابط يبقى صفرا', async () => {
     const id = await seed()
     const out = await draftPost(deps(net()), id, 'linkedin')
     if (out.kind !== 'drafted') throw new Error('لم تُكتب')
@@ -163,7 +163,7 @@ describe('المسار الكامل', () => {
     expect(row?.has_url).toBe(0)
   })
 
-  it('يرسل وصفَ المنصّة لا وصفا عامّا — ولكلٍّ حدُّه', async () => {
+  it('يرسل وصف المنصّة لا وصفا عامّا — ولكلّ حدُّه', async () => {
     const id = await seed()
     await draftPost(deps(net({ draft: { text: 'ن'.repeat(200), rationale: '' } })), id, 'x')
     const sent = calls[0]?.body as { system?: { text: string }[] }
@@ -173,7 +173,7 @@ describe('المسار الكامل', () => {
 })
 
 describe('D-008 · الكلفة قبل الكتابة', () => {
-  it('يسجّل الكلفة حتّى حين يكون جوابُ النموذج غير صالح', async () => {
+  it('يسجّل الكلفة حتّى حين يكون جواب النموذج غير صالح', async () => {
     const id = await seed()
     // نصٌّ فوق حدّ X: النداءُ وقع وحوسِب عليه، والكتابةُ وحدها تفشل
     const out = await draftPost(
@@ -197,7 +197,7 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
    * **وجوابٌ وصل ثمّ رُدّ يُسجَّل** (D-164). مبتورٌ عند `max_tokens` حوسِب
    * عليه كاملًا، وكان يعود `failed` قبل خطوة الكلفة فلا يراه الدفتر.
    */
-  it('يسجّل كلفةَ الجواب المبتور ثمّ يعود failed — ولا مسوّدة', async () => {
+  it('يسجّل كلفة الجواب المبتور ثمّ يعود failed — ولا مسوّدة', async () => {
     const id = await seed()
     const out = await draftPost(deps(net({ stop: 'max_tokens' })), id, 'linkedin')
     expect(out.kind).toBe('failed')
@@ -212,7 +212,7 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     expect((await db.prepare('SELECT id FROM posts').all()).results).toHaveLength(0)
   })
 
-  it('وعلى لهجة التوافق كذلك: بترٌ بـlength يُكتب صفًّا', async () => {
+  it('وعلى لهجة التوافق كذلك: بتر بـlength يُكتب صفًّا', async () => {
     const id = await seed()
     await writeRoute(db, 'draft', 'gemini', 'gemini-2.5-flash', 'test')
     const compat = (async (): Promise<Response> =>
@@ -231,7 +231,7 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
     expect(book[0]?.operation).toBe('draft:x:gemini-2.5-flash')
   })
 
-  it('لا يسجّل كلفةً حين يفشل النداءُ نفسه — لا نداءَ لا حساب', async () => {
+  it('لا يسجّل كلفةً حين يفشل النداء نفسه — لا نداء لا حساب', async () => {
     const id = await seed()
     const out = await draftPost(deps(net({ status: 500 })), id, 'x')
     expect(out.kind).toBe('failed')
@@ -242,8 +242,8 @@ describe('D-008 · الكلفة قبل الكتابة', () => {
   })
 })
 
-describe('D-164 · المخطّطُ المحمول', () => {
-  it('Anthropic يتلقّى مخطّطَ المسوّدة بلا minLength — والحدُّ في parseDraft', async () => {
+describe('D-164 · المخطّط المحمول', () => {
+  it('Anthropic يتلقّى مخطّط المسوّدة بلا minLength — والحدّ في parseDraft', async () => {
     const id = await seed()
     await draftPost(deps(net()), id, 'linkedin')
     const sent = calls[0]?.body as { output_config?: { format?: { schema?: { properties?: Record<string, Record<string, unknown>> } } } }
@@ -256,8 +256,8 @@ describe('D-164 · المخطّطُ المحمول', () => {
   })
 })
 
-describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
-  it('الطلبُ الثاني لا ينادي ولا يُنفق', async () => {
+describe('لا تسويد مرّتين لنسخة واحدة', () => {
+  it('الطلب الثاني لا ينادي ولا يُنفق', async () => {
     const id = await seed()
     const first = await draftPost(deps(net()), id, 'linkedin')
     expect(first.kind).toBe('drafted')
@@ -268,7 +268,7 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
     expect(await ledger()).toHaveLength(1)
   })
 
-  it('المنصّةُ الأخرى نداءٌ آخر — ونصٌّ لأحدهما لا يصلح للآخر', async () => {
+  it('المنصّة الأخرى نداء آخر — ونصّ لأحدهما لا يصلح للآخر', async () => {
     const id = await seed()
     await draftPost(deps(net()), id, 'linkedin')
     const x = await draftPost(deps(net({ draft: { text: 'ن'.repeat(200), rationale: '' } })), id, 'x')
@@ -280,7 +280,7 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
    * **والمرفوضةُ لا تسدّ الطريق** (رحلة R-2): كان «اكتب مسوّدة» بعد الرفض يقول «✓ سُوّدت
    * هذه النسخة — لم يُنفَق شيء» ولا يكتب شيئًا، ولا صياغةَ أخرى إلّا بتعديل المستند.
    */
-  it('بعد الرفض تُكتب صياغةٌ أخرى — والمرفوضةُ تبقى بكلفتها، والنقرةُ الثالثةُ لا تُنفق', async () => {
+  it('بعد الرفض تُكتب صياغة أخرى — والمرفوضة تبقى بكلفتها، والنقرة الثالثة لا تُنفق', async () => {
     const id = await seed()
     const first = await draftPost(deps(net()), id, 'linkedin')
     expect(first.kind).toBe('drafted')
@@ -308,7 +308,7 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
     expect(await ledger()).toHaveLength(2)
   })
 
-  it('ومرفوضةٌ أُعيدت بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها — ويُقال already', async () => {
+  it('ومرفوضة أُعيدت بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها — ويُقال already', async () => {
     const id = await seed()
     const first = await draftPost(deps(net()), id, 'linkedin')
     if (first.kind !== 'drafted') throw new Error(first.kind)
@@ -325,7 +325,7 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
     expect(keys.map((r) => r.k)).toEqual([draftKey(id, 'linkedin', 'md5:abc')])
   })
 
-  it('نسخةٌ جديدة من المستند تُسوَّد من جديد بحقّ', async () => {
+  it('نسخة جديدة من المستند تُسوَّد من جديد بحقّ', async () => {
     const id = await seed()
     await draftPost(deps(net()), id, 'linkedin')
     expect(draftKey(id, 'linkedin', 'md5:abc')).not.toBe(draftKey(id, 'linkedin', 'md5:xyz'))
@@ -333,7 +333,7 @@ describe('لا تسويدَ مرّتين لنسخةٍ واحدة', () => {
 })
 
 describe('الحارس قبل النداء', () => {
-  it('الإيقافُ يمنع، ولا يُرسَل شيء', async () => {
+  it('الإيقاف يمنع، ولا يُرسَل شيء', async () => {
     const id = await seed()
     await writeSetting(db, 'paused', 'true', 'test')
     const out = await draftPost(deps(net()), id, 'linkedin')
@@ -343,7 +343,7 @@ describe('الحارس قبل النداء', () => {
     expect(await ledger()).toHaveLength(0)
   })
 
-  it('سقفُ الإنفاق اليوميّ يمنع قبل النداء لا بعده', async () => {
+  it('سقف الإنفاق اليوميّ يمنع قبل النداء لا بعده', async () => {
     const id = await seed()
     await writeSetting(db, 'daily_spend_cap_usd', '0.01', 'test')
     await db
@@ -359,8 +359,8 @@ describe('الحارس قبل النداء', () => {
   })
 })
 
-describe('بلا خلاصةٍ لا مادّة', () => {
-  it('مصدرٌ لم يُحلَّل لا يُكتب منه — ولا يُنادى له نموذج', async () => {
+describe('بلا خلاصة لا مادّة', () => {
+  it('مصدر لم يُحلَّل لا يُكتب منه — ولا يُنادى له نموذج', async () => {
     const id = crypto.randomUUID()
     await db
       .prepare(
@@ -375,8 +375,8 @@ describe('بلا خلاصةٍ لا مادّة', () => {
   })
 })
 
-describe('حدودُ المنصّتين', () => {
-  it('X أقصر من LinkedIn حدّا — ولا يُقصّ نصٌّ من أحدهما للآخر', () => {
+describe('حدود المنصّتين', () => {
+  it('X أقصر من LinkedIn حدّا — ولا يُقصّ نصّ من أحدهما للآخر', () => {
     expect(PLATFORMS.x.hardLimit).toBeLessThan(PLATFORMS.linkedin.hardLimit)
   })
 
@@ -387,14 +387,14 @@ describe('حدودُ المنصّتين', () => {
    * يُملأ**: يكتب ليبلغ العدّاد لا ليقول شيئا. والحدُّ التقنيُّ يُفرَض
    * في `parseDraft` لا يُرجى من النموذج.
    */
-  it('ولا عددَ محارفَ في وصف أيٍّ منهما — البنيةُ تُملى لا الطول', () => {
+  it('ولا عدد محارف في وصف أيّ منهما — البنية تُملى لا الطول', () => {
     for (const spec of [PLATFORMS.x, PLATFORMS.linkedin]) {
       expect(spec.guide).not.toMatch(/\d{3,4}\s*محرف/)
       expect(spec.guide).not.toMatch(/[٠-٩]{3,4}/)
     }
   })
 
-  it('والحدُّ يبقى يُفرَض — نصٌّ فوقه يُردّ قبل أن يُعتمَد', () => {
+  it('والحدّ يبقى يُفرَض — نصّ فوقه يُردّ قبل أن يُعتمَد', () => {
     const over = parseDraft(
       { text: 'ن'.repeat(PLATFORMS.x.hardLimit + 1), rationale: 'ر' },
       PLATFORMS.x,
@@ -404,7 +404,7 @@ describe('حدودُ المنصّتين', () => {
 })
 
 describe('من فكرة المالك (D-190)', () => {
-  const IDEA = 'الحوكمةُ لا تبطئ القرار، تحميه'
+  const IDEA = 'الحوكمة لا تبطئ القرار، تحميه'
   const system = (): string => {
     const body = calls[0]!.body as { system?: { text: string }[] }
     return body.system?.[0]?.text ?? ''
@@ -414,7 +414,7 @@ describe('من فكرة المالك (D-190)', () => {
     return body.messages?.[0]?.content ?? ''
   }
 
-  it('مسوّدةٌ بحالة draft بلا مصدر، ومفتاحُها بصمةُ الفكرة ومنصّتُها، والكلفةُ قبلها باسم الفكرة', async () => {
+  it('مسوّدة بحالة draft بلا مصدر، ومفتاحُها بصمة الفكرة ومنصّتُها، والكلفة قبلها باسم الفكرة', async () => {
     const out = await draftFromIdea(deps(net()), `  ${IDEA}  `, 'linkedin')
     expect(out.kind).toBe('drafted')
     if (out.kind !== 'drafted') return
@@ -429,12 +429,12 @@ describe('من فكرة المالك (D-190)', () => {
     expect(db.raw.prepare('SELECT ref_id FROM cost_ledger').get()).toEqual({ ref_id: key.slice(0, key.lastIndexOf(':')) })
     // ‏الفكرةُ بكلماتها مادّةُ الكتابة، ووصفُ المنصّة نفسُه، والقيدُ على ما لم يقله
     expect(user()).toContain(IDEA)
-    expect(system()).toContain('فكرةُ المالك بكلماته')
+    expect(system()).toContain('فكرة المالك بكلماته')
     expect(system()).toContain(PLATFORMS.linkedin.guide.split('\n')[0]!)
     expect(system()).toContain('ولا قصّةً شخصيّة')
   })
 
-  it('والفكرةُ نفسُها مرّةً ثانيةً لا تُنادي — ولو اختلف فراغُها — ولمنصّةٍ أخرى تُنادي', async () => {
+  it('والفكرة نفسُها مرّةً ثانيةً لا تُنادي — ولو اختلف فراغُها — ولمنصّة أخرى تُنادي', async () => {
     await draftFromIdea(deps(net()), IDEA, 'linkedin')
     const again = await draftFromIdea(deps(net()), IDEA.replace(' ', '   '), 'linkedin')
     expect(again.kind).toBe('already')
@@ -444,7 +444,7 @@ describe('من فكرة المالك (D-190)', () => {
     expect(await ledger()).toHaveLength(2)
   })
 
-  it('والمرفوضةُ تُحرِّر مفتاحَها: الضغطةُ التالية تكتب بديلةً', async () => {
+  it('والمرفوضة تُحرِّر مفتاحَها: الضغطة التالية تكتب بديلةً', async () => {
     const first = await draftFromIdea(deps(net()), IDEA, 'linkedin')
     if (first.kind !== 'drafted') throw new Error('لم تُكتب')
     db.raw.exec(`UPDATE posts SET status = 'rejected' WHERE id = '${first.postId}'`)
@@ -453,7 +453,7 @@ describe('من فكرة المالك (D-190)', () => {
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(2)
   })
 
-  it('الإيقافُ يمنع النداء، وفكرةٌ فارغةٌ أو طويلةٌ تُردّ قبله', async () => {
+  it('الإيقاف يمنع النداء، وفكرة فارغة أو طويلة تُردّ قبله', async () => {
     await writeSetting(db, 'paused', 'true', 'test')
     expect(await draftFromIdea(deps(net()), IDEA, 'linkedin')).toMatchObject({ kind: 'blocked' })
     await writeSetting(db, 'paused', 'false', 'test')
@@ -465,7 +465,7 @@ describe('من فكرة المالك (D-190)', () => {
     expect(normalizeIdea(' أ\n\tب ')).toBe('أ ب')
   })
 
-  it('ونصٌّ فوق حدّ X يُردّ بعد أن سُجّلت كلفتُه — ولا مسوّدة', async () => {
+  it('ونصّ فوق حدّ X يُردّ بعد أن سُجّلت كلفتُه — ولا مسوّدة', async () => {
     const out = await draftFromIdea(deps(net({ draft: { text: 'ن'.repeat(400), rationale: 'ر' } })), IDEA, 'x')
     expect(out).toMatchObject({ kind: 'failed', retryable: true })
     expect(await ledger()).toHaveLength(1)
@@ -473,8 +473,8 @@ describe('من فكرة المالك (D-190)', () => {
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
   })
 
-  it('ووصفُ المصدر كما كان حرفًا — الفكرةُ بابٌ ثانٍ لا تعديلٌ للأوّل', () => {
+  it('ووصف المصدر كما كان حرفًا — الفكرة باب ثان لا تعديل للأوّل', () => {
     expect(systemPrompt(PLATFORMS.linkedin)).toContain('إلّا ما ورد في الخلاصة')
-    expect(systemPrompt(PLATFORMS.linkedin)).not.toContain('فكرةُ المالك')
+    expect(systemPrompt(PLATFORMS.linkedin)).not.toContain('فكرة المالك')
   })
 })

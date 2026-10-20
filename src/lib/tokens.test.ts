@@ -36,7 +36,7 @@ beforeEach(() => {
 })
 
 describe('upsertAccount', () => {
-  it('حسابٌ مربوطٌ في منظّمةٍ لا يُنقَل إلى أخرى (D-229)', async () => {
+  it('حساب مربوط في منظّمة لا يُنقَل إلى أخرى (D-229)', async () => {
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     const id = await upsertAccount(db, 'org_owner', IDENTITY)
     await expect(upsertAccount(db, 'org_b', { ...IDENTITY, displayName: 'دخيل' })).rejects.toBeInstanceOf(
@@ -172,8 +172,8 @@ describe('ما يحمي الرموز', () => {
   })
 })
 
-describe('مفتاحُ المنظّمة (D-238)', () => {
-  it('رمزُ منظّمةٍ أخرى يُشفَّر بمفتاحٍ مشتقٍّ فلا يُفكّ بالأصل، ويُقرأ بمسارِه', async () => {
+describe('مفتاح المنظّمة (D-238)', () => {
+  it('رمز منظّمة أخرى يُشفَّر بمفتاح مشتقّ فلا يُفكّ بالأصل، ويُقرأ بمسارِه', async () => {
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     const id = await upsertAccount(db, 'org_b', { ...IDENTITY, externalId: 'urn:li:person:b' })
     await saveTokens(db, KEY, id, TOKENS)
@@ -191,7 +191,7 @@ describe('مفتاحُ المنظّمة (D-238)', () => {
     ).rejects.toThrow()
   })
 
-  it('ورمزُ المالك بالمفتاح الأصل كما كان، فلا يُعاد تشفيرُ ما حُفظ', async () => {
+  it('ورمز المالك بالمفتاح الأصل كما كان، فلا يُعاد تشفير ما حُفظ', async () => {
     const id = await upsertAccount(db, 'org_owner', IDENTITY)
     await saveTokens(db, KEY, id, TOKENS)
     const row = db.raw.prepare('SELECT access_enc, access_iv FROM tokens WHERE account_id = ?').get(id) as {

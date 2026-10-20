@@ -4,17 +4,17 @@
 import { describe, expect, it } from 'vitest'
 import { gantt, localMidnight, readShift, readSpan, windowOf, type GanttPost } from './gantt'
 
-const NOW = new Date('2026-10-15T09:00:00Z') // ‏الثانيةَ عشرةَ ظهرًا بالرياض
+const NOW = new Date('2026-10-15T09:00:00Z') // ‏الثانية عشرة ظهرًا بالرياض
 
 function post(over: Partial<GanttPost>): GanttPost {
   return {
-    id: 'p', platform: 'linkedin', accountId: 'a1', account: 'عمر', status: 'draft', text: 'نصٌّ',
+    id: 'p', platform: 'linkedin', accountId: 'a1', account: 'عمر', status: 'draft', text: 'نصّ',
     createdAt: '2026-10-10 06:00:00', approvedAt: null, scheduledAt: null, publishedAt: null, ...over,
   }
 }
 
 describe('النافذة', () => {
-  it('تبدأ من منتصف ليل الرياض لا منتصف ليل غرينتش، وثلثُها ماضٍ', () => {
+  it('تبدأ من منتصف ليل الرياض لا منتصف ليل غرينتش، وثلثُها ماض', () => {
     const w = windowOf(NOW, null, 30, 0)
     // ‏منتصفُ ليل الرياض ٢١:٠٠ بغرينتش من اليوم السابق؛ وعشرةُ أيّامٍ قبل الخامس عشر
     expect(w.from.toISOString()).toBe('2026-10-04T21:00:00.000Z')
@@ -22,7 +22,7 @@ describe('النافذة', () => {
     expect(localMidnight(NOW, 'UTC').toISOString()).toBe('2026-10-15T00:00:00.000Z')
   })
 
-  it('تُقلَّب نوافذَ كاملة', () => {
+  it('تُقلَّب نوافذ كاملة', () => {
     const a = windowOf(NOW, null, 14, 0)
     const b = windowOf(NOW, null, 14, -1)
     expect(a.from.getTime() - b.from.getTime()).toBe(14 * 86_400_000)
@@ -41,7 +41,7 @@ describe('النافذة', () => {
 describe('الشريط', () => {
   const win = windowOf(NOW, null, 30, 0)
 
-  it('منشورٌ نُشر: كتابةٌ ثمّ انتظارٌ ثمّ علامةٌ خضراء عند لحظة النشر', () => {
+  it('منشور نُشر: كتابة ثمّ انتظار ثمّ علامة خضراء عند لحظة النشر', () => {
     const c = gantt({
       posts: [post({
         status: 'published', approvedAt: '2026-10-11 06:00:00',
@@ -59,7 +59,7 @@ describe('الشريط', () => {
     expect(c.summary).toEqual({ total: 1, published: 1, upcoming: 0, waiting: 0, failed: 0 })
   })
 
-  it('مسوّدةٌ لم يُقرَّر فيها تمتدّ إلى «الآن» مفتوحةً — ولو كُتبت قبل النافذة', () => {
+  it('مسوّدة لم يُقرَّر فيها تمتدّ إلى «الآن» مفتوحةً — ولو كُتبت قبل النافذة', () => {
     const c = gantt({ posts: [post({ createdAt: '2026-08-01 06:00:00' })], plans: [] }, win, NOW, null)
     const bar = c.groups[0]!.rows[0]!.tiers[0]![0]!
     expect(bar.open).toBe(true)
@@ -80,7 +80,7 @@ describe('الشريط', () => {
     expect(c.summary.total).toBe(0)
   })
 
-  it('المتداخلان في حسابٍ واحدٍ طابقان، والمتعاقبان طابقٌ واحد', () => {
+  it('المتداخلان في حساب واحد طابقان، والمتعاقبان طابق واحد', () => {
     const c = gantt({
       posts: [
         post({ id: 'a', createdAt: '2026-10-06 06:00:00', approvedAt: '2026-10-07 06:00:00', status: 'queued', scheduledAt: '2026-10-20 06:00:00' }),
@@ -94,7 +94,7 @@ describe('الشريط', () => {
     expect(c.summary.upcoming).toBe(3)
   })
 
-  it('المنصّاتُ بترتيب قاموسها، والمسوّدةُ بلا حسابٍ تُسمّى', () => {
+  it('المنصّات بترتيب قاموسها، والمسوّدة بلا حساب تُسمّى', () => {
     const c = gantt({
       posts: [post({ id: 'x1', platform: 'x', accountId: '', account: '' }), post({ id: 'l1' })],
       plans: [{ id: 'pl', weekStart: '2026-10-11', status: 'approved' }],
@@ -107,7 +107,7 @@ describe('الشريط', () => {
     expect(plan.end - plan.start).toBeCloseTo((7 / 30) * 100, 1)
   })
 
-  it('علاماتُ المحور: أسبوعيّةٌ في الثلاثين، وأوّلُ الشهر باسمه', () => {
+  it('علامات المحور: أسبوعيّة في الثلاثين، وأوّل الشهر باسمه', () => {
     const c = gantt({ posts: [], plans: [] }, win, NOW, null)
     expect(c.ticks[0]!.major).toBe(true)
     expect(c.ticks.some((t) => t.label === '1 نوفمبر')).toBe(true)

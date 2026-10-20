@@ -166,7 +166,7 @@ function readDraft(text: string, spec: PlatformSpec): { ok: true; draft: Draft }
   try {
     parsedJson = JSON.parse(text)
   } catch {
-    return { ok: false, reason: 'جوابُ النموذج ليس JSON صالحا' }
+    return { ok: false, reason: 'جواب النموذج ليس JSON صالحا' }
   }
   return parseDraft(parsedJson, spec)
 }
@@ -206,7 +206,7 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
             source_refs, rationale, has_url, status, idempotency_key, org_id, brand_id)
          VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?,
-                 -- ‏المسوّدةُ لمنظّمة مصدرها وعلامته
+                 -- ‏المسوّدة لمنظّمة مصدرها وعلامته
                  coalesce((SELECT org_id FROM sources WHERE id = ?), 'org_owner'),
                  coalesce((SELECT brand_id FROM sources WHERE id = ?), 'brand_owner'))`,
       )
@@ -268,8 +268,8 @@ export function normalizeIdea(raw: string): string {
 /** ما يمنع الفكرةَ قبل أيّ نداء — أو `null`. ويقرؤه المسارُ قبل أن يدور على المنصّات. */
 export function ideaProblem(raw: string): string | null {
   const idea = normalizeIdea(raw)
-  if (idea.length < IDEA_MIN) return 'اكتب فكرتك بجملةٍ أو كلماتٍ قليلة أوّلًا'
-  if (idea.length > IDEA_MAX) return `الفكرةُ أطولُ من ${IDEA_MAX} محرف — اختصرها في جملٍ قليلة`
+  if (idea.length < IDEA_MIN) return 'اكتب فكرتك بجملة أو كلمات قليلة أوّلًا'
+  if (idea.length > IDEA_MAX) return `الفكرة أطول من ${IDEA_MAX} محرف — اختصرها في جمل قليلة`
   return null
 }
 

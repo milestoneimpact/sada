@@ -24,7 +24,7 @@ function published(id: string, platform: 'linkedin' | 'x', at: string): void {
   db.raw.exec(
     `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
                         idempotency_key, approved_by, approved_at)
-     VALUES ('${id}', '${account}', '${platform}', 'text', 'نصُّ ${id}', '${at}',
+     VALUES ('${id}', '${account}', '${platform}', 'text', 'نصّ ${id}', '${at}',
              'published', 'k-${id}', 'omar', '${at}')`,
   )
   db.raw.exec(
@@ -54,7 +54,7 @@ beforeEach(() => {
   seed()
 })
 
-describe('حدُّ الأسبوع', () => {
+describe('حدّ الأسبوع', () => {
   /** الاثنينُ أوّلا: التقريرُ يُقرأ في أوّل يومِ عمل فيغطّي ما سبقه كاملا. */
   it('يبدأ الاثنين وينتهي بالاثنين الذي يليه', () => {
     // 2026-09-06 أحد
@@ -64,13 +64,13 @@ describe('حدُّ الأسبوع', () => {
     expect(id).toBe('2026-08-24')
   })
 
-  it('واثنينٌ نفسُه يعطي الأسبوعَ الذي قبله لا الجاري', () => {
+  it('واثنين نفسُه يعطي الأسبوع الذي قبله لا الجاري', () => {
     const { from, to } = weekBounds(new Date('2026-08-31T00:30:00Z'))
     expect(from.toISOString()).toBe('2026-08-24T00:00:00.000Z')
     expect(to.toISOString()).toBe('2026-08-31T00:00:00.000Z')
   })
 
-  it('وساعةُ اليوم لا تغيّر الحدّ', () => {
+  it('وساعة اليوم لا تغيّر الحدّ', () => {
     const a = weekBounds(new Date('2026-09-02T00:00:01Z')).id
     const b = weekBounds(new Date('2026-09-02T23:59:59Z')).id
     expect(a).toBe(b)
@@ -81,14 +81,14 @@ const FROM = new Date('2026-08-24T00:00:00Z')
 const TO = new Date('2026-08-31T00:00:00Z')
 
 describe('ما يدخل التقرير', () => {
-  it('يقرأ وقتَ النشر من المحاولة الناجحة لا من حالة الصفّ', async () => {
+  it('يقرأ وقت النشر من المحاولة الناجحة لا من حالة الصفّ', async () => {
     published('p1', 'x', '2026-08-25T10:00:00.000Z')
     const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(1)
   })
 
   /** حدُّ الأسبوع مغلقٌ من أوّله مفتوحٌ من آخره — فلا يُعدّ منشورٌ مرّتين. */
-  it('ولا يُعدّ منشورٌ في أسبوعين', async () => {
+  it('ولا يُعدّ منشور في أسبوعين', async () => {
     published('early', 'x', '2026-08-23T23:59:59.000Z')
     published('edge', 'x', '2026-08-24T00:00:00.000Z')
     published('late', 'x', '2026-08-31T00:00:00.000Z')
@@ -102,7 +102,7 @@ describe('ما يدخل التقرير', () => {
    * والمسافةُ أصغرُ من `T` في المقارنة النصّيّة: فكان صفُّ الاثنين الأوّل
    * خارجًا وصفُّ الاثنين التالي داخلًا — فمجموعٌ صوابُه 11 خرج 110.
    */
-  it('اثنينُ الأسبوع يدخل والاثنينُ التالي لا يدخل — بالصيغة التي يكتبها SQLite', async () => {
+  it('اثنين الأسبوع يدخل والاثنين التالي لا يدخل — بالصيغة التي يكتبها SQLite', async () => {
     const from = new Date('2026-09-21T00:00:00Z')
     const to = new Date('2026-09-28T00:00:00Z')
     published('mon', 'x', '2026-09-21 10:00:00')
@@ -120,7 +120,7 @@ describe('ما يدخل التقرير', () => {
     expect(report.spendUsd).toBe(11)
   })
 
-  it('ومسوّدةٌ لم تخرج لا تدخل — ولو كانت حالتُها تقول غير ذلك', async () => {
+  it('ومسوّدة لم تخرج لا تدخل — ولو كانت حالتُها تقول غير ذلك', async () => {
     db.raw.exec(
       `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
                           idempotency_key, approved_by, approved_at)
@@ -139,7 +139,7 @@ describe('و`null` ليست صفرا', () => {
    * LinkedIn لا يعطي ظهورا لمنشور عضو. ومجموعٌ يعدّه صفرا يعرض «٠ ظهور»
    * — **ويُقرأ فشلا، وهو غيابُ قياس**.
    */
-  it('مجموعُ ظهورٍ كلُّه غيرُ مقيسٍ يعود null لا صفرا', async () => {
+  it('مجموع ظهور كلُّه غير مقيس يعود null لا صفرا', async () => {
     published('l1', 'linkedin', '2026-08-25T10:00:00.000Z')
     measured('l1', '24h', { impressions: null, reactions: 4 })
     const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
@@ -148,7 +148,7 @@ describe('و`null` ليست صفرا', () => {
     expect(li.interactions).toBe(4)
   })
 
-  it('ومجموعٌ جزئيٌّ يقول من كم صفّا جُمع', async () => {
+  it('ومجموع جزئيّ يقول من كم صفّا جُمع', async () => {
     published('x1', 'x', '2026-08-25T10:00:00.000Z')
     published('x2', 'x', '2026-08-26T10:00:00.000Z')
     measured('x1', '24h', { impressions: 100, reactions: 5 })
@@ -167,15 +167,15 @@ describe('و`null` ليست صفرا', () => {
     expect(report.notes.join(' ')).toContain('لم يُقَس بعد')
   })
 
-  it('وأسبوعٌ بلا منشورٍ يقولها ولا يعرض أصفارا', async () => {
+  it('وأسبوع بلا منشور يقولها ولا يعرض أصفارا', async () => {
     const { report } = await buildWeekly(db, 'org_owner', FROM, TO)
     expect(report.published).toBe(0)
     expect(report.platforms).toEqual([])
-    expect(report.notes.join(' ')).toContain('لا منشورَ خرج')
+    expect(report.notes.join(' ')).toContain('لا منشور خرج')
   })
 })
 
-describe('الترتيبُ داخل النافذة', () => {
+describe('الترتيب داخل النافذة', () => {
   const post = (
     id: string, window: '24h' | '72h' | '7d' | null,
     impressions: number | null, interactions: number | null,
@@ -199,7 +199,7 @@ describe('الترتيبُ داخل النافذة', () => {
     expect(top?.post.id).toBe('a')
   })
 
-  it('وواحدٌ وحده ليس ترتيبا', () => {
+  it('وواحد وحده ليس ترتيبا', () => {
     expect(topOf([post('a', '24h', 100, 50)])).toBeNull()
   })
 
@@ -214,7 +214,7 @@ describe('الترتيبُ داخل النافذة', () => {
     expect(byCount?.post.id).toBe('a')
   })
 
-  it('وغيرُ المقيس لا يدخل الترتيب', () => {
+  it('وغير المقيس لا يدخل الترتيب', () => {
     expect(topOf([post('a', null, null, null), post('b', null, null, null)])).toBeNull()
   })
 
@@ -222,7 +222,7 @@ describe('الترتيبُ داخل النافذة', () => {
    * **وواحدٌ وحده يُرى ولو لم يُرتَّب.** كان التقريرُ يقول «لا ترتيب» فلا
    * يعرف المالكُ أيُّ منشورٍ جلب ظهورَ أسبوعه — والقاعدةُ نفسُها لم تتغيّر.
    */
-  it('والمنشورُ الوحيدُ يُحفَظ باسمه، ولا يُحفَظ حين يكون معه غيرُه', () => {
+  it('والمنشور الوحيد يُحفَظ باسمه، ولا يُحفَظ حين يكون معه غيرُه', () => {
     const lone = summarize([post('a', '72h', 1975, 58)], FROM, TO, 0)
     expect(lone.top).toBeNull()
     expect(lone.only?.id).toBe('a')
@@ -234,12 +234,12 @@ describe('الترتيبُ داخل النافذة', () => {
   })
 })
 
-describe('الحفظُ شهادة', () => {
+describe('الحفظ شهادة', () => {
   /**
    * **التقريرُ يشهد على وقتٍ مضى.** ومقاييسُ تتراكم بعده تبدّل رقمه
    * بأثرٍ رجعيّ لو أُعيد الحساب — فلا يُعرَف أنُميت الحصادُ أم أُعيد.
    */
-  it('أوّلُ كتابةٍ هي الشهادة، والثانيةُ لا تدهسها', async () => {
+  it('أوّل كتابة هي الشهادة، والثانية لا تدهسها', async () => {
     const first = summarize([], FROM, TO, 1.5)
     expect(await saveWeekly(db, 'org_owner', '2026-08-24', first)).toBe(true)
 
@@ -250,13 +250,13 @@ describe('الحفظُ شهادة', () => {
     expect(stored?.body.spendUsd).toBe(1.5)
   })
 
-  it('ويُقرأ بنسخته — فقارئٌ يجد رقما لا يعرفه يقول ذلك', async () => {
+  it('ويُقرأ بنسخته — فقارئ يجد رقما لا يعرفه يقول ذلك', async () => {
     await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
     const stored = await readReport(db, 'org_owner', '2026-08-24')
     expect(stored?.body.version).toBe(1)
   })
 
-  it('وجسدٌ فاسدٌ يُسقَط وحده ولا يُسقط القائمة', async () => {
+  it('وجسد فاسد يُسقَط وحده ولا يُسقط القائمة', async () => {
     await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
     db.raw.exec(
       `INSERT INTO reports (id, from_at, to_at, body_json)
@@ -266,7 +266,7 @@ describe('الحفظُ شهادة', () => {
     expect(list.map((r) => r.id)).toEqual(['2026-08-24'])
   })
 
-  it('منظّمةٌ لا ترى تقاريرَ غيرها (D-227)', async () => {
+  it('منظّمة لا ترى تقارير غيرها (D-227)', async () => {
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     await saveWeekly(db, 'org_owner', '2026-08-24', summarize([], FROM, TO, 0))
     expect(await listReports(db, 'org_b')).toEqual([])
@@ -274,7 +274,7 @@ describe('الحفظُ شهادة', () => {
     expect(await readReport(db, 'org_owner', '2026-08-24')).not.toBeNull()
   })
 
-  it('ولا تقريرَ بهذا المفتاح يعود null لا عطلا', async () => {
+  it('ولا تقرير بهذا المفتاح يعود null لا عطلا', async () => {
     expect(await readReport(db, 'org_owner', 'لا-شيء')).toBeNull()
   })
 })

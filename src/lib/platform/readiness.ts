@@ -81,7 +81,7 @@ export function readiness(input: ReadinessInput): Readiness {
   if (spec.stage === 'none') {
     return {
       rungs: [],
-      verdict: { kind: 'idle', text: 'لم يُبنَ سائقُها بعد' },
+      verdict: { kind: 'idle', text: 'لم يُبن سائقُها بعد' },
       next: null,
     }
   }
@@ -93,14 +93,14 @@ export function readiness(input: ReadinessInput): Readiness {
       ? {
           key: 'app', title: 'التطبيق', state: accounts.length > 0 ? 'failed' : 'now',
           note: accounts.length > 0
-            ? 'سرّا التطبيق غابا من البيئة والخزنة — والتجديدُ لا يملك ما يُقدّمه للمنصّة'
-            : 'يُضبط معرّفُ التطبيق وسرُّه أوّلًا',
+            ? 'سرّا التطبيق غابا من البيئة والخزنة — والتجديد لا يملك ما يُقدّمه للمنصّة'
+            : 'يُضبط معرّف التطبيق وسرُّه أوّلًا',
           action: { label: 'اضبط التطبيق', href: '#setup' },
         }
       : kind !== null && FAILED.has(kind)
         ? {
             key: 'app', title: 'التطبيق', state: 'failed',
-            note: kind === 'bad_secret' ? 'المنصّةُ تعرف المعرّفَ ولا تقبل السرّ' : 'المنصّةُ لا تعرف هذا المعرّف',
+            note: kind === 'bad_secret' ? 'المنصّة تعرف المعرّف ولا تقبل السرّ' : 'المنصّة لا تعرف هذا المعرّف',
             action: { label: 'أعد حفظ التطبيق', href: '#setup' },
           }
         : {
@@ -122,7 +122,7 @@ export function readiness(input: ReadinessInput): Readiness {
             : `${accounts.length} حسابات: ${accounts.map((a) => a.displayName).join('، ')}`,
         }
       : appRung.state === 'done'
-        ? { key: 'account', title: 'الحساب', state: 'now', note: 'لا حسابَ مربوطًا بعد', action: { label: `اربط ${spec.label}`, href: link } }
+        ? { key: 'account', title: 'الحساب', state: 'now', note: 'لا حساب مربوطًا بعد', action: { label: `اربط ${spec.label}`, href: link } }
         : { key: 'account', title: 'الحساب', state: 'waiting', note: 'يُربَط بعد ضبط التطبيق' }
 
   // ٣ · الإذن — من الصفّ لا من الكلمة
@@ -135,25 +135,25 @@ export function readiness(input: ReadinessInput): Readiness {
     const since = h?.needsReauthAt ?? null
     tokenRung = {
       key: 'token', title: 'الإذن', state: 'failed',
-      note: since === null ? 'سقط الإذن — والنشرُ متوقّفٌ عليه' : `سقط الإذن منذ ${since.slice(0, 10)} — والنشرُ متوقّفٌ عليه منذها`,
+      note: since === null ? 'سقط الإذن — والنشر متوقّف عليه' : `سقط الإذن منذ ${since.slice(0, 10)} — والنشر متوقّف عليه منذها`,
       action: { label: 'جدّد الإذن', href: link },
     }
   } else if (h === undefined || h.expiresAt === null) {
     tokenRung = {
       key: 'token', title: 'الإذن', state: 'failed',
-      note: 'الحسابُ محفوظٌ ولا إذنَ وصولٍ معه — أوّلُ منشورٍ مجدولٍ سيسقط',
+      note: 'الحساب محفوظ ولا إذن وصول معه — أوّل منشور مجدول سيسقط',
       action: { label: 'أعد الربط', href: link },
     }
   } else if (isPast(h.expiresAt, now)) {
     const refreshable = h.refreshExpiresAt !== null && !isPast(h.refreshExpiresAt, now)
     tokenRung = refreshable
-      ? { key: 'token', title: 'الإذن', state: 'waiting', note: 'انتهى إذنُ الوصول وإذنُ التجديد قائم — تجدّده الدورةُ القادمة' }
-      : { key: 'token', title: 'الإذن', state: 'failed', note: 'انتهى إذنُ الوصول ولا إذنَ تجديدٍ معه', action: { label: 'جدّد الإذن', href: link } }
+      ? { key: 'token', title: 'الإذن', state: 'waiting', note: 'انتهى إذن الوصول وإذن التجديد قائم — تجدّده الدورة القادمة' }
+      : { key: 'token', title: 'الإذن', state: 'failed', note: 'انتهى إذن الوصول ولا إذن تجديد معه', action: { label: 'جدّد الإذن', href: link } }
   } else {
     const days = daysUntil(h.expiresAt, now) ?? 0
     tokenRung = {
       key: 'token', title: 'الإذن', state: 'done',
-      note: days === 0 ? 'صالحٌ حتّى اليوم' : days === 1 ? 'صالحٌ حتّى الغد' : `صالحٌ ${counted(days, NOUNS.day, 'acc')}`,
+      note: days === 0 ? 'صالح حتّى اليوم' : days === 1 ? 'صالح حتّى الغد' : `صالح ${counted(days, NOUNS.day, 'acc')}`,
     }
   }
 
@@ -162,8 +162,8 @@ export function readiness(input: ReadinessInput): Readiness {
     first === undefined || tokenRung.state === 'failed'
       ? { key: 'renew', title: 'التجديد', state: 'waiting', note: 'يبدأ حين يصحّ الإذن' }
       : h?.refreshedAt === undefined || h.refreshedAt === null
-        ? { key: 'renew', title: 'التجديد', state: 'waiting', note: 'لم يُجدَّد بعد — الدورةُ تجدّده قبل انتهائه بساعتين' }
-        : { key: 'renew', title: 'التجديد', state: 'done', note: `جُدّد آخرَ مرّةٍ ${h.refreshedAt.slice(0, 16)}` }
+        ? { key: 'renew', title: 'التجديد', state: 'waiting', note: 'لم يُجدَّد بعد — الدورة تجدّده قبل انتهائه بساعتين' }
+        : { key: 'renew', title: 'التجديد', state: 'done', note: `جُدّد آخر مرّة ${h.refreshedAt.slice(0, 16)}` }
 
   // ٥ · النشر — من المحاولات
   //
@@ -173,7 +173,7 @@ export function readiness(input: ReadinessInput): Readiness {
   const lastFailed = posts.find((p) => p.status === 'failed' && p.lastError !== null && p.publishedAt === null)
   let publishRung: Rung
   if (spec.stage === 'link') {
-    publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: 'سائقُ الرفع لم يُبنَ لهذه المنصّة — تُربَط ولا تنشر' }
+    publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: 'سائق الرفع لم يُبن لهذه المنصّة — تُربَط ولا تنشر' }
   } else if (
     lastFailed !== undefined &&
     // ‏وقتُ الفشل لا وقتُ الكتابة: منشورٌ كُتب قبل آخر نجاحٍ ثمّ فشل بعده
@@ -183,17 +183,17 @@ export function readiness(input: ReadinessInput): Readiness {
     publishRung = {
       key: 'publish', title: 'النشر', state: 'failed',
       // ‏بما يقوله «لماذا فشل» في البطاقة نفسِها، لا الرمزُ الخامّ ولا «Internal Server Error» (D-202)
-      note: `آخرُ محاولةٍ فشلت: ${whyFailed(lastFailed.lastError ?? null, id).text}`,
+      note: `آخر محاولة فشلت: ${whyFailed(lastFailed.lastError ?? null, id).text}`,
       action: { label: 'افتح المنشور', href: `/panel/journey/${lastFailed.id}` },
     }
   } else if (tally.lastPublishedAt !== null) {
     publishRung = { key: 'publish', title: 'النشر', state: 'done', note: `${tally.published} نُشر، آخرُها ${relativeTime(tally.lastPublishedAt, now)}` }
   } else if (tally.queued > 0) {
-    publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: `${tally.queued} مجدولٌ ينتظر موعدَه` }
+    publishRung = { key: 'publish', title: 'النشر', state: 'waiting', note: `${tally.queued} مجدول ينتظر موعدَه` }
   } else {
     publishRung = {
       key: 'publish', title: 'النشر', state: tokenRung.state === 'done' ? 'now' : 'waiting',
-      note: 'لا منشورَ بعد — يُكتب ويُعتمَد ويُجدوَل',
+      note: 'لا منشور بعد — يُكتب ويُعتمَد ويُجدوَل',
       action: { label: 'افتح المسوّدات', href: '/panel#posts' },
     }
   }
@@ -211,7 +211,7 @@ export function readiness(input: ReadinessInput): Readiness {
         : publishRung.state === 'done'
           ? { kind: 'ok' as const, text: 'تعمل وتنشر' }
           : tokenRung.state === 'done'
-            ? { kind: 'ok' as const, text: 'جاهزةٌ للنشر' }
+            ? { kind: 'ok' as const, text: 'جاهزة للنشر' }
             : { kind: 'idle' as const, text: publishRung.note }
 
   return { rungs, verdict, next }

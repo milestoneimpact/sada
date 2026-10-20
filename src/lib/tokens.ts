@@ -62,7 +62,7 @@ export function accountId(identity: AccountIdentity): string {
 export class AccountElsewhere extends Error {
   override readonly name = 'AccountElsewhere'
   constructor(readonly displayName: string) {
-    super(`${displayName} مربوطٌ في منظّمةٍ أخرى`)
+    super(`${displayName} مربوط في منظّمة أخرى`)
   }
 }
 

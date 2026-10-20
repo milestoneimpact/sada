@@ -112,45 +112,45 @@ export function captionIssues(c: Pick<VideoCaptions, 'youtubeTitle' | 'youtubeDe
 export function captionSystem(shape: YouTubeShape): string {
   // ‏والمجهولُ لا يُوعَد ولا يُنفى: #Shorts لا يُكتب (D-190)، ولا يُقال إنّه «لن يكون Short»
   const shorts = shape === 'short' || shape === 'square'
-    ? 'واختم الوصفَ بالوسم #Shorts: المقطعُ قصيرٌ ورأسيّ فيصير Short.'
+    ? 'واختم الوصف بالوسم #Shorts: المقطع قصير ورأسيّ فيصير Short.'
     : shape === 'unknown'
-      ? 'ولا تكتب #Shorts: شكلُ المقطع أو مدّتُه لم تُقرأ، فلا يُوعَد بـ Short قد لا يكون.'
-      : 'ولا تكتب #Shorts: المقطعُ لن يكون Short.'
+      ? 'ولا تكتب #Shorts: شكل المقطع أو مدّتُه لم تُقرأ، فلا يُوعَد بـ Short قد لا يكون.'
+      : 'ولا تكتب #Shorts: المقطع لن يكون Short.'
   return [
-    'أنت تكتب نصوصَ مقطعِ فيديو باسم مالك الحساب، لا باسمك. فما تكتبه يخرج قولا له.',
+    'أنت تكتب نصوص مقطع فيديو باسم مالك الحساب، لا باسمك. فما تكتبه يخرج قولا له.',
     '',
-    '## قيودٌ لا تُخالَف',
+    '## قيود لا تُخالَف',
     '',
-    '**أنت لم ترَ المقطع.** وصفُ المالك له هو كلُّ ما تعرفه عنه: فلا تصف مشهدًا ولا',
+    '**أنت لم تر المقطع.** وصف المالك له هو كلّ ما تعرفه عنه: فلا تصف مشهدًا ولا',
     'شخصًا ولا كلامًا لم يذكره.',
-    '**لا رقمَ ولا اسمَ علمٍ ولا تاريخَ ولا اقتباسَ إلّا ما ورد في وصفه.** ورقمٌ تخترعه',
+    '**لا رقم ولا اسم علم ولا تاريخ ولا اقتباس إلّا ما ورد في وصفه.** ورقم تخترعه',
     'يصير رقما قاله المالك — وهذا أسوأ ما يمكن أن يقع.',
-    '**لا رابطَ ولا دعوةَ إلى منتَج ولا وعدَ بنتيجة.**',
-    '**العربيّةُ فصيحةٌ معاصرة**: لا عامّيّة، ولا تكلّفَ في الجزالة، ولا ترجمةٌ حرفيّة.',
-    'والمصطلحُ التقنيّ يبقى بحروفه اللاتينيّة إن كان ذلك أوضح.',
-    '**ولا «<» ولا «>» في أيّ نصّ**: YouTube يردّ المقطعَ بهما بعد رفعه.',
+    '**لا رابط ولا دعوة إلى منتَج ولا وعد بنتيجة.**',
+    '**العربيّة فصيحة معاصرة**: لا عامّيّة، ولا تكلّف في الجزالة، ولا ترجمة حرفيّة.',
+    'والمصطلح التقنيّ يبقى بحروفه اللاتينيّة إن كان ذلك أوضح.',
+    '**ولا «<» ولا «>» في أيّ نصّ**: YouTube يردّ المقطع بهما بعد رفعه.',
     '',
-    '## لكلّ منصّةٍ نصُّها — ولا يُنسَخ نصٌّ من منصّةٍ إلى أخرى',
+    '## لكلّ منصّة نصُّها — ولا يُنسَخ نصّ من منصّة إلى أخرى',
     '',
     '### YouTube',
-    `\`youtube_title\`: عنوانُ المقطع. يقف وحدَه ويقول موضوعه، **دون ${YT_TITLE_MAX} محرف** والأفضلُ`,
-    'دون ستّين، بلا وسمٍ ولا علاماتِ تعجّبٍ متكرّرة.',
+    `\`youtube_title\`: عنوان المقطع. يقف وحدَه ويقول موضوعه، **دون ${YT_TITLE_MAX} محرف** والأفضل`,
+    'دون ستّين، بلا وسم ولا علامات تعجّب متكرّرة.',
     '`youtube_description`: سطران إلى أربعة تقول ما يستفيده المشاهد ولا تكرّر العنوان، ثمّ',
-    'سطرٌ فارغ، ثمّ وسمان أو ثلاثة في آخره.',
+    'سطر فارغ، ثمّ وسمان أو ثلاثة في آخره.',
     shorts,
     '',
     '### TikTok',
-    '`tiktok`: سطرٌ أو سطران يُغريان بالمشاهدة ولا يشرحانها — ما بعد السطرين يُطوى ولا يُقرأ.',
-    'ثمّ ثلاثةُ وسومٍ إلى خمسة ذاتُ صلةٍ بالموضوع في آخر النصّ، لا وسومٌ عامّةٌ تُلصق بكلّ مقطع.',
+    '`tiktok`: سطر أو سطران يُغريان بالمشاهدة ولا يشرحانها — ما بعد السطرين يُطوى ولا يُقرأ.',
+    'ثمّ ثلاثة وسوم إلى خمسة ذات صلة بالموضوع في آخر النصّ، لا وسوم عامّة تُلصق بكلّ مقطع.',
     '',
     '### Instagram (Reel)',
-    '`instagram`: جملةٌ أولى تستوقف من يمرّ، ثمّ سطران أو ثلاثة تقول الفكرة، ثمّ سطرٌ فارغ،',
-    'ثمّ ثلاثةُ وسومٍ إلى خمسة في آخر النصّ وحدَه، لا داخل الجمل.',
+    '`instagram`: جملة أولى تستوقف من يمرّ، ثمّ سطران أو ثلاثة تقول الفكرة، ثمّ سطر فارغ،',
+    'ثمّ ثلاثة وسوم إلى خمسة في آخر النصّ وحدَه، لا داخل الجمل.',
     '',
     '## المخرَج',
     '',
-    'أعد JSON بأربعة حقولٍ لا غير: `youtube_title` و`youtube_description` و`tiktok` و`instagram`',
-    '— كلٌّ نصُّه كما يُنشر، بلا عنوانٍ ولا تعليقٍ منك.',
+    'أعد JSON بأربعة حقول لا غير: `youtube_title` و`youtube_description` و`tiktok` و`instagram`',
+    '— كلّ نصُّه كما يُنشر، بلا عنوان ولا تعليق منك.',
   ].join('\n')
 }
 
@@ -167,13 +167,13 @@ export function captionUser(input: {
   const form = input.shape === 'wide' ? 'أفقيّ' : input.shape === 'unknown' ? 'شكلُه لم يُقرأ' : input.shape === 'square' ? 'مربّع' : 'رأسيّ'
   return [
     '# المقطع',
-    `اسمُ الملفّ: ${input.name} (قد لا يعني شيئًا)`,
+    `اسم الملفّ: ${input.name} (قد لا يعني شيئًا)`,
     `${form}، ${length}`,
     '',
-    '## وصفُ المالك',
+    '## وصف المالك',
     input.about,
     '',
-    'اكتب النصوصَ الأربعة من هذا الوصف وحده.',
+    'اكتب النصوص الأربعة من هذا الوصف وحده.',
   ].join('\n')
 }
 
@@ -208,7 +208,7 @@ export function parseCaptions(raw: unknown):
     tiktok: strip(text('tiktok')),
     instagram: strip(text('instagram')),
   }
-  if (Object.values(texts).every((t) => t === '')) return { ok: false, reason: 'النصوصُ فارغة' }
+  if (Object.values(texts).every((t) => t === '')) return { ok: false, reason: 'النصوص فارغة' }
   return { ok: true, texts }
 }
 
@@ -234,14 +234,14 @@ export async function captionsFor(
   replace = '',
 ): Promise<CaptionsOutcome> {
   const about = normalizeAbout(rawAbout)
-  if (about.length < ABOUT_MIN) return { kind: 'failed', reason: 'صف المقطعَ بجملةٍ أوّلًا: ما فيه، وعمّ يتحدّث', retryable: false }
-  if (about.length > ABOUT_MAX) return { kind: 'failed', reason: `الوصفُ أطولُ من ${ABOUT_MAX} محرف — جملةٌ أو جملتان تكفيان`, retryable: false }
+  if (about.length < ABOUT_MIN) return { kind: 'failed', reason: 'صف المقطع بجملة أوّلًا: ما فيه، وعمّ يتحدّث', retryable: false }
+  if (about.length > ABOUT_MAX) return { kind: 'failed', reason: `الوصف أطول من ${ABOUT_MAX} محرف — جملة أو جملتان تكفيان`, retryable: false }
 
   const row = await deps.db
     .prepare('SELECT name, width, height, duration_ms, status FROM uploads WHERE id = ?')
     .bind(uploadId)
     .first<{ name: string; width: number | null; height: number | null; duration_ms: number | null; status: string }>()
-  if (row === null || row.status !== 'ready') return { kind: 'failed', reason: 'المقطعُ لم يكتمل رفعُه', retryable: false }
+  if (row === null || row.status !== 'ready') return { kind: 'failed', reason: 'المقطع لم يكتمل رفعُه', retryable: false }
 
   // ‏الضغطةُ الثانيةُ بالوصف نفسِه هي الأولى — لا نداءَ ولا كلفة. إلّا «أعد كتابتها» لهذه النصوص بعينها
   const cached = await readCaptions(deps.kv, uploadId)
@@ -264,7 +264,7 @@ export async function captionsFor(
   try {
     parsed = JSON.parse(out.text)
   } catch {
-    return { kind: 'failed', reason: 'جوابُ النموذج ليس JSON صالحا', retryable: true, cost: out.cost }
+    return { kind: 'failed', reason: 'جواب النموذج ليس JSON صالحا', retryable: true, cost: out.cost }
   }
   const read = parseCaptions(parsed)
   if (!read.ok) return { kind: 'failed', reason: read.reason, retryable: true, cost: out.cost }

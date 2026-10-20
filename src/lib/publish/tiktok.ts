@@ -114,11 +114,11 @@ export interface TikTokOutcome extends PublishResult {
 export function tiktokNote(out: Pick<TikTokOutcome, 'inbox' | 'privacy'>, wantedPublic: boolean): string | null {
   if (out.inbox) {
     return wantedPublic
-      ? 'وصل صندوقَ تطبيق TikTok لا حسابَك، وبلا نصّه: حسابُك بلا video.publish ولو قُلب العلنيّ — انشره من التطبيق والصق نصَّه، واربط TikTok من جديد لتمنحه'
-      : 'وصل صندوقَ تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
+      ? 'وصل صندوق تطبيق TikTok لا حسابَك، وبلا نصّه: حسابُك بلا video.publish ولو قُلب العلنيّ — انشره من التطبيق والصق نصَّه، واربط TikTok من جديد لتمنحه'
+      : 'وصل صندوق تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
   }
   if (wantedPublic && out.privacy !== null && out.privacy !== 'PUBLIC_TO_EVERYONE') {
-    return `نُشر بـ ${out.privacy} لا للعامّة: حسابُك على TikTok لم يعرض النشرَ للجميع`
+    return `نُشر بـ ${out.privacy} لا للعامّة: حسابُك على TikTok لم يعرض النشر للجميع`
   }
   return null
 }
@@ -140,7 +140,7 @@ export async function publishTikTok(
 ): Promise<TikTokOutcome> {
   const clip = 'read' in input ? input : bytesClip(input)
   const size = clip.size
-  if (size === 0) throw new PublishError('tiktok: مقطعٌ فارغ', 400, false)
+  if (size === 0) throw new PublishError('tiktok: مقطع فارغ', 400, false)
 
   const title = caption.slice(0, TIKTOK_CAPTION_MAX)
   // ‏**قطعٌ لا قطعةٌ واحدة** (D-179): مقطعُ المالك قد يجاوز ‏64MB، وTikTok يردّ قطعةً فوقها
@@ -163,7 +163,7 @@ export async function publishTikTok(
       body: '{}',
     })
     if (!asked.ok) {
-      throw new PublishError(`tiktok: لم تُقرأ خياراتُ الحساب (${await detail(asked)})`, asked.status, retryable(asked.status))
+      throw new PublishError(`tiktok: لم تُقرأ خيارات الحساب (${await detail(asked)})`, asked.status, retryable(asked.status))
     }
     const info = (await asked.json()) as { data?: { privacy_level_options?: unknown } }
     const offered = Array.isArray(info.data?.privacy_level_options)
@@ -195,10 +195,10 @@ export async function publishTikTok(
   const publishId = opened.data?.publish_id
   const uploadUrl = opened.data?.upload_url
   if (typeof publishId !== 'string' || publishId === '') {
-    throw new PublishError('tiktok: تهيئةٌ بلا publish_id', 502, false)
+    throw new PublishError('tiktok: تهيئة بلا publish_id', 502, false)
   }
   if (typeof uploadUrl !== 'string' || uploadUrl === '') {
-    throw new PublishError('tiktok: تهيئةٌ بلا upload_url', 502, false)
+    throw new PublishError('tiktok: تهيئة بلا upload_url', 502, false)
   }
 
   // ٢ — دفعُ البايتات قطعةً قطعةً بترتيبها. و `Content-Range` إلزاميٌّ ولو كانت واحدة،

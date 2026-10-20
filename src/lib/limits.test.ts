@@ -18,8 +18,8 @@ function spend(total: number, when = "datetime('now')"): void {
     .run(crypto.randomUUID(), total / 1000, total)
 }
 
-describe('استهلاك اليوم يُقرأ من الدفتر لا من عدّادٍ موازٍ', () => {
-  it('دفترٌ فارغ صفر', async () => {
+describe('استهلاك اليوم يُقرأ من الدفتر لا من عدّاد مواز', () => {
+  it('دفتر فارغ صفر', async () => {
     expect(await usageToday(db)).toEqual({ analyses: 0, spend: 0, clips: 0 })
   })
 
@@ -50,7 +50,7 @@ describe('استهلاك اليوم يُقرأ من الدفتر لا من عد�
    * **والمقاطعُ في القراءة نفسِها** (D-168): صفوفُ `video:` من الدفتر، بأيّ
    * مزوّدٍ وأيّ نموذج — والتحليلُ يبقى كما كان، لا يدخله مقطعٌ ولا يدخل المقطعَ.
    */
-  it('يعدّ المقاطعَ من الدفتر ولا يخلطها بالتحليل — والصفرُ الموسومُ يُعَدّ', async () => {
+  it('يعدّ المقاطع من الدفتر ولا يخلطها بالتحليل — والصفر الموسوم يُعَدّ', async () => {
     const clip = (provider: string, operation: string, when = "datetime('now')"): void => {
       db.raw
         .prepare(
@@ -67,7 +67,7 @@ describe('استهلاك اليوم يُقرأ من الدفتر لا من عد�
     expect(await usageToday(db)).toEqual({ analyses: 1, spend: 0.2, clips: 2 })
   })
 
-  it('دفترٌ لا يُقرأ يُفترض مستهلَكا — الخطأ يميل إلى المنع لا إلى الإنفاق', async () => {
+  it('دفتر لا يُقرأ يُفترض مستهلَكا — الخطأ يميل إلى المنع لا إلى الإنفاق', async () => {
     db.raw.exec('DROP TABLE cost_ledger')
     const usage = await usageToday(db)
     expect(usage.analyses).toBe(Number.POSITIVE_INFINITY)
@@ -92,7 +92,7 @@ describe('checkAllowance', () => {
     expect(allowance.blocker?.kind).toBe('paused')
   })
 
-  it('الإيقاف يغلب حتّى لو لم يُبلغ سقف — قرارُ المالك لا يُنقَض بحساب', async () => {
+  it('الإيقاف يغلب حتّى لو لم يُبلغ سقف — قرار المالك لا يُنقَض بحساب', async () => {
     await writeSetting(db, 'paused', 'true', 'panel')
     await writeSetting(db, 'daily_analysis_cap', '500', 'panel')
     expect((await checkAllowance(db, 'analyze')).blocker?.kind).toBe('paused')
@@ -117,13 +117,13 @@ describe('checkAllowance', () => {
     expect(allowance.blocker?.kind).toBe('spend_cap')
   })
 
-  it('سقفُ التحليل صفرًا يمنع التحليلَ وحدَه (D-169)', async () => {
+  it('سقف التحليل صفرًا يمنع التحليل وحدَه (D-169)', async () => {
     await writeSetting(db, 'daily_analysis_cap', '0', 'panel')
     expect((await checkAllowance(db, 'analyze')).allowed).toBe(false)
     expect((await checkAllowance(db, 'draft')).allowed).toBe(true)
   })
 
-  it('يعيد الإعدادات والاستهلاك معا — فتعرضهما اللوحة بلا استعلامٍ ثانٍ', async () => {
+  it('يعيد الإعدادات والاستهلاك معا — فتعرضهما اللوحة بلا استعلام ثان', async () => {
     spend(0.4)
     const allowance = await checkAllowance(db, 'analyze')
     expect(allowance.settings.dailyAnalysisCap).toBe(10)
@@ -143,11 +143,11 @@ describe('videoCapGate', () => {
     expect(videoCapGate(5, 2).blocker?.kind).toBe('video_cap')
   })
 
-  it('وصفرٌ يمنع كلَّ مقطع — طريقٌ لإغلاق التحريك وحده', () => {
+  it('وصفر يمنع كلّ مقطع — طريق لإغلاق التحريك وحده', () => {
     expect(videoCapGate(0, 0).blocker).not.toBeNull()
   })
 
-  it('ولا يحجبه checkAllowance: سقفُ المقاطع لا يوقف التحليلَ ولا الصورة', async () => {
+  it('ولا يحجبه checkAllowance: سقف المقاطع لا يوقف التحليل ولا الصورة', async () => {
     await writeSetting(db, 'daily_video_cap', '0', 'panel')
     const allowance = await checkAllowance(db, 'analyze')
     expect(allowance.allowed).toBe(true)
@@ -178,7 +178,7 @@ describe('السبب يُقرأ لا يُفكّ', () => {
  * اعتمده المالك ومسحَ Drive المجّانيّ ويحجب الصورة، وكان سقفُ المال يرى
  * تحليلَ Anthropic وحدَه.
  */
-describe('الحارسُ يسأل عمّا يحرسه (D-169)', () => {
+describe('الحارس يسأل عمّا يحرسه (D-169)', () => {
   const row = (provider: string, operation: string, total: number): void => {
     db.raw
       .prepare(
@@ -188,7 +188,7 @@ describe('الحارسُ يسأل عمّا يحرسه (D-169)', () => {
       .run(crypto.randomUUID(), provider, operation, total, total)
   }
 
-  it('سقفُ الإنفاق يعدّ كلَّ ما أُنفق اليوم — الكتابةُ والخطّةُ والصورةُ والنشرُ لا التحليلُ وحدَه', async () => {
+  it('سقف الإنفاق يعدّ كلّ ما أُنفق اليوم — الكتابة والخطّة والصورة والنشر لا التحليل وحدَه', async () => {
     row('anthropic', 'draft:linkedin:claude-opus-5', 0.4)
     row('deepseek', 'plan:deepseek-v4-pro', 0.3)
     row('gemini', 'image:x:gemini-image', 0.2)
@@ -200,7 +200,7 @@ describe('الحارسُ يسأل عمّا يحرسه (D-169)', () => {
     }
   })
 
-  it('بلوغُ سقف التحليل لا يوقف النشرَ ولا المسحَ ولا الكتابةَ ولا الصورة', async () => {
+  it('بلوغ سقف التحليل لا يوقف النشر ولا المسح ولا الكتابة ولا الصورة', async () => {
     await writeSetting(db, 'daily_analysis_cap', '1', 'panel')
     spend(0.01)
     expect((await checkAllowance(db, 'analyze')).blocker?.kind).toBe('analysis_cap')
@@ -209,21 +209,21 @@ describe('الحارسُ يسأل عمّا يحرسه (D-169)', () => {
     }
   })
 
-  it('وسقفُ المال لا يوقف نشرَ ما اعتمده المالك ولا المسحَ المجّانيّ', async () => {
+  it('وسقف المال لا يوقف نشر ما اعتمده المالك ولا المسح المجّانيّ', async () => {
     await writeSetting(db, 'daily_spend_cap_usd', '0.5', 'panel')
     row('anthropic', 'draft:x:claude-opus-5', 0.9)
     expect((await checkAllowance(db, 'publish')).allowed).toBe(true)
     expect((await checkAllowance(db, 'scan')).allowed).toBe(true)
   })
 
-  it('والإيقافُ يوقف كلَّ شيء', async () => {
+  it('والإيقاف يوقف كلّ شيء', async () => {
     await writeSetting(db, 'paused', 'true', 'panel')
     for (const duty of ['analyze', 'draft', 'plan', 'image', 'video', 'publish', 'scan'] as const) {
       expect((await checkAllowance(db, duty)).blocker?.kind, duty).toBe('paused')
     }
   })
 
-  it('والسببُ بالمعادلة الواحدة لا بأربعة أرقامٍ عشريّة', () => {
+  it('والسبب بالمعادلة الواحدة لا بأربعة أرقام عشريّة', () => {
     expect(blockerReason({ kind: 'spend_cap', used: 1.2345, cap: 1 })).not.toContain('1.2345')
   })
 })

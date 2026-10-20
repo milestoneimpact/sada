@@ -120,9 +120,9 @@ export interface OutboxRow {
 }
 
 const ALERT_KIND: Readonly<Record<string, string>> = {
-  token: 'إذنٌ يقترب',
-  publish: 'نشرٌ فشل',
-  budget: 'سقفُ الإنفاق',
+  token: 'إذن يقترب',
+  publish: 'نشر فشل',
+  budget: 'سقف الإنفاق',
 }
 
 /**
@@ -139,8 +139,8 @@ const ALERT_KIND: Readonly<Record<string, string>> = {
 export function alertChannel(webhook: string, rows: readonly OutboxRow[]): string {
   const list = rows.length === 0
     ? `<p class="hint">${webhook === ''
-        ? 'ولا قناةَ مضبوطة — فالتنبيهاتُ تُسجَّل في القاعدة ولا تخرج.'
-        : 'لم يخرج شيءٌ بعد. <b>وهذا خبرٌ جيّد</b> — الثلاثةُ لا تقع كلَّ يوم.'}</p>`
+        ? 'ولا قناة مضبوطة — فالتنبيهات تُسجَّل في القاعدة ولا تخرج.'
+        : 'لم يخرج شيء بعد. <b>وهذا خبر جيّد</b> — الثلاثة لا تقع كلّ يوم.'}</p>`
     : `<ul class="ax">${rows
         .map((r) => {
           const ok = r.status !== null && r.status >= 200 && r.status < 300
@@ -156,25 +156,25 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
         })
         .join('')}</ul>`
 
-  return `<div class="card"><h2>قناةُ التنبيهات</h2>
-    <p>ثلاثةُ أحداثٍ <b>فقط</b> تخرج من هنا: إذنٌ يقترب من الانتهاء، ونشرٌ
-      فشل نهائيّا، وبلوغُ سقف الإنفاق. <b>ولا رابع</b> — إشعارٌ يكثر يُطفَأ،
-      وحين يُطفَأ تسقط الثلاثةُ معه.</p>
-    <p class="hint"><b>ولا يحمل الإشعارُ إذنا ولا سرّا ولا رابطا موقَّعا</b> —
-      يقول ما وقع ويُحيلك إلى هذه اللوحة. والقناةُ خارجَ سيطرتنا: سجلُّها
+  return `<div class="card"><h2>قناة التنبيهات</h2>
+    <p>ثلاثة أحداث <b>فقط</b> تخرج من هنا: إذن يقترب من الانتهاء، ونشر
+      فشل نهائيّا، وبلوغ سقف الإنفاق. <b>ولا رابع</b> — إشعار يكثر يُطفَأ،
+      وحين يُطفَأ تسقط الثلاثة معه.</p>
+    <p class="hint"><b>ولا يحمل الإشعار إذنا ولا سرّا ولا رابطا موقَّعا</b> —
+      يقول ما وقع ويُحيلك إلى هذه اللوحة. والقناة خارج سيطرتنا: سجلُّها
       يُقرأ بعد سنة.</p>
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="alert_webhook">
-      <div class="field grow"><label for="hook">عنوانُ القناة (Webhook)</label>
+      <div class="field grow"><label for="hook">عنوان القناة (Webhook)</label>
         <input id="hook" name="value" type="url" class="mono" dir="ltr" inputmode="url"
           placeholder="https://hooks.slack.com/services/…"
           value="${escapeHtml(webhook)}"></div>
       <button class="btn btn-secondary" type="submit">احفظ</button>
     </form>
-    <p class="hint">يعمل مع Slack و Discord و Telegram وأيِّ عنوانٍ يقبل
+    <p class="hint">يعمل مع Slack و Discord و Telegram وأيّ عنوان يقبل
       <span class="mono">POST</span> بحقل <span class="mono">text</span>.
-      <b>والعناوينُ الداخليّةُ تُردّ عند الحفظ</b> — لا عند الإرسال وحدَه.</p>
-    <h3 class="sec">آخرُ ما خرج</h3>
+      <b>والعناوين الداخليّة تُردّ عند الحفظ</b> — لا عند الإرسال وحدَه.</p>
+    <h3 class="sec">آخر ما خرج</h3>
     ${list}
   </div>`
 }
@@ -194,8 +194,8 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
       // ‏والفعلُ قبل المعدود فلا يُطابَق مثنّاه (D-177): «تأخّرت أو سقطت دورتان» لا «2 دورةٌ متأخّرة»
       ? statusBadge('bad', '▲', `تأخّرت أو سقطت ${counted(bad.length, NOUNS.cycle)}`)
       : never.length === pulses.length
-        ? statusBadge('idle', '○', 'لم تدُر دورةٌ بعد')
-        : statusBadge('ok', '●', 'الدوراتُ في مواعيدها')
+        ? statusBadge('idle', '○', 'لم تدُر دورة بعد')
+        : statusBadge('ok', '●', 'الدورات في مواعيدها')
   const rows = pulses
     .map((p) => {
       const mark =
@@ -213,14 +213,14 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   // ‏(D-189): عنوانٌ وحالُه في طرف الرأس
   return card({
     id: 'machine',
-    title: 'هل الآلةُ تعمل؟',
+    title: 'هل الآلة تعمل؟',
     action: head,
     // ‏**والسليمةُ سطرٌ يُفتح** (D-194): كانت ثلثَ الرئيسيّة وكلُّها «في موعدها». تُفتح وحدَها حين يتأخّر شيء
     body: bad.length > 0
       ? `<ul class="ax">${rows.filter((_, i) => late[i]).join('')}</ul>
-    ${late.every(Boolean) ? '' : `<details class="machine-more"><summary>الدوراتُ الأخرى</summary>
+    ${late.every(Boolean) ? '' : `<details class="machine-more"><summary>الدورات الأخرى</summary>
       <ul class="ax mt-3">${rows.filter((_, i) => !late[i]).join('')}</ul></details>`}`
-      : `<details class="machine-more"><summary>تفاصيلُ الدورات</summary><ul class="ax mt-3">${rows.join('')}</ul></details>`,
+      : `<details class="machine-more"><summary>تفاصيل الدورات</summary><ul class="ax mt-3">${rows.join('')}</ul></details>`,
   })
 }
 

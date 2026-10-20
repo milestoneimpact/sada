@@ -91,8 +91,8 @@ const LI_OK = {
   },
 }
 
-describe('سائقُ المنصّة — والفراغُ ليس صفرا', () => {
-  it('X: يقرأ الظهورَ والتفاعل، ويجمع المشاركتين', async () => {
+describe('سائق المنصّة — والفراغ ليس صفرا', () => {
+  it('X: يقرأ الظهور والتفاعل، ويجمع المشاركتين', async () => {
     const m = await fetchXMetrics('t', '1874', fakeFetch(X_OK))
     expect(m.impressions).toBe(5120)
     expect(m.reactions).toBe(43)
@@ -107,7 +107,7 @@ describe('سائقُ المنصّة — والفراغُ ليس صفرا', () =>
    * LinkedIn لا يعطي الظهورَ لمنشور عضو. فلو حُوِّل الغيابُ إلى صفر
    * لعُرض «٠ ظهور» على منشورٍ رآه ألف — فيُحكَم عليه بالفشل وهو ناجح.
    */
-  it('LinkedIn: الظهورُ null لا صفر — لأنّه لا يُقاس أصلا', async () => {
+  it('LinkedIn: الظهور null لا صفر — لأنّه لا يُقاس أصلا', async () => {
     const m = await fetchLinkedInMetrics('t', 'urn:li:share:99', fakeFetch(LI_OK))
     expect(m.impressions).toBeNull()
     expect(m.shares).toBeNull()
@@ -115,14 +115,14 @@ describe('سائقُ المنصّة — والفراغُ ليس صفرا', () =>
     expect(m.comments).toBe(4)
   })
 
-  it('و URN يُرمَّز في المسار — وبلا ترميزٍ يُقطَع عند أوّل نقطتين', async () => {
+  it('و URN يُرمَّز في المسار — وبلا ترميز يُقطَع عند أوّل نقطتين', async () => {
     const f = fakeFetch(LI_OK)
     await fetchLinkedInMetrics('t', 'urn:li:share:99', f)
     expect(f.calls[0]!.url).toContain('urn%3Ali%3Ashare%3A99')
     expect(f.calls[0]!.url).not.toContain('urn:li:share:99')
   })
 
-  it('وحقلٌ غائبٌ يبقى null ولا يُصفَّر', async () => {
+  it('وحقل غائب يبقى null ولا يُصفَّر', async () => {
     const m = await fetchXMetrics(
       't', '1874',
       fakeFetch({
@@ -136,7 +136,7 @@ describe('سائقُ المنصّة — والفراغُ ليس صفرا', () =>
     expect(m.shares).toBeNull()
   })
 
-  it('و X يردّ 200 بلا data على منشورٍ محذوف — فيُعدّ غيرَ موجود ولا يُعاد', async () => {
+  it('و X يردّ 200 بلا data على منشور محذوف — فيُعدّ غير موجود ولا يُعاد', async () => {
     const f = fakeFetch({
       'https://api.x.com/2/tweets/1874?tweet.fields=public_metrics': {
         json: { errors: [{ title: 'Not Found Error' }] },
@@ -158,24 +158,24 @@ describe('سائقُ المنصّة — والفراغُ ليس صفرا', () =>
 })
 
 describe('ما حان قياسُه', () => {
-  it('منشورٌ عمرُه ساعةٌ لا نافذةَ له بعد', async () => {
+  it('منشور عمرُه ساعة لا نافذة له بعد', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 1 })
     expect(await dueWindows(db, NOW)).toEqual([])
   })
 
-  it('وعمرُ يومٍ يفتح نافذةً واحدة', async () => {
+  it('وعمر يوم يفتح نافذةً واحدة', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     const due = await dueWindows(db, NOW)
     expect(due.map((d) => d.window)).toEqual(['24h'])
   })
 
-  it('وعمرُ أسبوعين يفتح الثلاثَ معا', async () => {
+  it('وعمر أسبوعين يفتح الثلاث معا', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 24 * 14 })
     const due = await dueWindows(db, NOW)
     expect(due.map((d) => d.window).sort()).toEqual(['24h', '72h', '7d'])
   })
 
-  it('ومسوّدةٌ لا تُقاس — القياسُ لما نُشر', async () => {
+  it('ومسوّدة لا تُقاس — القياس لما نُشر', async () => {
     db.raw
       .prepare(
         sql(`INSERT INTO posts (id, platform, type, text, status, idempotency_key)
@@ -185,7 +185,7 @@ describe('ما حان قياسُه', () => {
     expect(await dueWindows(db, NOW)).toEqual([])
   })
 
-  it('ومنشورٌ بلا معرّفٍ عند المنصّة لا يُقاس — لا شيءَ يُسأل عنه', async () => {
+  it('ومنشور بلا معرّف عند المنصّة لا يُقاس — لا شيء يُسأل عنه', async () => {
     const accountId = await upsertAccount(db, 'org_owner', {
       platform: 'x', kind: 'member', externalId: '4242', displayName: 'عمر',
     })
@@ -209,7 +209,7 @@ describe('ما حان قياسُه', () => {
 })
 
 describe('الدورة', () => {
-  it('تقيس وتكتب، وتسجّل كلفةَ القراءة عند X', async () => {
+  it('تقيس وتكتب، وتسجّل كلفة القراءة عند X', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     const summary = await pullDue({ db, encKey: KEY, fetchImpl: fakeFetch(X_OK), now: () => NOW })
 
@@ -232,7 +232,7 @@ describe('الدورة', () => {
    * فلو أعادت الدورةُ قياسَ ما قِيس، لقُرئت منشوراتُ الشهر كلَّ ساعة —
    * ودُفع ثمنُ ذلك كلَّه بلا معرفةٍ جديدة.
    */
-  it('ولا تعيد قياسَ نافذةٍ قِيست — والقراءةُ مدفوعة', async () => {
+  it('ولا تعيد قياس نافذة قِيست — والقراءة مدفوعة', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     const first = fakeFetch(X_OK)
     await pullDue({ db, encKey: KEY, fetchImpl: first, now: () => NOW })
@@ -245,7 +245,7 @@ describe('الدورة', () => {
     expect(n.n).toBe(1)
   })
 
-  it('و LinkedIn لا يُسجَّل له صفرٌ يزحم الدفتر', async () => {
+  it('و LinkedIn لا يُسجَّل له صفر يزحم الدفتر', async () => {
     await seedPublished({
       id: 'p1', platform: 'linkedin', platformPostId: 'urn:li:share:99', agoHours: 25,
     })
@@ -258,7 +258,7 @@ describe('الدورة', () => {
    * الحارسُ قبل النداء (D-019 · D-045): رمزٌ بلا نطاق قراءةٍ **لا يُنادى
    * به ولا تُحسَب كلفتُه**.
    */
-  it('ورمزٌ بلا نطاقِ قراءةٍ يُؤجَّل ولا يُنفَق عليه', async () => {
+  it('ورمز بلا نطاق قراءة يُؤجَّل ولا يُنفَق عليه', async () => {
     await seedPublished({
       id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25,
       scopes: 'users.read tweet.write',
@@ -278,7 +278,7 @@ describe('الدورة', () => {
    * بلا ختمٍ، تختاره كلُّ دورةٍ ساعيّة فتُنادي وتدفع وتُردّ — إلى الأبد.
    * فيُختَم بصفٍّ كلُّه فراغ: المفتاحُ يمنع اختيارَه، والفراغُ لا يكذب.
    */
-  it('ومنشورٌ حُذف يُختَم بفراغٍ فلا يُعاد — ولا يُقرأ صفرا', async () => {
+  it('ومنشور حُذف يُختَم بفراغ فلا يُعاد — ولا يُقرأ صفرا', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     const gone = fakeFetch({
       'https://api.x.com/2/tweets/1874?tweet.fields=public_metrics': { status: 404, json: {} },
@@ -296,7 +296,7 @@ describe('الدورة', () => {
     expect(await dueWindows(db, NOW)).toEqual([])
   })
 
-  it('وعطلٌ عابرٌ يُؤجَّل ولا يُختَم — فتلتقطه الدورةُ التالية', async () => {
+  it('وعطل عابر يُؤجَّل ولا يُختَم — فتلتقطه الدورة التالية', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     const flaky = fakeFetch({
       'https://api.x.com/2/tweets/1874?tweet.fields=public_metrics': { status: 503, json: {} },
@@ -308,7 +308,7 @@ describe('الدورة', () => {
     expect((await dueWindows(db, NOW)).length).toBe(1)
   })
 
-  it('وصفٌّ يفشل لا يُسقط ما بعده', async () => {
+  it('وصفّ يفشل لا يُسقط ما بعده', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     await seedPublished({
       id: 'p2', platform: 'linkedin', platformPostId: 'urn:li:share:99', agoHours: 25,
@@ -322,7 +322,7 @@ describe('الدورة', () => {
     expect(summary).toMatchObject({ measured: 1, deferred: 1 })
   })
 
-  it('وحسابٌ بلا رمزٍ يُؤجَّل ولا يُنادى', async () => {
+  it('وحساب بلا رمز يُؤجَّل ولا يُنادى', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
     db.raw.prepare(sql('DELETE FROM tokens')).run()
     const f = fakeFetch(X_OK)
@@ -332,8 +332,8 @@ describe('الدورة', () => {
   })
 })
 
-describe('القراءةُ للعرض', () => {
-  it('تجمع نوافذَ كلّ منشورٍ تحت معرّفه', async () => {
+describe('القراءة للعرض', () => {
+  it('تجمع نوافذ كلّ منشور تحت معرّفه', async () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 24 * 14 })
     await pullDue({ db, encKey: KEY, fetchImpl: fakeFetch(X_OK), now: () => NOW })
 
@@ -341,12 +341,12 @@ describe('القراءةُ للعرض', () => {
     expect(map['p1']).toHaveLength(3)
   })
 
-  it('وبلا معرّفاتٍ لا استعلام', async () => {
+  it('وبلا معرّفات لا استعلام', async () => {
     expect(await metricsFor(db, [])).toEqual({})
   })
 
   /** التفاعلُ يتراكم، فالأوسعُ عمرا أصدقُ من الأحدث قياسا. */
-  it('والأوسعُ نافذةً هو الذي يُعرَض', () => {
+  it('والأوسع نافذةً هو الذي يُعرَض', () => {
     const rows = WINDOWS.map((w) => ({
       window: w.name, impressions: w.hours, reactions: null,
       comments: null, shares: null, pulledAt: '',
@@ -356,7 +356,7 @@ describe('القراءةُ للعرض', () => {
   })
 })
 
-describe('صنفُ الخطأ', () => {
+describe('صنف الخطأ', () => {
   it('يحمل حالتَه وأيُعاد', () => {
     const e = new MetricsError('x', 429, true)
     expect(e.name).toBe('MetricsError')

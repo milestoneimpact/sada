@@ -9,7 +9,7 @@ function ago(seconds: number): string {
 }
 
 describe('parseSqliteUtc', () => {
-  it('يقرأ صيغة SQLite كـ UTC لا كتوقيتٍ محلّي', () => {
+  it('يقرأ صيغة SQLite كـ UTC لا كتوقيت محلّي', () => {
     const date = parseSqliteUtc('2026-09-05 08:12:44')
     expect(date?.toISOString()).toBe('2026-09-05T08:12:44.000Z')
   })
@@ -50,17 +50,17 @@ describe('relativeTime — بمثنّى عربيّ صحيح', () => {
     expect(relativeTime(ago(120), NOW)).not.toContain('2 دقيقة')
   })
 
-  it('طابعٌ فاسد يُعاد كما هو لا يُسقط الصفحة', () => {
+  it('طابع فاسد يُعاد كما هو لا يُسقط الصفحة', () => {
     expect(relativeTime('ليس تاريخا', NOW)).toBe('ليس تاريخا')
   })
 
-  it('تاريخٌ في المستقبل لا يعطي رقما سالبا', () => {
+  it('تاريخ في المستقبل لا يعطي رقما سالبا', () => {
     const future = new Date(NOW.getTime() + 60_000).toISOString().replace('T', ' ').slice(0, 19)
     expect(relativeTime(future, NOW)).toBe('الآن')
   })
 })
 
-describe('money — دقّةٌ تناسب الحجم', () => {
+describe('money — دقّة تناسب الحجم', () => {
   it.each([
     [0, '0.00$'],
     [0.0004231, '0.0004$'],
@@ -76,7 +76,7 @@ describe('money — دقّةٌ تناسب الحجم', () => {
   })
 })
 
-describe('kb — معادلةٌ واحدةٌ للحجم (D-158)', () => {
+describe('kb — معادلة واحدة للحجم (D-158)', () => {
   it('يقرّب إلى أقرب كيلوبايت', () => {
     expect(kb(25_500)).toBe('25KB')
     expect(kb(1_536)).toBe('2KB')
@@ -86,8 +86,8 @@ describe('kb — معادلةٌ واحدةٌ للحجم (D-158)', () => {
 
 describe('attemptsLeft', () => {
   it('تفرد وتثنّي وتجمع: لا «بقيت 1 محاولات»', () => {
-    expect(attemptsLeft(0)).toBe('لم تبقَ محاولات')
-    expect(attemptsLeft(1)).toBe('بقيت محاولةٌ واحدة')
+    expect(attemptsLeft(0)).toBe('لم تبق محاولات')
+    expect(attemptsLeft(1)).toBe('بقيت محاولة واحدة')
     expect(attemptsLeft(2)).toBe('بقيت محاولتان')
     expect(attemptsLeft(3)).toBe('بقيت 3 محاولات')
     expect(attemptsLeft(10)).toBe('بقيت 10 محاولات')
@@ -103,7 +103,7 @@ describe('untilTime و shortAgo (D-172)', () => {
     expect(untilTime('2026-09-09 13:00:00', now)).toBe('بعد 3 أيّام')
     expect(untilTime('2026-09-06 11:00:00', now)).toBe('الآن')
   })
-  it('والوقتُ القصيرُ داخل الإطار', () => {
+  it('والوقت القصير داخل الإطار', () => {
     expect(shortAgo('2026-09-06 11:55:00', now)).toBe('5 د')
     expect(shortAgo('2026-09-06 09:00:00', now)).toBe('3 س')
     expect(shortAgo('2026-09-04 12:00:00', now)).toBe('2 ي')
@@ -111,8 +111,8 @@ describe('untilTime و shortAgo (D-172)', () => {
   })
 })
 
-describe('المدّةُ بأكبر وحدةٍ تصدق (D-194)', () => {
-  it('دقائقُ ثمّ ساعاتٌ ثمّ أيّام — لا «48599 دقيقة»', async () => {
+describe('المدّة بأكبر وحدة تصدق (D-194)', () => {
+  it('دقائق ثمّ ساعات ثمّ أيّام — لا «48599 دقيقة»', async () => {
     const { duration } = await import('./format')
     expect(duration(48599 * 60)).toBe('34 يومًا')
     expect(duration(120 * 60)).toBe('ساعتَين')

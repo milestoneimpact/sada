@@ -43,7 +43,7 @@ const ENDPOINTS: Readonly<Record<ProviderName, (key: string) => Request>> = {
 
 /** يميّز «مفتاح خطأ» من «الخدمة متعبة» — وعلاجهما مختلف. */
 function explain(status: number): string {
-  if (status === 401 || status === 403) return 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغَ'
+  if (status === 401 || status === 403) return 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغ'
   if (status === 429) return 'المفتاح صحيح على الأرجح، لكنّ الحدّ بلغ — أعد المحاولة لاحقا'
   if (status >= 500) return 'الخدمة متعبة الآن، لا المفتاح — أعد المحاولة'
   if (status === 404) return 'العنوان غير موجود — قد تكون الواجهة تغيّرت'

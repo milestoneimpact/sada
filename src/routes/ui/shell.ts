@@ -194,7 +194,7 @@ export function accountMenu(options: { readonly logout?: boolean } = {}): string
       `<div class="menu-seg"><span>السمة</span>${themeSwitch()}</div>`,
       `<div class="menu-seg"><span>الكثافة</span>${densitySwitch()}</div>`,
       menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
-      ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جارٍ الخروج…' })] : []),
+      ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
   })
 }
@@ -264,7 +264,7 @@ export function backNav(href: string, label: string): string {
    * **والسهمُ مرسومٌ لا حرف** (D-167): «→» ليس في خطٍّ مضمَّن (N-7)، فكان
    * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
-  return `<nav class="back" aria-label="مسارُ العودة">
+  return `<nav class="back" aria-label="مسار العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة">${wordmark(false)}<span class="glyph glyph-sm">${GLYPH_SVG}</span></a>
     <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
     <span class="grow"></span>${commandTrigger()}${accountMenu()}

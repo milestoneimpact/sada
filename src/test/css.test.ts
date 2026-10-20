@@ -21,15 +21,15 @@ import { STYLE } from '../routes/ui/styles'
 import { STYLE_BODY } from '../lib/ui/asset'
 import { parseCss, sheet, type Sheet } from './css'
 
-describe('المحلِّلُ يقرأ الساري', () => {
+describe('المحلِّل يقرأ الساري', () => {
   const SAMPLE = [
-    '/* تعليقٌ فيه { و} و; لا يُقرأ */',
+    '/* تعليق فيه { و} و; لا يُقرأ */',
     ':root{--ink:#111; --brand:#222}',
     '.a > .b ,  .c+.d{ color : var(--ink) ; margin:0 }',
     '.e{color:var(--ink) !important; color:var(--brand)}',
     '.e{color:var(--brand)}',
     '@media (max-width: 720px){',
-    '  .a>.b{color:var(--brand) /* تعليقٌ داخل قيمة */}',
+    '  .a>.b{color:var(--brand) /* تعليق داخل قيمة */}',
     '  @media (hover:hover){ .c + .d{margin:1px} }',
     '}',
     ".f::after{content:'  ( ; } ,  '}",
@@ -38,7 +38,7 @@ describe('المحلِّلُ يقرأ الساري', () => {
   ].join('\n')
   const css = sheet(SAMPLE)
 
-  it('المحدّدُ بعينه في سياقه، والفراغُ حول الرابط وبعد اسم الكتلة لا يفرّق', () => {
+  it('المحدّد بعينه في سياقه، والفراغ حول الرابط وبعد اسم الكتلة لا يفرّق', () => {
     expect(css.rule('.a>.b')).toEqual({ color: 'var(--ink)', margin: '0' })
     expect(css.rule('.a > .b')).toEqual(css.rule('.a>.b'))
     expect(css.rule('.a>.b', '@media(max-width:720px)')).toEqual({ color: 'var(--brand)' })
@@ -48,17 +48,17 @@ describe('المحلِّلُ يقرأ الساري', () => {
     expect(css.where('.b')).toEqual([])
   })
 
-  it('وسياقان معًا يُدمَجان بترتيب المصدر، وترتيبُ المفاتيح ترتيبُ السريان', () => {
+  it('وسياقان معًا يُدمَجان بترتيب المصدر، وترتيب المفاتيح ترتيب السريان', () => {
     const both = css.rule('.a>.b', ['', '@media(max-width:720px)'])
     expect(both).toEqual({ margin: '0', color: 'var(--brand)' })
     expect(Object.keys(both)).toEqual(['margin', 'color'])
   })
 
-  it('و!important يثبت أمام ما بعده في القاعدة وفي قاعدةٍ لاحقة، والفراغُ قبله يُطوى', () => {
+  it('و!important يثبت أمام ما بعده في القاعدة وفي قاعدة لاحقة، والفراغ قبله يُطوى', () => {
     expect(css.rule('.e').color).toBe('var(--ink)!important')
   })
 
-  it('وما بين علامتَي اقتباس كما هو، والتعليقُ لا يُقرأ، و@page قاعدةٌ باسمها', () => {
+  it('وما بين علامتَي اقتباس كما هو، والتعليق لا يُقرأ، و@page قاعدة باسمها', () => {
     expect(css.rule('.f::after').content).toBe("'  ( ; } ,  '")
     expect(css.rule('@page').margin).toBe('1cm')
     expect(css.decls().map((d) => d.prop)).toEqual([
@@ -74,7 +74,7 @@ describe('المحلِّلُ يقرأ الساري', () => {
  * الزرع وبعده. والعيّنةُ هنا لا في styles.ts: مرساةٌ في الورقة الحقيقيّة
  * تنكسر بإعادة لفّ، فيسقط الحارسُ والورقةُ سليمة — وهي العلّةُ المحروسُ منها.
  */
-describe('العيبُ المزروع يُرى', () => {
+describe('العيب المزروع يُرى', () => {
   const BASE = [
     ':root{--ink:#191b1f}',
     ':root[data-theme="dark"]{--ink:#ebe9e3}',
@@ -97,7 +97,7 @@ describe('العيبُ المزروع يُرى', () => {
   ]
   const ROWS: Row[] = [
     [
-      'قاعدةُ اللمس تخرج من كتلتها فيعود تقريبُ iOS',
+      'قاعدة اللمس تخرج من كتلتها فيعود تقريب iOS',
       (s) => s.replace('@media(pointer:coarse){textarea.mono,.cmd-text{font-size:17px}}',
         '@media(pointer:coarse){}\ntextarea.mono,.cmd-text{font-size:17px}'),
       (s) => /@media\(pointer:coarse\)\{[\s\S]*textarea\.mono,\.cmd-text\{font-size:17px\}/.test(s),
@@ -106,7 +106,7 @@ describe('العيبُ المزروع يُرى', () => {
       '17px', undefined,
     ],
     [
-      'كتلةُ الطباعة تسبق الليلَ فيغلبها حبرُه على الورق',
+      'كتلة الطباعة تسبق الليل فيغلبها حبرُه على الورق',
       (s) => s.replace(':root[data-theme="dark"]{--ink:#ebe9e3}\n@media print{:root,:root[data-theme="dark"]{--ink:#191b1f}}',
         '@media print{:root,:root[data-theme="dark"]{--ink:#191b1f}}\n:root[data-theme="dark"]{--ink:#ebe9e3}'),
       (s) => s.slice(s.indexOf('@media print')).includes('--ink:#191b1f'),
@@ -115,7 +115,7 @@ describe('العيبُ المزروع يُرى', () => {
       '#191b1f', '#ebe9e3',
     ],
     [
-      'قائمةٌ لاحقةٌ تغيّر وزنَ الرقم',
+      'قائمة لاحقة تغيّر وزن الرقم',
       (s) => `${s}\n.grid .x,.tile .v{font-weight:600}`,
       (s) => s.includes('.tile .v{font-size:20px; font-weight:400}') &&
         s.split('\n').filter((l) => l.startsWith('.tile .v{')).length === 1,
@@ -124,7 +124,7 @@ describe('العيبُ المزروع يُرى', () => {
       '400', '600',
     ],
     [
-      'مسافةٌ تهرّب لونَ التحذير',
+      'مسافة تهرّب لون التحذير',
       (s) => `${s}\n.delta.down{ color:var(--warn)}`,
       (s) => !s.includes('.delta.down{color:var(--warn)}'),
       true,
@@ -132,7 +132,7 @@ describe('العيبُ المزروع يُرى', () => {
       undefined, 'var(--warn)',
     ],
     [
-      'محدّدٌ يسقط من قائمة «inherit» فيصير كوفيًّا',
+      'محدّد يسقط من قائمة «inherit» فيصير كوفيًّا',
       (s) => s.replace('.sec,th{font-family:inherit}', 'th{font-family:inherit}'),
       (s) => /\.head,\.sec,[^{]*\{font-family:"Reem Kufi"\}/.test(s),
       true,
@@ -140,7 +140,7 @@ describe('العيبُ المزروع يُرى', () => {
       'inherit', '"Reem Kufi"',
     ],
     [
-      'المختصَرُ بعد المفصَّل يمحوه — والحرفيُّ يمسكه بالنصّ لا بالسبب',
+      'المختصَر بعد المفصَّل يمحوه — والحرفيّ يمسكه بالنصّ لا بالسبب',
       (s) => s.replace('.slice .stats{margin:0; margin-inline-start:auto}', '.slice .stats{margin-inline-start:auto; margin:0}'),
       (s) => s.includes('.slice .stats{margin:0; margin-inline-start:auto'),
       false,
@@ -148,7 +148,7 @@ describe('العيبُ المزروع يُرى', () => {
       ['margin', 'margin-inline-start'], ['margin-inline-start', 'margin'],
     ],
     [
-      'وإعادةُ لفٍّ وتعليقٌ لا يغيّران شيئًا — والحرفيُّ يسقط كاذبًا',
+      'وإعادة لفّ وتعليق لا يغيّران شيئًا — والحرفيّ يسقط كاذبًا',
       (s) => s.replace('.slice .stats{margin:0; margin-inline-start:auto}',
         '/* (D-142) THEME:rail */\n.slice .stats{margin:0;\n  margin-inline-start:auto}'),
       (s) => s.includes('.slice .stats{margin:0; margin-inline-start:auto'),
@@ -160,7 +160,7 @@ describe('العيبُ المزروع يُرى', () => {
 
   it.each(ROWS)('%s', (_name, plant, literal, literalAfter, ask, before, after) => {
     const planted = plant(BASE)
-    expect(planted, 'الزرعُ لم يقع').not.toBe(BASE)
+    expect(planted, 'الزرع لم يقع').not.toBe(BASE)
     expect(literal(BASE)).toBe(true)
     expect(literal(planted)).toBe(literalAfter)
     expect(ask(sheet(BASE))).toEqual(before)
@@ -172,13 +172,13 @@ describe('العيبُ المزروع يُرى', () => {
  * **وعلى الورقة الحقيقيّة: ما يُلحَق آخرَها وحدَه** — بلا مرساةٍ تنكسر.
  * كلُّ صفٍّ سؤالٌ تسأله views.test، ويُقلَب بسطرٍ واحدٍ يُلحَق.
  */
-describe('العيبُ يُلحَق بالورقة فيُرى', () => {
+describe('العيب يُلحَق بالورقة فيُرى', () => {
   it.each([
-    ['قائمةٌ لاحقةٌ تغيّر وزنَ رقم المؤشّر', '.grid .x,.tile .kv-v{font-weight:600}',
+    ['قائمة لاحقة تغيّر وزن رقم المؤشّر', '.grid .x,.tile .kv-v{font-weight:600}',
       (c: Sheet) => c.rule('.tile .kv-v')['font-weight'], '400', '600'],
-    ['مسافةٌ تهرّب لونَ التحذير إلى نزول الإنفاق', '.delta.down{ color:var(--warn)}',
+    ['مسافة تهرّب لون التحذير إلى نزول الإنفاق', '.delta.down{ color:var(--warn)}',
       (c: Sheet) => c.rule('.delta.down').color, 'var(--ink-2)', 'var(--warn)'],
-    ['رمزٌ يُعاد على الرافدة فتصير ثيمًا ثالثًا', '.rail{--bg:#14161c}',
+    ['رمز يُعاد على الرافدة فتصير ثيمًا ثالثًا', '.rail{--bg:#14161c}',
       (c: Sheet) => Object.keys(c.rule('.rail')).filter((p) => p.startsWith('--')), [], ['--bg']],
   ])('%s', (_name, tail, ask, before, after) => {
     expect(ask(sheet(STYLE))).toEqual(before)
@@ -193,7 +193,7 @@ describe('العيبُ يُلحَق بالورقة فيُرى', () => {
  * كلّ فاصلةٍ و«>» و«!»، و«@media (». **تحويلٌ عامٌّ لا مرساةَ فيه**، فلا
  * يمرّ فارغًا إن أُعيد لفُّ styles.ts. وما بين علامتَي اقتباس لا يُمسّ.
  */
-describe('التعليقُ والمسافةُ لا يُسقطان', () => {
+describe('التعليق والمسافة لا يُسقطان', () => {
   const shake = (css: string): string =>
     css.split(/("[^"]*"|'[^']*')/).map((part, i) => i % 2 === 1 ? part : part
       .replace(/\{/g, '{ /* THEME:rail (D-142) */\n    ')
@@ -204,41 +204,41 @@ describe('التعليقُ والمسافةُ لا يُسقطان', () => {
       .replace(/!/g, ' ! ')
       .replace(/@media\(/g, '@media (')).join('')
 
-  it('الورقةُ مهزوزةً تُقرأ قواعدَها نفسَها', () => {
+  it('الورقة مهزوزةً تُقرأ قواعدَها نفسَها', () => {
     const shaken = shake(STYLE_BODY)
     expect(shaken).not.toMatch(/\{\S/)
     expect(shaken).not.toMatch(/\S;/)
     expect(parseCss(shaken)).toEqual(parseCss(STYLE))
   })
 
-  it('والورقةُ المخدومةُ هي المصدرُ قاعدةً قاعدة', () => {
+  it('والورقة المخدومة هي المصدر قاعدةً قاعدة', () => {
     expect(parseCss(STYLE_BODY)).toEqual(parseCss(STYLE))
   })
 })
 
-describe('القوسُ المكسور يسقط باسم قاعدته', () => {
+describe('القوس المكسور يسقط باسم قاعدته', () => {
   it.each([
-    ['قوسٌ ناقص', '.bar i{background:var(--ink)}\n.bar i.done{background:var(--ink)\n.cap{color:var(--ink)}',
-      /كتلةٌ داخل قاعدة «\.bar i\.done»/],
-    ['قوسٌ زائد', '.bar i.done{background:var(--ink)}}\n.cap{color:var(--ink)}',
-      /قوسُ إغلاقٍ بلا فتح بعد «\.bar i\.done»/],
-    ['كتلةٌ لم تُغلَق آخرَ الورقة', '.a{color:var(--ink)}\n@media(max-width:720px){.a{color:var(--brand)}',
+    ['قوس ناقص', '.bar i{background:var(--ink)}\n.bar i.done{background:var(--ink)\n.cap{color:var(--ink)}',
+      /كتلة داخل قاعدة «\.bar i\.done»/],
+    ['قوس زائد', '.bar i.done{background:var(--ink)}}\n.cap{color:var(--ink)}',
+      /قوس إغلاق بلا فتح بعد «\.bar i\.done»/],
+    ['كتلة لم تُغلَق آخر الورقة', '.a{color:var(--ink)}\n@media(max-width:720px){.a{color:var(--brand)}',
       /1 كتلةً لم تُغلَق، آخرُها «@media\(max-width:720px\)»/],
-    ['تصريحٌ بلا نقطتين', '.a{color var(--ink)}', /تصريحٌ بلا نقطتين في «\.a»/],
-    ['«;» بعد القوس تُسقط القاعدةَ التالية', '.a{color:var(--ink)};\n.b{color:var(--ink)}', /محدّدٌ فيه «;»/],
-    ['قاعدةٌ بلا محدّد', '.a{color:var(--ink)}\n{color:var(--ink)}', /قاعدةٌ بلا محدّد بعد «\.a»/],
-    ['نصٌّ بلا قاعدة داخل كتلة', '@media print{.a{color:var(--ink)} color:var(--ink)}', /نصٌّ بلا قاعدة داخل «@media print»/],
+    ['تصريح بلا نقطتين', '.a{color var(--ink)}', /تصريح بلا نقطتين في «\.a»/],
+    ['«;» بعد القوس تُسقط القاعدة التالية', '.a{color:var(--ink)};\n.b{color:var(--ink)}', /محدّد فيه «;»/],
+    ['قاعدة بلا محدّد', '.a{color:var(--ink)}\n{color:var(--ink)}', /قاعدة بلا محدّد بعد «\.a»/],
+    ['نصّ بلا قاعدة داخل كتلة', '@media print{.a{color:var(--ink)} color:var(--ink)}', /نصّ بلا قاعدة داخل «@media print»/],
     // ‏الفتحةُ مقسومةٌ في المصدر: فتحةٌ بلا إغلاقٍ هنا يمحو بها عدّادُ الحرفيّات أدناه ما بعدها
-    ['تعليقٌ لم يُغلَق', '.a{color:var(--ink)}\n/' + '* يبدأ ولا ينتهي', /تعليقٌ لم يُغلَق بعد «\.a»/],
-    ['اقتباسٌ لم يُغلَق', ".a::after{content:'x}", /اقتباسٌ لم يُغلَق/],
+    ['تعليق لم يُغلَق', '.a{color:var(--ink)}\n/' + '* يبدأ ولا ينتهي', /تعليق لم يُغلَق بعد «\.a»/],
+    ['اقتباس لم يُغلَق', ".a::after{content:'x}", /اقتباس لم يُغلَق/],
   ])('%s', (_name, src, message) => {
     expect(() => parseCss(src)).toThrow(message)
   })
 
-  it('والورقةُ لا تُحلَّل حتى تُسأل: العيبُ يُسقط السؤالَ لا تحميلَ الملفّ', () => {
+  it('والورقة لا تُحلَّل حتى تُسأل: العيب يُسقط السؤال لا تحميل الملفّ', () => {
     const broken = sheet('.a{color:var(--ink)\n.b{color:var(--ink)}')
-    expect(() => broken.rule('.a')).toThrow(/كتلةٌ داخل قاعدة «\.a»/)
-    expect(() => broken.where('.b')).toThrow(/كتلةٌ داخل قاعدة «\.a»/)
+    expect(() => broken.rule('.a')).toThrow(/كتلة داخل قاعدة «\.a»/)
+    expect(() => broken.where('.b')).toThrow(/كتلة داخل قاعدة «\.a»/)
   })
 })
 
@@ -261,7 +261,7 @@ const SHEETS = new Map([
 
 /** ما يُقبل بحقٍّ — ومعه سببُه. وإعفاءٌ لم يعد يُستعمل يُسقط الاختبار. */
 const ALLOWED: ReadonlyArray<readonly [file: string, name: string, use: string, why: string]> = [
-  ['routes/assets.test.ts', 'STYLE', '.length', 'نسبةُ النزع: طولُ المصدر مقابلَ طولِ المخدوم، ولا قيمةَ فيه تُسأل'],
+  ['routes/assets.test.ts', 'STYLE', '.length', 'نسبة النزع: طول المصدر مقابل طول المخدوم، ولا قيمة فيه تُسأل'],
 ]
 
 interface Use {
@@ -307,7 +307,7 @@ function literalUses(file: string, source: string): Use[] {
   return out
 }
 
-describe('لا حرفيّةَ على نصّ الورقة في اختبار', () => {
+describe('لا حرفيّة على نصّ الورقة في اختبار', () => {
   const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
   const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
@@ -315,16 +315,16 @@ describe('لا حرفيّةَ على نصّ الورقة في اختبار', () 
     return name.endsWith('.test.ts') ? [path] : []
   })
 
-  it('العددُ صفر، ورسالةُ السقوط تسمّي كلَّ موضعٍ بملفّه وسطره', () => {
+  it('العدد صفر، ورسالة السقوط تسمّي كلّ موضع بملفّه وسطره', () => {
     const uses = walk(SRC).flatMap((path) => literalUses(relative(SRC, path).split('\\').join('/'), readFileSync(path, 'utf8')))
     const allowed = (u: Use): boolean => ALLOWED.some(([file, name, use]) => u.file === file && u.use === name + use)
     const bad = uses.filter((u) => !allowed(u)).map((u) => `${u.file}:${u.line} · ${u.text}`)
-    expect(bad, `حرفيّاتٌ على نصّ الورقة: ${bad.length} — اسأل sheet(STYLE) من src/test/css`).toEqual([])
+    expect(bad, `حرفيّات على نصّ الورقة: ${bad.length} — اسأل sheet(STYLE) من src/test/css`).toEqual([])
     const stale = ALLOWED.filter(([file, name, use]) => !uses.some((u) => u.file === file && u.use === name + use))
-    expect(stale.map(([file, name, use]) => `${file} · ${name}${use}`), 'إعفاءٌ لم يعد يُستعمل: احذفه').toEqual([])
+    expect(stale.map(([file, name, use]) => `${file} · ${name}${use}`), 'إعفاء لم يعد يُستعمل: احذفه').toEqual([])
   })
 
-  it('والعدّادُ يرى الاسمَ المستعار والاستيرادَ الحيّ، ولا يعدّ المحلِّلَ ولا اسمًا من مصدرٍ آخر', () => {
+  it('والعدّاد يرى الاسم المستعار والاستيراد الحيّ، ولا يعدّ المحلِّل ولا اسمًا من مصدر آخر', () => {
     const planted = [
       "import { STYLE as S } from './styles'",
       "import { TOKENS } from '../../lib/tokens'",
@@ -332,7 +332,7 @@ describe('لا حرفيّةَ على نصّ الورقة في اختبار', () 
       "const print = S.slice(S.indexOf('THEME:print'))",
       'const css = sheet(S)',
       'expect(TOKENS).toEqual({})',
-      '// expect(S) في شرحٍ لا يُعدّ',
+      '// expect(S) في شرح لا يُعدّ',
       'expect(S[0]).toBe(":")',
     ].join('\n')
     expect(literalUses('routes/ui/x.test.ts', planted).map((u) => `${u.line} ${u.use}`))

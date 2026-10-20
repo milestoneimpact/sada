@@ -114,7 +114,7 @@ export async function verifyTotp(
   options: { readonly now?: Date; readonly lastStep?: bigint } = {},
 ): Promise<{ ok: true; step: bigint } | { ok: false; reason: string }> {
   const digits = presented.replace(/\s/g, '')
-  if (!/^\d{6}$/.test(digits)) return { ok: false, reason: 'الرمز ستّةُ أرقام' }
+  if (!/^\d{6}$/.test(digits)) return { ok: false, reason: 'الرمز ستّة أرقام' }
 
   const current = counterFor(options.now ?? new Date())
   for (let drift = -DRIFT_STEPS; drift <= DRIFT_STEPS; drift += 1) {

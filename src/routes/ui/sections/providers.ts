@@ -23,9 +23,9 @@ import { statusBadge } from '../components/badge'
 const TASK_LABEL: Readonly<Record<string, string>> = {
   analyze: 'الفهم — الحكم على المصدر',
   draft: 'الكتابة — صياغة المنشور',
-  plan: 'الخطّة — منطقُ الأسبوع',
+  plan: 'الخطّة — منطق الأسبوع',
   image: 'الصورة — التوليد البصريّ',
-  video: 'الفيديو — تحريكُ الصورة',
+  video: 'الفيديو — تحريك الصورة',
 }
 
 /**
@@ -77,7 +77,7 @@ function modelPicker(options: {
           : `<option value="${current}" title="${current}" selected>${escapeHtml(modelName(options.current))}</option>`}
         <option value="__manual__">اكتبه يدويّا…</option>
       </select>
-      <button type="button" class="btn btn-secondary btn-sm mp-load" title="يجلب القائمةَ من عند المزوّد الآن">حدّث</button>
+      <button type="button" class="btn btn-secondary btn-sm mp-load" title="يجلب القائمة من عند المزوّد الآن">حدّث</button>
     </div>
     <div class="sub mp-note m-0 mt-1"></div>
   </div>`
@@ -138,16 +138,16 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       <div class="kv-v">${ready.length}<em> / ${d.providers.length}</em></div>
       ${bar(ready.length, Math.max(1, d.providers.length))}
       <div class="note">${untested === 0
-        ? 'وكلُّ مفاتيحهم اختُبرت'
+        ? 'وكلّ مفاتيحهم اختُبرت'
         : `<b>${untested}</b> منها لم يُختبر مفتاحُه بعد — افتح صفَّه واضغط «اختبر»`}</div></div>
-    <div class="card tile"><div class="kv-k">إنفاقُ اليوم على الذكاء</div>
+    <div class="card tile"><div class="kv-k">إنفاق اليوم على الذكاء</div>
       <div class="kv-v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
       ${bar(spentToday, d.spendCap)}
-      <div class="note">مجموعُ ما أنفقته خدماتُ الكتابة والصور اليوم · يُصفَّر الثالثةَ فجرًا بتوقيت الرياض</div></div>
-    <div class="card tile"><div class="kv-k">مهامٌّ جاهزة</div>
+      <div class="note">مجموع ما أنفقته خدمات الكتابة والصور اليوم · يُصفَّر الثالثة فجرًا بتوقيت الرياض</div></div>
+    <div class="card tile"><div class="kv-k">مهامّ جاهزة</div>
       <div class="kv-v">${tasksReady}<em> / ${d.routing.length}</em></div>
       ${bar(tasksReady, Math.max(1, d.routing.length))}
-      <div class="note">مهمّةٌ بلا مزوّدٍ جاهزٍ تقف عند أوّل نداء</div></div>
+      <div class="note">مهمّة بلا مزوّد جاهز تقف عند أوّل نداء</div></div>
   </div>`
 
   /**
@@ -170,7 +170,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
-      ? 'سعرٌ غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
+      ? 'سعر غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
       : `لكلّ مليون وحدة: دخول ${money(p.priceIn ?? 0)} · خروج ${money(p.priceOut ?? 0)}`
 
     return `<details class="prow">
@@ -187,7 +187,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       <div class="pbody">
         <div class="row mb-3">
           ${p.configured ? `
-          <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جارٍ الاختبار…">
+          <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جار الاختبار…">
             <input type="hidden" name="provider" value="${id}">
             <button class="btn btn-primary btn-sm" type="submit">اختبر المفتاح</button></form>` : ''}
           ${locked ? '' : `
@@ -223,7 +223,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           ? `<div class="outcome"><span class="kv-k">محميّ</span><span class="kv-v">مفتاح هذا المزوّد في
                <b>أسرار Worker</b> — لا يُبدَّل من هنا، وهو أأمن موضع.
                ولتبديله: ${pathArrows('لوحة Cloudflare ← Variables and Secrets')}.</span></div>`
-          : `<form class="row mt-3" method="POST" action="/panel/providers/key" data-busy="جارٍ الحفظ…"
+          : `<form class="row mt-3" method="POST" action="/panel/providers/key" data-busy="جار الحفظ…"
                   >
                <input type="hidden" name="provider" value="${id}">
                <div class="field grow-field">
@@ -284,37 +284,37 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       name: 'deepseek', label: 'DeepSeek',
       url: 'https://api.deepseek.com/v1', model: 'deepseek-chat',
       keyFrom: 'platform.deepseek.com ← API keys',
-      note: 'أرخصُهم للنصّ العربيّ الطويل، ويلزمه رصيدٌ مدفوعٌ مسبقا.',
+      note: 'أرخصُهم للنصّ العربيّ الطويل، ويلزمه رصيد مدفوع مسبقا.',
     },
     {
       name: 'openai', label: 'OpenAI',
       url: 'https://api.openai.com/v1', model: 'gpt-4o',
       keyFrom: 'platform.openai.com ← API keys ← Create new secret key',
-      note: 'المفتاحُ يُعرَض مرّةً واحدةً عند إنشائه ولا يُقرأ بعدها.',
+      note: 'المفتاح يُعرَض مرّةً واحدةً عند إنشائه ولا يُقرأ بعدها.',
     },
     {
       name: 'groq', label: 'Groq',
       url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile',
       keyFrom: 'console.groq.com ← API Keys',
-      note: 'أسرعُهم استجابةً، وحدُّه اليوميّ ضيّقٌ في الطبقة المجّانيّة.',
+      note: 'أسرعُهم استجابةً، وحدُّه اليوميّ ضيّق في الطبقة المجّانيّة.',
     },
     {
       name: 'mistral', label: 'Mistral',
       url: 'https://api.mistral.ai/v1', model: 'mistral-large-latest',
       keyFrom: 'console.mistral.ai ← API Keys',
-      note: 'يلزم تفعيلُ الحساب بالدفع قبل أن يعمل المفتاح.',
+      note: 'يلزم تفعيل الحساب بالدفع قبل أن يعمل المفتاح.',
     },
     {
       name: 'openrouter', label: 'OpenRouter',
       url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o',
       keyFrom: 'openrouter.ai/keys',
-      note: 'وهو الوحيدُ الذي يعطي السعرَ في فهرسه — فيُملأ حقلا السعر وحدَهما بضغطة «حدّث».',
+      note: 'وهو الوحيد الذي يعطي السعر في فهرسه — فيُملأ حقلا السعر وحدَهما بضغطة «حدّث».',
     },
     {
       name: 'xai', label: 'xAI',
       url: 'https://api.x.ai/v1', model: 'grok-2-latest',
       keyFrom: 'console.x.ai ← API Keys',
-      note: 'حسابُ xAI غيرُ حساب X — ومفتاحُ النشر لا يصلح هنا.',
+      note: 'حساب xAI غير حساب X — ومفتاح النشر لا يصلح هنا.',
     },
     /**
      * **Cloudflare — وعنوانُها يحمل معرّفَ حسابك في المسار.**
@@ -342,7 +342,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
         '/ai/v1',
       model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       keyFrom: 'dash.cloudflare.com ← My Profile ← API Tokens ← Create Token',
-      note: 'الصلاحيّة المطلوبة: Account · Workers AI · Read — ولا تكفي صلاحيّةُ AI Gateway وحدَها.',
+      note: 'الصلاحيّة المطلوبة: Account · Workers AI · Read — ولا تكفي صلاحيّة AI Gateway وحدَها.',
     },
   ]
 
@@ -375,7 +375,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <summary>
       <span class="g-ic">${ICON.add}</span>
       <span class="g-t"><b>أضف مزوّدا</b>
-        <span>أيّ مزوّدٍ يتكلّم لهجة chat/completions — ثلاثُ خطواتٍ بلا نشرٍ ولا شيفرة.</span></span>
+        <span>أيّ مزوّد يتكلّم لهجة chat/completions — ثلاث خطوات بلا نشر ولا شيفرة.</span></span>
       <span class="grow"></span>
       <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
     </summary>
@@ -385,14 +385,14 @@ export function providersSection(d: PanelData): ProvidersMarkup {
       <ol class="steps mt-4">
         <li><span class="step-n">1</span><span class="body">
           <span class="what">اختر مزوّدا</span>
-          <span class="why">تُملأ الحقولُ وحدَها. ومزوّدٌ ليس هنا: املأها يدويّا —
+          <span class="why">تُملأ الحقول وحدَها. ومزوّد ليس هنا: املأها يدويّا —
             وعنوانُه ينتهي بـ <span class="mono">/v1</span> عند أكثرهم.</span>
           <span class="row mt-2">${presetChips}</span></span></li>
 
         <li><span class="step-n">2</span><span class="body">
           <span class="what">راجع البيانات ثمّ أضف</span>
           <span class="why"><b>العنوان يُفحَص قبل الحفظ</b>: https وحدها، ولا عناوين داخليّة،
-            ولا قالبٌ لم يُملأ — خطأٌ مطبعيٌّ في المضيف يرسل مفتاحَك إلى حيث لا تريد.</span>
+            ولا قالب لم يُملأ — خطأ مطبعيّ في المضيف يرسل مفتاحَك إلى حيث لا تريد.</span>
           <span class="row mt-3">
             <span class="field"><label for="np">الاسم (لاتينيّ)</label>
               <input class="w-s" id="np" name="name" dir="ltr" required placeholder="deepseek"></span>
@@ -413,25 +413,25 @@ export function providersSection(d: PanelData): ProvidersMarkup {
           </span>
           ${d.cfAccountId === null
             ? `<span class="outcome warn"><span class="kv-k">Cloudflare</span><span class="kv-v">
-                عنوانُه يحمل <b>معرّفَ حسابك</b> في المسار، و<span class="mono">CF_AI_ACCOUNT_ID</span>
-                غيرُ مضبوطٍ في هذه البيئة — <b>فالقالبُ يبقى ظاهرا ولن يُحفَظ</b>.
+                عنوانُه يحمل <b>معرّف حسابك</b> في المسار، و<span class="mono">CF_AI_ACCOUNT_ID</span>
+                غير مضبوط في هذه البيئة — <b>فالقالب يبقى ظاهرا ولن يُحفَظ</b>.
                 اضبطه في <span class="mono">wrangler.toml</span> ليُملأ وحده.</span></span>`
             : `<span class="outcome"><span class="kv-k">Cloudflare</span><span class="kv-v">
-                عنوانُه مُلئ بمعرّف حسابك وحدَه، <b>وهو يكفي للثلاثة</b>: النصُّ يُنادى عليه،
-                <b>والصورةُ والفهرسُ يُشتقّان منه</b>
+                عنوانُه مُلئ بمعرّف حسابك وحدَه، <b>وهو يكفي للثلاثة</b>: النصّ يُنادى عليه،
+                <b>والصورة والفهرس يُشتقّان منه</b>
                 (<span class="mono">/ai/run</span> و <span class="mono">/ai/models/search</span>)
                 — فلا تُدخِل عنوانا ثانيا.</span></span>`}</span></li>
 
         <li><span class="step-n">3</span><span class="body">
           <span class="what">ضع المفتاح في صفّه، ثمّ «اختبر» و«حدّث»</span>
           <span class="why">بعد الإضافة يظهر صفُّه في القائمة أعلاه. <b>«اختبر»</b> يقول أيعمل المفتاح،
-            <b>و«حدّث»</b> يجلب قائمةَ نماذجه الآن فتختار منها بدل أن تكتب اسما —
-            <b>والفهرسُ لا يُجلَب قبل حفظ المفتاح</b>: هو نداءٌ باسمك عندهم.</span>
+            <b>و«حدّث»</b> يجلب قائمة نماذجه الآن فتختار منها بدل أن تكتب اسما —
+            <b>والفهرس لا يُجلَب قبل حفظ المفتاح</b>: هو نداء باسمك عندهم.</span>
           <span class="scroll mt-3"><table>
-            <thead><tr><th>المزوّد</th><th>موضعُ المفتاح عندهم</th></tr></thead>
+            <thead><tr><th>المزوّد</th><th>موضع المفتاح عندهم</th></tr></thead>
             <tbody>${presetRows}</tbody></table></span>
-          <span class="why">وصلاحيّةُ مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
-            — ولا تكفي صلاحيّةُ AI Gateway وحدَها.</span></span></li>
+          <span class="why">وصلاحيّة مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
+            — ولا تكفي صلاحيّة AI Gateway وحدَها.</span></span></li>
       </ol>
     </form>
     </div>
@@ -466,7 +466,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
               `title="${escapeHtml(`${RUNG_MARK.now.label} — ${r.pending}`)}"`)
           : r.implemented
             ? statusBadge('bad', '✕', 'مزوّده غير جاهز')
-            : statusBadge('idle', '○', 'لم تُبنَ')}</td></tr>`).join('')
+            : statusBadge('idle', '○', 'لم تُبن')}</td></tr>`).join('')
 
   return { strip, rows, add, routing }
 }
