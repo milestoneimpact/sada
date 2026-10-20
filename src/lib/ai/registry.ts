@@ -15,7 +15,7 @@ import type { Env } from '../../env'
 export type ProviderName = 'anthropic' | 'gemini' | 'cloudflare'
 
 /** المهامّ التي تنادي نموذجا. تُوسَّع حين تُبنى طبقةٌ جديدة. */
-export type TaskName = 'analyze' | 'draft' | 'image' | 'plan' | 'video'
+export type TaskName = 'analyze' | 'draft' | 'image' | 'plan' | 'video' | 'vision'
 
 export interface ProviderSpec {
   /** الاسمُ وحدَه — لرقاقةٍ لا تتّسع لدوره (D-125). */
@@ -97,11 +97,21 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
     model: 'alibaba/hh1-i2v',
     why: 'صورة ← مقطع رأسيّ: نرى الصورة ونعتمدها قبل أن نُنفق على تحريكها',
   },
+  /**
+   * قراءة صورة نصّا، خطوة قبل التحليل لا تحليل ثانٍ (D-243). وافتراضه Gemini
+   * لأنّه مدمَج بلهجة `chat/completions` ويقرأ الصور؛ وAnthropic تقرؤها بصياغة
+   * أخرى لم تُبنَ هنا، وافتراض لا يعمل أسوأ من افتراض يعمل.
+   */
+  vision: {
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    why: 'قراءة الصور نصّا — الوصف وحده، والحكم يبقى عند التحليل',
+  },
 }
 
 /** ما بُني فعلا. الباقي في السجلّ تصريحٌ بالنيّة لا وعدٌ بالعمل. */
 export const IMPLEMENTED: ReadonlySet<TaskName> = new Set<TaskName>([
-  'analyze', 'draft', 'image', 'plan', 'video',
+  'analyze', 'draft', 'image', 'plan', 'video', 'vision',
 ])
 
 export function isConfigured(env: Partial<Env>, provider: ProviderName): boolean {

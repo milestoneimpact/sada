@@ -814,6 +814,10 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
           r.task === 'draft' &&
           providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
       ),
+      // ‏ومن يكتب للمقارنة من ضُبط مفتاحه وفُعِّل لا من وُجد صفّه (D-244)
+      writers: providerCards
+        .filter((p) => p.configured && p.enabled)
+        .map((p) => ({ name: p.name, label: p.label })),
       peaks,
       alertWebhook: allowance.settings.alertWebhook,
       dashboardTiles: allowance.settings.dashboardTiles,
@@ -2241,17 +2245,27 @@ panel.post('/panel/drafts/write', async (c) => {
   }
   const platform = raw as Platform
 
+  /*
+   * ومزوّد يُختار لهذه الكتابة وحدها (D-244). واسمه يطابَق على صفّ قائم في
+   * `providers` ولا يمرَّر: حقل في نموذج يرسله المتصفّح، واسم مخترَع يسقط
+   * ويعود التوجيه المحفوظ — فلا يُفتَح باب إنفاق باسم يكتبه المرسل.
+   */
+  const wanted = String(form.get('provider') ?? '').trim()
+  const chosen = wanted === '' ? null : await getProvider(c.env.DB, wanted)
+  const provider = chosen === null ? undefined : chosen.name
+
   const outcome = await draftPost(
     { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
     id,
     platform,
+    provider,
   )
 
   const flash: PanelFlash =
     outcome.kind === 'drafted'
       ? {
           kind: 'ok',
-          text: `كُتبت مسوّدة ${PLATFORMS[platform].label} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+          text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
         }
       : outcome.kind === 'already'
         // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)

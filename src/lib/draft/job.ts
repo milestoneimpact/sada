@@ -92,8 +92,19 @@ function toBrief(row: SourceRow): { brief: SourceBrief; hash: string | null } {
  * لا ينجح منهما إلّا واحد، والقاعدةُ هي التي تفصل (`UNIQUE`) لا الشيفرة.
  * ونسخةٌ جديدة من المستند تعطي مفتاحا جديدا، فتُسوَّد من جديد بحقّ.
  */
-export function draftKey(sourceId: string, platform: Platform, hash: string): string {
-  return `draft:${sourceId}:${platform}:${hash}`
+export function draftKey(
+  sourceId: string,
+  platform: Platform,
+  hash: string,
+  /**
+   * مزوّد اختاره المالك لهذه الكتابة، للمقارنة (D-244). وغيابه يُبقي المفتاح
+   * كما كان حرفا: ما كُتب قبل اليوم يبقى معروفا ولا تُدفَع كلفته مرّتين.
+   * وحضوره يفتح نسخة واحدة لكلّ مزوّد، والثانية بالمزوّد نفسه `already`.
+   */
+  provider?: string,
+): string {
+  const base = `draft:${sourceId}:${platform}:${hash}`
+  return provider === undefined || provider === '' ? base : `${base}:${provider}`
 }
 
 /** يكتب مسوّدةً واحدة لمنصّةٍ واحدة. */
@@ -101,6 +112,8 @@ export async function draftPost(
   deps: DraftDeps,
   sourceRef: string,
   platform: Platform,
+  /** مزوّد يغلب التوجيه لهذه الكتابة وحدها (D-244) — مقارنة لا تبديل. */
+  provider?: string,
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
 
@@ -133,7 +146,7 @@ export async function draftPost(
    * لحظةَ تُكتب البديلة (الخطوة ٧) لا قبلها. **وحارسُ النقرة المزدوجة باقٍ**: ما دامت
    * البديلةُ قائمةً بالمفتاح نفسه، فالضغطةُ التالية `already`.
    */
-  const key = draftKey(row.id, platform, hash)
+  const key = draftKey(row.id, platform, hash, provider)
   const existing = await deps.db
     .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
     .bind(key)
@@ -147,6 +160,7 @@ export async function draftPost(
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
     refId: row.id,
+    ...(provider === undefined || provider === '' ? {} : { provider }),
   })
   if (out.kind !== 'written') return out
 

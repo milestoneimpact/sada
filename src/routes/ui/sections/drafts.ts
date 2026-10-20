@@ -988,6 +988,11 @@ export interface DraftsInput {
   /** أمزوّدُ مهمّة `draft` جاهز؟ زرٌّ لا ينادي أحدا لا يُعرض عاملا. */
   readonly ready: boolean
   /**
+   * مزوّدو الكتابة الجاهزون، للمقارنة على النسخة الواحدة (D-244). وأقلّ من
+   * اثنين لا قائمة: سطر واحد يوهم بخيار لا وجود له.
+   */
+  readonly writers?: readonly { readonly name: string; readonly label: string }[]
+  /**
    * حاجزُ الكتابة المدفوعة وسببُه وموضعُ إصلاحه (`writeBlock` في `lib/home.ts`) —
    * فيُعطَّل الزرُّ والسببُ تحته، لا زرٌّ يُضغَط فيُردّ إلى رأس اللوح (ر-10).
    */
@@ -1101,6 +1106,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
   const { drafts, writable, now } = input
   const waiting = drafts.filter((d) => d.status === 'draft').length
   const blocked = input.blocked ?? null
+  const writers = input.writers ?? []
 
   // نموذجُ الكتابة: مصدرٌ ومنصّة، ونداءٌ واحد لكلٍّ. ولا كتابةَ آليّة —
   // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة
@@ -1128,10 +1134,18 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
                      ? 'وصف مقطع (يحتاج مقطعًا)' : `حتّى ${spec.hardLimit} محرفا`}</option>`,
                )
                .join('')}</select></div>
+           ${writers.length < 2 ? '' : `<div class="field"><label for="dw-pv">بأيّ مزوّد</label>
+             <select id="dw-pv" name="provider">
+               <option value="">المحفوظ في التوجيه</option>
+               ${writers.map((w) =>
+                 `<option value="${escapeHtml(w.name)}">${escapeHtml(w.label)}</option>`).join('')}
+             </select></div>`}
            <div class="grow"></div>
            <button class="btn btn-primary" type="submit"${input.ready && blocked === null ? '' : ' disabled'}${
              blocked === null ? '' : ' aria-describedby="dw-why"'}>اكتب مسوّدة</button>
          </form>
+         ${writers.length < 2 ? '' : `<p class="hint m-0 mt-2"><b>واكتبها بمزوّدين لتقارن.</b>
+           لكلّ مزوّد نسخة واحدة من هذه النسخة، والثانية بالمزوّد نفسه لا تنفق شيئا.</p>`}
          ${blocked !== null
            ? `<p class="hint m-0 mt-2" id="dw-why">${escapeHtml(blocked.text)}
                 <a class="tap" href="${escapeHtml(blocked.href)}">${escapeHtml(blocked.label)}</a></p>`

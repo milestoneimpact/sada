@@ -2450,6 +2450,22 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     expect((await db.prepare('SELECT id FROM cost_ledger').all()).results).toHaveLength(0)
   })
 
+  // ‏واسم المزوّد يطابَق على صفّ قائم ولا يمرَّر (D-244): اسم مخترَع يسقط ويعود
+  // ‏التوجيه المحفوظ بمفتاحه القديم، فلا كتابة ولا إنفاق باسم يكتبه المرسل
+  it('ومزوّد مخترَع في «اكتب مسوّدة» يسقط إلى التوجيه المحفوظ', async () => {
+    const source = await seedSource('تقرير الأثر')
+    await db
+      .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
+      .run()
+    const existing = await seedPost('linkedin', 'draft', 'ن'.repeat(300), `draft:${source}:linkedin:md5:a`)
+    const cookie = await login()
+    const wrote = await post(cookie, '/panel/drafts/write', { id: source, platform: 'linkedin', provider: 'ghost' })
+    expect(where(wrote)).toBe(`/panel#d-${existing}`)
+    expect((await db.prepare('SELECT id FROM cost_ledger').all()).results).toHaveLength(0)
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).not.toContain('ghost')
+  })
+
   it('«اكتب مسوّدة» لنسخة سُوّدت إلى بطاقتها بلا إنفاق، و«ارفض الصورة» إلى بطاقة منشورها', async () => {
     const source = await seedSource('تقرير الأثر')
     await db

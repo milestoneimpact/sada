@@ -349,6 +349,8 @@ export interface PanelData {
   readonly writableSources: readonly { id: string; name: string }[]
   /** أمزوّدُ مهمّة `draft` مضبوطٌ ومفعَّل؟ */
   readonly draftReady: boolean
+  /** مزوّدو الكتابة الجاهزون — للمقارنة على النسخة الواحدة (D-244). */
+  readonly writers?: readonly { readonly name: string; readonly label: string }[]
   readonly flash: PanelFlash | null
   readonly now: Date
   /** رمز CSRF لهذه الجلسة — يُحقن في كلّ نموذج. */
@@ -1170,6 +1172,7 @@ ${pivotPane(d.pivot)}
     earliest: earliestLocal(d.now, d.zone ?? null),
     now: d.now,
     ready: d.draftReady,
+    writers: d.writers ?? [],
     blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null),
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
