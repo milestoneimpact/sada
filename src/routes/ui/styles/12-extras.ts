@@ -49,7 +49,21 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .doc a[href^="mailto"]::after{content:''}
 }
 
-@media(prefers-reduced-motion:reduce){*{transition:none!important; scroll-behavior:auto!important}}
+/* ── طبقة الحركة (D-246) ──────────────────────────────────────────────
+   صعود البطاقة حين تدخل، ووميض الهيكل حين ينتظر، والانتقال بين الصفحات بلا سكربت
+   (View Transitions بين المستندات) — فلا نونس يُطلب ولا شيفرة. وكلّها تسقط مع تقليل الحركة. */
+@view-transition{navigation:auto}
+@keyframes rise{from{opacity:0; transform:translateY(var(--s-2))}to{opacity:1; transform:none}}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+.skeleton{border-radius:var(--r-control); color:transparent;
+  background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 50%,var(--surface-2) 75%);
+  background-size:200% 100%; animation:shimmer 1.4s linear infinite}
+::view-transition-old(root),::view-transition-new(root){animation-duration:var(--dur-2); animation-timing-function:var(--ease-rise)}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important; animation:none!important; scroll-behavior:auto!important}
+  .btn:active:not(:disabled):not([aria-disabled="true"]){transform:none}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
 
 /* ── لوحةُ الأوامر (D-105) ────────────────────────────────────────────
    طبقة تعلو كلّ شيء وتحجب ما تحتها بلا أن تمحوه: الحجاب يقول «أنت

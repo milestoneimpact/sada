@@ -84,6 +84,7 @@ export function railHtml(input: RailInput): string {
     <div class="glyph">${GLYPH_SVG}</div>
   </div>
   ${scopeMenu(input.scope)}
+  <a class="btn btn-primary rail-new" href="/panel#idea">${ICON.add}<span>منشور جديد</span></a>
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
     ${moreSheet(input, counts)}

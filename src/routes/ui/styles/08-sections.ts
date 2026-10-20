@@ -147,7 +147,8 @@ ol.steps.wiz.nodot li::before{display:none}
 .tab-item{display:inline-flex; align-items:center; gap:var(--s-2); flex:none;
   padding:var(--s-2) var(--s-3); min-height:var(--tap); border:0; border-radius:0;
   border-bottom:var(--stroke) solid transparent; background:transparent; color:var(--ink-2);
-  font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; text-decoration:none; white-space:nowrap}
+  font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; text-decoration:none; white-space:nowrap;
+  transition:color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
 @media(hover:hover){.tab-item:hover{color:var(--ink); border-bottom-color:var(--line)}}
 .tab-item[aria-current=page],.tab-item[aria-selected=true],.tab-item[aria-pressed=true]{
   color:var(--ink); border-bottom-color:var(--ink)}
@@ -405,9 +406,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
 .ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
 /* ‏**النتيجةُ قبل الردّ** (D-233): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
-[data-pending]{position:relative}
-[data-pending] > :not(.pending-tag){opacity:.55; transition:opacity var(--dur-1)}
-[data-pending] > .pending-tag{position:absolute; z-index:1; inset-block-start:var(--s-3); inset-inline-end:var(--s-3); opacity:1}
+/* ‏**ولا على صفّ المكتبة** (D-246): «tr[data-pending]» عددُ ما لم يُحلَّل للفرز («0» و«1») لا حالُ انتظار،
+   فكانت صفوفُ المصادر كلُّها باهتةً ‏2.9:1 (أمسكه axe) */
+[data-pending]:not(tr){position:relative}
+[data-pending]:not(tr) > :not(.pending-tag){opacity:.55; transition:opacity var(--dur-1)}
+[data-pending]:not(tr) > .pending-tag{position:absolute; z-index:1; inset-block-start:var(--s-3); inset-inline-end:var(--s-3); opacity:1}
 /* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-233) */
 .ed-saved{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}

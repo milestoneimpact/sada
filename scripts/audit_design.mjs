@@ -343,6 +343,9 @@ for (const file of pages) {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
       document.querySelectorAll('details').forEach((d) => { d.open = true })
     })
+    // ‏**والحركةُ تُنهى قبل القياس** (D-246): بطاقةٌ تُكشَف تصعد من جديد، وصندوقُ ما فيها في منتصف
+    // ‏الصعود كسرٌ من بكسل (‏43.99) فيُقرأ هدفًا دون ‏44. فيُقاس ما تستقرّ عليه، كما تُطفأ الانتقالات
+    await page.evaluate(() => { for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations !== Infinity) a.finish() })
     if (density !== null) {
       await page.evaluate((d) => { document.documentElement.dataset.density = d }, density)
     }
@@ -639,6 +642,8 @@ for (const file of pages) {
     }
 
     const result = await page.evaluate(({ MIN_TARGET, MAX_LINE }) => {
+      // ‏وما بدأ يصعد بعد مشي «Tab» يُنهى كذلك قبل قياس الهدف (D-246)
+      for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations !== Infinity) a.finish()
       const seen = (el) => {
         const r = el.getBoundingClientRect()
         return r.width > 0 && r.height > 0
