@@ -495,7 +495,7 @@ export interface PlatformTile {
   readonly button: { readonly label: string; readonly href: string; readonly primary: boolean }
   /** يربط ولا ينشر (مرتبة `link`). */
   readonly linkOnly: boolean
-  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-234). */
+  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-236). */
   readonly fact: string
 }
 
