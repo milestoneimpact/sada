@@ -65,10 +65,11 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
     const prior = existing.get(file.id)
 
     if (prior === undefined) {
+    // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه لمنظّمته حتى يصير لكلّ منظّمةٍ مجلّدُها (D-233)
       await db
         .prepare(
-          `INSERT INTO sources (id, drive_file_id, name, mime, content_hash)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO sources (id, drive_file_id, name, mime, content_hash, org_id)
+           VALUES (?, ?, ?, ?, ?, 'org_owner')`,
         )
         .bind(sourceId(file.id), file.id, file.name, file.mimeType, file.contentHash)
         .run()
