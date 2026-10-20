@@ -584,6 +584,17 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var platform='all', order='urgent';
     var ptabs=document.getElementById('draft-platform');
     var orderSel=document.getElementById('draft-order');
+    // ‏والمطويُّ يقول ما اختير فيه على زرّه (D-240): فرزٌ مخفيٌّ لا يُنسى
+    var moreOn=document.querySelector('[data-more-on]');
+    function moreLabel(){
+      if(!moreOn)return;
+      var on=[];
+      if(platform!=='all'&&ptabs){var pb=ptabs.querySelector('button[aria-pressed="true"]'); if(pb)on.push(pb.dataset.label);}
+      if(order!=='urgent'&&orderSel){on.push(orderSel.options[orderSel.selectedIndex].text);}
+      // ‏كلُّ اسمٍ في «bdi»: «LinkedIn» بين كلماتٍ عربيّة يقلب مواضعَ الفواصل حوله
+      moreOn.textContent='';
+      on.forEach(function(t){var b=document.createElement('bdi'); b.textContent=t; moreOn.appendChild(document.createTextNode(' · ')); moreOn.appendChild(b);});
+    }
     function reorder(){
       if(!cards.length)return;
       var parent=cards[0].parentNode; if(!parent)return;
@@ -629,11 +640,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
             var on=o===b;
             o.setAttribute('aria-pressed',String(on));
           });
-          refilter();
+          refilter(); moreLabel();
         });
       });
     }
-    if(orderSel){orderSel.addEventListener('change',function(){order=orderSel.value; reorder();});}
+    if(orderSel){orderSel.addEventListener('change',function(){order=orderSel.value; reorder(); moreLabel();});}
     refilter();
     // ‏رابطٌ إلى بطاقةٍ في «الأرشيف» (‎/panel#d-…‎ من الخطّ الزمنيّ أو إشعار) يفتح «الكلّ» فلا يصل إلى بطاقةٍ مخفيّة
     (function(){
