@@ -121,7 +121,8 @@ function splitTop(s: string, sep: string): string[] {
 }
 
 /** كتلٌ تحمل تصريحاتٍ لا قواعد — فتُقرأ قاعدةً محدّدُها اسمُها. */
-const DECL_AT = /^@(page|font-face|property|counter-style)\b/
+// ‏و«@view-transition» منها (D-246): تصريحٌ واحد «navigation:auto»
+const DECL_AT = /^@(page|font-face|property|counter-style|view-transition)\b/
 
 const isGroup = (head: string): boolean => head.startsWith('@') && !DECL_AT.test(head)
 

@@ -797,8 +797,8 @@ describe('الطبعة الثانية (D-139)', () => {
     expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBeUndefined()
     expect(css.rule('.page-head h1')).toMatchObject({ 'font-size': 'var(--t-h1)', 'line-height': 'var(--lh-h1)', 'font-weight': '600' })
     expect(css.rule('.grid>.tile:first-child .kv-v')).toMatchObject({ 'font-size': 'var(--t-display)', 'line-height': 'var(--lh-display)' })
-    // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148، وعلى أرض الصفحة منذ D-187
-    expect(css.rule('.rail')).toMatchObject({ background: 'var(--bg)', 'border-inline-start': 'var(--bd)' })
+    // والرافدةُ سطحٌ من الثيم بلا تدرّجٍ منذ D-144، وقاعدتُها واحدةٌ منذ D-148، وبيضاءُ على أرض الصفحة منذ D-246
+    expect(css.rule('.rail')).toMatchObject({ background: 'var(--surface)', 'border-inline-start': 'var(--bd)' })
     expect(css.rule('.rail')['background-image']).toBeUndefined()
     expect(found((d) => d.value.includes('linear-gradient(') && d.selectors.some((x) => x.startsWith('.rail')))).toEqual([])
   })
@@ -840,9 +840,10 @@ describe('الطبعة الثالثة (D-143)', () => {
 describe('الطبعة الرابعة — الحبر والنحاس (D-144)', () => {
   it('الحبر لون البنية نهارًا وليلًا، والنحاس يجتاز نصّا', () => {
     // ‏والزرُّ «الأخضرُ العميق» من لوحة الهويّة نهارًا، والذهبُ برونزٌ على هيولاه (D-196)
-    expect(css.rule(':root')).toMatchObject({ '--brand': '#0b2f31', '--on-brand': '#faf6f0', '--au': '#7b5e20' })
+    // ‏ومنذ D-246 الزرّ تركوازُ التصميم المعتمد ‏#0e6b64 بحبرٍ أبيض
+    expect(css.rule(':root')).toMatchObject({ '--brand': '#0e6b64', '--on-brand': '#ffffff', '--au': '#7b5e20' })
     // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار — رملٌ بحبرٍ عميق
-    const NIGHT = { '--brand': '#e8e1d6', '--on-brand': '#0b2f31' }
+    const NIGHT = { '--brand': '#e3f1ef', '--on-brand': '#06201e' }
     expect(css.rule(':root[data-theme="dark"]')).toMatchObject(NIGHT)
     expect(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)')).toMatchObject(NIGHT)
     // ‏الزمرّدُ المتقاعد لا يعود في قيمة — والتعليقُ الذي يؤرّخه لا يُسقط شيئًا
@@ -917,7 +918,7 @@ describe('تصفية الطبعات (D-148)', () => {
     // ‏والتضييقُ بنسبةٍ على الرقم البطل وحدَه (‏-.01em، خطّة التصميم 4.3)، لا ببكسلٍ لكلّ رتبة
     expect(css.rule('.tile .kv-v')).toMatchObject({ direction: 'ltr', 'letter-spacing': '0' })
     expect(css.rule('.grid>.tile:first-child .kv-v')['letter-spacing']).toBe('-.01em')
-    expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-5)')
+    expect(css.rule('.rail-head').padding).toBe('var(--s-6) var(--s-5) var(--s-4)')
     expect(css.rule('nav.tabs a[aria-current=page]')).toMatchObject({
       background: 'var(--selected)', color: 'var(--ink)', position: 'relative',
     })
@@ -1385,11 +1386,11 @@ describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
   })
 
   it('التحذير برتقاليّ بعيد عن النحاس، ولا إطار مكتوبًا بلونه في الوسم', () => {
-    expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fdf4ec'])
+    expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fef3c7'])
     // ‏**مجمَّدان** (D-196): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
     // ‏(ΔE_OK ‏٩٫٥)؛ وأرضُ النهار والتحذيرُ عليها على الحدّ (‏4.5:1). من يدفئ الأرضَ أو يُميل التحذيرَ يبدّل هنا
     expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f2823b', '#231206'])
-    expect(THEME.light['--bg']).toBe('#f9f4ec')
+    expect(THEME.light['--bg']).toBe('#f6f7f8')
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
@@ -1418,12 +1419,12 @@ describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
   it('مربّع المنصّة والعلامة بحلقة ليلًا، ونهارًا كما كانا', () => {
     expect(css.rule('.pf-logo')['box-shadow']).toBe('0 0 0 1px var(--logo-ring)')
     expect(css.rule('.glyph')['box-shadow']).toContain('0 0 0 1px var(--mark-ring)')
-    expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a6362', '#4a6362'])
+    expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4b5563', '#4b5563'])
     expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line)'])
   })
 
   it('الرابط والزرّ الهادئ بحبر «--link» وخطّ تحته', () => {
-    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#cad3d3', '#8ee0d0'])
+    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#d1d5db', '#a9dbd4'])
     for (const s of ['.g-tog', '.setup>summary', '.history .bar-name', '.todo>li>a.btn']) {
       expect(css.rule(s), s).toMatchObject({ color: 'var(--link)', 'text-decoration': 'underline' })
     }
@@ -1509,18 +1510,18 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
   it('اللوحة من القسم 3.2 قيمةً قيمة في الوضعين', () => {
     // ‏اللوحةُ من لوحة الهويّة (D-196 · docs/BRAND.md): ورقٌ على رمل نهارًا، وأرضُ الغلاف ليلًا
     expect(THEME.light).toMatchObject({
-      '--bg': '#f9f4ec', '--surface': '#ffffff', '--surface-2': '#f1efeb', '--surface-3': '#e8e1d6',
-      '--line': '#d9d2c6', '--line-soft': '#e7e3db', '--field': '#718383',
-      '--ink': '#0a2021', '--ink-2': '#364748', '--ink-3': '#5a6969',
-      '--brand': '#0b2f31', '--brand-hover': '#113b3d', '--brand-press': '#154445', '--on-brand': '#faf6f0',
-      '--link': '#0e6b66', '--selection': '#cceae7', '--au': '#7b5e20',
-      '--ok': '#0e4304', '--ok-wash': '#edf8eb', '--bad': '#b3261e', '--bad-wash': '#fcefee',
+      '--bg': '#f6f7f8', '--surface': '#ffffff', '--surface-2': '#f3f4f6', '--surface-3': '#e9ebee',
+      '--line': '#e5e7eb', '--line-soft': '#eef0f2', '--field': '#6b7280',
+      '--ink': '#111827', '--ink-2': '#374151', '--ink-3': '#4b5563',
+      '--brand': '#0e6b64', '--brand-hover': '#09504b', '--brand-press': '#074440', '--on-brand': '#ffffff',
+      '--link': '#0e6b64', '--selected': '#ecf5f4', '--selection': '#cceae7', '--au': '#7b5e20',
+      '--ok': '#065f46', '--ok-wash': '#d1fae5', '--bad': '#991b1b', '--bad-wash': '#fee2e2',
     })
     expect(THEME.dark).toMatchObject({
-      '--bg': '#020f11', '--surface': '#041a1c', '--surface-2': '#082528', '--surface-3': '#0b2f31',
-      '--line': '#1e383a', '--line-soft': '#11282a', '--field': '#657b7b', '--ink-3': '#92a0a0',
-      '--brand': '#e8e1d6', '--brand-hover': '#dfd8cc', '--brand-press': '#d8d0c3', '--on-brand': '#0b2f31',
-      '--selection': '#103f3b', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#271111', '--ok-wash': '#0f1c0f',
+      '--bg': '#0b0f14', '--surface': '#121821', '--surface-2': '#1a212c', '--surface-3': '#232b37',
+      '--line': '#273140', '--line-soft': '#1c2430', '--field': '#6b7686', '--ink-3': '#9ca3af',
+      '--brand': '#e3f1ef', '--brand-hover': '#d2e8e4', '--brand-press': '#c2ddd9', '--on-brand': '#06201e',
+      '--selected': '#13302d', '--selection': '#164a45', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#2a1414', '--ok-wash': '#0f1f17',
     })
     // ‏ورموزُ ما قبل اللوحة لا تعود في أيّ سياق: لا سطحَ ثالثَ ولا حدَّ «أقوى» ولا مادّةَ ولا وهج
     for (const gone of ['--chrome', '--line-strong', '--brand-soft', '--brand-wash', '--glow', '--hair', '--sheen', '--bloom']) {
@@ -1550,14 +1551,14 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(css.rule('.dlg')).toMatchObject({ background: 'var(--dialog)', border: 'var(--bd)', 'box-shadow': 'var(--sh-3)' })
     expect(css.rule('.dlg::backdrop').background).toBe('var(--scrim)')
     // ‏والستارةُ من الثيم لا ثابتةٌ في الجذر (كانت واحدةً للوضعين، D-105)
-    expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(6,26,28,.48)', 'rgba(1,8,9,.7)'])
+    expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(17,24,39,.48)', 'rgba(3,6,10,.7)'])
   })
 
   it('ثلاثة ظلال في الوضعين، والبطاقة التفاعليّة ترتفع بالثاني وحدَّها الوظيفيّ', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
     }
-    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(11,40,42,.07), 0 1px 1px rgba(11,40,42,.04)')
+    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(17,24,39,.05)')
     expect(THEME.dark['--sh-3']).toBe('0 16px 40px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4)')
     expect(css.rule('.ch:hover', '@media(hover:hover)')).toMatchObject({
       'box-shadow': 'var(--sh-2)', 'border-color': 'var(--field)',
@@ -1567,10 +1568,11 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
 
   it('نصف القطر من القائمة المغلقة، بالدور', () => {
     const r = css.rule(':root')
-    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '8px', '12px', '16px', '999px'])
+    // ‏والزرّ ‏10 والبطاقة ‏14 والبطل ‏20 منذ D-246
+    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-hero'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '10px', '14px', '20px', '16px', '999px'])
     // ‏وكلُّ زاويةٍ من القائمة: الورقةُ السفليّة ‏١٦ في زاويتيها العلويّتين وصفرٌ في السفليّتين (D-189)
     const values = new Set(css.decls().filter((d) => d.prop === 'border-radius').map((d) => d.value))
-    expect([...values].filter((v) => !v.split(' ').every((p) => /^(0|50%|var\(--r-(inline|control|card|sheet|pill)\))$/.test(p)))).toEqual([])
+    expect([...values].filter((v) => !v.split(' ').every((p) => /^(0|50%|var\(--r-(inline|control|card|hero|sheet|pill)\))$/.test(p)))).toEqual([])
     expect(css.rule('.dlg.sheet', '@media(max-width:599px)')['border-radius']).toBe('var(--r-sheet) var(--r-sheet) 0 0')
     expect(css.rule('button')['border-radius']).toBe('var(--r-control)')
     expect(css.rule('.card')['border-radius']).toBe('var(--r-card)')
@@ -1684,7 +1686,7 @@ describe('مراجعة المرحلة ٢أ (D-187)', () => {
     for (const chain of classChains(post('linkedin'), 'np-tag')) expect(cascaded(chain, 'color')).toBe('var(--brand)')
     // ‏ولا سياقَ آخرَ يُعيد تلوينه — الطباعةُ ترسم المسرحَ أبيضَ بحبرٍ داكن من الرموز نفسِها
     expect(found((d) => d.at !== '' && d.prop === 'color' && d.selectors.some((s) => /\.np-tag\b/.test(s)))).toEqual([])
-    expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#0b2f31', '#0b0c10'])
+    expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#0e6b64', '#0b0c10'])
   })
 
   /**

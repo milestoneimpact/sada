@@ -127,6 +127,8 @@ for (const file of files) {
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
     })
     await page.waitForTimeout(250)
+    // ‏والصعودُ يُنهى قبل القياس (D-246): صندوقٌ في منتصفه كسرٌ من بكسل يُقرأ دون ‏44
+    await page.evaluate(() => { for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations !== Infinity) a.finish() })
 
     const hits = await page.evaluate(
       ({ width, touch, TAP, MIN_FIELD_FONT }) => {

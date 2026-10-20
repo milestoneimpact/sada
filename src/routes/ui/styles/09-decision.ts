@@ -97,6 +97,9 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
 .draft-len.warn b{color:var(--warn)}
 .draft-len.bad b{color:var(--bad)}
 .draft-meta{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:auto; padding-top:var(--s-0)}
+/* ‏واسمُ المصدر في شارة المسوّدة اسمٌ يُقرأ لا وسم، فهو بنمط «small» (D-246): كان ‏13 فرفع حروفَ المحرّر
+   تحت ‏14 على الجوّال إلى السقف (‏10٪) */
+.draft-meta .chip{font-size:var(--t-small); line-height:var(--lh-small); font-weight:400}
 /* ── الصورة ───────────────────────────────────────────────────────────
    تُعرض بعرض البطاقة كاملا: المالك يقرّر عليها، وقرار على مربّع صغير
    ليس قرارا. **وتُعرض كاملةً لا مقصوصة**: نسبة مفروضة مع cover كانت تقصّ

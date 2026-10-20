@@ -10,8 +10,12 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
   border:var(--bd-clear); padding:var(--s-2) var(--s-4); min-height:var(--tap);
   min-width:var(--tap); box-sizing:border-box; display:inline-flex; align-items:center;
   justify-content:center; gap:var(--s-2); text-decoration:none; white-space:nowrap;
-  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
   border-radius:var(--r-control)}
+/* ‏والضغطة تصغير خفيف لا إزاحة (D-246): «scale» لا يهزّ الصفّ لأنّه لا يغيّر التخطيط */
+.btn:active:not(:disabled):not([aria-disabled="true"]){transform:scale(.97)}
+@media(hover:hover){.btn-primary:hover,.btn-secondary:hover{box-shadow:var(--sh-2)}}
 /* ‏الأوّليّ: فعلٌ واحدٌ في كلّ منطقة، بتمريرٍ وضغطٍ مسمّيين (D-187) */
 .btn-primary{background:var(--brand); color:var(--on-brand)}
 .btn-primary:active:not(:disabled){background:var(--brand-press)}
