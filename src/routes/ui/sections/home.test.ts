@@ -38,4 +38,18 @@ describe('لوحة القيادة (D-194)', () => {
   it('وأسبوع فارغ يقول ما يفعله المالك', () => {
     expect(homeTop(facts(), NOW)).toContain('لا شيء مجدول في الأيّام السبعة')
   })
+  it('التحيّة بساعة المالك، والأرقام الأربعة من العدّ المجمَّع (D-247)', () => {
+    const html = homeTop(facts({ zone: 'Asia/Riyadh', counts: { perPlatform: {
+      x: { draft: 3, approved: 0, queued: 2, published: 5, failed: 1, recentFailed: 1, nextAt: null } }, publishedWeek: 4 } }), NOW)
+    expect(html).toContain('<p class="hello">نهارك سعيد</p>')
+    expect(html.match(/class="hs-n num">(\d+)</g)!.map((m) => m.replace(/\D/g, ''))).toEqual(['3', '2', '4', '1'])
+  })
+  it('أعمدة الأيّام من تواريخ الكتابة الحقيقيّة، وبلا شيء رسمٌ فارغ لا أعمدة مسطّحة', () => {
+    expect(homeTop(facts(), NOW)).toContain('لا منشورات في أسبوعين')
+    const html = homeTop(facts({ written: ['2026-10-04 08:00:00', '2026-10-04 09:00:00', '2026-10-01 09:00:00'] }), NOW)
+    expect(html.match(/class="db-bar/g)).toHaveLength(14)
+    expect(html).toContain('<title>اليوم: 2</title>')
+    expect(html).toContain('والمجموع 3')
+    expect(html).toContain('<div class="vh"><table>')
+  })
 })
