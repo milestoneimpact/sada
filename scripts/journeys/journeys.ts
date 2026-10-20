@@ -110,11 +110,16 @@ export function lastCode(stack: Pick<Stack, 'mail'>): string {
 }
 
 /** الدخولُ برمز البريد — تمهيدٌ لا يُعدّ إلّا في ر-11. */
-export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail'>): Promise<void> {
+export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail' | 'kv'>): Promise<void> {
   if (!/\/panel/.test(page.url())) await page.goto(`${stack.url}/panel`)
+  // ‏ودخولٌ ثانٍ في الدقيقة نفسِها لا يُرسَل له رمز (D-245): يُمسح الفاصلُ كما يمسحه مساعدُ الاختبار
+  await stack.kv.delete(`logincode-gap:${OWNER_EMAIL}`)
+  await stack.kv.delete(`logincode-hour:${OWNER_EMAIL}`)
+  const sent = stack.mail.length
   await page.locator('input[name="email"]').fill(OWNER_EMAIL)
   await page.locator('form[action^="/panel/login/code"] button[type="submit"]').first().click()
   await page.locator('input[name="code"]').waitFor()
+  if (stack.mail.length === sent) throw new Error('لم يصل رمزُ الدخول إلى الصندوق')
   await page.locator('input[name="code"]').fill(lastCode(stack))
   await page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first().click()
   await page.waitForLoadState('networkidle')

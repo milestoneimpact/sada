@@ -866,13 +866,15 @@ describe('رؤوس الألواح (D-137)', () => {
     expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel/library#videos', '/panel#plan-import'])
     for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
     // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
-    const dev = html.slice(html.indexOf('<div data-sub id="dev">'), html.indexOf('<div data-sub id="activity">'))
+    const dev = html.slice(html.indexOf('id="dev"'), html.indexOf('</section>', html.indexOf('id="dev"')))
     expect(dev).toMatch(/\/oauth\/linkedin\/callback/)
     expect(dev).toContain('LINKEDIN_CLIENT_ID')
     expect(dev).not.toMatch(/secret[^<]*=/i)
-    for (const old of ['sources', 'channels', 'pivot', 'limits', 'providers', 'security']) {
+    for (const old of ['sources', 'channels', 'pivot', 'limits']) {
       expect(html, old).toContain(`<div data-sub id="${old}">`)
     }
+    // ‏و«الخدمات» و«الأمان» معرّفان داخل قسميهما الجديدين (EASE-PLAN ز): المرساةُ تصل، والتبويبُ قسمُه
+    for (const old of ['providers', 'security']) expect(html, old).toContain(`<div id="${old}"`)
   })
 })
 
@@ -1513,7 +1515,7 @@ describe('سجلّ التدقيق — من فعل ماذا', () => {
     const cookie = await login()
     const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     // ‏في تبويب «سجلّ النشاط» من «الإعدادات» (خطّة التصميم 5.8 · D-206)
-    const log = html.slice(html.indexOf('<div data-sub id="activity">'))
+    const log = html.slice(html.indexOf('<div id="activity"'))
     expect(log).toContain('<h2>سجلّ النشاط</h2>')
     expect(log).toContain('فُتحت جلسة')
   })
@@ -5154,18 +5156,23 @@ describe('الكتابة من فكرة ومن وصف المقطع، والربط
 })
 
 describe('«المظهر» و«النظام» في الإعدادات (D-221)', () => {
-  it('سبعة أقسام بترتيب الخطّة، والمبدّلان بلا معرّف ثان، والآلة في «النظام»', async () => {
+  it('أربعة أقسام (EASE-PLAN ز)، والمبدّلان بلا معرّف ثان، والآلة في «النظام» تحت «متقدّم»', async () => {
     const html = await (await app.request('/panel/settings', withSession(await login()), env)).text()
-    const order = ['#appearance', '#system', '#limits', '#providers', '#security', '#activity', '#dev'].map((h) => html.indexOf(`href="${h}"`))
+    const order = ['#appearance', '#limits', '#security-all', '#advanced'].map((h) => html.indexOf(`href="${h}"`))
     expect(order.every((i) => i > -1)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    const appearance = html.slice(html.indexOf('<div data-sub id="appearance">'), html.indexOf('<div data-sub id="system">'))
+    const appearance = html.slice(html.indexOf('<div data-sub id="appearance">'), html.indexOf('<div data-sub id="limits">'))
     expect(appearance).toContain('data-theme="dark"')
     expect(appearance).toContain('data-density="compact"')
     expect(appearance).toContain('value="dashboard_tiles"')
     expect((html.match(/id="theme"/g) ?? []).length).toBeLessThanOrEqual(1)
-    const system = html.slice(html.indexOf('<div data-sub id="system">'), html.indexOf('<div data-sub id="limits">'))
+    // ‏والأقسامُ القديمةُ معرّفاتٌ داخل أقسامها الجديدة، فمراسيها تصل
+    const advanced = html.slice(html.indexOf('<div data-sub id="advanced">'))
+    for (const id of ['system', 'providers', 'orgs']) expect(advanced, id).toContain(`<div id="${id}"`)
+    expect(advanced).toContain('<details class="setup mt-5" id="dev"><summary>للمطوّر</summary>')
+    const system = advanced.slice(advanced.indexOf('<div id="system"'), advanced.indexOf('<div id="providers"'))
     expect(system).toContain('id="machine"')
+    expect(html.slice(html.indexOf('<div data-sub id="security-all">'))).toContain('<div id="activity"')
   })
 })
 

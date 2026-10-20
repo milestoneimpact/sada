@@ -693,15 +693,13 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
  * و«المظهر» و«النظام» أوّلًا (D-221): السمةُ والكثافةُ وبطاقاتُ اللوح، ثمّ «هل الآلةُ تعمل؟» نُقلت من الرئيسيّة.
  */
 function settingsTabs(missing: number): string {
+  // ‏أربعةٌ لا ثمانية (EASE-PLAN ز): ما يُفتح كثيرًا تبويبٌ وحده، والنادرُ تحت «متقدّم».
+  // ‏والمراسي القديمة (#providers و#activity و#dev…) معرّفاتٌ داخل أقسامها، فتفتح قسمَها كما كانت
   return tabs('أقسام الإعدادات', [
     { label: 'المظهر', href: '#appearance', current: true },
-    { label: 'النظام', href: '#system' },
     { label: 'الإنفاق والحدود', href: '#limits' },
-    { label: 'خدمات الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
-    { label: 'المنظّمات', href: '#orgs' },
-    { label: 'الأمان', href: '#security' },
-    { label: 'سجلّ النشاط', href: '#activity' },
-    { label: 'للمطوّر', href: '#dev' },
+    { label: 'الأمان', href: '#security-all' },
+    { label: 'متقدّم', href: '#advanced', ...(missing > 0 ? { count: missing, bad: true } : {}) },
   ], { id: 'settings-sub' })
 }
 
@@ -1231,10 +1229,6 @@ ${pivotPane(d.pivot)}
   </div>
   ${tilePicker(d)}
   </div>
-  <div data-sub id="system">
-  <p class="hint">هل يدور صدى في مواعيده. <b>والإيقاف المؤقّت في «الإنفاق والحدود»</b>.</p>
-  ${machineCard(d.pulses, d.now)}
-  </div>
   <div data-sub id="limits">
   <p class="hint">مفتاح الإيقاف وسقوف اليوم. <b>تُطبَّق قبل أيّ نداء مدفوع</b>، في اللوحة والنشر المجدول معًا.</p>
   ${/* الترتيب بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظام أوّلًا، ثمّ ما
@@ -1354,35 +1348,9 @@ ${pivotPane(d.pivot)}
         </details>`}
   </div>
 </div>
-<div data-sub id="providers">
-  <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، وكم أنفق. <b>وأسرار Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاح كاملا هنا.</p>
-  ${providerStrip}
-
-  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
-      <span class="st idle">القرار</span></div>
-    <p class="hint">أيّ مزوّد ونموذج ينفّذ كلّ مهمّة. <b>والنموذج يُختار من درج يُملأ من عندهم</b> —
-      اضغط «حدّث» بجانبه.</p>
-    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
-      <tbody>${routingRows}</tbody></table></div>
-    <div class="sub mt-3">والافتراض في الشيفرة يعمل حتّى تختار —
-      فنظام بجدول فارغ يعمل ولا ينتظر أن يُملأ.</div>
-  </div>
-
-  <div class="card mt-3">
-    <div class="card-head"><h2>المفاتيح المضبوطة</h2><div class="grow"></div>
-      <span class="st idle">${d.providers.length} مزوّدا</span></div>
-    <p class="hint"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
-      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
-      ولا يُعرض مفتاح كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
-    ${providerRows}
-  </div>
-
-  <div class="mt-3">${addCard}</div>
-</div>
-<div data-sub id="orgs">
-  ${orgsPane(d)}
-</div>
-<div data-sub id="security">
+<div data-sub id="security-all">
+<div id="security">
+  <h2>الدخول والأجهزة</h2>
   <p class="hint">العامل الثاني، والأجهزة المفتوحة وإغلاقها. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسة حيّة الآن. والجلسة 3 أيّام ثمّ تنتهي وحدها.</p>
@@ -1468,8 +1436,7 @@ ${pivotPane(d.pivot)}
   </div>
 
 </div>
-<div data-sub id="dev">${devPane(d)}</div>
-<div data-sub id="activity">
+<div id="activity" class="mt-5">
   <div class="card"><h2>سجلّ النشاط</h2>
     <p class="hint">آخر ${d.audit.length} فعل مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاح قطّ.</p>
     ${d.audit.length === 0
@@ -1478,6 +1445,46 @@ ${pivotPane(d.pivot)}
           <thead><tr><th>متى</th><th>الفعل</th><th>على ماذا</th><th>العنوان</th></tr></thead>
           <tbody>${auditRows}</tbody></table></div>`}
   </div>
+</div>
+</div>
+<div data-sub id="advanced">
+  <p class="hint">ما يُفتح نادرًا: حالُ المهامّ الدوريّة، وخدماتُ الكتابة والصور، والمنظّمات، وما يحتاجه المطوّر.</p>
+<div id="system">
+  <h2>النظام</h2>
+  <p class="hint">هل يدور صدى في مواعيده. <b>والإيقاف المؤقّت في «الإنفاق والحدود»</b>.</p>
+  ${machineCard(d.pulses, d.now)}
+  </div>
+<div id="providers" class="mt-5">
+  <h2>خدمات الكتابة والصور</h2>
+  <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، وكم أنفق. <b>وأسرار Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاح كاملا هنا.</p>
+  ${providerStrip}
+
+  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
+      <span class="st idle">القرار</span></div>
+    <p class="hint">أيّ مزوّد ونموذج ينفّذ كلّ مهمّة. <b>والنموذج يُختار من درج يُملأ من عندهم</b> —
+      اضغط «حدّث» بجانبه.</p>
+    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
+      <tbody>${routingRows}</tbody></table></div>
+    <div class="sub mt-3">والافتراض في الشيفرة يعمل حتّى تختار —
+      فنظام بجدول فارغ يعمل ولا ينتظر أن يُملأ.</div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-head"><h2>المفاتيح المضبوطة</h2><div class="grow"></div>
+      <span class="st idle">${d.providers.length} مزوّدا</span></div>
+    <p class="hint"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاح كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
+    ${providerRows}
+  </div>
+
+  <div class="mt-3">${addCard}</div>
+</div>
+<div id="orgs" class="mt-5">
+  <h2>المنظّمات</h2>
+  ${orgsPane(d)}
+</div>
+<details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
 </div>
 </section>
 

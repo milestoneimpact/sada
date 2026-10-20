@@ -31,6 +31,7 @@ export const MOVED_ANCHORS: Readonly<Record<string, string>> = {
   // ‏حقولُ السقوف في «الإنفاق والحدود»: تُشير إليها «خطوتُك التالية» والنتائج
   c1: PANE_PATH.settings, c2: PANE_PATH.settings, c3: PANE_PATH.settings, c4: PANE_PATH.settings,
   appearance: PANE_PATH.settings, system: PANE_PATH.settings, machine: PANE_PATH.settings,
+  'security-all': PANE_PATH.settings, advanced: PANE_PATH.settings,
   results: PANE_PATH.results, pivot: PANE_PATH.results,
 }
 
