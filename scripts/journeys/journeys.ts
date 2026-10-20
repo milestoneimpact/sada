@@ -249,7 +249,8 @@ const R2stop: Journey = {
       const seen: { text: string; disabled: boolean }[] = await page.evaluate(({ top, bottom, marked }) => {
         const vh = window.innerHeight
         const goal = /اكتب|أنشئ|جديد|اعتمد/
-        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, button[type="submit"]'))
+        // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-233): يراه المالكُ زرًّا فيُعدّ زرًّا
+        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"]'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
             return r.height > 0 && r.top >= top && r.bottom <= vh - bottom && getComputedStyle(el).visibility !== 'hidden'
@@ -290,6 +291,10 @@ const R2stop: Journey = {
      * ‏منذ D-195 أوّلُ ما يوافق المقصدَ بابٌ لا فعل: «اكتب من فكرة» ينزل إلى نموذجها. فيمضي المالكُ
      * ‏فيما وصل إليه، يكتب فكرتَه ويضغط زرَّه — ولا يُحسَب نجاحًا إن ضغط «اعتمد» على مسوّدةٍ قديمة.
      */
+    // ‏والقائمةُ تُفتح فيختار منها بابَ مقصدِه: «من فكرة» أوّلُها
+    if ((await page.locator('details[open] > summary[data-journey-hit]').count()) > 0) {
+      await m.tap(link(page.locator('details[open]'), /من فكرة/), '«من فكرة» في القائمة')
+    }
     const idea = visible(page.locator('form[action="/panel/drafts/idea"]')).first()
     if ((await idea.count()) > 0) {
       await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمة لا تبطئ القرار، تحميه', 'كتابة الفكرة')

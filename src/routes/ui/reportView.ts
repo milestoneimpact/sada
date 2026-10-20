@@ -282,6 +282,30 @@ function delta(cur: number | null, prev: number | null, hasPrev: boolean): strin
  * كان الرأسُ يقول ما خرج وما قِيس، والأرقامُ متفرّقةٌ في صفوف المنصّات والإنفاقُ رقاقةٌ في بطاقة — فسؤالُ «أأحسنتُ هذا
  * الأسبوع؟» يُجاب بالجمع في الرأس. ولا رقمَ يُخترع: ما لم يُقَس يقول «لم يُقَس»، والفرقُ بلا أسبوعٍ قبله يقول ذلك.
  */
+/**
+ * **جملةٌ تقرأ الأرقامَ الثلاثة** (EASE-PLAN هـ، من Revolut وMetricool): من أين جاء الظهور، وبكم التفاعلُ الواحد.
+ * لا تكرّر فرقَ البلاطات ولا عددَ ما خرج (الرأسُ يقوله، D-235)، **ولا تقول ما لم يُقَس**: منصّةٌ بلا قياسٍ لا تُعَدّ،
+ * وكلفةُ التفاعل لا تُحسب بلا إنفاقٍ وتفاعل. و`null` إن لم يبقَ ما يُقال.
+ */
+export function weekSentence(cur: WeeklyReport): string | null {
+  if (cur.published === 0) return null
+  const measured = cur.platforms.filter((p) => p.impressions !== null && p.impressions > 0)
+  const imp = total(cur, 'impressions'), act = total(cur, 'interactions')
+  const parts: string[] = []
+  if (imp !== null && imp > 0 && measured.length > 0) {
+    const lead = measured.reduce((a, b) => ((b.impressions ?? 0) > (a.impressions ?? 0) ? b : a))
+    const share = Math.round(((lead.impressions ?? 0) / imp) * 100)
+    parts.push(measured.length === 1
+      ? `الظهورُ كلُّه من ${platformLabel(lead.platform)}`
+      : `أكثرُ الظهور من ${platformLabel(lead.platform)} (${share}٪)`)
+  }
+  if (act !== null && act > 0 && cur.spendUsd > 0) {
+    parts.push(`وكلّف التفاعلُ الواحد نحو ${money(cur.spendUsd / act)}`)
+  }
+  if (parts.length === 0) return null
+  return `<p class="lede">${escapeHtml(parts.join('، '))}.</p>`
+}
+
 export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {
   const tile = (k: string, v: string, note: string): string =>
     `<div class="card tile"><div class="kv-k">${k}</div><div class="kv-v">${v}</div><div class="note">${escapeHtml(note)}</div></div>`
@@ -291,7 +315,7 @@ export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {
     ${tile('الظهور', num(imp), delta(imp, prev === null ? null : total(prev, 'impressions'), prev !== null))}
     ${tile('التفاعل', num(act), delta(act, prev === null ? null : total(prev, 'interactions'), prev !== null))}
     ${tile('الإنفاق', escapeHtml(money(cur.spendUsd)), delta(cur.spendUsd, prev?.spendUsd ?? null, prev !== null))}
-  </div>`
+  </div>${weekSentence(cur) ?? ''}`
 }
 
 /** التقريرُ الذي قبله في القائمة (الأحدثُ أوّلًا) — و`null` إن لم يكن، أو لم يُعرف موضعُه. */

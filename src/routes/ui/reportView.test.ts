@@ -185,6 +185,22 @@ describe('ثلاثة أرقام بفرقها في رأس «النتائج» (D-2
     expect(weekKpis(week(null, 5, 0), week(10, 5, 0))).toContain('لا يُقارَن: أحد الأسبوعين لم يُقَس')
   })
 
+  it('وجملةٌ تقرأ الأرقام: من أين الظهور وبكم التفاعل — ولا تقول ما لم يُقَس (EASE-PLAN هـ)', async () => {
+    const { weekSentence } = await import('./reportView')
+    expect(weekSentence(week(1200, 30, 1.5))).toBe('<p class="lede">الظهورُ كلُّه من X، وكلّف التفاعلُ الواحد نحو \u20660.050$\u2069.</p>')
+    const two = {
+      ...(week(0, 0, 0) as object), spendUsd: 0,
+      platforms: [
+        { platform: 'x', published: 1, measured: 1, impressions: 900, impressionsFrom: 1, interactions: 9, interactionsFrom: 1 },
+        { platform: 'linkedin', published: 1, measured: 1, impressions: 100, impressionsFrom: 1, interactions: 1, interactionsFrom: 1 },
+      ],
+    } as never
+    expect(weekSentence(two)).toBe('<p class="lede">أكثرُ الظهور من X (90٪).</p>')
+    // ‏لم يُقَس شيء، أو لم يخرج شيء: لا جملة
+    expect(weekSentence(week(null, null, 2))).toBeNull()
+    expect(weekSentence({ ...(week(5, 5, 1) as object), published: 0 } as never)).toBeNull()
+  })
+
   it('والشاشة تقارن التقرير الحاليّ بالذي بعده في القائمة', () => {
     const reports = [
       { id: '2026-W42', body: week(1200, 30, 2), createdAt: '' },
