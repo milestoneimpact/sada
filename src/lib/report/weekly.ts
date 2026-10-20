@@ -119,7 +119,7 @@ interface PublishedRow {
  * ما وقع يومَ الاثنين التالي — فمنشوراتُ الاثنين وكلفتُه بعد الرابعة فجرًا لا
  * تدخل تقريرًا قطّ. والتقاريرُ التي كُتبت قبل الإصلاح تبقى كما كُتبت.
  */
-async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> {
+async function publishedIn(db: Db, org: string, from: Date, to: Date): Promise<ReportPost[]> {
   try {
     const { results } = await db
       .prepare(
@@ -127,11 +127,12 @@ async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> 
                 min(pa.at) AS published_at
            FROM posts p
            JOIN publish_attempts pa ON pa.post_id = p.id AND pa.status = 'succeeded'
+          WHERE p.org_id = ?
           GROUP BY p.id
          HAVING published_at >= ? AND published_at < ?
           ORDER BY published_at ASC`,
       )
-      .bind(dbNow(from), dbNow(to))
+      .bind(org, dbNow(from), dbNow(to))
       .all<PublishedRow>()
     return results.map((r) => ({
       id: r.id,
@@ -148,11 +149,11 @@ async function publishedIn(db: Db, from: Date, to: Date): Promise<ReportPost[]> 
 }
 
 /** ما أُنفق في المدّة — من الدفتر وحده (D-008)، وبحدَّي `publishedIn` نفسِهما. */
-async function spendIn(db: Db, from: Date, to: Date): Promise<number> {
+async function spendIn(db: Db, org: string, from: Date, to: Date): Promise<number> {
   try {
     const row = await db
-      .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE at >= ? AND at < ?')
-      .bind(dbNow(from), dbNow(to))
+      .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE org_id = ? AND at >= ? AND at < ?')
+      .bind(org, dbNow(from), dbNow(to))
       .first<{ total: number | null }>()
     return row?.total ?? 0
   } catch {
@@ -216,8 +217,8 @@ export function topOf(posts: readonly ReportPost[]): TopPost | null {
  * يحتاج الصفَّ نفسَه (D-058). فتُقرأ مرّةً ويُبنى عليها الاثنان — لا
  * قراءتين تفترقان في اللحظة فتختلفان في الرقم.
  */
-export async function collectWeek(db: Db, from: Date, to: Date): Promise<ReportPost[]> {
-  const bare = await publishedIn(db, from, to)
+export async function collectWeek(db: Db, org: string, from: Date, to: Date): Promise<ReportPost[]> {
+  const bare = await publishedIn(db, org, from, to)
   const measurements = await metricsFor(db, bare.map((p) => p.id))
   return bare.map((p) => {
     const row = widest(measurements[p.id] ?? [])
@@ -272,11 +273,12 @@ export function summarize(
 /** يبني تقريرَ أسبوعٍ من القاعدة — ولا يكتب شيئا. */
 export async function buildWeekly(
   db: Db,
+  org: string,
   from: Date,
   to: Date,
 ): Promise<{ report: WeeklyReport; posts: readonly ReportPost[] }> {
-  const posts = await collectWeek(db, from, to)
-  const spendUsd = await spendIn(db, from, to)
+  const posts = await collectWeek(db, org, from, to)
+  const spendUsd = await spendIn(db, org, from, to)
   return { report: summarize(posts, from, to, spendUsd), posts }
 }
 
