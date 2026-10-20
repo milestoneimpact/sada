@@ -35,12 +35,12 @@
  * الاستعمال:  node scripts/audit_classes.mjs
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { SHEET_RE, sheetCss, sheetSource } from './sheet.mjs'
 import { join } from 'node:path'
 import ts from 'typescript'
 
 const ROOT = new URL('../src/', import.meta.url).pathname
 const ROUTES = join(ROOT, 'routes')
-const STYLES = join(ROOT, 'routes/ui/styles.ts')
 
 /** مقابضُ النصّ البرمجيّ — ومعها سببُها. */
 const HOOKS = new Map([
@@ -85,7 +85,7 @@ function stripExpressions(code) {
   return out
 }
 
-const styles = readFileSync(STYLES, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ')
+const styles = sheetSource(ROOT).replace(/\/\*[\s\S]*?\*\//g, ' ')
 const defined = new Set([...styles.matchAll(/\.([a-zA-Z_][\w-]*)/g)].map((m) => m[1]))
 
 /**
@@ -413,7 +413,7 @@ if (process.argv.includes('--self-test')) {
 
 const used = new Map()
 for (const file of walk(ROUTES)) {
-  if (file === STYLES || file.endsWith('tokens.ts')) continue
+  if (SHEET_RE.test(file) || file.endsWith('tokens.ts')) continue
   for (const cls of classesOf(readFileSync(file, 'utf8'))) {
     if (!used.has(cls)) used.set(cls, new Set())
     used.get(cls).add(file.slice(ROOT.length))
@@ -429,7 +429,7 @@ for (const file of walk(ROUTES)) {
  */
 const handChips = []
 for (const file of walk(ROUTES)) {
-  if (file.endsWith('/parts.ts') || file.endsWith('/components/badge.ts') || file === STYLES) continue
+  if (file.endsWith('/parts.ts') || file.endsWith('/components/badge.ts') || SHEET_RE.test(file)) continue
   const code = readFileSync(file, 'utf8')
   const n = (code.match(/<span class="(?:g|st-ic)">/g) ?? []).length
   if (n > 0) handChips.push([file.slice(ROOT.length), n])
@@ -459,7 +459,7 @@ for (const [where, n] of proseArrows) console.log(`      ${where}  ×${n}`)
 const inlineHits = []
 let inlineKept = 0
 for (const file of walk(ROUTES)) {
-  if (file === STYLES) continue
+  if (SHEET_RE.test(file)) continue
   const code = readFileSync(file, 'utf8')
   inlineKept += (code.match(/\sstyle="[^"]+"/g) ?? []).length
   for (const h of inlineSpacing(code)) inlineHits.push(`${file.slice(ROOT.length)}:${h.line}  ${h.why} — style="${h.style}"`)
@@ -529,11 +529,9 @@ for (const [cls, why] of HOOKS) {
  * فلم تتغيّر. **فالقاعدةُ**: محدّدٌ واحدٌ في المستوى الأعلى يُعلَن مرّةً؛
  * وما يُعاد داخلَ @media أو @supports لا يُعدّ، فذلك شرطٌ لا تكرار.
  */
-const sheet = readFileSync(STYLES, 'utf8')
-const cssStart = sheet.indexOf('export const STYLE = TOKENS + `') + 'export const STYLE = TOKENS + `'.length
 // ‏وتعبيرُ القالب يُمحى قبل العدّ: «@media${below('sm')}{» فيه قوسا «${…}»، فيُقرأ
 // ‏القوسُ الأوّلُ كتلةً بمحدّدٍ فارغ (D-187 — نقاطُ الانكسار من «BP»)
-const css = stripExpressions(sheet.slice(cssStart, sheet.lastIndexOf('`')))
+const css = stripExpressions(sheetCss(ROOT))
   .replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
 const seen = new Map()
 let depth = 0
