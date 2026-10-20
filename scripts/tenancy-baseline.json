@@ -1,7 +1,7 @@
 {
   "accounts": 23,
   "alert_outbox": 4,
-  "audit_log": 3,
+  "audit_log": 2,
   "content_items": 7,
   "cost_ledger": 14,
   "media": 29,
@@ -13,7 +13,7 @@
   "promotion_suggestions": 4,
   "providers": 8,
   "publish_attempts": 28,
-  "reports": 4,
+  "reports": 1,
   "settings": 4,
   "sources": 12,
   "task_routes": 2,

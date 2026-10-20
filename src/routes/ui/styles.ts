@@ -635,7 +635,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .auth-split .auth{margin:var(--s-8) auto}
 /* ‏والشريطُ تحت النصّ لا خلفه: الارتفاعُ الأدنى يترك له ربعَ الشريط الأسفل (‏٢٥٦ في ‏٣٩٠).
    وهو حاويةٌ («moment») يُسأل عرضُها */
-/* ‏شريطُ اليوم الأوّل (D-226): أرضُ اللحظة ونقشُها، بلا نصّ، ويختفي بعد أوّل مصدرٍ يُفهَم */
+/* ‏شريطُ اليوم الأوّل (D-227): أرضُ اللحظة ونقشُها، بلا نصّ، ويختفي بعد أوّل مصدرٍ يُفهَم */
 .first-band{height:10rem; overflow:hidden; margin-bottom:var(--s-6)}
 .first-band .echo, .first-band svg{display:block; width:100%; height:100%}
 @media print{.first-band{display:none}}

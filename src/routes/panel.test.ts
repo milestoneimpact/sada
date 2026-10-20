@@ -5156,7 +5156,7 @@ describe('المنظّمات من حساب الدخول', () => {
   })
 })
 
-describe('شريطُ اليوم الأوّل (D-226)', () => {
+describe('شريطُ اليوم الأوّل (D-227)', () => {
   it('أعلى الرئيسيّة حتّى يُفهَم أوّلُ مصدر، ثمّ يختفي', async () => {
     const cookie = await login()
     const before = await (await app.request('/panel', withSession(cookie), env)).text()
