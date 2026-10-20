@@ -243,7 +243,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
       var st=document.getElementById('flash');
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);
-        // ‏ومراحلُ الانتظار الطويل (7.11 · D-236): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
+        // ‏ومراحلُ الانتظار الطويل (7.11 · D-237): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
         var stages=(f.dataset.stages||'').split('|').filter(Boolean);
         if(stages.length){var i=0, t0=Date.now(), stay=' ابقَ في الصفحة حتّى ينتهي، فمغادرتُها تقطعه.';
           var tick=function(){if(!p.isConnected)return; i=Math.min(i+1,stages.length-1);

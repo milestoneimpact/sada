@@ -35,6 +35,7 @@ import {
 import { getProvider, resolveKey } from '../providers'
 import { cfAccountId, cfAccountOf } from '../ai/cloudflare'
 import type { Db } from '../tokens'
+import { objectKey, orgOfPost } from '../tenancy'
 
 /** أقصى ما يُقبل — و ٦٤ ميغا فوق حدّ مقطعٍ بخمسَ عشرةَ ثانيةً بكثير. */
 export const MAX_VIDEO_BYTES = 64 * 1024 * 1024
@@ -344,7 +345,7 @@ export async function animateForPost(
   // **ومفتاحُ R2 ليس مفتاحَ عدم التكرار**: كان الواحدُ يؤدّي الدورين،
   // وفيه `uuid` — فعمودٌ `UNIQUE` لا يمنع شيئا (D-068)
   const mediaId = crypto.randomUUID()
-  const r2Key = `video/${postId}/${mediaId}.mp4`
+  const r2Key = objectKey(await orgOfPost(deps.db, postId), `video/${postId}/${mediaId}.mp4`)
   try {
     await deps.bucket.put(r2Key, bytes)
   } catch (error) {
