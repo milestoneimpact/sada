@@ -509,8 +509,8 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
   })
 
   it('تبويبُ المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراضُ الكلّ', () => {
-    expect(html).toContain('data-platform-tab="all" aria-pressed="true">كلُّ المنصّات<span class="count">2</span>')
-    expect(html).toContain('data-platform-tab="linkedin" aria-pressed="false"\n      >LinkedIn<span class="count">1</span>')
+    expect(html).toContain('data-platform-tab="all" data-label="كلُّ المنصّات" aria-pressed="true">كلُّ المنصّات<span class="count">2</span>')
+    expect(html).toContain('data-platform-tab="linkedin" data-label="LinkedIn" aria-pressed="false"\n      >LinkedIn<span class="count">1</span>')
     expect(html).toContain('data-platform-tab="x"')
     expect(html).not.toContain('data-platform-tab="tiktok"')
   })
@@ -523,8 +523,14 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
     expect(html).toContain(`data-created="${Date.parse('2026-09-06T09:00:00Z')}" data-cost="0.05"`)
   })
 
-  it('والشريحةُ مخفيّةٌ بلا JavaScript — والقائمةُ كاملة', () => {
-    expect(html).toContain('id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden')
+  it('والمنصّةُ والترتيبُ مطويّان في «مرشّحات» داخل صفّ الحال، والصفُّ مخفيٌّ بلا JavaScript (D-240)', () => {
+    expect(html).toContain('id="draft-filter" aria-label="فرزُ المسوّدات" hidden')
+    const bar = html.slice(html.indexOf('id="draft-filter"'), html.indexOf('</nav>', html.indexOf('id="draft-filter"')))
+    expect(bar).toContain('<details class="menu draft-more" id="draft-more">')
+    expect(bar).toContain('id="draft-platform" role="group"')
+    expect(bar).toContain('<select id="draft-order"')
+    expect(html).not.toContain('tab-sub')
+    expect(SCRIPT).toContain("moreOn.textContent=''")
     expect(SCRIPT).toContain("platform=b.dataset.platformTab")
     expect(SCRIPT).toContain("order=orderSel.value; reorder();")
   })

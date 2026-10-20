@@ -23,6 +23,7 @@ import { stamp } from '../../lib/time/zone'
 import { escapeHtml } from './shell'
 import { ICON } from './icons'
 import { whenTag } from './time'
+import { pageHead } from './parts'
 import type { SpreadPlan } from '../../lib/schedule/spread'
 
 export interface SpreadScreenData {
@@ -45,9 +46,11 @@ function row(index: number, when: string, label: string, preview: string, zone: 
 
 export function spreadScreen(d: SpreadScreenData): string {
   const { slots, skipped } = d.plan
+  // ‏رأسُ الصفحة كبقيّة الصفحات المستقلّة: أين أنا قبل ما سيقع (Krug · axe «page-has-heading-one»)
+  const head = pageHead('المنشورات', 'توزيعُ المعتمَد', 'معاينةُ المواعيد قبل أن يقع منها شيء.')
 
   if (slots.length === 0) {
-    return `<section class="card">
+    return `${head}<section class="card">
       <h2>لا شيءَ يُوزَّع</h2>
       <p class="hint">لا مسوّدةَ معتمَدةً لها قناةٌ مربوطة. والاعتمادُ وحدَه لا يكفي
         — تُربَط قناةُ المنصّة أوّلا.</p>
@@ -60,7 +63,7 @@ export function spreadScreen(d: SpreadScreenData): string {
     </section>`
   }
 
-  return `<section class="card">
+  return `${head}<section class="card">
     <h2>هذا ما سيقع — ${counted(slots.length, NOUNS.post)}</h2>
     <p class="hint">كلُّ ${d.gap} ساعةً منشور، ابتداءً من
       <b class="mono">${escapeHtml(stamp(d.start.replace('T', ' '), null))}</b>.

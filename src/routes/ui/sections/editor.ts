@@ -279,7 +279,6 @@ export function editorPane(input: EditorInput): string {
       ${platformMark(d.platform)}
       <div class="pc-who"><h2 id="ed-t"><bdi>${escapeHtml(who)}</bdi></h2><span class="pc-when">${
         d.accountName === null ? '' : `${escapeHtml(spec.label)} · `}${escapeHtml(stageTime(d, input.zone, input.now))}</span></div>
-      <span class="grow"></span>
       ${statusBadge(st.cls, st.glyph, escapeHtml(st.text))}
       ${menu({ label: 'أفعالٌ أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
       <a class="btn btn-icon btn-sm ed-x" href="${escapeHtml(close)}" aria-label="أغلق المنشور وارجع إلى القائمة" title="أغلق">${ICON.close}</a>

@@ -149,7 +149,7 @@ function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
     `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
   return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…" data-swap
-      role="group" aria-label="انقل الموعد إلى">
+      aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <span class="ago">انقلها إلى</span>${buttons}</form>`
 }
@@ -681,8 +681,8 @@ function filterTabs(drafts: readonly DraftRow[]): string {
    */
   const platforms = [...new Set(drafts.map((d) => d.platform))]
   const ptabs = [
-    `<button type="button" class="tab-item" data-platform-tab="all" aria-pressed="true">كلُّ المنصّات${count(drafts.length)}</button>`,
-    ...platforms.map((p) => `<button type="button" class="tab-item" data-platform-tab="${escapeHtml(p)}" aria-pressed="false"
+    `<button type="button" class="menu-item" data-platform-tab="all" data-label="كلُّ المنصّات" aria-pressed="true">كلُّ المنصّات${count(drafts.length)}</button>`,
+    ...platforms.map((p) => `<button type="button" class="menu-item" data-platform-tab="${escapeHtml(p)}" data-label="${escapeHtml(platformLabel(p))}" aria-pressed="false"
       >${escapeHtml(platformLabel(p))}${count(drafts.filter((d) => d.platform === p).length)}</button>`),
   ].join('')
   const order = `<label class="order"><span class="sub">الترتيب</span>
@@ -692,8 +692,20 @@ function filterTabs(drafts: readonly DraftRow[]): string {
       <option value="old">الأقدم أوّلًا</option>
       <option value="cost">الأغلى نشرًا أوّلًا</option>
     </select></label>`
-  return `<nav class="tab-bar" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}</nav>
-  <nav class="tab-bar tab-sub" id="draft-platform" aria-label="فرزُ المسوّدات بالمنصّة" hidden>${ptabs}<span class="grow"></span>${order}</nav>`
+  /*
+   * ‏**والمنصّةُ والترتيبُ مطويّان في «مرشّحات»** (D-240): كانا صفًّا ثانيًا تحت الحال، فصار رأسُ
+   * ‏القائمة ثلاثةَ أسطرٍ على الهاتف قبل أوّل بطاقة. والحالُ وحدَها تبقى ظاهرةً بأعدادها — شرطُ D-062
+   * ‏الأوّل فيها لا هنا: الفشلُ يُرى في «فشلت» لا في منصّته. **وما اختير يُكتب على الزرّ** فلا يُنسى
+   * ‏فرزٌ مخفيٌّ يقصّ القائمة.
+   */
+  const more = `<span class="grow"></span><details class="menu draft-more" id="draft-more">
+    <summary class="btn btn-quiet btn-sm">${ICON.filter}<span>مرشّحات</span><span class="draft-more-on" data-more-on></span></summary>
+    <div class="menu-list">
+      <div id="draft-platform" role="group" aria-label="فرزُ المسوّدات بالمنصّة">${ptabs}</div>
+      <div class="menu-seg">${order}</div>
+    </div>
+  </details>`
+  return `<nav class="tab-bar" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}${more}</nav>`
 }
 
 /**
@@ -1201,7 +1213,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    */
   const list = `${bulk}
   <div class="lede-row">
-    <h3 class="sec bare">المسوّدات</h3>
+    <h2 class="sec bare">المسوّدات</h2>
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>

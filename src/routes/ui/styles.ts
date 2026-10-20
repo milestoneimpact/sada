@@ -67,9 +67,11 @@ code,kbd,samp,pre{font-family:inherit}
    وكان عند right:-9999px، **فامتدّ المستند إلى 10389px** وصار الجوّالُ
    يُسحَب جانبا. وهي علّةٌ لا تُرى: العنصرُ نفسه غيرُ مرئيّ، وأثرُه
    شريطُ تمريرٍ أفقيّ يظنّه الناظر عيبا في التخطيط.
-   والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض. */
-.skip{position:absolute; width:1px; height:1px; overflow:hidden;
-  clip-path:inset(50%); white-space:nowrap;
+   والقصُّ يخفيه من العين ويبقيه لقارئ الشاشة — وذاك كلُّ الغرض.
+   **والقصُّ نفسُه لما يُقرأ ولا يُرى** («.vh»): اسمُ عمودِ الأفعال في الجدول (axe «empty-table-header»). */
+.skip,.vh{position:absolute; width:1px; height:1px; overflow:hidden;
+  clip-path:inset(50%); white-space:nowrap}
+.skip{
   background:var(--brand); color:var(--on-brand);
   padding:var(--s-3) var(--s-4); border-radius:var(--r-control); z-index:99; font-weight:600}
 /* وحين يظهر يصير هدفا كاملا: من يتنقّل بلوحة المفاتيح على لوحٍ لمسيّ
@@ -1316,10 +1318,16 @@ ol.steps.wiz.nodot li::before{display:none}
 @media(hover:hover){.tab-item:hover{color:var(--ink); border-bottom-color:var(--line)}}
 .tab-item[aria-current=page],.tab-item[aria-selected=true],.tab-item[aria-pressed=true]{
   color:var(--ink); border-bottom-color:var(--ink)}
-/* الصفُّ الثاني: منصّاتٌ وترتيبٌ في سطرٍ واحدٍ يلتفّ (D-127) — فرزٌ داخل التبويب لا تبويبٌ ثانٍ */
+/* الصفُّ الفرعيّ «tabs({ sub })» — فرزٌ داخل التبويب لا تبويبٌ ثانٍ */
 .tab-sub{align-items:center; box-shadow:none; margin-top:calc(-1 * var(--s-2))}
-.tab-sub .order{display:inline-flex; align-items:center; gap:var(--s-2)}
-.tab-sub .order select{min-height:var(--tap)}
+/* ‏المنصّةُ والترتيبُ مطويّان في «مرشّحات» آخرَ صفّ الحال (D-240) — فرزٌ داخل التبويب لا صفٌّ ثانٍ */
+.draft-more{align-self:center}
+.draft-more-on{font-weight:600; color:var(--ink)}
+.draft-more .menu-item .count{margin-inline-start:auto}
+.draft-more .menu-item[aria-pressed=true]{background:var(--hover); font-weight:600}
+.draft-more .menu-item[aria-pressed=true]::before{content:'✓' / ''}
+.draft-more .order{display:flex; align-items:center; gap:var(--s-2); width:100%}
+.draft-more .order select{min-height:var(--tap); flex:1}
 
 /* ── لوحُ الإرشاد تحت اللصيقة ─────────────────────────────────────────
    بحثُ GOV.UK: المستخدمُ يبدأ الكتابة فور رؤية الحقل، **ولا ينظر تحته

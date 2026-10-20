@@ -34,7 +34,7 @@ export function landingBody(): string {
   const steps = STEPS.map(([t, l], i) =>
     `<li><span class="land-n" aria-hidden="true">${['١', '٢', '٣'][i]}</span><span><b>${t}</b><span>${l}</span></span></li>`).join('')
   const pfs = PLATFORMS.map(([k, label]) =>
-    `<li class="land-pf" role="img" aria-label="${label}" title="${label}">${LOGOS[k] ?? ''}</li>`).join('')
+    `<li class="land-pf" title="${label}">${(LOGOS[k] ?? '').replace('aria-hidden="true"', `role="img" aria-label="${label}"`)}</li>`).join('')
   // ‏**والبابُ لحظةُ العلامة** (D-196): السطحُ العميقُ والنقشُ بجانب المحتوى لا خلفَه، كالدخول —
   // ‏لحظةٌ واحدةٌ ابنٌ مباشرٌ لـ«.auth-split»، والرمزُ فيها فلا يُكرَّر فوق الاسم. والمحتوى كما كان.
   return `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="land">
