@@ -332,6 +332,42 @@ describe('لا تسويد مرّتين لنسخة واحدة', () => {
   })
 })
 
+describe('D-244 · مزوّدان على النسخة الواحدة', () => {
+  it('المفتاح بلا مزوّد يبقى كما كان حرفا', () => {
+    expect(draftKey('s1', 'linkedin', 'h')).toBe('draft:s1:linkedin:h')
+    expect(draftKey('s1', 'linkedin', 'h', '')).toBe('draft:s1:linkedin:h')
+  })
+
+  it('مزوّدان يعطيان مفتاحين، والمزوّد نفسه مفتاحا واحدا', () => {
+    const a = draftKey('s1', 'linkedin', 'h', 'anthropic')
+    const b = draftKey('s1', 'linkedin', 'h', 'deepseek')
+    expect(a).not.toBe(b)
+    expect(draftKey('s1', 'linkedin', 'h', 'deepseek')).toBe(b)
+    expect(a).not.toBe(draftKey('s1', 'linkedin', 'h'))
+  })
+
+  it('نسخة بمزوّد مختار تُكتب، والثانية بالمزوّد نفسه تُردّ ولا تنفق', async () => {
+    const id = await seed()
+    const first = await draftPost(deps(net()), id, 'linkedin', 'anthropic')
+    expect(first.kind).toBe('drafted')
+    const again = await draftPost(deps(net()), id, 'linkedin', 'anthropic')
+    expect(again.kind).toBe('already')
+    expect(await ledger()).toHaveLength(1)
+    // ‏والكتابة بالتوجيه المحفوظ نسخة أخرى لا تُعدّ قائمة
+    const routed = await draftPost(deps(net()), id, 'linkedin')
+    expect(routed.kind).toBe('drafted')
+  })
+
+  it('ولا يمسّ الاختيار توجيه المالك', async () => {
+    const id = await seed()
+    await draftPost(deps(net()), id, 'linkedin', 'anthropic')
+    const saved = db.raw
+      .prepare("SELECT count(*) AS n FROM task_routes WHERE task = 'draft'")
+      .get() as { n: number }
+    expect(saved.n).toBe(0)
+  })
+})
+
 describe('الحارس قبل النداء', () => {
   it('الإيقاف يمنع، ولا يُرسَل شيء', async () => {
     const id = await seed()

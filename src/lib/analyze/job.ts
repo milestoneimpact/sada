@@ -18,12 +18,15 @@
  */
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { resolveKey } from '../providers'
+import { costOf, getProvider, resolveKey, type Provider } from '../providers'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
 import { extractText } from '../drive/export'
 import { spentOf, type Spent } from '../ai/spent'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
+import { describeImage, type VisionDeps } from './vision'
+import { routeFor } from '../ai/routes'
+import { CompatError } from '../ai/openaiCompat'
 
 /**
  * أسعار Claude Opus 5 لكلّ مليون وحدة (2026-06-24).
@@ -66,6 +69,8 @@ export interface AnalyzeJobDeps {
   readonly anthropicKey: string
   /** مفتاح التشفير، لازمٌ لقراءة الخزانة. */
   readonly encKey?: string
+  /** سرّ Gemini في Worker — لقارئ الصور حين يوجَّه إليه (D-243). */
+  readonly geminiKey?: string
   readonly now?: Date
   readonly fetchImpl?: typeof fetch
 }
@@ -89,6 +94,43 @@ async function alreadyAnalyzed(db: Db, sourceId: string, hash: string): Promise<
     .bind(sourceId, `%"hash":"${hash}"%`)
     .first<{ id: string }>()
   return row !== null
+}
+
+/**
+ * قارئ الصور (D-243) — أو `null` حين لا مزوّد أو لا مفتاح أو لا عنوان أو
+ * سقفه مبلوغ: فتبقى الصورة «غير مدعومة» ولا تُنزَّل بايتاتها أصلا. ولا يقرأ
+ * Anthropic هنا: صياغتها غير لهجة `chat/completions`.
+ */
+async function visionReader(deps: AnalyzeJobDeps): Promise<
+  { readonly deps: VisionDeps; readonly provider: Provider } | null
+> {
+  try {
+    const route = await routeFor(deps.db, 'vision')
+    const provider = await getProvider(deps.db, route.provider)
+    if (provider === null || !provider.enabled || provider.kind === 'anthropic' || provider.baseUrl === null) {
+      return null
+    }
+    if ((await checkProvider(deps.db, provider.name)) !== null) return null
+    const resolved = await resolveKey(
+      deps.db,
+      deps.encKey ?? '',
+      provider.name,
+      provider.name === 'gemini' ? deps.geminiKey : undefined,
+    )
+    if (resolved.key === null || resolved.key.length === 0) return null
+    return {
+      provider,
+      deps: {
+        baseUrl: provider.baseUrl,
+        apiKey: resolved.key,
+        model: route.model,
+        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+      },
+    }
+  } catch {
+    // ‏وعطل في حلّ الطريق لا يُسقط تحليل نصّ سليم
+    return null
+  }
 }
 
 /** يحلّل مصدرا واحدا. لا يرمي — يعيد ما وقع ليُسجَّل ويُقرَّر. */
@@ -146,11 +188,14 @@ export async function analyzeSource(
     // ٤ · التصدير
     const sa = parseServiceAccount(deps.serviceAccountJson)
     const token = await accessToken(sa, now, deps.fetchImpl ?? fetch)
+    // ‏والصورة لا تُنزَّل إلّا إن كان لها قارئ (D-243)
+    const vision = source.mime.startsWith('image/') ? await visionReader(deps) : null
     const extracted = await extractText(
       token,
       source.drive_file_id,
       source.mime,
       deps.fetchImpl ?? fetch,
+      vision !== null,
     )
     if (extracted.kind === 'unsupported') {
       return { kind: 'skipped', sourceId: source.id, reason: extracted.reason }
@@ -158,7 +203,42 @@ export async function analyzeSource(
     if (extracted.kind === 'too_large') {
       return { kind: 'skipped', sourceId: source.id, reason: `النصّ ${extracted.bytes} بايت — فوق السقف` }
     }
-    if (extracted.text.trim().length === 0) {
+    /*
+     * والصورة تصير نصّا، ثمّ يجري عليها ما يجري على كلّ نصّ (D-243). ونداؤها
+     * يُسجَّل قبل أن يُعدّ ناجحا (D-008)، وفي الفشل حين وصل جواب ثمّ رُدّ (D-164)،
+     * باسم مزوّد الرؤية لا باسم Anthropic. وسعر غير مضبوط يُكتب موسوما.
+     */
+    let text: string
+    if (extracted.kind === 'image') {
+      if (vision === null) return { kind: 'skipped', sourceId: source.id, reason: 'لا مزوّد رؤية' }
+      const reader = vision
+      const chargeVision = async (spent: { inputTokens: number; outputTokens: number; model: string }): Promise<void> => {
+        const units = spent.inputTokens + spent.outputTokens
+        const priced = costOf(reader.provider, spent)
+        await recordCost(deps.db, {
+          provider: reader.provider.name,
+          operation: priced.priced ? `vision:${spent.model}` : `vision:${spent.model}:price_unverified`,
+          units,
+          unitCost: units === 0 ? 0 : priced.total / units,
+          refId: source.id,
+        })
+      }
+      try {
+        const seen = await describeImage(reader.deps, extracted.dataUrl, source.name)
+        await chargeVision(seen)
+        text = seen.text
+      } catch (error) {
+        const late = spentOf(error)
+        if (late !== null) await chargeVision(late)
+        const reason = error instanceof Error ? error.message : 'تعذّرت قراءة الصورة'
+        const retryable = error instanceof CompatError ? error.retryable : true
+        return { kind: 'failed', sourceId: source.id, reason, retryable }
+      }
+    } else {
+      text = extracted.text
+    }
+
+    if (text.trim().length === 0) {
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
@@ -173,7 +253,7 @@ export async function analyzeSource(
     }
     const result = await analyzeText(claudeDeps, {
       name: source.name,
-      text: extracted.text,
+      text,
       now,
     })
 

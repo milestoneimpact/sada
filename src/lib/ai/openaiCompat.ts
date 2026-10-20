@@ -57,6 +57,11 @@ export interface CompatRequest {
   /** يُطلب JSON. والتحقّق من الشكل عندنا: لا نثق بوعد المزوّد. */
   readonly json?: boolean
   readonly maxTokens?: number
+  /**
+   * صورة تُقرأ مع النصّ (D-243) — اللهجة نفسها لا سائق ثانٍ: يصير `content`
+   * مصفوفة أجزاء فيها `image_url`. وعنوان أو `data:` كلاهما يُقبَل.
+   */
+  readonly imageUrl?: string
 }
 
 function readUsage(raw: unknown): CompatUsage {
@@ -86,12 +91,20 @@ export async function chatCompletion(
     throw new CompatError('لا مفتاح لهذا المزوّد', 503, false)
   }
 
+  // ‏والنصّ وحده يبقى نصّا: بعض المزوّدين يردّ المصفوفة على نموذج نصّيّ صرف
+  const content = request.imageUrl === undefined || request.imageUrl === ''
+    ? request.user
+    : [
+        { type: 'text', text: request.user },
+        { type: 'image_url', image_url: { url: request.imageUrl } },
+      ]
+
   const body: Record<string, unknown> = {
     model: request.model,
     max_tokens: request.maxTokens ?? 4096,
     messages: [
       { role: 'system', content: request.system },
-      { role: 'user', content: request.user },
+      { role: 'user', content },
     ],
   }
   // الأضعف الذي يفهمه الجميع: `json_object` لا مخطّط كامل

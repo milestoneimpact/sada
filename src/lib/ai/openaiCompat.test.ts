@@ -236,3 +236,40 @@ describe('التحقّق من المفتاح', () => {
     expect((await verifyCompat('https://x.com/v1', 'k', net(200, {}))).ok).toBe(true)
   })
 })
+
+/** الرؤية (D-243) — اللهجة نفسها لا سائق ثانٍ. */
+describe('صورة مع النصّ', () => {
+  function capture(): { impl: typeof fetch; bodies: string[] } {
+    const bodies: string[] = []
+    const impl = (async (_u: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body ?? ''))
+      return Response.json({
+        choices: [{ message: { content: 'عرض فيه أربع شرائح' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 900, completion_tokens: 20 },
+        model: 'vision-m',
+      })
+    }) as unknown as typeof fetch
+    return { impl, bodies }
+  }
+  const base = { baseUrl: 'https://api.example.com/v1', apiKey: 'k', model: 'm', system: 'صف', user: 'ماذا في الصورة؟' }
+  const userContent = (raw: string | undefined): unknown =>
+    (JSON.parse(raw ?? '{}') as { messages: { content: unknown }[] }).messages[1]?.content
+
+  it('يلفّ الرسالة أجزاء حين تحمل صورة', async () => {
+    const { impl, bodies } = capture()
+    const out = await chatCompletion({ ...base, imageUrl: 'data:image/png;base64,AAAA' }, impl)
+    expect(out.text).toBe('عرض فيه أربع شرائح')
+    expect(userContent(bodies[0])).toEqual([
+      { type: 'text', text: 'ماذا في الصورة؟' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+    ])
+  })
+
+  it('والنصّ وحده يبقى نصّا، والعنوان الفارغ كغيابه', async () => {
+    const { impl, bodies } = capture()
+    await chatCompletion(base, impl)
+    await chatCompletion({ ...base, imageUrl: '' }, impl)
+    expect(userContent(bodies[0])).toBe('ماذا في الصورة؟')
+    expect(userContent(bodies[1])).toBe('ماذا في الصورة؟')
+  })
+})

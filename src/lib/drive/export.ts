@@ -32,6 +32,14 @@ export type ExtractOutcome =
   | { readonly kind: 'text'; readonly text: string; readonly bytes: number }
   | { readonly kind: 'unsupported'; readonly reason: string }
   | { readonly kind: 'too_large'; readonly bytes: number }
+  /** صورة تُقرأ بمزوّد رؤية — بايتاتها لا نصّها (D-243). */
+  | { readonly kind: 'image'; readonly dataUrl: string; readonly bytes: number }
+
+/**
+ * سقف الصورة، وأضيق من سقف النصّ: تُرسَل `base64` فتزيد الثلث، وتُحوَّل في
+ * ذاكرة Worker، وملفّ أكبر يقتل الطلب بلا رسالة تُقرأ.
+ */
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 /** ملفات Office: Drive يحوّلها، فالرسالة تقول كيف لا أنها مرفوضة. */
 const OFFICE_HINT: Readonly<Record<string, string>> = {
@@ -53,7 +61,10 @@ export function unsupportedReason(mimeType: string): string {
   if (mimeType === 'application/pdf') {
     return 'PDF غير مدعوم — حوّله إلى «مستند Google» (فتح بـ Google Docs ثم حفظ)'
   }
-  if (mimeType.startsWith('image/')) return 'صورة — لا نص فيها تُقرأ منه'
+  // ‏ولا تصل الصورة هنا إلّا إن لم يُضبَط مزوّد رؤية بعد (D-243)
+  if (mimeType.startsWith('image/')) {
+    return 'صورة — وجّه مهمّة «الرؤية» إلى مزوّد يقرؤها في «توجيه المهامّ»'
+  }
   if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) {
     return 'وسائط — خارج نطاق المرحلة الأولى'
   }
@@ -67,12 +78,42 @@ export function unsupportedReason(mimeType: string): string {
  * لا يرمي على «غير مدعوم» ولا على «أكبر من اللازم»: كلاهما نتيجة متوقعة
  * تُعاد لتُسجَّل، لا عطل يوقف المسح كله على ملف واحد.
  */
+/** بايتات إلى `data:` على دفعات: `fromCharCode` على ميغا دفعة واحدة يرمي `RangeError`. */
+function toDataUrl(bytes: Uint8Array, mime: string): string {
+  let binary = ''
+  const CHUNK = 8192
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return `data:${mime};base64,${btoa(binary)}`
+}
+
 export async function extractText(
   token: string,
   fileId: string,
   mimeType: string,
   fetchImpl: typeof fetch = fetch,
+  /**
+   * أتُنزَّل الصورة؟ يقوله المنادي، فهو يعرف أمضبوط مزوّد رؤية (D-243).
+   * وافتراضه `false`: بلا قارئ لا يُنزَّل ما لا يُقرأ.
+   */
+  wantsImage = false,
 ): Promise<ExtractOutcome> {
+  if (mimeType.startsWith('image/') && wantsImage) {
+    // ‏والصورة تُنزَّل كما هي (`alt=media`) ولا تُصدَّر
+    const response = await fetchImpl(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) {
+      throw new DriveError(`drive: تعذّر تنزيل ${fileId}`, response.status)
+    }
+    const buffer = await response.arrayBuffer()
+    if (buffer.byteLength > MAX_IMAGE_BYTES) {
+      return { kind: 'too_large', bytes: buffer.byteLength }
+    }
+    return { kind: 'image', dataUrl: toDataUrl(new Uint8Array(buffer), mimeType), bytes: buffer.byteLength }
+  }
+
   const exportAs = EXPORT_AS[mimeType]
   if (exportAs === undefined) {
     return { kind: 'unsupported', reason: unsupportedReason(mimeType) }

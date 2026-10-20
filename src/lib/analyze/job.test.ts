@@ -413,3 +413,70 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
     expect(items()).toBe(0)
   })
 })
+
+/** صورة في Drive — تُقرأ نصّا ثمّ تمضي في المسار نفسه (D-243). */
+describe('D-243 · قراءة الصور', () => {
+  const PNG = 'image/png'
+  const SEEN = 'عرض من أربع شرائح، عنوانه «أثر البرامج»، وفيه جدول وأرقام ربعيّة تُقرأ.'
+
+  function visionNet(options: { description?: string } = {}): { impl: typeof fetch; urls: string[] } {
+    const urls: string[] = []
+    const impl = (async (input: unknown): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      urls.push(url)
+      if (url.includes('oauth2.googleapis.com')) return Response.json({ access_token: 'g', expires_in: 3600 })
+      if (url.includes('alt=media')) return new Response(new Uint8Array([137, 80, 78, 71]).buffer)
+      if (url.includes('generativelanguage')) {
+        return Response.json({
+          choices: [{ message: { content: options.description ?? SEEN }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1500, completion_tokens: 80 },
+          model: 'gemini-2.5-flash',
+        })
+      }
+      if (url.includes('api.anthropic.com')) {
+        return Response.json({
+          id: 'msg_1', type: 'message', role: 'assistant', model: MODEL, stop_reason: 'end_turn',
+          content: [{ type: 'text', text: JSON.stringify(ANALYSIS) }],
+          usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 0 },
+        })
+      }
+      throw new Error(`نداء غير متوقّع: ${url}`)
+    }) as unknown as typeof fetch
+    return { impl, urls }
+  }
+
+  it('صورة تُقرأ ثمّ تُحلَّل، ونداء الرؤية في الدفتر باسم مزوّده', async () => {
+    const sourceId = await seedSource(PNG)
+    const { impl } = visionNet()
+    const out = await analyzeSource({ ...deps(impl), geminiKey: 'gk-test' }, sourceId)
+    expect(out.kind).toBe('analyzed')
+
+    const row = db.raw
+      .prepare("SELECT provider, operation, units FROM cost_ledger WHERE operation LIKE 'vision:%'")
+      .get() as { provider: string; operation: string; units: number } | undefined
+    expect(row?.provider).toBe('gemini')
+    // ‏وسعر غير مضبوط يُكتب موسوما لا صفرا صامتا
+    expect(row?.operation).toBe('vision:gemini-2.5-flash:price_unverified')
+    expect(row?.units).toBe(1580)
+  })
+
+  it('وبلا مفتاح رؤية تبقى غير مدعومة ولا تُنزَّل', async () => {
+    const sourceId = await seedSource(PNG)
+    const { impl, urls } = visionNet()
+    const out = await analyzeSource(deps(impl), sourceId)
+    expect(out.kind).toBe('skipped')
+    if (out.kind === 'skipped') expect(out.reason).toContain('الرؤية')
+    expect(urls.some((u) => u.includes('alt=media'))).toBe(false)
+  })
+
+  it('ووصف قصير يُردّ ولا يُحلَّل، وثمنه في الدفتر', async () => {
+    const sourceId = await seedSource(PNG)
+    const { impl, urls } = visionNet({ description: 'صورة.' })
+    const out = await analyzeSource({ ...deps(impl), geminiKey: 'gk-test' }, sourceId)
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.retryable).toBe(true)
+    expect(urls.some((u) => u.includes('api.anthropic.com'))).toBe(false)
+    const n = db.raw.prepare("SELECT count(*) AS n FROM cost_ledger WHERE provider = 'gemini'").get() as { n: number }
+    expect(n.n).toBe(1)
+  })
+})

@@ -20,7 +20,7 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { routeFor } from '../ai/routes'
+import { readRoutes, routeFor } from '../ai/routes'
 import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
 import { portableSchema } from '../ai/portableSchema'
@@ -45,6 +45,14 @@ export interface WriteCall {
   readonly operation: string
   /** ما يُنسَب إليه الصفّ في الدفتر — المادّةُ التي كُتب منها لا المنشور. */
   readonly refId: string
+  /**
+   * مزوّد يغلب التوجيه لهذه الكتابة وحدها، للمقارنة (D-244).
+   *
+   * ولا يبدّل المحفوظ: الكتابة التالية تعود إلى «توجيه المهامّ». واسمه يطابقه
+   * المنادي على صفّ قائم في `providers` قبل أن يصل هنا، والنموذج من التوجيه
+   * المحفوظ ما لم يُعطَ.
+   */
+  readonly provider?: string
 }
 
 export type Written =
@@ -57,6 +65,15 @@ export type Written =
    */
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean; readonly cost?: number }
 
+/**
+ * نموذج المزوّد المختار للمقارنة حين لا نموذج في صفّه: ما وُجّهت إليه مهمّة
+ * أخرى عنده، وإلّا نموذج التوجيه نفسه. فنموذج Anthropic لا يُرسَل إلى مزوّد غيره فيُردّ.
+ */
+async function modelFor(db: Db, provider: string, fallback: string): Promise<string> {
+  const other = (await readRoutes(db)).find((r) => r.provider === provider)
+  return other?.model ?? fallback
+}
+
 /** نداءٌ واحدٌ بحرّاسه كلِّها — والكلفةُ مكتوبةٌ قبل أن يعود. */
 export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Written> {
   // ١ · الحارس العامّ قبل أيّ نداء
@@ -66,12 +83,16 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
   }
 
   // ٢ · المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const route = await routeFor(deps.db, 'draft')
+  const routed = await routeFor(deps.db, 'draft')
+  const route = call.provider === undefined || call.provider === '' || call.provider === routed.provider
+    ? routed
+    : { provider: call.provider, model: '' }
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
     return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
   }
+  if (route.model === '') route.model = provider.model ?? (await modelFor(deps.db, provider.name, routed.model))
 
   // ٣ · وسقفُ المزوّد بعد الحارس العامّ لا قبله: مَن قدّم التفصيل على الجملة
   // قال «المزوّد متاح» ونظامُه موقوف

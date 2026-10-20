@@ -10,7 +10,7 @@
  *
  * | الصفّ | المفتاح | أين |
  * |---|---|---|
- * | `posts` | `draft:{source}:{platform}:{hash}` | `draft/job.ts` |
+ * | `posts` | `draft:{source}:{platform}:{hash}[:{provider}]` | `draft/job.ts` (D-244) |
  * | `media` صورةً | `image:{post}:{hash8(text)}` | `image/job.ts` |
  *
  * والقاعدةُ هي التي تفصل (`UNIQUE`) لا الشيفرة: طلبان متزامنان يكتب
