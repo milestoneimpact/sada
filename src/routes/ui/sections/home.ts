@@ -85,7 +85,7 @@ function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
     <div class="pf-head"><span class="pf-logo">${LOGOS[t.id] ?? ''}</span>
       <span class="pf-name"><b>${escapeHtml(t.label)}</b>
         ${t.account === null ? '' : `<span class="ago"><bdi>${escapeHtml(t.account)}</bdi></span>`}</span></div>
-    ${statusBadge(t.tone, TILE_MARK[t.tone], escapeHtml(t.status))}
+    ${statusBadge(t.tone, TILE_MARK[t.tone], escapeHtml(t.status), `data-fact="${escapeHtml(t.fact)}"`)}
     <span class="ago">${escapeHtml(t.linkOnly ? 'يربط ولا ينشر بعد' : meta)}</span>
     <a class="btn ${t.button.primary ? 'btn-primary' : 'btn-secondary'} btn-sm" href="${escapeHtml(t.button.href)}"
       aria-label="${escapeHtml(`${t.button.label} — ${t.label}`)}">${escapeHtml(t.button.label)}</a>

@@ -30,7 +30,7 @@ describe('الوراثة', () => {
   })
 })
 
-describe('مسارُ الملفّ (D-235)', () => {
+describe('مسارُ الملفّ (D-236)', () => {
   it('ملفُّ المالك بمساره القائم، وملفُّ غيره تحت سابقته', async () => {
     const { objectKey, orgOfPost } = await import('./tenancy')
     expect(objectKey('org_owner', 'img/p/m.png')).toBe('img/p/m.png')
