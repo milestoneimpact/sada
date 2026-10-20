@@ -101,3 +101,23 @@ describe('الخطّ الزمنيّ', () => {
     expect(await junk.text()).toContain('<option value="30" selected>')
   })
 })
+
+describe('«القادم» قائمةً على الهاتف (EASE-PLAN و)', () => {
+  it('المجدولُ القادم وحده، بيومه وساعته ومنصّته ورابطه — لا المنشورُ ولا المسوّدة', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel/timeline', { headers: { Cookie: cookie } }, env)).text()
+    const up = html.slice(html.indexOf('<div class="gt-up mt-3">'), html.indexOf('<div class="gt-wrap">'))
+    expect(up).toContain('<h2>القادم</h2>')
+    expect(up).toContain('X · @omar')
+    expect(up).toContain('href="/panel/journey/next"')
+    expect(up).not.toContain('/panel/journey/pub')
+    expect(up).not.toContain('/panel/journey/wait')
+  })
+
+  it('ولا قائمةَ حين لا قادم', async () => {
+    db.raw.exec("UPDATE posts SET status = 'published' WHERE id = 'next'")
+    const cookie = await login()
+    const html = await (await app.request('/panel/timeline', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).not.toContain('class="gt-up')
+  })
+})

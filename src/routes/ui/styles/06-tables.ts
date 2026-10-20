@@ -40,6 +40,9 @@ tbody tr:last-child td{border-bottom:0}
 .gt-form .field{flex:0 1 11rem; min-width:0}
 .gt-form button{flex:none}
 .gt-wrap{overflow-x:auto; margin-top:var(--s-3)}
+/* «القادم» قائمةً على الهاتف وحدَه (EASE-PLAN و): الحاسوبُ يرى الخطّ */
+.gt-up{display:none}
+@media${below('md')}{.gt-up{display:block}}
 .gt{min-inline-size:48rem}
 .gt-axis,.gt-row{display:grid; grid-template-columns:11rem 1fr; gap:var(--s-3); align-items:stretch}
 .gt-axis{position:sticky; top:0; z-index:1; background:var(--surface); border-bottom:var(--bd); min-height:var(--s-8)}

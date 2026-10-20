@@ -16,7 +16,7 @@ import { sectionLabel } from './command'
 import { resultsTabs } from './results'
 import { emptyState } from './components/empty'
 import { notice, toastRegion } from './components/toast'
-import { dayRange, stamp } from '../../lib/time/zone'
+import { clock, dayKey, dayLabel, dayRange, stamp } from '../../lib/time/zone'
 import {
   PLAN_LABEL, SHIFT_LIMIT, SPANS, STATUS_LABEL,
   type GanttBar, type GanttChart, type GanttRow, type Span,
@@ -143,6 +143,31 @@ function stats(d: TimelineView): string {
     one(s.upcoming, 'قادمة')}${one(s.waiting, 'تنتظر قرارك')}${one(s.failed, 'فشلت')}</div>`
 }
 
+/**
+ * **«القادم» قائمةً على الهاتف** (EASE-PLAN و، من Things 3 وBuffer): الأشرطةُ على ‏390px تُقصّ أسماؤها («منشو…»)،
+ * وسؤالُ الهاتف «ماذا يخرج ومتى؟» لا «كم انتظر كلُّ منشور». فالمجدولُ القادمُ أيّامًا، وفي كلّ يومٍ ساعتُه ومنصّتُه
+ * ونصُّه ورابطُه — **من الأشرطة نفسِها** لا من استعلامٍ ثانٍ. والحاسوبُ يرى الخطَّ كما كان، والقائمةُ مخفيّةٌ عنه.
+ */
+export function upcomingList(d: TimelineView): string {
+  const items = d.chart.groups
+    .filter((g) => g.key !== 'plans')
+    .flatMap((g) => g.rows.flatMap((r) => r.tiers.flat()
+      .filter((b) => b.status === 'queued' && b.at !== null && new Date(b.at.replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(b.at) ? '' : 'Z')).getTime() >= d.now.getTime())
+      .map((b) => ({ b, where: `${g.label} · ${r.label}` }))))
+    .sort((x, y) => (x.b.at! < y.b.at! ? -1 : x.b.at! > y.b.at! ? 1 : 0))
+  if (items.length === 0) return ''
+  const days = new Map<string, typeof items>()
+  for (const it of items) {
+    const k = dayKey(it.b.at!, d.zone)
+    days.set(k, [...(days.get(k) ?? []), it])
+  }
+  const blocks = [...days.values()].map((list) => `<h3 class="gt-gh">${escapeHtml(dayLabel(list[0]!.b.at!, d.zone, false))}</h3>
+    <ul class="todo">${list.map(({ b, where }) => `<li><span><b>${escapeHtml(clock(b.at!, d.zone))}</b> · <bdi>${escapeHtml(where)}</bdi>
+        <span class="ago">${escapeHtml(b.label)}</span></span>
+      <a class="btn btn-secondary btn-sm" href="${escapeHtml(b.href)}">افتح</a></li>`).join('')}</ul>`).join('')
+  return `<div class="gt-up mt-3"><h2>القادم</h2>${blocks}</div>`
+}
+
 export function timelineScreen(d: TimelineView): string {
   const c = d.chart
   const last = new Date(c.to.getTime() - 1)
@@ -178,7 +203,7 @@ export function timelineScreen(d: TimelineView): string {
     ${stats(d)}
     ${c.groups.length === 0
       ? empty
-      : `${legend()}
+      : `${upcomingList(d)}${legend()}
     <div class="gt-wrap"><div class="gt" data-days="${c.days}">${axis(d)}${groups}</div></div>
     <form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden>
       <input type="hidden" name="id"><input type="hidden" name="when">
