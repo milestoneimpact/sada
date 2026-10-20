@@ -5292,6 +5292,17 @@ describe('الدخول برمز البريد (D-245)', () => {
     expect(mailer.sent).toHaveLength(1)
   })
 
+  it('وبعد عشرِ محاولاتٍ في اليوم يُغلق بابُ الرمز ولو صحّ (D-247)', async () => {
+    await db.prepare("INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code:milestonesimpact@gmail.com', 10, datetime('now', '-2 hours'))").run()
+    const response = await emailLogin(app, env)
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Set-Cookie') ?? '').not.toContain('sada_session=')
+    expect(await response.text()).toContain('ادخل بمفتاح المرور')
+    const rows = await db.prepare("SELECT action FROM audit_log WHERE action = 'login.code.locked'").all()
+    expect(rows.results).toHaveLength(1)
+    await db.prepare("DELETE FROM auth_attempts WHERE bucket = 'code:milestonesimpact@gmail.com'").run()
+  })
+
   it('والجلسة ثلاثة أيّام', async () => {
     const response = await emailLogin(app, env)
     expect(response.headers.get('Set-Cookie')).toContain(`Max-Age=${3 * 24 * 60 * 60}`)

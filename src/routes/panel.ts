@@ -60,7 +60,7 @@ import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
-import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
+import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess } from '../lib/security/gate'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { canReceiveCode, OWNER_EMAIL } from '../lib/ownerEmail'
 
@@ -975,6 +975,24 @@ panel.post('/panel/login', async (c) => {
 
   // ‏صاحبُ الرمز المالكُ اليوم: الرمزُ الوحيد المخزَّن رمزُه (`canReceiveCode`)
   const who = canReceiveCode(OWNER_EMAIL)!
+  // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم
+  if (!(await reserveCodeGuess(c.env.DB, who.email)).allowed) {
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked' }, c.req.raw)
+    const passkeys = await hasPasskeys(c.env)
+    return page(
+      (nonce) =>
+        loginPage(
+          {
+            error: 'الدخول بالرمز موقوف يوما بعد محاولات خاطئة كثيرة. ادخل بمفتاح المرور.',
+            blocked: true,
+            passkeys,
+            next,
+          },
+          nonce,
+        ),
+      429,
+    )
+  }
   const verdict = await verifyCode(c.env.KV, who.email, String(form.get('code') ?? ''))
   if (!verdict.ok) {
     const after = await recordFailure(c.env.KV, c.req.raw)
@@ -1029,6 +1047,7 @@ panel.post('/panel/login', async (c) => {
 
   await clearAttempts(c.env.KV, c.req.raw)
   await releaseAttempt(c.env.DB, c.req.raw)
+  await releaseCodeGuesses(c.env.DB, who.email)
   await record(
     c.env.DB,
     {
