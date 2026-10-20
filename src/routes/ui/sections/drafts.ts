@@ -60,6 +60,7 @@ import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
+import { stagesAttr } from '../components/stages'
 
 const STATUS: Readonly<Record<string, { cls: Tone; glyph: string; text: string }>> = {
   draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
@@ -444,7 +445,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     const w = ready.width ?? slide.width
     const h = ready.height ?? slide.height
     const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string =>
-      `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جارٍ التوليد…">
+      `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جارٍ التوليد…" ${stagesAttr('image')}>
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
@@ -465,7 +466,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
               // **ولا زرَّ تحريكٍ على صورةٍ لها مقطع**: كانت الضغطةُ تُردّ «لهذا
               // المنشور مقطعٌ من قبل» — زرٌّ يُعرَض ليُقال إنّه لا يفعل شيئا
               ? `<form class="inline" method="POST" action="/panel/media/animate"
-                   data-busy="جارٍ التحريك…">
+                   data-busy="جارٍ التحريك…" ${stagesAttr('motion')}>
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
                <button class="btn btn-secondary btn-sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
               : ''}
@@ -498,7 +499,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">${caption}</span>
     <span class="grow"></span>
-    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…">
+    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…" ${stagesAttr('image')}>
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
       <input type="hidden" name="style" value="infographic">
       <button class="btn btn-primary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
@@ -507,7 +508,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       <summary>أو صورةٌ فنّيّة</summary>
       <div class="art-row">
         <span class="ago">${lines.caption}</span>
-        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…">
+        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…" ${stagesAttr('image')}>
           <input type="hidden" name="id" value="${escapeHtml(d.id)}">
           <input type="hidden" name="style" value="illustration">
           <button class="btn btn-secondary btn-sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
@@ -1051,7 +1052,7 @@ function ideaCard(input: DraftsInput): string {
     <div class="card-head"><h2>اكتب من فكرتك</h2></div>
     <p class="hint">جملةٌ أو كلماتٌ قليلة، ونكتب منها لكلّ منصّةٍ مسوّدتَها بطولها ونبرتها.
       <b>وتقرؤها وتعتمدها أنت</b> — لا يُنشر شيءٌ قبل ذلك.</p>
-    <form method="POST" action="/panel/drafts/idea" data-busy="جارٍ كتابة المسوّدات…">
+    <form method="POST" action="/panel/drafts/idea" data-busy="جارٍ كتابة المسوّدات…" ${stagesAttr('idea')}>
       ${field({
         id: 'di-text',
         label: 'فكرتك أو كلماتك',
@@ -1099,7 +1100,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
               حلّل مصدرا أوّلا ثمّ عد.`,
           action: '<a class="btn btn-secondary btn-sm" href="#sources">اذهب إلى المصادر</a>',
         })
-      : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…">
+      : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…" ${stagesAttr('write')}>
            <div class="field"><label for="dw-src">المصدر</label>
              <select id="dw-src" name="id">${writable
                .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)

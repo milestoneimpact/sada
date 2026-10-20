@@ -242,7 +242,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-busy','true'); b.setAttribute('aria-disabled','true');
         b.setAttribute('aria-label',(b.textContent||'').trim()+' — '+f.dataset.busy);}
       var st=document.getElementById('flash');
-      if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);}
+      if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);
+        // ‏ومراحلُ الانتظار الطويل (7.11 · D-237): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
+        var stages=(f.dataset.stages||'').split('|').filter(Boolean);
+        if(stages.length){var i=0, t0=Date.now(), stay=' ابقَ في الصفحة حتّى ينتهي، فمغادرتُها تقطعه.';
+          var tick=function(){if(!p.isConnected)return; i=Math.min(i+1,stages.length-1);
+            p.textContent=stages[i]+(Date.now()-t0>=10000?stay:''); setTimeout(tick,4000);};
+          p.textContent=stages[0]; setTimeout(tick,4000);}}
     });
   }
   document.querySelectorAll('form[data-busy]').forEach(bindBusy);

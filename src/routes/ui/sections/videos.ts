@@ -23,6 +23,7 @@ import { emptyState } from '../components/empty'
 import { field } from '../components/field'
 import { linkLine, pickLine } from '../reach'
 import { fileName } from '../parts'
+import { stagesAttr } from '../components/stages'
 
 const MARK: Readonly<Record<VideoCheck['level'], { cls: Tone; g: string }>> = {
   ok: { cls: 'ok', g: '●' },
@@ -117,7 +118,7 @@ function captionForm(u: UploadRow, cap: VideoCaptions | undefined, ctx: VideoCon
       placeholder="مثل: لقاءٌ عن القيادة في أوّل مئة يوم"${cap === undefined ? '' : ` value="${escapeHtml(cap.about)}"`}>`
   // ‏«أعد كتابتها» تحمل `at` ما على الشاشة (D-190): الوصفُ نفسُه يُكتب منه من جديد مرّةً، وإعادةُ
   // ‏إرسال النموذج نفسِه بعدها تحمل `at` قديمًا فتعود «مكتوبةً» بلا نداءٍ ولا كلفة
-  return `<form class="vcap" method="POST" action="/panel/uploads/${id}/captions" data-busy="جارٍ كتابة النصوص…">
+  return `<form class="vcap" method="POST" action="/panel/uploads/${id}/captions" data-busy="جارٍ كتابة النصوص…" ${stagesAttr('captions')}>
       ${cap === undefined ? '' : `<input type="hidden" name="replace" value="${escapeHtml(cap.at)}">`}
       ${field({
         id: `va-${u.id}`,

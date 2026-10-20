@@ -19,6 +19,7 @@ import { relativeTime } from '../../../lib/format'
 import type { StoredPlan } from '../../../lib/plan/job'
 import { statusBadge } from '../components/badge'
 import { emptyState } from '../components/empty'
+import { stagesAttr } from '../components/stages'
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
@@ -79,7 +80,7 @@ function row(
       ${item.why === '' ? '' : `<div class="sub">— ${escapeHtml(item.why)}</div>`}</td>
     <td data-label="">${gone
       ? statusBadge('idle', '○', 'لا مصدر')
-      : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…">
+      : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…" ${stagesAttr('write')}>
            <input type="hidden" name="id" value="${escapeHtml(item.sourceId)}">
            <input type="hidden" name="platform" value="${escapeHtml(item.platform)}">
            <button class="btn btn-secondary btn-sm" type="submit">اكتب منه</button></form>`}</td>
