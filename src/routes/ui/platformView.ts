@@ -122,7 +122,7 @@ const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
 const WRITE = '/panel#write'
 
 /**
- * ‏**غلافُ الحساب حين لا غلافَ من المنصّة** (BRAND §٥ · D-227): النغمةُ الفاتحةُ على `--surface-2` بلا حريرٍ ولا خيط،
+ * ‏**غلافُ الحساب حين لا غلافَ من المنصّة** (BRAND §٥ · D-228): النغمةُ الفاتحةُ على `--surface-2` بلا حريرٍ ولا خيط،
  * ‏صدَيان بحبر `--ink-3`، والقمّةُ في أوّل السطر (يمينًا) بعيدًا عن شعار المنصّة في آخره. حتميٌّ فيُحسب مرّة.
  */
 const COVER_ECHO = echo({ width: 960, height: 120, tone: 'light', density: 2, crest: 0.75, level: 0.45, align: 'xMaxYMid' })

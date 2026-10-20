@@ -100,7 +100,7 @@ describe('صفحةُ حساب', () => {
     expect(screen({ tab: 'setup' })).toContain('أتنشر الآن؟')
   })
 
-  it('وغلافُ الحساب نقشُ الصدى الفاتح خلف شعار المنصّة، مخفيٌّ عن قارئ الشاشة (D-227)', () => {
+  it('وغلافُ الحساب نقشُ الصدى الفاتح خلف شعار المنصّة، مخفيٌّ عن قارئ الشاشة (D-228)', () => {
     const cover = /<div class="acct-cover" aria-hidden="true">([\s\S]*?)<\/div>/.exec(screen())?.[1] ?? ''
     expect(cover).toContain('acct-echo')
     expect(cover).toContain('data-echo="light"')
