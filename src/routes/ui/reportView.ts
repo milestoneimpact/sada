@@ -303,7 +303,7 @@ export function weekSentence(cur: WeeklyReport): string | null {
     parts.push(`وكلّف التفاعلُ الواحد نحو ${money(cur.spendUsd / act)}`)
   }
   if (parts.length === 0) return null
-  return `<p class="lede">${escapeHtml(parts.join('، '))}.</p>`
+  return `<p class="lede m-0 mb-4">${escapeHtml(parts.join('، '))}.</p>`
 }
 
 export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {

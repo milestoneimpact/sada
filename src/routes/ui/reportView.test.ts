@@ -187,7 +187,7 @@ describe('ثلاثة أرقام بفرقها في رأس «النتائج» (D-2
 
   it('وجملةٌ تقرأ الأرقام: من أين الظهور وبكم التفاعل — ولا تقول ما لم يُقَس (EASE-PLAN هـ)', async () => {
     const { weekSentence } = await import('./reportView')
-    expect(weekSentence(week(1200, 30, 1.5))).toBe('<p class="lede">الظهورُ كلُّه من X، وكلّف التفاعلُ الواحد نحو \u20660.050$\u2069.</p>')
+    expect(weekSentence(week(1200, 30, 1.5))).toBe('<p class="lede m-0 mb-4">الظهورُ كلُّه من X، وكلّف التفاعلُ الواحد نحو \u20660.050$\u2069.</p>')
     const two = {
       ...(week(0, 0, 0) as object), spendUsd: 0,
       platforms: [
@@ -195,7 +195,7 @@ describe('ثلاثة أرقام بفرقها في رأس «النتائج» (D-2
         { platform: 'linkedin', published: 1, measured: 1, impressions: 100, impressionsFrom: 1, interactions: 1, interactionsFrom: 1 },
       ],
     } as never
-    expect(weekSentence(two)).toBe('<p class="lede">أكثرُ الظهور من X (90٪).</p>')
+    expect(weekSentence(two)).toBe('<p class="lede m-0 mb-4">أكثرُ الظهور من X (90٪).</p>')
     // ‏لم يُقَس شيء، أو لم يخرج شيء: لا جملة
     expect(weekSentence(week(null, null, 2))).toBeNull()
     expect(weekSentence({ ...(week(5, 5, 1) as object), published: 0 } as never)).toBeNull()
