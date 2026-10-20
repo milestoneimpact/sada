@@ -432,7 +432,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .next[data-tone=warn]{border-inline-start-color:var(--warn); background:var(--warn-wash)}
 .next[data-tone=bad]{border-inline-start-color:var(--bad); background:var(--bad-wash)}
 .next-body{flex:1 1 16rem; min-width:0}
-.next-k{display:block; font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2)}
+.next-k{display:block; font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 .next-t{margin:var(--s-1) 0 0; font-size:var(--t-h3); font-weight:600; line-height:var(--lh-h3)}
 .home-card{margin-bottom:var(--gap-card)}
 .home-sub{margin:var(--s-5) 0 var(--s-3); font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
@@ -483,7 +483,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
   border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
 .wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--brand)}
-.wk-d{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2)}
+.wk-d{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 .wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
 .wk-dot{width:var(--s-2); height:var(--s-2); border-radius:50%; background:var(--ink-3)}
@@ -599,7 +599,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* وكان على رأس كلّ مؤشّرٍ خيطُ نحاسٍ («::before») يُخفيه شريطُ المؤشّرات منذ
    D-143، فلم يبقَ إلّا على عدّاد المصادر المستعير للصنف — نحاسٌ بلا معنى. فحُذف
    (D-183)؛ والصفُّ يربطه حدُّ الشريط النحاسيُّ في «.grid.tiles». */
-.tile .kv-k{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2)}
+.tile .kv-k{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 /* **أرقامُ المؤشّرات نمطُ «kpi»** (D-185): حجمُ عنوان الصفحة بوزن ‏٤٠٠ — الرقمُ يُقرأ
    بحجمه لا بثخانته، والثخينُ للعناوين. */
 .tile .kv-v{font-size:var(--t-h1); font-weight:400; line-height:var(--lh-h1);
@@ -1282,6 +1282,8 @@ ol.steps.wiz li.at{background:var(--selected); border-color:var(--line)}
 ol.steps.wiz li:not(:last-child)::before{top:calc(var(--s-8) + var(--stroke)); bottom:calc(-1 * var(--s-3));
   inset-inline-start:var(--s-6)}
 ol.steps.wiz .body{flex:1; min-width:11.25rem}
+/* ‏حالُ المنصّة في بلاطتها بحجم المتن الصغير (D-239): أكثرُ حروف الرئيسيّة الصغيرة كانت هنا */
+.pf .st{font-size:var(--t-small); line-height:var(--lh-small)}
 ol.steps.wiz .st{flex:none; margin-inline-start:auto}
 /* ورقمُ خطوةٍ رُدّت أو تمّت يحمل لونَ حالها — والعلامةُ نصٌّ بجانبه */
 ol.steps.wiz li.ok .step-n{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
