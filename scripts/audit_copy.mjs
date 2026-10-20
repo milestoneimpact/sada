@@ -27,6 +27,14 @@
  * والتشكيلُ يُقاس ويُطبع ولا يُسقط (الهدفُ 3 لكلّ 100 حرف، §11.4): خفضُه
  * مراجعةٌ لكلّ نصٍّ في اللوحة، وتُفتح وحدَها لا في طيّ هذا الحارس.
  *
+ * ## والحقيقةُ مرّةً في الصفحة (§10.2 · D-235)
+ *
+ * كلُّ عنصرٍ يقول حالَ منصّةٍ يحمل `data-fact="<المنصّة>:<الحال>"` (`x:broken`)،
+ * **وتتكرّر القيمةُ في الصفحة الواحدة فيسقط الفحص**: «X منقطعة» في الشريط
+ * وفي البلاطة وفي البطاقة ثلاثُ جملٍ عن شيءٍ واحد، يقرؤها المالكُ ثلاثَ مشكلات.
+ * و«الصفحةُ» في اللوحة كلُّ `data-pane` وحدَه، وما خارجَ الألواح (الشريطُ) يُعَدّ
+ * في كلّ لوح.
+ *
  * ## والحارسُ يُجرَّب على عيبٍ مزروع
  *
  * `--self-test` يحقن في عيّنةٍ نصًّا فيه قاعدتان مكسورتان ويتحقّق أنّ الفحص
@@ -109,9 +117,43 @@ export function tashkeel(text) {
   return letters === 0 ? 0 : (100 * marks) / letters
 }
 
+/** ‏مدى كلّ لوحٍ في اللوحة: `[اسمُه، بدايتُه، نهايتُه]`. */
+function panes(html) {
+  const out = []
+  for (const m of html.matchAll(/<section\b[^>]*\bdata-pane="([a-z]+)"[^>]*>/g)) {
+    const re = /<(\/?)section\b[^>]*>/g
+    re.lastIndex = m.index
+    let depth = 0
+    for (let t; (t = re.exec(html)) !== null;) {
+      depth += t[1] === '' ? 1 : -1
+      if (depth === 0) { out.push([m[1], m.index, re.lastIndex]); break }
+    }
+  }
+  return out
+}
+
+/** ‏كلُّ حقيقةٍ تكرّرت في صفحةٍ واحدة (أو لوحٍ واحد). */
+export function repeatedFacts(html) {
+  const bare = html.replace(/<(script|style|template)\b[\s\S]*?<\/\1>/g, (m) => ' '.repeat(m.length))
+  const ranges = panes(bare)
+  const scopes = new Map(ranges.length === 0 ? [['', []]] : ranges.map(([n]) => [n, []]))
+  for (const m of bare.matchAll(/\bdata-fact="([^"]+)"/g)) {
+    const own = ranges.find(([, a, b]) => m.index > a && m.index < b)
+    for (const [n, list] of scopes) if (own === undefined || own[0] === n) list.push(m[1])
+  }
+  const out = []
+  for (const [n, list] of scopes) {
+    for (const f of new Set(list)) {
+      const k = list.filter((x) => x === f).length
+      if (k > 1) out.push(`${f} ×${k}${n === '' ? '' : ` في «${n}»`}`)
+    }
+  }
+  return out
+}
+
 export function check(name, html) {
   const text = visible(html)
-  const problems = []
+  const problems = repeatedFacts(html).map((f) => `${name} · fact: ${f} ← الحالُ مرّةً في الصفحة، وما سواه يحيل إليه`)
   for (const rule of RULES) {
     if (rule.except?.includes(name)) continue
     for (const m of text.matchAll(rule.re)) {
@@ -133,14 +175,16 @@ if (args.includes('--self-test')) {
   const name = basename(files[0])
   const base = readFileSync(files[0], 'utf8')
   const planted = check(name, base.replace('</body>', '<p>بقي 30 يوما على الربط، والمنشورُ في الطابور</p></body>'))
+  // ‏والحقيقةُ المكرّرة على صفحةٍ بلا ألواح، فيُعَدّ ما زُرع وحدَه لا مرّةً لكلّ لوح
+  const facts = repeatedFacts('<body><p data-fact="zz:broken">أ</p><section data-pane="a"><p data-fact="zz:broken">ب</p></section><section data-pane="b"></section></body>')
   const hidden = check(name, base.replace('</body>', '<details><summary>للمطوّر</summary><p>30 يوما · الطابور</p></details></body>'))
   const clean = check(name, base)
   const caught = planted.problems.length - clean.problems.length
-  if (caught !== 2 || hidden.problems.length !== clean.problems.length) {
-    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 2، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
+  if (caught !== 2 || facts.length !== 1 || hidden.problems.length !== clean.problems.length) {
+    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 2، والحقيقةُ المكرّرة ${facts.length} من 1، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
     process.exit(1)
   }
-  console.log('audit_copy --self-test: العيبان المزروعان أُمسكا، وما تحت «للمطوّر» مستثنى ✓')
+  console.log('audit_copy --self-test: العيبان المزروعان والحقيقةُ المكرّرةُ في لوحها أُمسكت، وما تحت «للمطوّر» مستثنى ✓')
 }
 
 const problems = []
