@@ -375,7 +375,7 @@ export function providersSection(d: PanelData): ProvidersMarkup {
     <summary>
       <span class="g-ic">${ICON.add}</span>
       <span class="g-t"><b>أضف مزوّدا</b>
-        <span>أيّ مزوّد يتكلّم لهجة chat/completions — ثلاث خطوات بلا نشر ولا شيفرة.</span></span>
+        <span>أيّ مزوّدٍ متوافقٍ مع واجهة OpenAI — ثلاث خطوات بلا نشر ولا شيفرة.</span></span>
       <span class="grow"></span>
       <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
     </summary>
