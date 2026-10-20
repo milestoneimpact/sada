@@ -79,3 +79,17 @@ export async function createOrg(
   ])
   return { ok: true, id }
 }
+
+/**
+ * مسارُ ملفٍّ في R2 للمنظّمة (D-235): ملفّاتُ المالك بمساراتها القائمة فلا يُنقَل
+ * شيء، ولغيره تحت `org/<المنظّمة>/`. فتُحصى ملفّاتُ منظّمةٍ وتُحذَف بسابقةٍ واحدة.
+ */
+export function objectKey(org: string, path: string): string {
+  return org === OWNER_ORG ? path : `org/${org}/${path}`
+}
+
+/** منظّمةُ منشور، وما لا يُعرَف فللمالك — للعامل الذي لا جلسةَ له. */
+export async function orgOfPost(db: Db, postId: string): Promise<string> {
+  const row = await db.prepare('SELECT org_id FROM posts WHERE id = ?').bind(postId).first<{ org_id: string }>()
+  return row?.org_id ?? OWNER_ORG
+}

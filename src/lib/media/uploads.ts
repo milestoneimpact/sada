@@ -15,6 +15,7 @@ import { isLinkedInPage, type LinkedAccount } from '../channels'
 import { schedulePost } from '../schedule/job'
 import { YT_TITLE_MAX, youtubeDescription, youtubeTitle } from '../publish/youtube'
 import { canUploadMedia } from '../oauth/scopes'
+import { objectKey } from '../tenancy'
 
 /** الأنواعُ التي تقبلها المنصّاتُ الثلاث أو بعضُها — وما سواها يُردّ قبل أن يُرفَع بايت. */
 export const UPLOAD_MIMES: ReadonlySet<string> = new Set(['video/mp4', 'video/quicktime', 'video/webm'])
@@ -113,7 +114,7 @@ export async function startUpload(
   if (meta.bytes > MAX_UPLOAD_BYTES) {
     return { ok: false, reason: `أكبرُ من ${MAX_UPLOAD_BYTES / 1024 / 1024}MB — صدّره بدقّة 1080p وجودةٍ أقلّ` }
   }
-  const key = `upload/${id}.${extension(meta.mime)}`
+  const key = objectKey(org, `upload/${id}.${extension(meta.mime)}`)
   const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: meta.mime } })
   await db
     .prepare(

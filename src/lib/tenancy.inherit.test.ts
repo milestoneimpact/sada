@@ -29,3 +29,13 @@ describe('الوراثة', () => {
     expect(orgOf('cost_ledger', `id = '${loose}'`)).toBe('org_owner')
   })
 })
+
+describe('مسارُ الملفّ (D-235)', () => {
+  it('ملفُّ المالك بمساره القائم، وملفُّ غيره تحت سابقته', async () => {
+    const { objectKey, orgOfPost } = await import('./tenancy')
+    expect(objectKey('org_owner', 'img/p/m.png')).toBe('img/p/m.png')
+    expect(objectKey('org_b', 'img/p/m.png')).toBe('org/org_b/img/p/m.png')
+    expect(await orgOfPost(db, 'p_b')).toBe('org_b')
+    expect(await orgOfPost(db, 'لا-منشور')).toBe('org_owner')
+  })
+})

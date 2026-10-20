@@ -37,6 +37,7 @@ import { HEADLINE_MAX, OVERLAY_OFF, SLIDE_SIZE, clip, slideHtml } from './slide'
 import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
+import { objectKey, orgOfPost } from '../tenancy'
 
 /** أقصى ما يُقبل من بايتات — حدُّ المنصّتين أدنى من هذا بكثير. */
 export const MAX_BYTES = 5 * 1024 * 1024
@@ -626,7 +627,7 @@ async function persistImage(
   // ٦ · R2 أوّلا — بايتاتٌ يتيمةٌ أرخص من صفٍّ يكذب
   const mediaId = crypto.randomUUID()
   const extension = image.mime.includes('jpeg') ? 'jpg' : image.mime.includes('webp') ? 'webp' : 'png'
-  const r2Key = `img/${post.id}/${mediaId}.${extension}`
+  const r2Key = objectKey(await orgOfPost(deps.db, post.id), `img/${post.id}/${mediaId}.${extension}`)
   try {
     await deps.bucket.put(r2Key, image.bytes, {
       httpMetadata: { contentType: image.mime },
