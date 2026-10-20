@@ -119,7 +119,7 @@ crons = ["*/15 * * * *", "7 * * * *", "0 3 * * *", "14 4 * * 1"]
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "sada"
-database_id = "PLACEHOLDER_D1_PRODUCTION_ID"
+database_id = "e12ed883-f785-43b2-ac37-efa7bc12b7d6"
 migrations_dir = "migrations"
 
 # رابطُ Workers AI — بلا مفتاح: الحسابُ نفسه هو الإذن ما دام
@@ -133,7 +133,7 @@ bucket_name = "sada-media"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "PLACEHOLDER_KV_PRODUCTION_ID"
+id = "3d649c83fc074853afb5f5fdee7d1fd5"
 
 [[env.production.queues.producers]]
 binding = "PUBLISH_QUEUE"
