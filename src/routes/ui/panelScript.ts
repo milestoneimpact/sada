@@ -454,14 +454,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏بعد أن خرج الطلب فالبديلُ إعادةُ تحميل اللوحة (GET) تُري الحالَ الحقيقيّة — لا إرسالٌ ثانٍ لما قد نُفّذ
     fetch(f.action,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'}).then(function(r){
       if(r.type!=='opaqueredirect'&&!(r.status>=300&&r.status<400))throw new Error('status '+r.status);
-      return fetch('/panel',{credentials:'same-origin'});
+      return fetch('/panel?swap=posts',{credentials:'same-origin'});
     }).then(function(r){
       if(!r.ok)throw new Error('panel '+r.status);
       return r.text().then(function(html){return {html:html,url:r.url};});
     }).then(function(res){
       // ‏وورقةُ الردّ تُنزَع قبل القراءة: نونسُها غيرُ نونس هذه الصفحة فيرفضها CSP في السجلّ، ولا حاجةَ بها
       var doc=new DOMParser().parseFromString(res.html.replace(/<style[\\s\\S]*?<\\/style>/g,''),'text/html');
-      if(!doc.querySelector('section[data-pane]')){location.href=res.url; return;}
+      if(!doc.querySelector('section[data-pane]')){location.href=res.url.replace(/[?]swap=posts$/,''); return;}
       var mine=document.getElementById('d-'+id), theirs=doc.getElementById('d-'+id);
       if(mine){
         var fresh=theirs?document.importNode(theirs,true):null;

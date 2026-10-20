@@ -818,7 +818,7 @@ export function keepPanes(html: string, keep: ReadonlySet<string>): string {
   return out + html.slice(i)
 }
 
-export function panelPage(d: PanelData, only: PaneId | null = null): string {
+export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = false): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
@@ -1459,7 +1459,7 @@ ${/* ‏والذيلُ اسمٌ وساعة (D-215): «كلّ زرٍّ هنا ي�
 </div>`
 
   // ‏و«/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره (D-211: ‏166KB كانت الصفحة، والخطّةُ ‏90)
-  const kept = keepPanes(body, new Set<string>(only === null ? ['overview', 'posts'] : [only]))
+  const kept = keepPanes(body, new Set<string>(swapPosts ? ['posts'] : only === null ? ['overview', 'posts'] : [only]))
   return shell(
     only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(kept, d.csrf), d.nonce, '',
     { commands: buildCommands({ onPanel: only === null, drafts: d.drafts }), panelScript: true },

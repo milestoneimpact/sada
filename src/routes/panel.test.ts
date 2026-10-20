@@ -613,6 +613,14 @@ describe('الأفعال — واللوحة ليست طريقا جانبيّا �
     expect(html).toContain('<form class="row" method="POST" action="/panel/settings" data-autosave>')
   })
 
+  it('وسكربتُ التبديل يجلب «المنشورات» وحدَها (D-227)', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel?swap=posts', withSession(cookie), env)).text()
+    expect(html).toContain('<section data-pane="posts"')
+    expect(html).not.toContain('<section data-pane="overview"')
+    expect(html).toContain('id="flash"')
+  })
+
   it('بلا جلسة لا فعل — لا مسحا ولا تحليلا', async () => {
     const body = new FormData()
     body.set('id', 'x')

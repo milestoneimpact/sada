@@ -862,7 +862,8 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       ownerPending,
       expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    }, only),
+    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-227): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
+    }, only, q.get('swap') === 'posts'),
   )
 }
 
