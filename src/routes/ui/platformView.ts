@@ -39,6 +39,7 @@ import {
 import { whyFailed } from '../../lib/publish/reasons'
 import { clock, dayKey, dayLabel, stamp } from '../../lib/time/zone'
 import { ICON } from './icons'
+import { echo } from './echo'
 import { escapeHtml } from './escape'
 import { setupPane } from './channels'
 import { LOGOS } from './logos'
@@ -119,6 +120,12 @@ const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
  * ‏ولا نموذجَ كتابة. والمرساةُ تفتح لوحَها ثمّ تنزل إليها (`panelScript` · show).
  */
 const WRITE = '/panel#write'
+
+/**
+ * ‏**غلافُ الحساب حين لا غلافَ من المنصّة** (BRAND §٥ · D-228): النغمةُ الفاتحةُ على `--surface-2` بلا حريرٍ ولا خيط،
+ * ‏صدَيان بحبر `--ink-3`، والقمّةُ في أوّل السطر (يمينًا) بعيدًا عن شعار المنصّة في آخره. حتميٌّ فيُحسب مرّة.
+ */
+const COVER_ECHO = echo({ width: 960, height: 120, tone: 'light', density: 2, crest: 0.75, level: 0.45, align: 'xMaxYMid' })
 
 export function tabOf(raw: string | undefined, show: string | undefined): Tab {
   if (raw !== undefined && (TABS as readonly string[]).includes(raw)) return raw as Tab
@@ -393,7 +400,7 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
           <li>${last === null ? 'لم يُنشر شيءٌ بعد' : `آخرُ نشرٍ ${escapeHtml(relativeTime(last, d.now))}`}</li>
         </ul>`
   return `<header class="card acct ${ACCT_CLASS[spec.id] ?? ''}">
-    <div class="acct-cover" aria-hidden="true"><span class="acct-mark">${logo}</span></div>
+    <div class="acct-cover" aria-hidden="true"><span class="echo acct-echo">${COVER_ECHO}</span><span class="acct-mark">${logo}</span></div>
     <div class="acct-body">
       ${first === undefined ? '' : `<span class="acct-av" data-kind="${first.kind === 'org' || spec.id === 'youtube' ? 'org' : 'member'}"
         aria-hidden="true">${escapeHtml(initial)}</span>`}

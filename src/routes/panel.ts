@@ -862,7 +862,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       ownerPending,
       expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-228): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
+    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-229): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
     }, only, q.get('swap') === 'posts'),
   )
 }
@@ -1207,7 +1207,7 @@ panel.post('/panel/settings', async (c) => {
     flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
-  // ‏**والحفظُ التلقائيّ في الحدود** (D-228): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
+  // ‏**والحفظُ التلقائيّ في الحدود** (D-229): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
   // ‏(وقد تُقصّ إلى المدى) لا بتحويلٍ يعيد رسمَ الصفحة. والفحصُ والقصُّ والتدقيقُ قبله كما هي.
   if (form.get('auto') === '1') return c.json({ ok: flash.kind !== 'bad', text: flash.text, stored: result.stored })
   await setFlash(c.env, c.req.raw, flash)
@@ -2391,7 +2391,7 @@ panel.post('/panel/drafts/decide', async (c) => {
   if (wants === 'save') {
     const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
     /*
-     * ‏**والحفظُ التلقائيّ** (D-228، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
+     * ‏**والحفظُ التلقائيّ** (D-229، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
      * ‏فيُردّ عليه بسطرٍ لا بتحويل: لا إشعارَ يملأ الشاشة كلَّ جملة، ولا سطرَ تدقيقٍ لكلّ توقّف. والفحصُ فحصُ الاعتماد نفسُه.
      */
     if (form.get('auto') === '1') {
@@ -2869,7 +2869,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-228) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
+  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-229) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
   const back = String(form.get('back') ?? '')
   if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
