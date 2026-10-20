@@ -1206,6 +1206,9 @@ panel.post('/panel/settings', async (c) => {
     flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
+  // ‏**والحفظُ التلقائيّ في الحدود** (D-227): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
+  // ‏(وقد تُقصّ إلى المدى) لا بتحويلٍ يعيد رسمَ الصفحة. والفحصُ والقصُّ والتدقيقُ قبله كما هي.
+  if (form.get('auto') === '1') return c.json({ ok: flash.kind !== 'bad', text: flash.text, stored: result.stored })
   await setFlash(c.env, c.req.raw, flash)
   // ‏ومفتاحٌ في صفحة منصّةٍ يعود إليها لا إلى «الحدود» (D-172 · D-190): من قائمةٍ مغلقة
   const to = backTo(form.get('return'), '')

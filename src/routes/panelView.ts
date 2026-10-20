@@ -1224,7 +1224,7 @@ ${pivotPane(d.pivot)}
   <div class="card mt-3"><h2>الحدود اليوميّة</h2>
     <p class="hint"><b>سقفُ التحليل</b> يعدّ التحليلاتِ وحدَها، و<b>سقفُ الإنفاق</b> يعدّ كلَّ ما دُفع اليوم:
       التحليلُ والكتابةُ والخطّةُ والصورُ والنشر. وبلوغُ أيٍّ منهما يوقف التوليدَ <b>ولا يوقف نشرَ ما اعتمدتَه</b>.</p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_analysis_cap">
       ${field({ id: 'c1', label: 'سقف التحليل (عدد)',
         control: `<input type="number" name="value" min="0" max="500" step="1" value="${d.analysisCap}">` })}
@@ -1232,7 +1232,7 @@ ${pivotPane(d.pivot)}
       <span class="note self-center">المستهلَك اليوم: ${d.usedAnalyses}</span>
     </form>
     <hr>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_spend_cap_usd">
       ${field({ id: 'c2', label: 'سقف الإنفاق (دولار)',
         control: `<input type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}">` })}
@@ -1244,7 +1244,7 @@ ${pivotPane(d.pivot)}
          وصفرٌ لا يبلغ سقفَ الإنفاق أبدًا */ ''}
     <p class="hint"><b>والمقاطعُ بعددها</b>: سعرُها لم يُقرأ بعد، فيُسجَّل صفرًا لا يبلغ سقفَ الإنفاق.
       والمحاولةُ التي تسقط تُعدّ كالتي تنجح. <b>وصفرٌ يُغلق التحريك.</b></p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_video_cap">
       ${field({ id: 'c4', label: 'سقف المقاطع (عدد)',
         control: `<input type="number" name="value" min="0"
@@ -1257,7 +1257,7 @@ ${pivotPane(d.pivot)}
   <div class="card mt-3"><h2>سقف الترويج الأسبوعيّ</h2>
     <p class="hint"><b>ومنه وحده يأتي مبلغُ التوصية.</b> رقمٌ يؤلّفه صدى رقمٌ بلا مصدر —
       والتوصيةُ هنا تقترح <b>مالا</b> لا كتابة. <b>وصفرٌ يعني لا توصيةَ تُكتب أصلا.</b></p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="weekly_promo_cap_usd">
       ${field({ id: 'c3', label: 'سقف الترويج (دولار في الأسبوع)',
         control: `<input type="number" name="value" min="0" max="500" step="1"

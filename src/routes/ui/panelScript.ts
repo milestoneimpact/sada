@@ -490,6 +490,29 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     });
   });
 
+  /*
+   * ‏**الحدودُ تُحفظ وحدَها** (D-227، من Notion): حقلُ الرقم في نموذجٍ معلَّم «data-autosave» يُرسَل حين يتغيّر بـ«auto=1»،
+   * ‏ويُقال ما حُفظ بجواره («حُفظ 5» أو القيمةُ بعد قصّها إلى المدى). ويُخفى «حفظ» حين يعمل هذا، ويبقى بلا سكربت.
+   */
+  document.querySelectorAll('form[data-autosave]').forEach(function(f){
+    if(!window.fetch)return;
+    var inp=f.querySelector('input[name="value"]'), btn=f.querySelector('button[type="submit"]');
+    if(!inp)return;
+    if(btn)btn.hidden=true;
+    var mark=document.createElement('span'); mark.className='ed-saved self-center'; mark.setAttribute('role','status'); f.appendChild(mark);
+    var last=inp.value;
+    var push=function(){
+      if(inp.value===last||!inp.checkValidity()){if(!inp.checkValidity())mark.textContent='خارج المدى';return;}
+      var body=new FormData(f); body.set('auto','1'); mark.textContent='جارٍ الحفظ…';
+      fetch(f.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+        if(j&&j.stored!==undefined){inp.value=j.stored; last=inp.value;}
+        mark.textContent=j&&j.ok?'حُفظ':'لم يُحفظ'+(j&&j.text?': '+j.text:'');
+      }).catch(function(){mark.textContent=navigator.onLine===false?'لم يُحفظ: لا اتّصال':'لم يُحفظ';});
+    };
+    inp.addEventListener('change',push);
+    f.addEventListener('submit',function(e){e.preventDefault(); push();});
+  });
+
   // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا
   // يمنع التمرير، وبدونها يؤخّره المتصفّحُ احتياطا
   var bar=document.querySelector('.topbar');

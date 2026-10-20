@@ -602,6 +602,17 @@ describe('الأفعال — واللوحة ليست طريقا جانبيّا �
     expect(cost.n).toBe(0)
   })
 
+  it('والحدودُ تُحفظ وحدَها (D-227): «auto=1» يُجاب بالقيمة المحفوظة، مقصوصةً إلى المدى', async () => {
+    const cookie = await login()
+    const ok = await post(cookie, '/panel/settings', { key: 'daily_spend_cap_usd', value: '7.5', auto: '1' })
+    expect(ok.status).toBe(200)
+    expect(await ok.json()).toMatchObject({ ok: true, stored: '7.5' })
+    const big = await post(cookie, '/panel/settings', { key: 'daily_spend_cap_usd', value: '9999', auto: '1' })
+    expect(((await big.json()) as { stored: string }).stored).toBe('100')
+    const html = await (await app.request('/panel/settings', withSession(cookie), env)).text()
+    expect(html).toContain('<form class="row" method="POST" action="/panel/settings" data-autosave>')
+  })
+
   it('بلا جلسة لا فعل — لا مسحا ولا تحليلا', async () => {
     const body = new FormData()
     body.set('id', 'x')
