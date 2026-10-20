@@ -123,7 +123,7 @@ describe('GET /oauth/:platform/start', () => {
    * `prompt=consent`. وبدونهما **يُربَط الحسابُ ويبدو ناجحا**، ثمّ
    * يسقط بعد ساعةٍ بلا ما يجدّده — فيُثبَّت المعاملان هنا.
    */
-  it('يطلب من Google إذنَ تجديدٍ صراحةً — وإلّا سقط الربطُ بعد ساعة', async () => {
+  it('يطلب من Google إذن تجديد صراحةً — وإلّا سقط الربط بعد ساعة', async () => {
     const response = await app.request('/oauth/youtube/start', {}, env)
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location') ?? '')
@@ -136,7 +136,7 @@ describe('GET /oauth/:platform/start', () => {
    * **TikTok يسمّي المعرّف `client_key`.** ورابطٌ يحمل الاسمَ
    * المعياريَّ يُردّ بخطأٍ لا يذكر السبب — فيُثبَّت الاسمُ لا يُترك.
    */
-  it('يسمّي معرّفَ TikTok client_key لا client_id', async () => {
+  it('يسمّي معرّف TikTok client_key لا client_id', async () => {
     const response = await app.request('/oauth/tiktok/start', {}, env)
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location') ?? '')
@@ -149,7 +149,7 @@ describe('GET /oauth/:platform/start', () => {
    * ‏**ولا سطرَ JSON في وجه المالك** (ر-1 · خطّة التصميم 7.11): كان `{"error":"not_configured"}`.
    * ‏فالتحويلُ إلى حقلَي التطبيق في تبويب الإعداد، ووميضٌ يقول لماذا.
    */
-  it('حين ينقص سرٌّ يعود إلى تبويب الإعداد بوميضٍ يقول لماذا، ولا يذكر قيمة', async () => {
+  it('حين ينقص سرّ يعود إلى تبويب الإعداد بوميض يقول لماذا، ولا يذكر قيمة', async () => {
     const response = await app.request('/oauth/x/start', { headers: { Cookie: `${COOKIE}=s1` } },
       { ...env, X_CLIENT_SECRET: '' })
     expect(response.status).toBe(303)
@@ -253,10 +253,10 @@ describe('GET /oauth/:platform/callback', () => {
     // ورفضُ المستخدم يُقال قرارا لا عطلا: لا تشخيصَ ولا خطوات
     expect(body).toContain('أُلغي')
     expect(body).toContain('لم يُحفَظ شيء')
-    expect(body).not.toContain('نطاقٌ لم يُمنَح')
+    expect(body).not.toContain('نطاق لم يُمنَح')
   })
 
-  it('ورفضُ نطاقٍ يُشخَّص بالاسم ومصدرِه — لا يُخلَط برفض المستخدم', async () => {
+  it('ورفض نطاق يُشخَّص بالاسم ومصدرِه — لا يُخلَط برفض المستخدم', async () => {
     // العلّةُ التي وُلد منها D-045: الجوابُ كان
     // { error: consent_denied, reason: unauthorized_scope_error } وحده
     const { state } = await startAndCaptureState('linkedin')
@@ -274,7 +274,7 @@ describe('GET /oauth/:platform/callback', () => {
     // ومخرجٌ لا شاشةُ عطلٍ مغلقة
     expect(body).toContain('/oauth/linkedin/start?scope=identity')
     // ولا يُتّهم السرُّ وهو بريء
-    expect(body).toContain('لا تُعِد توليدَ السرّ')
+    expect(body).toContain('لا تُعِد توليد السرّ')
   })
 
   /**
@@ -285,7 +285,7 @@ describe('GET /oauth/:platform/callback', () => {
    * بالاسم في `error_description`. وكانت الصفحةُ تعرض الثلاثةَ وتقول
    * «لا أعرف أيَّها» — وهي تعرف.
    */
-  it('يسمّي النطاقَ الذي سمّته المنصّةُ وحدَه، ولا يعرض الثلاثة', async () => {
+  it('يسمّي النطاق الذي سمّته المنصّة وحدَه، ولا يعرض الثلاثة', async () => {
     const { state } = await startAndCaptureState('linkedin')
     const description = encodeURIComponent(
       'Scope "openid" is not authorized for your application',
@@ -301,18 +301,18 @@ describe('GET /oauth/:platform/callback', () => {
     expect(body).toContain('openid')
     expect(body).toContain('Sign In with LinkedIn using OpenID Connect')
     // العنوانُ نفسه يتبدّل: «النطاقُ الناقص» لا «ما طُلب في هذه المحاولة»
-    expect(body).toContain('النطاقُ الناقص ومَن يمنحه')
+    expect(body).toContain('النطاق الناقص ومَن يمنحه')
     expect(body).not.toContain('ما طُلب في هذه المحاولة')
     // وجدولُ الاتّهام صفٌّ واحد: صفوفُه تحمل «يُمنَح فورا» في عمود المصدر
     const rows = body.split('<tr>').length - 1
-    expect(rows).toBe(2) // ترويسةٌ وصفٌّ واحد
+    expect(rows).toBe(2) // ترويسة وصفّ واحد
   })
 
   /**
    * ونطاقُ الهويّة إن كان هو الناقصَ **أسقط مخرجَ الهويّة**: زرٌّ يطلب
    * ما رُفض بعينه يَعِد بما لا يقع.
    */
-  it('ولا يعرض «اربط الهويّة وحدها» حين يكون الناقصُ نطاقَ الهويّة', async () => {
+  it('ولا يعرض «اربط الهويّة وحدها» حين يكون الناقص نطاق الهويّة', async () => {
     const { state } = await startAndCaptureState('linkedin')
     const description = encodeURIComponent('Scope "openid" is not authorized')
     const response = await app.request(
@@ -323,10 +323,10 @@ describe('GET /oauth/:platform/callback', () => {
     )
     const body = await response.text()
     expect(body).not.toContain('scope=identity')
-    expect(body).toContain('لا يفيدك ربطُ الهويّة وحدها')
+    expect(body).toContain('لا يفيدك ربط الهويّة وحدها')
   })
 
-  it('ووصفٌ لا يسمّي شيئا يعيد عرضَ القائمة كاملةً', async () => {
+  it('ووصف لا يسمّي شيئا يعيد عرض القائمة كاملةً', async () => {
     const { state } = await startAndCaptureState('linkedin')
     const response = await app.request(
       `/oauth/linkedin/callback?error=unauthorized_scope_error` +
@@ -340,10 +340,10 @@ describe('GET /oauth/:platform/callback', () => {
     expect(body).toContain('openid')
     expect(body).toContain('ما طُلب في هذه المحاولة')
     const rows = body.split('<tr>').length - 1
-    expect(rows).toBe(4) // ترويسةٌ وثلاثةُ نطاقات
+    expect(rows).toBe(4) // ترويسة وثلاثة نطاقات
   })
 
-  it('ولا يُعرَض مخرجُ الهويّة إن كانت هي التي رُفضت', async () => {
+  it('ولا يُعرَض مخرج الهويّة إن كانت هي التي رُفضت', async () => {
     const { state } = await startAndCaptureState('linkedin', 'identity')
     const response = await app.request(
       `/oauth/linkedin/callback?error=unauthorized_scope_error&state=${encodeURIComponent(state)}`,
@@ -383,7 +383,7 @@ describe('GET /oauth/:platform/callback', () => {
    * ‏ر-1: نهايةُ الرمز لا تُبلَغ (`TypeError` من `fetch`) — كان «Internal Server Error» نصًّا
    * ‏بعد أن وافق المالكُ عند المنصّة، والحالةُ استُهلكت فلا يصلحه تحديث.
    */
-  it('وعطلُ الشبكة صفحةٌ تقول ما وقع وتعيد المحاولة — لا «Internal Server Error»', async () => {
+  it('وعطل الشبكة صفحة تقول ما وقع وتعيد المحاولة — لا «Internal Server Error»', async () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       throw new TypeError(`network disabled for ${String(input)}?access_token=سرّ`)
@@ -408,7 +408,7 @@ describe('GET /oauth/:platform/callback', () => {
    * ‏سرّين محذوفين، و503 من نهاية الرمز أو الهويّة عند المنصّة يحمل الرقمَ نفسَه — فيُرسَل
    * ‏المالكُ يعيد لصقَ سرّين سليمين. والعطلُ عندها صفحةُ «لم نصل» بسببه، لا تبويبُ الإعداد.
    */
-  it('503 من نهاية الرمز عطلٌ عند المنصّة: «لم نصل» بسببه، لا «ينقص السرّان» ولا وميض', async () => {
+  it('503 من نهاية الرمز عطل عند المنصّة: «لم نصل» بسببه، لا «ينقص السرّان» ولا وميض', async () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = fakeFetch({ [X.tokenUrl]: { status: 503, json: { error: 'temporarily_unavailable' } } })
     const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
@@ -423,7 +423,7 @@ describe('GET /oauth/:platform/callback', () => {
     expect(await kv.get('flash:s1')).toBeNull()
   })
 
-  it('و503 من نهاية الهويّة كذلك — بعد رمزٍ صحيح، ولا يُحفظ شيء', async () => {
+  it('و503 من نهاية الهويّة كذلك — بعد رمز صحيح، ولا يُحفظ شيء', async () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = fakeFetch({
       [X.tokenUrl]: { json: { access_token: 'x-access', expires_in: 7200 } },
@@ -443,7 +443,7 @@ describe('GET /oauth/:platform/callback', () => {
    * ‏وكعكةُ الجلسة `SameSite=Strict` لا تعبره — فالوميضُ لا يُكتب في المتصفّح الحقيقيّ،
    * ‏والسببُ يجب أن يُقرأ في الصفحة نفسِها، ومعه زرٌّ إلى حقلَي التطبيق.
    */
-  it('سرّان حُذفا قبل العودة: صفحةٌ تقول ذلك وزرٌّ إلى حقليهما، بلا قيمةٍ ولا وميض', async () => {
+  it('سرّان حُذفا قبل العودة: صفحة تقول ذلك وزرّ إلى حقليهما، بلا قيمة ولا وميض', async () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = fakeFetch({})
     const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
@@ -451,7 +451,7 @@ describe('GET /oauth/:platform/callback', () => {
     expect(response.status).toBe(503)
     expect(response.headers.get('Content-Type')).toContain('text/html')
     const body = await response.text()
-    expect(body).toContain('لم نجد عندنا معرّفَ تطبيقها وسرَّه')
+    expect(body).toContain('لم نجد عندنا معرّف تطبيقها وسرَّه')
     expect(body).toContain('<a class="btn btn-primary" href="/panel/channels/x?tab=setup#ci-x">اضبط المعرّف والسرّ</a>')
     expect(body).not.toContain('x-id')
     expect(await kv.get('flash:s1')).toBeNull()
@@ -576,7 +576,7 @@ describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
     expect(response.status).toBe(401)
   })
 
-  it('بالرمز الصحيح يمضي إلى التحليل — ومصدرٌ مفقود ليس عطل خادم', async () => {
+  it('بالرمز الصحيح يمضي إلى التحليل — ومصدر مفقود ليس عطل خادم', async () => {
     const response = await app.request(
       '/admin/analyze/لا-وجود-له',
       { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` } },
@@ -627,7 +627,7 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     expect((await app.request('/admin/providers', {}, ctx())).status).toBe(401)
   })
 
-  it('**لا يعيد قيمة مفتاحٍ ولا جزءا منها**', async () => {
+  it('**لا يعيد قيمة مفتاح ولا جزءا منها**', async () => {
     const response = await app.request(
       '/admin/providers',
       auth(),
@@ -668,7 +668,7 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
    * فصار يثبّت **القاعدة**: كلُّ مهمّةٍ مبنيّةٍ ينقص سرُّ مزوّدها تُسمَّى،
    * وما لم يُبنَ لا يُشتكى منه — أيّا كانت المهامّ يومَ يُقرأ هذا.
    */
-  it('يسمّي ما يعطّل مهمّةً مبنيّة، ولا يشكو ممّا لم يُبنَ', async () => {
+  it('يسمّي ما يعطّل مهمّةً مبنيّة، ولا يشكو ممّا لم يُبن', async () => {
     const body = await read()
     const tasks = Object.keys(ROUTES) as TaskName[]
 
@@ -697,7 +697,7 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     expect(body.window_days).toBe(30)
   })
 
-  it('دفترٌ لا يُقرأ لا يُسقط اللوحة — التوجيه يبقى مقروءا', async () => {
+  it('دفتر لا يُقرأ لا يُسقط اللوحة — التوجيه يبقى مقروءا', async () => {
     const broken = {
       prepare: () => ({
         bind: () => ({
@@ -778,7 +778,7 @@ describe('GET /admin/sources — الجسر الذي كان مفقودا', () =>
     expect(body.pending).toBe(0)
   })
 
-  it('تحليلٌ لبصمةٍ قديمة يُعلَّم بائتا ويعود منتظرا', async () => {
+  it('تحليل لبصمة قديمة يُعلَّم بائتا ويعود منتظرا', async () => {
     const id = await seed('md5:جديد')
     await db
       .prepare('INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)')
@@ -801,7 +801,7 @@ describe('GET /admin/sources — الجسر الذي كان مفقودا', () =>
     expect(body.sources[0]!.analyzed).toBe(false)
   })
 
-  it('لا يذكر قيمة رمزٍ في أيّ ردّ', async () => {
+  it('لا يذكر قيمة رمز في أيّ ردّ', async () => {
     await seed('md5:a')
     const text = await (await app.request('/admin/sources', auth(), withToken())).text()
     expect(text).not.toContain(TOKEN)
@@ -852,7 +852,7 @@ describe('/health و /ready', () => {
    *
    * **وإشارةٌ حمراءُ دائما تُتجاهَل** — وهي حجّةٌ مكتوبةٌ في سير النشر.
    */
-  it('**ما سُدّ من الخزانة يُجيز البوّابة** — ولا جوابَ يناقض نفسَه', async () => {
+  it('**ما سُدّ من الخزانة يُجيز البوّابة** — ولا جواب يناقض نفسَه', async () => {
     // بيئةٌ بلا سرَّي LinkedIn: الخزانةُ وحدَها تسدّهما
     const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
     const before = (await (await app.request('/ready', {}, bare)).json()) as ReadyBody
@@ -869,7 +869,7 @@ describe('/health و /ready', () => {
   })
 
   /** **والجوابُ لا يناقض نفسَه في أيّ حال**: لا ناقصَ ⇒ المرحلةُ ماضية. */
-  it('لا ناقصَ ومع ذلك غيرُ جاهزٍ — حالٌ لا تقع', async () => {
+  it('لا ناقص ومع ذلك غير جاهز — حال لا تقع', async () => {
     for (const candidate of [env, { ...env, X_CLIENT_SECRET: '' }]) {
       const body = (await (await app.request('/ready', {}, candidate)).json()) as ReadyBody
       const missingPhase0 = body.missing_secrets.some((name) =>
@@ -908,14 +908,14 @@ describe('/health و /ready', () => {
  * ‏ر-1: صفحةُ «لم يكتمل الربط» كانت تقود إلى لوح القنوات ولا حقلَ فيه، وتقول «تبويب Auth»
  * ‏لكلّ منصّة، وتشرح رابطَ العودة بتنبيهٍ عن غيره («ولا منشورَ نصّيٌّ في Instagram»).
  */
-describe('صفحةُ الرفض بلغة كلّ منصّةٍ وإلى حقليها', () => {
-  it('رفضٌ عامّ: «اضبط المعرّف والسرّ» إلى حقل المعرّف، ورابطُ العودة بخطوته', () => {
+describe('صفحة الرفض بلغة كلّ منصّة وإلى حقليها', () => {
+  it('رفض عامّ: «اضبط المعرّف والسرّ» إلى حقل المعرّف، ورابط العودة بخطوته', () => {
     const html = refusedBody({ platform: 'instagram', reason: 'invalid_request', requested: [], identityRetry: false })
     expect(html).toContain('<a class="btn btn-primary" href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط المعرّف والسرّ</a>')
     expect(html).not.toContain('افتح الدليل والحقول')
     expect(html).not.toContain('REELS')
-    expect(html).toContain('رابطُ العودة المسجَّل في Meta for Developers')
-    expect(html).toContain('وهو الخطوةُ 3 من الدليل.')
+    expect(html).toContain('رابط العودة المسجَّل في Meta for Developers')
+    expect(html).toContain('وهو الخطوة 3 من الدليل.')
   })
 
   it('وinvalid_client عند TikTok لا يذكر «تبويب Auth»', () => {

@@ -104,14 +104,14 @@ export async function seed(
   await run(db,
     `INSERT INTO content_items (id, source_id, summary, themes_json, worth_score, extracted_at) VALUES (?, ?, ?, ?, ?, ?)`,
     crypto.randomUUID(), doc,
-    'يعرض المستندُ إطارًا لتعريف المعالم في المشاريع: كلُّ معلَمٍ يُعرَّف قبل التنفيذ بمخرَجٍ يُقاس، ' +
-      'ومالكٍ لقرار القبول، وأثرٍ معلومٍ للتأخّر. ويقترح مراجعةً أسبوعيّةً قصيرة تبني على هذا التعريف بدل النقاش المفتوح.',
+    'يعرض المستند إطارًا لتعريف المعالم في المشاريع: كلّ معلَم يُعرَّف قبل التنفيذ بمخرَج يُقاس، ' +
+      'ومالك لقرار القبول، وأثر معلوم للتأخّر. ويقترح مراجعةً أسبوعيّةً قصيرة تبني على هذا التعريف بدل النقاش المفتوح.',
     JSON.stringify({
       hash: docHash,
       themes: ['تعريف المعلَم قبل التنفيذ', 'ملكيّة قرار القبول', 'أثر التأخّر'],
       audience: 'مديرو المشاريع وقادة الفرق',
       angles: ['ثلاثة أسئلة قبل كلّ معلَم', 'من الاجتماع الطويل إلى المراجعة القصيرة'],
-      reason: 'فكرةٌ عمليّةٌ قابلةٌ للتطبيق، بلغةٍ يفهمها جمهورُ LinkedIn المهنيّ',
+      reason: 'فكرة عمليّة قابلة للتطبيق، بلغة يفهمها جمهور LinkedIn المهنيّ',
     }),
     0.82, at(-2 * DAY + HOUR))
 
@@ -141,7 +141,7 @@ export async function seed(
       id, fields.platform, fields.account ?? null, fields.source ?? null, fields.source === doc ? docHash : null,
       fields.model ?? 'claude-opus-5', fields.cost ?? 0, fields.text,
       JSON.stringify(fields.source === undefined || fields.source === null ? [] : [fields.source]),
-      fields.source === undefined || fields.source === null ? null : 'مبنيٌّ على فكرة المصدر المركزيّة.',
+      fields.source === undefined || fields.source === null ? null : 'مبنيّ على فكرة المصدر المركزيّة.',
       fields.status, fields.key, fields.approved === undefined || fields.approved === null ? null : 'panel',
       fields.approved ?? null, fields.scheduled ?? null, fields.created ?? at(-DAY), fields.dispatched ?? null,
       fields.original ?? null)
@@ -152,9 +152,9 @@ export async function seed(
   const draft = await post({
     platform: 'linkedin', status: 'draft', source: doc, key: `draft:${doc}:linkedin:md5:prev-version`, cost: 0.0612,
     created: at(-5 * HOUR),
-    text: 'كلُّ مشروعٍ يتعثّر يبدأ تعثّرُه قبل التنفيذ: حين لا يتّفق الفريقُ على معنى «تمّ».\n\n' +
-      'نعرّف كلَّ معلَمٍ اليوم بثلاثة: مخرَجٌ يُرى ويُقاس، ومالكٌ لقرار القبول، وأثرٌ معلومٌ إن تأخّر.\n\n' +
-      'والنتيجة: مراجعةٌ أسبوعيّةٌ في عشر دقائق بدل ساعة.\n\nما الذي يعنيه «تمّ» في فريقك؟\n\n#إدارة_المشاريع #الحوكمة',
+    text: 'كلّ مشروع يتعثّر يبدأ تعثّرُه قبل التنفيذ: حين لا يتّفق الفريق على معنى «تمّ».\n\n' +
+      'نعرّف كلّ معلَم اليوم بثلاثة: مخرَج يُرى ويُقاس، ومالك لقرار القبول، وأثر معلوم إن تأخّر.\n\n' +
+      'والنتيجة: مراجعة أسبوعيّة في عشر دقائق بدل ساعة.\n\nما الذي يعنيه «تمّ» في فريقك؟\n\n#إدارة_المشاريع #الحوكمة',
   })
 
   // من staging: YouTube معدَّلٌ معتمَد بمقطع المالك
@@ -176,7 +176,7 @@ export async function seed(
   const xPublished = await post({
     platform: 'x', status: 'published', account: x, source: doc, key: `draft:${doc}:x:${docHash}`, cost: 0.0231,
     approved: at(sent - DAY), scheduled: at(sent), dispatched: at(sent), created: at(sent - DAY - HOUR),
-    text: 'المعلَمُ ليس تاريخًا في الجدول، بل اتّفاقٌ على معنى «تمّ». ثلاثةُ أسئلةٍ قبل التنفيذ توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع',
+    text: 'المعلَم ليس تاريخًا في الجدول، بل اتّفاق على معنى «تمّ». ثلاثة أسئلة قبل التنفيذ توفّر ساعةً كلّ أسبوع. #إدارة_المشاريع',
   })
   await run(db,
     `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, platform_post_id, status, at)
@@ -198,15 +198,15 @@ export async function seed(
   const linkedinRejected = await post({
     platform: 'linkedin', status: 'rejected', source: slides, key: `draft:${slides}:linkedin:md5:old`, cost: 0.0587,
     created: at(-4 * DAY),
-    text: 'في عالمٍ يتسارع، أصبح من الضروريّ أن نعيد التفكير في طريقة إدارتنا للمشاريع. تجدر الإشارة إلى أنّ المعالم مهمّة جدًّا…',
+    text: 'في عالم يتسارع، أصبح من الضروريّ أن نعيد التفكير في طريقة إدارتنا للمشاريع. تجدر الإشارة إلى أنّ المعالم مهمّة جدًّا…',
   })
 
   // ر-8: منشورٌ فشل (أخطأت LinkedIn بـ 500 ثلاثَ مرّات — والحسابُ سليم كما في staging)
   const failed = await post({
     platform: 'linkedin', status: 'failed', account: linkedin, source: doc, key: `draft:${doc}:linkedin:md5:failed-one`,
     approved: at(-30 * HOUR), scheduled: at(-26 * HOUR), dispatched: at(-26 * HOUR), cost: 0.0598, created: at(-31 * HOUR),
-    text: 'ثلاثةُ أسئلةٍ قبل كلّ معلَم: ما المخرَج الذي يُقاس؟ ومن يملك قرار القبول؟ وما الذي يتوقّف إن تأخّر؟\n\n' +
-      'حين أجبنا عنها كتابةً، صار الاجتماعُ الأسبوعيّ عشر دقائق.\n\n#إدارة_المشاريع #القيادة',
+    text: 'ثلاثة أسئلة قبل كلّ معلَم: ما المخرَج الذي يُقاس؟ ومن يملك قرار القبول؟ وما الذي يتوقّف إن تأخّر؟\n\n' +
+      'حين أجبنا عنها كتابةً، صار الاجتماع الأسبوعيّ عشر دقائق.\n\n#إدارة_المشاريع #القيادة',
   })
   for (const n of [1, 2, 3]) {
     await run(db,

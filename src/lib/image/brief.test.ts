@@ -15,19 +15,19 @@ import { imagePrompt } from './prompt'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 
-describe('قراءةُ الجواب — يُفحَص الشكلُ ولا يُفترَض', () => {
-  it('يقرأ الحقولَ الثلاثة', () => {
+describe('قراءة الجواب — يُفحَص الشكل ولا يُفترَض', () => {
+  it('يقرأ الحقول الثلاثة', () => {
     const brief = parseBrief('{"subject":"folded paper","composition":"wide","palette":"teal"}')
     expect(brief?.subject).toBe('folded paper')
     expect(brief?.composition).toBe('wide')
   })
 
-  it('ويقرأ JSON ملفوفا بسياج — بعضُ النماذج تلفّه', () => {
+  it('ويقرأ JSON ملفوفا بسياج — بعض النماذج تلفّه', () => {
     const brief = parseBrief('```json\n{"subject":"stacked glass panes"}\n```')
     expect(brief?.subject).toBe('stacked glass panes')
   })
 
-  it('و**بلا `subject` لا موجز** — الحقلُ الحاكم لا يُرقَّع بفراغ', () => {
+  it('و**بلا `subject` لا موجز** — الحقل الحاكم لا يُرقَّع بفراغ', () => {
     expect(parseBrief('{"composition":"wide"}')).toBeNull()
     expect(parseBrief('{"subject":"   "}')).toBeNull()
   })
@@ -43,43 +43,43 @@ describe('قراءةُ الجواب — يُفحَص الشكلُ ولا يُف�
   })
 })
 
-describe('التعليمةُ نفسُها — إنجليزيّة، وتمنع ما لا يُرسَم', () => {
+describe('التعليمة نفسُها — إنجليزيّة، وتمنع ما لا يُرسَم', () => {
   it('تطلب JSON إنجليزيّا ملموسا', () => {
     expect(BRIEF_SYSTEM).toContain('JSON only')
     expect(BRIEF_SYSTEM).toContain('English only')
   })
 
-  it('وتمنع الحروفَ والوجوهَ والصورَ النمطيّة', () => {
+  it('وتمنع الحروف والوجوه والصور النمطيّة', () => {
     expect(BRIEF_SYSTEM).toContain('No text, letters')
     expect(BRIEF_SYSTEM).toContain('No faces')
     expect(BRIEF_SYSTEM).toContain('handshakes')
   })
 
-  it('و**تقصّ نصَّ المنشور** — ألفُ محرفٍ تكفي فكرةً، وما زاد كلفةٌ بلا معنى', () => {
+  it('و**تقصّ نصّ المنشور** — ألف محرف تكفي فكرةً، وما زاد كلفة بلا معنى', () => {
     expect(briefUser('ن'.repeat(4000)).length).toBeLessThan(1200)
   })
 })
 
-describe('الوصفُ النهائيّ — الموجزُ هو الموضوع، والاحتياطُ يُعلَّم', () => {
+describe('الوصف النهائيّ — الموجز هو الموضوع، والاحتياط يُعلَّم', () => {
   const visual = {
     subject: 'layered basalt slabs', composition: 'low angle', palette: 'slate and teal',
-    headline: 'أثرٌ يُقاس', kicker: 'Measured Impact',
+    headline: 'أثر يُقاس', kicker: 'Measured Impact',
   }
 
-  it('حين يوجد الموجزُ يصير هو الموضوع', () => {
+  it('حين يوجد الموجز يصير هو الموضوع', () => {
     const prompt = imagePrompt({ topic: 'الحوكمة', platform: 'linkedin', visual })
     expect(prompt).toContain('layered basalt slabs')
     expect(prompt).toContain('low angle')
     expect(prompt).not.toContain('الحوكمة')
   })
 
-  it('وحين يسقط يُستعمَل الموضوعُ العربيّ **معلَّما أنّه سياقٌ لا يُرسَم**', () => {
+  it('وحين يسقط يُستعمَل الموضوع العربيّ **معلَّما أنّه سياق لا يُرسَم**', () => {
     const prompt = imagePrompt({ topic: 'الحوكمة في المشاريع', platform: 'x', visual: null })
     expect(prompt).toContain('الحوكمة في المشاريع')
     expect(prompt).toContain('do not render it')
   })
 
-  it('والقيدُ في الطرفين لا في الوسط — فلا يُبهَت', () => {
+  it('والقيد في الطرفين لا في الوسط — فلا يُبهَت', () => {
     const prompt = imagePrompt({ topic: 'ت', platform: 'x', visual })
     expect(prompt.startsWith('ABSOLUTELY NO text')).toBe(true)
     expect(prompt.trimEnd().endsWith('resembles writing.')).toBe(true)
@@ -109,14 +109,14 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     await writeRoute(db, 'draft', 'writer', 'writer-1', 'test')
   }
 
-  it('لا مزوّدَ للكتابة يعني موجزا فارغا بسببٍ يُقرأ — لا رمي', async () => {
+  it('لا مزوّد للكتابة يعني موجزا فارغا بسبب يُقرأ — لا رمي', async () => {
     await writeRoute(db, 'draft', 'لا-أحد', 'x', 'test')
     const out = await visualBrief(deps(), 'نصّ المنشور العربيّ')
     expect(out.brief).toBeNull()
-    expect(out.detail).toContain('لا مزوّدَ للكتابة')
+    expect(out.detail).toContain('لا مزوّد للكتابة')
   })
 
-  it('يبني الموجزَ من نصّ المنشور', async () => {
+  it('يبني الموجز من نصّ المنشور', async () => {
     await seedWriter()
     let body: Record<string, unknown> = {}
     const net = (async (_url: unknown, init?: RequestInit): Promise<Response> => {
@@ -131,12 +131,12 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
       )
     }) as unknown as typeof fetch
 
-    const out = await visualBrief(deps(net), 'منشورٌ عن أثر الحوكمة', 'post-1')
+    const out = await visualBrief(deps(net), 'منشور عن أثر الحوكمة', 'post-1')
     expect(out.brief?.subject).toBe('woven brass mesh')
     expect(JSON.stringify(body)).toContain('أثر الحوكمة')
   })
 
-  it('و**الكلفةُ تُسجَّل** — نداءٌ مدفوعٌ لا يُخفى ولو كان صغيرا (D-008)', async () => {
+  it('و**الكلفة تُسجَّل** — نداء مدفوع لا يُخفى ولو كان صغيرا (D-008)', async () => {
     await seedWriter()
     const net = (async (): Promise<Response> =>
       new Response(
@@ -157,7 +157,7 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     expect(results[0]!.units).toBe(340)
   })
 
-  it('وسقوطُ النداء يُعاد سببا — والتوليدُ يمضي بالاحتياط', async () => {
+  it('وسقوط النداء يُعاد سببا — والتوليد يمضي بالاحتياط', async () => {
     await seedWriter()
     const net = (async (): Promise<Response> =>
       new Response('{}', { status: 500 })) as unknown as typeof fetch
@@ -171,7 +171,7 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
    * **والمبتورُ يُسجَّل كذلك** (D-164). سقفُ الموجز `maxTokens: 400`، فهو
    * أكثرُ المواضع عرضةً للبتر — وكان يعود «تعذّر» بكلفةٍ صفرٍ ولا صفّ.
    */
-  it('وجوابٌ مبتورٌ بـlength **يُسجَّل** ويُعاد سببا — والكلفةُ لا تُقال صفرا', async () => {
+  it('وجواب مبتور بـlength **يُسجَّل** ويُعاد سببا — والكلفة لا تُقال صفرا', async () => {
     await seedWriter()
     await db.prepare("UPDATE providers SET price_in = 1, price_out = 2 WHERE name = 'writer'").run()
     const net = (async (): Promise<Response> =>
@@ -196,7 +196,7 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
     expect(out.cost).toBeGreaterThan(0)
   })
 
-  it('وجوابٌ مشوَّهٌ **يُسجَّل كلفتُه** ثمّ يُردّ — النداءُ وقع', async () => {
+  it('وجواب مشوَّه **يُسجَّل كلفتُه** ثمّ يُردّ — النداء وقع', async () => {
     await seedWriter()
     const net = (async (): Promise<Response> =>
       new Response(
@@ -221,30 +221,30 @@ describe('النداء — ولا يوقف سقوطُه التوليد', () => {
  * سطرٌ طويلٌ فوق صورةٍ لا يُقرأ — يُقرأ المنشورُ نفسُه. فكلمتان أو ثلاث
  * بالعربيّة، وكلمتان بالإنجليزيّة فوقهما.
  */
-describe('عنوانُ الشريحة — والقصُّ عندنا لا رجاءٌ عند النموذج', () => {
-  it('يقرأ العنوانَ والفوقيّة', () => {
+describe('عنوان الشريحة — والقصّ عندنا لا رجاء عند النموذج', () => {
+  it('يقرأ العنوان والفوقيّة', () => {
     const brief = parseBrief(
-      '{"subject":"a","headline":"الحوكمةُ تسبق السرعة","kicker":"Governance First"}',
+      '{"subject":"a","headline":"الحوكمة تسبق السرعة","kicker":"Governance First"}',
     )
-    expect(brief?.headline).toBe('الحوكمةُ تسبق السرعة')
+    expect(brief?.headline).toBe('الحوكمة تسبق السرعة')
     expect(brief?.kicker).toBe('Governance First')
   })
 
-  it('و**الفوقيّةُ تُقصّ إلى كلمتين** ولو زاد النموذج', () => {
+  it('و**الفوقيّة تُقصّ إلى كلمتين** ولو زاد النموذج', () => {
     expect(twoWords('Governance First And Always')).toBe('Governance First')
     expect(twoWords('  Measured   Impact  ')).toBe('Measured Impact')
     expect(twoWords('Impact')).toBe('Impact')
     expect(twoWords('   ')).toBe('')
   })
 
-  it('وموجزٌ بلا عنوانٍ يبقى صالحا — والشريحةُ وحدَها تُتخطّى', () => {
+  it('وموجز بلا عنوان يبقى صالحا — والشريحة وحدَها تُتخطّى', () => {
     const brief = parseBrief('{"subject":"a"}')
     expect(brief).not.toBeNull()
     expect(brief?.headline).toBe('')
     expect(brief?.kicker).toBe('')
   })
 
-  it('والتعليمةُ تطلب العربيّةَ للعنوان وكلمتين للفوقيّة', () => {
+  it('والتعليمة تطلب العربيّة للعنوان وكلمتين للفوقيّة', () => {
     expect(BRIEF_SYSTEM).toContain('ARABIC. Two or three words')
     expect(BRIEF_SYSTEM).toContain('EXACTLY TWO WORDS')
     expect(BRIEF_SYSTEM).toContain('does NOT translate it')
@@ -257,7 +257,7 @@ describe('عنوانُ الشريحة — والقصُّ عندنا لا رجا�
  * كان `resolveKey` يعيد سرَّ البيئة ولو عُطّل المزوّد، والموجزُ لا يسأل
  * `checkProvider` — فمزوّدٌ أطفأه المالكُ يُنادى ويُحاسَب عليه مع كلّ صورة.
  */
-describe('الموجزُ يمرّ بحارس مزوّده (D-163)', () => {
+describe('الموجز يمرّ بحارس مزوّده (D-163)', () => {
   let db: FakeDb
   let calls = 0
   beforeEach(() => {
@@ -269,7 +269,7 @@ describe('الموجزُ يمرّ بحارس مزوّده (D-163)', () => {
     return new Response(
       JSON.stringify({
         id: 'msg', type: 'message', role: 'assistant', model: 'claude-opus-5',
-        content: [{ type: 'text', text: '{"subject":"folded brass","headline":"أثرٌ يُقاس"}' }],
+        content: [{ type: 'text', text: '{"subject":"folded brass","headline":"أثر يُقاس"}' }],
         stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 20 },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -279,9 +279,9 @@ describe('الموجزُ يمرّ بحارس مزوّده (D-163)', () => {
   const ledger = async (): Promise<unknown[]> =>
     (await db.prepare('SELECT id FROM cost_ledger').all()).results
 
-  it('معطَّلٌ ومفتاحُه في البيئة: لا نداءَ ولا صفَّ في الدفتر، وسببُه يُقرأ', async () => {
+  it('معطَّل ومفتاحُه في البيئة: لا نداء ولا صفّ في الدفتر، وسببُه يُقرأ', async () => {
     await setEnabled(db, 'anthropic', false, 'test')
-    const out = await visualBrief({ db, ...deps }, 'منشورٌ عن أثر الحوكمة', 'post-1')
+    const out = await visualBrief({ db, ...deps }, 'منشور عن أثر الحوكمة', 'post-1')
     expect(out).toMatchObject({ brief: null, cost: 0 })
     expect(out.detail).toContain('معطَّل')
     expect(calls).toBe(0)
@@ -297,9 +297,9 @@ describe('الموجزُ يمرّ بحارس مزوّده (D-163)', () => {
     expect(calls).toBe(0)
   })
 
-  it('ومفعَّلٌ دون سقفه يُنادى — الحارسُ لا يسدّ ما لا يُسدّ', async () => {
+  it('ومفعَّل دون سقفه يُنادى — الحارس لا يسدّ ما لا يُسدّ', async () => {
     const out = await visualBrief({ db, ...deps }, 'نصّ', 'post-1')
     expect(calls).toBe(1)
-    expect(out.brief?.headline).toBe('أثرٌ يُقاس')
+    expect(out.brief?.headline).toBe('أثر يُقاس')
   })
 })

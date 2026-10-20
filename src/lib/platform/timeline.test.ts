@@ -16,7 +16,7 @@ function post(id: string, status: string, over: { scheduled?: string | null; dis
     `INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at,
                         account_id, scheduled_at, dispatched_at, created_at)
      VALUES (?, 'linkedin', 'text', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, `نصُّ ${id}`, status, `k-${id}`, 'omar', '2026-09-01 00:00:00', queued ? 'a1' : null,
+  ).run(id, `نصّ ${id}`, status, `k-${id}`, 'omar', '2026-09-01 00:00:00', queued ? 'a1' : null,
     over.scheduled ?? (queued ? '2026-09-05 09:00:00' : null), over.dispatched ?? null, over.created ?? '2026-09-01 00:00:00')
 }
 
@@ -28,7 +28,7 @@ function attempt(postId: string, no: number, status: string, at: string, respons
 }
 
 describe('القادم', () => {
-  it('الأقربُ أوّلا', async () => {
+  it('الأقرب أوّلا', async () => {
     post('late', 'queued', { scheduled: '2026-09-09 09:00:00' })
     post('soon', 'queued', { scheduled: '2026-09-07 09:00:00' })
     post('done', 'published')
@@ -37,7 +37,7 @@ describe('القادم', () => {
 })
 
 describe('ما نُشر', () => {
-  it('فشل ثمّ نجح: «نُشر» بوقت النجاح، وعددُ المحاولات معه', async () => {
+  it('فشل ثمّ نجح: «نُشر» بوقت النجاح، وعدد المحاولات معه', async () => {
     post('p1', 'published')
     attempt('p1', 1, 'failed', '2026-09-05 09:00:00', '{"error":"timeout"}')
     attempt('p1', 2, 'succeeded', '2026-09-05 09:15:00')
@@ -47,7 +47,7 @@ describe('ما نُشر', () => {
     expect(page.rows[0]!.tries).toBe(2)
   })
 
-  it('والفاشلُ بسببه المختصر، والمؤشّرُ يقلّب الأرشيف بلا تكرار', async () => {
+  it('والفاشل بسببه المختصر، والمؤشّر يقلّب الأرشيف بلا تكرار', async () => {
     for (let i = 1; i <= 5; i += 1) {
       post(`f${i}`, 'failed')
       attempt(`f${i}`, 1, 'failed', `2026-09-0${i} 10:00:00`, '{"error":"token_expired","preflight":true}')
@@ -62,14 +62,14 @@ describe('ما نُشر', () => {
     expect(third.next).toBeNull()
   })
 
-  it('والمؤشّرُ الفاسدُ يُهمَل', () => {
+  it('والمؤشّر الفاسد يُهمَل', () => {
     expect(readCursor("2026-09-01 10:00:00|f1' OR 1=1")).toBeNull()
     expect(readCursor('2026-09-01 10:00:00|f1')).toEqual({ at: '2026-09-01 10:00:00', id: 'f1' })
   })
 })
 
 describe('ما ينتظر والأعداد', () => {
-  it('المسوّدةُ قبل المعتمَد، والمجدولُ ليس منه', async () => {
+  it('المسوّدة قبل المعتمَد، والمجدول ليس منه', async () => {
     post('ok', 'approved', { created: '2026-09-01 00:00:00' })
     post('d', 'draft', { created: '2026-09-03 00:00:00' })
     post('q', 'queued')
@@ -78,14 +78,14 @@ describe('ما ينتظر والأعداد', () => {
     expect(c).toMatchObject({ waiting: 1, ready: 1, queued: 1, missingMedia: 3 })
   })
 
-  it('والكلفةُ من الدفتر باسم المنشور', async () => {
+  it('والكلفة من الدفتر باسم المنشور', async () => {
     db.raw.prepare(`INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, ref_id)
       VALUES ('c1', 'gemini', 'image', 1, 0.02, 0.02, 'p1'), ('c2', 'x', 'post', 1, 0.015, 0.015, 'p1')`).run()
     expect((await postCosts(db, ['p1']))['p1']).toBeCloseTo(0.035)
   })
 })
 
-describe('حالُ المجدول', () => {
+describe('حال المجدول', () => {
   const row = (over: Partial<TimelineRow>): TimelineRow => ({
     id: 'r', text: '', status: 'queued', scheduledAt: null, createdAt: '2026-09-01 00:00:00', dispatchedAt: null,
     accountName: null, accountKind: null, sourceName: null, platformPostId: null, publishedAt: null, failedAt: null,

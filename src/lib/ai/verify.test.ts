@@ -11,7 +11,7 @@ function reply(status: number, body: unknown = {}): typeof fetch {
 let calls: Request[] = []
 
 describe('نداء التحقّق نفسه', () => {
-  it('لا يكلّف رموزا: قائمةُ نماذجَ لا توليد', async () => {
+  it('لا يكلّف رموزا: قائمة نماذج لا توليد', async () => {
     calls = []
     await verifyKey('anthropic', 'sk-ant-x', reply(200))
     expect(calls[0]!.url).toContain('/v1/models')
@@ -30,7 +30,7 @@ describe('نداء التحقّق نفسه', () => {
     expect(calls[0]!.headers.get('x-goog-api-key')).toBe('AIza-y')
   })
 
-  it('يقلّم المفتاح — سطرٌ لصق معه لا يُرسل', async () => {
+  it('يقلّم المفتاح — سطر لصق معه لا يُرسل', async () => {
     calls = []
     await verifyKey('gemini', '  AIza-y\n', reply(200))
     expect(calls[0]!.headers.get('x-goog-api-key')).toBe('AIza-y')
@@ -65,7 +65,7 @@ describe('يميّز «مفتاح خطأ» من «خدمة متعبة»', () => 
     expect(result.detail).not.toContain('مرفوض')
   })
 
-  it('عطلُ شبكةٍ يُبلَّغ ولا يُرمى', async () => {
+  it('عطل شبكة يُبلَّغ ولا يُرمى', async () => {
     const boom = (async () => {
       throw new Error('تعذّر الاتّصال')
     }) as unknown as typeof fetch
@@ -74,7 +74,7 @@ describe('يميّز «مفتاح خطأ» من «خدمة متعبة»', () => 
     if (!result.ok) expect(result.status).toBeNull()
   })
 
-  it('مفتاحٌ فارغ لا يُرسل نداء أصلا', async () => {
+  it('مفتاح فارغ لا يُرسل نداء أصلا', async () => {
     calls = []
     const result = await verifyKey('gemini', '  ', reply(200))
     expect(result.ok).toBe(false)

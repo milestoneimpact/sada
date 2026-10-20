@@ -28,7 +28,7 @@ function clientCounter(): (text: string) => number {
 
 const CASES: readonly string[] = [
   '',
-  'البرنامجُ بلا صاحبٍ لا يفشل — يذبل',
+  'البرنامج بلا صاحب لا يفشل — يذبل',
   'ن'.repeat(280),
   'https://a.co/x',
   `https://basserh.com/${'ط'.repeat(120)}`,
@@ -42,7 +42,7 @@ const CASES: readonly string[] = [
   'نصّ 😀 ورابط https://x.co/1 وعَلَم 🇸🇦',
 ]
 
-describe('عدّادُ المتصفّح يوافق عدّادَ الخادم (D-071)', () => {
+describe('عدّاد المتصفّح يوافق عدّاد الخادم (D-071)', () => {
   const count = clientCounter()
 
   it.each(CASES.map((c) => [c.slice(0, 32) || '(فارغ)', c]))(
@@ -53,7 +53,7 @@ describe('عدّادُ المتصفّح يوافق عدّادَ الخادم (D-
   )
 
   /** **والثوابتُ من `length.ts`** لا مكتوبةً في النصّ فتشيخ وحدَها. */
-  it('وثوابتُ القاعدة تخرج في النصّ من مصدرها', () => {
+  it('وثوابت القاعدة تخرج في النصّ من مصدرها', () => {
     expect(SCRIPT).toContain('var URL_LEN=23')
     expect(count('https://a.co/x')).toBe(23)
   })
@@ -67,16 +67,16 @@ describe('عدّادُ المتصفّح يوافق عدّادَ الخادم (D-
  * `\p{RI}` في المصدر `p{RI}` في المتصفّح. ولا يظهر ذلك إلّا حين يُقرأ
  * **النصُّ المُرسَل** لا المصدر.
  */
-describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ', () => {
-  it('النصُّ يُبنى دالّةً بلا خطأ صياغة', () => {
+describe('دَرَج النماذج — ما يُشحَن هو ما يُقرأ', () => {
+  it('النصّ يُبنى دالّةً بلا خطأ صياغة', () => {
     expect(() => new Function(SCRIPT)).not.toThrow()
   })
 
-  it('وينادي نهايةَ الفهرس عندنا لا عند المزوّد مباشرةً', () => {
+  it('وينادي نهاية الفهرس عندنا لا عند المزوّد مباشرةً', () => {
     expect(SCRIPT).toContain('/panel/providers/models')
   })
 
-  it('و**خيارُ الكتابة اليدويّة باقٍ** — مزوّدٌ بلا فهرسٍ يبقى صالحا', () => {
+  it('و**خيار الكتابة اليدويّة باق** — مزوّد بلا فهرس يبقى صالحا', () => {
     expect(SCRIPT).toContain('__manual__')
   })
 
@@ -86,7 +86,7 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
    * فتحُ اللوحة لا يوقظ نداءً باسم المالك إلى كلّ مزوّدٍ عنده. وأوّلُ
    * لمسةٍ للدرج تجلب — فتبديلُ النموذج لا يحتاج ضغطتين (D-083).
    */
-  it('الجلبُ من إيماءةٍ لا من فتح الشاشة — ولمسةٌ ثانيةٌ لا تُعيده', () => {
+  it('الجلب من إيماءة لا من فتح الشاشة — ولمسة ثانية لا تُعيده', () => {
     expect(SCRIPT).toContain("sel.addEventListener('focus',function(){load(true);})")
     expect(SCRIPT).toContain("btn.addEventListener('click',function(){loadedFor='';load(true);})")
     // حارسٌ يمنع نداءً ثانيا لقائمةٍ جُلبت — وإلّا نُودي عند كلّ لمسة
@@ -97,7 +97,7 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
    * **وتبديلُ المزوّد يُسقط نماذجَه** — وهو العطلُ الذي رآه المالك:
    * اختير Cloudflare فبقيت نماذجُ Gemini معروضة، وحُفظ توجيهٌ لا يعمل.
    */
-  it('وتبديلُ المزوّد يُفرّغ الدرجَ ويجلب نماذجَ الجديد', () => {
+  it('وتبديل المزوّد يُفرّغ الدرج ويجلب نماذج الجديد', () => {
     expect(SCRIPT).toContain("pick.addEventListener('change'")
     expect(SCRIPT).toContain("mpClear(sel,'— اختر نموذجا —')")
     expect(SCRIPT).toContain("box.dataset.provider=pick.value")
@@ -120,7 +120,7 @@ describe('دَرَجُ النماذج — ما يُشحَن هو ما يُقرأ
  * **وهذا لا يُختبَر بتشغيل**: لا لوحَ مفاتيحَ في vitest ولا تخطيطَ لغة.
  * فيُفحَص النصُّ المُرسَل: أيقارن الموضعَ أم الحرف؟ — وهو ما يُشحَن.
  */
-describe('اختصاراتُ لوحة المفاتيح', () => {
+describe('اختصارات لوحة المفاتيح', () => {
   /** كتلةُ القرار وحدَها — فلا يُفحَص ما تكتبه أجزاءٌ أخرى من اللوحة. */
   function keyBlock(): string {
     const block = /document\.addEventListener\('keydown'[\s\S]*?\n {4}\}\);/.exec(SCRIPT)
@@ -135,7 +135,7 @@ describe('اختصاراتُ لوحة المفاتيح', () => {
     expect(block).not.toContain('e.key')
   })
 
-  it('وتُسمّي المفاتيحَ بمواضعها الستّة', () => {
+  it('وتُسمّي المفاتيح بمواضعها الستّة', () => {
     const block = keyBlock()
     for (const code of ['KeyJ', 'KeyK', 'KeyA', 'KeyR', 'KeyE', 'KeyS', 'Slash']) {
       expect(block).toContain(code)
@@ -218,7 +218,7 @@ describe('المعاينة', () => {
    * بـ `indexOf`. **ونسختان تفترقان تجعلان السطرَ الأوّل يتبدّل عند أوّل
    * حرفٍ يُكتَب** — والمالكُ يظنّ أنّه غيّر شيئا ولم يغيّره.
    */
-  it('وتقسم عند أوّل سطرٍ كما يقسم الخادم', () => {
+  it('وتقسم عند أوّل سطر كما يقسم الخادم', () => {
     const block = bindBlock()
     expect(block).toContain("indexOf('\\n')")
     // والباقي يحمل السطرَ الفاصلَ معه، فلا يلتصق بما قبله
@@ -241,7 +241,7 @@ describe('المعاينة', () => {
  * ‏الجدولة لا يُرسَم لمعتمَدٍ بلا قناة، و«#i-…» لوحُ الصورة لا يُرسَم لمن له صورة. ومرساةٌ
  * ‏لا تجد شيئًا كانت ترتدّ إلى الرئيسيّة — فيُقرأ الرابطُ معطوبًا. فتُنتزَع الدالّةُ وتُشغَّل.
  */
-describe('مرساةُ الجزء ترجع إلى بطاقتها', () => {
+describe('مرساة الجزء ترجع إلى بطاقتها', () => {
   const fn = /function target\(id\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT)
   const run = (ids: readonly string[], id: string): string | null => {
     if (fn === null) throw new Error('لم تُعثَر target في نصّ اللوحة — أنُقلت؟')
@@ -250,7 +250,7 @@ describe('مرساةُ الجزء ترجع إلى بطاقتها', () => {
     return target(id)?.id ?? null
   }
 
-  it('الجزءُ إن رُسم، وإلّا بطاقتُه', () => {
+  it('الجزء إن رُسم، وإلّا بطاقتُه', () => {
     expect(run(['d-p1', 's-p1'], 's-p1')).toBe('s-p1')
     expect(run(['d-p1'], 's-p1')).toBe('d-p1')
     expect(run(['d-p1'], 'i-p1')).toBe('d-p1')
@@ -262,12 +262,12 @@ describe('مرساةُ الجزء ترجع إلى بطاقتها', () => {
   })
 })
 
-describe('الشريطُ لا يخطف إلّا المراسي', () => {
-  it('يُصفّي الروابطَ إلى ما يبدأ بمرساة', () => {
+describe('الشريط لا يخطف إلّا المراسي', () => {
+  it('يُصفّي الروابط إلى ما يبدأ بمرساة', () => {
     expect(SCRIPT).toContain("(a.getAttribute('href')||'').charAt(0)==='#'")
   })
 
-  it('و**المُصفّى هو ما يُخطَف**، لا القائمةُ الخام', () => {
+  it('و**المُصفّى هو ما يُخطَف**، لا القائمة الخام', () => {
     // ترتيبٌ يهمّ: يُبنى `all` ثمّ يُصفّى إلى `tabs`، والمستمعُ على `tabs`
     const order = SCRIPT.indexOf('var all=') < SCRIPT.indexOf('var tabs=')
     expect(order).toBe(true)
@@ -283,7 +283,7 @@ describe('الشريطُ لا يخطف إلّا المراسي', () => {
  * UTF-8» عند ‏-5747px. فيُنتزَع سلوكُه من النصّ المُرسَل ويُشغَّل على صفحةٍ مصغَّرة
  * بساعةٍ يملكها الاختبار — المهلةُ والإيقافُ والإغلاقُ والخطأُ الذي لا يذهب وحدَه.
  */
-describe('الإشعارُ العائم', () => {
+describe('الإشعار العائم', () => {
   // ‏حتّى نداء «armToast» للإشعار الذي جاء مع الصفحة (D-207: صار دالّةً يُعاد تسليحُها بعد فعلٍ بلا تحميل)
   const block = /  var flashBox=document\.getElementById\('flash'\);[\s\S]*?if\(note0\)armToast\(note0,false\);\n {2}\}\n/.exec(SCRIPT)
 
@@ -345,7 +345,7 @@ describe('الإشعارُ العائم', () => {
     expect(block).not.toBeNull()
   })
 
-  it('يطفو، ومعه «أغلق» يُغلقه — وبلا فعلٍ يذهب بعد ستّ ثوانٍ', () => {
+  it('يطفو، ومعه «أغلق» يُغلقه — وبلا فعل يذهب بعد ستّ ثوان', () => {
     const t = mount('ok')
     expect([...t.box]).toEqual(['toast'])
     expect(t.shut['textContent']).toBe('أغلق')
@@ -365,7 +365,7 @@ describe('الإشعارُ العائم', () => {
    * ‏رفضٍ خاطئ، ولوحُ المفاتيح يبلغه بعشرين Shift+Tab. فيبقى حتّى يُغلَق، ويُعلَن، ويعيد «أغلق»
    * ‏التركيزَ إلى البطاقة بلا تمرير — لا إلى `body`.
    */
-  it('وما فيه «تراجَع» لا يذهب وحدَه، ويُعاد إدراجُه فيُعلَن، و«أغلق» يعيد التركيزَ إلى البطاقة', () => {
+  it('وما فيه «تراجَع» لا يذهب وحدَه، ويُعاد إدراجُه فيُعلَن، و«أغلق» يعيد التركيز إلى البطاقة', () => {
     const t = mount('ok', true, '#d-p1')
     // ‏يُفصَل ثمّ يُدرَج بعد التحميل: إضافةٌ في المنطقة الحيّة يقرؤها قارئُ الشاشة
     expect(t.state.attached).toBe(false)
@@ -382,7 +382,7 @@ describe('الإشعارُ العائم', () => {
     expect(t.state.tabindex).toBe('-1')
   })
 
-  it('ويقف العدُّ ما دام المؤشّرُ أو التركيزُ عليه، ثمّ يبدأ من جديد', () => {
+  it('ويقف العدّ ما دام المؤشّر أو التركيز عليه، ثمّ يبدأ من جديد', () => {
     const t = mount('ok')
     t.advance(5000)
     t.on['mouseenter']!()
@@ -399,7 +399,7 @@ describe('الإشعارُ العائم', () => {
     expect(t.state.attached).toBe(false)
   })
 
-  it('**والخطأُ لا يذهب وحدَه** — يُعلَن تنبيهًا ويبقى حتّى يُغلَق', () => {
+  it('**والخطأ لا يذهب وحدَه** — يُعلَن تنبيهًا ويبقى حتّى يُغلَق', () => {
     const t = mount('bad')
     expect(t.attrs['role']).toBe('alert')
     t.advance(600_000)
@@ -433,23 +433,23 @@ function clientPresets(): {
     /function boxToDate\(v\)\{[\s\S]*?\n {2}\}\n/.exec(SCRIPT),
   ]
   if (parts.some((p) => p === null)) {
-    throw new Error('لم تُعثَر دوالُّ المواعيد في نصّ اللوحة — أنُقلت أم أُعيدت تسميتُها؟')
+    throw new Error('لم تُعثَر دوالّ المواعيد في نصّ اللوحة — أنُقلت أم أُعيدت تسميتُها؟')
   }
   return new Function(
     `${parts.map((p) => p![0]).join('')}\nreturn {localBox:localBox,preset:preset,boxToDate:boxToDate};`,
   )() as ReturnType<typeof clientPresets>
 }
 
-describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
+describe('مواعيد بضغطة واحدة (D-089)', () => {
   const { localBox, preset, boxToDate } = clientPresets()
 
-  it('«بعد ساعة» ساعةٌ بالضبط', () => {
+  it('«بعد ساعة» ساعة بالضبط', () => {
     const now = new Date('2026-09-07T10:17:33Z')
     const at = preset(now, 'hour')!
     expect(at.getTime() - now.getTime()).toBe(3_600_000)
   })
 
-  it('وكلُّ موعدٍ في المستقبل — مهما كانت الساعة', () => {
+  it('وكلّ موعد في المستقبل — مهما كانت الساعة', () => {
     // أربعٌ وعشرون لحظةً في اليوم: لا واحدةَ منها تعطي موعدا مضى
     for (let hour = 0; hour < 24; hour += 1) {
       const now = new Date(2026, 8, 7, hour, 31, 0)
@@ -460,7 +460,7 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
     }
   })
 
-  it('و«الأحد» أحدٌ فعلا — ولو كان اليومُ أحدا', () => {
+  it('و«الأحد» أحد فعلا — ولو كان اليوم أحدا', () => {
     // ٦ سبتمبر ٢٠٢٦ أحد. فالزرُّ يعطي الأحدَ القادم لا اليوم
     for (let day = 6; day <= 12; day += 1) {
       const now = new Date(2026, 8, day, 11, 0, 0)
@@ -471,7 +471,7 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
     }
   })
 
-  it('و«الليلة ٨م» تصير الغدَ بعد الثامنة', () => {
+  it('و«الليلة ٨م» تصير الغد بعد الثامنة', () => {
     const before = preset(new Date(2026, 8, 7, 19, 0, 0), 'tonight')!
     expect(before.getDate()).toBe(7)
     const after = preset(new Date(2026, 8, 7, 21, 0, 0), 'tonight')!
@@ -479,7 +479,7 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
     expect(after.getHours()).toBe(20)
   })
 
-  it('والصندوقُ يُكتب بتوقيت المتصفّح (D-199) — والصيغةُ هي التي يقرؤها الخادم', () => {
+  it('والصندوق يُكتب بتوقيت المتصفّح (D-199) — والصيغة هي التي يقرؤها الخادم', () => {
     const box = localBox(new Date(2026, 8, 7, 6, 5))
     expect(box).toBe('2026-09-07T06:05')
     expect(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(box)).toBe(true)
@@ -494,24 +494,24 @@ describe('مواعيدُ بضغطةٍ واحدة (D-089)', () => {
     }
   })
 
-  it('وصندوقٌ فارغٌ أو مشوَّهٌ لا يُقرأ لحظةً كاذبة', () => {
+  it('وصندوق فارغ أو مشوَّه لا يُقرأ لحظةً كاذبة', () => {
     for (const bad of ['', 'غدا', '2026-13-40T99:99', '2026-09-07']) {
       expect(boxToDate(bad)).toBe(null)
     }
   })
 })
 
-describe('شريطُ المواعيد في الصفحة', () => {
-  it('الأزرارُ تملأ الحقلَ الذي يُرسَل — لا حقلا آخر', () => {
+describe('شريط المواعيد في الصفحة', () => {
+  it('الأزرار تملأ الحقل الذي يُرسَل — لا حقلا آخر', () => {
     expect(SCRIPT).toContain("document.getElementById(bar.dataset.quick)")
     expect(SCRIPT).toContain('field.value=localBox(at)')
   })
 
-  it('والمرآةُ تُحدَّث على الكتابة اليدويّة كذلك', () => {
+  it('والمرآة تُحدَّث على الكتابة اليدويّة كذلك', () => {
     expect(SCRIPT).toContain("field.addEventListener('input',reflect)")
   })
 
-  it('وسقوطُ التنسيق المحلّيّ لا يُسقِط الصفحة', () => {
+  it('وسقوط التنسيق المحلّيّ لا يُسقِط الصفحة', () => {
     expect(SCRIPT).toContain("catch(e){mirror.textContent='';}")
   })
 })
@@ -523,11 +523,11 @@ describe('شريطُ المواعيد في الصفحة', () => {
  * المالك من كعكته. **ونسختان تفترقان بلا حارس** (D-071): «غدًا 9:00 ص» في موضعٍ يصير
  * العاشرةَ في الآخر. فتُشغَّل الاثنتان بمنطقة بيئة الاختبار وتُقارَنان.
  */
-describe('أزرارُ المقطع على الخادم توافق أزرارَ البطاقة في المتصفّح', () => {
+describe('أزرار المقطع على الخادم توافق أزرار البطاقة في المتصفّح', () => {
   const { preset } = clientPresets()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  it('الأربعةُ نفسُها، والموعدُ نفسُه في كلّ ساعةٍ من اليوم', () => {
+  it('الأربعة نفسُها، والموعد نفسُه في كلّ ساعة من اليوم', () => {
     expect(PRESETS.map((p) => p.kind)).toEqual(['hour', 'tonight', 'tomorrow', 'sunday'])
     for (let day = 4; day <= 10; day += 1) {
       for (let hour = 0; hour < 24; hour += 1) {
@@ -544,28 +544,28 @@ describe('أزرارُ المقطع على الخادم توافق أزرارَ 
 })
 
 /** **وعدّادُ عنوان YouTube يعدّ كما يقصّ الرفع** (ر-4). */
-describe('عدّادُ عنوان YouTube', () => {
+describe('عدّاد عنوان YouTube', () => {
   function ytLine(): (v: string) => string {
     const fn = /function ytLine\(v\)\{[^\n]*\}/.exec(SCRIPT)
     if (fn === null) throw new Error('لم يُعثَر على ytLine في نصّ اللوحة')
     return new Function(`${fn[0]}\nreturn ytLine`)() as (v: string) => string
   }
 
-  it('يتجاوز الحدَّ حيث يقصّ الخادمُ وحده', () => {
+  it('يتجاوز الحدّ حيث يقصّ الخادم وحده', () => {
     const line = ytLine()
-    for (const text of ['', 'قصير', `  ${'ع'.repeat(100)}  \nوصف`, `${'ع'.repeat(101)}\nوصف`, `${'كلمة '.repeat(30)}`, '\n\nسطرٌ بعد فراغ']) {
+    for (const text of ['', 'قصير', `  ${'ع'.repeat(100)}  \nوصف`, `${'ع'.repeat(101)}\nوصف`, `${'كلمة '.repeat(30)}`, '\n\nسطر بعد فراغ']) {
       expect(line(text).length > 100, JSON.stringify(text.slice(0, 20))).toBe(cutTitle(text) !== null)
     }
   })
 
-  it('ويُخفى إن أُزيل اختيارُ YouTube، ويقول القصَّ بكلمة لا بلونٍ وحده', () => {
+  it('ويُخفى إن أُزيل اختيار YouTube، ويقول القصّ بكلمة لا بلون وحده', () => {
     expect(SCRIPT).toContain("input[name=platform][value=youtube]")
     expect(SCRIPT).toContain('يُقصّ عند')
   })
 })
 
-describe('ملفُّ الخطّة يُقرأ فورَ اختياره (ر-5)', () => {
-  it('اسمُه في اللصيقة ثمّ يُرسَل النموذجُ بحارسه', () => {
+describe('ملفّ الخطّة يُقرأ فور اختياره (ر-5)', () => {
+  it('اسمُه في اللصيقة ثمّ يُرسَل النموذج بحارسه', () => {
     expect(SCRIPT).toContain("document.querySelectorAll('input[data-plan-file]')")
     expect(SCRIPT).toContain('pick.textContent=f.name')
     expect(SCRIPT).toContain('form.requestSubmit()')
@@ -577,8 +577,8 @@ describe('ملفُّ الخطّة يُقرأ فورَ اختياره (ر-5)', ()
  * ‏هنا بسببه — **قبل معالج «مشغول»** الذي يقرأ `defaultPrevented`؛ وEnter في عنوان YouTube لا
  * ‏يُنشئ؛ وعدّادُ كلّ حقلٍ يعدّ كما يعدّ الخادم (`captionProblem`).
  */
-describe('حرّاسُ «أنشئ» و«اكتب» (مراجعة D-190)', () => {
-  it('الإرسالُ بلا منصّةٍ يُمنع ويُقال في موضعه — مسجَّلًا قبل «مشغول»', () => {
+describe('حرّاس «أنشئ» و«اكتب» (مراجعة D-190)', () => {
+  it('الإرسال بلا منصّة يُمنع ويُقال في موضعه — مسجَّلًا قبل «مشغول»', () => {
     const guard = SCRIPT.indexOf("input[type=checkbox][name=platform]:not([disabled])")
     expect(guard).toBeGreaterThan(0)
     expect(guard).toBeLessThan(SCRIPT.indexOf("document.querySelectorAll('form[data-busy]')"))
@@ -591,13 +591,13 @@ describe('حرّاسُ «أنشئ» و«اكتب» (مراجعة D-190)', () => 
     expect(SCRIPT).toContain("if(e.key==='Enter')e.preventDefault();")
   })
 
-  it('وعدّادُ نصّ كلّ منصّةٍ يعدّ كما يعدّ الخادم: المحرفُ لـ TikTok وInstagram والبايتُ لوصف YouTube', () => {
+  it('وعدّاد نصّ كلّ منصّة يعدّ كما يعدّ الخادم: المحرف لـ TikTok وInstagram والبايت لوصف YouTube', () => {
     const enc = /var enc=[^\n]*\n/.exec(SCRIPT)
     const fn = /function capLen\(v,bytes\)\{[^\n]*\}/.exec(SCRIPT)
     expect(enc).not.toBeNull()
     expect(fn).not.toBeNull()
     const capLen = new Function(`${enc![0]}${fn![0]}; return capLen;`)() as (v: string, bytes: boolean) => number
-    for (const text of ['', 'نصّ', 'أوّلُ مئة يوم 👇 #قيادة', 'ن'.repeat(2300)]) {
+    for (const text of ['', 'نصّ', 'أوّل مئة يوم 👇 #قيادة', 'ن'.repeat(2300)]) {
       const t = text.trim()
       expect(capLen(t, false)).toBe(t.length)
       expect(capLen(t, true)).toBe(new TextEncoder().encode(t).length)
@@ -610,7 +610,7 @@ describe('حرّاسُ «أنشئ» و«اكتب» (مراجعة D-190)', () => 
  * **أفعالُ البطاقة بلا تحميل** (D-207) — والمتصفّحُ الحقيقيُّ يقيسها `npm run swap`. وهنا ما لا يجوز أن يرجع:
  * طلبٌ يُعاد إرسالُه بعد أن خرج، أو تحويلٌ يُتبَع آليًّا فيُقرأ ردُّه صفحةً غيرَ اللوحة.
  */
-describe('أفعالُ البطاقة بلا تحميل (D-207)', () => {
+describe('أفعال البطاقة بلا تحميل (D-207)', () => {
   const block = /document\.addEventListener\('submit',function\(e\)\{[\s\S]*?\n {2}\}\);/.exec(SCRIPT)?.[0] ?? ''
 
   it('يُنتزَع من النصّ المُرسَل، ولا يعمل إلّا على «data-swap» وما لم يُمنع', () => {
@@ -618,14 +618,14 @@ describe('أفعالُ البطاقة بلا تحميل (D-207)', () => {
     expect(block).toContain('e.defaultPrevented')
   })
 
-  it('**ولا إرسالَ ثانيًا**: التحويلُ يُقرأ يدويًّا، والسقوطُ يعيد تحميلَ اللوحة بـGET', () => {
+  it('**ولا إرسال ثانيًا**: التحويل يُقرأ يدويًّا، والسقوط يعيد تحميل اللوحة بـGET', () => {
     expect(block).toContain("redirect:'manual'")
     expect(block).toContain("fetch('/panel?swap=posts',{credentials:'same-origin'})")
     expect(block).not.toMatch(/\.submit\(|submit\.call/)
     expect(block).toContain('location.reload()')
   })
 
-  it('وردٌّ ليس لوحةً (جلسةٌ انتهت) يُفتح كما هو', () => {
+  it('وردّ ليس لوحةً (جلسة انتهت) يُفتح كما هو', () => {
     expect(block).toContain("if(!doc.querySelector('section[data-pane]')){location.href=res.url.replace(/[?]swap=posts$/,''); return;}")
   })
 })
@@ -635,20 +635,20 @@ describe('أفعالُ البطاقة بلا تحميل (D-207)', () => {
  * وهنا ما أمسكه الفحصُ الحيّ: «function say» عُرّفت فغلبها «var say» لمفاتيح المرور في النطاق نفسِه، فلم يظهر
  * «عاد الاتّصال». فلا اسمَ دالّةٍ يُعاد إعلانُه في السكربت.
  */
-describe('بلا اتّصال ونصُّ الجهاز (D-209)', () => {
-  it('لا اسمٌ يُعلَن مرّتين في نطاق السكربت', () => {
+describe('بلا اتّصال ونصّ الجهاز (D-209)', () => {
+  it('لا اسم يُعلَن مرّتين في نطاق السكربت', () => {
     const names = [...SCRIPT.matchAll(/(?:^|\n) {2}(?:function (\w+)\(|var (\w+)=function)/g)].map((m) => m[1] ?? m[2])
     const twice = names.filter((n, i) => names.indexOf(n) !== i)
     expect(twice).toEqual([])
   })
 
-  it('الشريطُ بالحدثين، والأزرارُ التي عطّلها وحدَها تعود، ولا إرسالَ تلقائيّ', () => {
+  it('الشريط بالحدثين، والأزرار التي عطّلها وحدَها تعود، ولا إرسال تلقائيّ', () => {
     expect(SCRIPT).toContain("window.addEventListener('offline'")
     expect(SCRIPT).toContain("window.addEventListener('online',function(){setOffline(false); toastSay('ok','عاد الاتّصال.');});")
     expect(SCRIPT).toContain("document.querySelectorAll('button[data-off]')")
   })
 
-  it('ونصُّ المحرّر وحدَه في «sada-draft:<id>»، بعد ثانيتين من الكتابة، ويُمحى إن ساوى نصَّ الخادم', () => {
+  it('ونصّ المحرّر وحدَه في «sada-draft:<id>»، بعد ثانيتين من الكتابة، ويُمحى إن ساوى نصّ الخادم', () => {
     expect(SCRIPT).toContain("var dKey='sada-draft:'+edBox.dataset.post")
     expect(SCRIPT).toContain('JSON.stringify({t:edT.value,at:Date.now()}));}catch(e){}},2000)')
     expect(SCRIPT).toContain('if(kept.t===edT.value){try{localStorage.removeItem(dKey);}catch(e){}}')

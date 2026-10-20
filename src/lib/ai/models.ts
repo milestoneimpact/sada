@@ -71,9 +71,9 @@ export interface ModelQuery {
 
 /** رمزُ الحالة يقرّر التفسير، لا نصُّ الرسالة — كما في كلّ سائقٍ عندنا. */
 function explain(status: number): string {
-  if (status === 401 || status === 403) return 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغَ'
-  if (status === 404) return 'هذا المزوّد لا يخدم فهرسَ نماذج على هذا العنوان'
-  if (status === 429) return 'بلغ حدُّ المزوّد — أعد المحاولة بعد قليل'
+  if (status === 401 || status === 403) return 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغ'
+  if (status === 404) return 'هذا المزوّد لا يخدم فهرس نماذج على هذا العنوان'
+  if (status === 429) return 'بلغ حدّ المزوّد — أعد المحاولة بعد قليل'
   if (status >= 500) return 'المزوّد متعب الآن، لا المفتاح'
   return `ردّ المزوّد ${status}`
 }
@@ -307,7 +307,7 @@ export async function listModels(
   try {
     payload = (await response.json()) as Record<string, unknown>
   } catch {
-    return { ok: false, models: [], detail: 'جوابُ الفهرس ليس JSON', status: response.status }
+    return { ok: false, models: [], detail: 'جواب الفهرس ليس JSON', status: response.status }
   }
 
   const models = read(payload)
@@ -317,7 +317,7 @@ export async function listModels(
       ok: false,
       models: [],
       status: response.status,
-      detail: 'جوابٌ مقبولٌ بلا نماذج — قد يكون شكلُ الفهرس تغيّر',
+      detail: 'جواب مقبول بلا نماذج — قد يكون شكل الفهرس تغيّر',
     }
   }
 

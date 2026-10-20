@@ -39,7 +39,7 @@ const KNOWN = {
 const SOURCE = readFileSync(new URL('../index.ts', import.meta.url), 'utf8')
 
 describe('ما في الشيفرة هو ما في الشيفرة', () => {
-  it('كلُّ ثابتٍ هنا مكتوبٌ في `index.ts` بنصّه', () => {
+  it('كلّ ثابت هنا مكتوب في `index.ts` بنصّه', () => {
     for (const [name, cron] of Object.entries(KNOWN)) {
       expect(SOURCE, `${name} تبدّل في index.ts ولم يتبدّل هنا`)
         .toContain(`const ${name} = '${cron}'`)
@@ -47,7 +47,7 @@ describe('ما في الشيفرة هو ما في الشيفرة', () => {
   })
 
   /** ثابتٌ جديدٌ يُضاف هناك ولا يُضاف هنا يفلت من المقارنة كلِّها. */
-  it('ولا ثابتَ جدولٍ في `index.ts` غائبٌ عن هذه القائمة', () => {
+  it('ولا ثابت جدول في `index.ts` غائب عن هذه القائمة', () => {
     const declared = [...SOURCE.matchAll(/const ([A-Z_]*CRON) = '([^']+)'/g)].map((m) => m[1]!)
     expect(declared.sort()).toEqual(Object.keys(KNOWN).sort())
   })
@@ -56,14 +56,14 @@ describe('ما في الشيفرة هو ما في الشيفرة', () => {
 describe('وما في الشيفرة هو ما في `wrangler.toml`', () => {
   const blocks = cronBlocks()
 
-  it('البيئتان معرَّفتان — وإلّا فالمقارنةُ تمرّ على لا شيء', () => {
+  it('البيئتان معرَّفتان — وإلّا فالمقارنة تمرّ على لا شيء', () => {
     expect(blocks.length).toBe(2)
   })
 
-  it('وكلُّ جدولٍ تعرفه الشيفرةُ مسجَّلٌ في كلّ بيئة', () => {
+  it('وكلّ جدول تعرفه الشيفرة مسجَّل في كلّ بيئة', () => {
     for (const block of blocks) {
       for (const [name, cron] of Object.entries(KNOWN)) {
-        expect(block, `${name} غائبٌ عن إحدى البيئتين — الدورةُ لن تُنادى`)
+        expect(block, `${name} غائب عن إحدى البيئتين — الدورة لن تُنادى`)
           .toContain(cron)
       }
     }
@@ -74,14 +74,14 @@ describe('وما في الشيفرة هو ما في `wrangler.toml`', () => {
    * يوقظ Worker ويجعله يدفع الطابورَ بلا سبب — ثمنُه صغير، **ودلالتُه
    * أنّ أحدَ الطرفين تبدّل وحده**.
    */
-  it('ولا جدولَ في الملفّ لا تعرفه الشيفرة', () => {
+  it('ولا جدول في الملفّ لا تعرفه الشيفرة', () => {
     const known = Object.values(KNOWN) as string[]
     // الإرسالُ يقع في كلّ دورة، وجدولُه ربعُ ساعةٍ لا يُقارَن باسم (D-037)
     const dispatch = '*/15 * * * *'
     for (const block of blocks) {
       for (const cron of block) {
         if (cron === dispatch) continue
-        expect(known, `جدولٌ ${cron} في wrangler.toml لا تعرفه الشيفرة`).toContain(cron)
+        expect(known, `جدول ${cron} في wrangler.toml لا تعرفه الشيفرة`).toContain(cron)
       }
     }
   })

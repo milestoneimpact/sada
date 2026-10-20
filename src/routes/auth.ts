@@ -98,7 +98,7 @@ async function guardPending(
     form = new FormData()
   }
   if (!(await checkCsrf(session, String(form.get('_csrf') ?? '')))) {
-    return { denied: await failSecondFactor(c, 'انتهت صلاحيةُ الصفحة — أعد المحاولة.', 403) }
+    return { denied: await failSecondFactor(c, 'انتهت صلاحية الصفحة — أعد المحاولة.', 403) }
   }
   return { session, form }
 }
@@ -223,7 +223,7 @@ auth.post('/panel/passkey/login', async (c) => {
     await recordFailure(c.env.KV, c.req.raw)
     await record(
       c.env.DB,
-      { actor: 'anonymous', action: 'passkey.denied', detail: 'لم يتحقّق المفتاحُ من صاحبه (لا بصمةَ ولا PIN)' },
+      { actor: 'anonymous', action: 'passkey.denied', detail: 'لم يتحقّق المفتاح من صاحبه (لا بصمة ولا PIN)' },
       c.req.raw,
     )
     return json({ error: 'uv_required' }, 401)
@@ -278,8 +278,8 @@ async function completeAssertion(
   if (credentialId === '') return { ok: false, reason: 'لا معرّف اعتماد' }
 
   const stored = await findPasskey(env.DB, credentialId)
-  if (stored === null) return { ok: false, reason: 'مفتاحٌ غير مسجَّل' }
-  if (stored.rpId !== rp.id) return { ok: false, reason: 'مفتاحٌ سُجّل على بيئةٍ أخرى' }
+  if (stored === null) return { ok: false, reason: 'مفتاح غير مسجَّل' }
+  if (stored.rpId !== rp.id) return { ok: false, reason: 'مفتاح سُجّل على بيئة أخرى' }
 
   let assertion
   try {
@@ -289,7 +289,7 @@ async function completeAssertion(
       signature: fromBase64Url(String(body.signature ?? '')),
     }
   } catch {
-    return { ok: false, reason: 'حقولٌ مشوّهة' }
+    return { ok: false, reason: 'حقول مشوّهة' }
   }
 
   const verdict = await verifyAssertion(
@@ -312,7 +312,7 @@ auth.post('/panel/2fa/passkey', async (c) => {
 
   const challenge = await c.env.KV.get(challengeKey(gate.session.id))
   if (challenge === null) {
-    return failSecondFactor(c, 'انتهت مهلةُ الصفحة — اضغط «الدخول بمفتاح المرور» مرّةً أخرى.', 400)
+    return failSecondFactor(c, 'انتهت مهلة الصفحة — اضغط «الدخول بمفتاح المرور» مرّةً أخرى.', 400)
   }
   await c.env.KV.delete(challengeKey(gate.session.id))
 
@@ -324,7 +324,7 @@ auth.post('/panel/2fa/passkey', async (c) => {
       return null
     }
   })()
-  if (body === null) return failSecondFactor(c, 'لم يصل توقيعُ المفتاح — أعد المحاولة.', 400)
+  if (body === null) return failSecondFactor(c, 'لم يصل توقيع المفتاح — أعد المحاولة.', 400)
 
   const verdict = await completeAssertion(c.env, body, challenge)
   if (!verdict.ok) {
@@ -352,18 +352,18 @@ auth.post('/panel/2fa/totp', async (c) => {
 
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
-    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
   // ‏والحجزُ قبل الفحص (D-161): ألفُ طلبٍ متزامنٍ يقرأ «صفرًا» من KV قبل أن
   // ‏يكتب أحدُها، والعدّادُ الذرّيُّ في D1 يردّ السادسَ قبل أن يُقارَن رمزُه
   if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
-    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
   const secret = await readTotpSecret(c.env.DB, c.env.TOKEN_ENC_KEY)
   const stored = await totpState(c.env.DB)
   if (secret === null || !stored.confirmed) {
-    return failSecondFactor(c, 'لا رمزَ تطبيقٍ مضبوطا على هذا النظام.', 400)
+    return failSecondFactor(c, 'لا رمز تطبيق مضبوطا على هذا النظام.', 400)
   }
 
   const result = await verifyTotp(secret, String(gate.form.get('code') ?? ''), {
@@ -403,11 +403,11 @@ auth.post('/panel/2fa/recovery', async (c) => {
 
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) {
-    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
   if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
-    return failSecondFactor(c, 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة.', 429)
+    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
   const used = await useRecoveryCode(c.env.DB, String(gate.form.get('code') ?? ''))
@@ -416,7 +416,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
     await record(c.env.DB, { actor: 'panel', action: '2fa.denied', detail: 'recovery' }, c.req.raw)
     const wait = delayMs(after.attempts)
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
-    return failSecondFactor(c, 'رمزُ استردادٍ غير صحيح أو مستهلَك.', 401)
+    return failSecondFactor(c, 'رمز استرداد غير صحيح أو مستهلَك.', 401)
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
@@ -432,7 +432,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
     `flash:${promoted.id}`,
     JSON.stringify({
       kind: 'warn',
-      text: `دخلتَ برمز استرداد — بقي ${left.unused} منها. ولّد مجموعةً جديدة من قسم الأمان.`,
+      text: `دخلت برمز استرداد — بقي ${left.unused} منها. ولّد مجموعةً جديدة من قسم الأمان.`,
     }),
     { expirationTtl: 60 },
   )
@@ -609,7 +609,7 @@ auth.post('/panel/security/passkey/delete', async (c) => {
   const isLast = state.passkeys.length === 1 && state.passkeys[0]?.id === id
   if (isLast && !state.totp.confirmed) {
     return json(
-      { error: 'last_factor', detail: 'هذا آخرُ عاملٍ ثانٍ. اضبط رمز تطبيقٍ أوّلا أو أزل الإلزام.' },
+      { error: 'last_factor', detail: 'هذا آخر عامل ثان. اضبط رمز تطبيق أوّلا أو أزل الإلزام.' },
       409,
     )
   }
@@ -667,7 +667,7 @@ auth.post('/panel/security/totp/remove', async (c) => {
   const state = await factorState(c.env.DB, rp.id)
   if (state.totp.confirmed && state.passkeys.length === 0) {
     return json(
-      { error: 'last_factor', detail: 'هذا آخرُ عاملٍ ثانٍ. سجّل مفتاح مرورٍ أوّلا.' },
+      { error: 'last_factor', detail: 'هذا آخر عامل ثان. سجّل مفتاح مرور أوّلا.' },
       409,
     )
   }

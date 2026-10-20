@@ -116,7 +116,7 @@ async function enrollTotp(cookie: string): Promise<string> {
   return secret
 }
 
-describe('بلا عاملٍ ثانٍ — لا يتغيّر شيء', () => {
+describe('بلا عامل ثان — لا يتغيّر شيء', () => {
   it('الدخول بالرمز يفتح اللوحة مباشرة', async () => {
     const { location, cookie } = await loginWithToken()
     expect(location).toBe('/panel')
@@ -124,13 +124,13 @@ describe('بلا عاملٍ ثانٍ — لا يتغيّر شيء', () => {
       .toContain('nav class="tabs"')
   })
 
-  it('صفحة الدخول لا تعرض بابَ مفتاح المرور', async () => {
+  it('صفحة الدخول لا تعرض باب مفتاح المرور', async () => {
     const html = await (await app.request('/panel', {}, env)).text()
     expect(html).not.toContain('pk-login')
   })
 })
 
-describe('تسجيلُ مفتاح مرور', () => {
+describe('تسجيل مفتاح مرور', () => {
   it('يُسجَّل ويظهر في اللوحة', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
@@ -141,7 +141,7 @@ describe('تسجيلُ مفتاح مرور', () => {
     expect(html).toContain('مفتاح المكتب')
   })
 
-  it('**تحدٍّ ملفَّق يُرفض** — التحدّي يجيء من الخادم لا من العميل', async () => {
+  it('**تحدّ ملفَّق يُرفض** — التحدّي يجيء من الخادم لا من العميل', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await post('/panel/security/passkey/challenge', cookie)
@@ -173,13 +173,13 @@ describe('تسجيلُ مفتاح مرور', () => {
     const key = await enrollPasskey(cookie)
     // إعادةُ الإرسال نفسه لا تجد تحدّيا
     const response = await post('/panel/security/passkey/register', cookie, {
-      label: 'ثانٍ',
+      label: 'ثان',
       credential: JSON.stringify({ credentialId: key.credentialId, publicKey: key.publicKey }),
     })
     expect(response.status).toBe(400)
   })
 
-  it('بلا جلسةٍ لا يُسجَّل شيء', async () => {
+  it('بلا جلسة لا يُسجَّل شيء', async () => {
     const response = await app.request(
       '/panel/security/passkey/challenge',
       { method: 'POST', body: new FormData() },
@@ -199,8 +199,8 @@ describe('تسجيلُ مفتاح مرور', () => {
   })
 })
 
-describe('الإلزام — والعاملُ الثاني ليس سؤالا يُتخطّى', () => {
-  it('بعد تسجيل مفتاح، الرمزُ وحده يعطي جلسةً معلَّقة', async () => {
+describe('الإلزام — والعامل الثاني ليس سؤالا يُتخطّى', () => {
+  it('بعد تسجيل مفتاح، الرمز وحده يعطي جلسةً معلَّقة', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -209,7 +209,7 @@ describe('الإلزام — والعاملُ الثاني ليس سؤالا ي�
     expect(second.location).toBe('/panel/2fa')
   })
 
-  it('والجلسةُ المعلَّقة تُردّ من اللوحة إلى الشاشة', async () => {
+  it('والجلسة المعلَّقة تُردّ من اللوحة إلى الشاشة', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -265,7 +265,7 @@ describe('الإلزام — والعاملُ الثاني ليس سؤالا ي�
   })
 })
 
-describe('إتمامُ العامل الثاني بمفتاح مرور', () => {
+describe('إتمام العامل الثاني بمفتاح مرور', () => {
   it('يرقّي الجلسة ويفتح اللوحة', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
@@ -321,7 +321,7 @@ describe('إتمامُ العامل الثاني بمفتاح مرور', () => {
 })
 
 describe('الدخول بمفتاح المرور من صفحة الدخول', () => {
-  it('يفتح جلسةً كاملةً بلا رمزٍ إداريّ', async () => {
+  it('يفتح جلسةً كاملةً بلا رمز إداريّ', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -356,7 +356,7 @@ describe('الدخول بمفتاح المرور من صفحة الدخول', ()
     expect(html).toContain('مفتاح مرور')
   })
 
-  it('صفحةُ الدخول تعرض بابَه حين يوجد مفتاح', async () => {
+  it('صفحة الدخول تعرض بابَه حين يوجد مفتاح', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -365,7 +365,7 @@ describe('الدخول بمفتاح المرور من صفحة الدخول', ()
     expect(html).toContain('pk-login')
   })
 
-  it('توقيعٌ بمفتاحٍ غير مسجَّل يُرفض', async () => {
+  it('توقيع بمفتاح غير مسجَّل يُرفض', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -393,10 +393,10 @@ describe('الدخول بمفتاح المرور من صفحة الدخول', ()
     const logged = db.raw.prepare(
       "SELECT detail FROM audit_log WHERE action = 'passkey.denied'",
     ).get() as { detail: string } | undefined
-    expect(logged?.detail).toBe('مفتاحٌ غير مسجَّل')
+    expect(logged?.detail).toBe('مفتاح غير مسجَّل')
   })
 
-  it('والتذكرةُ تُستهلَك — لا يُعاد إرسالُ التوقيع نفسه', async () => {
+  it('والتذكرة تُستهلَك — لا يُعاد إرسال التوقيع نفسه', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -414,7 +414,7 @@ describe('الدخول بمفتاح المرور من صفحة الدخول', ()
     expect((await app.request('/panel/passkey/login', { method: 'POST', headers, body }, env)).status).toBe(400)
   })
 
-  it('بلا مفاتيحَ مسجَّلة لا تحدٍّ أصلا', async () => {
+  it('بلا مفاتيح مسجَّلة لا تحدّ أصلا', async () => {
     const response = await app.request('/panel/passkey/challenge', { method: 'POST' }, env)
     expect(response.status).toBe(404)
   })
@@ -430,7 +430,7 @@ describe('رمز التطبيق', () => {
     expect((await loginWithToken()).location).toBe('/panel/2fa')
   })
 
-  it('**سرٌّ بدأ ولم يُؤكَّد لا يُلزِم** — وإلّا أقفل المالكَ خارج لوحته', async () => {
+  it('**سرّ بدأ ولم يُؤكَّد لا يُلزِم** — وإلّا أقفل المالك خارج لوحته', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await post('/panel/security/totp/start', cookie)
@@ -440,7 +440,7 @@ describe('رمز التطبيق', () => {
     expect((await loginWithToken()).location).toBe('/panel')
   })
 
-  it('رمزٌ خطأ لا يؤكّد', async () => {
+  it('رمز خطأ لا يؤكّد', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await post('/panel/security/totp/start', cookie)
@@ -449,7 +449,7 @@ describe('رمز التطبيق', () => {
     expect((await totpState(db)).confirmed).toBe(false)
   })
 
-  it('السرُّ لا يوجد مقروءا في القاعدة', async () => {
+  it('السرّ لا يوجد مقروءا في القاعدة', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     const secret = await enrollTotp(cookie)
@@ -480,7 +480,7 @@ describe('رمز التطبيق', () => {
       .toContain('nav class="tabs"')
   })
 
-  it('**رمزٌ استُعمل لا يُقبل ثانية** — ولو بقي من نافذته ثوانٍ', async () => {
+  it('**رمز استُعمل لا يُقبل ثانية** — ولو بقي من نافذته ثوان', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
     const secret = await enrollTotp(setup.cookie)
@@ -505,7 +505,7 @@ describe('رمز التطبيق', () => {
 })
 
 describe('رموز الاسترداد', () => {
-  it('تُولَّد مع أوّل تأكيدٍ لرمز التطبيق — فلا يصير الفقدُ قفلا', async () => {
+  it('تُولَّد مع أوّل تأكيد لرمز التطبيق — فلا يصير الفقد قفلا', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     const started = await post('/panel/security/totp/start', cookie)
@@ -584,10 +584,10 @@ describe('رموز الاسترداد', () => {
     expect(done.headers.get('Location')).toBe('/panel')
     const promoted = (done.headers.get('Set-Cookie') ?? '').split(';')[0]!
     const panel = await (await app.request('/panel', { headers: { Cookie: promoted } }, env)).text()
-    expect(panel).toContain(`دخلتَ برمز استرداد — بقي ${codes.length - 1} منها`)
+    expect(panel).toContain(`دخلت برمز استرداد — بقي ${codes.length - 1} منها`)
   })
 
-  it('ورمزُ التطبيق يعود إلى الصفحة المطلوبة كما كان (ر-11)', async () => {
+  it('ورمز التطبيق يعود إلى الصفحة المطلوبة كما كان (ر-11)', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
     const secret = await enrollTotp(setup.cookie)
@@ -606,7 +606,7 @@ describe('رموز الاسترداد', () => {
     expect(done.headers.get('Location')).toBe('/panel/report')
   })
 
-  it('تُقرأ بلا حساسيّةٍ للشرطة وحالة الأحرف', async () => {
+  it('تُقرأ بلا حساسيّة للشرطة وحالة الأحرف', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
     await enrollPasskey(setup.cookie)
@@ -626,7 +626,7 @@ describe('رموز الاسترداد', () => {
     expect(response.status).toBe(303)
   })
 
-  it('التوليدُ الجديد يُبطل القديمة كلَّها', async () => {
+  it('التوليد الجديد يُبطل القديمة كلَّها', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
     await enrollPasskey(setup.cookie)
@@ -650,7 +650,7 @@ describe('رموز الاسترداد', () => {
 })
 
 describe('لا يُقفَل المالك خارج لوحته', () => {
-  it('حذفُ آخر عاملٍ ثانٍ يُمنع ويُقال السبب', async () => {
+  it('حذف آخر عامل ثان يُمنع ويُقال السبب', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await enrollPasskey(cookie)
@@ -661,7 +661,7 @@ describe('لا يُقفَل المالك خارج لوحته', () => {
     expect(await listPasskeys(db, RP_ID)).toHaveLength(1)
   })
 
-  it('ويُسمح به إن بقي عاملٌ آخر', async () => {
+  it('ويُسمح به إن بقي عامل آخر', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await enrollPasskey(cookie)
@@ -673,7 +673,7 @@ describe('لا يُقفَل المالك خارج لوحته', () => {
     expect(await listPasskeys(db, RP_ID)).toHaveLength(0)
   })
 
-  it('وإزالةُ رمز التطبيق تُمنع إن كان الأخير', async () => {
+  it('وإزالة رمز التطبيق تُمنع إن كان الأخير', async () => {
     const { cookie } = await loginWithToken()
     await readCsrf(cookie)
     await enrollTotp(cookie)
@@ -681,8 +681,8 @@ describe('لا يُقفَل المالك خارج لوحته', () => {
   })
 })
 
-describe('تدويرُ الرمز يُبطل جلسة مفتاح المرور أيضا', () => {
-  it('الجلسةُ مربوطةٌ بالرمز وإن لم تُفتح به', async () => {
+describe('تدوير الرمز يُبطل جلسة مفتاح المرور أيضا', () => {
+  it('الجلسة مربوطة بالرمز وإن لم تُفتح به', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -709,7 +709,7 @@ describe('تدويرُ الرمز يُبطل جلسة مفتاح المرور أ
   })
 })
 
-describe('D-161 — إحكامُ باب الدخول', () => {
+describe('D-161 — إحكام باب الدخول', () => {
   /** يفتح شاشةَ العامل الثاني بجلسةٍ معلَّقة ويعيد ما يلزم لإتمامها. */
   async function pendingScreen(): Promise<{ cookie: string; csrf: string; challenge: string }> {
     const { cookie } = await loginWithToken()
@@ -721,7 +721,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     }
   }
 
-  it('**ألفُ طلبٍ متزامنٍ لا يفحص إلّا خمسةَ رموز**: الحجزُ قبل الفحص', async () => {
+  it('**ألف طلب متزامن لا يفحص إلّا خمسة رموز**: الحجز قبل الفحص', async () => {
     const setup = await loginWithToken()
     await readCsrf(setup.cookie)
     await enrollTotp(setup.cookie)
@@ -746,7 +746,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(7)
   })
 
-  it('المفتاحُ وحدَه لا يفتح اللوحة بلا تحقّقٍ من صاحبه (UV)', async () => {
+  it('المفتاح وحدَه لا يفتح اللوحة بلا تحقّق من صاحبه (UV)', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -764,7 +764,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     expect(await response.json()).toEqual({ error: 'uv_required' })
   })
 
-  it('والمفتاحُ نفسُه بلا UV يبقى عاملًا ثانيًا بعد كلمة الإدارة', async () => {
+  it('والمفتاح نفسُه بلا UV يبقى عاملًا ثانيًا بعد كلمة الإدارة', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -783,7 +783,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     expect(response.headers.get('Location')).toBe('/panel')
   })
 
-  it('تحدٍّ انتهت مهلتُه في شاشة العامل الثاني: صفحةٌ عربيّة بتحدٍّ جديد لا سطرُ JSON', async () => {
+  it('تحدّ انتهت مهلتُه في شاشة العامل الثاني: صفحة عربيّة بتحدّ جديد لا سطر JSON', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)
@@ -803,11 +803,11 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     const html = await response.text()
     expect(response.headers.get('Content-Type') ?? '').toContain('text/html')
     expect(html).not.toContain('"error"')
-    expect(html).toMatch(/انتهت مهلةُ الصفحة|لم يُقبَل المفتاح/)
+    expect(html).toMatch(/انتهت مهلة الصفحة|لم يُقبَل المفتاح/)
     expect(html).toMatch(/data-challenge="[^"]+"/)
   })
 
-  it('نموذجُ العامل الثاني بلا جلسة يعود إلى الدخول، وبرمز نموذجٍ قديم يُعاد رسمُه', async () => {
+  it('نموذج العامل الثاني بلا جلسة يعود إلى الدخول، وبرمز نموذج قديم يُعاد رسمُه', async () => {
     const orphan = await app.request('/panel/2fa/totp', { method: 'POST', body: new FormData() }, env)
     expect(orphan.status).toBe(303)
     expect(orphan.headers.get('Location')).toBe('/panel')
@@ -821,10 +821,10 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     body.set('code', '000000')
     const stale = await app.request('/panel/2fa/totp', { method: 'POST', body, headers: { Cookie: cookie } }, env)
     expect(stale.status).toBe(403)
-    expect(await stale.text()).toContain('انتهت صلاحيةُ الصفحة')
+    expect(await stale.text()).toContain('انتهت صلاحية الصفحة')
   })
 
-  it('كلمةُ إدارةٍ خاطئة لا تُخفي بابَ المفتاح، وتقول ما بقي بعربيّةٍ صحيحة', async () => {
+  it('كلمة إدارة خاطئة لا تُخفي باب المفتاح، وتقول ما بقي بعربيّة صحيحة', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -835,11 +835,11 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     const html = await response.text()
     expect(response.status).toBe(401)
     expect(html).toContain('id="pk-login"')
-    expect(html).toContain('كلمةُ الإدارة غير صحيحة — بقيت 4 محاولات.')
-    expect(html).not.toContain('رمزٌ غير صحيح')
+    expect(html).toContain('كلمة الإدارة غير صحيحة — بقيت 4 محاولات.')
+    expect(html).not.toContain('رمز غير صحيح')
   })
 
-  it('وجلسةٌ انتهت في منتصف عمل تعيد صفحةَ دخولٍ ببابه كذلك', async () => {
+  it('وجلسة انتهت في منتصف عمل تعيد صفحة دخول ببابه كذلك', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -849,7 +849,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     expect(html).toContain('id="pk-login"')
   })
 
-  it('إصدارُ التحدّيات لمجهولٍ له سقف: كلُّ تحدٍّ كتابةٌ مدفوعةٌ في KV', async () => {
+  it('إصدار التحدّيات لمجهول له سقف: كلّ تحدّ كتابة مدفوعة في KV', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     await enrollPasskey(first.cookie)
@@ -861,7 +861,7 @@ describe('D-161 — إحكامُ باب الدخول', () => {
     expect(statuses.slice(20)).toEqual([429, 429])
   })
 
-  it('سببُ الرفض في السجلّ لا يحمل مليونَ بايتٍ أرسلها مجهول، وجسدٌ ضخمٌ لا يُقرأ', async () => {
+  it('سبب الرفض في السجلّ لا يحمل مليون بايت أرسلها مجهول، وجسد ضخم لا يُقرأ', async () => {
     const first = await loginWithToken()
     await readCsrf(first.cookie)
     const key = await enrollPasskey(first.cookie)

@@ -31,15 +31,15 @@ const MARK: Readonly<Record<string, { g: string; cls: Tone; label: string }>> = 
 const OPENS: Readonly<Record<Unblocks, { label: string; cls: Tone; why: string }>> = {
   gate: {
     label: 'بوّابة', cls: 'bad',
-    why: 'مرحلةٌ لا تُجتاز بدونها — يقف المشروعُ عندها',
+    why: 'مرحلة لا تُجتاز بدونها — يقف المشروع عندها',
   },
   guard: {
     label: 'حارس', cls: 'warn',
-    why: 'النظامُ يعمل بدونها **ويبدو محروسا وهو ليس كذلك**',
+    why: 'النظام يعمل بدونها **ويبدو محروسا وهو ليس كذلك**',
   },
   capability: {
     label: 'قدرة', cls: 'idle',
-    why: 'تُفتَح قدرةٌ جديدة، ولا ينكسر شيءٌ بتركها',
+    why: 'تُفتَح قدرة جديدة، ولا ينكسر شيء بتركها',
   },
 }
 
@@ -74,7 +74,7 @@ function row(r: OwnerRow, env: string): string {
   const opens = OPENS[r.unblocks]
   return `<tr class="${key === 'todo' && r.unblocks === 'gate' ? 'urgent' : ''}">
     <td data-label="المهمّة">
-      ${/* ‏**العنوانُ أوّلًا والرمزُ صغيرٌ بعده** (D-203): كان «M-16» أبرزَ ما في الصفّ */ ''}<div class="nm">${bold(r.title)}
+      ${/* ‏**العنوان أوّلًا والرمز صغير بعده** (D-203): كان «M-16» أبرز ما في الصفّ */ ''}<div class="nm">${bold(r.title)}
         <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></div>
       <div class="sub">${bold(r.ifLeft)}</div>
       ${commandBox(r, env)}
@@ -86,7 +86,7 @@ function row(r: OwnerRow, env: string): string {
          * ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها، وكانت
          * ‏الشاشةُ تسمّيها ولا تفتحها — فلا تُبلَغ من الهاتف. ولا تُعرَض لما تمّ.
          */ ''}${r.state === true ? '' : `<div class="sub"><a class="tap" href="${escapeHtml(taskDoc(r.code))}"
-        target="_blank" rel="noopener noreferrer" aria-label="خطواتُ ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
+        target="_blank" rel="noopener noreferrer" aria-label="خطوات ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
     </td>
     <td data-label="تفتح">
       ${statusBadge(opens.cls, '◆', opens.label)}
@@ -159,11 +159,11 @@ export function tasksScreen(d: TasksScreenData): string {
   const lede =
     todo.length === 0
       ? unknown.length === 0
-        ? '<b>لا شيءَ عليك ممّا يُعرَف من هنا.</b>'
-        : `<b>لا شيءَ عليك ممّا يُعرَف من هنا</b> — و${unknown.length} لا تُقرأ
+        ? '<b>لا شيء عليك ممّا يُعرَف من هنا.</b>'
+        : `<b>لا شيء عليك ممّا يُعرَف من هنا</b> — و${unknown.length} لا تُقرأ
            من اللوحة، تُراجَع في بوّابة المنصّة.`
       : `<b>${todo.length}</b> عليك، منها
-         <b>${todo.filter((r) => r.unblocks === 'gate').length}</b> توقف بوّابةَ مرحلة.`
+         <b>${todo.filter((r) => r.unblocks === 'gate').length}</b> توقف بوّابة مرحلة.`
 
   return `<div class="page-head">
     <div class="txt">
@@ -177,9 +177,9 @@ export function tasksScreen(d: TasksScreenData): string {
     <div class="card-head"><h2>القائمة</h2><div class="grow"></div>
       <span class="chip">${done.length} تمّت · ${todo.length} عليك · ${
         unknown.length} لا تُعرَف</span></div>
-    <p class="hint"><b>والحالُ يُشتقّ من البيئة والقاعدة، لا يُكتَب بيد</b> —
-      قائمةٌ تُحدَّث بيدٍ تشيخ. <b>وما يقع عند المنصّة يُقال «لا يُعرَف من هنا»
-      لا «لم تتمّ»</b>: قولُ «لم تتمّ» عن طلبٍ قُبل يجعلك تعيده.</p>
+    <p class="hint"><b>والحال يُشتقّ من البيئة والقاعدة، لا يُكتَب بيد</b> —
+      قائمة تُحدَّث بيد تشيخ. <b>وما يقع عند المنصّة يُقال «لا يُعرَف من هنا»
+      لا «لم تتمّ»</b>: قول «لم تتمّ» عن طلب قُبل يجعلك تعيده.</p>
     <div class="scroll"><table>
       <thead><tr><th>المهمّة وما يقع إن تُركت</th><th>تفتح</th><th>الحال</th></tr></thead>
       <tbody>${d.rows.map((r) => row(r, d.env)).join('')}</tbody>
@@ -187,27 +187,27 @@ export function tasksScreen(d: TasksScreenData): string {
   </div>
 
   <div class="lede-row mt-6">
-    <h3 class="sec bare">بوّاباتُ المراحل</h3>
+    <h3 class="sec bare">بوّابات المراحل</h3>
     <span class="grow"></span>
     ${statusBadge(d.phase === null ? 'ok' : 'warn', d.phase === null ? '●' : '◍', `${
       d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}`)}
   </div>
 
   <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
-    خطّةُ المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
+    خطّة المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
     سابقتها ويُسجَّل ذلك في سجلّ الحال» —
-    <b>وسجلٌّ يُكتب بيدٍ يشيخ</b>، وقد شاخ. فكلُّ بندٍ هنا استعلامٌ على ما وقع،
-    <b>ومعه دليلُه</b>. <b>وبندٌ لا يُقاس يُبقي بوّابتَه غيرَ مجتازة</b> —
-    فبوّابةٌ تُجتاز بشرطٍ لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
+    <b>وسجلّ يُكتب بيد يشيخ</b>، وقد شاخ. فكلّ بند هنا استعلام على ما وقع،
+    <b>ومعه دليلُه</b>. <b>وبند لا يُقاس يُبقي بوّابتَه غير مجتازة</b> —
+    فبوّابة تُجتاز بشرط لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
 
   ${d.gates.map(gateCard).join('')}
 
   <div class="card">
     <h2>وأين الخطوات</h2>
-    <p class="hint">كلُّ مهمّةٍ لها صفحةٌ بالعناصر الستّة في
+    <p class="hint">كلّ مهمّة لها صفحة بالعناصر الستّة في
       <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"
-        title="docs/MANUAL-TASKS.md">دليلِ المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
-      على الشاشة، وعلامةِ النجاح، وما يُقرأ أوّلا إن فشلت.
-      <b>ومعرِّفٌ هنا بلا صفحةٍ هناك يُسقط CI</b>، فلا يبقى عنوانٌ بلا خطوات.</p>
+        title="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
+      على الشاشة، وعلامة النجاح، وما يُقرأ أوّلا إن فشلت.
+      <b>ومعرِّف هنا بلا صفحة هناك يُسقط CI</b>، فلا يبقى عنوان بلا خطوات.</p>
   </div>`
 }

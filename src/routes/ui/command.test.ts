@@ -21,20 +21,20 @@ import { shell } from './shell'
 import { STYLE } from './styles'
 import { sheet } from '../../test/css'
 
-describe('الطبعُ — والمالكُ يكتب همزتَه كما شاء', () => {
-  it('يطوي صورَ الألف والياء والتاء المربوطة', () => {
+describe('الطبع — والمالك يكتب همزتَه كما شاء', () => {
+  it('يطوي صور الألف والياء والتاء المربوطة', () => {
     expect(normalize('الأقسام')).toBe(normalize('الاقسام'))
     expect(normalize('إعداد')).toBe(normalize('اعداد'))
     expect(normalize('منصّة')).toBe(normalize('منصه'))
-    expect(normalize('علىَ')).toBe(normalize('علي'))
+    expect(normalize('على')).toBe(normalize('علي'))
   })
 
-  it('ويحذف التشكيلَ والتطويل — ولا يقارن حركةً بحركة', () => {
+  it('ويحذف التشكيل والتطويل — ولا يقارن حركةً بحركة', () => {
     expect(normalize('المُسوَّدَة')).toBe(normalize('المسوده'))
     expect(normalize('مـــصادر')).toBe(normalize('مصادر'))
   })
 
-  it('واللاتينيُّ يُصغَّر — فمن كتب SOURCES وجدها', () => {
+  it('واللاتينيّ يُصغَّر — فمن كتب SOURCES وجدها', () => {
     expect(normalize('SOURCES')).toBe('sources')
   })
 })
@@ -43,7 +43,7 @@ describe('الطبعُ — والمالكُ يكتب همزتَه كما شاء'
  * **وطبعُ المتصفّح يُنتزَع من النصّ المُرسَل لا من نسخةٍ هنا** — كما
  * فُعل بعدّاد X في D-071. فما يُختبَر هو ما يُشحَن.
  */
-describe('وطبعُ المتصفّح يوافق طبعَ الخادم', () => {
+describe('وطبع المتصفّح يوافق طبع الخادم', () => {
   const clientNorm = (): ((s: string) => string) => {
     const strip = /var STRIP=new RegExp\([^\n]*\n/.exec(COMMAND_SCRIPT)
     const fold = /var FOLD=[\s\S]*?\n {2}\}\);\n/.exec(COMMAND_SCRIPT)
@@ -54,19 +54,19 @@ describe('وطبعُ المتصفّح يوافق طبعَ الخادم', () => {
     return new Function(`${strip[0]}${fold[0]}${norm[0]}return norm`)() as (s: string) => string
   }
 
-  const CASES = ['الأقسام', 'منصّة', 'المُسوَّدَة', 'مـــصادر', 'SOURCES', 'امسح Drive', 'علىَ', '']
+  const CASES = ['الأقسام', 'منصّة', 'المُسوَّدَة', 'مـــصادر', 'SOURCES', 'امسح Drive', 'على', '']
 
   it.each(CASES.map((c) => [c || '(فارغ)', c]))('يتّفقان على: %s', (_l, text) => {
     expect(clientNorm()(text as string)).toBe(normalize(text as string))
   })
 
   /** **والجدولُ يخرج في النصّ من مصدره** لا مكتوبا فيه فيشيخ وحدَه. */
-  it('وجدولُ الطيّ مُسلسَلٌ في النصّ لا منسوخٌ فيه', () => {
+  it('وجدول الطيّ مُسلسَل في النصّ لا منسوخ فيه', () => {
     expect(COMMAND_SCRIPT).toContain('["أإآٱ","ا"]')
   })
 })
 
-describe('الفهرس — ولا فعلَ يقع من هنا', () => {
+describe('الفهرس — ولا فعل يقع من هنا', () => {
   /**
    * **وأخطرُ ما يمكن أن يُضاف غدا زرُّ تنفيذ.**
    *
@@ -75,26 +75,26 @@ describe('الفهرس — ولا فعلَ يقع من هنا', () => {
    * أن يُعدّ ناجحا، و`D-009` يوجب اعتمادا بشريّا. فالحدُّ يُحرَس هنا
    * لا في المراجعة.
    */
-  it('**ولا نموذجَ ولا زرَّ إرسالٍ في اللوحة كلِّها**', () => {
+  it('**ولا نموذج ولا زرّ إرسال في اللوحة كلِّها**', () => {
     const html = commandPalette(buildCommands())
     expect(html).not.toContain('<form')
     expect(html).not.toContain('method="POST"')
     expect(html).not.toContain('type="submit"')
   })
 
-  it('وكلُّ مدخلٍ رابطٌ له عنوان', () => {
+  it('وكلّ مدخل رابط له عنوان', () => {
     for (const c of buildCommands({ onPanel: true })) {
       expect(c.href.length).toBeGreaterThan(0)
     }
   })
 
   /** **ولا قسمَ يسقط من اللوحة** — الجدولُ واحدٌ لها وللرافدة. */
-  it('وكلُّ قسمٍ في الجدول له مدخلٌ في اللوحة', () => {
+  it('وكلّ قسم في الجدول له مدخل في اللوحة', () => {
     const labels = buildCommands().map((c) => c.label)
     for (const s of SECTIONS) expect(labels).toContain(s.label)
   })
 
-  it('واللوحُ يُقصَد بمرساةٍ في اللوحة وبمسارٍ خارجَها', () => {
+  it('واللوح يُقصَد بمرساة في اللوحة وبمسار خارجَها', () => {
     const on = buildCommands({ onPanel: true }).find((c) => c.label === 'المنشورات')!
     const off = buildCommands({ onPanel: false }).find((c) => c.label === 'المنشورات')!
     expect(on.href).toBe('#posts')
@@ -102,14 +102,14 @@ describe('الفهرس — ولا فعلَ يقع من هنا', () => {
   })
 
   /** **وصفحةٌ مستقلّةٌ مسارُها مسارٌ في الحالين** — ولا مرساةَ لها. */
-  it('و«النتائج» مسارُ التقرير في اللوحة وخارجَها سواء (D-204)', () => {
+  it('و«النتائج» مسار التقرير في اللوحة وخارجَها سواء (D-204)', () => {
     for (const onPanel of [true, false]) {
       const r = buildCommands({ onPanel }).find((c) => c.label === 'النتائج')!
       expect(r.href).toBe('/panel/report')
     }
   })
 
-  it('والفعلُ يُسمّى بفعله — «امسح Drive» لا «قسمُ المصادر»', () => {
+  it('والفعل يُسمّى بفعله — «امسح Drive» لا «قسم المصادر»', () => {
     const labels = buildCommands().map((c) => c.label)
     expect(labels).toContain('امسح Drive')
     expect(labels).toContain('اربط قناةً جديدة')
@@ -127,32 +127,32 @@ describe('الفهرس — ولا فعلَ يقع من هنا', () => {
   })
 })
 
-describe('المسوّدات — ثمانٍ لا كلُّها (D-101)', () => {
+describe('المسوّدات — ثمان لا كلُّها (D-101)', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({
-    id: `p${i}`, platform: 'linkedin', text: `مسوّدةٌ رقم ${i}`,
+    id: `p${i}`, platform: 'linkedin', text: `مسوّدة رقم ${i}`,
   }))
 
-  it('والفهرسُ لا يُترك ينمو مع كلّ منشور', () => {
+  it('والفهرس لا يُترك ينمو مع كلّ منشور', () => {
     const rows = buildCommands({ onPanel: true, drafts: many })
       .filter((c) => c.group === 'المسوّدات')
     expect(rows).toHaveLength(DRAFT_CAP)
   })
 
   /** **وتذهب إلى رحلتها لا إلى قائمتها** (D-104). */
-  it('والمسوّدةُ تقصد رحلتَها', () => {
+  it('والمسوّدة تقصد رحلتَها', () => {
     const one = buildCommands({ onPanel: true, drafts: many })
       .find((c) => c.group === 'المسوّدات')!
     expect(one.href).toBe('/panel/journey/p0')
   })
 
-  it('والنصُّ الطويلُ يُقصّ سطرا — ولا تُعرَض فقرةٌ في قائمة', () => {
+  it('والنصّ الطويل يُقصّ سطرا — ولا تُعرَض فقرة في قائمة', () => {
     const long = buildCommands({ onPanel: true, drafts: [{ id: 'a', platform: 'x', text: 'ن'.repeat(400) }] })
       .find((c) => c.group === 'المسوّدات')!
     expect(long.label.length).toBeLessThan(60)
     expect(long.label.endsWith('…')).toBe(true)
   })
 
-  it('**ونصُّ مسوّدةٍ يُهرَّب** — ووسمٌ فيه يُعرَض حرفا', () => {
+  it('**ونصّ مسوّدة يُهرَّب** — ووسم فيه يُعرَض حرفا', () => {
     const html = commandPalette(
       buildCommands({ onPanel: true, drafts: [{ id: 'a', platform: 'x', text: '<img onerror=x>' }] }),
     )
@@ -160,15 +160,15 @@ describe('المسوّدات — ثمانٍ لا كلُّها (D-101)', () => {
     expect(html).toContain('&lt;img')
   })
 
-  it('ومعرّفٌ فيه محرفٌ خاصٌّ يُرمَّز في المسار', () => {
+  it('ومعرّف فيه محرف خاصّ يُرمَّز في المسار', () => {
     const one = buildCommands({ onPanel: true, drafts: [{ id: 'a/b?c', platform: 'x', text: 'ن' }] })
       .find((c) => c.group === 'المسوّدات')!
     expect(one.href).toBe('/panel/journey/a%2Fb%3Fc')
   })
 })
 
-describe('مفتاحُ البحث — يُطبَّع مرّةً في الخادم', () => {
-  it('يجمع الاسمَ والسطرَ والمجموعةَ والمرادفَ اللاتينيّ', () => {
+describe('مفتاح البحث — يُطبَّع مرّةً في الخادم', () => {
+  it('يجمع الاسم والسطر والمجموعة والمرادف اللاتينيّ', () => {
     const c = buildCommands().find((x) => x.label === 'المكتبة')!
     const k = searchKey(c)
     expect(k).toContain('drive')
@@ -177,19 +177,19 @@ describe('مفتاحُ البحث — يُطبَّع مرّةً في الخاد�
     expect(k).toContain(normalize('مصادر'))
   })
 
-  it('وهو مطبوعٌ لا خام — فالمقارنةُ لا تطبع مع كلّ ضغطة', () => {
+  it('وهو مطبوع لا خام — فالمقارنة لا تطبع مع كلّ ضغطة', () => {
     const c = buildCommands().find((x) => x.label === 'المنشورات')!
     expect(searchKey(c)).toBe(normalize(searchKey(c)))
   })
 })
 
-describe('النصُّ البرمجيّ — وقواعدُ اللوحة تُوَرَّث', () => {
+describe('النصّ البرمجيّ — وقواعد اللوحة تُوَرَّث', () => {
   it('يُبنى دالّةً بلا خطأ صياغة', () => {
     expect(() => new Function(COMMAND_SCRIPT)).not.toThrow()
   })
 
   /** **بموضع المفتاح لا بحرفه** (D-100): لوحةٌ عربيّةٌ تعطي حرفا آخر. */
-  it('**والاختصارُ بموضع المفتاح لا بحرفه**', () => {
+  it('**والاختصار بموضع المفتاح لا بحرفه**', () => {
     expect(COMMAND_SCRIPT).toContain("e.code==='KeyK'")
     expect(COMMAND_SCRIPT).not.toContain("e.key==='k'")
     expect(COMMAND_SCRIPT).not.toContain("e.key==='K'")
@@ -208,7 +208,7 @@ describe('النصُّ البرمجيّ — وقواعدُ اللوحة تُوَ
   })
 
   /** **والتركيزُ يعود من حيث جاء** — وقفزُه يُفقِد قارئَ الشاشة موضعَه. */
-  it('ويعيد التركيزَ إلى ما كان عليه قبل الفتح', () => {
+  it('ويعيد التركيز إلى ما كان عليه قبل الفتح', () => {
     expect(COMMAND_SCRIPT).toContain('from=document.activeElement')
     expect(COMMAND_SCRIPT).toContain('from.focus()')
   })
@@ -220,19 +220,19 @@ describe('النصُّ البرمجيّ — وقواعدُ اللوحة تُوَ
  * قائمةٌ ثانيةٌ تُبنى للشريط **تشيخ وحدَها**: قسمٌ يُضاف غدا يدخل الرافدةَ
  * واللوحةَ ولا يدخلها، **ولا حارسَ يمسك غيابا**.
  */
-describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ وجهاتٍ و«المزيد» (D-204)', () => {
-  it('**وأربعُ وجهاتٍ لا أقلّ ولا أكثر**، والخامسةُ «المزيد»', () => {
+describe('شريط الجوّال — خمسة في اليد: أربع وجهات و«المزيد» (D-204)', () => {
+  it('**وأربع وجهات لا أقلّ ولا أكثر**، والخامسة «المزيد»', () => {
     expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
   })
 
   /** والرافدةُ سبعةُ عناصر (خطّة التصميم 5.1): الوجهاتُ الخمس، ثمّ «ما عليك» و«الإعدادات». */
-  it('**وسبعةٌ في الرافدة** بترتيب الخطّة', () => {
+  it('**وسبعة في الرافدة** بترتيب الخطّة', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
       ['الرئيسيّة', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
   })
 
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
-  it('وهي أقسامُ العمل اليوميّ', () => {
+  it('وهي أقسام العمل اليوميّ', () => {
     const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
     expect(bar).toEqual(['overview', 'posts', 'library', 'results'])
   })
@@ -241,7 +241,7 @@ describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ و�
    * **وما ليس في الشريط يُبلَغ من «المزيد»** — وهو بابُ اللوحة لا
    * قائمةٌ ثالثة. فالتسعةُ كلُّها مفهرَسةٌ فيها أصلا.
    */
-  it('وكلُّ ما خرج من الشريط في اللوحة', () => {
+  it('وكلّ ما خرج من الشريط في اللوحة', () => {
     const labels = buildCommands({ onPanel: true }).map((c) => c.label)
     for (const s of SECTIONS.filter((x) => x.bar !== true)) {
       expect(labels).toContain(s.label)
@@ -249,7 +249,7 @@ describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ و�
   })
 
   /** **وزرّان لا زرّ**: العلويُّ و«المزيد» — ومعرّفٌ واحدٌ يُعطِّل الثاني. */
-  it('**والنصُّ يربط بالصنف لا بالمعرّف**', () => {
+  it('**والنصّ يربط بالصنف لا بالمعرّف**', () => {
     expect(COMMAND_SCRIPT).toContain(".querySelectorAll('.cmdk-open')")
     expect(COMMAND_SCRIPT).not.toContain("getElementById('cmdk-open')")
     expect(commandTrigger()).toContain('class="cmdk-open"')
@@ -257,21 +257,21 @@ describe('شريطُ الجوّال — خمسةٌ في اليد: أربعُ و�
   })
 
   /** و«المزيد» قائمةٌ لا بحث (خطّة التصميم 5.3 · D-208): ما ليس في الشريط بأعداده، ويعمل بلا سكربت. */
-  it('و«المزيد» ورقةٌ فيها الحساباتُ وما عليك والإعدادات، وعددُها مجموعُها', () => {
+  it('و«المزيد» ورقة فيها الحسابات وما عليك والإعدادات، وعددُها مجموعُها', () => {
     const html = railHtml({ inPanel: true, counts: { accounts: 1, tasks: 4, settings: 0 } })
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
     expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/accounts', '/panel/tasks', '/panel/settings'])
-    expect(sheet).toContain('بحثٌ وأوامر')
+    expect(sheet).toContain('بحث وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })
 })
 
-describe('التركيب — واللوحةُ لا تُركَّب نصفَ تركيب', () => {
+describe('التركيب — واللوحة لا تُركَّب نصف تركيب', () => {
   const one = { label: 'أ', note: 'ب', href: '/x', group: 'ج', icon: '<svg></svg>' }
 
-  it('**من مرّر الفهرسَ نال الجسدَ والنصَّ معا**', () => {
+  it('**من مرّر الفهرس نال الجسد والنصّ معا**', () => {
     const html = shell('ت', '<p>x</p>', 'n1', '', { commands: [one] })
     expect(html).toContain('id="cmdk"')
     // النصُّ في الأصل العامّ الذي تربطه كلُّ صفحة (D-153)
@@ -291,7 +291,7 @@ describe('التركيب — واللوحةُ لا تُركَّب نصفَ تر�
    * الجسدُ `hidden`، والزرُّ `hidden`، **ولا يرفعهما إلّا النصُّ الذي
    * يجعلهما يعملان**. وزرٌّ يُرى ولا يفتح شيئا عطلٌ يُشتكى منه.
    */
-  it('والجسدُ والزرُّ مخفيّان حتّى يعمل النصّ', () => {
+  it('والجسد والزرّ مخفيّان حتّى يعمل النصّ', () => {
     expect(commandPalette([one])).toContain('id="cmdk" hidden')
     expect(commandTrigger()).toContain('hidden')
   })
@@ -307,14 +307,14 @@ describe('التركيب — واللوحةُ لا تُركَّب نصفَ تر�
    * فأُقفلت مرّةً للكلّ، **ويُحرَس القفلُ هنا**: حذفُه يعيد العلّةَ
    * لكلّ ما يُرسَم مخفيّا.
    */
-  it('**وقفلُ hidden قائمٌ للكلّ** — لا لصنفٍ صنفا', () => {
+  it('**وقفل hidden قائم للكلّ** — لا لصنف صنفا', () => {
     // ‏في المستوى الأعلى لا في كتلةٍ مشروطة، ومحدّدُه العاري وحدَه
     expect(sheet(STYLE).rule('[hidden]').display).toBe('none!important')
   })
 
-  it('والنصُّ يبقى داخل نطاق nonce — لا وسمَ ثانٍ بلا ختم', () => {
+  it('والنصّ يبقى داخل نطاق nonce — لا وسم ثان بلا ختم', () => {
     const html = shell('ت', '<p>x</p>', 'n1', 'var a=1;', { commands: [one] })
-    expect(html.match(/<script/g)).toHaveLength(3) // ‏ثيمُ الإقلاع، ثمّ الأصلُ العامّ، ثمّ نصُّ الصفحة
+    expect(html.match(/<script/g)).toHaveLength(3) // ‏ثيم الإقلاع، ثمّ الأصل العامّ، ثمّ نصّ الصفحة
     expect(html).not.toContain('<script>')
     expect(html.match(/<script nonce="n1"/g)).toHaveLength(3)
   })

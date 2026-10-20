@@ -238,14 +238,14 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
       ? { key: 'source', title: 'المصدر', state: 'done', note: 'لا ملفّ في Drive — وهو اختياريّ', href: '#sources' }
       : { key: 'source', title: 'المصدر', state: 'now', note: 'لا ملفّ بعد — امسح مجلّد Drive', href: '#sources' }
     : pending > 0
-      ? { key: 'source', title: 'المصدر', state: 'now', note: `ينتظر التحليلَ ${counted(pending, NOUNS.source)}`, href: '#sources' }
+      ? { key: 'source', title: 'المصدر', state: 'now', note: `ينتظر التحليل ${counted(pending, NOUNS.source)}`, href: '#sources' }
       : { key: 'source', title: 'المصدر', state: 'done', note: `حُلّل ${counted(f.sources.analyzed, NOUNS.source)}`, href: '#sources' }
 
   // ‏و«المسوّدة» محطّةُ الكتابة: بطاقتُها آخرُ اللوح (‏٥٢٩٢px على الهاتف)، و`#posts` يُنزل إلى أوّله
   const draft: Leg = written > 0
     ? { key: 'draft', title: 'المسوّدة', state: 'done', note: `كُتبت ${counted(written, NOUNS.draft)}`, href: '#write' }
     : f.sources.analyzed > 0
-      ? { key: 'draft', title: 'المسوّدة', state: 'now', note: 'اكتب أوّلَ مسوّدةٍ من مصدرٍ محلَّل', href: '#write' }
+      ? { key: 'draft', title: 'المسوّدة', state: 'now', note: 'اكتب أوّل مسوّدة من مصدر محلَّل', href: '#write' }
       : { key: 'draft', title: 'المسوّدة', state: 'waiting', note: 'بعد تحليل مصدر', href: '#write' }
 
   const image: Leg = f.withoutImage > 0
@@ -258,8 +258,8 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
   const approve: Leg = drafts > 0
     ? { key: 'approve', title: 'الاعتماد', state: 'now', note: `تنتظر قرارك ${counted(drafts, NOUNS.draft)}`, href: cardAt(f.firsts.waiting, 'd') }
     : approved + queued + published + failed > 0
-      ? { key: 'approve', title: 'الاعتماد', state: 'done', note: 'لا شيءَ ينتظر قرارك', href: '#posts' }
-      : { key: 'approve', title: 'الاعتماد', state: 'waiting', note: 'لا يُنشر شيءٌ قبل اعتمادك', href: '#posts' }
+      ? { key: 'approve', title: 'الاعتماد', state: 'done', note: 'لا شيء ينتظر قرارك', href: '#posts' }
+      : { key: 'approve', title: 'الاعتماد', state: 'waiting', note: 'لا يُنشر شيء قبل اعتمادك', href: '#posts' }
 
   // ‏و«تامّةٌ» بما جُدول ولو نُشر كلُّه: طابورٌ فارغٌ بعد النشر ليس «بعد الاعتماد»
   const schedule: Leg = approved > 0
@@ -267,7 +267,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
     : queued > 0
       ? { key: 'schedule', title: 'الموعد', state: 'done', note: `جُدول ${counted(queued, NOUNS.post)}`, href: '#posts' }
       : published + failed > 0
-        ? { key: 'schedule', title: 'الموعد', state: 'done', note: 'لا موعدَ قادم — مضى ما جُدول', href: '#posts' }
+        ? { key: 'schedule', title: 'الموعد', state: 'done', note: 'لا موعد قادم — مضى ما جُدول', href: '#posts' }
         : { key: 'schedule', title: 'الموعد', state: 'waiting', note: 'بعد الاعتماد', href: '#posts' }
 
   // ‏والسقوطُ بفشل الأسبوع وحده — كما في «خطوتك التالية»، فلا تقول المحطّةُ غيرَ ما يقوله الفعل
@@ -275,7 +275,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
   const publish: Leg = recent !== null
     ? {
         key: 'publish', title: 'النشر', state: 'failed',
-        note: `فشل ${counted(sumRecent(c), NOUNS.post)} — والسببُ في صفحة المنصّة`,
+        note: `فشل ${counted(sumRecent(c), NOUNS.post)} — والسبب في صفحة المنصّة`,
         href: failedHref(recent.platform),
       }
     : c.publishedWeek > 0
@@ -288,7 +288,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
             // ‏والقديمُ يُذكَر ولا يُسقِط: «في موعده بعد الجدولة» عن منشورٍ جُدول وسقط كذب
             ? {
                 key: 'publish', title: 'النشر', state: 'waiting',
-                note: `فشل ${counted(failed, NOUNS.post)} قبل أسبوعٍ فأكثر`,
+                note: `فشل ${counted(failed, NOUNS.post)} قبل أسبوع فأكثر`,
                 href: failedHref(Object.entries(c.perPlatform).find(([, p]) => p.failed > 0)?.[0] ?? ''),
               }
             : { key: 'publish', title: 'النشر', state: 'waiting', note: 'في موعده بعد الجدولة', href: '#channels' }
@@ -296,7 +296,7 @@ export function journeySteps(f: HomeFacts): JourneyStep[] {
   const results: Leg = f.openSuggestions > 0
     ? { key: 'results', title: 'النتائج', state: 'now', note: `تنتظر قرارك ${counted(f.openSuggestions, NOUNS.suggestion)}`, href: '/panel/report' }
     : published > 0
-      ? { key: 'results', title: 'النتائج', state: 'done', note: 'التقريرُ الأسبوعيّ', href: '/panel/report' }
+      ? { key: 'results', title: 'النتائج', state: 'done', note: 'التقرير الأسبوعيّ', href: '/panel/report' }
       : { key: 'results', title: 'النتائج', state: 'waiting', note: 'بعد أوّل نشر', href: '/panel/report' }
 
   const counts: Readonly<Record<JourneyStep['key'], number>> = {
@@ -369,11 +369,11 @@ export function writeBlock(
 ): { readonly text: string; readonly label: string; readonly href: string } | null {
   if (blocker === null) return null
   if (blocker.kind === 'paused') {
-    return { text: 'النظامُ موقوفٌ بقرارك — فلا كتابة.', label: 'استأنف من الحدود', href: '#limits' }
+    return { text: 'النظام موقوف بقرارك — فلا كتابة.', label: 'استأنف من الحدود', href: '#limits' }
   }
   if (blocker.kind === 'spend_cap') {
     return {
-      text: `بلغتَ سقفَ الإنفاق اليوم: ${money(blocker.used)} من ${money(blocker.cap)}. يُفتح ${capReopens(now, zone)}.`,
+      text: `بلغت سقف الإنفاق اليوم: ${money(blocker.used)} من ${money(blocker.cap)}. يُفتح ${capReopens(now, zone)}.`,
       label: 'ارفع السقف من الحدود',
       href: '#c2',
     }
@@ -391,19 +391,19 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   const stale = f.channels.find((c) => c.state === 'needs_reauth')
   if (stale !== undefined) {
     return {
-      tone: 'bad', text: `انتهى إذنُ ${stale.spec.label} — والنشرُ عليها متوقّفٌ حتّى تجدّده.`,
+      tone: 'bad', text: `انتهى إذن ${stale.spec.label} — والنشر عليها متوقّف حتّى تجدّده.`,
       label: `جدّد إذن ${stale.spec.label}`, href: `/oauth/${stale.spec.id}/start`,
     }
   }
   const unsigned = f.channels.find((c) => unsignedAccounts(c).length > 0)
   if (unsigned !== undefined) {
     return {
-      tone: 'bad', text: `${unsigned.spec.label} محفوظةٌ بلا إذن — أوّلُ منشورٍ مجدولٍ عليها يسقط.`,
+      tone: 'bad', text: `${unsigned.spec.label} محفوظة بلا إذن — أوّل منشور مجدول عليها يسقط.`,
       label: `أعد ربط ${unsigned.spec.label}`, href: `/oauth/${unsigned.spec.id}/start`,
     }
   }
   if (f.paused) {
-    return { tone: 'warn', text: 'النظامُ موقوفٌ بقرارك — لا مسحَ ولا تحليلَ ولا نشر.', label: 'استأنف من الإعدادات', href: '#limits' }
+    return { tone: 'warn', text: 'النظام موقوف بقرارك — لا مسح ولا تحليل ولا نشر.', label: 'استأنف من الإعدادات', href: '#limits' }
   }
   /*
    * ‏والإرسالُ المتوقّف قبل الفشل: الفشلُ يُرى بسببه، والتوقّفُ صامت — كانت الحبّةُ
@@ -415,8 +415,8 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
     return {
       tone: 'bad',
       text: stall.state === 'failed'
-        ? `النشرُ المجدولُ متوقّف — فشل الإرسالُ آخرَ مرّة${when === '' ? '' : ` (${when})`}، فلا يخرج منشورٌ في موعده.`
-        : `النشرُ المجدولُ متوقّف — آخرُ مرّةٍ عمل فيها الإرسالُ ${when}، فلا يخرج منشورٌ في موعده.`,
+        ? `النشر المجدول متوقّف — فشل الإرسال آخر مرّة${when === '' ? '' : ` (${when})`}، فلا يخرج منشور في موعده.`
+        : `النشر المجدول متوقّف — آخر مرّة عمل فيها الإرسال ${when}، فلا يخرج منشور في موعده.`,
       label: 'افحص الآلة', href: '#machine', step: 'publish',
     }
   }
@@ -425,7 +425,7 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   if (failure !== null) {
     const label = f.channels.find((c) => c.spec.id === failure.platform)?.spec.label ?? failure.platform
     return {
-      tone: 'bad', text: `فشل على ${label} ${counted(failure.n, NOUNS.post)} — والسببُ وزرُّ الإعادة في سجلّها.`,
+      tone: 'bad', text: `فشل على ${label} ${counted(failure.n, NOUNS.post)} — والسبب وزرّ الإعادة في سجلّها.`,
       label: failure.n === 1 ? 'أصلح المنشور' : 'أصلح المنشورات', href: failedHref(failure.platform), step: 'publish',
     }
   }
@@ -433,43 +433,43 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   if (f.blocker?.kind === 'spend_cap') {
     return {
       tone: 'warn',
-      text: `بلغ إنفاقُ اليوم سقفَه: ${money(f.blocker.used)} من ${money(f.blocker.cap)}. لا كتابةَ ولا صورةَ حتّى ${
-        capReopens(now, f.zone)}، والنشرُ ماضٍ في موعده.`,
+      text: `بلغ إنفاق اليوم سقفَه: ${money(f.blocker.used)} من ${money(f.blocker.cap)}. لا كتابة ولا صورة حتّى ${
+        capReopens(now, f.zone)}، والنشر ماض في موعده.`,
       label: 'ارفع السقف', href: '#c2',
     }
   }
   const linked = f.channels.some((c) => c.state === 'linked')
   if (!linked) {
-    return { tone: 'warn', text: 'لا منصّةَ متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.', label: 'اربط أوّلَ منصّة', href: '#channels' }
+    return { tone: 'warn', text: 'لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.', label: 'اربط أوّل منصّة', href: '#channels' }
   }
   const drafts = total(f.counts, 'draft')
   const approved = total(f.counts, 'approved')
   // ‏و«لا مصدر» حين لا شيءَ أصلًا: المقطعُ والخطّةُ من ملفٍّ يكتبان بلا Drive (D-180، D-181)
   const written = drafts + approved + total(f.counts, 'queued') + total(f.counts, 'published') + total(f.counts, 'failed')
   if (f.sources.total === 0 && written === 0) {
-    return { tone: 'warn', text: 'لا مصدرَ بعد — ضع ملفًّا في مجلّد Drive المشترَك ثمّ امسحه.', label: 'اذهب إلى المصادر', href: '#sources', step: 'source' }
+    return { tone: 'warn', text: 'لا مصدر بعد — ضع ملفًّا في مجلّد Drive المشترَك ثمّ امسحه.', label: 'اذهب إلى المصادر', href: '#sources', step: 'source' }
   }
   const pending = f.sources.total - f.sources.analyzed
   if (drafts === 0 && f.sources.analyzed === 0 && pending > 0) {
-    return { tone: 'ok', text: `ينتظر التحليلَ ${counted(pending, NOUNS.source)} — ومنه تُكتب المسوّدات.`, label: 'حلّل مصدرًا', href: '#sources', step: 'source' }
+    return { tone: 'ok', text: `ينتظر التحليل ${counted(pending, NOUNS.source)} — ومنه تُكتب المسوّدات.`, label: 'حلّل مصدرًا', href: '#sources', step: 'source' }
   }
   // ‏والزرُّ يُنزل إلى البطاقة التي يتكلّم عنها — الأولى بترتيب اللوح — لا إلى رأسه
   if (drafts > 0) {
     return {
-      tone: 'ok', text: `تنتظر قرارك ${counted(drafts, NOUNS.draft)} — ولا يُنشر شيءٌ قبله.`,
+      tone: 'ok', text: `تنتظر قرارك ${counted(drafts, NOUNS.draft)} — ولا يُنشر شيء قبله.`,
       label: 'راجع المسوّدات', href: cardAt(f.firsts.waiting, 'd'), step: 'approve',
     }
   }
   if (approved > 0) {
     return {
-      tone: 'ok', text: `معتمَدٌ بلا موعد: ${counted(approved, NOUNS.post)}.`,
+      tone: 'ok', text: `معتمَد بلا موعد: ${counted(approved, NOUNS.post)}.`,
       label: 'حدّد المواعيد', href: cardAt(f.firsts.unscheduled, 's'), step: 'schedule',
     }
   }
   const next = nextScheduled(f.counts)
   if (next !== null) {
     const label = f.channels.find((c) => c.spec.id === next.platform)?.spec.label ?? next.platform
-    return { tone: 'ok', text: `كلُّ شيءٍ على المسار — والتالي على ${label}.`, label: `افتح ${label}`, href: `/panel/channels/${next.platform}` }
+    return { tone: 'ok', text: `كلّ شيء على المسار — والتالي على ${label}.`, label: `افتح ${label}`, href: `/panel/channels/${next.platform}` }
   }
   /*
    * ‏**والدورةُ الجديدةُ من فكرة** (D-190): «اكتب من فكرتك» لا يحتاج مصدرًا ولا تحليلًا — جملةٌ
@@ -479,8 +479,8 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   return {
     tone: 'ok',
     text: f.sources.total === 0
-      ? 'لا شيءَ ينتظرك — اكتب فكرتك بجملة، أو ارفع مقطعًا، لتبدأ دورةً جديدة.'
-      : 'لا شيءَ ينتظرك — اكتب فكرتك بجملة، أو من مصدرٍ محلَّل، لتبدأ دورةً جديدة.',
+      ? 'لا شيء ينتظرك — اكتب فكرتك بجملة، أو ارفع مقطعًا، لتبدأ دورةً جديدة.'
+      : 'لا شيء ينتظرك — اكتب فكرتك بجملة، أو من مصدر محلَّل، لتبدأ دورةً جديدة.',
     label: 'اكتب من فكرة', href: '#idea', step: 'draft',
   }
 }

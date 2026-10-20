@@ -54,7 +54,7 @@ export function stationHref(kind: Station['kind'], platform: string): { href: st
       return { href: panelHref('sources'), label: 'المكتبة' }
     case 'publish':
     case 'metrics':
-      return { href: `/panel/channels/${encodeURIComponent(platform)}`, label: `شاشةُ ${platformLabel(platform)}` }
+      return { href: `/panel/channels/${encodeURIComponent(platform)}`, label: `شاشة ${platformLabel(platform)}` }
     default:
       return { href: '/panel#posts', label: 'المنشورات' }
   }
@@ -62,7 +62,7 @@ export function stationHref(kind: Station['kind'], platform: string): { href: st
 
 function stationRow(s: Station, now: Date, platform: string): string {
   const when = s.at === null
-    ? '<span class="ago">بلا وقتٍ مسجَّل</span>'
+    ? '<span class="ago">بلا وقت مسجَّل</span>'
     : `<span class="ago when">${escapeHtml(relativeTime(s.at, now))}</span>`
 
   /*
@@ -101,10 +101,10 @@ export function journeyBody(j: Journey, now: Date): string {
 
   return `<div class="page-head">
     <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>رحلةُ منشور</div>
+      <div class="eyebrow"><span class="ln"></span>رحلة منشور</div>
       <h1>من الملفّ إلى الأثر</h1>
-      <p class="lede">كلُّ محطّةٍ هنا <b>مشتقّةٌ من صفٍّ في القاعدة</b> — ولا
-        محطّةَ تُخترَع لتكتمل الصورة. وما لم يقع لا يُرسَم له مكانٌ فارغ.</p>
+      <p class="lede">كلّ محطّة هنا <b>مشتقّة من صفّ في القاعدة</b> — ولا
+        محطّة تُخترَع لتكتمل الصورة. وما لم يقع لا يُرسَم له مكان فارغ.</p>
     </div>
     <div class="aside">
       <span class="pill"><i class="led"></i>${escapeHtml(platformLabel(j.platform))}</span>
@@ -119,13 +119,13 @@ export function journeyBody(j: Journey, now: Date): string {
 
   <h3 class="sec">المحطّات</h3>
   ${j.stations.length === 0
-    ? emptyState({ title: 'لا محطّاتٍ بعد', html: 'لم يُسجَّل لهذا المنشور شيءٌ في القاعدة.' })
+    ? emptyState({ title: 'لا محطّات بعد', html: 'لم يُسجَّل لهذا المنشور شيء في القاعدة.' })
     : `<ol class="journey">${stops}</ol>`}
 
   <div class="split mt-5">
-    <p><b>ومجموعُ الدفتر ${escapeHtml(money(j.spent))}</b> — من
-      <span class="mono">cost_ledger</span> لا من جمع المحطّات. والدفترُ يُكتَب
-      <b>قبل</b> أن يُعدّ النداءُ ناجحا، فنداءٌ دُفع ثمنُه ثمّ فشل يبقى
-      فيه ولا محطّةَ له. <b>والفرقُ بين الرقمين هو ما دُفع بلا أثر.</b></p>
+    <p><b>ومجموع الدفتر ${escapeHtml(money(j.spent))}</b> — من
+      <span class="mono">cost_ledger</span> لا من جمع المحطّات. والدفتر يُكتَب
+      <b>قبل</b> أن يُعدّ النداء ناجحا، فنداء دُفع ثمنُه ثمّ فشل يبقى
+      فيه ولا محطّة له. <b>والفرق بين الرقمين هو ما دُفع بلا أثر.</b></p>
   </div>`
 }

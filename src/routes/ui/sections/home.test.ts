@@ -11,13 +11,13 @@ const facts = (over: Partial<HomeFacts> = {}): HomeFacts => ({
   firsts: { waiting: null, unscheduled: null, withoutImage: null }, pulses: [], blocker: null, zone: null, ...over,
 })
 
-describe('لوحةُ القيادة (D-194)', () => {
-  it('القمعُ سبعُ محطّاتٍ بأشرطةٍ نسبتُها إلى أكبرها', () => {
+describe('لوحة القيادة (D-194)', () => {
+  it('القمع سبع محطّات بأشرطة نسبتُها إلى أكبرها', () => {
     const html = homeTop(facts({ sources: { total: 4, analyzed: 4 } }), NOW)
     expect(html.match(/class="fn-bar"/g)).toHaveLength(7)
     expect(html).toContain('style="--w:100%"')
   })
-  it('شريطُ الأسبوع سبعةُ أيّامٍ أوّلُها «اليوم»، ونقطةٌ لكلّ منشورٍ في يومه بتوقيت المالك', () => {
+  it('شريط الأسبوع سبعة أيّام أوّلُها «اليوم»، ونقطة لكلّ منشور في يومه بتوقيت المالك', () => {
     const html = homeTop(facts({
       zone: 'Asia/Riyadh',
       scheduled: [
@@ -33,9 +33,9 @@ describe('لوحةُ القيادة (D-194)', () => {
     expect(days[0]).toContain('data-pf="linkedin"')
     expect(days[0]).not.toContain('data-pf="x"')
     expect(days[1]).toContain('data-pf="x"')
-    expect(html).toContain('مجدولٌ 2')
+    expect(html).toContain('مجدول 2')
   })
-  it('وأسبوعٌ فارغٌ يقول ما يفعله المالك', () => {
-    expect(homeTop(facts(), NOW)).toContain('لا شيءَ مجدولٌ في الأيّام السبعة')
+  it('وأسبوع فارغ يقول ما يفعله المالك', () => {
+    expect(homeTop(facts(), NOW)).toContain('لا شيء مجدول في الأيّام السبعة')
   })
 })

@@ -17,7 +17,7 @@ let calls: { body: unknown }[]
 const NOW = new Date('2026-09-09T08:00:00Z') // أربعاء
 const WEEK = '2026-09-13' // الأحد التالي
 
-function plan(items: unknown[], rationale = 'أسبوعٌ يبدأ بالأثقل وينتهي بالأخفّ.') {
+function plan(items: unknown[], rationale = 'أسبوع يبدأ بالأثقل وينتهي بالأخفّ.') {
   return { rationale, items }
 }
 
@@ -62,7 +62,7 @@ async function seedSource(name: string, worth: number): Promise<string> {
     .prepare(
       'INSERT INTO content_items (id, source_id, summary, themes_json, worth_score) VALUES (?, ?, ?, ?, ?)',
     )
-    .bind(crypto.randomUUID(), id, `خلاصةُ ${name}`, JSON.stringify({ themes: ['الوقف'] }), worth)
+    .bind(crypto.randomUUID(), id, `خلاصة ${name}`, JSON.stringify({ themes: ['الوقف'] }), worth)
     .run()
   return id
 }
@@ -81,10 +81,10 @@ function item(sourceId: string, over: Record<string, unknown> = {}) {
   return {
     source_id: sourceId,
     platform: 'linkedin',
-    angle: 'زاويةُ الوقت لا زاويةُ المبلغ',
+    angle: 'زاوية الوقت لا زاوية المبلغ',
     day: '2026-09-14',
     time: '09:00',
-    why: 'الأقربُ إلى قرارٍ يُتّخذ.',
+    why: 'الأقرب إلى قرار يُتّخذ.',
     ...over,
   }
 }
@@ -93,12 +93,12 @@ beforeEach(() => {
   db = fakeDb()
 })
 
-describe('بدايةُ الأسبوع', () => {
-  it('الأحدُ القادم — وأسبوعُ العمل في الرياض يبدأ الأحد', () => {
+describe('بداية الأسبوع', () => {
+  it('الأحد القادم — وأسبوع العمل في الرياض يبدأ الأحد', () => {
     expect(weekStart(new Date('2026-09-09T08:00:00Z'))).toBe('2026-09-13')
   })
 
-  it('واليومَ نفسه إن كان أحدا', () => {
+  it('واليوم نفسه إن كان أحدا', () => {
     expect(weekStart(new Date('2026-09-13T23:00:00Z'))).toBe('2026-09-13')
   })
 })
@@ -124,7 +124,7 @@ describe('المسار الكامل', () => {
     expect(results[0]?.operation).toContain('plan:')
   })
 
-  it('يعطي النموذجَ المصادرَ بمعرّفاتها ودرجاتِها', async () => {
+  it('يعطي النموذج المصادر بمعرّفاتها ودرجاتِها', async () => {
     const a = await seedSource('تقرير الأثر', 0.9)
     await seedSource('مراجعة', 0.5)
     await planWeek(deps(net({ payload: plan([item(a)]) })))
@@ -136,12 +136,12 @@ describe('المسار الكامل', () => {
   })
 })
 
-describe('**لا مصدرَ يُخترَع**', () => {
-  it('بندٌ بمعرّفٍ مجهولٍ يُسقَط وحده ولا تسقط الخطّة', async () => {
+describe('**لا مصدر يُخترَع**', () => {
+  it('بند بمعرّف مجهول يُسقَط وحده ولا تسقط الخطّة', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.6)
     const out = await planWeek(
-      deps(net({ payload: plan([item(a), item('معرّفٌ-مخترَع')]) })),
+      deps(net({ payload: plan([item(a), item('معرّف-مخترَع')]) })),
     )
 
     expect(out.kind).toBe('planned')
@@ -150,7 +150,7 @@ describe('**لا مصدرَ يُخترَع**', () => {
     expect(out.dropped).toBe(1)
   })
 
-  it('وخطّةٌ كلُّها مخترَعةٌ تفشل — ولا تُكتب', async () => {
+  it('وخطّة كلُّها مخترَعة تفشل — ولا تُكتب', async () => {
     await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.6)
     const out = await planWeek(deps(net({ payload: plan([item('لا-شيء')]) })))
@@ -170,14 +170,14 @@ describe('**لا مصدرَ يُخترَع**', () => {
     if (read.ok) expect(read.dropped).toBe(1)
   })
 
-  it('ومنصّةٌ لا نعرفها تُسقَط', () => {
+  it('ومنصّة لا نعرفها تُسقَط', () => {
     const read = parsePlan(plan([item('s1', { platform: 'snapchat' })]), new Set(['s1']), WEEK)
     expect(read.ok).toBe(false)
   })
 })
 
 describe('D-008 · الكلفة قبل القراءة', () => {
-  it('تُسجَّل حتّى حين يكون الجوابُ غيرَ صالح', async () => {
+  it('تُسجَّل حتّى حين يكون الجواب غير صالح', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     const out = await planWeek(deps(net({ payload: { rationale: 'x', items: 'ليست مصفوفة' } })))
@@ -187,7 +187,7 @@ describe('D-008 · الكلفة قبل القراءة', () => {
     expect(results).toHaveLength(1)
   })
 
-  it('ولا تُسجَّل حين يفشل النداءُ نفسه', async () => {
+  it('ولا تُسجَّل حين يفشل النداء نفسه', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     expect((await planWeek(deps(net({ status: 500 })))).kind).toBe('failed')
@@ -197,7 +197,7 @@ describe('D-008 · الكلفة قبل القراءة', () => {
 })
 
 describe('الحارس قبل النداء', () => {
-  it('الإيقافُ يمنع ولا يُرسَل شيء', async () => {
+  it('الإيقاف يمنع ولا يُرسَل شيء', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await writeSetting(db, 'paused', 'true', 'test')
@@ -206,7 +206,7 @@ describe('الحارس قبل النداء', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('ومصدرٌ واحدٌ لا يصنع أسبوعا — ولا يُنادى له نموذج', async () => {
+  it('ومصدر واحد لا يصنع أسبوعا — ولا يُنادى له نموذج', async () => {
     await seedSource('وحيد', 0.9)
     const out = await planWeek(deps(net()))
 
@@ -215,8 +215,8 @@ describe('الحارس قبل النداء', () => {
   })
 })
 
-describe('خطّةُ الأسبوع الواحد', () => {
-  it('توليدٌ ثانٍ يحلّ محلّ الأوّل ولا يتراكمان', async () => {
+describe('خطّة الأسبوع الواحد', () => {
+  it('توليد ثان يحلّ محلّ الأوّل ولا يتراكمان', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await planWeek(deps(net({ payload: plan([item(a)]) })))
@@ -232,7 +232,7 @@ describe('خطّةُ الأسبوع الواحد', () => {
 })
 
 describe('الاعتماد', () => {
-  it('إقرارٌ بالمنطق — ولا يكتب نصّا ولا يُنفق', async () => {
+  it('إقرار بالمنطق — ولا يكتب نصّا ولا يُنفق', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     const out = await planWeek(deps(net({ payload: plan([item(a)]) })))
@@ -273,7 +273,7 @@ describe('المصادر المؤهَّلة', () => {
     expect(rows[0]?.used).toBe(1)
   })
 
-  it('والمرفوضُ لا يُعدّ مستهلَكا', async () => {
+  it('والمرفوض لا يُعدّ مستهلَكا', async () => {
     const s = await seedSource('a', 0.9)
     await db
       .prepare(
@@ -291,26 +291,26 @@ describe('المصادر المؤهَّلة', () => {
  * openai_compat لا يعرف حقولَ البند إلّا من نصّ الموجّه، وكان النصُّ يذكر
  * `rationale` و`items` فقط — فثلاثُ محاولاتٍ على staging دُفعت ثمّ سقطت.
  */
-describe('D-157 — عقدُ الحقول والقارئُ المتسامح', () => {
-  it('الموجّهُ يسمّي الحقولَ الستّة وصيغَها', () => {
+describe('D-157 — عقد الحقول والقارئ المتسامح', () => {
+  it('الموجّه يسمّي الحقول الستّة وصيغَها', () => {
     const text = systemPrompt()
     for (const field of ['source_id', 'platform', 'angle', 'day', 'time', 'why']) expect(text).toContain(`\`${field}\``)
     expect(text).toContain('YYYY-MM-DD')
     expect(text).toContain('HH:MM')
   })
 
-  it('ورسالةُ المستخدم تسرد أيّامَ الأسبوع السبعة بحرفها', () => {
+  it('ورسالة المستخدم تسرد أيّام الأسبوع السبعة بحرفها', () => {
     const text = userPrompt([], '2026-09-13')
     for (const d of ['2026-09-13', '2026-09-16', '2026-09-19']) expect(text).toContain(d)
     expect(text).not.toContain('2026-09-20')
   })
 
-  it('والقارئُ يقبل sourceId وساعةً بلا صفرٍ بادئ، ولا يقبل منصّةً مجهولة', () => {
+  it('والقارئ يقبل sourceId وساعةً بلا صفر بادئ، ولا يقبل منصّةً مجهولة', () => {
     const known = new Set(['src:a'])
     const read = parsePlan(
       { rationale: 'r', items: [
-        { sourceId: 'src:a', platform: ' LinkedIn ', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '9:00', why: '' },
-        { source_id: 'src:a', platform: 'tiktok', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-15', time: '09:00' },
+        { sourceId: 'src:a', platform: ' LinkedIn ', angle: 'زاوية كافية الطول', day: '2026-09-14', time: '9:00', why: '' },
+        { source_id: 'src:a', platform: 'tiktok', angle: 'زاوية كافية الطول', day: '2026-09-15', time: '09:00' },
       ] },
       known,
       '2026-09-13',
@@ -323,7 +323,7 @@ describe('D-157 — عقدُ الحقول والقارئُ المتسامح', ()
     expect(read.dropped).toBe(1)
   })
 
-  it('والنداءُ يحمل العقدَ في رسالة النظام', async () => {
+  it('والنداء يحمل العقد في رسالة النظام', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.5)
     await planWeek(deps(net({ payload: plan([item(a)]) })))
@@ -338,11 +338,11 @@ describe('لماذا أُسقط ما أُسقط (D-157)', () => {
   it('يُحصى بالسبب لا بالعدد وحده', () => {
     const read = parsePlan(
       { rationale: 'r', items: [
-        { source_id: 'nope', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '09:00' },
-        { source_id: 'src:a', platform: 'tiktok', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-14', time: '09:00' },
+        { source_id: 'nope', platform: 'x', angle: 'زاوية كافية الطول', day: '2026-09-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'tiktok', angle: 'زاوية كافية الطول', day: '2026-09-14', time: '09:00' },
         { source_id: 'src:a', platform: 'x', angle: 'قصير', day: '2026-09-14', time: '09:00' },
-        { source_id: 'src:a', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-10-14', time: '09:00' },
-        { source_id: 'src:a', platform: 'x', angle: 'زاويةٌ كافيةُ الطول', day: '2026-09-15', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'زاوية كافية الطول', day: '2026-10-14', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'زاوية كافية الطول', day: '2026-09-15', time: '09:00' },
       ] },
       new Set(['src:a']),
       '2026-09-13',
@@ -350,10 +350,10 @@ describe('لماذا أُسقط ما أُسقط (D-157)', () => {
     expect(read.ok).toBe(true)
     if (!read.ok) return
     expect(read.dropped).toBe(4)
-    expect(read.droppedWhy).toContain('مصدرٌ لا نعرفه')
-    expect(read.droppedWhy).toContain('منصّةٌ غير مدعومة')
-    expect(read.droppedWhy).toContain('زاويةٌ أقصرُ')
-    expect(read.droppedWhy).toContain('يومٌ خارج الأسبوع')
+    expect(read.droppedWhy).toContain('مصدر لا نعرفه')
+    expect(read.droppedWhy).toContain('منصّة غير مدعومة')
+    expect(read.droppedWhy).toContain('زاوية أقصر')
+    expect(read.droppedWhy).toContain('يوم خارج الأسبوع')
   })
 })
 
@@ -364,7 +364,7 @@ describe('لماذا أُسقط ما أُسقط (D-157)', () => {
  * السقفُ إلّا في `parsePlan`، وحين يُرَدّ جوابٌ وصل لا يبقى أثرُه إلّا في
  * الدفتر.
  */
-describe('D-164 · المخطّطُ المحمول', () => {
+describe('D-164 · المخطّط المحمول', () => {
   /** كلُّ مفتاحٍ في الشجرة — لا نصُّها: الوصفُ يحمل «minLength: 10» حرفًا. */
   function keysDeep(value: unknown): string[] {
     if (Array.isArray(value)) return value.flatMap(keysDeep)
@@ -372,7 +372,7 @@ describe('D-164 · المخطّطُ المحمول', () => {
     return Object.entries(value).flatMap(([key, child]) => [key, ...keysDeep(child)])
   }
 
-  it('Anthropic يتلقّى المخطّطَ بلا minLength ولا maxItems ولا minItems', async () => {
+  it('Anthropic يتلقّى المخطّط بلا minLength ولا maxItems ولا minItems', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.5)
     await planWeek(deps(net({ payload: plan([item(a)]) })))
@@ -384,48 +384,48 @@ describe('D-164 · المخطّطُ المحمول', () => {
   })
 })
 
-describe('D-164 · سقفُ الستّة في القارئ', () => {
+describe('D-164 · سقف الستّة في القارئ', () => {
   /** ثمانيةُ بنودٍ صالحة، والأخيران في ترتيب النموذج **أبكرُها موعدًا**. */
   function eight() {
     const days = ['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-19', '2026-09-13', '2026-09-13']
-    return days.map((day, i) => item('s1', { day, time: `0${i + 1}:00`, angle: `زاويةُ البند رقم ${i + 1} في الترتيب` }))
+    return days.map((day, i) => item('s1', { day, time: `0${i + 1}:00`, angle: `زاوية البند رقم ${i + 1} في الترتيب` }))
   }
 
-  it('ثمانيةٌ صالحةٌ تصير ستّة، والاثنان يُحصَيان بسببهما', () => {
+  it('ثمانية صالحة تصير ستّة، والاثنان يُحصَيان بسببهما', () => {
     const read = parsePlan(plan(eight()), new Set(['s1']), WEEK)
     expect(read.ok).toBe(true)
     if (!read.ok) return
     expect(read.plan.items).toHaveLength(MAX_ITEMS)
     expect(read.dropped).toBe(2)
-    expect(read.droppedWhy).toBe('بندٌ بعد السادس ×2')
+    expect(read.droppedWhy).toBe('بند بعد السادس ×2')
   })
 
-  it('**والقصُّ على ترتيب النموذج لا على الموعد** — السابعُ في الأولويّة يُسقَط ولو كان الأحد', () => {
+  it('**والقصّ على ترتيب النموذج لا على الموعد** — السابع في الأولويّة يُسقَط ولو كان الأحد', () => {
     const read = parsePlan(plan(eight()), new Set(['s1']), WEEK)
     if (!read.ok) throw new Error('لم تُقرأ')
     const kept = read.plan.items.map((i) => i.angle)
-    for (let n = 1; n <= 6; n += 1) expect(kept).toContain(`زاويةُ البند رقم ${n} في الترتيب`)
+    for (let n = 1; n <= 6; n += 1) expect(kept).toContain(`زاوية البند رقم ${n} في الترتيب`)
     expect(read.plan.items.some((i) => i.day === '2026-09-13')).toBe(false)
     // والفرزُ بالموعد بعد القصّ لا قبله
     expect(read.plan.items[0]?.day).toBe('2026-09-14')
   })
 
-  it('والفاسدُ لا يُعدّ في الستّة — السقفُ على الصالح وحده', () => {
+  it('والفاسد لا يُعدّ في الستّة — السقف على الصالح وحده', () => {
     const items = [item('مخترَع'), ...eight().slice(0, 6)]
     const read = parsePlan(plan(items), new Set(['s1']), WEEK)
     if (!read.ok) throw new Error('لم تُقرأ')
     expect(read.plan.items).toHaveLength(6)
-    expect(read.droppedWhy).toBe('مصدرٌ لا نعرفه')
+    expect(read.droppedWhy).toBe('مصدر لا نعرفه')
   })
 })
 
-describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفتر', () => {
+describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر', () => {
   async function book(): Promise<{ operation: string; units: number }[]> {
     const { results } = await db.prepare('SELECT operation, units FROM cost_ledger').all<{ operation: string; units: number }>()
     return results
   }
 
-  it('Anthropic مبتورٌ عند max_tokens: صفٌّ واحد ثمّ failed يُعاد', async () => {
+  it('Anthropic مبتور عند max_tokens: صفّ واحد ثمّ failed يُعاد', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     const out = await planWeek(deps(net({ stop: 'max_tokens' })))
@@ -436,7 +436,7 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
     expect(await latestPlan(db)).toBeNull()
   })
 
-  it('وAnthropic رافضٌ: صفٌّ واحد، ولا يُعاد', async () => {
+  it('وAnthropic رافض: صفّ واحد، ولا يُعاد', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     const out = await planWeek(deps(net({ stop: 'refusal' })))
@@ -462,7 +462,7 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
     return { ...deps(fetchImpl), workerSecrets: { GEMINI_API_KEY: 'g-test' } }
   }
 
-  it('وعلى لهجة التوافق: المبتورُ بـlength يُكتب صفًّا ثمّ failed', async () => {
+  it('وعلى لهجة التوافق: المبتور بـlength يُكتب صفًّا ثمّ failed', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
@@ -472,7 +472,7 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
     expect(await book()).toEqual([{ operation: 'plan:gemini-2.5-flash', units: 1900 }])
   })
 
-  it('والنجاحُ على لهجة التوافق صفٌّ واحدٌ كذلك — والطلبُ json_object كما كان', async () => {
+  it('والنجاح على لهجة التوافق صفّ واحد كذلك — والطلب json_object كما كان', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')

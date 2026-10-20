@@ -67,7 +67,7 @@ describe('«هذا الشهر» في الرئيسيّة (ر-10)', () => {
    * **الشهرُ من أوّله لا ثلاثون يومًا متحرّكة.** كانت «إنفاق 30 يوما» وحدَها،
    * ووصفُها «المجموعُ الشهريّ»، فيدخل فيها صفُّ الشهر الماضي.
    */
-  it('رابعُ البطاقات الافتراضيّة، ولا يجمع الشهرَ الماضي', async () => {
+  it('رابع البطاقات الافتراضيّة، ولا يجمع الشهر الماضي', async () => {
     await seedLedger()
     const cookie = await login()
     const html = await home(`${cookie}; sada_tz=UTC`)
@@ -75,14 +75,14 @@ describe('«هذا الشهر» في الرئيسيّة (ر-10)', () => {
     expect(month).not.toBeNull()
     expect(month!.value).toBe('⁦0.827$⁩')
     expect(month!.note).toBe('منذ أوّل الشهر')
-    expect(html).not.toContain('المجموعُ الشهريّ')
+    expect(html).not.toContain('المجموع الشهريّ')
   })
 
   /**
    * ومنطقةُ المالك من كعكته (D-173)؛ وحين تغيب يُحسَب بتوقيت الرياض ويُقال (D-201).
    * فالصفُّ الذي قبل منتصف ليل UTC بساعة هو الثانيةُ فجرًا من أوّل الشهر بالرياض: داخلٌ فيه.
    */
-  it('وبلا منطقةٍ من المتصفّح يحسب بتوقيت الرياض ويقوله', async () => {
+  it('وبلا منطقة من المتصفّح يحسب بتوقيت الرياض ويقوله', async () => {
     await seedLedger()
     const month = tile(await home(await login()), 'إنفاق هذا الشهر')
     expect(month!.value).toBe('⁦1.27$⁩')
@@ -95,7 +95,7 @@ describe('«أين يذهب المال» من الدفتر كلِّه (ر-10)', 
    * **والأعمدةُ تساوي المجموع.** كانت تُرسَم من مزوّدي الذكاء وحدهم، فغابت
    * كلفةُ X — وX ما يُحاسَب على كلّ طلب — والبطاقةُ فوقها تحسبها.
    */
-  it('فيه X بكلفة نشره وقياسه، ومجموعُ الأعمدة رقمُ «30 يومًا»', async () => {
+  it('فيه X بكلفة نشره وقياسه، ومجموع الأعمدة رقم «30 يومًا»', async () => {
     await seedLedger()
     await writeSetting(db, 'dashboard_tiles', 'spend_today,spend_month,spend_30d', 'omar')
     const html = await home(await login())
@@ -111,7 +111,7 @@ describe('«أين يذهب المال» من الدفتر كلِّه (ر-10)', 
   })
 
   /** والتعليقُ من المصدر نفسِه، والعددُ بـ`counted` (D-177): لا «1 مزوّدا نشطا · 6 نداءً». */
-  it('وتعليقُ «30 يومًا» يعدّ طلباتِ الدفتر كلِّه بعربيّةٍ صحيحة', async () => {
+  it('وتعليق «30 يومًا» يعدّ طلبات الدفتر كلِّه بعربيّة صحيحة', async () => {
     await recordCost(db, { provider: 'anthropic', operation: 'analyze', units: 1, unitCost: 0.8 })
     await recordCost(db, { provider: 'x', operation: 'post', units: 1, unitCost: 0.015 })
     await recordCost(db, { provider: 'x', operation: 'metrics', units: 12, unitCost: 0.001 })
@@ -121,7 +121,7 @@ describe('«أين يذهب المال» من الدفتر كلِّه (ر-10)', 
     // ‏والرئيسيّةُ وحدها: بطاقاتُها ومالُها ونبضُ دوراتها
     const start = html.indexOf('<section data-pane="overview"')
     const overview = html.slice(start, html.indexOf('</section>', start))
-    expect(overview).not.toMatch(/\d+ (منشورا|مزوّدا|دورةٌ|يوما|نداءً)(?![ء-ي])/)
+    expect(overview).not.toMatch(/\d+ (منشورا|مزوّدا|دورة|يوما|نداءً)(?![ء-ي])/)
     expect(overview).toContain('<h2>الإنفاق — 14 يومًا</h2>')
   })
 })
@@ -134,7 +134,7 @@ describe('«النتائج» توصل (ر-7)', () => {
        VALUES ('a-x', 'x', 'member', 'e', 'عمر');
        INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
                           idempotency_key, approved_by, approved_at)
-       VALUES ('p-lone', 'a-x', 'x', 'text', 'منشورُ الأسبوع الوحيد\nوسطرُه الثاني', '2026-08-24 10:00:00',
+       VALUES ('p-lone', 'a-x', 'x', 'text', 'منشور الأسبوع الوحيد\nوسطرُه الثاني', '2026-08-24 10:00:00',
                'published', 'k-lone', 'omar', '2026-08-24 09:00:00');
        INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at)
        VALUES ('at-lone', 'p-lone', 'k-lone', 1, '{}', 'succeeded', '2026-08-24 10:00:00');
@@ -148,32 +148,32 @@ describe('«النتائج» توصل (ر-7)', () => {
    * يومَ الاثنين. ثمّ المنشورُ الوحيدُ بسطره وأرقامه ورابطِ سجلّه، وصفُّ X يوصل
    * إلى منشوراته، والعنوانُ مدًى بأسماء الشهور.
    */
-  it('المنشورُ الوحيدُ يُرى ويوصل، وصفُّ منصّته يوصل إلى منشوراتها', async () => {
+  it('المنشور الوحيد يُرى ويوصل، وصفّ منصّته يوصل إلى منشوراتها', async () => {
     seedLonePost()
     await runWeekly(db, new Date('2026-09-06T04:14:00Z'))
     const body = await (await app.request('/panel/report', { headers: { Cookie: await login() } }, env)).text()
 
     expect(body).toContain('أسبوع 24 إلى 30 أغسطس')
-    expect(body).toContain('خرج منشورٌ واحد، وقِيس.')
-    expect(body).toContain('منشورُ الأسبوع الوحيد')
+    expect(body).toContain('خرج منشور واحد، وقِيس.')
+    expect(body).toContain('منشور الأسبوع الوحيد')
     expect(body).not.toContain('وسطرُه الثاني')
     expect(body).toContain('<b>1975</b>ظهور')
     expect(body).toContain('<b>58</b>تفاعل')
     expect(body).toContain('href="/panel/journey/p-lone">سجلُّه</a>')
     expect(body).toContain('href="/panel/channels/x">اعرض منشوراتها</a>')
     // ‏وبلا سقفِ ترويجٍ رابطٌ إلى حقله في الإعدادات، و«هذا الشهر» يفتح حدودَ الإنفاق
-    expect(body).toContain('href="/panel#c3">ضع سقفَ الترويج الأسبوعيّ</a>')
+    expect(body).toContain('href="/panel#c3">ضع سقف الترويج الأسبوعيّ</a>')
     expect(body).toContain('هذا الشهر حتّى اليوم:')
     expect(body).toContain('href="/panel#c2">')
     expect(body).not.toMatch(/\d+ منشورا(?![ء-ي])/)
   })
 
-  it('و«هذا الشهر» يُرسَم ولو لم يُكتب تقريرٌ بعد', async () => {
+  it('و«هذا الشهر» يُرسَم ولو لم يُكتب تقرير بعد', async () => {
     await recordCost(db, { provider: 'x', operation: 'post', units: 1, unitCost: 0.39 })
     const body = await (await app.request('/panel/report', {
       headers: { Cookie: `${await login()}; sada_tz=Asia%2FRiyadh` },
     }, env)).text()
-    expect(body).toContain('لا تقريرَ بعد')
+    expect(body).toContain('لا تقرير بعد')
     expect(body).toMatch(/هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">\u20660\.390\$\u2069<\/a><\/div>/)
   })
 })

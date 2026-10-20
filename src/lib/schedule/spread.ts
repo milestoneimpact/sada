@@ -133,7 +133,7 @@ export function planSpread(
     const preview = firstLine(draft.text)
 
     if (slots.length >= SPREAD_MAX) {
-      skipped.push({ postId: draft.id, preview, reason: `فوق حدِّ ${SPREAD_MAX} في المرّة` })
+      skipped.push({ postId: draft.id, preview, reason: `فوق حدّ ${SPREAD_MAX} في المرّة` })
       continue
     }
 
@@ -144,7 +144,7 @@ export function planSpread(
 
     const fit = targets.find((t) => t.platform === draft.platform)
     if (fit === undefined) {
-      skipped.push({ postId: draft.id, preview, reason: 'لا قناةَ مربوطةً لمنصّته' })
+      skipped.push({ postId: draft.id, preview, reason: 'لا قناة مربوطةً لمنصّته' })
       continue
     }
 

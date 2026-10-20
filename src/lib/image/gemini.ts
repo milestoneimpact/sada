@@ -152,7 +152,7 @@ export async function generateImage(call: ImageCall): Promise<ImageResult> {
   }
 
   const bytes = decodeBase64(image.data)
-  if (bytes.length === 0) throw new ImageError('gemini: صورةٌ فارغة', 502, true)
+  if (bytes.length === 0) throw new ImageError('gemini: صورة فارغة', 502, true)
 
   return { bytes, mime: image.mime, model: call.model }
 }

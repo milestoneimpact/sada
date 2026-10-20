@@ -14,30 +14,30 @@ const UP: UploadRow = {
   ],
 }
 
-describe('صفُّ المقطع بعد الإنشاء', () => {
-  it('لكلّ منشورٍ حالُه ورابطُه إلى بطاقته، و«أُنشئت كلُّها» لا «ما بقي لا يوافق»', () => {
+describe('صفّ المقطع بعد الإنشاء', () => {
+  it('لكلّ منشور حالُه ورابطُه إلى بطاقته، و«أُنشئت كلُّها» لا «ما بقي لا يوافق»', () => {
     const html = videosSection([UP], NOW)
     for (const id of ['p-yt', 'p-tt', 'p-ig']) expect(html).toContain(`href="#d-${id}"`)
-    expect(html).toContain('معتمَدٌ بلا موعد')
+    expect(html).toContain('معتمَد بلا موعد')
     expect(html).toContain('أُنشئت كلُّها')
     expect(html).not.toContain('وما بقي لا يوافق')
     // ‏والجدولةُ معًا للمعتمَد وحده: المجدولُ والمسوّدةُ لا يُرسَلان
-    expect(html).toContain('جدوِل منشورَ YouTube بتوقيتك:')
+    expect(html).toContain('جدوِل منشور YouTube بتوقيتك:')
     expect(html).toContain('<input type="hidden" name="post" value="p-yt">')
     expect(html).not.toContain('value="p-tt"')
   })
 
-  it('وأوّلَ زيارةٍ «بتوقيت الرياض» والمنطقةُ تُرسَل مع الأزرار (D-202)', () => {
+  it('وأوّل زيارة «بتوقيت الرياض» والمنطقة تُرسَل مع الأزرار (D-202)', () => {
     const html = videosSection([UP], NOW, null, { zone: null })
-    expect(html).toContain('جدوِل منشورَ YouTube بتوقيت الرياض:')
+    expect(html).toContain('جدوِل منشور YouTube بتوقيت الرياض:')
     expect(html).not.toContain('بتوقيتك')
     expect(html).toContain('<input type="hidden" name="tz" value="Asia/Riyadh">')
     const known = videosSection([UP], NOW, null, { zone: 'Europe/London' })
-    expect(known).toContain('جدوِل منشورَ YouTube بتوقيتك:')
+    expect(known).toContain('جدوِل منشور YouTube بتوقيتك:')
     expect(known).toContain('value="Europe/London"')
   })
 
-  it('ومنشورٌ لا بطاقةَ له في الصفحة يُذكر بحاله بلا رابطٍ يرتدّ إلى الرئيسيّة', () => {
+  it('ومنشور لا بطاقة له في الصفحة يُذكر بحاله بلا رابط يرتدّ إلى الرئيسيّة', () => {
     const html = videosSection([UP], NOW, new Set(['p-yt']))
     expect(html).toContain('href="#d-p-yt"')
     expect(html).not.toContain('href="#d-p-tt"')
@@ -49,9 +49,9 @@ describe('صفُّ المقطع بعد الإنشاء', () => {
  * ‏**«نُشر» وحدَها لا تكفي** (مراجعة D-190): مقطعٌ وصل صندوقَ TikTok بلا نصّه، أو نُشر بأضيق
  * ‏ممّا قرّره المالك، يُقال تحت منصّته بما قاله الناشرُ — لا علامةَ نجاحٍ خضراءَ وحدَها.
  */
-describe('ما قاله الناشرُ عن نشرٍ لم يقع كما قُرّر', () => {
-  it('ملاحظةُ الناشر تحت المنشور المنشور، ولا شيءَ لغيره', () => {
-    const note = 'وصل صندوقَ تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
+describe('ما قاله الناشر عن نشر لم يقع كما قُرّر', () => {
+  it('ملاحظة الناشر تحت المنشور المنشور، ولا شيء لغيره', () => {
+    const note = 'وصل صندوق تطبيق TikTok بلا نصّه — انشره من التطبيق والصق نصَّه هناك'
     const html = videosSection([{
       ...UP,
       posts: [

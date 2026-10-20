@@ -4,8 +4,8 @@ import { afterVault, readiness, PHASE_0_SECRETS, PHASE_1_SECRETS } from './env'
 /**
  * **الجاهزيّةُ مرحلتان لا حالةٌ واحدة** — ونظامٌ ينشر ولا يفهم ليس معطلا.
  */
-describe('قراءةُ البيئة', () => {
-  it('بيئةٌ كاملةٌ تجتاز المرحلتين', () => {
+describe('قراءة البيئة', () => {
+  it('بيئة كاملة تجتاز المرحلتين', () => {
     const full: Record<string, string> = { DRIVE_FOLDER_ID: 'f' }
     for (const name of [...PHASE_0_SECRETS, ...PHASE_1_SECRETS]) full[name] = 'v'
     const state = readiness(full)
@@ -14,14 +14,14 @@ describe('قراءةُ البيئة', () => {
     expect(state.missing).toEqual([])
   })
 
-  it('وبيئةٌ فارغةٌ تسمّي كلَّ ناقصٍ ولا تكتفي بـ«غير جاهز»', () => {
+  it('وبيئة فارغة تسمّي كلّ ناقص ولا تكتفي بـ«غير جاهز»', () => {
     const state = readiness({})
     expect(state.phase0).toBe(false)
     expect(state.missing).toEqual([...PHASE_0_SECRETS, ...PHASE_1_SECRETS])
     expect(state.driveFolder).toBe(false)
   })
 
-  it('وسرٌّ فارغٌ كسرٍّ غائب — لا يُعدّ حاضرا بوجود المفتاح', () => {
+  it('وسرّ فارغ كسرّ غائب — لا يُعدّ حاضرا بوجود المفتاح', () => {
     expect(readiness({ TOKEN_ENC_KEY: '' }).missing).toContain('TOKEN_ENC_KEY')
   })
 })
@@ -39,10 +39,10 @@ describe('قراءةُ البيئة', () => {
  * أكثرَه من اللوحة**. فإشارةٌ حمراءُ دائما تُتجاهَل — وهي حجّةٌ مكتوبةٌ
  * في سير النشر نفسِه.
  */
-describe('الجاهزيّةُ بعد الخزانة (D-095)', () => {
+describe('الجاهزيّة بعد الخزانة (D-095)', () => {
   const BARE = { TOKEN_ENC_KEY: 'k', DRIVE_FOLDER_ID: 'f' }
 
-  it('ما سُدّ من الخزانة يُجيز المرحلة — ولا يبقى الحكمُ أحمرَ بلا ناقص', () => {
+  it('ما سُدّ من الخزانة يُجيز المرحلة — ولا يبقى الحكم أحمر بلا ناقص', () => {
     const state = readiness(BARE)
     expect(state.phase0).toBe(false)
 
@@ -53,7 +53,7 @@ describe('الجاهزيّةُ بعد الخزانة (D-095)', () => {
     expect(sealed.missing).toEqual(['GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY'])
   })
 
-  it('**ولا يقول «لا ناقص» و«غيرُ جاهز» معا** — الجوابُ لا يناقض نفسَه', () => {
+  it('**ولا يقول «لا ناقص» و«غير جاهز» معا** — الجواب لا يناقض نفسَه', () => {
     const sealed = afterVault(readiness(BARE), [
       'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'X_CLIENT_ID', 'X_CLIENT_SECRET',
       'GOOGLE_SA_JSON', 'ANTHROPIC_API_KEY',
@@ -70,7 +70,7 @@ describe('الجاهزيّةُ بعد الخزانة (D-095)', () => {
     expect(sealed.missing).not.toContain('LINKEDIN_CLIENT_ID')
   })
 
-  it('**والمجلَّدُ يبقى شرطا** — لا خزانةَ تسدّ متغيّرَ بيئة', () => {
+  it('**والمجلَّد يبقى شرطا** — لا خزانة تسدّ متغيّر بيئة', () => {
     const noFolder = readiness({ TOKEN_ENC_KEY: 'k' })
     const sealed = afterVault(noFolder, [
       'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'X_CLIENT_ID', 'X_CLIENT_SECRET',
@@ -81,12 +81,12 @@ describe('الجاهزيّةُ بعد الخزانة (D-095)', () => {
     expect(sealed.driveFolder).toBe(false)
   })
 
-  it('وبلا خزانةٍ لا يتغيّر شيء — الدالّةُ لا تُجيز ما لم يُسدّ', () => {
+  it('وبلا خزانة لا يتغيّر شيء — الدالّة لا تُجيز ما لم يُسدّ', () => {
     const state = readiness(BARE)
     expect(afterVault(state, [])).toEqual(state)
   })
 
-  it('و`TOKEN_ENC_KEY` لا تُسدّ من خزانةٍ تُفكّ به — فبدونه لا مرحلة', () => {
+  it('و`TOKEN_ENC_KEY` لا تُسدّ من خزانة تُفكّ به — فبدونه لا مرحلة', () => {
     const sealed = afterVault(readiness({ DRIVE_FOLDER_ID: 'f' }), [
       'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'X_CLIENT_ID', 'X_CLIENT_SECRET',
     ])

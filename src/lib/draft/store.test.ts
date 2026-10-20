@@ -60,7 +60,7 @@ beforeEach(() => {
 })
 
 describe('المنظّمة (D-230)', () => {
-  it('منشورُ منظّمةٍ لا يُرى ولا يُبَتّ فيه من أخرى', async () => {
+  it('منشور منظّمة لا يُرى ولا يُبَتّ فيه من أخرى', async () => {
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     const id = await seedDraft()
     expect(await listDrafts(db, 'org_b')).toEqual([])
@@ -73,7 +73,7 @@ describe('المنظّمة (D-230)', () => {
 })
 
 describe('الاعتماد', () => {
-  it('نصٌّ لم يتغيّر يُعتمد approved، ومع صاحبِ القرار ووقته', async () => {
+  it('نصّ لم يتغيّر يُعتمد approved، ومع صاحب القرار ووقته', async () => {
     const id = await seedDraft()
     const out = await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'panel:passkey')
 
@@ -84,7 +84,7 @@ describe('الاعتماد', () => {
     expect(row?.['approved_at']).not.toBeNull()
   })
 
-  it('نصٌّ تغيّر يُعتمد edited — والحالةُ تُستنتَج ولا تُسأل', async () => {
+  it('نصّ تغيّر يُعتمد edited — والحالة تُستنتَج ولا تُسأل', async () => {
     const id = await seedDraft()
     const out = await decide(db, 'org_owner', id, { kind: 'approve', text: `${LONG} زيادة` }, 'panel:token')
 
@@ -97,7 +97,7 @@ describe('الاعتماد', () => {
    * **والأصلُ يُحفَظ عند أوّل تعديل** (D-128): اعتمادٌ بلا تعديلٍ يترك
    * `original_text` فارغا — «كما كُتب» — وتعديلٌ يحفظ ما كان قبله.
    */
-  it('والأصلُ يُحفَظ عند التعديل ويبقى فارغا عند الاعتماد كما كُتب', async () => {
+  it('والأصل يُحفَظ عند التعديل ويبقى فارغا عند الاعتماد كما كُتب', async () => {
     const same = await seedDraft()
     await decide(db, 'org_owner', same, { kind: 'approve', text: LONG }, 'omar')
     const kept = (await listDrafts(db, 'org_owner', 10)).find((d) => d.id === same)!
@@ -111,7 +111,7 @@ describe('الاعتماد', () => {
     expect(edited.text).toBe(`${LONG} زيادة`)
   })
 
-  it('نصٌّ فوق حدّ المنصّة يُرفض عند الاعتماد لا عند النشر', async () => {
+  it('نصّ فوق حدّ المنصّة يُرفض عند الاعتماد لا عند النشر', async () => {
     const id = await seedDraft({ platform: 'x', text: 'ن'.repeat(200) })
     const out = await decide(db, 'org_owner', id, { kind: 'approve', text: 'ن'.repeat(400) }, 'panel:token')
 
@@ -123,7 +123,7 @@ describe('الاعتماد', () => {
     expect(String(row?.['text']).length).toBe(200)
   })
 
-  it('نصٌّ أقصر من أن يكون منشورا يُرفض', async () => {
+  it('نصّ أقصر من أن يكون منشورا يُرفض', async () => {
     const id = await seedDraft()
     expect((await decide(db, 'org_owner', id, { kind: 'approve', text: 'قصير' }, 'x')).ok).toBe(false)
   })
@@ -136,11 +136,11 @@ describe('الاعتماد', () => {
  * `edited` بأصلٍ محفوظ، ويُحفَظ النصُّ حاملًا `\r` — وهو ما يُنشَر. ومسوّدةُ X بستّة
  * أسطرٍ يقول عدّادُها «279 / 280» تُردّ بـ «285 محرفا» ولا تُعتمَد أبدًا.
  */
-describe('الأسطرُ كما يرسلها المتصفّح', () => {
+describe('الأسطر كما يرسلها المتصفّح', () => {
   const crlf = (text: string): string => text.replace(/\n/g, '\r\n')
-  const PARAS = ['فقرةٌ أولى عن الوقف وأثره.', 'فقرةٌ ثانية عن التعليم.', LONG].join('\n\n')
+  const PARAS = ['فقرة أولى عن الوقف وأثره.', 'فقرة ثانية عن التعليم.', LONG].join('\n\n')
 
-  it('نصُّ المسوّدة نفسُه بأسطر CRLF يُعتمَد approved، بلا أصلٍ محفوظ ولا «\\r»', async () => {
+  it('نصّ المسوّدة نفسُه بأسطر CRLF يُعتمَد approved، بلا أصل محفوظ ولا «\\r»', async () => {
     const id = await seedDraft({ text: PARAS })
     const out = await decide(db, 'org_owner', id, { kind: 'approve', text: `${crlf(PARAS)}\r\n` }, 'omar')
     expect(out).toEqual({ ok: true, status: 'approved' })
@@ -152,7 +152,7 @@ describe('الأسطرُ كما يرسلها المتصفّح', () => {
     expect(row?.text.includes('\r')).toBe(false)
   })
 
-  it('ومسوّدةُ X عند حدّها بستّة أسطرٍ تُقبَل — كلُّ سطرٍ محرفٌ واحد لا اثنان', async () => {
+  it('ومسوّدة X عند حدّها بستّة أسطر تُقبَل — كلّ سطر محرف واحد لا اثنان', async () => {
     // ‏سبعةُ أسطرٍ من ‏39 محرفًا لاتينيًّا وستُّ فواصل: ‏279 بحساب X، وبـ CRLF ‏285
     const text = Array.from({ length: 7 }, () => 'a'.repeat(39)).join('\n')
     const id = await seedDraft({ platform: 'x', text })
@@ -160,18 +160,18 @@ describe('الأسطرُ كما يرسلها المتصفّح', () => {
     expect(out).toEqual({ ok: true, status: 'approved' })
   })
 
-  it('وتعديلٌ حقيقيٌّ بأسطر CRLF يبقى edited — والمحفوظُ بأسطر LF', async () => {
+  it('وتعديل حقيقيّ بأسطر CRLF يبقى edited — والمحفوظ بأسطر LF', async () => {
     const id = await seedDraft({ text: PARAS })
-    const out = await decide(db, 'org_owner', id, { kind: 'approve', text: crlf(`${PARAS}\nسطرٌ جديد`) }, 'omar')
+    const out = await decide(db, 'org_owner', id, { kind: 'approve', text: crlf(`${PARAS}\nسطر جديد`) }, 'omar')
     expect(out).toEqual({ ok: true, status: 'edited' })
     const [row] = await listDrafts(db, 'org_owner')
-    expect(row?.text).toBe(`${PARAS}\nسطرٌ جديد`)
+    expect(row?.text).toBe(`${PARAS}\nسطر جديد`)
     expect(row?.originalText).toBe(PARAS)
   })
 })
 
 describe('الرفض', () => {
-  it('يُعلَّم rejected بلا approved_at — فلا يفتح بابَ الطابور', async () => {
+  it('يُعلَّم rejected بلا approved_at — فلا يفتح باب الطابور', async () => {
     const id = await seedDraft()
     expect(await decide(db, 'org_owner', id, { kind: 'reject' }, 'panel:token')).toEqual({
       ok: true,
@@ -191,24 +191,24 @@ describe('الرفض', () => {
   })
 })
 
-describe('ما غادر المسوّدةَ لا يُبَتّ فيه ثانية', () => {
-  it('المعتمَدُ لا يُعتمد مرّتين', async () => {
+describe('ما غادر المسوّدة لا يُبَتّ فيه ثانية', () => {
+  it('المعتمَد لا يُعتمد مرّتين', async () => {
     const id = await seedDraft({ status: 'approved' })
     expect((await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
   })
 
-  it('المرفوضُ لا يُقلَب اعتمادا من هذا الباب', async () => {
+  it('المرفوض لا يُقلَب اعتمادا من هذا الباب', async () => {
     const id = await seedDraft({ status: 'rejected' })
     expect((await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
   })
 
-  it('معرّفٌ لا وجود له لا يُنشئ صفّا', async () => {
+  it('معرّف لا وجود له لا يُنشئ صفّا', async () => {
     expect((await decide(db, 'org_owner', 'لا-شيء', { kind: 'approve', text: LONG }, 'x')).ok).toBe(false)
   })
 })
 
 describe('العرض', () => {
-  it('يعلّم المسوّدةَ التي تغيّر مصدرُها بعدها', async () => {
+  it('يعلّم المسوّدة التي تغيّر مصدرُها بعدها', async () => {
     const fresh = await seedDraft()
     const stale = await seedDraft({ hash: 'md5:قديم' })
     const list = await listDrafts(db, 'org_owner')
@@ -216,7 +216,7 @@ describe('العرض', () => {
     expect(list.find((d) => d.id === fresh)?.stale).toBe(false)
   })
 
-  it('يجلب اسمَ المصدر مع المسوّدة — فلا يُقرأ نصٌّ بلا أصله', async () => {
+  it('يجلب اسم المصدر مع المسوّدة — فلا يُقرأ نصّ بلا أصله', async () => {
     const id = await seedDraft()
     const list = await listDrafts(db, 'org_owner')
     expect(list.find((d) => d.id === id)?.sourceName).toBe('تقرير الأثر')
@@ -227,15 +227,15 @@ describe('العرض', () => {
  * **منصّةُ الصفّ كما هي** — كان كلُّ ما ليس X يُقرأ LinkedIn، فمسوّدةُ
  * TikTok تُعرض بشعار LinkedIn ولا تجد حساباتِها عند الجدولة.
  */
-describe('المنصّةُ تُقرأ كما كُتبت', () => {
+describe('المنصّة تُقرأ كما كُتبت', () => {
   /*
    * **وInstagram خامستُها** (رحلة R-4): كانت تُقرأ من `PLATFORMS` — وهي ما تُكتب له
    * مسوّدة — فمنشورُ Instagram من «فيديوهاتك» يُعرَض «LinkedIn» ويُسنَد إلى حسابها.
    */
-  it('المنصّاتُ الخمس ذهابا وإيابا — وInstagram ليست LinkedIn', async () => {
+  it('المنصّات الخمس ذهابا وإيابا — وInstagram ليست LinkedIn', async () => {
     const ids = {
       linkedin: await seedDraft({ platform: 'linkedin' }),
-      x: await seedDraft({ platform: 'x', text: 'نصٌّ قصير' }),
+      x: await seedDraft({ platform: 'x', text: 'نصّ قصير' }),
       tiktok: await seedDraft({ platform: 'tiktok' }),
       youtube: await seedDraft({ platform: 'youtube' }),
       instagram: await seedDraft({ platform: 'instagram' }),
@@ -247,8 +247,8 @@ describe('المنصّةُ تُقرأ كما كُتبت', () => {
   })
 })
 
-describe('D-009 · القيدُ في القاعدة لا في الشيفرة', () => {
-  it('SQL مباشر يحاول الطابورَ بلا اعتماد — فتردّه القاعدة', async () => {
+describe('D-009 · القيد في القاعدة لا في الشيفرة', () => {
+  it('SQL مباشر يحاول الطابور بلا اعتماد — فتردّه القاعدة', async () => {
     const id = await seedDraft()
     await expect(
       db
@@ -258,7 +258,7 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
     ).rejects.toThrow()
   })
 
-  it('ولا طابورَ إلى حسابٍ لا وجود له، وإن كان الاعتماد قائما', async () => {
+  it('ولا طابور إلى حساب لا وجود له، وإن كان الاعتماد قائما', async () => {
     const id = await seedDraft()
     await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'panel:token')
     await expect(
@@ -278,25 +278,25 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
  * صفرا **حرفا** في المسوّدة، ويُحسَب عند النشر — بعد الاعتماد بأسابيع
  * — فلا يراه المالكُ حين يبتّ. **ورابطٌ على X ثلاثةَ عشرَ ضعفا.**
  */
-describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
+describe('ثمن النشر يُرى قبل الاعتماد (D-069)', () => {
   // **يسع الرابطَ تحت حدّ X (٢٨٠)**: `LONG` بثلاثمئةٍ يُردّ قبل أن
   // يُحسَب العمود، فيمرّ الاختبارُ على فرعٍ غير الذي يفحصه
   const FITS = 'ن'.repeat(200)
   const LINK = 'https://basserh.com'
 
-  it('ورابطٌ على X يُسعَّر مئتين لا خمسةَ عشر', async () => {
+  it('ورابط على X يُسعَّر مئتين لا خمسة عشر', async () => {
     await seedDraft({ platform: 'x', text: `${FITS} ${LINK}` })
     const [row] = await listDrafts(db, 'org_owner')
     expect(row?.publishCost).toBeCloseTo(0.2)
   })
 
-  it('وبلا رابطٍ خمسةَ عشر', async () => {
+  it('وبلا رابط خمسة عشر', async () => {
     await seedDraft({ platform: 'x' })
     const [row] = await listDrafts(db, 'org_owner')
     expect(row?.publishCost).toBeCloseTo(0.015)
   })
 
-  it('و LinkedIn بلا رسمٍ على المنشور — فلا يُعرَض شيء', async () => {
+  it('و LinkedIn بلا رسم على المنشور — فلا يُعرَض شيء', async () => {
     await seedDraft({ platform: 'linkedin', text: `${FITS} ${LINK}` })
     const [row] = await listDrafts(db, 'org_owner')
     expect(row?.publishCost).toBe(0)
@@ -306,7 +306,7 @@ describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
    * **والمالكُ يعتمد بنصِّه بعد التعديل.** فنصٌّ بلا رابطٍ عند الكتابة
    * يخرج من البَتّ برابط — وعمودٌ حُسب مرّةً يبقى يقول ما بطل.
    */
-  it('وتعديلٌ يضيف رابطا يعيد حسابَ العمود', async () => {
+  it('وتعديل يضيف رابطا يعيد حساب العمود', async () => {
     const id = await seedDraft({ platform: 'x' })
     const before = db.raw.prepare('SELECT has_url AS u FROM posts WHERE id = ?').get(id) as { u: number }
     expect(before.u).toBe(0)
@@ -318,7 +318,7 @@ describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
     expect(after.u).toBe(1)
   })
 
-  it('وتعديلٌ يحذف الرابطَ يعيده صفرا', async () => {
+  it('وتعديل يحذف الرابط يعيده صفرا', async () => {
     const id = await seedDraft({ platform: 'x', text: `${FITS} ${LINK}` })
     const edited = await decide(db, 'org_owner', id, { kind: 'approve', text: FITS }, 'omar')
     expect(edited.ok).toBe(true)
@@ -334,8 +334,8 @@ describe('ثمنُ النشر يُرى قبل الاعتماد (D-069)', () => {
  * يُضغَط، وقد تكون المسوّدةُ بُتَّ فيها من تبويبٍ آخر بينهما. **فالشرطُ
  * أنّ الحالَ `rejected` الآن، لا أنّ الرفضَ وقع يوما.**
  */
-describe('التراجعُ عن الرفض', () => {
-  it('يعيدها مسوّدةً ويمحو اسمَ الرافض', async () => {
+describe('التراجع عن الرفض', () => {
+  it('يعيدها مسوّدةً ويمحو اسم الرافض', async () => {
     const id = await seedDraft({})
     await decide(db, 'org_owner', id, { kind: 'reject' }, 'omar')
 
@@ -348,7 +348,7 @@ describe('التراجعُ عن الرفض', () => {
     expect(row?.approvedBy).toBeNull()
   })
 
-  it('**ولا يُتراجَع عمّا لم يُرفَض** — والمعتمَدُ يُردّ بحاله', async () => {
+  it('**ولا يُتراجَع عمّا لم يُرفَض** — والمعتمَد يُردّ بحاله', async () => {
     const id = await seedDraft({})
     await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'omar')
 
@@ -357,19 +357,19 @@ describe('التراجعُ عن الرفض', () => {
     if (!back.ok) expect(back.reason).toContain('اعتُمدت من قبل')
   })
 
-  it('ومسوّدةٌ لم تُبَتّ لا يُتراجَع عنها', async () => {
+  it('ومسوّدة لم تُبَتّ لا يُتراجَع عنها', async () => {
     const id = await seedDraft({})
     const back = await undoReject(db, 'org_owner', id)
     expect(back.ok).toBe(false)
   })
 
-  it('ومعرّفٌ لا وجودَ له يُردّ ولا يرمي', async () => {
+  it('ومعرّف لا وجود له يُردّ ولا يرمي', async () => {
     const back = await undoReject(db, 'org_owner', 'لا-شيء')
     expect(back.ok).toBe(false)
   })
 
   /** والدورةُ كاملةً: رُفضت، فرُجع عنها، فاعتُمدت. */
-  it('والمُرجَعُ عنها يُعتمَد بعدها', async () => {
+  it('والمُرجَع عنها يُعتمَد بعدها', async () => {
     const id = await seedDraft({})
     await decide(db, 'org_owner', id, { kind: 'reject' }, 'omar')
     await undoReject(db, 'org_owner', id)
@@ -386,8 +386,8 @@ describe('التراجعُ عن الرفض', () => {
  * «ارفض» على بُعد ‏8px من «اعتمد»، والرفضُ وحدَه كان يُتراجَع عنه. فاعتمادٌ بالخطأ
  * كان يُدخل المنشورَ «وزّع المعتمَد» ولا طريقَ إلى المسوّدة.
  */
-describe('التراجعُ عن الاعتماد', () => {
-  it('يعيد المعتمَدةَ كما كُتبت مسوّدةً بلا صاحبِ قرارٍ ولا وقت', async () => {
+describe('التراجع عن الاعتماد', () => {
+  it('يعيد المعتمَدة كما كُتبت مسوّدةً بلا صاحب قرار ولا وقت', async () => {
     const id = await seedDraft()
     await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'omar')
 
@@ -399,7 +399,7 @@ describe('التراجعُ عن الاعتماد', () => {
     expect(row?.['text']).toBe(LONG)
   })
 
-  it('والمعتمَدةُ بعد تعديلٍ تعود بنصّها قبله — والأصلُ يُمحى، فلا يُقال «عُدّلت» على مسوّدة', async () => {
+  it('والمعتمَدة بعد تعديل تعود بنصّها قبله — والأصل يُمحى، فلا يُقال «عُدّلت» على مسوّدة', async () => {
     const id = await seedDraft()
     await decide(db, 'org_owner', id, { kind: 'approve', text: `${LONG} https://basserh.com` }, 'omar')
 
@@ -416,7 +416,7 @@ describe('التراجعُ عن الاعتماد', () => {
     expect(again).toEqual({ ok: true, status: 'approved' })
   })
 
-  it('**والمجدولةُ لا تُسحب من هنا** — يُقال اسحب موعدَها أوّلًا', async () => {
+  it('**والمجدولة لا تُسحب من هنا** — يُقال اسحب موعدَها أوّلًا', async () => {
     const id = await seedDraft()
     await decide(db, 'org_owner', id, { kind: 'approve', text: LONG }, 'omar')
     const account = crypto.randomUUID()
@@ -431,7 +431,7 @@ describe('التراجعُ عن الاعتماد', () => {
     expect((await readPost(id))?.['status']).toBe('queued')
   })
 
-  it('والمسوّدةُ والمرفوضةُ ومعرّفٌ لا وجودَ له تُردّ ولا ترمي', async () => {
+  it('والمسوّدة والمرفوضة ومعرّف لا وجود له تُردّ ولا ترمي', async () => {
     const draft = await seedDraft()
     const rejected = await seedDraft({ status: 'rejected' })
     expect((await undoApprove(db, 'org_owner', draft)).ok).toBe(false)
@@ -447,8 +447,8 @@ describe('التراجعُ عن الاعتماد', () => {
  * وأهمُّ ما يُثبَت هنا اثنان: أنّ النصَّ يُؤخَذ من القاعدة **فتخرج الحالُ
  * `approved` لا `edited`**، وأنّ متعثّرةً واحدةً لا توقف البقيّة.
  */
-describe('البَتُّ الجماعيّ', () => {
-  it('يعتمد الجملةَ بنصّها المحفوظ — والحالُ approved لا edited', async () => {
+describe('البَتّ الجماعيّ', () => {
+  it('يعتمد الجملة بنصّها المحفوظ — والحال approved لا edited', async () => {
     const one = await seedDraft({})
     const two = await seedDraft({})
 
@@ -462,7 +462,7 @@ describe('البَتُّ الجماعيّ', () => {
     expect(rows.every((r) => r.approvedBy === 'omar')).toBe(true)
   })
 
-  it('**ومتعثّرةٌ لا توقف البقيّة** — وتُسمّى بسببها', async () => {
+  it('**ومتعثّرة لا توقف البقيّة** — وتُسمّى بسببها', async () => {
     const good = await seedDraft({})
     const gone = await seedDraft({})
     await decide(db, 'org_owner', gone, { kind: 'reject' }, 'omar')
@@ -474,14 +474,14 @@ describe('البَتُّ الجماعيّ', () => {
     expect(result.failed[0]?.reason).toContain('رُفضت من قبل')
   })
 
-  it('ومعرّفٌ لا وجودَ له يُسمَّى ولا يرمي', async () => {
+  it('ومعرّف لا وجود له يُسمَّى ولا يرمي', async () => {
     const good = await seedDraft({})
     const result = await approveMany(db, 'org_owner', ['لا-شيء', good], 'omar')
     expect(result.done).toEqual([good])
     expect(result.failed[0]?.id).toBe('لا-شيء')
   })
 
-  it('وقائمةٌ فارغة تعطي حصيلةً فارغة', async () => {
+  it('وقائمة فارغة تعطي حصيلةً فارغة', async () => {
     const result = await approveMany(db, 'org_owner', [], 'omar')
     expect(result.done).toHaveLength(0)
     expect(result.failed).toHaveLength(0)
@@ -494,7 +494,7 @@ describe('البَتُّ الجماعيّ', () => {
    * هو الفحصُ الذي يجعل البَتَّ الجماعيَّ آمنا: **لا يمرّ منه ما لا يمرّ
    * من الفرديّ.**
    */
-  it('ونصٌّ فوق حدّ المنصّة يُردّ في الجملة كما يُردّ وحده', async () => {
+  it('ونصّ فوق حدّ المنصّة يُردّ في الجملة كما يُردّ وحده', async () => {
     const big = await seedDraft({ platform: 'x', text: 'ن'.repeat(400) })
     const result = await approveMany(db, 'org_owner', [big], 'omar')
     expect(result.done).toHaveLength(0)

@@ -13,8 +13,8 @@ import { FACES, PLEX_AR_400, PLEX_AR_600, PLEX_SANS } from '../lib/ui/fonts'
 
 const env = {} as never
 
-describe('مسارُ الخطّ', () => {
-  it('يُسلّم الأوجهَ الثلاثة بمساراتها', async () => {
+describe('مسار الخطّ', () => {
+  it('يُسلّم الأوجه الثلاثة بمساراتها', async () => {
     expect(FACES).toEqual([PLEX_AR_400, PLEX_AR_600, PLEX_SANS])
     for (const face of FACES) {
       const res = await fonts.request(face.path, {}, env)
@@ -24,18 +24,18 @@ describe('مسارُ الخطّ', () => {
     }
   })
 
-  it('**والتخبئةُ دائمة** — وبدونها لا معنى للبصمة', async () => {
+  it('**والتخبئة دائمة** — وبدونها لا معنى للبصمة', async () => {
     const res = await fonts.request(PLEX_AR_400.path, {}, env)
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
   })
 
   it.each([
-    ['اسمٌ مخترَع', '/f/plex-ar-400.woff2'],
-    ['بصمةٌ خاطئة', '/f/plex-ar-400.00000000.woff2'],
-    ['أسرةٌ لا وجودَ لها', `/f/tajawal.${PLEX_AR_400.hash}.woff2`],
+    ['اسم مخترَع', '/f/plex-ar-400.woff2'],
+    ['بصمة خاطئة', '/f/plex-ar-400.00000000.woff2'],
+    ['أسرة لا وجود لها', `/f/tajawal.${PLEX_AR_400.hash}.woff2`],
     // ‏وخطٌّ خرج من اللوحة (D-185) لا يُخدَم بمساره القديم ولو بقيت حزمتُه لخطوط الصور
-    ['وجهٌ خرج من اللوحة', '/f/beiruti.39b09ced.woff2'],
-    ['صعودٌ في المسار', '/f/..%2F..%2Fpanel'],
+    ['وجه خرج من اللوحة', '/f/beiruti.39b09ced.woff2'],
+    ['صعود في المسار', '/f/..%2F..%2Fpanel'],
   ])('٤٠٤ — %s', async (_name, path) => {
     const res = await fonts.request(path, {}, env)
     expect(res.status).toBe(404)
@@ -57,7 +57,7 @@ describe('مسارُ الخطّ', () => {
    * فلو ولّد السكربتُ يوما ملفّا خاطئا — أو فُكّ `base64` فُكّا معطوبا —
    * لم يظهر ذلك في الطول، **وظهر هنا**.
    */
-  it('البايتاتُ woff2 حقًّا لا نصٌّ أو ملفٌّ آخر', async () => {
+  it('البايتات woff2 حقًّا لا نصّ أو ملفّ آخر', async () => {
     const bytes = new Uint8Array(await (await fonts.request(PLEX_AR_400.path, {}, env)).arrayBuffer())
     expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('wOF2')
   })

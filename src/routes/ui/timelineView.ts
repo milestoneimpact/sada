@@ -52,7 +52,7 @@ function describe(bar: GanttBar, isPlan: boolean, zone: string | null): string {
   const parts = [bar.label, STATUS_LABEL[bar.status] ?? bar.status, `كُتب ${stamp(bar.createdAt, zone)}`]
   if (bar.approvedAt !== null) parts.push(`اعتُمد ${stamp(bar.approvedAt, zone)}`)
   if (bar.at !== null) parts.push(`${bar.status === 'published' ? 'نُشر' : 'موعدُه'} ${stamp(bar.at, zone)}`)
-  else if (bar.open) parts.push('بلا قرارٍ حتّى الآن')
+  else if (bar.open) parts.push('بلا قرار حتّى الآن')
   return parts.join(' · ')
 }
 
@@ -109,17 +109,17 @@ function legend(): string {
     `<span class="gt-key"><i class="gt-sw ${cls}"></i>${escapeHtml(text)}</span>`
   return `<div class="legend gt-legend">
     ${item('pending', 'تنتظر قرارك')}${item('warn', 'معتمَدة أو مجدولة')}${item('ok', 'نُشرت')}${item('bad', 'فشل النشر')}${item('idle', 'مرفوضة')}
-    <span class="gt-key"><i class="gt-sw split"></i>الجزءُ الأغمق: انتظارُ الموعد بعد الاعتماد</span>
-    <span class="gt-key"><i class="gt-sw mark"></i>موعدُ النشر أو لحظتُه</span>
+    <span class="gt-key"><i class="gt-sw split"></i>الجزء الأغمق: انتظار الموعد بعد الاعتماد</span>
+    <span class="gt-key"><i class="gt-sw mark"></i>موعد النشر أو لحظتُه</span>
   </div>`
 }
 
 function controls(d: TimelineView): string {
   const prev = d.shift > -SHIFT_LIMIT
-    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href(d.span, d.shift - 1))}" rel="prev">النافذةُ السابقة</a>`
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href(d.span, d.shift - 1))}" rel="prev">النافذة السابقة</a>`
     : ''
   const next = d.shift < SHIFT_LIMIT
-    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href(d.span, d.shift + 1))}" rel="next">النافذةُ التالية</a>`
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href(d.span, d.shift + 1))}" rel="next">النافذة التالية</a>`
     : ''
   const today = d.shift === 0 ? '' : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(href(d.span, 0))}">إلى اليوم</a>`
   const options = SPANS.map((s) =>
@@ -156,9 +156,9 @@ export function timelineScreen(d: TimelineView): string {
   }).join('')
 
   const empty = emptyState({
-    title: 'لا منشورَ في هذه النافذة',
-    html: `النافذةُ ${escapeHtml(range)}. قلّبها إلى ما قبلها أو ما بعدها، أو وسّع المدى —
-      أو اكتب مسوّدةً من «المنشورات» فتظهر هنا من يومِ كتابتها.`,
+    title: 'لا منشور في هذه النافذة',
+    html: `النافذة ${escapeHtml(range)}. قلّبها إلى ما قبلها أو ما بعدها، أو وسّع المدى —
+      أو اكتب مسوّدةً من «المنشورات» فتظهر هنا من يوم كتابتها.`,
   })
 
   const flash = toastRegion(d.flash === undefined || d.flash === null
@@ -166,14 +166,14 @@ export function timelineScreen(d: TimelineView): string {
     : notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad',
         g: d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲' }))
   return `${flash}${resultsTabs('timeline')}
-  ${pageHead('المحفظة', 'الخطّ الزمنيّ', `كلُّ منشورٍ في كلّ حسابٍ شريطٌ من كتابته إلى خروجه، والخططُ الأسبوعيّةُ فوقها.
-    <b>والشريطُ رابطٌ إلى رحلته</b>، والمجدولُ يُسحَب إلى يومٍ آخر.`)}
+  ${pageHead('المحفظة', 'الخطّ الزمنيّ', `كلّ منشور في كلّ حساب شريط من كتابته إلى خروجه، والخطط الأسبوعيّة فوقها.
+    <b>والشريط رابط إلى رحلته</b>، والمجدول يُسحَب إلى يوم آخر.`)}
   ${controls(d)}
   <div class="card mt-3">
     <div class="split">
       <h2>${escapeHtml(range)}</h2>
       <span class="note">${escapeHtml(counted(c.days, NOUNS.day))}${
-        d.capped ? ` · بلغ السقفَ (${escapeHtml(String(d.cap))}) فطُوي ما بعده` : ''}</span>
+        d.capped ? ` · بلغ السقف (${escapeHtml(String(d.cap))}) فطُوي ما بعده` : ''}</span>
     </div>
     ${stats(d)}
     ${c.groups.length === 0
@@ -183,8 +183,8 @@ export function timelineScreen(d: TimelineView): string {
     <form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden>
       <input type="hidden" name="id"><input type="hidden" name="when">
       <input type="hidden" name="from" value="timeline"><input type="hidden" name="back" value="${escapeHtml(href(d.span, d.shift))}"></form>
-    <p class="hint">التواريخُ ${d.zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'}. والشريطُ المفتوحُ الطرفِ يمتدّ خارجَ النافذة،
-      والمتقطّعُ مسوّدةٌ لم يُقرَّر فيها فنهايتُه «الآن».</p>`}
+    <p class="hint">التواريخ ${d.zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'}. والشريط المفتوح الطرف يمتدّ خارج النافذة،
+      والمتقطّع مسوّدة لم يُقرَّر فيها فنهايتُه «الآن».</p>`}
   </div>`
 }
 

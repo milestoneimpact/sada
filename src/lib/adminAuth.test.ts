@@ -69,7 +69,7 @@ describe('حين يُضبط السرّ', () => {
 describe('أخطاء اللصق الشائعة', () => {
   const SECRET = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 
-  it('سطرٌ جديد تسلّل إلى السرّ المحفوظ لا يُبطله', async () => {
+  it('سطر جديد تسلّل إلى السرّ المحفوظ لا يُبطله', async () => {
     // يقع مع: echo "$T" | wrangler secret put — و echo يضيف سطرا
     expect((await authorizeAdmin(`${SECRET}\n`, req(`Bearer ${SECRET}`))).kind).toBe('ok')
     expect((await authorizeAdmin(`  ${SECRET}  `, req(`Bearer ${SECRET}`))).kind).toBe('ok')
@@ -81,7 +81,7 @@ describe('أخطاء اللصق الشائعة', () => {
     expect(verdict.presentedLength).toBe(SECRET.length + 2)
   })
 
-  it('رمزٌ مقلوب — TOKEN_ENC_KEY مكان ADMIN_TOKEN — يُرفض', async () => {
+  it('رمز مقلوب — TOKEN_ENC_KEY مكان ADMIN_TOKEN — يُرفض', async () => {
     const encKey = 'bXlUb2tlbkVuY0tleUJhc2U2NDMyQnl0ZXNIZXJlPT0='
     expect((await authorizeAdmin(SECRET, req(`Bearer ${encKey}`))).kind).toBe('denied')
   })

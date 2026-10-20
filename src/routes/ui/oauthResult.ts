@@ -94,27 +94,27 @@ export function connectedBody(d: ConnectedData): string {
   const verdict =
     missing.length === 0
       ? `<div class="outcome"><span class="kv-k">تمّ</span><span class="kv-v">
-         كلُّ النطاقات ممنوحة. <b>يستطيع صدى أن ينشر باسم هذا الحساب</b> —
-         بعد موافقتك على كلّ منشورٍ على حدة.</span></div>`
+         كلّ النطاقات ممنوحة. <b>يستطيع صدى أن ينشر باسم هذا الحساب</b> —
+         بعد موافقتك على كلّ منشور على حدة.</span></div>`
       : canPublish
         ? `<div class="outcome warn"><span class="kv-k">ينقص</span><span class="kv-v">
-           النشرُ يعمل، <b>ولم يُمنَح ${counted(missing.length, NOUNS.scope)}</b> — وما يفتحه لا يعمل.
-           والجدولُ تحت يقول أيَّها ومَن يمنحه.</span></div>`
-        : `<div class="outcome warn"><span class="kv-k">مربوطٌ ولا ينشر</span><span class="kv-v">
-           <b>الهويّةُ مقروءة، والنشرُ غيرُ ممكن</b> — نطاقُ النشر لم يُمنَح.
-           والحسابُ محفوظٌ كما هو: أضف المنتَجَ في البوّابة ثمّ اضغط «جدّد الإذن»،
+           النشر يعمل، <b>ولم يُمنَح ${counted(missing.length, NOUNS.scope)}</b> — وما يفتحه لا يعمل.
+           والجدول تحت يقول أيَّها ومَن يمنحه.</span></div>`
+        : `<div class="outcome warn"><span class="kv-k">مربوط ولا ينشر</span><span class="kv-v">
+           <b>الهويّة مقروءة، والنشر غير ممكن</b> — نطاق النشر لم يُمنَح.
+           والحساب محفوظ كما هو: أضف المنتَج في البوّابة ثمّ اضغط «جدّد الإذن»،
            ولا تُعِد بناء التطبيق.</span></div>`
 
   const refresh = d.hasRefresh
     ? statusBadge('ok', '●', 'يُجدَّد تلقائيّا')
-    : `${statusBadge('warn', '!', `بلا تجديدٍ تلقائيّ`)}`
+    : `${statusBadge('warn', '!', `بلا تجديد تلقائيّ`)}`
 
   return `${head(
     d.platform,
     'رُبط',
     `${LABEL[d.platform]} — ${d.displayName}`,
-    'الإذنُ محفوظٌ مشفّرا، ولا يظهر في هذه الصفحة ولا في سجلّ. ' +
-      '<b>وما يستطيعه هذا الحسابُ مقروءٌ ممّا مُنح لا ممّا طُلب.</b>',
+    'الإذن محفوظ مشفّرا، ولا يظهر في هذه الصفحة ولا في سجلّ. ' +
+      '<b>وما يستطيعه هذا الحساب مقروء ممّا مُنح لا ممّا طُلب.</b>',
   )}
 
   ${verdict}
@@ -122,19 +122,19 @@ export function connectedBody(d: ConnectedData): string {
   <div class="card mt-4">
     <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
       <div class="grow"></div>${refresh}</div>
-    <p class="hint">وقتُ انتهاء الإذن: <span class="mono">${escapeHtml(
+    <p class="hint">وقت انتهاء الإذن: <span class="mono">${escapeHtml(
       stamp(d.expiresAt.slice(0, 16).replace('T', ' '), null),
     )}</span>.
       ${d.hasRefresh
         ? 'ويُجدَّد قبل انتهائه بلا تدخّل.'
-        : '<b>ولا إذنَ تجديدٍ معه</b> — فسيتوقّف النشرُ عند انتهائه حتّى تُعيد الربط.'}</p>
+        : '<b>ولا إذن تجديد معه</b> — فسيتوقّف النشر عند انتهائه حتّى تُعيد الربط.'}</p>
     <div class="scroll"><table>
       <thead><tr><th>النطاق</th><th>يفتح</th><th>الحال</th><th>مصدرُه إن نقص</th></tr></thead>
       <tbody>${scopeRows(d.platform, granted)}</tbody></table></div>
   </div>
 
   <div class="row mt-4">
-    <a class="btn btn-primary" href="/panel/channels/${escapeHtml(d.platform)}">شاشةُ ${escapeHtml(
+    <a class="btn btn-primary" href="/panel/channels/${escapeHtml(d.platform)}">شاشة ${escapeHtml(
       LABEL[d.platform],
     )}</a>
     <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
@@ -199,11 +199,11 @@ export function refusedBody(d: RefusedData): string {
       d.platform,
       'أُلغي',
       `لم تُمنَح ${LABEL[d.platform]} إذنا`,
-      'أُغلقت شاشةُ الإذن قبل الموافقة. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.',
+      'أُغلقت شاشة الإذن قبل الموافقة. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.',
     )}
     <div class="card">
-      <h2>لا شيءَ يحتاج إصلاحا</h2>
-      <p class="hint">هذا قرارُك لا عطلٌ في الضبط. وزرُّ الربط في لوح القنوات
+      <h2>لا شيء يحتاج إصلاحا</h2>
+      <p class="hint">هذا قرارُك لا عطل في الضبط. وزرّ الربط في لوح القنوات
         يعمل كما كان متى شئت.</p>
       <div class="row mt-3">
         <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
@@ -230,38 +230,38 @@ export function refusedBody(d: RefusedData): string {
     return `${head(
       d.platform,
       'رُفض',
-      'الإذنُ نجح، وتبديلُ الإذن رُدّ',
-      'شاشةُ الإذن مرّت، ثمّ ردّت ' + LABEL[d.platform] + ' تبديلَ الإذن بـ ' +
+      'الإذن نجح، وتبديل الإذن رُدّ',
+      'شاشة الإذن مرّت، ثمّ ردّت ' + LABEL[d.platform] + ' تبديل الإذن بـ ' +
         '<span class="mono">invalid_client</span>. ' +
-        '<b>ومعناه أنّ Client ID أو Client Secret في صدى ليس زوجَ هذا التطبيق.</b> ' +
+        '<b>ومعناه أنّ Client ID أو Client Secret في صدى ليس زوج هذا التطبيق.</b> ' +
         '<b>ولم يُحفَظ شيء.</b>',
     )}
     <div class="card">
-      <h2>ولا علاقةَ له بالنطاقات ولا بالمنتَجات</h2>
-      <p class="hint">النطاقاتُ تُفحَص <b>قبل</b> شاشة الإذن، وقد مرّت.
-        <b>فلا تفتّش في تبويب Products</b> — العطلُ في زوج المفاتيح وحده.</p>
+      <h2>ولا علاقة له بالنطاقات ولا بالمنتَجات</h2>
+      <p class="hint">النطاقات تُفحَص <b>قبل</b> شاشة الإذن، وقد مرّت.
+        <b>فلا تفتّش في تبويب Products</b> — العطل في زوج المفاتيح وحده.</p>
       <ol class="steps">
         <li><span class="step-n">1</span><span class="body">
-          <span class="what">أأُعيد إنشاءُ التطبيق؟</span>
-          <span class="why"><b>هذا أشيعُ سبب.</b> تطبيقٌ جديدٌ معرّفُه جديدٌ وسرُّه
-            جديد — وصدى يحمل زوجَ التطبيق القديم.</span></span></li>
+          <span class="what">أأُعيد إنشاء التطبيق؟</span>
+          <span class="why"><b>هذا أشيع سبب.</b> تطبيق جديد معرّفُه جديد وسرُّه
+            جديد — وصدى يحمل زوج التطبيق القديم.</span></span></li>
         <li><span class="step-n">2</span><span class="body">
-          <span class="what">أأُعيد توليدُ السرّ؟</span>
-          <span class="why">سرٌّ يُولَّد من جديد <b>يُبطل السابق فورا</b>،
-            والمعرّفُ يبقى كما هو — فيبدو أنّ شيئا لم يتغيّر.</span></span></li>
+          <span class="what">أأُعيد توليد السرّ؟</span>
+          <span class="why">سرّ يُولَّد من جديد <b>يُبطل السابق فورا</b>،
+            والمعرّف يبقى كما هو — فيبدو أنّ شيئا لم يتغيّر.</span></span></li>
         <li><span class="step-n">3</span><span class="body">
-          <span class="what">أَلُصق السرُّ في حقل المعرّف أو العكس؟</span>
+          <span class="what">أَلُصق السرّ في حقل المعرّف أو العكس؟</span>
           <span class="why">الحقلان متجاوران، والقيمتان طويلتان متشابهتان
             في الشكل.</span></span></li>
       </ol>
       ${d.description === undefined ? '' : `<div class="outcome warn">
-        <span class="kv-k">وهذا نصُّ ${LABEL[d.platform]} حرفا</span>
+        <span class="kv-k">وهذا نصّ ${LABEL[d.platform]} حرفا</span>
         <span class="kv-v"><span class="mono">${escapeHtml(d.description)}</span></span></div>`}
       ${d.sent === undefined ? '' : `<div class="card mt-3">
         <h2>وهذا ما أرسله صدى — قارنه بما في البوّابة</h2>
-        <p class="hint"><b>القيمتان علنيّتان</b>: المعرّفُ معروضٌ في البوّابة نفسِها،
-          والرابطُ يظهر في شريط العنوان عند كلّ دورة. <b>ولا يُعرَض السرُّ هنا</b> —
-          هذه الصفحةُ ليست خلف دخول؛ قناعُ السرّ في لوح القنوات.</p>
+        <p class="hint"><b>القيمتان علنيّتان</b>: المعرّف معروض في البوّابة نفسِها،
+          والرابط يظهر في شريط العنوان عند كلّ دورة. <b>ولا يُعرَض السرّ هنا</b> —
+          هذه الصفحة ليست خلف دخول؛ قناع السرّ في لوح القنوات.</p>
         <div class="field cb">
           <label for="sent-id">Client ID الذي أُرسل</label>
           <div class="copy">
@@ -270,11 +270,11 @@ export function refusedBody(d: RefusedData): string {
             <button type="button" class="btn btn-secondary btn-sm" data-copy="sent-id">انسخ</button>
           </div>
           <div class="help"><span class="help-ic">!</span><span class="help-t">
-            <b>إن خالف المعرّفَ في ${escapeHtml(portal)} فهذا تطبيقٌ آخر</b> — وهو وحده يفسّر
-            الرفض. وإن طابقه، <b>فالسرُّ هو الخطأ</b>: ولّد سرّا جديدا والصقه.</span></div>
+            <b>إن خالف المعرّف في ${escapeHtml(portal)} فهذا تطبيق آخر</b> — وهو وحده يفسّر
+            الرفض. وإن طابقه، <b>فالسرّ هو الخطأ</b>: ولّد سرّا جديدا والصقه.</span></div>
         </div>
         <div class="field cb">
-          <label for="sent-cb">رابطُ العودة الذي أُرسل</label>
+          <label for="sent-cb">رابط العودة الذي أُرسل</label>
           <div class="copy">
             <input id="sent-cb" class="mono" dir="ltr" value="${escapeHtml(d.sent.redirectUri)}" readonly
               aria-label="رابط العودة الذي أُرسل">
@@ -285,9 +285,9 @@ export function refusedBody(d: RefusedData): string {
       <div class="outcome warn"><span class="kv-k">ما يُفعَل</span>
         <span class="kv-v">انسخ <b>Client ID</b> و <b>Client Secret</b> من
           <b>${escapeHtml(portal)}</b> في التطبيق <b>الذي تراه الآن</b>، والصقهما في
-          <b>${pathArrows('صفحة المنصّة ← ضبطُ التطبيق ودليلُه')}</b>، ثمّ أعد الربط.
-          <b>وإن كان السرُّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
-          المعروضُ مقنَّعا لا يُنسَخ، ولصقُ قناعٍ يعطي هذا الردَّ نفسه.</span></div>
+          <b>${pathArrows('صفحة المنصّة ← ضبط التطبيق ودليلُه')}</b>، ثمّ أعد الربط.
+          <b>وإن كان السرّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
+          المعروض مقنَّعا لا يُنسَخ، ولصق قناع يعطي هذا الردّ نفسه.</span></div>
       <div class="row mt-3">
         <a class="btn btn-primary" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
         <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
@@ -304,16 +304,16 @@ export function refusedBody(d: RefusedData): string {
         '<b>ولم يُحفَظ شيء.</b>',
     )}
     <div class="card">
-      <h2>أوّلُ ما يُراجَع</h2>
+      <h2>أوّل ما يُراجَع</h2>
       <ol class="steps">
         <li><span class="step-n">1</span><span class="body">
-          <span class="what">رابطُ العودة المسجَّل في ${escapeHtml(portal)}</span>
-          <span class="why">يُطابَق حرفًا بحرف: شرطةٌ زائدةٌ في آخره أو http بدل https تُسقط الربط.${
-            step === null ? '' : ` وهو الخطوةُ ${step} من الدليل.`}</span></span></li>
+          <span class="what">رابط العودة المسجَّل في ${escapeHtml(portal)}</span>
+          <span class="why">يُطابَق حرفًا بحرف: شرطة زائدة في آخره أو http بدل https تُسقط الربط.${
+            step === null ? '' : ` وهو الخطوة ${step} من الدليل.`}</span></span></li>
         <li><span class="step-n">2</span><span class="body">
           <span class="what">Client ID و Client Secret</span>
-          <span class="why">سرٌّ من تطبيقٍ آخر، أو سرٌّ أُعيد توليدُه ولم يُبدَّل هنا،
-            يعطي هذا الردَّ نفسه.</span></span></li>
+          <span class="why">سرّ من تطبيق آخر، أو سرّ أُعيد توليدُه ولم يُبدَّل هنا،
+            يعطي هذا الردّ نفسه.</span></span></li>
       </ol>
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="kv-k">إن فشل</span>
         <span class="kv-v">${pathArrows(guide.failure)}</span></div>`}
@@ -354,35 +354,35 @@ export function refusedBody(d: RefusedData): string {
 
   return `${head(
     d.platform,
-    'نطاقٌ لم يُمنَح',
+    'نطاق لم يُمنَح',
     `${LABEL[d.platform]} رفضت نطاقا طلبناه`,
     named
-      ? `النطاقُ الناقص: <span class="mono">${escapeHtml(blamed.join('</span> و <span class="mono">'))}</span>. ` +
-        '<b>سمّته المنصّةُ في جوابها</b>، فلا حاجةَ إلى تخمين. ' +
-        'ولا علاقةَ للسرّ بهذا: <b>لا تُعِد توليده.</b>'
+      ? `النطاق الناقص: <span class="mono">${escapeHtml(blamed.join('</span> و <span class="mono">'))}</span>. ` +
+        '<b>سمّته المنصّة في جوابها</b>، فلا حاجة إلى تخمين. ' +
+        'ولا علاقة للسرّ بهذا: <b>لا تُعِد توليده.</b>'
       : `ما أعادته حرفًا: <span class="mono">${escapeHtml(d.reason)}</span>. ` +
-        '<b>ومعناه أنّ التطبيقَ لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
-        'فلا تُعِد توليدَ السرّ: لن يغيّر شيئا.',
+        '<b>ومعناه أنّ التطبيق لا يملك نطاقا طُلب — لا أنّ سرَّك خطأ.</b> ' +
+        'فلا تُعِد توليد السرّ: لن يغيّر شيئا.',
   )}
 
   <div class="outcome warn"><span class="kv-k">أين العلّة</span><span class="kv-v">
-    النطاقُ يُمنَح <b>بمنتَجٍ يُضاف في بوّابة المنصّة</b>، لا بمفتاحٍ يُكتب هنا.
-    والجدولُ تحت يقول ما طُلب ومَن يمنح كلَّ واحدٍ منه.
+    النطاق يُمنَح <b>بمنتَج يُضاف في بوّابة المنصّة</b>، لا بمفتاح يُكتب هنا.
+    والجدول تحت يقول ما طُلب ومَن يمنح كلّ واحد منه.
     <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.</span></div>
 
   <div class="card mt-4">
     <div class="card-head"><h2>${
-      named ? 'النطاقُ الناقص ومَن يمنحه' : 'ما طُلب في هذه المحاولة'
+      named ? 'النطاق الناقص ومَن يمنحه' : 'ما طُلب في هذه المحاولة'
     }</h2></div>
     <p class="hint">${
       named
-        ? 'سمّته المنصّةُ بعينه، <b>فهذا وحده ما ينقص</b>. وما عداه ممنوحٌ أصلا' + (d.platform === 'linkedin'
+        ? 'سمّته المنصّة بعينه، <b>فهذا وحده ما ينقص</b>. وما عداه ممنوح أصلا' + (d.platform === 'linkedin'
           // ‏و«تبويب Auth» اسمٌ عند LinkedIn وحدها — لا يُقال لمنصّةٍ لا تبويبَ فيها بهذا الاسم
           ? ' — وتبويب Auth في بوّابتك يُظهر ما مُنح تحت <span class="mono">OAuth 2.0 scopes</span>.'
           : '.')
-        : 'المنصّةُ لم تسمِّ نطاقا في جوابها، <b>فكلُّها معروضة</b>. ' +
-          'وأكثرُ ما يقع أن يكون النقصُ في المنتَج الذي يمنح النشر.'
-    } والمنتَجُ يُمنَح <b>فورا بلا مراجعة</b>.</p>
+        : 'المنصّة لم تسمّ نطاقا في جوابها، <b>فكلُّها معروضة</b>. ' +
+          'وأكثر ما يقع أن يكون النقص في المنتَج الذي يمنح النشر.'
+    } والمنتَج يُمنَح <b>فورا بلا مراجعة</b>.</p>
     <div class="scroll"><table>
       <thead><tr><th>النطاق</th><th>يفتح</th><th>مَن يمنحه</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
@@ -390,18 +390,18 @@ export function refusedBody(d: RefusedData): string {
 
   ${identityBlocked
     ? `<div class="card mt-4">
-      <div class="card-head"><h2>ولا يفيدك ربطُ الهويّة وحدها هنا</h2></div>
-      <p class="hint"><b>الناقصُ هو نطاقُ الهويّة نفسه</b> — فمحاولةٌ تطلبه وحده
-        تُردّ بالردّ نفسه. والمنتَجُ الذي يمنحه
+      <div class="card-head"><h2>ولا يفيدك ربط الهويّة وحدها هنا</h2></div>
+      <p class="hint"><b>الناقص هو نطاق الهويّة نفسه</b> — فمحاولة تطلبه وحده
+        تُردّ بالردّ نفسه. والمنتَج الذي يمنحه
         <b>${escapeHtml(SCOPES[d.platform].find((s) => blamed.includes(s.name))?.grantedBy ?? '')}</b>،
-        ويُضاف في دقيقةٍ بلا مراجعة. <b>أضفه ثمّ أعد المحاولة كاملةً.</b></p>
+        ويُضاف في دقيقة بلا مراجعة. <b>أضفه ثمّ أعد المحاولة كاملةً.</b></p>
     </div>`
     : !offerIdentity
     ? ''
     : `<div class="card mt-4">
       <div class="card-head"><h2>ولا تنتظر البوّابة لتربط</h2></div>
-      <p class="hint">يمكن الربطُ <b>بالهويّة وحدها</b> الآن: يُحفَظ الحساب ويظهر باسمه،
-        <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَجُ الناقص ثمّ تضغط «جدّد الإذن».
+      <p class="hint">يمكن الربط <b>بالهويّة وحدها</b> الآن: يُحفَظ الحساب ويظهر باسمه،
+        <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَج الناقص ثمّ تضغط «جدّد الإذن».
         وصدى يقرأ ما مُنح فعلا، فلن يحاول نشرا يعرف أنّه سيُردّ.</p>
       <div class="row mt-3">
         <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
@@ -419,7 +419,7 @@ export function refusedBody(d: RefusedData): string {
   ${guide === undefined
     ? ''
     : `<div class="card guide mt-4">
-      <div class="card-head"><h2>الخطواتُ في ${escapeHtml(guide.portalLabel)}</h2></div>
+      <div class="card-head"><h2>الخطوات في ${escapeHtml(guide.portalLabel)}</h2></div>
       <ol class="steps">${guide.before
         .map(
           (b, i) => `<li><span class="step-n">${i + 1}</span><span class="body">
@@ -454,10 +454,10 @@ export function refusedBody(d: RefusedData): string {
 export function unconfiguredBody(platform: Platform): string {
   const label = LABEL[platform]
   return `${head(platform, 'لم يكتمل', 'لم يكتمل الربط',
-    `وافقت ${escapeHtml(label)}، ثمّ لم نجد عندنا معرّفَ تطبيقها وسرَّه — حُذفا بعد أن بدأ الربط. <b>ولم يُحفَظ شيء.</b>`)}
+    `وافقت ${escapeHtml(label)}، ثمّ لم نجد عندنا معرّف تطبيقها وسرَّه — حُذفا بعد أن بدأ الربط. <b>ولم يُحفَظ شيء.</b>`)}
   <div class="card">
     <h2>ما يُفعَل</h2>
-    <p class="hint">اضبط المعرّفَ والسرَّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
+    <p class="hint">اضبط المعرّف والسرّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
     <div class="row mt-3">
       <a class="btn btn-primary" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
       <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
@@ -468,8 +468,8 @@ export function unconfiguredBody(platform: Platform): string {
 /** الحسابُ مربوطٌ في منظّمةٍ أخرى (D-229): لم يُنقَل ولم يُحفَظ رمز. */
 export function elsewhereBody(platform: Platform, displayName: string): string {
   const label = LABEL[platform]
-  return `${head(platform, 'لم يكتمل', 'الحسابُ مربوطٌ في منظّمةٍ أخرى',
-    `وافقت ${escapeHtml(label)} على «${escapeHtml(displayName)}»، وهو مربوطٌ من قبلُ في منظّمةٍ أخرى. <b>ولم يُنقَل منها ولم يُحفَظ شيء.</b>`)}
+  return `${head(platform, 'لم يكتمل', 'الحساب مربوط في منظّمة أخرى',
+    `وافقت ${escapeHtml(label)} على «${escapeHtml(displayName)}»، وهو مربوط من قبل في منظّمة أخرى. <b>ولم يُنقَل منها ولم يُحفَظ شيء.</b>`)}
   <div class="card">
     <h2>ما يُفعَل</h2>
     <p class="hint">انتقل إلى المنظّمة التي تملكه من الإعدادات، أو افصله منها أوّلًا ثمّ اربطه هنا.</p>
@@ -502,10 +502,10 @@ export function unreachedBody(d: UnreachedData): string {
   const label = LABEL[d.platform]
   const title = d.stage === 'save' ? 'لم يُحفَظ الربط' : d.stage === 'start' ? 'لم يبدأ الربط' : `لم نصل إلى ${label} الآن`
   const lede = d.stage === 'save'
-    ? `وافقت ${escapeHtml(label)}، ثمّ تعذّر الحفظُ عندنا. <b>أعد المحاولة</b>؛ وإن ظهر الحسابُ «بلا إذن» فالمحاولةُ نفسُها تُصلحه.`
+    ? `وافقت ${escapeHtml(label)}، ثمّ تعذّر الحفظ عندنا. <b>أعد المحاولة</b>؛ وإن ظهر الحساب «بلا إذن» فالمحاولة نفسُها تُصلحه.`
     : d.stage === 'start'
-      ? 'تعذّرت قراءةُ ضبط التطبيق قبل الذهاب إلى المنصّة. <b>ولم يُحفَظ شيء.</b>'
-      : `انقطع الطريقُ إلى ${escapeHtml(label)} قبل أن يكتمل الربط. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.`
+      ? 'تعذّرت قراءة ضبط التطبيق قبل الذهاب إلى المنصّة. <b>ولم يُحفَظ شيء.</b>'
+      : `انقطع الطريق إلى ${escapeHtml(label)} قبل أن يكتمل الربط. <b>ولم يُحفَظ شيء</b> — لا حساب ولا إذن.`
   return `${head(d.platform, 'لم يكتمل', title, lede)}
   <div class="card">
     <h2>ما يُفعَل</h2>

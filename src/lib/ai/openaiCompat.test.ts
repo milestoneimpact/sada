@@ -32,7 +32,7 @@ const REQ = {
   user: 'النصّ',
 }
 
-describe('ما يُرسل — لهجةٌ واحدة لكلّ المزوّدين', () => {
+describe('ما يُرسل — لهجة واحدة لكلّ المزوّدين', () => {
   it('ينادي chat/completions على عنوان المزوّد', async () => {
     await chatCompletion(REQ, net(200, OK))
     expect(sent[0]!.url).toBe('https://api.deepseek.com/v1/chat/completions')
@@ -61,7 +61,7 @@ describe('ما يُرسل — لهجةٌ واحدة لكلّ المزوّدين'
     expect(sent[0]!.body['response_format']).toBeUndefined()
   })
 
-  it('يقلّم المفتاح — سطرٌ لصق معه لا يُرسل', async () => {
+  it('يقلّم المفتاح — سطر لصق معه لا يُرسل', async () => {
     await chatCompletion({ ...REQ, apiKey: '  sk-deep\n' }, net(200, OK))
     expect(sent[0]!.headers.get('Authorization')).toBe('Bearer sk-deep')
   })
@@ -75,12 +75,12 @@ describe('ما يُقرأ', () => {
     expect(result.model).toBe('deepseek-chat')
   })
 
-  it('**استهلاكٌ غائب يُقرأ صفرا لا يُفترَض**', async () => {
+  it('**استهلاك غائب يُقرأ صفرا لا يُفترَض**', async () => {
     const result = await chatCompletion(REQ, net(200, { ...OK, usage: undefined }))
     expect(result.usage).toEqual({ inputTokens: 0, outputTokens: 0 })
   })
 
-  it('استهلاكٌ فاسد لا يُسقط النداء', async () => {
+  it('استهلاك فاسد لا يُسقط النداء', async () => {
     const result = await chatCompletion(REQ, net(200, { ...OK, usage: { prompt_tokens: 'كثير' } }))
     expect(result.usage.inputTokens).toBe(0)
   })
@@ -111,17 +111,17 @@ describe('الأخطاء — تُقرأ من الرمز لا من نصّ الر�
     }
   })
 
-  it('مفتاحٌ فارغ 503 ولا ينادي الشبكة', async () => {
+  it('مفتاح فارغ 503 ولا ينادي الشبكة', async () => {
     const f = net(200, OK)
     await expect(chatCompletion({ ...REQ, apiKey: '  ' }, f)).rejects.toBeInstanceOf(CompatError)
     expect(sent).toHaveLength(0)
   })
 
-  it('جوابٌ بلا نصّ يُعطَّل ولا يُعاد فارغا', async () => {
+  it('جواب بلا نصّ يُعطَّل ولا يُعاد فارغا', async () => {
     await expect(chatCompletion(REQ, net(200, { choices: [] }))).rejects.toBeInstanceOf(CompatError)
   })
 
-  it('جوابٌ مبتور يُعاد — قد يتمّ في محاولةٍ ثانية', async () => {
+  it('جواب مبتور يُعاد — قد يتمّ في محاولة ثانية', async () => {
     const truncated = { ...OK, choices: [{ message: { content: '{' }, finish_reason: 'length' }] }
     try {
       await chatCompletion(REQ, net(200, truncated))
@@ -131,7 +131,7 @@ describe('الأخطاء — تُقرأ من الرمز لا من نصّ الر�
     }
   })
 
-  it('عطلُ شبكةٍ يُعاد', async () => {
+  it('عطل شبكة يُعاد', async () => {
     const boom = (async () => {
       throw new Error('انقطاع')
     }) as unknown as typeof fetch
@@ -151,7 +151,7 @@ describe('الأخطاء — تُقرأ من الرمز لا من نصّ الر�
  * الخطأُ يُرمى بلا استهلاك، فيعود المنادي `failed` قبل خطوة الكلفة — نداءٌ
  * مدفوعٌ لا يراه الدفتر.
  */
-describe('D-164 · ما استُهلك في جوابٍ رُدّ', () => {
+describe('D-164 · ما استُهلك في جواب رُدّ', () => {
   const SPENT = { inputTokens: 900, outputTokens: 120, cachedInputTokens: 0, model: 'deepseek-chat' }
 
   async function thrown(payload: unknown, status = 200): Promise<CompatError> {
@@ -164,18 +164,18 @@ describe('D-164 · ما استُهلك في جوابٍ رُدّ', () => {
     throw new Error('توقّعنا عطلا')
   }
 
-  it('المبتورُ يحمل الاستهلاكَ والنموذج، ويبقى قابلًا للإعادة', async () => {
+  it('المبتور يحمل الاستهلاك والنموذج، ويبقى قابلًا للإعادة', async () => {
     const error = await thrown({ ...OK, choices: [{ message: { content: '{"a":' }, finish_reason: 'length' }] })
     expect(error.spent).toEqual(SPENT)
     expect(error.retryable).toBe(true)
   })
 
-  it('والفارغُ يحمله كذلك', async () => {
+  it('والفارغ يحمله كذلك', async () => {
     const error = await thrown({ ...OK, choices: [{ message: { content: '' }, finish_reason: 'stop' }] })
     expect(error.spent).toEqual(SPENT)
   })
 
-  it('**والرفضُ حقلٌ يُقرأ**: 422 لا يُعاد — وإعادتُه تدفع ثمنَ الجواب نفسه مرّتين', async () => {
+  it('**والرفض حقل يُقرأ**: 422 لا يُعاد — وإعادتُه تدفع ثمن الجواب نفسه مرّتين', async () => {
     const error = await thrown({
       ...OK,
       choices: [{ message: { content: null, refusal: 'I can’t help with that.' }, finish_reason: 'stop' }],
@@ -188,23 +188,23 @@ describe('D-164 · ما استُهلك في جوابٍ رُدّ', () => {
     expect(error.message).not.toContain('help')
   })
 
-  it('ورفضٌ فارغُ النصّ ليس رفضًا — يبقى «لا نصّ» ويُعاد', async () => {
+  it('ورفض فارغ النصّ ليس رفضًا — يبقى «لا نصّ» ويُعاد', async () => {
     const error = await thrown({ ...OK, choices: [{ message: { content: null, refusal: '  ' }, finish_reason: 'stop' }] })
     expect(error.retryable).toBe(true)
     expect(error.status).toBe(502)
   })
 
-  it('والنموذجُ المطلوب حين لا يعيده المزوّد', async () => {
+  it('والنموذج المطلوب حين لا يعيده المزوّد', async () => {
     const error = await thrown({ ...OK, model: undefined, choices: [{ message: { content: '{' }, finish_reason: 'length' }] })
     expect(error.spent?.model).toBe('deepseek-chat')
   })
 
-  it('**وما لم يصل لا استهلاكَ فيه**: الرمزُ غيرُ الناجح بلا spent', async () => {
+  it('**وما لم يصل لا استهلاك فيه**: الرمز غير الناجح بلا spent', async () => {
     const error = await thrown({ usage: { prompt_tokens: 5, completion_tokens: 0 } }, 500)
     expect(error.spent).toBeUndefined()
   })
 
-  it('ولا عطلُ الشبكة', async () => {
+  it('ولا عطل الشبكة', async () => {
     const boom = (async () => {
       throw new Error('انقطاع')
     }) as unknown as typeof fetch
@@ -220,7 +220,7 @@ describe('التحقّق من المفتاح', () => {
     expect(sent[0]!.url).toBe('https://api.deepseek.com/v1/models')
   })
 
-  it('404 لا يُتّهم به مفتاحٌ صحيح — يُميَّز عن الرفض', async () => {
+  it('404 لا يُتّهم به مفتاح صحيح — يُميَّز عن الرفض', async () => {
     const result = await verifyCompat('https://x.com/v1', 'k', net(404, {}))
     expect(result.ok).toBe(false)
     expect(result.detail).not.toContain('مرفوض')

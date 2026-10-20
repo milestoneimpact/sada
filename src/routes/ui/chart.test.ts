@@ -10,14 +10,14 @@
 import { describe, expect, it } from 'vitest'
 import { areaChart, barChart } from './chart'
 
-describe('الأعمدة — والسؤالُ «أيُّها أكبر»', () => {
+describe('الأعمدة — والسؤال «أيُّها أكبر»', () => {
   const rows = [
     { label: 'أنثروبيك', value: 0.42 },
     { label: 'جيميناي', value: 1.35 },
     { label: 'مِسترال', value: 0.08 },
   ]
 
-  it('**يُرتَّب نازلا** — وجوابُ السؤال أوّلُ سطر', () => {
+  it('**يُرتَّب نازلا** — وجواب السؤال أوّل سطر', () => {
     const html = barChart(rows, { unit: 'money' })
     const order = [...html.matchAll(/class="bar-name">([^<]+)</g)].map((m) => m[1])
     expect(order).toEqual(['جيميناي', 'أنثروبيك', 'مِسترال'])
@@ -29,7 +29,7 @@ describe('الأعمدة — والسؤالُ «أيُّها أكبر»', () => 
    * نسبةُ المجموع تجعل أطولَ عمودٍ قصيرا حين تكثر الصفوف — **فيُقرأ
    * الرسمُ فارغا وهو ممتلئ**.
    */
-  it('والأكبرُ يملأ المقياس، وما دونه بنسبته إليه', () => {
+  it('والأكبر يملأ المقياس، وما دونه بنسبته إليه', () => {
     const html = barChart(rows, { unit: 'money' })
     const widths = [...html.matchAll(/width:([\d.]+)%/g)].map((m) => Number(m[1]))
     expect(widths[0]).toBe(100)
@@ -37,25 +37,25 @@ describe('الأعمدة — والسؤالُ «أيُّها أكبر»', () => 
     expect(widths[1]).toBeCloseTo(31.1, 0)
   })
 
-  it('**والذهبُ للأوّل وحدَه** — وذهبٌ على الكلّ يُلغي معنى الأوّل', () => {
+  it('**والذهب للأوّل وحدَه** — وذهب على الكلّ يُلغي معنى الأوّل', () => {
     const html = barChart(rows)
     expect(html.match(/bar-fill top/g)).toHaveLength(1)
   })
 
   /** **ألوانُ الحالة محجوزة** (D-043): لا تُستعمَل لمقدار. */
-  it('ولا لونَ حالةٍ في مقياس مقدار', () => {
+  it('ولا لون حالة في مقياس مقدار', () => {
     const html = barChart(rows, { unit: 'money' })
     for (const state of ['var(--bad)', 'var(--warn)', 'var(--ok)']) {
       expect(html).not.toContain(state)
     }
   })
 
-  it('وما قيمتُه صفرٌ لا يُرسَم له عمود', () => {
+  it('وما قيمتُه صفر لا يُرسَم له عمود', () => {
     const html = barChart([...rows, { label: 'غير مستعمَل', value: 0 }])
     expect(html).not.toContain('غير مستعمَل')
   })
 
-  it('ولا شيءَ إطلاقا يعطي حالا فارغةً تقول لماذا', () => {
+  it('ولا شيء إطلاقا يعطي حالا فارغةً تقول لماذا', () => {
     const html = barChart([{ label: 'أ', value: 0 }])
     expect(html).toContain('لا إنفاق بعد')
     expect(html).not.toContain('bar-row')
@@ -74,14 +74,14 @@ describe('الأعمدة — والسؤالُ «أيُّها أكبر»', () => 
     expect(label).toContain('3')
   })
 
-  it('والاسمُ يُهرَّب — ووسمٌ في اسمِ مزوّدٍ يُعرَض حرفا', () => {
+  it('والاسم يُهرَّب — ووسم في اسم مزوّد يُعرَض حرفا', () => {
     const html = barChart([{ label: '<b>خبيث</b>', value: 1 }])
     expect(html).not.toContain('<b>خبيث</b>')
     expect(html).toContain('&lt;b&gt;')
   })
 })
 
-describe('المساحة — والسؤالُ «كيف تغيّر»', () => {
+describe('المساحة — والسؤال «كيف تغيّر»', () => {
   const series = Array.from({ length: 14 }, (_, i) => ({
     day: `2026-09-${String(i + 1).padStart(2, '0')}`,
     total: i === 6 ? 2.4 : 0.3,
@@ -95,7 +95,7 @@ describe('المساحة — والسؤالُ «كيف تغيّر»', () => {
   })
 
   /** **الرسمُ يتمدّد والحرفُ لا** (D-153): لا `<text>` في SVG، والحدُّ لا يتمدّد، والذروةُ HTML. */
-  it('لا حرفَ داخل SVG، والمسارُ بحدٍّ ثابت، والذروةُ نقطةٌ فوق الرسم', () => {
+  it('لا حرف داخل SVG، والمسار بحدّ ثابت، والذروة نقطة فوق الرسم', () => {
     const html = areaChart(series)
     expect(html).not.toContain('<text')
     expect(html).not.toContain('<circle')

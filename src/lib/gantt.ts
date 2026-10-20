@@ -179,7 +179,7 @@ export const STATUS_LABEL: Readonly<Record<string, string>> = {
 
 const PLAN_TONE: Readonly<Record<string, GanttTone>> = { draft: 'pending', approved: 'ok', superseded: 'idle' }
 export const PLAN_LABEL: Readonly<Record<string, string>> = {
-  draft: 'خطّةٌ تنتظر قرارك', approved: 'خطّةٌ معتمَدة', superseded: 'خطّةٌ حلّت محلَّها أخرى',
+  draft: 'خطّة تنتظر قرارك', approved: 'خطّة معتمَدة', superseded: 'خطّة حلّت محلَّها أخرى',
 }
 
 /** ترتيبُ المجموعات: **المنصّاتُ بترتيب قاموسها**، وما سواها بعدها بحرفه. */

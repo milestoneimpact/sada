@@ -28,9 +28,9 @@ beforeEach(() => {
   db = fakeDb()
 })
 
-describe('يفتحان بلا جلسة — وهو شرطُ المراجعة', () => {
+describe('يفتحان بلا جلسة — وهو شرط المراجعة', () => {
   for (const path of ['/privacy', '/terms']) {
-    it(`${path} يردّ 200 لزائرٍ بلا كعكة`, async () => {
+    it(`${path} يردّ 200 لزائر بلا كعكة`, async () => {
       const response = await app.request(path, {}, env())
       expect(response.status).toBe(200)
       expect(response.headers.get('Content-Type')).toContain('text/html')
@@ -41,26 +41,26 @@ describe('يفتحان بلا جلسة — وهو شرطُ المراجعة', ()
 })
 
 describe('تُفهرَسان — بخلاف اللوحة', () => {
-  it('السياسةُ تسمح بالفهرسة', async () => {
+  it('السياسة تسمح بالفهرسة', async () => {
     const html = await (await app.request('/privacy', {}, env())).text()
     expect(html).toContain('name="robots" content="index,follow"')
   })
 
-  it('واللوحةُ تمنعها — فالاستثناءُ مقصورٌ على ما يُقرأ من الخارج', async () => {
+  it('واللوحة تمنعها — فالاستثناء مقصور على ما يُقرأ من الخارج', async () => {
     const html = await (await app.request('/panel', {}, env())).text()
     expect(html).toContain('noindex,nofollow')
   })
 })
 
 describe('تُخزَّنان مؤقّتا ولا تُمنعان من التأطير', () => {
-  it('السياسةُ قابلةٌ للتخزين', async () => {
+  it('السياسة قابلة للتخزين', async () => {
     const response = await app.request('/privacy', {}, env())
     expect(response.headers.get('Cache-Control')).toContain('public')
     expect(response.headers.get('X-Frame-Options')).toBeNull()
     expect(response.headers.get('Content-Security-Policy')).toContain('frame-ancestors *')
   })
 
-  it('واللوحةُ لا — no-store و DENY كما كانتا', async () => {
+  it('واللوحة لا — no-store و DENY كما كانتا', async () => {
     const response = await app.request('/panel', {}, env())
     expect(response.headers.get('Cache-Control')).toContain('no-store')
     expect(response.headers.get('X-Frame-Options')).toBe('DENY')
@@ -69,10 +69,10 @@ describe('تُخزَّنان مؤقّتا ولا تُمنعان من التأط�
 })
 
 describe('لا تخترع ما لم يُضبَط', () => {
-  it('بلا LEGAL_CONTACT لا يظهر بريدٌ إطلاقا', async () => {
+  it('بلا LEGAL_CONTACT لا يظهر بريد إطلاقا', async () => {
     const html = await (await app.request('/privacy', {}, env())).text()
     expect(html).not.toContain('mailto:')
-    expect(html).toContain('لم يُضبط بريدُ تواصلٍ بعد')
+    expect(html).toContain('لم يُضبط بريد تواصل بعد')
   })
 
   it('وحين يُضبَط يظهر كما هو', async () => {
@@ -83,7 +83,7 @@ describe('لا تخترع ما لم يُضبَط', () => {
     expect(html).toContain('بصائر')
   })
 
-  it('اسمُ جهةٍ يحمل HTML يُهرَب ولا يُحقَن', async () => {
+  it('اسم جهة يحمل HTML يُهرَب ولا يُحقَن', async () => {
     const html = await (
       await app.request('/privacy', {}, env({ LEGAL_ENTITY: '<img src=x onerror=alert(1)>' }))
     ).text()
@@ -103,7 +103,7 @@ describe('تصفان ما يقع فعلا', () => {
    * ‏«LinkedIn و X» وحدهما وصدى يرفع مقاطعَ إلى YouTube وTikTok وInstagram تُسقط الطلبَ كلَّه.
    * ‏وشروطُ YouTube توجب: ذكرَ خدماتها، ورابطَي شروطها وسياسة Google، وصفحةَ سحب الإذن.
    */
-  it('تذكران منصّاتِ المقاطع ونطاقاتِها، وشروطَ YouTube وسياسةَ Google وسحبَ الإذن', async () => {
+  it('تذكران منصّات المقاطع ونطاقاتِها، وشروط YouTube وسياسة Google وسحب الإذن', async () => {
     const privacy = await (await app.request('/privacy', {}, env())).text()
     for (const scope of ['youtube.upload', 'video.publish', 'video.upload']) expect(privacy).toContain(scope)
     expect(privacy).toContain('YouTube API')
@@ -120,7 +120,7 @@ describe('تصفان ما يقع فعلا', () => {
    * ‏`media.write` الذي يُطلب فعلًا — والمراجعون يقارنون الطلبَ بالسياسة. فيُقرأ من `scopeSet`
    * ‏نفسِه، فلا يفترقان في أوّل نطاقٍ يُضاف.
    */
-  it('كلُّ نطاقٍ تطلبه صدى من كلّ منصّةٍ مسمًّى فيها باسمه', async () => {
+  it('كلّ نطاق تطلبه صدى من كلّ منصّة مسمًّى فيها باسمه', async () => {
     const privacy = await (await app.request('/privacy', {}, env())).text()
     for (const platform of ['linkedin', 'x', 'youtube', 'tiktok', 'instagram'] as const) {
       for (const scope of scopeSet(platform)) {
@@ -129,13 +129,13 @@ describe('تصفان ما يقع فعلا', () => {
     }
   })
 
-  it('وتعدّ حساباتِ المشغّل بلا مثنّى بعد خمس منصّات، ونصوصَ المقطع في KV صفًّا بمدّتها', async () => {
+  it('وتعدّ حسابات المشغّل بلا مثنّى بعد خمس منصّات، ونصوص المقطع في KV صفًّا بمدّتها', async () => {
     const privacy = await (await app.request('/privacy', {}, env())).text()
     expect(privacy).not.toContain('وحسابَيه')
     expect(privacy).toContain('وحساباته على المنصّات التي يربطها')
-    const row = privacy.slice(privacy.indexOf('وصفُ المقطع والنصوصُ المكتوبة له'))
+    const row = privacy.slice(privacy.indexOf('وصف المقطع والنصوص المكتوبة له'))
     expect(row).toContain('Cloudflare KV')
-    expect(row).toContain('يومٌ واحد من آخر حفظ')
+    expect(row).toContain('يوم واحد من آخر حفظ')
   })
 
   it('تقولان إنّ الرموز مشفّرة — وهو ما تفعله الشيفرة (D-005)', async () => {
@@ -148,9 +148,9 @@ describe('تصفان ما يقع فعلا', () => {
     expect(html).toContain('ولا يرون حسابَه ولا رمزَه')
   })
 
-  it('ولا تعدان بنشرٍ آليّ — والقاعدةُ نفسها ترفضه (D-009)', async () => {
+  it('ولا تعدان بنشر آليّ — والقاعدة نفسها ترفضه (D-009)', async () => {
     const html = await (await app.request('/privacy', {}, env())).text()
-    expect(html).toContain('لا نشرَ آليّ')
+    expect(html).toContain('لا نشر آليّ')
   })
 
   it('ولا تسرّبان كلمة الإدارة', async () => {
@@ -166,7 +166,7 @@ describe('تصفان ما يقع فعلا', () => {
  */
 describe('لا Markdown في مخرَج HTML', () => {
   for (const path of ['/privacy', '/terms']) {
-    it(`${path} لا يحمل نجوما ولا شرطاتِ قوائم حرفيّة`, async () => {
+    it(`${path} لا يحمل نجوما ولا شرطات قوائم حرفيّة`, async () => {
       const html = await (await app.request(path, {}, env())).text()
       const body = html.slice(html.indexOf('<body>'))
       expect(body).not.toMatch(/\*\*/)
@@ -175,8 +175,8 @@ describe('لا Markdown في مخرَج HTML', () => {
   }
 })
 
-describe('كلٌّ تصل إلى الأخرى', () => {
-  it('السياسةُ تشير إلى الشروط والعكس', async () => {
+describe('كلّ تصل إلى الأخرى', () => {
+  it('السياسة تشير إلى الشروط والعكس', async () => {
     expect(await (await app.request('/privacy', {}, env())).text()).toContain('href="/terms"')
     expect(await (await app.request('/terms', {}, env())).text()).toContain('href="/privacy"')
   })

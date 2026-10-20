@@ -54,7 +54,7 @@ export const GATEWAY = { gateway: { id: 'default' } } as const
  * ومهمّةُ M-30 ورسالةُ اللوحة بالنصّ نفسِه. وجهُ REST يقولها بـ 402، والرابطُ `env.AI` بنصّ
  * Cloudflare («2021: Insufficient balance») لأنّه يرمي خطأً لا ردًّا.
  */
-export const NO_CREDIT = 'لا رصيدَ في AI Gateway لنماذج الطرف الثالث'
+export const NO_CREDIT = 'لا رصيد في AI Gateway لنماذج الطرف الثالث'
 
 /**
  * سببُ الردّ بكلام المالك (D-188) — **والرمزُ ونصُّ Cloudflare بعده لمن يشخّص**. كان يُقال
@@ -64,12 +64,12 @@ export const NO_CREDIT = 'لا رصيدَ في AI Gateway لنماذج الطر�
 async function refusal(response: Response): Promise<string> {
   const why =
     response.status === 400 ? 'رفضت Cloudflare الطلب'
-    : response.status === 401 || response.status === 403 ? 'مفتاحُ Cloudflare لا يملك إذنَ Workers AI'
+    : response.status === 401 || response.status === 403 ? 'مفتاح Cloudflare لا يملك إذن Workers AI'
     : response.status === 402 ? NO_CREDIT
-    : response.status === 404 ? 'النموذجُ غيرُ متاحٍ لهذا الحساب'
-    : response.status === 429 ? 'كثرةُ الطلبات — يُعاد بعد قليل'
-    : response.status >= 500 ? 'عطلٌ عند Cloudflare — يُعاد بعد قليل'
-    : 'ردٌّ غيرُ متوقَّع'
+    : response.status === 404 ? 'النموذج غير متاح لهذا الحساب'
+    : response.status === 429 ? 'كثرة الطلبات — يُعاد بعد قليل'
+    : response.status >= 500 ? 'عطل عند Cloudflare — يُعاد بعد قليل'
+    : 'ردّ غير متوقَّع'
   let detail = ''
   try {
     const body = (await response.json()) as { errors?: { code?: unknown; message?: unknown }[] }
@@ -224,14 +224,14 @@ export async function generateImage(
       raw instanceof ArrayBuffer
         ? new Uint8Array(raw)
         : new Uint8Array(await new Response(raw).arrayBuffer())
-    if (bytes.byteLength === 0) throw new AiError('صورةٌ فارغة', true)
+    if (bytes.byteLength === 0) throw new AiError('صورة فارغة', true)
     return { bytes, mime: 'image/png', model }
   }
 
   const payload = (raw ?? {}) as Record<string, unknown>
   const image = payload['image']
   if (typeof image !== 'string' || image.length === 0) {
-    throw new AiError('جوابُ Workers AI بلا صورة', true)
+    throw new AiError('جواب Workers AI بلا صورة', true)
   }
   return { bytes: decodeBase64(image), mime: 'image/png', model }
 }
@@ -304,7 +304,7 @@ export async function generateVideo(
   const result = (payload['result'] ?? {}) as Record<string, unknown>
   const url = result['video']
   if (typeof url !== 'string' || !url.startsWith('https://')) {
-    throw new AiError('جوابُ Workers AI بلا رابط فيديو', true)
+    throw new AiError('جواب Workers AI بلا رابط فيديو', true)
   }
   return { url, model }
 }
@@ -326,11 +326,11 @@ export async function fetchVideoBytes(
     response = await fetchImpl(url)
   } catch (error) {
     throw new AiError(
-      `تعذّر سحبُ الفيديو: ${error instanceof Error ? error.message : 'عطل شبكة'}`,
+      `تعذّر سحب الفيديو: ${error instanceof Error ? error.message : 'عطل شبكة'}`,
       true,
     )
   }
-  if (!response.ok) throw new AiError(`سحبُ الفيديو ردّ ${response.status}`, response.status >= 500)
+  if (!response.ok) throw new AiError(`سحب الفيديو ردّ ${response.status}`, response.status >= 500)
 
   const buffer = await response.arrayBuffer()
   // حدٌّ يُفحَص بعد السحب لا قبله: الترويسةُ قد تكذب أو تغيب
@@ -344,7 +344,7 @@ export async function fetchVideoBytes(
    * يُعاد: البايتاتُ عندهم لا تتبدّل بإعادة السحب.
    */
   const declared = (response.headers.get('Content-Type') ?? 'video/mp4').split(';')[0]!.trim().toLowerCase()
-  if (!VIDEO_MIMES.has(declared)) throw new AiError(`نوعُ الفيديو غيرُ مقبول: ${declared}`, false)
+  if (!VIDEO_MIMES.has(declared)) throw new AiError(`نوع الفيديو غير مقبول: ${declared}`, false)
 
   return { bytes: new Uint8Array(buffer), mime: declared }
 }

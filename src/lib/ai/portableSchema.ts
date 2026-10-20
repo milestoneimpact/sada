@@ -45,9 +45,9 @@ function isNode(value: unknown): value is Node {
 }
 
 function walk(node: unknown, path: string): Record<string, unknown> {
-  if (!isNode(node)) throw new Error(`مخطّطٌ غير صالح عند ${path}`)
+  if (!isNode(node)) throw new Error(`مخطّط غير صالح عند ${path}`)
   for (const key of STRUCTURAL) {
-    if (key in node) throw new Error(`${path}: ${key} بنيةٌ لا تُحمَل`)
+    if (key in node) throw new Error(`${path}: ${key} بنية لا تُحمَل`)
   }
   const type = node['type']
   if (type === undefined) throw new Error(`${path}: بلا type`)
@@ -69,8 +69,8 @@ function walk(node: unknown, path: string): Record<string, unknown> {
     const required = Array.isArray(node['required']) ? (node['required'] as unknown[]).map(String) : []
     const optional = keys.filter((key) => !required.includes(key))
     const undeclared = required.filter((key) => !keys.includes(key))
-    if (optional.length > 0) throw new Error(`${path}: حقلٌ اختياريّ (${optional.join('، ')}) — والوضعُ الصارم يشترط الكلّ`)
-    if (undeclared.length > 0) throw new Error(`${path}: مطلوبٌ بلا تعريف (${undeclared.join('، ')})`)
+    if (optional.length > 0) throw new Error(`${path}: حقل اختياريّ (${optional.join('، ')}) — والوضع الصارم يشترط الكلّ`)
+    if (undeclared.length > 0) throw new Error(`${path}: مطلوب بلا تعريف (${undeclared.join('، ')})`)
     out['required'] = required
 
     // `false` وحدها: كائنٌ مفتوحٌ لا يُحمَل، وفرضُ الإغلاق عليه يغيّر ما طُلب

@@ -9,21 +9,21 @@ import { describe, expect, it } from 'vitest'
 import { REVIEW_AFTER_MONTHS, versionAge } from './version'
 import { LINKEDIN_VERSION } from './providers'
 
-describe('العمرُ يُحسَب بالشهور', () => {
-  it('نسخةُ الشهر نفسِه عمرُها صفر', () => {
+describe('العمر يُحسَب بالشهور', () => {
+  it('نسخة الشهر نفسِه عمرُها صفر', () => {
     expect(versionAge('202609', new Date('2026-09-06T00:00:00Z'))?.months).toBe(0)
   })
 
-  it('وشهرٌ مضى شهر', () => {
+  it('وشهر مضى شهر', () => {
     expect(versionAge('202608', new Date('2026-09-06T00:00:00Z'))?.months).toBe(1)
   })
 
   /** **والسنةُ تُعبَر**: طرحُ الشهرين وحدَه يعطي سالبا عبر رأس السنة. */
-  it('ويُعبَر رأسُ السنة بلا سالب', () => {
+  it('ويُعبَر رأس السنة بلا سالب', () => {
     expect(versionAge('202511', new Date('2026-02-01T00:00:00Z'))?.months).toBe(3)
   })
 
-  it('وتبلغ الدورةُ عند عتبتها لا بعدها', () => {
+  it('وتبلغ الدورة عند عتبتها لا بعدها', () => {
     const at = versionAge('202512', new Date('2026-09-06T00:00:00Z'))
     expect(at?.months).toBe(REVIEW_AFTER_MONTHS)
     expect(at?.due).toBe(true)
@@ -32,7 +32,7 @@ describe('العمرُ يُحسَب بالشهور', () => {
   })
 })
 
-describe('وصيغةٌ لا تُقرأ لا تُعدّ حديثة', () => {
+describe('وصيغة لا تُقرأ لا تُعدّ حديثة', () => {
   /**
    * **`null` تعني «لا يُعرَف» لا «سليمة»** (D-063). ورقمٌ لم يُفهَم
    * يُقال عنه ذلك، ولا يُطمأنّ إليه.
@@ -45,17 +45,17 @@ describe('وصيغةٌ لا تُقرأ لا تُعدّ حديثة', () => {
   )
 })
 
-describe('الرقمُ والوثيقةُ لا يفترقان', () => {
+describe('الرقم والوثيقة لا يفترقان', () => {
   /**
    * **حارسٌ لا زينة**: `PLATFORMS.md` هي التي يقرؤها المالكُ ليعرف ما
    * نُرسل، ورقمٌ فيها غيرُ الذي يُرسَل يجعله يراجع نسخةً لا نستعملها.
    */
-  it('`PLATFORMS.md` تسمّي النسخةَ التي تحملها الشيفرة', () => {
+  it('`PLATFORMS.md` تسمّي النسخة التي تحملها الشيفرة', () => {
     const doc = readFileSync(new URL('../../../docs/PLATFORMS.md', import.meta.url), 'utf8')
     expect(doc).toContain(`LinkedIn-Version: ${LINKEDIN_VERSION}`)
   })
 
-  it('والنسخةُ المثبَّتةُ تُقرأ أصلا', () => {
+  it('والنسخة المثبَّتة تُقرأ أصلا', () => {
     expect(versionAge(LINKEDIN_VERSION, new Date())).not.toBeNull()
   })
 })

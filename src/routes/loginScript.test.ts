@@ -51,24 +51,24 @@ async function run(next: string, path: string, search = ''): Promise<Run> {
   return out
 }
 
-describe('الدخولُ بمفتاح المرور ينتقل فعلًا (الجلسة ب)', () => {
-  it('الوجهةُ هي الصفحةُ نفسُها بمرساة ← إعادةُ تحميل، لا انتقالٌ داخل الوثيقة', async () => {
+describe('الدخول بمفتاح المرور ينتقل فعلًا (الجلسة ب)', () => {
+  it('الوجهة هي الصفحة نفسُها بمرساة ← إعادة تحميل، لا انتقال داخل الوثيقة', async () => {
     const r = await run('/panel#drafts', '/panel')
     expect(r.reload).toBe(1)
     expect(r.replaced).toEqual([])
     expect(r.note()).toBe('تمّ — تُفتح لوحتك…')
   })
-  it('والصفحةُ نفسُها بلا مرساة ← إعادةُ تحميل', async () => {
+  it('والصفحة نفسُها بلا مرساة ← إعادة تحميل', async () => {
     expect((await run('/panel', '/panel')).reload).toBe(1)
   })
-  it('ووجهةٌ أخرى تحلّ محلّ الدخول في السجلّ', async () => {
+  it('ووجهة أخرى تحلّ محلّ الدخول في السجلّ', async () => {
     const r = await run('/panel/channels/x', '/panel/login', '?next=%2Fpanel%2Fchannels%2Fx')
     expect(r.replaced).toEqual(['/panel/channels/x'])
   })
-  it('ووجهةٌ لا تبدأ بـ«/» وحدها أو تبدأ بـ«//» ← الرئيسيّة', async () => {
+  it('ووجهة لا تبدأ بـ«/» وحدها أو تبدأ بـ«//» ← الرئيسيّة', async () => {
     expect((await run('//evil.example', '/panel/login')).replaced).toEqual(['/panel'])
   })
-  it('وبعد ثماني ثوانٍ بلا انتقالٍ رابطٌ لا دوّارة', async () => {
+  it('وبعد ثماني ثوان بلا انتقال رابط لا دوّارة', async () => {
     const r = await run('/panel', '/panel')
     expect(r.btn()).toBe('تمّ')
     r.tick()

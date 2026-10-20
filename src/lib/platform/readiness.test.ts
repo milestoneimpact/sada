@@ -38,16 +38,16 @@ const post = (over: Partial<PlatformPost> = {}): PlatformPost => ({
 })
 
 describe('السلّم يقرأ الصفوف', () => {
-  it('حسابٌ «مربوط» بلا صفّ tokens: الإذنُ ساقطٌ والحكمُ «لا تنشر»', () => {
+  it('حساب «مربوط» بلا صفّ tokens: الإذن ساقط والحكم «لا تنشر»', () => {
     const r = readiness({ view: viewOf([account({ expiresAt: null })]), app, health: {}, tally: tally(), posts: [], now })
     const token = r.rungs.find((x) => x.key === 'token')!
     expect(token.state).toBe('failed')
-    expect(token.note).toContain('لا إذنَ وصولٍ')
+    expect(token.note).toContain('لا إذن وصول')
     expect(r.verdict.kind).toBe('bad')
     expect(r.next?.action?.href).toBe('/oauth/x/start')
   })
 
-  it('تجديدٌ وقع وإذنٌ صالح ونشرٌ سابق: تعمل وتنشر', () => {
+  it('تجديد وقع وإذن صالح ونشر سابق: تعمل وتنشر', () => {
     const r = readiness({
       view: viewOf([account()]), app, health: { a1: health() },
       tally: tally({ published: 3, lastPublishedAt: '2026-09-26 09:00:00' }), posts: [], now,
@@ -55,10 +55,10 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(r.rungs.map((x) => x.state)).toEqual(['done', 'done', 'done', 'done', 'done'])
     expect(r.verdict).toEqual({ kind: 'ok', text: 'تعمل وتنشر' })
     // ‏والعددُ بمعدوده (D-183): «صالحٌ 12 يومًا»، و«صالحٌ يومين» لا «صالحٌ 2 يوما»
-    expect(r.rungs[2]!.note).toMatch(/^صالحٌ \d+ (يومًا|أيّام)$/)
+    expect(r.rungs[2]!.note).toMatch(/^صالح \d+ (يومًا|أيّام)$/)
   })
 
-  it('needs_reauth مع تاريخه: الإذنُ ساقطٌ منذ يومه وزرُّه «جدّد الإذن»', () => {
+  it('needs_reauth مع تاريخه: الإذن ساقط منذ يومه وزرُّه «جدّد الإذن»', () => {
     const r = readiness({
       view: viewOf([account({ status: 'needs_reauth' })]), app,
       health: { a1: health({ status: 'needs_reauth', needsReauthAt: '2026-09-26 03:01:00' }) },
@@ -70,7 +70,7 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(token.action?.label).toBe('جدّد الإذن')
   })
 
-  it('إذنٌ انتهى وإذنُ تجديدٍ قائم: ينتظر الدورةَ لا المالك', () => {
+  it('إذن انتهى وإذن تجديد قائم: ينتظر الدورة لا المالك', () => {
     const r = readiness({
       view: viewOf([account()]), app,
       health: { a1: health({ expiresAt: '2026-09-27 09:00:00', refreshedAt: null }) },
@@ -80,7 +80,7 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(r.verdict.kind).toBe('idle')
   })
 
-  it('آخرُ محاولةٍ فشلت بعد آخر نشر: النشرُ ساقطٌ بسببه', () => {
+  it('آخر محاولة فشلت بعد آخر نشر: النشر ساقط بسببه', () => {
     const r = readiness({
       view: viewOf([account()]), app, health: { a1: health() },
       tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }),
@@ -92,13 +92,13 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(pub.action?.href).toBe('/panel/journey/p1')
   })
 
-  it('وجوابُ المنصّة يُقال بالعربيّة، وآخرُ نشرٍ نسبيًّا لا بساعة UTC (D-202)', () => {
+  it('وجواب المنصّة يُقال بالعربيّة، وآخر نشر نسبيًّا لا بساعة UTC (D-202)', () => {
     const failed = readiness({
       view: viewOf([account()]), app, health: { a1: health() },
       tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }),
       posts: [post({ status: 'failed', lastError: 'linkedin: Internal Server Error', createdAt: '2026-09-25 00:00:00' })], now,
     }).rungs.find((x) => x.key === 'publish')!
-    expect(failed.note).toContain('عطلٌ في خادمها (500)')
+    expect(failed.note).toContain('عطل في خادمها (500)')
     expect(failed.note).not.toContain('Internal Server Error')
     const done = readiness({
       view: viewOf([account()]), app, health: { a1: health() },
@@ -107,7 +107,7 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(done.note).not.toMatch(/\d{4}-\d{2}-\d{2}/)
   })
 
-  it('كُتب قبل آخر نشرٍ ثمّ فشل بعده: النشرُ ساقطٌ بوقت الفشل لا بوقت الكتابة', () => {
+  it('كُتب قبل آخر نشر ثمّ فشل بعده: النشر ساقط بوقت الفشل لا بوقت الكتابة', () => {
     const r = readiness({
       view: viewOf([account()]), app, health: { a1: health() },
       tally: tally({ published: 1, lastPublishedAt: '2026-09-20 09:00:00' }),
@@ -124,7 +124,7 @@ describe('السلّم يقرأ الصفوف', () => {
    * ‏**ر-8**: فشل ثمّ «أعده إلى المعتمَد» ثمّ «جدوِل» — صفُّ المحاولة الفاشلة باقٍ في
    * ‏`publish_attempts`، والمنشورُ نفسُه في الطابور. كانت الصفحةُ تقول «لا تنشر».
    */
-  it('فشل ثمّ أُعيد وجُدول: لا يُحكَم عليه بفشلٍ أصلحه المالك', () => {
+  it('فشل ثمّ أُعيد وجُدول: لا يُحكَم عليه بفشل أصلحه المالك', () => {
     for (const status of ['approved', 'queued']) {
       const r = readiness({
         view: viewOf([account()]), app, health: { a1: health() },
@@ -138,18 +138,18 @@ describe('السلّم يقرأ الصفوف', () => {
       view: viewOf([account()]), app, health: { a1: health() }, tally: tally({ queued: 1 }),
       posts: [post({ status: 'queued', lastError: 'رُدّ 500', lastFailedAt: '2026-09-26 06:00:00' })], now,
     })
-    expect(queued.rungs.find((x) => x.key === 'publish')!.note).toBe('1 مجدولٌ ينتظر موعدَه')
-    expect(queued.verdict).toEqual({ kind: 'ok', text: 'جاهزةٌ للنشر' })
+    expect(queued.rungs.find((x) => x.key === 'publish')!.note).toBe('1 مجدول ينتظر موعدَه')
+    expect(queued.verdict).toEqual({ kind: 'ok', text: 'جاهزة للنشر' })
   })
 
-  it('لا تطبيقَ ولا حساب: التطبيقُ هو «الآن» والحسابُ ينتظره', () => {
+  it('لا تطبيق ولا حساب: التطبيق هو «الآن» والحساب ينتظره', () => {
     const r = readiness({ view: viewOf([], false), app: undefined, health: {}, tally: tally(), posts: [], now })
     expect(r.rungs[0]!.state).toBe('now')
     expect(r.rungs[1]!.state).toBe('waiting')
     expect(r.verdict.kind).toBe('warn')
   })
 
-  it('سرٌّ مرفوضٌ من المنصّة: التطبيقُ ساقطٌ ولو كان الحسابُ مربوطًا', () => {
+  it('سرّ مرفوض من المنصّة: التطبيق ساقط ولو كان الحساب مربوطًا', () => {
     const r = readiness({
       view: viewOf([account()]), app: { ...app, verifiedKind: 'bad_secret' }, health: { a1: health() },
       tally: tally(), posts: [], now,
@@ -158,16 +158,16 @@ describe('السلّم يقرأ الصفوف', () => {
     expect(r.rungs[0]!.note).toContain('لا تقبل السرّ')
   })
 
-  it('منصّةٌ تُربَط ولا تنشر: درجةُ النشر تنتظر السائق', () => {
+  it('منصّة تُربَط ولا تنشر: درجة النشر تنتظر السائق', () => {
     const base = viewOf([account()])
     const r = readiness({
       view: { ...base, spec: { ...base.spec, stage: 'link' } }, app, health: { a1: health() },
       tally: tally(), posts: [], now,
     })
-    expect(r.rungs.find((x) => x.key === 'publish')!.note).toContain('سائقُ الرفع')
+    expect(r.rungs.find((x) => x.key === 'publish')!.note).toContain('سائق الرفع')
   })
 
-  it('منصّةٌ بلا سائق: لا درجات وحكمٌ رماديّ', () => {
+  it('منصّة بلا سائق: لا درجات وحكم رماديّ', () => {
     const r = readiness({ view: viewOf([], true, 'snapchat'), app: undefined, health: {}, tally: tally(), posts: [], now })
     expect(r.rungs).toHaveLength(0)
     expect(r.verdict.kind).toBe('idle')

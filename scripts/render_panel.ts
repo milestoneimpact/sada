@@ -86,19 +86,19 @@ const data: PanelData = {
     {
       id: 's1', driveFileId: '1kDa1TyYKK_2lpT', name: 'منهجية إدارة المشروعات للقادة — الإطار الأول',
       analyzed: true, stale: false, worth: 0.86,
-      summary: 'يشرح الإطارَ الأوّل من المنهجيّة: قيادةُ القيمة، وكيف تُقاس بمعالمَ لا بمخرجات.',
-      reason: 'مادّةٌ أصيلة، وفيها إطارٌ قابل للاقتباس.',
+      summary: 'يشرح الإطار الأوّل من المنهجيّة: قيادة القيمة، وكيف تُقاس بمعالم لا بمخرجات.',
+      reason: 'مادّة أصيلة، وفيها إطار قابل للاقتباس.',
       themes: ['إدارة المشروعات', 'القيادة', 'قياس الأثر'], lastSeenAt: ago(3),
     },
     {
       id: 's2', driveFileId: '1deicGMZG72tztw', name: 'تقرير الإغلاق — مشروع الرواد ألبانيا',
       analyzed: true, stale: true, worth: 0.61,
-      summary: 'تقريرُ إغلاقٍ فيه أرقامُ المستفيدين والدروسُ المستفادة.',
-      reason: 'قابلٌ للنشر بعد تجريده من التفاصيل التعاقديّة.',
+      summary: 'تقرير إغلاق فيه أرقام المستفيدين والدروس المستفادة.',
+      reason: 'قابل للنشر بعد تجريده من التفاصيل التعاقديّة.',
       themes: ['أثر', 'ألبانيا'], lastSeenAt: ago(26),
     },
     {
-      id: 's3', driveFileId: '1QpXm4Rt9YbNc2v', name: 'مسوّدة — ملاحظاتٌ متفرّقة',
+      id: 's3', driveFileId: '1QpXm4Rt9YbNc2v', name: 'مسوّدة — ملاحظات متفرّقة',
       analyzed: false, stale: false, worth: null, summary: null, reason: null,
       themes: [], lastSeenAt: ago(50),
     },
@@ -128,12 +128,12 @@ const data: PanelData = {
     },
   ],
   routing: [
-    { task: 'analyze', provider: 'anthropic', model: 'claude-opus-5', why: 'حكمٌ يحتاج فهما عميقا', ready: true, implemented: true },
-    { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', why: 'الصياغةُ العربيّة', ready: false, implemented: false },
-    { task: 'image', provider: 'gemini', model: 'gemini-2.5-flash-image', why: 'توليدُ الصور', ready: false, implemented: false },
+    { task: 'analyze', provider: 'anthropic', model: 'claude-opus-5', why: 'حكم يحتاج فهما عميقا', ready: true, implemented: true },
+    { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', why: 'الصياغة العربيّة', ready: false, implemented: false },
+    { task: 'image', provider: 'gemini', model: 'gemini-2.5-flash-image', why: 'توليد الصور', ready: false, implemented: false },
     // والمقطعُ برابط Worker وحده: الجدولُ ينتظرك بملاحظة النقطة نفسِها لا «جاهز»
     {
-      task: 'video', provider: 'cloudflare', model: 'alibaba/hh1-i2v', why: 'صورةٌ ← مقطعٌ رأسيّ',
+      task: 'video', provider: 'cloudflare', model: 'alibaba/hh1-i2v', why: 'صورة ← مقطع رأسيّ',
       ready: false, implemented: true, pending: routeDot(mediaReady, 'video')?.note ?? '',
     },
   ],
@@ -146,20 +146,20 @@ const data: PanelData = {
     {
       id: 'd1', platform: 'linkedin',
       text: [
-        'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره.',
+        'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره.',
         '',
-        'قرأتُ تقرير الأثر لهذا العام مرّتين. في الأولى بحثتُ عن الأرقام، وفي',
-        'الثانية عن الفجوات بينها — وهناك وجدتُ ما يستحقّ القول: البرامجُ التي',
+        'قرأت تقرير الأثر لهذا العام مرّتين. في الأولى بحثت عن الأرقام، وفي',
+        'الثانية عن الفجوات بينها — وهناك وجدت ما يستحقّ القول: البرامج التي',
         'قِيست شهريّا صحّحت مسارها في الربع الأوّل، والتي قِيست سنويّا اكتشفت',
         'الخطأ بعد أن صار كلفةً لا درسا.',
         '',
-        'القياسُ ليس تقريرا يُرفع في آخر السنة. هو أداةُ قيادةٍ تُستعمل وهي حارّة.',
+        'القياس ليس تقريرا يُرفع في آخر السنة. هو أداة قيادة تُستعمل وهي حارّة.',
         '',
-        'ما الفترةُ التي تقيسون بها أثركم — ولماذا اخترتموها؟',
+        'ما الفترة التي تقيسون بها أثركم — ولماذا اخترتموها؟',
         '',
         '#الوقف #قياس_الأثر',
       ].join('\n'),
-      rationale: 'زاويةُ الوقت لا زاويةُ المبلغ — الأرقامُ في التقرير تخدم الأولى.',
+      rationale: 'زاوية الوقت لا زاوية المبلغ — الأرقام في التقرير تخدم الأولى.',
       status: 'draft', model: 'claude-opus-5', cost: 0.0412,
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
       stale: false, approvedBy: null, approvedAt: null,
@@ -172,8 +172,8 @@ const data: PanelData = {
       text:
         // **نصٌّ عليه ملحوظات** عمدا (D-090): حشوٌ وخاتمةٌ مستهلَكة —
         // ومدقّقٌ لا يرى لوحَ المراجعة لا يحرسه
-        'ومما لا شك فيه ان البرامجَ التي تُقاس شهريّا تصحّح مسارها مبكّرا. والتي تُقاس سنويّا تكتشف الخطأ بعد أن يصير كلفةً لا درسا.\n\nما رأيكم؟',
-      rationale: 'الفكرةُ كاملةٌ في منشورٍ واحد — لا خيط.',
+        'ومما لا شك فيه ان البرامج التي تُقاس شهريّا تصحّح مسارها مبكّرا. والتي تُقاس سنويّا تكتشف الخطأ بعد أن يصير كلفةً لا درسا.\n\nما رأيكم؟',
+      rationale: 'الفكرة كاملة في منشور واحد — لا خيط.',
       status: 'draft', model: 'claude-opus-5', cost: 0.0118,
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
       stale: true, approvedBy: null, approvedAt: null,
@@ -185,22 +185,22 @@ const data: PanelData = {
     {
       id: 'd3', platform: 'linkedin',
       text:
-        'ثلاثةُ دروسٍ من مراجعة محفظة البرامج هذا الربع، وأحدها كلّفنا سنةً لنتعلّمه:\n\nأوّلا، البرنامجُ الذي لا صاحبَ له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nثانيا، مؤشّرٌ واحدٌ صادق خيرٌ من لوحةٍ فيها عشرون لا يُنظر إليها.\n\nثالثا، ما لا يُراجَع في اجتماعٍ ثابت لا يُراجَع أبدا.',
-      rationale: 'الدروسُ الثلاثة أوضحُ ما في المصدر، وأقربُ إلى قارئ LinkedIn.',
+        'ثلاثة دروس من مراجعة محفظة البرامج هذا الربع، وأحدها كلّفنا سنةً لنتعلّمه:\n\nأوّلا، البرنامج الذي لا صاحب له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nثانيا، مؤشّر واحد صادق خير من لوحة فيها عشرون لا يُنظر إليها.\n\nثالثا، ما لا يُراجَع في اجتماع ثابت لا يُراجَع أبدا.',
+      rationale: 'الدروس الثلاثة أوضح ما في المصدر، وأقرب إلى قارئ LinkedIn.',
       status: 'edited', model: 'claude-opus-5', cost: 0.0389,
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(22),
       createdAt: ago(26),
       scheduledAt: null, accountName: null, dispatchedAt: null,
-      publishCost: 0, originalText: 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثرُ ما يُهدر في المشروعات هو الوقت.'
+      publishCost: 0, originalText: 'قيادة القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثر ما يُهدر في المشروعات هو الوقت.'
     },
     {
       // معتمَدةٌ ثانيةٌ عمدا: شريطُ التوزيع لا يظهر دون اثنتين (D-089)،
       // ومدقّقٌ لا يرى الشريطَ لا يحرسه
       id: 'd3b', platform: 'linkedin',
       text:
-        'أكثرُ ما يُهدر في برامج الوقف ليس المال، بل الوقتُ بين القرار وأثره.\n\nوهذا ما يقيسه التقرير: كم يوما بين أن يُعتمد بندٌ وأن يبدأ العمل به.',
-      rationale: 'رقمٌ واحدٌ يقف وحده، ويصلح مدخلا للتقرير.',
+        'أكثر ما يُهدر في برامج الوقف ليس المال، بل الوقت بين القرار وأثره.\n\nوهذا ما يقيسه التقرير: كم يوما بين أن يُعتمد بند وأن يبدأ العمل به.',
+      rationale: 'رقم واحد يقف وحده، ويصلح مدخلا للتقرير.',
       status: 'approved', model: 'claude-opus-5', cost: 0.0301,
       sourceId: 's1', sourceName: 'تقرير الأثر السنويّ 2026.docx',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(18),
@@ -211,8 +211,8 @@ const data: PanelData = {
     {
       id: 'd4', platform: 'x',
       text:
-        'البرنامجُ الذي لا صاحبَ له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nوهذا أخطر من الفشل الصريح: الفشلُ يُراجَع، والذبولُ يُموَّل سنةً أخرى.',
-      rationale: 'أحدُّ جملةٍ في المصدر، وتقف وحدها.',
+        'البرنامج الذي لا صاحب له لا يفشل — يذبل. ولا أحد يعلن ذبوله.\n\nوهذا أخطر من الفشل الصريح: الفشل يُراجَع، والذبول يُموَّل سنةً أخرى.',
+      rationale: 'أحدّ جملة في المصدر، وتقف وحدها.',
       status: 'rejected', model: 'claude-opus-5', cost: 0.0102,
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:token', approvedAt: null,
@@ -223,8 +223,8 @@ const data: PanelData = {
     {
       id: 'd5', platform: 'linkedin',
       text:
-        'ما يُقاس شهريّا يُصحَّح في حينه. وما يُقاس سنويّا يُوثَّق بعد فوات أوانه.\n\nوالفرقُ بينهما ليس في الدقّة — كلاهما دقيق — بل في أنّ أحدهما يغيّر القرار والآخر يشرحه بعد وقوعه.\n\nاختر أيّهما تبني عليه، واعلم أنّك اخترت.',
-      rationale: 'أقصرُ صياغةٍ للفكرة، وأقربُها إلى قرارٍ يُتّخذ.',
+        'ما يُقاس شهريّا يُصحَّح في حينه. وما يُقاس سنويّا يُوثَّق بعد فوات أوانه.\n\nوالفرق بينهما ليس في الدقّة — كلاهما دقيق — بل في أنّ أحدهما يغيّر القرار والآخر يشرحه بعد وقوعه.\n\nاختر أيّهما تبني عليه، واعلم أنّك اخترت.',
+      rationale: 'أقصر صياغة للفكرة، وأقربُها إلى قرار يُتّخذ.',
       status: 'queued', model: 'claude-opus-5', cost: 0.0355,
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(4),
@@ -237,8 +237,8 @@ const data: PanelData = {
     {
       id: 'd6', platform: 'x',
       text:
-        'البرنامجُ بلا صاحبٍ لا يفشل — يذبل. والذبولُ يُموَّل سنةً أخرى لأنّ أحدا لم يعلنه.',
-      rationale: 'جملةٌ تقف وحدها.',
+        'البرنامج بلا صاحب لا يفشل — يذبل. والذبول يُموَّل سنةً أخرى لأنّ أحدا لم يعلنه.',
+      rationale: 'جملة تقف وحدها.',
       status: 'queued', model: 'claude-opus-5', cost: 0.0097,
       sourceId: 's2', sourceName: 'مراجعة المحفظة — الربع الثالث.pdf',
       stale: false, approvedBy: 'panel:passkey', approvedAt: ago(9),
@@ -257,25 +257,25 @@ const data: PanelData = {
     createdAt: ago(3),
     plan: {
       rationale:
-        'أسبوعٌ يبدأ بالأثقل: تقريرُ الأثر يفتح النقاش يوم الاثنين، ثمّ تسنده جملةٌ حادّة على X بعد يومين، ويُختم بدرسٍ من مراجعة المحفظة.',
+        'أسبوع يبدأ بالأثقل: تقرير الأثر يفتح النقاش يوم الاثنين، ثمّ تسنده جملة حادّة على X بعد يومين، ويُختم بدرس من مراجعة المحفظة.',
       items: [
         {
           sourceId: 's1', platform: 'linkedin',
-          angle: 'زاويةُ الوقت لا زاويةُ المبلغ — الفجوةُ بين القرار وأثره',
+          angle: 'زاوية الوقت لا زاوية المبلغ — الفجوة بين القرار وأثره',
           day: '2026-09-14', time: '09:00',
           why: 'أعلى المصادر استحقاقا، ولم يُنشر منه شيء.',
         },
         {
           sourceId: 's1', platform: 'x',
-          angle: 'الجملةُ التي تقف وحدها: القياسُ أداةُ قيادةٍ لا تقرير',
+          angle: 'الجملة التي تقف وحدها: القياس أداة قيادة لا تقرير',
           day: '2026-09-16', time: '11:30',
-          why: 'المصدرُ نفسه بزاويةٍ أحدّ، وبينهما يومان.',
+          why: 'المصدر نفسه بزاوية أحدّ، وبينهما يومان.',
         },
         {
           sourceId: 's2', platform: 'linkedin',
-          angle: 'ثلاثةُ دروسٍ من مراجعة المحفظة، وأحدها كلّف سنة',
+          angle: 'ثلاثة دروس من مراجعة المحفظة، وأحدها كلّف سنة',
           day: '2026-09-18', time: '08:00',
-          why: 'يُغلق الأسبوع بخلاصةٍ عمليّة.',
+          why: 'يُغلق الأسبوع بخلاصة عمليّة.',
         },
       ],
     },
@@ -287,13 +287,13 @@ const data: PanelData = {
       id: 'm1', postId: 'd3', mime: 'image/svg+xml', bytes: 148_320, cost: 0.039,
       status: 'ready',
       // **يُرسَم ليُقاس** (D-070): وصفٌ فارغٌ لا يُظهر الشارة
-      prompt: 'مشهدٌ تجريديٌّ بالأخضر والذهب، خطوطٌ هادئةٌ وإضاءةٌ ناعمة',
+      prompt: 'مشهد تجريديّ بالأخضر والذهب، خطوط هادئة وإضاءة ناعمة',
       // **وأطولُ سببٍ يُقال** (D-162): فيه اسما سرّين لا ينكسر أحدُهما،
       // فيُقاس فيضُه على عرض الجوّال — والعنوانُ المقترح بعده
       note:
-        'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
-        ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
-      headline: 'أثرٌ يُقاس',
+        'لا مفتاح متصفّح مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
+        ' في أسرار Worker ليُركَّب النصّ فوق الصورة',
+      headline: 'أثر يُقاس',
       model: '@cf/black-forest-labs/flux-1-schnell', width: 1024, height: 1024,
     },
     {
@@ -304,7 +304,7 @@ const data: PanelData = {
     {
       id: 'm3', postId: 'd5', mime: 'image/jpeg', bytes: 212_480, cost: 0.004, status: 'ready',
       prompt: '{"kind":"compare","title":"يغيّر القرار أم يشرحه"}',
-      note: 'المحتوى من نصّ المنشور مباشرةً — تعذّر نموذجُ الكتابة: لا نصّ في جواب المزوّد',
+      note: 'المحتوى من نصّ المنشور مباشرةً — تعذّر نموذج الكتابة: لا نصّ في جواب المزوّد',
       headline: 'ما يُقاس شهريّاً يُصحَّح في حينه', model: 'infographic:compare', width: 1080, height: 1350,
     },
   ],
@@ -317,7 +317,7 @@ const data: PanelData = {
     { id: 's2', name: 'مراجعة المحفظة — الربع الثالث.pdf' },
   ],
   draftReady: true,
-  flash: { kind: 'ok', text: 'تمّ المسح — رأى 3 · جديد 1. مصدرٌ واحد ينتظر تحليلا.' },
+  flash: { kind: 'ok', text: 'تمّ المسح — رأى 3 · جديد 1. مصدر واحد ينتظر تحليلا.' },
   now,
   csrf: 'demo-csrf-token',
   nonce: 'demoNonce123',
@@ -328,11 +328,11 @@ const data: PanelData = {
   audit: [
     // **كما فعل المالكُ يومَ قرّر** (D-135): ضغطتان على البطاقات وسقفُ الترويج —
     // فيُقاس أنّ المفتاحَ يُقرأ اسمًا، وأنّ المكرَّرَ يُطوى
-    { at: ago(0.5), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما · مسوّدات تنتظرك · مجدولٌ للنشر · مزوّدون جاهزون', ip: '203.0.113.9' },
+    { at: ago(0.5), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما · مسوّدات تنتظرك · مجدول للنشر · مزوّدون جاهزون', ip: '203.0.113.9' },
     { at: ago(0.6), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · إنفاق اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما', ip: '203.0.113.9' },
     { at: ago(0.7), actor: 'panel', action: 'settings.write', target: 'weekly_promo_cap_usd', detail: '← 2', ip: '203.0.113.9' },
     { at: ago(1), actor: 'panel', action: 'provider.key', target: 'anthropic', detail: 'بُدّل إلى sk-ant-…_QAA', ip: '203.0.113.9' },
-    { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعاملٍ واحد', ip: '203.0.113.9' },
+    { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعامل واحد', ip: '203.0.113.9' },
     { at: ago(26), actor: 'cron', action: 'drive.scan', target: null, detail: 'رأى 3 · تغيّر 1', ip: null },
   ],
   pulses: pulses([
@@ -341,16 +341,16 @@ const data: PanelData = {
     { job: 'publish', at: ago(3), outcome: 'ok', detail: '1 رسالة' },
     { job: 'metrics', at: ago(5), outcome: 'ok', detail: '2 مستحقّ' },
     { job: 'scan', at: ago(26), outcome: 'ok', detail: 'رأى 3 · جديد 1 · تغيّر 0' },
-    { job: 'alerts', at: ago(26), outcome: 'ok', detail: 'لا إذنَ يقترب' },
+    { job: 'alerts', at: ago(26), outcome: 'ok', detail: 'لا إذن يقترب' },
   ], new Date()),
   today: {
     items: [
       { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#activity', goLabel: 'سجلّ النشاط' },
       { at: ago(0.7), kind: 'note', text: 'تغيير إعداد — سقف الترويج الأسبوعيّ', go: '#activity', goLabel: 'سجلّ النشاط' },
       { at: ago(1), kind: 'note', text: 'تبديل مفتاح — Anthropic', go: '#activity', goLabel: 'سجلّ النشاط' },
-      { at: ago(3), kind: 'ok', text: 'اعتمدتَ مسوّدةً لـLinkedIn', go: '#posts', goLabel: 'المنشورات' },
-      { at: null, kind: 'ok', text: 'نُشر منشورٌ على LinkedIn', go: '/panel/channels/linkedin', goLabel: 'شاشةُ LinkedIn' },
-      { at: null, kind: 'bad', text: 'فشل النشرُ على X', go: '/panel/channels/x', goLabel: 'شاشةُ X' },
+      { at: ago(3), kind: 'ok', text: 'اعتمدت مسوّدةً لـLinkedIn', go: '#posts', goLabel: 'المنشورات' },
+      { at: null, kind: 'ok', text: 'نُشر منشور على LinkedIn', go: '/panel/channels/linkedin', goLabel: 'شاشة LinkedIn' },
+      { at: null, kind: 'bad', text: 'فشل النشر على X', go: '/panel/channels/x', goLabel: 'شاشة X' },
     ],
     more: 0,
   },
@@ -406,11 +406,11 @@ const data: PanelData = {
    */
   captions: {
     up1: {
-      about: 'لقاءٌ عن قيادة المعالم: كيف يُقرأ المشروعُ بمعالمه لا بمهامّه',
-      youtubeTitle: 'قيادةُ المعالم: اقرأ مشروعك بمعالمه لا بمهامّه',
-      youtubeDescription: 'المعلمُ نقطةُ قرارٍ لا تاريخٌ في جدول. في هذا المقطع: كيف تختار معالمَك، ومن يقرّر أنّ المعلمَ تحقّق.\n\n#قيادة #إدارة_المشاريع #Shorts',
-      tiktok: 'مشروعك ليس قائمةَ مهامّ 👇\n#قيادة #إدارة_المشاريع #معالم',
-      instagram: 'المعلمُ نقطةُ قرار، لا تاريخٌ في جدول.\n\nمن يقرّر أنّه تحقّق؟ وبأيّ رقم؟\n\n#قيادة #إدارة_المشاريع #معالم',
+      about: 'لقاء عن قيادة المعالم: كيف يُقرأ المشروع بمعالمه لا بمهامّه',
+      youtubeTitle: 'قيادة المعالم: اقرأ مشروعك بمعالمه لا بمهامّه',
+      youtubeDescription: 'المعلم نقطة قرار لا تاريخ في جدول. في هذا المقطع: كيف تختار معالمَك، ومن يقرّر أنّ المعلم تحقّق.\n\n#قيادة #إدارة_المشاريع #Shorts',
+      tiktok: 'مشروعك ليس قائمة مهامّ 👇\n#قيادة #إدارة_المشاريع #معالم',
+      instagram: 'المعلم نقطة قرار، لا تاريخ في جدول.\n\nمن يقرّر أنّه تحقّق؟ وبأيّ رقم؟\n\n#قيادة #إدارة_المشاريع #معالم',
       model: 'claude-opus-5', cost: 0.012, at: new Date(now.getTime() - 10 * 60_000).toISOString(),
     },
   },
@@ -418,7 +418,7 @@ const data: PanelData = {
   reach: PRIVATE_ONLY,
   promoCap: 50,            // D-062
   ownerPending: 4,         // D-063
-  cfAccountId: null,       // غيرُ مضبوط: الإرشادُ هو المرسوم
+  cfAccountId: null,       // غير مضبوط: الإرشاد هو المرسوم
   // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
   // ‏اللونان والتباينُ فيهما معا
   alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
@@ -450,8 +450,8 @@ const data: PanelData = {
     cap: 1500,
   },
   outbox: [
-    { kind: 'token', body: 'صدى — إذنُ التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
-    { kind: 'budget', body: 'صدى — بلغ إنفاقُ اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناةُ 404', at: ago(50) },
+    { kind: 'token', body: 'صدى — إذن التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
+    { kind: 'budget', body: 'صدى — بلغ إنفاق اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناة 404', at: ago(50) },
   ],
 }
 

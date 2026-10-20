@@ -10,20 +10,20 @@ import { scopeSet } from './scopes'
 /** ما عاد من LinkedIn حرفا بحرف، بعد فكّ ترميز العنوان. */
 const REAL = 'Scope "openid" is not authorized for your application'
 
-describe('استخراجُ الأسماء', () => {
+describe('استخراج الأسماء', () => {
   it('يقرأ ما بين علامتي اقتباس', () => {
     expect(namedScopes(REAL)).toEqual(['openid'])
   })
 
-  it('ويقبل الاقتباسَ مهرَّبا كما يصل من بعض المنصّات', () => {
+  it('ويقبل الاقتباس مهرَّبا كما يصل من بعض المنصّات', () => {
     expect(namedScopes('Scope &quot;openid&quot; is not authorized')).toEqual(['openid'])
   })
 
-  it('ويقبل الاقتباسَ المفرد', () => {
+  it('ويقبل الاقتباس المفرد', () => {
     expect(namedScopes("Scope 'tweet.write' is invalid")).toEqual(['tweet.write'])
   })
 
-  it('ويقرأ أكثرَ من واحدٍ بلا تكرار', () => {
+  it('ويقرأ أكثر من واحد بلا تكرار', () => {
     expect(namedScopes('"openid" and "profile" and "openid"').sort())
       .toEqual(['openid', 'profile'])
   })
@@ -34,19 +34,19 @@ describe('استخراجُ الأسماء', () => {
    * ووصفٌ يقتبس عبارةً — «your application» مثلا — لا يُقرأ نطاقا،
    * وإلّا عُرض للمالك اسمٌ لا وجودَ له في أيّ بوّابة.
    */
-  it('ولا يقرأ جملةً أو اسما بمسافةٍ أو حرفٍ كبير', () => {
+  it('ولا يقرأ جملةً أو اسما بمسافة أو حرف كبير', () => {
     expect(namedScopes('Scope "your application" is bad')).toEqual([])
     expect(namedScopes('"Share on LinkedIn" missing')).toEqual([])
     expect(namedScopes('"" empty')).toEqual([])
   })
 
-  it('ووصفٌ فارغٌ لا يعطي شيئا', () => {
+  it('ووصف فارغ لا يعطي شيئا', () => {
     expect(namedScopes('')).toEqual([])
     expect(namedScopes('no quotes at all')).toEqual([])
   })
 })
 
-describe('المطابقةُ على ما طُلب', () => {
+describe('المطابقة على ما طُلب', () => {
   /**
    * **النصُّ يُضيّق ولا يقرّر.**
    *
@@ -59,12 +59,12 @@ describe('المطابقةُ على ما طُلب', () => {
     expect(blamedScopes('Scope "r_liteprofile" is not authorized', requested)).toEqual([])
   })
 
-  it('وصياغةٌ لم تُتوقَّع تعيد لا شيء — فتُعرَض القائمةُ كاملة', () => {
+  it('وصياغة لم تُتوقَّع تعيد لا شيء — فتُعرَض القائمة كاملة', () => {
     expect(blamedScopes('Your app lacks the required product.', scopeSet('linkedin')))
       .toEqual([])
   })
 
-  it('وتعمل لـ X كما لـ LinkedIn — والسجلُّ واحد', () => {
+  it('وتعمل لـ X كما لـ LinkedIn — والسجلّ واحد', () => {
     expect(blamedScopes('Scope "media.write" is invalid', scopeSet('x')))
       .toEqual(['media.write'])
   })

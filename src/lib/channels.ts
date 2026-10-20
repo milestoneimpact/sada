@@ -99,21 +99,21 @@ const YOUTUBE_GUIDE: SetupGuide = {
   before: [
     {
       what: 'أنشئ مشروعا، ثمّ APIs & Services ← Library ← فعّل <b>YouTube Data API v3</b>',
-      why: 'بلا تفعيلها يُردّ كلُّ نداءٍ بـ <span class="mono">accessNotConfigured</span> — <b>ولو صحّ السرُّ والنطاق</b>.',
+      why: 'بلا تفعيلها يُردّ كلّ نداء بـ <span class="mono">accessNotConfigured</span> — <b>ولو صحّ السرّ والنطاق</b>.',
     },
     {
-      what: 'Google Auth Platform ← <b>Audience</b> ← External ← Test users ← <b>Add users</b> ← بريدُ الحساب الذي ستربط به',
-      why: 'التطبيقُ في وضع Testing لا يقبل إلّا من أُدرج، <b>ولو كنتَ مالكَ المشروع</b>. والبريدُ هو ما تختاره في شاشة Google ' +
-        'عند «اربط» (صاحبُ القناة)، لا بريدُ Cloud Console إن اختلفا. وإلّا ظهر «لم يكمل التطبيقُ عمليّةَ التحقّق» ' +
+      what: 'Google Auth Platform ← <b>Audience</b> ← External ← Test users ← <b>Add users</b> ← بريد الحساب الذي ستربط به',
+      why: 'التطبيق في وضع Testing لا يقبل إلّا من أُدرج، <b>ولو كنت مالك المشروع</b>. والبريد هو ما تختاره في شاشة Google ' +
+        'عند «اربط» (صاحب القناة)، لا بريد Cloud Console إن اختلفا. وإلّا ظهر «لم يكمل التطبيق عمليّة التحقّق» ' +
         '<span class="mono">403 access_denied</span>.',
     },
     {
       what: 'Data access ← Add scopes ← اختر <span class="mono">youtube.upload</span> و <span class="mono">youtube.readonly</span>',
-      why: '<b>ونطاقُ الرفع «حسّاس»</b>: يعمل في Testing بلا مراجعة، ويحتاجها للنشر العلنيّ.',
+      why: '<b>ونطاق الرفع «حسّاس»</b>: يعمل في Testing بلا مراجعة، ويحتاجها للنشر العلنيّ.',
     },
     {
       what: 'Credentials ← Create credentials ← <b>OAuth client ID</b> ← Web application',
-      why: 'ونوعُ «Web application» وحده يقبل رابطَ عودة. و«Desktop» يعطي سرّا لا يعمل هنا.',
+      why: 'ونوع «Web application» وحده يقبل رابط عودة. و«Desktop» يعطي سرّا لا يعمل هنا.',
     },
     {
       what: 'وفي الشاشة نفسها: <b>Authorized redirect URIs</b> ← الصق رابط العودة أدناه',
@@ -121,17 +121,17 @@ const YOUTUBE_GUIDE: SetupGuide = {
     },
   ],
   whereId: 'Credentials ← عميلُك ← <b>Client ID</b>، وينتهي بـ <span class="mono">.apps.googleusercontent.com</span>',
-  whereSecret: 'تحته: <b>Client secret</b>. واضغط زرَّ النسخ — ولا تعيد إنشاء العميل.',
+  whereSecret: 'تحته: <b>Client secret</b>. واضغط زرّ النسخ — ولا تعيد إنشاء العميل.',
   success:
     'يظهر <span class="mono">youtube.readonly</span> و <span class="mono">youtube.upload</span> ' +
     'في شاشة الإذن حين تضغط «اربط»، وبعدها تُعرض قناتُك باسمها لا بمعرّفها.',
   failure:
-    '«لم يكمل التطبيقُ عمليّةَ التحقّق» <span class="mono">403 access_denied</span> ← البريدُ الذي اخترته ليس في Test users. ' +
-    'و <span class="mono">redirect_uri_mismatch</span> ← الرابطُ لم يُلصق حرفا بحرف. ' +
-    'و <b>لا قناةَ على هذا الحساب</b> ← حسابُ Google بلا قناة YouTube، فأنشئ قناةً أوّلا.',
+    '«لم يكمل التطبيق عمليّة التحقّق» <span class="mono">403 access_denied</span> ← البريد الذي اخترته ليس في Test users. ' +
+    'و <span class="mono">redirect_uri_mismatch</span> ← الرابط لم يُلصق حرفا بحرف. ' +
+    'و <b>لا قناة على هذا الحساب</b> ← حساب Google بلا قناة YouTube، فأنشئ قناةً أوّلا.',
   gotcha:
     'صدى يطلب <span class="mono">access_type=offline</span> و <span class="mono">prompt=consent</span> — ' +
-    '<b>وبدونهما لا إذنَ تجديد</b>، فيسقط الربطُ بعد ساعة. وهما مضبوطان في الشيفرة، لا تحتاج فعلا.',
+    '<b>وبدونهما لا إذن تجديد</b>، فيسقط الربط بعد ساعة. وهما مضبوطان في الشيفرة، لا تحتاج فعلا.',
 }
 
 /**
@@ -146,32 +146,32 @@ const TIKTOK_GUIDE: SetupGuide = {
   before: [
     {
       what: 'أنشئ تطبيقا، ثمّ <b>Add products</b> ← <b>Login Kit</b>',
-      why: 'هو الذي يفتح دورةَ الإذن أصلا. <b>وبدونه لا رابطَ إذنٍ يعمل.</b>',
+      why: 'هو الذي يفتح دورة الإذن أصلا. <b>وبدونه لا رابط إذن يعمل.</b>',
     },
     {
       what: 'وأضف <b>Content Posting API</b>',
-      why: 'يمنح <span class="mono">video.upload</span> — ورفعُ المقطع مسوّدةً إلى تطبيقك.',
+      why: 'يمنح <span class="mono">video.upload</span> — ورفع المقطع مسوّدةً إلى تطبيقك.',
     },
     {
-      what: 'ولـ <b>Direct Post</b> اطلب مراجعةَ المحتوى في الشاشة نفسها',
-      why: 'بدونها يصل المقطعُ <b>مسوّدةً تنشرها بيدك</b> من تطبيق TikTok. وهي تعمل، ولا تنشر وحدها.',
+      what: 'ولـ <b>Direct Post</b> اطلب مراجعة المحتوى في الشاشة نفسها',
+      why: 'بدونها يصل المقطع <b>مسوّدةً تنشرها بيدك</b> من تطبيق TikTok. وهي تعمل، ولا تنشر وحدها.',
     },
     {
       // ‏بلا نطاقٍ مكتوب: الدليلُ نفسُه يُعرض على الإنتاج وstaging، ولكلٍّ نطاقُه في رابط العودة
-      what: 'وتبويب <b>Domain verification</b>: أضف <b>نطاقَ رابط العودة أدناه</b> (بلا https ولا مسار) وأثبت ملكيّته',
-      why: 'TikTok يسحب المقطعَ من رابطٍ عندنا، <b>ولا يسحب من نطاقٍ لم يُثبَت</b>.',
+      what: 'وتبويب <b>Domain verification</b>: أضف <b>نطاق رابط العودة أدناه</b> (بلا https ولا مسار) وأثبت ملكيّته',
+      why: 'TikTok يسحب المقطع من رابط عندنا، <b>ولا يسحب من نطاق لم يُثبَت</b>.',
     },
     {
       what: 'وفي Login Kit: <b>Redirect URI</b> ← الصق رابط العودة أدناه',
       why: 'يُطابَق حرفا بحرف كغيره.',
     },
   ],
-  whereId: 'شاشةُ التطبيق ← <b>Client key</b> — ولاحظ أنّه «key» لا «id»',
+  whereId: 'شاشة التطبيق ← <b>Client key</b> — ولاحظ أنّه «key» لا «id»',
   whereSecret: 'تحته: <b>Client secret</b>. ويُعرَض مرّةً، فاحفظه أو أعد توليده.',
-  success: 'تظهر بطاقةُ TikTok «مربوطة» باسم حسابك، وتُعرض نطاقاتُه في شاشة المنصّة.',
+  success: 'تظهر بطاقة TikTok «مربوطة» باسم حسابك، وتُعرض نطاقاتُه في شاشة المنصّة.',
   failure:
-    'ردٌّ يذكر <span class="mono">client_key</span> ← السرُّ لُصق في الحقل الخطأ. ' +
-    'و <b>فشلُ سحبِ المقطع</b> ← النطاق لم يُثبَت في Domain verification.',
+    'ردّ يذكر <span class="mono">client_key</span> ← السرّ لُصق في الحقل الخطأ. ' +
+    'و <b>فشل سحب المقطع</b> ← النطاق لم يُثبَت في Domain verification.',
   gotcha:
     'TikTok يسمّي المعرّف <span class="mono">client_key</span> لا <span class="mono">client_id</span>. ' +
     '<b>وصدى يرسله بالاسم الصحيح</b> — لا تحتاج فعلا، لكن لا تخلط بينه وبين الـ secret.',
@@ -196,41 +196,41 @@ const INSTAGRAM_GUIDE: SetupGuide = {
   portalLabel: 'Meta for Developers',
   before: [
     {
-      what: 'حوِّل حسابَك إلى احترافيّ: تطبيقُ Instagram ← Settings ← '
+      what: 'حوِّل حسابَك إلى احترافيّ: تطبيق Instagram ← Settings ← '
         + 'Account type and tools ← Switch to professional account',
-      why: 'هذه <b>أوّلُ عقبةٍ وأخفاها</b>: حسابٌ شخصيٌّ لا يفتح نهاياتِ النشر أصلا، '
-        + 'وردُّ Meta حينئذٍ 400 لا 403 — فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ».',
+      why: 'هذه <b>أوّل عقبة وأخفاها</b>: حساب شخصيّ لا يفتح نهايات النشر أصلا، '
+        + 'وردّ Meta حينئذ 400 لا 403 — فيُقرأ «طلب خطأ» وهو «حساب خطأ».',
     },
     {
       what: 'أنشئ تطبيقا: Create app ← اختر Business ← ثمّ أضف منتج Instagram',
-      why: 'ومنتجُ <span dir="ltr">Instagram</span> هو الذي يفتح شاشةَ '
+      why: 'ومنتج <span dir="ltr">Instagram</span> هو الذي يفتح شاشة '
         + '<span dir="ltr">API setup with Instagram business login</span>. '
-        + 'وبلا إضافته لا تجد المعرّفَ ولا السرَّ في اللوحة.',
+        + 'وبلا إضافته لا تجد المعرّف ولا السرّ في اللوحة.',
     },
     {
-      what: 'Instagram ← API setup ← Business login settings ← الصق رابطَ العودة أدناه',
-      why: 'بلا رابطِ عودةٍ مسجَّلٍ تردّ Meta الطلبَ <b>قبل أن تعرض شاشة الإذن</b>. '
-        + 'وهذا عائقٌ لا يُصلحه سرّ.',
+      what: 'Instagram ← API setup ← Business login settings ← الصق رابط العودة أدناه',
+      why: 'بلا رابط عودة مسجَّل تردّ Meta الطلب <b>قبل أن تعرض شاشة الإذن</b>. '
+        + 'وهذا عائق لا يُصلحه سرّ.',
     },
     {
       what: 'وفي الشاشة نفسِها: Add account — واختر حسابَك الاحترافيّ',
-      why: 'والتطبيقُ في وضع Development يعمل <b>مع الحسابات المضافة وحدَها</b>. '
-        + 'وحسابٌ لم يُضَف يُردّ إذنُه بلا سببٍ ظاهر.',
+      why: 'والتطبيق في وضع Development يعمل <b>مع الحسابات المضافة وحدَها</b>. '
+        + 'وحساب لم يُضَف يُردّ إذنُه بلا سبب ظاهر.',
     },
   ],
   whereId: 'Instagram ← API setup ← <span dir="ltr">Instagram app ID</span>',
   whereSecret: 'تحته مباشرةً: <span dir="ltr">Instagram app secret</span> ← Show',
-  success: 'تعود إلى هذه الشاشة فتجد بطاقةَ Instagram مربوطةً باسم حسابك '
-    + '(<span dir="ltr">@username</span>) لا بمعرّفٍ رقميّ.',
-  failure: 'إن رأيتَ <span dir="ltr">Invalid platform app</span> فالمنتَجُ لم يُضَف، '
-    + 'أو أنّك نسختَ معرّفَ <b>تطبيق Meta</b> لا معرّفَ <span dir="ltr">Instagram app</span> '
+  success: 'تعود إلى هذه الشاشة فتجد بطاقة Instagram مربوطةً باسم حسابك '
+    + '(<span dir="ltr">@username</span>) لا بمعرّف رقميّ.',
+  failure: 'إن رأيت <span dir="ltr">Invalid platform app</span> فالمنتَج لم يُضَف، '
+    + 'أو أنّك نسخت معرّف <b>تطبيق Meta</b> لا معرّف <span dir="ltr">Instagram app</span> '
     + '— وهما رقمان مختلفان في الشاشة نفسِها. '
-    + 'وإن رأيتَ <span dir="ltr">not an Instagram Professional account</span> '
-    + 'فالحسابُ لم يُحوَّل بعد.',
-  gotcha: 'ولا منشورَ نصّيٌّ في Instagram: <b>صورةٌ أو مقطعٌ ولا ثالث</b> — '
-    + 'فمسوّدةٌ بلا وسيطٍ تُردّ قبل أن تُنادى المنصّة. '
-    + 'والمقطعُ يُنشَر مقطعًا قصيرًا (<span dir="ltr">Reels</span>)، ويُسحَب من رابطٍ موقَّعٍ '
-    + 'تفتحه خوادمُ Meta لخمسَ عشرةَ دقيقة.',
+    + 'وإن رأيت <span dir="ltr">not an Instagram Professional account</span> '
+    + 'فالحساب لم يُحوَّل بعد.',
+  gotcha: 'ولا منشور نصّيّ في Instagram: <b>صورة أو مقطع ولا ثالث</b> — '
+    + 'فمسوّدة بلا وسيط تُردّ قبل أن تُنادى المنصّة. '
+    + 'والمقطع يُنشَر مقطعًا قصيرًا (<span dir="ltr">Reels</span>)، ويُسحَب من رابط موقَّع '
+    + 'تفتحه خوادم Meta لخمس عشرة دقيقة.',
 }
 
 /**
@@ -241,7 +241,7 @@ const INSTAGRAM_GUIDE: SetupGuide = {
  * ‏والخطوةُ تُعرَف من نصّها لا من رقمٍ يُكتب بيدٍ فيتأخّر عن ترتيبها.
  */
 export function callbackStep(guide: SetupGuide): number | null {
-  const i = guide.before.findIndex((b) => /(الصق|=)\s*رابطَ?\s*العودة/.test(b.what))
+  const i = guide.before.findIndex((b) => /(الصق|=)\s*رابط?\s*العودة/.test(b.what))
   return i < 0 ? null : i + 1
 }
 
@@ -264,29 +264,29 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     before: [
       {
         what: 'تبويب Auth ← Authorized redirect URLs ← الصق رابط العودة أدناه',
-        why: 'بلا رابطِ عودةٍ مسجَّل تردّ LinkedIn الطلبَ <b>قبل أن تعرض شاشة الإذن</b>. وهذا عائقٌ لا يُصلحه سرّ.',
+        why: 'بلا رابط عودة مسجَّل تردّ LinkedIn الطلب <b>قبل أن تعرض شاشة الإذن</b>. وهذا عائق لا يُصلحه سرّ.',
       },
       {
         what: 'تبويب Products ← Request access على «Share on LinkedIn»',
-        why: 'هو الذي يمنح <span class="mono">w_member_social</span> — <b>ويُمنَح فورا بلا مراجعة</b>. وبدونه يعمل الربطُ ولا يعمل النشر.',
+        why: 'هو الذي يمنح <span class="mono">w_member_social</span> — <b>ويُمنَح فورا بلا مراجعة</b>. وبدونه يعمل الربط ولا يعمل النشر.',
       },
       {
-        what: 'وأضف «Community Management API» إن أردت صفحةَ الشركة',
-        why: 'مراجعةٌ طويلة، <b>ولا تنتظرها للحساب الشخصيّ</b> — فهي لصفحة الشركة وحدها.',
+        what: 'وأضف «Community Management API» إن أردت صفحة الشركة',
+        why: 'مراجعة طويلة، <b>ولا تنتظرها للحساب الشخصيّ</b> — فهي لصفحة الشركة وحدها.',
       },
     ],
     whereId: 'تبويب Auth ← Application credentials ← Client ID: Primary',
-    whereSecret: 'تحته مباشرةً — اضغط أيقونةَ العين ليظهر، ثمّ أيقونةَ النسخ بجانبها لتنسخه. ولا تضغط «Generate a new Client Secret».',
-    success: 'تحت OAuth 2.0 scopes في تبويب Auth تظهر ثلاثةٌ: openid و profile و w_member_social.',
+    whereSecret: 'تحته مباشرةً — اضغط أيقونة العين ليظهر، ثمّ أيقونة النسخ بجانبها لتنسخه. ولا تضغط «Generate a new Client Secret».',
+    success: 'تحت OAuth 2.0 scopes في تبويب Auth تظهر ثلاثة: openid و profile و w_member_social.',
     failure:
-      'تعود الشاشةُ بـ <span class="mono">unauthorized_scope_error</span> — ' +
-      '<b>ومعناها أنّ نطاقا طُلب ولم يُمنَح لتطبيقك</b>، لا أنّ السرَّ خطأ. ' +
+      'تعود الشاشة بـ <span class="mono">unauthorized_scope_error</span> — ' +
+      '<b>ومعناها أنّ نطاقا طُلب ولم يُمنَح لتطبيقك</b>، لا أنّ السرّ خطأ. ' +
       'ومصدرُه تبويب Products: <span class="mono">w_member_social</span> من ' +
       '«Share on LinkedIn»، و <span class="mono">openid</span> و ' +
       '<span class="mono">profile</span> من «Sign In with LinkedIn using OpenID Connect». ' +
-      'وصدى يعرض عندها ما نقص بالاسم، ويعرض <b>ربطَ الهويّة وحدها</b> لتمضي اليوم وتُكمل غدا.',
+      'وصدى يعرض عندها ما نقص بالاسم، ويعرض <b>ربط الهويّة وحدها</b> لتمضي اليوم وتُكمل غدا.',
     gotcha:
-      'رابطُ العودة يُطابَق حرفا بحرف: شرطةٌ في آخره أو http بدل https تُسقط الربط.',
+      'رابط العودة يُطابَق حرفا بحرف: شرطة في آخره أو http بدل https تُسقط الربط.',
   },
   youtube: YOUTUBE_GUIDE,
   tiktok: TIKTOK_GUIDE,
@@ -295,12 +295,12 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     portalLabel: 'X Developer Portal',
     before: [
       {
-        what: 'Billing ← اشترِ رصيدا (عشرة دولارات تكفي شهورا)',
-        why: 'X يحاسب على كلّ منشور. <b>وبلا رصيدٍ ينجح الربطُ ويفشل أوّلُ نشر.</b>',
+        what: 'Billing ← اشتر رصيدا (عشرة دولارات تكفي شهورا)',
+        why: 'X يحاسب على كلّ منشور. <b>وبلا رصيد ينجح الربط ويفشل أوّل نشر.</b>',
       },
       {
         what: 'User authentication settings ← Set up ← App permissions: <b>Read and write</b>',
-        why: 'رفعُ الصور يوجب <span class="mono">media.write</span>، <b>وتطبيقٌ بصلاحية قراءةٍ فقط لا يمنحه</b> — فيفشل الربط بخطأٍ غامض.',
+        why: 'رفع الصور يوجب <span class="mono">media.write</span>، <b>وتطبيق بصلاحية قراءة فقط لا يمنحه</b> — فيفشل الربط بخطأ غامض.',
       },
       {
         what: 'وفي الشاشة نفسها: Type of App = Web App، و Callback URI = رابط العودة أدناه',
@@ -310,14 +310,14 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     whereId: 'تبويب Keys and tokens ← قسم OAuth 2.0 Client ID and Client Secret',
     whereSecret:
       'في القسم نفسه. <b>و X يعرضه مرّةً واحدةً عند إنشائه</b> — فإن لم تحفظه اضغط Regenerate، ولا ضرر ما دام لم يُربَط حساب.',
-    success: 'تظهر بطاقةُ X هنا «جاهزةٌ للربط» بزرٍّ يعمل، ويُظهر /ready أنّ سرَّيها لم يعودا ناقصين.',
+    success: 'تظهر بطاقة X هنا «جاهزة للربط» بزرّ يعمل، ويُظهر /ready أنّ سرَّيها لم يعودا ناقصين.',
     failure:
-      'يعود الربطُ بـ <span class="mono">unauthorized_client</span> أو ' +
+      'يعود الربط بـ <span class="mono">unauthorized_client</span> أو ' +
       '<span class="mono">invalid_request</span> — <b>وأكثرُه من شاشة User authentication ' +
       'settings لم تُكمَل</b>، أو App permissions تركت على Read فقط. ' +
-      'وأوّلُ نشرٍ يفشل بـ 403 إن لم يكن في حساب المطوّر رصيد.',
+      'وأوّل نشر يفشل بـ 403 إن لم يكن في حساب المطوّر رصيد.',
     gotcha:
-      'إن بقيت App permissions على Read فقط، يفشل الربطُ أو ينجح ولا يُرفَع وسيط.',
+      'إن بقيت App permissions على Read فقط، يفشل الربط أو ينجح ولا يُرفَع وسيط.',
   },
 }
 
@@ -329,7 +329,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     stage: 'publish',
     secrets: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
     task: 'M-02',
-    note: 'النشرُ باسمك أو باسم صفحة. ويحتاج موافقةَ LinkedIn على Community Management API للصفحات.',
+    note: 'النشر باسمك أو باسم صفحة. ويحتاج موافقة LinkedIn على Community Management API للصفحات.',
   },
   {
     id: 'x',
@@ -338,7 +338,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     stage: 'publish',
     secrets: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
     task: 'M-04',
-    note: 'النشرُ يحتاج رصيدا في حساب المطوّر — وكلّ طلبٍ يُحاسَب عليه.',
+    note: 'النشر يحتاج رصيدا في حساب المطوّر — وكلّ طلب يُحاسَب عليه.',
   },
   {
     id: 'snapchat',
@@ -347,7 +347,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     stage: 'none',
     secrets: [],
     task: null,
-    note: 'واجهةُ نشرِها لا تشبه غيرَها، فتحتاج سائقا يُكتب لها وحدها.',
+    note: 'واجهة نشرِها لا تشبه غيرَها، فتحتاج سائقا يُكتب لها وحدها.',
   },
   {
     id: 'instagram',
@@ -358,9 +358,9 @@ export const CHANNELS: readonly ChannelSpec[] = [
     task: 'M-24',
     // **ونصٌّ صِرفٌ بلا وسم**: يُهرَّب في أربعة مواضع (D-093)
     note:
-      'الربطُ والنشرُ مبنيّان، ولها طريقان: تسجيلُ دخولٍ مباشرٍ بحسابٍ ' +
-      'احترافيّ، أو عبر صفحة فيسبوك. ويلزم حسابٌ احترافيّ (Business أو ' +
-      'Creator) — والشخصيُّ لا يفتح النشرَ أصلا. ولا منشورَ نصّيّ: صورةٌ أو مقطع.',
+      'الربط والنشر مبنيّان، ولها طريقان: تسجيل دخول مباشر بحساب ' +
+      'احترافيّ، أو عبر صفحة فيسبوك. ويلزم حساب احترافيّ (Business أو ' +
+      'Creator) — والشخصيّ لا يفتح النشر أصلا. ولا منشور نصّيّ: صورة أو مقطع.',
   },
   {
     id: 'tiktok',
@@ -372,8 +372,8 @@ export const CHANNELS: readonly ChannelSpec[] = [
     // **ونصٌّ صِرفٌ بلا وسم**: هذا الحقلُ يُهرَّب في أربعة مواضع
     // (`escapeHtml`)، فوسمٌ فيه يُعرَض حرفا للمالك (D-093)
     note:
-      'الربطُ والنشرُ مبنيّان. ويصل المقطعُ صندوقَ تطبيقك فتنشره بيدك — ' +
-      'وذلك يعمل بمجرّد الربط. والنشرُ المباشرُ باسمك يحتاج نطاق video.publish، ' +
+      'الربط والنشر مبنيّان. ويصل المقطع صندوق تطبيقك فتنشره بيدك — ' +
+      'وذلك يعمل بمجرّد الربط. والنشر المباشر باسمك يحتاج نطاق video.publish، ' +
       'ولا يراه غيرُك حتّى تُجيز TikTok تطبيقك ثمّ تقلب «النشر العلنيّ» من «الإعداد».',
   },
   {
@@ -383,7 +383,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     stage: 'none',
     secrets: [],
     task: null,
-    note: 'واجهتُها حديثةٌ وتتبدّل، ولم تستقرّ بعد استقرارا يُبنى عليه.',
+    note: 'واجهتُها حديثة وتتبدّل، ولم تستقرّ بعد استقرارا يُبنى عليه.',
   },
   {
     id: 'youtube',
@@ -394,10 +394,10 @@ export const CHANNELS: readonly ChannelSpec[] = [
     task: 'M-15',
     // ونصٌّ صِرفٌ بلا وسم — الحقلُ يُهرَّب في أربعة مواضع (D-093)
     note:
-      'الربطُ والرفعُ مبنيّان. ويصل المقطعُ قناتَك خاصّا فتنشره بيدك — ' +
-      'ونطاقُ الرفع حسّاسٌ عند Google، فتُقفَل مرفوعاتُ المشاريع غير ' +
-      'المُجازة على خاصّ مهما طُلب. فإذا أُجيز تطبيقُك قلبتَ «النشر العلنيّ» من «الإعداد». ' +
-      'ويصير المقطعُ Short وحده إن كان رأسيًّا أو مربّعًا وأقصرَ من ثلاث دقائق.',
+      'الربط والرفع مبنيّان. ويصل المقطع قناتَك خاصّا فتنشره بيدك — ' +
+      'ونطاق الرفع حسّاس عند Google، فتُقفَل مرفوعات المشاريع غير ' +
+      'المُجازة على خاصّ مهما طُلب. فإذا أُجيز تطبيقُك قلبت «النشر العلنيّ» من «الإعداد». ' +
+      'ويصير المقطع Short وحده إن كان رأسيًّا أو مربّعًا وأقصر من ثلاث دقائق.',
   },
 ]
 
@@ -678,7 +678,7 @@ export function channelHealth(v: ChannelView, now: Date): ChannelHealth {
     return { kind: 'setup', tone: 'warn', label: 'تحتاج إعدادًا', button: { label: 'أكمل الإعداد', href: setupHref(v.spec.id), primary: true } }
   }
   if (v.state === 'connectable') {
-    return { kind: 'connectable', tone: 'warn', label: 'جاهزةٌ للربط', button: { label: 'اربط', href: `/oauth/${id}/start`, primary: true } }
+    return { kind: 'connectable', tone: 'warn', label: 'جاهزة للربط', button: { label: 'اربط', href: `/oauth/${id}/start`, primary: true } }
   }
   const health = v.accounts.map((a) => tokenHealth(a, now))
   if (v.state === 'needs_reauth' || unsignedAccounts(v).length > 0 || health.some((h) => h?.kind === 'expired')) {
@@ -687,7 +687,7 @@ export function channelHealth(v: ChannelView, now: Date): ChannelHealth {
   const soon = health.flatMap((h) => (h?.kind === 'soon' ? [h.days] : []))
   if (soon.length > 0) {
     const days = Math.min(...soon)
-    return { kind: 'expiring', tone: 'warn', label: `تحتاج إعادةَ ربطٍ ${inDays(days)}`, button: relink, days }
+    return { kind: 'expiring', tone: 'warn', label: `تحتاج إعادة ربط ${inDays(days)}`, button: relink, days }
   }
   return { kind: 'connected', tone: 'ok', label: 'متّصلة', button: { label: 'افتح', href: `/panel/channels/${id}`, primary: false } }
 }

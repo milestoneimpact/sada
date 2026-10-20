@@ -25,18 +25,18 @@ function drafts(count: number, platform = 'linkedin'): SpreadDraft[] {
     id: `p${i}`,
     platform,
     status: 'approved',
-    text: `منشورٌ رقم ${i}\nوسطرٌ ثانٍ لا يُعرَض`,
+    text: `منشور رقم ${i}\nوسطر ثان لا يُعرَض`,
   }))
 }
 
-describe('التوزيع — والمعروضُ هو المنفَّذ', () => {
-  it('نداءان بالمدخلات نفسِها يعطيان الخطّةَ نفسَها', () => {
+describe('التوزيع — والمعروض هو المنفَّذ', () => {
+  it('نداءان بالمدخلات نفسِها يعطيان الخطّة نفسَها', () => {
     const a = planSpread(drafts(5), TARGETS, START, 24, NOW)
     const b = planSpread(drafts(5), TARGETS, START, 24, NOW)
     expect(b).toEqual(a)
   })
 
-  it('والفاصلُ يُحترَم بالضبط — لا تقريبَ ولا انزلاق', () => {
+  it('والفاصل يُحترَم بالضبط — لا تقريب ولا انزلاق', () => {
     const { slots } = planSpread(drafts(4), TARGETS, START, 24, NOW)
     expect(slots.map((s) => s.when)).toEqual([
       '2026-09-08T06:00',
@@ -46,7 +46,7 @@ describe('التوزيع — والمعروضُ هو المنفَّذ', () => {
     ])
   })
 
-  it('والترتيبُ ترتيبُ القائمة — فما رآه المالكُ أوّلا يخرج أوّلا', () => {
+  it('والترتيب ترتيب القائمة — فما رآه المالك أوّلا يخرج أوّلا', () => {
     const { slots } = planSpread(drafts(3), TARGETS, START, 6, NOW)
     expect(slots.map((s) => s.postId)).toEqual(['p0', 'p1', 'p2'])
   })
@@ -57,7 +57,7 @@ describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
    * **ومنشورٌ ينقصه وسيطُه يُقال في المعاينة** — لا يُعطى خانةً تردّها `schedulePost`
    * بعد الضغط، ولا يأخذ موعدَ غيره: الخانةُ التاليةُ لمن يصلح.
    */
-  it('منشورٌ ينقصه مقطعُه يُردّ بسببه ولا يأخذ خانة', () => {
+  it('منشور ينقصه مقطعُه يُردّ بسببه ولا يأخذ خانة', () => {
     const list: SpreadDraft[] = [
       { id: 'tt', platform: 'linkedin', status: 'approved', text: 'بلا مقطع', lacking: 'TikTok تحتاج مقطعًا' },
       ...drafts(1, 'linkedin'),
@@ -67,10 +67,10 @@ describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
     expect(skipped).toEqual([{ postId: 'tt', preview: 'بلا مقطع', reason: 'TikTok تحتاج مقطعًا' }])
   })
 
-  it('منشورٌ بلا قناةٍ لمنصّته يُردّ بسببه', () => {
+  it('منشور بلا قناة لمنصّته يُردّ بسببه', () => {
     const mixed: SpreadDraft[] = [
       ...drafts(1, 'linkedin'),
-      { id: 'px', platform: 'x', status: 'approved', text: 'نصُّ إكس' },
+      { id: 'px', platform: 'x', status: 'approved', text: 'نصّ إكس' },
     ]
     const { slots, skipped } = planSpread(
       mixed,
@@ -85,7 +85,7 @@ describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
     expect(skipped[0]!.reason).toContain('لا قناة')
   })
 
-  it('وغيرُ المعتمَد لا يُوزَّع ولا يُشتكى منه — ليس مرشَّحا أصلا', () => {
+  it('وغير المعتمَد لا يُوزَّع ولا يُشتكى منه — ليس مرشَّحا أصلا', () => {
     const mix: SpreadDraft[] = [
       { id: 'd1', platform: 'linkedin', status: 'draft', text: 'مسوّدة' },
       { id: 'd2', platform: 'linkedin', status: 'queued', text: 'مجدولة' },
@@ -103,7 +103,7 @@ describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
     expect(planSpread(one, TARGETS, START, 24, NOW).slots).toHaveLength(1)
   })
 
-  it('وما فوق الحدِّ يُقال عددُه ولا يُبتَر صامتا', () => {
+  it('وما فوق الحدّ يُقال عددُه ولا يُبتَر صامتا', () => {
     const { slots, skipped } = planSpread(drafts(SPREAD_MAX + 3), TARGETS, START, 1, NOW)
     expect(slots).toHaveLength(SPREAD_MAX)
     expect(skipped).toHaveLength(3)
@@ -111,8 +111,8 @@ describe('ما لا يصلح يُقال ولا يُسقَط صامتا', () => {
   })
 })
 
-describe('ولا خانةَ في الماضي — فلا خطّةٌ نصفُها مرفوض', () => {
-  it('بدايةٌ مضت تُدفَع إلى ما بعد الآن', () => {
+describe('ولا خانة في الماضي — فلا خطّة نصفُها مرفوض', () => {
+  it('بداية مضت تُدفَع إلى ما بعد الآن', () => {
     const past = new Date('2026-09-01T06:00:00Z')
     const { slots } = planSpread(drafts(2), TARGETS, past, 24, NOW)
     for (const slot of slots) {
@@ -120,7 +120,7 @@ describe('ولا خانةَ في الماضي — فلا خطّةٌ نصفُها
     }
   })
 
-  it('وفاصلٌ خارجَ المدى يُقصّ إلى حدّه ويُرى في الخطّة', () => {
+  it('وفاصل خارج المدى يُقصّ إلى حدّه ويُرى في الخطّة', () => {
     const tight = planSpread(drafts(2), TARGETS, START, 0, NOW).slots
     expect(new Date(`${tight[1]!.when}:00Z`).getTime() - new Date(`${tight[0]!.when}:00Z`).getTime())
       .toBe(GAP_MIN_HOURS * 3_600_000)
@@ -130,16 +130,16 @@ describe('ولا خانةَ في الماضي — فلا خطّةٌ نصفُها
       .toBe(GAP_MAX_HOURS * 3_600_000)
   })
 
-  it('والصيغةُ هي التي تقرؤها `parseWhen` — بلا تحويلٍ بينهما', () => {
+  it('والصيغة هي التي تقرؤها `parseWhen` — بلا تحويل بينهما', () => {
     for (const slot of planSpread(drafts(3), TARGETS, START, 7, NOW).slots) {
       expect(slot.when).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
     }
   })
 })
 
-describe('السطرُ المعروض', () => {
-  it('أوّلُ سطرٍ لا النصُّ كلُّه', () => {
-    expect(firstLine('سطرٌ أوّل\nوثانٍ')).toBe('سطرٌ أوّل')
+describe('السطر المعروض', () => {
+  it('أوّل سطر لا النصّ كلُّه', () => {
+    expect(firstLine('سطر أوّل\nوثان')).toBe('سطر أوّل')
   })
 
   it('ولا يُقصّ في وسط كلمة', () => {
@@ -150,7 +150,7 @@ describe('السطرُ المعروض', () => {
     expect(cut).not.toContain('كل…')
   })
 
-  it('ونصٌّ فارغٌ لا يرمي', () => {
+  it('ونصّ فارغ لا يرمي', () => {
     expect(firstLine('')).toBe('')
     expect(firstLine('\n\n')).toBe('')
   })

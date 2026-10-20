@@ -40,14 +40,14 @@ describe('**ما يُمنع — وهو ما يجعل الطلب الخارجيّ
     expect(checkProviderUrl('https://172.32.0.1/v1').ok).toBe(true)
   })
 
-  it('http يُرفض — المفتاح لا يُرسل على اتّصالٍ غير مشفَّر', () => {
+  it('http يُرفض — المفتاح لا يُرسل على اتّصال غير مشفَّر', () => {
     const verdict = checkProviderUrl('http://api.deepseek.com/v1')
     expect(verdict.ok).toBe(false)
     if (!verdict.ok) expect(verdict.reason).toContain('https')
   })
 
   it.each(['ftp://x.com', 'file:///etc/passwd', 'javascript:alert(1)'])(
-    'بروتوكولٌ آخر يُرفض: %s',
+    'بروتوكول آخر يُرفض: %s',
     (url) => {
       expect(checkProviderUrl(url).ok).toBe(false)
     },
@@ -57,7 +57,7 @@ describe('**ما يُمنع — وهو ما يجعل الطلب الخارجيّ
     expect(checkProviderUrl('https://user:pass@api.deepseek.com/v1').ok).toBe(false)
   })
 
-  it('الفارغ وغير الصالح يُرفضان برسالةٍ تُقرأ', () => {
+  it('الفارغ وغير الصالح يُرفضان برسالة تُقرأ', () => {
     expect(checkProviderUrl('  ').ok).toBe(false)
     const verdict = checkProviderUrl('ليس عنوانا')
     expect(verdict.ok).toBe(false)

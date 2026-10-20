@@ -122,7 +122,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
   const stored = await loadTokens(deps.db, deps.encKey, row.account_id)
   if (stored === null) {
     await markNeedsReauth(deps.db, row.account_id)
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذنَ محفوظ' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذن محفوظ' }
   }
   if (!isExpiring(stored.expiresAt, now, RENEW_MARGIN_SECONDS)) {
     return { kind: 'skipped', accountId: row.account_id }
@@ -130,11 +130,11 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
   if (stored.refreshToken === null) {
     // **ولا يُعلَّم هنا**: منصّةٌ لا تعطي إذنَ تجديدٍ أصلا (X أحيانا)
     // ليست حسابا معطوبا — والحارسُ عند النشر يمنع النشرَ برمزٍ ميت
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذنَ تجديدٍ لهذا الحساب' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذن تجديد لهذا الحساب' }
   }
   if (stored.refreshExpiresAt !== null && Date.parse(stored.refreshExpiresAt) <= now.getTime()) {
     await markNeedsReauth(deps.db, row.account_id)
-    return { kind: 'needs_owner', accountId: row.account_id, why: 'انتهى إذنُ التجديد نفسُه' }
+    return { kind: 'needs_owner', accountId: row.account_id, why: 'انتهى إذن التجديد نفسُه' }
   }
 
   const platform = row.platform as Platform
@@ -146,7 +146,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
   }
   if (creds === null) {
     // **سرٌّ ناقصٌ عطلُ ضبطٍ لا عطلُ حساب** — ولا يُعلَّم الحسابُ به
-    return { kind: 'deferred', accountId: row.account_id, why: 'أسرارُ التطبيق غير مضبوطة' }
+    return { kind: 'deferred', accountId: row.account_id, why: 'أسرار التطبيق غير مضبوطة' }
   }
 
   try {
@@ -178,7 +178,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
       return {
         kind: 'needs_owner',
         accountId: row.account_id,
-        why: `ردّ المزوّدُ التجديد (${status})`,
+        why: `ردّ المزوّد التجديد (${status})`,
       }
     }
     return { kind: 'deferred', accountId: row.account_id, why: String(error).slice(0, 120) }

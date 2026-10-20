@@ -32,7 +32,7 @@ describe('السجلّ', () => {
    * والقاعدةُ تُثبَّت لا تُعدَّد: ما ينشر يحمل أسرارا، وما يُربَط يحمل
    * أسرارا، **وما لا سائقَ له لا يحمل شيئا** — فلا ينتظره المالك.
    */
-  it('لكلّ مرتبةٍ ما يليق بها، ولا يعد بما لم يُبنَ', () => {
+  it('لكلّ مرتبة ما يليق بها، ولا يعد بما لم يُبن', () => {
     // والمرتبةُ تتبع ما بُني: TikTok في D-092 وYouTube في D-096
     // وInstagram في D-121 — **والترتيبُ ترتيبُ السجلّ لا ترتيبُ البناء**
     expect(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id))
@@ -55,12 +55,12 @@ describe('السجلّ', () => {
   })
 
   /** و`built` مشتقٌّ من المرتبة، فلا يفترقان. */
-  it('و built هو stage === publish — لا حقلٌ ثانٍ يُنسى', () => {
+  it('و built هو stage === publish — لا حقل ثان يُنسى', () => {
     for (const spec of CHANNELS) expect(spec.built).toBe(spec.stage === 'publish')
   })
 
   /** ولكلّ ما يُربَط دليلٌ مكتوب — وزرُّ ربطٍ بلا دليلٍ يترك المالكَ واقفا. */
-  it('ولكلّ ما يُربَط دليلُ ضبطٍ كامل', () => {
+  it('ولكلّ ما يُربَط دليل ضبط كامل', () => {
     for (const spec of CHANNELS.filter((c) => c.stage !== 'none')) {
       const guide = SETUP[spec.id]
       expect(guide, spec.id).toBeDefined()
@@ -78,7 +78,7 @@ describe('السجلّ', () => {
 })
 
 describe('listAccounts', () => {
-  it('منظّمةٌ لا ترى حساباتِ غيرها (D-229)', async () => {
+  it('منظّمة لا ترى حسابات غيرها (D-229)', async () => {
     await seed('linkedin')
     db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
     expect(await listAccounts(db, 'org_b')).toEqual([])
@@ -91,7 +91,7 @@ describe('listAccounts', () => {
     expect(rows[0]).toMatchObject({ platform: 'linkedin', displayName: 'عمر', status: 'active' })
   })
 
-  it('ويحمل موعدَ انتهاء الرمز من جانبه — و`null` حين لا رمز (D-126)', async () => {
+  it('ويحمل موعد انتهاء الرمز من جانبه — و`null` حين لا رمز (D-126)', async () => {
     await seed('linkedin')
     const bare = await listAccounts(db, 'org_owner')
     expect(bare[0]!.expiresAt).toBeNull()
@@ -106,7 +106,7 @@ describe('listAccounts', () => {
     expect(withToken[0]!.expiresAt).toBe('2026-09-20 00:00:00')
   })
 
-  it('جدولٌ لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
+  it('جدول لا يُقرأ يعطي قائمةً فارغة ولا يُسقط اللوحة', async () => {
     db.raw.exec('DROP TABLE accounts')
     expect(await listAccounts(db, 'org_owner')).toEqual([])
   })
@@ -116,8 +116,8 @@ describe('listAccounts', () => {
  * ‏**صفحةُ LinkedIn وحدَها ليست وجهة** (D-087): YouTube يحفظ قناتَه `org` دائمًا (`identity.ts`)،
  * ‏وكان `kind !== 'org'` في جدولة المقطع والبطاقة والتوزيع يُسقطها كلَّها.
  */
-describe('isLinkedInPage — القاعدةُ مرّةً لا شرطٌ في كلّ موضع', () => {
-  it('صفحةُ الشركة على LinkedIn وحدَها؛ وقناةُ YouTube وحسابُ LinkedIn الشخصيّ وجهتان', () => {
+describe('isLinkedInPage — القاعدة مرّةً لا شرط في كلّ موضع', () => {
+  it('صفحة الشركة على LinkedIn وحدَها؛ وقناة YouTube وحساب LinkedIn الشخصيّ وجهتان', () => {
     expect(isLinkedInPage({ platform: 'linkedin', kind: 'org' })).toBe(true)
     expect(isLinkedInPage({ platform: 'linkedin', kind: 'member' })).toBe(false)
     expect(isLinkedInPage({ platform: 'youtube', kind: 'org' })).toBe(false)
@@ -125,8 +125,8 @@ describe('isLinkedInPage — القاعدةُ مرّةً لا شرطٌ في كل
   })
 })
 
-describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () => {
-  it('بلا حسابٍ وبأسرارٍ حاضرة: جاهزةٌ للربط', () => {
+describe('viewChannels — الحال يُحسَب لا يُفترَض', () => {
+  it('بلا حساب وبأسرار حاضرة: جاهزة للربط', () => {
     const views = viewChannels([], ALL)
     expect(views.find((v) => v.spec.id === 'linkedin')?.state).toBe('connectable')
   })
@@ -137,7 +137,7 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
     expect(view?.missing).toEqual(['X_CLIENT_ID', 'X_CLIENT_SECRET'])
   })
 
-  it('حسابٌ مربوط: مربوطة', async () => {
+  it('حساب مربوط: مربوطة', async () => {
     await seed('linkedin')
     const views = viewChannels(await listAccounts(db, 'org_owner'), ALL)
     const linkedin = views.find((v) => v.spec.id === 'linkedin')
@@ -145,27 +145,27 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
     expect(linkedin?.accounts).toHaveLength(1)
   })
 
-  it('**رمزٌ انتهى يغلب المربوط** — لأنّه يوقف النشر صامتا', async () => {
+  it('**رمز انتهى يغلب المربوط** — لأنّه يوقف النشر صامتا', async () => {
     await seed('linkedin', 'active', 'member', 'الأوّل')
     await seed('linkedin', 'needs_reauth', 'org', 'الصفحة')
     const view = viewChannels(await listAccounts(db, 'org_owner'), ALL).find((v) => v.spec.id === 'linkedin')
     expect(view?.state).toBe('needs_reauth')
   })
 
-  it('**والمربوطُ يغلب نقصَ السرّ** — الحسابُ قائمٌ والمالك يريد أن يعرف', async () => {
+  it('**والمربوط يغلب نقص السرّ** — الحساب قائم والمالك يريد أن يعرف', async () => {
     await seed('linkedin')
     const view = viewChannels(await listAccounts(db, 'org_owner'), NONE).find((v) => v.spec.id === 'linkedin')
     expect(view?.state).toBe('linked')
   })
 
-  it('المسحوبُ لا يُعدّ حسابا', async () => {
+  it('المسحوب لا يُعدّ حسابا', async () => {
     await seed('x', 'revoked')
     const view = viewChannels(await listAccounts(db, 'org_owner'), ALL).find((v) => v.spec.id === 'x')
     expect(view?.accounts).toHaveLength(0)
     expect(view?.state).toBe('connectable')
   })
 
-  it('**ما لم يُبنَ يبقى «لم يُبنَ» مهما كانت الأسرار**', () => {
+  it('**ما لم يُبن يبقى «لم يُبن» مهما كانت الأسرار**', () => {
     for (const guard of [ALL, NONE]) {
       const views = viewChannels([], guard)
       // و«لم يُبنَ» للمرتبة الدنيا وحدها: ما يُربَط له زرٌّ يعمل
@@ -175,7 +175,7 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
     }
   })
 
-  it('لا يخلط حساب منصّةٍ بأخرى', async () => {
+  it('لا يخلط حساب منصّة بأخرى', async () => {
     await seed('x')
     const views = viewChannels(await listAccounts(db, 'org_owner'), ALL)
     expect(views.find((v) => v.spec.id === 'x')?.accounts).toHaveLength(1)
@@ -196,8 +196,8 @@ describe('viewChannels — الحالُ يُحسَب لا يُفترَض', () =>
  * **والفرقُ عن `SetupGuide`**: تلك تُرسَم بلا تهريب فتقبل الوسم. فحقلان
  * متجاوران بعقدين متضادّين — والحارسُ هو ما يفرّق بينهما.
  */
-describe('عقدُ `note` — نصٌّ يُقرأ لا وسمٌ يُعرَض', () => {
-  it('لا وسمَ HTML ولا Markdown في أيّ سجلّ', () => {
+describe('عقد `note` — نصّ يُقرأ لا وسم يُعرَض', () => {
+  it('لا وسم HTML ولا Markdown في أيّ سجلّ', () => {
     for (const spec of CHANNELS) {
       expect(spec.note, spec.id).not.toContain('<')
       expect(spec.note, spec.id).not.toContain('**')
@@ -209,8 +209,8 @@ describe('عقدُ `note` — نصٌّ يُقرأ لا وسمٌ يُعرَض', (
 /*
  * ‏**حالُ الربط حيث تُختار المنصّة** (D-190): بحكم الجدولة نفسِه — حسابٌ نشطٌ ليس صفحةَ LinkedIn.
  */
-describe('linkStates — أمتّصلةٌ هي، بحكم الجدولة', () => {
-  it('متّصلة، أو انقطع ربطُها، أو لا حساب — وصفحةُ الشركة وحدَها لا تُعدّ', async () => {
+describe('linkStates — أمتّصلة هي، بحكم الجدولة', () => {
+  it('متّصلة، أو انقطع ربطُها، أو لا حساب — وصفحة الشركة وحدَها لا تُعدّ', async () => {
     await seed('youtube')
     await seed('x', 'needs_reauth')
     await seed('linkedin', 'active', 'org')

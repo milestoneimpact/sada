@@ -21,20 +21,20 @@ export interface FailReason {
 
 /** الرموزُ التي يكتبها الناشرُ قبل الإرسال — **ويحرس الاختبارُ أنّها كلُّها هنا**. */
 export const REASONS: Readonly<Record<string, FailReason>> = {
-  no_tokens: { text: 'لا إذنَ محفوظا لهذا الحساب — أعد ربطه ثمّ أعد المنشور', action: 'relink' },
-  account_disconnected: { text: 'فُصل الحسابُ من اللوحة قبل موعده، فلم يُنشَر. اربطه من جديد ثمّ أعد المنشور', action: 'relink' },
-  token_expired: { text: 'انتهى الإذنُ قبل الإرسال — جدّده ثمّ أعد المنشور', action: 'relink' },
-  token_expired_retry: { text: 'انتهى الإذنُ وتعذّر تجديدُه الآن — يُعاد وحده بعد التجديد', action: 'none' },
-  missing_publish_scope: { text: 'الحسابُ لم يمنح إذنَ النشر — أعد الربط ووافق عليه', action: 'relink' },
-  missing_media_scope: { text: 'الحسابُ لم يمنح إذنَ رفع الوسائط — أعد الربط ووافق عليه', action: 'relink' },
-  no_clip: { text: 'لا مقطعَ لهذا المنشور، والمنصّةُ لا تقبل نصًّا وحده — ولّد صورةً ثمّ حرّكها', action: 'requeue' },
+  no_tokens: { text: 'لا إذن محفوظا لهذا الحساب — أعد ربطه ثمّ أعد المنشور', action: 'relink' },
+  account_disconnected: { text: 'فُصل الحساب من اللوحة قبل موعده، فلم يُنشَر. اربطه من جديد ثمّ أعد المنشور', action: 'relink' },
+  token_expired: { text: 'انتهى الإذن قبل الإرسال — جدّده ثمّ أعد المنشور', action: 'relink' },
+  token_expired_retry: { text: 'انتهى الإذن وتعذّر تجديدُه الآن — يُعاد وحده بعد التجديد', action: 'none' },
+  missing_publish_scope: { text: 'الحساب لم يمنح إذن النشر — أعد الربط ووافق عليه', action: 'relink' },
+  missing_media_scope: { text: 'الحساب لم يمنح إذن رفع الوسائط — أعد الربط ووافق عليه', action: 'relink' },
+  no_clip: { text: 'لا مقطع لهذا المنشور، والمنصّة لا تقبل نصًّا وحده — ولّد صورةً ثمّ حرّكها', action: 'requeue' },
   no_media: { text: 'Instagram لا تقبل منشورًا بلا صورة — ولّد صورةً له', action: 'requeue' },
   instagram_needs_media: { text: 'Instagram لا تقبل منشورًا بلا صورة — ولّد صورةً له', action: 'requeue' },
-  instagram_needs_base_url: { text: 'أصلُ اللوحة غيرُ مضبوطٍ للطابور، فلا رابطَ تسحب منه Instagram الصورة', action: 'none' },
-  no_media_bucket: { text: 'مخزنُ الوسائط غيرُ موصولٍ بالعامل — عطلٌ في الضبط لا في المنشور', action: 'none' },
+  instagram_needs_base_url: { text: 'أصل اللوحة غير مضبوط للطابور، فلا رابط تسحب منه Instagram الصورة', action: 'none' },
+  no_media_bucket: { text: 'مخزن الوسائط غير موصول بالعامل — عطل في الضبط لا في المنشور', action: 'none' },
   not_approved: { text: 'لم يُعتمَد قبل موعده — اعتمده ثمّ جدوِله', action: 'open' },
-  post_not_found: { text: 'حُذف المنشورُ قبل موعده', action: 'none' },
-  unexpected_error: { text: 'عطلٌ لم يُتوقَّع عندنا قبل الإرسال — وسببُه في سجلّ العامل', action: 'requeue' },
+  post_not_found: { text: 'حُذف المنشور قبل موعده', action: 'none' },
+  unexpected_error: { text: 'عطل لم يُتوقَّع عندنا قبل الإرسال — وسببُه في سجلّ العامل', action: 'requeue' },
 }
 
 /** البادئةُ التي يكتبها الناشرُ قبل جواب المنصّة: «x: …» و«linkedin: …». */
@@ -50,15 +50,15 @@ const LABELS: Readonly<Record<string, string>> = {
  * وما سواها يبقى كما جاء: نصُّ المنصّة دليلٌ لا يُخترَع بدلَه.
  */
 const HTTP_PHRASES: Readonly<Record<string, string>> = {
-  'internal server error': 'عطلٌ في خادمها (500)',
-  'bad gateway': 'عطلٌ عابرٌ في بوّابتها (502)',
-  'service unavailable': 'خدمتُها متوقّفةٌ مؤقّتًا (503)',
+  'internal server error': 'عطل في خادمها (500)',
+  'bad gateway': 'عطل عابر في بوّابتها (502)',
+  'service unavailable': 'خدمتُها متوقّفة مؤقّتًا (503)',
   'gateway timeout': 'انقضت مهلتُها قبل أن تجيب (504)',
-  'too many requests': 'طلباتٌ كثيرةٌ في وقتٍ قصير (429)',
+  'too many requests': 'طلبات كثيرة في وقت قصير (429)',
   'unauthorized': 'رفضت الإذن (401)',
   'forbidden': 'منعت الطلب (403)',
   'not found': 'لم تجد ما طُلب (404)',
-  'bad request': 'رفضت الطلبَ كما أُرسل (400)',
+  'bad request': 'رفضت الطلب كما أُرسل (400)',
 }
 
 function says(detail: string): string {
@@ -71,7 +71,7 @@ function says(detail: string): string {
  */
 export function whyFailed(raw: string | null, platform: Platform | string): FailReason {
   if (raw === null || raw.trim() === '') {
-    return { text: 'فشل بلا سببٍ مسجَّل', action: 'requeue' }
+    return { text: 'فشل بلا سبب مسجَّل', action: 'requeue' }
   }
   const text = raw.trim()
   const code = /^([a-z_]+)(?::\s*(.*))?$/s.exec(text)

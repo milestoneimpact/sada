@@ -30,8 +30,8 @@ import { statusBadge, type Tone } from './components/badge'
 import { returnTo } from '../../lib/nav/back'
 
 const KIND: Readonly<Record<string, string>> = {
-  member: 'حسابٌ شخصيّ',
-  org: 'صفحةٌ أو شركة',
+  member: 'حساب شخصيّ',
+  org: 'صفحة أو شركة',
 }
 
 /**
@@ -105,8 +105,8 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
     return `<details class="card card-inset guide mb-3">
       <summary>
         <span class="g-ic">${ICON.guide}</span>
-        <span class="g-t"><b>الطريقُ إلى الربط — تمّ كلُّه</b>
-          <span>${tally}. والخطواتُ تبقى لتُراجَع عند أيّ تبديل.</span></span>
+        <span class="g-t"><b>الطريق إلى الربط — تمّ كلُّه</b>
+          <span>${tally}. والخطوات تبقى لتُراجَع عند أيّ تبديل.</span></span>
         <span class="grow"></span>
         <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
       </summary>
@@ -119,7 +119,7 @@ function wizardStrip(view: ChannelView, app: AppStatus | undefined): string {
     : `<b>أنت عند الخطوة ${w.current} من ${w.steps.length}.</b>`
 
   return `<div class="card mb-3">
-    <div class="card-head"><h2>الطريقُ إلى الربط</h2><div class="grow"></div>
+    <div class="card-head"><h2>الطريق إلى الربط</h2><div class="grow"></div>
       <span class="chip">${tally}</span></div>
     <p class="hint">${head}</p>
     <ol class="steps wiz">${rows}</ol>
@@ -151,20 +151,20 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   if (app.source === 'worker_secret') {
     return `${wizard}<div class="card card-inset guide"><div class="guide-body">
       <div class="help"><span class="help-ic">i</span><span class="help-t">
-        <b>مضبوطٌ من أسرار Worker — وسرُّ البيئة يغلب الخزانة دائما.</b>
-        فلا نموذجَ هنا: الكتابةُ فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو، في أسرار Worker.</span></div>
-      ${/* ‏واسمُ المتغيّر خلف «للمطوّر» (خطّة التصميم 5.7 · D-218): المالكُ يعرف أين يُبدَّل، والاسمُ لمن يكتب الأمر */''}
+        <b>مضبوط من أسرار Worker — وسرّ البيئة يغلب الخزانة دائما.</b>
+        فلا نموذج هنا: الكتابة فيه لن تغيّر ما يُستعمَل. ولتبديله، بدّله حيث هو، في أسرار Worker.</span></div>
+      ${/* ‏واسم المتغيّر خلف «للمطوّر» (خطّة التصميم 5.7 · D-218): المالك يعرف أين يُبدَّل، والاسم لمن يكتب الأمر */''}
       <details class="setup mt-2"><summary>للمطوّر</summary>
         <p class="ch-note">السرّان: <span class="mono">${escapeHtml(app.secretNames[0])}</span> و<span class="mono">${escapeHtml(app.secretNames[1])}</span>
           — <span class="mono">wrangler secret put ${escapeHtml(app.secretNames[1])}</span></p></details>
       ${app.clientId === null ? '' : `<p class="ch-note">المعرّف الحاليّ:
         <span class="mono">${escapeHtml(app.clientId)}</span></p>`}
-      <form method="POST" action="/panel/channels/app/verify" data-busy="جارٍ الفحص…">
+      <form method="POST" action="/panel/channels/app/verify" data-busy="جار الفحص…">
         <input type="hidden" name="platform" value="${escapeHtml(view.spec.id)}">
         <input type="hidden" name="return" value="${escapeHtml(returnTo(view.spec.id, 'setup'))}">
         <button class="btn btn-secondary btn-sm" type="submit">افحص الزوج</button>
-        <span class="ago">يسأل المنصّةَ أتقبل هذا الزوج — بلا دورةِ إذن، وبلا
-          إذنِ وصولٍ يُنتَج.</span>
+        <span class="ago">يسأل المنصّة أتقبل هذا الزوج — بلا دورة إذن، وبلا
+          إذن وصول يُنتَج.</span>
       </form>
     </div></div>`
   }
@@ -198,8 +198,8 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
   return `${wizard}<details class="card card-inset guide"${open ? ' open' : ''}>
     <summary>
       <span class="g-ic">${ICON.guide}</span>
-      <span class="g-t"><b>${fresh ? 'دليلُ ضبط التطبيق' : 'الدليل وتبديلُ الأسرار'}</b>
-        <span>${guide.before.length} خطواتٍ في ${escapeHtml(guide.portalLabel)}، ثمّ سرّان هنا.</span></span>
+      <span class="g-t"><b>${fresh ? 'دليل ضبط التطبيق' : 'الدليل وتبديل الأسرار'}</b>
+        <span>${guide.before.length} خطوات في ${escapeHtml(guide.portalLabel)}، ثمّ سرّان هنا.</span></span>
       <span class="grow"></span>
       <span class="g-tog"><span class="lbl-open">افتح</span><span class="lbl-close">أغلق</span></span>
     </summary>
@@ -217,7 +217,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
       <div class="help"><span class="help-ic">!</span><span class="help-t"><b>انتبه.</b> ${pathArrows(guide.gotcha)}</span></div>
 
       <div class="field cb">
-        <label for="cb-${id}">رابطُ العودة</label>
+        <label for="cb-${id}">رابط العودة</label>
         <div class="help" id="cb-${id}-h"><span class="help-ic">؟</span><span class="help-t">انسخه بزرّ «انسخ»${
           step === null ? '' : ` والصقه في الخطوة ${step} أعلاه`}.</span></div>
         <div class="copy">
@@ -227,7 +227,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
         </div>
       </div>
 
-      <form method="POST" action="/panel/channels/app" data-busy="جارٍ الحفظ…" id="app-${escapeHtml(id)}">
+      <form method="POST" action="/panel/channels/app" data-busy="جار الحفظ…" id="app-${escapeHtml(id)}">
         <input type="hidden" name="platform" value="${escapeHtml(id)}">
         ${/*
           * ‏**والفعلُ يعود إلى هذا التبويب** (ر-1): كان «احفظ» و«افحص الزوج» و«احذف» تنتهي
@@ -238,7 +238,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           <div class="help" id="ci-${id}-h"><span class="help-ic">؟</span>
             <span class="help-t">${pathArrows(guide.whereId)}</span></div>
           <input id="ci-${id}" name="client_id" dir="ltr" required pattern="\\S.*"
-            title="الصق المعرّف — الفراغُ وحدَه لا يكفي" aria-describedby="ci-${id}-h"
+            title="الصق المعرّف — الفراغ وحدَه لا يكفي" aria-describedby="ci-${id}-h"
             value="${escapeHtml(app.clientId ?? '')}" autocomplete="off" spellcheck="false">
           ${/*
             * **الفخُّ الذي أضاع ساعة** (D-074).
@@ -251,17 +251,17 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
             */ ''}${app.clientId === null
             ? ''
             : `<div class="help"><span class="help-ic">!</span><span class="help-t">
-                <b>هذا المعرّفُ محفوظٌ من قبل — والسرُّ أدناه يبدأ فارغا دائما.</b>
-                فإن كنتَ تنسخ السرَّ من <b>تطبيقٍ آخر</b> (أنشأتَه حديثا مثلا)
-                <b>فبدّل المعرّفَ معه</b>: سرٌّ صحيحٌ على معرّفٍ قديم يُردّ
-                <span class="mono">invalid_client</span> — والرسالةُ تتّهم السرَّ وهو سليم.</span></div>`}
+                <b>هذا المعرّف محفوظ من قبل — والسرّ أدناه يبدأ فارغا دائما.</b>
+                فإن كنت تنسخ السرّ من <b>تطبيق آخر</b> (أنشأتَه حديثا مثلا)
+                <b>فبدّل المعرّف معه</b>: سرّ صحيح على معرّف قديم يُردّ
+                <span class="mono">invalid_client</span> — والرسالة تتّهم السرّ وهو سليم.</span></div>`}
         </div>
         <div class="field">
           <label for="cs-${id}">Client Secret</label>
           <div class="help" id="cs-${id}-h"><span class="help-ic">؟</span>
             <span class="help-t">${pathArrows(guide.whereSecret)}</span></div>
           <input id="cs-${id}" name="client_secret" type="password" dir="ltr" required pattern="\\S.*"
-            title="الصق السرّ — الفراغُ وحدَه لا يكفي"
+            title="الصق السرّ — الفراغ وحدَه لا يكفي"
             aria-describedby="cs-${id}-h"
             placeholder="${app.source === 'vault' ? 'اكتبه لتبديله' : ''}"
             autocomplete="off" spellcheck="false">
@@ -269,16 +269,16 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           ${app.hint === null
             ? ''
             : `<div class="help"><span class="help-ic">i</span><span class="help-t">
-                المحفوظُ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
+                المحفوظ الآن <span class="mono">${escapeHtml(app.hint)}</span> —
                 <b>قارنه بأوّل السرّ وآخرِه في ${escapeHtml(guide.portalLabel)}</b> قبل أن تكتب.
-                فإن طابق فالسرُّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
+                فإن طابق فالسرّ ليس العلّة، <b>وانظر في المعرّف أعلاه</b>.</span></div>`}
         </div>
         ${app.source === 'none' ? '' : `<div class="sub mt-2">
           <b>«افحص الزوج»</b> يسأل ${escapeHtml(guide.portalLabel)} سؤالا واحدا —
-          <b>أتقبل هذا المعرّفَ وهذا السرّ؟</b> — بمسار
-          <span class="mono">client_credentials</span> الذي <b>لا منحةَ فيه تُفحَص</b>،
-          فلا يبقى إلّا التوثيق. ويفرّق الجوابُ بين <b>سرٍّ خاطئ</b> و<b>معرّفٍ
-          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج إذنُ وصولٍ لصدى، ولا
+          <b>أتقبل هذا المعرّف وهذا السرّ؟</b> — بمسار
+          <span class="mono">client_credentials</span> الذي <b>لا منحة فيه تُفحَص</b>،
+          فلا يبقى إلّا التوثيق. ويفرّق الجواب بين <b>سرّ خاطئ</b> و<b>معرّف
+          مجهول</b>، فلا تفتّش في الحقلين معا. ولا يُنتَج إذن وصول لصدى، ولا
           تُنفَق فلسا.</div>`}
       </form>
 
@@ -299,7 +299,7 @@ export function setupPane(view: ChannelView, app: AppStatus | undefined, base: s
           <span class="grow"></span>
           ${app.source === 'vault'
             ? `<button class="btn btn-danger btn-sm" type="submit" form="app-${escapeHtml(id)}" formaction="/panel/channels/app/delete" formnovalidate
-                 data-confirm="سيُحذف السرُّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
+                 data-confirm="سيُحذف السرّ المحفوظ ويتوقّف الربط. أتمضي؟">احذف</button>`
             : ''}
         </div>
     </div>
@@ -333,14 +333,14 @@ function card(view: ChannelView, now: Date): string {
   const stageNote =
     spec.stage === 'link'
       ? `<div class="why warn"><span class="why-ic">${glyph('◍')}</span><span class="why-t">
-         <b>تُربَط ولا تنشر بعد.</b> يُحفَظ الحساب، <b>ولا تُكتب لها مسوّدة</b> حتّى يُبنى سائقُ الرفع.</span></div>`
+         <b>تُربَط ولا تنشر بعد.</b> يُحفَظ الحساب، <b>ولا تُكتب لها مسوّدة</b> حتّى يُبنى سائق الرفع.</span></div>`
       : ''
 
   const note: Record<ChannelHealthKind, string> = {
-    broken: `انقطع الربط، <b>والنشرُ على ${escapeHtml(spec.label)} متوقّفٌ حتّى تعيد ربطها</b>.`,
-    expiring: '<b>تعمل الآن، وتنقطع ما لم تُعِد ربطها.</b> والمجدولُ عليها يبقى في موعده.',
+    broken: `انقطع الربط، <b>والنشر على ${escapeHtml(spec.label)} متوقّف حتّى تعيد ربطها</b>.`,
+    expiring: '<b>تعمل الآن، وتنقطع ما لم تُعِد ربطها.</b> والمجدول عليها يبقى في موعده.',
     setup: `ينقص التطبيق. <b>أكمل إعدادَه مرّةً واحدة</b> ثمّ اربط حسابك.`,
-    connectable: 'التطبيقُ مضبوط، <b>وبقي أن تربط حسابك</b>.',
+    connectable: 'التطبيق مضبوط، <b>وبقي أن تربط حسابك</b>.',
     connected: escapeHtml(spec.note),
     unbuilt: escapeHtml(spec.note),
   }
@@ -387,14 +387,14 @@ export function channelsSection(
   const strip = `<div class="card grid tiles c3 mb-4">
     <div class="card tile"><div class="kv-k">متّصلة</div>
       <div class="kv-v">${n('connected')}<em> / ${built.length}</em></div>
-      <div class="note">تنشر الآن بلا فعلٍ منك</div></div>
-    <div class="card tile"><div class="kv-k">تحتاج إعادةَ ربط</div>
+      <div class="note">تنشر الآن بلا فعل منك</div></div>
+    <div class="card tile"><div class="kv-k">تحتاج إعادة ربط</div>
       <div class="kv-v">${relink}</div>
-      <div class="note">${relink === 0 ? 'ولا ربطَ يقترب انقطاعُه' : n('broken') > 0
-        ? '<b>النشرُ متوقّفٌ على المنقطعة</b>' : 'تعمل الآن، وتنقطع بعد أيّام'}</div></div>
+      <div class="note">${relink === 0 ? 'ولا ربط يقترب انقطاعُه' : n('broken') > 0
+        ? '<b>النشر متوقّف على المنقطعة</b>' : 'تعمل الآن، وتنقطع بعد أيّام'}</div></div>
     <div class="card tile"><div class="kv-k">تحتاج إعدادًا</div>
       <div class="kv-v">${n('setup', 'connectable')}</div>
-      <div class="note">تطبيقٌ يُضبط أو حسابٌ يُربط</div></div>
+      <div class="note">تطبيق يُضبط أو حساب يُربط</div></div>
   </div>`
 
   return `${strip}

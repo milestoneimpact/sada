@@ -35,34 +35,34 @@ const PNG_B64 = 'iVBORw0KGgo='
 
 describe('الصورة', () => {
   it('تُقرأ من base64', async () => {
-    const out = await generateImage(ai({ image: PNG_B64 }), 'قمّةٌ عند الفجر')
+    const out = await generateImage(ai({ image: PNG_B64 }), 'قمّة عند الفجر')
     expect(out.bytes.byteLength).toBeGreaterThan(0)
     expect(out.mime).toBe('image/png')
   })
 
-  it('وتُقرأ من تدفّقٍ كذلك — والشكلُ يختلف بين النماذج فيُفحَص', async () => {
+  it('وتُقرأ من تدفّق كذلك — والشكل يختلف بين النماذج فيُفحَص', async () => {
     const stream = new Response(new Uint8Array([1, 2, 3])).body!
     const out = await generateImage(ai(stream), 'ن')
     expect(Array.from(out.bytes)).toEqual([1, 2, 3])
   })
 
-  it('والنموذجُ الافتراضيّ يُذكَر في النتيجة — فيُسجَّل على الصفّ', async () => {
+  it('والنموذج الافتراضيّ يُذكَر في النتيجة — فيُسجَّل على الصفّ', async () => {
     const out = await generateImage(ai({ image: PNG_B64 }), 'ن')
     expect(out.model).toBe(IMAGE_MODELS.lucid)
   })
 
-  it('وجوابٌ بلا صورةٍ يُردّ ولا يُخمَّن', async () => {
+  it('وجواب بلا صورة يُردّ ولا يُخمَّن', async () => {
     await expect(generateImage(ai({}), 'ن')).rejects.toBeInstanceOf(AiError)
     await expect(generateImage(ai({ image: '' }), 'ن')).rejects.toBeInstanceOf(AiError)
   })
 
-  it('وتدفّقٌ فارغٌ يُعدّ عطلا يُعاد — لا صورةً صفرَ البايتات', async () => {
+  it('وتدفّق فارغ يُعدّ عطلا يُعاد — لا صورةً صفر البايتات', async () => {
     const empty = new Response(new Uint8Array(0)).body!
     await expect(generateImage(ai(empty), 'ن')).rejects.toMatchObject({ retryable: true })
   })
 
   /** «نفدت السعة» يُعاد، و«النموذج غير موجود» لا يُعاد. */
-  it('و«نفدت السعة» يُعاد، وخطأُ الاسم لا يُعاد', async () => {
+  it('و«نفدت السعة» يُعاد، وخطأ الاسم لا يُعاد', async () => {
     await expect(generateImage(throwing('3040 Out of capacity'), 'ن'))
       .rejects.toMatchObject({ retryable: true })
     await expect(generateImage(throwing('No such model'), 'ن'))
@@ -80,7 +80,7 @@ describe('الفيديو', () => {
   })
 
   /** الرأسيُّ هو الأصل: Shorts و Reels و TikTok كلُّها رأسيّة. */
-  it('و«صورة ← فيديو» بلا `ratio` — النسبةُ نسبةُ الصورة؛ ونموذجُ النصّ وحده يأخذها، والرأسيُّ أصلُه', async () => {
+  it('و«صورة ← فيديو» بلا `ratio` — النسبة نسبة الصورة؛ ونموذج النصّ وحده يأخذها، والرأسيّ أصلُه', async () => {
     const a = ai(ok)
     await generateVideo(a, { imageUrl: 'https://s/1.png', prompt: 'ن' })
     expect(a.calls[0]!.input).not.toHaveProperty('ratio')
@@ -90,7 +90,7 @@ describe('الفيديو', () => {
     expect(t.calls[0]!.input['ratio']).toBe('9:16')
   })
 
-  it('والمدّةُ تُقصّ عندنا لا تُترك لتُردّ عند المزوّد', () => {
+  it('والمدّة تُقصّ عندنا لا تُترك لتُردّ عند المزوّد', () => {
     expect(clampDuration(0)).toBe(MIN_SECONDS)
     expect(clampDuration(2)).toBe(MIN_SECONDS)
     expect(clampDuration(9)).toBe(9)
@@ -105,13 +105,13 @@ describe('الفيديو', () => {
   })
 
   /** حالةٌ غيرُ مكتملةٍ ليست كذبا: النموذجُ طويل، فتُعاد لا تُكذَّب. */
-  it('وحالةٌ غيرُ مكتملةٍ تُعاد ولا تُعدّ فشلا', async () => {
+  it('وحالة غير مكتملة تُعاد ولا تُعدّ فشلا', async () => {
     await expect(
       generateVideo(ai({ state: 'Running' }), { imageUrl: 'https://s/1.png', prompt: 'ن' }),
     ).rejects.toMatchObject({ retryable: true })
   })
 
-  it('ورابطٌ ليس https يُردّ — ولا يُوثَق بما يعود', async () => {
+  it('ورابط ليس https يُردّ — ولا يُوثَق بما يعود', async () => {
     for (const video of ['http://x/v.mp4', '', 'javascript:alert(1)', 42]) {
       await expect(
         generateVideo(ai({ state: 'Completed', result: { video } }), {
@@ -122,7 +122,7 @@ describe('الفيديو', () => {
   })
 })
 
-describe('سحبُ البايتات', () => {
+describe('سحب البايتات', () => {
   const bytes = (n: number): typeof fetch =>
     (async () =>
       new Response(new Uint8Array(n), {
@@ -136,18 +136,18 @@ describe('سحبُ البايتات', () => {
   })
 
   /** رابطٌ لا يُسحَب فورا يُفقَد: هو عند المزوّد لا عندنا. */
-  it('وفارغٌ يُعدّ عطلا يُعاد — لا فيديو صفرَ البايتات', async () => {
+  it('وفارغ يُعدّ عطلا يُعاد — لا فيديو صفر البايتات', async () => {
     await expect(fetchVideoBytes('https://x/v.mp4', bytes(0)))
       .rejects.toMatchObject({ retryable: true })
   })
 
-  it('وأكبرُ من الحدّ يُردّ ولا يُعاد — الإعادةُ تكرّر الحجمَ نفسه', async () => {
+  it('وأكبر من الحدّ يُردّ ولا يُعاد — الإعادة تكرّر الحجم نفسه', async () => {
     await expect(fetchVideoBytes('https://x/v.mp4', bytes(100), 10))
       .rejects.toMatchObject({ retryable: false })
   })
 
   /** **النوعُ من قائمةٍ** (D-152): ما ليس مقطعًا لا يُخزَّن ليُبَثّ تحت أصل اللوحة. */
-  it('ونوعٌ ليس مقطعًا يُرفَض ولا يُعاد — والمعامِلاتُ تُقصّ', async () => {
+  it('ونوع ليس مقطعًا يُرفَض ولا يُعاد — والمعامِلات تُقصّ', async () => {
     const typed = (type: string): typeof fetch =>
       (async () => new Response(new Uint8Array(4), { headers: { 'Content-Type': type } })) as unknown as typeof fetch
     await expect(fetchVideoBytes('https://x/v', typed('text/html; charset=utf-8')))
@@ -166,7 +166,7 @@ describe('سحبُ البايتات', () => {
       .rejects.toMatchObject({ retryable: false })
   })
 
-  it('وعطلُ شبكةٍ يُعاد', async () => {
+  it('وعطل شبكة يُعاد', async () => {
     const dead = (async () => { throw new Error('ECONNRESET') }) as unknown as typeof fetch
     await expect(fetchVideoBytes('https://x/v.mp4', dead))
       .rejects.toMatchObject({ retryable: true })
@@ -181,19 +181,19 @@ describe('السجلّ', () => {
    * ومحتوانا من مستنداتِ Drive الخاصّة، فالفرقُ ليس تفصيلا. واختبارٌ
    * يثبّته يمنع ترقيةً تبدو تحسينا وهي تنازلٌ عن خصوصيّة.
    */
-  it('نموذجُ الفيديو الافتراضيّ هو hh1 لا hh1.1', () => {
+  it('نموذج الفيديو الافتراضيّ هو hh1 لا hh1.1', () => {
     expect(VIDEO_MODELS.fromImage).toBe('alibaba/hh1-i2v')
     expect(VIDEO_MODELS.fromImage).not.toContain('1.1')
   })
 
-  it('ولا اسمَ نموذجٍ فارغ', () => {
+  it('ولا اسم نموذج فارغ', () => {
     for (const name of [...Object.values(IMAGE_MODELS), ...Object.values(VIDEO_MODELS)]) {
       expect(name.length).toBeGreaterThan(4)
     }
   })
 })
 
-describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () => {
+describe('وجه REST — لحساب غير حساب الـ Worker', () => {
   const seen: { url: string; auth: string; body: string }[] = []
   const stub = (
     reply: { status?: number; json?: unknown; bytes?: Uint8Array },
@@ -216,7 +216,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
       })
     }) as unknown as typeof fetch
 
-  it('ينادي حسابا بعينه ويحمل الرمزَ في الترويسة وحدها — ونموذجُ Workers AI على `‎/run/@cf/…`', async () => {
+  it('ينادي حسابا بعينه ويحمل الرمز في الترويسة وحدها — ونموذج Workers AI على `‎/run/@cf/…`', async () => {
     seen.length = 0
     const ai = restBinding('acc-1', 'tok-1', stub({ json: { success: true, result: { a: 1 } } }))
     await ai.run('@cf/leonardo/lucid-origin', { prompt: 'ن' })
@@ -234,7 +234,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
    * ‏D-188: كان «حرّكها فيديو» ينادي `‎/ai/run/alibaba/hh1-i2v` فيُردّ ‏400 في كلّ مرّة. نموذجُ الطرف
    * الثالث نهايتُه الجامعة `‎/ai/run` وجسدُه غلاف `{ model, input }`، وجوابُه شكلُ النموذج بلا `success`.
    */
-  it('ونموذجُ الطرف الثالث على `‎/ai/run` بغلاف { model, input }، وجوابُه يُعاد كما هو', async () => {
+  it('ونموذج الطرف الثالث على `‎/ai/run` بغلاف { model, input }، وجوابُه يُعاد كما هو', async () => {
     seen.length = 0
     const reply = { state: 'Completed', result: { video: 'https://example.com/v.mp4' }, gatewayMetadata: { keySource: 'Unified' } }
     const ai = restBinding('acc-1', 'tok-1', stub({ json: reply }))
@@ -248,7 +248,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
     expect(video.url).toBe('https://example.com/v.mp4')
   })
 
-  it('وسببُ الردّ بكلام المالك ومعه رمزُ Cloudflare، بلا الرابط الموقَّع', async () => {
+  it('وسبب الردّ بكلام المالك ومعه رمز Cloudflare، بلا الرابط الموقَّع', async () => {
     const ai = restBinding('a', 't', stub({
       status: 400,
       json: { success: false, errors: [{ code: 5006, message: 'invalid image url https://sada2.basserh.com/m/SECRET-TOKEN' }] },
@@ -261,7 +261,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
     expect(viaVideo.message.startsWith('رفضت Cloudflare الطلب')).toBe(true)
   })
 
-  it('و«صورة ← فيديو» بلا `ratio` (ليست في مخطّطه)، والرابطُ يُنادى ببوّابةٍ لنموذج الطرف الثالث', async () => {
+  it('و«صورة ← فيديو» بلا `ratio` (ليست في مخطّطه)، والرابط يُنادى ببوّابة لنموذج الطرف الثالث', async () => {
     const calls: { model: string; input: Record<string, unknown>; options?: Record<string, unknown> }[] = []
     const binding = {
       async run(model: string, input: Record<string, unknown>, options?: Record<string, unknown>) {
@@ -275,12 +275,12 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
   })
 
   /** يُفَضّ الغلافُ ليتّحد شكلُ الوجهين — فالمنادي لا يعرف بأيّهما نُودي. */
-  it('ويفضّ غلافَ Cloudflare إلى result', async () => {
+  it('ويفضّ غلاف Cloudflare إلى result', async () => {
     const ai = restBinding('a', 't', stub({ json: { success: true, result: { image: 'AAA' } } }))
     expect(await ai.run('m', {})).toEqual({ image: 'AAA' })
   })
 
-  it('وجوابٌ ليس JSON يعود بايتاتٍ كما هو', async () => {
+  it('وجواب ليس JSON يعود بايتات كما هو', async () => {
     const ai = restBinding('a', 't', stub({ bytes: new Uint8Array([1, 2, 3]) }))
     const out = await ai.run('m', {})
     expect(out).toBeInstanceOf(ArrayBuffer)
@@ -299,7 +299,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
   })
 
   /** ولا يُذكر الرمزُ في نصّ الخطأ — الرسائلُ تُسجَّل. */
-  it('ولا يظهر الرمزُ في رسالة الخطأ', async () => {
+  it('ولا يظهر الرمز في رسالة الخطأ', async () => {
     const ai = restBinding('a', 'super-secret', stub({ status: 403, json: {} }))
     await expect(ai.run('m', {})).rejects.toThrow(/^(?!.*super-secret).*$/)
   })
@@ -309,7 +309,7 @@ describe('وجهُ REST — لحسابٍ غيرِ حساب الـ Worker', () =>
  * ‏**نفادُ الرصيد بالنصّ الواحد من الوجهين** (D-214): الرابطُ يرمي «2021: Insufficient balance»
  * ووجهُ REST يردّ 402، والمهمّةُ M-30 ورسالةُ اللوحة تعرفانه بـ `NO_CREDIT` وحدَها.
  */
-describe('نفادُ رصيد AI Gateway', () => {
+describe('نفاد رصيد AI Gateway', () => {
   it('من الرابط: يُقال بالعبارة الواحدة، ولا يُعاد', async () => {
     const err = await generateVideo(throwing('AiError: 2021: Insufficient balance'), { imageUrl: 'https://s/1.png', prompt: 'ن' })
       .catch((e: unknown) => e)

@@ -18,7 +18,7 @@ async function seed(
   await db
     .prepare(
       `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
-       VALUES (?, 'linkedin', 'org', ?, 'صفحةُ صدى', 'active')`,
+       VALUES (?, 'linkedin', 'org', ?, 'صفحة صدى', 'active')`,
     )
     .bind(accountId, accountId).run()
 
@@ -64,8 +64,8 @@ const trio = (hour: number, a: number, b: number, c: number) => [
 
 beforeEach(() => { db = fakeDb() })
 
-describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف', () => {
-  it('**ولا يُقترَح شيءٌ دون العيّنة الدنيا**', async () => {
+describe('ساعات الذروة — والصمت حين لا يُعرَف', () => {
+  it('**ولا يُقترَح شيء دون العيّنة الدنيا**', async () => {
     await seed([...trio(9, 10, 12, 11), ...trio(14, 3, 4, 3)])
     const p = await readPeaks(db, 'linkedin')
     expect(p.samples).toBe(6)
@@ -81,13 +81,13 @@ describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف'
     expect(p.why).toContain(String(MIN_SAMPLES))
   })
 
-  it('وقاعدةٌ فارغةٌ تماما تصمت ولا ترمي', async () => {
+  it('وقاعدة فارغة تماما تصمت ولا ترمي', async () => {
     const p = await readPeaks(db, 'linkedin')
     expect(p.samples).toBe(0)
     expect(p.hours).toHaveLength(0)
   })
 
-  it('وبلوغُ العيّنة يفتح الاقتراحَ ويرتّبه نازلا', async () => {
+  it('وبلوغ العيّنة يفتح الاقتراح ويرتّبه نازلا', async () => {
     await seed([...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5)])
     const p = await readPeaks(db, 'linkedin')
     expect(p.samples).toBe(9)
@@ -102,7 +102,7 @@ describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف'
    * لا عادة**. وهنا ساعةُ ‏٣ فيها شاذّةٌ ‏٥٠٠ ومتوسّطُها يفوق ‏١٩،
    * **ووسيطُها لا يفوقها**.
    */
-  it('**وشاذّةٌ واحدةٌ لا تصنع ذروة**', async () => {
+  it('**وشاذّة واحدة لا تصنع ذروة**', async () => {
     // ‏ساعةُ ‏٣ فيها انتشارةٌ ‏٥٠٠ ومتوسّطُها ‏١٦٧ — يفوق ‏١٩ بأضعاف.
     // ‏ووسيطُها ‏١، لأنّ الثالثَ يُحيط بالشاذّة فلا تُزيح المركز
     await seed([
@@ -115,7 +115,7 @@ describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف'
   })
 
   /** **وساعةٌ بمنشورٍ واحدٍ لا تُرشَّح** — وسيطُ الواحد هو الواحد. */
-  it('ولا تُرشَّح ساعةٌ لم تبلغ الثلاث', async () => {
+  it('ولا تُرشَّح ساعة لم تبلغ الثلاث', async () => {
     await seed([
       ...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5),
       { hour: 7, reactions: 900 }, { hour: 23, reactions: 800 }, { hour: 23, reactions: 800 },
@@ -126,7 +126,7 @@ describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف'
   })
 
   /** **ولكلّ منصّةٍ ذروتُها** — وخلطُهما يعطي وسطا لا يصف أيّا منهما. */
-  it('ولا تُخلَط منصّةٌ بمنصّة', async () => {
+  it('ولا تُخلَط منصّة بمنصّة', async () => {
     await seed([...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5)])
     await seed(Array.from({ length: 9 }, (_, i) => (
       { hour: i < 5 ? 2 : 21, reactions: 99, platform: 'x' as const }
@@ -139,7 +139,7 @@ describe('ساعاتُ الذروة — والصمتُ حين لا يُعرَف'
     expect(x.hours.map((h) => h.hour).sort((a, b) => a - b)).toEqual([2, 21])
   })
 
-  it('وجدولٌ لم يُرحَّل لا يرمي — تصمت ولا تسقط', async () => {
+  it('وجدول لم يُرحَّل لا يرمي — تصمت ولا تسقط', async () => {
     await db.raw.prepare('DROP TABLE metrics').run()
     const p = await readPeaks(db, 'linkedin')
     expect(p.samples).toBe(0)

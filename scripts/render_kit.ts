@@ -52,23 +52,23 @@ const status = section(2, 'الحال والأعداد', `<div class="row">
   ${statusBadge('pending', '◍', 'مجدول')}
   ${statusBadge('idle', '○', 'مسوّدة')}
   ${count(3, { label: '3 تنتظرك' })}
-  ${count('!', { tone: 'bad', label: 'إعدادٌ سقط' })}
+  ${count('!', { tone: 'bad', label: 'إعداد سقط' })}
 </div>`)
 
 const cards = section(3, 'البطاقات', `<div class="grid">
-  ${card({ title: 'بطاقة', desc: 'سطحٌ وحدٌّ وظلٌّ خفيف.', body: '<p class="hint">جسدُ البطاقة.</p>' })}
-  ${card({ variant: 'interactive', href: '#kit', title: 'بطاقةٌ رابط', body: '<p class="hint">البطاقةُ كلُّها رابطٌ واحد.</p>' })}
-  ${card({ variant: 'inset', title: 'بطاقةٌ داخليّة', body: '<p class="hint">داخل بطاقةٍ أخرى.</p>' })}
-  ${card({ variant: 'alert', tone: 'warn', title: 'بطاقةُ تنبيه', body: '<p class="hint">حافّتُها بنغمة الحال.</p>' })}
+  ${card({ title: 'بطاقة', desc: 'سطح وحدّ وظلّ خفيف.', body: '<p class="hint">جسد البطاقة.</p>' })}
+  ${card({ variant: 'interactive', href: '#kit', title: 'بطاقة رابط', body: '<p class="hint">البطاقة كلُّها رابط واحد.</p>' })}
+  ${card({ variant: 'inset', title: 'بطاقة داخليّة', body: '<p class="hint">داخل بطاقة أخرى.</p>' })}
+  ${card({ variant: 'alert', tone: 'warn', title: 'بطاقة تنبيه', body: '<p class="hint">حافّتُها بنغمة الحال.</p>' })}
 </div>`)
 
 const fields = section(4, 'الحقول', `<div class="card">
-  ${field({ id: 'kit-a', label: 'اسمُ الحساب', control: '<input type="text" name="a">' })}
-  ${field({ id: 'kit-b', label: 'الوصف', optional: true, hint: 'جملةٌ واحدةٌ تظهر تحت الاسم.', control: '<input type="text" name="b">' })}
-  ${field({ id: 'kit-c', label: 'المعرّف', error: 'المعرّفُ لا تعرفه المنصّة.', control: '<input type="text" name="c" dir="ltr" value="abc">' })}
+  ${field({ id: 'kit-a', label: 'اسم الحساب', control: '<input type="text" name="a">' })}
+  ${field({ id: 'kit-b', label: 'الوصف', optional: true, hint: 'جملة واحدة تظهر تحت الاسم.', control: '<input type="text" name="b">' })}
+  ${field({ id: 'kit-c', label: 'المعرّف', error: 'المعرّف لا تعرفه المنصّة.', control: '<input type="text" name="c" dir="ltr" value="abc">' })}
 </div>`)
 
-const choice = section(5, 'التبويبات والمقطع', `${tabs('حالُ المسوّدات', [
+const choice = section(5, 'التبويبات والمقطع', `${tabs('حال المسوّدات', [
   { label: 'تنتظر', href: '#kit', current: true, count: 3 },
   { label: 'مجدولة', href: '#kit' },
   { label: 'فشلت', href: '#kit', count: 1, bad: true },
@@ -80,25 +80,25 @@ const choice = section(5, 'التبويبات والمقطع', `${tabs('حالُ
 ])}</div>`)
 
 const notices = section(6, 'الإشعارات', `${notice({ tone: 'ok', html: 'حُفظت المسوّدة.' })}
-${notice({ tone: 'warn', html: 'الرمزُ ينتهي بعد يومين.' })}
+${notice({ tone: 'warn', html: 'الرمز ينتهي بعد يومين.' })}
 ${notice({ tone: 'bad', html: 'لم يُنشر المنشور: انتهى الإذن.' })}`)
 
-const empty = section(7, 'الحالةُ الفارغة', emptyState({
-  title: 'لا مسوّداتٍ بعد',
-  html: 'اكتب من فكرتك أو من ملفٍّ في Drive.',
+const empty = section(7, 'الحالة الفارغة', emptyState({
+  title: 'لا مسوّدات بعد',
+  html: 'اكتب من فكرتك أو من ملفّ في Drive.',
 }))
 
 const menus = section(8, 'القائمة', `<div class="row">${menu({
   label: 'المزيد',
   items: [
     menuItem({ label: 'افتح في المحرّر', href: '#kit' }),
-    menuItem({ label: 'انسخ الرابط', href: '#kit', note: 'رابطُ المنشور على المنصّة' }),
+    menuItem({ label: 'انسخ الرابط', href: '#kit', note: 'رابط المنشور على المنصّة' }),
   ],
 })}</div>`)
 
-const body = `${pageHead('للمطوّر', 'كتالوجُ المكوّنات', 'كلُّ مكوّنٍ في صدى بحالاته، من الدالّة التي تُخدَم.')}
+const body = `${pageHead('للمطوّر', 'كتالوج المكوّنات', 'كلّ مكوّن في صدى بحالاته، من الدالّة التي تُخدَم.')}
 <div id="kit">${buttons}${status}${cards}${fields}${choice}${notices}${empty}${menus}</div>`
 
-writeAudited(out, soloPage('صدى — كتالوجُ المكوّنات', { href: '/panel', label: 'اللوحة' }, body, 'n', '',
+writeAudited(out, soloPage('صدى — كتالوج المكوّنات', { href: '/panel', label: 'اللوحة' }, body, 'n', '',
   buildCommands({ onPanel: false }), soloNav('settings')))
 console.log(`رُسم ${out}`)

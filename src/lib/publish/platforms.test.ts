@@ -10,7 +10,7 @@ import { PublishError, uploadXMedia, xMediaCategory } from './platforms'
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 
 describe('uploadXMedia', () => {
-  it('يرسل الوسيطَ وفئتَه، ويقرأ معرّفَ v2', async () => {
+  it('يرسل الوسيط وفئتَه، ويقرأ معرّف v2', async () => {
     let sent: FormData | null = null
     const fetchImpl = (async (_url: string, init?: RequestInit) => {
       sent = init?.body as FormData
@@ -23,7 +23,7 @@ describe('uploadXMedia', () => {
     expect(form.get('media')).toBeInstanceOf(Blob)
   })
 
-  it('والرفضُ يسمّي الحقلَ الذي سمّاه X — لا «Invalid Request» وحدها', async () => {
+  it('والرفض يسمّي الحقل الذي سمّاه X — لا «Invalid Request» وحدها', async () => {
     const fetchImpl = (async () =>
       Response.json(
         { title: 'Invalid Request', errors: [{ message: 'The `media_category` field can not be empty' }] },
@@ -36,7 +36,7 @@ describe('uploadXMedia', () => {
     )
   })
 
-  it('والفئةُ من النوع', () => {
+  it('والفئة من النوع', () => {
     expect(xMediaCategory('image/jpeg')).toBe('tweet_image')
     expect(xMediaCategory('image/gif')).toBe('tweet_gif')
     expect(xMediaCategory('video/mp4')).toBe('tweet_video')

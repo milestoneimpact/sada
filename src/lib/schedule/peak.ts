@@ -89,7 +89,7 @@ export async function readPeaks(db: Db, platform: string): Promise<Peaks> {
     return {
       samples,
       hours: [],
-      why: `لم تُقَس بعد — ${samples} من ${MIN_SAMPLES} منشوراتٍ نُشرت وقِيست`,
+      why: `لم تُقَس بعد — ${samples} من ${MIN_SAMPLES} منشورات نُشرت وقِيست`,
     }
   }
 
@@ -126,7 +126,7 @@ export async function readPeaks(db: Db, platform: string): Promise<Peaks> {
     return {
       samples,
       hours: [],
-      why: `قِيست العيّنةُ ولم تبلغ ساعةٌ ${PER_HOUR} منشورات — ولا عادةَ في موعدٍ لم يتكرّر`,
+      why: `قِيست العيّنة ولم تبلغ ساعة ${PER_HOUR} منشورات — ولا عادة في موعد لم يتكرّر`,
     }
   }
   return { samples, hours, why: null }

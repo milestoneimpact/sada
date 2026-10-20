@@ -148,7 +148,7 @@ const PAD = 28
 function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
     `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
-  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جارٍ…" data-swap
+  return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جار…" data-swap
       aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
       <span class="ago">انقلها إلى</span>${buttons}</form>`
@@ -207,7 +207,7 @@ function scheduler(
       ${gone
         ? '<span class="ago">ولا تُستردّ من هناك</span>'
         : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
-             data-confirm="سحبُ الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جارٍ…" data-swap>
+             data-confirm="سحب الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جار…" data-swap>
              <input type="hidden" name="id" value="${escapeHtml(d.id)}">
              <button class="btn btn-secondary btn-sm" type="submit">اسحب الموعد</button></form>`}
     </div>`
@@ -223,7 +223,7 @@ function scheduler(
   const lacking = missingMedia(d.platform, readyMimes(d, media))
   if (lacking !== null) {
     return `<div class="card card-inset sched none" ${anchor}>
-      ${statusBadge('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطعَ بعد' : 'لا صورةَ ولا مقطعَ بعد')}
+      ${statusBadge('warn', '!', CLIP_PLATFORMS.has(d.platform) ? 'لا مقطع بعد' : 'لا صورة ولا مقطع بعد')}
       <span class="ago">${escapeHtml(lacking)}. واعتُمد النصّ ويبقى.</span>
     </div>`
   }
@@ -234,15 +234,15 @@ function scheduler(
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
       return `<div class="card card-inset sched none" ${anchor}>
-        ${statusBadge('warn', '!', `الصفحةُ مربوطة — والنشرُ باسمها لم يُبنَ`)}
+        ${statusBadge('warn', '!', `الصفحة مربوطة — والنشر باسمها لم يُبن`)}
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
-          أو انتظر موافقةَ <span class="mono">Community Management API</span>.</span>
+          أو انتظر موافقة <span class="mono">Community Management API</span>.</span>
         <span class="grow"></span>
         <a class="btn btn-secondary btn-sm" href="/panel/tasks">ما عليك</a>
       </div>`
     }
     return `<div class="card card-inset sched none" ${anchor}>
-      ${statusBadge('warn', '!', `لا قناةَ ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
+      ${statusBadge('warn', '!', `لا قناة ${escapeHtml(specOf(d.platform).label)} مربوطة`)}
       <span class="ago">اعتُمد النصّ، ويبقى حتّى تُربَط قناتُه — ولا يضيع.</span>
       <span class="grow"></span>
       <a class="btn btn-secondary btn-sm" href="#channels">اربط قناة</a>
@@ -261,7 +261,7 @@ function scheduler(
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
         .join('')}</select></div>`
-  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جارٍ…" data-swap>
+  return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جار…" data-swap>
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     ${account}
     <div class="quick" data-quick="wh-${id}">
@@ -274,7 +274,7 @@ function scheduler(
       <button class="btn btn-primary btn-sm" type="submit">جدوِل</button>
       <span class="mirror" data-mirror="wh-${id}"></span>
     </div>
-    <details class="sched-more"><summary>موعدٌ آخر</summary>
+    <details class="sched-more"><summary>موعد آخر</summary>
       <div class="field"><label for="wh-${id}">${zone === null ? 'اليوم والساعة بتوقيت الرياض' : 'اليوم والساعة بتوقيتك'}</label>
         <input id="wh-${id}" name="local" type="datetime-local" data-when data-local data-zone="${escapeHtml(zone ?? FALLBACK_ZONE)}"
           min="${escapeHtml(earliest)}"></div>
@@ -296,7 +296,7 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
   const id = escapeHtml(d.id)
   const fit = targets.filter((t) => t.platform === d.platform)
   const oneStep = fit.length === 1 && missingMedia(d.platform, readyMimes(d, media)) === null
-  return `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جارٍ…" data-swap>
+  return `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جار…" data-swap>
              <input type="hidden" name="id" value="${id}">${oneStep
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
@@ -308,7 +308,7 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
 export function requeueForm(id: string, primary: boolean): string {
-  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جارٍ…">
+  return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جار…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
     <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
 }
@@ -328,15 +328,15 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
   if (peaks.hours.length === 0) {
     return peaks.why === null
       ? ''
-      : `<p class="hint peak"><b>لا اقتراحَ للموعد</b> — ${escapeHtml(peaks.why)}.
-           <span class="ago">واقتراحٌ لم يُقَس أسوأُ من حقلٍ خامّ.</span></p>`
+      : `<p class="hint peak"><b>لا اقتراح للموعد</b> — ${escapeHtml(peaks.why)}.
+           <span class="ago">واقتراح لم يُقَس أسوأ من حقل خامّ.</span></p>`
   }
   const said = peaks.hours
-    .map((h) => `<span class="chip mono" title="وسيطُ التفاعل ${h.median} في ${h.posts} منشورات"
+    .map((h) => `<span class="chip mono" title="وسيط التفاعل ${h.median} في ${h.posts} منشورات"
       >${clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)}</span>`)
     .join('')
-  return `<p class="hint peak"><b>أعلى تفاعلٍ قِيس</b> عند ${said}
-    <span class="ago">${zone === null ? 'بتوقيت الرياض · ' : ''}من ${peaks.samples} منشوراتٍ نُشرت وقِيست — خبرٌ لا أمر.</span></p>`
+  return `<p class="hint peak"><b>أعلى تفاعل قِيس</b> عند ${said}
+    <span class="ago">${zone === null ? 'بتوقيت الرياض · ' : ''}من ${peaks.samples} منشورات نُشرت وقِيست — خبر لا أمر.</span></p>`
 }
 
 /**
@@ -361,7 +361,7 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
  */
 /** أشكالُ الإنفوجرافيك بأسمائها — تُقرأ تحت الصورة. */
 const INFO_KIND: Readonly<Record<string, string>> = {
-  pillars: 'أعمدة', layers: 'طبقات', steps: 'خطوات', stats: 'أرقام', bars: 'أعمدةٌ بيانيّة', compare: 'مقارنة', quote: 'فكرةٌ واحدة',
+  pillars: 'أعمدة', layers: 'طبقات', steps: 'خطوات', stats: 'أرقام', bars: 'أعمدة بيانيّة', compare: 'مقارنة', quote: 'فكرة واحدة',
 }
 
 function slideLine(m: MediaView): string {
@@ -371,7 +371,7 @@ function slideLine(m: MediaView): string {
     return `<div class="pic-foot">
         ${statusBadge('ok', '●', `إنفوجرافيك${kind === '' ? '' : ` · ${escapeHtml(kind)}`}`)}
         <span class="ago">${m.note === null || m.note === ''
-          ? 'المحتوى من نصّ المنشور بصياغة نموذج الكتابة، ولا رقمَ فيه لا يرد في النصّ.'
+          ? 'المحتوى من نصّ المنشور بصياغة نموذج الكتابة، ولا رقم فيه لا يرد في النصّ.'
           : escapeHtml(m.note)}</span>
       </div>`
   }
@@ -385,9 +385,9 @@ function slideLine(m: MediaView): string {
          </div>`
   }
   const off = m.note.endsWith(OVERLAY_OFF)
-  const offered = m.headline === null ? '' : ` — والعنوانُ المقترح «${escapeHtml(m.headline)}»`
+  const offered = m.headline === null ? '' : ` — والعنوان المقترح «${escapeHtml(m.headline)}»`
   return `<div class="pic-foot">
-      ${off ? statusBadge('idle', '○', 'بلا نصٍّ فوقها') : statusBadge('warn', '!', 'بلا نصٍّ فوقها')}
+      ${off ? statusBadge('idle', '○', 'بلا نصّ فوقها') : statusBadge('warn', '!', 'بلا نصّ فوقها')}
       <span class="ago">عند التوليد: ${escapeHtml(m.note)}${offered}</span>
     </div>`
 }
@@ -427,7 +427,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
         <span class="chip mono">${kb(owned.bytes)}</span>
         ${owned.width !== null && owned.height !== null
           ? `<span class="chip mono">${owned.width}×${owned.height}</span>` : ''}
-        <span class="ago">يُنشر كما هو — والنصُّ أعلاه وصفُه.</span>
+        <span class="ago">يُنشر كما هو — والنصّ أعلاه وصفُه.</span>
       </div>
     </div>`
   }
@@ -438,19 +438,19 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     const alt = info && ready.headline !== null
       ? `إنفوجرافيك: ${ready.headline}`
       : ready.note === '' && ready.headline !== null
-        ? `صورةٌ مولَّدة وعليها: ${ready.headline}`
-        : 'صورةٌ مولَّدة تصاحب المنشور'
+        ? `صورة مولَّدة وعليها: ${ready.headline}`
+        : 'صورة مولَّدة تصاحب المنشور'
     // ‏والأبعادُ المحفوظةُ تحجز المكانَ بنسبته الحقيقيّة (D-174)، وإلّا فمقاسُ الشريحة
     const slide = d.platform === 'instagram' ? INFO_SIZE.instagram : SLIDE_SIZE[d.platform]
     const w = ready.width ?? slide.width
     const h = ready.height ?? slide.height
     const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string =>
-      `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جارٍ التوليد…" ${stagesAttr('image')}>
+      `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جار التوليد…" ${stagesAttr('image')}>
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
          <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' disabled' : ''}
-           title="تُرفَض هذه بعد أن يمرّ التوليدُ بحرّاسه، فلا يبقى المنشورُ بلا صورة">${label}</button></form>`
+           title="تُرفَض هذه بعد أن يمرّ التوليد بحرّاسه، فلا يبقى المنشور بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
         loading="lazy" width="${w}" height="${h}">
@@ -466,14 +466,14 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
               // **ولا زرَّ تحريكٍ على صورةٍ لها مقطع**: كانت الضغطةُ تُردّ «لهذا
               // المنشور مقطعٌ من قبل» — زرٌّ يُعرَض ليُقال إنّه لا يفعل شيئا
               ? `<form class="inline" method="POST" action="/panel/media/animate"
-                   data-busy="جارٍ التحريك…" ${stagesAttr('motion')}>
+                   data-busy="جار التحريك…" ${stagesAttr('motion')}>
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
                <button class="btn btn-secondary btn-sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
               : ''}
              ${info
                ? `${regen('infographic', 'ولّد إنفوجرافيك بديلًا', lines.infoBlocked)}${regen('illustration', 'بدّلها صورةً فنّيّة', lines.imageBlocked)}`
                : `${regen('illustration', 'ولّد صورةً بديلة', lines.imageBlocked)}${regen('infographic', 'بدّلها إنفوجرافيك', lines.infoBlocked)}`}
-             <form class="inline" method="POST" action="/panel/media/reject" data-busy="جارٍ…">
+             <form class="inline" method="POST" action="/panel/media/reject" data-busy="جار…">
                <input type="hidden" name="id" value="${escapeHtml(ready.id)}">
                <button class="btn btn-secondary btn-sm" type="submit">ارفض الصورة</button></form>`
           : ''}
@@ -483,7 +483,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
-             ${statusBadge('ok', '●', `مقطعٌ رأسيّ 15ث`)}
+             ${statusBadge('ok', '●', `مقطع رأسيّ 15ث`)}
              <span class="chip mono">${kb(clip.bytes)}</span>
              <span class="ago">يصلح لـ Shorts و Reels و TikTok — وهي كلُّها رأسيّة.</span>
            </div>`}
@@ -499,16 +499,16 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">${caption}</span>
     <span class="grow"></span>
-    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ الرسم…" ${stagesAttr('image')}>
+    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار الرسم…" ${stagesAttr('image')}>
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
       <input type="hidden" name="style" value="infographic">
       <button class="btn btn-primary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
     ${lines.info}
     <details class="art">
-      <summary>أو صورةٌ فنّيّة</summary>
+      <summary>أو صورة فنّيّة</summary>
       <div class="art-row">
         <span class="ago">${lines.caption}</span>
-        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جارٍ التوليد…" ${stagesAttr('image')}>
+        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار التوليد…" ${stagesAttr('image')}>
           <input type="hidden" name="id" value="${escapeHtml(d.id)}">
           <input type="hidden" name="style" value="illustration">
           <button class="btn btn-secondary btn-sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
@@ -577,10 +577,10 @@ export function readyLines(ready: MediaReady): ReadyLines {
     videoBlocked: ready.video.blocked,
     // ‏والصورةُ الفنّيّةُ تُرسم من موجزٍ يترجم النصّ، ولا تُرسم بوصفٍ عامّ إن سقط (D-174)
     caption: overlay === undefined
-      ? 'مشهدٌ من موجزٍ يترجم النصّ، <b>بلا حرف</b>: النصُّ في المنشور حيث يُقرأ.'
+      ? 'مشهد من موجز يترجم النصّ، <b>بلا حرف</b>: النصّ في المنشور حيث يُقرأ.'
       : overlay.state === 'done'
-        ? 'مشهدٌ من موجزٍ يترجم النصّ، <b>وفوقه عنوانٌ من كلمتين أو ثلاث</b>.'
-        : 'مشهدٌ من موجزٍ يترجم النصّ، <b>بلا عنوانٍ فوقه بعد</b> — وما ينقصه تحت الزرّ.',
+        ? 'مشهد من موجز يترجم النصّ، <b>وفوقه عنوان من كلمتين أو ثلاث</b>.'
+        : 'مشهد من موجز يترجم النصّ، <b>بلا عنوان فوقه بعد</b> — وما ينقصه تحت الزرّ.',
   }
 }
 
@@ -681,12 +681,12 @@ function filterTabs(drafts: readonly DraftRow[]): string {
    */
   const platforms = [...new Set(drafts.map((d) => d.platform))]
   const ptabs = [
-    `<button type="button" class="menu-item" data-platform-tab="all" data-label="كلُّ المنصّات" aria-pressed="true">كلُّ المنصّات${count(drafts.length)}</button>`,
+    `<button type="button" class="menu-item" data-platform-tab="all" data-label="كلّ المنصّات" aria-pressed="true">كلّ المنصّات${count(drafts.length)}</button>`,
     ...platforms.map((p) => `<button type="button" class="menu-item" data-platform-tab="${escapeHtml(p)}" data-label="${escapeHtml(platformLabel(p))}" aria-pressed="false"
       >${escapeHtml(platformLabel(p))}${count(drafts.filter((d) => d.platform === p).length)}</button>`),
   ].join('')
   const order = `<label class="order"><span class="sub">الترتيب</span>
-    <select id="draft-order" aria-label="ترتيبُ المسوّدات">
+    <select id="draft-order" aria-label="ترتيب المسوّدات">
       <option value="urgent" selected>الأهمّ أوّلًا</option>
       <option value="new">الأحدث أوّلًا</option>
       <option value="old">الأقدم أوّلًا</option>
@@ -701,11 +701,11 @@ function filterTabs(drafts: readonly DraftRow[]): string {
   const more = `<span class="grow"></span><details class="menu draft-more" id="draft-more">
     <summary class="btn btn-quiet btn-sm">${ICON.filter}<span>مرشّحات</span><span class="draft-more-on" data-more-on></span></summary>
     <div class="menu-list">
-      <div id="draft-platform" role="group" aria-label="فرزُ المسوّدات بالمنصّة">${ptabs}</div>
+      <div id="draft-platform" role="group" aria-label="فرز المسوّدات بالمنصّة">${ptabs}</div>
       <div class="menu-seg">${order}</div>
     </div>
   </details>`
-  return `<nav class="tab-bar" id="draft-filter" aria-label="فرزُ المسوّدات" hidden>${tabs}${more}</nav>`
+  return `<nav class="tab-bar" id="draft-filter" aria-label="فرز المسوّدات" hidden>${tabs}${more}</nav>`
 }
 
 /**
@@ -744,8 +744,8 @@ function preview(d: DraftRow, target: string): string {
     <p class="pv-body" data-post-text><b data-pv-first>${escapeHtml(first)}</b><span data-pv-rest>${
       rest.length === 0 ? '' : escapeHtml('\n' + rest.join('\n'))
     }</span></p>
-    <p class="pv-note">تقريبٌ لا محاكاة: السطرُ الأوّل ما يُقرأ أوّلا.
-      <b>والطيُّ لا يُرسَم</b> — حدُّه يتبدّل بالجهاز ولم يُقَس، ورقمٌ من
+    <p class="pv-note">تقريب لا محاكاة: السطر الأوّل ما يُقرأ أوّلا.
+      <b>والطيّ لا يُرسَم</b> — حدُّه يتبدّل بالجهاز ولم يُقَس، ورقم من
       الذاكرة يجعلك تقصّر نصَّك على وهم.</p>
   </div>`
 }
@@ -771,7 +771,7 @@ export function notesPane(d: DraftRow, counted: number, hardLimit: number): stri
   return `<details class="notes">
     <summary>${statusBadge('idle', '◍', `${
       notes.length} ملحوظةً على الصياغة`)}
-      <span class="ago">تُقرأ ولا تمنع — والقرارُ لك</span></summary>
+      <span class="ago">تُقرأ ولا تمنع — والقرار لك</span></summary>
     <ul class="plain">${notes
       .map(
         (n) => `<li><b>${escapeHtml(n.text)}</b>${
@@ -800,7 +800,7 @@ export function platformMark(p: string): string {
 
 /** مَن كتبها — **باسم الخدمة لا بمعرّف النموذج** (D-198)، والمعرّفُ تحت «التفاصيل» في المحرّر وحدَها. */
 export function writerName(model: string | null): string {
-  if (model === null || model === '') return 'غيرُ مسجَّل'
+  if (model === null || model === '') return 'غير مسجَّل'
   if (model === 'owner' || model === 'upload') return 'أنت'
   const m = model.toLowerCase()
   if (m.startsWith('claude')) return 'Claude'
@@ -808,7 +808,7 @@ export function writerName(model: string | null): string {
   if (m.startsWith('gemini')) return 'Gemini'
   if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3')) return 'GPT'
   if (m.startsWith('plan')) return 'خطّتك من ملفّ'
-  return 'نموذجُ الكتابة'
+  return 'نموذج الكتابة'
 }
 
 /** أوّلُ كلماتِ المنشور اسمًا لزرّه: «عدّل» على عشر بطاقاتٍ عشرُ وجهاتٍ باسمٍ واحد لقارئ الشاشة. */
@@ -863,7 +863,7 @@ function card(
    * ‏و«أعده»)، كما أبقاهما D-195، والمعتمَدةُ نموذجُ جدولتها في الطيّة، والمسوّدةُ سطرُ مصدرها إن تغيّر.
    */
   const line = d.status === 'failed'
-    ? `<p class="pc-line" data-tone="bad">${statusBadge('bad', '▲', 'لم يُنشر')}<span>سببُه وزرُّ إعادته في «الموعدُ والتفاصيل».</span></p>`
+    ? `<p class="pc-line" data-tone="bad">${statusBadge('bad', '▲', 'لم يُنشر')}<span>سببُه وزرّ إعادته في «الموعد والتفاصيل».</span></p>`
     : ''
   // ‏وموعدُ المجدولة في سطر الحساب قصيرًا بـ UTC، وبتوقيتك في شريطها تحت الطيّة
   const when = d.status === 'queued' && d.scheduledAt !== null
@@ -877,12 +877,12 @@ function card(
 
   const more: string[] = []
   if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true, optimistic: 'رُفضت' }))
-  more.push(menuItem({ label: 'رحلةُ المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
+  more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
-    `<span class="chip mono" title="كلفةُ الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
+    `<span class="chip mono" title="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك. ورابطٌ على X ثلاثةَ عشرَ
      * ضعفا (D-003 · D-069): يُعلَّم تحذيرا ليُرى قبل النقر لا بعده.
@@ -928,11 +928,11 @@ function card(
         : lengthOf(d) > ceilingOf(spec.hardLimit)
           ? `<span class="draft-len ${lengthOf(d) > spec.hardLimit ? 'bad' : 'warn'}"><b>${lengthOf(d)}</b> / ${spec.hardLimit}</span>`
           : ''}
-      ${menu({ label: 'أفعالٌ أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
+      ${menu({ label: 'أفعال أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: more })}
     </div>
     ${here
-      ? '<p class="pc-line"><span class="ago">مفتوحةٌ في المحرّر بجوارها.</span></p>'
-      : `<details class="draft-more"><summary>${open ? 'المعاينةُ والصورةُ والموعد' : 'الموعدُ والصورةُ والتفاصيل'}</summary>
+      ? '<p class="pc-line"><span class="ago">مفتوحة في المحرّر بجوارها.</span></p>'
+      : `<details class="draft-more"><summary>${open ? 'المعاينة والصورة والموعد' : 'الموعد والصورة والتفاصيل'}</summary>
       ${open ? preview(d, spec.label) : ''}
       ${editDiff(d)}
       ${imagePane(d, media, lines)}
@@ -1046,7 +1046,7 @@ function ideaCard(input: DraftsInput): string {
     ? { text: blocked.text, label: blocked.label, href: blocked.href }
     : input.ready
       ? null
-      : { text: 'مزوّدُ مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
+      : { text: 'مزوّد مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
   const boxes = IDEA_PLATFORMS.map((p) => {
     const link = input.links?.[p]
     // ‏غيرُ المتّصل لا يُؤشَّر: تُكتب مسوّدتُه إن اختاره، ولا تُجدوَل حتّى يربطه
@@ -1056,25 +1056,25 @@ function ideaCard(input: DraftsInput): string {
         <span class="vpf-b"><b>${escapeHtml(PLATFORMS[p].label)}</b>
           ${link === undefined ? '' : linkLine(p, link, PRIVATE_ONLY)}
           <span class="ago">${p === 'x'
-            ? `فكرةٌ واحدةٌ في ${PLATFORMS.x.hardLimit} محرفًا`
-            : `فقراتٌ قصيرةٌ حتّى ${PLATFORMS.linkedin.hardLimit} محرف`}</span></span>
+            ? `فكرة واحدة في ${PLATFORMS.x.hardLimit} محرفًا`
+            : `فقرات قصيرة حتّى ${PLATFORMS.linkedin.hardLimit} محرف`}</span></span>
       </label>`
   }).join('')
   return `<div class="card mt-3" id="idea">
     <div class="card-head"><h2>اكتب من فكرتك</h2></div>
-    <p class="hint">جملةٌ أو كلماتٌ قليلة، ونكتب منها لكلّ منصّةٍ مسوّدتَها بطولها ونبرتها.
-      <b>وتقرؤها وتعتمدها أنت</b> — لا يُنشر شيءٌ قبل ذلك.</p>
-    <form method="POST" action="/panel/drafts/idea" data-busy="جارٍ كتابة المسوّدات…" ${stagesAttr('idea')}>
+    <p class="hint">جملة أو كلمات قليلة، ونكتب منها لكلّ منصّة مسوّدتَها بطولها ونبرتها.
+      <b>وتقرؤها وتعتمدها أنت</b> — لا يُنشر شيء قبل ذلك.</p>
+    <form method="POST" action="/panel/drafts/idea" data-busy="جار كتابة المسوّدات…" ${stagesAttr('idea')}>
       ${field({
         id: 'di-text',
         label: 'فكرتك أو كلماتك',
-        hint: 'مثل: «الحوكمةُ لا تبطئ القرار، تحميه» — أو كلماتٌ متفرّقة: «قيادة، ثقة، أوّل مئة يوم».',
+        hint: 'مثل: «الحوكمة لا تبطئ القرار، تحميه» — أو كلمات متفرّقة: «قيادة، ثقة، أوّل مئة يوم».',
         control: `<textarea name="idea" rows="3" required maxlength="${IDEA_MAX}"></textarea>`,
       })}
       <div class="vpfs mt-3" role="group" aria-label="اكتب لـ">${boxes}</div>
       ${pickLine('تُكتب مسوّدتُها ولا تُجدوَل')}
       <div class="row">
-        <span class="ago">نداءٌ لكلّ منصّةٍ تختارها، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.</span>
+        <span class="ago">نداء لكلّ منصّة تختارها، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.</span>
         <span class="grow"></span>
         ${button({
           label: 'اكتب المسوّدات',
@@ -1108,11 +1108,11 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
     writable.length === 0
       ? emptyState({
           title: 'لا مصدر جاهزا للكتابة',
-          html: `الكتابةُ تنطلق من خلاصةِ تحليلٍ لا من المستند نفسه.
+          html: `الكتابة تنطلق من خلاصة تحليل لا من المستند نفسه.
               حلّل مصدرا أوّلا ثمّ عد.`,
           action: '<a class="btn btn-secondary btn-sm" href="#sources">اذهب إلى المصادر</a>',
         })
-      : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…" ${stagesAttr('write')}>
+      : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جار الكتابة…" ${stagesAttr('write')}>
            <div class="field"><label for="dw-src">المصدر</label>
              <select id="dw-src" name="id">${writable
                .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)
@@ -1125,7 +1125,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
                  (spec) =>
                    // ‏ومنصّةُ المقطع تقول ذلك قبل أن يُدفَع ثمنُ الكتابة: نصُّها وصفٌ لا يُنشَر وحدَه
                    `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — ${CLIP_PLATFORMS.has(spec.id)
-                     ? 'وصفُ مقطع (يحتاج مقطعًا)' : `حتّى ${spec.hardLimit} محرفا`}</option>`,
+                     ? 'وصف مقطع (يحتاج مقطعًا)' : `حتّى ${spec.hardLimit} محرفا`}</option>`,
                )
                .join('')}</select></div>
            <div class="grow"></div>
@@ -1137,7 +1137,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
                 <a class="tap" href="${escapeHtml(blocked.href)}">${escapeHtml(blocked.label)}</a></p>`
            : input.ready
              ? ''
-             : '<p class="hint m-0 mt-2">مزوّدُ مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
+             : '<p class="hint m-0 mt-2">مزوّد مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
 
   /*
    * لوحُ الاختصارات — **ولا يُعرض إلّا حيث تعمل**.
@@ -1147,7 +1147,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    * السكربتُ — لأنّها كلَّها لا تعمل بدونه.
    */
   const keys = `<details class="card card-inset keys" id="keys" hidden>
-    <summary>اختصاراتُ لوحة المفاتيح <span class="grow"></span><kbd>?</kbd></summary>
+    <summary>اختصارات لوحة المفاتيح <span class="grow"></span><kbd>?</kbd></summary>
     <div class="rows">
       <span class="row-k"><kbd>J</kbd><kbd>K</kbd> التنقّل</span>
       <span class="row-k"><kbd>A</kbd> اعتمد</span>
@@ -1168,7 +1168,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
       ? emptyState({
           echo: true,
           title: 'لا مسوّدات بعد',
-          html: 'اكتب واحدةً من فكرتك أو من مصدرٍ محلَّل، وستظهر هنا لتقرأها وتقرّر.',
+          html: 'اكتب واحدةً من فكرتك أو من مصدر محلَّل، وستظهر هنا لتقرأها وتقرّر.',
           action: button({ label: 'اكتب من فكرتك', variant: 'primary', size: 'sm', href: '#idea' }),
         })
       : `<div class="dcols">${byUrgency(drafts)
@@ -1191,11 +1191,11 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    * **وشريطٌ يقول «٠ محدَّدة» أبدا زينةٌ تشغل مكانا**.
    */
   const bulk = `<form id="bulk" class="bulkbar" method="POST"
-      action="/panel/drafts/approve-many" data-busy="جارٍ الاعتماد…" hidden>
+      action="/panel/drafts/approve-many" data-busy="جار الاعتماد…" hidden>
     ${statusBadge('ok', '●', `<b data-bulk-n>0</b> محدَّدة`)}
     <span class="ago" data-bulk-cost></span>
     <span class="grow"></span>
-    <button type="button" class="btn btn-secondary btn-sm" data-bulk-clear>ألغِ التحديد</button>
+    <button type="button" class="btn btn-secondary btn-sm" data-bulk-clear>ألغ التحديد</button>
     <button class="btn btn-primary btn-sm" type="submit">اعتمدها كما كُتبت</button>
   </form>`
 
@@ -1217,21 +1217,21 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
     ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
     <span class="grow"></span>
     <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
-      <p class="hint m-0">الاعتمادُ يجيز النشرَ ولا ينشر وحدَه: <b>لا يُنشر منشورٌ بلا موافقةٍ مسجّلة</b>، والقيدُ في القاعدة لا في هذه الصفحة.</p>
+      <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
     </details>
   </div>
   ${filterTabs(drafts)}
   ${spreadBar(input)}
   ${keys}
   ${cards}
-  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدةَ في هذا الفرز', html: 'غيّر التبويبَ أعلاه، أو اختر «الكلّ».' })}`
+  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدة في هذا الفرز', html: 'غيّر التبويب أعلاه، أو اختر «الكلّ».' })}`
 
   const write = `${ideaCard(input)}
 
   <div class="card mt-3" id="write">
     <div class="card-head"><h2>الكتابة من مصدر</h2></div>
-    <p class="hint">نداءٌ واحدٌ لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
-      <b>ولا كتابةَ آليّة</b> — الإنفاق يبدأ بقرارك لا بدورةِ ساعة.</p>
+    <p class="hint">نداء واحد لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
+      <b>ولا كتابة آليّة</b> — الإنفاق يبدأ بقرارك لا بدورة ساعة.</p>
     ${writer}
   </div>`
   return { list, write }
@@ -1261,17 +1261,17 @@ function spreadBar(input: DraftsInput): string {
    * ‏‹mm/dd/yyyy› ولا UTC في أوّل ما يراه، ويُعرَض الجدولُ كاملًا قبل أن يقع منه شيء كما كان.
    */
   return `<details class="card card-inset spread" id="spread">
-    <summary>${statusBadge('ok', '●', `${ready} جاهزةٌ للتوزيع`)}<span class="grow"></span><span class="btn btn-secondary btn-sm spread-go">وزّعها</span></summary>
+    <summary>${statusBadge('ok', '●', `${ready} جاهزة للتوزيع`)}<span class="grow"></span><span class="btn btn-secondary btn-sm spread-go">وزّعها</span></summary>
     <form id="spread-form" class="spread-form" method="POST" action="/panel/drafts/spread">
-      ${whenField('spread-form', input.zone ?? null, input.now, undefined, 'أوّلُ موعد')}
+      ${whenField('spread-form', input.zone ?? null, input.now, undefined, 'أوّل موعد')}
       <div class="row">
-        <div class="field"><label for="sp-gap">بين كلِّ اثنتين (ساعة)</label>
+        <div class="field"><label for="sp-gap">بين كلّ اثنتين (ساعة)</label>
           <input id="sp-gap" name="gap" type="number" inputmode="numeric"
             min="1" max="168" value="24" required></div>
         <span class="grow"></span>
         <button class="btn btn-primary" type="submit">اعرض الجدول</button>
       </div>
-      <p class="hint m-0">يُعرَض الجدولُ كاملًا قبل أن يقع منه شيء.</p>
+      <p class="hint m-0">يُعرَض الجدول كاملًا قبل أن يقع منه شيء.</p>
     </form>
   </details>`
 }

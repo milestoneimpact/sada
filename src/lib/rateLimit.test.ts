@@ -36,7 +36,7 @@ describe('العدّ', () => {
     expect((await recordFailure(kv, request)).blocked).toBe(true)
   })
 
-  it('يعدّ كلّ عنوان على حدة — فلا يحجب مخمّنٌ المالكَ', async () => {
+  it('يعدّ كلّ عنوان على حدة — فلا يحجب مخمّن المالك', async () => {
     for (let i = 0; i < MAX_ATTEMPTS; i += 1) await recordFailure(kv, from('9.9.9.9'))
     expect((await attemptState(kv, from('9.9.9.9'))).blocked).toBe(true)
     expect((await attemptState(kv, from('1.1.1.1'))).blocked).toBe(false)
@@ -56,7 +56,7 @@ describe('العدّ', () => {
     expect((await attemptState(kv, request)).attempts).toBe(0)
   })
 
-  it('للعدّ مهلةٌ تنتهي وحدها — لا جدول ينمو ولا صفوف تُنظَّف', async () => {
+  it('للعدّ مهلة تنتهي وحدها — لا جدول ينمو ولا صفوف تُنظَّف', async () => {
     await recordFailure(kv, from('1.1.1.1'))
     expect(kv.ttlOf('login-attempts:1.1.1.1')).toBe(WINDOW_SECONDS)
   })
@@ -76,7 +76,7 @@ describe('التأخير المتصاعد', () => {
 })
 
 describe('السقف العامّ — ما يمنع الحملة الموزّعة', () => {
-  it('محاولاتٌ من عناوين شتّى لا يوقفها سقف العنوان، ويوقفها العامّ', async () => {
+  it('محاولات من عناوين شتّى لا يوقفها سقف العنوان، ويوقفها العامّ', async () => {
     // كلّ عنوانٍ يخطئ مرّتين: دون سقفه بكثير، وفوق السقف العامّ مجتمعا
     for (let i = 0; i < MAX_GLOBAL_ATTEMPTS / 2; i += 1) {
       const ip = `198.51.100.${i}`
@@ -89,7 +89,7 @@ describe('السقف العامّ — ما يمنع الحملة الموزّع�
     expect(fresh.blocked).toBe(true)
   })
 
-  it('نجاحُ الدخول لا يُصفّر العدّ العامّ — وإلّا صار أداةً تُنعش الحملة', async () => {
+  it('نجاح الدخول لا يُصفّر العدّ العامّ — وإلّا صار أداةً تُنعش الحملة', async () => {
     for (let i = 0; i < MAX_GLOBAL_ATTEMPTS; i += 1) {
       await recordFailure(kv, from(`198.51.100.${i}`))
     }

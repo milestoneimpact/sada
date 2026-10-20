@@ -34,7 +34,7 @@ function schemaOf(name: string): string {
   return row?.sql ?? ''
 }
 
-describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => {
+describe('أعمدة أُضيفت بعد أوّل بناء تبقى', () => {
   /** من 0009 — **وبناءٌ ينساه يمحو أثرَ كلّ إرسال**. */
   it('posts.dispatched_at', () => {
     expect(schemaOf('posts')).toContain('dispatched_at')
@@ -80,12 +80,12 @@ describe('أعمدةٌ أُضيفت بعد أوّل بناءٍ تبقى', () => 
   })
 })
 
-describe('قيودُ D-009 أربعةٌ لا تنقص', () => {
+describe('قيود D-009 أربعة لا تنقص', () => {
   /**
    * **والعددُ يُعَدّ لا يُقرأ.** قيدٌ يسقط لا يُغيّر شكلَ الجدول ولا يكسر
    * اختبارا، **ويفتح ما أُغلق بقرار**: منشورٌ يُنشَر بلا موافقةٍ مسجّلة.
    */
-  it('ثلاثةٌ تحرس النشرَ وواحدٌ يحرس السلسلة', () => {
+  it('ثلاثة تحرس النشر وواحد يحرس السلسلة', () => {
     const sql = schemaOf('posts')
     const checks = sql.match(/CHECK\s*\(/g) ?? []
     // ثلاثةٌ على الأعمدة (platform · type · has_url · status) وأربعةٌ للجدول
@@ -97,7 +97,7 @@ describe('قيودُ D-009 أربعةٌ لا تنقص', () => {
   })
 
   /** **ويُجرَّب القيدُ لا يُقرأ وحدَه**: نصٌّ يُقرأ صحيحا وقد لا يعمل. */
-  it('ومنشورٌ بلا موافقةٍ يُردّ فعلا', () => {
+  it('ومنشور بلا موافقة يُردّ فعلا', () => {
     const db = fakeDb()
     db.raw.exec(
       `INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
@@ -111,10 +111,10 @@ describe('قيودُ D-009 أربعةٌ لا تنقص', () => {
   })
 })
 
-describe('قيدُ المنصّة يتّسع بقدر ما بُني', () => {
+describe('قيد المنصّة يتّسع بقدر ما بُني', () => {
   const PLATFORMS = ['linkedin', 'x', 'youtube', 'tiktok', 'instagram'] as const
 
-  it('الحساباتُ تقبل الخمسَ', () => {
+  it('الحسابات تقبل الخمس', () => {
     const db = fakeDb()
     for (const [i, p] of PLATFORMS.entries()) {
       expect(() => db.raw.exec(
@@ -124,7 +124,7 @@ describe('قيدُ المنصّة يتّسع بقدر ما بُني', () => {
     }
   })
 
-  it('وأسرارُ التطبيقات كذلك', () => {
+  it('وأسرار التطبيقات كذلك', () => {
     const db = fakeDb()
     for (const p of PLATFORMS) {
       expect(() => db.raw.exec(
@@ -135,7 +135,7 @@ describe('قيدُ المنصّة يتّسع بقدر ما بُني', () => {
     }
   })
 
-  it('والمنشوراتُ كذلك', () => {
+  it('والمنشورات كذلك', () => {
     const db = fakeDb()
     for (const [i, p] of PLATFORMS.entries()) {
       expect(() => db.raw.exec(
@@ -146,7 +146,7 @@ describe('قيدُ المنصّة يتّسع بقدر ما بُني', () => {
   })
 
   /** **وما لم يُبنَ له سائقٌ يبقى مردودا** — الحارسُ يُفتَح بقدر ما بُني. */
-  it('وما لم يُبنَ يبقى مردودا', () => {
+  it('وما لم يُبن يبقى مردودا', () => {
     const db = fakeDb()
     expect(() => db.raw.exec(
       `INSERT INTO posts (id, platform, type, text, status, idempotency_key)
@@ -165,8 +165,8 @@ describe('قيدُ المنصّة يتّسع بقدر ما بُني', () => {
  * ‏0027» في شرحٍ أو وثيقة صار لا يُدرى أيَّ الملفّين يعني. **والفجوةُ
  * مثلُه**: ترحيلٌ حُذف بعد أن طُبّق على قاعدةٍ ولم يُطبَّق على أخرى.
  */
-describe('أرقامُ الترحيلات تسلسلٌ لا يتكرّر', () => {
-  it('من 0001 بلا تكرارٍ ولا فجوة', () => {
+describe('أرقام الترحيلات تسلسل لا يتكرّر', () => {
+  it('من 0001 بلا تكرار ولا فجوة', () => {
     const names = readdirSync(new URL('../../migrations/', import.meta.url))
       .filter((name) => name.endsWith('.sql'))
       .sort()
@@ -181,8 +181,8 @@ describe('أرقامُ الترحيلات تسلسلٌ لا يتكرّر', () =>
  * أُضيف `org_id` و`brand_id` بقيمةٍ افتراضيّةٍ هي منظّمةُ المالك وعلامتُه. فصفٌّ
  * يُكتَب بالشيفرة الحاليّة — التي لا تعرف المنظّمة بعد — يقع في منظّمته لا في فراغ.
  */
-describe('أساسُ تعدّد المستأجرين', () => {
-  it('منظّمةُ المالك وعلامتُه موجودتان', () => {
+describe('أساس تعدّد المستأجرين', () => {
+  it('منظّمة المالك وعلامتُه موجودتان', () => {
     const db = fakeDb()
     const org = db.raw.prepare("SELECT kind FROM orgs WHERE id = 'org_owner'").get() as { kind: string } | undefined
     const brand = db.raw.prepare("SELECT org_id FROM brands WHERE id = 'brand_owner'").get() as { org_id: string } | undefined
@@ -190,14 +190,14 @@ describe('أساسُ تعدّد المستأجرين', () => {
     expect(brand?.org_id).toBe('org_owner')
   })
 
-  it('صفٌّ يُكتَب بلا منظّمةٍ يُنسَب إلى المالك', () => {
+  it('صفّ يُكتَب بلا منظّمة يُنسَب إلى المالك', () => {
     const db = fakeDb()
     db.raw.prepare("INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 'f1', 'n', 'text/plain', 'h')").run()
     const row = db.raw.prepare("SELECT org_id, brand_id FROM sources WHERE id = 's1'").get() as { org_id: string; brand_id: string }
     expect(row).toEqual({ org_id: 'org_owner', brand_id: 'brand_owner' })
   })
 
-  it('جداولُ العمل كلُّها تحمل org_id', () => {
+  it('جداول العمل كلُّها تحمل org_id', () => {
     const tables = ['accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
       'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger', 'audit_log',
       'reports', 'token_alerts', 'media_claims', 'alert_outbox', 'oauth_apps', 'uploads', 'media']

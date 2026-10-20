@@ -15,19 +15,19 @@ describe('القيم الأولى من الترحيل', () => {
     expect(settings.dailySpendCapUsd).toBe(5)
   })
 
-  it('الإدراج الآليّ مطفأ افتراضا — إنفاقٌ يبدأ بلا قرارٍ صريح ليس ميزة', async () => {
+  it('الإدراج الآليّ مطفأ افتراضا — إنفاق يبدأ بلا قرار صريح ليس ميزة', async () => {
     expect((await readSettings(db)).autoEnqueue).toBe(false)
   })
 
   /** ولا صفَّ له في ترحيل: غيابُه يعود إلى الافتراض المحافظ لا إلى اللانهاية (D-168). */
-  it('سقفُ المقاطع مقطعان بلا صفٍّ في القاعدة', async () => {
+  it('سقف المقاطع مقطعان بلا صفّ في القاعدة', async () => {
     expect(DEFAULTS.dailyVideoCap).toBe(2)
     expect((await readSettings(db)).dailyVideoCap).toBe(2)
   })
 })
 
-describe('سقفُ المقاطع اليوميّ (D-168)', () => {
-  it('عددٌ صحيحٌ مقصوصٌ على حدّيه — والإشعارُ يقرأ ما حُفظ', async () => {
+describe('سقف المقاطع اليوميّ (D-168)', () => {
+  it('عدد صحيح مقصوص على حدّيه — والإشعار يقرأ ما حُفظ', async () => {
     expect((await writeSetting(db, 'daily_video_cap', '3', 'panel')).stored).toBe('3')
     expect((await readSettings(db)).dailyVideoCap).toBe(3)
 
@@ -39,7 +39,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
     expect((await writeSetting(db, 'daily_video_cap', 'كثير', 'panel')).stored).toBe('2')
   })
 
-  it('وقيمةٌ كُتبت بيدٍ في القاعدة تُقرأ مقصوصةً كذلك', async () => {
+  it('وقيمة كُتبت بيد في القاعدة تُقرأ مقصوصةً كذلك', async () => {
     db.raw.exec(`INSERT INTO settings (key, value, updated_by) VALUES ('daily_video_cap', '5000.7', 'hand')`)
     expect((await readSettings(db)).dailyVideoCap).toBe(LIMITS.dailyVideoCap.max)
   })
@@ -56,7 +56,7 @@ describe('مفاتيح الخطر تُقرأ بالمطابقة لا بالتس�
     expect((await readSettings(db)).autoEnqueue).toBe(true)
   })
 
-  it('غيابُ الصفّ يعني مطفأ لا مرفوعا', async () => {
+  it('غياب الصفّ يعني مطفأ لا مرفوعا', async () => {
     db.raw.exec("DELETE FROM settings WHERE key = 'auto_enqueue'")
     expect((await readSettings(db)).autoEnqueue).toBe(false)
   })
@@ -77,7 +77,7 @@ describe('الكتابة', () => {
     }
   })
 
-  it('يسجّل مَن غيّر ومتى — أثرٌ قابل للتدقيق', async () => {
+  it('يسجّل مَن غيّر ومتى — أثر قابل للتدقيق', async () => {
     await writeSetting(db, 'daily_analysis_cap', '25', 'panel')
     const row = db.raw
       .prepare("SELECT updated_by, updated_at FROM settings WHERE key = 'daily_analysis_cap'")
@@ -113,12 +113,12 @@ describe('الحدود تحرس من خطأ الإصبع', () => {
 })
 
 describe('حين تنقص القاعدة', () => {
-  it('جدولٌ محذوف يعيد الافتراضات المحافظة لا عطلا ولا لانهاية', async () => {
+  it('جدول محذوف يعيد الافتراضات المحافظة لا عطلا ولا لانهاية', async () => {
     db.raw.exec('DROP TABLE settings')
     expect(await readSettings(db)).toEqual(DEFAULTS)
   })
 
-  it('صفٌّ محذوف لا يفتح الباب — paused تعود false والسقوف إلى قيمها', async () => {
+  it('صفّ محذوف لا يفتح الباب — paused تعود false والسقوف إلى قيمها', async () => {
     db.raw.exec('DELETE FROM settings')
     const settings = await readSettings(db)
     expect(settings.paused).toBe(false)
@@ -134,14 +134,14 @@ describe('حين تنقص القاعدة', () => {
  * فأُضيف `alert_webhook` إلى النوع في D-109 **ونُسي في المجموعة** —
  * فالحقلُ يُعرَض ويُضغَط «احفظ» **ويردّ الخادمُ ‏٤٠٠ صامتة**.
  */
-describe('مفاتيحُ الإعدادات — قائمةٌ حيّةٌ لا نوعٌ يُمحى', () => {
-  it('**وكلُّ مفتاحٍ يُقرأ له قيمةٌ يُكتَب له مثلُها**', () => {
+describe('مفاتيح الإعدادات — قائمة حيّة لا نوع يُمحى', () => {
+  it('**وكلّ مفتاح يُقرأ له قيمة يُكتَب له مثلُها**', () => {
     // ‏ما يُقرأ في `readSettings` يُبنى من هذه القائمة نفسِها
     expect(new Set(SETTING_KEYS).has('alert_webhook')).toBe(true)
     expect(SETTING_KEYS.length).toBeGreaterThanOrEqual(7)
   })
 
-  it('ولا مفتاحَ مكرَّرٌ في القائمة', () => {
+  it('ولا مفتاح مكرَّر في القائمة', () => {
     expect(new Set(SETTING_KEYS).size).toBe(SETTING_KEYS.length)
   })
 
@@ -150,13 +150,13 @@ describe('مفاتيحُ الإعدادات — قائمةٌ حيّةٌ لا ن�
     ['http://localhost/hook'],
     ['http://169.254.169.254/x'],
     ['ليس عنوانا'],
-  ])('وعنوانُ قناةٍ مرفوضٌ يُخزَّن فارغا: %s', async (raw) => {
+  ])('وعنوان قناة مرفوض يُخزَّن فارغا: %s', async (raw) => {
     const db = fakeDb()
     const r = await writeSetting(db, 'alert_webhook', raw, 'panel')
     expect(r.stored).toBe('')
   })
 
-  it('وعنوانٌ عامٌّ صحيحٌ يُحفَظ كما هو', async () => {
+  it('وعنوان عامّ صحيح يُحفَظ كما هو', async () => {
     const db = fakeDb()
     const r = await writeSetting(db, 'alert_webhook', 'https://hooks.example.com/t/a', 'panel')
     expect(r.stored).toContain('hooks.example.com')
@@ -167,15 +167,15 @@ describe('مفاتيحُ الإعدادات — قائمةٌ حيّةٌ لا ن�
  * **اسمٌ لكلّ مفتاح** (D-134): ما يُقرأ في «ما وقع اليوم» وسجلّ الأمان
  * والإشعارات اسمٌ عربيّ، لا `dashboard_tiles` بحرفها.
  */
-describe('أسماءُ الإعدادات (D-134)', () => {
-  it('كلُّ مفتاحٍ في SETTING_KEYS له اسمٌ عربيٌّ يخالف حرفَه', () => {
+describe('أسماء الإعدادات (D-134)', () => {
+  it('كلّ مفتاح في SETTING_KEYS له اسم عربيّ يخالف حرفَه', () => {
     for (const key of SETTING_KEYS) {
       expect(SETTING_LABEL[key], key).toMatch(/[\u0600-\u06FF]/)
       expect(SETTING_LABEL[key]).not.toBe(key)
     }
   })
 
-  it('وما ليس مفتاحًا يُعاد بحرفه — القاموسُ لا يخترع', () => {
+  it('وما ليس مفتاحًا يُعاد بحرفه — القاموس لا يخترع', () => {
     expect(settingLabel('dashboard_tiles')).toBe('بطاقات اللوح')
     expect(settingLabel('weekly_promo_cap_usd')).toBe('سقف الترويج الأسبوعيّ')
     expect(settingLabel('daily_video_cap')).toBe('سقف المقاطع اليوميّ')
@@ -187,8 +187,8 @@ describe('أسماءُ الإعدادات (D-134)', () => {
  * ‏**مَن يرى مقاطع YouTube وTikTok** (D-190): خاصٌّ حتّى يقلبه المالكُ بعد الإجازة. ويُقرأ كمفاتيح
  * ‏الخطر: «true» وحدها تقلبه، والغيابُ والفسادُ خاصّ — نشرٌ للعامّة لا يقع بقيمةٍ لم تُفهَم.
  */
-describe('النشرُ العلنيّ بعد الإجازة (D-190)', () => {
-  it('خاصٌّ بالافتراض، و«true» وحدها تقلبه، ويُعاد خاصًّا', async () => {
+describe('النشر العلنيّ بعد الإجازة (D-190)', () => {
+  it('خاصّ بالافتراض، و«true» وحدها تقلبه، ويُعاد خاصًّا', async () => {
     expect(await readSettings(db)).toMatchObject({ youtubePublic: false, tiktokPublic: false })
     expect(DEFAULTS).toMatchObject({ youtubePublic: false, tiktokPublic: false })
     await writeSetting(db, 'youtube_public', 'yes', 'panel')

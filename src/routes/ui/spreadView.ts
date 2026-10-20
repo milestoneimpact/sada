@@ -47,13 +47,13 @@ function row(index: number, when: string, label: string, preview: string, zone: 
 export function spreadScreen(d: SpreadScreenData): string {
   const { slots, skipped } = d.plan
   // ‏رأسُ الصفحة كبقيّة الصفحات المستقلّة: أين أنا قبل ما سيقع (Krug · axe «page-has-heading-one»)
-  const head = pageHead('المنشورات', 'توزيعُ المعتمَد', 'معاينةُ المواعيد قبل أن يقع منها شيء.')
+  const head = pageHead('المنشورات', 'توزيع المعتمَد', 'معاينة المواعيد قبل أن يقع منها شيء.')
 
   if (slots.length === 0) {
     return `${head}<section class="card">
-      <h2>لا شيءَ يُوزَّع</h2>
-      <p class="hint">لا مسوّدةَ معتمَدةً لها قناةٌ مربوطة. والاعتمادُ وحدَه لا يكفي
-        — تُربَط قناةُ المنصّة أوّلا.</p>
+      <h2>لا شيء يُوزَّع</h2>
+      <p class="hint">لا مسوّدة معتمَدةً لها قناة مربوطة. والاعتماد وحدَه لا يكفي
+        — تُربَط قناة المنصّة أوّلا.</p>
       ${skipped.length === 0
         ? ''
         : `<ul class="plain">${skipped
@@ -65,9 +65,9 @@ export function spreadScreen(d: SpreadScreenData): string {
 
   return `${head}<section class="card">
     <h2>هذا ما سيقع — ${counted(slots.length, NOUNS.post)}</h2>
-    <p class="hint">كلُّ ${d.gap} ساعةً منشور، ابتداءً من
+    <p class="hint">كلّ ${d.gap} ساعةً منشور، ابتداءً من
       <b class="mono">${escapeHtml(stamp(d.start.replace('T', ' '), null))}</b>.
-      <b>ولا يقع منه شيءٌ حتّى تضغط «اعتمد التوزيع»</b>.</p>
+      <b>ولا يقع منه شيء حتّى تضغط «اعتمد التوزيع»</b>.</p>
 
     <div class="scroll"><table>
       <thead><tr><th>#</th><th>المنشور</th><th>الحساب</th><th>الموعد</th></tr></thead>
@@ -83,13 +83,13 @@ export function spreadScreen(d: SpreadScreenData): string {
        * خارجَ السلّم، ولم يُمسَك لأنّ الشاشةَ لم تكن تُرسَم. فيلبس صنفَ
        * عنوان القسم كأخواته.
        */
-      : `<h3 class="sec">وخارجَ الجدول — ${skipped.length}</h3>
+      : `<h3 class="sec">وخارج الجدول — ${skipped.length}</h3>
          <p class="hint">تبقى معتمَدةً كما هي، ولا يضيع منها شيء.</p>
          <ul class="plain">${skipped
            .map((s) => `<li><b>${escapeHtml(s.preview)}</b> — ${escapeHtml(s.reason)}</li>`)
            .join('')}</ul>`}
 
-    <form method="POST" action="/panel/drafts/spread/apply" data-busy="جارٍ الجدولة…">
+    <form method="POST" action="/panel/drafts/spread/apply" data-busy="جار الجدولة…">
       <input type="hidden" name="_csrf" value="${escapeHtml(d.csrf)}">
       <input type="hidden" name="start" value="${escapeHtml(d.start)}">
       <input type="hidden" name="gap" value="${String(d.gap)}">

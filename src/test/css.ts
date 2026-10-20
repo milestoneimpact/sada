@@ -146,18 +146,18 @@ export function parseCss(src: string): Rule[] {
   const top = (): string | undefined => stack.at(-1)
   let buf = ''
   let quote = ''
-  let last = '(أوّلُ الورقة)'
+  let last = '(أوّل الورقة)'
 
   const close = (head: string): void => {
     const context = stack.map(atKey).join(' ')
     if (isGroup(head)) {
-      if (buf.trim() !== '') throw new Error(`نصٌّ بلا قاعدة داخل «${atKey(head)}»: «${excerpt(buf)}»`)
+      if (buf.trim() !== '') throw new Error(`نصّ بلا قاعدة داخل «${atKey(head)}»: «${excerpt(buf)}»`)
       return
     }
     const decls: Record<string, string> = {}
     for (const d of splitTop(buf, ';')) {
       const i = d.indexOf(':')
-      if (i <= 0) throw new Error(`تصريحٌ بلا نقطتين في «${excerpt(head)}»: «${excerpt(d)}»`)
+      if (i <= 0) throw new Error(`تصريح بلا نقطتين في «${excerpt(head)}»: «${excerpt(d)}»`)
       merge(decls, d.slice(0, i).trim(), valueKey(d.slice(i + 1)))
     }
     const selectors = head.startsWith('@') ? [atKey(head)] : splitTop(head, ',').map(selKey)
@@ -174,7 +174,7 @@ export function parseCss(src: string): Rule[] {
     }
     if (c === '/' && src[i + 1] === '*') {
       const end = src.indexOf('*/', i + 2)
-      if (end === -1) throw new Error(`تعليقٌ لم يُغلَق بعد «${excerpt(last)}»`)
+      if (end === -1) throw new Error(`تعليق لم يُغلَق بعد «${excerpt(last)}»`)
       buf += ' '
       i = end + 1
       continue
@@ -188,11 +188,11 @@ export function parseCss(src: string): Rule[] {
       const holder = top()
       const head = buf.trim()
       if (holder !== undefined && !isGroup(holder)) {
-        throw new Error(`كتلةٌ داخل قاعدة «${excerpt(holder)}»: قوسٌ لم يُغلَق قبل «${excerpt(head)}»`)
+        throw new Error(`كتلة داخل قاعدة «${excerpt(holder)}»: قوس لم يُغلَق قبل «${excerpt(head)}»`)
       }
-      if (head === '') throw new Error(`قاعدةٌ بلا محدّد بعد «${excerpt(last)}»`)
+      if (head === '') throw new Error(`قاعدة بلا محدّد بعد «${excerpt(last)}»`)
       if (!head.startsWith('@') && head.includes(';')) {
-        throw new Error(`محدّدٌ فيه «;» فيُسقطه المتصفّح: «${excerpt(head)}»`)
+        throw new Error(`محدّد فيه «;» فيُسقطه المتصفّح: «${excerpt(head)}»`)
       }
       stack.push(head)
       buf = ''
@@ -200,7 +200,7 @@ export function parseCss(src: string): Rule[] {
     }
     if (c === '}') {
       const head = stack.pop()
-      if (head === undefined) throw new Error(`قوسُ إغلاقٍ بلا فتح بعد «${excerpt(last)}»`)
+      if (head === undefined) throw new Error(`قوس إغلاق بلا فتح بعد «${excerpt(last)}»`)
       close(head)
       buf = ''
       continue
@@ -215,10 +215,10 @@ export function parseCss(src: string): Rule[] {
     }
     buf += c
   }
-  if (quote !== '') throw new Error(`اقتباسٌ لم يُغلَق بعد «${excerpt(last)}»`)
+  if (quote !== '') throw new Error(`اقتباس لم يُغلَق بعد «${excerpt(last)}»`)
   const open = top()
   if (open !== undefined) throw new Error(`${stack.length} كتلةً لم تُغلَق، آخرُها «${excerpt(open)}»`)
-  if (buf.trim() !== '') throw new Error(`نصٌّ بعد آخر قاعدة: «${excerpt(buf)}»`)
+  if (buf.trim() !== '') throw new Error(`نصّ بعد آخر قاعدة: «${excerpt(buf)}»`)
   return out
 }
 

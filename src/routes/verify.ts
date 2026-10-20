@@ -48,8 +48,8 @@ export const VERIFICATIONS: readonly SiteVerification[] = [
     file: 'tiktokN1WYOuMzZInIGczXYTbkHqsu05KyYWy0.txt',
     body: 'tiktok-developers-site-verification=N1WYOuMzZInIGczXYTbkHqsu05KyYWy0',
     why:
-      'إثباتُ ملكيّة النطاق في TikTok for Developers — ' +
-      'وبدونه لا يُقبَل رابطُ العودة، فلا يعمل الربط (M-14).',
+      'إثبات ملكيّة النطاق في TikTok for Developers — ' +
+      'وبدونه لا يُقبَل رابط العودة، فلا يعمل الربط (M-14).',
   },
 ]
 

@@ -79,7 +79,7 @@ interface PostRow {
 /** حالُ المسوّدة بلسانٍ يفهمه المالك — لا باسم العمود. */
 const DECISION: Readonly<Record<string, { title: string; detail: string }>> = {
   approved: { title: 'اعتمدتَها', detail: 'كما كُتبت، بلا تعديل' },
-  edited: { title: 'اعتمدتَها بعد تعديل', detail: 'النصُّ المعتمَد نصُّك أنت' },
+  edited: { title: 'اعتمدتَها بعد تعديل', detail: 'النصّ المعتمَد نصُّك أنت' },
   rejected: { title: 'رفضتَها', detail: 'وتبقى بكلفتها — فما دُفع ثمنُه يُرى' },
 }
 
@@ -91,11 +91,11 @@ const DECISION: Readonly<Record<string, { title: string; detail: string }>> = {
  */
 const ATTEMPT: Readonly<Record<string, { title: string; detail: string }>> = {
   succeeded: { title: 'نُشرت', detail: '' },
-  sent: { title: 'أُرسلت ولم يعد الجواب', detail: 'طلبٌ غادر إلى المنصّة، وردُّها لم يُسجَّل' },
-  failed: { title: 'لم تنجح', detail: 'ردّت المنصّةُ بخطأ — وصدى يعيد المحاولة' },
+  sent: { title: 'أُرسلت ولم يعد الجواب', detail: 'طلب غادر إلى المنصّة، وردُّها لم يُسجَّل' },
+  failed: { title: 'لم تنجح', detail: 'ردّت المنصّة بخطأ — وصدى يعيد المحاولة' },
   skipped_duplicate: {
     title: 'تُخطّيت — مكرَّرة',
-    detail: 'المفتاحُ نفسُه نُشر من قبل، فلم يُدفَع ثمنُه مرّتين',
+    detail: 'المفتاح نفسُه نُشر من قبل، فلم يُدفَع ثمنُه مرّتين',
   },
 }
 
@@ -109,7 +109,7 @@ const ATTEMPT: Readonly<Record<string, { title: string; detail: string }>> = {
 function slideSaid(note: string | null, headline: string | null): string {
   if (note === null) return ''
   if (note === '') return headline === null ? '' : ` · وعليها «${headline}»`
-  return ` · بلا نصٍّ فوقها: ${note}`
+  return ` · بلا نصّ فوقها: ${note}`
 }
 
 /**
@@ -125,7 +125,7 @@ function slideSaid(note: string | null, headline: string | null): string {
  * حين يُسأل «لماذا لم يظهر للعامّة».
  */
 function published(id: string | null, json: string | null): string {
-  const parts = [id ?? 'بلا معرّفٍ من المنصّة']
+  const parts = [id ?? 'بلا معرّف من المنصّة']
   if (json !== null) {
     try {
       const v = JSON.parse(json) as { request?: { privacy_level?: unknown; privacy?: unknown; direct?: unknown }; note?: unknown }
@@ -169,7 +169,7 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
   // ولا يُصطنَع له أصلٌ ليكتمل الخطّ
   if (post.source_name !== null) {
     stations.push({
-      kind: 'source', title: 'ملفٌّ في Drive', at: post.last_seen_at,
+      kind: 'source', title: 'ملفّ في Drive', at: post.last_seen_at,
       detail: post.source_name, cost: null, model: null, state: 'done',
     })
   }
@@ -178,7 +178,7 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
   if (post.summary !== null) {
     const worth = post.worth_score === null
       ? 'بلا درجة'
-      : `درجةُ الاستحقاق ${Math.round(post.worth_score * 100)}٪`
+      : `درجة الاستحقاق ${Math.round(post.worth_score * 100)}٪`
     stations.push({
       kind: 'analysis', title: 'قُرئ وحُلّل', at: post.extracted_at,
       detail: worth, cost: null, model: null, state: 'done',
@@ -260,10 +260,10 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
 
   for (const a of attempts) {
     const ok = a.status === 'succeeded'
-    const shape = ATTEMPT[a.status] ?? { title: 'محاولةٌ بحالٍ غير معروف', detail: a.status }
+    const shape = ATTEMPT[a.status] ?? { title: 'محاولة بحال غير معروف', detail: a.status }
     stations.push({
       kind: 'publish',
-      title: ok ? shape.title : `محاولةٌ ${a.attempt_no} — ${shape.title}`,
+      title: ok ? shape.title : `محاولة ${a.attempt_no} — ${shape.title}`,
       at: a.at,
       detail: ok ? published(a.platform_post_id, a.response_json) : shape.detail,
       cost: null, model: null,
@@ -300,7 +300,7 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
     ].filter((x): x is string => x !== null)
 
     stations.push({
-      kind: 'metrics', title: `قياسُ ${w.window}`, at: w.pulled_at,
+      kind: 'metrics', title: `قياس ${w.window}`, at: w.pulled_at,
       detail: parts.length === 0 ? 'لا تُقاس من هذه المنصّة' : parts.join(' · '),
       cost: null, model: null, state: 'done',
     })

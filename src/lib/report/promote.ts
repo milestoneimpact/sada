@@ -100,8 +100,8 @@ export function pick(posts: readonly ReportPost[], capUsd: number): PromoteOutco
         median: mid,
         budgetUsd,
         reason:
-          `تفاعلُه ${best.interactions} — ${times}× وسيطَ نافذة ${windowLabel(window)} ` +
-          `(${cohort.length} منشورات). والمبلغُ ${budgetUsd}$ نصفُ سقفٍ وضعتَه ` +
+          `تفاعلُه ${best.interactions} — ${times}× وسيط نافذة ${windowLabel(window)} ` +
+          `(${cohort.length} منشورات). والمبلغ ${budgetUsd}$ نصف سقف وضعتَه ` +
           `(${money(capUsd)}$)، ولا يُنفَق حتّى تقبله.`,
       },
     }

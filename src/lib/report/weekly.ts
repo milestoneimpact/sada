@@ -245,15 +245,15 @@ export function summarize(
   const measured = posts.filter((p) => p.window !== null).length
   const notes: string[] = []
   if (posts.length === 0) {
-    notes.push('لا منشورَ خرج في هذه المدّة — والتقريرُ يقولها ولا يعرض أصفارا.')
+    notes.push('لا منشور خرج في هذه المدّة — والتقرير يقولها ولا يعرض أصفارا.')
   } else if (measured < posts.length) {
     notes.push(
       `${posts.length - measured} من ${posts.length} لم يُقَس بعد: ` +
-        'أقربُ نافذةٍ أربعٌ وعشرون ساعة، وما نُشر قبيلَ نهاية الأسبوع يُقاس في الذي يليه.',
+        'أقرب نافذة أربع وعشرون ساعة، وما نُشر قبيل نهاية الأسبوع يُقاس في الذي يليه.',
     )
   }
   if (platforms.some((s) => s.platform === 'linkedin' && s.impressions === null)) {
-    notes.push('LinkedIn لا يعطي ظهورا لمنشور عضو — والفراغُ هنا غيابُ قياسٍ لا صفرُ ظهور.')
+    notes.push('LinkedIn لا يعطي ظهورا لمنشور عضو — والفراغ هنا غياب قياس لا صفر ظهور.')
   }
 
   return {

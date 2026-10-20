@@ -207,7 +207,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     f.addEventListener('submit',function(e){
       if(Array.prototype.some.call(boxes,function(b){return b.checked;})){if(msg)msg.hidden=true; return;}
       e.preventDefault();
-      if(msg){msg.hidden=false; msg.textContent='اختر منصّةً واحدةً على الأقلّ — وغيرُ المتّصلة تُختار ولا تُجدوَل حتّى تربطها.';}
+      if(msg){msg.hidden=false; msg.textContent='اختر منصّةً واحدةً على الأقلّ — وغير المتّصلة تُختار ولا تُجدوَل حتّى تربطها.';}
       boxes[0].focus();
     });
   });
@@ -245,7 +245,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(st&&f.dataset.busy){var p=document.createElement('p'); p.className='busy-note'; p.textContent=f.dataset.busy; st.appendChild(p);
         // ‏ومراحلُ الانتظار الطويل (7.11 · D-238): تتقلّب بالوقت وتقف عند آخرها، وبعد عشر ثوانٍ «ابقَ في الصفحة»
         var stages=(f.dataset.stages||'').split('|').filter(Boolean);
-        if(stages.length){var i=0, t0=Date.now(), stay=' ابقَ في الصفحة حتّى ينتهي، فمغادرتُها تقطعه.';
+        if(stages.length){var i=0, t0=Date.now(), stay=' ابق في الصفحة حتّى ينتهي، فمغادرتُها تقطعه.';
           var tick=function(){if(!p.isConnected)return; i=Math.min(i+1,stages.length-1);
             p.textContent=stages[i]+(Date.now()-t0>=10000?stay:''); setTimeout(tick,4000);};
           p.textContent=stages[0]; setTimeout(tick,4000);}}
@@ -360,7 +360,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     if(off){
       if(!offBar){
         offBar=document.createElement('div'); offBar.className='outcome warn mb-3'; offBar.setAttribute('role','status');
-        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v">لا اتّصالَ بالإنترنت. ما تكتبه في المحرّر محفوظٌ على هذا الجهاز، والأزرارُ تعود حين يعود الاتّصال.</span>';
+        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v">لا اتّصال بالإنترنت. ما تكتبه في المحرّر محفوظ على هذا الجهاز، والأزرار تعود حين يعود الاتّصال.</span>';
         main.insertBefore(offBar,main.firstChild);
       }
       document.querySelectorAll('form[method=POST] button[type=submit],button[type=submit][form]').forEach(function(b){
@@ -388,7 +388,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         var at='';
         try{at=new Date(kept.at).toLocaleTimeString('ar-u-nu-latn',{hour:'numeric',minute:'2-digit'});}catch(e){}
         var row=document.createElement('p'); row.className='hint'; row.setAttribute('role','status');
-        row.appendChild(document.createTextNode('لديك نصٌّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
+        row.appendChild(document.createTextNode('لديك نصّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
         var take=document.createElement('button'); take.type='button'; take.className='btn btn-secondary btn-sm'; take.textContent='استعده';
         var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-quiet btn-sm'; drop.textContent='تجاهله';
         row.appendChild(take); row.appendChild(document.createTextNode(' ')); row.appendChild(drop);
@@ -415,7 +415,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var push=function(){
         if(edT.value===last)return;
         var v=edT.value, body=new FormData(edF); body.set('do','save'); body.set('auto','1'); body.set('text',v);
-        mark.textContent='جارٍ الحفظ…';
+        mark.textContent='جار الحفظ…';
         flight=fetch(edF.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){
           return r.json().then(function(j){
             if(r.ok&&j.ok){last=v; mark.textContent='حُفظ'; try{if(edT.value===v)localStorage.removeItem(dKey);}catch(e){}}
@@ -509,7 +509,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var last=inp.value;
     var push=function(){
       if(inp.value===last||!inp.checkValidity()){if(!inp.checkValidity())mark.textContent='خارج المدى';return;}
-      var body=new FormData(f); body.set('auto','1'); mark.textContent='جارٍ الحفظ…';
+      var body=new FormData(f); body.set('auto','1'); mark.textContent='جار الحفظ…';
       fetch(f.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
         if(j&&j.stored!==undefined){inp.value=j.stored; last=inp.value;}
         mark.textContent=j&&j.ok?'حُفظ':'لم يُحفظ'+(j&&j.text?': '+j.text:'');
@@ -665,7 +665,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(n)n.textContent=String(on.length);
       if(c){
         var sum=0; on.forEach(function(b){sum+=parseFloat(b.dataset.cost||'0')||0;});
-        c.textContent = sum>0 ? 'ثمنُ نشرها \u2066'+sum.toFixed(4)+'$\u2069' : '';
+        c.textContent = sum>0 ? 'ثمن نشرها \u2066'+sum.toFixed(4)+'$\u2069' : '';
       }
       bulkForm.hidden=on.length===0;
     }
@@ -833,7 +833,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       .then(function(r){
         if(r.ok)return r.json();
         return r.json().catch(function(){return {};}).then(function(e){
-          if(r.status===401&&e.error==='denied')throw Object.assign(new Error(e.detail||'رمزٌ غير صحيح.'),{name:'SadaServer'});
+          if(r.status===401&&e.error==='denied')throw Object.assign(new Error(e.detail||'رمز غير صحيح.'),{name:'SadaServer'});
           throw sadaPk.server(e.error,r.status);});
       }).then(function(d){
         if(d.codes&&d.codes.length){showCodes(d.codes); say('totp-msg','أُكّد. وهذه رموز استردادك — انسخها.');}
@@ -863,7 +863,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 
   var ri=document.getElementById('rc-issue');
   if(ri)ri.addEventListener('click',function(){
-    if(!confirm('توليدُ مجموعةٍ جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
+    if(!confirm('توليد مجموعة جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
     ri.disabled=true;
     post('/panel/security/recovery/issue',{}).then(function(r){
       return r.ok?r.json():sadaPk.fail(r);
@@ -905,7 +905,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var a=opt.dataset.pin,b=opt.dataset.pout;
     if(pin&&a)pin.value=a;
     if(pout&&b)pout.value=b;
-    if(note&&(a||b))note.textContent='السعرُ مُلئ من فهرس المزوّد — احفظ ليُثبَت.';
+    if(note&&(a||b))note.textContent='السعر مُلئ من فهرس المزوّد — احفظ ليُثبَت.';
   };
   // خيارُ الكتابة اليدويّة يُعاد بناؤه في كلّ تعبئة — فلا يُنسى
   var mpManual=function(sel){
@@ -934,7 +934,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 
     sel.addEventListener('change',function(){
       if(sel.value==='__manual__'){
-        var typed=prompt('اسمُ النموذج كما هو عند المزوّد:',last||'');
+        var typed=prompt('اسم النموذج كما هو عند المزوّد:',last||'');
         if(typed&&typed.trim())mpSet(sel,typed.trim());
         else sel.value=last;
         last=sel.value;
@@ -946,12 +946,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 
     var load=function(silent){
       var name=mpProvider(box);
-      if(!name){note.textContent='لا مزوّدَ لهذا الحقل.';return;}
+      if(!name){note.textContent='لا مزوّد لهذا الحقل.';return;}
       if(busy||loadedFor===name)return;
       // **ولا يُعطَّل الزرُّ وهي تُجلَب** (D-125): التركيزُ على القائمة يطلق
       // الجلبَ، وزرٌّ معطَّلٌ في تلك اللحظة يقفز عنه Tab — قِيس فوُجد
       // «حدّث» لا يُبلَغ بلوحة المفاتيح. و«busy» يحرس التكرار.
-      busy=true; btn.setAttribute('aria-busy','true'); note.textContent='تُجلَب نماذجُ '+name+'…';
+      busy=true; btn.setAttribute('aria-busy','true'); note.textContent='تُجلَب نماذج '+name+'…';
       post('/panel/providers/models',{provider:name}).then(function(r){
         return r.json();
       }).then(function(d){
@@ -989,8 +989,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         last=sel.value;
         note.textContent=keep.length+' نموذجا الآن عند '+name
           +(filtered?' (صُفّيت من '+models.length+')':'')
-          +(chosen&&!has?' — والنموذجُ السابق ليس منها، فاختر واحدا.':'')
-          +' · قائمةٌ لحظيّة لا محفوظة.';
+          +(chosen&&!has?' — والنموذج السابق ليس منها، فاختر واحدا.':'')
+          +' · قائمة لحظيّة لا محفوظة.';
       }).catch(function(){
         busy=false; btn.removeAttribute('aria-busy');
         note.textContent='تعذّر الاتّصال — اكتب الاسم يدويّا.';
@@ -1010,7 +1010,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       box.dataset.provider=pick.value;
       mpClear(sel,'— اختر نموذجا —');
       last='';
-      note.textContent='بدّلتَ المزوّد — تُجلَب نماذجُه…';
+      note.textContent='بدّلت المزوّد — تُجلَب نماذجُه…';
       load(false);
     });
   });
@@ -1155,11 +1155,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         return post('/panel/uploads/'+id+'/complete',{parts:JSON.stringify(parts)});
       });
     }).then(function(r){return r.json();}).then(function(c){
-      if(!c.ok)throw c.reason||'تعذّر جمعُ المقطع';
+      if(!c.ok)throw c.reason||'تعذّر جمع المقطع';
       location.hash='videos'; location.reload();
     }).catch(function(e){
       if(id!==null)post('/panel/uploads/'+id+'/abort',{});
-      tell(typeof e==='string'?e:'انقطع الرفع — اختر الملفَّ مرّةً أخرى');
+      tell(typeof e==='string'?e:'انقطع الرفع — اختر الملفّ مرّةً أخرى');
       vfile.disabled=false; vfile.value='';
       if(bar)bar.hidden=true;
     });
@@ -1196,7 +1196,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       var n=ytLine(t.value).length, over=n>max;
       out.hidden=n===0||(yt!==null&&!yt.checked);
       // ‏الرقمان معزولان (LRI…PDI): «57 / 100» في سطرٍ عربيٍّ تنقلب «100 / 57» بلا عزل
-      out.textContent='عنوانُ YouTube: \\u2066'+n+' / '+max+'\\u2069'+(over?' — يُقصّ عند '+max+' محرف':'');
+      out.textContent='عنوان YouTube: \\u2066'+n+' / '+max+'\\u2069'+(over?' — يُقصّ عند '+max+' محرف':'');
       out.className=over?'st warn':'ago';
     }
     t.addEventListener('input',tick);
@@ -1216,7 +1216,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var max=+t.dataset.capLimit||0, bytes=t.dataset.capUnit==='bytes';
     function tick(){
       var n=capLen(t.value.trim(),bytes), over=n>max;
-      out.textContent='\u2066'+n+' / '+max+'\u2069 '+(bytes?'بايت':'محرف')+(over?' — أطولُ ممّا تقبله المنصّة':'');
+      out.textContent='\u2066'+n+' / '+max+'\u2069 '+(bytes?'بايت':'محرف')+(over?' — أطول ممّا تقبله المنصّة':'');
       out.className=over?'st warn':'ago';
     }
     t.addEventListener('input',tick); tick();

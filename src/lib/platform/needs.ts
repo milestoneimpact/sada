@@ -69,15 +69,15 @@ export function platformNeeds(platform: Platform, isPublic = false): PlatformNee
   const measure = !measured
     ? 'لا يُقاس لهذه المنصّة بعد'
     : platform === 'linkedin'
-      ? 'تفاعلٌ وتعليقات بعد 24س و72س و7ي — ولا ظهورَ لحساب العضو'
-      : 'ظهورٌ وإعجابٌ وردودٌ ومشاركات بعد 24س و72س و7ي'
+      ? 'تفاعل وتعليقات بعد 24س و72س و7ي — ولا ظهور لحساب العضو'
+      : 'ظهور وإعجاب وردود ومشاركات بعد 24س و72س و7ي'
 
   if (platform === 'instagram') {
     return {
-      platform, label: platformLabel(platform), account: 'حسابُ Business أو Creator',
-      text: 'حتّى 2200 محرف، وخمسةُ وسومٍ على الأكثر', limit: 2200,
-      media: { kind: 'image', required: true, spec: 'صورةٌ إلزاميّة 1080×1350 (4:5)', width: 1080, height: 1350 },
-      publish: 'علنيٌّ فورَ موعده', cost: 'بلا رسم', measure, measured, drafts: false,
+      platform, label: platformLabel(platform), account: 'حساب Business أو Creator',
+      text: 'حتّى 2200 محرف، وخمسة وسوم على الأكثر', limit: 2200,
+      media: { kind: 'image', required: true, spec: 'صورة إلزاميّة 1080×1350 (4:5)', width: 1080, height: 1350 },
+      publish: 'علنيّ فور موعده', cost: 'بلا رسم', measure, measured, drafts: false,
     }
   }
 
@@ -87,23 +87,23 @@ export function platformNeeds(platform: Platform, isPublic = false): PlatformNee
   return {
     platform,
     label: spec.label,
-    account: platform === 'youtube' ? 'قناة' : platform === 'linkedin' ? 'حسابٌ شخصيّ — والصفحةُ لم تُبنَ' : 'حساب',
+    account: platform === 'youtube' ? 'قناة' : platform === 'linkedin' ? 'حساب شخصيّ — والصفحة لم تُبن' : 'حساب',
     text: platform === 'x'
-      ? `حتّى ${spec.hardLimit} محرفٍ موزون`
+      ? `حتّى ${spec.hardLimit} محرف موزون`
       : platform === 'youtube'
-        ? `السطرُ الأوّل عنوانٌ حتّى 100، وما بعده وصفٌ حتّى ${spec.hardLimit}`
+        ? `السطر الأوّل عنوان حتّى 100، وما بعده وصف حتّى ${spec.hardLimit}`
         : `حتّى ${spec.hardLimit} محرف`,
     limit: spec.hardLimit,
     media: clip
-      ? { kind: 'clip', required: true, spec: `مقطعٌ رأسيٌّ إلزاميّ ${ratio(size.width, size.height)} حتّى ${MAX_SECONDS}ث`, width: size.width, height: size.height }
+      ? { kind: 'clip', required: true, spec: `مقطع رأسيّ إلزاميّ ${ratio(size.width, size.height)} حتّى ${MAX_SECONDS}ث`, width: size.width, height: size.height }
       : { kind: 'image', required: false, spec: `اختياريّة ${size.width}×${size.height} (${ratio(size.width, size.height)})`, width: size.width, height: size.height },
     publish: clip && isPublic
-      ? 'علنيٌّ فورَ موعده — بعد إجازة تطبيقك'
+      ? 'علنيّ فور موعده — بعد إجازة تطبيقك'
       : platform === 'tiktok'
-        ? 'يصل صندوقَ تطبيقك ثمّ تنشره بيدك'
+        ? 'يصل صندوق تطبيقك ثمّ تنشره بيدك'
         : platform === 'youtube'
           ? 'يُرفع إلى قناتك خاصًّا ثمّ تنشره بيدك'
-          : 'علنيٌّ فورَ موعده',
+          : 'علنيّ فور موعده',
     cost: platform === 'x'
       ? `${money(X_PRICE_PER_POST)} للمنشور، و${money(X_PRICE_PER_POST_WITH_URL)} إن كان فيه رابط`
       : 'بلا رسم',

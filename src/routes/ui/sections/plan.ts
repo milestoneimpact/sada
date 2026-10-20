@@ -57,10 +57,10 @@ function lastAttemptLine(input: PlanInput): string {
   const reason = rest.join(': ')
   const cls = kind === 'failed' ? 'bad' : 'warn'
   const glyph = kind === 'failed' ? '✕' : '!'
-  const what = kind === 'failed' ? 'فشلت' : kind === 'blocked' ? 'أُوقفت' : 'لم تكفِ المادّة'
+  const what = kind === 'failed' ? 'فشلت' : kind === 'blocked' ? 'أُوقفت' : 'لم تكف المادّة'
   return `<div class="lede-row mt-3">
-      ${statusBadge(cls, glyph, `آخرُ محاولةٍ ${what} ${escapeHtml(relativeTime(a.at, input.now))}`)}
-      <span class="lede-note">${reason === '' ? 'بلا سببٍ مسجَّل — أعد المحاولة وسيُكتب السبب.' : escapeHtml(reason)}</span>
+      ${statusBadge(cls, glyph, `آخر محاولة ${what} ${escapeHtml(relativeTime(a.at, input.now))}`)}
+      <span class="lede-note">${reason === '' ? 'بلا سبب مسجَّل — أعد المحاولة وسيُكتب السبب.' : escapeHtml(reason)}</span>
     </div>`
 }
 
@@ -69,7 +69,7 @@ function row(
   names: Readonly<Record<string, string>>,
   zone: string | null,
 ): string {
-  const name = names[item.sourceId] ?? '— مصدرٌ حُذف —'
+  const name = names[item.sourceId] ?? '— مصدر حُذف —'
   const gone = names[item.sourceId] === undefined
   return `<tr>
     <td data-label="متى"><b>${escapeHtml(dayName(item.day))}</b>
@@ -80,7 +80,7 @@ function row(
       ${item.why === '' ? '' : `<div class="sub">— ${escapeHtml(item.why)}</div>`}</td>
     <td data-label="">${gone
       ? statusBadge('idle', '○', 'لا مصدر')
-      : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جارٍ الكتابة…" ${stagesAttr('write')}>
+      : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جار الكتابة…" ${stagesAttr('write')}>
            <input type="hidden" name="id" value="${escapeHtml(item.sourceId)}">
            <input type="hidden" name="platform" value="${escapeHtml(item.platform)}">
            <button class="btn btn-secondary btn-sm" type="submit">اكتب منه</button></form>`}</td>
@@ -91,14 +91,14 @@ export function planSection(input: PlanInput): string {
   const { plan, now } = input
 
   const generate = `<form class="inline" method="POST" action="/panel/plan/generate"
-      data-busy="جارٍ التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّة هذا الأسبوع. أتمضي؟"'}>
+      data-busy="جار التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّة هذا الأسبوع. أتمضي؟"'}>
       <button class="btn ${plan === null ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit"${
         input.ready && input.analyzed >= 2 ? '' : ' disabled'
       }>${plan === null ? 'خطّط الأسبوع' : 'أعد التخطيط'}</button></form>`
 
   const why =
     !input.ready
-      ? '<p class="hint m-0 mt-2">مزوّدُ مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
+      ? '<p class="hint m-0 mt-2">مزوّد مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
       : input.analyzed < 2
         /*
          * **ودعوةٌ إلى فعلٍ زرٌّ لا كلمةٌ في جملة** (D-108).
@@ -108,7 +108,7 @@ export function planSection(input: PlanInput): string {
          * تحليل، **وعيّنةُ الرسم كانت نظاما يعمل**. فأظهرتها عيّنةُ
          * اليوم الأوّل.
          */
-        ? `<p class="hint m-0 mt-2">${input.analyzed === 0 ? 'لا مصدرَ محلَّلٌ بعد' : 'مصدرٌ واحدٌ محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ.</p>
+        ? `<p class="hint m-0 mt-2">${input.analyzed === 0 ? 'لا مصدر محلَّل بعد' : 'مصدر واحد محلَّل'} — والخطّة تحتاج اثنين على الأقلّ.</p>
            <a class="btn btn-secondary btn-sm mt-2" href="#sources">حلّل مصادرك</a>`
         : ''
 
@@ -117,9 +117,9 @@ export function planSection(input: PlanInput): string {
       <div class="card-head"><h2>الخطّة الأسبوعيّة</h2><div class="grow"></div>${generate}</div>
       ${emptyState({
         echo: true,
-        title: 'لا خطّةَ بعد',
-        html: `نداءٌ واحدٌ يقرأ خلاصاتِ ما حُلِّل، ويقول ما يستحقّ النشر هذا الأسبوع
-           وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابةُ زرٌّ لكلّ بند.`,
+        title: 'لا خطّة بعد',
+        html: `نداء واحد يقرأ خلاصات ما حُلِّل، ويقول ما يستحقّ النشر هذا الأسبوع
+           وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابة زرّ لكلّ بند.`,
       })}
       ${why}
       ${lastAttemptLine(input)}
@@ -136,7 +136,7 @@ export function planSection(input: PlanInput): string {
       <div class="grow"></div>${status}${generate}</div>
 
     <div class="lede-row m-0 mb-3">
-      <span class="chip mono">أسبوعُ ${escapeHtml(plan.week)}</span>
+      <span class="chip mono">أسبوع ${escapeHtml(plan.week)}</span>
       <span class="chip mono">${escapeHtml(plan.model)}</span>
       <span class="ago">وُضعت ${escapeHtml(relativeTime(plan.createdAt, now))}</span>
     </div>
@@ -152,11 +152,11 @@ export function planSection(input: PlanInput): string {
 
     ${lastAttemptLine(input)}
     <div class="lede-row mt-3">
-      <span class="lede-note"><b>الخطّةُ تقترح ولا تنفّذ.</b> كلُّ «اكتب منه» نداءٌ مدفوعٌ بضغطتك،
-        والمسوّدةُ بعده تنتظر اعتمادَك كأيّ مسوّدة.</span>
+      <span class="lede-note"><b>الخطّة تقترح ولا تنفّذ.</b> كلّ «اكتب منه» نداء مدفوع بضغطتك،
+        والمسوّدة بعده تنتظر اعتمادَك كأيّ مسوّدة.</span>
       <span class="grow"></span>
       ${plan.status === 'draft'
-        ? `<form class="inline" method="POST" action="/panel/plan/approve" data-busy="جارٍ…">
+        ? `<form class="inline" method="POST" action="/panel/plan/approve" data-busy="جار…">
              <input type="hidden" name="id" value="${escapeHtml(plan.id)}">
              <button class="btn btn-primary btn-sm" type="submit">اعتمد المنطق</button></form>`
         : ''}

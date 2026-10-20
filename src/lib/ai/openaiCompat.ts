@@ -152,7 +152,7 @@ export async function chatCompletion(
    */
   const refusal = message?.['refusal']
   if (empty && typeof refusal === 'string' && refusal.trim().length > 0) {
-    throw new CompatError('رفض المزوّدُ الطلب', 422, false, spent)
+    throw new CompatError('رفض المزوّد الطلب', 422, false, spent)
   }
   if (empty) {
     throw new CompatError('لا نصّ في جواب المزوّد', 502, true, spent)

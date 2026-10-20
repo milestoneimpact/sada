@@ -149,7 +149,7 @@ describe('الإدراج الآليّ — والحدّ يُقصّ قبل الإ�
     expect(sent).toHaveLength(3)
   })
 
-  it('سقفٌ مستهلَك لا يُرسل شيئا — ولا رسالةً واحدة', async () => {
+  it('سقف مستهلَك لا يُرسل شيئا — ولا رسالةً واحدة', async () => {
     await writeSetting(db, 'daily_analysis_cap', '1', 'test')
     db.raw
       .prepare(
@@ -170,7 +170,7 @@ describe('الإدراج الآليّ — والحدّ يُقصّ قبل الإ�
     expect(sent).toHaveLength(0)
   })
 
-  it('الإيقاف يغلب المفتاح — قرارُ المالك لا يُنقَض بإعداد', async () => {
+  it('الإيقاف يغلب المفتاح — قرار المالك لا يُنقَض بإعداد', async () => {
     await writeSetting(db, 'paused', 'true', 'test')
     await runCron(3)
     expect(sent).toHaveLength(0)
@@ -184,7 +184,7 @@ describe('الإدراج الآليّ — والحدّ يُقصّ قبل الإ�
  * — بل **أنّه لا يتوقّف حين يتبدّل جدولٌ في `wrangler.toml`**. وهو أخطر
  * ما في الموزّع: نشرٌ يسقط بلا صوت، ووعدٌ للمالك بموعدٍ لا يجيء.
  */
-describe('موزّعُ الدورات', () => {
+describe('موزّع الدورات', () => {
   async function seedDue(): Promise<string> {
     const account = crypto.randomUUID()
     await db
@@ -217,7 +217,7 @@ describe('موزّعُ الدورات', () => {
     expect(published).toEqual([post])
   })
 
-  it('**وعلى جدولٍ لا يعرفه** — تغييرٌ في wrangler.toml لا يوقف النشر صامتا', async () => {
+  it('**وعلى جدول لا يعرفه** — تغيير في wrangler.toml لا يوقف النشر صامتا', async () => {
     const post = await seedDue()
     await runCron(0, '*/7 * * * *')
     expect(published).toEqual([post])

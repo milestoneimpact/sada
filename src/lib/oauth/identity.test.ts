@@ -21,7 +21,7 @@ describe('LinkedIn', () => {
     expect(id).toMatchObject({ platform: 'linkedin', kind: 'member', externalId: 'urn:li:person:a' })
   })
 
-  it('وجوابٌ بلا sub يُردّ ولا يُخمَّن', async () => {
+  it('وجواب بلا sub يُردّ ولا يُخمَّن', async () => {
     await expect(fetchIdentity(LINKEDIN, 't', reply({ name: 'عمر' }))).rejects.toThrow()
   })
 })
@@ -41,7 +41,7 @@ describe('YouTube', () => {
    * `(platform, kind, external_id)` — وتبديلُ المرتبة غدا يُنشئ حسابا
    * ثانيا للقناة نفسِها.
    */
-  it('يسجّل القناةَ org لا member', async () => {
+  it('يسجّل القناة org لا member', async () => {
     const id = await fetchIdentity(
       YOUTUBE, 't',
       reply({ items: [{ id: 'UC123', snippet: { title: 'صدى' } }] }),
@@ -55,7 +55,7 @@ describe('YouTube', () => {
    * وهي حالٌ شائعةٌ تُصيب مالكا حقيقيّا، فتُقال له بما يُفعَل لا
    * برقمٍ أعمى.
    */
-  it('وحسابٌ بلا قناةٍ يُقال له ما يفعل، لا يُردّ برقم', async () => {
+  it('وحساب بلا قناة يُقال له ما يفعل، لا يُردّ برقم', async () => {
     await expect(fetchIdentity(YOUTUBE, 't', reply({ items: [] })))
       .rejects.toThrow(/أنشئ قناةً/)
     await expect(fetchIdentity(YOUTUBE, 't', reply({})))
@@ -72,7 +72,7 @@ describe('TikTok', () => {
     expect(id).toMatchObject({ platform: 'tiktok', kind: 'member', externalId: 'op-1', displayName: 'صدى' })
   })
 
-  it('واسمٌ فارغٌ يقع على المعرّف — لا صفَّ بلا اسم', async () => {
+  it('واسم فارغ يقع على المعرّف — لا صفّ بلا اسم', async () => {
     const id = await fetchIdentity(
       TIKTOK, 't',
       reply({ data: { user: { open_id: 'op-2', display_name: '' } } }),
@@ -80,13 +80,13 @@ describe('TikTok', () => {
     expect(id.displayName).toBe('op-2')
   })
 
-  it('وجوابٌ بلا open_id يُردّ', async () => {
+  it('وجواب بلا open_id يُردّ', async () => {
     await expect(fetchIdentity(TIKTOK, 't', reply({ data: {} }))).rejects.toThrow()
   })
 })
 
-describe('الطبقةُ المشتركة', () => {
-  it('جوابٌ غيرُ ناجحٍ يُردّ باسم المنصّة — والسجلُّ يفرز', async () => {
+describe('الطبقة المشتركة', () => {
+  it('جواب غير ناجح يُردّ باسم المنصّة — والسجلّ يفرز', async () => {
     await expect(fetchIdentity(TIKTOK, 't', reply({}, 401))).rejects.toThrow(/tiktok/)
     await expect(fetchIdentity(YOUTUBE, 't', reply({}, 403))).rejects.toThrow(/youtube/)
   })

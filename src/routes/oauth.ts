@@ -65,7 +65,7 @@ async function toSetup(env: Env, request: Request, platform: Platform): Promise<
   const label = platformLabel(platform)
   await setFlash(env, request, {
     kind: 'warn',
-    text: `لم يبدأ الربط: ينقص معرّفُ تطبيق ${label} وسرُّه. اضبطهما هنا، ثمّ «اربط ${label}».`,
+    text: `لم يبدأ الربط: ينقص معرّف تطبيق ${label} وسرُّه. اضبطهما هنا، ثمّ «اربط ${label}».`,
   })
   return new Response(null, {
     status: 303,

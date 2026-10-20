@@ -72,9 +72,9 @@ function net(
   }) as unknown as typeof fetch
 }
 
-describe('الخطوتان — وصفٌ ثمّ بايتات', () => {
-  it('التهيئةُ بلا بايتات، والرفعُ على عنوان الجلسة', async () => {
-    const out = await publishYouTube('tok', CLIP, 'عنوانُ المقطع', net())
+describe('الخطوتان — وصف ثمّ بايتات', () => {
+  it('التهيئة بلا بايتات، والرفع على عنوان الجلسة', async () => {
+    const out = await publishYouTube('tok', CLIP, 'عنوان المقطع', net())
     expect(out.platformPostId).toBe('vid-9')
     expect(calls).toHaveLength(2)
     expect(calls[0]!.method).toBe('POST')
@@ -84,20 +84,20 @@ describe('الخطوتان — وصفٌ ثمّ بايتات', () => {
     expect(calls[1]!.url).toBe(SESSION)
   })
 
-  it('والحجمُ والنوعُ يُعلَنان في التهيئة — فيُردّ الكبيرُ قبل رفعه', async () => {
+  it('والحجم والنوع يُعلَنان في التهيئة — فيُردّ الكبير قبل رفعه', async () => {
     await publishYouTube('tok', CLIP, 'عنوان', net())
     expect(calls[0]!.headers['X-Upload-Content-Length']).toBe(String(CLIP.bytes.length))
     expect(calls[0]!.headers['X-Upload-Content-Type']).toBe('video/mp4')
   })
 
-  it('**ولا إذنَ في دفعة البايتات** — العنوانُ نفسُه هو الإذن', async () => {
+  it('**ولا إذن في دفعة البايتات** — العنوان نفسُه هو الإذن', async () => {
     await publishYouTube('tok', CLIP, 'عنوان', net())
     expect(calls[0]!.headers['Authorization']).toBe('Bearer tok')
     expect(calls[1]!.headers['Authorization']).toBeUndefined()
   })
 
-  it('والوصفُ يحمل القيمَ المقروءةَ من الوثيقة', async () => {
-    await publishYouTube('tok', CLIP, 'عنوانٌ\nثمّ وصف', net())
+  it('والوصف يحمل القيم المقروءة من الوثيقة', async () => {
+    await publishYouTube('tok', CLIP, 'عنوان\nثمّ وصف', net())
     const meta = calls[0]!.body as {
       snippet: { title: string; description: string; categoryId: string }
       status: { privacyStatus: string; selfDeclaredMadeForKids: boolean }
@@ -114,7 +114,7 @@ describe('الخطوتان — وصفٌ ثمّ بايتات', () => {
     expect(out.private).toBe(true)
   })
 
-  it('وللعامّة حين قلبه المالكُ بعد الإجازة (D-190) — ويُقال إنّه ليس خاصًّا', async () => {
+  it('وللعامّة حين قلبه المالك بعد الإجازة (D-190) — ويُقال إنّه ليس خاصًّا', async () => {
     const out = await publishYouTube('tok', CLIP, 'عنوان', net(), { public: true })
     const meta = calls[0]!.body as { status: { privacyStatus: string } }
     expect(meta.status.privacyStatus).toBe(YT_PUBLIC)
@@ -128,72 +128,72 @@ describe('العنوان — يُقصّ ويُنقّى قبل النداء', () 
    * ‏**والعنوانُ لا يتكرّر في أوّل الوصف** (مراجعة D-190): كان الوصفُ النصَّ كلَّه، فبدأ وصفُ كلِّ
    * ‏مقطعٍ بعنوانه، وحقلُ «وصف YouTube» الذي راجعه المالكُ ليس فيه عنوان.
    */
-  it('أوّلُ سطرٍ عنوانٌ، وما بعده وصف — بلا العنوان مكرّرًا', async () => {
-    await publishYouTube('tok', CLIP, 'الحوكمةُ تسبق السرعة\n\nوهذا شرحُها.', net())
+  it('أوّل سطر عنوان، وما بعده وصف — بلا العنوان مكرّرًا', async () => {
+    await publishYouTube('tok', CLIP, 'الحوكمة تسبق السرعة\n\nوهذا شرحُها.', net())
     const meta = calls[0]!.body as { snippet: { title: string; description: string } }
-    expect(meta.snippet.title).toBe('الحوكمةُ تسبق السرعة')
+    expect(meta.snippet.title).toBe('الحوكمة تسبق السرعة')
     expect(meta.snippet.description).toBe('وهذا شرحُها.')
   })
 
-  it('ونصٌّ من حقلَي المقطع يُرفع كما حُرّر: العنوانُ عنوانًا والوصفُ وصفًا', async () => {
-    const text = youtubeText('القيادةُ في أوّل مئة يوم', 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts')
+  it('ونصّ من حقلَي المقطع يُرفع كما حُرّر: العنوان عنوانًا والوصف وصفًا', async () => {
+    const text = youtubeText('القيادة في أوّل مئة يوم', 'ما يقرّره القائد أوّلًا.\n\n#قيادة #Shorts')
     await publishYouTube('tok', CLIP, text, net())
     const meta = calls[0]!.body as { snippet: { title: string; description: string } }
     expect(meta.snippet).toMatchObject({
-      title: 'القيادةُ في أوّل مئة يوم',
-      description: 'ما يقرّره القائدُ أوّلًا.\n\n#قيادة #Shorts',
+      title: 'القيادة في أوّل مئة يوم',
+      description: 'ما يقرّره القائد أوّلًا.\n\n#قيادة #Shorts',
     })
   })
 
-  it('وعنوانٌ يُقصّ أو نصٌّ من سطرٍ واحدٍ يبقى وصفُه النصَّ كلَّه — لا تضيع جملةٌ ولا يُرفع وصفٌ فارغ', () => {
-    expect(youtubeDescription('عنوانٌ وحده')).toBe('عنوانٌ وحده')
+  it('وعنوان يُقصّ أو نصّ من سطر واحد يبقى وصفُه النصّ كلَّه — لا تضيع جملة ولا يُرفع وصف فارغ', () => {
+    expect(youtubeDescription('عنوان وحده')).toBe('عنوان وحده')
     const long = `${'كلمة '.repeat(30).trim()}\nوالباقي`
     expect(youtubeDescription(long)).toBe(long)
     expect(youtubeDescription('أ <ب>\nوصف')).toBe('أ <ب>\nوصف')
-    expect(youtubeDescription('عنوان\nوصفٌ بسطرٍ واحد')).toBe('وصفٌ بسطرٍ واحد')
+    expect(youtubeDescription('عنوان\nوصف بسطر واحد')).toBe('وصف بسطر واحد')
   })
 
   /**
    * **والزاويّتان تُنزَعان**: ترفض Google العنوانَ الحاملَ لهما بـ
    * `invalidVideoMetadata` — **ورفضٌ بعد رفع البايتات يُهدر حصّةَ اليوم**.
    */
-  it('ولا زاويّةَ في العنوان', () => {
+  it('ولا زاويّة في العنوان', () => {
     expect(youtubeTitle('<script>عنوان</script>')).not.toContain('<')
     expect(youtubeTitle('<script>عنوان</script>')).not.toContain('>')
     expect(youtubeTitle('أ < ب')).toBe('أ  ب')
   })
 
-  it('ويُقصّ عند مئةٍ بلا بترِ كلمة', () => {
+  it('ويُقصّ عند مئة بلا بتر كلمة', () => {
     const long = `${'كلمة '.repeat(60)}`
     const title = youtubeTitle(long)
     expect(title.length).toBeLessThanOrEqual(YT_TITLE_MAX)
     expect(title.endsWith('…')).toBe(true)
   })
 
-  it('ونصٌّ فارغٌ يعطي عنوانا صالحا لا فراغا يُردّ', () => {
+  it('ونصّ فارغ يعطي عنوانا صالحا لا فراغا يُردّ', () => {
     for (const text of ['', '   ', '\n\n', '<>']) {
       expect(youtubeTitle(text).length, JSON.stringify(text)).toBeGreaterThan(0)
     }
   })
 
-  it('والوصفُ يُقصّ عند حدّه', async () => {
+  it('والوصف يُقصّ عند حدّه', async () => {
     await publishYouTube('tok', CLIP, 'ن'.repeat(YT_DESCRIPTION_MAX + 400), net())
     const meta = calls[0]!.body as { snippet: { description: string } }
     expect(meta.snippet.description.length).toBe(YT_DESCRIPTION_MAX)
   })
 })
 
-describe('الفشلُ يُسمّى، والإعادةُ من الرمز', () => {
-  it('سببُ Google يُنقَل لا رقمُ الحالة وحده', async () => {
+describe('الفشل يُسمّى، والإعادة من الرمز', () => {
+  it('سبب Google يُنقَل لا رقم الحالة وحده', async () => {
     await expect(publishYouTube('tok', CLIP, 'ع', net({ initStatus: 403, reason: 'forbidden' })))
       .rejects.toThrow(/forbidden/)
   })
 
-  it('**وحصّةُ اليوم تُقال بلغتها** — لا «٤٠٣» يُبحَث عنه', async () => {
+  it('**وحصّة اليوم تُقال بلغتها** — لا «٤٠٣» يُبحَث عنه', async () => {
     const error = await publishYouTube(
       'tok', CLIP, 'ع', net({ initStatus: 403, reason: 'quotaExceeded' }),
     ).catch((e: PublishError) => e)
-    expect((error as PublishError).message).toContain('حصّةَ اليوم')
+    expect((error as PublishError).message).toContain('حصّة اليوم')
     expect((error as PublishError).retryable).toBe(false)
   })
 
@@ -207,18 +207,18 @@ describe('الفشلُ يُسمّى، والإعادةُ من الرمز', () =>
     expect((bad as PublishError).retryable).toBe(false)
   })
 
-  it('وتهيئةٌ بلا `Location` تُردّ ولا تُدفَع بايتاتٌ إلى العدم', async () => {
+  it('وتهيئة بلا `Location` تُردّ ولا تُدفَع بايتات إلى العدم', async () => {
     await expect(publishYouTube('tok', CLIP, 'ع', net({ noLocation: true })))
       .rejects.toThrow(/Location/)
     expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(0)
   })
 
-  it('ورفعٌ نجح بلا معرّفٍ لا يُعدّ نجاحا — صفٌّ بلا معرّفٍ يكذب', async () => {
+  it('ورفع نجح بلا معرّف لا يُعدّ نجاحا — صفّ بلا معرّف يكذب', async () => {
     await expect(publishYouTube('tok', CLIP, 'ع', net({ putBody: {} })))
       .rejects.toThrow(/معرّف/)
   })
 
-  it('ومقطعٌ فارغٌ لا يُنادى به أحد', async () => {
+  it('ومقطع فارغ لا يُنادى به أحد', async () => {
     await expect(
       publishYouTube('tok', { bytes: new Uint8Array(0), mime: 'video/mp4' }, 'ع', net()),
     ).rejects.toThrow(PublishError)

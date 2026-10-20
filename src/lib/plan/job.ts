@@ -116,7 +116,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   if (sources.length < MIN_SOURCES) {
     return {
       kind: 'not_enough',
-      reason: `${sources.length} مصدرا محلَّلا — والخطّةُ تحتاج ${MIN_SOURCES} على الأقلّ`,
+      reason: `${sources.length} مصدرا محلَّلا — والخطّة تحتاج ${MIN_SOURCES} على الأقلّ`,
     }
   }
 
@@ -130,7 +130,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
 
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
-    return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${route.provider}`, retryable: false }
+    return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
   }
   const perProvider = await checkProvider(deps.db, provider.name)
   if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
@@ -207,7 +207,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
         : true
-    return { kind: 'failed', reason: error instanceof Error ? error.message : 'نداءٌ فشل', retryable }
+    return { kind: 'failed', reason: error instanceof Error ? error.message : 'نداء فشل', retryable }
   }
 
   // ٥ · الكلفة قبل القراءة
@@ -220,7 +220,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   try {
     parsedJson = JSON.parse(text)
   } catch {
-    return { kind: 'failed', reason: 'جوابُ النموذج ليس JSON صالحا', retryable: true }
+    return { kind: 'failed', reason: 'جواب النموذج ليس JSON صالحا', retryable: true }
   }
   const known = new Set(sources.map((s) => s.id))
   const read = parsePlan(parsedJson, known, week)

@@ -252,8 +252,8 @@ export async function saveApp(
 ): Promise<SaveResult> {
   const id = clientId.trim()
   const secret = clientSecret.trim()
-  if (id.length === 0) throw new Error('معرّفُ التطبيق فارغ')
-  if (secret.length === 0) throw new Error('سرُّ التطبيق فارغ')
+  if (id.length === 0) throw new Error('معرّف التطبيق فارغ')
+  if (secret.length === 0) throw new Error('سرّ التطبيق فارغ')
 
   const before = await db
     .prepare('SELECT fingerprint FROM oauth_apps WHERE platform = ?')
@@ -273,11 +273,11 @@ export async function saveApp(
          secret_iv = excluded.secret_iv, hint = excluded.hint,
          fingerprint = excluded.fingerprint, updated_by = excluded.updated_by,
          updated_at = datetime('now'),
-         -- **ويُبطَل الفحصُ عند كلّ حفظ.**
+         -- **ويُبطَل الفحص عند كلّ حفظ.**
          --
-         -- نتيجةٌ عن سرٍّ مضى **أسوأُ من لا نتيجة**: تقول «مفحوص» عن
-         -- شيءٍ لم يُفحَص، فيمضي المالكُ إلى الخطوة التالية على وهم.
-         -- ويُبطَل ولو لم يتبدّل السرّ — المعرّفُ قد يتبدّل وحدَه.
+         -- نتيجة عن سرّ مضى **أسوأ من لا نتيجة**: تقول «مفحوص» عن
+         -- شيء لم يُفحَص، فيمضي المالك إلى الخطوة التالية على وهم.
+         -- ويُبطَل ولو لم يتبدّل السرّ — المعرّف قد يتبدّل وحدَه.
          verified_at = NULL, verified_kind = NULL`,
     )
     .bind(platform, id, sealed.ciphertext, sealed.iv, hint, print, by)

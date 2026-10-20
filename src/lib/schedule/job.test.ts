@@ -89,7 +89,7 @@ beforeEach(() => {
   db = fakeDb()
 })
 
-describe('قراءةُ الموعد', () => {
+describe('قراءة الموعد', () => {
   it('تقرأ صيغة datetime-local وتحوّلها إلى صيغة القاعدة', () => {
     expect(parseWhen('2026-09-08T09:00')).toBe('2026-09-08 09:00:00')
     expect(parseWhen('2026-09-08T09:00:30')).toBe('2026-09-08 09:00:30')
@@ -101,7 +101,7 @@ describe('قراءةُ الموعد', () => {
     }
   })
 
-  it('صيغةُ «الآن» هي صيغةُ القاعدة نفسها — فالمقارنةُ النصّيّة تصحّ', () => {
+  it('صيغة «الآن» هي صيغة القاعدة نفسها — فالمقارنة النصّيّة تصحّ', () => {
     expect(dbNow(NOW)).toBe('2026-09-08 08:00:00')
     expect(parseWhen(SOON)! > dbNow(NOW)).toBe(true)
     expect(parseWhen(PAST)! > dbNow(NOW)).toBe(false)
@@ -123,7 +123,7 @@ describe('الجدولة', () => {
     expect(row?.['dispatched_at']).toBeNull()
   })
 
-  it('المسوّدةُ لا تُجدول — والاعتمادُ شرطٌ لا تفصيل', async () => {
+  it('المسوّدة لا تُجدول — والاعتماد شرط لا تفصيل', async () => {
     const post = await seedPost({ status: 'draft', approved: false })
     const account = await seedAccount()
     const out = await schedulePost(db, post, account, SOON, NOW)
@@ -132,7 +132,7 @@ describe('الجدولة', () => {
     expect((await readPost(post))?.['status']).toBe('draft')
   })
 
-  it('حسابٌ من منصّةٍ أخرى يُردّ — ونصُّ X لا يُنشر في LinkedIn', async () => {
+  it('حساب من منصّة أخرى يُردّ — ونصّ X لا يُنشر في LinkedIn', async () => {
     const post = await seedPost({ platform: 'x' })
     const account = await seedAccount({ platform: 'linkedin' })
     const out = await schedulePost(db, post, account, SOON, NOW)
@@ -142,7 +142,7 @@ describe('الجدولة', () => {
     expect((await readPost(post))?.['status']).toBe('approved')
   })
 
-  it('قناةٌ إذنُها منتهٍ تُردّ — فلا تفشل بعد أيّامٍ صامتة', async () => {
+  it('قناة إذنُها منته تُردّ — فلا تفشل بعد أيّام صامتة', async () => {
     const post = await seedPost()
     const account = await seedAccount({ status: 'needs_reauth', name: 'بصائر' })
     const out = await schedulePost(db, post, account, SOON, NOW)
@@ -151,19 +151,19 @@ describe('الجدولة', () => {
     if (!out.ok) expect(out.reason).toContain('بصائر')
   })
 
-  it('موعدٌ في الماضي يُردّ — وذاك إرسالٌ فوريّ لا جدولة', async () => {
+  it('موعد في الماضي يُردّ — وذاك إرسال فوريّ لا جدولة', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     expect((await schedulePost(db, post, account, PAST, NOW)).ok).toBe(false)
   })
 
-  it('موعدٌ غير مفهوم يُردّ ولا يُخمَّن', async () => {
+  it('موعد غير مفهوم يُردّ ولا يُخمَّن', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     expect((await schedulePost(db, post, account, 'غدا صباحا', NOW)).ok).toBe(false)
   })
 
-  it('المعتمَدُ بعد تعديل يُجدول كالمعتمَد سواء', async () => {
+  it('المعتمَد بعد تعديل يُجدول كالمعتمَد سواء', async () => {
     const post = await seedPost({ status: 'edited' })
     const account = await seedAccount()
     expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)
@@ -171,7 +171,7 @@ describe('الجدولة', () => {
 })
 
 describe('السحب', () => {
-  it('قبل الإرسال يعود approved — والاعتمادُ لا يُمحى بسحب موعد', async () => {
+  it('قبل الإرسال يعود approved — والاعتماد لا يُمحى بسحب موعد', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     await schedulePost(db, post, account, SOON, NOW)
@@ -224,7 +224,7 @@ describe('الإعادة', () => {
   }
   const LATER = new Date('2026-09-08T12:00:00Z')
 
-  it('الفاشلُ يعود معتمَدا بلا موعدٍ ولا حساب، ومفتاحُه كما هو', async () => {
+  it('الفاشل يعود معتمَدا بلا موعد ولا حساب، ومفتاحُه كما هو', async () => {
     const post = await failedPost()
     expect((await requeue(db, post, LATER)).ok).toBe(true)
     const row = await readPost(post)
@@ -235,7 +235,7 @@ describe('الإعادة', () => {
     expect(key?.idempotency_key).toBe(`k-${post}`)
   })
 
-  it('ويُردّ إن كانت له محاولةٌ ناجحة', async () => {
+  it('ويُردّ إن كانت له محاولة ناجحة', async () => {
     const post = await failedPost()
     await attempt(post, 'succeeded', '2026-09-08 09:10:00', 2)
     const out = await requeue(db, post, LATER)
@@ -244,7 +244,7 @@ describe('الإعادة', () => {
     expect((await readPost(post))?.['status']).toBe('failed')
   })
 
-  it('ويُردّ إن كانت له محاولةٌ أُرسلت بلا جواب', async () => {
+  it('ويُردّ إن كانت له محاولة أُرسلت بلا جواب', async () => {
     const post = await failedPost()
     await attempt(post, 'sent', '2026-09-08 09:10:00', 2)
     const out = await requeue(db, post, LATER)
@@ -252,7 +252,7 @@ describe('الإعادة', () => {
     if (!out.ok) expect(out.reason).toContain('تحقّق على المنصّة')
   })
 
-  it('والعالقُ منذ ساعةٍ بلا محاولةٍ يعود، وما دونها يُردّ', async () => {
+  it('والعالق منذ ساعة بلا محاولة يعود، وما دونها يُردّ', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     await schedulePost(db, post, account, SOON, NOW)
@@ -262,14 +262,14 @@ describe('الإعادة', () => {
     expect((await readPost(post))?.['status']).toBe('approved')
   })
 
-  it('والمجدولُ الذي ينتظر موعدَه لا يُعاد', async () => {
+  it('والمجدول الذي ينتظر موعدَه لا يُعاد', async () => {
     const post = await seedPost()
     const account = await seedAccount()
     await schedulePost(db, post, account, SOON, NOW)
     expect((await requeue(db, post, NOW)).ok).toBe(false)
   })
 
-  it('وطلبان متتاليان: الأوّلُ يقلب الحال والثاني يُردّ', async () => {
+  it('وطلبان متتاليان: الأوّل يقلب الحال والثاني يُردّ', async () => {
     const post = await failedPost()
     const [a, b] = await Promise.all([requeue(db, post, LATER), requeue(db, post, LATER)])
     expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1)
@@ -296,13 +296,13 @@ describe('ما حلّ موعدُه', () => {
     expect(due.map((d) => d.id)).toEqual([post])
   })
 
-  it('لا يعيد ما أُرسل — والختمُ يفصل المعنيين', async () => {
+  it('لا يعيد ما أُرسل — والختم يفصل المعنيين', async () => {
     const post = await scheduled('2026-09-08T10:00')
     await markDispatched(db, [post], new Date('2026-09-08T10:00:00Z'))
     expect(await dueNow(db, new Date('2026-09-08T11:00:00Z'))).toHaveLength(0)
   })
 
-  it('يفرز بالموعد ويقصّ على السقف — فلا تُغرق دورةٌ الطابور', async () => {
+  it('يفرز بالموعد ويقصّ على السقف — فلا تُغرق دورة الطابور', async () => {
     await scheduled('2026-09-08T12:00')
     const first = await scheduled('2026-09-08T09:00')
     const due = await dueNow(db, new Date('2026-09-08T13:00:00Z'), 1)
@@ -310,7 +310,7 @@ describe('ما حلّ موعدُه', () => {
   })
 })
 
-describe('دورةُ الإرسال', () => {
+describe('دورة الإرسال', () => {
   async function due(): Promise<string> {
     const post = await seedPost()
     const account = await seedAccount()
@@ -328,7 +328,7 @@ describe('دورةُ الإرسال', () => {
     expect((await readPost(post))?.['dispatched_at']).not.toBeNull()
   })
 
-  it('**الدورةُ الثانية لا ترسل ما أرسلته الأولى**', async () => {
+  it('**الدورة الثانية لا ترسل ما أرسلته الأولى**', async () => {
     await due()
     const now = () => new Date('2026-09-08T09:05:00Z')
     const q1 = fakeQueue()
@@ -341,7 +341,7 @@ describe('دورةُ الإرسال', () => {
     expect(second.kind).toBe('none')
   })
 
-  it('الإيقافُ يوقف النشر كما يوقف النداء — ولا رسالةَ تخرج', async () => {
+  it('الإيقاف يوقف النشر كما يوقف النداء — ولا رسالة تخرج', async () => {
     const post = await due()
     await writeSetting(db, 'paused', 'true', 'test')
     const queue = fakeQueue()
@@ -353,7 +353,7 @@ describe('دورةُ الإرسال', () => {
     expect((await readPost(post))?.['dispatched_at']).toBeNull()
   })
 
-  it('**بلوغُ سقف التحليل أو سقف الإنفاق لا يوقف نشرَ ما اعتمده المالك** (D-169)', async () => {
+  it('**بلوغ سقف التحليل أو سقف الإنفاق لا يوقف نشر ما اعتمده المالك** (D-169)', async () => {
     const post = await due()
     await writeSetting(db, 'daily_analysis_cap', '0', 'test')
     await writeSetting(db, 'daily_spend_cap_usd', '0', 'test')
@@ -364,14 +364,14 @@ describe('دورةُ الإرسال', () => {
     expect(queue.sent).toEqual([post])
   })
 
-  it('بلا مستحقٍّ لا شيء', async () => {
+  it('بلا مستحقّ لا شيء', async () => {
     const queue = fakeQueue()
     expect((await dispatchDue({ db, queue, now: () => NOW })).kind).toBe('none')
   })
 })
 
-describe('D-009 · القيدُ في القاعدة لا في الشيفرة', () => {
-  it('SQL مباشر: طابورٌ بلا حساب يُردّ', async () => {
+describe('D-009 · القيد في القاعدة لا في الشيفرة', () => {
+  it('SQL مباشر: طابور بلا حساب يُردّ', async () => {
     const post = await seedPost()
     await expect(
       db
@@ -381,7 +381,7 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
     ).rejects.toThrow()
   })
 
-  it('SQL مباشر: طابورٌ بلا اعتماد يُردّ وإن كملت البقيّة', async () => {
+  it('SQL مباشر: طابور بلا اعتماد يُردّ وإن كملت البقيّة', async () => {
     const post = await seedPost({ approved: false, status: 'draft' })
     const account = await seedAccount()
     await expect(
@@ -402,7 +402,7 @@ describe('D-009 · القيدُ في القاعدة لا في الشيفرة', (
  * **فالمنعُ رُفع** — والحارسُ الباقي في الناشر: هو الذي يمنع فعلا،
  * ورسالةٌ في الطابور تجده قائما.
  */
-describe('منشورٌ بصورة', () => {
+describe('منشور بصورة', () => {
   async function withImage(): Promise<{ post: string; account: string }> {
     const post = await seedPost()
     const account = await seedAccount()
@@ -416,7 +416,7 @@ describe('منشورٌ بصورة', () => {
     return { post, account }
   }
 
-  it('يُجدول كغيره — والرفعُ يقع عند النشر لا عند الجدولة', async () => {
+  it('يُجدول كغيره — والرفع يقع عند النشر لا عند الجدولة', async () => {
     const { post, account } = await withImage()
     const out = await schedulePost(db, post, account, SOON, NOW)
 
@@ -431,7 +431,7 @@ describe('منشورٌ بصورة', () => {
  * مسوّدةُ TikTok من مصدرٍ اعتُمدت وجُدولت بلا مقطع: «✓ جُدولت» على البطاقة، ثمّ ردّها
  * الناشرُ عند موعدها بـ `no_clip`. فالسؤالُ نفسُه يُسأل الآن بمنصّات الناشر نفسِها.
  */
-describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () => {
+describe('منصّات المقطع وInstagram تحتاج وسيطها', () => {
   async function withMedia(post: string, mime: string, status = 'ready'): Promise<void> {
     await db
       .prepare(
@@ -442,7 +442,7 @@ describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () =
       .run()
   }
 
-  it('TikTok بلا مقطعٍ تُردّ بسببٍ يقول ما يُفعَل — وتبقى معتمَدة', async () => {
+  it('TikTok بلا مقطع تُردّ بسبب يقول ما يُفعَل — وتبقى معتمَدة', async () => {
     const post = await seedPost({ platform: 'tiktok' })
     const account = await seedAccount({ platform: 'tiktok' })
     const out = await schedulePost(db, post, account, SOON, NOW)
@@ -451,7 +451,7 @@ describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () =
     expect((await readPost(post))?.['status']).toBe('approved')
   })
 
-  it('وYouTube بصورةٍ وحدَها تُردّ كذلك، وبمقطعٍ جاهزٍ تُجدوَل', async () => {
+  it('وYouTube بصورة وحدَها تُردّ كذلك، وبمقطع جاهز تُجدوَل', async () => {
     const post = await seedPost({ platform: 'youtube' })
     const account = await seedAccount({ platform: 'youtube' })
     await withMedia(post, 'image/png')
@@ -463,7 +463,7 @@ describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () =
     expect(out).toMatchObject({ ok: true, platform: 'youtube' })
   })
 
-  it('وInstagram بلا وسيطٍ تُردّ، وبصورةٍ أو مقطعٍ تُجدوَل', async () => {
+  it('وInstagram بلا وسيط تُردّ، وبصورة أو مقطع تُجدوَل', async () => {
     const bare = await seedPost({ platform: 'instagram' })
     const account = await seedAccount({ platform: 'instagram' })
     const out = await schedulePost(db, bare, account, SOON, NOW)
@@ -475,7 +475,7 @@ describe('منصّاتُ المقطع وInstagram تحتاج وسيطها', () =
     expect((await schedulePost(db, pictured, account, SOON, NOW)).ok).toBe(true)
   })
 
-  it('وLinkedIn وX نصٌّ يكفي — لا وسيطَ يُشترَط', async () => {
+  it('وLinkedIn وX نصّ يكفي — لا وسيط يُشترَط', async () => {
     const post = await seedPost({ platform: 'x' })
     const account = await seedAccount({ platform: 'x' })
     expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)

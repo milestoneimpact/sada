@@ -168,16 +168,16 @@ export const PASSKEY_TEXT_SCRIPT = `
 var sadaPk={
   server:function(code,status){
     var t={
-      rate_limited:'محاولاتٌ كثيرة — انتظر دقائقَ ثمّ أعد.',
-      no_passkeys:'لا مفتاحَ مسجَّلًا على هذه البيئة — ادخل بكلمة الإدارة.',
-      challenge_expired:'انتهت مهلةُ الطلب — اضغط مرّةً أخرى.',
+      rate_limited:'محاولات كثيرة — انتظر دقائق ثمّ أعد.',
+      no_passkeys:'لا مفتاح مسجَّلًا على هذه البيئة — ادخل بكلمة الإدارة.',
+      challenge_expired:'انتهت مهلة الطلب — اضغط مرّةً أخرى.',
       denied:'لم يُقبَل المفتاح — جرّب مفتاحًا آخر أو ادخل بكلمة الإدارة.',
-      uv_required:'هذا المفتاح لا يتحقّق منك (لا بصمةَ ولا PIN)، فلا يكفي وحدَه — ادخل بكلمة الإدارة ثمّ به.',
-      not_started:'ابدأ ضبطَ رمز التطبيق أوّلًا.',
-      admin_disabled:'الدخولُ معطَّل: كلمةُ الإدارة غير مضبوطة على الخادم.',
-      csrf_failed:'انتهت صلاحيةُ الصفحة — حدّثها ثمّ أعد.',
+      uv_required:'هذا المفتاح لا يتحقّق منك (لا بصمة ولا PIN)، فلا يكفي وحدَه — ادخل بكلمة الإدارة ثمّ به.',
+      not_started:'ابدأ ضبط رمز التطبيق أوّلًا.',
+      admin_disabled:'الدخول معطَّل: كلمة الإدارة غير مضبوطة على الخادم.',
+      csrf_failed:'انتهت صلاحية الصفحة — حدّثها ثمّ أعد.',
       no_session:'انتهت الجلسة — ادخل من جديد.',
-      pending_second_factor:'أتمَّ العاملَ الثانيَ أوّلًا.'
+      pending_second_factor:'أتمّ العامل الثاني أوّلًا.'
     }[code];
     var e=new Error(t||('تعذّر الطلب ('+status+').'));
     e.name='SadaServer';
@@ -188,11 +188,11 @@ var sadaPk={
     if(n==='SadaServer')return err.message;
     if(n==='NotAllowedError')return 'أُلغي الطلب أو انتهت مهلتُه — اضغط مرّةً أخرى والمس مفتاحك.';
     if(n==='AbortError')return 'أُوقف الطلب قبل تمامه.';
-    if(n==='SecurityError')return 'العنوانُ لا يطابق نطاقَ المفتاح — افتح اللوحةَ من عنوانها.';
-    if(n==='InvalidStateError')return 'هذا المفتاحُ مسجَّلٌ من قبل.';
-    if(n==='NotSupportedError')return 'متصفّحُك لا يدعم هذا النوعَ من المفاتيح.';
-    if(n==='TypeError')return 'تعذّر الاتصالُ بالخادم — تحقّق من الشبكة.';
-    return 'تعذّر إتمامُ العمليّة بالمفتاح'+(n?' ('+n+')':'')+'.';
+    if(n==='SecurityError')return 'العنوان لا يطابق نطاق المفتاح — افتح اللوحة من عنوانها.';
+    if(n==='InvalidStateError')return 'هذا المفتاح مسجَّل من قبل.';
+    if(n==='NotSupportedError')return 'متصفّحُك لا يدعم هذا النوع من المفاتيح.';
+    if(n==='TypeError')return 'تعذّر الاتصال بالخادم — تحقّق من الشبكة.';
+    return 'تعذّر إتمام العمليّة بالمفتاح'+(n?' ('+n+')':'')+'.';
   },
   fail:function(r){
     return r.json().catch(function(){return {};}).then(function(e){
@@ -217,7 +217,7 @@ export const IMG_SCRIPT = `
     if(img.closest('a')){var s=document.createElement('span'); s.className='st bad';
       s.textContent='لم تُحمَّل'; img.replaceWith(s); return;}
     var box=document.createElement('div'); box.className='pic-err'; box.setAttribute('role','status');
-    var b=document.createElement('b'); b.textContent='تعذّر عرضُ الصورة';
+    var b=document.createElement('b'); b.textContent='تعذّر عرض الصورة';
     var t=document.createElement('span'); t.className='ago';
     t.textContent='لم يصل الملفّ من المخزن. افتحه وحده، فإن لم يُفتح فولّد صورةً بديلة.';
     var a=document.createElement('a'); a.className='btn btn-secondary btn-sm'; a.href=img.currentSrc||img.src;

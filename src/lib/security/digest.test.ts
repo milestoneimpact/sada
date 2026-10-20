@@ -6,7 +6,7 @@ describe('sameBytes', () => {
     expect(sameBytes(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3]))).toBe(true)
   })
 
-  it('اختلافٌ في أيّ موضع يُرفض — ولو في الأخير', () => {
+  it('اختلاف في أيّ موضع يُرفض — ولو في الأخير', () => {
     expect(sameBytes(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4]))).toBe(false)
     expect(sameBytes(new Uint8Array([1, 2, 3]), new Uint8Array([9, 2, 3]))).toBe(false)
   })
@@ -21,11 +21,11 @@ describe('sameSecret', () => {
     expect(await sameSecret('abc123', 'abc123')).toBe(true)
   })
 
-  it('اختلافٌ في محرفٍ واحد يُرفض', async () => {
+  it('اختلاف في محرف واحد يُرفض', async () => {
     expect(await sameSecret('abc123', 'abc124')).toBe(false)
   })
 
-  it('لا يقلّم — الفراغ فرقٌ ما لم يُقلَّم قبل النداء', async () => {
+  it('لا يقلّم — الفراغ فرق ما لم يُقلَّم قبل النداء', async () => {
     expect(await sameSecret('abc', 'abc ')).toBe(false)
   })
 
@@ -35,7 +35,7 @@ describe('sameSecret', () => {
 })
 
 describe('fingerprint', () => {
-  it('ثابتةٌ لنفس السرّ', async () => {
+  it('ثابتة لنفس السرّ', async () => {
     expect(await fingerprint('secret')).toBe(await fingerprint('secret'))
   })
 
@@ -43,11 +43,11 @@ describe('fingerprint', () => {
     expect(await fingerprint('a')).not.toBe(await fingerprint('b'))
   })
 
-  it('تُقلّم — فسطرٌ تسلّل مع السرّ لا يبدّل البصمة', async () => {
+  it('تُقلّم — فسطر تسلّل مع السرّ لا يبدّل البصمة', async () => {
     expect(await fingerprint('secret\n')).toBe(await fingerprint('secret'))
   })
 
-  it('ستّةَ عشرَ محرفا ستّينيّ عشر، ولا تحمل السرّ', async () => {
+  it('ستّة عشر محرفا ستّينيّ عشر، ولا تحمل السرّ', async () => {
     const value = await fingerprint('super-secret-value')
     expect(value).toMatch(/^[0-9a-f]{16}$/)
     expect(value).not.toContain('secret')
@@ -59,12 +59,12 @@ describe('randomToken', () => {
     expect(new Set(Array.from({ length: 200 }, () => randomToken())).size).toBe(200)
   })
 
-  it('طولُه ضعفُ البايتات — ستّينيّ عشر', () => {
+  it('طولُه ضعف البايتات — ستّينيّ عشر', () => {
     expect(randomToken(16)).toHaveLength(32)
     expect(randomToken(32)).toHaveLength(64)
   })
 
-  it('محارفُه كلّها ستّينيّةُ عشر', () => {
+  it('محارفُه كلّها ستّينيّة عشر', () => {
     expect(randomToken(32)).toMatch(/^[0-9a-f]{64}$/)
   })
 })

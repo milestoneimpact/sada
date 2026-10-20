@@ -2,24 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { IMPLEMENTED, isConfigured, PROVIDERS, ROUTES, routeStatuses } from './registry'
 import { MODEL } from '../analyze/claude'
 
-describe('السجلّ مرجعٌ واحد', () => {
-  it('نموذج التحليل يُقرأ من السجلّ لا من ثابتٍ مكرّر', () => {
+describe('السجلّ مرجع واحد', () => {
+  it('نموذج التحليل يُقرأ من السجلّ لا من ثابت مكرّر', () => {
     expect(MODEL).toBe(ROUTES.analyze.model)
   })
 
-  it('كلّ مهمّة موجّهة إلى مزوّدٍ معروف', () => {
+  it('كلّ مهمّة موجّهة إلى مزوّد معروف', () => {
     for (const route of Object.values(ROUTES)) {
       expect(Object.keys(PROVIDERS)).toContain(route.provider)
     }
   })
 
-  it('لكلّ توجيه سببٌ مكتوب — لا نموذجَ بلا تعليل', () => {
+  it('لكلّ توجيه سبب مكتوب — لا نموذج بلا تعليل', () => {
     for (const route of Object.values(ROUTES)) {
       expect(route.why.length).toBeGreaterThan(10)
     }
   })
 
-  it('لا مفتاح ولا قيمة سرٍّ في السجلّ — أسماء فقط', () => {
+  it('لا مفتاح ولا قيمة سرّ في السجلّ — أسماء فقط', () => {
     const text = JSON.stringify({ PROVIDERS, ROUTES })
     expect(text).not.toMatch(/sk-ant/)
     expect(text).not.toMatch(/AIza/)
@@ -38,7 +38,7 @@ describe('isConfigured', () => {
     expect(isConfigured({}, 'anthropic')).toBe(false)
   })
 
-  it('يفرّق بين المزوّدين — سرُّ أحدهما لا يضبط الآخر', () => {
+  it('يفرّق بين المزوّدين — سرّ أحدهما لا يضبط الآخر', () => {
     const env = { ANTHROPIC_API_KEY: 'x' }
     expect(isConfigured(env, 'anthropic')).toBe(true)
     expect(isConfigured(env, 'gemini')).toBe(false)
@@ -64,7 +64,7 @@ describe('routeStatuses', () => {
    * حاله لصار اختبارا يمنع البناء لا يحرسه. **والمبدأ هو الذي يُثبَّت لا
    * المثال**: الجاهزيّةُ بناءٌ وضبطٌ معا، وسقوطُ أحدهما يُسقطها.
    */
-  it('الجاهزيّةُ بناءٌ **و** ضبطٌ معا — لا أحدُهما', () => {
+  it('الجاهزيّة بناء **و** ضبط معا — لا أحدُهما', () => {
     const all = { ANTHROPIC_API_KEY: 'x', GEMINI_API_KEY: 'y', CF_AI_TOKEN: 'z' }
     for (const status of routeStatuses(all)) {
       expect(status.ready).toBe(IMPLEMENTED.has(status.task))

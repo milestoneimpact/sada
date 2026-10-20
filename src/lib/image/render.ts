@@ -76,11 +76,11 @@ function decodeBase64(value: string): Uint8Array {
  */
 export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
   if (shot.accountId.trim() === '' || shot.apiToken.trim() === '') {
-    throw new SlideError('حسابُ Cloudflare أو مفتاحُ المتصفّح غيرُ مضبوط', false)
+    throw new SlideError('حساب Cloudflare أو مفتاح المتصفّح غير مضبوط', false)
   }
   // القصُّ عندنا لا عندهم: طلبٌ فوق الحدّ يُردّ بخطأٍ لا يقول إنّ السببَ الحجم
   if (shot.html.length > MAX_HTML_BYTES) {
-    throw new SlideError('صفحةُ الشريحة أكبر من الحدّ', false)
+    throw new SlideError('صفحة الشريحة أكبر من الحدّ', false)
   }
 
   const call = shot.fetchImpl ?? fetch
@@ -132,9 +132,9 @@ export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
      */
     const hint =
       response.status === 401 || response.status === 403
-        ? ' — والصلاحيّةُ المطلوبة: Browser Run (وتُسمّى Browser Rendering في الوثيقة) · Edit'
+        ? ' — والصلاحيّة المطلوبة: Browser Run (وتُسمّى Browser Rendering في الوثيقة) · Edit'
         : ''
-    throw new SlideError(`تصويرُ الشريحة ردّ ${response.status}${hint}`, retryable)
+    throw new SlideError(`تصوير الشريحة ردّ ${response.status}${hint}`, retryable)
   }
 
   const type = response.headers.get('Content-Type') ?? ''
@@ -143,26 +143,26 @@ export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
     try {
       payload = (await response.json()) as Record<string, unknown>
     } catch {
-      throw new SlideError('جوابُ التصوير ليس JSON ولا بايتات', false)
+      throw new SlideError('جواب التصوير ليس JSON ولا بايتات', false)
     }
-    if (payload['success'] === false) throw new SlideError('تصويرُ الشريحة ردّ فشلا', false)
+    if (payload['success'] === false) throw new SlideError('تصوير الشريحة ردّ فشلا', false)
     const result = (payload['result'] ?? {}) as Record<string, unknown>
     const shotB64 = result['screenshot']
     if (typeof shotB64 !== 'string' || shotB64.length === 0) {
-      throw new SlideError('جوابٌ بلا لقطة', false)
+      throw new SlideError('جواب بلا لقطة', false)
     }
     let bytes: Uint8Array
     try {
       bytes = decodeBase64(shotB64)
     } catch {
-      throw new SlideError('اللقطةُ ليست base64 صالحا', false)
+      throw new SlideError('اللقطة ليست base64 صالحا', false)
     }
-    if (bytes.length === 0) throw new SlideError('لقطةٌ فارغة', true)
+    if (bytes.length === 0) throw new SlideError('لقطة فارغة', true)
     return { bytes, mime: 'image/jpeg' }
   }
 
   const buffer = await response.arrayBuffer()
-  if (buffer.byteLength === 0) throw new SlideError('لقطةٌ فارغة', true)
+  if (buffer.byteLength === 0) throw new SlideError('لقطة فارغة', true)
   return {
     bytes: new Uint8Array(buffer),
     // ما نطلبه jpeg؛ وترويسةٌ تقول غيرَه تُصدَّق — هي أعلمُ بما أرسلت

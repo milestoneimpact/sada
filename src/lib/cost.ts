@@ -81,7 +81,7 @@ export async function recordCost(db: Db, entry: CostEntry): Promise<string> {
     .prepare(
       `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, ref_id, org_id)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,
-               -- ‏الكلفةُ لمنظّمة ما أُنفقت عليه، وما لا مرجعَ له فللمالك
+               -- ‏الكلفة لمنظّمة ما أُنفقت عليه، وما لا مرجع له فللمالك
                coalesce((SELECT org_id FROM posts WHERE id = ?7), (SELECT org_id FROM sources WHERE id = ?7), 'org_owner'))`,
     )
     .bind(id, entry.provider, entry.operation, entry.units, entry.unitCost, total, entry.refId ?? null)

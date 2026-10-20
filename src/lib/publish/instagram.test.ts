@@ -20,7 +20,7 @@ function fakeFetch(queue: Response[]): typeof fetch & { calls: string[] } {
   const impl = (async (url: string | URL | Request) => {
     calls.push(String(url))
     const next = queue.shift()
-    if (next === undefined) throw new Error(`نداءٌ زائد: ${String(url)}`)
+    if (next === undefined) throw new Error(`نداء زائد: ${String(url)}`)
     return next
   }) as typeof fetch & { calls: string[] }
   impl.calls = calls
@@ -28,7 +28,7 @@ function fakeFetch(queue: Response[]): typeof fetch & { calls: string[] } {
 }
 
 describe('الصورة', () => {
-  it('حاويةٌ ثمّ نشرٌ — ولا استطلاع', async () => {
+  it('حاوية ثمّ نشر — ولا استطلاع', async () => {
     const f = fakeFetch([reply({ id: 'c1' }), reply({ id: 'p9' })])
     const out = await publishInstagram(
       'tok', '17841', { kind: 'image', url: 'https://x/m/t' }, 'نصّ', f, noSleep,
@@ -79,20 +79,20 @@ describe('المقطع', () => {
    * استطلاعُ حاويةٍ فشل ترميزُها يردّ ‏٢٠٠ وفيه `ERROR` — **فمن فحص
    * `ok` وحدَه انتظر ستَّ دوراتٍ ثمّ نشر حاويةً ميّتة**.
    */
-  it('وERROR في ردٍّ ٢٠٠ يُوقف ولا يُنشَر', async () => {
+  it('وERROR في ردّ ٢٠٠ يُوقف ولا يُنشَر', async () => {
     const f = fakeFetch([
       reply({ id: 'c4' }),
-      reply({ status_code: 'ERROR', status: 'التنسيقُ غيرُ مدعوم' }),
+      reply({ status_code: 'ERROR', status: 'التنسيق غير مدعوم' }),
     ])
     await expect(publishInstagram(
       'tok', '1', { kind: 'video', url: 'https://x/m/t' }, 'نصّ', f, noSleep,
-    )).rejects.toThrow(/فشل ترميزُ المقطع/)
+    )).rejects.toThrow(/فشل ترميز المقطع/)
     // **ولا نداءَ نشرٍ وقع**: حاويةٌ ميّتةٌ لا تُنشَر
     expect(f.calls).toHaveLength(2)
   })
 
   /** وسقفٌ لا حلقةٌ مفتوحة — **وWorker له سقفُ زمن**. */
-  it('ولا يستطلع أكثرَ من سقفه', async () => {
+  it('ولا يستطلع أكثر من سقفه', async () => {
     const f = fakeFetch([
       reply({ id: 'c5' }),
       ...Array.from({ length: POLL_TRIES }, () => reply({ status_code: 'IN_PROGRESS' })),
@@ -108,7 +108,7 @@ describe('المقطع', () => {
 
 describe('ما يُردّ صريحا', () => {
   /** **ولا منشورَ نصّيٌّ فيها** — ورسالةُ المنصّة لا تقول للمالك ما يفعل. */
-  it('بلا وسيطٍ يُردّ قبل أن يُنادى شيء', async () => {
+  it('بلا وسيط يُردّ قبل أن يُنادى شيء', async () => {
     const f = fakeFetch([])
     await expect(publishInstagram(
       'tok', '1', { kind: 'image', url: '' }, 'نصّ', f, noSleep,
@@ -117,7 +117,7 @@ describe('ما يُردّ صريحا', () => {
   })
 
   /** **ورسالةُ Meta تُنقَل كما هي**: تقول للمالك ما يفعل. */
-  it('وحسابٌ غيرُ احترافيٍّ يُنقَل نصُّ عطله', async () => {
+  it('وحساب غير احترافيّ يُنقَل نصّ عطله', async () => {
     const f = fakeFetch([
       reply({ error: { message: 'The user is not an Instagram Professional account' } }, 400),
     ])
@@ -143,16 +143,16 @@ describe('ما يُردّ صريحا', () => {
    * وادّعاءُ النجاح يمنع إعادةَ المحاولة، وادّعاءُ الفشل قد يُكرّر
    * منشورا — فيُقال غيرُ مؤكَّدٍ **ولا يُعاد**.
    */
-  it('وردٌّ ٢٠٠ بلا معرّفٍ لا يُعَدّ نجاحا ولا يُعاد', async () => {
+  it('وردّ ٢٠٠ بلا معرّف لا يُعَدّ نجاحا ولا يُعاد', async () => {
     const f = fakeFetch([reply({ id: 'c6' }), reply({ ok: true })])
     const err = await publishInstagram(
       'tok', '1', { kind: 'image', url: 'https://x/m/t' }, 'نصّ', f, noSleep,
     ).catch((e: unknown) => e)
-    expect((err as PublishError).message).toMatch(/بلا معرّفٍ يُؤكّده/)
+    expect((err as PublishError).message).toMatch(/بلا معرّف يُؤكّده/)
     expect((err as PublishError).retryable).toBe(false)
   })
 
-  it('وحاويةٌ بلا معرّفٍ تُعاد', async () => {
+  it('وحاوية بلا معرّف تُعاد', async () => {
     const f = fakeFetch([reply({ ok: true })])
     const err = await publishInstagram(
       'tok', '1', { kind: 'image', url: 'https://x/m/t' }, 'نصّ', f, noSleep,

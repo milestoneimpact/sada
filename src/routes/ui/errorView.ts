@@ -31,7 +31,7 @@ export function notFoundPage(nonce: string, path: string, detail?: string): stri
       ابدأ من الرئيسيّة، أو ابحث عمّا تريد بـ <kbd class="kbd">Ctrl K</kbd>.`,
     action: button({ label: 'الرئيسيّة', variant: 'primary', href: '/panel' }),
   })
-  return soloPage('صدى — صفحةٌ غير موجودة', HOME, body, nonce, '', buildCommands({ onPanel: false }),
+  return soloPage('صدى — صفحة غير موجودة', HOME, body, nonce, '', buildCommands({ onPanel: false }),
     railHtml({ inPanel: false }))
 }
 
@@ -54,14 +54,14 @@ export function serverErrorPage(nonce: string, requestId: string, retry: string 
     icon: GLYPH_ICON['▲'] ?? '',
     title: 'حدث خطأ من جهتنا، لا منك',
     html: retry === null
-      ? `<b>ربّما تمّ بعضُ ما طلبتَ قبل الخطأ.</b> افتح الصفحةَ التي كنتَ فيها وتحقّق ممّا حُفظ قبل أن تعيده، ${tail}`
+      ? `<b>ربّما تمّ بعض ما طلبت قبل الخطأ.</b> افتح الصفحة التي كنت فيها وتحقّق ممّا حُفظ قبل أن تعيده، ${tail}`
       : `أعد المحاولة بعد دقيقة، ${tail}`,
     action: retry === null
       ? button({ label: 'الرئيسيّة', variant: 'primary', href: '/panel' })
       : button({ label: 'أعد المحاولة', variant: 'primary', href: retry }),
   })}
   <details class="setup mt-3"><summary>للمطوّر</summary>
-    <div class="setup-body"><p class="hint m-0">رقمُ الطلب: <span class="mono">${escapeHtml(requestId)}</span></p></div></details></div>`
-  return soloPage('صدى — خطأٌ في الخادم', HOME, body, nonce, '', buildCommands({ onPanel: false }),
+    <div class="setup-body"><p class="hint m-0">رقم الطلب: <span class="mono">${escapeHtml(requestId)}</span></p></div></details></div>`
+  return soloPage('صدى — خطأ في الخادم', HOME, body, nonce, '', buildCommands({ onPanel: false }),
     railHtml({ inPanel: false }))
 }

@@ -32,27 +32,27 @@ const COMPAT = {
   builtin: false,
 }
 
-describe('عنوانُ الفهرس — موضعٌ واحد يقرأه الفاحصُ والقائمة', () => {
-  it('لهجةُ OpenAI: models على العنوان', () => {
+describe('عنوان الفهرس — موضع واحد يقرأه الفاحص والقائمة', () => {
+  it('لهجة OpenAI: models على العنوان', () => {
     expect(compatCatalogUrl('https://api.deepseek.com/v1')).toBe('https://api.deepseek.com/v1/models')
   })
 
-  it('وشرطةٌ زائدةٌ لا تُضاعَف', () => {
+  it('وشرطة زائدة لا تُضاعَف', () => {
     expect(compatCatalogUrl('https://api.deepseek.com/v1/')).toBe('https://api.deepseek.com/v1/models')
   })
 
-  it('و**Cloudflare تُصرَف إلى models/search** — وهذه هي العلّةُ المُصلَحة', () => {
+  it('و**Cloudflare تُصرَف إلى models/search** — وهذه هي العلّة المُصلَحة', () => {
     expect(compatCatalogUrl(CF_V1)).toContain('/ai/models/search')
   })
 })
 
-describe('Cloudflare — الفهرسُ يُقرأ من result', () => {
+describe('Cloudflare — الفهرس يُقرأ من result', () => {
   const PAYLOAD = {
     success: true,
     result: [
       {
         name: '@cf/black-forest-labs/flux-1-schnell',
-        description: 'نموذجُ صورٍ سريع',
+        description: 'نموذج صور سريع',
         task: { name: 'Text-to-Image' },
       },
       { name: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: { name: 'Text Generation' } },
@@ -65,13 +65,13 @@ describe('Cloudflare — الفهرسُ يُقرأ من result', () => {
     expect(seen[0]!.url).not.toContain('/ai/v1/')
   })
 
-  it('والرمزُ في الترويسة لا في العنوان', async () => {
+  it('والرمز في الترويسة لا في العنوان', async () => {
     await listModels({ ...COMPAT, name: 'cloudflare', baseUrl: CF_V1 }, net(200, PAYLOAD))
     expect(seen[0]!.headers.get('Authorization')).toBe('Bearer sk-deep')
     expect(seen[0]!.url).not.toContain('sk-deep')
   })
 
-  it('ويُصنَّف مخرَجُ الصورةِ صورةً ومخرَجُ النصِّ نصّا', async () => {
+  it('ويُصنَّف مخرَج الصورة صورةً ومخرَج النصّ نصّا', async () => {
     const out = await listModels({ ...COMPAT, name: 'cloudflare', baseUrl: CF_V1 }, net(200, PAYLOAD))
     expect(out.ok).toBe(true)
     const flux = out.models.find((m) => m.id.includes('flux'))
@@ -80,14 +80,14 @@ describe('Cloudflare — الفهرسُ يُقرأ من result', () => {
   })
 })
 
-describe('لهجةُ OpenAI — والسعرُ يُقرأ حيث يُعطى', () => {
+describe('لهجة OpenAI — والسعر يُقرأ حيث يُعطى', () => {
   it('يقرأ المعرّفات من data', async () => {
     const out = await listModels(COMPAT, net(200, { data: [{ id: 'deepseek-chat' }] }))
     expect(out.ok).toBe(true)
     expect(out.models[0]!.id).toBe('deepseek-chat')
   })
 
-  it('و**سعرُ الرمز يُحوَّل إلى سعرِ المليون** — وهو ما تخزّنه القاعدة', async () => {
+  it('و**سعر الرمز يُحوَّل إلى سعر المليون** — وهو ما تخزّنه القاعدة', async () => {
     const out = await listModels(
       COMPAT,
       net(200, {
@@ -104,7 +104,7 @@ describe('لهجةُ OpenAI — والسعرُ يُقرأ حيث يُعطى', ()
     expect(out.models[0]!.priceOut).toBeNull()
   })
 
-  it('وسعرٌ ليس عددا يُترَك ولا يُقبَل NaN', async () => {
+  it('وسعر ليس عددا يُترَك ولا يُقبَل NaN', async () => {
     const out = await listModels(
       COMPAT,
       net(200, { data: [{ id: 'x', pricing: { prompt: 'مجّانا', completion: -1 } }] }),
@@ -114,22 +114,22 @@ describe('لهجةُ OpenAI — والسعرُ يُقرأ حيث يُعطى', ()
   })
 })
 
-describe('Gemini — سابقةُ models/ تُنزَع', () => {
+describe('Gemini — سابقة models/ تُنزَع', () => {
   const GEM = { ...COMPAT, name: 'gemini', builtin: true, baseUrl: null }
 
-  it('يُنادى عنوانُ Google بمفتاحه في ترويسته', async () => {
+  it('يُنادى عنوان Google بمفتاحه في ترويسته', async () => {
     await listModels(GEM, net(200, { models: [{ name: 'models/gemini-2.5-flash' }] }))
     expect(seen[0]!.url).toContain('generativelanguage.googleapis.com')
     expect(seen[0]!.headers.get('x-goog-api-key')).toBe('sk-deep')
   })
 
-  it('والمعرّفُ يُكتب بلا سابقة — فما يُحفَظ هو ما يُنادى به', async () => {
+  it('والمعرّف يُكتب بلا سابقة — فما يُحفَظ هو ما يُنادى به', async () => {
     const out = await listModels(GEM, net(200, { models: [{ name: 'models/gemini-2.5-flash' }] }))
     expect(out.models[0]!.id).toBe('gemini-2.5-flash')
   })
 })
 
-describe('Anthropic — لهجتُه ترويسةٌ أخرى', () => {
+describe('Anthropic — لهجتُه ترويسة أخرى', () => {
   it('x-api-key و anthropic-version لا Bearer', async () => {
     await listModels(
       { ...COMPAT, name: 'anthropic', kind: 'anthropic', builtin: true },
@@ -141,43 +141,43 @@ describe('Anthropic — لهجتُه ترويسةٌ أخرى', () => {
   })
 })
 
-describe('والفشلُ يُقال بسببه — ولا يُرمى', () => {
+describe('والفشل يُقال بسببه — ولا يُرمى', () => {
   it('٤٠١ تعني المفتاح لا الشكل', async () => {
     const out = await listModels(COMPAT, net(401, {}))
     expect(out.ok).toBe(false)
     expect(out.detail).toContain('المفتاح مرفوض')
   })
 
-  it('٤٠٤ تعني أنّ الفهرسَ غيرُ مخدوم — لا أنّ المفتاح فاسد', async () => {
+  it('٤٠٤ تعني أنّ الفهرس غير مخدوم — لا أنّ المفتاح فاسد', async () => {
     const out = await listModels(COMPAT, net(404, {}))
-    expect(out.detail).toContain('فهرسَ نماذج')
+    expect(out.detail).toContain('فهرس نماذج')
   })
 
-  it('وجوابٌ ليس JSON يُقال ولا يُبتلَع', async () => {
+  it('وجواب ليس JSON يُقال ولا يُبتلَع', async () => {
     const out = await listModels(COMPAT, net(200, '<html>', 'text/html'))
     expect(out.ok).toBe(false)
     expect(out.detail).toContain('JSON')
   })
 
-  it('و**٢٠٠ بقائمةٍ فارغة ليست نجاحا يُشهَد به**', async () => {
+  it('و**٢٠٠ بقائمة فارغة ليست نجاحا يُشهَد به**', async () => {
     const out = await listModels(COMPAT, net(200, { data: [] }))
     expect(out.ok).toBe(false)
     expect(out.models).toHaveLength(0)
   })
 
-  it('ولا مفتاحَ يعني لا نداء', async () => {
+  it('ولا مفتاح يعني لا نداء', async () => {
     const out = await listModels({ ...COMPAT, apiKey: '  ' }, net(200, { data: [{ id: 'x' }] }))
     expect(out.ok).toBe(false)
     expect(seen).toHaveLength(0)
   })
 
-  it('ولا عنوانَ لمزوّدٍ بلهجة OpenAI يعني لا نداء', async () => {
+  it('ولا عنوان لمزوّد بلهجة OpenAI يعني لا نداء', async () => {
     const out = await listModels({ ...COMPAT, baseUrl: null }, net(200, { data: [{ id: 'x' }] }))
     expect(out.ok).toBe(false)
     expect(out.detail).toContain('لا عنوان')
   })
 
-  it('وعطلُ الشبكة يُعاد سببا لا استثناء', async () => {
+  it('وعطل الشبكة يُعاد سببا لا استثناء', async () => {
     const fail = (async () => {
       throw new Error('تعذّر')
     }) as unknown as typeof fetch
@@ -187,7 +187,7 @@ describe('والفشلُ يُقال بسببه — ولا يُرمى', () => {
   })
 })
 
-describe('تصنيفُ المهمّة — والاتّجاهُ يُقرأ لا وجودُ الكلمة', () => {
+describe('تصنيف المهمّة — والاتّجاه يُقرأ لا وجود الكلمة', () => {
   it('«image-to-text» مخرَجُه نصّ لا صورة', () => {
     expect(classifyTask('Image-to-Text')).toBe('text')
   })
@@ -196,7 +196,7 @@ describe('تصنيفُ المهمّة — والاتّجاهُ يُقرأ لا �
     expect(classifyTask('Text-to-Image')).toBe('image')
   })
 
-  it('والتضمينُ صنفٌ ثالث', () => {
+  it('والتضمين صنف ثالث', () => {
     expect(classifyTask('Text Embeddings')).toBe('embedding')
   })
 

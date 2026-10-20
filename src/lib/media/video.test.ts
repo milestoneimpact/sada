@@ -86,8 +86,8 @@ beforeEach(() => {
   puts = []
 })
 
-describe('الحارسُ قبل النداء', () => {
-  it('بلا رابطِ Workers AI يُقال ولا يُسقَط الطلب', async () => {
+describe('الحارس قبل النداء', () => {
+  it('بلا رابط Workers AI يُقال ولا يُسقَط الطلب', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(deps(undefined), 'p1')
@@ -95,7 +95,7 @@ describe('الحارسُ قبل النداء', () => {
   })
 
   /** الإيقافُ قرارُ المالك الصريح، ولا يُنقَض بأيّ شيء (D-019). */
-  it('والنظامُ الموقوف يمنع قبل أن يُنفَق', async () => {
+  it('والنظام الموقوف يمنع قبل أن يُنفَق', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await writeSetting(db, 'paused', 'true', 'omar')
@@ -108,7 +108,7 @@ describe('الحارسُ قبل النداء', () => {
     expect(n.n).toBe(0)
   })
 
-  it('وبلا صورةٍ معتمَدةٍ لا تحريك', async () => {
+  it('وبلا صورة معتمَدة لا تحريك', async () => {
     seedPost()
     const a = ai(OK_VIDEO)
     const out = await animateForPost(deps(a), 'p1')
@@ -117,7 +117,7 @@ describe('الحارسُ قبل النداء', () => {
   })
 
   /** ما رُفض حُكم عليه، وتحريكُه إنفاقٌ على ما لن يُنشَر. */
-  it('وصورةٌ مرفوضةٌ لا تُحرَّك', async () => {
+  it('وصورة مرفوضة لا تُحرَّك', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png', status: 'rejected' })
     const a = ai(OK_VIDEO)
@@ -127,7 +127,7 @@ describe('الحارسُ قبل النداء', () => {
 })
 
 describe('التوليد', () => {
-  it('يولّد ويكتب البايتاتِ ثمّ الصفّ', async () => {
+  it('يولّد ويكتب البايتات ثمّ الصفّ', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(deps(ai(OK_VIDEO)), 'p1')
@@ -140,7 +140,7 @@ describe('التوليد', () => {
     expect(row).toMatchObject({ mime: 'video/mp4', model: VIDEO_MODELS.fromImage, bytes: 2048 })
   })
 
-  it('ويطلب خمسَ عشرةَ ثانية، والنسبةُ نسبةُ الصورة (مخطّطُ «صورة ← فيديو» بلا `ratio`، D-188)', async () => {
+  it('ويطلب خمس عشرة ثانية، والنسبة نسبة الصورة (مخطّط «صورة ← فيديو» بلا `ratio`، D-188)', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const a = ai(OK_VIDEO)
@@ -156,7 +156,7 @@ describe('التوليد', () => {
    * ولو مُرّر معرّفٌ عارٍ لفُتح الدلوُ لمن يخمّن. ولو وُقّع لمعرّفٍ آخر
    * لسحب المزوّدُ صورةً غيرَ التي اعتمدها المالك.
    */
-  it('والرابطُ موقَّعٌ ويفتح الصورةَ المصدرَ وحدها', async () => {
+  it('والرابط موقَّع ويفتح الصورة المصدر وحدها', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const a = ai(OK_VIDEO)
@@ -169,7 +169,7 @@ describe('التوليد', () => {
   })
 
   /** الفيديو أغلى ما يُنادى: مقطعٌ قائمٌ لا يُعاد توليدُه. */
-  it('ولا يولّد مرّتين لمنشورٍ واحد', async () => {
+  it('ولا يولّد مرّتين لمنشور واحد', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await animateForPost(deps(ai(OK_VIDEO)), 'p1')
@@ -192,8 +192,8 @@ describe('التوليد', () => {
  *
  * وما يُثبَت هنا أنّ الثانيةَ **لا تنادي ولا تُسجَّل لها كلفة**.
  */
-describe('الحجزُ قبل الإنفاق (D-068)', () => {
-  it('ونداءٌ جارٍ يمنع الثانيَ قبل أن يُنفِق', async () => {
+describe('الحجز قبل الإنفاق (D-068)', () => {
+  it('ونداء جار يمنع الثاني قبل أن يُنفِق', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
 
@@ -217,7 +217,7 @@ describe('الحجزُ قبل الإنفاق (D-068)', () => {
    * **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — فالمالكُ
    * يرى «جارٍ» على نداءٍ مات.
    */
-  it('وفشلُ التوليد يحرّر حجزَه فتُقبل الإعادة', async () => {
+  it('وفشل التوليد يحرّر حجزَه فتُقبل الإعادة', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
 
@@ -233,7 +233,7 @@ describe('الحجزُ قبل الإنفاق (D-068)', () => {
    * **ومفتاحُ R2 ليس مفتاحَ عدم التكرار.** كان الواحدُ يؤدّي الدورين
    * وفيه `uuid` — فعمودٌ `UNIQUE` لا يمنع شيئا.
    */
-  it('ومفتاحُ الصفّ مشتقٌّ من المحتوى لا من الصدفة', async () => {
+  it('ومفتاح الصفّ مشتقّ من المحتوى لا من الصدفة', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await animateForPost(deps(ai(OK_VIDEO)), 'p1')
@@ -266,7 +266,7 @@ describe('الدفتر', () => {
   })
 
   /** التكلفةُ قبل النجاح (D-008): نداءٌ وقع يُحسَب ولو فشل بعده. */
-  it('ويُسجَّل ولو فشل التوليدُ بعده', async () => {
+  it('ويُسجَّل ولو فشل التوليد بعده', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(
@@ -286,7 +286,7 @@ describe('الدفتر', () => {
  * مالٍ أبدًا** — فكان الفيديو، أغلى ما يُنادى، يُنادى بلا حدّ. وما يُثبَت هنا
  * أنّ الذي فوق السقف **لا يبلغ المزوّدَ ولا الدفترَ ولا الحجز**.
  */
-describe('سقفُ المقاطع اليوميّ (D-168)', () => {
+describe('سقف المقاطع اليوميّ (D-168)', () => {
   const ledger = (): number =>
     (db.raw.prepare(`SELECT count(*) AS n FROM cost_ledger WHERE operation LIKE 'video:%'`).get() as { n: number }).n
   const claims = (postId: string): number =>
@@ -299,7 +299,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
   }
 
   /** وهو الاختبارُ الذي يسقط على الشيفرة القديمة: الثالثُ كان يُولَّد. */
-  it('الافتراضُ مقطعان: الثالثُ يُردّ قبل المزوّد والدفتر والحجز', async () => {
+  it('الافتراض مقطعان: الثالث يُردّ قبل المزوّد والدفتر والحجز', async () => {
     seedPosts('p1', 'p2', 'p3')
     expect(await animateForPost(deps(ai(OK_VIDEO)), 'p1')).toMatchObject({ kind: 'generated' })
     expect(await animateForPost(deps(ai(OK_VIDEO)), 'p2')).toMatchObject({ kind: 'generated' })
@@ -317,7 +317,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
     expect(claims('p3')).toBe(0)
   })
 
-  it('والسقفُ من الإعداد: ثلاثةٌ تسمح بالثالث وتردّ الرابع', async () => {
+  it('والسقف من الإعداد: ثلاثة تسمح بالثالث وتردّ الرابع', async () => {
     await writeSetting(db, 'daily_video_cap', '3', 'omar')
     seedPosts('p1', 'p2', 'p3', 'p4')
     for (const id of ['p1', 'p2', 'p3']) {
@@ -329,7 +329,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
   })
 
   /** الدفترُ يُكتب قبل النداء (D-008) — فالمحاولةُ التي بلغت المزوّدَ ثمّ سقطت قد حوسبت. */
-  it('والمحاولةُ الفاشلةُ تُعدّ كالناجحة — العدُّ من الدفتر لا من `media`', async () => {
+  it('والمحاولة الفاشلة تُعدّ كالناجحة — العدّ من الدفتر لا من `media`', async () => {
     await writeSetting(db, 'daily_video_cap', '1', 'omar')
     seedPosts('p1')
     expect((await animateForPost(deps(ai(undefined)), 'p1')).kind).toBe('failed')
@@ -339,7 +339,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
     expect(retry.calls).toHaveLength(0)
   })
 
-  it('وصفرٌ يُغلق التحريكَ كلَّه — بسببٍ يقول إنّه قرار', async () => {
+  it('وصفر يُغلق التحريك كلَّه — بسبب يقول إنّه قرار', async () => {
     await writeSetting(db, 'daily_video_cap', '0', 'omar')
     seedPosts('p1')
     const a = ai(OK_VIDEO)
@@ -349,7 +349,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
     expect(ledger()).toBe(0)
   })
 
-  it('ومقاطعُ الأمس لا تُعدّ — اليومُ بتوقيت UTC كما يكتبه الدفتر', async () => {
+  it('ومقاطع الأمس لا تُعدّ — اليوم بتوقيت UTC كما يكتبه الدفتر', async () => {
     for (let i = 0; i < 5; i += 1) {
       db.raw
         .prepare(
@@ -362,7 +362,7 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
     expect(await animateForPost(deps(ai(OK_VIDEO)), 'p1')).toMatchObject({ kind: 'generated' })
   })
 
-  it('ومنشورٌ له مقطعٌ يُقال «من قبل» لا «بلغ السقف» — وكلاهما بلا إنفاق', async () => {
+  it('ومنشور له مقطع يُقال «من قبل» لا «بلغ السقف» — وكلاهما بلا إنفاق', async () => {
     seedPosts('p1', 'p2')
     await animateForPost(deps(ai(OK_VIDEO)), 'p1')
     await animateForPost(deps(ai(OK_VIDEO)), 'p2')
@@ -370,9 +370,9 @@ describe('سقفُ المقاطع اليوميّ (D-168)', () => {
   })
 })
 
-describe('الفشلُ لا يترك صفّا يكذب', () => {
+describe('الفشل لا يترك صفّا يكذب', () => {
   /** صفٌّ يشير إلى بايتاتٍ لا وجودَ لها يكذب، وبايتاتٌ بلا صفٍّ تيتم. */
-  it('R2 يفشل فلا يُكتب صفٌّ', async () => {
+  it('R2 يفشل فلا يُكتب صفّ', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(deps(ai(OK_VIDEO), pull(), bucket(true)), 'p1')
@@ -384,7 +384,7 @@ describe('الفشلُ لا يترك صفّا يكذب', () => {
     expect(n.n).toBe(0)
   })
 
-  it('والسحبُ يفشل فلا بايتاتٍ ولا صفّ', async () => {
+  it('والسحب يفشل فلا بايتات ولا صفّ', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const dead = (async () => new Response('', { status: 503 })) as unknown as typeof fetch
@@ -394,7 +394,7 @@ describe('الفشلُ لا يترك صفّا يكذب', () => {
     expect(puts).toHaveLength(0)
   })
 
-  it('وحالةٌ غيرُ مكتملةٍ تُعدّ قابلةً للإعادة', async () => {
+  it('وحالة غير مكتملة تُعدّ قابلةً للإعادة', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     const out = await animateForPost(deps(ai({ state: 'Running' })), 'p1')
@@ -402,16 +402,16 @@ describe('الفشلُ لا يترك صفّا يكذب', () => {
   })
 })
 
-describe('اختيارُ الوجه — والرابطُ يُفضَّل متى بلغ', () => {
+describe('اختيار الوجه — والرابط يُفضَّل متى بلغ', () => {
   const binding: AiBinding = { async run() { return {} } }
 
   /** مَن جمع الحسابين حذف السرَّ من نظامه. */
-  it('بلا حسابٍ ثانٍ يُختار الرابط — ولا سرَّ يُدوَّر', () => {
+  it('بلا حساب ثان يُختار الرابط — ولا سرّ يُدوَّر', () => {
     expect(pickBinding({ AI: binding })).toBe(binding)
   })
 
   /** والرابطُ يبلغ حسابَ الـ Worker وحده، فحسابٌ آخر يوجب REST. */
-  it('وبحسابٍ ثانٍ ورمزٍ يُختار REST ولو وُجد الرابط', () => {
+  it('وبحساب ثان ورمز يُختار REST ولو وُجد الرابط', () => {
     const picked = pickBinding({
       AI: binding, CF_AI_ACCOUNT_ID: 'acc', CF_AI_TOKEN: 'tok',
     })
@@ -419,14 +419,14 @@ describe('اختيارُ الوجه — والرابطُ يُفضَّل متى �
     expect(picked).not.toBe(binding)
   })
 
-  it('وضبطٌ ناقصٌ يعود إلى الرابط — ولا يُنادى بنصفِ ضبط', () => {
+  it('وضبط ناقص يعود إلى الرابط — ولا يُنادى بنصف ضبط', () => {
     expect(pickBinding({ AI: binding, CF_AI_ACCOUNT_ID: 'acc' })).toBe(binding)
     expect(pickBinding({ AI: binding, CF_AI_TOKEN: 'tok' })).toBe(binding)
     // وفراغٌ بمسافاتٍ ليس ضبطا
     expect(pickBinding({ AI: binding, CF_AI_ACCOUNT_ID: '  ', CF_AI_TOKEN: ' ' })).toBe(binding)
   })
 
-  it('وبلا شيءٍ لا وجه', () => {
+  it('وبلا شيء لا وجه', () => {
     expect(pickBinding({})).toBeUndefined()
   })
 })
@@ -440,8 +440,8 @@ describe('اختيارُ الوجه — والرابطُ يُفضَّل متى �
  *
  * وهو **أغلى ما يُنادى في النظام** — فأن يُختار نموذجُه أولى لا أدنى.
  */
-describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091)', () => {
-  it('النموذجُ المكتوبُ في اللوحة هو المُنادى', async () => {
+describe('توجيه الفيديو يُطاع لا يُقرأ وحسب (D-091)', () => {
+  it('النموذج المكتوب في اللوحة هو المُنادى', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
@@ -452,7 +452,7 @@ describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091
     expect(link.calls[0]!.model).toBe('@cf/other/model-v2')
   })
 
-  it('ويُسجَّل في الدفتر ما نُودي به — لا اسمٌ ثابت', async () => {
+  it('ويُسجَّل في الدفتر ما نُودي به — لا اسم ثابت', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
@@ -464,7 +464,7 @@ describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091
     expect(row?.operation).toContain('@cf/other/model-v2')
   })
 
-  it('ويُكتب في صفّ الوسيط كذلك — فيُعرَف بأيّ نموذجٍ وُلّد', async () => {
+  it('ويُكتب في صفّ الوسيط كذلك — فيُعرَف بأيّ نموذج وُلّد', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await writeRoute(db, 'video', 'cloudflare', '@cf/other/model-v2', 'panel')
@@ -479,7 +479,7 @@ describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091
     expect(row?.model).toBe('@cf/other/model-v2')
   })
 
-  it('وبلا توجيهٍ مكتوبٍ يُنادى افتراضُ الشيفرة — لا فراغ', async () => {
+  it('وبلا توجيه مكتوب يُنادى افتراض الشيفرة — لا فراغ', async () => {
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
 
@@ -489,7 +489,7 @@ describe('توجيهُ الفيديو يُطاع لا يُقرأ وحسب (D-091
   })
 })
 
-describe('الوجهُ من بطاقة المزوّد حين تغيب البيئة (D-157)', () => {
+describe('الوجه من بطاقة المزوّد حين تغيب البيئة (D-157)', () => {
   const seen: string[] = []
   const net = (async (url: unknown) => {
     seen.push(String(url))
@@ -498,19 +498,19 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
     })
   }) as unknown as typeof fetch
 
-  it('وصفُ المقطع الافتراضيّ إنجليزيّ — النموذجُ لا يقرأ العربيّة', () => {
+  it('وصف المقطع الافتراضيّ إنجليزيّ — النموذج لا يقرأ العربيّة', () => {
     expect(/[\u0600-\u06FF]/.test(DEFAULT_PROMPT)).toBe(false)
     expect(DEFAULT_PROMPT).toContain('no text')
   })
 
-  it('البيئةُ أوّلا', async () => {
+  it('البيئة أوّلا', async () => {
     seen.length = 0
     const b = await bindingFor({ CF_AI_ACCOUNT_ID: 'env-acc', CF_AI_TOKEN: 'env-tok' }, db, KEY, net)
     await b!.run('@cf/m', {})
     expect(seen[0]).toContain('/accounts/env-acc/')
   })
 
-  it('ثمّ مفتاحُ البطاقة ومعرّفُ حسابها من عنوانها', async () => {
+  it('ثمّ مفتاح البطاقة ومعرّف حسابها من عنوانها', async () => {
     seen.length = 0
     await upsertProvider(db, {
       name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
@@ -523,7 +523,7 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
     expect(seen[0]).toContain('/accounts/card-acc/')
   })
 
-  it('ولا بطاقةَ ولا بيئة: يبقى env.AI أو لا شيء', async () => {
+  it('ولا بطاقة ولا بيئة: يبقى env.AI أو لا شيء', async () => {
     const binding = ai(OK_VIDEO)
     expect(await bindingFor({ AI: binding }, db, KEY, net)).toBe(binding)
     expect(await bindingFor({}, db, KEY, net)).toBeUndefined()
@@ -533,7 +533,7 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
    * **والبيئةُ تغلب البطاقةَ ولو حضرتا معًا** (D-163). اختبارُ «البيئةُ أوّلا»
    * أعلاه يعمل على قاعدةٍ بلا بطاقة، فقلبُ الأسبقيّة لا يُسقطه — وهذا يُسقطه.
    */
-  it('والبطاقةُ حاضرةٌ بمفتاحها: البيئةُ تُنادى لا البطاقة', async () => {
+  it('والبطاقة حاضرة بمفتاحها: البيئة تُنادى لا البطاقة', async () => {
     seen.length = 0
     await upsertProvider(db, {
       name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat',
@@ -545,7 +545,7 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
     expect(seen[0]).toContain('/accounts/env-acc/')
   })
 
-  it('وحين تكفي البيئة لا يُسأل جدولُ المزوّدين أصلًا — ولا يُفكّ مفتاحُ الخزنة', async () => {
+  it('وحين تكفي البيئة لا يُسأل جدول المزوّدين أصلًا — ولا يُفكّ مفتاح الخزنة', async () => {
     const asked: string[] = []
     const spy = { prepare: (sql: string) => { asked.push(sql); return db.prepare(sql) } }
     await bindingFor({ CF_AI_ACCOUNT_ID: 'env-acc', CF_AI_TOKEN: 'env-tok' }, spy, KEY, net)
@@ -555,17 +555,17 @@ describe('الوجهُ من بطاقة المزوّد حين تغيب البيئ
   })
 })
 
-describe('videoFace — الوجهُ نقيًّا، يناديه bindingFor ولوحُ المسوّدات (D-163)', () => {
+describe('videoFace — الوجه نقيًّا، يناديه bindingFor ولوح المسوّدات (D-163)', () => {
   const card = { enabled: true, hasKey: true, urlAccount: true }
   it.each([
-    ['البيئةُ كاملةً تغلب البطاقة', { envAccount: true, envToken: true, card, binding: true }, 'env'],
-    ['بطاقةٌ بمفتاحٍ وحسابٍ في عنوانها', { envAccount: false, envToken: false, card, binding: true }, 'card'],
-    ['وبلا حسابٍ في عنوانها يكفيها حسابُ البيئة',
+    ['البيئة كاملةً تغلب البطاقة', { envAccount: true, envToken: true, card, binding: true }, 'env'],
+    ['بطاقة بمفتاح وحساب في عنوانها', { envAccount: false, envToken: false, card, binding: true }, 'card'],
+    ['وبلا حساب في عنوانها يكفيها حساب البيئة',
       { envAccount: true, envToken: false, card: { ...card, urlAccount: false }, binding: false }, 'card'],
-    ['بلا حسابٍ هنا ولا هناك: الرابط',
+    ['بلا حساب هنا ولا هناك: الرابط',
       { envAccount: false, envToken: true, card: { ...card, urlAccount: false }, binding: true }, 'binding'],
-    ['بطاقةٌ معطَّلة: الرابط', { envAccount: false, envToken: false, card: { ...card, enabled: false }, binding: true }, 'binding'],
-    ['بطاقةٌ بلا مفتاحٍ ولا رابط: لا وجه',
+    ['بطاقة معطَّلة: الرابط', { envAccount: false, envToken: false, card: { ...card, enabled: false }, binding: true }, 'binding'],
+    ['بطاقة بلا مفتاح ولا رابط: لا وجه',
       { envAccount: false, envToken: false, card: { ...card, hasKey: false }, binding: false }, 'none'],
     ['لا بطاقة ولا رابط: لا وجه', { envAccount: false, envToken: false, card: null, binding: false }, 'none'],
   ] as const)('%s', (_, input, face) => {

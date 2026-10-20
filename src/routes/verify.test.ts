@@ -18,8 +18,8 @@ const env = {
   DRIVE_FOLDER_ID: 'folder',
 }
 
-describe('إثباتُ ملكيّة النطاق', () => {
-  it('كلُّ ملفٍّ يُخدَم على جذر النطاق', async () => {
+describe('إثبات ملكيّة النطاق', () => {
+  it('كلّ ملفّ يُخدَم على جذر النطاق', async () => {
     for (const record of VERIFICATIONS) {
       const response = await app.request(`/${record.file}`, {}, env)
       expect(response.status, record.file).toBe(200)
@@ -27,14 +27,14 @@ describe('إثباتُ ملكيّة النطاق', () => {
     }
   })
 
-  it('**وبلا جلسة** — ملفٌّ خلف بابٍ لا يُثبت شيئا', async () => {
+  it('**وبلا جلسة** — ملفّ خلف باب لا يُثبت شيئا', async () => {
     for (const record of VERIFICATIONS) {
       const response = await app.request(`/${record.file}`, { headers: {} }, env)
       expect(response.status, record.file).toBe(200)
     }
   })
 
-  it('ونصٌّ صِرفٌ لا يُخمَّن نوعُه', async () => {
+  it('ونصّ صِرف لا يُخمَّن نوعُه', async () => {
     for (const record of VERIFICATIONS) {
       const response = await app.request(`/${record.file}`, {}, env)
       expect(response.headers.get('Content-Type')).toContain('text/plain')
@@ -46,14 +46,14 @@ describe('إثباتُ ملكيّة النطاق', () => {
    * **ولا بايتَ زائد.** سطرٌ جديدٌ في آخر المحتوى قد يُسقط المطابقة عند
    * بعض المنصّات — والملفُّ المنزَّل من TikTok بلا واحد.
    */
-  it('ولا فراغَ في طرفٍ ولا سطرَ جديد', () => {
+  it('ولا فراغ في طرف ولا سطر جديد', () => {
     for (const record of VERIFICATIONS) {
       expect(record.body, record.platform).toBe(record.body.trim())
       expect(record.body, record.platform).not.toContain('\n')
     }
   })
 
-  it('واسمُ الملفّ مسارٌ واحدٌ لا مسارات', () => {
+  it('واسم الملفّ مسار واحد لا مسارات', () => {
     for (const record of VERIFICATIONS) {
       expect(record.file, record.platform).not.toContain('/')
       expect(record.file, record.platform).not.toContain('..')
@@ -62,7 +62,7 @@ describe('إثباتُ ملكيّة النطاق', () => {
   })
 
   /** **ولكلٍّ سببٌ مكتوب**: ملفٌّ لا يُعرَف سببُه يُحذَف يوما فتسقط المراجعة. */
-  it('ولكلٍّ سببٌ يُقرأ', () => {
+  it('ولكلّ سبب يُقرأ', () => {
     for (const record of VERIFICATIONS) {
       expect(record.why.length, record.platform).toBeGreaterThan(30)
     }

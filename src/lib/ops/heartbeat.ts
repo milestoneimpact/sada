@@ -25,13 +25,13 @@ export interface Heartbeat {
  * الاثنين ‏04:14. و`publish` عند الطلب: لا موعدَ له فلا يُحكَم بالتأخّر.
  */
 export const CADENCE: Readonly<Record<Job, { readonly label: string; readonly everySeconds: number | null }>> = {
-  renew: { label: 'تجديدُ الأذونات', everySeconds: 15 * 60 },
-  dispatch: { label: 'إرسالُ المجدول', everySeconds: 15 * 60 },
-  metrics: { label: 'قياسُ المنشورات', everySeconds: 60 * 60 },
-  scan: { label: 'مسحُ Drive', everySeconds: 24 * 60 * 60 },
-  alerts: { label: 'تنبيهاتُ الانتهاء', everySeconds: 24 * 60 * 60 },
-  report: { label: 'النتائجُ الأسبوعيّة', everySeconds: 7 * 24 * 60 * 60 },
-  publish: { label: 'النشرُ في الموعد', everySeconds: null },
+  renew: { label: 'تجديد الأذونات', everySeconds: 15 * 60 },
+  dispatch: { label: 'إرسال المجدول', everySeconds: 15 * 60 },
+  metrics: { label: 'قياس المنشورات', everySeconds: 60 * 60 },
+  scan: { label: 'مسح Drive', everySeconds: 24 * 60 * 60 },
+  alerts: { label: 'تنبيهات الانتهاء', everySeconds: 24 * 60 * 60 },
+  report: { label: 'النتائج الأسبوعيّة', everySeconds: 7 * 24 * 60 * 60 },
+  publish: { label: 'النشر في الموعد', everySeconds: null },
 }
 
 export const JOBS: readonly Job[] = ['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report']

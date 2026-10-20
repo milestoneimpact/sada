@@ -222,9 +222,9 @@ export async function startServer(options: StartOptions = {}): Promise<Stack> {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const port = Number(process.env['PORT'] ?? 8787)
   const stack = await startServer({ port })
-  console.log(`صدى — نسخةٌ محلّيّة: ${stack.url}/panel`)
-  console.log(`كلمةُ الإدارة المحلّيّة: ${LOCAL_ADMIN_TOKEN}`)
-  console.log('المزوّدون مزيَّفون، والشبكةُ الخارجيّة مقطوعة. Ctrl+C للإيقاف.')
+  console.log(`صدى — نسخة محلّيّة: ${stack.url}/panel`)
+  console.log(`كلمة الإدارة المحلّيّة: ${LOCAL_ADMIN_TOKEN}`)
+  console.log('المزوّدون مزيَّفون، والشبكة الخارجيّة مقطوعة. Ctrl+C للإيقاف.')
   const stop = () => {
     void stack.close().then(() => process.exit(0))
   }

@@ -113,14 +113,14 @@ export function routeMismatch(
     next.model.trim() !== ''
   ) {
     return (
-      `بدّلتَ المزوّدَ إلى «${next.provider}» والنموذجُ ما زال «${next.model}» — ` +
-      `وهو نموذجُ «${previous.provider}». اضغط «حدّث» بجانب الدرج واختر من نماذجه.`
+      `بدّلت المزوّد إلى «${next.provider}» والنموذج ما زال «${next.model}» — ` +
+      `وهو نموذج «${previous.provider}». اضغط «حدّث» بجانب الدرج واختر من نماذجه.`
     )
   }
   if (next.model.trim().startsWith('@cf/') && !providerIsCloudflare) {
     return (
-      `«${next.model}» معرّفُ نموذجٍ في Workers AI، ولا يخدمه «${next.provider}». ` +
-      'اختر مزوّدَ Cloudflare، أو اختر نموذجا من نماذج هذا المزوّد.'
+      `«${next.model}» معرّف نموذج في Workers AI، ولا يخدمه «${next.provider}». ` +
+      'اختر مزوّد Cloudflare، أو اختر نموذجا من نماذج هذا المزوّد.'
     )
   }
   return null

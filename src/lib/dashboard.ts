@@ -170,14 +170,14 @@ export const TILES: readonly TileSpec[] = [
   {
     id: 'spend_30d',
     label: 'إنفاق 30 يومًا',
-    why: 'آخرُ ثلاثين يومًا متّصلة، وعلى كم خدمةٍ توزّعت.',
+    why: 'آخر ثلاثين يومًا متّصلة، وعلى كم خدمة توزّعت.',
     of: (d, f) => {
       const calls = d.spendBy.reduce((sum, s) => sum + s.calls, 0)
       return {
         value: f.money(d.spendBy.reduce((sum, s) => sum + s.total, 0)),
         // ‏والعددُ من «counted» (D-177): «6 طلبات إلى خدمتَين» لا «1 مزوّدا نشطا · 6 نداءً»
         note: calls === 0
-          ? 'لا طلبَ مدفوعًا في 30 يومًا'
+          ? 'لا طلب مدفوعًا في 30 يومًا'
           : `${counted(calls, NOUNS.request)} إلى ${counted(d.spendBy.length, NOUNS.service, 'gen')}`,
       }
     },
@@ -185,42 +185,42 @@ export const TILES: readonly TileSpec[] = [
   {
     id: 'drafts_waiting',
     label: 'مسوّدات تنتظرك',
-    why: '**ولا تُنشر واحدةٌ منها بلا قرارك** — فهذا عددُ ما يقف عليك.',
+    why: '**ولا تُنشر واحدة منها بلا قرارك** — فهذا عدد ما يقف عليك.',
     of: (d) => {
       const waiting = d.drafts.filter((x) => x.status === 'draft').length
       return {
         value: String(waiting),
         em: `/ ${d.drafts.length}`,
-        note: waiting === 0 ? 'لا قرارَ معلَّق' : 'تنتظر اعتمادا أو تعديلا',
+        note: waiting === 0 ? 'لا قرار معلَّق' : 'تنتظر اعتمادا أو تعديلا',
       }
     },
   },
   {
     id: 'scheduled',
-    label: 'مجدولٌ للنشر',
-    why: 'ما اعتمدتَه وله موعدٌ لم يحن بعد.',
+    label: 'مجدول للنشر',
+    why: 'ما اعتمدتَه وله موعد لم يحن بعد.',
     of: (d) => {
       const n = d.drafts.filter((x) => x.scheduledAt !== null).length
       // **والصفرُ لا «له موعد»**: الملاحظةُ تتبع الرقم لا القالب (D-134)
-      return { value: String(n), note: n === 0 ? 'لا موعدَ مجدول' : 'له موعدٌ مجدول' }
+      return { value: String(n), note: n === 0 ? 'لا موعد مجدول' : 'له موعد مجدول' }
     },
   },
   {
     id: 'live_targets',
-    label: 'قنواتٌ جاهزة',
-    why: 'كم حسابًا مربوطًا وإذنُه قائمٌ الآن — **وهي التي يقع عليها النشر**.',
+    label: 'قنوات جاهزة',
+    why: 'كم حسابًا مربوطًا وإذنُه قائم الآن — **وهي التي يقع عليها النشر**.',
     of: (d) => {
       const platforms = new Set(d.targets.map((t) => t.platform)).size
       return {
         value: String(d.targets.length),
-        note: platforms === 0 ? 'لا حسابَ مربوطًا' : `على ${platforms} منصّة`,
+        note: platforms === 0 ? 'لا حساب مربوطًا' : `على ${platforms} منصّة`,
       }
     },
   },
   {
     id: 'providers_ready',
     label: 'مزوّدون جاهزون',
-    why: 'كم مزوّدَ ذكاءٍ مفتاحُه مضبوط.',
+    why: 'كم مزوّد ذكاء مفتاحُه مضبوط.',
     of: (d) => {
       const ready = d.providers.filter((p) => p.configured).length
       return {
@@ -234,8 +234,8 @@ export const TILES: readonly TileSpec[] = [
   },
   {
     id: 'tasks_ready',
-    label: 'مهامٌّ جاهزة',
-    why: 'كم مهمّةً في جدول التوجيه لها مزوّدٌ جاهزٌ ينفّذها.',
+    label: 'مهامّ جاهزة',
+    why: 'كم مهمّةً في جدول التوجيه لها مزوّد جاهز ينفّذها.',
     of: (d) => {
       const ready = d.routing.filter((r) => r.ready && r.implemented).length
       return {
@@ -249,35 +249,35 @@ export const TILES: readonly TileSpec[] = [
   },
   {
     id: 'alerts_out',
-    label: 'تنبيهاتٌ خرجت',
-    why: '**ولا صمتٌ يُظنّ نجاحا**: كم تنبيها وصل، وكم ردَّته القناة.',
+    label: 'تنبيهات خرجت',
+    why: '**ولا صمت يُظنّ نجاحا**: كم تنبيها وصل، وكم ردَّته القناة.',
     of: (d) => {
       const failed = d.outbox.filter((o) => o.error !== null || (o.status ?? 0) >= 400).length
       return {
         value: String(d.outbox.length - failed),
         em: `/ ${d.outbox.length}`,
         note: d.alertWebhook === ''
-          ? 'لا قناةَ مضبوطة'
+          ? 'لا قناة مضبوطة'
           : failed === 0 ? 'كلُّها وصلت' : `${failed} ردَّتها القناة`,
       }
     },
   },
   {
     id: 'peak_spend_day',
-    label: 'ذروةُ الإنفاق',
-    why: 'أعلى يومٍ في أربعةَ عشرَ يوما — ومتى كان.',
+    label: 'ذروة الإنفاق',
+    why: 'أعلى يوم في أربعة عشر يوما — ومتى كان.',
     of: (d, f) => {
-      if (d.series.length === 0) return { value: f.money(0), note: 'لا سجلَّ بعد' }
+      if (d.series.length === 0) return { value: f.money(0), note: 'لا سجلّ بعد' }
       const top = d.series.reduce((a, c) => (c.total > a.total ? c : a), d.series[0]!)
       return { value: f.money(top.total), note: `يوم ${top.day}` }
     },
   },
   {
     id: 'daily_average',
-    label: 'المتوسّطُ اليوميّ',
-    why: 'ما تنفقه في يومٍ وسطيّ — **وهو الذي يُقاس عليه السقف**.',
+    label: 'المتوسّط اليوميّ',
+    why: 'ما تنفقه في يوم وسطيّ — **وهو الذي يُقاس عليه السقف**.',
     of: (d, f) => {
-      if (d.series.length === 0) return { value: f.money(0), note: 'لا سجلَّ بعد' }
+      if (d.series.length === 0) return { value: f.money(0), note: 'لا سجلّ بعد' }
       const sum = d.series.reduce((a, c) => a + c.total, 0)
       return {
         value: f.money(sum / d.series.length),
@@ -287,24 +287,24 @@ export const TILES: readonly TileSpec[] = [
   },
   {
     id: 'system_state',
-    label: 'حالُ النظام',
-    why: 'أتدور الدوراتُ — من نبضها كحبّة الرأس — ومعها مفتاحُ الإيقاف والإدراجُ الآليّ ومفتاحُ المتصفّح.',
+    label: 'حال النظام',
+    why: 'أتدور الدورات — من نبضها كحبّة الرأس — ومعها مفتاح الإيقاف والإدراج الآليّ ومفتاح المتصفّح.',
     of: (d) => {
       const on = [!d.paused, d.autoEnqueue, d.slide.missing.length === 0].filter(Boolean).length
       // ‏والحكمُ حكمُ الحبّة نفسُه (`systemPill`): لا «يعمل» هنا و«النشر متوقّف» فوقها
       return {
         value: systemPill(d.paused, d.pulses).text,
-        note: `${on} من 3 مفاتيحَ مرفوعة`,
+        note: `${on} من 3 مفاتيح مرفوعة`,
       }
     },
   },
   {
     id: 'plan_state',
-    label: 'خطّةُ الأسبوع',
-    why: 'أمزوّدُها جاهزٌ فتُولَّد، أم تنتظر مفتاحا.',
+    label: 'خطّة الأسبوع',
+    why: 'أمزوّدُها جاهز فتُولَّد، أم تنتظر مفتاحا.',
     of: (d) => ({
       value: d.planReady ? 'جاهزة' : 'تنتظر',
-      note: d.planReady ? 'مزوّدُها مضبوط' : 'لا مزوّدَ جاهزٌ لها',
+      note: d.planReady ? 'مزوّدُها مضبوط' : 'لا مزوّد جاهز لها',
     }),
   },
 ]

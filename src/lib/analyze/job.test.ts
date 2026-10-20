@@ -36,7 +36,7 @@ const ANALYSIS = {
   summary: 'خلاصة عربية.',
   themes: ['الوقف'],
   worth_score: 0.8,
-  worth_reason: 'رقمٌ من الميدان.',
+  worth_reason: 'رقم من الميدان.',
   audience: 'المديرون',
   angles: ['زاوية'],
 }
@@ -113,7 +113,7 @@ describe('حساب الكلفة', () => {
     expect(output).toBeCloseTo(input * 5, 10)
   })
 
-  it('صفرُ استهلاك صفرُ كلفة', () => {
+  it('صفر استهلاك صفر كلفة', () => {
     expect(analysisCost({ inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 })).toBe(0)
   })
 })
@@ -137,7 +137,7 @@ describe('المسار الكامل', () => {
 
     const parsed = JSON.parse(item.themes_json) as Record<string, unknown>
     expect(parsed['themes']).toEqual(['الوقف'])
-    expect(parsed['reason']).toBe('رقمٌ من الميدان.')
+    expect(parsed['reason']).toBe('رقم من الميدان.')
     // البصمة تُحفظ مع التحليل، فيُعرف لأيّ نسخةٍ هو
     expect(parsed['hash']).toBe('md5:abc')
   })
@@ -241,7 +241,7 @@ describe('الإيقاف والسقفان يُفرضان قبل أيّ نداء'
     expect(items.n).toBe(0)
   })
 
-  it('رفعُ الإيقاف يعيد العمل فورا — بلا نشرٍ ولا إعادة تشغيل', async () => {
+  it('رفع الإيقاف يعيد العمل فورا — بلا نشر ولا إعادة تشغيل', async () => {
     const sourceId = await seedSource()
     await writeSetting(db, 'paused', 'true', 'test')
     expect((await analyzeSource(deps(net()), sourceId)).kind).toBe('blocked')
@@ -284,7 +284,7 @@ describe('ما يُتخطّى ولا يوقف شيئا', () => {
     ['PDF', 'application/pdf'],
     ['صورة', 'image/png'],
     ['عرض PowerPoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-  ])('%s يُتخطّى بسببٍ مفهوم ولا يكلّف شيئا', async (_name, mime) => {
+  ])('%s يُتخطّى بسبب مفهوم ولا يكلّف شيئا', async (_name, mime) => {
     const sourceId = await seedSource(mime)
     const out = await analyzeSource(deps(net()), sourceId)
     expect(out.kind).toBe('skipped')
@@ -301,7 +301,7 @@ describe('ما يُتخطّى ولا يوقف شيئا', () => {
     expect(calls.filter((u) => u.includes('anthropic'))).toHaveLength(0)
   })
 
-  it('مصدرٌ غير موجود يُبلَّغ ولا يُعاد', async () => {
+  it('مصدر غير موجود يُبلَّغ ولا يُعاد', async () => {
     const out = await analyzeSource(deps(net()), 'لا-وجود-له')
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(false)
@@ -309,7 +309,7 @@ describe('ما يُتخطّى ولا يوقف شيئا', () => {
 })
 
 describe('حين يفشل النداء', () => {
-  it('يُسجَّل في cost_ledger صفرُ صفوف — لم يقع نداءٌ محاسَب عليه', async () => {
+  it('يُسجَّل في cost_ledger صفر صفوف — لم يقع نداء محاسَب عليه', async () => {
     const sourceId = await seedSource()
     const out = await analyzeSource(
       deps(net({ anthropicStatus: 500, anthropic: { type: 'error', error: { type: 'x', message: 'x' } } })),
@@ -323,7 +323,7 @@ describe('حين يفشل النداء', () => {
     expect(items.n).toBe(0)
   })
 
-  it('طلبٌ فاسد لا يُعاد', async () => {
+  it('طلب فاسد لا يُعاد', async () => {
     const sourceId = await seedSource()
     const out = await analyzeSource(
       deps(net({ anthropicStatus: 400, anthropic: { type: 'error', error: { type: 'x', message: 'x' } } })),
@@ -340,7 +340,7 @@ describe('حين يفشل النداء', () => {
  * يعيده لأنّه `retryable`. وبلا صفٍّ يقيس السقفان على دفترٍ أقلَّ من الحقيقة
  * في كلّ إعادة.
  */
-describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفتر', () => {
+describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر', () => {
   const USAGE = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 500 }
 
   function arrived(overrides: Record<string, unknown>): unknown {
@@ -363,7 +363,7 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
     return (db.raw.prepare('SELECT count(*) AS n FROM content_items').get() as { n: number }).n
   }
 
-  it('Anthropic مبتورٌ عند max_tokens: صفٌّ واحد ثمّ failed يُعاد', async () => {
+  it('Anthropic مبتور عند max_tokens: صفّ واحد ثمّ failed يُعاد', async () => {
     const sourceId = await seedSource()
     const out = await analyzeSource(deps(net({ anthropic: arrived({ stop_reason: 'max_tokens' }) })), sourceId)
 
@@ -385,7 +385,7 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
     expect(items()).toBe(0)
   })
 
-  it('وكلُّ إعادةٍ صفٌّ آخر: ما دُفع مرّتين يُكتب مرّتين، فيراه السقفُ في الثالثة', async () => {
+  it('وكلّ إعادة صفّ آخر: ما دُفع مرّتين يُكتب مرّتين، فيراه السقف في الثالثة', async () => {
     const sourceId = await seedSource()
     const truncated = arrived({ stop_reason: 'max_tokens' })
     await analyzeSource(deps(net({ anthropic: truncated })), sourceId)
@@ -400,9 +400,9 @@ describe('D-164 · جوابٌ وصل ثمّ رُدّ يُكتب في الدفت�
   })
 
   it.each([
-    ['وAnthropic رافضٌ: صفٌّ واحد، ولا يُعاد', { stop_reason: 'refusal', content: [] }, false],
-    ['وجوابٌ بلا كتلةِ نصّ: صفٌّ واحد', { content: [] }, true],
-    ['والـJSON الفاسدُ رغم المخطّط: صفٌّ واحد', { content: [{ type: 'text', text: '{"summary":"' }] }, true],
+    ['وAnthropic رافض: صفّ واحد، ولا يُعاد', { stop_reason: 'refusal', content: [] }, false],
+    ['وجواب بلا كتلة نصّ: صفّ واحد', { content: [] }, true],
+    ['والـJSON الفاسد رغم المخطّط: صفّ واحد', { content: [{ type: 'text', text: '{"summary":"' }] }, true],
   ])('%s', async (_name, overrides, retryable) => {
     const sourceId = await seedSource()
     const out = await analyzeSource(deps(net({ anthropic: arrived(overrides) })), sourceId)

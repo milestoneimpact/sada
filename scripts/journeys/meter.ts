@@ -151,7 +151,7 @@ export class Meter {
    */
   async reveal(target: Locator): Promise<{ inView: boolean; scrolled: number; swipes: number }> {
     await target.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {
-      throw new Blocked('الهدفُ غيرُ ظاهرٍ في الصفحة')
+      throw new Blocked('الهدف غير ظاهر في الصفحة')
     })
     const { top, bottom, vh } = await this.insets()
     const usable = vh - top - bottom

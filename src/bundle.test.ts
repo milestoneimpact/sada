@@ -116,8 +116,8 @@ function browserGlobals(document: Record<string, unknown>): Record<string, unkno
   }
 }
 
-describe('الحزمةُ المشحونة', () => {
-  it('صفحةُ الدخول: لا سكربتَ يبدأ بقيمةٍ لم تُسنَد بعد', async () => {
+describe('الحزمة المشحونة', () => {
+  it('صفحة الدخول: لا سكربت يبدأ بقيمة لم تُسنَد بعد', async () => {
     const db = fakeDb()
     db.raw.prepare(
       `INSERT INTO passkeys (id, credential_id, public_key, alg, label, rp_id)
@@ -135,7 +135,7 @@ describe('الحزمةُ المشحونة', () => {
     expect(login).toContain('var sadaB64=')
   })
 
-  it('زرُّ «الدخول بمفتاح المرور» يُضغَط فيفتح جلسةً من خادم الحزمة نفسِه', async () => {
+  it('زرّ «الدخول بمفتاح المرور» يُضغَط فيفتح جلسةً من خادم الحزمة نفسِه', async () => {
     /*
      * **لا خادمَ بديل**: التحدّي والتحقّق من العامل المبنيّ، والتوقيعُ من مفتاح
      * P-256 حقيقيّ. فحقلٌ يُعاد تسميتُه في السكربت أو في المسار يُسقط هذا
@@ -214,11 +214,11 @@ describe('الحزمةُ المشحونة', () => {
   })
 
   it.each([
-    ['تحدٍّ مردودٌ بحدّ المحاولات', { challenge: 429, code: 'rate_limited' }, 'محاولاتٌ كثيرة'],
-    ['نافذةُ المفتاح أُغلقت', { reject: 'NotAllowedError' }, 'أُلغي الطلب أو انتهت مهلتُه'],
-    ['توقيعٌ لم يُقبَل', { login: 401, code: 'denied' }, 'لم يُقبَل المفتاح'],
-    ['تذكرةٌ انتهت مهلتُها', { login: 400, code: 'challenge_expired' }, 'انتهت مهلةُ الطلب'],
-  ])('%s: رسالةٌ عربيّة، والزرُّ يعود', async (_name, fault, text) => {
+    ['تحدّ مردود بحدّ المحاولات', { challenge: 429, code: 'rate_limited' }, 'محاولات كثيرة'],
+    ['نافذة المفتاح أُغلقت', { reject: 'NotAllowedError' }, 'أُلغي الطلب أو انتهت مهلتُه'],
+    ['توقيع لم يُقبَل', { login: 401, code: 'denied' }, 'لم يُقبَل المفتاح'],
+    ['تذكرة انتهت مهلتُها', { login: 400, code: 'challenge_expired' }, 'انتهت مهلة الطلب'],
+  ])('%s: رسالة عربيّة، والزرّ يعود', async (_name, fault, text) => {
     const db = fakeDb()
     db.raw.prepare(
       `INSERT INTO passkeys (id, credential_id, public_key, alg, label, rp_id)
@@ -264,7 +264,7 @@ describe('الحزمةُ المشحونة', () => {
     expect(button['textContent']).toBe('الدخول بمفتاح المرور')
   })
 
-  it('أصلا اللوحة يُشغَّلان في وثيقةٍ فارغة بلا خطأ', async () => {
+  it('أصلا اللوحة يُشغَّلان في وثيقة فارغة بلا خطأ', async () => {
     const e = env()
     const body = new FormData()
     body.set('token', TOKEN)

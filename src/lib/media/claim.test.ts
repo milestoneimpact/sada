@@ -23,8 +23,8 @@ beforeEach(async () => {
   await seedPost()
 })
 
-describe('الحجزُ يسبق الإنفاق (D-068)', () => {
-  it('الأوّلُ يحجز والثاني يُردّ «جارٍ»', async () => {
+describe('الحجز يسبق الإنفاق (D-068)', () => {
+  it('الأوّل يحجز والثاني يُردّ «جار»', async () => {
     expect(await claimGeneration(db, 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
 
     const second = await claimGeneration(db, 'k1', 'p1', 'video', later(1))
@@ -40,7 +40,7 @@ describe('الحجزُ يسبق الإنفاق (D-068)', () => {
    * **وحجزٌ لا يُحرَّر يشيخ ولا يُخلَّد.** Worker يُقتل وشبكةٌ تنقطع،
    * فحجزٌ أبديٌّ يُقفل بابَ التوليد على منشورٍ إلى الأبد.
    */
-  it('وحجزٌ شائخٌ يُؤخَذ لا يُنتظَر', async () => {
+  it('وحجز شائخ يُؤخَذ لا يُنتظَر', async () => {
     await claimGeneration(db, 'k1', 'p1', 'video', NOW)
 
     // قبل النافذة: لا يزال لصاحبه
@@ -53,7 +53,7 @@ describe('الحجزُ يسبق الإنفاق (D-068)', () => {
   })
 
   /** والنافذةُ بقدر النداء: الصورةُ ثوانٍ والمقطعُ دقائق. */
-  it('ونافذةُ الصورة أضيقُ من نافذة المقطع', () => {
+  it('ونافذة الصورة أضيق من نافذة المقطع', () => {
     expect(STALE_MINUTES.image).toBeLessThan(STALE_MINUTES.video)
   })
 
@@ -61,7 +61,7 @@ describe('الحجزُ يسبق الإنفاق (D-068)', () => {
    * **والأخذُ مشروطٌ بما قُرئ.** اثنان يقرآن الشيخوخةَ معا: يأخذه
    * **واحدٌ** لا كلاهما — وإلّا عاد السباقُ من حيث طُرد.
    */
-  it('واثنان على حجزٍ شائخٍ يفوز أحدُهما وحدَه', async () => {
+  it('واثنان على حجز شائخ يفوز أحدُهما وحدَه', async () => {
     await claimGeneration(db, 'k1', 'p1', 'video', NOW)
     const at = later(STALE_MINUTES.video + 1)
 
@@ -72,7 +72,7 @@ describe('الحجزُ يسبق الإنفاق (D-068)', () => {
     expect(outcomes.filter((o) => o.kind === 'claimed')).toHaveLength(1)
   })
 
-  it('والتحريرُ يفتح البابَ فورا', async () => {
+  it('والتحرير يفتح الباب فورا', async () => {
     await claimGeneration(db, 'k1', 'p1', 'image', NOW)
     await releaseClaim(db, 'k1')
     expect(await claimGeneration(db, 'k1', 'p1', 'image', later(1))).toEqual({ kind: 'claimed' })
@@ -82,7 +82,7 @@ describe('الحجزُ يسبق الإنفاق (D-068)', () => {
    * **ونظامٌ قبل الترحيل يعمل** — بحارسه القديم. ومدخلٌ يرمي على جدولٍ
    * ناقصٍ يوقف التوليدَ كلَّه لأجل حراسةٍ إضافيّة.
    */
-  it('وجدولٌ لم يُرحَّل يحجز ولا يقف', async () => {
+  it('وجدول لم يُرحَّل يحجز ولا يقف', async () => {
     db.raw.exec('DROP TABLE media_claims')
     expect(await claimGeneration(db, 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
     await expect(releaseClaim(db, 'k1')).resolves.toBeUndefined()

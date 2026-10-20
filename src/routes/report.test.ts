@@ -55,7 +55,7 @@ function seedWeek(): void {
     db.raw.exec(
       `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status,
                           idempotency_key, approved_by, approved_at)
-       VALUES ('${id}', 'a-x', 'x', 'text', 'نصُّ المنشور ${i}', '${at(4 + i)}',
+       VALUES ('${id}', 'a-x', 'x', 'text', 'نصّ المنشور ${i}', '${at(4 + i)}',
                'published', 'k-${id}', 'omar', '${at(4 + i)}')`,
     )
     db.raw.exec(
@@ -80,14 +80,14 @@ describe('الباب', () => {
     expect(await response.text()).toContain('name="next" id="login-next" value="/panel/report"')
   })
 
-  it('وأسبوعٌ بلا تقريرٍ يقولها ولا يخترع أرقاما', async () => {
+  it('وأسبوع بلا تقرير يقولها ولا يخترع أرقاما', async () => {
     const cookie = await login()
     const body = await (await app.request('/panel/report', { headers: { Cookie: cookie } }, env)).text()
-    expect(body).toContain('لا تقريرَ بعد')
-    expect(body).toContain('فجرَ كلّ اثنين')
+    expect(body).toContain('لا تقرير بعد')
+    expect(body).toContain('فجر كلّ اثنين')
   })
 
-  it('وتقريرُ أسبوعٍ لا وجودَ له يعود 404 لا صفحةً فارغة', async () => {
+  it('وتقرير أسبوع لا وجود له يعود 404 لا صفحةً فارغة', async () => {
     const cookie = await login()
     const response = await app.request('/panel/report/1999-01-04', { headers: { Cookie: cookie } }, env)
     expect(response.status).toBe(404)
@@ -95,7 +95,7 @@ describe('الباب', () => {
 })
 
 describe('ما يُعرَض', () => {
-  it('يعرض ما خرج وما قِيس، والنافذةَ التي وقع فيها الترتيب', async () => {
+  it('يعرض ما خرج وما قِيس، والنافذة التي وقع فيها الترتيب', async () => {
     seedWeek()
     await runWeekly(db, MONDAY)
     const cookie = await login()
@@ -105,9 +105,9 @@ describe('ما يُعرَض', () => {
     expect(body).toContain('أسبوع 24 إلى 30 أغسطس')
     expect(body).not.toContain('2026-08-24 — 2026-08-31')
     // **والنافذةُ باسمها لا بمفتاح CHECK** (D-124): كان الاختبارُ يثبّت «24h»
-    expect(body).toContain('الأوّلُ في نافذة 24 ساعة')
+    expect(body).toContain('الأوّل في نافذة 24 ساعة')
     expect(body).not.toContain('نافذة 24h')
-    expect(body).toContain('نصُّ المنشور 4')
+    expect(body).toContain('نصّ المنشور 4')
     // **صفوفٌ لا بطاقاتٌ في بطاقة** (D-140): كلُّ منصّةٍ صفٌّ في «ما خرج»
     expect(body).toContain('<div class="slices">')
     expect(body).toMatch(/<div class="slice">\s*<div class="plat-logo">/)
@@ -119,7 +119,7 @@ describe('ما يُعرَض', () => {
    * الظهورُ غيرُ مقيسٍ هنا. وعرضُه صفرا يُقرأ «لم يره أحد» — وهو ليس
    * ذلك، **بل واجهةٌ صامتة**. فيُعرَض «—» ومعه سببُه.
    */
-  it('والظهورُ غيرُ المقيس يُعرَض فراغا لا صفرا', async () => {
+  it('والظهور غير المقيس يُعرَض فراغا لا صفرا', async () => {
     seedWeek()
     await runWeekly(db, MONDAY)
     const cookie = await login()
@@ -130,7 +130,7 @@ describe('ما يُعرَض', () => {
   })
 
   /** والنسبةُ لم تُستعمَل لأنّ الظهورَ ناقص — ويُقال، لا يُترك ليُخمَّن. */
-  it('ويقول بمَ رُتِّب ولماذا لم تُستعمَل النسبة', async () => {
+  it('ويقول بم رُتِّب ولماذا لم تُستعمَل النسبة', async () => {
     seedWeek()
     await runWeekly(db, MONDAY)
     const cookie = await login()
@@ -141,18 +141,18 @@ describe('ما يُعرَض', () => {
 })
 
 describe('التوصية — تقترح ولا تُنفق', () => {
-  it('بلا سقفٍ لا مبلغَ يُعرَض، ويُقال لماذا', async () => {
+  it('بلا سقف لا مبلغ يُعرَض، ويُقال لماذا', async () => {
     seedWeek()
     await runWeekly(db, MONDAY)
     const cookie = await login()
     const body = await (await app.request('/panel/report', { headers: { Cookie: cookie } }, env)).text()
 
-    expect(body).toContain('لا سقفَ موضوع')
-    expect(body).toContain('رقمٌ بلا مصدر')
+    expect(body).toContain('لا سقف موضوع')
+    expect(body).toContain('رقم بلا مصدر')
     expect(body).not.toContain('أقبل')
   })
 
-  it('وبسقفٍ تُعرَض بمبلغها وسببها وزرَّي بتّ', async () => {
+  it('وبسقف تُعرَض بمبلغها وسببها وزرَّي بتّ', async () => {
     seedWeek()
     await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
     await runWeekly(db, MONDAY)
@@ -162,7 +162,7 @@ describe('التوصية — تقترح ولا تُنفق', () => {
     expect(body).toContain('تنتظر بتّك')
     expect(body).toContain('أقبل')
     expect(body).toContain('أرفض')
-    expect(body).toContain('تسجيلُ رأيٍ لا أمرُ إنفاق')
+    expect(body).toContain('تسجيل رأي لا أمر إنفاق')
   })
 
   /**
@@ -170,7 +170,7 @@ describe('التوصية — تقترح ولا تُنفق', () => {
    * `_csrf` فيردّه `guardPost` كلَّ مرّة — زرٌّ ظاهرٌ لا يعمل. والفحصُ على كلّ
    * نموذجِ POST في الشاشتين لا على واحد.
    */
-  it('**كلُّ نموذجٍ في شاشتَي التقرير يحمل `_csrf` الجلسة**', async () => {
+  it('**كلّ نموذج في شاشتَي التقرير يحمل `_csrf` الجلسة**', async () => {
     seedWeek()
     await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
     await runWeekly(db, MONDAY)
@@ -188,7 +188,7 @@ describe('التوصية — تقترح ولا تُنفق', () => {
   })
 
   /** **قبولٌ لا يُنفق** — ولا صفَّ يدخل دفترَ التكلفة (D-006 · D-008). */
-  it('والقبولُ يسجَّل ولا يُنفق دولارا', async () => {
+  it('والقبول يسجَّل ولا يُنفق دولارا', async () => {
     seedWeek()
     await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
     await runWeekly(db, MONDAY)
@@ -215,7 +215,7 @@ describe('التوصية — تقترح ولا تُنفق', () => {
     expect(row.human_decision).toBe('accepted')
   })
 
-  it('وبتٌّ لا نعرفه يُردّ ولا يُحفَظ', async () => {
+  it('وبتّ لا نعرفه يُردّ ولا يُحفَظ', async () => {
     seedWeek()
     await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
     await runWeekly(db, MONDAY)
@@ -251,8 +251,8 @@ describe('التوصية — تقترح ولا تُنفق', () => {
   })
 })
 
-describe('رابطُ التقرير في اللوحة', () => {
-  it('يظهر، ويحمل عددَ ما ينتظر البتّ', async () => {
+describe('رابط التقرير في اللوحة', () => {
+  it('يظهر، ويحمل عدد ما ينتظر البتّ', async () => {
     seedWeek()
     await writeSetting(db, 'weekly_promo_cap_usd', '20', 'omar')
     await runWeekly(db, MONDAY)

@@ -35,13 +35,13 @@ const src: TileSource = {
 }
 
 describe('الكتالوج', () => {
-  it('لا معرِّفَ مكرَّر — والمعرِّفُ مفتاحُ التخزين', () => {
+  it('لا معرِّف مكرَّر — والمعرِّف مفتاح التخزين', () => {
     const ids = TILES.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
 
   /** **وكلُّ بطاقةٍ تُحسَب بلا رمي**: بطاقةٌ ترمي تُسقط اللوحةَ كلَّها. */
-  it('وكلُّ بطاقةٍ تعطي رقما من بياناتٍ حاضرة', () => {
+  it('وكلّ بطاقة تعطي رقما من بيانات حاضرة', () => {
     for (const t of TILES) {
       const v = t.of(src, fmt)
       expect(v.value, t.id).toBeTypeOf('string')
@@ -55,7 +55,7 @@ describe('الكتالوج', () => {
    * أوّلُ يومٍ لا مصادرَ فيه ولا مزوّدين ولا سجلَّ إنفاق — **والقسمةُ على
    * صفرٍ تعطي `NaN` فيُعرَض للمالك حرفا**.
    */
-  it('ولا بطاقةَ تعطي NaN على لوحةٍ فارغة', () => {
+  it('ولا بطاقة تعطي NaN على لوحة فارغة', () => {
     const empty: TileSource = {
       ...src,
       usedAnalyses: 0, usedSpend: 0, spendBy: [], spendMonth: { total: 0, utc: true },
@@ -69,7 +69,7 @@ describe('الكتالوج', () => {
     }
   })
 
-  it('والافتراضُ كلُّه من الكتالوج', () => {
+  it('والافتراض كلُّه من الكتالوج', () => {
     const ids = new Set(TILES.map((t) => t.id))
     for (const id of DEFAULT_TILES) expect(ids.has(id), id).toBe(true)
     expect(DEFAULT_TILES.length).toBeGreaterThanOrEqual(TILE_MIN)
@@ -77,14 +77,14 @@ describe('الكتالوج', () => {
   })
 })
 
-describe('قراءةُ الاختيار', () => {
-  it('فارغٌ أو غائبٌ يعود إلى الافتراض', () => {
+describe('قراءة الاختيار', () => {
+  it('فارغ أو غائب يعود إلى الافتراض', () => {
     expect(parseTiles(undefined)).toEqual(DEFAULT_TILES)
     expect(parseTiles('')).toEqual(DEFAULT_TILES)
     expect(parseTiles('   ')).toEqual(DEFAULT_TILES)
   })
 
-  it('ويحفظ الترتيبَ كما اختاره', () => {
+  it('ويحفظ الترتيب كما اختاره', () => {
     expect(parseTiles('spend_30d,analyses_today,drafts_waiting'))
       .toEqual(['spend_30d', 'analyses_today', 'drafts_waiting'])
   })
@@ -95,12 +95,12 @@ describe('قراءةُ الاختيار', () => {
    * بطاقةٌ تُحذف غدا تترك معرِّفَها عند مالكٍ اختارها. **ولو رُمي لبقي
    * لوحُه أبيضَ حتّى يفتح الإعدادات** — وهو لا يعرف أنّ عليه أن يفتحها.
    */
-  it('ومعرِّفٌ لا يعرفه الكتالوجُ يُتخطّى ولا يُسقط ما سواه', () => {
-    expect(parseTiles('analyses_today,لا_وجودَ_لها,spend_today'))
+  it('ومعرِّف لا يعرفه الكتالوج يُتخطّى ولا يُسقط ما سواه', () => {
+    expect(parseTiles('analyses_today,لا_وجود_لها,spend_today'))
       .toEqual(['analyses_today', 'spend_today'])
   })
 
-  it('والمكرَّرُ يُكتب مرّةً', () => {
+  it('والمكرَّر يُكتب مرّةً', () => {
     expect(parseTiles('spend_today,spend_today,analyses_today'))
       .toEqual(['spend_today', 'analyses_today'])
   })
@@ -118,14 +118,14 @@ describe('قراءةُ الاختيار', () => {
   })
 
   /** **والتصفيةُ عند الكتابة هي عينُها عند القراءة** — فلا يُخزَّن ما لا يُقرأ. */
-  it('والمخزَّنُ يوافق المقروء', () => {
-    const raw = 'spend_today, لا_وجودَ_لها ,spend_today,drafts_waiting'
+  it('والمخزَّن يوافق المقروء', () => {
+    const raw = 'spend_today, لا_وجود_لها ,spend_today,drafts_waiting'
     expect(normalizeTiles(raw)).toBe('spend_today,drafts_waiting')
     expect(parseTiles(normalizeTiles(raw))).toEqual(parseTiles(raw))
   })
 })
 
-describe('البطاقاتُ بأعيانها', () => {
+describe('البطاقات بأعيانها', () => {
   it('تُردّ مرتَّبةً كما اختارها', () => {
     const got = chosenTiles('drafts_waiting,analyses_today')
     expect(got.map((t) => t.id)).toEqual(['drafts_waiting', 'analyses_today'])
@@ -133,16 +133,16 @@ describe('البطاقاتُ بأعيانها', () => {
   })
 
   /** **وواحدةٌ ليست لوحا**: تعود إلى الافتراض لا إلى بطاقةٍ وحيدة. */
-  it('وواحدةٌ وحدَها تعود إلى الافتراض', () => {
+  it('وواحدة وحدَها تعود إلى الافتراض', () => {
     expect(chosenTiles('drafts_waiting').map((t) => t.id)).toEqual(DEFAULT_TILES)
   })
 
-  it('ومسوّدةٌ واحدةٌ تنتظر من اثنتين', () => {
+  it('ومسوّدة واحدة تنتظر من اثنتين', () => {
     const spec = TILES.find((t) => t.id === 'drafts_waiting')
     expect(spec?.of(src, fmt)).toMatchObject({ value: '1', em: '/ 2' })
   })
 
-  it('وتنبيهٌ ردَّته القناةُ يُعَدّ فاشلا', () => {
+  it('وتنبيه ردَّته القناة يُعَدّ فاشلا', () => {
     const spec = TILES.find((t) => t.id === 'alerts_out')
     expect(spec?.of(src, fmt)).toMatchObject({ value: '1', em: '/ 2', note: '1 ردَّتها القناة' })
   })
@@ -152,7 +152,7 @@ describe('البطاقاتُ بأعيانها', () => {
    * نُقلت كما هي: `!analyzed || stale`. **ونقلٌ يغيّر المعنى صامتا
    * أسوأُ من نقلٍ يكسر.**
    */
-  it('ومصدرٌ حُلِّل ثمّ تغيّر يُعَدّ منتظِرا', () => {
+  it('ومصدر حُلِّل ثمّ تغيّر يُعَدّ منتظِرا', () => {
     const spec = TILES.find((t) => t.id === 'sources_analyzed')
     const withStale: TileSource = {
       ...src,
@@ -165,7 +165,7 @@ describe('البطاقاتُ بأعيانها', () => {
    * ‏مراجعة الرحلات: **«حالُ النظام» حكمُ الحبّة نفسُه.** كانت البطاقةُ «يعمل» من مفتاح الإيقاف وحده،
    * ‏والحبّةُ في رأس الشاشة نفسِها «النشر متوقّف» من نبض الإرسال — جوابان متناقضان.
    */
-  it('و«حالُ النظام» من النبض كحبّة الرأس — لا «يعمل» والإرسالُ متوقّف', () => {
+  it('و«حال النظام» من النبض كحبّة الرأس — لا «يعمل» والإرسال متوقّف', () => {
     const spec = TILES.find((t) => t.id === 'system_state')!
     const stalled: TileSource = {
       ...src,
@@ -176,19 +176,19 @@ describe('البطاقاتُ بأعيانها', () => {
     expect(spec.of({ ...stalled, paused: true }, fmt).value).toBe('موقوف مؤقتا')
   })
 
-  it('وذروةُ الإنفاق أعلى يومٍ لا آخرُه', () => {
+  it('وذروة الإنفاق أعلى يوم لا آخرُه', () => {
     const spec = TILES.find((t) => t.id === 'peak_spend_day')
     expect(spec?.of(src, fmt)).toMatchObject({ value: '3.00$', note: 'يوم 09-02' })
   })
 })
 
 /** الملاحظةُ تتبع الرقم: صفرٌ مجدولٌ «لا موعدَ»، لا «له موعد» (D-134). */
-describe('مجدولٌ للنشر (D-134)', () => {
-  it('صفرٌ يقول «لا موعدَ مجدول»', () => {
+describe('مجدول للنشر (D-134)', () => {
+  it('صفر يقول «لا موعد مجدول»', () => {
     const spec = TILES.find((t) => t.id === 'scheduled')!
     const none = { ...src, drafts: [{ status: 'draft', scheduledAt: null }] }
-    expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعدَ مجدول' })
-    expect(spec.of(src, fmt).note).toBe('له موعدٌ مجدول')
+    expect(spec.of(none, fmt)).toMatchObject({ value: '0', note: 'لا موعد مجدول' })
+    expect(spec.of(src, fmt).note).toBe('له موعد مجدول')
   })
 })
 
@@ -196,7 +196,7 @@ describe('بطاقتا الإنفاق (ر-10)', () => {
   const tile = (id: string) => TILES.find((t) => t.id === id)!
 
   /** **«هذا الشهر» رقمٌ في اللوح لا يُستنتَج** — ورابعُ الافتراض. */
-  it('«إنفاق هذا الشهر» من أوّل الشهر، وفي الافتراض مكانَ «30 يومًا»', () => {
+  it('«إنفاق هذا الشهر» من أوّل الشهر، وفي الافتراض مكان «30 يومًا»', () => {
     expect(DEFAULT_TILES).toContain('spend_month')
     expect(DEFAULT_TILES).not.toContain('spend_30d')
     const v = tile('spend_month').of(src, fmt)
@@ -209,21 +209,21 @@ describe('بطاقتا الإنفاق (ر-10)', () => {
   })
 
   /** **ووصفُ «30 يومًا» صادق**: آخرُ ثلاثين يومًا، لا «المجموعُ الشهريّ». */
-  it('و«30 يومًا» تجمع الدفترَ كلَّه وتعدّه بعربيّةٍ صحيحة', () => {
+  it('و«30 يومًا» تجمع الدفتر كلَّه وتعدّه بعربيّة صحيحة', () => {
     expect(tile('spend_30d').why).not.toContain('الشهريّ')
     const v = tile('spend_30d').of(src, fmt)
     expect(v.value).toBe('23.41$')
     expect(v.note).toBe('46 طلبًا إلى خدمتَين')
     const one = tile('spend_30d').of({ ...src, spendBy: [{ calls: 6, total: 0.8 }] }, fmt)
-    expect(one.note).toBe('6 طلبات إلى خدمةٍ واحدة')
+    expect(one.note).toBe('6 طلبات إلى خدمة واحدة')
   })
 
   /** والعددُ ومعدودُه من `counted` في كلّ بطاقة (D-177). */
-  it('ولا «1 مزوّدا» ولا «30 يوما» في بطاقةٍ ولا في وصفها', () => {
+  it('ولا «1 مزوّدا» ولا «30 يوما» في بطاقة ولا في وصفها', () => {
     for (const t of TILES) {
       const v = t.of(src, fmt)
       const text = `${t.label} ${t.why} ${v.value} ${v.em ?? ''} ${v.note ?? ''}`
-      expect(text, t.id).not.toMatch(/\d+ (منشورا|مزوّدا|دورةٌ|يوما|نداءً)(?![\u0621-\u064A])/)
+      expect(text, t.id).not.toMatch(/\d+ (منشورا|مزوّدا|دورة|يوما|نداءً)(?![\u0621-\u064A])/)
     }
   })
 })

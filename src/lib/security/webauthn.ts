@@ -80,16 +80,16 @@ export function checkClientData(
   }
 
   // ‏وما أرسله الطالبُ لا يُعاد كاملًا في السبب: قد يكون مليونَ بايت (D-161)
-  if (data.type !== kind) return { ok: false, reason: `نوعٌ غير متوقّع: ${String(data.type).slice(0, 40)}` }
+  if (data.type !== kind) return { ok: false, reason: `نوع غير متوقّع: ${String(data.type).slice(0, 40)}` }
   // مقارنةُ نصٍّ لا بايتات: التحدّي معرَّفٌ في المواصفة نصّا بـ base64url
   if (data.challenge !== expected.challenge) {
-    return { ok: false, reason: 'التحدّي لا يطابق — انتهت المهلة أو أُعيد إرسالٌ قديم' }
+    return { ok: false, reason: 'التحدّي لا يطابق — انتهت المهلة أو أُعيد إرسال قديم' }
   }
   if (data.origin !== expected.origin) {
     return { ok: false, reason: `الأصل لا يطابق: ${String(data.origin).slice(0, 80)}` }
   }
   if (data.crossOrigin === true) {
-    return { ok: false, reason: 'طلبٌ من إطارٍ عابرٍ للأصل — مرفوض' }
+    return { ok: false, reason: 'طلب من إطار عابر للأصل — مرفوض' }
   }
   return { ok: true }
 }
@@ -121,7 +121,7 @@ async function checkAuthData(bytes: Uint8Array, expected: Expected): Promise<
   if (data === null) return { ok: false, reason: 'بيانات المتوثِّق أقصر من أن تكون صحيحة' }
 
   if (!equalBytes(data.rpIdHash, await sha256(expected.rpId))) {
-    return { ok: false, reason: 'المفتاح موقَّعٌ على نطاقٍ آخر' }
+    return { ok: false, reason: 'المفتاح موقَّع على نطاق آخر' }
   }
   // «حاضر» تعني أنّ إنسانا لمس شيئا. وبدونها التوقيع قد يكون آليّا
   if (!data.userPresent) return { ok: false, reason: 'لم يُثبَت حضور المستخدم' }
@@ -244,7 +244,7 @@ export async function verifyAssertion(
   let signature = assertion.signature
   if (credential.alg !== RS256) {
     const raw = derToRaw(signature)
-    if (raw === null) return fail('صيغةُ التوقيع غير مفهومة')
+    if (raw === null) return fail('صيغة التوقيع غير مفهومة')
     signature = raw
   }
 
@@ -287,7 +287,7 @@ export async function verifyRegistration(
     return fail('متصفّحك لا يقدّم المفتاح العامّ مباشرةً — يلزم متصفّح أحدث')
   }
   if (input.alg !== ES256 && input.alg !== RS256) {
-    return fail(`خوارزميّةٌ غير مدعومة: ${input.alg}`)
+    return fail(`خوارزميّة غير مدعومة: ${input.alg}`)
   }
 
   // يُستورَد الآن ليُرفض المشوَّه هنا لا عند أوّل دخول

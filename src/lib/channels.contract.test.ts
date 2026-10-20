@@ -36,14 +36,14 @@ const NAMED: Readonly<Record<string, string>> = {
   instagram: 'Instagram',
 }
 
-describe('سجلُّ العقود يواكب ما بُني (D-138)', () => {
+describe('سجلّ العقود يواكب ما بُني (D-138)', () => {
   const publishing = CHANNELS.filter((c) => c.stage === 'publish')
 
-  it('كلُّ منصّةٍ تنشر مذكورةٌ في `PLATFORMS.md`', () => {
+  it('كلّ منصّة تنشر مذكورة في `PLATFORMS.md`', () => {
     expect(publishing.length).toBeGreaterThan(0)
     for (const spec of publishing) {
       const name = NAMED[spec.id] ?? spec.label
-      expect(DOC, `${spec.id} — سائقٌ بُني ولا عقدَ له في السجلّ`).toContain(name)
+      expect(DOC, `${spec.id} — سائق بُني ولا عقد له في السجلّ`).toContain(name)
     }
   })
 
@@ -51,13 +51,13 @@ describe('سجلُّ العقود يواكب ما بُني (D-138)', () => {
    * **ولا يكفي ذكرُ الاسم عَرَضا**: منصّةٌ تُذكَر في قائمة المصادر وحدَها
    * لا عقدَ لها. فيُشترَط عنوانٌ يخصّها — سطرٌ يبدأ بـ`#` وفيه اسمُها.
    */
-  it('ولكلٍّ عنوانٌ يخصّها لا ذكرٌ عابر', () => {
+  it('ولكلّ عنوان يخصّها لا ذكر عابر', () => {
     const headings = DOC.split('\n').filter((line) => line.startsWith('#'))
     for (const spec of publishing) {
       const name = NAMED[spec.id] ?? spec.label
       expect(
         headings.some((h) => h.includes(name)),
-        `${spec.id} — مذكورٌ بلا عنوانٍ يخصّه`,
+        `${spec.id} — مذكور بلا عنوان يخصّه`,
       ).toBe(true)
     }
   })
@@ -66,13 +66,13 @@ describe('سجلُّ العقود يواكب ما بُني (D-138)', () => {
    * **وما لم يُبنَ لا يُوعَد به في السجلّ.** عقدٌ مكتوبٌ لمنصّةٍ بلا سائق
    * يُقرأ قدرةً، فينتظرها المالكُ ولا تأتي — وهي D-056 نفسُها.
    */
-  it('وما لم يُبنَ سائقُه لا عنوانَ له', () => {
+  it('وما لم يُبن سائقُه لا عنوان له', () => {
     const headings = DOC.split('\n').filter((line) => line.startsWith('#'))
     for (const spec of CHANNELS.filter((c) => c.stage === 'none')) {
       const name = NAMED[spec.id] ?? spec.label
       expect(
         headings.some((h) => h.includes(name)),
-        `${spec.id} — عقدٌ لمنصّةٍ لا سائقَ لها`,
+        `${spec.id} — عقد لمنصّة لا سائق لها`,
       ).toBe(false)
     }
   })

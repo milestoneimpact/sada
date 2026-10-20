@@ -165,8 +165,8 @@ export async function publishPost(
   if (isLinkedInPage({ platform: post.platform, kind: post.account_kind })) {
     return preflightFailed(
       db, post,
-      'حسابُ صفحةٍ — والنشرُ باسم الصفحة لم يُبنَ بعد (M-03). ' +
-        'انشر من حسابك الشخصيّ، أو انتظر موافقةَ Community Management API.',
+      'حساب صفحة — والنشر باسم الصفحة لم يُبن بعد (M-03). ' +
+        'انشر من حسابك الشخصيّ، أو انتظر موافقة Community Management API.',
     )
   }
 
@@ -229,7 +229,7 @@ export async function publishPost(
   // **ومنصّةُ المقاطع لا تقبل نصّا وحده**: لا نهايةَ نشرٍ نصّيّةٍ عندها
   // أصلا، فمحاولةٌ بلا مقطعٍ تُردّ بعد أن تُسجَّل وتُحاسَب
   if (CLIP_PLATFORMS.has(post.platform) && image === null) {
-    return preflightFailed(db, post, 'no_clip: لا مقطعَ لهذا المنشور — ولّد صورةً ثمّ حرّكها')
+    return preflightFailed(db, post, 'no_clip: لا مقطع لهذا المنشور — ولّد صورةً ثمّ حرّكها')
   }
   // **وInstagram كذلك لا نهايةَ نصّيّةَ لها** — صورةٌ أو مقطعٌ ولا ثالث
   if (post.platform === 'instagram' && image === null) {

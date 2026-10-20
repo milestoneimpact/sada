@@ -84,7 +84,7 @@ export async function schedulePost(
 
   // المعتمَدُ وحده يُجدول: المسوّدةُ لم تُقرأ، والمجدولُ له موعدٌ يُسحب أوّلا
   if (post.status !== 'approved' && post.status !== 'edited') {
-    return { ok: false, reason: `حالتُه «${post.status}» — والجدولةُ للمعتمَد وحده` }
+    return { ok: false, reason: `حالتُه «${post.status}» — والجدولة للمعتمَد وحده` }
   }
 
   // ‏ومنشورٌ يعرف الناشرُ أنّه سيردّه عند موعده لا يُجدوَل: TikTok وYouTube بلا مقطع،
@@ -116,10 +116,10 @@ export async function schedulePost(
   }
 
   const at = parseWhen(when)
-  if (at === null) return { ok: false, reason: 'موعدٌ غير مفهوم — الصيغة YYYY-MM-DDTHH:MM' }
+  if (at === null) return { ok: false, reason: 'موعد غير مفهوم — الصيغة YYYY-MM-DDTHH:MM' }
   // موعدٌ مضى يُرسَل في أوّل دورة — وذاك إرسالٌ فوريّ لا جدولة. ومَن أراد
   // الفورَ فليقل ذلك بموعدٍ قريب، لا بموعدٍ في الماضي
-  if (at <= dbNow(now)) return { ok: false, reason: 'الموعدُ في الماضي' }
+  if (at <= dbNow(now)) return { ok: false, reason: 'الموعد في الماضي' }
 
   await db
     .prepare(
@@ -176,11 +176,11 @@ export async function reschedulePost(db: Db, postId: string, when: string, now: 
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
   if (row.dispatched_at !== null) return { ok: false, reason: 'أُرسل للنشر، ولا يُغيَّر موعدُه بعد الإرسال' }
   if (row.account_status !== null && row.account_status !== 'active') {
-    return { ok: false, reason: `${row.display_name ?? 'الحساب'}: إذنُ الحساب لا يعمل، فجدّد إذنه أوّلًا` }
+    return { ok: false, reason: `${row.display_name ?? 'الحساب'}: إذن الحساب لا يعمل، فجدّد إذنه أوّلًا` }
   }
   const at = parseWhen(when)
-  if (at === null) return { ok: false, reason: 'موعدٌ غير مفهوم' }
-  if (at <= dbNow(now)) return { ok: false, reason: 'الموعدُ في الماضي' }
+  if (at === null) return { ok: false, reason: 'موعد غير مفهوم' }
+  if (at <= dbNow(now)) return { ok: false, reason: 'الموعد في الماضي' }
   const moved = await db
     .prepare(
       `UPDATE posts SET scheduled_at = ?
@@ -226,9 +226,9 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
       ok: false,
       reason: row.status === 'queued'
         ? row.dispatched_at === null
-          ? 'ينتظر موعدَه ولم يفشل — ألغِ الجدولة إن أردت تغييره'
-          : `أُرسل للنشر قبل أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابَ المنصّة`
-        : `حالتُه «${row.status}» — والإعادةُ للفاشل أو العالق وحده`,
+          ? 'ينتظر موعدَه ولم يفشل — ألغ الجدولة إن أردت تغييره'
+          : `أُرسل للنشر قبل أقلّ من ${STUCK_MINUTES} دقيقة — انتظر جواب المنصّة`
+        : `حالتُه «${row.status}» — والإعادة للفاشل أو العالق وحده`,
     }
   }
 
@@ -243,10 +243,10 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
     return { ok: false, reason: 'نُشر من قبل — وإعادتُه تنشره مرّتين' }
   }
   if (attempts.results.some((a) => a.status === 'sent')) {
-    return { ok: false, reason: 'أُرسلت محاولةٌ ولم يُعرف ردُّها — تحقّق على المنصّة أوّلا' }
+    return { ok: false, reason: 'أُرسلت محاولة ولم يُعرف ردُّها — تحقّق على المنصّة أوّلا' }
   }
   if (stuck && attempts.results.length > 0) {
-    return { ok: false, reason: `حاولت الدورةُ منذ أقلَّ من ${STUCK_MINUTES} دقيقة — انتظر جوابها` }
+    return { ok: false, reason: `حاولت الدورة منذ أقلّ من ${STUCK_MINUTES} دقيقة — انتظر جوابها` }
   }
 
   const moved = await db

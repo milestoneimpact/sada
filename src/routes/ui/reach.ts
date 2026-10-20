@@ -52,6 +52,6 @@ export function linkLine(platform: string, link: LinkState, reach: Reach): strin
  * `data-pick-msg`، والخادمُ يبقى حارسًا لمن لا سكربتَ عنده. و`made` ما يقع لغير المتّصلة.
  */
 export function pickLine(made: string): string {
-  return `<div class="row"><span class="ago">اختر منصّةً — وغيرُ المتّصلة ${escapeHtml(made)} حتّى تربطها.</span>
+  return `<div class="row"><span class="ago">اختر منصّةً — وغير المتّصلة ${escapeHtml(made)} حتّى تربطها.</span>
       <span class="st bad" data-pick-msg role="alert" hidden></span></div>`
 }

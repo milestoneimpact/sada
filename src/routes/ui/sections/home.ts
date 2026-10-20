@@ -71,16 +71,16 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
   }).join('')
   return `<div class="card home-card">
     <div class="card-head"><h2>هذا الأسبوع</h2><div class="grow"></div>
-      <span class="ago">مجدولٌ ${total}</span></div>
+      <span class="ago">مجدول ${total}</span></div>
     <ol class="wk">${cols}</ol>
-    <p class="hint wk-hint">${total === 0 ? 'لا شيءَ مجدولٌ في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلُّ نقطةٍ منشورٌ بلون منصّته.'}</p>
+    <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ نقطة منشور بلون منصّته.'}</p>
   </div>`
 }
 
 function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
   const meta = t.tone === 'ok'
-    ? nextAt === null ? 'لا شيءَ مجدولٌ عليها' : `التالي ${untilTime(nextAt, now)}`
-    : t.tone === 'bad' ? 'النشرُ عليها متوقّف' : t.tone === 'warn' ? 'ضغطةٌ واحدةٌ تربطها' : 'سرّا التطبيق أوّلًا'
+    ? nextAt === null ? 'لا شيء مجدول عليها' : `التالي ${untilTime(nextAt, now)}`
+    : t.tone === 'bad' ? 'النشر عليها متوقّف' : t.tone === 'warn' ? 'ضغطة واحدة تربطها' : 'سرّا التطبيق أوّلًا'
   return `<div class="card pf" data-pf="${escapeHtml(t.id)}">
     <div class="pf-head"><span class="pf-logo">${LOGOS[t.id] ?? ''}</span>
       <span class="pf-name"><b>${escapeHtml(t.label)}</b>
@@ -122,7 +122,7 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
 
   <div class="home-pair">
     <div class="card home-card">
-      <div class="card-head"><h2>رحلةُ المنشور</h2><div class="grow"></div>
+      <div class="card-head"><h2>رحلة المنشور</h2><div class="grow"></div>
         <span class="ago">كم مرّ بكلّ محطّة</span></div>
       <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
     </div>

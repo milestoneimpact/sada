@@ -81,8 +81,8 @@ const precedes = (selector: string, a: string, b: string): boolean => {
   return keys.includes(a) && keys.indexOf(a) < keys.indexOf(b)
 }
 
-describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المفاتيح', () => {
-  it('مفتاحُ القاعدة له اسمٌ، وما ليس له اسمٌ يُعرَض بحرفه', () => {
+describe('اللوح المحوريّ يقرأ الأسماء لا المفاتيح', () => {
+  it('مفتاح القاعدة له اسم، وما ليس له اسم يُعرَض بحرفه', () => {
     expect(keyLabel('status', 'published')).toBe('نُشرت')
     expect(keyLabel('platform', 'linkedin')).toBe('LinkedIn')
     expect(keyLabel('type', 'thread')).toBe('سلسلة')
@@ -90,7 +90,7 @@ describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المف�
     expect(keyLabel('day', '2026-09-07')).toBe('2026-09-07')
   })
 
-  it('والترويساتُ تُرسَم بالاسم — **وكانت تُرسَم `published`**', () => {
+  it('والترويسات تُرسَم بالاسم — **وكانت تُرسَم `published`**', () => {
     const table = pivot(
       [{ platform: 'linkedin', account: 'a', status: 'published', day: '2026-09-07',
          type: 'text', attempts: 1, succeeded: true, cost: 0 }],
@@ -102,14 +102,14 @@ describe('اللوحُ المحوريّ يقرأ الأسماءَ لا المف�
     })
     expect(html).toContain('<th scope="col">نُشرت</th>')
     // ورأسُ صفّ المنصّة رابطٌ إلى شاشتها منذ D-132 — والاسمُ فيه لا المفتاح
-    expect(html).toContain('title="شاشةُ LinkedIn">LinkedIn</a></th>')
+    expect(html).toContain('title="شاشة LinkedIn">LinkedIn</a></th>')
     expect(html).not.toMatch(/>published</)
     expect(html).not.toMatch(/>linkedin</)
   })
 })
 
 describe('زرّا التوصية لهما درجة', () => {
-  it('القبولُ أوّليٌّ والرفضُ ثانويّ — **ولا `ghost`**', () => {
+  it('القبول أوّليّ والرفض ثانويّ — **ولا `ghost`**', () => {
     const html = reportScreen({
       reports: [], current: null, promoCapUsd: 20, now: new Date('2026-09-06T09:00:00Z'),
       suggestions: [{
@@ -123,7 +123,7 @@ describe('زرّا التوصية لهما درجة', () => {
   })
 })
 
-describe('شعارُ المسوّدة من مصدره الواحد', () => {
+describe('شعار المسوّدة من مصدره الواحد', () => {
   const draft = (platform: DraftRow['platform']): DraftRow => ({
     id: 'd1', platform, text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
@@ -137,13 +137,13 @@ describe('شعارُ المسوّدة من مصدره الواحد', () => {
       mediaReady: READY,
     })
 
-  it('منصّةٌ ثالثةٌ لها شعارُها — **وكانت تُرسَم بلا شعار**', () => {
+  it('منصّة ثالثة لها شعارُها — **وكانت تُرسَم بلا شعار**', () => {
     expect(section('tiktok')).toContain(LOGOS['tiktok'])
     expect(section('linkedin')).toContain(LOGOS['linkedin'])
   })
 })
 
-describe('الاعتمادُ يعرض الموعد (D-218)', () => {
+describe('الاعتماد يعرض الموعد (D-218)', () => {
   const d: DraftRow = {
     id: 'd1', platform: 'linkedin', text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
@@ -157,7 +157,7 @@ describe('الاعتمادُ يعرض الموعد (D-218)', () => {
       mediaReady: READY,
     })
 
-  it('حسابٌ واحدٌ يناسبها: «اعتمد · غدًا» أوّلًا بحسابه وموعده، و«اعتمد فقط» بجوارها', () => {
+  it('حساب واحد يناسبها: «اعتمد · غدًا» أوّلًا بحسابه وموعده، و«اعتمد فقط» بجوارها', () => {
     const html = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }])
     expect(html).toContain('value="approve-schedule"')
     expect(html).toContain('name="account" value="a1"')
@@ -166,7 +166,7 @@ describe('الاعتمادُ يعرض الموعد (D-218)', () => {
     expect(html.indexOf('approve-schedule')).toBeLessThan(html.indexOf('value="approve"'))
   })
 
-  it('لا حسابَ أو حسابان: «اعتمد» وحده كما كان، فلا يُختار عن المالك', () => {
+  it('لا حساب أو حسابان: «اعتمد» وحده كما كان، فلا يُختار عن المالك', () => {
     expect(section([])).not.toContain('approve-schedule')
     const two = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }, { id: 'a2', platform: 'linkedin', label: 'الشركة' }])
     expect(two).not.toContain('approve-schedule')
@@ -174,13 +174,13 @@ describe('الاعتمادُ يعرض الموعد (D-218)', () => {
   })
 })
 
-describe('الرمزُ يقول ما يعنيه', () => {
-  it('زرُّ البحث عدسةٌ لا شبكةُ «نظرة عامّة»', () => {
+describe('الرمز يقول ما يعنيه', () => {
+  it('زرّ البحث عدسة لا شبكة «نظرة عامّة»', () => {
     expect(commandTrigger()).toContain(ICON.search)
     expect(commandTrigger()).not.toContain(ICON.overview)
   })
 
-  it('و«المزيد» نقاطٌ لا زائد — الزائدُ يقول «أنشئ»', () => {
+  it('و«المزيد» نقاط لا زائد — الزائد يقول «أنشئ»', () => {
     const more = railHtml({ inPanel: true }).split('<details class="more-sheet">')[1] ?? ''
     expect(more).toContain(ICON.more)
     expect(more).not.toContain(ICON.add)
@@ -188,7 +188,7 @@ describe('الرمزُ يقول ما يعنيه', () => {
 })
 
 describe('ما يُكتب في الوسم يُرسَم في الورقة', () => {
-  it('صفُّ المهمّة العاجلة له قاعدة، وقائمةُ الملحوظات بلا نقاط', () => {
+  it('صفّ المهمّة العاجلة له قاعدة، وقائمة الملحوظات بلا نقاط', () => {
     expect(css.where('tr.urgent td')).toContain('')
     expect(css.rule('ul.plain')['list-style']).toBe('none')
     const html = tasksScreen({
@@ -201,7 +201,7 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(html).toContain('<tr class="urgent">')
   })
 
-  it('ورمزٌ بين علامتَي اقتباسٍ خلفيّتين في المهمّة يُرسَم رمزًا لا علاماتٍ يراها المالك (D-202)', () => {
+  it('ورمز بين علامتَي اقتباس خلفيّتين في المهمّة يُرسَم رمزًا لا علامات يراها المالك (D-202)', () => {
     const html = tasksScreen({
       phase: null, gates: [], env: 'staging',
       rows: [{
@@ -213,7 +213,7 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(html).not.toContain('`')
   })
 
-  it('والفرقُ عن أمس حبرٌ لا حالة — إنفاقٌ نزل ليس تحذيرا', () => {
+  it('والفرق عن أمس حبر لا حالة — إنفاق نزل ليس تحذيرا', () => {
     for (const s of ['.delta.up', '.delta.down']) expect(css.rule(s).color, s).toBe('var(--ink-2)')
     // ‏ولا في سياقٍ آخر ولا في محدّدٍ أخصّ: «.x .delta.down» تحذيرٌ كذلك
     expect(found((d) => d.prop === 'color' && d.value === 'var(--warn)' &&
@@ -224,14 +224,14 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
    * **وأربعٌ في خمسة أعمدةٍ تترك عمودا أبيض** (لاحقةُ D-123). كانت قاعدةُ
    * D-102 تفتح خمسةً لكلّ «c4» فوق ‏١٩٢٠، **وبعد D-119 العددُ يقرّر الصنف**.
    */
-  it('ولا عمودَ خامسَ يُفرَض على شبكةٍ من أربع', () => {
+  it('ولا عمود خامس يُفرَض على شبكة من أربع', () => {
     // ‏في أيّ سياق، لا عند ‏١٩٢٠ وحدَه: شبكةُ الأربع لا تُعطى خمسةَ أعمدة
     expect(found((d) => d.prop === 'grid-template-columns' && /repeat\(5/.test(d.value) &&
       d.selectors.some((s) => /\.c4\b/.test(s)))).toEqual([])
     expect(css.rule('.c5')['grid-template-columns']).toBe('repeat(5,1fr)')
   })
 
-  it('واسمُ المزوّد يأخذ سطرَه حين تضيق قائمتُه، والعلامةُ في الشريط حيث لا رافدة', () => {
+  it('واسم المزوّد يأخذ سطرَه حين تضيق قائمتُه، والعلامة في الشريط حيث لا رافدة', () => {
     // ‏بعرض القائمة لا بعرض الشاشة (مراجعة D-187): «sm» تركت الاسمَ ‏0px عند ‏600 و‏900
     const narrow = `@container plist ${narrower('prow')}`
     expect(css.rule('.plist').container).toBe('plist/inline-size')
@@ -250,14 +250,14 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
   })
 })
 
-describe('نافذةُ القياس تُقرأ اسما لا مفتاحا (D-124)', () => {
+describe('نافذة القياس تُقرأ اسما لا مفتاحا (D-124)', () => {
   it('«24h» تُقال «٢٤ ساعة»، وما ليس في القاموس يُعرَض بحرفه', () => {
     expect(windowLabel('24h')).toBe('24 ساعة')
     expect(windowLabel('7d')).toBe('7 أيّام')
     expect(windowLabel('90d')).toBe('90d')
   })
 
-  it('والتقريرُ لا يكتب مفتاحَ `CHECK` في جملةٍ عربيّة', () => {
+  it('والتقرير لا يكتب مفتاح `CHECK` في جملة عربيّة', () => {
     const html = reportScreen({
       reports: [], suggestions: [], promoCapUsd: 0, now: new Date('2026-09-06T09:00:00Z'),
       current: {
@@ -271,12 +271,12 @@ describe('نافذةُ القياس تُقرأ اسما لا مفتاحا (D-124
         },
       } as never,
     })
-    expect(html).toContain('الأوّلُ في نافذة 24 ساعة')
+    expect(html).toContain('الأوّل في نافذة 24 ساعة')
     expect(html).not.toContain('نافذة 24h')
   })
 })
 
-describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
+describe('رموز الليل على الجذر وحدَه (D-124)', () => {
   /**
    * زرُّ «ليليّ» يحمل `data-theme="dark"` قيمةً لا حالا. **ومحدّدٌ بلا قيدٍ
    * يجعل الزرَّ وحدَه ليليّا** — حبرُ الليل على أرض النهار، ‏٢٫٣٨:١.
@@ -302,11 +302,11 @@ describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
     .filter((r) => Object.keys(r.decls).some((p) => p.startsWith('--')))
     .flatMap((r) => r.selectors.filter((s) => s !== DENSITY && !ROOT.test(s)).map((s) => `${r.at} ${s}`.trim()))
 
-  it('المحدّدُ مقيّدٌ بالجذر فلا يلبسه زرٌّ يحمل السمةَ قيمةً', () => {
+  it('المحدّد مقيّد بالجذر فلا يلبسه زرّ يحمل السمة قيمةً', () => {
     expect(css.where(':root[data-theme="dark"]')).toContain('')
     expect(css.where('[data-theme="dark"]')).toEqual([])
-    expect(offRoot(css), 'رمزٌ على غير الجذر يلبسه كلُّ ما طابقه').toEqual([])
-    expect(css.where(DENSITY), 'الكثافةُ مستثناةٌ ما بقيت قاعدتُها وحدَها في المستوى الأعلى').toEqual([''])
+    expect(offRoot(css), 'رمز على غير الجذر يلبسه كلّ ما طابقه').toEqual([])
+    expect(css.where(DENSITY), 'الكثافة مستثناة ما بقيت قاعدتُها وحدَها في المستوى الأعلى').toEqual([''])
   })
 
   /**
@@ -315,22 +315,22 @@ describe('رموزُ الليل على الجذر وحدَه (D-124)', () => {
    * الليل الثلاث (الزرُّ والنظامُ والطباعة) مقبولٌ بالسؤال الذي فوق.
    */
   it.each([
-    ['الزرُّ الليليُّ تحت الجذر بمسافةٍ واحدة', ':root [data-theme="dark"]{--ink:#ebe9e3; --bg:#12141a}',
+    ['الزرّ الليليّ تحت الجذر بمسافة واحدة', ':root [data-theme="dark"]{--ink:#ebe9e3; --bg:#12141a}',
       [':root [data-theme="dark"]']],
-    ['الرافدةُ بثيمٍ ثالثٍ تحت الجذر', ':root .rail{--bg:#14161c; --ink:#ebe9e3}', [':root .rail']],
+    ['الرافدة بثيم ثالث تحت الجذر', ':root .rail{--bg:#14161c; --ink:#ebe9e3}', [':root .rail']],
     ['تحت الجذر الليليّ في تفضيل النظام', '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{--surface:#000}}',
       ['@media(prefers-color-scheme:dark) :root:not([data-theme="light"]) .card']],
-    ['ابنُ الجذر المباشر، والفراغُ حول الرابط لا يخفيه', ':root > body{--ink:#191b1f}', [':root>body']],
+    ['ابن الجذر المباشر، والفراغ حول الرابط لا يخفيه', ':root > body{--ink:#191b1f}', [':root>body']],
   ])('ويُمسك %s', (_name, tail, caught) => {
     // ‏ما زاده الذيلُ وحدَه: عيبٌ في الورقة نفسِها يُسقط السؤالَ الذي فوق لا هذه الصفوف
     expect(offRoot(sheet(STYLE + '\n' + tail)).slice(offRoot(css).length)).toEqual(caught)
   })
 })
 
-describe('صفحةُ الدخول تقول ما تطلب بالعربيّة', () => {
-  it('اللصيقةُ «كلمةُ الإدارة» واسمُ السرّ بجانبها', () => {
+describe('صفحة الدخول تقول ما تطلب بالعربيّة', () => {
+  it('اللصيقة «كلمة الإدارة» واسم السرّ بجانبها', () => {
     const html = loginPage({}, 'n')
-    expect(html).toContain('كلمةُ الإدارة <span class="mono">ADMIN_TOKEN</span>')
+    expect(html).toContain('كلمة الإدارة <span class="mono">ADMIN_TOKEN</span>')
   })
 })
 
@@ -340,14 +340,14 @@ describe('صفحةُ الدخول تقول ما تطلب بالعربيّة', ()
  * في «على ماذا»، و`24h` في سبب التوصية. **وكلُّها من جنس D-123**: مفتاحٌ
  * في مكان اسم. فصار للمنصّة اسمٌ بجانب معرِّفها في موضعٍ واحد.
  */
-describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-125)', () => {
-  it('اسمُ المنصّة بجانب معرِّفها، وما ليس في القاموس بحرفه', () => {
+describe('المفتاح لا يُعرَض — الاسم يُعرَض (D-125)', () => {
+  it('اسم المنصّة بجانب معرِّفها، وما ليس في القاموس بحرفه', () => {
     expect(platformLabel('linkedin')).toBe('LinkedIn')
     expect(platformLabel('tiktok')).toBe('TikTok')
     expect(platformLabel('mastodon')).toBe('mastodon')
   })
 
-  it('وبوّابةُ التأسيس تعدّ بالاسم — **وكانت تعدّ `linkedin: 4`**', () => {
+  it('وبوّابة التأسيس تعدّ بالاسم — **وكانت تعدّ `linkedin: 4`**', () => {
     const facts = {
       publishedPerPlatform: { linkedin: 4, x: 2 }, ledgerPerPlatform: { linkedin: 4, x: 2 },
       publishedWithMedia: {}, linkedInVersionDue: false,
@@ -357,7 +357,7 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
     expect(text).not.toMatch(/\blinkedin: /)
   })
 
-  it('والرحلةُ تسمّي منصّتَها', () => {
+  it('والرحلة تسمّي منصّتَها', () => {
     const html = journeyBody({
       postId: 'p1', platform: 'linkedin', status: 'published', spent: 0, text: 'نصّ',
       stations: [{ kind: 'draft', title: 'كُتبت', at: '2026-09-05 09:00:00', detail: '',
@@ -367,7 +367,7 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
     expect(html).not.toMatch(/<i class="led"><\/i>linkedin</)
   })
 
-  it('و«على ماذا» في سجلّ التدقيق اسمُ المزوّد لا مفتاحُه، وما ليس مزوّدا ولا منصّةً بحرفه', () => {
+  it('و«على ماذا» في سجلّ التدقيق اسم المزوّد لا مفتاحُه، وما ليس مزوّدا ولا منصّةً بحرفه', () => {
     expect(PROVIDERS.anthropic.name).toBe('Anthropic')
     const now = new Date('2026-09-06T09:00:00Z')
     const audit = (target: string): string => securitySection({
@@ -389,7 +389,7 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
    * ‏٣٫٠٩:١ على أرض الليل. **فالحبرُ من `--brand` المقيس في الثيمات الثلاثة**،
    * و`--brand-deep` لا يُكتب حبرا في موضع.
    */
-  it('ولا `--brand-deep` حبرا — هو أرضُ ضغطٍ في الليل لا حبرٌ', () => {
+  it('ولا `--brand-deep` حبرا — هو أرض ضغط في الليل لا حبر', () => {
     // ولا يُتَّهم `border-color` — الحدُّ ليس حبرا
     expect(found((d) => d.prop === 'color' && d.value.includes('var(--brand-deep)'))).toEqual([])
     expect(css.rule('.doc a').color).toBe('var(--link)')
@@ -402,8 +402,8 @@ describe('المفتاحُ لا يُعرَض — الاسمُ يُعرَض (D-12
  * قيَمُ النهار على الجذر في الطباعة **بالمحدّد نفسِه الذي يحمل الليل**،
  * لتغلبَه بالترتيب لا بالوزن.
  */
-describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
-  it('كتلةُ الطباعة تعيد حبرَ النهار على محدّد الليل نفسِه', () => {
+describe('الورق أبيض في الثيمين (D-125)', () => {
+  it('كتلة الطباعة تعيد حبر النهار على محدّد الليل نفسِه', () => {
     const DAY = { '--ink': THEME.light['--ink'], '--bg': '#ffffff', 'color-scheme': 'light' }
     for (const s of [':root', ':root:not([data-theme="light"])', ':root[data-theme="dark"]']) {
       expect(css.rule(s, '@media print'), s).toMatchObject(DAY)
@@ -421,7 +421,7 @@ describe('الورقُ أبيضُ في الثيمين (D-125)', () => {
  * يُعطَّل لحظةَ يُركَّز على القائمة فيقفز عنه `Tab`، ورابطُ العودة ‏٤٠px عرضا.
  */
 describe('ما مشاه Tab (D-125)', () => {
-  it('حلقةُ محرّر المسوّدة ظلٌّ مقيسٌ لا لونٌ في مكان ظلّ', () => {
+  it('حلقة محرّر المسوّدة ظلّ مقيس لا لون في مكان ظلّ', () => {
     expect(css.rule('.draft-text:focus')).toMatchObject({
       outline: 'none', 'border-color': 'var(--focus)', 'box-shadow': '0 0 0 var(--ring-w) var(--ring)',
     })
@@ -433,7 +433,7 @@ describe('ما مشاه Tab (D-125)', () => {
     expect(SCRIPT).not.toContain('btn.disabled=true')
   })
 
-  it('ورابطُ العودة هدفُ لمسٍ عرضا كما هو ارتفاعا', () => {
+  it('ورابط العودة هدف لمس عرضا كما هو ارتفاعا', () => {
     expect(css.rule('nav.back a')['min-width']).toBe('var(--tap)')
   })
 })
@@ -443,14 +443,14 @@ describe('ما مشاه Tab (D-125)', () => {
  * وكلُّ رابطٍ يُبنى من معرِّفٍ لا من نصّ.**
  */
 describe('من المحطّة إلى موضعها (D-126)', () => {
-  it('كلُّ نوعٍ يقود إلى حيث يُفعَل به شيء', () => {
+  it('كلّ نوع يقود إلى حيث يُفعَل به شيء', () => {
     expect(stationHref('source', 'x')).toEqual({ href: '/panel/library#sources', label: 'المكتبة' })
     expect(stationHref('decision', 'x').href).toBe('/panel#posts')
-    expect(stationHref('publish', 'linkedin')).toEqual({ href: '/panel/channels/linkedin', label: 'شاشةُ LinkedIn' })
+    expect(stationHref('publish', 'linkedin')).toEqual({ href: '/panel/channels/linkedin', label: 'شاشة LinkedIn' })
     expect(stationHref('metrics', 'a b').href).toBe('/panel/channels/a%20b')
   })
 
-  it('والرحلةُ ترسم الرابطَ في كلّ محطّة', () => {
+  it('والرحلة ترسم الرابط في كلّ محطّة', () => {
     const html = journeyBody({
       postId: 'p1', platform: 'x', status: 'published', spent: 0, text: 'نصّ',
       stations: [
@@ -460,13 +460,13 @@ describe('من المحطّة إلى موضعها (D-126)', () => {
     }, new Date('2026-09-06T09:00:00Z'))
     // ‏والسهمُ مرسومٌ يشير إلى نهاية السطر، لا حرفٌ من خطّ النظام (D-167)
     expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/library#sources">المكتبة${ICON.go}</a>`)
-    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/channels/x">شاشةُ X${ICON.go}</a>`)
+    expect(html).toContain(`<a class="btn btn-secondary btn-sm stop-go" href="/panel/channels/x">شاشة X${ICON.go}</a>`)
     expect(html).not.toContain('\u2190')
   })
 })
 
 describe('«افتح في Drive» لا يُبنى من نصّ (D-126)', () => {
-  it('معرِّفٌ بصيغة Drive يصير رابطًا، وما سواه لا', () => {
+  it('معرِّف بصيغة Drive يصير رابطًا، وما سواه لا', () => {
     expect(driveFileUrl('1AbC_dEf-GhIjK')).toBe('https://drive.google.com/file/d/1AbC_dEf-GhIjK/view')
     expect(driveFileUrl('a/b')).toBeNull()
     expect(driveFileUrl('"><script>')).toBeNull()
@@ -474,18 +474,18 @@ describe('«افتح في Drive» لا يُبنى من نصّ (D-126)', () => {
   })
 })
 
-describe('حالُ المنصّة من موعد ربطها (D-126 · D-205)', () => {
+describe('حال المنصّة من موعد ربطها (D-126 · D-205)', () => {
   const now = new Date('2026-09-12T12:00:00Z')
   const at = (expiresAt: string | null) => channelHealth(viewChannels([{
     id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
     createdAt: '2026-09-01 00:00:00', expiresAt,
   }], () => true).find((v) => v.spec.id === 'linkedin')!, now)
-  it('أسبوعٌ فأقلُّ «تحتاج إعادةَ ربط» بعدده، وما انتهى «منقطعة»، وما فوقُ «متّصلة»', () => {
+  it('أسبوع فأقلّ «تحتاج إعادة ربط» بعدده، وما انتهى «منقطعة»، وما فوق «متّصلة»', () => {
     expect(at(null)).toMatchObject({ kind: 'broken', label: 'منقطعة' })
     expect(at('2026-09-10 00:00:00')).toMatchObject({ kind: 'broken', tone: 'bad' })
-    expect(at('2026-09-12 20:00:00').label).toBe('تحتاج إعادةَ ربطٍ اليوم')
-    expect(at('2026-09-14 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال يومين')
-    expect(at('2026-09-17 12:00:00').label).toBe('تحتاج إعادةَ ربطٍ خلال 5 أيّام')
+    expect(at('2026-09-12 20:00:00').label).toBe('تحتاج إعادة ربط اليوم')
+    expect(at('2026-09-14 12:00:00').label).toBe('تحتاج إعادة ربط خلال يومين')
+    expect(at('2026-09-17 12:00:00').label).toBe('تحتاج إعادة ربط خلال 5 أيّام')
     expect(at('2026-09-19 12:00:00')).toMatchObject({ kind: 'expiring', tone: 'warn' })
     expect(at('2026-09-21 12:00:00')).toMatchObject({ kind: 'connected', label: 'متّصلة' })
   })
@@ -494,7 +494,7 @@ describe('حالُ المنصّة من موعد ربطها (D-126 · D-205)', ()
 /**
  * المرحلةُ الثالثة — الموجةُ الثانية (D-127): فرزٌ بالمنصّة وترتيب، و«ما مضى» رسمًا.
  */
-describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
+describe('فرز بالمنصّة وترتيب (D-127)', () => {
   const draft = (id: string, platform: DraftRow['platform'], createdAt: string, cost: number): DraftRow => ({
     id, platform, text: 'نصّ', rationale: null, status: 'draft', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
@@ -508,14 +508,14 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
       mediaReady: READY,
   })
 
-  it('تبويبُ المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراضُ الكلّ', () => {
-    expect(html).toContain('data-platform-tab="all" data-label="كلُّ المنصّات" aria-pressed="true">كلُّ المنصّات<span class="count">2</span>')
+  it('تبويب المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراض الكلّ', () => {
+    expect(html).toContain('data-platform-tab="all" data-label="كلّ المنصّات" aria-pressed="true">كلّ المنصّات<span class="count">2</span>')
     expect(html).toContain('data-platform-tab="linkedin" data-label="LinkedIn" aria-pressed="false"\n      >LinkedIn<span class="count">1</span>')
     expect(html).toContain('data-platform-tab="x"')
     expect(html).not.toContain('data-platform-tab="tiktok"')
   })
 
-  it('والترتيبُ قائمةٌ افتراضُها الأهمّ أوّلًا (D-215)، والبطاقةُ تحمل مفاتيحَه', () => {
+  it('والترتيب قائمة افتراضُها الأهمّ أوّلًا (D-215)، والبطاقة تحمل مفاتيحَه', () => {
     expect(html).toContain('<select id="draft-order"')
     expect(html).toContain('<option value="urgent" selected>')
     expect(html).toContain('<option value="new">')
@@ -523,8 +523,8 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
     expect(html).toContain(`data-created="${Date.parse('2026-09-06T09:00:00Z')}" data-cost="0.05"`)
   })
 
-  it('والمنصّةُ والترتيبُ مطويّان في «مرشّحات» داخل صفّ الحال، والصفُّ مخفيٌّ بلا JavaScript (D-240)', () => {
-    expect(html).toContain('id="draft-filter" aria-label="فرزُ المسوّدات" hidden')
+  it('والمنصّة والترتيب مطويّان في «مرشّحات» داخل صفّ الحال، والصفّ مخفيّ بلا JavaScript (D-240)', () => {
+    expect(html).toContain('id="draft-filter" aria-label="فرز المسوّدات" hidden')
     const bar = html.slice(html.indexOf('id="draft-filter"'), html.indexOf('</nav>', html.indexOf('id="draft-filter"')))
     expect(bar).toContain('<details class="menu draft-more" id="draft-more">')
     expect(bar).toContain('id="draft-platform" role="group"')
@@ -536,12 +536,12 @@ describe('فرزٌ بالمنصّة وترتيب (D-127)', () => {
   })
 })
 
-describe('حقلُ الأمر على اللمس (D-127)', () => {
+describe('حقل الأمر على اللمس (D-127)', () => {
   /*
    * ‏كان يُذكَر باسمه في طبقة اللمس ليكبر إلى ‏١٧٫٥. **وصار كلُّ حقلٍ ‏١٦ في كلّ عرض**
    * ‏(D-185 · نمطُ «input»)، وهي ما يكفي iOS — فلا قاعدةَ للّمس تُنسى في حقلٍ جديد.
    */
-  it('textarea.mono وحقلُ الأمر بنمط «input» في كلّ عرض — ولا قاعدةَ لمسٍ لهما', () => {
+  it('textarea.mono وحقل الأمر بنمط «input» في كلّ عرض — ولا قاعدة لمس لهما', () => {
     for (const s of ['textarea.mono', '.cmd-text']) {
       expect(css.rule(s)['font-size'], s).toBe('var(--t-input)')
       expect(css.rule(s, '@media(pointer:coarse)')['font-size'], s).toBeUndefined()
@@ -555,7 +555,7 @@ describe('«ما مضى» رسمًا (D-127)', () => {
     id, createdAt: '2026-09-01 03:00:00',
     body: { version: 1, from: id, to: id, published, measured, spendUsd: 1, platforms: [], notes: [], top: null },
   })
-  it('أسابيعُ بترتيبها، ومع كلّ عمودٍ عددُ المقيس، والجزئيُّ مخطَّط', () => {
+  it('أسابيع بترتيبها، ومع كلّ عمود عدد المقيس، والجزئيّ مخطَّط', () => {
     const html = reportScreen({
       reports: [report('2026-09-07', 5, 5), report('2026-08-31', 8, 3)] as never,
       current: null, suggestions: [], promoCapUsd: 0, now: new Date('2026-09-08T09:00:00Z'),
@@ -577,10 +577,10 @@ describe('«ما مضى» رسمًا (D-127)', () => {
  */
 describe('ما تغيّر قبل الاعتماد (D-128)', () => {
   const base = (over: Partial<DraftRow>): DraftRow => ({
-    id: 'd1', platform: 'linkedin', text: 'أوّل\nثانٍ معدَّل', rationale: null, status: 'edited', model: null,
+    id: 'd1', platform: 'linkedin', text: 'أوّل\nثان معدَّل', rationale: null, status: 'edited', model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: 'omar',
     approvedAt: '2026-09-05 09:00:00', createdAt: '2026-09-05 08:00:00', scheduledAt: null,
-    accountName: null, dispatchedAt: null, publishCost: 0, originalText: 'أوّل\nثانٍ',
+    accountName: null, dispatchedAt: null, publishCost: 0, originalText: 'أوّل\nثان',
     ...over,
   })
   const section = (d: DraftRow): string =>
@@ -590,16 +590,16 @@ describe('ما تغيّر قبل الاعتماد (D-128)', () => {
       mediaReady: READY,
     })
 
-  it('المعدَّلةُ تحمل فرقَها مطويًّا: المحذوفُ بـ«−» والمضافُ بـ«+»', () => {
+  it('المعدَّلة تحمل فرقَها مطويًّا: المحذوف بـ«−» والمضاف بـ«+»', () => {
     const html = section(base({}))
     expect(html).toContain('<details class="diff">')
     expect(html).toContain('ما تغيّر قبل الاعتماد <span class="chip">2 سطران</span>')
-    expect(html).toContain('<span class="dl del">− ثانٍ</span>')
-    expect(html).toContain('<span class="dl add">+ ثانٍ معدَّل</span>')
+    expect(html).toContain('<span class="dl del">− ثان</span>')
+    expect(html).toContain('<span class="dl add">+ ثان معدَّل</span>')
     expect(html).toContain('<span class="dl same">  أوّل</span>')
   })
 
-  it('والمعتمَدةُ كما كُتبت، والمعدَّلةُ بلا أصلٍ محفوظ، لا فرقَ لهما', () => {
+  it('والمعتمَدة كما كُتبت، والمعدَّلة بلا أصل محفوظ، لا فرق لهما', () => {
     expect(section(base({ status: 'approved', originalText: null }))).not.toContain('class="diff"')
     expect(section(base({ originalText: null }))).not.toContain('class="diff"')
   })
@@ -627,35 +627,35 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
       writable: [], now: new Date('2026-09-06T09:00:00Z'), ready: true, pageOnly: [], peaks: {},
       mediaReady: READY,
     })
-  const NO_KEY = 'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker'
-  const OFF = 'تركيبُ النصّ مُطفأٌ من الإعدادات'
+  const NO_KEY = 'لا مفتاح متصفّح مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker'
+  const OFF = 'تركيب النصّ مُطفأ من الإعدادات'
 
-  it('رُكّب: «على الصورة» والعنوانُ، و alt يحمله', () => {
-    const html = card('', 'أثرٌ يُقاس')
+  it('رُكّب: «على الصورة» والعنوان، و alt يحمله', () => {
+    const html = card('', 'أثر يُقاس')
     expect(html).toContain(statusBadge('ok', '●', 'على الصورة'))
-    expect(html).toContain('«أثرٌ يُقاس»')
-    expect(html).toContain('alt="صورةٌ مولَّدة وعليها: أثرٌ يُقاس"')
-    expect(html).not.toContain('بلا نصٍّ فوقها')
+    expect(html).toContain('«أثر يُقاس»')
+    expect(html).toContain('alt="صورة مولَّدة وعليها: أثر يُقاس"')
+    expect(html).not.toContain('بلا نصّ فوقها')
   })
 
-  it('سقط: «بلا نصٍّ فوقها» تحذيرًا، والسببُ مؤرَّخًا، والعنوانُ المقترح', () => {
-    const html = card(NO_KEY, 'أثرٌ يُقاس')
-    expect(html).toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
+  it('سقط: «بلا نصّ فوقها» تحذيرًا، والسبب مؤرَّخًا، والعنوان المقترح', () => {
+    const html = card(NO_KEY, 'أثر يُقاس')
+    expect(html).toContain(statusBadge('warn', '!', 'بلا نصّ فوقها'))
     expect(html).toContain(`عند التوليد: ${NO_KEY}`)
-    expect(html).toContain('والعنوانُ المقترح «أثرٌ يُقاس»')
+    expect(html).toContain('والعنوان المقترح «أثر يُقاس»')
     // وما لم يُرسَم لا يُقال في alt إنّه عليها
-    expect(html).toContain('alt="صورةٌ مولَّدة تصاحب المنشور"')
+    expect(html).toContain('alt="صورة مولَّدة تصاحب المنشور"')
   })
 
   /**
    * **والإطفاءُ قرارٌ لا عطل**: بطاقةُ الإعدادات تقول «وهذا ليس عطلا»، فتحذيرٌ
    * أصفرُ على كلّ صورةٍ يكذّبها. ويُطابَق بآخر السبب: سقوطُ الموجز يسبقه بـ«؛».
    */
-  it('أُطفئ التركيب: رقاقةٌ ساكنة لا تحذير — ولو سبقه سقوطُ الموجز', () => {
-    for (const note of [OFF, `لا مزوّدَ للكتابة (writer)؛ ${OFF}`]) {
+  it('أُطفئ التركيب: رقاقة ساكنة لا تحذير — ولو سبقه سقوط الموجز', () => {
+    for (const note of [OFF, `لا مزوّد للكتابة (writer)؛ ${OFF}`]) {
       const html = card(note, null)
-      expect(html).toContain(statusBadge('idle', '○', 'بلا نصٍّ فوقها'))
-      expect(html).not.toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
+      expect(html).toContain(statusBadge('idle', '○', 'بلا نصّ فوقها'))
+      expect(html).not.toContain(statusBadge('warn', '!', 'بلا نصّ فوقها'))
     }
   })
 
@@ -664,35 +664,35 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
    * كان يُقصّ مع ذيله عند ‏300، فيسقط «مُطفأ» وتصير الرقاقةُ صفراء، أو يسقط
    * المفتاحُ الذي يُصلحه المالك. والسببُ هنا كما تكتبه المهمّةُ حرفًا.
    */
-  it('وسقوطُ موجزٍ طويل قبل السبب: التصنيفُ والسببُ الثاني كما هما', () => {
-    const noise = `تعذّر الموجزُ البصريّ: anthropic: 400 ${'{"type":"error"} '.repeat(30)}`
+  it('وسقوط موجز طويل قبل السبب: التصنيف والسبب الثاني كما هما', () => {
+    const noise = `تعذّر الموجز البصريّ: anthropic: 400 ${'{"type":"error"} '.repeat(30)}`
     const off = noteOf({ brief: null, detail: noise }, { reason: OFF })
-    const quiet = card(off, 'أثرٌ يُقاس')
-    expect(quiet).toContain(statusBadge('idle', '○', 'بلا نصٍّ فوقها'))
-    expect(quiet).not.toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
+    const quiet = card(off, 'أثر يُقاس')
+    expect(quiet).toContain(statusBadge('idle', '○', 'بلا نصّ فوقها'))
+    expect(quiet).not.toContain(statusBadge('warn', '!', 'بلا نصّ فوقها'))
     expect(quiet).toContain(`؛ ${OFF}`)
 
     const missing = noteOf({ brief: null, detail: noise }, { reason: NO_KEY })
-    const loud = card(missing, 'أثرٌ يُقاس')
-    expect(loud).toContain(statusBadge('warn', '!', 'بلا نصٍّ فوقها'))
+    const loud = card(missing, 'أثر يُقاس')
+    expect(loud).toContain(statusBadge('warn', '!', 'بلا نصّ فوقها'))
     expect(loud).toContain(`؛ ${NO_KEY}`)
   })
 
-  it('صفٌّ قديمٌ أو رُكّب بلا عنوان: لا سطرَ — لا يُدّعى ما لم يُسجَّل', () => {
-    for (const [note, headline] of [[null, null], [null, 'أثرٌ يُقاس'], ['', null]] as const) {
+  it('صفّ قديم أو رُكّب بلا عنوان: لا سطر — لا يُدّعى ما لم يُسجَّل', () => {
+    for (const [note, headline] of [[null, null], [null, 'أثر يُقاس'], ['', null]] as const) {
       const html = card(note, headline)
-      expect(html).not.toContain('بلا نصٍّ فوقها')
+      expect(html).not.toContain('بلا نصّ فوقها')
       expect(html).not.toContain('على الصورة')
       expect(html).not.toContain('عند التوليد')
     }
   })
 
-  it('العنوانُ والسببُ من خارجنا — يُهرَّبان في النصّ وفي alt', () => {
+  it('العنوان والسبب من خارجنا — يُهرَّبان في النصّ وفي alt', () => {
     const drawn = card('', '<b>x</b>"')
     expect(drawn).toContain('«&lt;b&gt;x&lt;/b&gt;&quot;»')
-    expect(drawn).toContain('alt="صورةٌ مولَّدة وعليها: &lt;b&gt;x&lt;/b&gt;&quot;"')
+    expect(drawn).toContain('alt="صورة مولَّدة وعليها: &lt;b&gt;x&lt;/b&gt;&quot;"')
     expect(drawn).not.toContain('<b>x</b>')
-    const failed = card('تعذّر تصويرُ الشريحة: <img src=x>', '<i>y</i>')
+    const failed = card('تعذّر تصوير الشريحة: <img src=x>', '<i>y</i>')
     expect(failed).toContain('&lt;img src=x&gt;')
     expect(failed).toContain('«&lt;i&gt;y&lt;/i&gt;»')
     expect(failed).not.toContain('<img src=x>')
@@ -702,15 +702,15 @@ describe('ما قيل عن الشريحة يُقرأ تحت الصورة (D-162)
 /**
  * رأسُ الصفّ بابٌ إلى شاشته (D-132): منصّةٌ لها شاشةٌ تصير رابطًا، وما سواه اسم.
  */
-describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
+describe('رأس صفّ الجدول المحوريّ (D-132)', () => {
   const facts = [{ platform: 'linkedin', account: 'a', status: 'published', day: '2026-09-07',
     type: 'text', attempts: 1, succeeded: true, cost: 0 }]
-  it('صفُّ المنصّة رابطٌ إلى شاشتها، وصفُّ الحال اسمٌ كما كان', () => {
+  it('صفّ المنصّة رابط إلى شاشتها، وصفّ الحال اسم كما كان', () => {
     const byPlatform = pivotPane({
       table: pivot(facts, { rows: 'platform', cols: null, measure: 'count' }),
       rows: 'platform', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
     })
-    expect(byPlatform).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشةُ LinkedIn">LinkedIn</a></th>')
+    expect(byPlatform).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشة LinkedIn">LinkedIn</a></th>')
     const byStatus = pivotPane({
       table: pivot(facts, { rows: 'status', cols: null, measure: 'count' }),
       rows: 'status', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
@@ -725,8 +725,8 @@ describe('رأسُ صفّ الجدول المحوريّ (D-132)', () => {
  * **الامتلاءُ ليس واحدًا** (D-134): سقفٌ بُلغ أحمرُ، وعملٌ اكتمل أخضر —
  * والشريطُ وعلامتُه تحته لونٌ واحد.
  */
-describe('شريطُ المقدار (D-134)', () => {
-  it('السقفُ المبلوغ أحمرُ full، والاكتمالُ done — وكلاهما بنصّ', () => {
+describe('شريط المقدار (D-134)', () => {
+  it('السقف المبلوغ أحمر full، والاكتمال done — وكلاهما بنصّ', () => {
     const capped = bar(10, 10)
     expect(capped).toContain('<i class="full"')
     expect(capped).toContain('بلغ السقف')
@@ -739,7 +739,7 @@ describe('شريطُ المقدار (D-134)', () => {
     expect(css.rule('.bar i.done').background).toBe('var(--ok)')
   })
 
-  it('وما لم يمتلئ بلا لونِ حالٍ ولا نصّ', () => {
+  it('وما لم يمتلئ بلا لون حال ولا نصّ', () => {
     const part = bar(1, 2, 'كلّها محلَّلة')
     expect(part).toContain('<i class=""')
     expect(part).not.toContain('cap')
@@ -747,8 +747,8 @@ describe('شريطُ المقدار (D-134)', () => {
 })
 
 /** بطاقةُ الجدول: العدُّ وزرُّ CSV في رأسها، والشرحُ تحته (D-137). */
-describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
-  it('الزرُّ في الرأس مع العدّ، ورأسُ اللوح موجود', () => {
+describe('رأس بطاقة الجدول المحوريّ (D-137)', () => {
+  it('الزرّ في الرأس مع العدّ، ورأس اللوح موجود', () => {
     const rows = [
       { day: '2026-09-01', platform: 'x', account: 'a', status: 'published', costUsd: 0.1, week: '2026-W36', month: '2026-09' },
       { day: '2026-09-02', platform: 'linkedin', account: 'b', status: 'failed', costUsd: 0.2, week: '2026-W36', month: '2026-09' },
@@ -756,12 +756,12 @@ describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
     const html = pivotPane({ rows: 'platform', cols: 'status', measure: 'count', sinceDays: 30, table: pivot(rows, { rows: 'platform', cols: 'status', measure: 'count' }), capped: false, cap: 5000 } as never)
     expect(html).toContain('<h1>النتائج</h1>')
     // ‏والجدولُ تبويبُ «تحليلٌ مفصّل» في «النتائج»، ومرساتُه القديمةُ قسمُه (D-204)
-    expect(html).toContain('<a class="tab-item" href="#pivot" aria-current="page"><span>تحليلٌ مفصّل</span></a>')
+    expect(html).toContain('<a class="tab-item" href="#pivot" aria-current="page"><span>تحليل مفصّل</span></a>')
     expect(html).toContain('<div data-sub id="pivot">')
     const split = html.indexOf('<div class="split">')
     const acts = html.indexOf('<div class="row acts">', split)
-    const csv = html.indexOf('نزّل الجدولَ CSV', acts)
-    const hint = html.indexOf('ملفُّ CSV يحمل', csv)
+    const csv = html.indexOf('نزّل الجدول CSV', acts)
+    const hint = html.indexOf('ملفّ CSV يحمل', csv)
     expect(acts).toBeGreaterThan(split)
     expect(csv).toBeGreaterThan(acts)
     expect(hint).toBeGreaterThan(csv)
@@ -770,8 +770,8 @@ describe('رأسُ بطاقة الجدول المحوريّ (D-137)', () => {
 })
 
 /** بطاقةُ الخطوات في شاشة الرفض: عمودان على العريض (D-137). */
-describe('بطاقةُ الخطوات (D-137)', () => {
-  it('الخطواتُ ثمّ جانبٌ فيه البابُ و«إن نجح»', () => {
+describe('بطاقة الخطوات (D-137)', () => {
+  it('الخطوات ثمّ جانب فيه الباب و«إن نجح»', () => {
     const html = refusedBody({ platform: 'linkedin', reason: 'unauthorized_scope_error', requested: scopeSet('linkedin'), identityRetry: true })
     const card = html.indexOf('<div class="card guide')
     const steps = html.indexOf('<ol class="steps">', card)
@@ -786,8 +786,8 @@ describe('بطاقةُ الخطوات (D-137)', () => {
 })
 
 /** الطبعةُ الثانية (D-139): كلُّ قيمةٍ من السلّم، والكتلةُ آخرَ الورقة. */
-describe('الطبعةُ الثانية (D-139)', () => {
-  it('الرتبةُ الكبرى سقطت مع السلّم القديم (D-185)، والرافدةُ بلا تدرّج', () => {
+describe('الطبعة الثانية (D-139)', () => {
+  it('الرتبة الكبرى سقطت مع السلّم القديم (D-185)، والرافدة بلا تدرّج', () => {
     // ‏عنوانُ الصفحة ‏٢٨ والرقمُ البطل ‏٤٠ من رمزيهما في كلّ عرض، ولا قاعدةَ للعريض
     expect(css.rule(':root')['--t-4xl']).toBeUndefined()
     expect(css.rule('.page-head h1', '@media(min-width:1181px)')['font-size']).toBeUndefined()
@@ -805,13 +805,13 @@ describe('الطبعةُ الثانية (D-139)', () => {
  * المؤشّرات سطحٌ واحدٌ بفواصلَ من خيط، والرقمُ رقيقٌ، وأفعالُ القوائم هادئةٌ
  * بهدفِ لمسٍ باقٍ. والكتلةُ آخرَ الورقة فتغلب.
  */
-describe('الطبعةُ الثالثة (D-143)', () => {
+describe('الطبعة الثالثة (D-143)', () => {
   /*
    * ‏كان وجهُ العرض الكوفيُّ للعناوين (D-143). **وخرج في المرحلة ١ من D-183** (D-185):
    * ‏زوجُ Plex للنصّ كلِّه، والكوفيُّ في «صدى» وحدها مسارًا. فلا رمزَ للوجه ولا قاعدةَ
    * ‏تطلبه، ولا وجهَ ثالث، والخطُّ على الجذر بلا اصطناع ثخانة.
    */
-  it('وجهُ العرض سقط: زوجُ Plex على الجذر، ولا قاعدةَ تطلب خطًّا آخر', () => {
+  it('وجه العرض سقط: زوج Plex على الجذر، ولا قاعدة تطلب خطًّا آخر', () => {
     expect(css.rule(':root')['--font-display']).toBeUndefined()
     expect(css.rule(':root')['--font-ui']).toMatch(/^"Plex Arabic","Plex Sans",/)
     expect(css.rule('html')).toMatchObject({ 'font-family': 'var(--font-ui)', 'font-synthesis': 'none' })
@@ -819,7 +819,7 @@ describe('الطبعةُ الثالثة (D-143)', () => {
     expect(FACES.map((f) => f.path)).toEqual(FACES.map((f) => f.path.replace(/\s/g, '')))
     expect(FACES.every((f) => f.family === 'Plex Arabic' || f.family === 'Plex Sans')).toBe(true)
   })
-  it('شريطُ المؤشّرات سطحٌ واحد، والرقمُ رقيق، والفعلُ الهادئ يبقى هدفَ لمس', () => {
+  it('شريط المؤشّرات سطح واحد، والرقم رقيق، والفعل الهادئ يبقى هدف لمس', () => {
     expect(css.rule('.grid.tiles')).toMatchObject({ gap: '1px', background: 'var(--line)' })
     expect(css.rule('.grid.tiles>.tile')).toMatchObject({ border: '0', 'border-radius': '0', 'box-shadow': 'none' })
     expect(css.rule('.tile .kv-v')).toMatchObject({ 'font-size': 'var(--t-h1)', 'font-weight': '400' })
@@ -833,8 +833,8 @@ describe('الطبعةُ الثالثة (D-143)', () => {
  * الطبعةُ الرابعة — الحبرُ والنحاس (D-144): الحبرُ هو اللونُ الأوّل، والنحاسُ
  * خيطٌ، والرافدةُ من الثيم لا ثيمٌ ثالث، والعلامةُ ثابتةٌ في الثيمين.
  */
-describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)', () => {
-  it('الحبرُ لونُ البنية نهارًا وليلًا، والنحاسُ يجتاز نصّا', () => {
+describe('الطبعة الرابعة — الحبر والنحاس (D-144)', () => {
+  it('الحبر لون البنية نهارًا وليلًا، والنحاس يجتاز نصّا', () => {
     // ‏والزرُّ «الأخضرُ العميق» من لوحة الهويّة نهارًا، والذهبُ برونزٌ على هيولاه (D-196)
     expect(css.rule(':root')).toMatchObject({ '--brand': '#0b2f31', '--on-brand': '#faf6f0', '--au': '#7b5e20' })
     // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار — رملٌ بحبرٍ عميق
@@ -844,7 +844,7 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     // ‏الزمرّدُ المتقاعد لا يعود في قيمة — والتعليقُ الذي يؤرّخه لا يُسقط شيئًا
     expect(found((d) => /#12623e|#82c69e/i.test(d.value))).toEqual([])
   })
-  it('الرافدةُ ترث الثيم، والعلامةُ حبرٌ ونحاسٌ ثابتان', () => {
+  it('الرافدة ترث الثيم، والعلامة حبر ونحاس ثابتان', () => {
     // ‏لا ثيمَ ثالثًا للرافدة: لا رمزَ يُعاد عليها في أيّ سياق
     expect(css.where('.rail')).toContain('')
     for (const at of css.where('.rail')) {
@@ -871,7 +871,7 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     expect(css.rule('.glyph')).toMatchObject({ background: 'var(--mark-bg)', color: 'var(--mark-fg)' })
     expect(css.rule('nav.tabs a[aria-current=page]::before')).toMatchObject({ width: 'var(--stroke)', background: 'var(--au)' })
   })
-  it('الأزرارُ الأوّليّةُ مصمتة، والبطاقاتُ بحدٍّ وظلٍّ خفيف، والتنبيهاتُ سطحٌ بخيط', () => {
+  it('الأزرار الأوّليّة مصمتة، والبطاقات بحدّ وظلّ خفيف، والتنبيهات سطح بخيط', () => {
     expect(css.rule('.btn-primary')).toMatchObject({ background: 'var(--brand)', color: 'var(--on-brand)' })
     // ‏مراجعةُ D-144 «بطاقةٌ مسطّحة» (D-187): الحدُّ أوضح والظلُّ الأوّل يسنده
     expect(css.rule('.card')).toMatchObject({
@@ -882,7 +882,7 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
     expect(css.rule('.toast-note.ok')['border-inline-start-color']).toBe('var(--ok)')
     expect(css.rule('.card-alert')['border-inline-start']).toBe('var(--s-1) solid var(--ok)')
   })
-  it('رمزُ التبويب ولونُ المتصفّح من الطبعة نفسِها', () => {
+  it('رمز التبويب ولون المتصفّح من الطبعة نفسِها', () => {
     // ‏أيقونةُ التطبيق في اللوحة: مربّعٌ «أخضرُ عميق» مصمتٌ وشريطٌ نعناعيّ — لونا العلامة نفسُهما (D-196)
     expect(ICON_BYTES).toContain(`fill="${MARK['--mark-bg']}"`)
     expect(ICON_BYTES).toContain(`stroke="${MARK['--mark-fg']}"`)
@@ -900,8 +900,8 @@ describe('الطبعةُ الرابعة — الحبرُ والنحاس (D-144)'
  * في `audit_classes`، وهنا يُثبَّت أنّ الطبقاتِ التي كانت تُعاد صارت قاعدةً
  * واحدةً تحمل آخرَ قيمة.
  */
-describe('تصفيةُ الطبعات (D-148)', () => {
-  it('البطاقةُ والرافدةُ والمؤشّرُ الأوّل كلٌّ بقاعدةٍ واحدة تحمل آخرَ قيمة', () => {
+describe('تصفية الطبعات (D-148)', () => {
+  it('البطاقة والرافدة والمؤشّر الأوّل كلّ بقاعدة واحدة تحمل آخر قيمة', () => {
     // ‏تعريفُ audit_classes نفسُه: القاعدةُ في المستوى الأعلى محدّدُها كاملًا هذا
     const count = (sel: string): number => css.rules().filter((r) => r.at === '' && r.selectors.join(',') === sel).length
     for (const sel of ['.card', '.rail', '.btn-primary', '.toast-note', '.tile .kv-v', '.grid>.tile:first-child .kv-v', '.rail-head', 'nav.tabs a[aria-current=page]']) {
@@ -927,7 +927,7 @@ describe('تصفيةُ الطبعات (D-148)', () => {
  * يُقاس بـ audit_design وscripts/snapshot_styles.
  */
 describe('ما وراء المقاييس (D-149)', () => {
-  it('الاتّجاه: هامشٌ منطقيٌّ واحد، وخيطُ القسم من البداية، وشريطُ المختار في النهاية، وسهمُ العودة إلى البداية', () => {
+  it('الاتّجاه: هامش منطقيّ واحد، وخيط القسم من البداية، وشريط المختار في النهاية، وسهم العودة إلى البداية', () => {
     expect(css.rule('.slice .stats')).toMatchObject({ margin: '0', 'margin-inline-start': 'auto', padding: '0', 'border-top': '0' })
     expect(precedes('.slice .stats', 'margin', 'margin-inline-start')).toBe(true)
     // ‏وخيطُ القسم النحاسيُّ سقط مع ميزانيّة النحاس (D-187): لا قاعدةَ له في أيّ سياق
@@ -942,7 +942,7 @@ describe('ما وراء المقاييس (D-149)', () => {
     expect(ICON.back).toContain('m13 6 6 6-6 6')
     expect(backNav('/panel#channels', 'القنوات')).not.toMatch(/[\u2190\u2192]/)
   })
-  it('الوصول: حشوُ التمرير تحت الشريط، والرابطُ الهادئ بخيطٍ لا بلونٍ وحدَه، وحقلُ الأوامر يقول «هنا»', () => {
+  it('الوصول: حشو التمرير تحت الشريط، والرابط الهادئ بخيط لا بلون وحدَه، وحقل الأوامر يقول «هنا»', () => {
     expect(css.rule('html')['scroll-padding-top']).toBe('calc(var(--topbar) + var(--s-3))')
     // ‏والخطُّ تحت الرابط الهادئ بلونه لا بالنحاس (D-187): لا نحاسَ تحت رابطٍ في أيّ قاعدة
     for (const s of ['.todo>li>a.btn', '.todo>li>form .btn']) {
@@ -954,7 +954,7 @@ describe('ما وراء المقاييس (D-149)', () => {
     expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 calc(-1 * var(--stroke)) 0 var(--focus)')
     expect(css.where('.busy-note')).toContain('')
   })
-  it('الرموز: لا زمرّدَ في الوهج بصيغة rgba، والتاريخُ في مفتاح الرسم معزول، والرقمُ المحلّيُّ غربيٌّ في كلّ ICU', () => {
+  it('الرموز: لا زمرّد في الوهج بصيغة rgba، والتاريخ في مفتاح الرسم معزول، والرقم المحلّيّ غربيّ في كلّ ICU', () => {
     expect(found((d) => /rgba\(18,98,62|rgba\(130,198,158/i.test(d.value))).toEqual([])
     const chart = readFileSync(new URL('./chart.ts', import.meta.url), 'utf8')
     // ‏والتاريخُ «14 أكتوبر» لا «10-14» (D-202)
@@ -967,8 +967,8 @@ describe('ما وراء المقاييس (D-149)', () => {
 })
 
 /** الشاشةُ المستقلّة تحمل العلامة (D-140): بابٌ إلى اللوحة قبل سهم العودة. */
-describe('شريطُ العودة (D-140)', () => {
-  it('العلامةُ أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
+describe('شريط العودة (D-140)', () => {
+  it('العلامة أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
     const html = backNav('/panel#channels', 'القنوات')
     const home = html.indexOf('<a class="home" href="/panel"')
     const back = html.indexOf(`${ICON.back}القنوات`)
@@ -987,8 +987,8 @@ describe('شريطُ العودة (D-140)', () => {
  * تكتب شريطَ العودة حرفًا، فدُقّق شريطٌ ليس شريطَ المنتَج وضاعت علامةٌ أُضيفت
  * إليه. فلا يُكتب في العيّنات وسمٌ من وسوم الإطار — يُستدعى.
  */
-describe('العيّناتُ لا تنسخ الإطار (D-140)', () => {
-  it.each(['render_screens.ts', 'render_panel.ts', 'render_legal.ts'])('%s بلا وسمِ إطارٍ مكتوبٍ بيد', (name) => {
+describe('العيّنات لا تنسخ الإطار (D-140)', () => {
+  it.each(['render_screens.ts', 'render_panel.ts', 'render_legal.ts'])('%s بلا وسم إطار مكتوب بيد', (name) => {
     const src = readFileSync(new URL(`../../../scripts/${name}`, import.meta.url), 'utf8')
     for (const tag of ['<nav class="back"', 'class="rail"', 'class="topbar"', 'class="theme"', 'class="seg"', 'class="rail-head"']) {
       expect(src, `${name} يكتب ${tag} بدل استدعاء مصدره`).not.toContain(tag)
@@ -996,8 +996,8 @@ describe('العيّناتُ لا تنسخ الإطار (D-140)', () => {
   })
 })
 
-describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقاموسٌ واحدٌ للمنصّات', () => {
-  it('soloPage يبني التخطّي والعلامةَ والعودةَ والمحتوى ويحمل سكربتَ الثيم', () => {
+describe('D-151 — قالب واحد للشاشة المستقلّة وقاموس واحد للمنصّات', () => {
+  it('soloPage يبني التخطّي والعلامة والعودة والمحتوى ويحمل سكربت الثيم', () => {
     const html = soloPage('صدى — تجربة', { href: '/panel#posts', label: 'المنشورات' }, '<p>x</p>', 'n')
     expect(html).toContain('<a class="skip" href="#main">')
     expect(html).toContain('class="home"')
@@ -1010,7 +1010,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
    * **والصفحةُ المستقلّةُ جزءٌ من التطبيق** (D-178): رافدةٌ على العريض وشريطٌ في
    * الجوّال، والقسمُ معلَّمٌ في الوسم، والثيمُ مرّةً واحدة.
    */
-  it('soloPage برافدته: قسمُه معلَّم، ومساراتُه إلى اللوحة، والمنصّةُ الحاليّةُ تحته، والثيمُ لا يتكرّر', () => {
+  it('soloPage برافدته: قسمُه معلَّم، ومساراتُه إلى اللوحة، والمنصّة الحاليّة تحته، والثيم لا يتكرّر', () => {
     const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'الحسابات' }, '<p>x</p>', 'n', '', undefined,
       soloNav('accounts', 'linkedin'))
     expect(html).toContain('<aside class="rail">')
@@ -1026,7 +1026,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(tasks).not.toContain('class="plat"')
   })
 
-  it('بندُ خطّةٍ لمنصّةٍ خارج الاثنتين يحمل اسمَها لا مفتاحَها', async () => {
+  it('بند خطّة لمنصّة خارج الاثنتين يحمل اسمَها لا مفتاحَها', async () => {
     const { planSection } = await import('./sections/plan')
     // النوعُ يحصر المنصّةَ في اثنتين، والخطّةُ تصل JSON من نموذجٍ لا يعرف النوع
     const html = planSection({
@@ -1042,7 +1042,7 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
     expect(html).not.toMatch(/>youtube</)
   })
 
-  it('موعدُ البند بمنطقة المالك حين تُعرف (D-203)، والبندُ مخزَّنٌ بـ UTC', async () => {
+  it('موعد البند بمنطقة المالك حين تُعرف (D-203)، والبند مخزَّن بـ UTC', async () => {
     const { planSection } = await import('./sections/plan')
     const input = {
       plan: {
@@ -1058,9 +1058,9 @@ describe('D-151 — قالبٌ واحدٌ للشاشة المستقلّة وقا
   })
 })
 
-describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسوم', () => {
+describe('D-154 — رقاقة الحال دالّة ورمزُها مرسوم', () => {
   // ‏و«↓» معها منذ D-185: سهمُ الفرق عن الأمس سهمٌ لا مثلّث («▲» يعني «ساقط» في الحال)
-  it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '↓', '!'])('الحرفُ %s يُرسَم بمواصفة icon() بلون النصّ', (g) => {
+  it.each(['●', '○', '◍', '◔', '▲', '◆', '✓', '✕', '↑', '↓', '!'])('الحرف %s يُرسَم بمواصفة icon() بلون النصّ', (g) => {
     const html = statusBadge('ok', g, 'نصّ')
     // ‏شبكةُ ‏٢٤ وثخانةُ ‏١٫٨ بلا تعبئة — مواصفةُ الأيقونات نفسُها (D-103 · D-185)
     expect(html).toContain('<span class="st ok"><span class="st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"')
@@ -1068,7 +1068,7 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
     expect(html).toContain('</svg></span>نصّ</span>')
   })
 
-  it('ورموزُ الحال من GLYPH_ICON وحدَها: ثخانةٌ واحدة، ولا تعبئة، ولا «▼» بعدُ', () => {
+  it('ورموز الحال من GLYPH_ICON وحدَها: ثخانة واحدة، ولا تعبئة، ولا «▼» بعد', () => {
     for (const [g, svg] of Object.entries(GLYPH_ICON)) {
       expect(glyph(g), g).toBe(svg)
       expect([...svg.matchAll(/stroke-width="([\d.]+)"/g)].map((m) => m[1]), g).toEqual(['1.8'])
@@ -1077,7 +1077,7 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
     expect(glyph('▼')).toBe('▼')
   })
 
-  it('حرفٌ بلا رسمٍ يُطبَع مهرَّبًا، والسِّماتُ تُلحَق، والصنفُ الفارغ لا يترك فراغًا', () => {
+  it('حرف بلا رسم يُطبَع مهرَّبًا، والسِّمات تُلحَق، والصنف الفارغ لا يترك فراغًا', () => {
     expect(statusBadge('warn', '<', 'x', 'title="t"')).toBe('<span class="st warn" title="t"><span class="st-ic">&lt;</span>x</span>')
     expect(statusBadge('', '●', 'x')).toContain('<span class="st"><span class="st-ic"><svg')
   })
@@ -1087,7 +1087,7 @@ describe('D-154 — رقاقةُ الحال دالّةٌ ورمزُها مرسو
  * نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163) — **ما ستقوله الدالّةُ
  * بعد الضغط يُقال قبله**، وزرٌّ تسقط نقطتُه يُعطَّل وسببُه بجانبه.
  */
-describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع (D-163)', () => {
+describe('نقاط الجاهزيّة تحت زرَّي الصورة والمقطع (D-163)', () => {
   const draft = (id: string, state: DraftRow['status'] = 'draft'): DraftRow => ({
     id, platform: 'linkedin', text: 'نصّ', rationale: null, status: state, model: null,
     cost: 0, sourceId: null, sourceName: null, stale: false, approvedBy: null,
@@ -1116,7 +1116,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     })
   const ON = slideGate({ overlay: true, hasBrowserKey: true, hasAccount: true })
 
-  it('سطرُ كلِّ زرٍّ بعده داخل «بلا صورة»: الإنفوجرافيك أوّلًا، والفنّيّةُ في طيّتها (D-174)', () => {
+  it('سطر كلّ زرّ بعده داخل «بلا صورة»: الإنفوجرافيك أوّلًا، والفنّيّة في طيّتها (D-174)', () => {
     const html = section([draft('d1')])
     // ‏واللوحُ يحمل مرساتَه `i-…` (محطّة «الصورة» في الرئيسيّة)، فيُطلَب بصنفه لا بوسمه كاملًا
     const box = html.slice(html.indexOf('<div class="pic none"'), html.indexOf('<div class="draft-meta">'))
@@ -1128,8 +1128,8 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
     expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
     expect(box).toContain(statusBadge('ok', '●', 'المتصفّح', 'title="تامّة — يصوّر الصفحة"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'title="تامّة — نموذجُ الكتابة يستخرج المحتوى"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'title="تامّة — مفتوحةٌ اليوم"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'title="تامّة — نموذج الكتابة يستخرج المحتوى"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'title="تامّة — مفتوحة اليوم"'))
     expect(box).toContain(statusBadge('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
     expect(box).toContain('<b>إنفوجرافيك من نصّ المنشور</b>')
     // ‏والزرّان يرسلان نمطَهما — والدالّةُ تأخذ الإنفوجرافيك حين يغيب
@@ -1137,7 +1137,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(box).toContain('<input type="hidden" name="style" value="illustration">')
   })
 
-  it('والإنفوجرافيك بلا مفتاح المتصفّح معطَّلٌ وسببُه بجانبه — والفنّيّةُ لا تتبعه', () => {
+  it('والإنفوجرافيك بلا مفتاح المتصفّح معطَّل وسببُه بجانبه — والفنّيّة لا تتبعه', () => {
     const noBrowser = {
       ...READY,
       infographic: infographicReadiness({ blocker: null, browser: { key: false, account: true }, briefReady: true }),
@@ -1157,7 +1157,7 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(plain).toContain('<span class="ago">المحتوى من النصّ مباشرةً</span>')
   })
 
-  it('وسطرُ المقطع بعد «حرّكها فيديو» — ولا زرَّ ولا سطرَ حين يوجد مقطع', () => {
+  it('وسطر المقطع بعد «حرّكها فيديو» — ولا زرّ ولا سطر حين يوجد مقطع', () => {
     const noClip = section([draft('d1')], { media: [picture('d1')] })
     expect(noClip).toContain('حرّكها فيديو')
     expect(noClip.indexOf(statusBadge('ok', '●', 'المفتاح', 'title="تامّة — من أسرار Worker"')))
@@ -1169,19 +1169,19 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(withClip).toContain('ارفض الصورة')
   })
 
-  it('ولا سطرَ لمسوّدةٍ مرفوضةٍ أو منشورة — لا زرَّ فوقه', () => {
+  it('ولا سطر لمسوّدة مرفوضة أو منشورة — لا زرّ فوقه', () => {
     expect(section([draft('d1', 'rejected')])).not.toContain('class="hint ready"')
     expect(section([draft('d1', 'published')], { media: [picture('d1')] })).not.toContain('class="hint ready"')
   })
 
-  it('يُبنى مرّةً: ثلاثُ مسوّداتٍ فيها السطران نفسُهما حرفًا', () => {
+  it('يُبنى مرّةً: ثلاث مسوّدات فيها السطران نفسُهما حرفًا', () => {
     const html = section([draft('a'), draft('b'), draft('c')])
     const lines = [...html.matchAll(/<p class="hint ready">[\s\S]*?<\/p>/g)].map((m) => m[0])
     expect(lines).toHaveLength(6)
     expect(new Set(lines).size).toBe(2)
   })
 
-  it('والنقطةُ الساقطةُ تعطّل الزرَّ وسببُها ورابطُها بجانبه', () => {
+  it('والنقطة الساقطة تعطّل الزرّ وسببُها ورابطُها بجانبه', () => {
     const blocked = {
       infographic: infographicReadiness({ blocker: { kind: 'paused' }, browser: { key: true, account: true }, briefReady: true }),
       image: imageReadiness({
@@ -1192,11 +1192,11 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     const empty = section([draft('d1')], { mediaReady: blocked })
     expect(empty).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
     expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
-    expect(empty).toContain('<span class="ago">موقوفٌ بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
+    expect(empty).toContain('<span class="ago">موقوف بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
 
     const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
     expect(pictured).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
-    expect(pictured).toContain('<span class="ago">لا مفتاحَ لـ Workers AI</span>')
+    expect(pictured).toContain('<span class="ago">لا مفتاح لـ Workers AI</span>')
 
     // وما ينتظرك لا يعطّل: الصورةُ تخرج بلا عنوان، والزرُّ يعمل
     const waiting = section([draft('d1')], {
@@ -1210,11 +1210,11 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
    * **وسقفُ المقاطع يقوله السطرُ قبل الضغط** (D-168): الوجهُ والحدودُ تامّان،
    * والمقاطعُ بلغت سقفَها — فالزرُّ معطَّلٌ وسببُه ورابطُه إلى الحدود بجانبه.
    */
-  it('وسقفُ المقاطع يُعطِّل «حرّكها فيديو» وسببُه بجانبه — وتحته يقول كم بقي', () => {
+  it('وسقف المقاطع يُعطِّل «حرّكها فيديو» وسببُه بجانبه — وتحته يقول كم بقي', () => {
     const full = { ...READY, video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(2, 2) }) }
     const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
-    expect(html).toContain('<span class="ago">بلغ سقفَ المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
+    expect(html).toContain('<span class="ago">بلغ سقف المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
     const other = section([draft('d2')], { mediaReady: full })
     expect(other).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
@@ -1225,24 +1225,24 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
     expect(under).toContain(statusBadge('ok', '●', 'المقاطع', 'title="تامّة — بقي 2 من 2 اليوم"'))
   })
 
-  it('واسمُ المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
+  it('واسم المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
     const html = section([draft('d1')], {
       mediaReady: withImage(ON, { provider: { label: '<img onerror=x>', refusal: { kind: 'no_key' } } }),
     })
     expect(html).not.toContain('<img onerror')
-    expect(html).toContain('<span class="ago">لا مفتاحَ لـ &lt;img onerror=x&gt;</span>')
+    expect(html).toContain('<span class="ago">لا مفتاح لـ &lt;img onerror=x&gt;</span>')
   })
 
-  it('و«بلا حرف» يتبع الشريحة: مطفأةٌ فبلا حرف، ومركَّبةٌ فعنوان، وناقصةٌ فبعدُ', () => {
+  it('و«بلا حرف» يتبع الشريحة: مطفأة فبلا حرف، ومركَّبة فعنوان، وناقصة فبعد', () => {
     const at = (overlay: boolean, hasBrowserKey: boolean): string =>
       section([draft('d1')], { mediaReady: withImage(slideGate({ overlay, hasBrowserKey, hasAccount: true })) })
-    expect(at(false, true)).toContain('مشهدٌ من موجزٍ يترجم النصّ، <b>بلا حرف</b>')
-    expect(at(true, true)).toContain('<b>وفوقه عنوانٌ من كلمتين أو ثلاث</b>')
+    expect(at(false, true)).toContain('مشهد من موجز يترجم النصّ، <b>بلا حرف</b>')
+    expect(at(true, true)).toContain('<b>وفوقه عنوان من كلمتين أو ثلاث</b>')
     expect(at(true, true)).not.toContain('بلا حرف')
-    expect(at(true, false)).toContain('<b>بلا عنوانٍ فوقه بعد</b>')
+    expect(at(true, false)).toContain('<b>بلا عنوان فوقه بعد</b>')
   })
 
-  it('وسببُ السطر لا يمتدّ مئتي بكسل: قاعدةُ «بلا صورة» على ابنها المباشر وحده', () => {
+  it('وسبب السطر لا يمتدّ مئتي بكسل: قاعدة «بلا صورة» على ابنها المباشر وحده', () => {
     expect(css.rule('.pic.none > .ago').flex).toBe('1 1 12.5rem')
     expect(css.rule('.art-row > .ago').flex).toBe('1 1 12.5rem')
     expect(css.rules().some((r) => r.selectors.includes('.pic.none .ago'))).toBe(false)
@@ -1257,13 +1257,13 @@ describe('نقاطُ الجاهزيّة تحت زرَّي الصورة والم�
  * العلّتان الأوليان قاعدتان **صحيحتان في موضعٍ خطأ** — تغلبهما قاعدةٌ لاحقةٌ
  * بتساوي المحدّد — فالاختبارُ يسأل عن الموضع كما يسأل عن القيمة.
  */
-describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
+describe('D-167 — الجوّال واللمس والرموز', () => {
   const rules = css.rules()
   const at = (selector: string, ctx = ''): number =>
     rules.findIndex((r) => r.at === ctx && r.selectors.includes(selector.replace(/\s*>\s*/g, '>')))
   const TOUCH = '@media(pointer:coarse)'
 
-  it('طبقةُ اللمس آخرُ الورقة، وحقلُ اللوحة فيها باسمه — فلا يُقرّبه iOS', () => {
+  it('طبقة اللمس آخر الورقة، وحقل اللوحة فيها باسمه — فلا يُقرّبه iOS', () => {
     const first = rules.findIndex((r) => r.at === TOUCH)
     expect(first).toBeGreaterThan(0)
     // ‏ما بعد أوّل قاعدةٍ فيها كلُّه منها: قاعدةٌ تُكتب بعدها تغلبها بتساوي المحدّد
@@ -1274,14 +1274,14 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(at('.cmdk-in input', TOUCH)).toBe(-1)
   })
 
-  it('رقمُ المؤشّر يصغر على الجوّال من الرمز لا بقاعدة (D-185)', () => {
+  it('رقم المؤشّر يصغر على الجوّال من الرمز لا بقاعدة (D-185)', () => {
     const phone = '@media(max-width:599px)'
     expect(css.rule(':root', phone)).toMatchObject({ '--t-display': '32px', '--t-h1': '24px', '--t-body': '17px' })
     expect(css.rule('.tiles>.tile:first-child .v', `@media${below('md')}`)['font-size']).toBeUndefined()
     expect(css.rule('.tiles .v', `@media${below('md')}`)['font-size']).toBeUndefined()
   })
 
-  it('شريطُ الإبهام من السلّم، ولا حرفَ بالبكسل في الورقة كلّها', () => {
+  it('شريط الإبهام من السلّم، ولا حرف بالبكسل في الورقة كلّها', () => {
     const bar = `@media${below('md')}`
     // ‏نمطُ «caption» ‏13/20/600، والعدُّ يرثه من قاعدته الأولى (خطّة التصميم 5.3)
     expect(css.rule('nav.tabs > a[data-bar] span:not(.count)', bar)).toMatchObject({
@@ -1296,7 +1296,7 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(css.rule(':root')['--safe-b']).toBe('env(safe-area-inset-bottom,0px)')
   })
 
-  it('لا حرفَ رمزٍ في «content»: سهمُ الطيّ مثلّثٌ من حدود، والمطويُّ يشير إلى نهاية السطر', () => {
+  it('لا حرف رمز في «content»: سهم الطيّ مثلّث من حدود، والمطويّ يشير إلى نهاية السطر', () => {
     expect(found((d) => d.prop === 'content' && /[▾▸▲▼←→⌘]|\\2[05]/.test(d.value))).toEqual([])
     for (const s of ['.g-tog::after']) {
       expect(css.rule(s), s).toMatchObject({
@@ -1311,7 +1311,7 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     })
   })
 
-  it('والسهمُ مرسومٌ بقدر حرفه، والاختصارُ «Ctrl K» نصًّا لا «⌘» (D-185)', () => {
+  it('والسهم مرسوم بقدر حرفه، والاختصار «Ctrl K» نصًّا لا «⌘» (D-185)', () => {
     expect(glyph('↓')).toBe(GLYPH_ICON['↓'])
     // ‏«⌘» ليس في Plex ولا في أيّ وجهٍ مضمَّن، ورسمُه يقول «ماك» لمن لا يملكه (خطّة التصميم 3.4)
     expect(commandTrigger()).toContain('<kbd class="kbd">Ctrl K</kbd>')
@@ -1330,19 +1330,19 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
     expect(css.rule(':root')).toMatchObject({ '--icon-xs': '14px', '--icon-sm': '16px', '--icon-md': '20px', '--icon-lg': '24px' })
   })
 
-  it('وسهمُ المسار في الأدلّة مرسومٌ عند العرض لا حرفًا (D-185)', () => {
+  it('وسهم المسار في الأدلّة مرسوم عند العرض لا حرفًا (D-185)', () => {
     const html = pathArrows('Credentials ← Create credentials → x')
     expect(html).not.toMatch(/[←→]/)
     expect(html).toContain(`<span class="arw" role="img" aria-label="ثمّ">${ICON.go}</span>`)
     expect(html).toContain(`<span class="arw" role="img" aria-label="ثمّ">${ICON.back}</span>`)
   })
 
-  it('واسمُ الملفّ معزولٌ بلا امتداده، وكاملٌ في العنوان (خطّة التصميم 4.4/8)', () => {
+  it('واسم الملفّ معزول بلا امتداده، وكامل في العنوان (خطّة التصميم 4.4/8)', () => {
     expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi title="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
     expect(fileName('<x>')).toBe('<bdi title="&lt;x&gt;">&lt;x&gt;</bdi>')
   })
 
-  it('والجانبُ منطقيّ: الفاصلُ في نهاية السطر، والطبقةُ بعرض الرابط، والمحاذاةُ بداية', () => {
+  it('والجانب منطقيّ: الفاصل في نهاية السطر، والطبقة بعرض الرابط، والمحاذاة بداية', () => {
     expect(css.rule('.chip')).toMatchObject({ margin: 'var(--s-0) 0 0', 'margin-inline-end': 'var(--s-1)' })
     expect(precedes('.chip', 'margin', 'margin-inline-end')).toBe(true)
     // ‏و«.mono» لاتينيّةُ الاتّجاه، فنهايةُ السطر العربيّ بدايتُها هي
@@ -1358,8 +1358,8 @@ describe('D-167 — الجوّالُ واللمسُ والرموز', () => {
  * المرحلة ٠ من خطّة التصميم — الإتقانُ السريع (D-183). كلُّ اختبارٍ هنا علّةٌ
  * قِيست في التشخيص، ويُسأل عنها المصدرُ لا الصورة.
  */
-describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
-  it('كتلتا الليل نصٌّ واحد من «THEME.dark»، والطباعةُ من «PRINT»', () => {
+describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
+  it('كتلتا الليل نصّ واحد من «THEME.dark»، والطباعة من «PRINT»', () => {
     const viaButton = Object.entries(css.rule(':root[data-theme="dark"]'))
     const viaSystem = Object.entries(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)'))
     // ‏الترتيبُ والقيمةُ معًا: نصٌّ واحدٌ بعد تطبيع الفراغ، لا «متقاربان»
@@ -1371,7 +1371,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     }
   })
 
-  it('رمزُ الحال باسمه: لا أرضَ له ولا حدّ، ولا يلبس صنفَ الزرّ الشبحيّ', () => {
+  it('رمز الحال باسمه: لا أرض له ولا حدّ، ولا يلبس صنف الزرّ الشبحيّ', () => {
     const html = statusBadge('warn', '!', 'تنتظرك')
     expect(html).toContain('<span class="st-ic">')
     expect(html).not.toMatch(/class="g"/)
@@ -1380,7 +1380,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
       /^(background|border|color|box-shadow)/.test(d.prop))).toEqual([])
   })
 
-  it('التحذيرُ برتقاليٌّ بعيدٌ عن النحاس، ولا إطارَ مكتوبًا بلونه في الوسم', () => {
+  it('التحذير برتقاليّ بعيد عن النحاس، ولا إطار مكتوبًا بلونه في الوسم', () => {
     expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fdf4ec'])
     // ‏**مجمَّدان** (D-196): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
     // ‏(ΔE_OK ‏٩٫٥)؛ وأرضُ النهار والتحذيرُ عليها على الحدّ (‏4.5:1). من يدفئ الأرضَ أو يُميل التحذيرَ يبدّل هنا
@@ -1395,7 +1395,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(html).not.toMatch(/style="[^"]*var\(--(warn|ok|bad)\)/)
   })
 
-  it('وحالُ المنصّة تُقال مرّةً في البطاقة بـ`data-fact` (D-235)', () => {
+  it('وحال المنصّة تُقال مرّةً في البطاقة بـ`data-fact` (D-235)', () => {
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
@@ -1404,21 +1404,21 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     expect(html.match(/data-fact="linkedin:broken"/g)).toHaveLength(1)
   })
 
-  it('الزرُّ والحقلُ على اللمس بقياسهما على الحاسوب — والحقلُ ‏١٦ في كلّ عرض (D-185)', () => {
+  it('الزرّ والحقل على اللمس بقياسهما على الحاسوب — والحقل ‏١٦ في كلّ عرض (D-185)', () => {
     const TOUCH = '@media(pointer:coarse)'
     for (const s of ['button', '.btn', 'textarea']) expect(css.rule(s, TOUCH)['font-size'], s).toBeUndefined()
     expect(css.rule('textarea')['font-size']).toBe('var(--t-input)')
     expect(css.rule('button')['min-height']).toBe('var(--tap)')
   })
 
-  it('مربّعُ المنصّة والعلامةُ بحلقةٍ ليلًا، ونهارًا كما كانا', () => {
+  it('مربّع المنصّة والعلامة بحلقة ليلًا، ونهارًا كما كانا', () => {
     expect(css.rule('.pf-logo')['box-shadow']).toBe('0 0 0 1px var(--logo-ring)')
     expect(css.rule('.glyph')['box-shadow']).toContain('0 0 0 1px var(--mark-ring)')
     expect([THEME.dark['--logo-ring'], THEME.dark['--mark-ring']]).toEqual(['#4a6362', '#4a6362'])
     expect([THEME.light['--logo-ring'], THEME.light['--mark-ring']]).toEqual(['transparent', 'var(--line)'])
   })
 
-  it('الرابطُ والزرُّ الهادئ بحبر «--link» وخطٍّ تحته', () => {
+  it('الرابط والزرّ الهادئ بحبر «--link» وخطّ تحته', () => {
     expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#cad3d3', '#8ee0d0'])
     for (const s of ['.g-tog', '.setup>summary', '.history .bar-name', '.todo>li>a.btn']) {
       expect(css.rule(s), s).toMatchObject({ color: 'var(--link)', 'text-decoration': 'underline' })
@@ -1427,7 +1427,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
     for (const s of ['.tap', '.pv th a', '.doc a', '.hint.ready a']) expect(css.rule(s).color, s).toBe('var(--link)')
   })
 
-  it('«قبل …» لا تُسبَق بـ«منذ»: الجملةُ من relativeTime كاملة', () => {
+  it('«قبل …» لا تُسبَق بـ«منذ»: الجملة من relativeTime كاملة', () => {
     const now = new Date('2026-09-06T09:00:00Z')
     // ‏حسابان فتُرسم صفوفُهما بموعد ربطهما (D-205: الحسابُ الواحدُ اسمُه في رأس البطاقة)
     const channels = channelsSection(viewChannels(['a1', 'a2'].map((id) => ({
@@ -1439,7 +1439,7 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
       lastAttempt: { at: '2026-09-06 08:36:00', detail: 'failed: انقطع' },
     })
     // ‏والعددُ بمعدوده: كان «1 مصدرا محلَّلا»
-    expect(plan).toContain('مصدرٌ واحدٌ محلَّل')
+    expect(plan).toContain('مصدر واحد محلَّل')
     for (const html of [channels, plan]) {
       expect(html).toMatch(/قبل 24 دقيقة/)
       expect(html).not.toMatch(/منذ\s+(قبل|الآن|أمس)/)
@@ -1447,13 +1447,13 @@ describe('المرحلة ٠ — الإتقانُ السريع (D-183)', () => {
   })
 })
 
-describe('لا رمزَ خارج زوج Plex في نصٍّ يُكتب بعد التحميل (D-185)', () => {
+describe('لا رمز خارج زوج Plex في نصّ يُكتب بعد التحميل (D-185)', () => {
   /*
    * `audit_fonts` يقيس الصفحةَ كما تُرسَم، ولا يضغط زرًّا. فما يكتبه سكربتٌ بعد النقر
    * («نُسخ ✓») وما يظهر في دليل ضبطٍ لا تغطّيه العيّنات يُفحَص هنا من مصدره.
    */
   const FORBIDDEN = /[✓✕▲▼◐◍■▾⋯⌘]|[\u{1F300}-\u{1FAFF}]/u
-  it('السكربتاتُ وأدلّةُ الضبط', async () => {
+  it('السكربتات وأدلّة الضبط', async () => {
     const scripts = await import('./scripts')
     const { SCRIPT } = await import('./panelScript')
     const { SETUP } = await import('../../lib/channels')
@@ -1473,8 +1473,8 @@ describe('لا رمزَ خارج زوج Plex في نصٍّ يُكتب بعد ا�
  * ‏ر-0: كان الإشعارُ العائمُ في الجوّال عند ‏80px من الأسفل وصفُّ البتّ ملتصقٌ عند ‏64px، فغطّى خطأُ
  * ‏«اعتمد» زرَّي «اعتمد» و«ارفض» حتّى يُغلَق. ر-5: رابطٌ في نصّ صفٍّ دفع المعاينةَ ‏101px جانبًا.
  */
-describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا يُفيض الخطّة (مراجعة ر-0 ور-5)', () => {
-  it('في الجوّال يطفو الإشعارُ تحت الشريط العلويّ لا حيث يلتصق صفُّ البتّ، وفي العريض في الزاوية', () => {
+describe('الإشعار لا يغطّي البتّ، والرابط لا يُفيض الخطّة (مراجعة ر-0 ور-5)', () => {
+  it('في الجوّال يطفو الإشعار تحت الشريط العلويّ لا حيث يلتصق صفّ البتّ، وفي العريض في الزاوية', () => {
     const phone = css.rule('.toast')
     expect(phone.top).toBe('calc(var(--topbar) + var(--s-3))')
     expect(phone.bottom).toBeUndefined()
@@ -1489,7 +1489,7 @@ describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا ي
     expect(wide.bottom).toBe('var(--s-6)')
   })
 
-  it('ونصُّ صفّ الخطّة يُكسَر حيث لزم، وخلايا الجوّال كلُّها', () => {
+  it('ونصّ صفّ الخطّة يُكسَر حيث لزم، وخلايا الجوّال كلُّها', () => {
     expect(css.rule('.pi-text')['overflow-wrap']).toBe('anywhere')
     expect(css.rule('.pi td', `@media${below('sm')}`)['overflow-wrap']).toBe('anywhere')
   })
@@ -1502,7 +1502,7 @@ describe('الإشعارُ لا يغطّي البتّ، والرابطُ لا ي
  * (الأزواجُ) و`audit_tokens` (القائمةُ المغلقة).
  */
 describe('المرحلة ٢أ — الرموز (D-187)', () => {
-  it('اللوحةُ من القسم 3.2 قيمةً قيمة في الوضعين', () => {
+  it('اللوحة من القسم 3.2 قيمةً قيمة في الوضعين', () => {
     // ‏اللوحةُ من لوحة الهويّة (D-196 · docs/BRAND.md): ورقٌ على رمل نهارًا، وأرضُ الغلاف ليلًا
     expect(THEME.light).toMatchObject({
       '--bg': '#f9f4ec', '--surface': '#ffffff', '--surface-2': '#f1efeb', '--surface-3': '#e8e1d6',
@@ -1524,7 +1524,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     }
   })
 
-  it('الحدُّ الوظيفيُّ للحقل والزرّ الثانويّ، والتركيزُ بحبر الرابط', () => {
+  it('الحدّ الوظيفيّ للحقل والزرّ الثانويّ، والتركيز بحبر الرابط', () => {
     expect(css.rule('select').border).toBe('var(--bd-field)')
     expect(css.rule(':root')['--bd-field']).toBe('1px solid var(--field)')
     expect(css.rule('.btn-secondary')['border-color']).toBe('var(--field)')
@@ -1533,7 +1533,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(THEME.light['--focus']).toBe('var(--link)')
   })
 
-  it('رموزُ التفاعل باسمها: التمريرُ والضغطُ والمحدَّدُ والتحديدُ والستارةُ والحوار', () => {
+  it('رموز التفاعل باسمها: التمرير والضغط والمحدَّد والتحديد والستارة والحوار', () => {
     expect(css.rule('.btn-secondary:hover', '@media(hover:hover)').background).toBe('var(--hover)')
     expect(css.rule('.btn-secondary:active:not(:disabled)').background).toBe('var(--press)')
     expect(css.rule('.btn-primary:hover', '@media(hover:hover)').background).toBe('var(--brand-hover)')
@@ -1549,7 +1549,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect([THEME.light['--scrim'], THEME.dark['--scrim']]).toEqual(['rgba(6,26,28,.48)', 'rgba(1,8,9,.7)'])
   })
 
-  it('ثلاثةُ ظلالٍ في الوضعين، والبطاقةُ التفاعليّةُ ترتفع بالثاني وحدَّها الوظيفيّ', () => {
+  it('ثلاثة ظلال في الوضعين، والبطاقة التفاعليّة ترتفع بالثاني وحدَّها الوظيفيّ', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
     }
@@ -1561,7 +1561,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(css.where('.ch:hover')).toEqual(['@media(hover:hover)'])
   })
 
-  it('نصفُ القطر من القائمة المغلقة، بالدور', () => {
+  it('نصف القطر من القائمة المغلقة، بالدور', () => {
     const r = css.rule(':root')
     expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '8px', '12px', '16px', '999px'])
     // ‏وكلُّ زاويةٍ من القائمة: الورقةُ السفليّة ‏١٦ في زاويتيها العلويّتين وصفرٌ في السفليّتين (D-189)
@@ -1573,7 +1573,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect(css.rule('.mono')['border-radius']).toBe('var(--r-inline)')
   })
 
-  it('رموزُ التخطيط بقيمتيها، ونقاطُ الانكسار ثلاثٌ من «BP»', () => {
+  it('رموز التخطيط بقيمتيها، ونقاط الانكسار ثلاث من «BP»', () => {
     expect(css.rule(':root')).toMatchObject({
       '--pad-card': 'var(--s-6d)', '--gap-card': 'var(--s-6d)', '--gap-section': 'var(--s-12d)', '--gutter': 'var(--s-8d)',
     })
@@ -1589,7 +1589,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     expect([...widths('@container')].sort((a, b) => a - b)).toEqual(Object.values(CQ).map((v) => v - 1).sort((a, b) => a - b))
   })
 
-  it('النحاسُ في أدواره الثلاثة لا غير، بقيمته الكاملة', () => {
+  it('النحاس في أدواره الثلاثة لا غير، بقيمته الكاملة', () => {
     // ‏**والذهبُ بقيمته لا باسمه** (مراجعة D-196): كلُّ رمزٍ قيمتُه ذهبٌ أو إحالةٌ إليه ذهبٌ، فلا اسمَ ثانيًا له
     const values = new Set(css.decls().filter((d) => d.prop === '--au' || d.prop === '--mark-fg').map((d) => d.value.toLowerCase()))
     const aliases = css.decls().filter((d) => d.prop.startsWith('--') && d.prop !== '--au' && d.prop !== '--mark-fg' &&
@@ -1658,16 +1658,16 @@ function cascaded(chain: readonly string[][], prop: string): string | undefined 
   return best?.value
 }
 
-describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
+describe('مراجعة المرحلة ٢أ (D-187)', () => {
   /**
    * **ووصفُ YouTube أخو المسرح لا ابنُه**: «.np-desc» خارج «.np-stage» وعلى أرضه الداكنة،
    * فكان وسمُه «--brand» ‏#16181d على ‏#0b0c10 — ‏١٫١٠:١ نهارًا، أسودَ على أسود. ولا عيّنةَ
    * مرسومةً تفتح وصفًا بوسم، فيُسأل هنا كلُّ وسمٍ في الإطار الداكن عن لونه الساري.
    */
-  it('كلُّ وسمٍ على الإطار الداكن بحبر المسرح — والوصفُ المطويُّ منه', () => {
+  it('كلّ وسم على الإطار الداكن بحبر المسرح — والوصف المطويّ منه', () => {
     const post = (platform: 'youtube' | 'tiktok' | 'linkedin'): string => nativePost({
       platform, id: 'v1', author: { name: 'عمر', kind: 'member' }, when: '2 ي', media: null, poster: null,
-      metrics: null, variant: 'compact', text: 'عنوانٌ #قصير\nوصفٌ فيه #وسم و #tag',
+      metrics: null, variant: 'compact', text: 'عنوان #قصير\nوصف فيه #وسم و #tag',
     })
     const tube = classChains(post('youtube'), 'np-tag')
     // ‏وسمُ العنوان على المسرح، ووسما الوصف في «.np-desc» خارجه
@@ -1687,7 +1687,7 @@ describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
    * **وصفُّ المنشور ثلاثةُ أعمدةٍ حين تسعها قائمتُه وحدها**: بـ«md» عاد ثلاثةً عند ‏900 في ‏604px
    * (الرافدةُ ‏256)، فصار عمودُ الأفعال ‏0px وفاضت الصفحةُ ‏154px. والحاويةُ «.np-list».
    */
-  it('صفُّ المنشور يلتفّ بعرض قائمته لا بعرض الشاشة', () => {
+  it('صفّ المنشور يلتفّ بعرض قائمته لا بعرض الشاشة', () => {
     const narrow = `@container np-list ${narrower('npRow')}`
     // ‏**واسمُ الحاوية مفصولٌ عن شرطه**: «np-list(» دالّةٌ في CSS لا اسم، فيُسقط المتصفّحُ
     // الكتلةَ كلَّها صامتًا — وقع هذا في كتابتها الأولى، والقياسُ لم يتغيّر بكسلًا
@@ -1700,13 +1700,13 @@ describe('مراجعةُ المرحلة ٢أ (D-187)', () => {
   })
 })
 
-describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
+describe('مراجعة المرحلة ٢ب (D-189)', () => {
   /**
    * **ومقياسُ الاستحقاق بعرض درجته**: صنفُ التخطيط «.fill» (حقلٌ يأخذ ما بقي من صفّه) حمل
    * «min-width:min(12em,100%)!important» واسمَ عنصر المقياس نفسَه، فغلب عرضَ الدرجة: ‏0.86 و0.61
    * ممتلئتان على ‏1440، و0.61 ترسم ‏76٪ على ‏390. فصار «grow-field»، ولا قاعدةَ تحدّ عرضَ المقياس.
    */
-  it('عنصرُ المقياس عرضُه نسبةُ درجته وحدَها — لا حدَّ أدنى ولا أقصى ولا «flex» من صنفٍ آخر', () => {
+  it('عنصر المقياس عرضُه نسبة درجته وحدَها — لا حدّ أدنى ولا أقصى ولا «flex» من صنف آخر', () => {
     const WIDTH = ['width', 'min-width', 'max-width', 'inline-size', 'min-inline-size', 'max-inline-size', 'flex', 'flex-basis', 'flex-grow']
     for (const [worth, pct] of [[0.61, 61], [0.86, 86], [0.05, 5], [1, 100]] as const) {
       const html = worthCell(worth)
@@ -1726,7 +1726,7 @@ describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
    * تقصّ المحورين — حلقةُ التركيز خطّان — وغاب «فشلت» و«مرفوضة» على حاسوبٍ ‏900 خلف حافّةٍ لا
    * تبلغها العجلة، و«الإعداد !» عن الهاتف بلا أثر. والهندسةُ في «audit_mobile» (٨) على ستّة عروض.
    */
-  it('شريطُ التبويب يلتفّ في كلّ سياق: لا تمريرَ ولا شريطَ مخفيًّا يقصّ تبويبًا أو حلقتَه', () => {
+  it('شريط التبويب يلتفّ في كلّ سياق: لا تمرير ولا شريط مخفيًّا يقصّ تبويبًا أو حلقتَه', () => {
     expect(css.rule('.tab-bar')['flex-wrap']).toBe('wrap')
     expect(found((d) => d.selectors.some((sel) => /\.tab-(bar|sub|item)\b/.test(sel)) &&
       (/^overflow/.test(d.prop) || d.prop === 'scrollbar-width'))).toEqual([])
@@ -1739,7 +1739,7 @@ describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
    * عند ‏٣٢٠ إلى ‏٤٩px ونصُّه ‏٨٦ — «المنشو» تحت المبدّل. فالمبدّلُ ينزل سطرًا إلى طرفه حين لا
    * يسعهما سطر، وحشوُه على الهاتف ‏٨ كما كان. والقياسُ في «audit_mobile» (٧).
    */
-  it('شريطُ العودة يلتفّ، والمبدّلُ في طرف سطره، وحشوُه على الهاتف أضيق', () => {
+  it('شريط العودة يلتفّ، والمبدّل في طرف سطره، وحشوُه على الهاتف أضيق', () => {
     expect(css.rule('nav.back')['flex-wrap']).toBe('wrap')
     expect(css.rule('nav.back .seg')['margin-inline-start']).toBe('auto')
     expect(css.rule('nav.back .seg button', `@media${below('sm')}`)['padding-inline']).toBe('var(--s-2)')
@@ -1754,28 +1754,28 @@ describe('مراجعةُ المرحلة ٢ب (D-189)', () => {
  * والمميَّزةُ وحدَها بلون حالها، ورمزُ القسم الحاليّ وخطُّ العنوان بحبر الرابط، والقفلُ كما في اللوحة،
  * ولحظةُ العلامة في القالب T6 وحده.
  */
-describe('الهويّةُ من لوحتها (D-196)', () => {
-  it('القمعُ حبرٌ واحد، والمحطّةُ المميَّزةُ وحدَها بلون حالها — لا أرضَ تحذيرٍ على سطحٍ رمليّ (D-194 · D-196)', () => {
+describe('الهويّة من لوحتها (D-196)', () => {
+  it('القمع حبر واحد، والمحطّة المميَّزة وحدَها بلون حالها — لا أرض تحذير على سطح رمليّ (D-194 · D-196)', () => {
     expect(css.rule('.fn-bar > span').background).toBe('var(--ink-2)')
     expect(css.rule('.funnel li[data-focus][data-state=now] .fn-bar > span').background).toBe('var(--warn)')
     expect(css.rule('.funnel li[data-state=now] a')).toEqual({})
   })
 
-  it('رمزُ القسم الحاليّ وخطُّ عنوان الصفحة بحبر الرابط — لا ذهبَ رابعًا', () => {
+  it('رمز القسم الحاليّ وخطّ عنوان الصفحة بحبر الرابط — لا ذهب رابعًا', () => {
     expect(css.rule('nav.tabs a[aria-current=page] svg').color).toBe('var(--link)')
     expect(css.rule('.page-head h1::after')).toMatchObject({ width: 'var(--s-6)', height: 'var(--stroke)', background: 'var(--link)' })
     // ‏وتمريرُ شريط العودة لونٌ وخطّ: الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا
     expect(css.rule('nav.back a:hover', '@media(hover:hover)')['text-decoration']).toBe('underline')
   })
 
-  it('القفلُ كما في اللوحة: الاسمُ أوّلًا في الشيفرة فيقع الرمزُ يسارَه', () => {
+  it('القفل كما في اللوحة: الاسم أوّلًا في الشيفرة فيقع الرمز يسارَه', () => {
     const order = (html: string): boolean => html.indexOf('class="wordmark"') < html.indexOf('class="glyph')
     expect(order(backNav('/panel', 'اللوحة'))).toBe(true)
     const login = loginPage({}, 'n')
     expect(login.indexOf('class="wordmark"')).toBeLessThan(login.indexOf('class="moment-glyph"'))
   })
 
-  it('لحظةُ العلامة في الدخول مرّةً، بلا رمزٍ ثانٍ فوق النموذج، ومخفيّةٌ في الورق', () => {
+  it('لحظة العلامة في الدخول مرّةً، بلا رمز ثان فوق النموذج، ومخفيّة في الورق', () => {
     const login = loginPage({}, 'n')
     expect(login.match(/class="moment"/g)).toHaveLength(1)
     expect(login).not.toContain('<div class="glyph">')
@@ -1795,8 +1795,8 @@ const T6_PAGES: ReadonlyArray<readonly [string, string]> = [
   ['الدخول بمفتاح', loginPage({ passkeys: true }, 'n')],
   ['الدخول بكلمة الإدارة', loginPage({}, 'n')],
   ['الدخول موقوفًا', loginPage({ blocked: true, error: 'موقوف' }, 'n')],
-  ['العامل الثاني كاملًا', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true, hasTotp: true, hasRecovery: true, error: 'رمزٌ غير صحيح' }, 'n')],
-  ['العامل الثاني برمزٍ وحده', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: false, hasTotp: true, hasRecovery: false, error: null }, 'n')],
+  ['العامل الثاني كاملًا', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true, hasTotp: true, hasRecovery: true, error: 'رمز غير صحيح' }, 'n')],
+  ['العامل الثاني برمز وحده', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: false, hasTotp: true, hasRecovery: false, error: null }, 'n')],
   ['العامل الثاني بلا عامل', secondFactorPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: false, hasTotp: false, hasRecovery: false, error: null }, 'n')],
 ]
 
@@ -1824,8 +1824,8 @@ function ancestry(html: string, hit: (tag: string, attrs: string) => boolean): A
  * ‏**مراجعةُ D-196: ما كان يُحرَس في `npm run audit` وحده يُحرَس هنا** — لحظتان داخل نموذج العامل الثاني
  * اجتازتا `npm run ci` كلَّه (‏2434 اختبارًا)، وقاعدةُ الموضع لا تحتاج متصفّحًا. وما يلي ممّا وجدته المراجعة.
  */
-describe('مراجعةُ الهويّة (D-196)', () => {
-  it('لحظةٌ واحدةٌ في كلّ صفحة T6، ابنٌ مباشرٌ لـ.auth-split، ولا نقشَ في سطح عمل', () => {
+describe('مراجعة الهويّة (D-196)', () => {
+  it('لحظة واحدة في كلّ صفحة T6، ابن مباشر لـ.auth-split، ولا نقش في سطح عمل', () => {
     const WORK = /^(form|table|dialog|nav|fieldset)$/
     const WORK_ATTR = /\brole="(alert|status|dialog)"|\bclass="[^"]*\b(toast|toast-note|card-alert|kv-v)\b/
     for (const [name, html] of T6_PAGES) {
@@ -1847,13 +1847,13 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     }
   })
 
-  it('صفحةُ ‏500 معلَّمةٌ سطحًا لا نقشَ فيه، فيردّ الحارسُ نقشًا تحتها', () => {
+  it('صفحة ‏500 معلَّمة سطحًا لا نقش فيه، فيردّ الحارس نقشًا تحتها', () => {
     const page = serverErrorPage('n', 'r-1', null)
     expect(page).toContain('<div data-no-echo="500">')
     expect(page.indexOf('data-no-echo')).toBeLessThan(page.indexOf('حدث خطأ من جهتنا'))
   })
 
-  it('العلامةُ «صدى» وحدها في اللحظة (D-203): لا «SADA» ولا سطرٌ إنجليزيّ، والشعارُ العربيُّ باقٍ', () => {
+  it('العلامة «صدى» وحدها في اللحظة (D-203): لا «SADA» ولا سطر إنجليزيّ، والشعار العربيّ باق', () => {
     const login = loginPage({}, 'n')
     expect(login).not.toContain('moment-sada')
     expect(login).not.toContain('moment-en')
@@ -1863,7 +1863,7 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     expect(css.where('.moment-sada')).toEqual([])
   })
 
-  it('الشريطُ بارتفاعه لا بنصيب الشاشة', () => {
+  it('الشريط بارتفاعه لا بنصيب الشاشة', () => {
     expect(css.rule('.auth-split')['grid-template-rows']).toBe('auto 1fr')
     for (const sel of ['.moment .echo', '.moment-line']) {
       expect(css.rule(sel, `@media${below('md')} and (max-height:40rem)`).display, sel).toBe('none')
@@ -1871,18 +1871,18 @@ describe('مراجعةُ الهويّة (D-196)', () => {
     expect(css.rule('.moment', `@media${below('md')} and (max-height:40rem)`)['min-height']).toBe('0')
   })
 
-  it('لحظةُ العلامة بألوانها في التباين العالي: أرضُ النقش سمةٌ لا تُفرَض، فلا يُفرَض رمزُها', () => {
+  it('لحظة العلامة بألوانها في التباين العالي: أرض النقش سمة لا تُفرَض، فلا يُفرَض رمزُها', () => {
     expect(css.rule('.moment', '@media(forced-colors:active)')['forced-color-adjust']).toBe('none')
   })
 
-  it('اسمُ القفل في شريط العودة ليس أيقونة: «a>svg» لا يسحقه ‏16×16', () => {
+  it('اسم القفل في شريط العودة ليس أيقونة: «a>svg» لا يسحقه ‏16×16', () => {
     const iconRules = found((d) => d.prop === 'width' && d.selectors.some((sel) => /^nav\.back a>svg/.test(sel)))
     expect(iconRules.length).toBeGreaterThan(0)
     for (const r of iconRules) expect(r).toContain(':not(.wordmark)')
     expect(backNav('/panel', 'اللوحة')).toMatch(/<a class="home"[^>]*><svg class="wordmark"/)
   })
 
-  it('شريطُ المتصفّح بأرض اللحظة دون «md» في صفحتَي اللحظة، وسكربتا الثيم لا يكتبان فوقه', () => {
+  it('شريط المتصفّح بأرض اللحظة دون «md» في صفحتَي اللحظة، وسكربتا الثيم لا يكتبان فوقه', () => {
     const tag = `<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
     for (const [name, html] of T6_PAGES) {
       expect(html, name).toContain(tag)
@@ -1919,11 +1919,11 @@ describe('مراجعةُ الهويّة (D-196)', () => {
   })
 })
 
-describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)', () => {
+describe('اللوح بالأهمّ أوّلًا و«الأرشيف» (D-215)', () => {
   const at = (h: number) => `2026-09-06 ${String(h).padStart(2, '0')}:00:00`
   const row = (id: string, status: string, h: number) => ({ id, status, createdAt: at(h) }) as unknown as Parameters<typeof byUrgency>[0][number]
 
-  it('ما فشل، ثمّ ما ينتظر، ثمّ المعتمَد، ثمّ المجدول، ثمّ ما انتهى — والأحدثُ أوّلًا في الرتبة', () => {
+  it('ما فشل، ثمّ ما ينتظر، ثمّ المعتمَد، ثمّ المجدول، ثمّ ما انتهى — والأحدث أوّلًا في الرتبة', () => {
     const out = byUrgency([
       row('pub', 'published', 9), row('q', 'queued', 9), row('ok', 'approved', 9),
       row('old', 'draft', 1), row('new', 'draft', 8), row('rej', 'rejected', 9), row('bad', 'failed', 2),
@@ -1931,14 +1931,14 @@ describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)'
     expect(out).toEqual(['bad', 'new', 'old', 'ok', 'q', 'pub', 'rej'])
   })
 
-  it('«قيد العمل» افتراضٌ يحمل سلالَه، و«الأرشيف» يجمع ما نُشر وما رُفض', () => {
+  it('«قيد العمل» افتراض يحمل سلالَه، و«الأرشيف» يجمع ما نُشر وما رُفض', () => {
     expect(SCRIPT).toContain("var bucket='active'")
     expect(SCRIPT).toContain("bucketOf.indexOf(c.dataset.status)")
   })
 })
 
-describe('مراحلُ الانتظار الطويل (7.11 · D-238)', () => {
-  it('الكتابةُ والصورةُ والمقطعُ بمراحلَ مسمّاة، والسكربتُ يقف عند آخرها ويقول «ابقَ في الصفحة» بعد عشر ثوانٍ', async () => {
+describe('مراحل الانتظار الطويل (7.11 · D-238)', () => {
+  it('الكتابة والصورة والمقطع بمراحل مسمّاة، والسكربت يقف عند آخرها ويقول «ابق في الصفحة» بعد عشر ثوان', async () => {
     const { STAGES, stagesAttr } = await import('./components/stages')
     for (const s of Object.values(STAGES)) {
       expect(s.split('|').length).toBeGreaterThanOrEqual(2)
@@ -1947,6 +1947,6 @@ describe('مراحلُ الانتظار الطويل (7.11 · D-238)', () => {
     expect(stagesAttr('write')).toBe(`data-stages="${STAGES.write}"`)
     expect(SCRIPT).toContain("f.dataset.stages")
     expect(SCRIPT).toContain('i=Math.min(i+1,stages.length-1)')
-    expect(SCRIPT).toContain('ابقَ في الصفحة')
+    expect(SCRIPT).toContain('ابق في الصفحة')
   })
 })

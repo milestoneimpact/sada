@@ -173,15 +173,15 @@ export async function composeSlide(
     return {
       slide: null,
       reason:
-        'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
-        ' في أسرار Worker ليُركَّب النصُّ فوق الصورة',
+        'لا مفتاح متصفّح مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID' +
+        ' في أسرار Worker ليُركَّب النصّ فوق الصورة',
     }
   }
   if (request.headline.trim() === '') {
-    return { slide: null, reason: 'بلا عنوانٍ في الموجز — ولا يُخترَع نصّ' }
+    return { slide: null, reason: 'بلا عنوان في الموجز — ولا يُخترَع نصّ' }
   }
   if (request.image.bytes.length > MAX_OVERLAY_BYTES) {
-    return { slide: null, reason: 'الصورةُ فوق حدِّ الضمّ — بقيت بلا نصّ' }
+    return { slide: null, reason: 'الصورة فوق حدّ الضمّ — بقيت بلا نصّ' }
   }
 
   const size = SLIDE_SIZE[request.platform]
@@ -208,7 +208,7 @@ export async function composeSlide(
     // ونداءٌ ردَّ خطأً لا يُحاسَب عليه عند Cloudflare
     return {
       slide: null,
-      reason: `تعذّر تصويرُ الشريحة: ${error instanceof Error ? error.message : 'عطل'}`,
+      reason: `تعذّر تصوير الشريحة: ${error instanceof Error ? error.message : 'عطل'}`,
     }
   }
 
@@ -283,11 +283,11 @@ const INSERT_IMAGE =
 function refusalOutcome(refusal: ImageRefusal, name: string, label: string): ImageOutcome {
   switch (refusal.kind) {
     case 'missing':
-      return { kind: 'failed', reason: `مزوّدٌ غير موجود: ${name}`, retryable: false }
+      return { kind: 'failed', reason: `مزوّد غير موجود: ${name}`, retryable: false }
     case 'cannot_image':
       return {
         kind: 'failed',
-        reason: `${label} لا يولّد صورًا — وجّه الصورَ إلى Gemini أو Cloudflare`,
+        reason: `${label} لا يولّد صورًا — وجّه الصور إلى Gemini أو Cloudflare`,
         retryable: false,
       }
     case 'blocked':
@@ -298,8 +298,8 @@ function refusalOutcome(refusal: ImageRefusal, name: string, label: string): Ima
       return {
         kind: 'failed',
         reason:
-          'لا معرّفَ حسابٍ لـ Cloudflare — اضبط CF_AI_ACCOUNT_ID،' +
-          ' أو احفظ البطاقةَ بعنوانٍ فيه معرّفُ الحساب',
+          'لا معرّف حساب لـ Cloudflare — اضبط CF_AI_ACCOUNT_ID،' +
+          ' أو احفظ البطاقة بعنوان فيه معرّف الحساب',
         retryable: false,
       }
   }
@@ -343,7 +343,7 @@ export async function generateForPost(
 
   // ما نُشر لا تُضاف إليه صورة: خرج كما هو، وصورةٌ بعده تصف ما لم يُنشر
   if (post.status === 'published' || post.status === 'queued') {
-    return { kind: 'failed', reason: `حالتُه «${post.status}» — والصورةُ تُضاف قبل الجدولة`, retryable: false }
+    return { kind: 'failed', reason: `حالتُه «${post.status}» — والصورة تُضاف قبل الجدولة`, retryable: false }
   }
 
   // ‏**ومنشورُ مقطع المالك لا تُولَّد له صورة** (D-182): الصورةُ تصير أحدثَ وسيطه فتُنشر
@@ -376,7 +376,7 @@ export async function generateForPost(
       .bind(options.replace)
       .first<{ post_id: string; status: string }>()
     if (old === null || old.post_id !== post.id || old.status !== 'ready') {
-      return { kind: 'failed', reason: 'لا صورةَ جاهزةً بهذا المعرّف لهذا المنشور', retryable: false }
+      return { kind: 'failed', reason: 'لا صورة جاهزةً بهذا المعرّف لهذا المنشور', retryable: false }
     }
   }
 
@@ -402,7 +402,7 @@ export async function generateForPost(
     if (accountId === '' || apiToken === '') {
       return {
         kind: 'blocked',
-        reason: 'لا مفتاحَ متصفّحٍ مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker ليُرسم الإنفوجرافيك',
+        reason: 'لا مفتاح متصفّح مضبوط — اضبط CF_BROWSER_TOKEN و CF_AI_ACCOUNT_ID في أسرار Worker ليُرسم الإنفوجرافيك',
       }
     }
     // ‏والمحتوى قبل الرفض والحجز: لا يسقط (يعود إلى النصّ نفسِه)، والرفضُ بعده لا يُفقد الصورةَ القائمة سُدى
@@ -426,7 +426,7 @@ export async function generateForPost(
       await releaseClaim(deps.db, key)
       return {
         kind: 'failed',
-        reason: `تعذّر تصويرُ الإنفوجرافيك: ${error instanceof Error ? error.message : 'عطل'}`,
+        reason: `تعذّر تصوير الإنفوجرافيك: ${error instanceof Error ? error.message : 'عطل'}`,
         retryable: error instanceof SlideError ? error.retryable : true,
       }
     }
@@ -500,7 +500,7 @@ export async function generateForPost(
   if (visual.brief === null) {
     return {
       kind: 'failed',
-      reason: `لم تُولَّد الصورةُ الفنّيّة — ${visual.detail}. ولا تُرسم بوصفٍ عامٍّ لا يمتّ إلى النصّ؛ ` +
+      reason: `لم تُولَّد الصورة الفنّيّة — ${visual.detail}. ولا تُرسم بوصف عامّ لا يمتّ إلى النصّ؛ ` +
         'والإنفوجرافيك يُبنى من النصّ نفسِه',
       retryable: true,
     }
@@ -548,7 +548,7 @@ export async function generateForPost(
     await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
-      reason: error instanceof Error ? error.message : 'نداءٌ فشل',
+      reason: error instanceof Error ? error.message : 'نداء فشل',
       retryable,
     }
   }
@@ -636,7 +636,7 @@ async function persistImage(
     await releaseClaim(deps.db, key)
     return {
       kind: 'failed',
-      reason: `تعذّر رفعُ الصورة: ${error instanceof Error ? error.message : 'عطل'}`,
+      reason: `تعذّر رفع الصورة: ${error instanceof Error ? error.message : 'عطل'}`,
       retryable: true,
     }
   }

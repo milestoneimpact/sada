@@ -886,8 +886,8 @@ panel.get('/panel/login', (c) => c.redirect(safeNext(c.req.query('next')), 303))
 panel.post('/panel/login', async (c) => {
   const blockedText = (global: boolean): string =>
     global
-      ? 'الدخول موقوف مؤقتا: محاولاتٌ كثيرة من عناوين شتّى. انتظر ربع ساعة.'
-      : 'تجاوزتَ حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
+      ? 'الدخول موقوف مؤقتا: محاولات كثيرة من عناوين شتّى. انتظر ربع ساعة.'
+      : 'تجاوزت حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.'
 
   // ‏والوجهةُ قبل كلّ ردّ: كلُّ صفحةِ دخولٍ تُرسَم ثانيةً تحملها، فلا تضيع بكلمةٍ خاطئة (ر-11)
   const form = await c.req.formData().catch(() => new FormData())
@@ -929,7 +929,7 @@ panel.post('/panel/login', async (c) => {
         (nonce) =>
           loginPage(
             {
-              error: 'كلمةُ الإدارة (ADMIN_TOKEN) غير مضبوطة على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
+              error: 'كلمة الإدارة (ADMIN_TOKEN) غير مضبوطة على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
               passkeys: factors.passkeys.length > 0,
               next,
             },
@@ -953,7 +953,7 @@ panel.post('/panel/login', async (c) => {
           {
             error: after.blocked
               ? blockedText(after.globalBlock)
-              : `كلمةُ الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
+              : `كلمة الإدارة غير صحيحة — ${attemptsLeft(after.remaining)}.`,
             blocked: after.blocked,
             passkeys: factors.passkeys.length > 0,
             next,
@@ -971,7 +971,7 @@ panel.post('/panel/login', async (c) => {
     {
       actor: 'panel',
       action: factors.enforced ? 'session.pending' : 'session.open',
-      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'بعاملٍ واحد',
+      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'بعامل واحد',
     },
     c.req.raw,
   )
@@ -1061,7 +1061,7 @@ panel.post('/panel/orgs/switch', async (c) => {
   }
   await setActiveOrg(c.env.KV, gate.session, org)
   await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org, org }, c.req.raw)
-  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلتَ إلى المنظّمة.' })
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلت إلى المنظّمة.' })
   return back('orgs')
 })
 
@@ -1159,8 +1159,8 @@ panel.post('/panel/settings', async (c) => {
       : { kind: 'ok', text: 'أُطفئ الإدراج الآليّ. لا تحليل إلا بأمرك.' }
   } else if (key === 'image_overlay') {
     flash = result.stored === 'true'
-      ? { kind: 'ok', text: 'رُفع تركيبُ النصّ. الصورةُ تخرج بعنوانها العربيّ فوقها.' }
-      : { kind: 'warn', text: 'أُطفئ تركيبُ النصّ. تخرج الصورةُ نظيفةً بلا عنوان.' }
+      ? { kind: 'ok', text: 'رُفع تركيب النصّ. الصورة تخرج بعنوانها العربيّ فوقها.' }
+      : { kind: 'warn', text: 'أُطفئ تركيب النصّ. تخرج الصورة نظيفةً بلا عنوان.' }
   } else if (key === 'paused') {
     flash = result.stored === 'true'
       ? { kind: 'warn', text: 'أُوقف النظام. لا نداء مدفوع ولا مسح ولا نشر حتّى تستأنفه.' }
@@ -1174,10 +1174,10 @@ panel.post('/panel/settings', async (c) => {
     const n = result.stored === '' ? 0 : result.stored.split(',').length
     const asked = value === '' ? 0 : value.split(',').filter((x) => x !== '').length
     flash = asked === n
-      ? { kind: 'ok', text: `حُفظ لوحُك: ${n} بطاقاتٍ في صدر «نظرة عامّة».` }
+      ? { kind: 'ok', text: `حُفظ لوحُك: ${n} بطاقات في صدر «نظرة عامّة».` }
       : {
           kind: 'warn',
-          text: `اخترتَ ${asked} — وحُفظت ${n}. والحدُّ من ${TILE_MIN} إلى ${TILE_MAX}،`
+          text: `اخترت ${asked} — وحُفظت ${n}. والحدّ من ${TILE_MIN} إلى ${TILE_MAX}،`
             + ' وما دون الأدنى يعود إلى الأربع الأصليّة.',
         }
   } else if (key === 'youtube_public' || key === 'tiktok_public') {
@@ -1189,14 +1189,14 @@ panel.post('/panel/settings', async (c) => {
     flash = noScope
       ? {
           kind: 'warn',
-          text: 'قُلب النشرُ على TikTok للعامّة، وحسابُك المربوط بلا video.publish — فيصل كلُّ مقطعٍ صندوقَ تطبيقك'
+          text: 'قُلب النشر على TikTok للعامّة، وحسابُك المربوط بلا video.publish — فيصل كلّ مقطع صندوق تطبيقك'
             + ' بلا نصّه حتّى تربطه من جديد وتمنحه («اربط حسابا آخر» في الإعداد، بالحساب نفسِه).',
         }
       : result.stored === 'true'
-      ? { kind: 'ok', text: `صار النشرُ على ${name} للعامّة — يُطلب لكلّ مقطعٍ في موعده.` }
+      ? { kind: 'ok', text: `صار النشر على ${name} للعامّة — يُطلب لكلّ مقطع في موعده.` }
       : {
           kind: 'ok',
-          text: `عاد النشرُ على ${name} خاصًّا — تنشر المقاطعَ أنت ${key === 'youtube_public' ? 'من YouTube Studio' : 'من تطبيق TikTok'}.`,
+          text: `عاد النشر على ${name} خاصًّا — تنشر المقاطع أنت ${key === 'youtube_public' ? 'من YouTube Studio' : 'من تطبيق TikTok'}.`,
         }
   } else if (result.clamped) {
     flash = {
@@ -1317,7 +1317,7 @@ panel.post('/panel/channels/app', async (c) => {
 
   const platform = platformParam(String(form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
     return back('channels')
   }
   const label = platformLabel(platform)
@@ -1339,8 +1339,8 @@ panel.post('/panel/channels/app', async (c) => {
       kind: 'ok',
       // ‏باسم المنصّة لا بمعرّفها («أسرارُ tiktok»)، والفعلُ التالي باسمه كما على الزرّ
       text: result.unchanged
-        ? `أسرارُ ${label} محفوظةٌ كما هي — السرُّ نفسه لم يتغيّر.`
-        : `حُفظت أسرارُ ${label} مشفَّرة (${result.hint}). والخطوةُ التالية «اربط ${label}».`,
+        ? `أسرار ${label} محفوظة كما هي — السرّ نفسه لم يتغيّر.`
+        : `حُفظت أسرار ${label} مشفَّرة (${result.hint}). والخطوة التالية «اربط ${label}».`,
     }
   } catch (error) {
     detail = 'failed'
@@ -1383,7 +1383,7 @@ panel.post('/panel/channels/disconnect', async (c) => {
   const id = String(form.get('account') ?? '')
   const target = platform === null || id === '' || id.length > 200 ? null : await findLinked(c.env.DB, activeOrg(gate.session.record), id, platform)
   if (target === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا حسابَ مربوطًا بهذا المعرّف على هذه المنصّة، فلم يُفصَل شيء.' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا حساب مربوطًا بهذا المعرّف على هذه المنصّة، فلم يُفصَل شيء.' })
     return toSetup(form)
   }
 
@@ -1403,13 +1403,13 @@ panel.post('/panel/channels/disconnect', async (c) => {
   const label = platformLabel(target.platform)
   const page = REVOKE_PAGE[target.platform]
   const stopped = result.stopped === 0
-    ? 'ولم يكن عليه منشورٌ مجدول.'
+    ? 'ولم يكن عليه منشور مجدول.'
     : `وأُوقف ${result.stopped} من منشوراته المجدولة فصار «فشل» بسبب الفصل، ولن يُنشَر منها شيء.`
   const remote = result.remote === 'revoked'
-    ? `وأبطلت ${label} الإذنَ عندها.`
+    ? `وأبطلت ${label} الإذن عندها.`
     : result.remote === 'failed'
-      ? `وتعذّر إبطالُ الإذن عند ${label}، فاسحبه بيدك من «${page.label}».`
-      : `ولا نداءَ إبطالٍ يُنادى عند ${label} لهذا الحساب، فاسحب الإذنَ بيدك من «${page.label}».`
+      ? `وتعذّر إبطال الإذن عند ${label}، فاسحبه بيدك من «${page.label}».`
+      : `ولا نداء إبطال يُنادى عند ${label} لهذا الحساب، فاسحب الإذن بيدك من «${page.label}».`
   await setFlash(c.env, c.req.raw, {
     kind: result.remote === 'revoked' ? 'ok' : 'warn',
     text: `فُصل «${target.displayName}» وحُذفت رموزُه من القاعدة. ${stopped} ${remote}`,
@@ -1434,7 +1434,7 @@ panel.post('/panel/channels/app/verify', async (c) => {
 
   const platform = platformParam(String(gate.form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
     return back('channels')
   }
 
@@ -1448,7 +1448,7 @@ panel.post('/panel/channels/app/verify', async (c) => {
   if (creds === null) {
     await setFlash(c.env, c.req.raw, {
       kind: 'bad',
-      text: `لا أسرارَ محفوظةً لـ ${label} — احفظها أوّلا ثمّ افحص.`,
+      text: `لا أسرار محفوظةً لـ ${label} — احفظها أوّلا ثمّ افحص.`,
     })
     return toSetup(gate.form)
   }
@@ -1475,23 +1475,23 @@ panel.post('/panel/channels/app/verify', async (c) => {
     flash = {
       kind: 'bad',
       text:
-        `السرُّ مرفوض: ${label} تعرف المعرّف ${creds.clientId} ولا تقبل السرَّ معه.${said} ` +
-        `انسخ السرَّ من جديد من ${portal} — أو ولّد سرًّا جديدًا هناك — والصقه في حقل Client Secret.`,
+        `السرّ مرفوض: ${label} تعرف المعرّف ${creds.clientId} ولا تقبل السرّ معه.${said} ` +
+        `انسخ السرّ من جديد من ${portal} — أو ولّد سرًّا جديدًا هناك — والصقه في حقل Client Secret.`,
     }
   } else if (verdict.kind === 'bad_client_id') {
     flash = {
       kind: 'bad',
       text:
-        `المعرّفُ نفسُه مجهولٌ عند ${label}: أُرسل ${creds.clientId}.${said} فهو من تطبيقٍ آخر أو نقصه حرف — ` +
+        `المعرّف نفسُه مجهول عند ${label}: أُرسل ${creds.clientId}.${said} فهو من تطبيق آخر أو نقصه حرف — ` +
         `انسخه من جديد من ${portal} والصقه في حقل Client ID.`,
     }
   } else if (verdict.kind === 'accepted') {
     flash = {
       kind: 'ok',
-      text: `الزوجُ مقبولٌ عند ${label}. فإن بقي الربطُ يفشل فالعلّةُ ليست في المعرّف ولا في السرّ.`,
+      text: `الزوج مقبول عند ${label}. فإن بقي الربط يفشل فالعلّة ليست في المعرّف ولا في السرّ.`,
     }
   } else if (verdict.kind === 'unsupported') {
-    flash = { kind: 'warn', text: `لا فحصَ لـ ${label}: ${plain(verdict.detail)}` }
+    flash = { kind: 'warn', text: `لا فحص لـ ${label}: ${plain(verdict.detail)}` }
   } else if (verdict.unreachable === true) {
     flash = { kind: 'warn', text: `لم نصل إلى ${label} الآن، فلم يُحسَم الفحص. أعد الفحص بعد دقيقة.` }
   } else {
@@ -1516,7 +1516,7 @@ panel.post('/panel/channels/app/delete', async (c) => {
 
   const platform = platformParam(String(gate.form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
     return back('channels')
   }
 
@@ -1528,7 +1528,7 @@ panel.post('/panel/channels/app/delete', async (c) => {
   )
   await setFlash(c.env, c.req.raw, {
     kind: done ? 'ok' : 'bad',
-    text: done ? `حُذفت أسرارُ ${platformLabel(platform)} من الخزانة.` : 'لا أسرارَ محفوظةً لهذه المنصّة.',
+    text: done ? `حُذفت أسرار ${platformLabel(platform)} من الخزانة.` : 'لا أسرار محفوظةً لهذه المنصّة.',
   })
   return toSetup(gate.form)
 })
@@ -1555,13 +1555,13 @@ panel.post('/panel/plan/generate', async (c) => {
     outcome.kind === 'planned'
       ? {
           kind: 'ok',
-          text: `خطّةُ أسبوع ${outcome.week}: ${outcome.items} بندا${
+          text: `خطّة أسبوع ${outcome.week}: ${outcome.items} بندا${
             outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
           }، ${
             // وصفرٌ مع وحداتٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008).
             // و«وحدة» لا «رمز» (D-155): الرمزُ في اللوحة رمزُ التطبيق والاسترداد
             outcome.cost === 0 && outcome.units > 0
-              ? `و${outcome.units} وحدةً بلا سعرٍ مضبوطٍ للمزوّد — سُجّلت صفرا موسوما`
+              ? `و${outcome.units} وحدةً بلا سعر مضبوط للمزوّد — سُجّلت صفرا موسوما`
               : `الكلفة ${money(outcome.cost)}`
           }.`,
         }
@@ -1601,8 +1601,8 @@ panel.post('/panel/plan/approve', async (c) => {
   await setFlash(c.env, c.req.raw, {
     kind: done ? 'ok' : 'bad',
     text: done
-      ? 'اعتُمد منطقُ الأسبوع. ولا يُكتب منه حرفٌ حتّى تضغط «اكتب منه» لبند.'
-      : 'لا خطّةَ بهذه الحال.',
+      ? 'اعتُمد منطق الأسبوع. ولا يُكتب منه حرف حتّى تضغط «اكتب منه» لبند.'
+      : 'لا خطّة بهذه الحال.',
   })
   return back('posts')
 })
@@ -1646,7 +1646,7 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
   )
 
   // ‏وما لم يُولَّد لم يُرفَض: يُقال ذلك للمالك فلا يبحث عن صورةٍ اختفت
-  const kept = replace ? ' والصورةُ الحاليّة باقيةٌ كما هي.' : ''
+  const kept = replace ? ' والصورة الحاليّة باقية كما هي.' : ''
   const flash: PanelFlash =
     outcome.kind === 'generated'
       ? {
@@ -1657,15 +1657,15 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
             (style === 'infographic'
               ? `رُسم إنفوجرافيك${replace ? ' بديل' : ''} من نصّ المنشور — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.`
               : `وُلّدت صورة${replace ? 'ٌ بديلة' : ''} — ${kb(outcome.bytes)}، الكلفة ${money(outcome.cost)}.`) +
-            (replace ? ' والسابقةُ مرفوضةٌ تبقى في الدفتر بكلفتها.' : '') +
-            (outcome.note === '' ? '' : style === 'infographic' ? ` ${outcome.note}.` : ` وبلا نصٍّ فوقها: ${outcome.note}.`),
+            (replace ? ' والسابقة مرفوضة تبقى في الدفتر بكلفتها.' : '') +
+            (outcome.note === '' ? '' : style === 'infographic' ? ` ${outcome.note}.` : ` وبلا نصّ فوقها: ${outcome.note}.`),
         }
       : outcome.kind === 'already'
-        ? { kind: 'ok', text: 'وُلّدت صورةٌ لهذا النصّ — لم يُنفَق شيء.' }
+        ? { kind: 'ok', text: 'وُلّدت صورة لهذا النصّ — لم يُنفَق شيء.' }
         : outcome.kind === 'in_progress'
           ? {
               kind: 'warn',
-              text: `توليدٌ جارٍ لهذه الصورة منذ ${outcome.since} — انتظره ولا تنقر ثانيةً.`,
+              text: `توليد جار لهذه الصورة منذ ${outcome.since} — انتظره ولا تنقر ثانيةً.`,
             }
           : outcome.kind === 'blocked'
             ? { kind: 'warn', text: `${outcome.reason}.${kept}` }
@@ -1718,24 +1718,24 @@ panel.post('/panel/media/animate', async (c) => {
     outcome.kind === 'generated'
       ? {
           kind: 'ok',
-          text: `وُلّد مقطعٌ رأسيّ — ${kb(outcome.bytes)}. ` +
-            'والسعرُ لم يُقرأ من لوحة Cloudflare بعد، فسُجّل صفرا موسوما.',
+          text: `وُلّد مقطع رأسيّ — ${kb(outcome.bytes)}. ` +
+            'والسعر لم يُقرأ من لوحة Cloudflare بعد، فسُجّل صفرا موسوما.',
         }
       : outcome.kind === 'already'
-        ? { kind: 'ok', text: 'لهذا المنشور مقطعٌ من قبل — لم يُنفَق شيء.' }
+        ? { kind: 'ok', text: 'لهذا المنشور مقطع من قبل — لم يُنفَق شيء.' }
         : outcome.kind === 'in_progress'
           // **وليس عطلا**: نداءٌ سابقٌ لم يفرغ بعد، والتوليدُ دقائق
           ? {
               kind: 'warn',
-              text: `توليدٌ جارٍ لهذا المقطع منذ ${outcome.since} — ` +
-                'انتظره ولا تنقر ثانيةً، فالنقرةُ الثانيةُ كانت تدفع ثانيةً.',
+              text: `توليد جار لهذا المقطع منذ ${outcome.since} — ` +
+                'انتظره ولا تنقر ثانيةً، فالنقرة الثانية كانت تدفع ثانيةً.',
             }
           : outcome.kind === 'blocked'
             ? { kind: 'warn', text: outcome.reason }
             // ‏نفادُ الرصيد مهمّةٌ لا عطل (D-214): يُقال ما تفعله، والتفصيلُ في «ما عليك»
             : outcome.reason.startsWith(NO_CREDIT)
-              ? { kind: 'warn', text: 'لم يُحرَّك المقطع: رصيدُ AI Gateway نفد. أضِف رصيدًا من لوحة Cloudflare، ' +
-                  'والخطواتُ في «ما عليك» تحت «رصيدُ AI Gateway». ولم يُصرف شيء.' }
+              ? { kind: 'warn', text: 'لم يُحرَّك المقطع: رصيد AI Gateway نفد. أضِف رصيدًا من لوحة Cloudflare، ' +
+                  'والخطوات في «ما عليك» تحت «رصيد AI Gateway». ولم يُصرف شيء.' }
               : { kind: 'bad', text: `تعذّر تحريك الصورة: ${outcome.reason}` }
 
   await record(
@@ -1771,7 +1771,7 @@ panel.post('/panel/media/reject', async (c) => {
   )
   await setFlash(c.env, c.req.raw, {
     kind: done ? 'ok' : 'bad',
-    text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورةَ بهذه الحال.',
+    text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورة بهذه الحال.',
   })
   return owner === null ? back('posts') : toCard('d', owner.post_id)
 })
@@ -1801,7 +1801,7 @@ panel.get('/panel/channels/:platform', async (c) => {
   const id = c.req.param('platform')
   const spec = CHANNELS.find((ch) => ch.id === id)
   // ‏صفحةٌ لا نصٌّ خامّ (D-189): رابطٌ قديمٌ إلى منصّةٍ يفتح الرافدةَ وبابَ الرئيسيّة
-  if (spec === undefined) return notFoundResponse(c.req.raw, 'لا منصّةَ بهذا الاسم')
+  if (spec === undefined) return notFoundResponse(c.req.raw, 'لا منصّة بهذا الاسم')
 
   const accounts = await listAccounts(c.env.DB, activeOrg(session.record))
   // **لكلّ منصّةٍ لها سرّان** (D-142) — لا لمنصّتين، وإلّا بقيت شاشةُ
@@ -1815,7 +1815,7 @@ panel.get('/panel/channels/:platform', async (c) => {
     present.has(name) || (c.env[name as keyof Env] as string | undefined) !== undefined,
   )
   const view = views.find((v) => v.spec.id === id)
-  if (view === undefined) return notFoundResponse(c.req.raw, 'لا منصّةَ بهذا الاسم')
+  if (view === undefined) return notFoundResponse(c.req.raw, 'لا منصّة بهذا الاسم')
 
   const now = new Date()
 
@@ -2080,11 +2080,11 @@ panel.get('/panel/journey/:id', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const journey = await readJourney(c.env.DB, activeOrg(session.record), c.req.param('id'))
-  if (journey === null) return notFoundResponse(c.req.raw, 'لا منشورَ بهذا المعرّف')
+  if (journey === null) return notFoundResponse(c.req.raw, 'لا منشور بهذا المعرّف')
 
   const body = journeyBody(journey, new Date())
   return page((nonce) =>
-    soloPage('صدى — رحلةُ منشور', { href: '/panel#posts', label: 'المنشورات' },
+    soloPage('صدى — رحلة منشور', { href: '/panel#posts', label: 'المنشورات' },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
@@ -2097,7 +2097,7 @@ panel.get('/panel/report/:week', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const stored = await readReport(c.env.DB, activeOrg(session.record), c.req.param('week'))
-  if (stored === null) return notFoundResponse(c.req.raw, 'لا تقريرَ لهذا الأسبوع')
+  if (stored === null) return notFoundResponse(c.req.raw, 'لا تقرير لهذا الأسبوع')
 
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({
@@ -2110,7 +2110,7 @@ panel.get('/panel/report/:week', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — تقريرُ ${stored.id}`, { href: '/panel/report', label: sectionLabel('results') }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage(`صدى — تقرير ${stored.id}`, { href: '/panel/report', label: sectionLabel('results') }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
@@ -2144,10 +2144,10 @@ panel.post('/panel/report/promote', async (c) => {
     ? {
         kind: raw === 'accepted' ? 'warn' : 'ok',
         text: raw === 'accepted'
-          ? 'سُجّل قبولُك. ولم يُنفَق شيء — الترويجُ يقع في لوحة المنصّة بيدك.'
-          : 'سُجّل رفضُك، ولا يُقترَح هذا المنشورُ ثانيةً.',
+          ? 'سُجّل قبولُك. ولم يُنفَق شيء — الترويج يقع في لوحة المنصّة بيدك.'
+          : 'سُجّل رفضُك، ولا يُقترَح هذا المنشور ثانيةً.',
       }
-    : { kind: 'warn', text: 'لا توصيةَ تنتظر لهذا المنشور — أو بُتَّ فيها قبلا.' })
+    : { kind: 'warn', text: 'لا توصية تنتظر لهذا المنشور — أو بُتّ فيها قبلا.' })
 
   return new Response(null, { status: 303, headers: { Location: '/panel/report' } })
 })
@@ -2232,7 +2232,7 @@ panel.post('/panel/drafts/write', async (c) => {
    * فتُنسى إحداهما** — وهي علّةُ `KNOWN_TASKS` نفسُها (D-091).
    */
   if (!(raw in PLATFORMS)) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّةٌ غير معروفة' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
     return back('write')
   }
   const platform = raw as Platform
@@ -2251,7 +2251,7 @@ panel.post('/panel/drafts/write', async (c) => {
         }
       : outcome.kind === 'already'
         // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)
-        ? { kind: 'ok', text: `مسوّدةُ ${PLATFORMS[platform].label} من هذه النسخة موجودةٌ وهي هذه — لم يُنفَق شيء.` }
+        ? { kind: 'ok', text: `مسوّدة ${PLATFORMS[platform].label} من هذه النسخة موجودة وهي هذه — لم يُنفَق شيء.` }
         : outcome.kind === 'blocked'
           ? { kind: 'warn', text: outcome.reason }
           : outcome.kind === 'not_analyzed'
@@ -2260,7 +2260,7 @@ panel.post('/panel/drafts/write', async (c) => {
                 kind: 'bad',
                 text: `تعذّرت الكتابة: ${outcome.reason}${outcome.cost === undefined
                   ? ''
-                  : ` — ودُفع ثمنُ المحاولة المردودة ${money(outcome.cost)}، والإعادةُ تدفع ثانيةً`}`,
+                  : ` — ودُفع ثمن المحاولة المردودة ${money(outcome.cost)}، والإعادة تدفع ثانيةً`}`,
               }
 
   await record(
@@ -2330,18 +2330,18 @@ panel.post('/panel/drafts/idea', async (c) => {
   const unlinked = [...drafted, ...already].filter((d) => links[d.platform] !== 'linked')
   const parts: string[] = []
   if (drafted.length > 0) {
-    parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدةُ' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
+    parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدة' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
   }
-  if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدةُ' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودةٌ — لم يُنفَق عليها شيء.`)
+  if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدة' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودة — لم يُنفَق عليها شيء.`)
   for (const d of stopped) {
     const why = (d.outcome as { reason: string }).reason
     // ‏ومحاولةٌ رُدّ جوابُها بعد أن دُفع ثمنُه تُقال بكلفتها: كان الرقمُ الوحيدُ في الإشعار أقلَّ ممّا أُنفق
     const paid = d.outcome.kind === 'failed' ? d.outcome.cost : undefined
     parts.push(d.outcome.kind === 'blocked'
       ? `${why}.`
-      : `تعذّرت ${label(d.platform)}: ${why}${paid === undefined ? '' : ` — ودُفع ثمنُ المحاولة المردودة ${money(paid)}، والإعادةُ تدفع ثانيةً`}.`)
+      : `تعذّرت ${label(d.platform)}: ${why}${paid === undefined ? '' : ` — ودُفع ثمن المحاولة المردودة ${money(paid)}، والإعادة تدفع ثانيةً`}.`)
   }
-  if (unlinked.length > 0) parts.push(`ولا حسابَ متّصلًا على ${names(unlinked)}: تُعتمَد ولا تُجدوَل حتّى تربطه.`)
+  if (unlinked.length > 0) parts.push(`ولا حساب متّصلًا على ${names(unlinked)}: تُعتمَد ولا تُجدوَل حتّى تربطه.`)
   const flash: PanelFlash = {
     kind: stopped.some((d) => d.outcome.kind === 'failed')
       ? (drafted.length + already.length > 0 ? 'warn' : 'bad')
@@ -2568,13 +2568,13 @@ panel.post('/panel/drafts/approve-many', async (c) => {
 
   const ids = gate.form.getAll('id').map(String).filter((x) => x !== '')
   if (ids.length === 0) {
-    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم تُحدَّد مسوّدةٌ واحدة.' })
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم تُحدَّد مسوّدة واحدة.' })
     return back('posts')
   }
   if (ids.length > BULK_CAP) {
     await setFlash(c.env, c.req.raw, {
       kind: 'bad',
-      text: `${ids.length} مسوّدةً في طلبٍ واحد — والسقفُ ${BULK_CAP}. اعتمدها على دفعات.`,
+      text: `${ids.length} مسوّدةً في طلب واحد — والسقف ${BULK_CAP}. اعتمدها على دفعات.`,
     })
     return back('posts')
   }
@@ -2591,7 +2591,7 @@ panel.post('/panel/drafts/approve-many', async (c) => {
     result.failed.length === 0
       ? {
           kind: 'ok',
-          text: `اعتُمدت ${result.done.length} مسوّدةً كما كُتبت — اختر لكلٍّ حسابا وموعدا.`,
+          text: `اعتُمدت ${result.done.length} مسوّدةً كما كُتبت — اختر لكلّ حسابا وموعدا.`,
         }
       : {
           kind: result.done.length === 0 ? 'bad' : 'warn',
@@ -2736,7 +2736,7 @@ panel.post('/panel/drafts/spread', async (c) => {
 
   const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
   return page((nonce) =>
-    soloPage('صدى — توزيعُ المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf, zone }), nonce, '',
+    soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf, zone }), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
 })
@@ -2797,20 +2797,20 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   const said = first === null
     ? ''
     : done === 1
-      ? `جُدول منشورٌ واحد: ${ownerWhen(first, zone, now)}.`
+      ? `جُدول منشور واحد: ${ownerWhen(first, zone, now)}.`
       : `جُدول ${counted(done, NOUNS.post)}، أوّلُها ${ownerWhen(first, zone, now)}.`
   const missing = wanted.length - plan.slots.length
   const flash: PanelFlash =
     done === 0
-      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed[0] ?? 'لم تعد أيُّ مسوّدةٍ صالحةً للجدولة.'}` }
+      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed[0] ?? 'لم تعد أيّ مسوّدة صالحةً للجدولة.'}` }
       : failed.length === 0 && missing === 0
         ? { kind: 'ok', text: said }
         : {
             kind: 'warn',
             text:
               `${said} ` +
-              (missing > 0 ? `و${missing === 1 ? 'واحدةٌ لم تعد صالحة' : `${missing} لم تعد صالحةً`} للجدولة. ` : '') +
-              (failed.length > 0 ? `وردَّ ${failed.length}: ${failed[0]}` : ''),
+              (missing > 0 ? `و${missing === 1 ? 'واحدة لم تعد صالحة' : `${missing} لم تعد صالحةً`} للجدولة. ` : '') +
+              (failed.length > 0 ? `وردّ ${failed.length}: ${failed[0]}` : ''),
           }
 
   await record(
@@ -2950,7 +2950,7 @@ panel.post('/panel/uploads/:id/part', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const chunk = gate.form.get('chunk')
-  if (!(chunk instanceof Blob)) return Response.json({ ok: false, reason: 'قطعةٌ بلا بايتات' }, { status: 400 })
+  if (!(chunk instanceof Blob)) return Response.json({ ok: false, reason: 'قطعة بلا بايتات' }, { status: 400 })
   const result = await uploadPart(c.env.DB, c.env.MEDIA, c.req.param('id'), Number(gate.form.get('n')),
     await chunk.arrayBuffer())
   return Response.json(result, { status: result.ok ? 200 : 400 })
@@ -2985,7 +2985,7 @@ panel.post('/panel/uploads/:id/abort', async (c) => {
   // ‏زرُّ «ألغِ» في المكتبة نموذجٌ لا `fetch` (D-182): يعود إلى «فيديوهاتك» برسالته
   if (gate.form.get('from') === 'library') {
     await record(c.env.DB, { actor: 'panel', action: 'upload.abort', target: c.req.param('id') }, c.req.raw)
-    await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُلغي الرفعُ الذي انقطع — ارفع المقطعَ من جديد.' })
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُلغي الرفع الذي انقطع — ارفع المقطع من جديد.' })
     return back('videos')
   }
   return Response.json({ ok: true })
@@ -3017,11 +3017,11 @@ panel.post('/panel/uploads/:id/captions', async (c) => {
   const flash: PanelFlash = out.kind === 'written'
     ? {
         kind: Object.keys(captionIssues(out.captions)).length === 0 ? 'ok' : 'warn',
-        text: `كُتبت نصوصُ YouTube وTikTok وInstagram — الكلفة ${money(out.captions.cost)}. راجعها تحت المقطع ثمّ «أنشئ المنشورات».${
-          Object.keys(captionIssues(out.captions)).length === 0 ? '' : ' وفي بعضها ما يُصلَح قبل الإنشاء — والسببُ تحت حقله.'}`,
+        text: `كُتبت نصوص YouTube وTikTok وInstagram — الكلفة ${money(out.captions.cost)}. راجعها تحت المقطع ثمّ «أنشئ المنشورات».${
+          Object.keys(captionIssues(out.captions)).length === 0 ? '' : ' وفي بعضها ما يُصلَح قبل الإنشاء — والسبب تحت حقله.'}`,
       }
     : out.kind === 'already'
-      ? { kind: 'ok', text: 'النصوصُ من هذا الوصف مكتوبةٌ وهي هذه — لم يُنفَق شيء. ولنصوصٍ أخرى «أعد كتابتها» من صفّ المقطع.' }
+      ? { kind: 'ok', text: 'النصوص من هذا الوصف مكتوبة وهي هذه — لم يُنفَق شيء. ولنصوص أخرى «أعد كتابتها» من صفّ المقطع.' }
       : out.kind === 'blocked'
         ? { kind: 'warn', text: out.reason }
         // ‏وما دُفع في المحاولة المردودة يُقال: «تعذّرت» وحدَها تُري أقلَّ ممّا أُنفق
@@ -3029,7 +3029,7 @@ panel.post('/panel/uploads/:id/captions', async (c) => {
             kind: 'bad',
             text: `تعذّرت كتابة النصوص: ${out.reason}${out.cost === undefined
               ? ''
-              : ` — وكلّفت المحاولةُ ${money(out.cost)}، والإعادةُ تدفع ثانيةً`}`,
+              : ` — وكلّفت المحاولة ${money(out.cost)}، والإعادة تدفع ثانيةً`}`,
           }
   await setFlash(c.env, c.req.raw, flash)
   return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
@@ -3138,18 +3138,18 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
   await setFlash(c.env, c.req.raw, !result.ok
     ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
     : result.created.length === 0
-      ? { kind: 'bad', text: `موجودٌ من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
+      ? { kind: 'bad', text: `موجود من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
       : {
           kind: cut === null && unlinked.length === 0 && (planned === null || planned.failed.length === 0) ? 'ok' : 'warn',
           text: `أُنشئ على ${result.created.map(label).join(' و')}${planned !== null && at !== null && planned.scheduled.length > 0
-            ? ` وجُدول ${momentLabel(at, zone, now)}${zoneNote(zone)}.${planned.failed.length === 0 ? '' : ` وتعذّرت جدولةُ ${planned.failed.map((f) => `${label(f.platform)}: ${f.reason}`).join('؛ ')}.`}${plannedReach === null ? '' : ` ${plannedReach}`}`
+            ? ` وجُدول ${momentLabel(at, zone, now)}${zoneNote(zone)}.${planned.failed.length === 0 ? '' : ` وتعذّرت جدولة ${planned.failed.map((f) => `${label(f.platform)}: ${f.reason}`).join('؛ ')}.`}${plannedReach === null ? '' : ` ${plannedReach}`}`
             : form.get('approve') === 'on'
-              ? ' معتمَدًا — جدوِله تحت المقطع بموعدٍ واحد، أو من بطاقة كلٍّ.'
+              ? ' معتمَدًا — جدوِله تحت المقطع بموعد واحد، أو من بطاقة كلّ.'
               : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
             ? ''
-            : ` وعنوانُ YouTube أطولُ ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0 || planned !== null
+            : ` وعنوان YouTube أطول ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0 || planned !== null
             ? ''
-            : ` ولا حسابَ متّصلًا على ${unlinked.map(label).join(' و')}: لا يُجدوَل حتّى تربطه.`}`,
+            : ` ولا حساب متّصلًا على ${unlinked.map(label).join(' و')}: لا يُجدوَل حتّى تربطه.`}`,
         })
   // ‏ويعود إلى صفّ المقطع نفسِه: عليه روابطُ منشوراته وزرُّ جدولتها
   return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
@@ -3179,9 +3179,9 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   const failed = result === null ? '' : result.failed.map((f) => `${platformLabel(f.platform)}: ${f.reason}`).join('؛ ')
   const reach = result === null ? null : privateReach(result.scheduled, await reachNow(c.env.DB, activeOrg(gate.session.record)))
   const flash: PanelFlash = at === null || result === null
-    ? { kind: 'bad', text: 'لم يُجدوَل شيء: موعدٌ لا أعرفه — اختر أحدَ أزرار الموعد.' }
+    ? { kind: 'bad', text: 'لم يُجدوَل شيء: موعد لا أعرفه — اختر أحد أزرار الموعد.' }
     : result.scheduled.length === 0
-      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed === '' ? 'لا منشورَ معتمَدًا بلا موعدٍ من هذا المقطع الآن.' : `تعذّر ${failed}.`}` }
+      ? { kind: 'bad', text: `لم يُجدوَل شيء. ${failed === '' ? 'لا منشور معتمَدًا بلا موعد من هذا المقطع الآن.' : `تعذّر ${failed}.`}` }
       : {
           kind: result.failed.length === 0 ? 'ok' : 'warn',
           text: `جُدول على ${names(result.scheduled)} ${momentLabel(at, zone, now)}${zoneNote(zone)}.`
@@ -3236,11 +3236,11 @@ panel.post('/panel/plan-import', async (c) => {
   if ('denied' in gate) return gate.denied
   const file = gate.form.get('file')
   if (!(file instanceof Blob) || file.size === 0) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يصل ملفّ — اختر ملفَّ CSV ثمّ «اقرأ الخطّة».' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يصل ملفّ — اختر ملفّ CSV ثمّ «اقرأ الخطّة».' })
     return back('plan-import')
   }
   if (file.size > MAX_PLAN_BYTES) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `الملفُّ أكبرُ من ${MAX_PLAN_BYTES / 1024}KB — قسّمه ملفّين.` })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `الملفّ أكبر من ${MAX_PLAN_BYTES / 1024}KB — قسّمه ملفّين.` })
     return back('plan-import')
   }
   /*
@@ -3254,7 +3254,7 @@ panel.post('/panel/plan-import', async (c) => {
   } catch {
     await setFlash(c.env, c.req.raw, {
       kind: 'bad',
-      text: 'الملفُّ ليس UTF-8 — احفظه من Excel بصيغة «CSV UTF-8 (Comma delimited)»، أو نزّله من Google Sheets بصيغة CSV، ثمّ ارفعه.',
+      text: 'الملفّ ليس UTF-8 — احفظه من Excel بصيغة «CSV UTF-8 (Comma delimited)»، أو نزّله من Google Sheets بصيغة CSV، ثمّ ارفعه.',
     })
     return back('plan-import')
   }
@@ -3273,7 +3273,7 @@ panel.get('/panel/plan-import/:id', async (c) => {
   if (csv === null) {
     // ‏معاينةٌ تُركت مفتوحةً أكثرَ من ساعتين ثمّ حُدّثت: صفحةٌ بالرافدة وطريقٍ إلى الرفع، لا نصٌّ خامّ (7.11)
     return page((nonce) =>
-      soloPage('صدى — معاينةُ الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
+      soloPage('صدى — معاينة الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
         planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
   }
   const read = readPlan(csv, await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date()))
@@ -3281,7 +3281,7 @@ panel.get('/panel/plan-import/:id', async (c) => {
   // ‏«بتوقيت الرياض» حين لا منطقةَ عُرفت: هي ما قرأ به `planFacts` الأيّامَ (D-202)
   const fallback = (await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) === null
   return page((nonce) =>
-    soloPage('صدى — معاينةُ الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
+    soloPage('صدى — معاينة الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
       injectCsrf(planImportScreen(id, read, new Date(), reach, fallback), session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
@@ -3293,7 +3293,7 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
   const id = c.req.param('id')
   const csv = await c.env.KV.get(`plan-import:${id}`)
   if (csv === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'انتهت مهلةُ المعاينة — ارفع الملفَّ من جديد.' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'انتهت مهلة المعاينة — ارفع الملفّ من جديد.' })
     return back('plan-import')
   }
   const now = new Date()
@@ -3302,7 +3302,7 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
   // ‏ما عرضته المعاينةُ جاهزًا وحده (D-182) — والزرُّ وعدَ بعدده
   const shown = new Set(String(gate.form.get('lines') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 1))
   if (shown.size === 0) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'هذه المعاينةُ قديمة — افتحها من جديد ثمّ اعتمد.' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'هذه المعاينة قديمة — افتحها من جديد ثمّ اعتمد.' })
     return new Response(null, { status: 303, headers: { Location: `/panel/plan-import/${id}` } })
   }
   const outcomes = await applyPlan(c.env.DB, read.rows, by, now, shown)
@@ -3320,13 +3320,13 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
     list.slice(0, 3).map((o) => `السطر ${o.line} (${o.reason ?? ''})`).join('، ') + (list.length > 3 ? ' وغيرُها' : '')
   const existing = outcomes.filter((o) => o.result === 'exists')
   const parts = [
-    scheduled === 0 ? '' : scheduled === 1 ? 'جُدول منشورٌ واحد في موعده' : `جُدول ${counted(scheduled, NOUNS.post)} كلٌّ في موعده`,
+    scheduled === 0 ? '' : scheduled === 1 ? 'جُدول منشور واحد في موعده' : `جُدول ${counted(scheduled, NOUNS.post)} كلّ في موعده`,
     exists > 0 ? `ولم يُكرَّر ما كان موجودًا: ${named(existing)}` : '',
     failed.length > 0 ? `وتعذّر ${counted(failed.length, NOUNS.row)}: ${named(failed)}` : '',
   ].filter((p) => p !== '')
   await setFlash(c.env, c.req.raw, {
     kind: scheduled > 0 && failed.length === 0 ? 'ok' : 'bad',
-    text: parts.length === 0 ? 'لا صفَّ جاهزًا في الملفّ — لم يُجدوَل شيء.' : `${parts.join('، ')}.`,
+    text: parts.length === 0 ? 'لا صفّ جاهزًا في الملفّ — لم يُجدوَل شيء.' : `${parts.join('، ')}.`,
   })
   return back('posts')
 })

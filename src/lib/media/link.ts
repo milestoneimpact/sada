@@ -89,7 +89,7 @@ export async function signMediaToken(
   now: Date = new Date(),
   windowSeconds: number = WINDOW_SECONDS,
 ): Promise<string> {
-  if (mediaId.includes('.')) throw new LinkError('معرّفٌ فيه نقطة يلبس على الفاصل')
+  if (mediaId.includes('.')) throw new LinkError('معرّف فيه نقطة يلبس على الفاصل')
   const expiresAt = Math.floor(now.getTime() / 1000) + windowSeconds
   const key = await signingKey(encKey)
   const body = payload(mediaId, expiresAt)

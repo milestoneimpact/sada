@@ -26,8 +26,8 @@ const PLATFORMS: readonly (readonly [key: string, label: string])[] = [
 
 const STEPS: readonly (readonly [title: string, line: string])[] = [
   ['مصادرُك', 'تضع ملفّاتك في مجلّد Google Drive، وصدى يقرؤها ويفهم ما يستحقّ النشر.'],
-  ['مسوّداتٌ تعتمدها', 'يكتب لكلّ منصّةٍ نصَّها ويصمّم صورتها — ولا يُنشر شيءٌ قبل أن تعتمده.'],
-  ['نشرٌ في موعده', 'يجدول ما اعتمدتَه وينشره، ويقيس ما وصل، وكلفةُ كلّ طلبٍ ظاهرة.'],
+  ['مسوّدات تعتمدها', 'يكتب لكلّ منصّة نصَّها ويصمّم صورتها — ولا يُنشر شيء قبل أن تعتمده.'],
+  ['نشر في موعده', 'يجدول ما اعتمدتَه وينشره، ويقيس ما وصل، وكلفة كلّ طلب ظاهرة.'],
 ]
 
 export function landingBody(): string {
@@ -39,7 +39,7 @@ export function landingBody(): string {
   // ‏لحظةٌ واحدةٌ ابنٌ مباشرٌ لـ«.auth-split»، والرمزُ فيها فلا يُكرَّر فوق الاسم. والمحتوى كما كان.
   return `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="land">
   <h1>صدى</h1>
-  <p class="land-lede">تضع ملفّاتك، وصدى يكتب ويصمّم ويجدول — والقرارُ الأخيرُ لك.</p>
+  <p class="land-lede">تضع ملفّاتك، وصدى يكتب ويصمّم ويجدول — والقرار الأخير لك.</p>
   <a class="btn btn-primary land-cta" href="/panel">ادخل إلى لوحتك</a>
   <ol class="land-steps">${steps}</ol>
   <ul class="land-pfs" aria-label="المنصّات">${pfs}</ul>
@@ -52,7 +52,7 @@ export function landingPage(nonce: string): string {
   return shell('صدى', landingBody(), nonce, '', {
       indexable: true,
       moment: true,
-      description: 'صدى: تضع ملفّاتك، وهو يكتب ويصمّم ويجدول على LinkedIn وX وYouTube وTikTok وInstagram — والقرارُ الأخيرُ لك.',
+      description: 'صدى: تضع ملفّاتك، وهو يكتب ويصمّم ويجدول على LinkedIn وX وYouTube وTikTok وInstagram — والقرار الأخير لك.',
     })
 }
 

@@ -65,22 +65,22 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
   analyze: {
     provider: 'anthropic',
     model: 'claude-opus-5',
-    why: 'حكمٌ يقرّر إنفاقا لاحقا — الخطأ فيه أغلى من ثمنه',
+    why: 'حكم يقرّر إنفاقا لاحقا — الخطأ فيه أغلى من ثمنه',
   },
   draft: {
     provider: 'anthropic',
     model: 'claude-opus-5',
-    why: 'كتابةٌ عربية تُنشر باسم المالك — الخطأ فيها يُقرأ عليه لا علينا',
+    why: 'كتابة عربية تُنشر باسم المالك — الخطأ فيها يُقرأ عليه لا علينا',
   },
   plan: {
     provider: 'anthropic',
     model: 'claude-opus-5',
-    why: 'حكمٌ على أسبوعٍ كامل — يقرّر ما يُنفَق بعده، فالخطأ فيه أغلى من ثمنه',
+    why: 'حكم على أسبوع كامل — يقرّر ما يُنفَق بعده، فالخطأ فيه أغلى من ثمنه',
   },
   image: {
     provider: 'gemini',
     model: 'gemini-2.5-flash-image',
-    why: 'لا بديل عند Anthropic — وصورةٌ تصاحب النصّ تُرى أكثر',
+    why: 'لا بديل عند Anthropic — وصورة تصاحب النصّ تُرى أكثر',
   },
   /**
    * **والفيديو كان مثبَّتا في الشيفرة** (D-091).
@@ -95,7 +95,7 @@ export const ROUTES: Readonly<Record<TaskName, Route>> = {
   video: {
     provider: 'cloudflare',
     model: 'alibaba/hh1-i2v',
-    why: 'صورةٌ ← مقطعٌ رأسيّ: نرى الصورةَ ونعتمدها قبل أن نُنفق على تحريكها',
+    why: 'صورة ← مقطع رأسيّ: نرى الصورة ونعتمدها قبل أن نُنفق على تحريكها',
   },
 }
 
