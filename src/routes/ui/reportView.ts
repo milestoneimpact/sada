@@ -103,7 +103,7 @@ export interface MonthSpend {
 function monthLine(m: MonthSpend | undefined): string {
   if (m === undefined) return ''
   return `<div class="sub">هذا الشهر حتّى اليوم:
-    <a class="tap" href="/panel#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت الرياض' : ''}</div>`
+    <a class="tap" href="/panel/settings#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت الرياض' : ''}</div>`
 }
 
 /** جسدُ تقريرٍ واحد. */
@@ -321,7 +321,7 @@ export function reportScreen(d: ReportScreenData): string {
           <div class="outcome warn"><span class="kv-k">لا سقف موضوع</span>
             <span class="kv-v"><b>ولا مبلغ يُقترَح بلا سقف تضعه.</b>
               رقم نؤلّفه نحن رقم بلا مصدر — وهذه تقترح مالا لا كتابة.
-              <a class="tap" href="/panel#c3">ضع سقف الترويج الأسبوعيّ</a>
+              <a class="tap" href="/panel/settings#c3">ضع سقف الترويج الأسبوعيّ</a>
               لتُكتَب التوصيات.</span></div>
         </div>`
       : d.suggestions.length === 0
