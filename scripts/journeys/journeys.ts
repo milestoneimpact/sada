@@ -152,10 +152,11 @@ const R0: Journey = {
     const id = stack.seeded.posts.draft
     // ‏من الرئيسيّة: محطّةُ «الاعتماد» في رحلة المنشور تقول «تنتظر قرارك» — وتنزل إلى البطاقة
     await m.tap(station(page, 'الاعتماد'), 'محطّة «الاعتماد» في الرئيسيّة')
-    await m.tap(button(draftForm(page, id), 'اعتمد'), '«اعتمد» على المسوّدة', { key: true })
+    // ‏والزرُّ الأوّلُ «اعتمد · غدًا 9:00 ص» يعتمد ويجدول بضغطة، و«اعتمد فقط» بعده
+    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة', { key: true })
     const row = status(stack, id)
     crlf(m, stack, id)
-    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `posts.status = ${row?.status ?? '—'}` }
+    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'}` }
   },
 }
 
@@ -213,11 +214,11 @@ const R2: Journey = {
     const fresh = all<{ id: string; status: string }>(stack, "SELECT id, status FROM posts WHERE status = 'draft'").filter((r) => !before.has(r.id))
     if (fresh.length === 0) return { success: false, verified: 'لم تُكتب مسوّدة' }
     const id = fresh[0]!.id
-    await m.tap(button(draftForm(page, id), 'اعتمد'), '«اعتمد» على المسوّدة الجديدة')
+    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة الجديدة')
     const row = status(stack, id)
     crlf(m, stack, id)
     const cost = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM cost_ledger WHERE operation LIKE 'draft:linkedin:%' AND at >= datetime('now', '-5 minutes')")?.n ?? 0
-    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `مسوّدة جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
+    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `مسوّدة جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
   },
 }
 
@@ -393,7 +394,11 @@ const R5: Journey = {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     // ‏رأسُ «المنشورات» فيه بابُ الخطّة باسمه — والمالكُ يضغطه ولا يمرّر إلى آخر اللوح بحثًا عنه
-    await m.tap(link(page, 'خطّة من ملفّ'), '«خطّة من ملفّ» في رأس «المنشورات»')
+    // ‏والأبوابُ الأربعة في قائمة «منشور جديد» (D-233): تُفتح ثمّ يُختار منها
+    if ((await link(page, 'خطّة من ملفّ').count()) === 0) {
+      await m.tap(visible(page.locator('[data-head-new], [data-tb-new], details.fab').locator('summary, button').filter({ hasText: 'منشور جديد' })).first(), '«منشور جديد»')
+    }
+    await m.tap(link(page, 'خطّة من ملفّ'), '«خطّة من ملفّ» في قائمة «منشور جديد»')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
     await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
