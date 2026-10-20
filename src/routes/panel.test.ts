@@ -5188,6 +5188,35 @@ describe('المنظّمات من حساب الدخول', () => {
     expect(JSON.parse((await kv.get(`session:${id}`))!).org).toBe(org.id)
   })
 
+  it('منظّمةٌ واحدةٌ بلا مبدّل، وبمنظّمتين يظهر المبدّلُ أعلى الرافدة ويعود الانتقالُ إلى الصفحة نفسِها', async () => {
+    const cookie = await login()
+    expect(await (await app.request('/panel', withSession(cookie), env)).text()).not.toContain('id="scope"')
+    const body = new FormData()
+    body.set('name', 'جمعيّة كفالة')
+    body.set('kind', 'team')
+    await app.request('/panel/orgs', withSession(cookie, { method: 'POST', body }), env)
+    const org = db.raw.prepare("SELECT id FROM orgs WHERE name = 'جمعيّة كفالة'").get() as { id: string }
+
+    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const scope = html.slice(html.indexOf('id="scope"'), html.indexOf('</details>', html.indexOf('id="scope"')))
+    expect(scope).toContain('<b>منظّمتي</b>')
+    expect(scope).toContain(`name="org" value="${org.id}"`)
+    expect(scope).toContain('name="next" value="/panel"')
+    expect(html).toContain('<span>المنظّمة</span><b>منظّمتي</b>')
+
+    const to = new FormData()
+    to.set('org', org.id)
+    to.set('next', '/panel/posts#posts')
+    const switched = await app.request('/panel/orgs/switch', withSession(cookie, { method: 'POST', body: to }), env)
+    expect(switched.status).toBe(303)
+    expect(switched.headers.get('Location')).toBe('/panel/posts#posts')
+    // ‏ووجهةٌ خارج اللوحة لا تُتبَع
+    to.set('next', 'https://evil.example/')
+    const away = await app.request('/panel/orgs/switch', withSession(cookie, { method: 'POST', body: to }), env)
+    expect(away.headers.get('Location')).toBe('/panel')
+  })
+
+  it('لا ينتقل إلى منظّمةٍ غير موجودة', async () => {
   it('لا ينتقل إلى منظّمة غير موجودة', async () => {
     const cookie = await login()
     const to = new FormData()

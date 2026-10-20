@@ -1061,7 +1061,11 @@ panel.post('/panel/orgs/switch', async (c) => {
   }
   await setActiveOrg(c.env.KV, gate.session, org)
   await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org, org }, c.req.raw)
-  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلت إلى المنظّمة.' })
+  const name = (await listOrgs(c.env.DB)).find((o) => o.id === org)?.name
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: name === undefined ? 'انتقلت إلى المنظّمة.' : `انتقلت إلى «${name}».` })
+  // ‏ومن مبدّل الرافدة يعود إلى الصفحة التي بدأ منها (‏scope.ts)، ومن الإعدادات إليها
+  const next = gate.form.get('next')
+  if (typeof next === 'string' && next !== '') return new Response(null, { status: 303, headers: { Location: safeNext(next) } })
   return back('orgs')
 })
 

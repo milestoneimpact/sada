@@ -355,6 +355,12 @@ const data: PanelData = {
     more: 0,
   },
   rpId: 'sada2.basserh.com',
+  // ‏منظّمتان فيُرسَم مبدّلُ الرافدة ويُقاس (‏scope.ts) — والأولى منظّمةُ المالك النشطة
+  orgs: [
+    { id: 'org_owner', name: 'بصائر للاستشارات', kind: 'agency', brands: 2 },
+    { id: 'org_k', name: 'جمعيّة كفالة', kind: 'team', brands: 1 },
+  ],
+  org: 'org_owner',
   via: 'admin_token',
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
   channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),

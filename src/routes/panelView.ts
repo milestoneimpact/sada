@@ -61,7 +61,7 @@ import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
 import { emptyState } from './ui/components/empty'
-import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, type OrgRow } from '../lib/tenancy'
+import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, OWNER_ORG, type OrgRow } from '../lib/tenancy'
 
 export { escapeHtml, injectCsrf, shell }
 
@@ -986,6 +986,8 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
    * ‏تعدّ، فكانت «ما ينتظرك» تُقال في خمسة أماكن. فبقي ما يوجب يدَ المالك اليوم وحدَه: المسوّداتُ التي تنتظر قرارَه
    * ‏والفاشلةُ (كما في «ينتظر قرارك»)، والحساباتُ المنقطعة. والباقي يُقال في صفحته.
    */
+  // ‏المنظّمةُ النشطة ومبدّلُها (‏scope.ts)، والانتقالُ يعود إلى هذه الصفحة نفسِها
+  const scope = { orgs: d.orgs ?? [], active: d.org ?? OWNER_ORG, next: only === null ? '/panel' : panelHref(only) }
   const counts: Readonly<Record<string, number>> = {
     posts: waitingDrafts + d.drafts.filter((x) => x.status === 'failed').length,
     accounts: d.channels.filter((c) => channelHealth(c, d.now).kind === 'broken').length,
@@ -1001,7 +1003,7 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
 <div class="app">
 
 ${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} : { active: only }) })}
+${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">
@@ -1018,7 +1020,7 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, ...(only === null ? {} 
   ${topNew()}
   ${commandTrigger()}
   ${state}
-  ${accountMenu({ logout: true })}
+  ${accountMenu({ logout: true, scope })}
 </header>
 
 <main id="main" class="content">
