@@ -287,14 +287,19 @@ export async function buildWeekly(
  * ثانيةً بعد أن تراكمت مقاييسُ أكثرَ **لا تبدّل رقما شُهد به** — وإلّا
  * لم يُعرَف أنَما الحصادُ أم أُعيد الحساب.
  */
-export async function saveWeekly(db: Db, id: string, report: WeeklyReport): Promise<boolean> {
+export async function saveWeekly(
+  db: Db,
+  org: string,
+  id: string,
+  report: WeeklyReport,
+): Promise<boolean> {
   const result = await db
     .prepare(
-      `INSERT INTO reports (id, from_at, to_at, version, body_json)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO reports (id, org_id, from_at, to_at, version, body_json)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO NOTHING`,
     )
-    .bind(id, report.from, report.to, report.version, JSON.stringify(report))
+    .bind(id, org, report.from, report.to, report.version, JSON.stringify(report))
     .run()
   return changedRows(result)
 }
@@ -324,14 +329,15 @@ function parse(row: {
   }
 }
 
-export async function listReports(db: Db, limit = 12): Promise<StoredReport[]> {
+/** تقاريرُ المنظّمة وحدها (D-227): منظّمةٌ لا ترى أسابيعَ غيرها. */
+export async function listReports(db: Db, org: string, limit = 12): Promise<StoredReport[]> {
   try {
     const { results } = await db
       .prepare(
         `SELECT id, from_at, to_at, body_json, created_at
-           FROM reports ORDER BY from_at DESC LIMIT ?`,
+           FROM reports WHERE org_id = ? ORDER BY from_at DESC LIMIT ?`,
       )
-      .bind(limit)
+      .bind(org, limit)
       .all<{ id: string; from_at: string; to_at: string; body_json: string; created_at: string }>()
     return results.map(parse).filter((r): r is StoredReport => r !== null)
   } catch {
@@ -339,13 +345,13 @@ export async function listReports(db: Db, limit = 12): Promise<StoredReport[]> {
   }
 }
 
-export async function readReport(db: Db, id: string): Promise<StoredReport | null> {
+export async function readReport(db: Db, org: string, id: string): Promise<StoredReport | null> {
   try {
     const row = await db
       .prepare(
-        `SELECT id, from_at, to_at, body_json, created_at FROM reports WHERE id = ?`,
+        `SELECT id, from_at, to_at, body_json, created_at FROM reports WHERE id = ? AND org_id = ?`,
       )
-      .bind(id)
+      .bind(id, org)
       .first<{ id: string; from_at: string; to_at: string; body_json: string; created_at: string }>()
     return row === null ? null : parse(row)
   } catch {

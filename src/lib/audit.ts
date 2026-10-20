@@ -10,6 +10,7 @@
  * نعم؛ المفتاحُ نفسه لا. والسجلّ يُقرأ في اللوحة ويُصدَّر ويُنسخ.
  */
 import type { Db } from './tokens'
+import { OWNER_ORG } from './tenancy'
 import { PROVIDERS } from './ai/registry'
 import { platformLabel } from './oauth/providers'
 import { isSettingKey, SETTING_LABEL } from './settings'
@@ -21,6 +22,8 @@ export interface AuditEntry {
   readonly action: string
   readonly target?: string | null
   readonly detail?: string | null
+  /** المنظّمةُ التي وقع فيها الفعل؛ وفعلُ الحساب نفسِه (دخولٌ، عامل) لمنظّمة المالك (D-227). */
+  readonly org?: string
 }
 
 /**
@@ -48,10 +51,11 @@ export async function record(
   try {
     await db
       .prepare(
-        `INSERT INTO audit_log (actor, action, target, detail, ip, ua)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_log (org_id, actor, action, target, detail, ip, ua)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
+        entry.org ?? OWNER_ORG,
         entry.actor,
         entry.action,
         capped(entry.target),

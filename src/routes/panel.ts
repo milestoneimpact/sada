@@ -862,7 +862,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       ownerPending,
       expiring,
       cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-227): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
+    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-228): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
     }, only, q.get('swap') === 'posts'),
   )
 }
@@ -1045,7 +1045,7 @@ panel.post('/panel/orgs', async (c) => {
     })
     return back('orgs')
   }
-  await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id }, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id, org: result.id }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُنشئت المنظّمة. انتقل إليها حين تريد العمل فيها.' })
   return back('orgs')
 })
@@ -1060,7 +1060,7 @@ panel.post('/panel/orgs/switch', async (c) => {
     return back('orgs')
   }
   await setActiveOrg(c.env.KV, gate.session, org)
-  await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org }, c.req.raw)
+  await record(c.env.DB, { actor: 'panel', action: 'org.switch', target: org, org }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'انتقلتَ إلى المنظّمة.' })
   return back('orgs')
 })
@@ -1207,7 +1207,7 @@ panel.post('/panel/settings', async (c) => {
     flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
-  // ‏**والحفظُ التلقائيّ في الحدود** (D-227): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
+  // ‏**والحفظُ التلقائيّ في الحدود** (D-228): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
   // ‏(وقد تُقصّ إلى المدى) لا بتحويلٍ يعيد رسمَ الصفحة. والفحصُ والقصُّ والتدقيقُ قبله كما هي.
   if (form.get('auto') === '1') return c.json({ ok: flash.kind !== 'bad', text: flash.text, stored: result.stored })
   await setFlash(c.env, c.req.raw, flash)
@@ -2019,7 +2019,7 @@ panel.get('/panel/report', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const reports = await listReports(c.env.DB)
+  const reports = await listReports(c.env.DB, activeOrg(session.record))
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({
     reports,
@@ -2096,12 +2096,12 @@ panel.get('/panel/report/:week', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const stored = await readReport(c.env.DB, c.req.param('week'))
+  const stored = await readReport(c.env.DB, activeOrg(session.record), c.req.param('week'))
   if (stored === null) return notFoundResponse(c.req.raw, 'لا تقريرَ لهذا الأسبوع')
 
   const settings = await readSettings(c.env.DB)
   const body = reportScreen({
-    reports: await listReports(c.env.DB),
+    reports: await listReports(c.env.DB, activeOrg(session.record)),
     current: stored,
     suggestions: await openSuggestions(c.env.DB),
     promoCapUsd: settings.weeklyPromoCapUsd,
@@ -2391,7 +2391,7 @@ panel.post('/panel/drafts/decide', async (c) => {
   if (wants === 'save') {
     const saved = await saveText(c.env.DB, id, String(form.get('text') ?? ''))
     /*
-     * ‏**والحفظُ التلقائيّ** (D-227، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
+     * ‏**والحفظُ التلقائيّ** (D-228، من Notion): المحرّرُ يرسل النصَّ نفسَه بعد ثانيةٍ ونصف من آخر حرف، بـ`auto=1`،
      * ‏فيُردّ عليه بسطرٍ لا بتحويل: لا إشعارَ يملأ الشاشة كلَّ جملة، ولا سطرَ تدقيقٍ لكلّ توقّف. والفحصُ فحصُ الاعتماد نفسُه.
      */
     if (form.get('auto') === '1') {
@@ -2869,7 +2869,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-227) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
+  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-228) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
   const back = String(form.get('back') ?? '')
   if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
