@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 
 async function seedAccount(platform: 'linkedin' | 'x'): Promise<string> {
-  return upsertAccount(db, {
+  return upsertAccount(db, 'org_owner', {
     platform,
     kind: 'member',
     externalId: platform === 'x' ? '4242' : 'abc',
@@ -303,7 +303,7 @@ describe('needs_reauth_at', () => {
 
     const row = db.raw.prepare('SELECT platform, kind, external_id, display_name FROM accounts WHERE id = ?').get(id) as
       { platform: 'linkedin'; kind: 'member' | 'org'; external_id: string; display_name: string }
-    await upsertAccount(db, { id, platform: row.platform, kind: row.kind, externalId: row.external_id, displayName: row.display_name } as never)
+    await upsertAccount(db, 'org_owner', { id, platform: row.platform, kind: row.kind, externalId: row.external_id, displayName: row.display_name } as never)
     const back = (await accountHealth(db, 'linkedin'))[id]!
     expect(back.status).toBe('active')
     expect(back.needsReauthAt).toBeNull()

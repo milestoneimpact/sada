@@ -42,6 +42,12 @@ export interface OAuthState {
    * تُرفَض، ويُفترَض عندها الكامل — وهو ما كان يقع فعلا قبله.
    */
   readonly scopes?: string
+  /**
+   * المنظّمةُ التي بدأت الدورة (D-229). **وتُحفَظ مع الحالة لأنّ العودةَ
+   * بلا جلسة**: كعكةُ `SameSite=Strict` لا تعبر التحويلَ من المنصّة.
+   * واختياريٌّ كـ`scopes`: حالةٌ قديمةٌ بلا منظّمةٍ تُنسَب إلى المالك.
+   */
+  readonly org?: string
 }
 
 export class StateError extends Error {
@@ -99,6 +105,7 @@ function isOAuthState(value: unknown): value is OAuthState {
     typeof v['verifier'] === 'string' &&
     typeof v['redirectUri'] === 'string' &&
     typeof v['createdAt'] === 'string' &&
-    (v['scopes'] === undefined || typeof v['scopes'] === 'string')
+    (v['scopes'] === undefined || typeof v['scopes'] === 'string') &&
+    (v['org'] === undefined || typeof v['org'] === 'string')
   )
 }
