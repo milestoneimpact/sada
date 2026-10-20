@@ -1921,3 +1921,17 @@ describe('اللوحُ بالأهمّ أوّلًا و«الأرشيف» (D-215)'
     expect(SCRIPT).toContain("bucketOf.indexOf(c.dataset.status)")
   })
 })
+
+describe('مراحلُ الانتظار الطويل (7.11 · D-235)', () => {
+  it('الكتابةُ والصورةُ والمقطعُ بمراحلَ مسمّاة، والسكربتُ يقف عند آخرها ويقول «ابقَ في الصفحة» بعد عشر ثوانٍ', async () => {
+    const { STAGES, stagesAttr } = await import('./components/stages')
+    for (const s of Object.values(STAGES)) {
+      expect(s.split('|').length).toBeGreaterThanOrEqual(2)
+      expect(s).not.toMatch(/جاهز|اكتمل|\d+\s*[٪%]/)
+    }
+    expect(stagesAttr('write')).toBe(`data-stages="${STAGES.write}"`)
+    expect(SCRIPT).toContain("f.dataset.stages")
+    expect(SCRIPT).toContain('i=Math.min(i+1,stages.length-1)')
+    expect(SCRIPT).toContain('ابقَ في الصفحة')
+  })
+})
