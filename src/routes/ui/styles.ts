@@ -158,7 +158,7 @@ b,strong{font-weight:600}
 .scope-t{display:flex; flex-direction:column; min-width:0; flex:1}
 .scope-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.scope-t span{font-size:var(--t-caption); line-height:var(--lh-caption)}
+.scope-t span{font-size:var(--t-small); line-height:var(--lh-small)}
 .scope .menu-caret svg{width:var(--icon-sm); height:var(--icon-sm)}
 .scope[open] .menu-caret{transform:rotate(180deg)}
 .scope > .menu-list{inset-inline:0; width:auto; min-width:0; max-width:none}

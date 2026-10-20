@@ -5216,7 +5216,6 @@ describe('المنظّمات من حساب الدخول', () => {
     expect(away.headers.get('Location')).toBe('/panel')
   })
 
-  it('لا ينتقل إلى منظّمةٍ غير موجودة', async () => {
   it('لا ينتقل إلى منظّمة غير موجودة', async () => {
     const cookie = await login()
     const to = new FormData()
