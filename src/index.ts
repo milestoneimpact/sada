@@ -19,7 +19,7 @@ import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { dispatchDue } from './lib/schedule/job'
 import { expireStaleUploads } from './lib/media/uploads'
 import { pullDue } from './lib/metrics/job'
-import { runWeekly } from './lib/report/job'
+import { runWeeklyAll } from './lib/report/job'
 import { collectAlerts } from './lib/alerts/collect'
 import { readSettings } from './lib/settings'
 import { sendAlerts } from './lib/alerts/outbox'
@@ -657,15 +657,17 @@ async function metricsTick(env: Env): Promise<void> {
  */
 async function reportTick(env: Env): Promise<void> {
   try {
-    const out = await runWeekly(env.DB, new Date())
-    if (out.written) {
+    // ‏لكلّ منظّمةٍ تقريرُها (D-234)
+    const all = await runWeeklyAll(env.DB, new Date())
+    const written = all.filter((out) => out.written)
+    for (const out of written) {
       console.log({
         job: 'report', week: out.id,
         published: out.report.published, measured: out.report.measured,
         promotion: out.promotion.kind,
       })
     }
-    await beat(env.DB, 'report', 'ok', out.written ? `كُتب ${out.id}` : 'لا جديد')
+    await beat(env.DB, 'report', 'ok', written.length > 0 ? `كُتب ${written.map((o) => o.id).join('، ')}` : 'لا جديد')
   } catch (error) {
     console.log({ job: 'report', failed: String(error) })
     await beat(env.DB, 'report', 'failed', String(error))
