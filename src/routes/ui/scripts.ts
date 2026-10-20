@@ -18,6 +18,8 @@
  * «ما عليك» من الجنس نفسِه. **فالنصُّ واحدٌ تحمله اللوحةُ والشاشة**، لا
  * نسختان تفترقان في أوّل تعديل.
  */
+import { BP } from './tokens'
+
 export const COPY_SCRIPT = `
 (function(){
   document.querySelectorAll('button[data-copy]').forEach(function(b){
@@ -286,10 +288,22 @@ export const KIT_SCRIPT = `
       if(v==='preview'){var box=document.getElementById('ed-txt'), body=document.querySelector('#ed [data-view=preview] .np-text');
         if(box&&body&&box.tagName==='TEXTAREA'&&(box.dataset.count==='x'||box.dataset.count==='linkedin'))body.textContent=box.value;}
     };
-    seg.hidden=false;
+    /*
+     * ‏**والمعاينةُ ظاهرةٌ دائمًا على العريض** (D-232، من Canva وLater): النصُّ والمنشورُ بشكله واحدًا تحت الآخر،
+     * ‏والمعاينةُ تتبع كلَّ حرف. وعلى الضيّق يبقى المفتاح: الشاشةُ لا تتّسع للاثنين.
+     */
+    var box0=document.getElementById('ed-txt'), wide=window.matchMedia('(min-width: ${BP.md}px)');
+    var live=function(){var body=document.querySelector('#ed [data-view=preview] .np-text');
+      if(box0&&body&&box0.tagName==='TEXTAREA'&&(box0.dataset.count==='x'||box0.dataset.count==='linkedin'))body.textContent=box0.value;};
+    if(box0)box0.addEventListener('input',function(){if(wide.matches)live();});
+    var fit=function(){
+      if(wide.matches){seg.hidden=true; Array.prototype.forEach.call(views,function(x){x.hidden=false;}); live();}
+      else{seg.hidden=false; pick('edit');}
+    };
     seg.querySelectorAll('button[data-view-pick]').forEach(function(b){
       b.addEventListener('click',function(){pick(b.getAttribute('data-view-pick'));});});
-    pick('edit');
+    if(wide.addEventListener)wide.addEventListener('change',fit);
+    fit();
   }
   var dead=function(t){return t&&t.closest?t.closest('[aria-disabled="true"]'):null;};
   document.addEventListener('click',function(e){

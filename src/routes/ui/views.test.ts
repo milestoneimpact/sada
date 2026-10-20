@@ -170,7 +170,7 @@ describe('الاعتمادُ يعرض الموعد (D-218)', () => {
     expect(section([])).not.toContain('approve-schedule')
     const two = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }, { id: 'a2', platform: 'linkedin', label: 'الشركة' }])
     expect(two).not.toContain('approve-schedule')
-    expect(two).toContain('value="approve">اعتمد</button>')
+    expect(two).toContain('value="approve" data-optimistic="اعتُمدت">اعتمد</button>')
   })
 })
 

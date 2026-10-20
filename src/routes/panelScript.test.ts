@@ -620,13 +620,13 @@ describe('أفعالُ البطاقة بلا تحميل (D-207)', () => {
 
   it('**ولا إرسالَ ثانيًا**: التحويلُ يُقرأ يدويًّا، والسقوطُ يعيد تحميلَ اللوحة بـGET', () => {
     expect(block).toContain("redirect:'manual'")
-    expect(block).toContain("fetch('/panel',{credentials:'same-origin'})")
+    expect(block).toContain("fetch('/panel?swap=posts',{credentials:'same-origin'})")
     expect(block).not.toMatch(/\.submit\(|submit\.call/)
     expect(block).toContain('location.reload()')
   })
 
   it('وردٌّ ليس لوحةً (جلسةٌ انتهت) يُفتح كما هو', () => {
-    expect(block).toContain("if(!doc.querySelector('section[data-pane]')){location.href=res.url; return;}")
+    expect(block).toContain("if(!doc.querySelector('section[data-pane]')){location.href=res.url.replace(/[?]swap=posts$/,''); return;}")
   })
 })
 

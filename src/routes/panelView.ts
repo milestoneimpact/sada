@@ -767,6 +767,23 @@ function topNew(): string {
   })
 }
 
+/**
+ * ‏**بابٌ واحدٌ للإنشاء** (D-232، من مقارنة Buffer وCanva): كان رأسُ «المنشورات» أربعةَ أزرارٍ متساوية، فيقرأ
+ * ‏المالكُ أربعةَ خيارات قبل أن يعرف ماذا يريد. فصار زرًّا واحدًا يسأل «من أين تبدأ؟». وعلى العريض لا يُرسم:
+ * ‏زرُّ الترويسة (`topNew`) نفسُه ظاهرٌ هناك، فلا زرّان بالاسم نفسِه في شاشةٍ واحدة.
+ */
+function headNew(): string {
+  return menu({
+    label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-head-new',
+    items: [
+      menuItem({ label: 'من فكرة', note: 'جملةٌ أو كلمات', href: '#idea' }),
+      menuItem({ label: 'من مصدر', note: 'ملفٌّ محلَّلٌ من Drive', href: '#write' }),
+      menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
+      menuItem({ label: 'خطّةٌ من ملفّ', note: 'CSV لأسابيع', href: '#plan-import' }),
+    ],
+  })
+}
+
 function fabNew(): string {
   const items = [
     ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّةٌ من ملفّ'],
@@ -801,7 +818,7 @@ export function keepPanes(html: string, keep: ReadonlySet<string>): string {
   return out + html.slice(i)
 }
 
-export function panelPage(d: PanelData, only: PaneId | null = null): string {
+export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = false): string {
   const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
   const ready = d.sources.length - pending
   const missing = d.providers.filter((p) => !p.configured).length
@@ -1058,8 +1075,11 @@ ${flash}
    * عند ‏٩٦٥ — ‏٣٥٠px من الأرض الفارغة تحته. والاثنتان شيئان: أفعالٌ تنتظر
    * وسجلٌّ وقع. فلكلٍّ بطاقتُها، والعمودُ الأوّل رصّةٌ كالثاني.
    */''}
-  <div class="ov mt-3">
-    <div class="stack">
+  ${/*
+   * ‏**قاعدةُ الحذف** (D-232، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
+   * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
+   */''}
+  <div class="mt-3">
       <div class="card"><h2>ما ينتظرك</h2>
         <p class="hint">مولَّدٌ من حال النظام الآن — لا قائمةٌ ثابتة</p>
         ${todo === ''
@@ -1067,17 +1087,14 @@ ${flash}
           : `<ul class="todo">${todo}</ul>`}
         <div class="row mt-3">${scanBtn}
           <a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a></div></div>
-    </div>
-    <div class="stack">
-      ${todayList(d)}
-    </div>
   </div>
   ${/*
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
   <details class="card home-ops mt-3" id="ops">
-    <summary><h2>الكلفة</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال</span></summary>
+    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال، وسجلُّ اليوم</span></summary>
+  <div class="mt-3">${todayList(d)}</div>
   <div class="ov mt-3">
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يومًا</h2>
@@ -1138,10 +1155,7 @@ ${pivotPane(d.pivot)}
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
   ${pageHead('التحرير', sectionLabel('posts'), '<b>لا يُنشر نصٌّ قبل أن تعتمده.</b>',
-    `<a class="btn btn-primary btn-sm" href="#idea">اكتب من فكرة</a>
-     <a class="btn btn-secondary btn-sm" href="#write">اكتب من مصدر</a>
-     <a class="btn btn-secondary btn-sm" href="${panelHref('videos')}">ارفع فيديو</a>
-     <a class="btn btn-secondary btn-sm" href="#plan-import">خطّة من ملفّ</a>`)}
+    headNew())}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
     writable: d.writableSources,
@@ -1210,7 +1224,7 @@ ${pivotPane(d.pivot)}
   <div class="card mt-3"><h2>الحدود اليوميّة</h2>
     <p class="hint"><b>سقفُ التحليل</b> يعدّ التحليلاتِ وحدَها، و<b>سقفُ الإنفاق</b> يعدّ كلَّ ما دُفع اليوم:
       التحليلُ والكتابةُ والخطّةُ والصورُ والنشر. وبلوغُ أيٍّ منهما يوقف التوليدَ <b>ولا يوقف نشرَ ما اعتمدتَه</b>.</p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_analysis_cap">
       ${field({ id: 'c1', label: 'سقف التحليل (عدد)',
         control: `<input type="number" name="value" min="0" max="500" step="1" value="${d.analysisCap}">` })}
@@ -1218,7 +1232,7 @@ ${pivotPane(d.pivot)}
       <span class="note self-center">المستهلَك اليوم: ${d.usedAnalyses}</span>
     </form>
     <hr>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_spend_cap_usd">
       ${field({ id: 'c2', label: 'سقف الإنفاق (دولار)',
         control: `<input type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}">` })}
@@ -1230,7 +1244,7 @@ ${pivotPane(d.pivot)}
          وصفرٌ لا يبلغ سقفَ الإنفاق أبدًا */ ''}
     <p class="hint"><b>والمقاطعُ بعددها</b>: سعرُها لم يُقرأ بعد، فيُسجَّل صفرًا لا يبلغ سقفَ الإنفاق.
       والمحاولةُ التي تسقط تُعدّ كالتي تنجح. <b>وصفرٌ يُغلق التحريك.</b></p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_video_cap">
       ${field({ id: 'c4', label: 'سقف المقاطع (عدد)',
         control: `<input type="number" name="value" min="0"
@@ -1243,7 +1257,7 @@ ${pivotPane(d.pivot)}
   <div class="card mt-3"><h2>سقف الترويج الأسبوعيّ</h2>
     <p class="hint"><b>ومنه وحده يأتي مبلغُ التوصية.</b> رقمٌ يؤلّفه صدى رقمٌ بلا مصدر —
       والتوصيةُ هنا تقترح <b>مالا</b> لا كتابة. <b>وصفرٌ يعني لا توصيةَ تُكتب أصلا.</b></p>
-    <form class="row" method="POST" action="/panel/settings">
+    <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="weekly_promo_cap_usd">
       ${field({ id: 'c3', label: 'سقف الترويج (دولار في الأسبوع)',
         control: `<input type="number" name="value" min="0" max="500" step="1"
@@ -1445,7 +1459,7 @@ ${/* ‏والذيلُ اسمٌ وساعة (D-215): «كلّ زرٍّ هنا ي�
 </div>`
 
   // ‏و«/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره (D-211: ‏166KB كانت الصفحة، والخطّةُ ‏90)
-  const kept = keepPanes(body, new Set<string>(only === null ? ['overview', 'posts'] : [only]))
+  const kept = keepPanes(body, new Set<string>(swapPosts ? ['posts'] : only === null ? ['overview', 'posts'] : [only]))
   return shell(
     only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(kept, d.csrf), d.nonce, '',
     { commands: buildCommands({ onPanel: only === null, drafts: d.drafts }), panelScript: true },
