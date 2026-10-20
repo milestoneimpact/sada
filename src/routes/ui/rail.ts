@@ -11,6 +11,7 @@
  * معلَّمٌ في الوسم** فلا ينتظر سكربتًا ليُعرَف.
  */
 import { SECTIONS } from './command'
+import { scopeMenu, type Scope } from './scope'
 import { ICON } from './icons'
 import { count } from './components/badge'
 import { escapeHtml, GLYPH_SVG, wordmark } from './shell'
@@ -27,6 +28,8 @@ export interface RailInput {
    * لا `"page"` — فلا تُعلَن صفحتان حاليّتان، ويُلوَّن في شريط الجوّال وحدَه حيث لا تحته.
    */
   readonly parent?: boolean
+  /** المنظّماتُ والنشطةُ منها: مبدّلٌ تحت العلامة حين تكون أكثرَ من واحدة (`scope.ts`). */
+  readonly scope?: Scope
 }
 
 /**
@@ -80,6 +83,7 @@ export function railHtml(input: RailInput): string {
     <div class="brand">${wordmark(true)}${input.env === undefined || input.env === 'production' ? '' : '<span>تجريبيّ</span>'}</div>
     <div class="glyph">${GLYPH_SVG}</div>
   </div>
+  ${scopeMenu(input.scope)}
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
     ${moreSheet(input, counts)}

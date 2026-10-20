@@ -150,6 +150,18 @@ b,strong{font-weight:600}
 /* وكان على الحافّة الداخليّة خيطُ ذهبٍ (::after)؛ نزعته الطبعةُ الرابعة، فلا
    قاعدة له (D-144 · D-148). */
 .rail-head{padding:var(--s-6) var(--s-5) var(--s-5); display:flex; align-items:center; gap:var(--s-3)}
+/* ‏مبدّلُ المنظّمة تحت العلامة (‏scope.ts): اسمُها ثمّ نوعُها وعلاماتُها، وقائمتُه بعرض الرافدة */
+.scope{display:block; margin:0 var(--s-3) var(--s-2)}
+.scope-btn{display:flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-2) var(--s-3);
+  border:var(--bd); border-radius:var(--r-control); background:var(--surface); color:var(--ink-2); cursor:pointer}
+@media(hover:hover){.scope-btn:hover{background:var(--hover)}}
+.scope-t{display:flex; flex-direction:column; min-width:0; flex:1}
+.scope-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.scope-t span{font-size:var(--t-small); line-height:var(--lh-small)}
+.scope .menu-caret svg{width:var(--icon-sm); height:var(--icon-sm)}
+.scope[open] .menu-caret{transform:rotate(180deg)}
+.scope > .menu-list{inset-inline:0; width:auto; min-width:0; max-width:none}
 /* ── العلامة ──────────────────────────────────────────────────────────
    الأقواس نفسها التي في رمز التبويب، مرسومةً لا مكتوبة. وكانت مربّعا
    فيه «صدى» بخمسة عشر بكسلا: **الحرفان يزدحمان في ستّ وثلاثين**،
@@ -1958,7 +1970,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 @media${below('md')}{
   .rail{position:fixed; inset:auto 0 0; z-index:40; height:auto; border:0;
     border-top:var(--bd); box-shadow:var(--sh-2)}
-  .rail-head{display:none}
+  .rail-head,.scope{display:none}
   .topbar .glyph.tb{display:grid}
   /* والحشوُ السفليُّ يحترم شريطَ الجهاز: قضيبُ الإيماء يبتلع صفّا كاملا */
   nav.tabs{padding:var(--s-1) var(--s-1) calc(var(--s-1) + var(--safe-b));

@@ -6,6 +6,7 @@
  * لم يُبنَ فوقها أصلا.
  */
 import { commandPalette, commandTrigger, type Command } from './command'
+import { scopeLine, type Scope } from './scope'
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
 import { segmented } from './components/tabs'
@@ -187,10 +188,12 @@ if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
  * ‏يربط `#theme` الأوّلَ وحدَه)، فالقائمةُ هي مسكنُه الوحيد. و«خروج» نموذجٌ يحتاج رمزَ CSRF، فلا يُرسَم إلّا
  * ‏حيث يُحقَن (`logout`).
  */
-export function accountMenu(options: { readonly logout?: boolean } = {}): string {
+export function accountMenu(options: { readonly logout?: boolean; readonly scope?: Scope } = {}): string {
   return menu({
     label: 'الحساب والعرض', variant: 'icon', size: 'sm', icon: ICON.account, id: 'acct',
     items: [
+      // ‏والمنظّمةُ أوّلًا حين تكون أكثرَ من واحدة: على الهاتف لا رأسَ رافدةٍ يحمل مبدّلها
+      ...scopeLine(options.scope),
       `<div class="menu-seg"><span>السمة</span>${themeSwitch()}</div>`,
       `<div class="menu-seg"><span>الكثافة</span>${densitySwitch()}</div>`,
       menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
