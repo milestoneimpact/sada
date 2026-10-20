@@ -492,6 +492,8 @@ export interface PlatformTile {
   readonly button: { readonly label: string; readonly href: string; readonly primary: boolean }
   /** يربط ولا ينشر (مرتبة `link`). */
   readonly linkOnly: boolean
+  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-231). */
+  readonly fact: string
 }
 
 /**
@@ -505,7 +507,7 @@ export function platformTile(v: ChannelView, now: Date): PlatformTile {
   const h = channelHealth(v, now)
   return {
     id, label: v.spec.label, account: active?.displayName ?? null, linkOnly: v.spec.stage === 'link',
-    tone: h.tone, status: h.label,
+    tone: h.tone, status: h.label, fact: `${id}:${h.kind}`,
     button: h.button ?? { label: 'افتح', href: `/panel/channels/${id}`, primary: false },
   }
 }

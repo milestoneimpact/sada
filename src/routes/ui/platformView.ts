@@ -413,7 +413,8 @@ function accountHeader(d: PlatformScreenData, r: Readiness): string {
       <div class="acct-act">
         <span class="acct-verdict">${health.kind !== 'connected'
           // ‏والشارةُ حكمُ بطاقة «الحسابات» نفسُه ما دام الربطُ هو المانع (D-166 · D-205)، وإلّا فحالُ النشر
-          ? statusBadge(health.tone, health.tone === 'bad' ? '▲' : health.tone === 'warn' ? '!' : '○', health.label)
+          ? statusBadge(health.tone, health.tone === 'bad' ? '▲' : health.tone === 'warn' ? '!' : '○', health.label,
+            `data-fact="${escapeHtml(spec.id)}:${health.kind}"`)
           : verdictChip(r)}
           <a class="tap" href="${escapeHtml(href(spec.id, { tab: 'setup' }))}">التفاصيل</a></span>
         ${next === null ? '' : `<a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>`}

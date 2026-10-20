@@ -827,9 +827,10 @@ export function panelPage(d: PanelData, only: PaneId | null = null): string {
     .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
   const expiring = needy.length === 0 ? '' : notice({
     tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+    // ‏**والشريطُ يحيل ولا يعيد الحال** (D-231): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
     html: `${needy.slice(0, 3)
-      .map(({ v, h }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>: ${escapeHtml(h.label)}`)
-      .join(' · ')}${needy.length > 3 ? ` · <b>و${needy.length - 3} غيرُها</b>` : ''} <a class="tap" href="#channels">افتح الحسابات</a>` })
+      .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
+      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلٌّ منها'} يدَك. <a class="tap" href="#channels">افتح الحسابات</a>` })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(
