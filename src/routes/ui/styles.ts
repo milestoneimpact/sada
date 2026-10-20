@@ -2377,6 +2377,8 @@ nav.back .seg{margin-inline-start:auto}
 .acct{padding:0; overflow:hidden; margin-bottom:var(--s-5)}
 .acct-cover{position:relative; block-size:7.5rem; background-color:var(--surface-2);
   border-block-end:var(--bd)}
+.acct-echo{position:absolute; inset:0; color:var(--ink-3)}
+.acct-echo svg{display:block; inline-size:100%; block-size:100%}
 .acct-x .acct-cover{block-size:9rem}
 .acct-youtube .acct-cover{block-size:6rem}
 .acct-instagram .acct-cover,.acct-tiktok .acct-cover{display:none}
