@@ -745,6 +745,11 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
   const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, activeOrg(session.record), 'tiktok'))
   const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
+  const usedImages = (await c.env.DB
+    .prepare("SELECT COUNT(*) AS n FROM media WHERE created_at >= date('now') AND mime LIKE 'image/%'")
+    .first<{ n: number }>()
+    .catch(() => null))?.n ?? 0
   return page((nonce) =>
     panelPage({
       // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
@@ -754,6 +759,9 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
       zone: ownZone,
       autoEnqueue: allowance.settings.autoEnqueue,
+      autoImage: allowance.settings.autoImage,
+      imageCap: allowance.settings.dailyImageCap,
+      usedImages,
       imageOverlay: allowance.settings.imageOverlay,
       // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
       slide,
@@ -1756,6 +1764,38 @@ panel.post('/panel/media/generate', (c) => imageRoute(c, false))
  */
 panel.post('/panel/media/regenerate', (c) => imageRoute(c, true))
 
+/**
+ * **صورةٌ مع كلّ مسوّدة** (GROWTH-PLAN م-٣، D-255) — إن رفعه المالك، وبما بقي من سقف اليوم.
+ *
+ * تُرسم **في الخلفيّة بعد الردّ** (`waitUntil`): المسوّدةُ لا تنتظر نداءً ثانيًا. والحارسُ في `generateForPost`
+ * كما هو (D-019): الإيقافُ وسقفُ الإنفاق ومفتاحُ التكرار والدفتر. والسقفُ هنا **بالعدد** فوق المال، ويُعدّ فيه
+ * كلُّ صورةٍ وُلّدت اليوم آليّةً أو بزرّ، فلا يتجاوزه المالكُ دون أن يدري. ويُعاد كم صورةً بدأت.
+ */
+async function autoImages(c: Context<{ Bindings: Env }>, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const s = await readSettings(c.env.DB)
+  if (!s.autoImage || s.paused) return 0
+  const used = (await c.env.DB
+    .prepare("SELECT COUNT(*) AS n FROM media WHERE created_at >= date('now') AND mime LIKE 'image/%'")
+    .first<{ n: number }>()
+    .catch(() => null))?.n ?? s.dailyImageCap
+  const batch = ids.slice(0, Math.max(0, s.dailyImageCap - used))
+  if (batch.length === 0) return 0
+  const deps = {
+    db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY,
+    workerSecrets: c.env as unknown as Record<string, string | undefined>,
+  }
+  const work = Promise.all(batch.map((id) => generateForPost(deps, id, { style: 'infographic' })
+    .catch((error: unknown) => console.warn({ job: 'auto-image', post: id, failed: String(error) }))))
+  try {
+    c.executionCtx.waitUntil(work)
+  } catch {
+    // ‏بلا سياق تنفيذ (الاختبار): يُنتظَر هنا
+    await work
+  }
+  return batch.length
+}
+
 async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Promise<Response> {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
@@ -2387,7 +2427,8 @@ panel.post('/panel/drafts/write', async (c) => {
     outcome.kind === 'drafted'
       ? {
           kind: 'ok',
-          text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+          text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.${
+            (await autoImages(c, [outcome.postId])) > 0 ? ' وتُرسم صورتُها الآن.' : ''}`,
         }
       : outcome.kind === 'already'
         // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)
@@ -2471,6 +2512,8 @@ panel.post('/panel/drafts/idea', async (c) => {
   const parts: string[] = []
   if (drafted.length > 0) {
     parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدة' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
+    const drawn = await autoImages(c, drafted.map((d) => d.outcome.postId))
+    if (drawn > 0) parts.push(`وتُرسم ${drawn === 1 ? 'صورتُها' : `${drawn} صور`} الآن.`)
   }
   if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدة' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودة — لم يُنفَق عليها شيء.`)
   for (const d of stopped) {

@@ -4738,6 +4738,29 @@ describe('الكتابة من فكرة ومن وصف المقطع، والربط
       expect(where(again)).toBe(`/panel#d-${linkedin.id}`)
     })
 
+    it('وصورةٌ مع كلّ مسوّدة إن رُفع (D-255): مطفأٌ أوّلًا، وبسقفه اليوميّ', async () => {
+      await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+      env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
+      anthropic(() => POST_TEXT)
+      const cookie = await login()
+      const flash = async (idea: string): Promise<string> => {
+        await post(cookie, '/panel/drafts/idea', { idea, platform: 'linkedin' })
+        return (await app.request('/panel', withSession(cookie), env)).text()
+      }
+      // ‏مطفأٌ: لا صورة تُذكر
+      expect(await flash('فكرة أولى عن الأثر')).not.toContain('وتُرسم صورتُها الآن')
+      // ‏مرفوعٌ: تبدأ صورتُها وتُقال
+      await db.prepare("INSERT INTO settings (key, value, updated_by) VALUES ('auto_image', 'true', 'test')").run()
+      expect(await flash('فكرة ثانية عن الحوكمة')).toContain('وتُرسم صورتُها الآن')
+      // ‏والسقفُ صفرٌ يُغلقها
+      await db.prepare("INSERT INTO settings (key, value, updated_by) VALUES ('daily_image_cap', '0', 'test')").run()
+      expect(await flash('فكرة ثالثة عن القرار')).not.toContain('وتُرسم صورتُها الآن')
+      // ‏والبطاقةُ في «الإنفاق والحدود» تقول حالَها
+      const settings = await (await app.request('/panel/settings', withSession(cookie), env)).text()
+      expect(settings).toContain('id="auto-image"')
+      expect(settings).toContain('<input type="hidden" name="key" value="auto_image">')
+    })
+
     it('بلا منصّة أو بفكرة فارغة يُردّ قبل أيّ نداء، والإيقاف يحجز — والزرّ معطَّل وسببُه تحته', async () => {
       env['ANTHROPIC_API_KEY'] = 'sk-ant-test-0001'
       const net = anthropic(() => POST_TEXT)
