@@ -119,7 +119,7 @@ import { insightsCsv, insightsScreen } from './ui/insightsView'
 import { clientScreen } from './ui/clientView'
 import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
 import { autoImageRoom } from '../lib/image/auto'
-import { editPlanItem, removePlanItem } from '../lib/plan/edit'
+import { addPlanItem, editPlanItem, removePlanItem } from '../lib/plan/edit'
 import { monthlyReport, monthOf } from '../lib/report/monthly'
 import { MONTHLY_SCRIPT, monthlyScreen } from './ui/monthlyView'
 import { planProgress, schedulePlan } from '../lib/plan/schedule'
@@ -487,6 +487,8 @@ panel.get('/panel/client', async (c) => {
   const body = clientScreen({
     waiting: waiting?.n ?? 0,
     ...(plan === null ? {} : await planProgress(c.env.DB, org, plan.id)),
+    sources: plan === null ? [] : (await c.env.DB.prepare('SELECT id, name FROM sources WHERE org_id = ? ORDER BY last_seen_at DESC LIMIT 60')
+      .bind(org).all<{ id: string; name: string }>().catch(() => ({ results: [] as { id: string; name: string }[] }))).results,
     orgName: orgRow?.name ?? 'منظّمتي',
     brief,
     linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
@@ -1869,11 +1871,12 @@ panel.post('/panel/plan/item', async (c) => {
     ...(opt('time') === undefined ? {} : { time: opt('time')! }),
     // ‏«ولّد أنت» يرسل `asset` فارغًا فيمحو المختار، و«من المكتبة» يرسل مرجعَه (D-260)
     ...(f.has('asset') ? { asset: String(f.get('asset') ?? '') } : {}),
+    ...(opt('angle') === undefined ? {} : { angle: opt('angle')! }),
   })
   if ((c.req.header('Accept') ?? '').includes('application/json')) {
     return c.json(result, result.ok ? 200 : 400)
   }
-  const said = !f.has('asset') ? 'نُقل البند.' : f.get('asset') === '' ? 'سيُولَّد محتوى البند.' : 'اختير ملفُّ البند من الأصول.'
+  const said = !f.has('asset') ? 'حُفظ البند.' : f.get('asset') === '' ? 'سيُولَّد محتوى البند.' : 'اختير ملفُّ البند من الأصول.'
   await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: said } : { kind: 'bad', text: result.reason })
   return c.redirect('/panel/client#board', 303)
 })
@@ -1939,6 +1942,19 @@ panel.post('/panel/plan/schedule', async (c) => {
     ? { kind: 'ok', text: `جُدول ${done.scheduled} — كلٌّ في يوم بنده وأرجح ساعات منصّته. شكرًا.` }
     : { kind: done.scheduled > 0 ? 'warn' : 'bad', text: `جُدول ${done.scheduled}، وبقي ${done.skipped.length}: ${first?.reason ?? ''}` })
   return c.redirect('/panel/client', 303)
+})
+
+/** إضافةُ بندٍ إلى الخطّة (D-264) — والتحقّقُ كلُّه في `addPlanItem`. */
+panel.post('/panel/plan/item/add', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const result = await addPlanItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), {
+    sourceId: String(f.get('source') ?? ''), platform: String(f.get('platform') ?? ''),
+    day: String(f.get('day') ?? ''), time: String(f.get('time') ?? ''), angle: String(f.get('angle') ?? ''),
+  })
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'أُضيف البند إلى الخطّة.' } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/client#board', 303)
 })
 
 /** حذفُ بندٍ من الخطّة (D-260) — قبل أن يُكتب، والصفحةُ تُعاد بفهارسها الجديدة. */

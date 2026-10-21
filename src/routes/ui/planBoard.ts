@@ -15,7 +15,7 @@ import { LOGOS } from './logos'
 import { platformLabel } from '../../lib/oauth/providers'
 import { dayLabel } from '../../lib/time/zone'
 import { spanDays } from '../../lib/plan/prompt'
-import { PLAN_PLATFORMS } from '../../lib/plan/edit'
+import { ANGLE_MAX, PLAN_PLATFORMS } from '../../lib/plan/edit'
 import type { StoredPlan } from '../../lib/plan/job'
 
 function addDays(day: string, n: number): string {
@@ -38,7 +38,7 @@ export const PLAN_VIEWS = [
 
 type Item = StoredPlan['plan']['items'][number]
 
-export function planBoard(plan: StoredPlan, names: Readonly<Record<string, string>>): string {
+export function planBoard(plan: StoredPlan, names: Readonly<Record<string, string>>, sources: readonly { readonly id: string; readonly name: string }[] = []): string {
   const month = plan.span === 'month'
   const days = Array.from({ length: spanDays(plan.span ?? 'week') }, (_, i) => addDays(plan.week, i))
   const items = plan.plan.items.map((item, index) => ({ item, index }))
@@ -55,6 +55,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
           <label>اليوم <select name="day">${dayOptions(item.day)}</select></label>
           <label>المنصّة <select name="platform">${platOptions(item.platform)}</select></label>
           <label>الساعة <input type="time" name="time" value="${escapeHtml(item.time)}" dir="ltr"></label>
+          <label>الزاوية <textarea name="angle" rows="2" maxlength="${ANGLE_MAX}" dir="auto">${escapeHtml(item.angle)}</textarea></label>
           <button class="btn btn-secondary btn-sm" type="submit">احفظ</button>
         </form>
         <form class="inline" method="POST" action="/panel/plan/item/remove" data-confirm="احذف هذا البند من الخطّة؟">
@@ -123,12 +124,25 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
       <td dir="auto">${escapeHtml(item.angle)}</td><td><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td>
       <td>${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
 
+  /** **أضف بندًا** (D-264): مصدرٌ من مصادر العميل، ويومٌ ومنصّةٌ وساعةٌ وزاوية — يُلحق آخرَ الخطّة. */
+  const addForm = (): string => sources.length === 0 ? '' : `<details class="pb-more mb-4"><summary>أضف بندًا</summary>
+      <form class="pb-edit mt-2" method="POST" action="/panel/plan/item/add">
+        <input type="hidden" name="id" value="${escapeHtml(plan.id)}">
+        <label>المصدر <select name="source">${sources.map((x) => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)}</option>`).join('')}</select></label>
+        <label>اليوم <select name="day">${dayOptions(days[0]!)}</select></label>
+        <label>المنصّة <select name="platform">${platOptions('linkedin')}</select></label>
+        <label>الساعة <input type="time" name="time" value="07:00" dir="ltr"></label>
+        <label>الزاوية <textarea name="angle" rows="2" maxlength="${ANGLE_MAX}" dir="auto" required></textarea></label>
+        <button class="btn btn-primary btn-sm" type="submit">أضف</button>
+      </form></details>`
+
   const views = PLAN_VIEWS.map((v, i) => `<button class="btn btn-secondary btn-sm" type="button" data-view="${v.id}" aria-pressed="${i === 0}">${v.label}</button>`).join('')
 
   return `<div class="card mt-4" id="board" data-plan="${escapeHtml(plan.id)}">
     <div class="split"><h2>الخطّة ${month ? 'شهرًا' : 'أسبوعًا'} <span class="count">${items.length}</span></h2>
       <div class="row gap-2" role="group" aria-label="طريقة العرض">${views}</div></div>
     <p class="hint m-0 mb-4">اسحب البطاقةَ إلى يومٍ أو منصّةٍ لتنقلها، أو «عدّل» في القائمة. والساعةُ بتوقيت UTC كما يكتبها المخطِّط.</p>
+    ${addForm()}
     <div class="pb-board" data-mode="board" data-pv="days">${dayCols(true)}</div>
     <div class="pb-board" data-mode="board" data-pv="platforms" hidden>${platformCols}</div>
     <div class="pb-cal" data-pv="calendar" hidden>${weekdays}${cells}</div>

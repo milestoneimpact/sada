@@ -34,6 +34,8 @@ export interface ClientData {
   readonly ready?: number
   /** مسوّداتُ الخطّة المكتوبة كلُّها — صفرٌ بعد «ابدأ» يعني أنّها تُكتب الآن. */
   readonly written?: number
+  /** مصادرُ العميل لـ«أضف بندًا» (D-264). */
+  readonly sources?: readonly { readonly id: string; readonly name: string }[]
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -167,7 +169,7 @@ export function clientScreen(d: ClientData): string {
   <p class="lede m-0 mb-4"><b>اكتمل ${ready} من 7</b>${next === undefined ? ' — العميلُ جاهز.' : ` — التالي: <b>${escapeHtml(next)}</b>.`}</p>
   ${flow(d)}
   <div class="grid tiles c4 mb-4">${stations.join("")}</div>
-  ${d.plan === null ? '' : planBoard(d.plan, d.names ?? {})}
+  ${d.plan === null ? '' : planBoard(d.plan, d.names ?? {}, d.sources ?? [])}
   <div class="card mt-4" id="brief"><h2>الموجز</h2>
     <p class="hint">يقرؤه مخطِّطُ الخطّة وكاتبُ المسوّدات، <b>وصفًا يُراعى</b>: القيودُ قبله أعلى منه، فلا رقمَ يُخترَع ولا رابط.</p>
     ${briefForm(b)}
