@@ -128,6 +128,7 @@ import { libraryScreen } from './ui/libraryView'
 import { readBrief, writeBrief } from '../lib/brief'
 import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
+import { channelPulse } from '../lib/insights/pulse'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
@@ -2334,6 +2335,10 @@ panel.get('/panel/channels/:platform', async (c) => {
     flash: await takeFlash(c.env, c.req.raw),
     ...(clipReach === undefined ? {} : { reachPublic: clipReach }),
     ...(platform === 'tiktok' && reach !== null ? { reachNoScope: tiktokNeedsScope(reach) } : {}),
+    // ‏نبضُ القناة لهذا العميل (D-263) — في «المنشورات» وحدها، من الحقائق نفسِها التي يقرؤها «ما ينجح»
+    ...(tab === 'posts' && needs?.measured === true
+      ? { pulse: channelPulse(await readFacts(c.env.DB, activeOrg(session.record), platform), now, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) }
+      : {}),
   })
   return page((nonce) =>
     // ‏والرمزُ يُحقَن هنا كما في اللوحة: نموذجا ضبط التطبيق كانا يُرسَلان بلا

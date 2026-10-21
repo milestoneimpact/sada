@@ -343,3 +343,21 @@ describe('المنشورُ بجانب معتاد قناته (GROWTH-PLAN م-٤)'
     expect(html).not.toContain('من المعتاد')
   })
 })
+
+describe('نبضُ القناة ونموُّ المنشور (D-263)', () => {
+  const w = (window: '24h' | '72h' | '7d', reactions: number) => ({ window, impressions: null, reactions, comments: 0, shares: 0, pulledAt: '2026-09-06 00:00:00' })
+
+  it('أربعُ بلاطاتٍ فوق «ما نُشر»، وما لم يُقَس يقول ما بقي له', () => {
+    const html = screen({ pulse: { last30: 5, median30: 12, trend: 40, slot: null, format: null, why: 'لم يُقَس بعد — 5 من 8' } })
+    for (const k of ['خرج في 30 يومًا', 'وسيطُ التفاعل', 'أرجحُ موعد', 'أنجحُ شكل']) expect(html).toContain(`<div class="kv-k">${k}</div>`)
+    expect(html).toContain('<b>أعلى بـ40٪</b>')
+    expect(html).toContain('5 من 8')
+    expect(html.indexOf('خرج في 30 يومًا')).toBeLessThan(html.indexOf('id="history"'))
+    expect(screen({ tab: 'setup', pulse: { last30: 5, median30: 12, trend: 40, slot: null, format: null, why: null } })).not.toContain('خرج في 30 يومًا')
+  })
+
+  it('النموُّ عبر النوافذ حين تُقاس اثنتان فأكثر', () => {
+    expect(screen({ metrics: { p1: [w('24h', 12), w('72h', 18), w('7d', 21)] } })).toMatch(/12 ← .*18 ← .*21/)
+    expect(screen({ metrics: { p1: [w('24h', 12)] } })).not.toContain(' ← ')
+  })
+})
