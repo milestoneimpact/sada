@@ -31,8 +31,10 @@ describe('رحلةُ العميل', () => {
   it('المحطّاتُ السبع، والموجزُ أوّلُ ما ينقص', async () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
-    for (const s of ['العميل', 'الموجز', 'القنوات', 'الخطّة', 'المحتوى', 'الكلفة', 'التحليل']) expect(html).toContain(`· ${s}</b>`)
+    for (const s of ['العميل', 'الموجز', 'القنوات', 'الخطّة', 'المحتوى', 'الكلفة', 'التحليل']) expect(html).toContain(` · ${s}</div>`)
     expect(html).toContain('لم يُكتب بعد')
+    // ‏والتقدّمُ والتالي في سطرٍ واحد فوق البلاطات
+    expect(html).toContain('<b>اكتمل 1 من 7</b> — التالي: <b>الموجز</b>.')
     expect(html).toContain('action="/panel/client/brief"')
   })
 
