@@ -2511,6 +2511,12 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     // ‏والمعاينةُ والتنفيذُ يسندانه إلى حسابه
     const shown = await (await post(cookie, '/panel/drafts/spread', { start: '2030-03-04T06:00', gap: '24' })).text()
     expect(shown).not.toContain('لا قناة مربوطةً لمنصّته')
+    // ‏والمعاينةُ بـ GET هي نفسُها (EASE-PLAN ب): التحديثُ لا يسأل «أعيد الإرسال؟»، ولا يكتب شيئًا
+    const viaGet = await (await app.request('/panel/drafts/spread?start=2030-03-04T06%3A00&gap=24', withSession(cookie), env)).text()
+    expect(viaGet).toContain('هذا ما سيقع')
+    expect(viaGet).not.toContain('لا قناة مربوطةً لمنصّته')
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'").first<{ n: number }>())?.n).toBe(0)
+    expect((await app.request('/panel/drafts/spread?gap=24', {}, env)).status).not.toBe(200)
     await post(cookie, '/panel/drafts/spread/apply', { start: '2030-03-04T06:00', gap: '24', post: [ig, li] })
     const rows = await db
       .prepare('SELECT id, status, account_id FROM posts ORDER BY scheduled_at')

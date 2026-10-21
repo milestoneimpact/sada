@@ -2807,34 +2807,50 @@ async function lackingOf(db: Env['DB'], drafts: readonly { id: string; platform:
  * ثانٍ يضغطه المالكُ بعد أن يرى**. ومسارٌ يفعل الاثنين يجعل زرَّ
  * «وزّع» يجدول عشرةَ منشوراتٍ بضغطةٍ واحدةٍ بلا أن يُقرأ جدول.
  */
-panel.post('/panel/drafts/spread', async (c) => {
-  const gate = await guardPost(c)
-  if ('denied' in gate) return gate.denied
-
-  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
-  const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
+/**
+ * ‏**والمعاينةُ بـ GET** (EASE-PLAN ب): كانت ردًّا على POST، فتحديثُ الصفحة يسأل «أعيد الإرسال؟». وهي لا تكتب شيئًا،
+ * فلا حارسَ CSRF يلزمها — الجلسةُ وحدها. والمسارُ القديمُ بـ POST باقٍ لمن حفظ النموذجَ القديم.
+ */
+async function spreadPreview(c: Context<{ Bindings: Env }>, form: FormData, csrf: string, org: ReturnType<typeof activeOrg>): Promise<Response> {
+  const drafts = await listDrafts(c.env.DB, org, BOARD)
+  const accounts = await listAccounts(c.env.DB, org)
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
 
   const now = new Date()
-  const gap = readGap(gate.form.get('gap'))
+  const gap = readGap(form.get('gap'))
   const lacking = await lackingOf(c.env.DB, drafts)
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const plan = planSpread(
     drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     // ‏وأوّلُ موعدٍ بتوقيت المالك من اللوحة (`local`، D-199)، أو `start` بـ UTC كما يُرسله شريطُ الشاشة
-    readStart(readWhen(gate.form, zone, now) || gate.form.get('start'), now),
+    readStart(readWhen(form, zone, now) || form.get('start'), now),
     gap,
     now,
   )
 
-  const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
+  const start = plan.slots[0]?.when ?? String(form.get('start') ?? '')
   return page((nonce) =>
-    soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf, zone }), nonce, '',
+    soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf, zone }), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
+}
+
+panel.post('/panel/drafts/spread', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  return spreadPreview(c, gate.form, gate.session.record.csrf, activeOrg(gate.session.record))
+})
+
+panel.get('/panel/drafts/spread', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const form = new FormData()
+  for (const [k, v] of new URL(c.req.url).searchParams) form.append(k, v)
+  return spreadPreview(c, form, session.record.csrf, activeOrg(session.record))
 })
 
 /**
