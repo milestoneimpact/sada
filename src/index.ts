@@ -427,7 +427,7 @@ export interface AnalyzeMessage {
  * ثمّ صورتُه إن رُفعت الصورةُ الآليّة وبقي من سقفها. **ولا جدولة**: المسوّدةُ تنتظر اعتمادَ المالك كما تنتظر كلُّ مسوّدة.
  */
 export interface PlanDraftMessage {
-  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string; readonly asset?: string }
+  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string; readonly asset?: string; readonly planId?: string }
 }
 
 /**
@@ -445,6 +445,13 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
   if (outcome.kind === 'failed' && outcome.retryable) return message.retry()
   message.ack()
+  // ‏والمسوّدةُ تعرف خطّتها (D-261): منها يُقرأ يومُ البند حين تُجدوَل الخطّة
+  const planId = message.body.draft.planId
+  if (outcome.kind === 'drafted' && planId !== undefined) {
+    await env.DB.prepare('UPDATE posts SET plan_id = ? WHERE id = ? AND org_id = ? AND plan_id IS NULL')
+      .bind(planId, outcome.postId, org).run()
+      .catch((error: unknown) => console.warn({ job: 'plan-draft-link', post: outcome.postId, failed: String(error) }))
+  }
   // ‏ما اختير من المكتبة (D-260) يُربط بالمسوّدة بلا كلفة، ولا تُرسم لها صورةٌ آليّة فوقه
   const asset = message.body.draft.asset
   if (outcome.kind === 'drafted' && asset !== undefined) {

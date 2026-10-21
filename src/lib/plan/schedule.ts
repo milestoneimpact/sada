@@ -1,0 +1,69 @@
+/**
+ * **جدولةُ الخطّة على أرجح الأوقات** (D-261 · AGENCY-PLAN و-٥) — ما اعتمده المالكُ من مسوّدات الخطّة يُجدوَل بضغطةٍ واحدة.
+ *
+ * الموعدُ يومُ البند كما في اللوحة (بعد السحب والنقل)، **والساعةُ أرجحُ ساعات المنصّة إن قِيست** (`readPeaks`: ثمانيةُ منشوراتٍ
+ * فأكثر)، وإلّا ساعةُ البند كما كتبها المخطِّط. وموعدٌ مضى يُرحَّل يومًا فيومًا إلى أوّل موعدٍ قادمٍ بالساعة نفسِها.
+ *
+ * **ولا يُجدوَل إلّا المعتمَد**: `schedulePost` نفسُها بحرّاسها (الحال، والوسيط، والحساب النشط، والموعد في المستقبل). والمسوّدةُ
+ * التي لم تُعتمد تبقى تنتظر، ولا شيءَ يُنشر لم يقرأه المالك.
+ */
+import type { Db } from '../tokens'
+import { schedulePost } from '../schedule/job'
+import { readPeaks } from '../schedule/peak'
+import type { StoredPlan } from './job'
+
+export interface PlanSchedule {
+  readonly scheduled: number
+  readonly skipped: readonly { readonly postId: string; readonly reason: string }[]
+}
+
+/** الموعدُ `YYYY-MM-DDTHH:MM` بـ UTC — في المستقبل دائمًا. */
+export function slotFor(day: string, time: string, peakHour: number | null, now: Date): string {
+  const hhmm = peakHour === null ? time : `${String(peakHour).padStart(2, '0')}:00`
+  const at = new Date(`${day}T${hhmm}:00Z`)
+  while (at.getTime() <= now.getTime()) at.setUTCDate(at.getUTCDate() + 1)
+  return at.toISOString().slice(0, 16)
+}
+
+/**
+ * أين الخطّةُ من الرحلة: كم مسوّدةً كُتبت منها، وكم منها معتمَدٌ لم يُجدوَل — يقرؤها شريطُ الرحلة وزرُّه.
+ * **وصفرٌ مكتوبٌ بعد «ابدأ» يعني «يُكتب الآن»** لا «انتهى».
+ */
+export async function planProgress(db: Db, org: string, planId: string): Promise<{ readonly written: number; readonly ready: number }> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS written, COALESCE(SUM(status IN ('approved', 'edited')), 0) AS ready
+                FROM posts WHERE org_id = ? AND plan_id = ?`)
+    .bind(org, planId)
+    .first<{ written: number; ready: number }>()
+    .catch(() => null)
+  return { written: row?.written ?? 0, ready: row?.ready ?? 0 }
+}
+
+export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: Date): Promise<PlanSchedule> {
+  const { results: posts } = await db
+    .prepare("SELECT id, platform, source_id FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
+    .bind(org, plan.id)
+    .all<{ id: string; platform: string; source_id: string | null }>()
+  const peaks = new Map<string, number | null>()
+  const accounts = new Map<string, string | null>()
+  const skipped: { postId: string; reason: string }[] = []
+  let scheduled = 0
+  for (const post of posts) {
+    const item = plan.plan.items.find((i) => i.sourceId === post.source_id && i.platform === post.platform)
+    if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
+    if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, post.platform)).hours[0]?.hour ?? null)
+    if (!accounts.has(post.platform)) {
+      const acc = await db
+        .prepare("SELECT id FROM accounts WHERE org_id = ? AND platform = ? AND status = 'active' ORDER BY id LIMIT 1")
+        .bind(org, post.platform)
+        .first<{ id: string }>()
+      accounts.set(post.platform, acc?.id ?? null)
+    }
+    const account = accounts.get(post.platform) ?? null
+    if (account === null) { skipped.push({ postId: post.id, reason: `لا حسابَ ${post.platform} مربوطًا لهذا العميل` }); continue }
+    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peaks.get(post.platform) ?? null, now), now)
+    if (result.ok) scheduled += 1
+    else skipped.push({ postId: post.id, reason: result.reason })
+  }
+  return { scheduled, skipped }
+}

@@ -120,6 +120,9 @@ import { clientScreen } from './ui/clientView'
 import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
 import { autoImageRoom } from '../lib/image/auto'
 import { editPlanItem, removePlanItem } from '../lib/plan/edit'
+import { monthlyReport, monthOf } from '../lib/report/monthly'
+import { MONTHLY_SCRIPT, monthlyScreen } from './ui/monthlyView'
+import { planProgress, schedulePlan } from '../lib/plan/schedule'
 import { addLibraryFile, libraryProblem, listLibrary, rawObject } from '../lib/library'
 import { libraryScreen } from './ui/libraryView'
 import { readBrief, writeBrief } from '../lib/brief'
@@ -482,6 +485,7 @@ panel.get('/panel/client', async (c) => {
     .bind(org).first<{ n: number }>().catch(() => null)
   const body = clientScreen({
     waiting: waiting?.n ?? 0,
+    ...(plan === null ? {} : await planProgress(c.env.DB, org, plan.id)),
     orgName: orgRow?.name ?? 'منظّمتي',
     brief,
     linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
@@ -510,6 +514,23 @@ panel.post('/panel/client/brief', async (c) => {
   })
   await record(c.env.DB, { actor: 'panel', action: 'brief.write' }, c.req.raw)
   return c.redirect('/panel/client?saved=1#brief', 303)
+})
+
+/** تقريرُ الشهر لكلّ عميل (D-262 · AGENCY-PLAN و-٦) — يُطبع PDF من المتصفّح. */
+panel.get('/panel/client/report', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const [orgRow, zone] = await Promise.all([
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+  ])
+  const report = await monthlyReport(c.env.DB, org, monthOf(c.req.query('month'), new Date()), zone)
+  return page((nonce) =>
+    soloPage(`صدى — تقرير ${report.month}`, { href: '/panel/client', label: 'رحلة العميل' }, monthlyScreen(report, orgRow?.name ?? 'منظّمتي'), nonce, MONTHLY_SCRIPT,
+      buildCommands({ onPanel: false }), soloNav('results')),
+  )
 })
 
 panel.get('/panel/insights', async (c) => {
@@ -1881,7 +1902,7 @@ panel.post('/panel/plan/start', async (c) => {
   })
   if (items.length > 0) {
     await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => ({
-      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org, ...(i.asset === undefined ? {} : { asset: i.asset }) } },
+      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org, planId: plan.id, ...(i.asset === undefined ? {} : { asset: i.asset }) } },
     })))
   }
   await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
@@ -1890,6 +1911,32 @@ panel.post('/panel/plan/start', async (c) => {
     text: `بدأ العمل: ${items.length} ${items.length === 1 ? 'مسوّدة تُكتب' : 'مسوّدات تُكتب'} في الخلفيّة${
       settings.autoImage ? ' مع صورها' : ''}، وتظهر في «تنتظر قرارك» خلال دقائق. ولا يُنشر منها شيءٌ قبل اعتمادك.`,
   })
+  return c.redirect('/panel/client', 303)
+})
+
+/**
+ * **جدولةُ ما اعتُمد من الخطّة** (D-261 · AGENCY-PLAN و-٥): كلُّ مسوّدةٍ معتمَدةٍ من الخطّة إلى يوم بندها وأرجح ساعات منصّتها.
+ * والمرفوضُ بسببه يُقال، والإيقافُ يمنع قبل أن يُجدوَل شيء.
+ */
+panel.post('/panel/plan/schedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const plan = await latestPlan(c.env.DB, org)
+  if (plan === null || plan.id !== String(gate.form.get('id') ?? '')) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا خطّة بهذا المعرّف لهذا العميل.' })
+    return c.redirect('/panel/client', 303)
+  }
+  if ((await readSettings(c.env.DB)).paused) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'صدى موقوفٌ مؤقّتًا — لا يُجدوَل شيءٌ حتّى يُرفع الإيقاف.' })
+    return c.redirect('/panel/client', 303)
+  }
+  const done = await schedulePlan(c.env.DB, org, plan, new Date())
+  await record(c.env.DB, { actor: 'panel', action: 'plan.schedule', target: plan.id, detail: `${done.scheduled} جُدول · ${done.skipped.length} لم يُجدوَل` }, c.req.raw)
+  const first = done.skipped[0]
+  await setFlash(c.env, c.req.raw, done.skipped.length === 0
+    ? { kind: 'ok', text: `جُدول ${done.scheduled} — كلٌّ في يوم بنده وأرجح ساعات منصّته. شكرًا.` }
+    : { kind: done.scheduled > 0 ? 'warn' : 'bad', text: `جُدول ${done.scheduled}، وبقي ${done.skipped.length}: ${first?.reason ?? ''}` })
   return c.redirect('/panel/client', 303)
 })
 
