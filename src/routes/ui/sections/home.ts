@@ -14,7 +14,8 @@ import {
   type HomeFacts, type JourneyStep, type PlatformTile,
 } from '../../../lib/home'
 import { parseSqliteUtc, untilTime } from '../../../lib/format'
-import { localParts } from '../../../lib/time/zone'
+import { clock, localParts } from '../../../lib/time/zone'
+import { platformLabel } from '../../../lib/oauth/providers'
 
 import { LOGOS } from '../logos'
 import { RUNG_MARK } from '../parts'
@@ -152,6 +153,24 @@ function activity(f: HomeFacts, now: Date): string {
   </div>`
 }
 
+/**
+ * **«يُنشر اليوم»** (D-267 · EASE د): ما يخرج قبل منتصف ليل المالك، بساعته ومنصّته — أوّلُ ما يُسأل عنه صباحًا.
+ * من المجدول نفسِه الذي يرسم «هذا الأسبوع»، فلا استعلامَ جديد. وما مضى بأكثرَ من ساعةٍ يسقط كما يسقط هناك.
+ */
+function today(items: readonly { platform: string; at: string }[], now: Date, zone: string | null): string {
+  const key = (d: Date): string => { const p = localParts(d, zone); return `${p.year}-${p.month}-${p.day}` }
+  const list = items
+    .map((it) => ({ platform: it.platform, at: it.at, d: parseSqliteUtc(it.at) }))
+    .filter((it): it is { platform: string; at: string; d: Date } => it.d !== null && it.d.getTime() >= now.getTime() - 3_600_000 && key(it.d) === key(now))
+    .sort((a, b) => a.d.getTime() - b.d.getTime())
+  const rows = list.map((it) => `<li><bdi dir="ltr" class="num">${escapeHtml(clock(it.at, zone))}</bdi>
+      <span class="td-pf">${LOGOS[it.platform] ?? ''}${escapeHtml(platformLabel(it.platform as never))}</span></li>`).join('')
+  return `<div class="card home-card">
+    <div class="card-head"><h2>يُنشر اليوم</h2><div class="grow"></div><span class="count">${list.length}</span></div>
+    ${list.length === 0 ? '<p class="hint">لا شيء يُنشر اليوم.</p>' : `<ol class="td-list">${rows}</ol>`}
+  </div>`
+}
+
 export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
@@ -174,6 +193,7 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
       <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
     </div>
     <div class="home-side">
+    ${today(f.scheduled ?? [], now, f.zone)}
     ${activity(f, now)}
     ${week(f.scheduled ?? [], now, f.zone)}
   <div class="card home-card">

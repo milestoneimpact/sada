@@ -258,6 +258,11 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .grid>.tile:first-child .kv-v{font-size:var(--t-display); line-height:var(--lh-display); color:var(--au);
   font-weight:400; direction:ltr; letter-spacing:-.01em}
 
+/* ‏«يُنشر اليوم» (D-267): الساعةُ ثمّ المنصّةُ بشعارها، سطرًا لكلّ منشور */
+.td-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-2)}
+.td-list li{display:flex; align-items:center; gap:var(--s-3); font-size:var(--t-ui); line-height:var(--lh-ui)}
+.td-pf{display:inline-flex; align-items:center; gap:var(--s-1); color:var(--ink-2)}
+.td-pf svg{width:var(--icon-sm); height:var(--icon-sm)}
 /* ── الرئيسيّة (D-265): التحيّة، والأرقام الأربعة، وأعمدة الأيّام ── */
 .hello{margin:0 0 var(--s-2); font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .hstats{list-style:none; margin:0 0 var(--gap-card); padding:0; display:grid; gap:var(--s-3);

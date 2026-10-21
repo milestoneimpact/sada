@@ -53,3 +53,22 @@ describe('لوحة القيادة (D-194)', () => {
     expect(html).toContain('<div class="vh"><table>')
   })
 })
+
+describe('«يُنشر اليوم» (D-267 · EASE د)', () => {
+  it('ما يخرج قبل منتصف ليل المالك، بساعته ومنصّته ومرتّبًا', () => {
+    const html = homeTop(facts({
+      zone: 'Asia/Riyadh',
+      scheduled: [
+        { platform: 'x', at: '2026-10-04 18:00:00' },
+        { platform: 'linkedin', at: '2026-10-04 14:00:00' },
+        { platform: 'x', at: '2026-10-04 22:30:00' }, // ‏01:30 بتوقيت الرياض: الغد
+      ],
+    }), NOW)
+    const td = html.slice(html.indexOf('<ol class="td-list">'), html.indexOf('</ol>', html.indexOf('<ol class="td-list">')))
+    expect(td.match(/<li>/g)).toHaveLength(2)
+    expect(td.indexOf('LinkedIn')).toBeLessThan(td.indexOf('X'))
+  })
+  it('ويومٌ فارغٌ يقول ذلك', () => {
+    expect(homeTop(facts(), NOW)).toContain('لا شيء يُنشر اليوم.')
+  })
+})
