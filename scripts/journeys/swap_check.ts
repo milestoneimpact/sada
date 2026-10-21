@@ -18,7 +18,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   page.on('console', (m) => { if (m.type() !== 'log') console.log('[console]', m.type(), m.text()) })
   page.on('pageerror', (e) => console.log('[pageerror]', e.message))
-  await login(page, stack.url)
+  await login(page, stack)
   const draft = stack.db.raw.prepare("SELECT id FROM posts WHERE status = 'draft' ORDER BY created_at LIMIT 1").get() as { id: string }
   const status = (): string => (stack.db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(draft.id) as { status: string }).status
   await page.goto(`${stack.url}/panel#d-${draft.id}`)
@@ -129,10 +129,8 @@ try {
   check(status() === 'draft', `ولم يقع الفعل بلا جلسة: ${status()}`)
 
   // ‏**المراسي القديمة تصل إلى صفحاتها** (D-211): رابطٌ محفوظٌ «/panel#providers» يُفتح في «/panel/settings»
-  await page.goto(`${stack.url}/panel/login`)
-  await page.locator('input[name="token"]').fill((await import('./server')).LOCAL_ADMIN_TOKEN)
-  await page.locator('form button[type="submit"]').first().click()
-  await page.waitForLoadState('networkidle')
+  await page.goto(`${stack.url}/panel`)
+  await login(page, stack)
   for (const [from, to, shown] of [
     ['/panel#providers', '/panel/settings', '#providers'], ['/panel#ch-x', '/panel/accounts', '#ch-x'],
     ['/panel#sources', '/panel/library', '#sources'], ['/panel#pivot', '/panel/analysis', '#pivot'],

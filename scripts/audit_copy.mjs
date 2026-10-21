@@ -61,6 +61,7 @@ export const RULES = [
   { id: 'infra', re: /الطابور|\bQueue\b|\bcron\b|\bD1\b|\bR2\b|idempotency/g, say: '«مجدولة» و«قيد النشر» و«المهامّ الدوريّة»', except: LEGAL },
   { id: 'scopes', re: /\bopenid\b|w_member_social|\bscopes?\b/g, say: '«الصلاحيات»، والأسماءُ تحت «للمطوّر»', except: [...LEGAL, ...SETUP] },
   { id: 'secret-name', re: /\b[A-Z][A-Z0-9]*_(?:SECRET|TOKEN|KEY)\b|client_credentials|invalid_client/g, say: '«المفتاحُ السرّيّ للتطبيق»، والاسمُ في `<code>`', except: [...LEGAL, ...SETUP] },
+  { id: 'dev-cmd', re: /\bwrangler\b|chat\/completions/g, say: 'لغةُ المالك، والأمرُ تحت «للمطوّر» (EASE-PLAN أ-2)', except: LEGAL },
   { id: 'task-id', re: /\bM-\d\d\b/g, say: 'يُحذف من الواجهة، والمهمّةُ بعنوانها', except: [...TASKS, ...SETUP] },
   { id: 'failed', re: /ساقطة/g, say: '«فشلت»' },
   { id: 'gone', re: /غادرت?\s+إلى/g, say: '«قيد النشر» أو «نُشرت» أو «فشلت» بحسب الحال' },

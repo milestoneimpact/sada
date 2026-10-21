@@ -96,7 +96,19 @@ export function systemPrompt(): string {
   ].join('\n')
 }
 
-export function userPrompt(sources: readonly PlanSource[], week: string): string {
+/** مدى الخطّة (D-256): أسبوعٌ أو شهرٌ من أربعة أسابيع تبدأ بالاثنين نفسِه. */
+export type PlanSpan = 'week' | 'month'
+
+export function spanDays(span: PlanSpan): number {
+  return span === 'month' ? 28 : 7
+}
+
+/** سقفُ البنود بالمدى: ستّةٌ للأسبوع كما كان، وأربعةٌ وعشرون للشهر. */
+export function maxItems(span: PlanSpan): number {
+  return span === 'month' ? MAX_ITEMS * 4 : MAX_ITEMS
+}
+
+export function userPrompt(sources: readonly PlanSource[], week: string, span: PlanSpan = 'week'): string {
   const lines = sources.map((s) =>
     [
       `### ${s.name}`,
@@ -110,13 +122,13 @@ export function userPrompt(sources: readonly PlanSource[], week: string): string
       .join('\n'),
   )
   // أيّامُ الأسبوع السبعةُ بحرفها: النموذجُ لا يحسب تواريخَ، ينسخها
-  const days = Array.from({ length: 7 }, (_, i) => {
+  const days = Array.from({ length: spanDays(span) }, (_, i) => {
     const d = new Date(`${week}T00:00:00Z`)
     d.setUTCDate(d.getUTCDate() + i)
     return d.toISOString().slice(0, 10)
   })
   return [
-    `# أسبوع يبدأ ${week}`,
+    span === 'month' ? `# شهرٌ من أربعة أسابيع يبدأ ${week}، وبنودُه حتّى ${maxItems(span)}` : `# أسبوع يبدأ ${week}`,
     `أيّامُه المتاحة للنشر: ${days.join(' · ')}`,
     '',
     '# المصادر المتاحة',
@@ -169,6 +181,8 @@ export interface PlanItem {
   /** `HH:MM` بـ UTC. */
   readonly time: string
   readonly why: string
+  /** ما اختير له من المكتبة (D-260): `m:` · `u:` · `f:` — وغيابُه يعني «ولّد أنت». */
+  readonly asset?: string
 }
 
 export interface Plan {
@@ -176,13 +190,13 @@ export interface Plan {
   readonly items: readonly PlanItem[]
 }
 
-function within(day: string, week: string): boolean {
+function within(day: string, week: string, length = 7): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false
   const start = Date.parse(`${week}T00:00:00Z`)
   const at = Date.parse(`${day}T00:00:00Z`)
   if (Number.isNaN(start) || Number.isNaN(at)) return false
   const days = (at - start) / 86_400_000
-  return days >= 0 && days < 7
+  return days >= 0 && days < length
 }
 
 /**
@@ -202,6 +216,7 @@ export function parsePlan(
   raw: unknown,
   known: ReadonlySet<string>,
   week: string,
+  span: PlanSpan = 'week',
 ): { ok: true; plan: Plan; dropped: number; droppedWhy: string } | { ok: false; reason: string } {
   if (typeof raw !== 'object' || raw === null) return { ok: false, reason: 'الجواب ليس كائنا' }
   const value = raw as { rationale?: unknown; items?: unknown }
@@ -229,7 +244,7 @@ export function parsePlan(
         ? 'منصّة غير مدعومة'
         : angle.length < 10
           ? 'زاوية أقصر من عشرة أحرف'
-          : !within(day, week)
+          : !within(day, week, spanDays(span))
             ? 'يوم خارج الأسبوع'
             : !/^\d{2}:\d{2}$/.test(time)
               ? 'وقت ليس HH:MM'
@@ -259,11 +274,11 @@ export function parsePlan(
    * الفرز يُسقط آخرَ الأسبوع لا أضعفَ البنود: سابعٌ في الأولويّة يومَ
    * الأحد يبقى، وثانٍ يومَ الخميس يُرمى.
    */
-  const over = items.length - MAX_ITEMS
+  const over = items.length - maxItems(span)
   if (over > 0) {
-    items.splice(MAX_ITEMS)
+    items.splice(maxItems(span))
     dropped += over
-    why.set('بند بعد السادس', over)
+    why.set(span === 'month' ? 'بند بعد الرابع والعشرين' : 'بند بعد السادس', over)
   }
 
   return {

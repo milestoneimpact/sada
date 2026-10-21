@@ -38,7 +38,7 @@ describe('لوحة القيادة (D-194)', () => {
   it('وأسبوع فارغ يقول ما يفعله المالك', () => {
     expect(homeTop(facts(), NOW)).toContain('لا شيء مجدول في الأيّام السبعة')
   })
-  it('التحيّة بساعة المالك، والأرقام الأربعة من العدّ المجمَّع (D-247)', () => {
+  it('التحيّة بساعة المالك، والأرقام الأربعة من العدّ المجمَّع (D-265)', () => {
     const html = homeTop(facts({ zone: 'Asia/Riyadh', counts: { perPlatform: {
       x: { draft: 3, approved: 0, queued: 2, published: 5, failed: 1, recentFailed: 1, nextAt: null } }, publishedWeek: 4 } }), NOW)
     expect(html).toContain('<p class="hello">نهارك سعيد</p>')

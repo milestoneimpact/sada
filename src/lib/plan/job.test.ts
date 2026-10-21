@@ -487,3 +487,37 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
     expect((calls[0]?.body as { response_format?: unknown }).response_format).toEqual({ type: 'json_object' })
   })
 })
+
+describe('خطّةٌ لكلّ عميل، أسبوعًا أو شهرًا (D-256)', () => {
+  it('الشهرُ يقبل بندًا في أسبوعه الثالث ويُكتب شهرًا، والأسبوعُ يُسقطه', async () => {
+    const a = await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    const later = item(a, { day: '2026-09-28' })
+    const month = await planWeek({ ...deps(net({ payload: plan([item(a), later]) })), span: 'month' })
+    expect(month).toMatchObject({ kind: 'planned', items: 2, dropped: 0 })
+    expect((await latestPlan(db))?.span).toBe('month')
+    // ‏والموجّهُ يقول إنّه شهر
+    expect(JSON.stringify(calls[0]?.body)).toContain('شهرٌ من أربعة أسابيع')
+
+    const week = await planWeek(deps(net({ payload: plan([item(a), later]) })))
+    expect(week).toMatchObject({ kind: 'planned', items: 1, dropped: 1 })
+    // ‏وخطّةُ الأسبوع لا تمحو خطّةَ الشهر
+    expect((await db.prepare('SELECT span FROM plans ORDER BY span').all<{ span: string }>()).results.map((r) => r.span)).toEqual(['month', 'week'])
+  })
+
+  it('عميلان لكلٍّ خطّتُه للأسبوع نفسِه، ومصادرُ كلٍّ له وحده', async () => {
+    const a = await seedSource('a', 0.9)
+    await seedSource('b', 0.6)
+    db.raw.exec("INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'عميل', 'agency')")
+    // ‏العميلُ الثاني بلا مصادر: لا يُخطَّط له من مصادر المالك
+    expect(await planWeek({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })).toMatchObject({ kind: 'not_enough' })
+    db.raw.exec("UPDATE sources SET org_id = 'org_b'; UPDATE content_items SET org_id = 'org_b'")
+    await planWeek({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })
+    expect(await latestPlan(db, 'org_b')).not.toBeNull()
+    expect(await latestPlan(db)).toBeNull()
+    // ‏والاعتمادُ من منظّمةٍ أخرى لا يقع
+    const id = (await latestPlan(db, 'org_b'))!.id
+    expect(await approvePlan(db, id)).toBe(false)
+    expect(await approvePlan(db, id, 'org_b')).toBe(true)
+  })
+})

@@ -10,6 +10,9 @@ describe('أين تسكن كلّ مرساة (D-211)', () => {
     expect(panelHref('pivot')).toBe('/panel/analysis#pivot')
     expect(panelHref('d-123')).toBe('/panel#d-123')
     expect(panelHref('posts')).toBe('/panel#posts')
+    // ‏حقولُ السقوف انتقلت مع «الإنفاق والحدود»، وكانت «#c2» و«#c3» تقع على /panel بلا هدف
+    expect(panelHref('c2')).toBe('/panel/settings#c2')
+    expect(panelHref('c3')).toBe('/panel/settings#c3')
     expect(anchorPath('write')).toBeNull()
   })
 })

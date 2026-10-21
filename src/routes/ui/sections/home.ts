@@ -108,7 +108,7 @@ function focusOf(trip: readonly JourneyStep[], step: JourneyStep['key'] | undefi
   return failed >= 0 ? failed : trip.findIndex(live)
 }
 
-/** التحيّةُ بساعة المالك لا بساعة الخادم (D-247). */
+/** التحيّةُ بساعة المالك لا بساعة الخادم (D-265). */
 export function greeting(now: Date, zone: string | null): string {
   const h = localParts(now, zone).hour
   return h >= 4 && h < 12 ? 'صباح الخير' : h >= 12 && h < 17 ? 'نهارك سعيد' : 'مساء الخير'
@@ -118,7 +118,7 @@ export function greeting(now: Date, zone: string | null): string {
 function stats(f: HomeFacts): string {
   const failed = Object.values(f.counts.perPlatform).reduce((n, p) => n + (p.recentFailed ?? p.failed), 0)
   const cells: readonly [string, number, string, string][] = [
-    ['بانتظار قرارك', total(f.counts, 'draft'), '#desk', 'wait'],
+    ['بانتظار قرارك', total(f.counts, 'draft'), '#posts', 'wait'],
     ['مجدولة', total(f.counts, 'queued'), '#posts', 'sched'],
     ['نُشرت هذا الأسبوع', f.counts.publishedWeek, '#results', 'ok'],
     ['فشلت هذا الأسبوع', failed, '#posts', failed > 0 ? 'bad' : 'idle'],

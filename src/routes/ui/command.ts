@@ -237,6 +237,11 @@ export function buildCommands(
       icon: '', alias: a.alias,
     })
   }
+  // ‏ورحلةُ العميل (D-257): المحطّاتُ السبع والموجز
+  out.push({
+    label: 'رحلة العميل', note: 'الموجزُ والقنواتُ والخطّةُ والكلفةُ في شاشة', group: 'الأفعال',
+    href: '/panel/client', icon: '', alias: 'client brief onboarding agency عميل موجز وكاله رحله',
+  })
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
     label: 'الخطّ الزمنيّ للمحفظة', note: 'كلّ منشور شريط على الأيّام — في النتائج', group: 'الأفعال',

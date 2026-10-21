@@ -1,0 +1,94 @@
+/**
+ * **المكتبة** (D-260) — كلُّ ما رُفع أو وُلّد أو في Drive لهذا العميل، **مجلّداتٍ تُقرأ**: النوعُ › المنشأ › الشهر.
+ *
+ * وتُفتح بوجهين: تصفّحًا، **أو اختيارًا لبندٍ في الخطّة** (`?plan=…&index=…`) فيصير تحت كلّ ملفٍّ زرُّ «اختر لهذا البند»،
+ * والرفعُ من هنا يُربط بالبند نفسِه. والفلاترُ روابطُ لا سكربت: تعمل بلا JavaScript، وتُحفظ في العنوان.
+ */
+import { escapeHtml } from './escape'
+import { pageHead } from './parts'
+import { notice, toastRegion } from './components/toast'
+import { kb } from '../../lib/format'
+import { folderOf, KIND_LABEL, LIBRARY_MIMES, ORIGIN_LABEL, type Asset, type AssetKind, type AssetOrigin } from '../../lib/library'
+
+export interface LibraryData {
+  readonly assets: readonly Asset[]
+  readonly kind: AssetKind | null
+  readonly origin: AssetOrigin | null
+  /** وجهُ الاختيار: البندُ الذي يُختار له. */
+  readonly pick: { readonly plan: string; readonly index: number } | null
+  readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+}
+
+const ICON: Readonly<Record<AssetKind, string>> = { image: '▣', video: '▶', doc: '¶' }
+
+function query(d: LibraryData, change: { kind?: AssetKind | null; origin?: AssetOrigin | null }): string {
+  const q = new URLSearchParams()
+  const kind = change.kind === undefined ? d.kind : change.kind
+  const origin = change.origin === undefined ? d.origin : change.origin
+  if (kind !== null) q.set('kind', kind)
+  if (origin !== null) q.set('origin', origin)
+  if (d.pick !== null) { q.set('plan', d.pick.plan); q.set('index', String(d.pick.index)) }
+  const s = q.toString()
+  return `/panel/assets${s === '' ? '' : `?${s}`}`
+}
+
+function chips<T extends string>(d: LibraryData, labels: Readonly<Record<T, string>>, current: T | null, key: 'kind' | 'origin', counts: (v: T | null) => number): string {
+  const one = (v: T | null, text: string): string =>
+    `<a class="btn btn-secondary btn-sm" href="${escapeHtml(query(d, { [key]: v }))}"${v === current ? ' aria-current="page"' : ''}>${escapeHtml(text)} <span class="count">${counts(v)}</span></a>`
+  return [one(null, 'الكلّ'), ...(Object.keys(labels) as T[]).map((v) => one(v, labels[v]))].join('')
+}
+
+function hidden(d: LibraryData): string {
+  return d.pick === null ? ''
+    : `<input type="hidden" name="id" value="${escapeHtml(d.pick.plan)}"><input type="hidden" name="index" value="${d.pick.index}">`
+}
+
+function tile(a: Asset, d: LibraryData): string {
+  const media = a.preview !== null && a.kind === 'image'
+    ? `<img class="lib-thumb" src="${escapeHtml(a.preview)}" alt="" loading="lazy" decoding="async">`
+    : `<div class="lib-thumb lib-ico" aria-hidden="true">${ICON[a.kind]}</div>`
+  const open = a.drive !== null
+    ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.drive)}" target="_blank" rel="noopener">افتح في Drive</a>`
+    : a.preview !== null ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.preview)}" target="_blank" rel="noopener">افتح</a>` : ''
+  const pick = d.pick === null ? ''
+    : `<form class="inline" method="POST" action="/panel/plan/item">${hidden(d)}<input type="hidden" name="asset" value="${escapeHtml(a.ref)}">
+        <button class="btn btn-primary btn-sm" type="submit">${a.origin === 'drive' ? 'اكتب منه' : 'اختر لهذا البند'}</button></form>`
+  return `<article class="card card-inset tile">
+    ${media}
+    <div class="kv-k"><bdi>${escapeHtml(a.name)}</bdi></div>
+    <div class="note">${escapeHtml(folderOf(a))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}</div>
+    <div class="row gap-2 mt-3">${pick}${open}</div>
+  </article>`
+}
+
+export function libraryScreen(d: LibraryData): string {
+  const shown = d.assets.filter((a) => (d.kind === null || a.kind === d.kind) && (d.origin === null || a.origin === d.origin))
+  // ‏المجلّداتُ بترتيب أحدث ما فيها — وكلُّ مجلّدٍ عنوانٌ وعدد
+  const folders = new Map<string, Asset[]>()
+  for (const a of shown) {
+    const f = folderOf(a)
+    folders.set(f, [...(folders.get(f) ?? []), a])
+  }
+  const lead = d.pick === null
+    ? 'كلُّ ما رُفع أو وُلّد أو في Drive — <b>يُحفظ مصنَّفًا ويُعاد استعمالُه بلا كلفة</b>.'
+    : `<b>اختر ملفًّا لبند الخطّة</b> — أو ارفع جديدًا فيُحفظ في الأصول ويُربط به. <a href="/panel/client#board">عُد إلى الخطّة</a>`
+  const accept = [...LIBRARY_MIMES].join(',')
+  const upload = `<form class="card card-inset" id="upload" method="POST" action="/panel/assets/upload" enctype="multipart/form-data">
+      <div class="kv-k">ارفع صورة</div>
+      <p class="note">PNG أو JPEG أو WebP حتّى 5MB. والمقاطعُ من <a href="/panel/library#videos">فيديوهاتك</a> وتظهر هنا بعد رفعها.</p>
+      ${hidden(d)}
+      <div class="row gap-2 mt-3"><input type="file" name="file" accept="${accept}" required>
+      <button class="btn btn-primary btn-sm" type="submit">ارفع${d.pick === null ? '' : ' واربطه بالبند'}</button></div>
+    </form>`
+
+  return `${pageHead('الأصول', 'أصولُ العميل', lead)}
+  ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
+  <div class="row gap-2 mb-3 lib-chips" role="group" aria-label="النوع">${chips(d, KIND_LABEL, d.kind, 'kind', (v) => d.assets.filter((a) => v === null || a.kind === v).length)}</div>
+  <div class="row gap-2 mb-4 lib-chips" role="group" aria-label="المنشأ">${chips(d, ORIGIN_LABEL, d.origin, 'origin', (v) => d.assets.filter((a) => v === null || a.origin === v).length)}</div>
+  ${upload}
+  ${folders.size === 0
+    ? '<p class="hint mt-4">لا شيءَ هنا بعد — ارفع صورة، أو ولّد صورةً لمسوّدة، أو أضف ملفًّا إلى مجلّد Drive.</p>'
+    : [...folders].map(([f, list]) => `<section class="mt-4" aria-label="${escapeHtml(f)}">
+        <h2>${escapeHtml(f)} <span class="count">${list.length}</span></h2>
+        <div class="lib-grid">${list.map((a) => tile(a, d)).join('')}</div></section>`).join('')}`
+}

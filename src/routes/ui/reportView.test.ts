@@ -103,7 +103,7 @@ describe('التقرير يوصل (ر-7)', () => {
   /** **«ضع السقف» رابطٌ إلى حقله** لا نصٌّ بخطٍّ أحاديّ — فيفتح الإعداداتِ عنده. */
   it('وبلا سقف ترويج رابط إلى حقله في الإعدادات', () => {
     const html = reportScreen({ reports: [], current: null, suggestions: [], promoCapUsd: 0, now: NOW })
-    expect(html).toContain('<a class="tap" href="/panel#c3">ضع سقف الترويج الأسبوعيّ</a>')
+    expect(html).toContain('<a class="tap" href="/panel/settings#c3">ضع سقف الترويج الأسبوعيّ</a>')
     expect(html).not.toContain('<span class="mono">سقف الترويج')
   })
 })
@@ -114,14 +114,14 @@ describe('هذا الشهر تحت الرأس (ر-10)', () => {
       reports: [], current: stored('2026-09-21', FROM, TO, []), suggestions: [],
       promoCapUsd: 0, now: NOW, month: { total: 0.39, utc: false },
     })
-    expect(html).toMatch(/<div class="sub">هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">\u20660\.390\$\u2069<\/a><\/div>/)
+    expect(html).toMatch(/<div class="sub">هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel\/settings#c2">\u20660\.390\$\u2069<\/a><\/div>/)
   })
 
   it('ويُرسَم ولو لم يُكتب تقرير بعد، ويقول «بتوقيت الرياض» حين غابت منطقة المالك (D-201)', () => {
     const html = reportScreen({
       reports: [], current: null, suggestions: [], promoCapUsd: 0, now: NOW, month: { total: 0, utc: true },
     })
-    expect(html).toContain('href="/panel#c2">⁦0.00$⁩</a> بتوقيت الرياض')
+    expect(html).toContain('href="/panel/settings#c2">⁦0.00$⁩</a> بتوقيت الرياض')
   })
 })
 
@@ -183,6 +183,22 @@ describe('ثلاثة أرقام بفرقها في رأس «النتائج» (D-2
     expect(html).toContain('<div class="kv-v">لم يُقَس</div>')
     expect(html).toContain('لا أسبوع قبله يُقارَن به')
     expect(weekKpis(week(null, 5, 0), week(10, 5, 0))).toContain('لا يُقارَن: أحد الأسبوعين لم يُقَس')
+  })
+
+  it('وجملةٌ تقرأ الأرقام: من أين الظهور وبكم التفاعل — ولا تقول ما لم يُقَس (EASE-PLAN هـ)', async () => {
+    const { weekSentence } = await import('./reportView')
+    expect(weekSentence(week(1200, 30, 1.5))).toBe('<p class="lede m-0 mb-4">الظهورُ كلُّه من X، وكلّف التفاعلُ الواحد نحو \u20660.050$\u2069.</p>')
+    const two = {
+      ...(week(0, 0, 0) as object), spendUsd: 0,
+      platforms: [
+        { platform: 'x', published: 1, measured: 1, impressions: 900, impressionsFrom: 1, interactions: 9, interactionsFrom: 1 },
+        { platform: 'linkedin', published: 1, measured: 1, impressions: 100, impressionsFrom: 1, interactions: 1, interactionsFrom: 1 },
+      ],
+    } as never
+    expect(weekSentence(two)).toBe('<p class="lede m-0 mb-4">أكثرُ الظهور من X (90٪).</p>')
+    // ‏لم يُقَس شيء، أو لم يخرج شيء: لا جملة
+    expect(weekSentence(week(null, null, 2))).toBeNull()
+    expect(weekSentence({ ...(week(5, 5, 1) as object), published: 0 } as never)).toBeNull()
   })
 
   it('والشاشة تقارن التقرير الحاليّ بالذي بعده في القائمة', () => {

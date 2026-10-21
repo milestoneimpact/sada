@@ -58,14 +58,14 @@ function commandBox(r: OwnerRow, env: string): string {
   if (r.secrets === undefined || r.secrets.length === 0 || r.state === true) return ''
   const id = `cmd-${r.code}`
   const text = r.secrets.map((n) => secretCommand(n, env)).join('\n')
-  return `<div class="cmd">
+  return `<details class="setup cmd"><summary>للمطوّر</summary>
       <label class="sub" for="${escapeHtml(id)}">من جذر المستودع، بعد <span class="mono">npx wrangler login</span>:</label>
       <div class="row gap-2">
         <textarea class="mono cmd-text" id="${escapeHtml(id)}" rows="${r.secrets.length}" readonly
                   spellcheck="false">${escapeHtml(text)}</textarea>
         <button class="btn btn-secondary btn-sm" type="button" data-copy="${escapeHtml(id)}">انسخ الأمر</button>
       </div>
-    </div>`
+    </details>`
 }
 
 function row(r: OwnerRow, env: string): string {
@@ -89,8 +89,7 @@ function row(r: OwnerRow, env: string): string {
         target="_blank" rel="noopener noreferrer" aria-label="خطوات ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
     </td>
     <td data-label="تفتح">
-      ${statusBadge(opens.cls, '◆', opens.label)}
-      <div class="sub">${bold(opens.why)}</div>
+      ${/* ‏والشرحُ مرّةً فوق الجدول لا في كلّ صفّ (EASE-PLAN): كان يتكرّر عشرَ مرّاتٍ على الهاتف */''}${statusBadge(opens.cls, '◆', opens.label)}
     </td>
     <td data-label="الحال">
       ${statusBadge(mark.cls, mark.g, mark.label)}
@@ -151,6 +150,13 @@ export interface TasksScreenData {
   readonly env: string
 }
 
+function table(rows: readonly OwnerRow[], env: string): string {
+  return `<div class="scroll"><table>
+      <thead><tr><th>المهمّة وما يقع إن تُركت</th><th>تفتح</th><th>الحال</th></tr></thead>
+      <tbody>${rows.map((r) => row(r, env)).join('')}</tbody>
+    </table></div>`
+}
+
 export function tasksScreen(d: TasksScreenData): string {
   const todo = d.rows.filter((r) => r.state === false)
   const unknown = d.rows.filter((r) => r.state === null)
@@ -177,21 +183,17 @@ export function tasksScreen(d: TasksScreenData): string {
     <div class="card-head"><h2>القائمة</h2><div class="grow"></div>
       <span class="chip">${done.length} تمّت · ${todo.length} عليك · ${
         unknown.length} لا تُعرَف</span></div>
-    <p class="hint"><b>والحال يُشتقّ من البيئة والقاعدة، لا يُكتَب بيد</b> —
-      قائمة تُحدَّث بيد تشيخ. <b>وما يقع عند المنصّة يُقال «لا يُعرَف من هنا»
-      لا «لم تتمّ»</b>: قول «لم تتمّ» عن طلب قُبل يجعلك تعيده.</p>
-    <div class="scroll"><table>
-      <thead><tr><th>المهمّة وما يقع إن تُركت</th><th>تفتح</th><th>الحال</th></tr></thead>
-      <tbody>${d.rows.map((r) => row(r, d.env)).join('')}</tbody>
-    </table></div>
+    <p class="hint"><b>الحالُ يُقرأ من صدى نفسِه</b>، ولا يُكتَب بيد. وما يقع عند المنصّة يُقال «لا يُعرَف من هنا».</p>
+    <p class="hint">${(['gate', 'guard', 'capability'] as const)
+      .map((k) => `<b>«${OPENS[k].label}»</b>: ${bold(OPENS[k].why)}.`).join(' ')}</p>
+    ${table(d.rows.filter((r) => r.state !== true), d.env)}
+    ${/* ‏وما تمّ يُطوى (EASE-PLAN): كانت الصفحةُ ثلاثَ عشرةَ شاشةً على الهاتف، وأوّلُها لا يقول ما بقي */''}${done.length === 0
+      ? ''
+      : `<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${table(done, d.env)}</details>`}
   </div>
 
-  <div class="lede-row mt-6">
-    <h3 class="sec bare">بوّابات المراحل</h3>
-    <span class="grow"></span>
-    ${statusBadge(d.phase === null ? 'ok' : 'warn', d.phase === null ? '●' : '◍', `${
-      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}`)}
-  </div>
+  ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: تُطوى ورأسُها يقول حالَها */''}<details class="setup mt-6"><summary>بوّابات المراحل · ${
+      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}</summary>
 
   <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
     خطّة المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
@@ -201,6 +203,7 @@ export function tasksScreen(d: TasksScreenData): string {
     فبوّابة تُجتاز بشرط لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
 
   ${d.gates.map(gateCard).join('')}
+  </details>
 
   <div class="card">
     <h2>وأين الخطوات</h2>

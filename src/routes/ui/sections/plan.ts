@@ -90,11 +90,13 @@ function row(
 export function planSection(input: PlanInput): string {
   const { plan, now } = input
 
+  // ‏أسبوعٌ أو شهر (D-256): زرّان في نموذجٍ واحد، والزرُّ يحمل المدى
+  const off = input.ready && input.analyzed >= 2 ? '' : ' disabled'
   const generate = `<form class="inline" method="POST" action="/panel/plan/generate"
-      data-busy="جار التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّة هذا الأسبوع. أتمضي؟"'}>
-      <button class="btn ${plan === null ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit"${
-        input.ready && input.analyzed >= 2 ? '' : ' disabled'
-      }>${plan === null ? 'خطّط الأسبوع' : 'أعد التخطيط'}</button></form>`
+      data-busy="جار التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّتك لهذا المدى. أتمضي؟"'}>
+      <button class="btn ${plan === null ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit" name="span" value="week"${off}>${
+        plan === null ? 'خطّط الأسبوع' : 'أعد تخطيط الأسبوع'}</button>
+      <button class="btn btn-secondary btn-sm" type="submit" name="span" value="month"${off}>خطّط الشهر</button></form>`
 
   const why =
     !input.ready

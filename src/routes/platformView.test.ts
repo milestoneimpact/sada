@@ -328,3 +328,36 @@ describe('سجلّ الصحّة بمنطقة المالك (D-203)', () => {
     expect(unknown).toContain('title="2026-10-01 03:00 بتوقيت الرياض"')
   })
 })
+
+describe('المنشورُ بجانب معتاد قناته (GROWTH-PLAN م-٤)', () => {
+  const m = (reactions: number) => [{ window: '24h' as const, impressions: null, reactions, comments: 0, shares: 0, pulledAt: '2026-09-06 00:00:00' }]
+
+  it('أعلى من المعتاد يُقال بنسبته، ورابطُ «ما ينجح» للقناة', () => {
+    const html = screen({ metrics: { p1: m(30), a: m(10), b: m(10), c: m(12) } })
+    expect(html).toContain('<b>أعلى من المعتاد بـ')
+    expect(html).toContain('href="/panel/insights?p=x"')
+  })
+
+  it('ولا مقارنةَ قبل ثلاثةٍ مقيسة', () => {
+    const html = screen({ metrics: { p1: m(30), a: m(10) } })
+    expect(html).not.toContain('من المعتاد')
+  })
+})
+
+describe('نبضُ القناة ونموُّ المنشور (D-263)', () => {
+  const w = (window: '24h' | '72h' | '7d', reactions: number) => ({ window, impressions: null, reactions, comments: 0, shares: 0, pulledAt: '2026-09-06 00:00:00' })
+
+  it('أربعُ بلاطاتٍ فوق «ما نُشر»، وما لم يُقَس يقول ما بقي له', () => {
+    const html = screen({ pulse: { last30: 5, median30: 12, trend: 40, slot: null, format: null, why: 'لم يُقَس بعد — 5 من 8' } })
+    for (const k of ['خرج في 30 يومًا', 'وسيطُ التفاعل', 'أرجحُ موعد', 'أنجحُ شكل']) expect(html).toContain(`<div class="kv-k">${k}</div>`)
+    expect(html).toContain('<b>أعلى بـ40٪</b>')
+    expect(html).toContain('5 من 8')
+    expect(html.indexOf('خرج في 30 يومًا')).toBeLessThan(html.indexOf('id="history"'))
+    expect(screen({ tab: 'setup', pulse: { last30: 5, median30: 12, trend: 40, slot: null, format: null, why: null } })).not.toContain('خرج في 30 يومًا')
+  })
+
+  it('النموُّ عبر النوافذ حين تُقاس اثنتان فأكثر', () => {
+    expect(screen({ metrics: { p1: [w('24h', 12), w('72h', 18), w('7d', 21)] } })).toMatch(/12 ← .*18 ← .*21/)
+    expect(screen({ metrics: { p1: [w('24h', 12)] } })).not.toContain(' ← ')
+  })
+})
