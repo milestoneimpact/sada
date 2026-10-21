@@ -65,7 +65,7 @@ import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { normalizeEmail, OWNER_EMAIL } from '../lib/ownerEmail'
 import { inviteMember, listMembers, revokeMember, ROLE_LABEL, whoCanReceive, type MemberRole } from '../lib/team'
 import { teamScreen } from './ui/teamView'
-import { PERIODS, portfolio, type Period } from '../lib/portfolio'
+import { PERIODS, portfolio, previousWindow, type Period } from '../lib/portfolio'
 import { portfolioScreen } from './ui/portfolioView'
 
 /** من قرّر — بطريق الدخول (D-245): `panel:token` للجلسات القديمة وحدَها. */
@@ -581,7 +581,9 @@ panel.get('/panel/portfolio', async (c) => {
     platform: (PLATFORM_IDS as readonly string[]).includes(p) ? p : null,
     org: orgs.some((o) => o.id === wanted) ? wanted : null,
   }
-  const body = portfolioScreen(await portfolio(c.env.DB, filter, new Date()), orgs, filter, activeOrg(session.record))
+  const now = new Date()
+  const [rows, before] = await Promise.all([portfolio(c.env.DB, filter, now), portfolio(c.env.DB, filter, previousWindow(now, filter.period))])
+  const body = portfolioScreen(rows, orgs, filter, activeOrg(session.record), before)
   return page((nonce) =>
     soloPage('صدى — المحفظة', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('overview')),

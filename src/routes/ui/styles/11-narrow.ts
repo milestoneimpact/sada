@@ -100,7 +100,9 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   details.fab{display:block; position:fixed; z-index:39; inset-inline-end:var(--s-4);
     bottom:calc(var(--s-16) + var(--safe-b) + var(--s-4))}
   details.fab > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--s-2);
-    min-height:calc(var(--s-12) + var(--s-2)); padding:0 var(--s-5); border-radius:var(--r-sheet); box-shadow:var(--sh-3);
+    min-height:calc(var(--s-12) + var(--s-2)); width:calc(var(--s-12) + var(--s-2)); justify-content:center; padding:0;
+    /* ‏دائرةٌ بأيقونةٍ لا شريطٌ بنصّ (UX-AUDIT-4 · أ): كان يغطّي نصفَ عرض البطاقة تحته، والاسمُ لقارئ الشاشة في .vh */
+    border-radius:var(--r-pill); box-shadow:var(--sh-3);
     background:var(--brand); color:var(--on-brand); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
   details.fab > summary::-webkit-details-marker{display:none}
   details.fab > summary svg{width:var(--icon-lg); height:var(--icon-lg)}

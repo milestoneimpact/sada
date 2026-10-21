@@ -31,8 +31,15 @@ export interface PortfolioFilter {
 
 type Count = { org_id: string; n: number }
 
+/** الفترةُ نفسُها قبلها — للمقارنة: «خرج 12، أعلى بـ‏40٪ من الثلاثين التي قبلها». */
+export function previousWindow(now: Date, period: Period): Date {
+  return new Date(now.getTime() - period * 86_400_000)
+}
+
 export async function portfolio(db: Db, f: PortfolioFilter, now: Date): Promise<PortfolioRow[]> {
-  const since = new Date(now.getTime() - f.period * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+  const stamp = (d: Date): string => d.toISOString().slice(0, 19).replace('T', ' ')
+  const since = stamp(new Date(now.getTime() - f.period * 86_400_000))
+  const until = stamp(now)
   const p = f.platform
   const read = <T>(sql: string, ...args: unknown[]): Promise<T[]> =>
     db.prepare(sql).bind(...args).all<T>().then((r) => r.results).catch(() => [])
@@ -45,14 +52,14 @@ export async function portfolio(db: Db, f: PortfolioFilter, now: Date): Promise<
               COUNT(DISTINCT CASE WHEN a.status = 'succeeded' THEN p.id END) AS published,
               COUNT(DISTINCT CASE WHEN a.status = 'failed' AND p.status = 'failed' THEN p.id END) AS failed
          FROM posts p JOIN publish_attempts a ON a.post_id = p.id
-        WHERE a.at >= ?2 AND (?1 IS NULL OR p.platform = ?1) GROUP BY p.org_id`, p, since),
+        WHERE a.at >= ?2 AND a.at < ?3 AND (?1 IS NULL OR p.platform = ?1) GROUP BY p.org_id`, p, since, until),
     read<Count>(
       `SELECT p.org_id AS org_id, SUM(COALESCE(m.reactions, 0) + COALESCE(m.comments, 0) + COALESCE(m.shares, 0)) AS n
          FROM posts p JOIN metrics m ON m.post_id = p.id AND m.window = '24h'
         WHERE p.status = 'published' AND (?1 IS NULL OR p.platform = ?1)
-          AND (SELECT min(a.at) FROM publish_attempts a WHERE a.post_id = p.id AND a.status = 'succeeded') >= ?2
-        GROUP BY p.org_id`, p, since),
-    read<{ org_id: string; t: number }>('SELECT org_id, SUM(total) AS t FROM cost_ledger WHERE at >= ? GROUP BY org_id', since),
+          AND (SELECT min(a.at) FROM publish_attempts a WHERE a.post_id = p.id AND a.status = 'succeeded') BETWEEN ?2 AND ?3
+        GROUP BY p.org_id`, p, since, until),
+    read<{ org_id: string; t: number }>('SELECT org_id, SUM(total) AS t FROM cost_ledger WHERE at >= ? AND at < ? GROUP BY org_id', since, until),
     read<Count>(
       `SELECT org_id, COUNT(*) AS n FROM accounts WHERE status = 'active' AND (?1 IS NULL OR platform = ?1) GROUP BY org_id`, p),
   ])

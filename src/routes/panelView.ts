@@ -10,6 +10,7 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
@@ -522,7 +523,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const themes = s.themes.slice(0, 5).map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')
   const body = s.summary === null
     ? ''
-    : `<div class="sub">${escapeHtml(s.summary)}</div>` +
+    : `<div class="sub clamp2">${escapeHtml(s.summary)}</div>` +
       (s.reason === null ? '' : `<div class="sub">— ${escapeHtml(s.reason)}</div>`) +
       (themes === '' ? '' : `<div class="mt-1">${themes}</div>`)
 
@@ -546,8 +547,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${fileName(s.name)}</div>
-        <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
+    <td><div class="nm">${fileName(s.name)}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
@@ -823,7 +823,7 @@ function fabNew(): string {
     // ‏بمسار «/panel» لا بمرساةٍ وحدها: الزرُّ في كلّ صفحة، و«#idea» في «المكتبة» لا هدفَ لها (EASE-PLAN أ-1)
     ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
-  return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
+  return `<details class="fab"><summary>${ICON.add}<span class="vh">منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
 }
 
@@ -920,19 +920,19 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
         action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
            <button class="btn btn-primary" type="submit">مسح Drive الآن</button></form>`,
       })
-    : `<div class="row mb-3">
-         <div class="field"><label for="flt">التصفية</label>
-           <select id="flt"><option value="all">الكلّ</option>
-             <option value="pending">ما ينتظر تحليلا</option>
-             <option value="analyzed">المحلَّل</option></select></div>
-         <div class="field"><label for="srt">الفرز</label>
-           <select id="srt"><option value="seen">الأحدث مسحا</option>
-             <option value="worth">الأعلى استحقاقا</option>
-             <option value="name">الاسم</option></select></div>
-         <div class="grow"></div>
-         <div class="tile ta-end">
-           <span class="note">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
-       </div>
+    : `${filterBar([
+         { kind: 'seg', label: 'أيّ الملفّات', name: 'src-show', options: [
+           { label: 'الكلّ', value: 'all', current: true },
+           { label: 'ينتظر', value: 'pending', current: false },
+           { label: 'محلَّل', value: 'analyzed', current: false },
+         ] },
+         { kind: 'pick', label: 'رتّب:', name: 'src-sort', options: [
+           { label: 'الأحدث', value: 'seen', current: true },
+           { label: 'الأهمّ', value: 'worth', current: false },
+           { label: 'الاسم', value: 'name', current: false },
+         ] },
+       ], 'فلتر الملفّات')}
+       <p class="note m-0 mb-3">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</p>
        <div class="scroll"><table>
          <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th><span class="vh">الإجراء</span></th></tr></thead>
          <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
