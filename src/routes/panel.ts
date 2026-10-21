@@ -747,7 +747,8 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
   const usedImages = (await c.env.DB
-    .prepare("SELECT COUNT(*) AS n FROM media WHERE created_at >= date('now') AND mime LIKE 'image/%'")
+    .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
+    .bind(activeOrg(session.record))
     .first<{ n: number }>()
     .catch(() => null))?.n ?? 0
   return page((nonce) =>
@@ -1771,12 +1772,13 @@ panel.post('/panel/media/regenerate', (c) => imageRoute(c, true))
  * كما هو (D-019): الإيقافُ وسقفُ الإنفاق ومفتاحُ التكرار والدفتر. والسقفُ هنا **بالعدد** فوق المال، ويُعدّ فيه
  * كلُّ صورةٍ وُلّدت اليوم آليّةً أو بزرّ، فلا يتجاوزه المالكُ دون أن يدري. ويُعاد كم صورةً بدأت.
  */
-async function autoImages(c: Context<{ Bindings: Env }>, ids: readonly string[]): Promise<number> {
+async function autoImages(c: Context<{ Bindings: Env }>, org: string, ids: readonly string[]): Promise<number> {
   if (ids.length === 0) return 0
   const s = await readSettings(c.env.DB)
   if (!s.autoImage || s.paused) return 0
   const used = (await c.env.DB
-    .prepare("SELECT COUNT(*) AS n FROM media WHERE created_at >= date('now') AND mime LIKE 'image/%'")
+    .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
+    .bind(org)
     .first<{ n: number }>()
     .catch(() => null))?.n ?? s.dailyImageCap
   const batch = ids.slice(0, Math.max(0, s.dailyImageCap - used))
@@ -2428,7 +2430,7 @@ panel.post('/panel/drafts/write', async (c) => {
       ? {
           kind: 'ok',
           text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.${
-            (await autoImages(c, [outcome.postId])) > 0 ? ' وتُرسم صورتُها الآن.' : ''}`,
+            (await autoImages(c, activeOrg(gate.session.record), [outcome.postId])) > 0 ? ' وتُرسم صورتُها الآن.' : ''}`,
         }
       : outcome.kind === 'already'
         // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)
@@ -2512,7 +2514,7 @@ panel.post('/panel/drafts/idea', async (c) => {
   const parts: string[] = []
   if (drafted.length > 0) {
     parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدة' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
-    const drawn = await autoImages(c, drafted.map((d) => d.outcome.postId))
+    const drawn = await autoImages(c, activeOrg(gate.session.record), drafted.map((d) => d.outcome.postId))
     if (drawn > 0) parts.push(`وتُرسم ${drawn === 1 ? 'صورتُها' : `${drawn} صور`} الآن.`)
   }
   if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدة' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودة — لم يُنفَق عليها شيء.`)
