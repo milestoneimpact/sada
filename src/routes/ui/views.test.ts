@@ -201,6 +201,17 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(html).toContain('<tr class="urgent">')
   })
 
+  it('«ما عليك» يقول ما بقي أوّلًا: ما تمّ مطويّ، والشرحُ مرّةً، والبوّاباتُ مطويّة (EASE-PLAN)', () => {
+    const r = (code: string, state: boolean) => ({ code, title: code, ifLeft: 'يقف', unblocks: 'capability', state, measured: '', done: () => state }) as never
+    const html = tasksScreen({ phase: '3', gates: [], env: 'staging', rows: [r('M-01', true), r('M-02', false), r('M-03', true)] })
+    const open = html.slice(0, html.indexOf('<details class="setup mt-3">'))
+    expect(open).toContain('M-02')
+    expect(open).not.toContain('M-01')
+    expect(html).toContain('<summary>تمّت (2)</summary>')
+    expect(html.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
+    expect(html).toContain('<details class="setup mt-6"><summary>بوّابات المراحل · أنت في المرحلة 3</summary>')
+  })
+
   it('ورمز بين علامتَي اقتباس خلفيّتين في المهمّة يُرسَم رمزًا لا علامات يراها المالك (D-202)', () => {
     const html = tasksScreen({
       phase: null, gates: [], env: 'staging',
