@@ -244,10 +244,25 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 .pb-edit{display:grid; gap:var(--s-2)}
 .pb-edit label{display:grid; gap:var(--s-1); font-weight:400}
 .pb-board[data-mode="list"] .pb-edit{grid-template-columns:repeat(auto-fit,minmax(10rem,1fr)); align-items:end}
+/* التقويم: أسبوعٌ في كلّ صفّ، وفي الخانة رقمُ اليوم ورقائقُ بنوده (شعارٌ وساعةٌ وسطرٌ) */
+.pb-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-2)}
+.pb-wd{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); text-align:center; font-weight:600}
+.pb-cell{min-height:7rem; padding:var(--s-2); gap:var(--s-1)}
+.pb-dn{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-weight:600}
+.pb-chip{flex-direction:row; align-items:center; gap:var(--s-1); padding:var(--s-1) var(--s-2); font-size:var(--t-small); line-height:var(--lh-small);
+  cursor:grab; user-select:none; -webkit-user-select:none}
+.pb-chip svg{width:var(--icon-xs); height:var(--icon-xs); flex:none}
+.pb-ct{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+/* ‏وعلى الهاتف أجندةٌ لا شبكة (من Google Calendar وNotion): سبعةُ أعمدةٍ في ‏390px تُقصّ أسماءها، فاليومُ صفٌّ باسمه كاملًا */
+.pb-dl{display:none}
+@media${below('md')}{
+  .pb-cal{grid-template-columns:1fr}
+  .pb-wd,.pb-dn{display:none}
+  .pb-dl{display:block; font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+  .pb-cell{min-height:0}}
 @media(prefers-reduced-motion:reduce){
   .pb-card,.pb-col{transition:none}
   .pb-card.landed{animation:none}
-  .pb-board[data-mode="board"] .pb-card:hover{transform:none}
   .pb-ghost{transform:none}
 }
 `
