@@ -1094,6 +1094,7 @@ ${flash}
     zone: d.zone ?? null,
     scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
       .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
+    written: d.drafts.map((x) => x.createdAt),
   // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
   // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
   }, d.now, `${deskQueue(d.drafts, d.now)}<h2 class="home-sub">اليوم بالأرقام</h2>${tileRow(d)}`)}

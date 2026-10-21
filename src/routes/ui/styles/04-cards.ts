@@ -257,4 +257,32 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ‏وهو ثالثُ مواضع الذهب: رقمٌ واحدٌ في الشاشة (D-187 · D-196) */
 .grid>.tile:first-child .kv-v{font-size:var(--t-display); line-height:var(--lh-display); color:var(--au);
   font-weight:400; direction:ltr; letter-spacing:-.01em}
+
+/* ── الرئيسيّة (D-265): التحيّة، والأرقام الأربعة، وأعمدة الأيّام ── */
+.hello{margin:0 0 var(--s-2); font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
+.hstats{list-style:none; margin:0 0 var(--gap-card); padding:0; display:grid; gap:var(--s-3);
+  grid-template-columns:repeat(4,minmax(0,1fr))}
+@media${below('md')}{.hstats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hstats a{display:flex; flex-direction:column; gap:var(--s-1); min-height:var(--tap); padding:var(--s-4);
+  background:var(--surface); border:1px solid var(--bd-soft); border-radius:var(--r-card); color:var(--ink);
+  text-decoration:none; border-inline-start:var(--ring-w) solid var(--line); animation:rise var(--dur-3) var(--ease-rise) both}
+.hstats li:nth-child(2) a{animation-delay:40ms}.hstats li:nth-child(3) a{animation-delay:80ms}.hstats li:nth-child(4) a{animation-delay:120ms}
+@media(hover:hover){.hstats a:hover{box-shadow:var(--sh-2)} .db-bar:hover rect{opacity:.8}}
+.hstats [data-tone=wait] a{border-inline-start-color:var(--warn)}
+.hstats [data-tone=sched] a{border-inline-start-color:var(--brand)}
+.hstats [data-tone=ok] a{border-inline-start-color:var(--ok)}
+.hstats [data-tone=bad] a{border-inline-start-color:var(--bad)}
+.hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.hs-n{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
+.daybars{margin:0}
+.db-svg{display:block; width:100%; height:9rem; overflow:visible}
+.db-base{stroke:var(--line)}
+.db-bar rect{fill:var(--brand); transform-box:fill-box; transform-origin:50% 100%;
+  animation:grow var(--dur-3) var(--ease-rise) both; animation-delay:calc(var(--i) * 25ms)}
+.db-bar.zero rect{fill:var(--line)}
+.db-axis{display:flex; justify-content:space-between; margin-top:var(--s-1); font-size:var(--t-small);
+  line-height:var(--lh-small); color:var(--ink-2)}
+@keyframes grow{from{transform:scaleY(0)}to{transform:none}}
+.ill-wash{fill:var(--surface-2)}.ill-line{fill:var(--brand); opacity:.45}.ill-soft{fill:var(--line)}
+.ill-brand{fill:var(--brand)}.ill-plus{stroke:var(--surface); fill:none}.ill-dot{fill:var(--warn)}
 `

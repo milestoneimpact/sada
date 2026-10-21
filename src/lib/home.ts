@@ -173,6 +173,8 @@ export interface HomeFacts {
   readonly zone: string | null
   /** ما جُدول ولم يُنشر بعد — منصّتُه وموعدُه (UTC)، لشريط الأسبوع (D-194). */
   readonly scheduled?: readonly { readonly platform: string; readonly at: string }[]
+  /** متى كُتب كلُّ منشورٍ من الستّين المرسومة (UTC) — لأعمدة الأيّام (D-265). */
+  readonly written?: readonly string[]
 }
 
 export type StepState = 'done' | 'now' | 'waiting' | 'failed'

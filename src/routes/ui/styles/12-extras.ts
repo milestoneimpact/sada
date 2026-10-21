@@ -211,7 +211,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   gap:var(--s-3); overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:var(--s-2); perspective:60rem}
 .pb-board[data-mode="list"]{display:grid; gap:var(--s-4)}
 .pb-col{scroll-snap-align:start; display:flex; flex-direction:column; gap:var(--s-2); min-width:0;
-  background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-card); padding:var(--s-3);
+  background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-control); padding:var(--s-3);
   transition:background var(--dur-2) var(--ease), outline-color var(--dur-2) var(--ease); outline:var(--s-0) dashed transparent}
 .pb-col.over{background:var(--hover); outline-color:var(--focus)}
 .pb-head{display:flex; align-items:baseline; gap:var(--s-2); margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
