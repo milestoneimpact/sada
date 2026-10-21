@@ -626,7 +626,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   for (const platform of [...new Set([...drafts, ...(editing === null ? [] : [editing])].map((d) => d.platform))]) {
     peaks[platform] = await readPeaks(c.env.DB, platform)
   }
-  const plan = await latestPlan(c.env.DB)
+  const plan = await latestPlan(c.env.DB, activeOrg(session.record))
   const sessions = await listSessions(c.env.KV, session.id)
   const orgs = await listOrgs(c.env.DB)
   const audit = await recentAudit(c.env.DB, 50)
@@ -1684,17 +1684,21 @@ panel.post('/panel/plan/generate', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
+  // ‏لعميلِ الجلسة، وأسبوعًا أو شهرًا من قائمةٍ مغلقة (D-256)
+  const span = gate.form.get('span') === 'month' ? 'month' : 'week'
   const outcome = await planWeek({
     db: c.env.DB,
     encKey: c.env.TOKEN_ENC_KEY,
     workerSecrets: c.env as unknown as Record<string, string | undefined>,
+    org: activeOrg(gate.session.record),
+    span,
   })
 
   const flash: PanelFlash =
     outcome.kind === 'planned'
       ? {
           kind: 'ok',
-          text: `خطّة أسبوع ${outcome.week}: ${outcome.items} بندا${
+          text: `خطّة ${span === 'month' ? 'شهر يبدأ' : 'أسبوع'} ${outcome.week}: ${outcome.items} بندا${
             outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
           }، ${
             // وصفرٌ مع وحداتٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008).
@@ -1731,7 +1735,7 @@ panel.post('/panel/plan/approve', async (c) => {
   if ('denied' in gate) return gate.denied
   const id = String(gate.form.get('id') ?? '')
 
-  const done = await approvePlan(c.env.DB, id)
+  const done = await approvePlan(c.env.DB, id, activeOrg(gate.session.record))
   await record(
     c.env.DB,
     { actor: 'panel', action: 'plan.approve', target: id, detail: done ? 'approved' : 'refused' },
