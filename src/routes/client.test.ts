@@ -86,8 +86,8 @@ describe('«ابدأ الخطّة» (D-258)', () => {
     body.set('id', 'pl1')
     expect((await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
     expect(sent).toEqual([
-      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner' } },
-      { draft: { sourceId: 's1', platform: 'x', org: 'org_owner' } },
+      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1' } },
+      { draft: { sourceId: 's1', platform: 'x', org: 'org_owner', planId: 'pl1' } },
     ])
     expect(db.raw.prepare("SELECT status FROM plans WHERE id = 'pl1'").get()).toEqual({ status: 'approved' })
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts").get()).toEqual({ n: 0 })
@@ -172,5 +172,38 @@ describe('محتوى البند والأصول (D-260)', () => {
     const raw = await app.request(`/panel/assets/raw/${plan.items[0]!.asset!}`, { headers: { Cookie: cookie } }, env)
     expect(raw.status).toBe(200)
     expect(raw.headers.get('Content-Type')).toBe('image/png')
+  })
+})
+
+describe('جدولةُ الخطّة من رحلة العميل (D-261)', () => {
+  it('الشريطُ يقول «اعتمد» وزرَّ الجدولة، والجدولةُ تضع المعتمَد في طابوره', async () => {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير', 'text/plain', 'md5:a')`)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a1', 'linkedin', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status) VALUES ('pl1', '2099-01-04', ?, 'm', 'approved')`)
+      .run(JSON.stringify({ rationale: 'ر', items: [{ sourceId: 's1', platform: 'linkedin', angle: 'ز', day: '2099-01-05', time: '07:00', why: 'ل' }] }))
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, plan_id, source_id, approved_by, approved_at)
+      VALUES ('p1', 'linkedin', 'text', 'نص', 'approved', 'k1', 'pl1', 's1', 'owner', datetime('now'))`)
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('action="/panel/plan/schedule"')
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1')
+    expect((await app.request('/panel/plan/schedule', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-01-05 07:00:00' })
+    const after = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(after).toContain('وجُدولت')
+  })
+})
+
+describe('تقريرُ الشهر (D-262)', () => {
+  it('يُفتح من رحلة العميل بأرقامه الأربعة وزرّ الطباعة', async () => {
+    const { cookie } = await session()
+    const res = await app.request('/panel/client/report?month=2026-10', { headers: { Cookie: cookie } }, env)
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    for (const k of ['خرج', 'التفاعل', 'أُنفق', 'قادم']) expect(html).toContain(`<div class="kv-k">${k}</div>`)
+    expect(html).toContain('data-print')
+    expect(html).toContain('month=2026-09')
+    expect(await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()).toContain('href="/panel/client/report"')
   })
 })

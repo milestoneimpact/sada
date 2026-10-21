@@ -30,6 +30,10 @@ export interface ClientData {
   readonly names?: Readonly<Record<string, string>>
   /** مسوّداتُ العميل التي تنتظر قراره — تقول أين هو من الرحلة بعد «ابدأ» (D-260). */
   readonly waiting?: number
+  /** مسوّداتُ الخطّة المعتمَدة التي لم تُجدوَل (D-261). */
+  readonly ready?: number
+  /** مسوّداتُ الخطّة المكتوبة كلُّها — صفرٌ بعد «ابدأ» يعني أنّها تُكتب الآن. */
+  readonly written?: number
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -92,16 +96,26 @@ function startForm(d: ClientData): string {
  */
 const FLOW = ['قسّم', 'اختر', 'ولّد', 'عدّل وانقل', 'اعتمد', 'شكرًا'] as const
 
+/** «جدول المعتمَد» (D-261): زرٌّ واحد، والتأكيدُ يقول العددَ وأنّ المسوّدةَ غيرَ المعتمَدة لا تُمسّ. */
+function scheduleForm(d: ClientData): string {
+  if (d.plan === null || (d.ready ?? 0) === 0) return ''
+  return `<form class="inline" method="POST" action="/panel/plan/schedule" data-busy="جار الجدولة…"
+      data-confirm="${escapeHtml(`جدول ${d.ready} على أرجح الأوقات؟ وما لم تعتمده لا يُجدوَل.`)}">
+      <input type="hidden" name="id" value="${escapeHtml(d.plan.id)}">
+      <button class="btn btn-primary btn-sm" type="submit">جدول المعتمَد</button></form>`
+}
+
 function flow(d: ClientData): string {
   const waiting = d.waiting ?? 0
-  const now = d.plan === null ? 0 : d.plan.status === 'draft' ? 1 : waiting > 0 ? 3 : 5
+  const ready = d.ready ?? 0
+  const now = d.plan === null ? 0 : d.plan.status === 'draft' ? 1 : (d.written ?? 0) === 0 ? 2 : waiting > 0 ? 3 : ready > 0 ? 4 : 5
   const say: readonly string[] = [
     `خطّط أسبوعًا أو شهرًا — يقسّم صدى المصادرَ على الأيّام والمنصّات. ${'<a href="/panel#sub-plan">خطّط</a>'}`,
     'لكلّ بند: <b>ولّد</b> أو <b>ارفع</b> أو <b>من الأصول</b>، واسحبه إلى يومه — ثمّ «ابدأ الخطّة».',
-    'يُكتب كلُّ شيءٍ في الخلفيّة خلال دقائق.',
+    '«ابدأ الخطّة» يكتب كلَّ شيءٍ في الخلفيّة خلال دقائق — وإن ضغطتها فأعد فتح الصفحة بعد قليل.',
     `${waiting} ${waiting === 1 ? 'مسوّدةٌ تنتظر' : 'مسوّداتٍ تنتظر'}: عدّل نصَّها أو انقل موعدها أو احذفها، ثمّ اعتمد. <a href="/panel#posts">افتحها</a>`,
-    'اعتمد ما ترضاه — ولا يُنشر غيرُه.',
-    'شكرًا — الخطّةُ كُتبت واعتُمدت، وصدى ينشرها في مواعيدها ويقيسها.',
+    `${ready} ${ready === 1 ? 'منشورٌ معتمَد' : 'منشوراتٍ معتمَدة'} — تُجدوَل كلٌّ في يوم بنده وأرجح ساعات منصّته. ${scheduleForm(d)}`,
+    'شكرًا — الخطّةُ كُتبت واعتُمدت وجُدولت، وصدى ينشرها في مواعيدها ويقيسها. <a href="/panel#posts">المجدوَلة</a>',
   ]
   const steps = FLOW.map((t, i) => `<li data-state="${i < now ? 'done' : i === now ? 'now' : 'next'}"${i === now ? ' aria-current="step"' : ''}>
       <span class="flow-n" aria-hidden="true">${i < now ? '✓' : i + 1}</span>${escapeHtml(t)}</li>`).join('')
@@ -142,7 +156,7 @@ export function clientScreen(d: ClientData): string {
     station(6, 'الكلفة', at(e.posts === 0 ? 'idle' : 'done'), cost, link('/panel/settings#limits', 'السقوف')),
     station(7, 'التحليل', at(d.measured >= 8 ? 'done' : 'idle'),
       d.measured >= 8 ? `${d.measured} منشورًا قِيست: أرجحُ الأوقات وأفضلُ الأشكال جاهزة.` : `${d.measured} من 8 منشورات قِيست — ثمّ يُقال ما ينجح.`,
-      link('/panel/insights', 'ما ينجح')),
+      `${link('/panel/insights', 'ما ينجح')}${link('/panel/client/report', 'تقرير الشهر')}`),
   ]
   const ready = states.filter((x) => x === 'done').length
   const next = TITLES[states.indexOf('todo')]

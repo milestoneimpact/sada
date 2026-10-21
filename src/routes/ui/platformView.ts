@@ -24,6 +24,7 @@
  *
  * وفيها ما ينقص بالضبط، لا «قريبا». **والسببُ يُصدَّق، والوعدُ يُنتظَر ثمّ يُنسى.**
  */
+import type { Pulse } from '../../lib/insights/pulse'
 import { channelHealth, SETUP, unsignedAccounts, type ChannelView } from '../../lib/channels'
 import type { AccountHealth, PlatformPost, PlatformTally } from '../../lib/platform/screen'
 import { permalink } from '../../lib/platform/screen'
@@ -109,6 +110,8 @@ export interface PlatformScreenData {
    * صندوق التطبيق، وتقول البطاقةُ ذلك بدل «للعامّة».
    */
   readonly reachNoScope?: boolean
+  /** نبضُ القناة لهذا العميل (D-263) — يغيب لمنصّةٍ لا تُقاس. */
+  readonly pulse?: Pulse
 }
 
 const TABS: readonly Tab[] = ['posts', 'waiting', 'media', 'setup']
@@ -597,6 +600,28 @@ function upcomingSection(d: PlatformScreenData): string {
       : `<div class="np-list">${rows.join('')}</div>`}`
 }
 
+// ── ٤½ · نبضُ القناة (D-263) ─────────────────────────────────────────
+
+/**
+ * أربعُ بلاطاتٍ فوق «ما نُشر»: ما خرج في ثلاثين يومًا، ووسيطُ تفاعله واتّجاهُه، وأرجحُ موعد، وأنجحُ شكل.
+ * وما لم يُقَس يقول ما بقي له، لا صفرًا يوهم.
+ */
+function pulseStrip(d: PlatformScreenData): string {
+  const p = d.pulse
+  if (p === undefined || d.needs?.measured !== true) return ''
+  const tile = (k: string, v: string, note: string): string =>
+    `<div class="card tile"><div class="kv-k">${escapeHtml(k)}</div><div class="kv-v">${v}</div><div class="note">${note}</div></div>`
+  const trend = p.trend === null ? 'لا مقارنةَ قبل ثلاثةٍ مقيسة في كلّ شهر'
+    : p.trend === 0 ? 'كالشهر الذي قبله' : p.trend > 0 ? `<b>أعلى بـ${p.trend}٪</b> من الشهر الذي قبله` : `أقلّ بـ${-p.trend}٪ من الشهر الذي قبله`
+  const later = escapeHtml(p.why ?? 'لم يُقَس بعد')
+  return `<div class="grid tiles c4 mb-4" aria-label="نبض ${escapeHtml(d.view.spec.label)}">
+    ${tile('خرج في 30 يومًا', String(p.last30), 'منشورًا قِيس بعد يومه الأوّل')}
+    ${tile('وسيطُ التفاعل', p.median30 === null ? '—' : String(Math.round(p.median30)), trend)}
+    ${tile('أرجحُ موعد', p.slot === null ? '—' : escapeHtml(p.slot), p.slot === null ? later : 'من كلّ ما قِيس هنا')}
+    ${tile('أنجحُ شكل', p.format === null ? '—' : escapeHtml(p.format), p.format === null ? later : 'بتفاعل يومه الأوّل')}
+  </div>`
+}
+
 // ── ٥ · ما نُشر وما فشل ───────────────────────────────────────────────
 
 /** تفاعلُ المنشور في نافذة ‏24 ساعة — المقياسُ الذي يُقارَن به في «ما ينجح» (D-253). */
@@ -622,13 +647,24 @@ function versusUsual(d: PlatformScreenData, row: TimelineRow): string {
   return ' · كالمعتاد'
 }
 
+/**
+ * **نموُّ المنشور عبر نوافذه** (D-263): «يومٌ 12 ← ثلاثةُ أيّام 18 ← أسبوع 21» يقول هل ما زال يُرى أم انطفأ.
+ * يُكتب حين تُقاس نافذتان فأكثر، بتفاعل كلٍّ منها.
+ */
+function growth(rows: readonly PostMetricRow[]): string {
+  const order = ['24h', '72h', '7d']
+  const steps = order.map((w) => rows.find((r) => r.window === w)).filter((r): r is PostMetricRow => r !== undefined)
+  if (steps.length < 2) return ''
+  return ` · ${steps.map((r) => `${escapeHtml(windowLabel(r.window))} ${(r.reactions ?? 0) + (r.comments ?? 0) + (r.shares ?? 0)}`).join(' ← ')}`
+}
+
 function resultLine(d: PlatformScreenData, row: TimelineRow): string {
   if (d.needs?.measured !== true) return '<span class="ago">لا يُقاس لهذه المنصّة بعد</span>'
   const m = widest(d.metrics[row.id] ?? [])
   if (m === null) return '<span class="ago">لم يُقَس بعد — أوّل قياس بعد 24 ساعةً من النشر</span>'
   const v = (n: number | null): string => n === null ? '<span title="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
   return `<span class="np-result">نافذة ${escapeHtml(windowLabel(m.window))}:
-    تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}${versusUsual(d, row)}</span>`
+    تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}${versusUsual(d, row)}${growth(d.metrics[row.id] ?? [])}</span>`
 }
 
 function historyRow(d: PlatformScreenData, row: TimelineRow): string {
@@ -947,7 +983,7 @@ export function platformScreen(d: PlatformScreenData): string {
       ? waitingSection(d)
       : d.tab === 'media'
         ? mediaSection(d)
-        : `${upcomingSection(d)}${historySection(d)}`
+        : `${pulseStrip(d)}${upcomingSection(d)}${historySection(d)}`
   // ‏الإشعارُ مكوّنُه (D-189)، والخطأُ يُعلَن تنبيهًا ويبقى حتّى يُغلَق (7.8)
   const flash = toastRegion(d.flash === null
     ? ''
