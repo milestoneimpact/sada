@@ -204,4 +204,79 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .cmdk-open span{display:none}
 }
 
+/* ── الخطّةُ لوحةً أو قائمة (D-259) ─────────────────────────────────────
+   أعمدةٌ بعرض بطاقة تُمرَّر أفقيًّا على الهاتف بالتقاطٍ لكلّ عمود، والبطاقةُ ترتفع وتميل قليلًا
+   عند المرور، وظلٌّ يتبع الإصبع عند السحب. **وكلُّ حركةٍ تسقط مع تقليل الحركة.** */
+.pb-board[data-mode="board"]{display:grid; grid-auto-flow:column; grid-auto-columns:minmax(15rem,1fr);
+  gap:var(--s-3); overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:var(--s-2); perspective:60rem}
+.pb-board[data-mode="list"]{display:grid; gap:var(--s-4)}
+.pb-col{scroll-snap-align:start; display:flex; flex-direction:column; gap:var(--s-2); min-width:0;
+  background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-card); padding:var(--s-3);
+  transition:background var(--dur-2) var(--ease), outline-color var(--dur-2) var(--ease); outline:var(--s-0) dashed transparent}
+.pb-col.over{background:var(--hover); outline-color:var(--focus)}
+.pb-head{display:flex; align-items:baseline; gap:var(--s-2); margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.pb-head .count{margin-inline-start:auto}
+.pb-drop{display:flex; flex-direction:column; gap:var(--s-2); min-height:var(--s-16)}
+.pb-board[data-mode="list"] .pb-drop{min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(18rem,1fr))}
+/* والعرضُ المختارُ يُرى مختارًا */
+#board [data-view][aria-pressed="true"]{background:var(--hover); border-color:var(--ink-2)}
+.pb-card{padding:var(--s-3); margin:0; box-shadow:var(--sh-1); display:flex; flex-direction:column; gap:var(--s-2); touch-action:pan-y;
+  border-inline-start-width:var(--ring-w);
+  transition:transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out); transform-origin:center bottom}
+/* ولا يُظلَّل النصُّ تحت الإصبع أثناء السحب */
+.pb-board[data-mode="board"] .pb-card{cursor:grab; user-select:none; -webkit-user-select:none}
+.pb-card[data-platform="linkedin"]{border-inline-start-color:var(--link)}
+.pb-card[data-platform="x"]{border-inline-start-color:var(--ink)}
+@media(hover:hover){.pb-board[data-mode="board"] .pb-card:hover{transform:translateY(calc(-1 * var(--s-0))) rotateX(3deg); box-shadow:var(--sh-2)}}
+.pb-card:focus-visible{box-shadow:0 0 0 var(--ring-w) var(--ring)}
+.pb-card.dragging{opacity:.35}
+.pb-card.landed{animation:pb-land var(--dur-3) var(--ease-rise)}
+@keyframes pb-land{from{transform:scale(.96)} to{transform:none}}
+.pb-ghost{position:fixed; z-index:60; pointer-events:none; margin:0; transform:rotate(-2deg) scale(1.03); box-shadow:var(--sh-2); cursor:grabbing}
+.pb-top{display:flex; align-items:center; gap:var(--s-2)}
+.pb-plat{display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-small); line-height:var(--lh-small)}
+.pb-plat svg{width:var(--icon-sm); height:var(--icon-sm)}
+.pb-time{margin-inline-start:auto; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.pb-angle{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.pb-board[data-mode="list"] .pb-angle{-webkit-line-clamp:unset}
+.pb-src{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.pb-more summary{font-size:var(--t-small); line-height:var(--lh-small); color:var(--link); cursor:pointer; min-height:var(--tap); display:flex; align-items:center}
+.pb-edit{display:grid; gap:var(--s-2)}
+.pb-edit label{display:grid; gap:var(--s-1); font-weight:400}
+.pb-board[data-mode="list"] .pb-edit{grid-template-columns:repeat(auto-fit,minmax(10rem,1fr)); align-items:end}
+/* التقويم: أسبوعٌ في كلّ صفّ، وفي الخانة رقمُ اليوم ورقائقُ بنوده (شعارٌ وساعةٌ وسطرٌ) */
+.pb-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-2)}
+.pb-wd{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); text-align:center; font-weight:600}
+.pb-cell{min-height:7rem; padding:var(--s-2); gap:var(--s-1)}
+.pb-dn{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-weight:600}
+.pb-chip{flex-direction:row; align-items:center; gap:var(--s-1); padding:var(--s-1) var(--s-2); font-size:var(--t-small); line-height:var(--lh-small);
+  cursor:grab; user-select:none; -webkit-user-select:none}
+.pb-chip svg{width:var(--icon-xs); height:var(--icon-xs); flex:none}
+.pb-ct{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+/* ‏وعلى الهاتف أجندةٌ لا شبكة (من Google Calendar وNotion): سبعةُ أعمدةٍ في ‏390px تُقصّ أسماءها، فاليومُ صفٌّ باسمه كاملًا */
+.pb-dl{display:none}
+@media${below('md')}{
+  .pb-cal{grid-template-columns:1fr}
+  .pb-wd,.pb-dn{display:none}
+  .pb-dl{display:block; font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+  .pb-cell{min-height:0}}
+/* ‏محتوى البند والأصول (D-260): المختارُ يُرى مختارًا، والمعاينةُ بنسبةٍ ثابتة لا تقفز */
+#board .pb-card .btn[aria-pressed="true"],.lib-chips .btn[aria-current="page"]{background:var(--hover); border-color:var(--ink-2)}
+.lib-thumb{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--r-control); margin-bottom:var(--s-3); background:var(--surface-2)}
+.lib-ico{display:grid; place-items:center; font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink-2)}
+/* ‏الرحلةُ في ستّ خطوات: ما مضى بعلامته، والحاليّةُ بارزة، وما بعدها خافت */
+.flow{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--s-2); counter-reset:none}
+.flow li{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
+  padding-block-start:var(--s-2); border-block-start:var(--ring-w) solid var(--line); transition:border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease)}
+.flow li[data-state="done"]{border-block-start-color:var(--ink-2)}
+.flow li[data-state="now"]{color:var(--ink); font-weight:600; border-block-start-color:var(--focus)}
+.flow-n{display:inline-grid; place-items:center; width:var(--icon-md); height:var(--icon-md); border-radius:var(--r-pill); background:var(--surface-2); flex:none}
+.flow li[data-state="now"] .flow-n{background:var(--focus); color:var(--surface)}
+@media${below('md')}{.flow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){
+  .pb-card,.pb-col{transition:none}
+  .pb-card.landed{animation:none}
+  .pb-ghost{transform:none}
+  .flow li{transition:none}
+}
 `

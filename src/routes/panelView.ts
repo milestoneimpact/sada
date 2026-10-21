@@ -307,6 +307,10 @@ export interface PanelData {
   readonly env: 'staging' | 'production'
   readonly paused: boolean
   readonly autoEnqueue: boolean
+  /** صورةٌ مع كلّ مسوّدة (D-255) وسقفُها وما وُلّد اليوم. */
+  readonly autoImage: boolean
+  readonly imageCap: number
+  readonly usedImages: number
   /** أيُركَّب العنوانُ العربيُّ فوق الصورة؟ (D-085) */
   readonly imageOverlay: boolean
   /**
@@ -1312,6 +1316,32 @@ ${pivotPane(d.pivot)}
       </form>
     </div>
     <div class="sub mt-3">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
+  </div>
+
+  <div class="card mt-3" id="auto-image"><h2>صورةٌ مع كلّ مسوّدة</h2>
+    <div class="split">
+      <p>${d.autoImage
+        ? `مرفوع: كلُّ مسوّدةٍ تُكتب يُرسَم لها إنفوجرافيك من نصّها في الخلفيّة، <b>بحدّ ${d.imageCap} صور في اليوم</b>.
+           وكلُّ صورةٍ في دفتر الكلفة، وتُرفض أو تُبدَّل من بطاقتها كما هي.`
+        : `مطفأ: الصورةُ بزرّ «ولّد صورة» على البطاقة. ورفعُه يجعل كلَّ مسوّدةٍ تأتي بصورتها — <b>وكلُّ صورةٍ نداءٌ مدفوع</b>.`}</p>
+      <form class="inline" method="POST" action="/panel/settings"
+            data-confirm="${d.autoImage
+              ? 'إطفاء الصورة الآليّة؟ تُولَّد الصورة بزرّها وحده.'
+              : `رفع الصورة الآليّة؟ سيُرسَم لكلّ مسوّدةٍ صورةٌ مدفوعة، بحدّ ${d.imageCap} في اليوم وسقف الإنفاق.`}">
+        <input type="hidden" name="key" value="auto_image">
+        <input type="hidden" name="value" value="${d.autoImage ? 'false' : 'true'}">
+        <button class="btn ${d.autoImage ? 'btn-secondary' : 'btn-primary'}" type="submit">
+          ${d.autoImage ? 'إطفاء' : 'رفع الصورة الآليّة'}</button>
+      </form>
+    </div>
+    <form class="row mt-3" method="POST" action="/panel/settings" data-autosave>
+      <input type="hidden" name="key" value="daily_image_cap">
+      ${field({ id: 'c5', label: 'سقف الصور (عدد في اليوم)',
+        control: `<input type="number" name="value" min="0"
+          max="${SETTING_LIMITS.dailyImageCap.max}" step="1" value="${d.imageCap}">` })}
+      <button class="btn btn-primary" type="submit">حفظ</button>
+      <span class="note self-center">وُلّد اليوم: ${d.usedImages}</span>
+    </form>
   </div>
 
   ${alertChannel(d.alertWebhook, d.outbox)}

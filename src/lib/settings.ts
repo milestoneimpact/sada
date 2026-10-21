@@ -68,6 +68,13 @@ export interface Settings {
    */
   readonly youtubePublic: boolean
   readonly tiktokPublic: boolean
+  /**
+   * **صورةٌ مع كلّ مسوّدة** (GROWTH-PLAN م-٣، D-255): بعد الكتابة يُرسَم إنفوجرافيك في الخلفيّة.
+   * **مطفأٌ أوّلًا** ويُقرأ بالمطابقة الحرفيّة كمفاتيح الخطر: كلُّ صورةٍ نداءٌ مدفوع (D-008)، فلا يُفتح إلّا بقرار المالك.
+   */
+  readonly autoImage: boolean
+  /** كم صورةً في اليوم على الأكثر — والعدُّ لكلّ صورةٍ وُلّدت اليوم آليّةً أو بزرّ. */
+  readonly dailyImageCap: number
 }
 
 export const DEFAULTS: Settings = {
@@ -87,6 +94,8 @@ export const DEFAULTS: Settings = {
   // ‏خاصّان حتّى يُجازا — والقلبُ قرارُ المالك بعد الإجازة لا قبلها (D-190)
   youtubePublic: false,
   tiktokPublic: false,
+  autoImage: false,
+  dailyImageCap: 10,
   // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
   alertWebhook: '',
   // والأربعُ التي كانت مكتوبةً في الشيفرة — **فلا شاشةَ فارغةً في أوّل يوم**
@@ -100,6 +109,7 @@ export const LIMITS = {
   weeklyPromoCapUsd: { min: 0, max: 500 },
   // ‏وعشرون حدٌّ لخطأ الإصبع لا للحاجة: عشرةُ أضعاف الافتراض بسعرٍ لم يُقرأ
   dailyVideoCap: { min: 0, max: 20 },
+  dailyImageCap: { min: 0, max: 50 },
 } as const
 
 /**
@@ -125,6 +135,8 @@ export const SETTING_KEYS = [
   'dashboard_tiles',
   'youtube_public',
   'tiktok_public',
+  'auto_image',
+  'daily_image_cap',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -148,6 +160,8 @@ export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
   dashboard_tiles: 'بطاقات اللوح',
   youtube_public: 'النشر العلنيّ على YouTube',
   tiktok_public: 'النشر العلنيّ على TikTok',
+  auto_image: 'صورة مع كلّ مسوّدة',
+  daily_image_cap: 'سقف الصور اليوميّ',
 }
 
 export function isSettingKey(key: string): key is SettingKey {
@@ -218,6 +232,8 @@ export async function readSettings(db: Db): Promise<Settings> {
     // ‏بالمطابقة الحرفيّة كمفاتيح الخطر: غيابٌ أو فسادٌ يعني «خاصّ» (D-190)
     youtubePublic: map.get('youtube_public') === 'true',
     tiktokPublic: map.get('tiktok_public') === 'true',
+    autoImage: map.get('auto_image') === 'true',
+    dailyImageCap: Math.floor(toNumber(map.get('daily_image_cap'), DEFAULTS.dailyImageCap, 'dailyImageCap')),
   }
 }
 
@@ -238,7 +254,7 @@ export async function writeSetting(
 ): Promise<WriteResult> {
   let stored: string
   if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay' ||
-      key === 'youtube_public' || key === 'tiktok_public') {
+      key === 'youtube_public' || key === 'tiktok_public' || key === 'auto_image') {
     stored = raw === 'true' ? 'true' : 'false'
   } else if (key === 'alert_webhook') {
     /*
@@ -264,6 +280,8 @@ export async function writeSetting(
     stored = normalizeTiles(raw)
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
+  } else if (key === 'daily_image_cap') {
+    stored = String(Math.floor(toNumber(raw, DEFAULTS.dailyImageCap, 'dailyImageCap')))
   } else if (key === 'daily_video_cap') {
     // ‏ويُحفَظ ما يُقرأ: عددٌ صحيحٌ مقصوصٌ على حدّيه، فالإشعارُ يقول ما حُفظ فعلًا
     stored = String(wholeClips(raw))

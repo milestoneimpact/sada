@@ -1,5 +1,5 @@
 /** الشبكة والبطاقات والرئيسيّة وبطاقة المؤشّر — الوحدةُ 4 من 14 في ورقة الأنماط، بترتيبها (`scripts/split_styles.mjs`). */
-import { below } from '../tokens'
+import { atLeast, below } from '../tokens'
 
 export const CARDS = `/* ══ الشبكة والبطاقات ════════════════════════════════════════ */
 /* عنصرُ الشبكة لا ينكمش تحت محتواه ما لم يُقَل له: min-width الافتراضيّة
@@ -47,7 +47,11 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    الرقم يسع**، والرقم يصغر درجةً ليسع — وقاعدتُه بعد قاعدة الرقم أدناه. */
 @media${below('md')}{
   .tiles.c2,.tiles.c3,.tiles.c4,.tiles.c5{grid-template-columns:repeat(2,1fr)}
-  .tiles.c3>.tile:last-child:nth-child(odd){grid-column:1/-1}}
+  .tiles.c3>.tile:last-child:nth-child(odd),.tiles.c4>.tile:last-child:nth-child(odd){grid-column:1/-1}}
+/* ‏وصفُّ أربعةٍ لا يترك خانةً فارغةً في آخره: الأخيرةُ تمتدّ إلى نهاية السطر (محطّاتُ العميل السبع، D-259) */
+@media${atLeast('md')}{
+  .tiles.c4>.tile:last-child:nth-child(4n+3){grid-column:span 2}
+  .tiles.c4>.tile:last-child:nth-child(4n+2){grid-column:span 3}}
 /* ── نظرةٌ عامّة: عمودان يُملآن لا يُمدّان (D-136) ──────────────────────
    شبكة تمدّ البطاقة لتساوي جارتَها تترك تحت رسم الإنفاق ‏٥٢١px بيضاء
    (قِيست). فالعمود الثاني **رصّة** من بطاقتين تملأ ما تملؤه القائمة،

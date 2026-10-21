@@ -36,7 +36,7 @@ import { applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type 
 import { planImportExpired, planImportScreen } from './ui/planImportView'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel, type PublishPlatform } from '../lib/oauth/providers'
-import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
+import { abortUpload, cleanName, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
 import { parseRange, resolveRange } from '../lib/media/range'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
@@ -116,6 +116,14 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
 import { insightsCsv, insightsScreen } from './ui/insightsView'
+import { clientScreen } from './ui/clientView'
+import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
+import { autoImageRoom } from '../lib/image/auto'
+import { editPlanItem, removePlanItem } from '../lib/plan/edit'
+import { addLibraryFile, libraryProblem, listLibrary, rawObject } from '../lib/library'
+import { libraryScreen } from './ui/libraryView'
+import { readBrief, writeBrief } from '../lib/brief'
+import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
@@ -437,6 +445,73 @@ async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
   return { facts, platform, platforms, zone }
 }
 
+/**
+ * رحلةُ العميل (D-257 · AGENCY-PLAN): المحطّاتُ السبع لعميلِ الجلسة، والموجزُ يُكتب فيها. **قراءةٌ لا نداء**:
+ * التقديرُ ممّا أُنفق فعلًا، ولا يُنفَق شيءٌ من هنا.
+ */
+/** أسماءُ المصادر لبطاقات اللوحة — للعميل وحدَه، وبعددٍ محدود. */
+async function sourceNames(db: Env['DB'], org: string, ids: readonly string[]): Promise<Record<string, string>> {
+  const uniq = [...new Set(ids)].slice(0, 60)
+  if (uniq.length === 0) return {}
+  const { results } = await db
+    .prepare(`SELECT id, name FROM sources WHERE org_id = ? AND id IN (${uniq.map(() => '?').join(',')})`)
+    .bind(org, ...uniq)
+    .all<{ id: string; name: string }>()
+    .catch(() => ({ results: [] as { id: string; name: string }[] }))
+  return Object.fromEntries(results.map((r) => [r.id, r.name]))
+}
+
+panel.get('/panel/client', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const [orgRow, brief, linkedRows, plan, settings, units, spent, facts] = await Promise.all([
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    readBrief(c.env.DB, org),
+    c.env.DB.prepare("SELECT platform, count(*) AS n FROM accounts WHERE org_id = ? AND status = 'active' GROUP BY platform")
+      .bind(org).all<{ platform: string; n: number }>().catch(() => ({ results: [] as { platform: string; n: number }[] })),
+    latestPlan(c.env.DB, org),
+    readSettings(c.env.DB),
+    unitCosts(c.env.DB, org),
+    c.env.DB.prepare("SELECT COALESCE(SUM(total), 0) AS t FROM cost_ledger WHERE org_id = ? AND at >= strftime('%Y-%m-01 00:00:00', 'now')")
+      .bind(org).first<{ t: number }>().catch(() => null),
+    readFacts(c.env.DB, org, null),
+  ])
+  const waiting = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'draft'")
+    .bind(org).first<{ n: number }>().catch(() => null)
+  const body = clientScreen({
+    waiting: waiting?.n ?? 0,
+    orgName: orgRow?.name ?? 'منظّمتي',
+    brief,
+    linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
+    plan,
+    autoImage: settings.autoImage,
+    estimate: estimateMonth({ perWeek: brief.perWeek, channels: brief.channels.length, autoImage: settings.autoImage, ...units }),
+    spentMonth: spent?.t ?? 0,
+    measured: facts.length,
+    saved: c.req.query('saved') === '1',
+    flash: await takeFlash(c.env, c.req.raw),
+    names: plan === null ? {} : await sourceNames(c.env.DB, org, plan.plan.items.map((i) => i.sourceId)),
+  })
+  return page((nonce) =>
+    soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, PLAN_BOARD_SCRIPT,
+      buildCommands({ onPanel: false }), soloNav('accounts')),
+  )
+})
+
+panel.post('/panel/client/brief', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  await writeBrief(c.env.DB, activeOrg(gate.session.record), {
+    goal: f.get('goal'), audience: f.get('audience'), tone: f.get('tone'), avoid: f.get('avoid'),
+    channels: f.getAll('channel'), perWeek: f.get('per_week'),
+  })
+  await record(c.env.DB, { actor: 'panel', action: 'brief.write' }, c.req.raw)
+  return c.redirect('/panel/client?saved=1#brief', 303)
+})
+
 panel.get('/panel/insights', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -626,7 +701,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   for (const platform of [...new Set([...drafts, ...(editing === null ? [] : [editing])].map((d) => d.platform))]) {
     peaks[platform] = await readPeaks(c.env.DB, platform)
   }
-  const plan = await latestPlan(c.env.DB)
+  const plan = await latestPlan(c.env.DB, activeOrg(session.record))
   const sessions = await listSessions(c.env.KV, session.id)
   const orgs = await listOrgs(c.env.DB)
   const audit = await recentAudit(c.env.DB, 50)
@@ -745,6 +820,12 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
   const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, activeOrg(session.record), 'tiktok'))
   const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
+  const usedImages = (await c.env.DB
+    .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
+    .bind(activeOrg(session.record))
+    .first<{ n: number }>()
+    .catch(() => null))?.n ?? 0
   return page((nonce) =>
     panelPage({
       // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
@@ -754,6 +835,9 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
       zone: ownZone,
       autoEnqueue: allowance.settings.autoEnqueue,
+      autoImage: allowance.settings.autoImage,
+      imageCap: allowance.settings.dailyImageCap,
+      usedImages,
       imageOverlay: allowance.settings.imageOverlay,
       // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
       slide,
@@ -1675,17 +1759,21 @@ panel.post('/panel/plan/generate', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
 
+  // ‏لعميلِ الجلسة، وأسبوعًا أو شهرًا من قائمةٍ مغلقة (D-256)
+  const span = gate.form.get('span') === 'month' ? 'month' : 'week'
   const outcome = await planWeek({
     db: c.env.DB,
     encKey: c.env.TOKEN_ENC_KEY,
     workerSecrets: c.env as unknown as Record<string, string | undefined>,
+    org: activeOrg(gate.session.record),
+    span,
   })
 
   const flash: PanelFlash =
     outcome.kind === 'planned'
       ? {
           kind: 'ok',
-          text: `خطّة أسبوع ${outcome.week}: ${outcome.items} بندا${
+          text: `خطّة ${span === 'month' ? 'شهر يبدأ' : 'أسبوع'} ${outcome.week}: ${outcome.items} بندا${
             outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
           }، ${
             // وصفرٌ مع وحداتٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008).
@@ -1722,7 +1810,7 @@ panel.post('/panel/plan/approve', async (c) => {
   if ('denied' in gate) return gate.denied
   const id = String(gate.form.get('id') ?? '')
 
-  const done = await approvePlan(c.env.DB, id)
+  const done = await approvePlan(c.env.DB, id, activeOrg(gate.session.record))
   await record(
     c.env.DB,
     { actor: 'panel', action: 'plan.approve', target: id, detail: done ? 'approved' : 'refused' },
@@ -1735,6 +1823,167 @@ panel.post('/panel/plan/approve', async (c) => {
       : 'لا خطّة بهذه الحال.',
   })
   return back('posts')
+})
+
+/**
+ * **«ابدأ الخطّة»** (D-258 · AGENCY-PLAN و-٥): تُعتمَد الخطّة إن كانت مسوّدة، ويُرسَل كلُّ بندٍ إلى طابور التوليد
+ * فيُكتب بـ `draftPost` نفسِها (حرّاسُها وسقوفُها ومفتاحُها) وتُرسَم صورتُه إن رُفعت الصورةُ الآليّة.
+ *
+ * **ولا يُنشر شيء**: المسوّداتُ تظهر في «تنتظر قرارك» وتُعتمَد واحدةً واحدةً كما كانت. والبندُ المكرّرُ (المصدرُ والمنصّةُ نفسُهما)
+ * يُرسَل مرّة: مفتاحُ المسوّدة واحدٌ لهما، والثانيةُ «كُتبت من قبل». والإيقافُ يُقال هنا قبل أن يُرسَل شيء.
+ */
+/**
+ * تعديلُ بندٍ في الخطّة (D-259): يومُه بالسحب في اللوحة، ومنصّتُه وساعتُه بالقائمة. **والسكربتُ يطلب JSON** فتبقى الصفحةُ
+ * في مكانها، وبلا سكربتٍ نموذجٌ عاديٌّ يعود إلى اللوحة بإشعاره. والتحقّقُ كلُّه في `editPlanItem`.
+ */
+panel.post('/panel/plan/item', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const opt = (k: string): string | undefined => { const v = f.get(k); return v === null || v === '' ? undefined : String(v) }
+  const result = await editPlanItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), Number(f.get('index')), {
+    ...(opt('day') === undefined ? {} : { day: opt('day')! }),
+    ...(opt('platform') === undefined ? {} : { platform: opt('platform')! }),
+    ...(opt('time') === undefined ? {} : { time: opt('time')! }),
+    // ‏«ولّد أنت» يرسل `asset` فارغًا فيمحو المختار، و«من المكتبة» يرسل مرجعَه (D-260)
+    ...(f.has('asset') ? { asset: String(f.get('asset') ?? '') } : {}),
+  })
+  if ((c.req.header('Accept') ?? '').includes('application/json')) {
+    return c.json(result, result.ok ? 200 : 400)
+  }
+  const said = !f.has('asset') ? 'نُقل البند.' : f.get('asset') === '' ? 'سيُولَّد محتوى البند.' : 'اختير ملفُّ البند من الأصول.'
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: said } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/client#board', 303)
+})
+
+panel.post('/panel/plan/start', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('id') ?? '')
+  const plan = await latestPlan(c.env.DB, org)
+  const settings = await readSettings(c.env.DB)
+  if (plan === null || plan.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا خطّة بهذا المعرّف لهذا العميل.' })
+    return c.redirect('/panel/client', 303)
+  }
+  if (settings.paused) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'صدى موقوفٌ مؤقّتًا — لا يُكتب شيءٌ حتّى يُرفع الإيقاف.' })
+    return c.redirect('/panel/client', 303)
+  }
+  if (plan.status === 'draft') await approvePlan(c.env.DB, plan.id, org)
+  const seen = new Set<string>()
+  const items = plan.plan.items.filter((i) => {
+    const k = `${i.sourceId}:${i.platform}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  if (items.length > 0) {
+    await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => ({
+      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org, ...(i.asset === undefined ? {} : { asset: i.asset }) } },
+    })))
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
+  await setFlash(c.env, c.req.raw, {
+    kind: 'ok',
+    text: `بدأ العمل: ${items.length} ${items.length === 1 ? 'مسوّدة تُكتب' : 'مسوّدات تُكتب'} في الخلفيّة${
+      settings.autoImage ? ' مع صورها' : ''}، وتظهر في «تنتظر قرارك» خلال دقائق. ولا يُنشر منها شيءٌ قبل اعتمادك.`,
+  })
+  return c.redirect('/panel/client', 303)
+})
+
+/** حذفُ بندٍ من الخطّة (D-260) — قبل أن يُكتب، والصفحةُ تُعاد بفهارسها الجديدة. */
+panel.post('/panel/plan/item/remove', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const result = await removePlanItem(c.env.DB, activeOrg(gate.session.record), String(gate.form.get('id') ?? ''), Number(gate.form.get('index')))
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُذف البند من الخطّة.' } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/client#board', 303)
+})
+
+// ── المكتبة (D-260) ─────────────────────────────────────────────────
+
+panel.get('/panel/assets', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const kind = c.req.query('kind')
+  const origin = c.req.query('origin')
+  const plan = c.req.query('plan') ?? ''
+  const index = Number(c.req.query('index'))
+  const body = libraryScreen({
+    assets: await listLibrary(c.env.DB, org),
+    kind: kind === 'image' || kind === 'video' || kind === 'doc' ? kind : null,
+    origin: origin === 'generated' || origin === 'upload' || origin === 'drive' ? origin : null,
+    pick: /^[A-Za-z0-9_-]{1,80}$/.test(plan) && Number.isInteger(index) && index >= 0 ? { plan, index } : null,
+    flash: await takeFlash(c.env, c.req.raw),
+  })
+  return page((nonce) =>
+    soloPage('صدى — الأصول', { href: '/panel/client', label: 'رحلة العميل' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('accounts')),
+  )
+})
+
+/**
+ * **رفعُ صورةٍ إلى المكتبة** — البايتاتُ إلى R2 أوّلًا ثمّ الصفّ، فلا صفَّ بلا كائن. ومع `id` و`index` يُربط بالبند مباشرةً.
+ * والمفتاحُ من معرّفٍ يصنعه صدى لا من اسم الملفّ (D-126).
+ */
+panel.post('/panel/assets/upload', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const file = f.get('file')
+  const planId = String(f.get('id') ?? '')
+  const backTo = planId === '' ? '/panel/assets' : `/panel/assets?plan=${encodeURIComponent(planId)}&index=${Number(f.get('index'))}`
+  if (!(file instanceof File)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اختر صورةً أوّلًا.' })
+    return c.redirect(backTo, 303)
+  }
+  const problem = libraryProblem(file.type, file.size)
+  if (problem !== null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: problem })
+    return c.redirect(backTo, 303)
+  }
+  const key = `library/${org}/${crypto.randomUUID()}.${file.type.split('/')[1] ?? 'img'}`
+  await c.env.MEDIA.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
+  const id = await addLibraryFile(c.env.DB, org, { key, name: cleanName(file.name), mime: file.type, bytes: file.size })
+  await record(c.env.DB, { actor: 'panel', action: 'library.upload', target: id }, c.req.raw)
+  if (planId !== '') {
+    const linked = await editPlanItem(c.env.DB, org, planId, Number(f.get('index')), { asset: `f:${id}` })
+    await setFlash(c.env, c.req.raw, linked.ok ? { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول، وربطت بالبند.' } : { kind: 'bad', text: linked.reason })
+    return c.redirect('/panel/client#board', 303)
+  }
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول.' })
+  return c.redirect('/panel/assets', 303)
+})
+
+/** معاينةُ المرفوع خلف الجلسة وبمنظّمتها — والمولَّدةُ من `/panel/media/:id`. */
+panel.get('/panel/assets/raw/:ref', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
+  const found = await rawObject(c.env.DB, activeOrg(session.record), c.req.param('ref'))
+  if (found === null) return c.text('لا ملفّ', 404)
+  // ‏المقطعُ يُطلب بمداه (D-182)، والصورةُ كاملة
+  const wanted = parseRange(c.req.header('Range'))
+  const object = await c.env.MEDIA.get(found.key, wanted === null ? {} : { range: wanted })
+  if (object === null) return c.text('البايتات مفقودة', 404)
+  const span = wanted === null ? null : resolveRange(wanted, object.size)
+  return new Response(object.body as unknown as BodyInit, {
+    status: span === null ? 200 : 206,
+    headers: {
+      ...(span === null
+        ? { 'Content-Length': String(object.size) }
+        : { 'Content-Range': `bytes ${span.start}-${span.end}/${object.size}`, 'Content-Length': String(span.end - span.start + 1) }),
+      'Accept-Ranges': 'bytes',
+      'Content-Type': found.mime,
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+    },
+  })
 })
 
 // ── الصور ────────────────────────────────────────────────────────────
@@ -1755,6 +2004,32 @@ panel.post('/panel/media/generate', (c) => imageRoute(c, false))
  * فيبقى المنشورُ بلا صورة. والحارسُ في `generateForPost` لا هنا (D-019).
  */
 panel.post('/panel/media/regenerate', (c) => imageRoute(c, true))
+
+/**
+ * **صورةٌ مع كلّ مسوّدة** (GROWTH-PLAN م-٣، D-255) — إن رفعه المالك، وبما بقي من سقف اليوم.
+ *
+ * تُرسم **في الخلفيّة بعد الردّ** (`waitUntil`): المسوّدةُ لا تنتظر نداءً ثانيًا. والحارسُ في `generateForPost`
+ * كما هو (D-019): الإيقافُ وسقفُ الإنفاق ومفتاحُ التكرار والدفتر. والسقفُ هنا **بالعدد** فوق المال، ويُعدّ فيه
+ * كلُّ صورةٍ وُلّدت اليوم آليّةً أو بزرّ، فلا يتجاوزه المالكُ دون أن يدري. ويُعاد كم صورةً بدأت.
+ */
+async function autoImages(c: Context<{ Bindings: Env }>, org: string, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const batch = ids.slice(0, await autoImageRoom(c.env.DB, org))
+  if (batch.length === 0) return 0
+  const deps = {
+    db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY,
+    workerSecrets: c.env as unknown as Record<string, string | undefined>,
+  }
+  const work = Promise.all(batch.map((id) => generateForPost(deps, id, { style: 'infographic' })
+    .catch((error: unknown) => console.warn({ job: 'auto-image', post: id, failed: String(error) }))))
+  try {
+    c.executionCtx.waitUntil(work)
+  } catch {
+    // ‏بلا سياق تنفيذ (الاختبار): يُنتظَر هنا
+    await work
+  }
+  return batch.length
+}
 
 async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Promise<Response> {
   const gate = await guardPost(c)
@@ -2387,7 +2662,8 @@ panel.post('/panel/drafts/write', async (c) => {
     outcome.kind === 'drafted'
       ? {
           kind: 'ok',
-          text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.`,
+          text: `كُتبت مسوّدة ${PLATFORMS[platform].label}${provider === undefined ? '' : ` بـ${provider}`} — ${outcome.length} محرفا، الكلفة ${money(outcome.cost)}.${
+            (await autoImages(c, activeOrg(gate.session.record), [outcome.postId])) > 0 ? ' وتُرسم صورتُها الآن.' : ''}`,
         }
       : outcome.kind === 'already'
         // ‏والمسوّدةُ القائمةُ أمامه لا في مكانٍ يبحث عنه — والمرفوضةُ لا تُعدّ قائمة (job.ts)
@@ -2445,7 +2721,7 @@ panel.post('/panel/drafts/idea', async (c) => {
     return back('idea')
   }
 
-  const deps = { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> }
+  const deps = { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined>, org: activeOrg(gate.session.record) }
   const done: { platform: Platform; outcome: DraftOutcome }[] = []
   for (const platform of chosen) {
     const outcome = await draftFromIdea(deps, idea, platform)
@@ -2471,6 +2747,8 @@ panel.post('/panel/drafts/idea', async (c) => {
   const parts: string[] = []
   if (drafted.length > 0) {
     parts.push(`كُتبت من فكرتك ${drafted.length === 1 ? 'مسوّدة' : 'مسوّدتا'} ${names(drafted)} — الكلفة ${money(spent)}.`)
+    const drawn = await autoImages(c, activeOrg(gate.session.record), drafted.map((d) => d.outcome.postId))
+    if (drawn > 0) parts.push(`وتُرسم ${drawn === 1 ? 'صورتُها' : `${drawn} صور`} الآن.`)
   }
   if (already.length > 0) parts.push(`${already.length === 1 ? 'ومسوّدة' : 'ومسوّدتا'} ${names(already)} من هذه الفكرة موجودة — لم يُنفَق عليها شيء.`)
   for (const d of stopped) {

@@ -15,6 +15,7 @@
  * **والخامسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ —
  * مبتورًا أو مرفوضًا أو فارغًا. وما لم يصل لا يُكتب له صفّ.
  */
+import { readBrief, voiceSection } from '../brief'
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
@@ -24,7 +25,7 @@ import { chatCompletion } from '../ai/openaiCompat'
 import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
 import {
-  PLAN_SCHEMA, parsePlan, systemPrompt, userPrompt, weekStart,
+  PLAN_SCHEMA, maxItems, parsePlan, systemPrompt, userPrompt, weekStart, type PlanSpan,
   type Plan, type PlanSource,
 } from './prompt'
 import type { Db } from '../tokens'
@@ -56,6 +57,10 @@ export interface PlanDeps {
   readonly workerSecrets: Readonly<Record<string, string | undefined>>
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
+  /** العميلُ الذي تُبنى له الخطّة (D-256) — وغيابُه المالك كما كان. */
+  readonly org?: string
+  /** أسبوعٌ أو شهر (D-256). */
+  readonly span?: PlanSpan
 }
 
 interface Row {
@@ -74,18 +79,18 @@ interface Row {
  * القاعدة يكبر بلا حدّ ويُدفع ثمنُه في كلّ نداء، **والنموذجُ لا يقرأ
  * الخمسين قراءةً واحدة**. والأعلى استحقاقا هو ما يُخطَّط منه أصلا.
  */
-export async function eligible(db: Db, limit = 15): Promise<PlanSource[]> {
+export async function eligible(db: Db, limit = 15, org = 'org_owner'): Promise<PlanSource[]> {
   const { results } = await db
     .prepare(
       `SELECT s.id, s.name, i.summary, i.themes_json, i.worth_score,
               (SELECT count(*) FROM posts p
-                WHERE p.source_id = s.id AND p.status <> 'rejected') AS used
-         FROM sources s JOIN content_items i ON i.source_id = s.id
-        WHERE i.summary IS NOT NULL AND i.summary <> ''
+                WHERE p.source_id = s.id AND p.org_id = s.org_id AND p.status <> 'rejected') AS used
+         FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+        WHERE s.org_id = ? AND i.summary IS NOT NULL AND i.summary <> ''
         ORDER BY i.worth_score DESC
         LIMIT ?`,
     )
-    .bind(limit)
+    .bind(org, limit)
     .all<Row>()
 
   return results.map((row) => {
@@ -110,9 +115,11 @@ export async function eligible(db: Db, limit = 15): Promise<PlanSource[]> {
 export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
   const now = (deps.now ?? (() => new Date()))()
   const week = weekStart(now)
+  const org = deps.org ?? 'org_owner'
+  const span: PlanSpan = deps.span ?? 'week'
 
-  // ١ و ٢ · المادّة
-  const sources = await eligible(deps.db)
+  // ١ و ٢ · المادّة — مصادرُ العميل وحدَه
+  const sources = await eligible(deps.db, span === 'month' ? 30 : 15, org)
   if (sources.length < MIN_SOURCES) {
     return {
       kind: 'not_enough',
@@ -169,7 +176,9 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
 
   // ٤ · النداء
   const system = systemPrompt()
-  const user = userPrompt(sources, week)
+  // ‏وموجزُ العميل (D-257): هدفُه وجمهورُه ونبرتُه وما لا يُقال — وفارغٌ إن لم يُكتب
+  const voice = voiceSection(await readBrief(deps.db, org))
+  const user = voice === '' ? userPrompt(sources, week, span) : `${voice}\n\n${userPrompt(sources, week, span)}`
   let text: string
   let spent: Spent
   try {
@@ -181,7 +190,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
         user,
         // المحمولُ لا الخامّ (D-164): `minLength` و`maxItems` يُطويان وصفًا،
         // وحدودُهما في `parsePlan`
-        schema: portableSchema(PLAN_SCHEMA),
+        schema: portableSchema(span === 'month' ? monthSchema() : PLAN_SCHEMA),
         // حكمٌ يقرّر إنفاقَ أسبوعٍ كامل — يُعطى جهدَه
         effort: 'high',
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
@@ -223,21 +232,21 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     return { kind: 'failed', reason: 'جواب النموذج ليس JSON صالحا', retryable: true }
   }
   const known = new Set(sources.map((s) => s.id))
-  const read = parsePlan(parsedJson, known, week)
+  const read = parsePlan(parsedJson, known, week, span)
   if (!read.ok) return { kind: 'failed', reason: read.reason, retryable: true }
 
   // ٧ · الكتابة — والسابقةُ لهذا الأسبوع تُنسَخ لا تُحذف
   const planId = crypto.randomUUID()
   await deps.db
-    .prepare("UPDATE plans SET status = 'superseded' WHERE week_start = ? AND status <> 'superseded'")
-    .bind(week)
+    .prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND week_start = ? AND span = ? AND status <> 'superseded'")
+    .bind(org, week, span)
     .run()
-  // `week_start` فريدٌ في المخطّط، فالسابقةُ تُزال بعد أن نُسخت حالُها —
+  // `(org_id, week_start, span)` فريدٌ في المخطّط (0032)، فالسابقةُ لهذا العميل وهذا المدى تُزال بعد أن نُسخت حالُها —
   // وهي كلفةٌ وقعت، فتبقى في الدفتر بمعرّف الأسبوع
-  await deps.db.prepare("DELETE FROM plans WHERE week_start = ?").bind(week).run()
+  await deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, week, span).run()
   await deps.db
-    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id) VALUES (?, ?, ?, ?, ?, \'org_owner\')')
-    .bind(planId, week, JSON.stringify(read.plan), ran, 'draft')
+    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(planId, week, JSON.stringify(read.plan), ran, 'draft', org, span)
     .run()
 
   return {
@@ -259,16 +268,19 @@ export interface StoredPlan {
   readonly model: string
   readonly status: 'draft' | 'approved' | 'superseded'
   readonly createdAt: string
+  /** وغيابُه أسبوعٌ — خطّةٌ قُرئت قبل 0032. */
+  readonly span?: PlanSpan
 }
 
 /** أحدثُ خطّةٍ لأقرب أسبوع. */
-export async function latestPlan(db: Db): Promise<StoredPlan | null> {
+export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan | null> {
   try {
     const row = await db
       .prepare(
-        `SELECT id, week_start, plan_json, model, status, created_at FROM plans
-          WHERE status <> 'superseded' ORDER BY week_start DESC LIMIT 1`,
+        `SELECT id, week_start, plan_json, model, status, created_at, span FROM plans
+          WHERE org_id = ? AND status <> 'superseded' ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
+      .bind(org)
       .first<Record<string, string>>()
     if (row === null) return null
     return {
@@ -278,6 +290,7 @@ export async function latestPlan(db: Db): Promise<StoredPlan | null> {
       model: String(row['model']),
       status: row['status'] === 'approved' ? 'approved' : 'draft',
       createdAt: String(row['created_at']),
+      span: row['span'] === 'month' ? 'month' : 'week',
     }
   } catch {
     // جدولٌ لم يُرحَّل أو JSON فاسد: لوحةٌ بلا خطّةٍ خيرٌ من لوحةٍ لا تُفتح
@@ -286,12 +299,22 @@ export async function latestPlan(db: Db): Promise<StoredPlan | null> {
 }
 
 /** اعتمادُ الخطّة — إقرارٌ بالمنطق، **ولا يكتب نصّا ولا يُنفق**. */
-export async function approvePlan(db: Db, planId: string): Promise<boolean> {
+export async function approvePlan(db: Db, planId: string, org = 'org_owner'): Promise<boolean> {
   const row = await db
-    .prepare('SELECT status FROM plans WHERE id = ?')
-    .bind(planId)
+    .prepare('SELECT status FROM plans WHERE id = ? AND org_id = ?')
+    .bind(planId, org)
     .first<{ status: string }>()
   if (row === null || row.status !== 'draft') return false
   await db.prepare("UPDATE plans SET status = 'approved' WHERE id = ?").bind(planId).run()
   return true
 }
+
+/** مخطّطُ الشهر: المخطّطُ نفسُه بسقف بنوده (D-256). */
+function monthSchema(): typeof PLAN_SCHEMA {
+  const base = PLAN_SCHEMA as unknown as { properties: { items: Record<string, unknown> } }
+  return {
+    ...PLAN_SCHEMA,
+    properties: { ...base.properties, items: { ...base.properties.items, maxItems: maxItems('month') } },
+  } as unknown as typeof PLAN_SCHEMA
+}
+

@@ -122,6 +122,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'session.revoke_all': 'أُبطلت كلّ الجلسات',
   'login.denied': 'محاولة دخول مرفوضة',
   'login.code.locked': 'الدخول بالرمز موقوف يوما',
+  'brief.write': 'حُفظ موجز العميل',
+  'plan.start': 'بدأت الخطّة',
   'settings.write': 'تغيير إعداد',
   'drive.scan': 'مسح Drive',
   'source.analyze': 'تحليل مصدر',
