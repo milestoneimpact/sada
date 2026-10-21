@@ -115,6 +115,8 @@ import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
+import { insightsCsv, insightsScreen } from './ui/insightsView'
+import { readFacts, whatWorks } from '../lib/insights/whatWorks'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
@@ -421,6 +423,48 @@ function toPanelSource(row: SourceRow): PanelSource {
  * يحمّله، **فلا يُنزَّل غيرُ ما يُعرَض**. ولا مكتبةَ في المتصفّح: `CSV`
  * يُكتب في الخادم من الجدول نفسِه.
  */
+/**
+ * «ما ينجح» (D-253): أرجحُ موعدٍ وأفضلُ شكلٍ وطولٍ من تاريخ الحساب — **بلا نداءٍ مدفوع**، قراءةٌ لما قِيس.
+ * والمنصّةُ من `?p=` بقائمة سماح (ما له منشوراتٌ مقيسة)، فلا يُبنى استعلامٌ من نصٍّ مجهول.
+ */
+async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
+  const all = await readFacts(c.env.DB, org, null)
+  const platforms = [...new Set(all.map((f) => f.platform))]
+  const asked = new URL(c.req.url).searchParams.get('p')
+  const platform = asked !== null && platforms.includes(asked) ? asked : null
+  const facts = platform === null ? all : all.filter((f) => f.platform === platform)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  return { facts, platform, platforms, zone }
+}
+
+panel.get('/panel/insights', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const input = await insightsInput(c, activeOrg(session.record))
+  const body = insightsScreen({ ...input, works: whatWorks(input.facts, input.zone) })
+  return page((nonce) =>
+    soloPage(`صدى — ${sectionLabel('results')} · ما ينجح`, { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+      buildCommands({ onPanel: false }), soloNav('results')),
+  )
+})
+
+panel.get('/panel/insights.csv', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.redirect('/panel', 303)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const input = await insightsInput(c, activeOrg(session.record))
+  return new Response(insightsCsv(input.facts, input.zone), {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="sada-log${input.platform === null ? '' : `-${input.platform}`}.csv"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
+
 panel.get('/panel/pivot.csv', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.redirect('/panel', 303)
