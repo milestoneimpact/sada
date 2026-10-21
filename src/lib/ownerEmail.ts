@@ -3,8 +3,8 @@
  *
  * لا مسارَ يكتبه ولا شاشةَ تحذفه: ما يُعدَّل من اللوحة يُعدَّل بجلسةٍ مسروقة
  * أيضا، وبريدُ الدخول هو الباب نفسه. فتبديلُه طلبُ دمجٍ يُراجَع، لا ضغطة.
- * والقيمةُ نفسُها في `destination_address` من `wrangler.toml`، فلا يُرسَل
- * رمزٌ إلى عنوانٍ غيرِه ولو أخطأت الشيفرة.
+ * وكانت القيمةُ نفسُها `destination_address` في `wrangler.toml`، ورُفع القيدُ للفريق (D-270): الربطُ يرسل
+ * إلى العناوين المُتحقَّق منها في Email Routing وحدها، والشيفرةُ للمالك والمدعوّين وحدهم.
  */
 export const OWNER_EMAIL = 'milestonesimpact@gmail.com'
 
@@ -17,15 +17,8 @@ export function isOwnerEmail(raw: string): boolean {
   return normalizeEmail(raw) === OWNER_EMAIL
 }
 
-/** الأدوارُ — المالكُ وحدَه اليوم، والدعواتُ بأدوارٍ أضيقَ خطوةٌ لاحقة (D-245). */
-export type Role = 'owner'
-
 /**
- * من يُرسَل إليه رمزُ الدخول، وبأيّ دور — **السؤالُ في موضعٍ واحد**.
- *
- * اليومَ المالكُ وحدَه. ويومَ تُبنى الدعوات (ناشرٌ، وعميلٌ يقرأ، وموظّفٌ يبني)
- * تُضاف هنا قراءتُها، ولا يُمسّ مسارُ الدخول.
+ * الأدوارُ (D-270) — من الأوسع إلى الأضيق. المالكُ بريدُه في الشيفرة، والباقون مدعوّون في `members`.
+ * والترتيبُ في `access.ts` (`ROLE_RANK`): كلُّ دورٍ يملك ما تحته.
  */
-export function canReceiveCode(raw: string): { readonly email: string; readonly role: Role } | null {
-  return isOwnerEmail(raw) ? { email: OWNER_EMAIL, role: 'owner' } : null
-}
+export type Role = 'owner' | 'admin' | 'publisher' | 'editor' | 'viewer'

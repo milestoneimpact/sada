@@ -82,6 +82,8 @@ export interface LoginState {
    * وبلا قيمةٍ فالرئيسيّة.
    */
   readonly next?: string
+  /** البريدُ الذي طُلب له الرمز (D-270) — يُحمل في خطوة الرمز فيُعرف صاحبُه، مالكًا كان أو مدعوًّا. */
+  readonly email?: string
   /**
    * الخطوة (D-245): `email` يطلب العنوان، و`code` يطلب الرمزَ بعد «أُرسل إن كان العنوانُ للمالك».
    */
@@ -190,6 +192,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
   const form = step === 'code'
     ? `<form method="POST" action="${escapeHtml(action)}">
           <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
+          ${state.email === undefined || state.email === '' ? '' : `<input type="hidden" name="email" value="${escapeHtml(state.email)}">`}
           <div class="field"><label for="c">رمز الدخول</label>
             <input id="c" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
                    pattern="[0-9 ]{6,8}" maxlength="8" required autofocus${disabled}></div>
@@ -480,6 +483,7 @@ export interface PanelAudit {
   readonly target: string | null
   readonly detail: string | null
   readonly ip: string | null
+  readonly byEmail?: string | null
 }
 
 /**
@@ -1512,7 +1516,7 @@ ${pivotPane(d.pivot)}
   <div class="mt-3">${addCard}</div>
 </div>
 <div id="orgs" class="mt-5">
-  <h2>المنظّمات</h2>
+  <div class="split"><h2>المنظّمات</h2><a class="btn btn-secondary btn-sm" href="/panel/team">الفريقُ والصلاحيّات</a></div>
   ${orgsPane(d)}
 </div>
 <details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>

@@ -64,7 +64,8 @@ export function securitySection(d: PanelData): SecurityMarkup {
 
   const audit = d.audit.map((a) => `<tr>
     <td><span title="${escapeHtml(stamp(a.at, d.zone ?? null))}">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
-    <td data-label="الفعل"><div class="nm" title="${escapeHtml(a.action)}">${escapeHtml(actionLabel(a.action))}</div></td>
+    <td data-label="الفعل"><div class="nm" title="${escapeHtml(a.action)}">${escapeHtml(actionLabel(a.action))}</div>${
+      a.byEmail === undefined || a.byEmail === null ? '' : `<div class="sub"><bdi dir="ltr">${escapeHtml(a.byEmail)}</bdi></div>`}</td>
     <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}
       ${a.detail === null ? '' : `<div class="sub">${pathArrows(escapeHtml(a.detail))}</div>`}</td>
     <td data-label="العنوان"><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>

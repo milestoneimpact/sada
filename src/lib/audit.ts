@@ -11,6 +11,7 @@
  */
 import type { Db } from './tokens'
 import { OWNER_ORG } from './tenancy'
+import { whoNow } from './access'
 import { PROVIDERS } from './ai/registry'
 import { platformLabel } from './oauth/providers'
 import { isSettingKey, SETTING_LABEL } from './settings'
@@ -51,8 +52,8 @@ export async function record(
   try {
     await db
       .prepare(
-        `INSERT INTO audit_log (org_id, actor, action, target, detail, ip, ua)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_log (org_id, actor, action, target, detail, ip, ua, by_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         entry.org ?? OWNER_ORG,
@@ -62,6 +63,8 @@ export async function record(
         capped(entry.detail),
         header(request, 'CF-Connecting-IP', 45),
         header(request, 'User-Agent', 160),
+        // ‏من فعل (D-270): بريدُ صاحب الطلب، و`NULL` خارج طلبٍ مُصادَق (المهامُّ المجدولة) أو للمالك قبل الفريق
+        whoNow()?.email ?? null,
       )
       .run()
   } catch (error) {
@@ -76,6 +79,8 @@ export interface AuditRow {
   readonly target: string | null
   readonly detail: string | null
   readonly ip: string | null
+  /** من فعل (D-270) — بريدُه، و`null` قبل الفريق أو خارج طلبٍ مُصادَق. */
+  readonly byEmail?: string | null
 }
 
 /** آخرُ ما وقع. وجدولٌ لا يُقرأ لا يُسقط اللوحة: تُعاد قائمةٌ فارغة. */
@@ -84,7 +89,7 @@ export async function recentAudit(db: Db, limit = 50): Promise<AuditRow[]> {
   try {
     const { results } = await db
       .prepare(
-        `SELECT at, actor, action, target, detail, ip
+        `SELECT at, actor, action, target, detail, ip, by_email AS byEmail
            FROM audit_log
           ORDER BY id DESC
           LIMIT ?`,
@@ -103,6 +108,10 @@ export async function recentAudit(db: Db, limit = 50): Promise<AuditRow[]> {
  */
 export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'session.open': 'فُتحت جلسة',
+  'team.invite': 'دُعي عضو',
+  'team.revoke': 'أُلغي دخول عضو',
+  'report.mail.sent': 'أُرسل تقرير الشهر',
+  'report.mail.unsent': 'لم يُرسَل تقرير الشهر',
   'session.pending': 'دخول ينتظر العامل الثاني',
   'csrf.reject': 'طلب بلا رمز نموذج',
   'passkey.denied': 'مفتاح مرور مرفوض',
