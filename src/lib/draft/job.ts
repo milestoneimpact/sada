@@ -23,6 +23,7 @@
  * والقاعدةُ نفسها ترفض `queued` بلا `approved_at` — فلو أخطأتُ في كلّ
  * سطرٍ هنا لبقي ذلك القيدُ قائما.
  */
+import { readBrief, voiceSection } from '../brief'
 import { containsUrl } from '../idempotency'
 import { digest } from '../security/digest'
 import { atomically, type Db, type DbStatement } from '../tokens'
@@ -50,7 +51,8 @@ export type DraftOutcome =
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean; readonly cost?: number }
 
 /** ما تحتاجه الكتابة — وهو ما يحتاجه نداؤها الواحد (`writer.ts`). */
-export type DraftDeps = WriterDeps
+/** والمنظّمةُ اختياريّة (D-257): منها موجزُ العميل وصوتُه. وغيابُها المالك. */
+export type DraftDeps = WriterDeps & { readonly org?: string }
 
 interface SourceRow {
   id: string
@@ -59,6 +61,7 @@ interface SourceRow {
   summary: string | null
   themes_json: string | null
   worth_score: number | null
+  org_id: string | null
 }
 
 /** يقرأ الخلاصة ومحاورها وبصمةَ النسخة التي حُلِّلت. */
@@ -120,7 +123,7 @@ export async function draftPost(
   // ١ · المصدر وخلاصته
   const row = await deps.db
     .prepare(
-      `SELECT s.id, s.name, s.content_hash, i.summary, i.themes_json, i.worth_score
+      `SELECT s.id, s.name, s.content_hash, i.summary, i.themes_json, i.worth_score, s.org_id
          FROM sources s LEFT JOIN content_items i ON i.source_id = s.id
         WHERE s.id = ? OR s.drive_file_id = ?`,
     )
@@ -155,7 +158,8 @@ export async function draftPost(
 
   // ٤ إلى ٦ · الحارسُ والمزوّدُ والنداءُ والكلفة — في موضعها الواحد (`writer.ts`)
   const out = await writeOnce(deps, {
-    system: systemPrompt(spec),
+    // ‏وصوتُ العميل من موجز منظّمة المصدر (D-257) — وفارغٌ إن لم يُكتب، فالموجّهُ كما كان
+    system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, row.org_id ?? 'org_owner'))),
     user: userPrompt(brief),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
@@ -329,7 +333,7 @@ export async function draftFromIdea(
   // ‏والدفترُ يُنسَب إلى الفكرة ببصمتها لا إلى المنشور (كالمصدر): كلفةُ الكتابة في
   // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
   const out = await writeOnce(deps, {
-    system: systemPrompt(spec, 'idea'),
+    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, deps.org ?? 'org_owner'))),
     user: ideaPrompt(idea),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,

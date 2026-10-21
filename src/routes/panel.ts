@@ -116,6 +116,9 @@ import { decide as decidePromotion, openSuggestions } from '../lib/report/promot
 import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
 import { insightsCsv, insightsScreen } from './ui/insightsView'
+import { clientScreen } from './ui/clientView'
+import { readBrief, writeBrief } from '../lib/brief'
+import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
@@ -436,6 +439,56 @@ async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   return { facts, platform, platforms, zone }
 }
+
+/**
+ * رحلةُ العميل (D-257 · AGENCY-PLAN): المحطّاتُ السبع لعميلِ الجلسة، والموجزُ يُكتب فيها. **قراءةٌ لا نداء**:
+ * التقديرُ ممّا أُنفق فعلًا، ولا يُنفَق شيءٌ من هنا.
+ */
+panel.get('/panel/client', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const [orgRow, brief, linkedRows, plan, settings, units, spent, facts] = await Promise.all([
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    readBrief(c.env.DB, org),
+    c.env.DB.prepare("SELECT platform, count(*) AS n FROM accounts WHERE org_id = ? AND status = 'active' GROUP BY platform")
+      .bind(org).all<{ platform: string; n: number }>().catch(() => ({ results: [] as { platform: string; n: number }[] })),
+    latestPlan(c.env.DB, org),
+    readSettings(c.env.DB),
+    unitCosts(c.env.DB, org),
+    c.env.DB.prepare("SELECT COALESCE(SUM(total), 0) AS t FROM cost_ledger WHERE org_id = ? AND at >= strftime('%Y-%m-01 00:00:00', 'now')")
+      .bind(org).first<{ t: number }>().catch(() => null),
+    readFacts(c.env.DB, org, null),
+  ])
+  const body = clientScreen({
+    orgName: orgRow?.name ?? 'منظّمتي',
+    brief,
+    linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
+    plan,
+    autoImage: settings.autoImage,
+    estimate: estimateMonth({ perWeek: brief.perWeek, channels: brief.channels.length, autoImage: settings.autoImage, ...units }),
+    spentMonth: spent?.t ?? 0,
+    measured: facts.length,
+    saved: c.req.query('saved') === '1',
+  })
+  return page((nonce) =>
+    soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('accounts')),
+  )
+})
+
+panel.post('/panel/client/brief', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  await writeBrief(c.env.DB, activeOrg(gate.session.record), {
+    goal: f.get('goal'), audience: f.get('audience'), tone: f.get('tone'), avoid: f.get('avoid'),
+    channels: f.getAll('channel'), perWeek: f.get('per_week'),
+  })
+  await record(c.env.DB, { actor: 'panel', action: 'brief.write' }, c.req.raw)
+  return c.redirect('/panel/client?saved=1#brief', 303)
+})
 
 panel.get('/panel/insights', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
@@ -2492,7 +2545,7 @@ panel.post('/panel/drafts/idea', async (c) => {
     return back('idea')
   }
 
-  const deps = { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> }
+  const deps = { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined>, org: activeOrg(gate.session.record) }
   const done: { platform: Platform; outcome: DraftOutcome }[] = []
   for (const platform of chosen) {
     const outcome = await draftFromIdea(deps, idea, platform)

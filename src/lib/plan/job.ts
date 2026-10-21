@@ -15,6 +15,7 @@
  * **والخامسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ —
  * مبتورًا أو مرفوضًا أو فارغًا. وما لم يصل لا يُكتب له صفّ.
  */
+import { readBrief, voiceSection } from '../brief'
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
@@ -175,7 +176,9 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
 
   // ٤ · النداء
   const system = systemPrompt()
-  const user = userPrompt(sources, week, span)
+  // ‏وموجزُ العميل (D-257): هدفُه وجمهورُه ونبرتُه وما لا يُقال — وفارغٌ إن لم يُكتب
+  const voice = voiceSection(await readBrief(deps.db, org))
+  const user = voice === '' ? userPrompt(sources, week, span) : `${voice}\n\n${userPrompt(sources, week, span)}`
   let text: string
   let spent: Spent
   try {

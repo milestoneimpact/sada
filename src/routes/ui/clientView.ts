@@ -1,0 +1,99 @@
+/**
+ * شاشةُ العميل (D-257 · AGENCY-PLAN) — **رحلتُه في سبع محطّات، وكلُّ محطّةٍ تقول حالَها وزرَّها**.
+ *
+ * العميلُ ← الموجز ← القنوات ← الخطّة ← المحتوى ← الكلفة ← التحليل. والموجزُ يُكتب هنا، والباقي يدلّ على موضعه:
+ * شاشةٌ واحدةٌ تمشي العميلَ من «ماذا تريد؟» إلى «ما الذي نجح؟» بلا بحثٍ في الأقسام.
+ */
+import { escapeHtml } from './escape'
+import { pageHead } from './parts'
+import { field } from './components/field'
+import { notice, toastRegion } from './components/toast'
+import { money } from '../../lib/format'
+import { platformLabel } from '../../lib/oauth/providers'
+import { BRIEF_CHANNELS, BRIEF_MAX, isEmptyBrief, type Brief } from '../../lib/brief'
+import type { Estimate } from '../../lib/estimate'
+import type { StoredPlan } from '../../lib/plan/job'
+
+export interface ClientData {
+  readonly orgName: string
+  readonly brief: Brief
+  /** الحساباتُ النشطة لكلّ منصّة. */
+  readonly linked: Readonly<Record<string, number>>
+  readonly plan: StoredPlan | null
+  readonly autoImage: boolean
+  readonly estimate: Estimate
+  readonly spentMonth: number
+  readonly measured: number
+  readonly saved?: boolean
+}
+
+type State = 'done' | 'todo' | 'idle'
+const MARK: Readonly<Record<State, string>> = { done: '●', todo: '○', idle: '·' }
+
+function station(n: number, title: string, state: State, body: string, action: string): string {
+  return `<li class="${state === 'done' ? 'ok' : state === 'todo' ? 'warn' : 'idle'}">
+    <span class="body"><span class="what"><b>${n} · ${escapeHtml(title)}</b> <span aria-hidden="true">${MARK[state]}</span></span>
+      <span class="why">${body}</span></span>${action}</li>`
+}
+
+const link = (href: string, label: string, primary = false): string =>
+  `<a class="${primary ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}" href="${escapeHtml(href)}">${escapeHtml(label)}</a>`
+
+function briefForm(b: Brief): string {
+  const text = (id: string, name: string, label: string, value: string, hint: string): string =>
+    field({ id, label, hint, control: `<textarea name="${name}" rows="2" maxlength="${BRIEF_MAX}" dir="auto">${escapeHtml(value)}</textarea>` })
+  const boxes = BRIEF_CHANNELS.map((p) => `<label class="vpf"><input type="checkbox" name="channel" value="${p}"${
+    b.channels.includes(p) ? ' checked' : ''}><span class="vpf-b"><b>${escapeHtml(platformLabel(p))}</b></span></label>`).join('')
+  return `<form method="POST" action="/panel/client/brief" class="stack">
+    ${text('br-goal', 'goal', 'ماذا يريد العميل؟', b.goal, 'مثل: أن يُعرف خبيرًا في الحوكمة لدى مجالس الإدارة')}
+    ${text('br-aud', 'audience', 'لمن؟', b.audience, 'مثل: أعضاء مجالس الإدارة ومديرو المشاريع في الخليج')}
+    ${text('br-tone', 'tone', 'بأيّ نبرة؟', b.tone, 'مثل: هادئة واثقة، بلا مبالغة ولا عامّيّة')}
+    ${text('br-avoid', 'avoid', 'ما لا يُقال', b.avoid, 'مثل: لا أسماء عملاء، ولا أسعار')}
+    <fieldset class="field"><legend>على أيّ قنوات؟</legend><div class="row gap-2">${boxes}</div></fieldset>
+    ${field({ id: 'br-week', label: 'كم منشورًا في الأسبوع لكلّ قناة؟',
+      control: `<input type="number" name="per_week" min="0" max="28" step="1" value="${b.perWeek}">` })}
+    <div class="row"><button class="btn btn-primary" type="submit">احفظ الموجز</button></div>
+  </form>`
+}
+
+export function clientScreen(d: ClientData): string {
+  const b = d.brief
+  const chosen = b.channels
+  const missing = chosen.filter((p) => (d.linked[p] ?? 0) === 0)
+  const e = d.estimate
+  const cost = e.posts === 0
+    ? 'اختر القنوات والإيقاع في الموجز ليُقدَّر الشهر.'
+    : `${e.posts} منشورًا${e.images > 0 ? ` و${e.images} صورة` : ''} في الشهر — ${e.usd === null
+      ? '<b>ولا تقدير قبل أوّل مسوّدة</b>: يُقاس على ما أُنفق فعلًا لا على قائمة أسعار'
+      : `نحو <b>${escapeHtml(money(e.usd))}</b>، والمنفَق هذا الشهر ${escapeHtml(money(d.spentMonth))}`}.`
+
+  const stations = [
+    station(1, 'العميل', 'done', `<bdi>${escapeHtml(d.orgName)}</bdi>`, link('/panel/settings#orgs', 'بدّل العميل')),
+    station(2, 'الموجز', isEmptyBrief(b) ? 'todo' : 'done',
+      isEmptyBrief(b) ? 'لم يُكتب بعد — والكتابةُ بلا موجزٍ بصوتٍ عامّ.' : escapeHtml(b.goal || b.tone || b.audience), link('#brief', isEmptyBrief(b) ? 'اكتبه' : 'عدّله', isEmptyBrief(b))),
+    station(3, 'القنوات', chosen.length === 0 ? 'idle' : missing.length === 0 ? 'done' : 'todo',
+      chosen.length === 0 ? 'لم تُختر في الموجز.'
+        : missing.length === 0 ? `${chosen.map((p) => escapeHtml(platformLabel(p as never))).join(' · ')} — كلُّها مربوطة.`
+          : `بقي ربطُ ${missing.map((p) => escapeHtml(platformLabel(p as never))).join(' و')}.`,
+      link('/panel/accounts', missing.length === 0 ? 'الحسابات' : 'اربط', missing.length > 0)),
+    station(4, 'الخطّة', d.plan === null ? 'todo' : 'done',
+      d.plan === null ? 'لا خطّة بعد — أسبوعًا أو شهرًا.'
+        : `${d.plan.span === 'month' ? 'شهرٌ' : 'أسبوعٌ'} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,
+      link('/panel#sub-plan', d.plan === null ? 'خطّط' : 'افتحها', d.plan === null)),
+    station(5, 'المحتوى', d.autoImage ? 'done' : 'idle',
+      d.autoImage ? 'كلُّ مسوّدةٍ تأتي بصورتها.' : 'الصورةُ بزرّها على كلّ مسوّدة، أو ارفع صورك ومقاطعك.',
+      link('/panel/settings#auto-image', 'الصورة الآليّة')),
+    station(6, 'الكلفة', e.posts === 0 ? 'idle' : 'done', cost, link('/panel/settings#limits', 'السقوف')),
+    station(7, 'التحليل', d.measured >= 8 ? 'done' : 'idle',
+      d.measured >= 8 ? `${d.measured} منشورًا قِيست: أرجحُ الأوقات وأفضلُ الأشكال جاهزة.` : `${d.measured} من 8 منشورات قِيست — ثمّ يُقال ما ينجح.`,
+      link('/panel/insights', 'ما ينجح')),
+  ].join('')
+
+  return `${pageHead('العميل', 'رحلةُ العميل', 'من «ماذا تريد؟» إلى «ما الذي نجح؟» — <b>كلُّ محطّةٍ تقول حالَها وزرَّها</b>، ولا يُنشر شيءٌ قبل اعتمادك.')}
+  ${d.saved === true ? toastRegion(notice({ tone: 'ok', g: '●', html: 'حُفظ الموجز — والخطّةُ والكتابةُ تقرآنه من الآن.' })) : ''}
+  <div class="card mb-4"><h2>المحطّات</h2><ol class="steps wiz nodot">${stations}</ol></div>
+  <div class="card" id="brief"><h2>الموجز</h2>
+    <p class="hint">يقرؤه مخطِّطُ الخطّة وكاتبُ المسوّدات، <b>وصفًا يُراعى</b>: القيودُ قبله أعلى منه، فلا رقمَ يُخترَع ولا رابط.</p>
+    ${briefForm(b)}
+  </div>`
+}

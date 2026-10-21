@@ -514,3 +514,18 @@ describe('من فكرة المالك (D-190)', () => {
     expect(systemPrompt(PLATFORMS.linkedin)).not.toContain('فكرة المالك')
   })
 })
+
+describe('صوتُ العميل في موجّه الكتابة (D-257)', () => {
+  it('موجزُ منظّمة المصدر يدخل الموجّه، والفارغُ لا يُضيف شيئًا', async () => {
+    const id = await seed()
+    await draftPost(deps(net()), id, 'linkedin')
+    expect(JSON.stringify(calls[0]?.body)).not.toContain('صوت العميل')
+
+    const { writeBrief } = await import('../brief')
+    await writeBrief(db, 'org_owner', { tone: 'هادئة واثقة بلا مبالغة' })
+    await draftPost(deps(net()), id, 'x')
+    const sent = JSON.stringify(calls[0]?.body)
+    expect(sent).toContain('صوت العميل')
+    expect(sent).toContain('هادئة واثقة بلا مبالغة')
+  })
+})

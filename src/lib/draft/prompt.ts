@@ -133,7 +133,7 @@ export const PLATFORMS: Readonly<Record<Platform, PlatformSpec>> = {
  */
 export type Material = 'source' | 'idea'
 
-export function systemPrompt(spec: PlatformSpec, from: Material = 'source'): string {
+export function systemPrompt(spec: PlatformSpec, from: Material = 'source', voice = ''): string {
   return [
     'أنت تكتب باسم مالك الحساب، لا باسمك. فما تكتبه يخرج قولا له.',
     '',
@@ -159,6 +159,7 @@ export function systemPrompt(spec: PlatformSpec, from: Material = 'source'): str
     'ترجمة حرفيّة من الإنجليزيّة. والمصطلح التقنيّ يبقى بحروفه اللاتينيّة',
     'إن كان ذلك أوضح.',
     '',
+    ...(voice === '' ? [] : [voice, '']),
     '## المنصّة',
     '',
     spec.guide,
