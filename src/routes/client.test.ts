@@ -245,3 +245,14 @@ describe('«أرسله إلى بريدي» (D-268)', () => {
     void mailer
   })
 })
+
+describe('المحفظة (D-271)', () => {
+  it('تُفتح بفلاترها، وصفُّ كلّ شركةٍ بزرّ «افتحها»', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/portfolio?days=7&p=x', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('كلُّ شركاتك')
+    expect(html).toContain('في 7 يومًا على X')
+    expect(html).toContain('action="/panel/orgs/switch"')
+    expect(html).toContain('href="/panel/portfolio?days=90&amp;p=x"')
+  })
+})

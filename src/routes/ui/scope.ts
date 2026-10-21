@@ -43,7 +43,7 @@ export function scopeMenu(scope: Scope | undefined): string {
       <span class="scope-t"><b>${escapeHtml(now.name)}</b><span>${ORG_KIND_LABEL[now.kind]} · ${brands(now.brands)}</span></span>
       <span class="menu-caret" aria-hidden="true">${ICON.chevron}</span>
     </summary>
-    <div class="menu-list">${others.join('')}${menuItem({ label: 'إدارة المنظّمات', href: '/panel/settings#orgs' })}</div>
+    <div class="menu-list">${menuItem({ label: 'كلُّ الشركات — المحفظة', href: '/panel/portfolio', note: 'ما ينتظر وما خرج وما أُنفق لكلّ شركة' })}${others.join('')}${menuItem({ label: 'إدارة المنظّمات', href: '/panel/settings#orgs' })}</div>
   </details>`
 }
 
@@ -52,5 +52,6 @@ export function scopeLine(scope: Scope | undefined): string[] {
   const now = current(scope)
   if (now === null) return []
   return [`<div class="menu-seg"><span>المنظّمة</span><b>${escapeHtml(now.name)}</b></div>`,
+    menuItem({ label: 'كلُّ الشركات — المحفظة', href: '/panel/portfolio' }),
     menuItem({ label: 'بدّل المنظّمة', href: '/panel/settings#orgs' })]
 }

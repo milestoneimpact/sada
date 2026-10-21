@@ -65,6 +65,8 @@ import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { normalizeEmail, OWNER_EMAIL } from '../lib/ownerEmail'
 import { inviteMember, listMembers, revokeMember, ROLE_LABEL, whoCanReceive, type MemberRole } from '../lib/team'
 import { teamScreen } from './ui/teamView'
+import { PERIODS, portfolio, type Period } from '../lib/portfolio'
+import { portfolioScreen } from './ui/portfolioView'
 
 /** من قرّر — بطريق الدخول (D-245): `panel:token` للجلسات القديمة وحدَها. */
 function deciderOf(via: string): string {
@@ -563,6 +565,27 @@ panel.post('/panel/client/report/send', async (c) => {
     ? { kind: 'ok', text: `أُرسل تقريرُ ${month} إلى بريدك.` }
     : { kind: 'warn', text: `لم يُرسَل: ${sent.reason} — اطبعه PDF، أو أتمّ M-31 (Email Routing).` })
   return c.redirect(`/panel/client/report?month=${month}`, 303)
+})
+
+/** **المحفظة** (D-271): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
+panel.get('/panel/portfolio', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const days = Number(c.req.query('days'))
+  const p = c.req.query('p') ?? ''
+  const orgs = await listOrgs(c.env.DB)
+  const wanted = c.req.query('org') ?? ''
+  const filter = {
+    period: (PERIODS as readonly number[]).includes(days) ? (days as Period) : 30,
+    platform: (PLATFORM_IDS as readonly string[]).includes(p) ? p : null,
+    org: orgs.some((o) => o.id === wanted) ? wanted : null,
+  }
+  const body = portfolioScreen(await portfolio(c.env.DB, filter, new Date()), orgs, filter, activeOrg(session.record))
+  return page((nonce) =>
+    soloPage('صدى — المحفظة', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('overview')),
+  )
 })
 
 // ── الفريق (D-270) ─────────────────────────────────────────────────

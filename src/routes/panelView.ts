@@ -1516,7 +1516,7 @@ ${pivotPane(d.pivot)}
   <div class="mt-3">${addCard}</div>
 </div>
 <div id="orgs" class="mt-5">
-  <div class="split"><h2>المنظّمات</h2><a class="btn btn-secondary btn-sm" href="/panel/team">الفريقُ والصلاحيّات</a></div>
+  <div class="split"><h2>المنظّمات</h2><div class="row gap-2"><a class="btn btn-secondary btn-sm" href="/panel/portfolio">المحفظة</a><a class="btn btn-secondary btn-sm" href="/panel/team">الفريقُ والصلاحيّات</a></div></div>
   ${orgsPane(d)}
 </div>
 <details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
