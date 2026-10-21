@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
-import { monthlyReport, monthOf, shiftMonth } from './monthly'
+import { monthlyReport, monthOf, reportText, shiftMonth } from './monthly'
 
 function seed() {
   const db = fakeDb()
@@ -50,5 +50,17 @@ describe('تقريرُ الشهر (D-262)', () => {
     const r = await monthlyReport(seed(), 'org_b', '2026-10', null)
     expect(r.published).toEqual({})
     expect(r.spend).toBe(0)
+  })
+})
+
+describe('التقريرُ نصًّا للبريد (D-268)', () => {
+  it('الأرقامُ نفسُها سطرًا سطرًا، بلا HTML', async () => {
+    const r = await monthlyReport(seed(), 'org_owner', '2026-10', null)
+    const text = reportText(r, 'ميلستون', (p) => p.toUpperCase(), (n) => `$${n.toFixed(2)}`)
+    expect(text).toContain('تقرير 2026-10 — ميلستون')
+    expect(text).toContain('خرج: 3 (LINKEDIN 2، X 1)')
+    expect(text).toContain('أُنفق: $0.02')
+    expect(text).toContain('1. LINKEDIN — 40 تفاعلًا')
+    expect(text).not.toMatch(/<[a-z]/)
   })
 })

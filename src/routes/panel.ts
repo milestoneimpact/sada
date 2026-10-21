@@ -120,7 +120,7 @@ import { clientScreen } from './ui/clientView'
 import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
 import { autoImageRoom } from '../lib/image/auto'
 import { addPlanItem, editPlanItem, removePlanItem } from '../lib/plan/edit'
-import { monthlyReport, monthOf } from '../lib/report/monthly'
+import { monthlyReport, monthOf, reportText } from '../lib/report/monthly'
 import { MONTHLY_SCRIPT, monthlyScreen } from './ui/monthlyView'
 import { planProgress, schedulePlan } from '../lib/plan/schedule'
 import { addLibraryFile, libraryProblem, listLibrary, rawObject } from '../lib/library'
@@ -530,10 +530,37 @@ panel.get('/panel/client/report', async (c) => {
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
   ])
   const report = await monthlyReport(c.env.DB, org, monthOf(c.req.query('month'), new Date()), zone)
+  const flash = await takeFlash(c.env, c.req.raw)
   return page((nonce) =>
-    soloPage(`صدى — تقرير ${report.month}`, { href: '/panel/client', label: 'رحلة العميل' }, monthlyScreen(report, orgRow?.name ?? 'منظّمتي'), nonce, MONTHLY_SCRIPT,
+    soloPage(`صدى — تقرير ${report.month}`, { href: '/panel/client', label: 'رحلة العميل' },
+      injectCsrf(monthlyScreen(report, orgRow?.name ?? 'منظّمتي', flash), session.record.csrf), nonce, MONTHLY_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('results')),
   )
+})
+
+/**
+ * **«أرسله إلى بريدي»** (D-268): التقريرُ نصًّا إلى بريد المالك وحدَه (`OWNER_EMAIL`)، لا إلى عنوانٍ يُكتب في نموذج.
+ * ويقف على M-31 (Email Routing): قبلها يُقال السببُ ولا يُدّعى الإرسال.
+ */
+panel.post('/panel/client/report/send', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const month = monthOf(String(gate.form.get('month') ?? ''), new Date())
+  const [orgRow, zone] = await Promise.all([
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+  ])
+  const name = orgRow?.name ?? 'منظّمتي'
+  const report = await monthlyReport(c.env.DB, org, month, zone)
+  const sent = await sendText(c.env.EMAIL, OWNER_EMAIL, `صدى — تقرير ${month} · ${name}`,
+    reportText(report, name, (p) => platformLabel(p as never), money))
+  await record(c.env.DB, { actor: 'panel', action: sent.sent ? 'report.mail.sent' : 'report.mail.unsent', target: month,
+    detail: sent.sent ? '' : sent.reason }, c.req.raw)
+  await setFlash(c.env, c.req.raw, sent.sent
+    ? { kind: 'ok', text: `أُرسل تقريرُ ${month} إلى بريدك.` }
+    : { kind: 'warn', text: `لم يُرسَل: ${sent.reason} — اطبعه PDF، أو أتمّ M-31 (Email Routing).` })
+  return c.redirect(`/panel/client/report?month=${month}`, 303)
 })
 
 panel.get('/panel/insights', async (c) => {

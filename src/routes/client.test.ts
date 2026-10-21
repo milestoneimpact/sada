@@ -223,3 +223,25 @@ describe('أضف بندًا (D-264)', () => {
     expect(await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()).toContain('زاوية أضفتُها بيدي')
   })
 })
+
+describe('«أرسله إلى بريدي» (D-268)', () => {
+  it('إلى بريد المالك وحدَه، وبلا ربط EMAIL يُقال السببُ ولا يُدّعى الإرسال', async () => {
+    const { cookie, csrf } = await session()
+    const mailer = env['EMAIL']
+    delete env['EMAIL']
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('month', '2026-10')
+    const res = await app.request('/panel/client/report/send', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/client/report?month=2026-10')
+    expect(await (await app.request('/panel/client/report?month=2026-10', { headers: { Cookie: cookie } }, env)).text()).toContain('لم يُرسَل')
+    // ‏ومع الربط يُرسَل
+    const sent: unknown[] = []
+    env['EMAIL'] = { async send(m: unknown) { sent.push(m) } }
+    const again = new FormData()
+    again.set('_csrf', csrf); again.set('month', '2026-10')
+    await app.request('/panel/client/report/send', { method: 'POST', body: again, headers: { Cookie: cookie } }, env)
+    expect(sent).toHaveLength(1)
+    expect(await (await app.request('/panel/client/report?month=2026-10', { headers: { Cookie: cookie } }, env)).text()).toContain('أُرسل تقريرُ 2026-10')
+    void mailer
+  })
+})
