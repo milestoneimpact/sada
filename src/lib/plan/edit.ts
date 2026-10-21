@@ -11,6 +11,8 @@ import { findAsset } from '../library'
 export const PLAN_PLATFORMS = ['linkedin', 'x'] as const
 export type PlanPlatform = (typeof PLAN_PLATFORMS)[number]
 
+export const ANGLE_MAX = 280
+
 export type EditResult = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
 export function dayWithin(day: string, start: string, span: PlanSpan): boolean {
@@ -24,7 +26,7 @@ export async function editPlanItem(
   org: string,
   planId: string,
   index: number,
-  change: { readonly day?: string; readonly platform?: string; readonly time?: string; readonly asset?: string },
+  change: { readonly day?: string; readonly platform?: string; readonly time?: string; readonly asset?: string; readonly angle?: string },
 ): Promise<EditResult> {
   const row = await db
     .prepare("SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?")
@@ -46,6 +48,12 @@ export async function editPlanItem(
   if (change.time !== undefined) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(change.time)) return { ok: false, reason: 'ساعة غير صالحة' }
     item['time'] = change.time
+  }
+  // ‏وزاويتُه نصًّا (D-264): ما يُكتب عنه، لا فارغًا ولا مقالًا
+  if (change.angle !== undefined) {
+    const angle = change.angle.trim()
+    if (angle.length === 0 || [...angle].length > ANGLE_MAX) return { ok: false, reason: `الزاوية سطرٌ حتّى ${ANGLE_MAX} حرف` }
+    item['angle'] = angle
   }
   // ‏محتوى البند (D-260): «ولّد» يمحو الأصل، و«من المكتبة» يحفظ مرجعَه — ومصدرُ Drive يصير موضوعَ الكتابة نفسَه
   if (change.asset !== undefined) {
@@ -73,6 +81,34 @@ export async function removePlanItem(db: Db, org: string, planId: string, index:
   const plan = JSON.parse(row.plan_json) as { items: unknown[] }
   if (!Number.isInteger(index) || index < 0 || index >= plan.items.length) return { ok: false, reason: 'لا بند بهذا الرقم' }
   plan.items.splice(index, 1)
+  await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  return { ok: true }
+}
+
+/**
+ * **إضافةُ بند** (D-264) — من مصدرٍ لعميل الجلسة، بيومٍ داخل المدى ومنصّةٍ من القائمة وساعةٍ صالحة وزاوية.
+ * يُلحق آخرَ البنود فلا تتبدّل فهارسُ ما قبله، و«لماذا» تقول إنّه من المالك لا من المخطِّط.
+ */
+export async function addPlanItem(
+  db: Db,
+  org: string,
+  planId: string,
+  item: { readonly sourceId: string; readonly platform: string; readonly day: string; readonly time: string; readonly angle: string },
+): Promise<EditResult> {
+  const row = await db
+    .prepare('SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?')
+    .bind(planId, org)
+    .first<{ plan_json: string; week_start: string; span: string; status: string }>()
+  if (row === null || row.status === 'superseded') return { ok: false, reason: 'لا خطّة بهذا المعرّف' }
+  const source = await db.prepare('SELECT id FROM sources WHERE id = ? AND org_id = ?').bind(item.sourceId, org).first<{ id: string }>()
+  if (source === null) return { ok: false, reason: 'اختر مصدرًا من مصادر العميل' }
+  if (!dayWithin(item.day, row.week_start, row.span === 'month' ? 'month' : 'week')) return { ok: false, reason: 'اليوم خارج مدى الخطّة' }
+  if (!(PLAN_PLATFORMS as readonly string[]).includes(item.platform)) return { ok: false, reason: 'منصّة لا تُخطَّط' }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(item.time)) return { ok: false, reason: 'ساعة غير صالحة' }
+  const angle = item.angle.trim()
+  if (angle.length === 0 || [...angle].length > ANGLE_MAX) return { ok: false, reason: `الزاوية سطرٌ حتّى ${ANGLE_MAX} حرف` }
+  const plan = JSON.parse(row.plan_json) as { items: unknown[] }
+  plan.items.push({ sourceId: item.sourceId, platform: item.platform, angle, day: item.day, time: item.time, why: 'أضافه المالك' })
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
   return { ok: true }
 }

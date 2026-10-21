@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
-import { dayWithin, editPlanItem, removePlanItem } from './edit'
+import { addPlanItem, dayWithin, editPlanItem, removePlanItem } from './edit'
 
 function seed(span: 'week' | 'month' = 'week') {
   const db = fakeDb()
@@ -55,5 +55,30 @@ describe('محتوى البند وحذفُه (D-260)', () => {
     expect(await removePlanItem(db, 'org_owner', 'p', 0)).toEqual({ ok: true })
     const plan = JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'p'").get() as { plan_json: string }).plan_json) as { items: unknown[] }
     expect(plan.items).toHaveLength(0)
+  })
+})
+
+describe('إضافةُ بندٍ وتعديلُ زاويته (D-264)', () => {
+  it('الزاويةُ سطرٌ لا فارغٌ ولا مقال', async () => {
+    const { db, item } = seed()
+    expect(await editPlanItem(db, 'org_owner', 'p', 0, { angle: '  زاوية جديدة  ' })).toEqual({ ok: true })
+    expect(item()['angle']).toBe('زاوية جديدة')
+    expect(await editPlanItem(db, 'org_owner', 'p', 0, { angle: '   ' })).toMatchObject({ ok: false })
+    expect(await editPlanItem(db, 'org_owner', 'p', 0, { angle: 'ا'.repeat(281) })).toMatchObject({ ok: false })
+  })
+
+  it('يُلحق بندًا من مصدر العميل بحرّاسه، ولا يُلحق من مصدر غيره', async () => {
+    const { db } = seed()
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash, org_id) VALUES ('s2', 'd2', 'م', 'text/plain', 'h', 'org_owner'),
+      ('s3', 'd3', 'غ', 'text/plain', 'h', 'org_b')`)
+    const ok = { sourceId: 's2', platform: 'x', day: '2026-10-27', time: '18:00', angle: 'زاوية مضافة' }
+    expect(await addPlanItem(db, 'org_owner', 'p', ok)).toEqual({ ok: true })
+    expect(await addPlanItem(db, 'org_owner', 'p', { ...ok, sourceId: 's3' })).toMatchObject({ ok: false })
+    expect(await addPlanItem(db, 'org_owner', 'p', { ...ok, day: '2026-11-09' })).toMatchObject({ ok: false })
+    expect(await addPlanItem(db, 'org_owner', 'p', { ...ok, angle: '' })).toMatchObject({ ok: false })
+    expect(await addPlanItem(db, 'org_b', 'p', ok)).toMatchObject({ ok: false })
+    const plan = JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'p'").get() as { plan_json: string }).plan_json) as { items: { angle: string; why: string }[] }
+    expect(plan.items).toHaveLength(2)
+    expect(plan.items[1]).toMatchObject({ angle: 'زاوية مضافة', why: 'أضافه المالك' })
   })
 })

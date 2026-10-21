@@ -207,3 +207,19 @@ describe('تقريرُ الشهر (D-262)', () => {
     expect(await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()).toContain('href="/panel/client/report"')
   })
 })
+
+describe('أضف بندًا (D-264)', () => {
+  it('النموذجُ بمصادر العميل، والإضافةُ تظهر على اللوحة', async () => {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير الأثر', 'text/plain', 'md5:a')`)
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status) VALUES ('pl1', '2026-10-25', ?, 'm', 'draft')`)
+      .run(JSON.stringify({ rationale: 'ر', items: [] }))
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('action="/panel/plan/item/add"')
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1'); body.set('source', 's1'); body.set('platform', 'linkedin')
+    body.set('day', '2026-10-26'); body.set('time', '09:00'); body.set('angle', 'زاوية أضفتُها بيدي')
+    expect((await app.request('/panel/plan/item/add', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    expect(await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()).toContain('زاوية أضفتُها بيدي')
+  })
+})
