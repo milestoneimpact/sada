@@ -6,6 +6,7 @@
  */
 import type { Db } from '../tokens'
 import { spanDays, type PlanSpan } from './prompt'
+import { findAsset } from '../library'
 
 export const PLAN_PLATFORMS = ['linkedin', 'x'] as const
 export type PlanPlatform = (typeof PLAN_PLATFORMS)[number]
@@ -23,7 +24,7 @@ export async function editPlanItem(
   org: string,
   planId: string,
   index: number,
-  change: { readonly day?: string; readonly platform?: string; readonly time?: string },
+  change: { readonly day?: string; readonly platform?: string; readonly time?: string; readonly asset?: string },
 ): Promise<EditResult> {
   const row = await db
     .prepare("SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?")
@@ -46,6 +47,32 @@ export async function editPlanItem(
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(change.time)) return { ok: false, reason: 'ساعة غير صالحة' }
     item['time'] = change.time
   }
+  // ‏محتوى البند (D-260): «ولّد» يمحو الأصل، و«من المكتبة» يحفظ مرجعَه — ومصدرُ Drive يصير موضوعَ الكتابة نفسَه
+  if (change.asset !== undefined) {
+    if (change.asset === '') delete item['asset']
+    else {
+      const asset = await findAsset(db, org, change.asset)
+      if (asset === null) return { ok: false, reason: 'لا ملفّ بهذا المرجع في أصول العميل' }
+      if (asset.origin === 'drive') { item['sourceId'] = asset.ref.slice(2); delete item['asset'] }
+      else item['asset'] = asset.ref
+    }
+  }
+  await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  return { ok: true }
+}
+
+/**
+ * **حذفُ بند** — والفهرسُ يتبدّل بعده، فالصفحةُ تُعاد بعد الحذف ولا تبقى بطاقاتُها القديمة. والخطّةُ المستبدَلة لا تُمسّ.
+ */
+export async function removePlanItem(db: Db, org: string, planId: string, index: number): Promise<EditResult> {
+  const row = await db
+    .prepare('SELECT plan_json, status FROM plans WHERE id = ? AND org_id = ?')
+    .bind(planId, org)
+    .first<{ plan_json: string; status: string }>()
+  if (row === null || row.status === 'superseded') return { ok: false, reason: 'لا خطّة بهذا المعرّف' }
+  const plan = JSON.parse(row.plan_json) as { items: unknown[] }
+  if (!Number.isInteger(index) || index < 0 || index >= plan.items.length) return { ok: false, reason: 'لا بند بهذا الرقم' }
+  plan.items.splice(index, 1)
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
   return { ok: true }
 }

@@ -41,6 +41,7 @@ import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
 import { draftPost } from './lib/draft/job'
 import { generateForPost } from './lib/image/job'
+import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
@@ -426,7 +427,7 @@ export interface AnalyzeMessage {
  * ثمّ صورتُه إن رُفعت الصورةُ الآليّة وبقي من سقفها. **ولا جدولة**: المسوّدةُ تنتظر اعتمادَ المالك كما تنتظر كلُّ مسوّدة.
  */
 export interface PlanDraftMessage {
-  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string }
+  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string; readonly asset?: string }
 }
 
 /**
@@ -444,6 +445,13 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
   if (outcome.kind === 'failed' && outcome.retryable) return message.retry()
   message.ack()
+  // ‏ما اختير من المكتبة (D-260) يُربط بالمسوّدة بلا كلفة، ولا تُرسم لها صورةٌ آليّة فوقه
+  const asset = message.body.draft.asset
+  if (outcome.kind === 'drafted' && asset !== undefined) {
+    const linked = attachStatement(env.DB, org, outcome.postId, asset)
+    if (linked !== null) await linked.run().catch((error: unknown) => console.warn({ job: 'plan-draft-asset', post: outcome.postId, failed: String(error) }))
+    return
+  }
   if (outcome.kind === 'drafted' && (await autoImageRoom(env.DB, org)) > 0) {
     await generateForPost({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, outcome.postId, { style: 'infographic' })
       .catch((error: unknown) => console.warn({ job: 'plan-draft-image', post: outcome.postId, failed: String(error) }))

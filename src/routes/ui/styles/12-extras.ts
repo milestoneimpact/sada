@@ -260,9 +260,23 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .pb-wd,.pb-dn{display:none}
   .pb-dl{display:block; font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
   .pb-cell{min-height:0}}
+/* ‏محتوى البند والأصول (D-260): المختارُ يُرى مختارًا، والمعاينةُ بنسبةٍ ثابتة لا تقفز */
+#board .pb-card .btn[aria-pressed="true"],.lib-chips .btn[aria-current="page"]{background:var(--hover); border-color:var(--ink-2)}
+.lib-thumb{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--r-control); margin-bottom:var(--s-3); background:var(--surface-2)}
+.lib-ico{display:grid; place-items:center; font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink-2)}
+/* ‏الرحلةُ في ستّ خطوات: ما مضى بعلامته، والحاليّةُ بارزة، وما بعدها خافت */
+.flow{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--s-2); counter-reset:none}
+.flow li{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
+  padding-block-start:var(--s-2); border-block-start:var(--ring-w) solid var(--line); transition:border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease)}
+.flow li[data-state="done"]{border-block-start-color:var(--ink-2)}
+.flow li[data-state="now"]{color:var(--ink); font-weight:600; border-block-start-color:var(--focus)}
+.flow-n{display:inline-grid; place-items:center; width:var(--icon-md); height:var(--icon-md); border-radius:var(--r-pill); background:var(--surface-2); flex:none}
+.flow li[data-state="now"] .flow-n{background:var(--focus); color:var(--surface)}
+@media${below('md')}{.flow{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){
   .pb-card,.pb-col{transition:none}
   .pb-card.landed{animation:none}
   .pb-ghost{transform:none}
+  .flow li{transition:none}
 }
 `

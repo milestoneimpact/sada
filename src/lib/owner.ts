@@ -408,6 +408,13 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'guard',
     done: () => null,
   },
+  {
+    code: 'M-32',
+    title: 'قرار: هل تُنسَخ الأصول إلى مجلّدٍ في Drive؟',
+    ifLeft: 'الأصول في صدى وحده تُرفع وتُصنَّف وتُعاد، ولا نسخة منها في Drive — تأجيلٌ لا خطر (D-017 · D-260).',
+    unblocks: 'capability',
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

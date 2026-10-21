@@ -28,6 +28,8 @@ export interface ClientData {
   readonly saved?: boolean
   /** أسماءُ مصادر البنود — تُقرأ على البطاقة بدل معرّفاتها (D-259). */
   readonly names?: Readonly<Record<string, string>>
+  /** مسوّداتُ العميل التي تنتظر قراره — تقول أين هو من الرحلة بعد «ابدأ» (D-260). */
+  readonly waiting?: number
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -84,6 +86,28 @@ function startForm(d: ClientData): string {
       <button class="btn btn-primary btn-sm" type="submit">ابدأ الخطّة</button></form>`
 }
 
+/**
+ * **الرحلةُ في ستّ خطوات** (D-260) — كما قالها المالك: قسّم، واختر، وولّد في دقائق، وعدّل وانقل واحذف، واعتمد، ثمّ شكرًا.
+ * شريطٌ واحدٌ فوق المحطّات: ما مضى بعلامته، والخطوةُ الحاليّة بارزةٌ وتحتها سطرُها وزرُّها، وما بعدها خافت.
+ */
+const FLOW = ['قسّم', 'اختر', 'ولّد', 'عدّل وانقل', 'اعتمد', 'شكرًا'] as const
+
+function flow(d: ClientData): string {
+  const waiting = d.waiting ?? 0
+  const now = d.plan === null ? 0 : d.plan.status === 'draft' ? 1 : waiting > 0 ? 3 : 5
+  const say: readonly string[] = [
+    `خطّط أسبوعًا أو شهرًا — يقسّم صدى المصادرَ على الأيّام والمنصّات. ${'<a href="/panel#sub-plan">خطّط</a>'}`,
+    'لكلّ بند: <b>ولّد</b> أو <b>ارفع</b> أو <b>من الأصول</b>، واسحبه إلى يومه — ثمّ «ابدأ الخطّة».',
+    'يُكتب كلُّ شيءٍ في الخلفيّة خلال دقائق.',
+    `${waiting} ${waiting === 1 ? 'مسوّدةٌ تنتظر' : 'مسوّداتٍ تنتظر'}: عدّل نصَّها أو انقل موعدها أو احذفها، ثمّ اعتمد. <a href="/panel#posts">افتحها</a>`,
+    'اعتمد ما ترضاه — ولا يُنشر غيرُه.',
+    'شكرًا — الخطّةُ كُتبت واعتُمدت، وصدى ينشرها في مواعيدها ويقيسها.',
+  ]
+  const steps = FLOW.map((t, i) => `<li data-state="${i < now ? 'done' : i === now ? 'now' : 'next'}"${i === now ? ' aria-current="step"' : ''}>
+      <span class="flow-n" aria-hidden="true">${i < now ? '✓' : i + 1}</span>${escapeHtml(t)}</li>`).join('')
+  return `<div class="card mb-4"><ol class="flow">${steps}</ol><p class="hint m-0 mt-3">${say[now]}</p></div>`
+}
+
 export function clientScreen(d: ClientData): string {
   const b = d.brief
   const chosen = b.channels
@@ -113,8 +137,8 @@ export function clientScreen(d: ClientData): string {
         ? link('/panel#sub-plan', 'خطّط', true)
         : `${link('/panel#sub-plan', 'افتحها')}${startForm(d)}`),
     station(5, 'المحتوى', at(d.autoImage ? 'done' : 'idle'),
-      d.autoImage ? 'كلُّ مسوّدةٍ تأتي بصورتها.' : 'الصورةُ بزرّها على كلّ مسوّدة، أو ارفع صورك ومقاطعك.',
-      link('/panel/settings#auto-image', 'الصورة الآليّة')),
+      d.autoImage ? 'كلُّ مسوّدةٍ تأتي بصورتها، أو اختر لبندٍ من الأصول.' : 'لكلّ بند: ولّد، أو ارفع، أو اختر من الأصول.',
+      `${link('/panel/assets', 'الأصول')}${link('/panel/settings#auto-image', 'الصورة الآليّة')}`),
     station(6, 'الكلفة', at(e.posts === 0 ? 'idle' : 'done'), cost, link('/panel/settings#limits', 'السقوف')),
     station(7, 'التحليل', at(d.measured >= 8 ? 'done' : 'idle'),
       d.measured >= 8 ? `${d.measured} منشورًا قِيست: أرجحُ الأوقات وأفضلُ الأشكال جاهزة.` : `${d.measured} من 8 منشورات قِيست — ثمّ يُقال ما ينجح.`,
@@ -127,6 +151,7 @@ export function clientScreen(d: ClientData): string {
   ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
   ${d.saved === true ? toastRegion(notice({ tone: 'ok', g: '●', html: 'حُفظ الموجز — والخطّةُ والكتابةُ تقرآنه من الآن.' })) : ''}
   <p class="lede m-0 mb-4"><b>اكتمل ${ready} من 7</b>${next === undefined ? ' — العميلُ جاهز.' : ` — التالي: <b>${escapeHtml(next)}</b>.`}</p>
+  ${flow(d)}
   <div class="grid tiles c4 mb-4">${stations.join("")}</div>
   ${d.plan === null ? '' : planBoard(d.plan, d.names ?? {})}
   <div class="card mt-4" id="brief"><h2>الموجز</h2>

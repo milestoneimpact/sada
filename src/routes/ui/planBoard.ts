@@ -56,7 +56,26 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
           <label>المنصّة <select name="platform">${platOptions(item.platform)}</select></label>
           <label>الساعة <input type="time" name="time" value="${escapeHtml(item.time)}" dir="ltr"></label>
           <button class="btn btn-secondary btn-sm" type="submit">احفظ</button>
-        </form></details>`
+        </form>
+        <form class="inline" method="POST" action="/panel/plan/item/remove" data-confirm="احذف هذا البند من الخطّة؟">
+          <input type="hidden" name="id" value="${escapeHtml(plan.id)}"><input type="hidden" name="index" value="${index}">
+          <button class="btn btn-danger btn-sm" type="submit">احذف البند</button></form></details>`
+
+  /**
+   * **محتوى البند بثلاثة أزرار** (D-260): «ولّد» (الافتراض: يكتبه صدى ويرسم صورته)، و«ارفع» (ملفُّك يُحفظ في المكتبة ويُربط)،
+   * و«المكتبة» (ما رُفع أو وُلّد أو في Drive من قبل). والمختارُ عليه علامةُ `aria-pressed`، فيُقرأ حالُ البند من نظرة.
+   */
+  const content = (item: Item, index: number): string => {
+    const pick = `/panel/assets?plan=${encodeURIComponent(plan.id)}&index=${index}`
+    const chosen = item.asset !== undefined
+    return `<div class="row gap-2 mt-2" role="group" aria-label="محتوى البند">
+      <form class="inline" method="POST" action="/panel/plan/item">
+        <input type="hidden" name="id" value="${escapeHtml(plan.id)}"><input type="hidden" name="index" value="${index}"><input type="hidden" name="asset" value="">
+        <button class="btn btn-secondary btn-sm" type="submit" aria-pressed="${!chosen}">ولّد</button></form>
+      <a class="btn btn-secondary btn-sm" href="${escapeHtml(pick)}#upload">ارفع</a>
+      <a class="btn btn-secondary btn-sm" href="${escapeHtml(pick)}" aria-pressed="${chosen}">الأصول${chosen ? ' ✓' : ''}</a>
+    </div>`
+  }
 
   const card = (item: Item, index: number, opts: { showDay: boolean; editable: boolean }): string => {
     const offset = Math.max(0, days.indexOf(item.day))
@@ -66,7 +85,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
         <span class="pb-time">${opts.showDay ? `${escapeHtml(label(item.day))} · ` : ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi></span></div>
       <p class="pb-angle" dir="auto">${escapeHtml(item.angle)}</p>
       <div class="pb-src"><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></div>
-      ${opts.editable ? edit(item, index) : ''}
+      ${opts.editable ? `${content(item, index)}${edit(item, index)}` : ''}
     </article>`
   }
   const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }): string =>
@@ -101,7 +120,8 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
   // ٥ · جدول: سطرٌ لكلّ بند، مرتّبًا بالموعد
   const rows = [...items].sort((a, b) => `${a.item.day}${a.item.time}`.localeCompare(`${b.item.day}${b.item.time}`)).map(({ item }) => `<tr>
       <td>${escapeHtml(label(item.day))}</td><td><bdi dir="ltr">${escapeHtml(item.time)}</bdi></td><td>${plat(item.platform)}</td>
-      <td dir="auto">${escapeHtml(item.angle)}</td><td><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td></tr>`).join('')
+      <td dir="auto">${escapeHtml(item.angle)}</td><td><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td>
+      <td>${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
 
   const views = PLAN_VIEWS.map((v, i) => `<button class="btn btn-secondary btn-sm" type="button" data-view="${v.id}" aria-pressed="${i === 0}">${v.label}</button>`).join('')
 
@@ -114,7 +134,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
     <div class="pb-cal" data-pv="calendar" hidden>${weekdays}${cells}</div>
     <div class="pb-board" data-mode="list" data-pv="list" hidden>${dayCols(true)}</div>
     <div class="scroll" data-pv="table" hidden><table>
-      <thead><tr><th>اليوم</th><th>الساعة</th><th>المنصّة</th><th>الزاوية</th><th>المصدر</th></tr></thead>
+      <thead><tr><th>اليوم</th><th>الساعة</th><th>المنصّة</th><th>الزاوية</th><th>المصدر</th><th>المحتوى</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
   </div>`
 }

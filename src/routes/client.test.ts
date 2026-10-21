@@ -132,3 +132,45 @@ describe('الخطّةُ لوحةً أو قائمة (D-259)', () => {
     expect((await app.request('/panel/plan/item', { method: 'POST', body: bad, headers: { Cookie: cookie, Accept: 'application/json' } }, env)).status).toBe(400)
   })
 })
+
+describe('محتوى البند والأصول (D-260)', () => {
+  function seedPlan(): void {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير', 'text/plain', 'md5:a')`)
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status) VALUES ('pl1', '2026-10-25', ?, 'm', 'draft')`)
+      .run(JSON.stringify({ rationale: 'ر', items: [{ sourceId: 's1', platform: 'linkedin', angle: 'زاوية', day: '2026-10-25', time: '07:00', why: 'ل' }] }))
+  }
+
+  it('الرحلةُ في ستّ خطوات، والبندُ بثلاثة أزرار: ولّد وارفع والأصول', async () => {
+    seedPlan()
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['قسّم', 'اختر', 'ولّد', 'عدّل وانقل', 'اعتمد', 'شكرًا']) expect(html).toContain(s)
+    expect(html).toContain('aria-current="step"')
+    expect(html).toContain('href="/panel/assets?plan=pl1&amp;index=0#upload"')
+    expect(html).toContain('action="/panel/plan/item/remove"')
+  })
+
+  it('رفعُ صورةٍ من البند يحفظها في الأصول ويربطها به، والأصولُ تعرضها مصنَّفة', async () => {
+    seedPlan()
+    const store = new Map<string, ArrayBuffer>()
+    env['MEDIA'] = {
+      async put(k: string, v: ArrayBuffer) { store.set(k, v) },
+      async get(k: string) { const v = store.get(k); return v === undefined ? null : { body: new Blob([v]).stream(), size: v.byteLength } },
+    }
+    const { cookie, csrf } = await session()
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1'); body.set('index', '0')
+    body.set('file', new File([new Uint8Array([1, 2, 3])], 'شعار.png', { type: 'image/png' }))
+    const res = await app.request('/panel/assets/upload', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/client#board')
+    expect(store.size).toBe(1)
+    const plan = JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: { asset?: string }[] }
+    expect(plan.items[0]!.asset).toMatch(/^f:/)
+    const page = await (await app.request('/panel/assets?plan=pl1&index=0', { headers: { Cookie: cookie } }, env)).text()
+    expect(page).toContain('صور › مرفوعة ›')
+    expect(page).toContain('اختر لهذا البند')
+    const raw = await app.request(`/panel/assets/raw/${plan.items[0]!.asset!}`, { headers: { Cookie: cookie } }, env)
+    expect(raw.status).toBe(200)
+    expect(raw.headers.get('Content-Type')).toBe('image/png')
+  })
+})

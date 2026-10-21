@@ -36,7 +36,7 @@ import { applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type 
 import { planImportExpired, planImportScreen } from './ui/planImportView'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel, type PublishPlatform } from '../lib/oauth/providers'
-import { abortUpload, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
+import { abortUpload, cleanName, completeUpload, listUploads, postsFromUpload, startUpload, uploadPart } from '../lib/media/uploads'
 import { parseRange, resolveRange } from '../lib/media/range'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
@@ -119,7 +119,9 @@ import { insightsCsv, insightsScreen } from './ui/insightsView'
 import { clientScreen } from './ui/clientView'
 import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
 import { autoImageRoom } from '../lib/image/auto'
-import { editPlanItem } from '../lib/plan/edit'
+import { editPlanItem, removePlanItem } from '../lib/plan/edit'
+import { addLibraryFile, libraryProblem, listLibrary, rawObject } from '../lib/library'
+import { libraryScreen } from './ui/libraryView'
 import { readBrief, writeBrief } from '../lib/brief'
 import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
@@ -476,7 +478,10 @@ panel.get('/panel/client', async (c) => {
       .bind(org).first<{ t: number }>().catch(() => null),
     readFacts(c.env.DB, org, null),
   ])
+  const waiting = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'draft'")
+    .bind(org).first<{ n: number }>().catch(() => null)
   const body = clientScreen({
+    waiting: waiting?.n ?? 0,
     orgName: orgRow?.name ?? 'منظّمتي',
     brief,
     linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
@@ -1840,11 +1845,14 @@ panel.post('/panel/plan/item', async (c) => {
     ...(opt('day') === undefined ? {} : { day: opt('day')! }),
     ...(opt('platform') === undefined ? {} : { platform: opt('platform')! }),
     ...(opt('time') === undefined ? {} : { time: opt('time')! }),
+    // ‏«ولّد أنت» يرسل `asset` فارغًا فيمحو المختار، و«من المكتبة» يرسل مرجعَه (D-260)
+    ...(f.has('asset') ? { asset: String(f.get('asset') ?? '') } : {}),
   })
   if ((c.req.header('Accept') ?? '').includes('application/json')) {
     return c.json(result, result.ok ? 200 : 400)
   }
-  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند.' } : { kind: 'bad', text: result.reason })
+  const said = !f.has('asset') ? 'نُقل البند.' : f.get('asset') === '' ? 'سيُولَّد محتوى البند.' : 'اختير ملفُّ البند من الأصول.'
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: said } : { kind: 'bad', text: result.reason })
   return c.redirect('/panel/client#board', 303)
 })
 
@@ -1873,7 +1881,7 @@ panel.post('/panel/plan/start', async (c) => {
   })
   if (items.length > 0) {
     await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => ({
-      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org } },
+      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org, ...(i.asset === undefined ? {} : { asset: i.asset }) } },
     })))
   }
   await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
@@ -1883,6 +1891,99 @@ panel.post('/panel/plan/start', async (c) => {
       settings.autoImage ? ' مع صورها' : ''}، وتظهر في «تنتظر قرارك» خلال دقائق. ولا يُنشر منها شيءٌ قبل اعتمادك.`,
   })
   return c.redirect('/panel/client', 303)
+})
+
+/** حذفُ بندٍ من الخطّة (D-260) — قبل أن يُكتب، والصفحةُ تُعاد بفهارسها الجديدة. */
+panel.post('/panel/plan/item/remove', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const result = await removePlanItem(c.env.DB, activeOrg(gate.session.record), String(gate.form.get('id') ?? ''), Number(gate.form.get('index')))
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُذف البند من الخطّة.' } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/client#board', 303)
+})
+
+// ── المكتبة (D-260) ─────────────────────────────────────────────────
+
+panel.get('/panel/assets', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const kind = c.req.query('kind')
+  const origin = c.req.query('origin')
+  const plan = c.req.query('plan') ?? ''
+  const index = Number(c.req.query('index'))
+  const body = libraryScreen({
+    assets: await listLibrary(c.env.DB, org),
+    kind: kind === 'image' || kind === 'video' || kind === 'doc' ? kind : null,
+    origin: origin === 'generated' || origin === 'upload' || origin === 'drive' ? origin : null,
+    pick: /^[A-Za-z0-9_-]{1,80}$/.test(plan) && Number.isInteger(index) && index >= 0 ? { plan, index } : null,
+    flash: await takeFlash(c.env, c.req.raw),
+  })
+  return page((nonce) =>
+    soloPage('صدى — الأصول', { href: '/panel/client', label: 'رحلة العميل' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('accounts')),
+  )
+})
+
+/**
+ * **رفعُ صورةٍ إلى المكتبة** — البايتاتُ إلى R2 أوّلًا ثمّ الصفّ، فلا صفَّ بلا كائن. ومع `id` و`index` يُربط بالبند مباشرةً.
+ * والمفتاحُ من معرّفٍ يصنعه صدى لا من اسم الملفّ (D-126).
+ */
+panel.post('/panel/assets/upload', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const file = f.get('file')
+  const planId = String(f.get('id') ?? '')
+  const backTo = planId === '' ? '/panel/assets' : `/panel/assets?plan=${encodeURIComponent(planId)}&index=${Number(f.get('index'))}`
+  if (!(file instanceof File)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اختر صورةً أوّلًا.' })
+    return c.redirect(backTo, 303)
+  }
+  const problem = libraryProblem(file.type, file.size)
+  if (problem !== null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: problem })
+    return c.redirect(backTo, 303)
+  }
+  const key = `library/${org}/${crypto.randomUUID()}.${file.type.split('/')[1] ?? 'img'}`
+  await c.env.MEDIA.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
+  const id = await addLibraryFile(c.env.DB, org, { key, name: cleanName(file.name), mime: file.type, bytes: file.size })
+  await record(c.env.DB, { actor: 'panel', action: 'library.upload', target: id }, c.req.raw)
+  if (planId !== '') {
+    const linked = await editPlanItem(c.env.DB, org, planId, Number(f.get('index')), { asset: `f:${id}` })
+    await setFlash(c.env, c.req.raw, linked.ok ? { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول، وربطت بالبند.' } : { kind: 'bad', text: linked.reason })
+    return c.redirect('/panel/client#board', 303)
+  }
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول.' })
+  return c.redirect('/panel/assets', 303)
+})
+
+/** معاينةُ المرفوع خلف الجلسة وبمنظّمتها — والمولَّدةُ من `/panel/media/:id`. */
+panel.get('/panel/assets/raw/:ref', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
+  const found = await rawObject(c.env.DB, activeOrg(session.record), c.req.param('ref'))
+  if (found === null) return c.text('لا ملفّ', 404)
+  // ‏المقطعُ يُطلب بمداه (D-182)، والصورةُ كاملة
+  const wanted = parseRange(c.req.header('Range'))
+  const object = await c.env.MEDIA.get(found.key, wanted === null ? {} : { range: wanted })
+  if (object === null) return c.text('البايتات مفقودة', 404)
+  const span = wanted === null ? null : resolveRange(wanted, object.size)
+  return new Response(object.body as unknown as BodyInit, {
+    status: span === null ? 200 : 206,
+    headers: {
+      ...(span === null
+        ? { 'Content-Length': String(object.size) }
+        : { 'Content-Range': `bytes ${span.start}-${span.end}/${object.size}`, 'Content-Length': String(span.end - span.start + 1) }),
+      'Accept-Ranges': 'bytes',
+      'Content-Type': found.mime,
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+    },
+  })
 })
 
 // ── الصور ────────────────────────────────────────────────────────────

@@ -181,6 +181,8 @@ export interface PlanItem {
   /** `HH:MM` بـ UTC. */
   readonly time: string
   readonly why: string
+  /** ما اختير له من المكتبة (D-260): `m:` · `u:` · `f:` — وغيابُه يعني «ولّد أنت». */
+  readonly asset?: string
 }
 
 export interface Plan {
