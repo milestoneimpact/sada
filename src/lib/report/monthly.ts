@@ -63,3 +63,26 @@ export async function monthlyReport(db: Db, org: string, month: string, zone: st
     why: works.slot === null ? works.why : null,
   }
 }
+
+/**
+ * **التقريرُ نصًّا للبريد** (D-268) — الأرقامُ نفسُها التي تُعرض، سطرًا سطرًا، بلا HTML: يُقرأ في أيّ بريدٍ وعلى أيّ هاتف.
+ * ولا رابطَ يُبنى من مدخل، ولا رمزَ ولا سرّ — ما يخرج إلى البريد هو ما في الصفحة وحدَه.
+ */
+export function reportText(r: MonthlyReport, orgName: string, label: (platform: string) => string, money: (usd: number) => string): string {
+  const out = Object.values(r.published).reduce((s, n) => s + n, 0)
+  const lines = [
+    `تقرير ${r.month} — ${orgName}`,
+    '',
+    `خرج: ${out}${out === 0 ? '' : ` (${Object.entries(r.published).map(([p, n]) => `${label(p)} ${n}`).join('، ')})`}`,
+    `التفاعل: ${r.engagement} من ${r.measured} منشورًا قِيس`,
+    `أُنفق: ${money(r.spend)}`,
+    `قادم: ${r.upcoming} مجدولًا بعد هذا الشهر`,
+    `أرجح موعد: ${r.slot ?? (r.why ?? 'لم يُقَس بعد')}`,
+  ]
+  if (r.top.length > 0) {
+    lines.push('', 'أنجح ثلاثة:')
+    r.top.forEach((f, i) => lines.push(`${i + 1}. ${label(f.platform)} — ${f.engagement} تفاعلًا — ${[...f.text].slice(0, 80).join('')}`))
+  }
+  lines.push('', 'وما لم يُقَس لا يُقال.')
+  return lines.join('\n')
+}
