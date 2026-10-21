@@ -39,6 +39,9 @@ import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
+import { draftPost } from './lib/draft/job'
+import { generateForPost } from './lib/image/job'
+import { autoImageRoom } from './lib/image/auto'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -419,14 +422,40 @@ export interface AnalyzeMessage {
 }
 
 /**
+ * **وبندُ خطّةٍ يُكتب** (D-258 · «ابدأ»): المصدرُ والمنصّةُ والعميل. يُكتب بـ `draftPost` نفسِها بحرّاسها ومفتاحها،
+ * ثمّ صورتُه إن رُفعت الصورةُ الآليّة وبقي من سقفها. **ولا جدولة**: المسوّدةُ تنتظر اعتمادَ المالك كما تنتظر كلُّ مسوّدة.
+ */
+export interface PlanDraftMessage {
+  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string }
+}
+
+/**
  * مستهلك طابور الفهم.
  *
  * `retry` لما قد ينجح وحده (429 · 5xx · انقطاع)، و `ack` لما لا يصلحه
  * التكرار: نوعٌ غير مدعوم، أو رفضُ سياسة، أو مصدرٌ لا وجود له. وتركُ
  * الثاني في الطابور يعني نداءً مدفوعا يتكرّر بلا أمل.
  */
-async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Promise<void> {
+async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][number], env: Env): Promise<void> {
+  const { sourceId, platform, org } = message.body.draft
+  const secrets = env as unknown as Record<string, string | undefined>
+  const outcome = await draftPost({ db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }, sourceId, platform)
+  console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
+  // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
+  if (outcome.kind === 'failed' && outcome.retryable) return message.retry()
+  message.ack()
+  if (outcome.kind === 'drafted' && (await autoImageRoom(env.DB, org)) > 0) {
+    await generateForPost({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, outcome.postId, { style: 'infographic' })
+      .catch((error: unknown) => console.warn({ job: 'plan-draft-image', post: outcome.postId, failed: String(error) }))
+  }
+}
+
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
+    if ('draft' in message.body) {
+      await planDraft(message as MessageBatch<PlanDraftMessage>['messages'][number], env)
+      continue
+    }
     const outcome = await analyzeSource(
       {
         db: env.DB,
@@ -435,7 +464,7 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage>, env: Env): Prom
         encKey: env.TOKEN_ENC_KEY,
         geminiKey: env.GEMINI_API_KEY,
       },
-      message.body.sourceId,
+      (message.body as AnalyzeMessage).sourceId,
     )
     console.info({ job: 'analyze', ...outcome })
     if (outcome.kind === 'failed' && outcome.retryable) {
@@ -620,11 +649,11 @@ async function scanTick(env: Env): Promise<void> {
  * بإعادة المحاولة، وتركها تدور يستهلك حصّة الطابور بلا فائدة.
  */
 async function queue(
-  batch: MessageBatch<PublishMessage | AnalyzeMessage>,
+  batch: MessageBatch<PublishMessage | AnalyzeMessage | PlanDraftMessage>,
   env: Env,
 ): Promise<void> {
   if (batch.queue.startsWith('sada-generate')) {
-    return analyzeQueue(batch as MessageBatch<AnalyzeMessage>, env)
+    return analyzeQueue(batch as MessageBatch<AnalyzeMessage | PlanDraftMessage>, env)
   }
   if (batch.queue.startsWith('sada-publish')) {
     return publishQueue(batch as MessageBatch<PublishMessage>, env)

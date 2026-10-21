@@ -59,3 +59,49 @@ describe('رحلةُ العميل', () => {
     expect((await app.request('/panel/client/brief', { method: 'POST', body: bad, headers: { Cookie: cookie } }, env)).status).toBe(403)
   })
 })
+
+describe('«ابدأ الخطّة» (D-258)', () => {
+  function seedPlan(status: 'draft' | 'approved' = 'draft'): void {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير', 'text/plain', 'md5:a')`)
+    const items = [
+      { sourceId: 's1', platform: 'linkedin', angle: 'زاوية أولى طويلة', day: '2026-10-25', time: '07:00', why: 'ل' },
+      { sourceId: 's1', platform: 'linkedin', angle: 'زاوية مكرّرة طويلة', day: '2026-10-26', time: '07:00', why: 'ل' },
+      { sourceId: 's1', platform: 'x', angle: 'زاوية ثالثة طويلة', day: '2026-10-27', time: '07:00', why: 'ل' },
+    ]
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status) VALUES ('pl1', '2026-10-25', ?, 'm', ?)`)
+      .run(JSON.stringify({ rationale: 'ر', items }), status)
+  }
+
+  it('يعتمد الخطّة ويرسل كلَّ بندٍ مرّةً إلى الطابور، ولا يُنشر شيء', async () => {
+    seedPlan()
+    const sent: unknown[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: unknown }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    const html0 = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html0).toContain('action="/panel/plan/start"')
+    const body = new FormData()
+    body.set('_csrf', csrf)
+    body.set('id', 'pl1')
+    expect((await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    expect(sent).toEqual([
+      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner' } },
+      { draft: { sourceId: 's1', platform: 'x', org: 'org_owner' } },
+    ])
+    expect(db.raw.prepare("SELECT status FROM plans WHERE id = 'pl1'").get()).toEqual({ status: 'approved' })
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts").get()).toEqual({ n: 0 })
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('بدأ العمل: 2 مسوّدات تُكتب في الخلفيّة')
+  })
+
+  it('ومعرّفٌ لغير خطّة العميل لا يُرسل شيئًا', async () => {
+    seedPlan()
+    const sent: unknown[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: unknown[]) { sent.push(...b) } }
+    const { cookie, csrf } = await session()
+    const body = new FormData()
+    body.set('_csrf', csrf)
+    body.set('id', 'other')
+    await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(sent).toEqual([])
+  })
+})

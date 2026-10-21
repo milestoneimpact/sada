@@ -25,6 +25,7 @@ export interface ClientData {
   readonly spentMonth: number
   readonly measured: number
   readonly saved?: boolean
+  readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
 type State = 'done' | 'todo' | 'idle'
@@ -56,6 +57,20 @@ function briefForm(b: Brief): string {
   </form>`
 }
 
+/**
+ * **«ابدأ الخطّة»** (D-258): يكتب البنودَ كلَّها في الخلفيّة. والتأكيدُ يقول العددَ والتقديرَ قبل أن يقع،
+ * ويقول إنّ شيئًا لا يُنشر قبل الاعتماد.
+ */
+function startForm(d: ClientData): string {
+  if (d.plan === null) return ''
+  const n = new Set(d.plan.plan.items.map((i) => `${i.sourceId}:${i.platform}`)).size
+  const cost = d.estimate.perDraft === null ? 'بكلفة الكتابة المعتادة' : `بنحو ${money(n * d.estimate.perDraft)} للكتابة`
+  return `<form class="inline" method="POST" action="/panel/plan/start" data-busy="جار البدء…"
+      data-confirm="${escapeHtml(`ابدأ الخطّة؟ تُكتب ${n} مسوّدة ${cost}${d.autoImage ? ' مع صورها' : ''}، ولا يُنشر منها شيءٌ قبل اعتمادك.`)}">
+      <input type="hidden" name="id" value="${escapeHtml(d.plan.id)}">
+      <button class="btn btn-primary btn-sm" type="submit">ابدأ الخطّة</button></form>`
+}
+
 export function clientScreen(d: ClientData): string {
   const b = d.brief
   const chosen = b.channels
@@ -79,7 +94,9 @@ export function clientScreen(d: ClientData): string {
     station(4, 'الخطّة', d.plan === null ? 'todo' : 'done',
       d.plan === null ? 'لا خطّة بعد — أسبوعًا أو شهرًا.'
         : `${d.plan.span === 'month' ? 'شهرٌ' : 'أسبوعٌ'} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,
-      link('/panel#sub-plan', d.plan === null ? 'خطّط' : 'افتحها', d.plan === null)),
+      d.plan === null
+        ? link('/panel#sub-plan', 'خطّط', true)
+        : `${link('/panel#sub-plan', 'افتحها')}${startForm(d)}`),
     station(5, 'المحتوى', d.autoImage ? 'done' : 'idle',
       d.autoImage ? 'كلُّ مسوّدةٍ تأتي بصورتها.' : 'الصورةُ بزرّها على كلّ مسوّدة، أو ارفع صورك ومقاطعك.',
       link('/panel/settings#auto-image', 'الصورة الآليّة')),
@@ -90,6 +107,7 @@ export function clientScreen(d: ClientData): string {
   ].join('')
 
   return `${pageHead('العميل', 'رحلةُ العميل', 'من «ماذا تريد؟» إلى «ما الذي نجح؟» — <b>كلُّ محطّةٍ تقول حالَها وزرَّها</b>، ولا يُنشر شيءٌ قبل اعتمادك.')}
+  ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
   ${d.saved === true ? toastRegion(notice({ tone: 'ok', g: '●', html: 'حُفظ الموجز — والخطّةُ والكتابةُ تقرآنه من الآن.' })) : ''}
   <div class="card mb-4"><h2>المحطّات</h2><ol class="steps wiz nodot">${stations}</ol></div>
   <div class="card" id="brief"><h2>الموجز</h2>

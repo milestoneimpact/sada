@@ -117,6 +117,7 @@ import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
 import { insightsCsv, insightsScreen } from './ui/insightsView'
 import { clientScreen } from './ui/clientView'
+import { autoImageRoom } from '../lib/image/auto'
 import { readBrief, writeBrief } from '../lib/brief'
 import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
@@ -471,6 +472,7 @@ panel.get('/panel/client', async (c) => {
     spentMonth: spent?.t ?? 0,
     measured: facts.length,
     saved: c.req.query('saved') === '1',
+    flash: await takeFlash(c.env, c.req.raw),
   })
   return page((nonce) =>
     soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
@@ -1803,6 +1805,50 @@ panel.post('/panel/plan/approve', async (c) => {
   return back('posts')
 })
 
+/**
+ * **«ابدأ الخطّة»** (D-258 · AGENCY-PLAN و-٥): تُعتمَد الخطّة إن كانت مسوّدة، ويُرسَل كلُّ بندٍ إلى طابور التوليد
+ * فيُكتب بـ `draftPost` نفسِها (حرّاسُها وسقوفُها ومفتاحُها) وتُرسَم صورتُه إن رُفعت الصورةُ الآليّة.
+ *
+ * **ولا يُنشر شيء**: المسوّداتُ تظهر في «تنتظر قرارك» وتُعتمَد واحدةً واحدةً كما كانت. والبندُ المكرّرُ (المصدرُ والمنصّةُ نفسُهما)
+ * يُرسَل مرّة: مفتاحُ المسوّدة واحدٌ لهما، والثانيةُ «كُتبت من قبل». والإيقافُ يُقال هنا قبل أن يُرسَل شيء.
+ */
+panel.post('/panel/plan/start', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('id') ?? '')
+  const plan = await latestPlan(c.env.DB, org)
+  const settings = await readSettings(c.env.DB)
+  if (plan === null || plan.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا خطّة بهذا المعرّف لهذا العميل.' })
+    return c.redirect('/panel/client', 303)
+  }
+  if (settings.paused) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'صدى موقوفٌ مؤقّتًا — لا يُكتب شيءٌ حتّى يُرفع الإيقاف.' })
+    return c.redirect('/panel/client', 303)
+  }
+  if (plan.status === 'draft') await approvePlan(c.env.DB, plan.id, org)
+  const seen = new Set<string>()
+  const items = plan.plan.items.filter((i) => {
+    const k = `${i.sourceId}:${i.platform}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  if (items.length > 0) {
+    await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => ({
+      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org } },
+    })))
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
+  await setFlash(c.env, c.req.raw, {
+    kind: 'ok',
+    text: `بدأ العمل: ${items.length} ${items.length === 1 ? 'مسوّدة تُكتب' : 'مسوّدات تُكتب'} في الخلفيّة${
+      settings.autoImage ? ' مع صورها' : ''}، وتظهر في «تنتظر قرارك» خلال دقائق. ولا يُنشر منها شيءٌ قبل اعتمادك.`,
+  })
+  return c.redirect('/panel/client', 303)
+})
+
 // ── الصور ────────────────────────────────────────────────────────────
 
 /**
@@ -1831,14 +1877,7 @@ panel.post('/panel/media/regenerate', (c) => imageRoute(c, true))
  */
 async function autoImages(c: Context<{ Bindings: Env }>, org: string, ids: readonly string[]): Promise<number> {
   if (ids.length === 0) return 0
-  const s = await readSettings(c.env.DB)
-  if (!s.autoImage || s.paused) return 0
-  const used = (await c.env.DB
-    .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
-    .bind(org)
-    .first<{ n: number }>()
-    .catch(() => null))?.n ?? s.dailyImageCap
-  const batch = ids.slice(0, Math.max(0, s.dailyImageCap - used))
+  const batch = ids.slice(0, await autoImageRoom(c.env.DB, org))
   if (batch.length === 0) return 0
   const deps = {
     db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY,
