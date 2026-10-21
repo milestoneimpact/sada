@@ -24,18 +24,19 @@ function orgNames(m: Member, orgs: readonly OrgRow[]): string {
 
 export function teamScreen(d: TeamData): string {
   const rows = [
-    `<tr><td><bdi dir="ltr">${escapeHtml(OWNER_EMAIL)}</bdi></td><td><b>${ROLE_LABEL.owner.name}</b><div class="hint m-0">${ROLE_LABEL.owner.can}</div></td>
-      <td>كلّ الشركات</td><td>—</td><td></td></tr>`,
-    ...d.members.map((m) => `<tr><td><bdi dir="ltr">${escapeHtml(m.email)}</bdi></td>
-      <td><b>${ROLE_LABEL[m.role].name}</b><div class="hint m-0">${ROLE_LABEL[m.role].can}</div></td>
-      <td>${orgNames(m, d.orgs)}</td>
-      <td>${m.lastSeenAt === null ? '<span class="ago">لم يدخل بعد</span>' : `<bdi dir="ltr">${escapeHtml(m.lastSeenAt.slice(0, 16))}</bdi>`}</td>
+    `<tr><td data-label="البريد"><bdi dir="ltr">${escapeHtml(OWNER_EMAIL)}</bdi></td>
+      <td data-label="الدور"><b>${ROLE_LABEL.owner.name}</b><div class="note">${ROLE_LABEL.owner.can}</div></td>
+      <td data-label="الشركات">كلّ الشركات</td><td data-label="آخرُ دخول">أنت</td><td></td></tr>`,
+    ...d.members.map((m) => `<tr><td data-label="البريد"><bdi dir="ltr">${escapeHtml(m.email)}</bdi></td>
+      <td data-label="الدور"><b>${ROLE_LABEL[m.role].name}</b><div class="note">${ROLE_LABEL[m.role].can}</div></td>
+      <td data-label="الشركات">${orgNames(m, d.orgs)}</td>
+      <td data-label="آخرُ دخول">${m.lastSeenAt === null ? '<span class="ago">لم يدخل بعد</span>' : `<bdi dir="ltr">${escapeHtml(m.lastSeenAt.slice(0, 16))}</bdi>`}</td>
       <td><form class="inline" method="POST" action="/panel/team/revoke" data-confirm="${escapeHtml(`ألغِ دخول ${m.email}؟ تسقط جلستُه في طلبه التالي.`)}">
         <input type="hidden" name="email" value="${escapeHtml(m.email)}">
         <button class="btn btn-danger btn-sm" type="submit">ألغِ</button></form></td></tr>`),
   ].join('')
   const roles = MEMBER_ROLES.map((r, i) => `<label class="vpf"><input type="radio" name="role" value="${r}"${i === 2 ? ' checked' : ''}>
-      <span class="vpf-b"><b>${ROLE_LABEL[r].name}</b> <span class="hint m-0">${ROLE_LABEL[r].can}</span></span></label>`).join('')
+      <span class="vpf-b"><b>${ROLE_LABEL[r].name}</b><span class="note">${ROLE_LABEL[r].can}</span></span></label>`).join('')
   const orgs = d.orgs.map((o) => `<label class="vpf"><input type="checkbox" name="org" value="${escapeHtml(o.id)}">
       <span class="vpf-b"><b>${escapeHtml(o.name)}</b></span></label>`).join('')
 

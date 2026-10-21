@@ -37,9 +37,9 @@ export function portfolioScreen(rows: readonly PortfolioRow[], orgs: readonly Or
 
   const cell = (n: number, bad = false): string => n === 0 ? '<span class="ago">—</span>' : bad ? statusBadge('bad', '▲', String(n)) : `<b>${n}</b>`
   const body = rows.map((r) => `<tr${r.org.id === active ? ' aria-current="true"' : ''}>
-      <td><b><bdi>${escapeHtml(r.org.name)}</bdi></b>${r.org.id === active ? ' <span class="chip">الحاليّة</span>' : ''}</td>
-      <td>${cell(r.waiting)}</td><td>${cell(r.queued)}</td><td>${cell(r.published)}</td><td>${cell(r.failed, true)}</td>
-      <td>${cell(r.engagement)}</td><td>${r.spend === 0 ? '<span class="ago">—</span>' : escapeHtml(money(r.spend))}</td><td>${cell(r.channels)}</td>
+      <td data-label="الشركة"><b><bdi>${escapeHtml(r.org.name)}</bdi></b>${r.org.id === active ? ' <span class="chip">الحاليّة</span>' : ''}</td>
+      <td data-label="ينتظر">${cell(r.waiting)}</td><td data-label="مجدول">${cell(r.queued)}</td><td data-label="خرج">${cell(r.published)}</td><td data-label="فشل">${cell(r.failed, true)}</td>
+      <td data-label="التفاعل">${cell(r.engagement)}</td><td data-label="أُنفق">${r.spend === 0 ? '<span class="ago">—</span>' : escapeHtml(money(r.spend))}</td><td data-label="قنوات">${cell(r.channels)}</td>
       <td><form class="inline" method="POST" action="/panel/orgs/switch"><input type="hidden" name="org" value="${escapeHtml(r.org.id)}">
         <input type="hidden" name="next" value="/panel"><button class="btn btn-secondary btn-sm" type="submit">افتحها</button></form></td></tr>`).join('')
 
