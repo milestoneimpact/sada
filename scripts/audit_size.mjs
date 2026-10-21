@@ -6,8 +6,11 @@
  *
  * | الصفحة | السقف مضغوطًا | لماذا |
  * |---|---|---|
- * | اللوحةُ وأقسامُها (`panel*`) | ‏32KB | تُفتح كلَّ يوم، وفيها الورقةُ والخطُّ المضمَّن مرّةً واحدة |
- * | الشاشاتُ (`screen-*`) والوثيقة | ‏24KB | صفحةٌ واحدةُ الغرض |
+ * | اللوحةُ وأقسامُها (`panel*`) | ‏26KB | تُفتح كلَّ يوم، وفيها الورقةُ كاملة — وأثقلُها اليومَ المحرّرُ ‏23.1KB |
+ * | الشاشاتُ (`screen-*`) والوثيقة | ‏14KB | صفحةٌ واحدةُ الغرض — وأثقلُها اليومَ «ما عليك» ‏11.4KB |
+ *
+ * **ويُقاس المجرَّدُ (`.bare.html`) لا المدقَّق**: المدقَّقُ يضمّن الخطوطَ ليُقاس النصّ (نحو ‏157KB)، والخادمُ يرسلها أصولًا
+ * منفصلةً مخزّنةً سنة، فلا يدفعها المالكُ مع كلّ صفحة.
  *
  *     node scripts/audit_size.mjs /tmp/panel.html /tmp/screen-x.html …
  *     node scripts/audit_size.mjs --self-test
@@ -17,7 +20,7 @@ import { basename } from 'node:path'
 import { gzipSync } from 'node:zlib'
 
 const KB = 1024
-export const BUDGET = { panel: 32 * KB, screen: 24 * KB }
+export const BUDGET = { panel: 26 * KB, screen: 14 * KB }
 
 export function budgetOf(file) {
   return basename(file).startsWith('panel') ? BUDGET.panel : BUDGET.screen
@@ -30,7 +33,7 @@ export function measure(html) {
 function selfTest() {
   const small = measure('<p>صدى</p>'.repeat(10))
   // ‏نصٌّ عشوائيٌّ لا ينضغط: يتجاوز السقفَ مضغوطًا
-  const noise = Array.from({ length: 60 * KB }, () => String.fromCharCode(33 + Math.floor(Math.random() * 90))).join('')
+  const noise = Array.from({ length: 40 * KB }, () => String.fromCharCode(33 + Math.floor(Math.random() * 90))).join('')
   const big = measure(noise)
   if (small.gz > BUDGET.screen || big.gz <= BUDGET.screen || budgetOf('/tmp/panel-x.html') !== BUDGET.panel) {
     console.error('✕ self-test: الحارسُ لا يميّز الخفيفَ من الثقيل')
