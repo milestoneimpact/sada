@@ -30,7 +30,7 @@ import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
 import { IDEA_MAX } from '../../../lib/draft/job'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
-import { menu, menuAction, menuItem } from '../components/menu'
+import { menu, menuItem } from '../components/menu'
 import { field } from '../components/field'
 import { linkLine, pickLine } from '../reach'
 import { INFO_SIZE } from '../../../lib/image/infographic'
@@ -289,6 +289,9 @@ function scheduler(
  * ‏بضغطةٍ واحدة — «اعتمد · غدًا 9:00 ص» — بالمسار نفسِه الذي يسلكه المحرّر (`approve-schedule`، D-198)،
  * ‏و«اعتمد» وحدَه ثانويٌّ بجوارها. والموعدُ مكتوبٌ على الزرّ نفسِه فلا يُجدوَل شيءٌ لم يُقرأ، والسحبُ
  * ‏في شريط المجدولة الذي تنزل إليه. وحيث تعدّد الحسابُ أو نقص الوسيطُ يبقى «اعتمد» وحده كما كان.
+ *
+ * ‏**و«ارفض» ظاهرٌ بجانبه** (D-267 · EASE ب): كان في «أفعال أخرى» خلف قائمة، والقرارُ اثنان لا واحد. والتراجعُ في الإشعار
+ * ‏بعده (D-100) هو الأمانُ لا سؤالٌ قبله، واختصارُ R يجد زرَّه الآن.
  */
 export const APPROVE_AT = PRESETS.find((p) => p.kind === 'tomorrow')!
 
@@ -303,7 +306,8 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule" data-optimistic="اعتُمدت وجُدولت"
                title="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
              <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد فقط</button>`
-    : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}</form>`
+    : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}
+             <button class="btn btn-danger btn-sm" type="submit" name="do" value="reject" data-optimistic="رُفضت">ارفض</button></form>`
 }
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
@@ -876,7 +880,6 @@ function card(
     : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
 
   const more: string[] = []
-  if (open) more.push(menuAction({ label: 'ارفض', action: '/panel/drafts/decide', fields: { id: d.id, do: 'reject' }, danger: true, swap: true, optimistic: 'رُفضت' }))
   more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const meta = [

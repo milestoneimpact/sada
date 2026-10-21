@@ -172,6 +172,13 @@ describe('الاعتماد يعرض الموعد (D-218)', () => {
     expect(two).not.toContain('approve-schedule')
     expect(two).toContain('value="approve" data-optimistic="اعتُمدت">اعتمد</button>')
   })
+
+  it('«ارفض» ظاهرٌ بجانب «اعتمد» في النموذج نفسِه، لا في «أفعال أخرى» (D-267)', () => {
+    const html = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }])
+    const form = html.slice(html.indexOf('action="/panel/drafts/decide"'))
+    expect(form.slice(0, form.indexOf('</form>'))).toContain('name="do" value="reject"')
+    expect(html.match(/value="reject"/g)).toHaveLength(1)
+  })
 })
 
 describe('الرمز يقول ما يعنيه', () => {
@@ -1967,3 +1974,4 @@ describe('مراحل الانتظار الطويل (7.11 · D-238)', () => {
     expect(SCRIPT).toContain('ابق في الصفحة')
   })
 })
+
