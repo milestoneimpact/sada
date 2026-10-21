@@ -105,3 +105,23 @@ describe('«ابدأ الخطّة» (D-258)', () => {
     expect(sent).toEqual([])
   })
 })
+
+describe('الخطّةُ لوحةً أو قائمة (D-259)', () => {
+  it('أعمدةُ الأسبوع سبعة وبطاقاتُها بأسماء مصادرها، والنقلُ بـ JSON يحفظ', async () => {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير الأثر', 'text/plain', 'md5:a')`)
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status) VALUES ('pl1', '2026-10-25', ?, 'm', 'draft')`)
+      .run(JSON.stringify({ rationale: 'ر', items: [{ sourceId: 's1', platform: 'linkedin', angle: 'زاوية الأسبوع', day: '2026-10-25', time: '07:00', why: 'ل' }] }))
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html.match(/class="pb-col"/g)).toHaveLength(7)
+    expect(html).toContain('تقرير الأثر')
+    expect(html).toContain('data-view="list"')
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1'); body.set('index', '0'); body.set('day', '2026-10-27')
+    const res = await app.request('/panel/plan/item', { method: 'POST', body, headers: { Cookie: cookie, Accept: 'application/json' } }, env)
+    expect(await res.json()).toEqual({ ok: true })
+    const bad = new FormData()
+    bad.set('_csrf', csrf); bad.set('id', 'pl1'); bad.set('index', '0'); bad.set('day', '2027-01-01')
+    expect((await app.request('/panel/plan/item', { method: 'POST', body: bad, headers: { Cookie: cookie, Accept: 'application/json' } }, env)).status).toBe(400)
+  })
+})

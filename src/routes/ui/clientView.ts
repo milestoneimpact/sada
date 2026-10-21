@@ -13,6 +13,7 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { BRIEF_CHANNELS, BRIEF_MAX, isEmptyBrief, type Brief } from '../../lib/brief'
 import type { Estimate } from '../../lib/estimate'
 import type { StoredPlan } from '../../lib/plan/job'
+import { planBoard } from './planBoard'
 
 export interface ClientData {
   readonly orgName: string
@@ -25,6 +26,8 @@ export interface ClientData {
   readonly spentMonth: number
   readonly measured: number
   readonly saved?: boolean
+  /** أسماءُ مصادر البنود — تُقرأ على البطاقة بدل معرّفاتها (D-259). */
+  readonly names?: Readonly<Record<string, string>>
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -110,7 +113,8 @@ export function clientScreen(d: ClientData): string {
   ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
   ${d.saved === true ? toastRegion(notice({ tone: 'ok', g: '●', html: 'حُفظ الموجز — والخطّةُ والكتابةُ تقرآنه من الآن.' })) : ''}
   <div class="card mb-4"><h2>المحطّات</h2><ol class="steps wiz nodot">${stations}</ol></div>
-  <div class="card" id="brief"><h2>الموجز</h2>
+  ${d.plan === null ? '' : planBoard(d.plan, d.names ?? {})}
+  <div class="card mt-4" id="brief"><h2>الموجز</h2>
     <p class="hint">يقرؤه مخطِّطُ الخطّة وكاتبُ المسوّدات، <b>وصفًا يُراعى</b>: القيودُ قبله أعلى منه، فلا رقمَ يُخترَع ولا رابط.</p>
     ${briefForm(b)}
   </div>`

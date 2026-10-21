@@ -117,7 +117,9 @@ import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
 import { insightsCsv, insightsScreen } from './ui/insightsView'
 import { clientScreen } from './ui/clientView'
+import { PLAN_BOARD_SCRIPT } from './ui/planBoard'
 import { autoImageRoom } from '../lib/image/auto'
+import { editPlanItem } from '../lib/plan/edit'
 import { readBrief, writeBrief } from '../lib/brief'
 import { estimateMonth, unitCosts } from '../lib/estimate'
 import { readFacts, whatWorks } from '../lib/insights/whatWorks'
@@ -445,6 +447,18 @@ async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
  * رحلةُ العميل (D-257 · AGENCY-PLAN): المحطّاتُ السبع لعميلِ الجلسة، والموجزُ يُكتب فيها. **قراءةٌ لا نداء**:
  * التقديرُ ممّا أُنفق فعلًا، ولا يُنفَق شيءٌ من هنا.
  */
+/** أسماءُ المصادر لبطاقات اللوحة — للعميل وحدَه، وبعددٍ محدود. */
+async function sourceNames(db: Env['DB'], org: string, ids: readonly string[]): Promise<Record<string, string>> {
+  const uniq = [...new Set(ids)].slice(0, 60)
+  if (uniq.length === 0) return {}
+  const { results } = await db
+    .prepare(`SELECT id, name FROM sources WHERE org_id = ? AND id IN (${uniq.map(() => '?').join(',')})`)
+    .bind(org, ...uniq)
+    .all<{ id: string; name: string }>()
+    .catch(() => ({ results: [] as { id: string; name: string }[] }))
+  return Object.fromEntries(results.map((r) => [r.id, r.name]))
+}
+
 panel.get('/panel/client', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -473,9 +487,10 @@ panel.get('/panel/client', async (c) => {
     measured: facts.length,
     saved: c.req.query('saved') === '1',
     flash: await takeFlash(c.env, c.req.raw),
+    names: plan === null ? {} : await sourceNames(c.env.DB, org, plan.plan.items.map((i) => i.sourceId)),
   })
   return page((nonce) =>
-    soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, PLAN_BOARD_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('accounts')),
   )
 })
@@ -1812,6 +1827,27 @@ panel.post('/panel/plan/approve', async (c) => {
  * **ولا يُنشر شيء**: المسوّداتُ تظهر في «تنتظر قرارك» وتُعتمَد واحدةً واحدةً كما كانت. والبندُ المكرّرُ (المصدرُ والمنصّةُ نفسُهما)
  * يُرسَل مرّة: مفتاحُ المسوّدة واحدٌ لهما، والثانيةُ «كُتبت من قبل». والإيقافُ يُقال هنا قبل أن يُرسَل شيء.
  */
+/**
+ * تعديلُ بندٍ في الخطّة (D-259): يومُه بالسحب في اللوحة، ومنصّتُه وساعتُه بالقائمة. **والسكربتُ يطلب JSON** فتبقى الصفحةُ
+ * في مكانها، وبلا سكربتٍ نموذجٌ عاديٌّ يعود إلى اللوحة بإشعاره. والتحقّقُ كلُّه في `editPlanItem`.
+ */
+panel.post('/panel/plan/item', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const opt = (k: string): string | undefined => { const v = f.get(k); return v === null || v === '' ? undefined : String(v) }
+  const result = await editPlanItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), Number(f.get('index')), {
+    ...(opt('day') === undefined ? {} : { day: opt('day')! }),
+    ...(opt('platform') === undefined ? {} : { platform: opt('platform')! }),
+    ...(opt('time') === undefined ? {} : { time: opt('time')! }),
+  })
+  if ((c.req.header('Accept') ?? '').includes('application/json')) {
+    return c.json(result, result.ok ? 200 : 400)
+  }
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند.' } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/client#board', 303)
+})
+
 panel.post('/panel/plan/start', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
