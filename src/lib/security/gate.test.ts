@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
-import { releaseAttempt, reserveAttempt, reserveChallenge, MAX_CHALLENGES } from './gate'
+import {
+  releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveChallenge, reserveCodeGuess,
+  MAX_CHALLENGES, MAX_CODE_GUESSES_PER_DAY,
+} from './gate'
 import { MAX_ATTEMPTS } from '../rateLimit'
 
 const from = (ip: string): Request => new Request('https://sada2.basserh.com/panel/login', {
@@ -55,5 +58,33 @@ describe('بوّابة المحاولات الذرّيّة (D-161)', () => {
     const db = fakeDb()
     db.raw.exec('DROP TABLE auth_attempts')
     expect(await reserveAttempt(db, from('1.1.1.1'))).toEqual({ allowed: true, count: 0 })
+  })
+})
+
+describe('سقفُ التخمين على رمز البريد في اليوم (D-247)', () => {
+  const owner = 'milestonesimpact@gmail.com'
+
+  it('عشرٌ في اليوم ولو تبدّلت العناوين، ثمّ يُغلق باب الرمز', async () => {
+    const db = fakeDb()
+    const verdicts = await Promise.all(
+      Array.from({ length: MAX_CODE_GUESSES_PER_DAY + 3 }, () => reserveCodeGuess(db, owner)),
+    )
+    expect(verdicts.filter((v) => v.allowed)).toHaveLength(MAX_CODE_GUESSES_PER_DAY)
+  })
+
+  it('النافذة يوم كامل لا ربع ساعة', async () => {
+    const db = fakeDb()
+    for (let i = 0; i < MAX_CODE_GUESSES_PER_DAY; i += 1) await reserveCodeGuess(db, owner)
+    db.raw.prepare("UPDATE auth_attempts SET window_start = datetime('now', '-16 minutes')").run()
+    expect((await reserveCodeGuess(db, owner)).allowed).toBe(false)
+    db.raw.prepare("UPDATE auth_attempts SET window_start = datetime('now', '-25 hours')").run()
+    expect(await reserveCodeGuess(db, owner)).toEqual({ allowed: true, count: 1 })
+  })
+
+  it('الدخولُ الناجح يمحو عدَّ يومه', async () => {
+    const db = fakeDb()
+    await reserveCodeGuess(db, owner)
+    await releaseCodeGuesses(db, owner)
+    expect((await reserveCodeGuess(db, owner)).count).toBe(1)
   })
 })

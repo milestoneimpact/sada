@@ -161,9 +161,9 @@ describe('«النتائج» توصل (ر-7)', () => {
     expect(body).toContain('href="/panel/journey/p-lone">سجلُّه</a>')
     expect(body).toContain('href="/panel/channels/x">اعرض منشوراتها</a>')
     // ‏وبلا سقفِ ترويجٍ رابطٌ إلى حقله في الإعدادات، و«هذا الشهر» يفتح حدودَ الإنفاق
-    expect(body).toContain('href="/panel#c3">ضع سقف الترويج الأسبوعيّ</a>')
+    expect(body).toContain('href="/panel/settings#c3">ضع سقف الترويج الأسبوعيّ</a>')
     expect(body).toContain('هذا الشهر حتّى اليوم:')
-    expect(body).toContain('href="/panel#c2">')
+    expect(body).toContain('href="/panel/settings#c2">')
     expect(body).not.toMatch(/\d+ منشورا(?![ء-ي])/)
   })
 
@@ -173,6 +173,6 @@ describe('«النتائج» توصل (ر-7)', () => {
       headers: { Cookie: `${await login()}; sada_tz=Asia%2FRiyadh` },
     }, env)).text()
     expect(body).toContain('لا تقرير بعد')
-    expect(body).toMatch(/هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel#c2">\u20660\.390\$\u2069<\/a><\/div>/)
+    expect(body).toMatch(/هذا الشهر حتّى اليوم:\s*<a class="tap" href="\/panel\/settings#c2">\u20660\.390\$\u2069<\/a><\/div>/)
   })
 })

@@ -1276,7 +1276,7 @@ function spreadBar(input: DraftsInput): string {
    */
   return `<details class="card card-inset spread" id="spread">
     <summary>${statusBadge('ok', '●', `${ready} جاهزة للتوزيع`)}<span class="grow"></span><span class="btn btn-secondary btn-sm spread-go">وزّعها</span></summary>
-    <form id="spread-form" class="spread-form" method="POST" action="/panel/drafts/spread">
+    <form id="spread-form" class="spread-form" method="GET" action="/panel/drafts/spread">
       ${whenField('spread-form', input.zone ?? null, input.now, undefined, 'أوّل موعد')}
       <div class="row">
         <div class="field"><label for="sp-gap">بين كلّ اثنتين (ساعة)</label>

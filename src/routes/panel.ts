@@ -60,7 +60,7 @@ import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
-import { releaseAttempt, reserveAttempt } from '../lib/security/gate'
+import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess } from '../lib/security/gate'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { canReceiveCode, OWNER_EMAIL } from '../lib/ownerEmail'
 
@@ -115,6 +115,8 @@ import { listReports, readReport } from '../lib/report/weekly'
 import { decide as decidePromotion, openSuggestions } from '../lib/report/promote'
 import { reportScreen } from './ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from './ui/timelineView'
+import { insightsCsv, insightsScreen } from './ui/insightsView'
+import { readFacts, whatWorks } from '../lib/insights/whatWorks'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../lib/ganttStore'
 import { ownerRows, pendingCount, type OwnerFacts } from '../lib/owner'
@@ -421,6 +423,48 @@ function toPanelSource(row: SourceRow): PanelSource {
  * يحمّله، **فلا يُنزَّل غيرُ ما يُعرَض**. ولا مكتبةَ في المتصفّح: `CSV`
  * يُكتب في الخادم من الجدول نفسِه.
  */
+/**
+ * «ما ينجح» (D-253): أرجحُ موعدٍ وأفضلُ شكلٍ وطولٍ من تاريخ الحساب — **بلا نداءٍ مدفوع**، قراءةٌ لما قِيس.
+ * والمنصّةُ من `?p=` بقائمة سماح (ما له منشوراتٌ مقيسة)، فلا يُبنى استعلامٌ من نصٍّ مجهول.
+ */
+async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
+  const all = await readFacts(c.env.DB, org, null)
+  const platforms = [...new Set(all.map((f) => f.platform))]
+  const asked = new URL(c.req.url).searchParams.get('p')
+  const platform = asked !== null && platforms.includes(asked) ? asked : null
+  const facts = platform === null ? all : all.filter((f) => f.platform === platform)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  return { facts, platform, platforms, zone }
+}
+
+panel.get('/panel/insights', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const input = await insightsInput(c, activeOrg(session.record))
+  const body = insightsScreen({ ...input, works: whatWorks(input.facts, input.zone) })
+  return page((nonce) =>
+    soloPage(`صدى — ${sectionLabel('results')} · ما ينجح`, { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+      buildCommands({ onPanel: false }), soloNav('results')),
+  )
+})
+
+panel.get('/panel/insights.csv', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.redirect('/panel', 303)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const input = await insightsInput(c, activeOrg(session.record))
+  return new Response(insightsCsv(input.facts, input.zone), {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="sada-log${input.platform === null ? '' : `-${input.platform}`}.csv"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
+
 panel.get('/panel/pivot.csv', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.redirect('/panel', 303)
@@ -975,6 +1019,24 @@ panel.post('/panel/login', async (c) => {
 
   // ‏صاحبُ الرمز المالكُ اليوم: الرمزُ الوحيد المخزَّن رمزُه (`canReceiveCode`)
   const who = canReceiveCode(OWNER_EMAIL)!
+  // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم
+  if (!(await reserveCodeGuess(c.env.DB, who.email)).allowed) {
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked' }, c.req.raw)
+    const passkeys = await hasPasskeys(c.env)
+    return page(
+      (nonce) =>
+        loginPage(
+          {
+            error: 'الدخول بالرمز موقوف يوما بعد محاولات خاطئة كثيرة. ادخل بمفتاح المرور.',
+            blocked: true,
+            passkeys,
+            next,
+          },
+          nonce,
+        ),
+      429,
+    )
+  }
   const verdict = await verifyCode(c.env.KV, who.email, String(form.get('code') ?? ''))
   if (!verdict.ok) {
     const after = await recordFailure(c.env.KV, c.req.raw)
@@ -1029,6 +1091,7 @@ panel.post('/panel/login', async (c) => {
 
   await clearAttempts(c.env.KV, c.req.raw)
   await releaseAttempt(c.env.DB, c.req.raw)
+  await releaseCodeGuesses(c.env.DB, who.email)
   await record(
     c.env.DB,
     {
@@ -2788,34 +2851,50 @@ async function lackingOf(db: Env['DB'], drafts: readonly { id: string; platform:
  * ثانٍ يضغطه المالكُ بعد أن يرى**. ومسارٌ يفعل الاثنين يجعل زرَّ
  * «وزّع» يجدول عشرةَ منشوراتٍ بضغطةٍ واحدةٍ بلا أن يُقرأ جدول.
  */
-panel.post('/panel/drafts/spread', async (c) => {
-  const gate = await guardPost(c)
-  if ('denied' in gate) return gate.denied
-
-  const drafts = await listDrafts(c.env.DB, activeOrg(gate.session.record), BOARD)
-  const accounts = await listAccounts(c.env.DB, activeOrg(gate.session.record))
+/**
+ * ‏**والمعاينةُ بـ GET** (EASE-PLAN ب): كانت ردًّا على POST، فتحديثُ الصفحة يسأل «أعيد الإرسال؟». وهي لا تكتب شيئًا،
+ * فلا حارسَ CSRF يلزمها — الجلسةُ وحدها. والمسارُ القديمُ بـ POST باقٍ لمن حفظ النموذجَ القديم.
+ */
+async function spreadPreview(c: Context<{ Bindings: Env }>, form: FormData, csrf: string, org: ReturnType<typeof activeOrg>): Promise<Response> {
+  const drafts = await listDrafts(c.env.DB, org, BOARD)
+  const accounts = await listAccounts(c.env.DB, org)
   const targets = accounts
     .filter((a) => a.status === 'active' && !isLinkedInPage(a))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.displayName }))
 
   const now = new Date()
-  const gap = readGap(gate.form.get('gap'))
+  const gap = readGap(form.get('gap'))
   const lacking = await lackingOf(c.env.DB, drafts)
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const plan = planSpread(
     drafts.map((d) => ({ id: d.id, platform: d.platform, status: d.status, text: d.text, lacking: lacking.get(d.id) ?? null })),
     targets,
     // ‏وأوّلُ موعدٍ بتوقيت المالك من اللوحة (`local`، D-199)، أو `start` بـ UTC كما يُرسله شريطُ الشاشة
-    readStart(readWhen(gate.form, zone, now) || gate.form.get('start'), now),
+    readStart(readWhen(form, zone, now) || form.get('start'), now),
     gap,
     now,
   )
 
-  const start = plan.slots[0]?.when ?? String(gate.form.get('start') ?? '')
+  const start = plan.slots[0]?.when ?? String(form.get('start') ?? '')
   return page((nonce) =>
-    soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf: gate.session.record.csrf, zone }), nonce, '',
+    soloPage('صدى — توزيع المعتمَد', { href: '/panel', label: 'اللوحة' }, spreadScreen({ plan, start, gap, csrf, zone }), nonce, '',
       buildCommands({ onPanel: false }), soloNav('posts')),
   )
+}
+
+panel.post('/panel/drafts/spread', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  return spreadPreview(c, gate.form, gate.session.record.csrf, activeOrg(gate.session.record))
+})
+
+panel.get('/panel/drafts/spread', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const form = new FormData()
+  for (const [k, v] of new URL(c.req.url).searchParams) form.append(k, v)
+  return spreadPreview(c, form, session.record.csrf, activeOrg(session.record))
 })
 
 /**

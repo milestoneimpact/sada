@@ -599,13 +599,36 @@ function upcomingSection(d: PlatformScreenData): string {
 
 // ── ٥ · ما نُشر وما فشل ───────────────────────────────────────────────
 
+/** تفاعلُ المنشور في نافذة ‏24 ساعة — المقياسُ الذي يُقارَن به في «ما ينجح» (D-253). */
+function engagement24(rows: readonly PostMetricRow[]): number | null {
+  const m = rows.find((r) => r.window === '24h')
+  return m === undefined ? null : (m.reactions ?? 0) + (m.comments ?? 0) + (m.shares ?? 0)
+}
+
+/**
+ * **المنشورُ بجانب معتاد قناته** (GROWTH-PLAN م-٤): «أعلى من المعتاد بـ40٪» تقول ما لا يقوله الرقمُ وحده.
+ * والمعتادُ وسيطُ ما قِيس في الصفحة نفسِها؛ ولا مقارنةَ قبل ثلاثةٍ مقيسة، ولا يُقال فرقٌ دون ‏20٪.
+ */
+function versusUsual(d: PlatformScreenData, row: TimelineRow): string {
+  const mine = engagement24(d.metrics[row.id] ?? [])
+  const all = Object.values(d.metrics).map(engagement24).filter((x): x is number => x !== null).sort((a, b) => a - b)
+  if (mine === null || all.length < 3) return ''
+  const mid = Math.floor(all.length / 2)
+  const usual = all.length % 2 === 1 ? all[mid]! : (all[mid - 1]! + all[mid]!) / 2
+  if (usual <= 0) return ''
+  const r = mine / usual
+  if (r >= 1.2) return ` · <b>أعلى من المعتاد بـ${Math.round((r - 1) * 100)}٪</b>`
+  if (r <= 0.8) return ` · أقلّ من المعتاد بـ${Math.round((1 - r) * 100)}٪`
+  return ' · كالمعتاد'
+}
+
 function resultLine(d: PlatformScreenData, row: TimelineRow): string {
   if (d.needs?.measured !== true) return '<span class="ago">لا يُقاس لهذه المنصّة بعد</span>'
   const m = widest(d.metrics[row.id] ?? [])
   if (m === null) return '<span class="ago">لم يُقَس بعد — أوّل قياس بعد 24 ساعةً من النشر</span>'
   const v = (n: number | null): string => n === null ? '<span title="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
   return `<span class="np-result">نافذة ${escapeHtml(windowLabel(m.window))}:
-    تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}</span>`
+    تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}${versusUsual(d, row)}</span>`
 }
 
 function historyRow(d: PlatformScreenData, row: TimelineRow): string {
@@ -674,6 +697,9 @@ function historySection(d: PlatformScreenData): string {
     ? ''
     : `<a class="btn btn-secondary" href="${escapeHtml(href(id, d.filter === 'all' ? { before: d.history.next } : { filter: d.filter, before: d.history.next }, '#history'))}">أقدم</a>`
   return `<h3 class="sec" id="history">حتّى الآن · ما نُشر</h3>
+    ${d.needs?.measured === true
+      ? `<p class="hint">متى تنشر على ${escapeHtml(d.view.spec.label)} وبأيّ شكل؟ <a class="tap" href="/panel/insights?p=${escapeHtml(encodeURIComponent(id))}">ما ينجح على ${escapeHtml(d.view.spec.label)}</a></p>`
+      : ''}
     ${nav}
     ${parts.length === 0
       ? emptyState({
@@ -897,11 +923,13 @@ export function platformScreen(d: PlatformScreenData): string {
       <div class="aside"><div class="plat-logo lg">${logo}</div></div>
     </div>
     <div class="card">
-      <h2>لماذا لا يكفي أن يُضاف من اللوحة</h2>
-      <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
-        (<span class="mono">chat/completions</span>)، فسائق واحد يغطّي مَن لم يُخترَع بعد.
-        <b>والمنصّات الاجتماعيّة لا لهجة لها مشتركة</b> — فحقل «عنوان API» لا يكفيها،
-        <b>ولوحة تعرض حقلا يوهم بأنّه يكفي تكذب</b>.</p>
+      <h2>لماذا لا تُضاف من اللوحة</h2>
+      <p class="hint">لكلّ منصّةٍ طريقتُها في النشر، فتُبنى في صدى واحدةً واحدة.
+        <b>وحقلٌ في اللوحة يوهم بأنّه يكفي لا يكفي</b>، فلا نعرضه.</p>
+      <details class="setup mt-2"><summary>للمطوّر</summary>
+        <p class="hint">مزوّدو الذكاء يُضافون من اللوحة لأنّهم يتكلّمون لهجةً واحدة
+          (<span class="mono">chat/completions</span>)، فسائقٌ واحد يغطّيهم. والمنصّاتُ الاجتماعيّة لا لهجةَ لها مشتركة.</p>
+      </details>
       <div class="outcome warn"><span class="kv-k">ما ينقص</span>
         <span class="kv-v">${escapeHtml(spec.note)}</span></div>
     </div>`
@@ -931,6 +959,6 @@ export function platformScreen(d: PlatformScreenData): string {
   ${zoneNote}
   ${body}
   ${d.tab === 'posts' || d.tab === 'waiting'
-    ? '<p class="np-note">المعاينة ببنية المنصّة وخطّ صدى، لا لقطة منها. والنصّ مختصر هنا للتصفّح؛ والطيّ عند المنصّة لم يُقَس فلا يُرسم.</p>'
+    ? '<p class="np-note">المعاينة ببنية المنصّة وخطّ صدى، لا لقطة منها، والنصّ مختصر هنا للتصفّح.</p>'
     : ''}`
 }

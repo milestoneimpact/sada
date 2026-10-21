@@ -642,7 +642,7 @@ function todayList(d: PanelData): string {
     .join('')
   const more = d.today.more === 0 ? '' : `<p class="hint">و${d.today.more} غيرُها اليوم — في سجلّ الأمان.</p>`
   return `<div class="card"><h2>ما وقع اليوم</h2>
-      <p class="hint">يُروى ممّا قُرئ — ولا يُفتَح له استعلام</p>
+      <p class="hint">من سجلّ النشاط، منذ الثالثة فجرًا بتوقيت الرياض</p>
       ${rows === ''
         ? emptyState({ title: 'لم يقع شيء بعد', html: 'منذ الثالثة فجرًا بتوقيت الرياض.' })
         : `<ul class="todo">${rows}</ul>${more}`}</div>`
@@ -693,15 +693,13 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
  * و«المظهر» و«النظام» أوّلًا (D-221): السمةُ والكثافةُ وبطاقاتُ اللوح، ثمّ «هل الآلةُ تعمل؟» نُقلت من الرئيسيّة.
  */
 function settingsTabs(missing: number): string {
+  // ‏أربعةٌ لا ثمانية (EASE-PLAN ز): ما يُفتح كثيرًا تبويبٌ وحده، والنادرُ تحت «متقدّم».
+  // ‏والمراسي القديمة (#providers و#activity و#dev…) معرّفاتٌ داخل أقسامها، فتفتح قسمَها كما كانت
   return tabs('أقسام الإعدادات', [
     { label: 'المظهر', href: '#appearance', current: true },
-    { label: 'النظام', href: '#system' },
     { label: 'الإنفاق والحدود', href: '#limits' },
-    { label: 'خدمات الكتابة والصور', href: '#providers', ...(missing > 0 ? { count: missing, bad: true } : {}) },
-    { label: 'المنظّمات', href: '#orgs' },
-    { label: 'الأمان', href: '#security' },
-    { label: 'سجلّ النشاط', href: '#activity' },
-    { label: 'للمطوّر', href: '#dev' },
+    { label: 'الأمان', href: '#security-all' },
+    { label: 'متقدّم', href: '#advanced', ...(missing > 0 ? { count: missing, bad: true } : {}) },
   ], { id: 'settings-sub' })
 }
 
@@ -814,7 +812,8 @@ function headNew(): string {
 
 function fabNew(): string {
   const items = [
-    ['#idea', 'من فكرة'], ['#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['#plan-import', 'خطّة من ملفّ'],
+    // ‏بمسار «/panel» لا بمرساةٍ وحدها: الزرُّ في كلّ صفحة، و«#idea» في «المكتبة» لا هدفَ لها (EASE-PLAN أ-1)
+    ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
   return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
@@ -1230,10 +1229,6 @@ ${pivotPane(d.pivot)}
   </div>
   ${tilePicker(d)}
   </div>
-  <div data-sub id="system">
-  <p class="hint">هل يدور صدى في مواعيده. <b>والإيقاف المؤقّت في «الإنفاق والحدود»</b>.</p>
-  ${machineCard(d.pulses, d.now)}
-  </div>
   <div data-sub id="limits">
   <p class="hint">مفتاح الإيقاف وسقوف اليوم. <b>تُطبَّق قبل أيّ نداء مدفوع</b>، في اللوحة والنشر المجدول معًا.</p>
   ${/* الترتيب بالخطورة لا بتاريخ الكتابة (D-126): ما يوقف النظام أوّلًا، ثمّ ما
@@ -1341,51 +1336,22 @@ ${pivotPane(d.pivot)}
       d.slide.missing.length === 0
       ? '<div class="sub mt-3">مفتاح المتصفّح ومعرّف الحساب مضبوطان.'
         + ' وكلّ لقطة تُسجَّل في دفتر الكلفة كسائر النداءات المدفوعة.</div>'
-      : d.slide.missing.includes('key')
-        ? `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
-          <span class="mono">CF_BROWSER_TOKEN</span> غير مضبوط في أسرار Worker${
-            d.slide.missing.includes('account')
-              ? '، ومعه <span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّراته'
-              : ''}،
-          <b>فلا يقع نداء ولا كلفة</b> — وتخرج الصورة بلا عنوان مهما كان هذا المفتاح مرفوعا.
-          وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span>،
-          <b>وهي غير صلاحيّة Workers AI</b>. وتفصيلُه في «ما عليك».</span></div>`
-        : `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
-          مفتاح المتصفّح في أسرار Worker، و<span class="mono">CF_AI_ACCOUNT_ID</span> غير مضبوط
-          في متغيّراته — <b>واللقطة تُنادى على حساب بعينه</b>، فلا يقع نداء ولا كلفة،
-          وتخرج الصورة بلا عنوان. وتفصيلُه في «ما عليك».</span></div>`}
+      : `<div class="outcome warn"><span class="kv-k">ينقصك</span><span class="kv-v">
+          ${d.slide.missing.includes('key')
+            ? (d.slide.missing.includes('account') ? 'مفتاحُ المتصفّح ومعرّفُ الحساب' : 'مفتاحُ المتصفّح')
+            : 'معرّفُ الحساب'}،
+          <b>فلا يقع نداءٌ ولا كلفة</b>، وتخرج الصورة بلا عنوان. وخطواتُه في «ما عليك».</span></div>
+        <details class="setup mt-2"><summary>للمطوّر</summary>
+          <p class="hint">${d.slide.missing.includes('key')
+            ? '<span class="mono">CF_BROWSER_TOKEN</span> في أسرار Worker، وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span> لا صلاحيّة Workers AI. '
+            : ''}${d.slide.missing.includes('account') ? '<span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّرات Worker.' : ''}</p>
+        </details>`}
   </div>
 </div>
-<div data-sub id="providers">
-  <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، وكم أنفق. <b>وأسرار Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاح كاملا هنا.</p>
-  ${providerStrip}
-
-  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
-      <span class="st idle">القرار</span></div>
-    <p class="hint">أيّ مزوّد ونموذج ينفّذ كلّ مهمّة. <b>والنموذج يُختار من درج يُملأ من عندهم</b> —
-      اضغط «حدّث» بجانبه.</p>
-    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
-      <tbody>${routingRows}</tbody></table></div>
-    <div class="sub mt-3">والافتراض في الشيفرة يعمل حتّى تختار —
-      فنظام بجدول فارغ يعمل ولا ينتظر أن يُملأ.</div>
-  </div>
-
-  <div class="card mt-3">
-    <div class="card-head"><h2>المفاتيح المضبوطة</h2><div class="grow"></div>
-      <span class="st idle">${d.providers.length} مزوّدا</span></div>
-    <p class="hint"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
-      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
-      ولا يُعرض مفتاح كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
-    ${providerRows}
-  </div>
-
-  <div class="mt-3">${addCard}</div>
-</div>
-<div data-sub id="orgs">
-  ${orgsPane(d)}
-</div>
-<div data-sub id="security">
-  <p class="hint">العامل الثاني، والجلسات المفتوحة، وتدوير المفتاح السرّيّ للتطبيق. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
+<div data-sub id="security-all">
+<div id="security">
+  <h2>الدخول والأجهزة</h2>
+  <p class="hint">العامل الثاني، والأجهزة المفتوحة وإغلاقها. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
   <div class="card"><h2>الأجهزة المفتوحة</h2>
     <p class="hint">كلّ جلسة حيّة الآن. والجلسة 3 أيّام ثمّ تنتهي وحدها.</p>
     <p class="hint">بريد المالك <span class="mono" dir="ltr">${escapeHtml(OWNER_EMAIL)}</span> — ثابت في الشيفرة، لا يُعدَّل ولا يُحذف من اللوحة.</p>
@@ -1461,15 +1427,16 @@ ${pivotPane(d.pivot)}
   </div>
 
   <div class="card mt-3"><h2>إبطال كلّ الجلسات</h2>
-    <p class="hint m-0"><b>تدوير <span class="mono">ADMIN_TOKEN</span> يُبطل كلّ الجلسات فورا.</b>
-      فهو لم يعد كلمة تُكتب في الدخول، لكنّ كلّ جلسة مربوطة ببصمته وتُفحص في كلّ طلب — جلسة البريد ومفتاح المرور معا.
-      فإن شككت في تسرّب فبدّله
-      بـ <span class="mono">wrangler secret put ADMIN_TOKEN</span> — ولا حاجة إلى انتظار انتهاء الجلسات.</p>
+    <p class="hint m-0"><b>إن شككت في تسرّب فأغلق كلّ الجلسات الآن</b> من «الأجهزة المفتوحة» أعلاه،
+      وادخل ثانيةً بالبريد أو بمفتاح المرور. ولا حاجة إلى انتظار انتهاء الجلسات.</p>
+    <details class="setup mt-2"><summary>للمطوّر</summary>
+      <p class="hint">وتدويرُ <span class="mono">ADMIN_TOKEN</span> يُبطل كلَّ الجلسات على كلّ جهاز معًا، لأنّ كلّ جلسةٍ مربوطةٌ ببصمته:
+        <span class="mono">wrangler secret put ADMIN_TOKEN</span>.</p>
+    </details>
   </div>
 
 </div>
-<div data-sub id="dev">${devPane(d)}</div>
-<div data-sub id="activity">
+<div id="activity" class="mt-5">
   <div class="card"><h2>سجلّ النشاط</h2>
     <p class="hint">آخر ${d.audit.length} فعل مسجَّل. السجلّ يُكتب ولا يُعدَّل، ولا يُذكر فيه مفتاح قطّ.</p>
     ${d.audit.length === 0
@@ -1478,6 +1445,46 @@ ${pivotPane(d.pivot)}
           <thead><tr><th>متى</th><th>الفعل</th><th>على ماذا</th><th>العنوان</th></tr></thead>
           <tbody>${auditRows}</tbody></table></div>`}
   </div>
+</div>
+</div>
+<div data-sub id="advanced">
+  <p class="hint">ما يُفتح نادرًا: حالُ المهامّ الدوريّة، وخدماتُ الكتابة والصور، والمنظّمات، وما يحتاجه المطوّر.</p>
+<div id="system">
+  <h2>النظام</h2>
+  <p class="hint">هل يدور صدى في مواعيده. <b>والإيقاف المؤقّت في «الإنفاق والحدود»</b>.</p>
+  ${machineCard(d.pulses, d.now)}
+  </div>
+<div id="providers" class="mt-5">
+  <h2>خدمات الكتابة والصور</h2>
+  <p class="hint">أيّ نموذج ينفّذ كلّ مهمّة، وكم أنفق. <b>وأسرار Worker تغلب الخزانة دائما</b>، ولا يُعرض مفتاح كاملا هنا.</p>
+  ${providerStrip}
+
+  <div class="card"><div class="card-head"><h2>توجيه المهامّ</h2><div class="grow"></div>
+      <span class="st idle">القرار</span></div>
+    <p class="hint">أيّ مزوّد ونموذج ينفّذ كلّ مهمّة. <b>والنموذج يُختار من درج يُملأ من عندهم</b> —
+      اضغط «حدّث» بجانبه.</p>
+    <div class="scroll"><table><thead><tr><th>المهمّة</th><th>المزوّد والنموذج</th><th>الحال</th></tr></thead>
+      <tbody>${routingRows}</tbody></table></div>
+    <div class="sub mt-3">والافتراض في الشيفرة يعمل حتّى تختار —
+      فنظام بجدول فارغ يعمل ولا ينتظر أن يُملأ.</div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-head"><h2>المفاتيح المضبوطة</h2><div class="grow"></div>
+      <span class="st idle">${d.providers.length} مزوّدا</span></div>
+    <p class="hint"><b>أسرار Worker تغلب الخزانة دائما</b> — فمفتاحك الأساسيّ يبقى حيث لا تقرؤه هذه
+      الشيفرة ولا تعيده Cloudflare، والخزانة للتجريب والتبديل السريع.
+      ولا يُعرض مفتاح كاملا هنا ولا يُخزَّن مقروءا: أوّلُه وآخرُه فقط.</p>
+    ${providerRows}
+  </div>
+
+  <div class="mt-3">${addCard}</div>
+</div>
+<div id="orgs" class="mt-5">
+  <h2>المنظّمات</h2>
+  ${orgsPane(d)}
+</div>
+<details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
 </div>
 </section>
 

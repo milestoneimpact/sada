@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs'
 import type { Locator, Page } from 'playwright'
 import { Blocked, Meter } from './meter'
 import type { Stack } from './server'
-import { LOCAL_ADMIN_TOKEN } from './server'
+import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
+import { codeFrom } from '../../src/test/emailLogin'
 
 export interface Verdict {
   readonly success: boolean
@@ -102,11 +103,25 @@ function scheduleForm(page: Page, postId: string): Locator {
   return page.locator(`form[action="/panel/drafts/schedule"]:has(input[name="id"][value="${postId}"])`)
 }
 
-/** الدخولُ بكلمة الإدارة — تمهيدٌ لا يُعدّ إلّا في ر-11. */
-export async function login(page: Page, url: string): Promise<void> {
-  await page.goto(`${url}/panel`)
-  await page.locator('input[name="token"]').fill(LOCAL_ADMIN_TOKEN)
-  await page.locator('form button[type="submit"]').first().click()
+/** آخرُ رمز دخولٍ وصل «الصندوق» — يُقرأ من الرسالة كما يقرؤه المالك (D-245). */
+export function lastCode(stack: Pick<Stack, 'mail'>): string {
+  const last = stack.mail[stack.mail.length - 1]
+  return last === undefined ? '' : codeFrom(last)
+}
+
+/** الدخولُ برمز البريد — تمهيدٌ لا يُعدّ إلّا في ر-11. */
+export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail' | 'kv'>): Promise<void> {
+  if (!/\/panel/.test(page.url())) await page.goto(`${stack.url}/panel`)
+  // ‏ودخولٌ ثانٍ في الدقيقة نفسِها لا يُرسَل له رمز (D-245): يُمسح الفاصلُ كما يمسحه مساعدُ الاختبار
+  await stack.kv.delete(`logincode-gap:${OWNER_EMAIL}`)
+  await stack.kv.delete(`logincode-hour:${OWNER_EMAIL}`)
+  const sent = stack.mail.length
+  await page.locator('input[name="email"]').fill(OWNER_EMAIL)
+  await page.locator('form[action^="/panel/login/code"] button[type="submit"]').first().click()
+  await page.locator('input[name="code"]').waitFor()
+  if (stack.mail.length === sent) throw new Error('لم يصل رمزُ الدخول إلى الصندوق')
+  await page.locator('input[name="code"]').fill(lastCode(stack))
+  await page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first().click()
   await page.waitForLoadState('networkidle')
 }
 
@@ -142,10 +157,11 @@ const R0: Journey = {
     const id = stack.seeded.posts.draft
     // ‏من الرئيسيّة: محطّةُ «الاعتماد» في رحلة المنشور تقول «تنتظر قرارك» — وتنزل إلى البطاقة
     await m.tap(station(page, 'الاعتماد'), 'محطّة «الاعتماد» في الرئيسيّة')
-    await m.tap(button(draftForm(page, id), 'اعتمد'), '«اعتمد» على المسوّدة', { key: true })
+    // ‏والزرُّ الأوّلُ «اعتمد · غدًا 9:00 ص» يعتمد ويجدول بضغطة، و«اعتمد فقط» بعده
+    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة', { key: true })
     const row = status(stack, id)
     crlf(m, stack, id)
-    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `posts.status = ${row?.status ?? '—'}` }
+    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'}` }
   },
 }
 
@@ -203,11 +219,11 @@ const R2: Journey = {
     const fresh = all<{ id: string; status: string }>(stack, "SELECT id, status FROM posts WHERE status = 'draft'").filter((r) => !before.has(r.id))
     if (fresh.length === 0) return { success: false, verified: 'لم تُكتب مسوّدة' }
     const id = fresh[0]!.id
-    await m.tap(button(draftForm(page, id), 'اعتمد'), '«اعتمد» على المسوّدة الجديدة')
+    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة الجديدة')
     const row = status(stack, id)
     crlf(m, stack, id)
     const cost = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM cost_ledger WHERE operation LIKE 'draft:linkedin:%' AND at >= datetime('now', '-5 minutes')")?.n ?? 0
-    return { success: row?.status === 'approved' || row?.status === 'edited', verified: `مسوّدة جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
+    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `مسوّدة جديدة ${id.slice(0, 8)} · status = ${row?.status ?? '—'} · cost_ledger +${cost}` }
   },
 }
 
@@ -238,7 +254,8 @@ const R2stop: Journey = {
       const seen: { text: string; disabled: boolean }[] = await page.evaluate(({ top, bottom, marked }) => {
         const vh = window.innerHeight
         const goal = /اكتب|أنشئ|جديد|اعتمد/
-        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, button[type="submit"]'))
+        // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-233): يراه المالكُ زرًّا فيُعدّ زرًّا
+        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"]'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
             return r.height > 0 && r.top >= top && r.bottom <= vh - bottom && getComputedStyle(el).visibility !== 'hidden'
@@ -279,6 +296,10 @@ const R2stop: Journey = {
      * ‏منذ D-195 أوّلُ ما يوافق المقصدَ بابٌ لا فعل: «اكتب من فكرة» ينزل إلى نموذجها. فيمضي المالكُ
      * ‏فيما وصل إليه، يكتب فكرتَه ويضغط زرَّه — ولا يُحسَب نجاحًا إن ضغط «اعتمد» على مسوّدةٍ قديمة.
      */
+    // ‏والقائمةُ تُفتح فيختار منها بابَ مقصدِه: «من فكرة» أوّلُها
+    if ((await page.locator('details[open] > summary[data-journey-hit]').count()) > 0) {
+      await m.tap(link(page.locator('details[open]'), /من فكرة/), '«من فكرة» في القائمة')
+    }
     const idea = visible(page.locator('form[action="/panel/drafts/idea"]')).first()
     if ((await idea.count()) > 0) {
       await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمة لا تبطئ القرار، تحميه', 'كتابة الفكرة')
@@ -383,7 +404,11 @@ const R5: Journey = {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     // ‏رأسُ «المنشورات» فيه بابُ الخطّة باسمه — والمالكُ يضغطه ولا يمرّر إلى آخر اللوح بحثًا عنه
-    await m.tap(link(page, 'خطّة من ملفّ'), '«خطّة من ملفّ» في رأس «المنشورات»')
+    // ‏والأبوابُ الأربعة في قائمة «منشور جديد» (D-233): تُفتح ثمّ يُختار منها
+    if ((await link(page, 'خطّة من ملفّ').count()) === 0) {
+      await m.tap(visible(page.locator('[data-head-new], [data-tb-new], details.fab').locator('summary, button').filter({ hasText: 'منشور جديد' })).first(), '«منشور جديد»')
+    }
+    await m.tap(link(page, 'خطّة من ملفّ'), '«خطّة من ملفّ» في قائمة «منشور جديد»')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
     await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
@@ -518,8 +543,10 @@ const R11: Journey = {
   plan: { today: 'يُقاس', target: '2' },
   startLoggedOut: true,
   async run({ page, m, stack }) {
-    await m.type(page.locator('input[name="token"]'), LOCAL_ADMIN_TOKEN, 'لصق كلمة الإدارة', { pasted: true })
-    await m.tap(page.locator('form button[type="submit"]').first(), '«ادخل»', { key: true })
+    await m.type(page.locator('input[name="email"]'), OWNER_EMAIL, 'كتابة البريد', { pasted: true })
+    await m.tap(page.locator('form[action^="/panel/login/code"] button[type="submit"]').first(), '«أرسل الرمز»')
+    await m.type(page.locator('input[name="code"]'), lastCode(stack), 'لصق الرمز من البريد', { pasted: true })
+    await m.tap(page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first(), '«ادخل»', { key: true })
     const landed = new URL(page.url())
     m.note(`بعد الدخول: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
     const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')

@@ -34,7 +34,7 @@ function ipOf(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? 'unknown'
 }
 
-async function bump(db: Db, bucket: string): Promise<number | null> {
+async function bump(db: Db, bucket: string, window = WINDOW): Promise<number | null> {
   try {
     const row = await db
       .prepare(
@@ -45,7 +45,7 @@ async function bump(db: Db, bucket: string): Promise<number | null> {
                                THEN datetime('now') ELSE window_start END
          RETURNING n`,
       )
-      .bind(bucket, WINDOW, WINDOW)
+      .bind(bucket, window, window)
       .first<{ n: number }>()
     return row?.n ?? null
   } catch (error) {
@@ -68,6 +68,31 @@ async function both(
 /** يحجز محاولةَ تحقّقٍ (كلمة، رمزُ تطبيق، رمزُ استرداد، توقيعُ مفتاح). */
 export function reserveAttempt(db: Db, request: Request): Promise<Reservation> {
   return both(db, `ip:${ipOf(request)}`, 'global', [MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS])
+}
+
+/**
+ * سقفُ التخمين على رمز البريد في اليوم (D-247) — **للباب لا للعنوان**.
+ *
+ * حدُّ العنوان وحدُّ الجميع يُعدّان بربع الساعة: ثلاثون تخمينًا فيه، ومئةٌ وعشرون
+ * في الساعة، والمهاجمُ يطلب للمالك رمزًا جديدًا متى شاء. فاحتمالُ إصابة ستّة أرقامٍ
+ * يقارب ‏8٪ في الشهر. وهنا عشرُ محاولاتٍ في اليوم على الرمز كلِّه، فلا يزيد على ‏0.4٪
+ * في السنة. والثمنُ: من يخطئ عشرًا يُغلق بابَ الرمز يومًا، **ويبقى مفتاحُ المرور**.
+ */
+export const MAX_CODE_GUESSES_PER_DAY = 10
+
+export async function reserveCodeGuess(db: Db, email: string): Promise<Reservation> {
+  const n = await bump(db, `code:${email}`, '-24 hours')
+  if (n === null) return { allowed: true, count: 0 }
+  return { allowed: n <= MAX_CODE_GUESSES_PER_DAY, count: n }
+}
+
+/** الدخولُ بالرمز يمحو عدَّ يومه: المالكُ الذي أخطأ مرّةً ثمّ أصاب لا يحمل خطأه. */
+export async function releaseCodeGuesses(db: Db, email: string): Promise<void> {
+  try {
+    await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`code:${email}`).run()
+  } catch (error) {
+    console.warn({ job: 'gate', failed: String(error) })
+  }
 }
 
 /** يحجز إصدارَ تحدٍّ لمجهول — قبل أن يُكتب في KV. */
