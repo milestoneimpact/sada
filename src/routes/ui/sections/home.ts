@@ -19,6 +19,8 @@ import { localParts } from '../../../lib/time/zone'
 import { LOGOS } from '../logos'
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
+import { dayBars } from '../chart'
+import { total } from '../../../lib/home'
 
 const TILE_MARK: Readonly<Record<PlatformTile['tone'], string>> = { ok: '●', bad: '▲', warn: '◍', idle: '○' }
 
@@ -106,6 +108,50 @@ function focusOf(trip: readonly JourneyStep[], step: JourneyStep['key'] | undefi
   return failed >= 0 ? failed : trip.findIndex(live)
 }
 
+/** التحيّةُ بساعة المالك لا بساعة الخادم (D-265). */
+export function greeting(now: Date, zone: string | null): string {
+  const h = localParts(now, zone).hour
+  return h >= 4 && h < 12 ? 'صباح الخير' : h >= 12 && h < 17 ? 'نهارك سعيد' : 'مساء الخير'
+}
+
+/** أربعةُ أرقامٍ من العدّ المجمَّع نفسِه — لا رقمَ يُخترَع. */
+function stats(f: HomeFacts): string {
+  const failed = Object.values(f.counts.perPlatform).reduce((n, p) => n + (p.recentFailed ?? p.failed), 0)
+  const cells: readonly [string, number, string, string][] = [
+    ['بانتظار قرارك', total(f.counts, 'draft'), '#posts', 'wait'],
+    ['مجدولة', total(f.counts, 'queued'), '#posts', 'sched'],
+    ['نُشرت هذا الأسبوع', f.counts.publishedWeek, '#results', 'ok'],
+    ['فشلت هذا الأسبوع', failed, '#posts', failed > 0 ? 'bad' : 'idle'],
+  ]
+  return `<ul class="hstats">${cells.map(([k, n, href, tone]) =>
+    `<li data-tone="${tone}"><a href="${escapeHtml(href)}"><span class="hs-k">${escapeHtml(k)}</span>
+      <b class="hs-n num">${n}</b></a></li>`).join('')}</ul>`
+}
+
+/** ما كُتب في أربعة عشر يومًا بتوقيت المالك — من المنشورات المرسومة وحدها. */
+function activity(f: HomeFacts, now: Date): string {
+  const key = (d: Date): string => { const p = localParts(d, f.zone); return `${p.year}-${p.month}-${p.day}` }
+  const by = new Map<string, number>()
+  for (const at of f.written ?? []) {
+    const d = parseSqliteUtc(at)
+    if (d !== null) by.set(key(d), (by.get(key(d)) ?? 0) + 1)
+  }
+  const rows = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(now.getTime() - (13 - i) * 86_400_000)
+    const p = localParts(d, f.zone)
+    return { label: i === 13 ? 'اليوم' : `${p.day}/${p.month}`, value: by.get(key(d)) ?? 0 }
+  })
+  return `<div class="card home-card">
+    <div class="card-head"><h2>ما كُتب في أسبوعين</h2><div class="grow"></div>
+      <span class="ago">من آخر ستّين منشورًا</span></div>
+    ${dayBars(rows, {
+      title: 'لا منشورات في أسبوعين',
+      html: 'اكتب فكرة في جملة، وصدى يحوّلها مسوّدة لكلّ قناة.',
+      action: '<a class="btn btn-primary btn-sm" href="/panel#idea">اكتب فكرة</a>',
+    })}
+  </div>`
+}
+
 export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
@@ -114,10 +160,11 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
   const linked = built.filter((c) => platformTile(c, now).tone === 'ok').length
   return `<div class="card card-alert next" data-tone="${next.tone}">
-    <div class="next-body"><span class="next-k">خطوتُك التالية</span>
+    <div class="next-body"><p class="hello">${greeting(now, f.zone)}</p><span class="next-k">خطوتُك التالية</span>
       <p class="next-t">${escapeHtml(next.text)}</p></div>
     <a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>
   </div>
+  ${stats(f)}
   ${kpis}
 
   <div class="home-pair">
@@ -127,6 +174,7 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
       <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
     </div>
     <div class="home-side">
+    ${activity(f, now)}
     ${week(f.scheduled ?? [], now, f.zone)}
   <div class="card home-card">
     <div class="card-head"><h2>المنصّات</h2><div class="grow"></div>

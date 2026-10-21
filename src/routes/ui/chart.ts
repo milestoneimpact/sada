@@ -192,3 +192,51 @@ export function historyBars(
   </div>`
 }
 
+
+/**
+ * أعمدةُ الأيّام (D-265) — **عددٌ حقيقيٌّ لكلّ يوم، والزمنُ بترتيبه**.
+ *
+ * رسمٌ من الخادم بـ SVG بلا سكربت: العمودُ ينمو بـ CSS (ويقف مع تقليل الحركة)،
+ * وقيمتُه في `<title>` للتمرير، والخلاصةُ سطرٌ مكتوبٌ تحته (فاللمسُ لا يمرّر)، **وجدولٌ مخفيٌّ لقارئ الشاشة**.
+ * ومجموعٌ صفرٌ لا يُرسَم أعمدةً مسطّحة: يُقال إنّه لا شيء بعد، برسمٍ صغير.
+ */
+export function dayBars(
+  rows: readonly { readonly label: string; readonly value: number }[],
+  empty: { readonly title: string; readonly html: string; readonly action?: string },
+): string {
+  const total = rows.reduce((n, r) => n + r.value, 0)
+  if (total === 0) {
+    return emptyState({ title: empty.title, html: empty.html, icon: EMPTY_DRAFTS, ...(empty.action === undefined ? {} : { action: empty.action }) })
+  }
+  const max = Math.max(...rows.map((r) => r.value))
+  const w = 28, gap = 12, top = 22, h = 120
+  const width = rows.length * (w + gap) - gap
+  const bars = rows.map((r, i) => {
+    const bh = r.value === 0 ? 2 : Math.max(6, Math.round((r.value / max) * h))
+    const x = width - (i + 1) * (w + gap) + gap // ‏الأقدمُ يمينًا: يُقرأ الزمنُ من اليمين
+    const y = top + h - bh
+    return `<g class="db-bar${r.value === 0 ? ' zero' : ''}" style="--i:${i}"><title>${escapeHtml(`${r.label}: ${r.value}`)}</title>
+      <rect x="${x}" y="${y}" width="${w}" height="${bh}" rx="6"></rect>
+</g>`
+  }).join('')
+  const peak = rows.reduce((a, b) => (b.value > a.value ? b : a))
+  const summary = `${rows.length} يومًا، والمجموع ${total}، وأعلاها ${peak.label} بـ${peak.value}`
+  return `<figure class="chart daybars">
+    <svg class="db-svg" viewBox="0 0 ${width} ${top + h + 2}" role="img" aria-label="${escapeHtml(summary)}" preserveAspectRatio="none">
+      <line class="db-base" x1="0" y1="${top + h + 1}" x2="${width}" y2="${top + h + 1}"></line>${bars}</svg>
+    <figcaption class="db-axis" aria-hidden="true"><span>${escapeHtml(rows[0]!.label)}</span><span>${escapeHtml(rows[rows.length - 1]!.label)}</span></figcaption>
+    <p class="hint">${escapeHtml(summary)}</p>
+    <div class="vh"><table><caption>${escapeHtml(summary)}</caption><tbody>${rows.map((r) =>
+      `<tr><th scope="row">${escapeHtml(r.label)}</th><td>${r.value}</td></tr>`).join('')}</tbody></table></div>
+  </figure>`
+}
+
+/** رسمُ «لا شيء بعد» من الطبقة البصريّة (Visuals): ورقةٌ وسطورٌ وزائد. */
+const EMPTY_DRAFTS = `<svg width="120" height="88" viewBox="0 0 180 130" aria-hidden="true">
+  <rect class="ill-wash" x="30" y="30" width="120" height="84" rx="12"></rect>
+  <rect class="ill-line" x="44" y="46" width="70" height="8" rx="4"></rect>
+  <rect class="ill-soft" x="44" y="62" width="92" height="8" rx="4"></rect>
+  <rect class="ill-soft" x="44" y="78" width="56" height="8" rx="4"></rect>
+  <circle class="ill-brand" cx="146" cy="30" r="18"></circle>
+  <path class="ill-plus" d="M146 22v16M138 30h16" stroke-width="3" stroke-linecap="round"></path>
+  <circle class="ill-dot" cx="22" cy="100" r="6"></circle></svg>`
