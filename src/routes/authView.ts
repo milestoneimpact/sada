@@ -88,7 +88,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
     : `${d.hasPasskey ? '<div class="or">أو</div>' : ''}
        <form method="POST" action="/panel/2fa/totp">
          ${hidden}
-         <div class="field"><label for="code">رمز التطبيق</label>
+         <div class="field"><label for="code">الرقم من تطبيق المصادقة</label>
            <input id="code" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
                   pattern="[0-9 ]{6,8}" maxlength="8" required
                   ${d.hasPasskey ? '' : 'autofocus'}></div>
@@ -118,7 +118,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
     'صدى — العامل الثاني',
     `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
       <h1>خطوة أخيرة</h1>
-      <p class="lede">أثبتّ بريدك. وبقي ما يثبت أنّك أنت.</p>
+      <p class="lede">${escapeHtml(d.hasPasskey && d.hasTotp ? 'ادخل بمفتاح المرور على هذا الجهاز، أو اكتب الرقم من تطبيق المصادقة.' : d.hasPasskey ? 'ادخل بمفتاح المرور على هذا الجهاز — بصمة الوجه أو الإصبع.' : 'افتح تطبيق المصادقة على هاتفك، واكتب الرقم الظاهر فيه.')}</p>
       ${note}${nothing}
       <div class="card">${passkey}${totp}</div>
       ${recovery}

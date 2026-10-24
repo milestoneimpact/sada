@@ -4,6 +4,7 @@
  * المرحلة صفر: الصحة والجاهزية، وربط الحسابات عبر OAuth.
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
+import { accessGuard } from './routes/access'
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
 import { authorizeAdmin } from './lib/adminAuth'
@@ -363,6 +364,8 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 
 // **والخطُّ قبل الجميع**: تطلبه صفحةُ الدخول نفسُها، فحارسٌ يردّه يُخرج
 // شاشةَ دخولٍ بخطٍّ بديل — ولا جلسةَ بعدُ ليُحرَس بها (D-099)
+// ‏حارسُ الأدوار قبل كلّ مسار (D-272): المدعوّ يُفحَص دورُه وشركتُه، والمالكُ يمرّ ويُكتب بريدُه في التدقيق
+app.use('*', accessGuard)
 app.route('/', assets)
 app.route('/', fonts)
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة

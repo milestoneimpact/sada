@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildTextMail, encodeSubject } from './mime'
-import { canReceiveCode, isOwnerEmail, OWNER_EMAIL } from '../ownerEmail'
+import { isOwnerEmail, OWNER_EMAIL } from '../ownerEmail'
 
 describe('رسالة MIME بلا مكتبة (D-245)', () => {
   const raw = buildTextMail({ from: 'noreply@basserh.com', to: OWNER_EMAIL, subject: 'رمز الدخول', text: 'الرمز: 123456' })
@@ -26,7 +26,5 @@ describe('بريد المالك ثابت', () => {
   it('يُقارَن بلا حساسيّة للحروف والمسافات', () => {
     expect(isOwnerEmail('  MilestonesImpact@Gmail.com ')).toBe(true)
     expect(isOwnerEmail('someone@gmail.com')).toBe(false)
-    expect(canReceiveCode('MILESTONESIMPACT@gmail.com')).toEqual({ email: OWNER_EMAIL, role: 'owner' })
-    expect(canReceiveCode('x@basserh.com')).toBeNull()
   })
 })

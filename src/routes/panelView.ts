@@ -10,6 +10,7 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
@@ -64,6 +65,7 @@ import { emptyState } from './ui/components/empty'
 import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, OWNER_ORG, type OrgRow } from '../lib/tenancy'
 
 import { OWNER_EMAIL } from '../lib/ownerEmail'
+import type { Role } from '../lib/ownerEmail'
 
 export { escapeHtml, injectCsrf, shell }
 
@@ -82,6 +84,8 @@ export interface LoginState {
    * وبلا قيمةٍ فالرئيسيّة.
    */
   readonly next?: string
+  /** البريدُ الذي طُلب له الرمز (D-272) — يُحمل في خطوة الرمز فيُعرف صاحبُه، مالكًا كان أو مدعوًّا. */
+  readonly email?: string
   /**
    * الخطوة (D-245): `email` يطلب العنوان، و`code` يطلب الرمزَ بعد «أُرسل إن كان العنوانُ للمالك».
    */
@@ -190,6 +194,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
   const form = step === 'code'
     ? `<form method="POST" action="${escapeHtml(action)}">
           <input type="hidden" name="next" id="login-next" value="${escapeHtml(next)}">
+          ${state.email === undefined || state.email === '' ? '' : `<input type="hidden" name="email" value="${escapeHtml(state.email)}">`}
           <div class="field"><label for="c">رمز الدخول</label>
             <input id="c" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
                    pattern="[0-9 ]{6,8}" maxlength="8" required autofocus${disabled}></div>
@@ -303,6 +308,8 @@ export interface PanelFlash {
 }
 
 export interface PanelData {
+  /** دورُ صاحب الطلب (D-272) — والغائبُ المالك. يحجب أقسامَ الإعدادات التي للمالك وحده. */
+  readonly role?: Role
   /** البيئةُ كما يعرفها Worker — تُطبَع في العلامة (D-151) */
   readonly env: 'staging' | 'production'
   readonly paused: boolean
@@ -480,6 +487,7 @@ export interface PanelAudit {
   readonly target: string | null
   readonly detail: string | null
   readonly ip: string | null
+  readonly byEmail?: string | null
 }
 
 /**
@@ -518,7 +526,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const themes = s.themes.slice(0, 5).map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')
   const body = s.summary === null
     ? ''
-    : `<div class="sub">${escapeHtml(s.summary)}</div>` +
+    : `<div class="sub clamp2">${escapeHtml(s.summary)}</div>` +
       (s.reason === null ? '' : `<div class="sub">— ${escapeHtml(s.reason)}</div>`) +
       (themes === '' ? '' : `<div class="mt-1">${themes}</div>`)
 
@@ -542,8 +550,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${fileName(s.name)}</div>
-        <div class="mono">${escapeHtml(s.driveFileId)}</div>${body}</td>
+    <td><div class="nm">${fileName(s.name)}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
@@ -696,14 +703,18 @@ function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write
  * أسماءُ أقسامها**: `#settings` يفتح الأوّل، و`#limits` و`#providers` و`#security` أقسامَها.
  * و«المظهر» و«النظام» أوّلًا (D-221): السمةُ والكثافةُ وبطاقاتُ اللوح، ثمّ «هل الآلةُ تعمل؟» نُقلت من الرئيسيّة.
  */
-function settingsTabs(missing: number): string {
+function settingsTabs(missing: number, owner: boolean): string {
   // ‏أربعةٌ لا ثمانية (EASE-PLAN ز): ما يُفتح كثيرًا تبويبٌ وحده، والنادرُ تحت «متقدّم».
   // ‏والمراسي القديمة (#providers و#activity و#dev…) معرّفاتٌ داخل أقسامها، فتفتح قسمَها كما كانت
+  // ‏ولغير المالك (D-272) المظهرُ والحدودُ وحدهما: «الأمان» (الأجهزةُ والمفاتيحُ وسجلُّ التدقيق) و«متقدّم»
+  // ‏(خدماتُ الكتابة ومفاتيحُها والمنظّمات) للمالك وحده — والحارسُ يردّ أفعالَها، وهنا لا تُرسَم قراءتُها أصلًا
   return tabs('أقسام الإعدادات', [
     { label: 'المظهر', href: '#appearance', current: true },
     { label: 'الإنفاق والحدود', href: '#limits' },
-    { label: 'الأمان', href: '#security-all' },
-    { label: 'متقدّم', href: '#advanced', ...(missing > 0 ? { count: missing, bad: true } : {}) },
+    ...(owner ? [
+      { label: 'الأمان', href: '#security-all' },
+      { label: 'متقدّم', href: '#advanced', ...(missing > 0 ? { count: missing, bad: true } : {}) },
+    ] : []),
   ], { id: 'settings-sub' })
 }
 
@@ -819,7 +830,7 @@ function fabNew(): string {
     // ‏بمسار «/panel» لا بمرساةٍ وحدها: الزرُّ في كلّ صفحة، و«#idea» في «المكتبة» لا هدفَ لها (EASE-PLAN أ-1)
     ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
-  return `<details class="fab"><summary>${ICON.add}<span>منشور جديد</span></summary>
+  return `<details class="fab"><summary>${ICON.add}<span class="vh">منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
 }
 
@@ -901,6 +912,8 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
    * ‏**والحبّةُ من النبض لا من مفتاح الإيقاف وحده**، ورابطٌ إلى بطاقة الآلة: كانت
    * ‏«يعمل» خضراءَ والإرسالُ متوقّفٌ منذ ثلاثة أيّام، والجوابُ على بُعد ثلاث شاشات
    */
+  // ‏المالكُ وحدَه يرى أقسامَ الإعدادات التي للمالك (D-272)؛ والجلسةُ القديمةُ بلا دورٍ للمالك
+  const ownerView = (d.role ?? 'owner') === 'owner'
   const pill = systemPill(d.paused, d.pulses)
   const state = `<a class="pill ${pill.tone}" href="${panelHref('machine')}"
     aria-label="${escapeHtml(`حال النظام: ${pill.text} — افتح «هل الآلة تعمل؟»`)}"><i class="led"></i>${escapeHtml(pill.text)}</a>`
@@ -916,19 +929,19 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
         action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
            <button class="btn btn-primary" type="submit">مسح Drive الآن</button></form>`,
       })
-    : `<div class="row mb-3">
-         <div class="field"><label for="flt">التصفية</label>
-           <select id="flt"><option value="all">الكلّ</option>
-             <option value="pending">ما ينتظر تحليلا</option>
-             <option value="analyzed">المحلَّل</option></select></div>
-         <div class="field"><label for="srt">الفرز</label>
-           <select id="srt"><option value="seen">الأحدث مسحا</option>
-             <option value="worth">الأعلى استحقاقا</option>
-             <option value="name">الاسم</option></select></div>
-         <div class="grow"></div>
-         <div class="tile ta-end">
-           <span class="note">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</span></div>
-       </div>
+    : `${filterBar([
+         { kind: 'seg', label: 'أيّ الملفّات', name: 'src-show', options: [
+           { label: 'الكلّ', value: 'all', current: true },
+           { label: 'ينتظر', value: 'pending', current: false },
+           { label: 'محلَّل', value: 'analyzed', current: false },
+         ] },
+         { kind: 'pick', label: 'رتّب:', name: 'src-sort', options: [
+           { label: 'الأحدث', value: 'seen', current: true },
+           { label: 'الأهمّ', value: 'worth', current: false },
+           { label: 'الاسم', value: 'name', current: false },
+         ] },
+       ], 'فلتر الملفّات')}
+       <p class="note m-0 mb-3">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</p>
        <div class="scroll"><table>
          <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th><span class="vh">الإجراء</span></th></tr></thead>
          <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
@@ -1224,7 +1237,7 @@ ${pivotPane(d.pivot)}
 
 <section data-pane="settings" hidden>
   ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوف الإنفاق تُطبَّق قبل أيّ نداء مدفوع</b>، والمفاتيح لا تُعرض كاملة، والدخول بعاملين.')}
-  ${settingsTabs(missing)}
+  ${settingsTabs(missing, ownerView)}
   <div data-sub id="appearance">
   <p class="hint">كيف تبدو اللوحة لك. <b>والسمة والكثافة تُحفظان في هذا المتصفّح وحده</b>، وبطاقات اللوح في حسابك.</p>
   <div class="card"><h2>السمة والكثافة</h2>
@@ -1379,7 +1392,7 @@ ${pivotPane(d.pivot)}
         </details>`}
   </div>
 </div>
-<div data-sub id="security-all">
+${ownerView ? `<div data-sub id="security-all">
 <div id="security">
   <h2>الدخول والأجهزة</h2>
   <p class="hint">العامل الثاني، والأجهزة المفتوحة وإغلاقها. <b>والأذونات مشفّرة في القاعدة</b>، ومفتاحُها في أسرار Worker وحدها.</p>
@@ -1512,11 +1525,12 @@ ${pivotPane(d.pivot)}
   <div class="mt-3">${addCard}</div>
 </div>
 <div id="orgs" class="mt-5">
-  <h2>المنظّمات</h2>
+  <div class="split"><h2>المنظّمات</h2><div class="row gap-2"><a class="btn btn-secondary btn-sm" href="/panel/portfolio">المحفظة</a><a class="btn btn-secondary btn-sm" href="/panel/team">الفريقُ والصلاحيّات</a></div></div>
   ${orgsPane(d)}
 </div>
 <details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
 </div>
+` : ''}
 </section>
 
 

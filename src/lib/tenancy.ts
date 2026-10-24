@@ -9,6 +9,7 @@
  * الخادم، ولا يُقبَل معرّفٌ لا يوجد في `orgs`.
  */
 import { atomically, type Db } from './tokens'
+import { orgAllowed, whoNow } from './access'
 
 /** منظّمةُ المالك الأوّل — القيمةُ الافتراضيّةُ لكلّ عمود `org_id` (0031). */
 export const OWNER_ORG = 'org_owner'
@@ -37,14 +38,17 @@ export function activeOrg(record: { readonly org?: string }): string {
 
 const asKind = (v: unknown): OrgKind => (ORG_KINDS as readonly unknown[]).includes(v) ? (v as OrgKind) : 'individual'
 
-/** كلُّ المنظّمات بترتيب إنشائها — **للمشغّل وحده**. */
+/** المنظّماتُ بترتيب إنشائها — **كلُّها للمالك، وشركاتُ المدعوّ وحدَها له** (D-272). */
 export async function listOrgs(db: Db): Promise<OrgRow[]> {
   const { results } = await db
     .prepare(`SELECT o.id, o.name, o.kind,
                 (SELECT COUNT(*) FROM brands b WHERE b.org_id = o.id) AS brands
               FROM orgs o ORDER BY o.created_at, o.id`)
     .all<{ id: string; name: string; kind: string; brands: number }>()
-  return results.map((r) => ({ id: r.id, name: r.name, kind: asKind(r.kind), brands: Number(r.brands) }))
+  const who = whoNow()
+  return results
+    .filter((r) => who === undefined || orgAllowed(who, r.id))
+    .map((r) => ({ id: r.id, name: r.name, kind: asKind(r.kind), brands: Number(r.brands) }))
 }
 
 export async function orgExists(db: Db, id: string): Promise<boolean> {

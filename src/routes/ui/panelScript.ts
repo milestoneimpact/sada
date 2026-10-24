@@ -535,29 +535,34 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       f.name.focus();
     });
   });
-  var q=document.getElementById('flt'), s=document.getElementById('srt'),
-      tb=document.getElementById('src-body');
+  // ‏شريطُ الفلتر الواحد (UX-AUDIT-4 · أ): زرٌّ بقيمةٍ في مجموعته، والمختارُ «مضغوط»، وفي القائمة يكتب اسمَه على زرّها ويغلقها
+  function picked(name,dflt){var b=document.querySelector('[data-filter="'+name+'"][aria-pressed="true"]');return b?b.value:dflt;}
+  document.querySelectorAll('.fbar button[data-filter]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('[data-filter="'+btn.dataset.filter+'"]').forEach(function(o){o.setAttribute('aria-pressed',o===btn?'true':'false');});
+      var d=btn.closest('details');
+      if(d){var lb=d.querySelector('summary b'); if(lb)lb.textContent=btn.textContent.trim(); d.open=false;}
+      apply();
+    });
+  });
+  var tb=document.getElementById('src-body');
   function apply(){
     if(!tb)return;
     var rows=Array.prototype.slice.call(tb.querySelectorAll('tr'));
-    var mode=q?q.value:'all';
+    var mode=picked('src-show','all');
     rows.forEach(function(r){
       r.hidden = mode==='pending' ? r.dataset.pending!=='1'
               : mode==='analyzed' ? r.dataset.pending==='1' : false;
     });
-    if(s){
-      var k=s.value;
-      rows.sort(function(a,b){
-        if(k==='worth')return (+b.dataset.worth)-(+a.dataset.worth);
-        if(k==='name')return a.dataset.name.localeCompare(b.dataset.name,'ar');
-        return (+b.dataset.seen)-(+a.dataset.seen);
-      }).forEach(function(r){tb.appendChild(r);});
-    }
+    var k=picked('src-sort','seen');
+    rows.sort(function(a,b){
+      if(k==='worth')return (+b.dataset.worth)-(+a.dataset.worth);
+      if(k==='name')return a.dataset.name.localeCompare(b.dataset.name,'ar');
+      return (+b.dataset.seen)-(+a.dataset.seen);
+    }).forEach(function(r){tb.appendChild(r);});
     var vis=rows.filter(function(r){return !r.hidden;}).length;
     var n=document.getElementById('shown'); if(n)n.textContent=vis;
   }
-  if(q)q.addEventListener('change',apply);
-  if(s)s.addEventListener('change',apply);
   apply();
 
   // ══ مسرحُ القرار (D-100) ══════════════════════════════

@@ -273,10 +273,52 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 .flow-n{display:inline-grid; place-items:center; width:var(--icon-md); height:var(--icon-md); border-radius:var(--r-pill); background:var(--surface-2); flex:none}
 .flow li[data-state="now"] .flow-n{background:var(--focus); color:var(--surface)}
 @media${below('md')}{.flow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* ── شريطُ الفلتر الواحد والرقمُ باتّجاهه (UX-AUDIT-4 · أ) ─────────────
+   سطرٌ واحدٌ يلتفّ: مقطّعٌ للخيارات القليلة، وزرُّ قائمةٍ للطويلة، وشعاراتٌ للمنصّات. */
+.fbar{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); margin-block:var(--s-3) var(--s-4)}
+.fb-seg{display:inline-flex; padding:var(--s-0); gap:var(--s-0); background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-control)}
+.fb-opt{display:inline-flex; align-items:center; min-height:var(--tap); padding:0 var(--s-3); border:0; background:transparent; border-radius:var(--r-control);
+  font:inherit; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); text-decoration:none; cursor:pointer;
+  transition:background var(--dur-2) var(--ease), color var(--dur-2) var(--ease)}
+.fb-opt[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:var(--sh-1)}
+@media(hover:hover){.fb-opt:hover{color:var(--ink)}}
+.fb-logos{display:inline-flex; flex-wrap:wrap; gap:var(--s-1)}
+.fb-logo{display:inline-grid; place-items:center; width:var(--tap); height:var(--tap); border:var(--bd-soft); border-radius:var(--r-control);
+  background:var(--surface); color:var(--ink-2); opacity:.55; transition:opacity var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
+.fb-logo svg{width:var(--icon-md); height:var(--icon-md)}
+.fb-logo[aria-pressed="true"]{opacity:1; border-color:var(--ink-2); box-shadow:var(--sh-1)}
+@media(hover:hover){.fb-logo:hover{opacity:1}}
+.fb-btn{display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); padding:0 var(--s-3); border:var(--bd-soft);
+  border-radius:var(--r-control); background:var(--surface); font-size:var(--t-small); line-height:var(--lh-small); cursor:pointer}
+.fb-k{color:var(--ink-2)}
+.fb-btn .menu-caret svg{width:var(--icon-sm); height:var(--icon-sm)}
+.kpi{margin:0; padding:var(--s-4); display:flex; flex-direction:column; gap:var(--s-1)}
+.kpi-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-weight:600}
+.kpi-v{font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink)}
+.kpi-d{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+.kpi-d[data-tone="good"]{color:var(--ok)}
+.kpi-d[data-tone="bad"]{color:var(--bad)}
+.kpi-d[data-tone="flat"]{color:var(--ink-2); font-weight:400}
+.kpi-n{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.clamp2{display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.oc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr)); gap:var(--s-3)}
+.oc{margin:0; padding:var(--s-4); display:flex; flex-direction:column; gap:var(--s-3)}
+.oc[aria-current="true"]{border-color:var(--ink-2)}
+.oc-h{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+.oc-ch{margin-inline-start:auto; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.oc-fs{display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-4)}
+.oc-f{display:inline-flex; align-items:baseline; gap:var(--s-1); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.oc-f b{font-size:var(--t-h3); line-height:var(--lh-h3); color:var(--ink)}
+.oc-f[data-tone="warn"] b{color:var(--warn)}
+.oc-f[data-tone="bad"] b{color:var(--bad)}
+.oc-quiet{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.kpis{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--s-3); margin-bottom:var(--s-4)}
+@media${below('md')}{.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){
   .pb-card,.pb-col{transition:none}
   .pb-card.landed{animation:none}
   .pb-ghost{transform:none}
   .flow li{transition:none}
+  .fb-opt,.fb-logo{transition:none}
 }
 `

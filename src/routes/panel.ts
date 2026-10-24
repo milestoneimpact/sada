@@ -62,7 +62,11 @@ import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../li
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess, reserveCodeIssue } from '../lib/security/gate'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
-import { canReceiveCode, OWNER_EMAIL } from '../lib/ownerEmail'
+import { normalizeEmail, OWNER_EMAIL } from '../lib/ownerEmail'
+import { inviteMember, listMembers, revokeMember, ROLE_LABEL, whoCanReceive, type MemberRole } from '../lib/team'
+import { teamScreen } from './ui/teamView'
+import { PERIODS, portfolio, previousWindow, type Period } from '../lib/portfolio'
+import { portfolioScreen } from './ui/portfolioView'
 
 /** من قرّر — بطريق الدخول (D-245): `panel:token` للجلسات القديمة وحدَها. */
 function deciderOf(via: string): string {
@@ -563,6 +567,79 @@ panel.post('/panel/client/report/send', async (c) => {
   return c.redirect(`/panel/client/report?month=${month}`, 303)
 })
 
+/** **المحفظة** (D-273): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
+panel.get('/panel/portfolio', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const days = Number(c.req.query('days'))
+  const p = c.req.query('p') ?? ''
+  const orgs = await listOrgs(c.env.DB)
+  const wanted = c.req.query('org') ?? ''
+  const filter = {
+    period: (PERIODS as readonly number[]).includes(days) ? (days as Period) : 30,
+    platform: (PLATFORM_IDS as readonly string[]).includes(p) ? p : null,
+    org: orgs.some((o) => o.id === wanted) ? wanted : null,
+  }
+  const now = new Date()
+  const [rows, before] = await Promise.all([portfolio(c.env.DB, filter, now), portfolio(c.env.DB, filter, previousWindow(now, filter.period))])
+  const body = portfolioScreen(rows, orgs, filter, activeOrg(session.record), before)
+  return page((nonce) =>
+    soloPage('صدى — المحفظة', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('overview')),
+  )
+})
+
+// ── الفريق (D-272) ─────────────────────────────────────────────────
+
+panel.get('/panel/team', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const body = teamScreen({ members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
+  return page((nonce) =>
+    soloPage('صدى — الفريق', { href: '/panel/settings', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('settings')),
+  )
+})
+
+/**
+ * **الدعوة** — بريدٌ ودورٌ وشركات. والرسالةُ إلى المدعوّ تقول كيف يدخل؛ وقبل التحقّق من بريده عند Cloudflare (M-33) يُقال
+ * السببُ ولا يُدّعى الإرسال، **والدعوةُ قائمةٌ** يدخل بها متى وصل الرمز.
+ */
+panel.post('/panel/team/invite', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const result = await inviteMember(c.env.DB, {
+    email: String(f.get('email') ?? ''), role: String(f.get('role') ?? ''),
+    orgs: f.get('all') === '1' ? '*' : f.getAll('org').map(String), by: gate.session.record.email ?? OWNER_EMAIL,
+  })
+  if (!result.ok) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: result.reason })
+    return c.redirect('/panel/team#invite', 303)
+  }
+  const sent = await sendText(c.env.EMAIL, result.email, 'دعوة إلى صدى',
+    `دُعيت إلى صدى بدور «${ROLE_LABEL[String(f.get('role')) as MemberRole].name}».\n\n` +
+    `ادخل من ${c.env.PUBLIC_BASE_URL}/panel واكتب بريدك هذا، فيصلك رمزٌ من ستّة أرقام.\n` +
+    'لا كلمةَ مرورٍ تُحفظ، ولا يدخل أحدٌ بلا الرمز.')
+  await record(c.env.DB, { actor: 'panel', action: 'team.invite', target: result.email, detail: `${String(f.get('role'))}${sent.sent ? '' : ` · لم تُرسَل: ${sent.reason}`}` }, c.req.raw)
+  await setFlash(c.env, c.req.raw, sent.sent
+    ? { kind: 'ok', text: `دُعي ${result.email} ووصلته رسالةُ الدعوة.` }
+    : { kind: 'warn', text: `دُعي ${result.email}، ولم تُرسَل الرسالة: ${sent.reason}. يدخل متى تحقّق من بريده عند Cloudflare (M-33).` })
+  return c.redirect('/panel/team', 303)
+})
+
+panel.post('/panel/team/revoke', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const email = String(gate.form.get('email') ?? '')
+  const done = await revokeMember(c.env.DB, email)
+  await record(c.env.DB, { actor: 'panel', action: 'team.revoke', target: email, detail: done ? 'revoked' : 'not_found' }, c.req.raw)
+  await setFlash(c.env, c.req.raw, done ? { kind: 'ok', text: `أُلغي دخولُ ${email}، وتسقط جلستُه في طلبه التالي.` } : { kind: 'bad', text: 'لا عضوَ بهذا البريد.' })
+  return c.redirect('/panel/team', 303)
+})
+
 panel.get('/panel/insights', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -885,6 +962,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
       draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
       zone: ownZone,
+      role: session.record.role ?? 'owner',
       autoEnqueue: allowance.settings.autoEnqueue,
       autoImage: allowance.settings.autoImage,
       imageCap: allowance.settings.dailyImageCap,
@@ -1105,7 +1183,9 @@ panel.post('/panel/login/code', async (c) => {
     )
   }
 
-  const who = canReceiveCode(String(form.get('email') ?? ''))
+  // ‏المالكُ أو مدعوٌّ قائم (D-272) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
+  const typed = normalizeEmail(String(form.get('email') ?? ''))
+  const who = await whoCanReceive(c.env.DB, typed)
   if (who !== null) {
     const issued = await issueCode(c.env.KV, who.email)
     if (issued.ok) {
@@ -1128,7 +1208,7 @@ panel.post('/panel/login/code', async (c) => {
       await record(c.env.DB, { actor: 'anonymous', action: 'login.code.capped', detail: issued.reason }, c.req.raw)
     }
   }
-  return page((nonce) => loginPage({ step: 'code', next }, nonce), 200)
+  return page((nonce) => loginPage({ step: 'code', next, email: typed }, nonce), 200)
 })
 
 /**
@@ -1165,8 +1245,10 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
-  // ‏صاحبُ الرمز المالكُ اليوم: الرمزُ الوحيد المخزَّن رمزُه (`canReceiveCode`)
-  const who = canReceiveCode(OWNER_EMAIL)!
+  // ‏صاحبُ الرمز من خطوة البريد (D-272): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
+  // ‏كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**، فلا يكشف الفرقُ أيَّ العناوين مدعوّ
+  const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
+  const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }
   // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم
   if (!(await reserveCodeGuess(c.env.DB, who.email)).allowed) {
     await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked' }, c.req.raw)
@@ -1214,12 +1296,19 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
+  // ‏ورمزٌ صحيحٌ لدعوةٍ أُلغيت بين الطلب والإدخال لا يفتح شيئًا
+  if ((await whoCanReceive(c.env.DB, who.email)) === null) {
+    return page((nonce) => loginPage({ error: 'الرمز غير صحيح أو انتهت مهلته. اطلب رمزًا جديدًا.', step: 'code', next }, nonce), 401)
+  }
+
   // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
   // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
-  const result = await createEmailSession(c.env.KV, c.env.ADMIN_TOKEN, who, c.req.raw, {
-    pending: factors.enforced,
+  // ‏العاملُ الثاني عاملُ المالك (مفاتيحُه ورمزُ تطبيقه)، فلا يُطلب من المدعوّ ما لا يملكه
+  const pending = factors.enforced && who.role === 'owner'
+  const result = await createEmailSession(c.env.KV, c.env.ADMIN_TOKEN, { email: who.email, role: who.role }, c.req.raw, {
+    pending,
     next,
   })
   if ('error' in result) {
@@ -1244,8 +1333,8 @@ panel.post('/panel/login', async (c) => {
     c.env.DB,
     {
       actor: 'panel',
-      action: factors.enforced ? 'session.pending' : 'session.open',
-      detail: factors.enforced ? 'ينتظر العامل الثاني' : 'برمز البريد',
+      action: pending ? 'session.pending' : 'session.open',
+      detail: pending ? 'ينتظر العامل الثاني' : `برمز البريد · ${who.email}`,
     },
     c.req.raw,
   )
@@ -1253,7 +1342,7 @@ panel.post('/panel/login', async (c) => {
     status: 303,
     headers: {
       // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createEmailSession`)، لا في العنوان
-      Location: factors.enforced ? '/panel/2fa' : next,
+      Location: pending ? '/panel/2fa' : next,
       'Set-Cookie': sessionCookie(result.id),
     },
   })
