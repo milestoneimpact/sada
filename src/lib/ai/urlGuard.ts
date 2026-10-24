@@ -11,6 +11,7 @@
  * بابا إلى الداخل.
  */
 
+import { withTimeout } from '../net/timeout'
 export type UrlVerdict =
   | { readonly ok: true; readonly url: string; readonly host: string }
   | { readonly ok: false; readonly reason: string }
@@ -133,7 +134,7 @@ export async function guardedFetch(
     }
 
     // ‏`manual` يجعل الردَّ يعود بالتحويل بدل أن يُتبَع من تحتنا
-    const res = await fetchImpl(verdict.url, { ...init, redirect: 'manual' })
+    const res = await withTimeout(fetchImpl, 30_000)(verdict.url, { ...init, redirect: 'manual' })
     if (res.status < 300 || res.status > 399) return res
 
     const next = res.headers.get('location')

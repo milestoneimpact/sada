@@ -34,6 +34,19 @@ function classify(status: number): boolean {
   return status === 429 || status >= 500
 }
 
+/**
+ * **نداءُ الإنشاء لا يُعاد على 5xx** (D-269).
+ *
+ * `429` تعني أنّ شيئا لم يُنشَأ، فتُعاد. أمّا `5xx` من نهاية الإنشاء نفسِها
+ * فقد تعود **بعد أن أُنشئ المنشور** — وقد وقع على X — فإعادتُها تنشر
+ * المنشورَ مرّتين وتُحاسِب مرّتين. فتُردّ نهائيّةً بسببٍ يقول «لم يُؤكَّد»،
+ * والمالكُ يتحقّق على المنصّة ثمّ يضغط «أعده» إن لم يجده.
+ * والرفعُ يبقى على `classify`: صورةٌ تُرفَع مرّتين تكلّف ولا تُكرّر منشورا.
+ */
+function classifyCreate(status: number): boolean {
+  return status === 429
+}
+
 async function errorCode(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as {
@@ -94,9 +107,9 @@ export async function publishLinkedIn(
   })
   if (!response.ok) {
     throw new PublishError(
-      `linkedin: رفض النشر (${await errorCode(response)})`,
+      `linkedin: ${response.status >= 500 ? 'unconfirmed_send' : 'رفض النشر'} (${await errorCode(response)})`,
       response.status,
-      classify(response.status),
+      classifyCreate(response.status),
     )
   }
   // LinkedIn يعيد المعرف في ترويسة، لا في الجسم
@@ -122,9 +135,9 @@ export async function publishX(
   })
   if (!response.ok) {
     throw new PublishError(
-      `x: رفض النشر (${await errorCode(response)})`,
+      `x: ${response.status >= 500 ? 'unconfirmed_send' : 'رفض النشر'} (${await errorCode(response)})`,
       response.status,
-      classify(response.status),
+      classifyCreate(response.status),
     )
   }
   const body = (await response.json()) as { data?: { id?: unknown } }

@@ -11,8 +11,9 @@ import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { saveApp } from '../lib/oauth/apps'
 import { PHASE_0_SECRETS } from '../env'
-import { COOKIE } from '../lib/session'
+import { COOKIE, createEmailSession } from '../lib/session'
 import { refusedBody } from './ui/oauthResult'
+import { emailLogin } from '../test/emailLogin'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const realFetch = globalThis.fetch
@@ -42,6 +43,23 @@ beforeEach(() => {
   }
 })
 
+/** مسارات الإدارة تُختبَر بلا `ADMIN_TOKEN` (مغلقةٌ افتراضا)، فالرمزُ يُضاف حيث تلزم جلسة وحدها. */
+const ADMIN_TOKEN = 'admin-token-for-oauth-tests-0123456789'
+
+/** جلسةٌ كاملة: البدءُ لا يُقبل بلا كعكتها (D-269). */
+async function login(): Promise<string> {
+  env['ADMIN_TOKEN'] = ADMIN_TOKEN
+  const response = await emailLogin(app, env)
+  expect(response.status).toBe(303)
+  return (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
+}
+
+/** طلبُ بدءٍ بجلسة — كما يرسله متصفّحُ المالك من اللوحة. */
+async function start(path: string, extra: Record<string, unknown> = {}): Promise<Response> {
+  const cookie = await login()
+  return await app.request(path, { headers: { Cookie: cookie } }, { ...env, ...extra })
+}
+
 afterEach(() => {
   globalThis.fetch = realFetch
 })
@@ -54,11 +72,7 @@ async function startAndCaptureState(
   state: string
   location: URL
 }> {
-  const response = await app.request(
-    `/oauth/${platform}/start${scope === undefined ? '' : `?scope=${scope}`}`,
-    {},
-    env,
-  )
+  const response = await start(`/oauth/${platform}/start${scope === undefined ? '' : `?scope=${scope}`}`)
   expect(response.status).toBe(302)
   const location = new URL(response.headers.get('location') ?? '')
   return { state: location.searchParams.get('state') ?? '', location }
@@ -111,6 +125,27 @@ describe('GET /oauth/:platform/start', () => {
     expect(first.state).not.toBe(second.state)
   })
 
+  /*
+   * ‏**لا بدءَ بلا جلسة** (D-269): البدءُ المفتوح كان يسمح لغريبٍ يعرف العنوانَ أن
+   * ‏يوافق بحسابه هو فيُحفَظ تحت منظّمة المالك. فبلا كعكةٍ: إلى الدخول، ولا حالةَ تُكتب.
+   */
+  it('بلا جلسة يحوّل إلى الدخول ولا يكتب حالةً في KV', async () => {
+    const response = await app.request('/oauth/x/start', {}, env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('/panel/login?next=%2Fpanel%2Fchannels%2Fx')
+    expect((await kv.list?.({ prefix: 'oauth' }))?.keys ?? []).toHaveLength(0)
+  })
+
+  it('وجلسةٌ تنتظر العامل الثاني لا تكفي', async () => {
+    env['ADMIN_TOKEN'] = ADMIN_TOKEN
+    const made = await createEmailSession(kv, ADMIN_TOKEN, { email: 'o@x.test', role: 'owner' }, undefined, { pending: true })
+    expect('id' in made).toBe(true)
+    const cookie = `${COOKIE}=${'id' in made ? made.id : ''}`
+    const response = await app.request('/oauth/x/start', { headers: { Cookie: cookie } }, env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location') ?? '').toContain('/panel/login')
+  })
+
   it('يرد 404 لمنصة غير معروفة', async () => {
     const response = await app.request('/oauth/facebook/start', {}, env)
     expect(response.status).toBe(404)
@@ -124,7 +159,7 @@ describe('GET /oauth/:platform/start', () => {
    * يسقط بعد ساعةٍ بلا ما يجدّده — فيُثبَّت المعاملان هنا.
    */
   it('يطلب من Google إذن تجديد صراحةً — وإلّا سقط الربط بعد ساعة', async () => {
-    const response = await app.request('/oauth/youtube/start', {}, env)
+    const response = await start('/oauth/youtube/start')
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location') ?? '')
     expect(`${location.origin}${location.pathname}`).toBe(YOUTUBE.authorizeUrl)
@@ -137,7 +172,7 @@ describe('GET /oauth/:platform/start', () => {
    * المعياريَّ يُردّ بخطأٍ لا يذكر السبب — فيُثبَّت الاسمُ لا يُترك.
    */
   it('يسمّي معرّف TikTok client_key لا client_id', async () => {
-    const response = await app.request('/oauth/tiktok/start', {}, env)
+    const response = await start('/oauth/tiktok/start')
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location') ?? '')
     expect(`${location.origin}${location.pathname}`).toBe(TIKTOK.authorizeUrl)
@@ -150,21 +185,23 @@ describe('GET /oauth/:platform/start', () => {
    * ‏فالتحويلُ إلى حقلَي التطبيق في تبويب الإعداد، ووميضٌ يقول لماذا.
    */
   it('حين ينقص سرّ يعود إلى تبويب الإعداد بوميض يقول لماذا، ولا يذكر قيمة', async () => {
-    const response = await app.request('/oauth/x/start', { headers: { Cookie: `${COOKIE}=s1` } },
+    const cookie = await login()
+    const sid = cookie.split('=')[1]!
+    const response = await app.request('/oauth/x/start', { headers: { Cookie: cookie } },
       { ...env, X_CLIENT_SECRET: '' })
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toBe('/panel/channels/x?tab=setup')
     expect(response.headers.get('content-type') ?? '').not.toContain('json')
     const body = await response.text()
     expect(body).not.toContain('x-secret')
-    const flash = JSON.parse(String(await kv.get('flash:s1'))) as { kind: string; text: string }
+    const flash = JSON.parse(String(await kv.get(`flash:${sid}`))) as { kind: string; text: string }
     expect(flash.kind).toBe('warn')
     expect(flash.text).toContain('«اربط X»')
     expect(flash.text).not.toContain('x-id')
   })
 
   it('وInstagram بلا سرّين كذلك — لا 503 ولا JSON', async () => {
-    const response = await app.request('/oauth/instagram/start', {}, env)
+    const response = await start('/oauth/instagram/start')
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toBe('/panel/channels/instagram?tab=setup')
   })
@@ -376,7 +413,8 @@ describe('GET /oauth/:platform/callback', () => {
       [X.tokenUrl]: { status: 400, json: { error: 'invalid_grant' } },
     })
     await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
-    expect(kv.size()).toBe(0)
+    // ‏ما بقي في KV جلسةُ المالك ورمزُ دخوله، لا حالةُ OAuth
+    expect((await kv.list?.({ prefix: 'oauth' }))?.keys ?? []).toHaveLength(0)
   })
 
   /*

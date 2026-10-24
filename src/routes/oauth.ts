@@ -126,15 +126,32 @@ function scopeModeOf(raw: string | undefined): ScopeMode {
   return raw === 'identity' ? 'identity' : 'full'
 }
 
-/** منظّمةُ من بدأ الربط؛ وبلا جلسةٍ (نداءُ طرفيّة) فالمالك (D-229). */
-async function startingOrg(env: Env, request: Request): Promise<string> {
+/**
+ * **لا بدءَ ربطٍ بلا جلسةٍ كاملة** (D-269).
+ *
+ * كان البدءُ مفتوحا، والمنظّمةُ تسقط إلى المالك حين لا كعكة (D-229) —
+ * فمَن عرف العنوانَ العامّ يبدأ دورةً ويوافق **بحسابه هو** على المنصّة،
+ * فيُحفَظ حسابُه ورموزُه تحت منظّمة المالك ويظهر في لوحته. ولا يُعرَف
+ * من هنا من يملك الحساب: المنصّةُ تعيد ما وافق عليه المتصفّحُ الذي فتح الرابط.
+ *
+ * والعودةُ (`callback`) تبقى بلا جلسة بالضرورة: كعكةُ `SameSite=Strict`
+ * لا تعبر التحويلَ من المنصّة. **وحارسُها حالتُها**: صفُّ `state` لا يُكتب
+ * إلّا هنا، بعد الجلسة، فمَن لا يملك جلسةً لا يملك حالةً تُقبَل عند العودة.
+ */
+async function startingOrg(env: Env, request: Request): Promise<string | null> {
   const session = await loadSession(env.KV, request, env.ADMIN_TOKEN)
-  return session === null ? OWNER_ORG : activeOrg(session.record)
+  if (session === null || session.record.pending) return null
+  return activeOrg(session.record)
 }
 
 oauth.get('/oauth/:platform/start', async (c) => {
   const platform = platformOf(c.req.param('platform'))
   if (platform === null) return c.json({ error: 'unknown_platform' }, 404)
+
+  const org = await startingOrg(c.env, c.req.raw)
+  if (org === null) {
+    return c.redirect(`/panel/login?next=${encodeURIComponent(`/panel/channels/${platform}`)}`, 303)
+  }
 
   const provider = PROVIDERS[platform]
   const mode = scopeModeOf(c.req.query('scope'))
@@ -163,7 +180,7 @@ oauth.get('/oauth/:platform/start', async (c) => {
     // ما طُلب في **هذه** الدورة يُحفظ معها: صفحةُ التشخيص تعرضه، وما
     // يُسجَّل في القاعدة يُبنى عليه — والحارسُ يقرأ من القاعدة
     scopes: scopes.join(' '),
-    org: await startingOrg(c.env, c.req.raw),
+    org,
   })
 
   const url = new URL(provider.authorizeUrl)

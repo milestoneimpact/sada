@@ -9,6 +9,7 @@
  * ساعة. لا مكتبة: Web Crypto يكفي، وإضافة اعتمادية إلى Worker ثمنها حجم.
  */
 
+import { withTimeout } from '../net/timeout'
 export class DriveError extends Error {
   override readonly name = 'DriveError'
   constructor(
@@ -88,7 +89,7 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
 export async function accessToken(
   sa: ServiceAccount,
   now: Date = new Date(),
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 30_000),
 ): Promise<string> {
   const iat = Math.floor(now.getTime() / 1000)
   const header = b64url(encoder.encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' })))
@@ -176,7 +177,7 @@ function hashOf(file: RawFile): string {
 export async function listFolder(
   token: string,
   folderId: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 30_000),
   maxPages = 20,
 ): Promise<DriveFile[]> {
   const files: DriveFile[] = []

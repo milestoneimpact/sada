@@ -1,4 +1,4 @@
-/** الفريقُ من الدعوة إلى الإلغاء (D-270): المالكُ يدعو، والمحرّرُ يدخل برمزه، ودورُه وشركتُه يُفحصان على الخادم. */
+/** الفريقُ من الدعوة إلى الإلغاء (D-271): المالكُ يدعو، والمحرّرُ يدخل برمزه، ودورُه وشركتُه يُفحصان على الخادم. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { codeFrom, emailLogin, fakeMailer, type FakeMailer } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
@@ -39,7 +39,7 @@ async function memberLogin(email: string): Promise<Response> {
   return app.request('/panel/login', { method: 'POST', body }, env)
 }
 
-describe('الفريق (D-270)', () => {
+describe('الفريق (D-271)', () => {
   it('المالكُ يدعو محرّرًا لشركةٍ واحدة، فيدخل برمزه ويُقصَر على دوره وشركته، ثمّ يُلغى فتسقط جلستُه', async () => {
     const owner = cookieOf(await emailLogin(app, env))
     expect((await app.request('/panel/team', { headers: { Cookie: owner } }, env)).status).toBe(200)
@@ -79,7 +79,7 @@ describe('الفريق (D-270)', () => {
     expect(after.status).not.toBe(200)
   })
 
-  it('المديرُ يقرأ الإعدادات بلا «الأمان» ولا «متقدّم»: لا أجهزةَ ولا مفاتيحَ ولا سجلَّ تدقيق (D-270)', async () => {
+  it('المديرُ يقرأ الإعدادات بلا «الأمان» ولا «متقدّم»: لا أجهزةَ ولا مفاتيحَ ولا سجلَّ تدقيق (D-271)', async () => {
     const owner = cookieOf(await emailLogin(app, env))
     const ownerCsrf = await csrfOf(owner, '/panel/team')
     await post('/panel/team/invite', owner, { _csrf: ownerCsrf, email: 'admin@example.com', role: 'admin', all: '1' })

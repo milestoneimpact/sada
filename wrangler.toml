@@ -47,11 +47,11 @@ LEGAL_CONTACT = ""
 [env.staging.triggers]
 # دورتان لا واحدة (D-037):
 #   */15 — تُرسل ما حلّ موعدُه إلى طابور النشر
-#   0 3  — تمسح Drive مرّةً في اليوم
+#   3 3  — تمسح Drive مرّةً في اليوم (لا عند الصفر: هناك تلتقي مع */15 فيدور التجديدُ مرّتين — D-269)
 # ودورةٌ يوميّةٌ وحدها كانت تعني أنّ منشورا موعدُه التاسعة صباحا لا يخرج
 # قبل الثالثة فجرا بعده — تأخيرٌ يبلغ اثنتين وعشرين ساعة، و«نُشرت في
 # مواعيدها» لا تصحّ معه.
-crons = ["*/15 * * * *", "7 * * * *", "0 3 * * *", "14 4 * * 1"]
+crons = ["*/15 * * * *", "7 * * * *", "3 3 * * *", "14 4 * * 1"]
 
 [[env.staging.d1_databases]]
 binding = "DB"
@@ -71,7 +71,7 @@ bucket_name = "sada-media-staging"
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
 # ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
-# ‏بلا `destination_address` (D-270): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
+# ‏بلا `destination_address` (D-271): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
 # ‏والشيفرةُ لا ترسل إلّا لهم (`whoCanReceive`)، وCloudflare يردّ ما لم يُتحقَّق منه.
 [[env.staging.send_email]]
 name = "EMAIL"
@@ -90,6 +90,15 @@ queue = "sada-generate-staging"
 
 # المستهلك: دفعة صغيرة ومحاولات محدودة. المفتاح يمنع التكرار، لكن كل
 # محاولة على X تُحاسَب — فلا تُترك المحاولات مفتوحة.
+# ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
+# ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
+[[env.staging.queues.consumers]]
+queue = "sada-generate-staging"
+max_batch_size = 1
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "sada-generate-dlq-staging"
+
 [[env.staging.queues.consumers]]
 queue = "sada-publish-staging"
 # ‏رسالةٌ واحدةٌ لكلّ استدعاء (D-182): حاويةُ Instagram تُستطلَع حتّى خمس دقائق، ودفعةٌ
@@ -118,11 +127,11 @@ LEGAL_CONTACT = ""
 [env.production.triggers]
 # دورتان لا واحدة (D-037):
 #   */15 — تُرسل ما حلّ موعدُه إلى طابور النشر
-#   0 3  — تمسح Drive مرّةً في اليوم
+#   3 3  — تمسح Drive مرّةً في اليوم (لا عند الصفر: هناك تلتقي مع */15 فيدور التجديدُ مرّتين — D-269)
 # ودورةٌ يوميّةٌ وحدها كانت تعني أنّ منشورا موعدُه التاسعة صباحا لا يخرج
 # قبل الثالثة فجرا بعده — تأخيرٌ يبلغ اثنتين وعشرين ساعة، و«نُشرت في
 # مواعيدها» لا تصحّ معه.
-crons = ["*/15 * * * *", "7 * * * *", "0 3 * * *", "14 4 * * 1"]
+crons = ["*/15 * * * *", "7 * * * *", "3 3 * * *", "14 4 * * 1"]
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -142,7 +151,7 @@ bucket_name = "sada-media"
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
 # ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
-# ‏بلا `destination_address` (D-270): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
+# ‏بلا `destination_address` (D-271): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
 # ‏والشيفرةُ لا ترسل إلّا لهم (`whoCanReceive`)، وCloudflare يردّ ما لم يُتحقَّق منه.
 [[env.production.send_email]]
 name = "EMAIL"
@@ -158,6 +167,15 @@ queue = "sada-publish"
 [[env.production.queues.producers]]
 binding = "GENERATE_QUEUE"
 queue = "sada-generate"
+
+# ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
+# ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
+[[env.production.queues.consumers]]
+queue = "sada-generate"
+max_batch_size = 1
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "sada-generate-dlq"
 
 [[env.production.queues.consumers]]
 queue = "sada-publish"

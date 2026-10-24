@@ -63,7 +63,7 @@ export async function record(
         capped(entry.detail),
         header(request, 'CF-Connecting-IP', 45),
         header(request, 'User-Agent', 160),
-        // ‏من فعل (D-270): بريدُ صاحب الطلب، و`NULL` خارج طلبٍ مُصادَق (المهامُّ المجدولة) أو للمالك قبل الفريق
+        // ‏من فعل (D-271): بريدُ صاحب الطلب، و`NULL` خارج طلبٍ مُصادَق (المهامُّ المجدولة) أو للمالك قبل الفريق
         whoNow()?.email ?? null,
       )
       .run()
@@ -79,7 +79,7 @@ export interface AuditRow {
   readonly target: string | null
   readonly detail: string | null
   readonly ip: string | null
-  /** من فعل (D-270) — بريدُه، و`null` قبل الفريق أو خارج طلبٍ مُصادَق. */
+  /** من فعل (D-271) — بريدُه، و`null` قبل الفريق أو خارج طلبٍ مُصادَق. */
   readonly byEmail?: string | null
 }
 

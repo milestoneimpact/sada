@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, unschedule,
+  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, unmarkDispatched, unschedule,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -479,5 +479,50 @@ describe('منصّات المقطع وInstagram تحتاج وسيطها', () => 
     const post = await seedPost({ platform: 'x' })
     const account = await seedAccount({ platform: 'x' })
     expect((await schedulePost(db, post, account, SOON, NOW)).ok).toBe(true)
+  })
+})
+
+
+/*
+ * ‏**الختمُ ذرّيّ** (D-269): دورتان تلتقيان لا تختمان الصفَّ نفسَه مرّتين، وما سقط
+ * ‏إرسالُه إلى الطابور يُرفَع ختمُه فتجده الدورةُ التالية.
+ */
+describe('الختم الذرّيّ (D-269)', () => {
+  it('يعيد ما ختمه هو وحده — والثانية تجد لا شيء', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    expect(await markDispatched(db, [post], NOW)).toEqual([{ id: post, org: 'org_owner' }])
+    expect(await markDispatched(db, [post], NOW)).toEqual([])
+  })
+
+  it('ولا يختم ما ليس في الطابور', async () => {
+    const post = await seedPost()
+    expect(await markDispatched(db, [post], NOW)).toEqual([])
+    expect((await readPost(post))?.['dispatched_at']).toBeNull()
+  })
+
+  it('حين يرمي الطابور يُرفَع الختم ويُرمى الخطأ', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    const later = () => new Date('2026-09-08T09:05:00Z')
+    const queue = { async sendBatch(): Promise<never> { throw new Error('queue down') } }
+    await expect(dispatchDue({ db, queue, now: later })).rejects.toThrow('queue down')
+    expect((await readPost(post))?.['dispatched_at']).toBeNull()
+    // والدورةُ التالية ترسله
+    const q2 = fakeQueue()
+    const out = await dispatchDue({ db, queue: q2, now: later })
+    expect(out).toMatchObject({ kind: 'sent', count: 1 })
+  })
+
+  it('رفعُ الختم لا يمسّ ختما وضعته دورةٌ أخرى', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    const other = new Date('2026-09-08T09:06:00Z')
+    await markDispatched(db, [post], other)
+    await unmarkDispatched(db, [{ id: post, org: 'org_owner' }], new Date('2026-09-08T09:05:00Z'))
+    expect((await readPost(post))?.['dispatched_at']).not.toBeNull()
   })
 })

@@ -31,7 +31,7 @@ function cronBlocks(): string[][] {
 
 /** ما تعرفه الشيفرة — يُنسَخ هنا حرفا، ويُقارَن بالمصدرين. */
 const KNOWN = {
-  SCAN_CRON: '0 3 * * *',
+  SCAN_CRON: '3 3 * * *',
   METRICS_CRON: '7 * * * *',
   REPORT_CRON: '14 4 * * 1',
 } as const

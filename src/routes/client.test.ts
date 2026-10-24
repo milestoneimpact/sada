@@ -246,7 +246,7 @@ describe('«أرسله إلى بريدي» (D-268)', () => {
   })
 })
 
-describe('المحفظة (D-271)', () => {
+describe('المحفظة (D-272)', () => {
   it('تُفتح بفلاترها، وصفُّ كلّ شركةٍ بزرّ «افتحها»', async () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel/portfolio?days=7&p=x', { headers: { Cookie: cookie } }, env)).text()

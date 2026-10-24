@@ -24,7 +24,7 @@ function seed() {
   return db
 }
 
-describe('المحفظة (D-271)', () => {
+describe('المحفظة (D-272)', () => {
   it('صفٌّ لكلّ شركةٍ بأرقامها في الفترة، والمجموع', async () => {
     const rows = await portfolio(seed(), { period: 30, platform: null, org: null }, NOW)
     const a = rows.find((r) => r.org.id === 'org_a')!

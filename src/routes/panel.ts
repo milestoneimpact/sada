@@ -567,7 +567,7 @@ panel.post('/panel/client/report/send', async (c) => {
   return c.redirect(`/panel/client/report?month=${month}`, 303)
 })
 
-/** **المحفظة** (D-271): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
+/** **المحفظة** (D-272): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
 panel.get('/panel/portfolio', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -590,7 +590,7 @@ panel.get('/panel/portfolio', async (c) => {
   )
 })
 
-// ── الفريق (D-270) ─────────────────────────────────────────────────
+// ── الفريق (D-271) ─────────────────────────────────────────────────
 
 panel.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
@@ -1170,7 +1170,7 @@ panel.post('/panel/login/code', async (c) => {
     )
   }
 
-  // ‏المالكُ أو مدعوٌّ قائم (D-270) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
+  // ‏المالكُ أو مدعوٌّ قائم (D-271) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
   const typed = normalizeEmail(String(form.get('email') ?? ''))
   const who = await whoCanReceive(c.env.DB, typed)
   if (who !== null) {
@@ -1232,7 +1232,7 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
-  // ‏صاحبُ الرمز من خطوة البريد (D-270): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
+  // ‏صاحبُ الرمز من خطوة البريد (D-271): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
   // ‏كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**، فلا يكشف الفرقُ أيَّ العناوين مدعوّ
   const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
   const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }

@@ -22,6 +22,13 @@ let db: FakeDb
 let env: Record<string, unknown>
 let csrf = ''
 
+/** ‏البدءُ يشترط جلسةً كاملة (D-269)، فتُنشأ قبله كما يفعل المتصفّح. */
+async function startWithSession(path: string): Promise<Response> {
+  const login = await emailLogin(app, env)
+  const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
+  return await app.request(path, { headers: { Cookie: cookie } }, env)
+}
+
 beforeEach(() => {
   db = fakeDb()
   env = {
@@ -51,7 +58,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
     try {
-      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const start = await startWithSession('/oauth/linkedin/start')
       const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
       const response = await app.request(
         `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
@@ -92,7 +99,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       },
     })
     try {
-      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const start = await startWithSession('/oauth/linkedin/start')
       const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
       const body = await (
         await app.request(
@@ -118,7 +125,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
     try {
-      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const start = await startWithSession('/oauth/linkedin/start')
       const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
       const body = await (
         await app.request(
@@ -145,7 +152,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       [LINKEDIN.tokenUrl]: { status: 401, json: { error: 'invalid_client' } },
     })
     try {
-      const start = await app.request('/oauth/linkedin/start', {}, env)
+      const start = await startWithSession('/oauth/linkedin/start')
       const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
       const body = await (
         await app.request(
