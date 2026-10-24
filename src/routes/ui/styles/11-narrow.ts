@@ -10,6 +10,14 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   .app{grid-template-columns:1fr}
   .rail{position:static; height:auto; border-inline-start:0; border-bottom:var(--bd)}
   .rail-new{display:none}
+  /* ‏رأسُ الصفحة سطرٌ واحد على الهاتف (D-275): العنوانُ وفعلُه جنبًا إلى جنب، واللصيقةُ ساقطة — اسمُ
+     الصفحة في شريط الإبهام تحتها (D-248 أ-3). كان الرأسُ ‏197px قبل أوّل بطاقة */
+  .page-head{flex-wrap:nowrap; align-items:center; margin:var(--s-2) 0 var(--s-4); padding-bottom:var(--s-3)}
+  .page-head .txt{flex:1 1 auto}
+  .page-head .eyebrow{display:none}
+  .page-head .aside{flex:none}
+  /* ‏وتبويباتُ الحال أضيقُ حشوًا فتلتفّ على سطرين لا ثلاثة — والهدفُ ‏44 باقٍ */
+  #draft-filter .tab-item{padding-inline:var(--s-2)}
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);
     scrollbar-width:thin}
   nav.tabs .lbl{display:none}
