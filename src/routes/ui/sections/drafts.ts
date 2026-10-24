@@ -709,7 +709,10 @@ function filterTabs(drafts: readonly DraftRow[]): string {
       <div class="menu-seg">${order}</div>
     </div>
   </details>`
-  return `<nav class="tab-bar" id="draft-filter" aria-label="فرز المسوّدات" hidden>${tabs}${more}</nav>`
+  const why = `<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
+    <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
+  </details>`
+  return `<nav class="tab-bar" id="draft-filter" aria-label="فرز المسوّدات" hidden>${tabs}${more}${why}</nav>`
 }
 
 /**
@@ -1229,19 +1232,16 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    * ‏ثمّ التوزيعُ سطرًا مطويًّا، ثمّ البطاقات.
    */
   const list = `${bulk}
-  <div class="lede-row">
-    <h2 class="sec bare">المسوّدات</h2>
-    ${statusBadge(waiting === 0 ? 'idle' : 'warn', waiting === 0 ? '○' : '!', `${waiting} تنتظر قرارك`)}
-    <span class="grow"></span>
-    <details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
-      <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
-    </details>
-  </div>
+  ${/*
+    * ‏**أوّلُ قرارٍ في الشاشة الأولى** (D-275): كان فوق أوّل بطاقةٍ ‏525px من الأدوات على الهاتف — ومنها سطرُ
+    * ‏«المسوّدات · ٢ تنتظر قرارك» وهو ما يقوله تبويبُ «المسوّدات 2» فوقه حرفًا، ولوحُ الاختصارات مرجعٌ لا قرار.
+    * ‏فسقط السطرُ وانتقلت «؟» إلى صفّ الفرز، ونزل اللوحُ تحت البطاقات. والعددُ باقٍ في التبويب.
+    */''}
   ${filterTabs(drafts)}
   ${spreadBar(input)}
-  ${keys}
   ${cards}
-  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدة في هذا الفرز', html: 'غيّر التبويب أعلاه، أو اختر «الكلّ».' })}`
+  ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدة في هذا الفرز', html: 'غيّر التبويب أعلاه، أو اختر «الكلّ».' })}
+  ${keys}`
 
   const write = `${ideaCard(input)}
 
