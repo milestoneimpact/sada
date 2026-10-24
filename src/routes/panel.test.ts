@@ -2595,8 +2595,8 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     expect(x).toContain('انتهى الإذن قبل الإرسال')
     expect(x).toContain('href="/oauth/x/start"')
     expect(x).toContain('action="/panel/drafts/requeue"')
-    expect(html).toMatch(/data-bucket="failed"[^>]*>فشلت<span class="count">2</)
-    expect(html).toMatch(/data-bucket="archive"[^>]*>الأرشيف<span class="count">0</)
+    expect(html).toMatch(/data-filter="draft-bucket" value="failed"[^>]*>فشلت<span class="count">2</)
+    expect(html).toMatch(/data-filter="draft-bucket" value="archive"[^>]*>الأرشيف<span class="count">0</)
     expect(html).not.toContain('>غادرت<')
 
     const back = await post(cookie, '/panel/drafts/requeue', { id })

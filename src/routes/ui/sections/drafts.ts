@@ -56,6 +56,7 @@ import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { fileName, glyph, RUNG_MARK } from '../parts'
 import { count, statusBadge, type Tone } from '../components/badge'
+import { filterBar } from '../components/filterbar'
 import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
@@ -670,49 +671,39 @@ function editDiff(d: DraftRow): string {
 }
 
 function filterTabs(drafts: readonly DraftRow[]): string {
-  const tabs = BUCKETS.map((b) => {
-    const n = b.of === null ? drafts.length : drafts.filter((d) => b.of!.includes(bucketOf(d))).length
-    // ‏تبويبُ فرزٍ بلغة التنقّل (D-189) — وحالُه في «aria-pressed» لا في صنف
-    return `<button type="button" class="tab-item"
-      data-bucket="${b.id}" data-of="${b.of === null ? '' : b.of.join(' ')}" aria-pressed="${b.id === 'active'}"
-      >${escapeHtml(b.label)}${count(n)}</button>`
-  }).join('')
   /*
-   * **وفرزٌ ثانٍ بالمنصّة، وترتيب** (D-127) — بشرطَي D-062 نفسيهما:
-   * العددُ معروضٌ ولو صفرًا، والافتراضُ «الكلّ» والأحدثُ أوّلًا. والمنصّاتُ
-   * من المسوّدات نفسِها لا من قائمةٍ ثابتة: منصّةٌ بلا مسوّدةٍ لا تبويبَ لها.
-   * **وبلا JavaScript لا يظهر شيءٌ من هذا** — والقائمةُ كاملةٌ كما هي.
+   * ‏**صفُّ الفرز شريطٌ واحد** (D-276): كان تبويباتَ حالٍ تلتفّ ثلاثةَ أسطرٍ على الهاتف ومعها
+   * ‏«مرشّحات» مطويّة (D-240). فصار `filterBar` (D-274) كما في «المصادر» و«المحفظة»: **مقطّعُ الحال**
+   * ‏بأعداده — ولو صفرًا، والفشلُ يُرى في «فشلت» لا في منصّته (D-062) — **وزرُّ المنصّة** و**زرُّ الترتيب**
+   * ‏يقول كلٌّ ما اختير فيه على وجهه فلا يُنسى فرزٌ مخفيٌّ يقصّ القائمة (D-240). والمنصّاتُ من المسوّدات
+   * ‏نفسِها لا من قائمةٍ ثابتة. **وبلا JavaScript لا يظهر شيءٌ من هذا** — والقائمةُ كاملةٌ كما هي.
+   * ‏والحالُ في `aria-pressed` لا في صنف (D-189)، والسكربتُ يقرأ `data-filter` و`value` و`data-of`.
    */
+  const bucketOpts = BUCKETS.map((b) => ({
+    label: b.label, value: b.id, current: b.id === 'active',
+    count: b.of === null ? drafts.length : drafts.filter((d) => b.of!.includes(bucketOf(d))).length,
+    data: { of: b.of === null ? '' : b.of.join(' ') },
+  }))
   const platforms = [...new Set(drafts.map((d) => d.platform))]
-  const ptabs = [
-    `<button type="button" class="menu-item" data-platform-tab="all" data-label="كلّ المنصّات" aria-pressed="true">كلّ المنصّات${count(drafts.length)}</button>`,
-    ...platforms.map((p) => `<button type="button" class="menu-item" data-platform-tab="${escapeHtml(p)}" data-label="${escapeHtml(platformLabel(p))}" aria-pressed="false"
-      >${escapeHtml(platformLabel(p))}${count(drafts.filter((d) => d.platform === p).length)}</button>`),
-  ].join('')
-  const order = `<label class="order"><span class="sub">الترتيب</span>
-    <select id="draft-order" aria-label="ترتيب المسوّدات">
-      <option value="urgent" selected>الأهمّ أوّلًا</option>
-      <option value="new">الأحدث أوّلًا</option>
-      <option value="old">الأقدم أوّلًا</option>
-      <option value="cost">الأغلى نشرًا أوّلًا</option>
-    </select></label>`
-  /*
-   * ‏**والمنصّةُ والترتيبُ مطويّان في «مرشّحات»** (D-240): كانا صفًّا ثانيًا تحت الحال، فصار رأسُ
-   * ‏القائمة ثلاثةَ أسطرٍ على الهاتف قبل أوّل بطاقة. والحالُ وحدَها تبقى ظاهرةً بأعدادها — شرطُ D-062
-   * ‏الأوّل فيها لا هنا: الفشلُ يُرى في «فشلت» لا في منصّته. **وما اختير يُكتب على الزرّ** فلا يُنسى
-   * ‏فرزٌ مخفيٌّ يقصّ القائمة.
-   */
-  const more = `<span class="grow"></span><details class="menu draft-more" id="draft-more">
-    <summary class="btn btn-quiet btn-sm">${ICON.filter}<span>مرشّحات</span><span class="draft-more-on" data-more-on></span></summary>
-    <div class="menu-list">
-      <div id="draft-platform" role="group" aria-label="فرز المسوّدات بالمنصّة">${ptabs}</div>
-      <div class="menu-seg">${order}</div>
-    </div>
-  </details>`
+  const platformOpts = [
+    { label: 'كلّ المنصّات', value: 'all', current: true, count: drafts.length },
+    ...platforms.map((p) => ({ label: platformLabel(p), value: p, current: false, count: drafts.filter((d) => d.platform === p).length })),
+  ]
+  const orderOpts = [
+    { label: 'الأهمّ أوّلًا', value: 'urgent', current: true },
+    { label: 'الأحدث أوّلًا', value: 'new', current: false },
+    { label: 'الأقدم أوّلًا', value: 'old', current: false },
+    { label: 'الأغلى نشرًا أوّلًا', value: 'cost', current: false },
+  ]
   const why = `<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
     <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
   </details>`
-  return `<nav class="tab-bar" id="draft-filter" aria-label="فرز المسوّدات" hidden>${tabs}${more}${why}</nav>`
+  const bar = filterBar([
+    { kind: 'seg', label: 'الحال', name: 'draft-bucket', options: bucketOpts },
+    { kind: 'pick', label: 'المنصّة', name: 'draft-platform', options: platformOpts },
+    { kind: 'pick', label: 'الترتيب', name: 'draft-order', options: orderOpts },
+  ], 'فرز المسوّدات', why)
+  return `<div class="draft-filter" id="draft-filter" hidden>${bar}</div>`
 }
 
 /**

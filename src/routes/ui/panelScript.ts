@@ -541,7 +541,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     btn.addEventListener('click',function(){
       document.querySelectorAll('[data-filter="'+btn.dataset.filter+'"]').forEach(function(o){o.setAttribute('aria-pressed',o===btn?'true':'false');});
       var d=btn.closest('details');
-      if(d){var lb=d.querySelector('summary b'); if(lb)lb.textContent=btn.textContent.trim(); d.open=false;}
+      // ‏والاسمُ وحدَه على الزرّ لا عددُه معه (D-276): «X» لا «X3»
+      if(d){var lb=d.querySelector('summary b'); var nm=btn.querySelector('.menu-t b')||btn; if(lb)lb.textContent=nm.textContent.trim(); d.open=false;}
       apply();
     });
   });
@@ -587,18 +588,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // والمنصّةُ والترتيبُ فرزٌ ثانٍ وثالث (D-127) — بالقاعدة نفسِها: افتراضُهما
     // «الكلّ» و«الأحدث»، وما يُخفى يُلغى تحديدُه
     var platform='all', order='urgent';
-    var ptabs=document.getElementById('draft-platform');
-    var orderSel=document.getElementById('draft-order');
-    // ‏والمطويُّ يقول ما اختير فيه على زرّه (D-240): فرزٌ مخفيٌّ لا يُنسى
-    var moreOn=document.querySelector('[data-more-on]');
-    function moreLabel(){
-      if(!moreOn)return;
-      var on=[];
-      if(platform!=='all'&&ptabs){var pb=ptabs.querySelector('button[aria-pressed="true"]'); if(pb)on.push(pb.dataset.label);}
-      if(order!=='urgent'&&orderSel){on.push(orderSel.options[orderSel.selectedIndex].text);}
-      // ‏كلُّ اسمٍ في «bdi»: «LinkedIn» بين كلماتٍ عربيّة يقلب مواضعَ الفواصل حوله
-      moreOn.textContent='';
-      on.forEach(function(t){var b=document.createElement('bdi'); b.textContent=t; moreOn.appendChild(document.createTextNode(' · ')); moreOn.appendChild(b);});
+    // ‏والثلاثةُ أزرارٌ في شريط الفلتر الواحد (D-276): «مضغوطُها» وكتابةُ المختار على زرّ القائمة يتولّاهما
+    // ‏معالجُ «.fbar» العامّ أعلاه، وهنا القراءةُ وحدَها — بالاسم في «data-filter» والقيمةُ في «value»
+    function onFilter(name,fn){
+      if(!ftabs)return;
+      ftabs.querySelectorAll('button[data-filter="'+name+'"]').forEach(function(b){b.addEventListener('click',function(){fn(b);});});
     }
     function reorder(){
       if(!cards.length)return;
@@ -623,40 +617,17 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(none)none.hidden=shown>0;
       count();
     }
-    if(ftabs){
-      ftabs.hidden=false;
-      ftabs.querySelectorAll('button[data-bucket]').forEach(function(b){
-        b.addEventListener('click',function(){
-          bucket=b.dataset.bucket; bucketOf=b.dataset.of?b.dataset.of.split(' '):null;
-          ftabs.querySelectorAll('button[data-bucket]').forEach(function(o){
-            var on=o===b;
-            o.setAttribute('aria-pressed',String(on));
-          });
-          refilter();
-        });
-      });
-    }
-    if(ptabs){
-      ptabs.hidden=false;
-      ptabs.querySelectorAll('button[data-platform-tab]').forEach(function(b){
-        b.addEventListener('click',function(){
-          platform=b.dataset.platformTab;
-          ptabs.querySelectorAll('button[data-platform-tab]').forEach(function(o){
-            var on=o===b;
-            o.setAttribute('aria-pressed',String(on));
-          });
-          refilter(); moreLabel();
-        });
-      });
-    }
-    if(orderSel){orderSel.addEventListener('change',function(){order=orderSel.value; reorder(); moreLabel();});}
+    if(ftabs)ftabs.hidden=false;
+    onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();});
+    onFilter('draft-platform',function(b){platform=b.value; refilter();});
+    onFilter('draft-order',function(b){order=b.value; reorder();});
     refilter();
     // ‏رابطٌ إلى بطاقةٍ في «الأرشيف» (‎/panel#d-…‎ من الخطّ الزمنيّ أو إشعار) يفتح «الكلّ» فلا يصل إلى بطاقةٍ مخفيّة
     (function(){
       var h=location.hash.slice(1); if(!h||!ftabs)return;
       var t=document.getElementById(h); if(!t)return;
       var card=t.closest?t.closest('[data-draft]'):null;
-      if(card&&card.hidden){var all=ftabs.querySelector('button[data-bucket="all"]'); if(all)all.click(); t.scrollIntoView();}
+      if(card&&card.hidden){var all=ftabs.querySelector('button[data-filter="draft-bucket"][value="all"]'); if(all)all.click(); t.scrollIntoView();}
     })();
 
     // ── شريطُ البَتِّ الجماعيّ ───────────────────────────
