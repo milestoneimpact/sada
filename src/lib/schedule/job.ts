@@ -264,6 +264,51 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
   return { ok: true, at: '', account: '', platform: '' }
 }
 
+export interface Swept { readonly id: string; readonly org: string }
+
+/**
+ * الكنّاس (D-270): ما غادر إلى الطابور منذ أكثر من `STUCK_MINUTES` ولم تُكتب
+ * له محاولةٌ منذها، ولا محاولةَ ناجحةً أو `sent` قطّ — **يُعلَّم `failed` بأثرٍ**.
+ *
+ * كان يبقى «في الطابور» إلى الأبد: الطابورُ فرغ منه إلى طابور الأعطال، و`collectAlerts`
+ * لا تنبّه إلّا على `failed`، فلا يعلم المالكُ حتّى يدخل ويبحث. والأثرُ صفُّ محاولةٍ
+ * `failed` بسبب `stuck` تقرؤه الرحلةُ والتنبيه، ويعيده «أعده» كأيّ فاشل.
+ * **ولا يمسّ ما له محاولةٌ `sent`**: ذاك يحتاج تحقّقَ المالك على المنصّة لا كنّاسا.
+ */
+export async function sweepStuck(db: Db, now: Date): Promise<readonly Swept[]> {
+  const cutoff = dbNow(new Date(now.getTime() - STUCK_MINUTES * 60_000))
+  const { results } = await db
+    .prepare(
+      `UPDATE posts SET status = 'failed'
+        WHERE status = 'queued' AND dispatched_at IS NOT NULL AND dispatched_at < ?1
+          AND NOT EXISTS (SELECT 1 FROM publish_attempts pa
+                           WHERE pa.post_id = posts.id AND pa.org_id = posts.org_id
+                             AND (pa.status IN ('succeeded', 'sent', 'skipped_duplicate') OR pa.at >= ?1))
+        RETURNING id, org_id, idempotency_key`,
+    )
+    .bind(cutoff)
+    .all<{ id: string; org_id: string; idempotency_key: string }>()
+  for (const row of results) {
+    const no = await db
+      .prepare('SELECT coalesce(max(attempt_no), 0) AS n FROM publish_attempts WHERE post_id = ? AND org_id = ?')
+      .bind(row.id, row.org_id)
+      .first<{ n: number }>()
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
+      )
+      .bind(
+        crypto.randomUUID(), row.id, row.idempotency_key, (no?.n ?? 0) + 1,
+        JSON.stringify({ sweep: true }),
+        JSON.stringify({ error: `stuck: غادر إلى الطابور قبل أكثر من ${STUCK_MINUTES} دقيقة ولم يعد جواب`, sweep: true }),
+        row.org_id,
+      )
+      .run()
+  }
+  return results.map((r) => ({ id: r.id, org: r.org_id }))
+}
+
 export interface DuePost {
   readonly id: string
   readonly scheduledAt: string

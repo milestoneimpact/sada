@@ -16,7 +16,7 @@ import { spendByProvider } from './lib/ai/spend'
 import { blockerReason, checkAllowance } from './lib/limits'
 import { scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
-import { dispatchDue } from './lib/schedule/job'
+import { dispatchDue, sweepStuck } from './lib/schedule/job'
 import { expireStaleUploads } from './lib/media/uploads'
 import { pullDue } from './lib/metrics/job'
 import { runWeeklyAll } from './lib/report/job'
@@ -517,7 +517,8 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
       // بلا صورةٍ لا يمسّه (D-040)
       // ‏**وأصلُ الموقع يُمرَّر** (D-182): Instagram تسحب الوسيطَ من رابطٍ موقَّعٍ عندنا
       // (D-121)، وبلا أصلٍ كان كلُّ منشورٍ لها يسقط في الطابور بلا نداءٍ واحد إلى Meta
-      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA, baseUrl: env.PUBLIC_BASE_URL },
+      // ‏ورقمُ المحاولة من الطابور يُكتب في الصفّ (D-270): بلا هذا لا يُعرَف من اللوحة أيُّ إعادةٍ هذه
+      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA, baseUrl: env.PUBLIC_BASE_URL, queueAttempt: message.attempts },
       message.body,
     )
     // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
@@ -592,6 +593,12 @@ async function uploadsTick(env: Env): Promise<void> {
 
 async function dispatchTick(env: Env): Promise<void> {
   try {
+    // ‏الكنّاسُ قبل الإرسال (D-270): ما علق فوق ساعةٍ يُعلَّم `failed` فيراه التنبيهُ واللوحة
+    const swept = await sweepStuck(env.DB, new Date()).catch((error: unknown) => {
+      console.error({ job: 'sweep', failed: String(error) })
+      return []
+    })
+    if (swept.length > 0) console.error({ job: 'sweep', failed_posts: swept.map((s) => s.id) })
     const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
     if (report.kind === 'sent') {
       console.info({ job: 'dispatch', sent: report.count, ids: report.ids })
@@ -682,10 +689,63 @@ async function scanTick(env: Env): Promise<void> {
  * والاسم غير المعروف يُقَرّ لا يُعاد: رسالةٌ لطابور لا نعرفه لن تُفهَم
  * بإعادة المحاولة، وتركها تدور يستهلك حصّة الطابور بلا فائدة.
  */
+/**
+ * طابورُ الأعطال له مستهلك (D-270).
+ *
+ * كانت الرسالةُ التي استنفدت محاولاتها تسقط في `sada-publish-dlq` **ولا أحدَ يقرؤه**:
+ * المنشورُ يبقى «في الطابور» بلا جواب، والتنبيهُ لا يرى إلّا `failed`. فهنا يُعلَّم `failed`
+ * بأثرٍ يقول «فرغ منه الطابور»، ويُقَرّ. **ولا يُعاد النشرُ من هنا**: الإعادةُ قرارُ المالك.
+ */
+async function publishDeadLetters(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
+  for (const message of batch.messages) {
+    const postId = message.body.postId
+    try {
+      const row = await env.DB
+        .prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND status = 'queued' RETURNING org_id, idempotency_key`)
+        .bind(postId)
+        .first<{ org_id: string; idempotency_key: string }>()
+      if (row !== null) {
+        const no = await env.DB
+          .prepare('SELECT coalesce(max(attempt_no), 0) AS n FROM publish_attempts WHERE post_id = ? AND org_id = ?')
+          .bind(postId, row.org_id)
+          .first<{ n: number }>()
+        await env.DB
+          .prepare(
+            `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
+             VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
+          )
+          .bind(
+            crypto.randomUUID(), postId, row.idempotency_key, (no?.n ?? 0) + 1,
+            JSON.stringify({ dead_letter: true, queue_attempts: message.attempts }),
+            JSON.stringify({ error: 'dead_letter: استنفد الطابورُ محاولاتَه ولم يُنشَر', dead_letter: true }),
+            row.org_id,
+          )
+          .run()
+      }
+      console.error({ job: 'publish-dlq', post: postId, marked: row !== null })
+    } catch (error) {
+      console.error({ job: 'publish-dlq', post: postId, failed: String(error) })
+    }
+    message.ack()
+  }
+}
+
 async function queue(
   batch: MessageBatch<PublishMessage | AnalyzeMessage | PlanDraftMessage>,
   env: Env,
 ): Promise<void> {
+  // ‏طوابيرُ الأعطال أوّلا: اسمُها يبدأ باسم أصلها فلا تُترك لمستهلكه
+  if (batch.queue.startsWith('sada-publish-dlq')) {
+    return publishDeadLetters(batch as MessageBatch<PublishMessage>, env)
+  }
+  if (batch.queue.startsWith('sada-generate-dlq')) {
+    // ‏التوليدُ يُعاد بزرٍّ أو بالمسح التالي، فيُسجَّل ويُقَرّ
+    for (const message of batch.messages) {
+      console.error({ job: 'generate-dlq', body: message.body, attempts: message.attempts })
+      message.ack()
+    }
+    return
+  }
   if (batch.queue.startsWith('sada-generate')) {
     return analyzeQueue(batch as MessageBatch<AnalyzeMessage | PlanDraftMessage>, env)
   }
@@ -748,7 +808,13 @@ async function reportTick(env: Env): Promise<void> {
  * وعطلُها لا يُرمى: **التنبيهُ يُعرَض في اللوحة من الحساب المباشر لا
  * من الصفّ** — فسقوطُ الكتابة يُفقد الأثرَ ولا يُفقد التنبيه.
  */
-async function alertTick(env: Env): Promise<void> {
+async function alertTick(env: Env, scope: 'daily' | 'hourly' = 'daily'): Promise<void> {
+  // ‏الساعيُّ (D-270) يُخرج ما سُجّل ولا يعيد حسابَ الأذونات: ذاك يوميُّ الأثر
+  if (scope === 'daily') await tokenAlertTick(env)
+  await outboxTick(env)
+}
+
+async function tokenAlertTick(env: Env): Promise<void> {
   try {
     const items = await expiringTokens(env.DB, new Date())
     if (items.length === 0) {
@@ -770,9 +836,12 @@ async function alertTick(env: Env): Promise<void> {
    * ينجح وقناةٌ تسقط لا يُضيّع الحدثَ — الدورةُ التالية تجده مسجَّلا
    * وغيرَ مُرسَل فتعيد النداءَ وحدَه.
    *
-   * **ولا يقع في دورةٍ أخرى**: الأحداثُ الثلاثةُ يوميّةُ الأثر، ودورةُ
-   * المسح تدور مرّةً كلَّ يوم — **وتنبيهٌ يتكرّر كلَّ ربع ساعةٍ يُطفَأ**.
+   * **ويقع كلَّ ساعةٍ أيضا** (D-270): نشرٌ فشل التاسعةَ صباحا كان يُقال
+   * الثالثةَ فجرا. والقيدُ على `ref` يمنع التكرار، **فساعيٌّ لا يُغرِق**.
    */
+}
+
+async function outboxTick(env: Env): Promise<void> {
   try {
     const settings = await readSettings(env.DB)
     if (settings.alertWebhook === '') return
@@ -843,7 +912,10 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
     await scanTick(env)
     await alertTick(env)
   }
-  if (controller.cron === METRICS_CRON) await metricsTick(env)
+  if (controller.cron === METRICS_CRON) {
+    await metricsTick(env)
+    await alertTick(env, 'hourly')
+  }
   if (controller.cron === REPORT_CRON) await reportTick(env)
 }
 

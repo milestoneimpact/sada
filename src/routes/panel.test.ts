@@ -5321,6 +5321,20 @@ describe('الدخول برمز البريد (D-245)', () => {
     expect(JSON.stringify(rows.results)).not.toContain(code)
   })
 
+  /** ‏سقفٌ للعنوان قبل الرمز (D-270): عناوينُ بريدٍ شتّى من عنوانٍ واحد لا تفلت من سقف البريد الواحد. */
+  it('وبعد عشرين طلبا من عنوان واحد يُردّ 429 ولا يُرسَل شيء', async () => {
+    const mailer = fakeMailer()
+    const scoped = { ...env, EMAIL: mailer }
+    let last = 0
+    for (let i = 0; i < 21; i += 1) {
+      const body = new FormData()
+      body.set('email', `s${i}@example.com`)
+      last = (await app.request('/panel/login/code', { method: 'POST', body, headers: { 'CF-Connecting-IP': '203.0.113.9' } }, scoped)).status
+    }
+    expect(last).toBe(429)
+    expect(mailer.sent).toHaveLength(0)
+  })
+
   it('وطلب ثان في الدقيقة نفسها لا يرسل', async () => {
     const mailer = fakeMailer()
     const scoped = { ...env, EMAIL: mailer }

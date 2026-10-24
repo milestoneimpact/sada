@@ -161,12 +161,22 @@ export async function sendAlerts(
       .catch(() => false)
     if (!fresh) { skipped += 1; continue }
 
+    /*
+     * **وما ردّته القناةُ بغير نجاحٍ يُعاد — بحدّ** (D-270).
+     *
+     * كان الرمزُ يُكتب (502 مثلا) ثمّ يُعدّ الصفُّ «أُرسل» فلا يُعاد أبدا، خلافا
+     * لما وعد به تعليقُ الدورة. فيُعاد ما لم ينجح حتّى `MAX_TRIES`، ويبقى
+     * المكرّرُ ممنوعا بالقيد نفسِه: صفٌّ ناجح لا يُعاد.
+     */
     const already = await db
-      .prepare('SELECT status FROM alert_outbox WHERE ref = ?')
+      .prepare('SELECT status, tries FROM alert_outbox WHERE ref = ?')
       .bind(a.ref)
-      .first<{ status: number | null }>()
+      .first<{ status: number | null; tries: number }>()
       .catch(() => null)
-    if (already !== null && already.status !== null) { skipped += 1; continue }
+    if (already !== null && already.status !== null) {
+      const ok = already.status >= 200 && already.status < 300
+      if (ok || already.tries >= MAX_TRIES) { skipped += 1; continue }
+    }
 
     try {
       /*
@@ -210,13 +220,16 @@ function redact(text: string): string {
   return text.replace(/https?:\/\/\S+/gi, '«عنوان مُزال»')
 }
 
+/** كم مرّةً يُعاد تنبيهٌ ردّته القناةُ بغير نجاح (D-270). */
+export const MAX_TRIES = 3
+
 async function mark(
   db: Db, a: Alert, status: number | null, error: string | null,
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO alert_outbox (ref, kind, body, status, error) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(ref) DO UPDATE SET status = excluded.status, error = excluded.error`,
+      `INSERT INTO alert_outbox (ref, kind, body, status, error, tries) VALUES (?, ?, ?, ?, ?, 1)
+       ON CONFLICT(ref) DO UPDATE SET status = excluded.status, error = excluded.error, tries = alert_outbox.tries + 1`,
     )
     .bind(a.ref, a.kind, a.body, status, error === null ? null : redact(error))
     .run()
