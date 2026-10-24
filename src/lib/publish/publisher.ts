@@ -13,6 +13,7 @@
  * الخطوتان ٣ و٤ قبل ٥ عمدا: الطلب الذي أُرسل وضاع جوابه قد كُلِّف فعلا،
  * وسجلٌّ أعلى من الحقيقة أهون من سجل أقل منها.
  */
+import { isTimeout, withTimeout } from '../net/timeout'
 import { bucketClip, type RangeBucket } from './clip'
 import { CLIP_PLATFORMS } from '../platform/needs'
 import { estimatePostCost, recordCost } from '../cost'
@@ -38,6 +39,9 @@ export interface PublishMessage {
   readonly postId: string
 }
 
+/** مهلةُ نداءات النشر: قطعُ المقاطع تُدفَع واحدةً بعد أخرى، فدقيقتان لكلّ نداء تكفي أكبرَها. */
+const CLIP_TIMEOUT_MS = 120_000
+
 export type Outcome =
   | { readonly kind: 'published'; readonly platformPostId: string }
   | { readonly kind: 'skipped_duplicate'; readonly platformPostId: string }
@@ -45,6 +49,7 @@ export type Outcome =
 
 interface PostRow {
   id: string
+  org_id: string
   account_id: string
   text: string
   status: string
@@ -123,13 +128,14 @@ export async function publishPost(
   message: PublishMessage,
 ): Promise<Outcome> {
   const { db, encKey } = deps
-  const fetchImpl = deps.fetchImpl ?? fetch
+  // ‏مهلةٌ على كلّ نداء (D-269): المقاطعُ تُرفَع قطعا فتُعطى أطول، والباقي دقيقة
+  const fetchImpl = withTimeout(deps.fetchImpl ?? fetch, CLIP_TIMEOUT_MS)
   const now = deps.now ?? (() => new Date())
 
   // ١ — المنشور وحسابه
   const post = await db
     .prepare(
-      `SELECT p.id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
+      `SELECT p.id, p.org_id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
               a.platform, a.external_id, a.kind AS account_kind,
               a.status AS account_status
          FROM posts p JOIN accounts a ON a.id = p.account_id
@@ -181,6 +187,29 @@ export async function publishPost(
   if (done !== null) {
     await markPublished(db, post.id, done.platform_post_id ?? '')
     return { kind: 'skipped_duplicate', platformPostId: done.platform_post_id ?? '' }
+  }
+
+  /*
+   * **ومحاولةٌ أُرسلت ولم يُعرَف جوابُها توقف الإعادةَ** (D-269).
+   *
+   * صفٌّ بقي `sent` يعني أنّ الطلبَ خرج ولم يعد الجواب: قُتل الاستدعاءُ وسطَ
+   * النداء، أو سقط تحديثُ الصفّ بعده. **والمنشورُ قد يكون على المنصّة**،
+   * وإعادةُ الإرسال تنشره ثانيةً وتُحاسِب ثانية — وهو أسوأُ اتّجاهات الخطأ.
+   * فيُردّ نهائيّا بسببٍ يقول للمالك ما يفعل، و«أعده» يرفضه ما دام الصفُّ
+   * `sent`، فلا يُعاد إلّا بعد أن يتحقّق المالكُ على المنصّة.
+   */
+  const unconfirmed = await db
+    .prepare(
+      `SELECT id FROM publish_attempts
+        WHERE idempotency_key = ? AND org_id = ? AND status = 'sent' LIMIT 1`,
+    )
+    .bind(post.idempotency_key, post.org_id)
+    .first<{ id: string }>()
+  if (unconfirmed !== null) {
+    return preflightFailed(
+      db, post,
+      'unconfirmed_prior_send: محاولةٌ سابقة أُرسلت ولم يُعرَف جوابُها — تحقّق على المنصّة قبل أن تعيدها',
+    )
   }
 
   /**
@@ -496,10 +525,17 @@ export async function publishPost(
           : await publishX(tokens.accessToken, post.text, fetchImpl, mediaId)
     }
   } catch (error) {
+    /*
+     * **وما رُمي من غير `PublishError` لا يُعاد** (D-269).
+     *
+     * انقطاعُ شبكةٍ أو مهلةٌ وسطَ نداء الإنشاء لا يقول هل وصل الطلبُ المنصّةَ
+     * أم لا. كان يُعاد «قابلا للإعادة»، فيُنشر المنشورُ مرّتين إن كان قد
+     * وصل. فيُردّ نهائيّا بسببٍ مسمّى، والمالكُ يتحقّق ثمّ يضغط «أعده».
+     */
     const failure =
       error instanceof PublishError
         ? { reason: error.message, retryable: error.retryable, status: error.status }
-        : { reason: 'unexpected_error', retryable: true, status: 0 }
+        : { reason: isTimeout(error) ? 'unconfirmed_send: timeout' : 'unconfirmed_send: network', retryable: false, status: 0 }
     await db
       .prepare(
         `UPDATE publish_attempts

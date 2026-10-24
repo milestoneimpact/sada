@@ -443,7 +443,7 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
   const outcome = await draftPost({ db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }, sourceId, platform)
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
-  if (outcome.kind === 'failed' && outcome.retryable) return message.retry()
+  if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)
   message.ack()
   // ‏والمسوّدةُ تعرف خطّتها (D-261): منها يُقرأ يومُ البند حين تُجدوَل الخطّة
   const planId = message.body.draft.planId
@@ -483,11 +483,30 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessag
     )
     console.info({ job: 'analyze', ...outcome })
     if (outcome.kind === 'failed' && outcome.retryable) {
-      message.retry()
+      retryLater(message, outcome.kind)
     } else {
       message.ack()
     }
   }
+}
+
+/**
+ * إعادةٌ بتباعد لا فورا (D-269).
+ *
+ * `message.retry()` بلا مهلة كانت تعيد الرسالةَ في ثوانٍ، فتُستنفَد
+ * المحاولاتُ الثلاث قبل أن يتغيّر شيء: `429` تعود `429`، ورمزٌ منتهٍ لا
+ * يُجدَّد قبل دورة التجديد (كلَّ ربع ساعة). فالمهلةُ تتصاعد بالمحاولة،
+ * **وانتهاءُ الرمز ينتظر دورةَ تجديدٍ كاملة** قبل أن يُسأل ثانية.
+ */
+const RETRY_DELAYS_SECONDS = [60, 300, 900] as const
+const RENEW_TICK_SECONDS = 15 * 60
+
+export function retryLater(message: { attempts: number; retry(options?: { delaySeconds?: number }): void }, reason: string): void {
+  const step = Math.min(Math.max(message.attempts, 1), RETRY_DELAYS_SECONDS.length) - 1
+  const delaySeconds = reason === 'token_expired_retry'
+    ? Math.max(RENEW_TICK_SECONDS, RETRY_DELAYS_SECONDS[step]!)
+    : RETRY_DELAYS_SECONDS[step]!
+  message.retry({ delaySeconds })
 }
 
 async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
@@ -504,7 +523,7 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
     // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
     // اليوم وتستنزف حصّة الطابور بلا نداءٍ واحد ينجح
     if (outcome.kind === 'failed' && outcome.retryable) {
-      message.retry()
+      retryLater(message, outcome.reason)
     } else {
       message.ack()
     }
@@ -772,7 +791,7 @@ async function alertTick(env: Env): Promise<void> {
 }
 
 /** جدولُ المسح — يُعرَّف هنا وفي `wrangler.toml`، ويُقارَن نصّا. */
-const SCAN_CRON = '0 3 * * *'
+const SCAN_CRON = '3 3 * * *'
 
 /**
  * جدولُ القياس — ساعيٌّ عند الدقيقة السابعة.

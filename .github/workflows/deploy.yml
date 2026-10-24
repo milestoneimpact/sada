@@ -105,14 +105,16 @@ jobs:
       # فالمهلة هي ما يكشفه، والعلاج CI=true لا علم غير موجود.
       # طوابيرُ الإنتاج تُنشأ إن غابت، فلا أداةَ لها في اللوحة الموصولة.
       # والأمرُ لا يُعاد على طابورٍ قائم: يُسأل عنه أوّلاً.
+      # ‏وفي البيئتين (D-269): طابورُ أعطال التوليد جديدٌ على staging أيضا، ونشرٌ
+      # ‏يسمّي طابورا لا وجودَ له يُردّ قبل أن يبدأ.
       - name: الطوابير
-        if: env.TARGET == 'production'
         run: |
-          for q in sada-publish sada-generate sada-publish-dlq; do
-            if npx wrangler queues info "$q" >/dev/null 2>&1; then
-              echo "قائم: $q"
+          suffix="$([ "$TARGET" = production ] && echo "" || echo "-staging")"
+          for q in sada-publish sada-generate sada-publish-dlq sada-generate-dlq; do
+            if npx wrangler queues info "$q$suffix" >/dev/null 2>&1; then
+              echo "قائم: $q$suffix"
             else
-              npx wrangler queues create "$q"
+              npx wrangler queues create "$q$suffix"
             fi
           done
 

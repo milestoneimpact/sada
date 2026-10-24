@@ -185,17 +185,50 @@ describe('D-008 · التكلفة تُسجَّل قبل أن يُعدّ الطل
 })
 
 describe('الفشل', () => {
-  it('يعدّ 500 قابلا لإعادة المحاولة ولا يعلّم المنشور failed', async () => {
+  /*
+   * ‏**500 من نهاية الإنشاء لا يُعاد** (D-269): قد تعود بعد أن أُنشئ المنشور، وإعادتُها
+   * ‏تنشره مرّتين. فيُردّ نهائيّا بسببٍ يقول «لم يُؤكَّد»، والمالكُ يتحقّق ثمّ يعيد.
+   */
+  it('يعدّ 500 من نهاية الإنشاء «لم يُؤكَّد» ولا يُعيده — ويعلّم المنشور failed', async () => {
     const postId = await seedPost({ platform: 'x' })
     const outcome = await publishPost(
       deps(fakeFetch({ [X.postUrl]: { status: 500, json: { error: 'x' } } })),
       { postId },
     )
-    expect(outcome).toMatchObject({ kind: 'failed', retryable: true })
-    const post = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as {
-      status: string
-    }
-    expect(post.status).toBe('queued')
+    expect(outcome).toMatchObject({ kind: 'failed', retryable: false })
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('unconfirmed_send')
+    const post = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as { status: string }
+    expect(post.status).toBe('failed')
+  })
+
+  it('وانقطاعُ الشبكة وسطَ الإنشاء كذلك: لا يُعاد، ويُسمّى', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    const impl: typeof fetch = async () => { throw new TypeError('fetch failed') }
+    const outcome = await publishPost(deps(impl), { postId })
+    expect(outcome).toMatchObject({ kind: 'failed', retryable: false, reason: 'unconfirmed_send: network' })
+    const attempt = db.raw.prepare('SELECT status FROM publish_attempts WHERE post_id = ?').get(postId) as { status: string }
+    expect(attempt.status).toBe('failed')
+  })
+
+  /*
+   * ‏**ومحاولةٌ بقيت `sent` توقف الإعادة** (D-269): الاستدعاءُ قُتل وسطَ النداء، والمنشورُ
+   * ‏قد يكون على المنصّة. فلا يُرسَل طلبٌ ثانٍ، ويُقال للمالك أن يتحقّق.
+   */
+  it('محاولةٌ سابقة بحالة sent تمنع الإرسال ولا يُنادى شيء', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    const key = (db.raw.prepare('SELECT idempotency_key FROM posts WHERE id = ?').get(postId) as { idempotency_key: string }).idempotency_key
+    db.raw.prepare(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status)
+       VALUES ('a-sent', ?, ?, 1, '{}', 'sent')`,
+    ).run(postId, key)
+    let calls = 0
+    const impl: typeof fetch = async () => { calls += 1; return new Response('{}', { status: 201 }) }
+    const outcome = await publishPost(deps(impl), { postId })
+    expect(calls).toBe(0)
+    expect(outcome).toMatchObject({ kind: 'failed', retryable: false })
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('unconfirmed_prior_send')
+    const post = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as { status: string }
+    expect(post.status).toBe('failed')
   })
 
   it('يعدّ 429 قابلا لإعادة المحاولة', async () => {

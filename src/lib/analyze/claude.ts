@@ -84,6 +84,7 @@ export async function analyzeText(
     apiKey: deps.apiKey,
     ...(deps.fetchImpl === undefined ? {} : { fetch: deps.fetchImpl }),
     maxRetries: 0, // الطابور يعيد المحاولة، فإعادة داخل النداء تضاعف الكلفة بلا علم
+    timeout: 120_000, // ‏مهلةٌ صريحة (D-269): الافتراضُ عشرُ دقائق، أطولُ من استدعاء الطابور نفسِه
   })
 
   let message: Anthropic.Message

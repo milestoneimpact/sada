@@ -296,13 +296,45 @@ export async function dueNow(db: Db, now: Date, limit = 20): Promise<DuePost[]> 
  * جوابُ الإرسال تبقى مرسَلة. وختمٌ بعد النجاح وحده يجعل الدورة التالية
  * ترسلها ثانية — والخطأُ يميل إلى تكرار النشر، وهو أسوأ اتّجاهاته.
  */
-export async function markDispatched(db: Db, ids: readonly string[], now: Date): Promise<void> {
-  if (ids.length === 0) return
+export interface Stamped { readonly id: string; readonly org: string }
+
+export async function markDispatched(db: Db, ids: readonly string[], now: Date): Promise<readonly Stamped[]> {
+  if (ids.length === 0) return []
   const marks = ids.map(() => '?').join(', ')
-  await db
-    .prepare(`UPDATE posts SET dispatched_at = ? WHERE id IN (${marks})`)
+  /*
+   * **ذرّيٌّ لا «اقرأ ثمّ اكتب»** (D-269).
+   *
+   * دورتان تلتقيان في الدقيقة نفسِها (الثالثةُ فجرا: `*\/15` و`3 3`) كانتا
+   * تقرآن المستحقَّ نفسَه ثمّ تختمانه معا وترسلانه مرّتين — والرسالةُ
+   * الثانية تجد الأولى «أُرسلت» فلا تُنشر، لكنّها كانت تُعاد وتُحاسَب.
+   * فالختمُ يشترط أنّ الصفَّ لم يُختَم بعد، **والقاعدةُ تعيد ما ختمته هي**،
+   * والدورةُ ترسل ذاك وحده.
+   */
+  const { results } = await db
+    .prepare(
+      `UPDATE posts SET dispatched_at = ?
+        WHERE id IN (${marks}) AND status = 'queued' AND dispatched_at IS NULL
+        RETURNING id, org_id`,
+    )
     .bind(dbNow(now), ...ids)
-    .run()
+    .all<{ id: string; org_id: string }>()
+  return results.map((r) => ({ id: r.id, org: r.org_id }))
+}
+
+/**
+ * يرفع الختمَ عمّا لم يصل الطابور (D-269): `sendBatch` رمى بعد الختم،
+ * فبقيت المنشوراتُ «أُرسلت» ولا رسالةَ لها — وكانت تنتظر ستّين دقيقةً
+ * حتّى يعيدها المالكُ بيده. والشرطُ على الختم نفسِه، فلا يُرفَع ختمٌ وضعته دورةٌ أخرى.
+ */
+export async function unmarkDispatched(db: Db, stamped: readonly Stamped[], now: Date): Promise<void> {
+  if (stamped.length === 0) return
+  const stamp = dbNow(now)
+  for (const s of stamped) {
+    await db
+      .prepare('UPDATE posts SET dispatched_at = NULL WHERE id = ? AND org_id = ? AND dispatched_at = ?')
+      .bind(s.id, s.org, stamp)
+      .run()
+  }
 }
 
 export interface DispatchDeps {
@@ -340,9 +372,16 @@ export async function dispatchDue(deps: DispatchDeps): Promise<DispatchReport> {
   const due = await dueNow(deps.db, now, deps.limit ?? 20)
   if (due.length === 0) return { kind: 'none' }
 
-  const ids = due.map((d) => d.id)
-  await markDispatched(deps.db, ids, now)
-  await deps.queue.sendBatch(ids.map((postId) => ({ body: { postId } })))
+  // ‏ما ختمته هذه الدورةُ وحدَه يُرسَل: دورةٌ متزامنةٌ قد سبقت إلى بعضه (D-269)
+  const stamped = await markDispatched(deps.db, due.map((d) => d.id), now)
+  if (stamped.length === 0) return { kind: 'none' }
+  const ids = stamped.map((s) => s.id)
+  try {
+    await deps.queue.sendBatch(ids.map((postId) => ({ body: { postId } })))
+  } catch (error) {
+    await unmarkDispatched(deps.db, stamped, now)
+    throw error
+  }
 
   return { kind: 'sent', count: ids.length, ids }
 }

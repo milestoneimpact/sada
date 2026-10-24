@@ -78,7 +78,7 @@ let published: string[] = []
  * والجدولُ يُمرَّر كما يمرّره Cloudflare: الموزّع يفرّق بالجدول، ونداءٌ
  * بمتحكّمٍ فارغ يختبر فرعا لا يقع في الإنتاج.
  */
-async function runCron(count: number, cron = '0 3 * * *'): Promise<void> {
+async function runCron(count: number, cron = '3 3 * * *'): Promise<void> {
   const real = globalThis.fetch
   globalThis.fetch = drive(count)
   try {
@@ -207,7 +207,7 @@ describe('موزّع الدورات', () => {
 
   it('يرسل المستحقّ على جدول المسح — فالدورتان تلتقيان ولا تتعطّلان', async () => {
     const post = await seedDue()
-    await runCron(0, '0 3 * * *')
+    await runCron(0, '3 3 * * *')
     expect(published).toEqual([post])
   })
 
@@ -225,7 +225,7 @@ describe('موزّع الدورات', () => {
 
   it('ولا يرسله مرّتين حين تلتقي الدورتان في الثالثة فجرا', async () => {
     await seedDue()
-    await runCron(0, '0 3 * * *')
+    await runCron(0, '3 3 * * *')
     await runCron(0, '*/15 * * * *')
     expect(published).toHaveLength(1)
   })
