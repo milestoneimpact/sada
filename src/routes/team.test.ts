@@ -78,4 +78,20 @@ describe('الفريق (D-270)', () => {
     const after = await app.request('/panel/client', { headers: { Cookie: sara } }, env)
     expect(after.status).not.toBe(200)
   })
+
+  it('المديرُ يقرأ الإعدادات بلا «الأمان» ولا «متقدّم»: لا أجهزةَ ولا مفاتيحَ ولا سجلَّ تدقيق (D-270)', async () => {
+    const owner = cookieOf(await emailLogin(app, env))
+    const ownerCsrf = await csrfOf(owner, '/panel/team')
+    await post('/panel/team/invite', owner, { _csrf: ownerCsrf, email: 'admin@example.com', role: 'admin', all: '1' })
+    const admin = cookieOf(await memberLogin('admin@example.com'))
+    const res = await app.request('/panel/settings', { headers: { Cookie: admin } }, env)
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    for (const mark of ['security-all', 'data-sub id="advanced"', 'revoke-all', 'totp-confirm', 'passkey'])
+      expect(html).not.toContain(mark)
+    expect(html).toContain('data-sub id="limits"')
+    // ‏والمالكُ يراها كما كانت
+    const mine = await (await app.request('/panel/settings', { headers: { Cookie: owner } }, env)).text()
+    for (const mark of ['security-all', 'data-sub id="advanced"', 'revoke-all']) expect(mine).toContain(mark)
+  })
 })

@@ -962,6 +962,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
       draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
       zone: ownZone,
+      role: session.record.role ?? 'owner',
       autoEnqueue: allowance.settings.autoEnqueue,
       autoImage: allowance.settings.autoImage,
       imageCap: allowance.settings.dailyImageCap,
