@@ -67,6 +67,7 @@
 | `media` | `id` · `post_id` · `r2_key` · `mime` · `bytes` · `prompt` · `model` · `cost_usd` · `status` · `idempotency_key` · `platform_media_id` · `note` · `headline` | صورةٌ أو مقطع، والبايتاتُ في R2. و`note` ثلاثيّة: `NULL` لم يُسجَّل · `''` رُكّب العنوان · نصٌّ سببُ السقوط (D-162) |
 | `media_claims` | `idempotency_key` · `post_id` · `kind` · `claimed_at` | **حجزٌ يسبق الإنفاق** — القيدُ الفريدُ على `media` يقع بعد الدفع (D-068) |
 | `heartbeats` | `job` · `at` · `outcome` · `detail` | صفٌّ لكلّ دورةٍ يُستبدَل — «هل دارت ومتى» (D-158) |
+| `analysis_claims` | `source_id` · `content_hash` · `claimed_at` | **حجزٌ يسبق دفعَ التحليل** كـ`media_claims` للصور (D-270) |
 | `auth_attempts` | `bucket` · `n` · `window_start` | حجزُ محاولات الدخول والتحدّيات قبل فحصها — عدٌّ ذرّيٌّ لكلّ عنوانٍ وللجميع في ربع ساعة (D-161) |
 
 ## ٤. عقد المنشور (ما يُخرجه Claude وتقرأه اللوحة والناشر)

@@ -82,6 +82,8 @@ export interface PublisherDeps {
   readonly baseUrl?: string
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
+  /** رقمُ تسليم الطابور لهذه الرسالة (D-270) — يُكتب في الصفّ ليُعرَف أيُّ إعادةٍ هذه */
+  readonly queueAttempt?: number
 }
 
 /**
@@ -354,7 +356,10 @@ export async function publishPost(
       post.id,
       post.idempotency_key,
       attemptNo,
-      JSON.stringify({ platform: post.platform, has_url: hasUrl, length: post.text.length }),
+      JSON.stringify({
+        platform: post.platform, has_url: hasUrl, length: post.text.length,
+        ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
+      }),
     )
     .run()
 

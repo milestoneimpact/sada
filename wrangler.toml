@@ -89,6 +89,20 @@ queue = "sada-generate-staging"
 
 # المستهلك: دفعة صغيرة ومحاولات محدودة. المفتاح يمنع التكرار، لكن كل
 # محاولة على X تُحاسَب — فلا تُترك المحاولات مفتوحة.
+# ‏مستهلكا طابورَي الأعطال (D-270): ما استنفد محاولاتَه يُعلَّم `failed` بأثرٍ ويُقَرّ،
+# ‏فيراه التنبيهُ واللوحةُ بدل أن يبقى «في الطابور» بلا جواب. ولا إعادةَ هنا.
+[[env.staging.queues.consumers]]
+queue = "sada-publish-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
+[[env.staging.queues.consumers]]
+queue = "sada-generate-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
 [[env.staging.queues.consumers]]
@@ -165,6 +179,20 @@ queue = "sada-publish"
 [[env.production.queues.producers]]
 binding = "GENERATE_QUEUE"
 queue = "sada-generate"
+
+# ‏مستهلكا طابورَي الأعطال (D-270): ما استنفد محاولاتَه يُعلَّم `failed` بأثرٍ ويُقَرّ،
+# ‏فيراه التنبيهُ واللوحةُ بدل أن يبقى «في الطابور» بلا جواب. ولا إعادةَ هنا.
+[[env.production.queues.consumers]]
+queue = "sada-publish-dlq"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
+[[env.production.queues.consumers]]
+queue = "sada-generate-dlq"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
 
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.

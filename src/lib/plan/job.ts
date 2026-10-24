@@ -243,11 +243,13 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     .run()
   // `(org_id, week_start, span)` فريدٌ في المخطّط (0032)، فالسابقةُ لهذا العميل وهذا المدى تُزال بعد أن نُسخت حالُها —
   // وهي كلفةٌ وقعت، فتبقى في الدفتر بمعرّف الأسبوع
-  await deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, week, span).run()
-  await deps.db
+  // ‏الحذفُ والإدراجُ معا أو لا شيء (D-270): سقوطٌ بينهما كان يضيّع خطّةَ الأسبوع ودفعَ ثمنها
+  const remove = deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, week, span)
+  const insert = deps.db
     .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(planId, week, JSON.stringify(read.plan), ran, 'draft', org, span)
-    .run()
+  if (deps.db.batch !== undefined) await deps.db.batch([remove, insert])
+  else { await remove.run(); await insert.run() }
 
   return {
     kind: 'planned',

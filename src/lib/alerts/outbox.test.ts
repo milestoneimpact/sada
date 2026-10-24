@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { budgetAlert, looksSecret, publishAlert, sendAlerts, tokenAlert } from './outbox'
+import { budgetAlert, looksSecret, MAX_TRIES, publishAlert, sendAlerts, tokenAlert } from './outbox'
 
 let db: FakeDb
 beforeEach(() => { db = fakeDb() })
@@ -204,5 +204,29 @@ describe('ولا سرّ في نصّ عطل يُخزَّن', () => {
     await sendAlerts(db, HOOK, [budgetAlert('2026-09-09', 5, 5)], f)
     const row = await db.prepare('SELECT error FROM alert_outbox').first<{ error: string }>()
     expect(row!.error).toContain('503')
+  })
+})
+
+
+/** ‏ردٌّ غير ناجح يُعاد بحدّ (D-270): كان يُكتب رمزُه ولا يُعاد أبدا. */
+describe('ردّ غير ناجح يُعاد بحدّ (D-270)', () => {
+  it('يُعاد حتّى يبلغ الحدّ ثمّ يُتخطّى', async () => {
+    const a = budgetAlert('2026-09-10', 5, 5)
+    const bad = vi.fn(async () => new Response('down', { status: 502 })) as unknown as typeof fetch
+    for (let i = 0; i < MAX_TRIES; i += 1) expect((await sendAlerts(db, HOOK, [a], bad)).failed).toBe(1)
+    expect((await sendAlerts(db, HOOK, [a], bad)).skipped).toBe(1)
+    expect(bad).toHaveBeenCalledTimes(MAX_TRIES)
+    const row = await db.prepare('SELECT tries FROM alert_outbox').first<{ tries: number }>()
+    expect(row!.tries).toBe(MAX_TRIES)
+  })
+
+  it('وما نجح مرّةً لا يُعاد ولو دون الحدّ', async () => {
+    const a = budgetAlert('2026-09-11', 5, 5)
+    const bad = vi.fn(async () => new Response('down', { status: 502 })) as unknown as typeof fetch
+    await sendAlerts(db, HOOK, [a], bad)
+    const good = ok()
+    expect((await sendAlerts(db, HOOK, [a], good)).sent).toBe(1)
+    expect((await sendAlerts(db, HOOK, [a], good)).skipped).toBe(1)
+    expect(good).toHaveBeenCalledTimes(1)
   })
 })

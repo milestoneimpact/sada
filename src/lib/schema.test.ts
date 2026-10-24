@@ -200,7 +200,7 @@ describe('أساس تعدّد المستأجرين', () => {
   it('جداول العمل كلُّها تحمل org_id', () => {
     const tables = ['accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
       'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger', 'audit_log',
-      'reports', 'token_alerts', 'media_claims', 'alert_outbox', 'oauth_apps', 'uploads', 'media']
+      'reports', 'token_alerts', 'media_claims', 'alert_outbox', 'oauth_apps', 'uploads', 'media', 'analysis_claims']
     for (const t of tables) expect(schemaOf(t), t).toContain('org_id')
   })
 })

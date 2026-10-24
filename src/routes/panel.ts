@@ -60,7 +60,7 @@ import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
-import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess } from '../lib/security/gate'
+import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess, reserveCodeIssue } from '../lib/security/gate'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { canReceiveCode, OWNER_EMAIL } from '../lib/ownerEmail'
 
@@ -1088,6 +1088,19 @@ panel.post('/panel/login/code', async (c) => {
   if (state.blocked) {
     return page(
       (nonce) => loginPage({ error: 'تجاوزت حدّ المحاولات. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true, next }, nonce),
+      429,
+    )
+  }
+
+  /*
+   * ‏**سقفٌ للعنوان وللجميع قبل أن يُصدَر رمز** (D-270): كلُّ طلبٍ هنا كتابةٌ في KV
+   * ‏وبريدٌ وصفُّ تدقيق، والطالبُ مجهول — كسقف تحدّي المفتاح (D-161) في دلوٍ مستقلّ. وسقفُ البريد
+   * ‏الواحد (`issueCode`) لا يحرس عناوينَ شتّى.
+   */
+  if (!(await reserveCodeIssue(c.env.DB, c.req.raw)).allowed) {
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.capped', detail: 'ip_or_global' }, c.req.raw)
+    return page(
+      (nonce) => loginPage({ error: 'طلباتٌ كثيرة من هذا العنوان. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true, next }, nonce),
       429,
     )
   }
