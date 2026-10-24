@@ -106,6 +106,19 @@ export function reserveChallenge(db: Db, request: Request): Promise<Reservation>
 }
 
 /** النجاحُ يعيد ما حجز: حصّةُ العنوان تُمحى، وحصّةُ الجميع تنقص واحدًا. */
+/**
+ * إصدارُ رمز البريد لمجهول (D-270): سقفُ التحدّيات نفسُه، **في دلوٍ مستقلّ** —
+ * دخولُ المالك بالرمز لا ينقص رصيدَ تحدّيات مفتاحه، ولا العكس.
+ */
+export function reserveCodeIssue(db: Db, request: Request): Promise<Reservation> {
+  return both(
+    db,
+    `code-issue:${ipOf(request)}`,
+    'code-issue:global',
+    [MAX_CHALLENGES, MAX_GLOBAL_CHALLENGES],
+  )
+}
+
 export async function releaseAttempt(db: Db, request: Request): Promise<void> {
   try {
     await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`ip:${ipOf(request)}`).run()

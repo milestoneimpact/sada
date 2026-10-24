@@ -60,7 +60,7 @@ import { scanDrive } from '../lib/drive/job'
 import { attemptsLeft, kb, money, parseSqliteUtc } from '../lib/format'
 import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../lib/limits'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
-import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess } from '../lib/security/gate'
+import { releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess, reserveCodeIssue } from '../lib/security/gate'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
 import { normalizeEmail, OWNER_EMAIL } from '../lib/ownerEmail'
 import { inviteMember, listMembers, revokeMember, ROLE_LABEL, whoCanReceive, type MemberRole } from '../lib/team'
@@ -567,7 +567,7 @@ panel.post('/panel/client/report/send', async (c) => {
   return c.redirect(`/panel/client/report?month=${month}`, 303)
 })
 
-/** **المحفظة** (D-272): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
+/** **المحفظة** (D-273): كلُّ الشركات في جدولٍ واحد، تُفلتَر بالفترة والمنصّة والشركة، وتُقصَر على شركات من يراها. */
 panel.get('/panel/portfolio', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -590,7 +590,7 @@ panel.get('/panel/portfolio', async (c) => {
   )
 })
 
-// ── الفريق (D-271) ─────────────────────────────────────────────────
+// ── الفريق (D-272) ─────────────────────────────────────────────────
 
 panel.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
@@ -1170,7 +1170,20 @@ panel.post('/panel/login/code', async (c) => {
     )
   }
 
-  // ‏المالكُ أو مدعوٌّ قائم (D-271) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
+  /*
+   * ‏**سقفٌ للعنوان وللجميع قبل أن يُصدَر رمز** (D-270): كلُّ طلبٍ هنا كتابةٌ في KV
+   * ‏وبريدٌ وصفُّ تدقيق، والطالبُ مجهول — كسقف تحدّي المفتاح (D-161) في دلوٍ مستقلّ. وسقفُ البريد
+   * ‏الواحد (`issueCode`) لا يحرس عناوينَ شتّى.
+   */
+  if (!(await reserveCodeIssue(c.env.DB, c.req.raw)).allowed) {
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.capped', detail: 'ip_or_global' }, c.req.raw)
+    return page(
+      (nonce) => loginPage({ error: 'طلباتٌ كثيرة من هذا العنوان. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true, next }, nonce),
+      429,
+    )
+  }
+
+  // ‏المالكُ أو مدعوٌّ قائم (D-272) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
   const typed = normalizeEmail(String(form.get('email') ?? ''))
   const who = await whoCanReceive(c.env.DB, typed)
   if (who !== null) {
@@ -1232,7 +1245,7 @@ panel.post('/panel/login', async (c) => {
     )
   }
 
-  // ‏صاحبُ الرمز من خطوة البريد (D-271): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
+  // ‏صاحبُ الرمز من خطوة البريد (D-272): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
   // ‏كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**، فلا يكشف الفرقُ أيَّ العناوين مدعوّ
   const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
   const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }

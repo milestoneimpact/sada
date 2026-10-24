@@ -170,6 +170,31 @@ describe('لا يُدفع ثمن ما لم يتغيّر (D-008)', () => {
     expect(count.n).toBe(1)
   })
 
+  /** ‏حجزٌ قبل الدفع (D-270): حجزٌ قائمٌ للبصمة نفسِها يردّ الثاني «محلَّل» بلا نداء. */
+  it('حجزٌ قائم لمصدرٍ يمنع نداءً ثانيا متزامنا', async () => {
+    const sourceId = await seedSource()
+    await db.prepare("INSERT INTO analysis_claims (source_id, content_hash) VALUES (?, 'md5:abc')").bind(sourceId).run()
+    const out = await analyzeSource(deps(net()), sourceId)
+    expect(out.kind).toBe('already')
+    expect(calls.filter((u) => u.includes('anthropic'))).toHaveLength(0)
+  })
+
+  it('وحجزٌ شاخ يُؤخَذ، وحجزُ بصمةٍ أخرى كذلك', async () => {
+    const sourceId = await seedSource()
+    await db.prepare("INSERT INTO analysis_claims (source_id, content_hash, claimed_at) VALUES (?, 'md5:abc', datetime('now', '-11 minutes'))").bind(sourceId).run()
+    expect((await analyzeSource(deps(net()), sourceId)).kind).toBe('analyzed')
+    await db.prepare('UPDATE sources SET content_hash = ? WHERE id = ?').bind('md5:new', sourceId).run()
+    expect((await analyzeSource(deps(net()), sourceId)).kind).toBe('analyzed')
+  })
+
+  it('وعطلٌ عند Claude يحرّر الحجز فتُعاد المحاولة', async () => {
+    const sourceId = await seedSource()
+    const out = await analyzeSource(deps(net({ anthropicStatus: 500 })), sourceId)
+    expect(out.kind).toBe('failed')
+    const row = db.raw.prepare('SELECT count(*) AS n FROM analysis_claims').get() as { n: number }
+    expect(row.n).toBe(0)
+  })
+
   it('تغيّر البصمة يعيد التحليل', async () => {
     const sourceId = await seedSource()
     await analyzeSource(deps(net()), sourceId)

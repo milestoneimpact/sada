@@ -26,7 +26,7 @@ const BASELINE = new URL('./tenancy-baseline.json', import.meta.url).pathname
 export const TENANT_TABLES = new Set([
   'accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
   'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger',
-  'audit_log', 'reports', 'token_alerts', 'media_claims', 'alert_outbox', 'oauth_apps',
+  'audit_log', 'reports', 'token_alerts', 'media_claims', 'analysis_claims', 'alert_outbox', 'oauth_apps',
   'uploads', 'media', 'brands',
 ])
 

@@ -292,7 +292,7 @@ function parse(raw: string): SessionRecord | null {
       ...(typeof value.next === 'string' ? { next: safeNext(value.next) } : {}),
       ...(typeof value.org === 'string' && value.org.length > 0 ? { org: value.org } : {}),
       email: typeof value.email === 'string' ? value.email : OWNER_EMAIL,
-      // ‏الدورُ كما كُتب (D-271)، والغائبُ جلسةٌ قديمةٌ للمالك. وما ليس دورًا معروفًا يُنزَّل إلى القارئ لا يُرفع إلى المالك
+      // ‏الدورُ كما كُتب (D-272)، والغائبُ جلسةٌ قديمةٌ للمالك. وما ليس دورًا معروفًا يُنزَّل إلى القارئ لا يُرفع إلى المالك
       role: value.role === undefined ? 'owner'
         : (['owner', 'admin', 'publisher', 'editor', 'viewer'] as const).find((r) => r === value.role) ?? 'viewer',
     }

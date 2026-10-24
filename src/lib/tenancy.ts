@@ -38,7 +38,7 @@ export function activeOrg(record: { readonly org?: string }): string {
 
 const asKind = (v: unknown): OrgKind => (ORG_KINDS as readonly unknown[]).includes(v) ? (v as OrgKind) : 'individual'
 
-/** المنظّماتُ بترتيب إنشائها — **كلُّها للمالك، وشركاتُ المدعوّ وحدَها له** (D-271). */
+/** المنظّماتُ بترتيب إنشائها — **كلُّها للمالك، وشركاتُ المدعوّ وحدَها له** (D-272). */
 export async function listOrgs(db: Db): Promise<OrgRow[]> {
   const { results } = await db
     .prepare(`SELECT o.id, o.name, o.kind,

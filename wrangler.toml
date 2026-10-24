@@ -71,7 +71,7 @@ bucket_name = "sada-media-staging"
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
 # ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
-# ‏بلا `destination_address` (D-271): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
+# ‏بلا `destination_address` (D-272): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
 # ‏والشيفرةُ لا ترسل إلّا لهم (`whoCanReceive`)، وCloudflare يردّ ما لم يُتحقَّق منه.
 [[env.staging.send_email]]
 name = "EMAIL"
@@ -90,6 +90,20 @@ queue = "sada-generate-staging"
 
 # المستهلك: دفعة صغيرة ومحاولات محدودة. المفتاح يمنع التكرار، لكن كل
 # محاولة على X تُحاسَب — فلا تُترك المحاولات مفتوحة.
+# ‏مستهلكا طابورَي الأعطال (D-270): ما استنفد محاولاتَه يُعلَّم `failed` بأثرٍ ويُقَرّ،
+# ‏فيراه التنبيهُ واللوحةُ بدل أن يبقى «في الطابور» بلا جواب. ولا إعادةَ هنا.
+[[env.staging.queues.consumers]]
+queue = "sada-publish-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
+[[env.staging.queues.consumers]]
+queue = "sada-generate-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
 [[env.staging.queues.consumers]]
@@ -151,7 +165,7 @@ bucket_name = "sada-media"
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
 # ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
-# ‏بلا `destination_address` (D-271): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
+# ‏بلا `destination_address` (D-272): يُرسَل إلى أيّ عنوانٍ **مُتحقَّقٍ منه** في Email Routing — المالكُ والمدعوّون (M-33).
 # ‏والشيفرةُ لا ترسل إلّا لهم (`whoCanReceive`)، وCloudflare يردّ ما لم يُتحقَّق منه.
 [[env.production.send_email]]
 name = "EMAIL"
@@ -167,6 +181,20 @@ queue = "sada-publish"
 [[env.production.queues.producers]]
 binding = "GENERATE_QUEUE"
 queue = "sada-generate"
+
+# ‏مستهلكا طابورَي الأعطال (D-270): ما استنفد محاولاتَه يُعلَّم `failed` بأثرٍ ويُقَرّ،
+# ‏فيراه التنبيهُ واللوحةُ بدل أن يبقى «في الطابور» بلا جواب. ولا إعادةَ هنا.
+[[env.production.queues.consumers]]
+queue = "sada-publish-dlq"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
+
+[[env.production.queues.consumers]]
+queue = "sada-generate-dlq"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 0
 
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.

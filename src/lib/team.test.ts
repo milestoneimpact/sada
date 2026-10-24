@@ -8,7 +8,7 @@ function seed() {
   return db
 }
 
-describe('الفريق (D-271)', () => {
+describe('الفريق (D-272)', () => {
   it('الدعوةُ بريدٌ صحيحٌ ودورٌ من القائمة وشركاتٌ موجودة، والمالكُ لا يُدعى', async () => {
     const db = seed()
     expect(await inviteMember(db, { email: ' Sara@Example.com ', role: 'editor', orgs: ['org_a'], by: 'o' })).toEqual({ ok: true, email: 'sara@example.com' })

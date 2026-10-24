@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, unmarkDispatched, unschedule,
+  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, sweepStuck, unmarkDispatched, unschedule,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -524,5 +524,58 @@ describe('الختم الذرّيّ (D-269)', () => {
     await markDispatched(db, [post], other)
     await unmarkDispatched(db, [{ id: post, org: 'org_owner' }], new Date('2026-09-08T09:05:00Z'))
     expect((await readPost(post))?.['dispatched_at']).not.toBeNull()
+  })
+})
+
+
+/** ‏الكنّاس (D-270): العالقُ فوق ساعةٍ بلا جوابٍ يُعلَّم `failed` بأثر، وما له `sent` لا يُمسّ. */
+describe('الكنّاس (D-270)', () => {
+  const T0 = new Date('2026-09-08T09:05:00Z')
+  const LATER = new Date('2026-09-08T10:30:00Z')
+
+  async function stuckPost(): Promise<string> {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    await markDispatched(db, [post], T0)
+    return post
+  }
+
+  it('يعلّم العالق failed ويكتب محاولةً بسببها', async () => {
+    const post = await stuckPost()
+    const swept = await sweepStuck(db, LATER)
+    expect(swept.map((s) => s.id)).toEqual([post])
+    expect((await readPost(post))?.['status']).toBe('failed')
+    const attempt = db.raw.prepare('SELECT status, response_json FROM publish_attempts WHERE post_id = ?').get(post) as { status: string; response_json: string }
+    expect(attempt.status).toBe('failed')
+    expect(attempt.response_json).toContain('stuck')
+  })
+
+  it('ولا يمسّ ما أُرسل قبل أقلّ من ساعة', async () => {
+    const post = await stuckPost()
+    expect(await sweepStuck(db, new Date('2026-09-08T09:50:00Z'))).toEqual([])
+    expect((await readPost(post))?.['status']).toBe('queued')
+  })
+
+  it('ولا يمسّ ما له محاولةٌ sent — ذاك للمالك', async () => {
+    const post = await stuckPost()
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status)
+      VALUES ('a1', ?, 'k', 1, '{}', 'sent')`).run(post)
+    expect(await sweepStuck(db, LATER)).toEqual([])
+    expect((await readPost(post))?.['status']).toBe('queued')
+  })
+
+  it('ولا يمسّ ما حاول الطابورُ فيه منذ أقلّ من ساعة', async () => {
+    const post = await stuckPost()
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at)
+      VALUES ('a1', ?, 'k', 1, '{}', 'failed', '2026-09-08 10:00:00')`).run(post)
+    expect(await sweepStuck(db, LATER)).toEqual([])
+  })
+
+  it('وبعد الكنس يقبله «أعده»', async () => {
+    const post = await stuckPost()
+    await sweepStuck(db, LATER)
+    const out = await requeue(db, post, new Date('2026-09-08T12:00:00Z'))
+    expect(out.ok).toBe(true)
   })
 })

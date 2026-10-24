@@ -88,6 +88,37 @@ interface SourceRow {
  * والقيد هنا: صفُّ تحليلٍ واحدٌ لكلّ مصدر، يُستبدل حين تتغيّر البصمة.
  * فالسؤال «أحُلِّل هذا؟» يُجاب من القاعدة لا من ذاكرةٍ في العملية.
  */
+const CLAIM_STALE_MINUTES = 10
+
+async function claimAnalysis(db: Db, sourceId: string, hash: string): Promise<boolean> {
+  try {
+    const row = await db
+      .prepare(
+        `INSERT INTO analysis_claims (source_id, content_hash, claimed_at, org_id)
+         VALUES (?1, ?2, datetime('now'), (SELECT org_id FROM sources WHERE id = ?1))
+         ON CONFLICT(source_id) DO UPDATE SET
+           content_hash = excluded.content_hash, claimed_at = datetime('now')
+         WHERE analysis_claims.content_hash <> excluded.content_hash
+            OR analysis_claims.claimed_at <= datetime('now', ?3)
+         RETURNING source_id`,
+      )
+      .bind(sourceId, hash, `-${CLAIM_STALE_MINUTES} minutes`)
+      .first<{ source_id: string }>()
+    return row !== null
+  } catch (error) {
+    // ‏**مغلقٌ عند العطل**: جدولٌ لا يُقرأ لا يعني «لك النداء» — النداءُ يكلّف، والمسحُ التالي يعيد
+    console.warn({ job: 'analyze-claim', failed: String(error) })
+    return false
+  }
+}
+
+/** يُحرَّر الحجزُ حين لا يُكتب صفُّ تحليل، فلا يُقفَل المصدرُ عشرَ دقائق على عطلٍ عابر. */
+async function releaseAnalysis(db: Db, sourceId: string): Promise<void> {
+  await db
+    .prepare('DELETE FROM analysis_claims WHERE source_id = ?1 AND org_id = (SELECT org_id FROM sources WHERE id = ?1)')
+    .bind(sourceId).run().catch(() => undefined)
+}
+
 async function alreadyAnalyzed(db: Db, sourceId: string, hash: string): Promise<boolean> {
   const row = await db
     .prepare('SELECT id FROM content_items WHERE source_id = ? AND themes_json LIKE ?')
@@ -157,15 +188,25 @@ export async function analyzeSource(
     return { kind: 'already', sourceId: source.id }
   }
 
+  /*
+   * ‏٢ب · حجزٌ قبل الدفع (D-270): رسالتان للمصدر نفسِه (مسحٌ مرّتين، أو زرٌّ وآليّ) كانتا
+   * ‏تدفعان مرّتين. الحجزُ بالمصدر، ويُؤخَذ من حجزٍ شاخ (فوق عشر دقائق) أو ببصمةٍ أخرى.
+   * ‏**ومشغولٌ ليس فشلا**: يُقَرّ ولا يُعاد، فالحاجزُ يكتب أو يحرّر.
+   */
+  const claimed = await claimAnalysis(deps.db, source.id, source.content_hash)
+  if (!claimed) return { kind: 'already', sourceId: source.id }
+
   // ٣ · الإيقاف والسقفان — قبل أن يُلمس Drive، فضلا عن Claude.
   // وموضعه بعد فحص «محلَّل بالفعل» عمدا: ما لا يكلّف شيئا لا يُمنع بسقف.
   const allowance = await checkAllowance(deps.db, 'analyze')
   if (allowance.blocker !== null) {
+    await releaseAnalysis(deps.db, source.id)
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
   }
   // ثمّ حارس المزوّد: تفصيلٌ تحت الجملة لا فوقها
   const providerBlocker = await checkProvider(deps.db, 'anthropic')
   if (providerBlocker !== null) {
+    await releaseAnalysis(deps.db, source.id)
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(providerBlocker) }
   }
 
@@ -232,6 +273,7 @@ export async function analyzeSource(
         if (late !== null) await chargeVision(late)
         const reason = error instanceof Error ? error.message : 'تعذّرت قراءة الصورة'
         const retryable = error instanceof CompatError ? error.retryable : true
+        await releaseAnalysis(deps.db, source.id)
         return { kind: 'failed', sourceId: source.id, reason, retryable }
       }
     } else {
@@ -284,10 +326,12 @@ export async function analyzeSource(
     const late = spentOf(error)
     if (late !== null) await charge(late)
     if (error instanceof AnalyzeError) {
+      await releaseAnalysis(deps.db, source.id)
       return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }
     }
     const reason = error instanceof Error ? error.message : 'عطل غير متوقّع'
     // عطل Drive أو القاعدة: قد ينجح لاحقا وحده
+    await releaseAnalysis(deps.db, source.id)
     return { kind: 'failed', sourceId: source.id, reason, retryable: true }
   }
 }

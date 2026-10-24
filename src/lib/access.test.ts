@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { allows, orgAllowed, requiredRole } from './access'
 
-describe('من يملك ماذا (D-271)', () => {
+describe('من يملك ماذا (D-272)', () => {
   it('الدورُ يملك ما تحته', () => {
     expect(allows('publisher', 'editor')).toBe(true)
     expect(allows('editor', 'publisher')).toBe(false)
