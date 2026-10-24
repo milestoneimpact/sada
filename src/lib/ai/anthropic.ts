@@ -67,6 +67,8 @@ export async function anthropicChat(call: AnthropicCall): Promise<AnthropicResul
     ...(call.fetchImpl === undefined ? {} : { fetch: call.fetchImpl }),
     // الطابور يعيد المحاولة، فإعادةٌ داخل النداء تضاعف الكلفة بلا علم
     maxRetries: 0,
+    // ‏مهلةٌ صريحة (D-269): الافتراضُ عشرُ دقائق، أطولُ من استدعاء الطابور نفسِه
+    timeout: 120_000,
   })
 
   let message: Anthropic.Message
