@@ -16,8 +16,11 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   .page-head .txt{flex:1 1 auto}
   .page-head .eyebrow{display:none}
   .page-head .aside{flex:none}
-  /* ‏وتبويباتُ الحال أضيقُ حشوًا فتلتفّ على سطرين لا ثلاثة — والهدفُ ‏44 باقٍ */
-  #draft-filter .tab-item{padding-inline:var(--s-2)}
+  /* ‏ومقطّعُ الحال أضيقُ حشوًا على الهاتف فيلتفّ على سطرين — والهدفُ ‏44 باقٍ */
+  #draft-filter .fb-opt{padding-inline:var(--s-1)}
+  #draft-filter .fb-opt .count{margin-inline-start:var(--s-0)}
+  /* ‏وزرّا القائمة بلا مفتاحهما («المنصّة»، «الترتيب») — المختارُ وحدَه يقول ما هو، و«؟» في صفّهما لا تحتهما */
+  #draft-filter .fb-k{display:none}
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);
     scrollbar-width:thin}
   nav.tabs .lbl{display:none}

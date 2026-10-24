@@ -276,7 +276,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 /* ── شريطُ الفلتر الواحد والرقمُ باتّجاهه (UX-AUDIT-4 · أ) ─────────────
    سطرٌ واحدٌ يلتفّ: مقطّعٌ للخيارات القليلة، وزرُّ قائمةٍ للطويلة، وشعاراتٌ للمنصّات. */
 .fbar{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); margin-block:var(--s-3) var(--s-4)}
-.fb-seg{display:inline-flex; padding:var(--s-0); gap:var(--s-0); background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-control)}
+.fb-seg{display:inline-flex; flex-wrap:wrap; max-width:100%; padding:var(--s-0); gap:var(--s-0); background:var(--surface-2); border:var(--bd-soft); border-radius:var(--r-control)}
 .fb-opt{display:inline-flex; align-items:center; min-height:var(--tap); padding:0 var(--s-3); border:0; background:transparent; border-radius:var(--r-control);
   font:inherit; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); text-decoration:none; cursor:pointer;
   transition:background var(--dur-2) var(--ease), color var(--dur-2) var(--ease)}

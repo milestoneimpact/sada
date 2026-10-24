@@ -154,14 +154,12 @@ ol.steps.wiz.nodot li::before{display:none}
   color:var(--ink); border-bottom-color:var(--ink)}
 /* الصفُّ الفرعيّ «tabs({ sub })» — فرزٌ داخل التبويب لا تبويبٌ ثانٍ */
 .tab-sub{align-items:center; box-shadow:none; margin-top:calc(-1 * var(--s-2))}
-/* ‏المنصّةُ والترتيبُ مطويّان في «مرشّحات» آخرَ صفّ الحال (D-240) — فرزٌ داخل التبويب لا صفٌّ ثانٍ */
-.draft-more{align-self:center}
-.draft-more-on{font-weight:600; color:var(--ink)}
-.draft-more .menu-item .count{margin-inline-start:auto}
-.draft-more .menu-item[aria-pressed=true]{background:var(--hover); font-weight:600}
-.draft-more .menu-item[aria-pressed=true]::before{content:'✓' / ''}
-.draft-more .order{display:flex; align-items:center; gap:var(--s-2); width:100%}
-.draft-more .order select{min-height:var(--tap); flex:1}
+/* ‏صفُّ فرز المسوّدات شريطُ فلترٍ واحد (D-276) و«؟» آخرَه، والمختارُ في قائمتَيه بعلامة */
+.draft-filter .fbar{margin-block:0 var(--s-4)}
+.draft-filter .menu-item .count{margin-inline-start:auto}
+.draft-filter .menu-item[aria-pressed=true]{background:var(--hover)}
+.draft-filter .menu-item[aria-pressed=true]::before{content:'✓' / ''}
+.draft-filter .fb-opt .count{margin-inline-start:var(--s-1)}
 
 /* ── لوحُ الإرشاد تحت اللصيقة ─────────────────────────────────────────
    بحث GOV.UK: المستخدم يبدأ الكتابة فور رؤية الحقل، **ولا ينظر تحته

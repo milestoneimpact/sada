@@ -530,31 +530,35 @@ describe('فرز بالمنصّة وترتيب (D-127)', () => {
       mediaReady: READY,
   })
 
-  it('تبويب المنصّات من المسوّدات نفسِها، بالاسم وبالعدد، والافتراض الكلّ', () => {
-    expect(html).toContain('data-platform-tab="all" data-label="كلّ المنصّات" aria-pressed="true">كلّ المنصّات<span class="count">2</span>')
-    expect(html).toContain('data-platform-tab="linkedin" data-label="LinkedIn" aria-pressed="false"\n      >LinkedIn<span class="count">1</span>')
-    expect(html).toContain('data-platform-tab="x"')
-    expect(html).not.toContain('data-platform-tab="tiktok"')
+  const bar = html.slice(html.indexOf('id="draft-filter"'), html.indexOf('</details></div>', html.indexOf('id="draft-filter"')))
+
+  it('المنصّات قائمةٌ من المسوّدات نفسِها، بالاسم وبالعدد، والافتراض الكلّ (D-276)', () => {
+    expect(bar).toContain('data-filter="draft-platform" value="all" title="كلّ المنصّات"><span class="menu-t"><b>كلّ المنصّات</b></span><span class="count">2</span>')
+    expect(bar).toMatch(/aria-pressed="false" data-filter="draft-platform" value="linkedin"[^>]*><span class="menu-t"><b>LinkedIn<\/b><\/span><span class="count">1<\/span>/)
+    expect(bar).toContain('data-filter="draft-platform" value="x"')
+    expect(bar).not.toContain('value="tiktok"')
+    expect(bar).toContain('<span class="fb-k">المنصّة</span><b>كلّ المنصّات</b>')
   })
 
   it('والترتيب قائمة افتراضُها الأهمّ أوّلًا (D-215)، والبطاقة تحمل مفاتيحَه', () => {
-    expect(html).toContain('<select id="draft-order"')
-    expect(html).toContain('<option value="urgent" selected>')
-    expect(html).toContain('<option value="new">')
+    expect(bar).toContain('<span class="fb-k">الترتيب</span><b>الأهمّ أوّلًا</b>')
+    expect(bar).toMatch(/aria-pressed="true" data-filter="draft-order" value="urgent"/)
+    expect(bar).toMatch(/aria-pressed="false" data-filter="draft-order" value="new"/)
     expect(html).toMatch(/data-rank="\d"/)
     expect(html).toContain(`data-created="${Date.parse('2026-09-06T09:00:00Z')}" data-cost="0.05"`)
   })
 
-  it('والمنصّة والترتيب مطويّان في «مرشّحات» داخل صفّ الحال، والصفّ مخفيّ بلا JavaScript (D-240)', () => {
-    expect(html).toContain('id="draft-filter" aria-label="فرز المسوّدات" hidden')
-    const bar = html.slice(html.indexOf('id="draft-filter"'), html.indexOf('</nav>', html.indexOf('id="draft-filter"')))
-    expect(bar).toContain('<details class="menu draft-more" id="draft-more">')
-    expect(bar).toContain('id="draft-platform" role="group"')
-    expect(bar).toContain('<select id="draft-order"')
+  it('وصفّ الفرز شريطُ فلترٍ واحد: مقطّعُ الحال بأعداده ومراسيه، والصفّ مخفيّ بلا JavaScript (D-276)', () => {
+    expect(html).toContain('<div class="draft-filter" id="draft-filter" hidden><div class="fbar" role="toolbar" aria-label="فرز المسوّدات">')
+    expect(bar).toContain('<div class="fb-seg" role="group" aria-label="الحال">')
+    expect(bar).toMatch(/aria-pressed="true" data-filter="draft-bucket" value="active" data-of="failed waiting approved queued"[^>]*>قيد العمل<span class="count">2<\/span>/)
+    expect(bar).toMatch(/data-filter="draft-bucket" value="all" data-of=""[^>]*>الكلّ<span class="count">2<\/span>/)
+    expect(bar).toContain('class="why-tip"')
+    expect(html).not.toContain('draft-more" id=')
     expect(html).not.toContain('tab-sub')
-    expect(SCRIPT).toContain("moreOn.textContent=''")
-    expect(SCRIPT).toContain("platform=b.dataset.platformTab")
-    expect(SCRIPT).toContain("order=orderSel.value; reorder();")
+    expect(SCRIPT).toContain("onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();})")
+    expect(SCRIPT).toContain("onFilter('draft-platform',function(b){platform=b.value; refilter();})")
+    expect(SCRIPT).toContain("onFilter('draft-order',function(b){order=b.value; reorder();})")
   })
 })
 

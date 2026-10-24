@@ -11,6 +11,7 @@
  */
 import { escapeHtml } from '../escape'
 import { ICON } from '../icons'
+import { count } from './badge'
 
 export interface FilterOption {
   readonly label: string
@@ -19,6 +20,10 @@ export interface FilterOption {
   readonly value?: string
   /** شعارُ المنصّة (`LOGOS`) — لقطعة `logos`. */
   readonly logo?: string
+  /** عددُ ما في الخيار — يُعرض ولو صفرًا (D-062)، بـ`count` من الشارات. */
+  readonly count?: number
+  /** سماتُ `data-*` إضافيّة يقرؤها سكربتُ الصفحة (كـ`of` في فرز الحال). */
+  readonly data?: Readonly<Record<string, string>>
 }
 
 export type FilterPart =
@@ -28,9 +33,11 @@ export type FilterPart =
 
 function option(o: FilterOption, name: string | undefined, cls: string, inner: string, title = o.label): string {
   const pressed = `aria-pressed="${o.current}"`
+  const n = o.count === undefined ? '' : count(o.count)
+  const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${escapeHtml(v)}"`).join('')
   return o.href !== undefined
-    ? `<a class="${cls}" href="${escapeHtml(o.href)}" ${o.current ? 'aria-current="true"' : ''} ${pressed} title="${escapeHtml(title)}">${inner}</a>`
-    : `<button class="${cls}" type="button" ${pressed} data-filter="${escapeHtml(name ?? '')}" value="${escapeHtml(o.value ?? '')}" title="${escapeHtml(title)}">${inner}</button>`
+    ? `<a class="${cls}" href="${escapeHtml(o.href)}" ${o.current ? 'aria-current="true"' : ''} ${pressed} title="${escapeHtml(title)}">${inner}${n}</a>`
+    : `<button class="${cls}" type="button" ${pressed} data-filter="${escapeHtml(name ?? '')}" value="${escapeHtml(o.value ?? '')}"${data} title="${escapeHtml(title)}">${inner}${n}</button>`
 }
 
 function part(p: FilterPart): string {
@@ -49,8 +56,9 @@ function part(p: FilterPart): string {
   </details>`
 }
 
-export function filterBar(parts: readonly FilterPart[], label = 'الفلتر'): string {
-  return `<div class="fbar" role="toolbar" aria-label="${escapeHtml(label)}">${parts.map(part).join('')}</div>`
+/** و`tail` ما يُلحَق آخرَ الشريط في صفّه (كـ«؟» في المسوّدات) — HTML جاهزٌ لا نصّ. */
+export function filterBar(parts: readonly FilterPart[], label = 'الفلتر', tail = ''): string {
+  return `<div class="fbar" role="toolbar" aria-label="${escapeHtml(label)}">${parts.map(part).join('')}${tail}</div>`
 }
 
 /**
