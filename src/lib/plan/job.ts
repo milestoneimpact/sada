@@ -307,7 +307,7 @@ export async function approvePlan(db: Db, planId: string, org = 'org_owner'): Pr
     .bind(planId, org)
     .first<{ status: string }>()
   if (row === null || row.status !== 'draft') return false
-  await db.prepare("UPDATE plans SET status = 'approved' WHERE id = ?").bind(planId).run()
+  await db.prepare("UPDATE plans SET status = 'approved' WHERE id = ? AND org_id = ?").bind(planId, org).run()
   return true
 }
 

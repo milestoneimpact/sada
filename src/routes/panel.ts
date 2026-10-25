@@ -742,10 +742,11 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at,
               i.worth_score, i.summary, i.themes_json
          FROM sources s
-         LEFT JOIN content_items i ON i.source_id = s.id
+         LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+        WHERE s.org_id = ?
         ORDER BY s.last_seen_at DESC
         LIMIT 200`,
-    ).all<SourceRow>()
+    ).bind(activeOrg(session.record)).all<SourceRow>()
     sources = results.map(toPanelSource)
   } catch {
     sources = []
@@ -818,8 +819,9 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
   const { results: outbox } = await c.env.DB
     .prepare(
       `SELECT kind, body, status, error, at FROM alert_outbox
-        ORDER BY at DESC LIMIT 5`,
+        WHERE org_id = ? ORDER BY at DESC LIMIT 5`,
     )
+    .bind(activeOrg(session.record))
     .all<{ kind: string; body: string; status: number | null; error: string | null; at: string }>()
     .catch(() => ({ results: [] as {
       kind: string; body: string; status: number | null; error: string | null; at: string
@@ -827,12 +829,12 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
 
   const peaks: Record<string, Peaks> = {}
   for (const platform of [...new Set([...drafts, ...(editing === null ? [] : [editing])].map((d) => d.platform))]) {
-    peaks[platform] = await readPeaks(c.env.DB, platform)
+    peaks[platform] = await readPeaks(c.env.DB, activeOrg(session.record), platform)
   }
   const plan = await latestPlan(c.env.DB, activeOrg(session.record))
   const sessions = await listSessions(c.env.KV, session.id)
   const orgs = await listOrgs(c.env.DB)
-  const audit = await recentAudit(c.env.DB, 50)
+  const audit = await recentAudit(c.env.DB, activeOrg(session.record), 50)
   const beats = await readHeartbeats(c.env.DB)
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
   const factors = await factorState(c.env.DB, rp.id)
@@ -857,10 +859,10 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
 
   const flash = await takeFlash(c.env, c.req.raw)
   // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
-  const openCount = (await openSuggestions(c.env.DB)).length
+  const openCount = (await openSuggestions(c.env.DB, activeOrg(session.record))).length
   // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
   const journey = await journeyCounts(c.env.DB, activeOrg(session.record), new Date())
-  const uploads = await listUploads(c.env.DB)
+  const uploads = await listUploads(c.env.DB, activeOrg(session.record))
   /*
    * ‏**ونصوصُ المقاطع المكتوبة من KV** (D-190) — لما بقي فيه ما يُنشأ وحدَه: مقطعٌ أُنشئ على
    * ‏منصّاته كلِّها لا حقولَ له، فلا يُقرأ. قراءةٌ لكلّ مقطعٍ مفتوح، وهي قليلةٌ عادةً.
@@ -2213,7 +2215,7 @@ async function autoImages(c: Context<{ Bindings: Env }>, org: string, ids: reado
     db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY,
     workerSecrets: c.env as unknown as Record<string, string | undefined>,
   }
-  const work = Promise.all(batch.map((id) => generateForPost(deps, id, { style: 'infographic' })
+  const work = Promise.all(batch.map((id) => generateForPost(deps, id, { style: 'infographic', org })
     .catch((error: unknown) => console.warn({ job: 'auto-image', post: id, failed: String(error) }))))
   try {
     c.executionCtx.waitUntil(work)
@@ -2240,7 +2242,7 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
       workerSecrets: c.env as unknown as Record<string, string | undefined>,
     },
     id,
-    replace ? { replace: old, style } : { style },
+    replace ? { replace: old, style, org: activeOrg(gate.session.record) } : { style, org: activeOrg(gate.session.record) },
   )
 
   // ‏وما لم يُولَّد لم يُرفَض: يُقال ذلك للمالك فلا يبحث عن صورةٍ اختفت
@@ -2308,6 +2310,7 @@ panel.post('/panel/media/animate', async (c) => {
       ai: await bindingFor(c.env, c.env.DB, c.env.TOKEN_ENC_KEY),
       encKey: c.env.TOKEN_ENC_KEY,
       baseUrl: c.env.PUBLIC_BASE_URL,
+      org: activeOrg(gate.session.record),
     },
     id,
   )
@@ -2357,11 +2360,11 @@ panel.post('/panel/media/reject', async (c) => {
   const id = String(gate.form.get('id') ?? '')
   // ‏والمعرّفُ معرّفُ الصورة، والعودةُ إلى بطاقة منشورها
   const owner = await c.env.DB
-    .prepare('SELECT post_id FROM media WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT post_id FROM media WHERE id = ? AND org_id = ?')
+    .bind(id, activeOrg(gate.session.record))
     .first<{ post_id: string }>()
 
-  const done = await rejectMedia(c.env.DB, id)
+  const done = await rejectMedia(c.env.DB, activeOrg(gate.session.record), id)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'media.reject', target: id, detail: done ? 'rejected' : 'refused' },
@@ -2450,8 +2453,8 @@ panel.get('/panel/channels/:platform', async (c) => {
 
   const shown = [...upcomingRows, ...historyPage.rows, ...waitingRows].map((p) => p.id)
   // ما قِيس — للمنشورة وحدها: مسوّدةٌ لا مقياسَ لها (D-048)
-  const metrics = await metricsFor(c.env.DB, historyPage.rows.map((p) => p.id))
-  const costs = await postCosts(c.env.DB, shown)
+  const metrics = await metricsFor(c.env.DB, activeOrg(session.record), historyPage.rows.map((p) => p.id))
+  const costs = await postCosts(c.env.DB, activeOrg(session.record), shown)
 
   // والوسائطُ تُعرَض لا يُقال إنّ هناك وسيطا (D-062) — استعلامٌ واحدٌ
   // لكلّ الصفحة لا واحدٌ لكلّ بطاقة، **وبصفّها كاملا**: الملاحظةُ تقول
@@ -2516,7 +2519,8 @@ async function ownerFacts(c: {
   let anyPublished = false
   try {
     const row = await c.env.DB
-      .prepare("SELECT 1 AS n FROM publish_attempts WHERE status = 'succeeded' LIMIT 1")
+      .prepare("SELECT 1 AS n FROM publish_attempts WHERE org_id = ? AND status = 'succeeded' LIMIT 1")
+      .bind(org)
       .first<{ n: number }>()
     anyPublished = row !== null
   } catch {
@@ -2528,8 +2532,9 @@ async function ownerFacts(c: {
     const row = await c.env.DB
       .prepare(
         `SELECT 1 AS n FROM cost_ledger
-          WHERE operation LIKE '%video%' AND unit_cost > 0 LIMIT 1`,
+          WHERE org_id = ? AND operation LIKE '%video%' AND unit_cost > 0 LIMIT 1`,
       )
+      .bind(org)
       .first<{ n: number }>()
     videoPriced = row !== null
   } catch {
@@ -2541,10 +2546,11 @@ async function ownerFacts(c: {
   try {
     const row = await c.env.DB
       .prepare(
-        `SELECT detail FROM audit_log WHERE action = 'media.animate'
+        `SELECT detail FROM audit_log WHERE org_id = ? AND action = 'media.animate'
             AND (detail LIKE 'generated%' OR detail LIKE 'failed:%')
           ORDER BY at DESC, rowid DESC LIMIT 1`,
       )
+      .bind(org)
       .first<{ detail: string | null }>()
     if (row !== null) gatewayCredit = (row.detail ?? '').includes(NO_CREDIT) ? 'short' : 'ok'
   } catch {
@@ -2588,7 +2594,7 @@ panel.get('/panel/tasks', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const gates = gatesOf(await readGateFacts(c.env.DB))
+  const gates = gatesOf(await readGateFacts(c.env.DB, activeOrg(session.record)))
   const body = tasksScreen({
     rows: ownerRows(await ownerFacts(c, activeOrg(session.record))),
     gates,
@@ -2626,7 +2632,7 @@ panel.get('/panel/report', async (c) => {
   const body = reportScreen({
     reports,
     current: reports[0] ?? null,
-    suggestions: await openSuggestions(c.env.DB),
+    suggestions: await openSuggestions(c.env.DB, activeOrg(session.record)),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
     // ‏ما أُنفق هذا الشهر حتّى اليوم، تحت الرأس (ر-10) — حيٌّ من الدفتر لا من التقرير
@@ -2705,7 +2711,7 @@ panel.get('/panel/report/:week', async (c) => {
   const body = reportScreen({
     reports: await listReports(c.env.DB, activeOrg(session.record)),
     current: stored,
-    suggestions: await openSuggestions(c.env.DB),
+    suggestions: await openSuggestions(c.env.DB, activeOrg(session.record)),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
     month: await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date()),
@@ -2735,7 +2741,7 @@ panel.post('/panel/report/promote', async (c) => {
   }
   if (postId === '') return c.json({ error: 'missing_post' }, 400)
 
-  const changed = await decidePromotion(c.env.DB, postId, raw)
+  const changed = await decidePromotion(c.env.DB, activeOrg(gate.session.record), postId, raw)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'promotion.decide', target: postId, detail: raw },
@@ -2769,8 +2775,9 @@ panel.get('/panel/media/:id', async (c) => {
   if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
 
   const row = await c.env.DB
-    .prepare('SELECT r2_key, mime FROM media WHERE id = ?')
-    .bind(c.req.param('id'))
+    // ‏صورةُ منظّمةٍ لا تُسلَّم من جلسةٍ نشطةٍ في غيرها (D-271)
+    .prepare('SELECT r2_key, mime FROM media WHERE id = ? AND org_id = ?')
+    .bind(c.req.param('id'), activeOrg(session.record))
     .first<{ r2_key: string; mime: string }>()
   if (row === null) return c.text('لا صورة', 404)
 
@@ -3028,7 +3035,8 @@ panel.post('/panel/drafts/decide', async (c) => {
   if (wants !== 'reject') {
     const sent = form.get('text')
     text = sent === null
-      ? (await c.env.DB.prepare('SELECT text FROM posts WHERE id = ?').bind(id).first<{ text: string }>())?.text ?? ''
+      ? (await c.env.DB.prepare('SELECT text FROM posts WHERE id = ? AND org_id = ?')
+          .bind(id, activeOrg(gate.session.record)).first<{ text: string }>())?.text ?? ''
       : String(sent)
   }
   const result = await decide(
@@ -3044,7 +3052,7 @@ panel.post('/panel/drafts/decide', async (c) => {
    */
   let scheduled: ScheduleResult | null = null
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
-    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now)
+    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record))
     await record(c.env.DB, {
       actor: 'panel', action: 'draft.schedule', target: id, detail: scheduled.ok ? scheduled.at : `refused:${scheduled.reason}`,
     }, c.req.raw)
@@ -3250,6 +3258,7 @@ panel.post('/panel/drafts/schedule', async (c) => {
     // ‏و«when» بـ UTC من شريط البطاقة، أو زرٌّ ويومٌ بتوقيت المالك من المحرّر (D-198)
     readWhen(form, zone, now),
     now,
+    activeOrg(gate.session.record),
   )
 
   let flash: PanelFlash = result.ok
@@ -3262,7 +3271,8 @@ panel.post('/panel/drafts/schedule', async (c) => {
 
   // ‏YouTube وTikTok يصلان خاصَّين (ر-4): يُقال في إشعار الجدولة، لا في صفحة المنصّة وحدها
   const scheduled = result.ok
-    ? await c.env.DB.prepare('SELECT platform FROM posts WHERE id = ?').bind(id).first<{ platform: string }>()
+    ? await c.env.DB.prepare('SELECT platform FROM posts WHERE id = ? AND org_id = ?')
+        .bind(id, activeOrg(gate.session.record)).first<{ platform: string }>()
     : null
   // ‏ويسكت حين قلب المالكُ النشرَ علنيًّا بعد الإجازة (D-190)
   const reach = scheduled === null ? null : privateReach([scheduled.platform], await reachNow(c.env.DB, activeOrg(gate.session.record)))
@@ -3416,7 +3426,7 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   let first: string | null = null
   const failed: string[] = []
   for (const slot of plan.slots) {
-    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date())
+    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date(), activeOrg(gate.session.record))
     if (result.ok) {
       done += 1
       first ??= result.at
@@ -3459,7 +3469,7 @@ panel.post('/panel/drafts/unschedule', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await unschedule(c.env.DB, id)
+  const result = await unschedule(c.env.DB, id, activeOrg(gate.session.record))
 
   const flash: PanelFlash = result.ok
     ? { kind: 'ok', text: 'سُحب الموعد — وتبقى معتمَدةً تنتظر موعدا جديدا.' }
@@ -3493,7 +3503,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   const id = String(form.get('id') ?? '')
   const now = new Date()
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now)
+  const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now, activeOrg(gate.session.record))
   await record(c.env.DB, {
     actor: 'panel', action: 'draft.reschedule', target: id, detail: result.ok ? result.at : `refused:${result.reason}`,
   }, c.req.raw)
@@ -3523,7 +3533,7 @@ panel.post('/panel/drafts/requeue', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await requeue(c.env.DB, id, new Date())
+  const result = await requeue(c.env.DB, id, new Date(), activeOrg(gate.session.record))
 
   await record(
     c.env.DB,
@@ -3582,7 +3592,7 @@ panel.post('/panel/uploads/:id/part', async (c) => {
   if ('denied' in gate) return gate.denied
   const chunk = gate.form.get('chunk')
   if (!(chunk instanceof Blob)) return Response.json({ ok: false, reason: 'قطعة بلا بايتات' }, { status: 400 })
-  const result = await uploadPart(c.env.DB, c.env.MEDIA, c.req.param('id'), Number(gate.form.get('n')),
+  const result = await uploadPart(c.env.DB, activeOrg(gate.session.record), c.env.MEDIA, c.req.param('id'), Number(gate.form.get('n')),
     await chunk.arrayBuffer())
   return Response.json(result, { status: result.ok ? 200 : 400 })
 })
@@ -3600,7 +3610,7 @@ panel.post('/panel/uploads/:id/complete', async (c) => {
     parts = []
   }
   const id = c.req.param('id')
-  const result = await completeUpload(c.env.DB, c.env.MEDIA, id, parts)
+  const result = await completeUpload(c.env.DB, activeOrg(gate.session.record), c.env.MEDIA, id, parts)
   await record(c.env.DB, {
     actor: 'panel', action: 'upload.complete', target: id,
     detail: result.ok ? `${parts.length} parts` : `refused:${result.reason}`.slice(0, 200),
@@ -3612,7 +3622,7 @@ panel.post('/panel/uploads/:id/complete', async (c) => {
 panel.post('/panel/uploads/:id/abort', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
-  await abortUpload(c.env.DB, c.env.MEDIA, c.req.param('id'))
+  await abortUpload(c.env.DB, activeOrg(gate.session.record), c.env.MEDIA, c.req.param('id'))
   // ‏زرُّ «ألغِ» في المكتبة نموذجٌ لا `fetch` (D-182): يعود إلى «فيديوهاتك» برسالته
   if (gate.form.get('from') === 'library') {
     await record(c.env.DB, { actor: 'panel', action: 'upload.abort', target: c.req.param('id') }, c.req.raw)
@@ -3633,7 +3643,7 @@ panel.post('/panel/uploads/:id/captions', async (c) => {
   const id = c.req.param('id')
   const out = await captionsFor(
     {
-      db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, kv: c.env.KV,
+      db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, kv: c.env.KV, org: activeOrg(gate.session.record),
       workerSecrets: c.env as unknown as Record<string, string | undefined>,
     },
     id,
@@ -3697,6 +3707,7 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
     instagram: pick('caption_instagram', cached?.instagram ?? ''),
   }
   const result = await postsFromUpload(c.env.DB, {
+    org: activeOrg(gate.session.record),
     uploadId: id,
     platforms: form.getAll('platform').map(String),
     ...(perPlatform
@@ -3745,10 +3756,12 @@ panel.post('/panel/uploads/:id/posts', async (c) => {
     ? presetAt(String(form.get('preset') ?? ''), now, zone)
     : null
   const planned = at === null ? null : await scheduleFromUpload(c.env.DB, {
+    org: activeOrg(gate.session.record),
     uploadId: id,
     shown: (await c.env.DB
-      .prepare(`SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id WHERE m.upload_id = ?`)
-      .bind(id).all<{ id: string; platform: string }>()).results
+      .prepare(`SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+                 WHERE m.upload_id = ? AND m.org_id = ?`)
+      .bind(id, activeOrg(gate.session.record)).all<{ id: string; platform: string }>()).results
       .filter((r) => (result.ok ? result.created as readonly string[] : []).includes(r.platform)).map((r) => r.id),
     accounts: await listAccounts(c.env.DB, activeOrg(gate.session.record)),
     at,
@@ -3800,6 +3813,7 @@ panel.post('/panel/uploads/:id/schedule', async (c) => {
   const zone = validZone(String(gate.form.get('tz') ?? '')) ?? await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const at = presetAt(String(gate.form.get('preset') ?? ''), now, zone)
   const result = at === null ? null : await scheduleFromUpload(c.env.DB, {
+    org: activeOrg(gate.session.record),
     uploadId: id,
     shown: gate.form.getAll('post').map(String),
     accounts: await listAccounts(c.env.DB, activeOrg(gate.session.record)),
@@ -3838,11 +3852,12 @@ const PLAN_TTL = 2 * 60 * 60
 
 async function planFacts(env: Env, org: string, cookie: string | null, now: Date): Promise<PlanFacts> {
   const { results: scheduled } = await env.DB
-    .prepare(`SELECT platform, text, scheduled_at AS at FROM posts WHERE status = 'queued' AND scheduled_at IS NOT NULL LIMIT 1000`)
+    .prepare(`SELECT platform, text, scheduled_at AS at FROM posts WHERE org_id = ? AND status = 'queued' AND scheduled_at IS NOT NULL LIMIT 1000`)
+    .bind(org)
     .all<{ platform: string; text: string; at: string }>()
   return {
     accounts: await listAccounts(env.DB, org),
-    uploads: await listUploads(env.DB, 200),
+    uploads: await listUploads(env.DB, org, 200),
     now,
     zone: (await ownerZone(env.DB, cookie)) ?? DEFAULT_ZONE,
     publishable: new Set(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id)),
@@ -3936,7 +3951,7 @@ panel.post('/panel/plan-import/:id/approve', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'هذه المعاينة قديمة — افتحها من جديد ثمّ اعتمد.' })
     return new Response(null, { status: 303, headers: { Location: `/panel/plan-import/${id}` } })
   }
-  const outcomes = await applyPlan(c.env.DB, read.rows, by, now, shown)
+  const outcomes = await applyPlan(c.env.DB, activeOrg(gate.session.record), read.rows, by, now, shown)
   // ‏المعاينةُ استُهلكت: ضغطةٌ ثانيةٌ على «اعتمد» من نافذةٍ قديمةٍ لا تجد ما تعيده
   await c.env.KV.delete(`plan-import:${id}`)
   const scheduled = outcomes.filter((o) => o.result === 'scheduled').length

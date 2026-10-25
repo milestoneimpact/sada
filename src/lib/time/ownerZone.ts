@@ -11,6 +11,7 @@
  * وليست في `SETTING_KEYS`: لا يضبطها نموذجٌ في اللوحة، ولا تدخل في قرارِ أمنٍ ولا إنفاق.
  */
 import type { Db } from '../tokens'
+import { OWNER_ORG } from '../tenancy'
 import { validZone, zoneOf } from './zone'
 
 export const ZONE_SETTING = 'owner_tz'
@@ -18,7 +19,11 @@ export const ZONE_SETTING = 'owner_tz'
 /** المنطقةُ المحفوظة إن كانت صالحة — وأيُّ عطلٍ في القراءة يعني «لا شيء» لا انكسارَ الصفحة. */
 export async function storedZone(db: Db): Promise<string | null> {
   try {
-    const row = await db.prepare('SELECT value FROM settings WHERE key = ?').bind(ZONE_SETTING).first<{ value: string }>()
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    const row = await db
+      .prepare('SELECT value FROM settings WHERE key = ? AND org_id = ?')
+      .bind(ZONE_SETTING, OWNER_ORG)
+      .first<{ value: string }>()
     return validZone(row?.value ?? null)
   } catch {
     return null
@@ -36,10 +41,11 @@ export async function ownerZone(db: Db, cookieHeader: string | null): Promise<st
   if (fromCookie !== stored) {
     try {
       await db.prepare(
-        `INSERT INTO settings (key, value, updated_by, updated_at)
-         VALUES (?, ?, 'browser', datetime('now'))
+        `INSERT INTO settings (key, value, updated_by, updated_at, org_id)
+         -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+         VALUES (?, ?, 'browser', datetime('now'), ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = 'browser', updated_at = datetime('now')`,
-      ).bind(ZONE_SETTING, fromCookie).run()
+      ).bind(ZONE_SETTING, fromCookie, OWNER_ORG).run()
     } catch {
       // ‏كتابةٌ فشلت لا تُسقط الصفحة: الكعكةُ في يدنا لهذا الطلب
     }

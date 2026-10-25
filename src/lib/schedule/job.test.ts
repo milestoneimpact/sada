@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, schedulePost, sweepStuck, unmarkDispatched, unschedule,
+  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, reschedulePost, schedulePost, sweepStuck, unmarkDispatched, unschedule,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -577,5 +577,20 @@ describe('الكنّاس (D-270)', () => {
     await sweepStuck(db, LATER)
     const out = await requeue(db, post, new Date('2026-09-08T12:00:00Z'))
     expect(out.ok).toBe(true)
+  })
+})
+
+
+/** ‏منظّمةُ الجلسة تُفرَض على أفعال اللوحة (D-271): منشورُ منظّمةٍ أخرى «لا منشور». */
+describe('منظّمة الجلسة على أفعال الجدولة (D-271)', () => {
+  it('schedulePost وunschedule وreschedulePost وrequeue تردّ منشورَ منظّمةٍ أخرى', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    expect((await schedulePost(db, post, account, SOON, NOW, 'org_other')).ok).toBe(false)
+    expect((await schedulePost(db, post, account, SOON, NOW, 'org_owner')).ok).toBe(true)
+    expect((await reschedulePost(db, post, '2026-09-08T11:00', NOW, 'org_other')).ok).toBe(false)
+    expect((await unschedule(db, post, 'org_other')).ok).toBe(false)
+    expect((await unschedule(db, post, 'org_owner')).ok).toBe(true)
+    expect((await requeue(db, post, NOW, 'org_other')).ok).toBe(false)
   })
 })

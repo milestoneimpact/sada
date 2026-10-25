@@ -134,10 +134,11 @@ interface Pending {
   readonly multipart_id: string | null
 }
 
-async function pending(db: Db, id: string): Promise<Pending | null> {
+/** الرفعُ الجاري — في منظّمة الجلسة وحدَها (D-271). */
+async function pending(db: Db, org: string, id: string): Promise<Pending | null> {
   return db
-    .prepare('SELECT r2_key, bytes, status, multipart_id FROM uploads WHERE id = ?')
-    .bind(id)
+    .prepare('SELECT r2_key, bytes, status, multipart_id FROM uploads WHERE id = ? AND org_id = ?')
+    .bind(id, org)
     .first<Pending>()
 }
 
@@ -147,12 +148,13 @@ async function pending(db: Db, id: string): Promise<Pending | null> {
  */
 export async function uploadPart(
   db: Db,
+  org: string,
   bucket: MultipartBucket,
   id: string,
   partNumber: number,
   body: ArrayBuffer,
 ): Promise<{ ok: true; part: { partNumber: number; etag: string } } | { ok: false; reason: string }> {
-  const row = await pending(db, id)
+  const row = await pending(db, org, id)
   if (row === null || row.status !== 'uploading' || row.multipart_id === null) {
     return { ok: false, reason: 'لا رفع جاريًا بهذا المعرّف' }
   }
@@ -169,11 +171,12 @@ export async function uploadPart(
 /** يجمع القطعَ في R2 ويعلن المقطعَ جاهزًا — **وكلُّ القطع حاضرةٌ أو لا شيء**. */
 export async function completeUpload(
   db: Db,
+  org: string,
   bucket: MultipartBucket,
   id: string,
   parts: readonly { partNumber: number; etag: string }[],
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const row = await pending(db, id)
+  const row = await pending(db, org, id)
   if (row === null || row.status !== 'uploading' || row.multipart_id === null) {
     return { ok: false, reason: 'لا رفع جاريًا بهذا المعرّف' }
   }
@@ -185,8 +188,8 @@ export async function completeUpload(
   await bucket.resumeMultipartUpload(row.r2_key, row.multipart_id)
     .complete([...parts].sort((a, b) => a.partNumber - b.partNumber))
   await db
-    .prepare(`UPDATE uploads SET status = 'ready', multipart_id = NULL, ready_at = datetime('now') WHERE id = ?`)
-    .bind(id)
+    .prepare(`UPDATE uploads SET status = 'ready', multipart_id = NULL, ready_at = datetime('now') WHERE id = ? AND org_id = ?`)
+    .bind(id, org)
     .run()
   return { ok: true }
 }
@@ -202,37 +205,38 @@ export const STALE_UPLOAD_HOURS = 6
 export async function expireStaleUploads(db: Db, bucket: MultipartBucket, now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_UPLOAD_HOURS * 3_600_000).toISOString().slice(0, 19).replace('T', ' ')
   const { results } = await db
-    .prepare(`SELECT id, r2_key, multipart_id FROM uploads WHERE status = 'uploading' AND created_at < ? LIMIT 50`)
+    // ‏دورةٌ تعبر المنظّمات كلَّها (D-271): تقرأ منظّمةَ كلّ صفٍّ وتعلّمه بها
+    .prepare(`SELECT id, org_id, r2_key, multipart_id FROM uploads WHERE status = 'uploading' AND created_at < ? LIMIT 50`)
     .bind(cutoff)
-    .all<{ id: string; r2_key: string; multipart_id: string | null }>()
+    .all<{ id: string; org_id: string; r2_key: string; multipart_id: string | null }>()
   for (const row of results) {
     if (row.multipart_id !== null) {
       await Promise.resolve()
         .then(() => bucket.resumeMultipartUpload(row.r2_key, row.multipart_id!).abort())
         .catch(() => undefined)
     }
-    await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ? AND status = 'uploading'`).bind(row.id).run()
+    await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ? AND org_id = ? AND status = 'uploading'`).bind(row.id, row.org_id).run()
   }
   return results.length
 }
 
 /** يلغي رفعًا لم يكتمل — R2 يحذف قطعه، والصفُّ يُعلَّم فاشلًا لا يُمحى. */
-export async function abortUpload(db: Db, bucket: MultipartBucket, id: string): Promise<void> {
-  const row = await pending(db, id)
+export async function abortUpload(db: Db, org: string, bucket: MultipartBucket, id: string): Promise<void> {
+  const row = await pending(db, org, id)
   if (row === null || row.status !== 'uploading' || row.multipart_id === null) return
   await bucket.resumeMultipartUpload(row.r2_key, row.multipart_id).abort().catch(() => undefined)
-  await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ?`).bind(id).run()
+  await db.prepare(`UPDATE uploads SET status = 'failed', multipart_id = NULL WHERE id = ? AND org_id = ?`).bind(id, org).run()
 }
 
 /** ‏ترتيبُ المكتبة ونافذتُها — **نصٌّ واحدٌ للنداءين**: المقاطعُ ومنشوراتُها من النافذة نفسِها. */
-const LIBRARY = `SELECT id FROM uploads WHERE status != 'failed' ORDER BY created_at DESC, id LIMIT ?`
+const LIBRARY = `SELECT id FROM uploads WHERE org_id = ? AND status != 'failed' ORDER BY created_at DESC, id LIMIT ?`
 
 interface LibraryRow {
   id: string; r2_key: string; name: string; mime: string; bytes: number; width: number | null
   height: number | null; duration_ms: number | null; status: UploadRow['status']; created_at: string
 }
 
-export async function listUploads(db: Db, limit = 20): Promise<UploadRow[]> {
+export async function listUploads(db: Db, org: string, limit = 20): Promise<UploadRow[]> {
   let results: LibraryRow[]
   try {
     results = (await db
@@ -240,10 +244,10 @@ export async function listUploads(db: Db, limit = 20): Promise<UploadRow[]> {
         // ‏ووقتُ المقطع وقتُ اكتماله إن اكتمل: «رُفع قبل ساعة» لا «بدأ رفعُه»
         `SELECT u.id, u.r2_key, u.name, u.mime, u.bytes, u.width, u.height, u.duration_ms, u.status,
                 COALESCE(u.ready_at, u.created_at) AS created_at
-           FROM uploads u WHERE u.id IN (${LIBRARY})
+           FROM uploads u WHERE u.org_id = ? AND u.id IN (${LIBRARY})
           ORDER BY u.created_at DESC, u.id`,
       )
-      .bind(limit)
+      .bind(org, org, limit)
       .all<LibraryRow>()).results
   } catch {
     // ‏جدولٌ لم يُرحَّل بعد: اللوحةُ تُفتح بلا مكتبةٍ ولا تسقط
@@ -267,13 +271,13 @@ export async function listUploads(db: Db, limit = 20): Promise<UploadRow[]> {
           `SELECT m.upload_id, p.id, p.platform, p.status,
                   CASE WHEN p.status = 'published' THEN
                     (SELECT json_extract(pa.response_json, '$.note') FROM publish_attempts pa
-                      WHERE pa.post_id = p.id AND pa.status = 'succeeded'
+                      WHERE pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
                       ORDER BY pa.attempt_no DESC LIMIT 1) END AS note
-             FROM media m JOIN posts p ON p.id = m.post_id
-            WHERE m.upload_id IN (${LIBRARY}) AND p.status != 'rejected'
+             FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+            WHERE m.org_id = ? AND m.upload_id IN (${LIBRARY}) AND p.status != 'rejected'
             ORDER BY p.created_at DESC, p.id`,
         )
-        .bind(limit)
+        .bind(org, org, limit)
         .all<{ upload_id: string; id: string; platform: string; status: string; note: string | null }>()).results
     } catch (error) {
       console.error({ job: 'uploads.list', posts_failed: String(error).slice(0, 200) })
@@ -492,10 +496,10 @@ export function isVideoPlatform(p: string): p is VideoPlatform {
 /** ما يُنسخ من صفّ المقطع إلى صفّ الوسيط. */
 export type UploadFacts = { r2_key: string; mime: string; bytes: number; width: number | null; height: number | null; duration_ms: number | null }
 
-export async function readyUpload(db: Db, uploadId: string): Promise<UploadFacts | null> {
+export async function readyUpload(db: Db, org: string, uploadId: string): Promise<UploadFacts | null> {
   return db
-    .prepare('SELECT r2_key, mime, bytes, width, height, duration_ms FROM uploads WHERE id = ? AND status = ?')
-    .bind(uploadId, 'ready')
+    .prepare('SELECT r2_key, mime, bytes, width, height, duration_ms FROM uploads WHERE id = ? AND org_id = ? AND status = ?')
+    .bind(uploadId, org, 'ready')
     .first<UploadFacts>()
 }
 
@@ -530,6 +534,8 @@ export type PostsResult =
 export async function postsFromUpload(
   db: Db,
   input: {
+    /** منظّمةُ الجلسة — المقطعُ ومنشوراتُه فيها وحدَها (D-271). */
+    readonly org: string
     readonly uploadId: string
     readonly platforms: readonly string[]
     readonly caption?: string
@@ -557,8 +563,8 @@ export async function postsFromUpload(
       ? youtubeText(input.title ?? '', input.captions?.youtube ?? '')
       : clean(input.captions?.[p] ?? '')
   const row = await db
-    .prepare('SELECT id, r2_key, mime, bytes, width, height, duration_ms, status FROM uploads WHERE id = ?')
-    .bind(input.uploadId)
+    .prepare('SELECT id, r2_key, mime, bytes, width, height, duration_ms, status FROM uploads WHERE id = ? AND org_id = ?')
+    .bind(input.uploadId, input.org)
     .first<{ id: string; r2_key: string; mime: string; bytes: number; width: number | null; height: number | null; duration_ms: number | null; status: string }>()
   if (row === null || row.status !== 'ready') return { ok: false, reason: 'المقطع لم يكتمل رفعُه' }
 
@@ -587,12 +593,12 @@ export async function postsFromUpload(
   for (const platform of allowed) {
     const key = `upload:${row.id}:${platform}`
     const exists = await db
-      .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
-      .bind(key)
+      .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
+      .bind(key, input.org)
       .first<{ id: string; status: string }>()
     if (exists !== null && exists.status !== 'rejected') {
       // ‏منشورٌ بلا مقطعه (كُتب قبل أن تصير الكتابةُ ذرّيّة): يُكمَّل ولا يُكرَّر
-      const has = await db.prepare('SELECT 1 AS x FROM media WHERE post_id = ? AND upload_id = ?').bind(exists.id, row.id).first()
+      const has = await db.prepare('SELECT 1 AS x FROM media WHERE post_id = ? AND upload_id = ? AND org_id = ?').bind(exists.id, row.id, input.org).first()
       if (has === null) await uploadMediaRow(db, exists.id, row.id, media).run()
       skipped.push(platform)
       continue
@@ -602,8 +608,8 @@ export async function postsFromUpload(
     if (exists !== null) {
       // ‏رفضه المالكُ ليبدأ من جديد: المرفوضُ يبقى سجلًّا، ومفتاحُه يُحرَّر (كـ D-088)
       statements.push(db
-        .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id WHERE id = ?`)
-        .bind(exists.id))
+        .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id WHERE id = ? AND org_id = ?`)
+        .bind(exists.id, input.org))
     }
     statements.push(db
       .prepare(
@@ -652,6 +658,8 @@ export interface UploadSchedule {
 export async function scheduleFromUpload(
   db: Db,
   input: {
+    /** منظّمةُ الجلسة (D-271). */
+    readonly org: string
     readonly uploadId: string
     readonly shown: readonly string[]
     readonly accounts: readonly LinkedAccount[]
@@ -661,10 +669,10 @@ export async function scheduleFromUpload(
 ): Promise<UploadSchedule> {
   const { results } = await db
     .prepare(
-      `SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id
-        WHERE m.upload_id = ? AND p.status IN ('approved', 'edited') ORDER BY p.created_at, p.id`,
+      `SELECT p.id, p.platform FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+        WHERE m.upload_id = ? AND m.org_id = ? AND p.status IN ('approved', 'edited') ORDER BY p.created_at, p.id`,
     )
-    .bind(input.uploadId)
+    .bind(input.uploadId, input.org)
     .all<{ id: string; platform: string }>()
   const when = input.at.toISOString().slice(0, 16)
   const scheduled: string[] = []

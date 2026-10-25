@@ -36,6 +36,8 @@ export interface CostEntry {
   readonly units: number
   readonly unitCost: number
   readonly refId?: string | undefined
+  /** منظّمةُ ما أُنفق عليه حين يعرفها النادي (D-271) — وإلّا تُستنتَج من المرجع. */
+  readonly org?: string | undefined
 }
 
 /**
@@ -81,10 +83,10 @@ export async function recordCost(db: Db, entry: CostEntry): Promise<string> {
     .prepare(
       `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, ref_id, org_id)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,
-               -- ‏الكلفة لمنظّمة ما أُنفقت عليه، وما لا مرجع له فللمالك
-               coalesce((SELECT org_id FROM posts WHERE id = ?7), (SELECT org_id FROM sources WHERE id = ?7), 'org_owner'))`,
+               -- ‏الكلفة لمنظّمة ما أُنفقت عليه: ما سمّاه النادي، وإلّا من المرجع، وما لا مرجع له فللمالك
+               coalesce(?8, (SELECT org_id FROM posts WHERE id = ?7), (SELECT org_id FROM sources WHERE id = ?7), 'org_owner'))`,
     )
-    .bind(id, entry.provider, entry.operation, entry.units, entry.unitCost, total, entry.refId ?? null)
+    .bind(id, entry.provider, entry.operation, entry.units, entry.unitCost, total, entry.refId ?? null, entry.org ?? null)
     .run()
   return id
 }

@@ -22,6 +22,7 @@
  */
 import { importKey, open, seal, toBase64 } from '../crypto'
 import type { Db } from '../tokens'
+import { OWNER_ORG } from '../tenancy'
 import type { Platform } from './providers'
 
 export function secretContext(platform: Platform): string {
@@ -83,8 +84,9 @@ export async function readApp(
   let row: { client_id: string; secret_enc: string; secret_iv: string } | null
   try {
     row = await db
-      .prepare('SELECT client_id, secret_enc, secret_iv FROM oauth_apps WHERE platform = ?')
-      .bind(platform)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      .prepare('SELECT client_id, secret_enc, secret_iv FROM oauth_apps WHERE platform = ? AND org_id = ?')
+      .bind(platform, OWNER_ORG)
       .first<{ client_id: string; secret_enc: string; secret_iv: string }>()
   } catch {
     return null
@@ -147,8 +149,11 @@ export async function appStatuses(
       .prepare(
         `SELECT platform, client_id, hint, updated_at, updated_by,
                 verified_at, verified_kind
-           FROM oauth_apps`,
+           FROM oauth_apps
+          -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+          WHERE org_id = ?`,
       )
+      .bind(OWNER_ORG)
       .all<Record<string, string>>()
     rows = result.results
   } catch {
@@ -221,9 +226,10 @@ export async function recordVerification(
       .prepare(
         `UPDATE oauth_apps
             SET verified_at = datetime('now'), verified_kind = ?
-          WHERE platform = ?`,
+          -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+          WHERE platform = ? AND org_id = ?`,
       )
-      .bind(kind, platform)
+      .bind(kind, platform, OWNER_ORG)
       .run()
   } catch {
     // أثرٌ لم يُكتَب لا يُسقط فحصا وقع — والمالكُ رأى جوابَه في الإشعار
@@ -256,8 +262,9 @@ export async function saveApp(
   if (secret.length === 0) throw new Error('سرّ التطبيق فارغ')
 
   const before = await db
-    .prepare('SELECT fingerprint FROM oauth_apps WHERE platform = ?')
-    .bind(platform)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    .prepare('SELECT fingerprint FROM oauth_apps WHERE platform = ? AND org_id = ?')
+    .bind(platform, OWNER_ORG)
     .first<{ fingerprint: string }>()
 
   const print = await fingerprint(secret)
@@ -266,8 +273,9 @@ export async function saveApp(
 
   await db
     .prepare(
-      `INSERT INTO oauth_apps (platform, client_id, secret_enc, secret_iv, hint, fingerprint, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO oauth_apps (platform, client_id, secret_enc, secret_iv, hint, fingerprint, updated_by, org_id)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(platform) DO UPDATE SET
          client_id = excluded.client_id, secret_enc = excluded.secret_enc,
          secret_iv = excluded.secret_iv, hint = excluded.hint,
@@ -280,7 +288,7 @@ export async function saveApp(
          -- ويُبطَل ولو لم يتبدّل السرّ — المعرّف قد يتبدّل وحدَه.
          verified_at = NULL, verified_kind = NULL`,
     )
-    .bind(platform, id, sealed.ciphertext, sealed.iv, hint, print, by)
+    .bind(platform, id, sealed.ciphertext, sealed.iv, hint, print, by, OWNER_ORG)
     .run()
 
   return { hint, unchanged: before?.fingerprint === print }
@@ -289,10 +297,11 @@ export async function saveApp(
 /** حذفُ التطبيق من الخزانة — ولا يمسّ ما في البيئة. */
 export async function deleteApp(db: Db, platform: Platform): Promise<boolean> {
   const row = await db
-    .prepare('SELECT platform FROM oauth_apps WHERE platform = ?')
-    .bind(platform)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    .prepare('SELECT platform FROM oauth_apps WHERE platform = ? AND org_id = ?')
+    .bind(platform, OWNER_ORG)
     .first<{ platform: string }>()
   if (row === null) return false
-  await db.prepare('DELETE FROM oauth_apps WHERE platform = ?').bind(platform).run()
+  await db.prepare('DELETE FROM oauth_apps WHERE platform = ? AND org_id = ?').bind(platform, OWNER_ORG).run()
   return true
 }

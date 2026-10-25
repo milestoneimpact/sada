@@ -398,6 +398,8 @@ const EXISTING: Readonly<Record<string, string>> = {
  */
 export async function applyPlan(
   db: Db,
+  /** منظّمةُ الجلسة — المفاتيحُ والمقاطعُ والمنشوراتُ فيها وحدَها (D-271). */
+  org: string,
   rows: readonly PlanRow[],
   by: string,
   now: Date,
@@ -412,10 +414,10 @@ export async function applyPlan(
     }
     const key = await rowKey(row)
     const existing = await db
-      .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
-      .bind(key)
+      .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
+      .bind(key, org)
       .first<{ id: string; status: string }>()
-    const upload = row.uploadId === null ? null : await readyUpload(db, row.uploadId)
+    const upload = row.uploadId === null ? null : await readyUpload(db, org, row.uploadId)
     if (row.uploadId !== null && upload === null) {
       out.push({ line: row.line, result: 'failed', reason: 'المقطع لم يعد جاهزًا' })
       continue
@@ -426,7 +428,7 @@ export async function applyPlan(
       // ‏كُتب ولم يُجدوَل: يُكمَّل وسيطُه إن نقص، ثمّ يُجدوَل
       postId = existing.id
       if (row.uploadId !== null && upload !== null) {
-        const has = await db.prepare('SELECT 1 AS x FROM media WHERE post_id = ? AND upload_id = ?').bind(postId, row.uploadId).first()
+        const has = await db.prepare('SELECT 1 AS x FROM media WHERE post_id = ? AND upload_id = ? AND org_id = ?').bind(postId, row.uploadId, org).first()
         if (has === null) await uploadMediaRow(db, postId, row.uploadId, upload).run()
       }
     } else if (existing !== null && existing.status !== 'rejected') {
@@ -437,8 +439,8 @@ export async function applyPlan(
       if (existing !== null) {
         // ‏رفضه المالكُ ثمّ اعتمد الملفَّ من جديد: المرفوضُ يبقى سجلًّا، ومفتاحُه يُحرَّر (كـ D-088)
         statements.push(db
-          .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id WHERE id = ?`)
-          .bind(existing.id))
+          .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id WHERE id = ? AND org_id = ?`)
+          .bind(existing.id, org))
       }
       postId = crypto.randomUUID()
       statements.push(db

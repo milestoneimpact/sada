@@ -30,15 +30,15 @@ describe('لا سرّ في المتن — والحدّ يُفرَض قبل ال�
   })
 
   it('ولا يمسك متنا سليما', () => {
-    expect(looksSecret(tokenAlert('صفحة صدى', 7, 'refresh').body)).toBe(false)
-    expect(looksSecret(publishAlert('p1', 'linkedin', 3).body)).toBe(false)
+    expect(looksSecret(tokenAlert('صفحة صدى', 7, 'refresh', 'org_owner').body)).toBe(false)
+    expect(looksSecret(publishAlert('p1', 'linkedin', 3, 'org_owner').body)).toBe(false)
     expect(looksSecret(budgetAlert('2026-09-09', 5, 5).body)).toBe(false)
   })
 
   /** **ولا يُعدّ فشلا يُعاد**: إعادةُ المحاولة تُعيد إرسالَ السرّ. */
   it('**ومتن يحمل سرّا لا يُنادى أصلا**', async () => {
     const f = ok()
-    const r = await sendAlerts(db, HOOK, [{ kind: 'token', ref: 'x', body: 'Bearer zzz' }], f)
+    const r = await sendAlerts(db, HOOK, [{ kind: 'token', ref: 'x', body: 'Bearer zzz', org: 'org_owner' }], f)
     expect(f).not.toHaveBeenCalled()
     expect(r.failed).toBe(1)
     expect(r.sent).toBe(0)
@@ -50,9 +50,9 @@ describe('لا سرّ في المتن — والحدّ يُفرَض قبل ال�
 
 describe('نصّ تنبيه الإذن بعدده (D-184)', () => {
   it('يوم واحد، وسبعة أيّام، والصفر «انتهى» لا «خلال 0 يومًا»', () => {
-    expect(tokenAlert('ح', 1, 'access').body).toContain('ينتهي خلال يوم واحد.')
-    expect(tokenAlert('ح', 7, 'access').body).toContain('ينتهي خلال 7 أيّام.')
-    const gone = tokenAlert('ح', 0, 'refresh')
+    expect(tokenAlert('ح', 1, 'access', 'org_owner').body).toContain('ينتهي خلال يوم واحد.')
+    expect(tokenAlert('ح', 7, 'access', 'org_owner').body).toContain('ينتهي خلال 7 أيّام.')
+    const gone = tokenAlert('ح', 0, 'refresh', 'org_owner')
     expect(gone.body).toContain('إذن التجديد لحساب «ح» انتهى.')
     expect(gone.body).not.toMatch(/0 يوم/)
     expect(gone.ref).toBe('token:ح:refresh:0')
@@ -61,7 +61,7 @@ describe('نصّ تنبيه الإذن بعدده (D-184)', () => {
 
 describe('ولا يُرسَل حدث مرّتين (D-004)', () => {
   it('والثانية تُتخطّى بالقيد لا بالشيفرة', async () => {
-    const a = tokenAlert('صفحة صدى', 7, 'refresh')
+    const a = tokenAlert('صفحة صدى', 7, 'refresh', 'org_owner')
     const f = ok()
     expect((await sendAlerts(db, HOOK, [a], f)).sent).toBe(1)
     const again = await sendAlerts(db, HOOK, [a], f)
@@ -78,8 +78,8 @@ describe('ولا يُرسَل حدث مرّتين (D-004)', () => {
    * حارسا (D-073) — **وحارسٌ يمرّ على اثنين من ثلاثةٍ يُقرأ حارسا**.
    */
   it.each([
-    ['token', () => tokenAlert('ح', 7, 'refresh'), () => tokenAlert('ح', 1, 'refresh')],
-    ['publish', () => publishAlert('p1', 'linkedin', 3), () => publishAlert('p2', 'linkedin', 3)],
+    ['token', () => tokenAlert('ح', 7, 'refresh', 'org_owner'), () => tokenAlert('ح', 1, 'refresh', 'org_owner')],
+    ['publish', () => publishAlert('p1', 'linkedin', 3, 'org_owner'), () => publishAlert('p2', 'linkedin', 3, 'org_owner')],
     ['budget', () => budgetAlert('2026-09-09', 5, 5), () => budgetAlert('2026-09-10', 5, 5)],
   ])('ومفتاح %s يُبنى من الحدث نفسِه', (_k, same, other) => {
     expect(same().ref).toBe(same().ref)
@@ -88,8 +88,8 @@ describe('ولا يُرسَل حدث مرّتين (D-004)', () => {
 
   /** **وثلاثتُها لا تُرسَل مرّتين** — لا واحدةٌ منها. */
   it.each([
-    ['token', () => tokenAlert('ح', 7, 'refresh')],
-    ['publish', () => publishAlert('p1', 'linkedin', 3)],
+    ['token', () => tokenAlert('ح', 7, 'refresh', 'org_owner')],
+    ['publish', () => publishAlert('p1', 'linkedin', 3, 'org_owner')],
     ['budget', () => budgetAlert('2026-09-09', 5, 5)],
   ])('و%s لا يخرج مرّتين', async (_k, make) => {
     const f = ok()
@@ -132,8 +132,8 @@ describe('والعنوان يُحرَس بحارس المزوّدين نفسِه
 describe('والمتن يقول ما وقع ويُحيل إلى اللوحة', () => {
   it('ولا يحمل رابطا موقَّعا ولا معرّف جلسة', async () => {
     for (const a of [
-      tokenAlert('صفحة صدى', 1, 'refresh'),
-      publishAlert('p1', 'linkedin', 3),
+      tokenAlert('صفحة صدى', 1, 'refresh', 'org_owner'),
+      publishAlert('p1', 'linkedin', 3, 'org_owner'),
       budgetAlert('2026-09-09', 5.2, 5),
     ]) {
       expect(a.body).not.toMatch(/https?:\/\//)

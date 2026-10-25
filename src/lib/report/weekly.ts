@@ -219,7 +219,7 @@ export function topOf(posts: readonly ReportPost[]): TopPost | null {
  */
 export async function collectWeek(db: Db, org: string, from: Date, to: Date): Promise<ReportPost[]> {
   const bare = await publishedIn(db, org, from, to)
-  const measurements = await metricsFor(db, bare.map((p) => p.id))
+  const measurements = await metricsFor(db, org, bare.map((p) => p.id))
   return bare.map((p) => {
     const row = widest(measurements[p.id] ?? [])
     return {

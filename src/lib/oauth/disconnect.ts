@@ -158,18 +158,18 @@ export async function disconnectAccount(
   // ‏رمزٌ لا يُفكّ (مفتاحٌ بُدّل) لا يمنع الحذف: يُفصَل الحسابُ ولا يُنادى إبطال
   let tokens: StoredTokens | null = null
   try {
-    tokens = await loadTokens(db, encKey, target.id)
+    tokens = await loadTokens(db, encKey, target.id, target.org)
   } catch {
     tokens = null
   }
 
   const queued = await db
-    .prepare(`SELECT id, idempotency_key FROM posts WHERE account_id = ? AND status = 'queued'`)
-    .bind(target.id)
+    .prepare(`SELECT id, idempotency_key FROM posts WHERE account_id = ? AND org_id = ? AND status = 'queued'`)
+    .bind(target.id, target.org)
     .all<{ id: string; idempotency_key: string }>()
 
   const statements = [
-    db.prepare('DELETE FROM tokens WHERE account_id = ?').bind(target.id),
+    db.prepare('DELETE FROM tokens WHERE account_id = ? AND org_id = ?').bind(target.id, target.org),
     db
       .prepare(`UPDATE accounts SET status = 'revoked', needs_reauth_at = NULL WHERE id = ? AND org_id = ?`)
       .bind(target.id, target.org),
@@ -181,16 +181,16 @@ export async function disconnectAccount(
           `INSERT INTO publish_attempts
              (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
            VALUES (?, ?, ?,
-             (SELECT coalesce(max(attempt_no), 0) + 1 FROM publish_attempts WHERE post_id = ?),
+             (SELECT coalesce(max(attempt_no), 0) + 1 FROM publish_attempts WHERE post_id = ? AND org_id = ?),
              ?, ?, 'failed', ?)`,
         )
         .bind(
-          crypto.randomUUID(), post.id, post.idempotency_key, post.id,
+          crypto.randomUUID(), post.id, post.idempotency_key, post.id, target.org,
           JSON.stringify({ platform: target.platform, preflight: true }),
           JSON.stringify({ error: 'account_disconnected', preflight: true }),
           target.org,
         ),
-      db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND status = 'queued'`).bind(post.id),
+      db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND org_id = ? AND status = 'queued'`).bind(post.id, target.org),
     )
   }
   await atomically(db, statements)

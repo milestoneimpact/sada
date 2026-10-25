@@ -69,19 +69,19 @@ const COLUMNS = `
   a.display_name AS account_name, a.kind AS account_kind, s.name AS source_name,
   ok.platform_post_id, ok.at AS published_at,
   bad.at AS failed_at, bad.response_json AS fail_json,
-  (SELECT count(*) FROM publish_attempts t WHERE t.post_id = p.id) AS tries,
-  (SELECT max(t.at) FROM publish_attempts t WHERE t.post_id = p.id) AS last_try_at,
-  (SELECT count(*) FROM publish_attempts t WHERE t.post_id = p.id AND t.status = 'sent') AS open_tries,
+  (SELECT count(*) FROM publish_attempts t WHERE t.post_id = p.id AND t.org_id = p.org_id) AS tries,
+  (SELECT max(t.at) FROM publish_attempts t WHERE t.post_id = p.id AND t.org_id = p.org_id) AS last_try_at,
+  (SELECT count(*) FROM publish_attempts t WHERE t.post_id = p.id AND t.org_id = p.org_id AND t.status = 'sent') AS open_tries,
   coalesce(ok.at, bad.at, p.scheduled_at, p.created_at) AS sort_at`
 
 const JOINS = `
   FROM posts p
-  LEFT JOIN accounts a ON a.id = p.account_id
-  LEFT JOIN sources s ON s.id = p.source_id
+  LEFT JOIN accounts a ON a.id = p.account_id AND a.org_id = p.org_id
+  LEFT JOIN sources s ON s.id = p.source_id AND s.org_id = p.org_id
   LEFT JOIN publish_attempts ok ON ok.id = (SELECT id FROM publish_attempts
-       WHERE post_id = p.id AND status = 'succeeded' ORDER BY at ASC LIMIT 1)
+       WHERE post_id = p.id AND org_id = p.org_id AND status = 'succeeded' ORDER BY at ASC LIMIT 1)
   LEFT JOIN publish_attempts bad ON bad.id = (SELECT id FROM publish_attempts
-       WHERE post_id = p.id AND status = 'failed' ORDER BY attempt_no DESC LIMIT 1)`
+       WHERE post_id = p.id AND org_id = p.org_id AND status = 'failed' ORDER BY attempt_no DESC LIMIT 1)`
 
 function hasMedia(json: string | null): boolean {
   if (json === null || json === '') return false
@@ -270,13 +270,13 @@ export async function platformCounts(db: Db, org: string, platform: Platform, cl
  * `posts.cost_usd` كلفةُ الكتابة وحدها، والصورةُ والموجزُ والنشرُ في الدفتر
  * بمعرّف المنشور. فالعمودُ وحده يقول «0.01$» لمنشورٍ كلّف أربعةَ أضعافها.
  */
-export async function postCosts(db: Db, ids: readonly string[]): Promise<Readonly<Record<string, number>>> {
+export async function postCosts(db: Db, org: string, ids: readonly string[]): Promise<Readonly<Record<string, number>>> {
   if (ids.length === 0) return {}
   try {
     const marks = ids.map(() => '?').join(', ')
     const { results } = await db
-      .prepare(`SELECT ref_id, sum(total) AS total FROM cost_ledger WHERE ref_id IN (${marks}) GROUP BY ref_id`)
-      .bind(...ids)
+      .prepare(`SELECT ref_id, sum(total) AS total FROM cost_ledger WHERE org_id = ? AND ref_id IN (${marks}) GROUP BY ref_id`)
+      .bind(org, ...ids)
       .all<{ ref_id: string; total: number }>()
     const out: Record<string, number> = {}
     for (const r of results) out[r.ref_id] = r.total

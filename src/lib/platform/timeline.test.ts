@@ -81,7 +81,7 @@ describe('ما ينتظر والأعداد', () => {
   it('والكلفة من الدفتر باسم المنشور', async () => {
     db.raw.prepare(`INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, ref_id)
       VALUES ('c1', 'gemini', 'image', 1, 0.02, 0.02, 'p1'), ('c2', 'x', 'post', 1, 0.015, 0.015, 'p1')`).run()
-    expect((await postCosts(db, ['p1']))['p1']).toBeCloseTo(0.035)
+    expect((await postCosts(db, 'org_owner', ['p1']))['p1']).toBeCloseTo(0.035)
   })
 })
 

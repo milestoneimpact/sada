@@ -51,7 +51,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   for (const post of posts) {
     const item = plan.plan.items.find((i) => i.sourceId === post.source_id && i.platform === post.platform)
     if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
-    if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, post.platform)).hours[0]?.hour ?? null)
+    if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, org, post.platform)).hours[0]?.hour ?? null)
     if (!accounts.has(post.platform)) {
       const acc = await db
         .prepare("SELECT id FROM accounts WHERE org_id = ? AND platform = ? AND status = 'active' ORDER BY id LIMIT 1")

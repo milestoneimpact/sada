@@ -28,7 +28,8 @@ export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvide
     .prepare(
       `SELECT provider, count(*) AS calls, coalesce(sum(total), 0) AS total
          FROM cost_ledger
-        WHERE at >= datetime('now', ?)
+        -- السقفُ عامّ لكلّ المنظّمات: دفترُ الإنفاق يُقرأ على المنظّمات كلِّها
+        WHERE org_id IN (SELECT id FROM orgs) AND at >= datetime('now', ?)
         GROUP BY provider`,
     )
     .bind(`-${days} days`)
@@ -52,7 +53,8 @@ export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvide
 async function spendSince(db: Db, since: Date): Promise<number> {
   try {
     const row = await db
-      .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE at >= ?')
+      // السقفُ عامّ لكلّ المنظّمات (D-271)
+      .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE org_id IN (SELECT id FROM orgs) AND at >= ?')
       .bind(since.toISOString().slice(0, 19).replace('T', ' '))
       .first<{ total: number | null }>()
     return row?.total ?? 0
@@ -132,7 +134,8 @@ export async function dailySpend(db: Db, days = 14): Promise<DailySpend[]> {
       .prepare(
         `SELECT date(at) AS day, coalesce(sum(total), 0) AS total, count(*) AS calls
            FROM cost_ledger
-          WHERE at >= date('now', ?)
+          -- السقفُ عامّ لكلّ المنظّمات
+          WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now', ?)
           GROUP BY date(at)`,
       )
       .bind(`-${days - 1} days`)
@@ -161,7 +164,8 @@ export async function spendTodayFor(db: Db, provider: string): Promise<number> {
       .prepare(
         `SELECT coalesce(sum(total), 0) AS total
            FROM cost_ledger
-          WHERE provider = ? AND at >= date('now')`,
+          -- سقفُ المزوّد عامّ لكلّ المنظّمات: المزوّدون إعدادٌ عامّ
+          WHERE org_id IN (SELECT id FROM orgs) AND provider = ? AND at >= date('now')`,
       )
       .bind(provider)
       .first<{ total: number }>()

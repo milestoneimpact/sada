@@ -320,7 +320,7 @@ describe('لا توليد مرّتين', () => {
     const post = await seedPost()
     const row = db.raw.prepare('SELECT text FROM posts WHERE id = ?').get(post) as { text: string }
     const key = await imageKey(post, row.text)
-    await claimGeneration(db, key, post, 'image', new Date('2026-09-08T09:00:00.000Z'))
+    await claimGeneration(db, 'org_owner', key, post, 'image', new Date('2026-09-08T09:00:00.000Z'))
 
     const out = await generateForPost(
       { ...deps(net()), now: () => new Date('2026-09-08T09:01:00.000Z') },
@@ -386,7 +386,7 @@ describe('الرفض', () => {
     const out = await generateForPost(deps(net(), b), post)
     if (out.kind !== 'generated') throw new Error('لم تُولَّد')
 
-    expect(await rejectMedia(db, out.mediaId)).toBe(true)
+    expect(await rejectMedia(db, 'org_owner', out.mediaId)).toBe(true)
     const rows = await mediaFor(db, [post])
     expect(rows[0]?.status).toBe('rejected')
     expect(b.objects.has(out.key)).toBe(true)
@@ -397,8 +397,8 @@ describe('الرفض', () => {
     const post = await seedPost()
     const out = await generateForPost(deps(net()), post)
     if (out.kind !== 'generated') throw new Error('لم تُولَّد')
-    expect(await rejectMedia(db, out.mediaId)).toBe(true)
-    expect(await rejectMedia(db, out.mediaId)).toBe(false)
+    expect(await rejectMedia(db, 'org_owner', out.mediaId)).toBe(true)
+    expect(await rejectMedia(db, 'org_owner', out.mediaId)).toBe(false)
   })
 })
 
@@ -740,7 +740,7 @@ describe('المرفوضة لا تسدّ الطريق', () => {
     const blocked = await generateForPost(deps(net()), post)
     expect(blocked.kind).toBe('already')
 
-    expect(await rejectMedia(db, (first as { mediaId: string }).mediaId)).toBe(true)
+    expect(await rejectMedia(db, 'org_owner', (first as { mediaId: string }).mediaId)).toBe(true)
 
     // بعد الرفض: يُولَّد بديلٌ فعلا
     const again = await generateForPost(deps(net()), post)
@@ -751,7 +751,7 @@ describe('المرفوضة لا تسدّ الطريق', () => {
   it('و**الصفّ المرفوض يبقى بكلفته** — الدفتر لا يُمحى', async () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
-    await rejectMedia(db, (first as { mediaId: string }).mediaId)
+    await rejectMedia(db, 'org_owner', (first as { mediaId: string }).mediaId)
     await generateForPost(deps(net()), post)
 
     const { results } = await db
@@ -766,8 +766,8 @@ describe('المرفوضة لا تسدّ الطريق', () => {
     const post = await seedPost()
     const first = await generateForPost(deps(net()), post)
     const id = (first as { mediaId: string }).mediaId
-    expect(await rejectMedia(db, id)).toBe(true)
-    expect(await rejectMedia(db, id)).toBe(false)
+    expect(await rejectMedia(db, 'org_owner', id)).toBe(true)
+    expect(await rejectMedia(db, 'org_owner', id)).toBe(false)
 
     const row = await db
       .prepare('SELECT idempotency_key FROM media WHERE id = ?')
