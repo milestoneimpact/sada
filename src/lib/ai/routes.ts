@@ -75,7 +75,7 @@ export async function writeRoute(
   await db
     .prepare(
       `INSERT INTO task_routes (task, provider, model, updated_by, updated_at, org_id)
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
        VALUES (?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT(task) DO UPDATE SET
          provider = excluded.provider, model = excluded.model,

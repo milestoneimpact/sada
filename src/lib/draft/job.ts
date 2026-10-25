@@ -226,7 +226,7 @@ async function insertDraft(db: Db, org: string, input: NewDraft): Promise<DraftO
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
             source_refs, rationale, has_url, status, idempotency_key, org_id, brand_id)
          VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?,
-                 -- ‏المسوّدة لمنظّمة مصدرها — أو منظّمة الجلسة لفكرةٍ بلا مصدر (D-271) — وعلامته
+                 -- ‏المسوّدة لمنظّمة مصدرها — أو منظّمة الجلسة لفكرةٍ بلا مصدر — وعلامته
                  ?,
                  coalesce((SELECT brand_id FROM sources WHERE id = ?), 'brand_owner'))`,
       )

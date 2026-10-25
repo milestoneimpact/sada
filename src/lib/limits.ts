@@ -86,7 +86,7 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
            coalesce(sum(total), 0) AS spend,
            coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips
            FROM cost_ledger
-          -- السقفُ عامّ لكلّ المنظّمات (D-271): الإعداداتُ عامّة، فالاستهلاكُ يُجمَع عليها كلِّها
+          -- السقفُ عامّ لكلّ المنظّمات: الإعداداتُ عامّة، فالاستهلاكُ يُجمَع عليها كلِّها
           WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now')`,
       )
       .first<{ analyses: number; spend: number; clips: number }>()

@@ -3052,7 +3052,7 @@ panel.post('/panel/drafts/decide', async (c) => {
    */
   let scheduled: ScheduleResult | null = null
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
-    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now)
+    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record))
     await record(c.env.DB, {
       actor: 'panel', action: 'draft.schedule', target: id, detail: scheduled.ok ? scheduled.at : `refused:${scheduled.reason}`,
     }, c.req.raw)
@@ -3258,6 +3258,7 @@ panel.post('/panel/drafts/schedule', async (c) => {
     // ‏و«when» بـ UTC من شريط البطاقة، أو زرٌّ ويومٌ بتوقيت المالك من المحرّر (D-198)
     readWhen(form, zone, now),
     now,
+    activeOrg(gate.session.record),
   )
 
   let flash: PanelFlash = result.ok
@@ -3425,7 +3426,7 @@ panel.post('/panel/drafts/spread/apply', async (c) => {
   let first: string | null = null
   const failed: string[] = []
   for (const slot of plan.slots) {
-    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date())
+    const result = await schedulePost(c.env.DB, slot.postId, slot.accountId, slot.when, new Date(), activeOrg(gate.session.record))
     if (result.ok) {
       done += 1
       first ??= result.at
@@ -3468,7 +3469,7 @@ panel.post('/panel/drafts/unschedule', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await unschedule(c.env.DB, id)
+  const result = await unschedule(c.env.DB, id, activeOrg(gate.session.record))
 
   const flash: PanelFlash = result.ok
     ? { kind: 'ok', text: 'سُحب الموعد — وتبقى معتمَدةً تنتظر موعدا جديدا.' }
@@ -3502,7 +3503,7 @@ panel.post('/panel/drafts/reschedule', async (c) => {
   const id = String(form.get('id') ?? '')
   const now = new Date()
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now)
+  const result = await reschedulePost(c.env.DB, id, readWhen(form, zone, now), now, activeOrg(gate.session.record))
   await record(c.env.DB, {
     actor: 'panel', action: 'draft.reschedule', target: id, detail: result.ok ? result.at : `refused:${result.reason}`,
   }, c.req.raw)
@@ -3532,7 +3533,7 @@ panel.post('/panel/drafts/requeue', async (c) => {
   if ('denied' in gate) return gate.denied
 
   const id = String(gate.form.get('id') ?? '')
-  const result = await requeue(c.env.DB, id, new Date())
+  const result = await requeue(c.env.DB, id, new Date(), activeOrg(gate.session.record))
 
   await record(
     c.env.DB,

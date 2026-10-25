@@ -297,7 +297,7 @@ export async function writeSetting(
   await db
     .prepare(
       `INSERT INTO settings (key, value, updated_by, updated_at, org_id)
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
        VALUES (?, ?, ?, datetime('now'), ?)
        ON CONFLICT(key) DO UPDATE SET
          value = excluded.value,

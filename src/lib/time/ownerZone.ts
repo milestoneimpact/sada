@@ -42,7 +42,7 @@ export async function ownerZone(db: Db, cookieHeader: string | null): Promise<st
     try {
       await db.prepare(
         `INSERT INTO settings (key, value, updated_by, updated_at, org_id)
-         -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+         -- إعدادٌ عامّ: يسكن منظّمةَ المالك
          VALUES (?, ?, 'browser', datetime('now'), ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = 'browser', updated_at = datetime('now')`,
       ).bind(ZONE_SETTING, fromCookie, OWNER_ORG).run()

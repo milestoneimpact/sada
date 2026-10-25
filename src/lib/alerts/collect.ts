@@ -57,7 +57,7 @@ export async function collectAlerts(
       .prepare(
         `SELECT COALESCE(SUM(total), 0) AS s FROM cost_ledger
           WHERE at >= ? AND at < datetime(?, '+1 day')
-            -- ‏السقفُ عامّ لكلّ المنظّمات (D-271)
+            -- ‏السقفُ عامّ لكلّ المنظّمات
             AND org_id IN (SELECT id FROM orgs)`,
       )
       .bind(day, day)

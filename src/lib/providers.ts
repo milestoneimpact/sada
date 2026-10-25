@@ -143,7 +143,7 @@ export async function upsertProvider(db: Db, input: UpsertInput, by: string): Pr
   await db
     .prepare(
       `INSERT INTO providers (name, label, kind, base_url, model, price_in, price_out, daily_cap, updated_by, updated_at, org_id)
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT(name) DO UPDATE SET
          label = excluded.label,
@@ -202,7 +202,7 @@ export async function saveKey(
          updated_by = ?, updated_at = datetime('now'),
          -- مفتاح جديد لم يُختبر: الشهادة السابقة لا تشهد له
          verified_at = CASE WHEN fingerprint = ? THEN verified_at ELSE NULL END
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
        WHERE name = ? AND org_id = ?`,
     )
     .bind(sealed.ciphertext, sealed.iv, hint, print, by, print, provider, OWNER_ORG)

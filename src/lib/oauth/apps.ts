@@ -150,7 +150,7 @@ export async function appStatuses(
         `SELECT platform, client_id, hint, updated_at, updated_by,
                 verified_at, verified_kind
            FROM oauth_apps
-          -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+          -- إعدادٌ عامّ: يسكن منظّمةَ المالك
           WHERE org_id = ?`,
       )
       .bind(OWNER_ORG)
@@ -226,7 +226,7 @@ export async function recordVerification(
       .prepare(
         `UPDATE oauth_apps
             SET verified_at = datetime('now'), verified_kind = ?
-          -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+          -- إعدادٌ عامّ: يسكن منظّمةَ المالك
           WHERE platform = ? AND org_id = ?`,
       )
       .bind(kind, platform, OWNER_ORG)
@@ -274,7 +274,7 @@ export async function saveApp(
   await db
     .prepare(
       `INSERT INTO oauth_apps (platform, client_id, secret_enc, secret_iv, hint, fingerprint, updated_by, org_id)
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(platform) DO UPDATE SET
          client_id = excluded.client_id, secret_enc = excluded.secret_enc,

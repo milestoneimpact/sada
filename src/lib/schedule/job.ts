@@ -76,11 +76,13 @@ export async function schedulePost(
   accountId: string,
   when: string,
   now: Date,
+  /** منظّمةُ الجلسة حين يأتي الطلبُ من اللوحة (D-271): منشورُ منظّمةٍ أخرى «لا منشور» */
+  org: string | null = null,
 ): Promise<ScheduleResult> {
   const post = await db
     // ‏المنظّمةُ تُقرأ مع الصفّ، وكلُّ ما بعده يُقيَّد بها (D-271)
-    .prepare('SELECT id, org_id, platform, status FROM posts WHERE id = ?')
-    .bind(postId)
+    .prepare('SELECT id, org_id, platform, status FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
+    .bind(postId, org)
     .first<PostRow>()
   if (post === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
 
@@ -141,10 +143,10 @@ export async function schedulePost(
  * ما غادر إلى الطابور لا يُستردّ: الرسالةُ عند Cloudflare، وزرٌّ يقول
  * «سحبتُها» وهي في الطريق **يكذب على المالك في أخطر لحظة**.
  */
-export async function unschedule(db: Db, postId: string): Promise<ScheduleResult> {
+export async function unschedule(db: Db, postId: string, org: string | null = null): Promise<ScheduleResult> {
   const row = await db
-    .prepare('SELECT id, org_id, status, dispatched_at FROM posts WHERE id = ?')
-    .bind(postId)
+    .prepare('SELECT id, org_id, status, dispatched_at FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
+    .bind(postId, org)
     .first<{ id: string; org_id: string; status: string; dispatched_at: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولا' }
@@ -166,13 +168,14 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
  * «غيّر الموعد» (D-198) — **الموعدُ وحدَه، بلا سحبٍ وجدولةٍ من جديد**. والحارسُ حارسُ الجدولة:
  * لا ماضٍ، ولا ما غادر إلى الطابور، ولا حسابٌ سقط إذنُه. والسببُ بكلام المالك لا بمعرّف الحال.
  */
-export async function reschedulePost(db: Db, postId: string, when: string, now: Date): Promise<ScheduleResult> {
+export async function reschedulePost(db: Db, postId: string, when: string, now: Date, org: string | null = null): Promise<ScheduleResult> {
   const row = await db
     .prepare(
       `SELECT p.org_id, p.platform, p.status, p.dispatched_at, a.status AS account_status, a.display_name
-         FROM posts p LEFT JOIN accounts a ON a.id = p.account_id AND a.org_id = p.org_id WHERE p.id = ?`,
+         FROM posts p LEFT JOIN accounts a ON a.id = p.account_id AND a.org_id = p.org_id
+        WHERE p.id = ? AND (?2 IS NULL OR p.org_id = ?2)`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .first<{ org_id: string; platform: string; status: string; dispatched_at: string | null; account_status: string | null; display_name: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
@@ -214,10 +217,10 @@ export const STUCK_MINUTES = 60
  * يمنع نشرا ثانيا إن فات هذا الحارس (D-004). **والتحديثُ ذرّيّ**: طلبان
  * متزامنان يقلب أحدُهما الحالَ والثاني يُردّ.
  */
-export async function requeue(db: Db, postId: string, now: Date): Promise<ScheduleResult> {
+export async function requeue(db: Db, postId: string, now: Date, org: string | null = null): Promise<ScheduleResult> {
   const row = await db
-    .prepare('SELECT org_id, status, dispatched_at FROM posts WHERE id = ?')
-    .bind(postId)
+    .prepare('SELECT org_id, status, dispatched_at FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
+    .bind(postId, org)
     .first<{ org_id: string; status: string; dispatched_at: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
 
