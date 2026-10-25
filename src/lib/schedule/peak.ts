@@ -59,7 +59,7 @@ function median(xs: readonly number[]): number {
  * **ولكلّ منصّةٍ ذروتُها**: جمهورُ LinkedIn في ساعات العمل، وجمهورُ X
  * ليلا. **وخلطُهما يعطي وسطا لا يصف أيّا منهما.**
  */
-export async function readPeaks(db: Db, platform: string): Promise<Peaks> {
+export async function readPeaks(db: Db, org: string, platform: string): Promise<Peaks> {
   /*
    * **والتفاعلُ لا الظهور** (D-048 · D-058).
    *
@@ -75,12 +75,12 @@ export async function readPeaks(db: Db, platform: string): Promise<Peaks> {
               COALESCE(m.reactions, 0) + COALESCE(m.comments, 0)
                 + COALESCE(m.shares, 0) AS engagement
          FROM posts p
-         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.status = 'succeeded'
-         JOIN metrics m ON m.post_id = p.id AND m.window = '24h'
-        WHERE p.platform = ?
+         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
+         JOIN metrics m ON m.post_id = p.id AND m.org_id = p.org_id AND m.window = '24h'
+        WHERE p.org_id = ? AND p.platform = ?
         GROUP BY p.id`,
     )
-    .bind(platform)
+    .bind(org, platform)
     .all<{ hour: number; engagement: number }>()
     .catch(() => ({ results: [] as { hour: number; engagement: number }[] }))
 

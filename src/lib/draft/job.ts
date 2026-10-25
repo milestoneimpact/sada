@@ -149,17 +149,19 @@ export async function draftPost(
    * لحظةَ تُكتب البديلة (الخطوة ٧) لا قبلها. **وحارسُ النقرة المزدوجة باقٍ**: ما دامت
    * البديلةُ قائمةً بالمفتاح نفسه، فالضغطةُ التالية `already`.
    */
+  // ‏والمسوّدةُ في منظّمة مصدرها (D-271): بها يُسأل عن المفتاح وبها يُكتب الصفّ
+  const org = row.org_id ?? 'org_owner'
   const key = draftKey(row.id, platform, hash, provider)
   const existing = await deps.db
-    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
-    .bind(key)
+    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
+    .bind(key, org)
     .first<{ id: string; status: string }>()
   if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
 
   // ٤ إلى ٦ · الحارسُ والمزوّدُ والنداءُ والكلفة — في موضعها الواحد (`writer.ts`)
   const out = await writeOnce(deps, {
     // ‏وصوتُ العميل من موجز منظّمة المصدر (D-257) — وفارغٌ إن لم يُكتب، فالموجّهُ كما كان
-    system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, row.org_id ?? 'org_owner'))),
+    system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, org))),
     user: userPrompt(brief),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
@@ -173,7 +175,7 @@ export async function draftPost(
   if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
 
   // ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد
-  return insertDraft(deps.db, {
+  return insertDraft(deps.db, org, {
     platform, key, existing, sourceId: row.id, sourceHash: hash, refs: [row.id],
     model: out.model, cost: out.cost, draft: draft.draft,
   })
@@ -206,7 +208,7 @@ interface NewDraft {
  * ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد. **ومشتركةٌ بين البابين**: المصدرُ
  * والفكرة يكتبان الصفَّ نفسَه بالقيود نفسِها، فلا يفترق ما يُحرَّر به المرفوضُ بينهما.
  */
-async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
+async function insertDraft(db: Db, org: string, input: NewDraft): Promise<DraftOutcome> {
   const postId = crypto.randomUUID()
   const statements: DbStatement[] = []
   if (input.existing !== null) {
@@ -214,8 +216,8 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
     // ‏بـ «تراجَع» بين القراءة والكتابة تبقى بمفتاحها، فيصطدم الإدراجُ بالقيد ويُقال `already`
     statements.push(db
       .prepare(`UPDATE posts SET idempotency_key = idempotency_key || ':rejected:' || id
-                 WHERE id = ? AND status = 'rejected'`)
-      .bind(input.existing.id))
+                 WHERE id = ? AND org_id = ? AND status = 'rejected'`)
+      .bind(input.existing.id, org))
   }
   try {
     statements.push(db
@@ -224,8 +226,8 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
             source_refs, rationale, has_url, status, idempotency_key, org_id, brand_id)
          VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?,
-                 -- ‏المسوّدة لمنظّمة مصدرها وعلامته
-                 coalesce((SELECT org_id FROM sources WHERE id = ?), 'org_owner'),
+                 -- ‏المسوّدة لمنظّمة مصدرها — أو منظّمة الجلسة لفكرةٍ بلا مصدر (D-271) — وعلامته
+                 ?,
                  coalesce((SELECT brand_id FROM sources WHERE id = ?), 'brand_owner'))`,
       )
       .bind(
@@ -243,7 +245,7 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
         // X». فكان يُحسَب عند النشر (بعد الاعتماد) ولا يُعرَض قطّ (D-069)
         containsUrl(input.draft.text) ? 1 : 0,
         input.key,
-        input.sourceId,
+        org,
         input.sourceId,
       ))
     await atomically(db, statements)
@@ -252,8 +254,8 @@ async function insertDraft(db: Db, input: NewDraft): Promise<DraftOutcome> {
     const message = error instanceof Error ? error.message : ''
     if (message.includes('UNIQUE')) {
       const won = await db
-        .prepare('SELECT id FROM posts WHERE idempotency_key = ?')
-        .bind(input.key)
+        .prepare('SELECT id FROM posts WHERE idempotency_key = ? AND org_id = ?')
+        .bind(input.key, org)
         .first<{ id: string }>()
       if (won !== null) return { kind: 'already', postId: won.id }
     }
@@ -323,17 +325,19 @@ export async function draftFromIdea(
   if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
 
   // أكُتبت هذه الفكرةُ لهذه المنصّة ولم تُرفَض؟ — لا نداءَ ولا كلفة
+  // ‏وفكرةٌ بلا مصدرٍ تُكتب في منظّمة الجلسة (D-271)
+  const org = deps.org ?? 'org_owner'
   const key = await ideaKey(idea, platform)
   const existing = await deps.db
-    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ?')
-    .bind(key)
+    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
+    .bind(key, org)
     .first<{ id: string; status: string }>()
   if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
 
   // ‏والدفترُ يُنسَب إلى الفكرة ببصمتها لا إلى المنشور (كالمصدر): كلفةُ الكتابة في
   // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
   const out = await writeOnce(deps, {
-    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, deps.org ?? 'org_owner'))),
+    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, org))),
     user: ideaPrompt(idea),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
@@ -344,7 +348,7 @@ export async function draftFromIdea(
   const draft = readDraft(out.text, spec)
   if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
 
-  return insertDraft(deps.db, {
+  return insertDraft(deps.db, org, {
     platform, key, existing, sourceId: null, sourceHash: null, refs: [],
     model: out.model, cost: out.cost, draft: draft.draft,
   })

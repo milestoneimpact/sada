@@ -9,6 +9,7 @@
  */
 import { IMPLEMENTED, ROUTES, type TaskName } from './registry'
 import type { Db } from '../tokens'
+import { OWNER_ORG } from '../tenancy'
 
 export interface TaskRoute {
   readonly task: TaskName
@@ -24,7 +25,9 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
   let saved = new Map<string, { provider: string; model: string }>()
   try {
     const { results } = await db
-      .prepare('SELECT task, provider, model FROM task_routes')
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      .prepare('SELECT task, provider, model FROM task_routes WHERE org_id = ?')
+      .bind(OWNER_ORG)
       .all<{ task: string; provider: string; model: string }>()
     saved = new Map(results.map((r) => [r.task, { provider: r.provider, model: r.model }]))
   } catch {
@@ -71,13 +74,14 @@ export async function writeRoute(
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO task_routes (task, provider, model, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, datetime('now'))
+      `INSERT INTO task_routes (task, provider, model, updated_by, updated_at, org_id)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       VALUES (?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT(task) DO UPDATE SET
          provider = excluded.provider, model = excluded.model,
          updated_by = excluded.updated_by, updated_at = datetime('now')`,
     )
-    .bind(task, provider, model, by)
+    .bind(task, provider, model, by, OWNER_ORG)
     .run()
 }
 

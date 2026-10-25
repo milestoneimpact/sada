@@ -161,6 +161,11 @@ export interface VideoDeps {
   readonly baseUrl: string
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
+  /**
+   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-271): وسائطُ المنشور تُقرأ فيها وحدَها. وبلا
+   * جلسةٍ تُقرأ منظّمةُ المنشور بمعرّفه أوّلًا، وبها تُساق كلُّ جملةٍ بعده.
+   */
+  readonly org?: string
 }
 
 interface ImageRow {
@@ -218,14 +223,17 @@ export async function animateForPost(
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
+  // ‏ومنظّمةُ المنشور قبل كلّ جملةٍ على وسائطه (D-271)
+  const org = deps.org ?? await orgOfPost(deps.db, postId)
+
   // ٢ — مقطعٌ قائمٌ لا يُعاد توليدُه: الفيديو أغلى ما يُنادى في النظام
   const existing = await deps.db
     .prepare(
       `SELECT id FROM media
-        WHERE post_id = ? AND status = 'ready' AND mime LIKE 'video/%'
+        WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE 'video/%'
         ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .first<{ id: string }>()
     .catch(() => null)
   if (existing !== null) return { kind: 'already', mediaId: existing.id }
@@ -234,10 +242,10 @@ export async function animateForPost(
   const image = await deps.db
     .prepare(
       `SELECT id, mime FROM media
-        WHERE post_id = ? AND status = 'ready' AND mime LIKE 'image/%'
+        WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE 'image/%'
         ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .first<ImageRow>()
     .catch(() => null)
   if (image === null) {
@@ -274,7 +282,7 @@ export async function animateForPost(
    * على منشورٍ لم يُنفَق عليه شيءٌ أصلا.
    */
   const key = await videoKey(postId, prompt)
-  const held = await claimGeneration(deps.db, key, postId, 'video', now)
+  const held = await claimGeneration(deps.db, org, key, postId, 'video', now)
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
   /*
@@ -316,7 +324,7 @@ export async function animateForPost(
     url = out.url
   } catch (error) {
     // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة**
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, org, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'تعذّر التوليد',
@@ -332,7 +340,7 @@ export async function animateForPost(
     bytes = pulled.bytes
     mime = pulled.mime
   } catch (error) {
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, org, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'تعذّر السحب',
@@ -345,11 +353,11 @@ export async function animateForPost(
   // **ومفتاحُ R2 ليس مفتاحَ عدم التكرار**: كان الواحدُ يؤدّي الدورين،
   // وفيه `uuid` — فعمودٌ `UNIQUE` لا يمنع شيئا (D-068)
   const mediaId = crypto.randomUUID()
-  const r2Key = objectKey(await orgOfPost(deps.db, postId), `video/${postId}/${mediaId}.mp4`)
+  const r2Key = objectKey(org, `video/${postId}/${mediaId}.mp4`)
   try {
     await deps.bucket.put(r2Key, bytes)
   } catch (error) {
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, org, key)
     return {
       kind: 'failed',
       reason: `تعذّر حفظ البايتات: ${error instanceof Error ? error.message : 'عطل'}`,
@@ -361,10 +369,10 @@ export async function animateForPost(
     .prepare(
       `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd,
                           status, idempotency_key, width, height, org_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'ready', ?8, 720, 1280, (SELECT org_id FROM posts WHERE id = ?2))`,
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'ready', ?8, 720, 1280, ?9)`,
     )
     // ‏والمقطعُ رأسيٌّ بمقاسٍ واحد (D-052): ‏9:16 بدقّة 720P كما يُطلب من النموذج
-    .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, model, key)
+    .bind(mediaId, postId, r2Key, mime, bytes.length, prompt, model, key, org)
     .run()
 
   return { kind: 'generated', mediaId, bytes: bytes.length }

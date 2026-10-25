@@ -147,18 +147,18 @@ export interface OpenSuggestion {
 }
 
 /** ما ينتظر بتّك — والمبتوتُ لا يعود يسأل. */
-export async function openSuggestions(db: Db, limit = 10): Promise<OpenSuggestion[]> {
+export async function openSuggestions(db: Db, org: string, limit = 10): Promise<OpenSuggestion[]> {
   try {
     const { results } = await db
       .prepare(
         `SELECT s.post_id, s.suggested_budget, s.currency, s.reason, s.created_at,
                 p.platform, p.text
            FROM promotion_suggestions s
-           JOIN posts p ON p.id = s.post_id
-          WHERE s.human_decision IS NULL
+           JOIN posts p ON p.id = s.post_id AND p.org_id = s.org_id
+          WHERE s.org_id = ? AND s.human_decision IS NULL
           ORDER BY s.created_at DESC LIMIT ?`,
       )
-      .bind(limit)
+      .bind(org, limit)
       .all<{
         post_id: string
         suggested_budget: number
@@ -191,15 +191,15 @@ export type Decision = 'accepted' | 'rejected' | 'ignored'
  * إعلاناتٍ في المستودع أصلا (D-006). فما يفعله المالكُ بالمبلغ يفعله
  * في لوحة المنصّة بيده، والصفُّ أثرٌ لقراره لا أمرٌ بتنفيذه.
  */
-export async function decide(db: Db, postId: string, decision: Decision): Promise<boolean> {
+export async function decide(db: Db, org: string, postId: string, decision: Decision): Promise<boolean> {
   try {
     const result = await db
       .prepare(
         `UPDATE promotion_suggestions
             SET human_decision = ?, decided_at = datetime('now')
-          WHERE post_id = ? AND human_decision IS NULL`,
+          WHERE post_id = ? AND org_id = ? AND human_decision IS NULL`,
       )
-      .bind(decision, postId)
+      .bind(decision, postId, org)
       .run()
     return changedRows(result)
   } catch {

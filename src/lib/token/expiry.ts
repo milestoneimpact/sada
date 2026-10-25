@@ -32,6 +32,8 @@ export type TokenKind = 'access' | 'refresh'
 
 export interface ExpiringToken {
   readonly accountId: string
+  /** منظّمةُ الحساب — تُقرأ مع الصفّ وتُكتب مع تنبيهه (D-271). */
+  readonly org: string
   readonly platform: string
   readonly displayName: string
   readonly kind: TokenKind
@@ -55,6 +57,7 @@ export function thresholdFor(daysLeft: number): number | null {
 
 interface Row {
   account_id: string
+  org_id: string
   platform: string
   display_name: string
   expires_at: string
@@ -74,10 +77,10 @@ export async function expiringTokens(db: Db, now: Date): Promise<ExpiringToken[]
   try {
     const result = await db
       .prepare(
-        `SELECT t.account_id, t.expires_at, t.refresh_expires_at,
+        `SELECT t.account_id, t.org_id, t.expires_at, t.refresh_expires_at,
                 CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS has_refresh,
                 a.platform, a.display_name
-           FROM tokens t JOIN accounts a ON a.id = t.account_id
+           FROM tokens t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
           WHERE a.status != 'revoked'`,
       )
       .all<Row>()
@@ -119,7 +122,7 @@ export async function expiringTokens(db: Db, now: Date): Promise<ExpiringToken[]
        */
       if (kind === 'access' && row.has_refresh === 1 && daysLeft >= 0) continue
       out.push({
-        accountId: row.account_id, platform: row.platform,
+        accountId: row.account_id, org: row.org_id, platform: row.platform,
         displayName: row.display_name, kind, expiresAt: at, daysLeft, threshold,
       })
     }
@@ -149,11 +152,11 @@ export async function recordAlerts(
     try {
       const result = await db
         .prepare(
-          `INSERT INTO token_alerts (account_id, kind, threshold, expires_at)
-           VALUES (?, ?, ?, ?)
+          `INSERT INTO token_alerts (account_id, kind, threshold, expires_at, org_id)
+           VALUES (?, ?, ?, ?, ?)
            ON CONFLICT (account_id, kind, threshold, expires_at) DO NOTHING`,
         )
-        .bind(item.accountId, item.kind, item.threshold, item.expiresAt)
+        .bind(item.accountId, item.kind, item.threshold, item.expiresAt, item.org)
         .run()
       if (changedRows(result)) written += 1
     } catch {
@@ -168,7 +171,8 @@ export async function recordAlerts(
 export async function anyWeekAlert(db: Db): Promise<boolean> {
   try {
     const row = await db
-      .prepare('SELECT 1 AS n FROM token_alerts WHERE threshold >= 7 LIMIT 1')
+      // ‏بندُ البوّابة عامّ لكلّ المنظّمات (D-271)
+      .prepare('SELECT 1 AS n FROM token_alerts WHERE threshold >= 7 AND org_id IN (SELECT id FROM orgs) LIMIT 1')
       .first<{ n: number }>()
     return row !== null
   } catch {

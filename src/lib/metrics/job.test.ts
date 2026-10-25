@@ -337,12 +337,12 @@ describe('القراءة للعرض', () => {
     await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 24 * 14 })
     await pullDue({ db, encKey: KEY, fetchImpl: fakeFetch(X_OK), now: () => NOW })
 
-    const map = await metricsFor(db, ['p1'])
+    const map = await metricsFor(db, 'org_owner', ['p1'])
     expect(map['p1']).toHaveLength(3)
   })
 
   it('وبلا معرّفات لا استعلام', async () => {
-    expect(await metricsFor(db, [])).toEqual({})
+    expect(await metricsFor(db, 'org_owner', [])).toEqual({})
   })
 
   /** التفاعلُ يتراكم، فالأوسعُ عمرا أصدقُ من الأحدث قياسا. */

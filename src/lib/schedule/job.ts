@@ -52,6 +52,7 @@ export function dbNow(now: Date): string {
 
 interface PostRow {
   id: string
+  org_id: string
   platform: string
   status: string
 }
@@ -77,7 +78,8 @@ export async function schedulePost(
   now: Date,
 ): Promise<ScheduleResult> {
   const post = await db
-    .prepare('SELECT id, platform, status FROM posts WHERE id = ?')
+    // ‏المنظّمةُ تُقرأ مع الصفّ، وكلُّ ما بعده يُقيَّد بها (D-271)
+    .prepare('SELECT id, org_id, platform, status FROM posts WHERE id = ?')
     .bind(postId)
     .first<PostRow>()
   if (post === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
@@ -90,15 +92,15 @@ export async function schedulePost(
   // ‏ومنشورٌ يعرف الناشرُ أنّه سيردّه عند موعده لا يُجدوَل: TikTok وYouTube بلا مقطع،
   // ‏وInstagram بلا صورةٍ ولا مقطع — «مجدولة» على بطاقته وعدٌ يُخلَف بعد أيّام
   const { results: ready } = await db
-    .prepare("SELECT mime FROM media WHERE post_id = ? AND status = 'ready'")
-    .bind(postId)
+    .prepare("SELECT mime FROM media WHERE post_id = ? AND org_id = ? AND status = 'ready'")
+    .bind(postId, post.org_id)
     .all<{ mime: string }>()
   const lacking = missingMedia(post.platform, ready.map((m) => m.mime))
   if (lacking !== null) return { ok: false, reason: lacking }
 
   const account = await db
-    .prepare('SELECT id, platform, status, display_name FROM accounts WHERE id = ?')
-    .bind(accountId)
+    .prepare('SELECT id, platform, status, display_name FROM accounts WHERE id = ? AND org_id = ?')
+    .bind(accountId, post.org_id)
     .first<AccountRow>()
   if (account === null) return { ok: false, reason: 'لا حساب بهذا المعرّف' }
 
@@ -125,9 +127,9 @@ export async function schedulePost(
     .prepare(
       `UPDATE posts SET status = 'queued', account_id = ?, scheduled_at = ?,
                         dispatched_at = NULL
-        WHERE id = ?`,
+        WHERE id = ? AND org_id = ?`,
     )
-    .bind(accountId, at, postId)
+    .bind(accountId, at, postId, post.org_id)
     .run()
 
   return { ok: true, at, account: account.display_name, platform: post.platform }
@@ -141,9 +143,9 @@ export async function schedulePost(
  */
 export async function unschedule(db: Db, postId: string): Promise<ScheduleResult> {
   const row = await db
-    .prepare('SELECT id, status, dispatched_at FROM posts WHERE id = ?')
+    .prepare('SELECT id, org_id, status, dispatched_at FROM posts WHERE id = ?')
     .bind(postId)
-    .first<{ id: string; status: string; dispatched_at: string | null }>()
+    .first<{ id: string; org_id: string; status: string; dispatched_at: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولا' }
   if (row.dispatched_at !== null) {
@@ -153,9 +155,9 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
   // يعود `approved` لا `draft`: الاعتمادُ وقع ولا يُمحى بسحب موعد
   await db
     .prepare(
-      "UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL WHERE id = ?",
+      "UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL WHERE id = ? AND org_id = ?",
     )
-    .bind(postId)
+    .bind(postId, row.org_id)
     .run()
   return { ok: true, at: '', account: '', platform: '' }
 }
@@ -167,11 +169,11 @@ export async function unschedule(db: Db, postId: string): Promise<ScheduleResult
 export async function reschedulePost(db: Db, postId: string, when: string, now: Date): Promise<ScheduleResult> {
   const row = await db
     .prepare(
-      `SELECT p.platform, p.status, p.dispatched_at, a.status AS account_status, a.display_name
-         FROM posts p LEFT JOIN accounts a ON a.id = p.account_id WHERE p.id = ?`,
+      `SELECT p.org_id, p.platform, p.status, p.dispatched_at, a.status AS account_status, a.display_name
+         FROM posts p LEFT JOIN accounts a ON a.id = p.account_id AND a.org_id = p.org_id WHERE p.id = ?`,
     )
     .bind(postId)
-    .first<{ platform: string; status: string; dispatched_at: string | null; account_status: string | null; display_name: string | null }>()
+    .first<{ org_id: string; platform: string; status: string; dispatched_at: string | null; account_status: string | null; display_name: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
   if (row.dispatched_at !== null) return { ok: false, reason: 'أُرسل للنشر، ولا يُغيَّر موعدُه بعد الإرسال' }
@@ -184,10 +186,10 @@ export async function reschedulePost(db: Db, postId: string, when: string, now: 
   const moved = await db
     .prepare(
       `UPDATE posts SET scheduled_at = ?
-        WHERE id = ? AND status = 'queued' AND dispatched_at IS NULL
+        WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL
         RETURNING id`,
     )
-    .bind(at, postId)
+    .bind(at, postId, row.org_id)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُه قبل التغيير، فأعد تحميل الصفحة' }
   return { ok: true, at, account: row.display_name ?? '', platform: row.platform }
@@ -214,9 +216,9 @@ export const STUCK_MINUTES = 60
  */
 export async function requeue(db: Db, postId: string, now: Date): Promise<ScheduleResult> {
   const row = await db
-    .prepare('SELECT status, dispatched_at FROM posts WHERE id = ?')
+    .prepare('SELECT org_id, status, dispatched_at FROM posts WHERE id = ?')
     .bind(postId)
-    .first<{ status: string; dispatched_at: string | null }>()
+    .first<{ org_id: string; status: string; dispatched_at: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
 
   const cutoff = dbNow(new Date(now.getTime() - STUCK_MINUTES * 60_000))
@@ -235,9 +237,9 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
   const attempts = await db
     .prepare(
       `SELECT status, at FROM publish_attempts
-        WHERE post_id = ? AND (status IN ('succeeded', 'sent', 'skipped_duplicate') OR at >= ?)`,
+        WHERE post_id = ? AND org_id = ? AND (status IN ('succeeded', 'sent', 'skipped_duplicate') OR at >= ?)`,
     )
-    .bind(postId, cutoff)
+    .bind(postId, row.org_id, cutoff)
     .all<{ status: string; at: string }>()
   if (attempts.results.some((a) => a.status === 'succeeded' || a.status === 'skipped_duplicate')) {
     return { ok: false, reason: 'نُشر من قبل — وإعادتُه تنشره مرّتين' }
@@ -252,13 +254,14 @@ export async function requeue(db: Db, postId: string, now: Date): Promise<Schedu
   const moved = await db
     .prepare(
       `UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, dispatched_at = NULL
-        WHERE id = ?
+        WHERE id = ? AND org_id = ?
           AND (status = 'failed' OR (status = 'queued' AND dispatched_at IS NOT NULL AND dispatched_at < ?))
-          AND NOT EXISTS (SELECT 1 FROM publish_attempts
-                           WHERE post_id = ? AND status IN ('succeeded', 'sent', 'skipped_duplicate'))
+          AND NOT EXISTS (SELECT 1 FROM publish_attempts pa
+                           WHERE pa.post_id = posts.id AND pa.org_id = posts.org_id
+                             AND pa.status IN ('succeeded', 'sent', 'skipped_duplicate'))
         RETURNING id`,
     )
-    .bind(postId, cutoff, postId)
+    .bind(postId, row.org_id, cutoff)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُه قبل الإعادة — أعد تحميل الصفحة' }
   return { ok: true, at: '', account: '', platform: '' }
@@ -311,6 +314,8 @@ export async function sweepStuck(db: Db, now: Date): Promise<readonly Swept[]> {
 
 export interface DuePost {
   readonly id: string
+  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى ما بعده (D-271). */
+  readonly org: string
   readonly scheduledAt: string
 }
 
@@ -324,14 +329,14 @@ export interface DuePost {
 export async function dueNow(db: Db, now: Date, limit = 20): Promise<DuePost[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, scheduled_at FROM posts
+      `SELECT id, org_id, scheduled_at FROM posts
         WHERE status = 'queued' AND dispatched_at IS NULL AND scheduled_at <= ?
         ORDER BY scheduled_at
         LIMIT ?`,
     )
     .bind(dbNow(now), limit)
-    .all<{ id: string; scheduled_at: string }>()
-  return results.map((r) => ({ id: r.id, scheduledAt: r.scheduled_at }))
+    .all<{ id: string; org_id: string; scheduled_at: string }>()
+  return results.map((r) => ({ id: r.id, org: r.org_id, scheduledAt: r.scheduled_at }))
 }
 
 /**

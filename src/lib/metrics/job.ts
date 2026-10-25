@@ -75,6 +75,8 @@ const READ_SCOPE: Readonly<Record<string, string>> = {
 
 export interface DueRow {
   readonly postId: string
+  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى القياس والكلفة (D-271). */
+  readonly org: string
   readonly platform: 'linkedin' | 'x'
   readonly accountId: string
   readonly platformPostId: string
@@ -84,6 +86,7 @@ export interface DueRow {
 
 interface RawDue {
   post_id: string
+  org_id: string
   platform: string
   account_id: string
   platform_post_id: string
@@ -108,18 +111,18 @@ export async function dueWindows(db: Db, now: Date, limit = 50): Promise<DueRow[
     try {
       const out = await db
         .prepare(
-          `SELECT p.id AS post_id, p.platform, p.account_id,
+          `SELECT p.id AS post_id, p.org_id, p.platform, p.account_id,
                   pa.platform_post_id, pa.at AS published_at
              FROM posts p
              JOIN publish_attempts pa
-               ON pa.post_id = p.id AND pa.status = 'succeeded'
+               ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
             WHERE p.status = 'published'
               AND pa.platform_post_id IS NOT NULL
               AND p.account_id IS NOT NULL
               AND pa.at <= ?
               AND NOT EXISTS (
                     SELECT 1 FROM metrics m
-                     WHERE m.post_id = p.id AND m.window = ?)
+                     WHERE m.post_id = p.id AND m.org_id = p.org_id AND m.window = ?)
             ORDER BY pa.at DESC
             LIMIT ?`,
         )
@@ -136,6 +139,7 @@ export async function dueWindows(db: Db, now: Date, limit = 50): Promise<DueRow[
       if (!measured(platform)) continue
       rows.push({
         postId: r.post_id,
+        org: r.org_id,
         platform,
         accountId: r.account_id,
         platformPostId: r.platform_post_id,
@@ -150,6 +154,7 @@ export async function dueWindows(db: Db, now: Date, limit = 50): Promise<DueRow[
 /** يكتب القياسَ — ويستبدل ما كان للنافذة نفسها إن أُعيد القياسُ يدا. */
 export async function saveMetrics(
   db: Db,
+  org: string,
   postId: string,
   window: WindowName,
   m: PostMetrics,
@@ -157,7 +162,7 @@ export async function saveMetrics(
   await db
     .prepare(
       `INSERT INTO metrics (post_id, window, impressions, reactions, comments, shares, clicks, pulled_at, org_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), (SELECT org_id FROM posts WHERE id = ?1))
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), ?8)
        ON CONFLICT (post_id, window) DO UPDATE SET
          impressions = excluded.impressions,
          reactions   = excluded.reactions,
@@ -166,7 +171,7 @@ export async function saveMetrics(
          clicks      = excluded.clicks,
          pulled_at   = datetime('now')`,
     )
-    .bind(postId, window, m.impressions, m.reactions, m.comments, m.shares, m.clicks)
+    .bind(postId, window, m.impressions, m.reactions, m.comments, m.shares, m.clicks, org)
     .run()
 }
 
@@ -195,7 +200,7 @@ export type PullOutcome =
 export async function pullOne(deps: PullDeps, row: DueRow): Promise<PullOutcome> {
   const fetchImpl = deps.fetchImpl ?? fetch
 
-  const tokens = await loadTokens(deps.db, deps.encKey, row.accountId)
+  const tokens = await loadTokens(deps.db, deps.encKey, row.accountId, row.org)
   if (tokens === null) {
     return { kind: 'deferred', postId: row.postId, reason: 'no_tokens' }
   }
@@ -215,6 +220,7 @@ export async function pullOne(deps: PullDeps, row: DueRow): Promise<PullOutcome>
       units: 1,
       unitCost: X_PRICE_PER_OWNED_READ,
       refId: row.postId,
+      org: row.org,
     })
   }
 
@@ -227,7 +233,7 @@ export async function pullOne(deps: PullDeps, row: DueRow): Promise<PullOutcome>
   } catch (error) {
     if (error instanceof MetricsError && !error.retryable) {
       // ختمٌ بفراغ: لا يُعاد، ولا يُقرأ صفرا
-      await saveMetrics(deps.db, row.postId, row.window, {
+      await saveMetrics(deps.db, row.org, row.postId, row.window, {
         impressions: null, reactions: null, comments: null, shares: null, clicks: null,
       })
       return { kind: 'closed', postId: row.postId, reason: error.message }
@@ -239,7 +245,7 @@ export async function pullOne(deps: PullDeps, row: DueRow): Promise<PullOutcome>
     }
   }
 
-  await saveMetrics(deps.db, row.postId, row.window, measured)
+  await saveMetrics(deps.db, row.org, row.postId, row.window, measured)
   return { kind: 'measured', postId: row.postId, window: row.window }
 }
 
@@ -290,6 +296,7 @@ export interface PostMetricRow {
 /** ما قِيس لمنشوراتٍ بعينها — مفتاحُ الخريطة معرّفُ المنشور. */
 export async function metricsFor(
   db: Db,
+  org: string,
   postIds: readonly string[],
 ): Promise<Record<string, PostMetricRow[]>> {
   if (postIds.length === 0) return {}
@@ -299,9 +306,9 @@ export async function metricsFor(
     const { results } = await db
       .prepare(
         `SELECT post_id, window, impressions, reactions, comments, shares, pulled_at
-           FROM metrics WHERE post_id IN (${marks})`,
+           FROM metrics WHERE org_id = ? AND post_id IN (${marks})`,
       )
-      .bind(...postIds)
+      .bind(org, ...postIds)
       .all<{
         post_id: string
         window: string

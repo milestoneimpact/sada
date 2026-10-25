@@ -38,6 +38,7 @@
 import { checkProviderUrl, guardedFetch } from '../ai/urlGuard'
 import type { Db } from '../tokens'
 import { counted, NOUNS } from '../format'
+import { OWNER_ORG } from '../tenancy'
 
 /** حدثٌ يستحقّ أن يُوقظ المالك — **وثلاثةٌ لا رابعَ لها**. */
 export interface Alert {
@@ -49,6 +50,8 @@ export interface Alert {
    */
   readonly ref: string
   readonly body: string
+  /** منظّمةُ الحدث (D-271): حسابُه أو منشورُه، والسقفُ العامُّ لمنظّمة المالك. */
+  readonly org: string
 }
 
 export interface SendResult {
@@ -65,10 +68,11 @@ export interface SendResult {
  * والحدُّ يُفرَض بالبناء لا بالمراجعة: **لا يُمرَّر إلى هذه الدالّة إلّا
  * ما وُصف**، ولا تُقبَل قطعةٌ حرّةٌ من نداءٍ خارجيّ.
  */
-export function tokenAlert(account: string, days: number, kind: string): Alert {
+export function tokenAlert(account: string, days: number, kind: string, org: string): Alert {
   const which = kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'
   return {
     kind: 'token',
+    org,
     ref: `token:${account}:${kind}:${days}`,
     // ‏العتبةُ صفرٌ لإذنٍ انتهى فعلًا (`thresholdFor`) — فيُقال «انتهى» لا «ينتهي خلال 0 يومًا»،
     // كما تقوله صفحةُ المنصّة للعتبة نفسِها
@@ -79,9 +83,10 @@ export function tokenAlert(account: string, days: number, kind: string): Alert {
   }
 }
 
-export function publishAlert(postId: string, platform: string, attempts: number): Alert {
+export function publishAlert(postId: string, platform: string, attempts: number, org: string): Alert {
   return {
     kind: 'publish',
+    org,
     ref: `publish:${postId}`,
     body: `صدى — منشور على ${platform} لم يُنشَر بعد ${attempts} محاولات،` +
       ' وفات موعدُه ولا يُعاد. راجعه في لوحة صدى.',
@@ -91,6 +96,8 @@ export function publishAlert(postId: string, platform: string, attempts: number)
 export function budgetAlert(day: string, spent: number, cap: number): Alert {
   return {
     kind: 'budget',
+    // ‏السقفُ اليوميُّ عامٌّ لكلّ المنظّمات، فتنبيهُه يسكن منظّمةَ المالك (D-271)
+    org: OWNER_ORG,
     ref: `budget:${day}`,
     body: `صدى — بلغ إنفاق اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +
       ' وما بعده يُردّ حتّى الثالثة فجرًا بتوقيت الرياض أو حتّى تَرفع السقف.',
@@ -152,10 +159,10 @@ export async function sendAlerts(
     // ‏والقيدُ يمنع المكرَّر: إدخالٌ أوّلا، فإن رُدّ فقد أُرسل من قبل
     const fresh = await db
       .prepare(
-        `INSERT INTO alert_outbox (ref, kind, body) VALUES (?, ?, ?)
+        `INSERT INTO alert_outbox (ref, kind, body, org_id) VALUES (?, ?, ?, ?)
          ON CONFLICT(ref) DO NOTHING`,
       )
-      .bind(a.ref, a.kind, a.body)
+      .bind(a.ref, a.kind, a.body, a.org)
       .run()
       .then(() => true)
       .catch(() => false)
@@ -169,8 +176,8 @@ export async function sendAlerts(
      * المكرّرُ ممنوعا بالقيد نفسِه: صفٌّ ناجح لا يُعاد.
      */
     const already = await db
-      .prepare('SELECT status, tries FROM alert_outbox WHERE ref = ?')
-      .bind(a.ref)
+      .prepare('SELECT status, tries FROM alert_outbox WHERE ref = ? AND org_id = ?')
+      .bind(a.ref, a.org)
       .first<{ status: number | null; tries: number }>()
       .catch(() => null)
     if (already !== null && already.status !== null) {
@@ -228,10 +235,10 @@ async function mark(
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO alert_outbox (ref, kind, body, status, error, tries) VALUES (?, ?, ?, ?, ?, 1)
+      `INSERT INTO alert_outbox (ref, kind, body, status, error, tries, org_id) VALUES (?, ?, ?, ?, ?, 1, ?)
        ON CONFLICT(ref) DO UPDATE SET status = excluded.status, error = excluded.error, tries = alert_outbox.tries + 1`,
     )
-    .bind(a.ref, a.kind, a.body, status, error === null ? null : redact(error))
+    .bind(a.ref, a.kind, a.body, status, error === null ? null : redact(error), a.org)
     .run()
     .catch(() => undefined)
 }

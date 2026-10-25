@@ -67,6 +67,7 @@ function minutesBetween(from: string, to: Date): number {
  */
 export async function claimGeneration(
   db: Db,
+  org: string,
   key: string,
   postId: string,
   kind: ClaimKind,
@@ -75,18 +76,19 @@ export async function claimGeneration(
   try {
     const inserted = await db
       .prepare(
-        `INSERT INTO media_claims (idempotency_key, post_id, kind, claimed_at)
-         VALUES (?, ?, ?, ?)
+        // ‏والحجزُ في منظّمة منشوره (D-271)
+        `INSERT INTO media_claims (idempotency_key, post_id, kind, claimed_at, org_id)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(idempotency_key) DO NOTHING`,
       )
-      .bind(key, postId, kind, now.toISOString())
+      .bind(key, postId, kind, now.toISOString(), org)
       .run()
     if (changedRows(inserted)) return { kind: 'claimed' }
 
     // قائمٌ: أشائخٌ هو؟
     const row = await db
-      .prepare('SELECT claimed_at FROM media_claims WHERE idempotency_key = ?')
-      .bind(key)
+      .prepare('SELECT claimed_at FROM media_claims WHERE idempotency_key = ? AND org_id = ?')
+      .bind(key, org)
       .first<{ claimed_at: string }>()
     if (row === null) return { kind: 'claimed' }
 
@@ -99,8 +101,8 @@ export async function claimGeneration(
      * القديم: **يكتبه من قرأه**، والآخرُ يُردّ.
      */
     const took = await db
-      .prepare('UPDATE media_claims SET claimed_at = ? WHERE idempotency_key = ? AND claimed_at = ?')
-      .bind(now.toISOString(), key, row.claimed_at)
+      .prepare('UPDATE media_claims SET claimed_at = ? WHERE idempotency_key = ? AND org_id = ? AND claimed_at = ?')
+      .bind(now.toISOString(), key, org, row.claimed_at)
       .run()
     return changedRows(took) ? { kind: 'claimed' } : { kind: 'busy', since: row.claimed_at }
   } catch {
@@ -115,9 +117,9 @@ export async function claimGeneration(
  * الحجز يردّ «موجودةٌ» فلا يصل إلى هنا أصلا. **وتحريرُه يفتح البابَ
  * لتوليدٍ ثانٍ يُدفَع ثمنُه بلا داعٍ.**
  */
-export async function releaseClaim(db: Db, key: string): Promise<void> {
+export async function releaseClaim(db: Db, org: string, key: string): Promise<void> {
   try {
-    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ?').bind(key).run()
+    await db.prepare('DELETE FROM media_claims WHERE idempotency_key = ? AND org_id = ?').bind(key, org).run()
   } catch {
     // جدولٌ لم يُرحَّل، أو حجزٌ أُخذ منّا: الشيخوخةُ تكفله على كلّ حال
   }

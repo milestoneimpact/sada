@@ -100,7 +100,7 @@ describe('والقراءة من قاعدة حقيقيّة', () => {
   beforeEach(() => { db = fakeDb() })
 
   it('قاعدة فارغة تعطي أصفارا ولا تسقط', async () => {
-    const f = await readGateFacts(db)
+    const f = await readGateFacts(db, 'org_owner')
     expect(f.plans).toBe(0)
     expect(f.publishedPerPlatform).toEqual({})
     expect(gatesOf(f).every((g) => !g.passed)).toBe(true)
@@ -122,7 +122,7 @@ describe('والقراءة من قاعدة حقيقيّة', () => {
                                      request_json, status)
        VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
     )
-    const f = await readGateFacts(db)
+    const f = await readGateFacts(db, 'org_owner')
     expect(f.publishedPerPlatform['x']).toBe(1)
     // **وجُدوِل ثمّ خرج** — فيُعَدّ في «بلا تدخّل»
     expect(f.scheduledPublished).toBe(1)
@@ -145,6 +145,6 @@ describe('والقراءة من قاعدة حقيقيّة', () => {
                                      request_json, status)
        VALUES ('at1', 'p1', 'k1', 1, '{}', 'failed')`,
     )
-    expect((await readGateFacts(db)).publishedPerPlatform['x']).toBeUndefined()
+    expect((await readGateFacts(db, 'org_owner')).publishedPerPlatform['x']).toBeUndefined()
   })
 })

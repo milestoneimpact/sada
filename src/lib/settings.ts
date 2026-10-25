@@ -10,6 +10,7 @@
 import { checkProviderUrl } from './ai/urlGuard'
 import { DEFAULT_TILES, normalizeTiles, parseTiles } from './dashboard'
 import type { Db } from './tokens'
+import { OWNER_ORG } from './tenancy'
 
 export interface Settings {
   /** حين يُرفع: لا نداء مدفوع ولا نشر — في كلّ مسار، لا في الواجهة. */
@@ -200,7 +201,9 @@ export async function readSettings(db: Db): Promise<Settings> {
   let rows: { key: string; value: string }[] = []
   try {
     const result = await db
-      .prepare('SELECT key, value FROM settings')
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      .prepare('SELECT key, value FROM settings WHERE org_id = ?')
+      .bind(OWNER_ORG)
       .all<{ key: string; value: string }>()
     rows = result.results
   } catch {
@@ -293,14 +296,15 @@ export async function writeSetting(
 
   await db
     .prepare(
-      `INSERT INTO settings (key, value, updated_by, updated_at)
-       VALUES (?, ?, ?, datetime('now'))
+      `INSERT INTO settings (key, value, updated_by, updated_at, org_id)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+       VALUES (?, ?, ?, datetime('now'), ?)
        ON CONFLICT(key) DO UPDATE SET
          value = excluded.value,
          updated_by = excluded.updated_by,
          updated_at = datetime('now')`,
     )
-    .bind(key, stored, updatedBy)
+    .bind(key, stored, updatedBy, OWNER_ORG)
     .run()
 
   return { key, value: raw, stored, clamped: stored !== raw }

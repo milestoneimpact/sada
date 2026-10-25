@@ -87,10 +87,10 @@ export async function loadGantt(db: Db, org: string, from: Date, to: Date): Prom
     const planResult = await db
       .prepare(
         `SELECT id, week_start, status FROM plans
-          WHERE week_start < ? AND week_start >= date(?, '-7 days')
+          WHERE org_id = ? AND week_start < ? AND week_start >= date(?, '-7 days')
           ORDER BY week_start`,
       )
-      .bind(b, a)
+      .bind(org, b, a)
       .all<PlanRow>()
     plans = planResult.results
   } catch {
