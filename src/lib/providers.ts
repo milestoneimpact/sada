@@ -102,7 +102,7 @@ function toProvider(row: Row): Provider {
 
 export async function listProviders(db: Db): Promise<Provider[]> {
   try {
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     const { results } = await db
       .prepare(`SELECT ${COLUMNS} FROM providers WHERE org_id = ? ORDER BY builtin DESC, name`)
       .bind(OWNER_ORG)
@@ -116,7 +116,7 @@ export async function listProviders(db: Db): Promise<Provider[]> {
 
 export async function getProvider(db: Db, name: string): Promise<Provider | null> {
   try {
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     const row = await db
       .prepare(`SELECT ${COLUMNS} FROM providers WHERE name = ? AND org_id = ?`)
       .bind(name, OWNER_ORG)
@@ -232,7 +232,7 @@ export async function resolveKey(
   let row: { key_enc: string | null; key_iv: string | null; enabled: number } | null
   try {
     row = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
       .prepare('SELECT key_enc, key_iv, enabled FROM providers WHERE name = ? AND org_id = ?')
       .bind(provider, OWNER_ORG)
       .first<{ key_enc: string | null; key_iv: string | null; enabled: number }>()
@@ -256,7 +256,7 @@ export async function resolveKey(
 
 export async function setEnabled(db: Db, provider: string, enabled: boolean, by: string): Promise<void> {
   await db
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     .prepare("UPDATE providers SET enabled = ?, updated_by = ?, updated_at = datetime('now') WHERE name = ? AND org_id = ?")
     .bind(enabled ? 1 : 0, by, provider, OWNER_ORG)
     .run()
@@ -264,7 +264,7 @@ export async function setEnabled(db: Db, provider: string, enabled: boolean, by:
 
 export async function markVerified(db: Db, provider: string): Promise<void> {
   await db
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     .prepare("UPDATE providers SET verified_at = datetime('now') WHERE name = ? AND org_id = ?")
     .bind(provider, OWNER_ORG)
     .run()
@@ -274,7 +274,7 @@ export async function markVerified(db: Db, provider: string): Promise<void> {
 export async function deleteProvider(db: Db, provider: string): Promise<boolean> {
   const existing = await getProvider(db, provider)
   if (existing === null || existing.builtin) return false
-  // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+  // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
   await db.prepare('DELETE FROM providers WHERE name = ? AND org_id = ?').bind(provider, OWNER_ORG).run()
   return true
 }

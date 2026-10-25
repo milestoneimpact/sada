@@ -278,7 +278,7 @@ app.get('/admin/sources', async (c) => {
       WHERE s.org_id = ?
       ORDER BY s.last_seen_at DESC`,
   )
-    // ‏مسارُ المشرف بلا جلسة، ومصادرُ Drive تسكن منظّمةَ المالك (D-233 · D-271)
+    // ‏مسارُ المشرف بلا جلسة، ومصادرُ Drive تسكن منظّمةَ المالك (D-233 · D-277)
     .bind(OWNER_ORG)
     .all<{
     id: string

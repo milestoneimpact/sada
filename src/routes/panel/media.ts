@@ -1,7 +1,7 @@
 /**
  * مسارات اللوحة — المكتبة والصور والمقاطع ورفعُ مقاطع المالك.
  *
- * جزءٌ من `panel.ts` قُسم على أقسامه (D-272) بلا تغييرٍ في سلوك.
+ * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
@@ -305,7 +305,7 @@ media.get('/panel/media/:id', async (c) => {
   if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
 
   const row = await c.env.DB
-    // ‏صورةُ منظّمةٍ لا تُسلَّم من جلسةٍ نشطةٍ في غيرها (D-271)
+    // ‏صورةُ منظّمةٍ لا تُسلَّم من جلسةٍ نشطةٍ في غيرها (D-277)
     .prepare('SELECT r2_key, mime FROM media WHERE id = ? AND org_id = ?')
     .bind(c.req.param('id'), activeOrg(session.record))
     .first<{ r2_key: string; mime: string }>()

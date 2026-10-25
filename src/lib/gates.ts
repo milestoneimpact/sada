@@ -210,7 +210,7 @@ export function currentPhase(gates: readonly Gate[]): string | null {
 /**
  * يقرأ الحقائقَ من القاعدة. وما لا يُقرأ يعود صفرا، **ولا يُدَّعى**.
  *
- * و`org` منظّمةُ الجلسة النشطة (D-271): البوّاباتُ تُقاس على ما وقع في منظّمةٍ
+ * و`org` منظّمةُ الجلسة النشطة (D-277): البوّاباتُ تُقاس على ما وقع في منظّمةٍ
  * واحدة، لا على مجموعِ المنظّمات.
  */
 export async function readGateFacts(db: Db, org: string): Promise<GateFacts> {

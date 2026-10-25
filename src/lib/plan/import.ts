@@ -398,7 +398,7 @@ const EXISTING: Readonly<Record<string, string>> = {
  */
 export async function applyPlan(
   db: Db,
-  /** منظّمةُ الجلسة — المفاتيحُ والمقاطعُ والمنشوراتُ فيها وحدَها (D-271). */
+  /** منظّمةُ الجلسة — المفاتيحُ والمقاطعُ والمنشوراتُ فيها وحدَها (D-277). */
   org: string,
   rows: readonly PlanRow[],
   by: string,

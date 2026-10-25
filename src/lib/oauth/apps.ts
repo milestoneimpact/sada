@@ -84,7 +84,7 @@ export async function readApp(
   let row: { client_id: string; secret_enc: string; secret_iv: string } | null
   try {
     row = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
       .prepare('SELECT client_id, secret_enc, secret_iv FROM oauth_apps WHERE platform = ? AND org_id = ?')
       .bind(platform, OWNER_ORG)
       .first<{ client_id: string; secret_enc: string; secret_iv: string }>()
@@ -262,7 +262,7 @@ export async function saveApp(
   if (secret.length === 0) throw new Error('سرّ التطبيق فارغ')
 
   const before = await db
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     .prepare('SELECT fingerprint FROM oauth_apps WHERE platform = ? AND org_id = ?')
     .bind(platform, OWNER_ORG)
     .first<{ fingerprint: string }>()
@@ -297,7 +297,7 @@ export async function saveApp(
 /** حذفُ التطبيق من الخزانة — ولا يمسّ ما في البيئة. */
 export async function deleteApp(db: Db, platform: Platform): Promise<boolean> {
   const row = await db
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     .prepare('SELECT platform FROM oauth_apps WHERE platform = ? AND org_id = ?')
     .bind(platform, OWNER_ORG)
     .first<{ platform: string }>()

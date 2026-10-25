@@ -134,7 +134,7 @@ interface Pending {
   readonly multipart_id: string | null
 }
 
-/** الرفعُ الجاري — في منظّمة الجلسة وحدَها (D-271). */
+/** الرفعُ الجاري — في منظّمة الجلسة وحدَها (D-277). */
 async function pending(db: Db, org: string, id: string): Promise<Pending | null> {
   return db
     .prepare('SELECT r2_key, bytes, status, multipart_id FROM uploads WHERE id = ? AND org_id = ?')
@@ -205,7 +205,7 @@ export const STALE_UPLOAD_HOURS = 6
 export async function expireStaleUploads(db: Db, bucket: MultipartBucket, now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_UPLOAD_HOURS * 3_600_000).toISOString().slice(0, 19).replace('T', ' ')
   const { results } = await db
-    // ‏دورةٌ تعبر المنظّمات كلَّها (D-271): تقرأ منظّمةَ كلّ صفٍّ وتعلّمه بها
+    // ‏دورةٌ تعبر المنظّمات كلَّها (D-277): تقرأ منظّمةَ كلّ صفٍّ وتعلّمه بها
     .prepare(`SELECT id, org_id, r2_key, multipart_id FROM uploads WHERE status = 'uploading' AND created_at < ? LIMIT 50`)
     .bind(cutoff)
     .all<{ id: string; org_id: string; r2_key: string; multipart_id: string | null }>()
@@ -534,7 +534,7 @@ export type PostsResult =
 export async function postsFromUpload(
   db: Db,
   input: {
-    /** منظّمةُ الجلسة — المقطعُ ومنشوراتُه فيها وحدَها (D-271). */
+    /** منظّمةُ الجلسة — المقطعُ ومنشوراتُه فيها وحدَها (D-277). */
     readonly org: string
     readonly uploadId: string
     readonly platforms: readonly string[]
@@ -658,7 +658,7 @@ export interface UploadSchedule {
 export async function scheduleFromUpload(
   db: Db,
   input: {
-    /** منظّمةُ الجلسة (D-271). */
+    /** منظّمةُ الجلسة (D-277). */
     readonly org: string
     readonly uploadId: string
     readonly shown: readonly string[]

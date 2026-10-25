@@ -228,7 +228,7 @@ export type CaptionsOutcome =
  * منه تحملان `at` واحدًا: الأولى تكتب وتُبدّله، والثانيةُ لا تطابق فتعود «مكتوبةً» بلا كلفة.
  */
 export async function captionsFor(
-  deps: WriterDeps & { readonly kv: CaptionStore; readonly now?: Date; /** منظّمةُ الجلسة — المقطعُ يُقرأ فيها وحدَها (D-271). */ readonly org: string },
+  deps: WriterDeps & { readonly kv: CaptionStore; readonly now?: Date; /** منظّمةُ الجلسة — المقطعُ يُقرأ فيها وحدَها (D-277). */ readonly org: string },
   uploadId: string,
   rawAbout: string,
   replace = '',

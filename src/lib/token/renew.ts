@@ -66,7 +66,7 @@ export type RenewOutcome =
 interface DueRow {
   account_id: string
   platform: string
-  /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-271). */
+  /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-277). */
   org_id: string
 }
 

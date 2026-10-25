@@ -76,7 +76,7 @@ export async function claimGeneration(
   try {
     const inserted = await db
       .prepare(
-        // ‏والحجزُ في منظّمة منشوره (D-271)
+        // ‏والحجزُ في منظّمة منشوره (D-277)
         `INSERT INTO media_claims (idempotency_key, post_id, kind, claimed_at, org_id)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(idempotency_key) DO NOTHING`,

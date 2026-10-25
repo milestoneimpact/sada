@@ -50,7 +50,7 @@ export function sourceId(driveFileId: string): string {
  */
 export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<SyncResult> {
   const existing = new Map<string, SourceRow>()
-  // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه تسكن منظّمته وتُقرأ منها وحدها (D-233 · D-271)
+  // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه تسكن منظّمته وتُقرأ منها وحدها (D-233 · D-277)
   const { results } = await db
     .prepare('SELECT id, drive_file_id, content_hash FROM sources WHERE org_id = ?')
     .bind(OWNER_ORG)

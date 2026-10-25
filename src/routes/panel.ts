@@ -24,7 +24,7 @@ export { setFlash } from './panel/shared'
 
 export const panel = new Hono<{ Bindings: Env }>()
 
-// الترتيبُ ترتيبُ التسجيل الأصليّ قبل القسمة (D-272): Hono يطابق بترتيب التسجيل.
+// الترتيبُ ترتيبُ التسجيل الأصليّ قبل القسمة (D-278): Hono يطابق بترتيب التسجيل.
 panel.route('/', client)
 panel.route('/', home)
 panel.route('/', session)

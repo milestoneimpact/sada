@@ -106,7 +106,7 @@ interface PostRow {
   platform: string
   text: string
   status: string
-  /** منظّمةُ المنشور — تُقرأ معه وتسوق كلَّ جملةٍ بعده (D-271). */
+  /** منظّمةُ المنشور — تُقرأ معه وتسوق كلَّ جملةٍ بعده (D-277). */
   org_id: string
 }
 
@@ -325,7 +325,7 @@ export interface GenerateOptions {
   readonly replace?: string
   readonly style?: ImageStyle
   /**
-   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-271): المنشورُ يُقرأ فيها وحدَها. والطابورُ
+   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-277): المنشورُ يُقرأ فيها وحدَها. والطابورُ
    * بلا جلسةٍ يقرأ المنشورَ بمعرّفه **مع منظّمته**، وبها تُساق كلُّ جملةٍ بعده.
    */
   readonly org?: string
@@ -753,7 +753,7 @@ function textOrNull(value: unknown): string | null {
 /**
  * صورُ منشوراتٍ بعينها — استعلامٌ واحد لا واحدٌ لكلّ بطاقة.
  *
- * ‏والوسيطُ في منظّمة منشوره (D-271): المعرّفاتُ تأتي من قوائمَ مسوقةٍ بالمنظّمة، والربطُ
+ * ‏والوسيطُ في منظّمة منشوره (D-277): المعرّفاتُ تأتي من قوائمَ مسوقةٍ بالمنظّمة، والربطُ
  * ‏`m.org_id = p.org_id` يردّ صفًّا تاه عن منظّمة منشوره.
  */
 export async function mediaFor(db: Db, postIds: readonly string[]): Promise<MediaRow[]> {

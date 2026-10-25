@@ -162,7 +162,7 @@ export interface VideoDeps {
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
   /**
-   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-271): وسائطُ المنشور تُقرأ فيها وحدَها. وبلا
+   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-277): وسائطُ المنشور تُقرأ فيها وحدَها. وبلا
    * جلسةٍ تُقرأ منظّمةُ المنشور بمعرّفه أوّلًا، وبها تُساق كلُّ جملةٍ بعده.
    */
   readonly org?: string
@@ -223,7 +223,7 @@ export async function animateForPost(
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
-  // ‏ومنظّمةُ المنشور قبل كلّ جملةٍ على وسائطه (D-271)
+  // ‏ومنظّمةُ المنشور قبل كلّ جملةٍ على وسائطه (D-277)
   const org = deps.org ?? await orgOfPost(deps.db, postId)
 
   // ٢ — مقطعٌ قائمٌ لا يُعاد توليدُه: الفيديو أغلى ما يُنادى في النظام

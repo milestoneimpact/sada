@@ -44,7 +44,7 @@ media.get('/m/:token', async (c) => {
     return notFound()
   }
 
-  // ‏الرمزُ يعيّن الصفَّ، والصفُّ يحمل منظّمته (D-271): تُقرأ معه وتُسجَّل لا تُخمَّن
+  // ‏الرمزُ يعيّن الصفَّ، والصفُّ يحمل منظّمته (D-277): تُقرأ معه وتُسجَّل لا تُخمَّن
   const row = await c.env.DB
     .prepare(`SELECT r2_key, mime, status, org_id FROM media WHERE id = ?`)
     .bind(verdict.mediaId)

@@ -36,7 +36,7 @@ export interface CostEntry {
   readonly units: number
   readonly unitCost: number
   readonly refId?: string | undefined
-  /** منظّمةُ ما أُنفق عليه حين يعرفها النادي (D-271) — وإلّا تُستنتَج من المرجع. */
+  /** منظّمةُ ما أُنفق عليه حين يعرفها النادي (D-277) — وإلّا تُستنتَج من المرجع. */
   readonly org?: string | undefined
 }
 

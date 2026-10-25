@@ -175,7 +175,7 @@ export async function analyzeSource(
   // المالك بترجمته يدويا عبءٌ صنعناه نحن ولا يخدم شيئا
   const source = await deps.db
     .prepare(
-      // ‏المنظّمةُ تُقرأ مع الصفّ وتُحمَل إلى كلّ ما بعده (D-271)
+      // ‏المنظّمةُ تُقرأ مع الصفّ وتُحمَل إلى كلّ ما بعده (D-277)
       'SELECT id, org_id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
     )
     .bind(sourceId, sourceId)

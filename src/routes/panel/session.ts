@@ -1,7 +1,7 @@
 /**
  * مسارات اللوحة — الدخول والخروج والجلسات والمنظّمات.
  *
- * جزءٌ من `panel.ts` قُسم على أقسامه (D-272) بلا تغييرٍ في سلوك.
+ * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
 import { Hono } from 'hono'
 import type { Env } from '../../env'
@@ -74,7 +74,7 @@ session.post('/panel/login/code', async (c) => {
     )
   }
 
-  // ‏المالكُ أو مدعوٌّ قائم (D-272) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
+  // ‏المالكُ أو مدعوٌّ قائم (D-278) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
   const typed = normalizeEmail(String(form.get('email') ?? ''))
   const who = await whoCanReceive(c.env.DB, typed)
   if (who !== null) {
@@ -136,7 +136,7 @@ session.post('/panel/login', async (c) => {
     )
   }
 
-  // ‏صاحبُ الرمز من خطوة البريد (D-272): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
+  // ‏صاحبُ الرمز من خطوة البريد (D-278): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
   // ‏كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**، فلا يكشف الفرقُ أيَّ العناوين مدعوّ
   const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
   const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }

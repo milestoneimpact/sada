@@ -75,7 +75,7 @@ const READ_SCOPE: Readonly<Record<string, string>> = {
 
 export interface DueRow {
   readonly postId: string
-  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى القياس والكلفة (D-271). */
+  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى القياس والكلفة (D-277). */
   readonly org: string
   readonly platform: 'linkedin' | 'x'
   readonly accountId: string

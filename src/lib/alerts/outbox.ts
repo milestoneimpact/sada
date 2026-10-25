@@ -50,7 +50,7 @@ export interface Alert {
    */
   readonly ref: string
   readonly body: string
-  /** منظّمةُ الحدث (D-271): حسابُه أو منشورُه، والسقفُ العامُّ لمنظّمة المالك. */
+  /** منظّمةُ الحدث (D-277): حسابُه أو منشورُه، والسقفُ العامُّ لمنظّمة المالك. */
   readonly org: string
 }
 
@@ -96,7 +96,7 @@ export function publishAlert(postId: string, platform: string, attempts: number,
 export function budgetAlert(day: string, spent: number, cap: number): Alert {
   return {
     kind: 'budget',
-    // ‏السقفُ اليوميُّ عامٌّ لكلّ المنظّمات، فتنبيهُه يسكن منظّمةَ المالك (D-271)
+    // ‏السقفُ اليوميُّ عامٌّ لكلّ المنظّمات، فتنبيهُه يسكن منظّمةَ المالك (D-277)
     org: OWNER_ORG,
     ref: `budget:${day}`,
     body: `صدى — بلغ إنفاق اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +

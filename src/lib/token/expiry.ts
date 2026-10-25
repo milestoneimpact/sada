@@ -32,7 +32,7 @@ export type TokenKind = 'access' | 'refresh'
 
 export interface ExpiringToken {
   readonly accountId: string
-  /** منظّمةُ الحساب — تُقرأ مع الصفّ وتُكتب مع تنبيهه (D-271). */
+  /** منظّمةُ الحساب — تُقرأ مع الصفّ وتُكتب مع تنبيهه (D-277). */
   readonly org: string
   readonly platform: string
   readonly displayName: string
@@ -171,7 +171,7 @@ export async function recordAlerts(
 export async function anyWeekAlert(db: Db): Promise<boolean> {
   try {
     const row = await db
-      // ‏بندُ البوّابة عامّ لكلّ المنظّمات (D-271)
+      // ‏بندُ البوّابة عامّ لكلّ المنظّمات (D-277)
       .prepare('SELECT 1 AS n FROM token_alerts WHERE threshold >= 7 AND org_id IN (SELECT id FROM orgs) LIMIT 1')
       .first<{ n: number }>()
     return row !== null

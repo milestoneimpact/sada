@@ -53,7 +53,7 @@ export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvide
 async function spendSince(db: Db, since: Date): Promise<number> {
   try {
     const row = await db
-      // السقفُ عامّ لكلّ المنظّمات (D-271)
+      // السقفُ عامّ لكلّ المنظّمات (D-277)
       .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE org_id IN (SELECT id FROM orgs) AND at >= ?')
       .bind(since.toISOString().slice(0, 19).replace('T', ' '))
       .first<{ total: number | null }>()

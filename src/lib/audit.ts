@@ -84,7 +84,7 @@ export interface AuditRow {
 }
 
 /**
- * آخرُ ما وقع **في منظّمةٍ** (D-271) — منظّمةُ الجلسة النشطة. وجدولٌ لا يُقرأ
+ * آخرُ ما وقع **في منظّمةٍ** (D-277) — منظّمةُ الجلسة النشطة. وجدولٌ لا يُقرأ
  * لا يُسقط اللوحة: تُعاد قائمةٌ فارغة.
  */
 export async function recentAudit(db: Db, org: string, limit = 50): Promise<AuditRow[]> {

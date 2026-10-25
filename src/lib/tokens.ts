@@ -165,7 +165,7 @@ interface TokenRow {
 /**
  * يقرأ الرموز ويفك تشفيرها. يعيد `null` إن لم يكن للحساب رمز.
  *
- * و`org` حين يُمرَّر **شرطٌ يُفرَض** (D-271): رمزُ حسابٍ في منظّمةٍ أخرى يعود
+ * و`org` حين يُمرَّر **شرطٌ يُفرَض** (D-277): رمزُ حسابٍ في منظّمةٍ أخرى يعود
  * `null` كأنّه لا رمز. والمعاملُ اختياريٌّ لمن لا يملك المنظّمة بعد (الناشر يمرّر
  * `post.org_id`)، لا رخصةً لإغفالها.
  */
@@ -217,7 +217,7 @@ export async function loadTokens(
   }
 }
 
-/** يختم تجديدا ناجحا — **وحدَه**، فالربطُ الأوّل ليس تجديدا (D-129). والمنظّمةُ منظّمةُ الحساب (D-271). */
+/** يختم تجديدا ناجحا — **وحدَه**، فالربطُ الأوّل ليس تجديدا (D-129). والمنظّمةُ منظّمةُ الحساب (D-277). */
 export async function markRefreshed(db: Db, id: string, org: string): Promise<void> {
   await db
     .prepare("UPDATE tokens SET refreshed_at = datetime('now') WHERE account_id = ? AND org_id = ?")
@@ -243,7 +243,7 @@ export async function markActive(db: Db, id: string, org: string): Promise<void>
 /**
  * يعلّم حسابا بأنه يحتاج إعادة ربط — بلا حذف، فالجدولة لا تضيع.
  *
- * و`org` حين يُمرَّر شرطٌ يُفرَض (D-271)؛ وبلا منظّمةٍ يُعلَّم الحسابُ بمعرّفه وحده
+ * و`org` حين يُمرَّر شرطٌ يُفرَض (D-277)؛ وبلا منظّمةٍ يُعلَّم الحسابُ بمعرّفه وحده
  * (`? IS NULL`)، والمعاملُ اختياريٌّ للناشر حتى يمرّر `post.org_id`.
  */
 export async function markNeedsReauth(db: Db, id: string, org?: string): Promise<void> {

@@ -263,6 +263,14 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .vfile{position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
 .vup progress{flex:1 1 12.5rem; height:var(--s-3); accent-color:var(--ok)}
 .vlist{display:flex; flex-direction:column; gap:var(--s-3)}
+/* ‏طيّةٌ نصّيّة (D-277): سطرٌ يُفتح بضغطة، بهدف ‏44 وبلا مثلّث المتصفّح */
+details.fold > summary{cursor:pointer; list-style:none; display:flex; align-items:center; gap:var(--s-2); min-height:var(--tap);
+  color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary > span{min-width:0}
+details.fold > summary::before{content:'›'; display:inline-block; transition:transform var(--dur-2) var(--ease)}
+details.fold[open] > summary::before{transform:rotate(-90deg)}
+details.fold[open] > summary{margin-bottom:var(--s-2)}
 /* ‏والصفُّ مرساةُ العودة بعد الإنشاء والجدولة (ر-4): يقف تحت الشريط الملتصق لا خلفَه، كالمسوّدة */
 .vrow{display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-3);
   border:var(--bd); scroll-margin-block-start:var(--s-16)}

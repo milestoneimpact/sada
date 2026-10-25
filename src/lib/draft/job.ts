@@ -149,7 +149,7 @@ export async function draftPost(
    * لحظةَ تُكتب البديلة (الخطوة ٧) لا قبلها. **وحارسُ النقرة المزدوجة باقٍ**: ما دامت
    * البديلةُ قائمةً بالمفتاح نفسه، فالضغطةُ التالية `already`.
    */
-  // ‏والمسوّدةُ في منظّمة مصدرها (D-271): بها يُسأل عن المفتاح وبها يُكتب الصفّ
+  // ‏والمسوّدةُ في منظّمة مصدرها (D-277): بها يُسأل عن المفتاح وبها يُكتب الصفّ
   const org = row.org_id ?? 'org_owner'
   const key = draftKey(row.id, platform, hash, provider)
   const existing = await deps.db
@@ -325,7 +325,7 @@ export async function draftFromIdea(
   if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
 
   // أكُتبت هذه الفكرةُ لهذه المنصّة ولم تُرفَض؟ — لا نداءَ ولا كلفة
-  // ‏وفكرةٌ بلا مصدرٍ تُكتب في منظّمة الجلسة (D-271)
+  // ‏وفكرةٌ بلا مصدرٍ تُكتب في منظّمة الجلسة (D-277)
   const org = deps.org ?? 'org_owner'
   const key = await ideaKey(idea, platform)
   const existing = await deps.db

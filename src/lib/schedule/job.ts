@@ -76,11 +76,11 @@ export async function schedulePost(
   accountId: string,
   when: string,
   now: Date,
-  /** منظّمةُ الجلسة حين يأتي الطلبُ من اللوحة (D-271): منشورُ منظّمةٍ أخرى «لا منشور» */
+  /** منظّمةُ الجلسة حين يأتي الطلبُ من اللوحة (D-277): منشورُ منظّمةٍ أخرى «لا منشور» */
   org: string | null = null,
 ): Promise<ScheduleResult> {
   const post = await db
-    // ‏المنظّمةُ تُقرأ مع الصفّ، وكلُّ ما بعده يُقيَّد بها (D-271)
+    // ‏المنظّمةُ تُقرأ مع الصفّ، وكلُّ ما بعده يُقيَّد بها (D-277)
     .prepare('SELECT id, org_id, platform, status FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
     .bind(postId, org)
     .first<PostRow>()
@@ -317,7 +317,7 @@ export async function sweepStuck(db: Db, now: Date): Promise<readonly Swept[]> {
 
 export interface DuePost {
   readonly id: string
-  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى ما بعده (D-271). */
+  /** منظّمةُ المنشور — تُقرأ مع المسح وتُحمَل إلى ما بعده (D-277). */
   readonly org: string
   readonly scheduledAt: string
 }

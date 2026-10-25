@@ -1,7 +1,7 @@
 /**
  * مسارات اللوحة — العميل والمحفظة والفريق و«ما ينجح» وملفّات CSV.
  *
- * جزءٌ من `panel.ts` قُسم على أقسامه (D-272) بلا تغييرٍ في سلوك.
+ * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
@@ -196,7 +196,7 @@ client.get('/panel/portfolio', async (c) => {
   )
 })
 
-// ── الفريق (D-272) ─────────────────────────────────────────────────
+// ── الفريق (D-278) ─────────────────────────────────────────────────
 
 client.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)

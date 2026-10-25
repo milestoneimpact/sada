@@ -25,7 +25,7 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
   let saved = new Map<string, { provider: string; model: string }>()
   try {
     const { results } = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
       .prepare('SELECT task, provider, model FROM task_routes WHERE org_id = ?')
       .bind(OWNER_ORG)
       .all<{ task: string; provider: string; model: string }>()

@@ -19,7 +19,7 @@ export const ZONE_SETTING = 'owner_tz'
 /** المنطقةُ المحفوظة إن كانت صالحة — وأيُّ عطلٍ في القراءة يعني «لا شيء» لا انكسارَ الصفحة. */
 export async function storedZone(db: Db): Promise<string | null> {
   try {
-    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
     const row = await db
       .prepare('SELECT value FROM settings WHERE key = ? AND org_id = ?')
       .bind(ZONE_SETTING, OWNER_ORG)

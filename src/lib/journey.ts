@@ -314,7 +314,7 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
    * — فجمعُ المحطّات يُنقص ما دُفع فعلا.
    */
   const spent = await db
-    // ‏والدفترُ يحمل منظّمةَ منشوره (`recordCost`)، فيُسأل بها (D-271)
+    // ‏والدفترُ يحمل منظّمةَ منشوره (`recordCost`)، فيُسأل بها (D-277)
     .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM cost_ledger WHERE ref_id = ? AND org_id = ?`)
     .bind(postId, org)
     .first<{ s: number }>()

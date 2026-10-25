@@ -201,7 +201,7 @@ export async function readSettings(db: Db): Promise<Settings> {
   let rows: { key: string; value: string }[] = []
   try {
     const result = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-271)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
       .prepare('SELECT key, value FROM settings WHERE org_id = ?')
       .bind(OWNER_ORG)
       .all<{ key: string; value: string }>()
