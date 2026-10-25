@@ -44,16 +44,17 @@ media.get('/m/:token', async (c) => {
     return notFound()
   }
 
+  // ‏الرمزُ يعيّن الصفَّ، والصفُّ يحمل منظّمته (D-277): تُقرأ معه وتُسجَّل لا تُخمَّن
   const row = await c.env.DB
-    .prepare(`SELECT r2_key, mime, status FROM media WHERE id = ?`)
+    .prepare(`SELECT r2_key, mime, status, org_id FROM media WHERE id = ?`)
     .bind(verdict.mediaId)
-    .first<{ r2_key: string; mime: string; status: string }>()
+    .first<{ r2_key: string; mime: string; status: string; org_id: string }>()
     .catch(() => null)
 
   // ما رُفض لا يُسلَّم ولو صحّ توقيعُه: المالك حكم عليه، والتوقيعُ أقدمُ
   // من حكمه — ورابطٌ وُقّع قبل الرفض يبقى صالحا دقائقَ بعده
   if (row === null || row.status !== 'ready') {
-    console.log({ job: 'media_link', denied: 'not_ready' })
+    console.log({ job: 'media_link', denied: 'not_ready', ...(row === null ? {} : { org: row.org_id }) })
     return notFound()
   }
 

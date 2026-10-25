@@ -207,8 +207,13 @@ export function currentPhase(gates: readonly Gate[]): string | null {
   return gates.find((g) => !g.passed)?.phase ?? null
 }
 
-/** يقرأ الحقائقَ من القاعدة. وما لا يُقرأ يعود صفرا، **ولا يُدَّعى**. */
-export async function readGateFacts(db: Db): Promise<GateFacts> {
+/**
+ * يقرأ الحقائقَ من القاعدة. وما لا يُقرأ يعود صفرا، **ولا يُدَّعى**.
+ *
+ * و`org` منظّمةُ الجلسة النشطة (D-277): البوّاباتُ تُقاس على ما وقع في منظّمةٍ
+ * واحدة، لا على مجموعِ المنظّمات.
+ */
+export async function readGateFacts(db: Db, org: string): Promise<GateFacts> {
   const zero: GateFacts = {
     publishedPerPlatform: {}, publishedWithMedia: {}, scheduledPublished: 0,
     ledgerPerPlatform: {}, plans: 0, reports: 0, suggestions: 0,
@@ -225,9 +230,9 @@ export async function readGateFacts(db: Db): Promise<GateFacts> {
     }
   }
 
-  const perPlatform = async (sql: string): Promise<Record<string, number>> => {
+  const perPlatform = async (sql: string, ...binds: unknown[]): Promise<Record<string, number>> => {
     try {
-      const { results } = await db.prepare(sql).all<{ platform: string; n: number }>()
+      const { results } = await db.prepare(sql).bind(...binds).all<{ platform: string; n: number }>()
       return Object.fromEntries(results.map((r) => [r.platform, r.n]))
     } catch {
       return {}
@@ -239,34 +244,41 @@ export async function readGateFacts(db: Db): Promise<GateFacts> {
     publishedPerPlatform: await perPlatform(
       `SELECT p.platform AS platform, count(DISTINCT p.id) AS n
          FROM posts p JOIN publish_attempts pa
-           ON pa.post_id = p.id AND pa.status = 'succeeded'
+           ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
+        WHERE p.org_id = ?
         GROUP BY p.platform`,
+      org,
     ),
     publishedWithMedia: await perPlatform(
       `SELECT p.platform AS platform, count(DISTINCT p.id) AS n
          FROM posts p
-         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.status = 'succeeded'
-         JOIN media m ON m.post_id = p.id AND m.status = 'ready'
+         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
+         JOIN media m ON m.post_id = p.id AND m.org_id = p.org_id AND m.status = 'ready'
+        WHERE p.org_id = ?
         GROUP BY p.platform`,
+      org,
     ),
     ledgerPerPlatform: await perPlatform(
       `SELECT provider AS platform, count(*) AS n FROM cost_ledger
-        WHERE provider IN ('linkedin', 'x') GROUP BY provider`,
+        WHERE org_id = ? AND provider IN ('linkedin', 'x') GROUP BY provider`,
+      org,
     ),
     // **«بلا تدخّل» تعني أنّها جُدوِلت ثمّ خرجت** — لا أنّها دُفعت بيد
     scheduledPublished: await count(
       `SELECT count(DISTINCT p.id) AS n FROM posts p
-         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.status = 'succeeded'
-        WHERE p.scheduled_at IS NOT NULL AND p.approved_at IS NOT NULL`,
+         JOIN publish_attempts pa ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
+        WHERE p.org_id = ? AND p.scheduled_at IS NOT NULL AND p.approved_at IS NOT NULL`,
+      org,
     ),
-    plans: await count('SELECT count(*) AS n FROM plans'),
-    reports: await count('SELECT count(*) AS n FROM reports'),
-    suggestions: await count('SELECT count(*) AS n FROM promotion_suggestions'),
+    plans: await count('SELECT count(*) AS n FROM plans WHERE org_id = ?', org),
+    reports: await count('SELECT count(*) AS n FROM reports WHERE org_id = ?', org),
+    suggestions: await count('SELECT count(*) AS n FROM promotion_suggestions WHERE org_id = ?', org),
     promoSpend: await count(
       `SELECT coalesce(sum(total), 0) AS n FROM cost_ledger
-        WHERE operation LIKE '%promot%' OR operation LIKE '%ads%'`,
+        WHERE org_id = ? AND (operation LIKE '%promot%' OR operation LIKE '%ads%')`,
+      org,
     ),
-    orgAccounts: await count("SELECT count(*) AS n FROM accounts WHERE kind = 'org'"),
+    orgAccounts: await count("SELECT count(*) AS n FROM accounts WHERE org_id = ? AND kind = 'org'", org),
     // **والسؤالُ يُسأل عند كاتبِه**: عتبةُ السبعة تعريفُها في `token/expiry`
     // ومعها كُتبت. واستعلامٌ ثانٍ هنا يشيخ حين تتغيّر العتبةُ هناك
     weekAlertFired: await anyWeekAlert(db),

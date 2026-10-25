@@ -25,15 +25,15 @@ beforeEach(async () => {
 
 describe('الحجز يسبق الإنفاق (D-068)', () => {
   it('الأوّل يحجز والثاني يُردّ «جار»', async () => {
-    expect(await claimGeneration(db, 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
+    expect(await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
 
-    const second = await claimGeneration(db, 'k1', 'p1', 'video', later(1))
+    const second = await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', later(1))
     expect(second.kind).toBe('busy')
   })
 
   it('ومفتاحان مختلفان لا يتزاحمان', async () => {
-    expect(await claimGeneration(db, 'k1', 'p1', 'image', NOW)).toEqual({ kind: 'claimed' })
-    expect(await claimGeneration(db, 'k2', 'p1', 'image', NOW)).toEqual({ kind: 'claimed' })
+    expect(await claimGeneration(db, 'org_owner', 'k1', 'p1', 'image', NOW)).toEqual({ kind: 'claimed' })
+    expect(await claimGeneration(db, 'org_owner', 'k2', 'p1', 'image', NOW)).toEqual({ kind: 'claimed' })
   })
 
   /**
@@ -41,14 +41,14 @@ describe('الحجز يسبق الإنفاق (D-068)', () => {
    * فحجزٌ أبديٌّ يُقفل بابَ التوليد على منشورٍ إلى الأبد.
    */
   it('وحجز شائخ يُؤخَذ لا يُنتظَر', async () => {
-    await claimGeneration(db, 'k1', 'p1', 'video', NOW)
+    await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)
 
     // قبل النافذة: لا يزال لصاحبه
-    expect((await claimGeneration(db, 'k1', 'p1', 'video', later(STALE_MINUTES.video - 1))).kind)
+    expect((await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', later(STALE_MINUTES.video - 1))).kind)
       .toBe('busy')
 
     // بعدها: يُؤخَذ
-    expect((await claimGeneration(db, 'k1', 'p1', 'video', later(STALE_MINUTES.video + 1))).kind)
+    expect((await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', later(STALE_MINUTES.video + 1))).kind)
       .toBe('claimed')
   })
 
@@ -62,20 +62,20 @@ describe('الحجز يسبق الإنفاق (D-068)', () => {
    * **واحدٌ** لا كلاهما — وإلّا عاد السباقُ من حيث طُرد.
    */
   it('واثنان على حجز شائخ يفوز أحدُهما وحدَه', async () => {
-    await claimGeneration(db, 'k1', 'p1', 'video', NOW)
+    await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)
     const at = later(STALE_MINUTES.video + 1)
 
     const outcomes = await Promise.all([
-      claimGeneration(db, 'k1', 'p1', 'video', at),
-      claimGeneration(db, 'k1', 'p1', 'video', at),
+      claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', at),
+      claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', at),
     ])
     expect(outcomes.filter((o) => o.kind === 'claimed')).toHaveLength(1)
   })
 
   it('والتحرير يفتح الباب فورا', async () => {
-    await claimGeneration(db, 'k1', 'p1', 'image', NOW)
-    await releaseClaim(db, 'k1')
-    expect(await claimGeneration(db, 'k1', 'p1', 'image', later(1))).toEqual({ kind: 'claimed' })
+    await claimGeneration(db, 'org_owner', 'k1', 'p1', 'image', NOW)
+    await releaseClaim(db, 'org_owner', 'k1')
+    expect(await claimGeneration(db, 'org_owner', 'k1', 'p1', 'image', later(1))).toEqual({ kind: 'claimed' })
   })
 
   /**
@@ -84,7 +84,7 @@ describe('الحجز يسبق الإنفاق (D-068)', () => {
    */
   it('وجدول لم يُرحَّل يحجز ولا يقف', async () => {
     db.raw.exec('DROP TABLE media_claims')
-    expect(await claimGeneration(db, 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
-    await expect(releaseClaim(db, 'k1')).resolves.toBeUndefined()
+    expect(await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
+    await expect(releaseClaim(db, 'org_owner', 'k1')).resolves.toBeUndefined()
   })
 })

@@ -140,7 +140,7 @@ describe('الصفّ في القاعدة', () => {
     const out = pick(cohort(100), 20)
     if (out.kind !== 'suggested') throw new Error('توقّعنا توصية')
     await saveSuggestion(db, out.candidate)
-    await decide(db, 'star', 'rejected')
+    await decide(db, 'org_owner', 'star', 'rejected')
 
     expect(await saveSuggestion(db, out.candidate)).toBe(false)
     const row = db.raw.prepare('SELECT human_decision FROM promotion_suggestions').get() as {
@@ -155,9 +155,9 @@ describe('الصفّ في القاعدة', () => {
     if (out.kind !== 'suggested') throw new Error('توقّعنا توصية')
     await saveSuggestion(db, out.candidate)
 
-    expect((await openSuggestions(db)).map((s) => s.postId)).toEqual(['star'])
-    await decide(db, 'star', 'accepted')
-    expect(await openSuggestions(db)).toEqual([])
+    expect((await openSuggestions(db, 'org_owner')).map((s) => s.postId)).toEqual(['star'])
+    await decide(db, 'org_owner', 'star', 'accepted')
+    expect(await openSuggestions(db, 'org_owner')).toEqual([])
   })
 
   it('وبتّ ثان لا يبدّل الأوّل', async () => {
@@ -165,8 +165,8 @@ describe('الصفّ في القاعدة', () => {
     const out = pick(cohort(100), 20)
     if (out.kind !== 'suggested') throw new Error('توقّعنا توصية')
     await saveSuggestion(db, out.candidate)
-    expect(await decide(db, 'star', 'accepted')).toBe(true)
-    expect(await decide(db, 'star', 'rejected')).toBe(false)
+    expect(await decide(db, 'org_owner', 'star', 'accepted')).toBe(true)
+    expect(await decide(db, 'org_owner', 'star', 'rejected')).toBe(false)
   })
 })
 

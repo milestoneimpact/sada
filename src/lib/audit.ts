@@ -83,18 +83,22 @@ export interface AuditRow {
   readonly byEmail?: string | null
 }
 
-/** آخرُ ما وقع. وجدولٌ لا يُقرأ لا يُسقط اللوحة: تُعاد قائمةٌ فارغة. */
-export async function recentAudit(db: Db, limit = 50): Promise<AuditRow[]> {
+/**
+ * آخرُ ما وقع **في منظّمةٍ** (D-277) — منظّمةُ الجلسة النشطة. وجدولٌ لا يُقرأ
+ * لا يُسقط اللوحة: تُعاد قائمةٌ فارغة.
+ */
+export async function recentAudit(db: Db, org: string, limit = 50): Promise<AuditRow[]> {
   const capped = Math.max(1, Math.min(200, Math.trunc(limit)))
   try {
     const { results } = await db
       .prepare(
         `SELECT at, actor, action, target, detail, ip, by_email AS byEmail
            FROM audit_log
+          WHERE org_id = ?
           ORDER BY id DESC
           LIMIT ?`,
       )
-      .bind(capped)
+      .bind(org, capped)
       .all<AuditRow>()
     return results
   } catch {

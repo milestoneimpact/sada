@@ -11,6 +11,7 @@ import { authorizeAdmin } from './lib/adminAuth'
 import { BASE_HEADERS } from './lib/security/headers'
 import { afterVault, readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
+import { OWNER_ORG } from './lib/tenancy'
 import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib/ai/registry'
 import { resolveKey } from './lib/providers'
 import { spendByProvider } from './lib/ai/spend'
@@ -273,9 +274,13 @@ app.get('/admin/sources', async (c) => {
     `SELECT s.id, s.drive_file_id, s.name, s.mime, s.content_hash, s.last_seen_at,
             i.worth_score, i.summary, i.themes_json
        FROM sources s
-       LEFT JOIN content_items i ON i.source_id = s.id
+       LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+      WHERE s.org_id = ?
       ORDER BY s.last_seen_at DESC`,
-  ).all<{
+  )
+    // ‏مسارُ المشرف بلا جلسة، ومصادرُ Drive تسكن منظّمةَ المالك (D-233 · D-277)
+    .bind(OWNER_ORG)
+    .all<{
     id: string
     drive_file_id: string
     name: string

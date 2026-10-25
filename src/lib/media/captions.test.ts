@@ -51,7 +51,7 @@ function net(answer: unknown = OK): typeof fetch {
 }
 
 function deps(fetchImpl: typeof fetch) {
-  return { db, kv, encKey: '', workerSecrets: { ANTHROPIC_API_KEY: 'sk-ant-secret-0001' }, fetchImpl, now: new Date('2026-10-05T08:00:00Z') }
+  return { db, kv, org: 'org_owner', encKey: '', workerSecrets: { ANTHROPIC_API_KEY: 'sk-ant-secret-0001' }, fetchImpl, now: new Date('2026-10-05T08:00:00Z') }
 }
 
 async function upload(id = 'u1', dims: { width: number | null; height: number | null; duration: number | null } = { width: 1080, height: 1920, duration: 42_000 }, status = 'ready'): Promise<void> {

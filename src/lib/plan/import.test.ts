@@ -146,19 +146,19 @@ describe('applyPlan', () => {
   it('يعتمد السليم ويجدوله بحسابه، ويتخطّى ذا المشكلة، والملفّ نفسُه مرّتين لا يكرّر', async () => {
     const csv = 'date,time,platform,text\n2026-10-12,09:30,linkedin,أوّل\n2026-10-12,09:30,tiktok,بلا حساب\n'
     const read = readPlan(csv, facts())
-    const first = await applyPlan(db, read.rows, 'panel:passkey', NOW)
+    const first = await applyPlan(db, 'org_owner', read.rows, 'panel:passkey', NOW)
     expect(first).toEqual([{ line: 2, result: 'scheduled' }])
     const row = db.raw.prepare(`SELECT status, approved_by, scheduled_at, account_id FROM posts`).get()
     expect(row).toEqual({ status: 'queued', approved_by: 'panel:passkey', scheduled_at: '2026-10-12 06:30:00', account_id: 'acc-li' })
 
-    expect(await applyPlan(db, read.rows, 'panel:passkey', NOW)).toEqual([{ line: 2, result: 'exists', reason: 'مجدول من قبل' }])
+    expect(await applyPlan(db, 'org_owner', read.rows, 'panel:passkey', NOW)).toEqual([{ line: 2, result: 'exists', reason: 'مجدول من قبل' }])
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(1)
   })
 
   it('وحساب سقط بين المعاينة والاعتماد: يُعتمَد الصفّ ولا يُجدوَل، ويُقال لماذا', async () => {
     db.raw.exec(`UPDATE accounts SET status = 'needs_reauth'`)
     const read = readPlan('date,time,platform,text\n2026-10-12,09:30,linkedin,نصّ\n', facts())
-    const [out] = await applyPlan(db, read.rows, 'panel:token', NOW)
+    const [out] = await applyPlan(db, 'org_owner', read.rows, 'panel:token', NOW)
     expect(out).toMatchObject({ line: 2, result: 'failed' })
     expect(out!.reason).toContain('اعتُمد ولم يُجدوَل')
   })
@@ -215,7 +215,7 @@ describe('applyPlan بعد المراجعة (D-182)', () => {
   it('ما لم يُعرَض جاهزًا لا يُجدوَل، وما عُرض جاهزًا ثمّ صارت له مشكلة يُردّ بها', async () => {
     const rows = readPlan(csv, facts()).rows
     const broken = [rows[0]!, { ...rows[1]!, problems: ['لا حساب متّصلًا على LinkedIn — اربطه أوّلًا'] }]
-    expect(await applyPlan(db, broken, 'o', NOW, new Set([3]))).toEqual([
+    expect(await applyPlan(db, 'org_owner', broken, 'o', NOW, new Set([3]))).toEqual([
       { line: 3, result: 'failed', reason: 'لا حساب متّصلًا على LinkedIn — اربطه أوّلًا' },
     ])
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
@@ -224,14 +224,14 @@ describe('applyPlan بعد المراجعة (D-182)', () => {
   it('مكتوب لم يُجدوَل يُجدوَل بإعادة الملفّ، والمرفوض يُكتب من جديد، والمنشور يُقال «نُشر»', async () => {
     const rows = readPlan(csv, facts()).rows
     db.raw.exec(`UPDATE accounts SET status = 'needs_reauth'`)
-    expect((await applyPlan(db, rows, 'o', NOW))[0]).toMatchObject({ result: 'failed' })
+    expect((await applyPlan(db, 'org_owner', rows, 'o', NOW))[0]).toMatchObject({ result: 'failed' })
     db.raw.exec(`UPDATE accounts SET status = 'active'`)
-    expect(await applyPlan(db, rows, 'o', NOW)).toEqual([{ line: 2, result: 'scheduled' }, { line: 3, result: 'scheduled' }])
+    expect(await applyPlan(db, 'org_owner', rows, 'o', NOW)).toEqual([{ line: 2, result: 'scheduled' }, { line: 3, result: 'scheduled' }])
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(2)
 
     db.raw.exec(`UPDATE posts SET status = 'rejected' WHERE text = 'أوّل'`)
     db.raw.exec(`UPDATE posts SET status = 'published' WHERE text = 'ثان'`)
-    expect(await applyPlan(db, rows, 'o', NOW)).toEqual([
+    expect(await applyPlan(db, 'org_owner', rows, 'o', NOW)).toEqual([
       { line: 2, result: 'scheduled' },
       { line: 3, result: 'exists', reason: 'نُشر من قبل' },
     ])

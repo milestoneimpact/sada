@@ -10,6 +10,7 @@
  */
 import { importKey, open, seal, toBase64 } from './crypto'
 import type { Db } from './tokens'
+import { OWNER_ORG } from './tenancy'
 
 export type ProviderKind = 'anthropic' | 'openai_compat'
 
@@ -101,7 +102,11 @@ function toProvider(row: Row): Provider {
 
 export async function listProviders(db: Db): Promise<Provider[]> {
   try {
-    const { results } = await db.prepare(`SELECT ${COLUMNS} FROM providers ORDER BY builtin DESC, name`).all<Row>()
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+    const { results } = await db
+      .prepare(`SELECT ${COLUMNS} FROM providers WHERE org_id = ? ORDER BY builtin DESC, name`)
+      .bind(OWNER_ORG)
+      .all<Row>()
     return results.map(toProvider)
   } catch {
     // ترحيلٌ لم يُطبَّق: لا مزوّدين محفوظين — لا عطل
@@ -111,7 +116,11 @@ export async function listProviders(db: Db): Promise<Provider[]> {
 
 export async function getProvider(db: Db, name: string): Promise<Provider | null> {
   try {
-    const row = await db.prepare(`SELECT ${COLUMNS} FROM providers WHERE name = ?`).bind(name).first<Row>()
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+    const row = await db
+      .prepare(`SELECT ${COLUMNS} FROM providers WHERE name = ? AND org_id = ?`)
+      .bind(name, OWNER_ORG)
+      .first<Row>()
     return row === null ? null : toProvider(row)
   } catch {
     return null
@@ -133,8 +142,9 @@ export interface UpsertInput {
 export async function upsertProvider(db: Db, input: UpsertInput, by: string): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO providers (name, label, kind, base_url, model, price_in, price_out, daily_cap, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `INSERT INTO providers (name, label, kind, base_url, model, price_in, price_out, daily_cap, updated_by, updated_at, org_id)
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT(name) DO UPDATE SET
          label = excluded.label,
          -- اللهجة والعنوان لا يُبدَّلان لمدمَج: عناوينه في الشيفرة
@@ -157,6 +167,7 @@ export async function upsertProvider(db: Db, input: UpsertInput, by: string): Pr
       input.priceOut ?? null,
       input.dailyCap ?? null,
       by,
+      OWNER_ORG,
     )
     .run()
 }
@@ -191,9 +202,10 @@ export async function saveKey(
          updated_by = ?, updated_at = datetime('now'),
          -- مفتاح جديد لم يُختبر: الشهادة السابقة لا تشهد له
          verified_at = CASE WHEN fingerprint = ? THEN verified_at ELSE NULL END
-       WHERE name = ?`,
+       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+       WHERE name = ? AND org_id = ?`,
     )
-    .bind(sealed.ciphertext, sealed.iv, hint, print, by, print, provider)
+    .bind(sealed.ciphertext, sealed.iv, hint, print, by, print, provider, OWNER_ORG)
     .run()
 
   return { hint, fingerprint: print, unchanged: before.fingerprint === print }
@@ -220,8 +232,9 @@ export async function resolveKey(
   let row: { key_enc: string | null; key_iv: string | null; enabled: number } | null
   try {
     row = await db
-      .prepare('SELECT key_enc, key_iv, enabled FROM providers WHERE name = ?')
-      .bind(provider)
+      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+      .prepare('SELECT key_enc, key_iv, enabled FROM providers WHERE name = ? AND org_id = ?')
+      .bind(provider, OWNER_ORG)
       .first<{ key_enc: string | null; key_iv: string | null; enabled: number }>()
   } catch {
     return { key: null, source: 'none' }
@@ -243,15 +256,17 @@ export async function resolveKey(
 
 export async function setEnabled(db: Db, provider: string, enabled: boolean, by: string): Promise<void> {
   await db
-    .prepare("UPDATE providers SET enabled = ?, updated_by = ?, updated_at = datetime('now') WHERE name = ?")
-    .bind(enabled ? 1 : 0, by, provider)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+    .prepare("UPDATE providers SET enabled = ?, updated_by = ?, updated_at = datetime('now') WHERE name = ? AND org_id = ?")
+    .bind(enabled ? 1 : 0, by, provider, OWNER_ORG)
     .run()
 }
 
 export async function markVerified(db: Db, provider: string): Promise<void> {
   await db
-    .prepare("UPDATE providers SET verified_at = datetime('now') WHERE name = ?")
-    .bind(provider)
+    // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+    .prepare("UPDATE providers SET verified_at = datetime('now') WHERE name = ? AND org_id = ?")
+    .bind(provider, OWNER_ORG)
     .run()
 }
 
@@ -259,7 +274,8 @@ export async function markVerified(db: Db, provider: string): Promise<void> {
 export async function deleteProvider(db: Db, provider: string): Promise<boolean> {
   const existing = await getProvider(db, provider)
   if (existing === null || existing.builtin) return false
-  await db.prepare('DELETE FROM providers WHERE name = ?').bind(provider).run()
+  // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
+  await db.prepare('DELETE FROM providers WHERE name = ? AND org_id = ?').bind(provider, OWNER_ORG).run()
   return true
 }
 

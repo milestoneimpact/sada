@@ -120,7 +120,7 @@ describe('والدمج لا يمحو بالفراغ', () => {
     db.raw.exec("UPDATE accounts SET status = 'needs_reauth', needs_reauth_at = '2026-09-26 03:01:08' WHERE id = 'a1'")
     const out = await renewOne(
       deps(reply({ access_token: 'FRESH', expires_in: 5_184_000 })),
-      { account_id: 'a1', platform: 'linkedin' },
+      { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' },
     )
     expect(out.kind).toBe('renewed')
     const row = db.raw.prepare('SELECT status, needs_reauth_at FROM accounts WHERE id = ?').get('a1') as { status: string; needs_reauth_at: string | null }
@@ -133,7 +133,7 @@ describe('والدمج لا يمحو بالفراغ', () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     const out = await renewOne(
       deps(reply({ access_token: 'FRESH', expires_in: 5_184_000 })),
-      { account_id: 'a1', platform: 'linkedin' },
+      { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' },
     )
     expect(out.kind).toBe('renewed')
 
@@ -148,7 +148,7 @@ describe('والدمج لا يمحو بالفراغ', () => {
 
   it('والتجديد المردود لا يختم شيئا', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
-    const out = await renewOne(deps(reply({ error: 'invalid_grant' }, 400)), { account_id: 'a1', platform: 'linkedin' })
+    const out = await renewOne(deps(reply({ error: 'invalid_grant' }, 400)), { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' })
     expect(out.kind).toBe('needs_owner')
     const stamp = db.raw.prepare('SELECT refreshed_at FROM tokens WHERE account_id = ?').get('a1') as { refreshed_at: string | null }
     expect(stamp.refreshed_at).toBeNull()
@@ -161,7 +161,7 @@ describe('ومتى يُطلَب من المالك إذن جديد', () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     const out = await renewOne(
       deps(reply({ error: 'invalid_grant' }, 400)),
-      { account_id: 'a1', platform: 'linkedin' },
+      { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' },
     )
     expect(out.kind).toBe('needs_owner')
 
@@ -180,7 +180,7 @@ describe('ومتى يُطلَب من المالك إذن جديد', () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     const out = await renewOne(
       deps(reply({ error: 'server_error' }, 503)),
-      { account_id: 'a1', platform: 'linkedin' },
+      { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' },
     )
     expect(out.kind).toBe('deferred')
 
@@ -192,7 +192,7 @@ describe('ومتى يُطلَب من المالك إذن جديد', () => {
   it('وعطل شبكة كذلك', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     const dead = (async () => { throw new Error('ECONNRESET') }) as unknown as typeof fetch
-    expect((await renewOne(deps(dead), { account_id: 'a1', platform: 'linkedin' })).kind)
+    expect((await renewOne(deps(dead), { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' })).kind)
       .toBe('deferred')
   })
 
@@ -201,7 +201,7 @@ describe('ومتى يُطلَب من المالك إذن جديد', () => {
     await seed('a1', { access: inSec(600), refresh: 'r1' })
     const out = await renewOne(
       { ...deps(reply({})), credentialsFor: async () => null },
-      { account_id: 'a1', platform: 'linkedin' },
+      { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' },
     )
     expect(out.kind).toBe('deferred')
     const row = db.raw.prepare("SELECT status FROM accounts WHERE id = 'a1'").get() as
@@ -211,7 +211,7 @@ describe('ومتى يُطلَب من المالك إذن جديد', () => {
 
   it('وانتهاء إذن التجديد نفسِه يُعلَّم', async () => {
     await seed('a1', { access: inSec(600), refresh: 'r1', refreshExpires: inSec(-10) })
-    const out = await renewOne(deps(reply({})), { account_id: 'a1', platform: 'linkedin' })
+    const out = await renewOne(deps(reply({})), { account_id: 'a1', platform: 'linkedin', org_id: 'org_owner' })
     expect(out.kind).toBe('needs_owner')
     if (out.kind !== 'needs_owner') return
     expect(out.why).toContain('إذن التجديد')

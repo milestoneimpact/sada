@@ -196,9 +196,9 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
   const { results: media } = await db
     .prepare(
       `SELECT mime, bytes, cost_usd, status, model, note, headline, created_at FROM media
-        WHERE post_id = ? ORDER BY rowid`,
+        WHERE post_id = ? AND org_id = ? ORDER BY rowid`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .all<{
       mime: string; bytes: number; cost_usd: number; status: string; model: string | null
       note: string | null; headline: string | null; created_at: string
@@ -252,9 +252,9 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
       `SELECT attempt_no, status, platform_post_id, at,
               CASE WHEN status = 'succeeded' THEN response_json END AS response_json
          FROM publish_attempts
-        WHERE post_id = ? ORDER BY attempt_no`,
+        WHERE post_id = ? AND org_id = ? ORDER BY attempt_no`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .all<{ attempt_no: number; status: string; platform_post_id: string | null; at: string; response_json: string | null }>()
     .catch(() => ({ results: [] as never[] }))
 
@@ -275,9 +275,9 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
   const { results: windows } = await db
     .prepare(
       `SELECT window, impressions, reactions, comments, shares, pulled_at
-         FROM metrics WHERE post_id = ? ORDER BY pulled_at`,
+         FROM metrics WHERE post_id = ? AND org_id = ? ORDER BY pulled_at`,
     )
-    .bind(postId)
+    .bind(postId, org)
     .all<{
       window: string; impressions: number | null; reactions: number | null
       comments: number | null; shares: number | null; pulled_at: string
@@ -314,8 +314,9 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
    * — فجمعُ المحطّات يُنقص ما دُفع فعلا.
    */
   const spent = await db
-    .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM cost_ledger WHERE ref_id = ?`)
-    .bind(postId)
+    // ‏والدفترُ يحمل منظّمةَ منشوره (`recordCost`)، فيُسأل بها (D-277)
+    .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM cost_ledger WHERE ref_id = ? AND org_id = ?`)
+    .bind(postId, org)
     .first<{ s: number }>()
     .catch(() => null)
 

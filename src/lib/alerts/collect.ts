@@ -27,27 +27,27 @@ export async function collectAlerts(
   // يفترق عدّادان
   const { results: tokens } = await db
     .prepare(
-      `SELECT a.display_name AS name, t.kind, t.threshold
-         FROM token_alerts t JOIN accounts a ON a.id = t.account_id
+      `SELECT a.display_name AS name, t.kind, t.threshold, t.org_id
+         FROM token_alerts t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
         WHERE t.at >= datetime('now', '-2 days')`,
     )
-    .all<{ name: string; kind: string; threshold: number }>()
-    .catch(() => ({ results: [] as { name: string; kind: string; threshold: number }[] }))
-  for (const t of tokens) out.push(tokenAlert(t.name, t.threshold, t.kind))
+    .all<{ name: string; kind: string; threshold: number; org_id: string }>()
+    .catch(() => ({ results: [] as { name: string; kind: string; threshold: number; org_id: string }[] }))
+  for (const t of tokens) out.push(tokenAlert(t.name, t.threshold, t.kind, t.org_id))
 
   // ── ٢ · نشرٌ فشل نهائيّا ───────────────────────────────────────────
   // **ونهائيٌّ لا محاولةٌ فشلت**: الطابورُ يعيد، وتنبيهٌ عند كلّ محاولةٍ
   // يُطفَأ في يومه. والحالُ `failed` هي التي تقول «فرغ منه الطابور»
   const { results: failed } = await db
     .prepare(
-      `SELECT p.id, p.platform, COUNT(pa.id) AS tries
-         FROM posts p LEFT JOIN publish_attempts pa ON pa.post_id = p.id
+      `SELECT p.id, p.platform, p.org_id, COUNT(pa.id) AS tries
+         FROM posts p LEFT JOIN publish_attempts pa ON pa.post_id = p.id AND pa.org_id = p.org_id
         WHERE p.status = 'failed'
         GROUP BY p.id`,
     )
-    .all<{ id: string; platform: string; tries: number }>()
-    .catch(() => ({ results: [] as { id: string; platform: string; tries: number }[] }))
-  for (const f of failed) out.push(publishAlert(f.id, f.platform, f.tries))
+    .all<{ id: string; platform: string; org_id: string; tries: number }>()
+    .catch(() => ({ results: [] as { id: string; platform: string; org_id: string; tries: number }[] }))
+  for (const f of failed) out.push(publishAlert(f.id, f.platform, f.tries, f.org_id))
 
   // ── ٣ · سقفُ الإنفاق ───────────────────────────────────────────────
   // **ولا يُنبَّه على سقفٍ لم يُوضَع**: صفرٌ يعني «بلا سقف» لا «سقفُه صفر»
@@ -56,7 +56,9 @@ export async function collectAlerts(
     const spent = await db
       .prepare(
         `SELECT COALESCE(SUM(total), 0) AS s FROM cost_ledger
-          WHERE at >= ? AND at < datetime(?, '+1 day')`,
+          WHERE at >= ? AND at < datetime(?, '+1 day')
+            -- ‏السقفُ عامّ لكلّ المنظّمات
+            AND org_id IN (SELECT id FROM orgs)`,
       )
       .bind(day, day)
       .first<{ s: number }>()

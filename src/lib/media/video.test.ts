@@ -199,7 +199,7 @@ describe('الحجز قبل الإنفاق (D-068)', () => {
 
     // نداءٌ سابقٌ حجز ولم يفرغ بعد
     const key = await videoKey('p1', DEFAULT_PROMPT)
-    await claimGeneration(db, key, 'p1', 'video', new Date('2026-09-08T09:00:00.000Z'))
+    await claimGeneration(db, 'org_owner', key, 'p1', 'video', new Date('2026-09-08T09:00:00.000Z'))
 
     const a = ai(OK_VIDEO)
     const out = await animateForPost(

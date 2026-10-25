@@ -228,7 +228,7 @@ export type CaptionsOutcome =
  * منه تحملان `at` واحدًا: الأولى تكتب وتُبدّله، والثانيةُ لا تطابق فتعود «مكتوبةً» بلا كلفة.
  */
 export async function captionsFor(
-  deps: WriterDeps & { readonly kv: CaptionStore; readonly now?: Date },
+  deps: WriterDeps & { readonly kv: CaptionStore; readonly now?: Date; /** منظّمةُ الجلسة — المقطعُ يُقرأ فيها وحدَها (D-277). */ readonly org: string },
   uploadId: string,
   rawAbout: string,
   replace = '',
@@ -238,8 +238,8 @@ export async function captionsFor(
   if (about.length > ABOUT_MAX) return { kind: 'failed', reason: `الوصف أطول من ${ABOUT_MAX} محرف — جملة أو جملتان تكفيان`, retryable: false }
 
   const row = await deps.db
-    .prepare('SELECT name, width, height, duration_ms, status FROM uploads WHERE id = ?')
-    .bind(uploadId)
+    .prepare('SELECT name, width, height, duration_ms, status FROM uploads WHERE id = ? AND org_id = ?')
+    .bind(uploadId, deps.org)
     .first<{ name: string; width: number | null; height: number | null; duration_ms: number | null; status: string }>()
   if (row === null || row.status !== 'ready') return { kind: 'failed', reason: 'المقطع لم يكتمل رفعُه', retryable: false }
 

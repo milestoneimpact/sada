@@ -97,16 +97,16 @@ export interface PublisherDeps {
  */
 async function preflightFailed(
   db: Db,
-  post: { id: string; idempotency_key: string; platform: string },
+  post: { id: string; org_id: string; idempotency_key: string; platform: string },
   reason: string,
 ): Promise<Outcome> {
   try {
-    const attemptNo = await nextAttemptNo(db, post.id)
+    const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
     await db
       .prepare(
         `INSERT INTO publish_attempts
            (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'failed', (SELECT org_id FROM posts WHERE id = ?2))`,
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'failed', ?7)`,
       )
       .bind(
         crypto.randomUUID(),
@@ -115,9 +115,10 @@ async function preflightFailed(
         attemptNo,
         JSON.stringify({ platform: post.platform, preflight: true }),
         JSON.stringify({ error: reason, preflight: true }),
+        post.org_id,
       )
       .run()
-    await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ?`).bind(post.id).run()
+    await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND org_id = ?`).bind(post.id, post.org_id).run()
   } catch (error) {
     // الأثرُ لا يُسقط الحكم: السببُ يعود ولو لم يُكتب
     console.error({ job: 'publish', preflight_record_failed: String(error) })
@@ -182,12 +183,12 @@ export async function publishPost(
   const done = await db
     .prepare(
       `SELECT platform_post_id FROM publish_attempts
-        WHERE idempotency_key = ? AND status = 'succeeded' LIMIT 1`,
+        WHERE idempotency_key = ? AND org_id = ? AND status = 'succeeded' LIMIT 1`,
     )
-    .bind(post.idempotency_key)
+    .bind(post.idempotency_key, post.org_id)
     .first<{ platform_post_id: string | null }>()
   if (done !== null) {
-    await markPublished(db, post.id, done.platform_post_id ?? '')
+    await markPublished(db, post.id, post.org_id, done.platform_post_id ?? '')
     return { kind: 'skipped_duplicate', platformPostId: done.platform_post_id ?? '' }
   }
 
@@ -238,11 +239,12 @@ export async function publishPost(
        * وُلّد له إنفوجرافيك بالخطأ فصار أحدثَ وسيطه، فكان يُنشر صورةً مكانَ الـ Reel.
        */
       `SELECT id, r2_key, mime, platform_media_id FROM media
-        WHERE post_id = ? AND status = 'ready' AND mime LIKE ?
+        WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE ?
         ORDER BY (upload_id IS NOT NULL) DESC, created_at DESC LIMIT 1`,
     )
     .bind(
       post.id,
+      post.org_id,
       post.platform === 'instagram'
         ? '%/%'
         : CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%',
@@ -271,9 +273,9 @@ export async function publishPost(
   // ‏الطابور قبل الفصل تصل هنا، و`no_tokens` كان سيعيد الحسابَ المفصول إلى اللوحة
   if (post.account_status === 'revoked') return preflightFailed(db, post, 'account_disconnected')
 
-  const tokens = await loadTokens(db, encKey, post.account_id)
+  const tokens = await loadTokens(db, encKey, post.account_id, post.org_id)
   if (tokens === null) {
-    await markNeedsReauth(db, post.account_id)
+    await markNeedsReauth(db, post.account_id, post.org_id)
     return preflightFailed(db, post, 'no_tokens')
   }
   if (isExpiring(tokens.expiresAt, now())) {
@@ -291,7 +293,7 @@ export async function publishPost(
     if (tokens.refreshToken !== null) {
       return { kind: 'failed', reason: 'token_expired_retry', retryable: true }
     }
-    await markNeedsReauth(db, post.account_id)
+    await markNeedsReauth(db, post.account_id, post.org_id)
     return preflightFailed(db, post, 'token_expired')
   }
   /**
@@ -340,7 +342,7 @@ export async function publishPost(
     return preflightFailed(db, post, lacking === '' ? which : `${which}: ${lacking}`)
   }
 
-  const attemptNo = await nextAttemptNo(db, post.id)
+  const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
   const hasUrl = containsUrl(post.text)
 
   // ٣ — المحاولة تُسجَّل قبل الإرسال
@@ -349,7 +351,7 @@ export async function publishPost(
     .prepare(
       `INSERT INTO publish_attempts
          (id, post_id, idempotency_key, attempt_no, request_json, status, org_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', (SELECT org_id FROM posts WHERE id = ?2))`,
+       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', ?6)`,
     )
     .bind(
       attemptId,
@@ -360,6 +362,7 @@ export async function publishPost(
         platform: post.platform, has_url: hasUrl, length: post.text.length,
         ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
       }),
+      post.org_id,
     )
     .run()
 
@@ -377,6 +380,7 @@ export async function publishPost(
       units: 1,
       unitCost,
       refId: post.id,
+      org: post.org_id,
     })
   }
 
@@ -424,6 +428,7 @@ export async function publishPost(
         units: 1,
         unitCost: 0,
         refId: post.id,
+        org: post.org_id,
       })
 
       mediaId =
@@ -437,8 +442,8 @@ export async function publishPost(
           : await uploadXMedia(tokens.accessToken, upload, fetchImpl)
 
       await db
-        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
-        .bind(mediaId, image.id)
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ? AND org_id = ?')
+        .bind(mediaId, image.id, post.org_id)
         .run()
     }
 
@@ -467,6 +472,7 @@ export async function publishPost(
         units: 1,
         unitCost: 0,
         refId: post.id,
+        org: post.org_id,
       })
       const out = await publishInstagram(
         tokens.accessToken,
@@ -479,8 +485,8 @@ export async function publishPost(
         fetchImpl,
       )
       await db
-        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
-        .bind(out.platformPostId, image.id)
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ? AND org_id = ?')
+        .bind(out.platformPostId, image.id, post.org_id)
         .run()
       result = out
     } else if (CLIP_PLATFORMS.has(post.platform)) {
@@ -501,6 +507,7 @@ export async function publishPost(
         units: 1,
         unitCost: 0,
         refId: post.id,
+        org: post.org_id,
       })
       // ‏ومَن يرى المقطع من قرار المالك بعد الإجازة لا من ثابت (D-190) — والافتراضُ خاصّ
       const reach = await readSettings(db)
@@ -513,8 +520,8 @@ export async function publishPost(
         out = await publishYouTube(tokens.accessToken, clip, post.text, fetchImpl, { public: reach.youtubePublic })
       }
       await db
-        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ?')
-        .bind(out.platformPostId, image!.id)
+        .prepare('UPDATE media SET platform_media_id = ? WHERE id = ? AND org_id = ?')
+        .bind(out.platformPostId, image!.id, post.org_id)
         .run()
       result = out
     } else {
@@ -545,12 +552,12 @@ export async function publishPost(
       .prepare(
         `UPDATE publish_attempts
             SET status = 'failed', response_json = ?
-          WHERE id = ?`,
+          WHERE id = ? AND org_id = ?`,
       )
-      .bind(JSON.stringify({ error: failure.reason, status: failure.status }), attemptId)
+      .bind(JSON.stringify({ error: failure.reason, status: failure.status }), attemptId, post.org_id)
       .run()
     if (!failure.retryable) {
-      await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ?`).bind(post.id).run()
+      await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND org_id = ?`).bind(post.id, post.org_id).run()
     }
     return { kind: 'failed', reason: failure.reason, retryable: failure.retryable }
   }
@@ -563,7 +570,7 @@ export async function publishPost(
     .prepare(
       `UPDATE publish_attempts
           SET status = 'succeeded', platform_post_id = ?, response_json = ?
-        WHERE id = ?`,
+        WHERE id = ? AND org_id = ?`,
     )
     .bind(
       result.platformPostId,
@@ -573,21 +580,22 @@ export async function publishPost(
         ...(note === null ? {} : { note }),
       }),
       attemptId,
+      post.org_id,
     )
     .run()
-  await markPublished(db, post.id, result.platformPostId)
+  await markPublished(db, post.id, post.org_id, result.platformPostId)
 
   return { kind: 'published', platformPostId: result.platformPostId }
 }
 
-async function markPublished(db: Db, postId: string, _platformPostId: string): Promise<void> {
-  await db.prepare(`UPDATE posts SET status = 'published' WHERE id = ?`).bind(postId).run()
+async function markPublished(db: Db, postId: string, org: string, _platformPostId: string): Promise<void> {
+  await db.prepare(`UPDATE posts SET status = 'published' WHERE id = ? AND org_id = ?`).bind(postId, org).run()
 }
 
-async function nextAttemptNo(db: Db, postId: string): Promise<number> {
+async function nextAttemptNo(db: Db, postId: string, org: string): Promise<number> {
   const row = await db
-    .prepare(`SELECT coalesce(max(attempt_no), 0) AS n FROM publish_attempts WHERE post_id = ?`)
-    .bind(postId)
+    .prepare(`SELECT coalesce(max(attempt_no), 0) AS n FROM publish_attempts WHERE post_id = ? AND org_id = ?`)
+    .bind(postId, org)
     .first<{ n: number }>()
   return (row?.n ?? 0) + 1
 }

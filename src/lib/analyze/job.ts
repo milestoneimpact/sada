@@ -77,6 +77,7 @@ export interface AnalyzeJobDeps {
 
 interface SourceRow {
   readonly id: string
+  readonly org_id: string
   readonly drive_file_id: string
   readonly name: string
   readonly mime: string
@@ -119,10 +120,10 @@ async function releaseAnalysis(db: Db, sourceId: string): Promise<void> {
     .bind(sourceId).run().catch(() => undefined)
 }
 
-async function alreadyAnalyzed(db: Db, sourceId: string, hash: string): Promise<boolean> {
+async function alreadyAnalyzed(db: Db, source: SourceRow, hash: string): Promise<boolean> {
   const row = await db
-    .prepare('SELECT id FROM content_items WHERE source_id = ? AND themes_json LIKE ?')
-    .bind(sourceId, `%"hash":"${hash}"%`)
+    .prepare('SELECT id FROM content_items WHERE source_id = ? AND org_id = ? AND themes_json LIKE ?')
+    .bind(source.id, source.org_id, `%"hash":"${hash}"%`)
     .first<{ id: string }>()
   return row !== null
 }
@@ -174,7 +175,8 @@ export async function analyzeSource(
   // المالك بترجمته يدويا عبءٌ صنعناه نحن ولا يخدم شيئا
   const source = await deps.db
     .prepare(
-      'SELECT id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
+      // ‏المنظّمةُ تُقرأ مع الصفّ وتُحمَل إلى كلّ ما بعده (D-277)
+      'SELECT id, org_id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
     )
     .bind(sourceId, sourceId)
     .first<SourceRow>()
@@ -184,7 +186,7 @@ export async function analyzeSource(
   }
 
   // ٢ · لا يُدفع ثمن نداءٍ لمحتوى لم يتغيّر
-  if (await alreadyAnalyzed(deps.db, source.id, source.content_hash)) {
+  if (await alreadyAnalyzed(deps.db, source, source.content_hash)) {
     return { kind: 'already', sourceId: source.id }
   }
 
@@ -221,6 +223,7 @@ export async function analyzeSource(
       units,
       unitCost: units === 0 ? 0 : cost / units,
       refId: source.id,
+      org: source.org_id,
     })
     return cost
   }
@@ -262,6 +265,7 @@ export async function analyzeSource(
           units,
           unitCost: units === 0 ? 0 : priced.total / units,
           refId: source.id,
+          org: source.org_id,
         })
       }
       try {

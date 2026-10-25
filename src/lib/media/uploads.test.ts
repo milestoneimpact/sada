@@ -46,21 +46,21 @@ describe('الرفع', () => {
     const start = await startUpload(db, 'org_owner', r2.bucket, META, 'u1')
     expect(start).toEqual({ ok: true, id: 'u1', partBytes: PART_BYTES, parts: 3 })
 
-    expect(await uploadPart(db, r2.bucket, 'u1', 4, new ArrayBuffer(10))).toMatchObject({ ok: false })
-    expect(await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(5))).toMatchObject({ ok: false })
-    const p1 = await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(PART_BYTES))
-    const p2 = await uploadPart(db, r2.bucket, 'u1', 2, new ArrayBuffer(PART_BYTES))
-    const p3 = await uploadPart(db, r2.bucket, 'u1', 3, new ArrayBuffer(10))
+    expect(await uploadPart(db, 'org_owner', r2.bucket, 'u1', 4, new ArrayBuffer(10))).toMatchObject({ ok: false })
+    expect(await uploadPart(db, 'org_owner', r2.bucket, 'u1', 1, new ArrayBuffer(5))).toMatchObject({ ok: false })
+    const p1 = await uploadPart(db, 'org_owner', r2.bucket, 'u1', 1, new ArrayBuffer(PART_BYTES))
+    const p2 = await uploadPart(db, 'org_owner', r2.bucket, 'u1', 2, new ArrayBuffer(PART_BYTES))
+    const p3 = await uploadPart(db, 'org_owner', r2.bucket, 'u1', 3, new ArrayBuffer(10))
     expect([p1.ok, p2.ok, p3.ok]).toEqual([true, true, true])
 
     // ‏ناقصةٌ لا تُجمَّع
-    expect(await completeUpload(db, r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])).toMatchObject({ ok: false })
-    expect(await completeUpload(db, r2.bucket, 'u1', [
+    expect(await completeUpload(db, 'org_owner', r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])).toMatchObject({ ok: false })
+    expect(await completeUpload(db, 'org_owner', r2.bucket, 'u1', [
       { partNumber: 3, etag: 'e3' }, { partNumber: 1, etag: 'e1' }, { partNumber: 2, etag: 'e2' },
     ])).toEqual({ ok: true })
     expect(r2.objects.get('upload/u1.mp4')).toBe(3)
 
-    const [row] = await listUploads(db)
+    const [row] = await listUploads(db, 'org_owner')
     expect(row).toMatchObject({ id: 'u1', name: 'قيادة.mp4', status: 'ready', durationMs: 42_000, posts: [] })
   })
 
@@ -69,7 +69,7 @@ describe('الرفع', () => {
     expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, mime: 'video/x-msvideo' })).toMatchObject({ ok: false })
     expect(await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: MAX_UPLOAD_BYTES + 1 })).toMatchObject({ ok: false })
     expect(r2.parts.size).toBe(0)
-    expect(await listUploads(db)).toEqual([])
+    expect(await listUploads(db, 'org_owner')).toEqual([])
   })
 })
 
@@ -90,13 +90,13 @@ describe('منشورات من مقطع', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
-    await uploadPart(db, r2.bucket, id, 1, new ArrayBuffer(10))
-    await completeUpload(db, r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
+    await uploadPart(db, 'org_owner', r2.bucket, id, 1, new ArrayBuffer(10))
+    await completeUpload(db, 'org_owner', r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
   }
 
   it('منشور لكلّ منصّة، كلُّها على كائن واحد، والاعتماد باسم المالك، والضغطة الثانية لا تكرّر', async () => {
     await ready()
-    const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'المعلم نقطة قرار', approve: true, by: 'omar' })
+    const out = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'المعلم نقطة قرار', approve: true, by: 'omar' })
     expect(out).toEqual({ ok: true, created: ['youtube', 'tiktok', 'instagram'], skipped: [] })
     const rows = db.raw.prepare(
       `SELECT p.platform, p.status, p.approved_by, m.r2_key, m.upload_id FROM posts p JOIN media m ON m.post_id = p.id ORDER BY p.platform`,
@@ -105,29 +105,29 @@ describe('منشورات من مقطع', () => {
     expect(new Set(rows.map((r) => r.r2_key))).toEqual(new Set(['upload/u1.mp4']))
     expect(rows.every((r) => r.status === 'approved' && r.approved_by === 'omar' && r.upload_id === 'u1')).toBe(true)
 
-    const again = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'omar' })
+    const again = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'omar' })
     expect(again).toEqual({ ok: true, created: [], skipped: ['youtube'] })
-    expect((await listUploads(db))[0]!.posts.map((p) => p.platform).sort()).toEqual(['instagram', 'tiktok', 'youtube'])
+    expect((await listUploads(db, 'org_owner'))[0]!.posts.map((p) => p.platform).sort()).toEqual(['instagram', 'tiktok', 'youtube'])
   })
 
   it('بلا نصّ أو بلا منصّة أو قبل اكتمال الرفع يُردّ، وبلا اعتماد يبقى مسوّدة', async () => {
-    expect(await postsFromUpload(db, { uploadId: 'none', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
+    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'none', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
     await ready()
-    expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: '  ', approve: true, by: 'o' })).toMatchObject({ ok: false })
-    expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['x'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
-    await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'نصّ', approve: false, by: 'o' })
+    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube'], caption: '  ', approve: true, by: 'o' })).toMatchObject({ ok: false })
+    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['x'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
+    await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['tiktok'], caption: 'نصّ', approve: false, by: 'o' })
     const row = db.raw.prepare("SELECT status, approved_at FROM posts WHERE platform = 'tiktok'").get() as { status: string; approved_at: string | null }
     expect(row).toEqual({ status: 'draft', approved_at: null })
   })
 
   it('المرفوض يُحرَّر مفتاحُه ويُنشأ من جديد، ولا يُعدّ «أُنشئ» في المكتبة (D-182)', async () => {
     await ready()
-    await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
+    await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
     const first = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok'").get() as { id: string }
     // ‏وصفٌ قصيرٌ سليم يُعتمَد: شرطُ «أربعين محرفًا» لمنشورٍ مكتوب لا لوصف مقطع
     expect(await decide(db, 'org_owner', first.id, { kind: 'reject' }, 'o')).toMatchObject({ ok: true })
-    expect((await listUploads(db))[0]!.posts).toEqual([])
-    const again = await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
+    expect((await listUploads(db, 'org_owner'))[0]!.posts).toEqual([])
+    const again = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['tiktok'], caption: 'ثلاث طبقات للحوكمة', approve: false, by: 'o' })
     expect(again).toEqual({ ok: true, created: ['tiktok'], skipped: [] })
     const second = db.raw.prepare("SELECT id FROM posts WHERE platform = 'tiktok' AND status = 'draft'").get() as { id: string }
     expect(await decide(db, 'org_owner', second.id, { kind: 'approve', text: 'ثلاث طبقات للحوكمة' }, 'o')).toEqual({ ok: true, status: 'approved' })
@@ -136,7 +136,7 @@ describe('منشورات من مقطع', () => {
   it('منشور بلا مقطعه (كتابة انقطعت) يُكمَّل بالضغطة الثانية ولا يُكرَّر', async () => {
     await ready()
     await db.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model) VALUES ('half', 'youtube', 'text', 'نصّ', 'draft', 'upload:u1:youtube', 'owner')`).run()
-    expect(await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: false, by: 'o' }))
+    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: false, by: 'o' }))
       .toEqual({ ok: true, created: [], skipped: ['youtube'] })
     expect(db.raw.prepare("SELECT upload_id FROM media WHERE post_id = 'half'").all()).toEqual([{ upload_id: 'u1' }])
   })
@@ -145,7 +145,7 @@ describe('منشورات من مقطع', () => {
     await ready()
     // ‏مفتاحُ الوسيط محجوزٌ مسبقًا — فيُردّ صفُّه، ومعه يُرجَع المنشور
     db.raw.exec(`CREATE TRIGGER boom BEFORE INSERT ON media BEGIN SELECT RAISE(ABORT, 'boom'); END`)
-    await expect(postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).rejects.toThrow('boom')
+    await expect(postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).rejects.toThrow('boom')
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
   })
 
@@ -155,7 +155,7 @@ describe('منشورات من مقطع', () => {
     expect(captionProblem('tiktok', 'a'.repeat(2201))).toContain('TikTok تقبل 2200')
     expect(captionProblem('instagram', 'وصف قصير')).toBeNull()
     await ready()
-    const out = await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok'], caption: 'قبل -> بعد', approve: true, by: 'o' })
+    const out = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'tiktok'], caption: 'قبل -> بعد', approve: true, by: 'o' })
     expect(out).toMatchObject({ ok: false })
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(0)
   })
@@ -169,7 +169,7 @@ describe('الرفع المتروك (D-182)', () => {
     db.raw.exec(`UPDATE uploads SET created_at = datetime('now', '-7 hours') WHERE id = 'old'`)
     expect(await expireStaleUploads(db, r2.bucket, new Date())).toBe(1)
     expect(r2.aborted).toEqual(['upload/old.mp4'])
-    expect((await listUploads(db)).map((u) => u.id)).toEqual(['new'])
+    expect((await listUploads(db, 'org_owner')).map((u) => u.id)).toEqual(['new'])
   })
 })
 
@@ -235,8 +235,8 @@ describe('نصّ لكلّ منصّة (D-190)', () => {
   async function ready(id = 'u1'): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, id)
-    await uploadPart(db, r2.bucket, id, 1, new ArrayBuffer(10))
-    await completeUpload(db, r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
+    await uploadPart(db, 'org_owner', r2.bucket, id, 1, new ArrayBuffer(10))
+    await completeUpload(db, 'org_owner', r2.bucket, id, [{ partNumber: 1, etag: 'e1' }])
   }
   const texts = (): Record<string, string> => Object.fromEntries(
     (db.raw.prepare('SELECT platform, text FROM posts').all() as { platform: string; text: string }[]).map((r) => [r.platform, r.text]),
@@ -245,7 +245,7 @@ describe('نصّ لكلّ منصّة (D-190)', () => {
   it('كلّ منصّة بنصّها، وعنوان YouTube سطرُه الأوّل ثمّ الوصف — ومن كتبها يُحفظ', async () => {
     await ready()
     const out = await postsFromUpload(db, {
-      uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], approve: true, by: 'o', model: 'claude-opus-5',
+      org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], approve: true, by: 'o', model: 'claude-opus-5',
       title: 'القيادة في أوّل مئة يوم',
       captions: { youtube: 'ما يقرّره القائد أوّلًا.\r\n\r\n#قيادة #Shorts', tiktok: 'أوّل مئة يوم 👇 #قيادة', instagram: 'من أين تبدأ؟\n\n#قيادة #إدارة' },
     })
@@ -260,7 +260,7 @@ describe('نصّ لكلّ منصّة (D-190)', () => {
 
   it('نصّ فارغ لمنصّة اختيرت يُردّ باسمها، وعنوان فارغ أو طويل أو بزاويّة كذلك — ولا يُكتب شيء', async () => {
     await ready()
-    const base = { uploadId: 'u1', approve: true, by: 'o' } as const
+    const base = { org: 'org_owner', uploadId: 'u1', approve: true, by: 'o' } as const
     expect(await postsFromUpload(db, { ...base, platforms: ['tiktok'], captions: { tiktok: '  ' } }))
       .toEqual({ ok: false, reason: 'TikTok: النصّ فارغ' })
     expect(await postsFromUpload(db, { ...base, platforms: ['youtube'], title: '', captions: { youtube: 'وصف' } }))
@@ -302,13 +302,13 @@ describe('نصّ لكلّ منصّة (D-190)', () => {
    */
   it('وما قاله الناشر عن نشر لم يقع كما قُرّر يُقرأ مع منشورات المقطع — للمنشور وحدَه', async () => {
     await ready()
-    await postsFromUpload(db, { uploadId: 'u1', platforms: ['tiktok', 'instagram'], caption: 'نصّ', approve: true, by: 'o' })
+    await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['tiktok', 'instagram'], caption: 'نصّ', approve: true, by: 'o' })
     const tt = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'tiktok'`).get() as { id: string }
     db.raw.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a', 'tiktok', 'member', 'x', 'x', 'active')`).run()
     db.raw.prepare(`UPDATE posts SET status = 'published', account_id = 'a', scheduled_at = '2026-10-05 06:00:00' WHERE id = ?`).run(tt.id)
     db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
       VALUES ('pa', ?, 'k', 1, '{}', ?, 'succeeded')`).run(tt.id, JSON.stringify({ publish_id: 'p', note: 'بلا نصّه' }))
-    const posts = (await listUploads(db))[0]!.posts
+    const posts = (await listUploads(db, 'org_owner'))[0]!.posts
     expect(posts.find((p) => p.platform === 'tiktok')!.note).toBe('بلا نصّه')
     expect(posts.find((p) => p.platform === 'instagram')!.note).toBeNull()
   })
@@ -316,7 +316,7 @@ describe('نصّ لكلّ منصّة (D-190)', () => {
   it('ومن كتبها بنموذج يحمل حصّتَه من كلفة الكتابة في cost_usd', async () => {
     await ready()
     await postsFromUpload(db, {
-      uploadId: 'u1', platforms: ['youtube', 'tiktok'], approve: false, by: 'o', model: 'claude-x', cost: 0.03 / 3,
+      org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'tiktok'], approve: false, by: 'o', model: 'claude-x', cost: 0.03 / 3,
       title: 'عنوان', captions: { youtube: 'وصف', tiktok: 'نصّ' },
     })
     const rows = db.raw.prepare('SELECT platform, model, cost_usd FROM posts ORDER BY platform').all()
@@ -349,19 +349,19 @@ describe('منشورات المقطع تُجدوَل معًا (ر-4)', () => {
   async function three(): Promise<string[]> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, 'u1')
-    await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(10))
-    await completeUpload(db, r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
+    await uploadPart(db, 'org_owner', r2.bucket, 'u1', 1, new ArrayBuffer(10))
+    await completeUpload(db, 'org_owner', r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
     for (const id of ['yt', 'ig']) {
       await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, ?, ?, 'x', 'active')`)
         .bind(id, id === 'yt' ? 'youtube' : 'instagram', id === 'yt' ? 'org' : 'member', id).run()
     }
-    await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'نصّ', approve: true, by: 'o' })
-    return (await listUploads(db))[0]!.posts.map((p) => p.id)
+    await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'tiktok', 'instagram'], caption: 'نصّ', approve: true, by: 'o' })
+    return (await listUploads(db, 'org_owner'))[0]!.posts.map((p) => p.id)
   }
 
   it('كلّ منشور عُرض إلى حساب منصّته في الموعد نفسِه، وما بلا حساب يُسمّى بسببه', async () => {
     const shown = await three()
-    const out = await scheduleFromUpload(db, { uploadId: 'u1', shown, accounts: ACCOUNTS, at: AT, now: NOW })
+    const out = await scheduleFromUpload(db, { org: 'org_owner', uploadId: 'u1', shown, accounts: ACCOUNTS, at: AT, now: NOW })
     expect([...out.scheduled].sort()).toEqual(['instagram', 'youtube'])
     expect(out.failed).toEqual([{ platform: 'tiktok', reason: 'لا حساب متّصلًا — اربطه أوّلًا' }])
     const rows = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all()
@@ -375,9 +375,9 @@ describe('منشورات المقطع تُجدوَل معًا (ر-4)', () => {
   it('ما لم يُعرَض لا يُجدوَل، والمجدول لا يُجدوَل مرّتين', async () => {
     const shown = await three()
     const yt = db.raw.prepare(`SELECT id FROM posts WHERE platform = 'youtube'`).get() as { id: string }
-    const out = await scheduleFromUpload(db, { uploadId: 'u1', shown: [yt.id], accounts: ACCOUNTS, at: AT, now: NOW })
+    const out = await scheduleFromUpload(db, { org: 'org_owner', uploadId: 'u1', shown: [yt.id], accounts: ACCOUNTS, at: AT, now: NOW })
     expect(out).toEqual({ scheduled: ['youtube'], failed: [] })
-    const again = await scheduleFromUpload(db, { uploadId: 'u1', shown, accounts: ACCOUNTS, at: AT, now: NOW })
+    const again = await scheduleFromUpload(db, { org: 'org_owner', uploadId: 'u1', shown, accounts: ACCOUNTS, at: AT, now: NOW })
     expect(again.scheduled).toEqual(['instagram'])
     expect((db.raw.prepare(`SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'`).get() as { n: number }).n).toBe(2)
   })
@@ -392,9 +392,9 @@ describe('مكتبة فوق المئة (مراجعة ر-5)', () => {
   async function library(extra: number): Promise<void> {
     const r2 = multipart()
     await startUpload(db, 'org_owner', r2.bucket, { ...META, bytes: 10 }, 'u1')
-    await uploadPart(db, r2.bucket, 'u1', 1, new ArrayBuffer(10))
-    await completeUpload(db, r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
-    await postsFromUpload(db, { uploadId: 'u1', platforms: ['youtube', 'instagram'], caption: 'نصّ', approve: false, by: 'o' })
+    await uploadPart(db, 'org_owner', r2.bucket, 'u1', 1, new ArrayBuffer(10))
+    await completeUpload(db, 'org_owner', r2.bucket, 'u1', [{ partNumber: 1, etag: 'e1' }])
+    await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube', 'instagram'], caption: 'نصّ', approve: false, by: 'o' })
     // ‏الأقدمُ في النافذة: آخرُ ما يُعرَض، فما يُربَط به يُقرأ من حافّتها
     db.raw.prepare(`UPDATE uploads SET created_at = '2026-01-01 00:00:00' WHERE id = 'u1'`).run()
     const add = db.raw.prepare(
@@ -409,13 +409,13 @@ describe('مكتبة فوق المئة (مراجعة ر-5)', () => {
 
   it('‏١٢١ مقطعًا بنافذة الخطّة (200): كلُّها، ومنشورات أقدمِها معه', async () => {
     await library(120)
-    const all = await listUploads(db, 200)
+    const all = await listUploads(db, 'org_owner', 200)
     expect(all).toHaveLength(121)
     expect(all.at(-1)!.id).toBe('u1')
     expect(all.at(-1)!.posts.map((p) => p.platform).sort()).toEqual(['instagram', 'youtube'])
     expect(all.slice(0, -1).every((u) => u.posts.length === 0)).toBe(true)
     // ‏ونافذةُ اللوحة (20) تبقى عشرين، والأقدمُ خارجها
-    const board = await listUploads(db)
+    const board = await listUploads(db, 'org_owner')
     expect(board).toHaveLength(20)
     expect(board.some((u) => u.id === 'u1')).toBe(false)
   })
@@ -429,7 +429,7 @@ describe('مكتبة فوق المئة (مراجعة ر-5)', () => {
         return db.prepare(query)
       },
     }
-    const all = await listUploads(broken, 200)
+    const all = await listUploads(broken, 'org_owner', 200)
     expect(all.map((u) => u.id)).toContain('u1')
     expect(all).toHaveLength(4)
     expect(all.every((u) => u.posts.length === 0)).toBe(true)

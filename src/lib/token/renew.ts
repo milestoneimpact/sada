@@ -66,6 +66,8 @@ export type RenewOutcome =
 interface DueRow {
   account_id: string
   platform: string
+  /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-277). */
+  org_id: string
 }
 
 /**
@@ -83,8 +85,8 @@ export async function dueForRenewal(
   try {
     const { results } = await db
       .prepare(
-        `SELECT t.account_id, a.platform
-           FROM tokens t JOIN accounts a ON a.id = t.account_id
+        `SELECT t.account_id, a.platform, a.org_id
+           FROM tokens t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
           WHERE a.status != 'revoked'
             AND t.refresh_enc IS NOT NULL
             AND t.expires_at <= ?
@@ -119,9 +121,9 @@ export function mergeRenewed(fresh: TokenResponse, stored: StoredTokens): TokenR
 /** يجدّد حسابا واحدا. */
 export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutcome> {
   const now = (deps.now ?? (() => new Date()))()
-  const stored = await loadTokens(deps.db, deps.encKey, row.account_id)
+  const stored = await loadTokens(deps.db, deps.encKey, row.account_id, row.org_id)
   if (stored === null) {
-    await markNeedsReauth(deps.db, row.account_id)
+    await markNeedsReauth(deps.db, row.account_id, row.org_id)
     return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذن محفوظ' }
   }
   if (!isExpiring(stored.expiresAt, now, RENEW_MARGIN_SECONDS)) {
@@ -133,7 +135,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
     return { kind: 'needs_owner', accountId: row.account_id, why: 'لا إذن تجديد لهذا الحساب' }
   }
   if (stored.refreshExpiresAt !== null && Date.parse(stored.refreshExpiresAt) <= now.getTime()) {
-    await markNeedsReauth(deps.db, row.account_id)
+    await markNeedsReauth(deps.db, row.account_id, row.org_id)
     return { kind: 'needs_owner', accountId: row.account_id, why: 'انتهى إذن التجديد نفسُه' }
   }
 
@@ -159,9 +161,9 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
       parseGranted(stored.scopes),
     )
     await saveTokens(deps.db, deps.encKey, row.account_id, mergeRenewed(fresh, stored))
-    await markRefreshed(deps.db, row.account_id)
+    await markRefreshed(deps.db, row.account_id, row.org_id)
     // والحسابُ المعلَّمُ ساقطًا بخطأٍ عابرٍ يعود فعّالًا بتجديدٍ ناجح (D-157)
-    await markActive(deps.db, row.account_id)
+    await markActive(deps.db, row.account_id, row.org_id)
     return { kind: 'renewed', accountId: row.account_id }
   } catch (error) {
     /**
@@ -174,7 +176,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
     const status = error instanceof OAuthError ? error.status : 0
     const permanent = status >= 400 && status < 500
     if (permanent) {
-      await markNeedsReauth(deps.db, row.account_id)
+      await markNeedsReauth(deps.db, row.account_id, row.org_id)
       return {
         kind: 'needs_owner',
         accountId: row.account_id,

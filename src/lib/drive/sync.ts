@@ -9,6 +9,7 @@
  * بـ `source_refs`، وحذفه يقطع أثر منشور نُشر فعلا. يُعلَّم غائبا ويبقى.
  */
 import type { Db } from '../tokens'
+import { OWNER_ORG } from '../tenancy'
 import type { DriveFile } from './client'
 
 export interface SyncResult {
@@ -49,9 +50,10 @@ export function sourceId(driveFileId: string): string {
  */
 export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<SyncResult> {
   const existing = new Map<string, SourceRow>()
+  // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه تسكن منظّمته وتُقرأ منها وحدها (D-233 · D-277)
   const { results } = await db
-    .prepare('SELECT id, drive_file_id, content_hash FROM sources')
-    .bind()
+    .prepare('SELECT id, drive_file_id, content_hash FROM sources WHERE org_id = ?')
+    .bind(OWNER_ORG)
     .all<SourceRow>()
   for (const row of results) existing.set(row.drive_file_id, row)
 
@@ -69,9 +71,9 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
       await db
         .prepare(
           `INSERT INTO sources (id, drive_file_id, name, mime, content_hash, org_id)
-           VALUES (?, ?, ?, ?, ?, 'org_owner')`,
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
-        .bind(sourceId(file.id), file.id, file.name, file.mimeType, file.contentHash)
+        .bind(sourceId(file.id), file.id, file.name, file.mimeType, file.contentHash, OWNER_ORG)
         .run()
       added.push(file.id)
       continue
@@ -82,17 +84,17 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
         .prepare(
           `UPDATE sources
               SET name = ?, mime = ?, content_hash = ?, last_seen_at = datetime('now')
-            WHERE drive_file_id = ?`,
+            WHERE drive_file_id = ? AND org_id = ?`,
         )
-        .bind(file.name, file.mimeType, file.contentHash, file.id)
+        .bind(file.name, file.mimeType, file.contentHash, file.id, OWNER_ORG)
         .run()
       changed.push(file.id)
       continue
     }
 
     await db
-      .prepare(`UPDATE sources SET last_seen_at = datetime('now') WHERE drive_file_id = ?`)
-      .bind(file.id)
+      .prepare(`UPDATE sources SET last_seen_at = datetime('now') WHERE drive_file_id = ? AND org_id = ?`)
+      .bind(file.id, OWNER_ORG)
       .run()
     unchanged.push(file.id)
   }

@@ -67,7 +67,7 @@ beforeEach(() => { db = fakeDb() })
 describe('ساعات الذروة — والصمت حين لا يُعرَف', () => {
   it('**ولا يُقترَح شيء دون العيّنة الدنيا**', async () => {
     await seed([...trio(9, 10, 12, 11), ...trio(14, 3, 4, 3)])
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.samples).toBe(6)
     expect(p.hours).toHaveLength(0)
     expect(p.why).not.toBeNull()
@@ -76,20 +76,20 @@ describe('ساعات الذروة — والصمت حين لا يُعرَف', ()
   /** **والسببُ يُقال نصّا ويعدّ ما بقي** — لا «لا بيانات» صمّاء. */
   it('ويقول كم قِيس وكم يلزم', async () => {
     await seed([...trio(9, 10, 12, 11)])
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.why).toContain('3')
     expect(p.why).toContain(String(MIN_SAMPLES))
   })
 
   it('وقاعدة فارغة تماما تصمت ولا ترمي', async () => {
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.samples).toBe(0)
     expect(p.hours).toHaveLength(0)
   })
 
   it('وبلوغ العيّنة يفتح الاقتراح ويرتّبه نازلا', async () => {
     await seed([...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5)])
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.samples).toBe(9)
     expect(p.why).toBeNull()
     expect(p.hours.map((h) => h.hour)).toEqual([19, 9, 14])
@@ -109,7 +109,7 @@ describe('ساعات الذروة — والصمت حين لا يُعرَف', ()
       ...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5),
       { hour: 3, reactions: 500 }, { hour: 3, reactions: 1 }, { hour: 3, reactions: 1 },
     ])
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.hours[0]!.hour).toBe(19)
     expect(p.hours.map((h) => h.hour)).not.toContain(3)
   })
@@ -120,7 +120,7 @@ describe('ساعات الذروة — والصمت حين لا يُعرَف', ()
       ...trio(19, 40, 44, 42), ...trio(9, 20, 22, 21), ...trio(14, 5, 6, 5),
       { hour: 7, reactions: 900 }, { hour: 23, reactions: 800 }, { hour: 23, reactions: 800 },
     ])
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.hours.map((h) => h.hour)).not.toContain(7)
     expect(p.hours.map((h) => h.hour)).not.toContain(23)
   })
@@ -131,8 +131,8 @@ describe('ساعات الذروة — والصمت حين لا يُعرَف', ()
     await seed(Array.from({ length: 9 }, (_, i) => (
       { hour: i < 5 ? 2 : 21, reactions: 99, platform: 'x' as const }
     )))
-    const li = await readPeaks(db, 'linkedin')
-    const x = await readPeaks(db, 'x')
+    const li = await readPeaks(db, 'org_owner', 'linkedin')
+    const x = await readPeaks(db, 'org_owner', 'x')
     expect(li.samples).toBe(9)
     expect(x.samples).toBe(9)
     expect(li.hours[0]!.hour).toBe(19)
@@ -141,7 +141,7 @@ describe('ساعات الذروة — والصمت حين لا يُعرَف', ()
 
   it('وجدول لم يُرحَّل لا يرمي — تصمت ولا تسقط', async () => {
     await db.raw.prepare('DROP TABLE metrics').run()
-    const p = await readPeaks(db, 'linkedin')
+    const p = await readPeaks(db, 'org_owner', 'linkedin')
     expect(p.samples).toBe(0)
     expect(p.hours).toHaveLength(0)
   })

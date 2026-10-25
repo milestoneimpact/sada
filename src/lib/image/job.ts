@@ -37,7 +37,7 @@ import { HEADLINE_MAX, OVERLAY_OFF, SLIDE_SIZE, clip, slideHtml } from './slide'
 import { readSettings } from '../settings'
 import type { Platform } from '../draft/prompt'
 import type { Db } from '../tokens'
-import { objectKey, orgOfPost } from '../tenancy'
+import { objectKey } from '../tenancy'
 
 /** أقصى ما يُقبل من بايتات — حدُّ المنصّتين أدنى من هذا بكثير. */
 export const MAX_BYTES = 5 * 1024 * 1024
@@ -106,6 +106,8 @@ interface PostRow {
   platform: string
   text: string
   status: string
+  /** منظّمةُ المنشور — تُقرأ معه وتسوق كلَّ جملةٍ بعده (D-277). */
+  org_id: string
 }
 
 /** أقصى صورةٍ تُضَمّ في الشريحة — وفوقه يبقى الأصلُ بلا نصّ. */
@@ -273,7 +275,7 @@ export function noteOf(
 const INSERT_IMAGE =
   `INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, idempotency_key,
                       note, headline, width, height, org_id)
-   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, (SELECT org_id FROM posts WHERE id = ?2))`
+   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`
 
 /**
  * ما يُقال حين تردّ بوّابةُ المزوّد — **ونصوصُ ما كان قائمًا باقيةٌ حرفًا**:
@@ -322,6 +324,11 @@ export type ImageStyle = 'infographic' | 'illustration'
 export interface GenerateOptions {
   readonly replace?: string
   readonly style?: ImageStyle
+  /**
+   * منظّمةُ الجلسة حين يُنادى من اللوحة (D-277): المنشورُ يُقرأ فيها وحدَها. والطابورُ
+   * بلا جلسةٍ يقرأ المنشورَ بمعرّفه **مع منظّمته**، وبها تُساق كلُّ جملةٍ بعده.
+   */
+  readonly org?: string
 }
 
 /** منصّةُ المقاس — ومنصّاتُ المقاطع رأسيّةٌ لا LinkedIn كما كانت تُقرأ. */
@@ -335,10 +342,15 @@ export async function generateForPost(
   options: GenerateOptions = {},
 ): Promise<ImageOutcome> {
   // ١ · المنشور
-  const post = await deps.db
-    .prepare('SELECT id, platform, text, status FROM posts WHERE id = ?')
-    .bind(postId)
-    .first<PostRow>()
+  const post = options.org === undefined
+    ? await deps.db
+      .prepare('SELECT id, platform, text, status, org_id FROM posts WHERE id = ?')
+      .bind(postId)
+      .first<PostRow>()
+    : await deps.db
+      .prepare('SELECT id, platform, text, status, org_id FROM posts WHERE id = ? AND org_id = ?')
+      .bind(postId, options.org)
+      .first<PostRow>()
   if (post === null) return { kind: 'failed', reason: 'لا منشور بهذا المعرّف', retryable: false }
 
   // ما نُشر لا تُضاف إليه صورة: خرج كما هو، وصورةٌ بعده تصف ما لم يُنشر
@@ -349,8 +361,8 @@ export async function generateForPost(
   // ‏**ومنشورُ مقطع المالك لا تُولَّد له صورة** (D-182): الصورةُ تصير أحدثَ وسيطه فتُنشر
   // على Instagram مكانَ الـ Reel. واللوحةُ لا تعرض الزرَّ له، وهذا الحارسُ لمن نادى المسارَ بلا لوحة
   const owned = await deps.db
-    .prepare("SELECT id FROM media WHERE post_id = ? AND model = 'upload' AND status = 'ready' LIMIT 1")
-    .bind(post.id)
+    .prepare("SELECT id FROM media WHERE post_id = ? AND org_id = ? AND model = 'upload' AND status = 'ready' LIMIT 1")
+    .bind(post.id, post.org_id)
     .first<{ id: string }>()
   if (owned !== null) {
     return { kind: 'failed', reason: 'لهذا المنشور مقطعُك المرفوع — يُنشر هو، ولا تُولَّد له صورة', retryable: false }
@@ -364,16 +376,16 @@ export async function generateForPost(
    */
   const key = await imageKey(post.id, post.text)
   const existing = await deps.db
-    .prepare("SELECT id FROM media WHERE idempotency_key = ? AND status = 'ready'")
-    .bind(key)
+    .prepare("SELECT id FROM media WHERE idempotency_key = ? AND org_id = ? AND status = 'ready'")
+    .bind(key, post.org_id)
     .first<{ id: string }>()
   if (existing !== null && existing.id !== options.replace) return { kind: 'already', mediaId: existing.id }
 
   // ‏والمستبدَلةُ صورةُ هذا المنشور الجاهزة، لا معرّفٌ يُمرَّر من النموذج كيفما اتّفق
   if (options.replace !== undefined) {
     const old = await deps.db
-      .prepare('SELECT post_id, status FROM media WHERE id = ?')
-      .bind(options.replace)
+      .prepare('SELECT post_id, status FROM media WHERE id = ? AND org_id = ?')
+      .bind(options.replace, post.org_id)
       .first<{ post_id: string; status: string }>()
     if (old === null || old.post_id !== post.id || old.status !== 'ready') {
       return { kind: 'failed', reason: 'لا صورة جاهزةً بهذا المعرّف لهذا المنشور', retryable: false }
@@ -407,8 +419,8 @@ export async function generateForPost(
     }
     // ‏والمحتوى قبل الرفض والحجز: لا يسقط (يعود إلى النصّ نفسِه)، والرفضُ بعده لا يُفقد الصورةَ القائمة سُدى
     const info = await infographicSpec(writerDeps, post.text, post.id)
-    if (options.replace !== undefined) await rejectMedia(deps.db, options.replace)
-    const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
+    if (options.replace !== undefined) await rejectMedia(deps.db, post.org_id, options.replace)
+    const held = await claimGeneration(deps.db, post.org_id, key, post.id, 'image', (deps.now ?? (() => new Date()))())
     if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
     const size = INFO_SIZE[platform]
@@ -423,7 +435,7 @@ export async function generateForPost(
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
     } catch (error) {
-      await releaseClaim(deps.db, key)
+      await releaseClaim(deps.db, post.org_id, key)
       return {
         kind: 'failed',
         reason: `تعذّر تصوير الإنفوجرافيك: ${error instanceof Error ? error.message : 'عطل'}`,
@@ -505,7 +517,7 @@ export async function generateForPost(
       retryable: true,
     }
   }
-  if (options.replace !== undefined) await rejectMedia(deps.db, options.replace)
+  if (options.replace !== undefined) await rejectMedia(deps.db, post.org_id, options.replace)
 
   /*
    * ٣·ب · الحجزُ قبل النداء (D-068).
@@ -513,7 +525,7 @@ export async function generateForPost(
    * **والقيدُ `UNIQUE` في ٧ يقع متأخّرا**: يمنع الصفَّ المكرّر بعد أن
    * وقع الدفعُ المكرّر — وهو ليس ما وُجد لأجله (D-004).
    */
-  const held = await claimGeneration(deps.db, key, post.id, 'image', (deps.now ?? (() => new Date()))())
+  const held = await claimGeneration(deps.db, post.org_id, key, post.id, 'image', (deps.now ?? (() => new Date()))())
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
   const prompt = imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
@@ -545,7 +557,7 @@ export async function generateForPost(
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
         : true
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, post.org_id, key)
     return {
       kind: 'failed',
       reason: error instanceof Error ? error.message : 'نداء فشل',
@@ -616,7 +628,7 @@ async function persistImage(
   const { post, key, image } = save
   // حدُّ الحجم بعد التسجيل: صورةٌ ضخمة كلّفت ما كلّفت
   if (image.bytes.length > MAX_BYTES) {
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, post.org_id, key)
     return {
       kind: 'failed',
       reason: `الصورة ${Math.round(image.bytes.length / 1024)}KB وفوق السقف`,
@@ -627,13 +639,13 @@ async function persistImage(
   // ٦ · R2 أوّلا — بايتاتٌ يتيمةٌ أرخص من صفٍّ يكذب
   const mediaId = crypto.randomUUID()
   const extension = image.mime.includes('jpeg') ? 'jpg' : image.mime.includes('webp') ? 'webp' : 'png'
-  const r2Key = objectKey(await orgOfPost(deps.db, post.id), `img/${post.id}/${mediaId}.${extension}`)
+  const r2Key = objectKey(post.org_id, `img/${post.id}/${mediaId}.${extension}`)
   try {
     await deps.bucket.put(r2Key, image.bytes, {
       httpMetadata: { contentType: image.mime },
     })
   } catch (error) {
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, post.org_id, key)
     return {
       kind: 'failed',
       reason: `تعذّر رفع الصورة: ${error instanceof Error ? error.message : 'عطل'}`,
@@ -644,7 +656,7 @@ async function persistImage(
   // ٧ · الصفّ — وقيمُه مصفوفةٌ واحدةٌ تُربَط في الموضعين
   const row = [
     mediaId, post.id, r2Key, image.mime, image.bytes.length, save.prompt, image.model, save.cost, key,
-    save.note, save.headline, save.width, save.height,
+    save.note, save.headline, save.width, save.height, post.org_id,
   ]
   const done: ImageOutcome = {
     kind: 'generated',
@@ -661,8 +673,8 @@ async function persistImage(
     const message = error instanceof Error ? error.message : ''
     if (message.includes('UNIQUE')) {
       const won = await deps.db
-        .prepare('SELECT id, status FROM media WHERE idempotency_key = ?')
-        .bind(key)
+        .prepare('SELECT id, status FROM media WHERE idempotency_key = ? AND org_id = ?')
+        .bind(key, post.org_id)
         .first<{ id: string; status: string }>()
 
       /*
@@ -672,17 +684,17 @@ async function persistImage(
       if (won !== null && won.status === 'rejected') {
         await deps.db
           .prepare(
-            "UPDATE media SET idempotency_key = idempotency_key || ':rejected:' || id" +
-              ' WHERE id = ? AND idempotency_key NOT LIKE ?',
+            `UPDATE media SET idempotency_key = idempotency_key || ':rejected:' || id
+              WHERE id = ? AND org_id = ? AND idempotency_key NOT LIKE ?`,
           )
-          .bind(won.id, '%:rejected:%')
+          .bind(won.id, post.org_id, '%:rejected:%')
           .run()
         try {
           await deps.db.prepare(INSERT_IMAGE).bind(...row).run()
           return done
         } catch (second) {
           await deps.bucket.delete(r2Key).catch(() => undefined)
-          await releaseClaim(deps.db, key)
+          await releaseClaim(deps.db, post.org_id, key)
           return {
             kind: 'failed',
             reason: `تعذّرت كتابة الصفّ: ${second instanceof Error ? second.message : 'قيد'}`,
@@ -695,7 +707,7 @@ async function persistImage(
       await deps.bucket.delete(r2Key).catch(() => undefined)
       if (won !== null) return { kind: 'already', mediaId: won.id }
     }
-    await releaseClaim(deps.db, key)
+    await releaseClaim(deps.db, post.org_id, key)
     return { kind: 'failed', reason: `تعذّرت كتابة الصفّ: ${message}`, retryable: false }
   }
   return done
@@ -738,16 +750,22 @@ function textOrNull(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
 }
 
-/** صورُ منشوراتٍ بعينها — استعلامٌ واحد لا واحدٌ لكلّ بطاقة. */
+/**
+ * صورُ منشوراتٍ بعينها — استعلامٌ واحد لا واحدٌ لكلّ بطاقة.
+ *
+ * ‏والوسيطُ في منظّمة منشوره (D-277): المعرّفاتُ تأتي من قوائمَ مسوقةٍ بالمنظّمة، والربطُ
+ * ‏`m.org_id = p.org_id` يردّ صفًّا تاه عن منظّمة منشوره.
+ */
 export async function mediaFor(db: Db, postIds: readonly string[]): Promise<MediaRow[]> {
   if (postIds.length === 0) return []
   const marks = postIds.map(() => '?').join(', ')
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, created_at,
-                note, headline, width, height
-           FROM media WHERE post_id IN (${marks}) ORDER BY created_at DESC`,
+        `SELECT m.id, m.post_id, m.r2_key, m.mime, m.bytes, m.prompt, m.model, m.cost_usd, m.status, m.created_at,
+                m.note, m.headline, m.width, m.height
+           FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+          WHERE m.post_id IN (${marks}) ORDER BY m.created_at DESC`,
       )
       .bind(...postIds)
       .all<Record<string, string | number | null>>()
@@ -779,13 +797,13 @@ export async function mediaFor(db: Db, postIds: readonly string[]): Promise<Medi
  * كلفتُها وقعت وسُجّلت، وحذفُها يجعل الدفترَ يذكر إنفاقا لا أثر له.
  * وما دُفع ثمنُه يُرى (D-036).
  */
-export async function rejectMedia(db: Db, mediaId: string): Promise<boolean> {
+export async function rejectMedia(db: Db, org: string, mediaId: string): Promise<boolean> {
   // قراءةٌ ثمّ كتابة: عقدُ `run` في `Db` لا يعيد عددَ الصفوف المتأثّرة،
   // وقراءةُ حقلٍ غيرِ مضمونٍ في غلافٍ يعيده السائق تربط الشيفرةَ بشكلٍ
   // قد يتبدّل. واستعلامان رخيصان أوثقُ من حقلٍ لا يضمنه العقد
   const row = await db
-    .prepare('SELECT status, idempotency_key FROM media WHERE id = ?')
-    .bind(mediaId)
+    .prepare('SELECT status, idempotency_key FROM media WHERE id = ? AND org_id = ?')
+    .bind(mediaId, org)
     .first<{ status: string; idempotency_key: string }>()
   if (row === null || row.status !== 'ready') return false
 
@@ -799,7 +817,7 @@ export async function rejectMedia(db: Db, mediaId: string): Promise<boolean> {
    *
    * وقد وقع في أوّل اختبار: `generated` ثمّ رفضٌ ثمّ `in_progress`.
    */
-  await releaseClaim(db, row.idempotency_key)
+  await releaseClaim(db, org, row.idempotency_key)
 
   /*
    * **والرفضُ يُطلِق المفتاح** (D-087).
@@ -819,10 +837,10 @@ export async function rejectMedia(db: Db, mediaId: string): Promise<boolean> {
    */
   await db
     .prepare(
-      "UPDATE media SET status = 'rejected', idempotency_key = idempotency_key || ':rejected:' || id" +
-        ' WHERE id = ?',
+      `UPDATE media SET status = 'rejected', idempotency_key = idempotency_key || ':rejected:' || id
+        WHERE id = ? AND org_id = ?`,
     )
-    .bind(mediaId)
+    .bind(mediaId, org)
     .run()
   return true
 }

@@ -162,20 +162,35 @@ interface TokenRow {
   org_id: string
 }
 
-/** يقرأ الرموز ويفك تشفيرها. يعيد `null` إن لم يكن للحساب رمز. */
+/**
+ * يقرأ الرموز ويفك تشفيرها. يعيد `null` إن لم يكن للحساب رمز.
+ *
+ * و`org` حين يُمرَّر **شرطٌ يُفرَض** (D-277): رمزُ حسابٍ في منظّمةٍ أخرى يعود
+ * `null` كأنّه لا رمز. والمعاملُ اختياريٌّ لمن لا يملك المنظّمة بعد (الناشر يمرّر
+ * `post.org_id`)، لا رخصةً لإغفالها.
+ */
 export async function loadTokens(
   db: Db,
   encKey: string,
   id: string,
+  org?: string,
 ): Promise<StoredTokens | null> {
-  const row = await db
-    .prepare(
-      `SELECT access_enc, access_iv, refresh_enc, refresh_iv,
-              expires_at, refresh_expires_at, scopes, org_id
-         FROM tokens WHERE account_id = ?`,
-    )
-    .bind(id)
-    .first<TokenRow>()
+  const row = await (org === undefined
+    ? db
+        .prepare(
+          `SELECT access_enc, access_iv, refresh_enc, refresh_iv,
+                  expires_at, refresh_expires_at, scopes, org_id
+             FROM tokens WHERE account_id = ?`,
+        )
+        .bind(id)
+    : db
+        .prepare(
+          `SELECT access_enc, access_iv, refresh_enc, refresh_iv,
+                  expires_at, refresh_expires_at, scopes, org_id
+             FROM tokens WHERE account_id = ? AND org_id = ?`,
+        )
+        .bind(id, org)
+  ).first<TokenRow>()
   if (row === null) return null
 
   const key = await orgKey(encKey, row.org_id)
@@ -202,10 +217,12 @@ export async function loadTokens(
   }
 }
 
-/** يعلّم حسابا بأنه يحتاج إعادة ربط — بلا حذف، فالجدولة لا تضيع. */
-/** يختم تجديدا ناجحا — **وحدَه**، فالربطُ الأوّل ليس تجديدا (D-129). */
-export async function markRefreshed(db: Db, id: string): Promise<void> {
-  await db.prepare("UPDATE tokens SET refreshed_at = datetime('now') WHERE account_id = ?").bind(id).run()
+/** يختم تجديدا ناجحا — **وحدَه**، فالربطُ الأوّل ليس تجديدا (D-129). والمنظّمةُ منظّمةُ الحساب (D-277). */
+export async function markRefreshed(db: Db, id: string, org: string): Promise<void> {
+  await db
+    .prepare("UPDATE tokens SET refreshed_at = datetime('now') WHERE account_id = ? AND org_id = ?")
+    .bind(id, org)
+    .run()
 }
 
 /**
@@ -213,22 +230,32 @@ export async function markRefreshed(db: Db, id: string): Promise<void> {
  * ينجح التجديدُ التالي: على staging حسابُ X مجدَّدٌ اليوم وإذنُه صالحٌ وحالُه
  * «يحتاج تجديدًا» منذ أمس — فيُطلَب من المالك ربطٌ لا حاجةَ إليه.
  */
-export async function markActive(db: Db, id: string): Promise<void> {
+export async function markActive(db: Db, id: string, org: string): Promise<void> {
   await db
-    .prepare("UPDATE accounts SET status = 'active', needs_reauth_at = NULL WHERE id = ? AND status = 'needs_reauth'")
-    .bind(id)
+    .prepare(
+      `UPDATE accounts SET status = 'active', needs_reauth_at = NULL
+        WHERE id = ? AND org_id = ? AND status = 'needs_reauth'`,
+    )
+    .bind(id, org)
     .run()
 }
 
-export async function markNeedsReauth(db: Db, id: string): Promise<void> {
+/**
+ * يعلّم حسابا بأنه يحتاج إعادة ربط — بلا حذف، فالجدولة لا تضيع.
+ *
+ * و`org` حين يُمرَّر شرطٌ يُفرَض (D-277)؛ وبلا منظّمةٍ يُعلَّم الحسابُ بمعرّفه وحده
+ * (`? IS NULL`)، والمعاملُ اختياريٌّ للناشر حتى يمرّر `post.org_id`.
+ */
+export async function markNeedsReauth(db: Db, id: string, org?: string): Promise<void> {
   // ‏وحسابٌ فصله المالكُ يبقى مفصولًا (D-197): لا يعود «جدّد الإذن» برسالةٍ متأخّرة
   // **ويُختَم وقتُ السقوط مرّةً** (D-131): تعليمٌ ثانٍ لحسابٍ ساقطٍ لا يبدّل التاريخ
+  const scope = org ?? null
   await db
     .prepare(
       `UPDATE accounts SET status = 'needs_reauth',
               needs_reauth_at = COALESCE(needs_reauth_at, datetime('now'))
-        WHERE id = ? AND status != 'revoked'`,
+        WHERE id = ? AND (? IS NULL OR org_id = ?) AND status != 'revoked'`,
     )
-    .bind(id)
+    .bind(id, scope, scope)
     .run()
 }
