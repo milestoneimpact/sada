@@ -21,6 +21,12 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   #draft-filter .fb-opt .count{margin-inline-start:var(--s-0)}
   /* ‏وزرّا القائمة بلا مفتاحهما («المنصّة»، «الترتيب») — المختارُ وحدَه يقول ما هو، و«؟» في صفّهما لا تحتهما */
   #draft-filter .fb-k{display:none}
+  /* ‏بطاقةُ المصدر على الهاتف (D-277): الحالُ والاستحقاقُ وآخرُ ظهورٍ في صفٍّ واحدٍ لا ثلاثة — ‏388 ← نحو ‏280px */
+  #src-body tr{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); column-gap:var(--s-2)}
+  #src-body td:first-child,#src-body td:last-child{grid-column:1 / -1}
+  #src-body .worth{min-width:0}
+  /* ‏والصورُ اثنتان في الصفّ: صورةٌ بعرض الشاشة شاشةٌ لكلّ صورة */
+  .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);
     scrollbar-width:thin}
   nav.tabs .lbl{display:none}

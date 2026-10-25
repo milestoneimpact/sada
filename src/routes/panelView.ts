@@ -1167,7 +1167,8 @@ ${flash}
 ${pivotPane(d.pivot)}
 
 <section data-pane="library" hidden>
-  ${pageHead('المادّة', sectionLabel('library'), 'ما يُبنى منه كلّ منشور: ملفّات Drive، ومقاطعُك، والصور المولَّدة. <b>والتحليل نداء مدفوع</b> — فلا يقع تلقائيّا على كلّ ملفّ.')}
+  ${/* ‏رأسٌ بلا فقرة (D-277): «التحليل نداء مدفوع» في «؟» بجوار عنوان الملفّات، حيث زرُّ «حلّل الآن» */''}
+  ${pageHead('المادّة', sectionLabel('library'), '')}
   ${libraryTabs(pending, d.uploads.length, libraryImages.length)}
   <div data-sub id="sources">
   ${/*
@@ -1175,7 +1176,10 @@ ${pivotPane(d.pivot)}
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
     * الجدولُ ما فيه هو، لا ما في الشاشة كلِّها.
     */''}
-  <div class="card"><div class="card-head"><h2>ملفّات مجلّدك</h2><div class="grow"></div>${scanBtn}</div>
+  <div class="card"><div class="card-head"><h2>ملفّات مجلّدك</h2>
+    <details class="why-tip"><summary aria-label="لماذا لا يُحلَّل كلُّ ملفّ؟">؟</summary>
+      <p class="hint m-0">ما يُبنى منه كلّ منشور: ملفّات Drive، ومقاطعُك، والصور المولَّدة. <b>والتحليل نداء مدفوع</b> — فلا يقع تلقائيًّا على كلّ ملفّ، بل حين تضغط «حلّل الآن».</p>
+    </details><div class="grow"></div>${scanBtn}</div>
     ${sourcesTable}</div>
   </div>
   <div data-sub id="sub-videos">${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {

@@ -320,5 +320,6 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .pb-ghost{transform:none}
   .flow li{transition:none}
   .fb-opt,.fb-logo{transition:none}
+  details.fold > summary::before{transition:none}
 }
 `

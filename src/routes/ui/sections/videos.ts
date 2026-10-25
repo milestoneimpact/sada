@@ -276,7 +276,12 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
     : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدود منصّته.'
   return `<div class="card card-inset vrow" id="v-${id}">
     <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
-    ${open ? captionForm(u, cap, ctx, now) : ''}
+    ${/*
+      * ‏والوصفُ بعد أن كُتبت النصوصُ مطويٌّ (D-277): النصوصُ نفسُها في حقولها أدناه تُراجَع وتُعدَّل،
+      * ‏والعودةُ إلى الجملة الأولى و«أعد كتابتها» (نداءٌ بكلفة) خطوةٌ ثانية لا أولى. وقبل الكتابة ظاهرٌ: هو الخطوةُ الأولى.
+      */''}
+    ${!open ? '' : cap === undefined ? captionForm(u, cap, ctx, now)
+      : `<details class="fold"><summary><span>الوصف: «<bdi>${escapeHtml(cap.about.length > 40 ? cap.about.slice(0, 39) + '…' : cap.about)}</bdi>» · غيّره أو أعد الكتابة</span></summary>${captionForm(u, cap, ctx, now)}</details>`}
     <form method="POST" action="/panel/uploads/${id}/posts" data-busy="جار الإنشاء…">
       <div class="vpfs" role="group" aria-label="أنشئ على">${boxes}</div>
       ${open ? PICK_LINE : ''}
@@ -346,8 +351,10 @@ export function videosSection(
   return `<div class="card mt-3" id="videos">
     <div class="card-head"><h2>فيديوهاتك</h2><div class="grow"></div>
       <span class="ago">ترفعه مرّةً، ويُنشر على YouTube وTikTok وInstagram</span></div>
-    <p class="hint"><b>صدّره هكذا فيقبله الثلاث</b>: MP4 (H.264 وصوت AAC)، رأسيّ 1080×1920 بثلاثين إطارًا،
-      بين ثلاث ثوان وثلاث دقائق، وأقلّ من 300MB — واختر «تحسين للويب» إن وُجد.</p>
+    ${/* ‏مواصفاتُ التصدير مطويّة (D-277): تُقرأ مرّةً، وكانت أربعةَ أسطرٍ فوق زرّ الرفع في كلّ زيارة */''}
+    <details class="fold"><summary>كيف أصدّره فيقبله الثلاث؟</summary>
+      <p class="hint m-0">MP4 (H.264 وصوت AAC)، رأسيّ 1080×1920 بثلاثين إطارًا، بين ثلاث ثوان وثلاث دقائق،
+      وأقلّ من 300MB — واختر «تحسين للويب» إن وُجد.</p></details>
     <div class="vup">
       <label class="btn btn-primary vpick">اختر مقطعًا وارفعه
         <input type="file" id="vfile" class="vfile" accept="video/mp4,video/quicktime,video/webm"></label>
