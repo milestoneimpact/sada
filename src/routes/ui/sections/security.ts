@@ -8,6 +8,7 @@ import { stamp } from '../../../lib/time/zone'
 import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../escape'
+import { html, join, raw } from '../html'
 import { actionLabel, targetLabel } from '../../../lib/audit'
 import { pathArrows } from '../parts'
 import { statusBadge } from '../components/badge'
@@ -31,6 +32,7 @@ function shortUa(ua: string): string {
   return parts.length === 0 ? ua.slice(0, 40) : parts.join(' · ')
 }
 
+/** صفوفٌ مرسومة — نصًّا، لأنّ `panelView` لم تُحوَّل بعدُ إلى القالب وتُقحِمها في قالبٍ عاديّ (D-281). */
 export interface SecurityMarkup {
   readonly sessions: string
   readonly passkeys: string
@@ -41,37 +43,39 @@ export interface SecurityMarkup {
 export type SecurityData = Pick<PanelData, 'sessions' | 'factors' | 'audit' | 'now' | 'zone'>
 
 export function securitySection(d: SecurityData): SecurityMarkup {
-  const sessions = d.sessions.map((x) => `<tr>
-    <td><div class="nm">${escapeHtml(shortUa(x.ua))}${
-      x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${
-      x.via === 'passkey' ? ' <span class="chip">مفتاح مرور</span>' : x.via === 'email_code' ? ' <span class="chip">رمز البريد</span>' : ''}</div>
-      <div class="mono">${escapeHtml(x.ip === '' ? 'عنوان غير معروف' : x.ip)}</div></td>
-    <td data-label="فُتحت"><span title="${escapeHtml(stamp(x.at, d.zone ?? null))}">${escapeHtml(relativeTime(x.at, d.now))}</span></td>
+  // ‏`statusBadge` من العُدّة ترسم HTML ولم تُحوَّل بعدُ إلى القالب: تُوثَق عند الحدّ (D-281)
+  const sessions = join(d.sessions.map((x) => html`<tr>
+    <td><div class="nm">${shortUa(x.ua)}${
+      x.current ? html` <span class="chip">هذا الجهاز</span>` : ''}${
+      x.via === 'passkey' ? html` <span class="chip">مفتاح مرور</span>` : x.via === 'email_code' ? html` <span class="chip">رمز البريد</span>` : ''}</div>
+      <div class="mono">${x.ip === '' ? 'عنوان غير معروف' : x.ip}</div></td>
+    <td data-label="فُتحت"><span title="${stamp(x.at, d.zone ?? null)}">${relativeTime(x.at, d.now)}</span></td>
     <td data-label="">${x.current
-      ? statusBadge('ok', '●', 'جلستك')
-      : `<form class="inline" method="POST" action="/panel/sessions/revoke"
+      ? raw(statusBadge('ok', '●', 'جلستك'))
+      : html`<form class="inline" method="POST" action="/panel/sessions/revoke"
              data-confirm="إبطال هذه الجلسة؟ سيُطلب من ذلك الجهاز الدخول من جديد.">
-           <input type="hidden" name="handle" value="${escapeHtml(x.handle)}">
+           <input type="hidden" name="handle" value="${x.handle}">
            <button class="btn btn-danger btn-sm" type="submit">أبطلها</button></form>`}</td>
-  </tr>`).join('')
+  </tr>`))
 
-  const passkeys = d.factors.passkeys.map((k) => `<tr>
-    <td><div class="nm">${escapeHtml(k.label)}</div></td>
-    <td data-label="سُجّل"><span title="${escapeHtml(stamp(k.createdAt, d.zone ?? null))}">${escapeHtml(relativeTime(k.createdAt, d.now))}</span></td>
+  const passkeys = join(d.factors.passkeys.map((k) => html`<tr>
+    <td><div class="nm">${k.label}</div></td>
+    <td data-label="سُجّل"><span title="${stamp(k.createdAt, d.zone ?? null)}">${relativeTime(k.createdAt, d.now)}</span></td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
-      ? statusBadge('idle', '○', 'لم يُستعمل')
-      : `<span title="${escapeHtml(stamp(k.lastUsedAt, d.zone ?? null))}">${escapeHtml(relativeTime(k.lastUsedAt, d.now))}</span>`}</td>
-    <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${escapeHtml(k.id)}"
-          data-label="${escapeHtml(k.label)}">احذف</button></td>
-  </tr>`).join('')
+      ? raw(statusBadge('idle', '○', 'لم يُستعمل'))
+      : html`<span title="${stamp(k.lastUsedAt, d.zone ?? null)}">${relativeTime(k.lastUsedAt, d.now)}</span>`}</td>
+    <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${k.id}"
+          data-label="${k.label}">احذف</button></td>
+  </tr>`))
 
-  const audit = d.audit.map((a) => `<tr>
-    <td><span title="${escapeHtml(stamp(a.at, d.zone ?? null))}">${escapeHtml(relativeTime(a.at, d.now))}</span></td>
-    <td data-label="الفعل"><div class="nm" title="${escapeHtml(a.action)}">${escapeHtml(actionLabel(a.action))}</div>${
-      a.byEmail === undefined || a.byEmail === null ? '' : `<div class="sub"><bdi dir="ltr">${escapeHtml(a.byEmail)}</bdi></div>`}</td>
-    <td data-label="على ماذا">${a.target === null ? '<span class="mono">—</span>' : `<span class="chip">${escapeHtml(targetLabel(a.target))}</span>`}
-      ${a.detail === null ? '' : `<div class="sub">${pathArrows(escapeHtml(a.detail))}</div>`}</td>
-    <td data-label="العنوان"><span class="mono">${escapeHtml(a.ip ?? '—')}</span></td>
-  </tr>`).join('')
-  return { sessions, passkeys, audit }
+  // ‏`pathArrows` تأخذ نصًّا مهرَّبًا وتُدخل أسهمَها وسومًا، فمخرَجُها موثوق (D-281)
+  const audit = join(d.audit.map((a) => html`<tr>
+    <td><span title="${stamp(a.at, d.zone ?? null)}">${relativeTime(a.at, d.now)}</span></td>
+    <td data-label="الفعل"><div class="nm" title="${a.action}">${actionLabel(a.action)}</div>${
+      a.byEmail === undefined || a.byEmail === null ? '' : html`<div class="sub"><bdi dir="ltr">${a.byEmail}</bdi></div>`}</td>
+    <td data-label="على ماذا">${a.target === null ? html`<span class="mono">—</span>` : html`<span class="chip">${targetLabel(a.target)}</span>`}
+      ${a.detail === null ? '' : html`<div class="sub">${raw(pathArrows(escapeHtml(a.detail)))}</div>`}</td>
+    <td data-label="العنوان"><span class="mono">${a.ip ?? '—'}</span></td>
+  </tr>`))
+  return { sessions: sessions.value, passkeys: passkeys.value, audit: audit.value }
 }

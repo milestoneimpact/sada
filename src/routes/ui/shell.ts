@@ -8,6 +8,7 @@
 import { commandPalette, commandTrigger, type Command } from './command'
 import { scopeLine, type Scope } from './scope'
 import { escapeHtml } from './escape'
+import { html, join, raw } from './html'
 import { ICON } from './icons'
 import { segmented } from './components/tabs'
 import { menu, menuAction, menuItem } from './components/menu'
@@ -40,9 +41,10 @@ import { MARK, MOMENT, THEME, below } from './tokens'
  * تصف خطًّا لا يراه المالك. **والقفزةُ تُقاس** (CLS عند التحميل الأوّل بلا
  * تخبئة، D-185)، ولا يُضاف وجهٌ احتياطيٌّ مقيسٌ إلّا إن تجاوزت ‏0.1.
  */
-const FONT_CSS = FACES.map((f) => `
+const FONT_CSS = html`${FACES.map((f) => html`
 @font-face{font-family:'${f.family}'; font-style:normal; font-weight:${f.weight};
-  font-display:swap; src:url('${f.path}') format('woff2'); unicode-range:${f.unicodeRange}}`).join('') + '\n'
+  font-display:swap; src:url('${f.path}') format('woff2'); unicode-range:${f.unicodeRange}}`)}
+`
 
 /**
  * والوجوهُ الثلاثة تُسبَق في كلّ صفحة: `preload` يبدأ التحميلَ مع الوثيقة لا بعد
@@ -52,9 +54,8 @@ const FONT_CSS = FACES.map((f) => `
  * وكان وجهُ العرض الكوفيُّ لا يُسبَق في الوثيقة العامّة (D-152). **وخرج الكوفيُّ
  * من الواجهة** (D-185)، والوجهُ الثخينُ عناوينُ كلِّ صفحةٍ ولصائقُها — فلا استثناء.
  */
-const FONT_PRELOAD = FACES
-  .map((f) => `<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`)
-  .join('\n')
+const FONT_PRELOAD = join(FACES
+  .map((f) => html`<link rel="preload" as="font" type="font/woff2" href="${f.path}" crossorigin>`), raw('\n'))
 
 /**
  * رمزُ التبويب — **مرسومٌ في الوثيقة لا مطلوبٌ من الشبكة**.
@@ -71,13 +72,7 @@ const FONT_PRELOAD = FACES
  */
 const RIBBON = 'M13 22C13 34 17 39 24 38C31 37 32 18 38 14C45 9 51 18 51 32'
 
-const ICON_SVG = [
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48">',
-  `<rect width="64" height="48" rx="11" fill="${MARK['--mark-bg']}"/>`,
-  `<path d="${RIBBON}" fill="none" stroke="${MARK['--mark-fg']}" stroke-width="11" `,
-  'stroke-linecap="round"/>',
-  '</svg>',
-].join('')
+const ICON_SVG = html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48"><rect width="64" height="48" rx="11" fill="${MARK['--mark-bg']}"/><path d="${RIBBON}" fill="none" stroke="${MARK['--mark-fg']}" stroke-width="11" stroke-linecap="round"/></svg>`
 
 /**
  * العلامةُ في الرافدة — شريطُ الهويّة — **مرسومٌ تقريبا لا منقولٌ من الأصل.**
@@ -92,11 +87,7 @@ const ICON_SVG = [
  * والعلامةُ الواحدة في الموضعين تُعرَف: تبويبٌ في المتصفّح ورافدةٌ في
  * الصفحة يحملان الشكلَ نفسه.
  */
-export const GLYPH_SVG =
-  '<svg viewBox="0 0 64 48" fill="none" stroke="currentColor" ' +
-  'stroke-linecap="round" aria-hidden="true">' +
-  '<path d="' + RIBBON + '" stroke-width="11"/>' +
-  '</svg>'
+export const GLYPH_SVG = html`<svg viewBox="0 0 64 48" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="${RIBBON}" stroke-width="11"/></svg>`.value
 
 /**
  * الاسمُ «صدى» — **مسارٌ مرسومٌ لا حرفٌ من خطّ** (D-185 · خطّة التصميم 3.6).
@@ -114,8 +105,8 @@ export const GLYPH_SVG =
 const WORDMARK_PATH = 'M393 200 162 -203Q122 -274 123.5 -328Q125 -382 154 -422.5Q183 -463 223 -493Q254 -516 271 -534Q288 -552 288 -591L627 0H471L274 -340Q268 -329 268.5 -309.5Q269 -290 279 -272L548 200ZM527 0 457 -140H524Q542 -140 562 -150Q582 -160 592 -180L700 0ZM25 200 133 20Q143 40 163 50Q183 60 201 60H358L418 200Z M750 0 834 -140H1405Q1406 -167 1388.5 -183.5Q1371 -200 1315 -200H860L1016 -460L1026 -453L974 -340H1315Q1381 -340 1423.5 -323Q1466 -306 1491 -277.5Q1516 -249 1527.5 -213.5Q1539 -178 1542 -140H1665V0Z M1720 -50V-409L1860 -440V-50ZM1625 0V-140H1900V0ZM1805 0V-140H2420Q2421 -167 2403.5 -183.5Q2386 -200 2330 -200H1805V-340H2330Q2404 -340 2449 -319Q2494 -298 2517.5 -263Q2541 -228 2550 -186Q2559 -144 2559.5 -101.5Q2560 -59 2560 -23Q2560 -11 2550 -6Q2540 -1 2530 -0.5Q2520 0 2520 0Z'
 
 export function wordmark(label: boolean): string {
-  return `<svg class="wordmark" viewBox="25 -591 2535 791" fill="currentColor" ${
-    label ? 'role="img" aria-label="صدى"' : 'aria-hidden="true"'}><path d="${WORDMARK_PATH}"/></svg>`
+  return html`<svg class="wordmark" viewBox="25 -591 2535 791" fill="currentColor" ${
+    label ? html`role="img" aria-label="صدى"` : html`aria-hidden="true"`}><path d="${WORDMARK_PATH}"/></svg>`.value
 }
 
 /**
@@ -127,7 +118,7 @@ export function wordmark(label: boolean): string {
  * «Cross-Origin-Resource-Policy: same-origin» — **فظهر في الكونسول
  * حظرٌ يبدو عطلَ أمنٍ وهو حرفان في نصّ**.
  */
-export const ICON_BYTES = ICON_SVG
+export const ICON_BYTES = ICON_SVG.value
 
 export { escapeHtml }
 
@@ -139,8 +130,8 @@ export { escapeHtml }
  * «THEME» نفسِه — لا رقمٌ يُنسَخ. ويحدّثهما سكربتُ الثيم حين يختار المالكُ
  * وضعًا يخالف الجهاز (`THEME_BOOT` هنا و`THEME_SCRIPT` في `scripts.ts`).
  */
-const THEME_COLOR = (['light', 'dark'] as const).map((mode) =>
-  `<meta name="theme-color" media="(prefers-color-scheme: ${mode})" content="${THEME[mode]['--bg']}" data-c="${THEME[mode]['--bg']}">`).join('\n')
+const THEME_COLOR = join((['light', 'dark'] as const).map((mode) =>
+  html`<meta name="theme-color" media="(prefers-color-scheme: ${mode})" content="${THEME[mode]['--bg']}" data-c="${THEME[mode]['--bg']}">`), raw('\n'))
 
 /**
  * ‏**وفي صفحتَي اللحظة يبدأ الشريطُ بلونها** (مراجعة D-196): دون «md» تبدأ صفحةُ الدخول والعاملِ الثاني
@@ -150,9 +141,9 @@ const THEME_COLOR = (['light', 'dark'] as const).map((mode) =>
  * ومن «md» فصاعدًا اللحظةُ لوحةٌ جانبيّة، فيعود الوسمان. (Safari ‏26 يأخذ اللونَ من أرض الصفحة لا من
  * الوسم، فلا يصله هذا.)
  */
-const MOMENT_COLOR = `<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
+const MOMENT_COLOR = html`<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
 
-const FAVICON = `<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG)}">
+const FAVICON = html`<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG.value)}">
 ${THEME_COLOR}`
 
 /**
@@ -194,8 +185,9 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
     items: [
       // ‏والمنظّمةُ أوّلًا حين تكون أكثرَ من واحدة: على الهاتف لا رأسَ رافدةٍ يحمل مبدّلها
       ...scopeLine(options.scope),
-      `<div class="menu-seg"><span>السمة</span>${themeSwitch()}</div>`,
-      `<div class="menu-seg"><span>الكثافة</span>${densitySwitch()}</div>`,
+      // ‏المبدّلان من العُدّة (`segmented`) يرسمان HTML ولم يُحوَّلا بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
+      html`<div class="menu-seg"><span>السمة</span>${raw(themeSwitch())}</div>`.value,
+      html`<div class="menu-seg"><span>الكثافة</span>${raw(densitySwitch())}</div>`.value,
       menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
       ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
@@ -243,14 +235,15 @@ export function soloPage(
    */
   rail?: string,
 ): string {
-  const inner = `${backNav(back.href, back.label)}
-         <main id="main">${body}</main>`
+  // ‏الجسدُ والرافدةُ مرسومان في وحداتٍ لم تُحوَّل بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
+  const inner = html`${raw(backNav(back.href, back.label))}
+         <main id="main">${raw(body)}</main>`
   return shell(
     title,
-    `<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+    html`<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        ${rail === undefined
-         ? `<div class="wrap">${inner}</div>`
-         : `<div class="app">${rail}<div class="main"><div class="wrap">${inner}</div></div></div>`}`,
+         ? html`<div class="wrap">${inner}</div>`
+         : html`<div class="app">${raw(rail)}<div class="main"><div class="wrap">${inner}</div></div></div>`}`.value,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -267,11 +260,13 @@ export function backNav(href: string, label: string): string {
    * **والسهمُ مرسومٌ لا حرف** (D-167): «→» ليس في خطٍّ مضمَّن (N-7)، فكان
    * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
    */
-  return `<nav class="back" aria-label="مسار العودة">
-    <a class="home" href="/panel" aria-label="صدى — اللوحة">${wordmark(false)}<span class="glyph glyph-sm">${GLYPH_SVG}</span></a>
-    <a href="${escapeHtml(href)}">${ICON.back}${escapeHtml(label)}</a>
-    <span class="grow"></span>${commandTrigger()}${accountMenu()}
-  </nav>`
+  // ‏العلامةُ والرمزُ ثابتان في الشيفرة يُخرَجان نصًّا لوحداتٍ لم تُحوَّل، وزرُّ الأوامر والقائمةُ من
+  // ‏العُدّة: كلُّها تُوثَق عند الحدّ (D-281)
+  return html`<nav class="back" aria-label="مسار العودة">
+    <a class="home" href="/panel" aria-label="صدى — اللوحة">${raw(wordmark(false))}<span class="glyph glyph-sm">${raw(GLYPH_SVG)}</span></a>
+    <a href="${href}">${raw(ICON.back)}${label}</a>
+    <span class="grow"></span>${raw(commandTrigger())}${raw(accountMenu())}
+  </nav>`.value
 }
 
 /**
@@ -294,9 +289,9 @@ export function themeSwitch(withId = true): string {
  * الثغرة التي كشفها D-019: حارسٌ يُنسى نسخُه في مسارٍ جديد. فالحقن هنا
  * مرّةً واحدة، ولا سبيل إلى نسيانه.
  */
-export function injectCsrf(html: string, token: string): string {
-  const field = `<input type="hidden" name="_csrf" value="${escapeHtml(token)}">`
-  return html.replace(/(<form\b[^>]*\bmethod="POST"[^>]*>)/gi, (tag) => tag + field)
+export function injectCsrf(page: string, token: string): string {
+  const field = html`<input type="hidden" name="_csrf" value="${token}">`.value
+  return page.replace(/(<form\b[^>]*\bmethod="POST"[^>]*>)/gi, (tag) => tag + field)
 }
 
 /**
@@ -336,21 +331,21 @@ export function shell(
     moment?: boolean
   } = {},
 ): string {
-  const safeNonce = escapeHtml(nonce)
-  return `<!doctype html><html lang="ar" dir="rtl"><head>
+  // ‏الجسدُ ولوحةُ الأوامر وسكربتُ الثيم مرسومةٌ خارج القالب: تُوثَق عند الحدّ، و`nonce` يُهرَّب كأيّ قيمة (D-281)
+  return html`<!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="${options.indexable === true ? 'index,follow' : 'noindex,nofollow'}">${
     options.description === undefined
       ? ''
-      : `\n<meta name="description" content="${escapeHtml(options.description)}">`
+      : html`\n<meta name="description" content="${options.description}">`
   }
-<title>${escapeHtml(title)}</title>${options.moment === true ? `\n${MOMENT_COLOR}` : ''}
+<title>${title}</title>${options.moment === true ? html`\n${MOMENT_COLOR}` : ''}
 ${FAVICON}
-<script nonce="${safeNonce}">${THEME_BOOT}</script>
+<script nonce="${nonce}">${raw(THEME_BOOT)}</script>
 ${FONT_PRELOAD}
-<style nonce="${safeNonce}">${FONT_CSS}</style>
-<link rel="stylesheet" href="${STYLE_PATH}"></head><body>${body}${
-    options.commands === undefined ? '' : commandPalette(options.commands)
+<style nonce="${nonce}">${FONT_CSS}</style>
+<link rel="stylesheet" href="${STYLE_PATH}"></head><body>${raw(body)}${
+    options.commands === undefined ? '' : raw(commandPalette(options.commands))
   }${
     (() => {
       /*
@@ -366,11 +361,11 @@ ${FONT_PRELOAD}
        * `/a/u.<hash>.js` تُخبَّأ سنةً، وسكربتُ اللوحة في `/a/p.<hash>.js`؛
        * ولا يبقى سطرًا إلّا ما يتبدّل بالطلب. وكلٌّ بـ`nonce`.
        */
-      const tags = [`<script nonce="${safeNonce}" src="${uiScript().path}"></script>`]
-      if (options.panelScript === true) tags.push(`<script nonce="${safeNonce}" src="${panelScript().path}"></script>`)
+      const tags = [html`<script nonce="${nonce}" src="${uiScript().path}"></script>`]
+      if (options.panelScript === true) tags.push(html`<script nonce="${nonce}" src="${panelScript().path}"></script>`)
       const inline = stripJs(script)
-      if (inline !== '') tags.push(`<script nonce="${safeNonce}">${inline}</script>`)
-      return tags.join('')
+      if (inline !== '') tags.push(html`<script nonce="${nonce}">${raw(inline)}</script>`)
+      return join(tags)
     })()
-  }</body></html>`
+  }</body></html>`.value
 }
