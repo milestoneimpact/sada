@@ -37,7 +37,10 @@ export interface SecurityMarkup {
   readonly audit: string
 }
 
-export function securitySection(d: PanelData): SecurityMarkup {
+/** ما يقرؤه القسمُ من بيانات اللوحة — **وهذا كلُّه** (D-280). */
+export type SecurityData = Pick<PanelData, 'sessions' | 'factors' | 'audit' | 'now' | 'zone'>
+
+export function securitySection(d: SecurityData): SecurityMarkup {
   const sessions = d.sessions.map((x) => `<tr>
     <td><div class="nm">${escapeHtml(shortUa(x.ua))}${
       x.current ? ' <span class="chip">هذا الجهاز</span>' : ''}${

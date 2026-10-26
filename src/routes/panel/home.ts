@@ -1,17 +1,19 @@
 /**
  * مسارات اللوحة — الرئيسيّة وأقسامُها الخمسة، والإعدادات، والمسح، والتحليل.
  *
- * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
+ * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك. **وكلُّ لوحٍ يُحمَّل له ما يقرأ وحدَه** (D-280):
+ * الهيكلُ لكلّ لوح، ثمّ محمِّلٌ للوح المطلوب — انظر `panelRoute`.
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { type TaskName } from '../../lib/ai/registry'
+import { readRoutes, type TaskRoute } from '../../lib/ai/routes'
 import { dailySpend, spendByProvider, spendRows, spendThisMonth, spendTodayFor } from '../../lib/ai/spend'
 import { cfAccountId, cfAccountOf } from '../../lib/ai/cloudflare'
-import { imageProviderGate, imageSecretName, slideGate } from '../../lib/image/gate'
-import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '../../lib/media/readiness'
+import { imageProviderGate, imageSecretName, slideGate, type SlideGate } from '../../lib/image/gate'
+import { imageReadiness, infographicReadiness, routeDot, videoReadiness, type MediaReady } from '../../lib/media/readiness'
 import { analyzeSource } from '../../lib/analyze/job'
-import { getDraft, listDrafts } from '../../lib/draft/store'
+import { getDraft, listDrafts, type DraftRow } from '../../lib/draft/store'
 import { journeyCounts } from '../../lib/home'
 import { type PublishPlatform } from '../../lib/oauth/providers'
 import { listUploads, reachOf, tiktokNeedsScope, VIDEO_PLATFORMS } from '../../lib/media/uploads'
@@ -23,32 +25,34 @@ import { latestPlan } from '../../lib/plan/job'
 import { appStatuses } from '../../lib/oauth/apps'
 import { scanDrive } from '../../lib/drive/job'
 import { money } from '../../lib/format'
-import { blockerFor, checkAllowance, providerBlocker, videoCapGate } from '../../lib/limits'
+import { blockerFor, checkAllowance, providerBlocker, videoCapGate, type Allowance } from '../../lib/limits'
 import { listProviders, resolveKey } from '../../lib/providers'
-import { readRoutes } from '../../lib/ai/routes'
 import { SETTING_KEYS, settingLabel, writeSetting, type SettingKey } from '../../lib/settings'
 import { chosenTiles, TILE_MAX, TILE_MIN } from '../../lib/dashboard'
 import { pivot, readCols, readDimension, readMeasure } from '../../lib/pivot'
-import { FACT_CAP, loadFacts } from '../../lib/pivotStore'
+import { FACT_CAP, loadFacts, type FactLoad } from '../../lib/pivotStore'
 import { todayFeed } from '../../lib/today'
 import { activeOrg, listOrgs } from '../../lib/tenancy'
-import type { PivotView } from '../ui/sections/pivot'
-import { listSessions, loadSession } from '../../lib/session'
+import type { MediaView, Target } from '../ui/sections/drafts'
+import type { OutboxRow } from '../ui/parts'
+import { listSessions, loadSession, type Session } from '../../lib/session'
 import { factorState } from '../../lib/security/factors'
-import { isLinkedInPage, linkStates, listAccounts, viewChannels } from '../../lib/channels'
+import { isLinkedInPage, linkStates, listAccounts, viewChannels, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import { activeScopes } from '../../lib/platform/screen'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
 import { openSuggestions } from '../../lib/report/promote'
-import { pendingCount } from '../../lib/owner'
 import { readCaptions, type VideoCaptions } from '../../lib/media/captions'
-import { expiringTokens } from '../../lib/token/expiry'
 import { relyingParty } from '../../lib/security/rp'
-import { record, recentAudit } from '../../lib/audit'
+import { record, recentAudit, type AuditRow } from '../../lib/audit'
 import { pulses, readHeartbeats } from '../../lib/ops/heartbeat'
-import { panelPage, type PanelFlash, type PanelSource } from '../panelView'
 import {
-  BUILTIN_SECRET, readSpan, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, POST_ID, BOARD, ownerFacts,
+  panelPage, type LibraryData, type OverviewData, type PanelData, type PaneView, type PanelFactors, type PanelFlash,
+  type PanelProvider, type PanelSource, type PostsData, type ResultsData, type SettingsData, type ShellData,
+} from '../panelView'
+import {
+  BUILTIN_SECRET, readSpan, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, POST_ID, BOARD, envFacts,
+  type EnvFacts,
 } from './shared'
 
 export const home = new Hono<{ Bindings: Env }>()
@@ -100,7 +104,7 @@ function toPanelSource(row: SourceRow): PanelSource {
 
 /**
  * ‏اللوحةُ صفحاتٌ بمساراتها (D-211): «/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره. والمعالجُ واحد —
- * ‏البياناتُ نفسُها والحرّاسُ أنفسُهم — ويُرسم منه اللوحُ المطلوب وحدَه.
+ * ‏الحرّاسُ أنفسُهم — **ويحمِّل للوح المطلوب ما يقرأ وحدَه** (D-280).
  */
 home.get('/panel/library', (c) => panelRoute(c, 'library'))
 
@@ -112,39 +116,165 @@ home.get('/panel/analysis', (c) => panelRoute(c, 'results'))
 
 home.get('/panel', (c) => panelRoute(c, null))
 
-async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): Promise<Response> {
+type PanelContext = Context<{ Bindings: Env }>
+
+/** وعدٌ يُنشأ أوّلَ ما يُطلَب ويُعاد بعدها — فما يقرؤه لوحان في طلبٍ واحد يُحمَّل مرّة. */
+function lazy<T>(make: () => Promise<T>): () => Promise<T> {
+  let made: Promise<T> | undefined
+  return () => (made ??= make())
+}
+
+/** بطاقاتُ المزوّدين وتوجيهُ المهامّ وإنفاقُ الثلاثين — ما تُبنى منه الجاهزيّةُ كلُّها. */
+interface ProviderLoad {
+  readonly cards: PanelProvider[]
+  readonly routes: TaskRoute[]
+  readonly spend: Awaited<ReturnType<typeof spendByProvider>>
+}
+
+/**
+ * ما يتقاسمه المحمِّلون: السياقُ والجلسةُ والمنظّمة، وما حُمِّل للهيكل ويقرؤه أكثرُ من لوح، **وما يقرؤه لوحان
+ * معًا على «/panel» كسولًا** — يُحمَّل حين يُطلَب ومرّةً واحدة.
+ */
+interface Load {
+  readonly c: PanelContext
+  readonly session: Session
+  readonly org: string
+  readonly now: Date
+  readonly q: URLSearchParams
+  readonly allowance: Allowance
+  readonly facts: EnvFacts
+  readonly accounts: LinkedAccount[]
+  readonly drafts: DraftRow[]
+  readonly channels: readonly ChannelView[]
+  readonly zone: string | null
+  readonly sources: () => Promise<PanelSource[]>
+  readonly audit: () => Promise<AuditRow[]>
+  readonly providers: () => Promise<ProviderLoad>
+  readonly factors: () => Promise<PanelFactors>
+  readonly outbox: () => Promise<OutboxRow[]>
+  readonly pivotFacts: () => Promise<FactLoad>
+}
+
+/** ما يحمله الهيكلُ لكلّ لوح — ‏`nonce` يُضاف عند الرسم لأنّه يُولَّد معه. */
+type ShellLoad = Omit<ShellData, 'nonce'>
+
+/**
+ * ‏**كلُّ لوحٍ يُحمَّل له ما يقرأ** (D-280، المرحلة ٤ب من خارطة الطريق الثانية).
+ *
+ * ‏كانت `panelRoute` تجمع `PanelData` كلَّها — خمسةً وأربعين انتظارًا متتابعًا، وكلُّ انتظارٍ رحلةٌ إلى D1 —
+ * ‏ثمّ ترسم الصفحةَ بألواحها الستّة وتقصّ منها ما لم يُطلَب. فصارت ثلاثَ طبقات:
+ *
+ * ‏- **الهيكل** (`shellData`): ما تقرؤه الرافدةُ والترويسةُ والإشعارُ في كلّ لوح — الجلسةُ والإعداداتُ والمسوّداتُ
+ * ‏  (أعدادُ الرافدة وفهرسُ الأوامر) والقنواتُ (شريطُ المنقطعة) والنبضُ والمنظّماتُ والإشعارُ ومنطقةُ المالك.
+ * ‏- **محمِّلٌ لكلّ لوح** (`overviewData` … `resultsData`): الانتظاراتُ التي تقرؤها أقسامُه وحدَها، والمستقلُّ منها
+ * ‏  في `Promise.all` — فـ D1 يقرأ المتوازيَ.
+ * ‏- **ما يتقاسمه لوحان** (`sources` و`audit` و`providers`…) كسولٌ في `Load`: يُحمَّل مرّةً مهما قرأه من لوح.
+ *
+ * ‏والنوعُ يحرس الحدّ: كلُّ لوحٍ يرسم من `ShellData & <لوحُه>Data` (`panelView.ts`)، فقسمٌ يقرأ حقلًا لم يُحمَّل
+ * ‏خطأُ تصريف لا فراغٌ صامت. وما لم يقرأه قسمٌ قطّ (`ownerPending` و`expiring` و`apps` و`via`) أُسقط مع
+ * ‏استعلاماته. ويحرس العدَّ `panelLoad.test.ts`: سقفُ الجمل لكلّ لوح.
+ */
+async function panelRoute(c: PanelContext, only: PaneId | null): Promise<Response> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw, 200)
   // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const allowance = await checkAllowance(c.env.DB, 'image')
-
-  /*
-   * **واللوحُ المحوريُّ يُقرأ من العنوان** (D-120).
-   *
-   * فالعرضُ كلُّه في الرابط: يُنسَخ ويُرسَل ويُحفَظ في المفضّلة. **وما
-   * لا يُعرَف من قيمةٍ يعود إلى افتراضه** ولا يُسقط الصفحة — القيمُ تأتي
-   * من الشبكة، **ونصٌّ في `SQL` أو في المخرَج لا يقع** لأنّها تُطابَق
-   * بقائمة سماحٍ لا تُمرَّر.
-   */
+  const org = activeOrg(session.record)
+  const now = new Date()
   const q = new URL(c.req.url).searchParams
-  const pivotRows = readDimension(q.get('rows') ?? undefined, 'platform')
-  const pivotCols = readCols(q.get('cols') ?? undefined)
-  const pivotMeasure = readMeasure(q.get('m') ?? undefined, 'count')
-  const pivotDays = readSpan(q.get('days'))
-  const loaded = await loadFacts(c.env.DB, activeOrg(session.record), pivotDays)
-  const pivotView: PivotView = {
-    table: pivot(loaded.facts, { rows: pivotRows, cols: pivotCols, measure: pivotMeasure }),
-    rows: pivotRows,
-    cols: pivotCols,
-    measure: pivotMeasure,
-    sinceDays: pivotDays,
-    capped: loaded.capped,
-    cap: FACT_CAP,
-  }
+  const { shell, load } = await shellData(c, session, org, now, q)
 
-  let sources: PanelSource[] = []
+  const render = <D extends ShellLoad>(data: D, view: (full: D & { nonce: string }) => PaneView): Response =>
+    page((nonce) => panelPage(view({ ...data, nonce })))
+
+  switch (only) {
+    case null: {
+      // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-233): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُحمَّل له
+      if (q.get('swap') === 'posts') {
+        const posts = await postsData(load)
+        return render({ ...shell, ...posts }, (data) => ({ only: null, swapPosts: true, data }))
+      }
+      const [overview, posts] = await Promise.all([overviewData(load), postsData(load)])
+      return render({ ...shell, ...overview, ...posts }, (data) => ({ only: null, data }))
+    }
+    case 'overview': return render({ ...shell, ...(await overviewData(load)) }, (data) => ({ only, data }))
+    case 'posts': return render({ ...shell, ...(await postsData(load)) }, (data) => ({ only, data }))
+    case 'library': return render({ ...shell, ...(await libraryData(load)) }, (data) => ({ only, data }))
+    case 'accounts': return render(shell, (data) => ({ only, data }))
+    case 'settings': return render({ ...shell, ...(await settingsData(load)) }, (data) => ({ only, data }))
+    case 'results': return render({ ...shell, ...(await resultsData(load)) }, (data) => ({ only, data }))
+  }
+}
+
+/**
+ * الهيكلُ — لكلّ لوح. ثمانيةُ انتظاراتٍ مستقلّةٍ معًا: الحارسُ (الإعداداتُ والاستهلاك)، والمسوّداتُ، وتطبيقاتُ
+ * OAuth والحساباتُ (القنوات)، والنبضُ، والمنظّماتُ، والإشعارُ من KV، ومنطقةُ المالك من كعكته (D-173).
+ */
+async function shellData(
+  c: PanelContext, session: Session, org: string, now: Date, q: URLSearchParams,
+): Promise<{ shell: ShellLoad; load: Load }> {
+  const env = c.env as unknown as Record<string, string | undefined>
+  const [allowance, drafts, apps, accounts, beats, orgs, flash, zone] = await Promise.all([
+    checkAllowance(c.env.DB, 'image'),
+    listDrafts(c.env.DB, org, BOARD),
+    appStatuses(c.env.DB, env),
+    listAccounts(c.env.DB, org),
+    readHeartbeats(c.env.DB),
+    listOrgs(c.env.DB),
+    takeFlash(c.env, c.req.raw),
+    // ‏«هذا الشهر» وساعةُ انفتاح السقف بتوقيت المالك من كعكة متصفّحه (D-173) — لا من إعدادٍ يُخزَّن
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+  ])
+
+  /**
+   * أمتاحٌ هذا السرّ؟ — **ومصدرانِ لا واحد** (D-042).
+   *
+   * سرُّ Worker يُفحص بوجوده لا بقيمته، والقيمةُ لا تغادر البيئة. وما
+   * حُفظ في الخزانة يُعدّ متاحا كذلك — وإلّا لبقيت البطاقةُ تقول
+   * «تنتظرك» بعد أن ضبطها المالك من اللوحة نفسها.
+   */
+  const configured = new Set(
+    apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames),
+  )
+  const channels = viewChannels(accounts, (name) => {
+    if (configured.has(name)) return true
+    const value = env[name]
+    return typeof value === 'string' && value.length > 0
+  })
+
+  const shell: ShellLoad = {
+    // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
+    env: c.env.SADA_ENV,
+    role: session.record.role ?? 'owner',
+    paused: allowance.settings.paused,
+    pulses: pulses(beats, now),
+    rpId: relyingParty(c.env.PUBLIC_BASE_URL).id,
+    flash,
+    now,
+    csrf: session.record.csrf,
+    orgs,
+    org,
+    drafts,
+    channels,
+    zone,
+  }
+  const load: Load = {
+    c, session, org, now, q, allowance, accounts, drafts, channels, zone,
+    facts: envFacts(c.env),
+    sources: lazy(() => loadSources(c, org)),
+    // ‏خمسون صفًّا للأمان، ومنها «ما وقع اليوم» وآخرُ محاولةِ خطّة — لا استعلامَ جديد (D-157)
+    audit: lazy(() => recentAudit(c.env.DB, org, 50)),
+    providers: lazy(() => loadProviders(c)),
+    factors: lazy(async () => toPanelFactors(await factorState(c.env.DB, shell.rpId))),
+    outbox: lazy(() => loadOutbox(c, org)),
+    // ‏ومدى اللوح المحوريّ من العنوان (D-120) — ومنه «ما وقع اليوم» كذلك
+    pivotFacts: lazy(() => loadFacts(c.env.DB, org, readSpan(q.get('days')))),
+  }
+  return { shell, load }
+}
+
+async function loadSources(c: PanelContext, org: string): Promise<PanelSource[]> {
   try {
     const { results } = await c.env.DB.prepare(
       `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at,
@@ -154,32 +284,57 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
         WHERE s.org_id = ?
         ORDER BY s.last_seen_at DESC
         LIMIT 200`,
-    ).bind(activeOrg(session.record)).all<SourceRow>()
-    sources = results.map(toPanelSource)
+    ).bind(org).all<SourceRow>()
+    return results.map(toPanelSource)
   } catch {
-    sources = []
+    return []
   }
+}
 
-  let spend: Awaited<ReturnType<typeof spendByProvider>> = {}
-  try {
-    spend = await spendByProvider(c.env.DB, 30)
-  } catch {
-    spend = {}
+/**
+ * **وآخرُ خمسةٍ لا كلُّها** (D-101): الصندوقُ ينمو ولا يُقلَّم،
+ * **وسجلٌّ كاملٌ في صفحةٍ تُفتَح كلَّ يومٍ ثمنٌ يُدفَع كلَّ يوم**.
+ * والخمسةُ تكفي لتقول «القناةُ تعمل» أو «ماتت».
+ */
+async function loadOutbox(c: PanelContext, org: string): Promise<OutboxRow[]> {
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT kind, body, status, error, at FROM alert_outbox
+        WHERE org_id = ? ORDER BY at DESC LIMIT 5`,
+    )
+    .bind(org)
+    .all<{ kind: string; body: string; status: number | null; error: string | null; at: string }>()
+    .catch(() => ({ results: [] as {
+      kind: string; body: string; status: number | null; error: string | null; at: string
+    }[] }))
+  return results
+}
+
+/** سرُّ Worker للمدمَج: المضاف لا سرّ له في البيئة. */
+function workerSecretOf(c: PanelContext, p: { readonly name: string; readonly builtin: boolean }): {
+  readonly secretName: string | null; readonly value: string | undefined
+} {
+  const secretName = p.builtin ? (BUILTIN_SECRET[p.name] ?? null) : null
+  return {
+    secretName,
+    value: secretName === null ? undefined : (c.env[secretName as keyof Env] as string | undefined),
   }
-  const series = (await dailySpend(c.env.DB, 14)).map((d) => ({ day: d.day, total: d.total }))
-  // ‏«هذا الشهر» بتوقيت المالك من كعكة متصفّحه (D-173) — لا من إعدادٍ يُخزَّن
-  const spendMonth = await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date())
+}
 
-  // حال كلّ مزوّد: مدمَجا كان أو مضافا من اللوحة
-  const stored = await listProviders(c.env.DB)
-  const providerCards = await Promise.all(
-    stored.map(async (p) => {
-      // السرّ يخصّ المدمَجين وحدهم: المضاف لا سرّ له في البيئة
-      const secretName = p.builtin ? (BUILTIN_SECRET[p.name] ?? null) : null
-      const workerSecret =
-        secretName === null ? undefined : (c.env[secretName as keyof Env] as string | undefined)
-      const resolved = await resolveKey(c.env.DB, c.env.TOKEN_ENC_KEY, p.name, workerSecret)
-      const today = await spendTodayFor(c.env.DB, p.name)
+/** حال كلّ مزوّد: مدمَجا كان أو مضافا من اللوحة — والمفتاحُ والإنفاقُ اليوميُّ لكلٍّ معًا. */
+async function loadProviders(c: PanelContext): Promise<ProviderLoad> {
+  const [stored, spend, routes] = await Promise.all([
+    listProviders(c.env.DB),
+    spendByProvider(c.env.DB, 30).catch((): Awaited<ReturnType<typeof spendByProvider>> => ({})),
+    readRoutes(c.env.DB),
+  ])
+  const cards = await Promise.all(
+    stored.map(async (p): Promise<PanelProvider> => {
+      const secret = workerSecretOf(c, p)
+      const [resolved, today] = await Promise.all([
+        resolveKey(c.env.DB, c.env.TOKEN_ENC_KEY, p.name, secret.value),
+        spendTodayFor(c.env.DB, p.name),
+      ])
       return {
         name: p.name,
         label: p.label,
@@ -188,7 +343,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
         model: p.model,
         builtin: p.builtin,
         configured: resolved.key !== null,
-        secretName,
+        secretName: secret.secretName,
         howToGet: p.builtin ? (BUILTIN_DOCS[p.name] ?? '') : '',
         calls: spend[p.name]?.calls ?? 0,
         spend: spend[p.name]?.total ?? 0,
@@ -205,97 +360,46 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       }
     }),
   )
-  const routes = await readRoutes(c.env.DB)
-  const drafts = await listDrafts(c.env.DB, activeOrg(session.record), BOARD)
-  /*
-   * ‏**والمحرّرُ المركّزُ من العنوان** (D-198): `?open=<id>` يرسم المنشورَ بجوار القائمة، فيُفتح برابطٍ
-   * ‏ويُحفَظ ويعمل بلا سكربت. والمعرّفُ يُفحَص قبل أن يُسأل عنه، ومنشورٌ أقدمُ من الستّين يُقرأ وحدَه.
-   */
-  const openId = q.get('open') ?? ''
-  const editing = POST_ID.test(openId)
-    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, activeOrg(session.record), openId))
-    : null
-  const media = await mediaFor(c.env.DB, [...new Set([...drafts.map((d) => d.id), ...(editing === null ? [] : [editing.id])])])
+  return { cards, routes, spend }
+}
 
-  /*
-   * **وذروةُ المنصّات التي في المسوّدات وحدَها** (D-106).
-   *
-   * لكلّ منصّةٍ استعلامُها، **وقراءةُ الأربع كلِّها في كلّ فتحةٍ للوحة
-   * ثلاثةُ استعلاماتٍ لا يقرؤها أحد** حين لا تكون في المسوّدات منصّةٌ
-   * غيرُ واحدة. فتُقرأ ما في اليد لا ما قد يقع.
-   */
-  const { results: outbox } = await c.env.DB
-    .prepare(
-      `SELECT kind, body, status, error, at FROM alert_outbox
-        WHERE org_id = ? ORDER BY at DESC LIMIT 5`,
-    )
-    .bind(activeOrg(session.record))
-    .all<{ kind: string; body: string; status: number | null; error: string | null; at: string }>()
-    .catch(() => ({ results: [] as {
-      kind: string; body: string; status: number | null; error: string | null; at: string
-    }[] }))
-
-  const peaks: Record<string, Peaks> = {}
-  for (const platform of [...new Set([...drafts, ...(editing === null ? [] : [editing])].map((d) => d.platform))]) {
-    peaks[platform] = await readPeaks(c.env.DB, activeOrg(session.record), platform)
-  }
-  const plan = await latestPlan(c.env.DB, activeOrg(session.record))
-  const sessions = await listSessions(c.env.KV, session.id)
-  const orgs = await listOrgs(c.env.DB)
-  const audit = await recentAudit(c.env.DB, activeOrg(session.record), 50)
-  const beats = await readHeartbeats(c.env.DB)
-  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
-  const factors = await factorState(c.env.DB, rp.id)
-  const apps = await appStatuses(c.env.DB, c.env as unknown as Record<string, string | undefined>)
-
-  /**
-   * أمتاحٌ هذا السرّ؟ — **ومصدرانِ لا واحد** (D-042).
-   *
-   * سرُّ Worker يُفحص بوجوده لا بقيمته، والقيمةُ لا تغادر البيئة. وما
-   * حُفظ في الخزانة يُعدّ متاحا كذلك — وإلّا لبقيت البطاقةُ تقول
-   * «تنتظرك» بعد أن ضبطها المالك من اللوحة نفسها.
-   */
-  const configured = new Set(
-    apps.filter((a) => a.source !== 'none').flatMap((a) => a.secretNames),
+/**
+ * أمزوّدُ المهمّة مضبوطٌ ومفعَّل؟ — زرٌّ لا ينادي أحدا لا يُعرض عاملا: الطريقُ جاهزٌ إن كان مزوّدُه
+ * مضبوطا ومفعَّلا — وإلّا فالضغطةُ تنتهي إلى رسالةِ عطل.
+ */
+function taskReady(p: ProviderLoad, task: TaskName): boolean {
+  return p.routes.some(
+    (r) => r.task === task && p.cards.some((x) => x.name === r.provider && x.configured && x.enabled),
   )
-  const accountsNow = await listAccounts(c.env.DB, activeOrg(session.record))
-  const channels = viewChannels(accountsNow, (name) => {
-    if (configured.has(name)) return true
-    const value = c.env[name as keyof Env]
-    return typeof value === 'string' && value.length > 0
-  })
+}
 
-  const flash = await takeFlash(c.env, c.req.raw)
-  // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
-  const openCount = (await openSuggestions(c.env.DB, activeOrg(session.record))).length
-  // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
-  const journey = await journeyCounts(c.env.DB, activeOrg(session.record), new Date())
-  const uploads = await listUploads(c.env.DB, activeOrg(session.record))
-  /*
-   * ‏**ونصوصُ المقاطع المكتوبة من KV** (D-190) — لما بقي فيه ما يُنشأ وحدَه: مقطعٌ أُنشئ على
-   * ‏منصّاته كلِّها لا حقولَ له، فلا يُقرأ. قراءةٌ لكلّ مقطعٍ مفتوح، وهي قليلةٌ عادةً.
-   */
-  const captions: Record<string, VideoCaptions> = {}
-  for (const u of uploads) {
-    if (u.status !== 'ready' || VIDEO_PLATFORMS.every((p) => u.posts.some((x) => x.platform === p))) continue
-    const found = await readCaptions(c.env.KV, u.id)
-    if (found !== null) captions[u.id] = found
+/**
+ * الحكمُ نفسُه لمهمّةٍ واحدة **بلا بطاقات** (D-280): «المكتبة» تقرأ جاهزيّةَ الكتابة وحدَها لزرّ «اكتب النصوص»،
+ * فيُحلّ مفتاحُ مزوّدِ المهمّة وحدَه — ثلاثُ جملٍ لا اثنتان لكلّ مزوّد.
+ */
+async function taskReadyAlone(c: PanelContext, task: TaskName): Promise<boolean> {
+  const [routes, stored] = await Promise.all([readRoutes(c.env.DB), listProviders(c.env.DB)])
+  for (const r of routes.filter((x) => x.task === task)) {
+    const p = stored.find((x) => x.name === r.provider)
+    if (p === undefined || !p.enabled) continue
+    const resolved = await resolveKey(c.env.DB, c.env.TOKEN_ENC_KEY, p.name, workerSecretOf(c, p).value)
+    if (resolved.key !== null) return true
   }
-  // والحقائقُ تبقى بعد العدّ: منها تُقرأ نقاطُ الجاهزيّة أدناه، بلا استعلامٍ ثانٍ
-  const facts = await ownerFacts(c, activeOrg(session.record))
-  const ownerPending = pendingCount(facts)
+  return false
+}
 
-  /*
-   * **نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع** (D-163).
-   *
-   * ممّا حُمِّل أعلاه وحدَه — البطاقاتُ والتوجيهُ والحارسُ والحقائق — ولا
-   * استعلامَ جديد. **وكلُّ حكمٍ من الدالّة التي يحكم بها النداءُ نفسُه عند
-   * الضغط**: `imageProviderGate` و`slideGate` و`videoFace` و`providerBlocker`.
-   * والأسرارُ تُسأل عن وجودها لا عن قيمتها (D-005).
-   */
-  const routeOf = (task: TaskName): string => routes.find((r) => r.task === task)?.provider ?? ''
-  const cardOf = (name: string): (typeof providerCards)[number] | undefined =>
-    providerCards.find((p) => p.name === name)
+/**
+ * **نقاطُ الجاهزيّة تحت زرَّي الصورة والمقطع** (D-163).
+ *
+ * ممّا حُمِّل وحدَه — البطاقاتُ والتوجيهُ والحارسُ والبيئة — ولا
+ * استعلامَ جديد. **وكلُّ حكمٍ من الدالّة التي يحكم بها النداءُ نفسُه عند
+ * الضغط**: `imageProviderGate` و`slideGate` و`videoFace` و`providerBlocker`.
+ * والأسرارُ تُسأل عن وجودها لا عن قيمتها (D-005).
+ */
+function readiness(load: Load, p: ProviderLoad): { readonly slide: SlideGate; readonly mediaReady: MediaReady } {
+  const { c, allowance, facts } = load
+  const routeOf = (task: TaskName): string => p.routes.find((r) => r.task === task)?.provider ?? ''
+  const cardOf = (name: string): PanelProvider | undefined => p.cards.find((x) => x.name === name)
   const imageName = routeOf('image')
   const imageCard = cardOf(imageName)
   const imageSecret = imageCard === undefined ? undefined : imageSecretName(imageCard)
@@ -329,7 +433,7 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       : { enabled: cfCard.enabled, hasKey: cfCard.configured, urlAccount: cfAccountId(cfCard.baseUrl) !== null },
     binding: c.env.AI !== undefined,
   })
-  const mediaReady = {
+  const mediaReady: MediaReady = {
     // ‏والإنفوجرافيك يحتاج المتصفّحَ وحدَه، وبلا مزوّد كتابةٍ يُستخرج من النصّ (D-174)
     infographic: infographicReadiness({
       blocker: allowance.blocker,
@@ -350,200 +454,325 @@ async function panelRoute(c: Context<{ Bindings: Env }>, only: PaneId | null): P
       clips: videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap),
     }),
   }
-  // **يُحسَب عند العرض لا يُقرأ من الصفّ**: الصفُّ أثرُ ما وقع،
-  // والشريطُ حالٌ الآن — ودورةٌ سقطت لا تُخفي رمزا يوشك (D-065)
-  const expiring = (await expiringTokens(c.env.DB, new Date())).map((e) => ({
-    platform: e.platform, displayName: e.displayName, kind: e.kind, daysLeft: e.daysLeft,
+  return { slide, mediaReady }
+}
+
+/**
+ * جدولُ التوجيه بحاله.
+ *
+ * **والصورةُ والمقطعُ من نقطتيهما عينِهما** (D-163): كان الجدولُ يقول
+ * «مزوّده غير جاهز» لصورٍ موجَّهةٍ إلى Cloudflare بمفتاح `CF_AI_TOKEN`
+ * وهي تعمل، ولمقطعٍ يُنادى من البيئة — فتناقض شاشةُ المزوّدين نقطةً
+ * تحت الزرّ تقول «جاهز». والمقطعُ لا يقرأ من توجيهه إلّا النموذج.
+ *
+ * **و«جاهز» هي «تامّة» وحدها**: رابطُ Worker وحده ينتظرك في النقطة،
+ * فينتظرك في الجدول ولا يُعدّ في المهامّ الجاهزة — والرابطُ معرَّفٌ
+ * في البيئتين، فكان كلُّ لوحٍ بلا `CF_AI_ACCOUNT_ID` يقول «جاهز».
+ */
+function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'] {
+  return p.routes.map((r) => {
+    const dot = routeDot(mediaReady, r.task)
+    return {
+      task: r.task,
+      provider: r.provider,
+      model: r.model,
+      why: r.why,
+      implemented: r.implemented,
+      ready: r.implemented && (dot === undefined
+        ? p.cards.some((x) => x.name === r.provider && x.configured && x.enabled)
+        : dot.state === 'done'),
+      ...(r.implemented && dot?.state === 'now' ? { pending: dot.note } : {}),
+    }
+  })
+}
+
+function toPanelFactors(f: Awaited<ReturnType<typeof factorState>>): PanelFactors {
+  return {
+    passkeys: f.passkeys.map((k) => ({
+      id: k.id,
+      label: k.label,
+      createdAt: k.createdAt,
+      lastUsedAt: k.lastUsedAt,
+    })),
+    totpConfirmed: f.totp.confirmed,
+    recoveryLeft: f.recovery.unused,
+    enforced: f.enforced,
+  }
+}
+
+/** الصورُ المولَّدة لهذه المنشورات — كما تراها الشاشة. */
+async function loadMedia(c: PanelContext, ids: readonly string[]): Promise<MediaView[]> {
+  return (await mediaFor(c.env.DB, [...new Set(ids)])).map((m) => ({
+    id: m.id,
+    postId: m.postId,
+    mime: m.mime,
+    bytes: m.bytes,
+    prompt: m.prompt,
+    cost: m.cost,
+    status: m.status,
+    note: m.note,
+    headline: m.headline,
+    model: m.model,
+    width: m.width,
+    height: m.height,
   }))
-  // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
-  const videoReach = reachOf(allowance.settings, await activeScopes(c.env.DB, activeOrg(session.record), 'tiktok'))
-  const ownZone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
-  const usedImages = (await c.env.DB
-    .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
-    .bind(activeOrg(session.record))
-    .first<{ n: number }>()
-    .catch(() => null))?.n ?? 0
-  return page((nonce) =>
-    panelPage({
-      // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
-      env: c.env.SADA_ENV,
-      paused: allowance.settings.paused,
-      // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
-      draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
-      zone: ownZone,
-      role: session.record.role ?? 'owner',
-      autoEnqueue: allowance.settings.autoEnqueue,
-      autoImage: allowance.settings.autoImage,
-      imageCap: allowance.settings.dailyImageCap,
-      usedImages,
-      imageOverlay: allowance.settings.imageOverlay,
-      // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
-      slide,
-      mediaReady,
-      analysisCap: allowance.settings.dailyAnalysisCap,
-      spendCap: allowance.settings.dailySpendCapUsd,
-      // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
-      usedAnalyses: Number.isFinite(allowance.usage.analyses) ? allowance.usage.analyses : 0,
-      usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
-      videoCap: allowance.settings.dailyVideoCap,
-      usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
-      // ‏من الدفتر كلِّه والاسمُ من المزوّدين حيث وُجد (ر-10): X يُحاسَب على كلّ طلب
-      spendBy: spendRows(spend, Object.fromEntries(providerCards.map((p) => [p.name, p.label]))),
-      spendMonth,
-      series,
-      sources,
-      providers: providerCards,
-      routing: routes.map((r) => {
-        /*
-         * **والصورةُ والمقطعُ من نقطتيهما عينِهما** (D-163): كان الجدولُ يقول
-         * «مزوّده غير جاهز» لصورٍ موجَّهةٍ إلى Cloudflare بمفتاح `CF_AI_TOKEN`
-         * وهي تعمل، ولمقطعٍ يُنادى من البيئة — فتناقض شاشةُ المزوّدين نقطةً
-         * تحت الزرّ تقول «جاهز». والمقطعُ لا يقرأ من توجيهه إلّا النموذج.
-         *
-         * **و«جاهز» هي «تامّة» وحدها**: رابطُ Worker وحده ينتظرك في النقطة،
-         * فينتظرك في الجدول ولا يُعدّ في المهامّ الجاهزة — والرابطُ معرَّفٌ
-         * في البيئتين، فكان كلُّ لوحٍ بلا `CF_AI_ACCOUNT_ID` يقول «جاهز».
-         */
-        const dot = routeDot(mediaReady, r.task)
-        return {
-          task: r.task,
-          provider: r.provider,
-          model: r.model,
-          why: r.why,
-          implemented: r.implemented,
-          ready: r.implemented && (dot === undefined
-            ? providerCards.some((p) => p.name === r.provider && p.configured && p.enabled)
-            : dot.state === 'done'),
-          ...(r.implemented && dot?.state === 'now' ? { pending: dot.note } : {}),
-        }
-      }),
-      knownProviders: providerCards.map((p) => ({ name: p.name, label: p.label })),
-      drafts,
-      editing,
-      media: media.map((m) => ({
-        id: m.id,
-        postId: m.postId,
-        mime: m.mime,
-        bytes: m.bytes,
-        prompt: m.prompt,
-        cost: m.cost,
-        status: m.status,
-        note: m.note,
-        headline: m.headline,
-        model: m.model,
-        width: m.width,
-        height: m.height,
-      })),
-      plan,
-      planReady: routes.some(
-        (r) =>
-          r.task === 'plan' &&
-          providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
-      ),
-      /*
-       * الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
-       * في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا.
-       *
-       * **وحسابُ الصفحة كذلك** (D-087): كان الحارسُ يفحص الإذنَ ولا يفحص
-       * النوع — **وهو نصفُ حارسٍ** (علّةُ D-073 نفسُها). فالسائقُ يبني
-       * `urn:li:person:` حرفا (D-080)، ووجهةُ صفحةٍ تُجدوَل فتُنتظَر
-       * ساعاتٍ ثمّ تُردّ عند المنصّة برسالةٍ لا تدلّ على السبب.
-       *
-       * وقد وقع: جُدولت مسوّدةٌ إلى صفحةِ الشركة، ولم يخرج شيء.
-       */
-      targets: channels.flatMap((c) =>
-        c.spec.built
-          ? c.accounts
-              .filter((a) => a.status === 'active' && !isLinkedInPage(a))
-              .map((a) => ({
-                id: a.id,
-                platform: c.spec.id as PublishPlatform,
-                label: `${a.displayName} · ${c.spec.label}`,
-              }))
-          : [],
-      ),
-      /*
-       * **منصّةٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص** (D-087).
-       *
-       * تُحسَب هنا لا في الشاشة: الشاشةُ ترى `targets` بعد التصفية، فلا
-       * تفرّق بين «لا قناةَ مربوطة» و«القناةُ مربوطةٌ صفحةً». **والفرقُ
-       * ليس لفظا**: الأولى تُرسل المالكَ يربط، والثانيةُ تُرسله ينتظر
-       * موافقةً — ومن قيل له «اربط» وهو رابطٌ يشكّ في نظامه لا في نضجه.
-       */
-      pageOnly: channels
-        .filter(
-          (c) =>
-            c.spec.built &&
-            c.accounts.some((a) => a.status === 'active') &&
-            !c.accounts.some((a) => a.status === 'active' && !isLinkedInPage(a)),
-        )
-        .map((c) => c.spec.id),
-      writableSources: sources
-        .filter((x) => x.analyzed)
-        .map((x) => ({ id: x.id, name: x.name })),
-      // زرٌّ لا ينادي أحدا لا يُعرض عاملا: الطريقُ جاهزٌ إن كان مزوّدُه
-      // مضبوطا ومفعَّلا — وإلّا فالضغطةُ تنتهي إلى رسالةِ عطل
-      draftReady: routes.some(
-        (r) =>
-          r.task === 'draft' &&
-          providerCards.some((p) => p.name === r.provider && p.configured && p.enabled),
-      ),
-      // ‏ومن يكتب للمقارنة من ضُبط مفتاحه وفُعِّل لا من وُجد صفّه (D-244)
-      writers: providerCards
-        .filter((p) => p.configured && p.enabled)
-        .map((p) => ({ name: p.name, label: p.label })),
-      peaks,
-      alertWebhook: allowance.settings.alertWebhook,
-      dashboardTiles: allowance.settings.dashboardTiles,
-      pivot: pivotView,
-      /*
-       * **وآخرُ خمسةٍ لا كلُّها** (D-101): الصندوقُ ينمو ولا يُقلَّم،
-       * **وسجلٌّ كاملٌ في صفحةٍ تُفتَح كلَّ يومٍ ثمنٌ يُدفَع كلَّ يوم**.
-       * والخمسةُ تكفي لتقول «القناةُ تعمل» أو «ماتت».
-       */
-      outbox,
-      flash,
-      now: new Date(),
-      csrf: session.record.csrf,
-      nonce,
-      sessions,
-      orgs,
-      org: activeOrg(session.record),
-      audit,
-      // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
-      today: todayFeed({ now: new Date(), audit, drafts, facts: loaded.facts }),
-      pulses: pulses(beats, new Date()),
-      rpId: rp.id,
-      via: session.record.via,
-      factors: {
-        passkeys: factors.passkeys.map((k) => ({
-          id: k.id,
-          label: k.label,
-          createdAt: k.createdAt,
-          lastUsedAt: k.lastUsedAt,
-        })),
-        totpConfirmed: factors.totp.confirmed,
-        recoveryLeft: factors.recovery.unused,
-        enforced: factors.enforced,
-      },
-      channels,
-      apps,
-      baseUrl: c.env.PUBLIC_BASE_URL,
-      openSuggestions: openCount,
-      journey,
-      uploads,
-      captions,
-      // ‏أمتّصلةٌ كلُّ منصّة، ومَن يرى المقطع — حيث تُختار المنصّة (D-190)
-      links: linkStates(accountsNow),
-      reach: videoReach,
-      promoCap: allowance.settings.weeklyPromoCapUsd,
-      ownerPending,
-      expiring,
-      cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
-    // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-233): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
-    }, only, q.get('swap') === 'posts'),
+}
+
+/**
+ * الوجهاتُ من الحسابات الحيّة: قناةٌ إذنُها منتهٍ ليست وجهة، وعرضُها
+ * في القائمة يجعل الجدولة تنجح ثمّ يفشل النشر بعد أيّامٍ صامتا.
+ *
+ * **وحسابُ الصفحة كذلك** (D-087): كان الحارسُ يفحص الإذنَ ولا يفحص
+ * النوع — **وهو نصفُ حارسٍ** (علّةُ D-073 نفسُها). فالسائقُ يبني
+ * `urn:li:person:` حرفا (D-080)، ووجهةُ صفحةٍ تُجدوَل فتُنتظَر
+ * ساعاتٍ ثمّ تُردّ عند المنصّة برسالةٍ لا تدلّ على السبب.
+ *
+ * وقد وقع: جُدولت مسوّدةٌ إلى صفحةِ الشركة، ولم يخرج شيء.
+ */
+function targetsOf(channels: readonly ChannelView[]): Target[] {
+  return channels.flatMap((ch) =>
+    ch.spec.built
+      ? ch.accounts
+          .filter((a) => a.status === 'active' && !isLinkedInPage(a))
+          .map((a) => ({
+            id: a.id,
+            platform: ch.spec.id as PublishPlatform,
+            label: `${a.displayName} · ${ch.spec.label}`,
+          }))
+      : [],
   )
+}
+
+/**
+ * «نظرة عامّة»: الرحلةُ والبطاقاتُ و«ما ينتظرك» و«الكلفة وما وقع». أحدَ عشرَ انتظارًا مستقلًّا معًا — والأرقامُ
+ * من الدفتر كلِّه (ر-10)، و«ما وقع اليوم» ممّا قُرئ أصلًا (D-127).
+ */
+async function overviewData(load: Load): Promise<OverviewData> {
+  const { c, org, now, allowance, drafts, channels, zone } = load
+  const [sources, series, spendMonth, p, media, outbox, loaded, audit, journey, open, factors] = await Promise.all([
+    load.sources(),
+    dailySpend(c.env.DB, 14),
+    spendThisMonth(c.env.DB, zone, now),
+    load.providers(),
+    loadMedia(c, drafts.map((d) => d.id)),
+    load.outbox(),
+    load.pivotFacts(),
+    load.audit(),
+    // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
+    journeyCounts(c.env.DB, org, now),
+    // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
+    openSuggestions(c.env.DB, org),
+    load.factors(),
+  ])
+  const { slide, mediaReady } = readiness(load, p)
+  return {
+    sources,
+    media,
+    journey,
+    openSuggestions: open.length,
+    // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
+    draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
+    factors,
+    providers: p.cards,
+    routing: routingOf(p, mediaReady),
+    dashboardTiles: allowance.settings.dashboardTiles,
+    series: series.map((d) => ({ day: d.day, total: d.total })),
+    // ‏من الدفتر كلِّه والاسمُ من المزوّدين حيث وُجد (ر-10): X يُحاسَب على كلّ طلب
+    spendBy: spendRows(p.spend, Object.fromEntries(p.cards.map((x) => [x.name, x.label]))),
+    spendMonth,
+    // «ما وقع اليوم» ممّا قُرئ أعلاه — ولا استعلامَ جديد (D-127)
+    today: todayFeed({ now, audit, drafts, facts: loaded.facts }),
+    autoEnqueue: allowance.settings.autoEnqueue,
+    // **وجودُ السرّ يُفحَص لا قيمتُه** — والقيمةُ لا تغادر البيئة (D-042)
+    slide,
+    analysisCap: allowance.settings.dailyAnalysisCap,
+    spendCap: allowance.settings.dailySpendCapUsd,
+    // لانهاية تعني دفترا لا يُقرأ — تُعرض صفرا لا `Infinity` في الشاشة
+    usedAnalyses: Number.isFinite(allowance.usage.analyses) ? allowance.usage.analyses : 0,
+    usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
+    targets: targetsOf(channels),
+    outbox,
+    alertWebhook: allowance.settings.alertWebhook,
+    planReady: taskReady(p, 'plan'),
+  }
+}
+
+/**
+ * «المنشورات»: المسوّداتُ ومحرّرُها والخطّة.
+ *
+ * ‏**والمحرّرُ المركّزُ من العنوان** (D-198): `?open=<id>` يرسم المنشورَ بجوار القائمة، فيُفتح برابطٍ
+ * ‏ويُحفَظ ويعمل بلا سكربت. والمعرّفُ يُفحَص قبل أن يُسأل عنه، ومنشورٌ أقدمُ من الستّين يُقرأ وحدَه.
+ */
+async function postsData(load: Load): Promise<PostsData> {
+  const { c, org, allowance, drafts, channels, accounts, q } = load
+  const openId = q.get('open') ?? ''
+  const editing = POST_ID.test(openId)
+    ? (drafts.find((d) => d.id === openId) ?? await getDraft(c.env.DB, org, openId))
+    : null
+  const board = [...drafts, ...(editing === null ? [] : [editing])]
+  /*
+   * **وذروةُ المنصّات التي في المسوّدات وحدَها** (D-106).
+   *
+   * لكلّ منصّةٍ استعلامُها، **وقراءةُ الأربع كلِّها في كلّ فتحةٍ للوحة
+   * ثلاثةُ استعلاماتٍ لا يقرؤها أحد** حين لا تكون في المسوّدات منصّةٌ
+   * غيرُ واحدة. فتُقرأ ما في اليد لا ما قد يقع.
+   */
+  const platforms = [...new Set(board.map((d) => d.platform))]
+  const [sources, p, media, plan, audit, peakRows] = await Promise.all([
+    load.sources(),
+    load.providers(),
+    loadMedia(c, board.map((d) => d.id)),
+    latestPlan(c.env.DB, org),
+    load.audit(),
+    Promise.all(platforms.map(async (platform): Promise<[string, Peaks]> => [platform, await readPeaks(c.env.DB, org, platform)])),
+  ])
+  const { mediaReady } = readiness(load, p)
+  return {
+    editing,
+    media,
+    targets: targetsOf(channels),
+    /*
+     * **منصّةٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص** (D-087).
+     *
+     * تُحسَب هنا لا في الشاشة: الشاشةُ ترى `targets` بعد التصفية، فلا
+     * تفرّق بين «لا قناةَ مربوطة» و«القناةُ مربوطةٌ صفحةً». **والفرقُ
+     * ليس لفظا**: الأولى تُرسل المالكَ يربط، والثانيةُ تُرسله ينتظر
+     * موافقةً — ومن قيل له «اربط» وهو رابطٌ يشكّ في نظامه لا في نضجه.
+     */
+    pageOnly: channels
+      .filter(
+        (ch) =>
+          ch.spec.built &&
+          ch.accounts.some((a) => a.status === 'active') &&
+          !ch.accounts.some((a) => a.status === 'active' && !isLinkedInPage(a)),
+      )
+      .map((ch) => ch.spec.id),
+    peaks: Object.fromEntries(peakRows),
+    mediaReady,
+    writableSources: sources
+      .filter((x) => x.analyzed)
+      .map((x) => ({ id: x.id, name: x.name })),
+    draftReady: taskReady(p, 'draft'),
+    // ‏ومن يكتب للمقارنة من ضُبط مفتاحه وفُعِّل لا من وُجد صفّه (D-244)
+    writers: p.cards
+      .filter((x) => x.configured && x.enabled)
+      .map((x) => ({ name: x.name, label: x.label })),
+    draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
+    // ‏أمتّصلةٌ كلُّ منصّة — حيث تُختار المنصّة (D-190)
+    links: linkStates(accounts),
+    plan,
+    planReady: taskReady(p, 'plan'),
+    sources,
+    audit,
+  }
+}
+
+/** «المكتبة»: المصادرُ والمقاطعُ (ونصوصُها من KV) والصور، وجاهزيّةُ الكتابة لزرّ «اكتب النصوص». */
+async function libraryData(load: Load): Promise<LibraryData> {
+  const { c, org, allowance, drafts, accounts } = load
+  const [sources, uploads, scopes, media, draftReady] = await Promise.all([
+    load.sources(),
+    listUploads(c.env.DB, org),
+    // ‏مَن يرى المقطع بحكم الناشر: القرارُ ونطاقُ حساب TikTok النشط (D-190)
+    activeScopes(c.env.DB, org, 'tiktok'),
+    loadMedia(c, drafts.map((d) => d.id)),
+    taskReadyAlone(c, 'draft'),
+  ])
+  /*
+   * ‏**ونصوصُ المقاطع المكتوبة من KV** (D-190) — لما بقي فيه ما يُنشأ وحدَه: مقطعٌ أُنشئ على
+   * ‏منصّاته كلِّها لا حقولَ له، فلا يُقرأ. قراءةٌ لكلّ مقطعٍ مفتوح، وهي قليلةٌ عادةً.
+   */
+  const open = uploads.filter(
+    (u) => u.status === 'ready' && !VIDEO_PLATFORMS.every((p) => u.posts.some((x) => x.platform === p)),
+  )
+  const captions: Record<string, VideoCaptions> = {}
+  for (const [id, found] of await Promise.all(open.map(async (u) => [u.id, await readCaptions(c.env.KV, u.id)] as const))) {
+    if (found !== null) captions[id] = found
+  }
+  return {
+    sources,
+    uploads,
+    captions,
+    links: linkStates(accounts),
+    reach: reachOf(allowance.settings, scopes),
+    draftReady,
+    draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
+    media,
+  }
+}
+
+/** «الإعدادات»: الحدودُ ومستهلَكُها، والمزوّدون وتوجيهُهم، والأجهزةُ والعواملُ وسجلُّ النشاط. */
+async function settingsData(load: Load): Promise<SettingsData> {
+  const { c, org, session, allowance } = load
+  const [usedImages, outbox, sessions, factors, audit, p] = await Promise.all([
+    // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
+    c.env.DB
+      .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
+      .bind(org)
+      .first<{ n: number }>()
+      .catch(() => null)
+      .then((row) => row?.n ?? 0),
+    load.outbox(),
+    listSessions(c.env.KV, session.id),
+    load.factors(),
+    load.audit(),
+    load.providers(),
+  ])
+  const { slide, mediaReady } = readiness(load, p)
+  const s = allowance.settings
+  return {
+    dashboardTiles: s.dashboardTiles,
+    analysisCap: s.dailyAnalysisCap,
+    usedAnalyses: Number.isFinite(allowance.usage.analyses) ? allowance.usage.analyses : 0,
+    spendCap: s.dailySpendCapUsd,
+    usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
+    videoCap: s.dailyVideoCap,
+    usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
+    promoCap: s.weeklyPromoCapUsd,
+    autoEnqueue: s.autoEnqueue,
+    autoImage: s.autoImage,
+    imageCap: s.dailyImageCap,
+    usedImages,
+    alertWebhook: s.alertWebhook,
+    outbox,
+    imageOverlay: s.imageOverlay,
+    slide,
+    sessions,
+    factors,
+    audit,
+    providers: p.cards,
+    routing: routingOf(p, mediaReady),
+    knownProviders: p.cards.map((x) => ({ name: x.name, label: x.label })),
+    cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
+    baseUrl: c.env.PUBLIC_BASE_URL,
+  }
+}
+
+/**
+ * «التحليل» — **واللوحُ المحوريُّ يُقرأ من العنوان** (D-120).
+ *
+ * فالعرضُ كلُّه في الرابط: يُنسَخ ويُرسَل ويُحفَظ في المفضّلة. **وما
+ * لا يُعرَف من قيمةٍ يعود إلى افتراضه** ولا يُسقط الصفحة — القيمُ تأتي
+ * من الشبكة، **ونصٌّ في `SQL` أو في المخرَج لا يقع** لأنّها تُطابَق
+ * بقائمة سماحٍ لا تُمرَّر.
+ */
+async function resultsData(load: Load): Promise<ResultsData> {
+  const { q } = load
+  const pivotRows = readDimension(q.get('rows') ?? undefined, 'platform')
+  const pivotCols = readCols(q.get('cols') ?? undefined)
+  const pivotMeasure = readMeasure(q.get('m') ?? undefined, 'count')
+  const loaded = await load.pivotFacts()
+  return {
+    pivot: {
+      table: pivot(loaded.facts, { rows: pivotRows, cols: pivotCols, measure: pivotMeasure }),
+      rows: pivotRows,
+      cols: pivotCols,
+      measure: pivotMeasure,
+      sinceDays: readSpan(q.get('days')),
+      capped: loaded.capped,
+      cap: FACT_CAP,
+    },
+  }
 }
 
 /*

@@ -216,6 +216,28 @@ export const POST_ID = /^[0-9a-f-]{8,}$/
 /** ‏نافذةُ «المنشورات»: ما ترسمه اللوحةُ بطاقاتٍ، وما يوزَّع منه، وما يُنزَل إليه — عددٌ واحد. */
 export const BOARD = 60
 
+/** أسماءُ أسرار Worker ومتغيّراته المضبوطة — من البيئة وحدها بلا استعلام (D-005 · D-280). */
+export type EnvFacts = Pick<OwnerFacts, 'secrets' | 'vars'>
+
+/**
+ * **وجودُ السرّ يُفحَص لا قيمتُه** (D-042): ما تحتاجه نقاطُ الجاهزيّة والشريحةُ من حقائق المالك هو هذا وحدَه،
+ * فيُقرأ من البيئة بلا الاستعلامات السبعة التي تجمعها `ownerFacts` لشاشة «ما عليك» (D-280).
+ */
+export function envFacts(env: Env): EnvFacts {
+  const bag = env as unknown as Record<string, string | undefined>
+  const has = (name: string): boolean => {
+    const v = bag[name]
+    return typeof v === 'string' && v.trim() !== ''
+  }
+  return {
+    secrets: new Set(
+      ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
+       'GOOGLE_SA_JSON', 'CF_AI_TOKEN', 'CF_BROWSER_TOKEN'].filter(has),
+    ),
+    vars: new Set(['LEGAL_ENTITY', 'LEGAL_CONTACT', 'CF_AI_ACCOUNT_ID'].filter(has)),
+  }
+}
+
 /**
  * حقائقُ المالك — **تُجمَع من البيئة والقاعدة، ولا تُكتب بيد.**
  *
@@ -225,10 +247,6 @@ export async function ownerFacts(c: {
   env: Env
 }, org: string): Promise<OwnerFacts> {
   const env = c.env as unknown as Record<string, string | undefined>
-  const has = (name: string): boolean => {
-    const v = env[name]
-    return typeof v === 'string' && v.trim() !== ''
-  }
 
   const accounts = await listAccounts(c.env.DB, org)
   // ‏كلُّ منصّةٍ لها سرّان (D-142) — وكانت Instagram خارجها، فمهمّتُها لا تعرف أنّ سرّيها حُفظا
@@ -278,11 +296,7 @@ export async function ownerFacts(c: {
 
   return {
     ...(gatewayCredit === undefined ? {} : { gatewayCredit }),
-    secrets: new Set(
-      ['TOKEN_ENC_KEY', 'ADMIN_TOKEN', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
-       'GOOGLE_SA_JSON', 'CF_AI_TOKEN', 'CF_BROWSER_TOKEN'].filter(has),
-    ),
-    vars: new Set(['LEGAL_ENTITY', 'LEGAL_CONTACT', 'CF_AI_ACCOUNT_ID'].filter(has)),
+    ...envFacts(c.env),
     linked: new Set(accounts.filter((a) => a.status !== 'revoked').map((a) => a.platform)),
     appsConfigured: new Set(apps.filter((a) => a.source !== 'none').map((a) => a.platform)),
     appsVerified: new Set(

@@ -17,7 +17,6 @@ import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
 import { pivotPane, type PivotView } from './ui/sections/pivot'
 import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channels'
-import type { AppStatus } from '../lib/oauth/apps'
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
@@ -405,11 +404,8 @@ export interface PanelData {
   readonly pulses: readonly Pulse[]
   /** النطاق الذي تُوقَّع عليه المفاتيح — يُعرض ليُعرف أنّه ليس الآخر. */
   readonly rpId: string
-  readonly via: 'admin_token' | 'passkey' | 'email_code'
   readonly factors: PanelFactors
   readonly channels: readonly ChannelView[]
-  /** حالُ تطبيقَي OAuth — بلا سرٍّ ولا فكِّ تشفير. */
-  readonly apps: readonly AppStatus[]
   /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروض للنسخ. */
   readonly baseUrl: string
   /** كم توصيةَ ترويجٍ تنتظر بتّك — عددٌ على رابط التقرير (D-058). */
@@ -424,26 +420,8 @@ export interface PanelData {
   readonly links?: Readonly<Record<string, LinkState>>
   /** مَن يرى مقاطع YouTube وTikTok: قرارُ المالك بعد الإجازة (D-190). */
   readonly reach?: Reach
-  /**
-   * رموزٌ تقترب من الانتهاء — **تُعرَض في صدر اللوحة لا في شاشةٍ تُفتَح.**
-   *
-   * وسقوطُ رمزِ تجديدٍ **يوقف المنصّة حتّى يجلس المالكُ إليها**، فلا
-   * يُترك في صفحةٍ قد لا تُفتَح قبل أن يقع (D-065).
-   */
-  readonly expiring: readonly {
-    readonly platform: string
-    readonly displayName: string
-    readonly kind: 'access' | 'refresh'
-    readonly daysLeft: number
-  }[]
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
   readonly promoCap: number
-  /**
-   * كم مهمّةً **يُعرَف** أنّها على المالك — ولا يُعدّ فيها ما لا يُعرَف.
-   *
-   * وعدٌّ يشمل المجهولَ يجعل الرقمَ لا ينزل أبدا، **فيُهمَل** (D-063).
-   */
-  readonly ownerPending: number
   /**
    * معرّفُ حساب Cloudflare إن كان مضبوطا — يُملأ به عنوانُ نموذجه.
    *
@@ -460,6 +438,58 @@ export interface PanelData {
   /** منطقةُ المالك من كعكة `sada_tz` (D-173) — ومنها ساعةُ انفتاح السقف بتوقيته. */
   readonly zone?: string | null
 }
+
+/*
+ * ‏**كلُّ لوحٍ يسمّي ما يقرأ** (D-280). كانت `PanelData` حقيبةً واحدةً تُملأ كلُّها لكلّ طلب — خمسةٌ وأربعون
+ * ‏استعلامًا متتابعًا لرسم لوحٍ يقرأ عشرة. فصار لكلّ لوحٍ نوعُه: `Pick` من الحقيبة يقول للمحمِّل في `panel/home.ts`
+ * ‏ما يُحمَّل، وللمصرِّف أنّ قسمًا يقرأ حقلًا ليس في لوحه **خطأٌ في النوع لا فراغٌ صامت**. والهيكلُ — الرافدةُ
+ * ‏والترويسةُ والإشعارُ والذيل — يقرأ `ShellData` في كلّ لوح.
+ */
+
+/** ما يرسمه الهيكلُ لكلّ لوح: الرافدةُ بأعدادها، والترويسةُ وحبّةُ الحال، والإشعارُ وشريطُ المنصّات المنقطعة. */
+export type ShellData = Pick<PanelData,
+  'env' | 'role' | 'paused' | 'pulses' | 'rpId' | 'flash' | 'now' | 'csrf' | 'nonce' | 'orgs' | 'org' | 'drafts' | 'channels' | 'zone'>
+
+/** «نظرة عامّة»: الرحلةُ و«ما ينتظرك» والبطاقاتُ (`TileSource`) و«الكلفة وما وقع». */
+export type OverviewData = Pick<PanelData,
+  'sources' | 'media' | 'journey' | 'openSuggestions' | 'draftBlocker' | 'factors' | 'providers' | 'routing'
+  | 'dashboardTiles' | 'series' | 'spendBy' | 'spendMonth' | 'today' | 'autoEnqueue' | 'slide' | 'analysisCap'
+  | 'spendCap' | 'usedAnalyses' | 'usedSpend' | 'targets' | 'outbox' | 'alertWebhook' | 'planReady'>
+
+/** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
+export type PostsData = Pick<PanelData,
+  'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
+  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit'>
+
+/** «المكتبة»: المصادرُ والمقاطعُ والصور. */
+export type LibraryData = Pick<PanelData,
+  'sources' | 'uploads' | 'captions' | 'links' | 'reach' | 'draftReady' | 'draftBlocker' | 'media'>
+
+/** «الحسابات»: القنواتُ وحدها — وهي في الهيكل أصلًا. */
+export type AccountsData = Pick<PanelData, 'channels'>
+
+/** «الإعدادات»: الحدودُ والمزوّدون والأمانُ والمنظّمات وما للمطوّر. */
+export type SettingsData = Pick<PanelData,
+  'dashboardTiles' | 'analysisCap' | 'usedAnalyses' | 'spendCap' | 'usedSpend' | 'videoCap' | 'usedClips' | 'promoCap'
+  | 'autoEnqueue' | 'autoImage' | 'imageCap' | 'usedImages' | 'alertWebhook' | 'outbox' | 'imageOverlay' | 'slide'
+  | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl'>
+
+/** «التحليل»: اللوحُ المحوريّ. */
+export type ResultsData = Pick<PanelData, 'pivot'>
+
+/**
+ * ما يُرسَم وبياناتُه معًا — **والنوعُ يربط اللوحَ بما يحتاجه**: «/panel» الرئيسيّةُ والمنشورات، و`swapPosts`
+ * ‏«المنشورات» وحدَها لسكربت التبديل (D-233)، وكلُّ لوحٍ آخر في مساره (D-211).
+ */
+export type PaneView =
+  | { readonly only: null; readonly swapPosts?: false; readonly data: ShellData & OverviewData & PostsData }
+  | { readonly only: null; readonly swapPosts: true; readonly data: ShellData & PostsData }
+  | { readonly only: 'overview'; readonly data: ShellData & OverviewData }
+  | { readonly only: 'posts'; readonly data: ShellData & PostsData }
+  | { readonly only: 'library'; readonly data: ShellData & LibraryData }
+  | { readonly only: 'accounts'; readonly data: ShellData & AccountsData }
+  | { readonly only: 'settings'; readonly data: ShellData & SettingsData }
+  | { readonly only: 'results'; readonly data: ShellData & ResultsData }
 
 export interface PanelFactors {
   readonly passkeys: {
@@ -575,7 +605,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
  * **وشبكةُ أربعةٍ فيها خمسُ بطاقاتٍ تترك واحدةً وحيدةً في صفٍّ ثانٍ** —
  * وهي عينُ التمزّق الذي حُرِس في D-111.
  */
-function tileRow(d: PanelData): string {
+function tileRow(d: ShellData & OverviewData): string {
   const tiles = chosenTiles(d.dashboardTiles)
   const cols = tiles.length >= 6 ? 'c3' : tiles.length === 5 ? 'c5' : `c${tiles.length}`
   const cards = tiles.map((spec) => {
@@ -600,7 +630,7 @@ function tileRow(d: PanelData): string {
  * **والحدُّ يُقال قبل أن يُردّ**: «ستّ على الأكثر» مكتوبةٌ فوق المربّعات،
  * لا رسالةَ خطأ بعد الضغط.
  */
-function tilePicker(d: PanelData): string {
+function tilePicker(d: Pick<SettingsData, 'dashboardTiles'>): string {
   const chosen = new Set(chosenTiles(d.dashboardTiles).map((t) => t.id))
   const boxes = TILES.map((spec) => {
     const on = chosen.has(spec.id)
@@ -645,7 +675,7 @@ function deltaOf(series: readonly { day: string; total: number }[]): string {
  * والثانيةُ ما وقع منذ منتصف الليل UTC. ولا استعلامَ لها: تُروى من سجلّ
  * التدقيق والمسوّدات وحقائق اللوح المحوريّ التي قُرئت أصلًا.
  */
-function todayList(d: PanelData): string {
+function todayList(d: Pick<PanelData, 'today' | 'now'>): string {
   const rows = d.today.items
     .map((i) => `<li><span class="dot ${i.kind}"></span>
       <span>${escapeHtml(i.text)}${i.at === null ? '' : ` <span class="ago">${escapeHtml(relativeTime(i.at, d.now))}</span>`}</span>
@@ -666,7 +696,7 @@ function todayList(d: PanelData): string {
  * والتبويبُ رابطٌ إلى قسمه (`#sub-…`)، **وكلُّ مرساةٍ قديمة تفتح قسمَها** (`#idea` و`#write` و`#videos`
  * و`#plan-import` و`#d-…`) — يقرأ `show()` القسمَ الذي يحوي المرساة. وبلا سكربتٍ تظهر الأقسامُ كلُّها.
  */
-function postsTabs(d: PanelData, drafts: { readonly list: string; readonly write: string }, plan: string): string {
+function postsTabs(d: ShellData & PostsData, drafts: { readonly list: string; readonly write: string }, plan: string): string {
   /*
    * ‏**والمحرّرُ المركّز بجوار القائمة في قسمها** (D-198): لا تبويبَ خامس ولا صفحةٌ ثانية. لوحٌ ‏560px
    * ‏على الحاسوب، وشاشةٌ كاملةٌ على الهاتف، وبلا `?open=` تبقى القائمةُ كما رسمها D-195.
@@ -722,7 +752,7 @@ function settingsTabs(missing: number, owner: boolean): string {
  * «المنظّمات» (D-225): حسابُ الدخول الحاليّ حسابُ المشغّل — يرى كلَّ المنظّمات وينشئها وينتقل بينها.
  * وصلاحيّاتُ كلّ منظّمةٍ والحساباتُ الإشرافيّة في المرحلة الثانية (وثيقةُ الرؤية §الوصول).
  */
-function orgsPane(d: PanelData): string {
+function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
   const orgs = d.orgs ?? []
   const rows = orgs.map((o) => {
     const current = o.id === d.org
@@ -753,7 +783,7 @@ function orgsPane(d: PanelData): string {
  * ورابطُ العودة لكلّ منصّة كما يُلصق في بوّابتها، وأسماءُ أسرار Worker الناقصة — **أسماءٌ لا قيَم**، ولا يُقرأ سرٌّ هنا.
  * كانت أسماءُ الأسرار على بطاقة «الحسابات» فرُفعت عنها في D-205؛ فهذا موضعُها.
  */
-function devPane(d: PanelData): string {
+function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<SettingsData, 'baseUrl'>): string {
   const built = d.channels.filter((v) => v.spec.built)
   const rows = built.map((v) => `<tr><th scope="row">${escapeHtml(v.spec.label)}</th>
       <td dir="ltr" class="mono">${escapeHtml(`${d.baseUrl}/oauth/${v.spec.id}/callback`)}</td>
@@ -833,122 +863,21 @@ function fabNew(): string {
   return `<details class="fab"><summary>${ICON.add}<span class="vh">منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
 }
-
-/**
- * يُبقي من الصفحة ألواحَ `keep` وحدَها (D-211) — **وبعدّ العمق لا بتعبيرٍ نمطيّ**: في «المنشورات» `<section class="ed-sec">`
- * داخل اللوح، فأوّلُ `</section>` بعد رأس اللوح ليس نهايتَه.
- */
-export function keepPanes(html: string, keep: ReadonlySet<string>): string {
-  let out = ''
-  let i = 0
-  const open = /<section data-pane="([a-z]+)"/g
-  for (let m = open.exec(html); m !== null; m = open.exec(html)) {
-    if (m.index < i) continue
-    out += html.slice(i, m.index)
-    let depth = 0
-    let j = m.index
-    const tag = /<section\b|<\/section>/g
-    tag.lastIndex = m.index
-    for (let t = tag.exec(html); t !== null; t = tag.exec(html)) {
-      depth += t[0] === '</section>' ? -1 : 1
-      if (depth === 0) { j = t.index + '</section>'.length; break }
-    }
-    if (keep.has(m[1]!)) out += html.slice(m.index, j)
-    i = j
-    open.lastIndex = j
-  }
-  return out + html.slice(i)
-}
-
-export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = false): string {
-  const pending = d.sources.filter((s) => !s.analyzed || s.stale).length
-  const ready = d.sources.length - pending
-  const missing = d.providers.filter((p) => !p.configured).length
-  const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
-  // ‏والصورُ الجاهزةُ وحدَها في «المكتبة ← الصور» (D-206): المرفوضةُ لا تُعرض مادّةً
-  const libraryImages = d.media.filter((m) => m.status === 'ready' && m.mime.startsWith('image/'))
-
-  // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
-  // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
-  /**
-   * شريطُ الرموز المقتربة — **فوق كلّ شيءٍ في اللوحة.**
-   *
-   * ولا يُخفى خلف زرّ: سقوطُ رمزِ تجديدٍ يوقف المنصّة، **وأوّلُ علامةٍ
-   * بغير هذا منشورٌ وُعد بموعده ولم يخرج**.
-   *
-   * والتجديدُ يُعرَض `bad` والوصولُ `warn`: **الأوّلُ يوجب يدَك،
-   * والثاني يُصلحه النظامُ وحده** — ولا يُسوَّى بينهما فيُقرآن سواء.
-   */
-  // ‏**ومن الحكم الواحد** (D-205): كان الشريطُ يقرأ استعلامَه بعتبته وكلماته («إذنُ الوصول»، «إذنُ التجديد»)،
-  // ‏فيقول «يبقى 6 أيّام» عن منصّةٍ تقول بطاقتُها «متّصلة». فصار سطرًا واحدًا بحال كلّ منصّةٍ تحتاج يدَك، وزرًّا واحدًا
-  const needy = d.channels
-    .map((v) => ({ v, h: channelHealth(v, d.now) }))
-    .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
-  const expiring = needy.length === 0 ? '' : notice({
-    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
-    // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
-    html: `${needy.slice(0, 3)
-      .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
-      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. <a class="tap" href="#channels">افتح الحسابات</a>` })
-
-  // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
-  const flash = `${expiring}${toastRegion(
-    d.flash === null
-      ? ''
-      : notice({
-          tone: d.flash.kind,
-          html: pathArrows(escapeHtml(d.flash.text)),
-          ...(d.flash.undo === undefined ? {} : {
-            action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
-                        data-busy="جار…" data-swap>
-                    <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
-                    <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
-                  </form>`,
-          }),
-        }),
-  )}`
-
-  /*
-   * ‏**والحبّةُ من النبض لا من مفتاح الإيقاف وحده**، ورابطٌ إلى بطاقة الآلة: كانت
-   * ‏«يعمل» خضراءَ والإرسالُ متوقّفٌ منذ ثلاثة أيّام، والجوابُ على بُعد ثلاث شاشات
-   */
-  // ‏المالكُ وحدَه يرى أقسامَ الإعدادات التي للمالك (D-272)؛ والجلسةُ القديمةُ بلا دورٍ للمالك
-  const ownerView = (d.role ?? 'owner') === 'owner'
-  const pill = systemPill(d.paused, d.pulses)
-  const state = `<a class="pill ${pill.tone}" href="${panelHref('machine')}"
-    aria-label="${escapeHtml(`حال النظام: ${pill.text} — افتح «هل الآلة تعمل؟»`)}"><i class="led"></i>${escapeHtml(pill.text)}</a>`
-
-  const scanBtn = `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
+/** زرُّ المسح — في «ما ينتظرك» وفي رأس جدول المصادر. */
+const SCAN_BTN = `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
       <button class="btn btn-secondary btn-sm" type="submit">مسح Drive الآن</button></form>`
 
-  const sourcesTable = d.sources.length === 0
-    ? emptyState({
-        echo: true,
-        title: 'لا مصادر بعد',
-        html: 'صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.',
-        action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
-           <button class="btn btn-primary" type="submit">مسح Drive الآن</button></form>`,
-      })
-    : `${filterBar([
-         { kind: 'seg', label: 'أيّ الملفّات', name: 'src-show', options: [
-           { label: 'الكلّ', value: 'all', current: true },
-           { label: 'ينتظر', value: 'pending', current: false },
-           { label: 'محلَّل', value: 'analyzed', current: false },
-         ] },
-         { kind: 'pick', label: 'رتّب:', name: 'src-sort', options: [
-           { label: 'الأحدث', value: 'seen', current: true },
-           { label: 'الأهمّ', value: 'worth', current: false },
-           { label: 'الاسم', value: 'name', current: false },
-         ] },
-       ], 'فلتر الملفّات')}
-       <p class="note m-0 mb-3">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</p>
-       <div class="scroll"><table>
-         <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th><span class="vh">الإجراء</span></th></tr></thead>
-         <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
-       </table></div>`
+/** ما ينتظر التحليل — **والمتقادمُ ينتظر وإن حُلِّل**. */
+function pendingSources(sources: readonly PanelSource[]): number {
+  return sources.filter((s) => !s.analyzed || s.stale).length
+}
 
-  const { strip: providerStrip, rows: providerRows, add: addCard, routing: routingRows } =
-    providersSection(d)
+/**
+ * «نظرة عامّة» (D-280: تُرسَم وحدَها حين تُطلَب، ولا يُحمَّل لها غيرُ ما تقرأ).
+ */
+function overviewPane(d: ShellData & OverviewData): string {
+  const pending = pendingSources(d.sources)
+  const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
   const linkedChannels = d.channels.filter(
     (c) => c.state === 'linked' || c.state === 'needs_reauth',
   ).length
@@ -1018,58 +947,12 @@ export function panelPage(d: PanelData, only: PaneId | null = null, swapPosts = 
       ${i.go === undefined ? '' : `<a class="btn btn-secondary btn-sm" href="${i.go}">${escapeHtml(i.label ?? 'اذهب')}</a>`}</li>`)
     .join('')
 
-  const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
-    securitySection(d)
-
-  /*
-   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105)، وفي `rail.ts` منذ صارت لكلّ
-   * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
-   */
-  /*
-   * ‏**عددان لا ستّة** (D-216): كانت الرافدةُ تقول «الإعدادات 4» و«ما عليك 6» و«المكتبة 1» و«المزيد 7» ولا تقول ماذا
-   * ‏تعدّ، فكانت «ما ينتظرك» تُقال في خمسة أماكن. فبقي ما يوجب يدَ المالك اليوم وحدَه: المسوّداتُ التي تنتظر قرارَه
-   * ‏والفاشلةُ (كما في «ينتظر قرارك»)، والحساباتُ المنقطعة. والباقي يُقال في صفحته.
-   */
-  // ‏المنظّمةُ النشطة ومبدّلُها (‏scope.ts)، والانتقالُ يعود إلى هذه الصفحة نفسِها
-  const scope = { orgs: d.orgs ?? [], active: d.org ?? OWNER_ORG, next: only === null ? '/panel' : panelHref(only) }
-  const counts: Readonly<Record<string, number>> = {
-    posts: waitingDrafts + d.drafts.filter((x) => x.status === 'failed').length,
-    accounts: d.channels.filter((c) => channelHealth(c, d.now).kind === 'broken').length,
-  }
-
   // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
   const bare = (x: DraftRow): boolean =>
     (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
     && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
 
-  const body = `
-<a class="skip" href="#main">تخطّي إلى المحتوى</a>
-<div class="app">
-
-${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
-
-<div class="main">
-<header class="topbar">
-  ${/*
-    * **والعلامةُ حاضرةٌ في كلّ عرض** (D-123). رأسُ الرافدة يختفي في
-    * الجوّال (D-107) فلم يبقَ في الشاشة ما يقول «هذه صدى» — ثلاثون
-    * بكسلا في شريطٍ ارتفاعُه ستّون لا تُشترى بشيء. وفي المكتب تُخفى:
-    * علامتان في شاشةٍ واحدة تكرار.
-    */''}
-  <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
-    <div class="crumb">${escapeHtml(d.rpId)}</div></div>
-  <div class="grow"></div>
-  ${topNew()}
-  ${commandTrigger()}
-  ${state}
-  ${accountMenu({ logout: true, scope })}
-</header>
-
-<main id="main" class="content">
-${flash}
-<section data-pane="overview" hidden>
+  return `<section data-pane="overview" hidden>
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
     *
@@ -1133,7 +1016,7 @@ ${flash}
         ${todo === ''
           ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
           : `<ul class="todo">${todo}</ul>`}
-        <div class="row mt-3">${scanBtn}
+        <div class="row mt-3">${SCAN_BTN}
           <a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a></div></div>
   </div>
   ${/*
@@ -1162,11 +1045,42 @@ ${flash}
     </div>
   </div>
   </details>
-</section>
+</section>`
+}
 
-${pivotPane(d.pivot)}
+/** «المكتبة» — المصادرُ والمقاطعُ والصور. */
+function libraryPane(d: ShellData & LibraryData): string {
+  const pending = pendingSources(d.sources)
+  // ‏والصورُ الجاهزةُ وحدَها في «المكتبة ← الصور» (D-206): المرفوضةُ لا تُعرض مادّةً
+  const libraryImages = d.media.filter((m) => m.status === 'ready' && m.mime.startsWith('image/'))
 
-<section data-pane="library" hidden>
+  const sourcesTable = d.sources.length === 0
+    ? emptyState({
+        echo: true,
+        title: 'لا مصادر بعد',
+        html: 'صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.',
+        action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
+           <button class="btn btn-primary" type="submit">مسح Drive الآن</button></form>`,
+      })
+    : `${filterBar([
+         { kind: 'seg', label: 'أيّ الملفّات', name: 'src-show', options: [
+           { label: 'الكلّ', value: 'all', current: true },
+           { label: 'ينتظر', value: 'pending', current: false },
+           { label: 'محلَّل', value: 'analyzed', current: false },
+         ] },
+         { kind: 'pick', label: 'رتّب:', name: 'src-sort', options: [
+           { label: 'الأحدث', value: 'seen', current: true },
+           { label: 'الأهمّ', value: 'worth', current: false },
+           { label: 'الاسم', value: 'name', current: false },
+         ] },
+       ], 'فلتر الملفّات')}
+       <p class="note m-0 mb-3">يُعرض <b id="shown">${d.sources.length}</b> من ${d.sources.length}</p>
+       <div class="scroll"><table>
+         <thead><tr><th>المصدر</th><th>الحال</th><th>الاستحقاق</th><th>آخر مسح</th><th><span class="vh">الإجراء</span></th></tr></thead>
+         <tbody id="src-body">${d.sources.map((s) => sourceRow(s, d.now, d.zone ?? null)).join('')}</tbody>
+       </table></div>`
+
+  return `<section data-pane="library" hidden>
   ${/* ‏رأسٌ بلا فقرة (D-277): «التحليل نداء مدفوع» في «؟» بجوار عنوان الملفّات، حيث زرُّ «حلّل الآن» */''}
   ${pageHead('المادّة', sectionLabel('library'), '')}
   ${libraryTabs(pending, d.uploads.length, libraryImages.length)}
@@ -1179,7 +1093,7 @@ ${pivotPane(d.pivot)}
   <div class="card"><div class="card-head"><h2>ملفّات مجلّدك</h2>
     <details class="why-tip"><summary aria-label="لماذا لا يُحلَّل كلُّ ملفّ؟">؟</summary>
       <p class="hint m-0">ما يُبنى منه كلّ منشور: ملفّات Drive، ومقاطعُك، والصور المولَّدة. <b>والتحليل نداء مدفوع</b> — فلا يقع تلقائيًّا على كلّ ملفّ، بل حين تضغط «حلّل الآن».</p>
-    </details><div class="grow"></div>${scanBtn}</div>
+    </details><div class="grow"></div>${SCAN_BTN}</div>
     ${sourcesTable}</div>
   </div>
   <div data-sub id="sub-videos">${videosSection(d.uploads, d.now, new Set(d.drafts.map((x) => x.id)), {
@@ -1191,16 +1105,20 @@ ${pivotPane(d.pivot)}
     writer: { ready: d.draftReady, blocked: writeBlock(d.draftBlocker ?? null, d.now, d.zone ?? null) },
   })}</div>
   <div data-sub id="sub-images">${imagesGallery(libraryImages, d.drafts)}</div>
-</section>
+</section>`
+}
 
-
-
-<section data-pane="accounts" hidden>
+/** «الحسابات» — القنواتُ وحالُ كلٍّ منها. */
+function accountsPane(d: ShellData & AccountsData): string {
+  return `<section data-pane="accounts" hidden>
   ${pageHead('النشر', sectionLabel('accounts'), 'منصّاتُك وحال كلّ منها، <b>وما يحتاج يدَك أوّلًا</b>. والبطاقة تفتح صفحة الحساب: ما نُشر عليه، وما يأتي، وإعدادُه.')}
   <div data-sub id="channels">${channelsSection(d.channels, d.now)}</div>
-</section>
+</section>`
+}
 
-<section data-pane="posts" hidden>
+/** «المنشورات» — المسوّداتُ ومحرّرُها و«اكتب» والخطّة. */
+function postsPane(d: ShellData & PostsData): string {
+  return `<section data-pane="posts" hidden>
   ${/*
     * ‏**والأبوابُ الثلاثةُ في الشاشة الأولى** — جسرٌ إلى «منشور جديد ▾» (الخطّة 5.6). كانت
     * ‏«اكتب مسوّدة» في الشاشة التاسعة على الهاتف، فضغط المالكُ «اعتمد» على مسوّدةٍ قديمة
@@ -1237,9 +1155,20 @@ ${pivotPane(d.pivot)}
     // من الخمسين صفًّا المحمَّلة أصلًا للأمان — لا استعلامَ جديد (D-157)
     lastAttempt: d.audit.find((a) => a.action === 'plan.generate') ?? null,
   })}</div>`)}
-</section>
+</section>`
+}
 
-<section data-pane="settings" hidden>
+/** «الإعدادات» — الحدودُ والمزوّدون والأمانُ والمنظّمات وما للمطوّر. */
+function settingsPane(d: ShellData & SettingsData): string {
+  const missing = d.providers.filter((p) => !p.configured).length
+  // ‏المالكُ وحدَه يرى أقسامَ الإعدادات التي للمالك (D-272)؛ والجلسةُ القديمةُ بلا دورٍ للمالك
+  const ownerView = (d.role ?? 'owner') === 'owner'
+  const { strip: providerStrip, rows: providerRows, add: addCard, routing: routingRows } =
+    providersSection(d)
+  const { sessions: sessionRows, passkeys: passkeyRows, audit: auditRows } =
+    securitySection(d)
+
+  return `<section data-pane="settings" hidden>
   ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوف الإنفاق تُطبَّق قبل أيّ نداء مدفوع</b>، والمفاتيح لا تُعرض كاملة، والدخول بعاملين.')}
   ${settingsTabs(missing, ownerView)}
   <div data-sub id="appearance">
@@ -1535,9 +1464,126 @@ ${ownerView ? `<div data-sub id="security-all">
 <details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
 </div>
 ` : ''}
-</section>
+</section>`
+}
 
+/**
+ * ألواحُ الطلب وحدَها (D-280). كانت الصفحةُ تُرسَم بألواحها الستّة ثمّ يُقصّ منها ما لم يُطلَب (`keepPanes`،
+ * D-211) — **فتُحمَّل بياناتُ الستّة لرسم واحد**. فصار كلُّ لوحٍ دالّةً بنوعها، ولا يُنادى إلّا ما يُرسَم.
+ */
+function panesOf(view: PaneView): string {
+  switch (view.only) {
+    case null:
+      // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-233): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُرسَم له
+      return view.swapPosts === true
+        ? postsPane(view.data)
+        : `${overviewPane(view.data)}\n\n${postsPane(view.data)}`
+    case 'overview': return overviewPane(view.data)
+    case 'posts': return postsPane(view.data)
+    case 'library': return libraryPane(view.data)
+    case 'accounts': return accountsPane(view.data)
+    case 'settings': return settingsPane(view.data)
+    case 'results': return pivotPane(view.data.pivot)
+  }
+}
 
+export function panelPage(view: PaneView): string {
+  const d = view.data
+  const only = view.only
+  const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
+
+  // منطقة الإعلان تُنشأ دائما وإن كانت فارغة: قارئ الشاشة لا يعلن ما ظهر
+  // في منطقةٍ وُلدت معه — الحيّةُ يجب أن تسبق الرسالة لا أن تأتي بها
+  /**
+   * شريطُ الرموز المقتربة — **فوق كلّ شيءٍ في اللوحة.**
+   *
+   * ولا يُخفى خلف زرّ: سقوطُ رمزِ تجديدٍ يوقف المنصّة، **وأوّلُ علامةٍ
+   * بغير هذا منشورٌ وُعد بموعده ولم يخرج**.
+   *
+   * والتجديدُ يُعرَض `bad` والوصولُ `warn`: **الأوّلُ يوجب يدَك،
+   * والثاني يُصلحه النظامُ وحده** — ولا يُسوَّى بينهما فيُقرآن سواء.
+   */
+  // ‏**ومن الحكم الواحد** (D-205): كان الشريطُ يقرأ استعلامَه بعتبته وكلماته («إذنُ الوصول»، «إذنُ التجديد»)،
+  // ‏فيقول «يبقى 6 أيّام» عن منصّةٍ تقول بطاقتُها «متّصلة». فصار سطرًا واحدًا بحال كلّ منصّةٍ تحتاج يدَك، وزرًّا واحدًا
+  const needy = d.channels
+    .map((v) => ({ v, h: channelHealth(v, d.now) }))
+    .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
+  const expiring = needy.length === 0 ? '' : notice({
+    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+    // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
+    html: `${needy.slice(0, 3)
+      .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
+      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. <a class="tap" href="#channels">افتح الحسابات</a>` })
+
+  // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
+  const flash = `${expiring}${toastRegion(
+    d.flash === null
+      ? ''
+      : notice({
+          tone: d.flash.kind,
+          html: pathArrows(escapeHtml(d.flash.text)),
+          ...(d.flash.undo === undefined ? {} : {
+            action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
+                        data-busy="جار…" data-swap>
+                    <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
+                    <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
+                  </form>`,
+          }),
+        }),
+  )}`
+
+  /*
+   * ‏**والحبّةُ من النبض لا من مفتاح الإيقاف وحده**، ورابطٌ إلى بطاقة الآلة: كانت
+   * ‏«يعمل» خضراءَ والإرسالُ متوقّفٌ منذ ثلاثة أيّام، والجوابُ على بُعد ثلاث شاشات
+   */
+  const pill = systemPill(d.paused, d.pulses)
+  const state = `<a class="pill ${pill.tone}" href="${panelHref('machine')}"
+    aria-label="${escapeHtml(`حال النظام: ${pill.text} — افتح «هل الآلة تعمل؟»`)}"><i class="led"></i>${escapeHtml(pill.text)}</a>`
+
+  /*
+   * **الرافدةُ تُرسَم من جدول الأقسام** (D-105)، وفي `rail.ts` منذ صارت لكلّ
+   * صفحة (D-178). وهنا ما تملكه اللوحةُ وحدَها: الأعدادُ وأزرارُ المنصّات.
+   */
+  /*
+   * ‏**عددان لا ستّة** (D-216): كانت الرافدةُ تقول «الإعدادات 4» و«ما عليك 6» و«المكتبة 1» و«المزيد 7» ولا تقول ماذا
+   * ‏تعدّ، فكانت «ما ينتظرك» تُقال في خمسة أماكن. فبقي ما يوجب يدَ المالك اليوم وحدَه: المسوّداتُ التي تنتظر قرارَه
+   * ‏والفاشلةُ (كما في «ينتظر قرارك»)، والحساباتُ المنقطعة. والباقي يُقال في صفحته.
+   */
+  // ‏المنظّمةُ النشطة ومبدّلُها (‏scope.ts)، والانتقالُ يعود إلى هذه الصفحة نفسِها
+  const scope = { orgs: d.orgs ?? [], active: d.org ?? OWNER_ORG, next: only === null ? '/panel' : panelHref(only) }
+  const counts: Readonly<Record<string, number>> = {
+    posts: waitingDrafts + d.drafts.filter((x) => x.status === 'failed').length,
+    accounts: d.channels.filter((c) => channelHealth(c, d.now).kind === 'broken').length,
+  }
+
+  const body = `
+<a class="skip" href="#main">تخطّي إلى المحتوى</a>
+<div class="app">
+
+${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
+${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
+
+<div class="main">
+<header class="topbar">
+  ${/*
+    * **والعلامةُ حاضرةٌ في كلّ عرض** (D-123). رأسُ الرافدة يختفي في
+    * الجوّال (D-107) فلم يبقَ في الشاشة ما يقول «هذه صدى» — ثلاثون
+    * بكسلا في شريطٍ ارتفاعُه ستّون لا تُشترى بشيء. وفي المكتب تُخفى:
+    * علامتان في شاشةٍ واحدة تكرار.
+    */''}
+  <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
+  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
+    <div class="crumb">${escapeHtml(d.rpId)}</div></div>
+  <div class="grow"></div>
+  ${topNew()}
+  ${commandTrigger()}
+  ${state}
+  ${accountMenu({ logout: true, scope })}
+</header>
+
+<main id="main" class="content">
+${flash}
+${panesOf(view)}
 
 ${fabNew()}
 ${/* ‏والذيل اسم وساعة (D-215): «كلّ زرّ هنا يحرسه قيد مُختبَر في الخادم» جملة للمطوّر لا للمالك */''}
@@ -1548,9 +1594,8 @@ ${/* ‏والذيل اسم وساعة (D-215): «كلّ زرّ هنا يحرس�
 </div>`
 
   // ‏و«/panel» الرئيسيّةُ والمنشورات، وكلُّ لوحٍ آخر في مساره (D-211: ‏166KB كانت الصفحة، والخطّةُ ‏90)
-  const kept = keepPanes(body, new Set<string>(swapPosts ? ['posts'] : only === null ? ['overview', 'posts'] : [only]))
   return shell(
-    only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(kept, d.csrf), d.nonce, '',
+    only === null ? 'صدى — لوحة التحكّم' : `صدى — ${sectionLabel(only)}`, injectCsrf(body, d.csrf), d.nonce, '',
     { commands: buildCommands({ onPanel: only === null, drafts: d.drafts }), panelScript: true },
   )
 }
