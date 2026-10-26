@@ -121,7 +121,10 @@ export interface ProvidersMarkup {
  * التي لم تُختبر يُعرض أعلى الصفحة — فمن لم يفتح صفّا يعرف أنّ عليه
  * شيئا.
  */
-export function providersSection(d: PanelData): ProvidersMarkup {
+/** ما يقرؤه القسمُ من بيانات اللوحة — **وهذا كلُّه** (D-280): فيُحمَّل له هذا لا الحقيبةُ كلُّها. */
+export type ProvidersData = Pick<PanelData, 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'spendCap' | 'now' | 'zone'>
+
+export function providersSection(d: ProvidersData): ProvidersMarkup {
   const ready = d.providers.filter((p) => p.configured && p.enabled)
   const untested = ready.filter((p) => p.verifiedAt === null).length
   const spentToday = d.providers.reduce((sum, p) => sum + p.spendToday, 0)

@@ -364,31 +364,9 @@ const data: PanelData = {
     { id: 'org_k', name: 'جمعيّة كفالة', kind: 'team', brands: 1 },
   ],
   org: 'org_owner',
-  via: 'admin_token',
   factors: { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false },
   channels: viewChannels(accounts, (n) => n.startsWith('LINKEDIN')),
   baseUrl: 'https://sada2.basserh.com',
-  // **الشريطُ يُرسَم ليُقاس** — وما لا يُرسَم لا يُقاس (D-061)
-  expiring: [
-    { platform: 'x', displayName: '@omar_ah', kind: 'refresh', daysLeft: 2 },
-    { platform: 'linkedin', displayName: 'بصائر للاستشارات', kind: 'access', daysLeft: 6 },
-  ],
-  apps: [
-    // LinkedIn من البيئة: لا نموذجَ يُعرض، ويُقال لماذا
-    {
-      platform: 'linkedin', source: 'worker_secret',
-      clientId: '78k4gm3yw1g18e', hint: null, updatedAt: null, updatedBy: null,
-      secretNames: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
-      verifiedAt: null, verifiedKind: null,
-    },
-    // و X لم يُضبَط: النموذجُ مفتوحٌ بإرشاده
-    {
-      platform: 'x', source: 'none',
-      clientId: null, hint: null, updatedAt: null, updatedBy: null,
-      secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
-      verifiedAt: null, verifiedKind: null,
-    },
-  ],
   // ما زادته القراراتُ الأخيرة — **ويُرسَم ليُقاس**
   openSuggestions: 2,      // D-058
   // ‏عدُّ الرحلة (D-177): مسوّداتٌ تنتظر، ومعتمَدٌ بلا موعد، ومجدولٌ على LinkedIn، وفشلٌ على X
@@ -426,7 +404,6 @@ const data: PanelData = {
   links: { ...linkStates(accounts), youtube: 'linked' },
   reach: PRIVATE_ONLY,
   promoCap: 50,            // D-062
-  ownerPending: 4,         // D-063
   cfAccountId: null,       // غير مضبوط: الإرشاد هو المرسوم
   // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
   // ‏اللونان والتباينُ فيهما معا
@@ -465,7 +442,7 @@ const data: PanelData = {
 }
 
 // ‏والعيّنةُ ترى صورَها بمقاساتها (D-172): الملفُّ المدقَّق وحدَه، والمجرّدُ بمساره
-writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data), {
+writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage({ only: null, data }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
 /*
@@ -473,7 +450,7 @@ writeAudited(process.argv[2] ?? '/tmp/panel.html', panelPage(data), {
  * ‏لخرجت المكتبةُ والحساباتُ والإعداداتُ والتحليلُ من كلّ مدقّقٍ صامتةً — ألواحٌ تُشحَن ولا يراها حارس.
  */
 for (const pane of ['library', 'accounts', 'settings', 'results'] as const) {
-  writeAudited(`/tmp/panel-${pane}.html`, panelPage(data, pane), {
+  writeAudited(`/tmp/panel-${pane}.html`, panelPage({ only: pane, data }), {
     m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
   })
 }
@@ -499,18 +476,18 @@ const first = {
   // ‏واليومُ الأوّل لا نشرَ فيه ولا موعد: المسوّداتُ كلُّها تنتظر
   journey: { perPlatform: { linkedin: { draft: data.drafts.length, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 },
 }
-writeAudited('/tmp/panel-first.html', panelPage(first))
+writeAudited('/tmp/panel-first.html', panelPage({ only: null, data: first }))
 // ‏واليومُ الأوّل في «الحسابات» وجهٌ ثانٍ لها: كلُّ منصّةٍ منقطعةٌ أو تنتظر إعدادًا
-writeAudited('/tmp/panel-first-accounts.html', panelPage(first, 'accounts'))
+writeAudited('/tmp/panel-first-accounts.html', panelPage({ only: 'accounts', data: first }))
 /*
  * ‏**والمحرّرُ المركّزُ وضعٌ يُشحَن فيُرسَم ليُدقَّق** (D-198): `?open=<id>` بجوار القائمة. مسوّدةٌ
  * ‏بصورتها (الاعتمادُ والحفظُ والموعدُ بتوقيت المالك)، ومجدولةٌ («غيّر الموعد»).
  */
 const pick = (id: string): (typeof data.drafts)[number] => data.drafts.find((d) => d.id === id)!
-writeAudited('/tmp/panel-editor.html', panelPage({ ...data, zone: 'Asia/Riyadh', editing: pick('d1') }), {
+writeAudited('/tmp/panel-editor.html', panelPage({ only: null, data: { ...data, zone: 'Asia/Riyadh', editing: pick('d1') } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
-writeAudited('/tmp/panel-editor-queued.html', panelPage({ ...data, zone: 'Asia/Riyadh', editing: pick('d5') }), {
+writeAudited('/tmp/panel-editor-queued.html', panelPage({ only: null, data: { ...data, zone: 'Asia/Riyadh', editing: pick('d5') } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
 console.log('رُسمت')
