@@ -30,6 +30,28 @@ const STEPS: readonly (readonly [title: string, line: string])[] = [
   ['نشر في موعده', 'يجدول ما اعتمدتَه وينشره، ويقيس ما وصل، وكلفة كلّ طلب ظاهرة.'],
 ]
 
+/**
+ * ‏**قسمٌ إنجليزيٌّ مستقلٌّ لمراجِعي المنصّات** — TikTok رفض الرابطَ لأنّ الصفحة لم تقل له ما صدى
+ * بلغةٍ يقرؤها. فهو بعد العربيّ كلِّه بـ `lang="en" dir="ltr"`، لا سطرٌ مختلط. ويقول ما يقع فعلًا:
+ * النطاقات المطلوبة من TikTok هي ما في `lib/oauth/scopes.ts` لا أكثر.
+ */
+const ENGLISH = `<section class="land-en" lang="en" dir="ltr" aria-labelledby="land-en-h">
+  <h2 id="land-en-h">SADA — content management and publishing</h2>
+  <p>SADA turns your own documents and videos into posts, drafts the text and visuals for each platform, and schedules
+    them on your own accounts — <b>nothing is published until you approve it</b>.</p>
+  <ol>
+    <li><b>Sources</b> — you add files to a Google Drive folder; SADA reads them and finds what is worth sharing.</li>
+    <li><b>Drafts you approve</b> — SADA writes a post for each platform and designs its image; you review and approve.</li>
+    <li><b>Publishing on time</b> — approved posts go out on schedule, with results and the cost of every request visible.</li>
+  </ol>
+  <h3>How SADA uses TikTok</h3>
+  <ul>
+    <li><b>Login Kit</b> (<span class="mono">user.info.basic</span>) — you connect your TikTok account; SADA shows its display name and avatar.</li>
+    <li><b>Content Posting API</b> (<span class="mono">video.upload</span>, <span class="mono">video.publish</span>) — you upload a video, write its caption, approve it, and SADA posts it to your own TikTok account.</li>
+  </ul>
+  <p>Supported platforms: LinkedIn, X, YouTube, TikTok and Instagram.</p>
+</section>`
+
 export function landingBody(): string {
   const steps = STEPS.map(([t, l], i) =>
     `<li><span class="land-n" aria-hidden="true">${['١', '٢', '٣'][i]}</span><span><b>${t}</b><span>${l}</span></span></li>`).join('')
@@ -43,7 +65,8 @@ export function landingBody(): string {
   <a class="btn btn-primary land-cta" href="/panel">ادخل إلى لوحتك</a>
   <ol class="land-steps">${steps}</ol>
   <ul class="land-pfs" aria-label="المنصّات">${pfs}</ul>
-  <footer class="land-foot"><a class="tap" href="/privacy">سياسة الخصوصيّة</a><a class="tap" href="/terms">شروط الاستعمال</a></footer>
+  ${ENGLISH}
+  <footer class="land-foot"><a class="tap" href="/privacy">سياسة الخصوصيّة</a><a class="tap" href="/terms">شروط الاستعمال</a><a class="tap" href="/privacy#en" lang="en">Privacy Policy</a><a class="tap" href="/terms#en" lang="en">Terms of Service</a></footer>
 </main></div></div>`
 }
 
