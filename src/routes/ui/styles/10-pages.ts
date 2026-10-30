@@ -76,7 +76,12 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
   background:var(--surface-2); font-weight:600; font-size:var(--t-small)}
 .land-pfs{list-style:none; margin:var(--s-6) 0 0; padding:0; display:flex; justify-content:center; gap:var(--s-4); color:var(--ink-2)}
 .land-pf svg{width:var(--icon-lg); height:var(--icon-lg)}
-.land-foot{margin-top:var(--s-6); display:flex; justify-content:center; gap:var(--s-4); font-size:var(--t-small)}
+.land-foot{margin-top:var(--s-6); display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-4); font-size:var(--t-small)}
+.land-en{margin-top:var(--s-8); padding-top:var(--s-6); border-top:1px solid var(--line); text-align:start;
+  font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.land-en h2{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink); margin:0 0 var(--s-2)}
+.land-en h3{font-size:var(--t-small); font-weight:600; color:var(--ink); margin:var(--s-4) 0 var(--s-1)}
+.land-en ol, .land-en ul{margin:var(--s-2) 0; padding-inline-start:var(--s-5); display:grid; gap:var(--s-1)}
 .auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
 .auth button{width:100%; justify-content:center; padding:var(--s-3)}
 .auth .card form + form{margin-top:var(--s-3)}

@@ -25,11 +25,12 @@ import type { Env } from '../env'
 import { publicPageHeaders } from '../lib/security/headers'
 import { escapeHtml, shell, GLYPH_SVG } from './ui/shell'
 import { pathArrows } from './ui/parts'
+import { html, raw } from './ui/html'
 
 export const legal = new Hono<{ Bindings: Env }>()
 
 /** تاريخُ آخر تعديلٍ جوهريّ — يُرفع باليد حين يتبدّل ما تصفه الوثيقة. */
-const UPDATED = '2026-10-05'
+const UPDATED = '2026-10-30'
 
 /**
  * جهةُ التشغيل والتواصل.
@@ -219,7 +220,9 @@ function policyBody(env: Env, base: string): string {
     : `<p>لأيّ سؤال عن هذه الوثيقة أو طلب حذف:
        <a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
-  <footer><a class="tap" href="/terms">شروط الاستعمال</a></footer>
+  ${policyEnglish(contact)}
+
+  <footer><a class="tap" href="/terms">شروط الاستعمال</a> · <a class="tap" href="/terms#en" lang="en">Terms of Service</a></footer>
 </main>`
 }
 
@@ -233,8 +236,9 @@ function termsBody(env: Env, base: string): string {
       المشغّل: ${escapeHtml(entity)} · النطاق: <span class="mono">${escapeHtml(base)}</span></p>
   </header>
 
-  ${section('١ · أداة خاصّة لا خدمة عامّة', `<p>صدى أداة داخليّة يشغّلها شخص واحد لإدارة
-    محتواه هو. لا تُقدَّم خدمةً لأحد، ولا تُفتح للتسجيل، ولا تُتاح لأطراف أخرى.</p>`)}
+  ${section('١ · ما صدى', `<p>صدى أداة لإدارة المحتوى ونشره: يربط فيها صاحبُ الحساب حساباتِه
+    على المنصّات، ويكتب معه المسوّدات، وينشر ما يعتمده <b>على حساباته هو وحدها</b>. ولا تنشر على
+    حساب أحدٍ آخر، ولا تجمع بيانات غير صاحبها.</p>`)}
 
   ${section('٢ · المحتوى ومسؤوليّتُه', `<p>تصوغ نماذج لغويّة مسوّدات المنشورات، <b>ولا
     يُنشر منها شيء قبل أن يقرأه المشغّل ويعتمده بيده.</b> والمشغّل هو المسؤول وحده عن كلّ ما
@@ -251,8 +255,76 @@ function termsBody(env: Env, base: string): string {
     ? `<p class="ago">لم يُضبط بريد تواصل بعد على هذا النشر.</p>`
     : `<p><a class="tap" href="mailto:${escapeHtml(contact)}"><span class="mono">${escapeHtml(contact)}</span></a></p>`)}
 
-  <footer><a class="tap" href="/privacy">سياسة الخصوصيّة</a></footer>
+  ${termsEnglish(contact)}
+
+  <footer><a class="tap" href="/privacy">سياسة الخصوصيّة</a> · <a class="tap" href="/privacy#en" lang="en">Privacy Policy</a></footer>
 </main>`
+}
+
+/**
+ * النسخةُ الإنجليزيّة — **لمراجِعي المنصّات** (TikTok خاصّةً) الذين لا يقرؤون العربيّة.
+ * قسمٌ مستقلٌّ بـ `lang="en" dir="ltr"` بعد العربيّ كلِّه، لا سطرٌ مختلط داخله. وتقول ما تقوله
+ * العربيّة نفسَها لا أكثر: وعدٌ في ترجمةٍ لا يقابله أصلٌ يُسقط المراجعة كما يُسقطها وعدٌ كاذب.
+ */
+function englishContact(contact: string | null): string {
+  return contact === null
+    ? '<p>No contact address is configured on this deployment yet.</p>'
+    : html`<p>Questions or deletion requests: <a class="tap" href="mailto:${contact}"><span class="mono">${contact}</span></a></p>`.value
+}
+
+function policyEnglish(contact: string | null): string {
+  return html`<section id="en" lang="en" dir="ltr">
+  <h2>Privacy Policy (English)</h2>
+  <p>SADA is a content management and publishing tool. The account owner connects their own accounts on
+    LinkedIn, X, YouTube, TikTok and Instagram, drafts posts with the help of language models, and SADA
+    publishes <b>only what the owner approves, only to the owner's own accounts</b>.</p>
+  <h3>What we process</h3>
+  <ul>
+    <li>Text from documents in one Google Drive folder the owner shares (read-only) — summaries stored in Cloudflare D1.</li>
+    <li>Your account ID and display name on each connected platform — to know where to publish.</li>
+    <li>OAuth access and refresh tokens — stored in Cloudflare D1, <b>encrypted with AES-GCM</b>; the key lives only in Worker secrets.</li>
+    <li>Videos the owner uploads — stored in Cloudflare R2 until the owner deletes them.</li>
+    <li>Post text, statuses, publish attempts, a cost ledger and an audit log — in Cloudflare D1.</li>
+    <li>One session cookie for the admin panel — three days, or until sign-out.</li>
+  </ul>
+  <h3>TikTok data</h3>
+  <p>With your consent through Login Kit, SADA requests <span class="mono">user.info.basic</span> (open id, display name,
+    avatar) to show which account is connected, and <span class="mono">video.upload</span> /
+    <span class="mono">video.publish</span> (Content Posting API) to post the videos you approve. SADA does not read
+    your feed, followers, messages or other users' content.</p>
+  <h3>What we never do</h3>
+  <ul>
+    <li>No selling, renting or sharing of your data with advertisers.</li>
+    <li>No ads, tracking or third-party analytics on any page.</li>
+    <li>No automatic posting: nothing is published until the owner approves it.</li>
+  </ul>
+  <h3>Disconnecting and deletion</h3>
+  <p>Disconnecting an account deletes its encrypted tokens, cancels its scheduled posts and asks the platform to revoke
+    access (TikTok included). You can also revoke SADA at any time from the security settings of each platform.</p>
+  <h3>Contact</h3>
+  ${raw(englishContact(contact))}
+</section>`.value
+}
+
+function termsEnglish(contact: string | null): string {
+  return html`<section id="en" lang="en" dir="ltr">
+  <h2>Terms of Service (English)</h2>
+  <h3>1. What SADA is</h3>
+  <p>SADA is a content management and publishing tool. The account owner connects their own social accounts, drafts posts
+    with SADA, and publishes what they approve <b>to their own accounts only</b>. SADA never posts to anyone else's account
+    and does not collect data about other people.</p>
+  <h3>2. Content and responsibility</h3>
+  <p>Language models draft posts, but <b>nothing is published until the owner reads and approves it</b>. The owner is solely
+    responsible for what is published under their name and for complying with each platform's terms.</p>
+  <h3>3. Platform terms</h3>
+  <p>Use of SADA follows the terms and rate limits of LinkedIn, X, YouTube, TikTok and Instagram. SADA is not used for
+    scraping, unreviewed automated posting, or circumventing limits. Users of SADA with YouTube agree to the
+    <a class="tap" href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>.</p>
+  <h3>4. No warranty</h3>
+  <p>SADA is provided as is, without any guarantee of availability or freedom from errors.</p>
+  <h3>5. Contact</h3>
+  ${raw(englishContact(contact))}
+</section>`.value
 }
 
 /** `nonce` جديدٌ لكلّ ردّ — كما في اللوحة سواء. */
