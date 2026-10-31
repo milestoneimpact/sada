@@ -24,7 +24,10 @@ describe('تعديلُ بند الخطّة (D-259)', () => {
     expect(await editPlanItem(db, 'org_owner', 'p', 0, { day: '2026-10-28', platform: 'x', time: '18:30' })).toEqual({ ok: true })
     expect(item()).toMatchObject({ day: '2026-10-28', platform: 'x', time: '18:30' })
     expect(await editPlanItem(db, 'org_owner', 'p', 0, { day: '2026-11-05' })).toMatchObject({ ok: false })
-    expect(await editPlanItem(db, 'org_owner', 'p', 0, { platform: 'tiktok' })).toMatchObject({ ok: false })
+    // ‏وكلُّ قناةٍ ينشر لها صدى تُخطَّط (D-282)، وما ليس منها يُردّ
+    expect(await editPlanItem(db, 'org_owner', 'p', 0, { platform: 'tiktok' })).toEqual({ ok: true })
+    expect(item()).toMatchObject({ platform: 'tiktok', kind: 'video' })
+    expect(await editPlanItem(db, 'org_owner', 'p', 0, { platform: 'threads' })).toMatchObject({ ok: false })
     expect(await editPlanItem(db, 'org_owner', 'p', 0, { time: '25:00' })).toMatchObject({ ok: false })
     expect(await editPlanItem(db, 'org_owner', 'p', 5, { day: '2026-10-26' })).toMatchObject({ ok: false })
     // ‏وخطّةُ عميلٍ آخر لا تُمسّ

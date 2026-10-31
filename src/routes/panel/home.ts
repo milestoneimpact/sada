@@ -22,6 +22,9 @@ import { readPeaks, type Peaks } from '../../lib/schedule/peak'
 import { mediaFor } from '../../lib/image/job'
 import { videoFace } from '../../lib/media/video'
 import { latestPlan } from '../../lib/plan/job'
+import { planProgress } from '../../lib/plan/schedule'
+import { readBrief } from '../../lib/brief'
+import { unitCosts } from '../../lib/estimate'
 import { appStatuses } from '../../lib/oauth/apps'
 import { scanDrive } from '../../lib/drive/job'
 import { money } from '../../lib/format'
@@ -618,16 +621,29 @@ async function postsData(load: Load): Promise<PostsData> {
    * غيرُ واحدة. فتُقرأ ما في اليد لا ما قد يقع.
    */
   const platforms = [...new Set(board.map((d) => d.platform))]
-  const [sources, p, media, plan, audit, peakRows] = await Promise.all([
+  const [sources, p, media, plan, audit, peakRows, brief, units] = await Promise.all([
     load.sources(),
     load.providers(),
     loadMedia(c, board.map((d) => d.id)),
     latestPlan(c.env.DB, org),
     load.audit(),
     Promise.all(platforms.map(async (platform): Promise<[string, Peaks]> => [platform, await readPeaks(c.env.DB, org, platform)])),
+    readBrief(c.env.DB, org),
+    unitCosts(c.env.DB, org),
   ])
   const { mediaReady } = readiness(load, p)
+  const progress = plan === null ? null : await planProgress(c.env.DB, org, plan.id)
   return {
+    // ‏نموذجُ الخطّة (D-282): القنواتُ المربوطةُ بحسابٍ نشط، وقنواتُ الموجز وإيقاعُه، والمصادرُ المحلَّلة، ووسيطُ كلفة الصورة
+    planForm: {
+      linked: [...new Set(accounts.filter((a) => a.status === 'active').map((a) => a.platform as string))],
+      chosen: brief.channels,
+      perWeek: brief.perWeek,
+      sources: sources.filter((x) => x.analyzed).map((x) => ({ id: x.id, name: x.name })),
+      perImage: units.perImage,
+      autoImage: allowance.settings.autoImage,
+    },
+    planPending: progress?.pending ?? 0,
     editing,
     media,
     targets: targetsOf(channels),

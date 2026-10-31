@@ -42,6 +42,8 @@ export const SLIDE_SIZE: Readonly<Record<Platform, { width: number; height: numb
   // 9:16 — والمقطعُ يُشتقّ منها، وهي مقاسُ Shorts و Reels و TikTok معا
   tiktok: { width: 1080, height: 1920 },
   youtube: { width: 1080, height: 1920 },
+  // 4:5 — مقاسُ Instagram بلا قصّ (D-282)
+  instagram: { width: 1080, height: 1350 },
 }
 
 /** أقصى ما يُقبَل في العنوان والفوقيّة — والقصُّ هنا لا في الشاشة. */

@@ -28,7 +28,7 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/(channels\/disconnect|scan|analyze|report\/promote|plan-import)(\/|$)/, 'admin'],
   // ‏الناشر: كلُّ ما يعتمد أو يجدول أو يُنشر
   [/^\/panel\/drafts\/(approve-many|schedule|reschedule|unschedule|requeue|spread\/apply|undo-approve|undo-reject)$/, 'publisher'],
-  [/^\/panel\/plan\/(approve|start|schedule)$/, 'publisher'],
+  [/^\/panel\/plan\/(approve|approve-all|start|schedule)$/, 'publisher'],
   [/^\/panel\/uploads\/[^/]+\/schedule$/, 'publisher'],
   [/^\/panel\/client\/report\/send$/, 'publisher'],
   // ‏المحرّر: الكتابةُ والتعديلُ والتخطيطُ والوسائط

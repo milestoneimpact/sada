@@ -5,6 +5,7 @@
  * ترويسةٌ خام، وزرّان بلا درجة، وشعارٌ يغيب عن منصّةٍ ثالثة، ورمزٌ يقول
  * غيرَ ما يعنيه. **والعينُ ترى مرّةً، والاختبارُ يرى في كلّ دفعة.**
  */
+import { EMPTY_CHOICES } from '../../lib/plan/prompt'
 import { describe, expect, it } from 'vitest'
 import { FACES } from '../../lib/ui/fonts'
 import { readFileSync } from 'node:fs'
@@ -1058,7 +1059,7 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
     // النوعُ يحصر المنصّةَ في اثنتين، والخطّةُ تصل JSON من نموذجٍ لا يعرف النوع
     const html = planSection({
       plan: {
-        id: 'w', week: '2026-09-13', model: 'm', status: 'draft', createdAt: '2026-09-12 08:00',
+        id: 'w', week: '2026-09-13', model: 'm', status: 'draft', createdAt: '2026-09-12 08:00', choices: EMPTY_CHOICES,
         plan: { rationale: 'ر', items: [
           { sourceId: 's', platform: 'youtube' as never, angle: 'ز', day: '2026-09-14', time: '09:00', why: 'س' },
         ] },
@@ -1073,7 +1074,7 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
     const { planSection } = await import('./sections/plan')
     const input = {
       plan: {
-        id: 'w', week: '2026-09-13', model: 'm', status: 'draft' as const, createdAt: '2026-09-12 08:00',
+        id: 'w', week: '2026-09-13', model: 'm', status: 'draft' as const, createdAt: '2026-09-12 08:00', choices: EMPTY_CHOICES,
         plan: { rationale: 'ر', items: [
           { sourceId: 's', platform: 'x' as const, angle: 'ز', day: '2026-09-14', time: '09:00', why: 'س' },
         ] },

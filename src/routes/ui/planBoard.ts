@@ -15,6 +15,7 @@ import { LOGOS } from './logos'
 import { platformLabel } from '../../lib/oauth/providers'
 import { dayLabel } from '../../lib/time/zone'
 import { spanDays } from '../../lib/plan/prompt'
+import { kindChip } from './sections/plan'
 import { ANGLE_MAX, PLAN_PLATFORMS } from '../../lib/plan/edit'
 import type { StoredPlan } from '../../lib/plan/job'
 
@@ -39,8 +40,10 @@ export const PLAN_VIEWS = [
 type Item = StoredPlan['plan']['items'][number]
 
 export function planBoard(plan: StoredPlan, names: Readonly<Record<string, string>>, sources: readonly { readonly id: string; readonly name: string }[] = []): string {
-  const month = plan.span === 'month'
+  // ‏أسبوعٌ بعمودٍ لكلّ يوم، وما فوقه (أسبوعان وشهرٌ وشهران — D-282) بعمودٍ لكلّ أسبوع
   const days = Array.from({ length: spanDays(plan.span ?? 'week') }, (_, i) => addDays(plan.week, i))
+  const weeks = days.length / 7
+  const month = weeks > 1
   const items = plan.plan.items.map((item, index) => ({ item, index }))
   const width = month ? 7 : 1
 
@@ -82,7 +85,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
     const offset = Math.max(0, days.indexOf(item.day))
     return `<article class="card card-inset pb-card" data-drag data-index="${index}" data-offset="${offset % width}" data-platform="${escapeHtml(item.platform)}" tabindex="0"
         aria-label="${escapeHtml(`${platformLabel(item.platform)} — ${item.angle} — ${label(item.day)} ${item.time}`)}">
-      <div class="pb-top">${plat(item.platform)}
+      <div class="pb-top">${plat(item.platform)}${kindChip(item.kind).value}
         <span class="pb-time">${opts.showDay ? `${escapeHtml(label(item.day))} · ` : ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi></span></div>
       <p class="pb-angle" dir="auto">${escapeHtml(item.angle)}</p>
       <div class="pb-src"><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></div>
@@ -97,7 +100,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
 
   // ١ · أيّام: عمودٌ لكلّ يوم، أو لكلّ أسبوعٍ في الشهر (والبطاقةُ تحفظ يومَها من أسبوعه)
   const dayCols = (editable: boolean): string => (month
-    ? [0, 1, 2, 3].map((w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7 }))
+    ? Array.from({ length: weeks }, (_, w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7 }))
     : days.map((d, i) => ({ key: d, title: escapeHtml(label(d)), sub: '', from: i }))
   ).map((col) => column(`data-drop data-day="${col.key}" data-width="${width}"`, col.title, col.sub,
     items.filter(({ item }) => { const i = days.indexOf(item.day); return i >= col.from && i < col.from + width }),
@@ -122,7 +125,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
   const rows = [...items].sort((a, b) => `${a.item.day}${a.item.time}`.localeCompare(`${b.item.day}${b.item.time}`)).map(({ item }) => `<tr>
       <td>${escapeHtml(label(item.day))}</td><td><bdi dir="ltr">${escapeHtml(item.time)}</bdi></td><td>${plat(item.platform)}</td>
       <td dir="auto">${escapeHtml(item.angle)}</td><td><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td>
-      <td>${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
+      <td>${kindChip(item.kind).value} ${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
 
   /** **أضف بندًا** (D-264): مصدرٌ من مصادر العميل، ويومٌ ومنصّةٌ وساعةٌ وزاوية — يُلحق آخرَ الخطّة. */
   const addForm = (): string => sources.length === 0 ? '' : `<details class="pb-more mb-4"><summary>أضف بندًا</summary>
@@ -139,7 +142,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
   const views = PLAN_VIEWS.map((v, i) => `<button class="btn btn-secondary btn-sm" type="button" data-view="${v.id}" aria-pressed="${i === 0}">${v.label}</button>`).join('')
 
   return `<div class="card mt-4" id="board" data-plan="${escapeHtml(plan.id)}">
-    <div class="split"><h2>الخطّة ${month ? 'شهرًا' : 'أسبوعًا'} <span class="count">${items.length}</span></h2>
+    <div class="split"><h2>الخطّة ${weeks === 1 ? 'أسبوعًا' : weeks === 2 ? 'أسبوعين' : weeks === 4 ? 'شهرًا' : 'شهرين'} <span class="count">${items.length}</span></h2>
       <div class="row gap-2" role="group" aria-label="طريقة العرض">${views}</div></div>
     <p class="hint m-0 mb-4">اسحب البطاقةَ إلى يومٍ أو منصّةٍ لتنقلها، أو «عدّل» في القائمة. والساعةُ بتوقيت UTC كما يكتبها المخطِّط.</p>
     ${addForm()}

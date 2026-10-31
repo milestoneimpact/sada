@@ -197,6 +197,18 @@ describe('أساس تعدّد المستأجرين', () => {
     expect(row).toEqual({ org_id: 'org_owner', brand_id: 'brand_owner' })
   })
 
+  /** الخطّةُ محورَ المنصّة (D-282 · 0037): أربعةُ أمداء، واختياراتُ المالك عمودًا، والفرادةُ كما كانت. */
+  it('plans بأربعة أمداء وعمود choices_json، والصفوفُ القديمة تبقى بمداها', () => {
+    const db = fakeDb()
+    const sql = schemaOf('plans')
+    for (const span of ["'week'", "'2weeks'", "'month'", "'2months'"]) expect(sql).toContain(span)
+    expect(sql).toContain('choices_json')
+    expect(sql).toContain('UNIQUE (org_id, week_start, span)')
+    db.raw.prepare("INSERT INTO plans (id, week_start, plan_json, model, span) VALUES ('p1', '2026-11-01', '{}', 'm', '2months')").run()
+    expect(() => db.raw.prepare("INSERT INTO plans (id, week_start, plan_json, model, span) VALUES ('p2', '2026-11-01', '{}', 'm', 'year')").run()).toThrow()
+    expect(db.raw.prepare("SELECT choices_json FROM plans WHERE id = 'p1'").get()).toEqual({ choices_json: '{}' })
+  })
+
   it('جداول العمل كلُّها تحمل org_id', () => {
     const tables = ['accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
       'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger', 'audit_log',

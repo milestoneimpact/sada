@@ -259,3 +259,78 @@ describe('المحفظة (D-273)', () => {
     expect(html).toContain('href="/panel/portfolio?days=90&amp;p=x"')
   })
 })
+
+/**
+ * **الخطّةُ محورَ المنصّة** (D-282): «اعتمد الخطّة كاملةً» يعتمد مسوّداتِ هذه الخطّة لهذا العميل وحدها ولا ينشر،
+ * و«ابنِ الخطّة» يردّ قناةً لا حسابَ لها، و«ابدأ» يحمل الفكرةَ واختيارَ الصورة إلى الطابور ويقول إنّ المقطعَ يُنتظر.
+ */
+describe('الخطّةُ محورَ المنصّة (D-282)', () => {
+  function seedPlan(status: 'draft' | 'approved' = 'draft', choices: Record<string, unknown> = {}): void {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 's1', 'تقرير', 'text/plain', 'md5:a')`)
+    const items = [
+      { sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاوية أولى طويلة', day: '2026-11-01', time: '07:00', why: 'ل' },
+      { sourceId: 'idea:1', platform: 'x', kind: 'text', angle: 'زاوية الفكرة طويلة', day: '2026-11-02', time: '07:00', why: 'ل' },
+      { sourceId: 's1', platform: 'tiktok', kind: 'video', angle: 'زاوية المقطع طويلة', day: '2026-11-03', time: '07:00', why: 'ل' },
+    ]
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status, span, choices_json) VALUES ('pl1', '2026-11-01', ?, 'm', ?, 'week', ?)`)
+      .run(JSON.stringify({ rationale: 'ر', items }), status, JSON.stringify({ channels: ['linkedin', 'x', 'tiktok'], ideas: ['فكرةٌ عن الوقف'], autoImage: true, ...choices }))
+  }
+  const post = (id: string, org: string, plan: string | null, status = 'draft'): void => {
+    db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, plan_id, source_id, org_id)
+      VALUES (?, 'linkedin', 'text', 'نصٌّ يكفي لأن يكون منشورًا يُقرأ ويُعتمد كما كُتب', ?, ?, ?, 's1', ?)`).run(id, status, id, plan, org)
+  }
+
+  it('«اعتمد الخطّة كاملةً» يعتمد مسوّداتِ هذه الخطّة لهذا العميل وحدها، ولا يُنشر شيء', async () => {
+    seedPlan('approved')
+    db.raw.exec("INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'عميل', 'agency')")
+    post('p1', 'org_owner', 'pl1'); post('p2', 'org_owner', 'pl1'); post('p3', 'org_owner', null); post('p4', 'org_b', 'pl1'); post('p5', 'org_owner', 'pl1', 'rejected')
+    const { cookie, csrf } = await session()
+    const before = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(before).toContain('action="/panel/plan/approve-all"')
+    expect(before).toContain('اعتمد 2 مسوّدات من الخطّة')
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1')
+    expect((await app.request('/panel/plan/approve-all', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    const rows = db.raw.prepare('SELECT id, status, approved_by, approved_at FROM posts ORDER BY id').all() as { id: string; status: string; approved_by: string | null; approved_at: string | null }[]
+    expect(rows.map((r) => [r.id, r.status])).toEqual([['p1', 'approved'], ['p2', 'approved'], ['p3', 'draft'], ['p4', 'draft'], ['p5', 'rejected']])
+    expect(rows.filter((r) => r.status === 'approved').every((r) => r.approved_by !== null && r.approved_at !== null)).toBe(true)
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status IN ('queued', 'published')").get()).toEqual({ n: 0 })
+    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '2 اعتُمدت · 0 تعثّرت' })
+    const after = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(after).toContain('اعتُمدت مسوّدتان من الخطّة كما كُتبت')
+    expect(after).toContain('action="/panel/plan/schedule"')
+    expect(after).not.toContain('action="/panel/plan/approve-all"')
+  })
+
+  it('«ابنِ الخطّة» يردّ قناةً لا حسابَ لها قبل أيّ نداء، ويقبل المربوطة', async () => {
+    const { cookie, csrf } = await session()
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('span', '2weeks'); body.append('channel', 'instagram')
+    expect((await app.request('/panel/plan/generate', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('لا حسابَ مربوطًا على Instagram')
+    expect(db.raw.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'plan.generate'").get()).toEqual({ n: 0 })
+    // ‏والنموذجُ في اللوحة بأمدائه الأربعة وقنواته ويوم بدايته وأفكاره وصورته
+    for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'value="2months"', 'name="start"', 'name="ideas"', 'name="auto_image"', 'name="source" value="all"']) expect(html).toContain(s)
+  })
+
+  it('«ابدأ» يحمل الفكرةَ واختيارَ الصورة إلى الطابور، ويقول إنّ بندَ المقطع ينتظر مقطعًا', async () => {
+    seedPlan()
+    const sent: unknown[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: unknown }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('id', 'pl1')
+    await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(sent).toEqual([
+      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1', autoImage: true } },
+      { draft: { sourceId: 'idea:1', platform: 'x', org: 'org_owner', planId: 'pl1', idea: 'فكرةٌ عن الوقف', autoImage: true } },
+      { draft: { sourceId: 's1', platform: 'tiktok', org: 'org_owner', planId: 'pl1', autoImage: true } },
+    ])
+    const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('مع صورها')
+    expect(html).toContain('بندُ مقطعٍ ينتظر مقطعًا')
+    // ‏واللوحةُ ترسم رقاقةَ نوع البند
+    expect(html).toContain('<span class="chip">مقطع</span>')
+  })
+})

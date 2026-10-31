@@ -58,7 +58,7 @@
 | `tokens` | `account_id` · `access_enc` · `refresh_enc` · `iv` · `expires_at` · `refresh_expires_at` · `scopes` | مشفّر AES-GCM (D-005) |
 | `sources` | `id` · `drive_file_id` · `name` · `mime` · `content_hash` · `last_seen_at` | ملفّ في Drive |
 | `content_items` | `id` · `source_id` · `summary` · `themes_json` · `worth_score` · `extracted_at` | ما فهمه Claude |
-| `plans` | `id` · `week_start` · `plan_json` · `model` · `status` | خطّة أسبوعية |
+| `plans` | `id` · `week_start` · `span` (week/2weeks/month/2months) · `plan_json` · `choices_json` · `model` · `status` | خطّةُ مدًى، واختياراتُ المالك معها (D-282) |
 | `posts` | `id` · `plan_id` · `account_id` · `type` · `text` · `media_json` · `has_url` · `scheduled_at` · `status` · `idempotency_key` · `approved_by` · `approved_at` | العقد أدناه |
 | `publish_attempts` | `id` · `post_id` · `idempotency_key` · `attempt_no` · `request_json` · `response_json` · `platform_post_id` · `status` · `at` | كلّ محاولة، ناجحةً أو فاشلة |
 | `metrics` | `post_id` · `window` (24h/72h/7d) · `impressions` · `reactions` · `comments` · `shares` · `clicks` · `pulled_at` | |

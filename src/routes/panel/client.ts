@@ -94,9 +94,10 @@ client.get('/panel/client', async (c) => {
   ])
   const waiting = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'draft'")
     .bind(org).first<{ n: number }>().catch(() => null)
+  const progress = plan === null ? null : await planProgress(c.env.DB, org, plan.id)
   const body = clientScreen({
     waiting: waiting?.n ?? 0,
-    ...(plan === null ? {} : await planProgress(c.env.DB, org, plan.id)),
+    ...(progress === null ? {} : { written: progress.written, ready: progress.ready, pending: progress.pending }),
     sources: plan === null ? [] : (await c.env.DB.prepare('SELECT id, name FROM sources WHERE org_id = ? ORDER BY last_seen_at DESC LIMIT 60')
       .bind(org).all<{ id: string; name: string }>().catch(() => ({ results: [] as { id: string; name: string }[] }))).results,
     orgName: orgRow?.name ?? 'منظّمتي',

@@ -35,7 +35,7 @@ describe('جدولةُ الخطّة (D-261)', () => {
 
   it('يُجدوَل المعتمَدُ وحده، وما لا حسابَ له يُقال سببُه', async () => {
     const { db, plan } = seed()
-    expect(await planProgress(db, 'org_owner', 'pl')).toEqual({ written: 3, ready: 2 })
+    expect(await planProgress(db, 'org_owner', 'pl')).toEqual({ written: 3, ready: 2, pending: 1 })
     const done = await schedulePlan(db, 'org_owner', plan, NOW)
     expect(done.scheduled).toBe(1)
     expect(done.skipped).toEqual([{ postId: 'p2', reason: 'لا حسابَ x مربوطًا لهذا العميل' }])

@@ -11,7 +11,9 @@ import { notice, toastRegion } from './components/toast'
 import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { BRIEF_CHANNELS, BRIEF_MAX, isEmptyBrief, type Brief } from '../../lib/brief'
-import type { Estimate } from '../../lib/estimate'
+import { estimateLine, estimatePlan, type Estimate } from '../../lib/estimate'
+import { approveAllForm } from './sections/plan'
+import { SPAN_LABEL } from '../../lib/plan/prompt'
 import type { StoredPlan } from '../../lib/plan/job'
 import { planBoard } from './planBoard'
 
@@ -34,6 +36,8 @@ export interface ClientData {
   readonly ready?: number
   /** مسوّداتُ الخطّة المكتوبة كلُّها — صفرٌ بعد «ابدأ» يعني أنّها تُكتب الآن. */
   readonly written?: number
+  /** مسوّداتُ هذه الخطّة التي تنتظر القرار — لـ«اعتمد الخطّة كاملةً» (D-282). */
+  readonly pending?: number
   /** مصادرُ العميل لـ«أضف بندًا» (D-264). */
   readonly sources?: readonly { readonly id: string; readonly name: string }[]
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
@@ -84,10 +88,13 @@ function briefForm(b: Brief): string {
  */
 function startForm(d: ClientData): string {
   if (d.plan === null) return ''
-  const n = new Set(d.plan.plan.items.map((i) => `${i.sourceId}:${i.platform}`)).size
-  const cost = d.estimate.perDraft === null ? 'بكلفة الكتابة المعتادة' : `بنحو ${money(n * d.estimate.perDraft)} للكتابة`
+  // ‏التقديرُ قبل «ابدأ» (D-282): بندٌ لكلّ مسوّدة، وصورةٌ لكلّ بندٍ غيرِ مقطع إن اختارها المالكُ في الخطّة (أو الإعدادُ العامّ لخطّةٍ قبلها)
+  const seen = new Set<string>()
+  const items = d.plan.plan.items.filter((i) => { const k = `${i.sourceId}:${i.platform}`; if (seen.has(k)) return false; seen.add(k); return true })
+  const autoImage = d.plan.choices.channels.length === 0 ? d.autoImage : d.plan.choices.autoImage
+  const line = estimateLine(estimatePlan({ items, autoImage, perDraft: d.estimate.perDraft, perImage: d.estimate.perImage }))
   return `<form class="inline" method="POST" action="/panel/plan/start" data-busy="جار البدء…"
-      data-confirm="${escapeHtml(`ابدأ الخطّة؟ تُكتب ${n} مسوّدة ${cost}${d.autoImage ? ' مع صورها' : ''}، ولا يُنشر منها شيءٌ قبل اعتمادك.`)}">
+      data-confirm="${escapeHtml(`ابدأ الخطّة؟ ${line}، ولا يُنشر منها شيءٌ قبل اعتمادك.`)}">
       <input type="hidden" name="id" value="${escapeHtml(d.plan.id)}">
       <button class="btn btn-primary btn-sm" type="submit">ابدأ الخطّة</button></form>`
 }
@@ -108,14 +115,16 @@ function scheduleForm(d: ClientData): string {
 }
 
 function flow(d: ClientData): string {
-  const waiting = d.waiting ?? 0
+  // ‏ما ينتظر من هذه الخطّة (D-282) يحدّد الخطوة، لا كلُّ مسوّدات العميل — ومسوّدةٌ من غير الخطّة لا تُبقي الرحلةَ عند «اعتمد»
+  const waiting = d.pending ?? d.waiting ?? 0
   const ready = d.ready ?? 0
   const now = d.plan === null ? 0 : d.plan.status === 'draft' ? 1 : (d.written ?? 0) === 0 ? 2 : waiting > 0 ? 3 : ready > 0 ? 4 : 5
   const say: readonly string[] = [
-    `خطّط أسبوعًا أو شهرًا — يقسّم صدى المصادرَ على الأيّام والمنصّات. ${'<a href="/panel#sub-plan">خطّط</a>'}`,
+    `خطّط من أسبوعٍ إلى شهرين — يقسّم صدى المصادرَ والأفكارَ على الأيّام والقنوات. ${'<a href="/panel#sub-plan">خطّط</a>'}`,
     'لكلّ بند: <b>ولّد</b> أو <b>ارفع</b> أو <b>من الأصول</b>، واسحبه إلى يومه — ثمّ «ابدأ الخطّة».',
     '«ابدأ الخطّة» يكتب كلَّ شيءٍ في الخلفيّة خلال دقائق — وإن ضغطتها فأعد فتح الصفحة بعد قليل.',
-    `${waiting} ${waiting === 1 ? 'مسوّدةٌ تنتظر' : 'مسوّداتٍ تنتظر'}: عدّل نصَّها أو انقل موعدها أو احذفها، ثمّ اعتمد. <a href="/panel#posts">افتحها</a>`,
+    `${waiting} ${waiting === 1 ? 'مسوّدةٌ تنتظر' : 'مسوّداتٍ تنتظر'}: عدّل نصَّها أو انقل موعدها أو احذفها، ثمّ اعتمد. <a href="/panel#posts">افتحها</a> ${
+      d.plan === null ? '' : approveAllForm(d.plan.id, d.pending ?? 0).value}`,
     `${ready} ${ready === 1 ? 'منشورٌ معتمَد' : 'منشوراتٍ معتمَدة'} — تُجدوَل كلٌّ في يوم بنده وأرجح ساعات منصّته. ${scheduleForm(d)}`,
     'شكرًا — الخطّةُ كُتبت واعتُمدت وجُدولت، وصدى ينشرها في مواعيدها ويقيسها. <a href="/panel#posts">المجدوَلة</a>',
   ]
@@ -147,8 +156,8 @@ export function clientScreen(d: ClientData): string {
           : `بقي ربطُ ${missing.map((p) => escapeHtml(platformLabel(p as never))).join(' و')}.`,
       link('/panel/accounts', missing.length === 0 ? 'الحسابات' : 'اربط', missing.length > 0)),
     station(4, 'الخطّة', at(d.plan === null ? 'todo' : 'done'),
-      d.plan === null ? 'لا خطّة بعد — أسبوعًا أو شهرًا.'
-        : `${d.plan.span === 'month' ? 'شهرٌ' : 'أسبوعٌ'} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,
+      d.plan === null ? 'لا خطّة بعد — من أسبوعٍ إلى شهرين.'
+        : `${SPAN_LABEL[d.plan.span ?? 'week']} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,
       d.plan === null
         ? link('/panel#sub-plan', 'خطّط', true)
         : `${link('/panel#sub-plan', 'افتحها')}${startForm(d)}`),
