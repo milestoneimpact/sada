@@ -20,6 +20,9 @@ import type { StoredPlan } from '../../../lib/plan/job'
 import { statusBadge } from '../components/badge'
 import { emptyState } from '../components/empty'
 import { stagesAttr } from '../components/stages'
+import { html, raw, type Html } from '../html'
+import { money } from '../../../lib/format'
+import { CLIP_CHANNELS, PLAN_CHANNELS, PLAN_SPANS, SPAN_LABEL, weekStart, type PlanKind, type PlanPlatform } from '../../../lib/plan/prompt'
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
@@ -42,12 +45,74 @@ export interface PlanInput {
   readonly zone?: string | null
   /** آخرُ ضغطةٍ على «خطّط الأسبوع» من سجلّ التدقيق — وسببُها إن فشلت (D-157) */
   readonly lastAttempt?: { readonly at: string; readonly detail: string | null } | null
+  /** ما يحتاجه نموذجُ الخطّة (D-282): القنواتُ المربوطةُ وإيقاعُها، والمصادرُ المحلَّلة، وكلفةُ الصورة. */
+  readonly form?: PlanFormInput
+  /** مسوّداتُ هذه الخطّة التي تنتظر القرار — لزرّ «اعتمد الخطّة كاملةً». */
+  readonly pending?: number
+}
+
+export interface PlanFormInput {
+  /** القنواتُ المربوطةُ بحسابٍ نشط. */
+  readonly linked: readonly string[]
+  /** قنواتُ الموجز — المحدَّدةُ أوّلًا. */
+  readonly chosen: readonly string[]
+  readonly perWeek: number
+  /** المصادرُ المحلَّلة التي يُختار منها. */
+  readonly sources: readonly { readonly id: string; readonly name: string }[]
+  /** وسيطُ كلفة الصورة من الدفتر، أو `null` قبل أوّل صورة. */
+  readonly perImage: number | null
+  readonly autoImage: boolean
+}
+
+const KIND_LABEL: Readonly<Record<PlanKind, string>> = { text: 'نصّ', image: 'صورة', video: 'مقطع' }
+
+/** رقاقةُ نوع البند — ما يُنشر مع النصّ، وغيابُه في خطّةٍ قديمة نصّ. */
+export function kindChip(kind: PlanKind | undefined): Html {
+  return html`<span class="chip">${KIND_LABEL[kind ?? 'text']}</span>`
 }
 
 /**
- * **سببُ آخر فشلٍ يُقرأ في مكانه** (D-157). كان الفلاشُ يقوله مرّةً ثمّ يزول،
- * وسجلُّ التدقيق يحفظ «failed» بلا سبب، فيعود المالكُ إلى الزرّ ولا يعرف
- * لماذا لم تُكتب خطّة. السطرُ يبقى حتّى تنجح محاولةٌ أحدثُ منه.
+ * **نموذجُ الخطّة** (D-282): المدى من أربعة، ويومُ البداية (الأحدُ القادم افتراضًا)، والقنواتُ المربوطةُ وإيقاعُ كلٍّ في الأسبوع،
+ * والمصادرُ («الكلّ» افتراضًا)، وأفكارٌ سطرًا سطرًا، و«ولّد صورةً مع كلّ منشور» بكلفتها. والشاشةُ الكاملةُ بخطواتها
+ * الأربع تأتي بعدها؛ هذا ما يلزم ليُختار كلُّ شيء من اللوحة.
+ */
+function planForm(input: PlanInput, f: PlanFormInput, replacing: boolean): Html {
+  const off = input.ready && input.analyzed >= 2 ? false : true
+  const spans = PLAN_SPANS.map((sp) => html`<label class="vpf"><input type="radio" name="span" value="${sp}"${sp === 'week' ? raw(' checked') : ''}><span class="vpf-b"><b>${SPAN_LABEL[sp]}</b></span></label>`)
+  const channels = PLAN_CHANNELS.map((p: PlanPlatform) => {
+    const linked = f.linked.includes(p)
+    const checked = linked && (f.chosen.length === 0 ? !CLIP_CHANNELS.has(p) : f.chosen.includes(p))
+    return html`<label class="vpf"><input type="checkbox" name="channel" value="${p}"${checked ? raw(' checked') : ''}${linked ? '' : raw(' disabled')}>
+      <span class="vpf-b"><b>${platformLabel(p)}</b>${linked
+        ? html`<span class="row gap-2"><input type="number" name="cadence_${p}" min="0" max="28" step="1" value="${f.perWeek}" dir="ltr" aria-label="${platformLabel(p)} في الأسبوع"> في الأسبوع</span>`
+        : html`<span class="ago">غير مربوطة</span>`}${CLIP_CHANNELS.has(p) ? html`<span class="ago">كلُّ بند لها مقطع ترفعه</span>` : ''}</span></label>`
+  })
+  const sources = f.sources.slice(0, 60).map((x) => html`<label class="vpf"><input type="checkbox" name="source" value="${x.id}"><span class="vpf-b"><bdi>${x.name}</bdi></span></label>`)
+  const imageCost = f.perImage === null ? html`ولا تقدير لكلفة الصورة قبل أوّل صورة تُقاس عليها` : html`ونحو ${money(f.perImage)} للصورة`
+  return html`<form method="POST" action="/panel/plan/generate" class="stack mt-3" data-busy="جار التخطيط…"${replacing ? raw(' data-confirm="سيحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
+    <fieldset class="field"><legend>المدى</legend><div class="row gap-2">${spans}</div></fieldset>
+    <div class="field"><label for="plan-start">يوم البداية</label>
+      <p class="field-hint" id="plan-start-hint">الأحد القادم افتراضًا — وأسبوع العمل يبدأ الأحد.</p>
+      <input type="date" id="plan-start" name="start" value="${weekStart(input.now)}" dir="ltr" aria-describedby="plan-start-hint"></div>
+    <fieldset class="field"><legend>القنوات وإيقاعُها</legend>
+      <p class="field-hint">ما رُبط بحساب وحده يُختار، والرقم كم منشورًا في الأسبوع لكلّ قناة.</p>
+      <div class="row gap-2">${channels}</div></fieldset>
+    <fieldset class="field"><legend>المصادر</legend>
+      <p class="field-hint">بلا اختيار تُقرأ المصادر المحلَّلة كلُّها.</p>
+      <div class="row gap-2"><label class="vpf"><input type="checkbox" name="source" value="all" checked><span class="vpf-b"><b>الكلّ</b></span></label>${sources}</div></fieldset>
+    <div class="field"><label for="plan-ideas">أفكار بكلماتك</label>
+      <p class="field-hint" id="plan-ideas-hint">سطر لكلّ فكرة، حتّى عشرين — تدخل الخطّة كما يدخل المصدر.</p>
+      <textarea id="plan-ideas" name="ideas" rows="3" dir="auto" aria-describedby="plan-ideas-hint"></textarea></div>
+    <input type="hidden" name="auto_image" value="0">
+    <label class="vpf"><input type="checkbox" name="auto_image" value="1"${f.autoImage ? raw(' checked') : ''}><span class="vpf-b"><b>ولّد صورة مع كلّ منشور</b><span class="ago">${imageCost} — تُحسب في التقدير قبل «ابدأ»</span></span></label>
+    <div class="row"><button class="btn ${replacing ? 'btn-secondary' : 'btn-primary'}" type="submit"${off ? raw(' disabled') : ''}>${replacing ? 'ابن خطّة جديدة' : 'ابن الخطّة'}</button></div>
+  </form>`
+}
+
+/**
+ * **سبب آخر فشل يُقرأ في مكانه** (D-157). كان الفلاش يقوله مرّة ثمّ يزول،
+ * وسجلُّ التدقيق يحفظ «failed» بلا سبب، فيعود المالك إلى الزرّ ولا يعرف
+ * لماذا لم تُكتب خطّة. السطر يبقى حتّى تنجح محاولة أحدث منه.
  */
 function lastAttemptLine(input: PlanInput): string {
   const a = input.lastAttempt
@@ -74,7 +139,7 @@ function row(
   return `<tr>
     <td data-label="متى"><b>${escapeHtml(dayName(item.day))}</b>
       <div class="mono">${escapeHtml(stamp(`${item.day} ${item.time}`, zone))}</div></td>
-    <td data-label="المنصّة"><span class="chip">${escapeHtml(platformLabel(item.platform))}</span></td>
+    <td data-label="المنصّة"><span class="chip">${escapeHtml(platformLabel(item.platform))}</span> ${kindChip(item.kind).value}</td>
     <td data-label="المصدر"><div class="nm">${escapeHtml(name)}</div>
       <div class="sub">${escapeHtml(item.angle)}</div>
       ${item.why === '' ? '' : `<div class="sub">— ${escapeHtml(item.why)}</div>`}</td>
@@ -90,9 +155,9 @@ function row(
 export function planSection(input: PlanInput): string {
   const { plan, now } = input
 
-  // ‏أسبوعٌ أو شهر (D-256): زرّان في نموذجٍ واحد، والزرُّ يحمل المدى
+  // ‏أسبوع أو شهر (D-256): زرّان في نموذج واحد، والزرُّ يحمل المدى
   const off = input.ready && input.analyzed >= 2 ? '' : ' disabled'
-  const generate = `<form class="inline" method="POST" action="/panel/plan/generate"
+  const generate = input.form !== undefined ? '' : `<form class="inline" method="POST" action="/panel/plan/generate"
       data-busy="جار التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّتك لهذا المدى. أتمضي؟"'}>
       <button class="btn ${plan === null ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit" name="span" value="week"${off}>${
         plan === null ? 'خطّط الأسبوع' : 'أعد تخطيط الأسبوع'}</button>
@@ -103,11 +168,11 @@ export function planSection(input: PlanInput): string {
       ? '<p class="hint m-0 mt-2">مزوّد مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
       : input.analyzed < 2
         /*
-         * **ودعوةٌ إلى فعلٍ زرٌّ لا كلمةٌ في جملة** (D-108).
+         * **ودعوة إلى فعل زرٌّ لا كلمة في جملة** (D-108).
          *
          * قِيست ‏٥٥×‏١٥px عند ‏٤٣٠ — **دون هدف اللمس بثلاثة أضعاف**.
-         * ولم يرَها مدقّقٌ قطُّ لأنّها لا تظهر إلّا حين تكون المصادرُ بلا
-         * تحليل، **وعيّنةُ الرسم كانت نظاما يعمل**. فأظهرتها عيّنةُ
+         * ولم يرَها مدقّق قطُّ لأنّها لا تظهر إلّا حين تكون المصادر بلا
+         * تحليل، **وعيّنة الرسم كانت نظاما يعمل**. فأظهرتها عيّنة
          * اليوم الأوّل.
          */
         ? `<p class="hint m-0 mt-2">${input.analyzed === 0 ? 'لا مصدر محلَّل بعد' : 'مصدر واحد محلَّل'} — والخطّة تحتاج اثنين على الأقلّ.</p>
@@ -124,6 +189,7 @@ export function planSection(input: PlanInput): string {
            وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابة زرّ لكلّ بند.`,
       })}
       ${why}
+      ${input.form === undefined ? '' : planForm(input, input.form, false).value}
       ${lastAttemptLine(input)}
     </div>`
   }
@@ -162,6 +228,20 @@ export function planSection(input: PlanInput): string {
              <input type="hidden" name="id" value="${escapeHtml(plan.id)}">
              <button class="btn btn-primary btn-sm" type="submit">اعتمد المنطق</button></form>`
         : ''}
+      ${approveAllForm(plan.id, input.pending ?? 0).value}
     </div>
+    ${input.form === undefined ? '' : html`<details class="pb-more mt-3"><summary>خطّة جديدة</summary>${planForm(input, input.form, true)}</details>`.value}
   </div>`
+}
+
+/**
+ * **«اعتمد الخطّة كاملةً»** (D-282): كلُّ مسوّدةٍ من الخطّة تنتظر القرار تُعتمَد بضغطة، والتأكيدُ يقول العددَ وأنّ شيئًا
+ * لا يُنشر قبل الجدولة. ولا زرَّ حين لا شيءَ ينتظر.
+ */
+export function approveAllForm(planId: string, pending: number): Html {
+  if (pending === 0) return html``
+  return html`<form class="inline" method="POST" action="/panel/plan/approve-all" data-busy="جار الاعتماد…"
+      data-confirm="${html`اعتمد ${pending} ${pending === 1 ? 'مسوّدة' : 'مسوّدات'} من الخطّة كما كُتبت؟ ولا يُنشر منها شيء حتّى تجدولها.`}">
+      <input type="hidden" name="id" value="${planId}">
+      <button class="btn btn-primary btn-sm" type="submit">اعتمد الخطّة كاملة</button></form>`
 }

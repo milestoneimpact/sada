@@ -6,8 +6,10 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { approvePlan, eligible, latestPlan, planWeek, type PlanDeps } from './job'
-import { MAX_ITEMS, parsePlan, systemPrompt, userPrompt, weekStart } from './prompt'
+import { approvePlan, eligible, ideaOf, latestPlan, planSpan, type PlanDeps } from './job'
+import {
+  CALL_CAP, EMPTY_CHOICES, MAX_ITEMS, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
+} from './prompt'
 import { writeSetting } from '../settings'
 import { writeRoute } from '../ai/routes'
 
@@ -107,7 +109,7 @@ describe('المسار الكامل', () => {
   it('يكتب الخطّة ويسجّل الكلفة', async () => {
     const a = await seedSource('تقرير الأثر', 0.9)
     const b = await seedSource('مراجعة المحفظة', 0.7)
-    const out = await planWeek(deps(net({ payload: plan([item(a), item(b, { platform: 'x', day: '2026-09-16' })]) })))
+    const out = await planSpan(deps(net({ payload: plan([item(a), item(b, { platform: 'x', day: '2026-09-16' })]) })))
 
     expect(out.kind).toBe('planned')
     if (out.kind !== 'planned') return
@@ -127,7 +129,7 @@ describe('المسار الكامل', () => {
   it('يعطي النموذج المصادر بمعرّفاتها ودرجاتِها', async () => {
     const a = await seedSource('تقرير الأثر', 0.9)
     await seedSource('مراجعة', 0.5)
-    await planWeek(deps(net({ payload: plan([item(a)]) })))
+    await planSpan(deps(net({ payload: plan([item(a)]) })))
 
     const sent = calls[0]?.body as { messages?: { content: string }[] }
     const user = sent.messages?.[0]?.content ?? ''
@@ -140,7 +142,7 @@ describe('**لا مصدر يُخترَع**', () => {
   it('بند بمعرّف مجهول يُسقَط وحده ولا تسقط الخطّة', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.6)
-    const out = await planWeek(
+    const out = await planSpan(
       deps(net({ payload: plan([item(a), item('معرّف-مخترَع')]) })),
     )
 
@@ -153,7 +155,7 @@ describe('**لا مصدر يُخترَع**', () => {
   it('وخطّة كلُّها مخترَعة تفشل — ولا تُكتب', async () => {
     await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.6)
-    const out = await planWeek(deps(net({ payload: plan([item('لا-شيء')]) })))
+    const out = await planSpan(deps(net({ payload: plan([item('لا-شيء')]) })))
 
     expect(out.kind).toBe('failed')
     expect(await latestPlan(db)).toBeNull()
@@ -180,7 +182,7 @@ describe('D-008 · الكلفة قبل القراءة', () => {
   it('تُسجَّل حتّى حين يكون الجواب غير صالح', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    const out = await planWeek(deps(net({ payload: { rationale: 'x', items: 'ليست مصفوفة' } })))
+    const out = await planSpan(deps(net({ payload: { rationale: 'x', items: 'ليست مصفوفة' } })))
 
     expect(out.kind).toBe('failed')
     const { results } = await db.prepare('SELECT id FROM cost_ledger').all()
@@ -190,7 +192,7 @@ describe('D-008 · الكلفة قبل القراءة', () => {
   it('ولا تُسجَّل حين يفشل النداء نفسه', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    expect((await planWeek(deps(net({ status: 500 })))).kind).toBe('failed')
+    expect((await planSpan(deps(net({ status: 500 })))).kind).toBe('failed')
     const { results } = await db.prepare('SELECT id FROM cost_ledger').all()
     expect(results).toHaveLength(0)
   })
@@ -202,13 +204,13 @@ describe('الحارس قبل النداء', () => {
     await seedSource('b', 0.6)
     await writeSetting(db, 'paused', 'true', 'test')
 
-    expect((await planWeek(deps(net()))).kind).toBe('blocked')
+    expect((await planSpan(deps(net()))).kind).toBe('blocked')
     expect(calls).toHaveLength(0)
   })
 
   it('ومصدر واحد لا يصنع أسبوعا — ولا يُنادى له نموذج', async () => {
     await seedSource('وحيد', 0.9)
-    const out = await planWeek(deps(net()))
+    const out = await planSpan(deps(net()))
 
     expect(out.kind).toBe('not_enough')
     expect(calls).toHaveLength(0)
@@ -219,8 +221,8 @@ describe('خطّة الأسبوع الواحد', () => {
   it('توليد ثان يحلّ محلّ الأوّل ولا يتراكمان', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    await planWeek(deps(net({ payload: plan([item(a)]) })))
-    await planWeek(deps(net({ payload: plan([item(a, { time: '11:00' })]) })))
+    await planSpan(deps(net({ payload: plan([item(a)]) })))
+    await planSpan(deps(net({ payload: plan([item(a, { time: '11:00' })]) })))
 
     const { results } = await db.prepare('SELECT id FROM plans').all()
     expect(results).toHaveLength(1)
@@ -235,7 +237,7 @@ describe('الاعتماد', () => {
   it('إقرار بالمنطق — ولا يكتب نصّا ولا يُنفق', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    const out = await planWeek(deps(net({ payload: plan([item(a)]) })))
+    const out = await planSpan(deps(net({ payload: plan([item(a)]) })))
     if (out.kind !== 'planned') throw new Error('لم تُكتب')
 
     expect(await approvePlan(db, out.planId)).toBe(true)
@@ -249,7 +251,7 @@ describe('الاعتماد', () => {
   it('ولا يُعتمد مرّتين', async () => {
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    const out = await planWeek(deps(net({ payload: plan([item(a)]) })))
+    const out = await planSpan(deps(net({ payload: plan([item(a)]) })))
     if (out.kind !== 'planned') throw new Error('لم تُكتب')
     expect(await approvePlan(db, out.planId)).toBe(true)
     expect(await approvePlan(db, out.planId)).toBe(false)
@@ -326,7 +328,7 @@ describe('D-157 — عقد الحقول والقارئ المتسامح', () => 
   it('والنداء يحمل العقد في رسالة النظام', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.5)
-    await planWeek(deps(net({ payload: plan([item(a)]) })))
+    await planSpan(deps(net({ payload: plan([item(a)]) })))
     // رسالةُ النظام في Anthropic مصفوفةُ كتلٍ نصّيّة
     const sent = calls[0]?.body as { system?: string | { text?: string }[] }
     const system = Array.isArray(sent.system) ? sent.system.map((b) => b.text ?? '').join('\n') : (sent.system ?? '')
@@ -351,9 +353,9 @@ describe('لماذا أُسقط ما أُسقط (D-157)', () => {
     if (!read.ok) return
     expect(read.dropped).toBe(4)
     expect(read.droppedWhy).toContain('مصدر لا نعرفه')
-    expect(read.droppedWhy).toContain('منصّة غير مدعومة')
+    expect(read.droppedWhy).toContain('منصّة غير مطلوبة')
     expect(read.droppedWhy).toContain('زاوية أقصر')
-    expect(read.droppedWhy).toContain('يوم خارج الأسبوع')
+    expect(read.droppedWhy).toContain('يوم خارج المدى')
   })
 })
 
@@ -375,7 +377,7 @@ describe('D-164 · المخطّط المحمول', () => {
   it('Anthropic يتلقّى المخطّط بلا minLength ولا maxItems ولا minItems', async () => {
     const a = await seedSource('تقرير', 0.9)
     await seedSource('مراجعة', 0.5)
-    await planWeek(deps(net({ payload: plan([item(a)]) })))
+    await planSpan(deps(net({ payload: plan([item(a)]) })))
 
     const sent = calls[0]?.body as { output_config?: { format?: { schema?: unknown } } }
     const keys = keysDeep(sent.output_config?.format?.schema)
@@ -428,7 +430,7 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
   it('Anthropic مبتور عند max_tokens: صفّ واحد ثمّ failed يُعاد', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    const out = await planWeek(deps(net({ stop: 'max_tokens' })))
+    const out = await planSpan(deps(net({ stop: 'max_tokens' })))
 
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(true)
@@ -439,7 +441,7 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
   it('وAnthropic رافض: صفّ واحد، ولا يُعاد', async () => {
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
-    const out = await planWeek(deps(net({ stop: 'refusal' })))
+    const out = await planSpan(deps(net({ stop: 'refusal' })))
 
     expect(out.kind).toBe('failed')
     if (out.kind === 'failed') expect(out.retryable).toBe(false)
@@ -466,7 +468,7 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
     await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
-    const out = await planWeek(compatDeps(compat({ message: { content: '{"rationale":"' }, finish_reason: 'length' })))
+    const out = await planSpan(compatDeps(compat({ message: { content: '{"rationale":"' }, finish_reason: 'length' })))
 
     expect(out.kind).toBe('failed')
     expect(await book()).toEqual([{ operation: 'plan:gemini-2.5-flash', units: 1900 }])
@@ -476,7 +478,7 @@ describe('D-164 · جواب وصل ثمّ رُدّ يُكتب في الدفتر'
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     await writeRoute(db, 'plan', 'gemini', 'gemini-2.5-flash', 'test')
-    const out = await planWeek(
+    const out = await planSpan(
       compatDeps(compat({ message: { content: JSON.stringify(plan([item(a)])) }, finish_reason: 'stop' })),
     )
 
@@ -493,13 +495,13 @@ describe('خطّةٌ لكلّ عميل، أسبوعًا أو شهرًا (D-256)'
     const a = await seedSource('a', 0.9)
     await seedSource('b', 0.6)
     const later = item(a, { day: '2026-09-28' })
-    const month = await planWeek({ ...deps(net({ payload: plan([item(a), later]) })), span: 'month' })
+    const month = await planSpan({ ...deps(net({ payload: plan([item(a), later]) })), span: 'month' })
     expect(month).toMatchObject({ kind: 'planned', items: 2, dropped: 0 })
     expect((await latestPlan(db))?.span).toBe('month')
     // ‏والموجّهُ يقول إنّه شهر
     expect(JSON.stringify(calls[0]?.body)).toContain('شهرٌ من أربعة أسابيع')
 
-    const week = await planWeek(deps(net({ payload: plan([item(a), later]) })))
+    const week = await planSpan(deps(net({ payload: plan([item(a), later]) })))
     expect(week).toMatchObject({ kind: 'planned', items: 1, dropped: 1 })
     // ‏وخطّةُ الأسبوع لا تمحو خطّةَ الشهر
     expect((await db.prepare('SELECT span FROM plans ORDER BY span').all<{ span: string }>()).results.map((r) => r.span)).toEqual(['month', 'week'])
@@ -510,14 +512,119 @@ describe('خطّةٌ لكلّ عميل، أسبوعًا أو شهرًا (D-256)'
     await seedSource('b', 0.6)
     db.raw.exec("INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'عميل', 'agency')")
     // ‏العميلُ الثاني بلا مصادر: لا يُخطَّط له من مصادر المالك
-    expect(await planWeek({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })).toMatchObject({ kind: 'not_enough' })
+    expect(await planSpan({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })).toMatchObject({ kind: 'not_enough' })
     db.raw.exec("UPDATE sources SET org_id = 'org_b'; UPDATE content_items SET org_id = 'org_b'")
-    await planWeek({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })
+    await planSpan({ ...deps(net({ payload: plan([item(a)]) })), org: 'org_b' })
     expect(await latestPlan(db, 'org_b')).not.toBeNull()
     expect(await latestPlan(db)).toBeNull()
     // ‏والاعتمادُ من منظّمةٍ أخرى لا يقع
     const id = (await latestPlan(db, 'org_b'))!.id
     expect(await approvePlan(db, id)).toBe(false)
     expect(await approvePlan(db, id, 'org_b')).toBe(true)
+  })
+})
+
+/**
+ * **الخطّةُ محورَ المنصّة** (D-282): المدى من أربعة، والقنواتُ المختارةُ هي المقبولة، والفكرةُ مصدرٌ بمعرّفها،
+ * والشهران نداءان بصفّين في الدفتر، والاختياراتُ تُحفظ وتُقرأ.
+ */
+describe('الخطّةُ محورَ المنصّة (D-282)', () => {
+  it('الموجّهُ يسمّي القنواتِ المختارةَ وإيقاعَها و`kind`، ولا يذكر قناةً لم تُختر', () => {
+    const text = systemPrompt({ channels: ['linkedin', 'tiktok'], cadence: { linkedin: 3, tiktok: 1 } })
+    expect(text).toContain('`linkedin` أو `tiktok`')
+    expect(text).toContain('linkedin: 3 في الأسبوع')
+    expect(text).toContain('`kind`')
+    expect(text).toContain('يحتاج مقطعًا')
+    expect(text).not.toContain('`x`')
+    // ‏ومخطّطُ القنوات هو المختارُ لا غير
+    const schema = planSchema(['x', 'instagram'], 8) as unknown as { properties: { items: { maxItems: number; items: { properties: { platform: { enum: string[] } } } } } }
+    expect(schema.properties.items.items.properties.platform.enum).toEqual(['x', 'instagram'])
+    expect(schema.properties.items.maxItems).toBe(8)
+  })
+
+  it.each([['week', 7], ['2weeks', 14], ['month', 28], ['2months', 56]] as const)('رسالةُ %s تسرد %i يومًا، والسقفُ بالإيقاع', (span, days) => {
+    expect(spanDays(span)).toBe(days)
+    const text = userPrompt([], '2026-11-01', span, { cadence: { linkedin: 2, x: 1 } })
+    expect(text).toContain('2026-11-01')
+    const last = new Date(Date.UTC(2026, 10, 1 + days - 1)).toISOString().slice(0, 10)
+    const after = new Date(Date.UTC(2026, 10, 1 + days)).toISOString().slice(0, 10)
+    expect(text).toContain(last)
+    expect(text).not.toContain(after)
+    expect(maxItems(span, { linkedin: 2, x: 1 })).toBe(Math.min(CALL_CAP, (3 * days) / 7))
+    expect(text).toContain(`حتّى ${maxItems(span, { linkedin: 2, x: 1 })}`)
+  })
+
+  it('القارئُ يقبل القنواتِ المختارةَ وحدها، ويفرض نوعَ البند بمنصّته، ويقبل `idea:`', () => {
+    const read = parsePlan(
+      { rationale: 'r', items: [
+        { source_id: 'idea:1', platform: 'tiktok', kind: 'text', angle: 'زاوية كافية الطول', day: '2026-11-02', time: '09:00' },
+        { source_id: 'src:a', platform: 'instagram', angle: 'زاوية كافية الطول', day: '2026-11-03', time: '09:00' },
+        { source_id: 'src:a', platform: 'linkedin', kind: 'image', angle: 'زاوية كافية الطول', day: '2026-11-04', time: '09:00' },
+        { source_id: 'src:a', platform: 'x', angle: 'زاوية كافية الطول', day: '2026-11-05', time: '09:00' },
+      ] },
+      new Set(['src:a', 'idea:1']),
+      '2026-11-01', 'week', { channels: ['tiktok', 'instagram', 'linkedin'] },
+    )
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.plan.items.map((i) => [i.sourceId, i.platform, i.kind])).toEqual([
+      ['idea:1', 'tiktok', 'video'], ['src:a', 'instagram', 'image'], ['src:a', 'linkedin', 'image'],
+    ])
+    expect(read.droppedWhy).toBe('منصّة غير مطلوبة')
+  })
+
+  it('الشهران نداءان بصفّين في الدفتر، وتُدمج بنودُهما خطّةً واحدة باختياراتها', async () => {
+    const a = await seedSource('a', 0.9)
+    const b = await seedSource('b', 0.6)
+    // ‏الشبكةُ تردّ بنداءٍ أوّلَ في الشهر الأوّل وثانٍ في الثاني: اليومُ يُقرأ من رسالة النداء
+    let n = 0
+    const fetchImpl = (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const body = JSON.parse(String(input instanceof Request ? await input.clone().text() : init?.body)) as { messages: { content: string }[] }
+      const start = /يبدأ (\d{4}-\d{2}-\d{2})/.exec(body.messages[0]?.content ?? '')?.[1] ?? ''
+      n += 1
+      return new Response(JSON.stringify({
+        id: `msg_${n}`, type: 'message', role: 'assistant', model: 'claude-opus-5', stop_reason: 'end_turn',
+        content: [{ type: 'text', text: JSON.stringify(plan([item(n === 1 ? a : b, { day: start, platform: n === 1 ? 'linkedin' : 'instagram' })], `شهر ${n}`)) }],
+        usage: { input_tokens: 1000, output_tokens: 300, cache_read_input_tokens: 0 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+    const out = await planSpan({
+      ...deps(fetchImpl), span: '2months', startDay: '2026-11-01', channels: ['linkedin', 'instagram'],
+      cadence: { linkedin: 2, instagram: 1 }, sources: [a, b], ideas: ['فكرةٌ عن الوقف'], autoImage: true,
+    })
+    expect(out).toMatchObject({ kind: 'planned', items: 2, calls: 2, week: '2026-11-01' })
+    expect(n).toBe(2)
+    expect((await db.prepare("SELECT count(*) AS n FROM cost_ledger WHERE operation LIKE 'plan:%'").first<{ n: number }>())?.n).toBe(2)
+    const stored = await latestPlan(db)
+    expect(stored?.span).toBe('2months')
+    expect(stored?.plan.items.map((i) => i.day)).toEqual(['2026-11-01', '2026-11-29'])
+    expect(stored?.plan.rationale).toBe('شهر 1 ثمّ شهر 2')
+    expect(stored?.choices).toEqual({
+      channels: ['linkedin', 'instagram'], cadence: { linkedin: 2, instagram: 1 }, sources: [a, b], ideas: ['فكرةٌ عن الوقف'], assets: [], autoImage: true, startDay: '2026-11-01',
+    })
+    // ‏والفكرةُ تُقرأ من اختياراتها بمعرّف بندها
+    expect(ideaOf('idea:1', stored!.choices)).toBe('فكرةٌ عن الوقف')
+    expect(ideaOf('idea:2', stored!.choices)).toBeNull()
+    expect(ideaOf(a, stored!.choices)).toBeNull()
+  })
+
+  it('المصادرُ المختارةُ وحدها تصل إلى النموذج، والفكرةُ تدخل مصدرًا بمعرّف idea:', async () => {
+    const a = await seedSource('المختار', 0.9)
+    await seedSource('المتروك', 0.8)
+    await planSpan({ ...deps(net({ payload: plan([item(a)]) })), sources: [a], ideas: ['فكرةٌ بكلمات المالك'] })
+    const sent = JSON.stringify(calls[0]?.body)
+    expect(sent).toContain('المختار')
+    expect(sent).not.toContain('المتروك')
+    expect(sent).toContain('id: idea:1')
+    expect(sent).toContain('فكرةٌ بكلمات المالك')
+    // ‏وبندٌ من الفكرة يُقبل
+    const out = await planSpan({ ...deps(net({ payload: plan([item('idea:1', { platform: 'x' })]) })), sources: [a], ideas: ['فكرةٌ بكلمات المالك'] })
+    expect(out).toMatchObject({ kind: 'planned', items: 1, dropped: 0 })
+  })
+
+  it('اختياراتٌ قديمةٌ أو فاسدة تُقرأ بافتراضاتها الآمنة', () => {
+    expect(readChoices('{bad')).toEqual(EMPTY_CHOICES)
+    expect(readChoices({ channels: ['x', 'threads', 'x'], cadence: { x: 99, nope: 1 }, sources: 'all', autoImage: 'yes', startDay: 'غدًا' }))
+      .toEqual({ ...EMPTY_CHOICES, channels: ['x'], cadence: { x: 28 } })
   })
 })

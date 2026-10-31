@@ -10,18 +10,24 @@ import {
 } from '../../lib/plan/import'
 import { planImportExpired, planImportScreen } from '../ui/planImportView'
 import { counted, NOUNS, money } from '../../lib/format'
+import { platformLabel } from '../../lib/oauth/providers'
+import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
+import { readBrief } from '../../lib/brief'
+import { IDEA_MAX } from '../../lib/draft/job'
+import { asSpan, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
-import { approvePlan, latestPlan, planWeek } from '../../lib/plan/job'
+import { approvePlan, ideaOf, latestPlan, planSpan } from '../../lib/plan/job'
 import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
-import { schedulePlan } from '../../lib/plan/schedule'
+import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
@@ -40,31 +46,70 @@ export const plan = new Hono<{ Bindings: Env }>()
 plan.post('/panel/plan/generate', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
 
-  // ‏لعميلِ الجلسة، وأسبوعًا أو شهرًا من قائمةٍ مغلقة (D-256)
-  const span = gate.form.get('span') === 'month' ? 'month' : 'week'
-  const outcome = await planWeek({
+  /*
+   * ‏اختياراتُ المالك (D-282): المدى من أربعة، ويومُ البداية، والقنواتُ **من حساباته المربوطة لا غير**،
+   * ‏وإيقاعُ كلٍّ منها (وافتراضُه إيقاعُ الموجز)، والمصادرُ أو «الكلّ»، والأفكارُ سطرًا سطرًا حتّى عشرين،
+   * ‏والصورةُ مع كلّ منشور. وما لم يُرسَل يأخذ افتراضَه فلا يُكسر نموذجٌ قديم يرسل المدى وحده.
+   */
+  const span = asSpan(f.get('span'))
+  const linked = new Set((await listAccounts(c.env.DB, org)).filter((a) => a.status === 'active').map((a) => a.platform as string))
+  const brief = await readBrief(c.env.DB, org)
+  const asked = f.getAll('channel').map(String).filter((x) => x !== '')
+  const unknown = asked.filter((x) => !isPlanPlatform(x))
+  const unlinked = asked.filter((x) => isPlanPlatform(x) && !linked.has(x))
+  if (unknown.length > 0 || unlinked.length > 0) {
+    await setFlash(c.env, c.req.raw, {
+      kind: 'bad',
+      text: unknown.length > 0
+        ? 'قناةٌ لا ينشر لها صدى — اختر من القائمة.'
+        : sayUnlinked(unlinked.map((p) => platformLabel(p as never))),
+    })
+    return back('posts')
+  }
+  // ‏بلا اختيار: قنواتُ الموجز، ثمّ ما رُبط، ثمّ افتراضُ المخطِّط (القناتان النصّيّتان)
+  const channels: PlanPlatform[] = asked.length > 0
+    ? asked.filter(isPlanPlatform)
+    : brief.channels.length > 0
+      ? brief.channels.filter(isPlanPlatform)
+      : [...linked].filter(isPlanPlatform)
+  const cadence: Partial<Record<PlanPlatform, number>> = {}
+  for (const ch of channels) {
+    const raw = f.get('cadence_' + ch)
+    const n = raw === null ? brief.perWeek : Math.floor(Number(raw))
+    cadence[ch] = Number.isFinite(n) ? Math.min(28, Math.max(0, n)) : brief.perWeek
+  }
+  const picked = f.getAll('source').map(String).filter((x) => x !== '')
+  const sources: readonly string[] | 'all' = picked.length === 0 || picked.includes('all') ? 'all' : picked
+  const ideas = String(f.get('ideas') ?? '').split('\n').map((l) => l.trim()).filter((l) => l !== '').slice(0, 20).map((l) => l.slice(0, IDEA_MAX))
+  const autoImage = f.has('auto_image') ? f.getAll('auto_image').map(String).includes('1') : undefined
+  const startRaw = String(f.get('start') ?? '')
+
+  const outcome = await planSpan({
     db: c.env.DB,
     encKey: c.env.TOKEN_ENC_KEY,
     workerSecrets: c.env as unknown as Record<string, string | undefined>,
-    org: activeOrg(gate.session.record),
+    org,
     span,
+    channels,
+    cadence: cadence as Cadence,
+    sources,
+    ideas,
+    ...(autoImage === undefined ? {} : { autoImage }),
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
   })
+
+  // ‏والتقديرُ قبل «ابدأ» (D-257 · D-282): ما سيُكتب وما سيُرسم، بوسيط ما أُنفق فعلًا — فلا إنفاقَ قبل أن يرى المالكُ الرقم
+  const wanted = autoImage ?? (await readSettings(c.env.DB)).autoImage
+  const written = outcome.kind === 'planned' ? await latestPlan(c.env.DB, org) : null
+  const estimate = written === null ? '' : estimateLine(estimatePlan({ items: written.plan.items, autoImage: wanted, ...(await unitCosts(c.env.DB, org)) }))
 
   const flash: PanelFlash =
     outcome.kind === 'planned'
-      ? {
-          kind: 'ok',
-          text: `خطّة ${span === 'month' ? 'شهر يبدأ' : 'أسبوع'} ${outcome.week}: ${outcome.items} بندا${
-            outcome.dropped === 0 ? '' : ` (وأُسقط ${outcome.dropped}: ${outcome.droppedWhy})`
-          }، ${
-            // وصفرٌ مع وحداتٍ مستهلَكةٍ ليس مجّانا بل سعرٌ لم يُضبط (D-008).
-            // و«وحدة» لا «رمز» (D-155): الرمزُ في اللوحة رمزُ التطبيق والاسترداد
-            outcome.cost === 0 && outcome.units > 0
-              ? `و${outcome.units} وحدةً بلا سعر مضبوط للمزوّد — سُجّلت صفرا موسوما`
-              : `الكلفة ${money(outcome.cost)}`
-          }.`,
-        }
+      // ‏الجملةُ في `lib/plan/say.ts`: العددُ وما أُسقط والكلفةُ بنداءاتها والتقديرُ قبل «ابدأ» (D-008 · D-155)
+      ? { kind: 'ok', text: sayPlanned(outcome, span, estimate) }
       : outcome.kind === 'not_enough'
         ? { kind: 'warn', text: outcome.reason }
         : outcome.kind === 'blocked'
@@ -162,16 +207,47 @@ plan.post('/panel/plan/start', async (c) => {
     seen.add(k)
     return true
   })
+  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ
+  const autoImage = plan.choices.channels.length === 0 ? undefined : plan.choices.autoImage
   if (items.length > 0) {
-    await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => ({
-      body: { draft: { sourceId: i.sourceId, platform: i.platform as 'linkedin' | 'x', org, planId: plan.id, ...(i.asset === undefined ? {} : { asset: i.asset }) } },
-    })))
+    await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => {
+      const idea = ideaOf(i.sourceId, plan.choices)
+      return {
+        body: { draft: {
+          sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
+          ...(i.asset === undefined ? {} : { asset: i.asset }),
+          ...(idea === null ? {} : { idea }),
+          ...(autoImage === undefined ? {} : { autoImage }),
+        } },
+      }
+    }))
   }
+  // ‏بندُ مقطعٍ بلا أصل لا يفشل ولا يُرسَم له شيء: مسوّدتُه تنتظر مقطعًا — يُقال الآن لا عند الجدولة
+  const clips = items.filter((i) => CLIP_CHANNELS.has(i.platform) && i.asset === undefined).length
+  const images = autoImage ?? settings.autoImage
   await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: sayStarted(items.length, images, clips) })
+  return c.redirect('/panel/client', 303)
+})
+
+/**
+ * **اعتمادُ الخطّة كاملةً** (D-282): كلُّ مسوّدةٍ من هذه الخطّة تنتظر القرار تُعتمَد مرّةً واحدة بالفحص نفسِه الذي يفحص به
+ * الاعتمادُ الفرديّ. **ولا يُنشر شيء**: ما اعتُمد ينتظر «جدول المعتمَد» فيُوضع في موعده.
+ */
+plan.post('/panel/plan/approve-all', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const plan = await latestPlan(c.env.DB, org)
+  if (plan === null || plan.id !== String(gate.form.get('id') ?? '')) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا خطّة بهذا المعرّف لهذا العميل.' })
+    return c.redirect('/panel/client', 303)
+  }
+  const done = await approvePlanDrafts(c.env.DB, org, plan.id, deciderOf(gate.session.record.via))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.approve_all', target: plan.id, detail: `${done.done} اعتُمدت · ${done.failed.length} تعثّرت` }, c.req.raw)
   await setFlash(c.env, c.req.raw, {
-    kind: 'ok',
-    text: `بدأ العمل: ${items.length} ${items.length === 1 ? 'مسوّدة تُكتب' : 'مسوّدات تُكتب'} في الخلفيّة${
-      settings.autoImage ? ' مع صورها' : ''}، وتظهر في «تنتظر قرارك» خلال دقائق. ولا يُنشر منها شيءٌ قبل اعتمادك.`,
+    kind: done.done === 0 && done.failed.length === 0 ? 'warn' : done.failed.length === 0 ? 'ok' : done.done === 0 ? 'bad' : 'warn',
+    text: sayApprovedAll(done.done, done.failed),
   })
   return c.redirect('/panel/client', 303)
 })

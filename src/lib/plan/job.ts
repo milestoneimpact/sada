@@ -1,19 +1,23 @@
 /**
- * توليدُ الخطّة الأسبوعيّة.
+ * توليدُ الخطّة — أسبوعًا أو أسبوعين أو شهرًا أو شهرين.
  *
  * **الترتيب هو الحوكمة:**
  *
- *   ١ · اجمع المصادر المحلَّلة وما خرج منها
+ *   ١ · اجمع المصادر المحلَّلة (ما اختاره المالكُ منها أو كلَّها) وأفكارَه، وما خرج منها
  *   ٢ · إن لم تكفِ مادّةٌ — اخرج بلا نداء
  *   ٣ · **افحص الإيقاف والسقفين وسقفَ المزوّد** (D-019)
- *   ٤ · نادِ المزوّد الموجَّه لمهمّة `plan`
- *   ٥ · **سجّل الكلفة** (D-008)
+ *   ٤ · نادِ المزوّد الموجَّه لمهمّة `plan` — **والشهران نداءان** (شهرٌ ثمّ شهر)
+ *   ٥ · **سجّل الكلفة** (D-008) لكلّ نداء
  *   ٦ · اقرأ الجواب وارفض ما لا يصحّ
- *   ٧ · اكتب الخطّة، وانسخ سابقةَ الأسبوع نفسه `superseded`
+ *   ٧ · اكتب الخطّة باختيارات المالك، وانسخ سابقةَ المدى نفسه `superseded`
  *
  * والسادسةُ بعد الخامسة عمدا: جوابٌ مشوَّهٌ لا يُلغي كلفةً وقعت.
  * **والخامسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ —
  * مبتورًا أو مرفوضًا أو فارغًا. وما لم يصل لا يُكتب له صفّ.
+ *
+ * **والشهران بنداءين لا بنداءٍ واحد** (D-282): ستّةٌ وخمسون يومًا بثمانيةٍ وأربعين بندًا لا يقرؤها
+ * نموذجٌ قراءةً واحدة. فيُنادى للشهر الأوّل ثمّ للثاني من بدايته، وكلٌّ بصفّه في الدفتر، وتُدمج
+ * البنودُ خطّةً واحدة. وفشلُ الثاني بعد نجاح الأوّل يُعاد كما هو: ما دُفع دُفع، وما يُكتب يُكتب كاملًا.
  */
 import { readBrief, voiceSection } from '../brief'
 import { recordCost } from '../cost'
@@ -25,12 +29,12 @@ import { chatCompletion } from '../ai/openaiCompat'
 import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
 import {
-  PLAN_SCHEMA, maxItems, parsePlan, systemPrompt, userPrompt, weekStart, type PlanSpan,
-  type Plan, type PlanSource,
+  asSpan, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, systemPrompt, userPrompt, weekStart,
+  type Cadence, type Plan, type PlanChoices, type PlanPlatform, type PlanSource, type PlanSpan,
 } from './prompt'
 import type { Db } from '../tokens'
 
-/** أقلُّ ما يُخطَّط له: مصدرٌ واحدٌ محلَّل لا يصنع أسبوعا. */
+/** أقلُّ ما يُخطَّط له: مصدرٌ واحدٌ محلَّل لا يصنع أسبوعا — والفكرةُ تُعدّ مادّة. */
 export const MIN_SOURCES = 2
 
 export type PlanOutcome =
@@ -45,6 +49,8 @@ export type PlanOutcome =
       readonly cost: number
       /** الوحداتُ المستهلَكة: صفرٌ في الكلفة مع وحداتٍ يعني سعرا لم يُضبط. */
       readonly units: number
+      /** كم نداءً دُفع — واحدٌ لكلّ مدًى حتّى الشهر، واثنان للشهرين. */
+      readonly calls: number
     }
   /** لا مادّةَ تكفي — يُحلَّل أكثرُ أوّلا. */
   | { readonly kind: 'not_enough'; readonly reason: string }
@@ -59,8 +65,22 @@ export interface PlanDeps {
   readonly now?: () => Date
   /** العميلُ الذي تُبنى له الخطّة (D-256) — وغيابُه المالك كما كان. */
   readonly org?: string
-  /** أسبوعٌ أو شهر (D-256). */
+  /** المدى (D-256 · D-282). */
   readonly span?: PlanSpan
+  /** يومُ البداية `YYYY-MM-DD` — وغيابُه الأحدُ القادم. */
+  readonly startDay?: string
+  /** القنواتُ المختارة — وغيابُها `DEFAULT_CHANNELS`. */
+  readonly channels?: readonly PlanPlatform[]
+  /** إيقاعُ كلّ قناة في الأسبوع. */
+  readonly cadence?: Cadence
+  /** المصادرُ المختارة بمعرّفاتها، أو «الكلّ». */
+  readonly sources?: readonly string[] | 'all'
+  /** أفكارٌ بكلمات المالك — تدخل مصادرَ بمعرّف `idea:<n>`. */
+  readonly ideas?: readonly string[]
+  /** أصولٌ اختارها المالكُ للخطّة — تُحفظ معها ليُختار منها للبنود. */
+  readonly assets?: readonly string[]
+  /** أتُرسَم صورةٌ مع كلّ منشور؟ `undefined` يعني الإعدادَ العامّ كما كان. */
+  readonly autoImage?: boolean
 }
 
 interface Row {
@@ -78,19 +98,23 @@ interface Row {
  * والفرزُ بالاستحقاق ثمّ القصُّ على خمسةَ عشر: وصفٌ يحمل كلَّ مصدرٍ في
  * القاعدة يكبر بلا حدّ ويُدفع ثمنُه في كلّ نداء، **والنموذجُ لا يقرأ
  * الخمسين قراءةً واحدة**. والأعلى استحقاقا هو ما يُخطَّط منه أصلا.
+ *
+ * **وما اختاره المالكُ وحده حين يختار** (D-282): القائمةُ تُقصر على معرّفاته.
  */
-export async function eligible(db: Db, limit = 15, org = 'org_owner'): Promise<PlanSource[]> {
+export async function eligible(db: Db, limit = 15, org = 'org_owner', only: readonly string[] | 'all' = 'all'): Promise<PlanSource[]> {
+  const chosen = only === 'all' ? [] : only.slice(0, 200)
+  const filter = chosen.length === 0 ? '' : ` AND s.id IN (${chosen.map(() => '?').join(',')})`
   const { results } = await db
     .prepare(
       `SELECT s.id, s.name, i.summary, i.themes_json, i.worth_score,
               (SELECT count(*) FROM posts p
                 WHERE p.source_id = s.id AND p.org_id = s.org_id AND p.status <> 'rejected') AS used
          FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
-        WHERE s.org_id = ? AND i.summary IS NOT NULL AND i.summary <> ''
+        WHERE s.org_id = ? AND i.summary IS NOT NULL AND i.summary <> ''${filter}
         ORDER BY i.worth_score DESC
         LIMIT ?`,
     )
-    .bind(org, limit)
+    .bind(org, ...chosen, limit)
     .all<Row>()
 
   return results.map((row) => {
@@ -112,35 +136,52 @@ export async function eligible(db: Db, limit = 15, org = 'org_owner'): Promise<P
   })
 }
 
-export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
-  const now = (deps.now ?? (() => new Date()))()
-  const week = weekStart(now)
-  const org = deps.org ?? 'org_owner'
-  const span: PlanSpan = deps.span ?? 'week'
+/** الفكرةُ مصدرًا: معرّفُها `idea:<n>` واسمُها نصُّها، فيختارها النموذجُ كما يختار مصدرًا. */
+export function ideaSources(ideas: readonly string[]): PlanSource[] {
+  return ideas.map((text, i) => ({
+    id: `idea:${i + 1}`, name: text, summary: 'فكرةٌ بكلمات المالك — تُكتب منها لا من مصدرٍ محلَّل.', themes: [], worth: 1, used: 0,
+  }))
+}
 
-  // ١ و ٢ · المادّة — مصادرُ العميل وحدَه
-  const sources = await eligible(deps.db, span === 'month' ? 30 : 15, org)
-  if (sources.length < MIN_SOURCES) {
-    return {
-      kind: 'not_enough',
-      reason: `${sources.length} مصدرا محلَّلا — والخطّة تحتاج ${MIN_SOURCES} على الأقلّ`,
-    }
-  }
+/** معرّفُ فكرةٍ في الخطّة: `idea:<n>`، ونصُّها في اختياراتها. */
+export function ideaOf(sourceId: string, choices: PlanChoices): string | null {
+  const m = /^idea:(\d+)$/.exec(sourceId)
+  if (m === null) return null
+  return choices.ideas[Number(m[1]) - 1] ?? null
+}
+
+function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+type Called =
+  | { readonly ok: true; readonly plan: Plan; readonly dropped: number; readonly droppedWhy: string; readonly cost: number; readonly units: number; readonly model: string }
+  | { readonly ok: false; readonly outcome: PlanOutcome }
+
+interface Caller {
+  readonly deps: PlanDeps
+  readonly sources: readonly PlanSource[]
+  readonly channels: readonly PlanPlatform[]
+  readonly cadence: Cadence
+  readonly voice: string
+}
+
+/** نداءٌ واحدٌ لمدًى واحد — الخطواتُ ٣ إلى ٦، وصفُّ الدفتر فيه. */
+async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Called> {
+  const { deps, sources, channels, cadence } = ctx
+  const fail = (outcome: PlanOutcome): Called => ({ ok: false, outcome })
 
   // ٣ · الحارس قبل النداء
   const allowance = await checkAllowance(deps.db, 'plan')
-  if (allowance.blocker !== null) {
-    return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
-  }
+  if (allowance.blocker !== null) return fail({ kind: 'blocked', reason: blockerReason(allowance.blocker) })
 
   const route = await routeFor(deps.db, 'plan')
-
   const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
-  }
+  if (provider === null) return fail({ kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false })
   const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
+  if (perProvider !== null) return fail({ kind: 'blocked', reason: blockerReason(perProvider) })
 
   const secretName = provider.builtin
     ? provider.name === 'anthropic'
@@ -155,9 +196,7 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
     provider.name,
     secretName === undefined ? undefined : deps.workerSecrets[secretName],
   )
-  if (resolved.key === null) {
-    return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
-  }
+  if (resolved.key === null) return fail({ kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false })
 
   // خطوةُ الكلفة (٥) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
   // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
@@ -169,16 +208,18 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
       operation: `plan:${spent.model}`,
       units,
       unitCost: units === 0 ? 0 : priced.total / units,
-      refId: week,
+      refId: start,
+      ...(deps.org === undefined ? {} : { org: deps.org }),
     })
     return { total: priced.total, units }
   }
 
   // ٤ · النداء
-  const system = systemPrompt()
+  const options = { channels, cadence }
+  const system = systemPrompt(options)
   // ‏وموجزُ العميل (D-257): هدفُه وجمهورُه ونبرتُه وما لا يُقال — وفارغٌ إن لم يُكتب
-  const voice = voiceSection(await readBrief(deps.db, org))
-  const user = voice === '' ? userPrompt(sources, week, span) : `${voice}\n\n${userPrompt(sources, week, span)}`
+  const body = userPrompt(sources, start, span, options)
+  const user = ctx.voice === '' ? body : `${ctx.voice}\n\n${body}`
   let text: string
   let spent: Spent
   try {
@@ -190,17 +231,15 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
         user,
         // المحمولُ لا الخامّ (D-164): `minLength` و`maxItems` يُطويان وصفًا،
         // وحدودُهما في `parsePlan`
-        schema: portableSchema(span === 'month' ? monthSchema() : PLAN_SCHEMA),
-        // حكمٌ يقرّر إنفاقَ أسبوعٍ كامل — يُعطى جهدَه
+        schema: portableSchema(planSchema(channels, maxItems(span, cadence))),
+        // حكمٌ يقرّر إنفاقَ مدًى كامل — يُعطى جهدَه
         effort: 'high',
         ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
       })
       text = result.text
       spent = result
     } else {
-      if (provider.baseUrl === null) {
-        return { kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false }
-      }
+      if (provider.baseUrl === null) return fail({ kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false })
       const result = await chatCompletion(
         { baseUrl: provider.baseUrl, apiKey: resolved.key, model: route.model, system, user, json: true },
         deps.fetchImpl ?? fetch,
@@ -216,50 +255,99 @@ export async function planWeek(deps: PlanDeps): Promise<PlanOutcome> {
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)
         : true
-    return { kind: 'failed', reason: error instanceof Error ? error.message : 'نداء فشل', retryable }
+    return fail({ kind: 'failed', reason: error instanceof Error ? error.message : 'نداء فشل', retryable })
   }
 
   // ٥ · الكلفة قبل القراءة
   const priced = await charge(spent)
-  const ran = spent.model
-  const units = priced.units
 
   // ٦ · القراءة — وما لا يصحّ يُسقَط
   let parsedJson: unknown
   try {
     parsedJson = JSON.parse(text)
   } catch {
-    return { kind: 'failed', reason: 'جواب النموذج ليس JSON صالحا', retryable: true }
+    return fail({ kind: 'failed', reason: 'جواب النموذج ليس JSON صالحا', retryable: true })
   }
   const known = new Set(sources.map((s) => s.id))
-  const read = parsePlan(parsedJson, known, week, span)
-  if (!read.ok) return { kind: 'failed', reason: read.reason, retryable: true }
+  const read = parsePlan(parsedJson, known, start, span, options)
+  if (!read.ok) return fail({ kind: 'failed', reason: read.reason, retryable: true })
+  return { ok: true, plan: read.plan, dropped: read.dropped, droppedWhy: read.droppedWhy, cost: priced.total, units: priced.units, model: spent.model }
+}
 
-  // ٧ · الكتابة — والسابقةُ لهذا الأسبوع تُنسَخ لا تُحذف
+export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
+  const now = (deps.now ?? (() => new Date()))()
+  const org = deps.org ?? 'org_owner'
+  const span: PlanSpan = deps.span ?? 'week'
+  const start = deps.startDay !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(deps.startDay) && !Number.isNaN(Date.parse(`${deps.startDay}T00:00:00Z`))
+    ? deps.startDay
+    : weekStart(now)
+  const channels = deps.channels === undefined || deps.channels.length === 0 ? DEFAULT_CHANNELS : [...new Set(deps.channels)]
+  const cadence: Cadence = deps.cadence ?? {}
+  const ideas = (deps.ideas ?? []).map((t) => t.trim()).filter((t) => t !== '').slice(0, 20)
+  const only = deps.sources ?? 'all'
+
+  // ١ و ٢ · المادّة — مصادرُ العميل وحدَه (أو ما اختاره منها)، وأفكارُه
+  const limit = span === 'week' ? 15 : 30
+  const sources = [...(await eligible(deps.db, limit, org, only)), ...ideaSources(ideas)]
+  if (sources.length < MIN_SOURCES) {
+    return {
+      kind: 'not_enough',
+      reason: `${sources.length} مصدرا محلَّلا — والخطّة تحتاج ${MIN_SOURCES} على الأقلّ`,
+    }
+  }
+
+  const ctx: Caller = { deps, sources, channels, cadence, voice: voiceSection(await readBrief(deps.db, org)) }
+
+  // ٣ إلى ٦ · نداءٌ لكلّ شهرٍ على الأكثر — والشهران شهرٌ ثمّ شهر
+  const windows: { start: string; span: PlanSpan }[] = span === '2months'
+    ? [{ start, span: 'month' }, { start: addDays(start, 28), span: 'month' }]
+    : [{ start, span }]
+  const parts: Extract<Called, { ok: true }>[] = []
+  for (const w of windows) {
+    const called = await planOnce(ctx, w.start, w.span)
+    if (!called.ok) return called.outcome
+    parts.push(called)
+  }
+  const merged: Plan = {
+    rationale: parts.map((p) => p.plan.rationale).filter((r) => r !== '').join(' ثمّ '),
+    items: parts.flatMap((p) => p.plan.items),
+  }
+  const dropped = parts.reduce((n, p) => n + p.dropped, 0)
+  const droppedWhy = parts.map((p) => p.droppedWhy).filter((w) => w !== '').join('، ')
+  const cost = parts.reduce((n, p) => n + p.cost, 0)
+  const units = parts.reduce((n, p) => n + p.units, 0)
+  const ran = parts[0]?.model ?? ''
+
+  // ٧ · الكتابة — والسابقةُ لهذا المدى تُنسَخ لا تُحذف
+  const choices: PlanChoices = {
+    channels, cadence, sources: only === 'all' ? 'all' : [...only], ideas, assets: [...(deps.assets ?? [])],
+    autoImage: deps.autoImage === true, startDay: start,
+  }
   const planId = crypto.randomUUID()
   await deps.db
     .prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND week_start = ? AND span = ? AND status <> 'superseded'")
-    .bind(org, week, span)
+    .bind(org, start, span)
     .run()
-  // `(org_id, week_start, span)` فريدٌ في المخطّط (0032)، فالسابقةُ لهذا العميل وهذا المدى تُزال بعد أن نُسخت حالُها —
-  // وهي كلفةٌ وقعت، فتبقى في الدفتر بمعرّف الأسبوع
-  // ‏الحذفُ والإدراجُ معا أو لا شيء (D-270): سقوطٌ بينهما كان يضيّع خطّةَ الأسبوع ودفعَ ثمنها
-  const remove = deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, week, span)
+  // `(org_id, week_start, span)` فريدٌ في المخطّط (0032 · 0037)، فالسابقةُ لهذا العميل وهذا المدى تُزال بعد أن نُسخت حالُها —
+  // وهي كلفةٌ وقعت، فتبقى في الدفتر بمعرّف البداية
+  // ‏الحذفُ والإدراجُ معا أو لا شيء (D-270): سقوطٌ بينهما كان يضيّع خطّةَ المدى ودفعَ ثمنها
+  const remove = deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, start, span)
   const insert = deps.db
-    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(planId, week, JSON.stringify(read.plan), ran, 'draft', org, span)
+    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(planId, start, JSON.stringify(merged), ran, 'draft', org, span, JSON.stringify(choices))
   if (deps.db.batch !== undefined) await deps.db.batch([remove, insert])
   else { await remove.run(); await insert.run() }
 
   return {
     kind: 'planned',
     planId,
-    week,
-    items: read.plan.items.length,
-    dropped: read.dropped,
-    droppedWhy: read.droppedWhy,
-    cost: priced.total,
+    week: start,
+    items: merged.items.length,
+    dropped,
+    droppedWhy,
+    cost,
     units,
+    calls: parts.length,
   }
 }
 
@@ -272,14 +360,16 @@ export interface StoredPlan {
   readonly createdAt: string
   /** وغيابُه أسبوعٌ — خطّةٌ قُرئت قبل 0032. */
   readonly span?: PlanSpan
+  /** اختياراتُ المالك (D-282) — فارغةٌ لخطّةٍ قبل 0037. */
+  readonly choices: PlanChoices
 }
 
-/** أحدثُ خطّةٍ لأقرب أسبوع. */
+/** أحدثُ خطّةٍ لأقرب مدًى. */
 export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan | null> {
   try {
     const row = await db
       .prepare(
-        `SELECT id, week_start, plan_json, model, status, created_at, span FROM plans
+        `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json FROM plans
           WHERE org_id = ? AND status <> 'superseded' ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
       .bind(org)
@@ -292,7 +382,8 @@ export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan 
       model: String(row['model']),
       status: row['status'] === 'approved' ? 'approved' : 'draft',
       createdAt: String(row['created_at']),
-      span: row['span'] === 'month' ? 'month' : 'week',
+      span: asSpan(row['span']),
+      choices: row['choices_json'] === undefined ? EMPTY_CHOICES : readChoices(row['choices_json']),
     }
   } catch {
     // جدولٌ لم يُرحَّل أو JSON فاسد: لوحةٌ بلا خطّةٍ خيرٌ من لوحةٍ لا تُفتح
@@ -310,13 +401,3 @@ export async function approvePlan(db: Db, planId: string, org = 'org_owner'): Pr
   await db.prepare("UPDATE plans SET status = 'approved' WHERE id = ? AND org_id = ?").bind(planId, org).run()
   return true
 }
-
-/** مخطّطُ الشهر: المخطّطُ نفسُه بسقف بنوده (D-256). */
-function monthSchema(): typeof PLAN_SCHEMA {
-  const base = PLAN_SCHEMA as unknown as { properties: { items: Record<string, unknown> } }
-  return {
-    ...PLAN_SCHEMA,
-    properties: { ...base.properties, items: { ...base.properties.items, maxItems: maxItems('month') } },
-  } as unknown as typeof PLAN_SCHEMA
-}
-

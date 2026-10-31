@@ -104,12 +104,12 @@ const STOP: ReadonlySet<string> = new Set([
 /** أقصى ما تحتمله الجملةُ من كلماتٍ قبل أن تُقرأ مرّتين. */
 // و TikTok أضيقُها: وصفٌ يُطوى بعد سطرين، فجملةٌ طويلةٌ فيه لا تُقرأ
 const SENTENCE_WORDS: Readonly<Record<Platform, number>> = {
-  linkedin: 28, x: 22, tiktok: 18, youtube: 24,
+  linkedin: 28, x: 22, tiktok: 18, youtube: 24, instagram: 20,
 }
 
 /** ما تحتمله المنصّةُ من وسوم — مقروءٌ من عرفها لا مخترَع. */
 const HASHTAG_MAX: Readonly<Record<Platform, number>> = {
-  linkedin: 3, x: 1, tiktok: 3, youtube: 3,
+  linkedin: 3, x: 1, tiktok: 3, youtube: 3, instagram: 5,
 }
 
 /**

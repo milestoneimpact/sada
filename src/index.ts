@@ -41,10 +41,11 @@ import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
-import { draftPost } from './lib/draft/job'
+import { draftFromIdea, draftPost } from './lib/draft/job'
 import { generateForPost } from './lib/image/job'
 import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
+import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -435,7 +436,18 @@ export interface AnalyzeMessage {
  * ثمّ صورتُه إن رُفعت الصورةُ الآليّة وبقي من سقفها. **ولا جدولة**: المسوّدةُ تنتظر اعتمادَ المالك كما تنتظر كلُّ مسوّدة.
  */
 export interface PlanDraftMessage {
-  readonly draft: { readonly sourceId: string; readonly platform: 'linkedin' | 'x'; readonly org: string; readonly asset?: string; readonly planId?: string }
+  readonly draft: {
+    readonly sourceId: string
+    /** كلُّ قناةٍ ينشر لها صدى (D-282). */
+    readonly platform: PlanPlatform
+    readonly org: string
+    readonly asset?: string
+    readonly planId?: string
+    /** نصُّ الفكرة حين يكون المصدرُ `idea:<n>` — يُكتب منها بـ `draftFromIdea`. */
+    readonly idea?: string
+    /** اختيارُ الخطّة: صورةٌ مع كلّ منشور؟ وغيابُه الإعدادُ العامّ كما كان. */
+    readonly autoImage?: boolean
+  }
 }
 
 /**
@@ -446,9 +458,15 @@ export interface PlanDraftMessage {
  * الثاني في الطابور يعني نداءً مدفوعا يتكرّر بلا أمل.
  */
 async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][number], env: Env): Promise<void> {
-  const { sourceId, platform, org } = message.body.draft
+  const { sourceId, platform, org, idea } = message.body.draft
   const secrets = env as unknown as Record<string, string | undefined>
-  const outcome = await draftPost({ db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }, sourceId, platform)
+  const deps = { db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }
+  // ‏فكرةُ المالك (D-282) تُكتب بباب «اكتب من فكرتك» نفسِه، لا بطريقٍ ثانٍ حول حرّاسه
+  const outcome = sourceId.startsWith('idea:')
+    ? idea === undefined || idea === ''
+      ? { kind: 'failed' as const, reason: 'بندُ فكرةٍ بلا نصّها', retryable: false }
+      : await draftFromIdea(deps, idea, platform)
+    : await draftPost(deps, sourceId, platform)
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
   if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)
@@ -456,8 +474,10 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
   // ‏والمسوّدةُ تعرف خطّتها (D-261): منها يُقرأ يومُ البند حين تُجدوَل الخطّة
   const planId = message.body.draft.planId
   if (outcome.kind === 'drafted' && planId !== undefined) {
-    await env.DB.prepare('UPDATE posts SET plan_id = ? WHERE id = ? AND org_id = ? AND plan_id IS NULL')
-      .bind(planId, outcome.postId, org).run()
+    // ‏ومسوّدةُ الفكرة تحمل معرّفَ بندها في `source_refs`، فتجدها جدولةُ الخطّة كما تجد مسوّدةَ المصدر
+    const refs = sourceId.startsWith('idea:') ? JSON.stringify([sourceId]) : null
+    await env.DB.prepare('UPDATE posts SET plan_id = ?, source_refs = coalesce(?, source_refs) WHERE id = ? AND org_id = ? AND plan_id IS NULL')
+      .bind(planId, refs, outcome.postId, org).run()
       .catch((error: unknown) => console.warn({ job: 'plan-draft-link', post: outcome.postId, failed: String(error) }))
   }
   // ‏ما اختير من المكتبة (D-260) يُربط بالمسوّدة بلا كلفة، ولا تُرسم لها صورةٌ آليّة فوقه
@@ -467,7 +487,10 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
     if (linked !== null) await linked.run().catch((error: unknown) => console.warn({ job: 'plan-draft-asset', post: outcome.postId, failed: String(error) }))
     return
   }
-  if (outcome.kind === 'drafted' && (await autoImageRoom(env.DB, org)) > 0) {
+  // ‏قناةُ مقاطع بلا أصل: لا صورةَ تُرسم ولا فشل — المسوّدةُ تنتظر مقطعًا يرفعه المالك، كما يشرح فحصُ الناشر
+  if (outcome.kind === 'drafted' && CLIP_CHANNELS.has(platform)) return
+  // ‏واختيارُ الخطّة (D-282) يغلب الإعدادَ العامّ، والسقفُ اليوميُّ وسقفُ الإنفاق في `autoImageRoom` و`generateForPost` كما هما
+  if (outcome.kind === 'drafted' && (await autoImageRoom(env.DB, org, message.body.draft.autoImage)) > 0) {
     await generateForPost({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, outcome.postId, { style: 'infographic' })
       .catch((error: unknown) => console.warn({ job: 'plan-draft-image', post: outcome.postId, failed: String(error) }))
   }

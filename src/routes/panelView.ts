@@ -26,7 +26,7 @@ import { earliestLocal } from './ui/when'
 import { tabs } from './ui/components/tabs'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
-import { planSection } from './ui/sections/plan'
+import { planSection, type PlanFormInput } from './ui/sections/plan'
 import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
@@ -380,6 +380,9 @@ export interface PanelData {
   readonly media: readonly MediaView[]
   /** خطّةُ الأسبوع إن وُجدت، وأمزوّدُها جاهز. */
   readonly plan: StoredPlan | null
+  /** نموذجُ الخطّة (D-282): ما يلزمه من القنوات والمصادر والكلفة، وعدُّ ما ينتظر منها. */
+  readonly planForm?: PlanFormInput
+  readonly planPending?: number
   readonly planReady: boolean
   /** المصادرُ التي لها خلاصة — وحدها تُكتب منها مسوّدة. */
   readonly writableSources: readonly { id: string; name: string }[]
@@ -459,7 +462,7 @@ export type OverviewData = Pick<PanelData,
 /** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
 export type PostsData = Pick<PanelData,
   'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
-  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit'>
+  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending'>
 
 /** «المكتبة»: المصادرُ والمقاطعُ والصور. */
 export type LibraryData = Pick<PanelData,
@@ -1154,6 +1157,8 @@ function postsPane(d: ShellData & PostsData): string {
     zone: d.zone ?? null,
     // من الخمسين صفًّا المحمَّلة أصلًا للأمان — لا استعلامَ جديد (D-157)
     lastAttempt: d.audit.find((a) => a.action === 'plan.generate') ?? null,
+    ...(d.planForm === undefined ? {} : { form: d.planForm }),
+    ...(d.planPending === undefined ? {} : { pending: d.planPending }),
   })}</div>`)}
 </section>`
 }

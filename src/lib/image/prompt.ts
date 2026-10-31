@@ -41,6 +41,8 @@ export const ASPECT: Readonly<Record<Platform, string>> = {
   youtube: '9:16 vertical portrait',
   linkedin: '1.91:1 wide landscape',
   x: '16:9 landscape',
+  // و Instagram رأسيّةٌ 4:5 — ما تعرضه بلا قصّ (D-282)
+  instagram: '4:5 vertical portrait',
 }
 
 /**

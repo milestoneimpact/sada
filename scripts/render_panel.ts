@@ -7,6 +7,7 @@
  *
  * يستورد `panelPage` نفسها لا نسخةً منها، فما يُرى هنا هو ما يُرسَل.
  */
+import { EMPTY_CHOICES } from '../src/lib/plan/prompt'
 import { fixtureImage, writeAudited } from './writeAudited'
 import { panelPage, type PanelData } from '../src/routes/panelView'
 import { linkStates, viewChannels, type LinkedAccount } from '../src/lib/channels'
@@ -258,6 +259,7 @@ const data: PanelData = {
     model: 'claude-opus-5',
     status: 'draft',
     createdAt: ago(3),
+    choices: EMPTY_CHOICES,
     plan: {
       rationale:
         'أسبوع يبدأ بالأثقل: تقرير الأثر يفتح النقاش يوم الاثنين، ثمّ تسنده جملة حادّة على X بعد يومين، ويُختم بدرس من مراجعة المحفظة.',
@@ -284,6 +286,13 @@ const data: PanelData = {
     },
   },
   planReady: true,
+  // ‏نموذجُ الخطّة (D-282): قناتان مربوطتان من خمس، وإيقاعُ الموجز، ومصدران محلَّلان، وكلفةُ الصورة من الدفتر
+  planForm: {
+    linked: ['linkedin', 'x'], chosen: ['linkedin', 'x'], perWeek: 3,
+    sources: [{ id: 's1', name: 'تقرير الأثر 2025' }, { id: 's2', name: 'مراجعة المحفظة' }],
+    perImage: 0.011, autoImage: false,
+  },
+  planPending: 2,
   media: [
     // معاينةٌ محلّيّة: `data:` تكفي للنظر، والحيُّ يُخدَم من `/panel/media/:id`
     {

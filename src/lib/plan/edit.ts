@@ -5,11 +5,11 @@
  * وغيرُ مستبدَلة. **والفهرسُ ثابت**: البنودُ لا تُرتَّب عند الحفظ، فبطاقةٌ في الصفحة لا يتبدّل بندُها تحتها.
  */
 import type { Db } from '../tokens'
-import { spanDays, type PlanSpan } from './prompt'
+import { asSpan, kindFor, PLAN_CHANNELS, spanDays, type PlanSpan } from './prompt'
 import { findAsset } from '../library'
 
-export const PLAN_PLATFORMS = ['linkedin', 'x'] as const
-export type PlanPlatform = (typeof PLAN_PLATFORMS)[number]
+/** ما يُبدَّل إليه بندٌ: كلُّ قناةٍ ينشر لها صدى (D-282). */
+export const PLAN_PLATFORMS = PLAN_CHANNELS
 
 export const ANGLE_MAX = 280
 
@@ -36,7 +36,7 @@ export async function editPlanItem(
   const plan = JSON.parse(row.plan_json) as { items: Record<string, unknown>[] }
   const item = Number.isInteger(index) ? plan.items[index] : undefined
   if (item === undefined) return { ok: false, reason: 'لا بند بهذا الرقم' }
-  const span: PlanSpan = row.span === 'month' ? 'month' : 'week'
+  const span: PlanSpan = asSpan(row.span)
   if (change.day !== undefined) {
     if (!dayWithin(change.day, row.week_start, span)) return { ok: false, reason: 'اليوم خارج مدى الخطّة' }
     item['day'] = change.day
@@ -44,6 +44,8 @@ export async function editPlanItem(
   if (change.platform !== undefined) {
     if (!(PLAN_PLATFORMS as readonly string[]).includes(change.platform)) return { ok: false, reason: 'منصّة لا تُخطَّط' }
     item['platform'] = change.platform
+    // ‏ونوعُ البند يتبع منصّتَه (D-282): قناةُ مقاطع تجعله مقطعًا، وما سواها يبقى على ما كان أو نصًّا
+    item['kind'] = kindFor(change.platform as never, item['kind'])
   }
   if (change.time !== undefined) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(change.time)) return { ok: false, reason: 'ساعة غير صالحة' }
@@ -102,13 +104,13 @@ export async function addPlanItem(
   if (row === null || row.status === 'superseded') return { ok: false, reason: 'لا خطّة بهذا المعرّف' }
   const source = await db.prepare('SELECT id FROM sources WHERE id = ? AND org_id = ?').bind(item.sourceId, org).first<{ id: string }>()
   if (source === null) return { ok: false, reason: 'اختر مصدرًا من مصادر العميل' }
-  if (!dayWithin(item.day, row.week_start, row.span === 'month' ? 'month' : 'week')) return { ok: false, reason: 'اليوم خارج مدى الخطّة' }
+  if (!dayWithin(item.day, row.week_start, asSpan(row.span))) return { ok: false, reason: 'اليوم خارج مدى الخطّة' }
   if (!(PLAN_PLATFORMS as readonly string[]).includes(item.platform)) return { ok: false, reason: 'منصّة لا تُخطَّط' }
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(item.time)) return { ok: false, reason: 'ساعة غير صالحة' }
   const angle = item.angle.trim()
   if (angle.length === 0 || [...angle].length > ANGLE_MAX) return { ok: false, reason: `الزاوية سطرٌ حتّى ${ANGLE_MAX} حرف` }
   const plan = JSON.parse(row.plan_json) as { items: unknown[] }
-  plan.items.push({ sourceId: item.sourceId, platform: item.platform, angle, day: item.day, time: item.time, why: 'أضافه المالك' })
+  plan.items.push({ sourceId: item.sourceId, platform: item.platform, kind: kindFor(item.platform as never), angle, day: item.day, time: item.time, why: 'أضافه المالك' })
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
   return { ok: true }
 }
