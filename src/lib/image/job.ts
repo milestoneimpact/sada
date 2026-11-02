@@ -20,12 +20,14 @@
  * **والأرخصُ خطأً هو الذي يقع أوّلا.**
  */
 import { recordCost } from '../cost'
+import { record } from '../audit'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
 import { routeFor } from '../ai/routes'
 import { claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
+import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, cfPrice, imageNeurons, neuronsUsedToday, splitCharge, FREE_NEURONS_PER_DAY } from '../ai/imagePricing'
 import { cfAccountOf } from '../ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate, type ImageRefusal } from './gate'
 import { imagePrompt, topicOf } from './prompt'
@@ -329,6 +331,33 @@ export interface GenerateOptions {
    * بلا جلسةٍ يقرأ المنشورَ بمعرّفه **مع منظّمته**، وبها تُساق كلُّ جملةٍ بعده.
    */
   readonly org?: string
+  /**
+   * مستوى الرسم الفنّيّ على Cloudflare (D-285، قرارُ المالك): المسوّدةُ بـ schnell الرخيص، و`final` بـ klein 9B
+   * بعد الاعتماد — فلا تُدفع الجودةُ العالية على منشورٍ سيُرفض. وغيابُه مسوّدة.
+   */
+  readonly tier?: 'draft' | 'final'
+  /** النهائيّةُ تُرسم بوصف المسوّدة المعتمَدة نفسِه، لا بموجزٍ جديدٍ يُدفع ثمنُه ويرسم غيرَها. */
+  readonly reuse?: { readonly prompt: string; readonly headline: string }
+  /** المالكُ أذن بالدفع فوق الحصّة المجّانيّة اليوم (D-285). */
+  readonly overage?: boolean
+}
+
+/** مقاسُ التوليد لـ FLUX.2 — دون ميغابكسلٍ واحد فيبقى بسعر الميغابكسل الأوّل، وبنسبة المنصّة. */
+const GEN_SIZE: Readonly<Record<Platform, { width: number; height: number }>> = {
+  linkedin: { width: 1344, height: 704 },
+  x: { width: 1344, height: 768 },
+  tiktok: { width: 768, height: 1344 },
+  youtube: { width: 768, height: 1344 },
+} as Readonly<Record<Platform, { width: number; height: number }>>
+
+/** هل أذن المالكُ اليومَ بالدفع فوق الحصّة؟ قرارُه في سجلّ التدقيق، **ولمنظّمته وحدَها** — لا يفتح الدفعَ لغيرها. */
+export async function overageApprovedToday(db: Db, org: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 AS ok FROM audit_log WHERE org_id = ? AND action = 'image.overage.approve' AND at >= date('now') LIMIT 1")
+    .bind(org)
+    .first<{ ok: number }>()
+    .catch(() => null)
+  return row !== null
 }
 
 /** منصّةُ المقاس — ومنصّاتُ المقاطع رأسيّةٌ لا LinkedIn كما كانت تُقرأ. */
@@ -508,7 +537,27 @@ export async function generateForPost(
    * لا صورة**: تُدفع كلفتُها ويُنشر معها ادّعاءٌ لم يُقصد. فيُردّ بسببه، والصورةُ
    * القائمةُ باقية، والإنفوجرافيك طريقٌ لا يحتاج الموجز.
    */
-  const visual = await visualBrief(writerDeps, post.text, post.id)
+  /*
+   * ٣·ج · **الحصّةُ المجّانيّة قبل أيّ إنفاق** (D-285). النموذجُ بمستواه، وNeurons الصورة بمقاسها؛ فإن تجاوزت ما بقي
+   * من حصّة اليوم ولم يأذن المالكُ بالدفع، **لا يُنادى الموجزُ ولا النموذج**: يُسجَّل الانتظارُ ويُسأل المالك.
+   */
+  const cfModel = provider.name === 'cloudflare'
+    ? (options.tier === 'final' ? FINAL_IMAGE_MODEL : cfPrice(route.model) !== null && route.model !== FINAL_IMAGE_MODEL ? route.model : DRAFT_IMAGE_MODEL)
+    : null
+  const gen = GEN_SIZE[platform] ?? { width: 1024, height: 1024 }
+  const neurons = cfModel === null ? null : imageNeurons(cfModel, cfPrice(cfModel)?.multipart === true ? gen.width : 1024, cfPrice(cfModel)?.multipart === true ? gen.height : 1024)
+  const usedToday = neurons === null ? 0 : await neuronsUsedToday(deps.db)
+  if (neurons !== null && usedToday + neurons > FREE_NEURONS_PER_DAY && options.overage !== true && !(await overageApprovedToday(deps.db, post.org_id))) {
+    await record(deps.db, { actor: 'system', action: 'image.quota_wait', target: post.id, detail: `${options.tier ?? 'draft'} · ${Math.round(neurons)}`, org: post.org_id })
+    return {
+      kind: 'blocked',
+      reason: 'نفدت حصّةُ Cloudflare المجّانيّة اليوم — الصورةُ تنتظر قرارَك: «ارسمها بالدفع» أو «انتظر للغد» (تتجدّد 03:00 بتوقيت الرياض)',
+    }
+  }
+
+  const visual = options.reuse !== undefined
+    ? { brief: { subject: '', composition: '', palette: '', headline: options.reuse.headline, kicker: '' }, cost: 0, detail: '' }
+    : await visualBrief(writerDeps, post.text, post.id)
   if (visual.brief === null) {
     return {
       kind: 'failed',
@@ -528,7 +577,7 @@ export async function generateForPost(
   const held = await claimGeneration(deps.db, post.org_id, key, post.id, 'image', (deps.now ?? (() => new Date()))())
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
 
-  const prompt = imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
+  const prompt = options.reuse?.prompt ?? imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
 
   /*
    * **والسائقُ يتبع المزوّدَ المختار** (D-079): كان الاستيرادُ مثبَّتا على Gemini،
@@ -541,9 +590,11 @@ export async function generateForPost(
         ? await generateImageCf({
             accountId,
             apiToken: resolved.key,
-            // ونموذجٌ لم يُسمَّ في التوجيه يأخذ افتراضَ المزوّد لا افتراضَ غيرِه
-            model: route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL,
+            // ‏والنموذجُ بمستواه (D-285)، وما ليس في جدول الأسعار من التوجيه كما كان
+            model: cfModel ?? (route.model.startsWith('@cf/') ? route.model : CF_IMAGE_MODEL),
             prompt,
+            width: gen.width,
+            height: gen.height,
             ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
           })
         : await generateImage({
@@ -584,12 +635,19 @@ export async function generateForPost(
 
   // ٥ · **الكلفة قبل الرفع والكتابة** — النداءُ وقع وحوسِب عليه. وصورةٌ تُسعَّر
   // بالنداء: وحدةٌ واحدةٌ في `outputTokens`، ومزوّدٌ بلا سعرٍ يعطي صفرا **ويُعلَّم**
-  const priced = costOf(provider, { inputTokens: 0, outputTokens: 1 })
+  /*
+   * **والسعرُ بالنموذج والمقاس** (D-285): Cloudflare بـ Neurons من جدولها، وما وقع في حصّة اليوم صفرٌ موسومٌ «free»
+   * وما زاد بسعره؛ والوحداتُ Neurons فيُقرأ منها ما بقي من الحصّة. ومزوّدٌ بلا سعرٍ يُسجَّل صفرًا **موسومًا**، لا صامتًا.
+   */
+  const charge = neurons === null ? null : splitCharge(neurons, usedToday)
+  const priced = charge !== null
+    ? { total: charge.usd, priced: true }
+    : costOf(provider, { inputTokens: 0, outputTokens: 1 })
   await recordCost(deps.db, {
     provider: provider.name,
-    operation: `image:${platform}:${image.model}`,
-    units: 1,
-    unitCost: priced.total,
+    operation: `image:${platform}:${image.model}${charge !== null && charge.usd === 0 ? ':free' : ''}${priced.priced ? '' : ':price_unverified'}`,
+    units: charge?.neurons ?? 1,
+    unitCost: charge !== null ? (charge.neurons === 0 ? 0 : charge.usd / charge.neurons) : priced.total,
     refId: post.id,
   })
 
@@ -843,4 +901,71 @@ export async function rejectMedia(db: Db, org: string, mediaId: string): Promise
     .bind(mediaId, org)
     .run()
   return true
+}
+
+/**
+ * **الصورةُ النهائيّةُ بعد الاعتماد** (D-285، قرارُ المالك): ما رُسم مسوّدةً بـ schnell يُعاد بـ klein 9B **بوصفه نفسِه**
+ * حين يُعتمَد منشورُه — فالجودةُ العالية تُدفع على ما سيُنشر وحدَه، والصورةُ لا تتبدّل فكرتُها بعد أن رآها المالك.
+ * وتمرّ بحرّاس `generateForPost` كلِّها: الحصّةُ المجّانيّة، وسقفُ الإنفاق، والإيقاف.
+ */
+export async function finalizeApproved(deps: ImageDeps, org: string, postIds: readonly string[], overage = false): Promise<number> {
+  let done = 0
+  for (const id of postIds) {
+    const draft = await deps.db
+      .prepare("SELECT id, prompt, headline FROM media WHERE post_id = ? AND org_id = ? AND status = 'ready' AND model = ? ORDER BY created_at DESC LIMIT 1")
+      .bind(id, org, DRAFT_IMAGE_MODEL)
+      .first<{ id: string; prompt: string | null; headline: string | null }>()
+    if (draft === null || draft.prompt === null) continue
+    const out = await generateForPost(deps, id, {
+      style: 'illustration', tier: 'final', org, replace: draft.id,
+      reuse: { prompt: draft.prompt, headline: draft.headline ?? '' },
+      ...(overage ? { overage } : {}),
+    }).catch(() => null)
+    if (out?.kind === 'generated') done += 1
+  }
+  return done
+}
+
+export interface WaitingImage {
+  readonly postId: string
+  readonly tier: 'draft' | 'final'
+  readonly neurons: number
+}
+
+/**
+ * **ما ينتظر الحصّة** (D-285): كلُّ صورةٍ رُدّت بـ `image.quota_wait` منذ `since` ولم تُرسَم بعدها. ومن السجلّ وحدَه:
+ * القرارُ والانتظارُ أثرٌ يُقرأ، لا جدولٌ جديد.
+ */
+export async function waitingImages(db: Db, org: string, since: 'today' | 'yesterday' = 'today'): Promise<WaitingImage[]> {
+  const from = since === 'today' ? "date('now')" : "date('now', '-1 day')"
+  const { results } = await db
+    .prepare(`SELECT a.target AS post, a.detail AS detail FROM audit_log a
+               WHERE a.action = 'image.quota_wait' AND a.org_id = ? AND a.at >= ${from}
+                 AND NOT EXISTS (SELECT 1 FROM media m WHERE m.post_id = a.target AND m.org_id = a.org_id AND m.status = 'ready' AND m.created_at >= a.at)
+               ORDER BY a.id`)
+    .bind(org)
+    .all<{ post: string; detail: string | null }>()
+    .catch(() => ({ results: [] as { post: string; detail: string | null }[] }))
+  const seen = new Map<string, WaitingImage>()
+  for (const r of results) {
+    const [tier, n] = (r.detail ?? '').split(' · ')
+    seen.set(r.post, { postId: r.post, tier: tier === 'final' ? 'final' : 'draft', neurons: Number(n) || 0 })
+  }
+  return [...seen.values()]
+}
+
+/** يرسم ما انتظر: بإذن المالك اليوم (`overage`)، أو بعد تجدّد الحصّة — والحارسُ نفسُه يردّ ما لا يتّسع. */
+export async function resumeWaiting(deps: ImageDeps, org: string, since: 'today' | 'yesterday', overage: boolean): Promise<number> {
+  let done = 0
+  for (const w of await waitingImages(deps.db, org, since)) {
+    if (w.tier === 'final') {
+      done += await finalizeApproved(deps, org, [w.postId], overage)
+      continue
+    }
+    const out = await generateForPost(deps, w.postId, { style: 'illustration', org, ...(overage ? { overage } : {}) }).catch(() => null)
+    if (out?.kind === 'generated') done += 1
+    // ‏والحصّةُ نفدت ثانيةً بلا إذن: يقف هنا، والباقي ينتظر كما ينتظر
+    if (out?.kind === 'blocked') break
+  }
+  return done
 }

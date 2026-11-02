@@ -34,6 +34,7 @@ import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
 import {
   deciderOf, page, loginResponse, setFlash, guardPost, reachNow, back, toCard, POST_ID, BOARD,
+  finalizeLater,
 } from './shared'
 
 export const drafts = new Hono<{ Bindings: Env }>()
@@ -363,6 +364,8 @@ drafts.post('/panel/drafts/decide', async (c) => {
    * ‏«اعتمد وجدوِل» (D-198): بعد الاعتماد وحده، **وبـ`schedulePost` نفسِها** بحسابها وموعدها من
    * ‏النموذج، فالحارسُ واحد (D-019) والاعتمادُ مسجَّلٌ قبلها (D-009).
    */
+  // ‏والصورةُ النهائيّةُ بعد الاعتماد (D-285)
+  if (result.ok && result.status !== 'rejected') finalizeLater(c, activeOrg(gate.session.record), [id])
   let scheduled: ScheduleResult | null = null
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
     scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record))
@@ -520,6 +523,7 @@ drafts.post('/panel/drafts/approve-many', async (c) => {
     ids,
     deciderOf(gate.session.record.via),
   )
+  finalizeLater(c, activeOrg(gate.session.record), result.done)
 
   // **والمتعثّرُ يُسمَّى بسببه**: حصيلةٌ تقول «فشل بعضُها» تجعل المالك
   // يعيد الكلَّ — ولا يعرف أيَّها مضى

@@ -42,7 +42,7 @@ import { beat } from './lib/ops/heartbeat'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
 import { draftFromIdea, draftPost } from './lib/draft/job'
-import { generateForPost } from './lib/image/job'
+import { generateForPost, resumeWaiting } from './lib/image/job'
 import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
@@ -448,6 +448,8 @@ export interface PlanDraftMessage {
     readonly idea?: string
     /** اختيارُ الخطّة: صورةٌ مع كلّ منشور؟ وغيابُه الإعدادُ العامّ كما كان. */
     readonly autoImage?: boolean
+    /** ونوعُها (D-285) — وغيابُه إنفوجرافيك كما كان. */
+    readonly imageStyle?: 'infographic' | 'illustration'
   }
 }
 
@@ -492,7 +494,7 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
   if (outcome.kind === 'drafted' && CLIP_CHANNELS.has(platform)) return
   // ‏واختيارُ الخطّة (D-282) يغلب الإعدادَ العامّ، والسقفُ اليوميُّ وسقفُ الإنفاق في `autoImageRoom` و`generateForPost` كما هما
   if (outcome.kind === 'drafted' && (await autoImageRoom(env.DB, org, message.body.draft.autoImage)) > 0) {
-    await generateForPost({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, outcome.postId, { style: 'infographic' })
+    await generateForPost({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, outcome.postId, { style: message.body.draft.imageStyle ?? 'infographic' })
       .catch((error: unknown) => console.warn({ job: 'plan-draft-image', post: outcome.postId, failed: String(error) }))
   }
 }
@@ -935,6 +937,23 @@ const REPORT_CRON = '14 4 * * 1'
  * وفي الثالثة فجرا يلتقي الجدولان فيدور الإرسال مرّتين — **وذاك لا يضرّ**:
  * `dispatched_at` يجعل الثانية تجد الطابور فارغا (D-037).
  */
+/**
+ * **ما انتظر الحصّةَ أمسِ يُرسَم اليوم** (D-285): المسحُ يجري 03:03 UTC، بعد تجدّد حصّة Cloudflare (00:00 UTC).
+ * وبلا إذنٍ بالدفع: الحارسُ نفسُه يقف حين تنفد ثانيةً، والباقي ينتظر ويُسأل عنه المالك.
+ */
+async function quotaTick(env: Env): Promise<void> {
+  const { results } = await env.DB
+    .prepare("SELECT DISTINCT org_id FROM audit_log WHERE action = 'image.quota_wait' AND at >= date('now', '-1 day')")
+    .all<{ org_id: string }>()
+    .catch(() => ({ results: [] as { org_id: string }[] }))
+  const secrets = env as unknown as Record<string, string | undefined>
+  for (const { org_id } of results) {
+    const done = await resumeWaiting({ db: env.DB, bucket: env.MEDIA, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets }, org_id, 'yesterday', false)
+      .catch(() => 0)
+    console.info({ job: 'image-quota-resume', org: org_id, done })
+  }
+}
+
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
   // **والتجديدُ قبل الطابور** — منشورٌ ينتظر رمزا انتهى يُجدَّد رمزُه
   // في هذه الدورة نفسِها، فلا يفشل فشلا نهائيّا لأجل دقائق (D-066)
@@ -944,6 +963,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   if (controller.cron === SCAN_CRON) {
     await scanTick(env)
     await alertTick(env)
+    await quotaTick(env)
   }
   if (controller.cron === METRICS_CRON) {
     await metricsTick(env)

@@ -46,14 +46,14 @@ export async function planProgress(db: Db, org: string, planId: string): Promise
  * **اعتمادُ الخطّة كاملةً** (D-282): كلُّ مسوّدةٍ من هذه الخطّة تنتظر القرار تُعتمَد بـ`approveMany` نفسِها (فحصُها
  * و`approved_by` و`approved_at` كما في الاعتماد الفرديّ). **ولا يُنشر شيء**: الجدولةُ خطوةٌ بعدها.
  */
-export async function approvePlanDrafts(db: Db, org: string, planId: string, by: string): Promise<{ readonly done: number; readonly failed: readonly string[] }> {
+export async function approvePlanDrafts(db: Db, org: string, planId: string, by: string): Promise<{ readonly done: number; readonly ids?: readonly string[]; readonly failed: readonly string[] }> {
   const { results } = await db
     .prepare("SELECT id FROM posts WHERE org_id = ? AND plan_id = ? AND status = 'draft' ORDER BY created_at")
     .bind(org, planId)
     .all<{ id: string }>()
   if (results.length === 0) return { done: 0, failed: [] }
   const result = await approveMany(db, org, results.map((r) => r.id), by)
-  return { done: result.done.length, failed: result.failed.map((f) => f.reason) }
+  return { done: result.done.length, ids: result.done, failed: result.failed.map((f) => f.reason) }
 }
 
 function readRefs(raw: string | null): string[] {

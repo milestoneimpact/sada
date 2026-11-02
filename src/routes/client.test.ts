@@ -86,8 +86,8 @@ describe('«ابدأ الخطّة» (D-258)', () => {
     body.set('id', 'pl1')
     expect((await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)).status).toBe(303)
     expect(sent).toEqual([
-      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1' } },
-      { draft: { sourceId: 's1', platform: 'x', org: 'org_owner', planId: 'pl1' } },
+      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1', imageStyle: 'infographic' } },
+      { draft: { sourceId: 's1', platform: 'x', org: 'org_owner', planId: 'pl1', imageStyle: 'infographic' } },
     ])
     expect(db.raw.prepare("SELECT status FROM plans WHERE id = 'pl1'").get()).toEqual({ status: 'approved' })
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts").get()).toEqual({ n: 0 })
@@ -315,7 +315,7 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(html).not.toContain('name="ideas"')
     // ‏والشاشةُ بأمدائها الثلاثة ويوم بدايتها وأفكارها وصورتها — والشهران يقبلهما الخادمُ ولا يُعرَضان
     const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
-    for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'name="start"', 'name="ideas"', 'name="auto_image"', 'name="source" value="all"', 'action="/panel/plan/generate"']) expect(screen).toContain(s)
+    for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'name="start"', 'name="ideas"', 'name="image_style" value="illustration"', 'name="source" value="all"', 'action="/panel/plan/generate"']) expect(screen).toContain(s)
     expect(screen).not.toContain('value="2months"')
     // ‏والمربوطُ وحدَه يُرى: لا خانةَ لمنصّةٍ غيرِ مربوطة ولا لما ليس في الخطّة اليوم
     expect(screen).not.toContain('value="instagram"')
@@ -348,9 +348,9 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     body.set('_csrf', csrf); body.set('id', 'pl1')
     await app.request('/panel/plan/start', { method: 'POST', body, headers: { Cookie: cookie } }, env)
     expect(sent).toEqual([
-      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1', autoImage: true } },
-      { draft: { sourceId: 'idea:1', platform: 'x', org: 'org_owner', planId: 'pl1', idea: 'فكرةٌ عن الوقف', autoImage: true } },
-      { draft: { sourceId: 's1', platform: 'tiktok', org: 'org_owner', planId: 'pl1', autoImage: true } },
+      { draft: { sourceId: 's1', platform: 'linkedin', org: 'org_owner', planId: 'pl1', autoImage: true, imageStyle: 'infographic' } },
+      { draft: { sourceId: 'idea:1', platform: 'x', org: 'org_owner', planId: 'pl1', idea: 'فكرةٌ عن الوقف', autoImage: true, imageStyle: 'infographic' } },
+      { draft: { sourceId: 's1', platform: 'tiktok', org: 'org_owner', planId: 'pl1', autoImage: true, imageStyle: 'infographic' } },
     ])
     const html = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('مع صورها')

@@ -30,6 +30,10 @@ import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { panelHref } from '../../lib/nav/panes'
 import { UPLOAD_EXTENSIONS } from '../../lib/sources/ingest'
+import { FINAL_IMAGE_MODEL, NEURON_USD, imageNeurons } from '../../lib/ai/imagePricing'
+
+/** سعرُ الصورة النهائيّة بعد الحصّة — من الجدول لا رقمًا يُكتب (D-285). */
+const FINAL_PER_IMAGE = (imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0) * NEURON_USD
 import { weekStart, type PlanPlatform } from '../../lib/plan/prompt'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
@@ -68,6 +72,10 @@ export interface PlanNewData {
   readonly sources: readonly PlanNewSource[]
   readonly perDraft: number | null
   readonly perImage: number | null
+  /** كلفةُ الإنفوجرافيك: نداءُ كتابة محتواه (D-285). */
+  readonly perInfographic?: number | null
+  /** كم صورةً مجّانيّةً بقيت اليوم: المسوّدةُ بـ schnell والنهائيّةُ بـ klein 9B (D-285). */
+  readonly freeLeft?: { readonly draft: number; readonly final: number }
   readonly autoImage: boolean
   /** أمزوّدُ مهمّة الخطّة جاهز؟ */
   readonly ready: boolean
@@ -141,7 +149,25 @@ function sourceCard(s: PlanNewSource, picked: boolean): Html {
 }
 
 function contentStep(d: PlanNewData): Html {
-  const imageCost = d.perImage === null ? 'تُقاس كلفتُها بعد أوّل صورة' : 'نحو ' + money(d.perImage) + ' للصورة'
+  const info = d.perInfographic ?? null
+  const free = d.freeLeft ?? { draft: 0, final: 0 }
+  const left = (n: number, what: string): string => n === 0 ? what + ': نفدت حصّةُ اليوم' : what + ': مجّانًا — بقي ' + AR(n) + ' اليوم'
+  const styles = [
+    { v: 'none', title: 'بلا صورة', notes: ['نصٌّ وحده'], cost: 0 },
+    { v: 'infographic', title: 'إنفوجرافيك', notes: [
+      info === null ? 'كتابةُ محتواه: تُقاس بعد أوّل صورة' : 'كتابةُ محتواه: نحو ' + money(info),
+      'رسمُه مجّانيّ، والعربيّةُ فيه صحيحة',
+    ], cost: info ?? 0 },
+    { v: 'illustration', title: 'رسمٌ فنّيّ', notes: [
+      left(free.draft, 'المسوّدة (FLUX schnell)'),
+      left(free.final, 'النهائيّة بعد اعتمادك (klein 9B)') + '، ثمّ ' + money(FINAL_PER_IMAGE),
+      d.perImage === null ? 'وموجزُها يُقاس بعد أوّل صورة' : 'وموجزُها نحو ' + money(d.perImage),
+    ], cost: d.perImage ?? 0 },
+  ]
+  const picked = d.autoImage ? 'infographic' : 'none'
+  const imageChoice = html`<fieldset class="field mt-3"><legend>الصورة مع كلّ منشور</legend>
+      <div class="wz-opts">${styles.map((x) => html`<label class="wz-opt card"><input type="radio" name="image_style" value="${x.v}" data-cost="${String(x.cost)}"${x.v === picked ? raw(' checked') : ''}>
+        <span class="wz-big">${x.title}</span>${x.notes.map((n) => html`<span class="ago">${n}</span>`)}</label>`)}</div></fieldset>`
   const add = d.canAdd === false
     ? html``
     : html`<div class="wz-add card card-inset">
@@ -164,9 +190,7 @@ function contentStep(d: PlanNewData): Html {
         <label class="wz-src"><input type="checkbox" name="source" value="all"${d.picked ? '' : raw(' checked')}><span class="wz-src-b"><b>الكلّ</b><span class="ago">${AR(d.sources.length)} محلَّلًا</span></span></label>
         ${d.sources.slice(0, 60).map((s) => sourceCard(s, s.id === d.picked))}
       </div></fieldset>
-    <label class="vpf mt-3"><input type="checkbox" name="auto_image" value="1"${d.autoImage ? raw(' checked') : ''}>
-      <span class="vpf-b"><b>صورة مع كلّ منشور</b><span class="ago">${imageCost}</span></span></label>
-    <input type="hidden" name="auto_image" value="0">
+    ${imageChoice}
     <details class="fold mt-3"><summary><span>أفكارٌ بكلماتك (اختياري)</span></summary>
       <div class="field"><label for="plan-ideas">سطرٌ لكلّ فكرة</label>
         <p class="field-hint" id="plan-ideas-hint">حتّى عشرين — تدخل الخطّة كما يدخل المصدر.</p>
@@ -195,7 +219,7 @@ function reviewStep(d: PlanNewData, shown: readonly PlanPlatform[], count: numbe
       <div><dt>الفترة</dt><dd id="pn-s-span">شهر</dd></div>
       <div><dt>المنصّات</dt><dd id="pn-s-ch">${shown.map((p) => platformLabel(p)).join(' · ') || '—'}</dd></div>
       <div><dt>المحتوى</dt><dd id="pn-s-src">كلُّ المصادر المحلَّلة</dd></div>
-      <div><dt>المنشورات</dt><dd id="pn-sum" data-draft="${String(d.perDraft ?? 0)}" data-image="${String(d.perImage ?? 0)}">${summaryText(count, d, d.autoImage)}</dd></div>
+      <div><dt>المنشورات</dt><dd id="pn-sum" data-draft="${String(d.perDraft ?? 0)}" data-image="${String(d.perInfographic ?? 0)}">${summaryText(count, d, d.autoImage)}</dd></div>
     </dl>
     <p class="wz-note"><b>لا يُنشر شيءٌ قبل اعتمادك.</b> بعد البناء تراجع كلَّ منشور: تعتمده أو تعدّله أو تؤخّره أو تحذفه.</p>
     ${stop === null ? html`` : html`<div class="wz-empty" role="alert">${stop}</div>`}
@@ -203,7 +227,7 @@ function reviewStep(d: PlanNewData, shown: readonly PlanPlatform[], count: numbe
 }
 
 function summaryText(count: number, d: PlanNewData, image: boolean): string {
-  const unit = (d.perDraft ?? 0) + (image ? (d.perImage ?? 0) : 0)
+  const unit = (d.perDraft ?? 0) + (image ? (d.perInfographic ?? 0) : 0)
   const cost = d.perDraft === null ? 'والكلفةُ تُقدَّر بعد أوّل كتابة' : 'نحو ' + money(count * unit)
   // ‏نصٌّ عاديٌّ يُهرَّب حين يُقحَم في القالب
   return AR(count) + ' منشورًا' + (image ? ' بصورها' : '') + ' · ' + cost
@@ -266,7 +290,8 @@ export const PLAN_NEW_SCRIPT = `(function(){
       per+=Math.max(0,Math.min(28,Math.floor(Number(n)||0)));
       var b=ch.closest('label'); names.push(b?b.textContent.trim():p);
     });
-    var img=!!f.querySelector('input[name="auto_image"][value="1"]:checked'), count=per*weeks;
+    var st=f.querySelector('input[name="image_style"]:checked'), img=!!st&&st.value!=='none', count=per*weeks;
+    perImage=st?Number(st.getAttribute('data-cost'))||0:0;
     var cost=perDraft>0?'نحو '+money(count*(perDraft+(img?perImage:0))):'والكلفةُ تُقدَّر بعد أوّل كتابة';
     var text=count.toLocaleString('ar-EG')+' منشورًا'+(img?' بصورها':'')+' · '+cost;
     if(out)out.textContent=text; if(live)live.textContent=text;

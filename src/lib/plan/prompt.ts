@@ -298,10 +298,18 @@ export interface PlanChoices {
   readonly ideas: readonly string[]
   readonly assets: readonly string[]
   readonly autoImage: boolean
+  /** نوعُ الصورة الآليّة (D-285): إنفوجرافيك (الافتراض) أو رسمٌ فنّيّ بمستويَي المسوّدة والنهائيّة. */
+  readonly imageStyle: PlanImageStyle
   readonly startDay: string
 }
 
-export const EMPTY_CHOICES: PlanChoices = { channels: [], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: false, startDay: '' }
+export type PlanImageStyle = 'infographic' | 'illustration'
+
+export function asImageStyle(v: unknown): PlanImageStyle {
+  return v === 'illustration' ? 'illustration' : 'infographic'
+}
+
+export const EMPTY_CHOICES: PlanChoices = { channels: [], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: false, imageStyle: 'infographic', startDay: '' }
 
 const IDEA_CAP = 20
 
@@ -327,6 +335,7 @@ export function readChoices(raw: unknown): PlanChoices {
     ideas: strings(v.ideas, IDEA_CAP),
     assets: strings(v.assets, 200),
     autoImage: v.autoImage === true,
+    imageStyle: asImageStyle(v.imageStyle),
     startDay: typeof v.startDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.startDay) ? v.startDay : '',
   }
 }

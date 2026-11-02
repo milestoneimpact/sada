@@ -35,6 +35,8 @@
  * أم بالـREST (D-055).
  */
 import { AiError, restBinding, type AiBinding } from '../media/workersAi'
+import { cfPrice } from '../ai/imagePricing'
+import { cfRunUrl } from '../ai/cloudflare'
 import { ImageError, type ImageResult } from './gemini'
 
 /** النموذجُ الافتراضيّ — ويبدّله المالكُ من اللوحة. */
@@ -56,6 +58,9 @@ export interface CfImageCall {
   readonly apiToken: string
   readonly model: string
   readonly prompt: string
+  /** المقاسُ لمن يقبله (FLUX.2) — ويُحاسَب عليه (D-285). schnell يرسم 1024×1024 ويتجاهله. */
+  readonly width?: number
+  readonly height?: number
   readonly fetchImpl?: typeof fetch
   /** يُحقَن في الاختبار، وفي الإنتاج يُبنى من الحساب والرمز. */
   readonly binding?: AiBinding
@@ -90,7 +95,13 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
 
   let out: unknown
   try {
-    out = await binding.run(call.model, { prompt: text, steps: CF_IMAGE_STEPS })
+    /*
+     * **عائلةُ FLUX.2 تُنادى بـ multipart ولو كان الطلبُ وصفًا وحده** (وثيقة klein 9B، D-285). كان الجسدُ JSON لكلّ
+     * نموذج، فمن اختار klein أُرسل إليه ما لا يقرؤه. والخطواتُ فيها ثابتةٌ أربعًا فلا تُرسَل.
+     */
+    out = cfPrice(call.model)?.multipart === true
+      ? await runMultipart(call, text)
+      : await binding.run(call.model, { prompt: text, steps: CF_IMAGE_STEPS })
   } catch (error) {
     // **وقابليّةُ الإعادة تُورَث من `AiError` ولا تُخترَع**
     const retryable = error instanceof AiError ? error.retryable : false
@@ -120,4 +131,27 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
   if (bytes.length === 0) throw new ImageError('صورة فارغة', 502, false)
 
   return { bytes, mime: 'image/jpeg', model: call.model }
+}
+
+/** نداءُ multipart: بالرابط حين يُحقَن (`env.AI` أو الاختبار)، وإلّا REST إلى نهاية النموذج نفسِه. */
+async function runMultipart(call: CfImageCall, prompt: string): Promise<unknown> {
+  const form = new FormData()
+  form.append('prompt', prompt)
+  form.append('width', String(call.width ?? 1024))
+  form.append('height', String(call.height ?? 1024))
+  if (call.binding !== undefined) {
+    const packed = new Response(form)
+    return call.binding.run(call.model, { multipart: { body: packed.body, contentType: packed.headers.get('Content-Type') ?? '' } })
+  }
+  const response = await (call.fetchImpl ?? fetch)(cfRunUrl(call.accountId.trim(), call.model), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${call.apiToken.trim()}` },
+    body: form,
+  })
+  if (!response.ok) {
+    throw new AiError(`ردّت Cloudflare ${response.status} على ${call.model}`, response.status === 429 || response.status >= 500)
+  }
+  const payload = (await response.json()) as { success?: boolean; result?: unknown }
+  if (payload.success === false) throw new AiError('رفضت Cloudflare الطلب (success:false)', false)
+  return payload.result
 }

@@ -112,3 +112,33 @@ describe('المعالج', () => {
     expect(odd).not.toContain('data-start="3"')
   })
 })
+
+describe('نفدت الحصّةُ المجّانيّة — والقرارُ للمالك (D-285)', () => {
+  it('البطاقةُ بعددها وكلفتها، و«انتظر» يُسجَّل فتصير سطرًا، و«ادفع» إذنٌ لليوم', async () => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES ('p1', 'linkedin', 'text', 'نص', 'draft', 'k1')`)
+    db.raw.exec(`INSERT INTO audit_log (actor, action, target, detail, org_id) VALUES ('system', 'image.quota_wait', 'p1', 'final · 1364', 'org_owner')`)
+    const { cookie, csrf } = await session()
+    const before = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(before).toContain('نفدت حصّةُ الصور المجّانيّة اليوم')
+    expect(before).toContain('0.015$')
+    const wait = new FormData(); wait.set('_csrf', csrf); wait.set('decision', 'wait')
+    expect((await app.request('/panel/images/quota', { method: 'POST', body: wait, headers: { Cookie: cookie } }, env)).status).toBe(303)
+    const after = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(after).not.toContain('نفدت حصّةُ الصور المجّانيّة اليوم')
+    expect(after).toContain('تنتظر تجدّدَ حصّة Cloudflare')
+    const pay = new FormData(); pay.set('_csrf', csrf); pay.set('decision', 'pay')
+    await app.request('/panel/images/quota', { method: 'POST', body: pay, headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT action FROM audit_log WHERE action LIKE 'image.overage.%' ORDER BY id").all()).toEqual([
+      { action: 'image.overage.wait' }, { action: 'image.overage.approve' },
+    ])
+  })
+
+  it('المعالجُ يعرض الأنواعَ الثلاثة بكلفتها وما بقي مجّانيًّا', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    for (const v of ['none', 'infographic', 'illustration']) expect(html).toContain(`name="image_style" value="${v}"`)
+    expect(html).toContain('بقي ١٧٣ اليوم')
+    expect(html).toContain('بقي ٧ اليوم، ثمّ')
+    expect(html).toContain('0.015$')
+  })
+})
