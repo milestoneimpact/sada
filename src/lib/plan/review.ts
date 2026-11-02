@@ -32,6 +32,8 @@ export interface ReviewCard {
   readonly item: PlanItem
   readonly post: { readonly id: string; readonly text: string; readonly status: string; readonly scheduledAt: string | null } | null
   readonly mediaId: string | null
+  /** نوعُ الوسيط — للمعاينة بشكل المنصّة (D-288). */
+  readonly mediaMime?: string | null
   /** ما ينقص هذه البطاقةَ وحدَها. */
   readonly gaps: readonly Gap[]
 }
@@ -85,10 +87,10 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       .bind(org, plan.id)
       .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null }>()
       .then((r) => r.results).catch(() => []),
-    db.prepare(`SELECT m.id, m.post_id FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+    db.prepare(`SELECT m.id, m.post_id, m.mime FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
       .bind(org, plan.id)
-      .all<{ id: string; post_id: string }>().then((r) => r.results).catch(() => []),
+      .all<{ id: string; post_id: string; mime: string }>().then((r) => r.results).catch(() => []),
     db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
       .bind(org, plan.id)
       .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
@@ -96,7 +98,8 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   ])
   const wantsImage = plan.choices.autoImage
   const latestMedia = new Map<string, string>()
-  for (const m of media) if (!latestMedia.has(m.post_id)) latestMedia.set(m.post_id, m.id)
+  const mimeOf = new Map<string, string>()
+  for (const m of media) if (!latestMedia.has(m.post_id)) { latestMedia.set(m.post_id, m.id); mimeOf.set(m.id, m.mime) }
   const slots = new Map<string, number>()
   for (const i of plan.plan.items) slots.set(`${i.platform}|${i.day}|${i.time}`, (slots.get(`${i.platform}|${i.day}|${i.time}`) ?? 0) + 1)
 
@@ -111,7 +114,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     }
     if ((slots.get(`${item.platform}|${item.day}|${item.time}`) ?? 0) > 1) gaps.push('clash')
     return {
-      index, key: itemKey(item), item, mediaId, gaps,
+      index, key: itemKey(item), item, mediaId, mediaMime: mediaId === null ? null : mimeOf.get(mediaId) ?? null, gaps,
       post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at },
     }
   })

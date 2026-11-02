@@ -147,3 +147,21 @@ describe('«عندي خطّة» (D-287)', () => {
     expect(refused.headers.get('Location')).toBe('/panel/plan/import')
   })
 })
+
+describe('عرضُ الخطّة (D-288)', () => {
+  it('الغلافُ بالمنظّمة والمدّة والأرقام، والمنشورُ بشكل منصّته، وزرُّ الطباعة — وبلا خطّةٍ إلى «خطّة جديدة»', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/view', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('class="pd-hero"')
+    expect(html).toContain('خطّةُ النشر · أسبوع')
+    expect(html).toContain('<b>٣</b><span>منشورًا</span>')
+    expect(html).toContain('class="np np-li')
+    expect(html).toContain('نصُّ المنشور الأوّل')
+    expect(html).toContain('id="pd-print"')
+    expect(html).toContain('الأسبوع ١')
+    const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(review).toContain('href="/panel/plan/view"')
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    expect((await app.request('/panel/plan/view', { headers: { Cookie: cookie } }, env)).headers.get('Location')).toBe('/panel/plan/new')
+  })
+})

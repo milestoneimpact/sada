@@ -64,7 +64,7 @@ async function insightsInput(c: Context<{ Bindings: Env }>, org: string) {
  * التقديرُ ممّا أُنفق فعلًا، ولا يُنفَق شيءٌ من هنا.
  */
 /** أسماءُ المصادر لبطاقات اللوحة — للعميل وحدَه، وبعددٍ محدود. */
-async function sourceNames(db: Env['DB'], org: string, ids: readonly string[]): Promise<Record<string, string>> {
+export async function sourceNames(db: Env['DB'], org: string, ids: readonly string[]): Promise<Record<string, string>> {
   const uniq = [...new Set(ids)].slice(0, 60)
   if (uniq.length === 0) return {}
   const { results } = await db
