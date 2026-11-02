@@ -209,6 +209,14 @@ describe('أساس تعدّد المستأجرين', () => {
     expect(db.raw.prepare("SELECT choices_json FROM plans WHERE id = 'p1'").get()).toEqual({ choices_json: '{}' })
   })
 
+  /** مصادرُ من غير Drive (D-284 · 0038): الصفُّ القائمُ drive، والأعمدةُ الثلاثةُ فارغةٌ له. */
+  it('sources بنوعٍ افتراضُه drive، وعنوانٍ وملفٍّ ونصٍّ في R2', () => {
+    const db = fakeDb()
+    db.raw.prepare("INSERT INTO sources (id, drive_file_id, name, mime, content_hash) VALUES ('s1', 'f1', 'n', 'text/plain', 'h')").run()
+    expect(db.raw.prepare("SELECT kind, origin_url, file_key, text_key FROM sources WHERE id = 's1'").get())
+      .toEqual({ kind: 'drive', origin_url: null, file_key: null, text_key: null })
+  })
+
   it('جداول العمل كلُّها تحمل org_id', () => {
     const tables = ['accounts', 'tokens', 'sources', 'content_items', 'plans', 'posts', 'publish_attempts',
       'metrics', 'promotion_suggestions', 'settings', 'providers', 'task_routes', 'cost_ledger', 'audit_log',

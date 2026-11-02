@@ -432,7 +432,7 @@ writeAudited(
   '/tmp/screen-plan-new.html',
   soloPage('صدى — خطّة جديدة', { href: '/panel#posts', label: 'المنشورات' }, planNewScreen({
     now: new Date('2026-11-02T08:00:00Z'), linked: ['linkedin'], perWeek: 3,
-    sources: [{ id: 's1', name: 'تقرير الأثر 2025' }, { id: 's2', name: 'مراجعة المحفظة' }],
+    sources: [{ id: 's1', name: 'تقرير الأثر 2025', kind: 'drive' }, { id: 's2', name: 'مراجعة المحفظة', kind: 'upload' }, { id: 's3', name: 'قيادة القيمة لا تُقاس بالمخرجات', kind: 'url' }],
     perDraft: 0.012, perImage: 0.011, autoImage: true, ready: true, replacing: false,
   }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
 )

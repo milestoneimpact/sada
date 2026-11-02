@@ -52,7 +52,8 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
   const existing = new Map<string, SourceRow>()
   // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه تسكن منظّمته وتُقرأ منها وحدها (D-233 · D-277)
   const { results } = await db
-    .prepare('SELECT id, drive_file_id, content_hash FROM sources WHERE org_id = ?')
+    // ‏ومصادرُ Drive وحدَها (D-284): المرفوعُ والرابطُ ليسا في المجلّد، فلا يُعَدّان «غائبَين» عنه
+    .prepare("SELECT id, drive_file_id, content_hash FROM sources WHERE org_id = ? AND kind = 'drive'")
     .bind(OWNER_ORG)
     .all<SourceRow>()
   for (const row of results) existing.set(row.drive_file_id, row)

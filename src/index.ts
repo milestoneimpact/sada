@@ -356,6 +356,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
+      media: c.env.MEDIA,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
       encKey: c.env.TOKEN_ENC_KEY,
@@ -505,6 +506,7 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessag
     const outcome = await analyzeSource(
       {
         db: env.DB,
+      media: env.MEDIA,
         serviceAccountJson: env.GOOGLE_SA_JSON,
         anthropicKey: env.ANTHROPIC_API_KEY,
         encKey: env.TOKEN_ENC_KEY,

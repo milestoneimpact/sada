@@ -90,6 +90,15 @@ describe('الملف الغائب', () => {
     expect(count.n).toBe(2)
   })
 
+  it('والمرفوعُ والرابطُ ليسا من Drive (D-284): لا يُعَدّان غائبَين ولا يُمَسّان', async () => {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash, kind) VALUES
+      ('src:upload:1', 'upload:1', 'تقرير.pdf', 'application/pdf', 'sha:x', 'upload'),
+      ('src:url:1', 'url:1', 'مقال', 'text/html', 'sha:y', 'url')`)
+    const result = await syncSources(db, [file('a', 'h1')])
+    expect(result.missing).toEqual([])
+    expect(db.raw.prepare("SELECT count(*) AS n FROM sources WHERE kind != 'drive'").get()).toEqual({ n: 2 })
+  })
+
   it('يعود بلا تكرار حين يُشارَك مجدّدا', async () => {
     await syncSources(db, [file('a', 'h1')])
     await syncSources(db, [])

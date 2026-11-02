@@ -16,6 +16,7 @@ import { home } from './panel/home'
 import { session } from './panel/session'
 import { channels } from './panel/channels'
 import { plan } from './panel/plan'
+import { sources } from './panel/sources'
 import { media } from './panel/media'
 import { reports } from './panel/reports'
 import { drafts } from './panel/drafts'
@@ -30,6 +31,7 @@ panel.route('/', home)
 panel.route('/', session)
 panel.route('/', channels)
 panel.route('/', plan)
+panel.route('/', sources)
 panel.route('/', media)
 panel.route('/', reports)
 panel.route('/', drafts)

@@ -10,6 +10,7 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { html, raw } from './ui/html'
 import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
@@ -250,6 +251,12 @@ export interface PanelSource {
   readonly reason: string | null
   readonly themes: string[]
   readonly lastSeenAt: string
+  /** `drive` · `upload` · `url` (D-284) — وغيابُه Drive، كما كان كلُّ مصدرٍ قبله. */
+  readonly kind?: string
+  /** عنوانُ الصفحة لمصدر الرابط. */
+  readonly originUrl?: string | null
+  /** أللمرفوع أصلٌ في R2 يُنزَّل؟ */
+  readonly hasFile?: boolean
 }
 
 export interface PanelProvider {
@@ -578,12 +585,20 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
     ? ''
     : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(drive)}" target="_blank" rel="noopener noreferrer"
          aria-label="افتح ${escapeHtml(s.name)} في Drive">${ICON.external} افتح في Drive</a>`
-  const acts = `${action}${open}`
+  // ‏والمرفوعُ يُنزَّل أصلُه، والرابطُ يُفتح عنوانُه (D-284) — والعنوانُ مقبولٌ عند الاستلام بـ https وحدَه
+  const origin = s.originUrl !== undefined && s.originUrl !== null && s.originUrl.startsWith('https://')
+    ? html`<a class="btn btn-secondary btn-sm" href="${s.originUrl}" target="_blank" rel="noopener noreferrer"
+         aria-label="افتح صفحة ${s.name}">${raw(ICON.external)} افتح الصفحة</a>`.value
+    : ''
+  const file = s.hasFile === true
+    ? html`<a class="btn btn-secondary btn-sm" href="/panel/sources/${encodeURIComponent(s.id)}/file" download>نزّل الأصل</a>`.value
+    : ''
+  const acts = `${action}${open}${origin}${file}`
 
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${fileName(s.name)}</div>${body}</td>
+    <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>

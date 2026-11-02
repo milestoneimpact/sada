@@ -505,3 +505,29 @@ describe('D-243 · قراءة الصور', () => {
     expect(n.n).toBe(1)
   })
 })
+
+describe('مصادرُ من غير Drive (D-284)', () => {
+  function seedUpload(textKey: string | null): void {
+    db.raw.prepare(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash, kind, text_key)
+      VALUES ('src:upload:u1', 'upload:u1', 'تقرير.pdf', 'application/pdf', 'sha256:a', 'upload', ?)`).run(textKey)
+  }
+  const media = (store: Record<string, string>) => ({
+    async put() { return null },
+    async get(key: string) { return key in store ? { text: async () => store[key]! } : null },
+  })
+
+  it('يُحلَّل من نصِّه المحفوظ في R2 — لا Google ولا تصدير', async () => {
+    seedUpload('sources/org_owner/upload-u1/text.md')
+    const out = await analyzeSource({ ...deps(net()), media: media({ 'sources/org_owner/upload-u1/text.md': 'نصٌّ مستخرَجٌ من الملفّ المرفوع' }) }, 'src:upload:u1')
+    expect(out.kind).toBe('analyzed')
+    expect(calls.some((u) => u.includes('googleapis.com'))).toBe(false)
+    expect(calls.some((u) => u.includes('api.anthropic.com'))).toBe(true)
+  })
+
+  it('ونصٌّ مفقودٌ يُقال بسببه ولا يُعاد، ولا يُنادى نموذج', async () => {
+    seedUpload('sources/org_owner/upload-u1/text.md')
+    const out = await analyzeSource({ ...deps(net()), media: media({}) }, 'src:upload:u1')
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    expect(calls).toEqual([])
+  })
+})

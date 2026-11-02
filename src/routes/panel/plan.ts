@@ -11,6 +11,7 @@ import {
 import { planImportExpired, planImportScreen } from '../ui/planImportView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
 import { taskReadyAlone } from './home'
+import { allows } from '../../lib/access'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
@@ -148,9 +149,9 @@ plan.get('/panel/plan/new', async (c) => {
   const [accounts, brief, analyzed, units, settings, current, ready] = await Promise.all([
     listAccounts(c.env.DB, org),
     readBrief(c.env.DB, org),
-    c.env.DB.prepare(`SELECT s.id, s.name FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+    c.env.DB.prepare(`SELECT s.id, s.name, s.kind FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
                        WHERE s.org_id = ? ORDER BY s.last_seen_at DESC LIMIT 60`)
-      .bind(org).all<{ id: string; name: string }>().catch(() => ({ results: [] as { id: string; name: string }[] })),
+      .bind(org).all<{ id: string; name: string; kind: string }>().catch(() => ({ results: [] as { id: string; name: string; kind: string }[] })),
     unitCosts(c.env.DB, org),
     readSettings(c.env.DB),
     latestPlan(c.env.DB, org),
@@ -166,6 +167,10 @@ plan.get('/panel/plan/new', async (c) => {
     autoImage: settings.autoImage,
     ready,
     replacing: current !== null,
+    // ‏ما أُضيف للتوّ بلا سكربت يُحدَّد (D-284) — ومن المحلَّل وحدَه، لا معرّفًا يكتبه أحد
+    picked: analyzed.results.some((s) => s.id === c.req.query('picked')) ? c.req.query('picked') ?? null : null,
+    // ‏إضافةُ مصدرٍ تحليلٌ مدفوع: للمدير فأعلى كزرّ «حلّل» (D-272)
+    canAdd: allows(session.record.role ?? 'owner', 'admin'),
   })
   return page((nonce) =>
     soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,

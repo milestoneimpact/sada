@@ -21,7 +21,8 @@ import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey, type Provider } from '../providers'
 import type { Db } from '../tokens'
 import { accessToken, parseServiceAccount } from '../drive/client'
-import { extractText } from '../drive/export'
+import { extractText, type ExtractOutcome } from '../drive/export'
+import { readSourceText, type Bucket } from '../sources/ingest'
 import { spentOf, type Spent } from '../ai/spent'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
 import { describeImage, type VisionDeps } from './vision'
@@ -73,6 +74,8 @@ export interface AnalyzeJobDeps {
   readonly geminiKey?: string
   readonly now?: Date
   readonly fetchImpl?: typeof fetch
+  /** R2 — نصُّ المرفوع والرابط محفوظٌ فيه منذ الاستلام (D-284). وبلا رابطٍ لا يُقرأ إلّا Drive. */
+  readonly media?: Bucket
 }
 
 interface SourceRow {
@@ -82,6 +85,8 @@ interface SourceRow {
   readonly name: string
   readonly mime: string
   readonly content_hash: string
+  readonly kind: string
+  readonly text_key: string | null
 }
 
 /**
@@ -176,7 +181,7 @@ export async function analyzeSource(
   const source = await deps.db
     .prepare(
       // ‏المنظّمةُ تُقرأ مع الصفّ وتُحمَل إلى كلّ ما بعده (D-277)
-      'SELECT id, org_id, drive_file_id, name, mime, content_hash FROM sources WHERE id = ? OR drive_file_id = ?',
+      'SELECT id, org_id, drive_file_id, name, mime, content_hash, kind, text_key FROM sources WHERE id = ? OR drive_file_id = ?',
     )
     .bind(sourceId, sourceId)
     .first<SourceRow>()
@@ -229,18 +234,24 @@ export async function analyzeSource(
   }
 
   try {
+    // ٤أ · مرفوعٌ أو رابط (D-284): نصُّه استُخرج عند الاستلام وحُفظ في R2 — لا Drive ولا تصدير
+    const stored = source.kind === 'drive' ? null : deps.media === undefined ? undefined : await readSourceText(deps.media, source.text_key)
+    if (stored === undefined || (source.kind !== 'drive' && stored === null)) {
+      await releaseAnalysis(deps.db, source.id)
+      return { kind: 'failed', sourceId: source.id, reason: 'نصُّ المصدر غير موجود في التخزين — أعد رفعه', retryable: false }
+    }
     // ٤ · التصدير
-    const sa = parseServiceAccount(deps.serviceAccountJson)
-    const token = await accessToken(sa, now, deps.fetchImpl ?? fetch)
     // ‏والصورة لا تُنزَّل إلّا إن كان لها قارئ (D-243)
-    const vision = source.mime.startsWith('image/') ? await visionReader(deps) : null
-    const extracted = await extractText(
-      token,
-      source.drive_file_id,
-      source.mime,
-      deps.fetchImpl ?? fetch,
-      vision !== null,
-    )
+    const vision = stored === null && source.mime.startsWith('image/') ? await visionReader(deps) : null
+    const extracted: ExtractOutcome = stored !== null
+      ? { kind: 'text', text: stored, bytes: new TextEncoder().encode(stored).byteLength }
+      : await extractText(
+        await accessToken(parseServiceAccount(deps.serviceAccountJson), now, deps.fetchImpl ?? fetch),
+        source.drive_file_id,
+        source.mime,
+        deps.fetchImpl ?? fetch,
+        vision !== null,
+      )
     if (extracted.kind === 'unsupported') {
       return { kind: 'skipped', sourceId: source.id, reason: extracted.reason }
     }

@@ -1,26 +1,35 @@
 /**
- * شاشةُ «خطّة جديدة» (D-283) — الخطّةُ محورَ المنصّة، الطلبُ ٢ من ٤.
+ * معالجُ «خطّة جديدة» (D-283 · D-284) — الخطّةُ محورَ المنصّة.
  *
- * ## لماذا شاشةٌ لا نموذجٌ في اللوحة
+ * ## خطوةٌ في كلّ شاشة
  *
- * كان نموذجُ D-282 كلُّه في قسمٍ واحد: المدى ويومُ البداية والقنواتُ الخمسُ (ثلاثٌ منها «غير مربوطة»)
- * والمصادرُ والأفكارُ والصورة — **ستّةُ قراراتٍ في صفحةٍ قبل أن يُعرَف أيُّها يلزم**. والمالكُ يريد ثلاثةً:
- * كم مدّةً، وعلى أيّ منصّة، وبأيّ إيقاع. فصارت **خطواتٍ مرقَّمةً بقرارٍ واحدٍ لكلٍّ**، والباقي مطويٌّ اختيارًا.
+ * كان النموذجُ صفحةً طويلةً بخطواتٍ مرقَّمة (D-283)، وقال المالك: «ليس معالجًا». فصار **خطوةً واحدةً في كلّ شاشة**،
+ * فوقها شريطُ تقدّمٍ بأسماء الخطوات الأربع، وتحتها شريطٌ ثابتٌ فيه «السابق» و«التالي» والملخّصُ الحيّ:
  *
- * ## ثلاثُ قواعد
+ *   ١ الفترة  ←  ٢ المنصّات  ←  ٣ المحتوى  ←  ٤ المراجعة
  *
- * - **المربوطُ وحدَه يُرى.** منصّةٌ غيرُ مربوطةٍ لا تُعرَض معطّلةً؛ تُذكَر في سطرٍ برابط الربط. واليومَ
- *   LinkedIn وX وحدَهما بقرار المالك (2026-11-02)، والبقيّةُ تعود بإضافتها إلى `PLAN_NOW` لا بكتابة شاشة.
- * - **الإيقاعُ يُختار لا يُكتب.** ثلاثةُ مستوياتٍ مسمّاةٍ برقمها، و«مخصّص» لمن يريد غيرَها.
- * - **زرٌّ واحد.** الملخّصُ فوقه يقول العددَ والكلفةَ قبل الضغط (D-006 · D-008)، ولا يُنشر شيءٌ بعده.
+ * **وبلا سكربتٍ لا ينكسر شيء**: الخطواتُ كلُّها نموذجٌ واحدٌ يُرى متتابعًا، والزرُّ في آخره. والسكربتُ يضيف
+ * `wz-on` فيُخفي ما ليس الخطوةَ الحاليّة — تحسينٌ فوق ما يعمل، لا شرطٌ له.
  *
- * والنموذجُ يُرسل إلى `/panel/plan/generate` نفسِه — لا طريقًا ثانيًا حول الحارس.
+ * ## المحتوى: ما عندك، وما تضيفه الآن (D-284)
+ *
+ * الخطوةُ الثالثة شبكةُ مصادرك المحلَّلة (Drive والمرفوع والروابط بشاراتها)، ومعها بابان: **ارفع ملفًّا** (سحبٌ
+ * وإفلات) و**أضف رابطًا**. كلاهما نموذجٌ مستقلٌّ (`pn-up` · `pn-link`) مربوطٌ بحقوله بخاصّيّة `form` — فالنماذجُ لا
+ * تتداخل، وبلا سكربتٍ يُرسَل ويعود إلى هنا والمصدرُ محدَّد. وبالسكربت يُرفع بشريط تقدّم وتُرسم بطاقتُه في مكانها.
+ *
+ * ## ثلاثُ قواعد باقية
+ *
+ * - **المربوطُ وحدَه يُرى**، ومن `PLAN_NOW` وحدَه (LinkedIn وX بقرار المالك).
+ * - **الإيقاعُ يُختار لا يُكتب.**
+ * - **زرٌّ واحدٌ للبناء**، والعددُ والكلفةُ فوقه قبل الضغط (D-006 · D-008)، ولا يُنشر شيءٌ بعده.
  */
 import { html, raw, type Html } from './html'
 import { pageHead } from './parts'
+import { LOGOS } from './logos'
 import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { panelHref } from '../../lib/nav/panes'
+import { UPLOAD_EXTENSIONS } from '../../lib/sources/ingest'
 import { weekStart, type PlanPlatform } from '../../lib/plan/prompt'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
@@ -40,13 +49,23 @@ const PACES = [
   { n: 5, label: 'نشِط' },
 ] as const
 
+const STEPS = ['الفترة', 'المنصّات', 'المحتوى', 'المراجعة'] as const
+const DIGITS = ['١', '٢', '٣', '٤'] as const
+
+export interface PlanNewSource {
+  readonly id: string
+  readonly name: string
+  /** `drive` · `upload` · `url` (D-284) */
+  readonly kind: string
+}
+
 export interface PlanNewData {
   readonly now: Date
   /** المنصّاتُ المربوطةُ بحسابٍ نشط. */
   readonly linked: readonly string[]
   /** إيقاعُ الموجز في الأسبوع — يُختار مستواه افتراضًا. */
   readonly perWeek: number
-  readonly sources: readonly { readonly id: string; readonly name: string }[]
+  readonly sources: readonly PlanNewSource[]
   readonly perDraft: number | null
   readonly perImage: number | null
   readonly autoImage: boolean
@@ -54,6 +73,10 @@ export interface PlanNewData {
   readonly ready: boolean
   /** خطّةٌ قائمةٌ تُستبدَل لهذا المدى؟ */
   readonly replacing: boolean
+  /** مصدرٌ أُضيف للتوّ بلا سكربت — يُحدَّد ويُفتح المعالجُ على خطوته. */
+  readonly picked?: string | null
+  /** أيملك الدورُ إضافةَ مصدر؟ (المديرُ فأعلى — كالتحليل) */
+  readonly canAdd?: boolean
 }
 
 const AR = (n: number): string => n.toLocaleString('ar-EG')
@@ -64,91 +87,119 @@ function startLabel(day: string): string {
   return Number.isNaN(at.getTime()) ? day : at.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 }
 
-function spanStep(start: string): Html {
-  const cards = SPANS.map((s) => html`<label class="when-opt"><input type="radio" name="span" value="${s.id}" data-weeks="${String(s.weeks)}"${s.id === 'month' ? raw(' checked') : ''}>
-      <span><b>${s.label}</b><span class="ago">${s.note}</span></span></label>`)
-  return html`<li><span class="step-n" aria-hidden="true">١</span><div class="body">
-    <span class="what" id="pn-span">كم مدّةً تغطّي الخطّة؟</span>
-    <div class="when-opts" role="radiogroup" aria-labelledby="pn-span">${cards}</div>
-    <details class="fold mt-2"><summary><span>تبدأ ${startLabel(start)} — غيّر</span></summary>
-      <div class="field"><label for="plan-start">يوم البداية</label>
-        <input type="date" id="plan-start" name="start" value="${start}" dir="ltr"></div></details>
-  </div></li>`
+const KIND_LABEL: Readonly<Record<string, string>> = { drive: 'Drive', upload: 'مرفوع', url: 'رابط' }
+
+function stepHead(n: number, title: string, lede: string): Html {
+  return html`<header class="wz-head"><span class="wz-k">الخطوة ${DIGITS[n - 1] ?? ''} من ٤</span>
+    <h2 id="wz-t${String(n)}">${title}</h2><p class="hint m-0">${lede}</p></header>`
 }
 
-function channelBlock(p: PlanPlatform, perWeek: number): Html {
+function spanStep(start: string, perWeek: number, channels: number): Html {
+  const cards = SPANS.map((s) => html`<label class="wz-opt card"><input type="radio" name="span" value="${s.id}" data-weeks="${String(s.weeks)}"${s.id === 'month' ? raw(' checked') : ''}>
+      <span class="wz-big">${s.label}</span>
+      <span class="wz-sub">نحو ${AR(Math.max(1, channels) * perWeek * s.weeks)} منشورًا</span>
+      <span class="ago">${s.note}</span></label>`)
+  return html`<section class="wz-step" data-step="1" aria-labelledby="wz-t1">
+    ${stepHead(1, 'كم مدّةً تغطّي الخطّة؟', 'تُكتب المنشوراتُ كلُّها مرّةً واحدة، ثمّ تراجعها قبل أن يُجدوَل شيء.')}
+    <div class="wz-opts" role="radiogroup" aria-labelledby="wz-t1">${cards}</div>
+    <details class="fold mt-3"><summary><span>تبدأ ${startLabel(start)} — غيّر</span></summary>
+      <div class="field"><label for="plan-start">يوم البداية</label>
+        <input type="date" id="plan-start" name="start" value="${start}" dir="ltr"></div></details>
+  </section>`
+}
+
+function channelCard(p: PlanPlatform, perWeek: number): Html {
   const preset = PACES.some((x) => x.n === perWeek) ? perWeek : null
-  const paces = PACES.map((x) => html`<label class="when-opt"><input type="radio" name="cadence_${p}" value="${String(x.n)}"${preset === x.n ? raw(' checked') : ''}>
-      <span><b>${x.label}</b><span class="ago">${AR(x.n)} في الأسبوع</span></span></label>`)
-  return html`<fieldset class="field">
-    <legend><label class="vapprove"><input type="checkbox" name="channel" value="${p}" checked> <b>${platformLabel(p)}</b></label></legend>
-    <div class="when-opts" role="radiogroup" aria-label="إيقاع ${platformLabel(p)}">${paces}
-      <label class="when-opt"><input type="radio" name="cadence_${p}" value="custom"${preset === null ? raw(' checked') : ''}>
-        <span><b>مخصّص</b><span class="row gap-2"><input type="number" name="cadence_custom_${p}" min="1" max="28" step="1" value="${String(preset === null ? Math.max(1, perWeek) : 4)}" dir="ltr" aria-label="${platformLabel(p)}: منشورات في الأسبوع"> في الأسبوع</span></span></label>
+  const paces = PACES.map((x) => html`<label class="wz-pill"><input type="radio" name="cadence_${p}" value="${String(x.n)}"${preset === x.n ? raw(' checked') : ''}>
+      <span><b>${x.label}</b> · ${AR(x.n)} في الأسبوع</span></label>`)
+  return html`<fieldset class="wz-pf card" data-pf="${p}">
+    <legend class="wz-pf-h"><label class="row gap-2"><input type="checkbox" name="channel" value="${p}" checked>
+      <span class="pf-logo" aria-hidden="true">${raw(LOGOS[p] ?? '')}</span><b>${platformLabel(p)}</b></label></legend>
+    <div class="wz-pills" role="radiogroup" aria-label="إيقاع ${platformLabel(p)}">${paces}
+      <label class="wz-pill"><input type="radio" name="cadence_${p}" value="custom"${preset === null ? raw(' checked') : ''}>
+        <span><b>مخصّص</b> <input type="number" name="cadence_custom_${p}" min="1" max="28" step="1" value="${String(preset === null ? Math.max(1, perWeek) : 4)}" dir="ltr" aria-label="${platformLabel(p)}: منشورات في الأسبوع"></span></label>
     </div></fieldset>`
 }
 
 function channelStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
   const missing = PLAN_NOW.filter((p) => !shown.includes(p))
   const body = shown.length === 0
-    ? html`<p class="hint m-0">لا منصّة مربوطة بعد — الخطّةُ تُبنى لما يُنشر عليه فعلًا.</p>
-        <a class="btn btn-secondary btn-sm mt-2" href="${panelHref('channels')}">اربط LinkedIn أو X</a>`
-    : html`${shown.map((p) => channelBlock(p, d.perWeek))}${missing.length === 0
+    ? html`<div class="wz-empty"><p class="m-0">لا منصّة مربوطة بعد — الخطّةُ تُبنى لما يُنشر عليه فعلًا.</p>
+        <a class="btn btn-secondary btn-sm" href="${panelHref('channels')}">اربط LinkedIn أو X</a></div>`
+    : html`${shown.map((p) => channelCard(p, d.perWeek))}${missing.length === 0
         ? ''
         : html`<p class="hint m-0">${missing.map((p) => platformLabel(p)).join(' و')} غير مربوطة — <a href="${panelHref('channels')}">اربطها</a> لتظهر هنا.</p>`}`
-  return html`<li><span class="step-n" aria-hidden="true">٢</span><div class="body">
-    <span class="what">على أيّ منصّة، وكم مرّة؟</span>
-    <span class="why">المربوطُ وحدَه يظهر. والإيقاعُ عددُ المنشورات في الأسبوع لكلّ منصّة.</span>
-    <div class="stack mt-2">${body}</div>
-  </div></li>`
+  return html`<section class="wz-step" data-step="2" aria-labelledby="wz-t2">
+    ${stepHead(2, 'على أيّ منصّة، وكم مرّة؟', 'المربوطُ وحدَه يظهر. والإيقاعُ عددُ المنشورات في الأسبوع لكلّ منصّة.')}
+    <div class="stack">${body}</div>
+  </section>`
+}
+
+function sourceCard(s: PlanNewSource, picked: boolean): Html {
+  return html`<label class="wz-src"><input type="checkbox" name="source" value="${s.id}"${picked ? raw(' checked') : ''}>
+    <span class="wz-src-b"><bdi class="nm">${s.name}</bdi><span class="chip">${KIND_LABEL[s.kind] ?? s.kind}</span></span></label>`
 }
 
 function contentStep(d: PlanNewData): Html {
-  const sources = d.sources.slice(0, 60).map((x) => html`<label class="vpf"><input type="checkbox" name="source" value="${x.id}"><span class="vpf-b"><bdi>${x.name}</bdi></span></label>`)
   const imageCost = d.perImage === null ? 'تُقاس كلفتُها بعد أوّل صورة' : 'نحو ' + money(d.perImage) + ' للصورة'
-  return html`<li><span class="step-n" aria-hidden="true">٣</span><div class="body">
-    <span class="what">المحتوى</span>
-    <span class="why">صدى يقرأ مصادرك المحلَّلة كلَّها افتراضًا. وهنا تحصرها أو تضيف أفكارك.</span>
-    <label class="vpf mt-2"><input type="checkbox" name="auto_image" value="1"${d.autoImage ? raw(' checked') : ''}>
+  const add = d.canAdd === false
+    ? html``
+    : html`<div class="wz-add card card-inset">
+      <label class="wz-drop card" id="pn-drop"><input type="file" name="file" form="pn-up" accept="${UPLOAD_EXTENSIONS.map((e) => '.' + e).join(',')}" id="pn-file">
+        <span class="wz-big">ارفع ملفًّا</span>
+        <span class="ago">اسحبه إلى هنا أو اختره — PDF وWord وExcel وPowerPoint ونصّ، حتّى 10MB. يُحفظ في مكتبتك ويُحلَّل الآن.</span>
+        <span class="wz-prog" id="pn-prog" hidden><span></span></span></label>
+      <noscript><button class="btn btn-secondary btn-sm" type="submit" form="pn-up">ارفع الملفّ المختار</button></noscript>
+      <div class="field m-0"><label for="pn-url">أو أضف رابطًا</label>
+        <div class="row gap-2"><input type="url" id="pn-url" name="url" form="pn-link" placeholder="https://…" dir="ltr" inputmode="url" autocomplete="off">
+          <button class="btn btn-secondary" type="submit" form="pn-link" id="pn-link-go">اقرأ الرابط</button></div>
+        <p class="field-hint m-0">مقالٌ أو صفحةٌ أو PDF. يُستخرج نصُّه ويُحلَّل كأيّ مصدر.</p></div>
+      <p class="m-0 wz-say" id="pn-add-say" role="status" aria-live="polite"></p>
+    </div>`
+  return html`<section class="wz-step" data-step="3" aria-labelledby="wz-t3">
+    ${stepHead(3, 'من أيّ محتوى تُبنى؟', 'صدى يقرأ مصادرك المحلَّلة كلَّها افتراضًا. وهنا تضيف ملفًّا أو رابطًا الآن، أو تحصر الخطّة في بعضها.')}
+    ${add}
+    <fieldset class="field mt-3"><legend>مصادرك</legend>
+      <div class="wz-srcs" id="pn-srcs">
+        <label class="wz-src"><input type="checkbox" name="source" value="all"${d.picked ? '' : raw(' checked')}><span class="wz-src-b"><b>الكلّ</b><span class="ago">${AR(d.sources.length)} محلَّلًا</span></span></label>
+        ${d.sources.slice(0, 60).map((s) => sourceCard(s, s.id === d.picked))}
+      </div></fieldset>
+    <label class="vpf mt-3"><input type="checkbox" name="auto_image" value="1"${d.autoImage ? raw(' checked') : ''}>
       <span class="vpf-b"><b>صورة مع كلّ منشور</b><span class="ago">${imageCost}</span></span></label>
     <input type="hidden" name="auto_image" value="0">
-    <details class="fold mt-2"><summary><span>المصادر والأفكار (اختياري)</span></summary>
-      <fieldset class="field"><legend>المصادر</legend>
-        <div class="vpfs"><label class="vpf"><input type="checkbox" name="source" value="all" checked><span class="vpf-b"><b>الكلّ</b></span></label>${sources}</div></fieldset>
-      <div class="field"><label for="plan-ideas">أفكار بكلماتك</label>
-        <p class="field-hint" id="plan-ideas-hint">سطرٌ لكلّ فكرة، حتّى عشرين — تدخل الخطّة كما يدخل المصدر.</p>
-        <textarea id="plan-ideas" name="ideas" rows="3" dir="auto" aria-describedby="plan-ideas-hint"></textarea></div>
-    </details>
-  </div></li>`
+    <details class="fold mt-3"><summary><span>أفكارٌ بكلماتك (اختياري)</span></summary>
+      <div class="field"><label for="plan-ideas">سطرٌ لكلّ فكرة</label>
+        <p class="field-hint" id="plan-ideas-hint">حتّى عشرين — تدخل الخطّة كما يدخل المصدر.</p>
+        <textarea id="plan-ideas" name="ideas" rows="3" dir="auto" aria-describedby="plan-ideas-hint"></textarea></div></details>
+  </section>`
 }
 
 /** ما يمنع البناء، بسببه وزرِّ علاجه — أو لا شيء. */
 function blocker(d: PlanNewData, shown: readonly PlanPlatform[]): Html | null {
   if (!d.ready) {
-    return html`<p class="hint m-0">مزوّدُ الكتابة غير مضبوط بعد.</p>
-      <a class="btn btn-secondary btn-sm mt-2" href="${panelHref('providers')}">اضبط المزوّد</a>`
+    return html`<p class="m-0">مزوّدُ الكتابة غير مضبوط بعد.</p>
+      <a class="btn btn-secondary btn-sm" href="${panelHref('providers')}">اضبط المزوّد</a>`
   }
   if (d.sources.length < 2) {
-    return html`<p class="hint m-0">${d.sources.length === 0 ? 'لا مصدر محلَّل بعد' : 'مصدرٌ واحد محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ.</p>
-      <a class="btn btn-secondary btn-sm mt-2" href="${panelHref('sources')}">حلّل مصادرك</a>`
+    return html`<p class="m-0">${d.sources.length === 0 ? 'لا مصدر محلَّل بعد' : 'مصدرٌ واحد محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ. أضف ملفًّا أو رابطًا في الخطوة ٣.</p>`
   }
-  if (shown.length === 0) return html`<p class="hint m-0">اربط منصّةً أوّلًا (الخطوة ٢).</p>`
+  if (shown.length === 0) return html`<p class="m-0">اربط منصّةً أوّلًا (الخطوة ٢).</p>`
   return null
 }
 
-function summaryStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
+function reviewStep(d: PlanNewData, shown: readonly PlanPlatform[], count: number): Html {
   const stop = blocker(d, shown)
-  // ‏التقديرُ الأوّلُ بالافتراض (شهر · إيقاعُ الموجز · الصورةُ كما في الإعداد)، والسكربتُ يعيده مع كلّ اختيار
-  const preset = PACES.some((x) => x.n === d.perWeek) ? d.perWeek : Math.max(1, d.perWeek)
-  const count = shown.length * preset * 4
-  return html`<li><span class="step-n" aria-hidden="true">٤</span><div class="body">
-    <span class="what">الملخّص</span>
-    <p class="m-0" id="pn-sum" aria-live="polite" data-draft="${String(d.perDraft ?? 0)}" data-image="${String(d.perImage ?? 0)}">${summaryText(count, d, d.autoImage)}</p>
-    <span class="why">صدى يقرأ المصادر ويكتب المنشورات ويرسم صورها، ثمّ تراجعها أنت. <b>ولا يُنشر شيءٌ قبل اعتمادك.</b></span>
-    ${stop === null
-      ? html`<div class="row mt-3"><button class="btn btn-primary" type="submit">حلّل وابنِ الخطّة</button></div>`
-      : html`<div class="mt-3">${stop}</div>`}
-  </div></li>`
+  return html`<section class="wz-step" data-step="4" aria-labelledby="wz-t4">
+    ${stepHead(4, 'راجع ثمّ ابنِ', 'صدى يقرأ المصادر ويكتب المنشورات ويرسم صورها، ثمّ تراجعها أنت بندًا بندًا.')}
+    <dl class="wz-sum">
+      <div><dt>الفترة</dt><dd id="pn-s-span">شهر</dd></div>
+      <div><dt>المنصّات</dt><dd id="pn-s-ch">${shown.map((p) => platformLabel(p)).join(' · ') || '—'}</dd></div>
+      <div><dt>المحتوى</dt><dd id="pn-s-src">كلُّ المصادر المحلَّلة</dd></div>
+      <div><dt>المنشورات</dt><dd id="pn-sum" data-draft="${String(d.perDraft ?? 0)}" data-image="${String(d.perImage ?? 0)}">${summaryText(count, d, d.autoImage)}</dd></div>
+    </dl>
+    <p class="wz-note"><b>لا يُنشر شيءٌ قبل اعتمادك.</b> بعد البناء تراجع كلَّ منشور: تعتمده أو تعدّله أو تؤخّره أو تحذفه.</p>
+    ${stop === null ? html`` : html`<div class="wz-empty" role="alert">${stop}</div>`}
+  </section>`
 }
 
 function summaryText(count: number, d: PlanNewData, image: boolean): string {
@@ -161,35 +212,119 @@ function summaryText(count: number, d: PlanNewData, image: boolean): string {
 export function planNewScreen(d: PlanNewData): string {
   const start = weekStart(d.now)
   const shown = PLAN_NOW.filter((p) => d.linked.includes(p))
-  const head = pageHead('المنشورات', 'خطّة جديدة', 'ثلاثةُ اختيارات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
+  const preset = PACES.some((x) => x.n === d.perWeek) ? d.perWeek : Math.max(1, d.perWeek)
+  const count = shown.length * preset * 4
+  const canBuild = blocker(d, shown) === null
+  const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
   const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
       <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
       <a class="btn btn-secondary btn-sm" href="${panelHref('plan-import')}">عندي خطّة</a></nav>`
-  const form = html`<form method="POST" action="/panel/plan/generate" class="card pn" id="pn" data-busy="جار التحليل والبناء…"${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
-    <ol class="steps m-0">${spanStep(start)}${channelStep(d, shown)}${contentStep(d)}${summaryStep(d, shown)}</ol>
-  </form>`
+  const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${DIGITS[i] ?? ''}</span><span class="wz-l">${s}</span></li>`)}</ol>`
+  const foot = html`<div class="wz-foot">
+      <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
+      <span class="wz-live" id="pn-live" aria-hidden="true">${summaryText(count, d, d.autoImage)}</span>
+      <button class="btn btn-primary" type="button" id="wz-next" hidden>التالي</button>
+      ${canBuild ? html`<button class="btn btn-primary" type="submit" id="wz-go">حلّل وابنِ الخطّة</button>` : html``}
+    </div>`
+  const form = html`<form method="POST" action="/panel/plan/generate" class="card wz" id="pn" data-busy="جار التحليل والبناء…"${d.picked ? raw(' data-start="3"') : ''}${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
+    ${bar}${spanStep(start, preset, shown.length)}${channelStep(d, shown)}${contentStep(d)}${reviewStep(d, shown, count)}${foot}
+  </form>
+  <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" id="pn-up"><input type="hidden" name="return" value="plan"></form>
+  <form method="POST" action="/panel/sources/link" id="pn-link"><input type="hidden" name="return" value="plan"></form>`
   return html`${raw(head)}${ways}${form}`.value
 }
 
 /**
- * الملخّصُ حيًّا: العددُ = مجموعُ إيقاع المنصّات المختارة × أسابيعُ المدى، والكلفةُ بوسيط ما أُنفق.
- * وبلا سكربتٍ يبقى ملخّصُ الافتراض صادقًا — والتقديرُ الكاملُ يُقال بعد البناء كما كان (D-257).
+ * سكربتُ المعالج: خطوةٌ في كلّ شاشة، والملخّصُ حيًّا، والرفعُ بشريط تقدّم، والرابطُ بلا تحميل.
+ * وبلا سكربتٍ يبقى كلُّ ذلك نموذجًا يعمل (انظر رأس الملفّ).
  */
 export const PLAN_NEW_SCRIPT = `(function(){
-  var f=document.getElementById('pn'), out=document.getElementById('pn-sum'); if(!f||!out)return;
-  var perDraft=Number(out.getAttribute('data-draft'))||0, perImage=Number(out.getAttribute('data-image'))||0;
+  var f=document.getElementById('pn'); if(!f)return;
+  var steps=[].slice.call(f.querySelectorAll('.wz-step')), bar=[].slice.call(f.querySelectorAll('.wz-bar li'));
+  var prev=document.getElementById('wz-prev'), next=document.getElementById('wz-next'), go=document.getElementById('wz-go');
+  var out=document.getElementById('pn-sum'), live=document.getElementById('pn-live');
+  var perDraft=Number(out&&out.getAttribute('data-draft'))||0, perImage=Number(out&&out.getAttribute('data-image'))||0;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches, at=Number(f.getAttribute('data-start'))||1;
+  f.classList.add('wz-on');
+  function show(n,focus){
+    at=Math.max(1,Math.min(steps.length,n));
+    steps.forEach(function(s,i){s.classList.toggle('is-on',i+1===at); if(!reduce&&i+1===at){s.classList.remove('wz-in'); void s.offsetWidth; s.classList.add('wz-in');}});
+    bar.forEach(function(b,i){ if(i+1===at)b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); b.classList.toggle('is-done',i+1<at);});
+    prev.hidden=at===1; next.hidden=at===steps.length; if(go)go.hidden=at!==steps.length;
+    if(focus){var h=steps[at-1].querySelector('h2'); if(h){h.setAttribute('tabindex','-1'); h.focus({preventScroll:true});} f.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
+  }
+  prev.addEventListener('click',function(){show(at-1,true);});
+  next.addEventListener('click',function(){show(at+1,true);});
+  bar.forEach(function(b){b.addEventListener('click',function(){show(Number(b.getAttribute('data-to')),true);});});
   function money(n){return '$'+(n<1?n.toFixed(3):n.toFixed(2));}
   function upd(){
     var span=f.querySelector('input[name="span"]:checked'), weeks=span?Number(span.getAttribute('data-weeks'))||1:4;
-    var per=0;
+    var per=0, names=[];
     f.querySelectorAll('input[name="channel"]:checked').forEach(function(ch){
       var p=ch.value, pick=f.querySelector('input[name="cadence_'+p+'"]:checked'), n=pick?pick.value:'3';
       if(n==='custom'){var c=f.querySelector('input[name="cadence_custom_'+p+'"]'); n=c?c.value:'0';}
       per+=Math.max(0,Math.min(28,Math.floor(Number(n)||0)));
+      var b=ch.closest('label'); names.push(b?b.textContent.trim():p);
     });
     var img=!!f.querySelector('input[name="auto_image"][value="1"]:checked'), count=per*weeks;
     var cost=perDraft>0?'نحو '+money(count*(perDraft+(img?perImage:0))):'والكلفةُ تُقدَّر بعد أوّل كتابة';
-    out.textContent=count.toLocaleString('ar-EG')+' منشورًا'+(img?' بصورها':'')+' · '+cost;
+    var text=count.toLocaleString('ar-EG')+' منشورًا'+(img?' بصورها':'')+' · '+cost;
+    if(out)out.textContent=text; if(live)live.textContent=text;
+    var sp=document.getElementById('pn-s-span'); if(sp&&span){var l=span.closest('label').querySelector('.wz-big'); sp.textContent=l?l.textContent:'';}
+    var sc=document.getElementById('pn-s-ch'); if(sc)sc.textContent=names.length?names.join(' · '):'—';
+    var all=f.querySelector('input[name="source"][value="all"]'), picked=f.querySelectorAll('input[name="source"]:checked:not([value="all"])').length;
+    var ss=document.getElementById('pn-s-src'); if(ss)ss.textContent=(all&&all.checked)||picked===0?'كلُّ المصادر المحلَّلة':picked.toLocaleString('ar-EG')+' من مصادرك';
   }
-  f.addEventListener('change',upd); f.addEventListener('input',upd); upd();
+  f.addEventListener('change',upd); f.addEventListener('input',upd);
+  // ‏«الكلّ» وما سواه لا يجتمعان: اختيارُ مصدرٍ يرفع «الكلّ»، ورفعُ آخرِها يعيده
+  f.addEventListener('change',function(e){
+    var t=e.target; if(!t||t.name!=='source')return;
+    var all=f.querySelector('input[name="source"][value="all"]');
+    if(t.value==='all'&&t.checked){f.querySelectorAll('input[name="source"]:not([value="all"])').forEach(function(x){x.checked=false;});}
+    else if(t.value!=='all'&&all){all.checked=f.querySelectorAll('input[name="source"]:checked:not([value="all"])').length===0;}
+    upd();
+  });
+  var say=document.getElementById('pn-add-say'), grid=document.getElementById('pn-srcs');
+  var csrf=(document.querySelector('#pn-up input[name="_csrf"]')||{}).value||'';
+  function added(r){
+    if(!r||!r.ok){say.textContent=(r&&r.reason)||'تعذّر — أعد المحاولة.'; say.setAttribute('data-tone','bad'); return;}
+    say.textContent='«'+r.name+'» '+r.note; say.setAttribute('data-tone',r.ready?'ok':'warn');
+    if(!r.ready||f.querySelector('input[name="source"][value="'+r.id+'"]'))return;
+    var l=document.createElement('label'); l.className='wz-src is-new';
+    var i=document.createElement('input'); i.type='checkbox'; i.name='source'; i.value=r.id; i.checked=true;
+    var b=document.createElement('span'); b.className='wz-src-b';
+    var n=document.createElement('bdi'); n.className='nm'; n.textContent=r.name;
+    var k=document.createElement('span'); k.className='chip'; k.textContent='جديد';
+    b.appendChild(n); b.appendChild(k); l.appendChild(i); l.appendChild(b);
+    grid.insertBefore(l,grid.children[1]||null);
+    var all=f.querySelector('input[name="source"][value="all"]'); if(all)all.checked=false; upd();
+  }
+  var file=document.getElementById('pn-file'), drop=document.getElementById('pn-drop'), prog=document.getElementById('pn-prog');
+  function upload(fl){
+    if(!fl)return; var fd=new FormData(); fd.append('_csrf',csrf); fd.append('return','plan'); fd.append('file',fl);
+    var x=new XMLHttpRequest(); x.open('POST','/panel/sources/upload'); x.setRequestHeader('Accept','application/json');
+    prog.hidden=false; var bar=prog.firstElementChild; bar.style.inlineSize='0%'; say.removeAttribute('data-tone'); say.textContent='يُرفع «'+fl.name+'»…';
+    x.upload.onprogress=function(e){if(e.lengthComputable){bar.style.inlineSize=Math.round(e.loaded/e.total*100)+'%'; if(e.loaded===e.total)say.textContent='يُقرأ ويُحلَّل…';}};
+    x.onload=function(){prog.hidden=true; var r=null; try{r=JSON.parse(x.responseText);}catch(e){} added(r); file.value='';};
+    x.onerror=function(){prog.hidden=true; added(null);};
+    x.send(fd);
+  }
+  if(file){file.addEventListener('change',function(){upload(file.files&&file.files[0]);});}
+  if(drop){
+    ['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault(); drop.classList.add('is-over');});});
+    ['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault(); drop.classList.remove('is-over');});});
+    drop.addEventListener('drop',function(e){var fl=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; upload(fl);});
+  }
+  var link=document.getElementById('pn-link');
+  if(link){link.addEventListener('submit',function(e){
+    e.preventDefault(); var u=document.getElementById('pn-url'); if(!u||!u.value)return;
+    var btn=document.getElementById('pn-link-go'); btn.disabled=true; say.removeAttribute('data-tone'); say.textContent='تُقرأ الصفحة وتُحلَّل…';
+    var fd=new FormData(); fd.append('_csrf',csrf); fd.append('return','plan'); fd.append('url',u.value);
+    fetch('/panel/sources/link',{method:'POST',body:fd,headers:{Accept:'application/json'},credentials:'same-origin'})
+      .then(function(r){return r.json();}).then(function(r){added(r); if(r&&r.ok)u.value='';})
+      .catch(function(){added(null);}).finally(function(){btn.disabled=false;});
+  });}
+  // ‏Enter في حقلٍ لا يقفز إلى البناء قبل الخطوة الأخيرة
+  f.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.form===f&&at<steps.length){e.preventDefault(); show(at+1,true);} });
+  upd(); show(at,false);
 })();`

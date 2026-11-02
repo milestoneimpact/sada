@@ -74,6 +74,9 @@ interface SourceRow {
   worth_score: number | null
   summary: string | null
   themes_json: string | null
+  kind?: string
+  origin_url?: string | null
+  file_key?: string | null
 }
 
 function toPanelSource(row: SourceRow): PanelSource {
@@ -102,6 +105,10 @@ function toPanelSource(row: SourceRow): PanelSource {
     reason,
     themes,
     lastSeenAt: row.last_seen_at,
+    // ‏ما ليس من Drive يُعرَف بنوعه ويُفتح من أصله (D-284)
+    kind: row.kind ?? 'drive',
+    originUrl: row.origin_url ?? null,
+    hasFile: (row.file_key ?? null) !== null,
   }
 }
 
@@ -280,7 +287,7 @@ async function shellData(
 async function loadSources(c: PanelContext, org: string): Promise<PanelSource[]> {
   try {
     const { results } = await c.env.DB.prepare(
-      `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at,
+      `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at, s.kind, s.origin_url, s.file_key,
               i.worth_score, i.summary, i.themes_json
          FROM sources s
          LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
@@ -959,6 +966,7 @@ home.post('/panel/analyze', async (c) => {
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
+      media: c.env.MEDIA,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
       encKey: c.env.TOKEN_ENC_KEY,
