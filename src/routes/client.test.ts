@@ -310,8 +310,33 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('لا حسابَ مربوطًا على Instagram')
     expect(db.raw.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'plan.generate'").get()).toEqual({ n: 0 })
-    // ‏والنموذجُ في اللوحة بأمدائه الأربعة وقنواته ويوم بدايته وأفكاره وصورته
-    for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'value="2months"', 'name="start"', 'name="ideas"', 'name="auto_image"', 'name="source" value="all"']) expect(html).toContain(s)
+    // ‏واللوحةُ تحمل الطريقَ إلى «خطّة جديدة» لا النموذجَ نفسَه (D-283)
+    expect(html).toContain('href="/panel/plan/new"')
+    expect(html).not.toContain('name="ideas"')
+    // ‏والشاشةُ بأمدائها الثلاثة ويوم بدايتها وأفكارها وصورتها — والشهران يقبلهما الخادمُ ولا يُعرَضان
+    const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'name="start"', 'name="ideas"', 'name="auto_image"', 'name="source" value="all"', 'action="/panel/plan/generate"']) expect(screen).toContain(s)
+    expect(screen).not.toContain('value="2months"')
+    // ‏والمربوطُ وحدَه يُرى: لا خانةَ لمنصّةٍ غيرِ مربوطة ولا لما ليس في الخطّة اليوم
+    expect(screen).not.toContain('value="instagram"')
+    expect(screen).not.toContain('value="tiktok"')
+  })
+
+  it('«خطّة جديدة» (D-283): المربوطُ من LinkedIn وX وحدَه، والإيقاعُ مستوياتٌ تُختار، والزرُّ لا يظهر قبل أن يكتمل ما يلزم', async () => {
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
+      ('a1', 'linkedin', 'member', 'e1', 'عمر', 'active'), ('a2', 'tiktok', 'member', 'e2', 'عمر', 'active')`)
+    const { cookie } = await session()
+    const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    expect(screen).toContain('name="channel" value="linkedin" checked')
+    // ‏TikTok مربوطةٌ لكنّها ليست في خطّة اليوم، وX غيرُ مربوطة فتُذكَر برابطها لا بخانةٍ معطّلة
+    expect(screen).not.toContain('value="tiktok"')
+    expect(screen).not.toContain('name="channel" value="x"')
+    expect(screen).toContain('X غير مربوطة')
+    for (const n of ['2', '3', '5', 'custom']) expect(screen).toContain(`name="cadence_linkedin" value="${n}"`)
+    expect(screen).toContain('name="cadence_custom_linkedin"')
+    // ‏بلا مزوّدٍ ولا مصدرَين محلَّلين: السببُ وزرُّ علاجه، لا زرُّ بناءٍ يُضغط فيُردّ
+    expect(screen).toContain('مزوّدُ الكتابة غير مضبوط بعد')
+    expect(screen).not.toContain('حلّل وابنِ الخطّة')
   })
 
   it('«ابدأ» يحمل الفكرةَ واختيارَ الصورة إلى الطابور، ويقول إنّ بندَ المقطع ينتظر مقطعًا', async () => {

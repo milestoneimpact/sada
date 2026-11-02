@@ -67,6 +67,9 @@ ol.steps .body{min-width:0; max-width:var(--measure); padding-top:var(--s-0)}
 ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:var(--s-0);
   font-size:var(--t-ui); line-height:var(--lh-ui)}
 ol.steps .why{display:block; color:var(--ink-2)}
+/* ‏«خطّة جديدة» (D-283): الخطواتُ عمودٌ بعرض القراءة، فالبطاقةُ بعرضها لا بعرض الشاشة —
+   بطاقةٌ عريضةٌ محتواها في ثلثها تُقرأ فراغًا (حارسُ «البطاقة الجوفاء») */
+.card.pn{max-width:calc(var(--measure) + var(--s-16) * 2)}
 
 /* ── قائمةُ المزوّدين: صفٌّ يفتح لوحَه ────────────────────────────────
    كانت ستّ بطاقات في شبكة من عمودين، كلّ بطاقة سبعة شؤون. **والعين

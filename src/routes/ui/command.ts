@@ -222,7 +222,6 @@ export function buildCommands(
     { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
     { label: 'خطّة من ملفّ', note: 'جدول Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
     { label: 'امسح Drive', note: 'يقرأ الملفّات الجديدة — والزرّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
-    { label: 'ولّد خطّة الأسبوع', note: 'نداء مدفوع — يُطلَب من المنشورات', id: 'posts', alias: 'plan generate' },
     { label: 'اعتمد مسوّدة', note: 'القرار لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
     { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
     { label: 'بدّل سقف الإنفاق', note: 'الحدّ اليوميّ وعدد التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
@@ -237,6 +236,11 @@ export function buildCommands(
       icon: '', alias: a.alias,
     })
   }
+  // ‏و«خطّة جديدة» شاشتُها (D-283): كان «ولّد خطّة الأسبوع» ينقل إلى رأس «المنشورات» والنموذجُ في آخرها
+  out.push({
+    label: 'خطّة جديدة', note: 'أسبوع أو أسبوعان أو شهر — على المنصّات المربوطة', group: 'الأفعال',
+    href: '/panel/plan/new', icon: '', alias: 'plan generate new week month خطه جديده اسبوع شهر',
+  })
   // ‏ورحلةُ العميل (D-257): المحطّاتُ السبع والموجز
   out.push({
     label: 'رحلة العميل', note: 'الموجزُ والقنواتُ والخطّةُ والكلفةُ في شاشة', group: 'الأفعال',

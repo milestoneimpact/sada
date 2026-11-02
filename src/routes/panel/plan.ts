@@ -9,6 +9,8 @@ import {
   applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
 import { planImportExpired, planImportScreen } from '../ui/planImportView'
+import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
+import { taskReadyAlone } from './home'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
@@ -77,7 +79,9 @@ plan.post('/panel/plan/generate', async (c) => {
       : [...linked].filter(isPlanPlatform)
   const cadence: Partial<Record<PlanPlatform, number>> = {}
   for (const ch of channels) {
-    const raw = f.get('cadence_' + ch)
+    // ‏«مخصّص» في شاشة الخطّة الجديدة (D-283) يحمل رقمَه في حقلٍ بجانبه
+    const picked = f.get('cadence_' + ch)
+    const raw = picked === 'custom' ? f.get('cadence_custom_' + ch) : picked
     const n = raw === null ? brief.perWeek : Math.floor(Number(raw))
     cadence[ch] = Number.isFinite(n) ? Math.min(28, Math.max(0, n)) : brief.perWeek
   }
@@ -129,6 +133,44 @@ plan.post('/panel/plan/generate', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('posts')
+})
+
+/**
+ * **شاشةُ «خطّة جديدة»** (D-283): الفترةُ ثمّ المنصّاتُ المربوطةُ بإيقاعها ثمّ المحتوى اختيارًا، وملخّصٌ وزرٌّ واحد.
+ * تُرسل إلى `/panel/plan/generate` نفسِه. وما تقرؤه هنا ما يقرؤه قسمُ الخطّة: الحساباتُ النشطة، والموجز،
+ * والمصادرُ المحلَّلة، ووسيطُ الكلفة، وجاهزيّةُ مزوّد الخطّة.
+ */
+plan.get('/panel/plan/new', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const [accounts, brief, analyzed, units, settings, current, ready] = await Promise.all([
+    listAccounts(c.env.DB, org),
+    readBrief(c.env.DB, org),
+    c.env.DB.prepare(`SELECT s.id, s.name FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+                       WHERE s.org_id = ? ORDER BY s.last_seen_at DESC LIMIT 60`)
+      .bind(org).all<{ id: string; name: string }>().catch(() => ({ results: [] as { id: string; name: string }[] })),
+    unitCosts(c.env.DB, org),
+    readSettings(c.env.DB),
+    latestPlan(c.env.DB, org),
+    taskReadyAlone(c, 'plan'),
+  ])
+  const body = planNewScreen({
+    now: new Date(),
+    linked: [...new Set(accounts.filter((a) => a.status === 'active').map((a) => a.platform as string))],
+    perWeek: brief.perWeek,
+    sources: analyzed.results,
+    perDraft: units.perDraft,
+    perImage: units.perImage,
+    autoImage: settings.autoImage,
+    ready,
+    replacing: current !== null,
+  })
+  return page((nonce) =>
+    soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+      PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
 })
 
 /** اعتمادُ منطق الخطّة — علامةٌ لا تنفيذ. */

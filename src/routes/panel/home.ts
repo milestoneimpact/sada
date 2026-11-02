@@ -380,7 +380,7 @@ function taskReady(p: ProviderLoad, task: TaskName): boolean {
  * الحكمُ نفسُه لمهمّةٍ واحدة **بلا بطاقات** (D-280): «المكتبة» تقرأ جاهزيّةَ الكتابة وحدَها لزرّ «اكتب النصوص»،
  * فيُحلّ مفتاحُ مزوّدِ المهمّة وحدَه — ثلاثُ جملٍ لا اثنتان لكلّ مزوّد.
  */
-async function taskReadyAlone(c: PanelContext, task: TaskName): Promise<boolean> {
+export async function taskReadyAlone(c: PanelContext, task: TaskName): Promise<boolean> {
   const [routes, stored] = await Promise.all([readRoutes(c.env.DB), listProviders(c.env.DB)])
   for (const r of routes.filter((x) => x.task === task)) {
     const p = stored.find((x) => x.name === r.provider)

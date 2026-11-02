@@ -21,8 +21,7 @@ import { statusBadge } from '../components/badge'
 import { emptyState } from '../components/empty'
 import { stagesAttr } from '../components/stages'
 import { html, raw, type Html } from '../html'
-import { money } from '../../../lib/format'
-import { CLIP_CHANNELS, PLAN_CHANNELS, PLAN_SPANS, SPAN_LABEL, weekStart, type PlanKind, type PlanPlatform } from '../../../lib/plan/prompt'
+import type { PlanKind } from '../../../lib/plan/prompt'
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
@@ -72,41 +71,11 @@ export function kindChip(kind: PlanKind | undefined): Html {
 }
 
 /**
- * **نموذجُ الخطّة** (D-282): المدى من أربعة، ويومُ البداية (الأحدُ القادم افتراضًا)، والقنواتُ المربوطةُ وإيقاعُ كلٍّ في الأسبوع،
- * والمصادرُ («الكلّ» افتراضًا)، وأفكارٌ سطرًا سطرًا، و«ولّد صورةً مع كلّ منشور» بكلفتها. والشاشةُ الكاملةُ بخطواتها
- * الأربع تأتي بعدها؛ هذا ما يلزم ليُختار كلُّ شيء من اللوحة.
+ * **«خطّة جديدة» زرٌّ إلى شاشتها** (D-283). كان النموذجُ كلُّه هنا (D-282): ستّةُ قراراتٍ في قسمٍ واحد، وخمسُ منصّاتٍ
+ * ثلاثٌ منها معطّلة. فصار خطواتٍ في `/panel/plan/new`، وهنا الطريقُ إليها وحدَه.
  */
-function planForm(input: PlanInput, f: PlanFormInput, replacing: boolean): Html {
-  const off = input.ready && input.analyzed >= 2 ? false : true
-  const spans = PLAN_SPANS.map((sp) => html`<label class="vpf"><input type="radio" name="span" value="${sp}"${sp === 'week' ? raw(' checked') : ''}><span class="vpf-b"><b>${SPAN_LABEL[sp]}</b></span></label>`)
-  const channels = PLAN_CHANNELS.map((p: PlanPlatform) => {
-    const linked = f.linked.includes(p)
-    const checked = linked && (f.chosen.length === 0 ? !CLIP_CHANNELS.has(p) : f.chosen.includes(p))
-    return html`<label class="vpf"><input type="checkbox" name="channel" value="${p}"${checked ? raw(' checked') : ''}${linked ? '' : raw(' disabled')}>
-      <span class="vpf-b"><b>${platformLabel(p)}</b>${linked
-        ? html`<span class="row gap-2"><input type="number" name="cadence_${p}" min="0" max="28" step="1" value="${f.perWeek}" dir="ltr" aria-label="${platformLabel(p)} في الأسبوع"> في الأسبوع</span>`
-        : html`<span class="ago">غير مربوطة</span>`}${CLIP_CHANNELS.has(p) ? html`<span class="ago">كلُّ بند لها مقطع ترفعه</span>` : ''}</span></label>`
-  })
-  const sources = f.sources.slice(0, 60).map((x) => html`<label class="vpf"><input type="checkbox" name="source" value="${x.id}"><span class="vpf-b"><bdi>${x.name}</bdi></span></label>`)
-  const imageCost = f.perImage === null ? html`ولا تقدير لكلفة الصورة قبل أوّل صورة تُقاس عليها` : html`ونحو ${money(f.perImage)} للصورة`
-  return html`<form method="POST" action="/panel/plan/generate" class="stack mt-3" data-busy="جار التخطيط…"${replacing ? raw(' data-confirm="سيحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
-    <fieldset class="field"><legend>المدى</legend><div class="row gap-2">${spans}</div></fieldset>
-    <div class="field"><label for="plan-start">يوم البداية</label>
-      <p class="field-hint" id="plan-start-hint">الأحد القادم افتراضًا — وأسبوع العمل يبدأ الأحد.</p>
-      <input type="date" id="plan-start" name="start" value="${weekStart(input.now)}" dir="ltr" aria-describedby="plan-start-hint"></div>
-    <fieldset class="field"><legend>القنوات وإيقاعُها</legend>
-      <p class="field-hint">ما رُبط بحساب وحده يُختار، والرقم كم منشورًا في الأسبوع لكلّ قناة.</p>
-      <div class="row gap-2">${channels}</div></fieldset>
-    <fieldset class="field"><legend>المصادر</legend>
-      <p class="field-hint">بلا اختيار تُقرأ المصادر المحلَّلة كلُّها.</p>
-      <div class="row gap-2"><label class="vpf"><input type="checkbox" name="source" value="all" checked><span class="vpf-b"><b>الكلّ</b></span></label>${sources}</div></fieldset>
-    <div class="field"><label for="plan-ideas">أفكار بكلماتك</label>
-      <p class="field-hint" id="plan-ideas-hint">سطر لكلّ فكرة، حتّى عشرين — تدخل الخطّة كما يدخل المصدر.</p>
-      <textarea id="plan-ideas" name="ideas" rows="3" dir="auto" aria-describedby="plan-ideas-hint"></textarea></div>
-    <input type="hidden" name="auto_image" value="0">
-    <label class="vpf"><input type="checkbox" name="auto_image" value="1"${f.autoImage ? raw(' checked') : ''}><span class="vpf-b"><b>ولّد صورة مع كلّ منشور</b><span class="ago">${imageCost} — تُحسب في التقدير قبل «ابدأ»</span></span></label>
-    <div class="row"><button class="btn ${replacing ? 'btn-secondary' : 'btn-primary'}" type="submit"${off ? raw(' disabled') : ''}>${replacing ? 'ابن خطّة جديدة' : 'ابن الخطّة'}</button></div>
-  </form>`
+function newPlanLink(replacing: boolean): string {
+  return html`<a class="btn ${replacing ? 'btn-secondary' : 'btn-primary'} btn-sm" href="/panel/plan/new">خطّة جديدة</a>`.value
 }
 
 /**
@@ -189,7 +158,7 @@ export function planSection(input: PlanInput): string {
            وعلى أيّ منصّة وبأيّ ترتيب. <b>ويقترح ولا يكتب</b> — والكتابة زرّ لكلّ بند.`,
       })}
       ${why}
-      ${input.form === undefined ? '' : planForm(input, input.form, false).value}
+      ${input.form === undefined ? '' : html`<div class="row mt-3">${raw(newPlanLink(false))}</div>`.value}
       ${lastAttemptLine(input)}
     </div>`
   }
@@ -201,11 +170,10 @@ export function planSection(input: PlanInput): string {
 
   return `<div class="card">
     <div class="card-head"><h2>الخطّة الأسبوعيّة</h2>
-      <div class="grow"></div>${status}${generate}</div>
+      <div class="grow"></div>${status}${generate}${input.form === undefined ? '' : newPlanLink(true)}</div>
 
     <div class="lede-row m-0 mb-3">
       <span class="chip mono">أسبوع ${escapeHtml(plan.week)}</span>
-      <span class="chip mono">${escapeHtml(plan.model)}</span>
       <span class="ago">وُضعت ${escapeHtml(relativeTime(plan.createdAt, now))}</span>
     </div>
 
@@ -230,7 +198,6 @@ export function planSection(input: PlanInput): string {
         : ''}
       ${approveAllForm(plan.id, input.pending ?? 0).value}
     </div>
-    ${input.form === undefined ? '' : html`<details class="pb-more mt-3"><summary>خطّة جديدة</summary>${planForm(input, input.form, true)}</details>`.value}
   </div>`
 }
 
