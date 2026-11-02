@@ -280,6 +280,8 @@ export interface PlanItem {
   readonly kind?: PlanKind
   /** ما اختير له من المكتبة (D-260): `m:` · `u:` · `f:` — وغيابُه يعني «ولّد أنت». */
   readonly asset?: string
+  /** ملاحظةٌ على بندٍ من خطّةٍ مرفوعة (D-287): ما وجده القارئ فيه ولا يمنعه — منصّةٌ غيرُ مربوطة، أو نصٌّ أطولُ من حدّها. */
+  readonly note?: string
 }
 
 export interface Plan {

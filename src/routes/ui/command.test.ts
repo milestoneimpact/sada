@@ -120,10 +120,12 @@ describe('الفهرس — ولا فعل يقع من هنا', () => {
    * ‏فيديو» و«خطّة من ملفّ» كانت غائبةً، لأنّ الأفعالَ لا تقبل إلّا معرّفاتِ الأقسام.
    */
   it('و«اكتب» و«ارفع فيديو» و«خطّة من ملفّ» تنزل إلى بطاقاتها، في اللوحة وخارجها', () => {
-    for (const [label, anchor] of [['اكتب منشورًا من مصدر', 'write'], ['ارفع فيديو', 'videos'], ['خطّة من ملفّ', 'plan-import']]) {
+    for (const [label, anchor] of [['اكتب منشورًا من مصدر', 'write'], ['ارفع فيديو', 'videos']]) {
       expect(buildCommands({ onPanel: true }).find((c) => c.label === label)?.href).toBe(`#${anchor}`)
       expect(buildCommands({ onPanel: false }).find((c) => c.label === label)?.href).toBe(`/panel#${anchor}`)
     }
+    // ‏و«خطّة من ملفّ» صارت «عندي خطّة» بشاشتها (D-287): الصيغُ كلُّها، والتسكينُ في المراجعة
+    expect(buildCommands({ onPanel: true }).find((c) => c.label === 'عندي خطّة')?.href).toBe('/panel/plan/import')
   })
 })
 

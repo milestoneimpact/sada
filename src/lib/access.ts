@@ -25,7 +25,7 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/(team|security|sessions|providers|routes|channels\/app)(\/|$)/, 'owner'],
   [/^\/panel\/(settings|orgs)$/, 'owner'],
   // ‏المدير: ربطُ القنوات وفصلُها، والمسحُ والتحليل، والترويج، واستيرادُ الخطط
-  [/^\/panel\/(channels\/disconnect|scan|analyze|sources|images\/quota|report\/promote|plan-import)(\/|$)/, 'admin'],
+  [/^\/panel\/(channels\/disconnect|scan|analyze|sources|images\/quota|report\/promote|plan-import|plan\/import)(\/|$)/, 'admin'],
   // ‏الناشر: كلُّ ما يعتمد أو يجدول أو يُنشر
   [/^\/panel\/drafts\/(approve-many|schedule|reschedule|unschedule|requeue|spread\/apply|undo-approve|undo-reject)$/, 'publisher'],
   [/^\/panel\/plan\/(approve|approve-all|start|schedule|pin|review\/approve|review\/bulk)$/, 'publisher'],

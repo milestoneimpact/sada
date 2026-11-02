@@ -3,6 +3,10 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
+import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
+import { generateForPost } from '../../lib/image/job'
+import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, delayItem, dropItem, pinPlan } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../ui/planReviewView'
 import { approveMany, decide } from '../../lib/draft/store'
@@ -23,7 +27,7 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
-import { asImageStyle, asSpan, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { asImageStyle, asSpan, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
 import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
@@ -647,5 +651,69 @@ plan.post('/panel/plan/pin', async (c) => {
       text: 'ثُبّت الإصدار ' + String(pinned.version) + ' وجُدول ' + String(pinned.scheduled) + ' منشورًا في مواعيده' +
         (pinned.skipped.length === 0 ? '.' : '، وتعذّر ' + String(pinned.skipped.length) + ': ' + pinned.skipped.slice(0, 2).map((x) => x.reason).join('، ')),
     })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+// ── «عندي خطّة»: تُقرأ أيًّا كانت صيغتُها وتُسكَّن في المراجعة (D-287) ─────────
+
+plan.get('/panel/plan/import', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin') })
+  return page((nonce) =>
+    soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+      PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+})
+
+plan.post('/panel/plan/import', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const file = f.get('file')
+  const pasted = String(f.get('pasted') ?? '')
+  const styleRaw = String(f.get('image_style') ?? 'none')
+  const imageStyle = styleRaw === 'none' ? null : asImageStyle(styleRaw)
+  const bad = async (text: string): Promise<Response> => {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  if (file instanceof File && file.size > MAX_PLAN_BYTES * 20) return bad('الملفّ أكبر من 10MB — قسّمه أو ارفعه جدولًا.')
+  const toMarkdown = c.env.AI?.toMarkdown
+  const table = await toTable(
+    {
+      db: c.env.DB,
+      writer: { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
+      toMarkdown: toMarkdown === undefined ? undefined : (doc) => toMarkdown.call(c.env.AI, doc),
+    },
+    file instanceof File && file.size > 0 ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : { pasted },
+  )
+  if (table.kind === 'error') return bad(table.reason)
+  const now = new Date()
+  const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, now)
+  const { csv, filled } = await fillGaps(c.env.DB, org, table.csv, weekStart(now), facts.zone)
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'plan.import.seat', target: seated.planId,
+    detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
+  }, c.req.raw)
+  if (seated.planId === null) {
+    return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
+  }
+  // ‏والصورُ إن اختيرت تُرسم في الخلفيّة بحرّاسها وسقفها اليوميّ (D-255 · D-285)، والمراجعةُ تقول «بلا صورة» حتّى تصل
+  if (imageStyle !== null) {
+    const ids = (await seatedPosts(c.env.DB, org, seated.planId)).slice(0, await autoImageRoom(c.env.DB, org, true))
+    const deps = { db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> }
+    const job = (async () => { for (const id of ids) await generateForPost(deps, id, { style: imageStyle, org }).catch(() => null) })()
+    try { c.executionCtx.waitUntil(job) } catch { /* لا سياقَ تنفيذٍ خارج Worker */ }
+  }
+  const named = seated.skipped.slice(0, 3).map((x) => 'السطر ' + String(x.line) + ' (' + x.reason + ')').join('، ')
+  await setFlash(c.env, c.req.raw, {
+    kind: seated.skipped.length === 0 ? 'ok' : 'warn',
+    text: 'سُكّن ' + String(seated.seated) + ' منشورًا في خطّتك — راجعها واعتمدها ثمّ ثبّتها' +
+      (seated.skipped.length === 0 ? '.' : '. وتعذّر ' + String(seated.skipped.length) + ': ' + named + (seated.skipped.length > 3 ? ' وغيرُها.' : '.')),
+  })
   return c.redirect('/panel/plan/review', 303)
 })

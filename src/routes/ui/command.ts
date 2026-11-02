@@ -220,7 +220,6 @@ export function buildCommands(
   for (const a of [
     { label: 'اكتب منشورًا من مصدر', note: 'من خلاصة مصدر محلَّل — نداء مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
     { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
-    { label: 'خطّة من ملفّ', note: 'جدول Excel أو CSV يُقرأ ويُعايَن ثمّ يُعتمَد', id: 'posts', anchor: 'plan-import', alias: 'import plan csv excel sheet استيراد جدول' },
     { label: 'امسح Drive', note: 'يقرأ الملفّات الجديدة — والزرّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
     { label: 'اعتمد مسوّدة', note: 'القرار لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
     { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
@@ -240,6 +239,11 @@ export function buildCommands(
   out.push({
     label: 'خطّة جديدة', note: 'أسبوع أو أسبوعان أو شهر — على المنصّات المربوطة', group: 'الأفعال',
     href: '/panel/plan/new', icon: '', alias: 'plan generate new week month خطه جديده اسبوع شهر',
+  })
+  // ‏و«عندي خطّة» شاشتُها (D-287): CSV وExcel وPDF وWord ونصٌّ يُلصق، تُسكَّن في المراجعة
+  out.push({
+    label: 'عندي خطّة', note: 'ارفع خطّتك بأيّ صيغة أو الصقها — تُسكَّن في المراجعة', group: 'الأفعال',
+    href: '/panel/plan/import', icon: '', alias: 'import plan csv excel sheet pdf word استيراد جدول خطه ملف',
   })
   // ‏ورحلةُ العميل (D-257): المحطّاتُ السبع والموجز
   out.push({

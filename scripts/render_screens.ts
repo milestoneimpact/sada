@@ -25,6 +25,7 @@ import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
+import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
 import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
@@ -464,6 +465,13 @@ writeAudited(
     }, null), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
   )
 }
+
+// ‏«عندي خطّة» (D-287): ملفٌّ أو نصٌّ يُلصق، ونوعُ الصورة
+writeAudited(
+  '/tmp/screen-plan-seat.html',
+  soloPage('صدى — عندي خطّة', { href: '/panel#posts', label: 'المنشورات' }, planSeatScreen({ canRead: true }), 'n', PLAN_SEAT_SCRIPT,
+    buildCommands({ onPanel: false }), soloNav('posts')),
+)
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض
 writeAudited('/tmp/screen-login.html', loginPage({ passkeys: true }, 'n'))

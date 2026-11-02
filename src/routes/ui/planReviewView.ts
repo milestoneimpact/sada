@@ -53,7 +53,8 @@ function card(c: ReviewCard, planId: string, zone: string | null): Html {
       ${c.mediaId === null ? html`` : html`<img class="rv-thumb" src="/panel/media/${c.mediaId}" alt="" loading="lazy" width="96" height="96">`}
       <div class="rv-t">${c.post === null
         ? html`<p class="hint m-0">${c.item.angle}</p>`
-        : html`<p class="m-0 rv-text" dir="auto">${c.post.text}</p><p class="hint m-0 mt-1">${c.item.angle}</p>`}</div>
+        : html`<p class="m-0 rv-text" dir="auto">${c.post.text}</p>${c.item.why === 'من خطّتك المرفوعة' ? '' : html`<p class="hint m-0 mt-1">${c.item.angle}</p>`}`}
+        ${c.item.note === undefined ? html`` : html`<p class="hint m-0 mt-1">ملاحظة: ${c.item.note}</p>`}</div>
     </div>
     ${/* ‏و«تنتظر اعتمادك» في شارة الحال وحدَها على البطاقة — لا مرّتين */''}
     ${c.gaps.filter((g) => g !== 'pending').length === 0 ? html`` : html`<div class="row gap-2">${c.gaps.filter((g) => g !== 'pending').map((g) => html`<span class="chip">${GAP_LABEL[g]}</span>`)}</div>`}

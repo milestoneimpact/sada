@@ -121,3 +121,29 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(wizard).toContain('name="then" value="review"')
   })
 })
+
+describe('«عندي خطّة» (D-287)', () => {
+  it('CSV يُسكَّن ويُفتح في المراجعة بلا جدولة، ونصٌّ بلا مزوّدٍ يُردّ بسببه', async () => {
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    const { cookie } = await session()
+    const screen = await (await app.request('/panel/plan/import', { headers: { Cookie: cookie } }, env)).text()
+    const csrf = /name="_csrf" value="([^"]+)"/.exec(screen)?.[1] ?? ''
+    expect(screen).toContain('action="/panel/plan/import" enctype="multipart/form-data"')
+    expect(screen).toContain('name="pasted"')
+    const csv = 'التاريخ,الوقت,المنصة,النص\n2099-02-01,09:00,LinkedIn,قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم: ثلاثةُ أرقامٍ من تقرير الأثر.\n2099-02-03,,X,سؤالٌ واحد قبل أيّ تمويل'
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('image_style', 'none')
+    body.set('file', new File([csv], 'خطتي.csv', { type: 'text/csv' }))
+    const res = await app.request('/panel/plan/import', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(review).toContain('سُكّن 2 منشورًا في خطّتك')
+    expect(review).toContain('ملاحظة: ')
+    expect(review).toContain('الساعةُ أرجحُ ساعات المنصّة')
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status = 'queued'").get()).toEqual({ n: 0 })
+    const paste = new FormData()
+    paste.set('_csrf', csrf); paste.set('pasted', 'الأحد: منشورٌ عن الحوكمة على LinkedIn')
+    const refused = await app.request('/panel/plan/import', { method: 'POST', body: paste, headers: { Cookie: cookie } }, env)
+    expect(refused.headers.get('Location')).toBe('/panel/plan/import')
+  })
+})

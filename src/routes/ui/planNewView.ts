@@ -242,7 +242,7 @@ export function planNewScreen(d: PlanNewData): string {
   const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
   const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
       <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
-      <a class="btn btn-secondary btn-sm" href="${panelHref('plan-import')}">عندي خطّة</a></nav>`
+      <a class="btn btn-secondary btn-sm" href="/panel/plan/import">عندي خطّة</a></nav>`
   const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${DIGITS[i] ?? ''}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
