@@ -24,6 +24,8 @@ import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
+import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
 import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
@@ -435,6 +437,40 @@ writeAudited(
     sources: [{ id: 's1', name: 'تقرير الأثر 2025', kind: 'drive' }, { id: 's2', name: 'مراجعة المحفظة', kind: 'upload' }, { id: 's3', name: 'قيادة القيمة لا تُقاس بالمخرجات', kind: 'url' }],
     perDraft: 0.012, perImage: 0.011, perInfographic: 0.018, freeLeft: { draft: 173, final: 7 }, autoImage: true, ready: true, replacing: false,
   }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+)
+
+// ‏مراجعةُ الخطّة (D-286): بطاقةٌ معتمَدةٌ بصورتها، وأخرى تنتظر، وثالثةٌ لم تُكتب، ورابعةٌ مجدولة، وموعدان مكرَّران
+{
+  const it = (sourceId: string, platform: 'linkedin' | 'x', day: string, time: string, angle: string) => ({ sourceId, platform, kind: 'text' as const, angle, day, time, why: 'ل' })
+  const items = [
+    it('s1', 'linkedin', '2026-11-08', '06:00', 'تقرير الأثر: ثلاثةُ أرقامٍ تغيّر النقاش'),
+    it('s2', 'x', '2026-11-08', '06:00', 'سؤالٌ واحد قبل أيّ تمويل'),
+    it('s2', 'linkedin', '2026-11-10', '09:00', 'مراجعةُ المحفظة بدرسٍ واحد'),
+    it('s3', 'x', '2026-11-12', '15:00', 'قيادةُ القيمة لا تُقاس بالمخرجات'),
+  ]
+  const post = (id: string, status: string, text: string) => ({ id, status, text, scheduledAt: status === 'queued' ? '2026-11-12 15:00:00' : null })
+  const cards = [
+    { index: 0, key: 'k0', item: items[0]!, post: post('p0', 'approved', 'قيادةُ القيمة لا تُقاس بالمخرجات بل بالمعالم: ثلاثةُ أرقامٍ من تقرير الأثر غيّرت نقاشَ مجلس الإدارة هذا العام.'), mediaId: 'm0', gaps: [] },
+    { index: 1, key: 'k1', item: items[1]!, post: post('p1', 'draft', 'قبل أيّ تمويل: ما الأثرُ الذي تقيسه؟ سؤالٌ واحدٌ يوفّر عامًا من التقارير.'), mediaId: null, gaps: ['no_image', 'pending'] as const },
+    { index: 2, key: 'k2', item: items[2]!, post: null, mediaId: null, gaps: ['unwritten'] as const },
+    { index: 3, key: 'k3', item: items[3]!, post: post('p3', 'queued', 'مراجعةُ المحفظة علّمتنا أنّ القرار الصحيح يأتي متأخّرًا أحيانًا — وأنّ التأخّرَ ثمنٌ يُدفع.'), mediaId: 'm3', gaps: [] },
+  ]
+  writeAudited(
+    '/tmp/screen-plan-review.html',
+    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen({
+      plan: { id: 'pl1', week: '2026-11-08', plan: { rationale: '', items }, model: 'm', status: 'approved', createdAt: '2026-11-02 08:00:00', span: '2weeks',
+        choices: { channels: ['linkedin', 'x'], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: true, imageStyle: 'illustration', startDay: '2026-11-08' } },
+      version: 2, lockedAt: null, cards: cards as never, gaps: { unwritten: 1, no_image: 1, pending: 1, clash: 0 },
+      versions: [{ version: 1, lockedAt: '2026-11-03 10:00:00', lockedBy: 'owner', scheduled: 3, items: 4 }],
+    }, null), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+}
+
+// ‏«عندي خطّة» (D-287): ملفٌّ أو نصٌّ يُلصق، ونوعُ الصورة
+writeAudited(
+  '/tmp/screen-plan-seat.html',
+  soloPage('صدى — عندي خطّة', { href: '/panel#posts', label: 'المنشورات' }, planSeatScreen({ canRead: true }), 'n', PLAN_SEAT_SCRIPT,
+    buildCommands({ onPanel: false }), soloNav('posts')),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

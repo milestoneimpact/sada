@@ -59,6 +59,7 @@
 | `sources` | `id` · `drive_file_id` · `name` · `mime` · `content_hash` · `last_seen_at` · `kind` · `origin_url` · `file_key` · `text_key` | ملفّ في Drive، أو مرفوعٌ من اللوحة، أو رابطُ صفحة (D-284) — والنصُّ المستخرَج للأخيرين في R2 |
 | `content_items` | `id` · `source_id` · `summary` · `themes_json` · `worth_score` · `extracted_at` | ما فهمه Claude |
 | `plans` | `id` · `week_start` · `span` (week/2weeks/month/2months) · `plan_json` · `choices_json` · `model` · `status` | خطّةُ مدًى، واختياراتُ المالك معها (D-282) |
+| `plan_versions` | `plan_id` · `version` · `plan_json` · `scheduled` · `locked_by` · `locked_at` | صورةُ كلِّ إصدارٍ لحظةَ «ثبّت الخطّة» (D-286)، و`plans.version` · `plans.locked_at` حالُ الإصدار الجاري |
 | `posts` | `id` · `plan_id` · `account_id` · `type` · `text` · `media_json` · `has_url` · `scheduled_at` · `status` · `idempotency_key` · `approved_by` · `approved_at` | العقد أدناه |
 | `publish_attempts` | `id` · `post_id` · `idempotency_key` · `attempt_no` · `request_json` · `response_json` · `platform_post_id` · `status` · `at` | كلّ محاولة، ناجحةً أو فاشلة |
 | `metrics` | `post_id` · `window` (24h/72h/7d) · `impressions` · `reactions` · `comments` · `shares` · `clicks` · `pulled_at` | |

@@ -242,7 +242,7 @@ export function planNewScreen(d: PlanNewData): string {
   const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
   const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
       <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
-      <a class="btn btn-secondary btn-sm" href="${panelHref('plan-import')}">عندي خطّة</a></nav>`
+      <a class="btn btn-secondary btn-sm" href="/panel/plan/import">عندي خطّة</a></nav>`
   const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${DIGITS[i] ?? ''}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
@@ -251,6 +251,7 @@ export function planNewScreen(d: PlanNewData): string {
       ${canBuild ? html`<button class="btn btn-primary" type="submit" id="wz-go">حلّل وابنِ الخطّة</button>` : html``}
     </div>`
   const form = html`<form method="POST" action="/panel/plan/generate" class="card wz" id="pn" data-busy="جار التحليل والبناء…"${d.picked ? raw(' data-start="3"') : ''}${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
+    <input type="hidden" name="then" value="review">
     ${bar}${spanStep(start, preset, shown.length)}${channelStep(d, shown)}${contentStep(d)}${reviewStep(d, shown, count)}${foot}
   </form>
   <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" id="pn-up"><input type="hidden" name="return" value="plan"></form>

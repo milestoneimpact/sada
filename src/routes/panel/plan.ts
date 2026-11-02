@@ -3,6 +3,15 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
+import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
+import { generateForPost } from '../../lib/image/job'
+import { autoImageRoom } from '../../lib/image/auto'
+import { reviewModel, delayItem, dropItem, pinPlan } from '../../lib/plan/review'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../ui/planReviewView'
+import { approveMany, decide } from '../../lib/draft/store'
+import { notice, toastRegion } from '../ui/components/toast'
+import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
@@ -18,7 +27,7 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
-import { asImageStyle, asSpan, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { asImageStyle, asSpan, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
 import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
@@ -35,7 +44,7 @@ import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
-import { deciderOf, finalizeLater, page, loginResponse, setFlash, guardPost, reachNow, back } from './shared'
+import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back } from './shared'
 
 export const plan = new Hono<{ Bindings: Env }>()
 
@@ -139,6 +148,16 @@ plan.post('/panel/plan/generate', async (c) => {
     },
     c.req.raw,
   )
+  // ‏ومن المعالج (D-286): «حلّل وابنِ» يكتب المسوّداتِ وصورَها الآن ويفتح المراجعة — التقديرُ قيل قبل الضغط
+  if (outcome.kind === 'planned' && f.get('then') === 'review' && !(await readSettings(c.env.DB)).paused) {
+    const built = await latestPlan(c.env.DB, org)
+    if (built !== null) {
+      const started = await enqueuePlan(c.env, org, built)
+      await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: built.id, detail: String(started.items) + ' بندًا' }, c.req.raw)
+      await setFlash(c.env, c.req.raw, { kind: 'ok', text: flash.text + ' وبدأت كتابةُ المنشورات وصورها — تظهر هنا تباعًا.' })
+      return c.redirect('/panel/plan/review', 303)
+    }
+  }
   await setFlash(c.env, c.req.raw, flash)
   return back('posts')
 })
@@ -221,6 +240,40 @@ plan.post('/panel/plan/approve', async (c) => {
  * يُرسَل مرّة: مفتاحُ المسوّدة واحدٌ لهما، والثانيةُ «كُتبت من قبل». والإيقافُ يُقال هنا قبل أن يُرسَل شيء.
  */
 /**
+ * **«ابدأ»: كلُّ بندٍ مرّةً إلى الطابور** — مسوّدتُه وصورتُه باختيار الخطّة (D-258 · D-282 · D-285). مشتركٌ بين زرّ «ابدأ»
+ * و«حلّل وابنِ» في المعالج (D-286)، فالطريقُ واحدٌ بحرّاسه.
+ */
+async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>): Promise<{ items: number; clips: number; autoImage: boolean | undefined }> {
+  if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
+  const seen = new Set<string>()
+  const items = plan.plan.items.filter((i) => {
+    const k = `${i.sourceId}:${i.platform}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ
+  const autoImage = plan.choices.channels.length === 0 ? undefined : plan.choices.autoImage
+  if (items.length > 0) {
+    await env.GENERATE_QUEUE.sendBatch(items.map((i) => {
+      const idea = ideaOf(i.sourceId, plan.choices)
+      return {
+        body: { draft: {
+          sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
+          ...(i.asset === undefined ? {} : { asset: i.asset }),
+          ...(idea === null ? {} : { idea }),
+          ...(autoImage === undefined ? {} : { autoImage }),
+          imageStyle: plan.choices.imageStyle,
+        } },
+      }
+    }))
+  }
+  // ‏بندُ مقطعٍ بلا أصل لا يفشل ولا يُرسَم له شيء: مسوّدتُه تنتظر مقطعًا — يُقال الآن لا عند الجدولة
+  const clips = items.filter((i) => CLIP_CHANNELS.has(i.platform) && i.asset === undefined).length
+  return { items: items.length, clips, autoImage }
+}
+
+/**
  * تعديلُ بندٍ في الخطّة (D-259): يومُه بالسحب في اللوحة، ومنصّتُه وساعتُه بالقائمة. **والسكربتُ يطلب JSON** فتبقى الصفحةُ
  * في مكانها، وبلا سكربتٍ نموذجٌ عاديٌّ يعود إلى اللوحة بإشعاره. والتحقّقُ كلُّه في `editPlanItem`.
  */
@@ -260,35 +313,10 @@ plan.post('/panel/plan/start', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'صدى موقوفٌ مؤقّتًا — لا يُكتب شيءٌ حتّى يُرفع الإيقاف.' })
     return c.redirect('/panel/client', 303)
   }
-  if (plan.status === 'draft') await approvePlan(c.env.DB, plan.id, org)
-  const seen = new Set<string>()
-  const items = plan.plan.items.filter((i) => {
-    const k = `${i.sourceId}:${i.platform}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
-  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ
-  const autoImage = plan.choices.channels.length === 0 ? undefined : plan.choices.autoImage
-  if (items.length > 0) {
-    await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => {
-      const idea = ideaOf(i.sourceId, plan.choices)
-      return {
-        body: { draft: {
-          sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
-          ...(i.asset === undefined ? {} : { asset: i.asset }),
-          ...(idea === null ? {} : { idea }),
-          ...(autoImage === undefined ? {} : { autoImage }),
-          imageStyle: plan.choices.imageStyle,
-        } },
-      }
-    }))
-  }
-  // ‏بندُ مقطعٍ بلا أصل لا يفشل ولا يُرسَم له شيء: مسوّدتُه تنتظر مقطعًا — يُقال الآن لا عند الجدولة
-  const clips = items.filter((i) => CLIP_CHANNELS.has(i.platform) && i.asset === undefined).length
+  const { items, clips, autoImage } = await enqueuePlan(c.env, org, plan)
   const images = autoImage ?? settings.autoImage
-  await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: `${items.length} بندًا` }, c.req.raw)
-  await setFlash(c.env, c.req.raw, { kind: 'ok', text: sayStarted(items.length, images, clips) })
+  await record(c.env.DB, { actor: 'panel', action: 'plan.start', target: plan.id, detail: String(items) + ' بندًا' }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: sayStarted(items, images, clips) })
   return c.redirect('/panel/client', 303)
 })
 
@@ -497,4 +525,195 @@ plan.post('/panel/plan-import/:id/approve', async (c) => {
     text: parts.length === 0 ? 'لا صفّ جاهزًا في الملفّ — لم يُجدوَل شيء.' : `${parts.join('، ')}.`,
   })
   return back('posts')
+})
+
+// ── مراجعةُ الخطّة وتثبيتُها (D-286) ──────────────────────────────────
+
+plan.get('/panel/plan/review', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null) return c.redirect('/panel/plan/new', 303)
+  const [model, zone, flash] = await Promise.all([
+    reviewModel(c.env.DB, org, current),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    takeFlash(c.env, c.req.raw),
+  ])
+  const body = planReviewScreen(model, zone ?? null) +
+    (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  return page((nonce) =>
+    soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+      PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+})
+
+/** العودةُ إلى البطاقة نفسِها، لا إلى رأس الصفحة. */
+const toCard = (index: unknown): Response =>
+  new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + (Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
+
+plan.post('/panel/plan/review/approve', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('post') ?? '')
+  const row = await c.env.DB.prepare('SELECT text FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<{ text: string }>()
+  const result = row === null
+    ? { ok: false as const, reason: 'لا مسوّدة بهذا المعرّف' }
+    : await decide(c.env.DB, org, id, { kind: 'approve', text: row.text }, deciderOf(gate.session.record.via))
+  if (result.ok) finalizeLater(c, org, [id])
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'اعتُمدت كما كُتبت.' } : { kind: 'bad', text: result.reason })
+  return toCard(gate.form.get('index'))
+})
+
+plan.post('/panel/plan/review/delay', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const days = Number(f.get('days'))
+  const result = await delayItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), Number(f.get('index')), String(f.get('key') ?? ''), days, new Date())
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: result.note === undefined ? 'ok' : 'warn', text: result.note ?? (days === 7 ? 'أُخّر أسبوعًا.' : 'أُخّر يومًا.') }
+    : { kind: 'bad', text: result.reason })
+  return toCard(f.get('index'))
+})
+
+plan.post('/panel/plan/review/drop', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const result = await dropItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), Number(f.get('index')), String(f.get('key') ?? ''), deciderOf(gate.session.record.via))
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُذف البند من الخطّة.' } : { kind: 'bad', text: result.reason })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+/**
+ * **فعلٌ واحدٌ على المحدَّد**: اعتمادٌ أو تأخيرٌ يومًا أو حذف. والحذفُ والتأخيرُ من آخر البنود إلى أوّلها فلا يتبدّل فهرسُ ما بعدُ،
+ * وكلُّ بندٍ ببصمته — فما تغيّر منذ فُتحت الصفحة يُردّ وحدَه ويُسمّى.
+ */
+plan.post('/panel/plan/review/bulk', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const planId = String(f.get('id') ?? '')
+  const act = String(f.get('do') ?? '')
+  const picked = f.getAll('sel').map(String).map((v) => {
+    const [index, ...rest] = v.split('|')
+    const post = rest.pop() ?? ''
+    return { index: Number(index), key: rest.join('|'), post }
+  }).filter((p) => Number.isInteger(p.index)).sort((a, b) => b.index - a.index)
+  if (picked.length === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم يُحدَّد بند.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  let done = 0
+  const failed: string[] = []
+  if (act === 'approve') {
+    const ids = picked.map((p) => p.post).filter((x) => x !== '')
+    const r = await approveMany(c.env.DB, org, ids, deciderOf(gate.session.record.via))
+    done = r.done.length
+    failed.push(...r.failed.map((x) => x.reason))
+    finalizeLater(c, org, r.done)
+  } else if (act === 'delay' || act === 'drop') {
+    for (const p of picked) {
+      const r = act === 'delay'
+        ? await delayItem(c.env.DB, org, planId, p.index, p.key, 1, new Date())
+        : await dropItem(c.env.DB, org, planId, p.index, p.key, deciderOf(gate.session.record.via))
+      if (r.ok) done += 1
+      else failed.push(r.reason)
+    }
+  }
+  const verb = act === 'approve' ? 'اعتُمد' : act === 'delay' ? 'أُخّر' : 'حُذف'
+  await setFlash(c.env, c.req.raw, {
+    kind: failed.length === 0 ? 'ok' : done === 0 ? 'bad' : 'warn',
+    text: verb + ' ' + String(done) + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ')),
+  })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+plan.post('/panel/plan/pin', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== String(gate.form.get('id') ?? '')) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لا خطّة بهذا المعرّف لهذا العميل.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const pinned = await pinPlan(c.env.DB, org, current, deciderOf(gate.session.record.via), new Date())
+  await record(c.env.DB, { actor: 'panel', action: 'plan.pin', target: current.id, detail: 'v' + String(pinned.version) + ' · ' + String(pinned.scheduled) + ' جُدولت · ' + String(pinned.skipped.length) + ' تعذّرت' }, c.req.raw)
+  await setFlash(c.env, c.req.raw, pinned.already
+    ? { kind: 'warn', text: 'هذا الإصدارُ مثبَّتٌ من قبل.' }
+    : {
+      kind: pinned.skipped.length === 0 ? 'ok' : 'warn',
+      text: 'ثُبّت الإصدار ' + String(pinned.version) + ' وجُدول ' + String(pinned.scheduled) + ' منشورًا في مواعيده' +
+        (pinned.skipped.length === 0 ? '.' : '، وتعذّر ' + String(pinned.skipped.length) + ': ' + pinned.skipped.slice(0, 2).map((x) => x.reason).join('، ')),
+    })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+// ── «عندي خطّة»: تُقرأ أيًّا كانت صيغتُها وتُسكَّن في المراجعة (D-287) ─────────
+
+plan.get('/panel/plan/import', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin') })
+  return page((nonce) =>
+    soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+      PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+})
+
+plan.post('/panel/plan/import', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const file = f.get('file')
+  const pasted = String(f.get('pasted') ?? '')
+  const styleRaw = String(f.get('image_style') ?? 'none')
+  const imageStyle = styleRaw === 'none' ? null : asImageStyle(styleRaw)
+  const bad = async (text: string): Promise<Response> => {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  if (file instanceof File && file.size > MAX_PLAN_BYTES * 20) return bad('الملفّ أكبر من 10MB — قسّمه أو ارفعه جدولًا.')
+  const toMarkdown = c.env.AI?.toMarkdown
+  const table = await toTable(
+    {
+      db: c.env.DB,
+      writer: { db: c.env.DB, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
+      toMarkdown: toMarkdown === undefined ? undefined : (doc) => toMarkdown.call(c.env.AI, doc),
+    },
+    file instanceof File && file.size > 0 ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : { pasted },
+  )
+  if (table.kind === 'error') return bad(table.reason)
+  const now = new Date()
+  const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, now)
+  const { csv, filled } = await fillGaps(c.env.DB, org, table.csv, weekStart(now), facts.zone)
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'plan.import.seat', target: seated.planId,
+    detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
+  }, c.req.raw)
+  if (seated.planId === null) {
+    return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
+  }
+  // ‏والصورُ إن اختيرت تُرسم في الخلفيّة بحرّاسها وسقفها اليوميّ (D-255 · D-285)، والمراجعةُ تقول «بلا صورة» حتّى تصل
+  if (imageStyle !== null) {
+    const ids = (await seatedPosts(c.env.DB, org, seated.planId)).slice(0, await autoImageRoom(c.env.DB, org, true))
+    const deps = { db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> }
+    const job = (async () => { for (const id of ids) await generateForPost(deps, id, { style: imageStyle, org }).catch(() => null) })()
+    try { c.executionCtx.waitUntil(job) } catch { /* لا سياقَ تنفيذٍ خارج Worker */ }
+  }
+  const named = seated.skipped.slice(0, 3).map((x) => 'السطر ' + String(x.line) + ' (' + x.reason + ')').join('، ')
+  await setFlash(c.env, c.req.raw, {
+    kind: seated.skipped.length === 0 ? 'ok' : 'warn',
+    text: 'سُكّن ' + String(seated.seated) + ' منشورًا في خطّتك — راجعها واعتمدها ثمّ ثبّتها' +
+      (seated.skipped.length === 0 ? '.' : '. وتعذّر ' + String(seated.skipped.length) + ': ' + named + (seated.skipped.length > 3 ? ' وغيرُها.' : '.')),
+  })
+  return c.redirect('/panel/plan/review', 303)
 })
