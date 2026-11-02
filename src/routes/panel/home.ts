@@ -4,6 +4,8 @@
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك. **وكلُّ لوحٍ يُحمَّل له ما يقرأ وحدَه** (D-280):
  * الهيكلُ لكلّ لوح، ثمّ محمِّلٌ للوح المطلوب — انظر `panelRoute`.
  */
+import { waitingImages } from '../../lib/image/job'
+import { NEURON_USD } from '../../lib/ai/imagePricing'
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { type TaskName } from '../../lib/ai/registry'
@@ -74,6 +76,9 @@ interface SourceRow {
   worth_score: number | null
   summary: string | null
   themes_json: string | null
+  kind?: string
+  origin_url?: string | null
+  file_key?: string | null
 }
 
 function toPanelSource(row: SourceRow): PanelSource {
@@ -102,6 +107,10 @@ function toPanelSource(row: SourceRow): PanelSource {
     reason,
     themes,
     lastSeenAt: row.last_seen_at,
+    // ‏ما ليس من Drive يُعرَف بنوعه ويُفتح من أصله (D-284)
+    kind: row.kind ?? 'drive',
+    originUrl: row.origin_url ?? null,
+    hasFile: (row.file_key ?? null) !== null,
   }
 }
 
@@ -280,7 +289,7 @@ async function shellData(
 async function loadSources(c: PanelContext, org: string): Promise<PanelSource[]> {
   try {
     const { results } = await c.env.DB.prepare(
-      `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at,
+      `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at, s.kind, s.origin_url, s.file_key,
               i.worth_score, i.summary, i.themes_json
          FROM sources s
          LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
@@ -380,7 +389,7 @@ function taskReady(p: ProviderLoad, task: TaskName): boolean {
  * الحكمُ نفسُه لمهمّةٍ واحدة **بلا بطاقات** (D-280): «المكتبة» تقرأ جاهزيّةَ الكتابة وحدَها لزرّ «اكتب النصوص»،
  * فيُحلّ مفتاحُ مزوّدِ المهمّة وحدَه — ثلاثُ جملٍ لا اثنتان لكلّ مزوّد.
  */
-async function taskReadyAlone(c: PanelContext, task: TaskName): Promise<boolean> {
+export async function taskReadyAlone(c: PanelContext, task: TaskName): Promise<boolean> {
   const [routes, stored] = await Promise.all([readRoutes(c.env.DB), listProviders(c.env.DB)])
   for (const r of routes.filter((x) => x.task === task)) {
     const p = stored.find((x) => x.name === r.provider)
@@ -600,6 +609,22 @@ async function overviewData(load: Load): Promise<OverviewData> {
   }
 }
 
+/** ما ينتظر الحصّةَ المجّانيّة اليوم، وكلفتُه الآن، وقرارُ المالك إن قاله (D-285). */
+async function imageQuotaOf(c: PanelContext, org: string, recent: readonly { action: string }[]): Promise<NonNullable<PostsData['imageQuota']>> {
+  // ‏ولا جملةَ جديدةً في كلّ فتحة (D-280): السجلُّ المحمَّلُ أصلًا يقول أوقع انتظارٌ قريبًا، والسؤالُ الدقيقُ بعده وحدَه
+  if (!recent.some((a) => a.action === 'image.quota_wait')) return { waiting: 0, usd: 0, decided: null }
+  const waiting = await waitingImages(c.env.DB, org)
+  if (waiting.length === 0) return { waiting: 0, usd: 0, decided: null }
+  const decision = await c.env.DB
+    .prepare("SELECT action FROM audit_log WHERE org_id = ? AND action IN ('image.overage.approve', 'image.overage.wait') AND at >= date('now') ORDER BY id DESC LIMIT 1")
+    .bind(org).first<{ action: string }>().catch(() => null)
+  return {
+    waiting: waiting.length,
+    usd: waiting.reduce((sum, w) => sum + w.neurons * NEURON_USD, 0),
+    decided: decision === null ? null : decision.action === 'image.overage.approve' ? 'pay' : 'wait',
+  }
+}
+
 /**
  * «المنشورات»: المسوّداتُ ومحرّرُها والخطّة.
  *
@@ -644,6 +669,7 @@ async function postsData(load: Load): Promise<PostsData> {
       autoImage: allowance.settings.autoImage,
     },
     planPending: progress?.pending ?? 0,
+    imageQuota: await imageQuotaOf(c, org, audit),
     editing,
     media,
     targets: targetsOf(channels),
@@ -959,6 +985,7 @@ home.post('/panel/analyze', async (c) => {
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
+      media: c.env.MEDIA,
       serviceAccountJson: c.env.GOOGLE_SA_JSON,
       anthropicKey: c.env.ANTHROPIC_API_KEY,
       encKey: c.env.TOKEN_ENC_KEY,

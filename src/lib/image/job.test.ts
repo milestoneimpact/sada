@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { NOTE_MAX, composeSlide, generateForPost as generate, imageKey, mediaFor, noteOf, rejectMedia, type Bucket, type GenerateOptions, type ImageDeps } from './job'
+import { NOTE_MAX, composeSlide, finalizeApproved, generateForPost as generate, imageKey, mediaFor, noteOf, rejectMedia, resumeWaiting, waitingImages, type Bucket, type GenerateOptions, type ImageDeps } from './job'
 import { imagePrompt, topicOf } from './prompt'
 import { OVERLAY_OFF } from './slide'
 import { writeSetting } from '../settings'
@@ -1212,5 +1212,73 @@ describe('الإنفوجرافيك', () => {
     await generate(infoDeps(lane()), post)
     const [row] = await mediaFor(db, [post])
     expect([row!.width, row!.height]).toEqual([1080, 1920])
+  })
+})
+
+/**
+ * **السعرُ بالنموذج والمقاس، والحصّةُ المجّانيّة قبل أيّ إنفاق، والنهائيّةُ بعد الاعتماد** (D-285).
+ */
+describe('كلفةُ الصورة الحقيقيّة على Cloudflare (D-285)', () => {
+  const SCHNELL = '@cf/black-forest-labs/flux-1-schnell'
+  const KLEIN = '@cf/black-forest-labs/flux-2-klein-9b'
+  async function cf(): Promise<void> {
+    await upsertProvider(db, { name: 'cloudflare', label: 'Cloudflare', kind: 'openai_compat', model: SCHNELL }, 'test')
+    await writeRoute(db, 'image', 'cloudflare', SCHNELL, 'test')
+  }
+  function run(calls: { url: string; body: unknown }[]): ImageDeps {
+    return {
+      db, bucket: bucket(), encKey: TOP_ENC,
+      workerSecrets: { CF_AI_ACCOUNT_ID: 'acc-1', CF_AI_TOKEN: 'tok-1' },
+      fetchImpl: (async (url: unknown, init?: RequestInit) => {
+        const u = String(url)
+        calls.push({ url: u, body: init?.body })
+        if (u.includes('api.writer.test')) return writerReply()
+        return new Response(JSON.stringify({ success: true, result: { image: 'AAECAw==' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }) as typeof fetch,
+    }
+  }
+  const ledger = () => db.raw.prepare("SELECT operation, units, total FROM cost_ledger WHERE provider = 'cloudflare'").all() as { operation: string; units: number; total: number }[]
+
+  it('المسوّدةُ بـ schnell داخل الحصّة: Neurons وحداتٌ، وصفرٌ موسومٌ free', async () => {
+    await cf()
+    const out = await generateForPost(run([]), await seedPost())
+    expect(out.kind).toBe('generated')
+    const [row] = ledger()
+    expect(row!.operation).toMatch(/^image:linkedin:@cf\/black-forest-labs\/flux-1-schnell:free$/)
+    expect(row!.units).toBeCloseTo(4 * 4.8 + 4 * 9.6, 5)
+    expect(row!.total).toBe(0)
+  })
+
+  it('نفدت الحصّة بلا إذن: لا موجزَ ولا نموذج، والانتظارُ مسجَّلٌ ويُقرأ', async () => {
+    await cf()
+    db.raw.prepare("INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, org_id) VALUES ('l1', 'cloudflare', 'image:linkedin:@cf/x/y:free', 9990, 0, 0, 'org_owner')").run()
+    const calls: { url: string; body: unknown }[] = []
+    const post = await seedPost()
+    const out = await generateForPost(run(calls), post)
+    expect(out).toMatchObject({ kind: 'blocked' })
+    expect(calls).toEqual([])
+    expect(await waitingImages(db, 'org_owner')).toEqual([{ postId: post, tier: 'draft', neurons: 58 }])
+    // ‏وبإذن المالك اليوم تُرسَم بسعرها: الزائدُ فوق الحصّة يُدفع
+    db.raw.prepare("INSERT INTO audit_log (actor, action, org_id) VALUES ('panel', 'image.overage.approve', 'org_owner')").run()
+    expect(await resumeWaiting(run(calls), 'org_owner', 'today', false)).toBe(1)
+    const paid = ledger().find((r) => r.operation.endsWith('flux-1-schnell'))!
+    expect(paid.total).toBeGreaterThan(0)
+    expect(await waitingImages(db, 'org_owner')).toEqual([])
+  })
+
+  it('النهائيّةُ بعد الاعتماد: klein 9B بـ multipart وبوصف المسوّدة نفسِه، بلا موجزٍ جديد', async () => {
+    await cf()
+    const post = await seedPost()
+    await generateForPost(run([]), post)
+    const calls: { url: string; body: unknown }[] = []
+    expect(await finalizeApproved(run(calls), 'org_owner', [post])).toBe(1)
+    expect(calls.some((c) => c.url.includes('api.writer.test'))).toBe(false)
+    const call = calls.find((c) => c.url.includes(KLEIN))!
+    expect(call.body).toBeInstanceOf(FormData)
+    expect((call.body as FormData).get('width')).toBe('1344')
+    const ready = db.raw.prepare("SELECT model FROM media WHERE post_id = ? AND status = 'ready'").all(post) as { model: string }[]
+    expect(ready.map((r) => r.model)).toEqual([KLEIN])
+    const final = ledger().find((r) => r.operation.includes('klein'))!
+    expect(final.units).toBeCloseTo(1363.64, 2)
   })
 })

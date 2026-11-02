@@ -1284,7 +1284,9 @@ describe('CSRF — طبقة في الخادم لا في المتصفّح وحد�
   it('كلّ نموذج POST في اللوحة يحمل الرمز — بلا استثناء', async () => {
     const cookie = await login()
     await seedSource('مستند')
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    // ‏وشاشةُ «خطّة جديدة» معها (D-283): نموذجُها خرج من اللوحة إليها
+    const html = (await (await app.request('/panel', withSession(cookie), env)).text()) +
+      (await (await app.request('/panel/plan/new', withSession(cookie), env)).text())
     // يُفحص كلّ موضعٍ على حدة لا كلّ نصٍّ فريد: نموذجان متطابقان نصّا
     // موضعان اثنان، ولو فُحص الأوّل مرّتين لمرّ ثانٍ ناقص
     const pattern = /<form\b[^>]*method="POST"[^>]*>/gi

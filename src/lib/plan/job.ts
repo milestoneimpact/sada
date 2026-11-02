@@ -30,7 +30,7 @@ import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
 import {
   asSpan, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, systemPrompt, userPrompt, weekStart,
-  type Cadence, type Plan, type PlanChoices, type PlanPlatform, type PlanSource, type PlanSpan,
+  type Cadence, type Plan, type PlanChoices, type PlanImageStyle, type PlanPlatform, type PlanSource, type PlanSpan,
 } from './prompt'
 import type { Db } from '../tokens'
 
@@ -81,6 +81,8 @@ export interface PlanDeps {
   readonly assets?: readonly string[]
   /** أتُرسَم صورةٌ مع كلّ منشور؟ `undefined` يعني الإعدادَ العامّ كما كان. */
   readonly autoImage?: boolean
+  /** نوعُ الصورة الآليّة (D-285). */
+  readonly imageStyle?: PlanImageStyle
 }
 
 interface Row {
@@ -321,7 +323,7 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   // ٧ · الكتابة — والسابقةُ لهذا المدى تُنسَخ لا تُحذف
   const choices: PlanChoices = {
     channels, cadence, sources: only === 'all' ? 'all' : [...only], ideas, assets: [...(deps.assets ?? [])],
-    autoImage: deps.autoImage === true, startDay: start,
+    autoImage: deps.autoImage === true, imageStyle: deps.imageStyle ?? 'infographic', startDay: start,
   }
   const planId = crypto.randomUUID()
   await deps.db

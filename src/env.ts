@@ -33,7 +33,11 @@ export interface Env {
    * واختياريٌّ لأنّ الرابطَ قد لا يكون مضبوطا في بيئةٍ قديمة: فيُفحَص
    * قبل الاستعمال ويُقال «غيرُ مضبوط»، ولا يسقط الطلبُ بـ 500.
    */
-  readonly AI?: { run(model: string, input: Record<string, unknown>): Promise<unknown> }
+  readonly AI?: {
+    run(model: string, input: Record<string, unknown>): Promise<unknown>
+    /** قارئُ المستندات (D-284): PDF وWord وExcel وHTML نصًّا — بلا كلفةٍ للمستندات. */
+    toMarkdown?: import('./lib/sources/ingest').ToMarkdown
+  }
   /**
    * حسابُ Workers AI حين يكون **غيرَ حساب الـ Worker**.
    *

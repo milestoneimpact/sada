@@ -600,7 +600,7 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(stored?.plan.items.map((i) => i.day)).toEqual(['2026-11-01', '2026-11-29'])
     expect(stored?.plan.rationale).toBe('شهر 1 ثمّ شهر 2')
     expect(stored?.choices).toEqual({
-      channels: ['linkedin', 'instagram'], cadence: { linkedin: 2, instagram: 1 }, sources: [a, b], ideas: ['فكرةٌ عن الوقف'], assets: [], autoImage: true, startDay: '2026-11-01',
+      channels: ['linkedin', 'instagram'], cadence: { linkedin: 2, instagram: 1 }, sources: [a, b], ideas: ['فكرةٌ عن الوقف'], assets: [], autoImage: true, imageStyle: 'infographic', startDay: '2026-11-01',
     })
     // ‏والفكرةُ تُقرأ من اختياراتها بمعرّف بندها
     expect(ideaOf('idea:1', stored!.choices)).toBe('فكرةٌ عن الوقف')

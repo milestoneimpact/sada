@@ -39,11 +39,11 @@ function median(xs: readonly number[]): number | null {
 }
 
 /** وسيطُ كلفة المسوّدة والصورة في دفتر العميل — والصورةُ مع موجزها (`image-brief`) لأنّهما نداءان لصورةٍ واحدة. */
-export async function unitCosts(db: Db, org: string): Promise<{ perDraft: number | null; perImage: number | null }> {
+export async function unitCosts(db: Db, org: string): Promise<{ perDraft: number | null; perImage: number | null; perInfographic: number | null }> {
   // ‏استعلامٌ واحدٌ للثلاثة (D-280): كان لكلٍّ استعلامُه، واللوحُ يحمله في كلّ فتحة
   const { results } = await db
     .prepare(`SELECT operation, total FROM cost_ledger WHERE org_id = ? AND at >= datetime('now', '-90 days')
-                AND (operation LIKE 'draft:%' OR operation LIKE 'image:%' OR operation LIKE 'image-brief%')`)
+                AND (operation LIKE 'draft:%' OR operation LIKE 'image:%' OR operation LIKE 'image-brief%' OR operation LIKE 'infographic%')`)
     .bind(org)
     .all<{ operation: string; total: number }>()
     .catch(() => ({ results: [] as { operation: string; total: number }[] }))
@@ -51,7 +51,9 @@ export async function unitCosts(db: Db, org: string): Promise<{ perDraft: number
   const draft = median(of('draft:'))
   const image = median(of('image:'))
   const brief = median(of('image-brief')) ?? 0
-  return { perDraft: draft, perImage: image === null ? null : image + brief }
+  // ‏والإنفوجرافيك نداءُ كتابةٍ لمحتواه ولقطةٌ مجّانيّة (D-285): كان خارجَ التقدير، فقال المعالجُ «تُقاس بعد أوّل صورة» أبدًا
+  // ‏والصورةُ الفنّيّةُ على حصّة Cloudflare قد تكون صفرًا حقًّا — فبلا صورةٍ مدفوعةٍ بعدُ كلفتُها موجزُها وحدَه
+  return { perDraft: draft, perImage: image === null ? (brief > 0 ? brief : null) : image + brief, perInfographic: median(of('infographic')) }
 }
 
 /**

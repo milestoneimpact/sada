@@ -10,6 +10,7 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
+import { html, raw } from './ui/html'
 import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
@@ -250,6 +251,12 @@ export interface PanelSource {
   readonly reason: string | null
   readonly themes: string[]
   readonly lastSeenAt: string
+  /** `drive` · `upload` · `url` (D-284) — وغيابُه Drive، كما كان كلُّ مصدرٍ قبله. */
+  readonly kind?: string
+  /** عنوانُ الصفحة لمصدر الرابط. */
+  readonly originUrl?: string | null
+  /** أللمرفوع أصلٌ في R2 يُنزَّل؟ */
+  readonly hasFile?: boolean
 }
 
 export interface PanelProvider {
@@ -383,6 +390,8 @@ export interface PanelData {
   /** نموذجُ الخطّة (D-282): ما يلزمه من القنوات والمصادر والكلفة، وعدُّ ما ينتظر منها. */
   readonly planForm?: PlanFormInput
   readonly planPending?: number
+  /** صورٌ تنتظر حصّةَ Cloudflare المجّانيّة اليوم (D-285)، وقرارُ المالك إن قاله. */
+  readonly imageQuota?: { readonly waiting: number; readonly usd: number; readonly decided: 'pay' | 'wait' | null }
   readonly planReady: boolean
   /** المصادرُ التي لها خلاصة — وحدها تُكتب منها مسوّدة. */
   readonly writableSources: readonly { id: string; name: string }[]
@@ -462,7 +471,7 @@ export type OverviewData = Pick<PanelData,
 /** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
 export type PostsData = Pick<PanelData,
   'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
-  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending'>
+  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'imageQuota'>
 
 /** «المكتبة»: المصادرُ والمقاطعُ والصور. */
 export type LibraryData = Pick<PanelData,
@@ -578,12 +587,20 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
     ? ''
     : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(drive)}" target="_blank" rel="noopener noreferrer"
          aria-label="افتح ${escapeHtml(s.name)} في Drive">${ICON.external} افتح في Drive</a>`
-  const acts = `${action}${open}`
+  // ‏والمرفوعُ يُنزَّل أصلُه، والرابطُ يُفتح عنوانُه (D-284) — والعنوانُ مقبولٌ عند الاستلام بـ https وحدَه
+  const origin = s.originUrl !== undefined && s.originUrl !== null && s.originUrl.startsWith('https://')
+    ? html`<a class="btn btn-secondary btn-sm" href="${s.originUrl}" target="_blank" rel="noopener noreferrer"
+         aria-label="افتح صفحة ${s.name}">${raw(ICON.external)} افتح الصفحة</a>`.value
+    : ''
+  const file = s.hasFile === true
+    ? html`<a class="btn btn-secondary btn-sm" href="/panel/sources/${encodeURIComponent(s.id)}/file" download>نزّل الأصل</a>`.value
+    : ''
+  const acts = `${action}${open}${origin}${file}`
 
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${fileName(s.name)}</div>${body}</td>
+    <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
@@ -1120,6 +1137,24 @@ function accountsPane(d: ShellData & AccountsData): string {
 }
 
 /** «المنشورات» — المسوّداتُ ومحرّرُها و«اكتب» والخطّة. */
+/**
+ * **نفدت الحصّةُ المجّانيّة — والقرارُ للمالك** (D-285، «يسألني أوّلًا»): كم صورةً تنتظر، وكم تكلّف الآن،
+ * وزرّان. وبعد «انتظر» سطرٌ يقول متى تُرسَم، فلا يُسأل مرّتين في اليوم.
+ */
+function quotaCard(q: PostsData['imageQuota']): string {
+  if (q === undefined || q.waiting === 0 || q.decided === 'pay') return ''
+  if (q.decided === 'wait') {
+    return html`<p class="hint mb-3">${String(q.waiting)} صورةً تنتظر تجدّدَ حصّة Cloudflare (03:00 بتوقيت الرياض) — يرسمها صدى بعدها وحدَه.</p>`.value
+  }
+  return html`<div class="card card-alert mb-4" data-tone="warn" role="status">
+    <h2 class="m-0">نفدت حصّةُ الصور المجّانيّة اليوم</h2>
+    <p class="m-0 mt-2">${String(q.waiting)} صورةً تنتظر. رسمُها الآن يكلّف نحو <b>${money(q.usd)}</b>، أو تنتظر تجدّدَ الحصّة 03:00 بتوقيت الرياض بلا كلفة.</p>
+    <div class="row gap-2 mt-3">
+      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-primary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-secondary btn-sm" type="submit">انتظر للغد</button></form>
+    </div></div>`.value
+}
+
 function postsPane(d: ShellData & PostsData): string {
   return `<section data-pane="posts" hidden>
   ${/*
@@ -1129,6 +1164,7 @@ function postsPane(d: ShellData & PostsData): string {
     */''}
   ${/* ‏بلا فقرةٍ (D-274، المرحلة د): جملةُ القيد في «؟» بجانب الفرز، لا سطرٌ فوق كلّ فتحة */''}
   ${pageHead('التحرير', sectionLabel('posts'), '', headNew())}
+  ${quotaCard(d.imageQuota)}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
     writable: d.writableSources,

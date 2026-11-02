@@ -23,6 +23,7 @@ import { soloNav } from '../src/routes/ui/rail'
 import { buildCommands } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
+import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
 import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
@@ -424,6 +425,16 @@ writeAudited(
          ],
        },
      }), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
+)
+
+// ‏«خطّة جديدة» (D-283): LinkedIn مربوطة وX لا، ومصدران محلَّلان، والمزوّدُ جاهز — فالزرُّ يظهر والملخّصُ بكلفته
+writeAudited(
+  '/tmp/screen-plan-new.html',
+  soloPage('صدى — خطّة جديدة', { href: '/panel#posts', label: 'المنشورات' }, planNewScreen({
+    now: new Date('2026-11-02T08:00:00Z'), linked: ['linkedin'], perWeek: 3,
+    sources: [{ id: 's1', name: 'تقرير الأثر 2025', kind: 'drive' }, { id: 's2', name: 'مراجعة المحفظة', kind: 'upload' }, { id: 's3', name: 'قيادة القيمة لا تُقاس بالمخرجات', kind: 'url' }],
+    perDraft: 0.012, perImage: 0.011, perInfographic: 0.018, freeLeft: { draft: 173, final: 7 }, autoImage: true, ready: true, replacing: false,
+  }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

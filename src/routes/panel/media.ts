@@ -12,7 +12,7 @@ import {
 import { parseRange, resolveRange } from '../../lib/media/range'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
-import { generateForPost, rejectMedia } from '../../lib/image/job'
+import { generateForPost, rejectMedia, resumeWaiting, waitingImages } from '../../lib/image/job'
 import { animateForPost, bindingFor } from '../../lib/media/video'
 import { NO_CREDIT } from '../../lib/media/workersAi'
 import { kb, money } from '../../lib/format'
@@ -629,4 +629,28 @@ media.post('/panel/uploads/:id/schedule', async (c) => {
   }, c.req.raw)
   await setFlash(c.env, c.req.raw, flash)
   return back(/^[0-9a-f-]{8,}$/.test(id) ? `v-${id}` : 'videos')
+})
+
+/**
+ * **قرارُ المالك حين تنفد الحصّةُ المجّانيّة** (D-285): «ارسمها الآن بالدفع» يُسجَّل إذنًا لليوم ثمّ تُرسَم المنتظرةُ
+ * في الخلفيّة بأسعارها؛ و«انتظر للغد» يُسجَّل فيختفي السؤالُ اليوم، ويرسمها المسحُ بعد تجدّد الحصّة. والقرارُ في السجلّ.
+ */
+media.post('/panel/images/quota', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const pay = gate.form.get('decision') === 'pay'
+  const waiting = await waitingImages(c.env.DB, org)
+  await record(c.env.DB, { actor: 'panel', action: pay ? 'image.overage.approve' : 'image.overage.wait', target: null, detail: String(waiting.length) + ' صورة', org }, c.req.raw)
+  if (pay && waiting.length > 0) {
+    const job = resumeWaiting(
+      { db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
+      org, 'today', true,
+    ).catch(() => 0)
+    try { c.executionCtx.waitUntil(job) } catch { /* لا سياقَ تنفيذٍ خارج Worker */ }
+  }
+  await setFlash(c.env, c.req.raw, pay
+    ? { kind: 'ok', text: 'تُرسَم ' + String(waiting.length) + ' صورةً الآن بأسعارها — تظهر على مسوّداتها خلال دقائق.' }
+    : { kind: 'ok', text: 'تنتظر الصورُ تجدّدَ الحصّة (03:00 بتوقيت الرياض)، ويرسمها صدى بعدها وحدَه.' })
+  return back('posts')
 })

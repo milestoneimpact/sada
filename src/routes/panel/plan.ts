@@ -3,18 +3,22 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import {
   applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
 import { planImportExpired, planImportScreen } from '../ui/planImportView'
+import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
+import { taskReadyAlone } from './home'
+import { allows } from '../../lib/access'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
-import { asSpan, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { asImageStyle, asSpan, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
 import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
@@ -31,7 +35,7 @@ import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
-import { deciderOf, page, loginResponse, setFlash, guardPost, reachNow, back } from './shared'
+import { deciderOf, finalizeLater, page, loginResponse, setFlash, guardPost, reachNow, back } from './shared'
 
 export const plan = new Hono<{ Bindings: Env }>()
 
@@ -77,14 +81,21 @@ plan.post('/panel/plan/generate', async (c) => {
       : [...linked].filter(isPlanPlatform)
   const cadence: Partial<Record<PlanPlatform, number>> = {}
   for (const ch of channels) {
-    const raw = f.get('cadence_' + ch)
+    // ‏«مخصّص» في شاشة الخطّة الجديدة (D-283) يحمل رقمَه في حقلٍ بجانبه
+    const picked = f.get('cadence_' + ch)
+    const raw = picked === 'custom' ? f.get('cadence_custom_' + ch) : picked
     const n = raw === null ? brief.perWeek : Math.floor(Number(raw))
     cadence[ch] = Number.isFinite(n) ? Math.min(28, Math.max(0, n)) : brief.perWeek
   }
   const picked = f.getAll('source').map(String).filter((x) => x !== '')
   const sources: readonly string[] | 'all' = picked.length === 0 || picked.includes('all') ? 'all' : picked
   const ideas = String(f.get('ideas') ?? '').split('\n').map((l) => l.trim()).filter((l) => l !== '').slice(0, 20).map((l) => l.slice(0, IDEA_MAX))
-  const autoImage = f.has('auto_image') ? f.getAll('auto_image').map(String).includes('1') : undefined
+  // ‏نوعُ الصورة من المعالج (D-285): «بلا صورة» أو إنفوجرافيك أو رسمٌ فنّيّ — ونموذجٌ قديمٌ يرسل `auto_image` وحده كما كان
+  const styleRaw = f.get('image_style')
+  const autoImage = styleRaw !== null
+    ? styleRaw !== 'none'
+    : f.has('auto_image') ? f.getAll('auto_image').map(String).includes('1') : undefined
+  const imageStyle = asImageStyle(styleRaw)
   const startRaw = String(f.get('start') ?? '')
 
   const outcome = await planSpan({
@@ -98,6 +109,7 @@ plan.post('/panel/plan/generate', async (c) => {
     sources,
     ideas,
     ...(autoImage === undefined ? {} : { autoImage }),
+    imageStyle,
     ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
   })
 
@@ -129,6 +141,55 @@ plan.post('/panel/plan/generate', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   return back('posts')
+})
+
+/**
+ * **شاشةُ «خطّة جديدة»** (D-283): الفترةُ ثمّ المنصّاتُ المربوطةُ بإيقاعها ثمّ المحتوى اختيارًا، وملخّصٌ وزرٌّ واحد.
+ * تُرسل إلى `/panel/plan/generate` نفسِه. وما تقرؤه هنا ما يقرؤه قسمُ الخطّة: الحساباتُ النشطة، والموجز،
+ * والمصادرُ المحلَّلة، ووسيطُ الكلفة، وجاهزيّةُ مزوّد الخطّة.
+ */
+plan.get('/panel/plan/new', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const [accounts, brief, analyzed, units, settings, current, ready] = await Promise.all([
+    listAccounts(c.env.DB, org),
+    readBrief(c.env.DB, org),
+    c.env.DB.prepare(`SELECT s.id, s.name, s.kind FROM sources s JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
+                       WHERE s.org_id = ? ORDER BY s.last_seen_at DESC LIMIT 60`)
+      .bind(org).all<{ id: string; name: string; kind: string }>().catch(() => ({ results: [] as { id: string; name: string; kind: string }[] })),
+    unitCosts(c.env.DB, org),
+    readSettings(c.env.DB),
+    latestPlan(c.env.DB, org),
+    taskReadyAlone(c, 'plan'),
+  ])
+  const used = await neuronsUsedToday(c.env.DB)
+  const body = planNewScreen({
+    now: new Date(),
+    linked: [...new Set(accounts.filter((a) => a.status === 'active').map((a) => a.platform as string))],
+    perWeek: brief.perWeek,
+    sources: analyzed.results,
+    perDraft: units.perDraft,
+    perImage: units.perImage,
+    perInfographic: units.perInfographic,
+    // ‏ما بقي من حصّة Cloudflare اليوم بنموذجَي المستويين (D-285) — والحصّةُ واحدةٌ يقتسمانها
+    freeLeft: {
+      draft: freeImagesLeft(imageNeurons(DRAFT_IMAGE_MODEL, 1024, 1024) ?? 0, used),
+      final: freeImagesLeft(imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0, used),
+    },
+    autoImage: settings.autoImage,
+    ready,
+    replacing: current !== null,
+    // ‏ما أُضيف للتوّ بلا سكربت يُحدَّد (D-284) — ومن المحلَّل وحدَه، لا معرّفًا يكتبه أحد
+    picked: analyzed.results.some((s) => s.id === c.req.query('picked')) ? c.req.query('picked') ?? null : null,
+    // ‏إضافةُ مصدرٍ تحليلٌ مدفوع: للمدير فأعلى كزرّ «حلّل» (D-272)
+    canAdd: allows(session.record.role ?? 'owner', 'admin'),
+  })
+  return page((nonce) =>
+    soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+      PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
 })
 
 /** اعتمادُ منطق الخطّة — علامةٌ لا تنفيذ. */
@@ -218,6 +279,7 @@ plan.post('/panel/plan/start', async (c) => {
           ...(i.asset === undefined ? {} : { asset: i.asset }),
           ...(idea === null ? {} : { idea }),
           ...(autoImage === undefined ? {} : { autoImage }),
+          imageStyle: plan.choices.imageStyle,
         } },
       }
     }))
@@ -244,6 +306,7 @@ plan.post('/panel/plan/approve-all', async (c) => {
     return c.redirect('/panel/client', 303)
   }
   const done = await approvePlanDrafts(c.env.DB, org, plan.id, deciderOf(gate.session.record.via))
+  finalizeLater(c, org, done.ids ?? [])
   await record(c.env.DB, { actor: 'panel', action: 'plan.approve_all', target: plan.id, detail: `${done.done} اعتُمدت · ${done.failed.length} تعثّرت` }, c.req.raw)
   await setFlash(c.env, c.req.raw, {
     kind: done.done === 0 && done.failed.length === 0 ? 'warn' : done.failed.length === 0 ? 'ok' : done.done === 0 ? 'bad' : 'warn',

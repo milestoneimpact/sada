@@ -3,6 +3,7 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { finalizeApproved } from '../../lib/image/job'
 import type { Env } from '../../env'
 import { panelHref } from '../../lib/nav/panes'
 import { NO_CREDIT } from '../../lib/media/workersAi'
@@ -316,5 +317,26 @@ export async function ownerFacts(c: {
     ]),
     // ‏وقلبٌ بلا `video.publish` يبقى صندوقًا — بحكم الناشر (D-190)
     tiktokNoScope: tiktokNeedsScope(reachOf(ownerSettings, await activeScopes(c.env.DB, org, 'tiktok'))),
+  }
+}
+
+/**
+ * **النهائيّةُ بعد الاعتماد في الخلفيّة** (D-285): ما اعتُمد ومعه صورةُ مسوّدةٍ (schnell) يُعاد رسمُه بـ klein 9B
+ * بعد أن يعود الجواب، فلا ينتظر المالكُ نموذجًا ليرى «اعتُمدت». وبلا سياق تنفيذٍ (الاختبار) يجري ولا يُنتظَر.
+ */
+export function finalizeLater(
+  c: { env: Env; executionCtx: { waitUntil(p: Promise<unknown>): void } },
+  org: string,
+  ids: readonly string[],
+): void {
+  if (ids.length === 0) return
+  const job = finalizeApproved(
+    { db: c.env.DB, bucket: c.env.MEDIA, encKey: c.env.TOKEN_ENC_KEY, workerSecrets: c.env as unknown as Record<string, string | undefined> },
+    org, ids,
+  ).catch(() => 0)
+  try {
+    c.executionCtx.waitUntil(job)
+  } catch {
+    // ‏لا سياقَ تنفيذٍ خارج Worker
   }
 }
