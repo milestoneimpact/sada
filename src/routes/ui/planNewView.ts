@@ -251,6 +251,7 @@ export function planNewScreen(d: PlanNewData): string {
       ${canBuild ? html`<button class="btn btn-primary" type="submit" id="wz-go">حلّل وابنِ الخطّة</button>` : html``}
     </div>`
   const form = html`<form method="POST" action="/panel/plan/generate" class="card wz" id="pn" data-busy="جار التحليل والبناء…"${d.picked ? raw(' data-start="3"') : ''}${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
+    <input type="hidden" name="then" value="review">
     ${bar}${spanStep(start, preset, shown.length)}${channelStep(d, shown)}${contentStep(d)}${reviewStep(d, shown, count)}${foot}
   </form>
   <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" id="pn-up"><input type="hidden" name="return" value="plan"></form>

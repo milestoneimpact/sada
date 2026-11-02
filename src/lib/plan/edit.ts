@@ -68,6 +68,8 @@ export async function editPlanItem(
     }
   }
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  // ‏وتعديلٌ بعد التثبيت يفتح إصدارًا جديدًا (D-286)
+  await touchPlan(db, org, planId)
   return { ok: true }
 }
 
@@ -84,6 +86,8 @@ export async function removePlanItem(db: Db, org: string, planId: string, index:
   if (!Number.isInteger(index) || index < 0 || index >= plan.items.length) return { ok: false, reason: 'لا بند بهذا الرقم' }
   plan.items.splice(index, 1)
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  // ‏وتعديلٌ بعد التثبيت يفتح إصدارًا جديدًا (D-286)
+  await touchPlan(db, org, planId)
   return { ok: true }
 }
 
@@ -112,5 +116,18 @@ export async function addPlanItem(
   const plan = JSON.parse(row.plan_json) as { items: unknown[] }
   plan.items.push({ sourceId: item.sourceId, platform: item.platform, kind: kindFor(item.platform as never), angle, day: item.day, time: item.time, why: 'أضافه المالك' })
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  // ‏وتعديلٌ بعد التثبيت يفتح إصدارًا جديدًا (D-286)
+  await touchPlan(db, org, planId)
   return { ok: true }
+}
+
+/**
+ * **تعديلٌ بعد التثبيت يفتح إصدارًا جديدًا** — مرّةً واحدة: أوّلُ تعديلٍ يرفع الرقمَ ويُفرغ `locked_at`، وما بعده على
+ * الإصدار المفتوح نفسِه. والإصدارُ المثبَّتُ في `plan_versions` لا يُمسّ.
+ */
+export async function touchPlan(db: Db, org: string, planId: string): Promise<void> {
+  await db
+    .prepare('UPDATE plans SET version = version + 1, locked_at = NULL WHERE id = ? AND org_id = ? AND locked_at IS NOT NULL')
+    .bind(planId, org)
+    .run()
 }
