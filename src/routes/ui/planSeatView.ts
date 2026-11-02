@@ -30,7 +30,8 @@ export function planSeatScreen(d: { readonly canRead: boolean }): string {
       <fieldset class="field m-0"><legend>الصورة مع كلّ منشور</legend>
         <div class="wz-opts">${styles.map((x) => html`<label class="wz-opt card"><input type="radio" name="image_style" value="${x.v}"${x.v === 'none' ? raw(' checked') : ''}>
           <span class="wz-big">${x.title}</span><span class="ago">${x.note}</span></label>`)}</div></fieldset>
-      <p class="hint m-0">الجدولُ يُقرأ بلا كلفة. وPDF وWord والنصُّ الحرّ يقرؤها نموذجُ الكتابة بنداءٍ واحدٍ في الدفتر. <a href="/panel/plan-import/template.csv">نزّل نموذج الجدول</a>.</p>
+      <p class="hint m-0">الجدولُ يُقرأ بلا كلفة. وPDF وWord والنصُّ الحرّ يقرؤها نموذجُ الكتابة بنداءٍ واحدٍ في الدفتر.</p>
+      <div class="row"><a class="btn btn-secondary btn-sm" href="/panel/plan-import/template.csv" download>نزّل نموذج الجدول</a></div>
       ${d.canRead
         ? html`<div class="row"><button class="btn btn-primary" type="submit">اقرأ الخطّة وسكّنها</button></div>`
         : html`<p class="m-0">قراءةُ الخطط للمدير فأعلى. <a href="${panelHref('posts')}">عُد إلى المنشورات</a></p>`}
