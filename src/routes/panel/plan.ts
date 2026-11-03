@@ -209,7 +209,7 @@ plan.get('/panel/plan/new', async (c) => {
   })
   return page((nonce) =>
     soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
-      PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
 
@@ -472,7 +472,7 @@ plan.get('/panel/plan-import/:id', async (c) => {
     // ‏معاينةٌ تُركت مفتوحةً أكثرَ من ساعتين ثمّ حُدّثت: صفحةٌ بالرافدة وطريقٍ إلى الرفع، لا نصٌّ خامّ (7.11)
     return page((nonce) =>
       soloPage('صدى — معاينة الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
-        planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('posts')), 404)
+        planImportExpired(), nonce, '', buildCommands({ onPanel: false }), soloNav('plan')), 404)
   }
   const read = readPlan(csv, await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date()))
   const reach = await reachNow(c.env.DB, activeOrg(session.record))
@@ -481,7 +481,7 @@ plan.get('/panel/plan-import/:id', async (c) => {
   return page((nonce) =>
     soloPage('صدى — معاينة الخطّة', { href: panelHref('plan-import'), label: 'المنشورات' },
       injectCsrf(planImportScreen(id, read, new Date(), reach, fallback), session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('posts')),
+      buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
 
@@ -547,7 +547,7 @@ plan.get('/panel/plan/review', async (c) => {
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
-      PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
 
@@ -665,7 +665,7 @@ plan.get('/panel/plan/import', async (c) => {
   const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin') })
   return page((nonce) =>
     soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
-      PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
 
@@ -742,6 +742,18 @@ plan.get('/panel/plan/view', async (c) => {
   const body = planDocScreen({ model, orgName: orgRow?.name ?? 'خطّتي', authors, sources: names, zone: zone ?? null })
   return page((nonce) =>
     soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, body, nonce,
-      PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
+})
+
+/**
+ * **«الخطّة» وجهةٌ واحدة** (D-289): تفتح ما يناسب حالَ خطّة العميل — بلا خطّة «خطّة جديدة»، ومثبَّتةٌ «العرض»، وما سواهما «المراجعة».
+ */
+plan.get('/panel/plan', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const current = await latestPlan(c.env.DB, activeOrg(session.record))
+  const to = current === null ? '/panel/plan/new' : current.lockedAt !== null && current.lockedAt !== undefined ? '/panel/plan/view' : '/panel/plan/review'
+  return c.redirect(to, 303)
 })

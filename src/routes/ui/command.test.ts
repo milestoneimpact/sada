@@ -227,16 +227,17 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
   })
 
-  /** والرافدةُ سبعةُ عناصر (خطّة التصميم 5.1): الوجهاتُ الخمس، ثمّ «ما عليك» و«الإعدادات». */
-  it('**وسبعة في الرافدة** بترتيب الخطّة', () => {
+  /** والرافدةُ ثمانية (D-289): «الخطّة» بعد الرئيسيّة — محورُ المنصّة وجهةٌ — ثمّ ما كان. */
+  it('**وثمانية في الرافدة** بترتيب الخطّة', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
+      ['الرئيسيّة', 'الخطّة', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
   })
 
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
   it('وهي أقسام العمل اليوميّ', () => {
     const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
-    expect(bar).toEqual(['overview', 'posts', 'library', 'results'])
+    // ‏و«الخطّة» مكانَ «المكتبة» في اليد (D-289): المكتبةُ تُفتح حين تُضاف مصادر، والخطّةُ كلَّ يوم
+    expect(bar).toEqual(['overview', 'plan', 'posts', 'results'])
   })
 
   /**
@@ -259,12 +260,12 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
   })
 
   /** و«المزيد» قائمةٌ لا بحث (خطّة التصميم 5.3 · D-208): ما ليس في الشريط بأعداده، ويعمل بلا سكربت. */
-  it('و«المزيد» ورقة فيها الحسابات وما عليك والإعدادات، وعددُها مجموعُها', () => {
+  it('و«المزيد» ورقة فيها المكتبة والحسابات وما عليك والإعدادات، وعددُها مجموعُها', () => {
     const html = railHtml({ inPanel: true, counts: { accounts: 1, tasks: 4, settings: 0 } })
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
-    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/accounts', '/panel/tasks', '/panel/settings'])
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
     expect(sheet).toContain('بحث وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })

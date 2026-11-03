@@ -499,4 +499,26 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .pd-week{break-before:page}
   .pd-sec{break-inside:auto}
 }
+
+/* ── «خطّةُ الشهر» في الرئيسيّة (D-289) ───────────────────────────────
+   أوّلُ ما يُرى: الحالُ، وشريطُ ما اعتُمد، وأقربُ ثلاثة منشورات، وزرٌّ يتبع الحال. */
+.home-plan{display:flex; flex-direction:column; gap:var(--s-2); margin-bottom:var(--gap-card)}
+.home-plan .card-head{margin:0}
+.home-hello{margin:0 0 var(--s-3)}
+.hp-prog{display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--s-3); margin-top:var(--s-2)}
+.hp-prog progress{width:100%; height:var(--s-2); appearance:none; border:0; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden}
+.hp-prog progress::-webkit-progress-bar{background:var(--surface-2); border-radius:var(--r-pill)}
+.hp-prog progress::-webkit-progress-value{background:var(--brand); border-radius:var(--r-pill)}
+.hp-prog progress::-moz-progress-bar{background:var(--brand); border-radius:var(--r-pill)}
+.hp-prog span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.hp-next{list-style:none; margin:var(--s-2) 0 0; padding:0; display:flex; flex-direction:column}
+.hp-next li{display:flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-1) 0; max-width:none}
+.hp-next li + li{border-top:var(--bd-soft)}
+.hp-a{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-2)}
+.hp-next li b,.hp-next li bdi{white-space:nowrap}
+@media${below('sm')}{
+  .hp-prog{grid-template-columns:1fr}
+  .hp-next li{flex-wrap:wrap; row-gap:var(--s-0)}
+  .hp-a{flex-basis:100%; white-space:normal; padding-inline-start:calc(var(--s-6) + var(--s-2))}
+}
 `

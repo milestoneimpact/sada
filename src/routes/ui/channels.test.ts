@@ -182,15 +182,19 @@ describe('بطاقة «الحسابات» تقول حالًا واحدة (D-205)
     expect(html).not.toMatch(/إذن? ?(الوصول|التجديد)/)
   })
 
-  it('والمنقطعة أوّلًا، ثمّ ما يحتاج إعدادًا، ثمّ المتّصلة', () => {
+  it('والمنقطعة أوّلًا، ثمّ منصّاتُ الخطّة، وما لم يُضبط من غيرها مطويٌّ «منصّاتٌ لاحقة» لا يُعَدّ (D-289)', () => {
     const views = viewChannels([
       acc({}),
       acc({ id: 'x:1', platform: 'x', status: 'needs_reauth' }),
     ], (name) => !name.startsWith('TIKTOK_'))
     const html = channelsSection(views, now)
-    const order = [...html.matchAll(/data-health="([a-z]+)"/g)].map((m) => m[1])
-    expect(order[0]).toBe('broken')
-    expect(order.indexOf('connected')).toBeGreaterThan(order.lastIndexOf('setup'))
+    const fold = html.indexOf('<details class="fold mt-5">')
+    const main = [...html.slice(0, fold).matchAll(/id="ch-([a-z]+)" data-health="([a-z]+)"/g)].map((m) => [m[1], m[2]])
+    expect(main).toEqual([['x', 'broken'], ['linkedin', 'connected']])
+    expect(html.slice(fold)).toContain('منصّاتٌ لاحقة')
+    expect(html.slice(fold)).toContain('data-health="setup"')
+    // ‏والأرقامُ فوقها لمنصّات الخطّة وحدَها: لا «تحتاج إعدادًا» لمنصّةٍ مطويّة
+    expect(html).toMatch(/تحتاج إعدادًا<\/div>\s*<div class="kv-v">0</)
   })
 
   it('وما لم يُبن سطر «قريبًا» لا بطاقات', () => {

@@ -137,8 +137,13 @@ export const SECTIONS: readonly Section[] = [
    * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها الجديدة.
    */
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
+  /*
+   * ‏**والخطّةُ وجهةٌ لا بطاقةٌ في لوح** (D-289): محورُ المنصّة يُبلَغ بضغطةٍ من كلّ صفحة، و`/panel/plan` يفتح ما يناسب حالَها
+   * ‏(بلا خطّة «خطّة جديدة»، ومسوّدةٌ «المراجعة»، ومثبَّتةٌ «العرض»). وفي شريط الهاتف مكانَ «المكتبة»، والمكتبةُ في «المزيد».
+   */
+  { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
   { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
-  { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', bar: true, page: '/panel/library' },
+  { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
   { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },

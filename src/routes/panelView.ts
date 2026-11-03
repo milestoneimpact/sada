@@ -46,7 +46,7 @@ import { ICON } from './ui/icons'
 import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
-import { homeTop } from './ui/sections/home'
+import { homeTop, planCard } from './ui/sections/home'
 import { deskQueue } from './ui/sections/desk'
 import { menu, menuItem } from './ui/components/menu'
 import { railHtml } from './ui/rail'
@@ -390,6 +390,8 @@ export interface PanelData {
   /** نموذجُ الخطّة (D-282): ما يلزمه من القنوات والمصادر والكلفة، وعدُّ ما ينتظر منها. */
   readonly planForm?: PlanFormInput
   readonly planPending?: number
+  /** أين الخطّةُ من الرحلة (D-289): ما كُتب منها، وما اعتُمد، وما ينتظر — لبطاقة «خطّة الشهر» في الرئيسيّة. */
+  readonly planCounts?: { readonly written: number; readonly ready: number; readonly pending: number }
   /** صورٌ تنتظر حصّةَ Cloudflare المجّانيّة اليوم (D-285)، وقرارُ المالك إن قاله. */
   readonly imageQuota?: { readonly waiting: number; readonly usd: number; readonly decided: 'pay' | 'wait' | null }
   readonly planReady: boolean
@@ -471,7 +473,7 @@ export type OverviewData = Pick<PanelData,
 /** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
 export type PostsData = Pick<PanelData,
   'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
-  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'imageQuota'>
+  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'planCounts' | 'imageQuota'>
 
 /** «المكتبة»: المصادرُ والمقاطعُ والصور. */
 export type LibraryData = Pick<PanelData,
@@ -895,7 +897,7 @@ function pendingSources(sources: readonly PanelSource[]): number {
 /**
  * «نظرة عامّة» (D-280: تُرسَم وحدَها حين تُطلَب، ولا يُحمَّل لها غيرُ ما تقرأ).
  */
-function overviewPane(d: ShellData & OverviewData): string {
+function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'plan' | 'planCounts'>>): string {
   const pending = pendingSources(d.sources)
   const waitingDrafts = d.drafts.filter((x) => x.status === 'draft').length
   const linkedChannels = d.channels.filter(
@@ -991,6 +993,7 @@ function overviewPane(d: ShellData & OverviewData): string {
     * المالك «لا أجد المراحل».
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
+  ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
   ${homeTop({
     channels: d.channels,
     counts: d.journey,
@@ -1013,7 +1016,9 @@ function overviewPane(d: ShellData & OverviewData): string {
     written: d.drafts.map((x) => x.createdAt),
   // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
   // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
-  }, d.now, `${deskQueue(d.drafts, d.now)}<h2 class="home-sub">اليوم بالأرقام</h2>${tileRow(d)}`)}
+  // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
+  // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
+  }, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null))}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
@@ -1044,7 +1049,8 @@ function overviewPane(d: ShellData & OverviewData): string {
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
   <details class="card home-ops mt-3" id="ops">
-    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">الإنفاق 14 يومًا، وأين يذهب المال، وسجلّ اليوم</span></summary>
+    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">اليوم بالأرقام، والإنفاق 14 يومًا، وأين يذهب المال، وسجلّ اليوم</span></summary>
+  <h2 class="home-sub mt-3">اليوم بالأرقام</h2>${tileRow(d)}
   <div class="mt-3">${todayList(d)}</div>
   <div class="ov mt-3">
     <div class="stack">

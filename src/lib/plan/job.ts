@@ -364,6 +364,9 @@ export interface StoredPlan {
   readonly span?: PlanSpan
   /** اختياراتُ المالك (D-282) — فارغةٌ لخطّةٍ قبل 0037. */
   readonly choices: PlanChoices
+  /** الإصدارُ الجاري ومتى ثُبّت (D-286) — `null` مسوّدةٌ أو عُدّلت بعد التثبيت. */
+  readonly version?: number
+  readonly lockedAt?: string | null
 }
 
 /** أحدثُ خطّةٍ لأقرب مدًى. */
@@ -371,7 +374,7 @@ export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan 
   try {
     const row = await db
       .prepare(
-        `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json FROM plans
+        `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
           WHERE org_id = ? AND status <> 'superseded' ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
       .bind(org)
@@ -386,6 +389,8 @@ export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan 
       createdAt: String(row['created_at']),
       span: asSpan(row['span']),
       choices: row['choices_json'] === undefined ? EMPTY_CHOICES : readChoices(row['choices_json']),
+      version: Number(row['version'] ?? 1) || 1,
+      lockedAt: row['locked_at'] === undefined || row['locked_at'] === null ? null : String(row['locked_at']),
     }
   } catch {
     // جدولٌ لم يُرحَّل أو JSON فاسد: لوحةٌ بلا خطّةٍ خيرٌ من لوحةٍ لا تُفتح
