@@ -26,6 +26,7 @@ import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
+import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
 import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
@@ -455,14 +456,22 @@ writeAudited(
     { index: 2, key: 'k2', item: items[2]!, post: null, mediaId: null, gaps: ['unwritten'] as const },
     { index: 3, key: 'k3', item: items[3]!, post: post('p3', 'queued', 'مراجعةُ المحفظة علّمتنا أنّ القرار الصحيح يأتي متأخّرًا أحيانًا — وأنّ التأخّرَ ثمنٌ يُدفع.'), mediaId: 'm3', gaps: [] },
   ]
-  writeAudited(
-    '/tmp/screen-plan-review.html',
-    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen({
+  const reviewSample = {
       plan: { id: 'pl1', week: '2026-11-08', plan: { rationale: '', items }, model: 'm', status: 'approved', createdAt: '2026-11-02 08:00:00', span: '2weeks',
         choices: { channels: ['linkedin', 'x'], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: true, imageStyle: 'illustration', startDay: '2026-11-08' } },
       version: 2, lockedAt: null, cards: cards as never, gaps: { unwritten: 1, no_image: 1, pending: 1, clash: 0 },
       versions: [{ version: 1, lockedAt: '2026-11-03 10:00:00', lockedBy: 'owner', scheduled: 3, items: 4 }],
-    }, null), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+    } as never
+  writeAudited(
+    '/tmp/screen-plan-review.html',
+    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
+  writeAudited(
+    '/tmp/screen-plan-doc.html',
+    soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, planDocScreen({
+      model: reviewSample, orgName: 'مؤسّسة المعالم للأثر', authors: { linkedin: 'عمر عبدالحميد', x: '@omar_ah' },
+      sources: { s1: 'تقرير الأثر 2025', s2: 'مراجعة المحفظة' }, zone: null,
+    }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
   )
 }
 

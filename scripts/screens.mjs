@@ -15,7 +15,7 @@ const PANEL = ['panel', 'panel-library', 'panel-accounts', 'panel-settings', 'pa
   'panel-first-accounts', 'panel-editor', 'panel-editor-queued']
 const SCREENS = ['screen-tasks', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
   'screen-tiktok', 'screen-link-only', 'screen-yt-setup', 'screen-instagram', 'screen-unbuilt', 'screen-refused',
-  'screen-journey', 'screen-spread', 'screen-plan-new', 'screen-plan-review', 'screen-plan-seat', 'screen-timeline', 'screen-login', 'screen-2fa', 'screen-404', 'screen-landing',
+  'screen-journey', 'screen-spread', 'screen-plan-new', 'screen-plan-review', 'screen-plan-seat', 'screen-plan-doc', 'screen-timeline', 'screen-login', 'screen-2fa', 'screen-404', 'screen-landing',
   'screen-500']
 const BASE = [...PANEL, ...SCREENS, 'privacy']
 
@@ -23,9 +23,9 @@ export const GROUPS = {
   base: BASE,
   kit: [...PANEL, ...SCREENS, 'screen-kit', 'privacy'],
   copy: [...PANEL, ...SCREENS, 'screen-connected', 'privacy'],
-  text: [...PANEL, 'screen-tasks', 'screen-wizard', 'screen-report', 'screen-journey', 'screen-spread', 'screen-plan-new', 'screen-plan-review', 'screen-plan-seat', 'screen-linkedin',
+  text: [...PANEL, 'screen-tasks', 'screen-wizard', 'screen-report', 'screen-journey', 'screen-spread', 'screen-plan-new', 'screen-plan-review', 'screen-plan-seat', 'screen-plan-doc', 'screen-linkedin',
     'screen-li-setup', 'screen-login', 'screen-2fa', 'screen-404', 'screen-landing', 'screen-500', 'privacy'],
-  print: ['privacy', 'screen-report', 'screen-journey', 'screen-tasks', 'screen-spread', 'screen-timeline'],
+  print: ['privacy', 'screen-plan-doc', 'screen-report', 'screen-journey', 'screen-tasks', 'screen-spread', 'screen-timeline'],
 }
 
 const group = process.argv[2] ?? 'base'

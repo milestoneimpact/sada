@@ -3,6 +3,8 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { sourceNames } from './client'
+import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
 import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { generateForPost } from '../../lib/image/job'
@@ -716,4 +718,30 @@ plan.post('/panel/plan/import', async (c) => {
       (seated.skipped.length === 0 ? '.' : '. وتعذّر ' + String(seated.skipped.length) + ': ' + named + (seated.skipped.length > 3 ? ' وغيرُها.' : '.')),
   })
   return c.redirect('/panel/plan/review', 303)
+})
+
+// ── عرضُ الخطّة (D-288): الخطّةُ كما تُقدَّم — الغلافُ والمنصّاتُ والتقويمُ والمحتوى بشكل منصّاته ──
+
+plan.get('/panel/plan/view', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  const org = activeOrg(session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null) return c.redirect('/panel/plan/new', 303)
+  const [model, zone, orgRow, accounts, names] = await Promise.all([
+    reviewModel(c.env.DB, org, current),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
+      .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
+    sourceNames(c.env.DB, org, current.plan.items.map((i) => i.sourceId)),
+  ])
+  const authors: Record<string, string> = {}
+  for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
+  const body = planDocScreen({ model, orgName: orgRow?.name ?? 'خطّتي', authors, sources: names, zone: zone ?? null })
+  return page((nonce) =>
+    soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, body, nonce,
+      PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
 })

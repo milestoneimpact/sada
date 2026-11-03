@@ -15,14 +15,14 @@ import { GAP_LABEL, type Gap, type ReviewCard, type ReviewModel } from '../../li
 
 const AR = (n: number): string => n.toLocaleString('ar-EG')
 
-function dayLabel(day: string, style: 'long' | 'short' = 'long'): string {
+export function dayLabel(day: string, style: 'long' | 'short' = 'long'): string {
   const at = new Date(day + 'T12:00:00Z')
   return Number.isNaN(at.getTime())
     ? day
     : at.toLocaleDateString('ar-EG', style === 'long' ? { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' } : { day: 'numeric', timeZone: 'UTC' })
 }
 
-function shift(day: string, n: number): string {
+export function shift(day: string, n: number): string {
   const at = new Date(day + 'T00:00:00Z')
   at.setUTCDate(at.getUTCDate() + n)
   return at.toISOString().slice(0, 10)
@@ -69,7 +69,7 @@ function card(c: ReviewCard, planId: string, zone: string | null): Html {
   </article>`
 }
 
-function calendar(m: ReviewModel): Html {
+export function calendar(m: ReviewModel): Html {
   const start = m.plan.week
   const days = spanDays(m.plan.span ?? 'week')
   const counts = new Map<string, number>()
@@ -126,7 +126,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null): string {
     : html`<form class="inline" method="POST" action="/panel/plan/pin" data-busy="جار التثبيت…" data-confirm="${'ثبّت الإصدار ' + AR(m.version) + '؟ يُجدوَل ' + AR(approved) + ' منشورًا معتمَدًا في مواعيده' + (m.cards.length - approved > 0 ? '، ويبقى ' + AR(m.cards.length - approved) + ' بلا اعتمادٍ لا يُجدوَل' : '') + '.'}">
         <input type="hidden" name="id" value="${m.plan.id}"><button class="btn btn-primary" type="submit"${approved === 0 ? raw(' disabled') : ''}>ثبّت الخطّة</button></form>`
   return html`${raw(head)}
-    <div class="row gap-2 mb-3">${state}<span class="grow"></span><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
+    <div class="row gap-2 mb-3">${state}<span class="grow"></span><a class="btn btn-primary btn-sm" href="/panel/plan/view">اعرض الخطّة</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
     ${progress}
     ${calendar(m)}
     ${gapsBar(m)}

@@ -454,4 +454,49 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .rv-wd,.rv-cd:not(.is-on){display:none}
   .rv-cd.is-on{min-width:var(--tap); padding:0 var(--s-2)}
 }
+
+/* ── عرضُ الخطّة (D-288) ──────────────────────────────────────────────
+   غلافٌ بأرض الهويّة وموجة الصدى، ثمّ أقسامٌ بعناوين كبيرة، والمنشورُ بشكل منصّته.
+   والطباعةُ بمقاس التسليم 25 × 20.05 سم، وما ليس من الوثيقة يُخفى. */
+.pd{display:flex; flex-direction:column; gap:var(--s-8)}
+.pd-tools{align-items:center}
+.pd-hero{position:relative; overflow:hidden; isolation:isolate; display:flex; flex-direction:column; align-items:flex-start;
+  gap:var(--s-2); padding:var(--s-12) var(--gutter) var(--s-8); border-radius:var(--r-hero);
+  background:var(--moment-ground); color:var(--moment-ink)}
+/* ‏والموجةُ في الزاوية المقابلة للعنوان وفوق الأرقام — نقشٌ لا يمرّ تحت نصٍّ (حارسُ النقش، 24px) */
+.pd-echo{position:absolute; top:0; inset-inline-end:0; width:50%; height:60%; z-index:-1; pointer-events:none; opacity:.9;
+  -webkit-mask-image:linear-gradient(to right, currentColor 45%, transparent); mask-image:linear-gradient(to right, currentColor 45%, transparent)}
+.pd-echo svg{display:block; width:100%; height:100%}
+.pd-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
+.pd-title{margin:0; font-size:var(--t-display); line-height:var(--lh-display); font-weight:700}
+.pd-dates{font-size:var(--t-h3); line-height:var(--lh-h3)}
+.pd-state{margin-top:var(--s-1); padding:var(--s-1) var(--s-3); border-radius:var(--r-control); border:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 35%,transparent);
+  font-size:var(--t-ui); line-height:var(--lh-ui)}
+.pd-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); gap:var(--s-4); width:100%; margin-top:var(--s-6)}
+.pd-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 30%,transparent)}
+.pd-kpi b{font-size:var(--t-h1); line-height:var(--lh-h1); font-variant-numeric:tabular-nums}
+.pd-kpi span{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
+.pd-sec h2{margin:0 0 var(--s-4); font-size:var(--t-h2); line-height:var(--lh-h2)}
+.pd-mix{display:grid; gap:var(--s-3); max-width:calc(var(--measure) * 1.4)}
+.pd-bar{display:grid; grid-template-columns:auto 6rem minmax(0,1fr) 3ch; align-items:center; gap:var(--s-3)}
+.pd-bar progress{width:100%; height:var(--s-3); appearance:none; border:0; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden}
+.pd-bar progress::-webkit-progress-bar{background:var(--surface-2); border-radius:var(--r-pill)}
+.pd-bar progress::-webkit-progress-value{background:var(--brand); border-radius:var(--r-pill)}
+.pd-bar progress::-moz-progress-bar{background:var(--brand); border-radius:var(--r-pill)}
+.pd-week + .pd-week{margin-top:var(--s-8)}
+.pd-wh{margin:0 0 var(--s-4); padding-bottom:var(--s-2); border-bottom:var(--bd); font-size:var(--t-h3); line-height:var(--lh-h3); color:var(--brand)}
+.pd-day + .pd-day{margin-top:var(--s-6)}
+.pd-dh{margin:0 0 var(--s-3); font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2); scroll-margin-block-start:var(--s-16)}
+.pd-posts{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
+.pd-post{display:flex; flex-direction:column; gap:var(--s-2); break-inside:avoid}
+.pd-post-h{display:flex; align-items:center; gap:var(--s-2)}
+.pd-pending{display:flex; flex-direction:column; gap:var(--s-1); padding:var(--s-4); border:var(--bd-dash); border-radius:var(--r-control); color:var(--ink-2)}
+.pd-tail{display:grid; gap:var(--s-6); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))}
+@media print{
+  @page{size:250mm 200.5mm; margin:12mm}
+  .pd-tools,.skip,.rail,.topbar,.bnav{display:none !important}
+  .pd-hero{print-color-adjust:exact; -webkit-print-color-adjust:exact; break-after:page}
+  .pd-week{break-before:page}
+  .pd-sec{break-inside:auto}
+}
 `
