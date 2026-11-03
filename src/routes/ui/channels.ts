@@ -17,6 +17,8 @@
  * سرّ، **ولا شيء** حيث لم يُبنَ سائق. وزرٌّ يُعرض ثمّ يقول «غير مدعوم»
  * أسوأ من غيابه: يجعل المالك يشكّ في ضبطه لا في نضج النظام.
  */
+import { html, raw } from './html'
+import { PLAN_NOW } from './planNewView'
 import { stamp } from '../../lib/time/zone'
 import { byNeed, callbackStep, channelHealth, SETUP, setupHref, tokenHealth, type ChannelHealthKind, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import type { AppStatus } from '../../lib/oauth/apps'
@@ -379,7 +381,14 @@ export function channelsSection(
   views: readonly ChannelView[],
   now: Date,
 ): string {
-  const built = byNeed(views.filter((v) => v.spec.built), now)
+  /*
+   * ‏**ما يُخطَّط له أوّلًا** (D-289): LinkedIn وX هما خطّةُ اليوم بقرار المالك، فكانت YouTube وTikTok وInstagram «تحتاج إعدادًا»
+   * ‏تتصدّر الصفحةَ بأزرارها الخضراء والمتّصلةُ الوحيدةُ في آخرها. فما لم يُضبط بعدُ من غير منصّات الخطّة يُطوى تحت «منصّاتٌ لاحقة»
+   * ‏ولا يُعَدّ في الأرقام فوقها. **ومنصّةٌ لاحقةٌ مربوطةٌ أو منقطعةٌ تبقى ظاهرة**: ما يحتاج يدَك لا يُطوى.
+   */
+  const all = byNeed(views.filter((v) => v.spec.built), now)
+  const later = all.filter((v) => !(PLAN_NOW as readonly string[]).includes(v.spec.id) && ['setup', 'connectable'].includes(channelHealth(v, now).kind))
+  const built = [...all.filter((v) => !later.includes(v))].sort((a, b) => Number(!(PLAN_NOW as readonly string[]).includes(a.spec.id)) - Number(!(PLAN_NOW as readonly string[]).includes(b.spec.id)))
   const rest = views.filter((v) => !v.spec.built)
   const kinds = built.map((v) => channelHealth(v, now).kind)
   const n = (...k: ChannelHealthKind[]): number => kinds.filter((x) => k.includes(x)).length
@@ -399,5 +408,8 @@ export function channelsSection(
 
   return `${strip}
   <div class="grid c2">${built.map((v) => card(v, now)).join('')}</div>
+  ${later.length === 0 ? '' : html`<details class="fold mt-5"><summary><span>منصّاتٌ لاحقة (${String(later.length)}) — ${later.map((v) => v.spec.label).join(' و')}</span></summary>
+    <p class="hint">خارج خطّتك الآن. تُضبط وتُربط حين تقرّر النشر عليها.</p>
+    <div class="grid c2">${raw(later.map((v) => card(v, now)).join(''))}</div></details>`.value}
   ${rest.length === 0 ? '' : `<p class="hint mt-5">قريبًا: ${rest.map((v) => escapeHtml(v.spec.label)).join(' و')}</p>`}`
 }

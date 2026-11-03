@@ -669,6 +669,7 @@ async function postsData(load: Load): Promise<PostsData> {
       autoImage: allowance.settings.autoImage,
     },
     planPending: progress?.pending ?? 0,
+    ...(progress === null ? {} : { planCounts: progress }),
     imageQuota: await imageQuotaOf(c, org, audit),
     editing,
     media,

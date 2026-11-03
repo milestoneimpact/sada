@@ -260,6 +260,8 @@ const data: PanelData = {
     status: 'draft',
     createdAt: ago(3),
     choices: EMPTY_CHOICES,
+    version: 1,
+    lockedAt: null,
     plan: {
       rationale:
         'أسبوع يبدأ بالأثقل: تقرير الأثر يفتح النقاش يوم الاثنين، ثمّ تسنده جملة حادّة على X بعد يومين، ويُختم بدرس من مراجعة المحفظة.',
@@ -293,6 +295,8 @@ const data: PanelData = {
     perImage: 0.011, autoImage: false,
   },
   planPending: 2,
+  // ‏«خطّةُ الشهر» في الرئيسيّة (D-289): ثلاثةُ بنودٍ كُتبت، واحدٌ معتمَد واثنان ينتظران
+  planCounts: { written: 3, ready: 1, pending: 2 },
   media: [
     // معاينةٌ محلّيّة: `data:` تكفي للنظر، والحيُّ يُخدَم من `/panel/media/:id`
     {

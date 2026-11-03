@@ -165,3 +165,41 @@ describe('عرضُ الخطّة (D-288)', () => {
     expect((await app.request('/panel/plan/view', { headers: { Cookie: cookie } }, env)).headers.get('Location')).toBe('/panel/plan/new')
   })
 })
+
+describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
+  it('حالُها وتقدّمُ اعتمادها وأقربُ منشوراتها، والزرُّ يتبع الحال — وبلا خطّةٍ «ابنِ خطّة»', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('class="card home-plan"')
+    expect(html).toContain('مسوّدة · الإصدار ١')
+    expect(html).toContain('<b>١</b> معتمَدةً من ٣')
+    expect(html).toContain('href="/panel/plan/review">تابع الكتابة</a>')
+    expect(html).toContain('class="hp-next"')
+    // ‏و«اليوم بالأرقام» في المطويّ لا أعلى الرئيسيّة
+    expect(html.indexOf('اليوم بالأرقام</h2>')).toBeGreaterThan(html.indexOf('id="ops"'))
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    const none = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(none).toContain('href="/panel/plan/new">ابنِ خطّة</a>')
+  })
+
+  it('إذنٌ انتهى: الشريطُ يقوله، والرئيسيّةُ زرٌّ صغيرٌ بجانب التحيّة لا بطاقةٌ حمراء', async () => {
+    db.raw.exec("UPDATE accounts SET status = 'needs_reauth'")
+    const { cookie } = await session()
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('class="row gap-2 home-hello"')
+    expect(html).toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
+    expect(html).not.toContain('class="card card-alert next" data-tone="bad"')
+  })
+})
+
+describe('«الخطّة» وجهةٌ واحدة (D-289)', () => {
+  it('تفتح ما يناسب الحال: المراجعة لمسوّدة، والعرض لمثبَّتة، و«خطّة جديدة» بلا خطّة', async () => {
+    const { cookie } = await session()
+    const go = async () => (await app.request('/panel/plan', { headers: { Cookie: cookie } }, env)).headers.get('Location')
+    expect(await go()).toBe('/panel/plan/review')
+    db.raw.exec("UPDATE plans SET locked_at = datetime('now')")
+    expect(await go()).toBe('/panel/plan/view')
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    expect(await go()).toBe('/panel/plan/new')
+  })
+})

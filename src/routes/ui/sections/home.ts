@@ -18,6 +18,13 @@ import { clock, localParts } from '../../../lib/time/zone'
 import { platformLabel } from '../../../lib/oauth/providers'
 
 import { LOGOS } from '../logos'
+import { html, raw } from '../html'
+import { stamp } from '../../../lib/time/zone'
+import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
+import type { StoredPlan } from '../../../lib/plan/job'
+import { dayLabel, shift } from '../planReviewView'
+
+const ar = (n: number): string => n.toLocaleString('ar-EG')
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
 import { dayBars } from '../chart'
@@ -171,18 +178,28 @@ function today(items: readonly { platform: string; at: string }[], now: Date, zo
   </div>`
 }
 
-export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
+export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
   const focus = focusOf(trip, next.step)
   const built = f.channels.filter((c: ChannelView) => c.state !== 'unbuilt')
   const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
   const linked = built.filter((c) => platformTile(c, now).tone === 'ok').length
-  return `<div class="card card-alert next" data-tone="${next.tone}">
+  /*
+   * ‏**ولا تُقال الحالُ مرّتين** (D-289): منصّةٌ انقطعت أو قارب إذنُها يقولها شريطُ اللوحة فوق كلّ لوح بزرّه، فكانت الرئيسيّةُ
+   * ‏تعيدها بطاقةً حمراءَ كاملةً تحته — أوّلَ ما يُرى في كلّ فتحة. فخطوةٌ عن منصّةٍ والشريطُ يقولها تُترك له، ويبقى التحيّةُ سطرًا.
+   */
+  // ‏والزرُّ يبقى بضغطةٍ واحدة صغيرًا بجانب التحيّة: الشريطُ يقول الحالَ، وهذا يصلحها
+  const repeated = next.tone === 'bad' && next.href.startsWith('/oauth/')
+  return `${repeated
+    ? html`<div class="row gap-2 home-hello"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>
+        <a class="btn btn-secondary btn-sm" href="${next.href}">${next.label}</a></div>`.value
+    : html`<div class="card card-alert next" data-tone="${next.tone}">
     <div class="next-body"><p class="hello">${greeting(now, f.zone)}</p><span class="next-k">خطوتُك التالية</span>
-      <p class="next-t">${escapeHtml(next.text)}</p></div>
-    <a class="btn btn-primary" href="${escapeHtml(next.href)}">${escapeHtml(next.label)}</a>
-  </div>
+      <p class="next-t">${next.text}</p></div>
+    <a class="btn btn-primary" href="${next.href}">${next.label}</a>
+  </div>`.value}
+  ${lead}
   ${stats(f)}
   ${kpis}
 
@@ -206,4 +223,51 @@ export function homeTop(f: HomeFacts, now: Date, kpis = ''): string {
   </div>
     </div>
   </div>`
+}
+
+/**
+ * **«خطّةُ الشهر» أوّلَ الرئيسيّة** (D-289): الخطّةُ محورُ المنصّة، فهي أوّلُ ما يُرى — حالُها وتقدّمُ اعتمادها وأقربُ ثلاثة
+ * منشوراتٍ فيها، وزرٌّ واحدٌ يتبع حالَها: بلا خطّة «ابنِ خطّة»، وتُكتب «تابع الكتابة»، وتنتظر «راجع واعتمد»، ومعتمَدةٌ
+ * «ثبّت»، ومثبَّتةٌ «اعرض». **وقراءةٌ بلا جملةٍ جديدة**: الخطّةُ وعدُّها محمَّلان للوح «المنشورات» أصلًا.
+ */
+export function planCard(
+  plan: StoredPlan | null,
+  counts: { readonly written: number; readonly ready: number; readonly pending: number } | undefined,
+  now: Date,
+  zone: string | null,
+): string {
+  if (plan === null) {
+    return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
+      <div class="card-head"><h2 id="hp-t">خطّةُ الشهر</h2></div>
+      <p class="m-0">لا خطّة بعد. ابنِ خطّة أسبوعٍ أو شهرٍ في أربع خطوات، أو ارفع خطّتك كما هي.</p>
+      <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/plan/new">ابنِ خطّة</a><a class="btn btn-secondary" href="/panel/plan/import">عندي خطّة</a></div>
+    </div>`.value
+  }
+  const total = plan.plan.items.length
+  const c = counts ?? { written: 0, ready: 0, pending: 0 }
+  const span = SPAN_LABEL[plan.span ?? 'week']
+  const end = shift(plan.week, spanDays(plan.span ?? 'week') - 1)
+  const locked = plan.lockedAt !== null && plan.lockedAt !== undefined
+  const state = locked
+    ? html`<span class="st ok">مثبَّتة · الإصدار ${ar(plan.version ?? 1)}</span>`
+    : html`<span class="st idle">مسوّدة · الإصدار ${ar(plan.version ?? 1)}</span>`
+  const go = locked
+    ? { href: '/panel/plan/view', label: 'اعرض الخطّة' }
+    : c.written < total
+      ? { href: '/panel/plan/review', label: 'تابع الكتابة' }
+      : c.pending > 0
+        ? { href: '/panel/plan/review', label: 'راجع واعتمد (' + ar(c.pending) + ')' }
+        : { href: '/panel/plan/review', label: 'ثبّت الخطّة' }
+  const today = now.toISOString().slice(0, 10)
+  const next = [...plan.plan.items].filter((i) => i.day >= today).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
+  return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
+    <div class="card-head"><h2 id="hp-t">خطّةُ ${span === 'شهر' ? 'الشهر' : span}</h2><span class="grow"></span>${state}</div>
+    <p class="hint m-0">${dayLabel(plan.week)} — ${dayLabel(end)}</p>
+    <div class="hp-prog"><progress max="${String(Math.max(1, total))}" value="${String(c.ready)}" aria-label="المعتمَد من الخطّة"></progress>
+      <span><b>${ar(c.ready)}</b> معتمَدةً من ${ar(total)}${c.pending > 0 ? ' · ' + ar(c.pending) + ' تنتظرك' : ''}${c.written < total ? ' · ' + ar(total - c.written) + ' تُكتب' : ''}</span></div>
+    ${next.length === 0 ? html`` : html`<ol class="hp-next" aria-label="أقربُ ما في الخطّة">${next.map((i) => html`<li>
+      <span class="pf-logo rv-pf" data-pf="${i.platform}" aria-hidden="true">${raw(LOGOS[i.platform] ?? '')}</span>
+      <b>${dayLabel(i.day)}</b><bdi class="mono">${stamp(i.day + ' ' + i.time, zone).slice(11, 16)}</bdi><span class="hp-a">${i.angle}</span></li>`)}</ol>`}
+    <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}</div>
+  </div>`.value
 }
