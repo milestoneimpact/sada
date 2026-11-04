@@ -114,6 +114,30 @@ describe('النشر الناجح', () => {
   })
 })
 
+describe('رقمُ المحاولة من الطابور عمودًا (D-291)', () => {
+  it('المحاولةُ التي تُرسَل تحمل رقمَ تسليم الطابور', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    await publishPost({ ...deps(fakeFetch(X_OK)), queueAttempt: 2 }, { postId })
+    const row = db.raw.prepare('SELECT queue_attempt FROM publish_attempts WHERE post_id = ?').get(postId) as { queue_attempt: number | null }
+    expect(row.queue_attempt).toBe(2)
+  })
+
+  it('وسقوطٌ قبل الإرسال يحمله كذلك — ومن اللوحة بلا رقم', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    db.raw.prepare('DELETE FROM tokens').run()
+    const out = await publishPost({ ...deps(fakeFetch(X_OK)), queueAttempt: 3 }, { postId })
+    expect(out.kind).toBe('failed')
+    const row = db.raw.prepare('SELECT queue_attempt, status FROM publish_attempts WHERE post_id = ?').get(postId) as { queue_attempt: number | null; status: string }
+    expect(row).toEqual({ queue_attempt: 3, status: 'failed' })
+
+    const manual = await seedPost({ platform: 'linkedin' })
+    db.raw.prepare('DELETE FROM tokens').run()
+    await publishPost(deps(fakeFetch(X_OK)), { postId: manual })
+    const second = db.raw.prepare('SELECT queue_attempt FROM publish_attempts WHERE post_id = ?').get(manual) as { queue_attempt: number | null }
+    expect(second.queue_attempt).toBeNull()
+  })
+})
+
 describe('D-004 · لا نشر مرتين', () => {
   it('لا يرسل طلبا ثانيا حين توجد محاولة ناجحة بالمفتاح نفسه', async () => {
     const postId = await seedPost({ platform: 'x' })

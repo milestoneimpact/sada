@@ -38,6 +38,8 @@ export interface PlatformPost {
   readonly lastError: string | null
   /** وقتُ آخرِ محاولةٍ فاشلة — يُقارَن بآخر نجاح، لا بوقت الكتابة. */
   readonly lastFailedAt: string | null
+  /** رقمُ تسليم الطابور لآخر محاولةٍ فاشلة (D-291) — و`null` لمحاولةٍ من اللوحة. */
+  readonly lastQueueAttempt: number | null
   readonly hasMedia: boolean
   readonly costUsd: number
 }
@@ -53,6 +55,7 @@ interface PostRow {
   published_at: string | null
   last_error: string | null
   last_failed_at: string | null
+  last_queue_attempt: number | null
   media_json: string
   cost_usd: number
 }
@@ -142,7 +145,10 @@ export async function platformPosts(
                   ORDER BY pa.at DESC LIMIT 1) AS last_error,
                 (SELECT pa.at FROM publish_attempts pa
                   WHERE pa.post_id = p.id AND pa.status = 'failed'
-                  ORDER BY pa.at DESC LIMIT 1) AS last_failed_at
+                  ORDER BY pa.at DESC LIMIT 1) AS last_failed_at,
+                (SELECT pa.queue_attempt FROM publish_attempts pa
+                  WHERE pa.post_id = p.id AND pa.status = 'failed'
+                  ORDER BY pa.at DESC LIMIT 1) AS last_queue_attempt
            FROM posts p
            LEFT JOIN accounts a ON a.id = p.account_id
           WHERE p.platform = ? AND p.org_id = ?
@@ -163,6 +169,7 @@ export async function platformPosts(
       publishedAt: row.published_at,
       lastError: briefError(row.last_error),
       lastFailedAt: row.last_failed_at,
+      lastQueueAttempt: row.last_queue_attempt ?? null,
       hasMedia: row.media_json !== '[]' && row.media_json.trim().length > 2,
       costUsd: row.cost_usd,
     }))
@@ -288,6 +295,12 @@ export interface AccountHealth {
   readonly refreshedAt: string | null
   /** متى سقط الإذن — و`null` لحسابٍ قائم (D-131). */
   readonly needsReauthAt: string | null
+  /** سببُ آخر تجديدٍ لم يتمّ، ومتى (D-291) — و`null` حين نجح آخرُ تجديد. */
+  readonly renewNote: string | null
+  readonly renewNotedAt: string | null
+  /** سببُ آخر قياسٍ لم يتمّ على هذا الحساب، ومتى (D-291). */
+  readonly metricsNote: string | null
+  readonly metricsNotedAt: string | null
   /** ما سُجّل من اقترابٍ أو انتهاء — الأحدثُ أوّلا. */
   readonly alerts: readonly { readonly kind: 'access' | 'refresh'; readonly threshold: number; readonly at: string }[]
 }
@@ -304,18 +317,26 @@ export async function accountHealth(
   try {
     const { results: rows } = await db
       .prepare(
-        `SELECT a.id, a.status, a.needs_reauth_at, t.expires_at, t.refresh_expires_at, t.refreshed_at
+        `SELECT a.id, a.status, a.needs_reauth_at, t.expires_at, t.refresh_expires_at, t.refreshed_at,
+                a.renew_note, a.renew_noted_at, a.metrics_note, a.metrics_noted_at
            FROM accounts a
            LEFT JOIN tokens t ON t.account_id = a.id
           WHERE a.platform = ? AND a.org_id = ?`,
       )
       .bind(platform, org)
-      .all<{ id: string; status: string; needs_reauth_at: string | null; expires_at: string | null; refresh_expires_at: string | null; refreshed_at: string | null }>()
+      .all<{
+        id: string; status: string; needs_reauth_at: string | null; expires_at: string | null
+        refresh_expires_at: string | null; refreshed_at: string | null
+        renew_note: string | null; renew_noted_at: string | null; metrics_note: string | null; metrics_noted_at: string | null
+      }>()
     const out: Record<string, AccountHealth> = {}
     for (const r of rows) {
       out[r.id] = {
         status: r.status, expiresAt: r.expires_at ?? null, refreshExpiresAt: r.refresh_expires_at ?? null,
-        refreshedAt: r.refreshed_at ?? null, needsReauthAt: r.needs_reauth_at ?? null, alerts: [],
+        refreshedAt: r.refreshed_at ?? null, needsReauthAt: r.needs_reauth_at ?? null,
+        renewNote: r.renew_note ?? null, renewNotedAt: r.renew_noted_at ?? null,
+        metricsNote: r.metrics_note ?? null, metricsNotedAt: r.metrics_noted_at ?? null,
+        alerts: [],
       }
     }
     if (rows.length === 0) return out

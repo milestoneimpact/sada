@@ -746,14 +746,15 @@ async function publishDeadLetters(batch: MessageBatch<PublishMessage>, env: Env)
           .first<{ n: number }>()
         await env.DB
           .prepare(
-            `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
-             VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
+            `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id, queue_attempt)
+             VALUES (?, ?, ?, ?, ?, ?, 'failed', ?, ?)`,
           )
           .bind(
             crypto.randomUUID(), postId, row.idempotency_key, (no?.n ?? 0) + 1,
             JSON.stringify({ dead_letter: true, queue_attempts: message.attempts }),
             JSON.stringify({ error: 'dead_letter: استنفد الطابورُ محاولاتَه ولم يُنشَر', dead_letter: true }),
             row.org_id,
+            message.attempts,
           )
           .run()
       }

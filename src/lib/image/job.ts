@@ -24,7 +24,7 @@ import { record } from '../audit'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
 import { routeFor } from '../ai/routes'
-import { claimGeneration, releaseClaim } from '../media/claim'
+import { CLAIM_UNAVAILABLE, claimGeneration, releaseClaim } from '../media/claim'
 import { generateImage } from './gemini'
 import { CF_IMAGE_MODEL, generateImageCf } from './cloudflare'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, cfPrice, imageNeurons, neuronsUsedToday, splitCharge, FREE_NEURONS_PER_DAY } from '../ai/imagePricing'
@@ -451,6 +451,7 @@ export async function generateForPost(
     if (options.replace !== undefined) await rejectMedia(deps.db, post.org_id, options.replace)
     const held = await claimGeneration(deps.db, post.org_id, key, post.id, 'image', (deps.now ?? (() => new Date()))())
     if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+    if (held.kind === 'unavailable') return { kind: 'failed', reason: CLAIM_UNAVAILABLE, retryable: true }
 
     const size = INFO_SIZE[platform]
     let shot: { bytes: Uint8Array; mime: string }
@@ -576,6 +577,7 @@ export async function generateForPost(
    */
   const held = await claimGeneration(deps.db, post.org_id, key, post.id, 'image', (deps.now ?? (() => new Date()))())
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+  if (held.kind === 'unavailable') return { kind: 'failed', reason: CLAIM_UNAVAILABLE, retryable: true }
 
   const prompt = options.reuse?.prompt ?? imagePrompt({ topic: topicOf(post.text), platform, visual: visual.brief })
 

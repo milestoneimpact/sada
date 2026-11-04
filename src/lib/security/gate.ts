@@ -11,10 +11,13 @@
  * المحاولةُ الناجحة حُجزت كالخاطئة، فتُمحى حصّةُ العنوان وتُنقَص حصّةُ الجميع
  * واحدًا: المالكُ الذي يدخل بالكلمة ثمّ برمز التطبيق لا يأكل من حصّةٍ لم يخطئ فيها.
  *
- * ## وعطلُ القاعدة لا يقفل الباب
+ * ## وعطلُ القاعدة يغلق الباب لحظةً — لا يفتحه (D-291)
  *
- * جدولٌ لم يُرحَّل أو قاعدةٌ متعبة تعيد «مسموح» مع تحذير: الحدُّ القديم في KV
- * باقٍ، فالسقوطُ إلى ما كان لا إلى لوحةٍ لا يدخلها صاحبُها.
+ * كان العطلُ يعيد «مسموح» بحجّة حدّ KV الباقي. لكنّ حدَّ KV يقرأ ثمّ يكتب، وهو ما
+ * بُنيت هذه البوّابةُ لتسدّه (D-161)؛ وسقفُ اليوم على رمز البريد (D-247) لا نظيرَ له
+ * في KV أصلًا. والجلسةُ نفسُها تُكتب في D1: قاعدةٌ لا تردّ لا تُدخل أحدًا على كلّ حال،
+ * فالبابُ المفتوحُ عندها يبيع التخمينَ ولا يشتري دخولًا. فيُردّ الطلبُ **بسببٍ يقول
+ * «أعد المحاولة»** لا «كثرت المحاولات»، ولا يُحسَب على صاحبه.
  */
 import type { Db } from '../tokens'
 import { MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS } from '../rateLimit'
@@ -28,7 +31,15 @@ const WINDOW = '-15 minutes'
 export interface Reservation {
   readonly allowed: boolean
   readonly count: number
+  /** `db` حين رُدّ لأنّ القاعدةَ لم تردّ لا لأنّ الحدَّ بلغ (D-291). */
+  readonly why?: 'db'
 }
+
+/** ردُّ البوّابة حين لا تردّ القاعدة: ليس حدًّا، فلا يُقال «انتظر ربع ساعة». */
+export const GATE_UNAVAILABLE: Reservation = { allowed: false, count: 0, why: 'db' }
+
+/** نصُّ الردّ على المستخدم حين تُردّ المحاولةُ لعطلٍ لا لحدّ. */
+export const GATE_UNAVAILABLE_TEXT = 'تعذّر التحقّق الآن: القاعدة لم تردّ. أعد المحاولة بعد دقيقة.'
 
 function ipOf(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? 'unknown'
@@ -61,7 +72,7 @@ async function both(
   limits: readonly [number, number],
 ): Promise<Reservation> {
   const [mine, all] = await Promise.all([bump(db, local), bump(db, global)])
-  if (mine === null || all === null) return { allowed: true, count: 0 }
+  if (mine === null || all === null) return GATE_UNAVAILABLE
   return { allowed: mine <= limits[0] && all <= limits[1], count: mine }
 }
 
@@ -82,7 +93,7 @@ export const MAX_CODE_GUESSES_PER_DAY = 10
 
 export async function reserveCodeGuess(db: Db, email: string): Promise<Reservation> {
   const n = await bump(db, `code:${email}`, '-24 hours')
-  if (n === null) return { allowed: true, count: 0 }
+  if (n === null) return GATE_UNAVAILABLE
   return { allowed: n <= MAX_CODE_GUESSES_PER_DAY, count: n }
 }
 

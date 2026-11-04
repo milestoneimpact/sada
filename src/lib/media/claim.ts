@@ -30,6 +30,12 @@
  * **يُؤخَذ** لا يُنتظَر: وإلّا أقفل بابَ التوليد على منشورٍ إلى الأبد.
  *
  * والنافذةُ بقدر النداء لا بقدرٍ واحد: الصورةُ ثوانٍ، والمقطعُ دقائق.
+ *
+ * ## وقاعدةٌ لا تردّ تغلق لا تفتح (D-291)
+ *
+ * كان العطلُ يُعاد «لك النداء» بحجّة جدولٍ لم يُرحَّل. والجدولُ مُرحَّلٌ منذ `0017`،
+ * فما يقع هنا عطلٌ حقيقيّ، والبابُ المفتوحُ عنده يدفع مرّتين. فصار `unavailable`
+ * بسببه، والمنادي يردّه فشلًا قابلًا للإعادة قبل أيّ إنفاق — كحجز التحليل (D-270).
  */
 import { changedRows } from '../dbResult'
 import type { Db } from '../tokens'
@@ -52,6 +58,14 @@ export type ClaimOutcome =
   | { readonly kind: 'claimed' }
   /** غيرُك يولّد الآن — **وليس فشلا**، فلا يُعاد ولا يُبلَّغ عطلا */
   | { readonly kind: 'busy'; readonly since: string }
+  /**
+   * القاعدةُ لم تردّ فلا حجزَ ولا نداء (D-291) — **مغلقٌ عند العطل** كحجز التحليل (D-270).
+   *
+   * كان يُعاد `claimed`: «جدولٌ لم يُرحَّل لا يوقف التوليد». لكنّ الترحيلَ قبل الدالّة قاعدةٌ
+   * (CLAUDE.md)، وما يصل هنا فعلًا هو قاعدةٌ متعبة — وفتحُ الباب حينها يعني نداءين مدفوعين
+   * لصورةٍ واحدة، وهو عينُ ما وُجد الحجزُ ليمنعه. والردُّ قابلٌ للإعادة: لم يُنفَق شيء.
+   */
+  | { readonly kind: 'unavailable'; readonly why: string }
 
 function minutesBetween(from: string, to: Date): number {
   const started = Date.parse(from.includes('T') ? from : `${from.replace(' ', 'T')}Z`)
@@ -60,10 +74,10 @@ function minutesBetween(from: string, to: Date): number {
 }
 
 /**
- * يحجز، أو يقول إنّ الحجزَ لغيرِك.
+ * يحجز، أو يقول إنّ الحجزَ لغيرِك، أو إنّ القاعدةَ لم تردّ فلا نداء.
  *
- * **ولا يرمي على جدولٍ لم يُرحَّل**: يُعيد `claimed` — فنظامٌ قبل
- * الترحيل يعمل كما كان يعمل، بحارسه القديم، ولا يقف.
+ * **ولا يرمي**: عطلُ القاعدة يعود `unavailable` بسببه، والمنادي يردّه فشلًا يُعاد
+ * **قبل** أن يُنفَق شيء (D-291).
  */
 export async function claimGeneration(
   db: Db,
@@ -105,10 +119,14 @@ export async function claimGeneration(
       .bind(now.toISOString(), key, org, row.claimed_at)
       .run()
     return changedRows(took) ? { kind: 'claimed' } : { kind: 'busy', since: row.claimed_at }
-  } catch {
-    return { kind: 'claimed' }
+  } catch (error) {
+    console.warn({ job: 'media-claim', key, failed: String(error) })
+    return { kind: 'unavailable', why: String(error).slice(0, 120) }
   }
 }
+
+/** ردُّ المنادي حين لا تردّ القاعدة — جملةٌ واحدةٌ للصورة والمقطع (D-291). */
+export const CLAIM_UNAVAILABLE = 'تعذّر حجزُ التوليد: القاعدة لم تردّ، ولم يُنفَق شيء — أعد المحاولة بعد قليل'
 
 /**
  * يُحرَّر عند الفشل — **لا عند النجاح**.

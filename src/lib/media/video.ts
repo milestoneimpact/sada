@@ -25,7 +25,7 @@
  */
 import { recordCost } from '../cost'
 import { routeFor } from '../ai/routes'
-import { claimGeneration, releaseClaim } from './claim'
+import { CLAIM_UNAVAILABLE, claimGeneration, releaseClaim } from './claim'
 import { blockerReason, checkAllowance, videoCapGate } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
 import {
@@ -284,6 +284,7 @@ export async function animateForPost(
   const key = await videoKey(postId, prompt)
   const held = await claimGeneration(deps.db, org, key, postId, 'video', now)
   if (held.kind === 'busy') return { kind: 'in_progress', since: held.since }
+  if (held.kind === 'unavailable') return { kind: 'failed', reason: CLAIM_UNAVAILABLE, retryable: true }
 
   /*
    * ٥٫٥ — **النموذجُ من التوجيه لا من الشيفرة** (D-091).

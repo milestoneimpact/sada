@@ -99,14 +99,16 @@ async function preflightFailed(
   db: Db,
   post: { id: string; org_id: string; idempotency_key: string; platform: string },
   reason: string,
+  queueAttempt?: number,
 ): Promise<Outcome> {
   try {
     const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
+    // ‏ورقمُ الطابور يُكتب هنا كما يُكتب في المحاولة التي تُرسَل (D-291)
     await db
       .prepare(
         `INSERT INTO publish_attempts
-           (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'failed', ?7)`,
+           (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id, queue_attempt)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'failed', ?7, ?8)`,
       )
       .bind(
         crypto.randomUUID(),
@@ -116,6 +118,7 @@ async function preflightFailed(
         JSON.stringify({ platform: post.platform, preflight: true }),
         JSON.stringify({ error: reason, preflight: true }),
         post.org_id,
+        queueAttempt ?? null,
       )
       .run()
     await db.prepare(`UPDATE posts SET status = 'failed' WHERE id = ? AND org_id = ?`).bind(post.id, post.org_id).run()
@@ -176,6 +179,7 @@ export async function publishPost(
       db, post,
       'حساب صفحة — والنشر باسم الصفحة لم يُبن بعد (M-03). ' +
         'انشر من حسابك الشخصيّ، أو انتظر موافقة Community Management API.',
+      deps.queueAttempt,
     )
   }
 
@@ -212,6 +216,7 @@ export async function publishPost(
     return preflightFailed(
       db, post,
       'unconfirmed_prior_send: محاولةٌ سابقة أُرسلت ولم يُعرَف جوابُها — تحقّق على المنصّة قبل أن تعيدها',
+      deps.queueAttempt,
     )
   }
 
@@ -256,27 +261,27 @@ export async function publishPost(
   // منشورا بصورة، ونشرُه بلا صورته نشرٌ لشيءٍ لم يعتمده — والفرقُ لا يُرى
   // في اللوحة، فيُكتشَف على المنصّة بعد أن يقرأه الناس
   if (image !== null && deps.bucket === undefined) {
-    return preflightFailed(db, post, 'no_media_bucket')
+    return preflightFailed(db, post, 'no_media_bucket', deps.queueAttempt)
   }
 
   // **ومنصّةُ المقاطع لا تقبل نصّا وحده**: لا نهايةَ نشرٍ نصّيّةٍ عندها
   // أصلا، فمحاولةٌ بلا مقطعٍ تُردّ بعد أن تُسجَّل وتُحاسَب
   if (CLIP_PLATFORMS.has(post.platform) && image === null) {
-    return preflightFailed(db, post, 'no_clip: لا مقطع لهذا المنشور — ولّد صورةً ثمّ حرّكها')
+    return preflightFailed(db, post, 'no_clip: لا مقطع لهذا المنشور — ولّد صورةً ثمّ حرّكها', deps.queueAttempt)
   }
   // **وInstagram كذلك لا نهايةَ نصّيّةَ لها** — صورةٌ أو مقطعٌ ولا ثالث
   if (post.platform === 'instagram' && image === null) {
-    return preflightFailed(db, post, 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور')
+    return preflightFailed(db, post, 'no_media: Instagram لا تقبل منشورا نصّيّا — ولّد صورةً لهذا المنشور', deps.queueAttempt)
   }
 
   // ‏**حسابٌ فصله المالكُ لا يُنشَر عليه ولا يُعلَّم «جدّد الإذن»** (D-197): رسالةٌ كانت في
   // ‏الطابور قبل الفصل تصل هنا، و`no_tokens` كان سيعيد الحسابَ المفصول إلى اللوحة
-  if (post.account_status === 'revoked') return preflightFailed(db, post, 'account_disconnected')
+  if (post.account_status === 'revoked') return preflightFailed(db, post, 'account_disconnected', deps.queueAttempt)
 
   const tokens = await loadTokens(db, encKey, post.account_id, post.org_id)
   if (tokens === null) {
     await markNeedsReauth(db, post.account_id, post.org_id)
-    return preflightFailed(db, post, 'no_tokens')
+    return preflightFailed(db, post, 'no_tokens', deps.queueAttempt)
   }
   if (isExpiring(tokens.expiresAt, now())) {
     /**
@@ -294,7 +299,7 @@ export async function publishPost(
       return { kind: 'failed', reason: 'token_expired_retry', retryable: true }
     }
     await markNeedsReauth(db, post.account_id, post.org_id)
-    return preflightFailed(db, post, 'token_expired')
+    return preflightFailed(db, post, 'token_expired', deps.queueAttempt)
   }
   /**
    * ورمزٌ لا يملك نطاقَ النشر لا يُرسَل به شيء (D-045).
@@ -339,7 +344,7 @@ export async function publishPost(
       .map((sc) => sc.name)
       .join('، ')
     const which = needsMedia ? 'missing_media_scope' : 'missing_publish_scope'
-    return preflightFailed(db, post, lacking === '' ? which : `${which}: ${lacking}`)
+    return preflightFailed(db, post, lacking === '' ? which : `${which}: ${lacking}`, deps.queueAttempt)
   }
 
   const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
@@ -350,8 +355,8 @@ export async function publishPost(
   await db
     .prepare(
       `INSERT INTO publish_attempts
-         (id, post_id, idempotency_key, attempt_no, request_json, status, org_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', ?6)`,
+         (id, post_id, idempotency_key, attempt_no, request_json, status, org_id, queue_attempt)
+       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', ?6, ?7)`,
     )
     .bind(
       attemptId,
@@ -363,6 +368,8 @@ export async function publishPost(
         ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
       }),
       post.org_id,
+      // ‏عمودًا لا نصًّا في JSON وحدَه (D-291): فيُقرأ في سلّم الجاهزيّة ويُسأل عنه
+      deps.queueAttempt ?? null,
     )
     .run()
 

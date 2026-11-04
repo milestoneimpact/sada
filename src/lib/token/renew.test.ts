@@ -236,6 +236,24 @@ describe('والدورة لا يوقفها حساب واحد', () => {
     expect(summary.due).toBe(2)
     expect(summary.renewed).toBe(1)
     expect(summary.deferred).toBe(1)
+
+    // ‏والسببُ على الحساب لا في العدّ وحدَه (D-291): الساقطُ يقول لماذا، والمجدَّدُ بلا ملاحظة
+    const notes = db.raw.prepare('SELECT id, renew_note, renew_noted_at FROM accounts ORDER BY id').all() as
+      { id: string; renew_note: string | null; renew_noted_at: string | null }[]
+    const noted = notes.filter((n) => n.renew_note !== null)
+    expect(noted).toHaveLength(1)
+    expect(noted[0]!.renew_note).toContain('boom')
+    expect(noted[0]!.renew_noted_at).not.toBeNull()
+    expect(notes.find((n) => n.renew_note === null)?.renew_noted_at).toBeNull()
+  })
+
+  it('وملاحظةُ التأجيل تُمحى حين ينجح التجديدُ التالي', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    db.raw.prepare("UPDATE accounts SET renew_note = 'قديم', renew_noted_at = datetime('now') WHERE id = 'a1'").run()
+    await renewDue(deps(reply({ access_token: 'FRESH', expires_in: 5_184_000 })))
+    const row = db.raw.prepare("SELECT renew_note, renew_noted_at FROM accounts WHERE id = 'a1'").get() as
+      { renew_note: string | null; renew_noted_at: string | null }
+    expect(row).toEqual({ renew_note: null, renew_noted_at: null })
   })
 
   it('ولا شيء يُنادى حين لا شيء يقترب', async () => {

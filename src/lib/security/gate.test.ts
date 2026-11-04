@@ -54,10 +54,12 @@ describe('بوّابة المحاولات الذرّيّة (D-161)', () => {
     expect((await reserveAttempt(db, from('1.1.1.1'))).allowed).toBe(true)
   })
 
-  it('جدول غائب لا يقفل الباب: يعود إلى حدّ KV كما كان', async () => {
+  /** **وقاعدةٌ لا تردّ تغلق لحظةً لا تفتح** (D-291): ردٌّ بسببه، لا «كثرت المحاولات». */
+  it('وقاعدة لا تردّ تردّ المحاولة بسببها ولا تفتح الباب', async () => {
     const db = fakeDb()
     db.raw.exec('DROP TABLE auth_attempts')
-    expect(await reserveAttempt(db, from('1.1.1.1'))).toEqual({ allowed: true, count: 0 })
+    expect(await reserveAttempt(db, from('1.1.1.1'))).toEqual({ allowed: false, count: 0, why: 'db' })
+    expect(await reserveCodeGuess(db, 'x@example.com')).toEqual({ allowed: false, count: 0, why: 'db' })
   })
 })
 

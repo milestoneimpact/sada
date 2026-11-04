@@ -85,9 +85,15 @@ const soon = (h: number): string => ago(-h)
 const liHealth = {
   'linkedin:member:abc': {
     status: 'active' as const, expiresAt: ago(-1200), refreshExpiresAt: ago(-7000), refreshedAt: ago(30), needsReauthAt: null,
+    renewNote: null, renewNotedAt: null, metricsNote: null, metricsNotedAt: null,
     alerts: [{ kind: 'access' as const, threshold: 7, at: ago(6) }],
   },
-  'linkedin:org:99': { status: 'active' as const, expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] },
+  // ‏وسببُ آخر تجديدٍ وقياسٍ لم يتمّ (D-291) يُرسَم في العُدّة ليمرّ بالبوّابات
+  'linkedin:org:99': {
+    status: 'active' as const, expiresAt: ago(-100), refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null,
+    renewNote: 'ردّ المزوّد التجديد (503)', renewNotedAt: ago(40), metricsNote: 'missing_read_scope', metricsNotedAt: ago(90),
+    alerts: [],
+  },
 }
 const base = {
   app: undefined, baseUrl: 'https://sada2.basserh.com', now, zone: 'Asia/Riyadh', flash: null,
