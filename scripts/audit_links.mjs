@@ -25,15 +25,24 @@
  *
  * الاستعمال:  node scripts/audit_links.mjs /tmp/panel.html …  [--self-test]
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = new URL('../src/', import.meta.url).pathname
 
+/** ‏ملفّاتُ المسارات كلُّها — والمجلّداتُ الفرعيّة معها: `routes/panel/*.ts` تسجّل مساراتٍ كاملةً (D-297). */
+function walk(dir) {
+  const out = []
+  for (const f of readdirSync(dir)) {
+    const p = join(dir, f)
+    if (statSync(p).isDirectory()) out.push(...walk(p))
+    else if (f.endsWith('.ts') && !f.endsWith('.test.ts')) out.push(p)
+  }
+  return out
+}
+
 function registered() {
-  const files = [join(ROOT, 'index.ts'), ...readdirSync(join(ROOT, 'routes'))
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => join(ROOT, 'routes', f))]
+  const files = [join(ROOT, 'index.ts'), ...walk(join(ROOT, 'routes'))]
   const out = []
   for (const file of files) {
     const text = readFileSync(file, 'utf8')

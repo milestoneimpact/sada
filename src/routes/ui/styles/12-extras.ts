@@ -11,6 +11,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
    أدوار اللوحة: عنوان الصفحة، وعنوان القسم، والمتن (D-185) */
 .doc h1{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-2)}
 .doc h2{font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600; margin:var(--s-8) 0 var(--s-2)}
+.doc h3{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; margin:var(--s-6) 0 var(--s-2)}
 .doc .lede{font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink-2);
   margin:0 0 var(--s-3); max-width:var(--measure)}
 .doc p{font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink-2); margin:0 0 var(--s-3)}
@@ -329,7 +330,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 .card.wz{max-width:calc(var(--measure) * 1.6 + var(--s-16)); padding-bottom:0}
 .wz-bar{display:flex; gap:var(--s-2); margin:0 0 var(--s-6); padding:0; list-style:none}
 .wz-bar li{flex:1 1 0; min-width:0; display:flex; align-items:center; gap:var(--s-2); padding-bottom:var(--s-2);
-  border-bottom:var(--stroke) solid var(--line); color:var(--ink-3); font-size:var(--t-small); line-height:var(--lh-small);
+  border-bottom:var(--stroke) solid var(--line); color:var(--ink-3); font-size:var(--t-ui); line-height:var(--lh-ui);
   max-width:none; transition:border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease)}
 .wz-on .wz-bar li{cursor:pointer}
 .wz-bar li.is-done{border-color:color-mix(in srgb,var(--brand) 45%,transparent); color:var(--ink-2)}
@@ -355,7 +356,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 @media(hover:hover){.wz-opt:hover,.wz-pill:hover,.wz-src:hover{border-color:var(--ink-3)}}
 .wz-opt:has(input:checked){border-color:var(--brand); background:var(--selected); box-shadow:0 0 0 var(--stroke) color-mix(in srgb,var(--brand) 30%,transparent)}
 .wz-opt:has(:focus-visible),.wz-pill:has(:focus-visible),.wz-src:has(:focus-visible),.wz-drop:has(:focus-visible){box-shadow:0 0 0 var(--ring-w) var(--ring)}
-.wz-big{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:700; color:var(--ink)}
+.wz-big{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
 .wz-sub{font-weight:600; color:var(--brand)}
 .wz-pf{margin:0; padding:var(--s-4)}
 .wz-pf-h{padding:0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui)}
@@ -380,8 +381,6 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 .wz-say[data-tone=ok]{color:var(--ok)}
 .wz-say[data-tone=warn]{color:var(--warn)}
 .wz-say[data-tone=bad]{color:var(--bad)}
-.wz-step fieldset.field{margin-inline:0; padding:0; border:0; min-inline-size:0}
-.wz-step fieldset.field > legend{padding:0; margin-bottom:var(--s-2); font-weight:600}
 .wz-srcs{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr))}
 .wz-src{display:flex; align-items:flex-start; gap:var(--s-2); min-height:var(--tap); padding:var(--s-3);
   border:var(--bd-soft); border-radius:var(--r-control); background:var(--surface); cursor:pointer}
@@ -419,9 +418,9 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
    تقويمٌ مصغَّرٌ بسبعة أعمدة، و«ما ينقص» سطرٌ واحد، والبطاقاتُ شبكةٌ تحت رأس يومها،
    وشريطا الجملة والتثبيت ملتصقان. والسطوحُ من العُدّة (card · card-inset). */
 .rv-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1); margin:var(--s-3) 0 var(--s-4)}
-.rv-wd{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-3); text-align:center}
+.rv-wd{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); text-align:center}
 .rv-cd{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--s-0); min-height:var(--tap);
-  border-radius:var(--r-control); color:var(--ink-3); font-size:var(--t-small); line-height:var(--lh-small); text-decoration:none}
+  border-radius:var(--r-control); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); text-decoration:none}
 .rv-cd.is-on{background:var(--selected); color:var(--ink); border:var(--bd-soft)}
 .rv-cd.is-on span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--brand); font-weight:600}
 .rv-gaps{margin-bottom:var(--s-4); align-items:center}
@@ -430,7 +429,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   gap:var(--s-2); padding:var(--s-3) var(--s-4); margin-bottom:var(--s-4)}
 .rv-bulk[hidden]{display:none}
 .rv-day + .rv-day{margin-top:var(--s-6)}
-.rv-dh{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); scroll-margin-block-start:var(--s-16)}
+.rv-dh{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; scroll-margin-block-start:var(--s-16)}
 .rv-cards{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))}
 .rv{display:flex; flex-direction:column; gap:var(--s-3); scroll-margin-block-start:var(--s-16)}
 .rv-h{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
@@ -468,15 +467,15 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   -webkit-mask-image:linear-gradient(to right, currentColor 45%, transparent); mask-image:linear-gradient(to right, currentColor 45%, transparent)}
 .pd-echo svg{display:block; width:100%; height:100%}
 .pd-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
-.pd-title{margin:0; font-size:var(--t-display); line-height:var(--lh-display); font-weight:700}
-.pd-dates{font-size:var(--t-h3); line-height:var(--lh-h3)}
+.pd-title{margin:0; font-size:var(--t-display); line-height:var(--lh-display); font-weight:400}
+.pd-dates{font-size:var(--t-ui); line-height:var(--lh-ui)}
 .pd-state{margin-top:var(--s-1); padding:var(--s-1) var(--s-3); border-radius:var(--r-control); border:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 35%,transparent);
   font-size:var(--t-ui); line-height:var(--lh-ui)}
 .pd-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); gap:var(--s-4); width:100%; margin-top:var(--s-6)}
 .pd-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 30%,transparent)}
 .pd-kpi b{font-size:var(--t-h1); line-height:var(--lh-h1); font-variant-numeric:tabular-nums}
 .pd-kpi span{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
-.pd-sec h2{margin:0 0 var(--s-4); font-size:var(--t-h2); line-height:var(--lh-h2)}
+.pd-sec h2{margin:0 0 var(--s-4); font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
 .pd-mix{display:grid; gap:var(--s-3); max-width:calc(var(--measure) * 1.4)}
 .pd-bar{display:grid; grid-template-columns:auto 6rem minmax(0,1fr) 3ch; align-items:center; gap:var(--s-3)}
 .pd-bar progress{width:100%; height:var(--s-3); appearance:none; border:0; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden}
@@ -484,9 +483,9 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 .pd-bar progress::-webkit-progress-value{background:var(--brand); border-radius:var(--r-pill)}
 .pd-bar progress::-moz-progress-bar{background:var(--brand); border-radius:var(--r-pill)}
 .pd-week + .pd-week{margin-top:var(--s-8)}
-.pd-wh{margin:0 0 var(--s-4); padding-bottom:var(--s-2); border-bottom:var(--bd); font-size:var(--t-h3); line-height:var(--lh-h3); color:var(--brand)}
+.pd-wh{margin:0 0 var(--s-4); padding-bottom:var(--s-2); border-bottom:var(--bd); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--brand)}
 .pd-day + .pd-day{margin-top:var(--s-6)}
-.pd-dh{margin:0 0 var(--s-3); font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2); scroll-margin-block-start:var(--s-16)}
+.pd-dh{margin:0 0 var(--s-3); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2); scroll-margin-block-start:var(--s-16)}
 .pd-posts{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
 .pd-post{display:flex; flex-direction:column; gap:var(--s-2); break-inside:avoid}
 .pd-post-h{display:flex; align-items:center; gap:var(--s-2)}

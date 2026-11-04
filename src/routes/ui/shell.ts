@@ -268,7 +268,7 @@ export function soloPage(
  */
 export function bell(unread: number | null): string {
   const n = unread ?? 0
-  return html`<a class="bell" href="/panel/notices" aria-label="${n > 0 ? 'الإشعارات: ' + n + ' جديدة' : 'الإشعارات'}">${raw(ICON.bell)}<span class="vh">الإشعارات</span>${n > 0 ? raw(count(n, { label: n + ' جديدة' })) : ''}</a>`.value
+  return html`<a class="bell" href="/panel/notices" aria-label="${n > 0 ? 'الإشعارات: ' + n + ' جديدة' : 'الإشعارات'}">${raw(ICON.bell)}${n > 0 ? raw(count(n, { label: n + ' جديدة' })) : ''}</a>`.value
 }
 
 export function backNav(href: string, label: string): string {
