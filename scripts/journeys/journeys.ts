@@ -1,5 +1,5 @@
 /**
- * الرحلاتُ الاثنتا عشرة (DESIGN-PLAN §6) — كما يؤدّيها مالكٌ يفتحها أوّلَ مرّة.
+ * الرحلاتُ الاثنتا عشرة (DESIGN-PLAN §6) ورحلتا الخطّة (ر-12 · ر-13، D-293) — كما يؤدّيها مالكٌ يفتحها أوّلَ مرّة.
  *
  * **لا روابطَ عميقة**: كلُّ رحلةٍ تبدأ من الرئيسيّة، وتبلغ هدفَها بما يُرى في الشاشة —
  * بطاقةٌ في الرئيسيّة، أو الشريطُ السفليّ على الهاتف، أو الرافدةُ على الحاسوب. والنجاحُ
@@ -53,6 +53,20 @@ function all<T>(stack: Stack, sql: string, ...values: unknown[]): T[] {
 /** بندٌ في الرافدة (الحاسوب) أو في الشريط السفليّ (الهاتف) — كما يُرى. */
 function navItem(page: Page, label: string): Locator {
   return visible(page.locator('aside.rail nav.tabs a').filter({ hasText: label })).first()
+}
+
+/**
+ * وجهةٌ ليست في شريط الهاتف (D-289: المكتبةُ والحساباتُ والإعداداتُ في «المزيد»): يُفتح «المزيد» لمسةً تُعدّ، ثمّ الوجهة.
+ * وعلى الحاسوب الرافدةُ تحملها كلَّها فلا لمسةَ زائدة. **فالمقياسُ يقول ثمنَ القرار لا يخفيه.**
+ */
+async function goSection(page: Page, m: Meter, label: string): Promise<void> {
+  const direct = navItem(page, label)
+  if ((await direct.count()) > 0) {
+    await m.tap(direct, `«${label}» في التنقّل`)
+    return
+  }
+  await m.tap(visible(page.locator('details.more-sheet > summary')).first(), '«المزيد» في شريط الهاتف')
+  await m.tap(visible(page.locator('details.more-sheet .more-panel a').filter({ hasText: label })).first(), `«${label}» في «المزيد»`)
 }
 
 /** تبويبٌ داخل وجهة (D-195 · D-204 · D-206): المنشورات والمكتبة والنتائج والإعدادات — شريطُ اللوح الظاهر. */
@@ -343,7 +357,7 @@ const R4: Journey = {
   },
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
-    await m.tap(navItem(page, 'المكتبة'), '«المكتبة» في التنقّل')
+    await goSection(page, m, 'المكتبة')
     await m.tap(subTab(page, 'الفيديو'), 'تبويب «الفيديو»')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
@@ -518,6 +532,9 @@ const R10: Journey = {
     const month = q<{ t: number }>(stack, "SELECT ROUND(COALESCE(SUM(total),0), 2) AS t FROM cost_ledger WHERE at >= strftime('%Y-%m-01 00:00:00','now')")?.t ?? 0
     const d30 = q<{ t: number }>(stack, "SELECT ROUND(COALESCE(SUM(total),0), 2) AS t FROM cost_ledger WHERE at >= datetime('now','-30 days')")?.t ?? 0
     m.note(`في القاعدة: هذا الشهر $${month.toFixed(2)} · آخر 30 يومًا $${d30.toFixed(2)}`)
+    // ‏«اليوم بالأرقام» مطويٌّ تحت «الكلفة وما وقع» منذ D-289: فتحُه لمسةٌ تُعدّ، لا تُخفى
+    const fold = visible(page.locator('details > summary').filter({ hasText: 'الكلفة وما وقع' })).first()
+    if ((await fold.count()) > 0) await m.tap(fold, '«الكلفة وما وقع» — المطويّ')
     // ‏أوّلًا: هل في الصفحة «هذا الشهر» أصلًا؟
     const monthText = visible(page.getByText(/هذا الشهر|الشهر الحاليّ|شهر (أكتوبر|سبتمبر)/)).first()
     if ((await monthText.count()) > 0) {
@@ -558,6 +575,85 @@ const R11: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R1, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11]
+/**
+ * ر-12 · «خطّة جديدة» من الرئيسيّة إلى «حلّل وابنِ» (D-293): الخطّةُ محورُ المنصّة منذ D-282، ولم تكن لها رحلةٌ تُقاس.
+ * أربعُ خطواتٍ في المعالج وزرٌّ واحد، والنجاحُ خطّةُ شهرٍ في القاعدة ورسائلُ الكتابة في الطابور (لا تُستهلك محلّيًّا).
+ */
+const R12: Journey = {
+  id: 'R-12',
+  title: 'خطّة جديدة: من الرئيسيّة إلى «حلّل وابنِ الخطّة»',
+  plan: { today: 'يُقاس', target: '6' },
+  async prepare(stack) {
+    // ‏الخطّةُ تحتاج مصدرين محلَّلين، وstaging حلّلت المستندَ وحدَه — فيُحلَّل العرضُ هنا
+    stack.db.raw.prepare(`INSERT INTO content_items (id, source_id, summary, themes_json, worth_score, extracted_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`)
+      .run(crypto.randomUUID(), stack.seeded.sources.slides,
+        'عرضٌ من اثنتي عشرة شريحة يختصر الإطار: تعريفُ المعلَم قبل التنفيذ، ومراجعةٌ أسبوعيّة قصيرة.',
+        JSON.stringify({ hash: 'md5:9a8b7c6d5e4f30211203f4e5d6c7b8a9', themes: ['المراجعة الأسبوعيّة', 'تعريف المعلَم'], audience: 'قادة الفرق', angles: ['من الاجتماع الطويل إلى المراجعة القصيرة'], reason: 'شرائح تصلح منشورًا بصريًّا' }),
+        0.74)
+    return 'حُلّل العرضُ أيضًا: الخطّةُ تحتاج مصدرين محلَّلين'
+  },
+  async run({ page, m, stack }) {
+    await m.tap(link(page, 'ابنِ خطّة'), '«ابنِ خطّة» في بطاقة «خطّةُ الشهر»')
+    await m.tap(button(page, 'التالي'), '«التالي» — الفترة: شهر، مختارةٌ سلفًا')
+    await m.tap(button(page, 'التالي'), '«التالي» — المنصّات المربوطة بإيقاعها، مختارةٌ سلفًا')
+    await m.tap(visible(page.locator('label.wz-opt').filter({ has: page.locator('input[name="image_style"][value="none"]') })).first(), '«بلا صورة»')
+    await m.tap(button(page, 'التالي'), '«التالي» — المراجعة: العددُ والكلفة')
+    await m.tap(button(page, 'حلّل وابنِ الخطّة'), '«حلّل وابنِ الخطّة»', { key: true })
+    const plans = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM plans WHERE span = 'month' AND status <> 'superseded'")?.n ?? 0
+    const queued = stack.generateQueue.sent.length
+    const at = new URL(page.url()).pathname
+    return {
+      success: plans === 1 && queued > 0 && at === '/panel/plan/review',
+      verified: `خطّة شهر في القاعدة: ${plans} · رسائل الكتابة في الطابور: ${queued} · الصفحة ${at}`,
+    }
+  },
+}
+
+/**
+ * ر-13 · مراجعةُ الخطّة: اعتمد بندًا ثمّ «ثبّت الخطّة» (D-293). البذرةُ خطّةُ شهرٍ ببندين ومسوّدتيهما تنتظران
+ * القرار، والنجاحُ الإصدارُ ١ في `plan_versions` والمعتمَدُ مجدولًا و`locked_at` مختومًا.
+ */
+let r13Plan = ''
+const R13: Journey = {
+  id: 'R-13',
+  title: 'مراجعة الخطّة: اعتمد بندًا ثمّ «ثبّت الخطّة»',
+  plan: { today: 'يُقاس', target: '3' },
+  async prepare(stack) {
+    const { doc, slides } = stack.seeded.sources
+    const day = (plus: number): string => { const d = new Date(); d.setUTCDate(d.getUTCDate() + plus); return d.toISOString().slice(0, 10) }
+    r13Plan = crypto.randomUUID()
+    const items = [
+      { sourceId: doc, platform: 'linkedin', kind: 'text', angle: 'ثلاثة أسئلة قبل كلّ معلَم', day: day(1), time: '07:00', why: 'لم يخرج منه شيء' },
+      { sourceId: slides, platform: 'linkedin', kind: 'text', angle: 'من الاجتماع الطويل إلى المراجعة القصيرة', day: day(3), time: '07:00', why: 'يكمّل الأوّل' },
+    ]
+    stack.db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, version) VALUES (?, ?, ?, 'claude-opus-5', 'approved', 'org_owner', 'month', ?, 1)`)
+      .run(r13Plan, day(0), JSON.stringify({ rationale: 'بندان على يومين', items }),
+        JSON.stringify({ channels: ['linkedin'], cadence: { linkedin: 1 }, sources: 'all', ideas: [], assets: [], autoImage: false, imageStyle: 'infographic', startDay: day(0) }))
+    const texts = [
+      'قبل كلّ معلَم ثلاثة أسئلة: ما المخرَج الذي يُرى؟ ومن يملك قرار القبول؟ وما أثر التأخّر؟\n\n#إدارة_المشاريع',
+      'الاجتماع الطويل لا يصنع اتّفاقًا؛ المراجعة القصيرة على تعريفٍ مكتوب تصنعه.\n\n#الحوكمة',
+    ]
+    items.forEach((it, i) => {
+      stack.db.raw.prepare(`INSERT INTO posts (id, plan_id, platform, account_id, source_id, source_refs, model, cost_usd, type, text, rationale, status, idempotency_key, created_at)
+        VALUES (?, ?, 'linkedin', ?, ?, ?, 'claude-opus-5', 0.0412, 'text', ?, 'من الخطّة', 'draft', ?, datetime('now'))`)
+        .run(crypto.randomUUID(), r13Plan, stack.seeded.accounts.linkedin, it.sourceId, JSON.stringify([it.sourceId]), texts[i]!, `plan:${r13Plan}:${i}`)
+    })
+    return 'خطّةُ شهرٍ ببندين ومسوّدتيهما تنتظران الاعتماد'
+  },
+  async run({ page, m, stack }) {
+    await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (٢)» في بطاقة «خطّةُ الشهر»')
+    await m.tap(visible(page.locator('form[action="/panel/plan/review/approve"] button[type="submit"]')).first(), '«اعتمد» على البند الأوّل')
+    await m.tap(button(page, 'ثبّت الخطّة'), '«ثبّت الخطّة» ← موافق', { key: true })
+    const versions = q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM plan_versions WHERE plan_id = ? AND version = 1', r13Plan)?.n ?? 0
+    const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
+    const locked = q<{ locked_at: string | null }>(stack, 'SELECT locked_at FROM plans WHERE id = ?', r13Plan)?.locked_at ?? null
+    return {
+      success: versions === 1 && queued === 1 && locked !== null,
+      verified: `الإصدار ١ محفوظ: ${versions} · مجدول من الخطّة: ${queued} من بندٍ معتمَد · ثُبّتت ${locked === null ? 'لا' : 'نعم'}`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R1, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13]
 
 export { Blocked }
