@@ -33,8 +33,8 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/client\/report\/send$/, 'publisher'],
   // ‏المحرّر: الكتابةُ والتعديلُ والتخطيطُ والوسائط
   [/^\/panel\/(drafts\/(write|idea|spread)|media|uploads|plan|client\/brief|assets\/upload)(\/|$)/, 'editor'],
-  // ‏القارئ: الانتقالُ بين شركاته
-  [/^\/panel\/orgs\/switch$/, 'viewer'],
+  // ‏القارئ: الانتقالُ بين شركاته، وإطفاءُ عدّاد الإشعارات (D-294) — الفعلُ نفسُه يبقى بدوره في مساره
+  [/^\/panel\/(orgs\/switch|notices\/read)$/, 'viewer'],
 ]
 
 /**

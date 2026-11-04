@@ -181,7 +181,9 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
 .why-tip > summary{cursor:pointer; display:grid; place-items:center; width:var(--tap); height:var(--tap);
   border-radius:50%; border:var(--bd); color:var(--ink-2); font-weight:600}
 @media(hover:hover){.why-tip > summary:hover{background:var(--surface-2)}}
-.lede-row:has(.why-tip[open]) .why-tip{flex-basis:100%; order:9}
+/* ‏والمفتوحُ سطرٌ كاملٌ في أيّ صفٍّ يلتفّ (D-294): كان الشرطُ .lede-row وحدَها، فلمّا انتقل «؟» إلى شريط الفلتر (D-276)
+   صار يفتح جملتَه في الصفّ نفسِه فتفيض 136px عن يسار الهاتف — وأوقف audit_design سلسلةَ التدقيق كلَّها منذ D-283 */
+.why-tip[open]{flex-basis:100%; order:9; min-width:0}
 /* لوحُ المراجعة — مطويٌّ عمدا (D-090): ملحوظاتُ ذوقٍ لا تزاحم النصَّ
    حتّى تُطلَب، «ولا شارة حمراء» فتُقرأ عطلا. */
 .notes{margin-bottom:var(--s-2); border:var(--bd);

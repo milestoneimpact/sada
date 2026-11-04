@@ -51,6 +51,7 @@ import { readCaptions, type VideoCaptions } from '../../lib/media/captions'
 import { relyingParty } from '../../lib/security/rp'
 import { record, recentAudit, type AuditRow } from '../../lib/audit'
 import { pulses, readHeartbeats } from '../../lib/ops/heartbeat'
+import { memoryNotices, unreadNotices } from '../../lib/notices'
 import {
   panelPage, type LibraryData, type OverviewData, type PanelData, type PaneView, type PanelFactors, type PanelFlash,
   type PanelProvider, type PanelSource, type PostsData, type ResultsData, type SettingsData, type ShellData,
@@ -255,12 +256,17 @@ async function shellData(
     return typeof value === 'string' && value.length > 0
   })
 
+  // ‏عدّادُ الإشعارات (D-294): مراجعُ الذاكرة (النبضُ والسقف) محمَّلةٌ أصلًا، والقاعدةُ جملةٌ واحدةٌ تُكمل العدّ
+  const beatsNow = pulses(beats, now)
+  const unread = await unreadNotices(c.env.DB, org, memoryNotices(beatsNow, allowance, now).map((n) => n.ref))
+
   const shell: ShellLoad = {
     // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
     env: c.env.SADA_ENV,
     role: session.record.role ?? 'owner',
     paused: allowance.settings.paused,
-    pulses: pulses(beats, now),
+    pulses: beatsNow,
+    unread,
     rpId: relyingParty(c.env.PUBLIC_BASE_URL).id,
     flash,
     now,
