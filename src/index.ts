@@ -31,6 +31,7 @@ import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
 import { assets } from './routes/assets'
+import { pwa } from './routes/pwa'
 import { fonts } from './routes/fonts'
 import { legal } from './routes/legal'
 import { landing } from './routes/landing'
@@ -374,6 +375,7 @@ app.post('/admin/analyze/:sourceRef', async (c) => {
 // ‏حارسُ الأدوار قبل كلّ مسار (D-272): المدعوّ يُفحَص دورُه وشركتُه، والمالكُ يمرّ ويُكتب بريدُه في التدقيق
 app.use('*', accessGuard)
 app.route('/', assets)
+app.route('/', pwa)
 app.route('/', fonts)
 // الوثيقتان العامّتان قبل كلّ حارس: تُقرآن من الخارج بلا جلسة
 app.route('/', legal)
