@@ -16,10 +16,10 @@ import { teamScreen } from '../ui/teamView'
 import { PERIODS, portfolio, previousWindow, type Period } from '../../lib/portfolio'
 import { portfolioScreen } from '../ui/portfolioView'
 import { sendText } from '../../lib/mail/send'
-import { readSettings } from '../../lib/settings'
+import { clearSetting, isOrgKey, ORG_KEYS, readSettings, readSettingsBoth, writeSetting } from '../../lib/settings'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../../lib/pivot'
 import { loadFacts } from '../../lib/pivotStore'
-import { activeOrg, listOrgs } from '../../lib/tenancy'
+import { activeOrg, listOrgs, OWNER_ORG } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { waiting } from '../../lib/platform/timeline'
 import { ownerZone } from '../../lib/time/ownerZone'
@@ -80,18 +80,22 @@ client.get('/panel/client', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
-  const [orgRow, brief, linkedRows, plan, settings, units, spent, facts] = await Promise.all([
+  const [orgRow, brief, linkedRows, plan, both, units, spent, facts, spentToday] = await Promise.all([
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
     readBrief(c.env.DB, org),
     c.env.DB.prepare("SELECT platform, count(*) AS n FROM accounts WHERE org_id = ? AND status = 'active' GROUP BY platform")
       .bind(org).all<{ platform: string; n: number }>().catch(() => ({ results: [] as { platform: string; n: number }[] })),
     latestPlan(c.env.DB, org),
-    readSettings(c.env.DB),
+    // ‏العامُّ والفعّالُ لهذا العميل من قراءةٍ واحدة (D-295)
+    readSettingsBoth(c.env.DB, org),
     unitCosts(c.env.DB, org),
     c.env.DB.prepare("SELECT COALESCE(SUM(total), 0) AS t FROM cost_ledger WHERE org_id = ? AND at >= strftime('%Y-%m-01 00:00:00', 'now')")
       .bind(org).first<{ t: number }>().catch(() => null),
     readFacts(c.env.DB, org, null),
+    c.env.DB.prepare("SELECT COALESCE(SUM(total), 0) AS t FROM cost_ledger WHERE org_id = ? AND at >= date('now')")
+      .bind(org).first<{ t: number }>().catch(() => null),
   ])
+  const settings = both.effective
   const waiting = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'draft'")
     .bind(org).first<{ n: number }>().catch(() => null)
   const progress = plan === null ? null : await planProgress(c.env.DB, org, plan.id)
@@ -111,11 +115,47 @@ client.get('/panel/client', async (c) => {
     saved: c.req.query('saved') === '1',
     flash: await takeFlash(c.env, c.req.raw),
     names: plan === null ? {} : await sourceNames(c.env.DB, org, plan.plan.items.map((i) => i.sourceId)),
+    limits: {
+      ownerOrg: org === OWNER_ORG,
+      global: { spend: both.global.dailySpendCapUsd, image: both.global.dailyImageCap, video: both.global.dailyVideoCap, analysis: both.global.dailyAnalysisCap },
+      mine: {
+        ...(both.overridden.has('daily_spend_cap_usd') ? { spend: both.effective.dailySpendCapUsd } : {}),
+        ...(both.overridden.has('daily_image_cap') ? { image: both.effective.dailyImageCap } : {}),
+        ...(both.overridden.has('daily_video_cap') ? { video: both.effective.dailyVideoCap } : {}),
+        ...(both.overridden.has('daily_analysis_cap') ? { analysis: both.effective.dailyAnalysisCap } : {}),
+      },
+      spentToday: spentToday?.t ?? 0,
+    },
   })
   return page((nonce) =>
     soloPage('صدى — رحلة العميل', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, PLAN_BOARD_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('accounts')),
   )
+})
+
+/**
+ * **حدودُ هذا العميل** (D-295): أربعةُ مفاتيحَ لا غير، فراغٌ يمحو سقفَه فيعود إلى العامّ، ورقمٌ يُقصّ على حدوده
+ * كالعامّ. ولمنظّمة المالك لا سقفَ خاصّ: هي العامُّ نفسُه. للمدير فأعلى (`access.ts`).
+ */
+client.post('/panel/client/limits', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  if (org === OWNER_ORG) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'منظّمةُ المالك حدودُها العامّة — تُعدَّل من «الإنفاق والحدود».' })
+    return c.redirect('/panel/client#limits', 303)
+  }
+  const changed: string[] = []
+  for (const key of ORG_KEYS) {
+    if (!isOrgKey(key)) continue
+    const raw = String(gate.form.get(key) ?? '').trim()
+    if (raw === '') { await clearSetting(c.env.DB, key, org); continue }
+    const r = await writeSetting(c.env.DB, key, raw, 'panel', org)
+    changed.push(key + ' = ' + r.stored)
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'settings.write', target: 'client_limits', detail: changed.join(' · ') || 'عاد إلى العامّ', org }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: changed.length === 0 ? 'عاد العميلُ إلى الحدود العامّة.' : 'حُفظت حدودُ هذا العميل.' })
+  return c.redirect('/panel/client#limits', 303)
 })
 
 client.post('/panel/client/brief', async (c) => {

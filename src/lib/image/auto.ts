@@ -6,7 +6,8 @@ import type { Db } from '../tokens'
 import { readSettings } from '../settings'
 
 export async function autoImageRoom(db: Db, org: string, wanted?: boolean): Promise<number> {
-  const s = await readSettings(db)
+  // ‏وسقفُ الصور الفعّالُ لهذا العميل (D-295): العامُّ أو ما كتبه لنفسه
+  const s = await readSettings(db, org)
   // ‏واختيارُ الخطّة يغلب الإعدادَ العامّ (D-282): «ولّد صورةً مع كلّ منشور» في الخطّة يُرسَم ولو كان الإعدادُ مطفأً،
   // ‏و«لا» فيها لا يُرسَم ولو كان مرفوعًا — والسقفُ اليوميُّ والإيقافُ فوق الاثنين
   if (wanted === false || s.paused || (wanted !== true && !s.autoImage)) return 0

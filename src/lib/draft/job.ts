@@ -160,6 +160,7 @@ export async function draftPost(
 
   // ٤ إلى ٦ · الحارسُ والمزوّدُ والنداءُ والكلفة — في موضعها الواحد (`writer.ts`)
   const out = await writeOnce(deps, {
+    org,
     // ‏وصوتُ العميل من موجز منظّمة المصدر (D-257) — وفارغٌ إن لم يُكتب، فالموجّهُ كما كان
     system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, org))),
     user: userPrompt(brief),
@@ -337,6 +338,7 @@ export async function draftFromIdea(
   // ‏والدفترُ يُنسَب إلى الفكرة ببصمتها لا إلى المنشور (كالمصدر): كلفةُ الكتابة في
   // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
   const out = await writeOnce(deps, {
+    org,
     system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, org))),
     user: ideaPrompt(idea),
     schema: DRAFT_SCHEMA,

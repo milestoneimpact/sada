@@ -26,7 +26,7 @@
 import { recordCost } from '../cost'
 import { routeFor } from '../ai/routes'
 import { CLAIM_UNAVAILABLE, claimGeneration, releaseClaim } from './claim'
-import { blockerReason, checkAllowance, videoCapGate } from '../limits'
+import { blockerReason, checkAllowance, videoCapFor } from '../limits'
 import { signMediaToken, mediaUrl } from './link'
 import {
   AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
@@ -218,13 +218,14 @@ export async function animateForPost(
   }
 
   // ١ — الحارسُ قبل النداء لا بعده (D-019). والإيقافُ قرارُ المالك
-  const allowance = await checkAllowance(deps.db, 'video')
+  // ‏منظّمةُ المنشور قبل الحارس (D-295): سقفُ العميل يُقرأ بها
+  const org = deps.org ?? await orgOfPost(deps.db, postId)
+  const allowance = await checkAllowance(deps.db, 'video', org)
   if (!allowance.allowed && allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
   // ‏ومنظّمةُ المنشور قبل كلّ جملةٍ على وسائطه (D-277)
-  const org = deps.org ?? await orgOfPost(deps.db, postId)
 
   // ٢ — مقطعٌ قائمٌ لا يُعاد توليدُه: الفيديو أغلى ما يُنادى في النظام
   const existing = await deps.db
@@ -264,7 +265,7 @@ export async function animateForPost(
    * وكلاهما بلا إنفاق. **وقبل الحجز في ٥**: حجزٌ قبل حارسٍ يمنع يُقفل البابَ
    * ثلاثين دقيقةً على منشورٍ لم يُنفَق عليه شيء.
    */
-  const clips = videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap)
+  const clips = videoCapFor(allowance)
   if (clips.blocker !== null) return { kind: 'blocked', reason: blockerReason(clips.blocker) }
 
   // ٤ — الرابطُ يُوقَّع لحظتَه: النافذةُ تبدأ من الاستعمال لا قبله

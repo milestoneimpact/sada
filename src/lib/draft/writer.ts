@@ -53,6 +53,8 @@ export interface WriteCall {
    * المحفوظ ما لم يُعطَ.
    */
   readonly provider?: string
+  /** منظّمةُ المنادي (D-295): سقفُها الخاصّ يُفحَص بعد العامّ — وبلا منظّمةٍ العامُّ وحدَه. */
+  readonly org?: string
 }
 
 export type Written =
@@ -77,7 +79,7 @@ async function modelFor(db: Db, provider: string, fallback: string): Promise<str
 /** نداءٌ واحدٌ بحرّاسه كلِّها — والكلفةُ مكتوبةٌ قبل أن يعود. */
 export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Written> {
   // ١ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db, 'draft')
+  const allowance = await checkAllowance(deps.db, 'draft', call.org)
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

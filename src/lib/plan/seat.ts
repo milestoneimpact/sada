@@ -85,6 +85,8 @@ export function rowsFromModel(text: string): { date: string; time: string; platf
 export async function toTable(
   deps: { readonly db: Db; readonly writer: BriefDeps; readonly toMarkdown?: ToMarkdown | undefined },
   input: { readonly name: string; readonly bytes: Uint8Array } | { readonly pasted: string },
+  /** منظّمةُ المالك الذي يرفع (D-295): سقفُها الخاصّ يُفحَص بعد العامّ. */
+  org?: string,
 ): Promise<TableOutcome> {
   let prose: string
   if ('pasted' in input) {
@@ -117,7 +119,7 @@ export async function toTable(
     }
   }
   // ‏نصٌّ حرّ: النموذجُ يستخرج الصفوف — بعد الإيقاف والسقف، ونداؤه في الدفتر من `askWriter` (D-008)
-  const allowance = await checkAllowance(deps.db, 'draft')
+  const allowance = await checkAllowance(deps.db, 'draft', org)
   if (allowance.blocker !== null) return { kind: 'error', reason: blockerReason(allowance.blocker) }
   const answer = await askWriter(deps.writer, { system: EXTRACT_SYSTEM, user: prose.slice(0, 60_000), operation: 'plan-import', maxTokens: 8000 })
   if (answer.text === null) return { kind: 'error', reason: 'تعذّر استخراج الخطّة: ' + answer.detail }

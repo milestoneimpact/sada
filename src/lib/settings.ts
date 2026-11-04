@@ -197,21 +197,54 @@ function wholeClips(raw: string | undefined): number {
  * الباب** — `paused` تعود `false` لأنّ الافتراض تشغيلٌ لا توقّف، لكنّ
  * السقوف تعود إلى قيمها المحافظة لا إلى اللانهاية.
  */
-export async function readSettings(db: Db): Promise<Settings> {
-  let rows: { key: string; value: string }[] = []
+/**
+ * مفاتيحُ السقوف التي تقبل قيمةً **لكلّ عميل** (D-295) — لا غير. الإيقافُ والمزوّدون والإدراجُ الآليّ
+ * والقناةُ والبطاقات عامّةٌ بطبعها (D-277)، فصفٌّ لها في غير منظّمة المالك لا يُكتب ولا يُقرأ.
+ */
+export const ORG_KEYS = ['daily_spend_cap_usd', 'daily_image_cap', 'daily_video_cap', 'daily_analysis_cap'] as const
+export type OrgKey = (typeof ORG_KEYS)[number]
+export function isOrgKey(key: string): key is OrgKey {
+  return (ORG_KEYS as readonly string[]).includes(key)
+}
+
+/** العامُّ من منظّمة المالك، والفعّالُ للعميل: العامُّ وفوقه ما كتبه لنفسه من السقوف الأربعة. */
+export interface SettingsBoth {
+  readonly global: Settings
+  readonly effective: Settings
+  /** ما كُتب لهذا العميل بعينه — فارغٌ لمنظّمة المالك. */
+  readonly overridden: ReadonlySet<OrgKey>
+}
+
+export async function readSettingsBoth(db: Db, org: string = OWNER_ORG): Promise<SettingsBoth> {
+  let rows: { key: string; value: string; org_id: string }[] = []
   try {
     const result = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
-      .prepare('SELECT key, value FROM settings WHERE org_id = ?')
-      .bind(OWNER_ORG)
-      .all<{ key: string; value: string }>()
+      // ‏العامُّ يسكن منظّمةَ المالك (D-277)، وصفُّ العميل يغلبه في السقوف الأربعة وحدَها (D-295) — جملةٌ واحدة للاثنين
+      .prepare('SELECT key, value, org_id FROM settings WHERE org_id IN (?, ?)')
+      .bind(OWNER_ORG, org)
+      .all<{ key: string; value: string; org_id: string }>()
     rows = result.results
   } catch {
     // جدولٌ غير موجود (ترحيل لم يُطبَّق): الافتراضات المحافظة لا العطل
-    return DEFAULTS
+    return { global: DEFAULTS, effective: DEFAULTS, overridden: new Set() }
   }
+  const globalMap = new Map(rows.filter((r) => r.org_id === OWNER_ORG).map((r) => [r.key, r.value]))
+  const global = fromMap(globalMap)
+  if (org === OWNER_ORG) return { global, effective: global, overridden: new Set() }
+  const mine = new Map(globalMap)
+  const overridden = new Set<OrgKey>()
+  for (const r of rows) {
+    if (r.org_id === org && isOrgKey(r.key)) { mine.set(r.key, r.value); overridden.add(r.key) }
+  }
+  return { global, effective: overridden.size === 0 ? global : fromMap(mine), overridden }
+}
 
-  const map = new Map(rows.map((r) => [r.key, r.value]))
+/** الإعداداتُ الفعّالة لمنظّمة — وبلا منظّمةٍ العامّة. */
+export async function readSettings(db: Db, org: string = OWNER_ORG): Promise<Settings> {
+  return (await readSettingsBoth(db, org)).effective
+}
+
+function fromMap(map: ReadonlyMap<string, string>): Settings {
   return {
     paused: map.get('paused') === 'true',
     // مفاتيح الخطر تُقرأ بالمطابقة الحرفيّة لا بالتساهل: غيابها أو فسادها
@@ -254,7 +287,10 @@ export async function writeSetting(
   key: SettingKey,
   raw: string,
   updatedBy: string,
+  org: string = OWNER_ORG,
 ): Promise<WriteResult> {
+  // ‏ولغير منظّمة المالك السقوفُ الأربعة وحدَها (D-295): مفتاحٌ عامٌّ يُكتب لعميلٍ لا يُقرأ أبدًا فلا يُكتب
+  if (org !== OWNER_ORG && !isOrgKey(key)) throw new Error(`not_per_org: ${key}`)
   let stored: string
   if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay' ||
       key === 'youtube_public' || key === 'tiktok_public' || key === 'auto_image') {
@@ -297,15 +333,21 @@ export async function writeSetting(
   await db
     .prepare(
       `INSERT INTO settings (key, value, updated_by, updated_at, org_id)
-       -- إعدادٌ عامّ: يسكن منظّمةَ المالك
+       -- العامُّ في منظّمة المالك، وسقفُ العميل في منظّمته (0042: المفتاحُ (org_id, key))
        VALUES (?, ?, ?, datetime('now'), ?)
-       ON CONFLICT(key) DO UPDATE SET
+       ON CONFLICT(org_id, key) DO UPDATE SET
          value = excluded.value,
          updated_by = excluded.updated_by,
          updated_at = datetime('now')`,
     )
-    .bind(key, stored, updatedBy, OWNER_ORG)
+    .bind(key, stored, updatedBy, org)
     .run()
 
   return { key, value: raw, stored, clamped: stored !== raw }
+}
+
+/** يمحو سقفَ عميلٍ فيعود إلى العامّ — ولا يمسّ منظّمةَ المالك: العامُّ لا يُمحى بل يُعدَّل. */
+export async function clearSetting(db: Db, key: OrgKey, org: string): Promise<void> {
+  if (org === OWNER_ORG) return
+  await db.prepare('DELETE FROM settings WHERE org_id = ? AND key = ?').bind(org, key).run()
 }

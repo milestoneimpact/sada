@@ -176,7 +176,7 @@ async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Cal
   const fail = (outcome: PlanOutcome): Called => ({ ok: false, outcome })
 
   // ٣ · الحارس قبل النداء
-  const allowance = await checkAllowance(deps.db, 'plan')
+  const allowance = await checkAllowance(deps.db, 'plan', deps.org)
   if (allowance.blocker !== null) return fail({ kind: 'blocked', reason: blockerReason(allowance.blocker) })
 
   const route = await routeFor(deps.db, 'plan')

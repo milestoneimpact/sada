@@ -19,25 +19,36 @@
 import { spendTodayFor } from './ai/spend'
 import { money } from './format'
 import { getProvider } from './providers'
-import { readSettings, type Settings } from './settings'
+import { readSettingsBoth, type Settings } from './settings'
+import { OWNER_ORG } from './tenancy'
 import type { Db } from './tokens'
+
+/** `org`: سقفُ هذا العميل بعينه لا السقفُ العامّ (D-295) — يُقال في السبب. */
+export type CapScope = 'org'
 
 export type Blocker =
   | { readonly kind: 'paused' }
-  | { readonly kind: 'analysis_cap'; readonly used: number; readonly cap: number }
-  | { readonly kind: 'spend_cap'; readonly used: number; readonly cap: number }
+  | { readonly kind: 'analysis_cap'; readonly used: number; readonly cap: number; readonly scope?: CapScope }
+  | { readonly kind: 'spend_cap'; readonly used: number; readonly cap: number; readonly scope?: CapScope }
   /** سقفٌ خاصّ بمزوّد — Anthropic لا يستهلك حصّة Gemini. */
   | { readonly kind: 'provider_cap'; readonly provider: string; readonly used: number; readonly cap: number }
   /** مزوّدٌ عطّله المالك بمفتاحه محفوظا. */
   | { readonly kind: 'provider_disabled'; readonly provider: string }
   /** سقفُ المقاطع اليوميّ بالعدد (D-168) — يحجب التحريكَ وحده لا غيرَه. */
-  | { readonly kind: 'video_cap'; readonly used: number; readonly cap: number }
+  | { readonly kind: 'video_cap'; readonly used: number; readonly cap: number; readonly scope?: CapScope }
 
 export interface Allowance {
   readonly allowed: boolean
   readonly blocker: Blocker | null
+  /** الإعداداتُ العامّة (منظّمة المالك). */
   readonly settings: Settings
+  /** الاستهلاكُ العامّ اليوم على المنظّمات كلِّها. */
   readonly usage: DailyUsage
+  /**
+   * العميلُ إن كان غيرَ منظّمة المالك (D-295): سقوفُه الفعّالة (العامُّ وفوقه ما كتبه) واستهلاكُه وحدَه.
+   * **والسقفُ العامُّ يبقى فوق الكلّ**: يُفحَص أوّلًا على المجموع، ثمّ سقفُ العميل على ما أنفقه هو.
+   */
+  readonly org?: { readonly settings: Settings; readonly usage: DailyUsage }
 }
 
 export interface DailyUsage {
@@ -68,7 +79,13 @@ export interface DailyUsage {
  * يُكتب **قبل** النجاح (D-008)، فهو الأعلى والأصدق — وحارسٌ يبني على
  * الأصدق يمنع أكثر ممّا يسمح، وذاك الاتّجاه الصحيح للخطأ.
  */
-export async function usageToday(db: Db): Promise<DailyUsage> {
+export async function usageToday(db: Db, org?: string): Promise<DailyUsage> {
+  const both = await usageTodayBoth(db, org ?? OWNER_ORG)
+  return both.all
+}
+
+/** استهلاكُ اليوم عامًّا ولمنظّمةٍ بعينها — **في الجملة نفسِها** (D-295)، فلا يفترق رقمان. */
+export async function usageTodayBoth(db: Db, org: string): Promise<{ readonly all: DailyUsage; readonly mine: DailyUsage }> {
   try {
     /*
      * **والمقاطعُ في الاستعلام نفسِه لا في ثانٍ** (D-168): `checkAllowance`
@@ -84,20 +101,25 @@ export async function usageToday(db: Db): Promise<DailyUsage> {
            coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
                              THEN 1 ELSE 0 END), 0) AS analyses,
            coalesce(sum(total), 0) AS spend,
-           coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips
+           coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips,
+           coalesce(sum(CASE WHEN org_id = ?1 AND provider = 'anthropic' AND operation LIKE 'analyze:%'
+                             THEN 1 ELSE 0 END), 0) AS my_analyses,
+           coalesce(sum(CASE WHEN org_id = ?1 THEN total ELSE 0 END), 0) AS my_spend,
+           coalesce(sum(CASE WHEN org_id = ?1 AND operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS my_clips
            FROM cost_ledger
-          -- السقفُ عامّ لكلّ المنظّمات: الإعداداتُ عامّة، فالاستهلاكُ يُجمَع عليها كلِّها
+          -- السقفُ العامّ على المنظّمات كلِّها، وسقفُ العميل على صفوفه وحدَها — من القراءة نفسِها
           WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now')`,
       )
-      .first<{ analyses: number; spend: number; clips: number }>()
-    return { analyses: row?.analyses ?? 0, spend: row?.spend ?? 0, clips: row?.clips ?? 0 }
+      .bind(org)
+      .first<{ analyses: number; spend: number; clips: number; my_analyses: number; my_spend: number; my_clips: number }>()
+    return {
+      all: { analyses: row?.analyses ?? 0, spend: row?.spend ?? 0, clips: row?.clips ?? 0 },
+      mine: { analyses: row?.my_analyses ?? 0, spend: row?.my_spend ?? 0, clips: row?.my_clips ?? 0 },
+    }
   } catch {
     // دفترٌ لا يُقرأ لا يُفتح به الباب: يُفترض السقف مستهلَكا
-    return {
-      analyses: Number.POSITIVE_INFINITY,
-      spend: Number.POSITIVE_INFINITY,
-      clips: Number.POSITIVE_INFINITY,
-    }
+    const spent = { analyses: Number.POSITIVE_INFINITY, spend: Number.POSITIVE_INFINITY, clips: Number.POSITIVE_INFINITY }
+    return { all: spent, mine: spent }
   }
 }
 
@@ -168,8 +190,17 @@ export interface VideoCapGate {
  *
  * والمنعُ عند البلوغ لا بعد التجاوز، وصفرٌ يُغلق التحريكَ كلَّه.
  */
-export function videoCapGate(used: number, cap: number): VideoCapGate {
-  return { used, cap, blocker: used >= cap ? { kind: 'video_cap', used, cap } : null }
+export function videoCapGate(used: number, cap: number, scope?: CapScope): VideoCapGate {
+  const tag = scope === undefined ? {} : { scope }
+  return { used, cap, blocker: used >= cap ? { kind: 'video_cap', used, cap, ...tag } : null }
+}
+
+/** حارسُ المقاطع للعميل: العامُّ أوّلًا، ثمّ سقفُه هو إن كتب لنفسه سقفًا (D-295). */
+export function videoCapFor(a: Allowance): VideoCapGate {
+  const all = videoCapGate(a.usage.clips, a.settings.dailyVideoCap)
+  if (all.blocker !== null || a.org === undefined) return all
+  if (a.org.settings.dailyVideoCap === a.settings.dailyVideoCap) return all
+  return videoCapGate(a.org.usage.clips, a.org.settings.dailyVideoCap, 'org')
 }
 
 /**
@@ -194,22 +225,31 @@ export type Duty = 'analyze' | 'draft' | 'plan' | 'image' | 'video' | 'publish' 
 const PAID: ReadonlySet<Duty> = new Set(['analyze', 'draft', 'plan', 'image', 'video'])
 
 /** الحكمُ نفسُه بلا قراءة — لمن قرأ الإعدادَ والاستهلاكَ مرّةً ويسأل عن عملين. */
-export function blockerFor(duty: Duty, settings: Settings, usage: DailyUsage): Blocker | null {
+export function blockerFor(duty: Duty, settings: Settings, usage: DailyUsage, scope?: CapScope): Blocker | null {
   if (settings.paused) return { kind: 'paused' }
+  const tag = scope === undefined ? {} : { scope }
   if (duty === 'analyze' && usage.analyses >= settings.dailyAnalysisCap) {
-    return { kind: 'analysis_cap', used: usage.analyses, cap: settings.dailyAnalysisCap }
+    return { kind: 'analysis_cap', used: usage.analyses, cap: settings.dailyAnalysisCap, ...tag }
   }
   if (PAID.has(duty) && usage.spend >= settings.dailySpendCapUsd) {
-    return { kind: 'spend_cap', used: usage.spend, cap: settings.dailySpendCapUsd }
+    return { kind: 'spend_cap', used: usage.spend, cap: settings.dailySpendCapUsd, ...tag }
   }
   return null
 }
 
-export async function checkAllowance(db: Db, duty: Duty): Promise<Allowance> {
-  const settings = await readSettings(db)
-  const usage = await usageToday(db)
-  const blocker = blockerFor(duty, settings, usage)
-  return { allowed: blocker === null, blocker, settings, usage }
+/**
+ * أيُسمح لهذه المنظّمة؟ (D-295): الإيقافُ والسقفُ العامُّ على المجموع أوّلًا، ثمّ سقفُ العميل على ما أنفقه هو
+ * إن كان غيرَ منظّمة المالك. جملتان لا أربع: الإعداداتُ العامّةُ والفعّالةُ من قراءةٍ واحدة، والاستهلاكان كذلك.
+ */
+export async function checkAllowance(db: Db, duty: Duty, org: string = OWNER_ORG): Promise<Allowance> {
+  const both = await readSettingsBoth(db, org)
+  const usage = await usageTodayBoth(db, org)
+  const settings = both.global
+  let blocker = blockerFor(duty, settings, usage.all)
+  if (org === OWNER_ORG) return { allowed: blocker === null, blocker, settings, usage: usage.all }
+  const mine = { settings: both.effective, usage: usage.mine }
+  if (blocker === null && both.overridden.size > 0) blocker = blockerFor(duty, mine.settings, mine.usage, 'org')
+  return { allowed: blocker === null, blocker, settings, usage: usage.all, org: mine }
 }
 
 /** سببٌ يُقرأ، لا رمزُ خطأ. */
@@ -218,16 +258,16 @@ export function blockerReason(blocker: Blocker): string {
     case 'paused':
       return 'النظام موقوف مؤقتا بقرار المالك — لا نداء مدفوع ولا نشر'
     case 'analysis_cap':
-      return `بلغ سقف التحليل اليوميّ: ${blocker.used} من ${blocker.cap}`
+      return `بلغ ${blocker.scope === 'org' ? 'سقف هذا العميل من التحليل' : 'سقف التحليل اليوميّ'}: ${blocker.used} من ${blocker.cap}`
     case 'spend_cap':
-      return `بلغ سقف الإنفاق اليوميّ: ${money(blocker.used)} من ${money(blocker.cap)}`
+      return `بلغ ${blocker.scope === 'org' ? 'سقف إنفاق هذا العميل' : 'سقف الإنفاق اليوميّ'}: ${money(blocker.used)} من ${money(blocker.cap)}`
     case 'provider_cap':
       return `بلغ سقف ${blocker.provider} اليوميّ: ${money(blocker.used)} من ${money(blocker.cap)}`
     case 'provider_disabled':
       return `${blocker.provider} معطَّل بقرار المالك`
     case 'video_cap':
       return blocker.cap === 0
-        ? 'سقف المقاطع اليوميّ صفر بقرار المالك — لا تحريك'
-        : `بلغ سقف المقاطع اليوميّ: ${blocker.used} من ${blocker.cap} — يُفتح غدًا، أو ارفعه من «الحدود»`
+        ? `${blocker.scope === 'org' ? 'سقف مقاطع هذا العميل' : 'سقف المقاطع اليوميّ'} صفر بقرار المالك — لا تحريك`
+        : `بلغ ${blocker.scope === 'org' ? 'سقف مقاطع هذا العميل' : 'سقف المقاطع اليوميّ'}: ${blocker.used} من ${blocker.cap} — يُفتح غدًا، أو ارفعه من «الحدود»`
   }
 }

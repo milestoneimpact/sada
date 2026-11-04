@@ -5,6 +5,7 @@
  * شاشةٌ واحدةٌ تمشي العميلَ من «ماذا تريد؟» إلى «ما الذي نجح؟» بلا بحثٍ في الأقسام.
  */
 import { escapeHtml } from './escape'
+import { html, raw } from './html'
 import { pageHead } from './parts'
 import { field } from './components/field'
 import { notice, toastRegion } from './components/toast'
@@ -41,6 +42,16 @@ export interface ClientData {
   /** مصادرُ العميل لـ«أضف بندًا» (D-264). */
   readonly sources?: readonly { readonly id: string; readonly name: string }[]
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+  /**
+   * حدودُ هذا العميل (D-295): العامُّ من منظّمة المالك، وما كتبه العميلُ لنفسه فوقه في السقوف الأربعة.
+   * ولمنظّمة المالك نفسِها البطاقةُ تحيل إلى «الإنفاق والحدود»: هي العامّ.
+   */
+  readonly limits?: {
+    readonly ownerOrg: boolean
+    readonly global: { readonly spend: number; readonly image: number; readonly video: number; readonly analysis: number }
+    readonly mine: { readonly spend?: number; readonly image?: number; readonly video?: number; readonly analysis?: number }
+    readonly spentToday: number
+  }
 }
 
 type State = 'done' | 'todo' | 'idle'
@@ -182,5 +193,36 @@ export function clientScreen(d: ClientData): string {
   <div class="card mt-4" id="brief"><h2>الموجز</h2>
     <p class="hint">يقرؤه مخطِّطُ الخطّة وكاتبُ المسوّدات، <b>وصفًا يُراعى</b>: القيودُ قبله أعلى منه، فلا رقمَ يُخترَع ولا رابط.</p>
     ${briefForm(b)}
-  </div>`
+  </div>
+  ${d.limits === undefined ? '' : limitsCard(d.limits)}`
+}
+
+/**
+ * **حدودُ هذا العميل** (D-295): أربعةُ سقوفٍ يرثها من العامّ، ويكتب لنفسه ما يشاء منها. فراغٌ يعني «العامّ»،
+ * والعامُّ يبقى فوق الكلّ. ولمنظّمة المالك لا نموذج: هي العامُّ نفسُه في «الإنفاق والحدود».
+ */
+function limitsCard(l: NonNullable<ClientData['limits']>): string {
+  if (l.ownerOrg) {
+    return html`<div class="card mt-4" id="limits"><h2>الحدود</h2>
+      <p class="hint m-0">هذه منظّمةُ المالك، وحدودُها هي <b>العامّة</b> على الكلّ: ${money(l.global.spend)} في اليوم،
+        و${l.global.image} صورة، و${l.global.video} مقطع، و${l.global.analysis} تحليلًا. تُعدَّل من
+        <a href="/panel/settings#limits">الإنفاق والحدود</a>. وعميلٌ آخر يكتب لنفسه سقفًا دونها من صفحته.</p>
+    </div>`.value
+  }
+  const num = (id: string, name: string, label: string, mine: number | undefined, global: string, attrs: string): string =>
+    field({ id, label, hint: 'العامّ: ' + global + ' — واتركه فارغًا ليبقى العامّ',
+      control: html`<input type="number" name="${name}" ${raw(attrs)} dir="ltr" placeholder="${global}" value="${mine === undefined ? '' : String(mine)}">`.value })
+  return html`<div class="card mt-4" id="limits"><h2>حدودُ هذا العميل</h2>
+    <p class="hint">السقفُ العامُّ يبقى فوق الكلّ، وهذه سقوفُ هذا العميل وحدَه ممّا أنفقه هو: بلوغُها يوقف الكتابةَ والصورَ له
+      ولا يوقف غيرَه. <b>أنفق اليوم ${money(l.spentToday)}.</b></p>
+    <form method="POST" action="/panel/client/limits" class="stack">
+      <div class="grid c2 gap-2">
+        ${raw(num('cl-spend', 'daily_spend_cap_usd', 'سقف الإنفاق في اليوم (دولار)', l.mine.spend, money(l.global.spend), 'min="0" max="100" step="0.5"'))}
+        ${raw(num('cl-image', 'daily_image_cap', 'سقف الصور في اليوم', l.mine.image, String(l.global.image), 'min="0" max="50" step="1"'))}
+        ${raw(num('cl-video', 'daily_video_cap', 'سقف المقاطع في اليوم', l.mine.video, String(l.global.video), 'min="0" max="20" step="1"'))}
+        ${raw(num('cl-analysis', 'daily_analysis_cap', 'سقف التحليل في اليوم', l.mine.analysis, String(l.global.analysis), 'min="0" max="500" step="1"'))}
+      </div>
+      <div class="row gap-2"><button class="btn btn-primary" type="submit">احفظ الحدود</button></div>
+    </form>
+  </div>`.value
 }
