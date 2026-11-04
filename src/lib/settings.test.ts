@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { DEFAULTS, LIMITS, readSettings, writeSetting, SETTING_KEYS, SETTING_LABEL, settingLabel } from './settings'
+import { clearSetting, DEFAULTS, LIMITS, readSettings, readSettingsBoth, writeSetting, SETTING_KEYS, SETTING_LABEL, settingLabel } from './settings'
 
 let db: FakeDb
 beforeEach(() => {
@@ -199,5 +199,44 @@ describe('النشر العلنيّ بعد الإجازة (D-190)', () => {
     await writeSetting(db, 'youtube_public', 'false', 'panel')
     expect(await readSettings(db)).toMatchObject({ youtubePublic: false, tiktokPublic: true })
     expect(settingLabel('tiktok_public')).toBe('النشر العلنيّ على TikTok')
+  })
+})
+
+describe('سقوفٌ لكلّ عميل (D-295)', () => {
+  const seedOrg = (): void => { db.raw.prepare("INSERT INTO orgs (id, name) VALUES ('org_b', 'عميل ب')").run() }
+
+  it('عميلٌ بلا صفٍّ يرث العامّ، وصفُّه يغلبه له وحدَه', async () => {
+    seedOrg()
+    await writeSetting(db, 'daily_spend_cap_usd', '9', 'panel')
+    expect((await readSettings(db, 'org_b')).dailySpendCapUsd).toBe(9)
+    await writeSetting(db, 'daily_spend_cap_usd', '2', 'panel', 'org_b')
+    const both = await readSettingsBoth(db, 'org_b')
+    expect(both.global.dailySpendCapUsd).toBe(9)
+    expect(both.effective.dailySpendCapUsd).toBe(2)
+    expect([...both.overridden]).toEqual(['daily_spend_cap_usd'])
+    // والعامُّ كما هو لمنظّمة المالك
+    expect((await readSettings(db)).dailySpendCapUsd).toBe(9)
+  })
+
+  it('ومحوُ السقف يعيده إلى العامّ', async () => {
+    seedOrg()
+    await writeSetting(db, 'daily_image_cap', '3', 'panel', 'org_b')
+    expect((await readSettings(db, 'org_b')).dailyImageCap).toBe(3)
+    await clearSetting(db, 'daily_image_cap', 'org_b')
+    expect((await readSettings(db, 'org_b')).dailyImageCap).toBe(DEFAULTS.dailyImageCap)
+    expect((await readSettingsBoth(db, 'org_b')).overridden.size).toBe(0)
+  })
+
+  it('ومفتاحٌ عامٌّ لا يُكتب لعميل: الإيقافُ عامٌّ بطبعه', async () => {
+    seedOrg()
+    await expect(writeSetting(db, 'paused', 'true', 'panel', 'org_b')).rejects.toThrow('not_per_org')
+    expect((await readSettings(db, 'org_b')).paused).toBe(false)
+  })
+
+  it('وسقفُ العميل يُقصّ على حدوده كالعامّ', async () => {
+    seedOrg()
+    const r = await writeSetting(db, 'daily_video_cap', '99', 'panel', 'org_b')
+    expect(r.clamped).toBe(true)
+    expect((await readSettings(db, 'org_b')).dailyVideoCap).toBe(LIMITS.dailyVideoCap.max)
   })
 })

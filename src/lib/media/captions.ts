@@ -251,6 +251,7 @@ export async function captionsFor(
 
   const shape = youtubeShape({ width: row.width, height: row.height, durationMs: row.duration_ms })
   const out = await writeOnce(deps, {
+    org: deps.org,
     system: captionSystem(shape),
     user: captionUser({ name: row.name, about, shape, durationMs: row.duration_ms }),
     schema: CAPTIONS_SCHEMA,

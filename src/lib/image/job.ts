@@ -422,7 +422,7 @@ export async function generateForPost(
   }
 
   // ٣ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db, 'image')
+  const allowance = await checkAllowance(deps.db, 'image', post.org_id)
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }

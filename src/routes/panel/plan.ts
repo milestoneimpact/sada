@@ -691,6 +691,7 @@ plan.post('/panel/plan/import', async (c) => {
       toMarkdown: toMarkdown === undefined ? undefined : (doc) => toMarkdown.call(c.env.AI, doc),
     },
     file instanceof File && file.size > 0 ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : { pasted },
+    org,
   )
   if (table.kind === 'error') return bad(table.reason)
   const now = new Date()

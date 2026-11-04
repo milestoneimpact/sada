@@ -229,7 +229,7 @@ async function shellData(
 ): Promise<{ shell: ShellLoad; load: Load }> {
   const env = c.env as unknown as Record<string, string | undefined>
   const [allowance, drafts, apps, accounts, beats, orgs, flash, zone] = await Promise.all([
-    checkAllowance(c.env.DB, 'image'),
+    checkAllowance(c.env.DB, 'image', org),
     listDrafts(c.env.DB, org, BOARD),
     appStatuses(c.env.DB, env),
     listAccounts(c.env.DB, org),

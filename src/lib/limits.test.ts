@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
-import { blockerReason, checkAllowance, usageToday, videoCapGate } from './limits'
+import { blockerReason, checkAllowance, usageToday, videoCapFor, videoCapGate } from './limits'
 import { writeSetting } from './settings'
 
 let db: FakeDb
@@ -225,5 +225,63 @@ describe('الحارس يسأل عمّا يحرسه (D-169)', () => {
 
   it('والسبب بالمعادلة الواحدة لا بأربعة أرقام عشريّة', () => {
     expect(blockerReason({ kind: 'spend_cap', used: 1.2345, cap: 1 })).not.toContain('1.2345')
+  })
+})
+
+describe('سقفُ العميل يوقفه هو ولا يوقف غيره (D-295)', () => {
+  const seedOrgs = (): void => {
+    db.raw.prepare("INSERT INTO orgs (id, name) VALUES ('org_b', 'عميل ب'), ('org_c', 'عميل ج')").run()
+  }
+  const spendFor = (org: string, total: number): void => {
+    db.raw.prepare(
+      `INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, at, org_id)
+       VALUES (?, 'anthropic', 'draft:claude-opus-5', 1000, ?, ?, datetime('now'), ?)`,
+    ).run(crypto.randomUUID(), total / 1000, total, org)
+  }
+
+  it('عميلٌ بلغ سقفَه يُمنع بسببٍ يسمّيه، والعميلُ الآخر والمالكُ يمرّون', async () => {
+    seedOrgs()
+    await writeSetting(db, 'daily_spend_cap_usd', '50', 'panel')
+    await writeSetting(db, 'daily_spend_cap_usd', '1', 'panel', 'org_b')
+    spendFor('org_b', 1.2)
+    const b = await checkAllowance(db, 'draft', 'org_b')
+    expect(b.allowed).toBe(false)
+    expect(b.blocker).toMatchObject({ kind: 'spend_cap', scope: 'org', used: 1.2, cap: 1 })
+    expect(blockerReason(b.blocker!)).toContain('سقف إنفاق هذا العميل')
+    expect(b.org?.usage.spend).toBe(1.2)
+    expect(b.usage.spend).toBe(1.2)
+    expect((await checkAllowance(db, 'draft', 'org_c')).allowed).toBe(true)
+    expect((await checkAllowance(db, 'draft')).allowed).toBe(true)
+  })
+
+  it('والسقفُ العامُّ فوق الكلّ: عميلٌ لم يبلغ سقفَه يُمنع حين يبلغ المجموعُ العامّ', async () => {
+    seedOrgs()
+    await writeSetting(db, 'daily_spend_cap_usd', '2', 'panel')
+    await writeSetting(db, 'daily_spend_cap_usd', '10', 'panel', 'org_b')
+    spendFor('org_c', 2.5)
+    const b = await checkAllowance(db, 'draft', 'org_b')
+    expect(b.allowed).toBe(false)
+    expect(b.blocker).toMatchObject({ kind: 'spend_cap', cap: 2 })
+    expect(b.blocker).not.toHaveProperty('scope')
+  })
+
+  it('وعميلٌ بلا سقفٍ خاصّ يُحكَم بالعامّ وحدَه ولا يُحسَب عليه غيرُه', async () => {
+    seedOrgs()
+    await writeSetting(db, 'daily_spend_cap_usd', '5', 'panel')
+    spendFor('org_c', 4)
+    spendFor('org_b', 0.5)
+    const b = await checkAllowance(db, 'draft', 'org_b')
+    expect(b.allowed).toBe(true)
+    expect(b.org?.usage.spend).toBe(0.5)
+    expect(b.usage.spend).toBe(4.5)
+  })
+
+  it('وحارسُ المقاطع يقرأ سقفَ العميل حين كتبه لنفسه', async () => {
+    seedOrgs()
+    await writeSetting(db, 'daily_video_cap', '0', 'panel', 'org_b')
+    const b = await checkAllowance(db, 'video', 'org_b')
+    const gate = videoCapFor(b)
+    expect(gate.blocker).toMatchObject({ kind: 'video_cap', cap: 0, scope: 'org' })
+    expect(videoCapFor(await checkAllowance(db, 'video', 'org_c')).blocker).toBeNull()
   })
 })
