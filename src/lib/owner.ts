@@ -431,7 +431,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'guard',
     // ‏الرقمُ الثاني في لوحة Cloudflare لا يُقرأ من هنا، والمقارنةُ بيد المالك (D-061)
     done: () => null,
-    evidence: () => 'يُقارَن سطرُ الدفتر بلوحة Workers AI ← Usage في اليوم نفسه — ولا تُقرأ اللوحة من هنا',
+    evidence: () => 'يُقارَن سطرُ الدفتر بصفحة Usage في لوحة Workers AI في اليوم نفسه — ولا تُقرأ اللوحة من هنا',
     go: 'https://dash.cloudflare.com/?to=/:account/ai/workers-ai',
     goLabel: 'افتح Workers AI',
   },
@@ -450,7 +450,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     done: () => null,
     go: 'https://dash.cloudflare.com/?to=/:account/r2',
-    goLabel: 'افتح R2',
+    goLabel: 'افتح Cloudflare',
   },
 ]
 
