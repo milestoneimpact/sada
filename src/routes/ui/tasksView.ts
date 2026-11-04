@@ -20,6 +20,8 @@ import { sectionLabel } from './command'
 import { secretCommand, taskDoc, TASKS_DOC, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
 import { statusBadge, type Tone } from './components/badge'
+import { html, raw } from './html'
+import { DEVICES, formatVital, METRICS, MIN_SAMPLES, THRESHOLDS, type Metric, type Rating, type VitalsSummary } from '../../lib/vitals'
 
 const MARK: Readonly<Record<string, { g: string; cls: Tone; label: string }>> = {
   done: { g: '●', cls: 'ok', label: 'تمّت' },
@@ -148,6 +150,54 @@ export interface TasksScreenData {
   readonly phase: string | null
   /** البيئةُ التي تُفتَح منها — فأمرُ `wrangler` يُكتب لها لا لغيرها. */
   readonly env: string
+  /** ما قِيس من متصفّح المالك في أسبوع (D-299) — و`null` حين لا تُقرأ القاعدة. */
+  readonly vitals?: VitalsSummary | null
+}
+
+const METRIC_LABEL: Readonly<Record<Metric, string>> = {
+  LCP: 'أوّلُ محتوًى كبير (LCP)',
+  INP: 'الاستجابةُ للّمس (INP)',
+  CLS: 'ثباتُ التخطيط (CLS)',
+}
+const DEVICE_LABEL = { phone: 'الهاتف', desktop: 'الحاسوب' } as const
+const RATING_MARK: Readonly<Record<Rating, { cls: Tone; label: string }>> = {
+  good: { cls: 'ok', label: 'جيّد' },
+  'needs-improvement': { cls: 'warn', label: 'يحتاج تحسينًا' },
+  poor: { cls: 'bad', label: 'ضعيف' },
+}
+
+/**
+ * **سرعةُ اللوحة عندك** (D-299): ما قاسه متصفّحُ المالك لا ما قدّره المختبر — المئينُ ‏75 لكلّ مقياسٍ وجهازٍ في
+ * أسبوع، والحكمُ من حدود web.dev. ودون عشر عيّناتٍ لا حكم: يُقال «لم تُقَس بعد» لا «جيّد».
+ */
+function vitalsCard(v: VitalsSummary | null | undefined): string {
+  if (v === null || v === undefined) {
+    return html`<div class="card mb-3"><div class="card-head"><h2>سرعةُ اللوحة عندك</h2></div>
+      <p class="hint m-0">القياسُ لا يُقرأ الآن.</p></div>`.value
+  }
+  const cell = (m: Metric, d: (typeof DEVICES)[number]): string => {
+    const x = v.byMetric[m][d]
+    if (x.p75 === null) return html`<td><span class="ago">لم تُقَس</span></td>`.value
+    const mark = x.rating === null ? null : RATING_MARK[x.rating]
+    return html`<td><b>${formatVital(m, x.p75)}</b> ${mark === null
+      ? html`<span class="ago">${x.n} من ${MIN_SAMPLES}</span>`
+      : raw(statusBadge(mark.cls, '●', mark.label))}</td>`.value
+  }
+  const rows = METRICS.map((m) => html`<tr><td>${METRIC_LABEL[m]}</td>${raw(DEVICES.map((d) => cell(m, d)).join(''))}<td>${formatVital(m, THRESHOLDS[m][0])}</td></tr>`)
+  const slow = v.slowest === null ? '' : html`<p class="hint m-0 mt-2">أبطأُ صفحةٍ على الهاتف: <code>${v.slowest.page}</code> (${formatVital('LCP', v.slowest.p75)}).</p>`
+  return html`<div class="card mb-3">
+    <div class="card-head"><h2>سرعةُ اللوحة عندك</h2><div class="grow"></div>
+      <span class="chip">${v.samples} عيّنة في ${v.days} أيّام</span></div>
+    ${v.samples < MIN_SAMPLES
+      ? html`<p class="hint">لم تُقَس بعد: افتح اللوحةَ من هاتفك مرّاتٍ وستُقاس من نفسها. ثلاثةُ أرقامٍ كما تعرّفها web.dev،
+        بلا هويّةٍ ولا عنوان، والحكمُ عند المئين 75 من عشر عيّناتٍ فأكثر.</p>`
+      : html`<p class="hint">ما قاسه متصفّحُك لا ما قدّره المختبر: المئينُ 75 في أسبوع، والحدُّ حدُّ web.dev للجيّد.</p>`}
+    <div class="scroll"><table>
+      <thead><tr><th>المقياس</th>${raw(DEVICES.map((d) => html`<th>${DEVICE_LABEL[d]}</th>`.value).join(''))}<th>الحدّ</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    ${slow}
+  </div>`.value
 }
 
 function table(rows: readonly OwnerRow[], env: string): string {
@@ -204,6 +254,8 @@ export function tasksScreen(d: TasksScreenData): string {
 
   ${d.gates.map(gateCard).join('')}
   </details>
+
+  ${vitalsCard(d.vitals)}
 
   <div class="card">
     <h2>وأين الخطوات</h2>

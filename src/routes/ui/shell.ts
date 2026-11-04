@@ -311,7 +311,9 @@ export function themeSwitch(withId = true): string {
  */
 export function injectCsrf(page: string, token: string): string {
   const field = html`<input type="hidden" name="_csrf" value="${token}">`.value
-  return page.replace(/(<form\b[^>]*\bmethod="POST"[^>]*>)/gi, (tag) => tag + field)
+  // ‏وحاملٌ مخفيٌّ للسكربت (D-299): صفحةٌ بلا نموذجٍ تُرسل عيّنةَ سرعتها بالرمز نفسِه، فلا بابَ ثانيًا
+  const carrier = html`<span hidden data-csrf="${token}"></span>`.value
+  return page.replace(/(<form\b[^>]*\bmethod="POST"[^>]*>)/gi, (tag) => tag + field) + carrier
 }
 
 /**
