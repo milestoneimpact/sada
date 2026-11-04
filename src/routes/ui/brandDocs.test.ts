@@ -31,7 +31,8 @@ function section(text: string, from: RegExp, to?: RegExp): string {
 }
 
 const BRAND = plain(read('docs/BRAND.md'))
-const DECISIONS = plain(read('docs/DECISIONS.md'))
+// ‏D-194 … D-197 في جزء السجلّ D-150 … D-199 منذ قُسّم بالخمسينات (D-292)
+const DECISIONS = plain(read('docs/decisions/D-150-199.md'))
 const PLAN = plain(read('docs/DESIGN-PLAN.md'))
 const TASKS = plain(read('docs/MANUAL-TASKS.md'))
 const PREV = section(DECISIONS, /^## D-194 /m, /^## D-196 /m)
