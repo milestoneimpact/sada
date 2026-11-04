@@ -46,6 +46,6 @@ notices.post('/panel/notices/read', async (c) => {
   const org = activeOrg(gate.session.record)
   const refs = gate.form.getAll('ref').map(String)
   const n = await markRead(c.env.DB, org, refs, gate.session.record.email ?? null)
-  await setFlash(c.env, c.req.raw, { kind: 'ok', text: n === 0 ? 'لا شيء يُعلَّم.' : `عُلّم ${n} ${n === 1 ? 'إشعارٌ' : 'إشعارات'} مقروءةً.` })
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: n === 0 ? 'لا شيء يُعلَّم.' : 'عُلّم ' + n + (n === 1 ? ' إشعارٌ' : ' إشعارات') + ' مقروءةً.' })
   return c.redirect('/panel/notices', 303)
 })

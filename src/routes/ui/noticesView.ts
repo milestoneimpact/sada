@@ -17,7 +17,7 @@ function row(n: Notice, read: NoticeRead | undefined, now: Date): Html {
   return html`<li data-kind="${n.kind}">
     <span class="dot ${n.tone}"></span>
     <span class="grow">${n.text}
-      <span class="ago">${relativeTime(n.at, now)}${read === undefined ? '' : ` · قرأها ${read.byEmail ?? 'أحدٌ'} ${relativeTime(read.readAt, now)}`}</span></span>
+      <span class="ago">${relativeTime(n.at, now)}${read === undefined ? '' : html` · قرأها ${read.byEmail ?? 'أحدٌ'} ${relativeTime(read.readAt, now)}`}</span></span>
     <a class="btn btn-secondary btn-sm" href="${n.href}">${n.action}</a>
   </li>`
 }
