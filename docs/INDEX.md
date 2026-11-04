@@ -29,7 +29,7 @@
 | [`PLATFORMS.md`](PLATFORMS.md) | حقائقُ المنصّات بتاريخ التحقّق، محروسةٌ باختبار | عند كلّ منصّةٍ تُربط |
 | [`BRAND.md`](BRAND.md) | الهويّة: الألوانُ والنقشُ والشعارُ وقواعدُها (D-196)، محروسةٌ باختبار | عند قرار هويّة |
 | [`DESIGN-PLAN.md`](DESIGN-PLAN.md) | خطّةُ التصميم المعتمدة ومراحلُها، محروسةٌ باختبار | عند مرحلةٍ تُغلق |
-| [`EASE-PLAN.md`](EASE-PLAN.md) | خطّةُ السهولة: ثماني مراحل، بقيت ح (الهاتفُ أصيلًا) | حين تُغلق ح |
+| [`EASE-PLAN-2.md`](EASE-PLAN-2.md) | خطّةُ السهولة ٢ (D-298): المحاورُ الستّة، والمراجعُ بقاعدةٍ ومقياس، والمكتباتُ المقبولةُ والمرفوضة، ولوحةُ القياس، وستّةَ عشرَ بندًا في ثلاثة آفاق، وبروتوكولُ الجلسة الشهريّة | حين يُغلق بندٌ منها |
 | [`GROWTH-PLAN.md`](GROWTH-PLAN.md) | خطّةُ النموّ: بقيت م-٥ (Snapchat وThreads) وقراراتُ الاستيراد | حين تُغلق |
 | [`AGENCY-PLAN.md`](AGENCY-PLAN.md) | رحلةُ العميل في سبع محطّات، مبنيّةٌ كلُّها؛ وما بقي بقرار | حين يُبتّ |
 | [`CLOUDFLARE-AGENT-SETUP.md`](CLOUDFLARE-AGENT-SETUP.md) | إعدادُ بيئة العمل على Cloudflare من جلسةٍ آليّة | عند تغيّر الإعداد |
@@ -43,6 +43,7 @@
 | [`archive/DASHBOARD-ROADMAP-2.md`](archive/DASHBOARD-ROADMAP-2.md) | من staging إلى الإنتاج: ما بالشيفرة تمّ (D-131 · D-132)، والباقي بيد المالك في `MANUAL-TASKS.md` |
 | [`archive/UI-PLAN.md`](archive/UI-PLAN.md) | خطّةُ الواجهة الأولى (D-043 …)، تجاوزتها خطّةُ التصميم (D-183) |
 | [`archive/UX-PLAN.md`](archive/UX-PLAN.md) | خطّةُ التجربة الأولى، تجاوزتها `EASE-PLAN` |
+| [`archive/EASE-PLAN.md`](archive/EASE-PLAN.md) | خطّةُ السهولة الأولى: ثماني مراحل أُغلقت كلُّها بالقياس (أ … ح، آخرُها D-296)؛ تكملها `EASE-PLAN-2.md` (D-298) |
 | [`archive/UI-UX-AUDIT.md`](archive/UI-UX-AUDIT.md) | التدقيقُ الأوّل لوحًا لوحًا، أُصلح ما فيه |
 | [`archive/UI-UX-AUDIT-3.md`](archive/UI-UX-AUDIT-3.md) | التدقيقُ الثالث، أُصلح ما فيه (D-149 …) |
 | [`archive/UI-UX-NEXT.md`](archive/UI-UX-NEXT.md) | ما بعد التدقيق: خمسةٌ تمّت، وواحدٌ صار مهمّةَ مالك |
