@@ -22,23 +22,22 @@
 
 | الملفّ | المحتوى |
 |---|---|
+| [docs/INDEX.md](docs/INDEX.md) | **ابدأ من هنا**: فهرسُ الوثائق، ما الحيُّ وما التاريخ، وقراءةٌ في خمس دقائق |
+| [docs/HANDOVER.md](docs/HANDOVER.md) | التسليم: ما هو صدى، وأين تبدأ، وقبل كلّ دفعة، والخطوط |
+| [docs/ROADMAP-3.md](docs/ROADMAP-3.md) | الخارطةُ الثالثة (D-290): الحكمُ عند D-289، ومقياسُ النضج، والآفاقُ الثلاثة ببوّابات قبولٍ تُقاس |
+| [docs/STATUS.md](docs/STATUS.md) | سجلُّ ما بُني بتاريخه وقراره وبوّابته |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | سجلّ القرارات: الخمسون الجارية، وفهرسُ `docs/decisions/` لما قبلها |
+| [docs/MANUAL-TASKS.md](docs/MANUAL-TASKS.md) | ما يقع على المالك يدويًّا، بالعناصر الستّة |
 | [docs/PLAN.md](docs/PLAN.md) | الخطّة: الرؤية، النطاق، المراحل، بوّابات الخروج، التكلفة، المخاطر |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | المعمارية على Cloudflare، نموذج البيانات، عقد المنشور |
-| [docs/PLATFORMS.md](docs/PLATFORMS.md) | حقائق LinkedIn وX المتحقَّق منها بتاريخها ومصادرها |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | سجلّ القرارات المعمارية D-001 … |
-| [docs/MANUAL-TASKS.md](docs/MANUAL-TASKS.md) | ما يقع على المالك يدويًّا، بالعناصر الستّة |
-| [docs/UI-PLAN.md](docs/UI-PLAN.md) | خطّة الواجهة: سبعة مسارات، وما قِيس، ولوح الحيازة |
-| [docs/UX-PLAN.md](docs/UX-PLAN.md) | خطّة التجربة: سبعة مسارات، مرتّبة بأثرها على المالك |
-| [docs/UI-UX-AUDIT.md](docs/UI-UX-AUDIT.md) | تدقيقُ الواجهة لوحًا لوحًا ورمزًا رمزًا: ما قِيس، وما أُصلح، وما بقي للمالك |
-| [docs/UI-UX-NEXT.md](docs/UI-UX-NEXT.md) | خطّةُ ما بعد التدقيق: ستّةُ مسارات، خمسةٌ تمّت وواحدٌ للمالك |
-| [docs/DASHBOARD-ROADMAP.md](docs/DASHBOARD-ROADMAP.md) | خارطةُ طريق الداشبورد: أين نقف بالعدد، وكلُّ تابٍ بسؤاله وجوابه، وخمسُ مراحلَ ببوّاباتها |
-| [docs/DASHBOARD-ROADMAP-2.md](docs/DASHBOARD-ROADMAP-2.md) | الخارطةُ الثانية: من staging إلى الإنتاج، ستُّ مراحلَ ببوّابات تحقّقٍ رقميّة |
-| [docs/ROADMAP-3.md](docs/ROADMAP-3.md) | الخارطةُ الثالثة (D-290، 2026-11-04): الحكمُ عند D-289، ومقياسُ النضج بثمانية محاور، والآفاقُ الثلاثة ببوّابات قبولٍ تُقاس، وسلاسلُ الفتح والمخاطر |
+| [docs/PLATFORMS.md](docs/PLATFORMS.md) | حقائق المنصّات المتحقَّق منها بتاريخها ومصادرها |
+| [docs/BRAND.md](docs/BRAND.md) · [docs/DESIGN-PLAN.md](docs/DESIGN-PLAN.md) | الهويّةُ وخطّةُ التصميم |
+| [docs/archive/](docs/archive/) | الخططُ المغلقةُ بالقياس، بسبب إغلاقها في الفهرس |
 | [CLAUDE.md](CLAUDE.md) | التعليمات الدائمة للمساعد في هذا المستودع |
 
 ## الحالة
 
-المرحلة الحالية: **٠ — التأسيس**. لا شيفرة بعد؛ الوثائق التأسيسية فقط.
+الحالُ الحيُّ في [docs/STATUS.md](docs/STATUS.md) (الأحدثُ آخرَ الجدول) و[docs/ROADMAP-3.md](docs/ROADMAP-3.md) §١. staging حيّةٌ على sada2.basserh.com، والإنتاجُ مؤجَّلٌ بقرار (D-271).
 
 ## ليس من سكينة
 
