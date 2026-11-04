@@ -66,6 +66,9 @@ export function htmlHeaders(nonce: string): Record<string, string> {
      * تسمح بموردٍ من أصلنا وحدَه، وكلُّ مساراتِ أصلنا نكتبها.
      */
     `style-src 'self' 'nonce-${nonce}'`,
+    // ‏بيانُ التثبيت وعاملُ الخدمة من أصلنا (D-296): بلا هذين يسقطان إلى `default-src 'none'` فيُرفضان صامتَين
+    "manifest-src 'self'",
+    "worker-src 'self'",
     /*
      * **والسِّمةُ `style=""` بابُها غيرُ باب الوسم** (D-150).
      *

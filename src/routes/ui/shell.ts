@@ -144,6 +144,16 @@ const THEME_COLOR = join((['light', 'dark'] as const).map((mode) =>
  */
 const MOMENT_COLOR = html`<meta name="theme-color" media="${below('md')}" content="${MOMENT.ground}">`
 
+/**
+ * الهاتفُ أصيلًا (D-296): البيانُ يجعل «أضف إلى الشاشة الرئيسيّة» تطبيقًا يبدأ من اللوحة، وiOS يقرأ أيقونتَه
+ * واسمَه من هذه الوسوم لا من البيان.
+ */
+const PWA_HEAD = html`<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/sada.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="صدى">`
+
 const FAVICON = html`<link rel="icon" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ICON_SVG.value)}">
 ${THEME_COLOR}`
 
@@ -351,6 +361,7 @@ export function shell(
   }
 <title>${title}</title>${options.moment === true ? html`\n${MOMENT_COLOR}` : ''}
 ${FAVICON}
+${PWA_HEAD}
 <script nonce="${nonce}">${raw(THEME_BOOT)}</script>
 ${FONT_PRELOAD}
 <style nonce="${nonce}">${FONT_CSS}</style>

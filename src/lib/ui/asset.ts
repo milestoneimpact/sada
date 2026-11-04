@@ -131,9 +131,19 @@ let ui: ScriptAsset | null = null
 let panel: ScriptAsset | null = null
 
 /** ما تحمله كلُّ صفحة: الثيمُ والكثافةُ والنسخُ وسلوكُ العُدّة ولوحةُ الأوامر والوقت. */
+/**
+ * تسجيلُ عامل الخدمة (D-296) — صامتٌ: متصفّحٌ بلا دعمٍ أو رفضٌ لا يُظهر شيئًا، فاللوحةُ تعمل كما كانت.
+ * والعاملُ نفسُه لا يخزّن صفحةً (المسارُ /sw.js)، فالتسجيلُ لا يبدّل ما يراه المالك إلّا حين تسقط الشبكة.
+ */
+const SW_SCRIPT = `
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+})();`
+
 export function uiScript(): ScriptAsset {
   if (ui === null) {
-    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT)
+    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT + SW_SCRIPT)
     ui = { path: `/a/u.${fingerprint(body)}.js`, body }
   }
   return ui
