@@ -276,12 +276,34 @@ export async function pullDue(deps: PullDeps, limit = 50): Promise<PullSummary> 
       if (outcome.kind === 'measured') measured += 1
       else if (outcome.kind === 'closed') closed += 1
       else deferred += 1
-    } catch {
+      // ‏سببُ التأجيل على الحساب (D-291): منشورٌ حُذف (`closed`) شأنُ منشوره لا حسابه
+      if (outcome.kind === 'measured') await noteMetrics(deps.db, row.accountId, row.org, null)
+      else if (outcome.kind === 'deferred') await noteMetrics(deps.db, row.accountId, row.org, outcome.reason)
+    } catch (error) {
       deferred += 1
+      await noteMetrics(deps.db, row.accountId, row.org, String(error).slice(0, 120))
     }
   }
 
   return { due: rows.length, measured, deferred, closed }
+}
+
+/**
+ * سببُ آخر قياسٍ لم يتمّ على صفّ الحساب (D-291) — و`null` يمحوه حين ينجح.
+ * **ولا يُسقط الدورةَ إن لم يُكتب**: الملاحظةُ أثرٌ لا حكم.
+ */
+export async function noteMetrics(db: Db, accountId: string, org: string, note: string | null): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `UPDATE accounts SET metrics_note = ?, metrics_noted_at = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END
+          WHERE id = ? AND org_id = ?`,
+      )
+      .bind(note, note, accountId, org)
+      .run()
+  } catch (error) {
+    console.warn({ job: 'metrics-note', account: accountId, failed: String(error) })
+  }
 }
 
 export interface PostMetricRow {

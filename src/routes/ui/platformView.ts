@@ -42,6 +42,8 @@ import { clock, dayKey, dayLabel, stamp } from '../../lib/time/zone'
 import { ICON } from './icons'
 import { echo } from './echo'
 import { escapeHtml } from './escape'
+// ‏القالبُ الموسوم (D-281) لما يُستحدث هنا؛ و`raw` لمخرَج `when()` الذي يرسم HTML ولم يُحوَّل بعد
+import { html, raw } from './html'
 import { setupPane } from './channels'
 import { LOGOS } from './logos'
 // وعلامةُ الدرجة من `parts` لا من نسخةٍ هنا — نقاطُ المسوّدات تقرؤها كذلك (D-163)
@@ -255,6 +257,13 @@ function capabilityTable(rows: readonly Capability[]): string {
  * القاعدة — `accounts` و`tokens` و`token_alerts` — **ولا محطّةَ تُخترَع**:
  * حسابٌ لم يُجدَّد قطّ يُقال فيه ذلك، لا يُرسَم له تاريخٌ فارغ.
  */
+/** أسبابُ القياس رموزٌ من `metrics/job.ts` — تُقال بالعربيّة، وما سواها كما جاء (D-291). */
+function metricsNoteText(note: string): string {
+  if (note === 'no_tokens') return 'لا إذن محفوظ'
+  if (note === 'missing_read_scope') return 'الإذن بلا نطاق قراءة — أعد الربط'
+  return note
+}
+
 function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zone: string | null): string {
   const when = (at: string | null, none: string): string =>
     at === null ? none : `<span title="${escapeHtml(stamp(at, zone))}">${escapeHtml(relativeTime(at, now))}</span>`
@@ -284,6 +293,8 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zo
           h?.expiresAt ? `إذن الوصول ${ends(h.expiresAt)}` : 'لا إذن وصول محفوظا'}${
           h?.refreshExpiresAt ? ` · والتجديد ${ends(h.refreshExpiresAt)}` : ''}</span></li>
         ${h?.needsReauthAt ? `<li><span class="dot bad"></span><span>سقط الإذن ${when(h.needsReauthAt, '')} — والنشر متوقّف عليه منذها</span></li>` : ''}
+        ${h?.renewNote ? html`<li><span class="dot warn"></span><span>آخر تجديد لم يتمّ: ${h.renewNote} <span class="ago">${raw(when(h.renewNotedAt, ''))}</span></span></li>` : ''}
+        ${h?.metricsNote ? html`<li><span class="dot warn"></span><span>آخر قياس لم يتمّ: ${metricsNoteText(h.metricsNote)} <span class="ago">${raw(when(h.metricsNotedAt, ''))}</span></span></li>` : ''}
         ${alerts}
       </ul>`
 }

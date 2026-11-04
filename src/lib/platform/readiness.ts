@@ -183,7 +183,8 @@ export function readiness(input: ReadinessInput): Readiness {
     publishRung = {
       key: 'publish', title: 'النشر', state: 'failed',
       // ‏بما يقوله «لماذا فشل» في البطاقة نفسِها، لا الرمزُ الخامّ ولا «Internal Server Error» (D-202)
-      note: `آخر محاولة فشلت: ${whyFailed(lastFailed.lastError ?? null, id).text}`,
+      // ‏ورقمُ الطابور يُقال (D-291): «المحاولة ٣ من الطابور» تفرّق إعادةً عن أوّل محاولة
+      note: `آخر محاولة فشلت${lastFailed.lastQueueAttempt === null ? '' : ` (المحاولة ${lastFailed.lastQueueAttempt} من الطابور)`}: ${whyFailed(lastFailed.lastError ?? null, id).text}`,
       action: { label: 'افتح المنشور', href: `/panel/journey/${lastFailed.id}` },
     }
   } else if (tally.lastPublishedAt !== null) {

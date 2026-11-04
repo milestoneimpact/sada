@@ -270,6 +270,20 @@ describe('الدورة', () => {
     expect(f.calls).toHaveLength(0)
     const n = db.raw.prepare(sql('SELECT count(*) AS n FROM cost_ledger')).get() as { n: number }
     expect(n.n).toBe(0)
+    // ‏والسببُ على الحساب (D-291)، رمزًا يُعرّبه سجلُّ الصحّة
+    const note = db.raw.prepare(sql('SELECT metrics_note, metrics_noted_at FROM accounts')).get() as
+      { metrics_note: string | null; metrics_noted_at: string | null }
+    expect(note.metrics_note).toBe('missing_read_scope')
+    expect(note.metrics_noted_at).not.toBeNull()
+  })
+
+  it('وقياسٌ يتمّ يمحو ملاحظةَ التأجيل', async () => {
+    await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 25 })
+    db.raw.prepare(sql("UPDATE accounts SET metrics_note = 'no_tokens', metrics_noted_at = datetime('now')")).run()
+    await pullDue({ db, encKey: KEY, fetchImpl: fakeFetch(X_OK), now: () => NOW })
+    const note = db.raw.prepare(sql('SELECT metrics_note, metrics_noted_at FROM accounts')).get() as
+      { metrics_note: string | null; metrics_noted_at: string | null }
+    expect(note).toEqual({ metrics_note: null, metrics_noted_at: null })
   })
 
   /**

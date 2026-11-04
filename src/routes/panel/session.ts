@@ -8,7 +8,7 @@ import type { Env } from '../../env'
 import { attemptsLeft } from '../../lib/format'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../../lib/rateLimit'
 import {
-  releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess, reserveCodeIssue,
+  GATE_UNAVAILABLE_TEXT, releaseAttempt, releaseCodeGuesses, reserveAttempt, reserveCodeGuess, reserveCodeIssue,
 } from '../../lib/security/gate'
 import { issueCode, verifyCode } from '../../lib/security/loginCode'
 import { normalizeEmail, OWNER_EMAIL } from '../../lib/ownerEmail'
@@ -66,7 +66,10 @@ session.post('/panel/login/code', async (c) => {
    * ‏وبريدٌ وصفُّ تدقيق، والطالبُ مجهول — كسقف تحدّي المفتاح (D-161) في دلوٍ مستقلّ. وسقفُ البريد
    * ‏الواحد (`issueCode`) لا يحرس عناوينَ شتّى.
    */
-  if (!(await reserveCodeIssue(c.env.DB, c.req.raw)).allowed) {
+  const issue = await reserveCodeIssue(c.env.DB, c.req.raw)
+  if (!issue.allowed) {
+    // ‏وقاعدةٌ لا تردّ ليست حدًّا (D-291): تُقال بسببها ولا تُحسَب على العنوان
+    if (issue.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, next }, nonce), 503)
     await record(c.env.DB, { actor: 'anonymous', action: 'login.code.capped', detail: 'ip_or_global' }, c.req.raw)
     return page(
       (nonce) => loginPage({ error: 'طلباتٌ كثيرة من هذا العنوان. انتظر ربع ساعة ثمّ أعد المحاولة.', blocked: true, next }, nonce),
@@ -130,6 +133,7 @@ session.post('/panel/login', async (c) => {
   // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن يُقارَن رمزُها
   const reserved = await reserveAttempt(c.env.DB, c.req.raw)
   if (!reserved.allowed) {
+    if (reserved.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, step: 'code', next }, nonce), 503)
     return page(
       (nonce) => loginPage({ error: blockedText(false), blocked: true, step: 'code', next }, nonce),
       429,
@@ -141,7 +145,9 @@ session.post('/panel/login', async (c) => {
   const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
   const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }
   // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم
-  if (!(await reserveCodeGuess(c.env.DB, who.email)).allowed) {
+  const guess = await reserveCodeGuess(c.env.DB, who.email)
+  if (!guess.allowed) {
+    if (guess.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, step: 'code', next }, nonce), 503)
     await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked' }, c.req.raw)
     const passkeys = await hasPasskeys(c.env)
     return page(

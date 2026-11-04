@@ -53,6 +53,13 @@ LEGAL_CONTACT = ""
 # مواعيدها» لا تصحّ معه.
 crons = ["*/15 * * * *", "7 * * * *", "3 3 * * *", "14 4 * * 1"]
 
+# ‏السجلّاتُ إلى مكانٍ دائم (D-291): Workers Logs تحفظ كلَّ سطرٍ أيّامًا وتُسأل من اللوحة
+# ‏(Workers & Pages ← sada-api-staging ← Logs)، بدل `wrangler tail` الذي يرى اللحظةَ وحدَها.
+# ‏والعيّنةُ كاملة: السجلُّ هنا شحيحٌ وموزون، وما يُفقَد منه لا يُستعاد.
+[env.staging.observability]
+enabled = true
+head_sampling_rate = 1
+
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "sada-staging"
@@ -146,6 +153,10 @@ LEGAL_CONTACT = ""
 # قبل الثالثة فجرا بعده — تأخيرٌ يبلغ اثنتين وعشرين ساعة، و«نُشرت في
 # مواعيدها» لا تصحّ معه.
 crons = ["*/15 * * * *", "7 * * * *", "3 3 * * *", "14 4 * * 1"]
+
+[env.production.observability]
+enabled = true
+head_sampling_rate = 1
 
 [[env.production.d1_databases]]
 binding = "DB"

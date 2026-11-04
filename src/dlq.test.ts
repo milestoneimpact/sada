@@ -28,9 +28,11 @@ describe('مستهلك طابور الأعطال', () => {
     expect(m.seen).toEqual(['ack'])
     const row = db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(post) as { status: string }
     expect(row.status).toBe('failed')
-    const attempt = db.raw.prepare('SELECT request_json, response_json FROM publish_attempts WHERE post_id = ?').get(post) as { request_json: string; response_json: string }
+    const attempt = db.raw.prepare('SELECT request_json, response_json, queue_attempt FROM publish_attempts WHERE post_id = ?').get(post) as { request_json: string; response_json: string; queue_attempt: number | null }
     expect(attempt.response_json).toContain('dead_letter')
     expect(JSON.parse(attempt.request_json)).toMatchObject({ queue_attempts: 4 })
+    // ‏والعمودُ كذلك (D-291): ما يُقرأ في سلّم الجاهزيّة لا يُستخرج من JSON
+    expect(attempt.queue_attempt).toBe(4)
   })
 
   it('ولا يمسّ منشورا نُشر في الأثناء', async () => {

@@ -194,6 +194,26 @@ export interface RenewSummary {
   readonly deferred: number
 }
 
+/**
+ * سببُ آخر تجديدٍ لم يتمّ على صفّ الحساب (D-291) — و`null` يمحوه حين ينجح.
+ *
+ * الدورةُ كانت تعدّ وتُلقي `why`، فيرى المالكُ «يحتاج تجديدًا» بلا سبب. وصفٌّ لكلّ
+ * دورةٍ ضجيج، فالأخيرُ وحدَه على الحساب، **ولا يُسقط الدورةَ إن لم يُكتب**.
+ */
+export async function noteRenewal(db: Db, accountId: string, org: string, note: string | null): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `UPDATE accounts SET renew_note = ?, renew_noted_at = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END
+          WHERE id = ? AND org_id = ?`,
+      )
+      .bind(note, note, accountId, org)
+      .run()
+  } catch (error) {
+    console.warn({ job: 'renew-note', account: accountId, failed: String(error) })
+  }
+}
+
 /** دورةُ التجديد — **تقع قبل الطابور**، كما وعد تعليقُ الناشر. */
 export async function renewDue(deps: RenewDeps): Promise<RenewSummary> {
   const now = (deps.now ?? (() => new Date()))()
@@ -207,10 +227,14 @@ export async function renewDue(deps: RenewDeps): Promise<RenewSummary> {
       if (out.kind === 'renewed') renewed += 1
       else if (out.kind === 'needs_owner') needsOwner += 1
       else if (out.kind === 'deferred') deferred += 1
-    } catch {
+      // ‏والسببُ يبقى على الحساب لا في العدّ وحدَه (D-291)
+      if (out.kind === 'renewed') await noteRenewal(deps.db, row.account_id, row.org_id, null)
+      else if (out.kind !== 'skipped') await noteRenewal(deps.db, row.account_id, row.org_id, out.why)
+    } catch (error) {
       // **حسابٌ يسقط لا يُسقط البقيّة** — دورةٌ تتوقّف عند أوّل عطلٍ
       // تترك حساباتٍ سليمةً تموت رموزُها
       deferred += 1
+      await noteRenewal(deps.db, row.account_id, row.org_id, String(error).slice(0, 120))
     }
   }
   return { due: rows.length, renewed, needsOwner, deferred }

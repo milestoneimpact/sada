@@ -21,7 +21,8 @@ function viewOf(accounts: LinkedAccount[], present = true, platform = 'x') {
 function health(over: Partial<AccountHealth> = {}): AccountHealth {
   return {
     status: 'active', expiresAt: '2026-10-10 00:00:00', refreshExpiresAt: '2026-12-01 00:00:00',
-    refreshedAt: '2026-09-27 10:30:00', needsReauthAt: null, alerts: [], ...over,
+    refreshedAt: '2026-09-27 10:30:00', needsReauthAt: null,
+    renewNote: null, renewNotedAt: null, metricsNote: null, metricsNotedAt: null, alerts: [], ...over,
   }
 }
 const app: AppStatus = {
@@ -34,7 +35,7 @@ const tally = (over: Partial<PlatformTally> = {}): PlatformTally => ({
 const post = (over: Partial<PlatformPost> = {}): PlatformPost => ({
   id: 'p1', text: 'نصّ', status: 'queued', scheduledAt: null, createdAt: '2026-09-26 00:00:00',
   accountName: '@omar', platformPostId: null, publishedAt: null, lastError: null, lastFailedAt: null,
-  hasMedia: false, costUsd: 0, ...over,
+  lastQueueAttempt: null, hasMedia: false, costUsd: 0, ...over,
 })
 
 describe('السلّم يقرأ الصفوف', () => {

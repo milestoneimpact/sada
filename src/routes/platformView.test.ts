@@ -10,6 +10,8 @@ import { platformNeeds } from '../lib/platform/needs'
 import type { TimelineRow } from '../lib/platform/timeline'
 
 const now = new Date('2026-09-06T12:00:00Z')
+/** الملاحظاتُ الأربع (D-291) فارغةً — ما لم يختبرها الاختبار. */
+const NO_NOTES = { renewNote: null, renewNotedAt: null, metricsNote: null, metricsNotedAt: null } as const
 
 const accounts: LinkedAccount[] = [
   { id: 'a1', platform: 'x', kind: 'member', displayName: '@omar', status: 'active',
@@ -195,7 +197,7 @@ describe('سجلّ صحّة الحساب', () => {
       health: {
         a1: {
           status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: '2027-01-01 00:00:00',
-          refreshedAt: '2026-09-10 03:00:00', needsReauthAt: null,
+          refreshedAt: '2026-09-10 03:00:00', needsReauthAt: null, ...NO_NOTES,
           alerts: [{ kind: 'access', threshold: 7, at: '2026-09-24 03:00:00' }, { kind: 'refresh', threshold: 0, at: '2027-01-01 03:00:00' }],
         },
       },
@@ -208,9 +210,26 @@ describe('سجلّ صحّة الحساب', () => {
   })
 })
 
+describe('سببُ آخر تجديدٍ وقياسٍ في سجلّ الصحّة (D-291)', () => {
+  const base = { status: 'active', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] }
+  it('يقول لماذا لم يتمّ آخرُ تجديدٍ ومتى، ويُعرّب رمزَ القياس', () => {
+    const html = screen({ tab: 'setup', health: { a1: {
+      ...base, renewNote: 'ردّ المزوّد التجديد (503)', renewNotedAt: '2026-09-06 11:00:00',
+      metricsNote: 'missing_read_scope', metricsNotedAt: '2026-09-06 10:00:00',
+    } } })
+    expect(html).toContain('آخر تجديد لم يتمّ: ردّ المزوّد التجديد (503)')
+    expect(html).toContain('آخر قياس لم يتمّ: الإذن بلا نطاق قراءة — أعد الربط')
+    expect(html).not.toContain('missing_read_scope')
+  })
+  it('ولا سطرَ حين نجح آخرُ تجديدٍ وقياس', () => {
+    const html = screen({ tab: 'setup', health: { a1: { ...base, ...NO_NOTES } } })
+    expect(html).not.toContain('لم يتمّ:')
+  })
+})
+
 describe('ختم السقوط في سجلّ الصحّة (D-131)', () => {
   it('حساب ساقط يقول متى سقط، والقائم لا يقول شيئا', () => {
-    const base = { status: 'needs_reauth', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, alerts: [] }
+    const base = { status: 'needs_reauth', expiresAt: null, refreshExpiresAt: null, refreshedAt: null, ...NO_NOTES, alerts: [] }
     const dropped = screen({ tab: 'setup', health: { a1: { ...base, needsReauthAt: '2026-09-10 03:00:00' } } })
     expect(dropped).toContain('سقط الإذن')
     expect(dropped).toContain('والنشر متوقّف عليه منذها')
@@ -255,7 +274,7 @@ describe('رحلات المالك على صفحة المنصّة', () => {
         platform: 'x', source: 'vault', clientId: 'cid', hint: '••••', updatedAt: null, updatedBy: null,
         secretNames: ['X_CLIENT_ID', 'X_CLIENT_SECRET'], verifiedAt: null, verifiedKind: 'accepted',
       },
-      health: { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] } },
+      health: { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, ...NO_NOTES, alerts: [] } },
     })
     expect(head).toContain('<a class="btn btn-primary" href="/panel#write">اكتب منشورًا من مصدر</a>')
     const empty = screen({ tab: 'waiting', waiting: [] })
@@ -269,7 +288,7 @@ describe('رحلات المالك على صفحة المنصّة', () => {
       tab: 'setup',
       health: { a1: {
         status: 'active', expiresAt: '2026-09-06 14:00:00', refreshExpiresAt: '2027-07-03 12:00:00',
-        refreshedAt: null, needsReauthAt: null, alerts: [],
+        refreshedAt: null, needsReauthAt: null, ...NO_NOTES, alerts: [],
       } },
     })
     const log = live.slice(live.indexOf('سجلّ صحّة الحساب'))
@@ -280,7 +299,7 @@ describe('رحلات المالك على صفحة المنصّة', () => {
       tab: 'setup',
       health: { a1: {
         status: 'active', expiresAt: '2026-09-06 10:00:00', refreshExpiresAt: null,
-        refreshedAt: null, needsReauthAt: null, alerts: [],
+        refreshedAt: null, needsReauthAt: null, ...NO_NOTES, alerts: [],
       } },
     })
     expect(lapsed.replace(/<[^>]+>/g, '')).toContain('إذن الوصول انتهى قبل ساعتين')
@@ -320,7 +339,7 @@ describe('رحلات المالك على صفحة المنصّة', () => {
 
 describe('سجلّ الصحّة بمنطقة المالك (D-203)', () => {
   it('عنوان التحويم بمنطقته لا بالرياض حين تُعرف', () => {
-    const health = { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, alerts: [] } } as const
+    const health = { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, ...NO_NOTES, alerts: [] } } as const
     const ny = screen({ tab: 'setup', zone: 'America/New_York', health })
     expect(ny).toContain('title="2026-09-30 20:00"')
     expect(ny).not.toContain('title="2026-10-01 03:00')

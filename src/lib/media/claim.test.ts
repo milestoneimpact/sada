@@ -79,12 +79,14 @@ describe('الحجز يسبق الإنفاق (D-068)', () => {
   })
 
   /**
-   * **ونظامٌ قبل الترحيل يعمل** — بحارسه القديم. ومدخلٌ يرمي على جدولٍ
-   * ناقصٍ يوقف التوليدَ كلَّه لأجل حراسةٍ إضافيّة.
+   * **وقاعدةٌ لا تردّ تغلق لا تفتح** (D-291): كان العطلُ «لك النداء» فيُدفَع مرّتين.
+   * صار `unavailable` بسببه — ولا يرمي، والتحريرُ يبقى صامتًا.
    */
-  it('وجدول لم يُرحَّل يحجز ولا يقف', async () => {
+  it('وقاعدة لا تردّ لا تحجز ولا ترمي: «غير متاح» بسببه', async () => {
     db.raw.exec('DROP TABLE media_claims')
-    expect(await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)).toEqual({ kind: 'claimed' })
+    const out = await claimGeneration(db, 'org_owner', 'k1', 'p1', 'video', NOW)
+    expect(out.kind).toBe('unavailable')
+    if (out.kind === 'unavailable') expect(out.why).toContain('media_claims')
     await expect(releaseClaim(db, 'org_owner', 'k1')).resolves.toBeUndefined()
   })
 })

@@ -26,7 +26,7 @@ import {
   promoteSession, safeNext, sessionCookie, type Session,
 } from '../lib/session'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
-import { releaseAttempt, reserveAttempt, reserveChallenge } from '../lib/security/gate'
+import { GATE_UNAVAILABLE_TEXT, releaseAttempt, reserveAttempt, reserveChallenge } from '../lib/security/gate'
 import { secondFactorPage } from './authView'
 
 export const auth = new Hono<{ Bindings: Env }>()
@@ -159,8 +159,10 @@ auth.post('/panel/passkey/challenge', async (c) => {
   const state = await attemptState(c.env.KV, c.req.raw)
   if (state.blocked) return json({ error: 'rate_limited' }, 429)
   // ‏كلُّ تحدٍّ كتابةٌ في KV تُدفَع، والطالبُ مجهول: سقفٌ للعنوان وللجميع قبل الكتابة (D-161)
-  if (!(await reserveChallenge(c.env.DB, c.req.raw)).allowed) {
-    return json({ error: 'rate_limited' }, 429)
+  const challengeSlot = await reserveChallenge(c.env.DB, c.req.raw)
+  if (!challengeSlot.allowed) {
+    // ‏قاعدةٌ لا تردّ ليست حدًّا (D-291): 503 لا 429، فالعميلُ يعيد بعد قليل ولا يُعدّ محظورًا
+    return json({ error: challengeSlot.why === 'db' ? 'unavailable' : 'rate_limited' }, challengeSlot.why === 'db' ? 503 : 429)
   }
 
   const ticket = crypto.randomUUID()
@@ -192,8 +194,9 @@ auth.post('/panel/passkey/login', async (c) => {
   if (Number(c.req.header('Content-Length') ?? '0') > MAX_ASSERTION_BYTES) {
     return json({ error: 'bad_request' }, 413)
   }
-  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
-    return json({ error: 'rate_limited' }, 429)
+  const slot = await reserveAttempt(c.env.DB, c.req.raw)
+  if (!slot.allowed) {
+    return json({ error: slot.why === 'db' ? 'unavailable' : 'rate_limited' }, slot.why === 'db' ? 503 : 429)
   }
 
   const body = await c.req.json<{
@@ -356,7 +359,9 @@ auth.post('/panel/2fa/totp', async (c) => {
   }
   // ‏والحجزُ قبل الفحص (D-161): ألفُ طلبٍ متزامنٍ يقرأ «صفرًا» من KV قبل أن
   // ‏يكتب أحدُها، والعدّادُ الذرّيُّ في D1 يردّ السادسَ قبل أن يُقارَن رمزُه
-  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
+  const slot = await reserveAttempt(c.env.DB, c.req.raw)
+  if (!slot.allowed) {
+    if (slot.why === 'db') return failSecondFactor(c, GATE_UNAVAILABLE_TEXT, 503)
     return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
@@ -406,7 +411,9 @@ auth.post('/panel/2fa/recovery', async (c) => {
     return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
-  if (!(await reserveAttempt(c.env.DB, c.req.raw)).allowed) {
+  const slot = await reserveAttempt(c.env.DB, c.req.raw)
+  if (!slot.allowed) {
+    if (slot.why === 'db') return failSecondFactor(c, GATE_UNAVAILABLE_TEXT, 503)
     return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
   }
 
