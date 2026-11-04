@@ -12,6 +12,7 @@ import { html, join, raw } from './html'
 import { ICON } from './icons'
 import { segmented } from './components/tabs'
 import { menu, menuAction, menuItem } from './components/menu'
+import { count } from './components/badge'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { MARK, MOMENT, THEME, below } from './tokens'
@@ -251,6 +252,15 @@ export function soloPage(
 }
 
 
+/**
+ * جرسُ الإشعارات (D-294): بابٌ إلى `/panel/notices` بعدّاد ما لم يُقرأ. في ترويسة اللوحة بعدّاده (الهيكلُ
+ * يعدّه جملةً واحدة)، وفي شريط العودة في الصفحة المستقلّة بلا عدّاد: الصفحةُ المستقلّةُ لا تحمّل الهيكل.
+ */
+export function bell(unread: number | null): string {
+  const n = unread ?? 0
+  return html`<a class="bell" href="/panel/notices" aria-label="${n > 0 ? 'الإشعارات: ' + n + ' جديدة' : 'الإشعارات'}">${raw(ICON.bell)}<span class="vh">الإشعارات</span>${n > 0 ? raw(count(n, { label: n + ' جديدة' })) : ''}</a>`.value
+}
+
 export function backNav(href: string, label: string): string {
   /*
    * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
@@ -265,7 +275,7 @@ export function backNav(href: string, label: string): string {
   return html`<nav class="back" aria-label="مسار العودة">
     <a class="home" href="/panel" aria-label="صدى — اللوحة">${raw(wordmark(false))}<span class="glyph glyph-sm">${raw(GLYPH_SVG)}</span></a>
     <a href="${href}">${raw(ICON.back)}${label}</a>
-    <span class="grow"></span>${raw(commandTrigger())}${raw(accountMenu())}
+    <span class="grow"></span>${raw(bell(null))}${raw(commandTrigger())}${raw(accountMenu())}
   </nav>`.value
 }
 

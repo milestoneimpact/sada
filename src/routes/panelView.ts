@@ -32,7 +32,7 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
-import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch } from './ui/shell'
+import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
@@ -319,6 +319,8 @@ export interface PanelData {
   /** البيئةُ كما يعرفها Worker — تُطبَع في العلامة (D-151) */
   readonly env: 'staging' | 'production'
   readonly paused: boolean
+  /** ما لم يُقرأ من الإشعارات (D-294) — جملةٌ واحدة في الهيكل، وغيابُه صفر. */
+  readonly unread?: number
   readonly autoEnqueue: boolean
   /** صورةٌ مع كلّ مسوّدة (D-255) وسقفُها وما وُلّد اليوم. */
   readonly autoImage: boolean
@@ -462,7 +464,7 @@ export interface PanelData {
 
 /** ما يرسمه الهيكلُ لكلّ لوح: الرافدةُ بأعدادها، والترويسةُ وحبّةُ الحال، والإشعارُ وشريطُ المنصّات المنقطعة. */
 export type ShellData = Pick<PanelData,
-  'env' | 'role' | 'paused' | 'pulses' | 'rpId' | 'flash' | 'now' | 'csrf' | 'nonce' | 'orgs' | 'org' | 'drafts' | 'channels' | 'zone'>
+  'env' | 'role' | 'paused' | 'pulses' | 'rpId' | 'flash' | 'now' | 'csrf' | 'nonce' | 'orgs' | 'org' | 'drafts' | 'channels' | 'zone' | 'unread'>
 
 /** «نظرة عامّة»: الرحلةُ و«ما ينتظرك» والبطاقاتُ (`TileSource`) و«الكلفة وما وقع». */
 export type OverviewData = Pick<PanelData,
@@ -1623,6 +1625,7 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === nul
     <div class="crumb">${escapeHtml(d.rpId)}</div></div>
   <div class="grow"></div>
   ${topNew()}
+  ${bell(d.unread ?? 0)}
   ${commandTrigger()}
   ${state}
   ${accountMenu({ logout: true, scope })}

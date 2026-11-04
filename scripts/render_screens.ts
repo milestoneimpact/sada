@@ -15,6 +15,7 @@ import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
 import { tasksScreen } from '../src/routes/ui/tasksView'
+import { noticesScreen } from '../src/routes/ui/noticesView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
@@ -391,6 +392,30 @@ writeAudited(
         gatesOf(GATE_FIXTURE),
       ),
     }),
+  ),
+)
+
+// ── الإشعارات (D-294): جديدٌ ومقروءٌ من الأنواع الستّة، لتُقاس كما تُقاس كلُّ شاشة ────
+writeAudited(
+  '/tmp/screen-notices.html',
+  page(
+    'صدى — الإشعارات',
+    noticesScreen({
+      now,
+      notices: [
+        { ref: 'publish:p1', kind: 'publish', tone: 'bad', text: 'فشل نشر «كلّ مشروع يتعثّر يبدأ تعثّرُه قبل التنفيذ…» على X: ردّت المنصّة الطلب (429) — كثرت الطلبات', href: '/panel/journey/p1', action: 'افتح المنشور', at: '2026-09-06 08:40:00' },
+        { ref: 'reauth:a1:2026-09-06 07:00:00', kind: 'reauth', tone: 'bad', text: 'انقطع إذن LinkedIn (عمر) — والنشر عليه متوقّف حتّى يُعاد الربط', href: '/oauth/linkedin/start', action: 'أعد الربط', at: '2026-09-06 07:00:00' },
+        { ref: 'quota:2026-09-06', kind: 'quota', tone: 'warn', text: '3 صور تنتظر حصّةَ الغد المجّانيّة — ارسمها اليوم بالدفع أو انتظر', href: '/panel#posts', action: 'المنشورات', at: '2026-09-06 06:30:00' },
+        { ref: 'token:a2:access:5', kind: 'token', tone: 'warn', text: 'إذن الوصول لـ X (omar_sada) يقترب — بقي 5 أيّام', href: '/panel/accounts', action: 'الحسابات', at: '2026-09-06 03:00:00' },
+        { ref: 'pulse:renew:2026-09-06 05:00:00', kind: 'pulse', tone: 'warn', text: 'دورة «تجديد الأذونات» لم تدُر منذ 210 دقيقة فوق موعدها — هل العدّاء يعمل؟', href: '/panel#machine', action: 'افتح «هل الآلة تعمل؟»', at: '2026-09-06 05:00:00' },
+        { ref: 'budget:2026-09-06', kind: 'budget', tone: 'warn', text: 'بلغ الإنفاقُ سقفَ اليوم ($5.00) — لا كتابةَ ولا صورَ حتّى الغد أو حتّى ترفعه', href: '/panel/settings#limits', action: 'الإنفاق والحدود', at: '2026-09-06 08:00:00' },
+      ],
+      reads: [
+        { ref: 'token:a2:access:5', readAt: '2026-09-06 04:00:00', byEmail: 'omar@example.com' },
+        { ref: 'pulse:renew:2026-09-06 05:00:00', readAt: '2026-09-06 06:00:00', byEmail: null },
+      ],
+    }),
+    'overview',
   ),
 )
 
