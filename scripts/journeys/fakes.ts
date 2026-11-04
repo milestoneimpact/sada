@@ -257,6 +257,33 @@ function infographicFor(user: string): Record<string, unknown> {
   }
 }
 
+/**
+ * خطّةٌ صالحةٌ من الموجّه نفسِه (D-293): المصادرُ من أسطر `id:`، والأيّامُ من سطر «أيّامُه المتاحة»،
+ * والقنواتُ من قائمة `platform` في المخطّط. `fillSchema` كان يعطي معرّفًا ويومًا نصًّا عربيًّا فتُسقَط
+ * البنودُ كلُّها ويعود «لا بنودَ تكفي» — ورحلةُ المعالج تحتاج خطّةً تُكتب.
+ */
+export function planFor(user: string, schema: Record<string, unknown>): unknown {
+  const ids = Array.from(user.matchAll(/^id: (\S+)$/gm), (m) => m[1]!)
+  const daysLine = user.split('\n').find((l) => l.startsWith('أيّامُه المتاحة للنشر:')) ?? ''
+  const days = daysLine.replace('أيّامُه المتاحة للنشر:', '').split('·').map((d) => d.trim()).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+  const items = (schema['properties'] as Record<string, unknown> | undefined)?.['items'] as Record<string, unknown> | undefined
+  const inner = (items?.['items'] as Record<string, unknown> | undefined)?.['properties'] as Record<string, unknown> | undefined
+  const platforms = ((inner?.['platform'] as Record<string, unknown> | undefined)?.['enum'] as string[] | undefined) ?? ['linkedin']
+  const n = Math.min(3, Math.max(1, ids.length * platforms.length))
+  return {
+    rationale: 'ثلاثةُ بنودٍ على أيّامٍ متباعدة، من المصادر المحلَّلة بالتناوب.',
+    items: Array.from({ length: n }, (_, i) => ({
+      source_id: ids[i % Math.max(1, ids.length)] ?? 'none',
+      platform: platforms[i % platforms.length],
+      kind: 'text',
+      angle: 'ثلاثة أسئلة قبل كلّ معلَم: المخرَج والمالك والأثر',
+      day: days[(i * 3) % Math.max(1, days.length)] ?? days[0] ?? '',
+      time: '07:00',
+      why: 'الفكرةُ عمليّة ولم يخرج منها منشورٌ بعد',
+    })),
+  }
+}
+
 /** يملأ مخطّط JSON بأصغر قيمةٍ توافقه — لأيّ مهمّةٍ لم يُخصَّص لها جواب. */
 export function fillSchema(schema: unknown): unknown {
   const s = (schema ?? {}) as Record<string, unknown>
@@ -311,6 +338,7 @@ function anthropicAnswer(body: AnthropicBody): Record<string, unknown> {
   let payload: unknown
   if (props.includes('text') && props.includes('rationale')) payload = draftFor(system)
   else if (/infographic/i.test(system)) payload = infographicFor(user)
+  else if (props.includes('items') && props.includes('rationale') && schema !== undefined) payload = planFor(user, schema)
   else if (schema !== undefined) payload = fillSchema(schema)
   else payload = { text: clipWords(user, 200) }
 
