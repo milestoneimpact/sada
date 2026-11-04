@@ -422,6 +422,36 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'capability',
     done: () => null,
   },
+  {
+    code: 'M-35',
+    title: 'أوّل صورةٍ بـ klein 9B تُقاس على staging — ما تركه D-285',
+    ifLeft:
+      'الصور تُرسَم وتُسجَّل بسعر الوثيقة لا بسعرٍ مقيس، **فإن أخطأت الوثيقة حرس سقفُ الإنفاق برقمٍ خاطئ** — ' +
+      'والحصّة المجّانيّة اليوميّة تحدّ الضرر.',
+    unblocks: 'guard',
+    // ‏الرقمُ الثاني في لوحة Cloudflare لا يُقرأ من هنا، والمقارنةُ بيد المالك (D-061)
+    done: () => null,
+    evidence: () => 'يُقارَن سطرُ الدفتر بلوحة Workers AI ← Usage في اليوم نفسه — ولا تُقرأ اللوحة من هنا',
+    go: 'https://dash.cloudflare.com/?to=/:account/ai/workers-ai',
+    goLabel: 'افتح Workers AI',
+  },
+  {
+    code: 'M-34',
+    title: 'تثبيت صدى على هاتفك وتجربة «شارك إلى صدى» — بعد D-296',
+    ifLeft: 'اللوحة تعمل من المتصفّح كما هي، وبوّابة البند 11 في الخارطة الثالثة تبقى بلا لقطتين — تأجيلٌ لا خطر.',
+    unblocks: 'capability',
+    // ‏التثبيتُ يقع على الهاتف ولا أثرَ له على الخادم (D-296)
+    done: () => null,
+  },
+  {
+    code: 'M-36',
+    title: 'Logpush لثلاثين يومًا — إن أردت أكثر من أيّام Workers Logs',
+    ifLeft: 'ما فوق أيّام Workers Logs يضيع، وما دونها يُرى من لوحة Cloudflare — تأجيلٌ لا خطر ما دام السجلّ شحيحًا.',
+    unblocks: 'capability',
+    done: () => null,
+    go: 'https://dash.cloudflare.com/?to=/:account/r2',
+    goLabel: 'افتح R2',
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

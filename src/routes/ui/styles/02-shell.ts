@@ -97,7 +97,7 @@ details.ladder .verdict.bad{color:var(--bad)}
    فوق شيء، لا يجلس على أرض فارغة. ويُضاف بـ JS لأنّ CSS وحدها لا تعرف
    موضع التمرير. */
 .topbar.lifted{box-shadow:var(--sh-2)}
-/* ‏جرسُ الإشعارات (D-294): بابٌ بعدّاد وهدفُ لمسٍ كامل — أيقونةٌ وكلمتُها لقارئ الشاشة (.vh)، كزرّ الحساب */
+/* ‏جرسُ الإشعارات (D-294): بابٌ بعدّاد وهدفُ لمسٍ كامل — أيقونةٌ واسمُها في aria-label (D-297: الكلمةُ المخفيّة كانت تُقاس نصًّا خارج صندوقه في شريط العودة) */
 .bell{display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); min-width:var(--tap); justify-content:center; padding:0 var(--s-2); border-radius:var(--r-control); color:var(--ink-2); text-decoration:none}
 .bell .count{margin-inline-start:0}
 /* ── الزجاجُ على ما يلصق (D-102) ──────────────────────────────────

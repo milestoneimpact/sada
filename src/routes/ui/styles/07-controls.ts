@@ -72,6 +72,9 @@ button[data-busy-on]::after,.btn[aria-busy="true"]::after{content:''; width:var(
 form.inline{display:inline; margin:0}
 
 .field{display:flex; flex-direction:column; gap:var(--s-1)}
+/* ‏والحقلُ حين يكون مجموعةً: بلا إطارِ المتصفّح ولا حشوِه، وعنوانُها بوزن العنوان (D-297) */
+fieldset.field{margin-inline:0; padding:0; border:0; min-inline-size:0}
+fieldset.field > legend{padding:0; margin-bottom:var(--s-2); font-weight:600}
 /* اللصيقةُ نمطُ «ui» بحبر المتن (D-185 · خطّة التصميم 7.6): كانت ‏١٢٫٥ خافتةً فوق
    حقل ‏١٥٫٥ — تُقرأ هامشًا، وهي سؤال الحقل */
 label{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}

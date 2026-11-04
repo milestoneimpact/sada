@@ -82,6 +82,7 @@ nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; col
 .land-en h2{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink); margin:0 0 var(--s-2)}
 .land-en h3{font-size:var(--t-small); font-weight:600; color:var(--ink); margin:var(--s-4) 0 var(--s-1)}
 .land-en ol, .land-en ul{margin:var(--s-2) 0; padding-inline-start:var(--s-5); display:grid; gap:var(--s-1)}
+.land-en p{margin:0 0 var(--s-2)}
 .auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
 .auth button{width:100%; justify-content:center; padding:var(--s-3)}
 .auth .card form + form{margin-top:var(--s-3)}
