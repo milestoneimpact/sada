@@ -184,6 +184,13 @@ const R1: Journey = {
   title: 'ربط منصّة جديدة (Instagram أوّل مرّة) — حتّى مغادرة الموقع إلى OAuth',
   plan: { today: '16', target: '5' },
   async run({ page, m, stack, leftSite }) {
+    // ‏بطاقاتُ المنصّات في «الحسابات» وحدَها منذ D-309 (لا في الرئيسيّة): لمسةُ التنقّل تُعدّ
+    await goSection(page, m, 'الحسابات')
+    // ‏ومنصّةٌ لم تُضبط بعدُ تحت طيّة «منصّاتٌ لاحقة» (D-205): فتحُها لمسةٌ تُعدّ — ثمنُ هدوء الرئيسيّة على رحلةٍ تقع مرّةً
+    const setup = visible(page.locator('a[href^="/panel/channels/instagram?tab=setup"]')).first()
+    if ((await setup.count()) === 0) {
+      await m.tap(visible(page.locator('details.fold > summary').filter({ hasText: 'لاحقة' })).first(), '«منصّاتٌ لاحقة» في «الحسابات»')
+    }
     // ‏و«أكمل الإعداد» ينزل إلى حقل المعرّف نفسِه (D-205: `setupHref`)، فلا تُضغط «اضبط التطبيق» إلّا إن لم يظهر
     await m.tap(visible(page.locator('a[href^="/panel/channels/instagram?tab=setup"]')).first(), 'بطاقة Instagram «أكمل الإعداد»')
     const id = page.locator('#ci-instagram')

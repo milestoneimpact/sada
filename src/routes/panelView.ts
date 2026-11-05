@@ -46,7 +46,7 @@ import { ICON } from './ui/icons'
 import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
-import { homeTop, planCard } from './ui/sections/home'
+import { activityCard, homeTop, planCard } from './ui/sections/home'
 import { deskQueue } from './ui/sections/desk'
 import { menu, menuItem } from './ui/components/menu'
 import { railHtml } from './ui/rail'
@@ -57,7 +57,7 @@ import { planImportCard } from './ui/planImportView'
 import type { Reach, UploadRow } from '../lib/media/uploads'
 import type { VideoCaptions } from '../lib/media/captions'
 import type { LinkState } from '../lib/channels'
-import { systemPill, writeBlock, type JourneyCounts } from '../lib/home'
+import { systemPill, writeBlock, type HomeFacts, type JourneyCounts } from '../lib/home'
 import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
@@ -953,17 +953,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   for (const p of unverified) {
     items.push({ kind: 'warn', text: `${p.label}: مفتاحُه لم يُختبر بعد.`, go: '#providers', label: 'اختبره' })
   }
-  if (waitingDrafts > 0) {
-    items.push({
-      kind: 'ok',
-      text: `تنتظر قرارك ${counted(waitingDrafts, NOUNS.draft)} — ولا يُنشر شيء قبله.`,
-      go: '#posts',
-      label: 'اقرأها',
-    })
-  }
-  if (pending > 0) {
-    items.push({ kind: 'ok', text: `ينتظر التحليل ${counted(pending, NOUNS.source)}.`, go: '#sources', label: 'راجعها' })
-  }
+  // ‏ولا «تنتظر قرارك» ولا «ينتظر التحليل» هنا (D-309): تقولهما «ينتظر قرارك» و«رحلة المنشور» فوق هذه البطاقة بأزرارهما
   if (d.factors.enforced && d.factors.recoveryLeft === 0) {
     items.push({ kind: 'warn', text: 'لا رموز استرداد — فقد الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
@@ -978,27 +968,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
     && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
 
-  return `<section data-pane="overview" hidden>
-  ${/*
-    * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
-    *
-    * ورأسُ الصفحة بُني لعلّةٍ صحيحة: صفحةٌ تفتح في وسطها بلا عنوان. لكنّه
-    * على هذا اللوح **يعيد ما قيل مرّتين**: «نظرة عامّة» في `#pane-title`
-    * فوقه، و«لوحةُ صدى» في الشريط الجانبيّ يمينَه. فقِيس أوّلُ مؤشّرٍ عند
-    * ‏٣٩٨px — **أكثرُ من ثلث الشاشة قبل أوّل رقم**، وأربعةُ أرقامٍ فيما بقي.
-    *
-    * فيسقط المكرَّرُ وحدَه ويبقى السطر: **هو الذي يقول ما هذه الشاشة**،
-    * وهو وحدَه ما لا يُقال في مكانٍ آخر. ولا يسقط على غيره من الألواح —
-    * تلك تُفتَح قصدا فتحتمل رأسا، **وهذا يُفتَح كلَّ صباح.**
-    */''}
-  ${/*
-    * **الرحلةُ قبل الدفتر** (D-177): خطوتُك التالية، ثمّ المحطّاتُ السبع، ثمّ
-    * المنصّاتُ الخمس. والمالُ وصحّةُ الدورات بعدها — كانت أوّلَ الشاشة فقال
-    * المالك «لا أجد المراحل».
-    */''}
-  ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
-  ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
-  ${homeTop({
+  // ‏حقائقُ الرئيسيّة مرّةً: للرأس ولبطاقة «ما كُتب في أسبوعين» في المطويّ (D-309)
+  const facts: HomeFacts = {
     channels: d.channels,
     counts: d.journey,
     paused: d.paused,
@@ -1022,7 +993,28 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
   // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
   // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
-  }, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null))}
+  }
+  return `<section data-pane="overview" hidden>
+  ${/*
+    * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
+    *
+    * ورأسُ الصفحة بُني لعلّةٍ صحيحة: صفحةٌ تفتح في وسطها بلا عنوان. لكنّه
+    * على هذا اللوح **يعيد ما قيل مرّتين**: «نظرة عامّة» في `#pane-title`
+    * فوقه، و«لوحةُ صدى» في الشريط الجانبيّ يمينَه. فقِيس أوّلُ مؤشّرٍ عند
+    * ‏٣٩٨px — **أكثرُ من ثلث الشاشة قبل أوّل رقم**، وأربعةُ أرقامٍ فيما بقي.
+    *
+    * فيسقط المكرَّرُ وحدَه ويبقى السطر: **هو الذي يقول ما هذه الشاشة**،
+    * وهو وحدَه ما لا يُقال في مكانٍ آخر. ولا يسقط على غيره من الألواح —
+    * تلك تُفتَح قصدا فتحتمل رأسا، **وهذا يُفتَح كلَّ صباح.**
+    */''}
+  ${/*
+    * **الرحلةُ قبل الدفتر** (D-177): خطوتُك التالية، ثمّ المحطّاتُ السبع، ثمّ
+    * المنصّاتُ الخمس. والمالُ وصحّةُ الدورات بعدها — كانت أوّلَ الشاشة فقال
+    * المالك «لا أجد المراحل».
+    */''}
+  ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
+  ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null))}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
@@ -1056,6 +1048,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">اليوم بالأرقام، والإنفاق 14 يومًا، وأين يذهب المال، وسجلّ اليوم</span></summary>
   <h2 class="home-sub mt-3">اليوم بالأرقام</h2>${tileRow(d)}
   <div class="mt-3">${todayList(d)}</div>
+  <div class="mt-3">${activityCard(facts, d.now)}</div>
   <div class="ov mt-3">
     <div class="stack">
       <div class="card"><h2>الإنفاق — 14 يومًا</h2>

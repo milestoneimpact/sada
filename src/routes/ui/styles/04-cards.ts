@@ -91,13 +91,6 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .home-side{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card)}
 .grid.tiles + .home-pair{margin-top:var(--gap-card)}
 .home-side > .home-card{margin-bottom:0}
-/* ‏والمنصّاتُ في العمود الجانبيّ صفوفٌ لا بطاقات (D-194): شعارٌ واسمٌ وحالٌ وزرٌّ في سطر */
-.home-side .pfgrid{grid-template-columns:1fr; gap:var(--s-1)}
-.home-side .pf{flex-direction:row; flex-wrap:wrap; align-items:center; column-gap:var(--s-3); row-gap:var(--s-1);
-  padding:var(--s-2); border:0; box-shadow:none; background:var(--surface-2)}
-.home-side .pf-head{flex:1 1 8rem; min-width:0}
-.home-side .pf .btn{margin:0; flex:none}
-.home-side .pf > .ago{display:none}
 .funnel{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-1)}
 .funnel a{display:grid; grid-template-columns:9rem minmax(0,1fr) 2.5rem; grid-template-areas:"t bar n" "t note note";
   column-gap:var(--s-3); row-gap:var(--s-0); align-items:center; padding:var(--s-1) var(--s-2); border-radius:var(--r-control);
@@ -128,26 +121,15 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .machine-more > summary{cursor:pointer; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); min-height:var(--tap); display:flex; align-items:center}
 .wk-hint{margin:var(--s-3) 0 0}
 .wk-c{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.pfgrid{display:grid; gap:var(--s-2); grid-template-columns:repeat(auto-fill,minmax(11.75rem,1fr))}
-.pf{display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2)}
-.pf .btn{margin-top:auto}
-.pf-head{display:flex; align-items:center; gap:var(--s-2); min-width:0}
-.pf-name{display:flex; flex-direction:column; min-width:0}
 /* ‏وحلقةٌ ليلًا (D-183): مربّعا X وTikTok على السطح الداكن ‏١٫٠٣ و‏١٫٠٥:١ —
    يختفيان ويبقى رمز أبيض يطفو. ونهارًا الحلقة شفّافة */
 .pf-logo{width:var(--s-10); height:var(--s-10); flex:none; display:grid; place-items:center;
   border-radius:var(--r-control); color:var(--pf-fg); background:var(--brand);
   box-shadow:0 0 0 1px var(--logo-ring)}
 .pf-logo svg{width:50%; height:50%; display:block}
-.pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
-.pf[data-pf=x] .pf-logo{background:var(--pf-x)}
-.pf[data-pf=instagram] .pf-logo{background:var(--pf-instagram)}
-.pf[data-pf=tiktok] .pf-logo{background:var(--pf-tiktok)}
-.pf[data-pf=youtube] .pf-logo{background:var(--pf-youtube)}
 @media${below('sm')}{
   .funnel a{grid-template-columns:6.5rem minmax(0,1fr) 2rem}
   .wk li{min-height:6.5rem}
-  .pfgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .next .btn{flex:1 1 100%}
 }
 .stack{display:grid; gap:var(--gap-card); align-content:start}
@@ -198,7 +180,6 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    «--pad-card» بالترتيب، فيُثبَّت هنا بمحدّد مركّب لا بإعادة إعلان الصنف */
 .card-alert.next{padding:var(--s-5) var(--s-6); border-radius:var(--r-hero)}
 @media${below('sm')}{.card-alert.next{padding:var(--s-4)}}
-.card.pf{padding:var(--s-3)}
 /* ‏و«.card > p» قاعدةٌ عامّةٌ لفقرة البطاقة (هامشٌ وحرفٌ صغيرٌ وحبرٌ ثانٍ) — وفقراتُ هذه
    المكوّنات لها قياسُها في قواعدها، فلا ترثها حين صارت بطاقة. والسهم في الرحلة وباب
    «ما تطلبه» سطحان ثانيان بلا ظلّ كما كانا */

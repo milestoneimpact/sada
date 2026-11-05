@@ -1,6 +1,6 @@
 /** القمعُ وشريطُ الأسبوع في الرسم (D-194). */
 import { describe, expect, it } from 'vitest'
-import { homeTop } from './home'
+import { activityCard, homeTop } from './home'
 import { viewChannels } from '../../../lib/channels'
 import type { HomeFacts } from '../../../lib/home'
 
@@ -45,8 +45,10 @@ describe('لوحة القيادة (D-194)', () => {
     expect(html.match(/class="hs-n num">(\d+)</g)!.map((m) => m.replace(/\D/g, ''))).toEqual(['3', '2', '4', '1'])
   })
   it('أعمدة الأيّام من تواريخ الكتابة الحقيقيّة، وبلا شيء رسمٌ فارغ لا أعمدة مسطّحة', () => {
-    expect(homeTop(facts(), NOW)).toContain('لا منشورات في أسبوعين')
-    const html = homeTop(facts({ written: ['2026-10-04 08:00:00', '2026-10-04 09:00:00', '2026-10-01 09:00:00'] }), NOW)
+    // ‏والبطاقةُ في «الكلفة وما وقع» المطويّة منذ D-309، لا في رأس الرئيسيّة
+    expect(homeTop(facts(), NOW)).not.toContain('ما كُتب في أسبوعين')
+    expect(activityCard(facts(), NOW)).toContain('لا منشورات في أسبوعين')
+    const html = activityCard(facts({ written: ['2026-10-04 08:00:00', '2026-10-04 09:00:00', '2026-10-01 09:00:00'] }), NOW)
     expect(html.match(/class="db-bar/g)).toHaveLength(14)
     expect(html).toContain('<title>اليوم: 2</title>')
     expect(html).toContain('والمجموع 3')
