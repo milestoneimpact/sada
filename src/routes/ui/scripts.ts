@@ -319,3 +319,10 @@ export const KIT_SCRIPT = `
   });
 })();
 `
+
+/** خلاصةُ الأخطاء تنال التركيزَ حين تُفتح الصفحة بها (D-302 · GOV.UK): فتُقرأ أوّلًا وتُرى قبل التمرير. */
+export const ERRSUM_SCRIPT = `
+(function(){
+  var es = document.getElementById('err-sum');
+  if (es) { try { es.focus({ preventScroll: false }); } catch (e) {} }
+})();`

@@ -10,6 +10,8 @@ import type { Env } from '../../env'
 import { activeOrg } from '../../lib/tenancy'
 import { isDevice, isMetric, MAX_VALUE, pageKey, recordVital } from '../../lib/vitals'
 import { guardPost } from './shared'
+import { say } from '../../lib/errors/catalog'
+import { recordReject } from '../../lib/forms'
 
 export const vitals = new Hono<{ Bindings: Env }>()
 
@@ -21,7 +23,8 @@ vitals.post('/panel/vitals', async (c) => {
   const page = pageKey(String(gate.form.get('page') ?? ''))
   const device = String(gate.form.get('device') ?? '')
   if (!isMetric(metric) || !isDevice(device) || page === null || !Number.isFinite(value) || value < 0 || value > MAX_VALUE) {
-    return Response.json({ error: 'bad_sample', detail: 'عيّنةٌ لا تُقرأ.' }, { status: 400 })
+    await recordReject(c.env.DB, { org: activeOrg(gate.session.record), path: '/panel/vitals', field: 'metric', id: 'bad_sample' }, c.req.raw)
+    return Response.json({ error: 'bad_sample', detail: say('bad_sample') }, { status: 400 })
   }
   await recordVital(c.env.DB, activeOrg(gate.session.record), { metric, value, page, device })
   return new Response(null, { status: 204 })

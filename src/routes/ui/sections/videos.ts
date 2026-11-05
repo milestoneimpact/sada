@@ -12,6 +12,7 @@ import {
   CAPTION_LIMIT, PRIVATE_ONLY, PRIVATE_REACH, privateReach, STALE_UPLOAD_HOURS, VIDEO_PLATFORMS, videoChecks,
   YOUTUBE_DESCRIPTION_BYTES, type Reach, type UploadPost, type UploadRow, type VideoCheck, type VideoPlatform,
 } from '../../../lib/media/uploads'
+import { errorSummary } from '../components/errorSummary'
 import { ABOUT_MAX, captionIssues, type VideoCaptions } from '../../../lib/media/captions'
 import type { LinkState } from '../../../lib/channels'
 import { YT_TITLE_MAX } from '../../../lib/publish/youtube'
@@ -194,8 +195,12 @@ function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: VideoPlat
       ...(issues[p] === undefined ? {} : { error: issues[p] }),
     }))
   }
+  // ‏وخلاصةُ الأخطاء فوق الحقول (D-302): سطرٌ لكلّ حقلٍ معروضٍ فيه ما يُصلَح، رابطُه إلى حقله
+  const anchors: Readonly<Record<string, string>> = { title: '#vyt-' + u.id, youtube: '#vyd-' + u.id, tiktok: '#vtt-' + u.id, instagram: '#vig-' + u.id }
+  const shown = new Set<string>([...(open('youtube') ? ['title', 'youtube'] : []), ...(open('tiktok') ? ['tiktok'] : []), ...(open('instagram') ? ['instagram'] : [])])
+  const summary = errorSummary(Object.entries(issues).filter(([k]) => shown.has(k)).map(([k, text]) => ({ href: anchors[k] ?? '#', text: text ?? '' })))
   // ‏ومَن كتبها يُرسَل معها (D-190): إن انتهى يومُها في KV قبل «أنشئ» لا تصير نصوصَ المالك
-  return `<div class="vcaps"><input type="hidden" name="per_platform" value="1">
+  return `<div class="vcaps">${summary}<input type="hidden" name="per_platform" value="1">
       <input type="hidden" name="caption_model" value="${escapeHtml(cap.model)}">${parts.join('')}</div>`
 }
 

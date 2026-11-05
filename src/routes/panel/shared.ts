@@ -22,6 +22,8 @@ import { reachOf, tiktokNeedsScope, type Reach } from '../../lib/media/uploads'
 import { relyingParty } from '../../lib/security/rp'
 import { record } from '../../lib/audit'
 import { loginPage, type PanelFlash } from '../panelView'
+import { say, type ErrorId } from '../../lib/errors/catalog'
+import { recordReject } from '../../lib/forms'
 
 /** أسماء أسرار المدمَجين — سرٌّ في البيئة يغلب ما في الجدول. */
 export const BUILTIN_SECRET: Readonly<Record<string, string>> = {
@@ -147,7 +149,7 @@ export async function guardPost(c: {
   if (session.record.pending) {
     return {
       denied: Response.json(
-        { error: 'pending_second_factor', detail: 'أتمّ العامل الثاني أوّلا.' },
+        { error: 'pending_second_factor', detail: say('pending_second_factor') },
         { status: 403, headers: { Location: '/panel/2fa' } },
       ),
     }
@@ -172,7 +174,7 @@ export async function guardPost(c: {
     )
     return {
       denied: Response.json(
-        { error: 'csrf_failed', detail: 'رمز النموذج لا يطابق الجلسة. أعد تحميل اللوحة.' },
+        { error: 'csrf_failed', detail: say('csrf_failed') },
         { status: 403 },
       ),
     }
@@ -339,4 +341,18 @@ export function finalizeLater(
   } catch {
     // ‏لا سياقَ تنفيذٍ خارج Worker
   }
+}
+
+/**
+ * **إرسالٌ رُدّ لعيبٍ في المُدخَل** (D-302): يُعَدّ في سجلّ النشاط، والجملةُ من الكتالوج (ما وقع وما تفعل) تُرسَل إشعارًا
+ * فتظهر في الصفحة التي يعود إليها. موضعٌ واحد لكلّ ردٍّ من هذا النوع، فلا رسالةَ تُكتب في المسار.
+ */
+export async function rejectForm(
+  c: { env: Env; req: { raw: Request } },
+  org: string,
+  field: string,
+  id: ErrorId,
+): Promise<void> {
+  await recordReject(c.env.DB, { org, path: new URL(c.req.raw.url).pathname, field, id }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'bad', text: say(id) })
 }

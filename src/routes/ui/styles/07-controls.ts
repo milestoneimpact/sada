@@ -72,6 +72,12 @@ button[data-busy-on]::after,.btn[aria-busy="true"]::after{content:''; width:var(
 form.inline{display:inline; margin:0}
 
 .field{display:flex; flex-direction:column; gap:var(--s-1)}
+/* ‏خلاصةُ الأخطاء فوق الحقول (D-302 · GOV.UK): صيغةُ الإشعار بحافّة الحال، تنال التركيزَ فتُقرأ أوّلًا */
+.err-sum{border-inline-start-color:var(--bad); margin-bottom:var(--s-4)}
+.err-sum:focus-visible{outline:var(--ring-w) solid var(--ring); outline-offset:var(--s-0)}
+.err-sum-t{margin:0 0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--bad)}
+.err-sum-l{margin:0; padding-inline-start:var(--s-5); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400}
+.err-sum-l a{color:var(--link)}
 /* ‏والحقلُ حين يكون مجموعةً: بلا إطارِ المتصفّح ولا حشوِه، وعنوانُها بوزن العنوان (D-297) */
 fieldset.field{margin-inline:0; padding:0; border:0; min-inline-size:0}
 fieldset.field > legend{padding:0; margin-bottom:var(--s-2); font-weight:600}
