@@ -177,7 +177,9 @@ if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;
 document.querySelectorAll('meta[name="theme-color"][data-c]').forEach(function(m){
 m.content=t==='dark'?${JSON.stringify(THEME.dark['--bg'])}:${JSON.stringify(THEME.light['--bg'])};});}
 var d=localStorage.getItem('sada-density');
-if(d==='compact')document.documentElement.dataset.density=d;}catch(e){}
+if(d==='compact')document.documentElement.dataset.density=d;
+var z=localStorage.getItem('sada-size');
+if(z==='large')document.documentElement.dataset.size=z;}catch(e){}
 `
 
 
@@ -199,12 +201,21 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
       // ‏المبدّلان من العُدّة (`segmented`) يرسمان HTML ولم يُحوَّلا بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
       html`<div class="menu-seg"><span>السمة</span>${raw(themeSwitch())}</div>`.value,
       html`<div class="menu-seg"><span>الكثافة</span>${raw(densitySwitch())}</div>`.value,
+      html`<div class="menu-seg"><span>حجم الخطّ</span>${raw(sizeSwitch())}</div>`.value,
       // ‏المساعدةُ في الموضع نفسِه على كلّ صفحة (D-305 · WCAG 2.2 · 3.2.6)
       menuItem({ label: 'المساعدة', href: '/panel/help' }),
       menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
       ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
   })
+}
+
+/** مبدّلُ حجم الخطّ بدرجتين (D-306) — سلّمٌ ثالثٌ معلَن لا تكبيرٌ بنسبة، وسكربتُه يقرأ «data-size». */
+export function sizeSwitch(withId = true): string {
+  return segmented('حجم الخطّ', 'size', [
+    { value: 'normal', label: 'عاديّ', pressed: true },
+    { value: 'large', label: 'أكبر' },
+  ], withId ? 'size' : undefined)
 }
 
 /** مبدّلُ الكثافة — مقطعٌ من العُدّة (D-189)، وسكربتُه يقرأ «data-density» كما كان. */

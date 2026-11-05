@@ -518,6 +518,25 @@ ${declare(LIGHT)}
   }
 }
 
+/* ── درجةُ خطٍّ أكبر بتفضيل المالك (D-306 · WCAG 1.4.4) ─────────────
+   سلّمٌ ثالثٌ معلَن، لا تكبيرٌ بنسبة: كلُّ قياسٍ من السلّم نفسِه، وكلُّ نمطٍ (حجم/سطر/وزن) في
+   قائمةٍ يحرسها «audit_scale --size large». على الحاسوب المتنُ ‏17 والواجهةُ ‏16 والعناوينُ
+   درجةً فوق؛ وعلى الجوّال المتنُ ‏18 والواجهةُ ‏17 والعناوينُ كعناوين الحاسوب. والمفتاحُ على
+   <html> من المتصفّح («data-size») كالكثافة، لا من الخادم. */
+:root[data-size="large"]{
+  --t-h1:32px; --lh-h1:40px; --t-h2:24px; --lh-h2:32px; --t-h3:20px; --lh-h3:28px;
+  --t-body:17px; --lh-body:30px; --t-ui:16px; --lh-ui:24px; --t-input:17px; --lh-input:26px;
+  --t-small:15px; --lh-small:24px; --t-caption:14px; --lh-caption:20px; --t-code:15px; --lh-code:22px;
+}
+@media${below('sm')}{
+  :root[data-size="large"]{
+    --t-display:40px; --lh-display:48px; --t-h1:28px; --lh-h1:36px; --t-h2:22px; --lh-h2:30px;
+    --t-h3:20px; --lh-h3:28px; --t-body:18px; --lh-body:30px; --t-ui:17px; --lh-ui:26px;
+    --t-input:17px; --lh-input:26px; --t-small:16px; --lh-small:24px; --t-caption:14px; --lh-caption:20px;
+    --t-code:15px; --lh-code:22px;
+  }
+}
+
 /* الليلُ بتفضيل النظام — **والقيَمُ من «THEME.dark»**، كتلةُ الزرّ أدناه نصُّها */
 @media(prefers-color-scheme:dark){
   :root:not([data-theme="light"]){

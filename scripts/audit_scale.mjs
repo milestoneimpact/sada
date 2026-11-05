@@ -69,6 +69,23 @@ const STYLES = {
     input: '16/24/400', small: '15/24/400', 'small-strong': '15/24/600', caption: '13/20/600', code: '14/22/400',
   },
 }
+/**
+ * ‏السلّمُ الثالث: الدرجةُ الأكبر (D-306). على الحاسوب المتنُ ‏17 والواجهةُ ‏16 والعناوينُ درجةً فوق؛
+ * ‏وعلى الجوّال المتنُ ‏18 والواجهةُ ‏17. قائمةٌ مغلقةٌ كالقائمتين، لا نسبةُ تكبير.
+ */
+const LARGE = {
+  desktop: {
+    display: '40/48/400', h1: '32/40/600', kpi: '32/40/400', h2: '24/32/600', h3: '20/28/600',
+    body: '17/30/400', 'body-strong': '17/30/600', ui: '16/24/600', 'ui-regular': '16/24/400',
+    input: '17/26/400', small: '15/24/400', 'small-strong': '15/24/600', caption: '14/20/600', code: '15/22/400',
+  },
+  mobile: {
+    display: '40/48/400', h1: '28/36/600', kpi: '28/36/400', h2: '22/30/600', h3: '20/28/600',
+    body: '18/30/400', 'body-strong': '18/30/600', ui: '17/26/600', 'ui-regular': '17/26/400',
+    input: '17/26/400', small: '16/24/400', 'small-strong': '16/24/600', caption: '14/20/600', code: '15/22/400',
+  },
+}
+
 /** الحروفُ تحت ‏١٤px — سقفٌ معلَنٌ ليُحرَس (خطّة التصميم 10.2؛ كانت ‏٣٦٪). */
 const MAX_SMALL_SHARE = 0.10
 /**
@@ -90,9 +107,12 @@ const SMALL_DEBT = {}
 /** طولُ السطر: ‏30em («--measure») لكلّ ما يلتفّ سطرين (خطّة التصميم 4.4/3). */
 const MEASURE_EM = 30
 
-const files = process.argv.slice(2)
+const args = process.argv.slice(2)
+/** ‏الدرجةُ الأكبر (D-306): `--size large` يضع `data-size` على الجذر ويقيس بقائمة السلّم الثالث. */
+const SIZE = args.includes('--size') ? args[args.indexOf('--size') + 1] : 'normal'
+const files = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--size')
 if (files.length === 0) {
-  console.error('الاستعمال: node scripts/audit_scale.mjs <ملفّ.html> …')
+  console.error('الاستعمال: node scripts/audit_scale.mjs [--size large] <ملفّ.html> …')
   process.exit(2)
 }
 
@@ -109,15 +129,16 @@ const totals = { chars: 0, small: 0, nodes: 0, bold: 0, faint: 0, styles: new Ma
 
 for (const view of VIEWS) {
   const { label, scale, ...options } = view
-  const allowed = new Set(Object.values(STYLES[scale]))
+  const allowed = new Set(Object.values(SIZE === 'large' ? LARGE[scale] : STYLES[scale]))
   const page = await browser.newPage(options)
   for (const file of files) {
     await page.goto(`file://${file}`)
     // ما هو مخفيٌّ لا يُقاس، وعللُه تبقى
-    await page.evaluate(() => {
+    await page.evaluate((size) => {
+      if (size === 'large') document.documentElement.dataset.size = 'large'
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
       document.querySelectorAll('details').forEach((d) => { d.open = true })
-    })
+    }, SIZE)
     await page.waitForTimeout(400)
 
     const { hits, stats } = await page.evaluate(({ FONTS, SPACES, WEIGHTS, allowed, MEASURE_EM }) => {

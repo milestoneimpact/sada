@@ -89,9 +89,12 @@ const ALLOWED = new Map([
   ['a.skip', 'رابطُ تخطٍّ لا يظهر إلّا عند التركيز بلوحة المفاتيح'],
 ])
 
-const files = process.argv.slice(2)
+const args = process.argv.slice(2)
+/** ‏الدرجةُ الأكبر (D-306): `--size large` يقيس الهاتفَ بالخطّ الأكبر — فهدفُ اللمس والفيضانُ يُحرَسان عليه أيضًا. */
+const SIZE = args.includes('--size') ? args[args.indexOf('--size') + 1] : 'normal'
+const files = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--size')
 if (files.length === 0) {
-  console.error('الاستعمال: node scripts/audit_mobile.mjs <ملفّ.html> …')
+  console.error('الاستعمال: node scripts/audit_mobile.mjs [--size large] <ملفّ.html> …')
   process.exit(2)
 }
 
@@ -123,9 +126,10 @@ for (const file of files) {
       : { viewport: { width, height: 900 } })
     await page.goto(`file://${file}`)
     // ما هو مخفيٌّ لا يُقاس، وعللُه تبقى — كما في `audit_scale`
-    await page.evaluate(() => {
+    await page.evaluate((size) => {
+      if (size === 'large') document.documentElement.dataset.size = 'large'
       document.querySelectorAll('section[data-pane]').forEach((s) => { s.hidden = false })
-    })
+    }, SIZE)
     await page.waitForTimeout(250)
     // ‏والصعودُ يُنهى قبل القياس (D-246): صندوقٌ في منتصفه كسرٌ من بكسل يُقرأ دون ‏44
     await page.evaluate(() => { for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations !== Infinity) a.finish() })

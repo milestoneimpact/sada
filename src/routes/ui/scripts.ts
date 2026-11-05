@@ -325,4 +325,35 @@ export const ERRSUM_SCRIPT = `
 (function(){
   var es = document.getElementById('err-sum');
   if (es) { try { es.focus({ preventScroll: false }); } catch (e) {} }
-})();`
+})();
+`
+
+/**
+ * حجمُ الخطّ بدرجتين (D-306): «أكبر» يضع «data-size="large"» على <html> ويُحفَظ في المتصفّح كالكثافة، والأزرارُ كلُّها
+ * (في القائمة وفي الإعدادات) تُربط معًا. والقراءةُ قبل الرسم في سكربت الرأس كالثيم، فلا وميضَ صغير ثمّ كبير.
+ */
+export const SIZE_SCRIPT = `
+(function(){
+  var box=document.getElementById('size');
+  if(!box)return;
+  var all=function(){return document.querySelectorAll('.seg button[data-size]');};
+  var apply=function(v){
+    try{
+      if(v==='large'){localStorage.setItem('sada-size',v);
+        document.documentElement.dataset.size=v;}
+      else{localStorage.removeItem('sada-size');
+        delete document.documentElement.dataset.size;}
+    }catch(e){
+      if(v==='large')document.documentElement.dataset.size=v;
+      else delete document.documentElement.dataset.size;
+    }
+    all().forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.size===v));});
+  };
+  var saved='normal';
+  try{saved=localStorage.getItem('sada-size')||'normal';}catch(e){}
+  apply(saved);
+  all().forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.size);});});
+})();
+`
