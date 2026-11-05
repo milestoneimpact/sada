@@ -63,15 +63,33 @@ export const RULES = [
   { id: 'secret-name', re: /\b[A-Z][A-Z0-9]*_(?:SECRET|TOKEN|KEY)\b|client_credentials|invalid_client/g, say: '«المفتاحُ السرّيّ للتطبيق»، والاسمُ في `<code>`', except: [...LEGAL, ...SETUP] },
   { id: 'dev-cmd', re: /\bwrangler\b|chat\/completions/g, say: 'لغةُ المالك، والأمرُ تحت «للمطوّر» (EASE-PLAN أ-2)', except: LEGAL },
   { id: 'task-id', re: /\bM-\d\d\b/g, say: 'يُحذف من الواجهة، والمهمّةُ بعنوانها', except: [...TASKS, ...SETUP] },
-  { id: 'failed', re: /ساقطة/g, say: '«فشلت»' },
-  { id: 'gone', re: /غادرت?\s+إلى/g, say: '«قيد النشر» أو «نُشرت» أو «فشلت» بحسب الحال' },
-  { id: 'providers', re: /المزوّدون|«المزوّدين»|المزوّدين»/g, say: '«خدماتُ الكتابة والصور»' },
-  { id: 'audit-log', re: /سجلّ التدقيق/g, say: '«سجلّ النشاط»', except: LEGAL },
-  { id: 'report', re: /التقرير(?:ُ)?\s*الأسبوعيّ|«التقرير»/g, say: '«النتائج»' },
-  { id: 'channels', re: /«القنوات»|«المنصّات»/g, say: '«الحسابات»' },
-  { id: 'spread', re: /وزّع المعتمَد|وزّع المعتمد/g, say: '«جدوِل الجاهزة على الأسبوع»' },
   { id: 'backtick', re: /`/g, say: '<code> مرسومة لا علامةٌ خلفيّة حرفيّة' },
+  ...glossaryRules(),
 ]
+
+/**
+ * ‏**المعجمُ الواحد** (D-304): الجدولُ الأوّل في `docs/GLOSSARY.md` هو مصدرُ قواعد المرادفات، لا قائمةٌ هنا تُكرّره.
+ * ‏الصفُّ: `| المفهوم | **الكلمة** | ممنوع1 · ممنوع2 | لماذا |`؛ وما بين `/…/` في «ممنوع» تعبيرٌ نمطيّ، وما سواه حرفيّ.
+ * ‏والاستثناءُ الوحيد صفحتا الخصوصيّة والشروط: نصٌّ قانونيّ يسمّي الأشياءَ بأسمائها عمدًا.
+ */
+export function glossaryRules() {
+  const doc = readFileSync(new URL('../docs/GLOSSARY.md', import.meta.url), 'utf8')
+  const first = doc.split('## ٢')[0]
+  const out = []
+  for (const line of first.split('\n')) {
+    const m = /^\|\s*([^|]+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*[^|]*\|\s*$/.exec(line)
+    if (m === null || m[1] === 'المفهوم' || /^-+$/.test(m[1])) continue
+    const word = m[2].replace(/\*\*/g, '').trim()
+    const banned = m[3].split(' · ').map((b) => b.trim()).filter((b) => b !== '')
+    const parts = banned.map((b) => (b.startsWith('/') && b.endsWith('/')
+      ? b.slice(1, -1)
+      : b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    if (parts.length === 0) continue
+    out.push({ id: `glossary:${m[1].trim()}`, re: new RegExp(parts.join('|'), 'g'), say: word, except: LEGAL })
+  }
+  if (out.length < 5) throw new Error('المعجمُ لم يُقرأ: أقلّ من خمسة صفوف — تغيّر شكلُ الجدول')
+  return out
+}
 
 /** ‏يُحذف عنصرٌ متوازن الوسم من موضعه، مع ما تداخل فيه من الوسم نفسه. */
 function dropBalanced(html, open, tag) {
@@ -178,17 +196,18 @@ if (files.length === 0) {
 if (args.includes('--self-test')) {
   const name = basename(files[0])
   const base = readFileSync(files[0], 'utf8')
-  const planted = check(name, base.replace('</body>', '<p>بقي 30 يوما على الربط، والمنشورُ في الطابور</p></body>'))
+  const planted = check(name, base.replace('</body>', '<p>بقي 30 يوما على الربط، والمنشورُ في الطابور، وانظر «القنوات»</p></body>'))
   // ‏والحقيقةُ المكرّرة على صفحةٍ بلا ألواح، فيُعَدّ ما زُرع وحدَه لا مرّةً لكلّ لوح
   const facts = repeatedFacts('<body><p data-fact="zz:broken">أ</p><section data-pane="a"><p data-fact="zz:broken">ب</p></section><section data-pane="b"></section></body>')
   const hidden = check(name, base.replace('</body>', '<details><summary>للمطوّر</summary><p>30 يوما · الطابور</p></details></body>'))
   const clean = check(name, base)
   const caught = planted.problems.length - clean.problems.length
-  if (caught !== 2 || facts.length !== 1 || hidden.problems.length !== clean.problems.length) {
-    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 2، والحقيقةُ المكرّرة ${facts.length} من 1، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
+  const fromGlossary = planted.problems.some((p) => p.includes('glossary:'))
+  if (caught !== 3 || !fromGlossary || facts.length !== 1 || hidden.problems.length !== clean.problems.length) {
+    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 3، والحقيقةُ المكرّرة ${facts.length} من 1، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
     process.exit(1)
   }
-  console.log('audit_copy --self-test: العيبان المزروعان والحقيقةُ المكرّرةُ في لوحها أُمسكت، وما تحت «للمطوّر» مستثنى ✓')
+  console.log('audit_copy --self-test: العيوبُ الثلاثة المزروعة (ومنها كلمةٌ من المعجم) والحقيقةُ المكرّرةُ في لوحها أُمسكت، وما تحت «للمطوّر» مستثنى ✓')
 }
 
 const problems = []
