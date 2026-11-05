@@ -257,6 +257,10 @@ export function buildCommands(
   })
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
+    label: 'المساعدة', note: 'كيف يعمل صدى في سبع محطّات، والأسئلةُ الأولى، والاختصارات', group: 'الأفعال',
+    href: '/panel/help', icon: '', alias: 'help faq keys shortcuts guide مساعده اسئله اختصارات دليل',
+  },
+  {
     label: 'الخطّ الزمنيّ للمحفظة', note: 'كلّ منشور شريط على الأيّام — في النتائج', group: 'الأفعال',
     href: '/panel/timeline', icon: '', alias: 'gantt timeline portfolio roadmap غانت جانت خط زمني محفظه',
   })

@@ -199,6 +199,8 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
       // ‏المبدّلان من العُدّة (`segmented`) يرسمان HTML ولم يُحوَّلا بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
       html`<div class="menu-seg"><span>السمة</span>${raw(themeSwitch())}</div>`.value,
       html`<div class="menu-seg"><span>الكثافة</span>${raw(densitySwitch())}</div>`.value,
+      // ‏المساعدةُ في الموضع نفسِه على كلّ صفحة (D-305 · WCAG 2.2 · 3.2.6)
+      menuItem({ label: 'المساعدة', href: '/panel/help' }),
       menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
       ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
