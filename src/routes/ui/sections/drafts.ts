@@ -208,7 +208,7 @@ function scheduler(
       ${gone
         ? '<span class="ago">ولا تُستردّ من هناك</span>'
         : `<form class="inline" method="POST" action="/panel/drafts/unschedule"
-             data-confirm="سحب الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟" data-busy="جار…" data-swap>
+             data-busy="جار…" data-swap>
              <input type="hidden" name="id" value="${escapeHtml(d.id)}">
              <button class="btn btn-secondary btn-sm" type="submit">اسحب الموعد</button></form>`}
     </div>`

@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
-  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, reschedulePost, schedulePost, sweepStuck, unmarkDispatched, unschedule,
+  dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, reschedulePost, schedulePost, sweepStuck, unmarkDispatched, unschedule, restoreSchedule,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -181,6 +181,26 @@ describe('السحب', () => {
     expect(row?.['status']).toBe('approved')
     expect(row?.['scheduled_at']).toBeNull()
     expect(row?.['account_id']).toBeNull()
+  })
+
+  it('ويعود الموعدُ والحسابُ مع النتيجة، والاستعادةُ تردّهما ما دامت معتمَدةً بلا موعد (D-303)', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    const before = await readPost(post)
+    const pulled = await unschedule(db, post)
+    expect(pulled.ok).toBe(true)
+    if (!pulled.ok) return
+    expect(pulled.at).toBe(before?.['scheduled_at'])
+    expect(pulled.account).toBe(account)
+    expect((await restoreSchedule(db, post, pulled.at, pulled.account, 'org_owner')).ok).toBe(true)
+    const after = await readPost(post)
+    expect(after?.['status']).toBe('queued')
+    expect(after?.['scheduled_at']).toBe(before?.['scheduled_at'])
+    expect(after?.['account_id']).toBe(account)
+    // ‏ومرّةً ثانية لا تُستعاد: الحالُ تبدّلت
+    expect((await restoreSchedule(db, post, pulled.at, pulled.account, 'org_owner')).ok).toBe(false)
+    expect((await restoreSchedule(db, post, '', '', 'org_owner')).ok).toBe(false)
   })
 
   it('بعد الإرسال يُردّ — ولا يُستردّ بعد الإرسال', async () => {
