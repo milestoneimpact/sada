@@ -75,6 +75,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
     var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
     var card=isPane?null:target(id);
+    // ‏وبابُ المُنشئ من مرساته (D-308): «#write» تختار «من مصدر» و«#idea» تختار «من فكرة»
+    if(card){var cm=card.closest('.composer'); if(cm){var rd=cm.querySelector('[name=cmp][value="'+card.id+'"]'); if(rd)rd.checked=true;}}
     // ‏ومرساةٌ لوحُها في صفحةٍ أخرى (D-211): «/panel#settings» المحفوظةُ تذهب إلى «/panel/settings#settings»، والخريطةُ
     // ‏من «lib/nav/panes» نفسِها التي يقرؤها الخادم. عند التحميل استبدالٌ لا يُبقي خطوةً ميّتةً في الرجوع
     if(!isPane&&!card&&id){var to=movedPath(id);
@@ -130,6 +132,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     e.preventDefault(); show(t.getAttribute('href').slice(1),true,true);
   });});
   // ‏و«?open=…» بلا مرساةٍ (رابطٌ كُتب يدًا) يفتح قسمَ المحرّر، لا الرئيسيّةَ والمحرّرُ مخفيٌّ خلفها (D-198)
+  // ‏وبابُ المُنشئ يُحفظ في المتصفّح كالسمة (D-308)، والمرساةُ تغلبه؛ واختيارُه يكتب مرساتَه فيُعاد بالرجوع
+  var cmps=document.querySelectorAll('.composer [name=cmp]');
+  try{var sv=localStorage.getItem('sada-compose');
+    if(sv&&!/^#(idea|write)$/.test(location.hash||'')){Array.prototype.forEach.call(cmps,function(r){if(r.value===sv)r.checked=true;});}}catch(e){}
+  Array.prototype.forEach.call(cmps,function(r){r.addEventListener('change',function(){
+    if(!r.checked)return; try{localStorage.setItem('sada-compose',r.value);}catch(e){}
+    if(history.replaceState)history.replaceState(null,'','#'+r.value);});});
   show((location.hash||'').slice(1)||(document.getElementById('ed')?'sub-list':first),false,false);
   /*
    * ‏والمرساةُ تُتبَع من أيّ مكان (D-105).

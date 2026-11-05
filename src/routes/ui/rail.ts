@@ -84,7 +84,8 @@ export function railHtml(input: RailInput): string {
     <div class="glyph">${GLYPH_SVG}</div>
   </div>
   ${scopeMenu(input.scope)}
-  <a class="btn btn-primary rail-new" href="/panel#idea">${ICON.add}<span>منشور جديد</span></a>
+  ${/* ‏ولا «منشور جديد» هنا (D-308): زرُّ الترويسة (D-216) بأبوابه الأربعة ظاهرٌ في كلّ صفحة، وزرّان أوّليّان
+     ‏بالاسم نفسِه في شاشةٍ واحدة يُقرآن خيارين — وكان الرافدةُ تحمله منذ D-246 قبل أن يصل الترويسةَ */''}
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
     ${moreSheet(input, counts)}

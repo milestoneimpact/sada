@@ -32,7 +32,8 @@ import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
 import { menu, menuItem } from '../components/menu'
 import { field } from '../components/field'
-import { linkLine, pickLine } from '../reach'
+import { linkLine } from '../reach'
+import { html, raw } from '../html'
 import { INFO_SIZE } from '../../../lib/image/infographic'
 import { CLIP_PLATFORMS } from '../../../lib/platform/needs'
 import { missingMedia } from '../../../lib/schedule/media'
@@ -1035,59 +1036,62 @@ export interface DraftsInput {
 const IDEA_PLATFORMS = ['linkedin', 'x'] as const
 
 /**
- * «اكتب من فكرتك» (D-190) — **جملةٌ أو كلماتٌ قليلة ← مسوّدةٌ لكلّ منصّةٍ تختارها**.
+ * **نموذجُ الفكرة** (D-190 · D-308) — **جملةٌ أو كلماتٌ قليلة ← مسوّدةٌ لكلّ منصّةٍ تختارها**.
  *
  * قال المالك: «يُفترض أن تكون الكتابةُ أسهل، وتنشأ من نصٍّ أو كلماتٍ بسيطة». وكانت لا تبدأ
  * إلّا من مستندٍ في Drive حُلّل، بمنصّةٍ واحدةٍ في كلّ ضغطة. فهنا حقلٌ واحدٌ ومربّعٌ لكلّ
  * منصّةٍ مكتوبة، **ونداءٌ لكلّ منصّةٍ مختارة** بوصفها وحدّها (`draftFromIdea`)، والكلفةُ
  * قبل المسوّدة. والزرُّ معطَّلٌ وسببُه تحته حين لا يُكتب الآن — بحكم النداء نفسِه.
+ *
+ * ‏ومنذ D-308 النموذجُ بابٌ في «المُنشئ» (`composer`): لصيقةٌ وتلميحٌ بجملة، ومجموعةُ المنصّات
+ * ‏بعنوانها، والزرُّ تحت الحقول في طرف البداية وبجانبه سطرُ الكلفة — لا ثلاثةُ أسطرِ شرحٍ قبل أوّل حقل.
  */
-function ideaCard(input: DraftsInput): string {
+function ideaForm(input: DraftsInput): string {
   const blocked = input.blocked ?? null
   const why = blocked !== null
     ? { text: blocked.text, label: blocked.label, href: blocked.href }
     : input.ready
       ? null
       : { text: 'مزوّد مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
+  let unlinked = false
   const boxes = IDEA_PLATFORMS.map((p) => {
     const link = input.links?.[p]
     // ‏غيرُ المتّصل لا يُؤشَّر: تُكتب مسوّدتُه إن اختاره، ولا تُجدوَل حتّى يربطه
     const checked = link === undefined || link === 'linked'
-    return `<label class="vpf">
-        <input type="checkbox" name="platform" value="${p}"${checked ? ' checked' : ''}>
-        <span class="vpf-b"><b>${escapeHtml(PLATFORMS[p].label)}</b>
-          ${link === undefined ? '' : linkLine(p, link, PRIVATE_ONLY)}
+    if (link !== undefined && link !== 'linked') unlinked = true
+    return html`<label class="vpf">
+        <input type="checkbox" name="platform" value="${p}"${raw(checked ? ' checked' : '')}>
+        <span class="vpf-b"><b>${PLATFORMS[p].label}</b>
+          ${link === undefined ? '' : raw(linkLine(p, link, PRIVATE_ONLY))}
           <span class="ago">${p === 'x'
-            ? `فكرة واحدة في ${PLATFORMS.x.hardLimit} محرفًا`
-            : `فقرات قصيرة حتّى ${PLATFORMS.linkedin.hardLimit} محرف`}</span></span>
+            ? 'فكرة واحدة في ' + PLATFORMS.x.hardLimit + ' محرفًا'
+            : 'فقرات قصيرة حتّى ' + PLATFORMS.linkedin.hardLimit + ' محرف'}</span></span>
       </label>`
-  }).join('')
-  return `<div class="card mt-3" id="idea">
-    <div class="card-head"><h2>اكتب من فكرتك</h2></div>
-    <p class="hint">جملة أو كلمات قليلة، ونكتب منها لكلّ منصّة مسوّدتَها بطولها ونبرتها.
-      <b>وتقرؤها وتعتمدها أنت</b> — لا يُنشر شيء قبل ذلك.</p>
-    <form method="POST" action="/panel/drafts/idea" data-busy="جار كتابة المسوّدات…" ${stagesAttr('idea')}>
-      ${field({
+  })
+  return html`<form method="POST" action="/panel/drafts/idea" data-busy="جار كتابة المسوّدات…" ${raw(stagesAttr('idea'))}>
+      ${raw(field({
         id: 'di-text',
-        label: 'فكرتك أو كلماتك',
-        hint: 'مثل: «الحوكمة لا تبطئ القرار، تحميه» — أو كلمات متفرّقة: «قيادة، ثقة، أوّل مئة يوم».',
-        control: `<textarea name="idea" rows="3" required maxlength="${IDEA_MAX}"></textarea>`,
-      })}
-      <div class="vpfs mt-3" role="group" aria-label="اكتب لـ">${boxes}</div>
-      ${pickLine('تُكتب مسوّدتُها ولا تُجدوَل')}
-      <div class="row">
-        <span class="ago">نداء لكلّ منصّة تختارها، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.</span>
-        <span class="grow"></span>
-        ${button({
+        label: 'فكرتك',
+        hint: 'جملة أو كلمات متفرّقة. مثل: «الحوكمة لا تبطئ القرار، تحميه».',
+        control: '<textarea name="idea" rows="4" required maxlength="' + IDEA_MAX + '"></textarea>',
+      }))}
+      <fieldset class="field mt-3">
+        <legend>اكتب لـ</legend>
+        <div class="vpfs">${boxes}</div>
+        ${unlinked ? raw('<p class="field-hint">غير المتّصلة تُكتب مسوّدتُها ولا تُجدوَل حتّى تربطها.</p>') : ''}
+        <span class="st bad" data-pick-msg role="alert" hidden></span>
+      </fieldset>
+      <div class="cmp-act">
+        ${raw(button({
           label: 'اكتب المسوّدات',
           variant: 'primary',
           type: 'submit',
           ...(why === null ? {} : { disabled: { id: 'di-why', reason: why.text } }),
-        })}
+        }))}
+        <span class="ago">نداء لكلّ منصّة تختارها، وكلفتُه تُسجَّل قبل المسوّدة.</span>
       </div>
-      ${why === null ? '' : `<a class="tap" href="${escapeHtml(why.href)}">${escapeHtml(why.label)}</a>`}
-    </form>
-  </div>`
+      ${why === null ? '' : html`<a class="tap" href="${why.href}">${why.label}</a>`}
+    </form>`.value
 }
 
 /**
@@ -1107,6 +1111,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
 
   // نموذجُ الكتابة: مصدرٌ ومنصّة، ونداءٌ واحد لكلٍّ. ولا كتابةَ آليّة —
   // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة
+  const ready = input.ready && blocked === null
   const writer =
     writable.length === 0
       ? emptyState({
@@ -1115,40 +1120,43 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
               حلّل مصدرا أوّلا ثمّ عد.`,
           action: '<a class="btn btn-secondary btn-sm" href="#sources">اذهب إلى المصادر</a>',
         })
-      : `<form class="row" method="POST" action="/panel/drafts/write" data-busy="جار الكتابة…" ${stagesAttr('write')}>
-           <div class="field"><label for="dw-src">المصدر</label>
-             <select id="dw-src" name="id">${writable
-               .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)
-               .join('')}</select></div>
-           <div class="field"><label for="dw-pf">المنصّة</label>
-             <select id="dw-pf" name="platform">${(
-               Object.values(PLATFORMS) as PlatformSpec[]
-             )
-               .map(
-                 (spec) =>
-                   // ‏ومنصّةُ المقطع تقول ذلك قبل أن يُدفَع ثمنُ الكتابة: نصُّها وصفٌ لا يُنشَر وحدَه
-                   `<option value="${escapeHtml(spec.id)}">${escapeHtml(spec.label)} — ${CLIP_PLATFORMS.has(spec.id)
-                     ? 'وصف مقطع (يحتاج مقطعًا)' : `حتّى ${spec.hardLimit} محرفا`}</option>`,
-               )
-               .join('')}</select></div>
-           ${writers.length < 2 ? '' : `<div class="field"><label for="dw-pv">بأيّ مزوّد</label>
-             <select id="dw-pv" name="provider">
-               <option value="">المحفوظ في التوجيه</option>
-               ${writers.map((w) =>
-                 `<option value="${escapeHtml(w.name)}">${escapeHtml(w.label)}</option>`).join('')}
-             </select></div>`}
-           <div class="grow"></div>
-           <button class="btn btn-primary" type="submit"${input.ready && blocked === null ? '' : ' disabled'}${
-             blocked === null ? '' : ' aria-describedby="dw-why"'}>اكتب مسوّدة</button>
-         </form>
-         ${writers.length < 2 ? '' : `<p class="hint m-0 mt-2"><b>واكتبها بمزوّدين لتقارن.</b>
-           لكلّ مزوّد نسخة واحدة من هذه النسخة، والثانية بالمزوّد نفسه لا تنفق شيئا.</p>`}
-         ${blocked !== null
-           ? `<p class="hint m-0 mt-2" id="dw-why">${escapeHtml(blocked.text)}
-                <a class="tap" href="${escapeHtml(blocked.href)}">${escapeHtml(blocked.label)}</a></p>`
-           : input.ready
-             ? ''
-             : '<p class="hint m-0 mt-2">مزوّد مهمّة الكتابة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'}`
+      : html`<form method="POST" action="/panel/drafts/write" data-busy="جار الكتابة…" ${raw(stagesAttr('write'))}>
+           ${raw(field({
+             id: 'dw-src',
+             label: 'المصدر',
+             control: html`<select name="id">${writable.map((s) => html`<option value="${s.id}">${s.name}</option>`)}</select>`.value,
+           }))}
+           ${raw(field({
+             id: 'dw-pf',
+             label: 'المنصّة',
+             // ‏ومنصّةُ المقطع تقول ذلك قبل أن يُدفَع ثمنُ الكتابة: نصُّها وصفٌ لا يُنشَر وحدَه
+             control: html`<select name="platform">${(Object.values(PLATFORMS) as PlatformSpec[]).map((spec) =>
+               html`<option value="${spec.id}">${spec.label} — ${CLIP_PLATFORMS.has(spec.id)
+                 ? 'وصف مقطع (يحتاج مقطعًا)' : 'حتّى ' + spec.hardLimit + ' محرفا'}</option>`)}</select>`.value,
+           }))}
+           ${writers.length < 2 ? '' : html`<details class="cmp-more"><summary>خيارات أكثر</summary>
+             ${raw(field({
+               id: 'dw-pv',
+               label: 'بأيّ مزوّد',
+               optional: true,
+               hint: 'لكلّ مزوّد نسخة واحدة من هذه النسخة، والثانية بالمزوّد نفسه لا تنفق شيئا.',
+               control: html`<select name="provider"><option value="">المحفوظ في التوجيه</option>${writers.map((w) =>
+                 html`<option value="${w.name}">${w.label}</option>`)}</select>`.value,
+             }))}
+           </details>`}
+           <div class="cmp-act">
+             ${raw(button({
+               label: 'اكتب مسوّدة',
+               variant: 'primary',
+               type: 'submit',
+               ...(ready ? {} : { disabled: { id: 'dw-why', reason: blocked?.text ?? 'مزوّد مهمّة الكتابة غير جاهز.' } }),
+             }))}
+             <span class="ago">نداء واحد لكلّ ضغطة، وكلفتُه تُسجَّل قبل المسوّدة.</span>
+           </div>
+           ${blocked !== null
+             ? html`<a class="tap" href="${blocked.href}">${blocked.label}</a>`
+             : input.ready ? '' : raw('<a class="tap" href="#providers">افتح المزوّدين</a>')}
+         </form>`.value
 
   /*
    * لوحُ الاختصارات — **ولا يُعرض إلّا حيث تعمل**.
@@ -1234,14 +1242,23 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
   ${emptyState({ id: 'draft-none', hidden: true, title: 'لا مسوّدة في هذا الفرز', html: 'غيّر التبويب أعلاه، أو اختر «الكلّ».' })}
   ${keys}`
 
-  const write = `${ideaCard(input)}
-
-  <div class="card mt-3" id="write">
-    <div class="card-head"><h2>الكتابة من مصدر</h2></div>
-    <p class="hint">نداء واحد لكلّ ضغطة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.
-      <b>ولا كتابة آليّة</b> — الإنفاق يبدأ بقرارك لا بدورة ساعة.</p>
-    ${writer}
-  </div>`
+  /*
+   * ‏**المُنشئُ** (D-308): بطاقةٌ واحدة بعرض ما يُقرأ، ومقطعٌ يختار البابَ («من فكرة» أو «من مصدر»)، ونموذجٌ
+   * ‏واحدٌ ظاهر. كانت بطاقتين متتاليتين بعرض الشاشة كلِّها (‏1,530px للحقل عند ‏1900)، وأربعةُ أزرارٍ أوّليّة
+   * ‏في شاشةٍ واحدة، و38 كلمةَ شرحٍ قبل أوّل حقل. المقطعُ أزرارُ راديو في لصائق، فيعمل بلا سكربت (`:has`)،
+   * ‏والمرساةُ «#write» تختاره، والاختيارُ يُحفظ في المتصفّح كالسمة.
+   */
+  const write = html`<div class="card composer mt-3" id="composer">
+    <div class="card-head"><h2>منشور جديد</h2></div>
+    <p class="hint">من جملة تكتبها، أو من مصدر حُلّل في المكتبة. تقرأ المسوّدة وتعتمدها قبل أن يُنشر شيء.</p>
+    <fieldset class="seg">
+      <legend class="vh">من أين تبدأ؟</legend>
+      <label><input type="radio" name="cmp" value="idea" checked>من فكرة</label>
+      <label><input type="radio" name="cmp" value="write">من مصدر</label>
+    </fieldset>
+    <div id="idea">${raw(ideaForm(input))}</div>
+    <div id="write">${raw(writer)}</div>
+  </div>`.value
   return { list, write }
 }
 
