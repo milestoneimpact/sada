@@ -152,6 +152,8 @@ export interface TasksScreenData {
   readonly env: string
   /** ما قِيس من متصفّح المالك في أسبوع (D-299) — و`null` حين لا تُقرأ القاعدة. */
   readonly vitals?: VitalsSummary | null
+  /** إرسالاتٌ رُدّت لعيبٍ في المُدخَل هذا الأسبوع (D-302). */
+  readonly rejects?: number
 }
 
 const METRIC_LABEL: Readonly<Record<Metric, string>> = {
@@ -170,7 +172,13 @@ const RATING_MARK: Readonly<Record<Rating, { cls: Tone; label: string }>> = {
  * **سرعةُ اللوحة عندك** (D-299): ما قاسه متصفّحُ المالك لا ما قدّره المختبر — المئينُ ‏75 لكلّ مقياسٍ وجهازٍ في
  * أسبوع، والحكمُ من حدود web.dev. ودون عشر عيّناتٍ لا حكم: يُقال «لم تُقَس بعد» لا «جيّد».
  */
-function vitalsCard(v: VitalsSummary | null | undefined): string {
+function rejectsLine(n: number | undefined): string {
+  if (n === undefined) return ''
+  const text = n === 0 ? 'لم يُردّ إرسالٌ هذا الأسبوع.' : n === 1 ? 'رُدّ إرسالٌ واحد هذا الأسبوع.' : n === 2 ? 'رُدّ إرسالان هذا الأسبوع.' : `رُدّ ${n} إرسالات هذا الأسبوع.`
+  return html`<p class="hint m-0 mt-2">${text} الردُّ لعيبٍ في المُدخَل يُعَدّ، والهدفُ خمسةٌ في المئة من الإرسال أو أقلّ.</p>`.value
+}
+
+function vitalsCard(v: VitalsSummary | null | undefined, rejects?: number): string {
   if (v === null || v === undefined) {
     return html`<div class="card mb-3"><div class="card-head"><h2>سرعةُ اللوحة عندك</h2></div>
       <p class="hint m-0">القياسُ لا يُقرأ الآن.</p></div>`.value
@@ -197,6 +205,7 @@ function vitalsCard(v: VitalsSummary | null | undefined): string {
       <tbody>${rows}</tbody>
     </table></div>
     ${slow}
+    ${raw(rejectsLine(rejects))}
   </div>`.value
 }
 
@@ -255,7 +264,7 @@ export function tasksScreen(d: TasksScreenData): string {
   ${d.gates.map(gateCard).join('')}
   </details>
 
-  ${vitalsCard(d.vitals)}
+  ${vitalsCard(d.vitals, d.rejects)}
 
   <div class="card">
     <h2>وأين الخطوات</h2>

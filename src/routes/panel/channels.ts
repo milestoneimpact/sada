@@ -49,7 +49,7 @@ import { record } from '../../lib/audit'
 import { modelName } from '../../lib/ai/modelName'
 import { type PanelFlash } from '../panelView'
 import {
-  BUILTIN_SECRET, deciderOf, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back,
+  BUILTIN_SECRET, deciderOf, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, rejectForm,
 } from './shared'
 
 export const channels = new Hono<{ Bindings: Env }>()
@@ -88,7 +88,7 @@ channels.post('/panel/channels/app', async (c) => {
 
   const platform = platformParam(String(form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
+    await rejectForm(c, activeOrg(gate.session.record), 'platform', 'unknown_platform')
     return back('channels')
   }
   const label = platformLabel(platform)
@@ -205,7 +205,7 @@ channels.post('/panel/channels/app/verify', async (c) => {
 
   const platform = platformParam(String(gate.form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
+    await rejectForm(c, activeOrg(gate.session.record), 'platform', 'unknown_platform')
     return back('channels')
   }
 
@@ -287,7 +287,7 @@ channels.post('/panel/channels/app/delete', async (c) => {
 
   const platform = platformParam(String(gate.form.get('platform') ?? ''))
   if (platform === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'منصّة غير معروفة' })
+    await rejectForm(c, activeOrg(gate.session.record), 'platform', 'unknown_platform')
     return back('channels')
   }
 

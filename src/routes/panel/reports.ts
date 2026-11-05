@@ -24,6 +24,7 @@ import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
 import { ownerRows } from '../../lib/owner'
 import { tasksScreen } from '../ui/tasksView'
 import { vitalsSummary } from '../../lib/vitals'
+import { rejectsLately } from '../../lib/forms'
 import { currentPhase, gatesOf, readGateFacts } from '../../lib/gates'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { notFoundResponse } from '../errors'
@@ -41,11 +42,13 @@ reports.get('/panel/tasks', async (c) => {
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const org = activeOrg(session.record)
-  const [gateFacts, facts, vitals] = await Promise.all([
+  const [gateFacts, facts, vitals, rejects] = await Promise.all([
     readGateFacts(c.env.DB, org),
     ownerFacts(c, org),
     // ‏ما قِيس من المتصفّح لا ما قُدّر (D-299) — وقراءةٌ تفشل لا تُسقط الصفحة
     vitalsSummary(c.env.DB, org).catch(() => null),
+    // ‏وإرسالاتٌ رُدّت لعيبٍ في المُدخَل (D-302)
+    rejectsLately(c.env.DB, org).catch(() => 0),
   ])
   const gates = gatesOf(gateFacts)
   const body = tasksScreen({
@@ -54,6 +57,7 @@ reports.get('/panel/tasks', async (c) => {
     phase: currentPhase(gates),
     env: c.env.SADA_ENV,
     vitals,
+    rejects,
   })
 
   return page((nonce) =>
