@@ -2,8 +2,6 @@
   - /url: "#main"
 - complementary:
   - img "صدى"
-  - link "منشور جديد":
-    - /url: /panel#idea
   - navigation "أقسام اللوحة":
     - text: العمل
     - link "الرئيسيّة":
