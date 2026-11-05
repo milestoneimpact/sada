@@ -33,7 +33,7 @@ import { dayMonth, dayRange } from '../../lib/time/zone'
 function sum(label: string, value: number | null, from: number, of: number): string {
   if (value === null) {
     return `<span class="stat"><b><span class="na"
-      title="لا تعطيه المنصّة لهذا الحساب">—</span></b>${escapeHtml(label)}</span>`
+      data-tip="لا تعطيه المنصّة لهذا الحساب">—</span></b>${escapeHtml(label)}</span>`
   }
   const partial = from < of ? `<span class="ago"> من ${from} من ${of}</span>` : ''
   return `<span class="stat"><b>${value}</b>${escapeHtml(label)}${partial}</span>`
@@ -128,7 +128,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
   const h = Number.isNaN(mid.getTime()) ? null : toHijri(mid)
   const season = h === null || h.season === null
     ? ''
-    : `<span class="pill" title="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
+    : `<span class="pill" data-tip="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
         >${escapeHtml(h.season)}</span>`
 
   /*
@@ -204,7 +204,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
     <div class="card-head">
       <h2>ما خرج</h2>
       <div class="grow"></div>
-      <span class="chip" title="من دفتر التكلفة في هذه المدّة وحدها">
+      <span class="chip" data-tip="من دفتر التكلفة في هذه المدّة وحدها">
         أُنفق ${escapeHtml(money(r.spendUsd))}</span>
     </div>
     ${r.platforms.length === 0 ? '' : `<div class="slices">${r.platforms.map(sliceCard).join('')}</div>`}

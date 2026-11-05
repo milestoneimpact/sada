@@ -117,7 +117,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
     return `<div class="pb-col pb-cell" data-drop data-day="${d}" data-width="1" aria-label="${escapeHtml(label(d))}">
       <span class="pb-dn">${escapeHtml(label(d, false))}</span><span class="pb-dl">${escapeHtml(label(d))}</span>
       ${list.map(({ item, index }) => `<div class="card card-inset pb-card pb-chip" data-drag data-index="${index}" data-offset="0" data-platform="${escapeHtml(item.platform)}" tabindex="0"
-          title="${escapeHtml(item.angle)}">${LOGOS[item.platform] ?? ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi><span class="pb-ct">${escapeHtml(item.angle)}</span></div>`).join('')}
+          data-tip="${escapeHtml(item.angle)}">${LOGOS[item.platform] ?? ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi><span class="pb-ct">${escapeHtml(item.angle)}</span></div>`).join('')}
     </div>`
   }).join('')
 

@@ -341,10 +341,10 @@ describe('سجلّ الصحّة بمنطقة المالك (D-203)', () => {
   it('عنوان التحويم بمنطقته لا بالرياض حين تُعرف', () => {
     const health = { a1: { status: 'active', expiresAt: '2026-10-01 00:00:00', refreshExpiresAt: null, refreshedAt: null, needsReauthAt: null, ...NO_NOTES, alerts: [] } } as const
     const ny = screen({ tab: 'setup', zone: 'America/New_York', health })
-    expect(ny).toContain('title="2026-09-30 20:00"')
-    expect(ny).not.toContain('title="2026-10-01 03:00')
+    expect(ny).toContain('data-tip="2026-09-30 20:00"')
+    expect(ny).not.toContain('data-tip="2026-10-01 03:00')
     const unknown = screen({ tab: 'setup', zone: null, health })
-    expect(unknown).toContain('title="2026-10-01 03:00 بتوقيت الرياض"')
+    expect(unknown).toContain('data-tip="2026-10-01 03:00 بتوقيت الرياض"')
   })
 })
 

@@ -71,7 +71,7 @@ export function menu(input: MenuInput): string {
   const cls = `btn btn-${variant}${input.size === 'sm' ? ' btn-sm' : ''} menu-btn`
   // ‏زرُّ الأيقونة بلا نصٍّ ظاهر: اسمُه في «aria-label» كـ`button()`
   const named = variant === 'icon'
-    ? ` aria-label="${escapeHtml(input.label)}" title="${escapeHtml(input.label)}"`
+    ? ` aria-label="${escapeHtml(input.label)}"`
     : ''
   const text = variant === 'icon' ? '' : `<span>${escapeHtml(input.label)}</span>`
   return `<details class="menu"${input.id === undefined ? '' : ` id="${escapeHtml(input.id)}"`}${

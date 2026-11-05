@@ -306,7 +306,7 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule" data-optimistic="اعتُمدت وجُدولت"
-               title="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
+               data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
              <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد فقط</button>`
     : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}
              <button class="btn btn-danger btn-sm" type="submit" name="do" value="reject" data-optimistic="رُفضت">ارفض</button></form>`
@@ -338,7 +338,7 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
            <span class="ago">واقتراح لم يُقَس أسوأ من حقل خامّ.</span></p>`
   }
   const said = peaks.hours
-    .map((h) => `<span class="chip mono" title="وسيط التفاعل ${h.median} في ${h.posts} منشورات"
+    .map((h) => `<span class="chip mono" data-tip="وسيط التفاعل ${h.median} في ${h.posts} منشورات"
       >${clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)}</span>`)
     .join('')
   return `<p class="hint peak"><b>أعلى تفاعل قِيس</b> عند ${said}
@@ -456,7 +456,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
          <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' disabled' : ''}
-           title="تُرفَض هذه بعد أن يمرّ التوليد بحرّاسه، فلا يبقى المنشور بلا صورة">${label}</button></form>`
+           data-tip="تُرفَض هذه بعد أن يمرّ التوليد بحرّاسه، فلا يبقى المنشور بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
         loading="lazy" width="${w}" height="${h}">
@@ -465,7 +465,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
         <span class="chip mono">${ready.cost === 0 ? '—' : money(ready.cost)}</span>
         ${ready.prompt === ''
           ? ''
-          : `<span class="chip" title="${escapeHtml(ready.prompt)}">الوصف</span>`}
+          : `<span class="chip" data-tip="${escapeHtml(ready.prompt)}">الوصف</span>`}
         <span class="grow"></span>
         ${open
           ? `${clip === undefined
@@ -552,7 +552,7 @@ function readyLine(line: MediaLine): string {
     .map((dot) => {
       const mark = RUNG_MARK[dot.state]
       return statusBadge(mark.cls, mark.g, escapeHtml(dot.title),
-        `title="${escapeHtml(`${mark.label} — ${dot.note}`)}"`)
+        `data-tip="${escapeHtml(`${mark.label} — ${dot.note}`)}"`)
     })
     .join('')
   const next = line.next
@@ -880,7 +880,7 @@ function card(
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
-    `<span class="chip mono" title="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
+    `<span class="chip mono" data-tip="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك. ورابطٌ على X ثلاثةَ عشرَ
      * ضعفا (D-003 · D-069): يُعلَّم تحذيرا ليُرى قبل النقر لا بعده.
@@ -897,7 +897,7 @@ function card(
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     <div class="draft-top">
       ${open
-        ? `<label class="pick" title="حدّدها للاعتماد الجماعيّ">
+        ? `<label class="pick" data-tip="حدّدها للاعتماد الجماعيّ">
              <input type="checkbox" form="bulk" name="id" value="${id}"
                data-pick data-cost="${d.publishCost}"
                aria-label="حدّد هذه المسوّدة للاعتماد الجماعيّ">

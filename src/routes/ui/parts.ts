@@ -32,7 +32,7 @@ export { glyph } from './icons'
  */
 export function fileName(name: string): string {
   const stem = name.replace(/\.[A-Za-z0-9]{1,5}$/, '')
-  return `<bdi title="${escapeHtml(name)}">${escapeHtml(stem === '' ? name : stem)}</bdi>`
+  return `<bdi data-tip="${escapeHtml(name)}">${escapeHtml(stem === '' ? name : stem)}</bdi>`
 }
 
 /**
@@ -150,7 +150,7 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
             <span class="grow"></span>
             ${r.error === null
               ? `<span class="chip mono">${r.status ?? '—'}</span>`
-              : `<span class="chip bad" title="${escapeHtml(r.error)}">${escapeHtml(
+              : `<span class="chip bad" data-tip="${escapeHtml(r.error)}">${escapeHtml(
                   r.error.slice(0, 28))}</span>`}
           </li>`
         })

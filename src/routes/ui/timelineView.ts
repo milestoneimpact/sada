@@ -78,7 +78,7 @@ function barHtml(bar: GanttBar, isPlan: boolean, zone: string | null): string {
     ? ` data-move="${escapeHtml(bar.id)}" data-at="${escapeHtml(bar.at)}"`
     : ''
   return `<a class="${cls}" href="${escapeHtml(bar.href)}" style="${place(bar.start, bar.end)}"${move}
-    title="${escapeHtml(text)}${move === '' ? '' : ' · اسحبه لتغيير اليوم'}" aria-label="${escapeHtml(text)}">${wait}${label}</a>${mark}`
+    data-tip="${escapeHtml(text)}${move === '' ? '' : ' · اسحبه لتغيير اليوم'}" aria-label="${escapeHtml(text)}">${wait}${label}</a>${mark}`
 }
 
 function rowHtml(row: GanttRow, isPlan: boolean, d: TimelineView): string {

@@ -86,7 +86,7 @@ function csvHref(d: PivotView): string {
 function rowHead(dim: Dimension, key: string): string {
   const label = escapeHtml(keyLabel(dim, key))
   if (dim !== 'platform' || !(key in PLATFORM_LABEL)) return label
-  return `<a href="/panel/channels/${escapeHtml(key)}" title="شاشة ${label}">${label}</a>`
+  return `<a href="/panel/channels/${escapeHtml(key)}" data-tip="شاشة ${label}">${label}</a>`
 }
 
 export function pivotPane(d: PivotView): string {

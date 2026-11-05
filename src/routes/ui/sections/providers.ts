@@ -77,7 +77,7 @@ function modelPicker(options: {
           : `<option value="${current}" title="${current}" selected>${escapeHtml(modelName(options.current))}</option>`}
         <option value="__manual__">اكتبه يدويّا…</option>
       </select>
-      <button type="button" class="btn btn-secondary btn-sm mp-load" title="يجلب القائمة من عند المزوّد الآن">حدّث</button>
+      <button type="button" class="btn btn-secondary btn-sm mp-load" data-tip="يجلب القائمة من عند المزوّد الآن">حدّث</button>
     </div>
     <div class="sub mp-note m-0 mt-1"></div>
   </div>`
@@ -170,7 +170,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         ? statusBadge('warn', '▲', 'معطَّل')
         : p.verifiedAt === null
           ? statusBadge('idle', '○', 'لم يُختبر')
-          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `title="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
+          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `data-tip="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعر غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
@@ -466,7 +466,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         : r.pending !== undefined
           // ينتظرك ولا يسقط — بعلامة النقطة وكلمتها، فيقول الجدولُ ما يقوله الزرّ
           ? statusBadge('warn', RUNG_MARK.now.g, escapeHtml(r.pending),
-              `title="${escapeHtml(`${RUNG_MARK.now.label} — ${r.pending}`)}"`)
+              `data-tip="${escapeHtml(`${RUNG_MARK.now.label} — ${r.pending}`)}"`)
           : r.implemented
             ? statusBadge('bad', '✕', 'مزوّده غير جاهز')
             : statusBadge('idle', '○', 'لم تُبن')}</td></tr>`).join('')

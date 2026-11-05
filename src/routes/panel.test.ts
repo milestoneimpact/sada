@@ -364,8 +364,8 @@ describe('اللوح المحوريّ (D-120)', () => {
     // صفّان: منصّتان — **والاسمُ كما يُقرأ لا كما في القاعدة** (D-123):
     // كان الاختبارُ يثبّت `linkedin` خاما، فثبّت العيبَ الذي كان يجب أن يمسكه
     // ورأسُ الصفّ بابٌ إلى شاشة المنصّة منذ D-132
-    expect(html).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشة LinkedIn">LinkedIn</a></th>')
-    expect(html).toContain('<th scope="row"><a href="/panel/channels/x" title="شاشة X">X</a></th>')
+    expect(html).toContain('<th scope="row"><a href="/panel/channels/linkedin" data-tip="شاشة LinkedIn">LinkedIn</a></th>')
+    expect(html).toContain('<th scope="row"><a href="/panel/channels/x" data-tip="شاشة X">X</a></th>')
     expect(html).not.toContain('>linkedin<')
   })
 
@@ -684,8 +684,8 @@ describe('نضج العرض', () => {
     const cookie = await login()
     const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(html).toMatch(/الآن|قبل /)
-    // ‏والدقيقُ في title بتوقيت الرياض لا UTC (D-201)
-    expect(html).toMatch(/title="\d{4}-\d\d-\d\d \d\d:\d\d بتوقيت الرياض"/)
+    // ‏والدقيقُ في التلميح (data-tip منذ D-312) بتوقيت الرياض لا UTC (D-201)
+    expect(html).toMatch(/data-tip="\d{4}-\d\d-\d\d \d\d:\d\d بتوقيت الرياض"/)
   })
 
   it('الحالة تحمل رمزا ونصّا — لا لونا وحده', async () => {
@@ -3754,7 +3754,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     await seedDraft()
     env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0001'
     const html = await panelHtml()
-    expect(html).toContain('title="تامّة — Cloudflare"')
+    expect(html).toContain('data-tip="تامّة — Cloudflare"')
     expect(html).not.toContain('لا مفتاح لـ Cloudflare')
     const row = html.slice(html.indexOf('الصورة — التوليد البصريّ'), html.indexOf('</tr>', html.indexOf('الصورة — التوليد البصريّ')))
     expect(row).toContain('جاهز')
@@ -3826,7 +3826,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     // تحت السقف: تامّةٌ والزرُّ يعمل — فالسقوطُ بعده من الدفتر لا من السقف وحدَه
     await recordCost(db, { provider: 'gemini', operation: 'image', units: 1, unitCost: 0.04 })
     const under = await panelHtml()
-    expect(under).toContain('title="تامّة — Gemini"')
+    expect(under).toContain('data-tip="تامّة — Gemini"')
     expect(under).toContain(IMAGE_BUTTON_ON)
 
     await recordCost(db, { provider: 'gemini', operation: 'image', units: 1, unitCost: 0.04 })
@@ -3842,7 +3842,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     env['CF_BROWSER_TOKEN'] = 'b-0001'
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
     const ready = await panelHtml()
-    expect(ready).toContain('title="تامّة — يُركَّب العنوان"')
+    expect(ready).toContain('data-tip="تامّة — يُركَّب العنوان"')
     expect(ready).not.toContain('لا مزوّد يصوغ العنوان')
 
     await setEnabled(db, 'anthropic', false, 'test')
@@ -3861,13 +3861,13 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     await seedDraft()
     const none = await panelHtml()
     expect(none).toContain(INFO_BUTTON_OFF)
-    expect(none).toContain('title="فشلت — بلا مفتاح المتصفّح"')
+    expect(none).toContain('data-tip="فشلت — بلا مفتاح المتصفّح"')
 
     env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0002'
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
     const ready = await panelHtml()
     expect(ready).toContain(INFO_BUTTON_ON)
-    expect(ready).toContain('title="تامّة — يصوّر الصفحة"')
+    expect(ready).toContain('data-tip="تامّة — يصوّر الصفحة"')
     expect(ready).not.toContain('سرّ-المتصفّح-0002')
   })
 
@@ -3876,7 +3876,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     env['CF_AI_ACCOUNT_ID'] = 'acc-1234'
     env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0002'
     const html = await panelHtml()
-    expect(html).toContain('title="تامّة — من أسرار Worker"')
+    expect(html).toContain('data-tip="تامّة — من أسرار Worker"')
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
     expect(routeRow(html, 'الفيديو — تحريك الصورة')).toContain('جاهز')
     expect(html).not.toContain('cf-ai-secret-value-0002')
@@ -3906,7 +3906,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     await seedImage(await seedDraft())
     env['AI'] = { run: async () => ({}) }
     const html = await panelHtml()
-    expect(html).toContain('title="تنتظرك — برابط Worker وحده"')
+    expect(html).toContain('data-tip="تنتظرك — برابط Worker وحده"')
     // ينتظرك ولا يسقط: الزرُّ يعمل
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
     const row = routeRow(html, 'الفيديو — تحريك الصورة')
@@ -4026,7 +4026,7 @@ describe('سقف المقاطع اليوميّ في اللوحة (D-168)', () =>
     const cookie = await login()
     await clipToday()
     const under = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
-    expect(under).toContain('title="تامّة — بقي 1 من 2 اليوم"')
+    expect(under).toContain('data-tip="تامّة — بقي 1 من 2 اليوم"')
     expect(under).toContain(ON)
 
     await clipToday()
@@ -4079,7 +4079,7 @@ describe('سقف المقاطع اليوميّ في اللوحة (D-168)', () =>
     const raised = await save('3')
     expect(raised).toContain('سقف المقاطع اليوميّ: حُفظ 3.')
     expect(raised).toContain(ON)
-    expect(raised).toContain('title="تامّة — بقي 1 من 3 اليوم"')
+    expect(raised).toContain('data-tip="تامّة — بقي 1 من 3 اليوم"')
 
     const clamped = await save('500')
     expect(clamped).toContain('سقف المقاطع اليوميّ: القيمة 500 خارج المدى — حُفظت 20.')

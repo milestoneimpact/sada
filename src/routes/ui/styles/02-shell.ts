@@ -7,7 +7,8 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
 
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--surface); border-inline-start:var(--bd); display:flex;
-  flex-direction:column; position:sticky; top:0; height:100dvh; overflow-y:auto; color:var(--ink)}
+  flex-direction:column; position:sticky; top:0; height:100dvh; overflow-y:auto; color:var(--ink);
+  view-transition-name:rail}
 /* وكان على الحافّة الداخليّة خيطُ ذهبٍ (::after)؛ نزعته الطبعةُ الرابعة، فلا
    قاعدة له (D-144 · D-148). */
 .rail-head{padding:var(--s-6) var(--s-5) var(--s-4); display:flex; align-items:center; gap:var(--s-3)}
@@ -87,7 +88,7 @@ details.ladder .verdict.bad{color:var(--bad)}
 /* **اسمٌ لا يتصادم**: كان هذا الشريط يسمّى .bar وهو اسمُ مقياس المقدار
    (ارتفاعُه أربعة بكسل) — فكان المقياس يدهسه فينسحق الشريط إلى خيط.
    علّة لا يكشفها اختبار ولا مدقّق: الصفحة تعمل، والترويسة غائبة. */
-.topbar{position:sticky; top:0; z-index:20; background:var(--bg);
+.topbar{position:sticky; top:0; z-index:20; background:var(--bg); view-transition-name:topbar;
   border-bottom:var(--bd); padding:0 var(--gutter); flex:none; display:flex;
   align-items:center; gap:var(--s-3); transition:box-shadow var(--dur-2) var(--ease);
   min-height:var(--topbar)}
@@ -130,6 +131,6 @@ details.ladder .verdict.bad{color:var(--bad)}
    نفسها التي يظهر بها الظلّ: أنّ فوقك محتوًى. */
 .topbar .ttl{min-width:0; opacity:0; transform:translateY(var(--s-1)); transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
 .topbar.lifted .ttl{opacity:1; transform:none}
-.content{padding:var(--s-5d) var(--gutter) var(--s-12d); max-width:var(--shell); width:100%}
+.content{padding:var(--s-5d) var(--gutter) var(--s-12d); max-width:var(--shell); width:100%; view-transition-name:content}
 
 `

@@ -264,7 +264,7 @@ export function tasksScreen(d: TasksScreenData): string {
     <h2>وأين الخطوات</h2>
     <p class="hint">كلّ مهمّة لها صفحة بالعناصر الستّة في
       <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"
-        title="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
+        data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
       على الشاشة، وعلامة النجاح، وما يُقرأ أوّلا إن فشلت.
       <b>ومعرِّف هنا بلا صفحة هناك يُسقط CI</b>، فلا يبقى عنوان بلا خطوات.</p>
   </div>`
