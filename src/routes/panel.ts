@@ -21,6 +21,7 @@ import { media } from './panel/media'
 import { reports } from './panel/reports'
 import { drafts } from './panel/drafts'
 import { notices } from './panel/notices'
+import { vitals } from './panel/vitals'
 
 export { setFlash } from './panel/shared'
 
@@ -37,3 +38,4 @@ panel.route('/', media)
 panel.route('/', reports)
 panel.route('/', drafts)
 panel.route('/', notices)
+panel.route('/', vitals)

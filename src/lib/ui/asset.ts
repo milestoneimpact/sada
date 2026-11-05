@@ -37,6 +37,7 @@ import { STYLE } from '../../routes/ui/styles'
 import { SCRIPT as PANEL_SCRIPT } from '../../routes/ui/panelScript'
 import { COMMAND_SCRIPT } from '../../routes/ui/command'
 import { CONFIRM_SCRIPT, COPY_SCRIPT, DENSITY_SCRIPT, IMG_SCRIPT, KIT_SCRIPT, THEME_SCRIPT, TZ_SCRIPT } from '../../routes/ui/scripts'
+import { WEB_VITALS_IIFE } from './vendor/webVitals'
 
 /**
  * بصمةٌ متزامنة — **مفتاحُ تخبئةٍ لا حارس**.
@@ -135,6 +136,30 @@ let panel: ScriptAsset | null = null
  * تسجيلُ عامل الخدمة (D-296) — صامتٌ: متصفّحٌ بلا دعمٍ أو رفضٌ لا يُظهر شيئًا، فاللوحةُ تعمل كما كانت.
  * والعاملُ نفسُه لا يخزّن صفحةً (المسارُ /sw.js)، فالتسجيلُ لا يبدّل ما يراه المالك إلّا حين تسقط الشبكة.
  */
+/**
+ * القياسُ الميدانيّ (D-299): web-vitals مضمَّنةً حرفيًّا (vendor/webVitals.ts)، وبعدها سطرُنا: ثلاثةُ أرقامٍ لكلّ فتحةٍ
+ * من جلسة (رمزُ النموذج شرطٌ، فلا عيّنةَ من زائرٍ ولا من صفحةٍ بلا نموذج) تُرسَل بـ sendBeacon إلى المسار الداخليّ
+ * حين تكتمل أو حين تُخفى الصفحة. ونوعُ الجهاز من العرض لا من الوكيل.
+ */
+const VITALS_SCRIPT = `
+(function(){
+  if (typeof webVitals === 'undefined' || !navigator.sendBeacon) return;
+  var f = document.querySelector('[data-csrf]');
+  var csrf = f ? f.getAttribute('data-csrf') : '';
+  if (!csrf) return;
+  var sent = {};
+  var device = window.innerWidth < 700 ? 'phone' : 'desktop';
+  function send(m){
+    if (sent[m.name]) return;
+    sent[m.name] = 1;
+    var p = new URLSearchParams();
+    p.set('_csrf', csrf); p.set('metric', m.name); p.set('value', String(m.value));
+    p.set('page', location.pathname); p.set('device', device);
+    navigator.sendBeacon('/panel/vitals', p);
+  }
+  webVitals.onLCP(send); webVitals.onINP(send); webVitals.onCLS(send);
+})();`
+
 const SW_SCRIPT = `
 (function(){
   if (!('serviceWorker' in navigator)) return;
@@ -143,7 +168,7 @@ const SW_SCRIPT = `
 
 export function uiScript(): ScriptAsset {
   if (ui === null) {
-    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT + SW_SCRIPT)
+    const body = stripJs(THEME_SCRIPT + DENSITY_SCRIPT + COPY_SCRIPT + CONFIRM_SCRIPT + IMG_SCRIPT + TZ_SCRIPT + KIT_SCRIPT + COMMAND_SCRIPT + SW_SCRIPT + '\n' + WEB_VITALS_IIFE + '\n' + VITALS_SCRIPT)
     ui = { path: `/a/u.${fingerprint(body)}.js`, body }
   }
   return ui

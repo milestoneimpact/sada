@@ -23,6 +23,7 @@ import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../../lib
 import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
 import { ownerRows } from '../../lib/owner'
 import { tasksScreen } from '../ui/tasksView'
+import { vitalsSummary } from '../../lib/vitals'
 import { currentPhase, gatesOf, readGateFacts } from '../../lib/gates'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { notFoundResponse } from '../errors'
@@ -39,12 +40,20 @@ reports.get('/panel/tasks', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
-  const gates = gatesOf(await readGateFacts(c.env.DB, activeOrg(session.record)))
+  const org = activeOrg(session.record)
+  const [gateFacts, facts, vitals] = await Promise.all([
+    readGateFacts(c.env.DB, org),
+    ownerFacts(c, org),
+    // ‏ما قِيس من المتصفّح لا ما قُدّر (D-299) — وقراءةٌ تفشل لا تُسقط الصفحة
+    vitalsSummary(c.env.DB, org).catch(() => null),
+  ])
+  const gates = gatesOf(gateFacts)
   const body = tasksScreen({
-    rows: ownerRows(await ownerFacts(c, activeOrg(session.record))),
+    rows: ownerRows(facts),
     gates,
     phase: currentPhase(gates),
     env: c.env.SADA_ENV,
+    vitals,
   })
 
   return page((nonce) =>
