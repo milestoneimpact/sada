@@ -310,6 +310,8 @@ export interface PanelFlash {
     readonly action: string
     readonly id: string
     readonly label: string
+    /** حقولٌ يحملها الزرّ مع المعرّف (D-303): الموعدُ والحسابُ لاستعادة سحب */
+    readonly fields?: Readonly<Record<string, string>>
   }
 }
 
@@ -1574,7 +1576,9 @@ export function panelPage(view: PaneView): string {
           ...(d.flash.undo === undefined ? {} : {
             action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
                         data-busy="جار…" data-swap>
-                    <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">
+                    <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">${
+                      Object.entries(d.flash.undo.fields ?? {}).map(([k, v]) =>
+                        html`<input type="hidden" name="${k}" value="${v}">`.value).join('')}
                     <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
                   </form>`,
           }),

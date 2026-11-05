@@ -145,9 +145,9 @@ export async function schedulePost(
  */
 export async function unschedule(db: Db, postId: string, org: string | null = null): Promise<ScheduleResult> {
   const row = await db
-    .prepare('SELECT id, org_id, status, dispatched_at FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
+    .prepare('SELECT id, org_id, status, dispatched_at, scheduled_at, account_id FROM posts WHERE id = ? AND (?2 IS NULL OR org_id = ?2)')
     .bind(postId, org)
-    .first<{ id: string; org_id: string; status: string; dispatched_at: string | null }>()
+    .first<{ id: string; org_id: string; status: string; dispatched_at: string | null; scheduled_at: string | null; account_id: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولا' }
   if (row.dispatched_at !== null) {
@@ -161,7 +161,39 @@ export async function unschedule(db: Db, postId: string, org: string | null = nu
     )
     .bind(postId, row.org_id)
     .run()
-  return { ok: true, at: '', account: '', platform: '' }
+  // ‏وما كان يُعاد مع النتيجة (D-303): الموعدُ والحسابُ ليحملهما زرُّ «تراجَع» في الإشعار
+  return { ok: true, at: row.scheduled_at ?? '', account: row.account_id ?? '', platform: '' }
+}
+
+/**
+ * **التراجعُ عن السحب** (D-303 · Norman: المسامحةُ لا التحذير): يعيد الموعدَ والحسابَ اللذين كانا، ما دامت
+ * معتمَدةً بلا موعد — فإشعارٌ شاخ لا يقلب حالًا تبدّلت بعده (كما في `undoReject`). ولا حارسَ للزمن هنا: موعدٌ
+ * مرّ في ثوانٍ بين السحب والتراجع يُنشَر في الدورة التالية، وهو ما أراده المالكُ حين جدوله.
+ */
+export async function restoreSchedule(
+  db: Db,
+  postId: string,
+  at: string,
+  accountId: string,
+  org: string,
+): Promise<ScheduleResult> {
+  if (at === '' || accountId === '') return { ok: false, reason: 'لا موعدَ يُستعاد' }
+  const row = await db
+    .prepare('SELECT status, scheduled_at FROM posts WHERE id = ? AND org_id = ?')
+    .bind(postId, org)
+    .first<{ status: string; scheduled_at: string | null }>()
+  if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
+  if (row.status !== 'approved' || row.scheduled_at !== null) return { ok: false, reason: 'تبدّلت حالُها بعد السحب' }
+  const account = await db
+    .prepare("SELECT id FROM accounts WHERE id = ? AND org_id = ? AND status = 'active'")
+    .bind(accountId, org)
+    .first<{ id: string }>()
+  if (account === null) return { ok: false, reason: 'الحسابُ لم يعد مربوطًا' }
+  await db
+    .prepare("UPDATE posts SET status = 'queued', scheduled_at = ?, account_id = ? WHERE id = ? AND org_id = ? AND status = 'approved'")
+    .bind(at, accountId, postId, org)
+    .run()
+  return { ok: true, at, account: accountId, platform: '' }
 }
 
 /**

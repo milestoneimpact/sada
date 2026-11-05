@@ -2367,6 +2367,18 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
 
     const pulled = await post(cookie, '/panel/drafts/unschedule', { id })
     expect(where(pulled)).toBe(`/panel#s-${id}`)
+    // ‏والتراجعُ بدل السؤال (D-303): الإشعارُ يحمل الموعدَ والحساب، والزرُّ يعيدهما
+    html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('action="/panel/drafts/undo-unschedule"')
+    const undoAt = /name="at" value="([^"]+)"/.exec(html)?.[1] ?? ''
+    const undoAccount = /name="account" value="([^"]+)"/.exec(html)?.[1] ?? ''
+    expect(undoAt).toBe('2030-03-04 06:00:00')
+    await post(cookie, '/panel/drafts/undo-unschedule', { id, at: undoAt, account: undoAccount })
+    const restored = await db.prepare('SELECT status, scheduled_at FROM posts WHERE id = ?').bind(id).first<{ status: string; scheduled_at: string }>()
+    expect(restored).toEqual({ status: 'queued', scheduled_at: '2030-03-04 06:00:00' })
+    html = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(html).toContain('عاد الموعدُ كما كان.')
+    await post(cookie, '/panel/drafts/unschedule', { id })
 
     // ‏وبلا كعكة المنطقة تُقرأ المنطقةُ التي حُفظت من آخر كعكة (D-200)، لا «UTC»
     await post(cookie, '/panel/drafts/schedule', { id, account, when: '2030-03-04T06:00' })

@@ -14,7 +14,7 @@ import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { generateForPost, mediaFor } from '../../lib/image/job'
 import {
-  requeue, reschedulePost, schedulePost, unschedule, type ScheduleResult,
+  requeue, reschedulePost, schedulePost, unschedule, type ScheduleResult, restoreSchedule,
 } from '../../lib/schedule/job'
 import { missingMedia } from '../../lib/schedule/media'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../../lib/schedule/spread'
@@ -789,7 +789,12 @@ drafts.post('/panel/drafts/unschedule', async (c) => {
   const result = await unschedule(c.env.DB, id, activeOrg(gate.session.record))
 
   const flash: PanelFlash = result.ok
-    ? { kind: 'ok', text: 'سُحب الموعد — وتبقى معتمَدةً تنتظر موعدا جديدا.' }
+    ? {
+        kind: 'ok',
+        text: 'سُحب الموعد — وتبقى معتمَدةً تنتظر موعدا جديدا.',
+        // ‏والتراجعُ بدل السؤال (D-303): الموعدُ والحسابُ في الزرّ، فلا يُسأل «أتمضي؟» قبل فعلٍ يُردّ
+        undo: { action: '/panel/drafts/undo-unschedule', id, label: 'تراجَع', fields: { at: result.at, account: result.account } },
+      }
     : { kind: 'bad', text: `تعذّر السحب: ${result.reason}` }
 
   await record(
@@ -813,6 +818,25 @@ drafts.post('/panel/drafts/unschedule', async (c) => {
  * «غيّر الموعد» من المحرّر (D-198) — **الموعدُ وحدَه، بلا سحبٍ وجدولةٍ من جديد** (`reschedulePost`).
  * والموعدُ من النموذج كما في «اعتمد وجدوِل» (`readWhen`): زرٌّ بتوقيت المالك، أو يومٌ وساعة.
  */
+/**
+ * التراجعُ عن السحب (D-303): يعيد الموعدَ والحسابَ من زرّ الإشعار — والحارسُ في `restoreSchedule` لا هنا.
+ */
+drafts.post('/panel/drafts/undo-unschedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+  const result = await restoreSchedule(
+    c.env.DB, id, String(gate.form.get('at') ?? ''), String(gate.form.get('account') ?? ''), activeOrg(gate.session.record),
+  )
+  await record(c.env.DB, {
+    actor: 'panel', action: 'draft.undo_unschedule', target: id, detail: result.ok ? result.at : 'refused:' + result.reason,
+  }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: 'عاد الموعدُ كما كان.' }
+    : { kind: 'bad', text: 'تعذّر التراجع: ' + result.reason })
+  return toCard('d', id)
+})
+
 drafts.post('/panel/drafts/reschedule', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
