@@ -1594,8 +1594,9 @@ describe('القنوات — سجلّ صادق لا وعد بما لا يقع', 
     }
     const login2 = await emailLogin(app, withSecrets)
     const cookie = (login2.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    // ‏وزرُّ الربط في «الحسابات» (D-309): لا بطاقةَ منصّاتٍ في الرئيسيّة
     const html = await (
-      await app.request('/panel', { headers: { Cookie: cookie } }, withSecrets)
+      await app.request('/panel/accounts', { headers: { Cookie: cookie } }, withSecrets)
     ).text()
     expect(html).toContain('/oauth/linkedin/start')
   })
@@ -1624,7 +1625,7 @@ describe('القنوات — سجلّ صادق لا وعد بما لا يقع', 
       .bind(crypto.randomUUID(), '<script>alert(1)</script>')
       .run()
     const cookie = await login()
-    const html = await (await app.request('/panel', withSession(cookie), env)).text()
+    const html = await (await app.request('/panel/accounts', withSession(cookie), env)).text()
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;')
   })
@@ -3065,11 +3066,11 @@ describe('ضبط التطبيق من اللوحة', () => {
 
   it('ويصير الربط ممكنا — بعد أن كان «تنتظرك»', async () => {
     const cookie = await login()
-    const before = await (await app.request('/panel', withSession(cookie), env)).text()
+    const before = await (await app.request('/panel/accounts', withSession(cookie), env)).text()
     expect(before).toContain('/panel/channels/linkedin')
 
     await save(cookie)
-    const after = await (await app.request('/panel', withSession(cookie), env)).text()
+    const after = await (await app.request('/panel/accounts', withSession(cookie), env)).text()
     expect(after).toContain('/oauth/linkedin/start')
   })
 
@@ -4096,7 +4097,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
       .run()
   }
 
-  it('الرحلة تُعدّ من القاعدة، والمسوّدات بعربيّة صحيحة، والمنصّات كلُّها بزرّها', async () => {
+  it('الرحلة تُعدّ من القاعدة، والمسوّدات بعربيّة صحيحة، ولا بطاقةَ منصّاتٍ في الرئيسيّة (D-309)', async () => {
     await seedPost('draft')
     await seedPost('draft')
     const html = await (await app.request('/panel', withSession(await login()), env)).text()
@@ -4107,12 +4108,11 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     expect(home).toContain('تنتظر قرارك مسوّدتان')
     expect(home).toContain('<ol class="funnel">')
     expect((home.match(/<li data-state=/g) ?? []).length).toBe(7)
-    for (const label of ['LinkedIn', 'X', 'Instagram', 'TikTok', 'YouTube']) {
-      expect(home).toContain(`<b>${label}</b>`)
-    }
-    // ‏وما لم يُبنَ سائقُه سطرُ «قريبًا» لا بطاقة
-    expect(home).toContain('قريبًا:')
-    expect(home).not.toContain('data-pf="snapchat"')
+    // ‏والمنصّاتُ في صفحتها «الحسابات» (D-309 · خطّة التصميم 5.5)، لا بطاقةً تعيدها في الرئيسيّة
+    expect(home).not.toContain('<h2>المنصّات</h2>')
+    expect(home).not.toContain('class="pfgrid"')
+    const accounts = await (await app.request('/panel/accounts', withSession(await login()), env)).text()
+    for (const label of ['LinkedIn', 'X', 'Instagram', 'TikTok', 'YouTube']) expect(accounts).toContain(label)
   })
   /*
    * ‏**المحطّةُ تنزل إلى البطاقة التي تعدّها، والبطاقةُ مرسومةٌ بمرساتها** (ر-0، ر-3، ر-6).

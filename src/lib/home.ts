@@ -10,7 +10,6 @@
  * فهنا ثلاثةُ أشياءَ نقيّة تُختبَر بلا قاعدة:
  * - `nextAction`: **فعلٌ واحدٌ** بأولويّةٍ مكتوبة — ما يوقف النشرَ أوّلًا.
  * - `journeySteps`: سبعُ محطّاتٍ بعدّها وحالها ورابطها.
- * - `platformTile`: حالُ كلّ منصّةٍ **وزرٌّ واحد** يناسبها.
  *
  * وما يُقرأ من القاعدة استعلامان مجمَّعان (`journeyCounts`) — لا قراءةُ الجداول.
  */
@@ -487,32 +486,3 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   }
 }
 
-export interface PlatformTile {
-  readonly id: string
-  readonly label: string
-  readonly tone: 'ok' | 'bad' | 'warn' | 'idle'
-  readonly status: string
-  /** اسمُ الحساب المربوط إن كان. */
-  readonly account: string | null
-  readonly button: { readonly label: string; readonly href: string; readonly primary: boolean }
-  /** يربط ولا ينشر (مرتبة `link`). */
-  readonly linkOnly: boolean
-  /** «<المنصّة>:<الحال>» — حقيقةُ الحال مرّةً في الصفحة (`data-fact` · D-235). */
-  readonly fact: string
-}
-
-/**
- * حالٌ واحدٌ وزرٌّ واحد لكلّ منصّة — **من حال القناة نفسِه** الذي يقرؤه لوحُ المنصّات.
- * والمحفوظةُ بلا إذنٍ تُقال حمراءَ لا خضراء (D-166).
- */
-export function platformTile(v: ChannelView, now: Date): PlatformTile {
-  const id = v.spec.id
-  const active = v.accounts.find((a) => a.status === 'active') ?? v.accounts[0]
-  // ‏والحالُ والزرُّ من `channelHealth` (D-205) — الحكمُ نفسُه الذي تقرؤه بطاقةُ «الحسابات»
-  const h = channelHealth(v, now)
-  return {
-    id, label: v.spec.label, account: active?.displayName ?? null, linkOnly: v.spec.stage === 'link',
-    tone: h.tone, status: h.label, fact: `${id}:${h.kind}`,
-    button: h.button ?? { label: 'افتح', href: `/panel/channels/${id}`, primary: false },
-  }
-}

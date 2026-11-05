@@ -161,6 +161,12 @@ describe('وشريط الرموز المقتربة', () => {
     const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
     return (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
   }
+  // ‏وحالُ المنصّة بأيّامها في بطاقتها في «الحسابات» (D-309): لا بلاطةَ منصّاتٍ في الرئيسيّة
+  async function accounts(): Promise<string> {
+    const login = await emailLogin(app, env)
+    const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    return (await app.request('/panel/accounts', { headers: { Cookie: cookie } }, env)).text()
+  }
 
   function seed(days: number, kind: 'access' | 'refresh'): void {
     const at = new Date(Date.now() + days * 86_400_000).toISOString()
@@ -191,14 +197,14 @@ describe('وشريط الرموز المقتربة', () => {
     const html = await panel()
     // ‏الشريطُ يسمّي ويحيل، والحالُ بأيّامها في البلاطة مرّةً (D-235)
     expect(html).toContain('<b><bdi>X</bdi></b> تحتاج يدَك.')
-    expect(html).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادة ربط خلال [34] أيّام/)
+    expect(await accounts()).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادة ربط خلال [34] أيّام/)
     expect(html).toContain('class="toast-note warn"')
     expect(html).not.toContain('إذن الوصول')
   })
 
   it('وإذن تجديد قريب: الحكم نفسُه، فالربط ينقطع بانقضائه', async () => {
     seed(2, 'refresh')
-    const html = await panel()
+    const html = await accounts()
     expect(html).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادة ربط خلال (يوم|يومين)/)
     expect(html).not.toContain('إذن التجديد')
   })

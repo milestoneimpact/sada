@@ -120,8 +120,6 @@ ol.steps.wiz li.at{background:var(--selected); border-color:var(--line)}
 ol.steps.wiz li:not(:last-child)::before{top:calc(var(--s-8) + var(--stroke)); bottom:calc(-1 * var(--s-3));
   inset-inline-start:var(--s-6)}
 ol.steps.wiz .body{flex:1; min-width:11.25rem}
-/* ‏حالُ المنصّة في بلاطتها بحجم المتن الصغير (D-239): أكثرُ حروف الرئيسيّة الصغيرة كانت هنا */
-.pf .st{font-size:var(--t-small); line-height:var(--lh-small)}
 ol.steps.wiz .st{flex:none; margin-inline-start:auto}
 /* ورقمُ خطوةٍ رُدّت أو تمّت يحمل لونَ حالها — والعلامةُ نصٌّ بجانبه */
 ol.steps.wiz li.ok .step-n{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}

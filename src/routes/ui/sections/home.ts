@@ -8,12 +8,11 @@
  * والحكمُ كلُّه في `lib/home.ts` نقيًّا مختبَرًا؛ وهنا رسمٌ وتهريبٌ فحسب.
  */
 import { escapeHtml } from '../escape'
-import { byNeed, type ChannelView } from '../../../lib/channels'
 import {
-  journeySteps, nextAction, platformTile,
-  type HomeFacts, type JourneyStep, type PlatformTile,
+  journeySteps, nextAction,
+  type HomeFacts, type JourneyStep,
 } from '../../../lib/home'
-import { parseSqliteUtc, untilTime } from '../../../lib/format'
+import { parseSqliteUtc } from '../../../lib/format'
 import { clock, localParts } from '../../../lib/time/zone'
 import { platformLabel } from '../../../lib/oauth/providers'
 
@@ -30,7 +29,6 @@ import { statusBadge } from '../components/badge'
 import { dayBars } from '../chart'
 import { total } from '../../../lib/home'
 
-const TILE_MARK: Readonly<Record<PlatformTile['tone'], string>> = { ok: '●', bad: '▲', warn: '◍', idle: '○' }
 
 /*
  * ‏ومحطّةُ النشر تقول «فشلت» لا «ساقطة» (الخطّة 8.2): علامةُ السلّم المشتركة تبقى
@@ -87,21 +85,6 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
   </div>`
 }
 
-function tile(t: PlatformTile, nextAt: string | null, now: Date): string {
-  const meta = t.tone === 'ok'
-    ? nextAt === null ? 'لا شيء مجدول عليها' : `التالي ${untilTime(nextAt, now)}`
-    : t.tone === 'bad' ? 'النشر عليها متوقّف' : t.tone === 'warn' ? 'ضغطة واحدة تربطها' : 'سرّا التطبيق أوّلًا'
-  return `<div class="card pf" data-pf="${escapeHtml(t.id)}">
-    <div class="pf-head"><span class="pf-logo">${LOGOS[t.id] ?? ''}</span>
-      <span class="pf-name"><b>${escapeHtml(t.label)}</b>
-        ${t.account === null ? '' : `<span class="ago"><bdi>${escapeHtml(t.account)}</bdi></span>`}</span></div>
-    ${statusBadge(t.tone, TILE_MARK[t.tone], escapeHtml(t.status), `data-fact="${escapeHtml(t.fact)}"`)}
-    <span class="ago">${escapeHtml(t.linkOnly ? 'يربط ولا ينشر بعد' : meta)}</span>
-    <a class="btn ${t.button.primary ? 'btn-primary' : 'btn-secondary'} btn-sm" href="${escapeHtml(t.button.href)}"
-      aria-label="${escapeHtml(`${t.button.label} — ${t.label}`)}">${escapeHtml(t.button.label)}</a>
-  </div>`
-}
-
 /**
  * المحطّةُ المميَّزة — **ما يتكلّم عنه الفعلُ فوقها**، ثمّ الساقطة، ثمّ أوّلُ ما ينتظرك.
  *
@@ -137,7 +120,8 @@ function stats(f: HomeFacts): string {
 }
 
 /** ما كُتب في أربعة عشر يومًا بتوقيت المالك — من المنشورات المرسومة وحدها. */
-function activity(f: HomeFacts, now: Date): string {
+/** «ما كُتب في أسبوعين» — في «الكلفة وما وقع» المطويّة منذ D-309: سجلٌّ يُقرأ لا قرارٌ يُتّخذ. */
+export function activityCard(f: HomeFacts, now: Date): string {
   const key = (d: Date): string => { const p = localParts(d, f.zone); return `${p.year}-${p.month}-${p.day}` }
   const by = new Map<string, number>()
   for (const at of f.written ?? []) {
@@ -182,9 +166,6 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
   const focus = focusOf(trip, next.step)
-  const built = f.channels.filter((c: ChannelView) => c.state !== 'unbuilt')
-  const soon = f.channels.filter((c: ChannelView) => c.state === 'unbuilt').map((c) => c.spec.label)
-  const linked = built.filter((c) => platformTile(c, now).tone === 'ok').length
   /*
    * ‏**ولا تُقال الحالُ مرّتين** (D-289): منصّةٌ انقطعت أو قارب إذنُها يقولها شريطُ اللوحة فوق كلّ لوح بزرّه، فكانت الرئيسيّةُ
    * ‏تعيدها بطاقةً حمراءَ كاملةً تحته — أوّلَ ما يُرى في كلّ فتحة. فخطوةٌ عن منصّةٍ والشريطُ يقولها تُترك له، ويبقى التحيّةُ سطرًا.
@@ -210,17 +191,10 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = ''): string {
       <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
     </div>
     <div class="home-side">
+    ${/* ‏ولا بطاقةَ منصّاتٍ هنا (D-309 · خطّة التصميم 5.5): صفحتُها «الحسابات»، والمنقطعةُ يقولها الشريطُ و«خطوتك التالية»؛
+       ‏و«ما كُتب في أسبوعين» سجلٌّ لا قرار، فنزل إلى «الكلفة وما وقع» (قاعدةُ الحذف D-233) */''}
     ${today(f.scheduled ?? [], now, f.zone)}
-    ${activity(f, now)}
     ${week(f.scheduled ?? [], now, f.zone)}
-  <div class="card home-card">
-    <div class="card-head"><h2>المنصّات</h2><div class="grow"></div>
-      <span class="ago">متّصلة ${linked} من ${built.length}</span></div>
-    <div class="pfgrid">${byNeed(built, now)
-      .map((c) => tile(platformTile(c, now), f.counts.perPlatform[c.spec.id]?.nextAt ?? null, now))
-      .join('')}</div>
-    ${soon.length === 0 ? '' : `<p class="hint">قريبًا: ${soon.map(escapeHtml).join(' · ')}</p>`}
-  </div>
     </div>
   </div>`
 }
