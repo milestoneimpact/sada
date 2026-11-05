@@ -230,6 +230,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
 .setup[open]>summary::before{border-inline:.3em solid transparent; border-block-start:.4em solid;
   border-block-end:0}
 .setup-body{padding-top:var(--s-2)}
+/* ‏مهمّةُ «ما عليك» طيّةً (D-310): رأسُها عنوانٌ بحبر المتن لا رابطٌ، وشاراتُه في طرفه، وتلتفّ على الهاتف؛
+   والعاجلةُ (بوّابةٌ لم تُجتَز) بصبغة الحال الخفيفة نفسِها التي كانت لصفّها */
+.task>summary{color:var(--ink); text-decoration:none; flex-wrap:wrap; gap:var(--s-2)}
+.task-t{flex:1 1 14rem; min-width:0}
+.task.urgent{background:color-mix(in srgb,var(--bad) 5%,transparent)}
 
 .copy{display:flex; gap:var(--s-2); align-items:stretch}
 .copy input{flex:1 1 auto; min-width:0;

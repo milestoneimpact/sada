@@ -70,38 +70,33 @@ function commandBox(r: OwnerRow, env: string): string {
     </details>`
 }
 
-function row(r: OwnerRow, env: string): string {
+/**
+ * ‏**المهمّةُ طيّةٌ مغلقة** (D-310 · GOV.UK Accordion · Krug): كانت كلُّ مهمّةٍ صفًّا مفتوحًا بعناصرها وأمرِها وزرّها، فالصفحةُ
+ * ‏‏11.6 شاشة على الهاتف وأوّلُها لا يقول كم بقي. فالعنوانُ وحالُه وما يفتحه في السطر، وما تحته يُفتح حين يُقصَد — والمعلّقةُ
+ * ‏الأولى مفتوحةٌ وحدَها: هي ما يُسأل عنه كلَّ صباح.
+ */
+function item(r: OwnerRow, env: string, open: boolean): string {
   const key = r.state === true ? 'done' : r.state === null ? 'unknown' : 'todo'
   const mark = MARK[key]!
   const opens = OPENS[r.unblocks]
-  return `<tr class="${key === 'todo' && r.unblocks === 'gate' ? 'urgent' : ''}">
-    <td data-label="المهمّة">
-      ${/* ‏**العنوان أوّلًا والرمز صغير بعده** (D-203): كان «M-16» أبرز ما في الصفّ */ ''}<div class="nm">${bold(r.title)}
-        <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></div>
-      <div class="sub">${bold(r.ifLeft)}</div>
+  const urgent = key === 'todo' && r.unblocks === 'gate'
+  return `<details class="setup task${urgent ? ' urgent' : ''}"${open ? ' open' : ''}>
+    <summary><span class="task-t">${bold(r.title)} <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></span>
+      <span class="grow"></span>${statusBadge(opens.cls, '●', opens.label)} ${statusBadge(mark.cls, mark.g, mark.label)}</summary>
+    <div class="setup-body">
+      ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<div class="sub">${bold(r.ifLeft)}</div>
+      ${r.measured === '' ? '' : `<div class="sub">${bold(r.measured)}</div>`}
       ${commandBox(r, env)}
-      ${r.go === undefined || r.state === true
-        ? ''
-        : `<a class="btn btn-secondary btn-sm mt-2" href="${escapeHtml(r.go)}"${
-            r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
-      ${/*
-         * ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها، وكانت
-         * ‏الشاشةُ تسمّيها ولا تفتحها — فلا تُبلَغ من الهاتف. ولا تُعرَض لما تمّ.
-         */ ''}${r.state === true ? '' : `<div class="sub"><a class="tap" href="${escapeHtml(taskDoc(r.code))}"
-        target="_blank" rel="noopener noreferrer" aria-label="خطوات ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a></div>`}
-    </td>
-    <td data-label="تفتح">
-      ${/* ‏والشرحُ مرّةً فوق الجدول لا في كلّ صفّ (EASE-PLAN): كان يتكرّر عشرَ مرّاتٍ على الهاتف */''}${statusBadge(opens.cls, '◆', opens.label)}
-    </td>
-    <td data-label="الحال">
-      ${statusBadge(mark.cls, mark.g, mark.label)}
-      ${/*
-         * **و«تمّت» وحدها تكذب على مهمّةٍ دوريّة** (D-072): مراجعةٌ لم
-         * تقع بعدُ وليست مستحقّةً ليست «تمّت» — فيُقال ما قِيس، كما
-         * تحمل بنودُ البوّابات دليلَها.
-         */ ''}${r.measured === '' ? '' : `<div class="sub">${bold(r.measured)}</div>`}
-    </td>
-  </tr>`
+      ${r.state === true ? '' : `<div class="row gap-2 mt-2">
+        ${r.go === undefined
+          ? ''
+          : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(r.go)}"${
+              r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
+        ${/* ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها */ ''}<a class="tap" href="${escapeHtml(taskDoc(r.code))}"
+          target="_blank" rel="noopener noreferrer" aria-label="خطوات ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a>
+      </div>`}
+    </div>
+  </details>`
 }
 
 /**
@@ -209,11 +204,10 @@ function vitalsCard(v: VitalsSummary | null | undefined, rejects?: number): stri
   </div>`.value
 }
 
-function table(rows: readonly OwnerRow[], env: string): string {
-  return `<div class="scroll"><table>
-      <thead><tr><th>المهمّة وما يقع إن تُركت</th><th>تفتح</th><th>الحال</th></tr></thead>
-      <tbody>${rows.map((r) => row(r, env)).join('')}</tbody>
-    </table></div>`
+/** القائمةُ طيّاتٌ — والمفتوحةُ أوّلُ ما عليك وحدَها. */
+function list(rows: readonly OwnerRow[], env: string): string {
+  const first = rows.findIndex((r) => r.state === false)
+  return rows.map((r, i) => item(r, env, i === first)).join('')
 }
 
 export function tasksScreen(d: TasksScreenData): string {
@@ -245,10 +239,10 @@ export function tasksScreen(d: TasksScreenData): string {
     <p class="hint"><b>الحالُ يُقرأ من صدى نفسِه</b>، ولا يُكتَب بيد. وما يقع عند المنصّة يُقال «لا يُعرَف من هنا».</p>
     <p class="hint">${(['gate', 'guard', 'capability'] as const)
       .map((k) => `<b>«${OPENS[k].label}»</b>: ${bold(OPENS[k].why)}.`).join(' ')}</p>
-    ${table(d.rows.filter((r) => r.state !== true), d.env)}
+    ${list(d.rows.filter((r) => r.state !== true), d.env)}
     ${/* ‏وما تمّ يُطوى (EASE-PLAN): كانت الصفحةُ ثلاثَ عشرةَ شاشةً على الهاتف، وأوّلُها لا يقول ما بقي */''}${done.length === 0
       ? ''
-      : `<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${table(done, d.env)}</details>`}
+      : `<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${list(done, d.env)}</details>`}
   </div>
 
   ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: تُطوى ورأسُها يقول حالَها */''}<details class="setup mt-6"><summary>بوّابات المراحل · ${
