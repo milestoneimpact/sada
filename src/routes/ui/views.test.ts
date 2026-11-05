@@ -196,8 +196,8 @@ describe('الرمز يقول ما يعنيه', () => {
 })
 
 describe('ما يُكتب في الوسم يُرسَم في الورقة', () => {
-  it('صفّ المهمّة العاجلة له قاعدة، وقائمة الملحوظات بلا نقاط', () => {
-    expect(css.where('tr.urgent td')).toContain('')
+  it('المهمّة العاجلة طيّةٌ لها قاعدة، وقائمة الملحوظات بلا نقاط', () => {
+    expect(css.where('.task.urgent')).toContain('')
     expect(css.rule('ul.plain')['list-style']).toBe('none')
     const html = tasksScreen({
       phase: null, gates: [], env: 'staging',
@@ -206,7 +206,7 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
         state: false, measured: '', done: () => false,
       } as never],
     })
-    expect(html).toContain('<tr class="urgent">')
+    expect(html).toContain('<details class="setup task urgent" open>')
   })
 
   it('«ما عليك» يقول ما بقي أوّلًا: ما تمّ مطويّ، والشرحُ مرّةً، والبوّاباتُ مطويّة (EASE-PLAN)', () => {
