@@ -1,0 +1,88 @@
+- link "تخطّي إلى المحتوى":
+  - /url: "#main"
+- complementary:
+  - img "صدى"
+  - link "منشور جديد":
+    - /url: /panel#idea
+  - navigation "أقسام اللوحة":
+    - text: العمل
+    - link "الرئيسيّة":
+      - /url: /panel#overview
+    - link "الخطّة":
+      - /url: /panel/plan
+    - link "المنشورات":
+      - /url: /panel#posts
+    - link "المكتبة":
+      - /url: /panel/library
+    - link "النتائج":
+      - /url: /panel/report
+    - link "الحسابات":
+      - /url: /panel/accounts
+    - text: الضبط
+    - link "ما عليك":
+      - /url: /panel/tasks
+    - link "الإعدادات":
+      - /url: /panel/settings
+- navigation "مسار العودة":
+  - link "اللوحة":
+    - /url: /panel
+  - link "الإشعارات":
+    - /url: /panel/notices
+  - button "بحث وأوامر Ctrl K"
+  - group
+- main:
+  - text: للمطوّر
+  - heading "كتالوج المكوّنات" [level=1]
+  - paragraph: كلّ مكوّن في صدى بحالاته، من الدالّة التي تُخدَم.
+  - heading "الأزرار" [level=2]
+  - button "اعتمد"
+  - button "معاينة"
+  - link "اعرض الكلّ":
+    - /url: "#kit"
+  - button "احذف"
+  - button "أغلق"
+  - button "معاينة"
+  - button "انشر الآن" [disabled]
+  - text: اربط الحساب أوّلًا.
+  - heading "الحال والأعداد" [level=2]
+  - text: نُشر ينتظر قرارك لم يُنشر مجدول مسوّدة 3 !
+  - heading "البطاقات" [level=2]
+  - heading "بطاقة" [level=2]
+  - paragraph: سطح وحدّ وظلّ خفيف.
+  - paragraph: جسد البطاقة.
+  - link "بطاقة رابط البطاقة كلُّها رابط واحد.":
+    - /url: "#kit"
+    - heading "بطاقة رابط" [level=2]
+    - paragraph: البطاقة كلُّها رابط واحد.
+  - heading "بطاقة داخليّة" [level=2]
+  - paragraph: داخل بطاقة أخرى.
+  - heading "بطاقة تنبيه" [level=2]
+  - paragraph: حافّتُها بنغمة الحال.
+  - heading "الحقول" [level=2]
+  - text: اسم الحساب
+  - textbox "اسم الحساب"
+  - text: الوصف (اختياريّ)
+  - paragraph: جملة واحدة تظهر تحت الاسم.
+  - textbox "الوصف (اختياريّ)"
+  - text: المعرّف
+  - textbox "المعرّف" [invalid]: abc
+  - alert: المعرّف لا تعرفه المنصّة.
+  - heading "التبويبات والمقطع" [level=2]
+  - navigation "حال المسوّدات":
+    - link "تنتظر 3":
+      - /url: "#kit"
+    - link "مجدولة":
+      - /url: "#kit"
+    - link "فشلت 1":
+      - /url: "#kit"
+  - group "المظهر":
+    - button "فاتح" [pressed]
+    - button "داكن"
+    - button "تلقائيّ"
+  - heading "الإشعارات" [level=2]
+  - text: "حُفظت المسوّدة. الرمز ينتهي بعد يومين. لم يُنشر المنشور: انتهى الإذن."
+  - heading "الحالة الفارغة" [level=2]
+  - paragraph: لا مسوّدات بعد
+  - paragraph: اكتب من فكرتك أو من ملفّ في Drive.
+  - heading "القائمة" [level=2]
+  - group: المزيد

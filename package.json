@@ -16,7 +16,7 @@
     "contrast": "node scripts/validate_contrast.js",
     "render": "tsx scripts/render_panel.ts /tmp/panel.html && tsx scripts/render_screens.ts && tsx scripts/render_kit.ts /tmp/screen-kit.html && tsx scripts/render_legal.ts /tmp/privacy.html /privacy",
     "text": "node scripts/measure_text.mjs $(node scripts/screens.mjs text)",
-    "audit": "npm run render && node scripts/audit_design.mjs --self-test /tmp/screen-404.html && node scripts/audit_design.mjs $(node scripts/screens.mjs base) && node scripts/audit_scale.mjs $(node scripts/screens.mjs base) && npm run a11y && npm run faces && npm run mobile && npm run print && npm run csp && npm run links && npm run copy && npm run size",
+    "audit": "npm run render && node scripts/audit_design.mjs --self-test /tmp/screen-404.html && node scripts/audit_design.mjs $(node scripts/screens.mjs base) && node scripts/audit_scale.mjs $(node scripts/screens.mjs base) && npm run a11y && npm run aria && npm run faces && npm run mobile && npm run print && npm run csp && npm run links && npm run copy && npm run size",
     "size": "node scripts/audit_size.mjs --self-test /tmp/*.bare.html",
     "dead": "node scripts/audit_dead.mjs",
     "cycles": "node scripts/audit_cycles.mjs --self-test",
@@ -39,6 +39,7 @@
     "journeys:serve": "tsx scripts/journeys/server.ts",
     "swap": "tsx scripts/journeys/swap_check.ts",
     "a11y": "node scripts/audit_a11y.mjs $(node scripts/screens.mjs kit)",
+    "aria": "node scripts/audit_aria.mjs --self-test /tmp/screen-kit.html",
     "split:styles": "node scripts/split_styles.mjs"
   },
   "devDependencies": {
