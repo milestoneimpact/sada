@@ -33,9 +33,17 @@ import { escapeHtml } from './escape'
 const SPEC = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
 
+/**
+ * **اتّجاهُ الأيقونة** (D-307 · Apple HIG «Right to Left» · Material 3 «Bidirectionality»): ما يدلّ على جهةٍ (سهمُ
+ * العودة والتالي، والخروجُ إلى صفحة، والإرسال) **ينعكس** حين يُقرأ الوسمُ من اليسار؛ وما يدلّ على شيءٍ أو زمنٍ
+ * أو وسيطٍ (الساعةُ، وعلامةُ الصحّ، وزرُّ التشغيل، والبحثُ) **يثبت**. والقاعدةُ في `01-base.ts`:
+ * `[dir="ltr"] svg[data-dir="mirrors"]` ينعكس. وكلُّ أيقونةٍ تعلن اتّجاهَها، واختبارُ `icons.test` لا يقبل أيقونةً بلا اتّجاه.
+ */
+export type IconDirection = 'mirrors' | 'fixed'
+
 /** يلبس الشكلَ المواصفةَ — **ولا يُكتب وسمُ `svg` في مكانٍ آخر**. */
-function icon(shape: string): string {
-  return `<svg ${SPEC}>${shape}</svg>`
+function icon(shape: string, dir: IconDirection = 'fixed'): string {
+  return `<svg ${SPEC}${dir === 'mirrors' ? ' data-dir="mirrors"' : ''}>${shape}</svg>`
 }
 
 /**
@@ -104,6 +112,7 @@ export const ICON = {
   external: icon(
     '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/>' +
     '<path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    'mirrors',
   ),
   /**
    * سهما الرابط — **باسم ما يفعلان لا باتّجاه ما يشيران** (D-167).
@@ -114,8 +123,8 @@ export const ICON = {
    * اليسار. وحرفُ U+2190 لا يُعكَس في سياقٍ عربيّ، فالرسمُ يحفظ ما كان الحرفُ
    * يقوله بلا زيادة.
    */
-  back: icon('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>'),
-  go: icon('<path d="M19 12H5"/><path d="m11 6-6 6 6 6"/>'),
+  back: icon('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>', 'mirrors'),
+  go: icon('<path d="M19 12H5"/><path d="m11 6-6 6 6 6"/>', 'mirrors'),
   /*
    * **شريطُ التفاعل في معاينة المنشور** (D-172) — رسومٌ عامّةٌ من صنعنا على
    * مواصفتنا، **لا نسخٌ من أطقم المنصّات**: البنيةُ تشبه المنصّة، والخطُّ
@@ -134,7 +143,7 @@ export const ICON = {
     '<path d="m17 3 3 3-3 3"/><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H20"/>' +
     '<path d="m7 21-3-3 3-3"/><path d="M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H4"/>',
   ),
-  send: icon('<path d="M21 3 10.5 13.5"/><path d="m21 3-6.5 18-4-7.5-7.5-4z"/>'),
+  send: icon('<path d="M21 3 10.5 13.5"/><path d="m21 3-6.5 18-4-7.5-7.5-4z"/>', 'mirrors'),
   share: icon('<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>'),
   bookmark: icon('<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/>'),
   views: icon('<path d="M5 20v-6M11 20V9M17 20V4"/>'),
