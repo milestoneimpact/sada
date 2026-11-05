@@ -176,6 +176,8 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 
 export function loginPage(state: LoginState = {}, nonce = ''): string {
   const step = state.step ?? 'email'
+  // ‏وزرٌّ أوّليٌّ واحد في البطاقة (D-313): مفتاحُ المرور حين يُعرض (مقاومٌ للتصيّد)، و«أرسل الرمز» ثانويٌّ بعده؛
+  // ‏وبلا مفتاحٍ يعود «أرسل الرمز» الأوّليَّ الوحيد
   const passkey =
     state.passkeys !== true || state.blocked === true || step === 'code'
       ? ''
@@ -209,7 +211,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
           <div class="field"><label for="e">البريد</label>
             <input id="e" type="email" name="email" dir="ltr" autocomplete="email"
                    required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
-          <button class="btn btn-primary" type="submit"${disabled}>أرسل الرمز</button>
+          <button class="btn ${passkey === '' ? 'btn-primary' : 'btn-secondary'}" type="submit"${disabled}>أرسل الرمز</button>
         </form>`
   return shell(
     'صدى — الدخول',
@@ -1407,7 +1409,7 @@ ${ownerView ? `<div data-sub id="security-all">
     <div class="row mt-3">
       <div class="field"><label for="pk-label">اسم الجهاز</label>
         <input id="pk-label" placeholder="هاتفي · مفتاح YubiKey" maxlength="60"></div>
-      <button class="btn btn-primary" id="pk-add" type="button">سجّل مفتاحا</button>
+      <button class="btn ${d.factors.passkeys.length === 0 ? 'btn-primary' : 'btn-secondary'}" id="pk-add" type="button">سجّل مفتاحا</button>
     </div>
     <div class="note" id="pk-msg" role="status" aria-live="polite"></div>
 
@@ -1419,7 +1421,7 @@ ${ownerView ? `<div data-sub id="security-all">
     <div class="row">
       ${d.factors.totpConfirmed
         ? '<button class="btn btn-danger" id="totp-remove" type="button">أزل رمز التطبيق</button>'
-        : '<button class="btn btn-primary" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
+        : '<button class="btn btn-secondary" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
     </div>
     <div id="totp-box" hidden>
       <div class="field mt-3"><label for="totp-secret">السرّ — انسخه إلى تطبيق المصادقة</label>
@@ -1439,7 +1441,7 @@ ${ownerView ? `<div data-sub id="security-all">
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
     <div class="row">
-      <button class="btn ${d.factors.recoveryLeft > 0 ? 'btn-secondary' : 'btn-primary'}" id="rc-issue" type="button">
+      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button">
         ${d.factors.recoveryLeft > 0 ? 'ولّد مجموعةً جديدة' : 'ولّد رموز استرداد'}</button>
     </div>
     <div id="rc-box" hidden><div class="codes" id="rc-list"></div>

@@ -265,7 +265,7 @@ const R2stop: Journey = {
     m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
     const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
-    const goal = /اكتب|أنشئ|جديد|اعتمد/
+    const goal = /اكتب|أنشئ|جديد/
     const screens: string[] = []
     let writeAt: number | null = null
     let stopAt: { screen: number; label: string } | null = null
@@ -275,9 +275,9 @@ const R2stop: Journey = {
     for (let screen = 1; screen <= 14; screen += 1) {
       const seen: { text: string; disabled: boolean }[] = await page.evaluate(({ top, bottom, marked }) => {
         const vh = window.innerHeight
-        const goal = /اكتب|أنشئ|جديد|اعتمد/
+        const goal = /اكتب|أنشئ|جديد/
         // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-233): يراه المالكُ زرًّا فيُعدّ زرًّا
-        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"]'))
+        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"], nav.tab-bar a'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
             return r.height > 0 && r.top >= top && r.bottom <= vh - bottom && getComputedStyle(el).visibility !== 'hidden'
