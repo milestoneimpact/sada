@@ -45,6 +45,11 @@ const buttons = section(1, 'الأزرار', `<div class="row">
   ${button({ label: 'انشر الآن', variant: 'secondary', size: 'sm', type: 'button', disabled: { id: 'kit-off', reason: 'اربط الحساب أوّلًا.' } })}
 </div>`)
 
+const iconRow = Object.entries(ICON).map(([k, svg]) => `<span class="chip" title="${k}">${svg}</span>`).join('')
+const icons = section(9, 'الأيقونات — من اليمين ومن اليسار', `<div class="row">${iconRow}</div>
+<p class="hint">وفي وسمٍ يُقرأ من اليسار تنعكس الاتّجاهيّةُ وحدَها (العودةُ والتالي والخروجُ والإرسال):</p>
+<div class="row" dir="ltr">${iconRow}</div>`)
+
 const status = section(2, 'الحال والأعداد', `<div class="row">
   ${statusBadge('ok', '✓', 'نُشر')}
   ${statusBadge('warn', '!', 'ينتظر قرارك')}
@@ -97,7 +102,7 @@ const menus = section(8, 'القائمة', `<div class="row">${menu({
 })}</div>`)
 
 const body = `${pageHead('للمطوّر', 'كتالوج المكوّنات', 'كلّ مكوّن في صدى بحالاته، من الدالّة التي تُخدَم.')}
-<div id="kit">${buttons}${status}${cards}${fields}${choice}${notices}${empty}${menus}</div>`
+<div id="kit">${buttons}${status}${cards}${fields}${choice}${notices}${empty}${menus}${icons}</div>`
 
 writeAudited(out, soloPage('صدى — كتالوج المكوّنات', { href: '/panel', label: 'اللوحة' }, body, 'n', '',
   buildCommands({ onPanel: false }), soloNav('settings')))

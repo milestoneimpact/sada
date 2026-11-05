@@ -11,6 +11,8 @@
 import { describe, expect, it } from 'vitest'
 import { ICON } from './icons'
 
+const direction = (svg: string): 'mirrors' | 'fixed' => (svg.includes('data-dir="mirrors"') ? 'mirrors' : 'fixed')
+
 const ALL = Object.entries(ICON)
 
 describe('مواصفة الأيقونات', () => {
@@ -48,6 +50,23 @@ describe('مواصفة الأيقونات', () => {
    * قِيست قبل التوحيد فوُجدت ثلاثٌ: ‏١٫٨ في تسعٍ، و‏٢ في اثنتين، و‏١٫٩ في
    * واحدة. **ولا أحدَ يقصد ‏١٫٩** — هي أثرُ نسخٍ عن أقربِ ما وُجد.
    */
+  /**
+   * **ولكلّ أيقونةٍ اتّجاهٌ معلَن** (D-307): ما يدلّ على جهةٍ ينعكس من اليسار، وما يدلّ على شيءٍ يثبت.
+   * أيقونةٌ جديدةٌ بلا قرارٍ هنا تسقط: «لم أفكّر» ليس اتّجاهًا.
+   */
+  it('ما يدلّ على جهةٍ ينعكس، وما يدلّ على شيءٍ يثبت — ولا أيقونةَ بلا قرار', () => {
+    const MIRRORS = ['external', 'back', 'go', 'send'] as const
+    const FIXED = [
+      'overview', 'sources', 'posts', 'channels', 'providers', 'settings', 'tasks', 'report', 'plan', 'guide', 'add', 'chevron',
+      'search', 'account', 'bell', 'more', 'like', 'heart', 'comment', 'repost', 'share', 'bookmark', 'views', 'globe', 'play', 'close',
+    ] as const
+    expect([...MIRRORS, ...FIXED].sort()).toEqual(Object.keys(ICON).sort())
+    for (const k of MIRRORS) expect(direction(ICON[k]), k).toBe('mirrors')
+    for (const k of FIXED) expect(direction(ICON[k]), k).toBe('fixed')
+    expect(ICON.back).toContain('data-dir="mirrors"')
+    expect(ICON.play).not.toContain('data-dir')
+  })
+
   it('ولا ثخانة ثانيةً في المجموعة', () => {
     const widths = new Set(
       ALL.flatMap(([, svg]) => [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map((m) => m[1])),
