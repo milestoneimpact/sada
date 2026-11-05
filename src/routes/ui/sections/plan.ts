@@ -196,7 +196,7 @@ export function planSection(input: PlanInput): string {
              <input type="hidden" name="id" value="${escapeHtml(plan.id)}">
              <button class="btn btn-primary btn-sm" type="submit">اعتمد المنطق</button></form>`
         : ''}
-      ${approveAllForm(plan.id, input.pending ?? 0).value}
+      ${/* ‏زرٌّ أوّليٌّ واحد في البطاقة (D-311 · خطّة التصميم 7.1): ما دامت الخطّةُ مسوّدةً فـ«اعتمد المنطق» أوّلًا وهذا ثانويّ */''}${approveAllForm(plan.id, input.pending ?? 0, plan.status !== 'draft').value}
     </div>
   </div>`
 }
@@ -205,10 +205,10 @@ export function planSection(input: PlanInput): string {
  * **«اعتمد الخطّة كاملةً»** (D-282): كلُّ مسوّدةٍ من الخطّة تنتظر القرار تُعتمَد بضغطة، والتأكيدُ يقول العددَ وأنّ شيئًا
  * لا يُنشر قبل الجدولة. ولا زرَّ حين لا شيءَ ينتظر.
  */
-export function approveAllForm(planId: string, pending: number): Html {
+export function approveAllForm(planId: string, pending: number, primary = true): Html {
   if (pending === 0) return html``
   return html`<form class="inline" method="POST" action="/panel/plan/approve-all" data-busy="جار الاعتماد…"
       data-confirm="${html`اعتمد ${pending} ${pending === 1 ? 'مسوّدة' : 'مسوّدات'} من الخطّة كما كُتبت؟ ولا يُنشر منها شيء حتّى تجدولها.`}">
       <input type="hidden" name="id" value="${planId}">
-      <button class="btn btn-primary btn-sm" type="submit">اعتمد الخطّة كاملة</button></form>`
+      <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">اعتمد الخطّة كاملة</button></form>`
 }

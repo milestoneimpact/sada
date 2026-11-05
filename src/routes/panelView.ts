@@ -1552,7 +1552,8 @@ export function panelPage(view: PaneView): string {
   const needy = d.channels
     .map((v) => ({ v, h: channelHealth(v, d.now) }))
     .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
-  const expiring = needy.length === 0 ? '' : notice({
+  // ‏ولا شريطَ في «الحسابات» نفسِها (D-311): «افتح الحسابات» وأنت فيها تكرارٌ، وبطاقاتُها تقول الحالَ بزرّها
+  const expiring = needy.length === 0 || only === 'accounts' ? '' : notice({
     tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
     // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
     html: `${needy.slice(0, 3)
