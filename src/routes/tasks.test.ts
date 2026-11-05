@@ -263,6 +263,6 @@ describe('«ما عليك» بلغة المالك (D-203)', () => {
     expect(html).toMatch(/<small class="ago"><bdi dir="ltr">M-\d+<\/bdi><\/small>/)
     const shown = html.replace(/<[^>]*>/g, ' ')
     expect(shown).not.toMatch(/docs\/|STATUS\.md|PLAN\.md|MANUAL-TASKS\.md/)
-    expect(html).toContain('title="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a>')
+    expect(html).toContain('data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a>')
   })
 })

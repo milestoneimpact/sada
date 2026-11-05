@@ -50,20 +50,103 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   .doc a[href^="mailto"]::after{content:''}
 }
 
-/* ── طبقة الحركة (D-246) ──────────────────────────────────────────────
+/* ── طبقة الحركة (D-246 · D-312) ──────────────────────────────────────
    صعود البطاقة حين تدخل، ووميض الهيكل حين ينتظر، والانتقال بين الصفحات بلا سكربت
-   (View Transitions بين المستندات) — فلا نونس يُطلب ولا شيفرة. وكلّها تسقط مع تقليل الحركة. */
+   (View Transitions بين المستندات) — فلا نونس يُطلب ولا شيفرة. وكلّها تسقط مع تقليل الحركة.
+
+   **والحركة تشرح لا تزيّن** (D-312): ثلاثُ وظائف لا غير — الاستمراريّة (من أين وإلى أين)،
+   والإقرار (استلمتُ فعلك)، والتوجيه (انظر هنا). فالمحتوى ينزلق من جهة النهاية حين يتقدّم المالك
+   ومن البداية حين يرجع، وعلامةُ الرافدة تنزلق إلى القسم الجديد، والطيُّ يُفتح بانزلاقٍ لا بقفزة،
+   والتلميحُ يظهر بعد مهلة. وكلُّ خاصّيّةٍ تُحرَّك مسمّاةٌ (opacity وtransform وheight في الطيّ وحدَه)،
+   ولا «transition:all». و«--dir» على الجذر وحدَه (D-124)، وصفحةٌ تُقرأ من اليسار تكتبه ‏-١ هناك. */
 @view-transition{navigation:auto}
 @keyframes rise{from{opacity:0; transform:translateY(var(--s-2))}to{opacity:1; transform:none}}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
 .skeleton{border-radius:var(--r-control); color:transparent;
   background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 50%,var(--surface-2) 75%);
   background-size:200% 100%; animation:shimmer 1.4s linear infinite}
+/* ‏البطاقاتُ تدخل متتابعةً لا دفعةً واحدة (D-312): ‏40ms بين البطاقة وأختها حتّى الخامسة، وما بعدها معها —
+   فالمجموع تحت نصف ثانية (Material 3: التتابع ستّةٌ على الأكثر). والعدُّ بين الإخوة في الحاوية الواحدة */
+.card:nth-child(2){animation-delay:var(--stagger)}
+.card:nth-child(3){animation-delay:calc(2 * var(--stagger))}
+.card:nth-child(4){animation-delay:calc(3 * var(--stagger))}
+.card:nth-child(n+5){animation-delay:calc(4 * var(--stagger))}
+/* ‏الهيكلُ ثابتٌ والمحتوى يتبدّل (D-312): الرافدةُ والشريطُ باسمَيهما فلا يُعاد رسمُهما مع كلّ انتقال —
+   صفحةٌ كلُّها تتلاشى تُقرأ «أُعيد تحميلُها»، ومحتوًى وحدَه يدخل يُقرأ «انتقلتُ». والحاليُّ في الرافدة
+   باسمه فتنزلق علامتُه إلى القسم الجديد بدل أن تقفز (المجموعة تتحرّك من موضعها القديم إلى الجديد).
+   **والاسمُ على الابن المباشر وحدَه**: رابطُ القسم في ورقة «المزيد» على الهاتف يحمل aria-current
+   أيضًا، واسمان متطابقان يُسقطان الانتقالَ كلَّه. وأسماءُ الرافدة والشريط والمحتوى في قواعدها (02-shell): محدّدٌ واحد
+   يُعلَن مرّةً (D-148) */
+nav.tabs>a[aria-current=page]{view-transition-name:nav-current}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:var(--dur-2); animation-timing-function:var(--ease-rise)}
+::view-transition-group(*){animation-duration:var(--dur-2); animation-timing-function:var(--ease-out)}
+/* ‏والمحتوى: الخارجُ يتلاشى سريعًا (‏70٪ من الداخل)، والداخلُ يصعد ‏8px بين المستندات، وداخل اللوحة
+   ينزلق ‏24px من جهة النهاية إلى الأمام ومن البداية رجوعًا — والسكربتُ يكتب الجهةَ في «data-nav» */
+::view-transition-old(content){animation:vt-out var(--dur-1) var(--ease) both}
+::view-transition-new(content){animation:vt-in var(--dur-3) var(--ease-rise) both}
+html[data-nav=forward]::view-transition-new(content){animation-name:vt-from-end}
+html[data-nav=back]::view-transition-new(content){animation-name:vt-from-start}
+@keyframes vt-out{to{opacity:0}}
+@keyframes vt-in{from{opacity:0; transform:translateY(var(--s-2))}}
+@keyframes vt-from-end{from{opacity:0; transform:translateX(calc(var(--dir) * -1 * var(--s-6)))}}
+@keyframes vt-from-start{from{opacity:0; transform:translateX(calc(var(--dir) * var(--s-6)))}}
+/* ‏وبعد أوّل انتقالٍ بالسكربت لا تعاود البطاقاتُ صعودَها: اللوحُ يدخل كلُّه بالانزلاق، وبطاقاتٌ تصعد
+   داخل لوحٍ ينزلق حركتان في اتّجاهين (قاعدةُ «مالكٌ واحد لكلّ خاصّيّة») */
+html[data-nav] section[data-pane] .card{animation-name:none}
+/* ── الطيُّ يُفتح بانزلاقٍ لا بقفزة (D-312) ──────────────────────────────
+   «::details-content» صندوقُ ما تحت الرأس، وارتفاعُه من صفرٍ إلى «auto» يُحرَّك حيث تُعرَف
+   «interpolate-size»، ويتلاشى معه. ومتصفّحٌ لا يعرفها يفتح كما يفتح اليوم — لا شيء ينكسر.
+   **وتُستثنى ورقةُ «المزيد» والقائمةُ**: ما فيهما موضوعٌ بإطلاقٍ خارج الصندوق، وصندوقٌ ارتفاعُه صفر
+   يُحرَّك يحبسهما. والقصُّ بهامش ‏8px فلا يُقصّ ظلُّ بطاقةٍ ولا حلقةُ تركيز */
+details{interpolate-size:allow-keywords}
+details:not(.more-sheet):not(.menu)::details-content{height:0; overflow:clip; overflow-clip-margin:var(--s-2); opacity:0;
+  transition:height var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease), content-visibility var(--dur-2) allow-discrete}
+details[open]:not(.more-sheet):not(.menu)::details-content{height:auto; opacity:1}
+/* ‏والرأسُ يردّ على التمرير بلونٍ وأرض (انتقالُه في قاعدة «summary» في 08-sections)، ورأسُ المهمّة بأرض التمرير الخفيفة */
+@media(hover:hover){.setup>summary:hover{color:var(--ink)} .task>summary:hover{background:var(--hover)}}
+/* ‏والقائمةُ المنسدلة تدخل من زرّها: ‏96٪ إلى ‏100٪ مع تلاشٍ، والأصلُ عند الزرّ لا في الوسط */
+@keyframes menu-in{from{opacity:0; transform:scale(.96)}}
+.menu[open]>.menu-list{animation:menu-in var(--dur-1) var(--ease-out); transform-origin:top}
+/* ── التلميح (D-312) ──────────────────────────────────────────────────
+   «title» الأصليّ يظهر بعد ثانيةٍ بخطّ النظام ولا يظهر للوحة المفاتيح. فالتلميحُ من «data-tip»
+   أو من «aria-label» زرِّ الأيقونة نفسِه — **نصٌّ واحد للاسم والتلميح** فلا يفترقان — يظهر بعد ‏400ms
+   على التمرير وفورًا على التركيز، ويدخل ‏4px من جهة مرجعه، وفوقه إلّا في الشريط العلويّ فتحته.
+   وهو زينةٌ على ما له اسمٌ أصلًا: قارئُ الشاشة يقرأ الاسمَ من سمته لا من هنا. و«Esc» تخفيه (WCAG 1.4.13) */
+/* ‏**وبخصوصيّةٍ صفر** («:where»): شريطُ الخطّ الزمنيّ «.gt-bar» موضوعٌ بإطلاقٍ وله التلميح، وقاعدةٌ متأخّرة بخصوصيّةٍ
+   مساوية كانت تنزع إطلاقَه فينسحق الشريط إلى ‏22px (أمسكه audit_mobile هدفَ لمسٍ صغيرًا) */
+:where([data-tip],.btn-icon[aria-label]){position:relative}
+/* ‏**والمخفيُّ «display:none» لا «visibility:hidden»**: صندوقٌ خفيٌّ خارج حافّة الشاشة يمدّ عرضَ التمرير ‏4px
+   (قاسه audit_design فيضانًا أفقيًّا على كلّ صفحة). و«display» يُحرَّك بـ«allow-discrete» فيبقى الخروجُ تلاشيًا،
+   و«@starting-style» تصف الدخول؛ ومتصفّحٌ لا يعرفهما يُظهره ويخفيه فورًا */
+[data-tip]::before,.btn-icon[aria-label]::before{content:attr(data-tip); position:absolute; z-index:30; display:none;
+  inset-block-end:calc(100% + var(--s-2)); inset-inline-start:50%; translate:calc(var(--dir) * 50%) var(--s-1);
+  width:max-content; max-width:18rem; padding:var(--s-1) var(--s-2); border-radius:var(--r-control);
+  background:var(--ink); color:var(--surface); font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:500;
+  text-decoration:none; text-align:center; white-space:normal; pointer-events:none; box-shadow:var(--sh-2); opacity:0;
+  transition:opacity var(--dur-1) var(--ease), translate var(--dur-1) var(--ease), display var(--dur-1) allow-discrete}
+.btn-icon[aria-label]::before{content:attr(aria-label)}
+/* ‏و«@starting-style» التمرير داخل حارس «hover» نفسِه: محدّدُ تمريرٍ خارجه يعلق على اللمس (audit_mobile) */
+@media(hover:hover){
+  [data-tip]:hover::before,.btn-icon[aria-label]:hover::before{display:block; opacity:1; translate:calc(var(--dir) * 50%) 0;
+    transition-delay:var(--delay-tip)}
+  @starting-style{
+    [data-tip]:hover::before,.btn-icon[aria-label]:hover::before{opacity:0; translate:calc(var(--dir) * 50%) var(--s-1)}
+  }
+}
+[data-tip]:focus-visible::before,.btn-icon[aria-label]:focus-visible::before{display:block; opacity:1; translate:calc(var(--dir) * 50%) 0}
+@starting-style{
+  [data-tip]:focus-visible::before,.btn-icon[aria-label]:focus-visible::before{opacity:0; translate:calc(var(--dir) * 50%) var(--s-1)}
+}
+.topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before,nav.back [data-tip]::before,nav.back .btn-icon[aria-label]::before{
+  inset-block-end:auto; inset-block-start:calc(100% + var(--s-2)); translate:calc(var(--dir) * 50%) calc(-1 * var(--s-1))}
+html[data-tip-off] [data-tip]::before,html[data-tip-off] .btn-icon[aria-label]::before{display:none; opacity:0; transition-delay:0s}
+/* ‏والروابطُ تردّ بانتقالٍ لا بقفزة (والمقطعُ في قاعدته في 08-sections) */
+a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition:none!important; animation:none!important; scroll-behavior:auto!important}
   .btn:active:not(:disabled):not([aria-disabled="true"]){transform:none}
   ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+  .card{animation-delay:0s}
 }
 
 /* ── لوحةُ الأوامر (D-105) ────────────────────────────────────────────

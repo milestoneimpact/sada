@@ -215,7 +215,8 @@ ol.steps.wiz.nodot li::before{display:none}
 .setup{border-top:var(--bd-soft); padding-top:var(--s-3); margin-top:var(--s-0)}
 /* وسمُ summary هدفٌ يُنقر كالزرّ سواء، فيأخذ حدَّه: قيس عند 20px قامةً
    — وهو ثلث الحدّ. */
-summary{min-height:var(--tap); display:flex; align-items:center}
+summary{min-height:var(--tap); display:flex; align-items:center;
+  transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease)}
 /* ‏والمطويُّ هنا زرٌّ هادئ كـ«.g-tog»: حبرُ الرابط وخطٌّ تحته (D-183) */
 .setup>summary{cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--link);
   text-decoration:underline; text-decoration-thickness:var(--ul); text-underline-offset:.3em;
@@ -226,9 +227,11 @@ summary{min-height:var(--tap); display:flex; align-items:center}
    الحدّ المنطقيّ يشير إلى «inline-end» في الاتّجاهين، ويُقلَب إلى الأسفل مفتوحًا */
 .setup>summary::before{content:''; display:inline-block; flex:none; width:0; height:0;
   margin-inline-end:var(--s-2);
-  border-block:.3em solid transparent; border-inline-start:.4em solid; border-inline-end:0}
-.setup[open]>summary::before{border-inline:.3em solid transparent; border-block-start:.4em solid;
-  border-block-end:0}
+  border-inline:.3em solid transparent; border-block-start:.4em solid; border-block-end:0;
+  rotate:calc(var(--dir) * 90deg); transition:rotate var(--dur-2) var(--ease)}
+/* ‏والمثلّثُ واحدٌ يدور (D-312): مثلّثٌ إلى الأسفل مُدارٌ ربعَ دورةٍ نحو جهة النهاية مغلقًا، ويعود مفتوحًا —
+   فالفتحُ يُرى دورانًا لا تبديلَ حدود، والجهةُ من «--dir» فيصحّ في الاتّجاهين */
+.setup[open]>summary::before{rotate:0deg}
 .setup-body{padding-top:var(--s-2)}
 /* ‏مهمّةُ «ما عليك» طيّةً (D-310): رأسُها عنوانٌ بحبر المتن لا رابطٌ، وشاراتُه في طرفه، وتلتفّ على الهاتف؛
    والعاجلةُ (بوّابةٌ لم تُجتَز) بصبغة الحال الخفيفة نفسِها التي كانت لصفّها */
@@ -298,7 +301,8 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 .composer{max-inline-size:44rem}
 .composer .seg{display:flex; width:fit-content; margin:0 0 var(--s-4); margin-inline:0; min-inline-size:0}
 .seg label{position:relative; display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-1) var(--s-4);
-  border-radius:var(--r-control); color:var(--ink-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; cursor:pointer}
+  border-radius:var(--r-control); color:var(--ink-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; cursor:pointer;
+  transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease)}
 .seg label:has(input:checked){background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
 .seg label input{position:absolute; inset:0; margin:0; opacity:0; cursor:pointer}
 .seg label:has(input:focus-visible){outline:var(--ring-w) solid var(--ring); outline-offset:var(--s-0)}

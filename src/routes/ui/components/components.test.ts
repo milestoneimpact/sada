@@ -41,9 +41,11 @@ describe('الزرّ (7.1)', () => {
       .toBe('<a class="btn btn-quiet" href="/panel?a=1&amp;b=2"><span>الرئيسيّة</span></a>')
   })
 
-  it('زرّ الأيقونة اسمُه في «aria-label» وتلميحُه في «title»، ولا نصّ ظاهرًا', () => {
+  it('زرّ الأيقونة اسمُه في «aria-label» وتلميحُه منه في الورقة لا في «title» (D-312)، ولا نصّ ظاهرًا', () => {
     const html = button({ label: 'أغلق الإشعار', variant: 'icon', icon: ICON.more })
-    expect(html).toContain('aria-label="أغلق الإشعار" title="أغلق الإشعار"')
+    expect(html).toContain('aria-label="أغلق الإشعار"><svg')
+    expect(html).not.toContain('title=')
+    expect(css.rule('.btn-icon[aria-label]::before').content).toBe('attr(aria-label)')
     expect(html).not.toContain('<span>')
     expect(html).toContain('aria-hidden="true"')
     // ‏ومربّعُه هدفُ اللمس نفسُه (‏٤٤)، والرمزُ ‏٢٠

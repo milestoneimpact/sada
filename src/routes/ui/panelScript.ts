@@ -89,6 +89,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       card=null; id=first;
     }
     if(host)id=host.dataset.pane;
+    // ‏والانتقالُ بين الألواح حركةٌ باتّجاه (D-312): إلى لوحٍ بعد الحاليّ في الرافدة يدخل المحتوى من جهة
+    // ‏النهاية، وإلى لوحٍ قبله من البداية — وعلامةُ الرافدة تنزلق معه (View Transitions في المستند نفسه).
+    // ‏وعند التحميل وبلا دعمٍ ومع تقليل الحركة يبدَّل فورًا كما كان
+    var fromAt=-1, toAt=-1;
+    panes.forEach(function(p,i){if(!p.hidden)fromAt=i; if(p.dataset.pane===id)toAt=i;});
+    swap(commit,(push||focus)&&fromAt>=0&&toAt>=0&&fromAt!==toAt?(toAt>fromAt?'forward':'back'):null);
+    function commit(){
     var found=false, pane=null;
     panes.forEach(function(p){var m=p.dataset.pane===id; p.hidden=!m; if(m){found=true; pane=p;}});
     // ‏واللوحُ المفتوحُ سِمةٌ على الجسد: الزرُّ العائمُ يظهر في اثنين منها وحدهما (D-208)
@@ -127,6 +134,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       return;}
     if(focus&&pane){var hd=pane.querySelector('h1,h2');
       if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
+    }
+  }
+  // ‏والاستعلامُ عن تقليل الحركة عند الطلب لا عند التحميل: الوثيقةُ الفارغة في الاختبار بلا matchMedia
+  function swap(fn,kind){
+    if(!kind||!document.startViewTransition||matchMedia('(prefers-reduced-motion: reduce)').matches){fn(); return;}
+    var root=document.documentElement; root.setAttribute('data-nav',kind);
+    var done=function(){root.setAttribute('data-nav','done');};
+    try{document.startViewTransition(fn).finished.then(done,done);}catch(e){fn(); done();}
   }
   tabs.forEach(function(t){t.addEventListener('click',function(e){
     e.preventDefault(); show(t.getAttribute('href').slice(1),true,true);
@@ -152,6 +167,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
    */
   window.addEventListener('hashchange',function(){
     show((location.hash||'').slice(1)||first,false,true);
+  });
+  // ‏و«Esc» تخفي التلميحَ المعروضَ بالتمرير (D-312 · WCAG 1.4.13)، وأوّلُ حركةٍ للمؤشّر تعيده
+  window.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return; var h=document.documentElement; h.setAttribute('data-tip-off','');
+    document.addEventListener('pointermove',function(){h.removeAttribute('data-tip-off');},{once:true,passive:true});
   });
 
   // ‏وزرُّ النسخ (D-126) في u.js الذي تحمله كلُّ صفحة، لا هنا: نسختان في

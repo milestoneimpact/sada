@@ -558,7 +558,7 @@ export function worthCell(worth: number | null): string {
   if (worth === null) return statusBadge('idle', '○', 'لم يُحلَّل')
   const p = Math.round(worth * 100)
   const shade = worth >= 0.66 ? 'var(--ink)' : worth >= 0.33 ? 'var(--ink-2)' : 'var(--ink-3)'
-  return `<div class="worth" title="درجة الاستحقاق ${worth.toFixed(2)} من 1">
+  return `<div class="worth" data-tip="درجة الاستحقاق ${worth.toFixed(2)} من 1">
     <div class="track"><span class="fill" style="width:${p}%;background:${shade}"></span></div>
     <span class="val">${worth.toFixed(2)}</span></div>`
 }
@@ -609,7 +609,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
     <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
-    <td data-label="آخر ظهور"><span title="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
+    <td data-label="آخر ظهور"><span data-tip="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
     <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row acts">${acts}</div>`}</td>
   </tr>`
 }

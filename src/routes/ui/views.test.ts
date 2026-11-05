@@ -103,7 +103,7 @@ describe('اللوح المحوريّ يقرأ الأسماء لا المفات�
     })
     expect(html).toContain('<th scope="col">نُشرت</th>')
     // ورأسُ صفّ المنصّة رابطٌ إلى شاشتها منذ D-132 — والاسمُ فيه لا المفتاح
-    expect(html).toContain('title="شاشة LinkedIn">LinkedIn</a></th>')
+    expect(html).toContain('data-tip="شاشة LinkedIn">LinkedIn</a></th>')
     expect(html).not.toMatch(/>published</)
     expect(html).not.toMatch(/>linkedin</)
   })
@@ -403,7 +403,7 @@ describe('المفتاح لا يُعرَض — الاسم يُعرَض (D-125)',
     expect(audit('d-42')).toContain('<span class="chip">d-42</span>')
     // ‏والفعلُ بالعربيّة وحدَه، ومفتاحُه في العنوان لمن سأل لا سطرًا تحته (D-202)
     expect(audit('x')).not.toContain('<div class="mono">provider.key</div>')
-    expect(audit('x')).toContain('title="provider.key"')
+    expect(audit('x')).toContain('data-tip="provider.key"')
   })
 
   /**
@@ -534,7 +534,7 @@ describe('فرز بالمنصّة وترتيب (D-127)', () => {
   const bar = html.slice(html.indexOf('id="draft-filter"'), html.indexOf('</details></div>', html.indexOf('id="draft-filter"')))
 
   it('المنصّات قائمةٌ من المسوّدات نفسِها، بالاسم وبالعدد، والافتراض الكلّ (D-276)', () => {
-    expect(bar).toContain('data-filter="draft-platform" value="all" title="كلّ المنصّات"><span class="menu-t"><b>كلّ المنصّات</b></span><span class="count">2</span>')
+    expect(bar).toContain('data-filter="draft-platform" value="all" data-tip="كلّ المنصّات"><span class="menu-t"><b>كلّ المنصّات</b></span><span class="count">2</span>')
     expect(bar).toMatch(/aria-pressed="false" data-filter="draft-platform" value="linkedin"[^>]*><span class="menu-t"><b>LinkedIn<\/b><\/span><span class="count">1<\/span>/)
     expect(bar).toContain('data-filter="draft-platform" value="x"')
     expect(bar).not.toContain('value="tiktok"')
@@ -737,7 +737,7 @@ describe('رأس صفّ الجدول المحوريّ (D-132)', () => {
       table: pivot(facts, { rows: 'platform', cols: null, measure: 'count' }),
       rows: 'platform', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
     })
-    expect(byPlatform).toContain('<th scope="row"><a href="/panel/channels/linkedin" title="شاشة LinkedIn">LinkedIn</a></th>')
+    expect(byPlatform).toContain('<th scope="row"><a href="/panel/channels/linkedin" data-tip="شاشة LinkedIn">LinkedIn</a></th>')
     const byStatus = pivotPane({
       table: pivot(facts, { rows: 'status', cols: null, measure: 'count' }),
       rows: 'status', cols: null, measure: 'count', sinceDays: 30, capped: false, cap: 1500,
@@ -1155,10 +1155,10 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
     expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(info)
     expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
     expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
-    expect(box).toContain(statusBadge('ok', '●', 'المتصفّح', 'title="تامّة — يصوّر الصفحة"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'title="تامّة — نموذج الكتابة يستخرج المحتوى"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'title="تامّة — مفتوحة اليوم"'))
-    expect(box).toContain(statusBadge('ok', '●', 'المزوّد', 'title="تامّة — Gemini"'))
+    expect(box).toContain(statusBadge('ok', '●', 'المتصفّح', 'data-tip="تامّة — يصوّر الصفحة"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'data-tip="تامّة — نموذج الكتابة يستخرج المحتوى"'))
+    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'data-tip="تامّة — مفتوحة اليوم"'))
+    expect(box).toContain(statusBadge('ok', '●', 'المزوّد', 'data-tip="تامّة — Gemini"'))
     expect(box).toContain('<b>إنفوجرافيك من نصّ المنشور</b>')
     // ‏والزرّان يرسلان نمطَهما — والدالّةُ تأخذ الإنفوجرافيك حين يغيب
     expect(box).toContain('<input type="hidden" name="style" value="infographic">')
@@ -1188,7 +1188,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
   it('وسطر المقطع بعد «حرّكها فيديو» — ولا زرّ ولا سطر حين يوجد مقطع', () => {
     const noClip = section([draft('d1')], { media: [picture('d1')] })
     expect(noClip).toContain('حرّكها فيديو')
-    expect(noClip.indexOf(statusBadge('ok', '●', 'المفتاح', 'title="تامّة — من أسرار Worker"')))
+    expect(noClip.indexOf(statusBadge('ok', '●', 'المفتاح', 'data-tip="تامّة — من أسرار Worker"')))
       .toBeGreaterThan(noClip.indexOf('حرّكها فيديو'))
 
     const withClip = section([draft('d1')], { media: [picture('d1'), picture('d1', 'video/mp4')] })
@@ -1250,7 +1250,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
 
     const under = section([draft('d1')], { media: [picture('d1')] })
     expect(under).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
-    expect(under).toContain(statusBadge('ok', '●', 'المقاطع', 'title="تامّة — بقي 2 من 2 اليوم"'))
+    expect(under).toContain(statusBadge('ok', '●', 'المقاطع', 'data-tip="تامّة — بقي 2 من 2 اليوم"'))
   })
 
   it('واسم المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
@@ -1331,11 +1331,13 @@ describe('D-167 — الجوّال واللمس والرموز', () => {
         content: "''", 'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid',
       })
     }
+    // ‏ومثلّثٌ واحدٌ يدور (D-312): إلى الأسفل، مُدارٌ ربعَ دورةٍ نحو النهاية مغلقًا، ويعود مفتوحًا
     expect(css.rule('.setup>summary::before')).toMatchObject({
-      'border-block': '.3em solid transparent', 'border-inline-start': '.4em solid', 'border-inline-end': '0',
+      'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid', 'border-block-end': '0',
+      rotate: 'calc(var(--dir) * 90deg)', transition: 'rotate var(--dur-2) var(--ease)',
     })
     expect(css.rule('.setup[open]>summary::before')).toMatchObject({
-      'border-inline': '.3em solid transparent', 'border-block-start': '.4em solid', 'border-block-end': '0',
+      rotate: '0deg',
     })
   })
 
@@ -1366,8 +1368,8 @@ describe('D-167 — الجوّال واللمس والرموز', () => {
   })
 
   it('واسم الملفّ معزول بلا امتداده، وكامل في العنوان (خطّة التصميم 4.4/8)', () => {
-    expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi title="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
-    expect(fileName('<x>')).toBe('<bdi title="&lt;x&gt;">&lt;x&gt;</bdi>')
+    expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi data-tip="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
+    expect(fileName('<x>')).toBe('<bdi data-tip="&lt;x&gt;">&lt;x&gt;</bdi>')
   })
 
   it('والجانب منطقيّ: الفاصل في نهاية السطر، والطبقة بعرض الرابط، والمحاذاة بداية', () => {

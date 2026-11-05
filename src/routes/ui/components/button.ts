@@ -58,7 +58,7 @@ export function button(input: ButtonInput): string {
   if (input.name !== undefined) parts.push(`name="${escapeHtml(input.name)}"`)
   if (input.value !== undefined) parts.push(`value="${escapeHtml(input.value)}"`)
   // ‏زرُّ الأيقونة بلا نصٍّ ظاهر: اسمُه وتلميحُه من النصّ نفسِه (خطّة التصميم 3.4)
-  if (variant === 'icon') parts.push(`aria-label="${escapeHtml(input.label)}" title="${escapeHtml(input.label)}"`)
+  if (variant === 'icon') parts.push(`aria-label="${escapeHtml(input.label)}"`)
   if (input.busy !== undefined) parts.push('aria-busy="true" aria-disabled="true"')
   else if (input.disabled !== undefined) {
     parts.push(`aria-disabled="true" aria-describedby="${escapeHtml(input.disabled.id)}"`)

@@ -36,8 +36,8 @@ function option(o: FilterOption, name: string | undefined, cls: string, inner: s
   const n = o.count === undefined ? '' : count(o.count)
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${escapeHtml(v)}"`).join('')
   return o.href !== undefined
-    ? `<a class="${cls}" href="${escapeHtml(o.href)}" ${o.current ? 'aria-current="true"' : ''} ${pressed} title="${escapeHtml(title)}">${inner}${n}</a>`
-    : `<button class="${cls}" type="button" ${pressed} data-filter="${escapeHtml(name ?? '')}" value="${escapeHtml(o.value ?? '')}"${data} title="${escapeHtml(title)}">${inner}${n}</button>`
+    ? `<a class="${cls}" href="${escapeHtml(o.href)}" ${o.current ? 'aria-current="true"' : ''} ${pressed} data-tip="${escapeHtml(title)}">${inner}${n}</a>`
+    : `<button class="${cls}" type="button" ${pressed} data-filter="${escapeHtml(name ?? '')}" value="${escapeHtml(o.value ?? '')}"${data} data-tip="${escapeHtml(title)}">${inner}${n}</button>`
 }
 
 function part(p: FilterPart): string {

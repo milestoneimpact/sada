@@ -266,7 +266,7 @@ function metricsNoteText(note: string): string {
 
 function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zone: string | null): string {
   const when = (at: string | null, none: string): string =>
-    at === null ? none : `<span title="${escapeHtml(stamp(at, zone))}">${escapeHtml(relativeTime(at, now))}</span>`
+    at === null ? none : `<span data-tip="${escapeHtml(stamp(at, zone))}">${escapeHtml(relativeTime(at, now))}</span>`
   /*
    * ‏**والموعدُ القادمُ يُعَدّ إلى الأمام** (ر-1): `relativeTime` للماضي وتحصر الفرقَ
    * ‏بالصفر، فكان كلُّ انتهاءٍ قادمٍ «الآن» — «إذنُ الوصول ينتهي الآن · والتجديدُ الآن»
@@ -275,7 +275,7 @@ function healthLog(h: AccountHealth | undefined, linkedAt: string, now: Date, zo
   const ends = (at: string): string => {
     const date = parseSqliteUtc(at)
     const past = date !== null && date.getTime() <= now.getTime()
-    return `${past ? 'انتهى' : 'ينتهي'} <span title="${escapeHtml(stamp(at, zone))}">${escapeHtml(past
+    return `${past ? 'انتهى' : 'ينتهي'} <span data-tip="${escapeHtml(stamp(at, zone))}">${escapeHtml(past
       ? relativeTime(at, now)
       : untilTime(at, now))}</span>`
   }
@@ -673,7 +673,7 @@ function resultLine(d: PlatformScreenData, row: TimelineRow): string {
   if (d.needs?.measured !== true) return '<span class="ago">لا يُقاس لهذه المنصّة بعد</span>'
   const m = widest(d.metrics[row.id] ?? [])
   if (m === null) return '<span class="ago">لم يُقَس بعد — أوّل قياس بعد 24 ساعةً من النشر</span>'
-  const v = (n: number | null): string => n === null ? '<span title="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
+  const v = (n: number | null): string => n === null ? '<span data-tip="لا تعطيه المنصّة لهذا الحساب">—</span>' : `<b>${n}</b>`
   return `<span class="np-result">نافذة ${escapeHtml(windowLabel(m.window))}:
     تفاعل ${v(m.reactions)} · تعليق ${v(m.comments)} · مشاركة ${v(m.shares)} · ظهور ${v(m.impressions)}${versusUsual(d, row)}${growth(d.metrics[row.id] ?? [])}</span>`
 }
