@@ -1626,7 +1626,7 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === nul
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
   <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
-    <div class="crumb">${escapeHtml(d.rpId)}</div></div>
+    ${d.env === 'production' ? '' : '<div class="crumb">تجريبيّ</div>'}</div>
   <div class="grow"></div>
   ${topNew()}
   ${bell(d.unread ?? 0)}

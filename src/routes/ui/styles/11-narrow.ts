@@ -9,7 +9,6 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
 @media${below('md')}{
   .app{grid-template-columns:1fr}
   .rail{position:static; height:auto; border-inline-start:0; border-bottom:var(--bd)}
-  .rail-new{display:none}
   /* ‏رأسُ الصفحة سطرٌ واحد على الهاتف (D-275): العنوانُ وفعلُه جنبًا إلى جنب، واللصيقةُ ساقطة — اسمُ
      الصفحة في شريط الإبهام تحتها (D-248 أ-3). كان الرأسُ ‏197px قبل أوّل بطاقة */
   .page-head{flex-wrap:nowrap; align-items:center; margin:var(--s-2) 0 var(--s-4); padding-bottom:var(--s-3)}
@@ -202,6 +201,9 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
 /* ‏وبابُ «المنشورات» الواحدُ على الضيّق وحدَه: على العريض يكفي زرُّ الترويسة (D-233) */
 @media${atLeast('md')}{details[data-head-new]{display:none}}
 @media${below('sm')}{
+  /* ‏زرُّ المُنشئ بعرض السطر على الهاتف (D-308): تحت الحقول حيث ينتهي الإبهام، لا في زاويةٍ بعيدة */
+  .cmp-act .btn{width:100%}
+  .cmp-act .ago{flex-basis:100%}
   .scroll{overflow:visible; margin:0}
   /* **والجدولُ المحوريُّ مستثنًى** (D-151): أعمدتُه أرقامٌ تُقارَن، وتكديسُها
      يُسقط رؤوسَها؛ فيبقى جدولًا ويتمرّر في .pv-wrap كما صُمّم. */

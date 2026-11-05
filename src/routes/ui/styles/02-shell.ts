@@ -47,8 +47,6 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
   padding:0 var(--s-2); border-radius:var(--r-pill); color:var(--ink-2);
   border:var(--bd)}
 
-/* ‏«منشور جديد» في الرافدة (D-246): أبرز ما فيها، بعرضها، تحت مبدّل المنظّمة كما في التصميم المعتمد */
-.rail-new{margin:var(--s-2) var(--s-3) var(--s-1)}
 nav.tabs{padding:var(--s-1) var(--s-3) var(--s-4); display:flex; flex-direction:column; gap:var(--s-0)}
 nav.tabs .lbl{font-size:var(--t-caption); line-height:var(--lh-caption); padding:var(--s-4) var(--s-2) var(--s-1); color:var(--ink-2);
   font-weight:600}
@@ -121,6 +119,7 @@ details.ladder .verdict.bad{color:var(--bad)}
 /* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
 .topbar .glyph.tb{display:none; width:var(--s-8); height:var(--s-8); border-radius:var(--r-control)}
 .topbar h1{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
+/* ‏وتحت العنوان كلمةُ البيئة لا النطاقُ (D-308): «sada2.basserh.com» لغةُ النظام، و«تجريبيّ» كلمةُ الرافدة نفسُها */
 .topbar .crumb{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 /* ‏والعنوانُ والنطاقُ يُقصّان لا يدفعان «خروج» خارج الشاشة (D-177): بعد رفع الحرف فاض
    الشريط ‏6px عند ‏320 — والزرّ الذي خرج هو الذي يُطلَب حين يُطلَب */

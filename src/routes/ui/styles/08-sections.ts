@@ -289,6 +289,23 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 /* ‏وسطرُ الشرح تحت المنصّة (D-190) نصٌّ عاديّ لا لصيقة: المربّعُ كلُّه «label» بوزن ‏600، فكان
    «Google لم تُجِز تطبيقك بعد» يُقرأ عنوانًا ثانيًا بجانب اسم المنصّة */
 .vpf-b .ago{font-weight:400}
+/* ‏المُنشئُ (D-308 · GOV.UK وBaymard: الحقلُ بعرض ما يُكتب لا بعرض الشاشة): بطاقةٌ واحدة بعرض ‏44rem،
+   ومقطعُ البابين أزرارُ راديو في لصائق تعمل بلا سكربت، والنموذجُ المختارُ وحدَه ظاهر («:has»)،
+   والزرُّ تحت الحقول في طرف البداية وسطرُ الكلفة بجانبه. وبلا «:has» يظهر البابان كما كانا. */
+.composer{max-inline-size:44rem}
+.composer .seg{display:flex; width:fit-content; margin:0 0 var(--s-4); margin-inline:0; min-inline-size:0}
+.seg label{position:relative; display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-1) var(--s-4);
+  border-radius:var(--r-control); color:var(--ink-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; cursor:pointer}
+.seg label:has(input:checked){background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
+.seg label input{position:absolute; inset:0; margin:0; opacity:0; cursor:pointer}
+.seg label:has(input:focus-visible){outline:var(--ring-w) solid var(--ring); outline-offset:var(--s-0)}
+.composer:has([name=cmp][value=write]:checked) #idea,.composer:has([name=cmp][value=idea]:checked) #write{display:none}
+.cmp-act{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4)}
+.cmp-act .ago{flex:1 1 14rem}
+.cmp-more{margin-top:var(--s-3)}
+.cmp-more > summary{display:flex; align-items:center; min-height:var(--tap); cursor:pointer; color:var(--link);
+  font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; text-decoration:underline; text-underline-offset:var(--s-0)}
+.cmp-more[open] > summary{margin-bottom:var(--s-2)}
 /* ‏«صف المقطع بجملة» (D-190): نموذجُ الكتابة فوق نموذج الإنشاء ويفصلهما خطٌّ خفيف، وحقولُ
    المنصّات بعده متتابعة بفجوة من السلّم — كانت حقلًا واحدًا لا يحتاجها */
 .vcap{display:flex; flex-direction:column; gap:var(--s-2); padding-bottom:var(--s-3); border-bottom:var(--bd-soft)}

@@ -229,8 +229,9 @@ export function npTile(input: {
       ? `<video src="${escapeHtml(src)}" preload="metadata" muted playsinline aria-hidden="true"></video>`
       : `<img src="/panel/media/${escapeHtml(encodeURIComponent(input.poster))}" alt="" loading="lazy" data-media>`
     : `<img src="${escapeHtml(src)}" alt="" loading="lazy" data-media>`
-  return `<a class="np-tile${input.dim ? ' dim' : ''}" href="#p-${escapeHtml(input.id)}"
-      aria-label="افتح المنشور في الخطّ الزمنيّ">${body}
+  // ‏الاسمُ الصوتيّ يحوي النصَّ الظاهر (WCAG 2.5.3 · D-308): كان «aria-label» وحدَه والشارةُ («6:00 م») ظاهرةً خارجه،
+  // ‏فمن ينطق ما يراه لا يصل. فالفعلُ نصٌّ مخفيّ قبل الشارة، والاسمُ «افتح المنشور في الخطّ الزمنيّ 6:00 م»
+  return `<a class="np-tile${input.dim ? ' dim' : ''}" href="#p-${escapeHtml(input.id)}">${body}
     ${video ? `<span class="np-play" aria-hidden="true">${ICON.play}</span>` : ''}
-    <span class="np-badge">${input.badge}</span></a>`
+    <span class="vh">افتح المنشور في الخطّ الزمنيّ</span> <span class="np-badge">${input.badge}</span></a>`
 }

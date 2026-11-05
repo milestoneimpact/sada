@@ -213,7 +213,7 @@ const R1: Journey = {
   },
 }
 
-/** ر-2 كما ينبغي: يبحث عن بطاقة «الكتابة من مصدر» حتّى يجدها، ثمّ يعتمد المسوّدةَ الجديدة. */
+/** ر-2 كما ينبغي: يفتح «اكتب» ويختار بابَ «من مصدر» في «منشور جديد»، ثمّ يعتمد المسوّدةَ الجديدة. */
 const R2: Journey = {
   id: 'R-2',
   title: 'كتابة منشور من مصدر واعتماده (المسار الذي يعمل)',
@@ -223,7 +223,8 @@ const R2: Journey = {
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     await m.tap(subTab(page, 'اكتب'), 'تبويب «اكتب»')
     const card = page.locator('form[action="/panel/drafts/write"]')
-    await m.look(visible(page.getByRole('heading', { name: 'الكتابة من مصدر' })), 'عنوان «الكتابة من مصدر»')
+    // ‏بابُ «من مصدر» في المُنشئ (D-308): لمسةٌ تُعدّ مرّةً، ويُحفظ الاختيارُ في المتصفّح بعدها
+    await m.tap(page.getByLabel('من مصدر'), 'باب «من مصدر» في «منشور جديد»', { key: true })
     const sources = await card.locator('select[name="id"] option').allTextContents()
     m.note(`قائمة المصدر فيها ${sources.length} خيار: ${sources.join(' · ')} — والمصدران في Drive بالاسم نفسه، والمحلَّل وحده يظهر`)
     const platform = await card.locator('select[name="platform"]').inputValue()
