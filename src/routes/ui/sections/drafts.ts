@@ -508,7 +508,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار الرسم…" ${stagesAttr('image')}>
       <input type="hidden" name="id" value="${escapeHtml(d.id)}">
       <input type="hidden" name="style" value="infographic">
-      <button class="btn btn-primary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
+      <button class="btn btn-secondary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
     ${lines.info}
     <details class="art">
       <summary>أو صورة فنّيّة</summary>

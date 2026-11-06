@@ -3742,8 +3742,8 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     Number(/مهامّ جاهزة<\/div>\s*<div class="kv-v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
   const IMAGE_BUTTON_OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>'
   const IMAGE_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>'
-  const INFO_BUTTON_OFF = '<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
-  const INFO_BUTTON_ON = '<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>'
+  const INFO_BUTTON_OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
+  const INFO_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد إنفوجرافيك</button>'
 
   it('صور إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطة المزوّد تامّة، والجدول «جاهز»، والقيمة لا تظهر', async () => {
     await upsertProvider(db, {

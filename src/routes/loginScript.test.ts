@@ -75,3 +75,36 @@ describe('الدخول بمفتاح المرور ينتقل فعلًا (الجل
     expect(r.note()).toBe('لم تُفتح؟ افتح لوحتك')
   })
 })
+
+/**
+ * ‏ومتصفّحٌ بلا مفاتيح مرور (مراجعة D-313): كان الأوّليُّ الوحيد في البطاقة زرًّا معطَّلًا، والطريقُ الذي تدلّ
+ * ‏عليه الرسالةُ («ادخل برمز البريد») ثانويًّا. فيُشغَّل السكربتُ بلا PublicKeyCredential ويُقرأ الصنفان.
+ */
+describe('متصفّحٌ بلا مفاتيح مرور (D-313)', () => {
+  it('زرُّ المفتاح يصير ثانويًّا معطَّلًا، و«أرسل الرمز» الأوّليَّ والتركيزُ في البريد', () => {
+    const html = loginPage({ passkeys: true, next: '/panel' })
+    expect(html).toContain('id="login-send"')
+    expect(html).toMatch(/class="btn btn-secondary" id="login-send"/)
+    const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]!).find((s) => s.includes('pk-login'))!
+    let focused = ''
+    const els: Record<string, Record<string, unknown>> = {
+      'pk-login': { className: 'btn btn-primary', disabled: false, textContent: 'الدخول بمفتاح المرور', addEventListener() {}, focus() {} },
+      'pk-note': { textContent: '' },
+      'login-next': { value: '/panel' },
+      'login-send': { className: 'btn btn-secondary' },
+      e: { focus() { focused = 'e' } },
+    }
+    const env = {
+      window: {}, navigator: {},
+      document: { getElementById: (id: string) => els[id] ?? null, createElement: () => ({}) },
+      location: { pathname: '/panel/login', search: '', hash: '' },
+      fetch: async () => ({ ok: true }), setTimeout: () => {}, atob, btoa,
+    }
+    new Function(...Object.keys(env), code)(...Object.values(env))
+    expect(els['pk-login']!.disabled).toBe(true)
+    expect(els['pk-login']!.className).toBe('btn btn-secondary')
+    expect(els['login-send']!.className).toBe('btn btn-primary')
+    expect(focused).toBe('e')
+    expect(els['pk-note']!.textContent).toBe('متصفّحك لا يدعم مفاتيح المرور — ادخل برمز البريد.')
+  })
+})

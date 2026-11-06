@@ -1171,7 +1171,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       infographic: infographicReadiness({ blocker: null, browser: { key: false, account: true }, briefReady: true }),
     }
     const html = section([draft('d1')], { mediaReady: noBrowser })
-    expect(html).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
     expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
@@ -1181,7 +1181,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       infographic: infographicReadiness({ blocker: null, browser: { key: true, account: true }, briefReady: false }),
     }
     const plain = section([draft('d1')], { mediaReady: noWriter })
-    expect(plain).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(plain).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
     expect(plain).toContain('<span class="ago">المحتوى من النصّ مباشرةً</span>')
   })
 
@@ -1218,7 +1218,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       video: videoReadiness({ face: 'none', blocker: null, clips: videoCapGate(0, 2) }),
     }
     const empty = section([draft('d1')], { mediaReady: blocked })
-    expect(empty).toContain('<button class="btn btn-primary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
     expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
     expect(empty).toContain('<span class="ago">موقوف بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
 
@@ -1245,7 +1245,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
     expect(html).toContain('<span class="ago">بلغ سقف المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
     const other = section([draft('d2')], { mediaReady: full })
-    expect(other).toContain('<button class="btn btn-primary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
+    expect(other).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد إنفوجرافيك</button>')
     expect(other).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
     const under = section([draft('d1')], { media: [picture('d1')] })

@@ -298,7 +298,7 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
   const ok = by('R-2', 'phone')
   if (stop !== undefined) {
     lines.push('', stop.success ? '## ر-2 على الهاتف: أين يقف مالك يبحث عن «اكتب»' : '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
-    lines.push('مالك يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرّ رئيسيّ يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
+    lines.push('مالك يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرٍّ رئيسيٍّ أو تبويبٍ في شريط القسم يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
     for (const n of stop.notes.filter((x) => x.startsWith('شاشة'))) lines.push(`- ${n}`)
     for (const n of stop.notes.filter((x) => !x.startsWith('شاشة') && !x.startsWith('⚠'))) lines.push(`- ${n}`)
     lines.push(`- **وما وقع حين ضغطه:** ${stop.verified}. والإشعار: ${stop.flashes.map((f) => `«${f}»`).join(' · ') || '—'}`)

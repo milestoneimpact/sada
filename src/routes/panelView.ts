@@ -128,7 +128,11 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var note=document.getElementById('pk-note');
   if(!btn)return;
   var label=btn.textContent;
+  // ‏ومتصفّحٌ بلا مفاتيح مرور (D-313): الزرُّ المعطَّل لا يبقى الأوّليَّ الوحيد، و«أرسل الرمز» يعود أوّليًّا والتركيزُ في البريد
   if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true;
+    btn.className=String(btn.className).replace('btn-primary','btn-secondary');
+    var send=document.getElementById('login-send'); if(send)send.className=String(send.className).replace('btn-secondary','btn-primary');
+    var mail=document.getElementById('e'); if(mail)try{mail.focus();}catch(e){}
     if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — ادخل برمز البريد.'; return;}
   // ‏والتركيزُ يعود إلى الزرّ: زرٌّ عُطّل يفقده، فـEnter بعد نافذةٍ أُغلقت لا يفعل شيئًا
   var reset=function(msg){btn.disabled=false; btn.removeAttribute('aria-busy');
@@ -176,6 +180,8 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
 
 export function loginPage(state: LoginState = {}, nonce = ''): string {
   const step = state.step ?? 'email'
+  // ‏وزرٌّ أوّليٌّ واحد في البطاقة (D-313): مفتاحُ المرور حين يُعرض (مقاومٌ للتصيّد)، و«أرسل الرمز» ثانويٌّ بعده؛
+  // ‏وبلا مفتاحٍ يعود «أرسل الرمز» الأوّليَّ الوحيد
   const passkey =
     state.passkeys !== true || state.blocked === true || step === 'code'
       ? ''
@@ -209,7 +215,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
           <div class="field"><label for="e">البريد</label>
             <input id="e" type="email" name="email" dir="ltr" autocomplete="email"
                    required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
-          <button class="btn btn-primary" type="submit"${disabled}>أرسل الرمز</button>
+          <button class="btn ${passkey === '' ? 'btn-primary' : 'btn-secondary'}" id="login-send" type="submit"${disabled}>أرسل الرمز</button>
         </form>`
   return shell(
     'صدى — الدخول',
@@ -1153,8 +1159,8 @@ function quotaCard(q: PostsData['imageQuota']): string {
     <h2 class="m-0">نفدت حصّةُ الصور المجّانيّة اليوم</h2>
     <p class="m-0 mt-2">${String(q.waiting)} صورةً تنتظر. رسمُها الآن يكلّف نحو <b>${money(q.usd)}</b>، أو تنتظر تجدّدَ الحصّة 03:00 بتوقيت الرياض بلا كلفة.</p>
     <div class="row gap-2 mt-3">
-      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-primary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
-      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-secondary btn-sm" type="submit">انتظر للغد</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-secondary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-primary btn-sm" type="submit">انتظر للغد</button></form>
     </div></div>`.value
 }
 
@@ -1407,7 +1413,7 @@ ${ownerView ? `<div data-sub id="security-all">
     <div class="row mt-3">
       <div class="field"><label for="pk-label">اسم الجهاز</label>
         <input id="pk-label" placeholder="هاتفي · مفتاح YubiKey" maxlength="60"></div>
-      <button class="btn btn-primary" id="pk-add" type="button">سجّل مفتاحا</button>
+      <button class="btn ${d.factors.passkeys.length === 0 ? 'btn-primary' : 'btn-secondary'}" id="pk-add" type="button">سجّل مفتاحا</button>
     </div>
     <div class="note" id="pk-msg" role="status" aria-live="polite"></div>
 
@@ -1419,7 +1425,7 @@ ${ownerView ? `<div data-sub id="security-all">
     <div class="row">
       ${d.factors.totpConfirmed
         ? '<button class="btn btn-danger" id="totp-remove" type="button">أزل رمز التطبيق</button>'
-        : '<button class="btn btn-primary" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
+        : '<button class="btn btn-secondary" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
     </div>
     <div id="totp-box" hidden>
       <div class="field mt-3"><label for="totp-secret">السرّ — انسخه إلى تطبيق المصادقة</label>
@@ -1439,7 +1445,7 @@ ${ownerView ? `<div data-sub id="security-all">
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
     <div class="row">
-      <button class="btn ${d.factors.recoveryLeft > 0 ? 'btn-secondary' : 'btn-primary'}" id="rc-issue" type="button">
+      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button">
         ${d.factors.recoveryLeft > 0 ? 'ولّد مجموعةً جديدة' : 'ولّد رموز استرداد'}</button>
     </div>
     <div id="rc-box" hidden><div class="codes" id="rc-list"></div>

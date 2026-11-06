@@ -251,7 +251,7 @@ const R2: Journey = {
 
 /**
  * ر-2 كما وقع: مالكٌ على الهاتف يمرّر «المنشورات» من أعلاها بحثًا عن «اكتب»، **ويضغط أوّلَ
- * زرٍّ رئيسيٍّ يوافق مقصده** — ويُسجَّل كلُّ شاشةٍ مرّ بها وما فيها.
+ * زرٍّ رئيسيٍّ أو تبويبٍ في شريط القسم يوافق مقصده** (التبويبُ بابٌ منذ D-313) — ويُسجَّل كلُّ شاشةٍ مرّ بها وما فيها.
  */
 const R2stop: Journey = {
   id: 'R-2·stop',
@@ -277,7 +277,7 @@ const R2stop: Journey = {
         const vh = window.innerHeight
         const goal = /اكتب|أنشئ|جديد|اعتمد/
         // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-233): يراه المالكُ زرًّا فيُعدّ زرًّا
-        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"]'))
+        return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"], nav.tab-bar a'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
             return r.height > 0 && r.top >= top && r.bottom <= vh - bottom && getComputedStyle(el).visibility !== 'hidden'
