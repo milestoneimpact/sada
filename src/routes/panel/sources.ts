@@ -109,7 +109,6 @@ sources.post('/panel/sources/link', async (c) => {
 sources.get('/panel/sources/:id/file', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const row = await c.env.DB
     .prepare("SELECT name, mime, file_key FROM sources WHERE id = ? AND org_id = ? AND kind = 'upload'")
     .bind(c.req.param('id'), activeOrg(session.record))

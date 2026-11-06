@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allows, orgAllowed, requiredRole } from './access'
+import { allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole } from './access'
 
 describe('من يملك ماذا (D-272)', () => {
   it('الدورُ يملك ما تحته', () => {
@@ -17,7 +17,7 @@ describe('من يملك ماذا (D-272)', () => {
     expect(requiredRole('POST', '/panel/2fa/totp', null)).toBeNull()
   })
 
-  it('الكتابةُ للمحرّر، والاعتمادُ والجدولةُ للناشر، والربطُ للمدير، والأمانُ للمالك', () => {
+  it('الكتابةُ للمحرّر، والاعتمادُ والجدولةُ للناشر، والربطُ للمدير، والفريقُ والجلساتُ للمالك', () => {
     expect(requiredRole('POST', '/panel/drafts/write', null)).toBe('editor')
     expect(requiredRole('POST', '/panel/plan/item', null)).toBe('editor')
     expect(requiredRole('POST', '/panel/drafts/decide', 'save')).toBe('editor')
@@ -27,7 +27,10 @@ describe('من يملك ماذا (D-272)', () => {
     expect(requiredRole('POST', '/panel/uploads/u1/schedule', null)).toBe('publisher')
     expect(requiredRole('GET', '/oauth/linkedin/start', null)).toBe('admin')
     expect(requiredRole('POST', '/panel/channels/disconnect', null)).toBe('admin')
-    expect(requiredRole('POST', '/panel/security/totp/start', null)).toBe('owner')
+    // ‏‏D-317: عواملُ الحساب نفسِه لكلّ دور — المسارُ لا يمسّ إلّا عواملَ بريد الجلسة، والمدعوُّ يسجّل عاملَه الإلزاميّ
+    expect(requiredRole('POST', '/panel/security/totp/start', null)).toBe('viewer')
+    expect(requiredRole('POST', '/panel/stepup/totp', null)).toBe('viewer')
+    expect(requiredRole('POST', '/panel/sessions/revoke-all', null)).toBe('owner')
     expect(requiredRole('POST', '/panel/team/invite', null)).toBe('owner')
     expect(requiredRole('POST', '/panel/providers/key', null)).toBe('owner')
     expect(requiredRole('POST', '/panel/orgs/switch', null)).toBe('viewer')
@@ -41,5 +44,43 @@ describe('من يملك ماذا (D-272)', () => {
     expect(orgAllowed({ orgs: '*' }, 'org_x')).toBe(true)
     expect(orgAllowed({ orgs: ['org_a'] }, 'org_a')).toBe(true)
     expect(orgAllowed({ orgs: ['org_a'] }, 'org_b')).toBe(false)
+  })
+})
+
+describe('الجلسةُ الناقصةُ والفعلُ الحسّاس (D-317)', () => {
+  it('العاملُ الثاني إلزاميٌّ للمالك والمدير والناشر، واختياريٌّ للمحرّر والقارئ', () => {
+    expect(['owner', 'admin', 'publisher', 'editor', 'viewer'].map((r) => factorRequired(r as never))).toEqual([true, true, true, false, false])
+  })
+
+  it('المعلَّقةُ لا تفتح إلّا شاشةَ عاملها وأبوابَ الدخول', () => {
+    for (const p of ['/panel/2fa', '/panel/2fa/totp', '/panel/login', '/panel/logout', '/panel/passkey/login']) expect(pendingMayOpen(p), p).toBe(true)
+    for (const p of ['/panel', '/panel/settings', '/panel/enrol', '/panel/stepup', '/panel/plan-import/template.csv']) expect(pendingMayOpen(p), p).toBe(false)
+  })
+
+  it('جلسةُ التسجيل لا تفتح إلّا صفحتَه وتسجيلَ العامل والتحقّقَ والمساعدةَ والخروج', () => {
+    expect(enrolMayOpen('GET', '/panel/enrol')).toBe(true)
+    expect(enrolMayOpen('GET', '/panel/help')).toBe(true)
+    expect(enrolMayOpen('GET', '/panel/stepup')).toBe(true)
+    expect(enrolMayOpen('POST', '/panel/security/passkey/register')).toBe(true)
+    expect(enrolMayOpen('POST', '/panel/security/totp/confirm')).toBe(true)
+    expect(enrolMayOpen('POST', '/panel/stepup/code/send')).toBe(true)
+    expect(enrolMayOpen('POST', '/panel/logout')).toBe(true)
+    for (const [m, p] of [['GET', '/panel'], ['GET', '/panel/settings'], ['POST', '/panel/security/recovery/issue'],
+      ['POST', '/panel/security/passkey/delete'], ['POST', '/panel/team/invite'], ['GET', '/oauth/x/start']] as const) {
+      expect(enrolMayOpen(m, p), `${m} ${p}`).toBe(false)
+    }
+  })
+
+  it('الأفعالُ الحسّاسةُ بتحقّقٍ حديث — والإعدادُ العاديُّ لا', () => {
+    for (const p of ['/panel/security/passkey/challenge', '/panel/security/passkey/register', '/panel/security/passkey/delete',
+      '/panel/security/totp/start', '/panel/security/totp/remove', '/panel/security/recovery/issue', '/panel/sessions/revoke-all',
+      '/panel/team/invite', '/panel/team/revoke', '/panel/providers/add', '/panel/providers/key', '/panel/providers/delete',
+      '/panel/channels/disconnect']) expect(needsStepUp('POST', p), p).toBe(true)
+    expect(needsStepUp('GET', '/oauth/linkedin/start')).toBe(true)
+    expect(needsStepUp('POST', '/panel/settings', 'alert_webhook')).toBe(true)
+    expect(needsStepUp('POST', '/panel/settings', 'paused')).toBe(false)
+    expect(needsStepUp('POST', '/panel/security/totp/confirm')).toBe(false)
+    expect(needsStepUp('POST', '/panel/drafts/write')).toBe(false)
+    expect(needsStepUp('GET', '/panel/settings')).toBe(false)
   })
 })

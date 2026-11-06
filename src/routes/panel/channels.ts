@@ -324,7 +324,6 @@ channels.post('/panel/channels/app/delete', async (c) => {
 channels.get('/panel/channels/:platform', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const id = c.req.param('platform')
   const spec = CHANNELS.find((ch) => ch.id === id)

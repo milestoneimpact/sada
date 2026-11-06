@@ -140,7 +140,8 @@ function scopeModeOf(raw: string | undefined): ScopeMode {
  */
 async function startingOrg(env: Env, request: Request): Promise<string | null> {
   const session = await loadSession(env.KV, request, env.ADMIN_TOKEN)
-  if (session === null || session.record.pending) return null
+  // ‏والمعلَّقةُ وجلسةُ التسجيل لا تصلان هنا: يردّهما حارسُ الجلسات قبل كلّ مسار (D-317)
+  if (session === null) return null
   return activeOrg(session.record)
 }
 

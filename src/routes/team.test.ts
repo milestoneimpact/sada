@@ -83,7 +83,8 @@ describe('الفريق (D-272)', () => {
     const owner = cookieOf(await emailLogin(app, env))
     const ownerCsrf = await csrfOf(owner, '/panel/team')
     await post('/panel/team/invite', owner, { _csrf: ownerCsrf, email: 'admin@example.com', role: 'admin', all: '1' })
-    const admin = cookieOf(await memberLogin('admin@example.com'))
+    // ‏والمديرُ يلزمه عاملٌ ثانٍ (D-317): يُزرع مفتاحُه ويدخل به كما يدخل المالك
+    const admin = cookieOf(await emailLogin(app, env, { email: 'admin@example.com' }))
     const res = await app.request('/panel/settings', { headers: { Cookie: admin } }, env)
     expect(res.status).toBe(200)
     const html = await res.text()

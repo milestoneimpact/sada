@@ -5,15 +5,13 @@
  * موقّعٌ على اسم النطاق، فصفحةٌ مزوّرة على عنوانٍ يشبهه لا تحصل على توقيع
  * مهما أتقنت الشكل. وهذا ما لا يفعله رمزٌ يُكتب ولا رقمٌ يُنسَخ من تطبيق.
  *
- * ## ما لا يُفعل هنا: تفكيك CBOR
+ * ## المفتاحُ من بيانات الاعتماد المشهودة لا من العميل (D-317)
  *
- * `attestationObject` مغلَّفٌ بـ CBOR، وتفكيكُه شيفرةُ تحليلٍ لمدخلٍ لا
- * نثق به — وهو الموضع الذي تسكن فيه الثغرات. والمتصفّح يقدّم المفتاح
- * جاهزا بـ `getPublicKey()` بصيغة SPKI، فيُستورَد بـ `crypto.subtle`
- * مباشرة. **فما لا نحلّله لا نُخطئ في تحليله.**
- *
- * وثمنُه أنّ متصفّحا قديما لا يعطي `getPublicKey()` — ويُقال ذلك للمالك
- * صراحةً بدل أن يفشل التسجيل بلا تفسير.
+ * كان التسجيلُ يأخذ المفتاحَ العامَّ ومعرّفَ الاعتماد كما يرسلهما العميل (`getPublicKey()`)، ولا يربطهما بما وقّع عليه
+ * المتوثِّق: «ما لا نحلّله لا نُخطئ في تحليله». والثمنُ أنّ ما يُحفظ قولُ العميل لا قولُ المتوثِّق. فصار
+ * `attestationObject` يُفكّ (CBOR) بمحلّلٍ صغيرٍ **محدودِ العمق والطول والأنواع** (`decodeCbor`)، ويُقرأ منه
+ * `authData` ثمّ «بيانات الاعتماد المشهودة»: المعرّفُ والمفتاحُ بصيغة COSE، ويُحوَّل المفتاحُ إلى SPKI بـ `crypto.subtle`.
+ * فلا يُحفظ إلّا مفتاحٌ قاله المتوثِّقُ على نطاقنا بعلامة «حاضر». والإقرارُ نفسُه (`attStmt`) لا يُفحص: نطلب `none`.
  *
  * ## ما يُفكَّك: `authenticatorData`
  *
@@ -22,6 +20,7 @@
  *     [٠..٣١]   بصمةُ اسم النطاق (SHA-256)
  *     [٣٢]      الرايات — الأولى «حاضر»، والثالثة «تُحقِّق منه»
  *     [٣٣..٣٦]  عدّادُ التوقيع، كبير الطرف
+ *     [٣٧..]    في التسجيل وحده (الراية 0x40): AAGUID ‏16 بايتًا، وطولُ المعرّف بايتان، ثمّ المعرّف، ثمّ المفتاحُ بـ COSE
  */
 import { equalBytes, fromBase64Url, randomBytes, sha256, toBase64Url } from './bytes'
 
@@ -261,41 +260,194 @@ export async function verifyAssertion(
   return { ok: true, signCount: auth.data.signCount, userVerified: auth.data.userVerified }
 }
 
+// ── CBOR: محلّلٌ صغيرٌ محدود (D-317) ───────────────────────────────────
+
+/** ما يقرؤه المحلّل: أعدادٌ صحيحة وبايتاتٌ ونصوصٌ ومصفوفاتٌ وخرائط، و`true`/`false`/`null`. ولا أعدادَ عشريّة ولا وسوم. */
+export type Cbor = number | Uint8Array | string | boolean | null | Cbor[] | Map<Cbor, Cbor>
+
+const CBOR_MAX_DEPTH = 8
+const CBOR_MAX_ITEMS = 256
+
+class CborError extends Error {}
+
 /**
- * يتحقّق من تسجيلِ مفتاحٍ جديد.
+ * يفكّ عنصرًا واحدًا من `bytes` بدءًا من `offset`، ويعيده ومعه موضعَ ما بعده.
  *
- * والمفتاحُ العامّ يجيء من المتصفّح لا من تفكيكنا — انظر رأس الملفّ. فما
- * يُفحص هنا: أنّ بيانات العميل لنا، وأنّ المتوثِّق وقّع على نطاقنا، وأنّ
- * الخوارزميّة ممّا ندعم.
+ * **ومحدودٌ عمدًا**: عمقٌ لا يتجاوز ثمانية، وعناصرُ لا تتجاوز مئتين وستّة وخمسين في الحاوية، وطولٌ لا يتجاوز ما بقي من
+ * البايتات، والأطوالُ اللانهائيّة (`0x1f`) والوسومُ والأعدادُ العشريّة مرفوضة — فمدخلٌ مصنوعٌ لا يستنزف ذاكرةً ولا وقتًا.
+ */
+export function decodeCbor(bytes: Uint8Array, offset = 0, depth = 0): { value: Cbor; end: number } {
+  if (depth > CBOR_MAX_DEPTH) throw new CborError('عمقٌ زائد')
+  if (offset >= bytes.length) throw new CborError('انتهت البايتات')
+  const head = bytes[offset]!
+  const major = head >> 5
+  const info = head & 0x1f
+  let pos = offset + 1
+  const need = (n: number): void => {
+    if (pos + n > bytes.length) throw new CborError('طولٌ يتجاوز البايتات')
+  }
+  let arg: number
+  if (info < 24) arg = info
+  else if (info === 24) { need(1); arg = bytes[pos]!; pos += 1 }
+  else if (info === 25) { need(2); arg = (bytes[pos]! << 8) | bytes[pos + 1]!; pos += 2 }
+  else if (info === 26) { need(4); arg = new DataView(bytes.buffer, bytes.byteOffset + pos, 4).getUint32(0); pos += 4 }
+  else throw new CborError('صيغةٌ غير مدعومة')
+
+  switch (major) {
+    case 0: return { value: arg, end: pos }
+    case 1: return { value: -1 - arg, end: pos }
+    case 2: need(arg); return { value: bytes.slice(pos, pos + arg), end: pos + arg }
+    case 3: need(arg); return { value: new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes.slice(pos, pos + arg)), end: pos + arg }
+    case 4: {
+      if (arg > CBOR_MAX_ITEMS) throw new CborError('مصفوفةٌ أكبر من الحدّ')
+      const out: Cbor[] = []
+      for (let i = 0; i < arg; i += 1) {
+        const item = decodeCbor(bytes, pos, depth + 1)
+        out.push(item.value)
+        pos = item.end
+      }
+      return { value: out, end: pos }
+    }
+    case 5: {
+      if (arg > CBOR_MAX_ITEMS) throw new CborError('خريطةٌ أكبر من الحدّ')
+      const out = new Map<Cbor, Cbor>()
+      for (let i = 0; i < arg; i += 1) {
+        const k = decodeCbor(bytes, pos, depth + 1)
+        const v = decodeCbor(bytes, k.end, depth + 1)
+        out.set(k.value, v.value)
+        pos = v.end
+      }
+      return { value: out, end: pos }
+    }
+    case 7:
+      if (info === 20) return { value: false, end: pos }
+      if (info === 21) return { value: true, end: pos }
+      if (info === 22) return { value: null, end: pos }
+      throw new CborError('قيمةٌ بسيطةٌ غير مدعومة')
+    default:
+      throw new CborError('نوعٌ غير مدعوم')
+  }
+}
+
+/** بيانات الاعتماد المشهودة كما قالها المتوثِّق. */
+export interface AttestedCredential {
+  readonly authData: Uint8Array
+  readonly credentialId: Uint8Array
+  /** المفتاحُ بصيغة SPKI بعد تحويله من COSE. */
+  readonly publicKey: Uint8Array
+  readonly alg: number
+}
+
+const AT_FLAG = 0x40
+
+/** يحوّل مفتاح COSE إلى SPKI بـ `crypto.subtle` — ‏ES256 (P-256) وRS256 وحدهما. */
+async function coseToSpki(cose: Map<Cbor, Cbor>): Promise<{ spki: Uint8Array; alg: number } | { error: string }> {
+  const kty = cose.get(1)
+  const alg = cose.get(3)
+  if (alg !== ES256 && alg !== RS256) return { error: `خوارزميّة غير مدعومة: ${String(alg)}` }
+  let jwk: JsonWebKey
+  if (alg === ES256) {
+    const crv = cose.get(-1)
+    const x = cose.get(-2)
+    const y = cose.get(-3)
+    if (kty !== 2 || crv !== 1 || !(x instanceof Uint8Array) || !(y instanceof Uint8Array) || x.length !== 32 || y.length !== 32) {
+      return { error: 'مفتاح EC غير صالح في بيانات الاعتماد' }
+    }
+    jwk = { kty: 'EC', crv: 'P-256', x: toBase64Url(x), y: toBase64Url(y), ext: true }
+  } else {
+    const n = cose.get(-1)
+    const e = cose.get(-2)
+    if (kty !== 3 || !(n instanceof Uint8Array) || !(e instanceof Uint8Array) || n.length < 256) {
+      return { error: 'مفتاح RSA غير صالح في بيانات الاعتماد' }
+    }
+    jwk = { kty: 'RSA', n: toBase64Url(n), e: toBase64Url(e), alg: 'RS256', ext: true }
+  }
+  try {
+    const key = await crypto.subtle.importKey(
+      'jwk', jwk,
+      alg === RS256 ? { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } : { name: 'ECDSA', namedCurve: 'P-256' },
+      true, ['verify'],
+    )
+    return { spki: new Uint8Array((await crypto.subtle.exportKey('spki', key)) as ArrayBuffer), alg }
+  } catch {
+    return { error: 'المفتاح العامّ لا يُقرأ' }
+  }
+}
+
+/**
+ * يقرأ `attestationObject`: خريطةَ CBOR فيها `authData`، ومنها بياناتُ الاعتماد المشهودة. ويرمي `CborError` لما لا يُقرأ.
+ */
+export async function readAttestation(attestationObject: Uint8Array): Promise<AttestedCredential | { error: string }> {
+  let top: Cbor
+  try {
+    const decoded = decodeCbor(attestationObject)
+    top = decoded.value
+  } catch {
+    return { error: 'بيانات الإقرار لا تُقرأ' }
+  }
+  if (!(top instanceof Map)) return { error: 'بيانات الإقرار ليست خريطة' }
+  const authData = top.get('authData')
+  if (!(authData instanceof Uint8Array) || authData.length < 37 + 18) return { error: 'بيانات المتوثِّق ناقصة' }
+  if ((authData[32]! & AT_FLAG) === 0) return { error: 'لا بيانات اعتمادٍ مشهودة في التسجيل' }
+  const idLength = (authData[53]! << 8) | authData[54]!
+  if (idLength === 0 || idLength > 1023 || 55 + idLength > authData.length) return { error: 'طولُ معرّف الاعتماد غير صالح' }
+  const credentialId = authData.slice(55, 55 + idLength)
+  let cose: Cbor
+  try {
+    cose = decodeCbor(authData, 55 + idLength).value
+  } catch {
+    return { error: 'مفتاح COSE لا يُقرأ' }
+  }
+  if (!(cose instanceof Map)) return { error: 'مفتاح COSE ليس خريطة' }
+  const key = await coseToSpki(cose)
+  if ('error' in key) return key
+  return { authData, credentialId, publicKey: key.spki, alg: key.alg }
+}
+
+export type RegistrationVerdict =
+  | {
+      readonly ok: true
+      readonly signCount: number
+      readonly userVerified: boolean
+      /** معرّفُ الاعتماد والمفتاحُ كما قالهما المتوثِّق — بـ base64url، والمفتاحُ SPKI. */
+      readonly credentialId: string
+      readonly publicKey: string
+      readonly alg: number
+    }
+  | { readonly ok: false; readonly reason: string }
+
+/**
+ * يتحقّق من تسجيلِ مفتاحٍ جديد (D-317).
+ *
+ * يُفحص أنّ بيانات العميل لنا (النوعُ والتحدّي والأصل)، ثمّ يُقرأ `attestationObject`: نطاقُه ورايةُ «حاضر»، ومنه
+ * **المعرّفُ والمفتاحُ نفسُهما** — فلا يُحفظ مفتاحٌ لم يقله المتوثِّق. والخوارزميّةُ ممّا ندعم، والمفتاحُ يُستورَد الآن
+ * ليُرفض المشوَّه هنا لا عند أوّل دخول.
  */
 export async function verifyRegistration(
   input: {
     readonly clientDataJSON: Uint8Array
-    readonly authenticatorData: Uint8Array
-    readonly publicKey: Uint8Array | null
-    readonly alg: number
+    readonly attestationObject: Uint8Array | null
   },
   expected: Expected,
-): Promise<Verdict> {
+): Promise<RegistrationVerdict> {
   const client = checkClientData(input.clientDataJSON, 'webauthn.create', expected)
-  if (!client.ok) return fail(client.reason)
+  if (!client.ok) return { ok: false, reason: client.reason }
 
-  const auth = await checkAuthData(input.authenticatorData, expected)
-  if (!auth.ok) return fail(auth.reason)
-
-  if (input.publicKey === null || input.publicKey.length === 0) {
-    return fail('متصفّحك لا يقدّم المفتاح العامّ مباشرةً — يلزم متصفّح أحدث')
+  if (input.attestationObject === null || input.attestationObject.length === 0) {
+    return { ok: false, reason: 'لم تصل بيانات الإقرار — يلزم متصفّح أحدث' }
   }
-  if (input.alg !== ES256 && input.alg !== RS256) {
-    return fail(`خوارزميّة غير مدعومة: ${input.alg}`)
-  }
+  const attested = await readAttestation(input.attestationObject)
+  if ('error' in attested) return { ok: false, reason: attested.error }
 
-  // يُستورَد الآن ليُرفض المشوَّه هنا لا عند أوّل دخول
-  try {
-    await importKey(input.publicKey, input.alg)
-  } catch {
-    return fail('المفتاح العامّ لا يُقرأ')
-  }
+  const auth = await checkAuthData(attested.authData, expected)
+  if (!auth.ok) return { ok: false, reason: auth.reason }
 
-  return { ok: true, signCount: auth.data.signCount, userVerified: auth.data.userVerified }
+  return {
+    ok: true,
+    signCount: auth.data.signCount,
+    userVerified: auth.data.userVerified,
+    credentialId: toBase64Url(attested.credentialId),
+    publicKey: toBase64Url(attested.publicKey),
+    alg: attested.alg,
+  }
 }

@@ -172,7 +172,6 @@ plan.post('/panel/plan/generate', async (c) => {
 plan.get('/panel/plan/new', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const [accounts, brief, analyzed, units, settings, current, ready] = await Promise.all([
     listAccounts(c.env.DB, org),
@@ -465,7 +464,6 @@ plan.post('/panel/plan-import', async (c) => {
 plan.get('/panel/plan-import/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const id = c.req.param('id')
   const csv = await c.env.KV.get(`plan-import:${id}`)
   if (csv === null) {
@@ -534,7 +532,6 @@ plan.post('/panel/plan-import/:id/approve', async (c) => {
 plan.get('/panel/plan/review', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const current = await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
@@ -661,7 +658,6 @@ plan.post('/panel/plan/pin', async (c) => {
 plan.get('/panel/plan/import', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin') })
   return page((nonce) =>
     soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
@@ -726,7 +722,6 @@ plan.post('/panel/plan/import', async (c) => {
 plan.get('/panel/plan/view', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const current = await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
@@ -753,7 +748,6 @@ plan.get('/panel/plan/view', async (c) => {
 plan.get('/panel/plan', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const current = await latestPlan(c.env.DB, activeOrg(session.record))
   const to = current === null ? '/panel/plan/new' : current.lockedAt !== null && current.lockedAt !== undefined ? '/panel/plan/view' : '/panel/plan/review'
   return c.redirect(to, 303)

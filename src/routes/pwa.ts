@@ -94,7 +94,6 @@ pwa.get('/icons/sada.png', (c) =>
 pwa.get('/panel/share', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const q = c.req.query()
   const parts = [q['title'] ?? '', q['text'] ?? '', q['url'] ?? ''].map((s) => s.trim()).filter((s) => s !== '')
   const idea = [...new Set(parts)].join('\n').slice(0, IDEA_MAX)

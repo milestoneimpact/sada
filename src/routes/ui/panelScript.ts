@@ -1,5 +1,5 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
-import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
+import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
 import { MOVED_ANCHORS, MOVED_PREFIXES } from '../../lib/nav/panes'
 
 /**
@@ -756,130 +756,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     });
   }
 
-  // ── العامل الثاني ─────────────────────────────────────
+  // ── نداءُ نموذجٍ برمز الجلسة ─────────────────────────
+  // ‏وأفعالُ العامل الثاني في سكربت العوامل المشترك (D-317): تقرؤه الإعداداتُ وصفحةُ «أمان حسابك»
   var csrf=(document.querySelector('input[name="_csrf"]')||{}).value||'';
-  var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
   var post=function(url,fields){
     var body=new FormData(); body.set('_csrf',csrf);
     for(var k in fields)body.set(k,fields[k]);
     return fetch(url,{method:'POST',body:body});
   };
-  var say=function(id,msg){var n=document.getElementById(id); if(n)n.textContent=msg;};
-
-  var add=document.getElementById('pk-add');
-  if(add)add.addEventListener('click',function(){
-    if(!window.PublicKeyCredential){say('pk-msg','متصفّحك لا يدعم مفاتيح المرور.'); return;}
-    var label=(document.getElementById('pk-label')||{}).value||'';
-    add.disabled=true; say('pk-msg','المس مفتاحك…');
-    post('/panel/security/passkey/challenge',{}).then(function(r){
-      return r.ok?r.json():sadaPk.fail(r);
-    }).then(function(d){
-      return navigator.credentials.create({publicKey:{
-        challenge:fromB64u(d.challenge),
-        rp:{id:d.rp.id,name:d.rp.name},
-        user:{id:fromB64u(d.user.id),name:d.user.name,displayName:d.user.displayName},
-        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
-        authenticatorSelection:{userVerification:'preferred',residentKey:'preferred'},
-        excludeCredentials:d.excludeCredentials.map(function(id){
-          return {id:fromB64u(id),type:'public-key'};}),
-        attestation:'none', timeout:60000
-      }});
-    }).then(function(cred){
-      var r=cred.response;
-      var pk=r.getPublicKey?r.getPublicKey():null;
-      if(!pk)throw new Error('OldBrowser');
-      return post('/panel/security/passkey/register',{label:label,
-        credential:JSON.stringify({credentialId:cred.id,
-          clientDataJSON:b64u(r.clientDataJSON),
-          authenticatorData:r.getAuthenticatorData?b64u(r.getAuthenticatorData()):'',
-          publicKey:b64u(pk), alg:r.getPublicKeyAlgorithm?r.getPublicKeyAlgorithm():-7})});
-    }).then(function(r){
-      if(r.ok){location.reload(); return;}
-      return r.json().catch(function(){return {};}).then(function(e){add.disabled=false;
-        say('pk-msg',e.detail||sadaPk.server(e.error,r.status).message); add.focus();});
-    }).catch(function(err){add.disabled=false;
-      say('pk-msg',err&&err.message==='OldBrowser'
-        ?'متصفّحك لا يقدّم المفتاح العامّ مباشرةً — يلزم متصفّح أحدث.'
-        :sadaPk.why(err)); add.focus();});
-  });
-
-  document.querySelectorAll('button.pk-del').forEach(function(b){
-    b.addEventListener('click',function(){
-      if(!confirm('حذف المفتاح «'+b.dataset.label+'»؟'))return;
-      b.disabled=true;
-      post('/panel/security/passkey/delete',{id:b.dataset.id}).then(function(r){
-        if(r.ok){location.reload(); return;}
-        return r.json().catch(function(){return {};}).then(function(e){b.disabled=false;
-          say('pk-msg',e.detail||sadaPk.server(e.error,r.status).message);});
-      }).catch(function(err){b.disabled=false; say('pk-msg',sadaPk.why(err));});
-    });
-  });
-
-  var ts=document.getElementById('totp-start');
-  if(ts)ts.addEventListener('click',function(){
-    ts.disabled=true;
-    post('/panel/security/totp/start',{}).then(function(r){
-      return r.ok?r.json():sadaPk.fail(r);
-    }).then(function(d){
-      document.getElementById('totp-secret').value=d.secret;
-      document.getElementById('totp-box').hidden=false;
-      // ‏و«أكّد» الأوّليُّ الوحيد في البطاقة ما دام الضبطُ مفتوحًا (D-313): الخطوةُ التالية خطوتُه
-      Array.prototype.forEach.call(document.querySelectorAll('#factors .btn-primary'),function(b){
-        if(!b.closest('#totp-box'))b.className=b.className.replace('btn-primary','btn-secondary');});
-      say('totp-msg','انسخ السرّ إلى تطبيق المصادقة ثمّ أكّد بالرمز الظاهر.');
-    }).catch(function(err){ts.disabled=false; say('totp-msg',sadaPk.why(err)); ts.focus();});
-  });
-
-  var tc=document.getElementById('totp-confirm');
-  if(tc)tc.addEventListener('submit',function(e){
-    e.preventDefault();
-    /*
-     * ‏«رمزٌ غير صحيح» لما هو كذلك وحدَه (D-161): جلسةٌ انتهت أو صفحةٌ قديمة
-     * ‏كانت تُقرأ رمزًا خاطئًا، فيعيد المالكُ رمزًا صحيحًا مرّةً بعد مرّة
-     */
-    post('/panel/security/totp/confirm',{code:tc.code.value})
-      .then(function(r){
-        if(r.ok)return r.json();
-        return r.json().catch(function(){return {};}).then(function(e){
-          if(r.status===401&&e.error==='denied')throw Object.assign(new Error(e.detail||'رمز غير صحيح.'),{name:'SadaServer'});
-          throw sadaPk.server(e.error,r.status);});
-      }).then(function(d){
-        if(d.codes&&d.codes.length){showCodes(d.codes); say('totp-msg','أُكّد. وهذه رموز استردادك — انسخها.');}
-        else location.reload();
-      }).catch(function(err){say('totp-msg',sadaPk.why(err));});
-  });
-
-  var tr=document.getElementById('totp-remove');
-  if(tr)tr.addEventListener('click',function(){
-    if(!confirm('إزالة رمز التطبيق؟'))return;
-    tr.disabled=true;
-    post('/panel/security/totp/remove',{}).then(function(r){
-      if(r.ok){location.reload(); return;}
-      return r.json().catch(function(){return {};}).then(function(e){
-        if(e.detail)throw Object.assign(new Error(e.detail),{name:'SadaServer'});
-        throw sadaPk.server(e.error,r.status);});
-    }).catch(function(err){tr.disabled=false; say('totp-msg',sadaPk.why(err)); tr.focus();});
-  });
-
-  function showCodes(list){
-    var box=document.getElementById('rc-box'), out=document.getElementById('rc-list');
-    if(!box||!out)return;
-    out.textContent='';
-    list.forEach(function(c){var d=document.createElement('code'); d.textContent=c; out.appendChild(d);});
-    box.hidden=false;
-  }
-
-  var ri=document.getElementById('rc-issue');
-  if(ri)ri.addEventListener('click',function(){
-    if(!confirm('توليد مجموعة جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
-    ri.disabled=true;
-    post('/panel/security/recovery/issue',{}).then(function(r){
-      return r.ok?r.json():sadaPk.fail(r);
-    }).then(function(d){ri.disabled=false;
-        if(d.codes){showCodes(d.codes); say('rc-msg','وُلّدت '+d.codes.length+' رموز. انسخها الآن.');}
-        else say('rc-msg','تعذّر التوليد.');
-    }).catch(function(err){ri.disabled=false; say('rc-msg',sadaPk.why(err)); ri.focus();});
-  });
 
   // ── دَرَجُ النماذج (D-081) ────────────────────────────
   //
@@ -1230,4 +1114,4 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     t.addEventListener('input',tick); tick();
   });
 })();
-`
+${FACTORS_SCRIPT}`

@@ -1,7 +1,6 @@
 {
   "routes/access.ts": 1,
   "routes/assets.ts": 1,
-  "routes/auth.ts": 8,
   "routes/authView.ts": 6,
   "routes/errors.ts": 1,
   "routes/fonts.ts": 1,
@@ -16,7 +15,7 @@
   "routes/panel/media.ts": 52,
   "routes/panel/plan.ts": 21,
   "routes/panel/reports.ts": 3,
-  "routes/panel/session.ts": 8,
+  "routes/panel/session.ts": 7,
   "routes/panel/shared.ts": 4,
   "routes/panelView.ts": 83,
   "routes/ui/channels.ts": 29,

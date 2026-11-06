@@ -15,6 +15,18 @@ export interface FakeAuthenticator {
   /** المفتاح العامّ SPKI بـ base64url — كما يعطيه `getPublicKey()`. */
   readonly publicKey: string
   readonly alg: number
+  /**
+   * تسجيلٌ كما يرسله المتصفّح (D-317): `attestationObject` بـ CBOR (‏`fmt: none`) وفيه بياناتُ الاعتماد المشهودة —
+   * المعرّفُ والمفتاحُ بصيغة COSE. و`override` يبدّل شيئًا ليُختبَر رفضُه.
+   */
+  register(input: {
+    challenge: string
+    origin: string
+    rpId: string
+    signCount?: number
+    userPresent?: boolean
+    override?: { readonly attestedFlag?: boolean; readonly cose?: Uint8Array; readonly credentialId?: Uint8Array }
+  }): Promise<{ credentialId: string; clientDataJSON: string; attestationObject: string }>
   sign(input: {
     challenge: string
     origin: string
@@ -29,6 +41,29 @@ export interface FakeAuthenticator {
     clientDataJSON: string
     signature: string
   }>
+}
+
+// ── CBOR للاختبار: ما يكفي لبناء ‹attestationObject› لا أكثر ─────────────
+
+function head(major: number, n: number): number[] {
+  if (n < 24) return [(major << 5) | n]
+  if (n < 0x100) return [(major << 5) | 24, n]
+  if (n < 0x10000) return [(major << 5) | 25, n >> 8, n & 0xff]
+  return [(major << 5) | 26, (n >>> 24) & 0xff, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+}
+
+export type CborIn = number | string | Uint8Array | Map<CborIn, CborIn>
+
+export function cbor(value: CborIn): Uint8Array {
+  if (typeof value === 'number') return new Uint8Array(value >= 0 ? head(0, value) : head(1, -1 - value))
+  if (typeof value === 'string') {
+    const bytes = new TextEncoder().encode(value)
+    return new Uint8Array([...head(3, bytes.length), ...bytes])
+  }
+  if (value instanceof Uint8Array) return new Uint8Array([...head(2, value.length), ...value])
+  const parts: number[] = [...head(5, value.size)]
+  for (const [k, v] of value) parts.push(...cbor(k), ...cbor(v))
+  return new Uint8Array(parts)
 }
 
 async function sha256(data: Uint8Array): Promise<Uint8Array> {
@@ -72,12 +107,33 @@ export async function fakeAuthenticator(): Promise<FakeAuthenticator> {
     ['sign', 'verify'],
   )
   const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey))
-  const credentialId = toBase64Url(crypto.getRandomValues(new Uint8Array(16)))
+  const rawId = crypto.getRandomValues(new Uint8Array(16))
+  const credentialId = toBase64Url(rawId)
+  const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey)
+  const fromB64u = (v: string): Uint8Array => Uint8Array.from(atob(v.replace(/-/g, '+').replace(/_/g, '/')), (ch) => ch.charCodeAt(0))
+  // ‏مفتاحُ COSE كما يكتبه المتوثِّق: kty=2 (EC2)، alg=-7، crv=1 (P-256)، x، y
+  const coseKey = cbor(new Map<CborIn, CborIn>([[1, 2], [3, -7], [-1, 1], [-2, fromB64u(jwk.x ?? '')], [-3, fromB64u(jwk.y ?? '')]]))
 
   return {
     credentialId,
     publicKey: toBase64Url(spki),
     alg: -7,
+    async register(input) {
+      const clientData = new TextEncoder().encode(
+        JSON.stringify({ type: 'webauthn.create', challenge: input.challenge, origin: input.origin, crossOrigin: false }),
+      )
+      const flags = (input.userPresent === false ? 0 : 0x01) | 0x04 | (input.override?.attestedFlag === false ? 0 : 0x40)
+      const base = await authData(input.rpId, flags, input.signCount ?? 0)
+      const id = input.override?.credentialId ?? rawId
+      const key = input.override?.cose ?? coseKey
+      const attested = new Uint8Array([...base, ...new Uint8Array(16), id.length >> 8, id.length & 0xff, ...id, ...key])
+      const attestationObject = cbor(new Map<CborIn, CborIn>([['fmt', 'none'], ['attStmt', new Map()], ['authData', attested]]))
+      return {
+        credentialId: toBase64Url(id),
+        clientDataJSON: toBase64Url(clientData),
+        attestationObject: toBase64Url(attestationObject),
+      }
+    },
     async sign(input) {
       const clientData = new TextEncoder().encode(
         JSON.stringify({

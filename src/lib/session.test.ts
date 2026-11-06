@@ -16,6 +16,13 @@ import {
   safeNext,
   sessionCookie,
   SESSION_TTL_SECONDS,
+  IDLE_SECONDS,
+  ENROL_TTL_SECONDS,
+  PENDING_TTL_SECONDS,
+  isFresh,
+  markFresh,
+  setActiveOrg,
+  touchSession,
 } from './session'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
@@ -323,5 +330,78 @@ describe('قيود الكعكة — وهي ما يجعلها كعكة لا ثغ�
     expect(cleared).toContain('Max-Age=0')
     expect(cleared).toContain('HttpOnly')
     expect(cleared).toContain('SameSite=Strict')
+  })
+})
+
+/*
+ * ‏‏D-317 · البند ٧: كانت الجلسةُ ثلاثةَ أيّامٍ بلا مهلة خمول، والمعلَّقةُ ثلاثةَ أيّامٍ كذلك، والانتقالُ بين الشركات يمدّ
+ * ‏الأيّامَ الثلاثة من جديد. وكلُّ صفٍّ من قبل D-317 يسقط: فُتح حين كان رمزُ البريد وحده يكفي.
+ */
+describe('المهل (D-317)', () => {
+  const at = (ms: number): Date => new Date(Date.now() + ms)
+  const H = 60 * 60 * 1000
+
+  it('اثنتا عشرة ساعةً بلا طلبٍ تُسقط الجلسة، ودونها تبقى', async () => {
+    const id = await open()
+    const request = withCookie(`${COOKIE}=${id}`)
+    expect(await loadSession(kv, request, TOKEN, at(11 * H))).not.toBeNull()
+    expect(await loadSession(kv, request, TOKEN, at(IDLE_SECONDS * 1000 + 60_000))).toBeNull()
+    expect(await kv.get(`session:${id}`)).toBeNull()
+  })
+
+  it('والطلبُ يؤرّخ آخرَ استعمالٍ مرّةً كلَّ خمس دقائق لا في كلّ طلب', async () => {
+    const id = await open()
+    const request = withCookie(`${COOKIE}=${id}`)
+    const session = (await loadSession(kv, request, TOKEN))!
+    const same = await touchSession(kv, session, at(60_000))
+    expect(same.record.seen).toBe(session.record.seen)
+    const later = await touchSession(kv, session, at(6 * 60_000))
+    expect(later.record.seen).not.toBe(session.record.seen)
+    // ‏فمن عمل ساعةً بعد ساعة لا يسقط في الثانية عشرة
+    expect(await loadSession(kv, request, TOKEN, at(12 * H))).not.toBeNull()
+  })
+
+  it('والأيّامُ الثلاثة مطلقة: الكتابةُ لا تمدّها', async () => {
+    const id = await open()
+    const request = withCookie(`${COOKIE}=${id}`)
+    const session = (await loadSession(kv, request, TOKEN))!
+    await setActiveOrg(kv, session, 'org_x')
+    expect(kv.ttlOf(`session:${id}`)!).toBeLessThanOrEqual(SESSION_TTL_SECONDS)
+    const record = JSON.parse((await kv.get(`session:${id}`))!) as { at: string; seen: string }
+    // ‏استُعملت للتوّ، وعمرُها فات الأيّامَ الثلاثة
+    record.at = new Date(Date.now() - SESSION_TTL_SECONDS * 1000 - 60_000).toISOString()
+    record.seen = new Date().toISOString()
+    await kv.put(`session:${id}`, JSON.stringify(record))
+    expect(await loadSession(kv, request, TOKEN)).toBeNull()
+  })
+
+  it('المعلَّقةُ عشرُ دقائق، وجلسةُ التسجيل نصفُ ساعة', async () => {
+    const pending = await createEmailSession(kv, TOKEN, WHO, undefined, { pending: true })
+    const enrol = await createEmailSession(kv, TOKEN, WHO, undefined, { enrol: true })
+    if (!('id' in pending) || !('id' in enrol)) throw new Error('توقّعنا جلستين')
+    expect(kv.ttlOf(`session:${pending.id}`)).toBe(PENDING_TTL_SECONDS)
+    expect(kv.ttlOf(`session:${enrol.id}`)).toBe(ENROL_TTL_SECONDS)
+    expect(await loadSession(kv, withCookie(`${COOKIE}=${pending.id}`), TOKEN, at(11 * 60_000))).toBeNull()
+    expect(await loadSession(kv, withCookie(`${COOKIE}=${enrol.id}`), TOKEN, at(31 * 60_000))).toBeNull()
+  })
+
+  it('وصفٌّ من قبل D-317 (بلا صيغة) لا يُقبل', async () => {
+    const id = await open()
+    const record = JSON.parse((await kv.get(`session:${id}`))!) as Record<string, unknown>
+    delete record['v']
+    await kv.put(`session:${id}`, JSON.stringify(record))
+    expect(await loadSession(kv, withCookie(`${COOKIE}=${id}`), TOKEN)).toBeNull()
+  })
+
+  it('«تحقّقتَ للتوّ» خمسُ دقائق من الدخول، والمعلَّقةُ لم تتحقّق، و`markFresh` يجدّدها بالمعرّف نفسِه', async () => {
+    const full = await createEmailSession(kv, TOKEN, WHO)
+    const pending = await createEmailSession(kv, TOKEN, WHO, undefined, { pending: true })
+    if (!('id' in full) || !('id' in pending)) throw new Error('توقّعنا جلستين')
+    expect(isFresh(full.record)).toBe(true)
+    expect(isFresh(full.record, at(6 * 60_000))).toBe(false)
+    expect(isFresh(pending.record)).toBe(false)
+    const renewed = await markFresh(kv, { id: full.id, record: full.record }, at(6 * 60_000))
+    expect(renewed.id).toBe(full.id)
+    expect(isFresh(renewed.record, at(7 * 60_000))).toBe(true)
   })
 })

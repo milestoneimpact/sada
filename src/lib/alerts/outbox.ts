@@ -40,9 +40,12 @@ import type { Db } from '../tokens'
 import { counted, NOUNS } from '../format'
 import { OWNER_ORG } from '../tenancy'
 
-/** حدثٌ يستحقّ أن يُوقظ المالك — **وثلاثةٌ لا رابعَ لها**. */
+/**
+ * حدثٌ يستحقّ أن يُوقظ المالك — **ثلاثةٌ في العمل، ورابعُها أمانُ الحساب** (D-317): دخولٌ جديد، وعاملٌ ثانٍ أُضيف أو أُزيل،
+ * ورمزُ استرداد استُعمل، وإخراجُ الأجهزة. يُكتب صفُّه عند الحدث (`security/events.ts`) وتُرسله الدورةُ كالثلاثة.
+ */
 export interface Alert {
-  readonly kind: 'token' | 'publish' | 'budget'
+  readonly kind: 'token' | 'publish' | 'budget' | 'security'
   /**
    * مفتاحٌ يُبنى من الحدث نفسِه لا من وقت الإرسال (D-004).
    *

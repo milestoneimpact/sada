@@ -42,6 +42,8 @@ import type { MediaView, Target } from '../ui/sections/drafts'
 import type { OutboxRow } from '../ui/parts'
 import { listSessions, loadSession, type Session } from '../../lib/session'
 import { factorState } from '../../lib/security/factors'
+import { OWNER_EMAIL } from '../../lib/ownerEmail'
+import { fingerprint } from '../../lib/security/digest'
 import { isLinkedInPage, linkStates, listAccounts, viewChannels, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import { activeScopes } from '../../lib/platform/screen'
 import { ownerZone } from '../../lib/time/ownerZone'
@@ -190,8 +192,7 @@ type ShellLoad = Omit<ShellData, 'nonce'>
 async function panelRoute(c: PanelContext, only: PaneId | null): Promise<Response> {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw, 200)
-  // الجلسةُ المعلَّقة لا تفتح اللوحة — ولا تُبنى لها بياناتُها أصلا
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
+  // ‏والجلسةُ المعلَّقة وجلسةُ التسجيل لا تصلان هنا: يردّهما حارسُ الجلسات قبل كلّ مسار (D-317)
 
   const org = activeOrg(session.record)
   const now = new Date()
@@ -258,7 +259,8 @@ async function shellData(
 
   // ‏عدّادُ الإشعارات (D-294): مراجعُ الذاكرة (النبضُ والسقف) محمَّلةٌ أصلًا، والقاعدةُ جملةٌ واحدةٌ تُكمل العدّ
   const beatsNow = pulses(beats, now)
-  const unread = await unreadNotices(c.env.DB, org, memoryNotices(beatsNow, allowance, now).map((n) => n.ref))
+  const unread = await unreadNotices(c.env.DB, org, memoryNotices(beatsNow, allowance, now).map((n) => n.ref),
+    { email: session.record.email ?? OWNER_EMAIL, handle: await fingerprint(session.id) })
 
   const shell: ShellLoad = {
     // البيئةُ تُقرأ لا تُكتب: كانت «STAGING» ثابتةً في العلامة حتّى في الإنتاج (D-151)
@@ -284,7 +286,9 @@ async function shellData(
     // ‏خمسون صفًّا للأمان، ومنها «ما وقع اليوم» وآخرُ محاولةِ خطّة — لا استعلامَ جديد (D-157)
     audit: lazy(() => recentAudit(c.env.DB, org, 50)),
     providers: lazy(() => loadProviders(c)),
-    factors: lazy(async () => toPanelFactors(await factorState(c.env.DB, shell.rpId))),
+    // ‏عواملُ صاحب الجلسة (D-317) — وعرضٌ لا قرار: قاعدةٌ لا تردّ تُرسم «لا عامل» ولا تُسقط الإعدادات
+    factors: lazy(async () => toPanelFactors(
+      await factorState(c.env.DB, shell.rpId, session.record.email ?? OWNER_EMAIL).catch(() => null))),
     outbox: lazy(() => loadOutbox(c, org)),
     // ‏ومدى اللوح المحوريّ من العنوان (D-120) — ومنه «ما وقع اليوم» كذلك
     pivotFacts: lazy(() => loadFacts(c.env.DB, org, readSpan(q.get('days')))),
@@ -504,7 +508,8 @@ function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'
   })
 }
 
-function toPanelFactors(f: Awaited<ReturnType<typeof factorState>>): PanelFactors {
+function toPanelFactors(f: Awaited<ReturnType<typeof factorState>> | null): PanelFactors {
+  if (f === null) return { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false }
   return {
     passkeys: f.passkeys.map((k) => ({
       id: k.id,

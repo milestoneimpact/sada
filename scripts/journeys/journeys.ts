@@ -9,8 +9,8 @@ import { readFileSync } from 'node:fs'
 import type { Locator, Page } from 'playwright'
 import { Blocked, Meter } from './meter'
 import type { Stack } from './server'
-import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
 import { codeFrom } from '../../src/test/emailLogin'
+import { ownerPasskey } from './seed'
 import { saveApp } from '../../src/lib/oauth/apps'
 import { monthStart } from '../../src/lib/time/zone'
 import { money } from '../../src/lib/format'
@@ -126,19 +126,40 @@ export function lastCode(stack: Pick<Stack, 'mail'>): string {
   return last === undefined ? '' : codeFrom(last)
 }
 
-/** الدخولُ برمز البريد — تمهيدٌ لا يُعدّ إلّا في ر-11. */
-export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail' | 'kv'>): Promise<void> {
+/**
+ * **متوثِّقٌ افتراضيٌّ في Chromium يحمل مفتاحَ المالك** (D-317) — كهاتف المالك: يتحقّق منه (UV) ويوقّع بلا نافذة.
+ * لكلّ صفحةٍ متوثِّقُها، والعدّادُ يبدأ ممّا في القاعدة (`passkeys.sign_count`) فلا يُرفض توقيعٌ بعدّادٍ لم يتقدّم.
+ */
+const WITH_KEY = new WeakSet<Page>()
+
+export async function ownerAuthenticator(page: Page, stack: Pick<Stack, 'db'>): Promise<void> {
+  if (WITH_KEY.has(page)) return
+  const key = await ownerPasskey()
+  const row = await stack.db.prepare('SELECT sign_count FROM passkeys WHERE credential_id = ?').bind(key.credentialId).first<{ sign_count: number }>()
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('WebAuthn.enable')
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true,
+      isUserVerified: true, automaticPresenceSimulation: true },
+  })
+  await cdp.send('WebAuthn.addCredential', {
+    authenticatorId,
+    credential: { credentialId: key.credentialIdB64, isResidentCredential: false, rpId: 'localhost',
+      privateKey: key.privateKeyB64, signCount: row?.sign_count ?? 0 },
+  })
+  WITH_KEY.add(page)
+}
+
+/**
+ * الدخولُ — تمهيدٌ لا يُعدّ إلّا في ر-11. **ومنذ D-317 بمفتاح المرور**: العاملُ الثاني إلزاميٌّ للمالك، والزرُّ الأوّليُّ في
+ * صفحة الدخول «الدخول بمفتاح المرور» (لمسةٌ ثمّ بصمةٌ على الهاتف). ورمزُ البريد بعده يطلب العاملَ نفسَه على كلّ حال.
+ */
+export async function login(page: Page, stack: Pick<Stack, 'url' | 'mail' | 'kv' | 'db'>): Promise<void> {
+  await ownerAuthenticator(page, stack)
   if (!/\/panel/.test(page.url())) await page.goto(`${stack.url}/panel`)
-  // ‏ودخولٌ ثانٍ في الدقيقة نفسِها لا يُرسَل له رمز (D-245): يُمسح الفاصلُ كما يمسحه مساعدُ الاختبار
-  await stack.kv.delete(`logincode-gap:${OWNER_EMAIL}`)
-  await stack.kv.delete(`logincode-hour:${OWNER_EMAIL}`)
-  const sent = stack.mail.length
-  await page.locator('input[name="email"]').fill(OWNER_EMAIL)
-  await page.locator('form[action^="/panel/login/code"] button[type="submit"]').first().click()
-  await page.locator('input[name="code"]').waitFor()
-  if (stack.mail.length === sent) throw new Error('لم يصل رمزُ الدخول إلى الصندوق')
-  await page.locator('input[name="code"]').fill(lastCode(stack))
-  await page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first().click()
+  await page.locator('#pk-login').click()
+  // ‏والصفحةُ تُحمَّل من جديد على عنوانها نفسِه: الشريطُ يظهر حين تُفتح اللوحة
+  await page.locator('nav.tabs').first().waitFor({ timeout: 15_000 })
   await page.waitForLoadState('networkidle')
 }
 
@@ -595,11 +616,14 @@ const R11: Journey = {
   title: 'الدخول من الهاتف (من رابط محفوظ إلى «التقرير»)',
   plan: { today: 'يُقاس', target: '2' },
   startLoggedOut: true,
+  /*
+   * ‏‏D-317: العاملُ الثاني إلزاميٌّ للمالك، فالمالكُ الذي سجّل مفتاحَه يدخل بالزرّ الأوّليّ في صفحة الدخول — لمسةٌ وبصمة —
+   * ‏بدل أربع خطواتٍ بالبريد (البريد، «أرسل الرمز»، لصقُ الرمز، «ادخل») تليها الآن خطوةُ العامل الثاني.
+   */
   async run({ page, m, stack }) {
-    await m.type(page.locator('input[name="email"]'), OWNER_EMAIL, 'كتابة البريد', { pasted: true })
-    await m.tap(page.locator('form[action^="/panel/login/code"] button[type="submit"]').first(), '«أرسل الرمز»')
-    await m.type(page.locator('input[name="code"]'), lastCode(stack), 'لصق الرمز من البريد', { pasted: true })
-    await m.tap(page.locator('form[action^="/panel/login"]:not([action^="/panel/login/code"]) button[type="submit"]').first(), '«ادخل»', { key: true })
+    await ownerAuthenticator(page, stack)
+    await m.tap(page.locator('#pk-login'), '«الدخول بمفتاح المرور» (بصمة الوجه)', { key: true })
+    await page.waitForURL((u) => u.pathname === '/panel/report', { timeout: 15_000 }).catch(() => undefined)
     const landed = new URL(page.url())
     m.note(`بعد الدخول: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
     const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')

@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { fakeAuthenticator, type FakeAuthenticator } from '../../test/authenticator'
+import { cbor, fakeAuthenticator, type CborIn, type FakeAuthenticator } from '../../test/authenticator'
 import { fromBase64Url, toBase64Url } from './bytes'
 import {
-  ES256, newChallenge, readAuthData, verifyAssertion, verifyRegistration,
+  decodeCbor, ES256, newChallenge, readAuthData, verifyAssertion, verifyRegistration,
 } from './webauthn'
 
 const RP_ID = 'sada2.basserh.com'
@@ -213,78 +213,110 @@ describe('عدّاد التوقيع — وهو ما يكشف الاستنساخ'
   })
 })
 
-describe('verifyRegistration', () => {
+describe('verifyRegistration — المفتاحُ من بيانات الاعتماد المشهودة (D-317)', () => {
   async function registration(
     challenge: string,
-  ): Promise<{ clientDataJSON: Uint8Array; authenticatorData: Uint8Array }> {
-    const signed = await key.sign({
-      challenge,
-      origin: ORIGIN,
-      rpId: RP_ID,
-      type: 'webauthn.create',
-    })
+    override?: Parameters<FakeAuthenticator['register']>[0]['override'],
+  ): Promise<{ clientDataJSON: Uint8Array; attestationObject: Uint8Array }> {
+    const made = await key.register({ challenge, origin: ORIGIN, rpId: RP_ID, ...(override === undefined ? {} : { override }) })
     return {
-      clientDataJSON: fromBase64Url(signed.clientDataJSON),
-      authenticatorData: fromBase64Url(signed.authenticatorData),
+      clientDataJSON: fromBase64Url(made.clientDataJSON),
+      attestationObject: fromBase64Url(made.attestationObject),
     }
   }
 
-  it('تسجيل صحيح يمرّ', async () => {
+  it('تسجيل صحيح يمرّ، والمعرّفُ والمفتاحُ ممّا قاله المتوثِّق', async () => {
     const challenge = newChallenge()
-    const result = await verifyRegistration(
-      { ...(await registration(challenge)), publicKey: fromBase64Url(key.publicKey), alg: ES256 },
-      expected(challenge),
-    )
+    const result = await verifyRegistration(await registration(challenge), expected(challenge))
     expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.credentialId).toBe(key.credentialId)
+    expect(result.alg).toBe(ES256)
+    // ‏المفتاحُ المستخرَج من COSE هو المفتاحُ العامّ نفسُه بصيغة SPKI
+    expect(result.publicKey).toBe(key.publicKey)
   })
 
-  it('**بلا مفتاح عامّ من المتصفّح يُقال السبب** — لا يفشل صامتا', async () => {
+  it('**والمفتاحُ المستخرَج يتحقّق من توقيع الدخول** — لا قولُ العميل', async () => {
     const challenge = newChallenge()
-    const result = await verifyRegistration(
-      { ...(await registration(challenge)), publicKey: null, alg: ES256 },
-      expected(challenge),
-    )
+    const result = await verifyRegistration(await registration(challenge), expected(challenge))
+    if (!result.ok) throw new Error(result.reason)
+    const login = newChallenge()
+    const verdict = await verifyAssertion(await assertion(login), { publicKey: result.publicKey, alg: result.alg, signCount: 0 }, expected(login))
+    expect(verdict.ok).toBe(true)
+  })
+
+  it('**بلا بيانات إقرار يُقال السبب** — لا يفشل صامتا', async () => {
+    const challenge = newChallenge()
+    const { clientDataJSON } = await registration(challenge)
+    const result = await verifyRegistration({ clientDataJSON, attestationObject: null }, expected(challenge))
     expect(result).toMatchObject({ ok: false })
     if (!result.ok) expect(result.reason).toContain('متصفّح أحدث')
   })
 
-  it('خوارزميّة غير مدعومة تُرفض بالاسم', async () => {
+  it('بلا راية «بيانات اعتماد مشهودة» يُرفض', async () => {
     const challenge = newChallenge()
-    const result = await verifyRegistration(
-      { ...(await registration(challenge)), publicKey: fromBase64Url(key.publicKey), alg: -8 },
-      expected(challenge),
-    )
+    const result = await verifyRegistration(await registration(challenge, { attestedFlag: false }), expected(challenge))
+    expect(result).toMatchObject({ ok: false })
+  })
+
+  it('خوارزميّة غير مدعومة في COSE تُرفض بالاسم', async () => {
+    const challenge = newChallenge()
+    const ed25519 = cbor(new Map<CborIn, CborIn>([[1, 1], [3, -8], [-1, 6], [-2, new Uint8Array(32)]]))
+    const result = await verifyRegistration(await registration(challenge, { cose: ed25519 }), expected(challenge))
     expect(result).toMatchObject({ ok: false })
     if (!result.ok) expect(result.reason).toContain('-8')
+  })
+
+  it('مفتاحُ EC بإحداثيّاتٍ ليست على المنحنى يُرفض عند التسجيل لا عند أوّل دخول', async () => {
+    const challenge = newChallenge()
+    const bogus = cbor(new Map<CborIn, CborIn>([[1, 2], [3, -7], [-1, 1], [-2, new Uint8Array(32).fill(9)], [-3, new Uint8Array(32).fill(9)]]))
+    const result = await verifyRegistration(await registration(challenge, { cose: bogus }), expected(challenge))
+    expect(result).toMatchObject({ ok: false })
+    if (!result.ok) expect(result.reason).toContain('لا يُقرأ')
   })
 
   it('نوع «دخول» لا يصلح تسجيلا', async () => {
     const challenge = newChallenge()
     const signed = await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID })
+    const { attestationObject } = await registration(challenge)
     const result = await verifyRegistration(
-      {
-        clientDataJSON: fromBase64Url(signed.clientDataJSON),
-        authenticatorData: fromBase64Url(signed.authenticatorData),
-        publicKey: fromBase64Url(key.publicKey),
-        alg: ES256,
-      },
+      { clientDataJSON: fromBase64Url(signed.clientDataJSON), attestationObject },
       expected(challenge),
     )
     expect(result).toMatchObject({ ok: false })
   })
 
-  it('مفتاح عامّ لا يُقرأ يُرفض عند التسجيل لا عند أوّل دخول', async () => {
+  it('نطاقٌ آخر في بيانات المتوثِّق يُرفض', async () => {
     const challenge = newChallenge()
+    const made = await key.register({ challenge, origin: ORIGIN, rpId: 'evil.example' })
     const result = await verifyRegistration(
-      {
-        ...(await registration(challenge)),
-        publicKey: new Uint8Array([9, 9, 9, 9]),
-        alg: ES256,
-      },
+      { clientDataJSON: fromBase64Url(made.clientDataJSON), attestationObject: fromBase64Url(made.attestationObject) },
       expected(challenge),
     )
     expect(result).toMatchObject({ ok: false })
-    if (!result.ok) expect(result.reason).toContain('لا يُقرأ')
+  })
+})
+
+describe('decodeCbor — محلّلٌ محدود (D-317)', () => {
+  it('يقرأ الخرائطَ والبايتاتِ والنصوصَ والسوالب', () => {
+    const bytes = cbor(new Map<CborIn, CborIn>([['a', 1], [-2, new Uint8Array([7, 8])], [3, -300]]))
+    const { value, end } = decodeCbor(bytes)
+    expect(end).toBe(bytes.length)
+    expect(value).toBeInstanceOf(Map)
+    const map = value as Map<unknown, unknown>
+    expect(map.get('a')).toBe(1)
+    expect(map.get(-2)).toEqual(new Uint8Array([7, 8]))
+    expect(map.get(3)).toBe(-300)
+  })
+
+  it('يرفض طولًا يتجاوز البايتات، والأطوالَ اللانهائيّة، والعمقَ الزائد', () => {
+    expect(() => decodeCbor(new Uint8Array([0x5a, 0xff, 0xff, 0xff, 0xff, 1]))).toThrow()
+    expect(() => decodeCbor(new Uint8Array([0x5f, 0x41, 1, 0xff]))).toThrow()
+    expect(() => decodeCbor(new Uint8Array(Array.from({ length: 20 }, () => 0x81).concat([0])))).toThrow()
+  })
+
+  it('ويرفض خريطةً أكبرَ من الحدّ قبل أن يقرأها', () => {
+    expect(() => decodeCbor(new Uint8Array([0xb9, 0xff, 0xff]))).toThrow()
   })
 })
 

@@ -31,7 +31,7 @@ import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
 import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
-import { secondFactorPage } from '../src/routes/authView'
+import { enrolPage, resumePage, secondFactorPage, stepUpPage } from '../src/routes/authView'
 import { notFoundPage, serverErrorPage } from '../src/routes/ui/errorView'
 import { landingBody } from '../src/routes/landing'
 import type { Journey } from '../src/lib/journey'
@@ -524,6 +524,23 @@ writeAudited(
   ),
 )
 
+// ‏العاملُ الثاني الإلزاميّ (D-317): صفحةُ التسجيل، و«تحقّق للتوّ» بمفتاحٍ ورمزِ تطبيق، و«أكمل ما بدأته»
+writeAudited(
+  '/tmp/screen-enrol.html',
+  enrolPage({ csrf: 'c', rpId: 'sada2.basserh.com', required: true, roleName: 'المالك', email: 'owner@example.com',
+    passkeys: [], totpConfirmed: false, recoveryLeft: 0, error: null }, 'n'),
+)
+writeAudited(
+  '/tmp/screen-stepup.html',
+  stepUpPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true, hasTotp: true,
+    emailCode: 'none', email: 'owner@example.com', next: '/panel/team', error: null }, 'n'),
+)
+writeAudited(
+  '/tmp/screen-resume.html',
+  resumePage({ csrf: 'c', action: '/panel/providers/key', title: 'مفتاح مزوّد', back: '/panel/settings',
+    fields: [['provider', 'anthropic']], secrets: ['key'] }, 'n'),
+)
+
 // ‏صفحتا الخطأ (خطّة التصميم 7.11 · D-189): من دالّتيهما اللتين يخدمهما Worker، لا نسخةٌ هنا —
 // ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare
 // ‏صفحةُ الهبوط على الجذر (D-193)
@@ -531,7 +548,7 @@ writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody(), 'n', '',
 writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّة بهذا الاسم'))
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
-console.log('رُسمت خمس عشرة في /tmp')
+console.log('رُسمت ثماني عشرة في /tmp')
 
 // ‏الخطُّ الزمنيّ للمحفظة (D-212) عيّنةٌ مدقَّقة (D-213): صفحةٌ لا يرسمها شيءٌ لا يقرؤها حارس
 {

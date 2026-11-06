@@ -152,7 +152,9 @@ describe('الدخول', () => {
     const cookie = await login()
     await app.request('/panel/logout', withSession(cookie, { method: 'POST' }), env)
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('اكتب بريدك ليصلك رمز الدخول')
+    // ‏صفحةُ الدخول — وللمالك مفتاحُ مرورٍ منذ D-317، فبابُه فيها وحقلُ البريد بعده
+    expect(html).toContain('name="email"')
+    expect(html).toContain('<title>صدى — الدخول</title>')
   })
   /*
    * ‏**ويعود المالكُ إلى ما طلبه لا إلى الرئيسيّة** (ر-11، الخطّة 7.11): كان كلُّ توجيهٍ بعد
@@ -5383,15 +5385,28 @@ describe('الدخول برمز البريد (D-245)', () => {
     expect(mailer.sent).toHaveLength(1)
   })
 
-  it('وبعد عشرِ محاولاتٍ في اليوم يُغلق بابُ الرمز ولو صحّ (D-247)', async () => {
-    await db.prepare("INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code:milestonesimpact@gmail.com', 10, datetime('now', '-2 hours'))").run()
+  /*
+   * ‏‏D-317: كان العدُّ للحساب كلِّه (`code:<بريد>`)، فعشرُ تخميناتٍ من مجهولٍ في أيّ مكانٍ تُغلق بابَ الرمز على المالك
+   * ‏يومًا. فصار لكلّ (حسابٍ، مصدر) — وهذا الاختبارُ يزرع عدَّ المصدر نفسِه (`unknown`: بلا ترويسة Cloudflare).
+   */
+  it('وبعد عشرِ محاولاتٍ في اليوم من المصدر نفسِه يُغلق بابُ الرمز ولو صحّ (D-247 · D-317)', async () => {
+    await db.prepare("INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code:milestonesimpact@gmail.com:unknown', 10, datetime('now', '-2 hours'))").run()
     const response = await emailLogin(app, env)
     expect(response.status).toBe(429)
     expect(response.headers.get('Set-Cookie') ?? '').not.toContain('sada_session=')
     expect(await response.text()).toContain('ادخل بمفتاح المرور')
     const rows = await db.prepare("SELECT action FROM audit_log WHERE action = 'login.code.locked'").all()
     expect(rows.results).toHaveLength(1)
-    await db.prepare("DELETE FROM auth_attempts WHERE bucket = 'code:milestonesimpact@gmail.com'").run()
+    await db.prepare("DELETE FROM auth_attempts WHERE bucket LIKE 'code:%'").run()
+  })
+
+  it('D-317: وعشرُ تخميناتٍ من مصدرٍ آخر لا تُغلق بابَ الرمز على المالك', async () => {
+    await db.prepare("INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code:milestonesimpact@gmail.com:203.0.113.9', 10, datetime('now', '-2 hours'))").run()
+    await db.prepare("INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code:milestonesimpact@gmail.com', 10, datetime('now', '-2 hours'))").run()
+    const response = await emailLogin(app, env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Set-Cookie') ?? '').toContain('sada_session=')
+    await db.prepare("DELETE FROM auth_attempts WHERE bucket LIKE 'code:%'").run()
   })
 
   it('والجلسة ثلاثة أيّام', async () => {

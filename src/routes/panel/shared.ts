@@ -14,7 +14,7 @@ import { readSettings } from '../../lib/settings'
 import { chosenTiles } from '../../lib/dashboard'
 import { checkCsrf, COOKIE, loadSession, readCookie, safeNext, type Session } from '../../lib/session'
 import { htmlHeaders, makeNonce } from '../../lib/security/headers'
-import { factorState } from '../../lib/security/factors'
+import { listPasskeys } from '../../lib/security/factors'
 import { listAccounts } from '../../lib/channels'
 import { activeScopes } from '../../lib/platform/screen'
 import { type OwnerFacts } from '../../lib/owner'
@@ -72,8 +72,8 @@ export function page(render: (nonce: string) => string, status = 200): Response 
  */
 export async function hasPasskeys(env: Env): Promise<boolean> {
   try {
-    const factors = await factorState(env.DB, relyingParty(env.PUBLIC_BASE_URL).id)
-    return factors.passkeys.length > 0
+    // ‏مفاتيحُ النطاق كلُّها (D-317): صفحةُ الدخول لا تعرف صاحبَها بعد
+    return (await listPasskeys(env.DB, relyingParty(env.PUBLIC_BASE_URL).id)).length > 0
   } catch {
     return false
   }
@@ -144,16 +144,8 @@ export async function guardPost(c: {
   if (session === null) {
     return { denied: await loginResponse(c.env, c.req.raw) }
   }
-  // **وهذا هو ما يجعل العامل الثاني عاملا لا سؤالا يُتخطّى**: جلسةٌ لم
-  // تُتمّه لا تغيّر شيئا، ولو نُودي المسار مباشرةً بلا مرورٍ بالشاشة
-  if (session.record.pending) {
-    return {
-      denied: Response.json(
-        { error: 'pending_second_factor', detail: say('pending_second_factor') },
-        { status: 403, headers: { Location: '/panel/2fa' } },
-      ),
-    }
-  }
+  // **والجلسةُ المعلَّقةُ لا تصل هنا** (D-317): يردّها حارسُ الجلسات قبل كلّ مسار (`routes/access.ts`)، فلا يسأل كلُّ
+  // ‏مسارٍ «أمعلَّقةٌ هي؟» بنفسه — ومسارٌ ينسى السؤالَ كان الطريقَ الجانبيّ حول العامل الثاني
 
   // جسدٌ غائبٌ أو مشوَّه ليس عطلا في الخادم: هو طلبٌ لا رمز فيه. ولو تُرك
   // يرمي لردّ 500 — فيبدو خللا في صدى وهو طلبٌ مرفوض

@@ -17,13 +17,14 @@ import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { noticesScreen } from '../ui/noticesView'
 import { guardPost, loginResponse, page, setFlash } from './shared'
+import { fingerprint } from '../../lib/security/digest'
+import { OWNER_EMAIL } from '../../lib/ownerEmail'
 
 export const notices = new Hono<{ Bindings: Env }>()
 
 notices.get('/panel/notices', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const now = new Date()
   const [beats, allowance, reads] = await Promise.all([
@@ -31,7 +32,8 @@ notices.get('/panel/notices', async (c) => {
     checkAllowance(c.env.DB, 'image').catch(() => null),
     readMarks(c.env.DB, org),
   ])
-  const list = await collectNotices(c.env.DB, org, now, { pulses: pulses(beats, now), allowance })
+  const list = await collectNotices(c.env.DB, org, now, { pulses: pulses(beats, now), allowance },
+    { email: session.record.email ?? OWNER_EMAIL, handle: await fingerprint(session.id) })
   const body = noticesScreen({ notices: list, reads, now })
   return page((nonce) =>
     soloPage('صدى — الإشعارات', { href: '/panel', label: 'اللوحة' },
