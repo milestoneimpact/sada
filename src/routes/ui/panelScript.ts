@@ -137,11 +137,23 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }
   }
   // ‏والاستعلامُ عن تقليل الحركة عند الطلب لا عند التحميل: الوثيقةُ الفارغة في الاختبار بلا matchMedia
+  function still(){return !!window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;}
+  /*
+   * ‏**ولا انتقالَ فوق انتقال** (D-323): نقرتان سريعتان على الرافدة كانتا تبدآن انتقالين، والمتصفّحُ يُسقط الأوّلَ فيرفض
+   * ‏وعدَه «ready» بلا من يلتقطه — «Transition was aborted because of invalid state» خطأَ صفحةٍ في ‏13 من ‏32 رحلة. فالجاري
+   * ‏يُتمَّ («skipTransition») قبل الجديد، ووعودُه الثلاثة تُلتقَط: انتقالٌ لم يقع زينةٌ فاتت، لا خطأ.
+   */
+  var vt=null;
   function swap(fn,kind){
-    if(!kind||!document.startViewTransition||matchMedia('(prefers-reduced-motion: reduce)').matches){fn(); return;}
+    if(!kind||!document.startViewTransition||still()){fn(); return;}
+    if(vt){try{vt.skipTransition();}catch(e){} vt=null;}
     var root=document.documentElement; root.setAttribute('data-nav',kind);
-    var done=function(){root.setAttribute('data-nav','done');};
-    try{document.startViewTransition(fn).finished.then(done,done);}catch(e){fn(); done();}
+    var t=null, done=function(){if(vt===t)vt=null; root.setAttribute('data-nav','done');}, no=function(){};
+    try{t=document.startViewTransition(fn);}catch(e){fn(); done(); return;}
+    vt=t;
+    if(t.ready&&t.ready.catch)t.ready.catch(no);
+    if(t.updateCallbackDone&&t.updateCallbackDone.catch)t.updateCallbackDone.catch(no);
+    if(t.finished&&t.finished.then)t.finished.then(done,done); else done();
   }
   tabs.forEach(function(t){t.addEventListener('click',function(e){
     e.preventDefault(); show(t.getAttribute('href').slice(1),true,true);
@@ -168,11 +180,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   window.addEventListener('hashchange',function(){
     show((location.hash||'').slice(1)||first,false,true);
   });
-  // ‏و«Esc» تخفي التلميحَ المعروضَ بالتمرير (D-312 · WCAG 1.4.13)، وأوّلُ حركةٍ للمؤشّر تعيده
-  window.addEventListener('keydown',function(e){
-    if(e.key!=='Escape')return; var h=document.documentElement; h.setAttribute('data-tip-off','');
-    document.addEventListener('pointermove',function(){h.removeAttribute('data-tip-off');},{once:true,passive:true});
-  });
+  // ‏و«Esc» تخفي التلميح في سكربت كلّ صفحة («TIP_SCRIPT»، D-323): التلميحُ هناك عنصرٌ يُمسَك لا زينةٌ هنا
 
   // ‏وزرُّ النسخ (D-126) في u.js الذي تحمله كلُّ صفحة، لا هنا: نسختان في
   // ‏اللوحة تربطان بالزرّ مستمعَين، فيبقى «نُسخ» عليه لا يعود (D-160)
@@ -215,12 +223,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     t.addEventListener('input',tick); tick();
   });
 
-  // تأكيدٌ قبل فعلٍ يوقف النظام كلّه
-  // ‏والربطُ لكلّ عنصرٍ دالّةٌ يُنادى بها عند التحميل ولما يُبدَّل بلا تحميل (D-207: «wire»)
+  // ‏والتأكيدُ نفسُه حوارٌ في الصفحة من سكربت كلّ صفحة («CONFIRM_SCRIPT»، D-323) يُوقف الإرسالَ الأوّل في طور الالتقاط،
+  // ‏فلا يصل هذا إلّا إرسالٌ أُكّد: زرُّه يُعطَّل فلا يُرسَل مرّتين. والربطُ دالّةٌ تُنادى عند التحميل ولما يُبدَّل بلا تحميل (D-207)
   function bindConfirm(f){
     f.addEventListener('submit',function(e){
-      if(!confirm(f.dataset.confirm)){e.preventDefault(); return;}
-      var b=f.querySelector('button'); if(b){b.disabled=true; b.textContent='…';}
+      if(e.defaultPrevented)return;
+      var b=f.querySelector('button'); if(b&&!f.dataset.busy){b.disabled=true; b.textContent='…';}
     });
   }
   document.querySelectorAll('form[data-confirm]').forEach(bindConfirm);
@@ -264,7 +272,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(f.getAttribute('aria-busy')==='true'){e.preventDefault(); return;}
       // ‏ومن ألغى التأكيدَ أو منعه المعطّلُ لم يُرسِل — فلا يبقى النموذجُ «مشغولًا» بأزرارٍ معطّلة (D-189)
       if(e.defaultPrevented)return;
-      var b=pressed||btns()[0]||null;
+      // ‏والزرُّ المضغوطُ من الحدث أوّلًا (D-323): إرسالٌ بعد «نعم» في حوار التأكيد يأتي بـ«requestSubmit» لا بنقرة
+      var b=e.submitter||pressed||btns()[0]||null;
       f.setAttribute('aria-busy','true');
       btns().forEach(function(x){if(x!==b)x.disabled=true;});
       // ‏والزرُّ المضغوطُ «مشغولٌ» بسِمته (خطّة التصميم 7.1): دوّارةُ «.btn[aria-busy]» والعرضُ ثابت
@@ -720,7 +729,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       here=Math.max(0,Math.min(i,list.length-1));
       var el=list[here];
       el.classList.add('here');
-      el.scrollIntoView({block:'nearest',behavior:'smooth'});
+      // ‏والانزلاقُ يتبع «تقليل الحركة» (D-323): خيارُ السكربت يغلب قاعدةَ الورقة «scroll-behavior:auto»
+      el.scrollIntoView({block:'nearest',behavior:still()?'auto':'smooth'});
     }
     function press(sel){
       var list=visible(); if(here<0||!list[here])return false;
@@ -732,9 +742,13 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       return true;
     }
     document.addEventListener('keydown',function(e){
-      // حقلُ كتابةٍ يملك مفاتيحَه: من يكتب منشورا لا يبتّ فيه
+      // ‏ومن أطفأها (D-323 · WCAG 2.1.4) لا تعمل: السمةُ تُقرأ عند كلّ ضغطة، فالمفتاحُ يسري فورًا
+      if(document.documentElement.getAttribute('data-shortcuts')==='off')return;
+      // حقلُ كتابةٍ يملك مفاتيحَه: من يكتب منشورا لا يبتّ فيه — ولا حوارٌ مفتوح ولا نصٌّ قابلٌ للتحرير (D-323)
       var t=e.target, tag=(t&&t.tagName)||'';
       if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable))return;
+      if(t&&t.closest&&t.closest('dialog,[role=dialog],[contenteditable]:not([contenteditable=false])'))return;
+      if(document.querySelector('dialog[open]'))return;
       // ومركّبةٌ للمتصفّح: Ctrl+R إعادةُ تحميل، لا رفضُ مسوّدة
       if(e.metaKey||e.ctrlKey||e.altKey)return;
       var did=true;

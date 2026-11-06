@@ -10,16 +10,17 @@ import { pageHead } from './parts'
 import { LOGOS } from './logos'
 import { platformLabel } from '../../lib/oauth/providers'
 import { stamp } from '../../lib/time/zone'
+import { AR_LATN, num } from '../../lib/format'
 import { SPAN_LABEL, spanDays } from '../../lib/plan/prompt'
 import { GAP_LABEL, type Gap, type ReviewCard, type ReviewModel } from '../../lib/plan/review'
 
-const AR = (n: number): string => n.toLocaleString('ar-EG')
+const AR = num
 
 export function dayLabel(day: string, style: 'long' | 'short' = 'long'): string {
   const at = new Date(day + 'T12:00:00Z')
   return Number.isNaN(at.getTime())
     ? day
-    : at.toLocaleDateString('ar-EG', style === 'long' ? { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' } : { day: 'numeric', timeZone: 'UTC' })
+    : at.toLocaleDateString(AR_LATN, style === 'long' ? { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' } : { day: 'numeric', timeZone: 'UTC' })
 }
 
 export function shift(day: string, n: number): string {
@@ -145,7 +146,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null): string {
 /** يُظهر شريطَ الجملة حين يُحدَّد شيءٌ ويعدّه — وبلا سكربتٍ يبقى ظاهرًا ويعمل. */
 export const PLAN_REVIEW_SCRIPT = `(function(){
   var bar=document.getElementById('rv-bulk'), n=document.getElementById('rv-n'); if(!bar||!n)return;
-  function upd(){var k=document.querySelectorAll('input[name="sel"]:checked').length; bar.hidden=k===0; n.textContent=k.toLocaleString('ar-EG')+' محدَّدًا';}
+  function upd(){var k=document.querySelectorAll('input[name="sel"]:checked').length; bar.hidden=k===0; n.textContent=k.toLocaleString('ar-u-nu-latn')+' محدَّدًا';}
   document.addEventListener('change',function(e){if(e.target&&e.target.name==='sel')upd();});
   upd();
 })();`

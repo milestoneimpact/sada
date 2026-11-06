@@ -154,16 +154,16 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
       leftSite.push(url.href)
       return route.fulfill(leftPage(url))
     }
-    // ‏بدءُ OAuth يردّ 302 إلى المنصّة — والتحويلُ لا يمرّ بالموجِّه، فيُقرأ هنا ويُوقَف
+    // ‏بدءُ OAuth يردّ 302 إلى المنصّة — والتحويلُ لا يمرّ بالموجِّه، فيُقرأ هنا ويُعاد **تحويلًا** كما يردّه الخادم: فيتبعه المتصفّح
+    // ‏إلى أصل المنصّة، ويُسجَّل ويُوقَف في فرع العنوان الخارجيّ أعلاه. وكانت صفحةُ «غادر الموقع» تُردّ هنا على المسار المحلّيّ
+    // ‏نفسِه — مستندًا من أصلنا بلا «@view-transition» — فيُسقط المتصفّحُ الانتقالَ بين المستندين ويرمي «Transition was aborted
+    // ‏because of invalid state. ViewTransition opt-in disabled» خطأَ صفحةٍ في ر-1 لا يقع في الإنتاج (D-323)
     if (/^\/oauth\/[^/]+\/start$/.test(url.pathname)) {
       const response = await route.fetch({ maxRedirects: 0 })
       const location = response.headers()['location']
       if (response.status() >= 300 && response.status() < 400 && location !== undefined) {
         const to = new URL(location, url)
-        if (to.hostname !== 'localhost') {
-          leftSite.push(to.href)
-          return route.fulfill(leftPage(to))
-        }
+        if (to.hostname !== 'localhost') return route.fulfill({ status: response.status(), headers: { location: to.href } })
       }
       return route.fulfill({ response })
     }

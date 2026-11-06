@@ -46,7 +46,7 @@ describe('«ما ينجح» (D-253)', () => {
   it('وأفضلُ موعدٍ يقول يومَه وفترتَه وتقديرَه', () => {
     const facts = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => fact(i, '2026-10-04 06:00:00', 10 + i))
     const r = whatWorks(facts, null)
-    expect(r.slot?.label).toBe('الأحد في الضحى (٩–١٢)')
+    expect(r.slot?.label).toBe('الأحد في الضحى (9–12)')
     expect(r.slot?.expected).toBeGreaterThan(0)
   })
 })

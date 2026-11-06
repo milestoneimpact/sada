@@ -174,7 +174,9 @@ export const PLAN_BOARD_SCRIPT = `(function(){
       root.querySelectorAll('[data-pv]').forEach(function(p){p.hidden=p.getAttribute('data-pv')!==v;});
       root.querySelectorAll('[data-view]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view')===v));});
     };
-    if(anim&&!reduce&&document.startViewTransition)document.startViewTransition(go); else go();
+    // ‏ووعودُ الانتقال تُلتقَط (D-323): انتقالٌ أسقطه المتصفّحُ زينةٌ فاتت لا خطأُ صفحة
+    if(anim&&!reduce&&document.startViewTransition){var t=document.startViewTransition(go), no=function(){};
+      [t.ready,t.finished,t.updateCallbackDone].forEach(function(p){if(p&&p.catch)p.catch(no);});}else go();
     try{localStorage.setItem('pb-view',v);}catch(e){}
   }
   try{show(localStorage.getItem('pb-view')||'days',false);}catch(e){}

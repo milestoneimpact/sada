@@ -27,7 +27,9 @@
  * **لا فراغا ولا رقما بلا منطقة**، وهو أسوأُ الثلاثة.
  */
 import { escapeHtml } from './escape'
-import { parseSqliteUtc } from '../../lib/format'
+import { html } from './html'
+import { parseSqliteUtc, relativeTime } from '../../lib/format'
+import { stamp } from '../../lib/time/zone'
 import { momentLabel } from '../../lib/time/local'
 
 /*
@@ -61,4 +63,18 @@ export function whenTag(
   const head = opts.label === undefined ? '' : `${escapeHtml(opts.label)} `
   return `${head}<time class="when-t" datetime="${date.toISOString()}">` +
     `<b>${escapeHtml(said)}</b> <span class="tz">${zone === null ? 'بتوقيت الرياض' : 'بتوقيتك'}</span></time>`
+}
+
+/**
+ * الوقتُ النسبيُّ ومعه المطلق — **يصله الإصبعُ ولوحةُ المفاتيح لا المؤشّرُ وحده** (D-323 · WCAG 1.4.13).
+ *
+ * «قبل ساعتين» نصٌّ، و«2026-11-06 09:00 بتوقيت الرياض» كان في `data-tip` على `<span>` لا يأخذ التركيز ولا يُلمَس —
+ * والمالكُ على iPhone. فالوسمُ `<time>` بـ`datetime` (قارئُ الشاشة يقرؤه تاريخًا) يأخذ التركيز ويُفتح تلميحُه باللمس
+ * (`TIP_SCRIPT`). و`said` لما يُقال بغير «قبل …» («بعد 300 يوم» لانتهاءٍ قادم).
+ */
+export function agoTag(value: string, now: Date, zone: string | null, said?: string): string {
+  const date = parseSqliteUtc(value)
+  const text = said ?? relativeTime(value, now)
+  if (date === null) return escapeHtml(text)
+  return html`<time datetime="${date.toISOString()}" tabindex="0" data-tip="${stamp(value, zone)}">${text}</time>`.value
 }

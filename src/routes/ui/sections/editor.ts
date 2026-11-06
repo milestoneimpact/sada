@@ -237,7 +237,8 @@ export function editorPane(input: EditorInput): string {
   }
   if (stage === 'ready') more.push(menuAction({ label: 'أعدها مسوّدة', action: '/panel/drafts/undo-approve', fields: { id: d.id } }))
   if (stage === 'scheduled' && d.dispatchedAt === null) {
-    more.push(menuAction({ label: 'اسحب الموعد', action: '/panel/drafts/unschedule', fields: { id: d.id }, confirm: 'سحب الموعد يعيدها معتمَدةً بلا موعد. أتمضي؟' }))
+    // ‏بلا سؤالٍ قبله (D-303 · D-323): السحبُ يُردّ بـ«تراجَع» في إشعاره، كما في قائمة المنشورات
+    more.push(menuAction({ label: 'اسحب الموعد', action: '/panel/drafts/unschedule', fields: { id: d.id } }))
   }
   // ‏والنسخُ من المربّع نفسِه (`COPY_SCRIPT` يحدّد حقلًا بمعرّفه)، فللمسوّدة وحدَها
   if (stage === 'waiting') more.push('<button class="menu-item" type="button" data-copy="ed-txt"><span class="menu-t"><b>انسخ النصّ</b></span></button>')

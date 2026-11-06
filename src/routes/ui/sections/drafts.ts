@@ -57,6 +57,7 @@ import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { fileName, glyph, RUNG_MARK } from '../parts'
 import { count, statusBadge, type Tone } from '../components/badge'
+import { shortcutsSwitch } from '../components/tabs'
 import { filterBar } from '../components/filterbar'
 import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
@@ -338,7 +339,7 @@ function peakLine(peaks: Peaks | undefined, zone: string | null, now: Date): str
            <span class="ago">واقتراح لم يُقَس أسوأ من حقل خامّ.</span></p>`
   }
   const said = peaks.hours
-    .map((h) => `<span class="chip mono" data-tip="وسيط التفاعل ${h.median} في ${h.posts} منشورات"
+    .map((h) => `<span class="chip mono" tabindex="0" data-tip="وسيط التفاعل ${h.median} في ${h.posts} منشورات"
       >${clock(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h.hour)), zone)}</span>`)
     .join('')
   return `<p class="hint peak"><b>أعلى تفاعل قِيس</b> عند ${said}
@@ -455,7 +456,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
-         <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' disabled' : ''}
+         <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' aria-disabled="true"' : ''}
            data-tip="تُرفَض هذه بعد أن يمرّ التوليد بحرّاسه، فلا يبقى المنشور بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
@@ -463,9 +464,10 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       <div class="pic-foot">
         <span class="chip mono">${kb(ready.bytes)}</span>
         <span class="chip mono">${ready.cost === 0 ? '—' : money(ready.cost)}</span>
-        ${ready.prompt === ''
+        ${/* ‏‏والوصفُ سطرٌ يُفتح لا تلميح (D-323): كان نصًّا طويلًا في تلميحٍ على رقاقةٍ لا تأخذ التركيز ولا يصلها الهاتف —
+             ووصفُ الإنفوجرافيك مواصفتُه JSON لا جملة، فلا يُعرض: عنوانُه في «alt» والصورةُ نفسُها هي الوصف */ ''}${ready.prompt === '' || info
           ? ''
-          : `<span class="chip" data-tip="${escapeHtml(ready.prompt)}">الوصف</span>`}
+          : `<details class="pic-desc"><summary class="chip">الوصف</summary><p class="hint m-0">${escapeHtml(ready.prompt)}</p></details>`}
         <span class="grow"></span>
         ${open
           ? `${clip === undefined
@@ -541,8 +543,10 @@ export interface ReadyLines {
  * سطرُ الجاهزيّة (D-163) — **نقطةٌ لكلّ بابٍ يمرّ به النداء**، وأوّلُ
  * ساقطةٍ (أو أوّلُ ما ينتظرك) سببٌ ورابطٌ بجانبها.
  *
- * والنقطةُ لونٌ ورمزٌ وكلمة (D-043)، وحالُها وما وقع في `title` لمن يمرّ
- * عليها. **وكلُّ ما يُكتب مهرَّب**: اسمُ المزوّد يكتبه المالكُ من اللوحة.
+ * والنقطةُ لونٌ ورمزٌ وكلمة (D-043) — **والكلمةُ حالُها لا اسمُها وحده** (D-323): كانت تكتب «المتصفّح» والحالُ
+ * («تامّة» أو «تنتظرك») في رمزٍ مخفيٍّ عن قارئ الشاشة ولونٍ وتلميحٍ لا يصله الهاتف، فقرأ قارئُ الشاشة «الحدود المتصفّح
+ * الصياغة» بلا حال. فالحالُ نصٌّ بعد الاسم، وسببُ ما لم يتمّ نصٌّ كذلك — إلّا الأوّلَ منها، فسببُه في السطر بجانبه برابطه —
+ * وما وقع للتامّة («مفتوحة اليوم») تلميحٌ على شارةٍ تأخذ التركيز. **وكلُّ ما يُكتب مهرَّب**: اسمُ المزوّد يكتبه المالكُ من اللوحة.
  *
  * والرابطُ `a.tap` لا `a.btn`: لا يزاحم زرَّ التوليد في وزنه، والزرُّ هو
  * الفعل — والرابطُ طريقٌ إلى موضع الإصلاح.
@@ -551,8 +555,9 @@ function readyLine(line: MediaLine): string {
   const dots = line.dots
     .map((dot) => {
       const mark = RUNG_MARK[dot.state]
-      return statusBadge(mark.cls, mark.g, escapeHtml(dot.title),
-        `data-tip="${escapeHtml(`${mark.label} — ${dot.note}`)}"`)
+      const why = dot.state === 'done' || dot.key === line.next?.key ? '' : ' — ' + dot.note
+      return statusBadge(mark.cls, mark.g, html`${dot.title}: ${mark.label + why}`.value,
+        html`tabindex="0" data-tip="${mark.label + ' — ' + dot.note}"`.value)
     })
     .join('')
   const next = line.next
@@ -880,7 +885,7 @@ function card(
   const meta = [
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
-    `<span class="chip mono" data-tip="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
+    `<span class="chip mono" tabindex="0" data-tip="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك. ورابطٌ على X ثلاثةَ عشرَ
      * ضعفا (D-003 · D-069): يُعلَّم تحذيرا ليُرى قبل النقر لا بعده.
@@ -1177,7 +1182,8 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
     </div>
     <p class="hint m-0 keys-hint">
       <b>وتُقاس بموضع المفتاح لا بحرفه</b> — فتعمل بالتخطيط العربيّ كما
-      تعمل بالإنجليزيّ. ولا تعمل وأنت داخل مربّع كتابة.</p>
+      تعمل بالإنجليزيّ. ولا تعمل وأنت داخل مربّع كتابة أو حوار.</p>
+    <div class="split mt-3"><p class="hint m-0"><b>أطفئها</b> إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ — ويُحفظ في هذا المتصفّح.</p>${shortcutsSwitch()}</div>
   </details>`
 
   // سطرا الجاهزيّة يُبنيان هنا مرّةً، والبطاقاتُ تأخذهما نصًّا (D-163)

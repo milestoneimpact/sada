@@ -55,7 +55,7 @@ describe('«ما ينجح»', () => {
     seed(9)
     const html = await (await get('/panel/insights?p=<script>')).text()
     expect(html).toContain('أرجحُ موعدٍ للنشر')
-    expect(html).toContain('الأحد في الضحى (٩–١٢)')
+    expect(html).toContain('الأحد في الضحى (9–12)')
     expect(html).toContain('href="/panel/journey/p9"')
     expect(html).not.toContain('<script>"')
   })

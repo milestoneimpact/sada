@@ -101,7 +101,7 @@ export function gatesOf(f: GateFacts): Gate[] {
 
   const gates: Gate[] = [
     {
-      phase: '٠',
+      phase: '0',
       title: 'التأسيس',
       items: [
         item(
@@ -125,7 +125,7 @@ export function gatesOf(f: GateFacts): Gate[] {
       passed: false,
     },
     {
-      phase: '١',
+      phase: '1',
       title: 'الذكاء',
       items: [
         item(
@@ -142,7 +142,7 @@ export function gatesOf(f: GateFacts): Gate[] {
       passed: false,
     },
     {
-      phase: '٢',
+      phase: '2',
       title: 'الصور والصفحات',
       items: [
         item(
@@ -170,7 +170,7 @@ export function gatesOf(f: GateFacts): Gate[] {
       passed: false,
     },
     {
-      phase: '٣',
+      phase: '3',
       title: 'القياس',
       items: [
         item(

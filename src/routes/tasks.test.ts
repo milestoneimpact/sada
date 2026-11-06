@@ -110,11 +110,11 @@ describe('وبوّابات المراحل تُقاس', () => {
    */
   it('تُعرَض الأربع، ولا واحدة مجتازة على قاعدة فارغة', async () => {
     const html = await open()
-    for (const phase of ['٠', '١', '٢', '٣']) {
+    for (const phase of ['0', '1', '2', '3']) {
       expect(html).toContain(`المرحلة ${phase}`)
     }
     expect(html).not.toContain('اجتِيزت')
-    expect(html).toContain('أنت في المرحلة ٠')
+    expect(html).toContain('أنت في المرحلة 0')
   })
 
   /** **ومعه دليلُه**: «لم تُجتَز» بلا رقمٍ لا تُعالَج. */

@@ -306,7 +306,7 @@ writeAudited(
         postId: 'a', platform: 'x',
         text: 'منشور a المرشَّح للترويج — سطر يُقرأ كما يُعرَض في التقرير.',
         budgetUsd: 10, currency: 'USD',
-        reason: 'تفاعلُه 96 — 4.6× وسيط نافذة ‏٢٤ ساعة (3 منشورات). ' +
+        reason: 'تفاعلُه 96 — 4.6× وسيط نافذة ‏24 ساعة (3 منشورات). ' +
           'والمبلغ 10$ نصف سقف وضعتَه (20$)، ولا يُنفَق حتّى تقبله.',
         createdAt: '2026-08-31T04:14:00.000Z',
       },
@@ -428,14 +428,14 @@ const journey: Journey = {
   text: 'قيادة القيمة لا تُقاس بالمخرجات بل بالمعالم.\n\nوأكثر ما يُهدر في المشروعات ليس وقتا ولا مالا — بل انتباه يُصرف على ما لا يُحرّك المعلم التالي.',
   stations: [
     { kind: 'source', title: 'ملفّ في Drive', at: ago(200), detail: 'منهجية إدارة المشروعات للقادة — الإطار الأول', cost: null, model: null, state: 'done' },
-    { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاق ‏٠٫٨٦: مادّة أصيلة وفيها إطار قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
+    { kind: 'analysis', title: 'حُلّل', at: ago(190), detail: 'استحقاق ‏0.86: مادّة أصيلة وفيها إطار قابل للاقتباس', cost: 0.0412, model: 'claude-opus-5', state: 'done' },
     { kind: 'draft', title: 'كُتبت مسوّدة', at: ago(120), detail: 'زاوية الوقت لا زاوية المبلغ — لـ LinkedIn', cost: 0.0311, model: 'claude-opus-5', state: 'done' },
     // وما على الصورة يُقال في محطّتها (D-162) — فيدخل المعجمَ والفيضَ كسائرها
     { kind: 'image', title: 'وُلّدت صورة', at: ago(110), detail: '145KB · وعليها «أثر يُقاس»', cost: 0.039, model: 'gemini-2.5-flash-image', state: 'done' },
     { kind: 'decision', title: 'اعتُمدت بعد تعديل', at: ago(100), detail: 'النصّ المعتمَد نصُّك أنت · أنت بمفتاح المرور', cost: null, model: null, state: 'done' },
-    { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏٠٩:٠٠ بتوقيت الرياض على عمر عبدالحميد', cost: null, model: null, state: 'done' },
+    { kind: 'schedule', title: 'جُدولت', at: ago(96), detail: 'الاثنين ‏09:00 بتوقيت الرياض على عمر عبدالحميد', cost: null, model: null, state: 'done' },
     { kind: 'publish', title: 'نُشرت', at: ago(19), detail: 'المحاولة الأولى — نجحت', cost: 0, model: null, state: 'done' },
-    { kind: 'metrics', title: 'قياس ‏٢٤ ساعة', at: null, detail: 'أوّل قياس بعد ‏٢٤ ساعةً من النشر', cost: null, model: null, state: 'pending' },
+    { kind: 'metrics', title: 'قياس ‏24 ساعة', at: null, detail: 'أوّل قياس بعد ‏24 ساعةً من النشر', cost: null, model: null, state: 'pending' },
   ],
 }
 writeAudited(

@@ -12,7 +12,9 @@
  *
  * النصُّ المرئيُّ من عيّنات `/tmp/*.html` المرسومة (`npm run render`)، بلا:
  *
- * - `<script>` و`<style>` والوسوم وقيم السمات (لا يراها المالك).
+ * - `<script>` و`<style>` والوسوم، وقيم السمات **إلّا ما يُعرَض منها** (D-323): `data-tip` تلميحٌ يُقرأ،
+ *   و`title` و`aria-label` يقرؤهما قارئُ الشاشة، و`placeholder` نصُّ الحقل الفارغ — وكانت تُستثنى كلُّها
+ *   فمرّت مفاتيحُ المطوّر (`settings.write`) والمعرّفُ الخامُ للمنصّة (`linkedin`) إلى وجه المالك بلا فحص.
  * - `<code>` وما صنفُه `mono`: **الاسمُ التقنيُّ مرسومًا اسمًا تقنيًّا** مسموح (§8.2).
  * - `<details>` عنوانُها «للمطوّر» أو «التفاصيل»: هناك يُقال UTC والمعرّفُ كما هو.
  * - `<span data-copy-ok>`: استثناءٌ مقصودٌ بسببٍ مكتوبٍ في الشيفرة بجانبه.
@@ -110,7 +112,33 @@ function dropBalanced(html, open, tag) {
   }
 }
 
-/** النصُّ الذي يراه المالك. */
+/** ‏السماتُ التي تُعرَض للناس (D-323): التلميح، والعنوان، واسمُ قارئ الشاشة، ونصُّ الحقل الفارغ. */
+export const SHOWN_ATTRS = ['data-tip', 'title', 'aria-label', 'placeholder']
+
+/** ‏قيمُ السمات المعروضة في وسمٍ — كلُّ قيمةٍ جملةٌ وحدَها. */
+export function attributeText(html) {
+  const out = []
+  const re = new RegExp(`\\s(?:${SHOWN_ATTRS.join('|')})="([^"]*)"`, 'g')
+  for (const tag of html.matchAll(/<[a-zA-Z][^>]*>/g)) for (const a of tag[0].matchAll(re)) out.push(a[1])
+  return out.join(' · ')
+}
+
+/**
+ * ‏**ومفتاحُ الشيفرة في تلميحٍ أو اسم** (D-323): قيمةٌ كلُّها مفتاحٌ بحروفٍ لاتينيّةٍ صغيرة («linkedin»، «settings.write»)
+ * ‏أو JSON — لا جملةَ فيها للمالك. و`title` و`placeholder` خارجها: اسمُ النموذج والعنوانُ مثالٌ يُكتب كما هو في الحقل.
+ */
+export function rawAttributes(html) {
+  const out = []
+  for (const tag of html.matchAll(/<[a-zA-Z][^>]*>/g)) {
+    for (const a of tag[0].matchAll(/\s(data-tip|aria-label)="([^"]*)"/g)) {
+      const v = a[2].replace(/&quot;/g, '"').trim()
+      if (/^[a-z][a-z0-9_]*(?:[.:][a-z0-9_]+)*$/.test(v) || /^[[{]/.test(v)) out.push(`${a[1]}="${v.slice(0, 40)}"`)
+    }
+  }
+  return out
+}
+
+/** النصُّ الذي يراه المالك — ومعه نصُّ السمات التي تُعرَض. */
 export function visible(html) {
   let t = html
     .replace(/<script\b[\s\S]*?<\/script>/g, ' ')
@@ -119,10 +147,11 @@ export function visible(html) {
     .replace(/<code\b[\s\S]*?<\/code>/g, ' ')
   t = dropBalanced(t, /<details\b[^>]*>\s*<summary\b[^>]*>[^<]*(?:للمطوّر|التفاصيل)/, 'details')
   t = dropBalanced(t, /<span\b[^>]*\bdata-copy-ok\b[^>]*>/, 'span')
+  // ‏والسماتُ تُقرأ قبل نزع «mono»: الاسمُ التقنيُّ في المتن مسموح، وتلميحُه جملةٌ للمالك
+  const shown = attributeText(t)
   t = dropBalanced(t, /<span\b[^>]*\bclass="[^"]*\bmono\b[^"]*"[^>]*>/, 'span')
   t = dropBalanced(t, /<bdi\b[^>]*\bclass="[^"]*\bmono\b[^"]*"[^>]*>/, 'bdi')
-  return t
-    .replace(/<[^>]+>/g, ' ')
+  return `${t.replace(/<[^>]+>/g, ' ')} ${shown}`
     .replace(/&nbsp;|&#160;/g, ' ')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/[‎‏]/g, '')
@@ -173,6 +202,8 @@ export function repeatedFacts(html) {
 export function check(name, html) {
   const text = visible(html)
   const problems = repeatedFacts(html).map((f) => `${name} · fact: ${f} ← الحالُ مرّةً في الصفحة، وما سواه يحيل إليه`)
+  const bare = html.replace(/<(script|style|template|code)\b[\s\S]*?<\/\1>/g, ' ')
+  for (const r of rawAttributes(bare)) problems.push(`${name} · raw-attr: ${r} ← جملةٌ للمالك أو اسمٌ معروض، لا مفتاحُ الشيفرة (D-323)`)
   for (const rule of RULES) {
     if (rule.except?.includes(name)) continue
     for (const m of text.matchAll(rule.re)) {
@@ -201,13 +232,16 @@ if (args.includes('--self-test')) {
   const facts = repeatedFacts('<body><p data-fact="zz:broken">أ</p><section data-pane="a"><p data-fact="zz:broken">ب</p></section><section data-pane="b"></section></body>')
   const hidden = check(name, base.replace('</body>', '<details><summary>للمطوّر</summary><p>30 يوما · الطابور</p></details></body>'))
   const clean = check(name, base)
+  // ‏والسماتُ المعروضة تُقرأ (D-323): كلمةٌ من المعجم في تلميح، ورقمٌ هنديّ في اسم قارئ الشاشة
+  const attrs = check(name, base.replace('</body>', '<span data-tip="انظر «القنوات»" aria-label="٣ منشورات">x</span><span data-tip="settings.write">y</span></body>'))
+  const inAttrs = attrs.problems.length - clean.problems.length
   const caught = planted.problems.length - clean.problems.length
   const fromGlossary = planted.problems.some((p) => p.includes('glossary:'))
-  if (caught !== 3 || !fromGlossary || facts.length !== 1 || hidden.problems.length !== clean.problems.length) {
-    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 3، والحقيقةُ المكرّرة ${facts.length} من 1، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
+  if (caught !== 3 || !fromGlossary || inAttrs !== 3 || facts.length !== 1 || hidden.problems.length !== clean.problems.length) {
+    console.error(`audit_copy --self-test: العيبُ المزروع أُمسك ${caught} من 3، وفي السمات ${inAttrs} من 3، والحقيقةُ المكرّرة ${facts.length} من 1، و«للمطوّر» ${hidden.problems.length === clean.problems.length ? 'مستثناة' : 'لم تُستثنَ'}`)
     process.exit(1)
   }
-  console.log('audit_copy --self-test: العيوبُ الثلاثة المزروعة (ومنها كلمةٌ من المعجم) والحقيقةُ المكرّرةُ في لوحها أُمسكت، وما تحت «للمطوّر» مستثنى ✓')
+  console.log('audit_copy --self-test: العيوبُ الثلاثة المزروعة (ومنها كلمةٌ من المعجم) وعيوبُ السمات المعروضة الثلاثة والحقيقةُ المكرّرةُ في لوحها أُمسكت، وما تحت «للمطوّر» مستثنى ✓')
 }
 
 const problems = []

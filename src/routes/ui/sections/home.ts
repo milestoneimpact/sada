@@ -12,7 +12,7 @@ import {
   journeySteps, nextAction,
   type HomeFacts, type JourneyStep,
 } from '../../../lib/home'
-import { parseSqliteUtc } from '../../../lib/format'
+import { num, parseSqliteUtc } from '../../../lib/format'
 import { clock, localParts } from '../../../lib/time/zone'
 import { platformLabel } from '../../../lib/oauth/providers'
 
@@ -23,7 +23,7 @@ import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
 import type { StoredPlan } from '../../../lib/plan/job'
 import { dayLabel, shift } from '../planReviewView'
 
-const ar = (n: number): string => n.toLocaleString('ar-EG')
+const ar = num
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
 import { dayBars } from '../chart'
@@ -71,10 +71,14 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
   const cols = days.map((d, i) => {
     const p = localParts(d, zone)
     const pfs = by.get(key(d)) ?? []
+    // ‏والمنصّاتُ بأسمائها في اسم النقاط وتلميحها (D-323): كان التلميحُ على كلّ نقطةٍ معرّفَها الخامّ («linkedin») على
+    // ‏وسمٍ لا يأخذ التركيز داخل صورةٍ لا يُقرأ ما فيها — فاللونُ وحدَه كان يقول المنصّة. والاسمُ الآن لقارئ الشاشة وللّمس
+    const names = pfs.map((pf) => platformLabel(pf)).join(' · ')
     return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${i === 0 ? 'اليوم' : WEEKDAYS[p.weekday]}</span>
       <span class="wk-n num">${p.day}</span>
-      <span class="wk-dots" role="img" aria-label="${pfs.length} منشور">${pfs.slice(0, 6).map((pf) =>
-        `<span class="wk-dot" data-pf="${escapeHtml(pf)}" data-tip="${escapeHtml(pf)}"></span>`).join('')}</span>
+      <span class="wk-dots" role="img" aria-label="${pfs.length === 0 ? 'لا منشور' : escapeHtml(String(pfs.length) + ' منشور: ' + names)}"${
+        pfs.length === 0 ? '' : ' tabindex="0" data-tip="' + escapeHtml(names) + '"'}>${pfs.slice(0, 6).map((pf) =>
+        `<span class="wk-dot" data-pf="${escapeHtml(pf)}"></span>`).join('')}</span>
       <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span></li>`
   }).join('')
   return `<div class="card home-card">

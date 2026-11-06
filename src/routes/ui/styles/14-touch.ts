@@ -269,7 +269,8 @@ export const TOUCH = `/* ══════════════════�
    وضع التباين العالي في Windows يمحو الظلال والأرضيّات ويُلبس الصفحة ألوان النظام —
    **فمؤشّرٌ مرسومٌ بظلٍّ أو بأرضٍ يختفي**: المقطعُ المختار، وخطُّ الرافدة النحاسيّ، والنقطة،
    والمقياس. فكلّ مؤشّر حال أو تحديد هنا بحدّ أو حلقة بألوان النظام، ويُقاس بلقطة في
-   Chromium بـ«forced-colors: active». وحلقة التركيز «outline» أصلًا فتبقى. */
+   Chromium بـ«forced-colors: active». وحلقة التركيز «outline» أصلًا فتبقى — **والحقلُ كان الاستثناء** («outline:none» وهالةٌ
+   تُمحى)، فصار خطًّا صلبًا كسائرها (D-323). */
 @media(forced-colors:active){
   .seg button[aria-pressed=true]{outline:var(--stroke) solid Highlight; outline-offset:calc(-1 * var(--stroke))}
   /* ‏والحدُّ الشفّافُ يُرسَم بلون النصّ في هذا الوضع — فيُمحى بلون الأرض، ويبقى خطُّ المختار وحدَه */
@@ -280,6 +281,8 @@ export const TOUCH = `/* ══════════════════�
   nav.tabs a[aria-current=page]{outline:var(--ul) solid Highlight; outline-offset:calc(-1 * var(--ul))}
   .st,.count,.toast-note,.card-alert{border-color:CanvasText}
   :focus-visible{outline-color:Highlight}
+  /* ‏والحقلُ المركَّز خطٌّ بلون النظام (D-323): «Highlight» صريحًا فلا يُترك لما يفرضه الوضع */
+  input:focus,select:focus,textarea:focus{outline:var(--stroke) solid Highlight}
   /* ‏**ولحظةُ العلامة بألوانها** (مراجعة D-196): النقشُ يرسم أرضَه سمةً لا تُفرَض («fill» في SVG)،
      وأرض «.moment» تُفرَض Canvas ورمزُها CanvasText — فرُسم الرمز أسود على أرض النقش العميقة ‏١٫٤٦:١
      في التباين العالي الفاتح. وأزواجُها مقيسة في «MOMENT_PAIRS» (‏٧٫٥٨ فأكثر)، فتبقى كما هي */

@@ -16,36 +16,36 @@ const gate = (f: GateFacts, phase: string) => gatesOf(f).find((g) => g.phase ===
 describe('لا تُجتاز بقول', () => {
   it('بلا شيء: لا بوّابة مجتازة', () => {
     expect(gatesOf(empty).every((g) => !g.passed)).toBe(true)
-    expect(currentPhase(gatesOf(empty))).toBe('٠')
+    expect(currentPhase(gatesOf(empty))).toBe('0')
   })
 
   /** **منصّةٌ واحدةٌ لا تكفي**: البوّابةُ تقول «على كلّ منصّة». */
-  it('ومنصّة واحدة لا تجتاز بوّابة المرحلة ٠', () => {
+  it('ومنصّة واحدة لا تجتاز بوّابة المرحلة 0', () => {
     const half: GateFacts = {
       ...empty,
       publishedPerPlatform: { linkedin: 3 },
       ledgerPerPlatform: { linkedin: 3 },
     }
-    expect(gate(half, '٠').passed).toBe(false)
+    expect(gate(half, '0').passed).toBe(false)
 
     const both: GateFacts = {
       ...empty,
       publishedPerPlatform: { linkedin: 3, x: 1 },
       ledgerPerPlatform: { linkedin: 3, x: 1 },
     }
-    expect(gate(both, '٠').passed).toBe(true)
+    expect(gate(both, '0').passed).toBe(true)
   })
 
   /** **ومنشورٌ بلا سطرٍ في الدفتر لا يجتاز** — D-008 شرطٌ لا زينة. */
   it('ونشر بلا سطر في الدفتر لا يجتاز', () => {
     const noLedger: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3, x: 1 } }
-    expect(gate(noLedger, '٠').passed).toBe(false)
+    expect(gate(noLedger, '0').passed).toBe(false)
   })
 
-  it('وأربعة من خمسة لا تجتاز بوّابة المرحلة ١', () => {
+  it('وأربعة من خمسة لا تجتاز بوّابة المرحلة 1', () => {
     const four: GateFacts = { ...empty, plans: 1, scheduledPublished: 4 }
-    expect(gate(four, '١').passed).toBe(false)
-    expect(gate({ ...four, scheduledPublished: 5 }, '١').passed).toBe(true)
+    expect(gate(four, '1').passed).toBe(false)
+    expect(gate({ ...four, scheduledPublished: 5 }, '1').passed).toBe(true)
   })
 })
 
@@ -63,33 +63,33 @@ describe('وبند التنبيه صار يُقاس', () => {
   }
 
   it('بلا تنبيه سُجّل: البوّابة لا تُجتاز، والبند «لم يتحقّق» لا «لا يُقاس»', () => {
-    const g = gate(almost, '٢')
+    const g = gate(almost, '2')
     expect(g.passed).toBe(false)
     expect(g.items.some((i) => i.state === 'unmeasured')).toBe(false)
     expect(g.items.filter((i) => i.state === 'unmet')).toHaveLength(1)
   })
 
   it('وبتنبيه سُجّل تُجتاز', () => {
-    expect(gate({ ...almost, weekAlertFired: true }, '٢').passed).toBe(true)
+    expect(gate({ ...almost, weekAlertFired: true }, '2').passed).toBe(true)
   })
 })
 
 describe('وبند سلبيّ يُجتاز بالصفر', () => {
   /** «ولم يُنفَق شيء» شرطٌ سلبيّ — وأيُّ صفٍّ يُسقط البوّابة (D-006). */
-  it('إنفاق ترويج يُسقط بوّابة المرحلة ٣ ولو تمّ الباقي', () => {
+  it('إنفاق ترويج يُسقط بوّابة المرحلة 3 ولو تمّ الباقي', () => {
     const clean: GateFacts = { ...empty, reports: 1, suggestions: 1 }
-    expect(gate(clean, '٣').passed).toBe(true)
+    expect(gate(clean, '3').passed).toBe(true)
 
     const spent: GateFacts = { ...clean, promoSpend: 10 }
-    expect(gate(spent, '٣').passed).toBe(false)
-    expect(gate(spent, '٣').items.at(-1)!.evidence).toContain('يُسقط البوّابة')
+    expect(gate(spent, '3').passed).toBe(false)
+    expect(gate(spent, '3').items.at(-1)!.evidence).toContain('يُسقط البوّابة')
   })
 })
 
 describe('ولكلّ بند دليلُه لا حكمُه وحده', () => {
   it('يُعرَض الرقم الذي بُني عليه الحكم', () => {
     const f: GateFacts = { ...empty, publishedPerPlatform: { linkedin: 3 } }
-    const first = gate(f, '٠').items[0]!
+    const first = gate(f, '0').items[0]!
     expect(first.evidence).toContain('LinkedIn: 3')
     expect(first.evidence).toContain('X: 0')
   })

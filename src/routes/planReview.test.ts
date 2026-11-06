@@ -46,10 +46,10 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('نصُّ المنشور الأوّل')
-    expect(html).toContain('مسوّدة · الإصدار ١')
+    expect(html).toContain('مسوّدة · الإصدار 1')
     // ‏بندٌ لم يُكتب، وواحدٌ ينتظر، واثنان بلا صورة، وموعدان مكرَّران لـ LinkedIn
-    for (const s of ['١ لم تُكتب بعد', '١ تنتظر اعتمادك', '٢ بلا صورة', '٢ موعدٌ مكرَّر']) expect(html).toContain(s)
-    expect(html).toContain('href="#c-2">١ لم تُكتب بعد')
+    for (const s of ['1 لم تُكتب بعد', '1 تنتظر اعتمادك', '2 بلا صورة', '2 موعدٌ مكرَّر']) expect(html).toContain(s)
+    expect(html).toContain('href="#c-2">1 لم تُكتب بعد')
     expect(html).toContain('action="/panel/plan/pin"')
   })
 
@@ -73,7 +73,7 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect((JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: unknown[] }).items).toHaveLength(2)
   })
 
-  it('ثبّت: صورةُ الإصدار ١ تُحفظ ويُجدوَل المعتمَد، وأوّلُ تعديلٍ بعده يفتح الإصدار ٢ والأوّلُ باقٍ', async () => {
+  it('ثبّت: صورةُ الإصدار 1 تُحفظ ويُجدوَل المعتمَد، وأوّلُ تعديلٍ بعده يفتح الإصدار 2 والأوّلُ باقٍ', async () => {
     const { cookie, csrf } = await session()
     const pinRes = await app.request('/panel/plan/pin', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1' }), headers: { Cookie: cookie } }, env)
     expect(pinRes.status).toBe(303)
@@ -81,7 +81,7 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft' })
     expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 1 }])
     const pinned = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
-    expect(pinned).toContain('مثبَّتة · الإصدار ١')
+    expect(pinned).toContain('مثبَّتة · الإصدار 1')
     // ‏تأخيرُ بندٍ مجدول: يفتح الإصدار ٢، ويتحرّك موعدُ منشوره، والإصدارُ ١ في السجلّ كما ثُبّت
     await app.request('/panel/plan/review/delay', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(pinned, 1), days: '1' }), headers: { Cookie: cookie } }, env)
     expect(db.raw.prepare("SELECT version, locked_at FROM plans WHERE id = 'pl1'").get()).toEqual({ version: 2, locked_at: null })
@@ -89,8 +89,8 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const v1 = JSON.parse((db.raw.prepare('SELECT plan_json FROM plan_versions WHERE version = 1').get() as { plan_json: string }).plan_json) as { items: { day: string }[] }
     expect(v1.items[1]!.day).toBe('2099-01-04')
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
-    expect(after).toContain('عُدّلت بعد التثبيت · الإصدار ٢ غير مثبَّت')
-    expect(after).toContain('الإصدار ١ — ثُبّت')
+    expect(after).toContain('عُدّلت بعد التثبيت · الإصدار 2 غير مثبَّت')
+    expect(after).toContain('الإصدار 1 — ثُبّت')
     // ‏ومنشورٌ مجدولٌ لا يُحذف من المراجعة
     await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(after, 1) }), headers: { Cookie: cookie } }, env)
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
@@ -154,11 +154,11 @@ describe('عرضُ الخطّة (D-288)', () => {
     const html = await (await app.request('/panel/plan/view', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('class="pd-hero"')
     expect(html).toContain('خطّةُ النشر · أسبوع')
-    expect(html).toContain('<b>٣</b><span>منشورًا</span>')
+    expect(html).toContain('<b>3</b><span>منشورًا</span>')
     expect(html).toContain('class="np np-li')
     expect(html).toContain('نصُّ المنشور الأوّل')
     expect(html).toContain('id="pd-print"')
-    expect(html).toContain('الأسبوع ١')
+    expect(html).toContain('الأسبوع 1')
     const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(review).toContain('href="/panel/plan/view"')
     db.raw.exec("UPDATE plans SET status = 'superseded'")
@@ -171,8 +171,8 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('class="card home-plan"')
-    expect(html).toContain('مسوّدة · الإصدار ١')
-    expect(html).toContain('<b>١</b> معتمَدةً من ٣')
+    expect(html).toContain('مسوّدة · الإصدار 1')
+    expect(html).toContain('<b>1</b> معتمَدةً من 3')
     expect(html).toContain('href="/panel/plan/review">تابع الكتابة</a>')
     expect(html).toContain('class="hp-next"')
     // ‏و«اليوم بالأرقام» في المطويّ لا أعلى الرئيسيّة
@@ -201,5 +201,21 @@ describe('«الخطّة» وجهةٌ واحدة (D-289)', () => {
     expect(await go()).toBe('/panel/plan/view')
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     expect(await go()).toBe('/panel/plan/new')
+  })
+})
+
+/**
+ * **نظامُ أرقامٍ واحد في وحدة الخطّة** (D-323 · GLOSSARY): كانت المراجعةُ والعرضُ والمعالجُ وبطاقةُ الرئيسيّة تكتب
+ * بـ`toLocaleString('ar-EG')` فتُرسَم «١ معتمَدةً من ٣» و«الأحد، ٤ يناير» بجوار «07:00».
+ */
+describe('أرقامُ الخطّة غربيّة (D-323)', () => {
+  it('المراجعةُ والعرضُ والمعالجُ والرئيسيّةُ بلا رقمٍ هنديّ', async () => {
+    const { cookie } = await session()
+    for (const path of ['/panel/plan/review', '/panel/plan/new', '/panel']) {
+      const html = (await (await app.request(path, { headers: { Cookie: cookie } }, env)).text())
+        .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, '')
+      const hits = [...html.matchAll(/[^<>]{0,30}[\u0660-\u0669\u06F0-\u06F9]+[^<>]{0,30}/g)].map((m) => m[0].trim())
+      expect(hits, path).toEqual([])
+    }
   })
 })

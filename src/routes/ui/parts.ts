@@ -6,6 +6,7 @@
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
 import { escapeHtml } from './escape'
+import { html } from './html'
 import { glyph, ICON } from './icons'
 import { statusBadge, type Tone } from './components/badge'
 import { card } from './components/card'
@@ -32,7 +33,8 @@ export { glyph } from './icons'
  */
 export function fileName(name: string): string {
   const stem = name.replace(/\.[A-Za-z0-9]{1,5}$/, '')
-  return `<bdi data-tip="${escapeHtml(name)}">${escapeHtml(stem === '' ? name : stem)}</bdi>`
+  // ‏والاسمُ كاملًا في تلميحٍ على وسمٍ يأخذ التركيز (D-323): لوحةُ المفاتيح واللمسُ يصلانه كالمؤشّر
+  return `<bdi tabindex="0" data-tip="${escapeHtml(name)}">${escapeHtml(stem === '' ? name : stem)}</bdi>`
 }
 
 /**
@@ -151,8 +153,12 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
             <span class="grow"></span>
             ${r.error === null
               ? `<span class="chip mono">${r.status ?? '—'}</span>`
-              : `<span class="chip bad" data-tip="${escapeHtml(r.error)}">${escapeHtml(
-                  r.error.slice(0, 28))}</span>`}
+              // ‏‏والخطأُ كاملًا بلا تمرير (D-323): كان مقصوصًا إلى ‏28 حرفًا وباقيه في تلميحٍ لا يصله الهاتف ولا لوحةُ
+              // ‏المفاتيح — وهو ما يُرسَل إليّ حين تموت القناة. فالطويلُ سطرٌ يُفتح، والقصيرُ رقاقةٌ كما هو
+              : r.error.length <= 28
+                ? html`<span class="chip bad">${r.error}</span>`.value
+                : html`<details class="ax-err"><summary class="chip bad">${r.error.slice(0, 28)}…</summary>
+                    <p class="hint m-0">${r.error}</p></details>`.value}
           </li>`
         })
         .join('')}</ul>`

@@ -171,6 +171,14 @@ ${THEME_COLOR}`
  *
  * ووضعٌ مختارٌ يخالف الجهاز يلوّن شريطَ المتصفّح بلونه كذلك (D-183): الوسمان
  * قبل السكربت في الرأس، فيُقرآن هنا قبل الرسم.
+ *
+ * **والانتقالُ بين المستندات لا يُخلّف خطأً** (D-323): «@view-transition{navigation:auto}» (D-312) يبدأ انتقالًا مع كلّ تنقّل،
+ * والمتصفّحُ يُسقطه حين لا يصلح (صفحةٌ لم تُرسَم بعد، أو تنقّلٌ قطع آخر) فيرفض وعودَه بلا من يلتقطها: «Transition was
+ * aborted because of invalid state. ViewTransition opt-in disabled» خطأَ صفحةٍ في ‏13 من ‏32 رحلة. فوعودُه الثلاثة تُلتقَط في
+ * الصفحتين — الخارجة («pageswap») والداخلة («pagereveal») — **وهنا في الرأس**: «pagereveal» يقع قبل أوّل رسم، قبل أيّ سكربتٍ في الجسد.
+ * **وما لا كائنَ له يُكتم رفضُه وحدَه**: تنقّلٌ يُقطع (OAuth يغادر الموقع فيُمنع، وصفحةٌ تُعاد قبل أن تُرسم) يُنشئ فيه المتصفّحُ
+ * الانتقالَ ويُسقطه قبل «pageswap»، فبقي الخطأُ في ‏6 من ‏32 رحلةً بعد الالتقاط. فرفضٌ اسمُه «InvalidStateError» أو «AbortError»
+ * ونصُّه «Transition was aborted/skipped» لا يُعدّ خطأً — وما سواه يبقى خطأً يُرى.
  */
 const THEME_BOOT = `
 try{var t=localStorage.getItem('sada-theme');
@@ -181,6 +189,10 @@ var d=localStorage.getItem('sada-density');
 if(d==='compact')document.documentElement.dataset.density=d;
 var z=localStorage.getItem('sada-size');
 if(z==='large')document.documentElement.dataset.size=z;}catch(e){}
+if(typeof window!=='undefined'&&window.addEventListener){['pagereveal','pageswap'].forEach(function(n){window.addEventListener(n,function(e){var t=e.viewTransition;if(!t)return;
+var no=function(){};[t.ready,t.finished,t.updateCallbackDone].forEach(function(p){if(p&&p.catch)p.catch(no);});});});
+window.addEventListener('unhandledrejection',function(e){var r=e.reason;
+if(r&&(r.name==='InvalidStateError'||r.name==='AbortError')&&/^Transition was (aborted|skipped)/.test(r.message||''))e.preventDefault();});}
 `
 
 

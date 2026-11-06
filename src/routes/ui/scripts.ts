@@ -39,19 +39,74 @@ export const COPY_SCRIPT = `
 `
 
 /**
- * **تأكيدُ الزرّ** (D-218) — في كلّ صفحة، **للزرّ وحدَه**.
+ * **التأكيدُ حوارٌ في الصفحة لا نافذةُ المتصفّح** (D-218 · D-303 · D-323) — في كلّ صفحة، للنموذج وللزرّ.
  *
- * «احذف» في دليل ضبط المنصّة يحمل «data-confirm» على الزرّ لا على النموذج (النموذجُ نفسُه يحفظ ويفحص)، وصفحةُ المنصّة
- * لا تحمل سكربتَ اللوحة أصلًا — **فكان يحذف السرَّ المحفوظ بضغطةٍ بلا سؤال**. والنموذجُ ذو «data-confirm» يسأل عنه
- * سكربتُ اللوحة؛ فهذا للأزرار وحدها، فلا يُسأل المالكُ مرّتين.
+ * كان `window.confirm()` يسأل بزرّين لا يقولان شيئًا («موافق · إلغاء»)، بخطّ النظام وفوق الصفحة كلّها، ويُغلق
+ * لوحةَ المفاتيح وقارئَ الشاشة على ما لا يُشبه اللوحة. **وكان نصفُه صامتًا**: سؤالُ النموذج في سكربت اللوحة وحدَه،
+ * فـ«ثبّت الخطّة» و«احذف البند» و«جدوِل الجاهزة» في صفحاتها المستقلّة **تُرسَل بلا سؤالٍ أصلًا** (قيس في D-323:
+ * ستّةُ نماذجَ في صفحتين مرسومتين). فهنا وحدَه، في طور الالتقاط على الوثيقة — قبل كلّ مستمعٍ على النموذج وقبل
+ * «مشغول»، وما يُبدَّل بلا تحميلٍ داخلٌ فيه بلا ربطٍ جديد:
+ *
+ * ١ · `form[data-confirm]` يُوقَف إرسالُه، و`button[data-confirm]` تُوقَف ضغطتُه، ويُفتح `<dialog>` واحدٌ بـ`showModal()`
+ *     (التركيزُ محبوسٌ وEsc يغلق، من المتصفّح): السؤالُ عنوانُه، **والفعلُ زرُّه باسمه** (نصُّ الزرّ المضغوط أو
+ *     `data-confirm-ok`) — أحمرُ إن كان الزرُّ أحمر — و«ارجع» بجانبه، والتركيزُ عليه حين يكون الفعلُ هادمًا.
+ * ٢ · «نعم» يعيد الفعلَ نفسَه بعلامةٍ تمرّره مرّةً: النموذجُ بـ`requestSubmit(زرّه)` فيُرسَل اسمُ الزرّ وقيمتُه
+ *     (`do=drop`) ويمرّ بـ«مشغول» و«data-swap» كأيّ إرسال، والزرُّ بضغطةٍ ثانية.
+ * ٣ · «ارجع» وEsc والنقرُ على الستارة لا يرسل شيئًا، والتركيزُ يعود إلى الزرّ الذي فتحه.
+ *
+ * والمعطَّلُ بـ`aria-disabled` لا يُسأل عنه: سلوكُ العُدّة بعده يمنعه (`KIT_SCRIPT`).
  */
 export const CONFIRM_SCRIPT = `
 (function(){
-  document.querySelectorAll('button[data-confirm]').forEach(function(b){
-    b.addEventListener('click',function(e){
-      if(!confirm(b.dataset.confirm)){e.preventDefault(); e.stopImmediatePropagation();}
+  var dlg=null, go=null, from=null;
+  function build(){
+    dlg=document.createElement('dialog'); dlg.className='dlg'; dlg.id='sada-cf'; dlg.setAttribute('aria-labelledby','sada-cf-t');
+    var h=document.createElement('h3'); h.className='dlg-t'; h.id='sada-cf-t';
+    var foot=document.createElement('div'); foot.className='dlg-foot';
+    var ok=document.createElement('button'); ok.type='button'; ok.setAttribute('data-cf','ok');
+    var no=document.createElement('button'); no.type='button'; no.className='btn btn-secondary'; no.setAttribute('data-cf','no'); no.textContent='ارجع';
+    foot.appendChild(ok); foot.appendChild(no); dlg.appendChild(h); dlg.appendChild(foot); document.body.appendChild(dlg);
+    ok.addEventListener('click',function(){var f=go; shut(); if(f)f();});
+    no.addEventListener('click',function(){shut(); back();});
+    dlg.addEventListener('cancel',function(e){e.preventDefault(); shut(); back();});
+    dlg.addEventListener('click',function(e){if(e.target===dlg){shut(); back();}});
+  }
+  function shut(){go=null; if(!dlg)return; if(typeof dlg.close==='function'&&dlg.open)dlg.close(); else dlg.removeAttribute('open');}
+  function back(){if(from&&from.focus)from.focus(); from=null;}
+  function ask(msg,label,danger,opener,then){
+    if(!dlg)build();
+    from=opener; go=then;
+    dlg.querySelector('.dlg-t').textContent=msg;
+    var ok=dlg.querySelector('[data-cf=ok]'), no=dlg.querySelector('[data-cf=no]');
+    ok.className='btn '+(danger?'btn-danger':'btn-primary'); ok.textContent=label||'تابع';
+    if(typeof dlg.showModal==='function'){if(!dlg.open)dlg.showModal();}else dlg.setAttribute('open','');
+    (danger?no:ok).focus();
+  }
+  function label(b){return b?((b.getAttribute('data-confirm-ok')||b.textContent||'').trim()):'';}
+  function danger(b){return !!b&&!!b.classList&&b.classList.contains('btn-danger');}
+  function dead(b){return !!b&&!!b.closest&&!!b.closest('[aria-disabled="true"]');}
+  window.sadaAsk=ask;
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('button[data-confirm]'):null;
+    if(!b||dead(b))return;
+    if(b.hasAttribute('data-confirmed')){b.removeAttribute('data-confirmed'); return;}
+    e.preventDefault(); e.stopImmediatePropagation();
+    ask(b.getAttribute('data-confirm'),label(b),danger(b),b,function(){b.setAttribute('data-confirmed',''); b.click();});
+  },true);
+  document.addEventListener('submit',function(e){
+    var f=e.target; if(!f||!f.matches||!f.matches('form[data-confirm]'))return;
+    var s=e.submitter||null;
+    if(s&&s.hasAttribute('data-confirm'))return;
+    if(f.hasAttribute('data-confirmed')){f.removeAttribute('data-confirmed'); return;}
+    if(dead(s))return;
+    var b=s||f.querySelector('button[type=submit],button:not([type])');
+    e.preventDefault(); e.stopImmediatePropagation();
+    ask(f.getAttribute('data-confirm'),label(b),danger(b),b,function(){
+      f.setAttribute('data-confirmed','');
+      if(typeof f.requestSubmit==='function'){if(s)f.requestSubmit(s); else f.requestSubmit();}
+      else{if(s&&s.name){var h=document.createElement('input'); h.type='hidden'; h.name=s.name; h.value=s.value; f.appendChild(h);} f.submit();}
     });
-  });
+  },true);
 })();
 `
 
@@ -275,7 +330,7 @@ export const FACTORS_SCRIPT = `
 
   document.querySelectorAll('button.pk-del').forEach(function(b){
     b.addEventListener('click',function(){
-      if(!confirm('حذف المفتاح «'+b.dataset.label+'»؟'))return;
+      // ‏والسؤالُ قبلها من «data-confirm» على الزرّ نفسِه (D-323): هذا لا يصل إلّا بعد «احذف» في الحوار
       b.disabled=true;
       send('/panel/security/passkey/delete',{id:b.dataset.id}).then(function(r){
         if(r.ok){location.reload(); return;}
@@ -319,7 +374,6 @@ export const FACTORS_SCRIPT = `
 
   var tr=document.getElementById('totp-remove');
   if(tr)tr.addEventListener('click',function(){
-    if(!confirm('إزالة رمز التطبيق؟'))return;
     tr.disabled=true;
     send('/panel/security/totp/remove',{}).then(function(r){
       if(r.ok){location.reload(); return;}
@@ -340,7 +394,6 @@ export const FACTORS_SCRIPT = `
 
   var ri=document.getElementById('rc-issue');
   if(ri)ri.addEventListener('click',function(){
-    if(!confirm('توليد مجموعة جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
     ri.disabled=true;
     send('/panel/security/recovery/issue',{}).then(function(r){
       return r.ok?r.json():sadaPk.fail(r);
@@ -506,5 +559,128 @@ export const SIZE_SCRIPT = `
   apply(saved);
   all().forEach(function(b){
     b.addEventListener('click',function(){apply(b.dataset.size);});});
+})();
+`
+
+/**
+ * **اختصاراتُ الحرف الواحد تُطفأ** (D-323 · WCAG 2.1.4 «اختصاراتُ المفتاح الواحد»).
+ *
+ * J وK وA وR وE وS و/ في المنشورات تعمل بحرفٍ واحدٍ بلا مُعدِّل، وقارئُ الشاشة والإدخالُ الصوتيّ يضغطان حروفًا
+ * لم يقصدها صاحبُها — «R» تُرفض بها مسوّدة. فمفتاحُ إطفاءٍ في لوح الاختصارات وفي «الضبط ← المظهر»، يُحفظ في
+ * المتصفّح كالكثافة (`sada-shortcuts`)، ويضع `data-shortcuts="off"` على `<html>`؛ وسكربتُ اللوحة يقرؤه عند كلّ
+ * ضغطة لا عند التحميل، فيسري فورًا. والأزرارُ كلُّها (في اللوح وفي الضبط) تُربط معًا.
+ */
+export const SHORTCUTS_SCRIPT = `
+(function(){
+  var root=document.documentElement;
+  var all=function(){return document.querySelectorAll('.seg button[data-shortcuts]');};
+  var apply=function(v,keep){
+    if(v==='off')root.setAttribute('data-shortcuts','off'); else root.removeAttribute('data-shortcuts');
+    if(keep){try{if(v==='off')localStorage.setItem('sada-shortcuts','off'); else localStorage.removeItem('sada-shortcuts');}catch(e){}}
+    all().forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-shortcuts')===(v==='off'?'off':'on')));});
+  };
+  var saved='on';
+  try{saved=localStorage.getItem('sada-shortcuts')==='off'?'off':'on';}catch(e){}
+  apply(saved,false);
+  all().forEach(function(b){b.addEventListener('click',function(){apply(b.getAttribute('data-shortcuts'),true);});});
+})();
+`
+
+/**
+ * **التلميحُ يُمسَك ويُركَّز ويُلمَس** (D-323 · WCAG 1.4.13 «محتوى عند التمرير أو التركيز»).
+ *
+ * كان التلميحُ (D-312) عنصرًا زائفًا `::before` بلا أحداثِ مؤشّر وبينه وبين مرجعه ‏8px: **فمن حرّك المؤشّرَ إليه ليقرأه
+ * اختفى**، ومن كبّر الشاشة لم يستطع الوصول إليه. ولا يظهر باللمس أصلًا — والمالكُ على iPhone — ولا يقرؤه قارئُ الشاشة.
+ * فهنا عنصرٌ واحدٌ حقيقيّ (`role="tooltip"`) يحلّ محلّ الزائف متى جرى السكربت (`data-tipjs` على الجذر يُطفئ الزائف،
+ * وبلا سكربتٍ يبقى الزائفُ كما كان):
+ *
+ * - **بالمؤشّر** بعد ‏400ms (`--delay-tip`)، **ويبقى والمؤشّرُ ينتقل إليه** عبر الفجوة (مهلةُ ‏300ms قبل الإخفاء، والدخولُ
+ *   إليه يلغيها)؛ ويذهب حين يغادرهما معًا.
+ * - **بلوحة المفاتيح** فورًا حين يأخذ الهدفُ التركيز، ويُربط به وصفًا (`aria-describedby`) ما دام ظاهرًا — إلّا أن
+ *   يكون هو اسمَه نفسَه (زرُّ الأيقونة) فلا يُقرأ مرّتين.
+ * - **باللمس**: لمسةٌ على هدفٍ ليس زرًّا ولا رابطًا تُظهره، ولمسةٌ خارجه تخفيه — الزرُّ والرابطُ يُضغطان كما كانا. واللمسةُ
+ *   تُقرأ من `pointerdown`/`pointerup` لا من `click`: Safari على iPhone لا يرسل `click` إلى وسمٍ لا يُضغط إن كان المستمعُ على الوثيقة.
+ * - **Esc تخفيه** ولا يعود حتّى يدخل المؤشّرُ هدفًا آخر أو يتحرّك التركيز؛ ويبقى ما بقي سببُه (WCAG «مستمرّ»).
+ *
+ * ويُوضع فوق الهدف، وتحته في الشريط العلويّ أو حين لا يتّسع ما فوقه، محصورًا في عرض الشاشة. ويسكن `<main>` حين يظهر
+ * (ما خارج المعالم لا يُقرأ في موضعه، axe «region»)، وداخلَ حوارٍ مفتوحٍ يُنقل إليه: ما خارجَ الطبقة العليا يُرسم تحتها.
+ */
+export const TIP_SCRIPT = `
+(function(){
+  var root=document.documentElement, body=document.body; if(!body)return;
+  var tip=document.createElement('div'); tip.className='tip'; tip.id='sada-tip'; tip.setAttribute('role','tooltip'); tip.hidden=true;
+  body.appendChild(tip); root.setAttribute('data-tipjs','');
+  var SEL='[data-tip],.btn-icon[aria-label]', ACT='a[href],button,input,select,textarea,summary,label';
+  var on=null, how='', wait=0, gone=0, kbd=false, down=null;
+  var delay=parseFloat(getComputedStyle(root).getPropertyValue('--delay-tip'))||400;
+  function own(t){return t&&t.closest?t.closest(SEL):null;}
+  function text(el){return el.getAttribute('data-tip')||el.getAttribute('aria-label')||'';}
+  function inside(n){return !!n&&(tip===n||tip.contains(n)||(!!on&&(on===n||on.contains(n))));}
+  function place(){
+    if(!on)return;
+    var r=on.getBoundingClientRect(), vw=root.clientWidth||window.innerWidth, w=tip.offsetWidth, h=tip.offsetHeight, gap=8;
+    var below=!!on.closest('.topbar,nav.back')||r.top<h+gap;
+    tip.setAttribute('data-side',below?'below':'above');
+    tip.style.top=Math.round(below?r.bottom+gap:r.top-h-gap)+'px';
+    tip.style.left=Math.round(Math.max(gap,Math.min(vw-w-gap,r.left+r.width/2-w/2)))+'px';
+  }
+  function unlink(){
+    if(!on||!on.hasAttribute('data-tip-was'))return;
+    var was=on.getAttribute('data-tip-was'); on.removeAttribute('data-tip-was');
+    if(was)on.setAttribute('aria-describedby',was); else on.removeAttribute('aria-describedby');
+  }
+  function show(el,why){
+    clearTimeout(wait); clearTimeout(gone);
+    var t=text(el); if(!t)return;
+    if(on!==el){unlink(); on=el;}
+    how=why; tip.textContent=t;
+    var host=el.closest('dialog[open]')||document.querySelector('main')||body; if(tip.parentNode!==host)host.appendChild(tip);
+    tip.hidden=false; place();
+    if(t!==(el.getAttribute('aria-label')||'')&&t!==(el.textContent||'').trim()&&!el.hasAttribute('data-tip-was')){
+      var d=el.getAttribute('aria-describedby')||''; el.setAttribute('data-tip-was',d);
+      el.setAttribute('aria-describedby',(d?d+' ':'')+'sada-tip');
+    }
+  }
+  function hide(){clearTimeout(wait); clearTimeout(gone); unlink(); on=null; how=''; tip.hidden=true;}
+  function later(){clearTimeout(gone); gone=setTimeout(hide,300);}
+  document.addEventListener('keydown',function(e){
+    kbd=true;
+    if(e.key==='Escape'&&on){hide();}
+  },true);
+  document.addEventListener('pointerdown',function(e){
+    kbd=false; down=null;
+    if(e.pointerType!=='touch')return;
+    down={x:e.clientX,y:e.clientY,el:own(e.target)};
+    if(on&&!inside(e.target))hide();
+  },true);
+  document.addEventListener('pointerup',function(e){
+    if(e.pointerType!=='touch'||!down)return;
+    var d=down, el=own(e.target); down=null;
+    if(!el||el!==d.el||Math.abs(e.clientX-d.x)>10||Math.abs(e.clientY-d.y)>10)return;
+    if(el.matches(ACT)||(el.closest&&el.closest(ACT)))return;
+    if(on===el&&how==='tap')hide(); else show(el,'tap');
+  });
+  document.addEventListener('pointerover',function(e){
+    if(e.pointerType==='touch')return;
+    if(inside(e.target)){clearTimeout(gone); return;}
+    var el=own(e.target); if(!el)return;
+    clearTimeout(wait);
+    if(on&&how==='hover'){show(el,'hover'); return;}
+    wait=setTimeout(function(){show(el,'hover');},delay);
+  });
+  document.addEventListener('pointerout',function(e){
+    if(e.pointerType==='touch')return;
+    clearTimeout(wait);
+    if(how==='hover'&&!inside(e.relatedTarget))later();
+  });
+  document.addEventListener('focusin',function(e){
+    var el=own(e.target); if(!el){if(on&&how==='focus')hide(); return;}
+    if(kbd)show(el,'focus');
+  });
+  document.addEventListener('focusout',function(e){
+    if(how==='focus'&&!inside(e.relatedTarget))hide();
+  });
+  window.addEventListener('scroll',function(){if(on)place();},{capture:true,passive:true});
+  window.addEventListener('resize',function(){if(on)place();},{passive:true});
 })();
 `

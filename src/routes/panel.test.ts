@@ -773,14 +773,13 @@ describe('اللون يتبع المرجع لا الذوق', () => {
  * لا كمّيّات فتبقى، والوثائقُ القانونيّةُ نثرٌ لا واجهة.
  */
 describe('رقم واحد في الواجهة (D-147)', () => {
-  it('لا رقمًا هنديًّا في اللوحة ولا في شاشة المنصّة سوى أسماء المراحل', async () => {
+  it('لا رقمًا هنديًّا في اللوحة ولا في شاشة المنصّة ولا في أسماء المراحل', async () => {
     const cookie = await login()
     for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks']) {
       const html = await (await app.request(path, withSession(cookie), env)).text()
+      // ‏وأسماءُ المراحل كذلك منذ D-323: نظامُ أرقامٍ واحد بلا استثناء («المرحلة 0» لا «المرحلة ٠»)
       const body = html
         .replace(/<style[\s\S]*?<\/style>/g, '')
-        .replace(/المرحلة [٠-٩]/g, '')
-        .replace(/المراحل [٠-٩ و]+/g, '')
       const hits = [...body.matchAll(/[^<>]{0,30}[٠-٩]+[^<>]{0,30}/g)].map((m) => m[0].trim())
       expect(hits, path).toEqual([])
     }

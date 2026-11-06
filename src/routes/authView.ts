@@ -276,13 +276,15 @@ export interface EnrolData {
 export function enrolPage(d: EnrolData, nonce: string): string {
   const csrf = html`<input type="hidden" name="_csrf" value="${d.csrf}">`
   const keys = d.passkeys.length === 0 ? '' : html`<ul class="plain">${d.passkeys.map((k) => html`<li class="split"><span>${k.label}</span>
-      <button class="btn btn-danger btn-sm pk-del" type="button" data-id="${k.id}" data-label="${k.label}">احذف</button></li>`)}</ul>`
+      <button class="btn btn-danger btn-sm pk-del" type="button" data-id="${k.id}" data-label="${k.label}"
+        data-confirm="${'أتحذف المفتاح «' + k.label + '»؟ لا يُسترجَع، والجهازُ الذي يحمله يدخل بعده برمز البريد.'}">احذف</button></li>`)}</ul>`
   const totp = d.totpConfirmed
-    ? raw('<button class="btn btn-danger" id="totp-remove" type="button">أزل رمز التطبيق</button>')
+    ? raw('<button class="btn btn-danger" id="totp-remove" type="button" data-confirm="أتُزيل رمزَ التطبيق؟ يبقى الدخولُ بمفتاح المرور ورموز الاستعادة وحدها." data-confirm-ok="أزله">أزل رمز التطبيق</button>')
     : raw('<button class="btn btn-secondary" id="totp-start" type="button">اضبط رمز التطبيق</button>')
   const recovery = d.required ? '' : html`<hr><h2 class="sec">رموز الاسترداد</h2>
     <p class="hint">${d.recoveryLeft > 0 ? html`بقي <b>${d.recoveryLeft}</b> رمزًا غير مستهلَك.` : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلًا.'}</p>
-    <button class="btn btn-secondary" id="rc-issue" type="button">${d.recoveryLeft > 0 ? 'ولّد مجموعة جديدة' : 'ولّد رموز استرداد'}</button>
+    <button class="btn btn-secondary" id="rc-issue" type="button"${raw(d.recoveryLeft > 0
+      ? ' data-confirm="أتولّد مجموعةً جديدة؟ تُبطل القديمةَ كلَّها، فلا يصلح رمزٌ منها بعد اليوم." data-confirm-ok="ولّد مجموعةً جديدة"' : '')}>${d.recoveryLeft > 0 ? 'ولّد مجموعة جديدة' : 'ولّد رموز استرداد'}</button>
     <div class="note" id="rc-msg" role="status" aria-live="polite"></div>`
   const lede = d.required
     ? html`دورُك «${d.roleName}» لا يكفيه رمز البريد: من قرأ بريدك دخل. سجّل مفتاح مرور (بصمة الوجه أو الإصبع) أو رمز تطبيق.`

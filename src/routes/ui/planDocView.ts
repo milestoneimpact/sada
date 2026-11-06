@@ -15,11 +15,12 @@ import { nativePost } from './nativePost'
 import { echo } from './echo'
 import { platformLabel } from '../../lib/oauth/providers'
 import { stamp } from '../../lib/time/zone'
+import { num } from '../../lib/format'
 import { SPAN_LABEL, spanDays } from '../../lib/plan/prompt'
 import type { ReviewCard, ReviewModel } from '../../lib/plan/review'
 import { calendar, dayLabel, shift } from './planReviewView'
 
-const AR = (n: number): string => n.toLocaleString('ar-EG')
+const AR = num
 
 export interface PlanDocData {
   readonly model: ReviewModel
