@@ -85,7 +85,7 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
   line-height:var(--lh-body); color:var(--ink); background:var(--bg); border:var(--bd);
   border-radius:var(--r-control); padding:var(--s-3) var(--s-4); resize:vertical;
   white-space:pre-wrap; word-break:break-word; overflow-y:auto}
-.draft-text:focus{outline:none; border-color:var(--focus); box-shadow:0 0 0 var(--ring-w) var(--ring)}
+.draft-text:focus{border-color:var(--focus); outline:var(--stroke) solid var(--focus); outline-offset:0; box-shadow:none}
 /* المقروءُ لا يُسحَب: مقبضُ التحجيم يظهر على أيّ عنصرٍ فيه resize، ومقبضٌ
    على نصّ لا يُحرَّر يعد بما لا يقع. */
 .draft-text.ro{background:var(--surface-3); color:var(--ink-2); resize:none}

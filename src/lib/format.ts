@@ -47,6 +47,20 @@ export function relativeTime(value: string, now: Date = new Date()): string {
   return 'قبل أكثر من سنة'
 }
 
+/**
+ * **نظامُ أرقامٍ واحد في الواجهة** (GLOSSARY «الأرقام: غربيّة» · D-147 · D-323).
+ *
+ * كانت وحدةُ الخطّة تكتب بـ`toLocaleString('ar-EG')` فتُرسَم «١ معتمَدةً من ٣» و«الأحد، ١٣ سبتمبر» بجوار «12:00»
+ * و«4 · 2 · 5» في الشاشة نفسِها. فالمحلّيّةُ العربيّةُ بأرقامٍ لاتينيّة (`ar-u-nu-latn`): أسماءُ الأيّام والأشهر عربيّة
+ * والأرقامُ كما في سائر اللوحة. و`audit_copy` يُسقط أيَّ رقمٍ هنديٍّ في نصٍّ مرسوم (صفُّ «الأرقام» في المعجم).
+ */
+export const AR_LATN = 'ar-u-nu-latn'
+
+/** عددٌ يُقرأ — بفاصل الآلاف وأرقامٍ غربيّة. */
+export function num(n: number): string {
+  return n.toLocaleString(AR_LATN)
+}
+
 /** حجمٌ بالكيلوبايت — معادلةٌ واحدةٌ لكلّ صورةٍ ومقطع (D-158). */
 export function kb(bytes: number): string {
   return `${Math.round(bytes / 1024)}KB`

@@ -167,7 +167,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     code: 'M-02',
     title: 'زوج أسرار LinkedIn يجوز فحصُه',
     ifLeft:
-      'لا يُربَط حساب ولا يُنشَر حرف. **وبوّابات المراحل ٠ و١ و٢ كلُّها تقف عليها.**',
+      'لا يُربَط حساب ولا يُنشَر حرف. **وبوّابات المراحل 0 و1 و2 كلُّها تقف عليها.**',
     unblocks: 'gate',
     done: (f) => f.appsVerified.has('linkedin') || f.linked.has('linkedin'),
     secrets: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
@@ -460,6 +460,16 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     done: () => null,
     go: 'https://dash.cloudflare.com/?to=/:account/r2',
     goLabel: 'افتح Cloudflare',
+  },
+  {
+    code: 'M-38',
+    title: 'قارئ الشاشة بالعربيّة على خمس رحلات: VoiceOver وTalkBack — بعد D-323',
+    ifLeft:
+      'اللوحة تعمل لك كما هي — تأجيلٌ لا خطر عليك. لكن لا يُقال إنّها تصلح لقارئ الشاشة: الآلة تمسك نحو نصف ما يجده الإنسان، ' +
+      '**وما بقي يقع على عميلٍ يقرأ بأذنه فيقف ولا يقول لماذا**.',
+    unblocks: 'capability',
+    // ‏الجلسةُ تقع على الهاتف بيد المالك، ولا أثرَ لها على الخادم (D-061)
+    done: () => null,
   },
 ]
 

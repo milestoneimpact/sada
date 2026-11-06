@@ -81,7 +81,7 @@ function item(r: OwnerRow, env: string, open: boolean): string {
   const opens = OPENS[r.unblocks]
   const urgent = key === 'todo' && r.unblocks === 'gate'
   return `<details class="setup task${urgent ? ' urgent' : ''}"${open ? ' open' : ''}>
-    <summary><span class="task-t">${bold(r.title)} <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></span>
+    <summary><span class="task-t" id="task-t-${escapeHtml(r.code)}">${bold(r.title)} <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></span>
       <span class="grow"></span>${statusBadge(opens.cls, '●', opens.label)} ${statusBadge(mark.cls, mark.g, mark.label)}</summary>
     <div class="setup-body">
       ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<div class="sub">${bold(r.ifLeft)}</div>
@@ -92,8 +92,8 @@ function item(r: OwnerRow, env: string, open: boolean): string {
           ? ''
           : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(r.go)}"${
               r.go.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(r.goLabel ?? 'افتح')}</a>`}
-        ${/* ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها */ ''}<a class="tap" href="${escapeHtml(taskDoc(r.code))}"
-          target="_blank" rel="noopener noreferrer" aria-label="خطوات ${escapeHtml(r.title.replaceAll('`', ''))}">الخطوات</a>
+        ${/* ‏**والخطواتُ رابطٌ لا اسمُ ملفّ** (ر-1): العناصرُ الستّةُ في الوثيقة وحدها */ ''}<a class="tap" href="${escapeHtml(taskDoc(r.code))}" id="task-s-${escapeHtml(r.code)}"
+          target="_blank" rel="noopener noreferrer" aria-labelledby="task-s-${escapeHtml(r.code)} task-t-${escapeHtml(r.code)}">الخطوات</a>
       </div>`}
     </div>
   </details>`

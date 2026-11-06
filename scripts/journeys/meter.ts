@@ -298,7 +298,7 @@ export class Meter {
     for (const message of this.pendingDialogs.splice(0)) {
       this.taps += 1
       this.steps.push({
-        n: this.steps.length + 1, kind: 'confirm', label: `حوار «${message.slice(0, 60)}» ← موافق`,
+        n: this.steps.length + 1, kind: 'confirm', label: message.includes(' ← ') ? `حوار «${message.slice(0, 80)}»` : `حوار «${message.slice(0, 60)}» ← موافق`,
         url, inView: true, scrolledPx: 0, swipes: 0, disabled: false, loaded: false, flash: null, ms: this.elapsed(), shot: '',
       })
     }
@@ -329,8 +329,25 @@ export class Meter {
     this.taps += 1
     if (this.vp.touch) await target.tap()
     else await target.click()
+    await this.confirmInPage()
     await this.settle(navs, before)
     await this.after('tap', label, url, seen, false, before, shot)
+  }
+
+  /**
+   * ‏**والتأكيدُ حوارٌ في الصفحة منذ D-323** لا نافذةُ المتصفّح: يُعَدّ كما كانت تُعَدّ النافذة — لمسةٌ وخطوةُ «تأكيد» بعد
+   * ‏الفعل الذي فتحه — ويُضغط زرُّ فعله باسمه. ولا حوارَ فلا شيء.
+   */
+  private async confirmInPage(): Promise<void> {
+    const dlg = this.page.locator('dialog#sada-cf[open]')
+    if (!(await dlg.isVisible().catch(() => false))) return
+    const message = ((await dlg.locator('.dlg-t').textContent().catch(() => '')) ?? '').trim()
+    const ok = dlg.locator('[data-cf=ok]')
+    const verb = ((await ok.textContent().catch(() => '')) ?? '').trim()
+    this.dialogs.push(`${message} ← ${verb}`)
+    if (this.counting) this.pendingDialogs.push(`${message} ← ${verb}`)
+    if (this.vp.touch) await ok.tap()
+    else await ok.click()
   }
 
   /** اختيارٌ من قائمة: خطوةٌ واحدة، ولمستان على الهاتف (تفتح القائمة ثمّ تختار). */

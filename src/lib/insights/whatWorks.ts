@@ -65,17 +65,17 @@ export interface WhatWorks {
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const BANDS: readonly { key: string; label: string; from: number; to: number }[] = [
-  { key: 'dawn', label: 'الفجر (٤–٩)', from: 4, to: 9 },
-  { key: 'morning', label: 'الضحى (٩–١٢)', from: 9, to: 12 },
-  { key: 'noon', label: 'الظهيرة (١٢–١٦)', from: 12, to: 16 },
-  { key: 'evening', label: 'المساء (١٦–٢٠)', from: 16, to: 20 },
-  { key: 'night', label: 'الليل (٢٠–٤)', from: 20, to: 28 },
+  { key: 'dawn', label: 'الفجر (4–9)', from: 4, to: 9 },
+  { key: 'morning', label: 'الضحى (9–12)', from: 9, to: 12 },
+  { key: 'noon', label: 'الظهيرة (12–16)', from: 12, to: 16 },
+  { key: 'evening', label: 'المساء (16–20)', from: 16, to: 20 },
+  { key: 'night', label: 'الليل (20–4)', from: 20, to: 28 },
 ]
 const FORMATS: Readonly<Record<Format, string>> = { text: 'نصّ', image: 'صورة', video: 'فيديو' }
 const LENGTHS: readonly { key: string; label: string; max: number }[] = [
-  { key: 'short', label: 'قصير (حتّى ٣٠٠ حرف)', max: 300 },
-  { key: 'mid', label: 'متوسّط (٣٠٠–١٢٠٠)', max: 1200 },
-  { key: 'long', label: 'طويل (فوق ١٢٠٠)', max: Infinity },
+  { key: 'short', label: 'قصير (حتّى 300 حرف)', max: 300 },
+  { key: 'mid', label: 'متوسّط (300–1200)', max: 1200 },
+  { key: 'long', label: 'طويل (فوق 1200)', max: Infinity },
 ]
 
 export function median(xs: readonly number[]): number {

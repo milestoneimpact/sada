@@ -99,7 +99,8 @@ tbody tr:last-child td{border-bottom:0}
 .gt-sw.split{background:color-mix(in srgb,var(--warn) 26%,var(--warn-wash)); border-color:var(--warn)}
 .gt-sw.mark{width:var(--s-2); height:var(--s-2); transform:rotate(45deg); background:var(--ink-2); border:0}
 @media(hover:hover){.gt-bar:hover{border-color:var(--ink-2)}}
-.gt-bar:focus-visible{outline:var(--ring-w) solid var(--ring); outline-offset:1px; z-index:2}
+/* ‏وشريطُ الخطّ الزمنيّ بحبر التركيز الصلب (D-323 · WCAG 1.4.11): الهالةُ ‏1.46:1 لا تُرى على الأرض */
+.gt-bar:focus-visible{outline:var(--stroke) solid var(--focus); outline-offset:1px; z-index:2}
 @media${below('md')}{.gt{min-inline-size:40rem} .gt-axis,.gt-row{grid-template-columns:7.5rem 1fr}
   .gt-tier{height:2.75rem} .gt-bar{min-inline-size:2.75rem}}
 .nm{font-weight:600}

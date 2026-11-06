@@ -50,7 +50,10 @@ describe('لوحة القيادة (D-194)', () => {
     expect(activityCard(facts(), NOW)).toContain('لا منشورات في أسبوعين')
     const html = activityCard(facts({ written: ['2026-10-04 08:00:00', '2026-10-04 09:00:00', '2026-10-01 09:00:00'] }), NOW)
     expect(html.match(/class="db-bar/g)).toHaveLength(14)
-    expect(html).toContain('<title>اليوم: 2</title>')
+    // ‏وعددُ اليوم مكتوبٌ فوق عموده (آخرُ الصفّ) لا في «<title>» يظهر بالفأرة وحدها (مراجعة D-323)، ويقرؤه قارئُ الشاشة من الجدول
+    expect(html).not.toContain('<title>')
+    expect(html).toMatch(/<li><span style="[^"]*">2<\/span><\/li><\/ol>/)
+    expect(html).toContain('<th scope="row">اليوم</th><td>2</td>')
     expect(html).toContain('والمجموع 3')
     expect(html).toContain('<div class="vh"><table>')
   })

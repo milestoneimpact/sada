@@ -32,8 +32,8 @@ import { dayMonth, dayRange } from '../../lib/time/zone'
 /** رقمٌ ومعه من كم صفٍّ جُمع — والفراغُ يُقال ولا يُصفَّر. */
 function sum(label: string, value: number | null, from: number, of: number): string {
   if (value === null) {
-    return `<span class="stat"><b><span class="na"
-      data-tip="لا تعطيه المنصّة لهذا الحساب">—</span></b>${escapeHtml(label)}</span>`
+    return `<span class="stat"><b><span class="na" tabindex="0"
+      data-tip="لا تعطيه المنصّة لهذا الحساب">—</span></b><span class="vh">لا تعطيه المنصّة لهذا الحساب</span>${escapeHtml(label)}</span>`
   }
   const partial = from < of ? `<span class="ago"> من ${from} من ${of}</span>` : ''
   return `<span class="stat"><b>${value}</b>${escapeHtml(label)}${partial}</span>`
@@ -128,7 +128,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
   const h = Number.isNaN(mid.getTime()) ? null : toHijri(mid)
   const season = h === null || h.season === null
     ? ''
-    : `<span class="pill" data-tip="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
+    : `<span class="pill" tabindex="0" data-tip="${escapeHtml(`${h.day} ${h.monthName} ${h.year}هـ`)}"
         >${escapeHtml(h.season)}</span>`
 
   /*
@@ -204,7 +204,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
     <div class="card-head">
       <h2>ما خرج</h2>
       <div class="grow"></div>
-      <span class="chip" data-tip="من دفتر التكلفة في هذه المدّة وحدها">
+      <span class="chip" tabindex="0" data-tip="من سجلّ الكلفة في هذه المدّة وحدها">
         أُنفق ${escapeHtml(money(r.spendUsd))}</span>
     </div>
     ${r.platforms.length === 0 ? '' : `<div class="slices">${r.platforms.map(sliceCard).join('')}</div>`}

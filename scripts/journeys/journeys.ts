@@ -701,15 +701,17 @@ const R13: Journey = {
     return 'خطّةُ شهرٍ ببندين ومسوّدتيهما تنتظران الاعتماد'
   },
   async run({ page, m, stack }) {
-    await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (٢)» في بطاقة «خطّةُ الشهر»')
+    await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (2)» في بطاقة «خطّةُ الشهر»')
     await m.tap(visible(page.locator('form[action="/panel/plan/review/approve"] button[type="submit"]')).first(), '«اعتمد» على البند الأوّل')
-    await m.tap(button(page, 'ثبّت الخطّة'), '«ثبّت الخطّة» ← موافق', { key: true })
+    // ‏والتأكيدُ حوارٌ في الصفحة بفعله (D-323) — يُعَدّ خطوةً بعد هذه في المقياس. وكان قبلها لا يظهر أصلًا: سؤالُ النموذج
+    // ‏في سكربت اللوحة وحدَه، وصفحةُ المراجعة لا تحمله، فكانت «ثبّت الخطّة» تُرسَل بلا سؤال
+    await m.tap(button(page, 'ثبّت الخطّة'), '«ثبّت الخطّة»', { key: true })
     const versions = q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM plan_versions WHERE plan_id = ? AND version = 1', r13Plan)?.n ?? 0
     const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
     const locked = q<{ locked_at: string | null }>(stack, 'SELECT locked_at FROM plans WHERE id = ?', r13Plan)?.locked_at ?? null
     return {
       success: versions === 1 && queued === 1 && locked !== null,
-      verified: `الإصدار ١ محفوظ: ${versions} · مجدول من الخطّة: ${queued} من بندٍ معتمَد · ثُبّتت ${locked === null ? 'لا' : 'نعم'}`,
+      verified: `الإصدار 1 محفوظ: ${versions} · مجدول من الخطّة: ${queued} من بندٍ معتمَد · ثُبّتت ${locked === null ? 'لا' : 'نعم'}`,
     }
   },
 }

@@ -73,3 +73,14 @@ export function segmented(label: string, name: string, options: readonly Segment
     ${buttons}
   </div>`
 }
+
+/**
+ * مبدّلُ اختصارات الحرف الواحد (D-323 · WCAG 2.1.4) — في لوح الاختصارات وفي «الضبط ← المظهر»، وسكربتُه
+ * (`SHORTCUTS_SCRIPT`) يربط النسختين ويحفظ الاختيار في المتصفّح. والافتراضُ «تعمل» كما كانت.
+ */
+export function shortcutsSwitch(): string {
+  return segmented('اختصارات الحرف الواحد', 'shortcuts', [
+    { value: 'on', label: 'تعمل', pressed: true },
+    { value: 'off', label: 'معطّلة' },
+  ])
+}

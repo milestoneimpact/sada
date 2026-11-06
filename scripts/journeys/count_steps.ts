@@ -81,6 +81,13 @@ export interface JourneyResult {
   readonly leftSite: readonly string[]
   readonly serverErrors: readonly string[]
   readonly blockedNetwork: readonly string[]
+  /** أخطاءُ الصفحة («pageerror»): ما رماه سكربتٌ ولم يُلتقَط. */
+  readonly pageErrors: readonly string[]
+  /**
+   * ‏**وما كُتم منها** (مراجعة D-323): رفضُ انتقالٍ أسقطه المتصفّحُ يكتمه سكربتُ الرأس فلا يصير «pageerror»، ويكتب سطرًا
+   * ‏في «console.debug» بعلامة «sada:vt-muted» — فيُعَدّ هنا بجوار أخطاء الصفحة، ولا يُقرأ الكتمُ منعًا.
+   */
+  readonly vtMuted: number
   readonly error: string | null
 }
 
@@ -154,16 +161,16 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
       leftSite.push(url.href)
       return route.fulfill(leftPage(url))
     }
-    // ‏بدءُ OAuth يردّ 302 إلى المنصّة — والتحويلُ لا يمرّ بالموجِّه، فيُقرأ هنا ويُوقَف
+    // ‏بدءُ OAuth يردّ 302 إلى المنصّة — والتحويلُ لا يمرّ بالموجِّه، فيُقرأ هنا ويُعاد **تحويلًا** كما يردّه الخادم: فيتبعه المتصفّح
+    // ‏إلى أصل المنصّة، ويُسجَّل ويُوقَف في فرع العنوان الخارجيّ أعلاه. وكانت صفحةُ «غادر الموقع» تُردّ هنا على المسار المحلّيّ
+    // ‏نفسِه — مستندًا من أصلنا بلا «@view-transition» — فيُسقط المتصفّحُ الانتقالَ بين المستندين ويرمي «Transition was aborted
+    // ‏because of invalid state. ViewTransition opt-in disabled» خطأَ صفحةٍ في ر-1 لا يقع في الإنتاج (D-323)
     if (/^\/oauth\/[^/]+\/start$/.test(url.pathname)) {
       const response = await route.fetch({ maxRedirects: 0 })
       const location = response.headers()['location']
       if (response.status() >= 300 && response.status() < 400 && location !== undefined) {
         const to = new URL(location, url)
-        if (to.hostname !== 'localhost') {
-          leftSite.push(to.href)
-          return route.fulfill(leftPage(to))
-        }
+        if (to.hostname !== 'localhost') return route.fulfill({ status: response.status(), headers: { location: to.href } })
       }
       return route.fulfill({ response })
     }
@@ -172,6 +179,8 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
   const page = await context.newPage()
   const pageErrors: string[] = []
   page.on('pageerror', (e) => pageErrors.push(e.message))
+  let vtMuted = 0
+  page.on('console', (msg) => { if (msg.type() === 'debug' && msg.text().startsWith('sada:vt-muted')) vtMuted += 1 })
 
   const rel = join('shots', vp.name, journey.id.replace(/[^\w-]+/g, '_'))
   const dir = join(out, rel)
@@ -198,6 +207,7 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
   const ms = m.elapsed()
   await context.close()
   if (pageErrors.length > 0) m.note(`أخطاء الصفحة: ${pageErrors.slice(0, 3).join(' · ')}`)
+  if (vtMuted > 0) m.note(`انتقالٌ أسقطه المتصفّحُ فكُتم رفضُه: ${vtMuted}`)
 
   return {
     id: journey.id,
@@ -227,6 +237,8 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
     leftSite,
     serverErrors: stack.errors.splice(0).map((e) => `${e.path}: ${e.message.split('\n')[0]}`),
     blockedNetwork: stack.calls.filter((c) => c.answeredBy === 'blocked').map((c) => `${c.method} ${c.url}`),
+    pageErrors,
+    vtMuted,
     error,
   }
 }
@@ -292,6 +304,13 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
     lines.push(`| **${id}** ${any?.title ?? ''} | ${any?.plan.today ?? ''} ← ${any?.plan.target ?? ''} | ${cell(p, row)} | ${cell(d, row)} |`)
   }
   if (baseline !== null) lines.push(...comparison(results, baseline.data, baseline.path))
+
+  // ‏أخطاءُ الصفحة وما كُتم منها — رقمان متجاوران لا رقمٌ واحد (مراجعة D-323)
+  const erred = results.filter((r) => r.pageErrors.length > 0)
+  const muted = results.filter((r) => r.vtMuted > 0)
+  lines.push('', '## أخطاء الصفحة وما كُتم', '')
+  lines.push(`- **أخطاء الصفحة** («pageerror»): ${erred.reduce((n, r) => n + r.pageErrors.length, 0)} في ${erred.length} من ${results.length} رحلة${erred.length === 0 ? '' : ` (${erred.map((r) => `${r.id} ${r.viewport.split(' ')[0]}`).join('، ')})`}.`)
+  lines.push(`- **انتقالٌ أسقطه المتصفّحُ فكُتم رفضُه** (\`sada:vt-muted\`، سكربتُ الرأس): ${muted.reduce((n, r) => n + r.vtMuted, 0)} في ${muted.length} من ${results.length} رحلة${muted.length === 0 ? '' : ` (${muted.map((r) => `${r.id} ${r.viewport.split(' ')[0]}`).join('، ')})`}. يقع ولا يُرى: لا يكسر شيئًا، ويُعَدّ هنا كي لا يُقرأ الكتمُ منعًا.`)
 
   // ‏ر-2 كما وقع: أين يقف مالكٌ على الهاتف
   const stop = by('R-2·stop', 'phone')

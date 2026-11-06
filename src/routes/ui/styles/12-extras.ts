@@ -139,7 +139,21 @@ details[open]:not(.more-sheet):not(.menu)::details-content{height:auto; opacity:
 }
 .topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before,nav.back [data-tip]::before,nav.back .btn-icon[aria-label]::before{
   inset-block-end:auto; inset-block-start:calc(100% + var(--s-2)); translate:calc(var(--dir) * 50%) calc(-1 * var(--s-1))}
-html[data-tip-off] [data-tip]::before,html[data-tip-off] .btn-icon[aria-label]::before{display:none; opacity:0; transition-delay:0s}
+/* ‏**ومتى جرى السكربتُ حلّ محلَّ الزائف عنصرٌ يُمسَك** (D-323 · WCAG 1.4.13): الزائفُ بلا أحداثِ مؤشّر وبينه وبين مرجعه
+   فجوة، فمن حرّك المؤشّرَ إليه اختفى، ولا يظهر باللمس. فـ«data-tipjs» على الجذر يُطفئه، و«.tip» أدناه هو التلميح */
+html[data-tipjs] [data-tip]::before,html[data-tipjs] .btn-icon[aria-label]::before{display:none; opacity:0; transition-delay:0s}
+/* ‏والتلميحُ عنصرٌ واحدٌ مثبَّتٌ يضعه السكربتُ فوق مرجعه أو تحته، **ويستقبل المؤشّر** فيبقى والمؤشّرُ عليه، بالوزن ‏400 من
+   زوج الوزنين المعلَن (‏500 كان خارجه فيسقط إلى ‏400 أصلًا)، ويدخل بتلاشٍ من جهة مرجعه ويسقط مع تقليل الحركة.
+   **وجانباه «auto» لا صفر** (مراجعة D-323): السكربتُ يكتب «left» من إحداثيّ النافذة، و«inset-inline-start:0» كان «right:0» في
+   الصفحة العربيّة — فـ«left» و«width» و«right» معًا فوق القيد، والمتصفّحُ يُسقط «left» في كتلةٍ من اليمين، **فلصق كلُّ تلميحٍ
+   حافّةَ الشاشة اليمنى** (‏1218–1280 لجرسٍ عند ‏393–437)، بعيدًا عن هدفه فلا يبلغه المؤشّر. و«audit_a11y» يقيس التداخل */
+.tip{position:fixed; z-index:60; inset-block-start:0; inset-inline:auto; width:max-content; max-width:min(18rem,calc(100vw - 2 * var(--s-2)));
+  padding:var(--s-1) var(--s-2); border-radius:var(--r-control); background:var(--ink); color:var(--surface);
+  font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:400; text-align:center; white-space:normal; overflow-wrap:anywhere;
+  box-shadow:var(--sh-2); pointer-events:auto; opacity:1; translate:0 0;
+  transition:opacity var(--dur-1) var(--ease), translate var(--dur-1) var(--ease), display var(--dur-1) allow-discrete}
+.tip[hidden]{display:none; opacity:0}
+@starting-style{.tip{opacity:0; translate:0 var(--s-1)} .tip[data-side=below]{translate:0 calc(-1 * var(--s-1))}}
 /* ‏والروابطُ تردّ بانتقالٍ لا بقفزة (والمقطعُ في قاعدته في 08-sections) */
 a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease)}
 @media(prefers-reduced-motion:reduce){
@@ -188,6 +202,13 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   overflow-wrap:anywhere}
 .chip.bad{color:var(--bad); background:var(--bad-wash);
   border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
+/* ‏‏والخطأُ الطويلُ سطرٌ يُفتح لا تلميح (D-323): الرقاقةُ رأسُه بهدف لمسٍ كامل، والنصُّ كاملًا تحته يلتفّ ولا يُقصّ.
+   ووصفُ الصورة في ذيلها على النمط نفسِه */
+.ax-err,.pic-desc{min-width:0; max-width:100%}
+.ax-err>summary,.pic-desc>summary{display:inline-flex; align-items:center; min-height:var(--tap); cursor:pointer; list-style:none}
+.ax-err>summary::-webkit-details-marker,.pic-desc>summary::-webkit-details-marker{display:none}
+.ax-err>p,.pic-desc>p{max-width:var(--measure); overflow-wrap:anywhere}
+.pic-desc[open]{flex-basis:100%}
 
 /* ── اليومُ الأوّل (D-108) ─────────────────────────────────────────────
    خطوات مرقّمة لا بطاقات: **الترتيب هو المعلومة** — كلّ خطوة تفتح
@@ -232,12 +253,12 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   border-radius:var(--r-card); box-shadow:var(--sh-3); overflow:hidden}
 .cmdk-in{display:flex; align-items:center; gap:var(--s-3);
   padding:var(--s-3) var(--s-4); border-bottom:var(--bd)}
-.cmdk-in input{flex:1; min-width:0; min-height:var(--tap); border:0; background:none; outline:none;
+.cmdk-in input{flex:1; min-width:0; min-height:var(--tap); border:0; background:none;
   font:inherit; font-size:var(--t-input); line-height:var(--lh-input); color:var(--ink)}
 .cmdk-in input::placeholder{color:var(--ink-3)}
-/* الحقلُ بلا حدٍّ فلا يتبدّل لونُه عند التركيز؛ خيطٌ تحته بحبر التركيز يقول «هنا» (D-149) —
-   وكان نحاسيًّا، فصار حبر التركيز نفسَه (D-187) */
-.cmdk-in:focus-within{box-shadow:inset 0 calc(-1 * var(--stroke)) 0 var(--focus)}
+/* ‏الحقلُ بلا حدٍّ فلا يتبدّل لونُه عند التركيز، **وحلقتُه حلقةُ كلّ حقل** (مراجعة D-323): كان «outline:none» هنا يغلب
+   «input:focus» (التحديدُ نفسُه وبعده في الورقة) فبقي خيطٌ ‏2px تحت السطر وحدَه (D-149 · D-187) — لا مساحةَ محيطٍ ولا أثرَ في
+   الوضع القسريّ (WCAG 2.4.13). فصار خطًّا صلبًا ‏2px حول الحقل بحبر التركيز، وسقط الخيطُ: خطّان متوازيان يقولان «هنا» مرّتين */
 .cmdk-l{flex:1; margin:0; padding:var(--s-2); list-style:none; overflow-y:auto}
 .cmdk-g{padding:var(--s-3) var(--s-3) var(--s-1); font-size:var(--t-caption);
   line-height:var(--lh-caption); font-weight:600; color:var(--ink-2)}
@@ -312,7 +333,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .pb-card[data-platform="linkedin"]{border-inline-start-color:var(--link)}
 .pb-card[data-platform="x"]{border-inline-start-color:var(--ink)}
 @media(hover:hover){.pb-board[data-mode="board"] .pb-card:hover{transform:translateY(calc(-1 * var(--s-0))) rotateX(3deg); box-shadow:var(--sh-2)}}
-.pb-card:focus-visible{box-shadow:0 0 0 var(--ring-w) var(--ring)}
+.pb-card:focus-visible{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
 .pb-card.dragging{opacity:.35}
 .pb-card.landed{animation:pb-land var(--dur-3) var(--ease-rise)}
 @keyframes pb-land{from{transform:scale(.96)} to{transform:none}}
@@ -438,7 +459,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-opt input{position:absolute; top:var(--s-5); inset-inline-end:var(--s-4); margin:0; accent-color:var(--brand)}
 @media(hover:hover){.wz-opt:hover,.wz-pill:hover,.wz-src:hover{border-color:var(--ink-3)}}
 .wz-opt:has(input:checked){border-color:var(--brand); background:var(--selected); box-shadow:0 0 0 var(--stroke) color-mix(in srgb,var(--brand) 30%,transparent)}
-.wz-opt:has(:focus-visible),.wz-pill:has(:focus-visible),.wz-src:has(:focus-visible),.wz-drop:has(:focus-visible){box-shadow:0 0 0 var(--ring-w) var(--ring)}
+.wz-opt:has(:focus-visible),.wz-pill:has(:focus-visible),.wz-src:has(:focus-visible),.wz-drop:has(:focus-visible){outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
 .wz-big{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
 .wz-sub{font-weight:600; color:var(--brand)}
 .wz-pf{margin:0; padding:var(--s-4)}

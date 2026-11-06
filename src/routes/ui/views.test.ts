@@ -64,6 +64,13 @@ const READY = {
 }
 
 /**
+ * ‏شارةُ الجاهزيّة كما تُرسَم (D-323): الاسمُ ثمّ حالُه نصًّا بعده، والتلميحُ على شارةٍ تأخذ التركيز. كانت هذه الاختباراتُ
+ * ‏تطلب الاسمَ وحدَه والحالَ في التلميح — وهو ما كان يجعل الحالَ لونًا ورمزًا مخفيًّا عن قارئ الشاشة.
+ */
+const rung = (title: string, note: string): string =>
+  statusBadge('ok', '●', `${title}: تامّة`, `tabindex="0" data-tip="تامّة — ${note}"`)
+
+/**
  * الورقةُ تُسأل قواعدَ لا نصًّا (N-13): المحدّدُ في سياقه وقيمتُه الساريةُ
  * بترتيب المصدر — فلا يُسقط الاختبارَ تعليقٌ ولا إعادةُ لفّ، ولا تجتازه قاعدةٌ
  * خرجت من كتلتها أو قائمةٌ لاحقةٌ غلبت. **وهي المعلَنُ لا المحسوب**: لا
@@ -401,9 +408,9 @@ describe('المفتاح لا يُعرَض — الاسم يُعرَض (D-125)',
     expect(audit('anthropic')).toContain('<span class="chip">Anthropic</span>')
     expect(audit('x')).toContain('<span class="chip">X</span>')
     expect(audit('d-42')).toContain('<span class="chip">d-42</span>')
-    // ‏والفعلُ بالعربيّة وحدَه، ومفتاحُه في العنوان لمن سأل لا سطرًا تحته (D-202)
+    // ‏والفعلُ بالعربيّة وحدَه (D-202)، ولا مفتاحَه في تلميحٍ كذلك (D-323): كلمةُ الشيفرة في وجه المالك
     expect(audit('x')).not.toContain('<div class="mono">provider.key</div>')
-    expect(audit('x')).toContain('data-tip="provider.key"')
+    expect(audit('x')).not.toContain('provider.key')
   })
 
   /**
@@ -444,9 +451,10 @@ describe('الورق أبيض في الثيمين (D-125)', () => {
  * يُعطَّل لحظةَ يُركَّز على القائمة فيقفز عنه `Tab`، ورابطُ العودة ‏٤٠px عرضا.
  */
 describe('ما مشاه Tab (D-125)', () => {
-  it('حلقة محرّر المسوّدة ظلّ مقيس لا لون في مكان ظلّ', () => {
+  // ‏وصارت خطًّا صلبًا لا هالة (D-323 · WCAG 2.4.13): الهالةُ ربعُ شفافيّة ‏1.46:1 وتُمحى في الألوان القسريّة
+  it('حلقة محرّر المسوّدة خطٌّ صلبٌ بحبر التركيز لا هالةٌ ولا لون في مكان ظلّ', () => {
     expect(css.rule('.draft-text:focus')).toMatchObject({
-      outline: 'none', 'border-color': 'var(--focus)', 'box-shadow': '0 0 0 var(--ring-w) var(--ring)',
+      outline: 'var(--stroke) solid var(--focus)', 'border-color': 'var(--focus)', 'box-shadow': 'none',
     })
     expect(found((d) => d.prop === 'box-shadow' && d.value === 'var(--ring)')).toEqual([])
   })
@@ -979,7 +987,9 @@ describe('ما وراء المقاييس (D-149)', () => {
     }
     expect(found((d) => d.prop.startsWith('text-decoration') && d.value.includes('var(--au)'))).toEqual([])
     expect(css.rule('.pv th a')['text-decoration']).toBe('underline')
-    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 calc(-1 * var(--stroke)) 0 var(--focus)')
+    // ‏و«هنا» حلقةُ الحقل نفسُها لا خيطٌ تحت السطر وحدَه (مراجعة D-323 · WCAG 2.4.13): «outline:none» كان يُطفئها
+    expect(css.rule('.cmdk-in input').outline).toBeUndefined()
+    expect(css.rule('input:focus').outline).toBe('var(--stroke) solid var(--focus)')
     expect(css.where('.busy-note')).toContain('')
   })
   it('الرموز: لا زمرّد في الوهج بصيغة rgba، والتاريخ في مفتاح الرسم معزول، والرقم المحلّيّ غربيّ في كلّ ICU', () => {
@@ -1155,10 +1165,10 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
     expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(info)
     expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
     expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
-    expect(box).toContain(statusBadge('ok', '●', 'المتصفّح', 'data-tip="تامّة — يصوّر الصفحة"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الصياغة', 'data-tip="تامّة — نموذج الكتابة يستخرج المحتوى"'))
-    expect(box).toContain(statusBadge('ok', '●', 'الحدود', 'data-tip="تامّة — مفتوحة اليوم"'))
-    expect(box).toContain(statusBadge('ok', '●', 'المزوّد', 'data-tip="تامّة — Gemini"'))
+    expect(box).toContain(rung('المتصفّح', 'يصوّر الصفحة'))
+    expect(box).toContain(rung('الصياغة', 'نموذج الكتابة يستخرج المحتوى'))
+    expect(box).toContain(rung('الحدود', 'مفتوحة اليوم'))
+    expect(box).toContain(rung('المزوّد', 'Gemini'))
     expect(box).toContain('<b>إنفوجرافيك من نصّ المنشور</b>')
     // ‏والزرّان يرسلان نمطَهما — والدالّةُ تأخذ الإنفوجرافيك حين يغيب
     expect(box).toContain('<input type="hidden" name="style" value="infographic">')
@@ -1188,7 +1198,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
   it('وسطر المقطع بعد «حرّكها فيديو» — ولا زرّ ولا سطر حين يوجد مقطع', () => {
     const noClip = section([draft('d1')], { media: [picture('d1')] })
     expect(noClip).toContain('حرّكها فيديو')
-    expect(noClip.indexOf(statusBadge('ok', '●', 'المفتاح', 'data-tip="تامّة — من أسرار Worker"')))
+    expect(noClip.indexOf(rung('المفتاح', 'من أسرار Worker')))
       .toBeGreaterThan(noClip.indexOf('حرّكها فيديو'))
 
     const withClip = section([draft('d1')], { media: [picture('d1'), picture('d1', 'video/mp4')] })
@@ -1250,7 +1260,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
 
     const under = section([draft('d1')], { media: [picture('d1')] })
     expect(under).toContain('<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>')
-    expect(under).toContain(statusBadge('ok', '●', 'المقاطع', 'data-tip="تامّة — بقي 2 من 2 اليوم"'))
+    expect(under).toContain(rung('المقاطع', 'بقي 2 من 2 اليوم'))
   })
 
   it('واسم المزوّد يكتبه المالك — فيُهرَّب في النقطة والسبب', () => {
@@ -1368,8 +1378,8 @@ describe('D-167 — الجوّال واللمس والرموز', () => {
   })
 
   it('واسم الملفّ معزول بلا امتداده، وكامل في العنوان (خطّة التصميم 4.4/8)', () => {
-    expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi data-tip="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
-    expect(fileName('<x>')).toBe('<bdi data-tip="&lt;x&gt;">&lt;x&gt;</bdi>')
+    expect(fileName('تقرير الأثر السنويّ 2026.docx')).toBe('<bdi tabindex="0" data-tip="تقرير الأثر السنويّ 2026.docx">تقرير الأثر السنويّ 2026</bdi>')
+    expect(fileName('<x>')).toBe('<bdi tabindex="0" data-tip="&lt;x&gt;">&lt;x&gt;</bdi>')
   })
 
   it('والجانب منطقيّ: الفاصل في نهاية السطر، والطبقة بعرض الرابط، والمحاذاة بداية', () => {

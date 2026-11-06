@@ -11,6 +11,7 @@
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
 import { html, raw } from './ui/html'
+import { agoTag } from './ui/time'
 import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
@@ -32,9 +33,10 @@ import type { StoredPlan } from '../lib/plan/job'
 import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
+import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
-import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
@@ -564,7 +566,7 @@ export function worthCell(worth: number | null): string {
   if (worth === null) return statusBadge('idle', '○', 'لم يُحلَّل')
   const p = Math.round(worth * 100)
   const shade = worth >= 0.66 ? 'var(--ink)' : worth >= 0.33 ? 'var(--ink-2)' : 'var(--ink-3)'
-  return `<div class="worth" data-tip="درجة الاستحقاق ${worth.toFixed(2)} من 1">
+  return `<div class="worth" tabindex="0" data-tip="درجة الاستحقاق ${worth.toFixed(2)} من 1">
     <div class="track"><span class="fill" style="width:${p}%;background:${shade}"></span></div>
     <span class="val">${worth.toFixed(2)}</span></div>`
 }
@@ -615,7 +617,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
     <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
-    <td data-label="آخر ظهور"><span data-tip="${escapeHtml(stamp(s.lastSeenAt, zone))}">${escapeHtml(relativeTime(s.lastSeenAt, now))}</span></td>
+    <td data-label="آخر ظهور">${agoTag(s.lastSeenAt, now, zone)}</td>
     <td data-label="">${acts === '' ? '<span class="mono">—</span>' : `<div class="row acts">${acts}</div>`}</td>
   </tr>`
 }
@@ -1222,11 +1224,13 @@ function settingsPane(d: ShellData & SettingsData): string {
   ${pageHead('الضبط', sectionLabel('settings'), 'ما يُفتح نادرًا: <b>سقوف الإنفاق تُطبَّق قبل أيّ نداء مدفوع</b>، والمفاتيح لا تُعرض كاملة، والدخول بعاملين.')}
   ${settingsTabs(missing, ownerView)}
   <div data-sub id="appearance">
-  <p class="hint">كيف تبدو اللوحة لك. <b>والسمة والكثافة تُحفظان في هذا المتصفّح وحده</b>، وبطاقات اللوح في حسابك.</p>
-  <div class="card"><h2>السمة والكثافة</h2>
+  <p class="hint">كيف تبدو اللوحة لك. <b>والسمة والكثافة والاختصارات تُحفظ في هذا المتصفّح وحده</b>، وبطاقات اللوح في حسابك.</p>
+  <div class="card"><h2>السمة والكثافة والاختصارات</h2>
     <div class="split"><p><b>السمة</b>: «النظام» يتبع جهازَك نهارًا وليلًا.</p>${themeSwitch(false)}</div>
     <hr>
     <div class="split"><p><b>الكثافة</b>: «مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p>${densitySwitch(false)}</div>
+    <hr>
+    <div class="split"><p><b>اختصارات الحرف الواحد</b>: J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p>${shortcutsSwitch()}</div>
   </div>
   ${tilePicker(d)}
   </div>
@@ -1424,7 +1428,7 @@ ${ownerView ? `<div data-sub id="security-all">
       : 'غير مضبوط. اضبطه طريق رجوع إن فقدت مفتاح المرور.'}</p>
     <div class="row">
       ${d.factors.totpConfirmed
-        ? '<button class="btn btn-danger" id="totp-remove" type="button">أزل رمز التطبيق</button>'
+        ? '<button class="btn btn-danger" id="totp-remove" type="button" data-confirm="أتُزيل رمزَ التطبيق؟ يبقى الدخولُ بمفتاح المرور ورموز الاستعادة وحدها." data-confirm-ok="أزله">أزل رمز التطبيق</button>'
         : '<button class="btn btn-secondary" id="totp-start" type="button">اضبط رمز التطبيق</button>'}
     </div>
     <div id="totp-box" hidden>
@@ -1445,8 +1449,10 @@ ${ownerView ? `<div data-sub id="security-all">
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
     <div class="row">
-      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button">
-        ${d.factors.recoveryLeft > 0 ? 'ولّد مجموعةً جديدة' : 'ولّد رموز استرداد'}</button>
+      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button" data-renew-ask="${escapeHtml(RC_RENEW.ask)}" data-renew-ok="${escapeHtml(RC_RENEW.ok)}"${d.factors.recoveryLeft > 0
+        // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا — وما يُولَّد في الصفحة يُضيف السؤالَ سكربتُها
+        ? ' data-confirm="' + escapeHtml(RC_RENEW.ask) + '" data-confirm-ok="' + escapeHtml(RC_RENEW.ok) + '"' : ''}>
+        ${d.factors.recoveryLeft > 0 ? RC_RENEW.ok : 'ولّد رموز استرداد'}</button>
     </div>
     <div id="rc-box" hidden><div class="codes" id="rc-list"></div>
       <div class="note"><b>انسخها الآن.</b> لن تُعرض ثانية. والتوليد الجديد يُبطل القديمة كلَّها.</div></div>

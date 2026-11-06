@@ -5,6 +5,7 @@
  * باسمه الحرفيّ لا بـ«غير معروف». سجلٌّ يُخفي ما لا يفهمه ليس سجلّا.
  */
 import { stamp } from '../../../lib/time/zone'
+import { agoTag } from '../time'
 import { relativeTime } from '../../../lib/format'
 import type { PanelData } from '../../panelView'
 import { escapeHtml } from '../escape'
@@ -49,7 +50,7 @@ export function securitySection(d: SecurityData): SecurityMarkup {
       x.current ? html` <span class="chip">هذا الجهاز</span>` : ''}${
       x.via === 'passkey' ? html` <span class="chip">مفتاح مرور</span>` : x.via === 'email_code' ? html` <span class="chip">رمز البريد</span>` : ''}</div>
       <div class="mono">${x.ip === '' ? 'عنوان غير معروف' : x.ip}</div></td>
-    <td data-label="فُتحت"><span data-tip="${stamp(x.at, d.zone ?? null)}">${relativeTime(x.at, d.now)}</span></td>
+    <td data-label="فُتحت">${raw(agoTag(x.at, d.now, d.zone ?? null))}</td>
     <td data-label="">${x.current
       ? raw(statusBadge('ok', '●', 'جلستك'))
       : html`<form class="inline" method="POST" action="/panel/sessions/revoke"
@@ -60,18 +61,18 @@ export function securitySection(d: SecurityData): SecurityMarkup {
 
   const passkeys = join(d.factors.passkeys.map((k) => html`<tr>
     <td><div class="nm">${k.label}</div></td>
-    <td data-label="سُجّل"><span data-tip="${stamp(k.createdAt, d.zone ?? null)}">${relativeTime(k.createdAt, d.now)}</span></td>
+    <td data-label="سُجّل">${raw(agoTag(k.createdAt, d.now, d.zone ?? null))}</td>
     <td data-label="آخر استعمال">${k.lastUsedAt === null
       ? raw(statusBadge('idle', '○', 'لم يُستعمل'))
-      : html`<span data-tip="${stamp(k.lastUsedAt, d.zone ?? null)}">${relativeTime(k.lastUsedAt, d.now)}</span>`}</td>
+      : raw(agoTag(k.lastUsedAt, d.now, d.zone ?? null))}</td>
     <td><button class="btn btn-danger btn-sm pk-del" type="button" data-id="${k.id}"
-          data-label="${k.label}">احذف</button></td>
+          data-label="${k.label}" data-confirm="${'أتحذف المفتاح «' + k.label + '»؟ لا يُسترجَع، والجهازُ الذي يحمله يدخل بعده برمز البريد.'}">احذف</button></td>
   </tr>`))
 
   // ‏`pathArrows` تأخذ نصًّا مهرَّبًا وتُدخل أسهمَها وسومًا، فمخرَجُها موثوق (D-281)
   const audit = join(d.audit.map((a) => html`<tr>
-    <td><span data-tip="${stamp(a.at, d.zone ?? null)}">${relativeTime(a.at, d.now)}</span></td>
-    <td data-label="الفعل"><div class="nm" data-tip="${a.action}">${actionLabel(a.action)}</div>${
+    <td>${raw(agoTag(a.at, d.now, d.zone ?? null))}</td>
+    ${/* ‏ومفتاحُ الفعل («provider.key») لا تلميحَ له (D-323): كلمةُ الشيفرة في وجه المالك، والاسمُ العربيُّ يكفيه */ ''}<td data-label="الفعل"><div class="nm">${actionLabel(a.action)}</div>${
       a.byEmail === undefined || a.byEmail === null ? '' : html`<div class="sub"><bdi dir="ltr">${a.byEmail}</bdi></div>`}</td>
     <td data-label="على ماذا">${a.target === null ? html`<span class="mono">—</span>` : html`<span class="chip">${targetLabel(a.target)}</span>`}
       ${a.detail === null ? '' : html`<div class="sub">${raw(pathArrows(escapeHtml(a.detail)))}</div>`}</td>

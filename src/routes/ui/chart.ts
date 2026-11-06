@@ -197,7 +197,11 @@ export function historyBars(
  * أعمدةُ الأيّام (D-265) — **عددٌ حقيقيٌّ لكلّ يوم، والزمنُ بترتيبه**.
  *
  * رسمٌ من الخادم بـ SVG بلا سكربت: العمودُ ينمو بـ CSS (ويقف مع تقليل الحركة)،
- * وقيمتُه في `<title>` للتمرير، والخلاصةُ سطرٌ مكتوبٌ تحته (فاللمسُ لا يمرّر)، **وجدولٌ مخفيٌّ لقارئ الشاشة**.
+ * **وقيمتُه مكتوبةٌ فوقه** لا في `<title>` (مراجعة D-323): العنوانُ يظهر بالفأرة وحدها، فكان عددُ ‏12 يومًا من ‏14 لا
+ * يُعرف على الهاتف ولا بلوحة المفاتيح. والأرقامُ صفٌّ من HTML فوق الرسم (`.db-vals`) لا نصٌّ في SVG: الرسمُ يتمدّد بعرضه
+ * (`preserveAspectRatio="none"`) فيتمدّد نصُّه معه؛ وأعمدةُ الصفّ بعرض الأعمدة وفجوتُها نسبتُها من الرسم نفسِه، والارتفاعُ
+ * نسبةٌ من ارتفاعه. والصفرُ بلا رقم: عمودُه خطٌّ مسطّح. والخلاصةُ سطرٌ مكتوبٌ تحته، **وجدولٌ مخفيٌّ لقارئ الشاشة**
+ * (والأرقامُ فوق الأعمدة مخفيّةٌ عنه: الجدولُ يقولها بأيّامها).
  * ومجموعٌ صفرٌ لا يُرسَم أعمدةً مسطّحة: يُقال إنّه لا شيء بعد، برسمٍ صغير.
  */
 export function dayBars(
@@ -211,19 +215,28 @@ export function dayBars(
   const max = Math.max(...rows.map((r) => r.value))
   const w = 28, gap = 12, top = 22, h = 120
   const width = rows.length * (w + gap) - gap
+  const tall = top + h + 2
+  const heights = rows.map((r) => (r.value === 0 ? 2 : Math.max(6, Math.round((r.value / max) * h))))
   const bars = rows.map((r, i) => {
-    const bh = r.value === 0 ? 2 : Math.max(6, Math.round((r.value / max) * h))
+    const bh = heights[i]!
     const x = width - (i + 1) * (w + gap) + gap // ‏الأقدمُ يمينًا: يُقرأ الزمنُ من اليمين
     const y = top + h - bh
-    return `<g class="db-bar${r.value === 0 ? ' zero' : ''}" style="--i:${i}"><title>${escapeHtml(`${r.label}: ${r.value}`)}</title>
+    return `<g class="db-bar${r.value === 0 ? ' zero' : ''}" style="--i:${i}">
       <rect x="${x}" y="${y}" width="${w}" height="${bh}" rx="6"></rect>
 </g>`
   }).join('')
+  // ‏الرقمُ فوق عموده: الصفُّ عمودٌ لكلّ يوم (والأوّلُ يمينًا كالرسم)، والفجوةُ نسبتُها من عرضه، والرقمُ يعلو رأسَ العمود بأربع بكسلات
+  const vals = rows.map((r, i) => r.value === 0
+    ? '<li></li>'
+    : `<li><span style="inset-block-end:calc(${(((heights[i]! + 2) / tall) * 100).toFixed(1)}% + var(--s-1))">${r.value}</span></li>`).join('')
   const peak = rows.reduce((a, b) => (b.value > a.value ? b : a))
   const summary = `${rows.length} يومًا، والمجموع ${total}، وأعلاها ${peak.label} بـ${peak.value}`
   return `<figure class="chart daybars">
-    <svg class="db-svg" viewBox="0 0 ${width} ${top + h + 2}" role="img" aria-label="${escapeHtml(summary)}" preserveAspectRatio="none">
+    <div class="db-plot">
+    <svg class="db-svg" viewBox="0 0 ${width} ${tall}" role="img" aria-label="${escapeHtml(summary)}" preserveAspectRatio="none">
       <line class="db-base" x1="0" y1="${top + h + 1}" x2="${width}" y2="${top + h + 1}"></line>${bars}</svg>
+    <ol class="db-vals" aria-hidden="true" style="--db-gap:${((gap / width) * 100).toFixed(2)}%">${vals}</ol>
+    </div>
     <figcaption class="db-axis" aria-hidden="true"><span>${escapeHtml(rows[0]!.label)}</span><span>${escapeHtml(rows[rows.length - 1]!.label)}</span></figcaption>
     <p class="hint">${escapeHtml(summary)}</p>
     <div class="vh"><table><caption>${escapeHtml(summary)}</caption><tbody>${rows.map((r) =>

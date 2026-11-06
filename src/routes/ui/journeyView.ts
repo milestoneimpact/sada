@@ -75,7 +75,7 @@ function stationRow(s: Station, now: Date, platform: string): string {
   const go = stationHref(s.kind, platform)
   const cost = s.cost === null
     ? ''
-    : `<span class="chip mono" data-tip="ما دُفع في هذه المحطّة">${escapeHtml(money(s.cost))}</span>`
+    : `<span class="chip mono" tabindex="0" data-tip="ما دُفع في هذه المحطّة">${escapeHtml(money(s.cost))}</span>`
 
   return `<li class="stop ${s.state}">
     <span class="stop-mark" aria-hidden="true">${MARK[s.kind]}</span>

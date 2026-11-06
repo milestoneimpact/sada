@@ -26,7 +26,7 @@
 import { html, raw, type Html } from './html'
 import { pageHead } from './parts'
 import { LOGOS } from './logos'
-import { money } from '../../lib/format'
+import { AR_LATN, money, num } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { panelHref } from '../../lib/nav/panes'
 import { UPLOAD_EXTENSIONS } from '../../lib/sources/ingest'
@@ -54,7 +54,6 @@ const PACES = [
 ] as const
 
 const STEPS = ['الفترة', 'المنصّات', 'المحتوى', 'المراجعة'] as const
-const DIGITS = ['١', '٢', '٣', '٤'] as const
 
 export interface PlanNewSource {
   readonly id: string
@@ -87,18 +86,18 @@ export interface PlanNewData {
   readonly canAdd?: boolean
 }
 
-const AR = (n: number): string => n.toLocaleString('ar-EG')
+const AR = num
 
 /** «الأحد ٨ نوفمبر» — يومُ البداية كما يُقرأ، لا `2026-11-08`. */
 function startLabel(day: string): string {
   const at = new Date(day + 'T12:00:00Z')
-  return Number.isNaN(at.getTime()) ? day : at.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+  return Number.isNaN(at.getTime()) ? day : at.toLocaleDateString(AR_LATN, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 }
 
 const KIND_LABEL: Readonly<Record<string, string>> = { drive: 'Drive', upload: 'مرفوع', url: 'رابط' }
 
 function stepHead(n: number, title: string, lede: string): Html {
-  return html`<header class="wz-head"><span class="wz-k">الخطوة ${DIGITS[n - 1] ?? ''} من ٤</span>
+  return html`<header class="wz-head"><span class="wz-k">الخطوة ${n} من 4</span>
     <h2 id="wz-t${String(n)}">${title}</h2><p class="hint m-0">${lede}</p></header>`
 }
 
@@ -205,9 +204,9 @@ function blocker(d: PlanNewData, shown: readonly PlanPlatform[]): Html | null {
       <a class="btn btn-secondary btn-sm" href="${panelHref('providers')}">اضبط المزوّد</a>`
   }
   if (d.sources.length < 2) {
-    return html`<p class="m-0">${d.sources.length === 0 ? 'لا مصدر محلَّل بعد' : 'مصدرٌ واحد محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ. أضف ملفًّا أو رابطًا في الخطوة ٣.</p>`
+    return html`<p class="m-0">${d.sources.length === 0 ? 'لا مصدر محلَّل بعد' : 'مصدرٌ واحد محلَّل'} — والخطّةُ تحتاج اثنين على الأقلّ. أضف ملفًّا أو رابطًا في الخطوة 3.</p>`
   }
-  if (shown.length === 0) return html`<p class="m-0">اربط منصّةً أوّلًا (الخطوة ٢).</p>`
+  if (shown.length === 0) return html`<p class="m-0">اربط منصّةً أوّلًا (الخطوة 2).</p>`
   return null
 }
 
@@ -243,7 +242,7 @@ export function planNewScreen(d: PlanNewData): string {
   const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
       <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
       <a class="btn btn-secondary btn-sm" href="/panel/plan/import">عندي خطّة</a></nav>`
-  const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${DIGITS[i] ?? ''}</span><span class="wz-l">${s}</span></li>`)}</ol>`
+  const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${String(i + 1)}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
       <span class="wz-live" id="pn-live" aria-hidden="true">${summaryText(count, d, d.autoImage)}</span>
@@ -294,12 +293,12 @@ export const PLAN_NEW_SCRIPT = `(function(){
     var st=f.querySelector('input[name="image_style"]:checked'), img=!!st&&st.value!=='none', count=per*weeks;
     perImage=st?Number(st.getAttribute('data-cost'))||0:0;
     var cost=perDraft>0?'نحو '+money(count*(perDraft+(img?perImage:0))):'والكلفةُ تُقدَّر بعد أوّل كتابة';
-    var text=count.toLocaleString('ar-EG')+' منشورًا'+(img?' بصورها':'')+' · '+cost;
+    var text=count.toLocaleString('ar-u-nu-latn')+' منشورًا'+(img?' بصورها':'')+' · '+cost;
     if(out)out.textContent=text; if(live)live.textContent=text;
     var sp=document.getElementById('pn-s-span'); if(sp&&span){var l=span.closest('label').querySelector('.wz-big'); sp.textContent=l?l.textContent:'';}
     var sc=document.getElementById('pn-s-ch'); if(sc)sc.textContent=names.length?names.join(' · '):'—';
     var all=f.querySelector('input[name="source"][value="all"]'), picked=f.querySelectorAll('input[name="source"]:checked:not([value="all"])').length;
-    var ss=document.getElementById('pn-s-src'); if(ss)ss.textContent=(all&&all.checked)||picked===0?'كلُّ المصادر المحلَّلة':picked.toLocaleString('ar-EG')+' من مصادرك';
+    var ss=document.getElementById('pn-s-src'); if(ss)ss.textContent=(all&&all.checked)||picked===0?'كلُّ المصادر المحلَّلة':picked.toLocaleString('ar-u-nu-latn')+' من مصادرك';
   }
   f.addEventListener('change',upd); f.addEventListener('input',upd);
   // ‏«الكلّ» وما سواه لا يجتمعان: اختيارُ مصدرٍ يرفع «الكلّ»، ورفعُ آخرِها يعيده

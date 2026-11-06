@@ -344,8 +344,8 @@ const data: PanelData = {
   audit: [
     // **كما فعل المالكُ يومَ قرّر** (D-135): ضغطتان على البطاقات وسقفُ الترويج —
     // فيُقاس أنّ المفتاحَ يُقرأ اسمًا، وأنّ المكرَّرَ يُطوى
-    { at: ago(0.5), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما · مسوّدات تنتظرك · مجدول للنشر · مزوّدون جاهزون', ip: '203.0.113.9' },
-    { at: ago(0.6), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · إنفاق اليوم · المصادر المحلَّلة · إنفاق ٣٠ يوما', ip: '203.0.113.9' },
+    { at: ago(0.5), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · المصادر المحلَّلة · إنفاق 30 يومًا · مسوّدات تنتظرك · مجدول للنشر · مزوّدون جاهزون', ip: '203.0.113.9' },
+    { at: ago(0.6), actor: 'panel', action: 'settings.write', target: 'dashboard_tiles', detail: '← تحليلات اليوم · إنفاق اليوم · المصادر المحلَّلة · إنفاق 30 يومًا', ip: '203.0.113.9' },
     { at: ago(0.7), actor: 'panel', action: 'settings.write', target: 'weekly_promo_cap_usd', detail: '← 2', ip: '203.0.113.9' },
     { at: ago(1), actor: 'panel', action: 'provider.key', target: 'anthropic', detail: 'بُدّل إلى sk-ant-…_QAA', ip: '203.0.113.9' },
     { at: ago(2), actor: 'panel', action: 'session.open', target: null, detail: 'بعامل واحد', ip: '203.0.113.9' },
@@ -449,7 +449,7 @@ const data: PanelData = {
     cap: 1500,
   },
   outbox: [
-    { kind: 'token', body: 'صدى — إذن التجديد لحساب «بصائر للاستشارات» ينتهي خلال ٧ أيّام.', status: 200, error: null, at: ago(20) },
+    { kind: 'token', body: 'صدى — إذن التجديد لحساب «بصائر للاستشارات» ينتهي خلال 7 أيّام.', status: 200, error: null, at: ago(20) },
     { kind: 'budget', body: 'صدى — بلغ إنفاق اليوم 5.00$ من سقف 5.00$.', status: 404, error: 'ردّت القناة 404', at: ago(50) },
   ],
 }

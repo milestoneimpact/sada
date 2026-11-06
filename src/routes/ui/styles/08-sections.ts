@@ -305,7 +305,9 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease)}
 .seg label:has(input:checked){background:var(--surface); color:var(--ink); box-shadow:var(--sh-1)}
 .seg label input{position:absolute; inset:0; margin:0; opacity:0; cursor:pointer}
-.seg label:has(input:focus-visible){outline:var(--ring-w) solid var(--ring); outline-offset:var(--s-0)}
+/* ‏‏والمقطعُ يُركَّز بحبر التركيز الصلب لا بالهالة (D-323 · WCAG 1.4.11): الهالةُ ربعُ شفافيّة ‏1.46:1 نهارًا و‏1.87:1 ليلًا،
+   والمؤشّرُ الوحيدُ على «من فكرة · من مصدر» — والزرُّ الدائريُّ نفسُه مخفيّ («opacity:0»)، فحلقتُه لا تُرى */
+.seg label:has(input:focus-visible){outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
 .composer:has([name=cmp][value=write]:checked) #idea,.composer:has([name=cmp][value=idea]:checked) #write{display:none}
 .cmp-act{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4)}
 .cmp-act .ago{flex:1 1 14rem}
