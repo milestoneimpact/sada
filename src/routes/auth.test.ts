@@ -1023,14 +1023,18 @@ describe('D-161 — إحكام باب الدخول', () => {
     expect(html).toContain('id="pk-login"')
   })
 
-  it('إصدار التحدّيات لمجهول له سقف: كلّ تحدّ كتابة مدفوعة في KV', async () => {
+  /*
+   * ‏مراجعة D-317: كان «إصدار التحدّيات لمجهول له سقف: كلّ تحدّ كتابة مدفوعة في KV» يتوقّع 429 بعد العشرين — والسقفُ
+   * ‏نفسُه هو ما ملأته كتلةُ `/48` فردّت تحدّي المالك. والتحدّي الآن موقَّعٌ بلا حالة: لا كتابةَ فلا سقف.
+   */
+  it('إصدار التحدّيات لمجهول بلا كتابةٍ في KV — فلا سقفَ يُملأ', async () => {
     await ownerWithPasskey()
     const statuses: number[] = []
     for (let i = 0; i < 22; i += 1) {
       statuses.push((await app.request('/panel/passkey/challenge', { method: 'POST' }, env)).status)
     }
-    expect(statuses.slice(0, 20).every((s) => s === 200)).toBe(true)
-    expect(statuses.slice(20)).toEqual([429, 429])
+    expect(statuses.every((s) => s === 200)).toBe(true)
+    expect((await kv.list!({ prefix: 'webauthn' })).keys).toEqual([])
   })
 
   it('سبب الرفض في السجلّ لا يحمل مليون بايت أرسلها مجهول، وجسد ضخم لا يُقرأ', async () => {
@@ -1265,5 +1269,228 @@ describe('D-317 · إشعاراتُ الأمان خارج القاعدة', () =>
     for (const r of db.raw.prepare("SELECT body FROM alert_outbox WHERE kind = 'security'").all() as { body: string }[]) {
       expect(r.body).not.toMatch(/[A-Z0-9]{5}-[A-Z0-9]{5}/)
     }
+  })
+})
+
+/*
+ * ‏**مراجعةُ D-317** — كلُّ بندٍ هنا سقط على الشيفرة قبل إصلاحه (أرقامُه في القرار، «المراجعة»).
+ */
+describe('D-317 · المراجعة', () => {
+  /** قاعدةٌ ترمي على أوّل قراءةٍ لصفّ `members` بعد التسليح — عثرةٌ عابرةٌ واحدة، وما سواها يمضي. */
+  function blip(): { arm(): void; hits(): number } {
+    let armed = false
+    let hits = 0
+    const real = db.prepare.bind(db)
+    ;(db as unknown as { prepare: (q: string) => unknown }).prepare = (q: string) => {
+      if (armed && /FROM members WHERE email/.test(q)) {
+        armed = false
+        hits += 1
+        const boom = { bind: () => boom, first: () => Promise.reject(new Error('D1_ERROR: transient')) }
+        return boom
+      }
+      return real(q)
+    }
+    return { arm: () => { armed = true }, hits: () => hits }
+  }
+
+  it('المراجعة ١: عثرةُ D1 في قراءة الدور عند الدخول لا تفتح جلسةَ مديرٍ بلا عامل — 503 بلا جلسة، والرمزُ باقٍ', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('a@example.com', 'admin', '*', 'x')`)
+    const code = await requestCode(app, env, 'a@example.com')
+    const d1 = blip()
+    d1.arm()
+    const body = new FormData()
+    body.set('email', 'a@example.com')
+    body.set('code', code)
+    const res = await app.request('/panel/login', { method: 'POST', body }, env)
+    expect(d1.hits()).toBe(1)
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Set-Cookie') ?? '').not.toContain('__Host-sada_session=')
+    // ‏والرمزُ لم يُستهلك: يعيده صاحبُه بعد دقيقة فيصل إلى صفحة التسجيل لا إلى اللوحة
+    const again = new FormData()
+    again.set('email', 'a@example.com')
+    again.set('code', code)
+    expect((await app.request('/panel/login', { method: 'POST', body: again }, env)).headers.get('Location')).toBe('/panel/enrol')
+  })
+
+  it('المراجعة ١: وطلبُ الرمز على قاعدةٍ لا تردّ يقول ذلك ولا يُرسل شيئًا', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('a@example.com', 'admin', '*', 'x')`)
+    const mailer = env['EMAIL'] as FakeMailer
+    const before = mailer.sent.length
+    blip().arm()
+    const body = new FormData()
+    body.set('email', 'a@example.com')
+    const res = await app.request('/panel/login/code', { method: 'POST', body }, env)
+    expect(res.status).toBe(503)
+    expect(mailer.sent.length).toBe(before)
+  })
+
+  it('المراجعة ١: وعثرةُ D1 في الحارس لا تُمرّر الطلبَ ولا تُسقط جلسةَ العضو', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('e@example.com', 'editor', '*', 'x')`)
+    const cookie = cookieOf(await emailLogin(app, env, { email: 'e@example.com', secondFactor: false }))
+    blip().arm()
+    const res = await app.request('/panel', { headers: { Cookie: cookie, Accept: 'text/html' } }, env)
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('حدث خطأ من جهتنا')
+    expect(await kv.get(`session:${cookie.split('=')[1]}`)).not.toBeNull()
+    expect((await app.request('/panel', { headers: { Cookie: cookie } }, env)).status).toBe(200)
+  })
+
+  it('المراجعة ٢: محرّرٌ بلا عاملٍ رُقّي مديرًا وجلستُه مفتوحة يُردّ إلى الدخول، ودخولُه التالي جلسةُ تسجيل', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('e@example.com', 'editor', '*', 'x')`)
+    const res = await emailLogin(app, env, { email: 'e@example.com', secondFactor: false })
+    expect(res.headers.get('Location')).toBe('/panel')
+    const cookie = cookieOf(res)
+    db.raw.exec(`UPDATE members SET role = 'admin' WHERE email = 'e@example.com'`)
+    const settings = await app.request('/panel/settings', { headers: { Cookie: cookie } }, env)
+    expect(settings.status).not.toBe(200)
+    expect(await settings.text()).toContain('يلزمه عاملٌ ثانٍ')
+    expect(await kv.get(`session:${cookie.split('=')[1]}`)).toBeNull()
+    // ‏وفعلٌ بالجلسة نفسِها لا يمرّ
+    const oauth = await app.request('/oauth/linkedin/start', { headers: { Cookie: cookie } }, env)
+    expect(oauth.headers.get('Location') ?? '').not.toContain('linkedin.com')
+    expect((await emailLogin(app, env, { email: 'e@example.com', secondFactor: false })).headers.get('Location')).toBe('/panel/enrol')
+  })
+
+  it('المراجعة ٢: ومن أثبت عاملًا في دخوله تبقى جلستُه بعد ترقيته', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('e@example.com', 'editor', '*', 'x')`)
+    const res = await emailLogin(app, env, { email: 'e@example.com' })
+    const cookie = cookieOf(res)
+    db.raw.exec(`UPDATE members SET role = 'admin' WHERE email = 'e@example.com'`)
+    expect((await app.request('/panel/settings', { headers: { Cookie: cookie } }, env)).status).toBe(200)
+  })
+
+  it('المراجعة ٦: طلبُ HEAD لبدء الربط بلا تحقّقٍ حديث يُردّ إلى «تحقّق للتوّ» ولا يكتب حالة OAuth', async () => {
+    env['LINKEDIN_CLIENT_ID'] = 'li-id'
+    env['LINKEDIN_CLIENT_SECRET'] = 'li-secret-long-enough-xxxxxxxx'
+    const { s } = await ownerWithPasskey()
+    await age(s.cookie, 'fresh', 10)
+    const head = await app.request('/oauth/linkedin/start', { method: 'HEAD', headers: { Cookie: s.cookie } }, env)
+    expect(head.status).toBe(303)
+    expect(head.headers.get('Location')).toBe(`/panel/stepup?next=${encodeURIComponent('/oauth/linkedin/start')}`)
+    const keys = (await kv.list!({ prefix: '' })).keys.map((k) => k.name)
+    expect(keys.filter((k) => k.startsWith('oauth:state'))).toEqual([])
+  })
+
+  it('المراجعة ١٠: ستُّ محاولاتٍ خاطئة لرمز التطبيق من عنوانٍ واحد تُسقط الجلسةَ المعلَّقة برسالتها', async () => {
+    const setup = await loginWithToken()
+    await readCsrf(setup.cookie)
+    await enrollTotp(setup)
+    const { cookie, csrf: pendingCsrf } = await pendingScreen()
+    const replies: Response[] = []
+    for (let i = 0; i < 6; i += 1) {
+      const body = new FormData()
+      body.set('_csrf', pendingCsrf)
+      body.set('code', '000000')
+      replies.push(await app.request('/panel/2fa/totp', {
+        method: 'POST', body, headers: { Cookie: cookie, 'CF-Connecting-IP': '198.51.100.7' },
+      }, env))
+    }
+    expect(replies.map((r) => r.status)).toEqual([401, 401, 401, 401, 401, 429])
+    expect(await replies[5]!.text()).toContain('أُغلقت هذه المحاولة')
+    expect(await kv.get(`session:${cookie.split('=')[1]}`)).toBeNull()
+  })
+
+  it('المراجعة ٥: تحدّي مفتاح المرور بلا حالة — لا كتابةَ في KV، ولا قاطعَ عامًّا يردّه', async () => {
+    const { key } = await ownerWithPasskey()
+    db.raw.exec(`INSERT OR REPLACE INTO auth_attempts (bucket, n, window_start) VALUES
+      ('challenge:global', 99999, datetime('now')), ('global', 99999, datetime('now'))`)
+    const statuses: number[] = []
+    for (let i = 0; i < 25; i += 1) {
+      statuses.push((await app.request('/panel/passkey/challenge', { method: 'POST', headers: { 'CF-Connecting-IP': '198.51.100.9' } }, env)).status)
+    }
+    expect(statuses.every((s) => s === 200)).toBe(true)
+    expect((await kv.list!({ prefix: 'webauthn:' })).keys).toEqual([])
+    // ‏والتذكرةُ تُقبل مرّةً واحدة — ومزوَّرةٌ لا تُقبل أصلًا
+    const t = (await (await app.request('/panel/passkey/challenge', { method: 'POST' }, env)).json()) as { ticket: string; challenge: string }
+    const signed = await key.sign({ challenge: t.challenge, origin: ORIGIN, rpId: RP_ID, signCount: 20 })
+    const send = (ticket: string): Promise<Response> => Promise.resolve(app.request('/panel/passkey/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket, ...signed }),
+    }, env))
+    const forged = t.ticket.replace(/.$/, (ch) => (ch === 'A' ? 'B' : 'A'))
+    expect((await send(forged)).status).toBe(400)
+    expect((await send(t.ticket)).status).toBe(200)
+    expect((await send(t.ticket)).status).toBe(400)
+  })
+
+  it('المراجعة ٣ و٥: جهازٌ دخل من قبل لا يُقفله مجهول — لا القاطعُ العامّ ولا سقفُ الحساب', async () => {
+    const { s } = await ownerWithPasskey()
+    void s
+    // ‏دخولٌ كاملٌ بمفتاح المرور يترك على الجهاز كعكتَه
+    const first = await emailLogin(app, env)
+    const device = (first.headers.get('Set-Cookie') ?? '').split(/,\s*(?=__Host-)/).find((c) => c.startsWith('__Host-sada_device='))
+    expect(device).toBeDefined()
+    const deviceCookie = device!.split(';')[0]!
+    // ‏ثمّ يملأ مجهولٌ القاطعَ العامّ وسقفَ رمز الحساب من مصادر شتّى
+    db.raw.exec(`INSERT OR REPLACE INTO auth_attempts (bucket, n, window_start) VALUES
+      ('global', 99999, datetime('now')), ('code-issue:global', 99999, datetime('now')),
+      ('code:${OWNER_EMAIL}', 99999, datetime('now'))`)
+    const code = await requestCodeWith(deviceCookie)
+    const body = new FormData()
+    body.set('code', code)
+    const trusted = await app.request('/panel/login', { method: 'POST', body, headers: { Cookie: deviceCookie } }, env)
+    expect(trusted.headers.get('Location')).toBe('/panel/2fa')
+    // ‏وجهازٌ لم يدخل من قبل يبقى مردودًا: الحدُّ يحرس الحسابَ من المجهول
+    const stranger = new FormData()
+    stranger.set('code', '123456')
+    expect((await app.request('/panel/login', { method: 'POST', body: stranger }, env)).status).toBe(429)
+  })
+
+  /** يطلب رمزًا بكعكة الجهاز — كما يطلبه المالكُ من هاتفه. */
+  async function requestCodeWith(deviceCookie: string): Promise<string> {
+    await kv.delete(`logincode-gap:${OWNER_EMAIL}`)
+    await kv.delete(`logincode-hour:${OWNER_EMAIL}`)
+    const body = new FormData()
+    body.set('email', OWNER_EMAIL)
+    const res = await app.request('/panel/login/code', { method: 'POST', body, headers: { Cookie: deviceCookie } }, env)
+    expect(res.status).toBe(200)
+    const mails = mailText(env['EMAIL'] as FakeMailer, OWNER_EMAIL).filter((m) => m.includes('رمز الدخول'))
+    return /\b(\d{6})\b/.exec(mails.at(-1) ?? '')?.[1] ?? ''
+  }
+
+  it('المراجعة ١٥: «تحقّق للتوّ» على قاعدةٍ لا تردّ لا يقول لصاحب الجلسة إنّه لا جلسةَ له', async () => {
+    const { s } = await ownerWithPasskey()
+    db.raw.exec('ALTER TABLE passkeys RENAME TO passkeys_away')
+    const res = await app.request('/panel/stepup?next=/panel', { headers: { Cookie: s.cookie } }, env)
+    expect(res.status).toBe(503)
+    const html = await res.text()
+    expect(html).not.toContain('لم تُفتح جلسة')
+    expect(html).toContain('لم يُنفَّذ شيء')
+  })
+
+  it('المراجعة ١٢: مهلةُ «تحقّق للتوّ» تسمّي الزرَّ كما يُرى', async () => {
+    const { s } = await ownerWithPasskey()
+    const token = await readCsrf(s.cookie, '/panel/stepup?next=/panel')
+    await kv.delete(`webauthn:up:${s.cookie.split('=')[1]}`)
+    const body = new FormData()
+    body.set('_csrf', token)
+    body.set('next', '/panel')
+    body.set('assertion', '{}')
+    const html = await (await app.request('/panel/stepup/passkey', { method: 'POST', body, headers: { Cookie: s.cookie } }, env)).text()
+    expect(html).toContain('«المس مفتاح المرور»')
+  })
+
+  it('المراجعة ١٣: «أكمل ما بدأته» يقول الدورَ باسمه لا بمفتاحه', async () => {
+    const { s, key } = await ownerWithPasskey()
+    await age(s.cookie, 'fresh', 6)
+    await readCsrf(s.cookie, '/panel/team')
+    await post('/panel/team/invite', s.cookie, { email: 'new@example.com', role: 'publisher', all: '1' })
+    const page = await (await app.request('/panel/stepup?next=/panel/stepup/resume', { headers: { Cookie: s.cookie } }, env)).text()
+    const challenge = /data-challenge="([^"]+)"/.exec(page)?.[1] ?? ''
+    const body = new FormData()
+    body.set('_csrf', /name="_csrf" value="([^"]+)"/.exec(page)?.[1] ?? '')
+    body.set('next', '/panel/stepup/resume')
+    body.set('assertion', JSON.stringify(await key.sign({ challenge, origin: ORIGIN, rpId: RP_ID, signCount: 30 })))
+    await app.request('/panel/stepup/passkey', { method: 'POST', body, headers: { Cookie: s.cookie } }, env)
+    const resume = await (await app.request('/panel/stepup/resume', { headers: { Cookie: s.cookie } }, env)).text()
+    expect(resume).toContain('<bdi>ناشر</bdi>')
+    expect(resume).not.toContain('<bdi>publisher</bdi>')
+  })
+
+  it('المراجعة ١٤: العضوُ يجد «أمان حسابك» في قائمة الحساب', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('e@example.com', 'editor', '*', 'x')`)
+    const cookie = cookieOf(await emailLogin(app, env, { email: 'e@example.com', secondFactor: false }))
+    const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('<a class="menu-item" href="/panel/enrol"><span class="menu-t"><b>أمان حسابك</b>')
+    expect(html).not.toContain('href="/panel/settings#security"')
   })
 })

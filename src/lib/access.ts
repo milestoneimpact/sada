@@ -130,3 +130,12 @@ export function runAs<T>(who: Who, fn: () => T): T {
 export function whoNow(): Who | undefined {
   return store.getStore()
 }
+
+/**
+ * أيرى الصفحةَ المالك؟ (مراجعة D-317) — من صاحب الطلب، **والصفحةُ خارج طلبٍ مُصادَق للمالك** (عيّناتُ التدقيق). تسأله
+ * قائمةُ الحساب ولوحةُ الأوامر: المالكُ إلى «الجلسات والأمان» في الإعدادات، والعضوُ إلى «أمان حسابك».
+ */
+export function ownerViewing(): boolean {
+  const who = store.getStore()
+  return who === undefined || who.role === 'owner'
+}

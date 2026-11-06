@@ -208,6 +208,13 @@ export interface ResumeData {
   readonly fields: readonly (readonly [string, string])[]
   readonly secrets: readonly string[]
   readonly back: string
+  /**
+   * **كيف تُقرأ القيمة** (مراجعة D-317): الدورُ باسمه في المعجم لا بمفتاحه، والمنصّةُ باسمها، والحسابُ باسمه الظاهر.
+   * و`null` يُخفي الحقلَ من الملخّص (معرّفٌ داخليٌّ لا يقرؤه صاحبُه) ويبقى في النموذج.
+   */
+  readonly display?: Readonly<Record<string, string | null>>
+  /** عاقبةُ الفعل كما كانت في حواره — تُقال قبل «أكمل» لا بعده. */
+  readonly warning?: string
 }
 
 const SECRET_LABEL: Readonly<Record<string, { readonly label: string; readonly type: string }>> = {
@@ -220,9 +227,12 @@ const SECRET_LABEL: Readonly<Record<string, { readonly label: string; readonly t
  * **لا يُعاد إرسالُ جسدٍ بلا علمه**، والسرُّ الذي كتبه لا يُخزَّن في الطريق: يُطلب ثانيةً.
  */
 export function resumePage(d: ResumeData, nonce: string): string {
-  const shown = d.fields.filter(([k]) => FIELD_LABEL[k] !== undefined)
+  const shown = d.fields
+    .filter(([k]) => FIELD_LABEL[k] !== undefined && d.display?.[k] !== null)
+    .map(([k, v]) => [k, d.display?.[k] ?? v] as const)
   const summary = shown.length === 0 ? '' : html`<ul class="plain">${shown.map(([k, v]) =>
     html`<li><b>${FIELD_LABEL[k] ?? k}:</b> <bdi>${v.slice(0, 120)}</bdi></li>`)}</ul>`
+  const warning = d.warning === undefined ? '' : raw(noticeText('warn', d.warning))
   const hidden = d.fields.map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)
   const secrets = d.secrets.map((k, i) => {
     const f = SECRET_LABEL[k] ?? { label: k, type: 'password' }
@@ -231,7 +241,7 @@ export function resumePage(d: ResumeData, nonce: string): string {
   })
   const body = html`<div class="auth-split">${raw(brandMoment())}<div class="wrap"><main class="auth">
       <h1>أكمل: ${d.title}</h1>
-      <div class="card">${summary}
+      <div class="card">${summary}${warning}
         <form method="POST" action="${d.action}">
           <input type="hidden" name="_csrf" value="${d.csrf}">${hidden}${secrets}
           <button class="btn btn-primary" type="submit">أكمل</button>

@@ -41,10 +41,17 @@ const SECURITY_NOTICE: Readonly<Record<string, string>> = {
   'sessions.revoke_all': 'أُخرجت الأجهزة الأخرى من حسابك',
 }
 
-/** إشعاراتُ أمان الحساب في أسبوعها — **بلا إشعار الجلسة الحاليّة نفسِها** (بصمتُها في `target`). */
+/**
+ * إشعاراتُ أمان الحساب في أسبوعها — **بلا إشعار الجلسة الحاليّة نفسِها** (بصمتُها في `target`)، **وبلا ما قرأه صاحبُها**.
+ *
+ * **وقراءتُها لصاحبها لا للمنظّمة** (مراجعة D-317): كانت تُستثنى بقراءات المنظّمة النشطة، فإشعارٌ قُرئ في منظّمة المالك
+ * يعود غيرَ مقروءٍ في غيرها، وعضوٌ يرى المنظّمةَ يُطفئ إشعارَ المالك بمرجعٍ يخمّنه (المعرّفاتُ متتالية). فقراءتُها تُحفظ
+ * في منظّمة المالك ببريد صاحبها، ولا يكتبها غيرُه (`markRead`).
+ */
 const SECURITY_REFS = `SELECT 'security:' || id AS ref FROM audit_log
   WHERE org_id = 'org_owner' AND action = 'security.notice' AND by_email = ?3
-    AND at >= datetime('now', '-7 days') AND COALESCE(target, '') != ?4`
+    AND at >= datetime('now', '-7 days') AND COALESCE(target, '') != ?4
+    AND ('security:' || id) NOT IN (SELECT ref FROM notice_reads WHERE org_id = 'org_owner' AND by_email = ?3)`
 
 export interface Notice {
   /** ثابتٌ لحدثه: المنشورُ الفاشل نفسُه مرجعٌ واحد مهما أُعيدت قراءتُه. */
@@ -130,7 +137,7 @@ export async function unreadNotices(db: Db, org: string, extraRefs: readonly str
            SELECT value FROM json_each(?2)
            UNION ALL
            ${SECURITY_REFS}
-         ) n WHERE ref NOT IN (SELECT ref FROM notice_reads WHERE org_id = ?1)`,
+         ) n WHERE ref NOT IN (SELECT ref FROM notice_reads WHERE org_id = ?1 AND ref NOT LIKE 'security:%')`,
       )
       .bind(org, JSON.stringify(extraRefs), viewer?.email ?? '', viewer?.handle ?? '')
       .first<{ n: number }>()
@@ -226,12 +233,17 @@ export async function collectNotices(
   return out.sort((x, y) => (y.at > x.at ? 1 : y.at < x.at ? -1 : 0))
 }
 
-/** ما قُرئ في آخر أسبوعين — ومعه من قرأه. */
-export async function readMarks(db: Db, org: string): Promise<NoticeRead[]> {
+/** ما قُرئ في آخر أسبوعين — ومعه من قرأه. وإشعاراتُ الأمان بقراءة صاحبها أيًّا كانت المنظّمة (مراجعة D-317). */
+export async function readMarks(db: Db, org: string, viewerEmail = ''): Promise<NoticeRead[]> {
   try {
     const { results } = await db
-      .prepare(`SELECT ref, read_at, by_email FROM notice_reads WHERE org_id = ? AND read_at >= datetime('now', '-14 days')`)
-      .bind(org)
+      .prepare(
+        `SELECT ref, read_at, by_email FROM notice_reads
+          WHERE read_at >= datetime('now', '-14 days')
+            AND ((org_id = ?1 AND ref NOT LIKE 'security:%')
+              OR (org_id = 'org_owner' AND ref LIKE 'security:%' AND by_email = ?2))`,
+      )
+      .bind(org, viewerEmail)
       .all<{ ref: string; read_at: string; by_email: string | null }>()
     return results.map((r) => ({ ref: r.ref, readAt: r.read_at, byEmail: r.by_email ?? null }))
   } catch {
@@ -239,18 +251,32 @@ export async function readMarks(db: Db, org: string): Promise<NoticeRead[]> {
   }
 }
 
-/** تُعلَّم مقروءةً — مرّةً لكلّ مرجع، ومن قرأها أوّلًا يبقى. */
+/**
+ * تُعلَّم مقروءةً — مرّةً لكلّ مرجع، ومن قرأها أوّلًا يبقى.
+ *
+ * **وإشعارُ الأمان لا يُعلِّمه إلّا صاحبُه** (مراجعة D-317): مرجعٌ `security:<n>` يُقبل حين يكون صفُّ التدقيق نفسُه
+ * `security.notice` ببريد القارئ، ويُحفظ في منظّمة المالك ببريده — فيُطفأ في كلّ منظّمة، ولا يُطفئه غيرُه.
+ */
 export async function markRead(db: Db, org: string, refs: readonly string[], byEmail: string | null): Promise<number> {
   const clean = [...new Set(refs.filter((r) => /^[a-z]+:[^\s]{1,200}$/.test(r)))].slice(0, 200)
   if (clean.length === 0) return 0
   try {
-    const statements = clean.map((ref) =>
-      db.prepare('INSERT OR IGNORE INTO notice_reads (ref, org_id, by_email) VALUES (?, ?, ?)').bind(ref, org, byEmail),
+    const asked = clean.filter((r) => /^security:\d{1,12}$/.test(r)).map((r) => Number(r.slice('security:'.length)))
+    const mine = asked.length === 0 || byEmail === null ? new Set<number>() : new Set((await db
+      .prepare(`SELECT id FROM audit_log WHERE org_id = 'org_owner' AND action = 'security.notice' AND by_email = ?
+                 AND id IN (SELECT value FROM json_each(?))`)
+      .bind(byEmail, JSON.stringify(asked))
+      .all<{ id: number }>()).results.map((r) => r.id))
+    const kept = clean.filter((ref) => !ref.startsWith('security:') || mine.has(Number(ref.slice('security:'.length))))
+    if (kept.length === 0) return 0
+    const statements = kept.map((ref) =>
+      db.prepare('INSERT OR IGNORE INTO notice_reads (ref, org_id, by_email) VALUES (?, ?, ?)')
+        .bind(ref, ref.startsWith('security:') ? 'org_owner' : org, byEmail),
     )
     // ‏دفعةٌ واحدة حيث تُتاح (D1)، وإلّا واحدةً واحدة — والنتيجةُ نفسُها
     if (typeof db.batch === 'function') await db.batch(statements)
     else for (const s of statements) await s.run()
-    return clean.length
+    return kept.length
   } catch (error) {
     console.warn({ job: 'notices-read', failed: String(error) })
     return 0

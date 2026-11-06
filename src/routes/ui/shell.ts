@@ -16,6 +16,7 @@ import { count } from './components/badge'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { MARK, MOMENT, THEME, below } from './tokens'
+import { ownerViewing } from '../../lib/access'
 
 /**
  * الخطّ — **زوجُ Plex من أصلنا** (D-099 · D-185).
@@ -204,7 +205,11 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
       html`<div class="menu-seg"><span>حجم الخطّ</span>${raw(sizeSwitch())}</div>`.value,
       // ‏المساعدةُ في الموضع نفسِه على كلّ صفحة (D-305 · WCAG 2.2 · 3.2.6)
       menuItem({ label: 'المساعدة', href: '/panel/help' }),
-      menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' }),
+      // ‏وأمانُ الحساب لصاحبه (مراجعة D-317): المالكُ إلى الجلسات والأمان في الإعدادات، والعضوُ إلى «أمان حسابك» —
+      // ‏كان العضوُ يُرسَل إلى إعداداتٍ لا يفتحها، ولا بابَ له إلى عوامله إلّا رابطُ ذيل البريد
+      ownerViewing()
+        ? menuItem({ label: 'الجلسات والأمان', href: '/panel/settings#security' })
+        : menuItem({ label: 'أمان حسابك', href: '/panel/enrol' }),
       ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
   })

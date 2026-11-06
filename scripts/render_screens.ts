@@ -540,6 +540,20 @@ writeAudited(
   resumePage({ csrf: 'c', action: '/panel/providers/key', title: 'مفتاح مزوّد', back: '/panel/settings',
     fields: [['provider', 'anthropic']], secrets: ['key'] }, 'n'),
 )
+// ‏و«أكمل» لدعوة عضوٍ ولفصل حساب (مراجعة D-317): الدورُ باسمه والمنصّةُ باسمها والعاقبةُ قبل الضغطة — كما يقرؤها `audit_copy`
+writeAudited(
+  '/tmp/screen-resume-invite.html',
+  resumePage({ csrf: 'c', action: '/panel/team/invite', title: 'دعوة عضو', back: '/panel/team',
+    fields: [['email', 'sara@example.com'], ['role', 'publisher'], ['all', '1']], secrets: [],
+    display: { role: 'ناشر' } }, 'n'),
+)
+writeAudited(
+  '/tmp/screen-resume-cut.html',
+  resumePage({ csrf: 'c', action: '/panel/channels/disconnect', title: 'فصل حساب', back: '/panel/accounts',
+    fields: [['platform', 'linkedin'], ['account', 'linkedin:abc123']], secrets: [],
+    display: { platform: 'LinkedIn', account: 'عمر الشهري' },
+    warning: 'تُحذف رموز الوصول والتجديد لهذا الحساب ولا تُستردّ، وكلّ منشور مجدول عليه يتوقّف.' }, 'n'),
+)
 
 // ‏صفحتا الخطأ (خطّة التصميم 7.11 · D-189): من دالّتيهما اللتين يخدمهما Worker، لا نسخةٌ هنا —
 // ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare

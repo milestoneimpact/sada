@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
 import {
-  releaseAttempt, releaseCodeGuesses, releaseFactorGuess, reserveAttempt, reserveChallenge, reserveCodeGuess,
-  reserveFactorGuess, MAX_ACCOUNT_CODE_GUESSES_PER_DAY, MAX_CHALLENGES, MAX_CODE_GUESSES_PER_DAY,
+  releaseAttempt, releaseCodeGuesses, releaseFactorGuess, reserveAttempt, reserveCodeGuess, reserveCodeIssue,
+  reserveFactorGuess, MAX_ACCOUNT_CODE_GUESSES_PER_DAY, MAX_CODE_ISSUES, MAX_CODE_GUESSES_PER_DAY, MAX_NET_ATTEMPTS,
   MAX_FACTOR_GUESSES_PER_DAY, MAX_FACTOR_GUESSES_PER_SESSION,
 } from './gate'
-import { ipBucket, MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS } from '../rateLimit'
+import { ipBucket, MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS, netBucket } from '../rateLimit'
 
 const from = (ip: string): Request => new Request('https://sada2.basserh.com/panel/login', {
   headers: { 'CF-Connecting-IP': ip },
@@ -73,12 +73,16 @@ describe('بوّابة المحاولات الذرّيّة (D-161)', () => {
     expect(rows).toEqual([{ bucket: 'global', n: 1 }])
   })
 
-  it('إصدار التحدّيات حصّة منفصلة لا تأكل من محاولات الدخول', async () => {
+  /*
+   * ‏مراجعة D-317: كان هذا الاختبارُ على `reserveChallenge` — وتحدّي الدخول بمفتاح المرور صار بلا حالةٍ ولا دلو، فالحصّةُ
+   * ‏المنفصلةُ الباقيةُ حصّةُ إصدار رمز البريد، والقاعدةُ نفسُها: لا تأكل من محاولات الدخول.
+   */
+  it('إصدار الرمز حصّة منفصلة لا تأكل من محاولات الدخول', async () => {
     const db = fakeDb()
-    for (let i = 0; i < MAX_CHALLENGES; i += 1) {
-      expect((await reserveChallenge(db, from('1.1.1.1'))).allowed).toBe(true)
+    for (let i = 0; i < MAX_CODE_ISSUES; i += 1) {
+      expect((await reserveCodeIssue(db, from('1.1.1.1'))).allowed).toBe(true)
     }
-    expect((await reserveChallenge(db, from('1.1.1.1'))).allowed).toBe(false)
+    expect((await reserveCodeIssue(db, from('1.1.1.1'))).allowed).toBe(false)
     expect((await reserveAttempt(db, from('1.1.1.1'))).allowed).toBe(true)
   })
 
@@ -162,5 +166,52 @@ describe('تخمينُ العامل الثاني (D-317)', () => {
     await releaseFactorGuess(db, owner, 'h1', from('1.1.1.1'))
     expect(db.raw.prepare("SELECT bucket, n FROM auth_attempts WHERE bucket LIKE '2fa%' ORDER BY bucket").all())
       .toEqual([{ bucket: `2fa:${owner}`, n: 1 }])
+  })
+})
+
+/*
+ * ‏**مراجعةُ D-317 · البندان ٣ و٥**: القاطعُ العامّ يُعدّ على `/64`، فكتلةُ IPv6 واحدةٌ بحجم ‎/48 تملؤه وحدَها (201 شبكةٍ
+ * ‏بخمسٍ لكلٍّ = 1005)؛ وسقفُ الحساب على رمز البريد (ثلاثون) يملؤه ثلاثةُ مصادر — فيُقفَل المالكُ يومًا من أيّ جهاز.
+ */
+describe('مراجعة D-317: حدودٌ لا يُقفل بها مجهولٌ الجميع', () => {
+  const owner = 'milestonesimpact@gmail.com'
+
+  it('شبكةُ ‎/48 كاملةٌ لا تحمل إلى القاطع العامّ أكثرَ من حصّة شبكتها', async () => {
+    const db = fakeDb()
+    for (let i = 0; i < 201; i += 1) {
+      for (let j = 0; j < MAX_ATTEMPTS; j += 1) await reserveAttempt(db, from(`2001:db8:aa:${i.toString(16)}::1`))
+    }
+    const global = db.raw.prepare("SELECT n FROM auth_attempts WHERE bucket = 'global'").get() as { n: number }
+    expect(global.n).toBeLessThanOrEqual(MAX_NET_ATTEMPTS)
+    expect((await reserveAttempt(db, from('198.51.100.7'))).allowed).toBe(true)
+    expect(netBucket(from('2001:db8:aa:ff::1'))).toBe('2001:db8:aa::/48')
+    expect(netBucket(from('198.51.100.7'))).toBeNull()
+  })
+
+  it('وجهازٌ دخل من قبل لا يردّه القاطعُ العامّ إذا انقطع، ولا يُزاد به', async () => {
+    const db = fakeDb()
+    db.raw.prepare(`INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('global', ?, datetime('now'))`).run(MAX_GLOBAL_ATTEMPTS + 50)
+    expect(await reserveAttempt(db, from('3.3.3.3'))).toMatchObject({ allowed: false, why: 'global' })
+    expect((await reserveAttempt(db, from('4.4.4.4'), 'dev1')).allowed).toBe(true)
+    await releaseAttempt(db, from('4.4.4.4'), 'dev1')
+    expect(db.raw.prepare("SELECT n FROM auth_attempts WHERE bucket = 'global'").get()).toEqual({ n: MAX_GLOBAL_ATTEMPTS + 51 })
+  })
+
+  it('ولا يردّه سقفُ الحساب على رمز البريد — وله سقفُه في اليوم', async () => {
+    const db = fakeDb()
+    db.raw.prepare(`INSERT INTO auth_attempts (bucket, n, window_start) VALUES (?, 999, datetime('now'))`).run(`code:${owner}`)
+    expect(await reserveCodeGuess(db, owner, from('1.1.1.1'))).toMatchObject({ allowed: false, why: 'global' })
+    let allowed = 0
+    for (let i = 0; i < MAX_CODE_GUESSES_PER_DAY + 2; i += 1) {
+      if ((await reserveCodeGuess(db, owner, from(`5.5.${i}.1`), 'dev1')).allowed) allowed += 1
+    }
+    expect(allowed).toBe(MAX_CODE_GUESSES_PER_DAY)
+  })
+
+  it('ولا يردّه القاطعُ العامّ على إصدار الرمز', async () => {
+    const db = fakeDb()
+    db.raw.prepare(`INSERT INTO auth_attempts (bucket, n, window_start) VALUES ('code-issue:global', 99999, datetime('now'))`).run()
+    expect((await reserveCodeIssue(db, from('6.6.6.6'))).allowed).toBe(false)
+    expect((await reserveCodeIssue(db, from('6.6.6.7'), 'dev1')).allowed).toBe(true)
   })
 })

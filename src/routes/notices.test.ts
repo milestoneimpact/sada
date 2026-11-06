@@ -9,7 +9,7 @@ import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
-import { memoryNotices } from '../lib/notices'
+import { markRead, memoryNotices, readMarks, unreadNotices } from '../lib/notices'
 import { pulses } from '../lib/ops/heartbeat'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -122,6 +122,32 @@ describe('مركز الإشعارات (D-294)', () => {
     db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, account_id, org_id)
       VALUES ('p-o', 'x', 'text', 'لغيرها', 'failed', 'k-o', 'a-o', 'org_other')`).run()
     expect(bellCount(await (await get('/panel')).text())).toBe(0)
+  })
+})
+
+/*
+ * ‏**مراجعة D-317 · البند ٤**: إشعارُ الأمان لصاحبه وحده، وكانت قراءتُه تُحفظ للمنظّمة النشطة: يُقرأ في منظّمة المالك
+ * ‏فيعود غيرَ مقروءٍ في غيرها، ويُطفئه عضوٌ في منظّمته بمرجعٍ يخمّنه (المعرّفاتُ متتالية).
+ */
+describe('مراجعة D-317: قراءةُ إشعار الأمان لصاحبه لا للمنظّمة', () => {
+  it('يُقرأ مرّةً فيُطفأ في كلّ منظّمة، ولا يُطفئه غيرُ صاحبه', async () => {
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'ب', 'team')`)
+    db.raw.exec(`INSERT INTO audit_log (org_id, actor, action, target, detail, by_email)
+      VALUES ('org_owner', 'panel', 'security.notice', 'other', 'session.new (x)', 'milestonesimpact@gmail.com')`)
+    const id = (db.raw.prepare(`SELECT id FROM audit_log WHERE action = 'security.notice' ORDER BY id DESC LIMIT 1`).get() as { id: number }).id
+    const viewer = { email: 'milestonesimpact@gmail.com', handle: 'mine' }
+    const owners = await unreadNotices(db, 'org_owner', [], viewer)
+    expect(await unreadNotices(db, 'org_b', [], viewer)).toBe(owners)
+
+    // ‏عضوٌ في org_b يرسل مرجعَ إشعار المالك: لا يُحفظ
+    expect(await markRead(db, 'org_b', [`security:${id}`], 'v@example.com')).toBe(0)
+    expect(await unreadNotices(db, 'org_b', [], viewer)).toBe(owners)
+
+    // ‏والمالكُ يقرؤه في منظّمته فيُطفأ في الأخرى أيضًا
+    expect(await markRead(db, 'org_owner', [`security:${id}`], 'milestonesimpact@gmail.com')).toBe(1)
+    expect(await unreadNotices(db, 'org_owner', [], viewer)).toBe(owners - 1)
+    expect(await unreadNotices(db, 'org_b', [], viewer)).toBe(owners - 1)
+    expect((await readMarks(db, 'org_b', viewer.email)).map((r) => r.ref)).toContain(`security:${id}`)
   })
 })
 

@@ -59,6 +59,20 @@ export function ipBucket(request: Request): string {
 }
 
 /**
+ * **الشبكةُ الأوسع** (مراجعة D-317): IPv6 بـ `/48`، ولا شيءَ لـ IPv4.
+ *
+ * كان القاطعُ العامّ يُعدّ على `/64` وحدها، و`/48` واحدةٌ فيها خمسةٌ وستّون ألفَ `/64` — مجّانًا من وسطاء الأنفاق.
+ * فمئتا شبكةٍ منها بخمس محاولاتٍ لكلٍّ تملأ القاطعَ (ألفًا) وتُغلق الدخولَ على الجميع. فلـ `/48` حصّتُها فوق حصّة `/64`
+ * (`gate.ts`)، وما ردّته لا يُزاد به العامّ. وIPv4 بلا دلوٍ أوسع: `/24` تجمع مشتركين لا صلةَ بينهم خلف مزوّدٍ واحد.
+ */
+export function netBucket(request: Request): string | null {
+  const bucket = ipBucket(request)
+  if (!bucket.endsWith('::/64')) return null
+  const groups = bucket.slice(0, -'::/64'.length).split(':')
+  return `${groups.slice(0, 3).join(':')}::/48`
+}
+
+/**
  * مفتاح العدّ.
  *
  * `CF-Connecting-IP` تضعها Cloudflare نفسها ولا تُزوَّر من العميل، بخلاف

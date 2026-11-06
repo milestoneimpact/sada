@@ -55,17 +55,22 @@ function rowToMember(r: Record<string, string | null>): Member {
   }
 }
 
-/** مدعوٌّ قائمٌ بهذا البريد، أو `null` — والملغى `null`. */
+/**
+ * مدعوٌّ قائمٌ بهذا البريد، أو `null` — والملغى `null`.
+ *
+ * **وقاعدةٌ لا تردّ ترمي، لا تقول «لا أحد»** (مراجعة D-317). كان الخطأ يُبلَع فيصير `null`، و`/panel/login` يجعل
+ * «لا أحد» دورَ «قارئ» فيحسب منه أنّ العاملَ الثانيَ لا يلزم: عثرةٌ واحدةٌ في D1 فتحت لمديرٍ بلا عاملٍ جلسةً كاملة.
+ * فمن يقرّر على الجواب يقرّر على جواب: «لا أحد» أو «القاعدةُ لم تردّ»، ولكلٍّ ردُّه.
+ */
 export async function activeMember(db: Db, raw: string): Promise<Member | null> {
   const row = await db
     .prepare('SELECT * FROM members WHERE email = ? AND revoked_at IS NULL')
     .bind(normalizeEmail(raw))
     .first<Record<string, string | null>>()
-    .catch(() => null)
   return row === null ? null : rowToMember(row)
 }
 
-/** **من يُرسَل إليه رمزُ الدخول** — المالكُ أو مدعوٌّ قائم. والسؤالُ في موضعٍ واحد (D-245). */
+/** **من يُرسَل إليه رمزُ الدخول** — المالكُ أو مدعوٌّ قائم. والسؤالُ في موضعٍ واحد (D-245). ويرمي إن لم تردّ القاعدة. */
 export async function whoCanReceive(db: Db, raw: string): Promise<Who | null> {
   const email = normalizeEmail(raw)
   if (isOwnerEmail(email)) return OWNER_WHO

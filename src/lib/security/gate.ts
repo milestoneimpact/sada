@@ -25,20 +25,32 @@
  * استنفد العنوانُ حصّتَه، فدفعةٌ من عنوانٍ واحدٍ تكفي. وكانت عشرُ تخميناتٍ لرمز المالك من أيّ مكانٍ تُغلق بابَ الرمز
  * يومًا كاملًا. فصار:
  *
- * - **العنوانُ أوّلًا**، و`/64` لـ IPv6 (`ipBucket`)؛ وما ردّه العنوانُ لا يُزاد به العامّ؛
+ * - **العنوانُ أوّلًا**، و`/64` لـ IPv6 (`ipBucket`)؛ **ثمّ شبكتُه `/48`** (`netBucket`، مراجعة D-317)؛ وما ردّه
+ *   أحدُهما لا يُزاد به ما فوقه؛
  * - **والعامُّ قاطعُ دائرةٍ** بسقفٍ أعلى بكثير (`MAX_GLOBAL_ATTEMPTS`)؛
  * - **ورمزُ البريد لكلّ (حسابٍ، مصدر)** عشرًا في اليوم، **وللحساب كلِّه** ثلاثين: من خمّن عشرًا أغلق على نفسه؛
- * - **ومفتاحُ المرور لا يمرّ بهذه الدلاء أصلًا**: التوقيعُ لا يُخمَّن، وتذكرتُه محدودةٌ بسقف التحدّيات.
+ * - **ومفتاحُ المرور لا يمرّ بهذه الدلاء أصلًا**، وتحدّيه بلا حالةٍ (`security/challenge.ts`) فلا سقفَ له يُملأ.
+ *
+ * ## والجهازُ الذي دخل من قبل لا يُقفله مجهول (مراجعة D-317)
+ *
+ * القاطعُ العامّ وسقفُ الحساب حدّان على «الجميع» وعلى «الحساب»، فكلُّ من ملك مصادرَ كافيةً يملؤهما — والمراجعةُ
+ * ملأتهما بكتلة `/48` واحدةٍ وبثلاثة مصادر. فالجهازُ الذي يحمل **كعكةَ جهازٍ موثوق** لهذا البريد (`security/device.ts`،
+ * تُكتب بعد دخولٍ كاملٍ ناجح) لا يمرّ بهما: له حصّةُ مصدره، وحصّتُه هو في اليوم بدل حصّة الحساب. وهذا نمطُ OWASP
+ * «Device Cookies»: الإقفالُ يقع على العملاء المجهولين وحدهم، فالمهاجمُ يُقفل نفسَه ومن لم يدخل قطّ، ولا يُقفل المالك.
  */
 import type { Db } from '../tokens'
-import { ipBucket, MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS } from '../rateLimit'
+import { ipBucket, MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS, netBucket } from '../rateLimit'
 
 /**
- * إصدارُ التحدّيات: كلُّ تحدٍّ كتابةٌ في KV تُدفَع، فللمجهول سقف.
- * والعامُّ قاطعُ دائرة (D-317): ثلاثةُ آلافٍ في ربع ساعة ≈ ‏1.4$ في اليوم أسوأَ حال، لا بابٌ يُغلقه خمسةَ عشرَ عنوانًا.
+ * إصدارُ رمز البريد لمجهول: كلُّ إصدارٍ كتابةٌ في KV وبريدٌ وصفُّ تدقيق، فللمجهول سقف.
+ * والعامُّ قاطعُ دائرة (D-317): ثلاثةُ آلافٍ في ربع ساعة، لا بابٌ يُغلقه خمسةَ عشرَ عنوانًا.
  */
-export const MAX_CHALLENGES = 20
-export const MAX_GLOBAL_CHALLENGES = 3000
+export const MAX_CODE_ISSUES = 20
+export const MAX_GLOBAL_CODE_ISSUES = 3000
+
+/** حصّةُ الشبكة `/48` (مراجعة D-317): خمسُ شبكاتٍ `/64` بحصّتها كاملة — لا مئتان. */
+export const MAX_NET_ATTEMPTS = 5 * MAX_ATTEMPTS
+export const MAX_NET_CODE_ISSUES = 3 * MAX_CODE_ISSUES
 
 const WINDOW = '-15 minutes'
 
@@ -83,26 +95,43 @@ async function bump(db: Db, bucket: string, window = WINDOW): Promise<number | n
 }
 
 /**
- * الحصّةُ المحلّيّةُ أوّلًا ثمّ العامّة (D-317) — **وما ردّته المحلّيّةُ لا يُزاد به العامّ**: عنوانٌ واحدٌ لا يحمل إلى
- * القاطع العامّ أكثرَ من حصّته، ولو أرسل ألفًا.
+ * الحصّةُ المحلّيّةُ أوّلًا، ثمّ الشبكةُ `/48` لـ IPv6، ثمّ العامّة (D-317) — **وما ردّه دلوٌ لا يُزاد به ما فوقه**:
+ * عنوانٌ واحدٌ لا يحمل إلى القاطع العامّ أكثرَ من حصّته ولو أرسل ألفًا، وكتلةُ `/48` لا تحمل أكثرَ من حصّة شبكتها ولو
+ * بدّلت `/64` مئتي مرّة (مراجعة D-317).
+ *
+ * **والجهازُ الموثوقُ** (`device`، مراجعة D-317) لا يمرّ بالشبكة ولا بالعامّ: حصّةُ مصدره وحدَها. فلا يردّه قاطعٌ ملأه
+ * غيرُه، **ولا يُزاد به** فلا يُنقَص منه عند نجاحه.
  */
-async function both(
+async function tiered(
   db: Db,
-  local: string,
-  global: string,
-  limits: readonly [number, number],
+  request: Request,
+  prefix: { readonly local: string; readonly net: string; readonly global: string },
+  limits: { readonly local: number; readonly net: number; readonly global: number },
+  device: string | null,
 ): Promise<Reservation> {
-  const mine = await bump(db, local)
+  const mine = await bump(db, `${prefix.local}${ipOf(request)}`)
   if (mine === null) return GATE_UNAVAILABLE
-  if (mine > limits[0]) return { allowed: false, count: mine }
-  const all = await bump(db, global)
+  if (mine > limits.local) return { allowed: false, count: mine }
+  if (device !== null) return { allowed: true, count: mine }
+  const net = netBucket(request)
+  if (net !== null) {
+    const wide = await bump(db, `${prefix.net}${net}`)
+    if (wide === null) return GATE_UNAVAILABLE
+    if (wide > limits.net) return { allowed: false, count: mine }
+  }
+  const all = await bump(db, prefix.global)
   if (all === null) return GATE_UNAVAILABLE
-  return all <= limits[1] ? { allowed: true, count: mine } : { allowed: false, count: mine, why: 'global' }
+  return all <= limits.global ? { allowed: true, count: mine } : { allowed: false, count: mine, why: 'global' }
 }
 
-/** يحجز محاولةَ تحقّقٍ (كلمة، رمزُ تطبيق، رمزُ استرداد، توقيعُ مفتاح). */
-export function reserveAttempt(db: Db, request: Request): Promise<Reservation> {
-  return both(db, `ip:${ipOf(request)}`, 'global', [MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS])
+const ATTEMPT = { local: 'ip:', net: 'net:', global: 'global' } as const
+
+/**
+ * يحجز محاولةَ تحقّقٍ (رمزُ بريد، رمزُ تطبيق، رمزُ استرداد).
+ * و`device` معرّفُ جهازٍ موثوقٍ لهذا البريد (`trustedDevice`) أو `null`.
+ */
+export function reserveAttempt(db: Db, request: Request, device: string | null = null): Promise<Reservation> {
+  return tiered(db, request, ATTEMPT, { local: MAX_ATTEMPTS, net: MAX_NET_ATTEMPTS, global: MAX_GLOBAL_ATTEMPTS }, device)
 }
 
 /**
@@ -113,30 +142,41 @@ export function reserveAttempt(db: Db, request: Request): Promise<Reservation> {
  * بابَ الرمز على المالك يومًا**. فصار:
  *
  * - عشرٌ في اليوم لكلّ (حسابٍ، عنوانٍ أو `/64`): من خمّن عشرًا أغلق على نفسه وحده؛
- * - وثلاثون في اليوم للحساب من كلّ المصادر: إغلاقُه يحتاج ثلاثةَ مصادرَ مستقلّةً لا طلبًا واحدًا. وسقفُ الاحتمال يصير
- *   ثلاثين في المليون في اليوم (‏≈1.1٪ في السنة على العامل الأوّل وحده) — **والعاملُ الأوّل وحده لم يعد يفتح جلسةَ
- *   مالكٍ ولا مديرٍ ولا ناشر** (العاملُ الثاني إلزاميّ لهم).
+ * - وثلاثون في اليوم للحساب من كلّ المصادر **المجهولة**: إغلاقُه يحتاج ثلاثةَ مصادرَ مستقلّة. وسقفُ الاحتمال يصير ثلاثين في
+ *   المليون في اليوم (‏≈1.1٪ في السنة على العامل الأوّل وحده) — **والعاملُ الأوّل وحده لم يعد يفتح جلسةَ مالكٍ ولا
+ *   مديرٍ ولا ناشر** (العاملُ الثاني إلزاميّ لهم)؛
+ * - **والجهازُ الموثوقُ لا يمرّ بسقف الحساب** (مراجعة D-317): ثلاثةُ مصادر كانت تُقفل المالكَ يومًا من كلّ أجهزته؛ فله
+ *   عشرٌ في اليوم له وحده (`code:<بريد>:dev:<جهاز>`) بدل الثلاثين المشتركة.
  */
 export const MAX_CODE_GUESSES_PER_DAY = 10
 export const MAX_ACCOUNT_CODE_GUESSES_PER_DAY = 30
 
-export async function reserveCodeGuess(db: Db, email: string, request: Request): Promise<Reservation> {
+export async function reserveCodeGuess(db: Db, email: string, request: Request, device: string | null = null): Promise<Reservation> {
   const mine = await bump(db, `code:${email}:${ipOf(request)}`, '-24 hours')
   if (mine === null) return GATE_UNAVAILABLE
   if (mine > MAX_CODE_GUESSES_PER_DAY) return { allowed: false, count: mine }
+  if (device !== null) {
+    const own = await bump(db, `code:${email}:dev:${device}`, '-24 hours')
+    if (own === null) return GATE_UNAVAILABLE
+    return own <= MAX_CODE_GUESSES_PER_DAY ? { allowed: true, count: mine } : { allowed: false, count: own }
+  }
   const all = await bump(db, `code:${email}`, '-24 hours')
   if (all === null) return GATE_UNAVAILABLE
   return all <= MAX_ACCOUNT_CODE_GUESSES_PER_DAY ? { allowed: true, count: mine } : { allowed: false, count: mine, why: 'global' }
 }
 
 /**
- * الدخولُ بالرمز يمحو عدَّ مصدره، **ويعيد إلى الحساب محاولتَه وحدَها** (D-317): لو مُحي عدُّ الحساب كلُّه لصار دخولُ
- * المالك الناجح أداةً تُنعش حملةً جارية من مصادرَ أخرى.
+ * الدخولُ بالرمز يمحو عدَّ مصدره (وعدَّ جهازه إن كان موثوقًا)، **ويعيد إلى الحساب محاولتَه وحدَها** (D-317): لو مُحي عدُّ
+ * الحساب كلُّه لصار دخولُ المالك الناجح أداةً تُنعش حملةً جارية من مصادرَ أخرى. والموثوقُ لم يُزَد به الحسابُ فلا يُنقَص.
  */
-export async function releaseCodeGuesses(db: Db, email: string, request: Request): Promise<void> {
+export async function releaseCodeGuesses(db: Db, email: string, request: Request, device: string | null = null): Promise<void> {
   try {
     await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`code:${email}:${ipOf(request)}`).run()
-    await db.prepare('UPDATE auth_attempts SET n = MAX(n - 1, 0) WHERE bucket = ?').bind(`code:${email}`).run()
+    if (device !== null) {
+      await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`code:${email}:dev:${device}`).run()
+    } else {
+      await db.prepare('UPDATE auth_attempts SET n = MAX(n - 1, 0) WHERE bucket = ?').bind(`code:${email}`).run()
+    }
   } catch (error) {
     console.warn({ job: 'gate', failed: String(error) })
   }
@@ -149,14 +189,15 @@ export async function releaseCodeGuesses(db: Db, email: string, request: Request
  * السقف العامّ (‏≈0.9٪ في اليوم)، والجلسةُ المعلَّقةُ تعيش ثلاثة أيّام. فصار:
  *
  * - **خمسٌ لكلّ جلسةٍ معلَّقة** (`2fa:s:<بصمتها>`) — والسادسةُ تُسقط الجلسة، فيعود إلى رمز البريد من أوّله؛
- * - **وعشرٌ في اليوم للحساب** (`2fa:<بريده>`) كسقف رمز البريد؛ ومفتاحُ المرور لا يُعدّ هنا؛
- * - وحصّةُ العنوان والقاطعُ العامُّ فوقهما (`reserveAttempt`).
+ * - **وعشرٌ في اليوم للحساب** (`2fa:<بريده>`) كسقف رمز البريد — ولا يملؤه إلّا من ملك العاملَ الأوّل؛ ومفتاحُ المرور لا
+ *   يُعدّ هنا؛
+ * - وحصّةُ العنوان والشبكةِ والقاطعُ العامُّ فوقهما (`reserveAttempt`)، **والجهازُ الموثوقُ لا يمرّ بالشبكة ولا بالعامّ**.
  */
 export const MAX_FACTOR_GUESSES_PER_SESSION = 5
 export const MAX_FACTOR_GUESSES_PER_DAY = 10
 
 export async function reserveFactorGuess(
-  db: Db, email: string, sessionHandle: string, request: Request,
+  db: Db, email: string, sessionHandle: string, request: Request, device: string | null = null,
 ): Promise<Reservation & { readonly dropSession?: boolean }> {
   const inSession = await bump(db, `2fa:s:${sessionHandle}`, '-10 minutes')
   if (inSession === null) return GATE_UNAVAILABLE
@@ -164,47 +205,43 @@ export async function reserveFactorGuess(
   const today = await bump(db, `2fa:${email}`, '-24 hours')
   if (today === null) return GATE_UNAVAILABLE
   if (today > MAX_FACTOR_GUESSES_PER_DAY) return { allowed: false, count: today, why: 'global' }
-  return await reserveAttempt(db, request)
+  return await reserveAttempt(db, request, device)
 }
 
 /** نجاحُ العامل الثاني يمحو عدَّ جلسته ويعيد إلى الحساب محاولتَه، كما يُعاد للعنوان. */
-export async function releaseFactorGuess(db: Db, email: string, sessionHandle: string, request: Request): Promise<void> {
+export async function releaseFactorGuess(
+  db: Db, email: string, sessionHandle: string, request: Request, device: string | null = null,
+): Promise<void> {
   try {
     await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`2fa:s:${sessionHandle}`).run()
     await db.prepare('UPDATE auth_attempts SET n = MAX(n - 1, 0) WHERE bucket = ?').bind(`2fa:${email}`).run()
   } catch (error) {
     console.warn({ job: 'gate', failed: String(error) })
   }
-  await releaseAttempt(db, request)
+  await releaseAttempt(db, request, device)
 }
 
-/** يحجز إصدارَ تحدٍّ لمجهول — قبل أن يُكتب في KV. */
-export function reserveChallenge(db: Db, request: Request): Promise<Reservation> {
-  return both(
-    db,
-    `challenge:${ipOf(request)}`,
-    'challenge:global',
-    [MAX_CHALLENGES, MAX_GLOBAL_CHALLENGES],
-  )
-}
-
-/** النجاحُ يعيد ما حجز: حصّةُ العنوان تُمحى، وحصّةُ الجميع تنقص واحدًا. */
 /**
- * إصدارُ رمز البريد لمجهول (D-270): سقفُ التحدّيات نفسُه، **في دلوٍ مستقلّ** —
- * دخولُ المالك بالرمز لا ينقص رصيدَ تحدّيات مفتاحه، ولا العكس.
+ * إصدارُ رمز البريد لمجهول (D-270) — **في دلوٍ مستقلّ** عن محاولات الدخول، بشبكته وقاطعه العامّ، والجهازُ الموثوقُ لا
+ * يمرّ بهما (مراجعة D-317): كان ثلاثةُ آلاف طلبٍ من مئةٍ وخمسين مصدرًا تمنع الرمزَ عن المالك نفسِه.
  */
-export function reserveCodeIssue(db: Db, request: Request): Promise<Reservation> {
-  return both(
+export function reserveCodeIssue(db: Db, request: Request, device: string | null = null): Promise<Reservation> {
+  return tiered(
     db,
-    `code-issue:${ipOf(request)}`,
-    'code-issue:global',
-    [MAX_CHALLENGES, MAX_GLOBAL_CHALLENGES],
+    request,
+    { local: 'code-issue:', net: 'code-issue-net:', global: 'code-issue:global' },
+    { local: MAX_CODE_ISSUES, net: MAX_NET_CODE_ISSUES, global: MAX_GLOBAL_CODE_ISSUES },
+    device,
   )
 }
 
-export async function releaseAttempt(db: Db, request: Request): Promise<void> {
+/** النجاحُ يعيد ما حجز: حصّةُ العنوان تُمحى، وحصّتا الشبكة والجميع تنقصان واحدًا — إلّا للموثوق، فلم يُزَد بهما. */
+export async function releaseAttempt(db: Db, request: Request, device: string | null = null): Promise<void> {
   try {
     await db.prepare('DELETE FROM auth_attempts WHERE bucket = ?').bind(`ip:${ipOf(request)}`).run()
+    if (device !== null) return
+    const net = netBucket(request)
+    if (net !== null) await db.prepare('UPDATE auth_attempts SET n = MAX(n - 1, 0) WHERE bucket = ?').bind(`net:${net}`).run()
     await db
       .prepare("UPDATE auth_attempts SET n = MAX(n - 1, 0) WHERE bucket = 'global'")
       .run()

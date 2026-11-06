@@ -13,20 +13,28 @@
  *
  * - **المعلَّقة** (رمزُ البريد بلا العامل الثاني) لا تفتح إلّا شاشتَه وأبوابَ الدخول والخروج (`pendingMayOpen`).
  * - **جلسةُ التسجيل وحده** (حسابٌ يلزمه عاملٌ ولا عاملَ له) لا تفتح إلّا صفحةَ التسجيل والمساعدةَ والخروج (`enrolMayOpen`).
- * - **والفعلُ الحسّاس** (`needsStepUp`) لا يجري إلّا بتحقّقٍ في آخر خمس دقائق، وإلّا فإلى «تحقّق للتوّ» ثمّ العودة.
+ * - **والفعلُ الحسّاس** (`needsStepUp`) لا يجري إلّا بتحقّقٍ في آخر خمس دقائق، وإلّا فإلى «تحقّق للتوّ» ثمّ العودة —
+ *   **ولا يُمرَّر إلى مساره بلا تحقّقٍ حديثٍ أبدًا** (مراجعة D-317): كان `HEAD` يمرّ لأنّ الفرعَ يعدّ `GET` وحده.
+ * - **والدورُ الذي صار يلزمه عامل** (مراجعة D-317): يُقرأ الدورُ من `members` في كلّ طلب، فمحرّرٌ دخل برمز بريده وحده ثمّ
+ *   رُقّي مديرًا أو ناشرًا لا تبقى جلستُه كاملةً بلا عامل — تسقط، ويُسأل في دخوله التالي عن عامله أو يسجّله.
  * - **والخمولُ** اثنتا عشرة ساعة تُحسَب في `loadSession`، ويُؤرَّخ آخرُ طلبٍ هنا (`touchSession`).
  */
 import type { Context, Next } from 'hono'
 import type { Env } from '../env'
-import { checkCsrf, destroySession, isFresh, loadSession, setActiveOrg, touchSession, type Session } from '../lib/session'
+import {
+  checkCsrf, clearedCookie, destroySession, isFresh, loadSession, safeNext, setActiveOrg, touchSession, type Session,
+} from '../lib/session'
 import { activeOrg, OWNER_ORG } from '../lib/tenancy'
 import {
-  allows, enrolMayOpen, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, STEP_UP_SECRET_FIELDS,
+  allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, STEP_UP_SECRET_FIELDS,
 } from '../lib/access'
 import { activeMember, OWNER_WHO, ROLE_LABEL, touchMember, type Who } from '../lib/team'
 import { OWNER_EMAIL } from '../lib/ownerEmail'
 import { say } from '../lib/errors/catalog'
-import { setFlash } from './panel'
+import { record } from '../lib/audit'
+import { htmlHeaders, makeNonce } from '../lib/security/headers'
+import { loginPage } from './panelView'
+import { hasPasskeys, setFlash } from './panel/shared'
 
 function denied(c: Context<{ Bindings: Env }>, text: string): Response | Promise<Response> {
   const wantsJson = (c.req.header('Accept') ?? '').includes('application/json')
@@ -38,6 +46,26 @@ function denied(c: Context<{ Bindings: Env }>, text: string): Response | Promise
 function toComplete(c: Context<{ Bindings: Env }>, to: string, error: 'pending_second_factor' | 'enrol_required'): Response {
   if (c.req.method === 'GET' || c.req.method === 'HEAD') return c.redirect(to, 303)
   return Response.json({ error, detail: say(error) }, { status: 403, headers: { Location: to } })
+}
+
+/**
+ * **الجلسةُ تسقط ويُعاد صاحبُها إلى الدخول بسببه** (مراجعة D-317) — صفحةُ الدخول نفسُها برسالتها، والكعكةُ ممحوّة؛
+ * ونداءُ سكربتٍ يُجاب بسببه. والوجهةُ تبقى لصفحةٍ تُفتح، فيعود إليها بعد الدخول.
+ */
+async function toSignIn(c: Context<{ Bindings: Env }>, text: string): Promise<Response> {
+  await destroySession(c.env.KV, c.req.raw)
+  if ((c.req.header('Accept') ?? '').includes('application/json')) {
+    return Response.json({ error: 'enrol_required', detail: text }, { status: 401, headers: { 'Set-Cookie': clearedCookie() } })
+  }
+  // ‏وصفحةٌ تُفتح يعود إليها بعد الدخول؛ ونموذجٌ أُرسل لا يُعاد إرسالُه — إلى الرئيسيّة
+  const url = new URL(c.req.url)
+  const opened = c.req.method === 'GET' || c.req.method === 'HEAD'
+  const passkeys = await hasPasskeys(c.env)
+  const nonce = makeNonce()
+  const headers = new Headers(htmlHeaders(nonce))
+  headers.set('Set-Cookie', clearedCookie())
+  return new Response(loginPage({ error: text, passkeys, next: opened ? safeNext(url.pathname + url.search) : '/panel' }, nonce),
+    { status: 401, headers })
 }
 
 /** مفتاحُ النموذج المحفوظ بين الفعل و«تحقّق للتوّ» — لجلسته وحدها، عشرَ دقائق. */
@@ -109,6 +137,7 @@ export async function accessGuard(c: Context<{ Bindings: Env }>, next: Next): Pr
   if (role === 'owner' && email === OWNER_EMAIL) {
     who = OWNER_WHO
   } else {
+    // ‏وقاعدةٌ لا تردّ **ترمي** (مراجعة D-317): صفحةُ «حدث خطأ من جهتنا، أعد المحاولة» — لا جلسةٌ تسقط بعثرة، ولا طلبٌ يمرّ
     const member = await activeMember(c.env.DB, email)
     if (member === null) {
       // ‏أُلغيت دعوتُه: الجلسةُ تسقط الآن لا بعد ثلاثة أيّام
@@ -116,6 +145,18 @@ export async function accessGuard(c: Context<{ Bindings: Env }>, next: Next): Pr
       return c.redirect('/panel', 303)
     }
     who = { email: member.email, role: member.role, orgs: member.orgs }
+  }
+
+  /*
+   * ‏**دورٌ يلزمه عاملٌ وجلسةٌ لم تُثبت عاملًا** (مراجعة D-317). قرارُ «جلسة التسجيل» يُتّخذ عند الدخول من دور تلك اللحظة،
+   * ‏والدورُ يُقرأ هنا من القاعدة في كلّ طلب: محرّرٌ دخل برمز بريده وحده ثمّ رقّاه المالكُ مديرًا كان يبقى مديرًا كاملًا بلا عامل
+   * ‏حتّى ثلاثة أيّام، ويتحقّق «للتوّ» برمز البريد نفسِه. فالجلسةُ تسقط، ودخولُه التالي يسأله عن عامله أو يسجّله. **ولا تُرقّى
+   * ‏هنا إلى جلسة تسجيلٍ «حديثة»**: من سرق كعكةَ المحرّر لا يُعطى بالترقية بابًا يسجّل منه مفتاحَه.
+   */
+  if (factorRequired(who.role) && session.record.enrol !== true && session.record.factor !== true) {
+    await record(c.env.DB, { actor: 'panel', action: 'session.drop', detail: 'دورٌ يلزمه عاملٌ ثانٍ · ' + who.role, by: who.email }, c.req.raw)
+    // ‏نصٌّ يُهرَّب في صفحة الدخول (`noticeText`)، لا قالبٌ يُقحَم
+    return toSignIn(c, 'دورُك صار «' + ROLE_LABEL[who.role].name + '» ويلزمه عاملٌ ثانٍ — ادخل من جديد لتسجّله.')
   }
 
   // ‏جلسةُ التسجيل وحده (D-317): صفحةُ التسجيل وما يلزمها، وما سواها إليها
@@ -150,12 +191,18 @@ export async function accessGuard(c: Context<{ Bindings: Env }>, next: Next): Pr
   }
 
   /*
-   * ‏**الفعلُ الحسّاسُ بتحقّقٍ حديث** (D-317). ونموذجٌ برمزٍ لا يطابق يمضي إلى مساره فيُردّ هناك كما كان: لا يُحفظ ما
-   * ‏أرسله غيرُ صاحب الجلسة ليُعرض عليه بعد التحقّق.
+   * ‏**الفعلُ الحسّاسُ بتحقّقٍ حديث** (D-317) — **ولا يُمرَّر إلى مساره بلا تحقّقٍ حديثٍ أبدًا** (مراجعة D-317). كان الفرعُ
+   * ‏يعدّ `GET` وحده فيمرّ `HEAD` (وHono يوجّهه إلى معالج `GET`) فيكتب حالةَ OAuth ويحوّل إلى المزوّد بكعكةٍ قديمة. والآن:
+   * ‏صفحةٌ تُفتح (`GET`/`HEAD`) إلى «تحقّق للتوّ»، ونموذجٌ برمزٍ صحيحٍ يُحفظ ويُعاد بعده، **ونموذجٌ برمزٍ لا يطابق يُردّ هنا**
+   * ‏بسببه — لا يُحفظ ما أرسله غيرُ صاحب الجلسة ليُعرض عليه، ولا يمضي إلى مساره.
    */
   if (needsStepUp(c.req.method, path, form?.get('key')?.toString() ?? null) && !isFresh(session.record)) {
-    const csrfOk = c.req.method === 'GET' || (form !== null && await checkCsrf(session, String(form.get('_csrf') ?? '')))
-    if (csrfOk) return toStepUp(c, session, who, path, form)
+    const opened = c.req.method === 'GET' || c.req.method === 'HEAD'
+    if (opened || (form !== null && await checkCsrf(session, String(form.get('_csrf') ?? '')))) {
+      return toStepUp(c, session, who, path, form)
+    }
+    await record(c.env.DB, { actor: 'panel', action: 'csrf.reject', target: path }, c.req.raw)
+    return Response.json({ error: 'csrf_failed', detail: say('csrf_failed') }, { status: 403 })
   }
 
   if (who.role !== 'owner') await touchMember(c.env.DB, who.email)

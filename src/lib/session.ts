@@ -166,6 +166,12 @@ export interface SessionRecord {
    * التسجيل والمساعدةَ والخروج، وتصير كاملةً **بمعرّفٍ جديد** حين يُسجَّل أوّلُ عامل.
    */
   readonly enrol?: boolean
+  /**
+   * **أثبتت الجلسةُ عاملًا ثانيًا** (مراجعة D-317): فُتحت بمفتاح مرور، أو رُقّيت بعد العامل الثاني، أو بعد تسجيل أوّل
+   * عامل. والحارسُ يسأل عنها حين يكون دورُ صاحبها **الآن** ممّا يلزمه عامل: محرّرٌ دخل برمز بريده وحده ثمّ رُقّي مديرًا لا
+   * تبقى جلستُه كاملةً بلا عامل — يُعاد إلى الدخول، فيُسأل عن عامله أو يسجّله.
+   */
+  readonly factor?: boolean
   /** آخرُ طلبٍ رأته (D-317) — يُقرأ للخمول، ويُكتب مرّةً كلَّ خمس دقائق لا في كلّ طلب. */
   readonly seen?: string
   /** آخرُ تحقّقٍ قويّ (D-317): العاملُ الثاني، أو رمزُ البريد لمن لا عاملَ له. ومنه «للتوّ» قبل الأفعال الحسّاسة. */
@@ -295,6 +301,7 @@ export async function createPasskeySession(
     at,
     seen: at,
     fresh: at,
+    factor: true,
     via: 'passkey',
     bind,
     csrf: randomToken(32),
@@ -329,6 +336,8 @@ export async function promoteSession(
     at,
     seen: at,
     fresh: at,
+    // ‏والترقيةُ لا تقع إلّا بعد عاملٍ ثانٍ أُتمّ أو سُجّل (مراجعة D-317)
+    factor: true,
     csrf: randomToken(32),
     pending: false,
   })
@@ -394,6 +403,7 @@ function parse(raw: string): SessionRecord | null {
       ...(typeof value.seen === 'string' ? { seen: value.seen } : {}),
       ...(typeof value.fresh === 'string' ? { fresh: value.fresh } : {}),
       ...(value.enrol === true ? { enrol: true } : {}),
+      ...(value.factor === true ? { factor: true } : {}),
       via: value.via === 'passkey' || value.via === 'email_code' ? value.via : 'admin_token',
       bind: value.bind,
       csrf: value.csrf,

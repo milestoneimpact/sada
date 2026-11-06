@@ -27,14 +27,17 @@ import { newSecret, otpauthUrl, verifyTotp } from '../lib/security/totp'
 import {
   CHALLENGE_TTL_SECONDS, newChallenge, verifyAssertion, verifyRegistration,
 } from '../lib/security/webauthn'
+import { issueTicket, openTicket, usedTicketKey } from '../lib/security/challenge'
+import { trustedDevice, withDevice } from '../lib/security/device'
+import { platformLabel } from '../lib/oauth/providers'
+import { activeOrg } from '../lib/tenancy'
 import {
   checkCsrf, clearedCookie, createPasskeySession, destroySession, isFresh, loadSession, markFresh,
   promoteSession, safeNext, sessionCookie, type Session,
 } from '../lib/session'
 import { attemptState, clearAttempts, delayMs, recordFailure } from '../lib/rateLimit'
 import {
-  GATE_UNAVAILABLE_TEXT, releaseCodeGuesses, releaseFactorGuess, reserveChallenge, reserveCodeGuess,
-  reserveCodeIssue, reserveFactorGuess,
+  GATE_UNAVAILABLE_TEXT, releaseCodeGuesses, releaseFactorGuess, reserveCodeGuess, reserveCodeIssue, reserveFactorGuess,
 } from '../lib/security/gate'
 import { digest, fingerprint } from '../lib/security/digest'
 import { issueCode, verifyCode } from '../lib/security/loginCode'
@@ -76,7 +79,7 @@ function emailOf(session: Session): string {
   return normalizeEmail(session.record.email ?? OWNER_EMAIL)
 }
 
-/** من صاحبُ هذا البريد الآن: المالكُ، أو مدعوٌّ قائم، أو لا أحد (أُلغيت دعوتُه). */
+/** من صاحبُ هذا البريد الآن: المالكُ، أو مدعوٌّ قائم، أو لا أحد (أُلغيت دعوتُه). **ويرمي إن لم تردّ القاعدة.** */
 async function whoIs(env: Env, email: string): Promise<Who | null> {
   if (isOwnerEmail(email)) return OWNER_WHO
   const member = await activeMember(env.DB, email)
@@ -200,7 +203,11 @@ auth.get('/panel/2fa', async (c) => {
  * أجهزةٍ خلف عنوانٍ واحد تدوس تحدّياتِ بعضها فيفشل الدخولُ بلا تفسير.
  *
  * **ولا يُردّ بدلاء رمز البريد** (D-317): كان «عنوانُك أخطأ خمسًا في رمز البريد» أو «ثلاثون فشلًا من أيّ مكان» يغلق
- * هذا البابَ أيضًا، والتوقيعُ لا يُخمَّن. فسقفُه سقفُ التحدّيات وحده (كتابةٌ مدفوعةٌ في KV لكلّ تحدٍّ).
+ * هذا البابَ أيضًا، والتوقيعُ لا يُخمَّن.
+ *
+ * **ولا سقفَ له يُملأ** (مراجعة D-317): كان كلُّ تحدٍّ كتابةً في KV، فاحتاج قاطعًا عامًّا (ثلاثة آلاف في ربع ساعة) ملأته
+ * كتلةُ `/48` واحدة فردّت تحدّي المالك من عنوانٍ نظيف. والتذكرةُ الآن موقَّعةٌ بلا حالة (`security/challenge.ts`): لا كتابةَ
+ * عند الإصدار، و«استُعملت» تُكتب بعد توقيعٍ صحيحٍ وحده.
  */
 auth.post('/panel/passkey/challenge', async (c) => {
   const rp = relyingParty(c.env.PUBLIC_BASE_URL)
@@ -212,22 +219,12 @@ auth.post('/panel/passkey/challenge', async (c) => {
   }
   if (keys.length === 0) return json({ error: 'no_passkeys' }, 404)
 
-  // ‏كلُّ تحدٍّ كتابةٌ في KV تُدفَع، والطالبُ مجهول: سقفٌ للعنوان وللجميع قبل الكتابة (D-161)
-  const challengeSlot = await reserveChallenge(c.env.DB, c.req.raw)
-  if (!challengeSlot.allowed) {
-    // ‏قاعدةٌ لا تردّ ليست حدًّا (D-291): 503 لا 429، فالعميلُ يعيد بعد قليل ولا يُعدّ محظورًا
-    return json({ error: challengeSlot.why === 'db' ? 'unavailable' : 'rate_limited' }, challengeSlot.why === 'db' ? 503 : 429)
-  }
-
-  const ticket = crypto.randomUUID()
-  const challenge = newChallenge()
-  await c.env.KV.put(challengeKey(ticket), challenge, {
-    expirationTtl: CHALLENGE_TTL_SECONDS,
-  })
+  const issued = await issueTicket(c.env.ADMIN_TOKEN)
+  if (issued === null) return json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, 503)
 
   return json({
-    ticket,
-    challenge,
+    ticket: issued.ticket,
+    challenge: issued.challenge,
     rpId: rp.id,
     // تُرسَل المعرّفات ليعرف المتصفّح أيّ مفتاحٍ يطلب. **وهي ليست سرّا**:
     // معرّفُ اعتمادٍ لا يوقّع شيئا بلا مفتاحه الخاصّ الذي لا يغادر الجهاز
@@ -256,13 +253,17 @@ auth.post('/panel/passkey/login', async (c) => {
   }>().catch(() => null)
   if (body === null) return json({ error: 'bad_request' }, 400)
 
-  const ticket = String(body.ticket ?? '')
-  const challenge = ticket === '' ? null : await c.env.KV.get(challengeKey(ticket))
-  if (challenge === null) return json({ error: 'challenge_expired' }, 400)
-  // التحدّي يُستهلَك مرّةً واحدة، نجح أو فشل: إعادةُ إرسالٍ لا تجد ما تردّ به
-  await c.env.KV.delete(challengeKey(ticket))
+  // ‏التذكرةُ موقَّعةٌ بلا حالة (مراجعة D-317): مزوَّرةٌ أو منتهيةٌ بلا قراءة، ومستعملةٌ بقراءةٍ واحدة ← «انتهت»
+  const opened = await openTicket(c.env.ADMIN_TOKEN, String(body.ticket ?? ''))
+  if (opened === null || (await c.env.KV.get(usedTicketKey(opened.challenge))) !== null) {
+    return json({ error: 'challenge_expired' }, 400)
+  }
+  const challenge = opened.challenge
 
   const verdict = await completeAssertion(c.env, body, challenge, null)
+  // ‏**وتوقيعٌ صحيحٌ يستهلكها، أيًّا كان ما بعده**: إعادةُ إرساله لا تجد ما تردّ به. وتوقيعٌ لا يصحّ لا يكتب شيئًا — فالكتابةُ
+  // ‏بعددِ الدخولات الحقيقيّة لا بعددِ الطالبين
+  if (verdict.ok) await c.env.KV.put(usedTicketKey(challenge), '1', { expirationTtl: Math.max(60, opened.ttl) })
   if (verdict.ok && !verdict.userVerified) {
     /*
      * **والمفتاحُ وحدَه بابٌ كامل، فيلزمه أن يعرف صاحبَه** (D-161).
@@ -289,8 +290,13 @@ auth.post('/panel/passkey/login', async (c) => {
     return json({ error: 'denied' }, 401)
   }
 
-  // ‏صاحبُ المفتاح ودورُه الآن (D-317): مدعوٌّ أُلغيت دعوتُه لا يفتح مفتاحُه شيئًا
-  const who = await whoIs(c.env, verdict.email)
+  // ‏صاحبُ المفتاح ودورُه الآن (D-317): مدعوٌّ أُلغيت دعوتُه لا يفتح مفتاحُه شيئًا — وقاعدةٌ لا تردّ لا تفتح شيئًا
+  let who: Who | null
+  try {
+    who = await whoIs(c.env, verdict.email)
+  } catch {
+    return json({ error: 'unavailable' }, 503)
+  }
   if (who === null) {
     await record(c.env.DB, { actor: 'anonymous', action: 'passkey.denied', detail: 'مفتاحٌ لدعوةٍ أُلغيت' }, c.req.raw)
     return json({ error: 'denied' }, 401)
@@ -307,10 +313,8 @@ auth.post('/panel/passkey/login', async (c) => {
     c.req.raw,
   )
   await securityEvent(c.env, c.req.raw, { kind: 'session.new', email: who.email, detail: 'بمفتاح «' + verdict.label + '»', sessionId: session.id })
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(session.id) },
-  })
+  const headers = new Headers({ 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(session.id) })
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: await withDevice(headers, c.env.ADMIN_TOKEN, who.email) })
 })
 
 interface AssertionBody {
@@ -386,10 +390,8 @@ async function promoted(
   const email = emailOf(session)
   await record(c.env.DB, { actor: 'panel', action: 'session.open', detail: how, by: email }, c.req.raw)
   await securityEvent(c.env, c.req.raw, { kind: 'session.new', email, detail: how, sessionId: next.id })
-  return new Response(null, {
-    status: 303,
-    headers: { Location: to, 'Set-Cookie': sessionCookie(next.id) },
-  })
+  const headers = new Headers({ Location: to, 'Set-Cookie': sessionCookie(next.id) })
+  return new Response(null, { status: 303, headers: await withDevice(headers, c.env.ADMIN_TOKEN, email) })
 }
 
 // ── إتمامُ العامل الثاني على جلسةٍ معلَّقة ────────────────────────────
@@ -425,7 +427,7 @@ auth.post('/panel/2fa/passkey', async (c) => {
 
 /**
  * يحجز تخمينَ عاملٍ ثانٍ (رمز تطبيق أو استرداد) — **والسادسُ في الجلسة يُسقطها** (D-317).
- * يعيد ردًّا جاهزًا إن رُدّ، أو `null` ليمضي التحقّق.
+ * يعيد ردًّا جاهزًا إن رُدّ، أو `null` ليمضي التحقّق. والجهازُ الموثوقُ لا يمرّ بالشبكة ولا بالقاطع العامّ (مراجعة D-317).
  */
 async function reserveGuess(
   c: { env: Env; req: { raw: Request } },
@@ -433,7 +435,8 @@ async function reserveGuess(
   onDenied: (text: string, status: number) => Promise<Response> | Response,
 ): Promise<Response | null> {
   const handle = await fingerprint(session.id)
-  const slot = await reserveFactorGuess(c.env.DB, emailOf(session), handle, c.req.raw)
+  const device = await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, emailOf(session))
+  const slot = await reserveFactorGuess(c.env.DB, emailOf(session), handle, c.req.raw, device)
   if (slot.allowed) return null
   if (slot.why === 'db') return onDenied(GATE_UNAVAILABLE_TEXT, 503)
   if (slot.dropSession === true) {
@@ -446,15 +449,24 @@ async function reserveGuess(
     : 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
 }
 
-/** خروجٌ بعد إسقاط الجلسة: الكعكةُ تُمحى، والدخولُ يعرض سببه. */
+/**
+ * خروجٌ بعد إسقاط الجلسة: الكعكةُ تُمحى، والدخولُ يعرض سببه — **وما يقع بعده كما يقع** (مراجعة D-317): الخطأُ الخامسُ
+ * أتمّ حدَّ العنوان (خمسٌ في ربع ساعة)، فرمزُ البريد من الجهاز نفسِه مردودٌ ربعَ ساعة، ومفتاحُ المرور لا يمرّ بهذا الحدّ.
+ */
 function redirectCleared(): Response {
   const nonce = makeNonce()
   const headers = new Headers(htmlHeaders(nonce))
   headers.set('Set-Cookie', clearedCookie())
   return new Response(
-    loginPage({ error: 'خمس محاولات خاطئة للعامل الثاني — أُغلقت هذه المحاولة. ادخل من جديد.' }, nonce),
+    loginPage({ error: 'خمس محاولات خاطئة للعامل الثاني — أُغلقت هذه المحاولة. ادخل بمفتاح المرور الآن، أو برمز البريد بعد ربع ساعة.' }, nonce),
     { status: 429, headers },
   )
+}
+
+/** حدُّ العنوان في KV بعد حجز تخمين الجلسة — فالسادسةُ تُسقط الجلسةَ أيًّا كان العنوان (مراجعة D-317). */
+async function addressBlocked(c: { env: Env; req: { raw: Request } }): Promise<Response | null> {
+  const state = await attemptState(c.env.KV, c.req.raw)
+  return state.blocked ? failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429) : null
 }
 
 auth.post('/panel/2fa/totp', async (c) => {
@@ -463,14 +475,14 @@ auth.post('/panel/2fa/totp', async (c) => {
   if (!gate.session.record.pending) return c.redirect('/panel', 303)
   const email = emailOf(gate.session)
 
-  const state = await attemptState(c.env.KV, c.req.raw)
-  if (state.blocked) {
-    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
-  }
   // ‏والحجزُ قبل الفحص (D-161): ألفُ طلبٍ متزامنٍ يقرأ «صفرًا» من KV قبل أن
-  // ‏يكتب أحدُها، والعدّادُ الذرّيُّ في D1 يردّ السادسَ قبل أن يُقارَن رمزُه
+  // ‏يكتب أحدُها، والعدّادُ الذرّيُّ في D1 يردّ السادسَ قبل أن يُقارَن رمزُه.
+  // ‏**وتخمينُ الجلسة قبل حدّ العنوان** (مراجعة D-317): كان حدُّ KV يردّ السادسةَ من عنوانٍ واحد (وهو حالُ المالك على
+  // ‏هاتفه) قبل أن يُسأل عن الجلسة، فتبقى الجلسةُ المعلَّقةُ ويرى صاحبُها رسالةً غيرَ التي في دليله
   const denied = await reserveGuess(c, gate.session, (text, status) => failSecondFactor(c, text, status))
   if (denied !== null) return denied
+  const blocked = await addressBlocked(c)
+  if (blocked !== null) return blocked
 
   let secret: string | null
   let stored
@@ -498,7 +510,8 @@ auth.post('/panel/2fa/totp', async (c) => {
   // الخطوةُ تُسجَّل قبل الترقية: رمزٌ قُبل لا يُقبل ثانيةً ولو تعثّر ما بعده
   await markTotpStep(c.env.DB, result.step, email)
   await clearAttempts(c.env.KV, c.req.raw)
-  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw)
+  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw,
+    await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email))
   await record(c.env.DB, { actor: 'panel', action: '2fa.totp', by: email }, c.req.raw)
   // ‏إلى الصفحة التي طُلبت قبل الدخول، وقد حُفظت في الجلسة المعلَّقة (ر-11)
   return promoted(c, gate.session, 'برمز التطبيق', safeNext(gate.session.record.next))
@@ -516,13 +529,11 @@ auth.post('/panel/2fa/recovery', async (c) => {
   if (!gate.session.record.pending) return c.redirect('/panel', 303)
   const email = emailOf(gate.session)
 
-  const state = await attemptState(c.env.KV, c.req.raw)
-  if (state.blocked) {
-    return failSecondFactor(c, 'تجاوزت حدّ المحاولات. انتظر ربع ساعة.', 429)
-  }
-
+  // ‏تخمينُ الجلسة قبل حدّ العنوان، كرمز التطبيق (مراجعة D-317)
   const denied = await reserveGuess(c, gate.session, (text, status) => failSecondFactor(c, text, status))
   if (denied !== null) return denied
+  const blocked = await addressBlocked(c)
+  if (blocked !== null) return blocked
 
   let used: boolean
   try {
@@ -539,7 +550,8 @@ auth.post('/panel/2fa/recovery', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
-  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw)
+  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw,
+    await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email))
   const left = await countRecoveryCodes(c.env.DB, email).catch(() => ({ total: 0, unused: 0 }))
   const remaining = 'بقي ' + String(left.unused)
   const next = await promoteSession(c.env.KV, gate.session)
@@ -567,7 +579,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
      * ‏التحذيرُ بعد دقيقةٍ بلا أن يُرى. **ومن فقد جهازه أحوجُ إلى «بقي N» منه إلى صفحته**:
      * ‏يعرف كم بقي قبل أن ينفد آخرُ باب. والعاملان الآخران يعودان إلى ما طُلب.
      */
-    headers: { Location: '/panel', 'Set-Cookie': sessionCookie(next.id) },
+    headers: await withDevice(new Headers({ Location: '/panel', 'Set-Cookie': sessionCookie(next.id) }), c.env.ADMIN_TOKEN, email),
   })
 })
 
@@ -606,7 +618,7 @@ async function afterFactorAdded(
   session: Session,
   hadRecovery: boolean,
   what: string,
-): Promise<{ codes: string[]; cookie: string | null }> {
+): Promise<{ codes: string[]; cookie: string | null; device: boolean }> {
   const email = emailOf(session)
   const codes = hadRecovery ? [] : await issueRecoveryCodes(c.env.DB, email)
   let cookie: string | null = null
@@ -618,13 +630,15 @@ async function afterFactorAdded(
     await record(c.env.DB, { actor: 'panel', action: 'session.open', detail: 'بعد تسجيل ' + what, by: email }, c.req.raw)
   }
   await securityEvent(c.env, c.req.raw, { kind: 'factor.add', email, detail: what, sessionId: id })
-  return { codes, cookie }
+  return { codes, cookie, device: cookie !== null }
 }
 
-function jsonWithCookie(body: unknown, cookie: string | null, status = 200): Response {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (cookie !== null) headers['Set-Cookie'] = cookie
-  return new Response(JSON.stringify(body), { status, headers })
+/** ردٌّ بكعكة الجلسة المرقّاة إن رُقّيت — ومعها كعكةُ الجهاز (مراجعة D-317): جلسةُ التسجيل صارت كاملة. */
+async function jsonWithCookie(c: { env: Env }, body: unknown, done: { cookie: string | null; device: boolean }, email: string): Promise<Response> {
+  const headers = new Headers({ 'Content-Type': 'application/json' })
+  if (done.cookie !== null) headers.append('Set-Cookie', done.cookie)
+  if (done.device) await withDevice(headers, c.env.ADMIN_TOKEN, email)
+  return new Response(JSON.stringify(body), { status: 200, headers })
 }
 
 /** تحدٍّ لتسجيل مفتاحٍ جديد — بجلسةٍ كاملة أو جلسة تسجيل، وبتحقّقٍ حديث (الحارس). */
@@ -727,7 +741,7 @@ auth.post('/panel/security/passkey/register', async (c) => {
   })
   await record(c.env.DB, { actor: 'panel', action: 'passkey.add', target: label }, c.req.raw)
   const done = await afterFactorAdded(c, gate.session, before.recovery.unused > 0, 'مفتاح «' + label + '»')
-  return jsonWithCookie({ ok: true, label, codes: done.codes, promoted: done.cookie !== null }, done.cookie)
+  return jsonWithCookie(c, { ok: true, label, codes: done.codes, promoted: done.cookie !== null }, done, email)
 })
 
 /** هل هذا آخرُ عاملٍ لحسابٍ يلزمه عامل؟ — فلا يُقفَل صاحبُه خارج لوحته. */
@@ -822,7 +836,7 @@ auth.post('/panel/security/totp/confirm', async (c) => {
   // أوّلُ عاملٍ ثانٍ يُؤكَّد يولّد رموزَ استرداد: بلا طريق رجوعٍ يصير
   // فقدُ الهاتف قفلا نهائيّا
   const done = await afterFactorAdded(c, gate.session, before.recovery.unused > 0, 'رمز التطبيق')
-  return jsonWithCookie({ ok: true, codes: done.codes, promoted: done.cookie !== null }, done.cookie)
+  return jsonWithCookie(c, { ok: true, codes: done.codes, promoted: done.cookie !== null }, done, email)
 })
 
 auth.post('/panel/security/totp/remove', async (c) => {
@@ -889,7 +903,7 @@ auth.get('/panel/enrol', async (c) => {
     passkeys: (state?.passkeys ?? []).map((k) => ({ id: k.id, label: k.label })),
     totpConfirmed: state?.totp.confirmed ?? false,
     recoveryLeft: state?.recovery.unused ?? 0,
-    error: state === null ? say('factor_unavailable') : null,
+    error: state === null ? say('factor_check_unavailable') : null,
   }, nonce), state === null ? 503 : 200)
 })
 
@@ -920,7 +934,7 @@ async function renderStepUp(
     emailCode: state === null || hasFactor ? 'none' : sent ? 'sent' : 'ask',
     email,
     next,
-    error: state === null ? say('factor_unavailable') : error,
+    error: state === null ? say('factor_check_unavailable') : error,
   }, nonce), state === null ? 503 : status)
 }
 
@@ -956,7 +970,7 @@ auth.post('/panel/stepup/passkey', async (c) => {
   if ('denied' in gate) return gate.denied
   const key = challengeKey('up:' + gate.session.id)
   const challenge = await c.env.KV.get(key)
-  if (challenge === null) return renderStepUp(c, gate.session, gate.next, 'انتهت مهلة الصفحة — اضغط «تحقّق بمفتاح المرور» مرّةً أخرى.', 400)
+  if (challenge === null) return renderStepUp(c, gate.session, gate.next, 'انتهت مهلة الصفحة — اضغط «المس مفتاح المرور» مرّةً أخرى.', 400)
   await c.env.KV.delete(key)
   const body = parseAssertion(String(gate.form.get('assertion') ?? ''))
   if (body === null) return renderStepUp(c, gate.session, gate.next, 'لم يصل توقيع المفتاح — أعد المحاولة.', 400)
@@ -980,7 +994,7 @@ auth.post('/panel/stepup/totp', async (c) => {
     secret = await readTotpSecret(c.env.DB, c.env.TOKEN_ENC_KEY, email)
     stored = await totpState(c.env.DB, email)
   } catch {
-    return renderStepUp(c, gate.session, gate.next, say('factor_unavailable'), 503)
+    return renderStepUp(c, gate.session, gate.next, say('factor_check_unavailable'), 503)
   }
   if (secret === null || !stored.confirmed) return renderStepUp(c, gate.session, gate.next, 'لا رمز تطبيق مضبوطا لهذا الحساب.', 400)
   const result = await verifyTotp(secret, String(gate.form.get('code') ?? ''), {
@@ -991,7 +1005,8 @@ auth.post('/panel/stepup/totp', async (c) => {
     return renderStepUp(c, gate.session, gate.next, result.reason, 401)
   }
   await markTotpStep(c.env.DB, result.step, email)
-  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw)
+  await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw,
+    await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email))
   return steppedUp(c, gate.session, 'رمز التطبيق', gate.next)
 })
 
@@ -1004,9 +1019,9 @@ auth.post('/panel/stepup/code/send', async (c) => {
   if ('denied' in gate) return gate.denied
   const email = emailOf(gate.session)
   const state = await factorsOf(c.env, email)
-  if (state === null) return renderStepUp(c, gate.session, gate.next, say('factor_unavailable'), 503)
+  if (state === null) return renderStepUp(c, gate.session, gate.next, say('factor_check_unavailable'), 503)
   if (state.enforced) return renderStepUp(c, gate.session, gate.next, 'لحسابك عاملٌ ثانٍ — تحقّق به.', 400)
-  const slot = await reserveCodeIssue(c.env.DB, c.req.raw)
+  const slot = await reserveCodeIssue(c.env.DB, c.req.raw, await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email))
   if (!slot.allowed) {
     return renderStepUp(c, gate.session, gate.next, slot.why === 'db' ? GATE_UNAVAILABLE_TEXT : 'طلباتٌ كثيرة — انتظر ربع ساعة.', slot.why === 'db' ? 503 : 429)
   }
@@ -1027,9 +1042,10 @@ auth.post('/panel/stepup/code', async (c) => {
   if ('denied' in gate) return gate.denied
   const email = emailOf(gate.session)
   const state = await factorsOf(c.env, email)
-  if (state === null) return renderStepUp(c, gate.session, gate.next, say('factor_unavailable'), 503)
+  if (state === null) return renderStepUp(c, gate.session, gate.next, say('factor_check_unavailable'), 503)
   if (state.enforced) return renderStepUp(c, gate.session, gate.next, 'لحسابك عاملٌ ثانٍ — تحقّق به.', 400)
-  const guess = await reserveCodeGuess(c.env.DB, email, c.req.raw)
+  const device = await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email)
+  const guess = await reserveCodeGuess(c.env.DB, email, c.req.raw, device)
   if (!guess.allowed) {
     return renderStepUp(c, gate.session, gate.next, guess.why === 'db' ? GATE_UNAVAILABLE_TEXT : 'محاولاتٌ خاطئة كثيرة — انتظر.', guess.why === 'db' ? 503 : 429, true)
   }
@@ -1038,7 +1054,7 @@ auth.post('/panel/stepup/code', async (c) => {
     await record(c.env.DB, { actor: 'panel', action: 'stepup.denied', detail: 'code · ' + verdict.reason }, c.req.raw)
     return renderStepUp(c, gate.session, gate.next, 'الرمز غير صحيح أو انتهت مهلته.', 401, verdict.reason === 'wrong')
   }
-  await releaseCodeGuesses(c.env.DB, email, c.req.raw)
+  await releaseCodeGuesses(c.env.DB, email, c.req.raw, device)
   return steppedUp(c, gate.session, 'رمز البريد', gate.next)
 })
 
@@ -1052,6 +1068,30 @@ const ACTION_TITLE: Readonly<Record<string, string>> = {
   '/panel/settings': 'قناة التنبيهات',
   '/panel/channels/disconnect': 'فصل حساب',
   '/panel/sessions/revoke-all': 'إخراج الأجهزة الأخرى',
+}
+
+/** عاقبةُ الفعل كما كانت في حواره (مراجعة D-317) — تُقال في «أكمل ما بدأته» قبل الضغطة. */
+const ACTION_WARNING: Readonly<Record<string, string>> = {
+  '/panel/channels/disconnect': 'تُحذف رموز الوصول والتجديد لهذا الحساب ولا تُستردّ، وكلّ منشور مجدول عليه يتوقّف.',
+  '/panel/team/revoke': 'تسقط جلستُه في طلبه التالي، ولا يدخل حتّى تدعوه من جديد.',
+}
+
+/**
+ * **كيف تُقرأ قيمُ النموذج** (مراجعة D-317): كانت «أكمل ما بدأته» تعرض `publisher` و`linkedin` و`linkedin:abc123`.
+ * فالدورُ باسمه في المعجم، والمنصّةُ باسمها، والحسابُ باسمه الظاهر من القاعدة — وإن لم يُعرف أُخفي من الملخّص.
+ */
+async function resumeDisplay(env: Env, saved: SavedForm, org: string): Promise<Record<string, string | null>> {
+  const out: Record<string, string | null> = {}
+  for (const [k, v] of saved.fields) {
+    if (k === 'role') out[k] = (ROLE_LABEL as Readonly<Record<string, { name: string } | undefined>>)[v]?.name ?? null
+    if (k === 'platform') out[k] = platformLabel(v) === v ? null : platformLabel(v)
+    if (k === 'account') {
+      const row = await env.DB.prepare('SELECT display_name FROM accounts WHERE id = ? AND org_id = ?').bind(v, org)
+        .first<{ display_name: string }>().catch(() => null)
+      out[k] = row?.display_name ?? null
+    }
+  }
+  return out
 }
 
 /** أين يعود من ألغى. */
@@ -1080,6 +1120,8 @@ auth.get('/panel/stepup/resume', async (c) => {
   }
   const title = ACTION_TITLE[saved.action]
   if (title === undefined) return c.redirect('/panel', 303)
+  const display = await resumeDisplay(c.env, saved, activeOrg(session.record))
+  const warning = ACTION_WARNING[saved.action]
   return page((nonce) => resumePage({
     csrf: session.record.csrf,
     action: saved.action,
@@ -1087,5 +1129,7 @@ auth.get('/panel/stepup/resume', async (c) => {
     fields: saved.fields,
     secrets: saved.secrets,
     back: ACTION_BACK[saved.action] ?? '/panel/settings',
+    display,
+    ...(warning === undefined ? {} : { warning }),
   }, nonce))
 })
