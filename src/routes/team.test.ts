@@ -95,3 +95,34 @@ describe('الفريق (D-272)', () => {
     for (const mark of ['security-all', 'data-sub id="advanced"', 'revoke-all']) expect(mine).toContain(mark)
   })
 })
+
+/**
+ * ‏**الحارسُ يقرأ ما يقرؤه الموجِّه** (D-315). مدعوٌّ بدور «مشاهد» كان يدعو مديرًا لكلّ الشركات ويقرأ صفحةَ الفريق
+ * ‏بمسارٍ مرمَّز («/p%61nel/team/invite» و«/panel/%74eam»): الحارسُ يرى المسارَ بترميزه، وHono يوجّه مفكوكَه.
+ */
+describe('المسارُ المرمَّز لا يتخطّى الحارس (D-315)', () => {
+  async function viewer(): Promise<string> {
+    const owner = cookieOf(await emailLogin(app, env))
+    await post('/panel/team/invite', owner, { _csrf: await csrfOf(owner, '/panel/team'), email: 'v@example.com', role: 'viewer', org: 'org_a' })
+    return cookieOf(await memberLogin('v@example.com'))
+  }
+
+  it('الكتابةُ بمسارٍ مرمَّز تُردّ كما تُردّ بمسارها الصريح، ولا يُدعى أحد', async () => {
+    const v = await viewer()
+    const csrf = await csrfOf(v)
+    for (const path of ['/p%61nel/team/invite', '/%70anel/team/invite', '/panel/%74eam/invite', '/panel/team/%69nvite', '/p%61nel/t%65am/invite']) {
+      const res = await post(path, v, { _csrf: csrf, email: 'evil@example.com', role: 'admin', all: '1' })
+      expect(res.headers.get('Location'), path).toBe('/panel')
+    }
+    expect(db.raw.prepare('SELECT email FROM members ORDER BY email').all()).toEqual([{ email: 'v@example.com' }])
+  })
+
+  it('والقراءةُ بمسارٍ مرمَّز تُقصَر على الدور كالصريح، و«/oauth» المرمَّز للمدير فأعلى', async () => {
+    const v = await viewer()
+    for (const path of ['/panel/%74eam', '/p%61nel/team', '/panel/%73ettings', '/%6Fauth/linkedin/start']) {
+      const res = await app.request(path, { headers: { Cookie: v } }, env)
+      expect(res.status, path).toBe(303)
+      expect(res.headers.get('Location'), path).toBe('/panel')
+    }
+  })
+})
