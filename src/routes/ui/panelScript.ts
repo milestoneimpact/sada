@@ -823,6 +823,9 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     }).then(function(d){
       document.getElementById('totp-secret').value=d.secret;
       document.getElementById('totp-box').hidden=false;
+      // ‏و«أكّد» الأوّليُّ الوحيد في البطاقة ما دام الضبطُ مفتوحًا (D-313): الخطوةُ التالية خطوتُه
+      Array.prototype.forEach.call(document.querySelectorAll('#factors .btn-primary'),function(b){
+        if(!b.closest('#totp-box'))b.className=b.className.replace('btn-primary','btn-secondary');});
       say('totp-msg','انسخ السرّ إلى تطبيق المصادقة ثمّ أكّد بالرمز الظاهر.');
     }).catch(function(err){ts.disabled=false; say('totp-msg',sadaPk.why(err)); ts.focus();});
   });

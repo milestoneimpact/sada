@@ -128,7 +128,11 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var note=document.getElementById('pk-note');
   if(!btn)return;
   var label=btn.textContent;
+  // ‏ومتصفّحٌ بلا مفاتيح مرور (D-313): الزرُّ المعطَّل لا يبقى الأوّليَّ الوحيد، و«أرسل الرمز» يعود أوّليًّا والتركيزُ في البريد
   if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true;
+    btn.className=String(btn.className).replace('btn-primary','btn-secondary');
+    var send=document.getElementById('login-send'); if(send)send.className=String(send.className).replace('btn-secondary','btn-primary');
+    var mail=document.getElementById('e'); if(mail)try{mail.focus();}catch(e){}
     if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور — ادخل برمز البريد.'; return;}
   // ‏والتركيزُ يعود إلى الزرّ: زرٌّ عُطّل يفقده، فـEnter بعد نافذةٍ أُغلقت لا يفعل شيئًا
   var reset=function(msg){btn.disabled=false; btn.removeAttribute('aria-busy');
@@ -211,7 +215,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
           <div class="field"><label for="e">البريد</label>
             <input id="e" type="email" name="email" dir="ltr" autocomplete="email"
                    required${passkey === '' ? ' autofocus' : ''}${disabled}></div>
-          <button class="btn ${passkey === '' ? 'btn-primary' : 'btn-secondary'}" type="submit"${disabled}>أرسل الرمز</button>
+          <button class="btn ${passkey === '' ? 'btn-primary' : 'btn-secondary'}" id="login-send" type="submit"${disabled}>أرسل الرمز</button>
         </form>`
   return shell(
     'صدى — الدخول',
@@ -1155,8 +1159,8 @@ function quotaCard(q: PostsData['imageQuota']): string {
     <h2 class="m-0">نفدت حصّةُ الصور المجّانيّة اليوم</h2>
     <p class="m-0 mt-2">${String(q.waiting)} صورةً تنتظر. رسمُها الآن يكلّف نحو <b>${money(q.usd)}</b>، أو تنتظر تجدّدَ الحصّة 03:00 بتوقيت الرياض بلا كلفة.</p>
     <div class="row gap-2 mt-3">
-      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-primary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
-      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-secondary btn-sm" type="submit">انتظر للغد</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-secondary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-primary btn-sm" type="submit">انتظر للغد</button></form>
     </div></div>`.value
 }
 

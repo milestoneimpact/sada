@@ -654,3 +654,17 @@ describe('بلا اتّصال ونصّ الجهاز (D-209)', () => {
     expect(SCRIPT).toContain('if(kept.t===edT.value){try{localStorage.removeItem(dKey);}catch(e){}}')
   })
 })
+
+/**
+ * ‏وضبطُ رمز التطبيق خطوةٌ لها أوّليُّها (مراجعة D-313): حين يُكشف «#totp-box» يصير «أكّد» الأوّليَّ الوحيد في
+ * ‏بطاقة «العامل الثاني». والحارسُ (audit_primary) يعدّ الحالَ المرسوم فلا يرى ما يكشفه السكربت؛ فيُثبَّت هنا.
+ */
+describe('العامل الثاني: «أكّد» الأوّليُّ الوحيد حين يُفتح الضبط (D-313)', () => {
+  it('يُخفَّض كلُّ أوّليٍّ في البطاقة خارج صندوق الضبط بعد كشفه', () => {
+    const at = SCRIPT.indexOf("document.getElementById('totp-box').hidden=false;")
+    expect(at).toBeGreaterThan(0)
+    const after = SCRIPT.slice(at, at + 400)
+    expect(after).toContain("querySelectorAll('#factors .btn-primary')")
+    expect(after).toContain("if(!b.closest('#totp-box'))b.className=b.className.replace('btn-primary','btn-secondary')")
+  })
+})

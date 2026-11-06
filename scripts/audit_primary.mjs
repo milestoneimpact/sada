@@ -7,6 +7,9 @@
  * (وصفُّ منشورٍ في الخطّ الزمنيّ `.np-row`)، والظاهرُ ما له موضعٌ في التخطيط وليس في طيّةٍ مغلقة. وتُفتح ألواحُ اللوحة لوحًا لوحًا
  * (المخفيُّ منها ليس ظاهرًا)، وأقسامُها كلُّها.
  *
+ * **وما يكشفه السكربتُ بعد نقرةٍ لا يراه** (مراجعة D-313): يعدّ الحالَ المرسوم؛ وحالُ «اضبط رمز التطبيق» مثبَّتٌ
+ * في `panelScript.test.ts`.
+ *
  * **والحارسُ يُزرَع قبل أن يُصدَّق**: `--self-test` يزرع بطاقةً بزرّين فيُشترَط أن تُمسَك،
  * وقائمةً صفوفُها بزرٍّ لكلٍّ فيُشترَط ألّا تُمسَك (كلُّ صفٍّ منطقة)، وتمرّ الصفحةُ بلا زرعٍ نظيفة.
  *
@@ -31,7 +34,11 @@ const PROBE = () => {
     const t = (h ? h.textContent : el.textContent) ?? ''
     return `${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).trim().split(/\s+/)[0] : ''} «${t.trim().replace(/\s+/g, ' ').slice(0, 28)}»`
   }
-  const visible = (b) => b.offsetParent !== null && getComputedStyle(b).visibility !== 'hidden' && b.closest('details:not([open])') === null
+  // ‏ورأسُ الطيّة (`summary`) يُرى وطيّتُه مغلقة: يُبدأ الفحصُ من خارج طيّته هو
+  const visible = (b) => {
+    const from = b.tagName === 'SUMMARY' ? b.parentElement?.parentElement : b
+    return b.offsetParent !== null && getComputedStyle(b).visibility !== 'hidden' && (from?.closest('details:not([open])') ?? null) === null
+  }
   const seen = new Map()
   for (const b of document.querySelectorAll('.btn-primary')) {
     if (!visible(b)) continue
@@ -68,6 +75,7 @@ if (selfTest) {
     ['بطاقةٌ بزرّين أوّليّين', `<div class="card"><h2>زرع</h2>${BTN('أ')}${BTN('ب')}</div>`, (n) => n.length === 1 && n[0].includes('أ ‖ ب')],
     ['قائمةٌ صفوفُها بزرٍّ لكلٍّ (كلُّ صفٍّ منطقة)', `<div class="card"><ul><li>${BTN('أ')}</li><li>${BTN('ب')}</li></ul></div>`, (n) => n.length === 0],
     ['زرّان أحدُهما في طيّةٍ مغلقة', `<div class="card">${BTN('أ')}<details><summary>أكثر</summary>${BTN('ب')}</details></div>`, (n) => n.length === 0],
+    ['زرٌّ ورأسُ قائمةٍ أوّليّان (رأسُ الطيّة يُرى)', `<div class="card"><h2>زرع</h2>${BTN('أ')}<details class="menu"><summary class="btn btn-primary">ب</summary><div>ج</div></details></div>`, (n) => n.length === 1 && n[0].includes('أ ‖ ب')],
   ]
   let missed = 0
   for (const [name, html, ok] of plants) {
