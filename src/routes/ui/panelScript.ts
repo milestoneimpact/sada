@@ -148,7 +148,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     if(!kind||!document.startViewTransition||still()){fn(); return;}
     if(vt){try{vt.skipTransition();}catch(e){} vt=null;}
     var root=document.documentElement; root.setAttribute('data-nav',kind);
-    var t=null, done=function(){if(vt===t)vt=null; root.setAttribute('data-nav','done');}, no=function(){};
+    // ‏و«done» من الأحدث وحده (مراجعة D-323): الأوّلُ المُتمَّمُ يُحَلّ «finished» له والثاني لم يتحرّك بعد، فكان يمحو جهتَه
+    var t=null, done=function(){if(vt!==t)return; vt=null; root.setAttribute('data-nav','done');}, no=function(){};
     try{t=document.startViewTransition(fn);}catch(e){fn(); done(); return;}
     vt=t;
     if(t.ready&&t.ready.catch)t.ready.catch(no);

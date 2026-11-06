@@ -462,7 +462,7 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     goLabel: 'افتح Cloudflare',
   },
   {
-    code: 'M-37',
+    code: 'M-38',
     title: 'قارئ الشاشة بالعربيّة على خمس رحلات: VoiceOver وTalkBack — بعد D-323',
     ifLeft:
       'اللوحة تعمل لك كما هي — تأجيلٌ لا خطر عليك. لكن لا يُقال إنّها تصلح لقارئ الشاشة: الآلة تمسك نحو نصف ما يجده الإنسان، ' +

@@ -261,7 +261,16 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .hs-n{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .daybars{margin:0}
+/* ‏والرقمُ فوق عموده (مراجعة D-323): صفٌّ بعرض الرسم وارتفاعه فوقه، عمودٌ لكلّ يوم بعرض عموده، والرقمُ في عموده على
+   ارتفاعٍ يكتبه الخادمُ نسبةً من ارتفاع الرسم — فيعلو رأسَ العمود أيًّا كان عرضُ الشاشة */
+.db-plot{position:relative; padding-block-start:var(--s-4)}
 .db-svg{display:block; width:100%; height:9rem; overflow:visible}
+.db-vals{position:absolute; inset-block:var(--s-4) 0; inset-inline:0; margin:0; padding:0; list-style:none; display:grid; grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr); column-gap:var(--db-gap); pointer-events:none}
+.db-vals li{position:relative}
+.db-vals span{position:absolute; inset-inline:0; text-align:center; white-space:nowrap; font-size:var(--t-small);
+  line-height:var(--lh-small); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums;
+  animation:rise var(--dur-3) var(--ease-rise) both}
 .db-base{stroke:var(--line)}
 .db-bar rect{fill:var(--brand); transform-box:fill-box; transform-origin:50% 100%;
   animation:grow var(--dur-3) var(--ease-rise) both; animation-delay:calc(var(--i) * 25ms)}

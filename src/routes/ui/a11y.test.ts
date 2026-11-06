@@ -16,6 +16,9 @@ import { draftsSection } from './sections/drafts'
 import { homeTop } from './sections/home'
 import { dayLabel } from './planReviewView'
 import { loginPage } from '../panelView'
+import { dayBars } from './chart'
+import { planReviewScreen } from './planReviewView'
+import { dialog } from './components/dialog'
 import { infographicReadiness, imageReadiness, videoReadiness } from '../../lib/media/readiness'
 import { videoCapGate } from '../../lib/limits'
 import { slideGate } from '../../lib/image/gate'
@@ -111,7 +114,7 @@ describe('لا نافذةَ تأكيدٍ من المتصفّح (D-303)', () => {
     expect(panelScript().body).not.toMatch(/(^|[^.\w])confirm\(/)
   })
 
-  it('نموذجٌ بـ«data-confirm» يفتح حوارًا في الصفحة بفعله، و«ارجع» لا يرسل، والفعلُ يرسل بزرّه', () => {
+  it('نموذجٌ بـ«data-confirm» يفتح حوارًا في الصفحة بفعله، و«إلغاء» لا يرسل، والفعلُ يرسل بزرّه', () => {
     const w = boot(`<form id="f" method="POST" action="/panel/plan/pin" data-confirm="ثبّت الإصدار 2؟">
       <button class="btn btn-primary" type="submit" name="do" value="pin">ثبّت الخطّة</button></form>`)
     const d = w.document
@@ -347,5 +350,193 @@ describe('انتقالٌ أُسقط لا يُخلّف خطأَ صفحة (View Tr
     expect(fire('InvalidStateError', 'Transition was aborted because of invalid state. ViewTransition opt-in disabled')).toBe(true)
     expect(fire('AbortError', 'Transition was skipped')).toBe(true)
     expect(fire('TypeError', 'x is not a function')).toBe(false)
+  })
+})
+
+/**
+ * ‏**مراجعةُ D-323**: ما أمسكه المراجعون بعد البناء، وكلُّ حالةٍ هنا سقطت على الشيفرة قبل إصلاحها.
+ */
+describe('مراجعةُ D-323', () => {
+  const css = sheet(STYLE)
+  const over = (w: Win, el: unknown, type: string, related: unknown = null, pointerType = 'mouse'): void => {
+    const e = new w.PointerEvent(type, { bubbles: true, pointerType, relatedTarget: related as never })
+    ;(el as { dispatchEvent(e: unknown): boolean }).dispatchEvent(e)
+  }
+  const esc = (w: Win): void => { w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) }
+  type Tip = { hidden: boolean; textContent: string }
+
+  it('التلميحُ يُثبَّت بإحداثيّاتٍ فيزيائيّة: «left» الذي يكتبه السكربت لا يُسقطه «inset-inline-start» (‏right:0 في RTL)', () => {
+    // ‏قِيس في Chromium: كلُّ تلميحٍ لصق الحافّة اليمنى (tipR=1280) أيًّا كان موضعُ هدفه — «left» و«width» و«right» معًا
+    // ‏فوق القيد، والمتصفّحُ يُسقط «left» في كتلةٍ اتّجاهُها RTL
+    const r = css.rule('.tip')
+    expect(r['inset-inline-start']).toBeUndefined()
+    expect(r['inset-inline-end']).toBeUndefined()
+    expect(r['inset-inline']).toBe('auto')
+    expect(uiScript().body).toMatch(/tip\.style\.left=/)
+  })
+
+  it('وEsc يُبقيه مخفيًّا والمؤشّرُ يتنقّل بين أبناء الهدف نفسِه، ويعود حين يخرج المؤشّرُ ثمّ يدخل', async () => {
+    const w = boot(`<p><span id="b" tabindex="0" data-tip="مفتوحة اليوم"><span id="b1">●</span><span id="b2">الحدود: تامّة</span></span> <a id="far" href="#">بعيد</a></p>`)
+    const d = w.document
+    const [b1, b2, far] = [d.getElementById('b1'), d.getElementById('b2'), d.getElementById('far')]
+    const tip = d.getElementById('sada-tip') as unknown as Tip
+    over(w, b1, 'pointerover')
+    await sleep(500)
+    expect(tip.hidden).toBe(false)
+    esc(w)
+    expect(tip.hidden).toBe(true)
+    over(w, b1, 'pointerout', b2)
+    over(w, b2, 'pointerover', b1)
+    await sleep(500)
+    expect(tip.hidden).toBe(true)
+    over(w, b2, 'pointerout', far)
+    over(w, far, 'pointerover', b2)
+    over(w, far, 'pointerout', b1)
+    over(w, b1, 'pointerover', far)
+    await sleep(500)
+    expect(tip.hidden).toBe(false)
+  })
+
+  it('والتركيزُ بلا ضغطة مفتاح (قارئُ شاشةٍ على الهاتف) يربط نصَّ التلميح وصفًا ولا يُظهره', () => {
+    const w = boot(`<p><time id="t" datetime="2026-09-06T06:00:00Z" tabindex="0" data-tip="2026-09-06 09:00 بتوقيت الرياض">قبل 3 ساعات</time> <a id="far" href="#">بعيد</a></p>`)
+    const d = w.document
+    const t = d.getElementById('t') as unknown as HTMLElement
+    const tip = d.getElementById('sada-tip') as unknown as Tip
+    over(w, d.getElementById('far'), 'pointerdown', null, 'touch')
+    over(w, d.getElementById('far'), 'pointerup', null, 'touch')
+    t.focus()
+    expect(tip.hidden).toBe(true)
+    expect(tip.textContent).toBe('2026-09-06 09:00 بتوقيت الرياض')
+    expect(t.getAttribute('aria-describedby')).toBe('sada-tip')
+    ;(d.getElementById('far') as unknown as HTMLElement).focus()
+    expect(t.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  it('ونقرةُ الفأرة على هدفٍ تلميحُه ظاهرٌ بالتمرير لا تخفيه', async () => {
+    const w = boot(`<p><span id="t" tabindex="0" data-tip="كلفة الكتابة">0.012$</span></p>`)
+    const d = w.document
+    const t = d.getElementById('t') as unknown as HTMLElement
+    const tip = d.getElementById('sada-tip') as unknown as Tip
+    over(w, t, 'pointerover')
+    await sleep(500)
+    expect(tip.hidden).toBe(false)
+    over(w, t, 'pointerdown')
+    t.focus()
+    expect(tip.hidden).toBe(false)
+  })
+
+  it('ورموزُ الاسترداد بعد أن تُولَّد في الصفحة يُسأل قبل تجديدها (توليدُها ثانيةً يُبطل ما حُفظ للتوّ)', async () => {
+    const w = boot(`<input type="hidden" name="_csrf" value="c">
+      <button class="btn btn-primary" id="rc-issue" type="button">ولّد رموز استرداد</button>
+      <div id="rc-box" hidden><div class="codes" id="rc-list"></div></div><div class="note" id="rc-msg"></div>`, { panel: true })
+    const d = w.document
+    let calls = 0
+    ;(w as unknown as { fetch: unknown }).fetch = async () => {
+      calls += 1
+      return { ok: true, status: 200, json: async () => ({ codes: ['aaaa-bbbb', 'cccc-dddd'] }) }
+    }
+    const rc = d.getElementById('rc-issue') as unknown as { click(): void; getAttribute(n: string): string | null }
+    rc.click()
+    await sleep(20)
+    expect(calls).toBe(1)
+    expect((d.getElementById('rc-box') as unknown as { hidden: boolean }).hidden).toBe(false)
+    expect(rc.getAttribute('data-confirm')).toMatch(/تُبطل القديمةَ/)
+    rc.click()
+    await sleep(20)
+    expect(calls).toBe(1)
+    const dlg = d.getElementById('sada-cf') as unknown as { open: boolean; querySelector(s: string): { textContent: string; click(): void } | null }
+    expect(dlg.open).toBe(true)
+    expect(dlg.querySelector('[data-cf=ok]')?.textContent).toBe('ولّد مجموعةً جديدة')
+    dlg.querySelector('[data-cf=ok]')!.click()
+    await sleep(20)
+    expect(calls).toBe(2)
+  })
+
+  it('وحذفُ البند في مراجعة الخطّة هادم: زرُّه أحمر، والحوارُ بفعلٍ أحمر والتركيزُ على «إلغاء»', () => {
+    const items = [{ sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاوية', day: '2026-11-08', time: '06:00', why: 'ل' }]
+    const m = {
+      plan: { id: 'pl1', week: '2026-11-08', plan: { rationale: '', items }, model: 'm', status: 'approved', createdAt: '2026-11-02 08:00:00', span: 'week',
+        choices: { channels: ['linkedin'], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: true, imageStyle: 'illustration', startDay: '2026-11-08' } },
+      version: 1, lockedAt: null, versions: [], gaps: { unwritten: 0, no_image: 0, pending: 1, clash: 0 },
+      cards: [{ index: 0, key: 'k0', item: items[0], post: { id: 'p0', status: 'draft', text: 'نصّ', scheduledAt: null }, mediaId: null, gaps: ['pending'] }],
+    } as never
+    const html = planReviewScreen(m, null)
+    for (const label of ['احذف', 'احذفها']) {
+      expect(html, label).toMatch(new RegExp(`<button class="btn btn-danger btn-sm"[^>]*>${label}</button>`))
+    }
+    const w = boot(html)
+    const d = w.document
+    ;(d.querySelector('form[action="/panel/plan/review/drop"] button') as unknown as { click(): void }).click()
+    const ok = d.querySelector('#sada-cf [data-cf=ok]') as unknown as { className: string; textContent: string }
+    expect(ok.textContent).toBe('احذف')
+    expect(ok.className).toContain('btn-danger')
+    expect((d.activeElement as unknown as { getAttribute(n: string): string | null }).getAttribute('data-cf')).toBe('no')
+  })
+
+  it('وزرُّ الرجوع في حوار التأكيد اسمُه اسمُ زرّ حوار العُدّة: الشيءُ الواحدُ باسمٍ واحد', () => {
+    const kit = /<button class="btn btn-secondary" value="cancel">([^<]+)<\/button>/.exec(dialog({ id: 'x', title: 'ت', body: '' }))?.[1]
+    expect(kit).toBe('إلغاء')
+    const w = boot(`<button type="button" class="btn btn-danger" id="b" data-confirm="أتفصل الحساب؟">افصل</button>`)
+    ;(w.document.getElementById('b') as unknown as { click(): void }).click()
+    expect(w.document.querySelector('#sada-cf [data-cf=no]')?.textContent).toBe(kit)
+  })
+
+  it('وإتمامُ الانتقال الأوّل لا يكتب «done» والثاني ما زال جاريًا: يبقى انزلاقُه من جهته', async () => {
+    const w = new Window({ url: 'https://sada2.basserh.com/panel#a' })
+    open.push(w)
+    w.document.body.innerHTML = `<nav class="tabs"><a href="#a"><span>أ</span></a><a href="#b"><span>ب</span></a></nav><h1 id="pane-title"></h1>
+      <main id="main"><section data-pane="a"><h2>أ</h2></section><section data-pane="b"><h2>ب</h2></section></main><div id="flash"></div>`
+    ;(w as unknown as { matchMedia(q: string): unknown }).matchMedia = (q: string) => ({ matches: false, media: q })
+    const ends: (() => void)[] = []
+    ;(w.document as unknown as { startViewTransition(fn: () => void): unknown }).startViewTransition = (fn: () => void) => {
+      fn()
+      let end: () => void = () => undefined
+      const finished = new Promise<void>((r) => { end = r })
+      ends.push(end)
+      return { ready: Promise.resolve(), updateCallbackDone: Promise.resolve(), finished, skipTransition: end }
+    }
+    ;(w as unknown as { eval(c: string): void }).eval(panelScript().body)
+    const root = w.document.documentElement
+    const tab = (h: string): { click(): void } => w.document.querySelector(`a[href="${h}"]`) as unknown as { click(): void }
+    tab('#b').click()
+    expect(root.getAttribute('data-nav')).toBe('forward')
+    tab('#a').click()
+    expect(root.getAttribute('data-nav')).toBe('back')
+    await sleep(10)
+    expect(root.getAttribute('data-nav')).toBe('back')
+    ends[1]!()
+    await sleep(10)
+    expect(root.getAttribute('data-nav')).toBe('done')
+  })
+
+  it('ورفضُ الانتقال المكتومُ يُعَدّ (console.debug بعلامته) فيراه مقياسُ الرحلات بجوار أخطاء الصفحة', () => {
+    const w = new Window({ url: 'https://sada2.basserh.com/panel' })
+    open.push(w)
+    const seen: string[] = []
+    ;(w.console as unknown as { debug(...a: unknown[]): void }).debug = (...a: unknown[]) => { seen.push(a.map(String).join(' ')) }
+    const code = /<script nonce="n">([\s\S]*?)<\/script>/.exec(loginPage({}, 'n'))?.[1] ?? ''
+    ;(w as unknown as { eval(c: string): void }).eval(code)
+    const fire = (name: string, message: string): void => {
+      const e = new w.Event('unhandledrejection', { cancelable: true }) as unknown as { reason: unknown }
+      Object.defineProperty(e, 'reason', { value: { name, message } })
+      w.dispatchEvent(e as never)
+    }
+    fire('InvalidStateError', 'Transition was aborted because of invalid state. ViewTransition opt-in disabled')
+    fire('TypeError', 'x is not a function')
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatch(/^sada:vt-muted /)
+  })
+
+  it('وحقلُ لوحة الأوامر (⌘K) لا يُطفئ حلقتَه: لا حقلَ في الورقة بـ«outline:none»', () => {
+    const off = css.rules().filter((r) => r.at === '' && r.selectors.some((s) => /(^|[\s>+~])(input|textarea|select)\b/.test(s)) && r.decls.outline === 'none')
+    expect(off.map((r) => r.selectors.join(','))).toEqual([])
+    expect(css.rule('.cmdk-in input').outline).toBeUndefined()
+  })
+
+  it('وعددُ كلّ يومٍ في «ما كُتب في أسبوعين» مكتوبٌ فوق عموده، لا في عنوان SVG يظهر بالفأرة وحدها', () => {
+    const html = dayBars([{ label: '1/9', value: 0 }, { label: '2/9', value: 3 }, { label: 'اليوم', value: 12 }], { title: 'لا شيء', html: '' })
+    expect(html).not.toContain('<title>')
+    const vals = /<ol class="db-vals"[^>]*>([\s\S]*?)<\/ol>/.exec(html)?.[1] ?? ''
+    expect([...vals.matchAll(/<li>(?:<span[^>]*>)?([^<]*)(?:<\/span>)?<\/li>/g)].map((x) => x[1])).toEqual(['', '3', '12'])
   })
 })

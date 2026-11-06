@@ -39,6 +39,15 @@ export const COPY_SCRIPT = `
 `
 
 /**
+ * سؤالُ تجديد رموز الاسترداد — **نصٌّ واحدٌ يرسمه الخادمُ ويكتبه السكربت** (مراجعة D-323): الخادمُ يضعه على الزرّ حين
+ * بقيت رموزٌ عند التحميل، وسكربتُ اللوحة يضعه بعد أن تُولَّد مجموعةٌ في الصفحة — فلا يفترق السؤالان في أوّل تعديل.
+ */
+export const RC_RENEW = {
+  ask: 'أتولّد مجموعةً جديدة؟ تُبطل القديمةَ كلَّها، فلا يصلح رمزٌ منها بعد اليوم.',
+  ok: 'ولّد مجموعةً جديدة',
+} as const
+
+/**
  * **التأكيدُ حوارٌ في الصفحة لا نافذةُ المتصفّح** (D-218 · D-303 · D-323) — في كلّ صفحة، للنموذج وللزرّ.
  *
  * كان `window.confirm()` يسأل بزرّين لا يقولان شيئًا («موافق · إلغاء»)، بخطّ النظام وفوق الصفحة كلّها، ويُغلق
@@ -49,10 +58,12 @@ export const COPY_SCRIPT = `
  *
  * ١ · `form[data-confirm]` يُوقَف إرسالُه، و`button[data-confirm]` تُوقَف ضغطتُه، ويُفتح `<dialog>` واحدٌ بـ`showModal()`
  *     (التركيزُ محبوسٌ وEsc يغلق، من المتصفّح): السؤالُ عنوانُه، **والفعلُ زرُّه باسمه** (نصُّ الزرّ المضغوط أو
- *     `data-confirm-ok`) — أحمرُ إن كان الزرُّ أحمر — و«ارجع» بجانبه، والتركيزُ عليه حين يكون الفعلُ هادمًا.
+ *     `data-confirm-ok`) — أحمرُ إن كان الزرُّ أحمر — و«إلغاء» بجانبه، والتركيزُ عليه حين يكون الفعلُ هادمًا. و«إلغاء» اسمُ زرّ
+ *     حوار العُدّة نفسُه (`components/dialog.ts`، خطّة التصميم 7.9): كان هنا «ارجع» فصار للزرّ الواحد اسمان في الصفحة الواحدة
+ *     (مراجعة D-323).
  * ٢ · «نعم» يعيد الفعلَ نفسَه بعلامةٍ تمرّره مرّةً: النموذجُ بـ`requestSubmit(زرّه)` فيُرسَل اسمُ الزرّ وقيمتُه
  *     (`do=drop`) ويمرّ بـ«مشغول» و«data-swap» كأيّ إرسال، والزرُّ بضغطةٍ ثانية.
- * ٣ · «ارجع» وEsc والنقرُ على الستارة لا يرسل شيئًا، والتركيزُ يعود إلى الزرّ الذي فتحه.
+ * ٣ · «إلغاء» وEsc والنقرُ على الستارة لا يرسل شيئًا، والتركيزُ يعود إلى الزرّ الذي فتحه.
  *
  * والمعطَّلُ بـ`aria-disabled` لا يُسأل عنه: سلوكُ العُدّة بعده يمنعه (`KIT_SCRIPT`).
  */
@@ -64,7 +75,7 @@ export const CONFIRM_SCRIPT = `
     var h=document.createElement('h3'); h.className='dlg-t'; h.id='sada-cf-t';
     var foot=document.createElement('div'); foot.className='dlg-foot';
     var ok=document.createElement('button'); ok.type='button'; ok.setAttribute('data-cf','ok');
-    var no=document.createElement('button'); no.type='button'; no.className='btn btn-secondary'; no.setAttribute('data-cf','no'); no.textContent='ارجع';
+    var no=document.createElement('button'); no.type='button'; no.className='btn btn-secondary'; no.setAttribute('data-cf','no'); no.textContent='إلغاء';
     foot.appendChild(ok); foot.appendChild(no); dlg.appendChild(h); dlg.appendChild(foot); document.body.appendChild(dlg);
     ok.addEventListener('click',function(){var f=go; shut(); if(f)f();});
     no.addEventListener('click',function(){shut(); back();});
@@ -390,6 +401,13 @@ export const FACTORS_SCRIPT = `
     list.forEach(function(c){var d=document.createElement('code'); d.textContent=c; out.appendChild(d);});
     box.hidden=false;
     var go=document.getElementById('rc-go'); if(go)go.hidden=false;
+    // ‏**وما عُرض للتوّ يُسأل قبل إبطاله** (مراجعة D-323): السؤالُ يُرسم حين بقيت رموزٌ عند التحميل، ورموزٌ وُلّدت في الصفحة
+    // ‏(هنا أو بعد تأكيد رمز التطبيق) كانت تُبطَل بضغطةٍ ثانيةٍ بلا سؤال. فالزرُّ يصير كما يُرسم بعد إعادة التحميل
+    var again=document.getElementById('rc-issue');
+    if(again&&!again.hasAttribute('data-confirm')){
+      again.setAttribute('data-confirm',${JSON.stringify(RC_RENEW.ask)}); again.setAttribute('data-confirm-ok',${JSON.stringify(RC_RENEW.ok)});
+      again.textContent=${JSON.stringify(RC_RENEW.ok)}; again.classList.remove('btn-primary'); again.classList.add('btn-secondary');
+    }
   }
 
   var ri=document.getElementById('rc-issue');
@@ -596,11 +614,15 @@ export const SHORTCUTS_SCRIPT = `
  *
  * - **بالمؤشّر** بعد ‏400ms (`--delay-tip`)، **ويبقى والمؤشّرُ ينتقل إليه** عبر الفجوة (مهلةُ ‏300ms قبل الإخفاء، والدخولُ
  *   إليه يلغيها)؛ ويذهب حين يغادرهما معًا.
- * - **بلوحة المفاتيح** فورًا حين يأخذ الهدفُ التركيز، ويُربط به وصفًا (`aria-describedby`) ما دام ظاهرًا — إلّا أن
- *   يكون هو اسمَه نفسَه (زرُّ الأيقونة) فلا يُقرأ مرّتين.
+ * - **بلوحة المفاتيح** فورًا حين يأخذ الهدفُ التركيز، ويُربط به وصفًا (`aria-describedby`) — إلّا أن يكون هو اسمَه نفسَه
+ *   (زرُّ الأيقونة) فلا يُقرأ مرّتين. **والوصفُ يُربط بكلّ تركيزٍ لا بلوحة المفاتيح وحدها** (مراجعة D-323): قارئُ الشاشة على
+ *   الهاتف يركّز بلا ضغطة مفتاح، فكان «قبل 3 ساعات» يُقرأ وحدَه بلا تاريخه؛ فالتركيزُ بلا مفتاحٍ يكتب النصَّ ويربطه والتلميحُ
+ *   مخفيٌّ عن العين (الوصفُ يُحسب من عنصرٍ مخفيٍّ مُشارٍ إليه)، والإظهارُ المرئيُّ وحدَه للوحة المفاتيح. ويبقى الوصفُ ما بقي
+ *   التركيز وإن غاب التلميحُ عن العين.
  * - **باللمس**: لمسةٌ على هدفٍ ليس زرًّا ولا رابطًا تُظهره، ولمسةٌ خارجه تخفيه — الزرُّ والرابطُ يُضغطان كما كانا. واللمسةُ
  *   تُقرأ من `pointerdown`/`pointerup` لا من `click`: Safari على iPhone لا يرسل `click` إلى وسمٍ لا يُضغط إن كان المستمعُ على الوثيقة.
- * - **Esc تخفيه** ولا يعود حتّى يدخل المؤشّرُ هدفًا آخر أو يتحرّك التركيز؛ ويبقى ما بقي سببُه (WCAG «مستمرّ»).
+ * - **Esc تخفيه** ولا يعود حتّى يخرج المؤشّرُ من الهدف أو يتحرّك التركيز — **لا بانتقال المؤشّر بين أبناء الهدف نفسِه**
+ *   (مراجعة D-323: «●» ثمّ «الحدود: تامّة» داخل الشارة الواحدة كانا يعيدانه بعد ‏400ms)؛ ويبقى ما بقي سببُه (WCAG «مستمرّ»).
  *
  * ويُوضع فوق الهدف، وتحته في الشريط العلويّ أو حين لا يتّسع ما فوقه، محصورًا في عرض الشاشة. ويسكن `<main>` حين يظهر
  * (ما خارج المعالم لا يُقرأ في موضعه، axe «region»)، وداخلَ حوارٍ مفتوحٍ يُنقل إليه: ما خارجَ الطبقة العليا يُرسم تحتها.
@@ -611,7 +633,7 @@ export const TIP_SCRIPT = `
   var tip=document.createElement('div'); tip.className='tip'; tip.id='sada-tip'; tip.setAttribute('role','tooltip'); tip.hidden=true;
   body.appendChild(tip); root.setAttribute('data-tipjs','');
   var SEL='[data-tip],.btn-icon[aria-label]', ACT='a[href],button,input,select,textarea,summary,label';
-  var on=null, how='', wait=0, gone=0, kbd=false, down=null;
+  var on=null, how='', wait=0, gone=0, kbd=false, down=null, muted=null;
   var delay=parseFloat(getComputedStyle(root).getPropertyValue('--delay-tip'))||400;
   function own(t){return t&&t.closest?t.closest(SEL):null;}
   function text(el){return el.getAttribute('data-tip')||el.getAttribute('aria-label')||'';}
@@ -629,23 +651,25 @@ export const TIP_SCRIPT = `
     var was=on.getAttribute('data-tip-was'); on.removeAttribute('data-tip-was');
     if(was)on.setAttribute('aria-describedby',was); else on.removeAttribute('aria-describedby');
   }
-  function show(el,why){
+  function show(el,why,quiet){
     clearTimeout(wait); clearTimeout(gone);
     var t=text(el); if(!t)return;
     if(on!==el){unlink(); on=el;}
     how=why; tip.textContent=t;
     var host=el.closest('dialog[open]')||document.querySelector('main')||body; if(tip.parentNode!==host)host.appendChild(tip);
-    tip.hidden=false; place();
+    tip.hidden=!!quiet; if(!quiet)place();
     if(t!==(el.getAttribute('aria-label')||'')&&t!==(el.textContent||'').trim()&&!el.hasAttribute('data-tip-was')){
       var d=el.getAttribute('aria-describedby')||''; el.setAttribute('data-tip-was',d);
       el.setAttribute('aria-describedby',(d?d+' ':'')+'sada-tip');
     }
   }
-  function hide(){clearTimeout(wait); clearTimeout(gone); unlink(); on=null; how=''; tip.hidden=true;}
+  function drop(){clearTimeout(wait); clearTimeout(gone); unlink(); on=null; how=''; tip.hidden=true;}
+  // ‏والهدفُ المركَّزُ يبقى موصوفًا وإن غاب التلميحُ عن العين: يُقرأ ما بقي التركيزُ عليه
+  function hide(){if(on&&on===document.activeElement){clearTimeout(wait); clearTimeout(gone); how='focus'; tip.hidden=true; return;} drop();}
   function later(){clearTimeout(gone); gone=setTimeout(hide,300);}
   document.addEventListener('keydown',function(e){
     kbd=true;
-    if(e.key==='Escape'&&on){hide();}
+    if(e.key==='Escape'&&on&&!tip.hidden){muted=on; drop();}
   },true);
   document.addEventListener('pointerdown',function(e){
     kbd=false; down=null;
@@ -658,27 +682,34 @@ export const TIP_SCRIPT = `
     var d=down, el=own(e.target); down=null;
     if(!el||el!==d.el||Math.abs(e.clientX-d.x)>10||Math.abs(e.clientY-d.y)>10)return;
     if(el.matches(ACT)||(el.closest&&el.closest(ACT)))return;
-    if(on===el&&how==='tap')hide(); else show(el,'tap');
+    muted=null;
+    if(on===el&&how==='tap'&&!tip.hidden)hide(); else show(el,'tap');
   });
   document.addEventListener('pointerover',function(e){
     if(e.pointerType==='touch')return;
-    if(inside(e.target)){clearTimeout(gone); return;}
-    var el=own(e.target); if(!el)return;
+    if(!tip.hidden&&inside(e.target)){clearTimeout(gone); return;}
+    var el=own(e.target); if(!el||el===muted)return;
     clearTimeout(wait);
-    if(on&&how==='hover'){show(el,'hover'); return;}
+    if(!tip.hidden&&how==='hover'){show(el,'hover'); return;}
     wait=setTimeout(function(){show(el,'hover');},delay);
   });
   document.addEventListener('pointerout',function(e){
     if(e.pointerType==='touch')return;
     clearTimeout(wait);
-    if(how==='hover'&&!inside(e.relatedTarget))later();
+    // ‏وما أُخفي بـEsc يبقى مخفيًّا حتّى يخرج المؤشّرُ من هدفه — لا حين ينتقل بين أبنائه
+    var to=e.relatedTarget; if(muted&&!(to&&(to===muted||(muted.contains&&muted.contains(to)))))muted=null;
+    if(how==='hover'&&!inside(to))later();
   });
   document.addEventListener('focusin',function(e){
-    var el=own(e.target); if(!el){if(on&&how==='focus')hide(); return;}
-    if(kbd)show(el,'focus');
+    var el=own(e.target);
+    if(muted&&el!==muted)muted=null;
+    if(!el){if(on&&how==='focus')hide(); return;}
+    // ‏ظاهرٌ له أصلًا (بالتمرير أو باللمس) فيبقى؛ ولوحةُ المفاتيح تُمسكه ما بقي التركيز
+    if(on===el&&!tip.hidden){if(kbd)how='focus'; return;}
+    show(el,'focus',!kbd||el===muted);
   });
   document.addEventListener('focusout',function(e){
-    if(how==='focus'&&!inside(e.relatedTarget))hide();
+    if(how==='focus'&&!inside(e.relatedTarget))drop();
   });
   window.addEventListener('scroll',function(){if(on)place();},{capture:true,passive:true});
   window.addEventListener('resize',function(){if(on)place();},{passive:true});

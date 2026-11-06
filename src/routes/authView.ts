@@ -9,7 +9,7 @@
 import { escapeHtml, shell } from './panelView'
 import { brandMoment } from './ui/moment'
 import { notice, noticeText } from './ui/components/toast'
-import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
+import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
 import { html, raw } from './ui/html'
 
 export interface SecondFactorData {
@@ -284,7 +284,7 @@ export function enrolPage(d: EnrolData, nonce: string): string {
   const recovery = d.required ? '' : html`<hr><h2 class="sec">رموز الاسترداد</h2>
     <p class="hint">${d.recoveryLeft > 0 ? html`بقي <b>${d.recoveryLeft}</b> رمزًا غير مستهلَك.` : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلًا.'}</p>
     <button class="btn btn-secondary" id="rc-issue" type="button"${raw(d.recoveryLeft > 0
-      ? ' data-confirm="أتولّد مجموعةً جديدة؟ تُبطل القديمةَ كلَّها، فلا يصلح رمزٌ منها بعد اليوم." data-confirm-ok="ولّد مجموعةً جديدة"' : '')}>${d.recoveryLeft > 0 ? 'ولّد مجموعة جديدة' : 'ولّد رموز استرداد'}</button>
+      ? ' data-confirm="' + escapeHtml(RC_RENEW.ask) + '" data-confirm-ok="' + escapeHtml(RC_RENEW.ok) + '"' : '')}>${d.recoveryLeft > 0 ? RC_RENEW.ok : 'ولّد رموز استرداد'}</button>
     <div class="note" id="rc-msg" role="status" aria-live="polite"></div>`
   const lede = d.required
     ? html`دورُك «${d.roleName}» لا يكفيه رمز البريد: من قرأ بريدك دخل. سجّل مفتاح مرور (بصمة الوجه أو الإصبع) أو رمز تطبيق.`

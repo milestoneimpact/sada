@@ -65,7 +65,8 @@ function card(c: ReviewCard, planId: string, zone: string | null): Html {
         : html``}
       ${c.post === null || c.post.status === 'published' ? html`` : html`<a class="btn btn-secondary btn-sm" href="/panel?open=${encodeURIComponent(c.post.id)}#ed">عدّل</a>`}
       <form class="inline" method="POST" action="/panel/plan/review/delay">${hidden}<button class="btn btn-secondary btn-sm" type="submit" name="days" value="1">أخّر يومًا</button><button class="btn btn-secondary btn-sm" type="submit" name="days" value="7">أسبوعًا</button></form>
-      <form class="inline" method="POST" action="/panel/plan/review/drop" data-confirm="احذف هذا البند من الخطّة؟ ومسوّدتُه تُرفض وتبقى بكلفتها.">${hidden}<button class="btn btn-quiet btn-sm" type="submit">احذف</button></form>
+      ${/* ‏والحذفُ أحمرُ كـ«احذف البند» في لوح الخطّة (مراجعة D-323): حوارُ التأكيد يقرأ الهدمَ من لون الزرّ، فيُحمرّ فعلُه ويقف التركيزُ على «إلغاء» */''}
+      <form class="inline" method="POST" action="/panel/plan/review/drop" data-confirm="احذف هذا البند من الخطّة؟ ومسوّدتُه تُرفض وتبقى بكلفتها.">${hidden}<button class="btn btn-danger btn-sm" type="submit">احذف</button></form>
     </div>
   </article>`
 }
@@ -136,7 +137,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null): string {
       <span id="rv-n">حدّد بنودًا لفعلٍ واحدٍ عليها</span><span class="grow"></span>
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد المحدَّد</button>
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="delay">أخّرها يومًا</button>
-      <button class="btn btn-quiet btn-sm" type="submit" name="do" value="drop" data-confirm="احذف البنودَ المحدَّدة من الخطّة؟">احذفها</button>
+      <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="احذف البنودَ المحدَّدة من الخطّة؟">احذفها</button>
     </form>
     ${list}
     ${versions}

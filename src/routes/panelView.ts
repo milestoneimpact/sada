@@ -36,7 +36,7 @@ import { securitySection } from './ui/sections/security'
 import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
-import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT } from './ui/scripts'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
@@ -1450,9 +1450,9 @@ ${ownerView ? `<div data-sub id="security-all">
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
     <div class="row">
       <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button"${d.factors.recoveryLeft > 0
-        // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا
-        ? ' data-confirm="أتولّد مجموعةً جديدة؟ تُبطل القديمةَ كلَّها، فلا يصلح رمزٌ منها بعد اليوم." data-confirm-ok="ولّد مجموعةً جديدة"' : ''}>
-        ${d.factors.recoveryLeft > 0 ? 'ولّد مجموعةً جديدة' : 'ولّد رموز استرداد'}</button>
+        // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا — وما يُولَّد في الصفحة يُضيف السؤالَ سكربتُها
+        ? ' data-confirm="' + escapeHtml(RC_RENEW.ask) + '" data-confirm-ok="' + escapeHtml(RC_RENEW.ok) + '"' : ''}>
+        ${d.factors.recoveryLeft > 0 ? RC_RENEW.ok : 'ولّد رموز استرداد'}</button>
     </div>
     <div id="rc-box" hidden><div class="codes" id="rc-list"></div>
       <div class="note"><b>انسخها الآن.</b> لن تُعرض ثانية. والتوليد الجديد يُبطل القديمة كلَّها.</div></div>

@@ -987,7 +987,9 @@ describe('ما وراء المقاييس (D-149)', () => {
     }
     expect(found((d) => d.prop.startsWith('text-decoration') && d.value.includes('var(--au)'))).toEqual([])
     expect(css.rule('.pv th a')['text-decoration']).toBe('underline')
-    expect(css.rule('.cmdk-in:focus-within')['box-shadow']).toBe('inset 0 calc(-1 * var(--stroke)) 0 var(--focus)')
+    // ‏و«هنا» حلقةُ الحقل نفسُها لا خيطٌ تحت السطر وحدَه (مراجعة D-323 · WCAG 2.4.13): «outline:none» كان يُطفئها
+    expect(css.rule('.cmdk-in input').outline).toBeUndefined()
+    expect(css.rule('input:focus').outline).toBe('var(--stroke) solid var(--focus)')
     expect(css.where('.busy-note')).toContain('')
   })
   it('الرموز: لا زمرّد في الوهج بصيغة rgba، والتاريخ في مفتاح الرسم معزول، والرقم المحلّيّ غربيّ في كلّ ICU', () => {

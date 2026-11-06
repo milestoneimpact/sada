@@ -40,7 +40,12 @@
  * | كلُّ طافية · ‏1280 | القائمةُ المنسدلة وورقةُ «المزيد» والزرُّ العائم، كلٌّ وحدَها ويُفحَص ما فيها |
  *
  * **وهدفُ التلميح يُعَدّ** (D-323 · WCAG 1.4.13): كلُّ `[data-tip]` لا يأخذ التركيزَ ولا فيه ما يأخذه يُسقط الفحص —
- * تلميحٌ لا تصله لوحةُ المفاتيح ولا اللمسُ معلومةٌ بالفأرة وحدها.
+ * تلميحٌ لا تصله لوحةُ المفاتيح ولا اللمسُ معلومةٌ بالفأرة وحدها. **و`<title>` في SVG مثلُه** (مراجعة D-323): المتصفّحُ
+ * يُظهره بالتمرير وحده، فكان عددُ كلّ يومٍ في «ما كُتب في أسبوعين» لا يُعرف إلّا بالفأرة.
+ *
+ * **والتلميحُ فوق هدفه** (مراجعة D-323): التلميحُ عنصرٌ مثبَّتٌ يكتب السكربتُ «left» له، وقاعدةٌ منطقيّةٌ في الورقة
+ * («inset-inline-start:0» = «right:0» في الصفحة العربيّة) جعلت المتصفّحَ يُسقط «left» فلصق كلُّ تلميحٍ الحافّةَ اليمنى.
+ * و`happy-dom` لا يرسم فلا يراه. فتُركَّز أهدافُ التلميح الظاهرةُ واحدًا واحدًا، ويُسقط الفحصَ تلميحٌ لا يتقاطع أفقيًّا مع هدفه.
  *
  *     node scripts/audit_a11y.mjs /tmp/panel.html /tmp/screen-login.html …
  */
@@ -61,6 +66,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 let failed = 0
 let runs = 0
 let unreachable = 0
+let misplaced = 0
 
 /** يفتح العيّنةَ بمقاسها وثيمها، ويُظهر الألواح، ويُنهي الصعود. */
 async function open(file, device, theme) {
@@ -103,9 +109,14 @@ for (const file of files) {
       // ‏هدفُ التلميح بلا تركيز (D-323)
       const lost = await page.evaluate(() => {
         const FOCUS = 'a[href],button:not([disabled]),input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])'
-        return [...document.querySelectorAll('[data-tip]')]
+        const tips = [...document.querySelectorAll('[data-tip]')]
           .filter((el) => !(el.matches(FOCUS) && !el.matches(':disabled')) && el.querySelector(FOCUS) === null)
           .map((el) => `${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ')[0] : ''} «${(el.getAttribute('data-tip') ?? '').slice(0, 30)}»`)
+        // ‏و«title» في SVG تلميحُ المتصفّح نفسِه: بالتمرير وحده، لا تركيزَ يصله ولا لمس
+        const titles = [...document.querySelectorAll('svg title')]
+          .filter((t) => (t.textContent ?? '').trim() !== '')
+          .map((t) => `svg › title «${(t.textContent ?? '').trim().slice(0, 30)}»`)
+        return [...tips, ...titles]
       })
       if (lost.length > 0) {
         unreachable += lost.length
@@ -143,6 +154,34 @@ for (const file of files) {
       await page.waitForTimeout(150)
       await settle(page)
       report(`${base} · تلميح`, (await new AxeBuilder({ page }).include('#sada-tip').withTags(TAGS).analyze()).violations)
+      // ‏والتلميحُ فوق هدفه لا في حافّة الشاشة: كلُّ هدفٍ ظاهرٍ يُركَّز، ويُقاس تقاطعُ المستطيلين أفقيًّا
+      const far = await page.evaluate(() => {
+        const out = []
+        const targets = [...document.querySelectorAll('[data-tip],.btn-icon[aria-label]')].filter((el) => {
+          const r = el.getBoundingClientRect()
+          return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'
+        })
+        for (const t of targets) {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+          t.focus()
+          const s = document.getElementById('sada-tip')
+          if (!s || s.hidden || document.activeElement !== t) continue
+          const a = t.getBoundingClientRect()
+          const b = s.getBoundingClientRect()
+          if (!(b.left < a.right && b.right > a.left)) {
+            out.push(`${t.tagName.toLowerCase()} ${Math.round(a.left)}–${Math.round(a.right)} ← تلميحُه ${Math.round(b.left)}–${Math.round(b.right)} «${(s.textContent ?? '').slice(0, 24)}»`)
+          }
+        }
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+        return { n: targets.length, out }
+      })
+      if (far.out.length > 0) {
+        misplaced += far.out.length
+        console.log(`✕ ${base} · تلميحٌ بعيدٌ عن هدفه — ${far.out.length} من ${far.n}`)
+        for (const l of far.out.slice(0, 5)) console.log(`      ${l}`)
+      } else {
+        console.log(`✓ ${base} · كلُّ تلميحٍ فوق هدفه (${far.n})`)
+      }
     }
     await context.close()
   }
@@ -196,5 +235,5 @@ for (const file of files) {
 }
 
 await browser.close()
-console.log(`\nالمجموع: ${failed} ملحوظة في ${runs} فحصًا · ${unreachable} تلميحٌ لا يصله التركيز`)
-process.exit(failed + unreachable > 0 ? 1 : 0)
+console.log(`\nالمجموع: ${failed} ملحوظة في ${runs} فحصًا · ${unreachable} تلميحٌ لا يصله التركيز · ${misplaced} تلميحٌ بعيدٌ عن هدفه`)
+process.exit(failed + unreachable + misplaced > 0 ? 1 : 0)
