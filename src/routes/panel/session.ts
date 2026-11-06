@@ -18,10 +18,15 @@ import { createOrg, listOrgs, orgExists } from '../../lib/tenancy'
 import {
   clearedCookie, createEmailSession, destroySession, revokeSessions, safeNext, sessionCookie, setActiveOrg,
 } from '../../lib/session'
-import { factorState } from '../../lib/security/factors'
+import { factorState, type FactorState } from '../../lib/security/factors'
 import { fingerprint } from '../../lib/security/digest'
 import { relyingParty } from '../../lib/security/rp'
 import { record } from '../../lib/audit'
+import { factorRequired } from '../../lib/access'
+import { say } from '../../lib/errors/catalog'
+import { securityEvent } from '../../lib/security/events'
+import { trustedDevice, withDevice } from '../../lib/security/device'
+import type { Who } from '../../lib/team'
 import { loginPage } from '../panelView'
 import { page, hasPasskeys, setFlash, guardPost, back } from './shared'
 
@@ -63,10 +68,13 @@ session.post('/panel/login/code', async (c) => {
 
   /*
    * ‏**سقفٌ للعنوان وللجميع قبل أن يُصدَر رمز** (D-270): كلُّ طلبٍ هنا كتابةٌ في KV
-   * ‏وبريدٌ وصفُّ تدقيق، والطالبُ مجهول — كسقف تحدّي المفتاح (D-161) في دلوٍ مستقلّ. وسقفُ البريد
-   * ‏الواحد (`issueCode`) لا يحرس عناوينَ شتّى.
+   * ‏وبريدٌ وصفُّ تدقيق، والطالبُ مجهول — في دلوٍ مستقلّ عن محاولات الدخول. وسقفُ البريد
+   * ‏الواحد (`issueCode`) لا يحرس عناوينَ شتّى. **والجهازُ الذي دخل منه صاحبُ هذا البريد لا يمرّ بالقاطع العامّ**
+   * ‏(مراجعة D-317): ثلاثةُ آلاف طلبٍ من مصادر شتّى كانت تمنع الرمزَ عن المالك نفسِه.
    */
-  const issue = await reserveCodeIssue(c.env.DB, c.req.raw)
+  const typed = normalizeEmail(String(form.get('email') ?? ''))
+  const device = await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, typed)
+  const issue = await reserveCodeIssue(c.env.DB, c.req.raw, device)
   if (!issue.allowed) {
     // ‏وقاعدةٌ لا تردّ ليست حدًّا (D-291): تُقال بسببها ولا تُحسَب على العنوان
     if (issue.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, next }, nonce), 503)
@@ -77,9 +85,15 @@ session.post('/panel/login/code', async (c) => {
     )
   }
 
-  // ‏المالكُ أو مدعوٌّ قائم (D-278) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد)
-  const typed = normalizeEmail(String(form.get('email') ?? ''))
-  const who = await whoCanReceive(c.env.DB, typed)
+  // ‏المالكُ أو مدعوٌّ قائم (D-278) — ولغيرهما الصفحةُ نفسُها بلا رسالة (لا تعداد). **وقاعدةٌ لا تردّ تُقال**
+  // ‏(مراجعة D-317): العطلُ لا يتعلّق بالعنوان المكتوب، فقولُه لا يكشف أيَّ العناوين مدعوّ
+  let who: Who | null
+  try {
+    who = await whoCanReceive(c.env.DB, typed)
+  } catch (error) {
+    console.warn({ job: 'login', step: 'member', failed: String(error) })
+    return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, next }, nonce), 503)
+  }
   if (who !== null) {
     const issued = await issueCode(c.env.KV, who.email)
     if (issued.ok) {
@@ -129,26 +143,45 @@ session.post('/panel/login', async (c) => {
     )
   }
 
+  // ‏صاحبُ الرمز من خطوة البريد (D-278)، وجهازُه إن كان دخل منه من قبل (مراجعة D-317): الموثوقُ لا يمرّ بالقاطع العامّ
+  // ‏ولا بسقف الحساب، فلا يُقفله مجهولٌ ملأهما
+  const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
+  const device = await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, claimed)
+
   // ‏والحجزُ قبل الفحص (D-161): طلباتٌ متزامنةٌ تمرّ كلُّها من قراءة KV قبل أن
   // ‏تكتب واحدةٌ منها، والعدّادُ الذرّيُّ في D1 يردّ السادسةَ قبل أن يُقارَن رمزُها
-  const reserved = await reserveAttempt(c.env.DB, c.req.raw)
+  const reserved = await reserveAttempt(c.env.DB, c.req.raw, device)
   if (!reserved.allowed) {
     if (reserved.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, step: 'code', next }, nonce), 503)
     return page(
-      (nonce) => loginPage({ error: blockedText(false), blocked: true, step: 'code', next }, nonce),
+      (nonce) => loginPage({ error: blockedText(reserved.why === 'global'), blocked: true, step: 'code', next }, nonce),
       429,
     )
   }
 
-  // ‏صاحبُ الرمز من خطوة البريد (D-278): المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode`
-  // ‏كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**، فلا يكشف الفرقُ أيَّ العناوين مدعوّ
-  const claimed = normalizeEmail(String(form.get('email') ?? '') || OWNER_EMAIL)
-  const who = (await whoCanReceive(c.env.DB, claimed)) ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }
-  // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم
-  const guess = await reserveCodeGuess(c.env.DB, who.email)
+  /*
+   * ‏المالكُ أو مدعوٌّ قائم. وغيرُهما لا رمزَ مخزّنًا له فيسقط في `verifyCode` كرمزٍ خاطئ — **ويُعدّ في سقف اليوم مثلَه**،
+   * ‏فلا يكشف الفرقُ أيَّ العناوين مدعوّ.
+   *
+   * ‏**وقاعدةٌ لا تردّ ليست «لا أحد»** (مراجعة D-317). كان الخطأ يُبلَع فيصير «لا أحد»، ثمّ يُجعل «لا أحد» دورَ «قارئ»،
+   * ‏ثمّ يُحسب منه أنّ العاملَ لا يلزم: عثرةٌ واحدةٌ في D1 فتحت لمديرٍ بلا عاملٍ جلسةً كاملة. والآن: عطلٌ ← 503 بلا جلسة
+   * ‏والرمزُ لم يُستهلك؛ **والدورُ الذي تُبنى عليه الجلسةُ من الصفّ نفسِه** (`found`) لا من البديل.
+   */
+  let found: Who | null
+  try {
+    found = await whoCanReceive(c.env.DB, claimed)
+  } catch (error) {
+    console.warn({ job: 'login', step: 'member', failed: String(error) })
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.member_unavailable' }, c.req.raw)
+    return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, step: 'code', next, email: claimed }, nonce), 503)
+  }
+  const who = found ?? { email: claimed, role: 'viewer' as const, orgs: [] as string[] }
+  // ‏وسقفُ اليوم على الرمز نفسِه (D-247): حدُّ العنوان يُعدّ بربع الساعة، والتخمينُ يتراكم.
+  // ‏ولكلّ (حسابٍ، مصدر) لا للحساب وحده (D-317): من خمّن عشرًا أغلق على نفسه، لا على المالك
+  const guess = await reserveCodeGuess(c.env.DB, who.email, c.req.raw, device)
   if (!guess.allowed) {
     if (guess.why === 'db') return page((nonce) => loginPage({ error: GATE_UNAVAILABLE_TEXT, step: 'code', next }, nonce), 503)
-    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked' }, c.req.raw)
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.code.locked', detail: guess.why === 'global' ? 'account' : 'source' }, c.req.raw)
     const passkeys = await hasPasskeys(c.env)
     return page(
       (nonce) =>
@@ -163,6 +196,20 @@ session.post('/panel/login', async (c) => {
         ),
       429,
     )
+  }
+
+  /*
+   * ‏**عواملُ الحساب قبل الرمز، ومن قاعدةٍ تردّ** (D-317). كانت قراءتُها تبلع الخطأ فتقول «لا عامل»، فرمزٌ صحيحٌ مع
+   * ‏عثرةٍ في D1 يفتح جلسةَ مالكٍ كاملة. والآن: قاعدةٌ لا تردّ ← لا جلسة، ورسالةُ «أعد المحاولة»، **والرمزُ لم يُستهلك**
+   * ‏(يُقرأ الحالُ قبل التحقّق منه)، فيعيده صاحبُه بعد دقيقة ولا يطلب غيره.
+   */
+  let factors: FactorState
+  try {
+    factors = await factorState(c.env.DB, relyingParty(c.env.PUBLIC_BASE_URL).id, who.email)
+  } catch (error) {
+    console.warn({ job: 'login', step: 'factors', failed: String(error) })
+    await record(c.env.DB, { actor: 'anonymous', action: 'login.factors_unavailable' }, c.req.raw)
+    return page((nonce) => loginPage({ error: say('factor_unavailable'), step: 'code', next, email: who.email }, nonce), 503)
   }
   const verdict = await verifyCode(c.env.KV, who.email, String(form.get('code') ?? ''))
   if (!verdict.ok) {
@@ -194,27 +241,30 @@ session.post('/panel/login', async (c) => {
   }
 
   // ‏ورمزٌ صحيحٌ لدعوةٍ أُلغيت بين الطلب والإدخال لا يفتح شيئًا
-  if ((await whoCanReceive(c.env.DB, who.email)) === null) {
+  if (found === null) {
     return page((nonce) => loginPage({ error: 'الرمز غير صحيح أو انتهت مهلته. اطلب رمزًا جديدًا.', step: 'code', next }, nonce), 401)
   }
 
-  // يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق
-  // بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ تكفي
-  const rp = relyingParty(c.env.PUBLIC_BASE_URL)
-  const factors = await factorState(c.env.DB, rp.id)
-  // ‏العاملُ الثاني عاملُ المالك (مفاتيحُه ورمزُ تطبيقه)، فلا يُطلب من المدعوّ ما لا يملكه
-  const pending = factors.enforced && who.role === 'owner'
-  const result = await createEmailSession(c.env.KV, c.env.ADMIN_TOKEN, { email: who.email, role: who.role }, c.req.raw, {
+  /*
+   * ‏يُقرأ حالُ العوامل **قبل** فتح الجلسة: جلسةٌ تُفتح كاملةً ثمّ تُعلَّق بعد ذلك تكون قد وُجدت كاملةً لحظةً — ولحظةٌ
+   * ‏تكفي. **ولكلّ حسابٍ عواملُه** (D-317): من سجّل عاملًا يُسأل عنه أيًّا كان دورُه، **ومن يلزمه عاملٌ ولا عاملَ له**
+   * ‏(المالكُ والمديرُ والناشر) يدخل جلسةَ تسجيلٍ وحده: صفحةُ التسجيل لا غير. والمحرّرُ والقارئُ بلا عاملٍ يدخلان كما كانا.
+   */
+  const pending = factors.enforced
+  const enrol = !pending && factorRequired(found.role)
+  const result = await createEmailSession(c.env.KV, c.env.ADMIN_TOKEN, { email: found.email, role: found.role }, c.req.raw, {
     pending,
+    enrol,
     next,
   })
   if ('error' in result) {
+    const passkeys = await hasPasskeys(c.env)
     return page(
       (nonce) =>
         loginPage(
           {
             error: '`ADMIN_TOKEN` غير مضبوط على هذه البيئة — اللوحة مقفلة لا مفتوحة.',
-            passkeys: factors.passkeys.length > 0,
+            passkeys,
             next,
           },
           nonce,
@@ -224,25 +274,27 @@ session.post('/panel/login', async (c) => {
   }
 
   await clearAttempts(c.env.KV, c.req.raw)
-  await releaseAttempt(c.env.DB, c.req.raw)
-  await releaseCodeGuesses(c.env.DB, who.email)
+  await releaseAttempt(c.env.DB, c.req.raw, device)
+  await releaseCodeGuesses(c.env.DB, who.email, c.req.raw, device)
   await record(
     c.env.DB,
     {
       actor: 'panel',
-      action: pending ? 'session.pending' : 'session.open',
-      detail: pending ? 'ينتظر العامل الثاني' : `برمز البريد · ${who.email}`,
+      action: pending ? 'session.pending' : enrol ? 'session.enrol' : 'session.open',
+      detail: pending ? 'ينتظر العامل الثاني' : (enrol ? 'يلزمه تسجيل عامل · ' : 'برمز البريد · ') + who.email,
+      by: who.email,
     },
     c.req.raw,
   )
-  return new Response(null, {
-    status: 303,
-    headers: {
-      // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createEmailSession`)، لا في العنوان
-      Location: pending ? '/panel/2fa' : next,
-      'Set-Cookie': sessionCookie(result.id),
-    },
-  })
+  // ‏جلسةٌ كاملةٌ جديدة تُقال لصاحبها خارج القاعدة (D-317)؛ والمعلَّقةُ وجلسةُ التسجيل ليستا بابًا مفتوحًا بعد
+  // ‏والوجهةُ بعد العامل الثاني في الجلسة المعلَّقة نفسِها (`createEmailSession`)، لا في العنوان
+  const headers = new Headers({ Location: pending ? '/panel/2fa' : enrol ? '/panel/enrol' : next, 'Set-Cookie': sessionCookie(result.id) })
+  if (!pending && !enrol) {
+    await securityEvent(c.env, c.req.raw, { kind: 'session.new', email: who.email, detail: 'برمز البريد', sessionId: result.id })
+    // ‏ودخولٌ كاملٌ يترك على الجهاز كعكتَه (مراجعة D-317)؛ والمعلَّقةُ وجلسةُ التسجيل لم تُثبتا شيئًا بعد
+    await withDevice(headers, c.env.ADMIN_TOKEN, who.email)
+  }
+  return new Response(null, { status: 303, headers })
 })
 
 /**
@@ -340,6 +392,10 @@ session.post('/panel/sessions/revoke-all', async (c) => {
     { actor: 'panel', action: 'session.revoke_all', detail: `${removed} جلسة` },
     c.req.raw,
   )
+  // ‏«أخرِج الأجهزة الأخرى» يُقال خارج القاعدة (D-317): من سرق جلسةً فأخرج صاحبَها لا يمرّ صامتًا
+  await securityEvent(c.env, c.req.raw, {
+    kind: 'sessions.revoke_all', email: gate.session.record.email ?? OWNER_EMAIL, detail: String(removed) + ' جلسة', sessionId: gate.session.id,
+  })
   await setFlash(c.env, c.req.raw, {
     kind: removed === 0 ? 'ok' : 'warn',
     text: removed === 0 ? 'لا جلسات أخرى مفتوحة.' : `أُبطلت ${removed} جلسة. جلستك هذه باقية.`,

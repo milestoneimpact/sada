@@ -230,3 +230,25 @@ describe('ردّ غير ناجح يُعاد بحدّ (D-270)', () => {
     expect(good).toHaveBeenCalledTimes(1)
   })
 })
+
+/*
+ * ‏‏D-317 · البند ٦: أحداثُ الأمان تُكتب صفًّا في القناة عند وقوعها (`security/events.ts`)، وتُرسلها الدورةُ كالثلاثة —
+ * ‏ويُعاد ما لم ينجح بحدّ، ولا يُرسَل ما نجح مرّتين.
+ */
+describe('أحداثُ الأمان في القناة (D-317)', () => {
+  it('صفٌّ كُتب عند الحدث يُرسَل مرّةً واحدة، وما ردّته القناةُ بفشلٍ يُعاد', async () => {
+    const { collectAlerts } = await import('./collect')
+    db.raw.prepare(`INSERT INTO alert_outbox (ref, kind, body, org_id) VALUES ('security:1', 'security', 'صدى — دخولٌ جديد إلى حسابك', 'org_owner')`).run()
+    const first = await collectAlerts(db, new Date(), 0)
+    expect(first.filter((a) => a.kind === 'security')).toEqual([
+      { kind: 'security', ref: 'security:1', body: 'صدى — دخولٌ جديد إلى حسابك', org: 'org_owner' },
+    ])
+    const failing = vi.fn(async () => new Response('no', { status: 502 })) as unknown as typeof fetch
+    expect((await sendAlerts(db, HOOK, first, failing)).failed).toBe(1)
+    const again = await collectAlerts(db, new Date(), 0)
+    expect(again.some((a) => a.ref === 'security:1')).toBe(true)
+    const f = ok()
+    expect((await sendAlerts(db, HOOK, again, f)).sent).toBe(1)
+    expect((await collectAlerts(db, new Date(), 0)).some((a) => a.ref === 'security:1')).toBe(false)
+  })
+})

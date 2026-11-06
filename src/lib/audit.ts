@@ -25,6 +25,8 @@ export interface AuditEntry {
   readonly detail?: string | null
   /** المنظّمةُ التي وقع فيها الفعل؛ وفعلُ الحساب نفسِه (دخولٌ، عامل) لمنظّمة المالك (D-227). */
   readonly org?: string
+  /** من فعل، حين لا يُعرَف من الطلب (D-317): حدثُ أمانٍ عند الدخول يقع قبل أن يُعرَف صاحبُ الطلب. */
+  readonly by?: string
 }
 
 /**
@@ -64,7 +66,7 @@ export async function record(
         header(request, 'CF-Connecting-IP', 45),
         header(request, 'User-Agent', 160),
         // ‏من فعل (D-272): بريدُ صاحب الطلب، و`NULL` خارج طلبٍ مُصادَق (المهامُّ المجدولة) أو للمالك قبل الفريق
-        whoNow()?.email ?? null,
+        entry.by ?? whoNow()?.email ?? null,
       )
       .run()
   } catch (error) {
@@ -117,6 +119,10 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'report.mail.sent': 'أُرسل تقرير الشهر',
   'report.mail.unsent': 'لم يُرسَل تقرير الشهر',
   'session.pending': 'دخول ينتظر العامل الثاني',
+  'session.enrol': 'دخول يلزمه تسجيل عامل ثانٍ',
+  'security.notice': 'إشعار أمان',
+  'stepup.ok': 'تحقّق للتوّ',
+  'stepup.denied': 'رُفض تحقّق للتوّ',
   'csrf.reject': 'طلب بلا رمز نموذج',
   'passkey.denied': 'مفتاح مرور مرفوض',
   'passkey.rejected': 'رُفض تسجيل مفتاح',

@@ -46,7 +46,7 @@ export function teamScreen(d: TeamData): string {
     <div class="scroll"><table><thead><tr><th>البريد</th><th>الدور</th><th>الشركات</th><th>آخرُ دخول</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>
   <div class="card" id="invite"><h2>ادعُ عضوًا</h2>
-    <p class="hint">يدخل برمزٍ إلى بريده كما تدخل. <b>والرمزُ يصله بعد أن يتحقّق من بريده عند Cloudflare</b> (M-33)، ودعوةُ بريدٍ مدعوٍّ تعدّل دورَه وشركاتِه.</p>
+    <p class="hint">يدخل برمزٍ إلى بريده كما تدخل. <b>والرمزُ يصله بعد أن يتحقّق من بريده عند Cloudflare</b> (M-33)، ودعوةُ بريدٍ مدعوٍّ تعدّل دورَه وشركاتِه — <b>ومن صار مديرًا أو ناشرًا بلا عاملٍ ثانٍ يُعاد إلى الدخول ليسجّله</b>.</p>
     <form method="POST" action="/panel/team/invite" class="stack">
       <div class="field"><label for="tm-email">البريد</label><input id="tm-email" type="email" name="email" dir="ltr" required></div>
       <fieldset class="field"><legend>الدور</legend><div class="stack">${roles}</div></fieldset>

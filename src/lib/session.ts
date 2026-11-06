@@ -36,6 +36,33 @@ export const COOKIE = '__Host-sada_session'
  */
 export const SESSION_TTL_SECONDS = 3 * 24 * 60 * 60
 
+/**
+ * **مهلةُ الخمول** (D-317): اثنتا عشرة ساعةً بلا طلبٍ تُسقط الجلسة، فوق الأيّام الثلاثة المطلقة.
+ *
+ * الأيّامُ الثلاثة طلبُ المالك (D-245) كي لا يُطلب الرمزُ كلَّ يوم، **وجهازٌ نُسي مفتوحًا لا يبقى بابًا ثلاثة أيّام**:
+ * من عمل صباحًا وعاد مساءً لم يُسأل، ومن ترك الهاتف ليلةً كاملةً يدخل من جديد. وهي مقايضةٌ مكتوبة: ‏ASVS 3.3.2
+ * يقترح نصف ساعة للمستوى الثاني، **ونظامٌ لمالكٍ واحدٍ يدخل بعاملين لا يحتمل رمزًا كلَّ نصف ساعة**.
+ */
+export const IDLE_SECONDS = 12 * 60 * 60
+
+/** الجلسةُ المعلَّقة (بعد رمز البريد وقبل العامل الثاني) **عشرُ دقائق لا ثلاثةُ أيّام** (D-317). */
+export const PENDING_TTL_SECONDS = 10 * 60
+
+/** جلسةُ التسجيل وحده (حسابٌ يلزمه عاملٌ ولا عاملَ له) — نصفُ ساعةٍ يكفي لمسح رمزٍ أو لمس مفتاح (D-317). */
+export const ENROL_TTL_SECONDS = 30 * 60
+
+/** «تحقّقتَ للتوّ» (D-317): العاملُ الثاني في آخر خمس دقائق يفتح الأفعالَ الحسّاسة بلا سؤالٍ ثانٍ. */
+export const FRESH_SECONDS = 5 * 60
+
+/** لا يُكتب الصفُّ في كلّ طلبٍ ليُعرَف الخمول: مرّةً كلَّ خمس دقائق تكفي لمهلةٍ من اثنتي عشرة ساعة. */
+const TOUCH_EVERY_SECONDS = 5 * 60
+
+/**
+ * صيغةُ الصفّ (D-317). **وصفٌّ بلا صيغةٍ يسقط**: كلُّ جلسةٍ فُتحت قبل العامل الثاني الإلزاميّ تُغلَق عند النشر، فلا
+ * يبقى مالكٌ بلا عاملٍ في جلسةٍ كاملةٍ ثلاثة أيّام بعد أن صار العاملُ شرطًا.
+ */
+const VERSION = 2
+
 /** بادئةُ مفاتيح الجلسات في KV — يُجرَد بها ويُبطَل. */
 const PREFIX = 'session:'
 
@@ -97,6 +124,8 @@ export interface SessionStore {
 export type SessionVia = 'email_code' | 'passkey' | 'admin_token'
 
 export interface SessionRecord {
+  /** صيغةُ الصفّ (D-317) — وما سواها يسقط. */
+  readonly v?: number
   /** متى فُتحت — ISO. */
   readonly at: string
   readonly via: SessionVia
@@ -132,6 +161,21 @@ export interface SessionRecord {
   /** من دخل ودورُه (D-245) — المالكُ اليوم، والمدعوّون لاحقا. والغائبُ جلسةٌ قديمةٌ للمالك. */
   readonly email?: string
   readonly role?: Role
+  /**
+   * **جلسةُ تسجيلٍ وحده** (D-317): حسابٌ يلزمه عاملٌ ثانٍ (المالكُ والمديرُ والناشر) ولا عاملَ له. لا تفتح إلّا صفحةَ
+   * التسجيل والمساعدةَ والخروج، وتصير كاملةً **بمعرّفٍ جديد** حين يُسجَّل أوّلُ عامل.
+   */
+  readonly enrol?: boolean
+  /**
+   * **أثبتت الجلسةُ عاملًا ثانيًا** (مراجعة D-317): فُتحت بمفتاح مرور، أو رُقّيت بعد العامل الثاني، أو بعد تسجيل أوّل
+   * عامل. والحارسُ يسأل عنها حين يكون دورُ صاحبها **الآن** ممّا يلزمه عامل: محرّرٌ دخل برمز بريده وحده ثمّ رُقّي مديرًا لا
+   * تبقى جلستُه كاملةً بلا عامل — يُعاد إلى الدخول، فيُسأل عن عامله أو يسجّله.
+   */
+  readonly factor?: boolean
+  /** آخرُ طلبٍ رأته (D-317) — يُقرأ للخمول، ويُكتب مرّةً كلَّ خمس دقائق لا في كلّ طلب. */
+  readonly seen?: string
+  /** آخرُ تحقّقٍ قويّ (D-317): العاملُ الثاني، أو رمزُ البريد لمن لا عاملَ له. ومنه «للتوّ» قبل الأفعال الحسّاسة. */
+  readonly fresh?: string
 }
 
 export interface Session {
@@ -170,25 +214,44 @@ export async function createEmailSession(
   adminToken: string | undefined,
   who: { readonly email: string; readonly role: Role },
   request?: Request,
-  options: { readonly pending?: boolean; readonly now?: Date; readonly next?: string } = {},
+  options: { readonly pending?: boolean; readonly enrol?: boolean; readonly now?: Date; readonly next?: string } = {},
 ): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' }> {
   const bind = await currentBind(adminToken)
   if (bind === null) return { error: 'disabled' }
 
+  const now = (options.now ?? new Date()).toISOString()
+  const pending = options.pending === true
   const next = safeNext(options.next)
   return await write(store, {
-    at: (options.now ?? new Date()).toISOString(),
+    v: VERSION,
+    at: now,
+    seen: now,
+    // ‏ورمزُ البريد تحقّقُ من لا عاملَ له (D-317): المعلَّقةُ لم تتحقّق بعد، فلا «للتوّ» لها
+    ...(pending ? {} : { fresh: now }),
     via: 'email_code',
     bind,
     csrf: randomToken(32),
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
-    pending: options.pending === true,
+    pending,
+    ...(options.enrol === true && !pending ? { enrol: true } : {}),
     email: who.email,
     role: who.role,
-    // ‏والوجهةُ للمعلَّقة وحدها: الكاملةُ تُوجَّه في ردّ الدخول نفسِه
-    ...(options.pending === true && next !== HOME ? { next } : {}),
-  })
+    // ‏والوجهةُ للمعلَّقة ولجلسة التسجيل: الكاملةُ تُوجَّه في ردّ الدخول نفسِه
+    ...((pending || options.enrol === true) && next !== HOME ? { next } : {}),
+  } as SessionRecord)
+}
+
+/** كم بقي من عمر الصفّ بالثواني — المطلقُ لا يتجدّد بالكتابة (D-317). */
+function lifetimeOf(record: SessionRecord): number {
+  return record.pending ? PENDING_TTL_SECONDS : record.enrol === true ? ENROL_TTL_SECONDS : SESSION_TTL_SECONDS
+}
+
+function remainingSeconds(record: SessionRecord, now: Date): number {
+  const born = Date.parse(record.at)
+  const age = Number.isFinite(born) ? Math.max(0, (now.getTime() - born) / 1000) : 0
+  // ‏‏KV لا يقبل مهلةً دون ستّين ثانية
+  return Math.max(60, Math.floor(lifetimeOf(record) - age))
 }
 
 /**
@@ -204,7 +267,7 @@ async function write(
 ): Promise<{ id: string; record: SessionRecord }> {
   const id = crypto.randomUUID()
   await store.put(sessionKey(id), JSON.stringify(record), {
-    expirationTtl: SESSION_TTL_SECONDS,
+    expirationTtl: lifetimeOf(record),
   })
   return { id, record }
 }
@@ -221,23 +284,33 @@ async function write(
 export async function createPasskeySession(
   store: SessionStore,
   adminToken: string | undefined,
+  who: { readonly email: string; readonly role: Role },
   request?: Request,
   now: Date = new Date(),
 ): Promise<{ id: string; record: SessionRecord } | { error: 'disabled' }> {
   const bind = await currentBind(adminToken)
   if (bind === null) return { error: 'disabled' }
 
+  /*
+   * ‏**صاحبُ المفتاح لا المالكُ دائمًا** (D-317). كانت الجلسةُ هنا `OWNER_EMAIL` بدور «المالك» أيًّا كان من سجّل
+   * ‏المفتاح — فمدعوٌّ يصل إلى تسجيل مفتاحٍ يدخل به مالكًا. والآن يقرّر المسارُ من صاحبُه ودورُه قبل أن يصل هنا.
+   */
+  const at = now.toISOString()
   const record: SessionRecord = {
-    at: now.toISOString(),
+    v: VERSION,
+    at,
+    seen: at,
+    fresh: at,
+    factor: true,
     via: 'passkey',
     bind,
     csrf: randomToken(32),
     ip: trim(request?.headers.get('CF-Connecting-IP') ?? null, 45),
     ua: trim(request?.headers.get('User-Agent') ?? null, 160),
     pending: false,
-    email: OWNER_EMAIL,
-    role: 'owner',
-  }
+    email: who.email,
+    role: who.role,
+  } as SessionRecord
   return await write(store, record)
 }
 
@@ -251,16 +324,57 @@ export async function createPasskeySession(
 export async function promoteSession(
   store: SessionStore,
   session: Session,
+  now: Date = new Date(),
 ): Promise<{ id: string; record: SessionRecord }> {
   // ‏والوجهةُ تُقرأ قبل الترقية وتسقط معها: جلسةٌ كاملةٌ لا تحمل وجهةً لا يقرؤها أحد
-  const { next: _next, ...rest } = session.record
+  // ‏وكذلك «التسجيلُ وحده» (D-317): من سجّل عاملَه صار كاملًا
+  const { next: _next, enrol: _enrol, ...rest } = session.record
+  const at = now.toISOString()
   const written = await write(store, {
     ...rest,
+    // ‏والعمرُ يبدأ من الترقية: الأيّامُ الثلاثةُ للجلسة الكاملة لا لدقائق الانتظار قبلها
+    at,
+    seen: at,
+    fresh: at,
+    // ‏والترقيةُ لا تقع إلّا بعد عاملٍ ثانٍ أُتمّ أو سُجّل (مراجعة D-317)
+    factor: true,
     csrf: randomToken(32),
     pending: false,
   })
   await store.delete(sessionKey(session.id))
   return written
+}
+
+/** «تحقّقتَ للتوّ»؟ (D-317) — العاملُ الثاني أو رمزُ البريد لمن لا عاملَ له، في آخر خمس دقائق. */
+export function isFresh(record: SessionRecord, now: Date = new Date()): boolean {
+  if (record.fresh === undefined) return false
+  const at = Date.parse(record.fresh)
+  return Number.isFinite(at) && now.getTime() - at <= FRESH_SECONDS * 1000 && now.getTime() >= at - 60_000
+}
+
+/** يكتب «تحقّقتَ الآن» في الجلسة نفسِها — بالمعرّف نفسِه وبما بقي من عمرها لا بعمرٍ جديد. */
+export async function markFresh(store: SessionStore, session: Session, now: Date = new Date()): Promise<Session> {
+  const at = now.toISOString()
+  const record: SessionRecord = { ...session.record, fresh: at, seen: at }
+  await store.put(sessionKey(session.id), JSON.stringify(record), { expirationTtl: remainingSeconds(record, now) })
+  return { id: session.id, record }
+}
+
+/**
+ * يؤرّخ آخرَ طلب (D-317) — **مرّةً كلَّ خمس دقائق** لا في كلّ طلب: كتابةٌ في KV لكلّ فتحةٍ تُدفَع ولا يُقرأ منها
+ * إلّا الفرقُ بين ساعةٍ واثنتي عشرة.
+ */
+export async function touchSession(store: SessionStore, session: Session, now: Date = new Date()): Promise<Session> {
+  const seen = Date.parse(session.record.seen ?? session.record.at)
+  if (Number.isFinite(seen) && now.getTime() - seen < TOUCH_EVERY_SECONDS * 1000) return session
+  const record: SessionRecord = { ...session.record, seen: now.toISOString() }
+  try {
+    await store.put(sessionKey(session.id), JSON.stringify(record), { expirationTtl: remainingSeconds(record, now) })
+  } catch (error) {
+    // ‏كتابةٌ لم تقع لا تُسقط الطلب: الخمولُ يُحسَب من آخر كتابةٍ وقعت، فيُطلب الدخولُ أبكرَ لا أبعد
+    console.warn({ job: 'session.touch', failed: String(error) })
+  }
+  return { id: session.id, record }
 }
 
 /** يقرأ معرّف الجلسة من ترويسة الكعكة. */
@@ -278,11 +392,18 @@ export function readCookie(header: string | null, name: string): string | null {
 
 function parse(raw: string): SessionRecord | null {
   try {
-    const value = JSON.parse(raw) as Partial<SessionRecord>
+    const value = JSON.parse(raw) as Partial<SessionRecord> & { v?: unknown }
     if (typeof value.bind !== 'string' || typeof value.csrf !== 'string') return null
     if (typeof value.pending !== 'boolean') return null
+    // ‏صفٌّ من قبل D-317 لا يُقبل: فُتح حين كان رمزُ البريد وحدَه يكفي
+    if (value.v !== VERSION || typeof value.at !== 'string') return null
     return {
-      at: typeof value.at === 'string' ? value.at : '',
+      v: VERSION,
+      at: value.at,
+      ...(typeof value.seen === 'string' ? { seen: value.seen } : {}),
+      ...(typeof value.fresh === 'string' ? { fresh: value.fresh } : {}),
+      ...(value.enrol === true ? { enrol: true } : {}),
+      ...(value.factor === true ? { factor: true } : {}),
       via: value.via === 'passkey' || value.via === 'email_code' ? value.via : 'admin_token',
       bind: value.bind,
       csrf: value.csrf,
@@ -312,6 +433,7 @@ export async function loadSession(
   store: SessionStore,
   request: Request,
   adminToken: string | undefined,
+  now: Date = new Date(),
 ): Promise<Session | null> {
   const id = readCookie(request.headers.get('Cookie'), COOKIE)
   if (id === null) return null
@@ -332,6 +454,21 @@ export async function loadSession(
     return null
   }
 
+  /*
+   * ‏**والمهلُ تُفحَص هنا لا في KV وحدَه** (D-317): مهلةُ KV تقريبيّةٌ وقد تتأخّر بين المواقع، والمطلقةُ لا تتجدّد
+   * ‏بالكتابة. فالعمرُ (ثلاثةُ أيّام، أو عشرُ دقائق للمعلَّقة، أو نصفُ ساعةٍ للتسجيل) والخمولُ (اثنتا عشرة ساعة)
+   * ‏يُحسبان من الصفّ نفسِه.
+   */
+  const born = Date.parse(record.at)
+  const seen = Date.parse(record.seen ?? record.at)
+  const t = now.getTime()
+  const expired = !Number.isFinite(born) || t - born > lifetimeOf(record) * 1000
+    || (Number.isFinite(seen) && t - seen > IDLE_SECONDS * 1000)
+  if (expired) {
+    await store.delete(sessionKey(id))
+    return null
+  }
+
   return { id, record }
 }
 
@@ -339,11 +476,12 @@ export async function loadSession(
  * يبدّل المنظّمةَ النشطة في الجلسة نفسِها (D-225).
  *
  * **بالمعرّف نفسِه** لا بمعرّفٍ جديد: لا صلاحيّةَ تُكتسب هنا — الجلسةُ كاملةٌ
- * أصلا، وجلسةُ المشغّل ترى كلَّ المنظّمات. والكتابةُ تجدّد مهلتَها الثلاثة أيّام.
+ * أصلا، وجلسةُ المشغّل ترى كلَّ المنظّمات. والكتابةُ لا تجدّد مهلتَها (D-317).
  */
 export async function setActiveOrg(store: SessionStore, session: Session, org: string): Promise<Session> {
   const record: SessionRecord = { ...session.record, org }
-  await store.put(sessionKey(session.id), JSON.stringify(record), { expirationTtl: SESSION_TTL_SECONDS })
+  // ‏بما بقي من عمرها (D-317): الانتقالُ بين الشركات لا يمدّ الأيّامَ الثلاثة
+  await store.put(sessionKey(session.id), JSON.stringify(record), { expirationTtl: remainingSeconds(record, new Date()) })
   return { id: session.id, record }
 }
 
@@ -364,6 +502,8 @@ export interface SessionSummary {
   readonly ua: string
   readonly via: SessionVia
   readonly current: boolean
+  /** جلسةُ تسجيلٍ وحده (D-317): بابٌ نصفُ مفتوح يُرى ويُبطَل. */
+  readonly enrol?: boolean
 }
 
 /**
@@ -398,6 +538,7 @@ export async function listSessions(
         ua: record.ua,
         via: record.via,
         current: id === currentId,
+        ...(record.enrol === true ? { enrol: true } : {}),
       })
     }
     cursor = page.list_complete === false ? page.cursor : undefined

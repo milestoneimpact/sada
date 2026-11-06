@@ -693,7 +693,6 @@ drafts.post('/panel/drafts/spread', async (c) => {
 drafts.get('/panel/drafts/spread', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const form = new FormData()
   for (const [k, v] of new URL(c.req.url).searchParams) form.append(k, v)
   return spreadPreview(c, form, session.record.csrf, activeOrg(session.record))

@@ -177,7 +177,12 @@ var sadaPk={
       admin_disabled:'الدخول معطَّل: ADMIN_TOKEN غير مضبوط على الخادم.',
       csrf_failed:'انتهت صلاحية الصفحة — حدّثها ثمّ أعد.',
       no_session:'انتهت الجلسة — ادخل من جديد.',
-      pending_second_factor:'أتمّ العامل الثاني أوّلًا.'
+      pending_second_factor:'أتمّ العامل الثاني أوّلًا.',
+      step_up:'هذا الفعل يحتاج تحقّقًا للتوّ — جارٍ فتحُ صفحته.',
+      enrol_required:'سجّل عاملك الثاني أوّلًا.',
+      totp_confirmed:'رمز التطبيق مضبوط — أزله أوّلًا ثمّ اضبط غيره.',
+      no_attestation:'متصفّحك لم يرسل بيانات المفتاح كاملة — حدّث الصفحة أو جرّب متصفّحًا أحدث.',
+      unavailable:'القاعدة لم تردّ — أعد المحاولة بعد دقيقة.'
     }[code];
     var e=new Error(t||('تعذّر الطلب ('+status+').'));
     e.name='SadaServer';
@@ -199,6 +204,152 @@ var sadaPk={
       throw sadaPk.server(e&&e.error,r.status);});
   }
 };
+`
+
+/**
+ * **أفعالُ العامل الثاني** (D-317) — تسجيلُ مفتاحٍ وحذفُه، وضبطُ رمز التطبيق وتأكيدُه وإزالتُه، وتوليدُ رموز الاسترداد.
+ *
+ * سكربتٌ واحدٌ تقرؤه الإعداداتُ (قسمُ الأمان) وصفحةُ «أمان حسابك» (`/panel/enrol`)، فلا نسختان تفترقان. ويقرأ المعرّفاتِ
+ * نفسَها (`pk-add` و`totp-start`…) ويعمل حيث وُجدت.
+ *
+ * - **«تحقّق للتوّ»**: ردُّ `step_up` يحمل وجهتَه (`to`)، فيُفتح ويعود صاحبُه إلى الصفحة نفسِها.
+ * - **والتسجيلُ يرسل `attestationObject`**: المفتاحُ العامّ يُقرأ على الخادم من بيانات الاعتماد المشهودة لا ممّا يقوله العميل.
+ * - **ورموزُ الاسترداد** تُعرض مع أوّل عامل، و«تابع» بعدها إلى اللوحة حين صارت الجلسةُ كاملة.
+ */
+export const FACTORS_SCRIPT = `
+(function(){
+  var csrf=(document.querySelector('input[name="_csrf"]')||{}).value||'';
+  var b64u=sadaB64.enc, fromB64u=sadaB64.dec;
+  var send=function(url,fields){
+    var body=new FormData(); body.set('_csrf',csrf);
+    for(var k in fields)body.set(k,fields[k]);
+    return fetch(url,{method:'POST',body:body}).then(function(r){
+      if(r.status!==403)return r;
+      return r.clone().json().then(function(e){
+        if(e&&e.error==='step_up'&&e.to){location.assign(e.to); return new Promise(function(){});}
+        return r;
+      },function(){return r;});
+    });
+  };
+  var tell=function(id,msg){var n=document.getElementById(id); if(n)n.textContent=msg;};
+  var after=function(d,box){
+    if(d&&d.codes&&d.codes.length){showCodes(d.codes); tell(box,'سُجّل. وهذه رموز استردادك — انسخها الآن.'); return;}
+    if(d&&d.promoted){location.assign('/panel'); return;}
+    location.reload();
+  };
+
+  var add=document.getElementById('pk-add');
+  if(add)add.addEventListener('click',function(){
+    if(!window.PublicKeyCredential){tell('pk-msg','متصفّحك لا يدعم مفاتيح المرور.'); return;}
+    var label=(document.getElementById('pk-label')||{}).value||'';
+    add.disabled=true; tell('pk-msg','المس مفتاحك…');
+    send('/panel/security/passkey/challenge',{}).then(function(r){
+      return r.ok?r.json():sadaPk.fail(r);
+    }).then(function(d){
+      return navigator.credentials.create({publicKey:{
+        challenge:fromB64u(d.challenge),
+        rp:{id:d.rp.id,name:d.rp.name},
+        user:{id:fromB64u(d.user.id),name:d.user.name,displayName:d.user.displayName},
+        pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+        authenticatorSelection:{userVerification:'preferred',residentKey:'preferred'},
+        excludeCredentials:d.excludeCredentials.map(function(id){
+          return {id:fromB64u(id),type:'public-key'};}),
+        attestation:'none', timeout:60000
+      }});
+    }).then(function(cred){
+      var r=cred.response;
+      if(!r.attestationObject)throw new Error('OldBrowser');
+      return send('/panel/security/passkey/register',{label:label,
+        credential:JSON.stringify({credentialId:cred.id,
+          clientDataJSON:b64u(r.clientDataJSON),
+          attestationObject:b64u(r.attestationObject)})});
+    }).then(function(r){
+      if(r.ok)return r.json().then(function(d){after(d,'pk-msg');});
+      return r.json().catch(function(){return {};}).then(function(e){add.disabled=false;
+        tell('pk-msg',e.detail||sadaPk.server(e.error,r.status).message); add.focus();});
+    }).catch(function(err){add.disabled=false;
+      tell('pk-msg',err&&err.message==='OldBrowser'
+        ?'متصفّحك لا يقدّم بيانات المفتاح — يلزم متصفّح أحدث.'
+        :sadaPk.why(err)); add.focus();});
+  });
+
+  document.querySelectorAll('button.pk-del').forEach(function(b){
+    b.addEventListener('click',function(){
+      if(!confirm('حذف المفتاح «'+b.dataset.label+'»؟'))return;
+      b.disabled=true;
+      send('/panel/security/passkey/delete',{id:b.dataset.id}).then(function(r){
+        if(r.ok){location.reload(); return;}
+        return r.json().catch(function(){return {};}).then(function(e){b.disabled=false;
+          tell('pk-msg',e.detail||sadaPk.server(e.error,r.status).message);});
+      }).catch(function(err){b.disabled=false; tell('pk-msg',sadaPk.why(err));});
+    });
+  });
+
+  var ts=document.getElementById('totp-start');
+  if(ts)ts.addEventListener('click',function(){
+    ts.disabled=true;
+    send('/panel/security/totp/start',{}).then(function(r){
+      return r.ok?r.json():sadaPk.fail(r);
+    }).then(function(d){
+      document.getElementById('totp-secret').value=d.secret;
+      document.getElementById('totp-box').hidden=false;
+      // ‏و«أكّد» الأوّليُّ الوحيد في البطاقة ما دام الضبطُ مفتوحًا (D-313): الخطوةُ التالية خطوتُه
+      Array.prototype.forEach.call(document.querySelectorAll('#factors .btn-primary'),function(b){
+        if(!b.closest('#totp-box'))b.className=b.className.replace('btn-primary','btn-secondary');});
+      tell('totp-msg','انسخ السرّ إلى تطبيق المصادقة ثمّ أكّد بالرمز الظاهر.');
+    }).catch(function(err){ts.disabled=false; tell('totp-msg',sadaPk.why(err)); ts.focus();});
+  });
+
+  var tc=document.getElementById('totp-confirm');
+  if(tc)tc.addEventListener('submit',function(e){
+    e.preventDefault();
+    /*
+     * ‏«رمزٌ غير صحيح» لما هو كذلك وحدَه (D-161): جلسةٌ انتهت أو صفحةٌ قديمة
+     * ‏كانت تُقرأ رمزًا خاطئًا، فيعيد المالكُ رمزًا صحيحًا مرّةً بعد مرّة
+     */
+    send('/panel/security/totp/confirm',{code:tc.code.value})
+      .then(function(r){
+        if(r.ok)return r.json();
+        return r.json().catch(function(){return {};}).then(function(e){
+          if(r.status===401&&e.error==='denied')throw Object.assign(new Error(e.detail||'رمز غير صحيح.'),{name:'SadaServer'});
+          throw sadaPk.server(e.error,r.status);});
+      }).then(function(d){after(d,'totp-msg');})
+      .catch(function(err){tell('totp-msg',sadaPk.why(err));});
+  });
+
+  var tr=document.getElementById('totp-remove');
+  if(tr)tr.addEventListener('click',function(){
+    if(!confirm('إزالة رمز التطبيق؟'))return;
+    tr.disabled=true;
+    send('/panel/security/totp/remove',{}).then(function(r){
+      if(r.ok){location.reload(); return;}
+      return r.json().catch(function(){return {};}).then(function(e){
+        if(e.detail)throw Object.assign(new Error(e.detail),{name:'SadaServer'});
+        throw sadaPk.server(e.error,r.status);});
+    }).catch(function(err){tr.disabled=false; tell('totp-msg',sadaPk.why(err)); tr.focus();});
+  });
+
+  function showCodes(list){
+    var box=document.getElementById('rc-box'), out=document.getElementById('rc-list');
+    if(!box||!out)return;
+    out.textContent='';
+    list.forEach(function(c){var d=document.createElement('code'); d.textContent=c; out.appendChild(d);});
+    box.hidden=false;
+    var go=document.getElementById('rc-go'); if(go)go.hidden=false;
+  }
+
+  var ri=document.getElementById('rc-issue');
+  if(ri)ri.addEventListener('click',function(){
+    if(!confirm('توليد مجموعة جديدة يُبطل القديمة كلَّها. متابعة؟'))return;
+    ri.disabled=true;
+    send('/panel/security/recovery/issue',{}).then(function(r){
+      return r.ok?r.json():sadaPk.fail(r);
+    }).then(function(d){ri.disabled=false;
+        if(d.codes){showCodes(d.codes); tell('rc-msg','وُلّدت '+d.codes.length+' رموز. انسخها الآن.');}
+        else tell('rc-msg','تعذّر التوليد.');
+    }).catch(function(err){ri.disabled=false; tell('rc-msg',sadaPk.why(err)); ri.focus();});
+  });
+})();
 `
 
 /**

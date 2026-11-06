@@ -15,7 +15,6 @@ export const help = new Hono<{ Bindings: Env }>()
 help.get('/panel/help', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   return page((nonce) =>
     soloPage('صدى — المساعدة', { href: '/panel', label: 'اللوحة' },
       injectCsrf(helpScreen(), session.record.csrf), nonce, '',

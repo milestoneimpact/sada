@@ -143,7 +143,9 @@ describe('GET /oauth/:platform/start', () => {
     const cookie = `${COOKIE}=${'id' in made ? made.id : ''}`
     const response = await app.request('/oauth/x/start', { headers: { Cookie: cookie } }, env)
     expect(response.status).toBe(303)
-    expect(response.headers.get('location') ?? '').toContain('/panel/login')
+    // ‏‏D-317: الحارسُ الواحدُ يردّها إلى شاشة عاملها (كانت تُعاد إلى الدخول كأنْ لا جلسة)، ولا رابطَ ربطٍ يُصدَر
+    expect(response.headers.get('location') ?? '').toBe('/panel/2fa')
+    expect((await kv.list?.({ prefix: 'oauth' }))?.keys ?? []).toHaveLength(0)
   })
 
   it('يرد 404 لمنصة غير معروفة', async () => {

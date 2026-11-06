@@ -17,21 +17,24 @@ import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { noticesScreen } from '../ui/noticesView'
 import { guardPost, loginResponse, page, setFlash } from './shared'
+import { fingerprint } from '../../lib/security/digest'
+import { OWNER_EMAIL } from '../../lib/ownerEmail'
 
 export const notices = new Hono<{ Bindings: Env }>()
 
 notices.get('/panel/notices', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const now = new Date()
+  const email = session.record.email ?? OWNER_EMAIL
   const [beats, allowance, reads] = await Promise.all([
     readHeartbeats(c.env.DB),
     checkAllowance(c.env.DB, 'image').catch(() => null),
-    readMarks(c.env.DB, org),
+    readMarks(c.env.DB, org, email),
   ])
-  const list = await collectNotices(c.env.DB, org, now, { pulses: pulses(beats, now), allowance })
+  const list = await collectNotices(c.env.DB, org, now, { pulses: pulses(beats, now), allowance },
+    { email, handle: await fingerprint(session.id) })
   const body = noticesScreen({ notices: list, reads, now })
   return page((nonce) =>
     soloPage('صدى — الإشعارات', { href: '/panel', label: 'اللوحة' },
@@ -45,7 +48,7 @@ notices.post('/panel/notices/read', async (c) => {
   if ('denied' in gate) return gate.denied
   const org = activeOrg(gate.session.record)
   const refs = gate.form.getAll('ref').map(String)
-  const n = await markRead(c.env.DB, org, refs, gate.session.record.email ?? null)
+  const n = await markRead(c.env.DB, org, refs, gate.session.record.email ?? OWNER_EMAIL)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: n === 0 ? 'لا شيء يُعلَّم.' : 'عُلّم ' + n + (n === 1 ? ' إشعارٌ' : ' إشعارات') + ' مقروءةً.' })
   return c.redirect('/panel/notices', 303)
 })

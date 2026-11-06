@@ -18,6 +18,42 @@ import { saveApp } from '../../src/lib/oauth/apps'
 import { recordCost } from '../../src/lib/cost'
 import { runWeekly } from '../../src/lib/report/job'
 import { weekBounds } from '../../src/lib/report/weekly'
+import { addPasskey } from '../../src/lib/security/factors'
+import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
+
+/**
+ * **مفتاحُ مرور المالك** (D-317) — العاملُ الثاني إلزاميٌّ للمالك، فالبذرةُ تحمله كما تحمله staging بعد المهمّة M-.
+ *
+ * زوجُ مفاتيح P-256 يُولَّد مرّةً للعمليّة: العامُّ يُحفظ بالدالّة التي يحفظ بها مسارُ التسجيل (`addPasskey`)، والخاصُّ
+ * يُسلَّم إلى متوثِّق Chromium الافتراضيّ (`WebAuthn.addCredential`) فيوقّع المتصفّحُ كما يوقّع هاتفُ المالك. ولا رايةَ
+ * في شيفرة الإنتاج تتخطّى العامل.
+ */
+export interface OwnerPasskey {
+  /** معرّفُ الاعتماد بـ base64url كما يحفظه صدى، وبـ base64 كما يطلبه CDP. */
+  readonly credentialId: string
+  readonly credentialIdB64: string
+  /** المفتاحُ الخاصّ PKCS#8 بـ base64 — لـ CDP وحده، لا يُكتب في قاعدة ولا ملفّ. */
+  readonly privateKeyB64: string
+  readonly publicKey: string
+}
+
+let ownerKey: Promise<OwnerPasskey> | null = null
+
+export function ownerPasskey(): Promise<OwnerPasskey> {
+  ownerKey ??= (async () => {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+    const raw = crypto.getRandomValues(new Uint8Array(16))
+    const b64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64')
+    const b64u = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64url')
+    return {
+      credentialId: b64u(raw),
+      credentialIdB64: b64(raw),
+      privateKeyB64: b64(new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey))),
+      publicKey: b64u(new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey))),
+    }
+  })()
+  return ownerKey
+}
 
 /** شكلُ `datetime('now')` في SQLite — والمقارنةُ في الشيفرة نصّيّة. */
 export function sqlTime(date: Date): string {
@@ -249,6 +285,13 @@ export async function seed(
 
   // ‏التقريرُ الأسبوعيّ كما تكتبه دورةُ الاثنين — بالدالّة نفسِها لا بصفٍّ مكتوبٍ باليد
   await runWeekly(db, now)
+
+  // ‏مفتاحُ مرور المالك (D-317) — بالدالّة التي يحفظ بها مسارُ التسجيل
+  const key = await ownerPasskey()
+  await addPasskey(db, {
+    credentialId: key.credentialId, publicKey: key.publicKey, alg: -7, signCount: 0,
+    label: 'هاتف المالك', rpId: 'localhost', email: OWNER_EMAIL,
+  })
 
   return {
     sources: { doc, slides },

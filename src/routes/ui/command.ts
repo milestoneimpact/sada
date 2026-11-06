@@ -26,6 +26,7 @@
  */
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
+import { ownerViewing } from '../../lib/access'
 
 /**
  * طيُّ الحروف — **جدولٌ واحدٌ يقرؤه الخادمُ والعميل**.
@@ -231,6 +232,8 @@ export function buildCommands(
     { label: 'بدّل سقف الإنفاق', note: 'الحدّ اليوميّ وعدد التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
     { label: 'راجع الجلسات', note: 'ما هو مفتوح الآن، وإنهاؤه', id: 'settings', anchor: 'security', alias: 'sessions revoke' },
   ]) {
+    // ‏والجلساتُ في إعدادات المالك؛ والعضوُ يجد عواملَه في «أمان حسابك» أدناه (مراجعة D-317)
+    if (a.anchor === 'security' && !ownerViewing()) continue
     const section = SECTIONS.find((s) => s.id === a.id)
     if (section === undefined) continue
     out.push({
@@ -255,6 +258,13 @@ export function buildCommands(
     label: 'رحلة العميل', note: 'الموجزُ والقنواتُ والخطّةُ والكلفةُ في شاشة', group: 'الأفعال',
     href: '/panel/client', icon: '', alias: 'client brief onboarding agency عميل موجز وكاله رحله',
   })
+  // ‏وأمانُ الحساب للعضو (مراجعة D-317): مفاتيحُ مروره ورمزُ تطبيقه ورموزُ استرداده — لا بابَ آخرَ إليها
+  if (!ownerViewing()) {
+    out.push({
+      label: 'أمان حسابك', note: 'مفتاح المرور ورمز التطبيق ورموز الاسترداد', group: 'الأفعال',
+      href: '/panel/enrol', icon: '', alias: 'security key 2fa otp recovery امان مفتاح مرور عامل ثاني استرداد',
+    })
+  }
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
     label: 'المساعدة', note: 'كيف يعمل صدى في سبع محطّات، والأسئلةُ الأولى، والاختصارات', group: 'الأفعال',

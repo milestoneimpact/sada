@@ -78,7 +78,6 @@ export async function sourceNames(db: Env['DB'], org: string, ids: readonly stri
 client.get('/panel/client', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const [orgRow, brief, linkedRows, plan, both, units, spent, facts, spentToday] = await Promise.all([
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
@@ -174,7 +173,6 @@ client.post('/panel/client/brief', async (c) => {
 client.get('/panel/client/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const [orgRow, zone] = await Promise.all([
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
@@ -218,7 +216,6 @@ client.post('/panel/client/report/send', async (c) => {
 client.get('/panel/portfolio', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const days = Number(c.req.query('days'))
   const p = c.req.query('p') ?? ''
   const orgs = await listOrgs(c.env.DB)
@@ -242,7 +239,6 @@ client.get('/panel/portfolio', async (c) => {
 client.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const body = teamScreen({ members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
   return page((nonce) =>
     soloPage('صدى — الفريق', { href: '/panel/settings', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, '',
@@ -290,7 +286,6 @@ client.post('/panel/team/revoke', async (c) => {
 client.get('/panel/insights', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const input = await insightsInput(c, activeOrg(session.record))
   const body = insightsScreen({ ...input, works: whatWorks(input.facts, input.zone) })
   return page((nonce) =>
@@ -302,7 +297,6 @@ client.get('/panel/insights', async (c) => {
 client.get('/panel/insights.csv', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.redirect('/panel', 303)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const input = await insightsInput(c, activeOrg(session.record))
   return new Response(insightsCsv(input.facts, input.zone), {
     status: 200,
@@ -318,7 +312,6 @@ client.get('/panel/insights.csv', async (c) => {
 client.get('/panel/pivot.csv', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.redirect('/panel', 303)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const q = new URL(c.req.url).searchParams
   const spec = {

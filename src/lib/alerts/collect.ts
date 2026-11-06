@@ -1,15 +1,16 @@
 /**
  * جمعُ ما يستحقّ أن يُوقظ المالك (D-109).
  *
- * **وثلاثةٌ لا رابعَ لها** — ولا يُقرأ منها إلّا ما وقع فعلا:
+ * **ثلاثةٌ في العمل ورابعُها أمانُ الحساب** (D-317) — ولا يُقرأ منها إلّا ما وقع فعلا:
  *
  * - إذنٌ يقترب: من `token_alerts` الذي يُكتَب أصلا (0016).
  * - نشرٌ فشل نهائيّا: منشورٌ حالُه `failed` — **والطابورُ فرغ منه**.
  * - سقفُ إنفاقٍ بُلغ: من `cost_ledger` مقابلَ الإعداد.
+ * - حدثُ أمان: صفٌّ كُتب في `alert_outbox` عند وقوعه ولم يُرسَل بعد.
  *
  * **ولا يُخترَع حدثٌ لتكتمل القائمة** — قاعدةُ D-104 نفسُها في موضعٍ آخر.
  */
-import { budgetAlert, publishAlert, tokenAlert, type Alert } from './outbox'
+import { budgetAlert, MAX_TRIES, publishAlert, tokenAlert, type Alert } from './outbox'
 import type { Db } from '../tokens'
 
 /** اليومُ بصيغة القاعدة — والسقفُ يوميٌّ فمفتاحُه يومٌ لا لحظة. */
@@ -67,6 +68,21 @@ export async function collectAlerts(
       out.push(budgetAlert(day, spent.s, spendCap))
     }
   }
+
+  // ── ٤ · أمانُ الحساب (D-317) ───────────────────────────────────────
+  // ‏صفوفٌ كُتبت عند الحدث بحالٍ فارغة؛ وما لم ينجح يُعاد حتّى `MAX_TRIES`، وما فات يومين لا يُرسَل متأخّرًا
+  const { results: security } = await db
+    .prepare(
+      `SELECT ref, body, org_id FROM alert_outbox
+        WHERE kind = 'security' AND org_id IN (SELECT id FROM orgs)
+          AND (status IS NULL OR status < 200 OR status >= 300) AND tries < ?
+          AND at >= datetime('now', '-2 days')
+        ORDER BY at LIMIT 50`,
+    )
+    .bind(MAX_TRIES)
+    .all<{ ref: string; body: string; org_id: string }>()
+    .catch(() => ({ results: [] as { ref: string; body: string; org_id: string }[] }))
+  for (const s of security) out.push({ kind: 'security', ref: s.ref, body: s.body, org: s.org_id })
 
   return out
 }

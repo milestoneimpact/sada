@@ -41,7 +41,6 @@ export const media = new Hono<{ Bindings: Env }>()
 media.get('/panel/assets', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
   const org = activeOrg(session.record)
   const kind = c.req.query('kind')
   const origin = c.req.query('origin')
@@ -97,7 +96,7 @@ media.post('/panel/assets/upload', async (c) => {
 /** معاينةُ المرفوع خلف الجلسة وبمنظّمتها — والمولَّدةُ من `/panel/media/:id`. */
 media.get('/panel/assets/raw/:ref', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
+  if (session === null) return c.text('غير مصرَّح', 403)
   const found = await rawObject(c.env.DB, activeOrg(session.record), c.req.param('ref'))
   if (found === null) return c.text('لا ملفّ', 404)
   // ‏المقطعُ يُطلب بمداه (D-182)، والصورةُ كاملة
@@ -302,7 +301,7 @@ media.post('/panel/media/reject', async (c) => {
  */
 media.get('/panel/media/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null || session.record.pending) return c.text('غير مصرَّح', 403)
+  if (session === null) return c.text('غير مصرَّح', 403)
 
   const row = await c.env.DB
     // ‏صورةُ منظّمةٍ لا تُسلَّم من جلسةٍ نشطةٍ في غيرها (D-277)

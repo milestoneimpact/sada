@@ -39,7 +39,6 @@ export const reports = new Hono<{ Bindings: Env }>()
 reports.get('/panel/tasks', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const org = activeOrg(session.record)
   const [gateFacts, facts, vitals, rejects] = await Promise.all([
@@ -83,7 +82,6 @@ reports.get('/panel/tasks', async (c) => {
 reports.get('/panel/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const reports = await listReports(c.env.DB, activeOrg(session.record))
   const settings = await readSettings(c.env.DB)
@@ -113,7 +111,6 @@ reports.get('/panel/report', async (c) => {
 reports.get('/panel/timeline', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const q = new URL(c.req.url).searchParams
   const span = readGanttSpan(q.get('span'))
@@ -143,7 +140,6 @@ reports.get('/panel/timeline', async (c) => {
 reports.get('/panel/journey/:id', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const journey = await readJourney(c.env.DB, activeOrg(session.record), c.req.param('id'))
   if (journey === null) return notFoundResponse(c.req.raw, 'لا منشور بهذا المعرّف')
@@ -160,7 +156,6 @@ reports.get('/panel/journey/:id', async (c) => {
 reports.get('/panel/report/:week', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  if (session.record.pending) return c.redirect('/panel/2fa', 303)
 
   const stored = await readReport(c.env.DB, activeOrg(session.record), c.req.param('week'))
   if (stored === null) return notFoundResponse(c.req.raw, 'لا تقرير لهذا الأسبوع')
