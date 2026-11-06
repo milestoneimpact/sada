@@ -438,13 +438,13 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 .ed-x{flex:none}
 .ed-field{display:flex; flex-direction:column; gap:var(--s-2)}
 .ed-label{display:flex; align-items:center; gap:var(--s-3); min-height:var(--tap)}
-/* ‏**النتيجةُ قبل الردّ** (D-233): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
+/* ‏**النتيجةُ قبل الردّ** (D-232): البطاقةُ تخفت وتقول ما ضُغط في رأسها بحبّة الحال نفسِها حتّى تصل بطاقةُ الخادم */
 /* ‏**ولا على صفّ المكتبة** (D-246): «tr[data-pending]» عددُ ما لم يُحلَّل للفرز («0» و«1») لا حالُ انتظار،
    فكانت صفوفُ المصادر كلُّها باهتةً ‏2.9:1 (أمسكه axe) */
 [data-pending]:not(tr){position:relative}
 [data-pending]:not(tr) > :not(.pending-tag){opacity:.55; transition:opacity var(--dur-1)}
 [data-pending]:not(tr) > .pending-tag{position:absolute; z-index:1; inset-block-start:var(--s-3); inset-inline-end:var(--s-3); opacity:1}
-/* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-233) */
+/* ‏«حُفظ» بجوار العنوان: الحفظُ التلقائيُّ يقول ما وقع بكلمة، لا بإشعار (D-232) */
 .ed-saved{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .ed-label > label,.ed-l{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
 .draft-text.ed-txt{height:auto; min-height:calc(8 * var(--lh-body) + var(--s-6)); max-height:60vh; field-sizing:content}

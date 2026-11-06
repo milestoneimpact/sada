@@ -186,15 +186,30 @@ describe('بطاقة «الحسابات» تقول حالًا واحدة (D-205)
     const views = viewChannels([
       acc({}),
       acc({ id: 'x:1', platform: 'x', status: 'needs_reauth' }),
-    ], (name) => !name.startsWith('TIKTOK_'))
+    ], (name) => /^(LINKEDIN|X)_/.test(name))
     const html = channelsSection(views, now)
     const fold = html.indexOf('<details class="fold mt-5">')
     const main = [...html.slice(0, fold).matchAll(/id="ch-([a-z]+)" data-health="([a-z]+)"/g)].map((m) => [m[1], m[2]])
     expect(main).toEqual([['x', 'broken'], ['linkedin', 'connected']])
-    expect(html.slice(fold)).toContain('منصّاتٌ لاحقة')
+    expect(html.slice(fold)).toContain('منصّاتٌ لاحقة (3)')
     expect(html.slice(fold)).toContain('data-health="setup"')
     // ‏والأرقامُ فوقها لمنصّات الخطّة وحدَها: لا «تحتاج إعدادًا» لمنصّةٍ مطويّة
     expect(html).toMatch(/تحتاج إعدادًا<\/div>\s*<div class="kv-v">0</)
+  })
+
+  it('واللاحقةُ التي ضُبط تطبيقُها ظاهرةٌ بعد منصّات الخطّة بزرّ «اربط» وتُعَدّ (D-314)', () => {
+    const views = viewChannels([
+      acc({}),
+      acc({ id: 'x:1', platform: 'x', status: 'needs_reauth' }),
+    ], (name) => !name.startsWith('TIKTOK_'))
+    const html = channelsSection(views, now)
+    const fold = html.indexOf('<details class="fold mt-5">')
+    const main = [...html.slice(0, fold).matchAll(/id="ch-([a-z]+)" data-health="([a-z]+)"/g)].map((m) => [m[1], m[2]])
+    expect(main).toEqual([['x', 'broken'], ['linkedin', 'connected'], ['instagram', 'connectable'], ['youtube', 'connectable']])
+    expect(html.slice(0, fold)).toContain('href="/oauth/instagram/start"')
+    expect(html.slice(fold)).toContain('منصّاتٌ لاحقة (1)')
+    expect(html.slice(fold)).not.toContain('id="ch-instagram"')
+    expect(html).toMatch(/تحتاج إعدادًا<\/div>\s*<div class="kv-v">2</)
   })
 
   it('وما لم يُبن سطر «قريبًا» لا بطاقات', () => {

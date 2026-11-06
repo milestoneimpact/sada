@@ -68,7 +68,7 @@ tbody tr:last-child td{border-bottom:0}
 .gt-bar.ok{background:var(--ok-wash); border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
 .gt-bar.warn{background:var(--warn-wash); border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .gt-bar.bad{background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
-/* ‏المجدولُ يُسحَب أفقيًّا إلى يومٍ آخر (D-233): مقبضٌ ظاهر، والتمريرُ العموديُّ يبقى للإصبع */
+/* ‏المجدولُ يُسحَب أفقيًّا إلى يومٍ آخر (D-232): مقبضٌ ظاهر، والتمريرُ العموديُّ يبقى للإصبع */
 .gt-bar[data-move]{cursor:grab; touch-action:pan-y}
 .gt-bar.pending{background:color-mix(in srgb,var(--brand) 12%,transparent); border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
 .gt-bar.idle{color:var(--ink-2); border-style:dashed}

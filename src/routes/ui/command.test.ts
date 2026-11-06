@@ -322,3 +322,15 @@ describe('التركيب — واللوحة لا تُركَّب نصف تركي�
     expect(html.match(/<script nonce="n1"/g)).toHaveLength(3)
   })
 })
+
+/**
+ * ‏«كم أنفقتُ هذا الشهر؟» يُبحث عنه بكلماته (D-314): كان بحثُ «انفاق» يقود إلى «الإعدادات» وهي لا تعرض إلّا اليوم،
+ * ‏والرقمُ الشهريّ تحت رأس «النتائج». فأوّلُ ما يوافق «انفاق» و«كلفه» هو «النتائج».
+ */
+describe('الإنفاقُ يُبحث عنه فيجد «النتائج» (D-314)', () => {
+  it('مفتاحُ «النتائج» يحمل كلماتِ الإنفاق، وأوّلُ أمرٍ يوافق «انفاق» هو «النتائج»', () => {
+    const results = buildCommands().find((x) => x.label === 'النتائج')!
+    for (const w of ['انفاق', 'كلفه', 'spend']) expect(searchKey(results)).toContain(normalize(w))
+    expect(buildCommands().find((x) => searchKey(x).includes(normalize('انفاق')))?.label).toBe('النتائج')
+  })
+})
