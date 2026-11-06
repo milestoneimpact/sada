@@ -22,7 +22,13 @@ function denied(c: Context<{ Bindings: Env }>, text: string): Response | Promise
 }
 
 export async function accessGuard(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
-  const path = new URL(c.req.url).pathname
+  /*
+   * ‏**المسارُ كما يوجّهه Hono لا كما وصل** (D-315). كان الحارسُ يقرأ `new URL(c.req.url).pathname` — المسارَ بترميزه —
+   * ‏وHono يوجّه على المسار مفكوكَ الترميز (`decodeURI`). فـ«/p%61nel/team/invite» يصل مسارَ الدعوة والحارسُ يراه خارج
+   * ‏«/panel» فيمرّره، و«/panel/%74eam» يُقرأ «عرضًا» لا «للمالك»: مدعوٌّ بدور «مشاهد» كان يدعو مديرًا ويقرأ الفريق.
+   * ‏فالحارسُ والموجِّهُ يقرآن السلسلةَ نفسَها: `c.req.path`.
+   */
+  const path = c.req.path
   if (!path.startsWith('/panel') && !path.startsWith('/oauth/')) return next()
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null || session.record.pending) return next()
