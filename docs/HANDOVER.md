@@ -28,7 +28,7 @@
 npm run ci                                             # الأنواع واثنتا عشرة بوّابة والاختبارات (2,903)
 flock /tmp/sada-audit.lock npm run audit               # التصميم والسلّم والجوّال والطباعة وCSP والروابط
 flock /tmp/sada-audit.lock bash -c 'npm run render && npm run text'
-npm run journeys                                       # الرحلات المقيسة على نسخةٍ حيّة: 30 من 30
+npm run journeys                                       # الرحلات المقيسة على نسخةٍ حيّة: 32 من 32
 ```
 
 ولا تُضعَف بوّابة لتمرّ. والطلبُ يُفتح مسوّدةً، ثمّ يُعلَّم جاهزًا مرّةً واحدة، ويُدمج squash، ونشرُ `main` إلى staging آليّ (`deploy.yml`).

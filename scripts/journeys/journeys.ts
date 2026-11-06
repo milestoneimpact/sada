@@ -570,8 +570,10 @@ const R10: Journey = {
   async run({ page, m, stack }) {
     const fold = visible(page.locator('details#ops > summary')).first()
     if ((await fold.count()) > 0) {
-      const y = await fold.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY))
-      m.note(`على الرئيسيّة: «الكلفة وما وقع» مطويّة على بعد ${y}px، والرقمُ خلف لمسة (القياسُ قبل D-314: 1950px على الهاتف و1005px على الحاسوب)`)
+      // ‏بالمقياس نفسِه الذي يعدّ به Meter التمرير (حافّةُ الطيّة السفلى فوق ما يغطّيه الشريطُ السفليّ بهامش 24px)، لا بموضعها في الصفحة
+      const { bottom, vh } = await m.insets()
+      const need = await fold.evaluate((el, edge) => Math.max(0, Math.round(el.getBoundingClientRect().bottom + window.scrollY - edge + 24)), vh - bottom)
+      m.note(`على الرئيسيّة: «الكلفة وما وقع» مطويّة، ويلزم ${need}px تمريرًا إليها ثمّ لمسةٌ لفتحها (رحلةُ ما قبل D-314 كانت تمرّر حتّى الرقم داخلها: 1950px على الهاتف و1005px على الحاسوب)`)
     }
     await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
     const figure = visible(page.locator('.sub').filter({ hasText: 'هذا الشهر حتّى اليوم' }).locator('a.tap')).first()
