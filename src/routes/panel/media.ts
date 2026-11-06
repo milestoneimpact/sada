@@ -569,17 +569,25 @@ media.post('/panel/uploads/:id/posts', async (c) => {
   // ‏ومنصّةٌ غيرُ متّصلةٍ يُنشأ منشورُها ولا يُجدوَل: يُقال الآن لا عند الجدولة (D-190)
   const links = result.ok ? linkStates(await listAccounts(c.env.DB, activeOrg(gate.session.record))) : {}
   const unlinked = result.ok ? result.created.filter((p) => links[p] !== 'linked') : []
+  // ‏والموعدُ الذي اختاره المالكُ لا يسقط بلا كلمة (D-314): بلا «اعتمده الآن» لا يُقرأ، ومع اعتمادٍ تعذّرت جدولتُه كلُّها يُقال لماذا
+  const approved = form.get('approve') === 'on'
+  const asked = String(form.get('preset') ?? '') !== ''
+  const noneScheduled = planned !== null && planned.scheduled.length === 0 && planned.failed.length > 0
   await setFlash(c.env, c.req.raw, !result.ok
     ? { kind: 'bad', text: `لم يُنشأ منشور: ${result.reason}` }
     : result.created.length === 0
       ? { kind: 'bad', text: `موجود من قبل على ${result.skipped.map(label).join(' و')} — لا يُكرَّر.` }
       : {
-          kind: cut === null && unlinked.length === 0 && (planned === null || planned.failed.length === 0) ? 'ok' : 'warn',
+          kind: cut === null && unlinked.length === 0 && (planned === null || planned.failed.length === 0) && !(asked && !approved) ? 'ok' : 'warn',
           text: `أُنشئ على ${result.created.map(label).join(' و')}${planned !== null && at !== null && planned.scheduled.length > 0
             ? ` وجُدول ${momentLabel(at, zone, now)}${zoneNote(zone)}.${planned.failed.length === 0 ? '' : ` وتعذّرت جدولة ${planned.failed.map((f) => `${label(f.platform)}: ${f.reason}`).join('؛ ')}.`}${plannedReach === null ? '' : ` ${plannedReach}`}`
-            : form.get('approve') === 'on'
-              ? ' معتمَدًا — جدوِله تحت المقطع بموعد واحد، أو من بطاقة كلّ.'
-              : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
+            : noneScheduled
+              ? ' معتمَدًا ولم يُجدوَل: تعذّرت جدولة ' + planned!.failed.map((f) => label(f.platform) + ': ' + f.reason).join('؛ ') + '.'
+              : approved
+                ? ' معتمَدًا — جدوِله تحت المقطع بموعد واحد، أو من بطاقة كلّ.'
+                : asked
+                  ? ' مسوّدةً تنتظر اعتمادك، ولم يُجدوَل: الموعد يُقرأ مع «اعتمده الآن» وحده.'
+                  : ' مسوّدةً تنتظر اعتمادك.'}${cut === null
             ? ''
             : ` وعنوان YouTube أطول ممّا تقبله فيُرفع مقصوصًا: «${cut}».`}${unlinked.length === 0 || planned !== null
             ? ''

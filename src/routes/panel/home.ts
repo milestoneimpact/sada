@@ -203,7 +203,7 @@ async function panelRoute(c: PanelContext, only: PaneId | null): Promise<Respons
 
   switch (only) {
     case null: {
-      // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-233): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُحمَّل له
+      // ‏وسكربتُ التبديل يطلب «المنشورات» وحدَها (D-232): البطاقةُ والأعدادُ والإشعارُ هناك، والرئيسيّةُ لا تُحمَّل له
       if (q.get('swap') === 'posts') {
         const posts = await postsData(load)
         return render({ ...shell, ...posts }, (data) => ({ only: null, swapPosts: true, data }))
@@ -935,7 +935,7 @@ home.post('/panel/settings', async (c) => {
     flash = { kind: 'ok', text: `${settingLabel(key)}: حُفظ ${result.stored}.` }
   }
 
-  // ‏**والحفظُ التلقائيّ في الحدود** (D-233): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
+  // ‏**والحفظُ التلقائيّ في الحدود** (D-232): الحقلُ يُرسَل حين يتغيّر بـ`auto=1`، فيُجاب بسطرٍ والقيمةِ المحفوظة
   // ‏(وقد تُقصّ إلى المدى) لا بتحويلٍ يعيد رسمَ الصفحة. والفحصُ والقصُّ والتدقيقُ قبله كما هي.
   if (form.get('auto') === '1') return c.json({ ok: flash.kind !== 'bad', text: flash.text, stored: result.stored })
   await setFlash(c.env, c.req.raw, flash)

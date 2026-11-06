@@ -56,6 +56,8 @@ export interface Stack {
   publishQueue: ReturnType<typeof heldQueue>
   generateQueue: ReturnType<typeof heldQueue>
   seeded: Seeded
+  /** ‏مفتاحُ التشفير المحلّيّ لهذا التشغيل (عشوائيٌّ في كلّ مرّة): تزرع به رحلةٌ أسرارَ تطبيقٍ مزيّفة كما تزرعها البذرة. */
+  readonly encKey: string
   /** ما «أُرسل» من بريد — ومنه يُقرأ رمزُ الدخول كما يقرؤه المالك من صندوقه. */
   readonly mail: EmailMessage[]
   readonly calls: NetCall[]
@@ -172,6 +174,7 @@ export async function startServer(options: StartOptions = {}): Promise<Stack> {
   const stack: Stack = {
     url: origin,
     port,
+    encKey,
     ...state,
     mail: [],
     calls: network.calls,

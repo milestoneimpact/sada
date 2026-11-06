@@ -11,6 +11,9 @@ import { Blocked, Meter } from './meter'
 import type { Stack } from './server'
 import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
 import { codeFrom } from '../../src/test/emailLogin'
+import { saveApp } from '../../src/lib/oauth/apps'
+import { monthStart } from '../../src/lib/time/zone'
+import { money } from '../../src/lib/format'
 
 export interface Verdict {
   readonly success: boolean
@@ -179,14 +182,42 @@ const R0: Journey = {
   },
 }
 
+/**
+ * ‏**ر-1 بنطاق خطّة التصميم §6** (D-314): ربطُ منصّةٍ ضُبط تطبيقُها (كما بعد مهمّة المالك M-24 أو بعد ر-1·ضبط) حتّى مغادرة
+ * ‏الموقع إلى OAuth. والسرّان مزيَّفان يُزرعان بالدالّة الحقيقيّة وبمفتاح هذا التشغيل العشوائيّ، كما تزرع البذرةُ غيرَهما.
+ */
 const R1: Journey = {
   id: 'R-1',
-  title: 'ربط منصّة جديدة (Instagram أوّل مرّة) — حتّى مغادرة الموقع إلى OAuth',
-  plan: { today: '16', target: '5' },
+  title: 'ربط Instagram بعد ضبط تطبيقها (§6) — حتّى مغادرة الموقع إلى OAuth',
+  plan: { today: '16', target: '2 · الهاتف 3 حتّى المغادرة (§6: 5 حتّى «ارجع»)' },
+  async prepare(stack) {
+    await saveApp(stack.db, stack.encKey, 'instagram', '1234567890123456', 'local0fake0instagram0secret00000', 'journey')
+    return 'سرّا Instagram المزيَّفان في الخزانة قبل الرحلة (كما بعد ر-1·ضبط أو مهمّة المالك)'
+  },
+  async run({ page, m, leftSite }) {
+    await goSection(page, m, 'الحسابات')
+    // ‏ومنصّةٌ ضُبط تطبيقُها ظاهرةٌ منذ D-314؛ فإن عادت الطيّةُ يوماً ظهر ثمنُها لمسةً هنا
+    const connect = visible(page.locator('a[href="/oauth/instagram/start"]')).first()
+    if ((await connect.count()) === 0) {
+      await m.tap(visible(page.locator('details.fold > summary').filter({ hasText: 'لاحقة' })).first(), '«منصّاتٌ لاحقة» في «الحسابات»')
+    }
+    await m.tap(visible(page.locator('a[href="/oauth/instagram/start"]')).first(), '«اربط» على بطاقة Instagram', { key: true })
+    const left = leftSite.find((u) => /^https:\/\/www\.instagram\.com\/oauth\/authorize/.test(u))
+    return {
+      success: left !== undefined,
+      verified: left === undefined ? `لم يغادر إلى Instagram (${leftSite.join(' · ') || '—'})` : `غادر إلى ${new URL(left).origin}${new URL(left).pathname}`,
+    }
+  },
+}
+
+const R1setup: Journey = {
+  id: 'R-1·ضبط',
+  title: 'ضبط تطبيق Instagram أوّل مرّة ثمّ ربطها — حتّى مغادرة الموقع',
+  plan: { today: '16', target: 'لا هدف في §6 · كان 5 في D-207' },
   async run({ page, m, stack, leftSite }) {
     // ‏بطاقاتُ المنصّات في «الحسابات» وحدَها منذ D-309 (لا في الرئيسيّة): لمسةُ التنقّل تُعدّ
     await goSection(page, m, 'الحسابات')
-    // ‏ومنصّةٌ لم تُضبط بعدُ تحت طيّة «منصّاتٌ لاحقة» (D-205): فتحُها لمسةٌ تُعدّ — ثمنُ هدوء الرئيسيّة على رحلةٍ تقع مرّةً
+    // ‏ومنصّةٌ لم تُضبط بعدُ تحت طيّة «منصّاتٌ لاحقة» (D-289): فتحُها لمسةٌ تُعدّ — ثمنُ هدوء الرئيسيّة على رحلةٍ تقع مرّةً
     const setup = visible(page.locator('a[href^="/panel/channels/instagram?tab=setup"]')).first()
     if ((await setup.count()) === 0) {
       await m.tap(visible(page.locator('details.fold > summary').filter({ hasText: 'لاحقة' })).first(), '«منصّاتٌ لاحقة» في «الحسابات»')
@@ -276,7 +307,7 @@ const R2stop: Journey = {
       const seen: { text: string; disabled: boolean }[] = await page.evaluate(({ top, bottom, marked }) => {
         const vh = window.innerHeight
         const goal = /اكتب|أنشئ|جديد|اعتمد/
-        // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-233): يراه المالكُ زرًّا فيُعدّ زرًّا
+        // ‏و«منشور جديد» قائمةٌ رأسُها `<summary>` بهيئة الزرّ الرئيسيّ (D-232): يراه المالكُ زرًّا فيُعدّ زرًّا
         return Array.from(document.querySelectorAll('button.btn-primary, a.btn-primary, summary.btn-primary, button[type="submit"], nav.tab-bar a'))
           .filter((el) => {
             const r = el.getBoundingClientRect()
@@ -365,8 +396,14 @@ const R4: Journey = {
   },
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
-    await goSection(page, m, 'المكتبة')
-    await m.tap(subTab(page, 'الفيديو'), 'تبويب «الفيديو»')
+    /*
+     * ‏**يقيس الطريقَ المبنيّ** (D-314): «منشور جديد» (الزرُّ العائم على الهاتف، وزرُّ الترويسة على الحاسوب) ← «فيديو»
+     * ‏← الملفّ ← النصّ ← «متى؟» ← «أنشئ المنشورات»: يُنشأ ويُعتمَد ويُجدوَل في ضغطةٍ واحدة (D-218). وكانت الرحلةُ
+     * ‏تدخل من «المكتبة ← الفيديو» وتجدول كلَّ منشورٍ من بطاقته، وهو الطريقُ الذي استبدله D-218. والبديلُ الظاهر
+     * ‏(صفُّ «جدوِل منشوراته معًا» تحت المقطع) ستُّ خطواتٍ كذلك. ولا رجوعَ صامتًا: إن غاب البابُ فشلت الرحلةُ علنًا.
+     */
+    await m.tap(visible(page.locator('[data-tb-new], details.fab').locator(':scope > summary')).first(), '«منشور جديد»')
+    await m.tap(visible(page.locator('[data-tb-new] .menu-item, details.fab .fab-menu a').filter({ hasText: /فيديو/ })).first(), '«فيديو» في قائمة «منشور جديد»')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
     // ‏بالاسم العربيّ كما يرفعه المالك — والبايتاتُ تُمرَّر لا المسار (Playwright يُسقط مسارًا غيرَ لاتينيّ)
@@ -393,27 +430,16 @@ const R4: Journey = {
     await m.type(form.locator('textarea[name="caption"]'), 'الإطار الأوّل في دقيقة: كيف نعرّف المعلَم قبل أن يبدأ العمل', 'نصّ المنشور (سطره الأوّل عنوان YouTube)')
     const approve = form.locator('input[name="approve"]')
     if ((await approve.count()) > 0 && !(await approve.isChecked())) await m.tap(approve, '«اعتمده الآن»')
+    await m.choose(form.locator('select[name="preset"]'), { label: 'غدًا 9:00 ص' }, '«متى؟» ← «غدًا 9:00 ص»')
     await m.tap(button(form, 'أنشئ المنشورات'), '«أنشئ المنشورات»')
     m.mark('posts_created')
     const posts = all<{ id: string; platform: string; status: string }>(stack,
       `SELECT p.id, p.platform, p.status FROM posts p JOIN media me ON me.post_id = p.id WHERE me.upload_id = ? ORDER BY p.platform`, upload.id)
     m.note(`منشورات أُنشئت: ${posts.map((p) => `${p.platform}:${p.status}`).join(' · ') || '—'}`)
-    // ‏ثمّ يجدول كلَّ واحدٍ من بطاقته — لا «جدوِل للثلاث»
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» للجدولة')
-    for (const p of posts) {
-      if ((await scheduleForm(page, p.id).count()) === 0) {
-        m.note(`لا نموذج جدولة لـ ${p.platform}`)
-        continue
-      }
-      await scheduleTomorrow({ page, m, stack, assets, leftSite: [] }, p.id, p.platform)
-    }
+    m.mark('scheduled')
     const after = posts.map((p) => `${p.platform}:${status(stack, p.id)?.status ?? '—'}`)
     const queued = posts.filter((p) => status(stack, p.id)?.status === 'queued').length
-    const ig = posts.find((p) => p.platform === 'instagram')
-    if (ig !== undefined && status(stack, ig.id)?.status !== 'queued') {
-      const offered = await scheduleForm(page, ig.id).locator('select[name="account"] option').allTextContents().catch(() => [])
-      m.note(`⚠ عطل: منشور Instagram (من المقطع) لا يُجدوَل من بطاقته — قائمة «الحساب» فيها ${offered.join(' · ') || '—'}، والخادم يردّ «المنشور لـ instagram والحساب في linkedin». السبب: platformOf() في src/lib/draft/store.ts تقرأ كلّ منصّة ليست في PLATFORMS (ومنها instagram) LinkedIn، فتُعرض البطاقة LinkedIn ويُعرض حساب LinkedIn — و«وزّع المعتمَد» يقرأ القائمة نفسَها`)
-    }
+    if (queued < posts.length) m.note(`الإشعار: ${await m.readFlash()}`)
     return { success: posts.length === 3 && queued === 3, verified: `${posts.length} منشورات · مجدولة ${queued} (${after.join(' · ')})` }
   },
 }
@@ -426,7 +452,7 @@ const R5: Journey = {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     // ‏رأسُ «المنشورات» فيه بابُ الخطّة باسمه — والمالكُ يضغطه ولا يمرّر إلى آخر اللوح بحثًا عنه
-    // ‏والأبوابُ الأربعة في قائمة «منشور جديد» (D-233): تُفتح ثمّ يُختار منها
+    // ‏والأبوابُ الأربعة في قائمة «منشور جديد» (D-232): تُفتح ثمّ يُختار منها
     if ((await link(page, 'خطّة من ملفّ').count()) === 0) {
       await m.tap(visible(page.locator('[data-head-new], [data-tb-new], details.fab').locator('summary, button').filter({ hasText: 'منشور جديد' })).first(), '«منشور جديد»')
     }
@@ -532,32 +558,32 @@ const R9: Journey = {
   },
 }
 
+/**
+ * ‏**ر-10 تسلك «النتائج»** (D-314): الجوابُ المصمَّم في خطّة التصميم §6 والمبنيُّ تحت رأسها («هذا الشهر حتّى اليوم»).
+ * ‏والنجاحُ أن يطابق الرقمُ المعروضُ الدفترَ بشهر منطقة المالك، بالحساب نفسِه الذي في الخادم (`monthStart` و`spendSince`).
+ * ‏وثمنُ طريق الرئيسيّة (الطيّة «الكلفة وما وقع») يُسجَّل ملاحظةً للشفافية لا يُعدّ.
+ */
 const R10: Journey = {
   id: 'R-10',
   title: 'معرفة ما أُنفق هذا الشهر',
   plan: { today: 'يُقاس', target: '1' },
   async run({ page, m, stack }) {
-    const month = q<{ t: number }>(stack, "SELECT ROUND(COALESCE(SUM(total),0), 2) AS t FROM cost_ledger WHERE at >= strftime('%Y-%m-01 00:00:00','now')")?.t ?? 0
-    const d30 = q<{ t: number }>(stack, "SELECT ROUND(COALESCE(SUM(total),0), 2) AS t FROM cost_ledger WHERE at >= datetime('now','-30 days')")?.t ?? 0
-    m.note(`في القاعدة: هذا الشهر $${month.toFixed(2)} · آخر 30 يومًا $${d30.toFixed(2)}`)
-    // ‏«اليوم بالأرقام» مطويٌّ تحت «الكلفة وما وقع» منذ D-289: فتحُه لمسةٌ تُعدّ، لا تُخفى
-    const fold = visible(page.locator('details > summary').filter({ hasText: 'الكلفة وما وقع' })).first()
-    if ((await fold.count()) > 0) await m.tap(fold, '«الكلفة وما وقع» — المطويّ')
-    // ‏أوّلًا: هل في الصفحة «هذا الشهر» أصلًا؟
-    const monthText = visible(page.getByText(/هذا الشهر|الشهر الحاليّ|شهر (أكتوبر|سبتمبر)/)).first()
-    if ((await monthText.count()) > 0) {
-      const ok = await m.look(monthText, '«هذا الشهر»', { key: true })
-      return { success: ok, verified: `وُجد «هذا الشهر» · القاعدة $${month.toFixed(2)}` }
+    const fold = visible(page.locator('details#ops > summary')).first()
+    if ((await fold.count()) > 0) {
+      const y = await fold.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY))
+      m.note(`على الرئيسيّة: «الكلفة وما وقع» مطويّة على بعد ${y}px، والرقمُ خلف لمسة (القياسُ قبل D-314: 1950px على الهاتف و1005px على الحاسوب)`)
     }
-    // ‏وإلّا: أقربُ ما في الرئيسيّة — بلاطةُ «إنفاق 30 يومًا»
-    const tile = visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: /إنفاق 30/ }) })).first()
-    const seen = await m.look(tile, 'بلاطة «إنفاق 30 يوما» (أقرب ما يوجد)', { key: true })
-    const shown = seen ? ((await tile.locator('.kv-v').textContent()) ?? '').replace(/\s+/g, ' ').trim() : '—'
-    const today = ((await visible(page.locator('.card.tile').filter({ has: page.locator('.kv-k', { hasText: 'إنفاق اليوم' }) })).first().locator('.kv-v').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
-    m.note(`المعروض: «إنفاق 30 يوما» = ${shown} · «إنفاق اليوم» = ${today} · ولا سقف شهريّ يُقارَن به`)
+    await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
+    const figure = visible(page.locator('.sub').filter({ hasText: 'هذا الشهر حتّى اليوم' }).locator('a.tap')).first()
+    const seen = await m.look(figure, 'رقم «هذا الشهر حتّى اليوم»', { key: true })
+    const zone = q<{ v: string }>(stack, "SELECT value AS v FROM settings WHERE key = 'owner_tz' LIMIT 1")?.v ?? 'Asia/Riyadh'
+    const since = monthStart(new Date(), zone).toISOString().slice(0, 19).replace('T', ' ')
+    const t = q<{ t: number }>(stack, 'SELECT COALESCE(SUM(total),0) AS t FROM cost_ledger WHERE org_id IN (SELECT id FROM orgs) AND at >= ?', since)?.t ?? 0
+    const strip = (x: string): string => x.replace(/[\u2066-\u2069\s]/g, '')
+    const shown = seen ? ((await figure.textContent()) ?? '') : ''
     return {
-      success: false,
-      verified: `لا رقم «هذا الشهر» في اللوحة — أقربُه «30 يومًا» ($${d30.toFixed(2)}) وهو غير الشهر ($${month.toFixed(2)})`,
+      success: seen && strip(shown) === strip(money(t)),
+      verified: `المعروض ${strip(shown) || '—'} · الدفتر ${strip(money(t))} منذ ${since} UTC (${zone})`,
     }
   },
 }
@@ -662,6 +688,6 @@ const R13: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R1, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13]
+export const JOURNEYS: readonly Journey[] = [R0, R1, R1setup, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13]
 
 export { Blocked }

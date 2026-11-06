@@ -385,9 +385,10 @@ export function channelsSection(
    * ‏**ما يُخطَّط له أوّلًا** (D-289): LinkedIn وX هما خطّةُ اليوم بقرار المالك، فكانت YouTube وTikTok وInstagram «تحتاج إعدادًا»
    * ‏تتصدّر الصفحةَ بأزرارها الخضراء والمتّصلةُ الوحيدةُ في آخرها. فما لم يُضبط بعدُ من غير منصّات الخطّة يُطوى تحت «منصّاتٌ لاحقة»
    * ‏ولا يُعَدّ في الأرقام فوقها. **ومنصّةٌ لاحقةٌ مربوطةٌ أو منقطعةٌ تبقى ظاهرة**: ما يحتاج يدَك لا يُطوى.
+   * ‏**ولا التي ضُبط تطبيقُها** (D-314): «اربط» ينتظر يدَك، فتظهر بعد منصّات الخطّة بزرّها؛ والطيّةُ لما لم يُضبط وحدَه.
    */
   const all = byNeed(views.filter((v) => v.spec.built), now)
-  const later = all.filter((v) => !(PLAN_NOW as readonly string[]).includes(v.spec.id) && ['setup', 'connectable'].includes(channelHealth(v, now).kind))
+  const later = all.filter((v) => !(PLAN_NOW as readonly string[]).includes(v.spec.id) && channelHealth(v, now).kind === 'setup')
   const built = [...all.filter((v) => !later.includes(v))].sort((a, b) => Number(!(PLAN_NOW as readonly string[]).includes(a.spec.id)) - Number(!(PLAN_NOW as readonly string[]).includes(b.spec.id)))
   const rest = views.filter((v) => !v.spec.built)
   const kinds = built.map((v) => channelHealth(v, now).kind)

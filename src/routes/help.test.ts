@@ -37,6 +37,8 @@ describe('/panel/help', () => {
     expect(r.status).toBe(200)
     const html = await r.text()
     expect(html).toContain('<h1>المساعدة</h1>')
+    // ‏ومحطّةُ «الكلفة» تقول أين رقمُ الشهر (D-314)
+    expect(html).toContain('وما أُنفق هذا الشهر في رأس «النتائج»')
     for (const s of ['العميل', 'الموجز', 'الحسابات', 'الخطّة', 'المحتوى', 'الكلفة', 'التنفيذ والنتائج']) expect(html).toContain(`<b>${s}</b>`)
     for (const id of ['accounts', 'states', 'idea', 'plan', 'failed', 'spend', 'reschedule', 'phone', 'tasks', 'roles']) {
       expect(html).toContain(`id="${id}"`)
