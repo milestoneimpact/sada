@@ -404,9 +404,10 @@ export const FACTORS_SCRIPT = `
     // ‏**وما عُرض للتوّ يُسأل قبل إبطاله** (مراجعة D-323): السؤالُ يُرسم حين بقيت رموزٌ عند التحميل، ورموزٌ وُلّدت في الصفحة
     // ‏(هنا أو بعد تأكيد رمز التطبيق) كانت تُبطَل بضغطةٍ ثانيةٍ بلا سؤال. فالزرُّ يصير كما يُرسم بعد إعادة التحميل
     var again=document.getElementById('rc-issue');
-    if(again&&!again.hasAttribute('data-confirm')){
-      again.setAttribute('data-confirm',${JSON.stringify(RC_RENEW.ask)}); again.setAttribute('data-confirm-ok',${JSON.stringify(RC_RENEW.ok)});
-      again.textContent=${JSON.stringify(RC_RENEW.ok)}; again.classList.remove('btn-primary'); again.classList.add('btn-secondary');
+    // ‏ونصُّ السؤال من الزرّ نفسِه («data-renew-*» يرسمه الخادمُ من «RC_RENEW»): نصٌّ واحدٌ في مكانٍ واحد
+    if(again&&!again.hasAttribute('data-confirm')&&again.dataset.renewAsk){
+      again.setAttribute('data-confirm',again.dataset.renewAsk); again.setAttribute('data-confirm-ok',again.dataset.renewOk||'');
+      again.textContent=again.dataset.renewOk||again.textContent; again.classList.remove('btn-primary'); again.classList.add('btn-secondary');
     }
   }
 

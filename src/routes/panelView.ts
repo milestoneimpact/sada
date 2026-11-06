@@ -1449,7 +1449,7 @@ ${ownerView ? `<div data-sub id="security-all">
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
     <div class="row">
-      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button"${d.factors.recoveryLeft > 0
+      <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button" data-renew-ask="${escapeHtml(RC_RENEW.ask)}" data-renew-ok="${escapeHtml(RC_RENEW.ok)}"${d.factors.recoveryLeft > 0
         // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا — وما يُولَّد في الصفحة يُضيف السؤالَ سكربتُها
         ? ' data-confirm="' + escapeHtml(RC_RENEW.ask) + '" data-confirm-ok="' + escapeHtml(RC_RENEW.ok) + '"' : ''}>
         ${d.factors.recoveryLeft > 0 ? RC_RENEW.ok : 'ولّد رموز استرداد'}</button>

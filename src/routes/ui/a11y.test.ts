@@ -427,7 +427,7 @@ describe('مراجعةُ D-323', () => {
 
   it('ورموزُ الاسترداد بعد أن تُولَّد في الصفحة يُسأل قبل تجديدها (توليدُها ثانيةً يُبطل ما حُفظ للتوّ)', async () => {
     const w = boot(`<input type="hidden" name="_csrf" value="c">
-      <button class="btn btn-primary" id="rc-issue" type="button">ولّد رموز استرداد</button>
+      <button class="btn btn-primary" id="rc-issue" type="button" data-renew-ask="أتولّد مجموعةً جديدة؟ تُبطل القديمةَ كلَّها، فلا يصلح رمزٌ منها بعد اليوم." data-renew-ok="ولّد مجموعةً جديدة">ولّد رموز استرداد</button>
       <div id="rc-box" hidden><div class="codes" id="rc-list"></div></div><div class="note" id="rc-msg"></div>`, { panel: true })
     const d = w.document
     let calls = 0
