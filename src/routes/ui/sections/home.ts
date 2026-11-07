@@ -237,9 +237,11 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
       </li>`
   })
   // ‏و`div` بدورٍ لا `section`: اللوحُ نفسُه `section` (`data-pane`)، وما يُقرأ حتّى أوّلِ إغلاقٍ له يُقرأ لوحًا كاملًا
+  // ‏والعدّادُ يقول الخطوةَ الآن («الخطوة 3 من 3»)، والشريطُ ما تمّ (2): كان «3 من 3» بجوار شريطٍ بثلثين، فيُقرأ «اكتملت»
+  // ‏وما زالت خطوةٌ باقية، ويسمع قارئُ الشاشة رقمين متناقضين (مراجعة D-326)
   return html`<div class="card mb-3" id="first-run" role="region" aria-labelledby="fr-t">
     <div class="card-head"><h2 id="fr-t">البدء في ثلاث خطوات</h2></div>
-    <div class="hp-prog"><progress max="3" value="${done}" aria-labelledby="fr-t"></progress><span data-fr-count>${run.current + 1} من 3</span></div>
+    <div class="hp-prog"><progress max="3" value="${done}" aria-labelledby="fr-t"></progress><span data-fr-count>الخطوة ${run.current + 1} من 3</span></div>
     <ol class="steps wiz mt-3">${rows}</ol>
   </div>`.value
 }

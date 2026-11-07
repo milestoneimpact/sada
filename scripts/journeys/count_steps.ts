@@ -25,7 +25,7 @@ import { chromium, type Browser } from 'playwright'
 import { Blocked, Meter, VIEWPORTS, type StepRecord, type Viewport } from './meter'
 import { CHROMIUM, startServer, type Stack } from './server'
 import { JOURNEYS, login, type Journey } from './journeys'
-import { judge, readThresholds, tightened, writeThresholds, type Judgement } from './gate'
+import { judge, readThresholds, shotSlug, tightened, writeThresholds, type Judgement } from './gate'
 
 interface Args {
   readonly only: readonly string[] | null
@@ -190,7 +190,8 @@ async function runOne(browser: Browser, stack: Stack, journey: Journey, vp: View
   let vtMuted = 0
   page.on('console', (msg) => { if (msg.type() === 'debug' && msg.text().startsWith('sada:vt-muted')) vtMuted += 1 })
 
-  const rel = join('shots', vp.name, journey.id.replace(/[^\w-]+/g, '_'))
+  // ‏مجلّدُ الرحلة باسمها وحدَها (`shotSlug`): كانت «R-1·ضبط» و«R-1·أوّل» تتقاسمان «R-1_» فتمحو الثانيةُ لقطاتِ الأولى
+  const rel = join('shots', vp.name, shotSlug(journey.id))
   const dir = join(out, rel)
   rmSync(dir, { recursive: true, force: true })
   const m = new Meter(page, vp, dir, rel)
@@ -357,7 +358,7 @@ function summary(results: readonly JourneyResult[], started: Date, facts: RunFac
   const muted = results.filter((r) => r.vtMuted > 0)
   lines.push('', '## أخطاء الصفحة وما كُتم', '')
   lines.push(`- **أخطاء الصفحة** («pageerror»): ${erred.reduce((n, r) => n + r.pageErrors.length, 0)} في ${erred.length} من ${results.length} رحلة${erred.length === 0 ? '' : ` (${erred.map((r) => `${r.id} ${r.viewport.split(' ')[0]}`).join('، ')})`}.`)
-  lines.push(`- **انتقالٌ أسقطه المتصفّحُ فكُتم رفضُه** (\`sada:vt-muted\`، سكربتُ الرأس): ${muted.reduce((n, r) => n + r.vtMuted, 0)} في ${muted.length} من ${results.length} رحلة${muted.length === 0 ? '' : ` (${muted.map((r) => `${r.id} ${r.viewport.split(' ')[0]}`).join('، ')})`}. يقع ولا يُرى: لا يكسر شيئًا، ويُعَدّ هنا كي لا يُقرأ الكتمُ منعًا.`)
+  lines.push(`- **انتقالٌ أسقطه المتصفّحُ فكُتم رفضُه** (\`sada:vt-muted\`، سكربتُ الرأس): ${muted.reduce((n, r) => n + r.vtMuted, 0)} في ${muted.length} من ${results.length} رحلة${muted.length === 0 ? '' : ` (${muted.map((r) => `${r.id} ${r.viewport.split(' ')[0]}`).join('، ')})، ونجح منها ${muted.filter((r) => r.success).length} من ${muted.length}`}. ويُعَدّ هنا كي لا يُقرأ الكتمُ منعًا.`)
 
   // ‏ر-2 كما وقع: أين يقف مالكٌ على الهاتف
   const stop = by('R-2·stop', 'phone')

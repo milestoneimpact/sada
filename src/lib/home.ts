@@ -441,7 +441,23 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   }
   const linked = f.channels.some((c) => c.state === 'linked')
   if (!linked) {
-    return { tone: 'warn', text: 'لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.', label: 'اربط أوّل منصّة', href: '#channels' }
+    /*
+     * ‏**إلى مساعد المنصّة نفسِه** (مراجعة D-326 · ر-1·أوّل): كان `#channels` فيُحوَّل إلى «الحسابات» ثمّ «أكمل الإعداد» على البطاقة
+     * ‏ثمّ الحقل — خطوةٌ وتحميلٌ فوق الهدف ≤5. فمنصّةٌ ضُبط تطبيقُها تُربط من الزرّ مباشرةً، وإلّا فأوّلُ منصّةٍ مبنيّة (بترتيب
+     * ‏السجلّ: LinkedIn أوّلًا) إلى حقل معرّفها بزرّ بطاقتها نفسِه (`channelHealth`)، وغيرُها في قائمة البدء و«الحسابات».
+     */
+    const doors = f.channels.filter((c) => c.spec.built && c.accounts.length === 0).map((c) => ({ c, h: channelHealth(c, now) }))
+    const door = doors.find((x) => x.h.kind === 'connectable') ?? doors.find((x) => x.h.kind === 'setup')
+    return {
+      tone: 'warn',
+      text: door === undefined
+        ? 'لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.'
+        : door.h.kind === 'connectable'
+          ? `لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة. تطبيقُ ${door.c.spec.label} مضبوط، فيبدأ الزرُّ بربطها.`
+          : `لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة. يبدأ الزرُّ بضبط ${door.c.spec.label} ثمّ ربطها.`,
+      label: 'اربط أوّل منصّة',
+      href: door?.h.button?.href ?? '#channels',
+    }
   }
   const drafts = total(f.counts, 'draft')
   const approved = total(f.counts, 'approved')

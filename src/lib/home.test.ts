@@ -1,6 +1,6 @@
 /** الرئيسيّة: فعلٌ واحدٌ بأولويّةٍ مكتوبة، وسبعُ محطّات، وزرٌّ لكلّ منصّة (D-177). */
 import { describe, expect, it } from 'vitest'
-import { viewChannels, type LinkedAccount } from './channels'
+import { setupHref, viewChannels, type LinkedAccount } from './channels'
 import { counted, NOUNS } from './format'
 import {
   firstRun, journeyCounts, journeySteps, nextAction, systemPill, writeBlock,
@@ -70,6 +70,21 @@ describe('nextAction', () => {
 
   it('ولا منصّة متّصلة: اربط أوّلًا', () => {
     expect(nextAction(facts({ channels: viewChannels([], () => true) })).label).toBe('اربط أوّل منصّة')
+  })
+
+  /*
+   * ‏**والزرُّ إلى مساعد المنصّة نفسِه** (مراجعة D-326 · ر-1·أوّل): كان `#channels` فيُحوَّل إلى «الحسابات» ثمّ «أكمل الإعداد»
+   * ‏على البطاقة ثمّ الحقل — خطوةٌ وتحميلٌ فوق الهدف ≤5، ولا رحلةَ تقيسه. فالمضبوطُ تطبيقُها يُربط من الزرّ مباشرةً، وإلّا
+   * ‏فأوّلُ منصّةٍ مبنيّة إلى حقل معرّفها.
+   */
+  it('والزرُّ إلى مساعد ضبط أوّل منصّةٍ عند حقل معرّفها، أو إلى ربط منصّةٍ ضُبط تطبيقُها', () => {
+    const none = nextAction(facts({ channels: viewChannels([], () => false) }))
+    expect(none.label).toBe('اربط أوّل منصّة')
+    expect(none.href).toBe(setupHref('linkedin'))
+    expect(none.text).toContain('LinkedIn')
+    const x = nextAction(facts({ channels: viewChannels([], (n) => n.startsWith('X_')) }))
+    expect(x.href).toBe('/oauth/x/start')
+    expect(x.text).toContain('X')
   })
 
   it('ثمّ المسوّدات بعدد صحيح، ثمّ المواعيد، ثمّ «على المسار»', () => {

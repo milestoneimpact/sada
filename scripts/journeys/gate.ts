@@ -12,10 +12,13 @@
  * ‏**ورحلةٌ بلا عتبة تُسقط التشغيل** (فلا تُضاف رحلةٌ لا يحرسها شيء)، **وعتبةٌ بلا رحلة** تُسقطه حين يُشغَّل الكلّ (فلا تبقى
  * ‏عتبةٌ تحرس ما حُذف).
  *
+ * ‏**ولكلّ رحلةٍ مجلّدُ لقطاتها** (`shotSlug`)، **ومرشّحُ مسارات `ui.yml` يُمسك ما تقيسه الرحلات** (`src/routes` كلُّها و`UI_SURFACES`)،
+ * ‏ولا يُشغِّله اختبارٌ وحدَه — يشترطهما `checkRepo` (مراجعة D-326).
+ *
  *     npx tsx scripts/journeys/gate.ts --self-test   ← يزرع كلَّ علّةٍ ويشترط أن تُمسَك، ويفحص الملفَّ مقابل الرحلات
  */
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export type VpName = 'phone' | 'desktop'
@@ -132,6 +135,10 @@ export function judge(results: readonly Measured[], file: ThresholdFile, options
 /**
  * ‏**يضيّق ولا يُرخي**: ما نزل تحت عتبته والرحلةُ ناجحة تصير عتبتُه ما قيس، ورحلةٌ بلا عتبةٍ تُكتب عتبتُها أوّلَ مرّة.
  * ‏وما فوق العتبة لا يُمسّ — يبقى فاشلًا حتّى تُرخى بيدٍ وسبب.
+ *
+ * ‏**وحارسُ الشاشة الأولى يُنقل كما هو** (مراجعة D-326): كان يبقى إن قاسه التشغيلُ وحدَه، فرحلةٌ وفّرت خطوةً وخرج فعلُها من
+ * ‏الشاشة الأولى تُكتب عتبتُها بلاه ويمرّ الحكمُ بعدها — إرخاءٌ آليّ. فلا يُضيَّق ما سقط فيه فحصٌ من فحوصه، ويُنقل `firstScreen`
+ * ‏بلا شرطٍ على ما قيس.
  */
 export function tightened(results: readonly Measured[], file: ThresholdFile, why: string): ThresholdFile {
   const journeys: Record<string, ThresholdEntry> = { ...file.journeys }
@@ -140,14 +147,77 @@ export function tightened(results: readonly Measured[], file: ThresholdFile, why
     if (vp === null || !r.success) continue
     const entry = journeys[r.id]
     const t = entry?.[vp]
-    const first = r.firstScreen === true && t?.firstScreen === true ? { firstScreen: true } : {}
     if (t === undefined) {
       journeys[r.id] = { why: entry?.why ?? why, ...entry, [vp]: { success: true, steps: r.steps, loads: r.loads } }
-    } else if (r.steps <= t.steps && r.loads <= t.loads && (r.steps < t.steps || r.loads < t.loads)) {
-      journeys[r.id] = { ...entry!, [vp]: { success: true, steps: r.steps, loads: r.loads, ...first } }
+      continue
+    }
+    if (t.firstScreen === true && r.firstScreen !== true) continue
+    if (r.steps <= t.steps && r.loads <= t.loads && (r.steps < t.steps || r.loads < t.loads)) {
+      journeys[r.id] = { ...entry!, [vp]: { success: true, steps: r.steps, loads: r.loads, ...(t.firstScreen === true ? { firstScreen: true } : {}) } }
     }
   }
   return { ...file, journeys }
+}
+
+/**
+ * ‏**مجلّدُ لقطات الرحلة باسمها وحدَها** (مراجعة D-326): كان `[^\w-]+` يجعل «R-1·ضبط» و«R-1·أوّل» كليهما «R-1_»، فتمحو الثانيةُ
+ * ‏مجلّدَ الأولى أوّلَ تشغيلها وتكتب لقطاتِها بالأسماء نفسِها، وتشير الخلاصةُ عن الأولى إلى صورِ الأخرى. فالحروفُ العربيّة
+ * ‏وعلاماتُها (الشدّة) تبقى، و`checkRepo` يشترط ألّا تتقاسم رحلتان مجلّدًا.
+ */
+export function shotSlug(id: string): string {
+  return id.replace(/[^\p{L}\p{M}\p{N}-]+/gu, '_')
+}
+
+// ‏نمطُ GitHub في `paths`: نجمةٌ داخل مجلّدٍ واحد، ونجمتان عبرها، ونجمتان ثمّ شرطةٌ صفرُ مجلّدٍ أو أكثر
+function globRe(glob: string): RegExp {
+  let re = ''
+  for (let i = 0; i < glob.length; i += 1) {
+    const c = glob[i]!
+    if (c === '*' && glob[i + 1] === '*') {
+      if (glob[i + 2] === '/') { re += '(?:.*/)?'; i += 2 } else { re += '.*'; i += 1 }
+    } else if (c === '*') re += '[^/]*'
+    else if (c === '?') re += '[^/]'
+    else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  }
+  return new RegExp(`^${re}$`)
+}
+
+/** ‏أيُشغِّل هذا الملفُّ السيرَ؟ آخرُ نمطٍ يطابقه يحكم، و«!» يستثني — كما يقرأ GitHub `paths`. */
+export function matches(paths: readonly string[], file: string): boolean {
+  let hit = false
+  for (const p of paths) {
+    const neg = p.startsWith('!')
+    if (globRe(neg ? p.slice(1) : p).test(file)) hit = !neg
+  }
+  return hit
+}
+
+/** ‏ما تقيسه الرحلاتُ ولا يُشغِّل مرشّحُ المسارات السيرَ إن تغيّر وحدَه. */
+export function uncovered(paths: readonly string[], files: readonly string[]): string[] {
+  return files.filter((f) => !f.endsWith('.test.ts') && !matches(paths, f))
+}
+
+/**
+ * ‏**ما ترسمه الرحلاتُ أو تقيسه خارج `src/routes`** (مراجعة D-326): الخادمُ يُقلع العاملَ كلَّه، والمرشّحُ يُشغِّل البوّابةَ لما
+ * ‏يمسّ الواجهة وحدَها — فكان طلبٌ يمسّ `auth.ts` (دخولُ ر-11·رمز) أو `lib/home.ts` (قائمةُ البدء وخطوتُك التالية) يُدمج بلا رحلة.
+ * ‏فكلُّ ملفٍّ في `src/routes` (سوى الاختبارات) وهذه القائمةُ يجب أن يطابقها `paths` في `ui.yml`.
+ */
+export const UI_SURFACES: readonly string[] = [
+  'src/lib/home.ts',
+  'src/lib/channels.ts',
+  'src/lib/nav/panes.ts',
+  'src/lib/nav/back.ts',
+  'src/lib/security/totp.ts',
+  'src/lib/security/factors.ts',
+  'src/lib/ui/asset.ts',
+  'package.json',
+  'package-lock.json',
+]
+
+/** ‏أنماطُ `paths` تحت `pull_request` في سيرٍ — قراءةٌ ضيّقةٌ لشكل `ui.yml` لا محلّلُ YAML. */
+export function workflowPaths(yml: string): string[] {
+  const block = /\n\s+paths:\n((?:\s+- .+\n)+)/.exec(yml)?.[1] ?? ''
+  return [...block.matchAll(/- '([^']+)'/g)].map((m) => m[1]!)
 }
 
 export function writeThresholds(file: ThresholdFile, path: string = THRESHOLDS_PATH): void {
@@ -166,6 +236,8 @@ export const BANNED_CONCLUSIONS: readonly string[] = [
   'لماذا قال المالك «تمّ» ولم تُكتب مسوّدة',
   'من تبويب «اكتب» حتّى «اكتب مسوّدة» ثمّ «اعتمد»',
   'وأيُّهما حُلّل في staging لم يُذكر، فاختير المستند',
+  // ‏حكمٌ على الانتقال المكتوم لم يُقَس: يُكتب ولو وقع في رحلةٍ لم تنجح (مراجعة D-326)
+  'يقع ولا يُرى: لا يكسر شيئًا',
 ]
 
 // ── الفحصُ الذاتيّ ──────────────────────────────────────────────────────
@@ -206,11 +278,38 @@ function selfTest(): void {
     console.log('  ✕ «--update» لا يضيّق وحدَه، أو يُرخي، أو لا يكتب عتبةَ الجديدة')
     missed += 1
   }
+  /*
+   * ‏**ولا يُسقط التضييقُ حارسَ الشاشة الأولى** (مراجعة D-326): كان يُبقي `firstScreen` إن قاسه التشغيلُ وحدَه، فرحلةٌ وفّرت
+   * ‏خطوةً أو تحميلًا وخرج فعلُها من الشاشة الأولى تُكتب عتبتُها بلاه، ويمرّ الحكمُ التالي — إرخاءٌ آليٌّ بلا كلمة.
+   */
+  const lostFirst = tightened([ok('R-A', 'desktop', 1, 1, { firstScreen: false })], t, 'جديدة')
+  const keptFirst = tightened([ok('R-A', 'desktop', 1, 1)], t, 'جديدة')
+  if (lostFirst.journeys['R-A']?.desktop?.firstScreen !== true || judge([ok('R-A', 'desktop', 1, 1, { firstScreen: false })], lostFirst, { complete: false }).failures.length === 0) {
+    console.log('  ✕ «--update» أسقط حارسَ الشاشة الأولى عن رحلةٍ خرج فعلُها منها')
+    missed += 1
+  }
+  if (keptFirst.journeys['R-A']?.desktop?.steps !== 1 || keptFirst.journeys['R-A']?.desktop?.firstScreen !== true) {
+    console.log('  ✕ «--update» ضيّق رحلةً بقي فعلُها في الشاشة الأولى ولم يُبقِ حارسَها')
+    missed += 1
+  }
+  // ‏ومجلّدُ لقطات كلّ رحلةٍ باسمها وحدَها: كان «R-1·ضبط» و«R-1·أوّل» كلاهما «R-1_»، فيمحو الثاني لقطاتِ الأوّل (مراجعة D-326)
+  if (shotSlug('R-1·ضبط') === shotSlug('R-1·أوّل') || shotSlug('R-2·stop') === shotSlug('R-2')) {
+    console.log('  ✕ رحلتان تتقاسمان مجلّدَ لقطات')
+    missed += 1
+  }
+  // ‏ومرشّحُ مسارات بوّابة الواجهة يُمسك ما تقيسه الرحلات، ولا يُشغَّل لاختبارٍ وحدَه (مراجعة D-326)
+  const planted = uncovered(['src/routes/ui/**', '!src/routes/**/*.test.ts'], ['src/routes/ui/home.ts', 'src/routes/auth.ts', 'src/routes/ui/home.test.ts'])
+  if (planted.length !== 1 || planted[0] !== 'src/routes/auth.ts' || !matches(['src/routes/**', '!src/routes/**/*.test.ts'], 'src/routes/auth.ts')
+    || matches(['src/routes/**', '!src/routes/**/*.test.ts'], 'src/routes/auth.test.ts')) {
+    console.log('  ✕ مطابقةُ مرشّح المسارات لا تقع كما يطابق GitHub')
+    missed += 1
+  }
+  const extra = 5
   if (missed > 0) {
-    console.log(`✕ self-test: ${missed} من ${cases.length + 1} لم يقع كما يجب`)
+    console.log(`✕ self-test: ${missed} من ${cases.length + extra} لم يقع كما يجب`)
     process.exit(1)
   }
-  console.log(`  ✓ الفحصُ الذاتيّ: العللُ المزروعة الـ${cases.length - 2} أُمسكت، والسليمُ يمرّ، و«--only» لا يتّهم ما لم يُشغَّل، والتضييقُ لا يُرخي`)
+  console.log(`  ✓ الفحصُ الذاتيّ: العللُ المزروعة الـ${cases.length - 2} أُمسكت، والسليمُ يمرّ، و«--only» لا يتّهم ما لم يُشغَّل، والتضييقُ لا يُرخي ولا يُسقط الشاشةَ الأولى، ولكلّ رحلةٍ مجلّدُها، والمرشّحُ يطابق كـ GitHub`)
 }
 
 async function checkRepo(): Promise<void> {
@@ -229,18 +328,32 @@ async function checkRepo(): Promise<void> {
     }
   }
   for (const id of Object.keys(file.journeys)) if (!ids.has(id)) notes.push(`${id}: عتبةٌ لرحلةٍ لا وجود لها`)
+  // ‏ولكلّ رحلةٍ مجلّدُ لقطاتها: رحلتان بمجلّدٍ واحدٍ تمحو الثانيةُ لقطاتِ الأولى
+  const slugs = new Map<string, string>()
+  for (const j of JOURNEYS) {
+    const other = slugs.get(shotSlug(j.id))
+    if (other !== undefined) notes.push(`${j.id} و${other}: مجلّدُ لقطاتٍ واحد «${shotSlug(j.id)}»`)
+    slugs.set(shotSlug(j.id), j.id)
+  }
   // ‏ولا تعود جملةٌ ثابتةٌ إلى ملفّات القياس
   const dir = fileURLToPath(new URL('.', import.meta.url))
   for (const f of ['journeys.ts', 'count_steps.ts', 'meter.ts']) {
     const text = readFileSync(join(dir, f), 'utf8')
     for (const b of BANNED_CONCLUSIONS) if (text.includes(b)) notes.push(`${f}: جملةٌ ثابتةٌ في الخلاصة: «${b}»`)
   }
+  // ‏ومرشّحُ مسارات بوّابة الواجهة يُمسك ما تقيسه الرحلات، ولا يُشغِّلها اختبارٌ وحدَه
+  const root = join(dir, '..', '..')
+  const paths = workflowPaths(readFileSync(join(root, '.github/workflows/ui.yml'), 'utf8'))
+  const routes = (readdirSync(join(root, 'src/routes'), { recursive: true }) as string[])
+    .map((f) => `src/routes/${f.split(sep).join('/')}`).filter((f) => f.endsWith('.ts'))
+  for (const f of uncovered(paths, [...routes, ...UI_SURFACES])) notes.push(`ui.yml: «${f}» تقيسه الرحلاتُ ولا يُشغِّل البوّابة`)
+  for (const f of routes.filter((x) => x.endsWith('.test.ts') && matches(paths, x)).slice(0, 1)) notes.push(`ui.yml: اختبارٌ وحدَه يُشغِّل البوّابة («${f}»)`)
   if (notes.length > 0) {
     console.log(`✕ عتباتُ الرحلات: ${notes.length} ملحوظة`)
     for (const n of notes) console.log(`  ${n}`)
     process.exit(1)
   }
-  console.log(`  ✓ عتباتُ الرحلات: ${JOURNEYS.length} رحلةً بمقاسيها، لكلٍّ عتبةٌ وسبب، ولا عتبةَ لرحلةٍ غائبة، ولا جملةَ ثابتةً في الخلاصة`)
+  console.log(`  ✓ عتباتُ الرحلات: ${JOURNEYS.length} رحلةً بمقاسيها، لكلٍّ عتبةٌ وسبب، ولا عتبةَ لرحلةٍ غائبة، ولا جملةَ ثابتةً في الخلاصة، ولكلّ رحلةٍ مجلّدُها، وui.yml يُمسك ${routes.length - routes.filter((x) => x.endsWith('.test.ts')).length + UI_SURFACES.length} ملفًّا تقيسه`)
   // ‏وما تحمله وحداتُ الرحلات من مقابضَ مفتوحة لا يُبقي البوّابةَ معلّقة
   process.exit(0)
 }

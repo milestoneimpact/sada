@@ -1132,16 +1132,24 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   /*
    * ‏**«أنشئ وجدوِل» يقول ما سيقع** (D-326 · ر-4): الموعدُ الافتراضيُّ مكتوبٌ على الزرّ الأوّليّ، فيتبع «متى؟» و«اعتمده الآن» —
    * ‏بلا موعدٍ أو بلا اعتمادٍ لا يُجدوَل شيء، فيعود الاسمُ «أنشئ المنشورات». والخادمُ يقرأ الحقلين نفسَيهما.
+   *
+   * ‏**وبلا اعتمادٍ يعود «متى؟» إلى «لاحقًا»** (مراجعة D-326): كان الإلغاءُ يبدّل الاسمَ وحدَه والموعدُ الافتراضيّ باقٍ في الحقل،
+   * ‏فيُرسَل ويقرؤه الخادمُ موعدًا طُلب بلا اعتماد، ويردّ بتنبيه D-314 عن موعدٍ لم يختره المالك. ويُستعاد بإعادة التأشير ما لم
+   * ‏يُختَر غيرُه بينهما؛ وموعدٌ يختاره المالكُ بعد الإلغاء يبقى، ويُنبَّه عنه كما كان.
    */
   document.querySelectorAll('button[data-create-go]').forEach(function(go){
     var f=go.form||go.closest('form'); if(!f)return;
-    var when=f.querySelector('select[name=preset]'), ok=f.querySelector('input[name=approve]');
+    var when=f.querySelector('select[name=preset]'), ok=f.querySelector('input[name=approve]'), kept='';
     var sync=function(){
       var at=!!when&&when.value!==''&&(!ok||ok.checked);
       go.textContent=at?'أنشئ وجدوِل · '+when.options[when.selectedIndex].text:'أنشئ المنشورات';
     };
-    if(when)when.addEventListener('change',sync);
-    if(ok)ok.addEventListener('change',sync);
+    if(when)when.addEventListener('change',function(){kept='';sync();});
+    if(ok)ok.addEventListener('change',function(){
+      if(when&&!ok.checked&&when.value!==''){kept=when.value;when.value='';}
+      else if(when&&ok.checked&&when.value===''&&kept!==''){when.value=kept;kept='';}
+      sync();
+    });
   });
 
   /*

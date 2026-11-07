@@ -353,6 +353,29 @@ describe('«أنشئ وجدوِل» يقول ما سيقع (D-326 · ر-4)', () 
     ok.dispatchEvent(new w.Event('change', { bubbles: true }))
     expect(go.textContent).toBe('أنشئ المنشورات')
   })
+  /*
+   * ‏**وبلا اعتمادٍ لا يُرسَل الموعدُ الافتراضيّ** (مراجعة D-326): كان الإلغاءُ يبدّل اسمَ الزرّ وحدَه و«متى؟» باقٍ «غدًا»، فيقرأ الخادمُ
+   * ‏موعدًا طُلب بلا اعتماد ويردّ بتنبيه D-314 عن موعدٍ لم يختره المالك. فيعود «متى؟» إلى «لاحقًا»، ويُستعاد بإعادة التأشير.
+   */
+  it('إلغاءُ «اعتمده الآن» يعيد «متى؟» إلى «لاحقًا» فلا يُرسَل موعد، وإعادتُه تستعيد الموعد', () => {
+    const { w } = boot('', NAV + PANES + FORM)
+    const d = w.document
+    const go = d.querySelector('[data-create-go]')!
+    const when = d.querySelector('select[name=preset]') as unknown as { value: string; dispatchEvent(e: unknown): void }
+    const ok = d.querySelector('input[name=approve]') as unknown as { checked: boolean; dispatchEvent(e: unknown): void }
+    const sent = (): string => String(new (w as unknown as { FormData: new (f: unknown) => { get(n: string): unknown } }).FormData(d.querySelector('form')).get('preset'))
+    // ‏(وhappy-dom لا يقرأ سمةَ «selected» على غير الأوّل كما يقرؤها المتصفّح، فيُضبط الموعدُ صراحةً كما يرسمه الخادم)
+    when.value = 'tomorrow'
+    ok.checked = false
+    ok.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(when.value).toBe('')
+    expect(sent()).toBe('')
+    expect(go.textContent).toBe('أنشئ المنشورات')
+    ok.checked = true
+    ok.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(when.value).toBe('tomorrow')
+    expect(go.textContent).toBe('أنشئ وجدوِل · غدًا 9:00 ص')
+  })
 })
 
 describe('مرساةُ حقلٍ تنزل إلى وسط الشاشة (D-326 · ر-4)', () => {

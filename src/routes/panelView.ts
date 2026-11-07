@@ -60,7 +60,7 @@ import { planImportCard } from './ui/planImportView'
 import type { Reach, UploadRow } from '../lib/media/uploads'
 import type { VideoCaptions } from '../lib/media/captions'
 import type { LinkState } from '../lib/channels'
-import { systemPill, writeBlock, type HomeFacts, type JourneyCounts } from '../lib/home'
+import { firstRun, systemPill, writeBlock, type HomeFacts, type JourneyCounts } from '../lib/home'
 import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
@@ -974,6 +974,37 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     (c) => c.state === 'linked' || c.state === 'needs_reauth',
   ).length
 
+  // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
+  const bare = (x: DraftRow): boolean =>
+    (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
+    && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
+
+  // ‏حقائقُ الرئيسيّة مرّةً: للرأس ولبطاقة «ما كُتب في أسبوعين» في المطويّ (D-309)
+  const facts: HomeFacts = {
+    channels: d.channels,
+    counts: d.journey,
+    paused: d.paused,
+    sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
+    withoutImage: d.drafts.filter(bare).length,
+    withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
+    openSuggestions: d.openSuggestions,
+    // ‏والأولى من الستّين المرسومة بترتيب اللوح — فالمرساةُ تجد بطاقتَها
+    firsts: {
+      waiting: d.drafts.find((x) => x.status === 'draft')?.id ?? null,
+      unscheduled: d.drafts.find((x) => x.status === 'approved' || x.status === 'edited')?.id ?? null,
+      withoutImage: d.drafts.find(bare)?.id ?? null,
+    },
+    pulses: d.pulses,
+    blocker: d.draftBlocker ?? null,
+    zone: d.zone ?? null,
+    scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
+      .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
+    written: d.drafts.map((x) => x.createdAt),
+  // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
+  // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
+  // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
+  // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
+  }
   /**
    * «ما ينتظرك» — مولَّدةٌ من الحال لا مكتوبةٌ سلفا.
    *
@@ -1012,8 +1043,12 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       label: 'سجّل مفتاحا',
     })
   }
-  // ‏ولا حسابَ أصلًا: تقولها «البدء في ثلاث خطوات» و«خطوتك التالية» فوقها (D-326) — الحقيقةُ تُقال مرّةً
-  if (linkedChannels === 0 && d.channels.some((c) => c.accounts.length > 0)) {
+  /*
+   * ‏ولا حسابَ أصلًا في أوّل يوم: تقولها «البدء في ثلاث خطوات» و«خطوتك التالية» فوقها (D-326) — الحقيقةُ تُقال مرّةً. **وتُقال
+   * ‏هنا حين لا ترسم الرئيسيّةُ تلك القائمة** (مراجعة D-326): من نشر ثمّ فصل حساباتِه كلَّها لا قائمةَ له، و«خطوتك التالية» يأخذها
+   * ‏فشلُ ما كان مجدولًا — وكان الشرطُ «في منصّةٍ حساب» لا يقع أبدًا مع «لا مربوطة».
+   */
+  if (linkedChannels === 0 && firstRun(facts) === null) {
     items.push({ kind: 'warn', text: 'لا قناة مربوطة — النظام يفهم ويكتب ولا ينشر.', go: '#channels', label: 'اربط' })
   }
   const unverified = d.providers.filter((p) => p.configured && p.enabled && p.verifiedAt === null)
@@ -1030,37 +1065,6 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       ${i.go === undefined ? '' : button({ label: i.label ?? 'اذهب', size: 'sm', href: i.go })}</li>`)
     .join('')
 
-  // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
-  const bare = (x: DraftRow): boolean =>
-    (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
-    && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
-
-  // ‏حقائقُ الرئيسيّة مرّةً: للرأس ولبطاقة «ما كُتب في أسبوعين» في المطويّ (D-309)
-  const facts: HomeFacts = {
-    channels: d.channels,
-    counts: d.journey,
-    paused: d.paused,
-    sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
-    withoutImage: d.drafts.filter(bare).length,
-    withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
-    openSuggestions: d.openSuggestions,
-    // ‏والأولى من الستّين المرسومة بترتيب اللوح — فالمرساةُ تجد بطاقتَها
-    firsts: {
-      waiting: d.drafts.find((x) => x.status === 'draft')?.id ?? null,
-      unscheduled: d.drafts.find((x) => x.status === 'approved' || x.status === 'edited')?.id ?? null,
-      withoutImage: d.drafts.find(bare)?.id ?? null,
-    },
-    pulses: d.pulses,
-    blocker: d.draftBlocker ?? null,
-    zone: d.zone ?? null,
-    scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
-      .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
-    written: d.drafts.map((x) => x.createdAt),
-  // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
-  // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
-  // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
-  // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
-  }
   return `<section data-pane="overview" hidden>
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).

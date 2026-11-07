@@ -83,7 +83,7 @@ describe('قائمةُ البدء في الرئيسيّة (D-326 · خطّة ا�
   it('رئيسيّةٌ خالية: «1 من 3»، والخطوةُ الأولى روابطُ إلى مساعد ضبط كلّ منصّةٍ مبنيّة عند حقل معرّفها', () => {
     const html = homeTop(zero(), NOW)
     expect(html).toContain('id="first-run"')
-    expect(html).toMatch(/data-fr-count>1 من 3</)
+    expect(html).toMatch(/data-fr-count>الخطوة 1 من 3</)
     expect(html).toContain('<progress max="3" value="0"')
     for (const p of ['linkedin', 'x', 'instagram']) expect(html).toContain(`href="${setupHref(p)}"`)
     // ‏والخطوةُ التالية تبقى أوّلَ الرئيسيّة بزرّها الأوّليّ الواحد، والقائمةُ بعدها بلا زرٍّ أوّليّ
@@ -104,8 +104,20 @@ describe('قائمةُ البدء في الرئيسيّة (D-326 · خطّة ا�
     const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
       createdAt: '2026-09-01 00:00:00', expiresAt: '2026-11-01 00:00:00' }], () => true)
     const html = homeTop(facts({ channels: linked, sources: { total: 0, analyzed: 0 } }), NOW)
-    expect(html).toMatch(/data-fr-count>2 من 3</)
+    expect(html).toMatch(/data-fr-count>الخطوة 2 من 3</)
     expect(html).toContain('href="/panel#idea"')
+  })
+  /*
+   * ‏**العدّادُ يقول الخطوةَ لا عددَ ما تمّ** (مراجعة D-326): كان «3 من 3» والشريطُ ثلثان وما زالت خطوةٌ باقية — و«3 من 3» تُقرأ
+   * ‏«اكتملت». فالنصُّ «الخطوة 3 من 3» والشريطُ ما تمّ (2)، ولا يتناقضان.
+   */
+  it('حسابٌ ومسوّدةٌ تنتظر ولم يُعتمَد شيء (اليومُ الأوّل): «الخطوة 3 من 3» والشريطُ 2 — لا «3 من 3» وكأنّها اكتملت', () => {
+    const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: '2026-11-01 00:00:00' }], () => true)
+    const html = homeTop(facts({ channels: linked, sources: { total: 0, analyzed: 0 },
+      counts: { perPlatform: { linkedin: { draft: 2, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 } }), NOW)
+    expect(html).toMatch(/data-fr-count>الخطوة 3 من 3</)
+    expect(html).toContain('<progress max="3" value="2"')
   })
   it('ومن نشر مرّةً لا يرى القائمة', () => {
     const html = homeTop(facts({ counts: { perPlatform: { x: { draft: 0, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW)
