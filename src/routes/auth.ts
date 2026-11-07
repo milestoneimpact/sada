@@ -537,7 +537,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
 
   let used: boolean
   try {
-    used = await useRecoveryCode(c.env.DB, String(gate.form.get('code') ?? ''), email)
+    used = await useRecoveryCode(c.env.DB, c.env.TOKEN_ENC_KEY, String(gate.form.get('code') ?? ''), email)
   } catch {
     return failSecondFactor(c, say('factor_unavailable'), 503)
   }
@@ -620,7 +620,7 @@ async function afterFactorAdded(
   what: string,
 ): Promise<{ codes: string[]; cookie: string | null; device: boolean }> {
   const email = emailOf(session)
-  const codes = hadRecovery ? [] : await issueRecoveryCodes(c.env.DB, email)
+  const codes = hadRecovery ? [] : await issueRecoveryCodes(c.env.DB, c.env.TOKEN_ENC_KEY, email)
   let cookie: string | null = null
   let id = session.id
   if (session.record.enrol === true) {
@@ -862,7 +862,7 @@ auth.post('/panel/security/recovery/issue', async (c) => {
   const gate = await guardFull(c)
   if ('denied' in gate) return gate.denied
 
-  const codes = await issueRecoveryCodes(c.env.DB, emailOf(gate.session))
+  const codes = await issueRecoveryCodes(c.env.DB, c.env.TOKEN_ENC_KEY, emailOf(gate.session))
   await record(
     c.env.DB,
     { actor: 'panel', action: 'recovery.issue', detail: String(codes.length) + ' رمزا' },

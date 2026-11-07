@@ -338,8 +338,8 @@ const data: PanelData = {
   csrf: 'demo-csrf-token',
   nonce: 'demoNonce123',
   sessions: [
-    { handle: 'x1', at: ago(2), ip: '203.0.113.9', ua: 'Mozilla/5.0 (Macintosh) Chrome/120', via: 'admin_token', current: true },
-    { handle: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false },
+    { handle: 'x1', at: ago(2), ip: '203.0.113.9', ua: 'Mozilla/5.0 (Macintosh) Chrome/120', via: 'admin_token', current: true, email: 'owner@example.com' },
+    { handle: 'x2', at: ago(30), ip: '198.51.100.4', ua: 'Mozilla/5.0 (iPhone) Safari/17', via: 'passkey', current: false, email: 'sara@example.com' },
   ],
   audit: [
     // **كما فعل المالكُ يومَ قرّر** (D-135): ضغطتان على البطاقات وسقفُ الترويج —
@@ -420,7 +420,8 @@ const data: PanelData = {
   cfAccountId: null,       // غير مضبوط: الإرشاد هو المرسوم
   // ‏قناةُ التنبيهات (D-109) — **وحالان يُرسمان**: ناجحٌ وفاشل، فيُقاس
   // ‏اللونان والتباينُ فيهما معا
-  alertWebhook: 'https://hooks.slack.com/services/T00/B00/xxxxxxxx',
+  // ‏قناعٌ لا عنوان (D-318): ما يصل اللوحةَ فعلًا
+  alertWebhook: 'https://hooks.slack.com/…xxxx',
   // الافتراضُ نفسُه — فالمقاييسُ تُقارَن بما يراه مَن لم يختر شيئا
   dashboardTiles: 'analyses_today,spend_today,sources_analyzed,spend_30d',
   /*

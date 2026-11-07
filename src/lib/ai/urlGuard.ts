@@ -12,26 +12,11 @@
  */
 
 import { withTimeout } from '../net/timeout'
+import { nonPublicHost } from '../net/ipGuard'
 export type UrlVerdict =
   | { readonly ok: true; readonly url: string; readonly host: string }
   | { readonly ok: false; readonly reason: string }
 
-/** نطاقاتٌ لا يُنادى فيها مزوّدٌ خارجيّ بحال. */
-const BLOCKED_HOSTS: readonly RegExp[] = [
-  /^localhost$/i,
-  /\.local$/i,
-  /\.internal$/i,
-  /^127\./,
-  /^0\./,
-  /^10\./,
-  /^192\.168\./,
-  /^169\.254\./, // خدمة البيانات الوصفيّة — أخطرها
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^\[?::1\]?$/,
-  /^\[?fc00:/i,
-  /^\[?fd/i,
-  /^\[?fe80:/i,
-]
 
 export function checkProviderUrl(raw: string): UrlVerdict {
   const trimmed = raw.trim()
@@ -52,14 +37,13 @@ export function checkProviderUrl(raw: string): UrlVerdict {
   }
 
   const host = url.hostname
-  for (const blocked of BLOCKED_HOSTS) {
-    if (blocked.test(host)) {
-      return { ok: false, reason: `عنوان داخليّ (${host}) — المزوّد خارجيّ لا داخل الشبكة` }
-    }
-  }
-  // مضيفٌ بلا نقطة ليس اسم نطاقٍ عامّ: `metadata` أو `db` أسماءُ داخلٍ
-  if (!host.includes('.')) {
-    return { ok: false, reason: `المضيف «${host}» ليس نطاقا عامّا` }
+  /*
+   * ‏**المضيفُ يُحلَّل عددًا لا نصًّا** (D-318): كانت قائمةُ تعابير على النصّ، و`[::ffff:127.0.0.1]` تُطبَّع إلى
+   * ‏`[::ffff:7f00:1]` فلا تطابق شيئًا. ومضيفٌ بلا نقطة (`metadata`) اسمُ داخلٍ كما كان.
+   */
+  const inner = nonPublicHost(host)
+  if (inner !== null) {
+    return { ok: false, reason: `عنوان داخليّ (${host}: ${inner}) — المزوّد خارجيّ لا داخل الشبكة` }
   }
 
   /**

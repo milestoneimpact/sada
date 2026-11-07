@@ -52,6 +52,7 @@ import { openSuggestions } from '../../lib/report/promote'
 import { readCaptions, type VideoCaptions } from '../../lib/media/captions'
 import { relyingParty } from '../../lib/security/rp'
 import { record, recentAudit, type AuditRow } from '../../lib/audit'
+import { saveWebhook } from '../../lib/alerts/webhook'
 import { pulses, readHeartbeats } from '../../lib/ops/heartbeat'
 import { memoryNotices, unreadNotices } from '../../lib/notices'
 import {
@@ -758,6 +759,7 @@ async function libraryData(load: Load): Promise<LibraryData> {
 /** «الإعدادات»: الحدودُ ومستهلَكُها، والمزوّدون وتوجيهُهم، والأجهزةُ والعواملُ وسجلُّ النشاط. */
 async function settingsData(load: Load): Promise<SettingsData> {
   const { c, org, session, allowance } = load
+  const owner = (session.record.role ?? 'owner') === 'owner'
   const [usedImages, outbox, sessions, factors, audit, p] = await Promise.all([
     // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
     c.env.DB
@@ -767,7 +769,8 @@ async function settingsData(load: Load): Promise<SettingsData> {
       .catch(() => null)
       .then((row) => row?.n ?? 0),
     load.outbox(),
-    listSessions(c.env.KV, session.id),
+    // ‏جلساتُ صاحب الصفحة وحدَه (D-318)، و«الكلّ» بأصحابها للمالك وحدَه — قسمُ الأجهزة لا يُرسَم لغيره أصلًا
+    listSessions(c.env.KV, session.id, owner ? 'all' : undefined),
     load.factors(),
     load.audit(),
     load.providers(),
@@ -787,8 +790,9 @@ async function settingsData(load: Load): Promise<SettingsData> {
     autoImage: s.autoImage,
     imageCap: s.dailyImageCap,
     usedImages,
-    alertWebhook: s.alertWebhook,
-    outbox,
+    // ‏قناعُ القناة وما خرج إليها للمالك وحدَه (D-318) — لا يُحمَل لغيره ولو لم يُرسَم
+    alertWebhook: owner ? s.alertWebhook : '',
+    outbox: owner ? outbox : [],
     imageOverlay: s.imageOverlay,
     slide,
     sessions,
@@ -799,6 +803,7 @@ async function settingsData(load: Load): Promise<SettingsData> {
     knownProviders: p.cards.map((x) => ({ name: x.name, label: x.label })),
     cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     baseUrl: c.env.PUBLIC_BASE_URL,
+    adminApi: s.adminApi,
   }
 }
 
@@ -870,6 +875,32 @@ home.post('/panel/settings', async (c) => {
     : String(form.get('value') ?? '')
   if (!WRITABLE.has(key)) return c.json({ error: 'unknown_setting' }, 400)
 
+  /*
+   * ‏**وعنوانُ القناة سرٌّ حامل** (D-318): يُحفَظ مشفَّرًا، ولا يُكتب كاملًا في سجلّ النشاط ولا في الإشعار — قناعُه وحدَه.
+   * ‏والفراغُ لا يُزيل القناةَ إلّا بزرّ «أزل القناة» (`clear=1`): الحقلُ يُرسَم فارغًا للمالك (لا يُعاد إليه السرّ)، فضغطةُ
+   * ‏«احفظ» عليه فارغًا كانت ستمحو قناةً قائمةً بلا قصد.
+   */
+  if (key === 'alert_webhook') {
+    const clearing = value.trim() === '' && form.get('clear') === '1'
+    if (value.trim() === '' && !clearing) {
+      await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم يتغيّر شيء: الصق عنوانًا جديدًا، أو اضغط «أزل القناة».' })
+      return back('settings')
+    }
+    const saved = await saveWebhook(c.env.DB, c.env.TOKEN_ENC_KEY, value, 'panel')
+    if (saved.kind !== 'refused') {
+      await record(c.env.DB, {
+        actor: 'panel', action: 'settings.write', target: key, detail: ['←', saved.kind === 'set' ? saved.hint : 'لا قناة'].join(' '),
+      }, c.req.raw)
+    }
+    await setFlash(c.env, c.req.raw, saved.kind === 'set'
+      ? { kind: 'ok', text: 'قناة التنبيهات: حُفظت مشفَّرةً — ' + saved.hint }
+      : saved.kind === 'cleared'
+        ? { kind: 'ok', text: 'أُزيلت قناة التنبيهات. لا يخرج تنبيهٌ حتّى تضبط غيرها.' }
+        : { kind: 'bad', text: 'لم تُحفَظ القناة: ' + saved.reason + '. وما كان مضبوطًا باقٍ كما هو.' })
+    if (form.get('auto') === '1') return c.json({ ok: saved.kind !== 'refused' })
+    return back('settings')
+  }
+
   const result = await writeSetting(c.env.DB, key as SettingKey, value, 'panel')
   /*
    * **والسجلُّ يُقرأ بالأسماء لا بالمعرِّفات** (D-134): بطاقاتٌ تُكتب
@@ -913,6 +944,11 @@ home.post('/panel/settings', async (c) => {
           text: `اخترت ${asked} — وحُفظت ${n}. والحدّ من ${TILE_MIN} إلى ${TILE_MAX}،`
             + ' وما دون الأدنى يعود إلى الأربع الأصليّة.',
         }
+  } else if (key === 'admin_api') {
+    // ‏أبوابُ الطرفيّة (D-318) — يُقال ما فُتح وما بقي، لا «true»
+    flash = result.stored === 'true'
+      ? { kind: 'warn', text: 'فُتحت أبواب الطرفيّة الثلاثة لكلمة الإدارة: خدمات الكتابة والمصادر والتحليل المدفوع — وكلّ نداء في سجلّ النشاط.' }
+      : { kind: 'ok', text: 'أُغلقت أبواب الطرفيّة الثلاثة. تبقى الجاهزيّة والمسح.' }
   } else if (key === 'youtube_public' || key === 'tiktok_public') {
     // ‏مَن يرى المقطع (D-190) — يُقال بما سيقع لا بـ«true»
     const name = key === 'youtube_public' ? 'YouTube' : 'TikTok'

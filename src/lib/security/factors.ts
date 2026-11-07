@@ -21,14 +21,16 @@
  * كانت القراءةُ تبلع الخطأ فتعيد «لا مفاتيح» و«لا رمز»، فيُفتح لصاحب رمز البريد وحده جلسةٌ كاملة. فصارت تقرأ أو
  * ترمي: **من يقرّر الدخولَ يقرّر على جوابٍ لا على صمت**، والعرضُ وحده (صفحةُ الدخول) يلتقط الخطأ بنفسه.
  */
-import { importKey, open, seal } from '../crypto'
-import { randomBytes, toBase64Url } from './bytes'
+import { hmacKeyFor, keyId, keyring, LEGACY_RAW, openScoped, sealScoped } from '../crypto'
+import { fromBase64Url, randomBytes, toBase64Url } from './bytes'
 import { digest, sameBytes } from './digest'
 import type { Db } from '../tokens'
 import { changedRows } from '../dbResult'
 import { isOwnerEmail, normalizeEmail, OWNER_EMAIL } from '../ownerEmail'
 
 const TOTP_CONTEXT = 'totp:secret'
+/** نطاقُ سرّ رمز التطبيق (D-318): مفتاحٌ مشتقٌّ باسمه، والقديمُ بالخام يُقرأ كما هو. */
+export const TOTP_SCOPE = 'factors:totp'
 
 /** بريدُ الحساب مطبَّعًا — والمالكُ ببريده الثابت (D-245). */
 function who(email: string): string {
@@ -176,6 +178,11 @@ function totpHome(email: string): { readonly owner: boolean; readonly email: str
     : { owner: false, email: e, context: `${TOTP_CONTEXT}:${e}` }
 }
 
+/** سياقُ تشفير رمز تطبيق هذا الحساب — لدورة التدوير (D-318) تعيد التشفيرَ بالسياق نفسِه. */
+export function totpContext(email: string): string {
+  return totpHome(email).context
+}
+
 /** يقرأ الصفّ أو يرمي — لا «لا رمز» عن قاعدةٍ صامتة (D-317). */
 async function totpRow(db: Db, email: string): Promise<TotpRow | null> {
   const home = totpHome(email)
@@ -207,8 +214,7 @@ export async function totpState(db: Db, email: string): Promise<TotpState> {
  */
 export async function startTotp(db: Db, encKey: string, secret: string, email: string): Promise<boolean> {
   const home = totpHome(email)
-  const key = await importKey(encKey)
-  const sealed = await seal(key, secret, home.context)
+  const sealed = await sealScoped(encKey, TOTP_SCOPE, secret, home.context)
   const result = home.owner
     ? await db
       .prepare(
@@ -244,8 +250,7 @@ export async function readTotpSecret(db: Db, encKey: string, email: string): Pro
   const row = await totpRow(db, email)
   if (row === null) return null
   try {
-    const key = await importKey(encKey)
-    return await open(key, { ciphertext: row.secret_cipher, iv: row.secret_iv }, totpHome(email).context)
+    return await openScoped(encKey, TOTP_SCOPE, { ciphertext: row.secret_cipher, iv: row.secret_iv }, totpHome(email).context, LEGACY_RAW)
   } catch {
     return null
   }
@@ -285,17 +290,23 @@ export async function removeTotp(db: Db, email: string): Promise<void> {
 // ── رموز الاسترداد ───────────────────────────────────────────────────
 
 /**
- * رمزٌ من عشرة محارف بأربع مجموعات — يُقرأ ويُكتب على ورق.
+ * رمزٌ من عشرين محرفًا بأربع مجموعات — يُقرأ ويُكتب على ورق.
  *
  * ولا يُستعمل `randomToken` الستّينيّ عشر: أربعةٌ وستّون محرفا لا تُنسَخ
  * من ورقةٍ بلا خطأ، ورمزٌ يُخطئ المالكُ في نسخه ليس رمزَ استرداد.
+ *
+ * **ومئةُ بتٍّ لا خمسون** (D-318): كان عشرةَ محارف (‏≈50 بتًّا) بتهشيم SHA-256 بلا ملح، فمن سرق نسخةً من الجدول
+ * عكسها بالقوّة على حاسوبٍ واحد. وأبجديّةُ الاثنين والثلاثين تقسم البايتَ بلا انحياز (256 ÷ 32)، فكلُّ محرفٍ خمسةُ بتّات.
  */
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+export const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const RECOVERY_CHARS = 20
+const RECOVERY_INFO = 'recovery-v1'
+const RECOVERY_SCHEME = 'r1'
 
 function oneCode(): string {
-  const bytes = randomBytes(10)
-  const chars = Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]!)
-  return `${chars.slice(0, 5).join('')}-${chars.slice(5).join('')}`
+  const bytes = randomBytes(RECOVERY_CHARS)
+  const chars = Array.from(bytes, (b) => RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length]!).join('')
+  return (chars.match(/.{5}/g) ?? [chars]).join('-')
 }
 
 /** يُطبّع ما كتبه المالك: حالةُ الأحرف والشرطة والمسافات لا تُحاسَب. */
@@ -303,8 +314,28 @@ export function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
-async function hashCode(code: string): Promise<string> {
+/** التهشيمُ القديم (قبل D-318): SHA-256 بلا ملح — يُقرأ لرموزٍ صدرت قبله حتّى تُستعمَل أو تُجدَّد. */
+async function legacyHash(code: string): Promise<string> {
   return toBase64Url(await digest(`recovery:${normalizeCode(code)}`))
+}
+
+/**
+ * HMAC-SHA256 بمفتاحٍ مشتقٍّ بـ HKDF من `TOKEN_ENC_KEY` (‏`info = recovery-v1`)، على **ملح الرمز** ثمّ نصِّه. فنسخةُ
+ * الجدول وحدَها لا تكفي لتخمين رمز: بلا المفتاح لا يُحسَب تهشيمٌ يُقارَن، ومع الملح لا يُحسَب جدولٌ مرّةً لكلّ الرموز.
+ */
+async function macOf(keyMaterial: string, salt: Uint8Array, code: string): Promise<Uint8Array> {
+  const key = await hmacKeyFor(keyMaterial, RECOVERY_INFO)
+  const text = new TextEncoder().encode(normalizeCode(code))
+  const message = new Uint8Array(salt.byteLength + text.byteLength)
+  message.set(salt, 0)
+  message.set(text, salt.byteLength)
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, message as BufferSource))
+}
+
+/** الصفُّ: `r1.<معرّف المفتاح>.<الملح>.<التهشيم>` — والمعرّفُ يقول بأيّ مفتاحٍ في الحلقة يُعاد الحساب. */
+async function sealCode(encKey: string, code: string): Promise<string> {
+  const salt = randomBytes(16)
+  return [RECOVERY_SCHEME, await keyId(encKey), toBase64Url(salt), toBase64Url(await macOf(encKey, salt, code))].join('.')
 }
 
 /** شرطُ صاحب الرموز في الجملة — والغائبُ (`NULL`) للمالك. */
@@ -316,12 +347,13 @@ const RECOVERY_OWNER = 'COALESCE(email, ?) = ?'
  * والاستبدالُ كاملٌ عمدا: مجموعتان قائمتان تعنيان أنّ ورقةً ظنّ المالك
  * أنّه أبطلها ما تزال تفتح.
  */
-export async function issueRecoveryCodes(db: Db, email: string, count = 8): Promise<string[]> {
+export async function issueRecoveryCodes(db: Db, encKey: string, email: string, count = 8): Promise<string[]> {
   const owner = who(email)
   const codes = Array.from({ length: count }, () => oneCode())
+  const hashes = await Promise.all(codes.map((code) => sealCode(encKey, code)))
   await db.prepare(`DELETE FROM recovery_codes WHERE ${RECOVERY_OWNER}`).bind(OWNER_EMAIL, owner).run()
-  for (const code of codes) {
-    await db.prepare('INSERT INTO recovery_codes (hash, email) VALUES (?, ?)').bind(await hashCode(code), owner).run()
+  for (const hash of hashes) {
+    await db.prepare('INSERT INTO recovery_codes (hash, email) VALUES (?, ?)').bind(hash, owner).run()
   }
   return codes
 }
@@ -339,18 +371,38 @@ export async function countRecoveryCodes(db: Db, email: string): Promise<{ total
 }
 
 /**
+ * أيطابق هذا الصفُّ الرمزَ المكتوب؟ — والمقارنةُ على بايتاتٍ متساوية الطول بزمنٍ ثابت.
+ * صفٌّ بمعرّف مفتاحٍ ليس في الحلقة لا يطابق شيئًا (التدويرُ انتهى ولم يُجدَّد).
+ */
+async function matches(row: string, presented: string, ring: readonly string[], legacy: Uint8Array): Promise<boolean> {
+  const parts = row.split('.')
+  if (parts[0] !== RECOVERY_SCHEME) return sameBytes(await digest(row), legacy)
+  if (parts.length !== 4) return false
+  const [, kid, salt, mac] = parts as [string, string, string, string]
+  for (const material of ring) {
+    if ((await keyId(material)) !== kid) continue
+    try {
+      return sameBytes(await macOf(material, fromBase64Url(salt), presented), fromBase64Url(mac))
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
+/**
  * يستهلك رمزَ استرداد.
  *
- * والمقارنةُ على التهشيم بمساواةٍ ثابتة الزمن، والاستهلاكُ **مشروطٌ في
- * جملة SQL نفسها** (`used_at IS NULL`): طلبان متزامنان بالرمز نفسه لا
- * ينجح منهما إلّا واحد — والقاعدةُ هي التي تفصل لا الشيفرة.
+ * والمقارنةُ بمساواةٍ ثابتة الزمن على كلّ صفوف الحساب بلا خروجٍ مبكر، والاستهلاكُ **مشروطٌ في جملة SQL نفسها**
+ * (`used_at IS NULL`): طلبان متزامنان بالرمز نفسه لا ينجح منهما إلّا واحد — والقاعدةُ هي التي تفصل لا الشيفرة.
+ * والقديمُ (D-317 وما قبله) يُقارَن بتهشيمه القديم حتّى يُستعمَل أو يُجدَّد.
  */
-export async function useRecoveryCode(db: Db, presented: string, email: string): Promise<boolean> {
+export async function useRecoveryCode(db: Db, encKey: string, presented: string, email: string): Promise<boolean> {
   const normalized = normalizeCode(presented)
   if (normalized.length < 8) return false
 
-  const target = await hashCode(normalized)
-  const targetBytes = await digest(target)
+  const legacy = await digest(await legacyHash(normalized))
+  const ring = keyring(encKey)
 
   // ‏رموزُ هذا الحساب وحدَه (D-317): رمزُ غيره لا يفتح بابه
   const { results } = await db
@@ -360,9 +412,8 @@ export async function useRecoveryCode(db: Db, presented: string, email: string):
 
   let match: string | null = null
   for (const row of results) {
-    // تُفحص كلُّ الصفوف بلا خروجٍ مبكر: موضعُ الرمز في القائمة لا يُستدلّ
-    // عليه من زمن الردّ
-    if (sameBytes(await digest(row.hash), targetBytes)) match = row.hash
+    // تُفحص كلُّ الصفوف بلا خروجٍ مبكر: موضعُ الرمز في القائمة لا يُستدلّ عليه من زمن الردّ
+    if (await matches(row.hash, normalized, ring, legacy)) match = row.hash
   }
   if (match === null) return false
 

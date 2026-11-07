@@ -480,6 +480,25 @@ export function elsewhereBody(platform: Platform, displayName: string): string {
   </div>`
 }
 
+/**
+ * **العودةُ من متصفّحٍ غير الذي بدأ** (D-318). رابطُ الموافقة يحمل حالةً مربوطةً بكعكةٍ في متصفّح من ضغط «اربط»؛ فإن فُتح
+ * في متصفّحٍ آخر — أو أُرسل إلى شخصٍ آخر — لا يُربَط شيء. ويُقال ذلك بلا اتّهام: أكثرُ ما يقع أن يبدأ المالكُ من حاسوبه
+ * ويُكمل من هاتفه.
+ */
+export function otherBrowserBody(platform: Platform): string {
+  const label = LABEL[platform]
+  return head(platform, 'لم يكتمل', 'الربطُ بدأ في متصفّحٍ آخر',
+    'عاد ' + escapeHtml(label) + ' إلى صدى في متصفّحٍ غير الذي ضُغط فيه «اربط». <b>ولم يُربَط حسابٌ ولم يُحفَظ شيء.</b>') + `
+  <div class="card">
+    <h2>ما يُفعَل</h2>
+    <p class="hint">ابدأ الربطَ من جديد وأكمله في المتصفّح نفسِه. وإن وصلك رابطُ موافقةٍ من شخصٍ آخر فلا تكمله:
+      الربطُ يبدأ من لوحتك أنت.</p>
+    <div class="row mt-3">
+      <a class="btn btn-primary" href="` + panelHref('channels') + `">الحسابات</a>
+    </div>
+  </div>`
+}
+
 export interface UnreachedData {
   readonly platform: Platform
   /**

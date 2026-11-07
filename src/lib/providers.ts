@@ -8,7 +8,7 @@
  * **وسرّ Worker يغلب المفتاح المحفوظ دائما** (D-030): الأضعف لا يعلو
  * على الأقوى. والمدمَجون (`builtin`) لا يُحذفون ولا تُبدَّل لهجتُهم.
  */
-import { importKey, open, seal, toBase64 } from './crypto'
+import { LEGACY_RAW, openScoped, sealScoped, toBase64 } from './crypto'
 import type { Db } from './tokens'
 import { OWNER_ORG } from './tenancy'
 
@@ -31,6 +31,9 @@ export interface Provider {
   readonly updatedAt: string | null
   readonly updatedBy: string | null
 }
+
+/** نطاقُ خزانة المزوّدين (D-318): مفتاحٌ مشتقٌّ باسمه، والقديمُ بالخام يُقرأ كما هو. */
+export const VAULT_SCOPE = 'vault:providers'
 
 export function keyContext(provider: string): string {
   return `provider:${provider}:key`
@@ -193,7 +196,7 @@ export async function saveKey(
 
   const print = await fingerprint(value)
   const hint = maskKey(value)
-  const sealed = await seal(await importKey(encKey), value, keyContext(provider))
+  const sealed = await sealScoped(encKey, VAULT_SCOPE, value, keyContext(provider))
 
   await db
     .prepare(
@@ -244,9 +247,8 @@ export async function resolveKey(
   }
 
   try {
-    const key = await importKey(encKey)
     return {
-      key: await open(key, { ciphertext: row.key_enc, iv: row.key_iv }, keyContext(provider)),
+      key: await openScoped(encKey, VAULT_SCOPE, { ciphertext: row.key_enc, iv: row.key_iv }, keyContext(provider), LEGACY_RAW),
       source: 'vault',
     }
   } catch {

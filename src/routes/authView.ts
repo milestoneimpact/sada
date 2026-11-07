@@ -103,7 +103,7 @@ export function secondFactorPage(d: SecondFactorData, nonce: string): string {
            ${hidden}
            <div class="field"><label for="rc">رمز الاسترداد</label>
              <input id="rc" name="code" dir="ltr" autocomplete="off" spellcheck="false"
-                    placeholder="XXXXX-XXXXX" required></div>
+                    placeholder="XXXXX-XXXXX-XXXXX-XXXXX" required></div>
            <button class="btn btn-secondary" type="submit">استخدم الرمز</button>
          </form>
          <div class="note">يُستهلك مرّةً واحدة، ولا يُقرأ من القاعدة بعد توليده.</div>

@@ -20,10 +20,13 @@
  * `oauth:linkedin:secret` ليس `oauth:x:secret`. فنصٌّ مشفَّرٌ يُنقَل بين
  * الصفّين لا يُفكّ — وهو ما تعنيه AAD في AES-GCM.
  */
-import { importKey, open, seal, toBase64 } from '../crypto'
+import { LEGACY_RAW, openScoped, sealScoped, toBase64 } from '../crypto'
 import type { Db } from '../tokens'
 import { OWNER_ORG } from '../tenancy'
 import type { Platform } from './providers'
+
+/** نطاقُ أسرار تطبيقات OAuth (D-318): مفتاحٌ مشتقٌّ باسمه، والقديمُ بالخام يُقرأ كما هو. */
+export const APPS_SCOPE = 'vault:oauth_apps'
 
 export function secretContext(platform: Platform): string {
   return `oauth:${platform}:secret`
@@ -94,11 +97,12 @@ export async function readApp(
   if (row === null) return null
 
   try {
-    const key = await importKey(encKey)
-    const secret = await open(
-      key,
+    const secret = await openScoped(
+      encKey,
+      APPS_SCOPE,
       { ciphertext: row.secret_enc, iv: row.secret_iv },
       secretContext(platform),
+      LEGACY_RAW,
     )
     return { clientId: row.client_id, clientSecret: secret, source: 'vault' }
   } catch {
@@ -269,7 +273,7 @@ export async function saveApp(
 
   const print = await fingerprint(secret)
   const hint = mask(secret)
-  const sealed = await seal(await importKey(encKey), secret, secretContext(platform))
+  const sealed = await sealScoped(encKey, APPS_SCOPE, secret, secretContext(platform))
 
   await db
     .prepare(

@@ -781,7 +781,7 @@ describe('رموز الاسترداد', () => {
 
   it('D-317: ورمزُ استرداد حسابٍ آخر لا يفتح بابَ المالك', async () => {
     await ownerWithPasskey()
-    const theirs = await issueRecoveryCodes(db, 'a@example.com')
+    const theirs = await issueRecoveryCodes(db, String(env['TOKEN_ENC_KEY']), 'a@example.com')
     expect(await useCode(theirs[0]!)).toBe(401)
   })
 

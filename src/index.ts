@@ -7,7 +7,9 @@
 import { accessGuard } from './routes/access'
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
-import { authorizeAdmin } from './lib/adminAuth'
+import { adminGate } from './routes/adminGate'
+import { previousKey, registerKeyring } from './lib/crypto'
+import { rotateKeys } from './lib/security/rotate'
 import { BASE_HEADERS } from './lib/security/headers'
 import { afterVault, readiness, type Env } from './env'
 import { analyzeSource } from './lib/analyze/job'
@@ -25,6 +27,7 @@ import { runWeeklyAll } from './lib/report/job'
 import { collectAlerts } from './lib/alerts/collect'
 import { readSettings } from './lib/settings'
 import { sendAlerts } from './lib/alerts/outbox'
+import { readWebhookUrl } from './lib/alerts/webhook'
 import { expiringTokens, recordAlerts } from './lib/token/expiry'
 import { renewDue } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
@@ -83,12 +86,44 @@ app.use('*', async (c, next) => {
   }
 })
 
+/**
+ * **حلقةُ المفاتيح من البيئة قبل أيّ عمل** (D-318): `TOKEN_ENC_KEY_PREV` يُقرأ هنا وفي `queue` و`scheduled`، فيفكّ كلُّ
+ * مسارٍ ما شُفِّر بالمفتاح السابق أثناء التدوير بلا أن يُمرَّر إليه.
+ */
+app.use('*', async (c, next) => {
+  registerKeyring(c.env)
+  await next()
+})
+
+/**
+ * **الحالُ وحدَها لمن لا يُعرَف** (D-318): كان يردّ اسمَ البيئة. والتفصيلُ خلف كلمة الإدارة (`/admin/ready`).
+ */
 app.get('/health', (c) =>
-  c.json({ ok: true, service: 'sada-api', env: c.env.SADA_ENV }),
+  c.json({ ok: true, service: 'sada-api' }),
 )
 
 /**
- * جاهزية التشغيل: يقول ما الناقص بالاسم، ولا يكشف قيمة سر.
+ * جاهزيّةُ التشغيل لمن لا يُعرَف — **الحالُ وحدَها** (D-318): جاهزٌ أم لا، والقاعدةُ موصولةٌ أم لا، واسمُ الخدمة ليعرف
+ * سيرُ النشر أنّ الرادَّ صدى. وكان يردّ أسماءَ الأسرار الناقصة وما سدّته الخزانةُ لأيّ أحد: خريطةٌ لما ينقص البيئةَ ولأيّ
+ * منصّةٍ تُدار بالخزانة. **والتفصيلُ كما كان خلف كلمة الإدارة** (`/admin/ready`).
+ */
+app.get('/ready', async (c) => {
+  const { ready, database } = await readinessDetail(c.env)
+  return c.json({ ready, service: 'sada-api', database }, ready ? 200 : 503)
+})
+
+/**
+ * حارس `/admin/*` في موضعٍ واحد — **وسيطٌ قبل المسارات لا نداءٌ في كلٍّ منها** (D-318).
+ *
+ * تكرارُه في كلّ مسار يعني أنّ مسارا جديدا قد يُكتب بلا حارس ولا يلحظه
+ * أحد — وهي الثغرة نفسها التي كشفها D-019. والوسيطُ يجمع الحدَّ والرمزَ
+ * والبابَ وسطرَ السجلّ (`routes/adminGate.ts`)، فمسارٌ يُضاف تحت `/admin/`
+ * يمرّ به شاء كاتبُه أم نسي.
+ */
+app.use('/admin/*', adminGate)
+
+/**
+ * جاهزية التشغيل بتفصيلها — **خلف كلمة الإدارة** (D-318): يقول ما الناقص بالاسم، ولا يكشف قيمة سر.
  * يرد 503 ما دام شيء ناقصا، حتى لا يبدو النظام جاهزا وهو ليس كذلك.
  *
  * **ومفتاحٌ في الخزانة ليس مفتاحا ناقصا.** كان `/ready` يقرأ أسرار
@@ -97,11 +132,32 @@ app.get('/health', (c) =>
  * فصار الناقصُ يُفرز: ما لا وجود له، وما وُجد في الخزانة. والجاهزيّةُ
  * لا تُحجب على الثاني.
  */
-app.get('/ready', async (c) => {
-  const state = readiness(c.env)
+app.get('/admin/ready', async (c) => {
+  const detail = await readinessDetail(c.env)
+  // ‏وحالُ المفاتيح (D-318): أيُّ مفتاحٍ يعمل، وأثمّة سابق، وكم حقلًا ليس على الحاليّ — ومنه قرارُ حذف السابق
+  let keys: { kid: string; previous: string | null; pending: number } | 'unreadable' = 'unreadable'
+  try {
+    const report = await rotateKeys(c.env.DB, c.env.TOKEN_ENC_KEY, { apply: false })
+    keys = { kid: report.kid, previous: report.previous, pending: report.pending }
+  } catch {
+    keys = 'unreadable'
+  }
+  return c.json({ ...detail, keys }, detail.ready ? 200 : 503)
+})
+
+async function readinessDetail(env: Env): Promise<{
+  readonly ready: boolean
+  readonly database: 'ok' | 'unreachable'
+  readonly phase_0: boolean
+  readonly phase_1: boolean
+  readonly drive_folder: boolean
+  readonly missing_secrets: readonly string[]
+  readonly configured_in_vault: readonly string[]
+}> {
+  const state = readiness(env)
   let database: 'ok' | 'unreachable' = 'unreachable'
   try {
-    await c.env.DB.prepare('SELECT 1').first()
+    await env.DB.prepare('SELECT 1').first()
     database = 'ok'
   } catch {
     database = 'unreachable'
@@ -109,7 +165,7 @@ app.get('/ready', async (c) => {
   // ما سُدّ من الخزانة يُذكر على حدة — لا في «ناقص» ولا مسكوتا عنه
   let inVault: string[] = []
   if (database === 'ok' && state.missing.length > 0) {
-    inVault = await vaultCovered(c.env, state.missing)
+    inVault = await vaultCovered(env, state.missing)
   }
   // **والحكمُ يُعاد بعد أن يُعرَف ما سُدّ** (D-095): كان يُحسَب من بيئة
   // Worker وحدَها، فيخرج جوابٌ يقول «لا شيءَ ناقص» و«غيرُ جاهز» معا
@@ -117,19 +173,16 @@ app.get('/ready', async (c) => {
 
   // البوابة هي المرحلة صفر: نظام ينشر ولا يفهم ليس معطلا
   const ready = sealed.phase0 && database === 'ok'
-  return c.json(
-    {
-      ready,
-      database,
-      phase_0: sealed.phase0,
-      phase_1: sealed.phase1,
-      drive_folder: sealed.driveFolder,
-      missing_secrets: sealed.missing,
-      configured_in_vault: inVault,
-    },
-    ready ? 200 : 503,
-  )
-})
+  return {
+    ready,
+    database,
+    phase_0: sealed.phase0,
+    phase_1: sealed.phase1,
+    drive_folder: sealed.driveFolder,
+    missing_secrets: sealed.missing,
+    configured_in_vault: inVault,
+  }
+}
 
 /**
  * أيُّ الأسرار الناقصة سدّته خزانةُ المزوّدين.
@@ -172,37 +225,6 @@ async function vaultCovered(env: Env, missing: readonly string[]): Promise<strin
 }
 
 /**
- * حارس `/admin/*` في موضعٍ واحد.
- *
- * تكرارُه في كلّ مسار يعني أنّ مسارا جديدا قد يُكتب بلا حارس ولا يلحظه
- * أحد — وهي الثغرة نفسها التي كشفها D-019، فلا تُترك لتتكرّر بالنسخ.
- */
-async function guardAdmin(c: {
-  env: Env
-  req: { raw: Request }
-}): Promise<Response | null> {
-  const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, c.req.raw)
-  if (verdict.kind === 'ok') return null
-  if (verdict.kind === 'disabled') {
-    return Response.json({ error: 'admin_disabled', detail: 'ADMIN_TOKEN غير مضبوط' }, { status: 503 })
-  }
-  if (verdict.kind === 'no_header') {
-    return Response.json(
-      { error: 'no_authorization_header', detail: 'الترويسة المتوقّعة: Authorization: Bearer <token>' },
-      { status: 401 },
-    )
-  }
-  return Response.json(
-    {
-      error: 'unauthorized',
-      presented_length: verdict.presentedLength,
-      hint: 'طول ما أرسلتَه أعلاه. رمز openssl rand -hex 32 طوله 64، و base64 طوله 44.',
-    },
-    { status: 401 },
-  )
-}
-
-/**
  * لوحة المزوّدين — قراءةٌ محضة.
  *
  * تجيب في نداءٍ واحد: أيّ مزوّدٍ مضبوط، وأيّ نموذجٍ ينفّذ كلّ مهمّة ولمَ،
@@ -213,8 +235,6 @@ async function guardAdmin(c: {
  * تُقرأ منها.
  */
 app.get('/admin/providers', async (c) => {
-  const denied = await guardAdmin(c)
-  if (denied !== null) return denied
 
   const days = 30
   let spend: Awaited<ReturnType<typeof spendByProvider>> = {}
@@ -269,8 +289,6 @@ app.get('/admin/providers', async (c) => {
  * للاستعمال وإن كان سليما.
  */
 app.get('/admin/sources', async (c) => {
-  const denied = await guardAdmin(c)
-  if (denied !== null) return denied
 
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.drive_file_id, s.name, s.mime, s.content_hash, s.last_seen_at,
@@ -329,9 +347,7 @@ app.get('/admin/sources', async (c) => {
  * لا يفعل شيئا لا يفعله Cron: المسار نفسه، فما يُختبر هنا هو ما يجري هناك.
  */
 app.post('/admin/scan', async (c) => {
-  // الحارس قبل أيّ عمل: لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
-  const denied = await guardAdmin(c)
-  if (denied !== null) return denied
+  // الحارس قبل أيّ عمل (`adminGate`): لا نداء Google ولا كتابة في D1 لطلبٍ غير مأذون
   try {
     const report = await scanDrive({
       db: c.env.DB,
@@ -352,8 +368,6 @@ app.post('/admin/scan', async (c) => {
  * وخلف الحارس نفسه: النداء يكلّف مالا، فلا يُترك مفتوحا (D-019).
  */
 app.post('/admin/analyze/:sourceRef', async (c) => {
-  const denied = await guardAdmin(c)
-  if (denied !== null) return denied
   const outcome = await analyzeSource(
     {
       db: c.env.DB,
@@ -772,6 +786,8 @@ async function queue(
   batch: MessageBatch<PublishMessage | AnalyzeMessage | PlanDraftMessage>,
   env: Env,
 ): Promise<void> {
+  // ‏حلقةُ المفاتيح قبل أيّ فكّ (D-318)
+  registerKeyring(env)
   // ‏طوابيرُ الأعطال أوّلا: اسمُها يبدأ باسم أصلها فلا تُترك لمستهلكه
   if (batch.queue.startsWith('sada-publish-dlq')) {
     return publishDeadLetters(batch as MessageBatch<PublishMessage>, env)
@@ -883,9 +899,12 @@ async function outboxTick(env: Env): Promise<void> {
   try {
     const settings = await readSettings(env.DB)
     if (settings.alertWebhook === '') return
+    // ‏‏`alertWebhook` قناعٌ لا عنوان (D-318): العنوانُ كاملًا يُفكّ هنا بالمفتاح، والقديمُ المقروءُ يُشفَّر في مكانه
+    const hook = await readWebhookUrl(env.DB, env.TOKEN_ENC_KEY)
+    if (hook === '') return
     const alerts = await collectAlerts(env.DB, new Date(), settings.dailySpendCapUsd)
     if (alerts.length === 0) return
-    const sent = await sendAlerts(env.DB, settings.alertWebhook, alerts)
+    const sent = await sendAlerts(env.DB, hook, alerts)
     // ‏والعدّاداتُ وحدَها في السجلّ: «why» تحمل مضيفَ القناة، وهو من
     // ‏اعتمادها. **ولا سرَّ في سجلّ** (CLAUDE.md · D-110)
     console.log({ job: 'alert-outbox', sent: sent.sent, skipped: sent.skipped, failed: sent.failed })
@@ -957,7 +976,24 @@ async function quotaTick(env: Env): Promise<void> {
   }
 }
 
+/**
+ * **دورةُ التدوير** (D-318) — في كلّ دورةٍ ما دام `TOKEN_ENC_KEY_PREV` مضبوطًا، وإلّا لا تعمل أصلًا. دفعةٌ في كلّ جدول،
+ * والتالية تُكمل؛ وما بقي يُقرأ في `/admin/ready` (`keys.pending`).
+ */
+async function rotateTick(env: Env): Promise<void> {
+  if (previousKey(env.TOKEN_ENC_KEY) === null) return
+  try {
+    const report = await rotateKeys(env.DB, env.TOKEN_ENC_KEY)
+    console.info({ job: 'key-rotation', kid: report.kid, previous: report.previous, rotated: report.rotated, failed: report.failed, pending: report.pending })
+  } catch (error) {
+    console.error({ job: 'key-rotation', failed: String(error) })
+  }
+}
+
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  // ‏حلقةُ المفاتيح قبل أيّ فكّ (D-318)
+  registerKeyring(env)
+  await rotateTick(env)
   // **والتجديدُ قبل الطابور** — منشورٌ ينتظر رمزا انتهى يُجدَّد رمزُه
   // في هذه الدورة نفسِها، فلا يفشل فشلا نهائيّا لأجل دقائق (D-066)
   await renewTick(env)

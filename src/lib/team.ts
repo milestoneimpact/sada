@@ -16,7 +16,7 @@ export const ROLE_LABEL: Readonly<Record<Role, { readonly name: string; readonly
   owner: { name: 'المالك', can: 'كلُّ شيء، والفريقُ والأمان' },
   admin: { name: 'مدير', can: 'كلُّ شيءٍ في شركاته، إلّا الفريقَ والأمانَ ومفاتيحَ المزوّدين' },
   publisher: { name: 'ناشر', can: 'يكتب ويعتمد ويجدول' },
-  editor: { name: 'محرّر', can: 'يكتب ويعدّل ويخطّط، ولا يعتمد ولا ينشر' },
+  editor: { name: 'محرّر', can: 'يكتب ويعدّل ويرتّب الخطّة، ولا يعتمد ولا ينشر ولا يبدأ ما يُدفَع ثمنُه' },
   viewer: { name: 'قارئ', can: 'يرى ولا يغيّر شيئًا' },
 }
 

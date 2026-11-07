@@ -35,6 +35,8 @@ import { FINAL_IMAGE_MODEL, NEURON_USD, imageNeurons } from '../../lib/ai/imageP
 /** سعرُ الصورة النهائيّة بعد الحصّة — من الجدول لا رقمًا يُكتب (D-285). */
 const FINAL_PER_IMAGE = (imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0) * NEURON_USD
 import { weekStart, type PlanPlatform } from '../../lib/plan/prompt'
+import { maySpend, SPEND_LOCKED } from '../../lib/access'
+import { button } from './components/button'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
 export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
@@ -247,7 +249,10 @@ export function planNewScreen(d: PlanNewData): string {
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
       <span class="wz-live" id="pn-live" aria-hidden="true">${summaryText(count, d, d.autoImage)}</span>
       <button class="btn btn-primary" type="button" id="wz-next" hidden>التالي</button>
-      ${canBuild ? html`<button class="btn btn-primary" type="submit" id="wz-go">حلّل وابنِ الخطّة</button>` : html``}
+      ${!canBuild ? html`` : maySpend()
+        ? html`<button class="btn btn-primary" type="submit" id="wz-go">حلّل وابنِ الخطّة</button>`
+        // ‏والمحرّرُ يرى الخطواتِ والكلفةَ ولا يبني (D-318): الزرُّ معطَّلٌ وسببُه تحته، لا زرٌّ رماديٌّ صامت
+        : raw(button({ label: 'حلّل وابنِ الخطّة', variant: 'primary', type: 'submit', id: 'wz-go', disabled: { id: 'wz-lock', reason: SPEND_LOCKED } }))}
     </div>`
   const form = html`<form method="POST" action="/panel/plan/generate" class="card wz" id="pn" data-busy="جار التحليل والبناء…"${d.picked ? raw(' data-start="3"') : ''}${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
     <input type="hidden" name="then" value="review">

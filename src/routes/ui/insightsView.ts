@@ -12,6 +12,7 @@ import { counted, NOUNS } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { stamp } from '../../lib/time/zone'
 import { PER_BUCKET, type Dimension, type PostFact, type WhatWorks } from '../../lib/insights/whatWorks'
+import { neutralizeFormula } from '../../lib/csv'
 
 export interface InsightsData {
   readonly works: WhatWorks
@@ -97,7 +98,8 @@ export function insightsScreen(d: InsightsData): string {
 
 /** السجلُّ ملفًّا: بالأسماء لا المفاتيح، وبمنطقة المالك، ويفتح في Excel بالعربيّة (BOM). */
 export function insightsCsv(facts: readonly PostFact[], zone: string | null): string {
-  const cell = (v: string | number): string => `"${String(v).replaceAll('"', '""')}"`
+  // ‏نصُّ المنشور يكتبه غيرُنا: خليّةٌ تبدأ بـ`=` تصير صيغةً في Excel (D-318)
+  const cell = (v: string | number): string => `"${neutralizeFormula(String(v)).replaceAll('"', '""')}"`
   const rows = facts.map((f) => [stamp(f.publishedAt, zone), platformLabel(f.platform as never), FORMAT_LABEL[f.format],
     f.chars, f.engagement, f.impressions ?? '', f.text.replace(/\s+/g, ' ').slice(0, 280)].map(cell).join(','))
   return `﻿${['نُشر', 'المنصّة', 'الشكل', 'الطول', 'التفاعل (24 ساعة)', 'الظهور', 'النصّ'].map(cell).join(',')}\r\n${rows.join('\r\n')}\r\n`

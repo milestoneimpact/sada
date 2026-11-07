@@ -249,3 +249,24 @@ export async function releaseAttempt(db: Db, request: Request, device: string | 
     console.warn({ job: 'gate', failed: String(error) })
   }
 }
+
+/**
+ * **نداءاتُ الطرفيّة بكلمة الإدارة** (D-318) — حدٌّ لكلّ مصدرٍ وشبكته، وقاطعٌ عامّ، بالدلاء الذرّيّة نفسِها.
+ *
+ * كانت `/admin/*` بلا حدٍّ أصلًا: رمزٌ واحدٌ يسرّب يُنادي التحليلَ المدفوعَ ومسحَ Drive بلا سقفٍ إلّا سقوفَ الإنفاق، ومجهولٌ
+ * يُرسل ما شاء فيملأ السجلَّ صفوفًا. والحجزُ **قبل** فحص الرمز كما في الدخول (D-161)، والعطلُ يغلق ولا يفتح (D-291).
+ * ولا يُعاد ما حُجز عند النجاح: الحدُّ هنا على النداءات لا على الإخفاقات.
+ */
+export const MAX_ADMIN_CALLS = 30
+export const MAX_NET_ADMIN_CALLS = 2 * MAX_ADMIN_CALLS
+export const MAX_GLOBAL_ADMIN_CALLS = 300
+
+export function reserveAdminCall(db: Db, request: Request): Promise<Reservation> {
+  return tiered(
+    db,
+    request,
+    { local: 'admin:', net: 'admin-net:', global: 'admin:global' },
+    { local: MAX_ADMIN_CALLS, net: MAX_NET_ADMIN_CALLS, global: MAX_GLOBAL_ADMIN_CALLS },
+    null,
+  )
+}

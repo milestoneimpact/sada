@@ -224,4 +224,11 @@ describe('CSV — ما يُعرَض يُنزَّل', () => {
     expect(csv).toContain('"a,b"')
     expect(csv).toContain("'-1")
   })
+
+  it('والجدولةُ ورجوعُ السطر في أوّل الخليّة يُعقَّمان كذلك (D-318)', () => {
+    const spec = { rows: 'account', cols: null, measure: 'count' } as const
+    const csv = toCsv(pivot([f({ account: '\t=1+1' }), f({ account: '\r=2+2' })], spec), spec)
+    expect(csv).toContain("'\t=1+1")
+    expect(csv).toContain('"\'\r=2+2"')
+  })
 })

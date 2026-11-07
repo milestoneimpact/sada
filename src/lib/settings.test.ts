@@ -145,21 +145,18 @@ describe('مفاتيح الإعدادات — قائمة حيّة لا نوع ي
     expect(new Set(SETTING_KEYS).size).toBe(SETTING_KEYS.length)
   })
 
-  /** **والعنوانُ يُحرَس عند الحفظ** — لا عند الإرسال وحدَه (D-109). */
+  /*
+   * ‏(D-318) كان هنا اختباران يثبّتان أنّ العنوانَ يُحفَظ **مقروءًا** من هذا الباب («يُحفَظ كما هو»)، وأنّ المرفوضَ يُكتب
+   * ‏فراغًا فوق القناة القائمة. والعنوانُ سرٌّ حامل: صار يُحفَظ مشفَّرًا من `saveWebhook` (وحارسُه هناك: `webhook.test.ts`)،
+   * ‏والمرفوضُ لا يمسّ ما كان. وهذا البابُ بلا مفتاحٍ فيُردّ.
+   */
   it.each([
     ['http://localhost/hook'],
-    ['http://169.254.169.254/x'],
-    ['ليس عنوانا'],
-  ])('وعنوان قناة مرفوض يُخزَّن فارغا: %s', async (raw) => {
+    ['https://hooks.example.com/t/a'],
+  ])('ولا يُكتب عنوانُ القناة من باب الإعدادات العامّ — مكانُه المشفِّر (D-318): %s', async (raw) => {
     const db = fakeDb()
-    const r = await writeSetting(db, 'alert_webhook', raw, 'panel')
-    expect(r.stored).toBe('')
-  })
-
-  it('وعنوان عامّ صحيح يُحفَظ كما هو', async () => {
-    const db = fakeDb()
-    const r = await writeSetting(db, 'alert_webhook', 'https://hooks.example.com/t/a', 'panel')
-    expect(r.stored).toContain('hooks.example.com')
+    await expect(writeSetting(db, 'alert_webhook', raw, 'panel')).rejects.toThrow('alert_webhook_sealed')
+    expect(db.raw.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'alert_webhook'").get()).toEqual({ n: 0 })
   })
 })
 

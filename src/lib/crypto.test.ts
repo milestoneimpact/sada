@@ -109,3 +109,67 @@ describe('ما يجب أن يفشل', () => {
     await expect(open(key, sealed, '')).rejects.toBeInstanceOf(CryptoError)
   })
 })
+
+describe('حلقةُ المفاتيح وإصدارُها (D-318)', () => {
+  const C = 'account:x:access'
+
+  it('النصُّ الجديدُ يحمل معرّفَ مفتاحه ويُفتح بالنطاق نفسِه وحده', async () => {
+    const { keyId, openScoped, sealScoped, LEGACY_RAW } = await import('./crypto')
+    const sealed = await sealScoped(KEY_A, 'tokens:org_owner', ACCESS, C)
+    expect(sealed.ciphertext.startsWith(`v2:${await keyId(KEY_A)}:`)).toBe(true)
+    expect(sealed.ciphertext).not.toContain(ACCESS)
+    await expect(openScoped(KEY_A, 'tokens:org_owner', sealed, C, LEGACY_RAW)).resolves.toBe(ACCESS)
+    // ‏نطاقٌ آخر لا يفتحه، ولا المفتاحُ الخامُ — منظّمةُ المالك صار مفتاحُها مشتقًّا كغيرها
+    await expect(openScoped(KEY_A, 'tokens:org_b', sealed, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+    const body = sealed.ciphertext.split(':')[2]!
+    await expect(open(await importKey(KEY_A), { ciphertext: body, iv: sealed.iv }, C)).rejects.toBeInstanceOf(CryptoError)
+  })
+
+  it('والقديمُ (قبل D-318) يُقرأ بطريقته: الخامُ للمالك، والمشتقُّ القديمُ للعميل', async () => {
+    const { deriveKey, legacyOrgKey, openScoped } = await import('./crypto')
+    const owner = await seal(await importKey(KEY_A), ACCESS, C)
+    await expect(openScoped(KEY_A, 'tokens:org_owner', owner, C, legacyOrgKey('org_owner'))).resolves.toBe(ACCESS)
+    const client = await seal(await deriveKey(KEY_A, 'org_b'), ACCESS, C)
+    await expect(openScoped(KEY_A, 'tokens:org_b', client, C, legacyOrgKey('org_b'))).resolves.toBe(ACCESS)
+    await expect(openScoped(KEY_A, 'tokens:org_b', client, C, legacyOrgKey('org_c'))).rejects.toBeInstanceOf(CryptoError)
+  })
+
+  it('التدوير: بلا السابق لا يُفتح ما شُفِّر به، ومعه يُفتح — جديدًا كان أو قديمًا', async () => {
+    const { LEGACY_RAW, openScoped, registerKeyring, sealScoped, sealedWithCurrent } = await import('./crypto')
+    const fresh = await sealScoped(KEY_A, 'vault:providers', ACCESS, C)
+    const legacy = await seal(await importKey(KEY_A), ACCESS, C)
+    registerKeyring({ TOKEN_ENC_KEY: KEY_B })
+    await expect(openScoped(KEY_B, 'vault:providers', fresh, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+    await expect(openScoped(KEY_B, 'vault:providers', legacy, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+
+    registerKeyring({ TOKEN_ENC_KEY: KEY_B, TOKEN_ENC_KEY_PREV: KEY_A })
+    try {
+      await expect(openScoped(KEY_B, 'vault:providers', fresh, C, LEGACY_RAW)).resolves.toBe(ACCESS)
+      await expect(openScoped(KEY_B, 'vault:providers', legacy, C, LEGACY_RAW)).resolves.toBe(ACCESS)
+      // ‏والكتابةُ بالحاليّ وحده
+      const again = await sealScoped(KEY_B, 'vault:providers', ACCESS, C)
+      expect(await sealedWithCurrent(KEY_B, again.ciphertext)).toBe(true)
+      expect(await sealedWithCurrent(KEY_B, fresh.ciphertext)).toBe(false)
+    } finally {
+      registerKeyring({ TOKEN_ENC_KEY: KEY_B })
+    }
+    await expect(openScoped(KEY_B, 'vault:providers', fresh, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+  })
+
+  it('ومعرّفٌ لا تعرفه الحلقةُ أو صيغةٌ تالفة: خطأُ تشفيرٍ لا قيمة', async () => {
+    const { LEGACY_RAW, openScoped, sealScoped } = await import('./crypto')
+    const sealed = await sealScoped(KEY_A, 's', ACCESS, C)
+    const forged = { ...sealed, ciphertext: sealed.ciphertext.replace(/^v2:[0-9a-f]{8}:/, 'v2:00000000:') }
+    await expect(openScoped(KEY_A, 's', forged, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+    await expect(openScoped(KEY_A, 's', { ...sealed, ciphertext: 'v2:abc' }, C, LEGACY_RAW)).rejects.toBeInstanceOf(CryptoError)
+  })
+
+  it('مفتاحُ HMAC مشتقٌّ لكلّ غرض: ثابتٌ للمفتاح والغرض، ويختلف باختلاف أحدهما', async () => {
+    const { hmacKeyFor } = await import('./crypto')
+    const mac = async (k: string, info: string): Promise<string> =>
+      toBase64(new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKeyFor(k, info), new TextEncoder().encode('x'))))
+    expect(await mac(KEY_A, 'recovery-v1')).toBe(await mac(KEY_A, 'recovery-v1'))
+    expect(await mac(KEY_A, 'recovery-v1')).not.toBe(await mac(KEY_B, 'recovery-v1'))
+    expect(await mac(KEY_A, 'recovery-v1')).not.toBe(await mac(KEY_A, 'other'))
+  })
+})

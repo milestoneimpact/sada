@@ -20,6 +20,8 @@ import type { StoredPlan } from '../../../lib/plan/job'
 import { statusBadge } from '../components/badge'
 import { emptyState } from '../components/empty'
 import { stagesAttr } from '../components/stages'
+import { button } from '../components/button'
+import { maySpend, SPEND_LOCKED } from '../../../lib/access'
 import { html, raw, type Html } from '../html'
 import type { PlanKind } from '../../../lib/plan/prompt'
 
@@ -117,16 +119,23 @@ function row(
       : `<form class="inline" method="POST" action="/panel/drafts/write" data-busy="جار الكتابة…" ${stagesAttr('write')}>
            <input type="hidden" name="id" value="${escapeHtml(item.sourceId)}">
            <input type="hidden" name="platform" value="${escapeHtml(item.platform)}">
-           <button class="btn btn-secondary btn-sm" type="submit">اكتب منه</button></form>`}</td>
+           ${/* ‏والمحرّرُ لا يبدأ كتابةً مدفوعة (D-318): الزرُّ معطَّلٌ وسببُه تحته */ ''}${maySpend()
+             ? '<button class="btn btn-secondary btn-sm" type="submit">اكتب منه</button>'
+             : button({
+               label: 'اكتب منه', variant: 'secondary', size: 'sm', type: 'submit',
+               disabled: { id: ('pw-' + item.day + '-' + item.platform + '-' + item.time).replace(/[^A-Za-z0-9_-]/g, ''), reason: SPEND_LOCKED },
+             })}</form>`}</td>
   </tr>`
 }
 
 export function planSection(input: PlanInput): string {
   const { plan, now } = input
 
-  // ‏أسبوع أو شهر (D-256): زرّان في نموذج واحد، والزرُّ يحمل المدى
+  // ‏أسبوع أو شهر (D-256): زرّان في نموذج واحد، والزرُّ يحمل المدى. والمحرّرُ لا يولّد خطّة (D-318): سببٌ مكتوبٌ بدل الزرّين
   const off = input.ready && input.analyzed >= 2 ? '' : ' disabled'
-  const generate = input.form !== undefined ? '' : `<form class="inline" method="POST" action="/panel/plan/generate"
+  const generate = input.form !== undefined ? '' : !maySpend()
+    ? '<p class="note m-0" data-spend-locked>' + escapeHtml(SPEND_LOCKED) + '</p>'
+    : `<form class="inline" method="POST" action="/panel/plan/generate"
       data-busy="جار التخطيط…"${plan === null ? '' : ' data-confirm="سيحلّ محلّ خطّتك لهذا المدى. أتمضي؟"'}>
       <button class="btn ${plan === null ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit" name="span" value="week"${off}>${
         plan === null ? 'خطّط الأسبوع' : 'أعد تخطيط الأسبوع'}</button>

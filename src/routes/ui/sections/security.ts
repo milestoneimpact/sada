@@ -49,7 +49,8 @@ export function securitySection(d: SecurityData): SecurityMarkup {
     <td><div class="nm">${shortUa(x.ua)}${
       x.current ? html` <span class="chip">هذا الجهاز</span>` : ''}${
       x.via === 'passkey' ? html` <span class="chip">مفتاح مرور</span>` : x.via === 'email_code' ? html` <span class="chip">رمز البريد</span>` : ''}</div>
-      <div class="mono">${x.ip === '' ? 'عنوان غير معروف' : x.ip}</div></td>
+      <div class="mono">${x.ip === '' ? 'عنوان غير معروف' : x.ip}</div>${
+      /* ‏صاحبُ الجهاز (D-318): كان الجردُ بلا بريد، فلا يُعرَف أيُّ جهازٍ لمن */ ''}${x.email === undefined ? '' : html`<div class="sub"><bdi dir="ltr">${x.email}</bdi></div>`}</td>
     <td data-label="فُتحت">${raw(agoTag(x.at, d.now, d.zone ?? null))}</td>
     <td data-label="">${x.current
       ? raw(statusBadge('ok', '●', 'جلستك'))

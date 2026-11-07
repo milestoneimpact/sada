@@ -30,6 +30,7 @@ import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
 import { IDEA_MAX } from '../../../lib/draft/job'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
+import { maySpend, SPEND_LOCKED } from '../../../lib/access'
 import { menu, menuItem } from '../components/menu'
 import { field } from '../components/field'
 import { linkLine } from '../reach'
@@ -411,8 +412,13 @@ function slideLine(m: MediaView): string {
  * **وتحت الزرّين سطرُ جاهزيّة** (D-163): ما ستقوله الدالّةُ بعد الضغط يُقال
  * قبله. وزرٌّ تسقط نقطتُه يُعطَّل وسببُه بجانبه — لا زرٌّ يُضغَط فيُردّ.
  */
+/** سببُ ما لا يبدؤه المحرّر (D-318) — سطرٌ مكتوبٌ بدل الأزرار المدفوعة، لا زرٌّ رماديٌّ صامت. */
+const LOCKED_NOTE = '<p class="note" data-spend-locked>' + escapeHtml(SPEND_LOCKED) + '</p>'
+
 export function imagePane(d: DraftRow, media: readonly MediaView[], lines: ReadyLines, caption: string = INFO_CAPTION): string {
   const open = d.status === 'draft' || d.status === 'approved' || d.status === 'edited'
+  // ‏أيبدأ صاحبُ الصفحة توليدًا مدفوعًا؟ (D-318) — والمحرّرُ يرى السببَ بدل الأزرار
+  const spend = maySpend()
   const mine = media.filter((m) => m.postId === d.id)
   // الصورةُ والمقطعُ صفّان في `media` يفترقان بالنوع — لا جدولَ ثانٍ
   const ready = mine.find((m) => m.status === 'ready' && !m.mime.startsWith('video/'))
@@ -451,7 +457,8 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     const slide = d.platform === 'instagram' ? INFO_SIZE.instagram : SLIDE_SIZE[d.platform]
     const w = ready.width ?? slide.width
     const h = ready.height ?? slide.height
-    const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string =>
+    // ‏والمحرّرُ لا يولّد ولا يحرّك (D-318): سببٌ واحدٌ مكتوبٌ بدل الأزرار، والرفضُ يبقى له (لا يُنفق)
+    const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string => !spend ? '' :
       `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جار التوليد…" ${stagesAttr('image')}>
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
@@ -470,7 +477,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
           : `<details class="pic-desc"><summary class="chip">الوصف</summary><p class="hint m-0">${escapeHtml(ready.prompt)}</p></details>`}
         <span class="grow"></span>
         ${open
-          ? `${clip === undefined
+          ? `${clip === undefined && spend
               // **ولا زرَّ تحريكٍ على صورةٍ لها مقطع**: كانت الضغطةُ تُردّ «لهذا
               // المنشور مقطعٌ من قبل» — زرٌّ يُعرَض ليُقال إنّه لا يفعل شيئا
               ? `<form class="inline" method="POST" action="/panel/media/animate"
@@ -486,8 +493,9 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
                <button class="btn btn-secondary btn-sm" type="submit">ارفض الصورة</button></form>`
           : ''}
       </div>
+      ${open && !spend ? LOCKED_NOTE : ''}
       ${slideLine(ready)}
-      ${open && clip === undefined ? lines.video : ''}
+      ${open && clip === undefined && spend ? lines.video : ''}
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
@@ -507,22 +515,22 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       rejected === 0 ? 'بلا صورة' : `رُفضت ${rejected} — وتبقى في الدفتر`}`)}
     <span class="ago">${caption}</span>
     <span class="grow"></span>
-    <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار الرسم…" ${stagesAttr('image')}>
-      <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+    ${!spend ? LOCKED_NOTE : html`<form class="inline" method="POST" action="/panel/media/generate" data-busy="جار الرسم…" ${raw(stagesAttr('image'))}>
+      <input type="hidden" name="id" value="${d.id}">
       <input type="hidden" name="style" value="infographic">
-      <button class="btn btn-secondary btn-sm" type="submit"${lines.infoBlocked ? ' disabled' : ''}>ولّد إنفوجرافيك</button></form>
-    ${lines.info}
+      <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.infoBlocked ? ' disabled' : '')}>ولّد إنفوجرافيك</button></form>
+    ${raw(lines.info)}
     <details class="art">
       <summary>أو صورة فنّيّة</summary>
       <div class="art-row">
-        <span class="ago">${lines.caption}</span>
-        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار التوليد…" ${stagesAttr('image')}>
-          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+        <span class="ago">${raw(lines.caption)}</span>
+        <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار التوليد…" ${raw(stagesAttr('image'))}>
+          <input type="hidden" name="id" value="${d.id}">
           <input type="hidden" name="style" value="illustration">
-          <button class="btn btn-secondary btn-sm" type="submit"${lines.imageBlocked ? ' disabled' : ''}>ولّد صورةً فنّيّة</button></form>
-        ${lines.image}
+          <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.imageBlocked ? ' disabled' : '')}>ولّد صورةً فنّيّة</button></form>
+        ${raw(lines.image)}
       </div>
-    </details>
+    </details>`.value}
   </div>`
 }
 
@@ -1053,11 +1061,14 @@ const IDEA_PLATFORMS = ['linkedin', 'x'] as const
  */
 function ideaForm(input: DraftsInput): string {
   const blocked = input.blocked ?? null
-  const why = blocked !== null
-    ? { text: blocked.text, label: blocked.label, href: blocked.href }
-    : input.ready
-      ? null
-      : { text: 'مزوّد مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
+  // ‏والمحرّرُ لا يبدأ نداءً مدفوعًا (D-318): الزرُّ معطَّلٌ وسببُه تحته، بلا رابطٍ يَعِد بما لا يفتح
+  const why = !maySpend()
+    ? { text: SPEND_LOCKED, label: '', href: '' }
+    : blocked !== null
+      ? { text: blocked.text, label: blocked.label, href: blocked.href }
+      : input.ready
+        ? null
+        : { text: 'مزوّد مهمّة الكتابة غير جاهز.', label: 'افتح المزوّدين', href: '#providers' }
   let unlinked = false
   const boxes = IDEA_PLATFORMS.map((p) => {
     const link = input.links?.[p]
@@ -1095,7 +1106,7 @@ function ideaForm(input: DraftsInput): string {
         }))}
         <span class="ago">نداء لكلّ منصّة تختارها، وكلفتُه تُسجَّل قبل المسوّدة.</span>
       </div>
-      ${why === null ? '' : html`<a class="tap" href="${why.href}">${why.label}</a>`}
+      ${why === null || why.href === '' ? '' : html`<a class="tap" href="${why.href}">${why.label}</a>`}
     </form>`.value
 }
 
@@ -1115,8 +1126,9 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
   const writers = input.writers ?? []
 
   // نموذجُ الكتابة: مصدرٌ ومنصّة، ونداءٌ واحد لكلٍّ. ولا كتابةَ آليّة —
-  // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة
-  const ready = input.ready && blocked === null
+  // الإنفاقُ يبدأ بضغطةٍ من المالك لا بدورةِ ساعة. ولا يبدؤه المحرّر (D-318)
+  const spend = maySpend()
+  const ready = input.ready && blocked === null && spend
   const writer =
     writable.length === 0
       ? emptyState({
@@ -1154,11 +1166,11 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
                label: 'اكتب مسوّدة',
                variant: 'primary',
                type: 'submit',
-               ...(ready ? {} : { disabled: { id: 'dw-why', reason: blocked?.text ?? 'مزوّد مهمّة الكتابة غير جاهز.' } }),
+               ...(ready ? {} : { disabled: { id: 'dw-why', reason: !spend ? SPEND_LOCKED : blocked?.text ?? 'مزوّد مهمّة الكتابة غير جاهز.' } }),
              }))}
              <span class="ago">نداء واحد لكلّ ضغطة، وكلفتُه تُسجَّل قبل المسوّدة.</span>
            </div>
-           ${blocked !== null
+           ${!spend ? '' : blocked !== null
              ? html`<a class="tap" href="${blocked.href}">${blocked.label}</a>`
              : input.ready ? '' : raw('<a class="tap" href="#providers">افتح المزوّدين</a>')}
          </form>`.value

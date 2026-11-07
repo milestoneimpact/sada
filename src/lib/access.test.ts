@@ -18,7 +18,8 @@ describe('من يملك ماذا (D-272)', () => {
   })
 
   it('الكتابةُ للمحرّر، والاعتمادُ والجدولةُ للناشر، والربطُ للمدير، والفريقُ والجلساتُ للمالك', () => {
-    expect(requiredRole('POST', '/panel/drafts/write', null)).toBe('editor')
+    // ‏(D-318) كان «اكتب مسوّدة من مصدر» للمحرّر، وهو نداءٌ مدفوع: صار للناشر (أدناه «الإنفاقُ لمن يعتمد»)
+    expect(requiredRole('POST', '/panel/drafts/write', null)).toBe('publisher')
     expect(requiredRole('POST', '/panel/plan/item', null)).toBe('editor')
     expect(requiredRole('POST', '/panel/drafts/decide', 'save')).toBe('editor')
     expect(requiredRole('POST', '/panel/drafts/decide', 'approve')).toBe('publisher')
@@ -78,9 +79,28 @@ describe('الجلسةُ الناقصةُ والفعلُ الحسّاس (D-317)'
       '/panel/channels/disconnect']) expect(needsStepUp('POST', p), p).toBe(true)
     expect(needsStepUp('GET', '/oauth/linkedin/start')).toBe(true)
     expect(needsStepUp('POST', '/panel/settings', 'alert_webhook')).toBe(true)
+    // ‏وأبوابُ الطرفيّة (D-318): رمزٌ ثابتٌ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
+    expect(needsStepUp('POST', '/panel/settings', 'admin_api')).toBe(true)
     expect(needsStepUp('POST', '/panel/settings', 'paused')).toBe(false)
     expect(needsStepUp('POST', '/panel/security/totp/confirm')).toBe(false)
     expect(needsStepUp('POST', '/panel/drafts/write')).toBe(false)
     expect(needsStepUp('GET', '/panel/settings')).toBe(false)
+  })
+})
+
+describe('الإنفاقُ لمن يعتمد (D-318)', () => {
+  it.each([
+    '/panel/plan/generate', '/panel/drafts/write', '/panel/drafts/idea',
+    '/panel/media/generate', '/panel/media/regenerate', '/panel/media/animate', '/panel/uploads/u1/captions',
+  ])('%s للناشر فما فوق — لا للمحرّر', (path) => {
+    expect(requiredRole('POST', path)).toBe('publisher')
+    expect(allows('editor', requiredRole('POST', path)!)).toBe(false)
+  })
+
+  it.each([
+    ['/panel/drafts/decide', 'save'], ['/panel/media/reject', null], ['/panel/uploads/start', null],
+    ['/panel/plan/item', null], ['/panel/client/brief', null], ['/panel/assets/upload', null], ['/panel/uploads/u1/posts', null],
+  ] as const)('وما لا يُنفق يبقى للمحرّر: %s', (path, action) => {
+    expect(requiredRole('POST', path, action)).toBe('editor')
   })
 })

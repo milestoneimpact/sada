@@ -16,15 +16,16 @@ import { fetchIdentity } from '../lib/oauth/identity'
 import { platformLabel, PROVIDERS, redirectUri, type Platform } from '../lib/oauth/providers'
 import { readApp } from '../lib/oauth/apps'
 import { parseGranted, scopeSet, type ScopeMode } from '../lib/oauth/scopes'
-import { consumeState, saveState, StateError } from '../lib/oauth/state'
+import { bindingCookie, bindingCookieName, bindingHash, clearedBindingCookie, consumeState, sameBrowser, saveState, StateError } from '../lib/oauth/state'
 import { AccountElsewhere, saveTokens, upsertAccount } from '../lib/tokens'
-import { loadSession } from '../lib/session'
+import { loadSession, readCookie } from '../lib/session'
+import { record } from '../lib/audit'
 import { activeOrg, OWNER_ORG } from '../lib/tenancy'
 import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
-import { connectedBody, elsewhereBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
+import { connectedBody, elsewhereBody, otherBrowserBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
 import { setFlash } from './panel'
 
 /**
@@ -172,6 +173,8 @@ oauth.get('/oauth/:platform/start', async (c) => {
   const uri = redirectUri(c.env.PUBLIC_BASE_URL, platform)
   const pkce = await createPkce()
   const state = randomToken()
+  // ‏والدورةُ مربوطةٌ بهذا المتصفّح (D-318): قيمةٌ في كعكةٍ قصيرة، وبصمتُها في الحالة
+  const nonce = randomToken(32)
 
   await saveState(c.env.KV, state, {
     platform,
@@ -182,6 +185,7 @@ oauth.get('/oauth/:platform/start', async (c) => {
     // يُسجَّل في القاعدة يُبنى عليه — والحارسُ يقرأ من القاعدة
     scopes: scopes.join(' '),
     org,
+    binding: await bindingHash(nonce),
   })
 
   const url = new URL(provider.authorizeUrl)
@@ -204,8 +208,14 @@ oauth.get('/oauth/:platform/start', async (c) => {
     url.searchParams.set(key, value)
   }
 
-  return c.redirect(url.toString(), 302)
+  return new Response(null, { status: 302, headers: { Location: url.toString(), 'Set-Cookie': bindingCookie(platform, nonce) } })
 })
+
+/** كعكةُ المنصّة تُمحى مع كلّ ردٍّ على العودة: الدورةُ انتهت نجحت أم لا. */
+function cleared(response: Response, platform: Platform): Response {
+  response.headers.append('Set-Cookie', clearedBindingCookie(platform))
+  return response
+}
 
 oauth.get('/oauth/:platform/callback', async (c) => {
   const platform = platformOf(c.req.param('platform'))
@@ -254,6 +264,14 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     if (saved.platform !== platform) {
       return c.json({ error: 'state_platform_mismatch' }, 400)
     }
+    /*
+     * ‏**والعودةُ من المتصفّح الذي بدأ** (D-318) — قبل أن يُبدَّل الرمز. الحالةُ استُهلكت فلا تُعاد، ولا يُنادى المزوّد،
+     * ‏ولا يُحفَظ حساب. وصفٌّ في سجلّ النشاط لمنظّمة البدء: رابطٌ أُرسل إلى غير صاحبه يُرى.
+     */
+    if (!(await sameBrowser(saved, readCookie(c.req.header('Cookie') ?? null, bindingCookieName(platform))))) {
+      await record(c.env.DB, { actor: 'oauth', action: 'oauth.state.mismatch', target: platform, org: saved.org ?? OWNER_ORG }, c.req.raw)
+      return cleared(resultPage('صدى — لم يكتمل الربط', otherBrowserBody(platform), 400), platform)
+    }
 
     const provider = PROVIDERS[platform]
     const creds = await credentialsFor(c.env, platform)
@@ -274,7 +292,7 @@ oauth.get('/oauth/:platform/callback', async (c) => {
     await saveTokens(c.env.DB, c.env.TOKEN_ENC_KEY, id, tokens)
 
     // لا رمزَ في الصفحة ولا في عنوانها: اسمٌ وحالُ نطاقاتٍ لا أكثر
-    return resultPage(
+    return cleared(resultPage(
       `صدى — رُبط ${identity.displayName}`,
       connectedBody({
         platform,
@@ -284,7 +302,7 @@ oauth.get('/oauth/:platform/callback', async (c) => {
         expiresAt: tokens.expiresAt,
       }),
       200,
-    )
+    ), platform)
   } catch (error) {
     // **من وصل هنا إنسانٌ ينظر، لا برنامجٌ يقرأ** (D-046).
     //

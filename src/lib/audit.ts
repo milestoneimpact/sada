@@ -165,6 +165,12 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'draft.schedule': 'جدولة منشور',
   'draft.unschedule': 'إلغاء جدولة',
   'draft.undo_reject': 'تراجع عن رفض',
+  // ‏نداءاتُ الطرفيّة بكلمة الإدارة (D-318) — كلُّ نداءٍ صفّ، والمردودُ بسببه
+  'admin.call': 'نداء بكلمة الإدارة',
+  'admin.denied': 'رُدّ نداء بكلمة الإدارة',
+  'admin.limited': 'كثرت نداءات الطرفيّة',
+  'admin.off': 'نداء لباب طرفيّة مغلق',
+  'oauth.state.mismatch': 'رُدّ ربط من متصفّح آخر',
   'oauth_app.save': 'حفظ تطبيق منصّة',
   'oauth_app.verify': 'اختبار تطبيق منصّة',
   'oauth_app.delete': 'حذف تطبيق منصّة',
