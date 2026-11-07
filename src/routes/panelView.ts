@@ -446,6 +446,11 @@ export interface PanelData {
   readonly captions?: Readonly<Record<string, VideoCaptions>>
   /** حالُ ربط كلّ منصّة — يُقال حيث تُختار (D-190). */
   readonly links?: Readonly<Record<string, LinkState>>
+  /**
+   * ‏بصمةُ المنظّمة وصاحبِ الجلسة (مراجعة D-324) — مفتاحُ ما يحفظه «بنفسي» في المتصفّح (`sada-own:<البصمة>`)، فلا يرى عضوٌ
+   * ‏آخر على الجهاز نفسِه نصًّا لم يُرسَل، ولا يُملأ مُنشئُ عميلٍ بنصّ عميلٍ آخر. وغيابُها بصمةٌ فارغة.
+   */
+  readonly ownScope?: string
   /** مَن يرى مقاطع YouTube وTikTok: قرارُ المالك بعد الإجازة (D-190). */
   readonly reach?: Reach
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
@@ -487,7 +492,7 @@ export type OverviewData = Pick<PanelData,
 /** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
 export type PostsData = Pick<PanelData,
   'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
-  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'planCounts' | 'imageQuota'>
+  | 'draftBlocker' | 'links' | 'ownScope' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'planCounts' | 'imageQuota'>
 
 /** «المكتبة»: المصادرُ والمقاطعُ والصور. */
 export type LibraryData = Pick<PanelData,
@@ -897,6 +902,8 @@ function topNew(): string {
     items: [
       menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
       menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
+      // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
+      menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
       menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
       menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
     ],
@@ -914,6 +921,7 @@ function headNew(): string {
     items: [
       menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '#idea' }),
       menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '#write' }),
+      menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '#own' }),
       menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
       menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '#plan-import' }),
     ],
@@ -923,7 +931,7 @@ function headNew(): string {
 function fabNew(): string {
   const items = [
     // ‏بمسار «/panel» لا بمرساةٍ وحدها: الزرُّ في كلّ صفحة، و«#idea» في «المكتبة» لا هدفَ لها (EASE-PLAN أ-1)
-    ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
+    ['/panel#idea', 'من فكرة'], ['/panel#write', 'من مصدر'], ['/panel#own', 'بنفسي'], [panelHref('videos'), 'ارفع فيديو'], ['/panel#plan-import', 'خطّة من ملفّ'],
   ].map(([h, t]) => `<a href="${h}">${escapeHtml(t!)}</a>`).join('')
   return `<details class="fab"><summary>${ICON.add}<span class="vh">منشور جديد</span></summary>
     <div class="fab-menu">${items}</div></details>`
@@ -1223,6 +1231,7 @@ function postsPane(d: ShellData & PostsData): string {
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
     ...(d.links === undefined ? {} : { links: d.links }),
+    ...(d.ownScope === undefined ? {} : { ownScope: d.ownScope }),
     editing: d.editing?.id ?? null,
     zone: d.zone ?? null,
   }), `${planImportCard()}

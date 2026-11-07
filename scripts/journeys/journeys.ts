@@ -204,6 +204,29 @@ const R0: Journey = {
 }
 
 /**
+ * ‏**ر-0·تراجع** (D-324): اعتمادٌ وجدولةٌ بضغطةٍ ثمّ «تراجَع» من الإشعار — والمسوّدةُ تعود تنتظر القرار بلا موعد. كان الإشعارُ
+ * ‏ينتهي بـ«أغلق» وحدَه، والرجوعُ «اسحب الموعد» على بطاقة المجدولة ثمّ «أعدها مسوّدة» في قائمة المعتمَدة: لا طريقَ من الإشعار.
+ */
+const R0undo: Journey = {
+  id: 'R-0·تراجع',
+  title: 'اعتماد مسوّدة بموعدها ثمّ «تراجَع» من الإشعار',
+  plan: { today: 'لا «تراجَع» في الإشعار', target: 'خطوةٌ واحدة بعد الاعتماد' },
+  async run({ page, m, stack }) {
+    const id = stack.seeded.posts.draft
+    await m.tap(station(page, 'الاعتماد'), 'محطّة «الاعتماد» في الرئيسيّة')
+    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة')
+    const queued = status(stack, id)
+    m.mark('approved')
+    await m.tap(button(page.locator('#flash'), 'تراجَع'), '«تراجَع» في الإشعار', { key: true })
+    const row = status(stack, id)
+    return {
+      success: queued?.status === 'queued' && row?.status === 'draft' && row.scheduled_at === null,
+      verified: `بعد «اعتمد»: ${queued?.status ?? '—'} · بعد «تراجَع»: posts.status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? 'NULL'}`,
+    }
+  },
+}
+
+/**
  * ‏**ر-1 بنطاق خطّة التصميم §6** (D-314): ربطُ منصّةٍ ضُبط تطبيقُها (كما بعد مهمّة المالك M-24 أو بعد ر-1·ضبط) حتّى مغادرة
  * ‏الموقع إلى OAuth. والسرّان مزيَّفان يُزرعان بالدالّة الحقيقيّة وبمفتاح هذا التشغيل العشوائيّ، كما تزرع البذرةُ غيرَهما.
  */
@@ -716,6 +739,38 @@ const R13: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R1, R1setup, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13]
+/**
+ * ‏**ر-14 «بنفسي»** (D-324): المالكُ يكتب منشورَه ويعتمده — بلا نموذجٍ ولا كلفة. كان كلُّ بابٍ إلى مسوّدةٍ يمرّ بنموذجٍ مدفوع،
+ * ‏فلا هدفَ له في §6 ولا «قبل»: الطريقُ لم يكن. والنصُّ يُلصق (خطوةٌ واحدة) كما يُلصق في ر-1، والنجاحُ من القاعدة: نصُّه حرفًا،
+ * ‏و`model = owner`، ولا صفَّ في الدفتر، والحالُ بعد «اعتمد».
+ */
+const OWN_TEXT = 'الحوكمة لا تبطئ القرار، تحميه. (كتبتُها بنفسي، كما هي)\n\n#الحوكمة'
+const R14: Journey = {
+  id: 'R-14',
+  title: 'منشورٌ تكتبه بنفسك ثمّ تعتمده — بلا نموذج ولا كلفة',
+  plan: { today: 'لم يكن (كلُّ بابٍ بنموذج)', target: 'لا هدف في §6 · يُقاس' },
+  async run({ page, m, stack }) {
+    const ledger = (): number => q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM cost_ledger')?.n ?? 0
+    const spent = ledger()
+    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await m.tap(subTab(page, 'اكتب'), 'تبويب «اكتب»')
+    await m.tap(page.getByLabel('بنفسي'), 'باب «بنفسي» في «منشور جديد»')
+    const form = page.locator('form[action="/panel/drafts/own"]')
+    await m.type(form.locator('textarea[name="text"]'), OWN_TEXT, 'لصق النصّ في «نصّك»', { pasted: true })
+    await m.tap(button(form, 'احفظ مسوّدة'), '«احفظ مسوّدة»', { key: true })
+    m.mark('saved')
+    const row = q<{ id: string; text: string; model: string }>(stack, "SELECT id, text, model FROM posts WHERE model = 'owner' AND text = ?", OWN_TEXT)
+    if (row === undefined) return { success: false, verified: 'لم تُحفظ مسوّدةٌ بالنصّ كما كُتب' }
+    await m.tap(button(draftForm(page, row.id), /^اعتمد/), '«اعتمد» على المسوّدة')
+    const after = status(stack, row.id)
+    const paid = ledger() - spent
+    return {
+      success: (after?.status === 'approved' || after?.status === 'queued') && paid === 0,
+      verified: `النصّ حرفًا · model = ${row.model} · status = ${after?.status ?? '—'} · cost_ledger +${paid}`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14]
 
 export { Blocked }

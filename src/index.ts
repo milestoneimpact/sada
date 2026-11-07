@@ -467,6 +467,8 @@ export interface PlanDraftMessage {
     readonly autoImage?: boolean
     /** ونوعُها (D-285) — وغيابُه إنفوجرافيك كما كان. */
     readonly imageStyle?: 'infographic' | 'illustration'
+    /** ‏بندٌ طُلب سلسلةً على X (D-324) — وغيابُه منشورٌ واحدٌ كما كان. */
+    readonly shape?: 'thread'
   }
 }
 
@@ -479,14 +481,15 @@ export interface PlanDraftMessage {
  */
 async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][number], env: Env): Promise<void> {
   const { sourceId, platform, org, idea } = message.body.draft
+  const shape = message.body.draft.shape === 'thread' ? 'thread' : 'single'
   const secrets = env as unknown as Record<string, string | undefined>
   const deps = { db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }
   // ‏فكرةُ المالك (D-282) تُكتب بباب «اكتب من فكرتك» نفسِه، لا بطريقٍ ثانٍ حول حرّاسه
   const outcome = sourceId.startsWith('idea:')
     ? idea === undefined || idea === ''
       ? { kind: 'failed' as const, reason: 'بندُ فكرةٍ بلا نصّها', retryable: false }
-      : await draftFromIdea(deps, idea, platform)
-    : await draftPost(deps, sourceId, platform)
+      : await draftFromIdea(deps, idea, platform, shape)
+    : await draftPost(deps, sourceId, platform, undefined, shape)
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
   if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)

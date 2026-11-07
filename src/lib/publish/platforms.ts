@@ -17,6 +17,7 @@
  * السجل قبل الإرسال (D-008).
  */
 import { LINKEDIN, X } from '../oauth/providers'
+import { littleText } from './littleText'
 
 export class PublishError extends Error {
   override readonly name = 'PublishError'
@@ -87,7 +88,8 @@ export async function publishLinkedIn(
 ): Promise<PublishResult> {
   const request = {
     author: authorUrn,
-    commentary: text,
+    // ‏بصيغة «little» لا كما كُتب (D-324): القوسُ و@ و# عناصرُ عندهم، وما لم يُهرَّب يبتر المنشور
+    commentary: littleText(text),
     visibility: 'PUBLIC',
     distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
     lifecycleState: 'PUBLISHED',
@@ -120,14 +122,24 @@ export async function publishLinkedIn(
   return { platformPostId: id, request, response: { id } }
 }
 
-/** X — POST /2/tweets. */
+/**
+ * X — POST /2/tweets.
+ *
+ * ‏و`replyTo` معرّفُ التغريدة التي تردّ عليها هذه (D-324): سلسلةٌ تُنشَر تغريدةً بعد تغريدة، كلٌّ في
+ * ‏`reply.in_reply_to_tweet_id` بالتي قبلها — وهو حقلُ v2 الموثَّق للردّ.
+ */
 export async function publishX(
   accessToken: string,
   text: string,
   fetchImpl: typeof fetch = fetch,
   mediaId: string | null = null,
+  replyTo: string | null = null,
 ): Promise<PublishResult> {
-  const request = { text, ...(mediaId === null ? {} : { media: { media_ids: [mediaId] } }) }
+  const request = {
+    text,
+    ...(mediaId === null ? {} : { media: { media_ids: [mediaId] } }),
+    ...(replyTo === null ? {} : { reply: { in_reply_to_tweet_id: replyTo } }),
+  }
   const response = await fetchImpl(X.postUrl, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },

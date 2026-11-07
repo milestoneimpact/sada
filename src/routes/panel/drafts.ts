@@ -5,7 +5,8 @@
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
-import { draftFromIdea, draftPost, ideaProblem, type DraftOutcome } from '../../lib/draft/job'
+import { draftFromIdea, draftFromOwner, draftPost, ideaProblem, OWN_PLATFORMS, type DraftOutcome, type OwnPlatform } from '../../lib/draft/job'
+import { tweetsOf } from '../../lib/draft/thread'
 import { PLATFORMS, type Platform } from '../../lib/draft/prompt'
 import { approveMany, decide, listDrafts, saveText, undoApprove, undoReject } from '../../lib/draft/store'
 import { counted, NOUNS, money, parseSqliteUtc } from '../../lib/format'
@@ -15,8 +16,10 @@ import { buildCommands } from '../ui/command'
 import { generateForPost, mediaFor } from '../../lib/image/job'
 import {
   requeue, reschedulePost, schedulePost, unschedule, type ScheduleResult, restoreSchedule,
+  UNDO_WINDOW_SECONDS, undoSchedule, undoUntil,
 } from '../../lib/schedule/job'
 import { missingMedia } from '../../lib/schedule/media'
+import { settleTweet, unsettledTweet } from '../../lib/publish/xThread'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../../lib/schedule/spread'
 import { getProvider } from '../../lib/providers'
 import { activeOrg } from '../../lib/tenancy'
@@ -304,6 +307,57 @@ drafts.post('/panel/drafts/idea', async (c) => {
 })
 
 /**
+ * ‏**«بنفسي»** (D-324) — المالكُ يكتب منشورَه فيُحفَظ مسوّدةً **كما كتبه**: بلا نموذجٍ ولا كلفةٍ ولا صفٍّ في الدفتر.
+ *
+ * ‏كان البابان إلى المسوّدة («من فكرة» و«من مصدر») يمرّان بنموذجٍ مدفوع، فنصٌّ كتبه المالكُ بيده يُعاد كتابتُه قبل أن يصل
+ * ‏إلى اللوحة. والفحصُ هنا فحصُ «احفظ» و«اعتمد» نفسُه (`draftFromOwner` ← `textProblem`)، والحالُ `draft`، فيمرّ بالاعتماد
+ * ‏والجدولة كأيّ مسوّدة. **ولا يمرّ بحارس الإنفاق ولا بمزوّد**: لا شيءَ يُنفَق، فلا يُوقفه ما يوقف الكتابةَ المدفوعة.
+ */
+drafts.post('/panel/drafts/own', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+  const raw = String(form.get('platform') ?? '')
+  if (!(OWN_PLATFORMS as readonly string[]).includes(raw)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اختر LinkedIn أو X.' })
+    return back('own')
+  }
+  const platform = raw as OwnPlatform
+  const org = activeOrg(gate.session.record)
+  // ‏ودورُ الكاتب يُحفظ معها (مراجعة D-324): البطاقةُ تقول «كتبها المحرّر» لا «أنت» لكلّ من يقرؤها
+  const outcome = await draftFromOwner(c.env.DB, org, platform, String(form.get('text') ?? ''), gate.session.record.role)
+  await record(c.env.DB, { actor: 'panel', action: 'draft.own', detail: platform + ':' + outcome.kind }, c.req.raw)
+  if (outcome.kind !== 'drafted' && outcome.kind !== 'already') {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يُحفظ: ' + ('reason' in outcome ? outcome.reason : '') })
+    return back('own')
+  }
+  // ‏ومسوّدةٌ بالنصّ نفسِه خارجَ النافذة لا بطاقةَ لها — رحلتُها تُريها (كما في «اكتب مسوّدة»)
+  if (outcome.kind === 'already' && !(await onBoard(c.env.DB, org, outcome.postId))) return toJourney(outcome.postId)
+  const tweets = platform === 'x' && outcome.kind === 'drafted'
+    ? tweetsOf('x', String((await c.env.DB.prepare('SELECT text FROM posts WHERE id = ? AND org_id = ?').bind(outcome.postId, org)
+        .first<{ text: string }>())?.text ?? '')).length
+    : 1
+  const links = linkStates(await listAccounts(c.env.DB, org))
+  const label = PLATFORMS[platform].label
+  const parts = [
+    outcome.kind === 'already'
+      ? 'مسوّدة ' + label + ' بهذا النصّ موجودة وهي هذه.'
+      : 'حُفظ نصّك مسوّدةً كما كتبته، بلا نموذج ولا كلفة.' + (tweets > 1 ? ' سلسلة X من ' + counted(tweets, NOUNS.tweet, 'gen') + '.' : ''),
+  ]
+  if (links[platform] !== 'linked') parts.push('ولا حساب متّصلًا على ' + label + ': تُعتمَد ولا تُجدوَل حتّى تربطه.')
+  await setFlash(c.env, c.req.raw, { kind: links[platform] === 'linked' ? 'ok' : 'warn', text: parts.join(' ') })
+  return toCard('d', outcome.postId)
+})
+
+/**
+ * ‏«تراجَع» في إشعار الجدولة (D-324 · نمط D-303) — الزرُّ يحمل الموعدَ وآخرَ النافذة وما يعود إليه، **والحارسُ في
+ * ‏`undoSchedule`**: بالموعد نفسِه، وقبل أن يُختَم للإرسال، وفي النافذة.
+ */
+function scheduleUndo(id: string, at: string, to: 'draft' | 'approved', now: Date): NonNullable<PanelFlash['undo']> {
+  return { action: '/panel/drafts/undo-schedule', id, label: 'تراجَع', fields: { at, until: undoUntil(now), to } }
+}
+
+/**
  * البَتُّ في مسوّدة — **وهو القرار الذي يفتح بابَ النشر.**
  *
  * يُسجَّل في `audit_log` بمعرّف المسوّدة وحالتها الجديدة: D-009 يشترط
@@ -368,7 +422,8 @@ drafts.post('/panel/drafts/decide', async (c) => {
   if (result.ok && result.status !== 'rejected') finalizeLater(c, activeOrg(gate.session.record), [id])
   let scheduled: ScheduleResult | null = null
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
-    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record))
+    // ‏والإمساكُ بنافذة «تراجَع» (D-324): موعدٌ أقربُ منها يُردّ، فلا يُنشَر شيءٌ والزرُّ قائم
+    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS)
     await record(c.env.DB, {
       actor: 'panel', action: 'draft.schedule', target: id, detail: scheduled.ok ? scheduled.at : `refused:${scheduled.reason}`,
     }, c.req.raw)
@@ -388,6 +443,8 @@ drafts.post('/panel/drafts/decide', async (c) => {
         ? {
             kind: 'ok',
             text: `اعتُمدت وجُدولت على ${platformLabel(scheduled.platform)} (${scheduled.account}) ${ownerWhen(scheduled.at, zone, now)}.`,
+            // ‏والتراجعُ دقيقتين يعيدها مسوّدةً (D-324): كان الإشعارُ يُغلَق بلا رجعة
+            undo: scheduleUndo(id, scheduled.at, 'draft', now),
           }
         : scheduled !== null
           ? { kind: 'warn', text: `اعتُمدت، وتعذّرت جدولتُها: ${scheduled.reason}` }
@@ -576,6 +633,7 @@ drafts.post('/panel/drafts/schedule', async (c) => {
     readWhen(form, zone, now),
     now,
     activeOrg(gate.session.record),
+    UNDO_WINDOW_SECONDS,
   )
 
   let flash: PanelFlash = result.ok
@@ -583,6 +641,8 @@ drafts.post('/panel/drafts/schedule', async (c) => {
         kind: 'ok',
         text: `جُدولت على ${platformLabel(result.platform)} (${result.account}) ${
           ownerWhen(result.at, zone, now)}.`,
+        // ‏وتراجعُ الجدولة دقيقتين يعيدها معتمَدةً (D-324)
+        undo: scheduleUndo(id, result.at, 'approved', now),
       }
     : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}` }
 
@@ -836,6 +896,27 @@ drafts.post('/panel/drafts/undo-unschedule', async (c) => {
   return toCard('d', id)
 })
 
+/**
+ * ‏«تراجَع» بعد «اعتمد وجدوِل» أو «جدوِل» (D-324): يعيد ما كان قبل الضغطة — والحارسُ في `undoSchedule` لا هنا.
+ */
+drafts.post('/panel/drafts/undo-schedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const form = gate.form
+  const id = String(form.get('id') ?? '')
+  const to = form.get('to') === 'draft' ? 'draft' : 'approved'
+  const result = await undoSchedule(c.env.DB, id, activeOrg(gate.session.record), {
+    at: String(form.get('at') ?? ''), until: String(form.get('until') ?? ''), to,
+  }, new Date())
+  await record(c.env.DB, {
+    actor: 'panel', action: 'draft.undo_schedule', target: id, detail: result.ok ? to : 'refused:' + result.reason,
+  }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? { kind: 'ok', text: to === 'draft' ? 'عادت مسوّدةً تنتظر قرارك، بلا موعد.' : 'سُحب الموعد، وتبقى معتمَدةً تنتظر موعدًا.' }
+    : { kind: 'bad', text: 'تعذّر التراجع: ' + result.reason })
+  return toCard(result.ok && to === 'approved' ? 's' : 'd', id)
+})
+
 drafts.post('/panel/drafts/reschedule', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
@@ -868,6 +949,44 @@ drafts.post('/panel/drafts/reschedule', async (c) => {
  * ‏منشوراتٍ لا ترسمها اللوحة، والنزولُ إلى بطاقةٍ لم تُرسَم يرتدّ إلى الرئيسيّة. فيعود إلى
  * ‏`return` كما كان قبل R-8 — وتبويبُ «تنتظر» يُريه معتمَدًا بلا موعد — وبلا `return` إلى رحلته.
  */
+/**
+ * ‏**«قل ما وجدت»** (مراجعة D-324) — تغريدةٌ من سلسلةٍ أُرسلت ولم يُعرَف جوابُها: «وجدتُها» برابطها تُعلّمها ناجحةً بمعرّفها
+ * ‏(فيُردّ عليها ولا تُرسَل)، و«لم أجدها» تُعلّمها فاشلةً (فتُرسَل). ثمّ يعود المنشورُ معتمَدًا بـ`requeue` نفسِها، فيُجدوَل على
+ * ‏حسابه ويكمل من حيث وقف. **والحارسُ في `settleTweet`**: الفاشلُ وحده، والتغريدةُ المعلّقةُ وحدها، وصفُّها كما قُرئ.
+ */
+drafts.post('/panel/drafts/thread-check', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+  const org = activeOrg(gate.session.record)
+  const found = gate.form.get('found') === 'yes'
+  const now = new Date()
+  // ‏وما سُوّي من قبل (ضغطةٌ ثانية، أو سقوطُ الإعادة بعد التسوية) يمضي إلى الإعادة وحدها
+  const open = await unsettledTweet(c.env.DB, id, org)
+  const settled = open === null ? null : await settleTweet(c.env.DB, org, id, found ? { link: String(gate.form.get('link') ?? '') } : null)
+  const result: ScheduleResult = settled !== null && !settled.ok ? settled : await requeue(c.env.DB, id, now, org)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'draft.thread_check', target: id,
+    detail: (result.ok ? (found ? 'found' : 'missing') + ':' + String(open ?? '-') : 'refused:' + result.reason).slice(0, 200),
+  }, c.req.raw)
+  const to = backTo(gate.form.get('return'), '')
+  const card = result.ok && (await onBoard(c.env.DB, org, id))
+  if (result.ok && !card && to === '') return toJourney(id)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? {
+        kind: 'ok',
+        text: open === null
+          ? 'عاد معتمَدًا — جدوِله على حسابه فيكمل من حيث وقف.'
+          : found
+            ? 'سُجّل أنّ التغريدة ' + String(open) + ' على X، فلا تُرسَل ثانيةً. عاد معتمَدًا — جدوِله على حسابه فيكمل بعدها.'
+            : 'سُجّل أنّك لم تجدها: لم تُنشَر التغريدة ' + String(open) + '. عاد معتمَدًا — جدوِله على حسابه فيكمل منها.',
+      }
+    : { kind: 'bad', text: 'لم يُحفظ ما وجدت: ' + result.reason })
+  if (card) return toCard('s', id)
+  if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
+  return toCard('d', id)
+})
+
 drafts.post('/panel/drafts/requeue', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied

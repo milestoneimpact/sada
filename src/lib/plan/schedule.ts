@@ -56,6 +56,20 @@ export async function approvePlanDrafts(db: Db, org: string, planId: string, by:
   return { done: result.done.length, ids: result.done, failed: result.failed.map((f) => f.reason) }
 }
 
+/**
+ * ‏**أبندُ السلسلة هذا أم بندُ التغريدة؟** (مراجعة D-324) — «ابدأ» يكتب لبندَي السلسلة والتغريدة من المصدر نفسِه مسوّدتين،
+ * ‏ومفتاحُ مسوّدة السلسلة المكتوبة (`draft:` و`idea:`) يُختَم بـ`:thread`. فالبندُ يطابق منشورَه بنوعه أيضًا، **والمفتاحُ هو
+ * ‏الحَكَم لا نوعُ النصّ**: سلسلةٌ عدّلها المالكُ تغريدةً تبقى لبندها. وما سوى ذلك (المُسكَّنُ من ملفّ) مرجعُه وحده لبنده فلا يُفرَّق.
+ */
+export function kindFits(kind: string | undefined, key: string): boolean {
+  if (!/^(draft|idea):/.test(key)) return true
+  return (kind === 'thread') === key.endsWith(':thread')
+}
+
+/** شرطُ `kindFits` في SQL — ومعاملُه `1` لبند السلسلة و`0` لغيره. */
+export const KIND_FITS_SQL = `(NOT (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%')
+                               OR (idempotency_key LIKE '%:thread') = ?)`
+
 function readRefs(raw: string | null): string[] {
   try {
     const parsed = JSON.parse(raw ?? '[]') as unknown
@@ -67,9 +81,9 @@ function readRefs(raw: string | null): string[] {
 
 export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: Date): Promise<PlanSchedule> {
   const { results: posts } = await db
-    .prepare("SELECT id, platform, source_id, source_refs FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
+    .prepare("SELECT id, platform, source_id, source_refs, idempotency_key FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
     .bind(org, plan.id)
-    .all<{ id: string; platform: string; source_id: string | null; source_refs: string | null }>()
+    .all<{ id: string; platform: string; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
   const peaks = new Map<string, number | null>()
   const accounts = new Map<string, string | null>()
   const skipped: { postId: string; reason: string }[] = []
@@ -77,7 +91,8 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   for (const post of posts) {
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
     const refs = readRefs(post.source_refs)
-    const item = plan.plan.items.find((i) => (i.sourceId === post.source_id || refs.includes(i.sourceId)) && i.platform === post.platform)
+    const item = plan.plan.items.find((i) => (i.sourceId === post.source_id || refs.includes(i.sourceId)) && i.platform === post.platform
+      && kindFits(i.kind, post.idempotency_key))
     if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
     if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, org, post.platform)).hours[0]?.hour ?? null)
     if (!accounts.has(post.platform)) {

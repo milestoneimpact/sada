@@ -26,16 +26,44 @@ beforeEach(() => {
   }
 })
 
-async function open(scoped = env): Promise<string> {
+async function open(scoped = env, path = '/panel/tasks'): Promise<string> {
   const login = await emailLogin(app, scoped)
   const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
-  return (await app.request('/panel/tasks', { headers: { Cookie: cookie } }, scoped)).text()
+  return (await app.request(path, { headers: { Cookie: cookie } }, scoped)).text()
 }
+
+/** ‏شاشةُ «بوّابات المراحل» (دمجُ D-318 مع D-324): خرجت من «ما عليك» إلى صفحتها. */
+const gates = (scoped = env): Promise<string> => open(scoped, '/panel/gates')
 
 describe('الباب', () => {
   it('لا يُفتَح بلا جلسة', async () => {
     const response = await app.request('/panel/tasks', {}, env)
     expect(response.status).toBe(401)
+  })
+
+  it('ولا بابُ البوّابات', async () => {
+    expect((await app.request('/panel/gates', {}, env)).status).toBe(401)
+  })
+
+  /**
+   * ‏**والبابان بدورٍ واحد** (`requiredRole`): البوّاباتُ كانت طيّةً في «ما عليك» فلا يراها إلّا من يرى «ما عليك».
+   * ‏وبابُها الجديد لا يُفتح لمن دونه، ولا يُغلق على من فوقه.
+   */
+  it('والبوّاباتُ لمن يرى «ما عليك» وحدَه: الناشرُ يُردّ عن البابين، والمديرُ يفتحهما', async () => {
+    const member = async (email: string, role: 'admin' | 'publisher'): Promise<string> => {
+      db.raw.prepare("INSERT INTO members (email, role, orgs, invited_by) VALUES (?, ?, '*', 'owner')").run(email, role)
+      const res = await emailLogin(app, env, { email })
+      expect(res.status, `دخول ${email}`).toBe(303)
+      return (res.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    }
+    const publisher = await member('p@example.com', 'publisher')
+    const admin = await member('a@example.com', 'admin')
+    for (const path of ['/panel/tasks', '/panel/gates']) {
+      const denied = await app.request(path, { headers: { Cookie: publisher } }, env)
+      expect(denied.status, path).toBe(303)
+      expect(denied.headers.get('Location'), path).toBe('/panel')
+      expect((await app.request(path, { headers: { Cookie: admin } }, env)).status, path).toBe(200)
+    }
   })
 })
 
@@ -109,9 +137,9 @@ describe('وبوّابات المراحل تُقاس', () => {
    * شاخ مرّتين**. فتُقاس هنا من القاعدة.
    */
   it('تُعرَض الأربع، ولا واحدة مجتازة على قاعدة فارغة', async () => {
-    const html = await open()
+    const html = await gates()
     for (const phase of ['0', '1', '2', '3']) {
-      expect(html).toContain(`المرحلة ${phase}`)
+      expect(html).toContain(`<h2>المرحلة ${phase} · `)
     }
     expect(html).not.toContain('اجتِيزت')
     expect(html).toContain('أنت في المرحلة 0')
@@ -119,7 +147,7 @@ describe('وبوّابات المراحل تُقاس', () => {
 
   /** **ومعه دليلُه**: «لم تُجتَز» بلا رقمٍ لا تُعالَج. */
   it('ولكلّ بند دليلُه لا حكمُه وحده', async () => {
-    const html = await open()
+    const html = await gates()
     expect(html).toContain('LinkedIn: 0')
     expect(html).toContain('X: 0')
   })
@@ -132,7 +160,7 @@ describe('وبوّابات المراحل تُقاس', () => {
    * محروسةٌ باختبار**: بندٌ جديدٌ يُضاف بلا استعلامٍ يُسقط هذا.
    */
   it('ولا بند في البوّابات يُجيزها بلا قياس', async () => {
-    expect(await open()).not.toContain('لا يُقاس من هنا')
+    expect(await gates()).not.toContain('لا يُقاس من هنا')
   })
 
   it('ومنشور خرج فعلا يُغيّر الدليل', async () => {
@@ -151,7 +179,36 @@ describe('وبوّابات المراحل تُقاس', () => {
                                      request_json, status)
        VALUES ('at1', 'p1', 'k1', 1, '{}', 'succeeded')`,
     )
-    expect(await open()).toContain('X: 1')
+    expect(await gates()).toContain('X: 1')
+  })
+})
+
+/**
+ * ‏**البوّاباتُ صفحتُها، و«ما عليك» يحيل إليها بسطر** (دمجُ D-318 مع D-324): مهامُّ القرارين الأربعُ (M-39 إلى M-42)
+ * ‏رفعت «ما عليك» فوق سقفه (‏14.2KB من ‏14KB مضغوطًا)، والحارسُ يقول «يُقسَم أو يُؤجَّل ولا يُرفع السقف». فخرجت البوّاباتُ،
+ * ‏وهي لغةُ خطّة المشروع لا سؤالُ اليوم، إلى `/panel/gates`.
+ */
+describe('صفحة البوّابات وسطرُها في «ما عليك»', () => {
+  it('«ما عليك» يحمل سطرًا إليها يقول المرحلة، ولا يحمل بطاقاتها', async () => {
+    const html = await open()
+    expect(html).toContain('href="/panel/gates"')
+    expect(html).toContain('أنت في المرحلة 0')
+    expect(html).not.toMatch(/<h2>المرحلة \d · /)
+    expect(html).not.toContain('LinkedIn: 0')
+    expect(html).not.toContain('<details class="setup mt-6">')
+  })
+
+  it('وصفحتُها صفحةٌ من اللوحة: عنوانُها، وعودتُها إلى «ما عليك»، وموضعُها في الرافدة', async () => {
+    const html = await gates()
+    expect(html).toContain('<title>صدى — بوّابات المراحل</title>')
+    expect(html).toContain('<h1>بوّابات المراحل</h1>')
+    const back = /<nav class="back"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? ''
+    expect(back).toContain('href="/panel/tasks"')
+    expect(back).toContain('ما عليك')
+    expect(html).toContain('href="/panel/tasks" aria-current="page"')
+    expect(html).toContain('cmdk-open')
+    // ‏والشرحُ مرّةً فوق البطاقات، لا في كلّ بطاقة
+    expect(html.match(/تُقاس من القاعدة لا تُكتَب في وثيقة/g)).toHaveLength(1)
   })
 })
 

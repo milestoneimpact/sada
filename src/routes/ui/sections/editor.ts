@@ -28,6 +28,7 @@ import { momentLabel, presetAt } from '../../../lib/time/local'
 import { whyFailed } from '../../../lib/publish/reasons'
 import { escapeHtml } from '../escape'
 import { ICON } from '../icons'
+import { containsUrl } from '../../../lib/idempotency'
 import { button } from '../components/button'
 import { field } from '../components/field'
 import { statusBadge } from '../components/badge'
@@ -36,7 +37,7 @@ import { nativePost } from '../nativePost'
 import { whenField } from '../when'
 import { fileName } from '../parts'
 import {
-  deciderText, imagePane, lengthOf, platformMark, writerName, notesPane, readyLines, readyMimes, requeueForm, specOf, statusOf,
+  deciderText, imagePane, lengthOf, platformMark, writerName, notesPane, readyLines, readyMimes, requeueForm, specOf, statusOf, threadCheckForm,
   type MediaView, type Target,
 } from './drafts'
 
@@ -155,7 +156,7 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
     const why = whyFailed(d.failure ?? null, d.platform)
     const action = why.action === 'relink'
       ? `${button({ label: 'أعد الربط', variant: 'primary', href: `/oauth/${d.platform}/start` })}${requeueForm(d.id, false)}`
-      : why.action === 'none' ? '' : requeueForm(d.id, true)
+      : why.action === 'confirm' ? threadCheckForm(d.id) : why.action === 'none' ? '' : requeueForm(d.id, true)
     return { forms: '', section: sec('ما وقع', `<p class="ed-note" data-tone="bad">${escapeHtml(why.text)}</p>`), bar: action }
   }
   if (stage === 'rejected') {
@@ -187,11 +188,14 @@ function details(d: DraftRow, input: EditorInput): string {
   const rows: [string, string][] = []
   if (d.rationale !== null && d.rationale !== '') rows.push(['لماذا هذه الزاوية؟', escapeHtml(d.rationale)])
   if (d.sourceName !== null) rows.push(['المصدر', `${fileName(d.sourceName)}${d.stale ? ' <span class="ago">(تغيّر بعد كتابتها)</span>' : ''}`])
-  const writer = writerName(d.model)
-  rows.push(['كتبها', `${escapeHtml(writer)}${d.model !== null && writer !== 'أنت' && writer !== 'غير مسجَّل' ? ` <span class="ago"><bdi dir="ltr">${escapeHtml(d.model)}</bdi></span>` : ''}`])
+  const writer = writerName(d.model, d.writtenBy ?? null)
+  // ‏واسمُ النموذج للنموذج وحده: «المحرّر» لا يُلحَق به `owner` (مراجعة D-324)
+  const human = d.model === 'owner' || d.model === 'upload'
+  rows.push(['كتبها', `${escapeHtml(writer)}${d.model !== null && !human && writer !== 'غير مسجَّل' ? ` <span class="ago"><bdi dir="ltr">${escapeHtml(d.model)}</bdi></span>` : ''}`])
   rows.push(['كلفة الكتابة', d.cost === 0 ? 'بلا كلفة' : `<span class="mono">${escapeHtml(money(d.cost))}</span>`])
   if (d.publishCost > 0) {
-    rows.push(['كلفة النشر', `<span class="mono">${escapeHtml(money(d.publishCost))}</span>${d.publishCost >= 0.1 ? ' <span class="ago">(فيها رابط)</span>' : ''}`])
+    // ‏والرابطُ من النصّ لا من عتبة الكلفة (مراجعة D-324)
+    rows.push(['كلفة النشر', `<span class="mono">${escapeHtml(money(d.publishCost))}</span>${containsUrl(d.text) ? ' <span class="ago">(فيها رابط)</span>' : ''}`])
   }
   const decider = deciderText(d.approvedBy)
   if (decider !== '') {

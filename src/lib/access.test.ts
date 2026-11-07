@@ -37,6 +37,17 @@ describe('من يملك ماذا (D-272)', () => {
     expect(requiredRole('POST', '/panel/orgs/switch', null)).toBe('viewer')
   })
 
+  /**
+   * ‏**وصفحةُ البوّابات بدور «ما عليك» نفسِه** (دمجُ D-318 مع D-324): كانت طيّةً فيها فلا يراها إلّا من يراها. وبابُ قراءةٍ
+   * ‏جديدٌ لا يُصنَّف يُفتح للقارئ (القراءةُ مفتوحة)، فتُسمّى في القاعدة مع «ما عليك» لا بعدها.
+   */
+  it('وبوّابات المراحل بدور «ما عليك» لا أدنى', () => {
+    for (const method of ['GET', 'HEAD']) {
+      expect(requiredRole(method, '/panel/gates', null)).toBe(requiredRole(method, '/panel/tasks', null))
+      expect(requiredRole(method, '/panel/gates', null)).toBe('admin')
+    }
+  })
+
   it('وبابٌ جديدٌ لم يُصنَّف للمالك وحدَه — يُغلَق لا يُفتح', () => {
     expect(requiredRole('POST', '/panel/something-new', null)).toBe('owner')
   })
@@ -102,5 +113,20 @@ describe('الإنفاقُ لمن يعتمد (D-318)', () => {
     ['/panel/plan/item', null], ['/panel/client/brief', null], ['/panel/assets/upload', null], ['/panel/uploads/u1/posts', null],
   ] as const)('وما لا يُنفق يبقى للمحرّر: %s', (path, action) => {
     expect(requiredRole('POST', path, action)).toBe('editor')
+  })
+})
+
+/**
+ * ‏**«بنفسي» للمحرّر في سطرٍ لا يشاركه بابٌ مدفوع** (D-324): يكتب ولا ينفق، فلا يتبع ما يُقيَّد من الكتابة المدفوعة.
+ * ‏و«تراجَع» بعد الجدولة للناشر كالجدولة نفسِها، ولا يحتاج تحقّقًا للتوّ: يُعيد ما فعله الناشرُ قبل ثوانٍ.
+ */
+describe('«بنفسي» و«تراجَع» بعد الجدولة (D-324)', () => {
+  it('«بنفسي» للمحرّر، و«تراجَع» بعد الجدولة للناشر', () => {
+    expect(requiredRole('POST', '/panel/drafts/own', null)).toBe('editor')
+    expect(requiredRole('POST', '/panel/drafts/undo-schedule', null)).toBe('publisher')
+    // ‏و«قل ما وجدت» لتغريدةٍ معلّقة (مراجعة D-324) دورُ «أعده» نفسُه: يعيد المنشورَ إلى المعتمَد
+    expect(requiredRole('POST', '/panel/drafts/thread-check', null)).toBe('publisher')
+    expect(needsStepUp('POST', '/panel/drafts/own')).toBe(false)
+    expect(needsStepUp('POST', '/panel/drafts/undo-schedule')).toBe(false)
   })
 })

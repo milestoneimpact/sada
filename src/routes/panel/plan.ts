@@ -248,7 +248,8 @@ async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<Retu
   if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
   const seen = new Set<string>()
   const items = plan.plan.items.filter((i) => {
-    const k = `${i.sourceId}:${i.platform}`
+    // ‏والسلسلةُ بندٌ غيرُ التغريدة من المصدر نفسِه (D-324): مفتاحُ مسوّدتها غيرُ مفتاحها
+    const k = `${i.sourceId}:${i.platform}${i.kind === 'thread' ? ':thread' : ''}`
     if (seen.has(k)) return false
     seen.add(k)
     return true
@@ -265,6 +266,7 @@ async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<Retu
           ...(idea === null ? {} : { idea }),
           ...(autoImage === undefined ? {} : { autoImage }),
           imageStyle: plan.choices.imageStyle,
+          ...(i.kind === 'thread' && i.platform === 'x' ? { shape: 'thread' as const } : {}),
         } },
       }
     }))

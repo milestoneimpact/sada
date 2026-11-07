@@ -138,10 +138,49 @@ function gateCard(g: Gate): string {
   </div>`
 }
 
-export interface TasksScreenData {
-  readonly rows: readonly OwnerRow[]
+/** أين المشروعُ من بوّاباته — في سطر «ما عليك» وفي رأس صفحتها، بكلمةٍ واحدة (نصًّا، ويُهرَّب حيث يُرسَم). */
+function phaseLine(phase: string | null): string {
+  return phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${phase}`
+}
+
+export interface GatesScreenData {
   readonly gates: readonly Gate[]
   /** أوّلُ مرحلةٍ لم تُجتَز — أو `null` إن اجتِزن. */
+  readonly phase: string | null
+}
+
+/**
+ * ‏**شاشةُ «بوّابات المراحل»** — `/panel/gates`.
+ *
+ * ‏كانت طيّةً في آخر «ما عليك» (EASE-PLAN · D-252)، ثمّ رفعت مهامُّ D-318 وD-324 الأربعُ (M-39 إلى M-42) الصفحةَ فوق سقفها
+ * ‏(‏14.2KB من ‏14KB مضغوطًا، `audit_size`)، وحارسُ الوزن يقول: ما تجاوز سقفَه يُقسَم أو يُؤجَّل، ولا يُرفع السقفُ ليمرّ.
+ * ‏والبوّاباتُ أخفُّ ما يخرج بلا خسارة: لغةُ خطّة المشروع لا سؤالُ اليوم، وتُقرأ نادرًا. فصار لها بابُها بدور «ما عليك» نفسِه،
+ * ‏و«ما عليك» يقول المرحلةَ في سطرٍ ويحيل إليها.
+ */
+export function gatesScreen(d: GatesScreenData): string {
+  return html`<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>خطّة المشروع تُقاس</div>
+      <h1>بوّابات المراحل</h1>
+      <p class="lede">${d.phase === null
+        ? html`<b>${phaseLine(d.phase)}.</b>`
+        : html`<b>${phaseLine(d.phase)}</b>، وبوّابتُها أوّلُ ما لم يُجتَز.`}</p>
+    </div>
+  </div>
+
+  <p class="hint"><b>البوّابات تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
+    خطّة المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
+    سابقتها ويُسجَّل ذلك في سجلّ الحال»،
+    <b>وسجلّ يُكتب بيد يشيخ</b>، وقد شاخ. فكلّ بند هنا استعلام على ما وقع،
+    <b>ومعه دليلُه</b>. <b>وبند لا يُقاس يُبقي بوّابتَه غير مجتازة</b>،
+    فبوّابة تُجتاز بشرط لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
+
+  ${raw(d.gates.map(gateCard).join(''))}`.value
+}
+
+export interface TasksScreenData {
+  readonly rows: readonly OwnerRow[]
+  /** أوّلُ مرحلةٍ لم تُجتَز — أو `null` إن اجتِزن. يقولها سطرُ البوّابات وحدَه، وبطاقاتُها في `/panel/gates`. */
   readonly phase: string | null
   /** البيئةُ التي تُفتَح منها — فأمرُ `wrangler` يُكتب لها لا لغيرها. */
   readonly env: string
@@ -245,18 +284,7 @@ export function tasksScreen(d: TasksScreenData): string {
       : `<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${list(done, d.env)}</details>`}
   </div>
 
-  ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: تُطوى ورأسُها يقول حالَها */''}<details class="setup mt-6"><summary>بوّابات المراحل · ${
-      d.phase === null ? 'اجتِزن كلُّهنّ' : `أنت في المرحلة ${escapeHtml(d.phase)}`}</summary>
-
-  <p class="hint"><b>وهذه تُقاس من القاعدة لا تُكتَب في وثيقة.</b>
-    خطّة المشروع تقول «لا تبدأ مرحلة قبل أن تُجتاز بوّابة
-    سابقتها ويُسجَّل ذلك في سجلّ الحال» —
-    <b>وسجلّ يُكتب بيد يشيخ</b>، وقد شاخ. فكلّ بند هنا استعلام على ما وقع،
-    <b>ومعه دليلُه</b>. <b>وبند لا يُقاس يُبقي بوّابتَه غير مجتازة</b> —
-    فبوّابة تُجتاز بشرط لم يُقَس تُجيز مرحلةً لم تكتمل.</p>
-
-  ${d.gates.map(gateCard).join('')}
-  </details>
+  ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: سطرٌ يقول حالَها ويحيل إلى صفحتها (دمجُ D-318 مع D-324) */''}<p class="hint mt-6"><a class="tap" href="/panel/gates">بوّابات المراحل</a> · ${escapeHtml(phaseLine(d.phase))}</p>
 
   ${vitalsCard(d.vitals, d.rejects)}
 

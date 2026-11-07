@@ -33,6 +33,7 @@ import { localParts } from '../time/zone'
 import { parseCsvRecords, readPlan, rowKey, type PlanFacts, type PlanRow } from './import'
 import { PLAN_CHANNELS, spanDays, type PlanItem, type PlanPlatform, type PlanSpan, type PlanImageStyle } from './prompt'
 import { cleanConverted, type ToMarkdown } from '../sources/ingest'
+import { isThread } from '../draft/thread'
 
 export const SEAT_EXTENSIONS: readonly string[] = ['csv', 'xlsx', 'xls', 'ods', 'pdf', 'docx', 'odt', 'txt', 'md']
 const SHEETS = new Set(['xlsx', 'xls', 'ods'])
@@ -223,7 +224,8 @@ export async function seatPlan(
     // ‏ما لا يمنع التسكينَ يُكتب على البند: حسابٌ غيرُ مربوط، أو طولٌ زائد، أو ما كمّله صدى
     const notes = [...r.problems.filter((p) => !/موعد|مضى/.test(p)), filled.get(r.line) ?? ''].filter((x) => x !== '')
     items.push({
-      sourceId: ref, platform: r.platform as PlanPlatform, kind: 'text',
+      // ‏ونصُّ X بسطر `---` بندُ سلسلة (D-324)، كما يكتبه الموجّه
+      sourceId: ref, platform: r.platform as PlanPlatform, kind: isThread(r.platform ?? '', r.text) ? 'thread' : 'text',
       angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة',
       ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
     })
@@ -239,8 +241,8 @@ export async function seatPlan(
       .bind(planId, start, JSON.stringify({ rationale: 'خطّتُك المرفوعة', items }), org, span, JSON.stringify(choices)),
     ...posts.map((p) => db
       .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id)
-                VALUES (?, ?, 'text', ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?)`)
-      .bind(p.id, p.row.platform, p.row.text, p.key, planId, JSON.stringify([p.ref]), org)),
+                VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?)`)
+      .bind(p.id, p.row.platform, isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text', p.row.text, p.key, planId, JSON.stringify([p.ref]), org)),
   ]
   if (db.batch !== undefined) await db.batch(statements)
   else for (const st of statements) await st.run()

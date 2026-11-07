@@ -14,6 +14,16 @@ describe('القاموس', () => {
     for (const code of codes) expect(REASONS[code], code).toBeDefined()
   })
 
+  it('وكلُّ رمزٍ في سلسلة X له جملة، والمعلّقةُ تُسمّى برقمها وفعلُها «قل ما وجدت» لا «أعده» (مراجعة D-324)', () => {
+    const src = readFileSync(new URL('./xThread.ts', import.meta.url), 'utf8')
+    const codes = new Set([...src.matchAll(/`(thread_[a-z_]+):/g)].map((m) => m[1]!))
+    expect([...codes].sort()).toEqual(['thread_account', 'thread_changed', 'thread_unconfirmed'])
+    for (const code of codes) expect(REASONS[code], code).toBeDefined()
+    const open = whyFailed('thread_unconfirmed: التغريدة 2 من 3 أُرسلت ولم يُؤكَّد نشرُها (انقضت المهلة قبل جوابها) — تحقّق على X ثمّ قل ما وجدت', 'x')
+    expect(open).toEqual({ text: 'التغريدة 2 من 3 أُرسلت ولم يُؤكَّد نشرُها (انقضت المهلة قبل جوابها) — تحقّق على X ثمّ قل ما وجدت', action: 'confirm' })
+    expect(whyFailed('thread_account: التغريدة 1 نُشرت من حسابٍ آخر', 'x').action).toBe('requeue')
+  })
+
   it('والنطاق الناقص يُسمّى، والرمز لا يظهر', () => {
     const r = whyFailed('missing_publish_scope: w_member_social', 'linkedin')
     expect(r.text).toContain('w_member_social')

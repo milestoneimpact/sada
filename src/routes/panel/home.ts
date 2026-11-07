@@ -43,7 +43,7 @@ import type { OutboxRow } from '../ui/parts'
 import { listSessions, loadSession, type Session } from '../../lib/session'
 import { factorState } from '../../lib/security/factors'
 import { OWNER_EMAIL } from '../../lib/ownerEmail'
-import { fingerprint } from '../../lib/security/digest'
+import { digest, fingerprint } from '../../lib/security/digest'
 import { isLinkedInPage, linkStates, listAccounts, viewChannels, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import { activeScopes } from '../../lib/platform/screen'
 import { ownerZone } from '../../lib/time/ownerZone'
@@ -716,11 +716,19 @@ async function postsData(load: Load): Promise<PostsData> {
     draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
     // ‏أمتّصلةٌ كلُّ منصّة — حيث تُختار المنصّة (D-190)
     links: linkStates(accounts),
+    // ‏ومفتاحُ مسوّدة «بنفسي» في المتصفّح لهذه المنظّمة وهذا العضو (مراجعة D-324)
+    ownScope: await ownScopeOf(org, load.session.record.email ?? OWNER_EMAIL),
     plan,
     planReady: taskReady(p, 'plan'),
     sources,
     audit,
   }
+}
+
+/** ‏بصمةُ المنظّمة والعضو (مراجعة D-324): ستّةَ عشرَ محرفًا من SHA-256 — لا البريدُ نفسُه في الصفحة. */
+async function ownScopeOf(org: string, email: string): Promise<string> {
+  const bytes = await digest(org + '\n' + email.toLowerCase())
+  return Array.from(bytes.slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 /** «المكتبة»: المصادرُ والمقاطعُ (ونصوصُها من KV) والصور، وجاهزيّةُ الكتابة لزرّ «اكتب النصوص». */

@@ -13,7 +13,7 @@ import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
 import { byUrgency, draftsSection } from './sections/drafts'
-import { tasksScreen } from './tasksView'
+import { gatesScreen, tasksScreen } from './tasksView'
 import { commandTrigger } from './command'
 import { railHtml } from './rail'
 import { GLYPH_ICON, ICON } from './icons'
@@ -207,7 +207,7 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(css.where('.task.urgent')).toContain('')
     expect(css.rule('ul.plain')['list-style']).toBe('none')
     const html = tasksScreen({
-      phase: null, gates: [], env: 'staging',
+      phase: null, env: 'staging',
       rows: [{
         code: 'M-99', title: 'مهمّة', ifLeft: 'يقف', unblocks: 'gate',
         state: false, measured: '', done: () => false,
@@ -216,20 +216,40 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     expect(html).toContain('<details class="setup task urgent" open>')
   })
 
-  it('«ما عليك» يقول ما بقي أوّلًا: ما تمّ مطويّ، والشرحُ مرّةً، والبوّاباتُ مطويّة (EASE-PLAN)', () => {
+  it('«ما عليك» يقول ما بقي أوّلًا: ما تمّ مطويّ، والشرحُ مرّةً، والبوّاباتُ سطرٌ إلى صفحتها (EASE-PLAN · دمج D-318 مع D-324)', () => {
     const r = (code: string, state: boolean) => ({ code, title: code, ifLeft: 'يقف', unblocks: 'capability', state, measured: '', done: () => state }) as never
-    const html = tasksScreen({ phase: '3', gates: [], env: 'staging', rows: [r('M-01', true), r('M-02', false), r('M-03', true)] })
+    const html = tasksScreen({ phase: '3', env: 'staging', rows: [r('M-01', true), r('M-02', false), r('M-03', true)] })
     const open = html.slice(0, html.indexOf('<details class="setup mt-3">'))
     expect(open).toContain('M-02')
     expect(open).not.toContain('M-01')
     expect(html).toContain('<summary>تمّت (2)</summary>')
     expect(html.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
-    expect(html).toContain('<details class="setup mt-6"><summary>بوّابات المراحل · أنت في المرحلة 3</summary>')
+    // ‏كانت طيّةً بشرحها وبطاقاتها (‏0.95KB مضغوطًا)، وصارت سطرًا يقول المرحلةَ ويحيل
+    expect(html).toContain('<a class="tap" href="/panel/gates">بوّابات المراحل</a> · أنت في المرحلة 3')
+    expect(html).not.toContain('<details class="setup mt-6">')
+    expect(tasksScreen({ phase: null, env: 'staging', rows: [] })).toContain('href="/panel/gates">بوّابات المراحل</a> · اجتِزن كلُّهنّ')
+  })
+
+  it('وصفحةُ البوّابات: رأسُها يقول المرحلة، والشرحُ مرّةً، ولكلّ بوّابةٍ بطاقتُها بدليل كلّ بند', () => {
+    const gates = [
+      { phase: '0', title: 'التأسيس', passed: true, items: [{ text: 'منشور', state: 'met' as const, evidence: 'LinkedIn: 1 · X: 1' }] },
+      { phase: '1', title: 'الذكاء', passed: false, items: [{ text: 'خطّة', state: 'unmet' as const, evidence: 'خطط: 0' }] },
+    ]
+    const html = gatesScreen({ gates, phase: '1' })
+    expect(html).toContain('<h1>بوّابات المراحل</h1>')
+    expect(html).toContain('أنت في المرحلة 1')
+    expect(html.match(/تُقاس من القاعدة لا تُكتَب في وثيقة/g)).toHaveLength(1)
+    expect(html.match(/<div class="card mb-3">/g)).toHaveLength(2)
+    expect(html).toContain('<h2>المرحلة 0 · التأسيس</h2>')
+    expect(html).toContain('اجتِيزت')
+    expect(html).toContain('LinkedIn: 1 · X: 1')
+    expect(html).toContain('لم تُجتَز')
+    expect(gatesScreen({ gates, phase: null })).toContain('اجتِزن كلُّهنّ')
   })
 
   it('ورمز بين علامتَي اقتباس خلفيّتين في المهمّة يُرسَم رمزًا لا علامات يراها المالك (D-202)', () => {
     const html = tasksScreen({
-      phase: null, gates: [], env: 'staging',
+      phase: null, env: 'staging',
       rows: [{
         code: 'M-99', title: 'مهمّة', ifLeft: 'يُسجَّل `price_unverified` بصفر', unblocks: 'gate',
         state: false, measured: '', done: () => false,

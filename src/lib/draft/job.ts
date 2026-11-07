@@ -27,11 +27,14 @@ import { readBrief, voiceSection } from '../brief'
 import { containsUrl } from '../idempotency'
 import { digest } from '../security/digest'
 import { atomically, type Db, type DbStatement } from '../tokens'
+import type { Role } from '../ownerEmail'
 import {
   DRAFT_SCHEMA, ideaPrompt, parseDraft, PLATFORMS, systemPrompt, userPrompt,
   type Draft, type Platform, type PlatformSpec, type SourceBrief,
 } from './prompt'
 import { writeOnce, type WriterDeps } from './writer'
+import { textProblem } from './store'
+import { isThread, threadProblem, tweetsOf } from './thread'
 
 export type DraftOutcome =
   | {
@@ -110,6 +113,12 @@ export function draftKey(
   return provider === undefined || provider === '' ? base : `${base}:${provider}`
 }
 
+/**
+ * ‏شكلُ ما يُكتب (D-324): منشورٌ واحد، أو **سلسلةُ X** لبندٍ في الخطّة طُلب سلسلة. والسلسلةُ لـ X وحدها، ومفتاحُها غيرُ
+ * ‏مفتاح التغريدة (`:thread`) فالبندان من المصدر نفسِه لا يلتقيان.
+ */
+export type DraftShape = 'single' | 'thread'
+
 /** يكتب مسوّدةً واحدة لمنصّةٍ واحدة. */
 export async function draftPost(
   deps: DraftDeps,
@@ -117,8 +126,10 @@ export async function draftPost(
   platform: Platform,
   /** مزوّد يغلب التوجيه لهذه الكتابة وحدها (D-244) — مقارنة لا تبديل. */
   provider?: string,
+  shape: DraftShape = 'single',
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
+  const thread = shape === 'thread' && platform === 'x'
 
   // ١ · المصدر وخلاصته
   const row = await deps.db
@@ -151,7 +162,7 @@ export async function draftPost(
    */
   // ‏والمسوّدةُ في منظّمة مصدرها (D-277): بها يُسأل عن المفتاح وبها يُكتب الصفّ
   const org = row.org_id ?? 'org_owner'
-  const key = draftKey(row.id, platform, hash, provider)
+  const key = `${draftKey(row.id, platform, hash, provider)}${thread ? ':thread' : ''}`
   const existing = await deps.db
     .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
     .bind(key, org)
@@ -162,8 +173,8 @@ export async function draftPost(
   const out = await writeOnce(deps, {
     org,
     // ‏وصوتُ العميل من موجز منظّمة المصدر (D-257) — وفارغٌ إن لم يُكتب، فالموجّهُ كما كان
-    system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, org))),
-    user: userPrompt(brief),
+    system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, org)), thread),
+    user: userPrompt(brief, thread),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
     refId: row.id,
@@ -172,7 +183,7 @@ export async function draftPost(
   if (out.kind !== 'written') return out
 
   // القراءةُ بعد التسجيل: نصٌّ مشوَّه لا يُلغي كلفةً وقعت — ويُقال ما دُفع فيه
-  const draft = readDraft(out.text, spec)
+  const draft = readDraft(out.text, spec, thread)
   if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
 
   // ٧ · المسوّدة — `draft` وحدها، بلا حسابٍ وبلا موعد
@@ -181,15 +192,25 @@ export async function draftPost(
     model: out.model, cost: out.cost, draft: draft.draft,
   })
 }
-/** يقرأ جوابَ النموذج منشورًا — **بعد أن سُجّلت كلفتُه**، فنصٌّ مشوَّهٌ لا يُلغي ما وقع. */
-function readDraft(text: string, spec: PlatformSpec): { ok: true; draft: Draft } | { ok: false; reason: string } {
+/**
+ * يقرأ جوابَ النموذج منشورًا — **بعد أن سُجّلت كلفتُه**، فنصٌّ مشوَّهٌ لا يُلغي ما وقع.
+ * ‏**والسلسلةُ تغريدةً تغريدة** (D-324): تغريدتان فأكثر، وكلٌّ بحدّها — لا النصُّ كلُّه على 280.
+ */
+function readDraft(text: string, spec: PlatformSpec, thread = false): { ok: true; draft: Draft } | { ok: false; reason: string } {
   let parsedJson: unknown
   try {
     parsedJson = JSON.parse(text)
   } catch {
     return { ok: false, reason: 'جواب النموذج ليس JSON صالحا' }
   }
-  return parseDraft(parsedJson, spec)
+  if (!thread) return parseDraft(parsedJson, spec)
+  const value = (typeof parsedJson === 'object' && parsedJson !== null ? parsedJson : {}) as Partial<Draft>
+  const body = typeof value.text === 'string' ? value.text.replace(/\r\n?/g, '\n').trim() : ''
+  if (body.length < 40) return { ok: false, reason: 'النصّ فارغ أو أقصر من أن يكون منشورا' }
+  if (tweetsOf('x', body).length < 2) return { ok: false, reason: 'طُلبت سلسلة فجاء الجوابُ تغريدةً واحدة' }
+  const problem = threadProblem(body)
+  if (problem !== null) return { ok: false, reason: problem }
+  return { ok: true, draft: { text: body, rationale: typeof value.rationale === 'string' ? value.rationale.trim() : '' } }
 }
 
 interface NewDraft {
@@ -202,7 +223,8 @@ interface NewDraft {
   readonly refs: readonly string[]
   readonly model: string
   readonly cost: number
-  readonly draft: Draft
+  /** ‏والسببُ `null` لنصّ المالك (D-324): لا زاويةَ اختارها نموذج. */
+  readonly draft: { readonly text: string; readonly rationale: string | null }
 }
 
 /**
@@ -226,7 +248,7 @@ async function insertDraft(db: Db, org: string, input: NewDraft): Promise<DraftO
         `INSERT INTO posts
            (id, platform, source_id, source_hash, model, cost_usd, type, text,
             source_refs, rationale, has_url, status, idempotency_key, org_id, brand_id)
-         VALUES (?, ?, ?, ?, ?, ?, 'text', ?, ?, ?, ?, 'draft', ?,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?,
                  -- ‏المسوّدة لمنظّمة مصدرها — أو منظّمة الجلسة لفكرةٍ بلا مصدر — وعلامته
                  ?,
                  coalesce((SELECT brand_id FROM sources WHERE id = ?), 'brand_owner'))`,
@@ -238,6 +260,8 @@ async function insertDraft(db: Db, org: string, input: NewDraft): Promise<DraftO
         input.sourceHash,
         input.model,
         input.cost,
+        // ‏ونصُّ X بفاصل `---` سلسلة (D-324) — النوعُ يتبع النصّ كما في «احفظ» و«اعتمد»
+        isThread(input.platform, input.draft.text) ? 'thread' : 'text',
         input.draft.text,
         JSON.stringify(input.refs),
         input.draft.rationale,
@@ -259,6 +283,8 @@ async function insertDraft(db: Db, org: string, input: NewDraft): Promise<DraftO
         .bind(input.key, org)
         .first<{ id: string }>()
       if (won !== null) return { kind: 'already', postId: won.id }
+      // ‏**ولا يُقال خطأُ القاعدة كما هو** (مراجعة D-324): مفتاحٌ مأخوذٌ خارجَ المنظّمة خبرٌ عن غيرها لا يُعرض
+      return { kind: 'failed', reason: 'تعذّرت كتابة المسوّدة — أعد المحاولة', retryable: false, cost: input.cost }
     }
     return { kind: 'failed', reason: `تعذّرت كتابة المسوّدة: ${message}`, retryable: false, cost: input.cost }
   }
@@ -301,10 +327,20 @@ export function ideaProblem(raw: string): string | null {
  * التي تفصل (`UNIQUE`). وبصمةٌ لا نصّ: المفتاحُ يُقرأ في سجلّ النشر وصفوف المحاولات،
  * وفكرةُ المالك لا تُنسَخ إلى كلّ موضعٍ يُطبَع فيه المفتاح.
  */
-export async function ideaKey(idea: string, platform: Platform): Promise<string> {
-  const bytes = await digest(normalizeIdea(idea))
-  const hex = Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')
-  return `idea:${hex}:${platform}`
+export async function ideaKey(idea: string, platform: Platform, org = 'org_owner'): Promise<string> {
+  // ‏**والمنظّمةُ في البصمة** (مراجعة D-324): المفتاحُ فريدٌ على الجدول كلّه (0022)، فالفكرةُ نفسُها في منظّمتين كانت تصطدم —
+  // ‏بعد النداء المدفوع — ويُقال للثانية خطأُ القاعدة كما هو، وهو يخبرها أنّ أخرى كتبت هذه الفكرة
+  const bytes = await digest(`${org}\n${normalizeIdea(idea)}`)
+  return `idea:${hex16(bytes)}:${platform}`
+}
+
+/** ‏مفتاحُ الفكرة قبل مراجعة D-324 — بلا منظّمة. يُسأل عنه مع الجديد فلا تُكتب فكرةٌ قديمةٌ ثانيةً ولا يُدفع نداؤها مرّتين. */
+async function legacyIdeaKey(idea: string, platform: Platform): Promise<string> {
+  return `idea:${hex16(await digest(normalizeIdea(idea)))}:${platform}`
+}
+
+function hex16(bytes: Uint8Array): string {
+  return Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 /**
@@ -319,8 +355,11 @@ export async function draftFromIdea(
   deps: DraftDeps,
   rawIdea: string,
   platform: Platform,
+  /** ‏سلسلةُ X لبندٍ في الخطّة (D-324) — كما في `draftPost`. */
+  shape: DraftShape = 'single',
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
+  const thread = shape === 'thread' && platform === 'x'
   const idea = normalizeIdea(rawIdea)
   const problem = ideaProblem(idea)
   if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
@@ -328,10 +367,14 @@ export async function draftFromIdea(
   // أكُتبت هذه الفكرةُ لهذه المنصّة ولم تُرفَض؟ — لا نداءَ ولا كلفة
   // ‏وفكرةٌ بلا مصدرٍ تُكتب في منظّمة الجلسة (D-277)
   const org = deps.org ?? 'org_owner'
-  const key = await ideaKey(idea, platform)
+  const base = await ideaKey(idea, platform, org)
+  const key = `${base}${thread ? ':thread' : ''}`
+  const legacy = `${await legacyIdeaKey(idea, platform)}${thread ? ':thread' : ''}`
+  // ‏والمفتاحُ القديم يُسأل عنه في المنظّمة نفسِها: ما كُتب قبل المراجعة لا يُكتب ثانيةً ولا يُدفع نداؤه مرّتين
   const existing = await deps.db
-    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
-    .bind(key, org)
+    .prepare(`SELECT id, status FROM posts WHERE idempotency_key IN (?1, ?2) AND org_id = ?3
+               ORDER BY (status = 'rejected'), (idempotency_key = ?1) DESC LIMIT 1`)
+    .bind(key, legacy, org)
     .first<{ id: string; status: string }>()
   if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
 
@@ -339,19 +382,67 @@ export async function draftFromIdea(
   // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
   const out = await writeOnce(deps, {
     org,
-    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, org))),
-    user: ideaPrompt(idea),
+    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, org)), thread),
+    user: ideaPrompt(idea, thread),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
-    refId: key.slice(0, key.lastIndexOf(':')),
+    refId: base.slice(0, base.lastIndexOf(':')),
   })
   if (out.kind !== 'written') return out
 
-  const draft = readDraft(out.text, spec)
+  const draft = readDraft(out.text, spec, thread)
   if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
 
   return insertDraft(deps.db, org, {
     platform, key, existing, sourceId: null, sourceHash: null, refs: [],
     model: out.model, cost: out.cost, draft: draft.draft,
+  })
+}
+
+// ── «بنفسي» — نصُّ المالك كما كتبه (D-324) ─────────────────────────────
+
+/** المنصّاتُ التي يُكتب لها بنفسك — المكتوبةُ وحدَها، كما في «من فكرة»: نصُّ المقطع له صفُّ المقطع. */
+export const OWN_PLATFORMS = ['linkedin', 'x'] as const
+export type OwnPlatform = (typeof OWN_PLATFORMS)[number]
+
+/**
+ * ‏مفتاحُ عدم التكرار لنصّ المالك (D-004) — **بصمتُه ومنصّتُه** لا نصُّه، كمفتاح الفكرة: ضغطةٌ ثانيةٌ بالنصّ نفسِه لا تصنع
+ * ‏مسوّدةً ثانية، والنصُّ لا يُنسَخ إلى كلّ موضعٍ يُطبَع فيه المفتاح.
+ */
+export async function ownKey(org: string, text: string, platform: OwnPlatform): Promise<string> {
+  // ‏**والمنظّمةُ في البصمة** (مراجعة D-324): وكالةٌ تكتب الإعلانَ نفسَه لعميلين كانت مسوّدةُ الثاني تُردّ بخطأ القاعدة
+  return `own:${hex16(await digest(`${org}\n${platform}\n${text}`))}:${platform}`
+}
+
+/**
+ * ‏**«بنفسي»** (D-324) — المالكُ يكتب منشورَه، فيُحفَظ مسوّدةً **كما كتبه**: بلا نداءٍ ولا كلفةٍ ولا صفٍّ في الدفتر
+ * ‏(`model = 'owner'`، كما يكتب «أنت» على ما رفعه). والفحصُ فحصُ «احفظ» و«اعتمد» نفسُه (`textProblem`) بحدّ كلّ منصّة —
+ * ‏وسلسلةُ X تغريدةً تغريدة — والحالُ `draft` وحدها، فيمرّ بالاعتماد كأيّ مسوّدة (D-009). والأسطرُ توحَّد وتُقصّ الأطرافُ
+ * ‏كما في الاعتماد، **وما سوى ذلك حرفُه**.
+ *
+ * ‏**ولا حارسَ إنفاق هنا ولا ينبغي**: لا شيءَ يُنفَق. فلا يمرّ بـ `checkAllowance`، ولا يتبع ما يُقيَّد من الكتابة المدفوعة.
+ */
+export async function draftFromOwner(
+  db: Db,
+  org: string,
+  platform: OwnPlatform,
+  raw: string,
+  /** ‏دورُ من كتبها (مراجعة D-324): «بنفسي» للمحرّر أيضًا، فيُحفظ في مراجعها `by:<الدور>` ويُقال «كتبها المحرّر» لا «أنت». */
+  by?: Role,
+): Promise<DraftOutcome> {
+  const text = raw.replace(/\r\n?/g, '\n').trim()
+  const problem = textProblem(platform, text)
+  if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
+  const key = await ownKey(org, text, platform)
+  const existing = await db
+    .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
+    .bind(key, org)
+    .first<{ id: string; status: string }>()
+  if (existing !== null && existing.status !== 'rejected') return { kind: 'already', postId: existing.id }
+  return insertDraft(db, org, {
+    platform, key, existing, sourceId: null, sourceHash: null,
+    // ‏والمالكُ «أنت» كما في كلّ اللوحة (`deciderText`)، فلا يُكتب دورُه
+    refs: by === undefined || by === 'owner' ? [] : [`by:${by}`],
+    model: 'owner', cost: 0, draft: { text, rationale: null },
   })
 }

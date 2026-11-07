@@ -1,4 +1,5 @@
 import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
+import { CEILING_SHARE } from '../../lib/draft/review'
 import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT } from './scripts'
 import { MOVED_ANCHORS, MOVED_PREFIXES } from '../../lib/nav/panes'
 
@@ -163,7 +164,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   // ‏وبابُ المُنشئ يُحفظ في المتصفّح كالسمة (D-308)، والمرساةُ تغلبه؛ واختيارُه يكتب مرساتَه فيُعاد بالرجوع
   var cmps=document.querySelectorAll('.composer [name=cmp]');
   try{var sv=localStorage.getItem('sada-compose');
-    if(sv&&!/^#(idea|write)$/.test(location.hash||'')){Array.prototype.forEach.call(cmps,function(r){if(r.value===sv)r.checked=true;});}}catch(e){}
+    if(sv&&!/^#(idea|write|own)$/.test(location.hash||'')){Array.prototype.forEach.call(cmps,function(r){if(r.value===sv)r.checked=true;});}}catch(e){}
   Array.prototype.forEach.call(cmps,function(r){r.addEventListener('change',function(){
     if(!r.checked)return; try{localStorage.setItem('sada-compose',r.value);}catch(e){}
     if(history.replaceState)history.replaceState(null,'','#'+r.value);});});
@@ -211,17 +212,28 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     for(var ch of plain)total+=weigh(ch.codePointAt(0)||0);
     return total;
   }
+  // ‏وسلسلةُ X تُعَدّ تغريدةً تغريدة (D-324): سطرٌ فيه --- وحدَها بينها، والحدُّ على كلٍّ — كما يقسمها «thread.ts»
+  var SEP=/^[ \\t]*---[ \\t]*$/m;
+  function tweets(v){
+    var p=v.replace(/\\r\\n?/g,'\\n').split(SEP).map(function(x){return x.trim();}).filter(function(x){return x!=='';});
+    return p.length?p:[v];
+  }
+  // ‏والحدُّ والمنصّةُ يُقرآن عند كلّ نقرة: «بنفسي» يبدّلهما مع المنصّة المختارة
+  function measure(t){
+    var v=t.value.trim();
+    // و LinkedIn على عدّ المحارف: لا قاعدةَ وزنٍ منشورةً لها فلا تُخترَع
+    return t.dataset.count==='x'?tweets(v).map(xLen):[v.length];
+  }
   document.querySelectorAll('textarea.draft-text').forEach(function(t){
     var out=t.parentNode.querySelector('.draft-len'); if(!out)return;
-    var b=out.querySelector('b'); var lim=+t.dataset.limit||0; var tgt=+t.dataset.target||0;
-    // و LinkedIn على عدّ المحارف: لا قاعدةَ وزنٍ منشورةً لها فلا تُخترَع
-    var weighted=t.dataset.count==='x';
+    var b=out.querySelector('b'), l=out.querySelector('[data-lim]');
     function tick(){
-      var v=t.value.trim();
-      var n=weighted?xLen(v):v.length; if(b)b.textContent=n;
+      var lim=+t.dataset.limit||0, tgt=+t.dataset.target||0;
+      var ns=measure(t), n=Math.max.apply(null,ns);
+      if(b)b.textContent=ns.join(' · '); if(l)l.textContent=lim;
       out.className='draft-len'+(n>lim?' bad':n>tgt?' warn':'');
     }
-    t.addEventListener('input',tick); tick();
+    t.addEventListener('input',tick); t.addEventListener('sada-count',tick); tick();
   });
 
   // ‏والتأكيدُ نفسُه حوارٌ في الصفحة من سكربت كلّ صفحة («CONFIRM_SCRIPT»، D-323) يُوقف الإرسالَ الأوّل في طور الالتقاط،
@@ -247,6 +259,41 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       e.preventDefault();
       if(msg){msg.hidden=false; msg.textContent='اختر منصّةً واحدةً على الأقلّ — وغير المتّصلة تُختار ولا تُجدوَل حتّى تربطها.';}
       boxes[0].focus();
+    });
+  });
+  /*
+   * ‏**«بنفسي»** (D-324): المنصّةُ المختارةُ تبدّل حدَّ العدّاد وعدَّه، **وما كُتب لا يضيع** — يُحفظ في هذا المتصفّح مع كلّ
+   * ‏نقرة، ويُستعاد إن عاد الخادمُ برفضٍ («#own») أو فُتحت الصفحةُ قبل أن يُرسَل. والإرسالُ يُمسَك هنا بسببه في موضعه حين
+   * ‏يُعرف قبله (أقصرُ من أربعين، أو تغريدةٌ فوق حدّها) — والخادمُ يفحص الفحصَ نفسَه بعدُ. وقبل معالج «مشغول» كأخيه أعلاه.
+   * ‏**والمفتاحُ للمنظّمة والعضو** (مراجعة D-324): «sada-own:<بصمتهما>» من «data-own» — كان «sada-own» وحده، فيرى العضوُ
+   * ‏التالي على الجهاز نصَّ من قبله، ويُملأ مُنشئُ عميلٍ بنصّ عميلٍ آخر. والمفتاحُ القديمُ بلا بصمةٍ يُمحى ولا يُقرأ.
+   */
+  try{localStorage.removeItem('sada-own'); sessionStorage.removeItem('sada-own');}catch(e){}
+  document.querySelectorAll('form[data-own]').forEach(function(f){
+    var t=f.querySelector('textarea[name=text]'), msg=f.querySelector('[data-own-msg]'), K='sada-own:'+(f.getAttribute('data-own')||'-');
+    if(!t)return;
+    function chosen(){return f.querySelector('input[name=platform]:checked');}
+    function pick(){var r=chosen(); if(!r)return; t.dataset.limit=r.dataset.limit; t.dataset.target=String(Math.floor(+r.dataset.limit*${CEILING_SHARE}));
+      t.dataset.count=r.dataset.count; t.dispatchEvent(new Event('sada-count'));}
+    function keep(){try{localStorage.setItem(K,JSON.stringify({t:t.value,p:(chosen()||{}).value||''}));}catch(e){}}
+    // ‏والمُرسَلُ يُستعاد مرّةً واحدة، حين عاد الخادمُ إلى «#own» برفضه — وإلّا حُفظ فلا يعود إلى الحقل في زيارةٍ تالية
+    try{var sent=sessionStorage.getItem(K); sessionStorage.removeItem(K);
+      if(t.value===''){
+        var refused=location.hash==='#own'&&!!document.querySelector('#flash .bad');
+        var was=(refused?sent:null)||localStorage.getItem(K);
+        var o=was?JSON.parse(was):null;
+        if(o&&typeof o.t==='string'){t.value=o.t; var r=f.querySelector('input[name=platform][value="'+o.p+'"]'); if(r)r.checked=true;}
+      }}catch(e){}
+    pick();
+    t.addEventListener('input',keep);
+    f.addEventListener('change',function(e){if(e.target&&e.target.name==='platform'){pick(); keep();}});
+    f.addEventListener('submit',function(e){
+      var ns=measure(t), lim=+t.dataset.limit||0, why='';
+      if(t.value.trim().length<40)why='النصّ أقصر من أن يكون منشورًا — أربعون محرفًا على الأقلّ.';
+      else for(var i=0;i<ns.length;i++)if(ns[i]>lim){why=(ns.length>1?'التغريدة '+(i+1)+' من '+ns.length:'النصّ')+' فوق حدّها: '+ns[i]+' من '+lim+'.'; break;}
+      if(why){e.preventDefault(); if(msg){msg.textContent=why; msg.hidden=false;} t.focus(); return;}
+      if(msg)msg.hidden=true;
+      try{sessionStorage.setItem(K,localStorage.getItem(K)||''); localStorage.removeItem(K);}catch(e2){}
     });
   });
   // ‏وEnter في عنوان YouTube لا يُرسل «أنشئ المنشورات» (D-190): كان تعديلُ العنوان ثمّ Enter

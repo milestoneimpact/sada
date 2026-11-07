@@ -133,6 +133,23 @@ export const CONFIRM_SCRIPT = `
 `
 
 /**
+ * ‏**الخروجُ يمحو ما كُتب ولم يُرسَل** (مراجعة D-324): نصُّ «بنفسي» («sada-own:…») ونصُّ المحرّر («sada-draft:…») محفوظان في
+ * ‏هذا المتصفّح، **والجهازُ قد يكون مشتركًا** — فالعضوُ التالي يرى نصَّ من خرج. فحين يُرسَل نموذجُ الخروج تُمحى المفاتيحُ التي
+ * ‏تبدأ بهما وحدَها، وتبقى التفضيلات (الثيمُ والكثافةُ والخطّ). ولا «Clear-Site-Data»: يمحو التفضيلاتِ وعاملَ التطبيق معها.
+ */
+export const SIGNOUT_SCRIPT = `
+(function(){
+  document.addEventListener('submit',function(e){
+    var f=e.target;
+    if(!f||f.tagName!=='FORM'||(f.getAttribute('action')||'')!=='/panel/logout')return;
+    [window.localStorage,window.sessionStorage].forEach(function(s){
+      try{for(var i=s.length-1;i>=0;i--){var k=s.key(i)||''; if(k.indexOf('sada-own')===0||k.indexOf('sada-draft:')===0)s.removeItem(k);}}catch(x){}
+    });
+  },true);
+})();
+`
+
+/**
  * مبدّلُ الثيم — يُحفظ الاختيار، و«النظام» يمحوه فيعود التفضيل.
  *
  * **ولونُ شريط المتصفّح معه** (D-183): وسما «theme-color» بشرط الوضع، فاختيارٌ

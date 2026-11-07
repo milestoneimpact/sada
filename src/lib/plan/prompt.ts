@@ -53,13 +53,17 @@ export function isPlanPlatform(p: unknown): p is PlanPlatform {
   return typeof p === 'string' && (PLAN_CHANNELS as readonly string[]).includes(p)
 }
 
-/** نوعُ ما يُنشر في البند: نصٌّ، أو نصٌّ بصورة، أو مقطع. */
-export type PlanKind = 'text' | 'image' | 'video'
+/** نوعُ ما يُنشر في البند: نصٌّ، أو نصٌّ بصورة، أو مقطع — أو سلسلةٌ على X (D-324). */
+export type PlanKind = 'text' | 'image' | 'video' | 'thread'
 
-/** نوعُ البند بمنصّته: المقطعُ إلزاميٌّ لقنوات المقاطع، والصورةُ لـ Instagram، وما سواهما نصٌّ ما لم يُقَل غيرُه. */
+/**
+ * نوعُ البند بمنصّته: المقطعُ إلزاميٌّ لقنوات المقاطع، والصورةُ لـ Instagram، وما سواهما نصٌّ ما لم يُقَل غيرُه.
+ * ‏**والسلسلةُ لـ X وحدها** (D-324): بندٌ على LinkedIn طُلب سلسلةً يُقرأ نصًّا، فلا سلسلةَ هناك.
+ */
 export function kindFor(platform: PlanPlatform, asked?: unknown): PlanKind {
   if (CLIP_CHANNELS.has(platform)) return 'video'
   if (platform === 'instagram') return asked === 'video' ? 'video' : 'image'
+  if (asked === 'thread') return platform === 'x' ? 'thread' : 'text'
   return asked === 'image' || asked === 'video' ? asked : 'text'
 }
 
@@ -186,6 +190,8 @@ export function systemPrompt(options: PromptOptions = {}): string {
     '- `source_id`: معرّف المصدر كما ورد بعد `id:` — يُنسخ حرفًا بحرف.',
     `- \`platform\`: ${names} لا غير.`,
     '- `kind`: `text` أو `image` أو `video` — ما يُنشر مع النصّ.',
+    // ‏والسلسلةُ على X وحدها (D-324)، وتُذكر حين تكون X مختارةً فلا يُسمّى ما لم يُختَر
+    ...(channels.includes('x') ? ['  أو `thread` لبند `x` وحدها: سلسلةٌ من ثلاث تغريدات إلى ستّ حين لا تتّسع الفكرةُ لتغريدة.'] : []),
     '- `angle`: الزاوية في جملة واحدة (عشرة أحرف فأكثر).',
     '- `day`: تاريخ بصيغة YYYY-MM-DD من الأيّام المذكورة في الرسالة.',
     '- `time`: الساعة بـ UTC بصيغة HH:MM (مثل 07:30).',
@@ -249,7 +255,7 @@ export function planSchema(channels: readonly PlanPlatform[] = DEFAULT_CHANNELS,
           properties: {
             source_id: { type: 'string' },
             platform: { type: 'string', enum: [...list] },
-            kind: { type: 'string', enum: ['text', 'image', 'video'] },
+            kind: { type: 'string', enum: ['text', 'image', 'video', 'thread'] },
             angle: { type: 'string', minLength: 10 },
             day: { type: 'string' },
             time: { type: 'string' },

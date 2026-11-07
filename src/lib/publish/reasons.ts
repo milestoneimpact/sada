@@ -11,11 +11,11 @@
  */
 import type { Platform } from '../oauth/providers'
 
-export type FailAction = 'requeue' | 'relink' | 'open' | 'none'
+export type FailAction = 'requeue' | 'relink' | 'open' | 'confirm' | 'none'
 
 export interface FailReason {
   readonly text: string
-  /** ما يُفعَل: أعده إلى المعتمَد، أو أعد الربط، أو افتح المنشور، أو لا شيء. */
+  /** ما يُفعَل: أعده إلى المعتمَد، أو أعد الربط، أو افتح المنشور، أو «قل ما وجدت» لتغريدةٍ لم يُعرَف جوابُها، أو لا شيء. */
   readonly action: FailAction
 }
 
@@ -35,6 +35,12 @@ export const REASONS: Readonly<Record<string, FailReason>> = {
   not_approved: { text: 'لم يُعتمَد قبل موعده — اعتمده ثمّ جدوِله', action: 'open' },
   post_not_found: { text: 'حُذف المنشور قبل موعده', action: 'none' },
   unexpected_error: { text: 'عطل لم يُتوقَّع عندنا قبل الإرسال — وسببُه في سجلّ العامل', action: 'requeue' },
+  // ‏سلسلةُ X (D-324): ما نُشر منها لا يُعاد، فالسببان يقولان ما يُفعَل باليد لا «أعده»
+  thread_changed: { text: 'تغيّر نصّ السلسلة بعد أن نُشر أوّلُها على X — أعد نصَّها كما نُشر، أو احذف المنشورَ هناك واكتبها منشورًا جديدًا', action: 'open' },
+  // ‏ومراجعة D-324: ما لم يُعرَف جوابُه يسوّيه المالكُ بما وجده على X («وجدتُها» برابطها أو «لم أجدها») ثمّ يعود معتمَدًا،
+  // ‏والسلسلةُ على حسابٍ غيرِ حسابها تُعاد إلى المعتمَد فتُجدوَل على حسابها
+  thread_unconfirmed: { text: 'تغريدةٌ من السلسلة أُرسلت ولم يُعرَف جوابُها — تحقّق على X ثمّ قل ما وجدت', action: 'confirm' },
+  thread_account: { text: 'نُشر أوّلُ السلسلة من حسابٍ آخر على X — أعدها إلى المعتمَد وجدوِلها على حسابها', action: 'requeue' },
 }
 
 /** البادئةُ التي يكتبها الناشرُ قبل جواب المنصّة: «x: …» و«linkedin: …». */
@@ -79,6 +85,8 @@ export function whyFailed(raw: string | null, platform: Platform | string): Fail
     const known = REASONS[code[1]!]
     if (known !== undefined) {
       const detail = code[2]?.trim() ?? ''
+      // ‏وتغريدةُ السلسلة المعلّقة تُسمّى برقمها وما وقع لها: جملتُها عربيّةٌ كتبها الناشر (مراجعة D-324)
+      if (code[1] === 'thread_unconfirmed' && detail !== '') return { ...known, text: detail }
       // ‏والنطاقُ الناقص يُسمّى: «الحسابُ لم يمنح إذنَ النشر (w_member_social)»
       return detail !== '' && code[1]!.startsWith('missing_')
         ? { ...known, text: `${known.text} (${detail})` }

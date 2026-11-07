@@ -16,13 +16,14 @@ import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { listReports, readReport } from '../../lib/report/weekly'
+import { successThisMonth } from '../../lib/report/success'
 import { decide as decidePromotion, openSuggestions } from '../../lib/report/promote'
 import { reportScreen } from '../ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from '../ui/timelineView'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
 import { ownerRows } from '../../lib/owner'
-import { tasksScreen } from '../ui/tasksView'
+import { gatesScreen, tasksScreen } from '../ui/tasksView'
 import { vitalsSummary } from '../../lib/vitals'
 import { rejectsLately } from '../../lib/forms'
 import { currentPhase, gatesOf, readGateFacts } from '../../lib/gates'
@@ -49,11 +50,10 @@ reports.get('/panel/tasks', async (c) => {
     // ‏وإرسالاتٌ رُدّت لعيبٍ في المُدخَل (D-302)
     rejectsLately(c.env.DB, org).catch(() => 0),
   ])
-  const gates = gatesOf(gateFacts)
   const body = tasksScreen({
     rows: ownerRows(facts),
-    gates,
-    phase: currentPhase(gates),
+    // ‏والبوّاباتُ في صفحتها (`/panel/gates`)، وهنا سطرُها يقول المرحلة: فالحقائقُ تُقرأ لها وحدَها
+    phase: currentPhase(gatesOf(gateFacts)),
     env: c.env.SADA_ENV,
     vitals,
     rejects,
@@ -61,6 +61,25 @@ reports.get('/panel/tasks', async (c) => {
 
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' },
+      injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('tasks')),
+  )
+})
+
+/**
+ * ‏شاشةُ «بوّابات المراحل» (دمجُ D-318 مع D-324) — كانت طيّةً في آخر «ما عليك»، ومهامُّ القرارين رفعت تلك فوق سقف وزنها
+ * ‏(`audit_size`: يُقسَم ما تجاوز ولا يُرفع السقف). **فهي جزءٌ منها في كلّ شيءٍ إلّا الصفحة**: الجلسةُ نفسُها، والدورُ نفسُه
+ * ‏(`requiredRole` يسمّي البابين معًا)، والرافدةُ على «ما عليك»، والعودةُ إليها.
+ */
+reports.get('/panel/gates', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+
+  const gates = gatesOf(await readGateFacts(c.env.DB, activeOrg(session.record)))
+  const body = gatesScreen({ gates, phase: currentPhase(gates) })
+
+  return page((nonce) =>
+    soloPage('صدى — بوّابات المراحل', { href: '/panel/tasks', label: sectionLabel('tasks') },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('tasks')),
   )
@@ -85,6 +104,7 @@ reports.get('/panel/report', async (c) => {
 
   const reports = await listReports(c.env.DB, activeOrg(session.record))
   const settings = await readSettings(c.env.DB)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const body = reportScreen({
     reports,
     current: reports[0] ?? null,
@@ -92,7 +112,9 @@ reports.get('/panel/report', async (c) => {
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
     // ‏ما أُنفق هذا الشهر حتّى اليوم، تحت الرأس (ر-10) — حيٌّ من الدفتر لا من التقرير
-    month: await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date()),
+    month: await spendThisMonth(c.env.DB, zone, new Date()),
+    // ‏ومقاييسُ النجاح هذا الشهر (D-324) — والقراءةُ تفشل فتسكت البطاقةُ ولا تسقط الصفحة
+    ...(await successOrNothing(c.env.DB, activeOrg(session.record), zone)),
   })
 
   return page((nonce) =>
@@ -161,13 +183,15 @@ reports.get('/panel/report/:week', async (c) => {
   if (stored === null) return notFoundResponse(c.req.raw, 'لا تقرير لهذا الأسبوع')
 
   const settings = await readSettings(c.env.DB)
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const body = reportScreen({
     reports: await listReports(c.env.DB, activeOrg(session.record)),
     current: stored,
     suggestions: await openSuggestions(c.env.DB, activeOrg(session.record)),
     promoCapUsd: settings.weeklyPromoCapUsd,
     now: new Date(),
-    month: await spendThisMonth(c.env.DB, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), new Date()),
+    month: await spendThisMonth(c.env.DB, zone, new Date()),
+    ...(await successOrNothing(c.env.DB, activeOrg(session.record), zone)),
   })
 
   return page((nonce) =>
@@ -175,6 +199,16 @@ reports.get('/panel/report/:week', async (c) => {
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
+
+/** مقاييسُ النجاح هذا الشهر (D-324) — أو لا شيء إن فشلت القراءة: البطاقةُ تسكت والتقريرُ يُقرأ. */
+async function successOrNothing(db: Env['DB'], org: string, zone: string | null): Promise<{ success?: Awaited<ReturnType<typeof successThisMonth>> }> {
+  try {
+    return { success: await successThisMonth(db, org, zone, new Date()) }
+  } catch (error) {
+    console.warn({ job: 'success-metrics', failed: String(error) })
+    return {}
+  }
+}
 
 /**
  * بتُّ توصيةِ ترويج — **تسجيلُ رأيٍ لا أمرُ إنفاق.**

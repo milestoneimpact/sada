@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { approveMany, decide, listDrafts, undoApprove, undoReject } from './store'
+import { approveMany, decide, listDrafts, saveText, undoApprove, undoReject } from './store'
 
 let db: FakeDb
 
@@ -499,5 +499,43 @@ describe('البَتّ الجماعيّ', () => {
     const result = await approveMany(db, 'org_owner', [big], 'omar')
     expect(result.done).toHaveLength(0)
     expect(result.failed[0]?.reason).toContain('محرفا')
+  })
+})
+
+/**
+ * ‏**سلسلةُ X تُفحَص تغريدةً تغريدة** (D-324): كان نصُّ X يُعدّ كلُّه على 280، فسلسلةٌ من ثلاث تغريداتٍ صالحة تُردّ
+ * ‏عند «احفظ» وعند «اعتمد» بـ«النصّ 600 محرفا»، ولا طريقَ إلى نشرها.
+ */
+describe('سلسلة X (D-324)', () => {
+  const THREAD = `${'ن'.repeat(250)}\n---\n${'م'.repeat(250)}\n---\n${'ل'.repeat(100)}`
+
+  it('سلسلةٌ كلُّ تغريدةٍ فيها تحت حدّها تُعتمَد، ونوعُها thread، وثمنُ نشرها مجموعُ تغريداتها', async () => {
+    const id = await seedDraft({ platform: 'x', text: THREAD })
+    expect(await decide(db, 'org_owner', id, { kind: 'approve', text: THREAD }, 'omar')).toEqual({ ok: true, status: 'approved' })
+    const row = await db.prepare('SELECT type FROM posts WHERE id = ?').bind(id).first<{ type: string }>()
+    expect(row?.type).toBe('thread')
+    const [shown] = await listDrafts(db, 'org_owner')
+    expect(shown?.publishCost).toBeCloseTo(0.045)
+  })
+
+  it('وتغريدةٌ واحدةٌ فوق حدّها تُردّ برقمها', async () => {
+    const text = `${'ن'.repeat(100)}\n---\n${'م'.repeat(281)}`
+    const id = await seedDraft({ platform: 'x', text })
+    const r = await saveText(db, 'org_owner', id, text)
+    expect(r).toEqual({ ok: false, reason: 'التغريدة 2 من 2 طولها 281 محرفًا بحساب X وهي تقبل 280' })
+  })
+
+  it('و«احفظ» يجعلها سلسلةً ويعيدها نصًّا حين يُحذَف الفاصل', async () => {
+    const id = await seedDraft({ platform: 'x', text: 'ن'.repeat(100) })
+    expect((await saveText(db, 'org_owner', id, THREAD)).ok).toBe(true)
+    expect((await db.prepare('SELECT type FROM posts WHERE id = ?').bind(id).first<{ type: string }>())?.type).toBe('thread')
+    expect((await saveText(db, 'org_owner', id, 'م'.repeat(120))).ok).toBe(true)
+    expect((await db.prepare('SELECT type FROM posts WHERE id = ?').bind(id).first<{ type: string }>())?.type).toBe('text')
+  })
+
+  it('وLinkedIn لا سلسلةَ لها: الفاصلُ نصٌّ والحدُّ على النصّ كلِّه', async () => {
+    const id = await seedDraft({ platform: 'linkedin', text: THREAD })
+    expect(await decide(db, 'org_owner', id, { kind: 'approve', text: THREAD }, 'omar')).toEqual({ ok: true, status: 'approved' })
+    expect((await db.prepare('SELECT type FROM posts WHERE id = ?').bind(id).first<{ type: string }>())?.type).toBe('text')
   })
 })

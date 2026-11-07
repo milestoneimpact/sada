@@ -11,7 +11,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { Window } from 'happy-dom'
-import { panelScript } from '../../lib/ui/asset'
+import { panelScript, uiScript } from '../../lib/ui/asset'
 
 type Win = InstanceType<typeof Window>
 
@@ -198,5 +198,99 @@ describe('الاختصاراتُ بموضع المفتاح لا بحرفه', () 
     key(w, { code: 'KeyJ', key: 'ت' })
     key(w, { code: 'KeyA', key: 'ش' })
     expect(pressed).toBe(1)
+  })
+})
+
+/**
+ * ‏**«بنفسي» في المتصفّح** (D-324): العدّادُ يتبع المنصّةَ المختارة ويعدّ سلسلةَ X تغريدةً تغريدة، والإرسالُ يُمسَك بسببه
+ * ‏في موضعه حين يُعرف قبله، **وما كُتب لا يضيع** — ويُستعاد ما رُدّ مرّةً واحدة.
+ */
+describe('«بنفسي» (D-324)', () => {
+  const OWN = `<main id="main"><section data-pane="posts"><h2>المنشورات</h2>
+    <form method="POST" action="/panel/drafts/own" data-own="s1">
+      <div class="field"><textarea name="text" class="draft-text" data-limit="3000" data-target="2760" data-count="linkedin"></textarea>
+        <span class="draft-len"><b>0</b> / <span data-lim>3000</span></span></div>
+      <input type="radio" name="platform" value="linkedin" checked data-limit="3000" data-count="linkedin">
+      <input type="radio" name="platform" value="x" data-limit="280" data-count="x">
+      <span class="st bad" data-own-msg hidden></span>
+      <button type="submit">احفظ مسوّدة</button>
+    </form></section></main><div id="flash"></div>`
+
+  type El = { value: string; checked: boolean; hidden: boolean; textContent: string; dispatchEvent(e: unknown): boolean }
+  const $ = (w: Win, sel: string): El => w.document.querySelector(sel) as unknown as El
+
+  it('X تعدّ كلَّ تغريدةٍ وحدَها بحدّ 280، والإرسالُ فوق الحدّ يُمسَك ويُقال برقم التغريدة', () => {
+    const { w, thrown } = boot('#posts', NAV + OWN)
+    expect(thrown).toBeNull()
+    const t = $(w, 'textarea')
+    const x = $(w, 'input[value=x]')
+    x.checked = true
+    x.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect($(w, '[data-lim]').textContent).toBe('280')
+    t.value = `${'ن'.repeat(50)}\n---\n${'م'.repeat(281)}`
+    t.dispatchEvent(new w.Event('input'))
+    expect($(w, '.draft-len b').textContent).toBe('50 · 281')
+    const ev = new w.Event('submit', { cancelable: true })
+    w.document.querySelector('form')!.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+    expect($(w, '[data-own-msg]').hidden).toBe(false)
+    expect($(w, '[data-own-msg]').textContent).toBe('التغريدة 2 من 2 فوق حدّها: 281 من 280.')
+  })
+
+  it('وما كُتب يُحفظ في المتصفّح ويعود في الزيارة التالية، وما رُدّ يعود مرّةً مع «#own» وإشعارِ رفض', () => {
+    const first = boot('#posts', NAV + OWN)
+    const t = $(first.w, 'textarea')
+    t.value = 'نصٌّ لم يُرسَل بعد'
+    t.dispatchEvent(new first.w.Event('input'))
+    // ‏ومفتاحُه بصمةُ المنظّمة والعضو (مراجعة D-324) — كان «sada-own» وحده
+    const kept = first.w.localStorage.getItem('sada-own:s1')
+    expect(JSON.parse(kept ?? '{}')).toEqual({ t: 'نصٌّ لم يُرسَل بعد', p: 'linkedin' })
+    expect(first.w.localStorage.getItem('sada-own')).toBeNull()
+
+    // ‏زيارةٌ تالية في متصفّحٍ حفظ ما كُتب: يعود إلى الحقل
+    const later = new Window({ url: 'https://sada2.basserh.com/panel#posts' })
+    open.push(later)
+    later.localStorage.setItem('sada-own:s1', kept ?? '')
+    later.document.body.innerHTML = NAV + OWN
+    ;(later as unknown as { eval(code: string): void }).eval(panelScript().body)
+    expect($(later, 'textarea').value).toBe('نصٌّ لم يُرسَل بعد')
+
+    const refused = new Window({ url: 'https://sada2.basserh.com/panel#own' })
+    open.push(refused)
+    refused.sessionStorage.setItem('sada-own:s1', JSON.stringify({ t: 'ردّه الخادم', p: 'x' }))
+    refused.document.body.innerHTML = NAV + OWN.replace('<div id="flash"></div>', '<div id="flash"><div class="toast-note bad">لم يُحفظ</div></div>')
+    ;(refused as unknown as { eval(code: string): void }).eval(panelScript().body)
+    expect($(refused, 'textarea').value).toBe('ردّه الخادم')
+    expect($(refused, 'input[value=x]').checked).toBe(true)
+    expect(refused.sessionStorage.getItem('sada-own:s1')).toBeNull()
+  })
+
+  it('وعضوٌ آخر أو عميلٌ آخر على الجهاز نفسِه لا يرى ما كُتب، والمفتاحُ القديمُ بلا بصمةٍ يُمحى ولا يُقرأ (مراجعة D-324)', () => {
+    const other = new Window({ url: 'https://sada2.basserh.com/panel#posts' })
+    open.push(other)
+    other.localStorage.setItem('sada-own:s1', JSON.stringify({ t: 'نصُّ عميلٍ آخر', p: 'linkedin' }))
+    other.localStorage.setItem('sada-own', JSON.stringify({ t: 'نصٌّ بلا بصمة', p: 'linkedin' }))
+    other.document.body.innerHTML = NAV + OWN.replace('data-own="s1"', 'data-own="s2"')
+    ;(other as unknown as { eval(code: string): void }).eval(panelScript().body)
+    expect($(other, 'textarea').value).toBe('')
+    expect(other.localStorage.getItem('sada-own')).toBeNull()
+    // ‏وما للعضو الأوّل يبقى له
+    expect(other.localStorage.getItem('sada-own:s1')).not.toBeNull()
+  })
+
+  it('والخروجُ يمحو ما كُتب ولم يُرسَل («بنفسي» والمحرّر) ويُبقي التفضيلات', () => {
+    const w = new Window({ url: 'https://sada2.basserh.com/panel#posts' })
+    open.push(w)
+    w.localStorage.setItem('sada-own:s1', '{"t":"لم يُرسَل"}')
+    w.localStorage.setItem('sada-draft:42', '{"t":"تعديلٌ لم يُحفظ"}')
+    w.sessionStorage.setItem('sada-own:s1', '{"t":"ردّه الخادم"}')
+    w.localStorage.setItem('sada-theme', 'dark')
+    w.document.body.innerHTML = '<form method="POST" action="/panel/logout"><button type="submit">خروج</button></form>'
+    ;(w as unknown as { eval(code: string): void }).eval(uiScript().body)
+    w.document.querySelector('form')!.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
+    expect(w.localStorage.getItem('sada-own:s1')).toBeNull()
+    expect(w.localStorage.getItem('sada-draft:42')).toBeNull()
+    expect(w.sessionStorage.getItem('sada-own:s1')).toBeNull()
+    expect(w.localStorage.getItem('sada-theme')).toBe('dark')
   })
 })

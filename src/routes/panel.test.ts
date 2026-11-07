@@ -775,7 +775,8 @@ describe('اللون يتبع المرجع لا الذوق', () => {
 describe('رقم واحد في الواجهة (D-147)', () => {
   it('لا رقمًا هنديًّا في اللوحة ولا في شاشة المنصّة ولا في أسماء المراحل', async () => {
     const cookie = await login()
-    for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks']) {
+    // ‏وأسماءُ المراحل في صفحتها منذ دمج D-318 مع D-324 (`/panel/gates`)، وسطرُها في «ما عليك»
+    for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks', '/panel/gates']) {
       const html = await (await app.request(path, withSession(cookie), env)).text()
       // ‏وأسماءُ المراحل كذلك منذ D-323: نظامُ أرقامٍ واحد بلا استثناء («المرحلة 0» لا «المرحلة ٠»)
       const body = html
@@ -863,10 +864,10 @@ describe('رؤوس الألواح (D-137)', () => {
     const libPane = html.slice(html.indexOf('<section data-pane="library"'), html.indexOf('</section>', html.indexOf('<section data-pane="library"')))
     expect(libPane).toContain('<div data-sub id="sub-videos">')
     expect(libPane).toContain('<div data-sub id="sub-images">')
-    // ‏و«منشور جديد» العائمُ بأبواب الكتابة الأربعة (D-208)، ومراسيها في اللوحة نفسِها
+    // ‏و«منشور جديد» العائمُ بأبواب الكتابة (D-208)، ومراسيها في اللوحة نفسِها — والخامسُ «بنفسي» منذ D-324
     const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
-    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel/library#videos', '/panel#plan-import'])
-    for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
+    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel#own', '/panel/library#videos', '/panel#plan-import'])
+    for (const a of ['idea', 'write', 'own', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
     // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
     const dev = html.slice(html.indexOf('id="dev"'), html.indexOf('</section>', html.indexOf('id="dev"')))
     expect(dev).toMatch(/\/oauth\/linkedin\/callback/)
@@ -5418,7 +5419,7 @@ describe('الدخول برمز البريد (D-245)', () => {
 describe('لا رابطَ ميّتًا داخل اللوحة (EASE-PLAN أ-1)', () => {
   it('كلُّ مرساةٍ في كلّ صفحةٍ تصل إلى معرّفٍ موجود — في صفحتها أو في الصفحة التي انتقل إليها', async () => {
     const cookie = await login()
-    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/timeline']
+    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/gates', '/panel/timeline']
     const html = new Map<string, string>()
     for (const p of pages) html.set(p, await (await app.request(p, withSession(cookie), env)).text())
     const ids = (page: string): Set<string> =>

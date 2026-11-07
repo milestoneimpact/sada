@@ -23,8 +23,8 @@ import { PLATFORMS } from './prompt'
 import type { Db } from '../tokens'
 import type { PublishPlatform } from '../oauth/providers'
 import { containsUrl } from '../idempotency'
-import { estimatePostCost } from '../cost'
 import { postLength } from './length'
+import { isThread, publishCostOf, threadProblem } from './thread'
 import { captionProblem, isVideoPlatform } from '../media/uploads'
 import { briefError } from '../platform/screen'
 
@@ -73,6 +73,11 @@ export interface DraftRow {
    */
   readonly originalText: string | null
   /**
+   * ‏دورُ من كتب نصَّ «بنفسي» إن لم يكن المالك (مراجعة D-324) — من `by:<الدور>` في `source_refs`، أو `null`. **واختياريٌّ**
+   * ‏كـ`failure`: صفوفٌ تُبنى بلا قاعدة. والغائبُ «أنت» كما كان.
+   */
+  readonly writtenBy?: string | null
+  /**
    * سببُ آخرِ فشلٍ كما حفظه الناشر، مختصرًا (`briefError`) — **للفاشل وحدَه**، و`null`
    * لما سواه. كانت بطاقةُ الفاشل في «المنشورات» تقول «فشل النشر» بلا سببٍ ولا زرّ
    * (رحلة R-8)، والسببُ والإعادةُ في صفحة المنصّة وحدَها.
@@ -102,6 +107,7 @@ interface Raw {
   dispatched_at: string | null
   account_name: string | null
   original_text: string | null
+  source_refs?: string | null
   fail_json: string | null
 }
 
@@ -146,9 +152,23 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
     scheduledAt: row.scheduled_at,
     accountName: row.account_name,
     dispatchedAt: row.dispatched_at,
-    publishCost: estimatePostCost(platform, containsUrl(row.text)),
+    // ‏وللسلسلة مجموعُ تغريداتها (D-324): كلُّ تغريدةٍ طلبٌ مدفوع
+    publishCost: publishCostOf(platform, row.text),
     originalText: row.original_text ?? null,
+    writtenBy: writerOf(row.source_refs ?? null),
     failure: row.status === 'failed' ? briefError(row.fail_json ?? null) : null,
+  }
+}
+
+/** ‏`by:<الدور>` من مراجع المنشور — ما يكتبه «بنفسي» لغير المالك (مراجعة D-324). */
+function writerOf(raw: string | null): string | null {
+  try {
+    const refs = JSON.parse(raw ?? '[]') as unknown
+    if (!Array.isArray(refs)) return null
+    const by = refs.find((r): r is string => typeof r === 'string' && /^by:[a-z]+$/.test(r))
+    return by === undefined ? null : by.slice(3)
+  } catch {
+    return null
   }
 }
 
@@ -185,7 +205,7 @@ async function selectDrafts(
       .prepare(
         `SELECT p.id, p.platform, p.text, p.rationale, p.status, p.model, p.cost_usd,
                 p.source_id, p.source_hash, p.approved_by, p.approved_at, p.created_at,
-                p.scheduled_at, p.dispatched_at, p.original_text,
+                p.scheduled_at, p.dispatched_at, p.original_text, p.source_refs,
                 s.name AS source_name, s.content_hash AS current_hash,
                 a.display_name AS account_name,
                 -- ‏وسبب آخر محاولة فاشلة للفاشل وحدَه: لا استعلام فرعيّ لما لم يفشل
@@ -228,6 +248,12 @@ export type Decision =
 export type DecisionResult =
   | { readonly ok: true; readonly status: DraftStatus }
   | { readonly ok: false; readonly reason: string }
+
+/**
+ * ‏**نوعُ المنشور يتبع نصَّه** (D-324): سطرُ `---` في نصّ X يجعله سلسلة (`thread`)، وحذفُه يعيده نصًّا — وما سوى ذلك
+ * ‏(`image` و`document`) كما هو. ومعاملُه علَمٌ من `isThread` يُربَط قبل المعرّف.
+ */
+const TYPE_OF_TEXT = "CASE WHEN ? = 1 THEN 'thread' WHEN type = 'thread' THEN 'text' ELSE type END"
 
 /** نصٌّ بأسطر `\n` وحدها، بلا فراغٍ في طرفيه — كما يُعَدّ ويُقارَن ويُحفَظ ويُنشَر. */
 function lines(text: string): string {
@@ -297,10 +323,11 @@ export async function decide(
     .prepare(
       `UPDATE posts SET text = ?, has_url = ?, status = ?, approved_by = ?,
               approved_at = datetime('now'),
-              original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END
+              original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END,
+              type = ${TYPE_OF_TEXT}
         WHERE id = ? AND org_id = ?`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, id, org)
+    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, isThread(row.platform, text) ? 1 : 0, id, org)
     .run()
   return { ok: true, status }
 }
@@ -454,11 +481,13 @@ const STATUS_WORD: Readonly<Record<string, string>> = {
  * ما يُردّ عليه النصّ قبل أن يُحفَظ أو يُعتمَد — **فحصٌ واحدٌ للبابين** (D-198).
  * «احفظ» بابٌ ثانٍ يكتب النصّ، وبابٌ يكتب بلا الفحص نفسِه يحفظ ما سيُردّ عند الاعتماد.
  */
-function textProblem(platform: string, text: string): string | null {
+export function textProblem(platform: string, text: string): string | null {
   // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
   if (isVideoPlatform(platform)) return captionProblem(platform, text)
   const spec = PLATFORMS[platform === 'x' ? 'x' : 'linkedin']
   if (text.length < 40) return 'النصّ أقصر من أن يكون منشورا'
+  // ‏ونصُّ X تغريدةً تغريدة (D-324): سطرُ `---` يفصل سلسلة، وكلُّ تغريدةٍ بحدّها لا النصُّ كلُّه
+  if (spec.id === 'x') return threadProblem(text)
   // الطولُ يُفحص هنا أيضا وبحساب المنصّة (D-071): نصٌّ فوق الحدّ يُرفض عند النشر بعد أسابيع
   const counted = postLength(text, spec.id)
   if (counted > spec.hardLimit) return `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`
@@ -484,10 +513,10 @@ export async function saveText(db: Db, org: string, id: string, raw: string): Pr
   if (text === lines(row.text)) return { ok: true, status: 'draft' }
   const moved = await db
     .prepare(
-      `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?)
+      `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?), type = ${TYPE_OF_TEXT}
         WHERE id = ? AND org_id = ? AND status = 'draft' RETURNING id`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, row.text, id, org)
+    .bind(text, containsUrl(text) ? 1 : 0, row.text, isThread(row.platform, text) ? 1 : 0, id, org)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل الحفظ، فأعد تحميل الصفحة' }
   return { ok: true, status: 'draft' }

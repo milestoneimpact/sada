@@ -20,6 +20,7 @@
  */
 import { blockerReason, checkAllowance } from '../limits'
 import type { Db } from '../tokens'
+import { threadAuthor, unsettledTweet } from '../publish/xThread'
 import { missingMedia } from './media'
 
 export type ScheduleResult =
@@ -62,6 +63,22 @@ interface AccountRow {
   platform: string
   status: string
   display_name: string
+  external_id: string
+}
+
+/**
+ * ‏**نافذةُ «تراجَع» بعد الجدولة من اللوحة** (D-324 · نمط D-303) — بالثواني، **ولا يُنشَر شيءٌ فيها**.
+ *
+ * ‏كان «اعتمد وجدوِل» و«جدوِل» يُغلقان الإشعارَ بلا رجعة: المجدولةُ تُسحب من بطاقتها، ثمّ يُتراجَع عن اعتمادها في موضعٍ
+ * ‏ثانٍ. فصار الإشعارُ يحمل «تراجَع» دقيقتين، **والضمانُ في الجدولة لا في الزرّ**: أقربُ موعدٍ تقبله اللوحةُ بعد النافذة
+ * ‏(`holdSeconds`)، والدورةُ لا ترسل إلّا ما حلّ موعدُه (`dueNow`) — فلا تبلغ رسالةٌ الطابورَ وزرُّ «تراجَع» قائم.
+ * ‏وبعد النافذة يبقى «اسحب الموعد» في بطاقتها كما كان، ما لم تُرسَل.
+ */
+export const UNDO_WINDOW_SECONDS = 120
+
+/** آخرُ لحظةٍ يُقبل فيها «تراجَع» — تُحمَل في زرّ الإشعار (`undo.fields`) كما يحمل زرُّ D-303 موعدَه. */
+export function undoUntil(now: Date): string {
+  return new Date(now.getTime() + UNDO_WINDOW_SECONDS * 1000).toISOString()
 }
 
 /**
@@ -78,6 +95,8 @@ export async function schedulePost(
   now: Date,
   /** منظّمةُ الجلسة حين يأتي الطلبُ من اللوحة (D-277): منشورُ منظّمةٍ أخرى «لا منشور» */
   org: string | null = null,
+  /** ‏إمساكٌ بالثواني (D-324): موعدٌ أقربُ منه يُردّ، فلا يُنشَر شيءٌ في نافذة «تراجَع». وصفرٌ لمن لا «تراجَع» له. */
+  holdSeconds = 0,
 ): Promise<ScheduleResult> {
   const post = await db
     // ‏المنظّمةُ تُقرأ مع الصفّ، وكلُّ ما بعده يُقيَّد بها (D-277)
@@ -101,7 +120,7 @@ export async function schedulePost(
   if (lacking !== null) return { ok: false, reason: lacking }
 
   const account = await db
-    .prepare('SELECT id, platform, status, display_name FROM accounts WHERE id = ? AND org_id = ?')
+    .prepare('SELECT id, platform, status, display_name, external_id FROM accounts WHERE id = ? AND org_id = ?')
     .bind(accountId, post.org_id)
     .first<AccountRow>()
   if (account === null) return { ok: false, reason: 'لا حساب بهذا المعرّف' }
@@ -118,12 +137,30 @@ export async function schedulePost(
   if (account.status !== 'active') {
     return { ok: false, reason: `${account.display_name}: الحساب ${account.status} — جدّد إذنه أوّلا` }
   }
+  // ‏**وسلسلةُ X نُشر أوّلُها تُكمَل من حسابها** (مراجعة D-324): «أعده» يمحو الحساب، وجدولتُها على حسابٍ آخر تشقّها بين
+  // ‏حسابين — ردٌّ من هذا على تغريدة ذاك. فتُردّ هنا باسم حسابها، والناشرُ يردّها أيضًا إن وصلته
+  if (post.platform === 'x') {
+    const author = await threadAuthor(db, postId, post.org_id)
+    if (author !== null && author !== account.external_id) {
+      const first = await db
+        .prepare("SELECT display_name FROM accounts WHERE org_id = ? AND platform = 'x' AND external_id = ? LIMIT 1")
+        .bind(post.org_id, author)
+        .first<{ display_name: string }>()
+      return {
+        ok: false,
+        reason: `نُشر أوّلُ هذه السلسلة من ${first === null ? 'حسابٍ آخر على X' : `«${first.display_name}»`} — جدوِلها عليه لتكتمل في موضعها`,
+      }
+    }
+  }
 
   const at = parseWhen(when)
   if (at === null) return { ok: false, reason: 'موعد غير مفهوم — الصيغة YYYY-MM-DDTHH:MM' }
   // موعدٌ مضى يُرسَل في أوّل دورة — وذاك إرسالٌ فوريّ لا جدولة. ومَن أراد
   // الفورَ فليقل ذلك بموعدٍ قريب، لا بموعدٍ في الماضي
   if (at <= dbNow(now)) return { ok: false, reason: 'الموعد في الماضي' }
+  if (holdSeconds > 0 && at < dbNow(new Date(now.getTime() + holdSeconds * 1000))) {
+    return { ok: false, reason: 'الموعد بعد أقلّ من دقيقتين، ولا يُنشَر شيءٌ في دقيقتي التراجع — اختر موعدًا أبعد قليلًا' }
+  }
 
   await db
     .prepare(
@@ -194,6 +231,40 @@ export async function restoreSchedule(
     .bind(at, accountId, postId, org)
     .run()
   return { ok: true, at, account: accountId, platform: '' }
+}
+
+/**
+ * ‏**«تراجَع» في إشعار الجدولة** (D-324): يعيد المنشورَ إلى ما كان قبل الضغطة — مسوّدةً تنتظر القرار بعد «اعتمد وجدوِل»
+ * ‏(`to: 'draft'`)، أو معتمَدةً تنتظر موعدًا بعد «جدوِل» (`to: 'approved'`). والنصُّ كما هو: ما حُفظ قبل الضغطة حُفظ.
+ *
+ * ‏**والحارسُ في جملة التحديث نفسِها** (كـ `undoApprove`): مجدولةٌ بالموعد نفسِه الذي حمله الزرّ، ولم تُختَم للإرسال — فإشعارٌ
+ * ‏شاخ لا يسحب موعدًا جديدًا ضُبط بعده، ولا يُستردّ ما غادر. **والنافذةُ تُقرأ من الزرّ** (`until`)، وتحريفُها لا يفتح شيئًا:
+ * ‏ما لم يُختَم يُسحب من بطاقته أصلًا، وما خُتم لا يُسحب بحال.
+ */
+export async function undoSchedule(
+  db: Db,
+  postId: string,
+  org: string,
+  undo: { readonly at: string; readonly until: string; readonly to: 'draft' | 'approved' },
+  now: Date,
+): Promise<ScheduleResult> {
+  const until = Date.parse(undo.until)
+  if (Number.isNaN(until) || now.getTime() > until) {
+    return { ok: false, reason: 'مضت دقيقتا التراجع — اسحب موعدَها من بطاقتها إن أردت' }
+  }
+  const draft = undo.to === 'draft' ? 1 : 0
+  const moved = await db
+    .prepare(
+      `UPDATE posts SET status = ?, scheduled_at = NULL, account_id = NULL,
+              approved_at = CASE WHEN ? = 1 THEN NULL ELSE approved_at END,
+              approved_by = CASE WHEN ? = 1 THEN NULL ELSE approved_by END
+        WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL AND scheduled_at = ?
+        RETURNING platform`,
+    )
+    .bind(draft === 1 ? 'draft' : 'approved', draft, draft, postId, org, undo.at)
+    .first<{ platform: string }>()
+  if (moved === null) return { ok: false, reason: 'تبدّل موعدُها أو حالُها بعد الإشعار — أعد تحميل الصفحة' }
+  return { ok: true, at: '', account: '', platform: moved.platform }
 }
 
 /**
@@ -284,6 +355,12 @@ export async function requeue(db: Db, postId: string, now: Date, org: string | n
   }
   if (stuck && attempts.results.length > 0) {
     return { ok: false, reason: `حاولت الدورة منذ أقلّ من ${STUCK_MINUTES} دقيقة — انتظر جوابها` }
+  }
+  // ‏**وتغريدةٌ من سلسلةٍ أُرسلت ولم يُعرَف جوابُها** (مراجعة D-324) كمحاولةٍ بقيت `sent`: الإعادةُ ترسلها ثانيةً وقد تكون على X.
+  // ‏فتُردّ حتّى يقول المالكُ ما وجده («لم أجدها» أو «وجدتُها» برابطها — `settleTweet`)
+  const open = await unsettledTweet(db, postId, row.org_id)
+  if (open !== null) {
+    return { ok: false, reason: `التغريدة ${open} من السلسلة أُرسلت ولم يُعرف ردُّها — تحقّق على X وقل ما وجدت أوّلًا` }
   }
 
   const moved = await db

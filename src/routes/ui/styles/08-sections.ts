@@ -308,7 +308,12 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 /* ‏‏والمقطعُ يُركَّز بحبر التركيز الصلب لا بالهالة (D-323 · WCAG 1.4.11): الهالةُ ربعُ شفافيّة ‏1.46:1 نهارًا و‏1.87:1 ليلًا،
    والمؤشّرُ الوحيدُ على «من فكرة · من مصدر» — والزرُّ الدائريُّ نفسُه مخفيّ («opacity:0»)، فحلقتُه لا تُرى */
 .seg label:has(input:focus-visible){outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
-.composer:has([name=cmp][value=write]:checked) #idea,.composer:has([name=cmp][value=idea]:checked) #write{display:none}
+/* ‏والبابُ الثالث «بنفسي» (D-324): المختارُ وحدَه ظاهر، وبلا «:has» تظهر الأبوابُ الثلاثة */
+.composer:has([name=cmp][value=write]:checked) #idea,.composer:has([name=cmp][value=own]:checked) #idea,
+.composer:has([name=cmp][value=idea]:checked) #write,.composer:has([name=cmp][value=own]:checked) #write,
+.composer:has([name=cmp][value=idea]:checked) #own,.composer:has([name=cmp][value=write]:checked) #own{display:none}
+/* ‏وعدّادُ «بنفسي» تحت حقله سطرًا وحدَه — ولسلسلة X عدُّ كلّ تغريدة */
+#own .draft-len{display:block; margin-top:var(--s-1)}
 .cmp-act{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4)}
 .cmp-act .ago{flex:1 1 14rem}
 .cmp-more{margin-top:var(--s-3)}

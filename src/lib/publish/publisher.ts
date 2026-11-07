@@ -27,6 +27,8 @@ import {
   PublishError, type PublishResult,
 } from './platforms'
 import { publishInstagram } from './instagram'
+import { publishXThread } from './xThread'
+import { tweetsOf } from '../draft/thread'
 import { isLinkedInPage } from '../channels'
 import { mediaUrl, signMediaToken } from '../media/link'
 import { publishTikTok, tiktokNote } from './tiktok'
@@ -52,6 +54,8 @@ interface PostRow {
   org_id: string
   account_id: string
   text: string
+  /** نوعُ المنشور كما اعتُمد — `thread` وحدها تُنشَر سلسلة (مراجعة D-324). */
+  type: string
   status: string
   idempotency_key: string
   approved_at: string | null
@@ -141,7 +145,7 @@ export async function publishPost(
   // ١ — المنشور وحسابه
   const post = await db
     .prepare(
-      `SELECT p.id, p.org_id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
+      `SELECT p.id, p.org_id, p.account_id, p.text, p.type, p.status, p.idempotency_key, p.approved_at,
               a.platform, a.external_id, a.kind AS account_kind,
               a.status AS account_status
          FROM posts p JOIN accounts a ON a.id = p.account_id
@@ -349,9 +353,19 @@ export async function publishPost(
 
   const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
   const hasUrl = containsUrl(post.text)
+  // ‏**وسلسلةُ X تغريداتٌ من نصّها** (D-324): سطرُ `---` بينها. ولكلّ تغريدةٍ مفتاحُها وعلامتُها وكلفتُها في `xThread.ts`.
+  // ‏**والنوعُ المعتمَد هو الحَكَم لا النصُّ** (مراجعة D-324): منشورٌ اعتُمد تغريدةً واحدةً قبل السلاسل وفي نصّه سطرُ `---`
+  // ‏كان يُشقّ عند النشر تغريداتٍ مدفوعةً لم يعتمدها أحد. والاعتمادُ والحفظُ والاستيرادُ يكتبون النوعَ من النصّ
+  const tweets = post.platform === 'x' && post.type === 'thread' ? tweetsOf('x', post.text) : [post.text]
+  const thread = tweets.length > 1
 
   // ٣ — المحاولة تُسجَّل قبل الإرسال
   const attemptId = crypto.randomUUID()
+  const attemptRequest: Record<string, unknown> = {
+    platform: post.platform, has_url: hasUrl, length: post.text.length,
+    ...(thread ? { thread: tweets.length } : {}),
+    ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
+  }
   await db
     .prepare(
       `INSERT INTO publish_attempts
@@ -363,10 +377,7 @@ export async function publishPost(
       post.id,
       post.idempotency_key,
       attemptNo,
-      JSON.stringify({
-        platform: post.platform, has_url: hasUrl, length: post.text.length,
-        ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
-      }),
+      JSON.stringify(attemptRequest),
       post.org_id,
       // ‏عمودًا لا نصًّا في JSON وحدَه (D-291): فيُقرأ في سلّم الجاهزيّة ويُسأل عنه
       deps.queueAttempt ?? null,
@@ -380,7 +391,8 @@ export async function publishPost(
   // لا يحمل غيرَهما، ويُضيَّق النوعُ هنا بلا فحصٍ يتظاهر بالحراسة
   const paying = post.platform as PublishPlatform
   const unitCost = estimatePostCost(paying, hasUrl)
-  if (unitCost > 0) {
+  // ‏والسلسلةُ تُسجَّل تغريدةً تغريدة قبل كلّ إرسال (`xThread.ts`) — لا مرّةً هنا ولا مرّتين
+  if (unitCost > 0 && !thread) {
     await recordCost(db, {
       provider: post.platform,
       operation: hasUrl ? 'create_post_with_url' : 'create_post',
@@ -541,7 +553,9 @@ export async function publishPost(
               fetchImpl,
               mediaId,
             )
-          : await publishX(tokens.accessToken, post.text, fetchImpl, mediaId)
+          : thread
+            ? await publishXThread(db, post, { id: attemptId, request: attemptRequest }, tweets, tokens.accessToken, fetchImpl, mediaId)
+            : await publishX(tokens.accessToken, tweets[0]!, fetchImpl, mediaId)
     }
   } catch (error) {
     /*
