@@ -25,7 +25,7 @@
 ## ٣ · قبل كلّ دفعة
 
 ```
-npm run ci                                             # الأنواع وثلاث عشرة بوّابة والاختبارات (3,295)؛ وفي CI قبلها npm audit --omit=dev (D-319)
+npm run ci                                             # الأنواع وثلاث عشرة بوّابة والاختبارات (3,301)؛ وفي CI قبلها npm audit --omit=dev (D-319)
 flock /tmp/sada-audit.lock npm run audit               # التصميم والسلّم والجوّال والطباعة وCSP والروابط والوصول (‏1280 و‏390 ومفتوحًا، D-323)
 flock /tmp/sada-audit.lock bash -c 'npm run render && npm run text'
 npm run journeys                                       # الرحلات المقيسة على نسخةٍ حيّة: 32 من 32
