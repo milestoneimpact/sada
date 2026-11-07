@@ -113,8 +113,25 @@ describe('أبوابُ التشغيل بلا أسماء (D-318)', () => {
     const res = await app.request('/ready', {}, env)
     expect(res.status).toBe(503)
     const body = await res.json() as Record<string, unknown>
-    expect(body).toEqual({ ready: false, service: 'sada-api', database: 'ok' })
+    // ‏(D-319) و`version` معه: معرّفُ النسخة المخدومة، و`null` حيث لا ربطَ له (هنا) — لا اسمَ سرٍّ ولا بيئة
+    expect(body).toEqual({ ready: false, service: 'sada-api', database: 'ok', version: null })
     expect(JSON.stringify(body)).not.toMatch(/SECRET|CLIENT_ID|vault|staging/i)
+  })
+
+  it('«/ready» يقول أيَّ نسخةٍ يخدم (D-319): معرّفُها من ربط `version_metadata` كما هو، ولا يُخترَع بدونه', async () => {
+    const id = '8d4b5f0e-2a1c-4e7b-9f3d-6c5a1b2e3f40'
+    const meta = { id, tag: '', timestamp: '2026-11-07T00:00:00.000Z' }
+    const served = await app.request('/ready', {}, { ...env, CF_VERSION_METADATA: meta })
+    expect(served.status).toBe(503)
+    expect(await served.json()).toEqual({ ready: false, service: 'sada-api', database: 'ok', version: id })
+
+    // ‏ومعرّفٌ ليس نصًّا (ربطٌ تالف أو غيرُ ما يُنتظَر) لا يُكتب كما وصل: `null` لا `[object Object]`
+    const odd = await app.request('/ready', {}, { ...env, CF_VERSION_METADATA: { id: 42 } })
+    expect((await odd.json() as { version: unknown }).version).toBeNull()
+
+    // ‏وتفصيلُ الإدارة يحمله كذلك، بالمعرّف نفسِه
+    const detail = await app.request('/admin/ready', { headers: { Authorization: `Bearer ${TOKEN}` } }, { ...env, CF_VERSION_METADATA: meta })
+    expect((await detail.json() as { version: unknown }).version).toBe(id)
   })
 
   it('والتفصيلُ خلف كلمة الإدارة، والإخفاقُ ردٌّ واحدٌ لا يقول شيئًا', async () => {

@@ -11,29 +11,47 @@ on:
   # مقصورٌ على main، فبقي الفرع بلا بوّابة — ولا سبيل لتشغيلها إلا بدفعة.
   # وبوّابةٌ لا تُشغَّل عند الطلب تدفع إلى دفعةٍ فارغة تكسر قاعدة الدقائق،
   # أو إلى دمجٍ بلا بوّابة. وكلاهما أسوأ من سطرين هنا.
+  # ‏وما نجح منه على main يُنشَر إلى staging كما تُنشَر الدفعة (deploy.yml، مراجعة D-319).
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # ‏يُلغى الجاري في طلبات الدمج وحدها (مراجعة D-319): على main صار النشرُ ينتظر نجاحَ ci على رأسه، وإعادةُ ci على التزامٍ قديمٍ
+  # ‏كانت تلغي ci الأحدثَ الجاري، فلا يُنشَر رأسُ main ولا يقول شيءٌ ذلك. فعلى main ينتظر الجديدُ ما قبله (والمنتظِرُ الأقدمُ يُلغى).
+  # ‏وثمنُه دقائقُ دفعتين في أربع دقائق: في آخر ‏12 دفعةً أقصرُ فاصلٍ ‏6.5 دقيقة وأطولُ ci ‏246 ثانية، فلا تداخلَ واحد.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   ci:
+    # ‏على المسوّدة اسمُ الفحص `ci (draft)` لا `ci` (مراجعة D-319): العملُ المتخطّى يُبلَّغ «Success» ولا يمنع الدمج ولو كان فحصًا
+    # ‏مشروطًا (وثائق GitHub)، فكان كلُّ التزامٍ في مسوّدةٍ يحمل `ci` متخطًّى = ناجحًا (قُرئ: ‏42400351053 على 887ed01)، والقاعدةُ
+    # ‏(M-43) ترى `ci` أخضرَ قبل أن يجري. وباسمٍ آخر يبقى `ci` المشروطُ «Expected» حتّى يجري فعلًا. وفي غير المسوّدة الاسمُ `ci`.
+    name: ${{ github.event.pull_request.draft && 'ci (draft)' || 'ci' }}
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # ‏بمعرّف التزامٍ كامل لا بوسمٍ يتحرّك (D-319)، والإصدارُ في التعليق يقرؤه Dependabot
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
 
       - run: npm ci
+
+      # ‏بوّابةُ الاعتماديّات (D-319): ما يُشحَن إلى Worker (`dependencies`) بلا ثغرةٍ عالية أو حرجة معروفة. خطوةٌ وحدَها لا داخل
+      # ‏`npm run ci`: هذه تسأل سجلَّ npm عن الثغرات، و`npm run ci` يجري بلا شبكة. ولا تغطّي أدواتِ التطوير: تلك لا تُشحَن،
+      # ‏ويرفعها Dependabot شهريًّا (`.github/dependabot.yml`). وإن احمرّت بلا تغييرٍ منك فثغرةٌ نُشرت اليوم: `npm audit --omit=dev`
+      # ‏يسمّيها، و`npm audit fix` أو رفعُ الحزمة يسدّها.
+      - name: الاعتماديّات
+        run: npm audit --omit=dev --audit-level=high
 
       # مرآة `npm run ci` المحلي: لا بوابة هنا ليست عند المطور
       - run: npm run ci

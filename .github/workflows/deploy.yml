@@ -2,11 +2,18 @@ name: deploy
 
 # النشر لا يبدأ إلا ببوابة خضراء، والترحيل قبل الدالة دائما (CLAUDE.md).
 #
-# staging: تلقائي على كل دمج في main.
-# production: يدوي وحده، وعبر بيئة GitHub محمية توجب موافقة بشرية —
-#             لا نشر إنتاج بضغطة سهو.
+# staging: تلقائيٌّ **بعد أن ينجح `ci` على الالتزام نفسِه** في main (D-319)، **وهو رأسُ main ساعتَها** (مراجعة D-319).
+# production: يدويٌّ وحده (Run workflow)، وعبر بيئة GitHub اسمُها `production`: ما يضبطه المالكُ عليها
+#             (موافقون، وفروعٌ يُنشَر منها، وسرٌّ للبيئة وحدها) يحرس كلَّ نشرٍ إليها — M-44.
+#
+# ‏**ولا تُعاد البوّابةُ هنا** (D-319): كان هذا السيرُ يُطلَق مع `ci` على كلّ دفعةٍ ويعيد `npm run ci` كاملًا على الالتزام
+# ‏الذي يفحصه `ci` في اللحظة نفسِها — ‏150 ثانيةً من ‏194 (وسيطُ آخر عشرة)، وأربعُ دقائقَ مفوترةٌ لكلّ دمجٍ بدل دقيقة، والدقائقُ
+# ‏نفدت ثلاثَ مرّات (M-23). فصار يُطلَق حين يكتمل `ci` (`workflow_run`)، ويسأل GitHub عن نجاحه على الالتزام قبل أيّ خطوة،
+# ‏والبوّابةُ تجري هنا احتياطًا حين لا تشغيلَ لـ`ci` عليه أصلًا (نشرٌ يدويٌّ لالتزامٍ لم يمرّ به).
 on:
-  push:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -18,66 +25,127 @@ on:
         options: [staging, production]
 
 concurrency:
-  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  group: deploy-${{ inputs.environment || 'staging' }}
   cancel-in-progress: false
 
+# ‏`actions: read` لسؤال GitHub عن تشغيلات `ci` على الالتزام (مستودعٌ خاصّ) — ولا كتابةَ لشيء.
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
+    # ‏ما يُطلَق من `ci`: نجح، على دفعةٍ إلى main أو تشغيلٍ يدويٍّ عليه (مخرجُ ci.yml حين لا ينطلق شيء، مراجعة D-319)، في هذا
+    # ‏المستودع نفسِه. و`branches: [main]` وحده لا يكفي: طلبُ دمجٍ من نسخةٍ فرعُها اسمُه main يُطابقه — فالحدثُ والمستودعُ شرطان
+    # ‏معه. **ولا يكفي هذا كلُّه**: إعادةُ ci على التزامٍ قديمٍ في main تُطابقه، فخطوةُ «رأس main» أوّلًا.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+    timeout-minutes: 30
+    environment: ${{ inputs.environment || 'staging' }}
     env:
-      TARGET: ${{ github.event.inputs.environment || 'staging' }}
-      # معرّف الحساب في wrangler.toml لا هنا — قيمةٌ في ملفّ تُراجَع،
-      # وسرٌّ يُلصق يدوياً أسقط نشرين. ولا يُمرَّر من الأسرار إطلاقاً:
-      # متغيّر البيئة يغلب الملفّ، فقيمةٌ فاسدة فيه تُبطل الملفّ الصحيح.
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TARGET: ${{ inputs.environment || 'staging' }}
+      # ‏الالتزامُ الذي فحصه `ci` — ويُنشَر إن كان رأسَ main وحده (خطوةُ «رأس main»)
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # ‏**ولا `CLOUDFLARE_API_TOKEN` هنا** (D-319): كان على مستوى العمل، فيراه `npm ci` بسكربتات تثبيته، وسلسلةُ الاختبار كلُّها.
+      # ‏صار على الخطوات الثلاث التي تكلّم Cloudflare وحدها: الترحيل والطوابير والنشر. ومعرّفُ الحساب في wrangler.toml لا هنا:
+      # ‏متغيّرُ البيئة يغلب الملفّ، فقيمةٌ فاسدة فيه تُبطل الملفّ الصحيح.
     steps:
-      - uses: actions/checkout@v4
+      # ‏**أوّلًا، وقبل السحب** (مراجعة D-319): أهذا الالتزامُ رأسُ main الآن؟ وإلّا فإعادةُ ci على التزامٍ قديمٍ تنشره فوق الأحدث
+      # ‏ويخضرّ كلُّ فحص (فـ`wait` يجد النسخةَ القديمة هي المنشورة للتوّ)، ووسمٌ اسمُه main يمرّ بشرط العمل. فإن تجاوزه main انتهى
+      # ‏العملُ أخضرَ بلا نشر — والأحدثُ يُنشَر حين ينجح ci عليه — وكلُّ خطوةٍ بعدها بشرط `go`. وقبل السحب لأنّ ما بعده شيفرةُ
+      # ‏الالتزام، لا شيفرةُ main. والنشرُ اليدويُّ لا يُسأل عنه: يُنشَر ما شُغّل منه، وفرعُه شرطُ البيئة (M-44).
+      - name: أهو رأسُ main؟
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != workflow_run ]; then
+            echo "نشرٌ يدويّ: الالتزامُ $SHA رأسُ ما شُغّل منه."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! HEAD=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha) || [ -z "$HEAD" ]; then
+            echo "::error::تعذّر سؤالُ GitHub عن رأس main — لا نشر. أعد هذا التشغيل (Re-run all jobs)."
+            exit 1
+          fi
+          if [ "$HEAD" != "$SHA" ]; then
+            echo "::notice::ci نجح على $SHA، ورأسُ main صار $HEAD — لا يُنشَر ما تجاوزه main، والأحدثُ يُنشَر حين ينجح ci عليه."
+            echo "لم يُنشَر \`$SHA\`: رأسُ main \`$HEAD\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "رأسُ main هو $SHA."
+          echo "go=true" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
+      # ‏كلُّ إجراءٍ بمعرّف التزامٍ كامل لا بوسم (D-319): الوسمُ يتحرّك، ومن ملكه غيّر ما يجري هنا بلا أن يتغيّر سطرٌ في المستودع.
+      # ‏والإصدارُ في التعليق يقرؤه Dependabot فيرفع الاثنين معا.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.head.outputs.go == 'true'
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.head.outputs.go == 'true'
         with:
           node-version: '22'
           cache: npm
 
-      - run: npm ci
+      # ‏قبل التثبيت: لا يحتاج إلّا node، والحكمُ يقرّر هل تجري البوّابةُ هنا. ينتظر `ci` إن كان جاريًا (نشرٌ يدويّ)، ويرفض إن سقط.
+      - name: بوّابة ci على هذا الالتزام
+        id: ci
+        if: steps.head.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deploy_checks.mjs ci-gate "$GITHUB_REPOSITORY" "$SHA"
 
-      # البوابة نفسها التي يشغلها المطور محليا. لا نشر على شيفرة لم تمر
-      - name: البوابة
+      # ‏بلا سكربتات التثبيت (D-319): ثلاثةُ حزمٍ فيها سكربت (esbuild وworkerd وfsevents)، وwrangler يبني ويرفع بدونها —
+      # ‏جُرّب: `wrangler deploy --dry-run` يُخرج الحزمةَ نفسَها بايتًا ببايت، و`npm run ci` كاملًا أخضر. فما يُثبَّت لا يجري فيه شيء.
+      - name: التثبيت
+        if: steps.head.outputs.go == 'true'
+        run: npm ci --ignore-scripts
+
+      # ‏**في كلّ نشر لا في الاحتياط وحده** (مراجعة D-319): نشرُ الإنتاج يدويٌّ وبعد الدمج بأسابيع (M-22)، وحكمُ ci يومَ الدمج لا
+      # ‏يعرف ثغرةً نُشرت بعده — والقاعدةُ «ما يُشحَن بلا ثغرةٍ عالية معروفة» تُقال ساعةَ الشحن. ثوانٍ، والشبكةُ هنا متاحة.
+      - name: الاعتماديّات
+        if: steps.head.outputs.go == 'true'
+        run: npm audit --omit=dev --audit-level=high
+
+      # ‏الاحتياطُ وحده: لا تشغيلَ مكتملًا لـ`ci` على هذا الالتزام. مرآةُ ci.yml (والاعتماديّاتُ قبلها لكلّ نشر)
+      - name: البوابة (لا ci على هذا الالتزام)
+        if: steps.head.outputs.go == 'true' && steps.ci.outputs.gate == 'run'
         run: npm run ci
 
       # يفشل مبكرا برسالة مفهومة بدل أن يفشل wrangler برسالة غامضة.
-      #
-      # لم يبقَ إلا الرمز يُفحَص: معرّف الحساب انتقل إلى wrangler.toml بعد
-      # أن أسقط نشرين، ورسالة wrangler عنه كانت تعرض `***` لأنّ GitHub
-      # يقنّع السرّ — فلا يعرف قارئ السجلّ ما العلّة. وما لا يُلصق يدوياً
-      # لا يحتاج بوّابة تحرسه.
+      # ‏ولا يرى الرمزَ نفسَه (D-319): يرى «أهو مضبوط» نعم أو لا.
       - name: التحقّق من الرمز
+        if: steps.head.outputs.go == 'true'
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN غير مضبوط في أسرار المستودع."
-            echo "::error::Settings ← Secrets and variables ← Actions ← New repository secret"
+          if [ "$HAS_TOKEN" != true ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN غير مضبوط لبيئة $TARGET."
+            echo "::error::Settings ← Environments ← $TARGET ← Environment secrets (M-44)، أو Secrets and variables ← Actions (M-10)"
             exit 1
           fi
           echo "الرمز حاضر. ومعرّف الحساب من wrangler.toml."
 
-      # معرّفاتُ الإنتاج ما تزال PLACEHOLDER حتّى تُنشَأ مواردُه (M-05).
+      # ‏معرّفاتُ الإنتاج حقيقيّةٌ منذ 2026-10-20؛ والحارسُ باقٍ لمن يعيد PLACEHOLDER إلى الملفّ.
       #
-      # وبدونها يسقط النشر **في عمق wrangler برسالةٍ لا تدلّ**:
+      # ‏وبدونه يسقط النشر **في عمق wrangler برسالةٍ لا تدلّ**:
       #
       #   A request to the Cloudflare API (/d1/database/PLACEHOLDER_D1_PRODUCTION_ID/query)
       #   Invalid property: databaseId => Invalid uuid [code: 7400]
       #
       # فيقرؤها المالك فيظنّ العطلَ عابراً، **ويعيد التشغيل على staging
       # فيخضرّ** — فيحسب الإنتاجَ منشوراً وهو لم يُنشَر قطّ. وقد وقع.
-      #
-      # وهذه هي حجّة خطوة «التحقّق من الرمز» نفسها: يفشل مبكراً برسالةٍ
-      # مفهومة. **وقد كُتبت لسبب واحد من سببين** — فيُغلَق الثاني.
       - name: التحقّق من معرّفات البيئة
-        if: env.TARGET == 'production'
+        if: steps.head.outputs.go == 'true' && env.TARGET == 'production'
         run: |
           if grep -q 'PLACEHOLDER_' wrangler.toml; then
             echo "::error::معرّفات الإنتاج في wrangler.toml ما تزال PLACEHOLDER — والإنتاج لا يُنشَر بها."
@@ -97,6 +165,9 @@ jobs:
       # تلقائيا في بيئة CI غير التفاعلية — فلا حاجة إليه أصلا.
       # و 0001_init طُبِّق يدويا عبر API وسُجِّل في d1_migrations، فلا يُعاد.
       - name: الترحيل
+        if: steps.head.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler d1 migrations apply "$([ "$TARGET" = production ] && echo sada || echo sada-staging)" --env "$TARGET" --remote
 
       # ولا --yes هنا: جُرّب فردّ Unknown argument: yes.
@@ -108,6 +179,9 @@ jobs:
       # ‏وفي البيئتين (D-269): طابورُ أعطال التوليد جديدٌ على staging أيضا، ونشرٌ
       # ‏يسمّي طابورا لا وجودَ له يُردّ قبل أن يبدأ.
       - name: الطوابير
+        if: steps.head.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           suffix="$([ "$TARGET" = production ] && echo "" || echo "-staging")"
           for q in sada-publish sada-generate sada-publish-dlq sada-generate-dlq; do
@@ -118,8 +192,20 @@ jobs:
             fi
           done
 
+      # ‏ومعرّفُ النسخة من ملفّ مخرَج wrangler (D-319) لا من نصٍّ مطبوع: هو ما يقوله `/ready` بعدُ إن كانت هي المخدومة.
+      # ‏والالتزامُ رسالةُ النسخة، فتُقرأ في لوحة Cloudflare (Deployments) أيُّ شيفرةٍ هي.
       - name: النشر
-        run: npx wrangler deploy --env "$TARGET"
+        id: deploy
+        if: steps.head.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-deploy.ndjson
+        run: |
+          npx wrangler deploy --env "$TARGET" --message "$SHA"
+          VERSION=$(node scripts/deploy_checks.mjs deployed "$WRANGLER_OUTPUT_FILE_PATH")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "نُشرت النسخة $VERSION من الالتزام $SHA على $TARGET."
+          echo "النسخة \`$VERSION\` ← الالتزام \`$SHA\` ← \`$TARGET\`" >> "$GITHUB_STEP_SUMMARY"
 
       # لا نقول إنّ النشر نجح حتّى يقول الخادم إنّه نجح.
       #
@@ -128,18 +214,26 @@ jobs:
       # كلّ نشرٍ أحمر طوالها لصار الأحمر عادةً تُتجاهَل — وحين يقع عطلٌ
       # حقيقيّ لا يميّزه أحد. فالأسرار الناقصة **تحذير**، وتُذكر بأسمائها.
       #
-      # وما يُحاسَب عليه النشر ثلاثة، وكلّها فشلٌ حقيقيّ:
-      #   ١ · أن يستجيب الخادم أصلاً       — وإلا فالنشر لم يهبط
-      #   ٢ · أن يكون الرادّ صدى لا قالباً — بحقلٍ لا يعرفه غيرها
-      #   ٣ · أن تكون القاعدة موصولة       — الربوط والترحيل معاً
+      # وما يُحاسَب عليه النشر أربعة، وكلّها فشلٌ حقيقيّ:
+      #   ١ · أن يستجيب **النطاقُ المخصّص** أصلاً — وإلا فالنشر لم يهبط
+      #   ٢ · أن يخدم النسخةَ التي نُشرت للتوّ — لا بناءً قديمًا لم يُستبدَل (D-319)
+      #   ٣ · أن يكون الرادّ صدى لا قالباً — بحقلٍ لا يعرفه غيرها
+      #   ٤ · أن تكون القاعدة موصولة       — الربوط والترحيل معاً
+      # ‏**و٣ و٤ وحكمُ الجاهزيّة على جواب النسخة الجديدة** (مراجعة D-319): كانت تُقرأ من أوّل جوابٍ، وهو جوابُ البناء القديم في الحال
+      # ‏التي بُني لها ٢ نفسُه — فتمرّ نسخةٌ لا تصل D1 على جواب سابقتها.
+      # ‏ولا بديلَ workers.dev (D-319): كان يُقبَل حين لا يردّ النطاق، فيخضرّ نشرٌ لا يصل العنوانَ الذي يفتحه المالك وتعود إليه
+      # ‏المنصّات. وأُطفئ workers.dev في البيئتين (wrangler.toml)، والإنتاجُ لم يكن له أصلًا.
       - name: التحقّق من النشر
+        if: steps.head.outputs.go == 'true'
+        env:
+          DEPLOYED: ${{ steps.deploy.outputs.version }}
         run: |
           BASE=$([ "$TARGET" = production ] && echo https://sada.basserh.com || echo https://sada2.basserh.com)
           probe() {
             for i in 1 2 3 4 5; do
-              CODE=$(curl -s -o /tmp/ready.json -w '%{http_code}' --max-time 15 "$1/ready" || echo 000)
+              CODE=$(curl -s -o /tmp/first.json -w '%{http_code}' --max-time 15 "$1/ready" || echo 000)
               echo "  $1 → HTTP $CODE"
-              [ "$CODE" != 000 ] && { cat /tmp/ready.json; echo; return 0; }
+              [ "$CODE" != 000 ] && { cat /tmp/first.json; echo; return 0; }
               sleep 6
             done
             return 1
@@ -147,33 +241,28 @@ jobs:
 
           echo "فحص النطاق المخصّص"
           if ! probe "$BASE"; then
-            echo "::warning::$BASE لا يستجيب — النطاق لم يُربط بعد (M-05)."
-            DEV=$(npx wrangler deployments list --env "$TARGET" 2>/dev/null | grep -om1 'https://[a-z0-9.-]*workers\.dev' || true)
-            if [ -z "$DEV" ]; then
-              echo "::error::لا النطاق استجاب ولا استُنتج عنوان workers.dev. النشر مشكوك فيه."
-              exit 1
-            fi
-            echo "فحص عنوان workers.dev"
-            if ! probe "$DEV"; then
-              echo "::error::لا النطاق ولا workers.dev استجابا. النشر مشكوك فيه."
-              exit 1
-            fi
+            echo "::error::$BASE لا يستجيب. النطاقُ غيرُ مربوطٍ بهذا الـ Worker (M-05 · M-22)، أو النشرُ لم يهبط."
+            exit 1
           fi
 
-          # ٢ · الرادّ صدى لا قالب: اسمُ الخدمة في جوابها. وكان `phase_0`، فخرج مع التفصيل
+          # ٢ · النطاقُ يخدم النسخةَ التي نُشرت للتوّ (D-319): يسأل حتّى دقيقة، فالانتقالُ على الحافّة ثوانٍ.
+          #     ويكتب جوابَ النسخة التي طابقت في /tmp/ready.json (مراجعة D-319)، فكلُّ ما بعده يقرؤه هو
+          node scripts/deploy_checks.mjs wait "$BASE" "$DEPLOYED" /tmp/ready.json
+
+          # ٣ · الرادّ صدى لا قالب: اسمُ الخدمة في جوابها. وكان `phase_0`، فخرج مع التفصيل
           #     إلى `/admin/ready` خلف كلمة الإدارة (D-318): `/ready` العامّ يقول الحالَ وحدَها
           if ! grep -q '"service":"sada-api"' /tmp/ready.json; then
             echo "::error::الخادم يستجيب لكن جوابه ليس جواب صدى — قالبٌ قديم ما يزال منشوراً؟"
             exit 1
           fi
 
-          # ٣ · القاعدة موصولة: يثبت الربوط والترحيل معاً
+          # ٤ · القاعدة موصولة **في النسخة الجديدة**: يثبت الربوط والترحيل معاً
           if ! grep -q '"database":"ok"' /tmp/ready.json; then
-            echo "::error::صدى منشورة لكنّها لا تصل إلى D1. ربطٌ ناقص أو ترحيلٌ لم يُطبَّق."
+            echo "::error::النسخةُ التي نُشرت للتوّ لا تصل إلى D1. ربطٌ ناقص أو ترحيلٌ لم يُطبَّق."
             exit 1
           fi
 
-          # ٤ · الوثيقتان العامّتان تفتحان (D-038)
+          # ٥ · الوثيقتان العامّتان تفتحان (D-038)
           #
           # هما رابطان تضعهما في مراجعة LinkedIn و Meta، وقيمتُهما في أن
           # يفتحا لغريبٍ بلا جلسة. ومسارٌ ينكسر بعد شهر يسقط الطلبَ صامتاً
@@ -208,7 +297,7 @@ jobs:
             fi
           done
 
-          # ٥ · ملفّاتُ إثبات ملكيّة النطاق تُخدَم حرفا بحرف (D-094)
+          # ٦ · ملفّاتُ إثبات ملكيّة النطاق تُخدَم حرفا بحرف (D-094)
           #
           # وهي حجّةُ الوثيقتين نفسُها: رابطٌ لا يفتح يُسقط مراجعةَ
           # المنصّة صامتاً. **والأسماءُ تُقرأ من السجلّ لا تُكتب هنا** —
@@ -229,7 +318,7 @@ jobs:
           done
 
           if grep -q '"ready":true' /tmp/ready.json; then
-            echo "النشر تمّ، والنظام جاهز."
+            echo "النشر تمّ، والنسخةُ المنشورة هي المخدومة، والنظام جاهز."
             exit 0
           fi
 

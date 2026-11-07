@@ -67,6 +67,12 @@ export interface Env {
    * وغيابُه لا يفتح شيئا: لا رمزَ يُرسَل، والدخولُ بمفتاح المرور باقٍ.
    */
   readonly EMAIL?: import('./lib/mail/send').MailBinding
+  /**
+   * ‏ربطُ `version_metadata` (D-319): **أيُّ نسخةٍ من الـ Worker تخدم هذا الطلب** — المعرّفُ نفسُه الذي يطبعه `wrangler deploy`.
+   * ‏يقوله `/ready` ليقارنه سيرُ النشر بما نشره للتوّ: بناءٌ قديمٌ لم يُستبدَل كان يمرّ بكلّ فحص. واختياريٌّ لأنّ الاختبارَ
+   * ‏و`wrangler dev` بلا نسخة، فيُقال `null` ولا يُخترَع معرّف.
+   */
+  readonly CF_VERSION_METADATA?: { readonly id: string; readonly tag: string; readonly timestamp: string }
 
   // أسرار Worker
   readonly TOKEN_ENC_KEY: string

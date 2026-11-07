@@ -5,7 +5,7 @@
 #
 # مُعرّفات staging حقيقية، أُنشئت في 2026-09-04 وطُبّق عليها الترحيل.
 # وهي ليست أسراراً: مُعرّف قاعدة أو مساحة لا يمنح وصولاً بلا مصادقة الحساب.
-# مُعرّفات الإنتاج ما تزال PLACEHOLDER ولا تعمل قبل أن تُنشَأ (M-05).
+# ومُعرّفات الإنتاج حقيقيّةٌ كذلك منذ 2026-10-20 (D1 وKV أدناه)، والإنتاجُ مؤجَّلٌ بقرار (D-271 · M-22).
 
 # معرّف الحساب هنا لا في أسرار GitHub: ليس سرّاً — لا يمنح وصولاً بلا رمز
 # مصادقة — ولصقه يدوياً في سرّ أسقط نشرين. وقيمة في ملفّ تُراجَع في طلب دمج
@@ -21,9 +21,18 @@ compatibility_flags = ["nodejs_compat"]
 # النطاق: sada2.basserh.com  (لا يُخلَط بالإنتاج — CLAUDE.md)
 
 [env.staging]
-# عنوان workers.dev يعطي staging رابطا يعمل فور النشر، قبل ربط النطاق.
-# لا يُستعمل في OAuth: روابط العودة مسجّلة على sada2.basserh.com وحده
-workers_dev = true
+# ‏**أصلٌ واحدٌ عامّ: sada2.basserh.com** (D-319). كان `workers_dev = true` «رابطا يعمل فور النشر قبل ربط النطاق»، والنطاقُ
+# ‏مربوطٌ منذ 2026-09، وstaging يحمل حساباتِ المالك الحقيقيّة (D-271): فعنوانُ workers.dev أصلٌ ثانٍ للـ Worker نفسِه لا يمرّ
+# ‏بما يُضبَط على النطاق (WAF وحدود المعدّل وAccess)، وفحصُ النشر كان يقبله بديلا فيخضرّ والنطاقُ لا يردّ. فأُطفئ،
+# ‏ومعه روابطُ المعاينة لكلّ نسخة (`preview_urls`): بدونها صريحةً يُبقيها wrangler على حالها في الحساب (أصلٌ ثالث).
+# ‏ولا يُستعمل أيٌّ منهما في OAuth: روابطُ العودة مسجّلةٌ على sada2.basserh.com وحده.
+workers_dev = false
+preview_urls = false
+
+# ‏أيُّ نسخةٍ تخدم الطلب (D-319): `/ready` يقول معرّفَها، وسيرُ النشر يقارنه بما نشره للتوّ على النطاق نفسِه.
+# ‏والربطُ لا يُورَث من الجذر: يُكتب في كلّ بيئة.
+[env.staging.version_metadata]
+binding = "CF_VERSION_METADATA"
 
 [env.staging.vars]
 SADA_ENV = "staging"
@@ -134,6 +143,11 @@ dead_letter_queue = "sada-publish-dlq-staging"
 
 [env.production]
 workers_dev = false
+# ‏ولا روابطَ معاينةٍ لكلّ نسخة: أصلٌ واحدٌ عامّ، sada.basserh.com (D-319)
+preview_urls = false
+
+[env.production.version_metadata]
+binding = "CF_VERSION_METADATA"
 
 [env.production.vars]
 SADA_ENV = "production"

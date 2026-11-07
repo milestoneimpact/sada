@@ -106,11 +106,20 @@ app.get('/health', (c) =>
  * جاهزيّةُ التشغيل لمن لا يُعرَف — **الحالُ وحدَها** (D-318): جاهزٌ أم لا، والقاعدةُ موصولةٌ أم لا، واسمُ الخدمة ليعرف
  * سيرُ النشر أنّ الرادَّ صدى. وكان يردّ أسماءَ الأسرار الناقصة وما سدّته الخزانةُ لأيّ أحد: خريطةٌ لما ينقص البيئةَ ولأيّ
  * منصّةٍ تُدار بالخزانة. **والتفصيلُ كما كان خلف كلمة الإدارة** (`/admin/ready`).
+ *
+ * ‏**ومعرّفُ النسخة المخدومة** (D-319): كان سيرُ النشر يفحص الجوابَ ولا يعرف أهو من البناء الذي نشره للتوّ أم من قديمٍ لم
+ * ‏يُستبدَل — فبناءٌ عالقٌ يمرّ بكلّ فحص. والمعرّفُ من ربط `version_metadata` كما هو (لا سرَّ فيه ولا اسمَ بيئة)، و`null` بدونه.
  */
 app.get('/ready', async (c) => {
   const { ready, database } = await readinessDetail(c.env)
-  return c.json({ ready, service: 'sada-api', database }, ready ? 200 : 503)
+  return c.json({ ready, service: 'sada-api', database, version: servedVersion(c.env) }, ready ? 200 : 503)
 })
+
+/** ‏معرّفُ النسخة من ربطها — نصًّا غيرَ فارغٍ وإلّا فـ`null`: ربطٌ غائبٌ أو تالفٌ لا يُكتب في الجواب كما وصل (D-319). */
+function servedVersion(env: Env): string | null {
+  const id: unknown = env.CF_VERSION_METADATA?.id
+  return typeof id === 'string' && id !== '' ? id : null
+}
 
 /**
  * حارس `/admin/*` في موضعٍ واحد — **وسيطٌ قبل المسارات لا نداءٌ في كلٍّ منها** (D-318).
@@ -143,7 +152,7 @@ app.get('/admin/ready', async (c) => {
   } catch {
     keys = 'unreadable'
   }
-  return c.json({ ...detail, keys }, detail.ready ? 200 : 503)
+  return c.json({ ...detail, version: servedVersion(c.env), keys }, detail.ready ? 200 : 503)
 })
 
 async function readinessDetail(env: Env): Promise<{
