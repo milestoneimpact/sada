@@ -31,6 +31,7 @@ import type { Platform, Provider } from '../oauth/providers'
 import type { ClientCredentials, TokenResponse } from '../oauth/exchange'
 import { isExpiring, OAuthError, refreshToken } from '../oauth/exchange'
 import { parseGranted } from '../oauth/scopes'
+import { withTimeout } from '../net/timeout'
 
 /**
  * كم يبقى على الانتهاء فيُجدَّد — **ساعتان لا خمسُ دقائق.**
@@ -42,6 +43,33 @@ import { parseGranted } from '../oauth/scopes'
  * وساعتان تحتملان ثمانيَ دوراتٍ ساقطة.
  */
 export const RENEW_MARGIN_SECONDS = 7200
+
+/**
+ * ‏**مهلةُ نداء التجديد** (D-320) — كان `fetch` عاريًا، والتجديدُ يقع في الدورة **قبل الإرسال**: نهايةُ OAuth تعلق كانت
+ * ‏تؤخّر كلَّ منشورٍ مستحقٍّ حتّى يُقتَل الاستدعاء. وخمسَ عشرةَ ثانيةً أضعافُ ما تحتاجه نهايةٌ سليمة.
+ */
+export const RENEW_TIMEOUT_MS = 15_000
+
+/**
+ * ‏**ميزانيّةُ الدورة** (D-320): التجديدُ قبل الإرسال في الدورة نفسِها، فخمسةٌ وعشرون نداءً بمهلة خمسَ عشرةَ ثانية تؤخّر
+ * ‏الإرسالَ ستَّ دقائق في أسوأ حال. فبعد دقيقةٍ يقف، **وما بقي ينتظر الدورةَ التالية بلا عقوبة** — والهامشُ ساعتان (ثماني دورات).
+ */
+export const RENEW_BUDGET_MS = 60_000
+
+/**
+ * ‏**التباعدُ بعد السقوط** (D-320): حسابٌ لم يتجدّد ينتظر نصفَ ساعة، ثمّ ضعفَ ما انتظر، حتّى يومٍ لا أكثر. والسليمُ لا ينتظر.
+ *
+ * ‏كان الساقطُ — ردّ المزوّدُ إذنَه، أو انتهى إذنُ تجديده، أو سرُّ التطبيق ناقص — أقدمَ الرموز انتهاءً، فيُختار أوّلًا في كلّ
+ * ‏دورة (ستًّا وتسعين مرّةً في اليوم)، **وخمسةٌ وعشرون منه تملأ الدفعةَ فلا يصل السليمَ دورُه حتّى يموت رمزُه**.
+ */
+export const RENEW_BACKOFF_BASE_MS = 30 * 60_000
+export const RENEW_BACKOFF_MAX_MS = 24 * 3600_000
+
+/** موعدُ المحاولة التالية بعد سقوطٍ رقمُه `failures + 1`. */
+export function nextRenewAt(failures: number, now: Date): string {
+  const wait = Math.min(RENEW_BACKOFF_BASE_MS * 2 ** Math.max(0, failures), RENEW_BACKOFF_MAX_MS)
+  return new Date(now.getTime() + wait).toISOString()
+}
 
 export interface RenewDeps {
   readonly db: Db
@@ -68,6 +96,8 @@ interface DueRow {
   platform: string
   /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-277). */
   org_id: string
+  /** ‏كم سقط تجديدُه متتاليًا (D-320) — صفرٌ للسليم، وغيابُه صفر. */
+  renew_failures?: number
 }
 
 /**
@@ -75,6 +105,9 @@ interface DueRow {
  *
  * ويُستثنى `revoked` وحده: `needs_reauth` **يُحاوَل مرّةً أخرى** —
  * فقد عُلّم بخطأٍ عابر، ورمزُ تجديدِه قد يكون سليما.
+ *
+ * ‏**والسليمُ أوّلًا** (D-320): ما لم يسقط قبلُ (`renew_failures = 0`) يتقدّم على ما سقط، وما سقط لا يُختار قبل موعده
+ * ‏(`renew_retry_at`). فلا تملأ الدفعةَ حساباتٌ لا تتجدّد.
  */
 export async function dueForRenewal(
   db: Db,
@@ -85,15 +118,16 @@ export async function dueForRenewal(
   try {
     const { results } = await db
       .prepare(
-        `SELECT t.account_id, a.platform, a.org_id
+        `SELECT t.account_id, a.platform, a.org_id, t.renew_failures
            FROM tokens t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
           WHERE a.status != 'revoked'
             AND t.refresh_enc IS NOT NULL
-            AND t.expires_at <= ?
-          ORDER BY t.expires_at ASC
+            AND t.expires_at <= ?1
+            AND (t.renew_retry_at IS NULL OR t.renew_retry_at <= ?2)
+          ORDER BY t.renew_failures ASC, t.expires_at ASC
           LIMIT 25`,
       )
-      .bind(cutoff)
+      .bind(cutoff, now.toISOString())
       .all<DueRow>()
     return results
   } catch {
@@ -157,7 +191,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
       creds,
       stored.refreshToken,
       now,
-      deps.fetchImpl ?? fetch,
+      withTimeout(deps.fetchImpl ?? fetch, RENEW_TIMEOUT_MS),
       parseGranted(stored.scopes),
     )
     await saveTokens(deps.db, deps.encKey, row.account_id, mergeRenewed(fresh, stored))
@@ -214,14 +248,32 @@ export async function noteRenewal(db: Db, accountId: string, org: string, note: 
   }
 }
 
+/**
+ * ‏يؤجّل حسابًا لم يتجدّد (D-320): يعدّ السقوطَ ويضع موعدَ المحاولة التالية. **ولا يُسقط الدورةَ إن لم يُكتب**: أسوأُ ما
+ * ‏يقع أن يُحاوَل الحسابُ في الدورة التالية كما كان.
+ */
+export async function holdRenewal(db: Db, row: DueRow, now: Date): Promise<void> {
+  try {
+    await db
+      .prepare('UPDATE tokens SET renew_failures = renew_failures + 1, renew_retry_at = ? WHERE account_id = ? AND org_id = ?')
+      .bind(nextRenewAt(row.renew_failures ?? 0, now), row.account_id, row.org_id)
+      .run()
+  } catch (error) {
+    console.warn({ job: 'renew-hold', account: row.account_id, failed: String(error) })
+  }
+}
+
 /** دورةُ التجديد — **تقع قبل الطابور**، كما وعد تعليقُ الناشر. */
 export async function renewDue(deps: RenewDeps): Promise<RenewSummary> {
-  const now = (deps.now ?? (() => new Date()))()
+  const clock = deps.now ?? (() => new Date())
+  const now = clock()
   const rows = await dueForRenewal(deps.db, now)
   let renewed = 0
   let needsOwner = 0
   let deferred = 0
   for (const row of rows) {
+    // ‏ميزانيّةُ الدورة (D-320): ما بقي ينتظر التالية — والإرسالُ بعد هذه في الدورة نفسِها
+    if (clock().getTime() - now.getTime() >= RENEW_BUDGET_MS) break
     try {
       const out = await renewOne(deps, row)
       if (out.kind === 'renewed') renewed += 1
@@ -230,11 +282,14 @@ export async function renewDue(deps: RenewDeps): Promise<RenewSummary> {
       // ‏والسببُ يبقى على الحساب لا في العدّ وحدَه (D-291)
       if (out.kind === 'renewed') await noteRenewal(deps.db, row.account_id, row.org_id, null)
       else if (out.kind !== 'skipped') await noteRenewal(deps.db, row.account_id, row.org_id, out.why)
+      // ‏وما لم يتجدّد يتباعد (D-320): لا يعود في الدورة التالية ليحجب سليمًا
+      if (out.kind === 'needs_owner' || out.kind === 'deferred') await holdRenewal(deps.db, row, now)
     } catch (error) {
       // **حسابٌ يسقط لا يُسقط البقيّة** — دورةٌ تتوقّف عند أوّل عطلٍ
       // تترك حساباتٍ سليمةً تموت رموزُها
       deferred += 1
       await noteRenewal(deps.db, row.account_id, row.org_id, String(error).slice(0, 120))
+      await holdRenewal(deps.db, row, now)
     }
   }
   return { due: rows.length, renewed, needsOwner, deferred }

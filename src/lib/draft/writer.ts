@@ -164,7 +164,7 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
           user: call.user,
           json: true,
         },
-        deps.fetchImpl ?? fetch,
+        deps.fetchImpl,
       )
       text = result.text
       spent = { ...result.usage, cachedInputTokens: 0, model: result.model }

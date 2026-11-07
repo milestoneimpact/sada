@@ -106,6 +106,8 @@ queue = "sada-generate-staging"
 
 # المستهلك: دفعة صغيرة ومحاولات محدودة. المفتاح يمنع التكرار، لكن كل
 # محاولة على X تُحاسَب — فلا تُترك المحاولات مفتوحة.
+# ‏`retry_delay` (D-320): ما يفلت من الإمساك في الشيفرة (استدعاءٌ قُتل، أو عطلٌ قبل الحلقة) يعيده Cloudflare بعد دقيقة
+# ‏لا فورًا — كانت الإعاداتُ الثلاث تُستنفَد في ثوانٍ قبل أن يعود D1. والإعادةُ من الشيفرة تحمل مهلتَها (60/300/900).
 # ‏مستهلكا طابورَي الأعطال (D-270): ما استنفد محاولاتَه يُعلَّم `failed` بأثرٍ ويُقَرّ،
 # ‏فيراه التنبيهُ واللوحةُ بدل أن يبقى «في الطابور» بلا جواب. ولا إعادةَ هنا.
 [[env.staging.queues.consumers]]
@@ -113,12 +115,14 @@ queue = "sada-publish-dlq-staging"
 max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 0
+retry_delay = 60
 
 [[env.staging.queues.consumers]]
 queue = "sada-generate-dlq-staging"
 max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 0
+retry_delay = 60
 
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
@@ -127,6 +131,7 @@ queue = "sada-generate-staging"
 max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+retry_delay = 60
 dead_letter_queue = "sada-generate-dlq-staging"
 
 [[env.staging.queues.consumers]]
@@ -136,6 +141,7 @@ queue = "sada-publish-staging"
 max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+retry_delay = 60
 dead_letter_queue = "sada-publish-dlq-staging"
 
 # ── production ──────────────────────────────────────────────────────
@@ -214,12 +220,14 @@ queue = "sada-publish-dlq"
 max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 0
+retry_delay = 60
 
 [[env.production.queues.consumers]]
 queue = "sada-generate-dlq"
 max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 0
+retry_delay = 60
 
 # ‏مستهلكُ طابور التوليد (D-269): كان مُنتَجا بلا مستهلكٍ في الملفّ، فرسائلُ
 # ‏التحليل ومسوّداتُ الخطّة لا يعالجها شيءٌ إلّا إن ضُبط من اللوحة بيد.
@@ -228,6 +236,7 @@ queue = "sada-generate"
 max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+retry_delay = 60
 dead_letter_queue = "sada-generate-dlq"
 
 [[env.production.queues.consumers]]
@@ -237,4 +246,5 @@ queue = "sada-publish"
 max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+retry_delay = 60
 dead_letter_queue = "sada-publish-dlq"

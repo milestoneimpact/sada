@@ -39,6 +39,13 @@ import { readSettings } from '../settings'
 
 export interface PublishMessage {
   readonly postId: string
+  /**
+   * ‏**الموعدُ الذي أُرسلت له رسالةٌ مؤجَّلة** (D-320) — `scheduled_at` كما كان حين أُرسلت. تختم منشورَها عند وصولها إن بقي
+   * ‏كما أُرسلت له (`claimDelivery`)، وإلّا لا تفعل شيئًا. وغيابُه رسالةُ ما حلّ موعدُه وخُتم قبل الإرسال، كما كانت.
+   */
+  readonly due?: string
+  /** ‏ومنظّمتُه (D-277): الختمُ عند الوصول يُقيَّد بها. يُحمَل مع `due`. */
+  readonly org?: string
 }
 
 /** مهلةُ نداءات النشر: قطعُ المقاطع تُدفَع واحدةً بعد أخرى، فدقيقتان لكلّ نداء تكفي أكبرَها. */
@@ -359,30 +366,43 @@ export async function publishPost(
   const tweets = post.platform === 'x' && post.type === 'thread' ? tweetsOf('x', post.text) : [post.text]
   const thread = tweets.length > 1
 
-  // ٣ — المحاولة تُسجَّل قبل الإرسال
+  // ٣ — المحاولة تُسجَّل قبل الإرسال، **وكتابتُها حجز** (D-320): المحفّزُ (0047) يردّ صفَّ `sent` ثانيًا بالمفتاح نفسِه
   const attemptId = crypto.randomUUID()
   const attemptRequest: Record<string, unknown> = {
     platform: post.platform, has_url: hasUrl, length: post.text.length,
     ...(thread ? { thread: tweets.length } : {}),
     ...(deps.queueAttempt === undefined ? {} : { queue_attempt: deps.queueAttempt }),
   }
-  await db
-    .prepare(
-      `INSERT INTO publish_attempts
-         (id, post_id, idempotency_key, attempt_no, request_json, status, org_id, queue_attempt)
-       VALUES (?1, ?2, ?3, ?4, ?5, 'sent', ?6, ?7)`,
-    )
-    .bind(
-      attemptId,
-      post.id,
-      post.idempotency_key,
-      attemptNo,
-      JSON.stringify(attemptRequest),
-      post.org_id,
-      // ‏عمودًا لا نصًّا في JSON وحدَه (D-291): فيُقرأ في سلّم الجاهزيّة ويُسأل عنه
-      deps.queueAttempt ?? null,
-    )
-    .run()
+  try {
+    await db
+      .prepare(
+        `INSERT INTO publish_attempts
+           (id, post_id, idempotency_key, attempt_no, request_json, status, org_id, queue_attempt)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'sent', ?6, ?7)`,
+      )
+      .bind(
+        attemptId,
+        post.id,
+        post.idempotency_key,
+        attemptNo,
+        JSON.stringify(attemptRequest),
+        post.org_id,
+        // ‏عمودًا لا نصًّا في JSON وحدَه (D-291): فيُقرأ في سلّم الجاهزيّة ويُسأل عنه
+        deps.queueAttempt ?? null,
+      )
+      .run()
+  } catch (error) {
+    /*
+     * ‏**تسليمٌ آخرُ سبق إلى الحجز** (D-320): الطابورُ «مرّةً على الأقلّ»، ورسالتان للمنشور نفسِه مرّتا من سؤالَي `succeeded`
+     * ‏و`sent` معًا. فيخرج هذا بلا نداءٍ ولا كلفة، **ولا يُعلَّم المنشورُ «نُشر»**: الآخرُ لم يُعرَف جوابُه بعد، وهو يكتبه.
+     * ‏وتعارضُ `(post_id, attempt_no)` من السباق نفسِه: حسبا الرقمَ نفسَه قبل أن يكتب أحدُهما.
+     */
+    if (await heldElsewhere(db, post, error)) {
+      console.info({ job: 'publish', post: post.id, held_elsewhere: true })
+      return { kind: 'skipped_duplicate', platformPostId: '' }
+    }
+    throw error
+  }
 
   // ٤ — التكلفة تُسجَّل قبل أن يُعدّ الطلب ناجحا
   //
@@ -393,14 +413,24 @@ export async function publishPost(
   const unitCost = estimatePostCost(paying, hasUrl)
   // ‏والسلسلةُ تُسجَّل تغريدةً تغريدة قبل كلّ إرسال (`xThread.ts`) — لا مرّةً هنا ولا مرّتين
   if (unitCost > 0 && !thread) {
-    await recordCost(db, {
-      provider: post.platform,
-      operation: hasUrl ? 'create_post_with_url' : 'create_post',
-      units: 1,
-      unitCost,
-      refId: post.id,
-      org: post.org_id,
-    })
+    try {
+      await recordCost(db, {
+        provider: post.platform,
+        operation: hasUrl ? 'create_post_with_url' : 'create_post',
+        units: 1,
+        unitCost,
+        refId: post.id,
+        org: post.org_id,
+      })
+    } catch (error) {
+      /*
+       * ‏**الدفترُ سقط بين الحجز والإرسال، ولم يُرسَل شيء** (D-320): كان يرمي من هنا فيبقى الصفُّ `sent`، وأوّلُ إعادةٍ تجده
+       * ‏فتُفشل المنشورَ نهائيًّا بـ«تحقّق على المنصّة» — عطلٌ في دفترنا يصير سؤالًا للمالك عن X. فيُفكّ الحجزُ ويُعاد بتباعد.
+       * ‏**ولا يُرسَل بلا دفتر** (D-008). وإن سقط الفكُّ أيضًا رُمي الأوّل: الصفُّ `sent` يمنع الإرسالَ — الاتّجاهُ الآمن.
+       */
+      await releaseUnsent(db, attemptId, post.org_id, error)
+      return { kind: 'failed', reason: 'pre_send: لم يُكتب الدفتر فلم يُرسَل شيء', retryable: true }
+    }
   }
 
   // ٥ — الرفعُ ثمّ الإرسال
@@ -441,7 +471,7 @@ export async function publishPost(
       // **وبصفرٍ مُعلَّم**: سعرُ رفع الوسائط عند X لم يُؤكَّد بعد
       // (docs/PLATFORMS.md)، ورقمٌ مخترَعٌ كذب، وسكوتٌ عن نداءٍ وقع يجعل
       // الدفتر أقلَّ من الحقيقة — وهو الاتّجاه الأسوأ للخطأ
-      await recordCost(db, {
+      await ledger(db, {
         provider: post.platform,
         operation: 'media_upload:price_unverified',
         units: 1,
@@ -485,7 +515,7 @@ export async function publishPost(
         throw new PublishError('instagram_needs_base_url', 500, false)
       }
       const token = await signMediaToken(encKey, image.id, now())
-      await recordCost(db, {
+      await ledger(db, {
         provider: post.platform,
         operation: 'instagram_publish:price_unverified',
         units: 1,
@@ -520,7 +550,7 @@ export async function publishPost(
       // ‏**بمداه لا كاملًا** (D-179): السائقُ يقرأ القطعةَ التي يدفعها، فلا يُحمَل مقطعُ المالك كلُّه
       const clip = await bucketClip(deps.bucket!, image!.r2_key, image!.mime)
       if (clip === null) throw new PublishError('media_bytes_missing', 502, false)
-      await recordCost(db, {
+      await ledger(db, {
         provider: post.platform,
         operation: 'clip_upload:price_unverified',
         units: 1,
@@ -607,6 +637,50 @@ export async function publishPost(
   await markPublished(db, post.id, post.org_id, result.platformPostId)
 
   return { kind: 'published', platformPostId: result.platformPostId }
+}
+
+/**
+ * ‏**قيدٌ في الدفتر داخل الإرسال، قبل النداء الذي يُقيَّد له** (D-320): عطلُ D1 هنا لم يُرسِل شيئًا، فيُرمى `PublishError`
+ * ‏قابلًا للإعادة فيُكتب الصفُّ `failed` ويُعاد بتباعد — لا «unconfirmed_send» يُفشل المنشورَ ويسأل المالكَ عن المنصّة.
+ */
+async function ledger(db: Db, entry: Parameters<typeof recordCost>[1]): Promise<void> {
+  try {
+    await recordCost(db, entry)
+  } catch (error) {
+    throw new PublishError(`pre_send: لم يُكتب الدفتر فلم يُرسَل شيء (${String(error).slice(0, 120)})`, 503, true)
+  }
+}
+
+/**
+ * ‏أردُّ الإدخال يعني أنّ تسليمًا آخرَ يحمل المفتاحَ الآن؟ (D-320) — ردُّ المحفّز (0047) يقوله نصًّا. وتعارضُ رقم المحاولة
+ * ‏`(post_id, attempt_no)` يقوله حين يُرى بعده صفٌّ `sent` أو `succeeded` بالمفتاح؛ وإلّا فهو صفُّ أثرٍ كُتب معًا (الكنّاسُ
+ * ‏أو طابورُ الأعطال) فيُرمى العطلُ ويُعاد بتباعد، ولا يُقَرّ ما لم يحجزه أحد.
+ */
+async function heldElsewhere(db: Db, post: { idempotency_key: string; org_id: string }, error: unknown): Promise<boolean> {
+  const text = error instanceof Error ? error.message : String(error)
+  if (text.includes('d004_once')) return true
+  if (!/UNIQUE constraint failed/i.test(text)) return false
+  const held = await db
+    .prepare(`SELECT 1 AS held FROM publish_attempts WHERE idempotency_key = ? AND org_id = ? AND status IN ('sent', 'succeeded') LIMIT 1`)
+    .bind(post.idempotency_key, post.org_id)
+    .first<{ held: number }>()
+    .catch(() => null)
+  return held !== null
+}
+
+/**
+ * ‏يفكّ حجزًا لم يُرسَل بعده شيء (D-320): الصفُّ `failed` بعلامة `pre_send` فتمضي الإعادةُ، **والشرطُ `status = 'sent'`** فلا
+ * ‏يمسّ صفًّا كتب غيرُه جوابَه. وفكٌّ يسقط يرمي العطلَ الأوّل: ما بقي `sent` لا يُرسَل ثانيةً، وهو الاتّجاهُ الآمن.
+ */
+async function releaseUnsent(db: Db, attemptId: string, org: string, cause: unknown): Promise<void> {
+  try {
+    await db
+      .prepare(`UPDATE publish_attempts SET status = 'failed', response_json = ? WHERE id = ? AND org_id = ? AND status = 'sent'`)
+      .bind(JSON.stringify({ error: `pre_send: ${String(cause).slice(0, 160)}`, pre_send: true }), attemptId, org)
+      .run()
+  } catch {
+    throw cause
+  }
 }
 
 async function markPublished(db: Db, postId: string, org: string, _platformPostId: string): Promise<void> {

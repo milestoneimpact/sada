@@ -49,6 +49,7 @@
  */
 import type { Platform, Provider } from './providers'
 import type { ClientCredentials } from './exchange'
+import { withTimeout } from '../net/timeout'
 
 export type Verdict =
   /** السرُّ مرفوض — المعرّفُ معروفٌ عند المنصّة والسرُّ لا يوافقه. */
@@ -112,7 +113,7 @@ const ID_FAILURES: ReadonlySet<string> = new Set([
 export async function verifyAppCredentials(
   provider: Provider,
   creds: ClientCredentials,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 15_000),
 ): Promise<Verdict> {
   const blocked = PROBE_UNAVAILABLE[provider.platform]
   if (blocked !== undefined) return { kind: 'unsupported', detail: blocked }

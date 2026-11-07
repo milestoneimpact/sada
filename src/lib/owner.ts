@@ -544,6 +544,15 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏حكمٌ يُقال لا حالٌ يُقرأ من البيئة (D-061)
     done: () => null,
   },
+  {
+    code: 'M-47',
+    title: 'مراقب من خارج Cloudflare على /pulse (بعد D-320)',
+    ifLeft:
+      'إن وقف الـ Cron كلُّه وقف معه ما ينبّهك: **لا تخرج المنشوراتُ المجدولة ولا يقول أحدٌ ذلك** حتّى تفتح اللوحة — خطرٌ صامتٌ لا عطلٌ قائم.',
+    unblocks: 'guard',
+    // ‏المراقبُ عند مزوّده، ونداؤه لا يُحفَظ هنا (D-061)
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

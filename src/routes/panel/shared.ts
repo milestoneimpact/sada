@@ -24,6 +24,7 @@ import { record } from '../../lib/audit'
 import { loginPage, type PanelFlash } from '../panelView'
 import { say, type ErrorId } from '../../lib/errors/catalog'
 import { recordReject } from '../../lib/forms'
+import { enqueueAhead } from '../../lib/schedule/job'
 
 /** أسماء أسرار المدمَجين — سرٌّ في البيئة يغلب ما في الجدول. */
 export const BUILTIN_SECRET: Readonly<Record<string, string>> = {
@@ -332,6 +333,29 @@ export function finalizeLater(
     c.executionCtx.waitUntil(job)
   } catch {
     // ‏لا سياقَ تنفيذٍ خارج Worker
+  }
+}
+
+/**
+ * ‏**أفعالُ اللوحة التي تضع موعدًا** (D-320): الجدولةُ و«اعتمد وجدوِل» والتوزيعُ وتغييرُ الموعد والتراجعُ عن السحب، وجدولةُ
+ * ‏الخطّة وتأخيرُ بندها، ومنشوراتُ المقطع بموعدها. بعد كلٍّ منها تُرسَل الرسالةُ المؤجَّلةُ إلى دقيقتها (`dispatchSoon`).
+ */
+export const SCHEDULING_PATHS = /^\/panel\/(?:drafts\/(?:decide|schedule|spread\/apply|undo-unschedule|reschedule)|plan\/(?:schedule|review\/delay)|uploads\/[^/]+\/(?:posts|schedule))$/
+
+/**
+ * ‏**موعدٌ قريبٌ يُرسَل إلى دقيقته الآن** (D-320): الدورةُ ترسل ما يحلّ قبل التي بعدها، وموعدٌ بعد خمس دقائق يُضبط بين دورتين
+ * ‏فلا تراه دورةٌ قبله — فكان يخرج في الدورة التالية، حتّى ثلاثَ عشرةَ دقيقةً بعد ما وُعد. فبعد كلّ فعلٍ يضع موعدًا يُرسَل ما
+ * ‏يحلّ في الأفق **بعد الردّ** (`waitUntil`)، والمالكُ لا ينتظره. وعطلُه لا يمسّ شيئًا: الدورةُ تُرسله كما كانت.
+ */
+export function dispatchSoon(c: { env: Env; executionCtx: { waitUntil(p: Promise<unknown>): void } }): void {
+  const queue = c.env.PUBLISH_QUEUE as Env['PUBLISH_QUEUE'] | undefined
+  if (queue === undefined) return
+  const job = enqueueAhead({ db: c.env.DB, queue })
+    .catch((error: unknown) => { console.warn({ job: 'dispatch-soon', failed: error instanceof Error ? error.message : 'unexpected_error' }); return 0 })
+  try {
+    c.executionCtx.waitUntil(job)
+  } catch {
+    // ‏لا سياقَ تنفيذٍ خارج Worker: يجري ولا يُنتظَر
   }
 }
 

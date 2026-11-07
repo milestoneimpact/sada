@@ -283,7 +283,7 @@ export async function askWriter(
         json: true,
         maxTokens: ask.maxTokens,
       },
-      deps.fetchImpl ?? fetch,
+      deps.fetchImpl,
     )
     return {
       text: result.text,

@@ -31,6 +31,7 @@
  * — فيُقرأ «طلبٌ خطأ» وهو «حسابٌ خطأ». فتُقرأ رسالةُ Meta وتُنقَل كما هي.
  */
 import { PublishError, type PublishResult } from './platforms'
+import { withTimeout } from '../net/timeout'
 
 /** ما يُنشَر على Instagram — **ولا ثالثَ لهما**. */
 export type InstagramMedia =
@@ -105,7 +106,7 @@ export async function publishInstagram(
   userId: string,
   media: InstagramMedia,
   caption: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   sleep: (ms: number) => Promise<void> = (ms) =>
     new Promise((r) => { setTimeout(r, ms) }),
 ): Promise<InstagramOutcome> {

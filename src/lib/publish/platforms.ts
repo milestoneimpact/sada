@@ -18,6 +18,7 @@
  */
 import { LINKEDIN, X } from '../oauth/providers'
 import { littleText } from './littleText'
+import { withTimeout } from '../net/timeout'
 
 export class PublishError extends Error {
   override readonly name = 'PublishError'
@@ -83,7 +84,7 @@ export async function publishLinkedIn(
   accessToken: string,
   authorUrn: string,
   text: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   imageUrn: string | null = null,
 ): Promise<PublishResult> {
   const request = {
@@ -131,7 +132,7 @@ export async function publishLinkedIn(
 export async function publishX(
   accessToken: string,
   text: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   mediaId: string | null = null,
   replyTo: string | null = null,
 ): Promise<PublishResult> {
@@ -184,7 +185,7 @@ export async function uploadLinkedInImage(
   accessToken: string,
   ownerUrn: string,
   upload: Upload,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
 ): Promise<string> {
   const init = await fetchImpl(LINKEDIN.uploadUrl, {
     method: 'POST',
@@ -243,7 +244,7 @@ export function xMediaCategory(mime: string): 'tweet_image' | 'tweet_gif' | 'twe
 export async function uploadXMedia(
   accessToken: string,
   upload: Upload,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
 ): Promise<string> {
   const form = new FormData()
   // نسخةٌ في `ArrayBuffer` صريح: `Blob` تقبله في كلّ بيئة، ونوعُ

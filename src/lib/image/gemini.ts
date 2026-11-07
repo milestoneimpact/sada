@@ -15,6 +15,8 @@
  * الرسالة، ويُفحَص شكلُ الجواب حقلا حقلا بدل أن يُفترَض.
  */
 
+import { withTimeout } from '../net/timeout'
+
 export interface ImageCall {
   readonly apiKey: string
   readonly model: string
@@ -88,7 +90,7 @@ export async function generateImage(call: ImageCall): Promise<ImageResult> {
   if (call.apiKey.trim().length === 0) {
     throw new ImageError('لا مفتاح لـ Gemini', 503, false)
   }
-  const fetchImpl = call.fetchImpl ?? fetch
+  const fetchImpl = withTimeout(call.fetchImpl ?? fetch, 120_000)
 
   let response: Response
   try {

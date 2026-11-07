@@ -1,17 +1,19 @@
 /**
  * جمعُ ما يستحقّ أن يُوقظ المالك (D-109).
  *
- * **ثلاثةٌ في العمل ورابعُها أمانُ الحساب** (D-317) — ولا يُقرأ منها إلّا ما وقع فعلا:
+ * **ثلاثةٌ في العمل ورابعُها أمانُ الحساب** (D-317) **وخامسُها نبضٌ تأخّر** (D-320) — ولا يُقرأ منها إلّا ما وقع فعلا:
  *
  * - إذنٌ يقترب: من `token_alerts` الذي يُكتَب أصلا (0016).
  * - نشرٌ فشل نهائيّا: منشورٌ حالُه `failed` — **والطابورُ فرغ منه**.
  * - سقفُ إنفاقٍ بُلغ: من `cost_ledger` مقابلَ الإعداد.
  * - حدثُ أمان: صفٌّ كُتب في `alert_outbox` عند وقوعه ولم يُرسَل بعد.
+ * - نبضٌ تأخّر: دورةُ الإرسال أو التجديد لم تدُر في موعدها، أو مستهلكُ النشر لم يأخذ ما سُلّم إليه (`ops/pulse.ts`).
  *
  * **ولا يُخترَع حدثٌ لتكتمل القائمة** — قاعدةُ D-104 نفسُها في موضعٍ آخر.
  */
-import { budgetAlert, MAX_TRIES, publishAlert, tokenAlert, type Alert } from './outbox'
+import { budgetAlert, heartbeatAlert, MAX_TRIES, publishAlert, tokenAlert, type Alert } from './outbox'
 import type { Db } from '../tokens'
+import { pulseReport } from '../ops/pulse'
 
 /** اليومُ بصيغة القاعدة — والسقفُ يوميٌّ فمفتاحُه يومٌ لا لحظة. */
 function dayOf(now: Date): string {
@@ -83,6 +85,12 @@ export async function collectAlerts(
     .all<{ ref: string; body: string; org_id: string }>()
     .catch(() => ({ results: [] as { ref: string; body: string; org_id: string }[] }))
   for (const s of security) out.push({ kind: 'security', ref: s.ref, body: s.body, org: s.org_id })
+
+  // ── ٥ · نبضٌ تأخّر (D-320) ─────────────────────────────────────────
+  // ‏**والمتأخّرُ وحدَه**: «لم يدُر قطّ» و«سقط في آخر مرّة» يُريان في اللوحة ويقولهما `/pulse` لمراقبه، ودورةٌ دارت في موعدها
+  // ‏فسقطت سببُها في سجلّها. والتأخّرُ هو ما لا يراه أحدٌ حتّى يفتح اللوحة
+  const pulse = await pulseReport(db, now).catch(() => null)
+  for (const late of pulse?.late ?? []) if (late.state === 'late') out.push(heartbeatAlert(late))
 
   return out
 }

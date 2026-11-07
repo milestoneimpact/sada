@@ -7,6 +7,7 @@
 import type { AccountIdentity } from '../tokens'
 import { OAuthError } from './exchange'
 import type { Provider } from './providers'
+import { withTimeout } from '../net/timeout'
 
 interface LinkedInUserInfo {
   sub?: unknown
@@ -20,7 +21,7 @@ interface XUserResponse {
 export async function fetchIdentity(
   provider: Provider,
   accessToken: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 15_000),
 ): Promise<AccountIdentity> {
   const response = await fetchImpl(provider.identityUrl, {
     headers: {

@@ -20,6 +20,8 @@
  */
 import { blockerReason, checkAllowance } from '../limits'
 import type { Db } from '../tokens'
+import { parseSqliteUtc } from '../format'
+import { sendChunked } from '../queue/batch'
 import { threadAuthor, unsettledTweet } from '../publish/xThread'
 import { missingMedia } from './media'
 
@@ -71,8 +73,9 @@ interface AccountRow {
  *
  * ‏كان «اعتمد وجدوِل» و«جدوِل» يُغلقان الإشعارَ بلا رجعة: المجدولةُ تُسحب من بطاقتها، ثمّ يُتراجَع عن اعتمادها في موضعٍ
  * ‏ثانٍ. فصار الإشعارُ يحمل «تراجَع» دقيقتين، **والضمانُ في الجدولة لا في الزرّ**: أقربُ موعدٍ تقبله اللوحةُ بعد النافذة
- * ‏(`holdSeconds`)، والدورةُ لا ترسل إلّا ما حلّ موعدُه (`dueNow`) — فلا تبلغ رسالةٌ الطابورَ وزرُّ «تراجَع» قائم.
- * ‏وبعد النافذة يبقى «اسحب الموعد» في بطاقتها كما كان، ما لم تُرسَل.
+ * ‏(`holdSeconds`)، ولا يُختَم منشورٌ قبل موعده — **فلا يُنشَر شيءٌ وزرُّ «تراجَع» قائم**. ومنذ D-320 قد تبلغ رسالةٌ مؤجَّلةٌ
+ * ‏الطابورَ داخل النافذة، لكنّها لا تختم منشورَها إلّا في دقيقته وما زال كما أُرسلت له (`claimDelivery`)، فـ«تراجَع» قبلها يغلب.
+ * ‏وبعد النافذة يبقى «اسحب الموعد» في بطاقتها كما كان، حتّى دقيقتها.
  */
 export const UNDO_WINDOW_SECONDS = 120
 
@@ -165,7 +168,7 @@ export async function schedulePost(
   await db
     .prepare(
       `UPDATE posts SET status = 'queued', account_id = ?, scheduled_at = ?,
-                        dispatched_at = NULL
+                        dispatched_at = NULL, enqueued_for = NULL
         WHERE id = ? AND org_id = ?`,
     )
     .bind(accountId, at, postId, post.org_id)
@@ -194,7 +197,7 @@ export async function unschedule(db: Db, postId: string, org: string | null = nu
   // يعود `approved` لا `draft`: الاعتمادُ وقع ولا يُمحى بسحب موعد
   await db
     .prepare(
-      "UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL WHERE id = ? AND org_id = ?",
+      "UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, enqueued_for = NULL WHERE id = ? AND org_id = ?",
     )
     .bind(postId, row.org_id)
     .run()
@@ -227,7 +230,7 @@ export async function restoreSchedule(
     .first<{ id: string }>()
   if (account === null) return { ok: false, reason: 'الحسابُ لم يعد مربوطًا' }
   await db
-    .prepare("UPDATE posts SET status = 'queued', scheduled_at = ?, account_id = ? WHERE id = ? AND org_id = ? AND status = 'approved'")
+    .prepare("UPDATE posts SET status = 'queued', scheduled_at = ?, account_id = ?, enqueued_for = NULL WHERE id = ? AND org_id = ? AND status = 'approved'")
     .bind(at, accountId, postId, org)
     .run()
   return { ok: true, at, account: accountId, platform: '' }
@@ -255,7 +258,7 @@ export async function undoSchedule(
   const draft = undo.to === 'draft' ? 1 : 0
   const moved = await db
     .prepare(
-      `UPDATE posts SET status = ?, scheduled_at = NULL, account_id = NULL,
+      `UPDATE posts SET status = ?, scheduled_at = NULL, account_id = NULL, enqueued_for = NULL,
               approved_at = CASE WHEN ? = 1 THEN NULL ELSE approved_at END,
               approved_by = CASE WHEN ? = 1 THEN NULL ELSE approved_by END
         WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL AND scheduled_at = ?
@@ -291,7 +294,7 @@ export async function reschedulePost(db: Db, postId: string, when: string, now: 
   if (at <= dbNow(now)) return { ok: false, reason: 'الموعد في الماضي' }
   const moved = await db
     .prepare(
-      `UPDATE posts SET scheduled_at = ?
+      `UPDATE posts SET scheduled_at = ?, enqueued_for = NULL
         WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL
         RETURNING id`,
     )
@@ -365,7 +368,7 @@ export async function requeue(db: Db, postId: string, now: Date, org: string | n
 
   const moved = await db
     .prepare(
-      `UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, dispatched_at = NULL
+      `UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, dispatched_at = NULL, enqueued_for = NULL
         WHERE id = ? AND org_id = ?
           AND (status = 'failed' OR (status = 'queued' AND dispatched_at IS NOT NULL AND dispatched_at < ?))
           AND NOT EXISTS (SELECT 1 FROM publish_attempts pa
@@ -432,23 +435,137 @@ export interface DuePost {
 }
 
 /**
+ * ‏**الأفقُ الذي تُرسله الدورةُ مؤجَّلًا** (D-320): ستَّ عشرةَ دقيقة — أوسعُ فجوةٍ بين دورتين ربعُ ساعة (‏:15 ← ‏:30)، ودقيقةٌ
+ * ‏لتأخّر Cron نفسِه. فكلُّ موعدٍ تراه دورةٌ قبله فتُرسله مؤجَّلًا إلى دقيقته، ولا يُترك للدورة التي بعده. واختبارٌ يقارنه بـwrangler.toml.
+ */
+export const DISPATCH_HORIZON_SECONDS = 16 * 60
+
+/**
+ * ‏**رسالةٌ مؤجَّلةٌ ضاعت** (D-320): ما عُلّم مؤجَّلًا ولم يُختَم بعد عشر دقائقَ من موعده يُرسَل فورًا كما يُرسَل المستحقّ —
+ * ‏والختمُ يمنع الاثنين معًا: من سبق إلى `dispatched_at` نشر، ووجد الآخرُ الختمَ فلا يفعل شيئًا.
+ */
+export const LOST_DELIVERY_SECONDS = 10 * 60
+
+/** ‏كم منشورًا في الجولة (D-320): ‏50 معاملًا مربوطًا وختمُ الوقت دون حدّ D1 (100)، ودفعةٌ دون حدّ الطابور (100). */
+export const DISPATCH_ROUND = 50
+
+/** ‏وكم جولةً في الدورة (D-320): خمسمئةٌ في الدورة بدل عشرين — والباقي في التالية. */
+export const DISPATCH_ROUNDS = 10
+
+/**
  * ما حلّ موعدُه ولم يُرسَل بعد.
  *
- * وسقفٌ لكلّ دورة: مالكٌ يجدول ثلاثين منشورا لساعةٍ واحدة يغرق الطابور
- * في دورةٍ واحدة. والباقي يخرج في الدورة التالية بعد ربع ساعة — تأخيرٌ
- * يُرى، خيرٌ من دفعةٍ تُرفض كلُّها.
+ * ‏وسقفٌ للجولة لا للدورة (D-320): الدورةُ تعيد الجولةَ حتّى يفرغ المستحقّ أو تبلغ `DISPATCH_ROUNDS` — كان عشرين في الدورة،
+ * ‏فمالكٌ يجدول ثلاثين منشورًا لساعةٍ واحدة يرى عشرةً منها بعد ربع ساعة.
+ *
+ * ‏**وما أُرسل له مؤجَّلٌ لموعده لا يُرسَل ثانية** (`enqueued_for`) — إلّا أن تمضي عشرُ دقائقَ بلا ختم: فرسالتُه ضاعت.
  */
-export async function dueNow(db: Db, now: Date, limit = 20): Promise<DuePost[]> {
+export async function dueNow(db: Db, now: Date, limit = DISPATCH_ROUND): Promise<DuePost[]> {
   const { results } = await db
     .prepare(
       `SELECT id, org_id, scheduled_at FROM posts
-        WHERE status = 'queued' AND dispatched_at IS NULL AND scheduled_at <= ?
+        WHERE status = 'queued' AND dispatched_at IS NULL AND scheduled_at <= ?1
+          AND (enqueued_for IS NOT scheduled_at OR scheduled_at <= ?3)
         ORDER BY scheduled_at
-        LIMIT ?`,
+        LIMIT ?2`,
     )
-    .bind(dbNow(now), limit)
+    .bind(dbNow(now), limit, dbNow(new Date(now.getTime() - LOST_DELIVERY_SECONDS * 1000)))
     .all<{ id: string; org_id: string; scheduled_at: string }>()
   return results.map((r) => ({ id: r.id, org: r.org_id, scheduledAt: r.scheduled_at }))
+}
+
+/** ‏ما يحلّ قبل الدورة التالية ولم يُرسَل له بعد (D-320) — يُرسَل مؤجَّلًا إلى دقيقته. */
+export async function dueAhead(db: Db, now: Date, limit = DISPATCH_ROUND): Promise<DuePost[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, org_id, scheduled_at FROM posts
+        WHERE status = 'queued' AND dispatched_at IS NULL
+          AND scheduled_at > ?1 AND scheduled_at <= ?2
+          AND enqueued_for IS NOT scheduled_at
+        ORDER BY scheduled_at
+        LIMIT ?3`,
+    )
+    .bind(dbNow(now), dbNow(new Date(now.getTime() + DISPATCH_HORIZON_SECONDS * 1000)), limit)
+    .all<{ id: string; org_id: string; scheduled_at: string }>()
+  return results.map((r) => ({ id: r.id, org: r.org_id, scheduledAt: r.scheduled_at }))
+}
+
+export interface Enqueued { readonly id: string; readonly org: string; readonly due: string }
+
+/**
+ * ‏**يعلّم المؤجَّلَ بموعده ذرّيًّا** (D-320) — كما يختم `markDispatched`: دورتان معًا تعلّمان الصفَّ مرّةً، والقاعدةُ تعيد ما
+ * ‏علّمته هي فيُرسَل ذاك وحده. **ولا يُختَم `dispatched_at`**: المنشورُ لم يغادر بعد، ويُسحب ويُغيَّر موعدُه حتّى دقيقته.
+ */
+export async function markEnqueued(db: Db, ids: readonly string[], now: Date): Promise<readonly Enqueued[]> {
+  if (ids.length === 0) return []
+  const { results } = await db
+    .prepare(
+      `UPDATE posts SET enqueued_for = scheduled_at
+        WHERE id IN (SELECT value FROM json_each(?1)) AND status = 'queued' AND dispatched_at IS NULL
+          AND scheduled_at > ?2 AND scheduled_at <= ?3 AND enqueued_for IS NOT scheduled_at
+        RETURNING id, org_id, scheduled_at`,
+    )
+    .bind(JSON.stringify(ids), dbNow(now), dbNow(new Date(now.getTime() + DISPATCH_HORIZON_SECONDS * 1000)))
+    .all<{ id: string; org_id: string; scheduled_at: string }>()
+  return results.map((r) => ({ id: r.id, org: r.org_id, due: r.scheduled_at }))
+}
+
+/** ‏يرفع علامةَ المؤجَّل عمّا لم يصل الطابور (D-320) — والشرطُ على الموعد نفسِه، فلا يُرفَع ما علّمته دورةٌ لموعدٍ آخر. */
+export async function unmarkEnqueued(db: Db, marked: readonly Enqueued[]): Promise<void> {
+  for (const m of marked) {
+    await db.prepare('UPDATE posts SET enqueued_for = NULL WHERE id = ? AND org_id = ? AND enqueued_for = ?').bind(m.id, m.org, m.due).run()
+  }
+}
+
+/** ‏كم ثانيةً حتّى الموعد — صفرٌ لما حلّ، ولا أكثرَ من الأفق. */
+function secondsUntil(due: string, now: Date): number {
+  const at = parseSqliteUtc(due)
+  if (at === null) return 0
+  return Math.min(DISPATCH_HORIZON_SECONDS, Math.max(0, Math.ceil((at.getTime() - now.getTime()) / 1000)))
+}
+
+export type Claim =
+  | { readonly kind: 'claimed' }
+  /** ‏وصل قبل دقيقته: يُعاد بما بقي. */
+  | { readonly kind: 'early'; readonly seconds: number }
+  /** ‏الإيقافُ قائم: لا يُختَم، وتُرفع علامتُه فتعيده الدورةُ بعد الاستئناف. */
+  | { readonly kind: 'paused'; readonly reason: string }
+  /** ‏سُحب أو تغيّر موعدُه أو خُتم بغيره: لا يفعل شيئًا. */
+  | { readonly kind: 'stale' }
+
+/**
+ * ‏**الختمُ عند الوصول** (D-320): الرسالةُ المؤجَّلةُ تختم منشورَها حين تصل في دقيقته **وما زال كما أُرسلت له** — مجدولًا،
+ * ‏لم يُختَم، وموعدُه موعدُها. **بجملةٍ واحدةٍ وبساعة القاعدة**: سحبٌ أو تغييرٌ أو «تراجَع» قبل الدقيقة يغلب لأنّه وقع قبلها في
+ * ‏القاعدة، وما بعدها يجد الختمَ فيُردّ (`dispatched_at IS NULL` في حرّاسها). **والإيقافُ يغلب** كما يغلب في الدورة.
+ */
+export async function claimDelivery(db: Db, postId: string, org: string, due: string): Promise<Claim> {
+  const allowance = await checkAllowance(db, 'publish')
+  if (allowance.blocker !== null) {
+    await db.prepare('UPDATE posts SET enqueued_for = NULL WHERE id = ? AND org_id = ? AND enqueued_for = ?').bind(postId, org, due).run()
+    return { kind: 'paused', reason: blockerReason(allowance.blocker) }
+  }
+  const claimed = await db
+    .prepare(
+      `UPDATE posts SET dispatched_at = datetime('now')
+        WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL
+          AND scheduled_at = ? AND scheduled_at <= datetime('now')
+        RETURNING id`,
+    )
+    .bind(postId, org, due)
+    .first<{ id: string }>()
+  if (claimed !== null) return { kind: 'claimed' }
+  const row = await db
+    .prepare(
+      `SELECT status, dispatched_at, scheduled_at,
+              CAST(strftime('%s', scheduled_at) AS INTEGER) - CAST(strftime('%s', 'now') AS INTEGER) AS wait
+         FROM posts WHERE id = ? AND org_id = ?`,
+    )
+    .bind(postId, org)
+    .first<{ status: string; dispatched_at: string | null; scheduled_at: string | null; wait: number | null }>()
+  if (row !== null && row.status === 'queued' && row.dispatched_at === null && row.scheduled_at === due && (row.wait ?? 0) > 0) {
+    return { kind: 'early', seconds: Math.min(DISPATCH_HORIZON_SECONDS, (row.wait ?? 0) + 1) }
+  }
+  return { kind: 'stale' }
 }
 
 /**
@@ -507,43 +624,88 @@ export interface DispatchDeps {
    * وجوابُ `sendBatch` يُهمَل بـ `unknown`: نجاحُ الإرسال في عدم الرمي،
    * وقراءةُ حقلٍ في جوابه تربط الشيفرةَ بشكلٍ قد يتبدّل.
    */
-  readonly queue: { sendBatch(messages: { body: { postId: string } }[]): Promise<unknown> }
+  readonly queue: { sendBatch(messages: DispatchMessage[]): Promise<unknown> }
   readonly now?: () => Date
+  /** ‏حجمُ الجولة — `DISPATCH_ROUND` ما لم يُقَل. */
   readonly limit?: number
 }
 
+/** ‏رسالةُ النشر: المستحقُّ بلا موعد، والمؤجَّلُ بمنظّمته وموعده ومهلته (D-320). */
+export interface DispatchMessage {
+  readonly body: { readonly postId: string; readonly org?: string; readonly due?: string }
+  readonly delaySeconds?: number
+}
+
 export type DispatchReport =
-  | { readonly kind: 'sent'; readonly count: number; readonly ids: readonly string[] }
+  /** ‏`count` ما أُرسل مستحقًّا وخُتم، و`ahead` ما أُرسل مؤجَّلًا إلى دقيقته (D-320). */
+  | { readonly kind: 'sent'; readonly count: number; readonly ids: readonly string[]; readonly ahead: number }
   | { readonly kind: 'none' }
   | { readonly kind: 'blocked'; readonly reason: string }
 
 /**
- * دورةُ الربع: تقرأ المستحقّ وترسله.
+ * دورةُ الربع: تقرأ المستحقّ وترسله — **وما يحلّ قبل الدورة التالية ترسله مؤجَّلًا إلى دقيقته** (D-320).
  *
  * والحارسُ العامّ أوّلا — **الإيقافُ يوقف النشر كما يوقف النداء**. ومفتاحٌ
- * يوقف الإنفاق ويترك المنشورات تخرج ليس مفتاحَ إيقاف.
+ * يوقف الإنفاق ويترك المنشورات تخرج ليس مفتاحَ إيقاف. ‏والمؤجَّلُ يُسأل عنه ثانيةً حين يصل (`claimDelivery`).
  */
 export async function dispatchDue(deps: DispatchDeps): Promise<DispatchReport> {
   const now = (deps.now ?? (() => new Date()))()
+  const round = deps.limit ?? DISPATCH_ROUND
 
   const allowance = await checkAllowance(deps.db, 'publish')
   if (allowance.blocker !== null) {
     return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
   }
 
-  const due = await dueNow(deps.db, now, deps.limit ?? 20)
-  if (due.length === 0) return { kind: 'none' }
-
-  // ‏ما ختمته هذه الدورةُ وحدَه يُرسَل: دورةٌ متزامنةٌ قد سبقت إلى بعضه (D-269)
-  const stamped = await markDispatched(deps.db, due.map((d) => d.id), now)
-  if (stamped.length === 0) return { kind: 'none' }
-  const ids = stamped.map((s) => s.id)
-  try {
-    await deps.queue.sendBatch(ids.map((postId) => ({ body: { postId } })))
-  } catch (error) {
-    await unmarkDispatched(deps.db, stamped, now)
-    throw error
+  // ١ — ما حلّ: يُختَم ثمّ يُرسَل فورًا، جولةً بعد جولة (D-320) حتّى يفرغ أو تبلغ الجولاتُ حدَّها
+  const ids: string[] = []
+  for (let r = 0; r < DISPATCH_ROUNDS; r += 1) {
+    const due = await dueNow(deps.db, now, round)
+    if (due.length === 0) break
+    // ‏ما ختمته هذه الدورةُ وحدَه يُرسَل: دورةٌ متزامنةٌ قد سبقت إلى بعضه (D-269)
+    const stamped = await markDispatched(deps.db, due.map((d) => d.id), now)
+    try {
+      await sendChunked(deps.queue, stamped.map((s): DispatchMessage => ({ body: { postId: s.id } })))
+    } catch (error) {
+      await unmarkDispatched(deps.db, stamped, now)
+      throw error
+    }
+    ids.push(...stamped.map((s) => s.id))
+    if (due.length < round) break
   }
 
-  return { kind: 'sent', count: ids.length, ids }
+  // ٢ — ما يحلّ قبل الدورة التالية: يُعلَّم بموعده ويُرسَل مؤجَّلًا إلى دقيقته، **ولا يُختَم** (D-320)
+  const ahead = await enqueueAhead({ ...deps, now: () => now })
+
+  if (ids.length === 0 && ahead === 0) return { kind: 'none' }
+  return { kind: 'sent', count: ids.length, ids, ahead }
+}
+
+/**
+ * ‏**ما يحلّ قبل الدورة التالية يُرسَل مؤجَّلًا إلى دقيقته** (D-320) — جزءُ الدورة الثاني، وتناديه اللوحةُ أيضًا بعد الجدولة
+ * ‏(`dispatchSoon`): موعدٌ بعد خمس دقائق يُضبط بين دورتين فلا تراه دورةٌ قبله. ويعيد كم أُرسل.
+ *
+ * ‏**ولا حارسَ للإيقاف هنا**: الرسالةُ لا تختم ولا تنشر، والإيقافُ يُسأل عنه حين تصل (`claimDelivery`) فيغلب كما يغلب في الدورة.
+ */
+export async function enqueueAhead(deps: DispatchDeps): Promise<number> {
+  const now = (deps.now ?? (() => new Date()))()
+  const round = deps.limit ?? DISPATCH_ROUND
+  let ahead = 0
+  for (let r = 0; r < DISPATCH_ROUNDS; r += 1) {
+    const soon = await dueAhead(deps.db, now, round)
+    if (soon.length === 0) break
+    const marked = await markEnqueued(deps.db, soon.map((d) => d.id), now)
+    try {
+      await sendChunked(deps.queue, marked.map((m): DispatchMessage => ({
+        body: { postId: m.id, org: m.org, due: m.due },
+        delaySeconds: secondsUntil(m.due, now),
+      })))
+    } catch (error) {
+      await unmarkEnqueued(deps.db, marked)
+      throw error
+    }
+    ahead += marked.length
+    if (soon.length < round) break
+  }
+  return ahead
 }

@@ -277,3 +277,93 @@ describe('والدورة لا يوقفها حساب واحد', () => {
     expect(seen[0]).toBe(X.tokenUrl)
   })
 })
+
+/**
+ * ‏**التجديدُ لا يجوّع** (D-320).
+ *
+ * ‏كانت الدورةُ تأخذ أقدمَ خمسةٍ وعشرين رمزًا يقترب انتهاؤها، وما ردّ المزوّدُ تجديدَه أقدمُها دائمًا: يُعاد كلَّ ربع ساعة
+ * ‏إلى الأبد، **وخمسةٌ وعشرون منها تملأ الدفعةَ فلا يصل الحسابَ السليمَ دورُه** حتّى يموت رمزُه.
+ */
+describe('التجديد لا يجوّع (D-320)', () => {
+  const TICK = 15 * 60_000
+  const refused = (seen: string[]) => (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const refresh = new URLSearchParams(String(init?.body ?? '')).get('refresh_token') ?? ''
+    seen.push(refresh)
+    if (refresh.startsWith('ok-')) {
+      return new Response(JSON.stringify({ access_token: `fresh-${refresh}`, expires_in: 5_184_000 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+  }) as unknown as typeof fetch
+
+  it('ثلاثون حسابًا يُردّ تجديدُها لا تحجب الحسابَ السليم، ولا تُعاد كلَّ دورة', async () => {
+    for (let i = 0; i < 30; i += 1) await seed(`dead${String(i).padStart(2, '0')}`, { access: inSec(60 + i), refresh: `dead-${i}` })
+    await seed('healthy', { access: inSec(3000), refresh: 'ok-h' })
+    // ‏وحسابٌ سليمٌ ثانٍ يحلّ تجديدُه بعد ستّ ساعات، والساقطون مستحقّون معه
+    await seed('later', { access: inSec(6 * 3600 + 3000), refresh: 'ok-l' })
+    const seen: string[] = []
+    const renewedAt: Record<string, number> = {}
+    for (let tick = 0; tick < 96; tick += 1) {
+      const at = new Date(NOW.getTime() + tick * TICK)
+      const before = seen.length
+      await renewDue({ ...deps(refused(seen)), now: () => at })
+      for (const r of seen.slice(before)) if (r.startsWith('ok-') && renewedAt[r] === undefined) renewedAt[r] = tick
+    }
+    // ‏السليمُ يُجدَّد في الدورة الثانية على الأكثر: الأولى رأت الثلاثين مثلَه بلا تاريخ
+    expect(renewedAt['ok-h']).toBeLessThanOrEqual(1)
+    // ‏والثاني في الدورة التي يدخل فيها هامشَ الساعتين، ولو كان الساقطون مستحقّين معه
+    expect(renewedAt['ok-l']).toBe(Math.ceil((6 * 3600 + 3000 - RENEW_MARGIN_SECONDS) / 900))
+    // ‏والساقطُ يتباعد: يومٌ كاملٌ (‏96 دورة) لا يعيده أكثرَ من ثماني مرّات — وكان ستًّا وتسعين
+    const perDead = new Map<string, number>()
+    for (const r of seen.filter((s) => s.startsWith('dead-'))) perDead.set(r, (perDead.get(r) ?? 0) + 1)
+    expect(perDead.size).toBe(30)
+    expect(Math.max(...perDead.values())).toBeLessThanOrEqual(8)
+  })
+
+  it('وربطٌ من جديد يمحو التباعد: الحسابُ يُحاوَل في الدورة التالية', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'dead-1' })
+    const seen: string[] = []
+    await renewDue({ ...deps(refused(seen)), now: () => NOW })
+    const held = db.raw.prepare("SELECT renew_failures, renew_retry_at FROM tokens WHERE account_id = 'a1'").get() as
+      { renew_failures: number; renew_retry_at: string | null }
+    expect(held.renew_failures).toBe(1)
+    expect(held.renew_retry_at).not.toBeNull()
+    // ‏التالية بعد ربع ساعة لا تعيده
+    await renewDue({ ...deps(refused(seen)), now: () => new Date(NOW.getTime() + TICK) })
+    expect(seen).toEqual(['dead-1'])
+    // ‏والمالكُ يربطه من جديد: `saveTokens` يصفّر العدّ والموعد
+    await saveTokens(db, KEY, 'a1', { accessToken: 'again', refreshToken: 'ok-1', expiresAt: inSec(900), refreshExpiresAt: null, scopes: 'openid' })
+    const reset = db.raw.prepare("SELECT renew_failures, renew_retry_at FROM tokens WHERE account_id = 'a1'").get()
+    expect(reset).toEqual({ renew_failures: 0, renew_retry_at: null })
+    await renewDue({ ...deps(refused(seen)), now: () => new Date(NOW.getTime() + 2 * TICK) })
+    expect(seen).toEqual(['dead-1', 'ok-1'])
+  })
+
+  it('ونداءُ التجديد يحمل مهلة', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'ok-1' })
+    let signal: unknown
+    const spy = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      signal = init?.signal
+      return new Response(JSON.stringify({ access_token: 'F', expires_in: 7200 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+    await renewDue(deps(spy))
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('والدورةُ تقف عند ميزانيّتها: نهايةٌ بطيئة لا تؤخّر الإرسالَ بعدها', async () => {
+    for (let i = 0; i < 10; i += 1) await seed(`s${i}`, { access: inSec(600 + i), refresh: `ok-${i}` })
+    let clock = NOW.getTime()
+    const seen: string[] = []
+    const slow = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      clock += 14_000
+      return refused(seen)(url, init)
+    }) as unknown as typeof fetch
+    const summary = await renewDue({ ...deps(slow), now: () => new Date(clock) })
+    // ‏ميزانيّةُ الدورة ستّون ثانية: خمسةُ نداءاتٍ بأربعَ عشرةَ ثانية (السادسُ يبدأ بعدها) — والباقي للدورة التالية بلا عقوبة
+    expect(seen.length).toBeLessThan(10)
+    expect(summary.renewed).toBe(seen.length)
+    const waiting = db.raw.prepare('SELECT count(*) AS n FROM tokens WHERE renew_failures = 0 AND renew_retry_at IS NULL').get() as { n: number }
+    expect(waiting.n).toBe(10)
+  })
+})

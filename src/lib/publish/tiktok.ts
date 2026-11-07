@@ -43,6 +43,7 @@
  */
 import { PublishError, type PublishResult, type Upload } from './platforms'
 import { bytesClip, tiktokChunks, type Clip } from './clip'
+import { withTimeout } from '../net/timeout'
 
 const INBOX_INIT = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/'
 const DIRECT_INIT = 'https://open.tiktokapis.com/v2/post/publish/video/init/'
@@ -134,7 +135,7 @@ export async function publishTikTok(
   input: Clip | Upload,
   caption: string,
   direct: boolean,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   /** العلنيُّ بقرار المالك بعد الإجازة (D-190) — ولا يمسّ الصندوق: النشرُ هناك بيده. */
   options: { readonly public?: boolean } = {},
 ): Promise<TikTokOutcome> {

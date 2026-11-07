@@ -428,6 +428,39 @@ describe('النشر بصورة (D-040)', () => {
     expect(f.calls).toHaveLength(0)
   })
 
+  /** ‏قيدُ الرفع في الدفتر قبل نداء الرفع (D-320): عطلُ D1 فيه لم يُرسل شيئًا، فيُعاد ولا يُعَدّ «أُرسل ولم يُعرَف». */
+  it('والدفترُ يسقط قبل الرفع: يُعاد ولا يُفشَل المنشور', async () => {
+    const { postId } = await seedWithImage('x')
+    let ledgerDown = true
+    const flaky = {
+      batch: db.batch!,
+      prepare(query: string) {
+        const statement = db.prepare(query)
+        if (!/INSERT INTO cost_ledger/.test(query)) return statement
+        return {
+          ...statement,
+          bind: (...v: unknown[]) => {
+            const bound = statement.bind(...v)
+            return ledgerDown && v.includes('media_upload:price_unverified')
+              ? { ...bound, run: async () => { throw new Error('D1_ERROR: network connection lost') } }
+              : bound
+          },
+        }
+      },
+    }
+    const f = fakeFetch({
+      [X.uploadUrl]: { json: { data: { id: 'media-9' } } },
+      [X.postUrl]: { json: { data: { id: 'tweet-1' } } },
+    })
+    const first = await publishPost({ db: flaky, encKey: KEY, fetchImpl: f, now: NOW, bucket: bucket() }, { postId })
+    expect(first).toMatchObject({ kind: 'failed', retryable: true })
+    expect(f.calls).toHaveLength(0)
+    expect((db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as { status: string }).status).toBe('queued')
+    ledgerDown = false
+    const second = await publishPost({ db: flaky, encKey: KEY, fetchImpl: f, now: NOW, bucket: bucket() }, { postId })
+    expect(second).toEqual({ kind: 'published', platformPostId: 'tweet-1' })
+  })
+
   it('يرفع ثمّ ينشر، ويُلحق المعرّف بالمنشور', async () => {
     const { postId } = await seedWithImage('x')
     const f = fakeFetch({
@@ -1080,3 +1113,106 @@ describe('حساب الصفحة', () => {
   })
 })
 
+
+/**
+ * ‏**D-004 في القاعدة: تسليمان متزامنان لا ينشران مرّتين** (D-320).
+ *
+ * ‏كان الحارسُ فحصًا ثمّ إدخالًا: يُسأل عن `succeeded` ثمّ `sent`، ثمّ تُكتب `sent` بعد خطوات. والطابورُ «مرّةً على الأقلّ»:
+ * ‏رسالتان للمنشور نفسِه تمرّان من السؤالين معًا قبل أن يكتب أيٌّ منهما، فيُرسَل مرّتين ويُدفع لـX مرّتين. والمحفّزُ
+ * ‏(0047) يردّ الحجزَ الثاني، والناشرُ يقرأ ردَّه «سبقه غيرُه» فيخرج بلا نداء.
+ */
+describe('تسليمان متزامنان (D-320)', () => {
+  /**
+   * ‏قاعدةٌ توقف التسليمَ الثاني بعد سؤاله عن `sent` حتّى يكتب الأوّلُ حجزَه — أضيقُ نافذةٍ كانت تفتح النشرَ المزدوج،
+   * ‏مثبَّتةً لا متروكةً لترتيب الوعود.
+   */
+  function racing(inner: FakeDb) {
+    let release: () => void = () => undefined
+    const firstReserved = new Promise<void>((r) => { release = r })
+    let sentChecks = 0
+    const db = {
+      batch: inner.batch!,
+      prepare(query: string) {
+        const statement = inner.prepare(query)
+        const asksSent = /status = 'sent' LIMIT 1/.test(query)
+        const reserves = /INSERT INTO publish_attempts[\s\S]*'sent'/.test(query)
+        const wrap = (s: typeof statement): typeof statement => ({
+          bind: (...v: unknown[]) => wrap(s.bind(...v)),
+          all: s.all.bind(s),
+          async first<T>() {
+            const out = await s.first<T>()
+            if (asksSent) {
+              sentChecks += 1
+              if (sentChecks === 2) await firstReserved
+            }
+            return out
+          },
+          async run() {
+            const out = await s.run()
+            if (reserves) release()
+            return out
+          },
+        })
+        return wrap(statement)
+      },
+    }
+    return db
+  }
+
+  it('رسالتان للمنشور نفسِه معًا: نداءٌ واحدٌ إلى X، ومحاولةٌ ناجحةٌ واحدة', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    const f = fakeFetch(X_OK)
+    const shared = { db: racing(db), encKey: KEY, fetchImpl: f, now: NOW }
+    const [a, b] = await Promise.all([publishPost(shared, { postId }), publishPost(shared, { postId })])
+    expect(f.calls.filter((c) => c.url === X.postUrl)).toHaveLength(1)
+    expect([a.kind, b.kind].sort()).toEqual(['published', 'skipped_duplicate'])
+    const rows = db.raw.prepare('SELECT status FROM publish_attempts WHERE post_id = ? ORDER BY attempt_no').all(postId) as { status: string }[]
+    expect(rows.map((r) => r.status)).toEqual(['succeeded'])
+    // ‏والكلفةُ مرّةً واحدة: الحجزُ قبل الدفتر
+    const cost = db.raw.prepare("SELECT count(*) AS n FROM cost_ledger WHERE ref_id = ?").get(postId) as { n: number }
+    expect(cost.n).toBe(1)
+    expect((db.raw.prepare('SELECT status FROM posts WHERE id = ?').get(postId) as { status: string }).status).toBe('published')
+  })
+
+  it('والقاعدةُ نفسُها تردّ ناجحةً ثانيةً بالمفتاح نفسِه، ومحاولةً مفتوحةً فوق مفتوحة', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    const key = `draft:src:x:${postId}`
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status) VALUES ('a1', ?, ?, 1, '{}', 'sent')`).run(postId, key)
+    expect(() => db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status) VALUES ('a2', ?, ?, 2, '{}', 'sent')`).run(postId, key)).toThrow(/d004_once/)
+    db.raw.prepare(`UPDATE publish_attempts SET status = 'succeeded' WHERE id = 'a1'`).run()
+    expect(() => db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status) VALUES ('a3', ?, ?, 3, '{}', 'succeeded')`).run(postId, key)).toThrow(/d004_once/)
+    // ‏والفاشلةُ تُكتب كما كانت: هي أثرٌ لا حجز
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status) VALUES ('a4', ?, ?, 4, '{}', 'failed')`).run(postId, key)
+    expect(() => db.raw.prepare(`UPDATE publish_attempts SET status = 'succeeded' WHERE id = 'a4'`).run()).toThrow(/d004_once/)
+  })
+})
+
+/**
+ * ‏**عطلٌ بين الحجز والإرسال لا يصير «أُرسلت ولم يُعرَف جوابُها»** (D-320).
+ *
+ * ‏كان `recordCost` بعد كتابة `sent` وخارجَ `try`: عطلُ D1 فيه يرمي من الناشر، فيبقى الصفُّ `sent` ولم يُرسَل شيء، وأوّلُ
+ * ‏إعادةٍ من الطابور تجده فتُفشل المنشورَ نهائيًّا بـ«تحقّق على المنصّة» — **عطلٌ في دفترنا يصير سؤالًا للمالك عن X**.
+ */
+describe('عطلٌ قبل الإرسال (D-320)', () => {
+  it('الدفترُ يسقط بعد الحجز: يُفكّ الحجز، ويُعاد، والإعادةُ تنشر', async () => {
+    const postId = await seedPost({ platform: 'x' })
+    let ledgerDown = true
+    const flaky = {
+      batch: db.batch!,
+      prepare(query: string) {
+        if (ledgerDown && /INSERT INTO cost_ledger/.test(query)) throw new Error('D1_ERROR: network connection lost')
+        return db.prepare(query)
+      },
+    }
+    const f = fakeFetch(X_OK)
+    const first = await publishPost({ db: flaky, encKey: KEY, fetchImpl: f, now: NOW }, { postId })
+    expect(first).toMatchObject({ kind: 'failed', retryable: true })
+    expect(f.calls).toHaveLength(0)
+    const held = db.raw.prepare('SELECT status FROM publish_attempts WHERE post_id = ?').all(postId) as { status: string }[]
+    expect(held.map((r) => r.status)).toEqual(['failed'])
+
+    ledgerDown = false
+    const second = await publishPost({ db: flaky, encKey: KEY, fetchImpl: f, now: NOW }, { postId })
+    expect(second).toEqual({ kind: 'published', platformPostId: 'tweet-1' })
+  })
+})

@@ -244,7 +244,7 @@ async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Cal
       if (provider.baseUrl === null) return fail({ kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false })
       const result = await chatCompletion(
         { baseUrl: provider.baseUrl, apiKey: resolved.key, model: route.model, system, user, json: true },
-        deps.fetchImpl ?? fetch,
+        deps.fetchImpl,
       )
       text = result.text
       spent = { ...result.usage, cachedInputTokens: 0, model: result.model }

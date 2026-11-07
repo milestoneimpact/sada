@@ -377,3 +377,36 @@ describe('صنف الخطأ', () => {
     expect(e.retryable).toBe(true)
   })
 })
+
+/**
+ * ‏**قياسُ LinkedIn وX لا يجوّعه ما لا يُقاس** (D-320).
+ *
+ * ‏كان `LIMIT 50` في SQL يقع قبل أن تُستثنى المنصّاتُ التي لا تُقرأ أرقامُها (YouTube وTikTok وInstagram)، وهذه لا يُكتب لها
+ * ‏صفُّ `metrics` أبدًا فتبقى مستحقّةً في كلّ دورة. فخمسون منشورَ مقاطعَ أحدثُ من منشور LinkedIn كانت تُخرجه من النافذة إلى الأبد.
+ */
+describe('ما لا يُقاس لا يحجب ما يُقاس (D-320)', () => {
+  it('ستّون مقطعًا أحدثُ لا تُخرج منشورَ LinkedIn من نافذته', async () => {
+    await seedPublished({ id: 'li-old', platform: 'linkedin', platformPostId: 'urn:li:share:99', agoHours: 30 })
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name) VALUES ('yt', 'youtube', 'org', 'chan', 'قناة')`)
+    for (let i = 0; i < 60; i += 1) {
+      const at = new Date(NOW.getTime() - (25 + i / 100) * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+      db.raw.prepare(`INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status, idempotency_key, approved_by, approved_at)
+                      VALUES (?, 'yt', 'youtube', 'text', 'مقطع', ?, 'published', ?, 'omar', ?)`).run(`yt-${i}`, at, `k-yt-${i}`, at)
+      db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, platform_post_id, status, at)
+                      VALUES (?, ?, ?, 1, '{}', ?, 'succeeded', ?)`).run(`a-yt-${i}`, `yt-${i}`, `k-yt-${i}`, `v${i}`, at)
+    }
+    const due = await dueWindows(db, NOW)
+    expect(due.map((d) => `${d.postId}:${d.window}`)).toEqual(['li-old:24h'])
+  })
+
+  it('ونداءُ القراءة يحمل مهلة', async () => {
+    await seedPublished({ id: 'p1', platform: 'x', platformPostId: '1874', agoHours: 30 })
+    let signal: unknown
+    const spy = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      signal = init?.signal
+      return new Response(JSON.stringify(X_OK['https://api.x.com/2/tweets/1874?tweet.fields=public_metrics'].json), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+    await pullDue({ db, encKey: KEY, fetchImpl: spy, now: () => NOW })
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+})

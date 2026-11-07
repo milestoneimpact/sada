@@ -10,6 +10,7 @@
  * ذلك بزرٍّ جميل. وما نستطيعه أنّ سائقا جديدا ملفٌّ واحد وسطرٌ هنا.
  */
 import type { ProviderName } from './registry'
+import { withTimeout } from '../net/timeout'
 
 export type VerifyResult =
   | { readonly ok: true; readonly detail: string }
@@ -53,7 +54,7 @@ function explain(status: number): string {
 export async function verifyKey(
   provider: ProviderName,
   key: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 15_000),
 ): Promise<VerifyResult> {
   if (key.trim().length === 0) {
     return { ok: false, detail: 'لا مفتاح لهذا المزوّد', status: null }

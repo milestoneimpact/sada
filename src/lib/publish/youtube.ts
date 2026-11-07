@@ -50,6 +50,7 @@
  */
 import { PublishError, type PublishResult, type Upload } from './platforms'
 import { bytesClip, YOUTUBE_CHUNK, type Clip } from './clip'
+import { withTimeout } from '../net/timeout'
 
 const INIT_URL =
   'https://www.googleapis.com/upload/youtube/v3/videos' +
@@ -146,7 +147,7 @@ export async function publishYouTube(
   accessToken: string,
   input: Clip | Upload,
   text: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   /** `public` بقرار المالك بعد إجازة Google (D-190) — والافتراضُ خاصّ. */
   options: { readonly public?: boolean } = {},
 ): Promise<YouTubeOutcome> {

@@ -12,6 +12,7 @@
  * للمالك، فيعرف لماذا تُجوهل ملفاته.
  */
 import { DriveError } from './client'
+import { withTimeout } from '../net/timeout'
 
 /** ما تصدّره الواجهة لكل نوع أصلي. */
 const EXPORT_AS: Readonly<Record<string, string>> = {
@@ -92,7 +93,7 @@ export async function extractText(
   token: string,
   fileId: string,
   mimeType: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 30_000),
   /**
    * أتُنزَّل الصورة؟ يقوله المنادي، فهو يعرف أمضبوط مزوّد رؤية (D-243).
    * وافتراضه `false`: بلا قارئ لا يُنزَّل ما لا يُقرأ.

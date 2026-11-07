@@ -37,7 +37,8 @@
  */
 import { checkProviderUrl, guardedFetch } from '../ai/urlGuard'
 import type { Db } from '../tokens'
-import { counted, NOUNS } from '../format'
+import { counted, duration, NOUNS } from '../format'
+import type { LateJob } from '../ops/pulse'
 import { OWNER_ORG } from '../tenancy'
 
 /**
@@ -45,7 +46,7 @@ import { OWNER_ORG } from '../tenancy'
  * ورمزُ استرداد استُعمل، وإخراجُ الأجهزة. يُكتب صفُّه عند الحدث (`security/events.ts`) وتُرسله الدورةُ كالثلاثة.
  */
 export interface Alert {
-  readonly kind: 'token' | 'publish' | 'budget' | 'security'
+  readonly kind: 'token' | 'publish' | 'budget' | 'security' | 'heartbeat'
   /**
    * مفتاحٌ يُبنى من الحدث نفسِه لا من وقت الإرسال (D-004).
    *
@@ -108,6 +109,26 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
 }
 
 /**
+ * ‏**نبضٌ تأخّر** (D-320) — الخامس: دورةُ الإرسال أو التجديد لم تدُر في موعدها، أو مستهلكُ النشر لم يأخذ ما سُلّم إليه.
+ *
+ * ‏**ومفتاحُه آخرُ نبضٍ رآه** لا الساعة: التأخّرُ نفسُه يُقال مرّةً ولو دام يومًا، وتأخّرٌ جديدٌ بعد أن دارت مفتاحُه جديد.
+ * ‏ويسكن منظّمةَ المالك: الآلةُ واحدةٌ لكلّ العملاء. **وما يوقف الـ Cron كلَّه لا يقوله هذا** — ذاك لمراقب `/pulse` (M-47).
+ */
+export function heartbeatAlert(late: LateJob): Alert {
+  const since = duration(late.waited, 'gen')
+  const body = late.job === 'publish'
+    ? `صدى — في طابور النشر منشورٌ صار في يده منذ ${since} ولم يأخذه. المنشوراتُ المجدولة قد لا تخرج.`
+    : `صدى — دورة «${late.label}» لم تدُر منذ ${since}، وموعدُها كلَّ ربع ساعة.` +
+      (late.job === 'dispatch' ? ' المنشوراتُ المجدولة لا تخرج في مواعيدها.' : ' الأذوناتُ القريبةُ من الانتهاء لا تُجدَّد.')
+  return {
+    kind: 'heartbeat',
+    org: OWNER_ORG,
+    ref: `heartbeat:${late.job}:${late.lastAt ?? 'never'}`,
+    body: `${body} افتح «هل الآلة تعمل؟» في لوحة صدى.`,
+  }
+}
+
+/**
  * أفي المتن سرٌّ؟ — **حارسٌ يُفرَض قبل النداء لا بعده**.
  *
  * ولا يُفحَص «هل نسينا؟» بالمراجعة: **رسالةٌ تخرج مرّةً لا تُستردّ**، وسجلُّ
@@ -135,7 +156,8 @@ export async function sendAlerts(
   db: Db,
   webhook: string,
   alerts: readonly Alert[],
-  fetchImpl: typeof fetch = fetch,
+  /** ‏والمهلةُ في `guardedFetch` عند كلّ قفزة (D-320). */
+  fetchImpl?: typeof fetch,
 ): Promise<SendResult> {
   if (webhook.trim() === '') {
     return { sent: 0, skipped: alerts.length, failed: 0, why: 'لا عنوان قناة مضبوط' }

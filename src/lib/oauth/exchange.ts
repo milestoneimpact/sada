@@ -5,6 +5,13 @@
  * الطلب وسببه، ولا تحمل جسم الاستجابة كاملا لئلا يتسرب رمز في سجل.
  */
 import type { Provider } from './providers'
+import { withTimeout } from '../net/timeout'
+
+/**
+ * ‏مهلةُ نهاية الرمز (D-320): التجديدُ يقع في الدورة قبل الإرسال، ونهايةٌ تعلق كانت تؤخّر ما بعدها حتّى يُقتَل الاستدعاء.
+ * ‏وخمسَ عشرةَ ثانيةً أضعافُ ما تحتاجه نهايةٌ سليمة.
+ */
+export const OAUTH_TIMEOUT_MS = 15_000
 
 export interface TokenResponse {
   readonly accessToken: string
@@ -161,7 +168,7 @@ export function exchangeCode(
     readonly requestedScopes?: readonly string[]
   },
   now: Date = new Date(),
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, OAUTH_TIMEOUT_MS),
 ): Promise<TokenResponse> {
   return postForm(
     provider,
@@ -186,7 +193,7 @@ export function refreshToken(
   creds: ClientCredentials,
   refresh: string,
   now: Date = new Date(),
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, OAUTH_TIMEOUT_MS),
   /** ما كان ممنوحا قبل التجديد: التجديدُ لا يوسّع نطاقا، فلا يُفترَض أوسع. */
   granted: readonly string[] = provider.scopes,
 ): Promise<TokenResponse> {
