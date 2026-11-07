@@ -84,7 +84,8 @@ describe('أسماءُ الأزرار في الدليل موجودة', () => {
       .map(String).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('helpView.ts'))
       .map((f) => readFileSync(join(__dirname, f), 'utf8')).join('\n') + readFileSync(join(__dirname, '../lib/channels.ts'), 'utf8')
     const missing = Object.values(answers()).flat().filter((n) => !NOT_OURS.has(n))
-      .filter((n) => !src.includes(`>${n}<`) && !src.includes(`label: '${n}'`) && !src.includes(`label: \`${n}`))
+      // ‏وعنوانُ بطاقةٍ بـ`card()` اسمٌ يُرى كذلك (`title: '…'`، دمجُ D-326 مع سقّاطة D-325)
+      .filter((n) => !src.includes(`>${n}<`) && !src.includes(`label: '${n}'`) && !src.includes(`label: \`${n}`) && !src.includes(`title: '${n}'`))
     expect(missing).toEqual([])
   })
 

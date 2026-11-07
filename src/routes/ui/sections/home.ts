@@ -19,6 +19,9 @@ import { platformLabel } from '../../../lib/oauth/providers'
 
 import { LOGOS } from '../logos'
 import { html, raw, type Html } from '../html'
+import { card } from '../components/card'
+// ‏باسمٍ آخر: «button» اسمُ حقلٍ في حال المنصّة (`h.button`)، وحارسُ القالب يقرأ الاسم
+import { button as kitButton } from '../components/button'
 import { stamp } from '../../../lib/time/zone'
 import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
 import type { StoredPlan } from '../../../lib/plan/job'
@@ -218,12 +221,12 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
     material: {
       what: 'أضف ما يُكتب منه',
       why: 'فكرةٌ بجملة، أو مقطعٌ يُرفع، أو ملفٌّ في مجلّد Drive المشترَك.',
-      act: html`<a class="btn btn-secondary btn-sm mt-2" href="/panel#idea">اكتب فكرتك</a>`,
+      act: html`<span class="why mt-2">${raw(kitButton({ label: 'اكتب فكرتك', href: '/panel#idea', size: 'sm' }))}</span>`,
     },
     approve: {
       what: 'اعتمد أوّل منشور',
       why: 'يُجدوَل في موعده ثمّ يُنشر — ولا يُنشر شيءٌ قبل اعتمادك.',
-      act: html`<a class="btn btn-secondary btn-sm mt-2" href="${f.firsts.waiting === null ? '#posts' : '#d-' + f.firsts.waiting}">راجع المسوّدات</a>`,
+      act: html`<span class="why mt-2">${raw(kitButton({ label: 'راجع المسوّدات', href: f.firsts.waiting === null ? '#posts' : '#d-' + f.firsts.waiting, size: 'sm' }))}</span>`,
     },
   }
   const rows = run.steps.map((x, i) => {
@@ -239,11 +242,10 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
   // ‏و`div` بدورٍ لا `section`: اللوحُ نفسُه `section` (`data-pane`)، وما يُقرأ حتّى أوّلِ إغلاقٍ له يُقرأ لوحًا كاملًا
   // ‏والعدّادُ يقول الخطوةَ الآن («الخطوة 3 من 3»)، والشريطُ ما تمّ (2): كان «3 من 3» بجوار شريطٍ بثلثين، فيُقرأ «اكتملت»
   // ‏وما زالت خطوةٌ باقية، ويسمع قارئُ الشاشة رقمين متناقضين (مراجعة D-326)
-  return html`<div class="card mb-3" id="first-run" role="region" aria-labelledby="fr-t">
-    <div class="card-head"><h2 id="fr-t">البدء في ثلاث خطوات</h2></div>
-    <div class="hp-prog"><progress max="3" value="${done}" aria-labelledby="fr-t"></progress><span data-fr-count>الخطوة ${run.current + 1} من 3</span></div>
-    <ol class="steps wiz mt-3">${rows}</ol>
-  </div>`.value
+  // ‏وبدوالّ العُدّة (دمجُ D-326 مع سقّاطة D-325): البطاقةُ بـ`card()` وعنوانُها يسمّي المنطقةَ والشريط، والفعلُ بـ`button()`
+  const body = html`<div class="hp-prog"><progress max="3" value="${done}" aria-labelledby="fr-t"></progress><span data-fr-count>الخطوة ${run.current + 1} من 3</span></div>
+    <ol class="steps wiz mt-3">${rows}</ol>`.value
+  return html`<div class="mb-3">${raw(card({ id: 'first-run', title: 'البدء في ثلاث خطوات', titleId: 'fr-t', attrs: 'role="region" aria-labelledby="fr-t"', body }))}</div>`.value
 }
 
 /**
