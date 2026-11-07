@@ -47,7 +47,12 @@ permissions:
 
 jobs:
   ui:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # ‏ولا على طلبات Dependabot (دمجُ D-326): تمسّ `package.json` فيطابقها المرشّح، وDependabot يعيد بناءها حين يتقدّم main —
+    # ‏قِيس بعد دمج D-325: أعاد بناءَ طلبين من ستّة (#239 و#240) في ثلاث دقائق، فجرى `ci` على كلٍّ. ولو جرت هذه معه لزاد كلُّ
+    # ‏دمجٍ نحو ‏35 دقيقةً لكلّ طلبٍ أُعيد بناؤه. ويُشغِّلها المالكُ على أحدها بيده (`workflow_dispatch` على فرعه) قبل أن يدمجه.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
