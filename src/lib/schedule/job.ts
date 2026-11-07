@@ -525,10 +525,11 @@ function secondsUntil(due: string, now: Date): number {
 }
 
 export type Claim =
+  /** ‏خُتم الآن، أو هي إعادةٌ للرسالة نفسِها بعد ختمها (مراجعة D-320): تمضي إلى الناشر. */
   | { readonly kind: 'claimed' }
   /** ‏وصل قبل دقيقته: يُعاد بما بقي. */
   | { readonly kind: 'early'; readonly seconds: number }
-  /** ‏الإيقافُ قائم: لا يُختَم، وتُرفع علامتُه فتعيده الدورةُ بعد الاستئناف. */
+  /** ‏الإيقافُ قائم: لا يُختَم (ويُرفع ختمُ الإعادة)، وتُرفع علامتُه فتعيده الدورةُ بعد الاستئناف. */
   | { readonly kind: 'paused'; readonly reason: string }
   /** ‏سُحب أو تغيّر موعدُه أو خُتم بغيره: لا يفعل شيئًا. */
   | { readonly kind: 'stale' }
@@ -537,21 +538,36 @@ export type Claim =
  * ‏**الختمُ عند الوصول** (D-320): الرسالةُ المؤجَّلةُ تختم منشورَها حين تصل في دقيقته **وما زال كما أُرسلت له** — مجدولًا،
  * ‏لم يُختَم، وموعدُه موعدُها. **بجملةٍ واحدةٍ وبساعة القاعدة**: سحبٌ أو تغييرٌ أو «تراجَع» قبل الدقيقة يغلب لأنّه وقع قبلها في
  * ‏القاعدة، وما بعدها يجد الختمَ فيُردّ (`dispatched_at IS NULL` في حرّاسها). **والإيقافُ يغلب** كما يغلب في الدورة.
+ *
+ * ‏**وإعادةُ الرسالة نفسِها تمضي بختمها** (مراجعة D-320): كان التسليمُ الثاني يجد الختمَ الذي وضعه الأوّلُ فيُردّ `stale`، فعطلٌ
+ * ‏بعد الختم (‏429، أو رمزٌ يقترب انتهاؤه، أو D1 لحظةً، أو حجزٌ فُكّ لأنّ الدفترَ سقط) يُقَرّ بلا نشرٍ حتّى يكنسه الكنّاسُ «فشل»
+ * ‏بعد ستّين دقيقة — وهذا المسارُ الغالب. فالإعادةُ (`redelivery`: رقمُ التسليم فوق الأوّل) تمضي ما دام المنشورُ مجدولًا بموعدها
+ * ‏**والعلامةُ علامتُها** (`enqueued_for = due`): ختمُ الدورة الفوريّ يمحو العلامة (`markDispatched`)، فرسالةٌ تأخّرت حتّى أرسلت
+ * ‏الدورةُ منشورَها لا تمضي. **ولا يُختَم ثانية** (`coalesce`): الكنّاسُ يعدّ من الختم الأوّل. **ومنعُ الإرسال المزدوج للناشر**:
+ * ‏سؤالا `succeeded` و`sent` ومحفّزُ D-004 (0047). والتسليمُ المكرَّرُ الأوّلُ بعد ختم أخيه يبقى `stale` كما كان.
  */
-export async function claimDelivery(db: Db, postId: string, org: string, due: string): Promise<Claim> {
+export async function claimDelivery(db: Db, postId: string, org: string, due: string, redelivery = false): Promise<Claim> {
   const allowance = await checkAllowance(db, 'publish')
   if (allowance.blocker !== null) {
-    await db.prepare('UPDATE posts SET enqueued_for = NULL WHERE id = ? AND org_id = ? AND enqueued_for = ?').bind(postId, org, due).run()
+    // ‏وإعادةٌ بعد ختمها يُرفع ختمُها أيضًا: بلا هذا يبقى «أُرسل» بلا رسالةٍ حتّى يكنسه الكنّاسُ «فشل» والإيقافُ قائم
+    await db
+      .prepare(
+        `UPDATE posts SET enqueued_for = NULL, dispatched_at = CASE WHEN ?4 THEN NULL ELSE dispatched_at END
+          WHERE id = ?1 AND org_id = ?2 AND enqueued_for = ?3 AND status = 'queued'`,
+      )
+      .bind(postId, org, due, redelivery ? 1 : 0)
+      .run()
     return { kind: 'paused', reason: blockerReason(allowance.blocker) }
   }
   const claimed = await db
     .prepare(
-      `UPDATE posts SET dispatched_at = datetime('now')
-        WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL
-          AND scheduled_at = ? AND scheduled_at <= datetime('now')
+      `UPDATE posts SET dispatched_at = coalesce(dispatched_at, datetime('now'))
+        WHERE id = ?1 AND org_id = ?2 AND status = 'queued'
+          AND scheduled_at = ?3 AND scheduled_at <= datetime('now')
+          AND (dispatched_at IS NULL OR (?4 AND enqueued_for = ?3))
         RETURNING id`,
     )
-    .bind(postId, org, due)
+    .bind(postId, org, due, redelivery ? 1 : 0)
     .first<{ id: string }>()
   if (claimed !== null) return { kind: 'claimed' }
   const row = await db
@@ -589,9 +605,14 @@ export async function markDispatched(db: Db, ids: readonly string[], now: Date):
    * فالختمُ يشترط أنّ الصفَّ لم يُختَم بعد، **والقاعدةُ تعيد ما ختمته هي**،
    * والدورةُ ترسل ذاك وحده.
    */
+  /*
+   * ‏**وتُمحى علامةُ المؤجَّل** (مراجعة D-320): ما ختمته الدورةُ هنا رسالتُه فوريّة، ورسالةٌ مؤجَّلةٌ تأخّرت حتّى هذه اللحظة
+   * ‏تصل فتجد العلامةَ ليست لها فلا تمضي ولو كانت إعادة (`claimDelivery`). ورفعُ الختم بعد سقوط الإرسال لا يعيدها: المنشورُ
+   * ‏مستحقٌّ والدورةُ التالية ترسله.
+   */
   const { results } = await db
     .prepare(
-      `UPDATE posts SET dispatched_at = ?
+      `UPDATE posts SET dispatched_at = ?, enqueued_for = NULL
         WHERE id IN (${marks}) AND status = 'queued' AND dispatched_at IS NULL
         RETURNING id, org_id`,
     )

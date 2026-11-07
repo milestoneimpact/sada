@@ -56,7 +56,7 @@
 | الجدول | الأعمدة الأساسية | ملاحظة |
 |---|---|---|
 | `accounts` | `id` · `platform` · `kind` (member/org) · `external_id` · `display_name` · `status` | حساب مربوط |
-| `tokens` | `account_id` · `access_enc` · `refresh_enc` · `iv` · `expires_at` · `refresh_expires_at` · `scopes` · `renew_failures` · `renew_retry_at` | مشفّر AES-GCM (D-005)؛ وما لم يتجدّد يتباعد (D-320) |
+| `tokens` | `account_id` · `access_enc` · `refresh_enc` · `iv` · `expires_at` · `refresh_expires_at` · `scopes` · `renew_failures` · `renew_retry_at` | مشفّر AES-GCM (D-005)؛ وما رُدّ تجديدُه يتباعد، والعابرُ يتأخّر خلف السليم ولا ينتظر (D-320) |
 | `sources` | `id` · `drive_file_id` · `name` · `mime` · `content_hash` · `last_seen_at` · `kind` · `origin_url` · `file_key` · `text_key` | ملفّ في Drive، أو مرفوعٌ من اللوحة، أو رابطُ صفحة (D-284) — والنصُّ المستخرَج للأخيرين في R2 |
 | `content_items` | `id` · `source_id` · `summary` · `themes_json` · `worth_score` · `extracted_at` | ما فهمه Claude |
 | `plans` | `id` · `week_start` · `span` (week/2weeks/month/2months) · `plan_json` · `choices_json` · `model` · `status` | خطّةُ مدًى، واختياراتُ المالك معها (D-282) |
@@ -68,7 +68,7 @@
 | `cost_ledger` | `id` · `provider` · `operation` · `units` · `unit_cost` · `total` · `ref_id` · `at` | X · Claude · Gemini (D-008) |
 | `media` | `id` · `post_id` · `r2_key` · `mime` · `bytes` · `prompt` · `model` · `cost_usd` · `status` · `idempotency_key` · `platform_media_id` · `note` · `headline` | صورةٌ أو مقطع، والبايتاتُ في R2. و`note` ثلاثيّة: `NULL` لم يُسجَّل · `''` رُكّب العنوان · نصٌّ سببُ السقوط (D-162) |
 | `media_claims` | `idempotency_key` · `post_id` · `kind` · `claimed_at` | **حجزٌ يسبق الإنفاق** — القيدُ الفريدُ على `media` يقع بعد الدفع (D-068) |
-| `heartbeats` | `job` · `at` · `outcome` · `detail` | صفٌّ لكلّ دورةٍ يُستبدَل — «هل دارت ومتى» (D-158)، ويقرؤه `/pulse` لمراقبٍ من الخارج (D-320) |
+| `heartbeats` | `job` · `at` · `outcome` · `detail` · `failed_since` | صفٌّ لكلّ دورةٍ يُستبدَل — «هل دارت ومتى» (D-158)، ويقرؤه `/pulse` لمراقبٍ من الخارج، و`failed_since` أوّلُ سقوطٍ متّصلٍ يقوله تنبيهُ الساعة (D-320) |
 | `analysis_claims` | `source_id` · `content_hash` · `claimed_at` | **حجزٌ يسبق دفعَ التحليل** كـ`media_claims` للصور (D-270) |
 | `auth_attempts` | `bucket` · `n` · `window_start` | حجزُ محاولات الدخول والتحدّيات قبل فحصها — عدٌّ ذرّيٌّ لكلّ عنوانٍ وللجميع في ربع ساعة (D-161) |
 

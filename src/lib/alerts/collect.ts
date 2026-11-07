@@ -7,13 +7,13 @@
  * - نشرٌ فشل نهائيّا: منشورٌ حالُه `failed` — **والطابورُ فرغ منه**.
  * - سقفُ إنفاقٍ بُلغ: من `cost_ledger` مقابلَ الإعداد.
  * - حدثُ أمان: صفٌّ كُتب في `alert_outbox` عند وقوعه ولم يُرسَل بعد.
- * - نبضٌ تأخّر: دورةُ الإرسال أو التجديد لم تدُر في موعدها، أو مستهلكُ النشر لم يأخذ ما سُلّم إليه (`ops/pulse.ts`).
+ * - نبضٌ تأخّر: دورةُ الإرسال أو التجديد تسقط منذ نصف ساعة، أو مستهلكُ النشر لم يأخذ ما سُلّم إليه (`ops/pulse.ts`).
  *
  * **ولا يُخترَع حدثٌ لتكتمل القائمة** — قاعدةُ D-104 نفسُها في موضعٍ آخر.
  */
 import { budgetAlert, heartbeatAlert, MAX_TRIES, publishAlert, tokenAlert, type Alert } from './outbox'
 import type { Db } from '../tokens'
-import { pulseReport } from '../ops/pulse'
+import { alertable, pulseReport } from '../ops/pulse'
 
 /** اليومُ بصيغة القاعدة — والسقفُ يوميٌّ فمفتاحُه يومٌ لا لحظة. */
 function dayOf(now: Date): string {
@@ -86,11 +86,12 @@ export async function collectAlerts(
     .catch(() => ({ results: [] as { ref: string; body: string; org_id: string }[] }))
   for (const s of security) out.push({ kind: 'security', ref: s.ref, body: s.body, org: s.org_id })
 
-  // ── ٥ · نبضٌ تأخّر (D-320) ─────────────────────────────────────────
-  // ‏**والمتأخّرُ وحدَه**: «لم يدُر قطّ» و«سقط في آخر مرّة» يُريان في اللوحة ويقولهما `/pulse` لمراقبه، ودورةٌ دارت في موعدها
-  // ‏فسقطت سببُها في سجلّها. والتأخّرُ هو ما لا يراه أحدٌ حتّى يفتح اللوحة
+  // ── ٥ · نبضٌ تأخّر أو سقوطٌ متّصل (D-320) ─────────────────────────
+  // ‏**ما لا يراه أحدٌ حتّى يفتح اللوحة**: ركودُ المستهلك، ودورةُ إرسالٍ أو تجديدٍ تسقط منذ نصف ساعة (`alertable`). ودورةٌ
+  // ‏واحدةٌ تسقط تُرى في اللوحة والسجلّ، و«لم تدُر قطّ» يقوله `/pulse` لمراقبه. **وكان «المتأخّرُ وحدَه»** (مراجعة D-320): هذا
+  // ‏يُحسَب في `scheduled()` بعد دورتي التجديد والإرسال، فعمرُ نبضيهما ثوانٍ ولا يتأخّران — والإرسالُ يسقط كلَّ ربع ساعةٍ بلا كلمة
   const pulse = await pulseReport(db, now).catch(() => null)
-  for (const late of pulse?.late ?? []) if (late.state === 'late') out.push(heartbeatAlert(late))
+  for (const late of pulse?.late ?? []) if (alertable(late)) out.push(heartbeatAlert(late))
 
   return out
 }

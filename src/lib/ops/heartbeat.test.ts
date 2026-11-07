@@ -64,3 +64,29 @@ describe('pulses', () => {
     expect(pulses([], now).map((x) => x.job)).toEqual(['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report'])
   })
 })
+
+/**
+ * ‏**مراجعة D-320: منذ متى تسقط** — النبضُ صفٌّ واحدٌ يُستبدَل، فكان «سقطت» لا يقول أهي المرّةُ الأولى أم الثلاثون. و«نبضٌ تأخّر»
+ * ‏لا يصل الإرسالَ والتجديد (تنبيهُهما يُحسَب بعدهما في الاستدعاء نفسِه)، فالسقوطُ المتّصل هو ما يُقال: `failed_since` أوّلُ
+ * ‏نبضٍ ساقطٍ بعد آخر ما لم يسقط.
+ */
+describe('مراجعة D-320: منذ متى تسقط', () => {
+  const since = (job: string) => (db.raw.prepare('SELECT failed_since, at FROM heartbeats WHERE job = ?').get(job) as { failed_since: string | null; at: string })
+  it('أوّلُ سقوطٍ يبدأ العدّ، وما بعده يُبقيه، وما لم يسقط يمحوه', async () => {
+    await beat(db, 'dispatch', 'ok')
+    expect(since('dispatch').failed_since).toBeNull()
+    await beat(db, 'dispatch', 'failed', 'queue down')
+    const first = since('dispatch')
+    expect(first.failed_since).toBe(first.at)
+    db.raw.exec("UPDATE heartbeats SET at = datetime('now', '-15 minutes'), failed_since = datetime('now', '-15 minutes') WHERE job = 'dispatch'")
+    const before = since('dispatch').failed_since
+    await beat(db, 'dispatch', 'failed', 'queue down')
+    expect(since('dispatch').failed_since).toBe(before)
+    expect((await readHeartbeats(db)).find((h) => h.job === 'dispatch')?.failedSince).toBe(before)
+    await beat(db, 'dispatch', 'skipped', 'موقوف')
+    expect(since('dispatch').failed_since).toBeNull()
+    // ‏وأوّلُ نبضٍ لم يُكتب قبله شيء
+    await beat(db, 'renew', 'failed')
+    expect(since('renew').failed_since).toBe(since('renew').at)
+  })
+})

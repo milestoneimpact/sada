@@ -15,6 +15,8 @@ export interface Heartbeat {
   readonly at: string
   readonly outcome: Outcome
   readonly detail: string | null
+  /** ‏أوّلُ نبضٍ ساقطٍ بعد آخر ما لم يسقط (مراجعة D-320) — `null` لما لم يسقط آخرَ مرّة. */
+  readonly failedSince?: string | null
 }
 
 /**
@@ -36,12 +38,22 @@ export const CADENCE: Readonly<Record<Job, { readonly label: string; readonly ev
 
 export const JOBS: readonly Job[] = ['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report']
 
+/**
+ * ‏**ومنذ متى تسقط** (مراجعة D-320): `failed_since` أوّلُ نبضٍ ساقطٍ بعد آخر ما لم يسقط، يبقى ما دامت تسقط، ويُمحى بأوّل ما لا
+ * ‏يسقط (`ok` أو `skipped`). منه يُقال «تسقط منذ…» في قناة المالك مرّةً للسقوط كلِّه (`alerts/collect.ts`).
+ */
 export async function beat(db: Db, job: Job, outcome: Outcome, detail = ''): Promise<void> {
   try {
     await db
       .prepare(
-        `INSERT INTO heartbeats (job, at, outcome, detail) VALUES (?, datetime('now'), ?, ?)
-         ON CONFLICT(job) DO UPDATE SET at = excluded.at, outcome = excluded.outcome, detail = excluded.detail`,
+        `INSERT INTO heartbeats (job, at, outcome, detail, failed_since)
+         VALUES (?1, datetime('now'), ?2, ?3, CASE WHEN ?2 = 'failed' THEN datetime('now') END)
+         ON CONFLICT(job) DO UPDATE SET
+           at = excluded.at, outcome = excluded.outcome, detail = excluded.detail,
+           failed_since = CASE
+             WHEN excluded.outcome != 'failed' THEN NULL
+             WHEN heartbeats.outcome = 'failed' THEN coalesce(heartbeats.failed_since, heartbeats.at)
+             ELSE excluded.at END`,
       )
       .bind(job, outcome, detail === '' ? null : detail.slice(0, 200))
       .run()
@@ -53,13 +65,14 @@ export async function beat(db: Db, job: Job, outcome: Outcome, detail = ''): Pro
 export async function readHeartbeats(db: Db): Promise<readonly Heartbeat[]> {
   try {
     const rows = await db
-      .prepare('SELECT job, at, outcome, detail FROM heartbeats')
-      .all<{ job: string; at: string; outcome: string; detail: string | null }>()
+      .prepare('SELECT job, at, outcome, detail, failed_since FROM heartbeats')
+      .all<{ job: string; at: string; outcome: string; detail: string | null; failed_since: string | null }>()
     return (rows.results ?? []).map((r) => ({
       job: r.job as Job,
       at: r.at,
       outcome: r.outcome as Outcome,
       detail: r.detail,
+      failedSince: r.failed_since,
     }))
   } catch {
     return []

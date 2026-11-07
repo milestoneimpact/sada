@@ -630,9 +630,10 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
       // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلُ D1 يُعاد بتباعد، والإعادةُ آمنة — حجزُ المحاولة (0047) يمنع إرسالًا ثانيًا
       const threw = await guarded(message, 'publish', async (m) => {
         // ‏**الرسالةُ المؤجَّلةُ تختم منشورَها عند وصولها** (D-320): إن بقي كما أُرسلت له وحلّ موعدُه. وصلت قبله؟ تُعاد بما بقي.
-        // ‏سُحب أو تغيّر موعدُه أو أُوقف النظام؟ تُقَرّ بلا نشر — والدورةُ ترسل له من جديد إن عاد مجدولًا
+        // ‏سُحب أو تغيّر موعدُه أو أُوقف النظام؟ تُقَرّ بلا نشر — والدورةُ ترسل له من جديد إن عاد مجدولًا.
+        // ‏**وإعادتُها بعد ختمها تمضي إلى الناشر** (مراجعة D-320): رقمُ التسليم فوق الأوّل، وحرّاسُ الناشر تمنع الإرسالَ المزدوج
         if (m.body.due !== undefined) {
-          const claim = await claimDelivery(env.DB, m.body.postId, m.body.org ?? OWNER_ORG, m.body.due)
+          const claim = await claimDelivery(env.DB, m.body.postId, m.body.org ?? OWNER_ORG, m.body.due, m.attempts > 1)
           if (claim.kind === 'early') return m.retry({ delaySeconds: claim.seconds })
           if (claim.kind !== 'claimed') {
             console.info({ job: 'publish', post: m.body.postId, delivery: claim.kind })

@@ -4,17 +4,72 @@
  * ‏الدورةُ ترسل ما يحلّ قبل التي بعدها. وموعدٌ بعد خمس دقائق يُضبط بين دورتين لا تراه دورةٌ قبله، فكان يخرج في الدورة التالية:
  * ‏حتّى ثلاثَ عشرةَ دقيقةً بعد ما وُعد. فبعد كلّ فعلٍ يضع موعدًا يُرسَل ما في الأفق بعد الردّ.
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { app } from '../index'
 import { fakeDb } from '../test/fakes'
 import { dispatchSoon, SCHEDULING_PATHS } from './panel/shared'
 
+/**
+ * ‏**مراجعة D-320: القائمةُ تُشتقّ من الشيفرة لا تُكتب باليد.** كانت قائمةُ الاختبار تقول «كلُّ مسارٍ ينادي دوالَّ الجدولة» ثمّ
+ * ‏تفرض ألّا يطابق النمطُ ما سواها — ففاتتها ثلاثةٌ تنادي تلك الدوالَّ بوسيط (`pinPlan` و`applyPlan` و`delayItem`)، وأثبتت
+ * ‏الفجوة. فهنا تُقرأ الشيفرة: كلُّ دالّةٍ تنادي دالّةَ جدولةٍ (حتّى تستقرّ)، ثمّ كلُّ مسار POST في اللوحة ينادي إحداها.
+ */
+const SRC = new URL('../', import.meta.url).pathname
+function sources(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) return sources(path)
+    return name.endsWith('.ts') && !name.endsWith('.test.ts') ? [path] : []
+  })
+}
+/** ‏أجسادُ الدوالّ المسمّاة: من `function الاسم(` إلى أوّل سطرٍ يبدأ بـ`}` — أسلوبُ الملفّات هنا. */
+function bodies(code: string): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const m of code.matchAll(/^(?:export )?(?:async )?function (\w+)\s*[(<]/gm)) {
+    const rest = code.slice(m.index!)
+    const end = rest.search(/^\}/m)
+    out.set(m[1]!, end === -1 ? rest : rest.slice(0, end))
+  }
+  return out
+}
+function schedulingRoutes(): Set<string> {
+  const files = sources(SRC).map((path) => readFileSync(path, 'utf8'))
+  const fns = new Map<string, string>()
+  for (const code of files) for (const [name, body] of bodies(code)) fns.set(`${name}\u0000${fns.size}`, body)
+  // ‏ما يضع موعدًا في القاعدة — والباقي من يناديه
+  const schedulers = new Set(['schedulePost', 'reschedulePost', 'restoreSchedule'])
+  const calls = (body: string) => [...schedulers].some((n) => new RegExp(`\\b${n}\\(`).test(body))
+  for (let grew = true; grew;) {
+    grew = false
+    for (const [key, body] of fns) {
+      const name = key.split('\u0000')[0]!
+      if (!schedulers.has(name) && calls(body.slice(body.indexOf('{')))) { schedulers.add(name); grew = true }
+    }
+  }
+  const routes = new Set<string>()
+  for (const code of files) {
+    for (const m of code.matchAll(/^\w+\.post\('(\/panel\/[^']+)'/gm)) {
+      const rest = code.slice(m.index!)
+      const end = rest.search(/^\}\)/m)
+      if (calls(end === -1 ? rest : rest.slice(0, end))) routes.add(m[1]!)
+    }
+  }
+  return routes
+}
+
 describe('أفعالُ الموعد (D-320)', () => {
-  /** ‏كلُّ مسارٍ ينادي `schedulePost` أو `reschedulePost` أو `restoreSchedule` أو `scheduleFromUpload` أو `schedulePlan`. */
-  const SCHEDULING = [
-    '/panel/drafts/decide', '/panel/drafts/schedule', '/panel/drafts/spread/apply', '/panel/drafts/undo-unschedule',
-    '/panel/drafts/reschedule', '/panel/plan/schedule', '/panel/plan/review/delay', '/panel/uploads/:id/posts', '/panel/uploads/:id/schedule',
-  ]
+  /** ‏كلُّ مسارٍ ينادي `schedulePost` أو `reschedulePost` أو `restoreSchedule`، بنفسه أو بدالّةٍ تناديها. */
+  const SCHEDULING = [...schedulingRoutes()].sort()
+
+  it('مراجعة D-320: الاشتقاقُ يرى الاثني عشر، ومنها الثلاثةُ التي فاتت القائمةَ المكتوبة', () => {
+    expect(SCHEDULING).toEqual([
+      '/panel/drafts/decide', '/panel/drafts/reschedule', '/panel/drafts/schedule', '/panel/drafts/spread/apply',
+      '/panel/drafts/undo-unschedule', '/panel/plan-import/:id/approve', '/panel/plan/pin', '/panel/plan/review/bulk',
+      '/panel/plan/review/delay', '/panel/plan/schedule', '/panel/uploads/:id/posts', '/panel/uploads/:id/schedule',
+    ])
+  })
 
   it('كلٌّ منها مسارٌ مسجَّل، والنمطُ يطابقه ولا يطابق ما سواه', () => {
     const posts = new Set(app.routes.filter((r) => r.method === 'POST').map((r) => r.path))

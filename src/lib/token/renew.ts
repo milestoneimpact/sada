@@ -57,10 +57,16 @@ export const RENEW_TIMEOUT_MS = 15_000
 export const RENEW_BUDGET_MS = 60_000
 
 /**
- * ‏**التباعدُ بعد السقوط** (D-320): حسابٌ لم يتجدّد ينتظر نصفَ ساعة، ثمّ ضعفَ ما انتظر، حتّى يومٍ لا أكثر. والسليمُ لا ينتظر.
+ * ‏**التباعدُ بعد الرفض النهائيّ** (D-320): حسابٌ ردّ المزوّدُ تجديدَه أو انتهى إذنُ تجديده ينتظر نصفَ ساعة، ثمّ ضعفَ ما انتظر،
+ * ‏حتّى يومٍ لا أكثر. والسليمُ لا ينتظر.
  *
- * ‏كان الساقطُ — ردّ المزوّدُ إذنَه، أو انتهى إذنُ تجديده، أو سرُّ التطبيق ناقص — أقدمَ الرموز انتهاءً، فيُختار أوّلًا في كلّ
- * ‏دورة (ستًّا وتسعين مرّةً في اليوم)، **وخمسةٌ وعشرون منه تملأ الدفعةَ فلا يصل السليمَ دورُه حتّى يموت رمزُه**.
+ * ‏كان الساقطُ أقدمَ الرموز انتهاءً، فيُختار أوّلًا في كلّ دورة (ستًّا وتسعين مرّةً في اليوم)، **وخمسةٌ وعشرون منه تملأ الدفعةَ
+ * ‏فلا يصل السليمَ دورُه حتّى يموت رمزُه**.
+ *
+ * ‏**والعابرُ لا يتباعد** (مراجعة D-320): ‏5xx والشبكةُ والمهلةُ وسرُّ التطبيق الناقص يُعدّ سقوطُها فتتأخّر خلف السليم
+ * ‏(`ORDER BY renew_failures`)، ولا تنتظر: رمزٌ في هامش الساعتين يُحاوَل في كلّ دورةٍ حتّى يعود المزوّد أو يُحفَظ السرّ. كان كلُّ
+ * ‏سقوطٍ يتباعد، فمزوّدٌ تعطّل ساعةً ونصفًا ترك رمزًا يموت ساعتين بعد عودته. **وحفظُ التطبيق أو فحصُه الناجح يمحو تباعدَ منصّته**
+ * ‏(`releaseRenewalHolds`): ‏401 `invalid_client` لسرٍّ خاطئ نهائيٌّ حتّى يُصحَّح السرّ، ثمّ لا.
  */
 export const RENEW_BACKOFF_BASE_MS = 30 * 60_000
 export const RENEW_BACKOFF_MAX_MS = 24 * 3600_000
@@ -249,14 +255,15 @@ export async function noteRenewal(db: Db, accountId: string, org: string, note: 
 }
 
 /**
- * ‏يؤجّل حسابًا لم يتجدّد (D-320): يعدّ السقوطَ ويضع موعدَ المحاولة التالية. **ولا يُسقط الدورةَ إن لم يُكتب**: أسوأُ ما
- * ‏يقع أن يُحاوَل الحسابُ في الدورة التالية كما كان.
+ * ‏يعدّ سقوطَ حسابٍ لم يتجدّد (D-320)، **ويؤجّله إن كان الرفضُ نهائيًّا** (`permanent`): موعدُ المحاولة التالية. والعابرُ يُعدّ
+ * ‏فيتأخّر خلف السليم ولا يُؤجَّل (مراجعة D-320). **ولا يُسقط الدورةَ إن لم يُكتب**: أسوأُ ما يقع أن يُحاوَل الحسابُ في الدورة
+ * ‏التالية كما كان.
  */
-export async function holdRenewal(db: Db, row: DueRow, now: Date): Promise<void> {
+export async function holdRenewal(db: Db, row: DueRow, now: Date, permanent: boolean): Promise<void> {
   try {
     await db
       .prepare('UPDATE tokens SET renew_failures = renew_failures + 1, renew_retry_at = ? WHERE account_id = ? AND org_id = ?')
-      .bind(nextRenewAt(row.renew_failures ?? 0, now), row.account_id, row.org_id)
+      .bind(permanent ? nextRenewAt(row.renew_failures ?? 0, now) : null, row.account_id, row.org_id)
       .run()
   } catch (error) {
     console.warn({ job: 'renew-hold', account: row.account_id, failed: String(error) })
@@ -282,14 +289,14 @@ export async function renewDue(deps: RenewDeps): Promise<RenewSummary> {
       // ‏والسببُ يبقى على الحساب لا في العدّ وحدَه (D-291)
       if (out.kind === 'renewed') await noteRenewal(deps.db, row.account_id, row.org_id, null)
       else if (out.kind !== 'skipped') await noteRenewal(deps.db, row.account_id, row.org_id, out.why)
-      // ‏وما لم يتجدّد يتباعد (D-320): لا يعود في الدورة التالية ليحجب سليمًا
-      if (out.kind === 'needs_owner' || out.kind === 'deferred') await holdRenewal(deps.db, row, now)
+      // ‏وما لم يتجدّد يُعدّ فيتأخّر خلف السليم (D-320)، **والنهائيُّ وحدَه يتباعد** (مراجعة D-320): العابرُ يُحاوَل في الدورة التالية
+      if (out.kind === 'needs_owner' || out.kind === 'deferred') await holdRenewal(deps.db, row, now, out.kind === 'needs_owner')
     } catch (error) {
       // **حسابٌ يسقط لا يُسقط البقيّة** — دورةٌ تتوقّف عند أوّل عطلٍ
       // تترك حساباتٍ سليمةً تموت رموزُها
       deferred += 1
       await noteRenewal(deps.db, row.account_id, row.org_id, String(error).slice(0, 120))
-      await holdRenewal(deps.db, row, now)
+      await holdRenewal(deps.db, row, now, false)
     }
   }
   return { due: rows.length, renewed, needsOwner, deferred }

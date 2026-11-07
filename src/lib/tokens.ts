@@ -46,6 +46,26 @@ export async function inBatches(db: Db, statements: readonly DbStatement[], size
   }
 }
 
+/**
+ * ‏**تطبيقٌ حُفظ أو فُحص فنجح: تباعدُ تجديد منصّته يُمحى** (مراجعة D-320). ‏401 `invalid_client` من نهاية الرمز رفضٌ نهائيٌّ يتباعد
+ * ‏حتّى يوم (`token/renew.ts`)، وسببُه سرُّ التطبيق — فإن صُحّح لم يكن ما ينتظره الحساب. والتطبيقُ إعدادٌ عامٌّ يخدم كلَّ
+ * ‏المنظّمات، فيُمحى في كلّ منظّمةٍ وحسابُ الرمز من منظّمته. **ولا يُسقط الحفظَ إن لم يُكتب**: أسوأُ ما يقع أن ينتظر الحسابُ موعدَه.
+ */
+export async function releaseRenewalHolds(db: Db, platform: Platform): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `UPDATE tokens SET renew_failures = 0, renew_retry_at = NULL
+          WHERE (renew_failures > 0 OR renew_retry_at IS NOT NULL)
+            AND account_id IN (SELECT a.id FROM accounts a WHERE a.platform = ? AND a.org_id = tokens.org_id)`,
+      )
+      .bind(platform)
+      .run()
+  } catch (error) {
+    console.warn({ job: 'renew-release', platform, failed: String(error) })
+  }
+}
+
 export interface DbStatement {
   bind(...values: unknown[]): DbStatement
   first<T = unknown>(): Promise<T | null>

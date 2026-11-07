@@ -6,9 +6,15 @@
  * ‏**ولا يُكتب نبضُ الطابور**. فصارت كلُّ رسالةٍ في `try` وحدَها: عطلُها يُعاد بتباعدٍ يتصاعد، والنبضُ يُكتب في `finally`.
  */
 import { readFileSync } from 'node:fs'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import worker, { guarded } from './index'
 import { fakeDb, type FakeDb } from './test/fakes'
+import { saveTokens, upsertAccount } from './lib/tokens'
+import { scopeSet } from './lib/oauth/scopes'
+import { toBase64 } from './lib/crypto'
+import { X } from './lib/oauth/providers'
+import { claimDelivery, dispatchDue } from './lib/schedule/job'
+import { writeSetting } from './lib/settings'
 
 let db: FakeDb
 beforeEach(() => { db = fakeDb() })
@@ -140,5 +146,115 @@ describe('الرسالةُ المؤجَّلة في مستهلك النشر (D-32
     await worker.queue({ queue: 'sada-publish-staging', messages: [m] } as never, env())
     expect(m.seen).toEqual(['ack'])
     expect(attempts(id)).toBe(0)
+  })
+})
+
+/**
+ * ‏**مراجعة D-320: الرسالةُ المؤجَّلةُ تُعاد بعد ختمها** — كان `claimDelivery` يختم في التسليم الأوّل ثمّ يردّ كلَّ إعادةٍ `stale`،
+ * ‏فعطلٌ بعد الختم (D1 لحظةً، أو ‏429 من X، أو رمزٌ يقترب انتهاؤه) يُقَرّ بلا نشرٍ حتّى يجعله الكنّاسُ «فشل» بعد ستّين دقيقة.
+ * ‏والمؤجَّلةُ هي المسارُ الغالب: كلُّ ما جُدول قبل دورته. **فإعادةُ الرسالة نفسِها تمضي بختمها**، ومنعُ الإرسال المزدوج
+ * ‏لحرّاس الناشر (`succeeded` و`sent` ومحفّز 0047). **والتسليمُ المكرَّرُ الأوّل** (لا إعادةَ قبله) يبقى `stale`.
+ */
+describe('مراجعة D-320: الرسالةُ المؤجَّلةُ تُعاد بعد ختمها', () => {
+  const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+  const sqlNow = (offset: number) => new Date(Date.now() + offset * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  /** ‏منشورُ X مؤجَّلٌ حلّ موعدُه، وحسابُه برمزٍ سليم. */
+  async function deferredX(offset = -30): Promise<{ id: string; due: string }> {
+    const account = await upsertAccount(db, 'org_owner', { platform: 'x', kind: 'member', externalId: '4242', displayName: 'عمر' })
+    await saveTokens(db, KEY, account, { accessToken: 'live', refreshToken: null, expiresAt: '2099-01-01T00:00:00.000Z', refreshExpiresAt: null, scopes: scopeSet('x').join(' ') })
+    const id = crypto.randomUUID()
+    const due = sqlNow(offset)
+    db.raw.prepare(`INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status, idempotency_key, approved_by, approved_at, enqueued_for)
+      VALUES (?, ?, 'x', 'text', 'نصّ', ?, 'queued', ?, 'panel', '2026-09-07T10:00:00Z', ?)`).run(id, account, due, `k-${id}`, due)
+    return { id, due }
+  }
+  /** ‏X يردّ بما في القائمة بالترتيب، ثمّ ‏201. */
+  function xAnswers(...statuses: number[]): { calls: () => number } {
+    let calls = 0
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      if (String(input) !== X.postUrl) return new Response('{}', { status: 200 })
+      const status = statuses[calls] ?? 201
+      calls += 1
+      return status === 201
+        ? new Response(JSON.stringify({ data: { id: `tweet-${calls}` } }), { status: 201 })
+        : new Response(JSON.stringify({ title: 'Too Many Requests' }), { status })
+    })
+    return { calls: () => calls }
+  }
+  const post = (id: string) => db.raw.prepare('SELECT status, dispatched_at, enqueued_for FROM posts WHERE id = ?').get(id) as { status: string; dispatched_at: string | null; enqueued_for: string | null }
+  const run = (m: ReturnType<typeof message>, env: unknown) => worker.queue({ queue: 'sada-publish-staging', messages: [m] } as never, env as never)
+
+  it('‏429 بعد الختم: تُعاد بعد دقيقة، والإعادةُ تنشر', async () => {
+    const { id, due } = await deferredX()
+    const x = xAnswers(429)
+    const first = message({ postId: id, org: 'org_owner', due }, 1)
+    await run(first, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(first.seen).toEqual([{ delaySeconds: 60 }])
+    expect(post(id).dispatched_at).not.toBeNull()
+    const second = message({ postId: id, org: 'org_owner', due }, 2)
+    await run(second, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(second.seen).toEqual(['ack'])
+    expect(x.calls()).toBe(2)
+    expect(post(id).status).toBe('published')
+  })
+
+  it('وعطلُ D1 في الناشر بعد الختم: الإعادةُ تصل الناشرَ وتنشر', async () => {
+    const { id, due } = await deferredX()
+    const x = xAnswers()
+    const first = message({ postId: id, org: 'org_owner', due }, 1)
+    await run(first, { DB: blip(db, /FROM posts p JOIN accounts a ON a\.id = p\.account_id/), TOKEN_ENC_KEY: KEY })
+    expect(first.seen).toEqual([{ delaySeconds: 60 }])
+    expect(x.calls()).toBe(0)
+    const second = message({ postId: id, org: 'org_owner', due }, 2)
+    await run(second, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(x.calls()).toBe(1)
+    expect(post(id).status).toBe('published')
+  })
+
+  it('ونشرت الإعادةُ الأولى: الثانيةُ لا ترسل شيئًا', async () => {
+    const { id, due } = await deferredX()
+    const x = xAnswers(429)
+    await run(message({ postId: id, org: 'org_owner', due }, 1), { DB: db, TOKEN_ENC_KEY: KEY })
+    await run(message({ postId: id, org: 'org_owner', due }, 2), { DB: db, TOKEN_ENC_KEY: KEY })
+    const third = message({ postId: id, org: 'org_owner', due }, 3)
+    await run(third, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(third.seen).toEqual(['ack'])
+    expect(x.calls()).toBe(2)
+    expect((db.raw.prepare("SELECT count(*) AS n FROM publish_attempts WHERE post_id = ? AND status = 'succeeded'").get(id) as { n: number }).n).toBe(1)
+  })
+
+  it('والتسليمُ المكرَّرُ الأوّل (لا إعادةَ قبله) بعد ختم أخيه: يُقَرّ بلا نشر', async () => {
+    const { id, due } = await deferredX()
+    const x = xAnswers()
+    await claimDelivery(db, id, 'org_owner', due, false)
+    const twin = message({ postId: id, org: 'org_owner', due }, 1)
+    await run(twin, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(twin.seen).toEqual(['ack'])
+    expect(x.calls()).toBe(0)
+  })
+
+  it('ورسالةٌ تأخّرت حتّى أرسلت الدورةُ منشورَها فورًا: لا تنشره ثانيةً ولو كانت إعادة', async () => {
+    const { id, due } = await deferredX(-11 * 60)
+    const sent: unknown[] = []
+    await dispatchDue({ db, queue: { async sendBatch(m: unknown[]) { sent.push(...m) } } })
+    expect(sent).toEqual([{ body: { postId: id } }])
+    const x = xAnswers()
+    const late = message({ postId: id, org: 'org_owner', due }, 2)
+    await run(late, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(late.seen).toEqual(['ack'])
+    expect(x.calls()).toBe(0)
+  })
+
+  it('والإيقافُ على إعادةٍ بعد الختم: يُرفع الختمُ والعلامة فتعيده الدورةُ بعد الاستئناف، لا يكنسه الكنّاس', async () => {
+    const { id, due } = await deferredX()
+    xAnswers(429)
+    await run(message({ postId: id, org: 'org_owner', due }, 1), { DB: db, TOKEN_ENC_KEY: KEY })
+    await writeSetting(db, 'paused', 'true', 'test')
+    const second = message({ postId: id, org: 'org_owner', due }, 2)
+    await run(second, { DB: db, TOKEN_ENC_KEY: KEY })
+    expect(second.seen).toEqual(['ack'])
+    expect(post(id)).toEqual({ status: 'queued', dispatched_at: null, enqueued_for: null })
   })
 })

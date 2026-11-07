@@ -867,6 +867,39 @@ describe('الختمُ عند الوصول (D-320)', () => {
     expect(await claimDelivery(db, pulled.id, 'org_owner', pulled.due)).toEqual({ kind: 'stale' })
   })
 
+  it('مراجعة D-320: وإعادةُ الرسالة نفسِها بعد ختمها تمضي بالختم الأوّل، والتسليمُ المكرَّرُ الأوّلُ لا', async () => {
+    const { id, due } = await queuedFor(-1)
+    expect(await claimDelivery(db, id, 'org_owner', due)).toEqual({ kind: 'claimed' })
+    await db.prepare(`UPDATE posts SET dispatched_at = '2026-01-01 00:00:00' WHERE id = ?`).bind(id).run()
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'claimed' })
+    // ‏لا يُختَم ثانية: الكنّاسُ يعدّ من الختم الأوّل
+    expect((await readPost(id))?.['dispatched_at']).toBe('2026-01-01 00:00:00')
+    expect(await claimDelivery(db, id, 'org_owner', due, false)).toEqual({ kind: 'stale' })
+    // ‏ونُشر: لا تمضي إعادة
+    await db.prepare(`UPDATE posts SET status = 'published' WHERE id = ?`).bind(id).run()
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'stale' })
+  })
+
+  it('مراجعة D-320: وختمُ الدورة الفوريّ يمحو العلامة، فإعادةُ رسالةٍ مؤجَّلةٍ تأخّرت بعده لا تمضي', async () => {
+    const { id, due } = await queuedFor(-1)
+    expect(await markDispatched(db, [id], new Date())).toEqual([{ id, org: 'org_owner' }])
+    expect(await db.prepare('SELECT enqueued_for FROM posts WHERE id = ?').bind(id).first()).toEqual({ enqueued_for: null })
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'stale' })
+  })
+
+  it('مراجعة D-320: والإيقافُ على إعادةٍ بعد الختم يرفع الختمَ والعلامة، وعلى تسليمٍ مكرَّرٍ أوّل لا يمسّ ختمَ أخيه', async () => {
+    const twin = await queuedFor(-1)
+    await claimDelivery(db, twin.id, 'org_owner', twin.due)
+    const again = await queuedFor(-1)
+    await claimDelivery(db, again.id, 'org_owner', again.due)
+    await writeSetting(db, 'paused', 'true', 'test')
+    expect((await claimDelivery(db, twin.id, 'org_owner', twin.due, false)).kind).toBe('paused')
+    expect((await readPost(twin.id))?.['dispatched_at']).not.toBeNull()
+    expect((await claimDelivery(db, again.id, 'org_owner', again.due, true)).kind).toBe('paused')
+    const row = await db.prepare('SELECT dispatched_at, enqueued_for FROM posts WHERE id = ?').bind(again.id).first()
+    expect(row).toEqual({ dispatched_at: null, enqueued_for: null })
+  })
+
   it('والإيقافُ يغلب: لا يُختَم، وتُرفع علامتُه فتعيده الدورةُ بعد الاستئناف', async () => {
     const { id, due } = await queuedFor(-1)
     await writeSetting(db, 'paused', 'true', 'test')

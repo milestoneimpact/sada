@@ -3,7 +3,9 @@
  *
  * ‏كان النبضُ (D-158) يُحكَم عليه حين يفتح المالكُ اللوحة وحدَها، والتنبيهاتُ تخرج من الـ Cron نفسِه: **فإن وقف الـ Cron وقف معه
  * ‏مَن يقول إنّه وقف**. فهنا حكمٌ واحدٌ يقرؤه اثنان: `/pulse` (‏200 أو ‏503 بلا تفصيل، يسأله مراقبٌ من خارج Cloudflare — M-47)،
- * ‏و`collectAlerts` («نبضٌ تأخّر» في قناة المالك ما دام الـ Cron الساعيُّ يدور).
+ * ‏و`collectAlerts` (في قناة المالك ما دام الـ Cron الساعيُّ يدور: الإرسالُ أو التجديدُ **يسقط** نصفَ ساعةٍ متّصلة، أو المستهلكُ
+ * ‏ركد — `alertable`). **و«تأخّرت» للإرسال والتجديد يقوله `/pulse` وحدَه** (مراجعة D-320): تنبيهُ الساعة يُحسَب في الاستدعاء
+ * ‏نفسِه بعدهما، فنبضاهما عمرُهما ثوانٍ، ودورةٌ لم تدُر لم يدُر معها تنبيهُها.
  *
  * ‏**وثلاثةٌ تُحرَس لا سبعة**: الإرسالُ والتجديدُ في كلّ دورة — وتأخّرُهما يعني أنّ المنشوراتِ لا تخرج أو أنّ الأذوناتِ تموت —
  * ‏ومستهلكُ النشر، ولا موعدَ له: **يُحكَم عليه بما سُلّم إليه**. رسالةٌ حلّ موعدُها منذ نصف ساعةٍ ولم يدُر المستهلكُ بعدها
@@ -33,6 +35,12 @@ export interface LateJob {
   readonly lateBy: number
   /** ‏كم مضى بالثواني: منذ آخر دورةٍ للدورة، ومنذ صار العملُ في يد المستهلك. */
   readonly waited: number
+  /**
+   * ‏**للساقط وحده** (مراجعة D-320): أوّلُ نبضٍ ساقطٍ بعد آخر ما لم يسقط، وكم ثانيةً مضت عليه. منه مفتاحُ التنبيه، فالسقوطُ
+   * ‏المتّصلُ يُقال مرّةً. ولسؤال المستهلك حين لا يُقرأ: لحظةُ السؤال، فلا يُرى سليمًا.
+   */
+  readonly failedSince?: string
+  readonly failingFor?: number
 }
 
 export interface PulseReport {
@@ -79,12 +87,40 @@ export async function pulseReport(db: Db, now: Date): Promise<PulseReport> {
   for (const job of ['dispatch', 'renew'] as const) {
     const p = states.find((s) => s.job === job)
     if (p === undefined || p.state === 'ok') continue
-    late.push({ job, label: CADENCE[job].label, state: p.state, lastAt: p.beat?.at ?? null, lateBy: p.lateBy, waited: secondsSince(p.beat?.at ?? null, now) })
+    const lastAt = p.beat?.at ?? null
+    const base = { job, label: CADENCE[job].label, state: p.state, lastAt, lateBy: p.lateBy, waited: secondsSince(lastAt, now) }
+    if (p.state !== 'failed' || lastAt === null) { late.push(base); continue }
+    // ‏صفٌّ سقط قبل عمود `failed_since` (0048) يُعدّ سقوطُه من نبضه
+    const failedSince = p.beat?.failedSince ?? lastAt
+    late.push({ ...base, failedSince, failingFor: secondsSince(failedSince, now) })
   }
   const publish = beats.find((b) => b.job === 'publish') ?? null
-  const stall = await consumerStall(db, now, publish).catch(() => null)
-  if (stall !== null) {
+  /*
+   * ‏**وسؤالٌ يسقط ليس جوابًا بالسلامة** (مراجعة D-320): كان `.catch(() => null)` يجعل عطلَ هذا السؤال «لا ركود»، فـ`/pulse`
+   * ‏يقول ‏200 والمستهلكُ لا يُرى — والمراقبُ أخضرُ في انقطاعه. فيصير «سقط» كما تصير الدورةُ التي لا يُقرأ نبضُها «لم تدُر قطّ».
+   */
+  const stall = await consumerStall(db, now, publish).then(
+    (found) => found,
+    (error: unknown) => ({ error: error instanceof Error ? error.message : 'unexpected_error' }),
+  )
+  if (stall !== null && 'error' in stall) {
+    console.error({ job: 'pulse', consumer_check_failed: stall.error })
+    const at = dbNow(now)
+    late.push({ job: 'publish', label: CADENCE.publish.label, state: 'failed', lastAt: publish?.at ?? null, lateBy: 0, waited: 0, failedSince: at, failingFor: 0 })
+  } else if (stall !== null) {
     late.push({ job: 'publish', label: CADENCE.publish.label, state: 'late', lastAt: publish?.at ?? null, lateBy: stall.lateBy, waited: secondsSince(stall.since, now) })
   }
   return { healthy: late.length === 0, late }
+}
+
+/**
+ * ‏**ما يُقال في قناة المالك** (مراجعة D-320): ركودُ المستهلك، ودورةُ إرسالٍ أو تجديدٍ **تسقط منذ ضعف موعدها** (نصفُ ساعة:
+ * ‏دورتان ساقطتان على الأقلّ). ودورةٌ واحدةٌ تسقط ثمّ تدور تُرى في اللوحة والسجلّ ولا توقظ أحدًا، و«لم تدُر قطّ» يقوله `/pulse`.
+ * ‏و«تأخّرت» يُقال إن وقع (نبضٌ لم يُكتب ودارت الدورةُ بعده)، وسؤالُ المستهلك حين يسقط لا يُخترَع منه ركود.
+ */
+export function alertable(late: LateJob): boolean {
+  if (late.state === 'late') return true
+  if (late.state !== 'failed' || late.job === 'publish') return false
+  const every = CADENCE[late.job].everySeconds ?? 0
+  return (late.failingFor ?? 0) >= 2 * every
 }
