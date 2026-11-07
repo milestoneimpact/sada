@@ -23,7 +23,7 @@ import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from '../ui/timelineVi
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
 import { ownerRows } from '../../lib/owner'
-import { tasksScreen } from '../ui/tasksView'
+import { gatesScreen, tasksScreen } from '../ui/tasksView'
 import { vitalsSummary } from '../../lib/vitals'
 import { rejectsLately } from '../../lib/forms'
 import { currentPhase, gatesOf, readGateFacts } from '../../lib/gates'
@@ -50,11 +50,10 @@ reports.get('/panel/tasks', async (c) => {
     // ‏وإرسالاتٌ رُدّت لعيبٍ في المُدخَل (D-302)
     rejectsLately(c.env.DB, org).catch(() => 0),
   ])
-  const gates = gatesOf(gateFacts)
   const body = tasksScreen({
     rows: ownerRows(facts),
-    gates,
-    phase: currentPhase(gates),
+    // ‏والبوّاباتُ في صفحتها (`/panel/gates`)، وهنا سطرُها يقول المرحلة: فالحقائقُ تُقرأ لها وحدَها
+    phase: currentPhase(gatesOf(gateFacts)),
     env: c.env.SADA_ENV,
     vitals,
     rejects,
@@ -62,6 +61,25 @@ reports.get('/panel/tasks', async (c) => {
 
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' },
+      injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('tasks')),
+  )
+})
+
+/**
+ * ‏شاشةُ «بوّابات المراحل» (دمجُ D-318 مع D-324) — كانت طيّةً في آخر «ما عليك»، ومهامُّ القرارين رفعت تلك فوق سقف وزنها
+ * ‏(`audit_size`: يُقسَم ما تجاوز ولا يُرفع السقف). **فهي جزءٌ منها في كلّ شيءٍ إلّا الصفحة**: الجلسةُ نفسُها، والدورُ نفسُه
+ * ‏(`requiredRole` يسمّي البابين معًا)، والرافدةُ على «ما عليك»، والعودةُ إليها.
+ */
+reports.get('/panel/gates', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+
+  const gates = gatesOf(await readGateFacts(c.env.DB, activeOrg(session.record)))
+  const body = gatesScreen({ gates, phase: currentPhase(gates) })
+
+  return page((nonce) =>
+    soloPage('صدى — بوّابات المراحل', { href: '/panel/tasks', label: sectionLabel('tasks') },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('tasks')),
   )

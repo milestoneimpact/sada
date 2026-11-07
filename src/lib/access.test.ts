@@ -37,6 +37,17 @@ describe('من يملك ماذا (D-272)', () => {
     expect(requiredRole('POST', '/panel/orgs/switch', null)).toBe('viewer')
   })
 
+  /**
+   * ‏**وصفحةُ البوّابات بدور «ما عليك» نفسِه** (دمجُ D-318 مع D-324): كانت طيّةً فيها فلا يراها إلّا من يراها. وبابُ قراءةٍ
+   * ‏جديدٌ لا يُصنَّف يُفتح للقارئ (القراءةُ مفتوحة)، فتُسمّى في القاعدة مع «ما عليك» لا بعدها.
+   */
+  it('وبوّابات المراحل بدور «ما عليك» لا أدنى', () => {
+    for (const method of ['GET', 'HEAD']) {
+      expect(requiredRole(method, '/panel/gates', null)).toBe(requiredRole(method, '/panel/tasks', null))
+      expect(requiredRole(method, '/panel/gates', null)).toBe('admin')
+    }
+  })
+
   it('وبابٌ جديدٌ لم يُصنَّف للمالك وحدَه — يُغلَق لا يُفتح', () => {
     expect(requiredRole('POST', '/panel/something-new', null)).toBe('owner')
   })

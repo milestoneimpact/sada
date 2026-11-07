@@ -775,7 +775,8 @@ describe('اللون يتبع المرجع لا الذوق', () => {
 describe('رقم واحد في الواجهة (D-147)', () => {
   it('لا رقمًا هنديًّا في اللوحة ولا في شاشة المنصّة ولا في أسماء المراحل', async () => {
     const cookie = await login()
-    for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks']) {
+    // ‏وأسماءُ المراحل في صفحتها منذ دمج D-318 مع D-324 (`/panel/gates`)، وسطرُها في «ما عليك»
+    for (const path of ['/panel', '/panel/channels/linkedin', '/panel/tasks', '/panel/gates']) {
       const html = await (await app.request(path, withSession(cookie), env)).text()
       // ‏وأسماءُ المراحل كذلك منذ D-323: نظامُ أرقامٍ واحد بلا استثناء («المرحلة 0» لا «المرحلة ٠»)
       const body = html
@@ -5418,7 +5419,7 @@ describe('الدخول برمز البريد (D-245)', () => {
 describe('لا رابطَ ميّتًا داخل اللوحة (EASE-PLAN أ-1)', () => {
   it('كلُّ مرساةٍ في كلّ صفحةٍ تصل إلى معرّفٍ موجود — في صفحتها أو في الصفحة التي انتقل إليها', async () => {
     const cookie = await login()
-    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/timeline']
+    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/gates', '/panel/timeline']
     const html = new Map<string, string>()
     for (const p of pages) html.set(p, await (await app.request(p, withSession(cookie), env)).text())
     const ids = (page: string): Set<string> =>

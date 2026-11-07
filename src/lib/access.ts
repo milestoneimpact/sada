@@ -143,7 +143,8 @@ export function requiredRole(method: string, path: string, action?: string | nul
   if (path.startsWith('/oauth/')) return 'admin'
   if (method === 'GET' || method === 'HEAD') {
     if (/^\/panel\/team(\/|$)/.test(path)) return 'owner'
-    if (/^\/panel\/(settings|tasks)(\/|$)/.test(path)) return 'admin'
+    // ‏و«بوّابات المراحل» بدور «ما عليك» نفسِه: كانت طيّةً فيها، وخرجت إلى صفحتها لوزنها (دمجُ D-318 مع D-324)
+    if (/^\/panel\/(settings|tasks|gates)(\/|$)/.test(path)) return 'admin'
     return 'viewer'
   }
   if (path === '/panel/drafts/decide') return action === 'save' ? 'editor' : 'publisher'

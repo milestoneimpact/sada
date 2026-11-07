@@ -75,7 +75,7 @@
   "routes/ui/styles/12-extras.ts": 1,
   "routes/ui/styles/13-editions.ts": 1,
   "routes/ui/styles/14-touch.ts": 1,
-  "routes/ui/tasksView.ts": 6,
+  "routes/ui/tasksView.ts": 5,
   "routes/ui/teamView.ts": 7,
   "routes/ui/time.ts": 3,
   "routes/ui/timelineView.ts": 36,

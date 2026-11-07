@@ -14,14 +14,14 @@ import { channelsSection, setupPane } from '../src/routes/ui/channels'
 import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
-import { tasksScreen } from '../src/routes/ui/tasksView'
+import { gatesScreen, tasksScreen } from '../src/routes/ui/tasksView'
 import { noticesScreen } from '../src/routes/ui/noticesView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
 import { summarize, type ReportPost, type StoredReport } from '../src/lib/report/weekly'
 import { shell, soloPage } from '../src/routes/ui/shell'
 import { soloNav } from '../src/routes/ui/rail'
-import { buildCommands } from '../src/routes/ui/command'
+import { buildCommands, sectionLabel } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
@@ -365,6 +365,7 @@ writeAudited(
 // حالٌ وسطى في البوّابات: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس.
 // **وواحدٌ لا اثنان**: كان هذا الحرفيُّ مكتوبا مرّتين — للبوّابات وللمرحلة
 // — فيُعدَّل أحدُهما وتُرسَم شاشةٌ تناقض نفسَها.
+// ‏وصار يُقرأ في عيّنتين (دمجُ D-318 مع D-324): مرحلةُ سطر «ما عليك» وبطاقاتُ «بوّابات المراحل» من الحقائق نفسِها
 const GATE_FIXTURE: GateFacts = {
   publishedPerPlatform: { linkedin: 4, x: 2 },
   publishedWithMedia: { linkedin: 1 },
@@ -373,6 +374,7 @@ const GATE_FIXTURE: GateFacts = {
   plans: 1, reports: 0, suggestions: 0, promoSpend: 0, orgAccounts: 1,
   weekAlertFired: false,
 }
+const GATES = gatesOf(GATE_FIXTURE)
 
 writeAudited(
   '/tmp/screen-tasks.html',
@@ -392,13 +394,19 @@ writeAudited(
         linkedInVersionDue: true,   // D-072: حال وسطى تُرسَم لتُقاس
               tilesChosen: 4, promoCapUsd: 0,
       }),
-      // حالٌ وسطى في البوّابات كذلك: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس
-      gates: gatesOf(GATE_FIXTURE),
-      phase: currentPhase(
-        gatesOf(GATE_FIXTURE),
-      ),
+      // ‏والبوّاباتُ سطرٌ يقول مرحلتَها، وبطاقاتُها في عيّنتها أدناه
+      phase: currentPhase(GATES),
     }),
   ),
+)
+
+// ── «بوّابات المراحل» (دمجُ D-318 مع D-324): خرجت من «ما عليك» إلى صفحتها، فتُرسَم كما تُخدَم ────
+// ‏حالٌ وسطى في البوّابات كذلك: بندٌ تحقّق، وبندٌ لا، وبندٌ لا يُقاس. والعودةُ إلى «ما عليك» والرافدةُ عليها كما في المسار
+writeAudited(
+  '/tmp/screen-gates.html',
+  soloPage('صدى — بوّابات المراحل', { href: '/panel/tasks', label: sectionLabel('tasks') },
+    gatesScreen({ gates: GATES, phase: currentPhase(GATES) }), 'n', '',
+    buildCommands({ onPanel: false }), soloNav('tasks')),
 )
 
 // ── الإشعارات (D-294): جديدٌ ومقروءٌ من الأنواع الستّة، لتُقاس كما تُقاس كلُّ شاشة ────
