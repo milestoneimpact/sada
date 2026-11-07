@@ -902,18 +902,31 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  * ‏**«منشور جديد» على الحاسوب أيضًا** (D-216): كان الزرُّ العائم على الهاتف وحدَه، وعلى الحاسوب أربعةُ أزرار بدءٍ داخل
  * ‏«المنشورات» فقط. فصار في الترويسة من كلّ صفحة، بالبدايات الأربع نفسِها، ومساراتُها إلى «/panel» لتصل من أيّ لوح.
  */
+/** ‏أبوابُ الكتابة الخمسة بمساراتها إلى «/panel» — لتصل من أيّ لوح. */
+function newItems(): string[] {
+  return [
+    menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
+    menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
+    // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
+    menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
+    menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
+    menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
+  ]
+}
+
 function topNew(): string {
-  return menu({
-    label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new',
-    items: [
-      menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
-      menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
-      // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
-      menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
-      menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
-      menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
-    ],
-  })
+  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new', items: newItems() })
+}
+
+/**
+ * ‏**«منشور جديد ▾» في سطر التحيّة على الهاتف** (D-326 · «أنشئ من كلّ مكان»، من مقارنة Buffer في UX-AUDIT-5): الترويسةُ على
+ * ‏الهاتف لا تحمل «منشور جديد»، وكان بابُ الكتابة في الرئيسيّة زرًّا عائمًا مستديرًا اسمُه لقارئ الشاشة وحده (UX-AUDIT-4 · أ) —
+ * ‏فقالت الخلاصةُ «لا باب» وقال المالكُ «لا أجد أين أكتب» (الجلسة أ، المهمّة ٢). فصار البابُ نفسُه **باسمه** في سطر التحيّة،
+ * ‏ثانويًّا: البطاقةُ تحمل أوّليَّها («خطوتك التالية»)، ولا زرّان أوّليّان في منطقة. وعلى الحاسوب لا يُرسم: زرُّ الترويسة ظاهر،
+ * ‏فلا زرّان بالاسم نفسِه في شاشة. والعائمُ يبقى في «المكتبة» ويخرج من الرئيسيّة لهذا.
+ */
+function homeNew(): string {
+  return menu({ label: 'منشور جديد', variant: 'secondary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
 }
 
 /**
@@ -999,7 +1012,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       label: 'سجّل مفتاحا',
     })
   }
-  if (linkedChannels === 0) {
+  // ‏ولا حسابَ أصلًا: تقولها «البدء في ثلاث خطوات» و«خطوتك التالية» فوقها (D-326) — الحقيقةُ تُقال مرّةً
+  if (linkedChannels === 0 && d.channels.some((c) => c.accounts.length > 0)) {
     items.push({ kind: 'warn', text: 'لا قناة مربوطة — النظام يفهم ويكتب ولا ينشر.', go: '#channels', label: 'اربط' })
   }
   const unverified = d.providers.filter((p) => p.configured && p.enabled && p.verifiedAt === null)
@@ -1067,7 +1081,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null))}
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew())}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ

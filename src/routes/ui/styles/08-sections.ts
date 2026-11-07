@@ -409,6 +409,9 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 
 /* ── القائمةُ المنسدلة («menu()»، D-198): «⋯» على البطاقة والمحرّر ─────────────────────── */
 .menu{position:relative; display:inline-block}
+/* ‏والبطاقةُ التي فُتحت فيها قائمةٌ فوق أخواتها (D-326): كلُّ بطاقةٍ سياقُ تكديسٍ بحركة دخولها («rise» بـboth)، فكانت
+   القائمةُ المنسدلةُ من سطر التحيّة تُرسم تحت بطاقة الخطّة بعدها، وبنودُها الأخيرةُ لا تُلمَس */
+.card:has(.menu[open]){position:relative; z-index:31}
 /* ‏والمطويّةُ لا لوحَ لها: اللوحُ المطلقُ يخرج من صندوق «details» المطويّ فيُقاس ولا يُبلَغ */
 .menu:not([open]) > .menu-list{display:none}
 .menu > summary{list-style:none}

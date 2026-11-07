@@ -1,0 +1,280 @@
+{
+  "about": "عتباتُ الرحلات (D-326): لكلّ رحلةٍ ولكلّ مقاس النجاحُ وأكثرُ الخطوات وأكثرُ تحميلات الصفحة — ما قيس في D-326 لا الهدف. `npm run journeys` يخرج بغير الصفر حين تخسر رحلةٌ نجاحَها أو تزيد خطوةً أو تحميلًا، أو تُقاس رحلةٌ بلا عتبة. و`--update` يضيّق ولا يُرخي؛ والإرخاءُ تعديلٌ بيدٍ هنا مع سببه في why. والهدفُ ومصدرُه في plan.target في journeys.ts.",
+  "journeys": {
+    "R-0": {
+      "why": "§6: 1 من الرئيسيّة. قيس 1 بـ«اعتمد» في «ينتظر قرارك» (D-326)؛ كان 2 بالمحطّة ثمّ البطاقة",
+      "phone": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      }
+    },
+    "R-0·تراجع": {
+      "why": "D-324: «تراجَع» خطوةٌ واحدة بعد «اعتمد · غدًا»؛ قيس 3 (المحطّة، «اعتمد»، «تراجَع»)",
+      "phone": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      },
+      "desktop": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      }
+    },
+    "R-1": {
+      "why": "§6: 2 · الهاتف 3 حتّى المغادرة إلى OAuth (D-314)؛ قيس 3 و2",
+      "phone": {
+        "success": true,
+        "steps": 3,
+        "loads": 2
+      },
+      "desktop": {
+        "success": true,
+        "steps": 2,
+        "loads": 2
+      }
+    },
+    "R-1·ضبط": {
+      "why": "إضافةُ منصّةٍ رابعة من «الحسابات» (لا هدف في §6)؛ قيس 8 و7 — والأولى من رئيسيّةٍ خالية ر-1·أوّل",
+      "phone": {
+        "success": true,
+        "steps": 8,
+        "loads": 4
+      },
+      "desktop": {
+        "success": true,
+        "steps": 7,
+        "loads": 4
+      }
+    },
+    "R-1·أوّل": {
+      "why": "§6 ر-1 والضبطُ معه ≤5 من قائمة البدء «1 من 3» (D-326 · EASE-PLAN-2 §٥)؛ قيس 5 و5",
+      "phone": {
+        "success": true,
+        "steps": 5,
+        "loads": 3
+      },
+      "desktop": {
+        "success": true,
+        "steps": 5,
+        "loads": 3
+      }
+    },
+    "R-2": {
+      "why": "§6: 4 بـ«منشور جديد ▾» ← «من مصدر» ← «اكتب» ← «اعتمد»؛ قيس 4 و4 (كان 5 من «المنشورات» ثمّ تبويب «اكتب»)",
+      "phone": {
+        "success": true,
+        "steps": 4,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 4,
+        "loads": 1
+      }
+    },
+    "R-2·stop": {
+      "why": "مالكٌ يمرّر «المنشورات» بحثًا عن «اكتب» (D-313)؛ قيس 5 و4",
+      "phone": {
+        "success": true,
+        "steps": 5,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 4,
+        "loads": 1
+      }
+    },
+    "R-3": {
+      "why": "§6: 2؛ قيس 2 و2 (البطاقةُ لا المحرّر: «أضف صورة ▾» في المحرّر لم يُبنَ)",
+      "phone": {
+        "success": true,
+        "steps": 2,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 2,
+        "loads": 1
+      }
+    },
+    "R-4": {
+      "why": "§6: 6 · KLM ≤40ث (EASE-PLAN-2 §٥)؛ قيس 5 و5 بـ«أنشئ وجدوِل · غدًا 9:00 ص» (D-326) — كان 6 و6",
+      "phone": {
+        "success": true,
+        "steps": 5,
+        "loads": 3
+      },
+      "desktop": {
+        "success": true,
+        "steps": 5,
+        "loads": 3
+      }
+    },
+    "R-5": {
+      "why": "§6: 4؛ قيس 5 و5 من «منشور جديد ▾» (الخامسةُ حوارُ التأكيد، D-323)",
+      "phone": {
+        "success": true,
+        "steps": 5,
+        "loads": 2
+      },
+      "desktop": {
+        "success": true,
+        "steps": 5,
+        "loads": 2
+      }
+    },
+    "R-6": {
+      "why": "§6: 2؛ قيس 3 و3 (الموعدُ السريعُ ثمّ «جدوِل»: زرّان)",
+      "phone": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      },
+      "desktop": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      }
+    },
+    "R-7": {
+      "why": "§6: 1؛ قيس 1 و1",
+      "phone": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      }
+    },
+    "R-8": {
+      "why": "§6: 3؛ قيس 4 و4 (الجدولةُ بعد «أعده» زرّان)",
+      "phone": {
+        "success": true,
+        "steps": 4,
+        "loads": 2
+      },
+      "desktop": {
+        "success": true,
+        "steps": 4,
+        "loads": 2
+      }
+    },
+    "R-9": {
+      "why": "§6: 3؛ قيس 3 و3",
+      "phone": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      },
+      "desktop": {
+        "success": true,
+        "steps": 3,
+        "loads": 0
+      }
+    },
+    "R-10": {
+      "why": "§6: 1 والرقمُ في الشاشة الأولى (D-314)؛ قيس 1 و1 والرقمُ في الأولى على المقاسين — والشاشةُ الأولى تُحرس هنا",
+      "phone": {
+        "success": true,
+        "steps": 1,
+        "loads": 1,
+        "firstScreen": true
+      },
+      "desktop": {
+        "success": true,
+        "steps": 1,
+        "loads": 1,
+        "firstScreen": true
+      }
+    },
+    "R-11": {
+      "why": "§6: 2 (الزرّ ثمّ البصمة)؛ قيس 1 و1 (البصمةُ لا تُعدّ لمسة)",
+      "phone": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 1,
+        "loads": 1
+      }
+    },
+    "R-11·رمز": {
+      "why": "جهازٌ بلا مفتاح المرور (D-326): البريدُ وزرُّه والرمزُ وزرُّه والرقمُ وزرُّه = 6؛ قيس 6 و6",
+      "phone": {
+        "success": true,
+        "steps": 6,
+        "loads": 3
+      },
+      "desktop": {
+        "success": true,
+        "steps": 6,
+        "loads": 3
+      }
+    },
+    "R-12": {
+      "why": "5 = البابُ وخطواتُ المعالج الأربع («في أربع خطوات»، D-326)، والرحلةُ تختار «بلا صورة» فوقها؛ قيس 6 و6",
+      "phone": {
+        "success": true,
+        "steps": 6,
+        "loads": 2
+      },
+      "desktop": {
+        "success": true,
+        "steps": 6,
+        "loads": 2
+      }
+    },
+    "R-13": {
+      "why": "3 = البابُ وقرارُ البند والتثبيت (التراجعُ بدل التأكيد، D-303 · D-326)؛ قيس 4 و4 (الرابعةُ حوارُ التأكيد، D-323)",
+      "phone": {
+        "success": true,
+        "steps": 4,
+        "loads": 3
+      },
+      "desktop": {
+        "success": true,
+        "steps": 4,
+        "loads": 3
+      }
+    },
+    "R-14": {
+      "why": "5 = §6 ر-2 ببابه «بنفسي» (D-326)؛ قيس 5 و5 (كان 6 من «المنشورات» ثمّ تبويب «اكتب»)",
+      "phone": {
+        "success": true,
+        "steps": 5,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 5,
+        "loads": 1
+      }
+    },
+    "R-15": {
+      "why": "4 = §6 ر-2 من قائمة البدء «2 من 3» (D-326)؛ قيس 4 و4",
+      "phone": {
+        "success": true,
+        "steps": 4,
+        "loads": 1
+      },
+      "desktop": {
+        "success": true,
+        "steps": 4,
+        "loads": 1
+      }
+    }
+  }
+}

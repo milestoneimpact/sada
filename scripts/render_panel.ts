@@ -495,6 +495,36 @@ writeAudited('/tmp/panel-first.html', panelPage({ only: null, data: first }))
 // ‏واليومُ الأوّل في «الحسابات» وجهٌ ثانٍ لها: كلُّ منصّةٍ منقطعةٌ أو تنتظر إعدادًا
 writeAudited('/tmp/panel-first-accounts.html', panelPage({ only: 'accounts', data: first }))
 /*
+ * ‏**والرئيسيّةُ الخالية وضعٌ ثالثٌ يُشحَن فيُرسَم ليُدقَّق** (D-326 · خطّة التصميم 5.5 «أوّل تشغيل»): لا حسابَ ولا تطبيقَ ولا
+ * ‏مصدرَ ولا مقطعَ ولا منشورَ ولا خطّةَ ولا كلفة — قائمةُ البدء «1 من 3» والمؤشّراتُ مخفيّة، و«منصّاتٌ لاحقة» مفتوحة. كان
+ * ‏«اليومُ الأوّل» أعلاه سبعَ مسوّداتٍ وحساباتٍ منقطعة، فلم يُرسَم الصفرُ الحقيقيُّ ولم يُدقَّق قطّ.
+ */
+const zero = {
+  ...data,
+  sources: [],
+  drafts: [],
+  media: [],
+  uploads: [],
+  plan: null,
+  planCounts: { written: 0, ready: 0, pending: 0 },
+  planPending: 0,
+  channels: viewChannels([], () => false),
+  links: {},
+  journey: { perPlatform: {}, publishedWeek: 0 },
+  spendBy: [],
+  spendMonth: { total: 0, utc: false },
+  series: data.series.map((x) => ({ ...x, total: 0 })),
+  usedSpend: 0,
+  usedAnalyses: 0,
+  usedImages: 0,
+  usedClips: 0,
+  openSuggestions: 0,
+  today: { items: [], more: 0 },
+  flash: null,
+}
+writeAudited('/tmp/panel-zero.html', panelPage({ only: null, data: zero }))
+writeAudited('/tmp/panel-zero-accounts.html', panelPage({ only: 'accounts', data: zero }))
+/*
  * ‏**والمحرّرُ المركّزُ وضعٌ يُشحَن فيُرسَم ليُدقَّق** (D-198): `?open=<id>` بجوار القائمة. مسوّدةٌ
  * ‏بصورتها (الاعتمادُ والحفظُ والموعدُ بتوقيت المالك)، ومجدولةٌ («غيّر الموعد»).
  */

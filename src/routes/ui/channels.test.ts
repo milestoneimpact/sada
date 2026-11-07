@@ -218,3 +218,14 @@ describe('بطاقة «الحسابات» تقول حالًا واحدة (D-205)
     expect(html).not.toContain('data-health="unbuilt"')
   })
 })
+
+describe('«منصّاتٌ لاحقة» مفتوحةٌ حين لا منصّةَ مربوطة (D-326 · ر-1)', () => {
+  it('لا حسابَ بعد: الطيّةُ مفتوحة فبطاقاتُها وأزرارُها ظاهرة', () => {
+    expect(channelsSection(viewChannels([], () => false), now)).toContain('<details class="fold mt-5" open>')
+  })
+  it('وحسابٌ مربوطٌ واحد: تُطوى كما كانت (D-289)', () => {
+    const html = channelsSection(viewChannels([acc({})], () => false), now)
+    expect(html).toContain('<details class="fold mt-5">')
+    expect(html).not.toContain('<details class="fold mt-5" open>')
+  })
+})

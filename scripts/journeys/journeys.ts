@@ -4,6 +4,11 @@
  * **لا روابطَ عميقة**: كلُّ رحلةٍ تبدأ من الرئيسيّة، وتبلغ هدفَها بما يُرى في الشاشة —
  * بطاقةٌ في الرئيسيّة، أو الشريطُ السفليّ على الهاتف، أو الرافدةُ على الحاسوب. والنجاحُ
  * يُقرأ من القاعدة لا من رسالةٍ في الصفحة.
+ *
+ * ‏**وكلُّ رحلةٍ في §6 تسلك طريقَ هدفها** (D-326): ر-0 «اعتمد» في «ينتظر قرارك» على الرئيسيّة، ور-2 ور-5 ور-14 من «منشور
+ * ‏جديد ▾» (الترويسةُ على الحاسوب، وسطرُ التحيّة على الهاتف). كان بعضُها يدخل من محطّةٍ أو من «المنشورات» فيعدّ خطوةً ليست في
+ * ‏الهدف. **والهدفُ مصدرُه مكتوبٌ معه** (`plan.target`)، والعتبةُ التي تُسقط التشغيلَ في `thresholds.json`. ولا جملةَ ثابتةً في
+ * ‏الملاحظات: ما يُكتب فيها يُقرأ من الصفحة أو من القاعدة في التشغيل نفسِه.
  */
 import { readFileSync } from 'node:fs'
 import type { Locator, Page } from 'playwright'
@@ -12,6 +17,10 @@ import type { Stack } from './server'
 import { codeFrom } from '../../src/test/emailLogin'
 import { ownerPasskey } from './seed'
 import { saveApp } from '../../src/lib/oauth/apps'
+import { saveTokens, upsertAccount } from '../../src/lib/tokens'
+import { confirmTotp, startTotp } from '../../src/lib/security/factors'
+import { codeAt, counterFor, newSecret } from '../../src/lib/security/totp'
+import { OWNER_EMAIL } from '../../src/lib/ownerEmail'
 import { monthStart } from '../../src/lib/time/zone'
 import { money } from '../../src/lib/format'
 
@@ -32,8 +41,8 @@ export interface JourneyContext {
 export interface Journey {
   readonly id: string
   readonly title: string
-  /** ما في جدول §6: الخطواتُ اليوم والهدف. */
-  readonly plan: { readonly today: string; readonly target: string }
+  /** الهدفُ ومصدرُه: صفُّ §6، أو قاعدةٌ مكتوبةٌ حيث لا صفّ (D-326) — لا رقمٌ قيس أوّلَ مرّةٍ فصار هدفًا. */
+  readonly plan: { readonly target: string }
   /** تعديلٌ على البذرة قبل الرحلة — يُقال في الملاحظات. */
   readonly prepare?: (stack: Stack) => Promise<string | null>
   /** بلا دخولٍ مسبق: الرحلةُ تبدأ من صفحة الدخول (ر-11). */
@@ -72,17 +81,45 @@ async function goSection(page: Page, m: Meter, label: string): Promise<void> {
   await m.tap(visible(page.locator('details.more-sheet .more-panel a').filter({ hasText: label })).first(), `«${label}» في «المزيد»`)
 }
 
-/** تبويبٌ داخل وجهة (D-195 · D-204 · D-206): المنشورات والمكتبة والنتائج والإعدادات — شريطُ اللوح الظاهر. */
-function subTab(page: Page, label: string): Locator {
-  return visible(page.locator('section[data-pane]:not([hidden]) > nav.tab-bar a').filter({ hasText: label })).first()
-}
-
 function button(scope: Page | Locator, name: string | RegExp): Locator {
   return visible(scope.getByRole('button', { name, exact: typeof name === 'string' })).first()
 }
 
 function link(scope: Page | Locator, name: string | RegExp): Locator {
   return visible(scope.getByRole('link', { name })).first()
+}
+
+/**
+ * ‏**«منشور جديد ▾» كما يُرى** (D-326): زرُّ الترويسة على الحاسوب (`data-tb-new`)، وعلى الهاتف قائمةُ سطر التحيّة في الرئيسيّة
+ * ‏(`data-home-new`) أو الزرُّ العائمُ في «المكتبة». أوّلُ ظاهرٍ منها يُفتح لمسةً تُعدّ، ثمّ يُختار البابُ باسمه لمسةً ثانية.
+ */
+async function newPost(page: Page, m: Meter, item: RegExp, label: string): Promise<void> {
+  const head = visible(page.locator('[data-home-new], [data-tb-new], details.fab').locator(':scope > summary')).first()
+  await m.tap(head, '«منشور جديد»')
+  const menu = page.locator('[data-home-new][open], [data-tb-new][open], details.fab[open]')
+  await m.tap(visible(menu.locator('.menu-item, .fab-menu a').filter({ hasText: item })).first(), `«${label}» في قائمة «منشور جديد»`)
+}
+
+/**
+ * ‏**بابُ الكتابة في الرئيسيّة كما يُرى** — يُقرأ من الصفحة لا يُكتب سلفًا: كلُّ عنصرٍ ظاهرٍ يُضغط (زرٌّ أو رابطٌ أو رأسُ
+ * ‏قائمة) اسمُه المقروء (نصُّه أو اسمُه لقارئ الشاشة) فيه «منشور جديد» أو «اكتب»، وأين يقع: في الشاشة الأولى أو تحتها.
+ */
+async function writeDoors(page: Page): Promise<{ first: string[]; below: string[] }> {
+  return page.evaluate(() => {
+    const vh = window.innerHeight
+    const name = (el: Element): string => (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().replace(/\s+/g, ' ')
+    const out = { first: [] as string[], below: [] as string[] }
+    for (const el of Array.from(document.querySelectorAll('a, button, summary'))) {
+      const r = el.getBoundingClientRect()
+      const s = getComputedStyle(el)
+      if (r.width === 0 || r.height === 0 || s.visibility === 'hidden' || el.closest('details:not([open]) > :not(summary)') !== null) continue
+      const n = name(el)
+      if (!/منشور جديد|اكتب/.test(n) || n.length > 40) continue
+      const where = el.closest('header, .topbar') !== null ? 'الترويسة' : el.closest('details.fab') !== null ? 'الزرّ العائم' : el.closest('[data-home-new]') !== null ? 'سطر التحيّة' : 'المحتوى'
+      ;(r.bottom <= vh ? out.first : out.below).push(`«${n}» (${where})`)
+    }
+    return out
+  })
 }
 
 /**
@@ -178,7 +215,7 @@ async function scheduleTomorrow(j: JourneyContext, postId: string, label: string
 function crlf(m: Meter, stack: Stack, id: string): void {
   const row = q<{ status: string; text: string; original_text: string | null }>(stack, 'SELECT status, text, original_text FROM posts WHERE id = ?', id)
   if (row?.status === 'edited' && row.original_text !== null && row.text.replace(/\r\n/g, '\n') === row.original_text.trim()) {
-    m.note('⚠ عطل: اعتُمدت بلا أيّ تعديل فكُتبت «edited» وحُفظ «original_text» — النصّ عاد من ‹textarea› بأسطر CRLF ولا يُوحَّد قبل المقارنة في decide() (src/lib/draft/store.ts). والإشعار يقول «بنصّك بعد التعديل»')
+    m.note('⚠ عطل: اعتُمدت بلا أيّ تعديل فكُتبت posts.status = edited، ونصُّها يساوي original_text بعد توحيد أسطر CRLF')
   }
 }
 
@@ -190,13 +227,13 @@ const status = (stack: Stack, id: string) =>
 const R0: Journey = {
   id: 'R-0',
   title: 'مراجعة ما ينتظر قرارك: اعتماد مسوّدة',
-  plan: { today: 'يُقاس', target: '1' },
+  plan: { target: '1 (§6: [اعتمد] في «تنتظر قرارك» على الرئيسيّة)' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
-    // ‏من الرئيسيّة: محطّةُ «الاعتماد» في رحلة المنشور تقول «تنتظر قرارك» — وتنزل إلى البطاقة
-    await m.tap(station(page, 'الاعتماد'), 'محطّة «الاعتماد» في الرئيسيّة')
-    // ‏والزرُّ الأوّلُ «اعتمد · غدًا 9:00 ص» يعتمد ويجدول بضغطة، و«اعتمد فقط» بعده
-    await m.tap(button(draftForm(page, id), /^اعتمد/), '«اعتمد» على المسوّدة', { key: true })
+    // ‏**طريقُ §6** (D-326): «اعتمد» على صفّها في «ينتظر قرارك» على الرئيسيّة نفسِها (D-216) — كانت الرحلةُ تنزل من محطّة
+    // ‏«الاعتماد» إلى بطاقتها في «المنشورات» فتعدّ خطوةً ليست في الهدف
+    const desk = page.locator('#desk li.desk-row').filter({ has: page.locator(`input[name="id"][value="${id}"]`) })
+    await m.tap(button(desk, /^اعتمد/), '«اعتمد» في «ينتظر قرارك» على الرئيسيّة', { key: true })
     const row = status(stack, id)
     crlf(m, stack, id)
     return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'}` }
@@ -210,7 +247,7 @@ const R0: Journey = {
 const R0undo: Journey = {
   id: 'R-0·تراجع',
   title: 'اعتماد مسوّدة بموعدها ثمّ «تراجَع» من الإشعار',
-  plan: { today: 'لا «تراجَع» في الإشعار', target: 'خطوةٌ واحدة بعد الاعتماد' },
+  plan: { target: 'خطوةٌ واحدة بعد الاعتماد (D-324 · §5.9)' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
     await m.tap(station(page, 'الاعتماد'), 'محطّة «الاعتماد» في الرئيسيّة')
@@ -233,7 +270,7 @@ const R0undo: Journey = {
 const R1: Journey = {
   id: 'R-1',
   title: 'ربط Instagram بعد ضبط تطبيقها (§6) — حتّى مغادرة الموقع إلى OAuth',
-  plan: { today: '16', target: '2 · الهاتف 3 حتّى المغادرة (§6: 5 حتّى «ارجع»)' },
+  plan: { target: '2 · الهاتف 3 حتّى المغادرة (§6: 5 حتّى «ارجع»)' },
   async prepare(stack) {
     await saveApp(stack.db, stack.encKey, 'instagram', '1234567890123456', 'local0fake0instagram0secret00000', 'journey')
     return 'سرّا Instagram المزيَّفان في الخزانة قبل الرحلة (كما بعد ر-1·ضبط أو مهمّة المالك)'
@@ -257,7 +294,7 @@ const R1: Journey = {
 const R1setup: Journey = {
   id: 'R-1·ضبط',
   title: 'ضبط تطبيق Instagram أوّل مرّة ثمّ ربطها — حتّى مغادرة الموقع',
-  plan: { today: '16', target: 'لا هدف في §6 · كان 5 في D-207' },
+  plan: { target: 'لا هدف في §6 لإضافة منصّةٍ رابعة · والأولى من الرئيسيّة الخالية ≤5 (ر-1·أوّل)' },
   async run({ page, m, stack, leftSite }) {
     // ‏بطاقاتُ المنصّات في «الحسابات» وحدَها منذ D-309 (لا في الرئيسيّة): لمسةُ التنقّل تُعدّ
     await goSection(page, m, 'الحسابات')
@@ -295,22 +332,23 @@ const R1setup: Journey = {
   },
 }
 
-/** ر-2 كما ينبغي: يفتح «اكتب» ويختار بابَ «من مصدر» في «منشور جديد»، ثمّ يعتمد المسوّدةَ الجديدة. */
+/**
+ * ‏ر-2 **بطريق §6** (D-326): «منشور جديد ▾» ← «من مصدر» ← «اكتب مسوّدة» ← «اعتمد». كانت تدخل من «المنشورات» ثمّ تبويب «اكتب»
+ * ‏ثمّ مقطع «من مصدر» — ثلاثُ لمساتٍ لبابٍ واحد تعدّها الرحلةُ ولا يعدّها الهدف.
+ */
 const R2: Journey = {
   id: 'R-2',
-  title: 'كتابة منشور من مصدر واعتماده (المسار الذي يعمل)',
-  plan: { today: '8', target: '4' },
+  title: 'كتابة منشور من مصدر واعتماده',
+  plan: { target: '4 (§6: «منشور جديد ▾» ← «من مصدر» ← «اكتب» ← «اعتمد»)' },
   async run({ page, m, stack }) {
     const before = new Set(all<{ id: string }>(stack, 'SELECT id FROM posts').map((r) => r.id))
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
-    await m.tap(subTab(page, 'اكتب'), 'تبويب «اكتب»')
+    await newPost(page, m, /من مصدر/, 'من مصدر')
     const card = page.locator('form[action="/panel/drafts/write"]')
-    // ‏بابُ «من مصدر» في المُنشئ (D-308): لمسةٌ تُعدّ مرّةً، ويُحفظ الاختيارُ في المتصفّح بعدها
-    await m.tap(page.getByLabel('من مصدر'), 'باب «من مصدر» في «منشور جديد»', { key: true })
     const sources = await card.locator('select[name="id"] option').allTextContents()
-    m.note(`قائمة المصدر فيها ${sources.length} خيار: ${sources.join(' · ')} — والمصدران في Drive بالاسم نفسه، والمحلَّل وحده يظهر`)
+    const drive = all<{ name: string; n: number; done: number }>(stack, 'SELECT s.name, COUNT(*) AS n, SUM(EXISTS (SELECT 1 FROM content_items c WHERE c.source_id = s.id)) AS done FROM sources s GROUP BY s.name')
+    m.note(`قائمة المصدر فيها ${sources.length} خيار: ${sources.join(' · ')} · وفي القاعدة: ${drive.map((d) => `«${d.name}» ${d.n} (${d.done} محلَّل)`).join(' · ')}`)
     const platform = await card.locator('select[name="platform"]').inputValue()
-    m.note(`المنصّة المختارة سلفًا: ${platform} — فلا اختيار يلزم لـ LinkedIn`)
+    m.note(`المنصّة المختارة سلفًا: ${platform}`)
     await m.tap(button(card, 'اكتب مسوّدة'), '«اكتب مسوّدة»', { key: true })
     m.mark('drafted')
     const fresh = all<{ id: string; status: string }>(stack, "SELECT id, status FROM posts WHERE status = 'draft'").filter((r) => !before.has(r.id))
@@ -331,13 +369,16 @@ const R2: Journey = {
 const R2stop: Journey = {
   id: 'R-2·stop',
   title: 'كتابة منشور من مصدر — حيث يقف مالك يمرّر بحثًا عن «اكتب»',
-  plan: { today: '8', target: '4' },
+  plan: { target: '4 (§6 ر-2)' },
   async run({ page, m, stack }) {
-    // ‏ما في الشاشة الأولى من الرئيسيّة: أفيها بابٌ إلى «اكتب»؟
-    const homeCtas = await page.evaluate(() => Array.from(document.querySelectorAll('a.btn, button.btn-primary, a.btn-primary'))
+    // ‏ما في الشاشة الأولى من الرئيسيّة: أفيها بابٌ إلى «اكتب»؟ — يُقرأ من الصفحة (D-326): كانت الجملةُ بعده ثابتةً تنفي
+    // ‏البابَ في الرئيسيّة كلّها، والفحصُ يقرأ الشاشةَ الأولى وحدَها ويتخطّى رأسَ القائمة والزرَّ العائم
+    const homeCtas = await page.evaluate(() => Array.from(document.querySelectorAll('a.btn, button.btn-primary, a.btn-primary, summary.btn'))
       .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight })
       .map((el) => (el.textContent ?? '').trim().replace(/\s+/g, ' ')).filter((t) => t !== ''))
-    m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'} — ولا «منشور جديد» ولا «اكتب» في الرئيسيّة كلّها`)
+    const doors = await writeDoors(page)
+    m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'}`)
+    m.note(`أبواب الكتابة في الرئيسيّة: في الشاشة الأولى ${doors.first.join(' · ') || 'لا شيء'} · وتحتها ${doors.below.join(' · ') || 'لا شيء'}`)
     const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
     await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
     const goal = /اكتب|أنشئ|جديد|اعتمد/
@@ -414,7 +455,7 @@ const R2stop: Journey = {
 const R3: Journey = {
   id: 'R-3',
   title: 'إضافة صورة إلى منشور (إنفوجرافيك)',
-  plan: { today: '3 (توليد فقط)', target: '2' },
+  plan: { target: '2 (§6)' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
     await m.tap(station(page, 'الصورة'), 'محطّة «الصورة» في الرئيسيّة')
@@ -429,7 +470,7 @@ const R3: Journey = {
 const R4: Journey = {
   id: 'R-4',
   title: 'رفع فيديو ونشره على YouTube وTikTok وInstagram',
-  plan: { today: '13', target: '6' },
+  plan: { target: '6 · KLM ≤40ث (§6 · EASE-PLAN-2 §٥)' },
   async prepare(stack) {
     // ‏staging لا تربط TikTok ولا Instagram — ورحلةُ «الثلاث» تفترضهما مربوطين
     for (const [platform, ext, name] of [['tiktok', 'tt-local', 'omar.sada'], ['instagram', 'ig-local', 'omar.sada']] as const) {
@@ -441,21 +482,21 @@ const R4: Journey = {
   async run({ page, m, stack, assets }) {
     const known = new Set(all<{ id: string }>(stack, 'SELECT id FROM uploads').map((r) => r.id))
     /*
-     * ‏**يقيس الطريقَ المبنيّ** (D-314): «منشور جديد» (الزرُّ العائم على الهاتف، وزرُّ الترويسة على الحاسوب) ← «فيديو»
-     * ‏← الملفّ ← النصّ ← «متى؟» ← «أنشئ المنشورات»: يُنشأ ويُعتمَد ويُجدوَل في ضغطةٍ واحدة (D-218). وكانت الرحلةُ
-     * ‏تدخل من «المكتبة ← الفيديو» وتجدول كلَّ منشورٍ من بطاقته، وهو الطريقُ الذي استبدله D-218. والبديلُ الظاهر
-     * ‏(صفُّ «جدوِل منشوراته معًا» تحت المقطع) ستُّ خطواتٍ كذلك. ولا رجوعَ صامتًا: إن غاب البابُ فشلت الرحلةُ علنًا.
+     * ‏**يقيس الطريقَ المبنيّ** (D-314): «منشور جديد» ← «فيديو» ← الملفّ ← النصّ ← «أنشئ وجدوِل · غدًا 9:00 ص»: يُنشأ
+     * ‏ويُعتمَد ويُجدوَل في ضغطةٍ واحدة (D-218). **والموعدُ افتراضيٌّ مكتوبٌ على الزرّ** (D-326): كان «متى؟» يبدأ «لاحقًا» فيلزم
+     * ‏اختيارٌ قبل الإنشاء، وصار يبدأ بموعد بطاقة المسوّدة نفسِه، و«أنشئ فقط» ثانويٌّ بجواره. ولا رجوعَ صامتًا: إن غاب البابُ
+     * ‏فشلت الرحلةُ علنًا.
      */
-    await m.tap(visible(page.locator('[data-tb-new], details.fab').locator(':scope > summary')).first(), '«منشور جديد»')
-    await m.tap(visible(page.locator('[data-tb-new] .menu-item, details.fab .fab-menu a').filter({ hasText: /فيديو/ })).first(), '«فيديو» في قائمة «منشور جديد»')
+    await newPost(page, m, /فيديو/, 'فيديو')
     await m.look(visible(page.getByRole('heading', { name: 'فيديوهاتك' })), 'عنوان «فيديوهاتك»')
     const pick = visible(page.locator('label').filter({ has: page.locator('#vfile') })).first()
     // ‏بالاسم العربيّ كما يرفعه المالك — والبايتاتُ تُمرَّر لا المسار (Playwright يُسقط مسارًا غيرَ لاتينيّ)
     const clip = { name: 'الإطار_الأول.mp4', mimeType: 'video/mp4', buffer: readFileSync(assets.clip) }
     await m.file(pick, page.locator('#vfile'), clip, '«اختر مقطعًا وارفعه» ← الملفّ', { key: true })
+    // ‏ويعود الرفعُ إلى صفّ المقطع الجديد عند حقل نصّه (D-326) — كان يعود إلى رأس «فيديوهاتك» والحقلُ تحته بشاشة
     const uploaded = await m.wait(async () => {
       const row = all<{ id: string; status: string }>(stack, 'SELECT id, status FROM uploads').find((r) => !known.has(r.id))
-      return row?.status === 'ready' && page.url().includes('#videos')
+      return row?.status === 'ready' && /#(videos|vc-)/.test(page.url())
     }, 60_000)
     if (!uploaded) {
       const msg = await page.locator('#vup-msg').textContent().catch(() => '')
@@ -474,8 +515,10 @@ const R4: Journey = {
     await m.type(form.locator('textarea[name="caption"]'), 'الإطار الأوّل في دقيقة: كيف نعرّف المعلَم قبل أن يبدأ العمل', 'نصّ المنشور (سطره الأوّل عنوان YouTube)')
     const approve = form.locator('input[name="approve"]')
     if ((await approve.count()) > 0 && !(await approve.isChecked())) await m.tap(approve, '«اعتمده الآن»')
-    await m.choose(form.locator('select[name="preset"]'), { label: 'غدًا 9:00 ص' }, '«متى؟» ← «غدًا 9:00 ص»')
-    await m.tap(button(form, 'أنشئ المنشورات'), '«أنشئ المنشورات»')
+    // ‏الموعدُ كما يُرى على الزرّ الأوّليّ — يُقرأ ولا يُختار
+    const go = visible(form.locator('button.btn-primary[type="submit"]')).first()
+    const goLabel = ((await go.textContent().catch(() => '')) ?? '').trim().replace(/\s+/g, ' ')
+    await m.tap(go, `«${goLabel || 'أنشئ'}»`)
     m.mark('posts_created')
     const posts = all<{ id: string; platform: string; status: string }>(stack,
       `SELECT p.id, p.platform, p.status FROM posts p JOIN media me ON me.post_id = p.id WHERE me.upload_id = ? ORDER BY p.platform`, upload.id)
@@ -491,16 +534,12 @@ const R4: Journey = {
 const R5: Journey = {
   id: 'R-5',
   title: 'استيراد خطّة من ملفّ CSV',
-  plan: { today: '8', target: '4' },
+  plan: { target: '4 (§6: «منشور جديد ▾» ← «خطّة من ملفّ» ← الملفّ ← «اعتمد وجدوِل»)' },
   async run({ page, m, stack, assets }) {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
-    // ‏رأسُ «المنشورات» فيه بابُ الخطّة باسمه — والمالكُ يضغطه ولا يمرّر إلى آخر اللوح بحثًا عنه
-    // ‏والأبوابُ الأربعة في قائمة «منشور جديد» (D-232): تُفتح ثمّ يُختار منها
-    if ((await link(page, 'خطّة من ملفّ').count()) === 0) {
-      await m.tap(visible(page.locator('[data-head-new], [data-tb-new], details.fab').locator('summary, button').filter({ hasText: 'منشور جديد' })).first(), '«منشور جديد»')
-    }
-    await m.tap(link(page, 'خطّة من ملفّ'), '«خطّة من ملفّ» في قائمة «منشور جديد»')
+    // ‏**بطريق §6 من الرئيسيّة** (D-326): «منشور جديد ▾» ← «خطّة من ملفّ» — كانت الرحلةُ تفتح «المنشورات» أوّلًا فتعدّ لمسةً
+    // ‏ليست في الهدف
+    await newPost(page, m, /خطّة من ملفّ/, 'خطّة من ملفّ')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
     await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
@@ -520,7 +559,7 @@ const R5: Journey = {
 const R6: Journey = {
   id: 'R-6',
   title: 'جدولة منشور معتمَد',
-  plan: { today: '4', target: '2' },
+  plan: { target: '2 (§6)' },
   async run(j) {
     const { page, m, stack } = j
     const id = stack.seeded.posts.youtubeEdited
@@ -534,7 +573,7 @@ const R6: Journey = {
 const R7: Journey = {
   id: 'R-7',
   title: 'رؤية النتائج (تقرير الأسبوع)',
-  plan: { today: '4', target: '1' },
+  plan: { target: '1 (§6)' },
   async run({ page, m, stack }) {
     await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
     const report = q<{ id: string; body_json: string }>(stack, 'SELECT id, body_json FROM reports ORDER BY id DESC LIMIT 1')
@@ -550,7 +589,7 @@ const R7: Journey = {
 const R8: Journey = {
   id: 'R-8',
   title: 'إصلاح منشور فشل وإعادته إلى الطابور',
-  plan: { today: '9', target: '3' },
+  plan: { target: '3 (§6)' },
   async run(j) {
     const { page, m, stack } = j
     const id = stack.seeded.posts.failed
@@ -584,7 +623,7 @@ const R8: Journey = {
 const R9: Journey = {
   id: 'R-9',
   title: 'تغيير موعد منشور مجدول (بعد أكثر من 48 ساعة)',
-  plan: { today: 'يُقاس', target: '3' },
+  plan: { target: '3 (§6)' },
   async run(j) {
     const { page, m, stack } = j
     const id = stack.seeded.posts.queued
@@ -610,14 +649,14 @@ const R9: Journey = {
 const R10: Journey = {
   id: 'R-10',
   title: 'معرفة ما أُنفق هذا الشهر',
-  plan: { today: 'يُقاس', target: '1' },
+  plan: { target: '1 والرقمُ في الشاشة الأولى (§6)' },
   async run({ page, m, stack }) {
     const fold = visible(page.locator('details#ops > summary')).first()
     if ((await fold.count()) > 0) {
       // ‏بالمقياس نفسِه الذي يعدّ به Meter التمرير (حافّةُ الطيّة السفلى فوق ما يغطّيه الشريطُ السفليّ بهامش 24px)، لا بموضعها في الصفحة
       const { bottom, vh } = await m.insets()
       const need = await fold.evaluate((el, edge) => Math.max(0, Math.round(el.getBoundingClientRect().bottom + window.scrollY - edge + 24)), vh - bottom)
-      m.note(`على الرئيسيّة: «الكلفة وما وقع» مطويّة، ويلزم ${need}px تمريرًا إليها ثمّ لمسةٌ لفتحها (رحلةُ ما قبل D-314 كانت تمرّر حتّى الرقم داخلها: 1950px على الهاتف و1005px على الحاسوب)`)
+      m.note(`على الرئيسيّة: «الكلفة وما وقع» مطويّة، ويلزم ${need}px تمريرًا إليها ثمّ لمسةٌ لفتحها`)
     }
     await m.tap(navItem(page, 'النتائج'), '«النتائج» في التنقّل')
     const figure = visible(page.locator('.sub').filter({ hasText: 'هذا الشهر حتّى اليوم' }).locator('a.tap')).first()
@@ -637,7 +676,7 @@ const R10: Journey = {
 const R11: Journey = {
   id: 'R-11',
   title: 'الدخول من الهاتف (من رابط محفوظ إلى «التقرير»)',
-  plan: { today: 'يُقاس', target: '2' },
+  plan: { target: '2 (§6: الزرّ الأوّليّ ثمّ بصمة الجهاز)' },
   startLoggedOut: true,
   /*
    * ‏‏D-317: العاملُ الثاني إلزاميٌّ للمالك، فالمالكُ الذي سجّل مفتاحَه يدخل بالزرّ الأوّليّ في صفحة الدخول — لمسةٌ وبصمة —
@@ -665,7 +704,7 @@ const R11: Journey = {
 const R12: Journey = {
   id: 'R-12',
   title: 'خطّة جديدة: من الرئيسيّة إلى «حلّل وابنِ الخطّة»',
-  plan: { today: 'يُقاس', target: '6' },
+  plan: { target: '5 = البابُ وخطواتُ المعالج الأربع كما تَعِد البطاقة («في أربع خطوات»)، والرحلةُ تختار «بلا صورة» فوقها (D-326)' },
   async prepare(stack) {
     // ‏الخطّةُ تحتاج مصدرين محلَّلين، وstaging حلّلت المستندَ وحدَه — فيُحلَّل العرضُ هنا
     stack.db.raw.prepare(`INSERT INTO content_items (id, source_id, summary, themes_json, worth_score, extracted_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`)
@@ -700,7 +739,7 @@ let r13Plan = ''
 const R13: Journey = {
   id: 'R-13',
   title: 'مراجعة الخطّة: اعتمد بندًا ثمّ «ثبّت الخطّة»',
-  plan: { today: 'يُقاس', target: '3' },
+  plan: { target: '3 = البابُ وقرارُ البند والتثبيت — التراجعُ بدل التأكيد (D-303 · D-326)' },
   async prepare(stack) {
     const { doc, slides } = stack.seeded.sources
     const day = (plus: number): string => { const d = new Date(); d.setUTCDate(d.getUTCDate() + plus); return d.toISOString().slice(0, 10) }
@@ -748,13 +787,12 @@ const OWN_TEXT = 'الحوكمة لا تبطئ القرار، تحميه. (كت�
 const R14: Journey = {
   id: 'R-14',
   title: 'منشورٌ تكتبه بنفسك ثمّ تعتمده — بلا نموذج ولا كلفة',
-  plan: { today: 'لم يكن (كلُّ بابٍ بنموذج)', target: 'لا هدف في §6 · يُقاس' },
+  plan: { target: '5 = §6 ر-2 ببابه «بنفسي»: «منشور جديد ▾» ← «بنفسي» ← النصّ ← «احفظ مسوّدة» ← «اعتمد» (D-326)' },
   async run({ page, m, stack }) {
     const ledger = (): number => q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM cost_ledger')?.n ?? 0
     const spent = ledger()
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
-    await m.tap(subTab(page, 'اكتب'), 'تبويب «اكتب»')
-    await m.tap(page.getByLabel('بنفسي'), 'باب «بنفسي» في «منشور جديد»')
+    // ‏من الرئيسيّة بـ«منشور جديد ▾» كسائر أبواب الكتابة (D-326)، لا «المنشورات» ثمّ تبويب «اكتب» ثمّ المقطع
+    await newPost(page, m, /بنفسي/, 'بنفسي')
     const form = page.locator('form[action="/panel/drafts/own"]')
     await m.type(form.locator('textarea[name="text"]'), OWN_TEXT, 'لصق النصّ في «نصّك»', { pasted: true })
     await m.tap(button(form, 'احفظ مسوّدة'), '«احفظ مسوّدة»', { key: true })
@@ -771,6 +809,162 @@ const R14: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14]
+/**
+ * ‏**الرئيسيّةُ الخالية** (D-326 · خطّة التصميم 5.5 «أوّل تشغيل»): ما تزرعه البذرةُ من حساباتٍ وتطبيقاتٍ ومصادرَ ومنشوراتٍ
+ * ‏وكلفةٍ وتقاريرَ يُمحى، ويبقى المالكُ ومفتاحُ مروره وإعداداتُه ونبضُ الدورات — كمن فتح لوحتَه أوّلَ مرّة. والجداولُ بترتيب
+ * ‏الأبناء قبل الآباء، والقيودُ موقوفةٌ أثناء المحو وحدَه (قاعدةٌ محلّيّةٌ للقياس، لا ترحيل).
+ */
+const ZERO_TABLES = [
+  'publish_attempts', 'metrics', 'promotion_suggestions', 'media_claims', 'media', 'plan_versions', 'posts', 'plans', 'briefs',
+  'analysis_claims', 'content_items', 'library_files', 'sources', 'uploads', 'token_alerts', 'tokens', 'accounts', 'oauth_apps',
+  'cost_ledger', 'reports', 'alert_outbox',
+] as const
+
+function zero(stack: Stack): string {
+  const raw = stack.db.raw
+  raw.exec('PRAGMA foreign_keys = OFF')
+  try {
+    for (const t of ZERO_TABLES) {
+      try { raw.exec(`DELETE FROM ${t}`) } catch { /* ‏جدولٌ لم يُرحَّل بعدُ لا يُمحى */ }
+    }
+  } finally {
+    raw.exec('PRAGMA foreign_keys = ON')
+  }
+  const left = ZERO_TABLES.filter((t) => { try { return (q<{ n: number }>(stack, `SELECT COUNT(*) AS n FROM ${t}`)?.n ?? 0) > 0 } catch { return false } })
+  return `رئيسيّةٌ خالية: مُحي ${ZERO_TABLES.length} جدولًا (الحساباتُ والتطبيقاتُ والمصادرُ والمقاطعُ والمنشوراتُ والكلفةُ والتقارير)${left.length === 0 ? '' : ` — وبقي في ${left.join('، ')}`}، وبقي المالكُ ومفتاحُه`
+}
+
+/** ‏قائمةُ البدء كما تُقرأ: «1 من 3» وما بعدها — من الصفحة. */
+async function firstRunText(page: Page): Promise<string> {
+  const box = page.locator('#first-run')
+  if ((await box.count()) === 0) return 'لا قائمةَ بدءٍ في الرئيسيّة'
+  return ((await box.locator('[data-fr-count]').textContent().catch(() => '')) ?? '').trim()
+}
+
+/**
+ * ‏**ر-1·أوّل** (D-326): أوّلُ منصّةٍ من رئيسيّةٍ خالية — قائمةُ البدء «1 من 3» تحمل أسماءَ المنصّات، وكلٌّ رابطٌ إلى مساعد ضبط
+ * ‏تطبيقها عند حقل المعرّف ودليلُه مفتوح (`setupHref`). كان «اربط أوّل منصّة» يُنزل إلى «الحسابات» والمنصّاتُ اللاحقةُ مطويّة،
+ * ‏فالطريقُ «المزيد» ثمّ «الحسابات» ثمّ الطيّة ثمّ «أكمل الإعداد» قبل أوّل حقل.
+ */
+const R1first: Journey = {
+  id: 'R-1·أوّل',
+  title: 'أوّل منصّة من رئيسيّةٍ خالية: ضبط Instagram وربطها — حتّى مغادرة الموقع',
+  plan: { target: '≤5 (§6 ر-1 والضبطُ معه: قائمةُ البدء ← المساعد ← المعرّف ← السرّ ← «احفظ» ← «اربط» · EASE-PLAN-2 §٥)' },
+  async prepare(stack) {
+    return zero(stack)
+  },
+  async run({ page, m, stack, leftSite }) {
+    m.note(`قائمة البدء في الرئيسيّة: ${await firstRunText(page)}`)
+    const pick = visible(page.locator('#first-run a').filter({ hasText: /^Instagram$/ })).first()
+    await m.tap(pick, '«Instagram» في «اربط أوّل حساب»', { key: true })
+    const id = page.locator('#ci-instagram')
+    if (!(await id.isVisible())) await m.tap(link(page.locator('main, body'), 'اضبط التطبيق'), '«اضبط التطبيق»')
+    await m.type(id, '1234567890123456', 'لصق «Client ID» (من Meta)', { pasted: true })
+    await m.type(page.locator('#cs-instagram'), 'local0fake0instagram0secret00000', 'لصق «Client Secret»', { pasted: true })
+    await m.tap(visible(page.locator('button[form="app-instagram"]').filter({ hasText: 'احفظ' })).first(), '«احفظ»')
+    m.mark('app_saved')
+    const saved = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM oauth_apps WHERE platform = 'instagram'")?.n ?? 0
+    if (saved === 0) return { success: false, verified: 'oauth_apps: لا صفّ لـ instagram بعد «احفظ»' }
+    m.note(`بعد «احفظ» أُعيد إلى: ${new URL(page.url()).pathname}${new URL(page.url()).hash}`)
+    const connect = visible(page.locator('a[href="/oauth/instagram/start"]')).first()
+    if ((await connect.count()) === 0) await m.tap(visible(page.locator('a[href^="/panel/channels/instagram"]')).first(), 'العودة إلى صفحة Instagram')
+    await m.tap(visible(page.locator('a[href="/oauth/instagram/start"]')).first(), '«اربط Instagram»')
+    const left = leftSite.find((u) => /instagram\.com|facebook\.com/.test(u))
+    return {
+      success: left !== undefined,
+      verified: left === undefined ? 'لم يغادر إلى Meta' : `غادر إلى ${new URL(left).origin}${new URL(left).pathname} (client_id في الرابط: ${new URL(left).searchParams.get('client_id') ?? '—'})`,
+    }
+  },
+}
+
+/**
+ * ‏**ر-11·رمز** (D-326): المالكُ على جهازٍ لا يحمل مفتاحَ مروره — رمزُ البريد ثمّ الرقمُ من تطبيق المصادقة (العاملُ الثاني إلزاميٌّ منذ
+ * ‏D-317، والرقمُ أحدُ بابيه). كانت ر-11 تقيس مفتاحَ المرور وحدَه، وهذا الطريقُ لا يُقاس. والرقمُ يُحسب بالدالّة التي يتحقّق بها
+ * ‏الخادم (`codeAt`) من سرٍّ يُزرع بدالّة التسجيل نفسِها (`startTotp` ثمّ `confirmTotp`)، والبريدُ يُقرأ من «الصندوق».
+ */
+let totpSecret = ''
+const R11code: Journey = {
+  id: 'R-11·رمز',
+  title: 'الدخول برمز البريد ثمّ رقم تطبيق المصادقة (جهازٌ بلا مفتاح المرور)',
+  plan: { target: '6 = البريدُ وزرُّه، والرمزُ وزرُّه، والرقمُ وزرُّه (لا هدف في §6 لهذا الطريق · D-326)' },
+  startLoggedOut: true,
+  async prepare(stack) {
+    totpSecret = newSecret()
+    await startTotp(stack.db, stack.encKey, totpSecret, OWNER_EMAIL)
+    // ‏مؤكَّدٌ بخطوةٍ قديمة: رقمُ اللحظة بعدها يُقبل، ولا يُعاد رقمٌ قُبل
+    await confirmTotp(stack.db, counterFor(new Date()) - 4n, OWNER_EMAIL)
+    return 'رقمُ تطبيق المصادقة مضبوطٌ ومؤكَّدٌ للمالك، ولا مفتاحَ مرورٍ في هذا المتصفّح'
+  },
+  async run({ page, m, stack }) {
+    await m.type(page.locator('#e'), OWNER_EMAIL, '«البريد» (من اقتراح لوحة المفاتيح)', { pasted: true })
+    await m.tap(page.locator('#login-send'), '«أرسل الرمز»')
+    const code = lastCode(stack)
+    if (code === '') return { success: false, verified: 'لم يصل رمزٌ إلى البريد' }
+    await m.type(page.locator('#c'), code, 'لصق «رمز الدخول» من البريد', { pasted: true })
+    await m.tap(button(page, 'دخول'), '«دخول»')
+    m.note(`بعد الرمز: ${new URL(page.url()).pathname}`)
+    const app = await codeAt(totpSecret, counterFor(new Date()))
+    await m.type(page.locator('#code'), app, 'الرقم من تطبيق المصادقة (ستّة أرقام)')
+    await m.tap(button(page.locator('form[action="/panel/2fa/totp"]'), 'تأكيد'), '«تأكيد»', { key: true })
+    await page.waitForURL((u) => u.pathname === '/panel/report', { timeout: 15_000 }).catch(() => undefined)
+    const landed = new URL(page.url())
+    m.note(`بعد الرقم: ${landed.pathname}${landed.search}${landed.hash} (طُلب /panel/report)`)
+    const session = (await page.context().cookies()).some((c) => c.name === '__Host-sada_session')
+    if (session && landed.pathname !== '/panel/report' && landed.pathname !== '/panel/2fa') {
+      await m.tap(navItem(page, 'النتائج'), '«النتائج» — لأنّ الدخول لم يُعِد إلى الصفحة المطلوبة')
+    }
+    const at = new URL(page.url()).pathname
+    const step = q<{ s: string | null }>(stack, 'SELECT last_step AS s FROM totp WHERE id = 1')?.s ?? null
+    return {
+      success: session && at === '/panel/report',
+      verified: `جلسة ${session ? 'مفتوحة' : 'لا'} · الصفحة ${at} · totp.last_step ${step === null ? '—' : 'تقدّم'}`,
+    }
+  },
+}
+
+/**
+ * ‏**ر-15 · أوّلُ منشور** (D-326): حسابٌ واحدٌ مربوطٌ ولا شيءَ غيره — قائمةُ البدء «2 من 3» ← «اكتب فكرتك» ← الفكرة ← «اكتب
+ * ‏المسوّدات» ← «اعتمد» حتّى يُجدوَل. والنجاحُ أوّلُ منشورٍ في الطابور، ثمّ لا قائمةَ بدء (اكتملت).
+ */
+const R15: Journey = {
+  id: 'R-15',
+  title: 'أوّل منشور من قائمة البدء: فكرةٌ ثمّ اعتمادٌ حتّى الطابور',
+  plan: { target: '4 = §6 ر-2 من قائمة البدء: البابُ ← الفكرة ← «اكتب» ← «اعتمد» (D-326)' },
+  async prepare(stack) {
+    const note = zero(stack)
+    await saveApp(stack.db, stack.encKey, 'linkedin', '86local0linkedin', 'local-fake-linkedin-secret-0000', 'journey')
+    const id = await upsertAccount(stack.db, 'org_owner', { platform: 'linkedin', kind: 'member', externalId: 'li-local-omar', displayName: 'عمر' })
+    await saveTokens(stack.db, stack.encKey, id, {
+      accessToken: `local-fake-access-${id}`,
+      refreshToken: null,
+      expiresAt: new Date(Date.now() + 55 * 86_400_000).toISOString(),
+      refreshExpiresAt: null,
+      scopes: 'openid profile w_member_social',
+    } as Parameters<typeof saveTokens>[3])
+    return `${note} — ثمّ رُبط LinkedIn «عمر» وحده`
+  },
+  async run({ page, m, stack }) {
+    m.note(`قائمة البدء في الرئيسيّة: ${await firstRunText(page)}`)
+    const before = new Set(all<{ id: string }>(stack, 'SELECT id FROM posts').map((r) => r.id))
+    const go = visible(page.locator('#first-run li.at a.btn')).first()
+    const goLabel = ((await go.textContent().catch(() => '')) ?? '').trim()
+    await m.tap(go, `«${goLabel || 'زرّ الخطوة'}» في قائمة البدء`)
+    const idea = visible(page.locator('form[action="/panel/drafts/idea"]')).first()
+    await m.type(idea.locator('textarea[name="idea"]'), 'الحوكمة لا تبطئ القرار، تحميه', 'كتابة الفكرة')
+    await m.tap(button(idea, /^اكتب/), '«اكتب المسوّدات»', { key: true })
+    m.mark('drafted')
+    const fresh = all<{ id: string }>(stack, "SELECT id FROM posts WHERE status = 'draft'").filter((r) => !before.has(r.id))
+    if (fresh.length === 0) return { success: false, verified: 'لم تُكتب مسوّدة من الفكرة' }
+    await m.tap(button(draftForm(page, fresh[0]!.id), /^اعتمد/), '«اعتمد» على المسوّدة الأولى')
+    const row = status(stack, fresh[0]!.id)
+    const cost = q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM cost_ledger')?.n ?? 0
+    return {
+      success: row?.status === 'queued' || row?.status === 'approved',
+      verified: `مسوّدات من الفكرة: ${fresh.length} · الأولى: ${row?.status ?? '—'}${row?.scheduled_at == null ? '' : ` (${row.scheduled_at} UTC)`} · cost_ledger ${cost} صفّ`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15]
 
 export { Blocked }

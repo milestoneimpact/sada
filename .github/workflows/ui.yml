@@ -1,0 +1,82 @@
+name: ui
+
+# ‏بوّابةُ الواجهة (D-326): `npm run audit` (تُرسَم الشاشاتُ وتُدقَّق: الوصولُ والسلّمُ والجوّالُ والزرُّ الأوّليُّ والنصُّ والوزن)
+# ‏ثمّ `npm run journeys` (تُقاد الرحلاتُ على نسخةٍ محلّيّة بـChromium وتُقارَن بعتباتها في scripts/journeys/thresholds.json —
+# ‏فرحلةٌ تخسر نجاحَها أو تزيد خطوةً أو تحميلًا تُسقط الطلب). كانتا تُشغَّلان محلّيًّا وحدَهما وتُقالان في نصّ الطلب،
+# ‏فسقطت رحلتان منذ D-289 ولم يرهما أحد حتّى D-293.
+#
+# ‏ودقائق GitHub تقاس ولا تقدر (CLAUDE.md): على طلبات الدمج الجاهزة وحدها (المسوّدةُ تتخطّى، كـ ci.yml)، وحين يمسّ الطلبُ مساراتِ
+# ‏الواجهة وأدواتِها وحدها، والدفعةُ الجديدةُ على الطلب تلغي الجاري. **وهي أثقلُ بوّابة**: قِيس محلّيًّا في D-326 (أربعُ أنوية
+# ‏يتقاسمها وكلاءُ آخرون) التدقيقُ ‏28 إلى ‏29 دقيقةً ساعةً (‏12 دقيقةَ معالج) والرحلاتُ ‏3.4 إلى ‏4.1، وفوقهما التثبيتُ وChromium نحو ‏3 — فالمتوقَّعُ
+# ‏بين ‏20 و‏35 دقيقةً مفوترةً للتشغيل الواحد (التفصيلُ في القرار). ولا push على main: الطلبُ قِيس قبل الدمج.
+#
+# ‏**ولا يُجعل فحصًا مشروطًا للدمج**: سيرٌ بمرشّح مسارات لا يجري على طلبٍ لا يمسّها، والفحصُ المشروطُ الغائبُ يُبقي الطلبَ
+# ‏«ينتظر» إلى الأبد. البوّابةُ المشروطة `ci` وحدَها (M-43).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/routes/ui/**'
+      - 'src/routes/panel/**'
+      - 'src/routes/panelView.ts'
+      - 'src/routes/ui/styles/**'
+      - 'src/routes/ui/styles.ts'
+      - 'scripts/audit_*'
+      - 'scripts/journeys/**'
+      - 'scripts/render_*.ts'
+      - 'scripts/screens.mjs'
+      - '.github/workflows/ui.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ui:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # ‏بمعرّف التزامٍ كامل لا بوسمٍ يتحرّك، كما في ci.yml (D-319)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # ‏Chromium الذي يطلبه Playwright المثبَّت نفسُه (بمكتباته)، في المسار الذي تفتحه المدقّقاتُ والرحلات
+      # ‏(`/opt/pw-browsers/chromium`، و`CHROMIUM_PATH` للرحلات)
+      - name: Chromium
+        run: |
+          sudo mkdir -p /opt/pw-browsers
+          sudo chown "$USER" /opt/pw-browsers
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+          ln -sf "$(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node -e "import('playwright').then((m) => console.log(m.chromium.executablePath()))")" /opt/pw-browsers/chromium
+          /opt/pw-browsers/chromium --version
+
+      - name: التدقيق
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+        run: npm run audit
+
+      - name: الرحلات
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /opt/pw-browsers
+        run: npm run journeys -- --out "$RUNNER_TEMP/sada-journeys"
+
+      # ‏الخلاصةُ في صفحة التشغيل نفسِها — نجحت الرحلاتُ أو سقطت
+      - name: الخلاصة
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/sada-journeys/SUMMARY.md" ]; then
+            cat "$RUNNER_TEMP/sada-journeys/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -126,12 +126,14 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏و«tabindex=-1» لما لا يُركَّز عليه وحدَه: حقلٌ أو زرٌّ يُعلَّم به يخرج من ترتيب Tab
     // ‏وما في طيّةٍ مغلقة («تفاصيلُ» بطاقة المسوّدة، D-195) تُفتح طيّاتُه قبل النزول إليه
     if(card){for(var dt=card.parentElement;dt;dt=dt.parentElement){if(dt.tagName==='DETAILS')dt.open=true;}}
-    if(card&&host){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.scrollIntoView({block:'start'});
+    // ‏وحقلٌ (‏«#vc-…» بعد رفع المقطع، D-326) ينزل إلى وسط الشاشة لا أعلاها: فوقه لصيقتُه وإشعارُ الرفع، وتحته زرُّه
+    var blk=/^(TEXTAREA|INPUT|SELECT)$/.test(card&&card.tagName)?'center':'start';
+    if(card&&host){if(card.tabIndex<0)card.setAttribute('tabindex','-1'); card.scrollIntoView({block:blk});
       card.focus({preventScroll:true});
       // ‏وما فوق البطاقة يتبدّل طولُه حتّى يكتمل التحميل (الخطوطُ وسكربتُ الفرز والصور)، فتنزل البطاقةُ
       // ‏عن رأس الشاشة بعد النزول إليها: ‏١٥٥١px على الهاتف لـ«#d-…» (D-195). فتُعاد مرّةً بعد التحميل
       if(document.readyState!=='complete'){var again=card;
-        window.addEventListener('load',function(){again.scrollIntoView({block:'start'});},{once:true});}
+        window.addEventListener('load',function(){again.scrollIntoView({block:blk});},{once:true});}
       return;}
     if(focus&&pane){var hd=pane.querySelector('h1,h2');
       if(hd){hd.setAttribute('tabindex','-1'); hd.focus();}}
@@ -1115,13 +1117,31 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       });
     }).then(function(r){return r.json();}).then(function(c){
       if(!c.ok)throw c.reason||'تعذّر جمع المقطع';
-      location.hash='videos'; location.reload();
+      // ‏إلى حقل نصّ المقطع الجديد نفسِه (D-326 · ر-4): كان يعود إلى رأس «فيديوهاتك» والحقلُ تحته بشاشة
+      // ‏والتحميلُ لا يعيد موضعَ التمرير القديم فوق المرساة: الإعادةُ تستعيده افتراضًا فتُسقط النزولَ إلى الحقل
+      if('scrollRestoration' in history)history.scrollRestoration='manual';
+      location.hash='vc-'+id; location.reload();
     }).catch(function(e){
       if(id!==null)post('/panel/uploads/'+id+'/abort',{});
       tell(typeof e==='string'?e:'انقطع الرفع — اختر الملفّ مرّةً أخرى');
       vfile.disabled=false; vfile.value='';
       if(bar)bar.hidden=true;
     });
+  });
+
+  /*
+   * ‏**«أنشئ وجدوِل» يقول ما سيقع** (D-326 · ر-4): الموعدُ الافتراضيُّ مكتوبٌ على الزرّ الأوّليّ، فيتبع «متى؟» و«اعتمده الآن» —
+   * ‏بلا موعدٍ أو بلا اعتمادٍ لا يُجدوَل شيء، فيعود الاسمُ «أنشئ المنشورات». والخادمُ يقرأ الحقلين نفسَيهما.
+   */
+  document.querySelectorAll('button[data-create-go]').forEach(function(go){
+    var f=go.form||go.closest('form'); if(!f)return;
+    var when=f.querySelector('select[name=preset]'), ok=f.querySelector('input[name=approve]');
+    var sync=function(){
+      var at=!!when&&when.value!==''&&(!ok||ok.checked);
+      go.textContent=at?'أنشئ وجدوِل · '+when.options[when.selectedIndex].text:'أنشئ المنشورات';
+    };
+    if(when)when.addEventListener('change',sync);
+    if(ok)ok.addEventListener('change',sync);
   });
 
   /*

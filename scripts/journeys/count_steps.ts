@@ -7,6 +7,10 @@
  *     npm run journeys -- --out /path/to/dir    ← مجلّدُ المخرجات (افتراضًا ‎$TMPDIR/sada-journeys)
  *     npm run journeys -- --port 8788           ← منفذٌ غيرُ 8787
  *     npm run journeys -- --baseline old/results.json  ← جدولُ «قبل ← بعد» في SUMMARY.md
+ *     npm run journeys -- --update              ← يضيّق عتبةَ ما نزل تحتها، ويكتب عتبةَ رحلةٍ جديدة (ولا يُرخي)
+ *
+ * ‏**ويخرج بغير الصفر** (D-326) حين تخسر رحلةٌ نجاحَها أو تزيد خطوةً أو تحميلًا عن عتبتها في `thresholds.json`، أو تُقاس رحلةٌ
+ * ‏بلا عتبة. والخلاصةُ لا تقول إلّا ما قيس: لا جملةَ ثابتةً فيها، والبذرةُ تُقرأ من القاعدة نفسِها (`gate.ts`).
  *
  * لكلّ رحلةٍ ولكلّ مقاس: قاعدةٌ جديدةٌ من البذرة، وجلسةٌ جديدة، ثمّ تبدأ من الرئيسيّة
  * وتمضي بما يُرى. ويُكتب `results.json` و`SUMMARY.md` ولقطةٌ لكلّ خطوة.
@@ -21,6 +25,7 @@ import { chromium, type Browser } from 'playwright'
 import { Blocked, Meter, VIEWPORTS, type StepRecord, type Viewport } from './meter'
 import { CHROMIUM, startServer, type Stack } from './server'
 import { JOURNEYS, login, type Journey } from './journeys'
+import { judge, readThresholds, tightened, writeThresholds, type Judgement } from './gate'
 
 interface Args {
   readonly only: readonly string[] | null
@@ -29,6 +34,8 @@ interface Args {
   readonly port: number
   /** نتائجُ تشغيلٍ سابق (`results.json`) تُقارَن بها هذه في SUMMARY.md. */
   readonly baseline: string | null
+  /** يضيّق العتبات بما قيس (ولا يُرخي)، ويكتب عتبةَ الجديدة. */
+  readonly update: boolean
 }
 
 function args(argv: readonly string[]): Args {
@@ -46,6 +53,7 @@ function args(argv: readonly string[]): Args {
     out: resolve(get('out') ?? process.env['JOURNEYS_OUT'] ?? join(tmpdir(), 'sada-journeys')),
     port: Number(get('port') ?? 8787),
     baseline: baseline === undefined ? null : resolve(baseline),
+    update: argv.includes('--update'),
   }
 }
 
@@ -53,7 +61,7 @@ export interface JourneyResult {
   readonly id: string
   readonly title: string
   readonly viewport: string
-  readonly plan: { readonly today: string; readonly target: string }
+  readonly plan: { readonly target: string }
   /** أفعالُ المالك: نقرةٌ أو اختيارٌ أو كتابةٌ أو ملفٌّ أو تأكيد. */
   readonly steps: number
   /** اللمساتُ المادّيّة (القائمةُ لمستان، والملفُّ لمستان). */
@@ -285,15 +293,53 @@ function comparison(results: readonly JourneyResult[], base: { startedAt: string
   return lines
 }
 
-function summary(results: readonly JourneyResult[], started: Date, baseline: { path: string; data: { startedAt: string; results: readonly Baseline[] } } | null = null): string {
+/** ما في البذرة كما قُرئ من القاعدة بعد زرعها — لا وصفٌ مكتوبٌ سلفًا (D-326). */
+export interface SeedInventory {
+  readonly rows: readonly { readonly what: string; readonly n: string }[]
+}
+
+export interface RunFacts {
+  readonly judgement: Judgement
+  readonly seed: SeedInventory
+  readonly aiDelayMs: number
+  readonly viewports: readonly Viewport[]
+}
+
+/** مقاسٌ كما يُكتب في رأس الخلاصة — من `VIEWPORTS` نفسِها. */
+function vpLine(v: Viewport): string {
+  return `${v.name === 'phone' ? 'الهاتف' : 'الحاسوب'} ${v.width}×${v.height}${v.touch ? ' لمس' : ''} @${v.dpr}x`
+}
+
+function gateLines(j: Judgement): string[] {
+  const lines: string[] = []
+  const word = { ok: '✓', tighter: '✓ تحتها', lost: '✕ خسرت النجاح', steps: '✕ خطوات أكثر', loads: '✕ تحميل أكثر', first: '✕ خرجت من الشاشة الأولى', missing: '✕ بلا عتبة', stale: '✕ عتبة قديمة' } as const
+  lines.push('', '## العتبات (`scripts/journeys/thresholds.json`)', '')
+  lines.push(j.failures.length === 0
+    ? `لا رحلةَ تجاوزت عتبتَها${j.tighter.length === 0 ? '.' : ` — و${j.tighter.length} تحتها: \`npm run journeys -- --update\` يضيّقها.`}`
+    : `**${j.failures.length} تجاوزٌ يُسقط التشغيل:**`)
+  for (const f of j.failures) lines.push(`- ${f.text}`)
+  lines.push('', '| الرحلة | الهاتف: العتبة ← المقيس | الحاسوب: العتبة ← المقيس |', '|---|---|---|')
+  const ids = [...new Set(j.rows.map((r) => r.id))]
+  const cell = (id: string, vp: 'phone' | 'desktop'): string => {
+    const r = j.rows.find((x) => x.id === id && x.vp === vp)
+    if (r === undefined) return '—'
+    const t = r.threshold
+    const want = t === null ? '—' : `≤${t.steps} خطوات · ≤${t.loads} تحميل${t.firstScreen === true ? ' · شاشة أولى' : ''}`
+    return `${want} ← ${r.measured.steps} · ${r.measured.loads}${t?.firstScreen === true ? ` · ${yes(r.measured.firstScreen)}` : ''} ${word[r.kind]}`
+  }
+  for (const id of ids) lines.push(`| **${id}** | ${cell(id, 'phone')} | ${cell(id, 'desktop')} |`)
+  return lines
+}
+
+function summary(results: readonly JourneyResult[], started: Date, facts: RunFacts, baseline: { path: string; data: { startedAt: string; results: readonly Baseline[] } } | null = null): string {
   const ids = [...new Set(results.map((r) => r.id))]
   const by = (id: string, vp: string) => results.find((r) => r.id === id && r.viewport.startsWith(vp))
   const cell = (r: JourneyResult | undefined, f: (r: JourneyResult) => string) => (r === undefined ? '—' : f(r))
   const lines: string[] = []
-  lines.push(baseline === null ? '# قياس الرحلات — الواجهة الحاليّة (خطّ الأساس)' : '# قياس الرحلات — الواجهة الحاليّة مقابل خطّ الأساس', '')
-  lines.push(`شُغِّل في ${started.toISOString().slice(0, 16).replace('T', ' ')} UTC على نسخة محلّيّة حيّة (\`npm run journeys\`): SQLite بكلّ الترحيلات، وبذرة على شكل staging، ومزوّدون مزيَّفون بلا شبكة. الهاتف 390×844 لمس @2x، والحاسوب 1440×900.`, '')
-  lines.push('**الخطوات** أفعال المالك (نقرة، اختيار من قائمة، لصق أو كتابة، ملفّ، تأكيد). **التمرير** بالبكسل حتّى يظهر كلّ هدف فوق الشريط السفليّ. **الشاشة الأولى**: أكان الفعل الحاسم ظاهرًا بلا تمرير حين بلغ صفحتَه. **النجاح** من القاعدة لا من رسالة الصفحة. **KLM** تقدير لزمن الإنسان (تفكير وإشارة لكلّ فعل + سحبات + زمن التطبيق المقيس)، والنموذج المزيَّف يجيب في 0.8ث لا في عشرات الثواني.', '')
-  lines.push('| الرحلة | الخطة: اليوم ← الهدف | الهاتف: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM | الحاسوب: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM |')
+  lines.push(baseline === null ? '# قياس الرحلات — الواجهة الحاليّة' : '# قياس الرحلات — الواجهة الحاليّة مقابل خطّ الأساس', '')
+  lines.push(`شُغِّل في ${started.toISOString().slice(0, 16).replace('T', ' ')} UTC على نسخة محلّيّة حيّة (\`npm run journeys\`): SQLite بكلّ الترحيلات، والبذرة أدناه، ومزوّدون مزيَّفون بلا شبكة. ${facts.viewports.map(vpLine).join('، ')}.`, '')
+  lines.push(`**الخطوات** أفعال المالك (نقرة، اختيار من قائمة، لصق أو كتابة، ملفّ، تأكيد). **التمرير** بالبكسل حتّى يظهر كلّ هدف فوق الشريط السفليّ. **الشاشة الأولى**: أكان الفعل الحاسم ظاهرًا بلا تمرير حين بلغ صفحتَه. **النجاح** من القاعدة لا من رسالة الصفحة. **KLM** تقدير لزمن الإنسان (تفكير وإشارة لكلّ فعل + سحبات + زمن التطبيق المقيس)، والنموذج المزيَّف في هذا التشغيل يجيب بعد ${facts.aiDelayMs / 1000}ث.`, '')
+  lines.push('| الرحلة | الهدف | الهاتف: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM | الحاسوب: خطوات · تحميل · تمرير (شاشات) · شاشة أولى · نجاح · KLM |')
   lines.push('|---|---|---|---|')
   for (const id of ids) {
     const p = by(id, 'phone')
@@ -301,8 +347,9 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
     const row = (r: JourneyResult) =>
       `${r.steps} · ${r.loads} · ${r.scrollPx}px (${r.screens}) · ${yes(r.firstScreen)} · ${r.success ? '✓' : '✗'} · ${r.klmSec}ث`
     const any = p ?? d
-    lines.push(`| **${id}** ${any?.title ?? ''} | ${any?.plan.today ?? ''} ← ${any?.plan.target ?? ''} | ${cell(p, row)} | ${cell(d, row)} |`)
+    lines.push(`| **${id}** ${any?.title ?? ''} | ${any?.plan.target ?? ''} | ${cell(p, row)} | ${cell(d, row)} |`)
   }
+  lines.push(...gateLines(facts.judgement))
   if (baseline !== null) lines.push(...comparison(results, baseline.data, baseline.path))
 
   // ‏أخطاءُ الصفحة وما كُتم منها — رقمان متجاوران لا رقمٌ واحد (مراجعة D-323)
@@ -316,21 +363,20 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
   const stop = by('R-2·stop', 'phone')
   const ok = by('R-2', 'phone')
   if (stop !== undefined) {
-    lines.push('', stop.success ? '## ر-2 على الهاتف: أين يقف مالك يبحث عن «اكتب»' : '## ر-2 على الهاتف: لماذا قال المالك «تمّ» ولم تُكتب مسوّدة', '')
+    lines.push('', `## ر-2·stop على الهاتف — ${stop.success ? 'نجحت' : 'لم تنجح'}`, '')
     lines.push('مالك يفتح «المنشورات» من الشريط السفليّ ويمرّر بحثًا عن «اكتب»، ويقف عند أوّل زرٍّ رئيسيٍّ أو تبويبٍ في شريط القسم يوافق مقصدَه (اكتب · أنشئ · جديد · اعتمد). ما رآه شاشةً شاشة:', '')
     for (const n of stop.notes.filter((x) => x.startsWith('شاشة'))) lines.push(`- ${n}`)
     for (const n of stop.notes.filter((x) => !x.startsWith('شاشة') && !x.startsWith('⚠'))) lines.push(`- ${n}`)
     lines.push(`- **وما وقع حين ضغطه:** ${stop.verified}. والإشعار: ${stop.flashes.map((f) => `«${f}»`).join(' · ') || '—'}`)
     if (ok !== undefined) {
-      lines.push(`- **والمسار الذي يعمل** (ر-2): ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة) من تبويب «اكتب» حتّى «اكتب مسوّدة» ثمّ «اعتمد».`)
+      lines.push(`- **ر-2 في التشغيل نفسِه**: ${ok.steps} خطوات و${ok.scrollPx}px تمريرًا (${ok.screens} شاشة): ${ok.detail.filter((x) => x.kind !== 'look').map((x) => x.label).join(' ← ') || '—'}.`)
     }
   }
 
-  lines.push('', '## البذرة وما افتُرض', '')
-  lines.push('- **من staging (قراءةً فقط):** مصدران باسم «الإطار_الأول_Milestone» (مستند Google وعرض شرائح)، حُلّل المستند منهما — **وأيُّهما حُلّل في staging لم يُذكر، فاختير المستند**؛ حسابات LinkedIn «عمر» وX وYouTube نشطة؛ YouTube «edited» معتمَد بمقطع المالك؛ X منشور (في الأسبوع التامّ الأخير، ومعه مقاييس 24س و72س وتقرير الاثنين مولَّدًا بـ `runWeekly`)؛ LinkedIn مرفوض؛ مقطع جاهز.')
-  lines.push('- **ما أُضيف لتُقاس رحلات لا مادّة لها في staging:** مسوّدة LinkedIn تنتظر القرار (ر-0 ور-3)؛ منشور LinkedIn فشل بـ 500 ثلاث مرّات (ر-8)؛ منشور X مجدول بعد ثلاثة أيّام (ر-9)؛ صفوف `cost_ledger` هذا الشهر وصفّ من الشهر الماضي (ر-10). ولـ ر-4 وحدها يُضاف حسابا TikTok وInstagram. ولـ ر-12 يُحلَّل العرضُ أيضًا (الخطّةُ تحتاج مصدرين)، ولـ ر-13 خطّةُ شهرٍ ببندين ومسوّدتيهما (D-293).')
-  lines.push('- **المزوّدون:** Anthropic مزيَّف بجواب عربيّ حتميّ وبـ `usage` معقول فيُسجَّل في `cost_ledger` بسعر المزوّد كما في الشيفرة؛ وBrowser Rendering يرسم صفحة الإنفوجرافيك الحقيقيّة بـ Chromium محلّيّ؛ وكلّ عنوان خارجيّ آخر مقطوع (في الخادم وفي المتصفّح).')
-  lines.push('- **المنطقة الزمنيّة** للمتصفّح Asia/Riyadh، واللغة ar.', '')
+  // ‏البذرةُ كما قُرئت من القاعدة بعد زرعها، وما زادته كلُّ رحلةٍ يُكتب في قسمها («أُضيف …»)
+  lines.push('', '## البذرة كما قُرئت من القاعدة', '')
+  for (const row of facts.seed.rows) lines.push(`- ${row.what}: ${row.n}`)
+  lines.push('')
 
   const findings = findingsOf(results)
   if (findings.length > 0) {
@@ -360,6 +406,32 @@ function summary(results: readonly JourneyResult[], started: Date, baseline: { p
 
 // ── التشغيل ────────────────────────────────────────────────────────────
 
+/** ‏البذرةُ كما في القاعدة بعد زرعها — عدٌّ بالاستعلام، فما تقوله الخلاصةُ عنها ما قيس لا ما كُتب سلفًا. */
+function inventory(stack: Stack): SeedInventory {
+  const rows: { what: string; n: string }[] = []
+  const list = (what: string, sql: string, fmt: (r: Record<string, unknown>) => string): void => {
+    try {
+      const got = stack.db.raw.prepare(sql).all() as Record<string, unknown>[]
+      rows.push({ what, n: got.length === 0 ? '0' : got.map(fmt).join(' · ') })
+    } catch (e) {
+      rows.push({ what, n: `تعذّرت قراءتُه (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` })
+    }
+  }
+  list('المصادر (المحلَّل منها)', `SELECT s.name AS name, COUNT(*) AS n, SUM(EXISTS (SELECT 1 FROM content_items c WHERE c.source_id = s.id)) AS done
+    FROM sources s GROUP BY s.name`, (r) => `«${String(r['name'])}» ${String(r['n'])} (${String(r['done'])} محلَّل)`)
+  list('الحسابات', 'SELECT platform, status, COUNT(*) AS n FROM accounts GROUP BY platform, status ORDER BY platform',
+    (r) => `${String(r['platform'])} ${String(r['status'])} ${String(r['n'])}`)
+  list('تطبيقات OAuth في الخزانة', 'SELECT platform FROM oauth_apps ORDER BY platform', (r) => String(r['platform']))
+  list('المنشورات بحالها', 'SELECT platform, status, COUNT(*) AS n FROM posts GROUP BY platform, status ORDER BY platform, status',
+    (r) => `${String(r['platform'])} ${String(r['status'])} ${String(r['n'])}`)
+  list('المقاطع', 'SELECT status, COUNT(*) AS n FROM uploads GROUP BY status', (r) => `${String(r['status'])} ${String(r['n'])}`)
+  list('صفوف cost_ledger', `SELECT provider, COUNT(*) AS n FROM cost_ledger GROUP BY provider ORDER BY provider`, (r) => `${String(r['provider'])} ${String(r['n'])}`)
+  list('تقارير الأسبوع', 'SELECT COUNT(*) AS n FROM reports', (r) => String(r['n']))
+  list('مفاتيح مرور المالك', 'SELECT COUNT(*) AS n FROM passkeys', (r) => String(r['n']))
+  list('رمز تطبيق المصادقة (TOTP)', 'SELECT COUNT(*) AS n FROM totp', (r) => String(r['n']))
+  return { rows }
+}
+
 async function main(): Promise<void> {
   const a = args(process.argv.slice(2))
   // ‏يُقرأ قبل التشغيل: مسارٌ خاطئٌ يُقال الآن لا بعد عشرين دقيقة
@@ -375,8 +447,10 @@ async function main(): Promise<void> {
   const clip = await makeClip(browser, clipPath)
   const planPath = join(a.out, 'assets', 'plan.csv')
   makePlan(planPath)
-  const stack = await startServer({ port: a.port, video: clip, quiet: true })
+  const aiDelayMs = 800
+  const stack = await startServer({ port: a.port, video: clip, quiet: true, aiDelayMs })
   console.log(`[journeys] ${stack.url} · المخرجات: ${a.out}`)
+  const seedRows = inventory(stack)
 
   const results: JourneyResult[] = []
   const chosen = JOURNEYS.filter((j) => a.only === null || a.only.includes(j.id))
@@ -393,11 +467,29 @@ async function main(): Promise<void> {
     await browser.close()
   }
 
+  /*
+   * ‏**الحكمُ بالعتبات** (D-326): كاملٌ حين شُغّلت الرحلاتُ كلُّها بالمقاسين، فعتبةٌ لرحلةٍ غائبةٍ قديمة؛ وبـ`--only` أو `--vp`
+   * ‏يُحكم على ما شُغّل وحده. و`--update` يضيّق ولا يُرخي، ثمّ يُعاد الحكمُ على الملفّ الجديد.
+   */
+  const complete = a.only === null && a.vps.length === VIEWPORTS.length
+  let thresholds = readThresholds()
+  if (a.update) {
+    thresholds = tightened(results, thresholds, `قيس أوّلَ مرّة في ${started.toISOString().slice(0, 10)}`)
+    writeThresholds(thresholds)
+  }
+  const judgement = judge(results, thresholds, { complete })
   const strip = results.map((r) => ({ ...r, stepsDetail: r.detail, detail: undefined }))
-  const report = { startedAt: started.toISOString(), url: stack.url, viewports: a.vps, baseline: a.baseline, findings: findingsOf(results), results: strip }
+  const report = { startedAt: started.toISOString(), url: stack.url, viewports: a.vps, baseline: a.baseline, findings: findingsOf(results), gate: { failures: judgement.failures, tighter: judgement.tighter }, results: strip }
   writeFileSync(join(a.out, 'results.json'), `${JSON.stringify(report, null, 2)}\n`)
-  writeFileSync(join(a.out, 'SUMMARY.md'), summary(results, started, baseline))
+  writeFileSync(join(a.out, 'SUMMARY.md'), summary(results, started, { judgement, seed: seedRows, aiDelayMs, viewports: a.vps }, baseline))
   console.log(`[journeys] ${results.filter((r) => r.success).length}/${results.length} نجحت · ${join(a.out, 'SUMMARY.md')}`)
+  for (const t of judgement.tighter) console.log(`[journeys] ↓ ${t.text}`)
+  if (judgement.failures.length > 0) {
+    for (const f of judgement.failures) console.log(`[journeys] ✕ ${f.text}`)
+    console.log(`[journeys] ✕ ${judgement.failures.length} تجاوزٌ للعتبات (scripts/journeys/thresholds.json)`)
+    process.exit(1)
+  }
+  console.log('[journeys] ✓ لا رحلةَ تجاوزت عتبتَها')
   process.exit(0)
 }
 

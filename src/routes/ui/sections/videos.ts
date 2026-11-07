@@ -17,6 +17,7 @@ import { ABOUT_MAX, captionIssues, type VideoCaptions } from '../../../lib/media
 import type { LinkState } from '../../../lib/channels'
 import { YT_TITLE_MAX } from '../../../lib/publish/youtube'
 import { PRESETS } from '../../../lib/time/local'
+import { APPROVE_AT } from './drafts'
 import { FALLBACK_ZONE } from '../../../lib/time/zone'
 import { statusBadge, type Tone } from '../components/badge'
 import { button } from '../components/button'
@@ -300,9 +301,9 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
             <label class="vapprove"><input type="checkbox" name="approve"${cap === undefined ? ' checked' : ''}> ${cap === undefined
               ? 'اعتمده الآن — كتبتُه أنا'
               : 'اعتمده الآن — راجعت النصوص'}</label>
-            ${whenPick(u.id, ctx.zone)}
+            ${whenPick(u.id, ctx.zone, cap === undefined)}
             <span class="grow"></span>
-            <button class="btn btn-primary" type="submit">أنشئ المنشورات</button>
+            <button class="btn btn-primary" type="submit" data-create-go>${cap === undefined ? 'أنشئ وجدوِل · ' + escapeHtml(APPROVE_AT.label) : 'أنشئ المنشورات'}</button>
           </div>`
         : `<p class="hint">${hint}</p>`}
     </form>
@@ -320,14 +321,18 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
  */
 /*
  * ‏**الإنشاءُ يعرض الجدولة** (D-218): «متى؟» بجوار «اعتمده الآن» فيُنشأ المنشورُ ويُجدوَل في ضغطةٍ
- * ‏واحدة، بأزرار الموعد نفسِها تحت المقطع (`scheduleFromUpload`). و«لاحقًا» افتراضيّة: مقطعٌ عامٌّ لا
- * ‏يُجدوَل بموعدٍ لم يختره المالك، ولا يُقرأ الموعدُ إلّا مع الاعتماد.
+ * ‏واحدة، بأزرار الموعد نفسِها تحت المقطع (`scheduleFromUpload`). ولا يُقرأ الموعدُ إلّا مع الاعتماد.
+ *
+ * ‏**والموعدُ الافتراضيُّ موعدُ بطاقة المسوّدة** (D-326 · ر-4): كان «لاحقًا» يبدأ القائمةَ فيلزم اختيارٌ قبل كلّ إنشاء — خطوةٌ
+ * ‏وثلاثُ ثوانٍ ونصف في KLM — وصار نصُّ المالك المعتمَدُ يبدأ بـ«غدًا 9:00 ص» (`APPROVE_AT`) **مكتوبًا على الزرّ الأوّليّ نفسِه**
+ * ‏(«أنشئ وجدوِل · غدًا 9:00 ص»)، فلا يُجدوَل شيءٌ لم يُقرأ؛ و«لاحقًا» باقٍ اختيارًا. ونصوصٌ كتبها النموذجُ لا تُعتمَد بالافتراض
+ * ‏(D-190)، فلا موعدَ افتراضيَّ لها: موعدٌ بلا اعتمادٍ يُردّ بتنبيه (D-314). والسكربتُ يُبقي اسمَ الزرّ على ما في الحقلين.
  */
-function whenPick(id: string, zone?: string | null): string {
+function whenPick(id: string, zone?: string | null, preset = false): string {
   const fid = `vwhen-${escapeHtml(id.slice(0, 8))}`
   return `<label class="vapprove" for="${fid}">متى؟
       <select id="${fid}" name="preset"><option value="">لاحقًا</option>${PRESETS
-        .map((q) => `<option value="${q.kind}">${escapeHtml(q.label)}</option>`).join('')}</select></label>${
+        .map((q) => `<option value="${q.kind}"${preset && q.kind === APPROVE_AT.kind ? ' selected' : ''}>${escapeHtml(q.label)}</option>`).join('')}</select></label>${
     zone === undefined ? '' : `<input type="hidden" name="tz" value="${escapeHtml(zone ?? FALLBACK_ZONE)}">`}`
 }
 
