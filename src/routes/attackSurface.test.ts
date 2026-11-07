@@ -231,12 +231,25 @@ describe('المالكُ يفتح أبوابَ الطرفيّة من «للمط�
     const html = await page(owner, '/panel/settings')
     expect(html).toContain('id="admin-api"')
     expect(html).toContain('الثلاثة الأخرى <b>مغلقة</b>')
+    // ‏(مراجعة D-325) **والبابُ زرٌّ لا نصّ**: نُقل إلى `button()` داخل قالب `html` فهُرِّب، فصار النموذجُ بلا زرّ إرسال
+    // ‏وظهر الوسمُ نصًّا — ومالكٌ فتح الأبوابَ قبل النشر لا يغلقها من اللوحة. والاختبارُ كان يرسل POST بيده فلا يرى ذلك
+    const toggle = (page: string): string => {
+      const card = page.slice(page.indexOf('id="admin-api"'), page.indexOf('</form>', page.indexOf('id="admin-api"')))
+      expect(card).toContain('name="key" value="admin_api"')
+      return card
+    }
+    expect(toggle(html)).toContain('<button class="btn btn-secondary" type="submit"><span>افتحها</span></button>')
+    expect(html).not.toContain('&lt;button')
     const auth = { Authorization: `Bearer ${TOKEN}` }
     expect((await app.request('/admin/sources', { headers: auth }, env)).status).toBe(403)
 
     expect((await post(owner, '/panel/settings', { key: 'admin_api', value: 'true' })).status).toBe(303)
     expect((await app.request('/admin/sources', { headers: auth }, env)).status).toBe(200)
-    expect(await page(owner, '/panel/settings')).toContain('الثلاثة الأخرى <b>مفتوحة</b>')
+    const opened = await page(owner, '/panel/settings')
+    expect(opened).toContain('الثلاثة الأخرى <b>مفتوحة</b>')
+    expect(toggle(opened)).toContain('<input type="hidden" name="value" value="false">')
+    expect(toggle(opened)).toContain('<button class="btn btn-secondary" type="submit"><span>أغلقها</span></button>')
+    expect(opened).not.toContain('&lt;button')
 
     await post(owner, '/panel/settings', { key: 'admin_api', value: 'false' })
     expect((await app.request('/admin/sources', { headers: auth }, env)).status).toBe(403)

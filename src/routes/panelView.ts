@@ -131,8 +131,9 @@ const LOGIN_SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var note=document.getElementById('pk-note');
   if(!btn)return;
   var label=btn.textContent;
-  // ‏ومتصفّحٌ بلا مفاتيح مرور (D-313): الزرُّ المعطَّل لا يبقى الأوّليَّ الوحيد، و«أرسل الرمز» يعود أوّليًّا والتركيزُ في البريد
-  if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true;
+  // ‏ومتصفّحٌ بلا مفاتيح مرور (D-313): الزرُّ المعطَّل لا يبقى الأوّليَّ الوحيد، و«أرسل الرمز» يعود أوّليًّا والتركيزُ في البريد.
+  // ‏والمعطَّلُ موصوفٌ بسببه الظاهر تحته «#pk-note» (مراجعة D-325): كان السببُ هناك بلا رابطٍ يصله به قارئُ الشاشة
+  if(!window.PublicKeyCredential||!navigator.credentials){btn.disabled=true; btn.setAttribute('aria-describedby','pk-note');
     btn.className=String(btn.className).replace('btn-primary','btn-secondary');
     var send=document.getElementById('login-send'); if(send)send.className=String(send.className).replace('btn-secondary','btn-primary');
     var mail=document.getElementById('e'); if(mail)try{mail.focus();}catch(e){}
@@ -852,6 +853,9 @@ function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<Settings
 /**
  * **أبوابُ الطرفيّة** (D-318) — ما يُنادى بكلمة الإدارة من الطرفيّة بلا عاملٍ ثانٍ. الجاهزيّةُ والمسحُ مفتوحان دائمًا (تذكرهما
  * «ما عليك» وسيرُ النشر)، والثلاثةُ التي لا يناديها شيءٌ في المستودع مغلقةٌ حتّى يفتحها المالكُ هنا، بتحقّقٍ للتوّ.
+ *
+ * ‏**والزرُّ `raw(button(…))`** (مراجعة D-325): `button()` يعيد نصًّا والقالبُ `html` يهرّب النصّ — فبلا `raw` صار الزرُّ وسمًا
+ * ‏يُقرأ ولا يُضغط، والنموذجُ بلا إرسال. ويمسك ذلك `audit_markup` (دالّةُ عُدّةٍ في قالب `html` بلا `raw`).
  */
 function adminApiCard(open: boolean): string {
   return html`<div class="card mt-3" id="admin-api"><h2>أبواب الطرفيّة</h2>
@@ -867,7 +871,7 @@ function adminApiCard(open: boolean): string {
               : 'فتح الأبواب الثلاثة لكلمة الإدارة؟ من يملكها يقرأ ويحلّل بلا عامل ثانٍ، بسقوف الإنفاق نفسِها.'}">
         <input type="hidden" name="key" value="admin_api">
         <input type="hidden" name="value" value="${open ? 'false' : 'true'}">
-        ${button({ label: open ? 'أغلقها' : 'افتحها', type: 'submit' })}
+        ${raw(button({ label: open ? 'أغلقها' : 'افتحها', type: 'submit' }))}
       </form>
     </div>
   </div>`.value

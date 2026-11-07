@@ -77,6 +77,13 @@ describe('شريطُ الأسبوع على الهاتف: الاسمُ بقدر �
     expect(css.rule('.wk-short', '@media(max-width:359px)').display).toBe('none')
     expect(css.rule('.wk-min', '@media(max-width:359px)').display).toBe('inline')
   })
+
+  // ‏(مراجعة D-325) أُدخلت كتلةُ «xs» وسطَ كتلة «sm» فانتقل معها زرُّ «خطوتك التالية»: لا يملأ البطاقةَ إلّا تحت ‏360 —
+  // ‏وعلى ‏390 و‏412 (أكثرُ الهواتف) يقف بعرضه في سطره وحدَه. وكان على الأساس يملؤها تحت «sm»
+  it('وما بجوار القاعدة لا ينتقل معها: زرُّ «خطوتك التالية» يملأ سطرَه تحت «sm» كما كان', () => {
+    expect(css.where('.next .btn')).toEqual(['@media(max-width:599px)'])
+    expect(css.rule('.next .btn', '@media(max-width:599px)').flex).toBe('1 1 100%')
+  })
 })
 
 describe('الوزنان ‏400 و‏600 وحدهما (tokens.ts · D-185)', () => {
@@ -152,6 +159,28 @@ describe('زرٌّ معطَّلٌ يقول لماذا (D-325)', () => {
     const html = planSection({ plan: null, now: NOW, ready: false, analyzed: 0, names: {}, zone: null } as never)
     expect(html).toMatch(/disabled aria-describedby="pl-why"/)
     expect(reasons(html)).toEqual([])
+  })
+
+  /*
+   * ‏(مراجعة D-325) وفي الخطّة القائمة صار السببُ يُرسَم لأوّل مرّة — ونصُّه «اضبط مفتاحه في «المزوّدون»»: كلمةٌ يمنعها المعجمُ
+   * ‏(GLOSSARY §١) واسمُ قسمٍ لم يعد موجودًا (صار «خدمات الكتابة والصور» في الإعدادات). فيقرأ قارئُ الشاشة والعينُ سببًا يرسلهما
+   * ‏إلى ما لا يجدانه، ولا عيّنةَ ترسم هذا الفرع فيقرأها `audit_copy`. فالسببُ باسم القسم، وبابُه زرٌّ إليه لا كلمةٌ في جملة.
+   */
+  it('و«أعد تخطيط الأسبوع» و«خطّط الشهر» في الخطّة القائمة: السببُ باسم القسم الموجود وبابُه زرّ', () => {
+    const plan = {
+      id: 'w', week: '2026-10-04', model: 'm', status: 'draft', createdAt: '2026-10-03 08:00:00',
+      choices: { channels: ['linkedin'], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: true, imageStyle: 'illustration', startDay: '2026-10-04' },
+      plan: { rationale: '', items: [{ sourceId: 's', platform: 'linkedin', angle: 'ز', day: '2026-10-05', time: '09:00', why: 'س' }] },
+    }
+    for (const p of [null, plan]) {
+      const html = planSection({ plan: p, now: NOW, ready: false, analyzed: 2, names: { s: 'مصدر' }, zone: null } as never)
+      expect(html, String(p === null)).toMatch(/disabled aria-describedby="pl-why"/)
+      expect(reasons(html)).toEqual([])
+      expect(html).not.toMatch(/المزوّدون|«المزوّدين»/)
+      const why = /<p[^>]*id="pl-why"[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? ''
+      expect(why).toContain('«خدمات الكتابة والصور»')
+      expect(html).toMatch(/<a class="btn btn-secondary btn-sm" href="\/panel\/settings#providers"><span>[^<]+<\/span><\/a>/)
+    }
   })
 
   it('بندُ القائمة المحجوب يصف نفسَه بسببه المكتوب تحته', () => {

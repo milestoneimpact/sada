@@ -87,8 +87,10 @@ describe('متصفّحٌ بلا مفاتيح مرور (D-313)', () => {
     expect(html).toMatch(/class="btn btn-secondary" id="login-send"/)
     const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]!).find((s) => s.includes('pk-login'))!
     let focused = ''
+    const attrs: Record<string, string> = {}
     const els: Record<string, Record<string, unknown>> = {
-      'pk-login': { className: 'btn btn-primary', disabled: false, textContent: 'الدخول بمفتاح المرور', addEventListener() {}, focus() {} },
+      'pk-login': { className: 'btn btn-primary', disabled: false, textContent: 'الدخول بمفتاح المرور', addEventListener() {}, focus() {},
+        setAttribute(n: string, v: string) { attrs[n] = v } },
       'pk-note': { textContent: '' },
       'login-next': { value: '/panel' },
       'login-send': { className: 'btn btn-secondary' },
@@ -106,5 +108,36 @@ describe('متصفّحٌ بلا مفاتيح مرور (D-313)', () => {
     expect(els['login-send']!.className).toBe('btn btn-primary')
     expect(focused).toBe('e')
     expect(els['pk-note']!.textContent).toBe('متصفّحك لا يدعم مفاتيح المرور — ادخل برمز البريد.')
+    // ‏(مراجعة D-325) والزرُّ المعطَّلُ موصوفٌ بسببه الظاهر تحته — كان السببُ في «#pk-note» بلا رابطٍ يصله به قارئُ الشاشة
+    expect(attrs['aria-describedby']).toBe('pk-note')
+    expect(html).toMatch(/<div class="note" id="pk-note"[^>]*><\/div>/)
+  })
+})
+
+/*
+ * ‏(مراجعة D-325) **وصفحتا العامل الثاني والتحقّق للتوّ كذلك**: زرُّ المفتاح يُعطَّل في متصفّحٍ بلا مفاتيح مرور وسببُه في «#pk-note»
+ * ‏بلا رابطٍ إليه. و`audit_disabled` يقيس الوسمَ الساكن، فيُشغَّل السكربتُ هنا بلا PublicKeyCredential.
+ */
+describe('صفحتا العامل الثاني والتحقّق: المفتاحُ المعطَّلُ موصوفٌ بسببه (مراجعة D-325)', () => {
+  it('زرُّ «المس مفتاح المرور» معطَّلٌ وموصوفٌ بـ«#pk-note» الظاهر', async () => {
+    const { stepUpPage } = await import('./authView')
+    const html = stepUpPage({ csrf: 'c', challenge: 'x', rpId: 'sada2.basserh.com', hasPasskey: true, hasTotp: true, next: '/panel', error: null } as never, 'n')
+    expect(html).toMatch(/<div class="note" id="pk-note"[^>]*><\/div>/)
+    const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]!).find((s) => s.includes('pk-btn'))!
+    const attrs: Record<string, string> = {}
+    const els: Record<string, Record<string, unknown>> = {
+      'pk-form': { dataset: {} },
+      'pk-btn': { disabled: false, textContent: 'المس مفتاح المرور', addEventListener() {}, setAttribute(n: string, v: string) { attrs[n] = v } },
+      'pk-note': { textContent: '' },
+    }
+    const env = {
+      window: {}, navigator: {},
+      document: { getElementById: (id: string) => els[id] ?? null, createElement: () => ({}) },
+      location: { pathname: '/panel/stepup', search: '', hash: '' }, fetch: async () => ({ ok: true }), setTimeout: () => {}, atob, btoa,
+    }
+    new Function(...Object.keys(env), code)(...Object.values(env))
+    expect(els['pk-btn']!.disabled).toBe(true)
+    expect(els['pk-note']!.textContent).toBe('متصفّحك لا يدعم مفاتيح المرور.')
+    expect(attrs['aria-describedby']).toBe('pk-note')
   })
 })

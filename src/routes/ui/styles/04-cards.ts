@@ -141,11 +141,11 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   .wk-d{font-size:var(--t-caption); line-height:var(--lh-caption)}
   .wk-long{display:none}
   .wk-short{display:inline}
+  .next .btn{flex:1 1 100%}
 }
 @media${below('xs')}{
   .wk-short{display:none}
   .wk-min{display:inline}
-  .next .btn{flex:1 1 100%}
 }
 .stack{display:grid; gap:var(--gap-card); align-content:start}
 @media${below('lg')}{.ov{grid-template-columns:1fr}}

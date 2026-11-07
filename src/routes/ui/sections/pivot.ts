@@ -60,11 +60,14 @@ const dims = DIMENSIONS.map((d) => ({ v: d, t: DIMENSION_LABEL[d] }))
  *
  * تدرّجٌ خافتٌ خلف الخليّة يدلّ العينَ على الثقل، **والرقمُ يبقى مقروءا
  * بحبره** — فمن لا يميّز الألوان لا يفقد شيئا (D-086).
+ *
+ * ‏**والتدرّجُ من «--accent» لا «--brand»** (مراجعة D-325): الخليّةُ بيانٌ لا يُضغط، و«--brand» لونُ الزرّ (ونهارًا هو
+ * ‏الرابطُ حرفًا) — فكانت الخلايا الأثقلُ تلبس تركوازَ «يُضغط» بجوار رؤوس صفوفٍ هي روابطُ حقًّا. ويحرسه `roles.test`.
  */
 function heat(v: number | null, max: number): string {
   if (v === null || max <= 0 || v <= 0) return ''
   const t = Math.min(1, v / max)
-  return ` style="background:color-mix(in srgb,var(--brand) ${Math.round(t * 16)}%,transparent)"`
+  return ` style="background:color-mix(in srgb,var(--accent) ${Math.round(t * 16)}%,transparent)"`
 }
 
 /**

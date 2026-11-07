@@ -7,6 +7,8 @@
  * المنصّة وحدَه، وX وTikTok أسودان. فيُسأل المصدرُ هنا: أين يقع كلُّ لون، وماذا يحمل معه.
  */
 import { describe, expect, it } from 'vitest'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { STYLE } from './styles'
 import { sheet } from '../../test/css'
 import { homeTop } from './sections/home'
@@ -37,6 +39,24 @@ describe('لكلّ لونٍ دورٌ واحد (D-325)', () => {
   it('ورابطٌ يُمرَّر عليه يبقى بحبر الرابط لا بحبر الزرّ', () => {
     expect(css.rule('nav.back a:hover', '@media(hover:hover)').color).toBe('var(--link)')
     expect(css.rule('.ch-name a:hover', '@media(hover:hover)').color).toBe('var(--link)')
+  })
+
+  /*
+   * ‏(مراجعة D-325) **والورقةُ ليست كلَّ ما يلوّن**: الحارسان أعلاه يقرآن `STYLE` وحدَها، وحرارةُ الجدول المحوريّ تُكتب
+   * ‏سِمةَ `style` في الوسم (`color-mix(in srgb,var(--brand) …)`) — فلبست خلايا البيانات تركوازَ «يُضغط» بجوار رؤوس صفوفٍ هي
+   * ‏روابطُ حقًّا، ومرّ الحارس. فيُقرأ المصدرُ كلُّه: لا `var(--brand` ولا `var(--pf-` في `src/routes` خارج الورقة والرموز.
+   */
+  it('ولا «var(--brand» ولا «var(--pf-» في وسمٍ يُكتب خارج الورقة (سِمةُ style في الوسم لا يراها حارسُ الورقة)', () => {
+    const ROUTES = join(__dirname, '..')
+    const walk = (d: string): string[] => readdirSync(d).flatMap((n) => {
+      const p = join(d, n)
+      return statSync(p).isDirectory() ? walk(p) : n.endsWith('.ts') && !n.endsWith('.test.ts') ? [p] : []
+    })
+    const SHEET = /(?:^|\/)ui\/(?:styles\/|tokens\.ts$)/
+    const off = walk(ROUTES).filter((f) => !SHEET.test(relative(ROUTES, f)))
+      .flatMap((f) => readFileSync(f, 'utf8').split('\n').flatMap((line, i) =>
+        /var\(--(?:brand|pf-)/.test(line) ? [`${relative(ROUTES, f)}:${i + 1}`] : []))
+    expect(off).toEqual([])
   })
 
   it('«--pf-*» في قاعدة مربّع شعارٍ وحدها — لا نقطةٌ ولا حدٌّ ولا نصٌّ بلون منصّة', () => {

@@ -536,6 +536,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     go: 'https://github.com/milestoneimpact/sada/settings/environments',
     goLabel: 'افتح بيئات GitHub',
   },
+  {
+    code: 'M-45',
+    title: 'لون مربّع TikTok في اللوحة: أحمر دليل علامته أم غيره (بعد D-325)',
+    ifLeft: 'يبقى أحمر دليل علامته والحارس قائم فلا تتقارب ألوان المنصّات — تأجيل لا خطر، ولون علامة غيرك قرار لم تقله أنت.',
+    unblocks: 'capability',
+    // ‏حكمٌ يُقال لا حالٌ يُقرأ من البيئة (D-061)
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

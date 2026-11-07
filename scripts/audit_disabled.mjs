@@ -11,12 +11,20 @@
  * عنصرٍ **موجودٍ ظاهرٍ بنصٍّ** — لا مخفيٍّ (`.vh` أو `hidden` أو في طيّةٍ مغلقة) ولا فارغ ولا تلميح. ويُقاس على كلّ عيّنةٍ
  * مرسومةٍ مرّتين: كما تُفتح، ثمّ وكلُّ طيّةٍ فيها مفتوحة؛ وتُفتح ألواحُ اللوحة لوحًا لوحًا كما في `audit_primary`.
  *
+ * **ووجهٌ ثانٍ لكلّ عيّنة: بلا شبكةٍ ولا مفاتيح مرور** (مراجعة D-325). الوسمُ الساكنُ لا يرى ما يعطّله السكربت: عند انقطاع
+ * الشبكة يُعطَّل كلُّ زرّ إرسالٍ وكان سببُه `title` وحدَه، وزرُّ مفتاح المرور في متصفّحٍ بلا WebAuthn معطَّلٌ وسببُه في
+ * `#pk-note` بلا ربط — ولم يقسهما شيء. فتُفتح العيّنةُ ثانيةً وقد مُحي `PublicKeyCredential` قبل سكربتها وقُطعت الشبكة،
+ * ثمّ يُقاس كلُّ ما سبق. **وأزرارُ الوسم المهرَّب** تُعَدّ كذلك: `&lt;button` أو `&lt;a class=&quot;btn` في الصفحة المرسومة
+ * زرٌّ صار نصًّا لا يُضغط (زرُّ «أبواب الطرفيّة» بعد نقله إلى `button()` في قالب `html`).
+ *
  * `--self-test` يزرع ستّةً قبل أن يُصدَّق: معطَّلٌ بلا سبب، وسببُه تلميح، وسببُه مخفيٌّ عن العين، وسببُه معرّفٌ لا عنصرَ له
- * (تُمسَك كلُّها)، ومعطَّلٌ بسببٍ ظاهر، ومشغولٌ (`aria-busy`) لا سببَ له (لا يُمسَكان)، والصفحةُ بلا زرعٍ نظيفة.
+ * (تُمسَك كلُّها)، ومعطَّلٌ بسببٍ ظاهر، ومشغولٌ (`aria-busy`) لا سببَ له (لا يُمسَكان)، والصفحةُ بلا زرعٍ نظيفة؛ وفي الوجه
+ * الثاني زرَّ إرسالٍ يعطّله انقطاعُ الشبكة (يُعطَّل حقًّا، ولا يُمسَك ما دام موصوفًا، ويُمسَك إن نُزع وصفُه)؛ وزرًّا مهرَّبًا.
  *
  * الاستعمال: node scripts/audit_disabled.mjs [--self-test] <ملف.html> [...]
  */
 import { chromium } from 'playwright'
+import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 
 const selfTest = process.argv.includes('--self-test')
@@ -67,6 +75,26 @@ const PROBE = () => {
 }
 
 const browser = await chromium.launch()
+const VIEW = { viewport: { width: 1440, height: 1000 } }
+
+/** زرٌّ مهرَّب: وسمُه نصٌّ في الصفحة المرسومة — يُرى ولا يُضغط. */
+const ESCAPED = /&lt;(?:button\b|a class=&quot;btn\b|small class=&quot;btn-why)/g
+const escapedButtons = (text) => (text.match(ESCAPED) ?? []).length
+
+/**
+ * يفتح العيّنةَ في وجهها: كما تُرسَم، أو **بلا شبكةٍ ولا مفاتيح مرور** — `PublicKeyCredential` يُمحى قبل كلّ سكربت، ثمّ تُقطع
+ * الشبكة فيقع حدثُ «offline» كما يقع على الهاتف. ويعيد الصفحةَ وسياقَها ليُغلَقا.
+ */
+async function openFace(file, offline, plant = '') {
+  const ctx = await browser.newContext(VIEW)
+  if (offline) await ctx.addInitScript(() => { try { delete window.PublicKeyCredential } catch { /* ‏لا شيء */ } })
+  const page = await ctx.newPage()
+  await page.goto(`file://${file}`)
+  if (plant !== '') await page.evaluate((h) => { (document.querySelector('main') ?? document.body).insertAdjacentHTML('beforeend', h) }, plant)
+  if (offline) await ctx.setOffline(true)
+  await page.waitForTimeout(offline ? 250 : 150)
+  return { page, ctx }
+}
 
 /** يفتح الألواحَ لوحًا لوحًا، ثمّ يفتح الطيّاتِ كلَّها ويعيد — ويجمع الملحوظات بأسماء ألواحها. */
 async function audit(page) {
@@ -100,34 +128,54 @@ if (selfTest) {
   ]
   let missed = 0
   for (const [label, html, ok] of plants) {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
-    await page.goto(`file://${base}`)
-    await page.evaluate((h) => { (document.querySelector('main') ?? document.body).insertAdjacentHTML('beforeend', h) }, html)
-    await page.waitForTimeout(100)
+    const { page, ctx } = await openFace(base, false, html)
     const found = [...new Set((await audit(page)).map((n) => n.replace(/^\[[^\]]+\] /, '')))]
     const caught = ok(html === '' ? found : found.filter((n) => n.includes('زرع')))
     if (!caught) missed += 1
     console.log(`  ${caught ? '✓' : '✕'} ${label}`)
-    await page.close()
+    await ctx.close()
+  }
+  // ‏والوجهُ الثاني: زرُّ إرسالٍ يعطّله انقطاعُ الشبكة — يُعطَّل حقًّا (فالوجهُ لا يمرّ فارغًا)، ولا يُمسَك ما دام موصوفًا بالشريط،
+  // ‏ويُمسَك إن نُزع وصفُه (ما كان قبل المراجعة: سببُه «title» وحدَه)
+  {
+    const plant = '<div class="card"><form method="POST" action="/x"><button class="btn btn-secondary" type="submit" id="zr-off">زرعز</button></form></div>'
+    const { page, ctx } = await openFace(base, true, plant)
+    const disabled = await page.evaluate(() => document.getElementById('zr-off')?.disabled === true)
+    const clean = (await audit(page)).filter((n) => n.includes('زرع')).length === 0
+    await page.evaluate(() => { document.getElementById('zr-off')?.removeAttribute('aria-describedby') })
+    const bare = (await audit(page)).filter((n) => n.includes('زرع')).length > 0
+    const ok = disabled && clean && bare
+    if (!ok) missed += 1
+    console.log(`  ${ok ? '✓' : '✕'} بلا شبكة: زرُّ الإرسال يُعطَّل (${disabled}) موصوفًا بالشريط (${clean})، وبلا وصفه يُمسَك (${bare})`)
+    await ctx.close()
+  }
+  {
+    const ok = escapedButtons('<p>&lt;button class=&quot;btn btn-secondary&quot; type=&quot;submit&quot;&gt;</p>') === 1 &&
+      escapedButtons('<p>&lt;a class=&quot;btn btn-sm&quot;</p><button class="btn">أ</button>') === 1 && escapedButtons('<p>&lt;b&gt;</p>') === 0
+    if (!ok) missed += 1
+    console.log(`  ${ok ? '✓' : '✕'} زرٌّ مهرَّبٌ في الصفحة يُعَدّ، والوسمُ الحقُّ لا يُعَدّ`)
   }
   if (missed > 0) {
     await browser.close()
     console.log(`\n✕ self-test: ${missed} من ${plants.length} لم يقع كما يجب`)
     process.exit(1)
   }
-  console.log(`✓ self-test: ${plants.length - 1} مزروعًا حُكم عليه كما يجب، والصفحةُ بلا زرعٍ نظيفة`)
+  console.log(`✓ self-test: ${plants.length - 1} مزروعًا حُكم عليه كما يجب، والصفحةُ بلا زرعٍ نظيفة، والوجهُ بلا شبكةٍ والزرُّ المهرَّب كما يجب`)
 }
 
 let total = 0
 for (const file of pages) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
-  await page.goto(`file://${file}`)
-  await page.waitForTimeout(150)
-  const notes = await audit(page)
-  await page.close()
+  const notes = []
+  for (const offline of [false, true]) {
+    const { page, ctx } = await openFace(file, offline)
+    for (const n of await audit(page)) if (!notes.includes(n) && !notes.includes(`بلا شبكة: ${n}`)) notes.push(offline ? `بلا شبكة: ${n}` : n)
+    await ctx.close()
+  }
+  const escaped = escapedButtons(readFileSync(file, 'utf8'))
+  if (escaped > 0) notes.push(`${escaped} زرًّا مهرَّبًا: وسمُه نصٌّ في الصفحة («&lt;button» أو «&lt;a class=&quot;btn») — يُرى ولا يُضغط`)
   total += notes.length
   console.log(`\n═══ ${basename(file)} ═══`)
-  if (notes.length === 0) console.log('  ✓ كلُّ زرٍّ معطَّلٍ ظاهرٍ سببُه نصٌّ يُرى')
+  if (notes.length === 0) console.log('  ✓ كلُّ زرٍّ معطَّلٍ ظاهرٍ سببُه نصٌّ يُرى (بالشبكة وبلاها)، ولا زرَّ مهرَّبًا')
   for (const n of notes) console.log(`  ✕ ${n}`)
 }
 await browser.close()

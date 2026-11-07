@@ -23,10 +23,22 @@
  * | بطاقة | سِمةُ `class` فيها `card` (وصيغُها الثلاث تُكتب `card card-…`) |
  * | حقل | وسمُ `<input>` ليس `type="hidden"`، ولا في وسيط `control:` لـ`field()` (ذاك الحقلُ في عقده) |
  *
- * `--self-test` يزرع زرًّا وبطاقةً وحقلًا وحقلًا مخفيًّا وحقلًا في `control:` وزرًّا بلا درجة، ويتحقّق أنّ العدَّ يراها كما يجب.
+ * ## والعُدّةُ في قالب `html` تمرّ بـ`raw` (مراجعة D-325)
+ *
+ * دوالُّ العُدّة (`button()` و`card()` و`field()` و`statusBadge()`…) وثوابتُ الرسم (`ICON` و`LOGOS`) **تعيد نصًّا لا `Html`**،
+ * والقالبُ `html` يهرّب كلَّ نصٍّ يُقحَم فيه (D-281). فلمّا نُقل زرُّ «أبواب الطرفيّة» إلى `button()` داخل قالب `html` صار
+ * وسمًا يُقرأ ولا يُضغط، والنموذجُ بلا إرسال — وبابُ الإدارة (D-318) لا يُفتح ولا يُغلق من اللوحة — ولم يسقط شيء: الأنواعُ
+ * تقبل النصَّ في القالب، والاختبارُ يرسل POST بيده. **والسقّاطةُ نفسُها تدفع إلى هذا النقل**، فيُحرَس هنا: كلُّ اسمٍ مستورَدٍ من
+ * `components/…` أو `icons` أو `logos` (سوى `btnClass` و`cardClass` و`pctChange`: نصٌّ لا وسم) يقع في `${…}` من قالب `html`
+ * ولا يلفّه `raw(…)` ولا قالبُ `html` أقرب — **يسقط مطلقًا**. والقراءةُ بشجرة TypeScript لا بتعبيرٍ نمطيّ.
+ *
+ * `--self-test` يزرع زرًّا وبطاقةً وحقلًا وحقلًا مخفيًّا وحقلًا في `control:` وزرًّا بلا درجة، ويتحقّق أنّ العدَّ يراها كما يجب؛
+ * ويزرع للقالب `button()` وحدَه وفي شرطٍ وفي `map` و`ICON.x` (تُمسَك)، و`raw(button())` وقالبًا متداخلًا ودالّةً محلّيّةً
+ * باسم `card` وقالبًا نصّيًّا عاديًّا (تمرّ).
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import ts from 'typescript'
 
 const SRC = new URL('../src/', import.meta.url).pathname
 const ROUTES = join(SRC, 'routes')
@@ -81,6 +93,48 @@ export function countMarkup(code) {
   return { buttons: buttons.length, cards: cards.length, inputs: inputs.length, bare: bare.map((a) => a.at) }
 }
 
+/** ما يعيد نصًّا من العُدّة ولا يحمل وسمًا: صنفٌ أو رقم — يُقحَم في القالب فلا يضرّه التهريب. */
+const PLAIN = new Set(['btnClass', 'cardClass', 'pctChange'])
+
+/**
+ * ‏دالّةُ عُدّةٍ أو ثابتُ رسمٍ في `${…}` من قالب `html` بلا `raw` — يُهرَّب فيُرى وسمًا (مراجعة D-325).
+ * ‏يعيد أسطرَها وأسماءَها.
+ */
+export function escapedKit(code, file = 'x.ts') {
+  const src = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true)
+  const names = new Set()
+  for (const st of src.statements) {
+    if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue
+    if (!/(?:^|\/)(?:components\/[A-Za-z]+|icons|logos)$/.test(st.moduleSpecifier.text)) continue
+    const nb = st.importClause?.namedBindings
+    if (nb === undefined || !ts.isNamedImports(nb) || st.importClause.isTypeOnly) continue
+    for (const el of nb.elements) if (!el.isTypeOnly && !PLAIN.has((el.propertyName ?? el.name).text)) names.add(el.name.text)
+  }
+  const out = []
+  if (names.size === 0) return out
+  const isHtml = (n) => ts.isTaggedTemplateExpression(n) && ts.isIdentifier(n.tag) && n.tag.text === 'html'
+  const visit = (n) => {
+    if (isHtml(n) && ts.isTemplateExpression(n.template)) {
+      for (const span of n.template.templateSpans) {
+        const inner = (m) => {
+          // ‏قالبٌ متداخلٌ يُفحَص في دوره، و«raw(…)» يمرّر ما فيه عن قصد
+          if (isHtml(m)) return
+          if (ts.isCallExpression(m) && ts.isIdentifier(m.expression) && m.expression.text === 'raw') return
+          if (ts.isIdentifier(m) && names.has(m.text)) {
+            out.push({ name: m.text, at: src.getLineAndCharacterOfPosition(m.getStart(src)).line + 1 })
+            return
+          }
+          ts.forEachChild(m, inner)
+        }
+        inner(span.expression)
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(src)
+  return out
+}
+
 function selfTest() {
   const cases = [
     ['<button class="btn btn-primary">أ</button>', { buttons: 1, cards: 0, inputs: 0, bare: 0 }],
@@ -100,16 +154,39 @@ function selfTest() {
     }
   }
   console.log(`  ✓ الفحصُ الذاتيّ: ${cases.length} مزروعًا عُدّ كما يجب (والحقلُ المخفيُّ وحقلُ «control:» لا يُعدّان)`)
+  const head = "import { html, raw } from './html'\nimport { button } from './components/button'\nimport { btnClass } from './components/button'\nimport { ICON } from './icons'\n"
+  const kit = [
+    ['html`<form>${button({ label: "أ" })}</form>`', ['button']],
+    ['html`<p>${ok ? button({ label: "أ" }) : ""}</p>`', ['button']],
+    ['html`<ul>${xs.map((x) => button({ label: x }))}</ul>`', ['button']],
+    ['html`<i>${ICON.send}</i>`', ['ICON']],
+    ['html`<form>${raw(button({ label: "أ" }))}</form>`', []],
+    ['html`<div>${xs.map((x) => html`<b>${raw(ICON.send)}</b>`)}</div>`', []],
+    ['html`<a class="${btnClass("primary")}">أ</a>`', []],
+    ['`<form>${button({ label: "أ" })}</form>`', []],
+    ['function card(c) { return html`<b>${c}</b>` }\nhtml`<i>${card(x)}</i>`', []],
+  ]
+  for (const [code, want] of kit) {
+    const got = escapedKit(head + code).map((h) => h.name)
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      console.error(`✕ الفحصُ الذاتيّ (العُدّةُ في قالب html): ${code}\n  أراد ${JSON.stringify(want)} ووجد ${JSON.stringify(got)}`)
+      process.exit(1)
+    }
+  }
+  console.log(`  ✓ الفحصُ الذاتيّ: ${kit.length} مزروعًا للعُدّة في قالب html — أربعةٌ تُمسَك (وحدَه وفي شرطٍ وفي map و«ICON») وخمسةٌ تمرّ`)
 }
 
 if (process.argv.includes('--self-test')) selfTest()
 
 const now = {}
 const bare = []
+const escaped = []
 for (const f of walk(ROUTES).filter((f) => !f.includes('/components/') && !f.includes('/test/'))) {
-  const c = countMarkup(readFileSync(f, 'utf8'))
+  const code = readFileSync(f, 'utf8')
+  const c = countMarkup(code)
   const rel = relative(SRC, f)
   for (const line of c.bare) bare.push(`${rel}:${line}`)
+  for (const e of escapedKit(code, f)) escaped.push(`${rel}:${e.at}: «${e.name}» نصٌّ في قالب html بلا raw() — يُهرَّب فيُرى وسمًا لا يُضغط`)
   if (c.buttons + c.cards + c.inputs > 0) now[rel] = { buttons: c.buttons, cards: c.cards, inputs: c.inputs }
 }
 const sum = (o, k) => Object.values(o).reduce((n, v) => n + (v[k] ?? 0), 0)
@@ -134,9 +211,10 @@ for (const file of new Set([...Object.keys(base), ...Object.keys(now)])) {
   }
 }
 for (const b of bare) notes.push(`${b}: زرٌّ بلا درجة («btn» وحدَه) — أضف btn-primary أو btn-secondary أو btn-quiet أو btn-danger`)
+notes.push(...escaped)
 
 if (notes.length === 0) {
-  console.log(`  ✓ الوسمُ باليد لم يصعد: ${sum(now, 'buttons')} زرًّا · ${sum(now, 'cards')} بطاقة · ${sum(now, 'inputs')} حقلًا خارج العُدّة، ولا زرَّ بلا درجة`)
+  console.log(`  ✓ الوسمُ باليد لم يصعد: ${sum(now, 'buttons')} زرًّا · ${sum(now, 'cards')} بطاقة · ${sum(now, 'inputs')} حقلًا خارج العُدّة، ولا زرَّ بلا درجة، ولا عُدّةَ تُهرَّب في قالب html`)
 } else {
   for (const n of notes) console.log(`  ✕ ${n}`)
   console.log(`\nالمجموع: ${notes.length} ملحوظة`)

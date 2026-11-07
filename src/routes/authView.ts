@@ -35,8 +35,9 @@ const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   var btn=document.getElementById('pk-btn');
   var note=document.getElementById('pk-note');
   if(!form||!btn)return;
+  // ‏والمعطَّلُ موصوفٌ بسببه الظاهر تحته (مراجعة D-325): كان السببُ في «#pk-note» بلا رابطٍ يصله به قارئُ الشاشة
   if(!window.PublicKeyCredential){
-    btn.disabled=true;
+    btn.disabled=true; btn.setAttribute('aria-describedby','pk-note');
     if(note)note.textContent='متصفّحك لا يدعم مفاتيح المرور.';
     return;
   }
