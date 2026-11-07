@@ -49,7 +49,7 @@ describe('رموز الاسترداد (D-318)', () => {
     expect(await useRecoveryCode(db, NEXT, codes[0]!, ME)).toBe(false)
     expect(await useRecoveryCode(db, KEY, codes[0]!.toLowerCase(), ME)).toBe(true)
     expect(await useRecoveryCode(db, KEY, codes[0]!, ME)).toBe(false)
-    expect((await countRecoveryCodes(db, ME)).unused).toBe(codes.length - 1)
+    expect((await countRecoveryCodes(db, KEY, ME)).unused).toBe(codes.length - 1)
     // ‏ورمزُ حسابٍ آخر لا يفتح بابَه
     expect(await useRecoveryCode(db, KEY, codes[1]!, 'other@example.com')).toBe(false)
   })

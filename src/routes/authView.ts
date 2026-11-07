@@ -9,7 +9,7 @@
 import { escapeHtml, shell } from './panelView'
 import { brandMoment } from './ui/moment'
 import { notice, noticeText } from './ui/components/toast'
-import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
+import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { html, raw } from './ui/html'
 
 export interface SecondFactorData {
@@ -265,6 +265,8 @@ export interface EnrolData {
   readonly passkeys: readonly { readonly id: string; readonly label: string }[]
   readonly totpConfirmed: boolean
   readonly recoveryLeft: number
+  /** رموزٌ على مفتاحٍ غير الحاليّ (مراجعة D-318) — تبطل أو بطلت. */
+  readonly recoveryStale?: number
   readonly error: string | null
 }
 
@@ -283,6 +285,7 @@ export function enrolPage(d: EnrolData, nonce: string): string {
     : raw('<button class="btn btn-secondary" id="totp-start" type="button">اضبط رمز التطبيق</button>')
   const recovery = d.required ? '' : html`<hr><h2 class="sec">رموز الاسترداد</h2>
     <p class="hint">${d.recoveryLeft > 0 ? html`بقي <b>${d.recoveryLeft}</b> رمزًا غير مستهلَك.` : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلًا.'}</p>
+    ${(d.recoveryStale ?? 0) > 0 ? raw(noticeText('warn', recoveryStaleNote(d.recoveryLeft, d.recoveryStale ?? 0))) : ''}
     <button class="btn btn-secondary" id="rc-issue" type="button" data-renew-ask="${RC_RENEW.ask}" data-renew-ok="${RC_RENEW.ok}"${raw(d.recoveryLeft > 0
       ? ' data-confirm="' + escapeHtml(RC_RENEW.ask) + '" data-confirm-ok="' + escapeHtml(RC_RENEW.ok) + '"' : '')}>${d.recoveryLeft > 0 ? RC_RENEW.ok : 'ولّد رموز استرداد'}</button>
     <div class="note" id="rc-msg" role="status" aria-live="polite"></div>`

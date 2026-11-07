@@ -289,7 +289,7 @@ async function shellData(
     providers: lazy(() => loadProviders(c)),
     // ‏عواملُ صاحب الجلسة (D-317) — وعرضٌ لا قرار: قاعدةٌ لا تردّ تُرسم «لا عامل» ولا تُسقط الإعدادات
     factors: lazy(async () => toPanelFactors(
-      await factorState(c.env.DB, shell.rpId, session.record.email ?? OWNER_EMAIL).catch(() => null))),
+      await factorState(c.env.DB, c.env.TOKEN_ENC_KEY, shell.rpId, session.record.email ?? OWNER_EMAIL).catch(() => null))),
     outbox: lazy(() => loadOutbox(c, org)),
     // ‏ومدى اللوح المحوريّ من العنوان (D-120) — ومنه «ما وقع اليوم» كذلك
     pivotFacts: lazy(() => loadFacts(c.env.DB, org, readSpan(q.get('days')))),
@@ -510,7 +510,7 @@ function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'
 }
 
 function toPanelFactors(f: Awaited<ReturnType<typeof factorState>> | null): PanelFactors {
-  if (f === null) return { passkeys: [], totpConfirmed: false, recoveryLeft: 0, enforced: false }
+  if (f === null) return { passkeys: [], totpConfirmed: false, recoveryLeft: 0, recoveryStale: 0, enforced: false }
   return {
     passkeys: f.passkeys.map((k) => ({
       id: k.id,
@@ -520,6 +520,7 @@ function toPanelFactors(f: Awaited<ReturnType<typeof factorState>> | null): Pane
     })),
     totpConfirmed: f.totp.confirmed,
     recoveryLeft: f.recovery.unused,
+    recoveryStale: f.recovery.stale,
     enforced: f.enforced,
   }
 }

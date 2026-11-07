@@ -26,7 +26,7 @@ import {
 } from '../lib/session'
 import { activeOrg, OWNER_ORG } from '../lib/tenancy'
 import {
-  allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, STEP_UP_SECRET_FIELDS,
+  allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, stepUpSecretFields,
 } from '../lib/access'
 import { activeMember, OWNER_WHO, ROLE_LABEL, touchMember, type Who } from '../lib/team'
 import { OWNER_EMAIL } from '../lib/ownerEmail'
@@ -102,13 +102,13 @@ async function toStepUp(c: Context<{ Bindings: Env }>, session: Session, who: Wh
     const to = stepUpUrl(path.startsWith('/panel/security/') ? own : '/panel/settings')
     return Response.json({ error: 'step_up', detail: say('step_up'), to }, { status: 403 })
   }
-  const secrets = STEP_UP_SECRET_FIELDS[path] ?? []
+  const secrets = stepUpSecretFields(path, form)
   const fields: [string, string][] = []
   form?.forEach((value, name) => {
     if (name === '_csrf' || secrets.includes(name) || typeof value !== 'string') return
     fields.push([name.slice(0, 64), value.slice(0, 2000)])
   })
-  const saved: SavedForm = { action: path, fields: fields.slice(0, 60), secrets: secrets.filter((n) => form?.has(n) === true) }
+  const saved: SavedForm = { action: path, fields: fields.slice(0, 60), secrets }
   await c.env.KV.put(stepUpFormKey(session.id), JSON.stringify(saved), { expirationTtl: 600 })
   return c.redirect(stepUpUrl('/panel/stepup/resume'), 303)
 }

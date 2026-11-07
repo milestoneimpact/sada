@@ -579,7 +579,11 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
     expect(wrong.status).toBe(401)
     expect(await bare.text()).toBe(await wrong.text())
     const reasons = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'admin.denied' ORDER BY id").all()
-    expect(reasons).toEqual([{ detail: 'بلا ترويسة Authorization: Bearer' }, { detail: `كلمة إدارة مخالفة بطول ${TOKEN.length + 2}` }])
+    // ‏(مراجعة D-318) والثاني من العنوان نفسِه يحمل عدَّه: المردودُ يُكتب عند 1 و2 و4 و8 و16، والعددُ في التفصيل
+    expect(reasons).toEqual([
+      { detail: 'بلا ترويسة Authorization: Bearer' },
+      { detail: `كلمة إدارة مخالفة بطول ${TOKEN.length + 2} · المردود 2 من هذا العنوان في ربع ساعة` },
+    ])
   })
 
   it('لا يذكر قيمة الرمز في أيّ ردّ', async () => {

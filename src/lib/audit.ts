@@ -86,23 +86,52 @@ export interface AuditRow {
 }
 
 /**
+ * **ما يكتبه المجهولُ بلا رمز** (مراجعة D-318): نداءٌ إلى `/admin/*` بلا كلمة الإدارة أو بغيرها، وردُّ الحدّ. لا يملك صاحبُه
+ * جلسةً ولا رمزًا، فلو عُرض صفًّا صفًّا لدفع أحداثَ الأمان الحقيقيّة خارج الخمسين المعروضة.
+ */
+const FOLDED_ACTIONS = ['admin.denied', 'admin.limited'] as const
+const FOLDED = `actor = 'admin_token' AND action IN (${FOLDED_ACTIONS.map((a) => `'${a}'`).join(', ')})`
+
+/**
  * آخرُ ما وقع **في منظّمةٍ** (D-277) — منظّمةُ الجلسة النشطة. وجدولٌ لا يُقرأ
  * لا يُسقط اللوحة: تُعاد قائمةٌ فارغة.
+ *
+ * **وما يكتبه المجهولُ يُطوى إلى آخره** (مراجعة D-318): من كلّ فعلٍ في `FOLDED_ACTIONS` يُعرض الصفُّ الأخير وحدَه —
+ * بعنوانه وتفصيله — ومعه عددُ ما طُوي قبله في المدّة المعروضة («و14 مثلُه قبله»). فلا يدفع نداءٌ بلا رمزٍ تغييرَ إعدادٍ
+ * أو إبطالَ جهازٍ خارج العرض، والصفوفُ كلُّها باقيةٌ في القاعدة وفي التصدير.
  */
 export async function recentAudit(db: Db, org: string, limit = 50): Promise<AuditRow[]> {
   const capped = Math.max(1, Math.min(200, Math.trunc(limit)))
   try {
+    // ‏جملةٌ واحدةٌ كما كانت (حِملُ اللوح، D-280): الأخيرُ من كلّ فعلٍ مطويّ يُعرَف بسؤالٍ داخلها لا بجملةٍ قبلها
     const { results } = await db
       .prepare(
-        `SELECT at, actor, action, target, detail, ip, by_email AS byEmail
-           FROM audit_log
+        `SELECT id, at, actor, action, target, detail, ip, by_email AS byEmail
+           FROM audit_log AS a
           WHERE org_id = ?
+            AND NOT (${FOLDED} AND id < (SELECT MAX(id) FROM audit_log AS b
+                                         WHERE b.org_id = a.org_id AND b.actor = a.actor AND b.action = a.action))
           ORDER BY id DESC
           LIMIT ?`,
       )
       .bind(org, capped)
-      .all<AuditRow>()
-    return results
+      .all<AuditRow & { id: number }>()
+    // ‏ما طُوي يُعدّ في المدّة المعروضة وحدَها: ما قبل أقدم صفٍّ معروضٍ لم يكن ليُعرض على كلّ حال
+    const floor = results.length === capped ? Math.min(...results.map((r) => r.id)) : 0
+    const rows: AuditRow[] = []
+    for (const { id, ...row } of results) {
+      if (row.actor !== 'admin_token' || !(FOLDED_ACTIONS as readonly string[]).includes(row.action)) {
+        rows.push(row)
+        continue
+      }
+      const folded = await db
+        .prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND ${FOLDED} AND action = ? AND id < ? AND id > ?`)
+        .bind(org, row.action, id, floor)
+        .first<{ n: number }>()
+      const n = folded?.n ?? 0
+      rows.push(n === 0 ? row : { ...row, detail: [row.detail, `و${n} مثلُه قبله`].filter((x) => x !== null && x !== '').join(' · ') })
+    }
+    return rows
   } catch {
     return []
   }

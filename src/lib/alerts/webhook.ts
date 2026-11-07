@@ -16,7 +16,7 @@
  * - **والقديمُ المقروءُ يُقرأ مرّةً**: أوّلُ قراءةٍ بالمفتاح (دورةُ التنبيهات) تشفّره في مكانه، والحفظُ التالي يشفّر كذلك.
  */
 import { CryptoError, openScoped, sealedWithCurrent, sealScoped, type LegacyKey } from '../crypto'
-import { checkProviderUrl } from '../ai/urlGuard'
+import { checkProviderUrl, type UrlRefusal } from '../ai/urlGuard'
 import type { Db } from '../tokens'
 import { OWNER_ORG } from '../tenancy'
 
@@ -131,7 +131,20 @@ export type SaveOutcome =
   | { readonly kind: 'refused'; readonly reason: string }
 
 /**
- * يحفظ العنوانَ مشفَّرًا — **ويُحرَس عند الحفظ لا عند الإرسال وحدَه** (D-109) بحارس المزوّدين نفسِه. والفراغُ يُزيل القناة.
+ * سببُ الردّ **بكلمات القناة** (مراجعة D-318): الحارسُ واحدٌ لخدمات الكتابة والقناة، وأسبابُه كُتبت للأولى («المزوّد»
+ * و«المفتاح»)، فكان المالكُ يقرأ عند حفظ عنوان Slack أنّ «المفتاح لا يُرسل على اتّصال غير مشفَّر». فلكلّ سببٍ نصُّه هنا.
+ */
+const CHANNEL_REASON: Readonly<Record<UrlRefusal, string>> = {
+  empty: 'العنوان فارغ',
+  invalid: 'العنوان غير صالح — يبدأ بـ https://',
+  scheme: 'عنوان القناة على https وحدها — رسالتها لا تخرج على اتّصال غير مشفَّر',
+  credentials: 'لا اسم دخول ولا كلمة مرور في العنوان — الصق عنوان القناة كما نسخته',
+  internal: 'عنوان داخليّ أو محجوز — القناة على الإنترنت لا داخل الشبكة',
+  template: 'في العنوان قالب لم يُملأ — استبدل ما بين القوسين بقيمته',
+}
+
+/**
+ * يحفظ العنوانَ مشفَّرًا — **ويُحرَس عند الحفظ لا عند الإرسال وحدَه** (D-109) بحارس خدمات الكتابة نفسِه. والفراغُ يُزيل القناة.
  */
 export async function saveWebhook(db: Db, encKey: string, raw: string, by: string): Promise<SaveOutcome> {
   const trimmed = raw.trim()
@@ -140,7 +153,10 @@ export async function saveWebhook(db: Db, encKey: string, raw: string, by: strin
     return { kind: 'cleared' }
   }
   const verdict = checkProviderUrl(trimmed)
-  if (!verdict.ok) return { kind: 'refused', reason: verdict.reason }
+  if (!verdict.ok) {
+    const reason = CHANNEL_REASON[verdict.code]
+    return { kind: 'refused', reason: verdict.detail === undefined ? reason : `${reason} (${verdict.detail})` }
+  }
   await write(db, await seal(encKey, verdict.url), by)
   return { kind: 'set', hint: maskWebhook(verdict.url) }
 }
@@ -149,21 +165,26 @@ export async function saveWebhook(db: Db, encKey: string, raw: string, by: strin
  * **دورةُ التدوير** (D-318): أعلى العنوانُ على المفتاح الحاليّ؟ وإن لم يكن (مشفَّرٌ بالسابق، أو قديمٌ مقروء) يُعاد تشفيرُه
  * بالحاليّ في مكانه — بشرط أن يكون الصفُّ ما يزال هو هو. ويعيد ما بقي: صفرٌ أو واحد، و`failed` لما لم يُفكّ.
  */
-export async function rotateWebhook(db: Db, encKey: string, apply: boolean): Promise<{ pending: number; rotated: number; failed: number }> {
+export async function rotateWebhook(
+  db: Db, encKey: string, apply: boolean,
+): Promise<{ pending: number; legacy: number; rotated: number; failed: number }> {
+  const none = { pending: 0, legacy: 0, rotated: 0, failed: 0 }
   const stored = await storedValue(db)
-  if (stored === '') return { pending: 0, rotated: 0, failed: 0 }
+  if (stored === '') return none
   const sealed = parseSealed(stored)
-  if (sealed !== null && (await sealedWithCurrent(encKey, sealed.ct))) return { pending: 0, rotated: 0, failed: 0 }
-  if (!apply) return { pending: 1, rotated: 0, failed: 0 }
+  if (sealed !== null && (await sealedWithCurrent(encKey, sealed.ct))) return none
+  // ‏المقروءُ قبل D-318 لا يلزمه مفتاح (مراجعة D-318): «قديمٌ» لا «باقٍ»، ويُشفَّر بالحاليّ عند أوّل قراءة
+  const plain = !stored.startsWith(PREFIX)
+  if (!apply) return { ...none, pending: plain ? 0 : 1, legacy: plain ? 1 : 0 }
   const url = await readWebhookUrl(db, encKey)
   // ‏القديمُ المقروءُ شُفِّر في `readWebhookUrl` نفسِها (ولو ردّه الحارس)؛ والمشفَّرُ بالسابق يُعاد هنا
   const now = await storedValue(db)
   const after = parseSealed(now)
-  if (after !== null && (await sealedWithCurrent(encKey, after.ct))) return { pending: 0, rotated: 1, failed: 0 }
-  if (url === '') return { pending: 1, rotated: 0, failed: 1 }
+  if (after !== null && (await sealedWithCurrent(encKey, after.ct))) return { ...none, rotated: 1 }
+  if (url === '') return { ...none, pending: 1, failed: 1 }
   await db
     .prepare("UPDATE settings SET value = ?, updated_at = datetime('now') WHERE key = ? AND org_id = ? AND value = ?")
     .bind(await seal(encKey, url), KEY, OWNER_ORG, now)
     .run()
-  return { pending: 0, rotated: 1, failed: 0 }
+  return { ...none, rotated: 1 }
 }

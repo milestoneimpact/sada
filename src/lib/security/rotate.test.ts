@@ -8,7 +8,7 @@ import { fakeDb, type FakeDb } from '../../test/fakes'
 import { loadTokens, saveTokens, upsertAccount } from '../tokens'
 import { keyContext, resolveKey, saveKey } from '../providers'
 import { readApp, saveApp } from '../oauth/apps'
-import { readTotpSecret, startTotp } from './factors'
+import { countRecoveryCodes, issueRecoveryCodes, readTotpSecret, startTotp, useRecoveryCode } from './factors'
 import { readWebhookUrl, saveWebhook } from '../alerts/webhook'
 import { OWNER_EMAIL } from '../ownerEmail'
 import { rotateKeys } from './rotate'
@@ -65,13 +65,15 @@ afterEach(() => {
 })
 
 describe('تدوير TOKEN_ENC_KEY (D-318)', () => {
-  it('خارج التدوير لا يُمسّ شيء: القديمُ يُقرأ بطريقته ويُعدّ ولا يُعاد تشفيرُه', async () => {
+  it('خارج التدوير لا يُمسّ شيء: القديمُ يُقرأ بطريقته ويُعدّ «قديمًا» لا «باقيًا» ولا يُعاد تشفيرُه', async () => {
     expect(await everything(OLD)).toEqual(EXPECTED)
     const before = db.raw.prepare("SELECT key_enc FROM providers WHERE name = 'gemini'").get()
     const report = await rotateKeys(db, OLD)
     expect(report.previous).toBeNull()
     expect(report.rotated).toBe(0)
-    expect(report.pending).toBe(1)
+    // ‏(مراجعة D-318) كان `pending: 1` إلى الأبد خارج التدوير: صفٌّ قبل D-318 يُقرأ بالحاليّ ليس «على مفتاحٍ آخر»
+    expect(report.pending).toBe(0)
+    expect(report.legacy).toBe(1)
     expect(db.raw.prepare("SELECT key_enc FROM providers WHERE name = 'gemini'").get()).toEqual(before)
   })
 
@@ -126,5 +128,51 @@ describe('تدوير TOKEN_ENC_KEY (D-318)', () => {
     }
     await rotateKeys(racing as unknown as FakeDb, NEW)
     expect((await loadTokens(db, NEW, owner))?.accessToken).toBe('acc-renewed')
+  })
+
+  it('(مراجعة D-318) وفي التدوير يُعدّ القديمُ «باقيًا» مع ما على السابق — كلاهما لا يُقرأ بعد حذفه', async () => {
+    registerKeyring({ TOKEN_ENC_KEY: NEW, TOKEN_ENC_KEY_PREV: OLD })
+    const dry = await rotateKeys(db, NEW, { apply: false })
+    expect(dry.legacy).toBe(1)
+    expect(dry.pending).toBe(9)
+    const done = await rotateKeys(db, NEW)
+    expect(done.pending).toBe(0)
+    expect(done.legacy).toBe(0)
+  })
+
+  it('(مراجعة D-318) ورموزُ الاسترداد المهشَّمةُ بالسابق تُعدّ: لا «صفر» يُحذف عنده السابقُ وهي حيّةٌ به وحده', async () => {
+    await issueRecoveryCodes(db, OLD, 'sara@example.com')
+    expect(await useRecoveryCode(db, OLD, (await issueRecoveryCodes(db, OLD, OWNER_EMAIL))[0]!, OWNER_EMAIL)).toBe(true)
+    registerKeyring({ TOKEN_ENC_KEY: NEW, TOKEN_ENC_KEY_PREV: OLD })
+    const report = await rotateKeys(db, NEW)
+    expect(report.pending).toBe(0)
+    // ‏ثمانيةٌ لسارة وسبعةٌ للمالك (استُعمل واحد) — والمستعمَلُ لا يُعدّ
+    expect(report.recovery).toBe(15)
+    expect(await countRecoveryCodes(db, NEW, 'sara@example.com')).toEqual({ total: 8, unused: 8, stale: 8 })
+
+    // ‏سارةُ تجدّد: رموزُها على الحاليّ، فتنقص من العدّ
+    await issueRecoveryCodes(db, NEW, 'sara@example.com')
+    expect((await rotateKeys(db, NEW)).recovery).toBe(7)
+
+    // ‏والسابقُ حُذف والمالكُ لم يجدّد: رموزُه لا تفتح، **ولا تُعدّ صالحةً** — فيُطلب منه غيرُها
+    registerKeyring({ TOKEN_ENC_KEY: NEW })
+    expect(await countRecoveryCodes(db, NEW, OWNER_EMAIL)).toEqual({ total: 8, unused: 0, stale: 7 })
+    expect((await rotateKeys(db, NEW)).recovery).toBe(7)
+  })
+
+  it('(مراجعة D-318) وصفوفٌ لا تُفكّ لا تحجب ما بعدها: كلُّ دورةٍ تمضي في الجدول إلى آخره', async () => {
+    const third = await upsertAccount(db, 'org_owner', { platform: 'x', kind: 'member', externalId: 't', displayName: 'ث' })
+    await saveTokens(db, OLD, third, { ...TOKENS, accessToken: 'acc-3', refreshToken: null })
+    db.raw.prepare("UPDATE tokens SET access_enc = 'v2:00000000:AAAA' WHERE account_id IN (?, ?)").run(owner, client)
+    registerKeyring({ TOKEN_ENC_KEY: NEW, TOKEN_ENC_KEY_PREV: OLD })
+    const first = await rotateKeys(db, NEW, { limit: 2 })
+    expect(first.failed).toBe(2)
+    expect((await loadTokens(db, NEW, third))?.accessToken).toBe('acc-3')
+    const row = db.raw.prepare('SELECT access_enc FROM tokens WHERE account_id = ?').get(third) as { access_enc: string }
+    expect(row.access_enc.startsWith(`v2:${first.kid}:`)).toBe(true)
+    // ‏وما بقي هو ما لا يُفكّ وحدَه: «باقٍ» يساوي «لم يُفكّ»
+    const again = await rotateKeys(db, NEW, { limit: 2 })
+    expect(again.pending).toBe(2)
+    expect(again.failed).toBe(2)
   })
 })

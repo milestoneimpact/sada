@@ -8,6 +8,8 @@ import { emailLogin, fakeMailer } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { readWebhookUrl } from '../lib/alerts/webhook'
+import { record, recentAudit } from '../lib/audit'
+import { ROLE_LABEL } from '../lib/team'
 import { app } from '../index'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
@@ -117,10 +119,10 @@ describe('أبوابُ التشغيل بلا أسماء (D-318)', () => {
 
   it('والتفصيلُ خلف كلمة الإدارة، والإخفاقُ ردٌّ واحدٌ لا يقول شيئًا', async () => {
     const detail = await app.request('/admin/ready', { headers: { Authorization: `Bearer ${TOKEN}` } }, env)
-    const body = await detail.json() as { missing_secrets: string[]; keys: { kid: string; previous: string | null; pending: number } }
+    const body = await detail.json() as { missing_secrets: string[]; keys: { kid: string; previous: string | null; pending: number; legacy: number; recovery: number } }
     expect(body.missing_secrets).toContain('LINKEDIN_CLIENT_SECRET')
     // ‏وحالُ المفاتيح: أيُّها يعمل، ولا سابق، ولا شيءَ على غيره
-    expect(body.keys).toEqual({ kid: expect.stringMatching(/^[0-9a-f]{8}$/), previous: null, pending: 0 })
+    expect(body.keys).toEqual({ kid: expect.stringMatching(/^[0-9a-f]{8}$/), previous: null, pending: 0, legacy: 0, recovery: 0 })
 
     const bodies = new Set<string>()
     for (const [headers, extra] of [
@@ -354,3 +356,68 @@ describe('الإنفاقُ لمن يعتمد: المحرّرُ يكتب ويعد
     expect(theirs).not.toContain('يبدؤه الناشر أو المدير أو المالك')
   })
 })
+
+/*
+ * ‏**مراجعةُ D-318** — بوّابةُ الطرفيّة: المجهولُ لا يدفع أحداثَ الأمان خارج «سجلّ النشاط»، ولا يُغلق القاطعُ العامُّ الطرفيّةَ على
+ * ‏صاحب الرمز، ولكلّ حدٍّ يردّ صفُّه في السجلّ.
+ */
+describe('مراجعة D-318 · بوّابةُ الطرفيّة', () => {
+  const auth = { Authorization: `Bearer ${TOKEN}` }
+  const call = async (ip: string, headers: Record<string, string> = {}): Promise<Response> =>
+    await app.request('/admin/ready', { headers: { ...headers, 'CF-Connecting-IP': ip } }, env)
+  const count = (where: string): unknown => db.raw.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE ${where}`).get()
+
+  it('المردودُ يُكتب عند أوّله ثمّ عند كلّ ضعف، و«سجلّ النشاط» يطويه سطرًا فلا يدفع ما سواه خارج العرض', async () => {
+    await record(db, { actor: 'panel', action: 'settings.write', target: 'paused', detail: '← true' })
+    for (const ip of ['198.51.100.7', '203.0.113.7', '192.0.2.7']) {
+      for (let i = 0; i < 30; i += 1) expect((await call(ip)).status).toBe(401)
+    }
+    // ‏ثلاثون مردودًا من كلّ مصدر: صفٌّ عند 1 و2 و4 و8 و16 — خمسةٌ لا ثلاثون
+    expect(count("action = 'admin.denied'")).toEqual({ n: 15 })
+    const latest = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'admin.denied' ORDER BY id DESC LIMIT 1").get() as { detail: string }
+    expect(latest.detail).toContain('16')
+
+    const shown = await recentAudit(db, 'org_owner', 50)
+    expect(shown.filter((a) => a.action === 'admin.denied')).toHaveLength(1)
+    expect(shown.find((a) => a.action === 'admin.denied')?.detail).toContain('و14 مثلُه قبله')
+    expect(shown.some((a) => a.action === 'settings.write')).toBe(true)
+  })
+
+  it('والقاطعُ العامُّ يعدّ المردودَ وحدَه: عشرةُ عناوين لا تُغلق الطرفيّةَ على صاحب الرمز، وللقاطع صفُّه', async () => {
+    for (let a = 1; a <= 10; a += 1) {
+      for (let i = 0; i < 30; i += 1) await call(`198.51.${a}.9`)
+    }
+    expect((await call('198.51.77.9')).status).toBe(429)
+    expect((await call('198.51.88.9', auth)).status).not.toBe(429)
+    expect(count("action = 'admin.limited' AND detail LIKE '%عناوين شتّى%'")).toEqual({ n: 1 })
+  })
+
+  it('ولـIPv4 شبكتُه /24 في المردود: ستّون منها ثمّ يُردّ ما بعدها، وصاحبُ الرمز منها يمرّ', async () => {
+    for (let a = 1; a <= 3; a += 1) {
+      for (let i = 0; i < 20; i += 1) expect((await call(`203.0.113.${a}`)).status).toBe(401)
+    }
+    expect((await call('203.0.113.4')).status).toBe(429)
+    expect((await call('203.0.113.5', auth)).status).not.toBe(429)
+    expect(count("action = 'admin.limited' AND detail LIKE '%شبكة%'")).toEqual({ n: 1 })
+  })
+
+  it('وشبكةُ IPv6 /48 تردّ ما فوق ستّين، ولردّها صفٌّ في السجلّ كما لحدّ العنوان', async () => {
+    const codes: number[] = []
+    for (const net of ['2001:db8:1:1::5', '2001:db8:1:2::5', '2001:db8:1:3::5']) {
+      for (let i = 0; i < 21; i += 1) codes.push((await call(net, auth)).status)
+    }
+    expect(codes.filter((s) => s === 429)).toHaveLength(3)
+    expect(count("action = 'admin.limited' AND detail LIKE '%شبكة%'")).toEqual({ n: 1 })
+  })
+})
+
+describe('مراجعة D-318 · ما يُقال للمحرّر يطابق ما يفتحه الخادم', () => {
+  it('لا يُوعَد بكتابة مسوّدةٍ لا بابَ لها: السببُ يقول ما يفتحه فعلًا', async () => {
+    const editor = await member('ed@example.com', 'editor')
+    const html = await page(editor, '/panel')
+    expect(html).not.toContain('وكتابة المسوّدة وتعديلها مفتوحان لك')
+    expect(html).toContain('وتعديل المسوّدات القائمة')
+    expect(ROLE_LABEL.editor.can).not.toMatch(/^يكتب/)
+  })
+})
+

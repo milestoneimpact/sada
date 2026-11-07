@@ -13,27 +13,30 @@
 
 import { withTimeout } from '../net/timeout'
 import { nonPublicHost } from '../net/ipGuard'
+/** لماذا رُدّ العنوان — ليقول كلُّ موضعٍ السببَ بكلماته (مراجعة D-318: القناةُ لا «مزوّدَ» لها ولا «مفتاح»). */
+export type UrlRefusal = 'empty' | 'invalid' | 'scheme' | 'credentials' | 'internal' | 'template'
+
 export type UrlVerdict =
   | { readonly ok: true; readonly url: string; readonly host: string }
-  | { readonly ok: false; readonly reason: string }
+  | { readonly ok: false; readonly reason: string; readonly code: UrlRefusal; readonly detail?: string }
 
 
 export function checkProviderUrl(raw: string): UrlVerdict {
   const trimmed = raw.trim()
-  if (trimmed.length === 0) return { ok: false, reason: 'العنوان فارغ' }
+  if (trimmed.length === 0) return { ok: false, reason: 'العنوان فارغ', code: 'empty' }
 
   let url: URL
   try {
     url = new URL(trimmed)
   } catch {
-    return { ok: false, reason: 'العنوان غير صالح — يبدأ بـ https://' }
+    return { ok: false, reason: 'العنوان غير صالح — يبدأ بـ https://', code: 'invalid' }
   }
 
   if (url.protocol !== 'https:') {
-    return { ok: false, reason: 'https وحدها — المفتاح لا يُرسل على اتّصال غير مشفَّر' }
+    return { ok: false, reason: 'https وحدها — المفتاح لا يُرسل على اتّصال غير مشفَّر', code: 'scheme' }
   }
   if (url.username !== '' || url.password !== '') {
-    return { ok: false, reason: 'لا اعتمادات في العنوان — المفتاح يُرسل في ترويسة' }
+    return { ok: false, reason: 'لا اعتمادات في العنوان — المفتاح يُرسل في ترويسة', code: 'credentials' }
   }
 
   const host = url.hostname
@@ -43,7 +46,7 @@ export function checkProviderUrl(raw: string): UrlVerdict {
    */
   const inner = nonPublicHost(host)
   if (inner !== null) {
-    return { ok: false, reason: `عنوان داخليّ (${host}: ${inner}) — المزوّد خارجيّ لا داخل الشبكة` }
+    return { ok: false, reason: `عنوان داخليّ (${host}: ${inner}) — المزوّد خارجيّ لا داخل الشبكة`, code: 'internal', detail: host }
   }
 
   /**
@@ -60,6 +63,7 @@ export function checkProviderUrl(raw: string): UrlVerdict {
     return {
       ok: false,
       reason: 'في العنوان قالب لم يُملأ — استبدل ما بين القوسين بقيمته',
+      code: 'template',
     }
   }
 

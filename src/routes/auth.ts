@@ -89,7 +89,7 @@ async function whoIs(env: Env, email: string): Promise<Who | null> {
 /** يقرأ عواملَ الحساب — أو `null` إن لم تردّ القاعدة (D-317): من يقرّر على `null` لا يفتح شيئًا. */
 async function factorsOf(env: Env, email: string): Promise<FactorState | null> {
   try {
-    return await factorState(env.DB, relyingParty(env.PUBLIC_BASE_URL).id, email)
+    return await factorState(env.DB, env.TOKEN_ENC_KEY, relyingParty(env.PUBLIC_BASE_URL).id, email)
   } catch (error) {
     console.warn({ job: 'factors', failed: String(error) })
     return null
@@ -552,7 +552,7 @@ auth.post('/panel/2fa/recovery', async (c) => {
   await clearAttempts(c.env.KV, c.req.raw)
   await releaseFactorGuess(c.env.DB, email, await fingerprint(gate.session.id), c.req.raw,
     await trustedDevice(c.req.raw, c.env.ADMIN_TOKEN, email))
-  const left = await countRecoveryCodes(c.env.DB, email).catch(() => ({ total: 0, unused: 0 }))
+  const left = await countRecoveryCodes(c.env.DB, c.env.TOKEN_ENC_KEY, email).catch(() => ({ total: 0, unused: 0, stale: 0 }))
   const remaining = 'بقي ' + String(left.unused)
   const next = await promoteSession(c.env.KV, gate.session)
   await record(
@@ -725,7 +725,7 @@ auth.post('/panel/security/passkey/register', async (c) => {
     if ((await findPasskey(c.env.DB, verdict.credentialId)) !== null) {
       return json({ error: 'already_registered', detail: 'هذا المفتاح مسجَّل بالفعل' }, 409)
     }
-    before = await factorState(c.env.DB, rp.id, email)
+    before = await factorState(c.env.DB, c.env.TOKEN_ENC_KEY, rp.id, email)
   } catch {
     return json({ error: 'unavailable' }, 503)
   }
@@ -820,7 +820,7 @@ auth.post('/panel/security/totp/confirm', async (c) => {
   let before: FactorState
   try {
     secret = await readTotpSecret(c.env.DB, c.env.TOKEN_ENC_KEY, email)
-    before = await factorState(c.env.DB, relyingParty(c.env.PUBLIC_BASE_URL).id, email)
+    before = await factorState(c.env.DB, c.env.TOKEN_ENC_KEY, relyingParty(c.env.PUBLIC_BASE_URL).id, email)
   } catch {
     return json({ error: 'unavailable' }, 503)
   }
@@ -903,6 +903,7 @@ auth.get('/panel/enrol', async (c) => {
     passkeys: (state?.passkeys ?? []).map((k) => ({ id: k.id, label: k.label })),
     totpConfirmed: state?.totp.confirmed ?? false,
     recoveryLeft: state?.recovery.unused ?? 0,
+    recoveryStale: state?.recovery.stale ?? 0,
     error: state === null ? say('factor_check_unavailable') : null,
   }, nonce), state === null ? 503 : 200)
 })
@@ -1065,7 +1066,6 @@ const ACTION_TITLE: Readonly<Record<string, string>> = {
   '/panel/providers/add': 'خدمة كتابة وصور',
   '/panel/providers/key': 'مفتاح خدمة الكتابة',
   '/panel/providers/delete': 'حذف خدمة الكتابة',
-  '/panel/settings': 'قناة التنبيهات',
   '/panel/channels/disconnect': 'فصل حساب',
   '/panel/sessions/revoke-all': 'إخراج الأجهزة الأخرى',
 }
@@ -1074,6 +1074,27 @@ const ACTION_TITLE: Readonly<Record<string, string>> = {
 const ACTION_WARNING: Readonly<Record<string, string>> = {
   '/panel/channels/disconnect': 'تُحذف رموز الوصول والتجديد لهذا الحساب ولا تُستردّ، وكلّ منشور مجدول عليه يتوقّف.',
   '/panel/team/revoke': 'تسقط جلستُه في طلبه التالي، ولا يدخل حتّى تدعوه من جديد.',
+}
+
+/**
+ * **عنوانُ «أكمل» وعاقبتُه من الإعداد لا من المسار وحده** (مراجعة D-318): `/panel/settings` بابٌ واحدٌ لثلاثة أفعالٍ تسأل
+ * «تحقّق للتوّ» — قناةُ التنبيهات وإزالتُها وأبوابُ الطرفيّة — وكان عنوانُها كلِّها «قناة التنبيهات». والعاقبةُ كما في حوار
+ * كلٍّ منها. وإعدادٌ غيرُها لا يصل هنا (لا يسأل «تحقّق للتوّ»)، فيُردّ إلى اللوحة.
+ */
+function settingAction(saved: SavedForm): { readonly title: string; readonly warning?: string } | undefined {
+  const field = (name: string): string | undefined => saved.fields.find(([k]) => k === name)?.[1]
+  const key = field('key')
+  if (key === 'alert_webhook') {
+    return field('clear') === '1' && !saved.secrets.includes('value')
+      ? { title: 'إزالة قناة التنبيهات', warning: 'لن يخرج تنبيهٌ حتّى تضبط غيرها.' }
+      : { title: 'قناة التنبيهات' }
+  }
+  if (key === 'admin_api') {
+    return field('value') === 'true'
+      ? { title: 'فتح أبواب الطرفيّة', warning: 'من يملك كلمة الإدارة يقرأ ويحلّل بلا عامل ثانٍ، بسقوف الإنفاق نفسِها.' }
+      : { title: 'إغلاق أبواب الطرفيّة' }
+  }
+  return undefined
 }
 
 /**
@@ -1118,10 +1139,11 @@ auth.get('/panel/stepup/resume', async (c) => {
   } catch {
     return c.redirect('/panel', 303)
   }
-  const title = ACTION_TITLE[saved.action]
+  const setting = saved.action === '/panel/settings' ? settingAction(saved) : undefined
+  const title = setting?.title ?? ACTION_TITLE[saved.action]
   if (title === undefined) return c.redirect('/panel', 303)
   const display = await resumeDisplay(c.env, saved, activeOrg(session.record))
-  const warning = ACTION_WARNING[saved.action]
+  const warning = setting === undefined ? ACTION_WARNING[saved.action] : setting.warning
   return page((nonce) => resumePage({
     csrf: session.record.csrf,
     action: saved.action,

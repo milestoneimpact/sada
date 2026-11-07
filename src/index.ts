@@ -135,10 +135,11 @@ app.use('/admin/*', adminGate)
 app.get('/admin/ready', async (c) => {
   const detail = await readinessDetail(c.env)
   // ‏وحالُ المفاتيح (D-318): أيُّ مفتاحٍ يعمل، وأثمّة سابق، وكم حقلًا ليس على الحاليّ — ومنه قرارُ حذف السابق
-  let keys: { kid: string; previous: string | null; pending: number } | 'unreadable' = 'unreadable'
+  // ‏(مراجعة D-318) و«القديمُ» قبل D-318 على حدة، ورموزُ الاسترداد على غير الحاليّ — والسابقُ لا يُحذف قبل أن يصيرا صفرًا
+  let keys: { kid: string; previous: string | null; pending: number; legacy: number; recovery: number } | 'unreadable' = 'unreadable'
   try {
     const report = await rotateKeys(c.env.DB, c.env.TOKEN_ENC_KEY, { apply: false })
-    keys = { kid: report.kid, previous: report.previous, pending: report.pending }
+    keys = { kid: report.kid, previous: report.previous, pending: report.pending, legacy: report.legacy, recovery: report.recovery }
   } catch {
     keys = 'unreadable'
   }
@@ -984,7 +985,10 @@ async function rotateTick(env: Env): Promise<void> {
   if (previousKey(env.TOKEN_ENC_KEY) === null) return
   try {
     const report = await rotateKeys(env.DB, env.TOKEN_ENC_KEY)
-    console.info({ job: 'key-rotation', kid: report.kid, previous: report.previous, rotated: report.rotated, failed: report.failed, pending: report.pending })
+    console.info({
+      job: 'key-rotation', kid: report.kid, previous: report.previous, rotated: report.rotated, failed: report.failed,
+      pending: report.pending, legacy: report.legacy, recovery: report.recovery,
+    })
   } catch (error) {
     console.error({ job: 'key-rotation', failed: String(error) })
   }

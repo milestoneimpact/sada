@@ -98,3 +98,22 @@ describe('الترحيل 0046 — العنوانُ يخرج من سجلّ الن
     expect(rows.map((r) => r.detail)).toEqual(Array.from({ length: 4 }, () => '← https://h.example/… (أُخفي المسار في D-318)'))
   })
 })
+
+describe('(مراجعة D-318) سببُ الردّ بكلمات القناة لا بكلمات خدمة الكتابة', () => {
+  it('لا «مزوّد» ولا «مفتاح» في سبب ردّ عنوان القناة', async () => {
+    const db = fakeDb()
+    for (const [raw, says] of [
+      ['http://hooks.slack.com/services/x', 'https'],
+      ['https://100.64.0.1/hook', 'داخليّ'],
+      ['https://user:pw@hooks.slack.com/x', 'اسم دخول'],
+      ['https://hooks.slack.com/{TOKEN}', 'قالب'],
+      ['ليس عنوانا', 'https://'],
+    ] as const) {
+      const saved = await saveWebhook(db, KEY, raw, 'panel')
+      expect(saved.kind, raw).toBe('refused')
+      const reason = saved.kind === 'refused' ? saved.reason : ''
+      expect(reason, raw).toContain(says)
+      expect(reason, raw).not.toMatch(/مزوّد|المفتاح/)
+    }
+  })
+})

@@ -36,7 +36,7 @@ import { securitySection } from './ui/sections/security'
 import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
-import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
@@ -525,6 +525,8 @@ export interface PanelFactors {
   }[]
   readonly totpConfirmed: boolean
   readonly recoveryLeft: number
+  /** رموزٌ على مفتاحٍ غير الحاليّ (مراجعة D-318) — تبطل أو بطلت. */
+  readonly recoveryStale?: number
   readonly enforced: boolean
 }
 
@@ -847,7 +849,7 @@ function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<Settings
 function adminApiCard(open: boolean): string {
   return html`<div class="card mt-3" id="admin-api"><h2>أبواب الطرفيّة</h2>
     <p class="hint">تُنادى بكلمة الإدارة (<span class="mono">ADMIN_TOKEN</span>) من الطرفيّة، بلا عامل ثانٍ.
-      <b>الجاهزيّة والمسح مفتوحان دائمًا</b>، وكلّ نداء صفّ في سجلّ النشاط، وثلاثون نداءً في ربع ساعة لكلّ عنوان.</p>
+      <b>الجاهزيّة والمسح مفتوحان دائمًا</b>، وكلّ نداء بالكلمة صفّ في سجلّ النشاط، وثلاثون نداءً في ربع ساعة لكلّ عنوان.</p>
     <div class="split">
       <p class="m-0">${raw(open
         ? 'الثلاثة الأخرى <b>مفتوحة</b>: قراءة خدمات الكتابة والصور، وقراءة المصادر، والتحليل المدفوع بسقوف اللوحة نفسِها.'
@@ -1479,6 +1481,7 @@ ${ownerView ? `<div data-sub id="security-all">
       ? `بقي <b>${d.factors.recoveryLeft}</b> رمزا غير مستهلَك. تُعرض مرّةً واحدةً حين تُولَّد،
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
+    ${(d.factors.recoveryStale ?? 0) > 0 ? noticeText('warn', recoveryStaleNote(d.factors.recoveryLeft, d.factors.recoveryStale ?? 0)) : ''}
     <div class="row">
       <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button" data-renew-ask="${escapeHtml(RC_RENEW.ask)}" data-renew-ok="${escapeHtml(RC_RENEW.ok)}"${d.factors.recoveryLeft > 0
         // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا — وما يُولَّد في الصفحة يُضيف السؤالَ سكربتُها

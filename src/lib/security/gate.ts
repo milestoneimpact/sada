@@ -251,22 +251,74 @@ export async function releaseAttempt(db: Db, request: Request, device: string | 
 }
 
 /**
- * **نداءاتُ الطرفيّة بكلمة الإدارة** (D-318) — حدٌّ لكلّ مصدرٍ وشبكته، وقاطعٌ عامّ، بالدلاء الذرّيّة نفسِها.
+ * **نداءاتُ الطرفيّة بكلمة الإدارة** (D-318) — حدٌّ لكلّ مصدرٍ وشبكته قبل الرمز، وقاطعٌ عامٌّ **على المردود وحده** بعده.
  *
  * كانت `/admin/*` بلا حدٍّ أصلًا: رمزٌ واحدٌ يسرّب يُنادي التحليلَ المدفوعَ ومسحَ Drive بلا سقفٍ إلّا سقوفَ الإنفاق، ومجهولٌ
  * يُرسل ما شاء فيملأ السجلَّ صفوفًا. والحجزُ **قبل** فحص الرمز كما في الدخول (D-161)، والعطلُ يغلق ولا يفتح (D-291).
  * ولا يُعاد ما حُجز عند النجاح: الحدُّ هنا على النداءات لا على الإخفاقات.
+ *
+ * **والقاطعُ العامُّ لا يُغلق الطرفيّةَ على صاحب الرمز** (مراجعة D-318): كان يُعدّ فيه كلُّ نداءٍ قبل الرمز، وIPv4 بلا دلوٍ
+ * أوسع، فعشرةُ عناوين بثلاثين نداءً بلا رمزٍ تملؤه، ويُردّ `/admin/ready` بالرمز الصحيح بـ‏429 ما دام الهجوم. فصار:
+ *
+ * - **قبل الرمز** (`reserveAdminCall`): العنوانُ أو `/64` (ثلاثون)، ثمّ شبكةُ IPv6 `/48` (ستّون) — كلُّ نداء؛
+ * - **وبعد رمزٍ مردود** (`reserveAdminFailure`): عدُّ المردود من العنوان (لصفّ السجلّ)، ثمّ **شبكةُ IPv4 `/24`** (ستّون)،
+ *   ثمّ **القاطعُ العامّ** (ثلاثمئة). والمصادَقُ لا يمرّ بهما: كالجهاز الموثوق في الدخول (D-317).
+ *   و`/24` على المردود وحده لأنّها تجمع مشتركين لا صلةَ بينهم (`netBucket`): جارٌ في الشبكة لا يُغلق على صاحب الرمز.
+ *
+ * والردُّ يقول أيُّ الدلاء ردّ وعدَّه فيه (`tier` · `count` · `limit`)، فيُكتب صفُّ «كثرت» مرّةً لكلّ دلوٍ في نافذته.
  */
 export const MAX_ADMIN_CALLS = 30
 export const MAX_NET_ADMIN_CALLS = 2 * MAX_ADMIN_CALLS
-export const MAX_GLOBAL_ADMIN_CALLS = 300
+export const MAX_NET4_ADMIN_FAILURES = 2 * MAX_ADMIN_CALLS
+export const MAX_GLOBAL_ADMIN_FAILURES = 300
 
-export function reserveAdminCall(db: Db, request: Request): Promise<Reservation> {
-  return tiered(
-    db,
-    request,
-    { local: 'admin:', net: 'admin-net:', global: 'admin:global' },
-    { local: MAX_ADMIN_CALLS, net: MAX_NET_ADMIN_CALLS, global: MAX_GLOBAL_ADMIN_CALLS },
-    null,
-  )
+export interface AdminSlot {
+  readonly allowed: boolean
+  readonly why?: 'db'
+  /** الدلوُ الذي ردّ: العنوان، أو شبكتُه (`/48` أو `/24`)، أو القاطعُ العامّ. */
+  readonly tier?: 'local' | 'net' | 'global'
+  /** العدُّ في الدلو الذي ردّ — وللمسموح عدُّ العنوان (للنداء قبل الرمز) أو عدُّ مردوده (بعده). */
+  readonly count: number
+  /** حدُّ الدلو الذي ردّ: صفُّ «كثرت» عند `limit + 1` وحده. */
+  readonly limit?: number
+}
+
+const ADMIN_UNAVAILABLE: AdminSlot = { allowed: false, count: 0, why: 'db' }
+
+/** شبكةُ IPv4 `/24` — للمردود في الطرفيّة وحدَها، و`null` لـ IPv6 (له `/48`) ولغير المعروف. */
+function ipv4Net(request: Request): string | null {
+  const ip = ipOf(request)
+  const parts = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(ip)
+  return parts === null ? null : `${parts[1]}.${parts[2]}.${parts[3]}.0/24`
+}
+
+/** قبل الرمز: كلُّ نداءٍ يُعدّ لعنوانه ثمّ لشبكة IPv6 `/48`. */
+export async function reserveAdminCall(db: Db, request: Request): Promise<AdminSlot> {
+  const mine = await bump(db, `admin:${ipOf(request)}`)
+  if (mine === null) return ADMIN_UNAVAILABLE
+  if (mine > MAX_ADMIN_CALLS) return { allowed: false, tier: 'local', count: mine, limit: MAX_ADMIN_CALLS }
+  const net = netBucket(request)
+  if (net !== null) {
+    const wide = await bump(db, `admin-net:${net}`)
+    if (wide === null) return ADMIN_UNAVAILABLE
+    if (wide > MAX_NET_ADMIN_CALLS) return { allowed: false, tier: 'net', count: wide, limit: MAX_NET_ADMIN_CALLS }
+  }
+  return { allowed: true, count: mine }
+}
+
+/** بعد رمزٍ مردود: مردودُ العنوان، ثمّ شبكةُ IPv4 `/24`، ثمّ القاطعُ العامّ — وما ردّه دلوٌ لا يُزاد به ما فوقه. */
+export async function reserveAdminFailure(db: Db, request: Request): Promise<AdminSlot> {
+  const mine = await bump(db, `admin-fail:${ipOf(request)}`)
+  if (mine === null) return ADMIN_UNAVAILABLE
+  const net = ipv4Net(request)
+  if (net !== null) {
+    const wide = await bump(db, `admin-net4:${net}`)
+    if (wide === null) return ADMIN_UNAVAILABLE
+    if (wide > MAX_NET4_ADMIN_FAILURES) return { allowed: false, tier: 'net', count: wide, limit: MAX_NET4_ADMIN_FAILURES }
+  }
+  const all = await bump(db, 'admin:global')
+  if (all === null) return ADMIN_UNAVAILABLE
+  return all <= MAX_GLOBAL_ADMIN_FAILURES
+    ? { allowed: true, count: mine }
+    : { allowed: false, tier: 'global', count: all, limit: MAX_GLOBAL_ADMIN_FAILURES }
 }

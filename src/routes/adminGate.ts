@@ -9,13 +9,17 @@
  *
  * ## ما صار
  *
- * ١ · **الحدُّ قبل الرمز** (`reserveAdminCall`): ثلاثون نداءً في ربع ساعةٍ لكلّ مصدر، وستّون لشبكته، وثلاثمئةٌ للجميع.
- *     والعطلُ يغلق (‏503) ولا يفتح (D-291).
+ * ١ · **الحدُّ قبل الرمز** (`reserveAdminCall`): ثلاثون نداءً في ربع ساعةٍ لكلّ مصدر، وستّون لشبكة IPv6 `/48`.
+ *     والعطلُ يغلق (‏503) ولا يفتح (D-291). **والمردودُ وحده بعد الرمز** (`reserveAdminFailure`، مراجعة D-318): ستّون لشبكة
+ *     IPv4 `/24`، وثلاثمئةٌ للجميع — فقاطعٌ يملؤه المجهولُ لا يردّ صاحبَ الرمز.
  * ٢ · **ثمّ الرمزُ بمقارنةٍ ثابتة الزمن** (`authorizeAdmin` · `sameSecret`): على بصمتين، فلا يُستدلّ من زمن الردّ على
  *     طوله ولا على أوّل محارفه. **والإخفاقُ ردٌّ واحدٌ لا يقول شيئًا** (‏401 `unauthorized`) — سببُه في السجلّ للمالك.
  * ٣ · **ثمّ البابُ**: ما يناديه المستودعُ أو وثائقُه (`ADMIN_IN_USE`: الجاهزيّةُ والمسح) مفتوح، والثلاثةُ التي لا يناديها
  *     أحدٌ (المزوّدون والمصادر والتحليل) **مغلقةٌ حتّى يفتحها المالك** من «للمطوّر» (`admin_api`).
- * ٤ · **وصفٌّ في سجلّ النشاط لكلّ نداء** — المسارُ والفعلُ وحالُ الردّ، **ولا الرمزُ ولا جزءٌ منه أبدًا**.
+ * ٤ · **وصفٌّ في سجلّ النشاط لكلّ نداءٍ بالرمز** — المسارُ والفعلُ وحالُ الردّ، **ولا الرمزُ ولا جزءٌ منه أبدًا**. **والمردودُ
+ *     صفٌّ عند أوّله ثمّ عند كلّ ضعف** (1 و2 و4 و8 و16 من العنوان في ربع الساعة، مراجعة D-318)، وصفُّ «كثرت» مرّةً لكلّ دلوٍ
+ *     في نافذته، و«سجلّ النشاط» يطوي ما يكتبه المجهولُ إلى آخره (`recentAudit`): ثلاثون نداءً بلا رمزٍ كانت ثلاثين صفًّا،
+ *     والعرضُ خمسون، فيدفع المجهولُ أحداثَ الأمان الحقيقيّة خارجه.
  *
  * والتحليلُ المدفوعُ يمرّ بـ `analyzeSource` نفسِها التي يمرّ بها زرُّ اللوحة: الإيقافُ وسقفُ التحليل وسقفُ الإنفاق وسقفُ
  * المزوّد قبل النداء، وصفُّ `cost_ledger` قبل أن يُعدّ ناجحًا (D-008).
@@ -24,7 +28,7 @@ import type { Context, Next } from 'hono'
 import type { Env } from '../env'
 import { authorizeAdmin } from '../lib/adminAuth'
 import { record } from '../lib/audit'
-import { MAX_ADMIN_CALLS, reserveAdminCall } from '../lib/security/gate'
+import { reserveAdminCall, reserveAdminFailure, type AdminSlot } from '../lib/security/gate'
 import { readSettings } from '../lib/settings'
 
 export type AdminEndpoint = 'ready' | 'scan' | 'providers' | 'sources' | 'analyze'
@@ -50,6 +54,18 @@ const DENIED_DETAIL = {
   no_header: 'بلا ترويسة Authorization: Bearer',
 } as const
 
+/** ما يُكتب في صفّ «كثرت» لكلّ دلو — مرّةً في نافذته. */
+const LIMITED_DETAIL = {
+  local: 'نداءً في ربع ساعة من هذا العنوان',
+  net: 'نداءً في ربع ساعة من شبكة هذا العنوان',
+  global: 'نداءً مردودًا في ربع ساعة من عناوين شتّى',
+} as const
+
+/** أوّلُ المردود وكلُّ ضعفٍ بعده: 1 و2 و4 و8 و16 — خمسةُ صفوفٍ لا ثلاثون. */
+function worthRow(count: number): boolean {
+  return count > 0 && (count & (count - 1)) === 0
+}
+
 /** ردٌّ واحدٌ لكلّ إخفاق — لا يقول أيُّ الثلاثة وقع (D-318). */
 function unauthorized(): Response {
   return Response.json({ error: 'unauthorized' }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } })
@@ -61,17 +77,28 @@ export async function adminGate(c: Context<{ Bindings: Env }>, next: Next): Prom
   const audit = (action: string, detail: string): Promise<void> =>
     record(c.env.DB, { actor: 'admin_token', action, target: path.slice(0, 120), detail }, request)
 
-  const slot = await reserveAdminCall(c.env.DB, request)
-  if (!slot.allowed) {
+  // ‏صفٌّ واحدٌ عند أوّل تجاوزٍ **لكلّ دلو** (مراجعة D-318) لا صفٌّ لكلّ نداءٍ بعده: الحدُّ لا يصير بابًا يملأ السجلّ.
+  // ‏وكان يُكتب عند حدّ العنوان وحده (‏31)، فشبكةٌ أو قاطعٌ يردّان لا يتركان أثرًا
+  const refuse = async (slot: AdminSlot): Promise<Response> => {
     if (slot.why === 'db') return Response.json({ error: 'unavailable' }, { status: 503 })
-    // ‏صفٌّ واحدٌ عند أوّل تجاوزٍ لا صفٌّ لكلّ نداءٍ بعده: الحدُّ لا يصير بابًا يملأ السجلّ
-    if (slot.count === MAX_ADMIN_CALLS + 1) await audit('admin.limited', String(slot.count) + ' نداءً في ربع ساعة')
+    if (slot.tier !== undefined && slot.limit !== undefined && slot.count === slot.limit + 1) {
+      await audit('admin.limited', String(slot.count) + ' ' + LIMITED_DETAIL[slot.tier])
+    }
     return Response.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '900' } })
   }
 
+  const slot = await reserveAdminCall(c.env.DB, request)
+  if (!slot.allowed) return await refuse(slot)
+
   const verdict = await authorizeAdmin(c.env.ADMIN_TOKEN, request)
   if (verdict.kind !== 'ok') {
-    await audit('admin.denied', verdict.kind === 'denied' ? 'كلمة إدارة مخالفة بطول ' + String(verdict.presentedLength) : DENIED_DETAIL[verdict.kind])
+    // ‏والمردودُ وحدَه يُعدّ في شبكة IPv4 وفي القاطع العامّ (مراجعة D-318): المجهولُ يملؤهما ولا يردّ صاحبَ الرمز
+    const failure = await reserveAdminFailure(c.env.DB, request)
+    if (!failure.allowed) return await refuse(failure)
+    if (worthRow(failure.count)) {
+      const why = verdict.kind === 'denied' ? 'كلمة إدارة مخالفة بطول ' + String(verdict.presentedLength) : DENIED_DETAIL[verdict.kind]
+      await audit('admin.denied', failure.count === 1 ? why : why + ' · المردود ' + String(failure.count) + ' من هذا العنوان في ربع ساعة')
+    }
     return unauthorized()
   }
 

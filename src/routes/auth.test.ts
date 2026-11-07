@@ -213,7 +213,7 @@ describe('بلا عامل ثانٍ — المالكُ يسجّل عاملَه أ
     await readCsrf(s.cookie)
     const key = await enrollPasskey(s)
     expect(key.codes).toHaveLength(8)
-    expect((await countRecoveryCodes(db, OWNER_EMAIL)).unused).toBe(8)
+    expect((await countRecoveryCodes(db, ENC, OWNER_EMAIL)).unused).toBe(8)
     expect(s.cookie).not.toBe(before)
     expect((await app.request('/panel', { headers: { Cookie: before } }, env)).headers.get('Location')).not.toBe('/panel/enrol')
     expect(await (await app.request('/panel', { headers: { Cookie: s.cookie } }, env)).text()).toContain('nav class="tabs"')
@@ -747,7 +747,7 @@ describe('رموز الاسترداد', () => {
     })
     const { codes } = (await confirmed.json()) as { codes: string[] }
     expect(codes.length).toBeGreaterThan(0)
-    expect((await countRecoveryCodes(db, OWNER_EMAIL)).unused).toBe(codes.length)
+    expect((await countRecoveryCodes(db, ENC, OWNER_EMAIL)).unused).toBe(codes.length)
   })
 
   it('لا تُخزَّن نصّا', async () => {
@@ -776,7 +776,7 @@ describe('رموز الاسترداد', () => {
     expect(await useCode(codes[0]!)).toBe(303)
     expect(await useCode(codes[0]!)).toBe(401)
     expect(await useCode(codes[1]!)).toBe(303)
-    expect((await countRecoveryCodes(db, OWNER_EMAIL)).unused).toBe(codes.length - 2)
+    expect((await countRecoveryCodes(db, ENC, OWNER_EMAIL)).unused).toBe(codes.length - 2)
   })
 
   it('D-317: ورمزُ استرداد حسابٍ آخر لا يفتح بابَ المالك', async () => {
@@ -1492,5 +1492,107 @@ describe('D-317 · المراجعة', () => {
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('<a class="menu-item" href="/panel/enrol"><span class="menu-t"><b>أمان حسابك</b>')
     expect(html).not.toContain('href="/panel/settings#security"')
+  })
+})
+
+/*
+ * ‏**مراجعةُ D-318** — «أكمل ما بدأته» بعد «تحقّق للتوّ» لفعلَي الإعدادات اللذين أضافهما القرار: أبوابُ الطرفيّة (`admin_api`)
+ * ‏و«أزل القناة». كان `value` في `/panel/settings` سرًّا لكلّ مفتاح، فيُمحى من النموذج ويُطلب حقلَ عنوانٍ إلزاميًّا: «true» لا
+ * ‏يُقبَل في حقل `url`، والعنوانُ الملصوقُ يحفظ `false` أو قناةً بدل إزالتها.
+ */
+describe('D-318 · المراجعة: «أكمل» بعد «تحقّق للتوّ» في الإعدادات', () => {
+  const HOOK = 'https://hooks.slack.com/services/T00/B00/zz9Q7hookTOKENpart'
+
+  async function stepUpAndResume(s: S, key: FakeAuthenticator, signCount: number): Promise<string> {
+    const shown = await (await app.request(`/panel/stepup?next=${encodeURIComponent('/panel/stepup/resume')}`, { headers: { Cookie: s.cookie } }, env)).text()
+    const body = new FormData()
+    body.set('_csrf', /name="_csrf" value="([^"]+)"/.exec(shown)?.[1] ?? '')
+    body.set('next', '/panel/stepup/resume')
+    body.set('assertion', JSON.stringify(await key.sign({ challenge: /data-challenge="([^"]+)"/.exec(shown)?.[1] ?? '', origin: ORIGIN, rpId: RP_ID, signCount })))
+    const done = await app.request('/panel/stepup/passkey', { method: 'POST', body, headers: { Cookie: s.cookie } }, env)
+    expect(done.headers.get('Location')).toBe('/panel/stepup/resume')
+    return await (await app.request('/panel/stepup/resume', { headers: { Cookie: s.cookie } }, env)).text()
+  }
+
+  /** يضغط «أكمل» كما يضغطه المالك: الحقولُ المخفيّة كما رُسمت، وما طُلب منه يُكتب. */
+  async function finish(s: S, resume: string, typed: Record<string, string> = {}): Promise<Response> {
+    const body = new FormData()
+    for (const [, name, value] of resume.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)) body.set(name!, value!)
+    for (const [k, v] of Object.entries(typed)) body.set(k, v)
+    return app.request(/action="([^"]+)"/.exec(resume)?.[1] ?? '', { method: 'POST', body, headers: { Cookie: s.cookie } }, env)
+  }
+
+  it('فتحُ أبواب الطرفيّة يُكمَل بضغطة «أكمل»: القيمةُ مخفيّةٌ كما أُرسلت، ولا حقلَ عنوانٍ يُطلب', async () => {
+    const { s, key } = await ownerWithPasskey()
+    await age(s.cookie, 'fresh', 60)
+    await readCsrf(s.cookie, '/panel/settings')
+    const held = await post('/panel/settings', s.cookie, { key: 'admin_api', value: 'true' })
+    expect(held.headers.get('Location') ?? '').toContain('/panel/stepup')
+
+    const resume = await stepUpAndResume(s, key, 5)
+    expect(resume).toContain('<input type="hidden" name="value" value="true">')
+    expect(resume).not.toContain('type="url"')
+    expect(resume).not.toContain('عنوان القناة')
+    expect(resume).toContain('أكمل: فتح أبواب الطرفيّة')
+    expect((await finish(s, resume)).status).toBe(303)
+    expect((await readSettings(db)).adminApi).toBe(true)
+  })
+
+  it('و«أزل القناة» يُكمَل كذلك: لا يُطلب عنوانٌ، والقناةُ تُزال لا تُستبدَل', async () => {
+    const { readWebhookUrl } = await import('../lib/alerts/webhook')
+    const { s, key } = await ownerWithPasskey()
+    await readCsrf(s.cookie, '/panel/settings')
+    expect((await post('/panel/settings', s.cookie, { key: 'alert_webhook', value: HOOK })).headers.get('Location') ?? '').not.toContain('/panel/stepup')
+    expect(await readWebhookUrl(db, ENC)).toBe(HOOK)
+
+    await age(s.cookie, 'fresh', 60)
+    await readCsrf(s.cookie, '/panel/settings')
+    const held = await post('/panel/settings', s.cookie, { key: 'alert_webhook', value: '', clear: '1' })
+    expect(held.headers.get('Location') ?? '').toContain('/panel/stepup')
+
+    const resume = await stepUpAndResume(s, key, 5)
+    expect(resume).toContain('<input type="hidden" name="clear" value="1">')
+    expect(resume).toContain('<input type="hidden" name="value" value="">')
+    expect(resume).not.toContain('type="url"')
+    expect(resume).toContain('أكمل: إزالة قناة التنبيهات')
+    expect((await finish(s, resume)).status).toBe(303)
+    expect(await readWebhookUrl(db, ENC)).toBe('')
+  })
+
+  it('وعنوانُ القناة الجديد ما يزال سرًّا: لا يُحفظ في الطريق، ويُطلب ثانيةً', async () => {
+    const { readWebhookUrl } = await import('../lib/alerts/webhook')
+    const { s, key } = await ownerWithPasskey()
+    await age(s.cookie, 'fresh', 60)
+    await readCsrf(s.cookie, '/panel/settings')
+    await post('/panel/settings', s.cookie, { key: 'alert_webhook', value: HOOK })
+    expect(await kv.get(`stepup-form:${s.cookie.split('=')[1]}`)).not.toContain('hookTOKEN')
+
+    const resume = await stepUpAndResume(s, key, 5)
+    expect(resume).toContain('أكمل: قناة التنبيهات')
+    expect(resume).toContain('name="value" type="url"')
+    expect(resume).not.toContain('hookTOKEN')
+    expect((await finish(s, resume, { value: HOOK })).status).toBe(303)
+    expect(await readWebhookUrl(db, ENC)).toBe(HOOK)
+  })
+})
+
+/*
+ * ‏**مراجعةُ D-318** — رموزُ الاسترداد مهشَّمةٌ بمفتاحٍ مشتقٍّ من `TOKEN_ENC_KEY`، فبعد تدويره وحذف السابق لا تفتح. كانت
+ * ‏تُعدّ «غيرَ مستهلَكة» كما هي: الصفحةُ تقول «بقي 8»، وتسجيلُ عاملٍ جديد لا يُصدر غيرها (`hadRecovery`).
+ */
+describe('D-318 · المراجعة: رموزُ استردادٍ بمفتاحٍ استُبدل', () => {
+  const GONE = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+  it('لا تُعدّ صالحة: «أمان حسابك» يقول إنّها لم تعد صالحة، والعاملُ التالي يُصدر غيرها', async () => {
+    db.raw.exec(`INSERT INTO members (email, role, orgs, invited_by) VALUES ('e@example.com', 'editor', '*', 'x')`)
+    const s: S = { cookie: cookieOf(await emailLogin(app, env, { email: 'e@example.com', secondFactor: false })), location: '' }
+    await issueRecoveryCodes(db, GONE, 'e@example.com')
+    const html = await (await app.request('/panel/enrol', { headers: { Cookie: s.cookie } }, env)).text()
+    expect(html).not.toContain('بقي <b>8</b>')
+    expect(html).toContain('رموزك السابقة لم تعد صالحة')
+
+    await readCsrf(s.cookie, '/panel/enrol')
+    const key = await enrollPasskey(s, 'هاتف المحرّر')
+    expect(key.codes).toHaveLength(8)
   })
 })

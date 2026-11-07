@@ -358,16 +358,57 @@ export async function issueRecoveryCodes(db: Db, encKey: string, email: string, 
   return codes
 }
 
-/** كم رمزًا لهذا الحساب، وكم بقي — ويرمي إن لم تردّ القاعدة (D-317). */
-export async function countRecoveryCodes(db: Db, email: string): Promise<{ total: number; unused: number }> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS total, SUM(CASE WHEN used_at IS NULL THEN 1 ELSE 0 END) AS unused
-         FROM recovery_codes WHERE ${RECOVERY_OWNER}`,
-    )
+/** معرّفُ مفتاح الصفّ `r1.<kid>.…`، أو `null` لتهشيمٍ قديم (SHA-256 بلا مفتاح). */
+function codeKid(hash: string): string | null {
+  const parts = hash.split('.')
+  return parts[0] === RECOVERY_SCHEME && parts.length === 4 ? parts[1]! : null
+}
+
+export interface RecoveryCount {
+  readonly total: number
+  /** ما يفتح الآن: غيرُ مستهلَكٍ **ويُتحقَّق منه بمفتاحٍ في الحلقة** — والقديمُ بلا مفتاحٍ معه. */
+  readonly unused: number
+  /**
+   * غيرُ مستهلَكٍ هُشِّم بمفتاحٍ غير الحاليّ (مراجعة D-318): في التدوير يفتح ما دام السابقُ مضبوطًا ثمّ يبطل، وبعده لا
+   * يفتح أصلًا. فيُقال لصاحبه «ولّد غيرها» ولا يُعدّ في `unused` ما لا يفتح.
+   */
+  readonly stale: number
+}
+
+/**
+ * كم رمزًا لهذا الحساب، وكم يفتح — ويرمي إن لم تردّ القاعدة (D-317).
+ *
+ * **ولا يُعدّ صالحًا ما لا تتحقّق منه الحلقة** (مراجعة D-318): كان العدُّ على `used_at` وحده، فبعد حذف `TOKEN_ENC_KEY_PREV`
+ * تقول الصفحةُ «بقي 8» والرموزُ الثمانية لا تفتح، وتسجيلُ عاملٍ جديد لا يُصدر غيرها لأنّ «عنده رموز».
+ */
+export async function countRecoveryCodes(db: Db, encKey: string, email: string): Promise<RecoveryCount> {
+  const { results } = await db
+    .prepare(`SELECT hash, used_at FROM recovery_codes WHERE ${RECOVERY_OWNER}`)
     .bind(OWNER_EMAIL, who(email))
-    .first<{ total: number; unused: number | null }>()
-  return { total: row?.total ?? 0, unused: row?.unused ?? 0 }
+    .all<{ hash: string; used_at: string | null }>()
+  const current = await keyId(encKey)
+  const ring = new Set(await Promise.all(keyring(encKey).map((k) => keyId(k))))
+  let unused = 0
+  let stale = 0
+  for (const row of results) {
+    if (row.used_at !== null) continue
+    const kid = codeKid(row.hash)
+    if (kid === null || ring.has(kid)) unused += 1
+    if (kid !== null && kid !== current) stale += 1
+  }
+  return { total: results.length, unused, stale }
+}
+
+/**
+ * رموزٌ غيرُ مستهلَكة على غير المفتاح الحاليّ، في كلّ الحسابات (مراجعة D-318) — لدورة التدوير و`/admin/ready`. لا يُعاد
+ * تهشيمُها (الرمزُ نفسُه لا يُعرَف)، فلا يُحذف السابقُ قبل أن يجدّدها أصحابُها أو يُقبَل أنّها تبطل.
+ */
+export async function countStaleRecoveryCodes(db: Db, encKey: string): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM recovery_codes WHERE used_at IS NULL AND hash LIKE ? AND hash NOT LIKE ?`)
+    .bind(`${RECOVERY_SCHEME}.%`, `${RECOVERY_SCHEME}.${await keyId(encKey)}.%`)
+    .first<{ n: number }>()
+  return row?.n ?? 0
 }
 
 /**
@@ -430,7 +471,7 @@ export async function useRecoveryCode(db: Db, encKey: string, presented: string,
 export interface FactorState {
   readonly passkeys: Passkey[]
   readonly totp: TotpState
-  readonly recovery: { total: number; unused: number }
+  readonly recovery: RecoveryCount
   /** أثمّة عاملٌ ثانٍ مفعَّل؟ وهو ما يقرّر أنّ الرمز وحده لا يكفي. */
   readonly enforced: boolean
 }
@@ -444,11 +485,11 @@ export interface FactorState {
  * البريد الصحيح مع عثرةٍ في D1 جلسةَ مالكٍ كاملة. فمن يسأل هنا ليقرّر دخولًا يلتقط الخطأ ويردّ «أعد المحاولة» **ولا
  * يفتح جلسة**، ومن يسأل ليعرض صفحةً يلتقطه ويعرض ما يقدر.
  */
-export async function factorState(db: Db, rpId: string, email: string): Promise<FactorState> {
+export async function factorState(db: Db, encKey: string, rpId: string, email: string): Promise<FactorState> {
   const [passkeys, totp, recovery] = await Promise.all([
     listPasskeys(db, rpId, email),
     totpState(db, email),
-    countRecoveryCodes(db, email),
+    countRecoveryCodes(db, encKey, email),
   ])
   return {
     passkeys,
