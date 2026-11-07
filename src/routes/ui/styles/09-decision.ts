@@ -198,9 +198,9 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
   margin-inline-start:var(--s-1)}
 
 /* ── العامل الثاني ─────────────────────────────────────────── */
-.codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(9.25rem,1fr)); gap:var(--s-2); margin:var(--s-3) 0}
+.codes{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr)); gap:var(--s-2); margin:var(--s-3) 0}
 /* رموزُ الاسترداد لاتينيّةٌ معزولة: بخطّ الصفحة وأرقامِه الجدوليّة (D-185)، والتباعدُ
-   صنعة في اللاتينيّ لا عيب */
+   صنعة في اللاتينيّ لا عيب. وعشرون محرفًا (D-318) تحتاج 15rem للعمود */
 .codes code{font-family:inherit; font-variant-numeric:tabular-nums; font-size:var(--t-code);
   line-height:var(--lh-code); letter-spacing:.06em; direction:ltr; background:var(--surface-2); border:var(--bd);
   border-radius:var(--r-control); padding:var(--s-2) var(--s-2); text-align:center; color:var(--ink)}

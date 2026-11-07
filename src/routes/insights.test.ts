@@ -69,4 +69,14 @@ describe('«ما ينجح»', () => {
     expect(csv).toContain('"LinkedIn","نصّ"')
     expect(csv).toContain('"نصّ ""9"""')
   })
+
+  it('ونصٌّ يبدأ بصيغةٍ يُكتب نصًّا لا صيغة (D-318)', async () => {
+    seed(2)
+    db.raw.exec(`UPDATE posts SET text = '=HYPERLINK("https://evil.example","اضغط")' WHERE id = 'p1'`)
+    db.raw.exec(`UPDATE posts SET text = '@SUM(1+1)' WHERE id = 'p2'`)
+    const csv = await (await get('/panel/insights.csv')).text()
+    expect(csv).toContain('"\'=HYPERLINK(""https://evil.example"",""اضغط"")"')
+    expect(csv).toContain('"\'@SUM(1+1)"')
+    expect(csv).not.toMatch(/(^|,)"[=+\-@]/m)
+  })
 })

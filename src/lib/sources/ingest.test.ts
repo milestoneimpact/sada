@@ -137,3 +137,60 @@ describe('مساعدات', () => {
     expect(cleanConverted('# f.pdf\n## Metadata\n- A=1\n- B=2\n## Contents\n### Page 1\nنصّ')).toBe('# f.pdf\n### Page 1\nنصّ')
   })
 })
+
+/*
+ * ‏(D-318) كان الرابطُ يُفحص في أوّله وحده ثمّ يُتبَع تحويلُه من تحت `fetch` (`redirect: 'follow'`): صفحةٌ عامّةٌ تردّ ‏302 إلى
+ * ‏عنوانٍ داخليٍّ تصل إليه. فصار التحويلُ يُتبَع يدًا، خمسَ قفزاتٍ على الأكثر، وكلُّ قفزةٍ تُفحص كما تُفحص الأولى.
+ */
+describe('رابطُ صفحة — التحويلُ يُفحص في كلّ قفزة (D-318)', () => {
+  const ARTICLE_HTML = `<html><head><title>مقال</title></head><body><p>${ARTICLE}</p></body></html>`
+
+  /** شبكةٌ تتبع التحويلَ بنفسها ما لم يُطلب `manual` — كما يفعل `fetch` في Workers. */
+  function chain(hops: Record<string, string>): { net: typeof fetch; seen: string[]; modes: (string | undefined)[] } {
+    const seen: string[] = []
+    const modes: (string | undefined)[] = []
+    const net = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      let url = String(input)
+      modes.push(init?.redirect)
+      for (let i = 0; i < 20; i += 1) {
+        seen.push(url)
+        const next = hops[url]
+        if (next === undefined) break
+        if (init?.redirect === 'manual') return new Response(null, { status: 302, headers: { Location: next } })
+        url = new URL(next, url).toString()
+      }
+      return new Response(ARTICLE_HTML, { headers: { 'Content-Type': 'text/html' } })
+    }) as unknown as typeof fetch
+    return { net, seen, modes }
+  }
+
+  it('تحويلٌ إلى عنوانٍ داخليٍّ يُردّ ولا يُنادى — ولو بكتابةٍ ستّ عشريّة أو مُعيَّنةِ IPv4', async () => {
+    for (const inner of ['https://169.254.169.254/latest/meta-data', 'https://0x7f.1/admin', 'https://[::ffff:10.0.0.1]/x', 'http://example.org/a', 'https://localhost/']) {
+      const { net, seen } = chain({ 'https://example.com/post': inner })
+      const out = await ingestLink(deps({ fetchImpl: net }), 'org_owner', 'https://example.com/post')
+      expect(out, inner).toMatchObject({ kind: 'rejected' })
+      expect(seen, inner).toEqual(['https://example.com/post'])
+    }
+    expect(db.raw.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 0 })
+  })
+
+  it('والتحويلُ العامُّ يُتبَع يدًا — نسبيًّا على ما سبقه — حتّى خمس قفزات', async () => {
+    const { net, seen, modes } = chain({
+      'https://example.com/a': '/b',
+      'https://example.com/b': 'https://www.example.com/c',
+    })
+    expect((await ingestLink(deps({ fetchImpl: net }), 'org_owner', 'https://example.com/a')).kind).toBe('added')
+    expect(seen).toEqual(['https://example.com/a', 'https://example.com/b', 'https://www.example.com/c'])
+    expect(new Set(modes)).toEqual(new Set(['manual']))
+  })
+
+  it('والسادسةُ تُردّ', async () => {
+    const hops: Record<string, string> = {}
+    for (let i = 0; i < 6; i += 1) hops[`https://example.com/${i}`] = `https://example.com/${i + 1}`
+    const { net, seen } = chain(hops)
+    expect(await ingestLink(deps({ fetchImpl: net }), 'org_owner', 'https://example.com/0'))
+      .toMatchObject({ kind: 'rejected', reason: expect.stringContaining('خمس') })
+    expect(seen).toHaveLength(6)
+  })
+})
+

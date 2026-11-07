@@ -48,6 +48,49 @@ export interface OAuthState {
    * واختياريٌّ كـ`scopes`: حالةٌ قديمةٌ بلا منظّمةٍ تُنسَب إلى المالك.
    */
   readonly org?: string
+  /**
+   * **بصمةُ كعكة المتصفّح الذي بدأ** (D-318) — SHA-256 لقيمةٍ عشوائيّةٍ في كعكة `__Host-` قصيرة. والعودةُ لا تُكمل إلّا
+   * من متصفّحٍ يحمل القيمة: رابطُ موافقةٍ يُرسَل إلى شخصٍ آخر لا يربط حسابَه في منظّمة من أرسله.
+   * واختياريٌّ في النوع لحالةٍ حُفظت قبله — **وغيابُه يُردّ عند العودة** لا يُفترَض.
+   */
+  readonly binding?: string
+}
+
+/**
+ * اسمُ كعكة الربط بالمتصفّح (D-318): `__Host-` فلا نطاقَ لها ولا مسارَ غيرُ `/`، ولا تُكتب إلّا على https.
+ * **ولكلّ منصّةٍ كعكتُها**: ربطُ LinkedIn وX في لسانين معًا لا يكتب أحدُهما فوق الآخر فيُردّ الأوّلُ «من متصفّحٍ آخر».
+ */
+export function bindingCookieName(platform: string): string {
+  return `__Host-sada-oauth-${platform.replace(/[^a-z]/g, '')}`
+}
+
+/** بصمةُ قيمة الكعكة — ما يُخزَّن في الحالة، فمن قرأ KV لا يملك الكعكة. */
+export async function bindingHash(nonce: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`oauth-binding:${nonce}`)))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * الكعكةُ عند البدء: `HttpOnly` فلا يقرؤها سكربت، و`SameSite=Lax` لأنّ العودةَ من المنصّة تنقّلٌ من موقعٍ آخر (و`Strict`
+ * لا تعبره، كما لا تعبره كعكةُ الجلسة)، وعمرُها عمرُ الحالة.
+ */
+export function bindingCookie(platform: string, nonce: string): string {
+  return `${bindingCookieName(platform)}=${nonce}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${STATE_TTL_SECONDS}`
+}
+
+/** تُمحى عند العودة نجحت أم لا: الدورةُ انتهت. */
+export function clearedBindingCookie(platform: string): string {
+  return `${bindingCookieName(platform)}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`
+}
+
+/** أيحمل هذا المتصفّحُ كعكةَ الدورة؟ — بمقارنةٍ ثابتة الزمن، وغيابُ أحدهما «لا». */
+export async function sameBrowser(saved: OAuthState, nonce: string | null): Promise<boolean> {
+  if (saved.binding === undefined || nonce === null || nonce === '') return false
+  const presented = await bindingHash(nonce)
+  if (presented.length !== saved.binding.length) return false
+  let diff = 0
+  for (let i = 0; i < presented.length; i += 1) diff |= presented.charCodeAt(i) ^ saved.binding.charCodeAt(i)
+  return diff === 0
 }
 
 export class StateError extends Error {
@@ -106,6 +149,7 @@ function isOAuthState(value: unknown): value is OAuthState {
     typeof v['redirectUri'] === 'string' &&
     typeof v['createdAt'] === 'string' &&
     (v['scopes'] === undefined || typeof v['scopes'] === 'string') &&
-    (v['org'] === undefined || typeof v['org'] === 'string')
+    (v['org'] === undefined || typeof v['org'] === 'string') &&
+    (v['binding'] === undefined || typeof v['binding'] === 'string')
   )
 }

@@ -25,6 +25,7 @@ import { field } from '../components/field'
 import { linkLine, pickLine } from '../reach'
 import { fileName } from '../parts'
 import { stagesAttr } from '../components/stages'
+import { maySpend, SPEND_LOCKED } from '../../../lib/access'
 
 const MARK: Readonly<Record<VideoCheck['level'], { cls: Tone; g: string }>> = {
   ok: { cls: 'ok', g: '●' },
@@ -108,7 +109,10 @@ function chip(p: VideoPlatform, c: VideoCheck, ctx: VideoContext): string {
 function captionForm(u: UploadRow, cap: VideoCaptions | undefined, ctx: VideoContext, now: Date): string {
   const id = escapeHtml(u.id)
   const w = ctx.writer
-  const why = w === undefined
+  // ‏والمحرّرُ لا يبدأ كتابةً مدفوعة (D-318) — ويكتب النصَّ بيده أدناه بلا كلفة
+  const why = !maySpend()
+    ? { text: SPEND_LOCKED, label: '', href: '' }
+    : w === undefined
     ? null
     : w.blocked !== null
       ? { text: w.blocked.text, label: w.blocked.label, href: w.blocked.href }
@@ -139,7 +143,7 @@ function captionForm(u: UploadRow, cap: VideoCaptions | undefined, ctx: VideoCon
           ...(why === null ? {} : { disabled: { id: `vw-${u.id}`, reason: why.text } }),
         })}
       </div>
-      ${why === null ? '' : `<a class="tap" href="${escapeHtml(why.href)}">${escapeHtml(why.label)}</a>`}
+      ${why === null || why.href === '' ? '' : `<a class="tap" href="${escapeHtml(why.href)}">${escapeHtml(why.label)}</a>`}
     </form>`
 }
 

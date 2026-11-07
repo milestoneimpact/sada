@@ -7,7 +7,7 @@
  * **وكلّ قيمة لها حدٌّ أعلى.** سقفٌ يقبل مليونا ليس سقفا؛ وحقلُ إدخالٍ
  * في لوحةٍ يقبل ما يُكتب فيه بابٌ لخطأ إصبعٍ يكلّف مالا.
  */
-import { checkProviderUrl } from './ai/urlGuard'
+import { webhookHint } from './alerts/webhook'
 import { DEFAULT_TILES, normalizeTiles, parseTiles } from './dashboard'
 import type { Db } from './tokens'
 import { OWNER_ORG } from './tenancy'
@@ -23,10 +23,11 @@ export interface Settings {
    */
   readonly autoEnqueue: boolean
   /**
-   * عنوانُ قناة التنبيهات (D-109) — **وفارغٌ يعني «لا قناة»**.
+   * **قناعُ** عنوان قناة التنبيهات (D-109 · D-318) — **وفارغٌ يعني «لا قناة»**.
    *
-   * ولا يُخزَّن مشفَّرا لأنّه **ليس سرّا**: عنوانٌ يقبل رسالةً، لا مفتاحٌ
-   * يفتح حسابا. **وخلطُهما يُرخِّص التشفيرَ حيث يجب ويُثقله حيث لا يلزم.**
+   * كتب D-109 أنّه «ليس سرًّا»، **وهو سرٌّ حامل**: عنوانُ Slack وDiscord يحمل رمزَه في مساره، ومن قرأه كتب في القناة.
+   * فصار يُخزَّن مشفَّرًا (`alerts/webhook.ts`)، وهذا الحقلُ قناعُه وحدَه (البروتوكولُ والمضيفُ وآخرُ أربعة محارف) — **لا
+   * يُرسَل إليه شيء**: العنوانُ كاملًا لا يُقرأ إلّا بالمفتاح (`readWebhookUrl`).
    */
   readonly alertWebhook: string
   /**
@@ -76,6 +77,12 @@ export interface Settings {
   readonly autoImage: boolean
   /** كم صورةً في اليوم على الأكثر — والعدُّ لكلّ صورةٍ وُلّدت اليوم آليّةً أو بزرّ. */
   readonly dailyImageCap: number
+  /**
+   * **أبوابُ الطرفيّة الثلاثة** (D-318): `/admin/providers` و`/admin/sources` و`/admin/analyze` — لا يناديها شيءٌ في
+   * المستودع ولا في وثائقه، ولكلٍّ منها بابٌ في اللوحة. **مغلقةٌ افتراضًا** وتُقرأ بالمطابقة الحرفيّة كمفاتيح الخطر: بابٌ
+   * يُنادى برمزٍ ثابتٍ بلا عاملٍ ثانٍ لا يُفتح إلّا بقرار المالك.
+   */
+  readonly adminApi: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -97,6 +104,7 @@ export const DEFAULTS: Settings = {
   tiktokPublic: false,
   autoImage: false,
   dailyImageCap: 10,
+  adminApi: false,
   // ‏وافتراضُها فراغ: **قناةٌ تُنشأ بقرارٍ لا بغفلة**
   alertWebhook: '',
   // والأربعُ التي كانت مكتوبةً في الشيفرة — **فلا شاشةَ فارغةً في أوّل يوم**
@@ -138,6 +146,7 @@ export const SETTING_KEYS = [
   'tiktok_public',
   'auto_image',
   'daily_image_cap',
+  'admin_api',
 ] as const
 
 export type SettingKey = (typeof SETTING_KEYS)[number]
@@ -163,6 +172,7 @@ export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
   tiktok_public: 'النشر العلنيّ على TikTok',
   auto_image: 'صورة مع كلّ مسوّدة',
   daily_image_cap: 'سقف الصور اليوميّ',
+  admin_api: 'أبواب الطرفيّة الثلاثة',
 }
 
 export function isSettingKey(key: string): key is SettingKey {
@@ -253,8 +263,8 @@ function fromMap(map: ReadonlyMap<string, string>): Settings {
     // **وهذا يُقرأ بالعكس**: غيابُه يعني «مشغَّل»، لأنّه لا يفتح إنفاقا —
     // والرمزُ وحده هو الذي يفتحه. فمَن لم يضبط شيئا لا يقع عليه نداء
     imageOverlay: map.get('image_overlay') !== 'false',
-    // ‏وعنوانٌ فاسدٌ يُقرأ فارغا: قناةٌ لا تعمل خيرٌ من نداءٍ إلى مجهول
-    alertWebhook: map.get('alert_webhook') ?? '',
+    // ‏قناعُ العنوان لا العنوان (D-318): المشفَّرُ يحمل قناعَه، والقديمُ المقروءُ يُقنَّع هنا
+    alertWebhook: webhookHint(map.get('alert_webhook') ?? ''),
     // **والاختيارُ يُصفَّى عند القراءة كما يُصفَّى عند الكتابة** (D-119):
     // معرِّفٌ زال من الكتالوج يُتخطّى، وفراغٌ يعود إلى الافتراض
     dashboardTiles: parseTiles(map.get('dashboard_tiles')).join(','),
@@ -270,6 +280,8 @@ function fromMap(map: ReadonlyMap<string, string>): Settings {
     tiktokPublic: map.get('tiktok_public') === 'true',
     autoImage: map.get('auto_image') === 'true',
     dailyImageCap: Math.floor(toNumber(map.get('daily_image_cap'), DEFAULTS.dailyImageCap, 'dailyImageCap')),
+    // ‏بالمطابقة الحرفيّة كمفاتيح الخطر (D-318): غيابٌ أو فسادٌ يعني «مغلقة»
+    adminApi: map.get('admin_api') === 'true',
   }
 }
 
@@ -293,22 +305,14 @@ export async function writeSetting(
   if (org !== OWNER_ORG && !isOrgKey(key)) throw new Error(`not_per_org: ${key}`)
   let stored: string
   if (key === 'paused' || key === 'auto_enqueue' || key === 'image_overlay' ||
-      key === 'youtube_public' || key === 'tiktok_public' || key === 'auto_image') {
+      key === 'youtube_public' || key === 'tiktok_public' || key === 'auto_image' || key === 'admin_api') {
     stored = raw === 'true' ? 'true' : 'false'
   } else if (key === 'alert_webhook') {
     /*
-     * **والعنوانُ يُحرَس عند الحفظ لا عند الإرسال وحدَه** (D-109).
-     *
-     * حارسٌ عند الإرسال يمنع النداء، **ويترك المالكَ يظنّ قناتَه مضبوطة
-     * حتّى يقع الحدثُ فلا يصل** — وذاك أسوأُ وقتٍ لاكتشاف العطل.
-     * فيُردّ العنوانُ في وجهه وهو ينظر.
+     * **ولا يُكتب العنوانُ مقروءًا من هنا** (D-318): سرٌّ حاملٌ يُشفَّر بالمفتاح (`saveWebhook`)، وهذه الدالّةُ بلا مفتاح.
+     * ومسارٌ ينسى ذلك يُردّ بخطأٍ يُرى، لا يحفظ السرَّ مقروءًا بصمت.
      */
-    const trimmed = raw.trim()
-    if (trimmed === '') stored = ''
-    else {
-      const verdict = checkProviderUrl(trimmed)
-      stored = verdict.ok ? verdict.url : ''
-    }
+    throw new Error('alert_webhook_sealed: saveWebhook')
   } else if (key === 'dashboard_tiles') {
     /*
      * **ويُصفَّى بقواعد القراءة نفسِها** (D-119).

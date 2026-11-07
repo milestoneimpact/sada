@@ -160,8 +160,9 @@ jobs:
             fi
           fi
 
-          # ٢ · الرادّ صدى لا قالب: phase_0 حقلٌ لا يعرفه غيرها
-          if ! grep -q '"phase_0"' /tmp/ready.json; then
+          # ٢ · الرادّ صدى لا قالب: اسمُ الخدمة في جوابها. وكان `phase_0`، فخرج مع التفصيل
+          #     إلى `/admin/ready` خلف كلمة الإدارة (D-318): `/ready` العامّ يقول الحالَ وحدَها
+          if ! grep -q '"service":"sada-api"' /tmp/ready.json; then
             echo "::error::الخادم يستجيب لكن جوابه ليس جواب صدى — قالبٌ قديم ما يزال منشوراً؟"
             exit 1
           fi
@@ -232,6 +233,7 @@ jobs:
             exit 0
           fi
 
-          echo "::warning::النشر تمّ وصدى تعمل والقاعدة موصولة — وأسرارٌ ما تزال ناقصة:"
-          echo "::warning::$(grep -o '"missing_secrets":\[[^]]*\]' /tmp/ready.json || echo 'تعذّرت قراءة القائمة')"
+          echo "::warning::النشر تمّ وصدى تعمل والقاعدة موصولة — وصدى ليست جاهزةً بعد (أسرارٌ ناقصة)."
+          # ‏وأسماؤها لا تُقرأ من `/ready` العامّ بعد D-318: في «ما عليك» باللوحة، أو `/admin/ready` بكلمة الإدارة
+          echo "::warning::أسماؤها في «ما عليك» باللوحة، أو: curl -H 'Authorization: Bearer <ADMIN_TOKEN>' $BASE/admin/ready"
           echo "::warning::هذه مهامّ المالك (docs/MANUAL-TASKS.md)، لا عطلٌ في النشر."

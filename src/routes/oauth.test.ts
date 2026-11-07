@@ -64,6 +64,17 @@ afterEach(() => {
   globalThis.fetch = realFetch
 })
 
+/**
+ * كعكةُ ربط الدورة بالمتصفّح من آخر بدء (D-318) — العودةُ تُرسَل بها كما يرسلها متصفّحُ المالك. وبلاها تُردّ العودة
+ * (`attackSurface.test.ts` يختبر ذلك)؛ فالاختباراتُ هنا لما بعد الربط من المتصفّح نفسِه.
+ */
+let binding = ''
+
+/** ترويساتُ العودة: كعكةُ الربط، وما يضيفه الاختبار من كعكات. */
+function withBinding(extra = ''): RequestInit {
+  return { headers: { Cookie: [binding, extra].filter((x) => x !== '').join('; ') } }
+}
+
 /** يمرّ بـ start ويعيد قيمة state التي أصدرها الخادم. */
 async function startAndCaptureState(
   platform: 'linkedin' | 'x',
@@ -74,6 +85,7 @@ async function startAndCaptureState(
 }> {
   const response = await start(`/oauth/${platform}/start${scope === undefined ? '' : `?scope=${scope}`}`)
   expect(response.status).toBe(302)
+  binding = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
   const location = new URL(response.headers.get('location') ?? '')
   return { state: location.searchParams.get('state') ?? '', location }
 }
@@ -232,7 +244,7 @@ describe('GET /oauth/:platform/callback', () => {
     const { state } = await startAndCaptureState('linkedin')
     const response = await app.request(
       `/oauth/linkedin/callback?code=the-code&state=${encodeURIComponent(state)}`,
-      {},
+      withBinding(),
       env,
     )
     expect(response.status).toBe(200)
@@ -251,7 +263,7 @@ describe('GET /oauth/:platform/callback', () => {
   it('لا يعيد رمزا في الاستجابة إطلاقا', async () => {
     stubNetwork()
     const { state } = await startAndCaptureState('x')
-    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     const body = await response.text()
     expect(body).not.toContain('x-access')
     expect(body).not.toContain('x-secret')
@@ -260,23 +272,23 @@ describe('GET /oauth/:platform/callback', () => {
   it('يرفض إعادة استعمال نفس state — الحاجز أمام الإعادة', async () => {
     stubNetwork()
     const { state } = await startAndCaptureState('x')
-    const first = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const first = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(first.status).toBe(200)
-    const second = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const second = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(second.status).toBe(400)
     expect((await second.json()) as unknown).toEqual({ error: 'invalid_state' })
   })
 
   it('يرفض state لم يصدر منا', async () => {
     stubNetwork()
-    const response = await app.request('/oauth/x/callback?code=c&state=مزور', {}, env)
+    const response = await app.request('/oauth/x/callback?code=c&state=مزور', withBinding(), env)
     expect(response.status).toBe(400)
   })
 
   it('يرفض state أصدر لمنصة أخرى', async () => {
     stubNetwork()
     const { state } = await startAndCaptureState('x')
-    const response = await app.request(`/oauth/linkedin/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/linkedin/callback?code=c&state=${state}`, withBinding(), env)
     expect(response.status).toBe(400)
     expect((await response.json()) as unknown).toEqual({ error: 'state_platform_mismatch' })
   })
@@ -284,7 +296,7 @@ describe('GET /oauth/:platform/callback', () => {
   it('يبلغ رفض المستخدم للموافقة كما هو، لا كعطل', async () => {
     const response = await app.request(
       '/oauth/x/callback?error=access_denied&state=s',
-      {},
+      withBinding(),
       env,
     )
     expect(response.status).toBe(400)
@@ -301,7 +313,7 @@ describe('GET /oauth/:platform/callback', () => {
     const { state } = await startAndCaptureState('linkedin')
     const response = await app.request(
       `/oauth/linkedin/callback?error=unauthorized_scope_error&state=${encodeURIComponent(state)}`,
-      {},
+      withBinding(),
       env,
     )
     expect(response.status).toBe(400)
@@ -386,7 +398,7 @@ describe('GET /oauth/:platform/callback', () => {
     const { state } = await startAndCaptureState('linkedin', 'identity')
     const response = await app.request(
       `/oauth/linkedin/callback?error=unauthorized_scope_error&state=${encodeURIComponent(state)}`,
-      {},
+      withBinding(),
       env,
     )
     const body = await response.text()
@@ -394,7 +406,7 @@ describe('GET /oauth/:platform/callback', () => {
   })
 
   it('يرد 400 حين يغيب code', async () => {
-    const response = await app.request('/oauth/x/callback?state=s', {}, env)
+    const response = await app.request('/oauth/x/callback?state=s', withBinding(), env)
     expect(response.status).toBe(400)
   })
 
@@ -403,7 +415,7 @@ describe('GET /oauth/:platform/callback', () => {
     globalThis.fetch = fakeFetch({
       [X.tokenUrl]: { status: 400, json: { error: 'invalid_grant' } },
     })
-    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(response.status).toBe(502)
     const count = db.raw.prepare('SELECT count(*) AS n FROM tokens').get() as { n: number }
     expect(count.n).toBe(0)
@@ -414,7 +426,7 @@ describe('GET /oauth/:platform/callback', () => {
     globalThis.fetch = fakeFetch({
       [X.tokenUrl]: { status: 400, json: { error: 'invalid_grant' } },
     })
-    await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     // ‏ما بقي في KV جلسةُ المالك ورمزُ دخوله، لا حالةُ OAuth
     expect((await kv.list?.({ prefix: 'oauth' }))?.keys ?? []).toHaveLength(0)
   })
@@ -428,7 +440,7 @@ describe('GET /oauth/:platform/callback', () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       throw new TypeError(`network disabled for ${String(input)}?access_token=سرّ`)
     }) as unknown as typeof fetch
-    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(response.status).toBe(502)
     expect(response.headers.get('Content-Type')).toContain('text/html')
     const body = await response.text()
@@ -452,7 +464,7 @@ describe('GET /oauth/:platform/callback', () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = fakeFetch({ [X.tokenUrl]: { status: 503, json: { error: 'temporarily_unavailable' } } })
     const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
-      { headers: { Cookie: `${COOKIE}=s1` } }, env)
+      withBinding(`${COOKIE}=s1`), env)
     expect(response.status).toBe(502)
     expect(response.headers.get('location')).toBeNull()
     const body = await response.text()
@@ -469,7 +481,7 @@ describe('GET /oauth/:platform/callback', () => {
       [X.tokenUrl]: { json: { access_token: 'x-access', expires_in: 7200 } },
       [X.identityUrl]: { status: 503, json: {} },
     })
-    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(response.status).toBe(502)
     const body = await response.text()
     expect(body).toContain('لم نصل إلى X الآن')
@@ -487,7 +499,7 @@ describe('GET /oauth/:platform/callback', () => {
     const { state } = await startAndCaptureState('x')
     globalThis.fetch = fakeFetch({})
     const response = await app.request(`/oauth/x/callback?code=c&state=${state}`,
-      { headers: { Cookie: `${COOKIE}=s1` } }, { ...env, X_CLIENT_SECRET: '' })
+      withBinding(`${COOKIE}=s1`), { ...env, X_CLIENT_SECRET: '' })
     expect(response.status).toBe(503)
     expect(response.headers.get('Content-Type')).toContain('text/html')
     const body = await response.text()
@@ -500,7 +512,7 @@ describe('GET /oauth/:platform/callback', () => {
   it('يربط حساب X بمعرفه لا باسمه', async () => {
     stubNetwork()
     const { state } = await startAndCaptureState('x')
-    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, {}, env)
+    const response = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     const body = await response.text()
     expect(body).toContain('Omar')
   })
@@ -510,7 +522,7 @@ describe('GET /oauth/:platform/callback', () => {
     for (let i = 0; i < 2; i += 1) {
       const { state } = await startAndCaptureState('linkedin')
       stubNetwork()
-      await app.request(`/oauth/linkedin/callback?code=c&state=${state}`, {}, env)
+      await app.request(`/oauth/linkedin/callback?code=c&state=${state}`, withBinding(), env)
     }
     const count = db.raw.prepare('SELECT count(*) AS n FROM accounts').get() as { n: number }
     expect(count.n).toBe(1)
@@ -530,13 +542,13 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
     return seen
   }
 
-  it('يرد 503 ولا ينادي Google حين لا ADMIN_TOKEN — مغلق افتراضا', async () => {
+  // ‏(D-318) كان يردّ ‏503 «admin_disabled» فيقول لأيّ منادٍ إنّ الرمزَ غيرُ مضبوطٍ على البيئة. صار الإخفاقُ ردًّا واحدًا،
+  // ‏والسببُ في سجلّ النشاط للمالك
+  it('يرد 401 ولا ينادي Google حين لا ADMIN_TOKEN — مغلق افتراضا، ولا يقول السبب', async () => {
     const net = watchNetwork()
     const response = await app.request('/admin/scan', { method: 'POST' }, env)
-    expect(response.status).toBe(503)
-    expect((await response.json()) as Record<string, unknown>).toMatchObject({
-      error: 'admin_disabled',
-    })
+    expect(response.status).toBe(401)
+    expect((await response.json()) as Record<string, unknown>).toEqual({ error: 'unauthorized' })
     expect(net.calls).toBe(0)
   })
 
@@ -551,28 +563,27 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
     expect(net.calls).toBe(0)
   })
 
-  it('يميّز غياب الترويسة عن مخالفة الرمز — الأول لا يعطي طولا', async () => {
-    const bare = await app.request(
-      '/admin/scan',
-      { method: 'POST' },
-      { ...env, ADMIN_TOKEN: TOKEN },
-    )
-    expect(bare.status).toBe(401)
-    const bareBody = (await bare.json()) as Record<string, unknown>
-    expect(bareBody['error']).toBe('no_authorization_header')
-    expect(bareBody['presented_length']).toBeUndefined()
-  })
-
-  it('يعيد طول ما أرسله المنادي ليكشف القوسين والمسافة', async () => {
-    const response = await app.request(
+  /*
+   * ‏(D-318) كان الردُّ يميّز غيابَ الترويسة من مخالفة الرمز، ويعيد طولَ ما أُرسل ليكشف القوسين والمسافة. والتمييزُ
+   * ‏للمنادي تسريبٌ («الإخفاقُ لا يقول شيئًا»)، فصار الردُّ واحدًا — **والطولُ والسببُ في سجلّ النشاط** يقرؤهما المالكُ
+   * ‏وحدَه، فيبقى ما كان يكشف القوسين والمسافة.
+   */
+  it('غيابُ الترويسة ومخالفةُ الرمز ردٌّ واحد، والسببُ والطولُ في سجلّ النشاط للمالك', async () => {
+    const bare = await app.request('/admin/scan', { method: 'POST' }, { ...env, ADMIN_TOKEN: TOKEN })
+    const wrong = await app.request(
       '/admin/scan',
       { method: 'POST', headers: { Authorization: `Bearer <${TOKEN}>` } },
       { ...env, ADMIN_TOKEN: TOKEN },
     )
-    expect(response.status).toBe(401)
-    const body = (await response.json()) as Record<string, unknown>
-    expect(body['error']).toBe('unauthorized')
-    expect(body['presented_length']).toBe(TOKEN.length + 2)
+    expect(bare.status).toBe(401)
+    expect(wrong.status).toBe(401)
+    expect(await bare.text()).toBe(await wrong.text())
+    const reasons = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'admin.denied' ORDER BY id").all()
+    // ‏(مراجعة D-318) والثاني من العنوان نفسِه يحمل عدَّه: المردودُ يُكتب عند 1 و2 و4 و8 و16، والعددُ في التفصيل
+    expect(reasons).toEqual([
+      { detail: 'بلا ترويسة Authorization: Bearer' },
+      { detail: `كلمة إدارة مخالفة بطول ${TOKEN.length + 2} · المردود 2 من هذا العنوان في ربع ساعة` },
+    ])
   })
 
   it('لا يذكر قيمة الرمز في أيّ ردّ', async () => {
@@ -602,9 +613,10 @@ describe('POST /admin/scan — الحارس قبل أيّ عمل', () => {
 describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
   const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 
-  it('يرد 503 بلا ADMIN_TOKEN — النداء يكلّف مالا فلا يُترك مفتوحا', async () => {
+  // ‏(D-318) ‏401 لا ‏503: الإخفاقُ لا يقول إنّ الرمزَ غيرُ مضبوط
+  it('يرد 401 بلا ADMIN_TOKEN — النداء يكلّف مالا فلا يُترك مفتوحا', async () => {
     const response = await app.request('/admin/analyze/s1', { method: 'POST' }, env)
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(401)
   })
 
   it('يرد 401 لرمز خطأ', async () => {
@@ -616,7 +628,8 @@ describe('POST /admin/analyze/:sourceId — الحارس نفسه', () => {
     expect(response.status).toBe(401)
   })
 
-  it('بالرمز الصحيح يمضي إلى التحليل — ومصدر مفقود ليس عطل خادم', async () => {
+  it('بالرمز الصحيح — وبابُه مفتوحٌ بقرار المالك (D-318) — يمضي إلى التحليل، ومصدر مفقود ليس عطل خادم', async () => {
+    db.raw.prepare("INSERT INTO settings (key, value, updated_by, org_id) VALUES ('admin_api', 'true', 'panel', 'org_owner')").run()
     const response = await app.request(
       '/admin/analyze/لا-وجود-له',
       { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}` } },
@@ -656,14 +669,19 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     blocked: Array<{ task: string; missing_secret: string }>
   }
 
+  // ‏بابٌ لا يناديه أحدٌ في المستودع، فمغلقٌ حتّى يفتحه المالك (D-318) — والاختباراتُ هنا لما بعد فتحه
+  beforeEach(() => {
+    db.raw.prepare("INSERT INTO settings (key, value, updated_by, org_id) VALUES ('admin_api', 'true', 'panel', 'org_owner')").run()
+  })
+
   async function read(extra: Record<string, unknown> = {}): Promise<Body> {
     const response = await app.request('/admin/providers', auth(), ctx(extra))
     expect(response.status).toBe(200)
     return (await response.json()) as Body
   }
 
-  it('محروس كسائر مسارات الإدارة', async () => {
-    expect((await app.request('/admin/providers', {}, env)).status).toBe(503)
+  it('محروس كسائر مسارات الإدارة — والإخفاقُ ‏401 واحد (D-318)', async () => {
+    expect((await app.request('/admin/providers', {}, env)).status).toBe(401)
     expect((await app.request('/admin/providers', {}, ctx())).status).toBe(401)
   })
 
@@ -737,13 +755,15 @@ describe('GET /admin/providers — لوحة قراءة لا إدخال', () => {
     expect(body.window_days).toBe(30)
   })
 
+  /*
+   * ‏(D-318) كانت القاعدةُ كلُّها معطّلةً هنا، والمسارُ لا يقرأ غيرَ الدفتر. وصار الحارسُ يحجز النداءَ ويكتب صفَّ السجلّ
+   * ‏في القاعدة نفسِها — وقاعدةٌ لا تردّ تغلقه (D-291). فالمعطّلُ الدفترُ وحدَه، وهو ما يسمّيه الاختبار.
+   */
   it('دفتر لا يُقرأ لا يُسقط اللوحة — التوجيه يبقى مقروءا', async () => {
     const broken = {
-      prepare: () => ({
-        bind: () => ({
-          all: () => Promise.reject(new Error('D1 معطّلة')),
-        }),
-      }),
+      prepare: (query: string) => (/cost_ledger/.test(query)
+        ? { bind: () => ({ all: () => Promise.reject(new Error('D1 معطّلة')) }) }
+        : db.prepare(query)),
     }
     const response = await app.request('/admin/providers', auth(), ctx({ DB: broken }))
     expect(response.status).toBe(200)
@@ -763,6 +783,11 @@ describe('GET /admin/sources — الجسر الذي كان مفقودا', () =>
   function auth(): RequestInit {
     return { headers: { Authorization: `Bearer ${TOKEN}` } }
   }
+
+  // ‏مغلقٌ حتّى يفتحه المالك (D-318) — والاختباراتُ هنا لما بعد فتحه
+  beforeEach(() => {
+    db.raw.prepare("INSERT INTO settings (key, value, updated_by, org_id) VALUES ('admin_api', 'true', 'panel', 'org_owner')").run()
+  })
 
   async function seed(hash: string): Promise<string> {
     const id = crypto.randomUUID()
@@ -785,8 +810,8 @@ describe('GET /admin/sources — الجسر الذي كان مفقودا', () =>
     }>
   }
 
-  it('محروس كسائر مسارات الإدارة', async () => {
-    expect((await app.request('/admin/sources', {}, env)).status).toBe(503)
+  it('محروس كسائر مسارات الإدارة — والإخفاقُ ‏401 واحد (D-318)', async () => {
+    expect((await app.request('/admin/sources', {}, env)).status).toBe(401)
     expect((await app.request('/admin/sources', {}, withToken())).status).toBe(401)
   })
 
@@ -848,7 +873,17 @@ describe('GET /admin/sources — الجسر الذي كان مفقودا', () =>
   })
 })
 
-describe('/health و /ready', () => {
+/*
+ * ‏(D-318) كانت هذه الاختباراتُ تقرأ التفصيلَ من `/ready` العامّ — أسماءَ الأسرار الناقصة وما سدّته الخزانة لأيّ منادٍ.
+ * ‏صار التفصيلُ خلف كلمة الإدارة (`/admin/ready`) بالمنطق نفسِه، و`/ready` يقول الحالَ وحدَها (`attackSurface.test.ts`).
+ */
+describe('/health و /admin/ready', () => {
+  const READY_TOKEN = 'ready-admin-token-0123456789abcdef'
+  /** التفصيلُ بكلمة الإدارة — والبيئةُ كما يمرّرها الاختبار. */
+  function readyDetail(candidate: Record<string, unknown>): Promise<Response> {
+    return Promise.resolve(app.request('/admin/ready', { headers: { Authorization: `Bearer ${READY_TOKEN}` } }, { ...candidate, ADMIN_TOKEN: READY_TOKEN }))
+  }
+
   it('health يجيب بلا شرط', async () => {
     const response = await app.request('/health', {}, env)
     expect(response.status).toBe(200)
@@ -864,7 +899,7 @@ describe('/health و /ready', () => {
   }
 
   it('ready يرد 503 ويسمي الناقص بلا قيمته', async () => {
-    const response = await app.request('/ready', {}, { ...env, X_CLIENT_SECRET: '' })
+    const response = await readyDetail({ ...env, X_CLIENT_SECRET: '' })
     expect(response.status).toBe(503)
     const body = (await response.json()) as ReadyBody
     expect(body.missing_secrets).toContain('X_CLIENT_SECRET')
@@ -875,7 +910,7 @@ describe('/health و /ready', () => {
   })
 
   it('ready يرد 200 بأسرار المرحلة صفر وحدها — المرحلة ١ ليست شرط بوابة', async () => {
-    const response = await app.request('/ready', {}, env)
+    const response = await readyDetail(env)
     expect(response.status).toBe(200)
     const body = (await response.json()) as ReadyBody
     expect(body.phase_0).toBe(true)
@@ -895,13 +930,13 @@ describe('/health و /ready', () => {
   it('**ما سُدّ من الخزانة يُجيز البوّابة** — ولا جواب يناقض نفسَه', async () => {
     // بيئةٌ بلا سرَّي LinkedIn: الخزانةُ وحدَها تسدّهما
     const bare = { ...env, LINKEDIN_CLIENT_ID: '', LINKEDIN_CLIENT_SECRET: '' }
-    const before = (await (await app.request('/ready', {}, bare)).json()) as ReadyBody
+    const before = (await (await readyDetail(bare)).json()) as ReadyBody
     expect(before.phase_0).toBe(false)
     expect(before.missing_secrets).toContain('LINKEDIN_CLIENT_ID')
 
     await saveApp(db, KEY, 'linkedin', 'li-id', 'li-secret-long-enough', 'panel')
 
-    const response = await app.request('/ready', {}, bare)
+    const response = await readyDetail(bare)
     const after = (await response.json()) as ReadyBody
     expect(after.missing_secrets).not.toContain('LINKEDIN_CLIENT_ID')
     expect(after.phase_0).toBe(true)
@@ -911,7 +946,7 @@ describe('/health و /ready', () => {
   /** **والجوابُ لا يناقض نفسَه في أيّ حال**: لا ناقصَ ⇒ المرحلةُ ماضية. */
   it('لا ناقص ومع ذلك غير جاهز — حال لا تقع', async () => {
     for (const candidate of [env, { ...env, X_CLIENT_SECRET: '' }]) {
-      const body = (await (await app.request('/ready', {}, candidate)).json()) as ReadyBody
+      const body = (await (await readyDetail(candidate)).json()) as ReadyBody
       const missingPhase0 = body.missing_secrets.some((name) =>
         (PHASE_0_SECRETS as readonly string[]).includes(name),
       )
@@ -926,7 +961,7 @@ describe('/health و /ready', () => {
       ANTHROPIC_API_KEY: 'sk-ant-fake',
       DRIVE_FOLDER_ID: 'folder-1',
     }
-    const body = (await (await app.request('/ready', {}, full)).json()) as ReadyBody
+    const body = (await (await readyDetail(full)).json()) as ReadyBody
     expect(body.phase_1).toBe(true)
     expect(body.missing_secrets).toEqual([])
   })
@@ -938,7 +973,7 @@ describe('/health و /ready', () => {
       ANTHROPIC_API_KEY: 'sk-ant-fake',
       DRIVE_FOLDER_ID: '',
     }
-    const body = (await (await app.request('/ready', {}, noFolder)).json()) as ReadyBody
+    const body = (await (await readyDetail(noFolder)).json()) as ReadyBody
     expect(body.phase_1).toBe(false)
     expect(body.drive_folder).toBe(false)
   })

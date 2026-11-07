@@ -22,6 +22,7 @@
  */
 import type { Db } from '../tokens'
 import { recordCost } from '../cost'
+import { nonPublicHost, parseIPv4 } from '../net/ipGuard'
 import { withTimeout } from '../net/timeout'
 import { MAX_TEXT_BYTES } from '../drive/export'
 
@@ -196,7 +197,12 @@ export async function ingestFile(
   return { kind: 'added', id, name }
 }
 
-/** عنوانٌ يُقبل: https، واسمُ مضيفٍ لا عنوانُ IP ولا اسمٌ محلّيّ. */
+/**
+ * عنوانٌ يُقبل: https، واسمُ مضيفٍ لا عنوانُ IP ولا اسمٌ محلّيّ — **ويُفحص به كلُّ تحويلٍ لا الأوّلُ وحدَه** (D-318).
+ *
+ * والعنوانُ العدديُّ يُردّ كلُّه (مقالٌ على عنوانٍ عدديٍّ نادرٌ)، والمحلّيُّ والخاصُّ والمحجوزُ يُعرَف بأيّ كتابة
+ * (`nonPublicHost`): ستّ عشريّةٌ أو ثُمانيّةٌ أو مختصرةٌ أو مُعيَّنةُ IPv4.
+ */
 export function parseLink(raw: string): URL | string {
   let url: URL
   try {
@@ -206,8 +212,7 @@ export function parseLink(raw: string): URL | string {
   }
   if (url.protocol !== 'https:') return 'الرابطُ يبدأ بـ https:// وحدَه.'
   const host = url.hostname.toLowerCase()
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')
-    || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) {
+  if (nonPublicHost(host) !== null || parseIPv4(host) !== null || host.startsWith('[')) {
     return 'هذا العنوانُ ليس موقعًا عامًّا.'
   }
   if (url.username !== '' || url.password !== '') return 'رابطٌ يحمل اسمَ دخولٍ أو كلمةَ سرّ لا يُقبل.'
@@ -283,6 +288,47 @@ async function viaBrowser(deps: IngestDeps, url: URL, org: string): Promise<stri
   return body?.success === true && typeof body.result === 'string' ? cleanConverted(body.result) : null
 }
 
+/** كم تحويلًا يُتبَع (D-318): نطاقٌ إلى آخر، ثمّ نسخةٌ للهاتف، ثمّ متتبِّعُ نقرات — وما فوق الخمس سلسلةٌ لا يقصدها مقال. */
+export const MAX_LINK_HOPS = 5
+
+/**
+ * **التحويلُ يُتبَع يدًا ويُفحص في كلّ قفزة** (D-318).
+ *
+ * كان `fetch` يتبعه من تحتنا (`redirect: 'follow'`) بعد أن فُحص الرابطُ الأوّل وحدَه: صفحةٌ عامّةٌ تردّ ‏302 إلى
+ * `169.254.169.254` أو `0x7f.1` أو `http://` تصل إليه. فصار كلُّ `Location` يُحَلّ على ما سبقه ثمّ يمرّ بـ `parseLink`
+ * نفسِها، وخمسُ قفزاتٍ على الأكثر. **وما يبقى**: Workers لا يحلّ الاسمَ قبل النداء، فاسمٌ عامٌّ يشير سجلُّه إلى عنوانٍ
+ * داخليٍّ لا يُرى هنا (`net/ipGuard.ts`).
+ */
+async function followLink(deps: IngestDeps, first: URL): Promise<Response | string> {
+  const call = withTimeout(deps.fetchImpl ?? fetch, 30_000)
+  let target = first
+  for (let hop = 0; hop <= MAX_LINK_HOPS; hop += 1) {
+    let response: Response
+    try {
+      response = await call(target.toString(), {
+        redirect: 'manual',
+        headers: { Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8', 'User-Agent': 'Sada/1.0 (content reader)' },
+      })
+    } catch {
+      return 'تعذّر الوصول إلى الصفحة — تحقّق من الرابط أو جرّب بعد قليل.'
+    }
+    if (response.status < 300 || response.status > 399) return response
+    const location = response.headers.get('Location')
+    // ‏‏304 وأخواتُها بلا وجهة: ردٌّ يُحكَم عليه كما هو
+    if (location === null || location.trim() === '') return response
+    if (hop === MAX_LINK_HOPS) break
+    let next: URL | string
+    try {
+      next = parseLink(new URL(location, target).toString())
+    } catch {
+      next = 'هذا ليس رابطًا'
+    }
+    if (typeof next === 'string') return `الصفحةُ تحوِّل إلى عنوانٍ لا يُقرأ (${next.replace(/\.$/, '')}) — الصق رابطَ المقال نفسِه.`
+    target = next
+  }
+  return `الصفحةُ تحوِّل أكثرَ من ${MAX_LINK_HOPS} مرّات — الصق رابطَ المقال نفسِه (خمس قفزاتٍ على الأكثر).`
+}
+
 /**
  * رابطُ صفحة. **والرابطُ نفسُه مرّتين مصدرٌ واحد**: يُعاد قراءتُه، فإن تغيّر نصُّه حُدّث الصفُّ وبصمتُه فيُعاد تحليلُه،
  * وإن لم يتغيّر قيل «موجود» ولم يُكتب شيء.
@@ -290,16 +336,9 @@ async function viaBrowser(deps: IngestDeps, url: URL, org: string): Promise<stri
 export async function ingestLink(deps: IngestDeps, org: string, raw: string): Promise<IngestOutcome> {
   const url = parseLink(raw)
   if (typeof url === 'string') return reject(url)
-  const call = withTimeout(deps.fetchImpl ?? fetch, 30_000)
-  let response: Response
-  try {
-    response = await call(url.toString(), {
-      redirect: 'follow',
-      headers: { Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8', 'User-Agent': 'Sada/1.0 (content reader)' },
-    })
-  } catch {
-    return reject('تعذّر الوصول إلى الصفحة — تحقّق من الرابط أو جرّب بعد قليل.')
-  }
+  const fetched = await followLink(deps, url)
+  if (typeof fetched === 'string') return reject(fetched)
+  const response = fetched
   if (response.status === 401 || response.status === 403) {
     return reject('الصفحةُ خلف تسجيل دخول أو تمنع القراءة الآليّة — انسخ نصَّها في ملفٍّ وارفعه.')
   }

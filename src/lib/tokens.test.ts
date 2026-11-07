@@ -191,16 +191,28 @@ describe('مفتاح المنظّمة (D-238)', () => {
     ).rejects.toThrow()
   })
 
-  it('ورمز المالك بالمفتاح الأصل كما كان، فلا يُعاد تشفير ما حُفظ', async () => {
+  /*
+   * ‏(D-318) كان هذا الاختبارُ يثبّت أنّ رمزَ المالك يُفكّ بالمفتاح الخام — وهو ما عدّه التقييمُ ضعفًا في الفصل: الخامُ
+   * ‏مفتاحُ AES للمالك ومادّةُ HKDF لغيره معًا. فصار يثبّت العكس: الجديدُ مشتقٌّ موسومٌ بمعرّف مفتاحه ولا يفتحه الخام،
+   * ‏والقديمُ المشفَّرُ بالخام يُقرأ كما هو — فلا يُعاد تشفيرُ ما حُفظ إلّا في تدويرٍ معلَن.
+   */
+  it('ورمزُ المالك الجديدُ بمفتاحٍ مشتقٍّ موسوم، والقديمُ بالخام يُقرأ كما هو (D-318)', async () => {
     const id = await upsertAccount(db, 'org_owner', IDENTITY)
     await saveTokens(db, KEY, id, TOKENS)
     const row = db.raw.prepare('SELECT access_enc, access_iv FROM tokens WHERE account_id = ?').get(id) as {
       access_enc: string
       access_iv: string
     }
-    const { importKey, open, tokenContext } = await import('./crypto')
-    expect(
-      await open(await importKey(KEY), { ciphertext: row.access_enc, iv: row.access_iv }, tokenContext(id, 'access')),
-    ).toBe(TOKENS.accessToken)
+    const { importKey, keyId, open, seal, tokenContext } = await import('./crypto')
+    expect(row.access_enc.startsWith(`v2:${await keyId(KEY)}:`)).toBe(true)
+    await expect(
+      open(await importKey(KEY), { ciphertext: row.access_enc.split(':')[2]!, iv: row.access_iv }, tokenContext(id, 'access')),
+    ).rejects.toThrow()
+
+    // ‏صفٌّ كُتب قبل D-318 بالمفتاح الخام
+    const legacy = await seal(await importKey(KEY), 'legacy-access', tokenContext(id, 'access'))
+    db.raw.prepare('UPDATE tokens SET access_enc = ?, access_iv = ?, refresh_enc = NULL, refresh_iv = NULL WHERE account_id = ?')
+      .run(legacy.ciphertext, legacy.iv, id)
+    expect((await loadTokens(db, KEY, id))?.accessToken).toBe('legacy-access')
   })
 })

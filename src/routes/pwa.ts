@@ -15,13 +15,15 @@ import type { Env } from '../env'
 import { BASE_HEADERS } from '../lib/security/headers'
 import { loadSession } from '../lib/session'
 import { IDEA_MAX } from '../lib/draft/job'
-import { html } from './ui/html'
+import { html, raw } from './ui/html'
 import { injectCsrf, soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
 import { buildCommands } from './ui/command'
 import { THEME } from './ui/tokens'
 import { iconPngBytes } from './ui/iconPng'
 import { loginResponse, page } from './panel/shared'
+import { maySpend, SPEND_LOCKED } from '../lib/access'
+import { button } from './ui/components/button'
 
 export const pwa = new Hono<{ Bindings: Env }>()
 
@@ -110,7 +112,11 @@ pwa.get('/panel/share', async (c) => {
           <label class="vpf"><input type="checkbox" name="platform" value="linkedin" checked><span class="vpf-b"><b>LinkedIn</b></span></label>
           <label class="vpf"><input type="checkbox" name="platform" value="x" checked><span class="vpf-b"><b>X</b></span></label>
         </div></fieldset>
-      <div class="row gap-2"><button class="btn btn-primary" type="submit">اكتب المسوّدات</button>
+      <div class="row gap-2">${raw(button({
+        label: 'اكتب المسوّدات', variant: 'primary', type: 'submit',
+        // ‏والمحرّرُ لا يبدأ كتابةً مدفوعة (D-318): السببُ تحت الزرّ
+        ...(maySpend() ? {} : { disabled: { id: 'sh-lock', reason: SPEND_LOCKED } }),
+      }))}
         <span class="ago">نداءٌ لكلّ منصّة، وكلفتُه تُسجَّل قبل أن تُكتب المسوّدة.</span></div>
     </form></div>`.value
   return page((nonce) =>

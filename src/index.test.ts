@@ -230,3 +230,26 @@ describe('موزّع الدورات', () => {
     expect(published).toHaveLength(1)
   })
 })
+
+describe('دورةُ تدوير TOKEN_ENC_KEY في المجدول (D-318)', () => {
+  it('لا تعمل بلا المفتاح السابق، ومعه تعيد تشفيرَ ما عليه بالجديد', async () => {
+    const { keyId, registerKeyring, toBase64 } = await import('./lib/crypto')
+    const { resolveKey, saveKey } = await import('./lib/providers')
+    const OLD = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+    const NEW = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+    registerKeyring({ TOKEN_ENC_KEY: OLD })
+    await saveKey(db, OLD, 'anthropic', 'sk-ant-cron-0001', 'panel')
+    const stored = (): string => (db.raw.prepare("SELECT key_enc FROM providers WHERE name = 'anthropic'").get() as { key_enc: string }).key_enc
+    const before = stored()
+    const tick = (extra: Record<string, unknown>): Promise<void> =>
+      worker.scheduled({ cron: '0 0 1 1 *' } as ScheduledController, { ...env(0), ...extra } as never)
+
+    await tick({ TOKEN_ENC_KEY: NEW })
+    expect(stored()).toBe(before)
+
+    await tick({ TOKEN_ENC_KEY: NEW, TOKEN_ENC_KEY_PREV: OLD })
+    expect(stored().startsWith(`v2:${await keyId(NEW)}:`)).toBe(true)
+    registerKeyring({ TOKEN_ENC_KEY: NEW })
+    expect((await resolveKey(db, NEW, 'anthropic', undefined)).key).toBe('sk-ant-cron-0001')
+  })
+})

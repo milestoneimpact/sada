@@ -64,19 +64,47 @@ const STEP_UP_POST: readonly RegExp[] = [
 
 export function needsStepUp(method: string, path: string, settingKey?: string | null): boolean {
   if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path)
-  if (path === '/panel/settings') return settingKey === 'alert_webhook'
+  // ‏وفتحُ أبواب الطرفيّة (D-318): بابٌ يُنادى برمزٍ ثابتٍ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
+  if (path === '/panel/settings') return settingKey === 'alert_webhook' || settingKey === 'admin_api'
   return STEP_UP_POST.some((re) => re.test(path))
 }
 
 /**
  * ما لا يُعاد رسمُه بعد «تحقّق للتوّ» (D-317): **سرٌّ كتبه المالك لا يُخزَّن في الطريق ولا يُطبَع في صفحة** — يُطلب
  * منه ثانيةً. والباقي يُعاد في النموذج كما أرسله ليراه ويضغط «أكمل» بنفسه، فلا يُعاد جسدٌ بلا علمه.
+ *
+ * **والسرُّ بمفتاح الإعداد لا بالمسار وحده، والفارغُ ليس سرًّا** (مراجعة D-318): كان `value` في `/panel/settings` سرًّا لكلّ
+ * إعداد، فـ«افتحها» في أبواب الطرفيّة (`value=true`) و«أزل القناة» (`value` فارغ) يُعادان بحقل عنوانٍ إلزاميّ: «true» لا
+ * يُقبَل فيه، والعنوانُ الملصوقُ يحفظ `false` أو يستبدل القناةَ بدل إزالتها. فـ`value` سرٌّ لعنوان القناة وحدَه، وما فرغ
+ * من حقول السرّ يُعاد مخفيًّا كما أُرسل.
  */
-export const STEP_UP_SECRET_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  '/panel/providers/key': ['key'],
-  '/panel/providers/add': ['key'],
-  '/panel/settings': ['value'],
+export function stepUpSecretFields(path: string, form: { get(name: string): unknown } | null): readonly string[] {
+  const names = path === '/panel/providers/key' || path === '/panel/providers/add'
+    ? ['key']
+    : path === '/panel/settings' && form?.get('key') === 'alert_webhook' ? ['value'] : []
+  return names.filter((name) => {
+    const value = form?.get(name)
+    return typeof value === 'string' && value.trim() !== ''
+  })
 }
+
+/**
+ * **الأفعالُ المدفوعة** (D-318) — كلٌّ منها نداءٌ إلى خدمة كتابةٍ أو صور يُسجَّل في `cost_ledger`. والمحرّرُ يعدّل المسوّدةَ
+ * القائمة مجّانًا (`/panel/drafts/decide` بـ«احفظ») ويكتب نصوصَ المقطع بيده، ولا يبدأ واحدًا من هذه — ولا يُنشئ مسوّدةَ نصٍّ
+ * من الصفر حتّى يُبنى «اكتب بنفسك» (D-324).
+ */
+const SPEND_PATHS = /^\/panel\/(plan\/generate|drafts\/(write|idea)|media\/(generate|regenerate|animate)|uploads\/[^/]+\/captions)$/
+
+/** أدنى دورٍ يبدأ فعلًا مدفوعًا (D-318). */
+export const SPEND_ROLE: Role = 'publisher'
+
+/** نصُّ السبب تحت كلّ زرٍّ مدفوعٍ يراه المحرّر — **لا زرَّ معطَّلًا بلا سبب** (خطّة التصميم 7.1). */
+/*
+ * ‏(مراجعة D-318) كان يقول «وكتابة المسوّدة وتعديلها مفتوحان لك» تحت زرَّي إنشاء المسوّدة نفسيهما وهما معطَّلان: البابان
+ * ‏الوحيدان اللذان يُنشئان مسوّدةَ نصٍّ (`/panel/drafts/write` و`/panel/drafts/idea`) مدفوعان، و«اكتب بنفسك» لم يُبنَ بعد
+ * ‏(D-324). فالنصُّ يقول ما يفتحه الخادمُ للمحرّر فعلًا: تعديلُ ما بدأه غيرُه، ونصوصُ المقطع بيده (`/panel/uploads/:id/posts`).
+ */
+export const SPEND_LOCKED = 'يبدؤه الناشر أو المدير أو المالك: كلّ توليد نداء مدفوع، والإنفاق لمن يعتمد. وتعديل المسوّدات القائمة وكتابة نصوص المقطع بيدك مفتوحان لك.'
 
 const RULES: readonly (readonly [RegExp, Role])[] = [
   // ‏عواملُ الحساب نفسِه (D-317): كلُّ دورٍ يسجّل عاملَه ويزيله ويتحقّق للتوّ — والمسارُ لا يمسّ إلّا عواملَ بريد الجلسة
@@ -91,6 +119,9 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/plan\/(approve|approve-all|start|schedule|pin|review\/approve|review\/bulk)$/, 'publisher'],
   [/^\/panel\/uploads\/[^/]+\/schedule$/, 'publisher'],
   [/^\/panel\/client\/report\/send$/, 'publisher'],
+  // ‏**وما يُنفق مالًا لمن يعتمد** (D-318): توليدُ الخطّة، والكتابةُ بالذكاء (من مصدرٍ أو فكرةٍ أو نصوصِ مقطع)، والصورُ،
+  // ‏وتحريكُها فيديو. كان المحرّرُ يبدأها كلَّها والسقوفُ وحدَها تحدّه؛ وصار الإنفاقُ مربوطًا بالدور الذي يعتمد
+  [SPEND_PATHS, 'publisher'],
   // ‏المحرّر: الكتابةُ والتعديلُ والتخطيطُ والوسائط
   [/^\/panel\/(drafts\/(write|idea|spread)|media|uploads|plan|client\/brief|assets\/upload)(\/|$)/, 'editor'],
   // ‏القارئ: الانتقالُ بين شركاته، وإطفاءُ عدّاد الإشعارات (D-294) — الفعلُ نفسُه يبقى بدوره في مساره
@@ -129,6 +160,15 @@ export function runAs<T>(who: Who, fn: () => T): T {
 /** من يعمل الآن — أو `undefined` خارج طلبٍ مُصادَق (المهامُّ المجدولةُ والطوابير). */
 export function whoNow(): Who | undefined {
   return store.getStore()
+}
+
+/**
+ * أيبدأ صاحبُ الطلب فعلًا مدفوعًا؟ (D-318) — والصفحةُ خارج طلبٍ مُصادَق للمالك (عيّناتُ التدقيق) كـ`ownerViewing`. تسأله
+ * الواجهةُ لترسم السببَ بدل الزرّ، والحارسُ يردّ المسارَ نفسَه على الخادم (`SPEND_PATHS`).
+ */
+export function maySpend(): boolean {
+  const who = store.getStore()
+  return who === undefined || allows(who.role, SPEND_ROLE)
 }
 
 /**

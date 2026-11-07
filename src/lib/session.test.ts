@@ -292,6 +292,28 @@ describe('جرد الجلسات وإبطالها', () => {
     expect(await kv.get('login-attempts:1.2.3.4')).toBe('3')
   })
 
+  /*
+   * ‏(D-318) كان الجردُ يمشي كلَّ مفاتيح `session:` لكلّ من فتح الإعدادات، فيحمل جلساتِ المالك وكلِّ عضوٍ بعناوينها
+   * ‏ومتصفّحاتها — ولو لم تُرسَم. فصار الجردُ لصاحب الجلسة وحدَه ما لم يُطلَب «الكلّ»، و«الكلّ» يحمل بريدَ كلِّ جلسة.
+   */
+  it('الجردُ لصاحب الجلسة وحدَه، و«الكلّ» يحمل بريدَ كلّ جلسة (D-318)', async () => {
+    const owner = await open({ 'CF-Connecting-IP': '203.0.113.9' })
+    const member = await createEmailSession(kv, TOKEN, { email: 'sara@example.com', role: 'admin' },
+      new Request('https://sada2.basserh.com/panel/login', { method: 'POST', headers: { 'CF-Connecting-IP': '198.51.100.7' } }))
+    if (!('id' in member)) throw new Error('توقّعنا جلسة')
+
+    const mine = await listSessions(kv, member.id)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.ip).toBe('198.51.100.7')
+    expect(JSON.stringify(mine)).not.toContain('203.0.113.9')
+
+    const everyone = await listSessions(kv, owner, 'all')
+    expect(everyone).toHaveLength(2)
+    expect(everyone.map((x) => x.email).sort()).toEqual([OWNER_EMAIL, 'sara@example.com'].sort())
+    // ‏وبلا جلسةٍ حاليّة لا جرد: لا صاحبَ يُعرَف فيُعرَض له
+    expect(await listSessions(kv, null)).toEqual([])
+  })
+
   it('مخزن بلا list يعطي جردا فارغا ولا يسقط', async () => {
     const { list: _ignored, ...noList } = kv
     expect(await listSessions(noList, null)).toEqual([])

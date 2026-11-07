@@ -36,7 +36,7 @@ import { securitySection } from './ui/sections/security'
 import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
-import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW } from './ui/scripts'
+import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
@@ -383,7 +383,7 @@ export interface PanelData {
    * بفراغٍ في نصف المواضع حقلٌ يكذب**.
    */
   readonly peaks?: Readonly<Record<string, Peaks>>
-  /** عنوانُ قناة التنبيهات (D-109) — وفارغٌ يعني «لا قناة». */
+  /** **قناعُ** عنوان قناة التنبيهات (D-109 · D-318) — للمالك وحدَه، وفارغٌ يعني «لا قناة» أو «ليس لك». */
   readonly alertWebhook: string
   /** بطاقاتُ لوح المالك بمعرِّفاتها (D-119) — **مصفّاةً**. */
   readonly dashboardTiles: string
@@ -434,6 +434,8 @@ export interface PanelData {
   readonly channels: readonly ChannelView[]
   /** أصلُ اللوحة — يُبنى منه رابطُ العودة المعروض للنسخ. */
   readonly baseUrl: string
+  /** أبوابُ الطرفيّة الثلاثة مفتوحةٌ بقرار المالك؟ (D-318) — والغائبُ مغلقة. */
+  readonly adminApi?: boolean
   /** كم توصيةَ ترويجٍ تنتظر بتّك — عددٌ على رابط التقرير (D-058). */
   readonly openSuggestions: number
   /** عدُّ المنشورات بحالها ومنصّتها من القاعدة كلِّها — لرحلة الرئيسيّة (D-177). */
@@ -498,7 +500,7 @@ export type AccountsData = Pick<PanelData, 'channels'>
 export type SettingsData = Pick<PanelData,
   'dashboardTiles' | 'analysisCap' | 'usedAnalyses' | 'spendCap' | 'usedSpend' | 'videoCap' | 'usedClips' | 'promoCap'
   | 'autoEnqueue' | 'autoImage' | 'imageCap' | 'usedImages' | 'alertWebhook' | 'outbox' | 'imageOverlay' | 'slide'
-  | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl'>
+  | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl' | 'adminApi'>
 
 /** «التحليل»: اللوحُ المحوريّ. */
 export type ResultsData = Pick<PanelData, 'pivot'>
@@ -523,6 +525,8 @@ export interface PanelFactors {
   }[]
   readonly totpConfirmed: boolean
   readonly recoveryLeft: number
+  /** رموزٌ على مفتاحٍ غير الحاليّ (مراجعة D-318) — تبطل أو بطلت. */
+  readonly recoveryStale?: number
   readonly enforced: boolean
 }
 
@@ -534,6 +538,8 @@ export interface PanelSession {
   readonly ua: string
   readonly via: 'admin_token' | 'passkey' | 'email_code'
   readonly current: boolean
+  /** صاحبُ الجهاز (D-318) — يُرسَم تحت عنوانه، والمالكُ وحدَه يرى أجهزةَ غيره. */
+  readonly email?: string
 }
 
 export interface PanelAudit {
@@ -817,7 +823,7 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
  * ورابطُ العودة لكلّ منصّة كما يُلصق في بوّابتها، وأسماءُ أسرار Worker الناقصة — **أسماءٌ لا قيَم**، ولا يُقرأ سرٌّ هنا.
  * كانت أسماءُ الأسرار على بطاقة «الحسابات» فرُفعت عنها في D-205؛ فهذا موضعُها.
  */
-function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<SettingsData, 'baseUrl'>): string {
+function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<SettingsData, 'baseUrl' | 'adminApi'>): string {
   const built = d.channels.filter((v) => v.spec.built)
   const rows = built.map((v) => `<tr><th scope="row">${escapeHtml(v.spec.label)}</th>
       <td dir="ltr" class="mono">${escapeHtml(`${d.baseUrl}/oauth/${v.spec.id}/callback`)}</td>
@@ -832,7 +838,32 @@ function devPane(d: Pick<ShellData, 'channels' | 'env' | 'rpId'> & Pick<Settings
     <p class="hint">رابط العودة يُلصق حرفًا في بوّابة كلّ منصّة — <b>ولا يُخلَط النطاقان</b>. والأسرار أسماؤها وحدها؛
       تُضبط بـ<span class="mono">wrangler secret put</span> أو من شاشة المنصّة.</p>
     <div class="scroll"><table><thead><tr><th>المنصّة</th><th>رابط العودة</th><th>أسرار Worker الناقصة</th></tr></thead>
-      <tbody>${rows}</tbody></table></div></div>`
+      <tbody>${rows}</tbody></table></div></div>
+  ${adminApiCard(d.adminApi === true)}`
+}
+
+/**
+ * **أبوابُ الطرفيّة** (D-318) — ما يُنادى بكلمة الإدارة من الطرفيّة بلا عاملٍ ثانٍ. الجاهزيّةُ والمسحُ مفتوحان دائمًا (تذكرهما
+ * «ما عليك» وسيرُ النشر)، والثلاثةُ التي لا يناديها شيءٌ في المستودع مغلقةٌ حتّى يفتحها المالكُ هنا، بتحقّقٍ للتوّ.
+ */
+function adminApiCard(open: boolean): string {
+  return html`<div class="card mt-3" id="admin-api"><h2>أبواب الطرفيّة</h2>
+    <p class="hint">تُنادى بكلمة الإدارة (<span class="mono">ADMIN_TOKEN</span>) من الطرفيّة، بلا عامل ثانٍ.
+      <b>الجاهزيّة والمسح مفتوحان دائمًا</b>، وكلّ نداء بالكلمة صفّ في سجلّ النشاط، وثلاثون نداءً في ربع ساعة لكلّ عنوان.</p>
+    <div class="split">
+      <p class="m-0">${raw(open
+        ? 'الثلاثة الأخرى <b>مفتوحة</b>: قراءة خدمات الكتابة والصور، وقراءة المصادر، والتحليل المدفوع بسقوف اللوحة نفسِها.'
+        : 'الثلاثة الأخرى <b>مغلقة</b>: قراءة خدمات الكتابة والصور، وقراءة المصادر، والتحليل المدفوع — ولكلّ منها باب في اللوحة.')}</p>
+      <form class="inline" method="POST" action="/panel/settings"
+            data-confirm="${open
+              ? 'إغلاق الأبواب الثلاثة؟ تبقى الجاهزيّة والمسح.'
+              : 'فتح الأبواب الثلاثة لكلمة الإدارة؟ من يملكها يقرأ ويحلّل بلا عامل ثانٍ، بسقوف الإنفاق نفسِها.'}">
+        <input type="hidden" name="key" value="admin_api">
+        <input type="hidden" name="value" value="${open ? 'false' : 'true'}">
+        <button class="btn btn-secondary" type="submit">${open ? 'أغلقها' : 'افتحها'}</button>
+      </form>
+    </div>
+  </div>`.value
 }
 
 /**
@@ -1345,7 +1376,9 @@ function settingsPane(d: ShellData & SettingsData): string {
     </form>
   </div>
 
-  ${alertChannel(d.alertWebhook, d.outbox)}
+  ${/* ‏قناةُ التنبيهات للمالك وحدَه (D-318): عنوانُها سرٌّ حامل، وما خرج إليها يحمل أحداثَ أمان حسابه */ ''}
+  ${ownerView ? alertChannel(d.alertWebhook, d.outbox) : `<div class="card mt-3"><h2>قناة التنبيهات</h2>
+    <p class="hint m-0">يضبطها المالك وحده: عنوانُها يفتح القناةَ لمن يقرؤه، وما يخرج إليها يحمل أحداثَ أمان حسابه.</p></div>`}
 
   <div class="card mt-3"><h2>النصّ فوق الصورة</h2>
     <div class="split">
@@ -1448,6 +1481,7 @@ ${ownerView ? `<div data-sub id="security-all">
       ? `بقي <b>${d.factors.recoveryLeft}</b> رمزا غير مستهلَك. تُعرض مرّةً واحدةً حين تُولَّد،
          ولا تُقرأ من القاعدة بعدها — لا لنا ولا لمن سرق نسخةً منها.`
       : 'لا رموز استرداد. وبلا طريق رجوع يصير فقد الجهاز قفلا نهائيّا.'}</p>
+    ${(d.factors.recoveryStale ?? 0) > 0 ? noticeText('warn', recoveryStaleNote(d.factors.recoveryLeft, d.factors.recoveryStale ?? 0)) : ''}
     <div class="row">
       <button class="btn ${d.factors.recoveryLeft === 0 && d.factors.passkeys.length > 0 ? 'btn-primary' : 'btn-secondary'}" id="rc-issue" type="button" data-renew-ask="${escapeHtml(RC_RENEW.ask)}" data-renew-ok="${escapeHtml(RC_RENEW.ok)}"${d.factors.recoveryLeft > 0
         // ‏والسؤالُ حين يُبطَل شيءٌ وحده (D-323): أوّلُ مجموعةٍ لا تُبطل شيئًا — وما يُولَّد في الصفحة يُضيف السؤالَ سكربتُها

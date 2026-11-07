@@ -4,7 +4,7 @@
  * لا رمز خام يعبر من هنا إلى D1، ولا رمز مشفر يعبر إلى خارج هذه الوحدة إلا
  * مفكوكا لمن طلبه صراحة (D-005). ولا تُسجل قيمة رمز في أي مسار.
  */
-import { deriveKey, importKey, open, seal, tokenContext } from './crypto'
+import { legacyOrgKey, openScoped, sealScoped, tokenContext } from './crypto'
 import type { TokenResponse } from './oauth/exchange'
 import type { Platform } from './oauth/providers'
 import { changedRows } from './dbResult'
@@ -93,11 +93,11 @@ export async function upsertAccount(
 }
 
 /**
- * مفتاحُ رموز المنظّمة (D-238): المالكُ بالمفتاح الأصل فلا يُعاد تشفيرُ رمزٍ قائم،
- * وغيرُه بمفتاحٍ مشتقٍّ باسمه. والاسمُ حرفيٌّ هنا لا من `tenancy`، وإلّا دارت الحلقة.
+ * نطاقُ رموز المنظّمة (D-238 · D-318): **كلُّ منظّمةٍ مفتاحُها مشتقٌّ باسمها — المالكُ معها**، والنصُّ الجديدُ موسومٌ
+ * بمعرّف مفتاحه. والقديمُ يُقرأ بطريقته (`legacyOrgKey`): المالكُ بالخام، والعميلُ بالمشتقّ القديم.
  */
-async function orgKey(encKey: string, org: string): Promise<CryptoKey> {
-  return org === 'org_owner' ? importKey(encKey) : deriveKey(encKey, org)
+export function tokenScope(org: string): string {
+  return `tokens:${org}`
 }
 
 /** يشفر الرموز ويكتبها. يستبدل ما كان للحساب نفسه. */
@@ -113,12 +113,11 @@ export async function saveTokens(
     .bind(id)
     .first<{ org_id: string }>()
   const org = owner?.org_id ?? 'org_owner'
-  const key = await orgKey(encKey, org)
-  const access = await seal(key, tokens.accessToken, tokenContext(id, 'access'))
+  const access = await sealScoped(encKey, tokenScope(org), tokens.accessToken, tokenContext(id, 'access'))
   const refresh =
     tokens.refreshToken === null
       ? null
-      : await seal(key, tokens.refreshToken, tokenContext(id, 'refresh'))
+      : await sealScoped(encKey, tokenScope(org), tokens.refreshToken, tokenContext(id, 'refresh'))
 
   await db
     .prepare(
@@ -193,18 +192,23 @@ export async function loadTokens(
   ).first<TokenRow>()
   if (row === null) return null
 
-  const key = await orgKey(encKey, row.org_id)
-  const accessToken = await open(
-    key,
+  const scope = tokenScope(row.org_id)
+  const legacy = legacyOrgKey(row.org_id)
+  const accessToken = await openScoped(
+    encKey,
+    scope,
     { ciphertext: row.access_enc, iv: row.access_iv },
     tokenContext(id, 'access'),
+    legacy,
   )
   const refreshToken =
     row.refresh_enc !== null && row.refresh_iv !== null
-      ? await open(
-          key,
+      ? await openScoped(
+          encKey,
+          scope,
           { ciphertext: row.refresh_enc, iv: row.refresh_iv },
           tokenContext(id, 'refresh'),
+          legacy,
         )
       : null
 

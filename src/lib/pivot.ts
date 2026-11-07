@@ -25,6 +25,7 @@
 
 /** صفُّ الحقيقة — **منشورٌ واحد**، بكلّ ما يُقاس عليه. */
 import { PLATFORM_LABEL } from './oauth/providers'
+import { neutralizeFormula } from './csv'
 
 export interface Fact {
   readonly platform: string
@@ -292,13 +293,14 @@ export function cellText(v: number | null, m: Measure): string {
  * - الفاصلُ `,` والسطرُ `\r\n`، والخليّةُ تُحاط بعلامتَي تنصيصٍ إن حملت
  *   فاصلًا أو تنصيصًا أو سطرًا، والتنصيصُ الداخليُّ يُضاعَف.
  * - وعلامةُ `BOM` في أوّل الملفّ: **بدونها يفتح Excel العربيّةَ رموزًا**.
- * - وخليّةٌ تبدأ بـ`=` أو `+` أو `-` أو `@` **تُسبَق بفاصلةٍ عليا**: جدولُ
- *   البيانات ينفّذها صيغةً، ومفتاحُ حسابٍ يكتبه غيرُنا قد يبدأ بها.
+ * - وخليّةٌ تبدأ بـ`=` أو `+` أو `-` أو `@` أو جدولةٍ أو رجوعِ سطر **تُسبَق
+ *   بفاصلةٍ عليا** (`neutralizeFormula` · D-318): جدولُ البيانات ينفّذها
+ *   صيغةً، ومفتاحُ حسابٍ يكتبه غيرُنا قد يبدأ بها.
  */
 export function toCsv(table: PivotTable, spec: PivotSpec): string {
   const twoAxis = spec.cols !== null
   const cell = (raw: string): string => {
-    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
+    const safe = neutralizeFormula(raw)
     return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
   }
   const line = (cells: readonly string[]): string => cells.map(cell).join(',')

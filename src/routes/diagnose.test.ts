@@ -26,8 +26,13 @@ let csrf = ''
 async function startWithSession(path: string): Promise<Response> {
   const login = await emailLogin(app, env)
   const cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0]!
-  return await app.request(path, { headers: { Cookie: cookie } }, env)
+  const response = await app.request(path, { headers: { Cookie: cookie } }, env)
+  binding = (response.headers.get('Set-Cookie') ?? '').split(';')[0]!
+  return response
 }
+
+/** كعكةُ ربط الدورة بالمتصفّح من آخر بدء (D-318) — العودةُ تُرسَل بها كما يرسلها متصفّحُ المالك. */
+let binding = ''
 
 beforeEach(() => {
   db = fakeDb()
@@ -62,7 +67,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
       const response = await app.request(
         `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
-        {},
+        { headers: { Cookie: binding } },
         env,
       )
 
@@ -104,7 +109,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       const body = await (
         await app.request(
           `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
-          {},
+          { headers: { Cookie: binding } },
           env,
         )
       ).text()
@@ -130,7 +135,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       const body = await (
         await app.request(
           `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
-          {},
+          { headers: { Cookie: binding } },
           env,
         )
       ).text()
@@ -157,7 +162,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
       const body = await (
         await app.request(
           `/oauth/linkedin/callback?code=c&state=${encodeURIComponent(state)}`,
-          {},
+          { headers: { Cookie: binding } },
           env,
         )
       ).text()
@@ -178,7 +183,7 @@ describe('١ · رفض نهاية الرمز يُشخَّص في صفحة', () =
   it('وسرّ ناقص يبقى 503 ولا يُلبَس ثوب الرفض', async () => {
     const response = await app.request(
       '/oauth/linkedin/callback?code=c&state=s',
-      {},
+      { headers: { Cookie: binding } },
       { ...env, LINKEDIN_CLIENT_SECRET: '' },
     )
     expect(response.status).not.toBe(502)

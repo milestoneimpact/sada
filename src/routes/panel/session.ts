@@ -205,7 +205,7 @@ session.post('/panel/login', async (c) => {
    */
   let factors: FactorState
   try {
-    factors = await factorState(c.env.DB, relyingParty(c.env.PUBLIC_BASE_URL).id, who.email)
+    factors = await factorState(c.env.DB, c.env.TOKEN_ENC_KEY, relyingParty(c.env.PUBLIC_BASE_URL).id, who.email)
   } catch (error) {
     console.warn({ job: 'login', step: 'factors', failed: String(error) })
     await record(c.env.DB, { actor: 'anonymous', action: 'login.factors_unavailable' }, c.req.raw)

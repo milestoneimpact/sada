@@ -1792,6 +1792,7 @@ describe('الثيم النهاريّ', () => {
   })
 })
 
+// ‏(D-318) التفصيلُ خلف كلمة الإدارة: كان يُقرأ من `/ready` العامّ، وصار ذاك يقول الحالَ وحدَها
 describe('الجاهزيّة تفرز ما سدّته الخزانة', () => {
   it('مفتاح في الخزانة لا يُعدّ ناقصا — ويُذكر على حدة', async () => {
     const cookie = await login()
@@ -1806,7 +1807,7 @@ describe('الجاهزيّة تفرز ما سدّته الخزانة', () => {
       env,
     )
 
-    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+    const ready = (await (await app.request('/admin/ready', { headers: { Authorization: `Bearer ${TOKEN}` } }, env)).json()) as {
       missing_secrets: string[]
       configured_in_vault: string[]
     }
@@ -1815,7 +1816,7 @@ describe('الجاهزيّة تفرز ما سدّته الخزانة', () => {
   })
 
   it('وما لا خزانة له يبقى ناقصا', async () => {
-    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+    const ready = (await (await app.request('/admin/ready', { headers: { Authorization: `Bearer ${TOKEN}` } }, env)).json()) as {
       missing_secrets: string[]
       configured_in_vault: string[]
     }
@@ -3075,10 +3076,10 @@ describe('ضبط التطبيق من اللوحة', () => {
     expect(after).toContain('/oauth/linkedin/start')
   })
 
-  it('ويُعدّ مسدودا في /ready بدل أن يبقى ناقصا', async () => {
+  it('ويُعدّ مسدودا في /admin/ready بدل أن يبقى ناقصا (D-318: التفصيلُ خلف كلمة الإدارة)', async () => {
     const cookie = await login()
     await save(cookie)
-    const ready = (await (await app.request('/ready', {}, env)).json()) as {
+    const ready = (await (await app.request('/admin/ready', { headers: { Authorization: `Bearer ${TOKEN}` } }, env)).json()) as {
       missing_secrets: string[]
       configured_in_vault: string[]
     }

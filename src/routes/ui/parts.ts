@@ -139,6 +139,10 @@ const ALERT_KIND: Readonly<Record<string, string>> = {
  * قِيس أن لا سرَّ فيه — **لكنّ عرضَه كاملا يجعل الشاشةَ نسخةً من القناة**
  * لا سجلًّا لها.
  */
+/**
+ * **و`webhook` قناعٌ لا عنوان** (D-318): البروتوكولُ والمضيفُ وآخرُ أربعة محارف. العنوانُ سرٌّ حاملٌ يُحفَظ مشفَّرًا، فلا
+ * يُعاد إلى الحقل ولا إلى الصفحة؛ والحقلُ فارغٌ لعنوانٍ جديدٍ يحلّ محلّه، وإزالتُه بزرٍّ مستقلّ لا بحقلٍ يُفرَّغ.
+ */
 export function alertChannel(webhook: string, rows: readonly OutboxRow[]): string {
   const list = rows.length === 0
     ? `<p class="hint">${webhook === ''
@@ -170,12 +174,21 @@ export function alertChannel(webhook: string, rows: readonly OutboxRow[]): strin
     <p class="hint"><b>ولا يحمل الإشعار إذنا ولا سرّا ولا رابطا موقَّعا</b> —
       يقول ما وقع ويُحيلك إلى هذه اللوحة. والقناة خارج سيطرتنا: سجلُّها
       يُقرأ بعد سنة.</p>
+    ${webhook === ''
+      ? ''
+      : html`<div class="split mt-2"><p class="m-0">القناة الآن: <bdi class="mono" dir="ltr">${webhook}</bdi>
+          <span class="hint">— مشفَّرة، ولا يُعرض منها إلّا هذا.</span></p>
+        <form class="inline" method="POST" action="/panel/settings"
+              data-confirm="إزالة قناة التنبيهات؟ لن يخرج تنبيهٌ حتّى تضبط غيرها.">
+          <input type="hidden" name="key" value="alert_webhook">
+          <input type="hidden" name="value" value="">
+          <input type="hidden" name="clear" value="1">
+          <button class="btn btn-danger btn-sm" type="submit">أزل القناة</button></form></div>`.value}
     <form class="row" method="POST" action="/panel/settings">
       <input type="hidden" name="key" value="alert_webhook">
-      <div class="field grow"><label for="hook">عنوان القناة (Webhook)</label>
-        <input id="hook" name="value" type="url" class="mono" dir="ltr" inputmode="url"
-          placeholder="https://hooks.slack.com/services/…"
-          value="${escapeHtml(webhook)}"></div>
+      <div class="field grow"><label for="hook">${webhook === '' ? 'عنوان القناة (Webhook)' : 'عنوانٌ جديد يحلّ محلّها'}</label>
+        <input id="hook" name="value" type="url" class="mono" dir="ltr" inputmode="url" autocomplete="off" required
+          placeholder="https://hooks.slack.com/services/…" value=""></div>
       <button class="btn btn-secondary" type="submit">احفظ</button>
     </form>
     <p class="hint">يعمل مع Slack و Discord و Telegram وأيّ عنوان يقبل

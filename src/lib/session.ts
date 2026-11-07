@@ -504,6 +504,8 @@ export interface SessionSummary {
   readonly current: boolean
   /** جلسةُ تسجيلٍ وحده (D-317): بابٌ نصفُ مفتوح يُرى ويُبطَل. */
   readonly enrol?: boolean
+  /** صاحبُها (D-318): كان الجردُ بلا بريد، فلا يعرف المالكُ أيُّ جهازٍ لمن. والجلسةُ القديمةُ بلا بريدٍ للمالك. */
+  readonly email: string
 }
 
 /**
@@ -517,8 +519,23 @@ export interface SessionSummary {
 export async function listSessions(
   store: SessionStore,
   currentId: string | null,
+  /**
+   * **«الكلّ» للمالك وحدَه، والافتراضُ صاحبُ الجلسة** (D-318).
+   *
+   * كان الجردُ يمشي كلَّ مفاتيح `session:` لكلّ من فتح الإعدادات — المديرُ معه — فيحمل جلساتِ المالك والأعضاء
+   * بعناوينها ومتصفّحاتها، ولو لم تُرسَم. فصار بلا هذا المعامل لا يعيد إلّا جلساتِ بريد الجلسة الحاليّة، وبلا جلسةٍ
+   * حاليّةٍ لا يعيد شيئًا: لا صاحبَ يُعرَف فيُعرَض له.
+   */
+  scope?: 'all',
 ): Promise<SessionSummary[]> {
   if (store.list === undefined) return []
+  let owner: string | null = null
+  if (scope !== 'all') {
+    const current = currentId === null ? null : await store.get(sessionKey(currentId))
+    const record = current === null ? null : parse(current)
+    if (record === null) return []
+    owner = (record.email ?? OWNER_EMAIL).toLowerCase()
+  }
   const summaries: SessionSummary[] = []
   let cursor: string | undefined
   do {
@@ -530,6 +547,8 @@ export async function listSessions(
       if (record === null) continue
       // الجلسةُ المعلَّقة ليست بابا مفتوحا: لا تُعرض في جرد الأجهزة
       if (record.pending) continue
+      const email = record.email ?? OWNER_EMAIL
+      if (owner !== null && email.toLowerCase() !== owner) continue
       const id = key.name.slice(PREFIX.length)
       summaries.push({
         handle: await fingerprint(id),
@@ -539,6 +558,7 @@ export async function listSessions(
         via: record.via,
         current: id === currentId,
         ...(record.enrol === true ? { enrol: true } : {}),
+        email,
       })
     }
     cursor = page.list_complete === false ? page.cursor : undefined

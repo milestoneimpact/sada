@@ -310,7 +310,7 @@ export const SETUP: Readonly<Record<string, SetupGuide>> = {
     whereId: 'تبويب Keys and tokens ← قسم OAuth 2.0 Client ID and Client Secret',
     whereSecret:
       'في القسم نفسه. <b>و X يعرضه مرّةً واحدةً عند إنشائه</b> — فإن لم تحفظه اضغط Regenerate، ولا ضرر ما دام لم يُربَط حساب.',
-    success: 'تظهر بطاقة X هنا «جاهزة للربط» بزرّ يعمل، ويُظهر /ready أنّ سرَّيها لم يعودا ناقصين.',
+    success: 'تظهر بطاقة X هنا «جاهزة للربط» بزرّ يعمل، ويُظهر «للمطوّر» في الإعدادات أنّ سرَّيها لم يعودا ناقصين.',
     failure:
       'يعود الربط بـ <span class="mono">unauthorized_client</span> أو ' +
       '<span class="mono">invalid_request</span> — <b>وأكثرُه من شاشة User authentication ' +
