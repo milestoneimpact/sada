@@ -19,14 +19,14 @@
 | `docs/STATUS.md` | سجلُّ الحال، الأحدثُ أوّلًا |
 | `docs/MANUAL-TASKS.md` | مهامُّ المالك بعناصرها الستّة، وحالُها الحيّ في `/panel/tasks` |
 | `docs/DESIGN-PLAN.md` | خطّةُ التصميم المعتمدة (D-183) ومراحلها |
-| `docs/BRAND.md` | الهويّة: الألوان والنقش والشعار وقواعدها (D-196) |
+| `docs/BRAND.md` | الهويّة: الألوان والنقش والشعار وقواعدها (D-196، وقيَمُ D-246 منذ D-325) |
 | `docs/ARCHITECTURE.md` و`docs/PLATFORMS.md` | البنية والمنصّات |
 
 ## ٣ · قبل كلّ دفعة
 
 ```
-npm run ci                                             # الأنواع وثلاث عشرة بوّابة والاختبارات (3,301)؛ وفي CI قبلها npm audit --omit=dev (D-319)
-flock /tmp/sada-audit.lock npm run audit               # التصميم والسلّم والجوّال والطباعة وCSP والروابط والوصول (‏1280 و‏390 ومفتوحًا، D-323)
+npm run ci                                             # الأنواع وأربع عشرة بوّابة (ومنها سقّاطةُ الوسم، D-325، والتسليم، D-319) والاختبارات (TESTS)؛ وفي CI قبلها npm audit --omit=dev (D-319)
+flock /tmp/sada-audit.lock npm run audit               # التصميم والسلّم والجوّال والطباعة وCSP والروابط والوصول (‏1280 و‏390 ومفتوحًا، D-323) والمعطَّلُ بسببه والنصُّ الذي لا يلتفّ (D-325)
 flock /tmp/sada-audit.lock bash -c 'npm run render && npm run text'
 npm run journeys                                       # الرحلات المقيسة على نسخةٍ حيّة: 32 من 32
 ```

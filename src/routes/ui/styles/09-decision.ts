@@ -8,7 +8,7 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
   width:var(--tap); height:var(--tap); margin-inline-start:calc(-1 * var(--s-3));
   border-radius:var(--r-control); cursor:pointer}
 @media(hover:hover){.pick:hover{background:var(--hover)}}
-.pick input{width:var(--icon-sm); height:var(--icon-sm); margin:0; accent-color:var(--brand); cursor:pointer}
+.pick input{width:var(--icon-sm); height:var(--icon-sm); margin:0; accent-color:var(--accent); cursor:pointer}
 
 /* ── البطاقةُ الحاليّة تحت لوحة المفاتيح ──────────────────────────
    حدّ بلون الهويّة **وحلقة**: الحدّ وحده يبدّل مقاس البطاقة بكسلا
@@ -49,7 +49,7 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
   display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap;
   margin:0 0 var(--s-3); padding:var(--s-3) var(--s-4);
   background:var(--surface);
-  border:1px solid var(--brand); border-radius:var(--r-card);
+  border:1px solid var(--accent); border-radius:var(--r-card);
   box-shadow:var(--sh-2)}
 .bulkbar b{font-variant-numeric:tabular-nums}
 .bulkbar .ago{direction:ltr; unicode-bidi:isolate}

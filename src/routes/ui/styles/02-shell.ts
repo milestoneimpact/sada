@@ -131,6 +131,7 @@ details.ladder .verdict.bad{color:var(--bad)}
    نفسها التي يظهر بها الظلّ: أنّ فوقك محتوًى. */
 .topbar .ttl{min-width:0; opacity:0; transform:translateY(var(--s-1)); transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
 .topbar.lifted .ttl{opacity:1; transform:none}
-.content{padding:var(--s-5d) var(--gutter) var(--s-12d); max-width:var(--shell); width:100%; view-transition-name:content}
+/* ‏والحيّزُ في وسط ما بقي (D-325 · خطّة التصميم 3.3): كان يلصق بأوّل السطر ويتّسع إلى ‏2040 */
+.content{padding:var(--s-5d) var(--gutter) var(--s-12d); max-width:var(--shell); width:100%; margin-inline:auto; view-transition-name:content}
 
 `

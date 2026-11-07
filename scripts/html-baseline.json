@@ -29,7 +29,7 @@
   "routes/ui/components/empty.ts": 8,
   "routes/ui/components/field.ts": 8,
   "routes/ui/components/filterbar.ts": 13,
-  "routes/ui/components/menu.ts": 16,
+  "routes/ui/components/menu.ts": 15,
   "routes/ui/components/stages.ts": 1,
   "routes/ui/components/tabs.ts": 11,
   "routes/ui/components/toast.ts": 4,

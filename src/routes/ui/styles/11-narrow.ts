@@ -24,6 +24,8 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   #src-body tr{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); column-gap:var(--s-2)}
   #src-body td:first-child,#src-body td:last-child{grid-column:1 / -1}
   #src-body .worth{min-width:0}
+  /* ‏والحالُ تلتفّ في عمودها (D-325): «تغيّر بعد التحليل» ‏115px في عمودٍ ‏69px عند ‏320 خرجت إلى جارها */
+  #src-body .st{white-space:normal}
   /* ‏والصورُ اثنتان في الصفّ: صورةٌ بعرض الشاشة شاشةٌ لكلّ صورة */
   .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   nav.tabs{flex-direction:row; align-items:flex-start; overflow-x:auto; padding:0 var(--s-3) var(--s-2); gap:var(--s-1);

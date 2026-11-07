@@ -163,7 +163,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
 .todo a,.todo form{margin-inline-start:auto}
 /* أزرارُ الصفوف عمودٌ واحدٌ لا حافّةٌ مسنّنة (D-136): عرضٌ أدنى واحد،
    والأطول يتجاوزه بحقّه. */
-.todo>li>a.btn,.todo>li>form .btn{background:transparent; border-color:transparent;
+.todo>li>a.btn,.todo>li>form .btn{flex:none; background:transparent; border-color:transparent;
   box-shadow:none; color:var(--link); min-width:var(--tap); padding-inline:var(--s-3); font-weight:600;
   margin-block:-1px;
   /* ‏زرٌّ هادئ: حبرُ الرابط وخطٌّ تحته بلونه (D-149 ثمّ D-187) — كان الخطُّ نحاسيًّا، فيُعدّ
@@ -197,7 +197,7 @@ ul.plain li:last-child{margin-bottom:0}
 .chart .axis-x{transform:translateY(-100%)}
 .chart .axis-x.end{text-align:end}
 .chart .peak{position:absolute; width:var(--s-2); height:var(--s-2); border-radius:50%; background:var(--surface);
-  border:var(--stroke) solid var(--brand); transform:translate(-50%,-50%)}
+  border:var(--stroke) solid var(--accent); transform:translate(-50%,-50%)}
 .chart .grid-l{stroke:var(--line-soft); stroke-width:1; vector-effect:non-scaling-stroke}
 .chart .base{stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke}
 /* ── خطُّ الرحلة (D-104) ───────────────────────────────────────────────
@@ -218,7 +218,7 @@ ul.plain li:last-child{margin-bottom:0}
 .stop-mark svg{width:var(--icon-sm); height:var(--icon-sm); display:block}
 /* **والحالُ لونٌ ورمزٌ ونصّ** (D-043): اللونُ على الحلقة، والنصُّ في
    العنوان («لم تنجح»)، والرمز نوع المحطّة. */
-.stop.done .stop-mark{color:var(--brand); border-color:color-mix(in srgb,var(--brand) 42%,transparent)}
+.stop.done .stop-mark{color:var(--accent); border-color:color-mix(in srgb,var(--accent) 42%,transparent)}
 .stop.failed .stop-mark{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 42%,transparent)}
 .stop.pending .stop-mark{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 42%,transparent);
   border-style:dashed}
@@ -297,7 +297,7 @@ ul.plain li:last-child{margin-bottom:0}
 .ch-logo svg{width:50%; height:50%; display:block}
 .ch-name{font-weight:600; font-size:var(--t-h3); line-height:var(--lh-h3)}
 .ch-name a{color:inherit; text-decoration:underline; text-underline-offset:var(--ul-off); text-decoration-thickness:var(--ul)}
-@media(hover:hover){.ch-name a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:var(--ul-off)}}
+@media(hover:hover){.ch-name a:hover{color:var(--link); text-decoration:underline; text-underline-offset:var(--ul-off)}}
 .ch-name span{display:block; font-size:var(--t-small); line-height:var(--lh-small); font-weight:400; color:var(--ink-2)}
 .ch-note{font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small); margin:0}
 /* ‏والصفُّ يلتفّ (D-185): الاسمُ والنوعُ والحالُ والوقتُ لا تسع ‏٣٢٠ بحرف ‏١٤، وكان الوقتُ

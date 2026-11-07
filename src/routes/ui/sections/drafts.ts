@@ -479,12 +479,15 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     const w = ready.width ?? slide.width
     const h = ready.height ?? slide.height
     // ‏والمحرّرُ لا يولّد ولا يحرّك (D-318): سببٌ واحدٌ مكتوبٌ بدل الأزرار، والرفضُ يبقى له (لا يُنفق)
+    // ‏**والمحجوبُ يصف نفسَه بسطر جاهزيّته** (D-325): كان «aria-disabled» وتلميحًا لا يقول لماذا حُجب، والسببُ لا يُرسَم
+    // ‏في هذا الفرع أصلًا — فيُرسَم السطرُ تحت الصورة ويُربط به الزرّ
+    const why = (style: 'infographic' | 'illustration'): string => (style === 'infographic' ? 'why-rinfo-' : 'why-rimage-') + d.id
     const regen = (style: 'infographic' | 'illustration', label: string, blocked: boolean): string => !spend ? '' :
       `<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="جار التوليد…" ${stagesAttr('image')}>
          <input type="hidden" name="id" value="${escapeHtml(d.id)}">
          <input type="hidden" name="media" value="${escapeHtml(ready.id)}">
          <input type="hidden" name="style" value="${style}">
-         <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' aria-disabled="true"' : ''}
+         <button class="btn btn-secondary btn-sm" type="submit"${blocked ? ' aria-disabled="true" aria-describedby="' + escapeHtml(why(style)) + '"' : ''}
            data-tip="تُرفَض هذه بعد أن يمرّ التوليد بحرّاسه، فلا يبقى المنشور بلا صورة">${label}</button></form>`
     return `<div class="pic">
       <img src="/panel/media/${escapeHtml(ready.id)}" alt="${escapeHtml(alt)}" data-media
@@ -504,7 +507,7 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
               ? `<form class="inline" method="POST" action="/panel/media/animate"
                    data-busy="جار التحريك…" ${stagesAttr('motion')}>
                <input type="hidden" name="id" value="${escapeHtml(d.id)}">
-               <button class="btn btn-secondary btn-sm" type="submit"${lines.videoBlocked ? ' disabled' : ''}>حرّكها فيديو</button></form>`
+               <button class="btn btn-secondary btn-sm" type="submit"${lines.videoBlocked ? ' disabled aria-describedby="why-video-' + escapeHtml(d.id) + '"' : ''}>حرّكها فيديو</button></form>`
               : ''}
              ${info
                ? `${regen('infographic', 'ولّد إنفوجرافيك بديلًا', lines.infoBlocked)}${regen('illustration', 'بدّلها صورةً فنّيّة', lines.imageBlocked)}`
@@ -516,7 +519,9 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
       </div>
       ${open && !spend ? LOCKED_NOTE : ''}
       ${slideLine(ready)}
-      ${open && clip === undefined && spend ? lines.video : ''}
+      ${open && spend && lines.infoBlocked ? readyAt(lines.info, why('infographic')) : ''}
+      ${open && spend && lines.imageBlocked ? readyAt(lines.image, why('illustration')) : ''}
+      ${open && clip === undefined && spend ? readyAt(lines.video, 'why-video-' + d.id) : ''}
       ${clip === undefined
         ? ''
         : `<div class="pic-foot">
@@ -539,8 +544,8 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
     ${!spend ? LOCKED_NOTE : html`<form class="inline" method="POST" action="/panel/media/generate" data-busy="جار الرسم…" ${raw(stagesAttr('image'))}>
       <input type="hidden" name="id" value="${d.id}">
       <input type="hidden" name="style" value="infographic">
-      <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.infoBlocked ? ' disabled' : '')}>ولّد إنفوجرافيك</button></form>
-    ${raw(lines.info)}
+      <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.infoBlocked ? ' disabled aria-describedby="why-info-' + escapeHtml(d.id) + '"' : '')}>ولّد إنفوجرافيك</button></form>
+    ${raw(readyAt(lines.info, 'why-info-' + d.id))}
     <details class="art">
       <summary>أو صورة فنّيّة</summary>
       <div class="art-row">
@@ -548,8 +553,8 @@ export function imagePane(d: DraftRow, media: readonly MediaView[], lines: Ready
         <form class="inline" method="POST" action="/panel/media/generate" data-busy="جار التوليد…" ${raw(stagesAttr('image'))}>
           <input type="hidden" name="id" value="${d.id}">
           <input type="hidden" name="style" value="illustration">
-          <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.imageBlocked ? ' disabled' : '')}>ولّد صورةً فنّيّة</button></form>
-        ${raw(lines.image)}
+          <button class="btn btn-secondary btn-sm" type="submit"${raw(lines.imageBlocked ? ' disabled aria-describedby="why-image-' + escapeHtml(d.id) + '"' : '')}>ولّد صورةً فنّيّة</button></form>
+        ${raw(readyAt(lines.image, 'why-image-' + d.id))}
       </div>
     </details>`.value}
   </div>`
@@ -596,6 +601,14 @@ function readyLine(line: MediaLine): string {
         ? ''
         : `<a class="tap" href="${escapeHtml(next.action.href)}">${escapeHtml(next.action.label)}</a>`}`
   return `<p class="hint ready">${dots}${why}</p>`
+}
+
+/**
+ * سطرُ الجاهزيّة **بمعرّفٍ لبطاقته** (D-325): هو سببُ الزرّ المحجوب فوقه، فيصفه الزرُّ به (`aria-describedby`). والسطرُ
+ * يُبنى مرّةً للّوح كلِّه (`readyLines`)، فالمعرّفُ يُضاف عند الرسم في بطاقته — ومعرّفٌ واحدٌ لستّين بطاقةً لا يصف شيئًا.
+ */
+export function readyAt(line: string, id: string): string {
+  return line.replace('<p class="hint ready">', '<p class="hint ready" id="' + escapeHtml(id) + '">')
 }
 
 /**

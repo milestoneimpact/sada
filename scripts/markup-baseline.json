@@ -1,0 +1,192 @@
+{
+  "routes/authView.ts": {
+    "buttons": 19,
+    "cards": 5,
+    "inputs": 7
+  },
+  "routes/landing.ts": {
+    "buttons": 1,
+    "cards": 0,
+    "inputs": 0
+  },
+  "routes/panelView.ts": {
+    "buttons": 11,
+    "cards": 31,
+    "inputs": 7
+  },
+  "routes/pwa.ts": {
+    "buttons": 0,
+    "cards": 1,
+    "inputs": 2
+  },
+  "routes/ui/channels.ts": {
+    "buttons": 7,
+    "cards": 9,
+    "inputs": 3
+  },
+  "routes/ui/clientView.ts": {
+    "buttons": 4,
+    "cards": 5,
+    "inputs": 1
+  },
+  "routes/ui/command.ts": {
+    "buttons": 0,
+    "cards": 0,
+    "inputs": 1
+  },
+  "routes/ui/helpView.ts": {
+    "buttons": 0,
+    "cards": 4,
+    "inputs": 0
+  },
+  "routes/ui/insightsView.ts": {
+    "buttons": 2,
+    "cards": 5,
+    "inputs": 0
+  },
+  "routes/ui/journeyView.ts": {
+    "buttons": 1,
+    "cards": 1,
+    "inputs": 0
+  },
+  "routes/ui/libraryView.ts": {
+    "buttons": 5,
+    "cards": 2,
+    "inputs": 1
+  },
+  "routes/ui/monthlyView.ts": {
+    "buttons": 4,
+    "cards": 4,
+    "inputs": 0
+  },
+  "routes/ui/noticesView.ts": {
+    "buttons": 2,
+    "cards": 2,
+    "inputs": 0
+  },
+  "routes/ui/oauthResult.ts": {
+    "buttons": 0,
+    "cards": 13,
+    "inputs": 2
+  },
+  "routes/ui/parts.ts": {
+    "buttons": 2,
+    "cards": 3,
+    "inputs": 1
+  },
+  "routes/ui/planBoard.ts": {
+    "buttons": 7,
+    "cards": 3,
+    "inputs": 2
+  },
+  "routes/ui/planDocView.ts": {
+    "buttons": 2,
+    "cards": 0,
+    "inputs": 0
+  },
+  "routes/ui/planImportView.ts": {
+    "buttons": 6,
+    "cards": 4,
+    "inputs": 1
+  },
+  "routes/ui/planNewView.ts": {
+    "buttons": 9,
+    "cards": 6,
+    "inputs": 11
+  },
+  "routes/ui/planReviewView.ts": {
+    "buttons": 11,
+    "cards": 3,
+    "inputs": 1
+  },
+  "routes/ui/planSeatView.ts": {
+    "buttons": 4,
+    "cards": 3,
+    "inputs": 2
+  },
+  "routes/ui/platformView.ts": {
+    "buttons": 10,
+    "cards": 6,
+    "inputs": 0
+  },
+  "routes/ui/portfolioView.ts": {
+    "buttons": 1,
+    "cards": 1,
+    "inputs": 0
+  },
+  "routes/ui/reportView.ts": {
+    "buttons": 2,
+    "cards": 12,
+    "inputs": 0
+  },
+  "routes/ui/sections/desk.ts": {
+    "buttons": 3,
+    "cards": 1,
+    "inputs": 0
+  },
+  "routes/ui/sections/drafts.ts": {
+    "buttons": 25,
+    "cards": 11,
+    "inputs": 9
+  },
+  "routes/ui/sections/editor.ts": {
+    "buttons": 1,
+    "cards": 1,
+    "inputs": 0
+  },
+  "routes/ui/sections/home.ts": {
+    "buttons": 7,
+    "cards": 7,
+    "inputs": 0
+  },
+  "routes/ui/sections/pivot.ts": {
+    "buttons": 2,
+    "cards": 3,
+    "inputs": 0
+  },
+  "routes/ui/sections/plan.ts": {
+    "buttons": 7,
+    "cards": 2,
+    "inputs": 0
+  },
+  "routes/ui/sections/providers.ts": {
+    "buttons": 9,
+    "cards": 6,
+    "inputs": 11
+  },
+  "routes/ui/sections/security.ts": {
+    "buttons": 2,
+    "cards": 0,
+    "inputs": 0
+  },
+  "routes/ui/sections/videos.ts": {
+    "buttons": 5,
+    "cards": 3,
+    "inputs": 4
+  },
+  "routes/ui/spreadView.ts": {
+    "buttons": 3,
+    "cards": 2,
+    "inputs": 0
+  },
+  "routes/ui/tasksView.ts": {
+    "buttons": 2,
+    "cards": 5,
+    "inputs": 0
+  },
+  "routes/ui/teamView.ts": {
+    "buttons": 2,
+    "cards": 2,
+    "inputs": 4
+  },
+  "routes/ui/timelineView.ts": {
+    "buttons": 5,
+    "cards": 2,
+    "inputs": 0
+  },
+  "routes/ui/when.ts": {
+    "buttons": 0,
+    "cards": 0,
+    "inputs": 3
+  }
+}

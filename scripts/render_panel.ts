@@ -39,8 +39,9 @@ const mediaReady = {
     slide,
     briefReady: true,
   }),
-  // ‏ومقطعٌ واحدٌ اليوم من اثنين — فالنقطةُ تامّةٌ وتقول كم بقي (D-168)
-  video: videoReadiness({ face: 'binding', blocker: null, clips: videoCapGate(1, 2) }),
+  // ‏**ومقطعا اليوم استُهلكا** (D-325): «حرّكها فيديو» معطَّلٌ تحت d3 وسببُه سطرُ المقطع — فيُقاس في «audit_disabled» زرٌّ
+  // ‏معطَّلٌ مرسومٌ حقًّا. وكان مقطعًا واحدًا من اثنين (D-168)، فلا زرَّ معطَّلًا في عيّنةٍ واحدة
+  video: videoReadiness({ face: 'binding', blocker: null, clips: videoCapGate(2, 2) }),
 }
 
 function ago(hours: number): string {

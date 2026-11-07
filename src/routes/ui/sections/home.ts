@@ -44,18 +44,32 @@ const STEP_LABEL: Readonly<Partial<Record<JourneyStep['state'], string>>> = { fa
 function leg(s: JourneyStep, i: number, focus: number, max: number): string {
   const mark = RUNG_MARK[s.state]
   const w = max === 0 ? 0 : Math.max(s.count === 0 ? 0 : 4, Math.round((s.count / max) * 100))
+  /*
+   * ‏**ولونُ التحذير للمحطّة التي تنتظر المالكَ الآن وحدَها** (D-325 · Refactoring UI «أخفِ الثانويّ»): كانت خمسٌ من سبعٍ
+   * ‏تلبس شارةَ «تنتظرك» البرتقاليّةَ نفسَها، فلا تقول أيُّها. فما ينتظره ولم يُسمَّ يبقى «تنتظرك» برمزه وكلمته بحبرٍ محايد
+   * ‏— والحالُ نصٌّ لا لون (D-043) — وما فشل يبقى أحمر: الفشلُ ليس انتظارًا
+   */
+  const tone = s.state === 'now' && i !== focus ? 'idle' : mark.cls
   return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
-      <span class="fn-t"><b>${escapeHtml(s.title)}</b>${statusBadge(mark.cls, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}</span>
+      <span class="fn-t"><b>${escapeHtml(s.title)}</b>${statusBadge(tone, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}</span>
       <span class="fn-bar" aria-hidden="true"><span style="--w:${w}%"></span></span>
       <span class="fn-n num">${s.count}</span>
       <span class="fn-note">${escapeHtml(s.note)}</span></a></li>`
 }
 
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+/**
+ * **والاسمُ القصيرُ على الهاتف** (D-325): «الأربعاء» ‏15px ثخينًا أعرضُ من عمودٍ ‏43px عند ‏390، فالتصقت الأسماءُ بجاراتها
+ * («الخميسالجمعة») — والصفحةُ لا تفيض فلم يره مدقّق. فالاسمُ بلا «ال» تحت «sm»، والكاملُ فوقها، واحدٌ يُرى ويُقرأ في المرّة.
+ */
+const WEEKDAYS_SHORT = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت']
+/** والحرفُ الواحدُ تحت «xs» كتقويم الهاتف — و«الخميس» وحدَه ‏42px لا يسعه عمودُ ‏320 ولو قصُر. */
+const WEEKDAYS_MIN = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س']
 
 /**
- * شريطُ الأسبوع (D-194): سبعةُ أيّامٍ من اليوم **بتوقيت المالك**، وفي كلٍّ نقطةٌ بلون منصّتها لكلّ
- * منشورٍ مجدول. واللونُ هويّةُ المنصّة لا قيمة، **والعددُ مكتوبٌ** فلا يُقرأ اللونُ وحدَه.
+ * شريطُ الأسبوع (D-194): سبعةُ أيّامٍ من اليوم **بتوقيت المالك**، وفي كلٍّ مربّعُ شعارٍ بلون منصّتها لكلّ
+ * منشورٍ مجدول. **والشعارُ يحمل المنصّةَ لا لونُه** (D-325): كانت نقطةً بلونها وحدَه، وX وTikTok أسودان لا
+ * يُفرَّقان (ΔE_OK ‏1.7) — فصار المربّعُ برمزه الأبيض كمربّعات البطاقات، والعددُ مكتوبٌ، والأسماءُ في اسم اليوم.
  */
 function week(items: readonly { platform: string; at: string }[], now: Date, zone: string | null): string {
   const key = (d: Date): string => { const p = localParts(d, zone); return `${p.year}-${p.month}-${p.day}` }
@@ -74,18 +88,22 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
     // ‏والمنصّاتُ بأسمائها في اسم النقاط وتلميحها (D-323): كان التلميحُ على كلّ نقطةٍ معرّفَها الخامّ («linkedin») على
     // ‏وسمٍ لا يأخذ التركيز داخل صورةٍ لا يُقرأ ما فيها — فاللونُ وحدَه كان يقول المنصّة. والاسمُ الآن لقارئ الشاشة وللّمس
     const names = pfs.map((pf) => platformLabel(pf)).join(' · ')
-    return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${i === 0 ? 'اليوم' : WEEKDAYS[p.weekday]}</span>
+    const day = i === 0
+      ? 'اليوم'
+      : html`<span class="wk-long" aria-hidden="true">${WEEKDAYS[p.weekday] ?? ''}</span><span class="wk-short" aria-hidden="true">${
+        WEEKDAYS_SHORT[p.weekday] ?? ''}</span><span class="wk-min" aria-hidden="true">${WEEKDAYS_MIN[p.weekday] ?? ''}</span><span class="vh">${WEEKDAYS[p.weekday] ?? ''}</span>`.value
+    return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${day}</span>
       <span class="wk-n num">${p.day}</span>
       <span class="wk-dots" role="img" aria-label="${pfs.length === 0 ? 'لا منشور' : escapeHtml(String(pfs.length) + ' منشور: ' + names)}"${
         pfs.length === 0 ? '' : ' tabindex="0" data-tip="' + escapeHtml(names) + '"'}>${pfs.slice(0, 6).map((pf) =>
-        `<span class="wk-dot" data-pf="${escapeHtml(pf)}"></span>`).join('')}</span>
+        `<span class="wk-pf" data-pf="${escapeHtml(pf)}">${LOGOS[pf] ?? ''}</span>`).join('')}</span>
       <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span></li>`
   }).join('')
   return `<div class="card home-card">
     <div class="card-head"><h2>هذا الأسبوع</h2><div class="grow"></div>
       <span class="ago">مجدول ${total}</span></div>
     <ol class="wk">${cols}</ol>
-    <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ نقطة منشور بلون منصّته.'}</p>
+    <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ مربّعٍ منشورٌ بشعار منصّته.'}</p>
   </div>`
 }
 
@@ -112,14 +130,18 @@ export function greeting(now: Date, zone: string | null): string {
 /** أربعةُ أرقامٍ من العدّ المجمَّع نفسِه — لا رقمَ يُخترَع. */
 function stats(f: HomeFacts): string {
   const failed = Object.values(f.counts.perPlatform).reduce((n, p) => n + (p.recentFailed ?? p.failed), 0)
+  /*
+   * ‏**والحافّةُ الملوّنة لما ليس صفرًا وحدَه، و«بانتظار قرارك» محايدة** (D-325 · خطّة التصميم 3.2): كانت الأربعُ ملوّنةً معًا
+   * ‏— تحذيرٌ وجيّدٌ وعلامةٌ وخطر — وصفرٌ بلونه يُقرأ حالًا لم تقع، و«بانتظار قرارك» برتقاليّةٌ والخطّةُ تقول «ليست تحذيرًا»
+   */
   const cells: readonly [string, number, string, string][] = [
     ['بانتظار قرارك', total(f.counts, 'draft'), '#posts', 'wait'],
     ['مجدولة', total(f.counts, 'queued'), '#posts', 'sched'],
     ['نُشرت هذا الأسبوع', f.counts.publishedWeek, '#results', 'ok'],
-    ['فشلت هذا الأسبوع', failed, '#posts', failed > 0 ? 'bad' : 'idle'],
+    ['فشلت هذا الأسبوع', failed, '#posts', 'bad'],
   ]
   return `<ul class="hstats">${cells.map(([k, n, href, tone]) =>
-    `<li data-tone="${tone}"><a href="${escapeHtml(href)}"><span class="hs-k">${escapeHtml(k)}</span>
+    `<li data-tone="${n === 0 ? 'idle' : tone}"><a href="${escapeHtml(href)}"><span class="hs-k">${escapeHtml(k)}</span>
       <b class="hs-n num">${n}</b></a></li>`).join('')}</ul>`
 }
 

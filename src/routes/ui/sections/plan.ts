@@ -132,7 +132,8 @@ export function planSection(input: PlanInput): string {
   const { plan, now } = input
 
   // ‏أسبوع أو شهر (D-256): زرّان في نموذج واحد، والزرُّ يحمل المدى. والمحرّرُ لا يولّد خطّة (D-318): سببٌ مكتوبٌ بدل الزرّين
-  const off = input.ready && input.analyzed >= 2 ? '' : ' disabled'
+  // ‏والمعطَّلُ يصف نفسَه بسببه المكتوب تحته (D-325): كان «disabled» وحدَه والسببُ سطرٌ لا يربطه شيء
+  const off = input.ready && input.analyzed >= 2 ? '' : ' disabled aria-describedby="pl-why"'
   const generate = input.form !== undefined ? '' : !maySpend()
     ? '<p class="note m-0" data-spend-locked>' + escapeHtml(SPEND_LOCKED) + '</p>'
     : `<form class="inline" method="POST" action="/panel/plan/generate"
@@ -143,7 +144,7 @@ export function planSection(input: PlanInput): string {
 
   const why =
     !input.ready
-      ? '<p class="hint m-0 mt-2">مزوّد مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
+      ? '<p class="hint m-0 mt-2" id="pl-why">مزوّد مهمّة الخطّة غير جاهز — اضبط مفتاحه في «المزوّدون».</p>'
       : input.analyzed < 2
         /*
          * **ودعوة إلى فعل زرٌّ لا كلمة في جملة** (D-108).
@@ -153,7 +154,7 @@ export function planSection(input: PlanInput): string {
          * تحليل، **وعيّنة الرسم كانت نظاما يعمل**. فأظهرتها عيّنة
          * اليوم الأوّل.
          */
-        ? `<p class="hint m-0 mt-2">${input.analyzed === 0 ? 'لا مصدر محلَّل بعد' : 'مصدر واحد محلَّل'} — والخطّة تحتاج اثنين على الأقلّ.</p>
+        ? `<p class="hint m-0 mt-2" id="pl-why">${input.analyzed === 0 ? 'لا مصدر محلَّل بعد' : 'مصدر واحد محلَّل'} — والخطّة تحتاج اثنين على الأقلّ.</p>
            <a class="btn btn-secondary btn-sm mt-2" href="#sources">حلّل مصادرك</a>`
         : ''
 
@@ -180,6 +181,7 @@ export function planSection(input: PlanInput): string {
   return `<div class="card">
     <div class="card-head"><h2>الخطّة الأسبوعيّة</h2>
       <div class="grow"></div>${status}${generate}${input.form === undefined ? '' : newPlanLink(true)}</div>
+    ${off === '' || generate === '' || !generate.includes('<button') ? '' : why}
 
     <div class="lede-row m-0 mb-3">
       <span class="chip mono">أسبوع ${escapeHtml(plan.week)}</span>

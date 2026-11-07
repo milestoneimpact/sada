@@ -12,12 +12,18 @@
  * ٣ · رقمُ قرارٍ `## D-NNN` يتكرّر، أو يخرج عن ترتيبه في ملفّه، أو يقع في غير جزئه
  *     (`decisions/D-100-149.md` لا يحمل إلّا ‏100 … ‏149)، أو يبدأ الحيُّ بغير ما يقوله اسمُ آخر جزء + ١.
  * ٤ · وثيقةٌ في `docs/` (أو `docs/archive/` أو `docs/decisions/`) لا يذكرها `docs/INDEX.md`.
+ * ٥ · **لونٌ في `docs/BRAND.md` أو `docs/DESIGN-PLAN.md` ليس في الرموز ولم يُعلَّم تاريخًا** (D-325). كانت الوثيقتان تصفان
+ *     لوحةَ D-196 (رملٌ وحبرٌ فيروزيّ) بعد أن بدّلتها D-246 بأسطحٍ محايدة: ‏`--bg` ‏`#f9f4ec` في الخريطة و`#f6f7f8` في
+ *     الشيفرة، وجدولُ التباين كلُّه لقيمٍ لا تُرسَم — و`brandDocs.test` لا يقارن قيمة. فكلُّ `#rgb` أو `#rrggbb` في الوثيقتين
+ *     قيمةٌ في `tokens.ts` (‏`THEME` و`PRINT` و`MARK` و`MOMENT` وما في `:root` كألوان المنصّات)، **أو معلَّمٌ تاريخًا**: سطرٌ فيه
+ *     `<!-- تاريخ -->`، أو ما بين سطرَي `<!-- تاريخ -->` و`<!-- /تاريخ -->`. وما في كتلة شيفرةٍ مسوّرة لا يُعَدّ.
  *
- * `--self-test` يزرع العللَ الأربع في مجلّدٍ مؤقّت ويتحقّق أنّ المدقّق يراها، ثمّ يفحص المستودع.
+ * `--self-test` يزرع العللَ الخمس في مجلّدٍ مؤقّت ويتحقّق أنّ المدقّق يراها، ثمّ يفحص المستودع.
  */
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
+import { MARK, MOMENT, PRINT, THEME, TOKENS } from '../src/routes/ui/tokens.ts'
 
 const MAX_LINES = 4000
 const ROOT = resolve(new URL('..', import.meta.url).pathname)
@@ -34,6 +40,45 @@ function walk(dir) {
 
 function stripCode(text) {
   return text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '')
+}
+
+/** ‏`#abc` ← ‏`#aabbcc` بحروفٍ صغيرة: «‏#FFF» و«‏#ffffff» لونٌ واحد. */
+const norm = (hex) => {
+  const v = hex.slice(1).toLowerCase()
+  return '#' + (v.length === 3 ? [...v].map((c) => c + c).join('') : v)
+}
+
+/** ألوانُ الرموز كلُّها: قيَمُ الثيمين والطباعة والعلامة واللحظة، وكلُّ لونٍ حرفيٍّ في الورقة المولَّدة (`:root`). */
+export function tokenColours() {
+  const out = new Set()
+  for (const block of [THEME.light, THEME.dark, PRINT, MARK, MOMENT]) {
+    for (const v of Object.values(block)) for (const m of String(v).matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/gi)) out.add(norm(m[0]))
+  }
+  for (const m of TOKENS.matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/gi)) out.add(norm(m[0]))
+  return out
+}
+
+/** ٥ · كلُّ لونٍ في وثيقتي الهويّة من الرموز أو معلَّمٌ تاريخًا — نقيّةٌ تأخذ القائمةَ لتُختبَر بزرع. */
+export function auditColours(root, known) {
+  const notes = []
+  for (const rel of ['docs/BRAND.md', 'docs/DESIGN-PLAN.md']) {
+    let text
+    try { text = readFileSync(join(root, rel), 'utf8') } catch { continue }
+    let history = false
+    let fence = false
+    text.split('\n').forEach((line, i) => {
+      const t = line.trim()
+      if (t.startsWith('```')) { fence = !fence; return }
+      if (t === '<!-- تاريخ -->') { history = true; return }
+      if (t === '<!-- /تاريخ -->') { history = false; return }
+      if (fence || history || line.includes('<!-- تاريخ -->')) return
+      for (const m of line.matchAll(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g)) {
+        if (!known.has(norm(m[0]))) notes.push(`لونٌ ليس في الرموز ولا معلَّمًا تاريخًا  ${rel}:${i + 1} ${m[0]}`)
+      }
+    })
+    if (history) notes.push(`كتلةُ تاريخٍ لم تُغلَق  ${rel}`)
+  }
+  return notes
 }
 
 /** يفحص جذرًا ويعيد الملحوظات — نقيّةً لتُختبَر بمجلّدٍ مزروع. */
@@ -122,8 +167,20 @@ function selfTest() {
     writeFileSync(join(root, 'docs', 'DECISIONS.md'), '## D-049 · هـ\n## D-003 · و\n')
     writeFileSync(join(root, 'docs', 'INDEX.md'), '[A](A.md)\n')
     writeFileSync(join(root, 'docs', 'B.md'), 'بلا فهرس\n')
-    const notes = auditDocs(root)
-    const want = ['رابطٌ لا يصل', 'ملفٌّ فوق', 'قرارٌ خارج ترتيبه', 'قرارٌ في غير جزئه', 'قرارٌ مكرّر', 'وثيقةٌ ليست في الفهرس']
+    // ‏٥ · لونٌ من الرموز يمرّ (ومختصرُه)، ولونٌ قديمٌ بلا علامةٍ يُمسَك، والمعلَّمُ سطرًا وكتلةً يمرّ، وما في الشيفرة المسوّرة لا يُعَدّ
+    writeFileSync(join(root, 'docs', 'BRAND.md'), [
+      '| `--bg` | `#F6F7F8` | `#fff` |', '| `--bg` | `#f9f4ec` قديم |', 'كان `#e8e1d6` <!-- تاريخ -->',
+      '<!-- تاريخ -->', '| `--ink` | `#0a2021` |', '<!-- /تاريخ -->', '```', 'color:#123456', '```',
+    ].join('\n'))
+    writeFileSync(join(root, 'docs', 'DESIGN-PLAN.md'), '<!-- تاريخ -->\n`#abcdef`\n')
+    const colours = auditColours(root, new Set(['#f6f7f8', '#ffffff']))
+    const caught = colours.filter((n) => n.startsWith('لونٌ ليس في الرموز'))
+    if (caught.length !== 1 || !caught[0].includes('BRAND.md:2 #f9f4ec') || !colours.some((n) => n.startsWith('كتلةُ تاريخٍ لم تُغلَق  docs/DESIGN-PLAN.md'))) {
+      console.error(`✕ الفحصُ الذاتيّ: الألوان\n${colours.join('\n')}`)
+      process.exit(1)
+    }
+    const notes = [...auditDocs(root), ...colours]
+    const want = ['رابطٌ لا يصل', 'ملفٌّ فوق', 'قرارٌ خارج ترتيبه', 'قرارٌ في غير جزئه', 'قرارٌ مكرّر', 'وثيقةٌ ليست في الفهرس', 'لونٌ ليس في الرموز']
     for (const w of want) {
       if (!notes.some((n) => n.startsWith(w))) {
         console.error(`✕ الفحصُ الذاتيّ: لم يُمسَك «${w}»\n${notes.join('\n')}`)
@@ -131,16 +188,16 @@ function selfTest() {
       }
     }
     // ‏ولا كذب: D-049 في الحيّ (liveLo = 50) خارجَ جزئه — ويُمسَك؛ وD-002 بعد D-003 خارج ترتيبه — ويُمسَك
-    console.log(`  ✓ الفحصُ الذاتيّ: العللُ الستّ المزروعة أُمسكت`)
+    console.log(`  ✓ الفحصُ الذاتيّ: العللُ السبع المزروعة أُمسكت، واللونُ المعلَّمُ والمسوَّرُ مرّا`)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 }
 
 if (process.argv.includes('--self-test')) selfTest()
-const notes = auditDocs(ROOT)
+const notes = [...auditDocs(ROOT), ...auditColours(ROOT, tokenColours())]
 if (notes.length === 0) {
-  console.log('  ✓ الوثائق: الروابطُ تصل، والفهرسُ تامّ، والقراراتُ في مواضعها')
+  console.log('  ✓ الوثائق: الروابطُ تصل، والفهرسُ تامّ، والقراراتُ في مواضعها، وكلُّ لونٍ في وثيقتي الهويّة من الرموز أو تاريخٌ معلَّم')
 } else {
   for (const n of notes) console.log(`  ✕ ${n}`)
   console.log(`\nالمجموع: ${notes.length} ملحوظة`)

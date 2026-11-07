@@ -41,6 +41,7 @@ import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, 
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
 import { field } from './ui/components/field'
+import { button } from './ui/components/button'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import type { SpendRow } from '../lib/ai/spend'
@@ -195,7 +196,8 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
     state.error === undefined
       ? step === 'code' ? noticeText('ok', CODE_SENT_NOTE, true) : ''
       : noticeText(state.blocked === true ? 'bad' : 'warn', state.error, true)
-  const disabled = state.blocked === true ? ' disabled' : ''
+  // ‏والمعطَّلُ يصف نفسَه بسبب الإيقاف المكتوب فوقه (D-325): كانت الأزرارُ «disabled» وحدَها
+  const disabled = state.blocked === true ? ' disabled aria-describedby="login-why"' : ''
   const next = state.next ?? '/panel'
   const path = step === 'code' ? '/panel/login' : '/panel/login/code'
   const action = next === '/panel' ? path : `${path}?next=${encodeURIComponent(next)}`
@@ -223,7 +225,7 @@ export function loginPage(state: LoginState = {}, nonce = ''): string {
     'صدى — الدخول',
     `<div class="auth-split">${brandMoment()}<div class="wrap"><main class="auth">
       <h1>لوحة التحكّم</h1>
-      <p class="lede">${state.blocked === true
+      <p class="lede"${state.blocked === true ? ' id="login-why"' : ''}>${state.blocked === true
         ? 'الدخول موقوف مؤقتًا لحماية اللوحة'
         : step === 'code'
           ? 'اكتب الرمز الذي وصل بريدك'
@@ -600,7 +602,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const action = pending
     ? `<form class="inline" method="POST" action="/panel/analyze" data-busy="جار…">
          <input type="hidden" name="id" value="${escapeHtml(s.id)}">
-         <button class="btn btn-secondary btn-sm" type="submit">حلّل الآن</button></form>`
+         ${button({ label: 'حلّل الآن', size: 'sm', type: 'submit' })}</form>`
     : ''
   /*
    * **«افتح في Drive»** (D-126): المعرِّفُ في اليد والرابطُ ثابتُ الصيغة،
@@ -692,7 +694,7 @@ function tilePicker(d: Pick<SettingsData, 'dashboardTiles'>): string {
       <input type="hidden" name="key" value="dashboard_tiles">
       <div class="tgrid">${boxes}</div>
       <div class="row mt-4">
-        <button class="btn btn-primary" type="submit">احفظ لوحي</button>
+        ${button({ label: 'احفظ لوحي', variant: 'primary', type: 'submit' })}
         <span class="note self-center">
           وما دون ${TILE_MIN} يعود إلى الأربع الأصليّة — فلا شاشة فارغة.</span>
       </div>
@@ -724,7 +726,7 @@ function todayList(d: Pick<PanelData, 'today' | 'now'>): string {
   const rows = d.today.items
     .map((i) => `<li><span class="dot ${i.kind}"></span>
       <span>${escapeHtml(i.text)}${i.at === null ? '' : ` <span class="ago">${escapeHtml(relativeTime(i.at, d.now))}</span>`}</span>
-      ${i.go === undefined ? '' : `<a class="btn btn-secondary btn-sm" href="${escapeHtml(i.go)}">${escapeHtml(i.goLabel ?? 'افتح')}</a>`}</li>`)
+      ${i.go === undefined ? '' : button({ label: i.goLabel ?? 'افتح', size: 'sm', href: i.go })}</li>`)
     .join('')
   const more = d.today.more === 0 ? '' : `<p class="hint">و${d.today.more} غيرُها اليوم — في سجلّ الأمان.</p>`
   return `<div class="card"><h2>ما وقع اليوم</h2>
@@ -805,7 +807,7 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
       ? statusBadge('ok', '●', 'النشطة')
       : `<form class="inline" method="POST" action="/panel/orgs/switch">
           <input type="hidden" name="org" value="${escapeHtml(o.id)}">
-          <button class="btn" type="submit">انتقل إليها</button></form>`
+          ${button({ label: 'انتقل إليها', size: 'sm', type: 'submit' })}</form>`
     return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td>${action}</td></tr>`
   }).join('')
   const kinds = ORG_KINDS.map((k) => `<option value="${k}">${ORG_KIND_LABEL[k]}</option>`).join('')
@@ -819,7 +821,7 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
         <input id="org-name" name="name" required maxlength="${ORG_NAME_MAX}"></div>
       <div class="field"><label for="org-kind">النوع</label>
         <select id="org-kind" name="kind">${kinds}</select></div>
-      <button class="btn btn-primary" type="submit">أنشئ المنظّمة</button>
+      ${button({ label: 'أنشئ المنظّمة', variant: 'primary', type: 'submit' })}
     </form></div>`
 }
 
@@ -865,7 +867,7 @@ function adminApiCard(open: boolean): string {
               : 'فتح الأبواب الثلاثة لكلمة الإدارة؟ من يملكها يقرأ ويحلّل بلا عامل ثانٍ، بسقوف الإنفاق نفسِها.'}">
         <input type="hidden" name="key" value="admin_api">
         <input type="hidden" name="value" value="${open ? 'false' : 'true'}">
-        <button class="btn btn-secondary" type="submit">${open ? 'أغلقها' : 'افتحها'}</button>
+        ${button({ label: open ? 'أغلقها' : 'افتحها', type: 'submit' })}
       </form>
     </div>
   </div>`.value
@@ -938,7 +940,7 @@ function fabNew(): string {
 }
 /** زرُّ المسح — في «ما ينتظرك» وفي رأس جدول المصادر. */
 const SCAN_BTN = `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
-      <button class="btn btn-secondary btn-sm" type="submit">مسح Drive الآن</button></form>`
+      ${button({ label: 'مسح Drive الآن', size: 'sm', type: 'submit' })}</form>`
 
 /** ما ينتظر التحليل — **والمتقادمُ ينتظر وإن حُلِّل**. */
 function pendingSources(sources: readonly PanelSource[]): number {
@@ -1007,7 +1009,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
 
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
-      ${i.go === undefined ? '' : `<a class="btn btn-secondary btn-sm" href="${i.go}">${escapeHtml(i.label ?? 'اذهب')}</a>`}</li>`)
+      ${i.go === undefined ? '' : button({ label: i.label ?? 'اذهب', size: 'sm', href: i.go })}</li>`)
     .join('')
 
   // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
@@ -1085,7 +1087,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
           ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
           : `<ul class="todo">${todo}</ul>`}
         <div class="row mt-3">${SCAN_BTN}
-          <a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a></div></div>
+          ${button({ label: 'مراجعة المصادر', size: 'sm', href: '#sources' })}</div></div>
   </div>
   ${/*
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
@@ -1130,7 +1132,7 @@ function libraryPane(d: ShellData & LibraryData): string {
         title: 'لا مصادر بعد',
         html: 'صدى تقرأ مجلد Drive المشترَك معها. شغّل المسح ليظهر ما فيه.',
         action: `<form class="inline" method="POST" action="/panel/scan" data-busy="جار المسح…">
-           <button class="btn btn-primary" type="submit">مسح Drive الآن</button></form>`,
+           ${button({ label: 'مسح Drive الآن', variant: 'primary', type: 'submit' })}</form>`,
       })
     : `${filterBar([
          { kind: 'seg', label: 'أيّ الملفّات', name: 'src-show', options: [
@@ -1200,8 +1202,8 @@ function quotaCard(q: PostsData['imageQuota']): string {
     <h2 class="m-0">نفدت حصّةُ الصور المجّانيّة اليوم</h2>
     <p class="m-0 mt-2">${String(q.waiting)} صورةً تنتظر. رسمُها الآن يكلّف نحو <b>${money(q.usd)}</b>، أو تنتظر تجدّدَ الحصّة 03:00 بتوقيت الرياض بلا كلفة.</p>
     <div class="row gap-2 mt-3">
-      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay"><button class="btn btn-secondary btn-sm" type="submit">ارسمها الآن بالدفع</button></form>
-      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait"><button class="btn btn-primary btn-sm" type="submit">انتظر للغد</button></form>
+      <form class="inline" method="POST" action="/panel/images/quota" data-busy="جار…"><input type="hidden" name="decision" value="pay">${raw(button({ label: 'ارسمها الآن بالدفع', size: 'sm', type: 'submit' }))}</form>
+      <form class="inline" method="POST" action="/panel/images/quota"><input type="hidden" name="decision" value="wait">${raw(button({ label: 'انتظر للغد', variant: 'primary', size: 'sm', type: 'submit' }))}</form>
     </div></div>`.value
 }
 
@@ -1288,7 +1290,7 @@ function settingsPane(d: ShellData & SettingsData): string {
             data-confirm="${d.paused ? 'استئناف عمل النظام؟' : 'إيقاف النظام كلّه؟ سيتوقّف المسح والتحليل والنشر حتّى تستأنفه.'}">
         <input type="hidden" name="key" value="paused">
         <input type="hidden" name="value" value="${d.paused ? 'false' : 'true'}">
-        <button class="btn ${d.paused ? 'btn-primary' : 'btn-danger'}" type="submit">${d.paused ? 'استئناف العمل' : 'إيقاف مؤقت'}</button>
+        ${button({ label: d.paused ? 'استئناف العمل' : 'إيقاف مؤقت', variant: d.paused ? 'primary' : 'danger', type: 'submit' })}
       </form>
     </div>
   </div>
@@ -1300,7 +1302,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       <input type="hidden" name="key" value="daily_analysis_cap">
       ${field({ id: 'c1', label: 'سقف التحليل (عدد)',
         control: `<input type="number" name="value" min="0" max="500" step="1" value="${d.analysisCap}">` })}
-      <button class="btn btn-primary" type="submit">حفظ</button>
+      ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${d.usedAnalyses}</span>
     </form>
     <hr>
@@ -1308,7 +1310,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       <input type="hidden" name="key" value="daily_spend_cap_usd">
       ${field({ id: 'c2', label: 'سقف الإنفاق (دولار)',
         control: `<input type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}">` })}
-      <button class="btn btn-primary" type="submit">حفظ</button>
+      ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
     </form>
     <hr>
@@ -1321,7 +1323,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       ${field({ id: 'c4', label: 'سقف المقاطع (عدد)',
         control: `<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.dailyVideoCap.max}" step="1" value="${d.videoCap}">` })}
-      <button class="btn btn-primary" type="submit">حفظ</button>
+      ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${d.usedClips}</span>
     </form>
   </div>
@@ -1334,7 +1336,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       ${field({ id: 'c3', label: 'سقف الترويج (دولار في الأسبوع)',
         control: `<input type="number" name="value" min="0" max="500" step="1"
                value="${d.promoCap}">` })}
-      <button class="btn btn-primary" type="submit">حفظ</button>
+      ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
     </form>
     <div class="sub mt-3"><b>ولا يُنفَق منه شيء آليّا</b>:
       لا عميل إعلانات في صدى ولا مفتاح يُطلَب. والتوصية صفّ ينتظر بتّك،
@@ -1352,8 +1354,7 @@ function settingsPane(d: ShellData & SettingsData): string {
               : `رفع الإدراج الآليّ؟ سيبدأ إنفاق يوميّ بلا أمر منك، بحدّ ${d.analysisCap} تحليلا و ${money(d.spendCap)} في اليوم.`}">
         <input type="hidden" name="key" value="auto_enqueue">
         <input type="hidden" name="value" value="${d.autoEnqueue ? 'false' : 'true'}">
-        <button class="btn ${d.autoEnqueue ? 'btn-secondary' : 'btn-primary'}" type="submit">
-          ${d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ'}</button>
+        ${button({ label: d.autoEnqueue ? 'إطفاء' : 'رفع الإدراج الآليّ', variant: d.autoEnqueue ? 'secondary' : 'primary', type: 'submit' })}
       </form>
     </div>
     <div class="sub mt-3">الحدّ يُقصّ <b>قبل</b> الإرسال لا بعده: حدّ يُطبَّق بعد الإنفاق ليس حدّا.</div>
@@ -1371,8 +1372,7 @@ function settingsPane(d: ShellData & SettingsData): string {
               : `رفع الصورة الآليّة؟ سيُرسَم لكلّ مسوّدةٍ صورةٌ مدفوعة، بحدّ ${d.imageCap} في اليوم وسقف الإنفاق.`}">
         <input type="hidden" name="key" value="auto_image">
         <input type="hidden" name="value" value="${d.autoImage ? 'false' : 'true'}">
-        <button class="btn ${d.autoImage ? 'btn-secondary' : 'btn-primary'}" type="submit">
-          ${d.autoImage ? 'إطفاء' : 'رفع الصورة الآليّة'}</button>
+        ${button({ label: d.autoImage ? 'إطفاء' : 'رفع الصورة الآليّة', variant: d.autoImage ? 'secondary' : 'primary', type: 'submit' })}
       </form>
     </div>
     <form class="row mt-3" method="POST" action="/panel/settings" data-autosave>
@@ -1380,7 +1380,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       ${field({ id: 'c5', label: 'سقف الصور (عدد في اليوم)',
         control: `<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.dailyImageCap.max}" step="1" value="${d.imageCap}">` })}
-      <button class="btn btn-primary" type="submit">حفظ</button>
+      ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">وُلّد اليوم: ${d.usedImages}</span>
     </form>
   </div>
@@ -1399,8 +1399,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       <form class="inline" method="POST" action="/panel/settings">
         <input type="hidden" name="key" value="image_overlay">
         <input type="hidden" name="value" value="${d.imageOverlay ? 'false' : 'true'}">
-        <button class="btn ${d.imageOverlay ? 'btn-secondary' : 'btn-primary'}" type="submit">
-          ${d.imageOverlay ? 'إطفاء' : 'رفع التركيب'}</button>
+        ${button({ label: d.imageOverlay ? 'إطفاء' : 'رفع التركيب', variant: d.imageOverlay ? 'secondary' : 'primary', type: 'submit' })}
       </form>
     </div>
     ${/* ثلاثة فروع لا اثنان (D-163): كان «مضبوط» يُقال متى حضر المفتاح،
@@ -1438,7 +1437,7 @@ ${ownerView ? `<div data-sub id="security-all">
       <p>إبطال الجلسات كلّها عدا جلستك هذه. ويُستعمل إن فقدت جهازا أو شككت في تسرّب.</p>
       <form class="inline" method="POST" action="/panel/sessions/revoke-all"
             data-confirm="إبطال كلّ الجلسات الأخرى؟ كلّ جهاز آخر سيُطلب منه الدخول من جديد.">
-        <button class="btn btn-danger" type="submit">أخرِج الأجهزة الأخرى</button></form>
+        ${button({ label: 'أخرِج الأجهزة الأخرى', variant: 'danger', type: 'submit' })}</form>
     </div>
   </div>
 
@@ -1479,7 +1478,7 @@ ${ownerView ? `<div data-sub id="security-all">
       <form class="row" method="POST" action="/panel/security/totp/confirm" id="totp-confirm">
         <div class="field"><label for="totp-code">الرمز الظاهر الآن</label>
           <input id="totp-code" name="code" dir="ltr" inputmode="numeric" maxlength="8" autocomplete="off"></div>
-        <button class="btn btn-primary" type="submit">أكّد</button>
+        ${button({ label: 'أكّد', variant: 'primary', type: 'submit' })}
       </form>
     </div>
     <div class="note" id="totp-msg" role="status" aria-live="polite"></div>
@@ -1557,7 +1556,7 @@ ${ownerView ? `<div data-sub id="security-all">
   <div class="mt-3">${addCard}</div>
 </div>
 <div id="orgs" class="mt-5">
-  <div class="split"><h2>المنظّمات</h2><div class="row gap-2"><a class="btn btn-secondary btn-sm" href="/panel/portfolio">المحفظة</a><a class="btn btn-secondary btn-sm" href="/panel/team">الفريقُ والصلاحيّات</a></div></div>
+  <div class="split"><h2>المنظّمات</h2><div class="row gap-2">${button({ label: 'المحفظة', size: 'sm', href: '/panel/portfolio' })}${button({ label: 'الفريقُ والصلاحيّات', size: 'sm', href: '/panel/team' })}</div></div>
   ${orgsPane(d)}
 </div>
 <details class="setup mt-5" id="dev"><summary>للمطوّر</summary>${devPane(d)}</details>
@@ -1628,7 +1627,7 @@ export function panelPage(view: PaneView): string {
                     <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">${
                       Object.entries(d.flash.undo.fields ?? {}).map(([k, v]) =>
                         html`<input type="hidden" name="${k}" value="${v}">`.value).join('')}
-                    <button class="btn btn-secondary btn-sm" type="submit">${escapeHtml(d.flash.undo.label)}</button>
+                    ${button({ label: d.flash.undo.label, size: 'sm', type: 'submit' })}
                   </form>`,
           }),
         }),

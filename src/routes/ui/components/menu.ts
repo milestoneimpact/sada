@@ -40,6 +40,16 @@ export function menuItem(input: { readonly label: string; readonly href: string;
  * بندٌ زرُّ نموذج — **والنموذجُ حولَه هنا** (`action` وحقولُه المخفيّة): قائمةٌ داخل بطاقةٍ لا
  * يُزرَع فيها نموذجٌ داخل نموذج، فلكلّ بندٍ نموذجُه.
  */
+/** بصمةٌ قصيرةٌ ثابتة (FNV-1a) — معرّفُ سببِ بندٍ محجوب. */
+function hash(text: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(36)
+}
+
 export function menuAction(input: {
   readonly label: string
   readonly action: string
@@ -59,10 +69,12 @@ export function menuAction(input: {
   const hidden = Object.entries(input.fields)
     .map(([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}">`).join('')
   const line = input.blocked ?? input.note
-  const why = line === undefined ? '' : `<span>${escapeHtml(line)}</span>`
+  // ‏والمحجوبُ يصف نفسَه بسببه (D-325): معرّفٌ ثابتٌ من فعله واسمه وحقوله، فلا يتكرّر في الصفحة ولا يتبدّل بين رسمين
+  const whyId = input.blocked === undefined ? '' : 'mw-' + hash(input.action + '|' + input.label + '|' + JSON.stringify(input.fields))
+  const why = line === undefined ? '' : '<span' + (whyId === '' ? '' : ' id="' + whyId + '"') + '>' + escapeHtml(line) + '</span>'
   return `<form class="menu-form" method="POST" action="${escapeHtml(input.action)}" data-busy="${escapeHtml(input.busy ?? 'جار…')}"${
     input.confirm === undefined ? '' : ` data-confirm="${escapeHtml(input.confirm)}"`}${input.swap === true ? ' data-swap' : ''}>${hidden}<button class="menu-item${
-    input.danger === true ? ' menu-danger' : ''}" type="submit"${input.optimistic === undefined ? '' : ` data-optimistic="${escapeHtml(input.optimistic)}"`}${input.blocked === undefined ? '' : ' disabled'}><span class="menu-t"><b>${
+    input.danger === true ? ' menu-danger' : ''}" type="submit"${input.optimistic === undefined ? '' : ` data-optimistic="${escapeHtml(input.optimistic)}"`}${input.blocked === undefined ? '' : ' disabled aria-describedby="' + whyId + '"'}><span class="menu-t"><b>${
     escapeHtml(input.label)}</b>${why}</span></button></form>`
 }
 
