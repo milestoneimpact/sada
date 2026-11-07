@@ -61,6 +61,40 @@ describe('اعتمادٌ بلا تعديل', () => {
   })
 })
 
+describe('اعتمادٌ بلا تعديل · الحفظُ التلقائيّ (مراجعة D-324)', () => {
+  it('حرفٌ حُفظ ثمّ أُعيد قبل الاعتماد لا يجعلها «معدَّلة»: الأصلُ يُحفظ عند أوّل حفظٍ ولا يُمحى، والحَكَمُ أن يساويه النصّ', async () => {
+    const asWritten = post({ status: 'approved', original: 'نصّ' })
+    const edited = post({ status: 'published', original: 'نصّ النموذج قبل تعديلك', scheduled: '2026-11-10 12:00:00' })
+    const crlf = post({ status: 'approved', original: 'نصّ\r\n' })
+    const m = await successThisMonth(db, 'org_owner', 'Asia/Riyadh', NOW)
+    expect([asWritten, edited, crlf]).toHaveLength(3)
+    expect(m.clean).toEqual({ n: 2, of: 3 })
+  })
+})
+
+describe('نُشر في موعده · ما لم يخرج (مراجعة D-324)', () => {
+  it('المجدولُ الذي فشل أو علق أو تأخّر في الطابور يُعدّ في المقام لا يختفي منه — وما لم يحلّ موعدُه لا يُعدّ', async () => {
+    const ok = post({ status: 'published', scheduled: '2026-11-12 09:00:00' })
+    attempt(ok, 'succeeded', '2026-11-12 09:05:00')
+    for (let i = 0; i < 3; i += 1) {
+      const failed = post({ status: 'failed', scheduled: '2026-11-12 09:00:00' })
+      attempt(failed, 'failed', '2026-11-12 09:01:00')
+    }
+    // ‏في الطابور وقد مضى موعدُه بأكثر من دورة، بلا محاولة
+    post({ status: 'queued', scheduled: '2026-11-20 10:00:00' })
+    // ‏في الطابور وموعدُه لم يحلّ بعد، أو حلّ قبل دقائق — لا يُحكم عليه
+    post({ status: 'queued', scheduled: '2026-11-25 09:00:00' })
+    post({ status: 'queued', scheduled: '2026-11-20 11:50:00' })
+    // ‏أُعيد بعد فشله («أعده» يمحو الموعد) ولم يُجدوَل بعد: فشلُه هذا الشهر يُعدّ
+    const requeued = post({ status: 'approved', scheduled: null })
+    attempt(requeued, 'failed', '2026-11-13 09:01:00')
+    // ‏ومسحوبٌ قبل موعده لا يُعدّ
+    post({ status: 'approved', scheduled: null })
+    const m = await successThisMonth(db, 'org_owner', 'Asia/Riyadh', NOW)
+    expect(m.onTime).toEqual({ n: 1, of: 6 })
+  })
+})
+
 describe('نُشر في موعده', () => {
   it(`أوّلُ نجاحٍ خلال ${ON_TIME_MINUTES} دقيقةً من موعده وبلا فشلٍ قبله — والمنشورُ هذا الشهر وحده`, async () => {
     const onTime = post({ status: 'published', scheduled: '2026-11-10 09:00:00' })

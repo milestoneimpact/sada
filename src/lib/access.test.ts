@@ -113,6 +113,8 @@ describe('«بنفسي» و«تراجَع» بعد الجدولة (D-324)', () =
   it('«بنفسي» للمحرّر، و«تراجَع» بعد الجدولة للناشر', () => {
     expect(requiredRole('POST', '/panel/drafts/own', null)).toBe('editor')
     expect(requiredRole('POST', '/panel/drafts/undo-schedule', null)).toBe('publisher')
+    // ‏و«قل ما وجدت» لتغريدةٍ معلّقة (مراجعة D-324) دورُ «أعده» نفسُه: يعيد المنشورَ إلى المعتمَد
+    expect(requiredRole('POST', '/panel/drafts/thread-check', null)).toBe('publisher')
     expect(needsStepUp('POST', '/panel/drafts/own')).toBe(false)
     expect(needsStepUp('POST', '/panel/drafts/undo-schedule')).toBe(false)
   })

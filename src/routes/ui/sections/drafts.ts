@@ -28,6 +28,7 @@ import type { PublishPlatform } from '../../../lib/oauth/providers'
 import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
 import { IDEA_MAX, OWN_PLATFORMS } from '../../../lib/draft/job'
 import { longestTweet, THREAD_SEPARATOR, tweetsOf } from '../../../lib/draft/thread'
+import { containsUrl } from '../../../lib/idempotency'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
 import { maySpend, SPEND_LOCKED } from '../../../lib/access'
@@ -201,7 +202,7 @@ function scheduler(
       ${why.action === 'relink'
         ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(d.platform)}/start">أعد الربط</a>`
         : ''}
-      ${why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink')}
+      ${why.action === 'confirm' ? threadCheckForm(d.id) : why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink')}
     </div>`
   }
 
@@ -323,6 +324,22 @@ export function requeueForm(id: string, primary: boolean): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جار…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
     <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
+}
+
+/**
+ * ‏**«قل ما وجدت»** لتغريدةٍ من سلسلةٍ أُرسلت ولم يُعرَف جوابُها (مراجعة D-324) — مكانَ «أعده» الذي كان يرسلها ثانيةً. رابطُها
+ * ‏و«وجدتُها» (فيُردّ عليها ولا تُرسَل)، أو «لم أجدها» (فتُرسَل)، وفي الحالين يعود المنشورُ معتمَدًا. واللصيقةُ تلفّ الحقل فلا
+ * ‏معرّفَ يتكرّر حين تُرسَم البطاقةُ والمحرّرُ في صفحةٍ واحدة.
+ */
+export function threadCheckForm(id: string, back = ''): string {
+  // ‏والقيمُ بوسم html تُهرَّب وحدها (حارسُ القوالب)، والحقلُ المخفيّ للعودة حين تُرسَم في صفحة المنصّة
+  const ret = back === '' ? '' : html`<input type="hidden" name="return" value="${back}">`.value
+  return html`<form class="inline tcheck" method="POST" action="/panel/drafts/thread-check" data-busy="جار…">
+    <input type="hidden" name="id" value="${id}">${raw(ret)}
+    <label class="tcheck-f"><span>رابطُ التغريدة على X إن وجدتَها</span>
+      <input type="text" name="link" dir="ltr" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://x.com/…/status/…"></label>
+    <button class="btn btn-primary btn-sm" type="submit" name="found" value="yes">وجدتُها</button>
+    <button class="btn btn-secondary btn-sm" type="submit" name="found" value="no">لم أجدها</button></form>`.value
 }
 
 /**
@@ -815,8 +832,13 @@ export function platformMark(p: string): string {
 }
 
 /** مَن كتبها — **باسم الخدمة لا بمعرّف النموذج** (D-198)، والمعرّفُ تحت «التفاصيل» في المحرّر وحدَها. */
-export function writerName(model: string | null): string {
+/** أسماءُ الأدوار كما في المعجم («من يدخل اللوحة»). */
+const WRITER_ROLES: Readonly<Record<string, string>> = { admin: 'المدير', publisher: 'الناشر', editor: 'المحرّر', viewer: 'القارئ' }
+
+export function writerName(model: string | null, by: string | null = null): string {
   if (model === null || model === '') return 'غير مسجَّل'
+  // ‏ونصُّ «بنفسي» كتبه غيرُ المالك يُسمّى دورُه (مراجعة D-324): «كتبها أنت» لكلّ من يقرؤها كانت تنسب كلامَ المحرّر إلى المالك
+  if (model === 'owner' && by !== null && WRITER_ROLES[by] !== undefined) return WRITER_ROLES[by]!
   if (model === 'owner' || model === 'upload') return 'أنت'
   const m = model.toLowerCase()
   if (m.startsWith('claude')) return 'Claude'
@@ -895,20 +917,21 @@ function card(
   more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
   const tweets = tweetsOf(d.platform, d.text).length
+  const linked = containsUrl(d.text)
   const meta = [
     // ‏والسلسلةُ تُقال بعددها (D-324): نصُّها في البطاقة سطرٌ واحد، والفواصلُ لا تُرى
     tweets > 1 ? html`<span class="chip">سلسلة من ${counted(tweets, NOUNS.tweet, 'gen')}</span>`.value : '',
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
-    d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
+    d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model, d.writtenBy ?? null))}</span>`,
     `<span class="chip mono" tabindex="0" data-tip="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
     /*
      * **وثمنُ النشر غيرُ ثمن الكتابة** — وهذا هو الذي يبتّ فيه المالك. ورابطٌ على X ثلاثةَ عشرَ
      * ضعفا (D-003 · D-069): يُعلَّم تحذيرا ليُرى قبل النقر لا بعده.
      */
+    // ‏**والرابطُ من النصّ لا من عتبة الكلفة** (مراجعة D-324): سلسلةٌ من سبع تغريداتٍ بلا رابطٍ تبلغ العتبة، فكان يُقال إنّ فيها رابطًا
     d.publishCost === 0
       ? ''
-      : statusBadge(d.publishCost >= 0.1 ? 'warn' : '', d.publishCost >= 0.1 ? '!' : '●',
-          `نشرُها ${money(d.publishCost)}${d.publishCost >= 0.1 ? ' — فيها رابط' : ''}`),
+      : statusBadge(linked ? 'warn' : '', linked ? '!' : '●', 'نشرُها ' + money(d.publishCost) + (linked ? ' — فيها رابط' : '')),
     d.approvedBy === null ? '' : `<span class="chip">${d.status === 'rejected' ? 'رفضها' : 'اعتمدها'} ${escapeHtml(deciderText(d.approvedBy))}</span>`,
   ].filter((x) => x !== '').join('')
 
@@ -1050,6 +1073,8 @@ export interface DraftsInput {
   readonly zone?: string | null
   /** معرّفُ المنشور المفتوح في المحرّر المركّز (D-198) — بطاقتُه بلا طيّة، وما فيها هناك. */
   readonly editing?: string | null
+  /** ‏بصمةُ المنظّمة والعضو لمفتاح «بنفسي» في المتصفّح (مراجعة D-324) — `PanelData.ownScope`. */
+  readonly ownScope?: string
 }
 
 /** المنصّاتُ التي تُكتب لها مسوّدةٌ من فكرة — **المكتوبةُ وحدَها**: نصُّ المقطع له صفُّ المقطع. */
@@ -1137,7 +1162,8 @@ function ownForm(input: DraftsInput): string {
       </label>`
   })
   const spec = PLATFORMS[OWN_PLATFORMS[0]]
-  return html`<form method="POST" action="/panel/drafts/own" data-busy="جار الحفظ…" data-own>
+  // ‏والمسوّدةُ في المتصفّح بمفتاح المنظّمة والعضو (مراجعة D-324): عضوٌ آخر على الجهاز، أو عميلٌ آخر، لا يرى نصًّا لم يُرسَل
+  return html`<form method="POST" action="/panel/drafts/own" data-busy="جار الحفظ…" data-own="${input.ownScope ?? ''}">
       ${raw(field({
         id: 'do-text',
         label: 'نصّك',
@@ -1146,7 +1172,7 @@ function ownForm(input: DraftsInput): string {
           ceilingOf(spec.hardLimit)}" data-count="${spec.id}"></textarea><span class="draft-len"><b>0</b> / <span data-lim>${spec.hardLimit}</span></span>`.value,
       }))}
       <fieldset class="field mt-3">
-        <legend>لـ</legend>
+        <legend>لأيّ منصّة؟</legend>
         <div class="vpfs">${boxes}</div>
       </fieldset>
       <span class="st bad" data-own-msg role="alert" hidden></span>

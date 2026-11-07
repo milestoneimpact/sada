@@ -20,6 +20,7 @@
  */
 import { blockerReason, checkAllowance } from '../limits'
 import type { Db } from '../tokens'
+import { threadAuthor, unsettledTweet } from '../publish/xThread'
 import { missingMedia } from './media'
 
 export type ScheduleResult =
@@ -62,6 +63,7 @@ interface AccountRow {
   platform: string
   status: string
   display_name: string
+  external_id: string
 }
 
 /**
@@ -118,7 +120,7 @@ export async function schedulePost(
   if (lacking !== null) return { ok: false, reason: lacking }
 
   const account = await db
-    .prepare('SELECT id, platform, status, display_name FROM accounts WHERE id = ? AND org_id = ?')
+    .prepare('SELECT id, platform, status, display_name, external_id FROM accounts WHERE id = ? AND org_id = ?')
     .bind(accountId, post.org_id)
     .first<AccountRow>()
   if (account === null) return { ok: false, reason: 'لا حساب بهذا المعرّف' }
@@ -134,6 +136,21 @@ export async function schedulePost(
   // جدولةٌ إلى قناةٍ إذنُها منتهٍ تفشل بعد أيّامٍ صامتةً — فتُمنع الآن
   if (account.status !== 'active') {
     return { ok: false, reason: `${account.display_name}: الحساب ${account.status} — جدّد إذنه أوّلا` }
+  }
+  // ‏**وسلسلةُ X نُشر أوّلُها تُكمَل من حسابها** (مراجعة D-324): «أعده» يمحو الحساب، وجدولتُها على حسابٍ آخر تشقّها بين
+  // ‏حسابين — ردٌّ من هذا على تغريدة ذاك. فتُردّ هنا باسم حسابها، والناشرُ يردّها أيضًا إن وصلته
+  if (post.platform === 'x') {
+    const author = await threadAuthor(db, postId, post.org_id)
+    if (author !== null && author !== account.external_id) {
+      const first = await db
+        .prepare("SELECT display_name FROM accounts WHERE org_id = ? AND platform = 'x' AND external_id = ? LIMIT 1")
+        .bind(post.org_id, author)
+        .first<{ display_name: string }>()
+      return {
+        ok: false,
+        reason: `نُشر أوّلُ هذه السلسلة من ${first === null ? 'حسابٍ آخر على X' : `«${first.display_name}»`} — جدوِلها عليه لتكتمل في موضعها`,
+      }
+    }
   }
 
   const at = parseWhen(when)
@@ -338,6 +355,12 @@ export async function requeue(db: Db, postId: string, now: Date, org: string | n
   }
   if (stuck && attempts.results.length > 0) {
     return { ok: false, reason: `حاولت الدورة منذ أقلّ من ${STUCK_MINUTES} دقيقة — انتظر جوابها` }
+  }
+  // ‏**وتغريدةٌ من سلسلةٍ أُرسلت ولم يُعرَف جوابُها** (مراجعة D-324) كمحاولةٍ بقيت `sent`: الإعادةُ ترسلها ثانيةً وقد تكون على X.
+  // ‏فتُردّ حتّى يقول المالكُ ما وجده («لم أجدها» أو «وجدتُها» برابطها — `settleTweet`)
+  const open = await unsettledTweet(db, postId, row.org_id)
+  if (open !== null) {
+    return { ok: false, reason: `التغريدة ${open} من السلسلة أُرسلت ولم يُعرف ردُّها — تحقّق على X وقل ما وجدت أوّلًا` }
   }
 
   const moved = await db

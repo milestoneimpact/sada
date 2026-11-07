@@ -87,6 +87,20 @@ describe('«بنفسي» (D-324)', () => {
   })
 })
 
+/** ‏**«فيها رابط» من النصّ لا من الكلفة** (مراجعة D-324): سلسلةٌ من سبع تغريداتٍ بلا رابطٍ كلفتُها ‏0.105$ فكان يُقال إنّ فيها رابطًا. */
+describe('علامةُ الرابط (مراجعة D-324)', () => {
+  it('سلسلةٌ طويلةٌ بلا رابط: كلفتُها تُقال ولا «فيها رابط»، والرابطُ الحقيقيُّ يُقال', async () => {
+    const cookie = await login()
+    const seven = Array.from({ length: 7 }, (_, i) => `التغريدة ${i + 1} من سلسلةٍ طويلةٍ بلا أيّ رابط.`).join('\n---\n')
+    await post(cookie, '/panel/drafts/own', { platform: 'x', text: seven })
+    const html = await panel(cookie)
+    expect(html).toContain('نشرُها \u20660.105$\u2069')
+    expect(html).not.toContain('فيها رابط')
+    await post(cookie, '/panel/drafts/own', { platform: 'x', text: 'نصٌّ قصيرٌ برابطٍ واحد يكفي ليُحسَب: https://example.com/a' })
+    expect(await panel(cookie)).toContain('— فيها رابط')
+  })
+})
+
 async function seedAccount(platform = 'linkedin'): Promise<string> {
   const id = crypto.randomUUID()
   await db.prepare("INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES (?, ?, 'member', ?, 'عمر', 'active')")
@@ -161,5 +175,67 @@ describe('«تراجَع» بعد الجدولة (D-324)', () => {
     await post(cookie, '/panel/drafts/undo-schedule', fields)
     expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('queued')
     expect(await panel(cookie)).toContain('تعذّر التراجع: مضت دقيقتا التراجع')
+  })
+})
+
+/**
+ * ‏**تغريدةٌ لم يُعرَف جوابُها يسوّيها المالكُ بما وجد** (مراجعة D-324): كان «أعده» يرسلها ثانيةً وقد تكون على X، ثمّ صار
+ * ‏يرفضها — فلا بدّ من بابٍ يقول فيه المالكُ ما وجد. «وجدتُها» برابطها أو «لم أجدها»، ثمّ تعود معتمَدةً.
+ */
+describe('«قل ما وجدت» لتغريدةٍ معلّقة (مراجعة D-324)', () => {
+  async function seedStuckThread(): Promise<{ id: string; account: string }> {
+    const account = await seedAccount('x')
+    const id = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO posts (id, account_id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, scheduled_at)
+       VALUES (?, ?, 'x', 'thread', ?, 'failed', ?, 'owner', 'panel:email', '2026-09-07 10:00:00', '2026-09-08 09:00:00')`,
+    ).bind(id, account, 'الأولى قصيرة بما يكفي لتغريدة.\n---\nوالثانية بعدها ردًّا عليها.', `own:${id}:x`).run()
+    const external = (await db.prepare('SELECT external_id FROM accounts WHERE id = ?').bind(account).first<{ external_id: string }>())!.external_id
+    const tweets = [
+      { no: 1, key: `own:${id}:x#1`, digest: 'a', author: external, status: 'succeeded', id: 'tw-1' },
+      { no: 2, key: `own:${id}:x#2`, digest: 'b', author: external, status: 'sent', error: 'unconfirmed_send: timeout' },
+    ]
+    await db.prepare(
+      `INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status, org_id)
+       VALUES (?, ?, ?, 1, ?, ?, 'failed', 'org_owner')`,
+    ).bind(crypto.randomUUID(), id, `own:${id}:x`, JSON.stringify({ platform: 'x', thread: 2, tweets }),
+      JSON.stringify({ error: 'thread_unconfirmed: التغريدة 2 من 2 أُرسلت ولم يُؤكَّد نشرُها (انقضت المهلة قبل جوابها) — نُشرت قبلها 1 ولا تُعاد — تحقّق على X ثمّ قل ما وجدت', status: 0 })).run()
+    return { id, account }
+  }
+
+  it('البطاقةُ تقول أيَّ تغريدةٍ ولماذا، وتسأل «وجدتُها» برابطٍ أو «لم أجدها» — بلا «أعده» يعيدها', async () => {
+    const { id } = await seedStuckThread()
+    const html = await panel(await login())
+    const strip = html.slice(html.indexOf(`id="s-${id}"`), html.indexOf('</div>', html.indexOf(`id="s-${id}"`)))
+    expect(strip).toContain('التغريدة 2 من 2 أُرسلت ولم يُؤكَّد نشرُها')
+    expect(strip).toContain('action="/panel/drafts/thread-check"')
+    expect(strip).toContain('name="link"')
+    expect(strip).toContain('وجدتُها')
+    expect(strip).toContain('لم أجدها')
+    expect(strip).not.toContain('/panel/drafts/requeue')
+    expect(strip.match(/btn-primary/g)).toHaveLength(1)
+  })
+
+  it('«لم أجدها»: تُعلَّم فاشلةً بيدك، ويعود المنشورُ معتمَدًا إلى نموذج جدولته', async () => {
+    const { id } = await seedStuckThread()
+    const cookie = await login()
+    const r = await post(cookie, '/panel/drafts/thread-check', { id, found: 'no', link: '' })
+    expect(where(r)).toBe(`/panel#s-${id}`)
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('approved')
+    const marks = JSON.parse((await db.prepare('SELECT request_json FROM publish_attempts WHERE post_id = ?').bind(id).first<{ request_json: string }>())!.request_json).tweets
+    expect(marks[1]).toMatchObject({ status: 'failed', settled: 'missing' })
+    expect(await panel(cookie)).toContain('لم تُنشَر التغريدة 2')
+  })
+
+  it('«وجدتُها» بلا رابطٍ يُقرأ تُردّ بسببها ولا يتغيّر شيء، وبرابطها تُعلَّم ناجحةً بمعرّفها', async () => {
+    const { id } = await seedStuckThread()
+    const cookie = await login()
+    await post(cookie, '/panel/drafts/thread-check', { id, found: 'yes', link: 'tw-2' })
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('failed')
+    expect(await panel(cookie)).toContain('ألصق رابطَ التغريدة من X')
+    await post(cookie, '/panel/drafts/thread-check', { id, found: 'yes', link: 'https://x.com/omar/status/1890000000000000002' })
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(id).first<{ status: string }>())?.status).toBe('approved')
+    const marks = JSON.parse((await db.prepare('SELECT request_json FROM publish_attempts WHERE post_id = ?').bind(id).first<{ request_json: string }>())!.request_json).tweets
+    expect(marks[1]).toMatchObject({ status: 'succeeded', id: '1890000000000000002', settled: 'found' })
   })
 })

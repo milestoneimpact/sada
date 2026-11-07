@@ -255,9 +255,11 @@ export function successCard(m: SuccessMetrics): string {
     : tile('اعتماد بلا تعديل', pct(m.clean.n, m.clean.of),
       m.clean.n + ' من ' + m.clean.of + ' مسوّدة كتبها النموذج وبُتّ فيها. الهدف 60٪ فأكثر.')
   const onTime = m.onTime.of === 0
-    ? tile('نُشر في موعده', none, 'لم يُنشر منشور مجدول هذا الشهر. الهدف 100٪.')
+    ? tile('نُشر في موعده', none, 'لم يحلّ موعد منشور مجدول هذا الشهر. الهدف 100٪.')
+    // ‏والمقامُ كلُّ ما حلّ موعدُه أو حوول نشرُه (مراجعة D-324): الفاشلُ والعالقُ فيه، فلا تقرأ ‏100٪ وثلاثةٌ لم تخرج
     : tile('نُشر في موعده', pct(m.onTime.n, m.onTime.of),
-      m.onTime.n + ' من ' + m.onTime.of + ' خرج خلال ' + ON_TIME_MINUTES + ' دقيقة من موعده بلا محاولة فاشلة قبله. الهدف 100٪.')
+      m.onTime.n + ' من ' + m.onTime.of + ' حلّ موعده هذا الشهر خرج خلال ' + ON_TIME_MINUTES +
+        ' دقيقة منه بلا محاولة فاشلة قبله، والفاشل والعالق من المقام. الهدف 100٪.')
   const cost = m.cost.posts === 0
     ? tile('كلفة المنشور', none, 'لم يُنشر شيء هذا الشهر، فلا قسمة.')
     : tile('كلفة المنشور', money(m.cost.direct / m.cost.posts),

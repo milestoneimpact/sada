@@ -446,6 +446,11 @@ export interface PanelData {
   readonly captions?: Readonly<Record<string, VideoCaptions>>
   /** حالُ ربط كلّ منصّة — يُقال حيث تُختار (D-190). */
   readonly links?: Readonly<Record<string, LinkState>>
+  /**
+   * ‏بصمةُ المنظّمة وصاحبِ الجلسة (مراجعة D-324) — مفتاحُ ما يحفظه «بنفسي» في المتصفّح (`sada-own:<البصمة>`)، فلا يرى عضوٌ
+   * ‏آخر على الجهاز نفسِه نصًّا لم يُرسَل، ولا يُملأ مُنشئُ عميلٍ بنصّ عميلٍ آخر. وغيابُها بصمةٌ فارغة.
+   */
+  readonly ownScope?: string
   /** مَن يرى مقاطع YouTube وTikTok: قرارُ المالك بعد الإجازة (D-190). */
   readonly reach?: Reach
   /** سقفُ الترويج الأسبوعيّ — ومنه وحده يأتي مبلغُ التوصية. */
@@ -487,7 +492,7 @@ export type OverviewData = Pick<PanelData,
 /** «المنشورات»: المسوّداتُ ومحرّرُها، و«اكتب»، والخطّة. */
 export type PostsData = Pick<PanelData,
   'editing' | 'media' | 'targets' | 'pageOnly' | 'peaks' | 'mediaReady' | 'writableSources' | 'draftReady' | 'writers'
-  | 'draftBlocker' | 'links' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'planCounts' | 'imageQuota'>
+  | 'draftBlocker' | 'links' | 'ownScope' | 'plan' | 'planReady' | 'sources' | 'audit' | 'planForm' | 'planPending' | 'planCounts' | 'imageQuota'>
 
 /** «المكتبة»: المصادرُ والمقاطعُ والصور. */
 export type LibraryData = Pick<PanelData,
@@ -1226,6 +1231,7 @@ function postsPane(d: ShellData & PostsData): string {
     peaks: d.peaks ?? {},
     mediaReady: d.mediaReady,
     ...(d.links === undefined ? {} : { links: d.links }),
+    ...(d.ownScope === undefined ? {} : { ownScope: d.ownScope }),
     editing: d.editing?.id ?? null,
     zone: d.zone ?? null,
   }), `${planImportCard()}

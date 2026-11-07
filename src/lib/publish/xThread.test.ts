@@ -11,7 +11,8 @@ import { saveTokens, upsertAccount } from '../tokens'
 import { X } from '../oauth/providers'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { publishPost } from './publisher'
-import { requeue } from '../schedule/job'
+import { requeue, schedulePost } from '../schedule/job'
+import { settleTweet } from './xThread'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const NOW = () => new Date('2026-09-08T09:00:00.000Z')
@@ -147,6 +148,141 @@ describe('سلسلة X', () => {
     expect(await publishPost(deps(net.impl), { postId: id })).toEqual({ kind: 'published', platformPostId: 'tw-1' })
     expect(net.sent).toEqual([{ text: 'تغريدة واحدة بلا فاصل، كما كانت قبل السلاسل.', reply: null }])
     expect(items()).toEqual([])
+    expect(ledger().n).toBe(1)
+  })
+})
+
+/**
+ * ‏**مراجعة D-324: تغريدةٌ لم يُعرَف جوابُها لا تُعاد وحدَها** (D-269). كانت المهلةُ وانقطاعُ الشبكة و5xx وجوابٌ بلا `data.id`
+ * ‏تُعلَّم `failed` ويُقال «لم تُنشَر … والإعادةُ تُكمل منها»، فيرسل «أعده» تغريدةً قد تكون على X فتتكرّر وتُدفع مرّتين.
+ */
+describe('سلسلة X: ما لم يُعرَف جوابُه (مراجعة D-324)', () => {
+  /** ‏X مزيَّفةٌ تنشر ثمّ ترمي في الطلب الذي رقمُه `at` — كأنّ الجوابَ ضاع بعد أن نُشرت. */
+  function lost(at: number, how: 'timeout' | 'network' | 503 | 'no-id') {
+    const sent: Sent[] = []
+    const impl = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { text: string; reply?: { in_reply_to_tweet_id: string } }
+      sent.push({ text: body.text, reply: body.reply?.in_reply_to_tweet_id ?? null })
+      if (sent.length === at) {
+        if (how === 'timeout') throw new DOMException('The operation timed out.', 'TimeoutError')
+        if (how === 'network') throw new TypeError('network connection lost')
+        if (how === 503) return Response.json({ title: 'Service Unavailable' }, { status: 503 })
+        return Response.json({ data: {} })
+      }
+      return Response.json({ data: { id: `tw-${sent.length}` } })
+    }) as unknown as typeof fetch
+    return { impl, sent }
+  }
+
+  for (const how of ['timeout', 'network', 503, 'no-id'] as const) {
+    it(`${String(how)} في الثانية: تبقى «أُرسلت»، والسببُ «لم يُؤكَّد» لا «لم تُنشَر»، و«أعده» يُردّ حتّى تقول ما وجدت`, async () => {
+      const id = await seedThread()
+      const out = await publishPost(deps(lost(2, how).impl), { postId: id })
+      expect(out.kind).toBe('failed')
+      if (out.kind === 'failed') {
+        expect(out.retryable).toBe(false)
+        expect(out.reason).toMatch(/^thread_unconfirmed: التغريدة 2 من 3/)
+        expect(out.reason).not.toContain('لم تُنشَر')
+      }
+      expect(items().map((r) => r.status)).toEqual(['succeeded', 'sent'])
+      const again = await requeue(db, id, NOW(), 'org_owner')
+      expect(again.ok).toBe(false)
+      if (!again.ok) expect(again.reason).toContain('التغريدة 2')
+    })
+  }
+
+  it('«لم أجدها على X»: تُعلَّم فاشلةً بيد المالك، ثمّ «أعده» يكمل منها وحدها', async () => {
+    const id = await seedThread()
+    await publishPost(deps(lost(2, 'timeout').impl), { postId: id })
+    expect(await settleTweet(db, 'org_owner', id, null)).toEqual({ ok: true, no: 2 })
+    expect((await requeue(db, id, NOW(), 'org_owner')).ok).toBe(true)
+    db.raw.prepare("UPDATE posts SET status = 'queued', account_id = (SELECT id FROM accounts LIMIT 1), scheduled_at = '2026-09-08 10:00:00' WHERE id = 'p-t'").run()
+    const net = x({}, 2)
+    expect(await publishPost(deps(net.impl), { postId: id })).toEqual({ kind: 'published', platformPostId: 'tw-1' })
+    expect(net.sent).toEqual([
+      { text: 'الثانية: بل تحميه من العجلة.', reply: 'tw-1' },
+      { text: 'الثالثة: فاسأل قبل أن تقرّر.', reply: 'tw-2' },
+    ])
+  })
+
+  it('«وجدتُها» برابطها: تُعلَّم ناجحةً بمعرّفها، فالإعادةُ لا ترسلها وتردّ الثالثةَ عليها', async () => {
+    const id = await seedThread()
+    await publishPost(deps(lost(2, 503).impl), { postId: id })
+    expect(await settleTweet(db, 'org_owner', id, { link: 'https://x.com/omar/status/1890000000000000002?s=20' })).toEqual({ ok: true, no: 2 })
+    expect((await requeue(db, id, NOW(), 'org_owner')).ok).toBe(true)
+    db.raw.prepare("UPDATE posts SET status = 'queued', account_id = (SELECT id FROM accounts LIMIT 1), scheduled_at = '2026-09-08 10:00:00' WHERE id = 'p-t'").run()
+    const net = x({}, 3)
+    expect(await publishPost(deps(net.impl), { postId: id })).toEqual({ kind: 'published', platformPostId: 'tw-1' })
+    expect(net.sent).toEqual([{ text: 'الثالثة: فاسأل قبل أن تقرّر.', reply: '1890000000000000002' }])
+  })
+
+  it('ورابطٌ لا يُقرأ معرّفُه يُردّ ولا يغيّر شيئًا، ولا تسويةَ لمنشورٍ لا تغريدةَ معلّقةً فيه', async () => {
+    const id = await seedThread()
+    await publishPost(deps(lost(2, 'network').impl), { postId: id })
+    const bad = await settleTweet(db, 'org_owner', id, { link: 'https://example.com/omar' })
+    expect(bad.ok).toBe(false)
+    expect(items().map((r) => r.status)).toEqual(['succeeded', 'sent'])
+    expect((await settleTweet(db, 'org_other', id, null)).ok).toBe(false)
+    expect((await settleTweet(db, 'org_owner', id, null)).ok).toBe(true)
+    expect((await settleTweet(db, 'org_owner', id, null)).ok).toBe(false)
+  })
+
+  it('وتحديثُ العلامة بعد نجاحٍ إن سقط: «لم يُؤكَّد» بمعرّفها، لا «أعده» يعيدها', async () => {
+    const id = await seedThread()
+    // ‏القاعدةُ تسقط عند كتابة علامة الثانية ناجحةً — الثالثةُ من نداءات `request_json` لهذه المحاولة
+    const realPrepare = db.prepare.bind(db)
+    let writes = 0
+    db.prepare = ((query: string) => {
+      if (query.includes('SET request_json')) {
+        writes += 1
+        if (writes === 4) throw new Error('D1_ERROR: network connection lost')
+      }
+      return realPrepare(query)
+    }) as typeof db.prepare
+    const out = await publishPost(deps(x().impl), { postId: id })
+    db.prepare = realPrepare
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.reason).toMatch(/^thread_unconfirmed: التغريدة 2 من 3/)
+    expect((await requeue(db, id, NOW(), 'org_owner')).ok).toBe(false)
+  })
+})
+
+/** ‏**والسلسلةُ تُكمَل من الحساب الذي بدأها** (مراجعة D-324): «أعده» يمحو الحساب، وجدولتُها على حسابٍ آخر كانت تشقّها بين حسابين. */
+describe('سلسلة X على حسابٍ آخر (مراجعة D-324)', () => {
+  it('تُردّ الجدولةُ على حسابٍ غيرِ الذي نشر أوّلَها، والنشرُ إن وصل يُردّ thread_account ولا يُرسَل شيء', async () => {
+    const id = await seedThread()
+    await publishPost(deps(x({ 2: 400 }).impl), { postId: id })
+    expect((await requeue(db, id, NOW(), 'org_owner')).ok).toBe(true)
+    const other = await upsertAccount(db, 'org_owner', { platform: 'x', kind: 'member', externalId: '9999', displayName: 'حسابٌ آخر' })
+    await saveTokens(db, KEY, other, {
+      accessToken: 'other-access', refreshToken: null, expiresAt: '2026-11-02T10:00:00.000Z', refreshExpiresAt: null,
+      scopes: scopeSet('x').join(' '),
+    })
+    const refused = await schedulePost(db, id, other, '2026-09-08T12:00', NOW(), 'org_owner')
+    expect(refused.ok).toBe(false)
+    if (!refused.ok) expect(refused.reason).toContain('عمر')
+    // ‏ولو وصلت إلى الناشر من طريقٍ آخر: لا تغريدةَ من الحساب الآخر
+    db.raw.prepare("UPDATE posts SET status = 'queued', account_id = ?, scheduled_at = '2026-09-08 10:00:00' WHERE id = 'p-t'").run(other)
+    const net = x({}, 2)
+    const out = await publishPost(deps(net.impl), { postId: id })
+    expect(net.sent).toHaveLength(0)
+    expect(out.kind).toBe('failed')
+    if (out.kind === 'failed') expect(out.reason).toMatch(/^thread_account/)
+    // ‏وعلى حسابها تُجدوَل
+    const own = (db.raw.prepare("SELECT id FROM accounts WHERE external_id = '4242'").get() as { id: string }).id
+    expect((await requeue(db, id, NOW(), 'org_owner')).ok).toBe(true)
+    expect((await schedulePost(db, id, own, '2026-09-08T12:00', NOW(), 'org_owner')).ok).toBe(true)
+  })
+})
+
+/** ‏**والنوعُ المعتمَد هو الحَكَم** (مراجعة D-324): منشورُ X اعتُمد تغريدةً واحدةً قبل السلاسل وفي نصّه سطر `---` لا يُشقّ. */
+describe('سلسلة X: النوعُ لا النصّ (مراجعة D-324)', () => {
+  it('نوعُه text وفي نصّه سطرُ الفاصل، فتغريدةٌ واحدة وصفٌّ واحدٌ في الدفتر', async () => {
+    const id = await seedThread('عنوان قبل الفاصل.\n---\nسطر بعد الفاصل.')
+    db.raw.prepare("UPDATE posts SET type = 'text' WHERE id = 'p-t'").run()
+    const net = x()
+    expect(await publishPost(deps(net.impl), { postId: id })).toEqual({ kind: 'published', platformPostId: 'tw-1' })
+    expect(net.sent).toEqual([{ text: 'عنوان قبل الفاصل.\n---\nسطر بعد الفاصل.', reply: null }])
     expect(ledger().n).toBe(1)
   })
 })

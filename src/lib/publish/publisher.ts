@@ -54,6 +54,8 @@ interface PostRow {
   org_id: string
   account_id: string
   text: string
+  /** نوعُ المنشور كما اعتُمد — `thread` وحدها تُنشَر سلسلة (مراجعة D-324). */
+  type: string
   status: string
   idempotency_key: string
   approved_at: string | null
@@ -143,7 +145,7 @@ export async function publishPost(
   // ١ — المنشور وحسابه
   const post = await db
     .prepare(
-      `SELECT p.id, p.org_id, p.account_id, p.text, p.status, p.idempotency_key, p.approved_at,
+      `SELECT p.id, p.org_id, p.account_id, p.text, p.type, p.status, p.idempotency_key, p.approved_at,
               a.platform, a.external_id, a.kind AS account_kind,
               a.status AS account_status
          FROM posts p JOIN accounts a ON a.id = p.account_id
@@ -351,8 +353,10 @@ export async function publishPost(
 
   const attemptNo = await nextAttemptNo(db, post.id, post.org_id)
   const hasUrl = containsUrl(post.text)
-  // ‏**وسلسلةُ X تغريداتٌ من نصّها** (D-324): سطرُ `---` بينها. ولكلّ تغريدةٍ مفتاحُها وعلامتُها وكلفتُها في `xThread.ts`
-  const tweets = post.platform === 'x' ? tweetsOf('x', post.text) : [post.text]
+  // ‏**وسلسلةُ X تغريداتٌ من نصّها** (D-324): سطرُ `---` بينها. ولكلّ تغريدةٍ مفتاحُها وعلامتُها وكلفتُها في `xThread.ts`.
+  // ‏**والنوعُ المعتمَد هو الحَكَم لا النصُّ** (مراجعة D-324): منشورٌ اعتُمد تغريدةً واحدةً قبل السلاسل وفي نصّه سطرُ `---`
+  // ‏كان يُشقّ عند النشر تغريداتٍ مدفوعةً لم يعتمدها أحد. والاعتمادُ والحفظُ والاستيرادُ يكتبون النوعَ من النصّ
+  const tweets = post.platform === 'x' && post.type === 'thread' ? tweetsOf('x', post.text) : [post.text]
   const thread = tweets.length > 1
 
   // ٣ — المحاولة تُسجَّل قبل الإرسال

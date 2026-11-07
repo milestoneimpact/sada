@@ -73,6 +73,11 @@ export interface DraftRow {
    */
   readonly originalText: string | null
   /**
+   * ‏دورُ من كتب نصَّ «بنفسي» إن لم يكن المالك (مراجعة D-324) — من `by:<الدور>` في `source_refs`، أو `null`. **واختياريٌّ**
+   * ‏كـ`failure`: صفوفٌ تُبنى بلا قاعدة. والغائبُ «أنت» كما كان.
+   */
+  readonly writtenBy?: string | null
+  /**
    * سببُ آخرِ فشلٍ كما حفظه الناشر، مختصرًا (`briefError`) — **للفاشل وحدَه**، و`null`
    * لما سواه. كانت بطاقةُ الفاشل في «المنشورات» تقول «فشل النشر» بلا سببٍ ولا زرّ
    * (رحلة R-8)، والسببُ والإعادةُ في صفحة المنصّة وحدَها.
@@ -102,6 +107,7 @@ interface Raw {
   dispatched_at: string | null
   account_name: string | null
   original_text: string | null
+  source_refs?: string | null
   fail_json: string | null
 }
 
@@ -149,7 +155,20 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
     // ‏وللسلسلة مجموعُ تغريداتها (D-324): كلُّ تغريدةٍ طلبٌ مدفوع
     publishCost: publishCostOf(platform, row.text),
     originalText: row.original_text ?? null,
+    writtenBy: writerOf(row.source_refs ?? null),
     failure: row.status === 'failed' ? briefError(row.fail_json ?? null) : null,
+  }
+}
+
+/** ‏`by:<الدور>` من مراجع المنشور — ما يكتبه «بنفسي» لغير المالك (مراجعة D-324). */
+function writerOf(raw: string | null): string | null {
+  try {
+    const refs = JSON.parse(raw ?? '[]') as unknown
+    if (!Array.isArray(refs)) return null
+    const by = refs.find((r): r is string => typeof r === 'string' && /^by:[a-z]+$/.test(r))
+    return by === undefined ? null : by.slice(3)
+  } catch {
+    return null
   }
 }
 
@@ -186,7 +205,7 @@ async function selectDrafts(
       .prepare(
         `SELECT p.id, p.platform, p.text, p.rationale, p.status, p.model, p.cost_usd,
                 p.source_id, p.source_hash, p.approved_by, p.approved_at, p.created_at,
-                p.scheduled_at, p.dispatched_at, p.original_text,
+                p.scheduled_at, p.dispatched_at, p.original_text, p.source_refs,
                 s.name AS source_name, s.content_hash AS current_hash,
                 a.display_name AS account_name,
                 -- ‏وسبب آخر محاولة فاشلة للفاشل وحدَه: لا استعلام فرعيّ لما لم يفشل

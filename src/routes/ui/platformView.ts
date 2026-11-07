@@ -56,6 +56,7 @@ import { readiness, type Readiness } from '../../lib/platform/readiness'
 import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
 import { returnTo } from '../../lib/nav/back'
 import { emptyState } from './components/empty'
+import { threadCheckForm } from './sections/drafts'
 import { button } from './components/button'
 import { card } from './components/card'
 import { dialog } from './components/dialog'
@@ -699,7 +700,7 @@ function historyRow(d: PlatformScreenData, row: TimelineRow): string {
         ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(platform)}/start">أعد الربط</a>${requeueForm(row.id, false, platform)}`
         : why.action === 'requeue' || why.action === 'open'
           ? requeueForm(row.id, true, platform)
-          : ''}
+          : why.action === 'confirm' ? threadCheckForm(row.id, returnTo(platform, 'waiting')) : ''}
       ${journeyLink(row.id)}`
   }
   return npRow(

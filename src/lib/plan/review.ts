@@ -20,7 +20,7 @@
 import type { Db } from '../tokens'
 import { decide, undoApprove } from '../draft/store'
 import { reschedulePost } from '../schedule/job'
-import { schedulePlan, type PlanSchedule } from './schedule'
+import { KIND_FITS_SQL, kindFits, schedulePlan, type PlanSchedule } from './schedule'
 import { dayWithin, touchPlan } from './edit'
 import { asSpan, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
@@ -82,10 +82,10 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   const [meta, posts, media, versions] = await Promise.all([
     db.prepare('SELECT version, locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org)
       .first<{ version: number; locked_at: string | null }>().catch(() => null),
-    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs FROM posts
+    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key FROM posts
                  WHERE org_id = ? AND plan_id = ? AND status <> 'rejected' ORDER BY created_at`)
       .bind(org, plan.id)
-      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null }>()
+      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
       .then((r) => r.results).catch(() => []),
     db.prepare(`SELECT m.id, m.post_id, m.mime FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
@@ -104,7 +104,9 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   for (const i of plan.plan.items) slots.set(`${i.platform}|${i.day}|${i.time}`, (slots.get(`${i.platform}|${i.day}|${i.time}`) ?? 0) + 1)
 
   const cards: ReviewCard[] = plan.plan.items.map((item, index) => {
-    const row = posts.find((p) => p.platform === item.platform && (p.source_id === item.sourceId || refsOf(p.source_refs).includes(item.sourceId))) ?? null
+    // ‏وبندُ السلسلة لمسوّدة السلسلة (مراجعة D-324): المصدرُ والمنصّةُ وحدهما يجمعان البندين على مسوّدةٍ واحدة
+    const row = posts.find((p) => p.platform === item.platform && (p.source_id === item.sourceId || refsOf(p.source_refs).includes(item.sourceId))
+      && kindFits(item.kind, p.idempotency_key)) ?? null
     const mediaId = row === null ? null : latestMedia.get(row.id) ?? null
     const gaps: Gap[] = []
     if (row === null) gaps.push('unwritten')
@@ -169,8 +171,9 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
   await touchPlan(db, org, planId)
   const queued = await db
-    .prepare("SELECT id, scheduled_at FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?) AND status = 'queued'")
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`)
+    .prepare(`SELECT id, scheduled_at FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
+                AND status = 'queued' AND ${KIND_FITS_SQL}`)
+    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
     .first<{ id: string; scheduled_at: string | null }>()
   if (queued !== null && queued.scheduled_at !== null) {
     const moved = new Date(queued.scheduled_at.replace(' ', 'T') + 'Z')
@@ -190,8 +193,9 @@ export async function dropItem(db: Db, org: string, planId: string, index: numbe
   if (typeof at === 'string') return { ok: false, reason: at }
   const item = at.plan.items[index]!
   const post = await db
-    .prepare("SELECT id, status FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?) AND status <> 'rejected'")
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`)
+    .prepare(`SELECT id, status FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
+                AND status <> 'rejected' AND ${KIND_FITS_SQL}`)
+    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
     .first<{ id: string; status: string }>()
   if (post !== null && (post.status === 'queued' || post.status === 'published')) {
     return { ok: false, reason: post.status === 'queued' ? 'منشورُه مجدول — ألغِ موعدَه من بطاقته أوّلًا' : 'نُشر منشورُه — لا يُحذف من الخطّة' }

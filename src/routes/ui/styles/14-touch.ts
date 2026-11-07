@@ -105,6 +105,10 @@ export const TOUCH = `/* ══════════════════�
 .np-why{display:flex; gap:var(--s-2); margin:0; color:var(--bad)}
 .np-why-ic{display:inline-flex; padding-top:var(--s-1)}
 .np-why-ic svg{inline-size:var(--icon-xs); block-size:var(--icon-xs)}
+/* ‏«قل ما وجدت» لتغريدةٍ معلّقة (مراجعة D-324): الحقلُ يأخذ السطرَ والزرّان بعده، وعلى الهاتف يلتفّان تحته */
+.tcheck{display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--s-2); flex:1 1 100%}
+.tcheck-f{display:grid; gap:var(--s-1); flex:1 1 16rem; min-inline-size:0}
+.tcheck-f input{inline-size:100%}
 .np-day{position:sticky; inset-block-start:0; z-index:1; margin:var(--s-5) 0 0; padding-block:var(--s-2);
   background-color:var(--bg); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600;
   border-block-end:var(--bd)}

@@ -19,6 +19,7 @@ import {
   UNDO_WINDOW_SECONDS, undoSchedule, undoUntil,
 } from '../../lib/schedule/job'
 import { missingMedia } from '../../lib/schedule/media'
+import { settleTweet, unsettledTweet } from '../../lib/publish/xThread'
 import { GAP_MAX_HOURS, GAP_MIN_HOURS, planSpread } from '../../lib/schedule/spread'
 import { getProvider } from '../../lib/providers'
 import { activeOrg } from '../../lib/tenancy'
@@ -323,7 +324,8 @@ drafts.post('/panel/drafts/own', async (c) => {
   }
   const platform = raw as OwnPlatform
   const org = activeOrg(gate.session.record)
-  const outcome = await draftFromOwner(c.env.DB, org, platform, String(form.get('text') ?? ''))
+  // ‏ودورُ الكاتب يُحفظ معها (مراجعة D-324): البطاقةُ تقول «كتبها المحرّر» لا «أنت» لكلّ من يقرؤها
+  const outcome = await draftFromOwner(c.env.DB, org, platform, String(form.get('text') ?? ''), gate.session.record.role)
   await record(c.env.DB, { actor: 'panel', action: 'draft.own', detail: platform + ':' + outcome.kind }, c.req.raw)
   if (outcome.kind !== 'drafted' && outcome.kind !== 'already') {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يُحفظ: ' + ('reason' in outcome ? outcome.reason : '') })
@@ -947,6 +949,44 @@ drafts.post('/panel/drafts/reschedule', async (c) => {
  * ‏منشوراتٍ لا ترسمها اللوحة، والنزولُ إلى بطاقةٍ لم تُرسَم يرتدّ إلى الرئيسيّة. فيعود إلى
  * ‏`return` كما كان قبل R-8 — وتبويبُ «تنتظر» يُريه معتمَدًا بلا موعد — وبلا `return` إلى رحلته.
  */
+/**
+ * ‏**«قل ما وجدت»** (مراجعة D-324) — تغريدةٌ من سلسلةٍ أُرسلت ولم يُعرَف جوابُها: «وجدتُها» برابطها تُعلّمها ناجحةً بمعرّفها
+ * ‏(فيُردّ عليها ولا تُرسَل)، و«لم أجدها» تُعلّمها فاشلةً (فتُرسَل). ثمّ يعود المنشورُ معتمَدًا بـ`requeue` نفسِها، فيُجدوَل على
+ * ‏حسابه ويكمل من حيث وقف. **والحارسُ في `settleTweet`**: الفاشلُ وحده، والتغريدةُ المعلّقةُ وحدها، وصفُّها كما قُرئ.
+ */
+drafts.post('/panel/drafts/thread-check', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+  const org = activeOrg(gate.session.record)
+  const found = gate.form.get('found') === 'yes'
+  const now = new Date()
+  // ‏وما سُوّي من قبل (ضغطةٌ ثانية، أو سقوطُ الإعادة بعد التسوية) يمضي إلى الإعادة وحدها
+  const open = await unsettledTweet(c.env.DB, id, org)
+  const settled = open === null ? null : await settleTweet(c.env.DB, org, id, found ? { link: String(gate.form.get('link') ?? '') } : null)
+  const result: ScheduleResult = settled !== null && !settled.ok ? settled : await requeue(c.env.DB, id, now, org)
+  await record(c.env.DB, {
+    actor: 'panel', action: 'draft.thread_check', target: id,
+    detail: (result.ok ? (found ? 'found' : 'missing') + ':' + String(open ?? '-') : 'refused:' + result.reason).slice(0, 200),
+  }, c.req.raw)
+  const to = backTo(gate.form.get('return'), '')
+  const card = result.ok && (await onBoard(c.env.DB, org, id))
+  if (result.ok && !card && to === '') return toJourney(id)
+  await setFlash(c.env, c.req.raw, result.ok
+    ? {
+        kind: 'ok',
+        text: open === null
+          ? 'عاد معتمَدًا — جدوِله على حسابه فيكمل من حيث وقف.'
+          : found
+            ? 'سُجّل أنّ التغريدة ' + String(open) + ' على X، فلا تُرسَل ثانيةً. عاد معتمَدًا — جدوِله على حسابه فيكمل بعدها.'
+            : 'سُجّل أنّك لم تجدها: لم تُنشَر التغريدة ' + String(open) + '. عاد معتمَدًا — جدوِله على حسابه فيكمل منها.',
+      }
+    : { kind: 'bad', text: 'لم يُحفظ ما وجدت: ' + result.reason })
+  if (card) return toCard('s', id)
+  if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
+  return toCard('d', id)
+})
+
 drafts.post('/panel/drafts/requeue', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied

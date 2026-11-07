@@ -55,7 +55,7 @@
   "routes/ui/scope.ts": 4,
   "routes/ui/scripts.ts": 1,
   "routes/ui/sections/desk.ts": 5,
-  "routes/ui/sections/drafts.ts": 84,
+  "routes/ui/sections/drafts.ts": 83,
   "routes/ui/sections/editor.ts": 51,
   "routes/ui/sections/home.ts": 15,
   "routes/ui/sections/library.ts": 4,

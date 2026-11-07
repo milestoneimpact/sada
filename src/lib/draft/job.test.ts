@@ -13,6 +13,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { draftFromIdea, draftFromOwner, draftKey, draftPost, ideaKey, ideaProblem, normalizeIdea, type DraftDeps } from './job'
+import { listDrafts } from './store'
+import { writerName } from '../../routes/ui/sections/drafts'
 import { PLATFORMS, parseDraft, systemPrompt } from './prompt'
 import { writeSetting } from '../settings'
 import { writeRoute } from '../ai/routes'
@@ -564,6 +566,63 @@ describe('draftFromOwner (D-324)', () => {
     expect(thread.kind).toBe('drafted')
     const row = await db.prepare('SELECT type FROM posts WHERE id = ?').bind((thread as { postId: string }).postId).first<{ type: string }>()
     expect(row?.type).toBe('thread')
+  })
+})
+
+/** ‏**ومَن كتبها يُقال** (مراجعة D-324): «بنفسي» للمحرّر أيضًا، و`model = 'owner'` وحدَه كان يُرى «كتبها أنت» لكلّ من يقرؤها. */
+describe('«بنفسي» · مَن كتبها (مراجعة D-324)', () => {
+  const MINE = 'الحوكمة لا تبطئ القرار، تحميه — كتبها المحرّرُ بيده لا النموذج.'
+
+  it('دورُ الكاتب في مراجعها إن لم يكن المالك، وبطاقتُها تقول «كتبها المحرّر»', async () => {
+    const out = await draftFromOwner(db, 'org_owner', 'linkedin', MINE, 'editor')
+    expect(out.kind).toBe('drafted')
+    const row = db.raw.prepare('SELECT source_refs, model FROM posts').get() as { source_refs: string; model: string }
+    expect(row).toEqual({ source_refs: '["by:editor"]', model: 'owner' })
+    const [draft] = await listDrafts(db, 'org_owner')
+    expect(draft?.writtenBy).toBe('editor')
+    expect(writerName(draft!.model, draft!.writtenBy)).toBe('المحرّر')
+    // ‏والمالكُ «أنت» كما كان، وما لا دورَ عليه كذلك
+    await draftFromOwner(db, 'org_owner', 'x', MINE, 'owner')
+    expect((db.raw.prepare("SELECT source_refs FROM posts WHERE platform = 'x'").get() as { source_refs: string }).source_refs).toBe('[]')
+    expect(writerName('owner', null)).toBe('أنت')
+  })
+})
+
+/**
+ * ‏**ومفتاحُ النصّ والفكرة لمنظّمته** (مراجعة D-324): كان بصمةَ المنصّة والنصّ وحدهما، و`posts.idempotency_key` فريدٌ على
+ * ‏الجدول كلّه — فوكالةٌ تكتب الإعلانَ نفسَه لعميلين لا تُحفظ مسوّدةُ الثاني ويُرى خطأُ القاعدة كما هو، ويعرف محرّرٌ في
+ * ‏منظّمةٍ أنّ أخرى كتبت نصًّا بعينه. وفي الفكرة يقع ذلك بعد النداء المدفوع.
+ */
+describe('المفتاحُ لمنظّمته (مراجعة D-324)', () => {
+  const MINE = 'عيد مبارك — كلُّ عامٍ وأنتم بخير من فريقنا كلِّه (إعلانٌ واحدٌ لعميلين).'
+  const IDEA = 'الحوكمة لا تبطئ القرار، تحميه'
+
+  it('«بنفسي» بالنصّ نفسِه في منظّمتين: مسوّدتان، ولكلٍّ مفتاحُها', async () => {
+    const a = await draftFromOwner(db, 'org_owner', 'linkedin', MINE)
+    const b = await draftFromOwner(db, 'org_b', 'linkedin', MINE)
+    expect(a.kind).toBe('drafted')
+    expect(b.kind).toBe('drafted')
+    const keys = db.raw.prepare('SELECT org_id, idempotency_key FROM posts ORDER BY org_id').all() as { org_id: string; idempotency_key: string }[]
+    expect(keys).toHaveLength(2)
+    expect(keys[0]!.idempotency_key).not.toBe(keys[1]!.idempotency_key)
+    // ‏والضغطةُ الثانية في كلٍّ تعيد مسوّدتَها هي
+    expect(await draftFromOwner(db, 'org_b', 'linkedin', MINE)).toEqual({ kind: 'already', postId: (b as { postId: string }).postId })
+  })
+
+  it('والفكرةُ نفسُها في منظّمتين: مسوّدتان — ولا يُرى خطأُ القاعدة', async () => {
+    const a = await draftFromIdea(deps(net()), IDEA, 'linkedin')
+    const b = await draftFromIdea({ ...deps(net()), org: 'org_b' }, IDEA, 'linkedin')
+    expect(a.kind).toBe('drafted')
+    expect(b.kind).toBe('drafted')
+  })
+
+  it('ومسوّدةُ فكرةٍ قبل المراجعة بمفتاحها القديم ما زالت تُعرف: لا نداءَ ثانٍ ولا مسوّدةَ ثانية', async () => {
+    const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalizeIdea(IDEA))))
+    const legacy = `idea:${Array.from(bytes.slice(0, 16), (x) => x.toString(16).padStart(2, '0')).join('')}:linkedin`
+    db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, org_id)
+      VALUES ('old', 'linkedin', 'text', 'نصٌّ قديم', 'draft', ?, 'claude-opus-5', 'org_owner')`).run(legacy)
+    expect(await draftFromIdea(deps(net()), IDEA, 'linkedin')).toEqual({ kind: 'already', postId: 'old' })
+    expect(calls).toHaveLength(0)
   })
 })
 

@@ -265,9 +265,12 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
    * ‏**«بنفسي»** (D-324): المنصّةُ المختارةُ تبدّل حدَّ العدّاد وعدَّه، **وما كُتب لا يضيع** — يُحفظ في هذا المتصفّح مع كلّ
    * ‏نقرة، ويُستعاد إن عاد الخادمُ برفضٍ («#own») أو فُتحت الصفحةُ قبل أن يُرسَل. والإرسالُ يُمسَك هنا بسببه في موضعه حين
    * ‏يُعرف قبله (أقصرُ من أربعين، أو تغريدةٌ فوق حدّها) — والخادمُ يفحص الفحصَ نفسَه بعدُ. وقبل معالج «مشغول» كأخيه أعلاه.
+   * ‏**والمفتاحُ للمنظّمة والعضو** (مراجعة D-324): «sada-own:<بصمتهما>» من «data-own» — كان «sada-own» وحده، فيرى العضوُ
+   * ‏التالي على الجهاز نصَّ من قبله، ويُملأ مُنشئُ عميلٍ بنصّ عميلٍ آخر. والمفتاحُ القديمُ بلا بصمةٍ يُمحى ولا يُقرأ.
    */
+  try{localStorage.removeItem('sada-own'); sessionStorage.removeItem('sada-own');}catch(e){}
   document.querySelectorAll('form[data-own]').forEach(function(f){
-    var t=f.querySelector('textarea[name=text]'), msg=f.querySelector('[data-own-msg]'), K='sada-own';
+    var t=f.querySelector('textarea[name=text]'), msg=f.querySelector('[data-own-msg]'), K='sada-own:'+(f.getAttribute('data-own')||'-');
     if(!t)return;
     function chosen(){return f.querySelector('input[name=platform]:checked');}
     function pick(){var r=chosen(); if(!r)return; t.dataset.limit=r.dataset.limit; t.dataset.target=String(Math.floor(+r.dataset.limit*${CEILING_SHARE}));
