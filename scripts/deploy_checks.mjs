@@ -7,28 +7,33 @@
  * والدقائقُ نفدت ثلاثَ مرّات (M-23). فصار النشرُ يسأل GitHub (`GITHUB_TOKEN` بإذن `actions: read`) عن تشغيلات `ci.yml` على
  * الالتزام، ويحكم:
  *
- * | ما وُجد | الحكم |
- * |---|---|
- * | تشغيلٌ ناجحٌ (`push` أو `workflow_dispatch`) | `pass` — لا تُعاد البوّابة |
- * | تشغيلٌ لم يكتمل ولا ناجحَ قبله | ينتظر حتّى يكتمل (حتّى المهلة) |
- * | تشغيلٌ ساقطٌ ولا ناجحَ ولا جارٍ | `refuse` — **لا نشرَ على شيفرةٍ سقطت بوّابتُها** |
- * | لا تشغيلَ أصلًا، أو أُلغي وحده، أو تعذّر السؤال | `run` — تجري البوّابةُ هنا كما كانت (الاحتياط) |
+ * **والحَكَمُ أحدثُ تشغيلٍ قال كلمتَه** (`push` أو `workflow_dispatch`، بترتيب `run_started_at`) — لا أيُّ نجاحٍ وُجد (مراجعة D-319):
+ * ساقطٌ بعد ناجحٍ على الالتزام نفسِه معناه أنّ شيئًا تغيّر بينهما (ثغرةٌ نُشرت فأسقطت `npm audit`)، والنجاحُ القديم لا يغلبه.
  *
- * وتشغيلُ `pull_request` لا يُعدّ: يفحص الدمجَ مع قاعدةٍ قد تكون تغيّرت، لا الالتزامَ نفسَه.
+ * | أحدثُ ما قال كلمتَه | الحكم |
+ * |---|---|
+ * | ناجح | `pass` — لا تُعاد البوّابة |
+ * | لم يكتمل | ينتظر حتّى يكتمل (حتّى المهلة) |
+ * | ساقط | `refuse` — **لا نشرَ على شيفرةٍ سقطت بوّابتُها** |
+ * | لا شيء: لا تشغيلَ أصلًا، أو أُلغي وحده، أو تعذّر السؤال | `run` — تجري البوّابةُ هنا كما كانت (الاحتياط) |
+ *
+ * والملغى والمتخطّى لم يحكما على شيء فلا يُعدّان. وتشغيلُ `pull_request` لا يُعدّ: يفحص الدمجَ مع قاعدةٍ قد تكون تغيّرت، لا الالتزامَ نفسَه.
  * ويكتب الحكمَ في `$GITHUB_OUTPUT` (`gate=pass|run`)، ويخرج بـ1 على الرفض أو انقضاء المهلة.
  *
  * ## ٢ · `deployed <ndjson>` — معرّفُ النسخة التي نشرها `wrangler deploy` للتوّ
  *
  * من ملفّ `WRANGLER_OUTPUT_FILE_PATH` (سطرُ `"type":"deploy"` و`version_id`)، لا من نصٍّ مطبوعٍ للبشر يتبدّل بين إصدارات wrangler.
  *
- * ## ٣ · `wait <base> <version>` — النطاقُ يخدم تلك النسخة
+ * ## ٣ · `wait <base> <version> [<body>]` — النطاقُ يخدم تلك النسخة
  *
  * يسأل `<base>/ready` حتّى يقول `"version"` المعرّفَ نفسَه، أو يسقط بعد المحاولات بما خدمه وما نُشر. **والنطاقُ المخصّص وحده**
- * — لا بديلَ workers.dev: نشرٌ يصل عنوانًا آخر ولا يصل النطاقَ ليس نشرًا.
+ * — لا بديلَ workers.dev: نشرٌ يصل عنوانًا آخر ولا يصل النطاقَ ليس نشرًا. **ويكتب في `<body>` جوابَ النسخة التي طابقت**
+ * (مراجعة D-319): فحوصُ الخدمة والقاعدة و`ready` بعده تقرؤه هو، لا أوّلَ جوابٍ ردّه البناءُ القديم قبل أن يُستبدَل.
  *
  * الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait> … | --self-test
  */
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -37,20 +42,24 @@ const COUNTED_EVENTS = new Set(['push', 'workflow_dispatch'])
 /** الخواتيمُ التي تعني «سقطت البوّابة» — لا «لم تجرِ». */
 const FAILED = new Set(['failure', 'timed_out', 'startup_failure', 'action_required'])
 
+/** بدءُ آخر محاولةٍ في التشغيل: إعادةُ التشغيل تُحدّث `run_started_at` على التشغيل نفسِه، و`created_at` احتياطًا. */
+const startedAt = (r) => Date.parse(r.run_started_at ?? r.created_at ?? '') || 0
+
 /**
- * الحكمُ على تشغيلات ci لالتزامٍ واحد — نقيٌّ ليُختبَر.
- * @param {ReadonlyArray<{ event: string, status: string, conclusion: string | null, html_url?: string }>} runs
+ * الحكمُ على تشغيلات ci لالتزامٍ واحد — نقيٌّ ليُختبَر. الحَكَمُ أحدثُ تشغيلٍ معدودٍ قال كلمتَه (جارٍ أو ناجحٌ أو ساقط).
+ * @param {ReadonlyArray<{ event: string, status: string, conclusion: string | null, html_url?: string, run_started_at?: string, created_at?: string }>} runs
  * @returns {{ kind: 'pass' | 'wait' | 'refuse' | 'run', url?: string }}
  */
 export function verdict(runs) {
-  const counted = runs.filter((r) => COUNTED_EVENTS.has(r.event))
-  const passed = counted.find((r) => r.status === 'completed' && r.conclusion === 'success')
-  if (passed !== undefined) return { kind: 'pass', url: passed.html_url }
-  const running = counted.find((r) => r.status !== 'completed')
-  if (running !== undefined) return { kind: 'wait', url: running.html_url }
-  const failed = counted.find((r) => r.conclusion !== null && FAILED.has(r.conclusion))
-  if (failed !== undefined) return { kind: 'refuse', url: failed.html_url }
-  return { kind: 'run' }
+  const latest = runs
+    .filter((r) => COUNTED_EVENTS.has(r.event))
+    .filter((r) => r.status !== 'completed' || r.conclusion === 'success' || (r.conclusion !== null && FAILED.has(r.conclusion)))
+    // ‏الترتيبُ ثابت: ما تساوى زمنُه يبقى على ترتيب GitHub (الأحدثُ أوّلًا)
+    .sort((x, y) => startedAt(y) - startedAt(x))[0]
+  if (latest === undefined) return { kind: 'run' }
+  if (latest.status !== 'completed') return { kind: 'wait', url: latest.html_url }
+  if (latest.conclusion === 'success') return { kind: 'pass', url: latest.html_url }
+  return { kind: 'refuse', url: latest.html_url }
 }
 
 /**
@@ -89,23 +98,25 @@ export function deployedVersion(ndjson) {
 /**
  * يسأل `/ready` حتّى يقول المعرّفَ المنتظَر. `get` يعيد `{ status, text }` أو يرمي.
  * @param {{ get: () => Promise<{ status: number, text: string }>, sleep: (ms: number) => Promise<void>, log: (s: string) => void, expected: string, tries: number, intervalMs: number }} io
- * @returns {Promise<{ ok: boolean, served: string | null }>}
+ * @returns {Promise<{ ok: boolean, served: string | null, text?: string }>} و`text` جوابُ النسخة التي طابقت
  */
 export async function waitVersion({ get, sleep, log, expected, tries, intervalMs }) {
   let served = null
   for (let i = 1; i <= tries; i += 1) {
     let status = 0
+    let text = ''
     try {
       const res = await get()
       status = res.status
-      const body = JSON.parse(res.text)
+      text = res.text
+      const body = JSON.parse(text)
       // ‏جوابُ صدى وحده يُقرأ: قالبٌ أو صفحةُ خطأٍ بحقل `version` لا تُعدّ
       served = body !== null && body.service === 'sada-api' && typeof body.version === 'string' ? body.version : null
     } catch {
       served = null
     }
     log(`  /ready → HTTP ${status} · النسخة ${served ?? 'لا تُقرأ'} (${i}/${tries})`)
-    if (served === expected) return { ok: true, served }
+    if (served === expected) return { ok: true, served, text }
     if (i < tries) await sleep(intervalMs)
   }
   return { ok: false, served }
@@ -115,7 +126,7 @@ const sleepReal = (ms) => new Promise((r) => setTimeout(r, ms))
 const out = (line) => { if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${line}\n`) }
 
 async function main(argv) {
-  const [cmd, a, b] = argv
+  const [cmd, a, b, c] = argv
   if (cmd === 'ci-gate') {
     if (!a || !b) { console.log('الاستعمال: ci-gate <owner/repo> <sha>'); return 2 }
     const api = process.env.GITHUB_API_URL || 'https://api.github.com'
@@ -158,14 +169,20 @@ async function main(argv) {
     return 0
   }
   if (cmd === 'wait') {
-    if (!a || !b) { console.log('::error::الاستعمال: wait <base> <version> — والنسخةُ فارغة: أقرأ «النشر» معرّفَها؟'); return 2 }
+    if (!a || !b) { console.log('::error::الاستعمال: wait <base> <version> [<body>] — والنسخةُ فارغة: أقرأ «النشر» معرّفَها؟'); return 2 }
+    // ‏لا يبقى في `<body>` جوابٌ سابق: ما لم يطابق لا يُكتب، فيسقط ما يقرؤه بعدُ بدل أن يقرأ القديم
+    if (c) rmSync(c, { force: true })
     const get = async () => {
       const res = await fetch(`${a}/ready`, { signal: AbortSignal.timeout(15_000), headers: { 'Cache-Control': 'no-cache' } })
       return { status: res.status, text: await res.text() }
     }
     const r = await waitVersion({ get, sleep: sleepReal, log: console.log, expected: b, tries: 12, intervalMs: 5_000 })
-    if (r.ok) { console.log(`${a} يخدم النسخةَ التي نُشرت للتوّ: ${b}`); return 0 }
-    console.log(`::error::${a} يخدم «${r.served ?? 'ما لا يُقرأ'}» لا «${b}» الذي نُشر للتوّ — بناءٌ قديمٌ ما يزال يخدم، أو النطاقُ لغير هذا الـ Worker.`)
+    if (r.ok) {
+      if (c) writeFileSync(c, r.text ?? '')
+      console.log(`${a} يخدم النسخةَ التي نُشرت للتوّ: ${b}`)
+      return 0
+    }
+    console.log(`::error::${a} يخدم «${r.served ?? 'ما لا يُقرأ'}» لا «${b}» الذي نُشر للتوّ — بناءٌ قديمٌ ما يزال يخدم، أو النطاقُ لغير هذا الـ Worker، أو جوابُه ليس جوابَ صدى (قالبٌ قديم).`)
     return 1
   }
   console.log('الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait> … | --self-test')
@@ -175,12 +192,21 @@ async function main(argv) {
 async function selfTest() {
   const fails = []
   const eq = (name, got, want) => { if (JSON.stringify(got) !== JSON.stringify(want)) fails.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`) }
-  const run = (event, status, conclusion) => ({ event, status, conclusion, html_url: `u/${event}/${conclusion ?? status}` })
+  // ‏`minute`: دقيقةُ البدء (`run_started_at`)، والأكبرُ أحدث — وGitHub يرتّب الأحدثَ أوّلًا
+  const run = (event, status, conclusion, minute = 0) => ({
+    event, status, conclusion, html_url: `u/${event}/${conclusion ?? status}`,
+    run_started_at: new Date(Date.UTC(2026, 10, 7, 12, minute)).toISOString(),
+  })
 
   // ١ · الحكم
   eq('لا تشغيل ← البوّابة هنا', verdict([]).kind, 'run')
   eq('ناجحٌ على push', verdict([run('push', 'completed', 'success')]).kind, 'pass')
-  eq('ناجحٌ بعد ساقط (إعادة تشغيل)', verdict([run('push', 'completed', 'failure'), run('workflow_dispatch', 'completed', 'success')]).kind, 'pass')
+  eq('ناجحٌ بعد ساقط (إعادة تشغيل)', verdict([run('workflow_dispatch', 'completed', 'success', 2), run('push', 'completed', 'failure', 1)]).kind, 'pass')
+  // ‏مراجعة D-319: الحكمُ لأحدث تشغيلٍ قال كلمتَه، لا لأيّ نجاحٍ وُجد — ساقطٌ بعد ناجحٍ (ثغرةٌ نُشرت بينهما) يمنع النشر
+  eq('ساقطٌ بعد ناجح ← لا نشر', verdict([run('workflow_dispatch', 'completed', 'failure', 9), run('push', 'completed', 'success', 1)]).kind, 'refuse')
+  eq('ساقطٌ بعد ناجح بأيّ ترتيب', verdict([run('push', 'completed', 'success', 1), run('workflow_dispatch', 'completed', 'failure', 9)]).kind, 'refuse')
+  eq('جارٍ بعد ناجح ← ينتظر', verdict([run('workflow_dispatch', 'in_progress', null, 9), run('push', 'completed', 'success', 1)]).kind, 'wait')
+  eq('ملغًى بعد ناجح ← الناجح', verdict([run('workflow_dispatch', 'completed', 'cancelled', 9), run('push', 'completed', 'success', 1)]).kind, 'pass')
   eq('جارٍ', verdict([run('push', 'in_progress', null)]).kind, 'wait')
   eq('ساقط', verdict([run('push', 'completed', 'failure')]).kind, 'refuse')
   eq('بلا عدّاء (الدقائق)', verdict([run('push', 'completed', 'startup_failure')]).kind, 'refuse')
@@ -217,6 +243,11 @@ async function selfTest() {
   eq('بلا نسخة (null)', (await waitVersion({ ...quiet, tries: 2, expected: NEW, get: gets(ready(null)) })).ok, false)
   eq('انقطاعٌ ثمّ الجديد', (await waitVersion({ ...quiet, tries: 3, expected: NEW, get: gets(new Error('reset'), ready(NEW)) })).ok, true)
   eq('صفحةُ خطأ HTML', (await waitVersion({ ...quiet, tries: 2, expected: NEW, get: gets({ status: 502, text: '<html>Bad gateway</html>' }) })).ok, false)
+  // ‏مراجعة D-319: ما يُفحَص بعد `wait` (الخدمةُ والقاعدةُ و`ready`) جوابُ النسخة الجديدة لا أوّلُ جوابٍ ردّه البناءُ القديم
+  const oldOk = { status: 200, text: JSON.stringify({ ready: true, service: 'sada-api', database: 'ok', version: 'OLD' }) }
+  const newBroken = { status: 503, text: JSON.stringify({ ready: false, service: 'sada-api', database: 'error', version: NEW }) }
+  const matched = await waitVersion({ ...quiet, tries: 3, expected: NEW, get: gets(oldOk, newBroken) })
+  eq('جوابُ النسخة الجديدة هو ما يُعاد', [matched.ok, JSON.parse(matched.text ?? 'null')?.database], [true, 'error'])
 
   // ٥ · الأوامرُ نفسُها: ملفُّ المخرَج والخروج
   const dir = mkdtempSync(join(tmpdir(), 'sada-deploy-'))
@@ -232,10 +263,23 @@ async function selfTest() {
     const first = printed.trim()
     const codeMissing = await main(['deployed', join(dir, 'missing.ndjson')])
     const codeEmpty = await main(['wait', 'https://sada2.basserh.com', ''])
+    // ‏مراجعة D-319: `wait` يكتب جوابَ النسخة التي طابقت في الملفّ الذي تقرؤه فحوصُ الخدمة والقاعدة و`ready` بعده.
+    // ‏خادمٌ محلّيٌّ يردّ النسخةَ الجديدة وقاعدتُها لا تصل — فالملفُّ يجب أن يقول `error`، لا ما ردّه البناءُ القديم قبلها.
+    const server = createServer((req, res) => { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(newBroken.text) })
+    await new Promise((r) => server.listen(0, '127.0.0.1', r))
+    const body = join(dir, 'ready.json')
+    writeFileSync(body, oldOk.text)
+    let codeWait
+    try {
+      codeWait = await main(['wait', `http://127.0.0.1:${server.address().port}`, NEW, body])
+    } finally {
+      await new Promise((r) => server.close(r))
+    }
     Object.assign(console, { log, error })
     eq('deployed يطبع المعرّف وحده', [codeOk, first], [0, NEW])
     eq('deployed بلا ملفّ يسقط', codeMissing, 1)
     eq('wait بلا نسخة يسقط', codeEmpty, 2)
+    eq('wait يكتب جوابَ النسخة الجديدة', [codeWait, JSON.parse(readFileSync(body, 'utf8')).database], [0, 'error'])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -245,7 +289,7 @@ async function selfTest() {
     for (const f of fails) console.log(`  ${f}`)
     return 1
   }
-  console.log('✓ self-test: حكمُ ci (تسعُ حالات) والانتظارُ (أربع) ومعرّفُ ما نُشر (ثلاث) والنطاقُ يخدمه (ستّ) والأوامرُ (ثلاثة)')
+  console.log('✓ self-test: حكمُ ci (ثلاثَ عشرةَ حالة) والانتظارُ (أربع) ومعرّفُ ما نُشر (ثلاث) والنطاقُ يخدمه (سبع) والأوامرُ (أربعة)')
   return 0
 }
 
