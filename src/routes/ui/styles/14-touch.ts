@@ -47,7 +47,9 @@ export const TOUCH = `/* ══════════════════�
 .acct-counts b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums}
 .acct-counts .bad b{color:var(--bad)}
 .acct-act{display:flex; flex-direction:column; align-items:flex-end; gap:var(--s-3)}
-.acct-verdict{display:inline-flex; align-items:center; gap:var(--s-2)}
+.acct-verdict{display:inline-flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:var(--s-2)}
+/* ‏والحكمُ يلتفّ ورابطُه لا ينعصر (D-325): عند ‏320 بالخطّ الأكبر ضاق «التفاصيل» عن كلمته فخرج منها ‏9px */
+.acct-verdict .tap{flex:none}
 .acct-card{margin-bottom:var(--s-3)}
 
 /* ما تطلبه المنصّة: سبعُ خاناتٍ متساوية، القاعدةُ سطرٌ وحالُ المنصّة تحته.
@@ -134,7 +136,7 @@ export const TOUCH = `/* ══════════════════�
 .np-av[data-kind="org"]{border-radius:var(--r-control)}
 .np-text{margin:0; padding:var(--s-3) var(--s-4); white-space:pre-wrap; overflow-wrap:anywhere;
   unicode-bidi:plaintext; max-inline-size:var(--measure)}
-.np-tag{color:var(--brand); font-weight:600}
+.np-tag{color:var(--accent); font-weight:600}
 .np-media{background-color:var(--surface-2); border-block:var(--bd-soft)}
 .np-media>img,.np-media>video{display:block; inline-size:100%; block-size:auto; max-block-size:calc(100cqi * 1.25);
   object-fit:contain; margin-inline:auto}
@@ -145,7 +147,8 @@ export const TOUCH = `/* ══════════════════�
 .np-compact .np-media>img,.np-compact .np-media>video{max-block-size:18.75rem}
 .np-counts{display:flex; gap:var(--s-2); padding:var(--s-2) var(--s-4); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small)}
 .np-counts b{font-weight:600; font-variant-numeric:tabular-nums}
-.np-bar{display:flex; align-items:center; gap:var(--s-4); padding:var(--s-2) var(--s-4) var(--s-3);
+/* ‏وشريطُ التفاعل يلتفّ ولا يفيض (D-325): خمسةُ أفعالٍ بأرقامها في عمود X عند ‏320 خرج آخرُها «1,204» من الإطار ‏26px */
+.np-bar{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-1) var(--s-4); padding:var(--s-2) var(--s-4) var(--s-3);
   color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small)}
 .np-bar span{display:inline-flex; align-items:center; gap:var(--s-1)}
 .np-bar svg{inline-size:var(--icon-md); block-size:var(--icon-md)}

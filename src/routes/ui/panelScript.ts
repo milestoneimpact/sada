@@ -439,6 +439,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
    * ‏**بلا اتّصال** (خطّة التصميم 7.11): لا عملَ بلا اتّصال ولا Service Worker — اللوحةُ «no-store» عمدًا، وقرارُ نشرٍ
    * ‏لا يُؤجَّل إلى عودة الشبكة. فشريطٌ واحدٌ محايد أعلى المحتوى، **وأزرارُ الإرسال تُعطَّل بسببٍ مكتوب**، ثمّ «عاد
    * ‏الاتّصال» وتعود الأزرارُ التي عطّلها هو وحدَها. ولا يُرسَل شيءٌ تلقائيًّا.
+   * ‏**والمعطَّلُ يقول لماذا نصًّا يُرى** (مراجعة D-325): كان سببُه «title» وحدَه — لا يُرى إلّا بالتمرير ولا يصل قارئَ الشاشة —
+   * ‏فصار كلُّ زرٍّ عطّله موصوفًا بالشريط نفسِه («off-why»)، ووصفُه السابقُ يبقى قبله ويعود وحدَه مع الاتّصال.
    */
   var offBar=null;
   function setOffline(off){
@@ -446,14 +448,17 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     if(off){
       if(!offBar){
         offBar=document.createElement('div'); offBar.className='outcome warn mb-3'; offBar.setAttribute('role','status');
-        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v">لا اتّصال بالإنترنت. ما تكتبه في المحرّر محفوظ على هذا الجهاز، والأزرار تعود حين يعود الاتّصال.</span>';
+        offBar.innerHTML='<span class="kv-k">بلا اتّصال</span><span class="kv-v" id="off-why">لا اتّصال بالإنترنت. ما تكتبه في المحرّر محفوظ على هذا الجهاز، والأزرار تعود حين يعود الاتّصال.</span>';
         main.insertBefore(offBar,main.firstChild);
       }
       document.querySelectorAll('form[method=POST] button[type=submit],button[type=submit][form]').forEach(function(b){
-        if(b.disabled)return; b.disabled=true; b.setAttribute('data-off','1'); b.title='بلا اتّصال';});
+        if(b.disabled)return; b.disabled=true; b.setAttribute('data-off',b.getAttribute('aria-describedby')||'');
+        b.setAttribute('aria-describedby',((b.getAttribute('aria-describedby')||'')+' off-why').trim()); b.title='بلا اتّصال';});
     }else{
       if(offBar){offBar.remove(); offBar=null;}
-      document.querySelectorAll('button[data-off]').forEach(function(b){b.disabled=false; b.removeAttribute('data-off'); b.removeAttribute('title');});
+      document.querySelectorAll('button[data-off]').forEach(function(b){var was=b.getAttribute('data-off');
+        b.disabled=false; if(was)b.setAttribute('aria-describedby',was); else b.removeAttribute('aria-describedby');
+        b.removeAttribute('data-off'); b.removeAttribute('title');});
     }
   }
   window.addEventListener('offline',function(){setOffline(true);});

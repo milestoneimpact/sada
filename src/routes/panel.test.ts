@@ -3743,9 +3743,10 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
   /** رقمُ «مهامٌّ جاهزة» في شريط المزوّدين. */
   const tasksReady = (html: string): number =>
     Number(/مهامّ جاهزة<\/div>\s*<div class="kv-v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
-  const IMAGE_BUTTON_OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>'
+  // ‏والمعطَّلُ يصف نفسَه بسطر جاهزيّته في بطاقته (D-325): كان «disabled» وحدَه
+  const IMAGE_BUTTON_OFF = /<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-image-[^"]+">ولّد صورةً فنّيّة<\/button>/
   const IMAGE_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>'
-  const INFO_BUTTON_OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>'
+  const INFO_BUTTON_OFF = /<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-info-[^"]+">ولّد إنفوجرافيك<\/button>/
   const INFO_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد إنفوجرافيك</button>'
 
   it('صور إلى Cloudflare بمفتاح `CF_AI_TOKEN`: نقطة المزوّد تامّة، والجدول «جاهز»، والقيمة لا تظهر', async () => {
@@ -3801,8 +3802,8 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     const cookie = await login()
     await writeSetting(db, 'paused', 'true', 'test')
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain(IMAGE_BUTTON_OFF)
-    expect(html).toContain(INFO_BUTTON_OFF)
+    expect(html).toMatch(IMAGE_BUTTON_OFF)
+    expect(html).toMatch(INFO_BUTTON_OFF)
     expect(html).toContain('<span class="ago">موقوف بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
   })
 
@@ -3818,7 +3819,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     await setEnabled(db, 'gemini', false, 'test')
     const html = await panelHtml()
     expect(html).toContain('<span class="ago">Gemini معطَّل بقرارك</span><a class="tap" href="#providers">افتح المزوّدين</a>')
-    expect(html).toContain(IMAGE_BUTTON_OFF)
+    expect(html).toMatch(IMAGE_BUTTON_OFF)
     expect(routeRow(html, 'الصورة — التوليد البصريّ')).toContain('مزوّده غير جاهز')
   })
 
@@ -3835,7 +3836,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     await recordCost(db, { provider: 'gemini', operation: 'image', units: 1, unitCost: 0.04 })
     const over = await panelHtml()
     expect(over).toContain('<span class="ago">بلغ Gemini سقفَه اليوميّ</span>')
-    expect(over).toContain(IMAGE_BUTTON_OFF)
+    expect(over).toMatch(IMAGE_BUTTON_OFF)
   })
 
   it('مزوّد الكتابة معطَّل والشريحة مضبوطة: «لا مزوّد يصوغ العنوان» ينتظرك ولا يُعطِّل', async () => {
@@ -3863,7 +3864,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
   it('الإنفوجرافيك: بلا مفتاح المتصفّح معطَّل، وبه وبالحساب يعمل — والسرّ لا يظهر', async () => {
     await seedDraft()
     const none = await panelHtml()
-    expect(none).toContain(INFO_BUTTON_OFF)
+    expect(none).toMatch(INFO_BUTTON_OFF)
     expect(none).toContain('data-tip="فشلت — بلا مفتاح المتصفّح"')
 
     env['CF_BROWSER_TOKEN'] = 'سرّ-المتصفّح-0002'
@@ -3896,7 +3897,7 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
     env['CF_AI_TOKEN'] = 'cf-ai-secret-value-0003'
     const html = await panelHtml()
     expect(html).toContain('<span class="ago">لا معرّف حساب لـ Cloudflare</span>')
-    expect(html).toContain(IMAGE_BUTTON_OFF)
+    expect(html).toMatch(IMAGE_BUTTON_OFF)
     expect(routeRow(html, 'الصورة — التوليد البصريّ')).toContain('مزوّده غير جاهز')
   })
 
@@ -4016,7 +4017,8 @@ describe('سقف المقاطع اليوميّ في اللوحة (D-168)', () =>
     recordCost(db, {
       provider: 'cloudflare', operation: 'video:alibaba/hh1-i2v:price_unverified', units: 1, unitCost: 0,
     })
-  const OFF = '<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>'
+  // ‏والمعطَّلُ يصف نفسَه بسطر جاهزيّته في بطاقته (D-325)
+  const OFF = /<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-video-[^"]+">حرّكها فيديو<\/button>/
   const ON = '<button class="btn btn-secondary btn-sm" type="submit">حرّكها فيديو</button>'
 
   beforeEach(() => {
@@ -4034,7 +4036,7 @@ describe('سقف المقاطع اليوميّ في اللوحة (D-168)', () =>
 
     await clipToday()
     const over = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
-    expect(over).toContain(OFF)
+    expect(over).toMatch(OFF)
     expect(over).toContain('<span class="ago">بلغ سقف المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     const pane = over.slice(over.indexOf('<section data-pane="settings"'))
     const form = pane.slice(pane.indexOf('value="daily_video_cap"'), pane.indexOf('</form>', pane.indexOf('value="daily_video_cap"')))

@@ -66,7 +66,7 @@ export const MOMENT = `/* ══ لحظةُ العلامة: الدخولُ وا�
 /* المقياس **مقياسُ مقدار لا تصنيف**: هيئةٌ واحدة تتدرّج، ولا لونَ حالٍ فيه
    قطّ — حتّى يبلغ. والبلوغ حالة لا مقدار، فيقفز إلى الأحمر **ومعه نصّ**. */
 .bar{height:var(--s-1); background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; margin-top:var(--s-3)}
-.bar i{display:block; height:100%; border-radius:var(--r-pill); background:var(--brand); transition:width var(--dur-3) var(--ease-out)}
+.bar i{display:block; height:100%; border-radius:var(--r-pill); background:var(--accent); transition:width var(--dur-3) var(--ease-out)}
 .bar i.full{background:var(--bad)}
 /* اكتمالٌ لا بلوغُ سقف — خضرةٌ كعلامته تحته (D-134) */
 .bar i.done{background:var(--ok)}

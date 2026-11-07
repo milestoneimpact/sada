@@ -126,7 +126,9 @@ export function planReviewScreen(m: ReviewModel, zone: string | null): string {
   const pin = m.lockedAt !== null
     ? html`<span class="hint">ثُبّت هذا الإصدار — أيُّ تعديلٍ يفتح إصدارًا جديدًا ويبقى هذا كما هو.</span>`
     : html`<form class="inline" method="POST" action="/panel/plan/pin" data-busy="جار التثبيت…" data-confirm="${'ثبّت الإصدار ' + AR(m.version) + '؟ يُجدوَل ' + AR(approved) + ' منشورًا معتمَدًا في مواعيده' + (m.cards.length - approved > 0 ? '، ويبقى ' + AR(m.cards.length - approved) + ' بلا اعتمادٍ لا يُجدوَل' : '') + '.'}">
-        <input type="hidden" name="id" value="${m.plan.id}"><button class="btn btn-primary" type="submit"${approved === 0 ? raw(' disabled') : ''}>ثبّت الخطّة</button></form>`
+        <input type="hidden" name="id" value="${m.plan.id}"><button class="btn btn-primary" type="submit"${approved === 0 ? raw(' disabled aria-describedby="rv-pin-why"') : ''}>ثبّت الخطّة</button>${
+          /* ‏والمعطَّلُ يقول لماذا (D-325): كان «disabled» وحدَه، فيُرى زرٌّ رماديٌّ في أسفل الشاشة بلا سبب */
+          approved === 0 ? html`<small class="btn-why" id="rv-pin-why">اعتمد بندًا واحدًا على الأقلّ ليُثبَّت ويُجدوَل.</small>` : ''}</form>`
   return html`${raw(head)}
     <div class="row gap-2 mb-3">${state}<span class="grow"></span><a class="btn btn-primary btn-sm" href="/panel/plan/view">اعرض الخطّة</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
     ${progress}

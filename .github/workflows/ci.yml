@@ -29,6 +29,7 @@ jobs:
     # ‏على المسوّدة اسمُ الفحص `ci (draft)` لا `ci` (مراجعة D-319): العملُ المتخطّى يُبلَّغ «Success» ولا يمنع الدمج ولو كان فحصًا
     # ‏مشروطًا (وثائق GitHub)، فكان كلُّ التزامٍ في مسوّدةٍ يحمل `ci` متخطًّى = ناجحًا (قُرئ: ‏42400351053 على 887ed01)، والقاعدةُ
     # ‏(M-43) ترى `ci` أخضرَ قبل أن يجري. وباسمٍ آخر يبقى `ci` المشروطُ «Expected» حتّى يجري فعلًا. وفي غير المسوّدة الاسمُ `ci`.
+    # ‏وعلى مسوّدة #236 ظهر المتخطّى بنصّ التعبير لا `ci (draft)`: GitHub لا يقيّم اسمَ عملٍ تخطّاه `if`. والغايةُ قائمة: ليس `ci`.
     name: ${{ github.event.pull_request.draft && 'ci (draft)' || 'ci' }}
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest

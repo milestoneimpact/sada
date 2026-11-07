@@ -12,7 +12,7 @@
  *   print     ما يُطبَع
  */
 const PANEL = ['panel', 'panel-library', 'panel-accounts', 'panel-settings', 'panel-results', 'panel-first',
-  'panel-first-accounts', 'panel-editor', 'panel-editor-queued']
+  'panel-first-accounts', 'panel-editor', 'panel-editor-queued', 'panel-week', 'panel-plan-off']
 // ‏و«بوّابات المراحل» بجانب «ما عليك» (دمجُ D-318 مع D-324): خرجت منها إلى صفحتها، فتُدقَّق حيثما دُقّقت هي
 const SCREENS = ['screen-tasks', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
   'screen-tiktok', 'screen-link-only', 'screen-yt-setup', 'screen-instagram', 'screen-unbuilt', 'screen-refused',

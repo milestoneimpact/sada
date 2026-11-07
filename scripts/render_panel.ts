@@ -39,8 +39,9 @@ const mediaReady = {
     slide,
     briefReady: true,
   }),
-  // ‏ومقطعٌ واحدٌ اليوم من اثنين — فالنقطةُ تامّةٌ وتقول كم بقي (D-168)
-  video: videoReadiness({ face: 'binding', blocker: null, clips: videoCapGate(1, 2) }),
+  // ‏**ومقطعا اليوم استُهلكا** (D-325): «حرّكها فيديو» معطَّلٌ تحت d3 وسببُه سطرُ المقطع — فيُقاس في «audit_disabled» زرٌّ
+  // ‏معطَّلٌ مرسومٌ حقًّا. وكان مقطعًا واحدًا من اثنين (D-168)، فلا زرَّ معطَّلًا في عيّنةٍ واحدة
+  video: videoReadiness({ face: 'binding', blocker: null, clips: videoCapGate(2, 2) }),
 }
 
 function ago(hours: number): string {
@@ -502,6 +503,29 @@ writeAudited('/tmp/panel-editor.html', panelPage({ only: null, data: { ...data, 
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
 writeAudited('/tmp/panel-editor-queued.html', panelPage({ only: null, data: { ...data, zone: 'Asia/Riyadh', editing: pick('d5') } }), {
+  m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
+})
+/*
+ * ‏**وشريطُ الأسبوع بمنصّاته الخمس** (مراجعة D-325): العيّنةُ أعلاه تجدول على X وLinkedIn وحدهما، فلم يُرسَم مربّعُ TikTok
+ * ‏(‏#fe2c55، الحكمُ الذي تُرك للمالك في M-45) ولا Instagram ولا YouTube في عيّنةٍ قطّ — ولا قاسها مدقّق، ولا رأتها لقطة.
+ * ‏فالرئيسيّةُ وحدَها ومعها أربعةُ مواعيدَ أخرى: TikTok بجوار X في يومٍ واحد (الزوجُ الذي كان ΔE_OK ‏1.7)، وInstagram وYouTube.
+ */
+const queued = (id: string, platform: 'x' | 'instagram' | 'tiktok' | 'youtube', at: string, account: string): (typeof data.drafts)[number] => ({
+  ...pick('d5'), id, platform, scheduledAt: at, accountName: account, approvedAt: ago(2), createdAt: ago(3),
+})
+writeAudited('/tmp/panel-week.html', panelPage({ only: 'overview', data: { ...data, drafts: [
+  ...data.drafts,
+  queued('d7', 'instagram', '2026-09-09 08:00:00', 'basserh'),
+  queued('d8', 'x', '2026-09-10 09:30:00', '@omar_ah'),
+  queued('d9', 'tiktok', '2026-09-10 17:00:00', 'القناة'),
+  queued('d10', 'youtube', '2026-09-11 15:00:00', 'القناة'),
+] } }))
+/*
+ * ‏**وخدمةُ الخطّة غير جاهزة** (مراجعة D-325): سببُها («#pl-why») يُرسَم تحت «الخطّة الأسبوعيّة» حين لا خطّة، ولم ترسمه عيّنةٌ قطّ
+ * ‏(العيّنةُ أعلاه جاهزة، واليومُ الأوّلُ بلا مصدرٍ محلَّل) — فمرّت فيه «المزوّدون»، كلمةٌ يمنعها المعجمُ واسمُ قسمٍ لم يعد
+ * ‏موجودًا، ولم يقرأه `audit_copy` ولا `audit_disabled`.
+ */
+writeAudited('/tmp/panel-plan-off.html', panelPage({ only: null, data: { ...data, plan: null, planReady: false } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
 console.log('رُسمت')

@@ -66,7 +66,7 @@ const section = (drafts: DraftRow[]): string => draftsSection({
 describe('لا معلومةَ بالتمرير وحده (WCAG 1.4.13 · 1.3.1)', () => {
   it('شارةُ الجاهزيّة تكتب حالَها نصًّا («تامّة» أو «تنتظرك») لا رمزًا ولونًا وتلميحًا', () => {
     const html = section([draft()])
-    const line = html.slice(html.indexOf('<p class="hint ready">'), html.indexOf('</p>', html.indexOf('<p class="hint ready">')))
+    const line = html.slice(html.indexOf('<p class="hint ready"'), html.indexOf('</p>', html.indexOf('<p class="hint ready"')))
     expect(line).toMatch(/<\/span>الحدود: تامّة<\/span>/)
     expect(line).toMatch(/<\/span>المتصفّح: فشلت<\/span>/)
   })

@@ -989,7 +989,8 @@ describe('ما وراء المقاييس (D-149)', () => {
     // ‏وخيطُ القسم النحاسيُّ سقط مع ميزانيّة النحاس (D-187): لا قاعدةَ له في أيّ سياق
     expect(css.where('.sec::after')).toEqual([])
     expect(css.rule('.cmdk-o[aria-selected="true"]')).toMatchObject({
-      background: 'var(--surface-2)', 'box-shadow': 'inset calc(-1 * var(--ring-w)) 0 0 var(--brand)',
+      // ‏والشريطُ بالمبرِز لا بحبر الزرّ (D-325): المختارُ يُبرز ولا يُضغط بلونه
+      background: 'var(--surface-2)', 'box-shadow': 'inset calc(-1 * var(--ring-w)) 0 0 var(--accent)',
     })
     expect(css.where('.cmdk-g')).toContain('')
     for (const at of css.where('.cmdk-g')) expect(css.rule('.cmdk-g', at)['letter-spacing'], at).toBeUndefined()
@@ -1182,9 +1183,10 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
     const info = box.indexOf('ولّد إنفوجرافيك')
     const art = box.indexOf('ولّد صورةً فنّيّة')
     expect(info).toBeGreaterThan(-1)
-    expect(box.indexOf('<p class="hint ready">')).toBeGreaterThan(info)
-    expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready">'))
-    expect(box.indexOf('<p class="hint ready">', art)).toBeGreaterThan(art)
+    // ‏والسطرُ بمعرّفه في بطاقته (D-325): الزرُّ المحجوبُ يصف نفسَه به
+    expect(box.indexOf('<p class="hint ready" id="why-info-d1">')).toBeGreaterThan(info)
+    expect(box.indexOf('<details class="art">')).toBeGreaterThan(box.indexOf('<p class="hint ready"'))
+    expect(box.indexOf('<p class="hint ready" id="why-image-d1">', art)).toBeGreaterThan(art)
     expect(box).toContain(rung('المتصفّح', 'يصوّر الصفحة'))
     expect(box).toContain(rung('الصياغة', 'نموذج الكتابة يستخرج المحتوى'))
     expect(box).toContain(rung('الحدود', 'مفتوحة اليوم'))
@@ -1201,7 +1203,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       infographic: infographicReadiness({ blocker: null, browser: { key: false, account: true }, briefReady: true }),
     }
     const html = section([draft('d1')], { mediaReady: noBrowser })
-    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-info-d1">ولّد إنفوجرافيك</button>')
     expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
@@ -1234,7 +1236,8 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
 
   it('يُبنى مرّةً: ثلاث مسوّدات فيها السطران نفسُهما حرفًا', () => {
     const html = section([draft('a'), draft('b'), draft('c')])
-    const lines = [...html.matchAll(/<p class="hint ready">[\s\S]*?<\/p>/g)].map((m) => m[0])
+    // ‏والمعرّفُ وحدَه يفترق بين البطاقات (D-325): السطرُ يُبنى مرّةً ويُعلَّم في بطاقته
+    const lines = [...html.matchAll(/<p class="hint ready"[^>]*>[\s\S]*?<\/p>/g)].map((m) => m[0].replace(/ id="[^"]+"/, ''))
     expect(lines).toHaveLength(6)
     expect(new Set(lines).size).toBe(2)
   })
@@ -1248,12 +1251,12 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       video: videoReadiness({ face: 'none', blocker: null, clips: videoCapGate(0, 2) }),
     }
     const empty = section([draft('d1')], { mediaReady: blocked })
-    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد إنفوجرافيك</button>')
-    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>ولّد صورةً فنّيّة</button>')
+    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-info-d1">ولّد إنفوجرافيك</button>')
+    expect(empty).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-image-d1">ولّد صورةً فنّيّة</button>')
     expect(empty).toContain('<span class="ago">موقوف بقرارك</span><a class="tap" href="#limits">افتح الحدود</a>')
 
     const pictured = section([draft('d1')], { media: [picture('d1')], mediaReady: blocked })
-    expect(pictured).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(pictured).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-video-d1">حرّكها فيديو</button>')
     expect(pictured).toContain('<span class="ago">لا مفتاح لـ Workers AI</span>')
 
     // وما ينتظرك لا يعطّل: الصورةُ تخرج بلا عنوان، والزرُّ يعمل
@@ -1271,7 +1274,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
   it('وسقف المقاطع يُعطِّل «حرّكها فيديو» وسببُه بجانبه — وتحته يقول كم بقي', () => {
     const full = { ...READY, video: videoReadiness({ face: 'env', blocker: null, clips: videoCapGate(2, 2) }) }
     const html = section([draft('d1')], { media: [picture('d1')], mediaReady: full })
-    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled>حرّكها فيديو</button>')
+    expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-video-d1">حرّكها فيديو</button>')
     expect(html).toContain('<span class="ago">بلغ سقف المقاطع اليوميّ</span><a class="tap" href="#limits">افتح الحدود</a>')
     // ‏وسقفُ المقاطع يحجب التحريكَ وحده: زرّا الصورة على مسوّدةٍ أخرى يعملان
     const other = section([draft('d2')], { mediaReady: full })
@@ -1737,8 +1740,8 @@ describe('مراجعة المرحلة ٢أ (D-187)', () => {
     for (const chain of [...tube, ...classChains(post('tiktok'), 'np-tag')]) {
       expect(cascaded(chain, 'color'), chain.map((el) => el.join('.')).join(' > ')).toBe('var(--np-on-stage)')
     }
-    // ‏وعلى الإطار الفاتح يبقى الوسمُ بحبر العلامة
-    for (const chain of classChains(post('linkedin'), 'np-tag')) expect(cascaded(chain, 'color')).toBe('var(--brand)')
+    // ‏وعلى الإطار الفاتح يبقى الوسمُ بالمبرِز — يُبرز ولا يُضغط في المعاينة، فلا حبرَ زرٍّ له (D-325؛ وكان «--brand»)
+    for (const chain of classChains(post('linkedin'), 'np-tag')) expect(cascaded(chain, 'color')).toBe('var(--accent)')
     // ‏ولا سياقَ آخرَ يُعيد تلوينه — الطباعةُ ترسم المسرحَ أبيضَ بحبرٍ داكن من الرموز نفسِها
     expect(found((d) => d.at !== '' && d.prop === 'color' && d.selectors.some((s) => /\.np-tag\b/.test(s)))).toEqual([])
     expect([THEME.light['--brand'], THEME.light['--np-stage']]).toEqual(['#0e6b64', '#0b0c10'])

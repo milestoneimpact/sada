@@ -294,3 +294,37 @@ describe('«بنفسي» (D-324)', () => {
     expect(w.localStorage.getItem('sada-theme')).toBe('dark')
   })
 })
+
+/*
+ * ‏(مراجعة D-325) **والمعطَّلُ بانقطاع الشبكة يقول لماذا كذلك**: السكربتُ يعطّل كلَّ زرّ إرسالٍ بـ«disabled» أصليٍّ وسببُه
+ * ‏«title» وحدَه — لا يُرى إلّا بالتمرير، ولا تلميحَ على اللمس، وقارئُ الشاشة لا يربط الزرَّ بشريط «بلا اتّصال». و`audit_disabled`
+ * ‏يقيس الوسمَ الساكن فلا يرى ما يعطّله السكربت. فالزرُّ يُربَط بالشريط نفسِه، ويعود وصفُه كما كان حين يعود الاتّصال.
+ */
+describe('بلا اتّصال: الزرُّ المعطَّلُ موصوفٌ بالشريط (مراجعة D-325)', () => {
+  const FORMS = `<main id="main"><section data-pane="overview"><h2>نظرة</h2>
+    <form method="POST" action="/panel/a"><button type="submit" id="b1">اعتمد</button></form>
+    <form method="POST" action="/panel/b"><button type="submit" id="b2" aria-describedby="b2-hint">احفظ</button><small id="b2-hint">تلميح</small></form>
+  </section></main><div id="flash"></div>`
+
+  it('يُعطَّل زرُّ الإرسال ويُوصَف بنصّ الشريط الظاهر، ويعود وصفُه الأوّلُ مع الاتّصال', () => {
+    const { w, thrown } = boot('', NAV + FORMS)
+    expect(thrown).toBeNull()
+    w.dispatchEvent(new w.Event('offline'))
+    const b1 = w.document.getElementById('b1') as unknown as { disabled: boolean; getAttribute(n: string): string | null }
+    const b2 = w.document.getElementById('b2') as unknown as { disabled: boolean; getAttribute(n: string): string | null }
+    expect(b1.disabled).toBe(true)
+    const ids = (b: typeof b1): string[] => (b.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    expect(ids(b1).length).toBe(1)
+    const offId = ids(b1)[0]!
+    const why = w.document.getElementById(offId)
+    expect(why?.textContent ?? '').toContain('لا اتّصال بالإنترنت')
+    // ‏ووصفٌ كان للزرّ يبقى، والسببُ يُضاف إليه
+    expect(ids(b2)).toEqual(['b2-hint', offId])
+
+    w.dispatchEvent(new w.Event('online'))
+    expect(b1.disabled).toBe(false)
+    expect(b1.getAttribute('aria-describedby')).toBeNull()
+    expect(b2.getAttribute('aria-describedby')).toBe('b2-hint')
+    expect(w.document.getElementById(offId)).toBeNull()
+  })
+})

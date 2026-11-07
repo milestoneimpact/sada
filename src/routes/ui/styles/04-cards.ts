@@ -30,7 +30,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    لكلّ «c4» فوق ‏١٩٢٠ — **وبعد D-119 صار العدد يقرّر الصنف**: أربع
    بطاقات في «c4» وخمس في «c5». فأربع في خمسة أعمدة **تترك عموداً
    أبيض في طرف الصفّ**، قِيس عند ‏٢٠٠٠px في نظرة عامّة وفي القنوات.
-   والعرض يتنفّس بـ«--shell» أصلا، وما يريد خمسا يختار خمسا. */
+   والعرضُ «--shell» ‏١٢٠٠ في الوسط منذ D-325، وما يريد خمسا يختار خمسا. */
 .c4{grid-template-columns:repeat(4,1fr)} .c3{grid-template-columns:repeat(3,1fr)}
 .c2{grid-template-columns:repeat(2,1fr)}
 /* خمسٌ حين يختار المالكُ خمسا (D-119): **ولا تُترَك واحدةٌ وحيدةً في صفٍّ
@@ -48,6 +48,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 @media${below('md')}{
   .tiles.c2,.tiles.c3,.tiles.c4,.tiles.c5{grid-template-columns:repeat(2,1fr)}
   .tiles.c3>.tile:last-child:nth-child(odd),.tiles.c4>.tile:last-child:nth-child(odd){grid-column:1/-1}}
+/* ‏**وما دام الرقم يسع** (D-325): تحت «xs» بالخطّ الأكبر خرج الرقمُ البطل «6,280» (‏40px) من خانته ‏6px — فعمودٌ واحد */
+@media${below('xs')}{.tiles.c2,.tiles.c3,.tiles.c4,.tiles.c5{grid-template-columns:1fr}}
 /* ‏وصفُّ أربعةٍ لا يترك خانةً فارغةً في آخره: الأخيرةُ تمتدّ إلى نهاية السطر (محطّاتُ العميل السبع، D-259) */
 @media${atLeast('md')}{
   .tiles.c4>.tile:last-child:nth-child(4n+3){grid-column:span 2}
@@ -108,29 +110,42 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .wk{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
 .wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
   border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
-.wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--brand)}
+.wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--accent)}
 .wk-d{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
+/* ‏والاسمُ بقدر عموده (D-325): الكاملُ فوق «sm»، وبلا «ال» تحتها بحجم الشارة، وحرفُه الأوّلُ تحت «xs» («ح ن ث ر خ ج س» كما في
+   تقويم الهاتف) — «الخميس» ‏42px و«خميس» ‏36px في عمودٍ ‏33px عند ‏320. والاسمُ الكاملُ لقارئ الشاشة دائمًا («.vh») */
+.wk-short,.wk-min{display:none}
 .wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
-.wk-dot{width:var(--s-2); height:var(--s-2); border-radius:50%; background:var(--ink-3)}
-.wk-dot[data-pf=linkedin]{background:var(--pf-linkedin)}
-.wk-dot[data-pf=x]{background:var(--pf-x); box-shadow:0 0 0 var(--stroke) var(--logo-ring)}
-.wk-dot[data-pf=instagram]{background:var(--pf-instagram)}
-.wk-dot[data-pf=tiktok]{background:var(--pf-tiktok); box-shadow:0 0 0 var(--stroke) var(--logo-ring)}
-.wk-dot[data-pf=youtube]{background:var(--pf-youtube)}
+/* ‏ومربّعُ شعارٍ لا نقطةُ لون (D-325): الرمزُ الأبيضُ يحمل المنصّة، واللونُ يُعين؛ وحلقةُ الليل تحدّ مربّعَ X على الأرض الداكنة */
+.wk-pf{flex:none; display:grid; place-items:center; width:var(--icon-sm); height:var(--icon-sm); border-radius:var(--r-inline);
+  color:var(--pf-fg); background:var(--ink-3); box-shadow:inset 0 0 0 var(--ul) var(--logo-ring)}
+.wk-pf svg{width:62%; height:62%; display:block}
+.wk-pf[data-pf=linkedin]{background:var(--pf-linkedin)}
+.wk-pf[data-pf=x]{background:var(--pf-x)}
+.wk-pf[data-pf=instagram]{background:var(--pf-instagram)}
+.wk-pf[data-pf=tiktok]{background:var(--pf-tiktok)}
+.wk-pf[data-pf=youtube]{background:var(--pf-youtube)}
 .machine-more > summary{cursor:pointer; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); min-height:var(--tap); display:flex; align-items:center}
 .wk-hint{margin:var(--s-3) 0 0}
 .wk-c{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 /* ‏وحلقةٌ ليلًا (D-183): مربّعا X وTikTok على السطح الداكن ‏١٫٠٣ و‏١٫٠٥:١ —
    يختفيان ويبقى رمز أبيض يطفو. ونهارًا الحلقة شفّافة */
 .pf-logo{width:var(--s-10); height:var(--s-10); flex:none; display:grid; place-items:center;
-  border-radius:var(--r-control); color:var(--pf-fg); background:var(--brand);
+  border-radius:var(--r-control); color:var(--pf-fg); background:var(--accent);
   box-shadow:0 0 0 1px var(--logo-ring)}
 .pf-logo svg{width:50%; height:50%; display:block}
 @media${below('sm')}{
   .funnel a{grid-template-columns:6.5rem minmax(0,1fr) 2rem}
   .wk li{min-height:6.5rem}
+  .wk-d{font-size:var(--t-caption); line-height:var(--lh-caption)}
+  .wk-long{display:none}
+  .wk-short{display:inline}
   .next .btn{flex:1 1 100%}
+}
+@media${below('xs')}{
+  .wk-short{display:none}
+  .wk-min{display:inline}
 }
 .stack{display:grid; gap:var(--gap-card); align-content:start}
 @media${below('lg')}{.ov{grid-template-columns:1fr}}
@@ -257,8 +272,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   text-decoration:none; border-inline-start:var(--ring-w) solid var(--line); animation:rise var(--dur-3) var(--ease-rise) both}
 .hstats li:nth-child(2) a{animation-delay:40ms}.hstats li:nth-child(3) a{animation-delay:80ms}.hstats li:nth-child(4) a{animation-delay:120ms}
 @media(hover:hover){.hstats a:hover{box-shadow:var(--sh-2)} .db-bar:hover rect{opacity:.8}}
-.hstats [data-tone=wait] a{border-inline-start-color:var(--warn)}
-.hstats [data-tone=sched] a{border-inline-start-color:var(--brand)}
+.hstats [data-tone=wait] a{border-inline-start-color:var(--ink-3)}
+.hstats [data-tone=sched] a{border-inline-start-color:var(--accent)}
 .hstats [data-tone=ok] a{border-inline-start-color:var(--ok)}
 .hstats [data-tone=bad] a{border-inline-start-color:var(--bad)}
 .hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
@@ -275,12 +290,12 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
   line-height:var(--lh-small); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums;
   animation:rise var(--dur-3) var(--ease-rise) both}
 .db-base{stroke:var(--line)}
-.db-bar rect{fill:var(--brand); transform-box:fill-box; transform-origin:50% 100%;
+.db-bar rect{fill:var(--accent); transform-box:fill-box; transform-origin:50% 100%;
   animation:grow var(--dur-3) var(--ease-rise) both; animation-delay:calc(var(--i) * 25ms)}
 .db-bar.zero rect{fill:var(--line)}
 .db-axis{display:flex; justify-content:space-between; margin-top:var(--s-1); font-size:var(--t-small);
   line-height:var(--lh-small); color:var(--ink-2)}
 @keyframes grow{from{transform:scaleY(0)}to{transform:none}}
-.ill-wash{fill:var(--surface-2)}.ill-line{fill:var(--brand); opacity:.45}.ill-soft{fill:var(--line)}
-.ill-brand{fill:var(--brand)}.ill-plus{stroke:var(--surface); fill:none}.ill-dot{fill:var(--warn)}
+.ill-wash{fill:var(--surface-2)}.ill-line{fill:var(--accent); opacity:.45}.ill-soft{fill:var(--line)}
+.ill-brand{fill:var(--accent)}.ill-plus{stroke:var(--surface); fill:none}.ill-dot{fill:var(--warn)}
 `

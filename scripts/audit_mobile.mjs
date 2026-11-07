@@ -20,6 +20,7 @@
  * | التمريرُ الأفقيّ | صفر عند ‏٣٢٠px وحتّى ‏٩٦٠ | WCAG 1.4.10 (Reflow) |
  * | فعلٌ مقصوصٌ في حاويةٍ تقصّ | صفر | يُرى ولا يُضغَط — والصفحةُ لا تفيض (مراجعة D-187) |
  * | نصٌّ خارج صندوقه أو تحت جاره في شريط العودة | صفر | «المنشو» تحت مبدّل الثيم (مراجعة D-189) |
+ * | نصٌّ لا يلتفّ (nowrap أو كلمةٌ واحدة) يفيض من صندوقه أو يُقصّ بلا نقاط | صفر | «الخميسالجمعة» في شريط الأسبوع عند ‏390 (D-325) |
  * | تبويبٌ أو حلقةُ تركيزه خارج ما يُرى | صفر | WCAG 2.4.7 و2.4.11 — وشريطٌ مخفيٌّ لا يُرى (مراجعة D-189) |
  * | مقياسُ الاستحقاق بطول رقمه | ±1٪ | ‏0.61 رُسمت ممتلئة (مراجعة D-189) |
  * | الاسمُ المرسومُ بنسبة رسمه | ±5٪ | «صدى» ‏16×16 في شريط العودة (مراجعة D-196) |
@@ -475,6 +476,59 @@ for (const file of files) {
             }
           }
         }
+        /*
+         * ١٤ · **نصٌّ لا يلتفّ يفيض من صندوقه** (D-325). ما لا ينكسر سطرًا — «white-space:nowrap» أو كلمةٌ واحدةٌ بلا فراغ —
+         * لا يقصّر حين يضيق حيّزُه: يخرج منه إلى جاره. كانت أسماءُ الأيّام في شريط الأسبوع («الأربعاء» ‏15px ثخينًا في عمودٍ
+         * ‏43px عند ‏390) تلتصق بجاراتها في اللقطة المحفوظة، والصفحةُ لا تفيض ولا شيءَ يقصّ، فلم يره (١) ولا (٦) ولا (٧).
+         * فيُقاس حرفُ كلِّ نصٍّ لا يلتفّ على كلّ صندوقٍ فوقه حتّى أوّلِ حاويةٍ تقصّ: يفيض منها أو يُقصّ فيها بلا نقاط. **وما
+         * يُقصّ بنقاطٍ بقصد** («text-overflow:ellipsis») أو يتمرّر (حاويةٌ بـ«auto») لا يُعدّ، **وما يُوضَع خارج أبيه بقصد**
+         * (عنصرٌ بـ«absolute» أو «fixed») يُقاس على نفسه ويقف الصعودُ عنده.
+         */
+        // ‏وما يُخفى عن العين بقصد لا يُقاس: رأسُ الجدول على الهاتف «clip» بصندوق ‏1px، و«.vh» بـ«clip-path»
+        const clipped = (el) => {
+          for (let p = el; p && p !== document.body; p = p.parentElement) {
+            const pcs = getComputedStyle(p)
+            if (pcs.clip !== 'auto' && pcs.clip !== '' && (pcs.position === 'absolute' || pcs.position === 'fixed')) return true
+            if (/inset\(50%/.test(pcs.clipPath)) return true
+          }
+          return false
+        }
+        for (const el of document.body.querySelectorAll('*')) {
+          if (el.closest('svg, script, style, template, .vh, .skip')) continue
+          const own = [...el.childNodes].filter((n) => n.nodeType === 3 && (n.textContent ?? '').trim() !== '')
+          if (own.length === 0 || !shown(el) || clipped(el)) continue
+          const cs = getComputedStyle(el)
+          const text = own.map((n) => n.textContent).join(' ').trim().replace(/\s+/g, ' ')
+          const nowrap = cs.whiteSpace === 'nowrap' || cs.whiteSpace === 'pre'
+          if (!nowrap && /\s/.test(text)) continue
+          let tl = Infinity
+          let tr = -Infinity
+          const range = document.createRange()
+          for (const n of own) {
+            range.selectNodeContents(n)
+            const r = range.getBoundingClientRect()
+            if (r.width === 0) continue
+            tl = Math.min(tl, r.left)
+            tr = Math.max(tr, r.right)
+          }
+          if (!Number.isFinite(tl)) continue
+          for (let p = el; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+            const pcs = getComputedStyle(p)
+            if (pcs.display === 'inline' || pcs.display === 'contents') continue
+            const clips = pcs.overflowX !== 'visible'
+            const pr = p.getBoundingClientRect()
+            const over = Math.max(pr.left - tl, tr - pr.right)
+            if (over > 1) {
+              const meant = clips && (pcs.textOverflow === 'ellipsis' || cs.textOverflow === 'ellipsis' || pcs.overflowX === 'auto' || pcs.overflowX === 'scroll')
+              if (!meant) {
+                const host = p.parentElement ? ` (في ${key(p.parentElement)})` : ''
+                out.push({ kind: 'nowrap', what: `${key(el)} «${text.slice(0, 18)}»`, detail: `${clips ? 'مقصوصٌ في' : 'يفيض من'} ${key(p)}${host} بـ${Math.round(over)}px` })
+              }
+              break
+            }
+            if (clips || pcs.position === 'absolute' || pcs.position === 'fixed') break
+          }
+        }
         // ٤ · حرفٌ داخل SVG يتمدّد مع الرسم (D-153): ما دون ‏١١px لا يُقرأ
         for (const t of document.querySelectorAll('svg text')) {
           if (!shown(t)) continue
@@ -623,6 +677,7 @@ for (const file of files) {
     moment: 'حرفٌ لاتينيٌّ في العلامة',
     fold: 'الفعلُ الأوّلُ أو حقلُه تحت الطيّة على شاشةٍ قصيرة',
     forced: 'لحظةُ العلامة دون ‏3:1 في الألوان القسريّة',
+    nowrap: 'نصٌّ لا يلتفّ يفيض من صندوقه أو يُقصّ بلا نقاط',
   }
 
   console.log(`\n═══ ${name} · ${kb}KB خامًا · ${gz}KB gzip ═══`)
@@ -640,10 +695,11 @@ for (const file of files) {
   for (const [kind, list] of byKind) {
     const uniq = [...new Map(list.map((n) => [`${n.what}|${n.detail}`, n])).values()]
     console.log(`  ✕ ${LABEL[kind]} — ${uniq.length}`)
-    for (const n of uniq.slice(0, 8)) {
+    // ‏و«ALL=1» يطبعها كلَّها حين يُفحَص سببُها
+    for (const n of uniq.slice(0, process.env.ALL ? uniq.length : 8)) {
       console.log(`      ${n.what}  ${n.detail}${n.width ? `  @${n.width}px` : ''}`)
     }
-    if (uniq.length > 8) console.log(`      … و${uniq.length - 8} غيرها`)
+    if (uniq.length > 8 && !process.env.ALL) console.log(`      … و${uniq.length - 8} غيرها`)
     failed += uniq.length
   }
 }

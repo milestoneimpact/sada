@@ -27,8 +27,8 @@ export const SECTIONS = `/* ══ الدليل — الشرحُ عنصرٌ لا
 .guide>summary::-webkit-details-marker{display:none}
 @media(hover:hover){.guide>summary:hover{background:var(--surface-3)}}
 .guide .g-ic{flex:none; width:var(--s-8); height:var(--s-8); border-radius:var(--r-control); display:grid; place-items:center;
-  background:var(--surface); color:var(--brand);
-  border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
+  background:var(--surface); color:var(--accent);
+  border:1px solid color-mix(in srgb,var(--accent) 26%,transparent)}
 .guide .g-ic svg{width:var(--icon-sm); height:var(--icon-sm); display:block}
 .guide .g-t{min-width:0}
 .guide .g-t b{display:block; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
@@ -59,9 +59,9 @@ ol.steps li{display:flex; gap:var(--s-3); align-items:flex-start; position:relat
 ol.steps li:not(:last-child)::before{content:''; position:absolute; top:calc(var(--s-6) + var(--stroke)); bottom:calc(-1 * var(--s-4));
   inset-inline-start:var(--s-3); width:1px; background:var(--line)}
 ol.steps .step-n{flex:none; width:var(--s-6); height:var(--s-6); border-radius:50%; margin-top:0; z-index:1;
-  display:grid; place-items:center; background:var(--surface); color:var(--brand);
+  display:grid; place-items:center; background:var(--surface); color:var(--accent);
   font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; font-variant-numeric:tabular-nums;
-  border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);
   box-shadow:0 0 0 var(--ring-w) var(--surface-2)}
 ol.steps .body{min-width:0; max-width:var(--measure); padding-top:var(--s-0)}
 ol.steps .what{display:block; font-weight:600; color:var(--ink); margin-bottom:var(--s-0);
@@ -176,8 +176,8 @@ ol.steps.wiz.nodot li::before{display:none}
 /* والعلامةُ في دائرةٍ بقدر سطر اللصيقة (‏٢٠) لا أضيقَ منه، فلا يفيض الحرفُ عن حدّها */
 .help-ic{flex:none; width:var(--s-5); height:var(--s-5); border-radius:50%; margin-top:var(--s-0);
   display:grid; place-items:center; font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600;
-  background:var(--surface-2); color:var(--brand);
-  border:1px solid color-mix(in srgb,var(--brand) 26%,transparent)}
+  background:var(--surface-2); color:var(--accent);
+  border:1px solid color-mix(in srgb,var(--accent) 26%,transparent)}
 .help b{color:var(--ink); font-weight:600}
 .help-ic svg{width:var(--icon-xs); height:var(--icon-xs); display:block}
 .help-t{min-width:0}
@@ -355,11 +355,11 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
 @media(hover:hover){.tpick:hover{background:var(--surface-3)}}
 /* والمختارةُ تُعرَف بحدٍّ لا بأرضيّةٍ ملوّنة: أرضيّةٌ تحت نصٍّ تخفض تباينَه */
-.tpick:has(input:checked){border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
+.tpick:has(input:checked){border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 /* **والهامشُ يُصرَّح به كلُّه**: المتصفّحُ يضع لصندوق الاختيار ٣px من
    عنده، **وهي خارج السلّم** — فيُضبَط الأربعة لا الأعلى وحدَه */
 .tpick input{flex:none; margin:var(--s-1) 0 0; width:var(--icon-sm); height:var(--icon-sm);
-  accent-color:var(--brand)}
+  accent-color:var(--accent)}
 .tpick .tp-t{min-width:0}
 .tpick .tp-t b{display:block; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .tpick .tp-t span{display:block; font-size:var(--t-small); color:var(--ink-2);
@@ -436,9 +436,11 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 
 /* ── المحرّرُ المركّز (D-198): لوحٌ ‏560px بجوار القائمة، وشاشةٌ كاملةٌ دون «lg» ────────────── */
 .ed{display:flex; flex-direction:column; padding:0; min-width:0; scroll-margin-block-start:var(--s-4)}
-.ed-head{display:flex; align-items:center; gap:var(--s-3); padding-block:var(--s-3); padding-inline:var(--s-5) var(--s-4);
+/* ‏ورأسُ المحرّر يلتفّ ولا يعصر الاسم (D-325): عند ‏320 ضاق «LinkedIn» إلى أقلَّ من كلمته فخرج منها ‏34px */
+.ed-head{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2) var(--s-3); padding-block:var(--s-3); padding-inline:var(--s-5) var(--s-4);
   border-bottom:var(--bd-soft); background:var(--surface); border-start-start-radius:var(--r-card); border-start-end-radius:var(--r-card)}
 .ed-head .pc-who h2,.ed-head .pc-when{white-space:normal; overflow:visible}
+.ed-head .pc-who{flex:1 1 7rem}
 .ed-body{display:flex; flex-direction:column; gap:var(--s-5); padding:var(--s-5)}
 .ed-views{display:flex; flex-direction:column; gap:var(--s-3)}
 .ed-view{min-width:0}
@@ -486,7 +488,7 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 .when-opts{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,9rem),1fr)); gap:var(--s-2)}
 .when-opt{display:flex; align-items:flex-start; gap:var(--s-2); min-height:var(--tap); padding:var(--s-2) var(--s-3);
   border:var(--bd-field); border-radius:var(--r-control); background:var(--surface); cursor:pointer}
-.when-opt input{flex:none; margin:var(--s-1) 0 0; accent-color:var(--brand)}
+.when-opt input{flex:none; margin:var(--s-1) 0 0; accent-color:var(--accent)}
 .when-opt > span{display:flex; flex-direction:column; min-width:0}
 .when-opt b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .when-opt small{font-size:var(--t-small); line-height:var(--lh-small); font-weight:400; color:var(--ink-2)}

@@ -10,7 +10,7 @@ nav.back{display:flex; flex-wrap:wrap; align-items:center; padding:var(--s-3) 0 
 nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2); text-decoration:none;
   display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); min-width:var(--tap)}
 /* ‏والتمريرُ لونٌ **وخطّ** (D-196): الحبرُ الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا، فاللونُ وحدَه لا يُرى */
-@media(hover:hover){nav.back a:hover{color:var(--brand); text-decoration:underline; text-underline-offset:var(--ul-off);
+@media(hover:hover){nav.back a:hover{color:var(--link); text-decoration:underline; text-underline-offset:var(--ul-off);
   text-decoration-thickness:var(--ul)}}
 
 .plat-logo{width:var(--s-12); height:var(--s-12); border-radius:var(--r-control); flex:none; display:grid; place-items:center;

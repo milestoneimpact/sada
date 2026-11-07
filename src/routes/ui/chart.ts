@@ -93,12 +93,12 @@ export function areaChart(series: { day: string; total: number }[]): string {
     <svg viewBox="0 0 ${w} ${h}" role="img" preserveAspectRatio="none"
       aria-label="إنفاق ${counted(series.length, NOUNS.day, 'gen')}، مجموعه ${money(total)}، وأعلاه ${money(peak.total)} في ${peak.day}">
       <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
-        <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
+        <stop offset="0%" stop-color="var(--accent)" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
       </linearGradient></defs>
       ${ticks}
       <path d="${area}" fill="url(#sg)"/>
-      <path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2"
+      <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
       <line class="base" x1="${padStart}" y1="${padTop + plotH}" x2="${w - 8}" y2="${padTop + plotH}"/>
     </svg>

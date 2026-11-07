@@ -35,7 +35,11 @@ import { escapeHtml } from './shell'
 import { LOGOS } from './logos'
 import { pathArrows } from './parts'
 import { statusBadge } from './components/badge'
+import { button } from './components/button'
 import { counted, NOUNS } from '../../lib/format'
+
+/** «الحسابات» ثانويًّا — طريقُ العودة في كلّ نتيجة، بدالّة العُدّة لا بوسمٍ يُكتب في كلّ موضع (D-325). */
+const ACCOUNTS = button({ label: 'الحسابات', href: panelHref('channels') })
 
 // القاموسُ واحدٌ في lib/oauth/providers (D-151)
 const LABEL = PLATFORM_LABEL
@@ -134,10 +138,8 @@ export function connectedBody(d: ConnectedData): string {
   </div>
 
   <div class="row mt-4">
-    <a class="btn btn-primary" href="/panel/channels/${escapeHtml(d.platform)}">شاشة ${escapeHtml(
-      LABEL[d.platform],
-    )}</a>
-    <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+    ${button({ label: 'شاشة ' + LABEL[d.platform], variant: 'primary', href: '/panel/channels/' + d.platform })}
+    ${ACCOUNTS}
   </div>`
 }
 
@@ -206,8 +208,8 @@ export function refusedBody(d: RefusedData): string {
       <p class="hint">هذا قرارُك لا عطل في الضبط. وزرّ الربط في لوح القنوات
         يعمل كما كان متى شئت.</p>
       <div class="row mt-3">
-        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">جرّب من جديد</a>
-        <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+        ${button({ label: 'جرّب من جديد', variant: 'primary', href: '/oauth/' + d.platform + '/start' })}
+        ${ACCOUNTS}
       </div>
     </div>`
   }
@@ -267,7 +269,7 @@ export function refusedBody(d: RefusedData): string {
           <div class="copy">
             <input id="sent-id" class="mono" dir="ltr" value="${escapeHtml(d.sent.clientId)}" readonly
               aria-label="معرّف التطبيق الذي أُرسل">
-            <button type="button" class="btn btn-secondary btn-sm" data-copy="sent-id">انسخ</button>
+            ${button({ label: 'انسخ', size: 'sm', attrs: 'data-copy="sent-id"' })}
           </div>
           <div class="help"><span class="help-ic">!</span><span class="help-t">
             <b>إن خالف المعرّف في ${escapeHtml(portal)} فهذا تطبيق آخر</b> — وهو وحده يفسّر
@@ -278,7 +280,7 @@ export function refusedBody(d: RefusedData): string {
           <div class="copy">
             <input id="sent-cb" class="mono" dir="ltr" value="${escapeHtml(d.sent.redirectUri)}" readonly
               aria-label="رابط العودة الذي أُرسل">
-            <button type="button" class="btn btn-secondary btn-sm" data-copy="sent-cb">انسخ</button>
+            ${button({ label: 'انسخ', size: 'sm', attrs: 'data-copy="sent-cb"' })}
           </div>
         </div>
       </div>`}
@@ -289,8 +291,8 @@ export function refusedBody(d: RefusedData): string {
           <b>وإن كان السرّ لا يظهر لك كاملا في البوّابة فولّد سرّا جديدا</b> —
           المعروض مقنَّعا لا يُنسَخ، ولصق قناع يعطي هذا الردّ نفسه.</span></div>
       <div class="row mt-3">
-        <a class="btn btn-primary" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
-        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+        ${button({ label: 'اضبط المعرّف والسرّ', variant: 'primary', href: fields })}
+        ${button({ label: 'أعد المحاولة', href: '/oauth/' + d.platform + '/start' })}
       </div>
     </div>`
   }
@@ -318,8 +320,8 @@ export function refusedBody(d: RefusedData): string {
       ${guide === undefined ? '' : `<div class="outcome warn"><span class="kv-k">إن فشل</span>
         <span class="kv-v">${pathArrows(guide.failure)}</span></div>`}
       <div class="row mt-3">
-        <a class="btn btn-primary" href="${escapeHtml(fields)}">اضبط المعرّف والسرّ</a>
-        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
+        ${button({ label: 'اضبط المعرّف والسرّ', variant: 'primary', href: fields })}
+        ${button({ label: 'أعد المحاولة', href: '/oauth/' + d.platform + '/start' })}
       </div>
     </div>`
   }
@@ -404,16 +406,15 @@ export function refusedBody(d: RefusedData): string {
         <b>ولا يُنشَر منه شيء</b> حتّى يُضاف المنتَج الناقص ثمّ تضغط «جدّد الإذن».
         وصدى يقرأ ما مُنح فعلا، فلن يحاول نشرا يعرف أنّه سيُردّ.</p>
       <div class="row mt-3">
-        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start?scope=identity"
-          >اربط الهويّة وحدها</a>
-        <a class="btn btn-secondary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+        ${button({ label: 'اربط الهويّة وحدها', variant: 'primary', href: '/oauth/' + d.platform + '/start?scope=identity' })}
+        ${button({ label: 'أعد المحاولة كاملةً', href: '/oauth/' + d.platform + '/start' })}
       </div>
     </div>`}
 
   ${!identityBlocked
     ? ''
     : `<div class="row mt-4">
-        <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة كاملةً</a>
+        ${button({ label: 'أعد المحاولة كاملةً', variant: 'primary', href: '/oauth/' + d.platform + '/start' })}
       </div>`}
 
   ${guide === undefined
@@ -431,15 +432,14 @@ export function refusedBody(d: RefusedData): string {
        * بجانب الخطوات على العريض لا تحتها — كانت البطاقةُ جوفاءَ نصفِها.
        */''}
       <div class="guide-aside">
-        <a class="btn btn-secondary btn-sm" href="${escapeHtml(guide.portal)}" target="_blank"
-          rel="noopener noreferrer">افتح ${escapeHtml(guide.portalLabel)}</a>
+        ${button({ label: 'افتح ' + guide.portalLabel, size: 'sm', href: guide.portal, attrs: 'target="_blank" rel="noopener noreferrer"' })}
         <div class="outcome"><span class="kv-k">إن نجح</span>
           <span class="kv-v">${pathArrows(guide.success)}</span></div>
       </div>
     </div>`}
 
   <div class="row mt-4">
-    <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+    ${ACCOUNTS}
   </div>`
 }
 
@@ -459,8 +459,8 @@ export function unconfiguredBody(platform: Platform): string {
     <h2>ما يُفعَل</h2>
     <p class="hint">اضبط المعرّف والسرّ في تبويب الإعداد، ثمّ «اربط ${escapeHtml(label)}» من جديد.</p>
     <div class="row mt-3">
-      <a class="btn btn-primary" href="${escapeHtml(setupHref(platform))}">اضبط المعرّف والسرّ</a>
-      <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+      ${button({ label: 'اضبط المعرّف والسرّ', variant: 'primary', href: setupHref(platform) })}
+      ${ACCOUNTS}
     </div>
   </div>`
 }
@@ -474,8 +474,8 @@ export function elsewhereBody(platform: Platform, displayName: string): string {
     <h2>ما يُفعَل</h2>
     <p class="hint">انتقل إلى المنظّمة التي تملكه من الإعدادات، أو افصله منها أوّلًا ثمّ اربطه هنا.</p>
     <div class="row mt-3">
-      <a class="btn btn-primary" href="${panelHref('orgs')}">المنظّمات</a>
-      <a class="btn btn-secondary" href="${panelHref('channels')}">الحسابات</a>
+      ${button({ label: 'المنظّمات', variant: 'primary', href: panelHref('orgs') })}
+      ${ACCOUNTS}
     </div>
   </div>`
 }
@@ -494,7 +494,7 @@ export function otherBrowserBody(platform: Platform): string {
     <p class="hint">ابدأ الربطَ من جديد وأكمله في المتصفّح نفسِه. وإن وصلك رابطُ موافقةٍ من شخصٍ آخر فلا تكمله:
       الربطُ يبدأ من لوحتك أنت.</p>
     <div class="row mt-3">
-      <a class="btn btn-primary" href="` + panelHref('channels') + `">الحسابات</a>
+      ` + button({ label: 'الحسابات', variant: 'primary', href: panelHref('channels') }) + `
     </div>
   </div>`
 }
@@ -530,8 +530,8 @@ export function unreachedBody(d: UnreachedData): string {
     <h2>ما يُفعَل</h2>
     <p class="hint">أعد المحاولة بعد دقيقة. فإن تكرّر هذا فأرسل إليّ ما تحت «للمطوّر» كما هو.</p>
     <div class="row mt-3">
-      <a class="btn btn-primary" href="/oauth/${escapeHtml(d.platform)}/start">أعد المحاولة</a>
-      <a class="btn btn-secondary" href="/panel/channels/${escapeHtml(d.platform)}">صفحة ${escapeHtml(label)}</a>
+      ${button({ label: 'أعد المحاولة', variant: 'primary', href: '/oauth/' + d.platform + '/start' })}
+      ${button({ label: 'صفحة ' + label, href: '/panel/channels/' + d.platform })}
     </div>
     <details class="mt-3"><summary>للمطوّر</summary>
       <p class="hint"><span class="mono">${escapeHtml(d.detail)}</span></p></details>
