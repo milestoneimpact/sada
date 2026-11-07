@@ -213,6 +213,18 @@
 **والقاعدةُ تبقى**: ليلةُ D-071 حتّى D-077 كلُّها درسٌ واحد — **قيمةٌ
 تُكتب بلا مصدرٍ تكذب، وثمنُها يقع بعد شهور**.
 
+## نصُّ LinkedIn بصيغة «little»، وسلسلةُ X — من الوثيقة، ولم يُقَسا حيًّا (D-324)
+
+**LinkedIn** تقرأ `commentary` في Posts API بلغةٍ صغيرة: «little Text Format»
+(`learn.microsoft.com/linkedin/marketing/community-management/shares/little-text-format`، `li-lms-2026-10`، قُرئت
+2026-11-06). والوثيقةُ تقول: «All reserved characters need to be escaped with a backslash, even if those characters are not used
+in one of the supported elements or templates»، والمحجوزُ في قاعدة `Text`: ‎`| { } @ [ ] ( ) < > # \ * _ ~`‎، والوسمُ بالقالب
+‎`{hashtag|\#|tag}`‎. فكلُّ نصٍّ يُرسَل مهرَّبًا (`src/lib/publish/littleText.ts`)، والوسمُ في أوّل النصّ أو بعد فراغٍ قالبٌ، والرابطُ
+يُهرَّب ولا يُقرأ ما فيه وسمًا. **ولم يُرَ على منشورٍ حقيقيّ** — M-41. ولا يُعرَف بعدُ أيُعَدّ حدُّ ‏3000 قبل التهريب أم بعده: صدى يعدّه قبله.
+
+**X**: السلسلةُ تغريداتٌ كلٌّ في `POST /2/tweets` بـ `reply.in_reply_to_tweet_id` بالتي قبلها، **وكلُّ تغريدةٍ طلبٌ مدفوع**
+(البندُ ١ من «نتائج تصميميّة» أعلاه): ‏0.015$، وبرابطٍ ‏0.20$. ولم يُرَ ردٌّ حيٌّ بعد — M-42.
+
 ## وحدُّ الطيّ لا يُقاس من هنا — والمعاينةُ لا ترسمه (D-100)
 
 LinkedIn يطوي المنشورَ الطويلَ خلف «اقرأ المزيد»، **وحدُّ الطيّ ليس رقما

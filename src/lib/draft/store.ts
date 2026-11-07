@@ -23,8 +23,8 @@ import { PLATFORMS } from './prompt'
 import type { Db } from '../tokens'
 import type { PublishPlatform } from '../oauth/providers'
 import { containsUrl } from '../idempotency'
-import { estimatePostCost } from '../cost'
 import { postLength } from './length'
+import { isThread, publishCostOf, threadProblem } from './thread'
 import { captionProblem, isVideoPlatform } from '../media/uploads'
 import { briefError } from '../platform/screen'
 
@@ -146,7 +146,8 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
     scheduledAt: row.scheduled_at,
     accountName: row.account_name,
     dispatchedAt: row.dispatched_at,
-    publishCost: estimatePostCost(platform, containsUrl(row.text)),
+    // ‏وللسلسلة مجموعُ تغريداتها (D-324): كلُّ تغريدةٍ طلبٌ مدفوع
+    publishCost: publishCostOf(platform, row.text),
     originalText: row.original_text ?? null,
     failure: row.status === 'failed' ? briefError(row.fail_json ?? null) : null,
   }
@@ -229,6 +230,12 @@ export type DecisionResult =
   | { readonly ok: true; readonly status: DraftStatus }
   | { readonly ok: false; readonly reason: string }
 
+/**
+ * ‏**نوعُ المنشور يتبع نصَّه** (D-324): سطرُ `---` في نصّ X يجعله سلسلة (`thread`)، وحذفُه يعيده نصًّا — وما سوى ذلك
+ * ‏(`image` و`document`) كما هو. ومعاملُه علَمٌ من `isThread` يُربَط قبل المعرّف.
+ */
+const TYPE_OF_TEXT = "CASE WHEN ? = 1 THEN 'thread' WHEN type = 'thread' THEN 'text' ELSE type END"
+
 /** نصٌّ بأسطر `\n` وحدها، بلا فراغٍ في طرفيه — كما يُعَدّ ويُقارَن ويُحفَظ ويُنشَر. */
 function lines(text: string): string {
   return text.replace(/\r\n?/g, '\n').trim()
@@ -297,10 +304,11 @@ export async function decide(
     .prepare(
       `UPDATE posts SET text = ?, has_url = ?, status = ?, approved_by = ?,
               approved_at = datetime('now'),
-              original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END
+              original_text = CASE WHEN ? = 'edited' THEN COALESCE(original_text, ?) ELSE original_text END,
+              type = ${TYPE_OF_TEXT}
         WHERE id = ? AND org_id = ?`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, id, org)
+    .bind(text, containsUrl(text) ? 1 : 0, status, by, status, row.text, isThread(row.platform, text) ? 1 : 0, id, org)
     .run()
   return { ok: true, status }
 }
@@ -454,11 +462,13 @@ const STATUS_WORD: Readonly<Record<string, string>> = {
  * ما يُردّ عليه النصّ قبل أن يُحفَظ أو يُعتمَد — **فحصٌ واحدٌ للبابين** (D-198).
  * «احفظ» بابٌ ثانٍ يكتب النصّ، وبابٌ يكتب بلا الفحص نفسِه يحفظ ما سيُردّ عند الاعتماد.
  */
-function textProblem(platform: string, text: string): string | null {
+export function textProblem(platform: string, text: string): string | null {
   // ‏نصُّ المقطع وصفٌ لا منشور (D-182): حدُّه حدُّ منصّته، ولا «أربعين محرفًا» عليه
   if (isVideoPlatform(platform)) return captionProblem(platform, text)
   const spec = PLATFORMS[platform === 'x' ? 'x' : 'linkedin']
   if (text.length < 40) return 'النصّ أقصر من أن يكون منشورا'
+  // ‏ونصُّ X تغريدةً تغريدة (D-324): سطرُ `---` يفصل سلسلة، وكلُّ تغريدةٍ بحدّها لا النصُّ كلُّه
+  if (spec.id === 'x') return threadProblem(text)
   // الطولُ يُفحص هنا أيضا وبحساب المنصّة (D-071): نصٌّ فوق الحدّ يُرفض عند النشر بعد أسابيع
   const counted = postLength(text, spec.id)
   if (counted > spec.hardLimit) return `النصّ ${counted} محرفا بحساب ${spec.label} وهي تقبل ${spec.hardLimit}`
@@ -484,10 +494,10 @@ export async function saveText(db: Db, org: string, id: string, raw: string): Pr
   if (text === lines(row.text)) return { ok: true, status: 'draft' }
   const moved = await db
     .prepare(
-      `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?)
+      `UPDATE posts SET text = ?, has_url = ?, original_text = COALESCE(original_text, ?), type = ${TYPE_OF_TEXT}
         WHERE id = ? AND org_id = ? AND status = 'draft' RETURNING id`,
     )
-    .bind(text, containsUrl(text) ? 1 : 0, row.text, id, org)
+    .bind(text, containsUrl(text) ? 1 : 0, row.text, isThread(row.platform, text) ? 1 : 0, id, org)
     .first<{ id: string }>()
   if (moved === null) return { ok: false, reason: 'تغيّرت حالُها قبل الحفظ، فأعد تحميل الصفحة' }
   return { ok: true, status: 'draft' }

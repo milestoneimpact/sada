@@ -12,6 +12,7 @@ import { COOKIE } from '../lib/session'
 import { runWeekly } from '../lib/report/job'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
+import { successCard } from './ui/reportView'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -259,5 +260,55 @@ describe('رابط التقرير في اللوحة', () => {
     const body = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(body).toContain('href="/panel/report"')
     expect(body).toContain('<span class="count">1</span>')
+  })
+})
+
+/**
+ * ‏**مقاييسُ النجاح على «النتائج»** (D-324): الثلاثةُ من PLAN.md §٧ — اعتمادٌ بلا تعديل، وفي موعده، وكلفةُ المنشور — هذا
+ * ‏الشهر، **والفراغُ «لم يُقَس»** لا ‏0٪. كانت معرَّفةً في الخطّة ولا تُرى في المنتج.
+ */
+describe('مقاييس النجاح (D-324)', () => {
+  it('ثلاثُ بلاطاتٍ بأهدافها، وشهرٌ بلا شيءٍ يقول «لم يُقَس»', async () => {
+    const cookie = await login()
+    const html = await (await app.request('/panel/report', { headers: { Cookie: cookie } }, env)).text()
+    const card = html.slice(html.indexOf('id="success"'), html.indexOf('</section>', html.indexOf('id="success"')))
+    expect(card).toContain('مقاييس النجاح هذا الشهر')
+    expect(card).toContain('اعتماد بلا تعديل')
+    expect(card).toContain('نُشر في موعده')
+    expect(card).toContain('كلفة المنشور')
+    expect(card.match(/لم يُقَس/g)?.length).toBe(3)
+    expect(card).not.toMatch(/class="kv-v">0٪/)
+  })
+
+  it('وبأرقام الشهر: نسبةٌ بمقامها، وكلفةٌ بما نُشر', async () => {
+    const now = new Date()
+    const day = (h: number): string => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), Math.max(2, Math.min(now.getUTCDate(), 27)), h)).toISOString().slice(0, 19).replace('T', ' ')
+    db.raw.exec(`INSERT INTO posts (id, account_id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, scheduled_at, cost_usd, created_at)
+      VALUES ('s1', 'a-x', 'x', 'text', 'نصّ', 'published', 'k-s1', 'claude-opus-5', 'omar', '${day(8)}', '${day(9)}', 0.02, '${day(7)}'),
+             ('s2', 'a-x', 'x', 'text', 'نصّ', 'rejected', 'k-s2', 'claude-opus-5', 'omar', NULL, NULL, 0.02, '${day(7)}')`)
+    db.raw.exec(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at, platform_post_id)
+      VALUES ('at1', 's1', 'k-s1', 1, '{}', 'succeeded', '${day(9).replace(':00:00', ':05:00')}', 't1')`)
+    db.raw.exec(`INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, ref_id, at)
+      VALUES ('c1', 'x', 'create_post', 1, 0.015, 0.015, 's1', '${day(9)}')`)
+    const cookie = await login()
+    const html = await (await app.request('/panel/report', { headers: { Cookie: cookie } }, env)).text()
+    const card = html.slice(html.indexOf('id="success"'), html.indexOf('</section>', html.indexOf('id="success"')))
+    expect(card).toContain('50٪')
+    expect(card).toContain('1 من 2')
+    expect(card).toContain('100٪')
+    expect(card).toContain('0.035$')
+  })
+})
+
+/** ‏**والعددُ بعربيّةٍ صحيحة** (D-177 · D-324): «متوسّط 9 منشورات» لا «9 منشورًا»، و«منشورَين» للاثنين. */
+describe('بلاطةُ كلفة المنشور تعدّ بالعربيّة (D-324)', () => {
+  const m = (posts: number) => successCard({
+    clean: { n: 0, of: 0 }, onTime: { n: 0, of: 0 }, cost: { posts, direct: 0.1 * posts, all: 0.2 * posts }, utc: false,
+  })
+  it('واحدٌ واثنان ومن ثلاثةٍ إلى عشرة وما فوقها', () => {
+    expect(m(1)).toContain('متوسّط منشور واحد:')
+    expect(m(2)).toContain('متوسّط منشورَين:')
+    expect(m(9)).toContain('متوسّط 9 منشورات:')
+    expect(m(12)).toContain('متوسّط 12 منشورًا:')
   })
 })

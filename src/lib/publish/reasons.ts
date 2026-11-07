@@ -35,6 +35,9 @@ export const REASONS: Readonly<Record<string, FailReason>> = {
   not_approved: { text: 'لم يُعتمَد قبل موعده — اعتمده ثمّ جدوِله', action: 'open' },
   post_not_found: { text: 'حُذف المنشور قبل موعده', action: 'none' },
   unexpected_error: { text: 'عطل لم يُتوقَّع عندنا قبل الإرسال — وسببُه في سجلّ العامل', action: 'requeue' },
+  // ‏سلسلةُ X (D-324): ما نُشر منها لا يُعاد، فالسببان يقولان ما يُفعَل باليد لا «أعده»
+  thread_changed: { text: 'تغيّر نصّ السلسلة بعد أن نُشر أوّلُها على X — أعد نصَّها كما نُشر، أو احذف المنشورَ هناك واكتبها منشورًا جديدًا', action: 'open' },
+  thread_unconfirmed: { text: 'تغريدةٌ من السلسلة أُرسلت ولم يُعرَف جوابُها — تحقّق على X قبل أن تعيدها', action: 'none' },
 }
 
 /** البادئةُ التي يكتبها الناشرُ قبل جواب المنصّة: «x: …» و«linkedin: …». */

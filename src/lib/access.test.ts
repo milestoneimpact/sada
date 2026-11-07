@@ -104,3 +104,16 @@ describe('الإنفاقُ لمن يعتمد (D-318)', () => {
     expect(requiredRole('POST', path, action)).toBe('editor')
   })
 })
+
+/**
+ * ‏**«بنفسي» للمحرّر في سطرٍ لا يشاركه بابٌ مدفوع** (D-324): يكتب ولا ينفق، فلا يتبع ما يُقيَّد من الكتابة المدفوعة.
+ * ‏و«تراجَع» بعد الجدولة للناشر كالجدولة نفسِها، ولا يحتاج تحقّقًا للتوّ: يُعيد ما فعله الناشرُ قبل ثوانٍ.
+ */
+describe('«بنفسي» و«تراجَع» بعد الجدولة (D-324)', () => {
+  it('«بنفسي» للمحرّر، و«تراجَع» بعد الجدولة للناشر', () => {
+    expect(requiredRole('POST', '/panel/drafts/own', null)).toBe('editor')
+    expect(requiredRole('POST', '/panel/drafts/undo-schedule', null)).toBe('publisher')
+    expect(needsStepUp('POST', '/panel/drafts/own')).toBe(false)
+    expect(needsStepUp('POST', '/panel/drafts/undo-schedule')).toBe(false)
+  })
+})

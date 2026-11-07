@@ -301,6 +301,8 @@ writeAudited(
     now,
     // ‏«هذا الشهر حتّى اليوم» تحت الرأس (ر-10)
     month: { total: 7.62, utc: false },
+    // ‏ومقاييسُ النجاح هذا الشهر (D-324): نسبتان بمقاميهما وكلفةُ المنشور — تُرسَم فتمرّ بالتدقيق كلِّه
+    success: { clean: { n: 7, of: 11 }, onTime: { n: 9, of: 9 }, cost: { posts: 9, direct: 0.21, all: 0.86 }, utc: false },
     suggestions: [
       {
         postId: 'a', platform: 'x',

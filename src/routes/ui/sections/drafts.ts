@@ -22,12 +22,12 @@
 import { deciderText } from '../../../lib/decider'
 export { deciderText }
 import type { DraftRow } from '../../../lib/draft/store'
-import { postLength } from '../../../lib/draft/length'
 import { ceilingOf, reviewText, type ReviewNote } from '../../../lib/draft/review'
 import { PLATFORMS, type PlatformSpec } from '../../../lib/draft/prompt'
 import type { PublishPlatform } from '../../../lib/oauth/providers'
 import { CAPTION_LIMIT, PRIVATE_ONLY } from '../../../lib/media/uploads'
-import { IDEA_MAX } from '../../../lib/draft/job'
+import { IDEA_MAX, OWN_PLATFORMS } from '../../../lib/draft/job'
+import { longestTweet, THREAD_SEPARATOR, tweetsOf } from '../../../lib/draft/thread'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
 import { maySpend, SPEND_LOCKED } from '../../../lib/access'
@@ -42,7 +42,7 @@ import { escapeHtml } from '../escape'
 import { whenTag } from '../time'
 import { whenField } from '../when'
 import type { Peaks } from '../../../lib/schedule/peak'
-import { kb, money, parseSqliteUtc, relativeTime } from '../../../lib/format'
+import { counted, kb, money, NOUNS, parseSqliteUtc, relativeTime } from '../../../lib/format'
 import { momentLabel, PRESETS } from '../../../lib/time/local'
 import { clock, FALLBACK_ZONE, zoneNote } from '../../../lib/time/zone'
 /*
@@ -106,9 +106,13 @@ export function specOf(p: PublishPlatform): CardSpec {
   return p === 'instagram' ? { id: p, label: platformLabel(p), hardLimit: CAPTION_LIMIT.instagram } : PLATFORMS[p]
 }
 
-/** طولُ النصّ كما تعدّه منصّتُه — وInstagram بالمحرف كما يعدّ `captionProblem`. */
+/**
+ * طولُ النصّ كما تعدّه منصّتُه — وInstagram بالمحرف كما يعدّ `captionProblem`.
+ * ‏**وسلسلةُ X بأطول تغريدةٍ فيها** (D-324): الحدُّ على كلّ تغريدة، فالنصُّ كلُّه فوق 280 لا يعني شيئًا.
+ */
 export function lengthOf(d: DraftRow): number {
-  return d.platform === 'instagram' ? d.text.length : postLength(d.text, d.platform)
+  if (d.platform === 'linkedin' || d.platform === 'x') return longestTweet(d.platform, d.text)
+  return d.text.length
 }
 
 /** أنواعُ الوسائط الجاهزة لمنشور — ما يسأل عنه `missingMedia` كما يسأله الناشر. */
@@ -890,7 +894,10 @@ function card(
   const more: string[] = []
   more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
 
+  const tweets = tweetsOf(d.platform, d.text).length
   const meta = [
+    // ‏والسلسلةُ تُقال بعددها (D-324): نصُّها في البطاقة سطرٌ واحد، والفواصلُ لا تُرى
+    tweets > 1 ? html`<span class="chip">سلسلة من ${counted(tweets, NOUNS.tweet, 'gen')}</span>`.value : '',
     d.sourceName === null ? '' : `<span class="chip">${fileName(d.sourceName)}</span>`,
     d.model === null ? '' : `<span class="chip">كتبها ${escapeHtml(writerName(d.model))}</span>`,
     `<span class="chip mono" tabindex="0" data-tip="كلفة الكتابة — وقد وقعت">${d.cost === 0 ? '—' : money(d.cost)}</span>`,
@@ -1111,6 +1118,46 @@ function ideaForm(input: DraftsInput): string {
 }
 
 /**
+ * ‏**نموذجُ «بنفسي»** (D-324) — نصُّك مسوّدةً كما كتبته: **بلا نموذجٍ ولا كلفة**، ثمّ تعتمده كأيّ مسوّدة.
+ *
+ * ‏حقلٌ واحدٌ ومنصّةٌ واحدة (نصٌّ واحدٌ لمنصّتين يُكتب مرّتين: حدُّ X غيرُ حدّ LinkedIn)، والعدّادُ يعدّ كما تعدّ المنصّة،
+ * ‏**ولـ X سلسلةٌ بسطر `---` بين كلّ تغريدتين** والعدّادُ لكلّ تغريدة. والزرُّ تحت الحقول في طرف البداية، وسطرُ الكلفة
+ * ‏بجانبه، كالبابين الآخرين (D-308). **ولا حاجزَ إنفاقٍ يعطّله**: لا شيءَ يُنفَق، فيعمل والكتابةُ المدفوعةُ موقوفة.
+ */
+function ownForm(input: DraftsInput): string {
+  const boxes = OWN_PLATFORMS.map((p, i) => {
+    const link = input.links?.[p]
+    return html`<label class="vpf">
+        <input type="radio" name="platform" value="${p}"${raw(i === 0 ? ' checked' : '')} data-limit="${PLATFORMS[p].hardLimit}" data-count="${p}">
+        <span class="vpf-b"><b>${PLATFORMS[p].label}</b>
+          ${link === undefined ? '' : raw(linkLine(p, link, PRIVATE_ONLY))}
+          <span class="ago">${p === 'x'
+            ? 'تغريدة حتّى ' + PLATFORMS.x.hardLimit + ' محرفًا، أو سلسلة'
+            : 'حتّى ' + PLATFORMS.linkedin.hardLimit + ' محرف'}</span></span>
+      </label>`
+  })
+  const spec = PLATFORMS[OWN_PLATFORMS[0]]
+  return html`<form method="POST" action="/panel/drafts/own" data-busy="جار الحفظ…" data-own>
+      ${raw(field({
+        id: 'do-text',
+        label: 'نصّك',
+        hint: 'يُحفظ كما تكتبه. ولسلسلة على X: سطر فيه ' + THREAD_SEPARATOR + ' وحدها بين كلّ تغريدتين.',
+        control: html`<textarea name="text" rows="8" required dir="auto" class="draft-text" data-limit="${spec.hardLimit}" data-target="${
+          ceilingOf(spec.hardLimit)}" data-count="${spec.id}"></textarea><span class="draft-len"><b>0</b> / <span data-lim>${spec.hardLimit}</span></span>`.value,
+      }))}
+      <fieldset class="field mt-3">
+        <legend>لـ</legend>
+        <div class="vpfs">${boxes}</div>
+      </fieldset>
+      <span class="st bad" data-own-msg role="alert" hidden></span>
+      <div class="cmp-act">
+        ${raw(button({ label: 'احفظ مسوّدة', variant: 'primary', type: 'submit' }))}
+        <span class="ago">بلا نموذج ولا كلفة، وتعتمدها قبل أن يُنشر شيء.</span>
+      </div>
+    </form>`.value
+}
+
+/**
  * اللوحُ قسمان (D-195): **المسوّداتُ** (ما ينتظر قرارك والتوزيعُ والفرز) و**الكتابة** (من فكرةٍ ومن مصدر)
  * — يُرسَم كلٌّ في تبويبه من تبويبات «المنشورات». و`draftsSection` يجمعهما كما كان لمن يريد اللوحَ كلَّه.
  */
@@ -1266,16 +1313,22 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
    * ‏في شاشةٍ واحدة، و38 كلمةَ شرحٍ قبل أوّل حقل. المقطعُ أزرارُ راديو في لصائق، فيعمل بلا سكربت (`:has`)،
    * ‏والمرساةُ «#write» تختاره، والاختيارُ يُحفظ في المتصفّح كالسمة.
    */
+  /*
+   * ‏**والبابُ الثالث «بنفسي»** (D-324): نصُّك كما كتبته بلا نموذج — كان كلُّ بابٍ يمرّ بنداءٍ مدفوع. بعد البابين لا بينهما،
+   * ‏فمرساتا «#idea» و«#write» وترتيبُهما كما كانا.
+   */
   const write = html`<div class="card composer mt-3" id="composer">
     <div class="card-head"><h2>منشور جديد</h2></div>
-    <p class="hint">من جملة تكتبها، أو من مصدر حُلّل في المكتبة. تقرأ المسوّدة وتعتمدها قبل أن يُنشر شيء.</p>
+    <p class="hint">من جملة تكتبها، أو من مصدر حُلّل في المكتبة، أو بنفسك كما تريده. تقرأ المسوّدة وتعتمدها قبل أن يُنشر شيء.</p>
     <fieldset class="seg">
       <legend class="vh">من أين تبدأ؟</legend>
       <label><input type="radio" name="cmp" value="idea" checked>من فكرة</label>
       <label><input type="radio" name="cmp" value="write">من مصدر</label>
+      <label><input type="radio" name="cmp" value="own">بنفسي</label>
     </fieldset>
     <div id="idea">${raw(ideaForm(input))}</div>
     <div id="write">${raw(writer)}</div>
+    <div id="own">${raw(ownForm(input))}</div>
   </div>`.value
   return { list, write }
 }

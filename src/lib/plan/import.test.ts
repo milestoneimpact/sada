@@ -238,3 +238,30 @@ describe('applyPlan بعد المراجعة (D-182)', () => {
     expect(db.raw.prepare(`SELECT status FROM posts WHERE text = 'أوّل' ORDER BY status`).all()).toEqual([{ status: 'queued' }, { status: 'rejected' }])
   })
 })
+
+/**
+ * ‏**سلسلةُ X في خطّةٍ من ملفّ** (D-324): نصُّ X بسطر `---` سلسلة، والملفُّ يُعتمَد ويُجدوَل بلا «اعتمد» — فحارسُ السلسلة
+ * ‏يُفحص هنا كما يُفحص في «احفظ» و«اعتمد»: كلُّ تغريدةٍ بحدّها، **وسقفُ التغريدات** (كلُّ تغريدةٍ نداءٌ مدفوع، D-003)،
+ * ‏والنوعُ `thread` على الصفّ كما يكتبه الاعتماد.
+ */
+describe('سلسلة X من ملفّ (D-324)', () => {
+  const x = account({ id: 'acc-x', platform: 'x', displayName: 'عمر على X' })
+  const csvOf = (text: string): string => `date,time,platform,text\n2026-10-12,09:30,x,"${text}"\n`
+
+  it('سلسلةٌ فوق سقف التغريدات تُردّ بسببه، ولا تُجدوَل ستٌّ وعشرون تغريدةً مدفوعة', () => {
+    const many = Array.from({ length: 26 }, (_, i) => `تغريدة ${i + 1}`).join('\n---\n')
+    const [row] = readPlan(csvOf(many), facts({ accounts: [x] })).rows
+    expect(row?.problems).toContain('السلسلة 26 تغريدةً والحدّ 25')
+  })
+
+  it('والسلسلةُ السليمة تُكتب بنوعها thread، والتغريدةُ الواحدة text كما كانت', async () => {
+    const db = fakeDb()
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-x', 'x', 'member', 'e', 'عمر', 'active')`).run()
+    const thread = readPlan(csvOf('الأولى من السلسلة.\n---\nالثانية تردّ عليها.'), facts({ accounts: [x] }))
+    expect(thread.rows[0]?.problems).toEqual([])
+    expect(await applyPlan(db, 'org_owner', thread.rows, 'panel:passkey', NOW)).toEqual([{ line: 2, result: 'scheduled' }])
+    const single = readPlan('date,time,platform,text\n2026-10-13,09:30,x,تغريدة واحدة بلا فاصل\n', facts({ accounts: [x] }))
+    await applyPlan(db, 'org_owner', single.rows, 'panel:passkey', NOW)
+    expect(db.raw.prepare('SELECT type FROM posts ORDER BY scheduled_at').all()).toEqual([{ type: 'thread' }, { type: 'text' }])
+  })
+})

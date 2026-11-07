@@ -628,3 +628,26 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
       .toEqual({ ...EMPTY_CHOICES, channels: ['x'], cadence: { x: 28 } })
   })
 })
+
+/**
+ * ‏**سلسلةُ X بندٌ في الخطّة** (D-324): كان نوعُ البند نصًّا أو صورةً أو مقطعًا، فالسلاسلُ العشر التي أعلنها المالك في
+ * ‏الشهر (PLAN.md §٥) تسقط عند التخطيط قبل النشر. والمخطّطُ JSON في `plans.plan_json`، فلا ترحيلَ يلزم.
+ */
+describe('سلسلة X في الخطّة (D-324)', () => {
+  it('المخطّطُ والموجّهُ يقبلان `thread`، والقارئُ يُبقيها لـ X ويردّها نصًّا لغيرها', () => {
+    const schema = planSchema(['x', 'linkedin']) as unknown as { properties: { items: { items: { properties: { kind: { enum: string[] } } } } } }
+    expect(schema.properties.items.items.properties.kind.enum).toContain('thread')
+    expect(systemPrompt({ channels: ['x'] })).toContain('`thread`')
+    const read = parsePlan(
+      { rationale: 'r', items: [
+        { source_id: 'src:a', platform: 'x', kind: 'thread', angle: 'زاوية كافية الطول', day: '2026-11-02', time: '09:00' },
+        { source_id: 'src:a', platform: 'linkedin', kind: 'thread', angle: 'زاوية كافية الطول', day: '2026-11-03', time: '09:00' },
+      ] },
+      new Set(['src:a']),
+      '2026-11-01', 'week', { channels: ['x', 'linkedin'] },
+    )
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.plan.items.map((i) => [i.platform, i.kind])).toEqual([['x', 'thread'], ['linkedin', 'text']])
+  })
+})

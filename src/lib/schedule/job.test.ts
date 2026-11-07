@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
   dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, reschedulePost, schedulePost, sweepStuck, unmarkDispatched, unschedule, restoreSchedule,
+  UNDO_WINDOW_SECONDS, undoSchedule, undoUntil,
 } from './job'
 import { writeSetting } from '../settings'
 
@@ -612,5 +613,76 @@ describe('منظّمة الجلسة على أفعال الجدولة (D-277)', (
     expect((await unschedule(db, post, 'org_other')).ok).toBe(false)
     expect((await unschedule(db, post, 'org_owner')).ok).toBe(true)
     expect((await requeue(db, post, NOW, 'org_other')).ok).toBe(false)
+  })
+})
+
+/**
+ * ‏**«تراجَع» بعد «اعتمد وجدوِل» وبعد «جدوِل»** (D-324 · نمط D-303): كان الإشعارُ يقول «اعتُمدت وجُدولت» ويُغلَق، ولا طريقَ
+ * ‏من المجدولة إلى المسوّدة إلّا سحبُ الموعد ثمّ التراجعُ عن الاعتماد في مكانين. **ولا يُنشَر شيءٌ في نافذة التراجع**:
+ * ‏أقربُ موعدٍ من اللوحة بعد النافذة، والدورةُ لا ترسل ما لم يحلّ موعدُه.
+ */
+describe('التراجع عن الجدولة (D-324)', () => {
+  it('موعدٌ داخل نافذة التراجع يُردّ حين يُطلب الإمساك، ويُقبل بلا إمساك كما كان', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const inMinute = '2026-09-08T08:01'
+    const held = await schedulePost(db, post, account, inMinute, NOW, null, UNDO_WINDOW_SECONDS)
+    expect(held).toEqual({ ok: false, reason: 'الموعد بعد أقلّ من دقيقتين، ولا يُنشَر شيءٌ في دقيقتي التراجع — اختر موعدًا أبعد قليلًا' })
+    expect((await schedulePost(db, post, account, inMinute, NOW)).ok).toBe(true)
+  })
+
+  it('ولا تُرسله الدورةُ داخل النافذة: أقربُ موعدٍ مقبولٍ بعدها', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const done = await schedulePost(db, post, account, '2026-09-08T08:02', NOW, null, UNDO_WINDOW_SECONDS)
+    expect(done.ok).toBe(true)
+    for (let s = 0; s < UNDO_WINDOW_SECONDS; s += 15) {
+      expect(await dueNow(db, new Date(NOW.getTime() + s * 1000))).toEqual([])
+    }
+  })
+
+  it('«تراجَع» بعد «اعتمد وجدوِل» يعيدها مسوّدةً بلا موعدٍ ولا حسابٍ ولا اعتماد', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const done = await schedulePost(db, post, account, SOON, NOW, 'org_owner', UNDO_WINDOW_SECONDS)
+    expect(done.ok).toBe(true)
+    const until = undoUntil(NOW)
+    const back = await undoSchedule(db, post, 'org_owner', { at: (done as { at: string }).at, until, to: 'draft' }, NOW)
+    expect(back).toEqual({ ok: true, at: '', account: '', platform: 'linkedin' })
+    const row = await db.prepare('SELECT status, scheduled_at, account_id, approved_at, approved_by FROM posts WHERE id = ?').bind(post).first()
+    expect(row).toEqual({ status: 'draft', scheduled_at: null, account_id: null, approved_at: null, approved_by: null })
+  })
+
+  it('و«تراجَع» بعد «جدوِل» يعيدها معتمَدةً تنتظر موعدًا', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const done = await schedulePost(db, post, account, SOON, NOW, 'org_owner', UNDO_WINDOW_SECONDS)
+    const back = await undoSchedule(db, post, 'org_owner', { at: (done as { at: string }).at, until: undoUntil(NOW), to: 'approved' }, NOW)
+    expect(back.ok).toBe(true)
+    const row = await db.prepare('SELECT status, scheduled_at, approved_at FROM posts WHERE id = ?').bind(post).first()
+    expect(row).toEqual({ status: 'approved', scheduled_at: null, approved_at: '2026-09-08T07:00:00Z' })
+  })
+
+  it('ولا يُتراجَع بعد النافذة، ولا عمّا غادر إلى الطابور، ولا عن موعدٍ تبدّل بعده', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const done = await schedulePost(db, post, account, SOON, NOW, 'org_owner', UNDO_WINDOW_SECONDS) as { at: string }
+    const until = undoUntil(NOW)
+    const late = new Date(NOW.getTime() + (UNDO_WINDOW_SECONDS + 1) * 1000)
+    expect(await undoSchedule(db, post, 'org_owner', { at: done.at, until, to: 'draft' }, late))
+      .toEqual({ ok: false, reason: 'مضت دقيقتا التراجع — اسحب موعدَها من بطاقتها إن أردت' })
+    expect(await undoSchedule(db, post, 'org_owner', { at: '2026-09-08 10:00:00', until, to: 'draft' }, NOW))
+      .toEqual({ ok: false, reason: 'تبدّل موعدُها أو حالُها بعد الإشعار — أعد تحميل الصفحة' })
+    await markDispatched(db, [post], new Date('2026-09-08T09:00:00Z'))
+    expect(await undoSchedule(db, post, 'org_owner', { at: done.at, until, to: 'draft' }, NOW))
+      .toEqual({ ok: false, reason: 'تبدّل موعدُها أو حالُها بعد الإشعار — أعد تحميل الصفحة' })
+    expect((await db.prepare('SELECT status FROM posts WHERE id = ?').bind(post).first<{ status: string }>())?.status).toBe('queued')
+  })
+
+  it('ومنظّمةٌ أخرى لا تتراجع عن منشورٍ ليس لها', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const done = await schedulePost(db, post, account, SOON, NOW, 'org_owner', UNDO_WINDOW_SECONDS) as { at: string }
+    expect((await undoSchedule(db, post, 'org_other', { at: done.at, until: undoUntil(NOW), to: 'draft' }, NOW)).ok).toBe(false)
   })
 })

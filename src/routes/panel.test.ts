@@ -863,10 +863,10 @@ describe('رؤوس الألواح (D-137)', () => {
     const libPane = html.slice(html.indexOf('<section data-pane="library"'), html.indexOf('</section>', html.indexOf('<section data-pane="library"')))
     expect(libPane).toContain('<div data-sub id="sub-videos">')
     expect(libPane).toContain('<div data-sub id="sub-images">')
-    // ‏و«منشور جديد» العائمُ بأبواب الكتابة الأربعة (D-208)، ومراسيها في اللوحة نفسِها
+    // ‏و«منشور جديد» العائمُ بأبواب الكتابة (D-208)، ومراسيها في اللوحة نفسِها — والخامسُ «بنفسي» منذ D-324
     const fab = html.slice(html.indexOf('<details class="fab">'), html.indexOf('</details>', html.indexOf('<details class="fab">')))
-    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel/library#videos', '/panel#plan-import'])
-    for (const a of ['idea', 'write', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
+    expect([...fab.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel#idea', '/panel#write', '/panel#own', '/panel/library#videos', '/panel#plan-import'])
+    for (const a of ['idea', 'write', 'own', 'videos', 'plan-import']) expect(html, a).toContain(`id="${a}"`)
     // ‏و«للمطوّر» (D-209): رابطُ العودة لكلّ منصّة وأسماءُ الأسرار الناقصة — أسماءٌ لا قيَم
     const dev = html.slice(html.indexOf('id="dev"'), html.indexOf('</section>', html.indexOf('id="dev"')))
     expect(dev).toMatch(/\/oauth\/linkedin\/callback/)

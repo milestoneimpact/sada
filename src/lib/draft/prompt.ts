@@ -151,7 +151,19 @@ export const PLATFORMS: Readonly<Record<Platform, PlatformSpec>> = {
  */
 export type Material = 'source' | 'idea'
 
-export function systemPrompt(spec: PlatformSpec, from: Material = 'source', voice = ''): string {
+/**
+ * ‏**وصفُ سلسلة X** (D-324) — لبندٍ في الخطّة طُلب سلسلة. يحلّ محلّ وصف X («لا تتمّة ولا خيط») لهذه الكتابة وحدها،
+ * ‏والحدُّ لكلّ تغريدة: يُقرأ الجوابُ تغريدةً تغريدة (`job.ts`) بعد أن تُسجَّل كلفتُه.
+ */
+export const X_THREAD_GUIDE = [
+  'اكتب سلسلة X عربيّة: من ثلاث تغريدات إلى ستّ، وبين كلّ تغريدتين سطرٌ فيه --- وحدها.',
+  '**كلّ تغريدة تقف وحدها في 280 محرفًا على الأكثر**، والأولى تحمل وعدَ السلسلة كلَّه.',
+  'لا ترقيم «1/5» ولا «تابع» ولا «خيط»: التسلسل يُرى من الردّ.',
+  'جمل قصيرة، وبلا حشو ولا تمهيد.',
+  'وسم واحد على الأكثر في آخر تغريدة، أو بلا وسم.',
+].join('\n')
+
+export function systemPrompt(spec: PlatformSpec, from: Material = 'source', voice = '', thread = false): string {
   return [
     'أنت تكتب باسم مالك الحساب، لا باسمك. فما تكتبه يخرج قولا له.',
     '',
@@ -180,12 +192,14 @@ export function systemPrompt(spec: PlatformSpec, from: Material = 'source', voic
     ...(voice === '' ? [] : [voice, '']),
     '## المنصّة',
     '',
-    spec.guide,
+    thread && spec.id === 'x' ? X_THREAD_GUIDE : spec.guide,
     '',
     '## المخرَج',
     '',
     'أعد JSON بحقلين لا غير:',
-    '`text` نصّ المنشور كما يُنشر — بلا عنوان ولا تعليق منك.',
+    thread && spec.id === 'x'
+      ? '`text` نصّ السلسلة كلُّها كما تُنشر، تغريداتُها بينها سطرٌ فيه --- وحدها — بلا عنوان ولا تعليق منك.'
+      : '`text` نصّ المنشور كما يُنشر — بلا عنوان ولا تعليق منك.',
     '`rationale` سطر واحد يشرح لماذا هذه الزاوية دون غيرها.',
   ].join('\n')
 }
@@ -198,7 +212,7 @@ export interface SourceBrief {
 }
 
 /** ما يُعطاه النموذج عن المصدر — خلاصتُه لا نصُّه كاملا. */
-export function userPrompt(brief: SourceBrief): string {
+export function userPrompt(brief: SourceBrief, thread = false): string {
   return [
     `# ${brief.name}`,
     '',
@@ -207,7 +221,7 @@ export function userPrompt(brief: SourceBrief): string {
     '',
     brief.themes.length === 0 ? '' : `## المحاور\n${brief.themes.join(' · ')}`,
     '',
-    'اكتب منشورا واحدا من هذه المادّة.',
+    thread ? 'اكتب سلسلة X واحدة من هذه المادّة.' : 'اكتب منشورا واحدا من هذه المادّة.',
   ]
     .filter((line) => line !== '')
     .join('\n')
@@ -217,12 +231,12 @@ export function userPrompt(brief: SourceBrief): string {
  * ما يُعطاه النموذج من فكرة المالك (D-190) — **كلماتُه كما كتبها**، بلا عنوانٍ يُخترَع
  * لها ولا محاورَ تُستنتَج: ما يُضاف هنا يصير مادّةً يُسنَد إليها.
  */
-export function ideaPrompt(idea: string): string {
+export function ideaPrompt(idea: string, thread = false): string {
   return [
     '## فكرة المالك بكلماته',
     idea,
     '',
-    'اكتب منشورا واحدا يقول هذه الفكرة.',
+    thread ? 'اكتب سلسلة X واحدة تقول هذه الفكرة.' : 'اكتب منشورا واحدا يقول هذه الفكرة.',
   ].join('\n')
 }
 

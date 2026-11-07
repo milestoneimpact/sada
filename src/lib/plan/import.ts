@@ -12,7 +12,7 @@
  */
 import { atomically, type Db, type DbStatement } from '../tokens'
 import { isLinkedInPage, type LinkedAccount } from '../channels'
-import { postLength } from '../draft/length'
+import { isThread, longestTweet, THREAD_MAX, tweetsOf } from '../draft/thread'
 import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
@@ -300,8 +300,12 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
       const why = captionProblem(platform, text)
       if (why !== null) problems.push(why)
     } else if (platform !== null) {
-      const length = platform === 'x' ? postLength(text, 'x') : text.length
+      // ‏ونصُّ X بسطر `---` سلسلة (D-324): الحدُّ على أطول تغريدة لا على النصّ كلِّه، كما يحكم الاعتمادُ والناشر
+      const length = platform === 'x' ? longestTweet('x', text) : text.length
       if (length > TEXT_LIMIT[platform]) problems.push(`النصّ ${length} محرفًا و${LABEL[platform]} تقبل ${TEXT_LIMIT[platform]}`)
+      // ‏**وسقفُ السلسلة كما في «احفظ» و«اعتمد»** (`threadProblem`): الملفُّ يُعتمَد ويُجدوَل بلا «اعتمد»، وكلُّ تغريدةٍ نداءٌ مدفوع
+      const tweets = platform === 'x' ? tweetsOf('x', text).length : 1
+      if (tweets > THREAD_MAX) problems.push(`السلسلة ${tweets} تغريدةً والحدّ ${THREAD_MAX}`)
     }
 
     // ‏المقطعُ يُطابَق باسمه في «فيديوهاتك» — الأحدثُ إن تكرّر الاسم
@@ -447,12 +451,13 @@ export async function applyPlan(
         .prepare(
           `INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, approved_by, approved_at, rationale,
                               org_id, brand_id)
-           VALUES (?, ?, 'text', ?, 'approved', ?, 'owner', ?, ?, 'من خطّة مستورَدة',
+           VALUES (?, ?, ?, ?, 'approved', ?, 'owner', ?, ?, 'من خطّة مستورَدة',
                    -- ‏منظّمة الحساب الذي يُنشر منه وعلامتُه
                    coalesce((SELECT org_id FROM accounts WHERE id = ?), 'org_owner'),
                    coalesce((SELECT brand_id FROM accounts WHERE id = ?), 'brand_owner'))`,
         )
-        .bind(postId, row.platform, row.text, key, by, dbNow(now), row.accountId, row.accountId))
+        // ‏ونصُّ X بسطر `---` سلسلةٌ بنوعها (D-324) كما يكتبه الاعتماد
+        .bind(postId, row.platform, isThread(row.platform ?? '', row.text) ? 'thread' : 'text', row.text, key, by, dbNow(now), row.accountId, row.accountId))
       if (row.uploadId !== null && upload !== null) statements.push(uploadMediaRow(db, postId, row.uploadId, upload))
       await atomically(db, statements)
     }

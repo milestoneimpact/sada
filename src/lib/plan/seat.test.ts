@@ -64,3 +64,19 @@ describe('التسكين', () => {
     expect(again.skipped.filter((s) => s.reason === 'مُسكَّنٌ من قبل')).toHaveLength(2)
   })
 })
+
+/** ‏**وسلسلةُ X في خطّةٍ مرفوعة** (D-324): بندُها `thread` ومسوّدتُها بنوعها، كما يكتبهما الموجّهُ و«اعتمد». */
+describe('سلسلة X تُسكَّن بنوعها (D-324)', () => {
+  it('نصُّ X بسطر --- بندٌ thread ومسوّدةٌ thread، وتغريدةٌ واحدة text', async () => {
+    const csv = [
+      'التاريخ,الوقت,المنصة,النص',
+      '2099-01-04,09:00,X,"الأولى من السلسلة.\n---\nالثانية تردّ عليها."',
+      '2099-01-05,09:00,X,تغريدة واحدة بلا فاصل',
+    ].join('\n')
+    const out = await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(out.seated).toBe(2)
+    const plan = db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }
+    expect((JSON.parse(plan.plan_json) as { items: { kind: string }[] }).items.map((i) => i.kind)).toEqual(['thread', 'text'])
+    expect(db.raw.prepare('SELECT type FROM posts ORDER BY source_refs').all()).toEqual([{ type: 'thread' }, { type: 'text' }])
+  })
+})

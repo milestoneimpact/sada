@@ -12,7 +12,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { draftFromIdea, draftKey, draftPost, ideaKey, ideaProblem, normalizeIdea, type DraftDeps } from './job'
+import { draftFromIdea, draftFromOwner, draftKey, draftPost, ideaKey, ideaProblem, normalizeIdea, type DraftDeps } from './job'
 import { PLATFORMS, parseDraft, systemPrompt } from './prompt'
 import { writeSetting } from '../settings'
 import { writeRoute } from '../ai/routes'
@@ -527,5 +527,72 @@ describe('صوتُ العميل في موجّه الكتابة (D-257)', () => {
     const sent = JSON.stringify(calls[0]?.body)
     expect(sent).toContain('صوت العميل')
     expect(sent).toContain('هادئة واثقة بلا مبالغة')
+  })
+})
+
+/**
+ * ‏**«بنفسي»** (D-324) — نصُّ المالك مسوّدةً كما كتبه: **لا نداءَ ولا كلفةَ ولا صفَّ في الدفتر**، والفحصُ فحصُ الاعتماد
+ * ‏نفسُه بحدّ كلّ منصّة، والمفتاحُ يمنع الضغطةَ المزدوجة. كان كلُّ بابٍ إلى مسوّدةٍ يمرّ بنموذجٍ مدفوع.
+ */
+describe('draftFromOwner (D-324)', () => {
+  const MINE = 'الحوكمة لا تبطئ القرار، تحميه — (وهذا قولي أنا) بلا نموذج.'
+
+  it('يحفظ النصَّ كما كُتب، model=owner بكلفة صفر، ولا نداء ولا دفتر', async () => {
+    const out = await draftFromOwner(db, 'org_owner', 'linkedin', `${MINE}\r\n`)
+    expect(out.kind).toBe('drafted')
+    if (out.kind !== 'drafted') return
+    expect(out.cost).toBe(0)
+    const row = await db.prepare('SELECT text, model, cost_usd, status, type, source_id, rationale FROM posts WHERE id = ?').bind(out.postId).first()
+    expect(row).toEqual({ text: MINE, model: 'owner', cost_usd: 0, status: 'draft', type: 'text', source_id: null, rationale: null })
+    const ledger = await db.prepare('SELECT COUNT(*) AS n FROM cost_ledger').first<{ n: number }>()
+    expect(ledger?.n).toBe(0)
+  })
+
+  it('والضغطةُ الثانية بالنصّ نفسِه تعيد المسوّدةَ نفسَها، والمرفوضةُ تُحرِّر مفتاحَها', async () => {
+    const first = await draftFromOwner(db, 'org_owner', 'x', MINE)
+    const again = await draftFromOwner(db, 'org_owner', 'x', `  ${MINE}  `)
+    expect(first.kind).toBe('drafted')
+    expect(again).toEqual({ kind: 'already', postId: (first as { postId: string }).postId })
+    await db.prepare("UPDATE posts SET status = 'rejected'").run()
+    expect((await draftFromOwner(db, 'org_owner', 'x', MINE)).kind).toBe('drafted')
+  })
+
+  it('والحدودُ حدودُ الاعتماد: قصيرٌ يُردّ، وX فوق 280 يُردّ، وسلسلةٌ صالحةٌ تُقبَل بنوع thread', async () => {
+    expect(await draftFromOwner(db, 'org_owner', 'linkedin', 'قصير')).toEqual({ kind: 'failed', reason: 'النصّ أقصر من أن يكون منشورا', retryable: false })
+    expect(await draftFromOwner(db, 'org_owner', 'x', 'ن'.repeat(281))).toEqual({ kind: 'failed', reason: 'النصّ 281 محرفا بحساب X وهي تقبل 280', retryable: false })
+    const thread = await draftFromOwner(db, 'org_owner', 'x', `${'ن'.repeat(200)}\n---\n${'م'.repeat(200)}`)
+    expect(thread.kind).toBe('drafted')
+    const row = await db.prepare('SELECT type FROM posts WHERE id = ?').bind((thread as { postId: string }).postId).first<{ type: string }>()
+    expect(row?.type).toBe('thread')
+  })
+})
+
+/**
+ * ‏**بندُ سلسلةٍ من الخطّة** (D-324): يُكتب بالباب نفسِه (`draftPost` وحرّاسُه وكلفتُه)، بوصفِ سلسلةٍ لا تغريدة، ويُقرأ
+ * ‏الجوابُ تغريدةً تغريدة — ومفتاحُه غيرُ مفتاح التغريدة، فالبندان من المصدر نفسِه لا يلتقيان.
+ */
+describe('draftPost · سلسلة X (D-324)', () => {
+  const THREAD = { text: `${'ن'.repeat(200)}\n---\n${'م'.repeat(200)}\n---\n${'ل'.repeat(120)}`, rationale: 'ثلاث خطوات.' }
+
+  it('الموجّهُ يطلب سلسلةً، والجوابُ يُقبَل بتغريداتٍ تحت حدّها ونوعِ thread ومفتاحٍ يُميّزه', async () => {
+    const id = await seed()
+    const out = await draftPost(deps(net({ draft: THREAD })), id, 'x', undefined, 'thread')
+    expect(out.kind).toBe('drafted')
+    const system = JSON.stringify(calls[0]?.body)
+    expect(system).toContain('سلسلة X')
+    const row = await db.prepare('SELECT type, idempotency_key FROM posts').first<{ type: string; idempotency_key: string }>()
+    expect(row?.type).toBe('thread')
+    expect(row?.idempotency_key).toMatch(/:thread$/)
+    // ‏والتغريدةُ الواحدةُ من المصدر نفسِه بابٌ آخر لا «كُتبت من قبل»
+    expect((await draftPost(deps(net({ draft: { text: 'ن'.repeat(200), rationale: 'ر' } })), id, 'x')).kind).toBe('drafted')
+  })
+
+  it('وجوابٌ بتغريدةٍ واحدةٍ أو بتغريدةٍ فوق حدّها يُردّ بعد أن سُجّلت كلفتُه', async () => {
+    const id = await seed()
+    const one = await draftPost(deps(net({ draft: { text: 'ن'.repeat(200), rationale: 'ر' } })), id, 'x', undefined, 'thread')
+    expect(one).toMatchObject({ kind: 'failed', reason: 'طُلبت سلسلة فجاء الجوابُ تغريدةً واحدة' })
+    const long = await draftPost(deps(net({ draft: { text: `${'ن'.repeat(100)}\n---\n${'م'.repeat(300)}`, rationale: 'ر' } })), id, 'x', undefined, 'thread')
+    expect(long).toMatchObject({ kind: 'failed', reason: 'التغريدة 2 من 2 طولها 300 محرفًا بحساب X وهي تقبل 280' })
+    expect((await ledger()).length).toBe(2)
   })
 })

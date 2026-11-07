@@ -199,4 +199,6 @@ export const NOUNS = {
   scope: { one: 'نطاق واحد', two: 'نطاقان', few: 'نطاقات', many: 'نطاقًا' },
   plan: { one: 'خطّة واحدة', two: 'خطّتان', few: 'خطط', many: 'خطّةً' },
   row: { one: 'صفّ واحد', two: 'صفّان', few: 'صفوف', many: 'صفًّا', oneAcc: 'صفًّا واحدًا', oneGen: 'صفّ واحد', twoObl: 'صفَّين' },
+  // ‏تغريداتُ السلسلة (D-324): «سلسلة من تغريدتَين» و«من 12 تغريدةً»
+  tweet: { one: 'تغريدة واحدة', two: 'تغريدتان', few: 'تغريدات', many: 'تغريدةً', oneGen: 'تغريدة واحدة', twoObl: 'تغريدتَين' },
 } as const satisfies Readonly<Record<string, Noun>>

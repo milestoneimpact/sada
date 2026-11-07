@@ -417,6 +417,9 @@ describe('مراجعة D-318 · ما يُقال للمحرّر يطابق ما �
     const html = await page(editor, '/panel')
     expect(html).not.toContain('وكتابة المسوّدة وتعديلها مفتوحان لك')
     expect(html).toContain('وتعديل المسوّدات القائمة')
+    // ‏ومنذ D-324 للمحرّر بابٌ يكتب منه بلا كلفة، فالسببُ يدلّه عليه
+    expect(html).toContain('واكتب أنت «بنفسي» بلا كلفة')
+    expect(ROLE_LABEL.editor.can).toContain('«بنفسي»')
     expect(ROLE_LABEL.editor.can).not.toMatch(/^يكتب/)
   })
 })

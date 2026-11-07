@@ -65,7 +65,7 @@ export interface PlanFormInput {
   readonly autoImage: boolean
 }
 
-const KIND_LABEL: Readonly<Record<PlanKind, string>> = { text: 'نصّ', image: 'صورة', video: 'مقطع' }
+const KIND_LABEL: Readonly<Record<PlanKind, string>> = { text: 'نصّ', image: 'صورة', video: 'مقطع', thread: 'سلسلة' }
 
 /** رقاقةُ نوع البند — ما يُنشر مع النصّ، وغيابُه في خطّةٍ قديمة نصّ. */
 export function kindChip(kind: PlanKind | undefined): Html {

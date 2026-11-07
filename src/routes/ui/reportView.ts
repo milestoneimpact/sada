@@ -27,6 +27,8 @@ import { LOGOS } from './logos'
 import { resultsTabs } from './results'
 import { windowLabel } from '../../lib/metrics/job'
 import { dayMonth, dayRange } from '../../lib/time/zone'
+import { ON_TIME_MINUTES, type SuccessMetrics } from '../../lib/report/success'
+import { html } from './html'
 
 
 /** رقمٌ ومعه من كم صفٍّ جُمع — والفراغُ يُقال ولا يُصفَّر. */
@@ -230,6 +232,45 @@ export interface ReportScreenData {
   readonly now: Date
   /** «هذا الشهر حتّى اليوم» من الدفتر — يُرسَم تحت الرأس حين يُمرَّر (ر-10). */
   readonly month?: MonthSpend
+  /** مقاييسُ النجاح هذا الشهر (D-324) — تُرسَم بعد التقرير حين تُمرَّر. */
+  readonly success?: SuccessMetrics
+}
+
+/** نسبةٌ صحيحة بعلامتها — والمقامُ الصفرُ لا يصل هنا. */
+function pct(n: number, of: number): string {
+  return String(Math.round((n / of) * 100)) + '٪'
+}
+
+/**
+ * ‏**مقاييسُ النجاح هذا الشهر** (D-324 · PLAN.md §٧ · ROADMAP-3 §٧) — ثلاثُ بلاطاتٍ بأهدافها، **حيّةٌ من الجداول** لا من
+ * ‏التقرير: اعتمادٌ بلا تعديل (≥ ‏60٪)، ونُشر في موعده بلا تدخّل (‏100٪)، وكلفةُ المنشور الكاملة. كانت معرَّفةً في الخطّة ولا
+ * ‏تُرى في المنتج. **وما لا مقامَ له «لم يُقَس»** بسببه، لا ‏0٪ يُقرأ فشلًا (سنّةُ هذه الشاشة).
+ */
+export function successCard(m: SuccessMetrics): string {
+  const tile = (k: string, v: string, note: string) =>
+    html`<div class="card tile"><div class="kv-k">${k}</div><div class="kv-v">${v}</div><div class="note">${note}</div></div>`
+  const none = 'لم يُقَس'
+  const clean = m.clean.of === 0
+    ? tile('اعتماد بلا تعديل', none, 'لم يُبَتّ في مسوّدة كتبها النموذج هذا الشهر. الهدف 60٪ فأكثر.')
+    : tile('اعتماد بلا تعديل', pct(m.clean.n, m.clean.of),
+      m.clean.n + ' من ' + m.clean.of + ' مسوّدة كتبها النموذج وبُتّ فيها. الهدف 60٪ فأكثر.')
+  const onTime = m.onTime.of === 0
+    ? tile('نُشر في موعده', none, 'لم يُنشر منشور مجدول هذا الشهر. الهدف 100٪.')
+    : tile('نُشر في موعده', pct(m.onTime.n, m.onTime.of),
+      m.onTime.n + ' من ' + m.onTime.of + ' خرج خلال ' + ON_TIME_MINUTES + ' دقيقة من موعده بلا محاولة فاشلة قبله. الهدف 100٪.')
+  const cost = m.cost.posts === 0
+    ? tile('كلفة المنشور', none, 'لم يُنشر شيء هذا الشهر، فلا قسمة.')
+    : tile('كلفة المنشور', money(m.cost.direct / m.cost.posts),
+      // ‏والعددُ بعربيّةٍ صحيحة (D-177): «متوسّط 9 منشورات» لا «9 منشورًا»
+      'متوسّط ' + counted(m.cost.posts, NOUNS.post, 'gen') +
+        ': الكتابة والصورة والنشر والقياس. ومع كلّ ما أُنفق هذا الشهر ' + money(m.cost.all / m.cost.posts) + ' لكلّ منشور.')
+  return html`<section class="mb-4" id="success" aria-labelledby="success-h">
+    <div class="card">
+      <div class="card-head"><h2 id="success-h">مقاييس النجاح هذا الشهر</h2></div>
+      <p class="hint m-0 mb-3">من الخطّة: منشور يُعتمَد بلا تعديل ويخرج في موعده بكلفة معروفة.${m.utc ? ' والشهر بتوقيت الرياض.' : ''}</p>
+      <div class="grid tiles c3">${clean}${onTime}${cost}</div>
+    </div>
+  </section>`.value
 }
 
 /** بطاقةُ توصيةٍ — **ومعها المبلغُ ومصدرُه، وزرّان لا زرُّ إنفاق.** */
@@ -388,5 +429,7 @@ export function reportScreen(d: ReportScreenData): string {
               .join('')}</tbody></table></div>
         </div>`
 
-  return `${resultsTabs('week')}${head}${promo}${past}`
+  // ‏ومقاييسُ النجاح بعد التقرير وقبل التوصية (D-324): جوابُ «أينجح صدى؟» تحت جواب «ماذا جلب الأسبوع؟»
+  const success = d.success === undefined ? '' : successCard(d.success)
+  return `${resultsTabs('week')}${head}${success}${promo}${past}`
 }
