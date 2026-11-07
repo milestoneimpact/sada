@@ -1,0 +1,35 @@
+# ‏تحديثُ الاعتماديّات والإجراءات (D-319) — شهريًّا، والصغيرُ مجموعٌ في طلبٍ واحد.
+#
+# ‏**كلُّ طلبٍ يفتحه Dependabot يُنفق دقائقَ CI**: طلباتُه ليست مسوّدات، فيجري `ci.yml` كاملًا (نحو ثلاث دقائق) عند فتحه وعند
+# ‏كلّ إعادةِ بناءٍ له، والدقائقُ نفدت ثلاثَ مرّات (M-23). فالدورةُ شهريّةٌ لا أسبوعيّة، والصغيرُ (minor وpatch) طلبٌ واحدٌ لكلّ
+# ‏نظام، والكبيرُ (major) طلبٌ لكلّ حزمةٍ لأنّه يكسر ويُراجَع وحده، وسقفُ المفتوح معًا صغير.
+# ‏وتحديثاتُ الأمن (Dependabot security updates، من إعدادات المستودع) لا تنتظر الشهر ولا تخضع للمهلة أدناه.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    # ‏لا يُقترح إصدارٌ قبل أسبوعٍ من نشره: أكثرُ الحزم المسمومة تُكشف وتُسحب في أيّامها الأولى
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'اعتماديّات'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # ‏يرفع معرّفَ الالتزام والإصدارَ في تعليقه معًا (`@<sha> # vX.Y.Z`)
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'إجراءات'

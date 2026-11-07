@@ -515,6 +515,27 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     go: '/panel#own',
     goLabel: 'اكتب بنفسك',
   },
+  {
+    code: 'M-43',
+    title: 'قاعدة على main تشترط نجاح ci — بخطّة GitHub Pro (بعد D-319)',
+    // ‏قصيرٌ عمدًا: «ما عليك» فوق سقف وزنها قبل هذا الصفّ (‏14.2KB من ‏14)، والتفصيلُ في صفحة المهمّة
+    ifLeft: 'main بلا حارس: يُدمَج ما لم يكتمل فحصُه. وstaging لا يصله بعد D-319، فهو حارسٌ ناقص لا عطل.',
+    unblocks: 'guard',
+    // ‏القاعدةُ وخطّةُ الحساب تُقرآن عند GitHub، والعاملُ لا يعرف عنهما شيئًا (D-061)
+    done: () => null,
+    go: 'https://github.com/milestoneimpact/sada/settings/rules',
+    goLabel: 'افتح قواعد المستودع',
+  },
+  {
+    code: 'M-44',
+    title: 'بيئتا GitHub: الفرع main وسرّ النشر لكلّ بيئة (بعد M-43)',
+    ifLeft: 'سرُّ النشر يقرؤه أيُّ سيرٍ من أيّ فرع، والإنتاجُ بلا شرطِ فرع — لا خطرَ قبل M-22، وحارسٌ ناقص.',
+    unblocks: 'guard',
+    // ‏إعداداتُ البيئة وأسرارُها عند GitHub لا هنا (D-061)
+    done: () => null,
+    go: 'https://github.com/milestoneimpact/sada/settings/environments',
+    goLabel: 'افتح بيئات GitHub',
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {
