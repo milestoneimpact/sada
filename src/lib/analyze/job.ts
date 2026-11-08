@@ -28,6 +28,7 @@ import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
 import { describeImage, type VisionDeps } from './vision'
 import { routeFor } from '../ai/routes'
 import { CompatError } from '../ai/openaiCompat'
+import { withTimeout } from '../net/timeout'
 
 /**
  * أسعار Claude Opus 5 لكلّ مليون وحدة (2026-06-24).
@@ -246,10 +247,10 @@ export async function analyzeSource(
     const extracted: ExtractOutcome = stored !== null
       ? { kind: 'text', text: stored, bytes: new TextEncoder().encode(stored).byteLength }
       : await extractText(
-        await accessToken(parseServiceAccount(deps.serviceAccountJson), now, deps.fetchImpl ?? fetch),
+        await accessToken(parseServiceAccount(deps.serviceAccountJson), now, withTimeout(deps.fetchImpl ?? fetch, 30_000)),
         source.drive_file_id,
         source.mime,
-        deps.fetchImpl ?? fetch,
+        withTimeout(deps.fetchImpl ?? fetch, 30_000),
         vision !== null,
       )
     if (extracted.kind === 'unsupported') {

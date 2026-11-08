@@ -15,6 +15,7 @@
 import { atomically, loadTokens, type Db, type StoredTokens } from '../tokens'
 import type { ClientCredentials } from './exchange'
 import type { Platform } from './providers'
+import { withTimeout } from '../net/timeout'
 
 /** ما وقع عند المنصّة: أُبطل، أو تعذّر، أو لا نهايةَ إبطالٍ تُنادى. */
 export type RevokeOutcome = 'revoked' | 'failed' | 'unsupported' | 'no_tokens'
@@ -94,7 +95,7 @@ export async function revokeRemote(
   platform: Platform,
   tokens: StoredTokens | null,
   app: ClientCredentials | null,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, TIMEOUT_MS),
 ): Promise<RevokeOutcome> {
   if (tokens === null) return 'no_tokens'
   // ‏منصّةٌ تطلب سرَّ التطبيق للإبطال، والسرُّ غائب: تعذّر، لا «لا نهاية»
@@ -153,7 +154,7 @@ export async function disconnectAccount(
   encKey: string,
   target: DisconnectTarget,
   app: ClientCredentials | null,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, TIMEOUT_MS),
 ): Promise<DisconnectResult> {
   // ‏رمزٌ لا يُفكّ (مفتاحٌ بُدّل) لا يمنع الحذف: يُفصَل الحسابُ ولا يُنادى إبطال
   let tokens: StoredTokens | null = null

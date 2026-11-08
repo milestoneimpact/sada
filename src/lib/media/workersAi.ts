@@ -39,6 +39,7 @@
  */
 
 import { cfRunAnyUrl, cfRunUrl, isWorkersAiModel } from '../ai/cloudflare'
+import { withTimeout } from '../net/timeout'
 
 /** ما يكفي من واجهة `env.AI`، حتّى تُختبَر الوحدةُ بلا Worker. */
 export interface AiBinding {
@@ -95,7 +96,8 @@ async function refusal(response: Response): Promise<string> {
 export function restBinding(
   accountId: string,
   apiToken: string,
-  fetchImpl: typeof fetch = fetch,
+  // ‏مهلةٌ (D-320): توليدُ المقطع أطولُ نداءاتنا، وخمسُ دقائق دون حدّ الطابور بكثير
+  fetchImpl: typeof fetch = withTimeout(fetch, 300_000),
 ): AiBinding {
   return {
     async run(model, input) {
@@ -318,7 +320,7 @@ export async function generateVideo(
  */
 export async function fetchVideoBytes(
   url: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 120_000),
   maxBytes = 64 * 1024 * 1024,
 ): Promise<{ bytes: Uint8Array; mime: string }> {
   let response: Response

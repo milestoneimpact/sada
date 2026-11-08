@@ -498,7 +498,8 @@ function stations(d: PlatformScreenData, r: Readiness, needs: PlatformNeeds): St
     {
       title: 'الموعد',
       state: c.ready > 0 ? 'warn' : c.queued > 0 ? 'ok' : 'idle',
-      rule: 'بتوقيتك، وتُرسله الدورة كلّ ربع ساعة',
+      // ‏ويخرج في دقيقته (D-320): الدورةُ ترسل ما يحلّ قبل التي بعدها برسالةٍ مؤجَّلةٍ إلى موعده
+      rule: 'بتوقيتك، ويخرج في دقيقته',
       now: c.ready > 0 ? `${c.ready} معتمَدة بلا موعد` : c.queued > 0 ? `${c.queued} مجدولة` : 'لا موعد قادم',
       href: c.ready > 0 ? waitingHref : '#upcoming',
     },

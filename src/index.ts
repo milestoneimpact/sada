@@ -18,9 +18,9 @@ import { isConfigured, PROVIDERS, routeStatuses, type ProviderName } from './lib
 import { resolveKey } from './lib/providers'
 import { spendByProvider } from './lib/ai/spend'
 import { blockerReason, checkAllowance } from './lib/limits'
-import { scanDrive } from './lib/drive/job'
+import { enqueueForAnalysis, scanDrive } from './lib/drive/job'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
-import { dispatchDue, sweepStuck } from './lib/schedule/job'
+import { claimDelivery, dispatchDue, sweepStuck } from './lib/schedule/job'
 import { expireStaleUploads } from './lib/media/uploads'
 import { pullDue } from './lib/metrics/job'
 import { runWeeklyAll } from './lib/report/job'
@@ -29,7 +29,7 @@ import { readSettings } from './lib/settings'
 import { sendAlerts } from './lib/alerts/outbox'
 import { readWebhookUrl } from './lib/alerts/webhook'
 import { expiringTokens, recordAlerts } from './lib/token/expiry'
-import { renewDue } from './lib/token/renew'
+import { renewDue, renewStalled } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
@@ -43,6 +43,7 @@ import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
+import { pulseReport } from './lib/ops/pulse'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
 import { draftFromIdea, draftPost } from './lib/draft/job'
@@ -120,6 +121,18 @@ function servedVersion(env: Env): string | null {
   const id: unknown = env.CF_VERSION_METADATA?.id
   return typeof id === 'string' && id !== '' ? id : null
 }
+
+/**
+ * ‏**النبضُ لمراقبٍ من الخارج** (D-320) — بلا مصادقةٍ ولا تفصيل: ‏200 حين دار الإرسالُ والتجديدُ في موعدهما ولم يتأخّر مستهلكُ
+ * ‏النشر عمّا سُلّم إليه، و‏503 حين تأخّر أحدُها أو لم يُقرأ النبض. **ولا يقول أيُّها ولا متى**: ما يتأخّر يُقرأ في «هل الآلة تعمل؟»
+ * ‏في اللوحة، وخريطةُ الدورات لمن لا يُعرَف لا تُعطى (D-318). وكان التنبيهُ يخرج من الـ Cron نفسِه، فإن وقف وقف معه مَن يقول
+ * ‏إنّه وقف — فيسأله مراقبٌ خارج Cloudflare (M-47). ولا تخبئة: جوابُ دقيقةٍ مضت ليس نبضًا.
+ */
+app.get('/pulse', async (c) => {
+  const report = await pulseReport(c.env.DB, new Date()).catch(() => ({ healthy: false }))
+  c.header('Cache-Control', 'no-store')
+  return c.json({ ok: report.healthy }, report.healthy ? 200 : 503)
+})
 
 /**
  * حارس `/admin/*` في موضعٍ واحد — **وسيطٌ قبل المسارات لا نداءٌ في كلٍّ منها** (D-318).
@@ -488,7 +501,7 @@ export interface PlanDraftMessage {
  * التكرار: نوعٌ غير مدعوم، أو رفضُ سياسة، أو مصدرٌ لا وجود له. وتركُ
  * الثاني في الطابور يعني نداءً مدفوعا يتكرّر بلا أمل.
  */
-async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][number], env: Env): Promise<void> {
+async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Promise<void> {
   const { sourceId, platform, org, idea } = message.body.draft
   const shape = message.body.draft.shape === 'thread' ? 'thread' : 'single'
   const secrets = env as unknown as Record<string, string | undefined>
@@ -530,27 +543,30 @@ async function planDraft(message: MessageBatch<PlanDraftMessage>['messages'][num
 
 async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
-    if ('draft' in message.body) {
-      await planDraft(message as MessageBatch<PlanDraftMessage>['messages'][number], env)
-      continue
-    }
-    const outcome = await analyzeSource(
-      {
-        db: env.DB,
-      media: env.MEDIA,
-        serviceAccountJson: env.GOOGLE_SA_JSON,
-        anthropicKey: env.ANTHROPIC_API_KEY,
-        encKey: env.TOKEN_ENC_KEY,
-        geminiKey: env.GEMINI_API_KEY,
-      },
-      (message.body as AnalyzeMessage).sourceId,
-    )
-    console.info({ job: 'analyze', ...outcome })
-    if (outcome.kind === 'failed' && outcome.retryable) {
-      retryLater(message, outcome.kind)
-    } else {
-      message.ack()
-    }
+    // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلٌ يُرمى يُعاد بتباعد ولا يُسقط الدفعة
+    await guarded(message, 'analyze', async (m) => {
+      if ('draft' in m.body) {
+        await planDraft(m as QueueMessage<PlanDraftMessage>, env)
+        return
+      }
+      const outcome = await analyzeSource(
+        {
+          db: env.DB,
+          media: env.MEDIA,
+          serviceAccountJson: env.GOOGLE_SA_JSON,
+          anthropicKey: env.ANTHROPIC_API_KEY,
+          encKey: env.TOKEN_ENC_KEY,
+          geminiKey: env.GEMINI_API_KEY,
+        },
+        (m.body as AnalyzeMessage).sourceId,
+      )
+      console.info({ job: 'analyze', ...outcome })
+      if (outcome.kind === 'failed' && outcome.retryable) {
+        retryLater(m, outcome.kind)
+      } else {
+        m.ack()
+      }
+    })
   }
 }
 
@@ -573,32 +589,84 @@ export function retryLater(message: { attempts: number; retry(options?: { delayS
   message.retry({ delaySeconds })
 }
 
+/** ‏ما يكفي من رسالة الطابور: جسدُها ورقمُ تسليمها، وإقرارُها أو إعادتُها. */
+export interface QueueMessage<B> {
+  readonly body: B
+  readonly attempts: number
+  ack(): void
+  retry(options?: { delaySeconds?: number }): void
+}
+
+/**
+ * ‏**كلُّ رسالةٍ في `try` وحدَها** (D-320).
+ *
+ * ‏كان عطلٌ يُرمى من الناشر أو الفهم (D1 تعطّل ثواني) يخرج من `queue()` كلِّها: Cloudflare يعيد الدفعةَ فورًا، فتُستنفَد
+ * ‏المحاولاتُ الثلاث في ثوانٍ قبل أن يعود D1، ويسقط ما بعدها في الدفعة معها، ولا يُكتب نبضُ الطابور. فالعطلُ يُسجَّل ويُعاد
+ * ‏بتباعد `retryLater` (دقيقةٌ ثمّ خمسٌ ثمّ خمسَ عشرة)، **وما أُقرّ قبل العطل لا يُعاد فوقه**: الإقرارُ أو الإعادةُ الأولى هي الحكم.
+ * ‏ويعيد `true` حين رُمي.
+ */
+export async function guarded<B>(message: QueueMessage<B>, job: string, work: (m: QueueMessage<B>) => Promise<void>): Promise<boolean> {
+  let decided = false
+  const tracked: QueueMessage<B> = {
+    get body() { return message.body },
+    get attempts() { return message.attempts },
+    ack() { decided = true; message.ack() },
+    retry(options) { decided = true; message.retry(options) },
+  }
+  try {
+    await work(tracked)
+    return false
+  } catch (error) {
+    console.error({ job, failed: error instanceof Error ? error.message : 'unexpected_error', attempts: message.attempts })
+    if (!decided) retryLater(message, 'infra')
+    return true
+  }
+}
+
 async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Promise<void> {
   let failed = 0
-  for (const message of batch.messages) {
-    const outcome = await publishPost(
-      // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
-      // بلا صورةٍ لا يمسّه (D-040)
-      // ‏**وأصلُ الموقع يُمرَّر** (D-182): Instagram تسحب الوسيطَ من رابطٍ موقَّعٍ عندنا
-      // (D-121)، وبلا أصلٍ كان كلُّ منشورٍ لها يسقط في الطابور بلا نداءٍ واحد إلى Meta
-      // ‏ورقمُ المحاولة من الطابور يُكتب في الصفّ (D-270): بلا هذا لا يُعرَف من اللوحة أيُّ إعادةٍ هذه
-      { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA, baseUrl: env.PUBLIC_BASE_URL, queueAttempt: message.attempts },
-      message.body,
-    )
-    // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
-    // اليوم وتستنزف حصّة الطابور بلا نداءٍ واحد ينجح
-    if (outcome.kind === 'failed' && outcome.retryable) {
-      retryLater(message, outcome.reason)
-    } else {
-      message.ack()
+  try {
+    for (const message of batch.messages) {
+      // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلُ D1 يُعاد بتباعد، والإعادةُ آمنة — حجزُ المحاولة (0047) يمنع إرسالًا ثانيًا
+      const threw = await guarded(message, 'publish', async (m) => {
+        // ‏**الرسالةُ المؤجَّلةُ تختم منشورَها عند وصولها** (D-320): إن بقي كما أُرسلت له وحلّ موعدُه. وصلت قبله؟ تُعاد بما بقي.
+        // ‏سُحب أو تغيّر موعدُه أو أُوقف النظام؟ تُقَرّ بلا نشر — والدورةُ ترسل له من جديد إن عاد مجدولًا.
+        // ‏**وإعادتُها بعد ختمها تمضي إلى الناشر** (مراجعة D-320): رقمُ التسليم فوق الأوّل، وحرّاسُ الناشر تمنع الإرسالَ المزدوج
+        if (m.body.due !== undefined) {
+          const claim = await claimDelivery(env.DB, m.body.postId, m.body.org ?? OWNER_ORG, m.body.due, m.attempts > 1)
+          if (claim.kind === 'early') return m.retry({ delaySeconds: claim.seconds })
+          if (claim.kind !== 'claimed') {
+            console.info({ job: 'publish', post: m.body.postId, delivery: claim.kind })
+            return m.ack()
+          }
+        }
+        const outcome = await publishPost(
+          // والدلوُ يُمرَّر دائما: منشورٌ بصورةٍ لا يُنشر نصّا وحده، ومنشورٌ
+          // بلا صورةٍ لا يمسّه (D-040)
+          // ‏**وأصلُ الموقع يُمرَّر** (D-182): Instagram تسحب الوسيطَ من رابطٍ موقَّعٍ عندنا
+          // (D-121)، وبلا أصلٍ كان كلُّ منشورٍ لها يسقط في الطابور بلا نداءٍ واحد إلى Meta
+          // ‏ورقمُ المحاولة من الطابور يُكتب في الصفّ (D-270): بلا هذا لا يُعرَف من اللوحة أيُّ إعادةٍ هذه
+          { db: env.DB, encKey: env.TOKEN_ENC_KEY, bucket: env.MEDIA, baseUrl: env.PUBLIC_BASE_URL, queueAttempt: m.attempts },
+          m.body,
+        )
+        // `blocked` تُقَرّ لا تُعاد: إعادةُ ما مُنع بسقفٍ تدور حتّى ينتهي
+        // اليوم وتستنزف حصّة الطابور بلا نداءٍ واحد ينجح
+        if (outcome.kind === 'failed' && outcome.retryable) {
+          retryLater(m, outcome.reason)
+        } else {
+          m.ack()
+        }
+        if (outcome.kind === 'failed') failed += 1
+      })
+      if (threw) failed += 1
     }
-    if (outcome.kind === 'failed') failed += 1
+  } finally {
+    // نبضُ الطابور (D-158): الدفعةُ وقعت، وكم منها سقط — **ولو سقطت كلُّها** (D-320)
+    await beat(
+      env.DB, 'publish', failed === batch.messages.length ? 'failed' : 'ok',
+      failed === 0 ? `${batch.messages.length} رسالة` : `${failed} من ${batch.messages.length} سقط`,
+    )
   }
-  // نبضُ الطابور (D-158): الدفعةُ وقعت، وكم منها سقط
-  await beat(
-    env.DB, 'publish', failed === batch.messages.length ? 'failed' : 'ok',
-    failed === 0 ? `${batch.messages.length} رسالة` : `${failed} من ${batch.messages.length} سقط`,
-  )
 }
 
 /**
@@ -620,7 +688,8 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
  * مقابلتُه بـ`wrangler.toml`** (D-058).
  *
  * وعطلُها لا يُرمى: حارسُ الناشر يمنع النشرَ برمزٍ ميت على كلّ حال —
- * **فسقوطُ التجديد يؤخّر ولا يُفسد.**
+ * **فسقوطُ التجديد يؤخّر ولا يُفسد.** ‏**لكنّه يُنبَض `failed`** (تحقّق D-320 على main): سؤالُ المستحقّ إن سقط، أو ما استحقّ
+ * ‏وسقط كلُّه عابرًا (`renewStalled`)، فيقوله `/pulse` وقناةُ المالك.
  */
 async function renewTick(env: Env): Promise<void> {
   try {
@@ -638,6 +707,11 @@ async function renewTick(env: Env): Promise<void> {
     })
     if (summary.due > 0) console.info({ job: 'renew', ...summary })
     // النبضُ بعد العمل (D-158): صفٌّ يقول إنّ الدورةَ دارت ولو لم تجد شيئا
+    // ‏**وما استحقّ وسقط كلُّه عابرًا دورةٌ ساقطة** (تحقّق D-320 على main): كان ينبض `ok` والرموزُ تقترب من موتها
+    if (renewStalled(summary)) {
+      await beat(env.DB, 'renew', 'failed', `${summary.due} مستحقّ، ولم يتجدّد منها شيء: ${summary.deferred} عابر`)
+      return
+    }
     await beat(env.DB, 'renew', 'ok', summary.due > 0 ? `${summary.due} مستحقّ` : 'لا مستحقّ')
   } catch (error) {
     console.error({ job: 'renew', failed: String(error) })
@@ -665,8 +739,9 @@ async function dispatchTick(env: Env): Promise<void> {
     if (swept.length > 0) console.error({ job: 'sweep', failed_posts: swept.map((s) => s.id) })
     const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
     if (report.kind === 'sent') {
-      console.info({ job: 'dispatch', sent: report.count, ids: report.ids })
-      await beat(env.DB, 'dispatch', 'ok', `أُرسل ${report.count}`)
+      console.info({ job: 'dispatch', sent: report.count, ids: report.ids, ahead: report.ahead })
+      // ‏و«إلى موعده» ما أُرسل مؤجَّلًا إلى دقيقته (D-320)
+      await beat(env.DB, 'dispatch', 'ok', report.ahead > 0 ? `أُرسل ${report.count} · إلى موعده ${report.ahead}` : `أُرسل ${report.count}`)
     } else if (report.kind === 'blocked') {
       console.info({ job: 'dispatch', skipped: report.reason })
       await beat(env.DB, 'dispatch', 'skipped', report.reason)
@@ -718,11 +793,8 @@ async function scanTick(env: Env): Promise<void> {
     let enqueued = 0
     if (allowance.settings.autoEnqueue && report.toAnalyze.length > 0) {
       const room = Math.max(0, allowance.settings.dailyAnalysisCap - allowance.usage.analyses)
-      const batch = report.toAnalyze.slice(0, room)
-      if (batch.length > 0) {
-        await env.GENERATE_QUEUE.sendBatch(batch.map((sourceId) => ({ body: { sourceId } })))
-        enqueued = batch.length
-      }
+      // ‏مئةً مئة (D-320): الطابورُ يردّ الدفعةَ فوق مئة، والسقفُ يبلغ خمسمئة
+      enqueued = await enqueueForAnalysis(env.GENERATE_QUEUE, report.toAnalyze, room)
     }
 
     console.info({

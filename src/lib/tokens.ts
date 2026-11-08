@@ -30,6 +30,42 @@ export async function atomically(db: Db, statements: DbStatement[]): Promise<voi
   for (const statement of statements) await statement.run()
 }
 
+/** ‏كم عبارةً في الدفعة الواحدة (D-320) — دون كلّ حدٍّ لـD1 على حجم الطلب، وألفُ ملفٍّ في عشرين نداءً لا ألف. */
+export const DB_BATCH_SIZE = 50
+
+/**
+ * ‏**عباراتٌ كثيرة في دفعاتٍ لا في نداءاتٍ** (D-320): D1 يقبل ألفَ نداءٍ في الاستدعاء الواحد (Workers Paid)، **والدفعةُ نداءٌ
+ * ‏واحد**. وكلُّ دفعةٍ معاملةٌ وحدَها — لا الكلُّ معًا كـ`atomically`: ما كُتب في دفعةٍ يبقى إن سقطت التي بعدها، فلا يُستعمل
+ * ‏هذا لما يجب أن يقع كلُّه أو لا شيء. وقاعدةٌ بلا `batch` تُكتب صفًّا صفًّا.
+ */
+export async function inBatches(db: Db, statements: readonly DbStatement[], size = DB_BATCH_SIZE): Promise<void> {
+  for (let i = 0; i < statements.length; i += size) {
+    const chunk = statements.slice(i, i + size)
+    if (db.batch !== undefined) await db.batch(chunk)
+    else for (const statement of chunk) await statement.run()
+  }
+}
+
+/**
+ * ‏**تطبيقٌ حُفظ أو فُحص فنجح: تباعدُ تجديد منصّته يُمحى** (مراجعة D-320). ‏401 `invalid_client` من نهاية الرمز رفضٌ نهائيٌّ يتباعد
+ * ‏حتّى يوم (`token/renew.ts`)، وسببُه سرُّ التطبيق — فإن صُحّح لم يكن ما ينتظره الحساب. والتطبيقُ إعدادٌ عامٌّ يخدم كلَّ
+ * ‏المنظّمات، فيُمحى في كلّ منظّمةٍ وحسابُ الرمز من منظّمته. **ولا يُسقط الحفظَ إن لم يُكتب**: أسوأُ ما يقع أن ينتظر الحسابُ موعدَه.
+ */
+export async function releaseRenewalHolds(db: Db, platform: Platform): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `UPDATE tokens SET renew_failures = 0, renew_retry_at = NULL
+          WHERE (renew_failures > 0 OR renew_retry_at IS NOT NULL)
+            AND account_id IN (SELECT a.id FROM accounts a WHERE a.platform = ? AND a.org_id = tokens.org_id)`,
+      )
+      .bind(platform)
+      .run()
+  } catch (error) {
+    console.warn({ job: 'renew-release', platform, failed: String(error) })
+  }
+}
+
 export interface DbStatement {
   bind(...values: unknown[]): DbStatement
   first<T = unknown>(): Promise<T | null>
@@ -119,6 +155,7 @@ export async function saveTokens(
       ? null
       : await sealScoped(encKey, tokenScope(org), tokens.refreshToken, tokenContext(id, 'refresh'))
 
+  // ‏ورمزٌ حُفظ — تجديدٌ نجح أو ربطٌ من جديد — يمحو تباعدَ ما سقط قبله (D-320): `renew_failures` و`renew_retry_at`
   await db
     .prepare(
       `INSERT INTO tokens
@@ -134,7 +171,9 @@ export async function saveTokens(
          expires_at = excluded.expires_at,
          refresh_expires_at = excluded.refresh_expires_at,
          scopes = excluded.scopes,
-         updated_at = datetime('now')`,
+         updated_at = datetime('now'),
+         renew_failures = 0,
+         renew_retry_at = NULL`,
     )
     .bind(
       id,

@@ -2015,3 +2015,27 @@ describe('مراحل الانتظار الطويل (7.11 · D-238)', () => {
   })
 })
 
+
+/**
+ * ‏**تحقّق D-320 على main: لكلّ نوعٍ في قناة التنبيهات اسمٌ عربيّ.** 0048 أضاف النوعَ الخامس `heartbeat`، وبطاقةُ القناة
+ * ‏كانت تكتب الكلمةَ الإنجليزيّة في شارته، ونصُّها يقول «ولا خامس». فالأنواعُ تُقرأ من قيد القاعدة نفسِه، فنوعٌ يُضاف بعده يُسأل عن اسمه.
+ */
+describe('قناة التنبيهات: كلُّ نوعٍ باسمه (تحقّق D-320 على main)', () => {
+  it('كلُّ نوعٍ يقبله قيدُ alert_outbox له شارةٌ عربيّة، والبطاقةُ تسمّي الخامس', async () => {
+    const { fakeDb } = await import('../../test/fakes')
+    const { alertChannel } = await import('./parts')
+    const table = fakeDb().raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alert_outbox'").get() as { sql: string }
+    const kinds = [...(/kind\s+TEXT NOT NULL CHECK \(kind IN \(([^)]*)\)\)/.exec(table.sql)?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!)
+    expect(kinds).toContain('heartbeat')
+    for (const kind of kinds) {
+      const card = alertChannel('https://example.com/hook', [{ kind, body: 'صدى — نصّ', status: 200, error: null, at: '2026-11-06 12:00:00' }])
+      const badge = /<span class="st ok"><span class="st-ic">[\s\S]*?<\/span>([^<]*)<\/span>/.exec(card)?.[1] ?? ''
+      expect(badge, kind).not.toBe('')
+      expect(badge, kind).not.toContain(kind)
+      expect(badge, kind).toMatch(/[؀-ۿ]/)
+    }
+    const card = alertChannel('', [])
+    expect(card).not.toContain('ولا خامس')
+    expect(card).toContain('وخامسُها')
+  })
+})

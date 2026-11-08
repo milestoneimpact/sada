@@ -108,7 +108,7 @@ const MAX_HOPS = 3
 export async function guardedFetch(
   url: string,
   init: RequestInit,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl?: typeof fetch,
 ): Promise<Response> {
   let target = url
   for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
@@ -122,7 +122,7 @@ export async function guardedFetch(
     }
 
     // ‏`manual` يجعل الردَّ يعود بالتحويل بدل أن يُتبَع من تحتنا
-    const res = await withTimeout(fetchImpl, 30_000)(verdict.url, { ...init, redirect: 'manual' })
+    const res = await withTimeout(fetchImpl ?? fetch, 30_000)(verdict.url, { ...init, redirect: 'manual' })
     if (res.status < 300 || res.status > 399) return res
 
     const next = res.headers.get('location')

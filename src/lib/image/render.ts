@@ -33,6 +33,8 @@
  * **والفشلُ هنا لا يُسقِط المنشور**: المنادي يُبقي الصورةَ بلا شريحة.
  */
 
+import { withTimeout } from '../net/timeout'
+
 /** أقصى ما نرسله من HTML — والشريحةُ تحمل الصورةَ `base64` في متنها. */
 export const MAX_HTML_BYTES = 6 * 1024 * 1024
 
@@ -83,7 +85,7 @@ export async function screenshotSlide(shot: SlideShot): Promise<SlideBytes> {
     throw new SlideError('صفحة الشريحة أكبر من الحدّ', false)
   }
 
-  const call = shot.fetchImpl ?? fetch
+  const call = withTimeout(shot.fetchImpl ?? fetch, 60_000)
   let response: Response
   try {
     response = await call(

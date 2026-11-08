@@ -37,7 +37,8 @@
  */
 import { checkProviderUrl, guardedFetch } from '../ai/urlGuard'
 import type { Db } from '../tokens'
-import { counted, NOUNS } from '../format'
+import { counted, duration, NOUNS } from '../format'
+import type { LateJob } from '../ops/pulse'
 import { OWNER_ORG } from '../tenancy'
 
 /**
@@ -45,7 +46,7 @@ import { OWNER_ORG } from '../tenancy'
  * ورمزُ استرداد استُعمل، وإخراجُ الأجهزة. يُكتب صفُّه عند الحدث (`security/events.ts`) وتُرسله الدورةُ كالثلاثة.
  */
 export interface Alert {
-  readonly kind: 'token' | 'publish' | 'budget' | 'security'
+  readonly kind: 'token' | 'publish' | 'budget' | 'security' | 'heartbeat'
   /**
    * مفتاحٌ يُبنى من الحدث نفسِه لا من وقت الإرسال (D-004).
    *
@@ -108,6 +109,30 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
 }
 
 /**
+ * ‏**نبضٌ تأخّر** (D-320) — الخامس: دورةُ الإرسال أو التجديد تسقط منذ نصف ساعة، أو مستهلكُ النشر لم يأخذ ما سُلّم إليه.
+ *
+ * ‏**ومفتاحُه من الحدث لا من الساعة**: السقوطُ من أوّله (`failedSince`) والتأخّرُ من آخر نبضٍ رآه — فالسقوطُ نفسُه يُقال مرّةً ولو
+ * ‏دام يومًا، وسقوطٌ جديدٌ بعد أن دارت مفتاحُه جديد. ويسكن منظّمةَ المالك: الآلةُ واحدةٌ لكلّ العملاء. **ولا يحمل سببَ السقوط**:
+ * ‏نصُّ العطل في السجلّ واللوحة، وقد يحمل ما لا يُرسَل. **وما يوقف الـ Cron كلَّه لا يقوله هذا** — ذاك لمراقب `/pulse` (M-47).
+ */
+export function heartbeatAlert(late: LateJob): Alert {
+  const failing = late.state === 'failed' && late.failedSince !== undefined
+  const since = duration(failing ? late.failingFor ?? 0 : late.waited, 'gen')
+  const effect = late.job === 'dispatch' ? ' المنشوراتُ المجدولة لا تخرج في مواعيدها.' : ' الأذوناتُ القريبةُ من الانتهاء لا تُجدَّد.'
+  const body = late.job === 'publish'
+    ? `صدى — في طابور النشر منشورٌ صار في يده منذ ${since} ولم يأخذه. المنشوراتُ المجدولة قد لا تخرج.`
+    : failing
+      ? `صدى — دورة «${late.label}» تسقط في كلّ مرّةٍ منذ ${since}، وموعدُها كلَّ ربع ساعة.${effect}`
+      : `صدى — دورة «${late.label}» لم تدُر منذ ${since}، وموعدُها كلَّ ربع ساعة.${effect}`
+  return {
+    kind: 'heartbeat',
+    org: OWNER_ORG,
+    ref: failing ? `heartbeat:${late.job}:failed:${late.failedSince}` : `heartbeat:${late.job}:${late.lastAt ?? 'never'}`,
+    body: `${body} افتح «هل الآلة تعمل؟» في لوحة صدى.`,
+  }
+}
+
+/**
  * أفي المتن سرٌّ؟ — **حارسٌ يُفرَض قبل النداء لا بعده**.
  *
  * ولا يُفحَص «هل نسينا؟» بالمراجعة: **رسالةٌ تخرج مرّةً لا تُستردّ**، وسجلُّ
@@ -135,7 +160,8 @@ export async function sendAlerts(
   db: Db,
   webhook: string,
   alerts: readonly Alert[],
-  fetchImpl: typeof fetch = fetch,
+  /** ‏والمهلةُ في `guardedFetch` عند كلّ قفزة (D-320). */
+  fetchImpl?: typeof fetch,
 ): Promise<SendResult> {
   if (webhook.trim() === '') {
     return { sent: 0, skipped: alerts.length, failed: 0, why: 'لا عنوان قناة مضبوط' }
@@ -183,8 +209,13 @@ export async function sendAlerts(
       .bind(a.ref, a.org)
       .first<{ status: number | null; tries: number }>()
       .catch(() => null)
-    if (already !== null && already.status !== null) {
-      const ok = already.status >= 200 && already.status < 300
+    /*
+     * ‏**والحدُّ يُعدّ كلَّ نداءٍ أيًّا كان جوابُه** (تحقّق D-320 على main): نداءٌ يرمي (مهلةٌ أو انقطاعٌ أو DNS) يُكتب بحالٍ فارغة،
+     * ‏وكان الحدُّ يُسأل عنه للحال المكتوبة وحدَها، فتنبيهٌ لا يتغيّر مفتاحُه (سقوطٌ متّصلٌ للإرسال) يُرسَل كلَّ ساعةٍ بلا نهاية.
+     * ‏كما يقرؤها `collectAlerts` لصفوف الأمان: `tries < MAX_TRIES` أيًّا كانت الحال.
+     */
+    if (already !== null) {
+      const ok = already.status !== null && already.status >= 200 && already.status < 300
       if (ok || already.tries >= MAX_TRIES) { skipped += 1; continue }
     }
 

@@ -21,7 +21,7 @@
  * الصفّين لا يُفكّ — وهو ما تعنيه AAD في AES-GCM.
  */
 import { LEGACY_RAW, openScoped, sealScoped, toBase64 } from '../crypto'
-import type { Db } from '../tokens'
+import { releaseRenewalHolds, type Db } from '../tokens'
 import { OWNER_ORG } from '../tenancy'
 import type { Platform } from './providers'
 
@@ -238,6 +238,8 @@ export async function recordVerification(
   } catch {
     // أثرٌ لم يُكتَب لا يُسقط فحصا وقع — والمالكُ رأى جوابَه في الإشعار
   }
+  // ‏‏**وزوجٌ قُبل يمحو تباعدَ التجديد** (مراجعة D-320): سرٌّ صُحّح في البيئة لا يمرّ بـ`saveApp`، وفحصُه يقول إنّه صُحّح
+  if (kind === 'accepted') await releaseRenewalHolds(db, platform)
 }
 
 export interface SaveResult {
@@ -294,6 +296,8 @@ export async function saveApp(
     )
     .bind(platform, id, sealed.ciphertext, sealed.iv, hint, print, by, OWNER_ORG)
     .run()
+  // ‏**وسرٌّ حُفظ يمحو تباعدَ تجديد منصّته** (مراجعة D-320): ‏401 `invalid_client` بالسرّ القديم لا ينتظر يومًا بعد تصحيحه
+  await releaseRenewalHolds(db, platform)
 
   return { hint, unchanged: before?.fingerprint === print }
 }

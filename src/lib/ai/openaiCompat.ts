@@ -85,7 +85,8 @@ function classify(status: number): { detail: string; retryable: boolean } {
 
 export async function chatCompletion(
   request: CompatRequest,
-  fetchImpl: typeof fetch = fetch,
+  /** ‏والمهلةُ في `guardedFetch` عند كلّ قفزة (D-320). */
+  fetchImpl?: typeof fetch,
 ): Promise<CompatResult> {
   if (request.apiKey.trim().length === 0) {
     throw new CompatError('لا مفتاح لهذا المزوّد', 503, false)
@@ -197,7 +198,8 @@ export async function chatCompletion(
 export async function verifyCompat(
   baseUrl: string,
   apiKey: string,
-  fetchImpl: typeof fetch = fetch,
+  /** ‏والمهلةُ في `guardedFetch` عند كلّ قفزة (D-320). */
+  fetchImpl?: typeof fetch,
 ): Promise<{ ok: boolean; detail: string; status: number | null }> {
   try {
     const response = await guardedFetch(compatCatalogUrl(baseUrl), {

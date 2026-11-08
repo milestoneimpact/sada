@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { budgetAlert, looksSecret, MAX_TRIES, publishAlert, sendAlerts, tokenAlert } from './outbox'
+import { budgetAlert, heartbeatAlert, looksSecret, MAX_TRIES, publishAlert, sendAlerts, tokenAlert } from './outbox'
 
 let db: FakeDb
 beforeEach(() => { db = fakeDb() })
@@ -218,6 +218,24 @@ describe('ردّ غير ناجح يُعاد بحدّ (D-270)', () => {
     expect(bad).toHaveBeenCalledTimes(MAX_TRIES)
     const row = await db.prepare('SELECT tries FROM alert_outbox').first<{ tries: number }>()
     expect(row!.tries).toBe(MAX_TRIES)
+  })
+
+  /*
+   * ‏**تحقّق D-320 على main**: نداءٌ يرمي (مهلةٌ أو انقطاعٌ أو DNS) يُكتب بحالٍ فارغة، والحدُّ كان يُسأل عنه للحال المكتوبة
+   * ‏وحدَها، فتنبيهُ «نبضٌ تأخّر» يُرسَل كلَّ ساعةٍ بلا حدٍّ ما دامت القناةُ لا تجيب وما دام السقوطُ قائمًا.
+   */
+  it('ونداءٌ يرمي أو تنقضي مهلتُه يُعدّ في الحدّ: تنبيهُ النبض لا يُعاد كلَّ ساعةٍ بلا نهاية', async () => {
+    const a = heartbeatAlert({
+      job: 'dispatch', label: 'إرسال المجدول', state: 'failed', lastAt: '2026-11-06 11:45:00', lateBy: 0, waited: 900,
+      failedSince: '2026-11-06 10:00:00', failingFor: 7200,
+    })
+    const hung = vi.fn(async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError') }) as unknown as typeof fetch
+    for (let i = 0; i < MAX_TRIES; i += 1) expect((await sendAlerts(db, HOOK, [a], hung)).failed).toBe(1)
+    expect((await sendAlerts(db, HOOK, [a], hung)).skipped).toBe(1)
+    expect((await sendAlerts(db, HOOK, [a], hung)).skipped).toBe(1)
+    expect(hung).toHaveBeenCalledTimes(MAX_TRIES)
+    const row = await db.prepare('SELECT status, tries FROM alert_outbox WHERE ref = ?').bind(a.ref).first<{ status: number | null; tries: number }>()
+    expect(row).toEqual({ status: null, tries: MAX_TRIES })
   })
 
   it('وما نجح مرّةً لا يُعاد ولو دون الحدّ', async () => {

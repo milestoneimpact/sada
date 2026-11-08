@@ -24,9 +24,18 @@ import { notices } from './panel/notices'
 import { vitals } from './panel/vitals'
 import { help } from './panel/help'
 
+import { dispatchSoon, SCHEDULING_PATHS } from './panel/shared'
+
 export { setFlash } from './panel/shared'
 
 export const panel = new Hono<{ Bindings: Env }>()
+
+// ‏**بعد كلّ فعلٍ يضع موعدًا: ما يحلّ قبل الدورة التالية يُرسَل إلى دقيقته** (D-320). وسيطٌ واحدٌ لا سطرٌ في كلّ مسار،
+// ‏والمسارُ كما يوجّهه Hono (D-315). وما رُدّ لا يُرسَل له شيء
+panel.use('*', async (c, next) => {
+  await next()
+  if (c.req.method === 'POST' && c.res.status < 400 && SCHEDULING_PATHS.test(c.req.path)) dispatchSoon(c)
+})
 
 // الترتيبُ ترتيبُ التسجيل الأصليّ قبل القسمة (D-278): Hono يطابق بترتيب التسجيل.
 panel.route('/', client)

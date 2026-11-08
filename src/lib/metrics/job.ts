@@ -26,6 +26,7 @@ import { recordCost, X_PRICE_PER_OWNED_READ } from '../cost'
 import { hasScope } from '../oauth/scopes'
 import { loadTokens, type Db } from '../tokens'
 import { fetchLinkedInMetrics, fetchXMetrics, MetricsError, type PostMetrics } from './platforms'
+import { withTimeout } from '../net/timeout'
 
 /**
  * ما تُقرأ أرقامُه — **ولا يُوعَد بقياسٍ لما سواه**.
@@ -33,6 +34,9 @@ import { fetchLinkedInMetrics, fetchXMetrics, MetricsError, type PostMetrics } f
  * شاشةُ المنصّة كانت تقول تحت منشور TikTok «أوّلُ قياسٍ بعد 24 ساعة»،
  * والدورةُ تتخطّاه دائما. فالقائمةُ هنا، ويقرؤها الاثنان.
  */
+/** ‏مهلةُ قراءة الأرقام (D-320): نداءُ قراءةٍ صغير، وخمسَ عشرةَ ثانيةً أضعافُ ما يحتاجه. */
+export const METRICS_TIMEOUT_MS = 15_000
+
 export const MEASURED: ReadonlySet<string> = new Set<Measured>(['linkedin', 'x'])
 
 type Measured = 'linkedin' | 'x'
@@ -40,6 +44,12 @@ type Measured = 'linkedin' | 'x'
 function measured(platform: string): platform is Measured {
   return MEASURED.has(platform)
 }
+
+/**
+ * ‏**والمنصّةُ تُستثنى في SQL قبل `LIMIT`** (D-320): كانت تُستثنى بعده، وما لا يُقاس لا يُكتب له صفٌّ أبدًا فيبقى مستحقًّا
+ * ‏في كلّ دورة — فخمسون منشورَ مقاطعَ أحدثُ تُخرج منشورَ LinkedIn أو X من نافذته إلى الأبد. وثوابتُ لا مُدخَل.
+ */
+const MEASURED_SQL = [...MEASURED].map((p) => `'${p}'`).join(', ')
 
 /** النوافذُ الثلاث وأعمارُها بالساعات. الأسماءُ تقابل `CHECK` في المخطّط. */
 export const WINDOWS = [
@@ -117,6 +127,7 @@ export async function dueWindows(db: Db, now: Date, limit = 50): Promise<DueRow[
              JOIN publish_attempts pa
                ON pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
             WHERE p.status = 'published'
+              AND p.platform IN (${MEASURED_SQL})
               AND pa.platform_post_id IS NOT NULL
               AND p.account_id IS NOT NULL
               AND pa.at <= ?
@@ -198,7 +209,8 @@ export type PullOutcome =
  * فالمفتاحُ `(post_id, window)` يمنع اختيارَه ثانيةً، ولا يُكذَب بصفر.
  */
 export async function pullOne(deps: PullDeps, row: DueRow): Promise<PullOutcome> {
-  const fetchImpl = deps.fetchImpl ?? fetch
+  // ‏مهلةٌ على كلّ نداء (D-320): مئةٌ وخمسون صفًّا في الساعة، وقراءةٌ تعلق كانت تعلق حتّى يُقتَل الاستدعاء
+  const fetchImpl = withTimeout(deps.fetchImpl ?? fetch, METRICS_TIMEOUT_MS)
 
   const tokens = await loadTokens(deps.db, deps.encKey, row.accountId, row.org)
   if (tokens === null) {

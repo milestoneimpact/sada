@@ -238,7 +238,8 @@ export function compatCatalogUrl(baseUrl: string): string {
  */
 export async function listModels(
   query: ModelQuery,
-  fetchImpl: typeof fetch = fetch,
+  /** ‏والمهلةُ في `guardedFetch` عند كلّ قفزة (D-320). */
+  fetchImpl?: typeof fetch,
 ): Promise<ModelList> {
   const key = query.apiKey.trim()
   if (key === '') {

@@ -7,9 +7,11 @@
  *
  * والقاعدةُ حقيقيّةٌ في كلّ ما يلي، فقيودُ `posts` الثلاثة تُقطَع فعلا.
  */
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import {
+  claimDelivery, DISPATCH_HORIZON_SECONDS,
   dbNow, dispatchDue, dueNow, markDispatched, parseWhen, requeue, reschedulePost, schedulePost, sweepStuck, unmarkDispatched, unschedule, restoreSchedule,
   UNDO_WINDOW_SECONDS, undoSchedule, undoUntil,
 } from './job'
@@ -219,6 +221,47 @@ describe('السحب', () => {
   it('ما ليس مجدولا لا يُسحب', async () => {
     const post = await seedPost()
     expect((await unschedule(db, post)).ok).toBe(false)
+  })
+
+  /*
+   * ‏**تحقّق D-320 على main**: «اسحب الموعد» يقرأ ثمّ يكتب، ورسالةٌ مؤجَّلةٌ تصل في الدقيقة نفسِها تختمه بين الاثنين. كان التحديثُ
+   * ‏بلا حارسٍ فيقول للمالك «سُحب» والمنشورُ خارجٌ إلى المنصّة. فالحارسُ في جملة التحديث نفسِها كما في `undoSchedule`.
+   */
+  it('رسالةٌ مؤجَّلةٌ تختمه بين قراءة السحب وكتابته: يُردّ السحب ويبقى مختومًا في الطابور', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    const due = String((await readPost(post))?.['scheduled_at'])
+    const racing = {
+      batch: db.batch,
+      prepare(query: string) {
+        const statement = db.prepare(query)
+        if (!/SET status = 'approved'/.test(query)) return statement
+        // ‏الرسالةُ تختم قبل أن تُنفَّذ كتابةُ السحب، أيًّا كانت صيغتُها
+        const claimFirst = async () => { expect(await claimDelivery(db, post, 'org_owner', due)).toEqual({ kind: 'claimed' }) }
+        return {
+          bind(...values: unknown[]) { statement.bind(...values); return this },
+          all: statement.all,
+          async first<T>() { await claimFirst(); return statement.first<T>() },
+          async run() { await claimFirst(); return statement.run() },
+        } as never
+      },
+    } as unknown as FakeDb
+    const out = await unschedule(racing, post)
+    expect(out.ok).toBe(false)
+    const row = await readPost(post)
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['dispatched_at']).not.toBeNull()
+    expect(row?.['account_id']).toBe(account)
+  })
+
+  it('والاستعادةُ لا تعيد إلى الطابور منشورًا مختومًا، فلا يبقى «مجدولًا» لا تراه الدورةُ ولا الكنّاس', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await db.prepare("UPDATE posts SET dispatched_at = '2026-09-08 09:00:00' WHERE id = ?").bind(post).run()
+    const out = await restoreSchedule(db, post, '2026-09-08 09:00:00', account, 'org_owner')
+    expect(out.ok).toBe(false)
+    expect((await readPost(post))?.['status']).toBe('approved')
   })
 })
 
@@ -684,5 +727,225 @@ describe('التراجع عن الجدولة (D-324)', () => {
     const account = await seedAccount()
     const done = await schedulePost(db, post, account, SOON, NOW, 'org_owner', UNDO_WINDOW_SECONDS) as { at: string }
     expect((await undoSchedule(db, post, 'org_other', { at: done.at, until: undoUntil(NOW), to: 'draft' }, NOW)).ok).toBe(false)
+  })
+})
+
+/**
+ * ‏**النشرُ في دقيقته** (D-320).
+ *
+ * ‏كانت الدورةُ (‏:00 و‏:07 و‏:15 و‏:30 و‏:45) ترسل ما حلّ موعدُه وحدَه، فمنشورٌ موعدُه ‏:16 يخرج ‏:30 — أربعَ عشرةَ دقيقةً
+ * ‏بعد ما وُعد، ومتوسّطُ التأخّر ستُّ دقائقَ ونصف. فصارت ترسل ما يحلّ قبل الدورة التالية برسالةٍ مؤجَّلةٍ إلى دقيقته
+ * ‏(`delaySeconds`)، **ولا تختمه «أُرسل»**: الختمُ عند وصول الرسالة في موعدها (`claimDelivery`)، فيبقى يُسحب ويُغيَّر حتّى دقيقته.
+ */
+describe('النشر في دقيقته (D-320)', () => {
+  type Sent = { body: { postId: string; org?: string; due?: string }; delaySeconds?: number }
+  function recordingQueue(max = 100) {
+    const sent: Sent[] = []
+    const batches: number[] = []
+    return {
+      sent, batches,
+      async sendBatch(messages: Sent[]) {
+        if (messages.length > max) throw new Error(`batch of ${messages.length} exceeds ${max}`)
+        batches.push(messages.length)
+        sent.push(...messages)
+      },
+    }
+  }
+  async function scheduledAt(when: string, from = new Date('2026-09-08T00:00:00Z')): Promise<string> {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const out = await schedulePost(db, post, account, when, from)
+    expect(out.ok).toBe(true)
+    return post
+  }
+  const at = (iso: string) => () => new Date(iso)
+
+  it('ما يحلّ قبل الدورة التالية يُرسَل مؤجَّلًا إلى دقيقته ولا يُختَم', async () => {
+    const post = await scheduledAt('2026-09-08T09:12')
+    const q = recordingQueue()
+    const report = await dispatchDue({ db, queue: q, now: at('2026-09-08T09:00:00Z') })
+    expect(report).toMatchObject({ kind: 'sent', count: 0, ahead: 1 })
+    expect(q.sent).toEqual([{ body: { postId: post, org: 'org_owner', due: '2026-09-08 09:12:00' }, delaySeconds: 720 }])
+    expect((await readPost(post))?.['dispatched_at']).toBeNull()
+    // ‏والدورةُ التالية (‏:07) لا ترسله ثانية
+    const again = recordingQueue()
+    expect((await dispatchDue({ db, queue: again, now: at('2026-09-08T09:07:00Z') })).kind).toBe('none')
+    expect(again.sent).toEqual([])
+  })
+
+  it('وما بعد الأفق ينتظر دورتَه، وما حلّ يُرسَل فورًا كما كان', async () => {
+    const far = await scheduledAt('2026-09-08T09:30')
+    const now = await scheduledAt('2026-09-08T08:55')
+    const q = recordingQueue()
+    const report = await dispatchDue({ db, queue: q, now: at('2026-09-08T09:00:00Z') })
+    expect(report).toMatchObject({ kind: 'sent', count: 1, ahead: 0 })
+    expect(q.sent).toEqual([{ body: { postId: now } }])
+    expect((await readPost(far))?.['dispatched_at']).toBeNull()
+    expect((await readPost(now))?.['dispatched_at']).not.toBeNull()
+  })
+
+  it('والأفقُ يغطّي أوسعَ فجوةٍ بين دورتين في wrangler.toml', () => {
+    const toml = readFileSync(new URL('../../../wrangler.toml', import.meta.url), 'utf8')
+    for (const line of toml.split('\n').filter((l) => /^\s*crons\s*=/.test(l))) {
+      const minutes = new Set<number>()
+      for (const cron of [...line.matchAll(/"([^"]+)"/g)].map((m) => m[1]!)) {
+        const [min, hour] = cron.split(' ')
+        if (hour !== '*') continue
+        if (min!.startsWith('*/')) for (let m = 0; m < 60; m += Number(min!.slice(2))) minutes.add(m)
+        else minutes.add(Number(min))
+      }
+      const ticks = [...minutes].sort((a, b) => a - b)
+      const gaps = ticks.map((m, i) => (ticks[i + 1] ?? ticks[0]! + 60) - m)
+      expect(Math.max(...gaps) * 60).toBeLessThan(DISPATCH_HORIZON_SECONDS)
+    }
+  })
+
+  it('أسوأُ تأخّرٍ صفرٌ لما جُدول قبل دورته: كلُّ دقيقةٍ من الساعة تخرج في دقيقتها', async () => {
+    // ‏دوراتُ الساعة كما في wrangler.toml: ‏*/15 ومعها ‏:07
+    const ticks = [0, 7, 15, 30, 45]
+    const posts = new Map<string, number>()
+    for (let minute = 0; minute < 60; minute += 1) {
+      posts.set(await scheduledAt(`2026-09-08T10:${String(minute).padStart(2, '0')}`), minute)
+    }
+    const delivered = new Map<string, number>()
+    for (const tick of [...ticks.map((t) => t - 60), ...ticks]) {
+      const q = recordingQueue()
+      const base = Date.parse('2026-09-08T10:00:00Z') + tick * 60_000
+      await dispatchDue({ db, queue: q, now: () => new Date(base) })
+      for (const m of q.sent) {
+        const arrives = base + (m.delaySeconds ?? 0) * 1000
+        delivered.set(m.body.postId, arrives)
+        // ‏والمستهلكُ يختمها حين تصل (`claimDelivery`): الدورةُ التالية لا تجدها
+        await db.prepare('UPDATE posts SET dispatched_at = ? WHERE id = ?').bind(dbNow(new Date(arrives)), m.body.postId).run()
+      }
+    }
+    const lateness = [...posts].map(([id, minute]) => (delivered.get(id)! - (Date.parse('2026-09-08T10:00:00Z') + minute * 60_000)) / 1000)
+    expect(lateness).toHaveLength(60)
+    expect(Math.max(...lateness)).toBe(0)
+    expect(Math.min(...lateness)).toBe(0)
+  })
+
+  it('وسقفُ العشرين رُفع: مئتان وخمسون مستحقّة تخرج في دورةٍ واحدة، ودفعاتٌ دون المئة', async () => {
+    const account = await seedAccount()
+    for (let i = 0; i < 250; i += 1) {
+      const post = await seedPost()
+      await schedulePost(db, post, account, '2026-09-08T08:30', new Date('2026-09-08T00:00:00Z'))
+    }
+    const q = recordingQueue()
+    const report = await dispatchDue({ db, queue: q, now: at('2026-09-08T09:00:00Z') })
+    expect(report).toMatchObject({ kind: 'sent', count: 250 })
+    expect(Math.max(...q.batches)).toBeLessThanOrEqual(100)
+    expect(new Set(q.sent.map((m) => m.body.postId)).size).toBe(250)
+  })
+
+  it('ورسالةٌ مؤجَّلةٌ لم تصل بعد عشر دقائقَ من موعدها تُرسَل فورًا', async () => {
+    const post = await scheduledAt('2026-09-08T09:12')
+    await dispatchDue({ db, queue: recordingQueue(), now: at('2026-09-08T09:00:00Z') })
+    const soon = recordingQueue()
+    expect((await dispatchDue({ db, queue: soon, now: at('2026-09-08T09:15:00Z') })).kind).toBe('none')
+    const late = recordingQueue()
+    const report = await dispatchDue({ db, queue: late, now: at('2026-09-08T09:23:00Z') })
+    expect(report).toMatchObject({ kind: 'sent', count: 1 })
+    expect(late.sent).toEqual([{ body: { postId: post } }])
+  })
+
+  it('وطابورٌ يرمي يرفع علامةَ المؤجَّل فتعيدها الدورةُ التالية', async () => {
+    const post = await scheduledAt('2026-09-08T09:12')
+    const down = { async sendBatch(): Promise<never> { throw new Error('queue down') } }
+    await expect(dispatchDue({ db, queue: down, now: at('2026-09-08T09:00:00Z') })).rejects.toThrow('queue down')
+    const q = recordingQueue()
+    await dispatchDue({ db, queue: q, now: at('2026-09-08T09:07:00Z') })
+    expect(q.sent).toEqual([{ body: { postId: post, org: 'org_owner', due: '2026-09-08 09:12:00' }, delaySeconds: 300 }])
+  })
+
+  it('والسحبُ وتغييرُ الموعد والتراجعُ تبقى ممكنةً حتّى الدقيقة: المؤجَّلُ لم يُختَم', async () => {
+    const post = await scheduledAt('2026-09-08T09:12')
+    await dispatchDue({ db, queue: recordingQueue(), now: at('2026-09-08T09:00:00Z') })
+    expect((await reschedulePost(db, post, '2026-09-08T09:40', new Date('2026-09-08T09:01:00Z'))).ok).toBe(true)
+    // ‏وموعدٌ جديدٌ داخل الأفق يُرسَل له من جديد
+    const q = recordingQueue()
+    await dispatchDue({ db, queue: q, now: at('2026-09-08T09:30:00Z') })
+    expect(q.sent).toEqual([{ body: { postId: post, org: 'org_owner', due: '2026-09-08 09:40:00' }, delaySeconds: 600 }])
+    expect((await unschedule(db, post)).ok).toBe(true)
+  })
+})
+
+/**
+ * ‏**الختمُ عند الوصول** (D-320): الرسالةُ المؤجَّلةُ تختم منشورَها حين تصل في دقيقته وما زال كما أُرسلت له — بالجملة نفسِها
+ * ‏وبساعة القاعدة، فتسحبٌ أو تغييرٌ قبل الدقيقة يغلب، وما بعدها يُردّ. والمواعيدُ هنا من ساعة القاعدة الحقيقيّة (`datetime('now')`).
+ */
+describe('الختمُ عند الوصول (D-320)', () => {
+  async function queuedFor(offsetSeconds: number): Promise<{ id: string; due: string }> {
+    const post = await seedPost()
+    const account = await seedAccount()
+    const due = dbNow(new Date(Date.now() + offsetSeconds * 1000))
+    await db.prepare(`UPDATE posts SET status = 'queued', account_id = ?, scheduled_at = ?, enqueued_for = ? WHERE id = ?`)
+      .bind(account, due, due, post).run()
+    return { id: post, due }
+  }
+
+  it('حلّ موعدُه وما زال كما أُرسل له: يُختَم مرّةً واحدة', async () => {
+    const { id, due } = await queuedFor(-1)
+    expect(await claimDelivery(db, id, 'org_owner', due)).toEqual({ kind: 'claimed' })
+    expect((await readPost(id))?.['dispatched_at']).not.toBeNull()
+    expect(await claimDelivery(db, id, 'org_owner', due)).toEqual({ kind: 'stale' })
+  })
+
+  it('وصل قبل دقيقته: يُعاد بما بقي', async () => {
+    const { id, due } = await queuedFor(120)
+    const out = await claimDelivery(db, id, 'org_owner', due)
+    expect(out.kind).toBe('early')
+    if (out.kind === 'early') expect(out.seconds).toBeGreaterThanOrEqual(119)
+    expect((await readPost(id))?.['dispatched_at']).toBeNull()
+  })
+
+  it('وتغيّر موعدُه أو سُحب: لا يفعل شيئًا', async () => {
+    const moved = await queuedFor(-1)
+    await db.prepare(`UPDATE posts SET scheduled_at = datetime('now', '+1 hour') WHERE id = ?`).bind(moved.id).run()
+    expect(await claimDelivery(db, moved.id, 'org_owner', moved.due)).toEqual({ kind: 'stale' })
+    const pulled = await queuedFor(-1)
+    expect((await unschedule(db, pulled.id)).ok).toBe(true)
+    expect(await claimDelivery(db, pulled.id, 'org_owner', pulled.due)).toEqual({ kind: 'stale' })
+  })
+
+  it('مراجعة D-320: وإعادةُ الرسالة نفسِها بعد ختمها تمضي بالختم الأوّل، والتسليمُ المكرَّرُ الأوّلُ لا', async () => {
+    const { id, due } = await queuedFor(-1)
+    expect(await claimDelivery(db, id, 'org_owner', due)).toEqual({ kind: 'claimed' })
+    await db.prepare(`UPDATE posts SET dispatched_at = '2026-01-01 00:00:00' WHERE id = ?`).bind(id).run()
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'claimed' })
+    // ‏لا يُختَم ثانية: الكنّاسُ يعدّ من الختم الأوّل
+    expect((await readPost(id))?.['dispatched_at']).toBe('2026-01-01 00:00:00')
+    expect(await claimDelivery(db, id, 'org_owner', due, false)).toEqual({ kind: 'stale' })
+    // ‏ونُشر: لا تمضي إعادة
+    await db.prepare(`UPDATE posts SET status = 'published' WHERE id = ?`).bind(id).run()
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'stale' })
+  })
+
+  it('مراجعة D-320: وختمُ الدورة الفوريّ يمحو العلامة، فإعادةُ رسالةٍ مؤجَّلةٍ تأخّرت بعده لا تمضي', async () => {
+    const { id, due } = await queuedFor(-1)
+    expect(await markDispatched(db, [id], new Date())).toEqual([{ id, org: 'org_owner' }])
+    expect(await db.prepare('SELECT enqueued_for FROM posts WHERE id = ?').bind(id).first()).toEqual({ enqueued_for: null })
+    expect(await claimDelivery(db, id, 'org_owner', due, true)).toEqual({ kind: 'stale' })
+  })
+
+  it('مراجعة D-320: والإيقافُ على إعادةٍ بعد الختم يرفع الختمَ والعلامة، وعلى تسليمٍ مكرَّرٍ أوّل لا يمسّ ختمَ أخيه', async () => {
+    const twin = await queuedFor(-1)
+    await claimDelivery(db, twin.id, 'org_owner', twin.due)
+    const again = await queuedFor(-1)
+    await claimDelivery(db, again.id, 'org_owner', again.due)
+    await writeSetting(db, 'paused', 'true', 'test')
+    expect((await claimDelivery(db, twin.id, 'org_owner', twin.due, false)).kind).toBe('paused')
+    expect((await readPost(twin.id))?.['dispatched_at']).not.toBeNull()
+    expect((await claimDelivery(db, again.id, 'org_owner', again.due, true)).kind).toBe('paused')
+    const row = await db.prepare('SELECT dispatched_at, enqueued_for FROM posts WHERE id = ?').bind(again.id).first()
+    expect(row).toEqual({ dispatched_at: null, enqueued_for: null })
+  })
+
+  it('والإيقافُ يغلب: لا يُختَم، وتُرفع علامتُه فتعيده الدورةُ بعد الاستئناف', async () => {
+    const { id, due } = await queuedFor(-1)
+    await writeSetting(db, 'paused', 'true', 'test')
+    expect((await claimDelivery(db, id, 'org_owner', due)).kind).toBe('paused')
+    const row = await db.prepare('SELECT dispatched_at, enqueued_for FROM posts WHERE id = ?').bind(id).first()
+    expect(row).toEqual({ dispatched_at: null, enqueued_for: null })
   })
 })

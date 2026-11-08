@@ -54,7 +54,7 @@ export async function describeImage(
       imageUrl: dataUrl,
       maxTokens: 2048,
     },
-    deps.fetchImpl ?? fetch,
+    deps.fetchImpl,
   )
 
   const text = result.text.trim()

@@ -36,9 +36,13 @@ import { getProvider, resolveKey } from '../providers'
 import { cfAccountId, cfAccountOf } from '../ai/cloudflare'
 import type { Db } from '../tokens'
 import { objectKey, orgOfPost } from '../tenancy'
+import { withTimeout } from '../net/timeout'
 
 /** أقصى ما يُقبل — و ٦٤ ميغا فوق حدّ مقطعٍ بخمسَ عشرةَ ثانيةً بكثير. */
 export const MAX_VIDEO_BYTES = 64 * 1024 * 1024
+
+/** ‏مهلةُ نداء التوليد (D-320): أطولُ نداءاتنا، وخمسُ دقائق دون حدّ الاستدعاء (خمسَ عشرةَ دقيقة) بكثير. */
+const VIDEO_TIMEOUT_MS = 300_000
 
 export type VideoOutcome =
   | { readonly kind: 'generated'; readonly mediaId: string; readonly bytes: number }
@@ -72,7 +76,7 @@ export function pickBinding(env: {
   const account = (env.CF_AI_ACCOUNT_ID ?? '').trim()
   const token = (env.CF_AI_TOKEN ?? '').trim()
   if (account.length > 0 && token.length > 0) {
-    return restBinding(account, token, fetchImpl ?? fetch)
+    return restBinding(account, token, withTimeout(fetchImpl ?? fetch, VIDEO_TIMEOUT_MS))
   }
   return env.AI
 }
@@ -120,7 +124,7 @@ export async function bindingFor(
     case 'card':
       return key === null
         ? undefined
-        : restBinding(cfAccountOf(env.CF_AI_ACCOUNT_ID, card?.baseUrl), key, fetchImpl ?? fetch)
+        : restBinding(cfAccountOf(env.CF_AI_ACCOUNT_ID, card?.baseUrl), key, withTimeout(fetchImpl ?? fetch, VIDEO_TIMEOUT_MS))
     case 'binding':
       return env.AI
     case 'none':
@@ -338,7 +342,7 @@ export async function animateForPost(
   let bytes: Uint8Array
   let mime: string
   try {
-    const pulled = await fetchVideoBytes(url, deps.fetchImpl ?? fetch, MAX_VIDEO_BYTES)
+    const pulled = await fetchVideoBytes(url, withTimeout(deps.fetchImpl ?? fetch, 120_000), MAX_VIDEO_BYTES)
     bytes = pulled.bytes
     mime = pulled.mime
   } catch (error) {

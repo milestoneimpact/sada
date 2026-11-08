@@ -5,6 +5,13 @@
  * الطلب وسببه، ولا تحمل جسم الاستجابة كاملا لئلا يتسرب رمز في سجل.
  */
 import type { Provider } from './providers'
+import { withTimeout } from '../net/timeout'
+
+/**
+ * ‏مهلةُ نهاية الرمز (D-320): التجديدُ يقع في الدورة قبل الإرسال، ونهايةٌ تعلق كانت تؤخّر ما بعدها حتّى يُقتَل الاستدعاء.
+ * ‏وخمسَ عشرةَ ثانيةً أضعافُ ما تحتاجه نهايةٌ سليمة.
+ */
+export const OAUTH_TIMEOUT_MS = 15_000
 
 export interface TokenResponse {
   readonly accessToken: string
@@ -39,9 +46,23 @@ export class OAuthError extends Error {
      * يُبنى عليه قرار (D-054: يُضيّق ولا يقرّر).
      */
     readonly description?: string,
+    /**
+     * ‏ثواني `Retry-After` كما ردّها المزوّدُ مع ‏429 وأخواتها (تحقّق D-320 على main) — أو `undefined` إن لم يقلها. يقرؤها
+     * ‏التجديدُ فلا يعيد قبلها، ولا تُقرأ لغيره.
+     */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message)
   }
+}
+
+/** ‏`Retry-After` بثوانيه أو بتاريخه (RFC 9110) — وما لا يُقرأ `undefined`، لا صفرٌ يُخترَع. */
+export function retryAfterOf(header: string | null, now: Date): number | undefined {
+  const raw = header?.trim() ?? ''
+  if (raw === '') return undefined
+  if (/^\d+$/.test(raw)) return Number(raw)
+  const at = Date.parse(raw)
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - now.getTime()) / 1000))
 }
 
 export interface ClientCredentials {
@@ -138,6 +159,7 @@ async function postForm(
       response.status,
       code,
       description,
+      retryAfterOf(response.headers.get('Retry-After'), now),
     )
   }
   return parseToken((await response.json()) as RawToken, now, requested)
@@ -161,7 +183,7 @@ export function exchangeCode(
     readonly requestedScopes?: readonly string[]
   },
   now: Date = new Date(),
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, OAUTH_TIMEOUT_MS),
 ): Promise<TokenResponse> {
   return postForm(
     provider,
@@ -186,7 +208,7 @@ export function refreshToken(
   creds: ClientCredentials,
   refresh: string,
   now: Date = new Date(),
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, OAUTH_TIMEOUT_MS),
   /** ما كان ممنوحا قبل التجديد: التجديدُ لا يوسّع نطاقا، فلا يُفترَض أوسع. */
   granted: readonly string[] = provider.scopes,
 ): Promise<TokenResponse> {

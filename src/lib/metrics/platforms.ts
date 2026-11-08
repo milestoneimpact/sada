@@ -19,6 +19,7 @@
  * و X يعطي `impression_count` **لمنشورات صاحب الرمز وحده** — وهو حالُنا.
  */
 import { LINKEDIN_VERSION } from '../oauth/providers'
+import { withTimeout } from '../net/timeout'
 
 export interface PostMetrics {
   readonly impressions: number | null
@@ -94,7 +95,7 @@ async function getJson(
 export async function fetchLinkedInMetrics(
   accessToken: string,
   postUrn: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 15_000),
 ): Promise<PostMetrics> {
   const payload = await getJson(
     `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(postUrn)}`,
@@ -129,7 +130,7 @@ export async function fetchLinkedInMetrics(
 export async function fetchXMetrics(
   accessToken: string,
   tweetId: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = withTimeout(fetch, 15_000),
 ): Promise<PostMetrics> {
   const payload = await getJson(
     `https://api.x.com/2/tweets/${encodeURIComponent(tweetId)}?tweet.fields=public_metrics`,

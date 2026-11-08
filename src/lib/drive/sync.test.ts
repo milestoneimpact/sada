@@ -115,3 +115,53 @@ describe('المجلد الفارغ', () => {
     expect(result).toEqual({ added: [], changed: [], unchanged: [], missing: [] })
   })
 })
+
+/**
+ * ‏**ألفُ ملفٍّ في دفعاتٍ لا في ألف نداء** (D-320).
+ *
+ * ‏كانت المزامنةُ تكتب صفًّا لكلّ ملفٍّ بنداءٍ مستقلّ، في استدعاء 03:03 الذي يحمل معه التجديدَ والإرسالَ والتنبيهاتِ والحصّة.
+ * ‏وD1 يقبل ألفَ نداءٍ في الاستدعاء الواحد (Workers Paid)، **والدفعةُ (`batch`) تُعدّ نداءً واحدًا** — فالمسحُ كان ينكسر
+ * ‏عند نحو تسعمئة ملفّ.
+ */
+describe('المزامنة في دفعات (D-320)', () => {
+  function counting(inner: FakeDb) {
+    const seen = { run: 0, batch: 0, largest: 0 }
+    const wrap = (s: ReturnType<FakeDb['prepare']>): ReturnType<FakeDb['prepare']> => ({
+      bind: (...v: unknown[]) => wrap(s.bind(...v)),
+      first: s.first.bind(s),
+      all: s.all.bind(s),
+      run: async () => { seen.run += 1; return s.run() },
+      // ‏ما يُدفَع في الدفعة يُنفَّذ بالأصل لا بالغلاف: لا يُعدّ نداءً
+      ...{ inner: s },
+    } as ReturnType<FakeDb['prepare']>)
+    const db = {
+      prepare: (q: string) => wrap(inner.prepare(q)),
+      batch: async (statements: ReturnType<FakeDb['prepare']>[]) => {
+        seen.batch += 1
+        seen.largest = Math.max(seen.largest, statements.length)
+        return inner.batch!(statements.map((s) => (s as unknown as { inner: ReturnType<FakeDb['prepare']> }).inner))
+      },
+    }
+    return { db, seen }
+  }
+
+  it('ألفٌ وملفٌّ جديدة ثمّ متغيّرة ثمّ ثابتة: نداءاتٌ معدودة، والتصنيفُ كما كان', async () => {
+    const files = Array.from({ length: 1001 }, (_, i) => file(`id${String(i).padStart(4, '0')}`, `h${i}`))
+    const { db: counted, seen } = counting(db)
+    const first = await syncSources(counted, files)
+    expect(first.added).toHaveLength(1001)
+    expect(seen.run).toBe(0)
+    expect(seen.batch).toBeLessThanOrEqual(21)
+    expect(seen.largest).toBeLessThanOrEqual(50)
+    const rows = db.raw.prepare("SELECT count(*) AS n FROM sources WHERE kind = 'drive'").get() as { n: number }
+    expect(rows.n).toBe(1001)
+
+    const again = files.map((f, i) => (i % 2 === 0 ? file(f.id, `${f.contentHash}-v2`) : f))
+    const second = await syncSources(counted, again)
+    expect(second.changed).toHaveLength(501)
+    expect(second.unchanged).toHaveLength(500)
+    expect(seen.run).toBe(0)
+    const changed = db.raw.prepare("SELECT content_hash FROM sources WHERE drive_file_id = 'id0000'").get() as { content_hash: string }
+    expect(changed.content_hash).toBe('h0-v2')
+  })
+})

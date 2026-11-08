@@ -9,7 +9,8 @@ import { toBase64 } from '../crypto'
 import { loadTokens, saveTokens } from '../tokens'
 import { LINKEDIN, X } from '../oauth/providers'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { dueForRenewal, mergeRenewed, renewDue, renewOne, RENEW_MARGIN_SECONDS } from './renew'
+import { dueForRenewal, mergeRenewed, renewDue, renewOne, renewStalled, RENEW_MARGIN_SECONDS } from './renew'
+import { recordVerification, saveApp } from '../oauth/apps'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const NOW = new Date('2026-09-06T12:00:00Z')
@@ -275,5 +276,255 @@ describe('والدورة لا يوقفها حساب واحد', () => {
 
     await renewDue({ ...deps(spy), providerFor: () => X })
     expect(seen[0]).toBe(X.tokenUrl)
+  })
+})
+
+/**
+ * ‏**التجديدُ لا يجوّع** (D-320).
+ *
+ * ‏كانت الدورةُ تأخذ أقدمَ خمسةٍ وعشرين رمزًا يقترب انتهاؤها، وما ردّ المزوّدُ تجديدَه أقدمُها دائمًا: يُعاد كلَّ ربع ساعة
+ * ‏إلى الأبد، **وخمسةٌ وعشرون منها تملأ الدفعةَ فلا يصل الحسابَ السليمَ دورُه** حتّى يموت رمزُه.
+ */
+describe('التجديد لا يجوّع (D-320)', () => {
+  const TICK = 15 * 60_000
+  const refused = (seen: string[]) => (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    const refresh = new URLSearchParams(String(init?.body ?? '')).get('refresh_token') ?? ''
+    seen.push(refresh)
+    if (refresh.startsWith('ok-')) {
+      return new Response(JSON.stringify({ access_token: `fresh-${refresh}`, expires_in: 5_184_000 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+  }) as unknown as typeof fetch
+
+  it('ثلاثون حسابًا يُردّ تجديدُها لا تحجب الحسابَ السليم، ولا تُعاد كلَّ دورة', async () => {
+    for (let i = 0; i < 30; i += 1) await seed(`dead${String(i).padStart(2, '0')}`, { access: inSec(60 + i), refresh: `dead-${i}` })
+    await seed('healthy', { access: inSec(3000), refresh: 'ok-h' })
+    // ‏وحسابٌ سليمٌ ثانٍ يحلّ تجديدُه بعد ستّ ساعات، والساقطون مستحقّون معه
+    await seed('later', { access: inSec(6 * 3600 + 3000), refresh: 'ok-l' })
+    const seen: string[] = []
+    const renewedAt: Record<string, number> = {}
+    for (let tick = 0; tick < 96; tick += 1) {
+      const at = new Date(NOW.getTime() + tick * TICK)
+      const before = seen.length
+      await renewDue({ ...deps(refused(seen)), now: () => at })
+      for (const r of seen.slice(before)) if (r.startsWith('ok-') && renewedAt[r] === undefined) renewedAt[r] = tick
+    }
+    // ‏السليمُ يُجدَّد في الدورة الثانية على الأكثر: الأولى رأت الثلاثين مثلَه بلا تاريخ
+    expect(renewedAt['ok-h']).toBeLessThanOrEqual(1)
+    // ‏والثاني في الدورة التي يدخل فيها هامشَ الساعتين، ولو كان الساقطون مستحقّين معه
+    expect(renewedAt['ok-l']).toBe(Math.ceil((6 * 3600 + 3000 - RENEW_MARGIN_SECONDS) / 900))
+    // ‏والساقطُ يتباعد: يومٌ كاملٌ (‏96 دورة) لا يعيده أكثرَ من ثماني مرّات — وكان ستًّا وتسعين
+    const perDead = new Map<string, number>()
+    for (const r of seen.filter((s) => s.startsWith('dead-'))) perDead.set(r, (perDead.get(r) ?? 0) + 1)
+    expect(perDead.size).toBe(30)
+    expect(Math.max(...perDead.values())).toBeLessThanOrEqual(8)
+  })
+
+  it('وربطٌ من جديد يمحو التباعد: الحسابُ يُحاوَل في الدورة التالية', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'dead-1' })
+    const seen: string[] = []
+    await renewDue({ ...deps(refused(seen)), now: () => NOW })
+    const held = db.raw.prepare("SELECT renew_failures, renew_retry_at FROM tokens WHERE account_id = 'a1'").get() as
+      { renew_failures: number; renew_retry_at: string | null }
+    expect(held.renew_failures).toBe(1)
+    expect(held.renew_retry_at).not.toBeNull()
+    // ‏التالية بعد ربع ساعة لا تعيده
+    await renewDue({ ...deps(refused(seen)), now: () => new Date(NOW.getTime() + TICK) })
+    expect(seen).toEqual(['dead-1'])
+    // ‏والمالكُ يربطه من جديد: `saveTokens` يصفّر العدّ والموعد
+    await saveTokens(db, KEY, 'a1', { accessToken: 'again', refreshToken: 'ok-1', expiresAt: inSec(900), refreshExpiresAt: null, scopes: 'openid' })
+    const reset = db.raw.prepare("SELECT renew_failures, renew_retry_at FROM tokens WHERE account_id = 'a1'").get()
+    expect(reset).toEqual({ renew_failures: 0, renew_retry_at: null })
+    await renewDue({ ...deps(refused(seen)), now: () => new Date(NOW.getTime() + 2 * TICK) })
+    expect(seen).toEqual(['dead-1', 'ok-1'])
+  })
+
+  it('ونداءُ التجديد يحمل مهلة', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'ok-1' })
+    let signal: unknown
+    const spy = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      signal = init?.signal
+      return new Response(JSON.stringify({ access_token: 'F', expires_in: 7200 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+    await renewDue(deps(spy))
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('والدورةُ تقف عند ميزانيّتها: نهايةٌ بطيئة لا تؤخّر الإرسالَ بعدها', async () => {
+    for (let i = 0; i < 10; i += 1) await seed(`s${i}`, { access: inSec(600 + i), refresh: `ok-${i}` })
+    let clock = NOW.getTime()
+    const seen: string[] = []
+    const slow = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      clock += 14_000
+      return refused(seen)(url, init)
+    }) as unknown as typeof fetch
+    const summary = await renewDue({ ...deps(slow), now: () => new Date(clock) })
+    // ‏ميزانيّةُ الدورة ستّون ثانية: خمسةُ نداءاتٍ بأربعَ عشرةَ ثانية (السادسُ يبدأ بعدها) — والباقي للدورة التالية بلا عقوبة
+    expect(seen.length).toBeLessThan(10)
+    expect(summary.renewed).toBe(seen.length)
+    const waiting = db.raw.prepare('SELECT count(*) AS n FROM tokens WHERE renew_failures = 0 AND renew_retry_at IS NULL').get() as { n: number }
+    expect(waiting.n).toBe(10)
+  })
+})
+
+/**
+ * ‏**مراجعة D-320: التباعدُ للنهائيّ وحدَه.** كان كلُّ ما لم يتجدّد يتباعد (نصفَ ساعةٍ ثمّ ضعفَها حتّى يوم) ولا يمحوه إلّا
+ * ‏`saveTokens` — ومنه العابر (‏5xx، شبكةٌ، المهلةُ الجديدة) وعطلُ الضبط (سرُّ التطبيق ناقص). فمزوّدٌ تعطّل ساعةً ونصفًا يترك
+ * ‏رمزًا يموت ساعتين بعد عودته، وسرٌّ يُحفَظ لا يعيد حسابًا إلى الدورة قبل موعده. فالعابرُ يُعدّ (فيتأخّر خلف السليم) ولا ينتظر،
+ * ‏والنهائيُّ (‏4xx من نهاية الرمز) يتباعد، **وحفظُ التطبيق أو فحصُه الناجح يمحو تباعدَ منصّته**.
+ */
+describe('مراجعة D-320: التباعدُ للنهائيّ وحدَه', () => {
+  const TICK = 15 * 60_000
+  const answering = (down: (at: number) => number | null, clock: () => number, seen: number[]) => (async () => {
+    const status = down(clock())
+    seen.push(clock())
+    if (status !== null) return new Response(JSON.stringify({ error: 'server_error' }), { status, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ access_token: 'fresh', expires_in: 5_184_000 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as unknown as typeof fetch
+  async function ticks(n: number, run: (at: Date) => Promise<void>): Promise<void> {
+    for (let tick = 0; tick < n; tick += 1) await run(new Date(NOW.getTime() + tick * TICK))
+  }
+  const minutes = (at: number) => (at - NOW.getTime()) / 60_000
+
+  it('‏503 خمسًا وتسعين دقيقة ورمزٌ بقيت له ‏105: يُحاوَل في كلّ دورة، ويُجدَّد في أوّل دورةٍ بعد عودة المزوّد', async () => {
+    await seed('a1', { access: inSec(105 * 60), refresh: 'r1' })
+    let clock = NOW.getTime()
+    const seen: number[] = []
+    const fetchImpl = answering((at) => (minutes(at) < 95 ? 503 : null), () => clock, seen)
+    await ticks(13, async (at) => { clock = at.getTime(); await renewDue({ ...deps(fetchImpl), now: () => at }) })
+    // ‏كلُّ دورةٍ حتّى عاد، ثمّ لا شيء: الرمزُ الجديدُ بعيد
+    expect(seen.map(minutes)).toEqual([0, 15, 30, 45, 60, 75, 90, 105])
+    const row = db.raw.prepare("SELECT renew_failures, renew_retry_at FROM tokens WHERE account_id = 'a1'").get()
+    expect(row).toEqual({ renew_failures: 0, renew_retry_at: null })
+  })
+
+  it('وسرُّ التطبيق الناقص: يُحاوَل الحسابُ في الدورة التي تلي حفظَه', async () => {
+    await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+    let creds: { clientId: string; clientSecret: string } | null = null
+    let renewedAt: number | null = null
+    await ticks(10, async (at) => {
+      // ‏حُفظ السرُّ في الدقيقة المئة، بين دورتي ‏90 و‏105
+      if (minutes(at.getTime()) >= 100) creds = { clientId: 'id', clientSecret: 'secret' }
+      const s = await renewDue({ ...deps(reply({ access_token: 'fresh', expires_in: 5_184_000 })), now: () => at, credentialsFor: async () => creds })
+      if (s.renewed > 0 && renewedAt === null) renewedAt = minutes(at.getTime())
+    })
+    expect(renewedAt).toBe(105)
+  })
+
+  it('والعابرُ يتأخّر خلف السليم: ثلاثون حسابًا يتعطّل مزوّدُها لا تحجب حسابًا سليمًا', async () => {
+    for (let i = 0; i < 30; i += 1) await seed(`down${String(i).padStart(2, '0')}`, { access: inSec(60 + i), refresh: `down-${i}` })
+    await seed('healthy', { access: inSec(3000), refresh: 'ok-h' })
+    const renewedAt: string[] = []
+    const fetchImpl = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const refresh = new URLSearchParams(String(init?.body ?? '')).get('refresh_token') ?? ''
+      if (refresh.startsWith('ok-')) {
+        renewedAt.push(refresh)
+        return new Response(JSON.stringify({ access_token: 'fresh', expires_in: 5_184_000 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response('{}', { status: 503 })
+    }) as unknown as typeof fetch
+    await ticks(2, async (at) => { await renewDue({ ...deps(fetchImpl), now: () => at }) })
+    expect(renewedAt).toEqual(['ok-h'])
+  })
+
+  it('والرفضُ النهائيّ (‏401 invalid_client) يتباعد، وحفظُ التطبيق يعيد حساباتِ منصّته إلى الدورة التالية', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    await seed('x1', { access: inSec(600), refresh: 'r2', platform: 'x' })
+    await renewDue({ ...deps(reply({ error: 'invalid_client' }, 401)), now: () => NOW })
+    const held = () => db.raw.prepare('SELECT account_id, renew_failures, renew_retry_at IS NOT NULL AS held FROM tokens ORDER BY account_id').all()
+    expect(held()).toEqual([
+      { account_id: 'a1', renew_failures: 1, held: 1 },
+      { account_id: 'x1', renew_failures: 1, held: 1 },
+    ])
+    await saveApp(db, KEY, 'linkedin', 'id', 'the-new-secret', 'panel')
+    // ‏منصّتُه وحدَها: سرُّ LinkedIn لا يُصلح X
+    expect(held()).toEqual([
+      { account_id: 'a1', renew_failures: 0, held: 0 },
+      { account_id: 'x1', renew_failures: 1, held: 1 },
+    ])
+    expect((await dueForRenewal(db, new Date(NOW.getTime() + TICK))).map((r) => r.account_id)).toEqual(['a1'])
+    // ‏وفحصٌ ناجحٌ يمحوه كذلك، وفحصٌ يردّ السرَّ لا
+    await recordVerification(db, 'x', 'bad_secret')
+    expect(held()[1]).toEqual({ account_id: 'x1', renew_failures: 1, held: 1 })
+    await recordVerification(db, 'x', 'accepted')
+    expect(held()[1]).toEqual({ account_id: 'x1', renew_failures: 0, held: 0 })
+  })
+})
+
+/**
+ * ‏**تحقّق D-320 على main: التباعدُ يعدّ الرفضَ وحدَه، و‏429 ليس رفضًا.** كان كلُّ سقوطٍ عابرٍ يزيد `renew_failures`، والرفضُ
+ * ‏الأوّلُ بعد عطلٍ عند المزوّد ينتظر نصفَ ساعةٍ مضروبةً في ‏2 أُسُّها كلُّ ما سقط قبله. وكان كلُّ ‏4xx رفضًا، ومنه ‏429 و‏408:
+ * ‏ردُّ «أبطئ» واحدٌ يعلّم الحسابَ «يحتاج تجديدًا» ويؤخّره ساعاتٍ بعد انتهاء رمزه.
+ */
+describe('تحقّق D-320 على main: الرفضُ وحدَه يتباعد، و«أبطئ» عابر', () => {
+  const TICK = 15 * 60_000
+  const at = (tick: number) => new Date(NOW.getTime() + tick * TICK)
+  const status = () => (db.raw.prepare("SELECT status FROM accounts WHERE id = 'a1'").get() as { status: string }).status
+  const retryAt = () => (db.raw.prepare("SELECT renew_retry_at FROM tokens WHERE account_id = 'a1'").get() as { renew_retry_at: string | null }).renew_retry_at
+  const answer = (code: number, headers: Record<string, string> = {}): typeof fetch => (async () =>
+    new Response(JSON.stringify({ error: code === 400 ? 'invalid_grant' : 'slow_down' }), {
+      status: code, headers: { 'Content-Type': 'application/json', ...headers },
+    })) as unknown as typeof fetch
+
+  it('أربعُ دوراتٍ ‏503 ثمّ رفضٌ: الرفضُ الأوّلُ ينتظر نصفَ ساعةٍ لا ثماني ساعات', async () => {
+    await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+    for (let tick = 0; tick < 4; tick += 1) await renewDue({ ...deps(answer(503)), now: () => at(tick) })
+    expect(status()).toBe('active')
+    await renewDue({ ...deps(answer(400)), now: () => at(4) })
+    expect(status()).toBe('needs_reauth')
+    expect(retryAt()).toBe(new Date(at(4).getTime() + 30 * 60_000).toISOString())
+    // ‏والرفضُ الثاني ضعفُه، ولو سقط بينهما عابر
+    await renewDue({ ...deps(answer(503)), now: () => at(6) })
+    await renewDue({ ...deps(answer(400)), now: () => at(7) })
+    expect(retryAt()).toBe(new Date(at(7).getTime() + 60 * 60_000).toISOString())
+  })
+
+  for (const code of [408, 425, 429]) {
+    it(`‏${code} بعد عطلٍ عند المزوّد عابرٌ: لا يُعلَّم الحساب، ويُحاوَل في الدورة التالية`, async () => {
+      await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+      for (let tick = 0; tick < 3; tick += 1) await renewDue({ ...deps(answer(503)), now: () => at(tick) })
+      const out = await renewDue({ ...deps(answer(code)), now: () => at(3) })
+      expect(out).toMatchObject({ needsOwner: 0, deferred: 1 })
+      expect(status()).toBe('active')
+      expect((await dueForRenewal(db, at(4))).map((r) => r.account_id)).toEqual(['a1'])
+    })
+  }
+
+  it('و‏429 بـ Retry-After يُنتظَر ما قال، لا أكثرَ من نصف ساعة', async () => {
+    await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+    await renewDue({ ...deps(answer(429, { 'Retry-After': '1200' })), now: () => at(0) })
+    expect(status()).toBe('active')
+    expect((await dueForRenewal(db, at(1))).map((r) => r.account_id)).toEqual([])
+    expect((await dueForRenewal(db, at(2))).map((r) => r.account_id)).toEqual(['a1'])
+    // ‏ومهلةٌ تتجاوز هامشَ الرمز لا تُطاع كاملة: الرمزُ يموت قبلها
+    await renewDue({ ...deps(answer(429, { 'Retry-After': '86400' })), now: () => at(2) })
+    expect(retryAt()).toBe(new Date(at(2).getTime() + 30 * 60_000).toISOString())
+  })
+})
+
+/**
+ * ‏**تحقّق D-320 على main: دورةُ تجديدٍ لا تجدّد شيئًا لا تقول «دارت سليمة».** كان `dueForRenewal` يبلع عطلَ استعلامه فيعيد
+ * ‏فراغًا، فتنبض الدورةُ `ok` و`/pulse` ‏200 والرموزُ تموت.
+ */
+describe('تحقّق D-320 على main: عطلُ الاختيار يُرى', () => {
+  it('سؤالُ المستحقّ يسقط: تُرمى الدورة ولا تعيد «لا مستحقّ»', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    const broken = {
+      ...db,
+      prepare(query: string) {
+        if (/FROM tokens t JOIN accounts a/.test(query)) throw new Error('D1_ERROR: no such column: t.renew_failures')
+        return db.prepare(query)
+      },
+    } as FakeDb
+    await expect(renewDue({ ...deps(reply({})), db: broken })).rejects.toThrow(/D1_ERROR/)
+  })
+
+  it('وما استحقّ وسقط كلُّه عابرًا يُعدّ دورةً ساقطة، وما تجدّد منه شيءٌ لا', () => {
+    expect(renewStalled({ due: 3, renewed: 0, needsOwner: 0, deferred: 3 })).toBe(true)
+    expect(renewStalled({ due: 3, renewed: 1, needsOwner: 0, deferred: 2 })).toBe(false)
+    expect(renewStalled({ due: 2, renewed: 0, needsOwner: 2, deferred: 0 })).toBe(false)
+    expect(renewStalled({ due: 0, renewed: 0, needsOwner: 0, deferred: 0 })).toBe(false)
   })
 })

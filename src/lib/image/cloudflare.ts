@@ -38,6 +38,7 @@ import { AiError, restBinding, type AiBinding } from '../media/workersAi'
 import { cfPrice } from '../ai/imagePricing'
 import { cfRunUrl } from '../ai/cloudflare'
 import { ImageError, type ImageResult } from './gemini'
+import { withTimeout } from '../net/timeout'
 
 /** النموذجُ الافتراضيّ — ويبدّله المالكُ من اللوحة. */
 export const CF_IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell'
@@ -52,6 +53,9 @@ export const CF_IMAGE_STEPS = 4
 
 /** أقصى ما يقبله النموذجُ من وصف — مقيسٌ كذلك. */
 export const CF_PROMPT_MAX = 2048
+
+/** ‏مهلةُ نداء الصورة (D-320): flux بأربع خطواتٍ ثوانٍ، ودقيقتان سقفٌ لا يُبلَغ إلّا بعطل. */
+const IMAGE_TIMEOUT_MS = 120_000
 
 export interface CfImageCall {
   readonly accountId: string
@@ -88,7 +92,7 @@ export async function generateImageCf(call: CfImageCall): Promise<ImageResult> {
     call.binding ??
     (call.accountId.trim() === '' || call.apiToken.trim() === ''
       ? null
-      : restBinding(call.accountId.trim(), call.apiToken.trim(), call.fetchImpl ?? fetch))
+      : restBinding(call.accountId.trim(), call.apiToken.trim(), withTimeout(call.fetchImpl ?? fetch, IMAGE_TIMEOUT_MS)))
   if (binding === null) {
     throw new ImageError('حساب Cloudflare أو مفتاحُه غير مضبوط', 503, false)
   }
@@ -143,7 +147,7 @@ async function runMultipart(call: CfImageCall, prompt: string): Promise<unknown>
     const packed = new Response(form)
     return call.binding.run(call.model, { multipart: { body: packed.body, contentType: packed.headers.get('Content-Type') ?? '' } })
   }
-  const response = await (call.fetchImpl ?? fetch)(cfRunUrl(call.accountId.trim(), call.model), {
+  const response = await withTimeout(call.fetchImpl ?? fetch, IMAGE_TIMEOUT_MS)(cfRunUrl(call.accountId.trim(), call.model), {
     method: 'POST',
     headers: { Authorization: `Bearer ${call.apiToken.trim()}` },
     body: form,

@@ -253,3 +253,43 @@ describe('دورةُ تدوير TOKEN_ENC_KEY في المجدول (D-318)', () =
     expect((await resolveKey(db, NEW, 'anthropic', undefined)).key).toBe('sk-ant-cron-0001')
   })
 })
+
+/**
+ * ‏**تحقّق D-320 على main: نبضُ التجديد يسقط حين لا يجدّد.** كان سؤالُ المستحقّ يُبلَع عطلُه، وما استحقّ وسقط كلُّه عابرًا
+ * ‏يُعدّ ثمّ يُنسى، فتنبض الدورةُ `ok` في الحالين: `/pulse` ‏200، وتنبيهُ «يسقط منذ…» للتجديد لا يقع أبدًا، والرموزُ تموت.
+ */
+describe('نبضُ التجديد (تحقّق D-320 على main)', () => {
+  const renewBeat = () => db.raw.prepare("SELECT outcome FROM heartbeats WHERE job = 'renew'").get() as { outcome: string } | undefined
+
+  it('سؤالُ المستحقّ يسقط: النبضُ failed', async () => {
+    const { toBase64 } = await import('./lib/crypto')
+    const broken = {
+      ...db,
+      prepare(query: string) {
+        if (/FROM tokens t JOIN accounts a/.test(query)) throw new Error('D1_ERROR: no such column: t.renew_failures')
+        return db.prepare(query)
+      },
+    }
+    await worker.scheduled(
+      { cron: '*/15 * * * *' } as ScheduledController,
+      { ...env(0), DB: broken, TOKEN_ENC_KEY: toBase64(crypto.getRandomValues(new Uint8Array(32))) } as never,
+    )
+    expect(renewBeat()?.outcome).toBe('failed')
+  })
+
+  it('وما استحقّ وسقط كلُّه عابرًا (سرُّ التطبيق غير مضبوط): النبضُ failed، وما لا مستحقَّ فيه ok', async () => {
+    const { toBase64 } = await import('./lib/crypto')
+    const { saveTokens } = await import('./lib/tokens')
+    const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
+    const tick = () => worker.scheduled({ cron: '*/15 * * * *' } as ScheduledController, { ...env(0), TOKEN_ENC_KEY: KEY } as never)
+    await tick()
+    expect(renewBeat()?.outcome).toBe('ok')
+    db.raw.exec("INSERT INTO accounts (id, platform, kind, external_id, display_name) VALUES ('a1', 'linkedin', 'member', 'e1', 'عمر')")
+    await saveTokens(db, KEY, 'a1', {
+      accessToken: 'access', refreshToken: 'refresh', expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      refreshExpiresAt: null, scopes: 'openid profile w_member_social',
+    })
+    await tick()
+    expect(renewBeat()?.outcome).toBe('failed')
+  })
+})

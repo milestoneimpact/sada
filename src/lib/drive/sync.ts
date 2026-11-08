@@ -8,7 +8,7 @@
  * ولا يُحذف صف من `sources` حين يختفي الملف من Drive: المنشورات تشير إليه
  * بـ `source_refs`، وحذفه يقطع أثر منشور نُشر فعلا. يُعلَّم غائبا ويبقى.
  */
-import type { Db } from '../tokens'
+import { inBatches, type Db, type DbStatement } from '../tokens'
 import { OWNER_ORG } from '../tenancy'
 import type { DriveFile } from './client'
 
@@ -62,6 +62,8 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
   const changed: string[] = []
   const unchanged: string[] = []
   const seen = new Set<string>()
+  // ‏**العباراتُ تُجمَع ثمّ تُكتب دفعاتٍ** (D-320): كانت نداءً لكلّ ملفّ، وD1 يقبل ألفًا في الاستدعاء — فالمسحُ ينكسر عند نحو تسعمئة
+  const writes: DbStatement[] = []
 
   for (const file of files) {
     seen.add(file.id)
@@ -69,36 +71,34 @@ export async function syncSources(db: Db, files: readonly DriveFile[]): Promise<
 
     if (prior === undefined) {
     // ‏مجلّدُ Drive مجلّدُ المالك، فمصادرُه لمنظّمته حتى يصير لكلّ منظّمةٍ مجلّدُها (D-233)
-      await db
+      writes.push(db
         .prepare(
           `INSERT INTO sources (id, drive_file_id, name, mime, content_hash, org_id)
            VALUES (?, ?, ?, ?, ?, ?)`,
         )
-        .bind(sourceId(file.id), file.id, file.name, file.mimeType, file.contentHash, OWNER_ORG)
-        .run()
+        .bind(sourceId(file.id), file.id, file.name, file.mimeType, file.contentHash, OWNER_ORG))
       added.push(file.id)
       continue
     }
 
     if (prior.content_hash !== file.contentHash) {
-      await db
+      writes.push(db
         .prepare(
           `UPDATE sources
               SET name = ?, mime = ?, content_hash = ?, last_seen_at = datetime('now')
             WHERE drive_file_id = ? AND org_id = ?`,
         )
-        .bind(file.name, file.mimeType, file.contentHash, file.id, OWNER_ORG)
-        .run()
+        .bind(file.name, file.mimeType, file.contentHash, file.id, OWNER_ORG))
       changed.push(file.id)
       continue
     }
 
-    await db
+    writes.push(db
       .prepare(`UPDATE sources SET last_seen_at = datetime('now') WHERE drive_file_id = ? AND org_id = ?`)
-      .bind(file.id, OWNER_ORG)
-      .run()
+      .bind(file.id, OWNER_ORG))
     unchanged.push(file.id)
   }
+  await inBatches(db, writes)
 
   // ما كان في القاعدة ولم يعد في Drive: يبقى، ويُبلَّغ عنه
   const missing = [...existing.keys()].filter((id) => !seen.has(id))
