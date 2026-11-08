@@ -222,6 +222,47 @@ describe('السحب', () => {
     const post = await seedPost()
     expect((await unschedule(db, post)).ok).toBe(false)
   })
+
+  /*
+   * ‏**تحقّق D-320 على main**: «اسحب الموعد» يقرأ ثمّ يكتب، ورسالةٌ مؤجَّلةٌ تصل في الدقيقة نفسِها تختمه بين الاثنين. كان التحديثُ
+   * ‏بلا حارسٍ فيقول للمالك «سُحب» والمنشورُ خارجٌ إلى المنصّة. فالحارسُ في جملة التحديث نفسِها كما في `undoSchedule`.
+   */
+  it('رسالةٌ مؤجَّلةٌ تختمه بين قراءة السحب وكتابته: يُردّ السحب ويبقى مختومًا في الطابور', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await schedulePost(db, post, account, SOON, NOW)
+    const due = String((await readPost(post))?.['scheduled_at'])
+    const racing = {
+      batch: db.batch,
+      prepare(query: string) {
+        const statement = db.prepare(query)
+        if (!/SET status = 'approved'/.test(query)) return statement
+        // ‏الرسالةُ تختم قبل أن تُنفَّذ كتابةُ السحب، أيًّا كانت صيغتُها
+        const claimFirst = async () => { expect(await claimDelivery(db, post, 'org_owner', due)).toEqual({ kind: 'claimed' }) }
+        return {
+          bind(...values: unknown[]) { statement.bind(...values); return this },
+          all: statement.all,
+          async first<T>() { await claimFirst(); return statement.first<T>() },
+          async run() { await claimFirst(); return statement.run() },
+        } as never
+      },
+    } as unknown as FakeDb
+    const out = await unschedule(racing, post)
+    expect(out.ok).toBe(false)
+    const row = await readPost(post)
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['dispatched_at']).not.toBeNull()
+    expect(row?.['account_id']).toBe(account)
+  })
+
+  it('والاستعادةُ لا تعيد إلى الطابور منشورًا مختومًا، فلا يبقى «مجدولًا» لا تراه الدورةُ ولا الكنّاس', async () => {
+    const post = await seedPost()
+    const account = await seedAccount()
+    await db.prepare("UPDATE posts SET dispatched_at = '2026-09-08 09:00:00' WHERE id = ?").bind(post).run()
+    const out = await restoreSchedule(db, post, '2026-09-08 09:00:00', account, 'org_owner')
+    expect(out.ok).toBe(false)
+    expect((await readPost(post))?.['status']).toBe('approved')
+  })
 })
 
 /**

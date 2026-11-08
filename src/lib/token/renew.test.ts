@@ -9,7 +9,7 @@ import { toBase64 } from '../crypto'
 import { loadTokens, saveTokens } from '../tokens'
 import { LINKEDIN, X } from '../oauth/providers'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { dueForRenewal, mergeRenewed, renewDue, renewOne, RENEW_MARGIN_SECONDS } from './renew'
+import { dueForRenewal, mergeRenewed, renewDue, renewOne, renewStalled, RENEW_MARGIN_SECONDS } from './renew'
 import { recordVerification, saveApp } from '../oauth/apps'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -450,5 +450,81 @@ describe('مراجعة D-320: التباعدُ للنهائيّ وحدَه', () 
     expect(held()[1]).toEqual({ account_id: 'x1', renew_failures: 1, held: 1 })
     await recordVerification(db, 'x', 'accepted')
     expect(held()[1]).toEqual({ account_id: 'x1', renew_failures: 0, held: 0 })
+  })
+})
+
+/**
+ * ‏**تحقّق D-320 على main: التباعدُ يعدّ الرفضَ وحدَه، و‏429 ليس رفضًا.** كان كلُّ سقوطٍ عابرٍ يزيد `renew_failures`، والرفضُ
+ * ‏الأوّلُ بعد عطلٍ عند المزوّد ينتظر نصفَ ساعةٍ مضروبةً في ‏2 أُسُّها كلُّ ما سقط قبله. وكان كلُّ ‏4xx رفضًا، ومنه ‏429 و‏408:
+ * ‏ردُّ «أبطئ» واحدٌ يعلّم الحسابَ «يحتاج تجديدًا» ويؤخّره ساعاتٍ بعد انتهاء رمزه.
+ */
+describe('تحقّق D-320 على main: الرفضُ وحدَه يتباعد، و«أبطئ» عابر', () => {
+  const TICK = 15 * 60_000
+  const at = (tick: number) => new Date(NOW.getTime() + tick * TICK)
+  const status = () => (db.raw.prepare("SELECT status FROM accounts WHERE id = 'a1'").get() as { status: string }).status
+  const retryAt = () => (db.raw.prepare("SELECT renew_retry_at FROM tokens WHERE account_id = 'a1'").get() as { renew_retry_at: string | null }).renew_retry_at
+  const answer = (code: number, headers: Record<string, string> = {}): typeof fetch => (async () =>
+    new Response(JSON.stringify({ error: code === 400 ? 'invalid_grant' : 'slow_down' }), {
+      status: code, headers: { 'Content-Type': 'application/json', ...headers },
+    })) as unknown as typeof fetch
+
+  it('أربعُ دوراتٍ ‏503 ثمّ رفضٌ: الرفضُ الأوّلُ ينتظر نصفَ ساعةٍ لا ثماني ساعات', async () => {
+    await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+    for (let tick = 0; tick < 4; tick += 1) await renewDue({ ...deps(answer(503)), now: () => at(tick) })
+    expect(status()).toBe('active')
+    await renewDue({ ...deps(answer(400)), now: () => at(4) })
+    expect(status()).toBe('needs_reauth')
+    expect(retryAt()).toBe(new Date(at(4).getTime() + 30 * 60_000).toISOString())
+    // ‏والرفضُ الثاني ضعفُه، ولو سقط بينهما عابر
+    await renewDue({ ...deps(answer(503)), now: () => at(6) })
+    await renewDue({ ...deps(answer(400)), now: () => at(7) })
+    expect(retryAt()).toBe(new Date(at(7).getTime() + 60 * 60_000).toISOString())
+  })
+
+  for (const code of [408, 425, 429]) {
+    it(`‏${code} بعد عطلٍ عند المزوّد عابرٌ: لا يُعلَّم الحساب، ويُحاوَل في الدورة التالية`, async () => {
+      await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+      for (let tick = 0; tick < 3; tick += 1) await renewDue({ ...deps(answer(503)), now: () => at(tick) })
+      const out = await renewDue({ ...deps(answer(code)), now: () => at(3) })
+      expect(out).toMatchObject({ needsOwner: 0, deferred: 1 })
+      expect(status()).toBe('active')
+      expect((await dueForRenewal(db, at(4))).map((r) => r.account_id)).toEqual(['a1'])
+    })
+  }
+
+  it('و‏429 بـ Retry-After يُنتظَر ما قال، لا أكثرَ من نصف ساعة', async () => {
+    await seed('a1', { access: inSec(110 * 60), refresh: 'r1' })
+    await renewDue({ ...deps(answer(429, { 'Retry-After': '1200' })), now: () => at(0) })
+    expect(status()).toBe('active')
+    expect((await dueForRenewal(db, at(1))).map((r) => r.account_id)).toEqual([])
+    expect((await dueForRenewal(db, at(2))).map((r) => r.account_id)).toEqual(['a1'])
+    // ‏ومهلةٌ تتجاوز هامشَ الرمز لا تُطاع كاملة: الرمزُ يموت قبلها
+    await renewDue({ ...deps(answer(429, { 'Retry-After': '86400' })), now: () => at(2) })
+    expect(retryAt()).toBe(new Date(at(2).getTime() + 30 * 60_000).toISOString())
+  })
+})
+
+/**
+ * ‏**تحقّق D-320 على main: دورةُ تجديدٍ لا تجدّد شيئًا لا تقول «دارت سليمة».** كان `dueForRenewal` يبلع عطلَ استعلامه فيعيد
+ * ‏فراغًا، فتنبض الدورةُ `ok` و`/pulse` ‏200 والرموزُ تموت.
+ */
+describe('تحقّق D-320 على main: عطلُ الاختيار يُرى', () => {
+  it('سؤالُ المستحقّ يسقط: تُرمى الدورة ولا تعيد «لا مستحقّ»', async () => {
+    await seed('a1', { access: inSec(600), refresh: 'r1' })
+    const broken = {
+      ...db,
+      prepare(query: string) {
+        if (/FROM tokens t JOIN accounts a/.test(query)) throw new Error('D1_ERROR: no such column: t.renew_failures')
+        return db.prepare(query)
+      },
+    } as FakeDb
+    await expect(renewDue({ ...deps(reply({})), db: broken })).rejects.toThrow(/D1_ERROR/)
+  })
+
+  it('وما استحقّ وسقط كلُّه عابرًا يُعدّ دورةً ساقطة، وما تجدّد منه شيءٌ لا', () => {
+    expect(renewStalled({ due: 3, renewed: 0, needsOwner: 0, deferred: 3 })).toBe(true)
+    expect(renewStalled({ due: 3, renewed: 1, needsOwner: 0, deferred: 2 })).toBe(false)
+    expect(renewStalled({ due: 2, renewed: 0, needsOwner: 2, deferred: 0 })).toBe(false)
+    expect(renewStalled({ due: 0, renewed: 0, needsOwner: 0, deferred: 0 })).toBe(false)
   })
 })

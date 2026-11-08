@@ -195,12 +195,17 @@ export async function unschedule(db: Db, postId: string, org: string | null = nu
   }
 
   // يعود `approved` لا `draft`: الاعتمادُ وقع ولا يُمحى بسحب موعد
-  await db
+  // ‏**والحارسُ في جملة التحديث نفسِها** (تحقّق D-320 على main): رسالةٌ مؤجَّلةٌ تختمه بين القراءة والكتابة تغلب، فلا يُقال «سُحب»
+  // ‏ومنشورُه خارج. والموعدُ والحسابُ كما قُرئا، فزرُّ «تراجَع» لا يحمل موعدًا غيّره طلبٌ آخر بينهما
+  const pulled = await db
     .prepare(
-      "UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, enqueued_for = NULL WHERE id = ? AND org_id = ?",
+      `UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, enqueued_for = NULL
+        WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL AND scheduled_at IS ? AND account_id IS ?
+        RETURNING id`,
     )
-    .bind(postId, row.org_id)
-    .run()
+    .bind(postId, row.org_id, row.scheduled_at, row.account_id)
+    .first<{ id: string }>()
+  if (pulled === null) return { ok: false, reason: 'تغيّرت حالُه قبل السحب، فأعد تحميل الصفحة' }
   // ‏وما كان يُعاد مع النتيجة (D-303): الموعدُ والحسابُ ليحملهما زرُّ «تراجَع» في الإشعار
   return { ok: true, at: row.scheduled_at ?? '', account: row.account_id ?? '', platform: '' }
 }
@@ -219,20 +224,28 @@ export async function restoreSchedule(
 ): Promise<ScheduleResult> {
   if (at === '' || accountId === '') return { ok: false, reason: 'لا موعدَ يُستعاد' }
   const row = await db
-    .prepare('SELECT status, scheduled_at FROM posts WHERE id = ? AND org_id = ?')
+    .prepare('SELECT status, scheduled_at, dispatched_at FROM posts WHERE id = ? AND org_id = ?')
     .bind(postId, org)
-    .first<{ status: string; scheduled_at: string | null }>()
+    .first<{ status: string; scheduled_at: string | null; dispatched_at: string | null }>()
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
-  if (row.status !== 'approved' || row.scheduled_at !== null) return { ok: false, reason: 'تبدّلت حالُها بعد السحب' }
+  // ‏ومختومٌ للإرسال لا يعود إلى الطابور (تحقّق D-320 على main): «مجدولٌ» مختومٌ لا تراه الدورةُ ولا الكنّاسُ إن كانت له محاولة
+  if (row.status !== 'approved' || row.scheduled_at !== null || row.dispatched_at !== null) {
+    return { ok: false, reason: 'تبدّلت حالُها بعد السحب' }
+  }
   const account = await db
     .prepare("SELECT id FROM accounts WHERE id = ? AND org_id = ? AND status = 'active'")
     .bind(accountId, org)
     .first<{ id: string }>()
   if (account === null) return { ok: false, reason: 'الحسابُ لم يعد مربوطًا' }
-  await db
-    .prepare("UPDATE posts SET status = 'queued', scheduled_at = ?, account_id = ?, enqueued_for = NULL WHERE id = ? AND org_id = ? AND status = 'approved'")
+  const restored = await db
+    .prepare(
+      `UPDATE posts SET status = 'queued', scheduled_at = ?, account_id = ?, enqueued_for = NULL
+        WHERE id = ? AND org_id = ? AND status = 'approved' AND scheduled_at IS NULL AND dispatched_at IS NULL
+        RETURNING id`,
+    )
     .bind(at, accountId, postId, org)
-    .run()
+    .first<{ id: string }>()
+  if (restored === null) return { ok: false, reason: 'تبدّلت حالُها بعد السحب' }
   return { ok: true, at, account: accountId, platform: '' }
 }
 

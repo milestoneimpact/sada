@@ -76,6 +76,25 @@ describe('الحكم (D-320)', () => {
     expect((await pulseReport(db, NOW)).healthy).toBe(true)
   })
 
+  /*
+   * ‏**تحقّق D-320 على main**: كان الحكمُ على أقدم ما سُلّم وحدَه، فمنشورٌ قديمٌ بقي في الطابور بعد دورةٍ للمستهلك (إعادةٌ
+   * ‏تنتظر) يجعل «دار بعده» صادقًا أبدًا، ويُخفي ما سُلّم بعد آخر دورةٍ ولم يصله.
+   */
+  it('ومنشورٌ قديمٌ بقي في الطابور بعد آخر دورةٍ للمستهلك لا يُخفي ما سُلّم بعدها ولم يصله', async () => {
+    beatAt('dispatch', 5)
+    beatAt('renew', 5)
+    // ‏دار المستهلكُ قبل خمسين دقيقة، وبقي بعدها منشورٌ سُلّم قبل سبعين (إعادةٌ تنتظر): ليس ركودًا
+    beatAt('publish', 50)
+    await handedToConsumer(70, 'dispatched')
+    expect((await pulseReport(db, NOW)).healthy).toBe(true)
+    // ‏ثمّ سُلّم منشورٌ قبل أربعين دقيقةً، بعد آخر دورة، ولم يدُر المستهلكُ بعده: ركود
+    await handedToConsumer(40, 'delayed')
+    const r = await pulseReport(db, NOW)
+    expect(r.late.map((l) => [l.job, l.state])).toEqual([['publish', 'late']])
+    expect(r.late[0]!.lateBy).toBe(40 * 60 - CONSUMER_GRACE_SECONDS)
+    expect((await app.request('/pulse', {}, { DB: db } as never)).status).toBe(503)
+  })
+
   it('وقاعدةٌ لا تُقرأ: ليس سليمًا', async () => {
     db.raw.exec('DROP TABLE heartbeats')
     expect((await pulseReport(db, NOW)).healthy).toBe(false)

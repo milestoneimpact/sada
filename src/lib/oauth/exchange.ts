@@ -46,9 +46,23 @@ export class OAuthError extends Error {
      * يُبنى عليه قرار (D-054: يُضيّق ولا يقرّر).
      */
     readonly description?: string,
+    /**
+     * ‏ثواني `Retry-After` كما ردّها المزوّدُ مع ‏429 وأخواتها (تحقّق D-320 على main) — أو `undefined` إن لم يقلها. يقرؤها
+     * ‏التجديدُ فلا يعيد قبلها، ولا تُقرأ لغيره.
+     */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message)
   }
+}
+
+/** ‏`Retry-After` بثوانيه أو بتاريخه (RFC 9110) — وما لا يُقرأ `undefined`، لا صفرٌ يُخترَع. */
+export function retryAfterOf(header: string | null, now: Date): number | undefined {
+  const raw = header?.trim() ?? ''
+  if (raw === '') return undefined
+  if (/^\d+$/.test(raw)) return Number(raw)
+  const at = Date.parse(raw)
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - now.getTime()) / 1000))
 }
 
 export interface ClientCredentials {
@@ -145,6 +159,7 @@ async function postForm(
       response.status,
       code,
       description,
+      retryAfterOf(response.headers.get('Retry-After'), now),
     )
   }
   return parseToken((await response.json()) as RawToken, now, requested)

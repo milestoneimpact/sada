@@ -5,8 +5,9 @@
  * ‏`sent`، ثمّ يسلّم التغريداتِ إلى هنا. **ولكلّ تغريدةٍ الترتيبُ نفسُه الذي للمنشور الواحد**:
  *
  *   ١ · مفتاحُها `<مفتاح المنشور>#<رقمها>` (D-004) — **ونجحت في محاولةٍ سابقة؟ لا تُرسَل**، ويُردّ على معرّفها
- *   ٢ · تُعلَّم `sent` قبل الإرسال (D-269): أُرسلت ولم يُعرَف جوابُها؟ تقف السلسلةُ ويُقال
- *   ٣ · **كلفتُها في الدفتر قبل أن تُعدّ** (D-008) — كلُّ تغريدةٍ طلبٌ مدفوع، وبرابطٍ ثلاثةَ عشرَ ضعفًا
+ *   ٢ · **كلفتُها في الدفتر قبل أن تُعدّ** (D-008) — كلُّ تغريدةٍ طلبٌ مدفوع، وبرابطٍ ثلاثةَ عشرَ ضعفًا
+ *   ٣ · تُعلَّم `sent` قبل الإرسال (D-269): أُرسلت ولم يُعرَف جوابُها؟ تقف السلسلةُ ويُقال. وعطلُ القاعدة في ٢ أو ٣ لم يُرسِل
+ *       شيئًا، فيُرمى `pre_send` قابلًا للإعادة (تحقّق D-320 على main)
  *   ٤ · ترسل ردًّا على التي قبلها (`reply.in_reply_to_tweet_id`)، والوسيطُ مع الأولى وحدها
  *   ٥ · `succeeded` بمعرّفها، أو `failed` حين **ردّتها X ردًّا قاطعًا** (4xx ومنه ‏429) — **والسلسلةُ تقف عند أوّل ما لم ينجح**
  *
@@ -255,21 +256,36 @@ export async function publishXThread(
       throw new PublishError(`thread_unconfirmed: التغريدة ${no} من ${tweets.length} أُرسلت ولم يُؤكَّد نشرُها — تحقّق على X ثمّ قل ما وجدت`, 0, false)
     }
     const author = post.external_id
-    marks.push({ no, key, digest: print, author, status: 'sent' })
-    await keep()
+    const sofar = ids.length === 0 ? '' : ` — نُشرت قبلها ${ids.length} ولا تُعاد`
 
-    // ٣ · الكلفةُ قبل الإرسال (D-008)
+    /*
+     * ‏٣ · **الكلفةُ قبل العلامة، والعلامةُ قبل الإرسال** (D-008 · D-269 · تحقّق D-320 على main). كانت العلامةُ تُحفَظ `sent`
+     * ‏ثمّ يُكتب الدفتر، فسقوطُ D1 في الدفتر يرمي خطأً عاديًّا يصنّفه الناشرُ «unconfirmed_send» نهائيًّا، وتبقى علامةُ تغريدةٍ لم
+     * ‏تبلغ X «أُرسلت» يردّ بها «أعده» حتّى يسوّيها المالك. فعطلٌ هنا قبل أيّ نداءٍ يُرمى `pre_send` قابلًا للإعادة كما في التغريدة
+     * ‏الواحدة (`ledger` في الناشر)، ويعيده الطابورُ من هذه التغريدة. وعلامةٌ سقط حفظُها بعد قيد الكلفة تُقيَّد ثانيةً في الإعادة:
+     * ‏الدفترُ أكثرُ من الحقيقة بتغريدةٍ لا أقلّ، وهو الاتّجاهُ الآمن (D-008). وعلامةٌ حُفظت ولم يصل جوابُ حفظها تبقى `sent` فلا تُرسَل.
+     */
     const hasUrl = containsUrl(tweet)
     const unitCost = estimatePostCost('x', hasUrl)
-    if (unitCost > 0) {
-      await recordCost(db, {
-        provider: 'x',
-        operation: hasUrl ? 'create_post_with_url' : 'create_post',
-        units: 1,
-        unitCost,
-        refId: post.id,
-        org: post.org_id,
-      })
+    try {
+      if (unitCost > 0) {
+        await recordCost(db, {
+          provider: 'x',
+          operation: hasUrl ? 'create_post_with_url' : 'create_post',
+          units: 1,
+          unitCost,
+          refId: post.id,
+          org: post.org_id,
+        })
+      }
+      marks.push({ no, key, digest: print, author, status: 'sent' })
+      await keep()
+    } catch (error) {
+      throw new PublishError(
+        `pre_send: التغريدة ${no} من ${tweets.length} لم تُرسَل، فلم يُكتب دفترُها أو علامتُها (${String(error).slice(0, 120)})${sofar}`,
+        503,
+        true,
+      )
     }
 
     // ٤ · ردًّا على التي قبلها، والوسيطُ مع الأولى وحدها
@@ -278,7 +294,6 @@ export async function publishXThread(
       out = await publishX(accessToken, tweet, fetchImpl, i === 0 ? mediaId : null, previous)
     } catch (error) {
       const detail = detailOf(error)
-      const sofar = ids.length === 0 ? '' : ` — نُشرت قبلها ${ids.length} ولا تُعاد`
       // ‏**ردٌّ قاطع** (4xx ومنه ‏429): لم تُنشَر يقينًا، فالإعادةُ تكمل منها ولا تعيد ما نُشر
       if (error instanceof PublishError && error.status >= 400 && error.status < 500) {
         marks[marks.length - 1] = { no, key, digest: print, author, status: 'failed', error: detail.slice(0, 300) }

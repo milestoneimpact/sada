@@ -29,7 +29,7 @@ import { readSettings } from './lib/settings'
 import { sendAlerts } from './lib/alerts/outbox'
 import { readWebhookUrl } from './lib/alerts/webhook'
 import { expiringTokens, recordAlerts } from './lib/token/expiry'
-import { renewDue } from './lib/token/renew'
+import { renewDue, renewStalled } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
@@ -688,7 +688,8 @@ async function publishQueue(batch: MessageBatch<PublishMessage>, env: Env): Prom
  * مقابلتُه بـ`wrangler.toml`** (D-058).
  *
  * وعطلُها لا يُرمى: حارسُ الناشر يمنع النشرَ برمزٍ ميت على كلّ حال —
- * **فسقوطُ التجديد يؤخّر ولا يُفسد.**
+ * **فسقوطُ التجديد يؤخّر ولا يُفسد.** ‏**لكنّه يُنبَض `failed`** (تحقّق D-320 على main): سؤالُ المستحقّ إن سقط، أو ما استحقّ
+ * ‏وسقط كلُّه عابرًا (`renewStalled`)، فيقوله `/pulse` وقناةُ المالك.
  */
 async function renewTick(env: Env): Promise<void> {
   try {
@@ -706,6 +707,11 @@ async function renewTick(env: Env): Promise<void> {
     })
     if (summary.due > 0) console.info({ job: 'renew', ...summary })
     // النبضُ بعد العمل (D-158): صفٌّ يقول إنّ الدورةَ دارت ولو لم تجد شيئا
+    // ‏**وما استحقّ وسقط كلُّه عابرًا دورةٌ ساقطة** (تحقّق D-320 على main): كان ينبض `ok` والرموزُ تقترب من موتها
+    if (renewStalled(summary)) {
+      await beat(env.DB, 'renew', 'failed', `${summary.due} مستحقّ، ولم يتجدّد منها شيء: ${summary.deferred} عابر`)
+      return
+    }
     await beat(env.DB, 'renew', 'ok', summary.due > 0 ? `${summary.due} مستحقّ` : 'لا مستحقّ')
   } catch (error) {
     console.error({ job: 'renew', failed: String(error) })

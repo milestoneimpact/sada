@@ -209,8 +209,13 @@ export async function sendAlerts(
       .bind(a.ref, a.org)
       .first<{ status: number | null; tries: number }>()
       .catch(() => null)
-    if (already !== null && already.status !== null) {
-      const ok = already.status >= 200 && already.status < 300
+    /*
+     * ‏**والحدُّ يُعدّ كلَّ نداءٍ أيًّا كان جوابُه** (تحقّق D-320 على main): نداءٌ يرمي (مهلةٌ أو انقطاعٌ أو DNS) يُكتب بحالٍ فارغة،
+     * ‏وكان الحدُّ يُسأل عنه للحال المكتوبة وحدَها، فتنبيهٌ لا يتغيّر مفتاحُه (سقوطٌ متّصلٌ للإرسال) يُرسَل كلَّ ساعةٍ بلا نهاية.
+     * ‏كما يقرؤها `collectAlerts` لصفوف الأمان: `tries < MAX_TRIES` أيًّا كانت الحال.
+     */
+    if (already !== null) {
+      const ok = already.status !== null && already.status >= 200 && already.status < 300
       if (ok || already.tries >= MAX_TRIES) { skipped += 1; continue }
     }
 

@@ -49,8 +49,12 @@ export interface PulseReport {
 }
 
 /**
- * ‏أقدمُ عملٍ صار في يد المستهلك ولم يدُر بعده (أو `null`): منشورٌ مجدولٌ خُتم «أُرسل»، أو أُرسلت له رسالةٌ مؤجَّلةٌ وحلّ موعدُها.
- * ‏وما خُتم يُحكَم عليه من ختمه، وما أُجّل من موعده.
+ * ‏أقدمُ عملٍ صار في يد المستهلك **بعد آخر دورةٍ له** ولم يدُر بعده (أو `null`): منشورٌ مجدولٌ خُتم «أُرسل»، أو أُرسلت له رسالةٌ
+ * ‏مؤجَّلةٌ وحلّ موعدُها. وما خُتم يُحكَم عليه من ختمه، وما أُجّل من موعده.
+ *
+ * ‏**وما سُلّم قبل آخر دورةٍ لا يُحكَم به** (تحقّق D-320 على main): كان الحكمُ على أقدم ما سُلّم وحدَه، فمنشورٌ قديمٌ بقي في
+ * ‏الطابور بعد دورةٍ للمستهلك (إعادةٌ تنتظر) يجعل «دار بعده» صادقًا أبدًا، ويُخفي ما سُلّم بعدها ولم يصله. فالقديمُ دار المستهلكُ
+ * ‏بعده، والحكمُ على أقدم ما سُلّم بعد نبضه.
  */
 export async function consumerStall(db: Db, now: Date, publish: Heartbeat | null): Promise<{ since: string; lateBy: number } | null> {
   const cutoff = dbNow(new Date(now.getTime() - CONSUMER_GRACE_SECONDS * 1000))
@@ -60,14 +64,13 @@ export async function consumerStall(db: Db, now: Date, publish: Heartbeat | null
         -- ‏الآلةُ واحدةٌ لكلّ المنظّمات
         WHERE org_id IN (SELECT id FROM orgs) AND status = 'queued'
           AND (dispatched_at IS NOT NULL OR (enqueued_for IS NOT NULL AND enqueued_for = scheduled_at))
-          AND coalesce(dispatched_at, scheduled_at) <= ?`,
+          AND coalesce(dispatched_at, scheduled_at) <= ?1
+          AND (?2 IS NULL OR coalesce(dispatched_at, scheduled_at) > ?2)`,
     )
-    .bind(cutoff)
+    .bind(cutoff, publish?.at ?? null)
     .first<{ since: string | null }>()
   const since = row?.since ?? null
   if (since === null) return null
-  // ‏دار المستهلكُ بعد أن صار العملُ في يده: يعمل، ولو بقي المنشورُ ينتظر إعادة
-  if (publish !== null && publish.at >= since) return null
   return { since, lateBy: Math.max(0, secondsSince(since, now) - CONSUMER_GRACE_SECONDS) }
 }
 

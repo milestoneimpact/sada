@@ -286,3 +286,56 @@ describe('سلسلة X: النوعُ لا النصّ (مراجعة D-324)', () =
     expect(ledger().n).toBe(1)
   })
 })
+
+/**
+ * ‏**تحقّق D-320 على main: عطلُ D1 قبل إرسال تغريدةٍ لم يُرسِل شيئًا، فيُعاد من الطابور.** كانت علامتُها تُحفَظ `sent` ثمّ
+ * ‏يُكتب الدفتر، فسقوطُ الدفتر يرمي خطأً عاديًّا يصنّفه الناشرُ «unconfirmed_send» نهائيًّا، و«أعده» يُردّ حتّى يسوّي المالكُ
+ * ‏تغريدةً لم تبلغ X قطّ. والتغريدةُ الواحدةُ في الحال نفسِها `pre_send` تُعاد.
+ */
+describe('سلسلة X: عطلُ القاعدة قبل الإرسال (تحقّق D-320 على main)', () => {
+  /** ‏القاعدةُ تسقط مرّةً في الاستعلام رقم `at` ممّا يطابق `pattern`، وما سواه يمضي. */
+  function blip(pattern: RegExp, at: number): () => void {
+    const realPrepare = db.prepare.bind(db)
+    let seen = 0
+    db.prepare = ((query: string) => {
+      if (pattern.test(query)) {
+        seen += 1
+        if (seen === at) throw new Error('D1_ERROR: Network connection lost.')
+      }
+      return realPrepare(query)
+    }) as typeof db.prepare
+    return () => { db.prepare = realPrepare }
+  }
+  const status = () => (db.raw.prepare("SELECT status FROM posts WHERE id = 'p-t'").get() as { status: string }).status
+
+  for (const [what, pattern, at, no] of [
+    ['الدفترُ يسقط عند الأولى', /INSERT INTO cost_ledger/, 1, 1],
+    ['الدفترُ يسقط عند الثانية', /INSERT INTO cost_ledger/, 2, 2],
+    // ‏كتاباتُ العلامة: ١ «أُرسلت» للأولى، ٢ «نجحت» لها، ٣ «أُرسلت» للثانية
+    ['علامةُ «أُرسلت» للثانية لا تُحفَظ', /SET request_json/, 3, 2],
+  ] as const) {
+    it(`${what}: لا يُرسَل منها شيء، والمنشورُ يبقى مجدولًا يعيده الطابور، والإعادةُ تكمل منها`, async () => {
+      const id = await seedThread()
+      const net = x()
+      const restore = blip(pattern, at)
+      const out = await publishPost(deps(net.impl), { postId: id })
+      restore()
+      expect(out.kind).toBe('failed')
+      if (out.kind === 'failed') {
+        expect(out.retryable).toBe(true)
+        expect(out.reason).toMatch(new RegExp(`^pre_send: التغريدة ${no} من 3`))
+      }
+      // ‏ما قبلها أُرسل مرّةً، وهي لم تُرسَل
+      expect(net.sent).toHaveLength(no - 1)
+      expect(status()).toBe('queued')
+      expect(items().filter((m) => m.status === 'sent')).toEqual([])
+
+      const retry = x({}, no)
+      expect(await publishPost(deps(retry.impl), { postId: id })).toEqual({ kind: 'published', platformPostId: 'tw-1' })
+      // ‏والإعادةُ ترسل من التي لم تُرسَل، ولا تُرسَل تغريدةٌ مرّتين
+      expect([...net.sent, ...retry.sent].map((s) => s.text)).toEqual(THREAD.split('\n---\n'))
+      // ‏وكلُّ ما أُرسل في الدفتر (D-008)، ولا أقلّ
+      expect(ledger().n).toBeGreaterThanOrEqual(3)
+    })
+  }
+})
