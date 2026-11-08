@@ -392,6 +392,11 @@ export function channelsSection(
   const built = [...all.filter((v) => !later.includes(v))].sort((a, b) => Number(!(PLAN_NOW as readonly string[]).includes(a.spec.id)) - Number(!(PLAN_NOW as readonly string[]).includes(b.spec.id)))
   const rest = views.filter((v) => !v.spec.built)
   const kinds = built.map((v) => channelHealth(v, now).kind)
+  /*
+   * ‏**ولا طيّةَ حين لا شيءَ مربوط** (D-326 · ر-1): الطيُّ هدوءٌ لمن نشر على منصّتي خطّته، ومن لم يربط شيئًا بعدُ كانت ثلاثٌ من
+   * ‏خمسٍ خلف لمسةٍ في أوّل يومه. فتُفتح ما دام لا حسابَ على أيّ منصّة، وتُطوى بعد أوّل ربط كما كانت (D-289).
+   */
+  const none = all.every((v) => v.accounts.length === 0)
   const n = (...k: ChannelHealthKind[]): number => kinds.filter((x) => k.includes(x)).length
   const relink = n('broken', 'expiring')
   const strip = `<div class="card grid tiles c3 mb-4">
@@ -409,7 +414,7 @@ export function channelsSection(
 
   return `${strip}
   <div class="grid c2">${built.map((v) => card(v, now)).join('')}</div>
-  ${later.length === 0 ? '' : html`<details class="fold mt-5"><summary><span>منصّاتٌ لاحقة (${String(later.length)}) — ${later.map((v) => v.spec.label).join(' و')}</span></summary>
+  ${later.length === 0 ? '' : html`<details class="fold mt-5"${raw(none ? ' open' : '')}><summary><span>منصّاتٌ لاحقة (${String(later.length)}) — ${later.map((v) => v.spec.label).join(' و')}</span></summary>
     <p class="hint">خارج خطّتك الآن. تُضبط وتُربط حين تقرّر النشر عليها.</p>
     <div class="grid c2">${raw(later.map((v) => card(v, now)).join(''))}</div></details>`.value}
   ${rest.length === 0 ? '' : `<p class="hint mt-5">قريبًا: ${rest.map((v) => escapeHtml(v.spec.label)).join(' و')}</p>`}`

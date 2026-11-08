@@ -1,9 +1,9 @@
 /** الرئيسيّة: فعلٌ واحدٌ بأولويّةٍ مكتوبة، وسبعُ محطّات، وزرٌّ لكلّ منصّة (D-177). */
 import { describe, expect, it } from 'vitest'
-import { viewChannels, type LinkedAccount } from './channels'
+import { setupHref, viewChannels, type LinkedAccount } from './channels'
 import { counted, NOUNS } from './format'
 import {
-  journeyCounts, journeySteps, nextAction, systemPill, writeBlock,
+  firstRun, journeyCounts, journeySteps, nextAction, systemPill, writeBlock,
   type HomeFacts, type PlatformCounts,
 } from './home'
 import { pulses, type Heartbeat } from './ops/heartbeat'
@@ -70,6 +70,21 @@ describe('nextAction', () => {
 
   it('ولا منصّة متّصلة: اربط أوّلًا', () => {
     expect(nextAction(facts({ channels: viewChannels([], () => true) })).label).toBe('اربط أوّل منصّة')
+  })
+
+  /*
+   * ‏**والزرُّ إلى مساعد المنصّة نفسِه** (مراجعة D-326 · ر-1·أوّل): كان `#channels` فيُحوَّل إلى «الحسابات» ثمّ «أكمل الإعداد»
+   * ‏على البطاقة ثمّ الحقل — خطوةٌ وتحميلٌ فوق الهدف ≤5، ولا رحلةَ تقيسه. فالمضبوطُ تطبيقُها يُربط من الزرّ مباشرةً، وإلّا
+   * ‏فأوّلُ منصّةٍ مبنيّة إلى حقل معرّفها.
+   */
+  it('والزرُّ إلى مساعد ضبط أوّل منصّةٍ عند حقل معرّفها، أو إلى ربط منصّةٍ ضُبط تطبيقُها', () => {
+    const none = nextAction(facts({ channels: viewChannels([], () => false) }))
+    expect(none.label).toBe('اربط أوّل منصّة')
+    expect(none.href).toBe(setupHref('linkedin'))
+    expect(none.text).toContain('LinkedIn')
+    const x = nextAction(facts({ channels: viewChannels([], (n) => n.startsWith('X_')) }))
+    expect(x.href).toBe('/oauth/x/start')
+    expect(x.text).toContain('X')
   })
 
   it('ثمّ المسوّدات بعدد صحيح، ثمّ المواعيد، ثمّ «على المسار»', () => {
@@ -318,5 +333,31 @@ describe('لوحة القيادة: القمع وشريط الأسبوع (D-194)'
     expect(Object.fromEntries(steps.map((s) => [s.key, s.count]))).toEqual({
       source: 3, draft: 15, image: 4, approve: 10, schedule: 8, publish: 4, results: 2,
     })
+  })
+})
+
+describe('قائمةُ البدء «1 من 3» (D-326 · خطّة التصميم 5.5 «أوّل تشغيل»)', () => {
+  const empty = { channels: viewChannels([], () => false), sources: { total: 0, analyzed: 0 } }
+  it('رئيسيّةٌ خالية: الخطوةُ الأولى الآن ولا شيءَ تمّ', () => {
+    const r = firstRun(facts(empty))
+    expect(r?.current).toBe(0)
+    expect(r?.steps.map((s) => s.done)).toEqual([false, false, false])
+  })
+  it('حسابٌ مربوطٌ ولا مادّة: الثانيةُ الآن، والأولى تمّت', () => {
+    const r = firstRun(facts({ sources: { total: 0, analyzed: 0 } }))
+    expect(r?.current).toBe(1)
+    expect(r?.steps.map((s) => s.done)).toEqual([true, false, false])
+  })
+  it('مسوّدةٌ تنتظر القرار (ولو بلا مصدر — من فكرة): الثالثةُ الآن', () => {
+    const r = firstRun(facts({ sources: { total: 0, analyzed: 0 }, counts: { perPlatform: { linkedin: counts({ draft: 1 }) }, publishedWeek: 0 } }))
+    expect(r?.current).toBe(2)
+  })
+  it('أوّلُ منشورٍ معتمَدٌ أو مجدول: اكتملت فلا قائمة', () => {
+    expect(firstRun(facts({ counts: { perPlatform: { linkedin: counts({ approved: 1 }) }, publishedWeek: 0 } }))).toBeNull()
+    expect(firstRun(facts({ counts: { perPlatform: { linkedin: counts({ queued: 1 }) }, publishedWeek: 0 } }))).toBeNull()
+  })
+  it('ومن نشر مرّةً (أو فشل نشرُه) لا يعود إلى البدء ولو انقطعت حساباتُه بعدها', () => {
+    expect(firstRun(facts({ ...empty, counts: { perPlatform: { x: counts({ published: 1 }) }, publishedWeek: 0 } }))).toBeNull()
+    expect(firstRun(facts({ ...empty, counts: { perPlatform: { x: counts({ failed: 1 }) }, publishedWeek: 0 } }))).toBeNull()
   })
 })

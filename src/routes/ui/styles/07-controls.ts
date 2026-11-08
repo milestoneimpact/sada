@@ -291,7 +291,8 @@ ul.plain li:last-child{margin-bottom:0}
 .ch-go:focus-visible{outline:none}
 .ch-go:focus-visible::after{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
 .ch-foot,.ch-acc{position:relative; z-index:1}
-.ch-top{display:flex; align-items:center; gap:var(--s-3)}
+/* ‏ويلتفّ (دمجُ D-326 مع D-325): بالخطّ الأكبر كانت «تحتاج إعدادًا» تفيض من رأس البطاقة بـ4px عند 320 و14px عند 900 */
+.ch-top{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3)}
 .ch-logo{width:var(--s-8); height:var(--s-8); border-radius:var(--r-control); flex:none; display:grid; place-items:center;
   background:var(--surface-2); border:var(--bd); color:var(--ink-2)}
 .ch-logo svg{width:50%; height:50%; display:block}

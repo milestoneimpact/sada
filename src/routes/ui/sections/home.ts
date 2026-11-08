@@ -9,15 +9,19 @@
  */
 import { escapeHtml } from '../escape'
 import {
-  journeySteps, nextAction,
-  type HomeFacts, type JourneyStep,
+  firstRun, journeySteps, nextAction,
+  type FirstRun, type HomeFacts, type JourneyStep,
 } from '../../../lib/home'
+import { channelHealth } from '../../../lib/channels'
 import { num, parseSqliteUtc } from '../../../lib/format'
 import { clock, localParts } from '../../../lib/time/zone'
 import { platformLabel } from '../../../lib/oauth/providers'
 
 import { LOGOS } from '../logos'
-import { html, raw } from '../html'
+import { html, raw, type Html } from '../html'
+import { card } from '../components/card'
+// ‏باسمٍ آخر: «button» اسمُ حقلٍ في حال المنصّة (`h.button`)، وحارسُ القالب يقرأ الاسم
+import { button as kitButton } from '../components/button'
 import { stamp } from '../../../lib/time/zone'
 import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
 import type { StoredPlan } from '../../../lib/plan/job'
@@ -188,41 +192,112 @@ function today(items: readonly { platform: string; at: string }[], now: Date, zo
   </div>`
 }
 
-export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = ''): string {
+const FR_MARK = {
+  done: { g: '●', cls: 'ok', label: 'تمّت' },
+  now: { g: '◍', cls: 'warn', label: 'الآن' },
+  waiting: { g: '○', cls: 'idle', label: 'تنتظر' },
+} as const
+
+/**
+ * ‏**قائمةُ البدء «1 من 3»** (خطّة التصميم 5.5 «أوّل تشغيل» · D-326) — بعد «خطوتك التالية» لا بدلَها: الخطوةُ التالية تبقى
+ * ‏أوّلَ الرئيسيّة بزرّها الأوّليّ الواحد، والقائمةُ تقول أين المالكُ من البدء وكم بقي، **بلا زرٍّ أوّليٍّ ثانٍ**. ولكلّ خطوةٍ
+ * ‏فعلُها حين تكون الآن: الأولى **أسماءُ المنصّات، كلٌّ رابطٌ إلى مساعد ضبط تطبيقها عند حقل المعرّف** (`setupHref`) أو إلى
+ * ‏ربطها إن ضُبط — فلا «المزيد» ثمّ «الحسابات» ثمّ الطيّةُ قبل أوّل حقل (ر-1·أوّل) — والثانيةُ بابُ الفكرة (لا تحتاج Drive)،
+ * ‏والثالثةُ أوّلُ مسوّدةٍ تنتظر.
+ */
+function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
+  const done = run.steps.filter((x) => x.done).length
+  const doors = f.channels
+    .filter((c) => c.spec.built && c.accounts.length === 0)
+    .map((c) => ({ c, h: channelHealth(c, now) }))
+    .filter((x) => x.h.button !== null && (x.h.kind === 'setup' || x.h.kind === 'connectable'))
+    .map((x, i) => html`${i === 0 ? '' : ' · '}<a class="tap" href="${x.h.button!.href}">${x.c.spec.label}</a>`)
+  const text: Readonly<Record<FirstRun['steps'][number]['key'], { what: string; why: string; act: Html }>> = {
+    link: {
+      what: 'اربط أوّل حساب',
+      why: 'صدى يكتب ولا ينشر حتّى تربط منصّة. لكلّ منصّةٍ تطبيقٌ يُضبط مرّةً واحدة بمساعدٍ مرقّم، ثمّ «اربط».',
+      act: doors.length === 0 ? html`` : html`<span class="why">اختر منصّة: ${doors}</span>`,
+    },
+    material: {
+      what: 'أضف ما يُكتب منه',
+      why: 'فكرةٌ بجملة، أو مقطعٌ يُرفع، أو ملفٌّ في مجلّد Drive المشترَك.',
+      act: html`<span class="why mt-2">${raw(kitButton({ label: 'اكتب فكرتك', href: '/panel#idea', size: 'sm' }))}</span>`,
+    },
+    approve: {
+      what: 'اعتمد أوّل منشور',
+      why: 'يُجدوَل في موعده ثمّ يُنشر — ولا يُنشر شيءٌ قبل اعتمادك.',
+      act: html`<span class="why mt-2">${raw(kitButton({ label: 'راجع المسوّدات', href: f.firsts.waiting === null ? '#posts' : '#d-' + f.firsts.waiting, size: 'sm' }))}</span>`,
+    },
+  }
+  const rows = run.steps.map((x, i) => {
+    const state = x.done ? 'done' : i === run.current ? 'now' : 'waiting'
+    const mark = FR_MARK[state]
+    const t = text[x.key]
+    return html`<li class="${mark.cls + (state === 'now' ? ' at' : '')}" data-step="${i + 1}">
+        <span class="step-n" aria-hidden="true">${i + 1}</span>
+        <span class="body"><span class="what">${t.what}</span><span class="why">${t.why}</span>${state === 'now' ? t.act : ''}</span>
+        ${raw(statusBadge(mark.cls, mark.g, mark.label))}
+      </li>`
+  })
+  // ‏و`div` بدورٍ لا `section`: اللوحُ نفسُه `section` (`data-pane`)، وما يُقرأ حتّى أوّلِ إغلاقٍ له يُقرأ لوحًا كاملًا
+  // ‏والعدّادُ يقول الخطوةَ الآن («الخطوة 3 من 3»)، والشريطُ ما تمّ (2): كان «3 من 3» بجوار شريطٍ بثلثين، فيُقرأ «اكتملت»
+  // ‏وما زالت خطوةٌ باقية، ويسمع قارئُ الشاشة رقمين متناقضين (مراجعة D-326)
+  // ‏وبدوالّ العُدّة (دمجُ D-326 مع سقّاطة D-325): البطاقةُ بـ`card()` وعنوانُها يسمّي المنطقةَ والشريط، والفعلُ بـ`button()`
+  const body = html`<div class="hp-prog"><progress max="3" value="${done}" aria-labelledby="fr-t"></progress><span data-fr-count>الخطوة ${run.current + 1} من 3</span></div>
+    <ol class="steps wiz mt-3">${rows}</ol>`.value
+  return html`<div class="mb-3">${raw(card({ id: 'first-run', title: 'البدء في ثلاث خطوات', titleId: 'fr-t', attrs: 'role="region" aria-labelledby="fr-t"', body }))}</div>`.value
+}
+
+/**
+ * ‏`entry`: بابُ الكتابة في سطر التحيّة (D-326 · «أنشئ من كلّ مكان»): «منشور جديد ▾» ثانويٌّ بجانب التحيّة على الهاتف، حيث
+ * ‏لا ترويسةَ تحمله — فلا يُبحث عن الكتابة خلف زرٍّ عائمٍ بلا اسمٍ يُرى، ولا زرَّ أوّليًّا ثانيًا في البطاقة.
+ */
+export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = ''): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
   const focus = focusOf(trip, next.step)
+  const run = firstRun(f)
+  /*
+   * ‏**والمؤشّراتُ مخفيّةٌ حتّى تتوفّر بيانات** (خطّة التصميم 5.5 · D-326): رئيسيّةٌ لا مصدرَ فيها ولا منشورَ ولا موعد كانت تُري
+   * ‏أربعةَ أصفار، وقمعًا بسبع محطّاتٍ فارغة، وأسبوعًا خاليًا — شاشتين من لا شيء فوق ما يفعله المالكُ أوّلًا.
+   */
+  const written = (['draft', 'approved', 'queued', 'published', 'failed'] as const).reduce((n, k) => n + total(f.counts, k), 0)
+  const bare = run !== null && f.sources.total === 0 && written === 0 && (f.scheduled ?? []).length === 0
   /*
    * ‏**ولا تُقال الحالُ مرّتين** (D-289): منصّةٌ انقطعت أو قارب إذنُها يقولها شريطُ اللوحة فوق كلّ لوح بزرّه، فكانت الرئيسيّةُ
    * ‏تعيدها بطاقةً حمراءَ كاملةً تحته — أوّلَ ما يُرى في كلّ فتحة. فخطوةٌ عن منصّةٍ والشريطُ يقولها تُترك له، ويبقى التحيّةُ سطرًا.
    */
   // ‏والزرُّ يبقى بضغطةٍ واحدة صغيرًا بجانب التحيّة: الشريطُ يقول الحالَ، وهذا يصلحها
   const repeated = next.tone === 'bad' && next.href.startsWith('/oauth/')
+  const hello = entry === ''
+    ? html`<p class="hello">${greeting(now, f.zone)}</p>`
+    : html`<div class="row gap-2"><p class="hello">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}</div>`
   return `${repeated
-    ? html`<div class="row gap-2 home-hello"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>
+    ? html`<div class="row gap-2 home-hello"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}
         <a class="btn btn-secondary btn-sm" href="${next.href}">${next.label}</a></div>`.value
     : html`<div class="card card-alert next" data-tone="${next.tone}">
-    <div class="next-body"><p class="hello">${greeting(now, f.zone)}</p><span class="next-k">خطوتُك التالية</span>
+    <div class="next-body">${hello}<span class="next-k">خطوتُك التالية</span>
       <p class="next-t">${next.text}</p></div>
     <a class="btn btn-primary" href="${next.href}">${next.label}</a>
   </div>`.value}
+  ${run === null ? '' : firstRunCard(run, f, now)}
   ${lead}
-  ${stats(f)}
+  ${bare ? '' : stats(f)}
   ${kpis}
 
-  <div class="home-pair">
+  ${bare ? '' : html`<div class="home-pair">
     <div class="card home-card">
       <div class="card-head"><h2>رحلة المنشور</h2><div class="grow"></div>
         <span class="ago">كم مرّ بكلّ محطّة</span></div>
-      <ol class="funnel">${trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join('')}</ol>
+      <ol class="funnel">${raw(trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join(''))}</ol>
     </div>
     <div class="home-side">
     ${/* ‏ولا بطاقةَ منصّاتٍ هنا (D-309 · خطّة التصميم 5.5): صفحتُها «الحسابات»، والمنقطعةُ يقولها الشريطُ و«خطوتك التالية»؛
        ‏و«ما كُتب في أسبوعين» سجلٌّ لا قرار، فنزل إلى «الكلفة وما وقع» (قاعدةُ الحذف D-232) */''}
-    ${today(f.scheduled ?? [], now, f.zone)}
-    ${week(f.scheduled ?? [], now, f.zone)}
+    ${raw(today(f.scheduled ?? [], now, f.zone))}
+    ${raw(week(f.scheduled ?? [], now, f.zone))}
     </div>
-  </div>`
+  </div>`.value}`
 }
 
 /**

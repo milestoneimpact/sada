@@ -11,8 +11,9 @@
  *   text      ما يُقاس نصُّه
  *   print     ما يُطبَع
  */
+// ‏و«الرئيسيّةُ الخالية» بحسابيها (D-326): قائمةُ البدء و«منصّاتٌ لاحقة» مفتوحة — وضعٌ يُشحَن فيُدقَّق
 const PANEL = ['panel', 'panel-library', 'panel-accounts', 'panel-settings', 'panel-results', 'panel-first',
-  'panel-first-accounts', 'panel-editor', 'panel-editor-queued', 'panel-week', 'panel-plan-off']
+  'panel-first-accounts', 'panel-zero', 'panel-zero-accounts', 'panel-editor', 'panel-editor-queued', 'panel-week', 'panel-plan-off']
 // ‏و«بوّابات المراحل» بجانب «ما عليك» (دمجُ D-318 مع D-324): خرجت منها إلى صفحتها، فتُدقَّق حيثما دُقّقت هي
 const SCREENS = ['screen-tasks', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
   'screen-tiktok', 'screen-link-only', 'screen-yt-setup', 'screen-instagram', 'screen-unbuilt', 'screen-refused',

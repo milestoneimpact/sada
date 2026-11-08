@@ -133,7 +133,7 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   body:has(details.fab) .content > footer{margin-bottom:var(--s-16)}
   /* ‏ولا في «المنشورات»: رأسُها يحمل الأبوابَ الأربعة، والزرُّ فوق «اكتب المسوّدات» ابتلع ضغطتَها في ر-2·stop —
      الحقل يفقد التركيز عند اللمس فيعود الزرّ تحت الإصبع. فيختفي ما دام في نموذج تركيز، لا في الحقل وحدَه */
-  body[data-pane]:not([data-pane=overview]):not([data-pane=library]) details.fab,
+  body[data-pane]:not([data-pane=library]) details.fab,
   body:has(#ed) details.fab,body:has(form:focus-within) details.fab{display:none}
   /* **والمحتوى لا يختفي تحت الشريط**: حشوٌ بقدره وقدرِ شريط الجهاز.
      والشريط ‏٥٢px (هدف ‏٤٤ وحشو ‏٨)، **فـ«--s-16» تتركه ‏١٢ فوقه** — وكان
@@ -200,6 +200,8 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
 @media${atLeast('md')}{details.more-sheet,details.fab{display:none}}
 /* ‏«منشور جديد» في الترويسة على العريض، والعائمُ مكانه على الضيّق (D-216) */
 @media${below('md')}{details[data-tb-new]{display:none}}
+/* ‏وبابُ الكتابة في سطر التحيّة للهاتف وحدَه (D-326): على العريض زرُّ الترويسة نفسُه ظاهر */
+@media${atLeast('md')}{details[data-home-new]{display:none}}
 /* ‏وبابُ «المنشورات» الواحدُ على الضيّق وحدَه: على العريض يكفي زرُّ الترويسة (D-232) */
 @media${atLeast('md')}{details[data-head-new]{display:none}}
 @media${below('sm')}{

@@ -4120,6 +4120,31 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     for (const label of ['LinkedIn', 'X', 'Instagram', 'TikTok', 'YouTube']) expect(accounts).toContain(label)
   })
   /*
+   * ‏**«لا قناة مربوطة» تُقال حين لا تقولها قائمةُ البدء** (مراجعة D-326): كان الشرطُ «لا مربوطة وفي منصّةٍ حساب» — و`viewChannels`
+   * ‏تجعل كلَّ منصّةٍ مبنيّةٍ بحسابٍ غيرِ مفصولٍ «مربوطة» أو «تحتاج تجديدًا» — فلا يقع أبدًا. ومن نشر ثمّ فصل حساباتِه كلَّها لا قائمةَ
+   * ‏بدءٍ له، و«خطوتك التالية» يأخذها فشلُ ما كان مجدولًا، فلا يقول شيءٌ في الرئيسيّة إنّ لا منصّة مربوطة.
+   */
+  it('من نشر ثمّ فصل كلَّ حساباته: «ما ينتظرك» تقول «لا قناة مربوطة» — والرئيسيّةُ الخالية تقولها قائمةُ البدء وحدَها', async () => {
+    const warn = 'لا قناة مربوطة — النظام يفهم ويكتب ولا ينشر.'
+    const fresh = await (await app.request('/panel', withSession(await login()), env)).text()
+    expect(fresh).toContain('id="first-run"')
+    expect(fresh).not.toContain(warn)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status)
+                 VALUES ('linkedin:member:gone', 'linkedin', 'member', 'gone', 'عمر', 'revoked')`)
+    for (const status of ['published', 'failed']) {
+      const id = crypto.randomUUID()
+      await db
+        .prepare(`INSERT INTO posts (id, account_id, platform, type, text, status, idempotency_key, approved_by, approved_at, scheduled_at)
+                  VALUES (?, 'linkedin:member:gone', 'linkedin', 'text', 'نصّ', ?, ?, 'omar', datetime('now'), datetime('now'))`)
+        .bind(id, status, `k-${id}`)
+        .run()
+    }
+    const html = await (await app.request('/panel', withSession(await login()), env)).text()
+    expect(html).not.toContain('id="first-run"')
+    expect(html).toContain(warn)
+  })
+
+  /*
    * ‏**المحطّةُ تنزل إلى البطاقة التي تعدّها، والبطاقةُ مرسومةٌ بمرساتها** (ر-0، ر-3، ر-6).
    * ‏كانت المحطّاتُ كلُّها `#posts` والمسوّدةُ المنتظرةُ ثانيةُ اللوح بعد منشورٍ مجدول.
    */

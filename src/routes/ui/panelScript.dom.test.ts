@@ -328,3 +328,71 @@ describe('بلا اتّصال: الزرُّ المعطَّلُ موصوفٌ با
     expect(w.document.getElementById(offId)).toBeNull()
   })
 })
+
+describe('«أنشئ وجدوِل» يقول ما سيقع (D-326 · ر-4)', () => {
+  const FORM = `<form method="POST" action="/panel/uploads/u1/posts">
+    <label><input type="checkbox" name="approve" checked> اعتمده الآن</label>
+    <select name="preset"><option value="">لاحقًا</option><option value="tonight">الليلة 8:00 م</option><option value="tomorrow" selected>غدًا 9:00 ص</option></select>
+    <button class="btn btn-primary" type="submit" data-create-go>أنشئ وجدوِل · غدًا 9:00 ص</button></form>`
+  it('اسمُ الزرّ يتبع «متى؟» و«اعتمده الآن»: بلا موعدٍ أو بلا اعتمادٍ «أنشئ المنشورات»', () => {
+    const { w, thrown } = boot('', NAV + PANES + FORM)
+    expect(thrown).toBeNull()
+    const d = w.document
+    const go = d.querySelector('[data-create-go]')!
+    const when = d.querySelector('select[name=preset]') as unknown as { value: string; dispatchEvent(e: unknown): void }
+    const ok = d.querySelector('input[name=approve]') as unknown as { checked: boolean; dispatchEvent(e: unknown): void }
+    when.value = 'tonight'
+    when.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(go.textContent).toBe('أنشئ وجدوِل · الليلة 8:00 م')
+    when.value = ''
+    when.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(go.textContent).toBe('أنشئ المنشورات')
+    when.value = 'tomorrow'
+    when.dispatchEvent(new w.Event('change', { bubbles: true }))
+    ok.checked = false
+    ok.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(go.textContent).toBe('أنشئ المنشورات')
+  })
+  /*
+   * ‏**وبلا اعتمادٍ لا يُرسَل الموعدُ الافتراضيّ** (مراجعة D-326): كان الإلغاءُ يبدّل اسمَ الزرّ وحدَه و«متى؟» باقٍ «غدًا»، فيقرأ الخادمُ
+   * ‏موعدًا طُلب بلا اعتماد ويردّ بتنبيه D-314 عن موعدٍ لم يختره المالك. فيعود «متى؟» إلى «لاحقًا»، ويُستعاد بإعادة التأشير.
+   */
+  it('إلغاءُ «اعتمده الآن» يعيد «متى؟» إلى «لاحقًا» فلا يُرسَل موعد، وإعادتُه تستعيد الموعد', () => {
+    const { w } = boot('', NAV + PANES + FORM)
+    const d = w.document
+    const go = d.querySelector('[data-create-go]')!
+    const when = d.querySelector('select[name=preset]') as unknown as { value: string; dispatchEvent(e: unknown): void }
+    const ok = d.querySelector('input[name=approve]') as unknown as { checked: boolean; dispatchEvent(e: unknown): void }
+    const sent = (): string => String(new (w as unknown as { FormData: new (f: unknown) => { get(n: string): unknown } }).FormData(d.querySelector('form')).get('preset'))
+    // ‏(وhappy-dom لا يقرأ سمةَ «selected» على غير الأوّل كما يقرؤها المتصفّح، فيُضبط الموعدُ صراحةً كما يرسمه الخادم)
+    when.value = 'tomorrow'
+    ok.checked = false
+    ok.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(when.value).toBe('')
+    expect(sent()).toBe('')
+    expect(go.textContent).toBe('أنشئ المنشورات')
+    ok.checked = true
+    ok.dispatchEvent(new w.Event('change', { bubbles: true }))
+    expect(when.value).toBe('tomorrow')
+    expect(go.textContent).toBe('أنشئ وجدوِل · غدًا 9:00 ص')
+  })
+})
+
+describe('مرساةُ حقلٍ تنزل إلى وسط الشاشة (D-326 · ر-4)', () => {
+  it('«#vc-…» بعد رفع المقطع: الحقلُ في الوسط ومركَّزٌ، والبطاقةُ في الأعلى كما كانت', () => {
+    const calls: { id: string; block: string }[] = []
+    const run = (hash: string): void => {
+      const w = new Window({ url: `https://sada2.basserh.com/panel${hash}` })
+      open.push(w)
+      w.document.body.innerHTML = NAV + PANES.replace('</section>\n</main>',
+        '<div class="card" id="v-u1"><textarea id="vc-u1"></textarea></div></section>\n</main>')
+      ;(w as unknown as { HTMLElement: { prototype: { scrollIntoView: (o?: { block?: string }) => void } } }).HTMLElement.prototype.scrollIntoView =
+        function (this: { id: string }, o?: { block?: string }) { calls.push({ id: this.id, block: o?.block ?? '' }) }
+      ;(w as unknown as { eval(code: string): void }).eval(panelScript().body)
+    }
+    run('#vc-u1')
+    expect(calls.find((c) => c.id === 'vc-u1')?.block).toBe('center')
+    run('#d-42')
+    expect(calls.find((c) => c.id === 'd-42')?.block).toBe('start')
+  })
+})

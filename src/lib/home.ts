@@ -441,7 +441,23 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   }
   const linked = f.channels.some((c) => c.state === 'linked')
   if (!linked) {
-    return { tone: 'warn', text: 'لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.', label: 'اربط أوّل منصّة', href: '#channels' }
+    /*
+     * ‏**إلى مساعد المنصّة نفسِه** (مراجعة D-326 · ر-1·أوّل): كان `#channels` فيُحوَّل إلى «الحسابات» ثمّ «أكمل الإعداد» على البطاقة
+     * ‏ثمّ الحقل — خطوةٌ وتحميلٌ فوق الهدف ≤5. فمنصّةٌ ضُبط تطبيقُها تُربط من الزرّ مباشرةً، وإلّا فأوّلُ منصّةٍ مبنيّة (بترتيب
+     * ‏السجلّ: LinkedIn أوّلًا) إلى حقل معرّفها بزرّ بطاقتها نفسِه (`channelHealth`)، وغيرُها في قائمة البدء و«الحسابات».
+     */
+    const doors = f.channels.filter((c) => c.spec.built && c.accounts.length === 0).map((c) => ({ c, h: channelHealth(c, now) }))
+    const door = doors.find((x) => x.h.kind === 'connectable') ?? doors.find((x) => x.h.kind === 'setup')
+    return {
+      tone: 'warn',
+      text: door === undefined
+        ? 'لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة.'
+        : door.h.kind === 'connectable'
+          ? `لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة. تطبيقُ ${door.c.spec.label} مضبوط، فيبدأ الزرُّ بربطها.`
+          : `لا منصّة متّصلة — صدى يكتب ولا ينشر حتّى تربط واحدة. يبدأ الزرُّ بضبط ${door.c.spec.label} ثمّ ربطها.`,
+      label: 'اربط أوّل منصّة',
+      href: door?.h.button?.href ?? '#channels',
+    }
   }
   const drafts = total(f.counts, 'draft')
   const approved = total(f.counts, 'approved')
@@ -486,3 +502,30 @@ export function nextAction(f: HomeFacts, now: Date = new Date()): NextAction {
   }
 }
 
+
+/**
+ * ‏**قائمةُ البدء «1 من 3»** (خطّة التصميم 5.5 «أوّل تشغيل» · D-326): اربط أوّل حساب، ثمّ أضف ما يُكتب منه، ثمّ اعتمد أوّل
+ * ‏منشور. كانت الرئيسيّةُ الخالية «خطوتُك التالية» وحدَها، ولا يرى المالكُ أين هو من البدء ولا كم بقي. **وتُحسب من الحقائق نفسِها**
+ * ‏فلا عمودَ ولا علامةَ تُخزَّن: الخطوةُ تتمّ بوقوعها، والقائمةُ تختفي حين تكتمل.
+ *
+ * ‏**ومن نشر مرّةً لا يعود إلى البدء** (أو فشل نشرُه: الفشلُ بعد اعتمادٍ وموعد) ولو انقطعت حساباتُه بعدها — تلك يقولها الشريطُ
+ * ‏و«خطوتك التالية»، لا قائمةُ أوّلِ يوم. و«المادّة» مصدرٌ في Drive أو أيُّ منشورٍ كُتب (من فكرةٍ بلا مصدر، أو من مقطع).
+ */
+export interface FirstRun {
+  readonly steps: readonly { readonly key: 'link' | 'material' | 'approve'; readonly done: boolean }[]
+  /** أوّلُ ما لم يتمّ (من الصفر). */
+  readonly current: number
+}
+
+export function firstRun(f: HomeFacts): FirstRun | null {
+  if (total(f.counts, 'published') + total(f.counts, 'failed') > 0) return null
+  const approved = total(f.counts, 'approved') + total(f.counts, 'queued')
+  const written = total(f.counts, 'draft') + approved
+  const steps = [
+    { key: 'link' as const, done: f.channels.some((c) => c.accounts.length > 0) },
+    { key: 'material' as const, done: f.sources.total > 0 || written > 0 },
+    { key: 'approve' as const, done: approved > 0 },
+  ]
+  const current = steps.findIndex((s) => !s.done)
+  return current < 0 ? null : { steps, current }
+}

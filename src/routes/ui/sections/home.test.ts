@@ -1,7 +1,7 @@
 /** القمعُ وشريطُ الأسبوع في الرسم (D-194). */
 import { describe, expect, it } from 'vitest'
 import { activityCard, homeTop } from './home'
-import { viewChannels } from '../../../lib/channels'
+import { setupHref, viewChannels } from '../../../lib/channels'
 import type { HomeFacts } from '../../../lib/home'
 
 const NOW = new Date('2026-10-04T12:00:00Z')
@@ -75,5 +75,67 @@ describe('«يُنشر اليوم» (D-267 · EASE د)', () => {
   })
   it('ويومٌ فارغٌ يقول ذلك', () => {
     expect(homeTop(facts(), NOW)).toContain('لا شيء يُنشر اليوم.')
+  })
+})
+
+describe('قائمةُ البدء في الرئيسيّة (D-326 · خطّة التصميم 5.5)', () => {
+  const zero = (over: Partial<HomeFacts> = {}): HomeFacts => facts({ channels: viewChannels([], () => false), sources: { total: 0, analyzed: 0 }, ...over })
+  it('رئيسيّةٌ خالية: «1 من 3»، والخطوةُ الأولى روابطُ إلى مساعد ضبط كلّ منصّةٍ مبنيّة عند حقل معرّفها', () => {
+    const html = homeTop(zero(), NOW)
+    expect(html).toContain('id="first-run"')
+    expect(html).toMatch(/data-fr-count>الخطوة 1 من 3</)
+    expect(html).toContain('<progress max="3" value="0"')
+    for (const p of ['linkedin', 'x', 'instagram']) expect(html).toContain(`href="${setupHref(p)}"`)
+    // ‏والخطوةُ التالية تبقى أوّلَ الرئيسيّة بزرّها الأوّليّ الواحد، والقائمةُ بعدها بلا زرٍّ أوّليّ
+    expect(html.indexOf('خطوتُك التالية')).toBeLessThan(html.indexOf('id="first-run"'))
+    const list = html.slice(html.indexOf('id="first-run"'), html.indexOf('</ol>', html.indexOf('id="first-run"')))
+    expect(list).not.toContain('btn-primary')
+  })
+  it('والمؤشّراتُ مخفيّةٌ حتّى تتوفّر بيانات: لا أرقامَ أربعة ولا قمعَ ولا أسبوعَ فارغًا', () => {
+    const html = homeTop(zero(), NOW)
+    expect(html).not.toContain('class="hstats"')
+    expect(html).not.toContain('class="funnel"')
+    expect(html).not.toContain('هذا الأسبوع')
+  })
+  it('منصّةٌ ضُبط تطبيقُها تُربط من القائمة مباشرةً', () => {
+    expect(homeTop(zero({ channels: viewChannels([], (n) => n.startsWith('TIKTOK')) }), NOW)).toContain('href="/oauth/tiktok/start"')
+  })
+  it('حسابٌ مربوطٌ ولا مادّة: «2 من 3» وبابُ الفكرة', () => {
+    const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: '2026-11-01 00:00:00' }], () => true)
+    const html = homeTop(facts({ channels: linked, sources: { total: 0, analyzed: 0 } }), NOW)
+    expect(html).toMatch(/data-fr-count>الخطوة 2 من 3</)
+    expect(html).toContain('href="/panel#idea"')
+  })
+  /*
+   * ‏**العدّادُ يقول الخطوةَ لا عددَ ما تمّ** (مراجعة D-326): كان «3 من 3» والشريطُ ثلثان وما زالت خطوةٌ باقية — و«3 من 3» تُقرأ
+   * ‏«اكتملت». فالنصُّ «الخطوة 3 من 3» والشريطُ ما تمّ (2)، ولا يتناقضان.
+   */
+  it('حسابٌ ومسوّدةٌ تنتظر ولم يُعتمَد شيء (اليومُ الأوّل): «الخطوة 3 من 3» والشريطُ 2 — لا «3 من 3» وكأنّها اكتملت', () => {
+    const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: '2026-11-01 00:00:00' }], () => true)
+    const html = homeTop(facts({ channels: linked, sources: { total: 0, analyzed: 0 },
+      counts: { perPlatform: { linkedin: { draft: 2, approved: 0, queued: 0, published: 0, failed: 0, nextAt: null } }, publishedWeek: 0 } }), NOW)
+    expect(html).toMatch(/data-fr-count>الخطوة 3 من 3</)
+    expect(html).toContain('<progress max="3" value="2"')
+  })
+  it('ومن نشر مرّةً لا يرى القائمة', () => {
+    const html = homeTop(facts({ counts: { perPlatform: { x: { draft: 0, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW)
+    expect(html).not.toContain('id="first-run"')
+  })
+})
+
+describe('بابُ الكتابة في سطر التحيّة (D-326 · «أنشئ من كلّ مكان»)', () => {
+  it('ما يُمرَّر بابًا يُرسَم في سطر التحيّة نفسِه، قبل «خطوتُك التالية»', () => {
+    const html = homeTop(facts(), NOW, '', '', '<details data-home-new></details>')
+    const hello = html.indexOf('class="hello')
+    expect(html.indexOf('data-home-new')).toBeGreaterThan(hello)
+    expect(html.indexOf('data-home-new')).toBeLessThan(html.indexOf('خطوتُك التالية'))
+  })
+  it('وكذلك حين تكون التحيّةُ سطرًا وحدَها (الشريطُ يقول المنصّةَ المنقطعة)', () => {
+    const html = homeTop(facts({ channels: viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'needs_reauth',
+      createdAt: '2026-09-01 00:00:00', expiresAt: null }], () => true) }), NOW, '', '', '<details data-home-new></details>')
+    expect(html).toContain('home-hello')
+    expect(html).toContain('data-home-new')
   })
 })

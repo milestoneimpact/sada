@@ -60,7 +60,7 @@ import { planImportCard } from './ui/planImportView'
 import type { Reach, UploadRow } from '../lib/media/uploads'
 import type { VideoCaptions } from '../lib/media/captions'
 import type { LinkState } from '../lib/channels'
-import { systemPill, writeBlock, type HomeFacts, type JourneyCounts } from '../lib/home'
+import { firstRun, systemPill, writeBlock, type HomeFacts, type JourneyCounts } from '../lib/home'
 import type { Blocker } from '../lib/limits'
 import { counted, NOUNS } from '../lib/format'
 import { platformLabel } from '../lib/oauth/providers'
@@ -902,18 +902,31 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  * ‏**«منشور جديد» على الحاسوب أيضًا** (D-216): كان الزرُّ العائم على الهاتف وحدَه، وعلى الحاسوب أربعةُ أزرار بدءٍ داخل
  * ‏«المنشورات» فقط. فصار في الترويسة من كلّ صفحة، بالبدايات الأربع نفسِها، ومساراتُها إلى «/panel» لتصل من أيّ لوح.
  */
+/** ‏أبوابُ الكتابة الخمسة بمساراتها إلى «/panel» — لتصل من أيّ لوح. */
+function newItems(): string[] {
+  return [
+    menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
+    menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
+    // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
+    menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
+    menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
+    menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
+  ]
+}
+
 function topNew(): string {
-  return menu({
-    label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new',
-    items: [
-      menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
-      menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
-      // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
-      menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
-      menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
-      menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
-    ],
-  })
+  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new', items: newItems() })
+}
+
+/**
+ * ‏**«منشور جديد ▾» في سطر التحيّة على الهاتف** (D-326 · «أنشئ من كلّ مكان»، من مقارنة Buffer في UX-AUDIT-5): الترويسةُ على
+ * ‏الهاتف لا تحمل «منشور جديد»، وكان بابُ الكتابة في الرئيسيّة زرًّا عائمًا مستديرًا اسمُه لقارئ الشاشة وحده (UX-AUDIT-4 · أ) —
+ * ‏فقالت الخلاصةُ «لا باب» وقال المالكُ «لا أجد أين أكتب» (الجلسة أ، المهمّة ٢). فصار البابُ نفسُه **باسمه** في سطر التحيّة،
+ * ‏ثانويًّا: البطاقةُ تحمل أوّليَّها («خطوتك التالية»)، ولا زرّان أوّليّان في منطقة. وعلى الحاسوب لا يُرسم: زرُّ الترويسة ظاهر،
+ * ‏فلا زرّان بالاسم نفسِه في شاشة. والعائمُ يبقى في «المكتبة» ويخرج من الرئيسيّة لهذا.
+ */
+function homeNew(): string {
+  return menu({ label: 'منشور جديد', variant: 'secondary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
 }
 
 /**
@@ -961,6 +974,37 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     (c) => c.state === 'linked' || c.state === 'needs_reauth',
   ).length
 
+  // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
+  const bare = (x: DraftRow): boolean =>
+    (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
+    && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
+
+  // ‏حقائقُ الرئيسيّة مرّةً: للرأس ولبطاقة «ما كُتب في أسبوعين» في المطويّ (D-309)
+  const facts: HomeFacts = {
+    channels: d.channels,
+    counts: d.journey,
+    paused: d.paused,
+    sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
+    withoutImage: d.drafts.filter(bare).length,
+    withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
+    openSuggestions: d.openSuggestions,
+    // ‏والأولى من الستّين المرسومة بترتيب اللوح — فالمرساةُ تجد بطاقتَها
+    firsts: {
+      waiting: d.drafts.find((x) => x.status === 'draft')?.id ?? null,
+      unscheduled: d.drafts.find((x) => x.status === 'approved' || x.status === 'edited')?.id ?? null,
+      withoutImage: d.drafts.find(bare)?.id ?? null,
+    },
+    pulses: d.pulses,
+    blocker: d.draftBlocker ?? null,
+    zone: d.zone ?? null,
+    scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
+      .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
+    written: d.drafts.map((x) => x.createdAt),
+  // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
+  // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
+  // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
+  // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
+  }
   /**
    * «ما ينتظرك» — مولَّدةٌ من الحال لا مكتوبةٌ سلفا.
    *
@@ -999,7 +1043,12 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       label: 'سجّل مفتاحا',
     })
   }
-  if (linkedChannels === 0) {
+  /*
+   * ‏ولا حسابَ أصلًا في أوّل يوم: تقولها «البدء في ثلاث خطوات» و«خطوتك التالية» فوقها (D-326) — الحقيقةُ تُقال مرّةً. **وتُقال
+   * ‏هنا حين لا ترسم الرئيسيّةُ تلك القائمة** (مراجعة D-326): من نشر ثمّ فصل حساباتِه كلَّها لا قائمةَ له، و«خطوتك التالية» يأخذها
+   * ‏فشلُ ما كان مجدولًا — وكان الشرطُ «في منصّةٍ حساب» لا يقع أبدًا مع «لا مربوطة».
+   */
+  if (linkedChannels === 0 && firstRun(facts) === null) {
     items.push({ kind: 'warn', text: 'لا قناة مربوطة — النظام يفهم ويكتب ولا ينشر.', go: '#channels', label: 'اربط' })
   }
   const unverified = d.providers.filter((p) => p.configured && p.enabled && p.verifiedAt === null)
@@ -1016,37 +1065,6 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       ${i.go === undefined ? '' : button({ label: i.label ?? 'اذهب', size: 'sm', href: i.go })}</li>`)
     .join('')
 
-  // ‏مفتوحٌ بلا صورةٍ جاهزة — عدُّ محطّة «الصورة» وأوّلُها من شرطٍ واحد
-  const bare = (x: DraftRow): boolean =>
-    (x.status === 'draft' || x.status === 'approved' || x.status === 'edited')
-    && !d.media.some((m) => m.postId === x.id && m.status === 'ready')
-
-  // ‏حقائقُ الرئيسيّة مرّةً: للرأس ولبطاقة «ما كُتب في أسبوعين» في المطويّ (D-309)
-  const facts: HomeFacts = {
-    channels: d.channels,
-    counts: d.journey,
-    paused: d.paused,
-    sources: { total: d.sources.length, analyzed: d.sources.filter((x) => x.analyzed).length },
-    withoutImage: d.drafts.filter(bare).length,
-    withImage: d.drafts.filter((x) => d.media.some((m) => m.postId === x.id && m.status === 'ready' && m.mime.startsWith('image/'))).length,
-    openSuggestions: d.openSuggestions,
-    // ‏والأولى من الستّين المرسومة بترتيب اللوح — فالمرساةُ تجد بطاقتَها
-    firsts: {
-      waiting: d.drafts.find((x) => x.status === 'draft')?.id ?? null,
-      unscheduled: d.drafts.find((x) => x.status === 'approved' || x.status === 'edited')?.id ?? null,
-      withoutImage: d.drafts.find(bare)?.id ?? null,
-    },
-    pulses: d.pulses,
-    blocker: d.draftBlocker ?? null,
-    zone: d.zone ?? null,
-    scheduled: d.drafts.filter((x) => x.scheduledAt !== null && x.status === 'queued')
-      .map((x) => ({ platform: x.platform, at: x.scheduledAt! })),
-    written: d.drafts.map((x) => x.createdAt),
-  // ‏الأرقامُ بعد «خطوتك التالية» مباشرةً (D-194) — كانت بعد الرحلة والمنصّات
-  // ‏و«ينتظر قرارك» قبل الأرقام (D-216): القرارُ يُتّخذ من الرئيسيّة، والأرقامُ بعده
-  // ‏و«اليوم بالأرقام» نزل إلى المطويّ (D-289): التحليلاتُ والإنفاقُ أرقامُ تشغيلٍ لا قرارُ اليوم
-  // ‏والخطّةُ بعد التحيّة وقبل الأرقام (D-289)
-  }
   return `<section data-pane="overview" hidden>
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
@@ -1067,7 +1085,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null))}
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew())}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ

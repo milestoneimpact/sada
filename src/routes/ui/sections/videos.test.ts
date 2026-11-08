@@ -64,3 +64,20 @@ describe('ما قاله الناشر عن نشر لم يقع كما قُرّر',
     expect(html.match(/بلا نصّه/g)).toHaveLength(1)
   })
 })
+
+describe('«أنشئ وجدوِل» الفعلُ الأوّل بموعدٍ افتراضيّ (D-326 · ر-4)', () => {
+  const FRESH: UploadRow = { ...UP, id: 'u2', posts: [] }
+  it('نصٌّ يكتبه المالك ويعتمده: الزرُّ الأوّليّ «أنشئ وجدوِل · غدًا 9:00 ص» و«متى؟» يبدأ بالموعد نفسِه', () => {
+    const html = videosSection([FRESH], NOW, null, { zone: 'Asia/Riyadh' })
+    expect(html).toMatch(/<button class="btn btn-primary" type="submit"[^>]*>أنشئ وجدوِل · غدًا 9:00 ص<\/button>/)
+    expect(html).toContain('<option value="tomorrow" selected>غدًا 9:00 ص</option>')
+    // ‏و«لاحقًا» باقٍ اختيارًا: يُنشأ بلا موعد
+    expect(html).toContain('<option value="">لاحقًا</option>')
+  })
+  it('ونصوصٌ كتبها النموذج ولم تُراجَع: لا اعتمادَ مؤشَّرًا، فلا موعدَ افتراضيّ والزرُّ «أنشئ المنشورات»', () => {
+    const cap = { about: 'وصف', youtubeTitle: 'عنوان', youtubeDescription: 'وصف', tiktok: 'نصّ', instagram: 'نصّ', model: 'claude', cost: 0.01, at: '2026-10-04T07:30:00.000Z' }
+    const html = videosSection([FRESH], NOW, null, { zone: 'Asia/Riyadh', captions: { u2: cap } })
+    expect(html).toMatch(/<button class="btn btn-primary" type="submit"[^>]*>أنشئ المنشورات<\/button>/)
+    expect(html).not.toContain('<option value="tomorrow" selected>')
+  })
+})

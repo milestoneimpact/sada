@@ -21,6 +21,8 @@ export interface CardInput {
   readonly title?: string
   /** مستوى العنوان في مخطّط الصفحة — والمظهرُ «h3» في كلّ مستوى. */
   readonly level?: 2 | 3
+  /** معرّفُ العنوان، لمن يسمّي به منطقةً أو شريطًا (`aria-labelledby`). */
+  readonly titleId?: string
   /** جملةٌ واحدةٌ تحت العنوان (وسمٌ جاهز). */
   readonly desc?: string
   /** فعلٌ في طرف الرأس (وسمٌ جاهز: زرٌّ أو رابط). */
@@ -42,9 +44,11 @@ export function cardClass(variant: CardVariant = 'card'): string {
 export function card(input: CardInput): string {
   const variant = input.variant ?? 'card'
   const level = input.level ?? 2
+  // ‏مهرَّبٌ بيده بلا قالبٍ جديد (سقّاطة html، D-281)
+  const hid = input.titleId === undefined ? '' : ' id="' + escapeHtml(input.titleId) + '"'
   const head = input.title === undefined
     ? ''
-    : `<div class="card-head"><h${level}>${escapeHtml(input.title)}</h${level}>${
+    : `<div class="card-head"><h${level}${hid}>${escapeHtml(input.title)}</h${level}>${
         input.action === undefined ? '' : `<span class="grow"></span>${input.action}`}</div>${
         input.desc === undefined ? '' : `<p class="card-desc">${input.desc}</p>`}`
   const attrs = [
