@@ -176,6 +176,72 @@ describe('مراجعةُ الخطّة (D-286)', () => {
   })
 })
 
+/**
+ * **منشوران في اليوم على المنصّة نفسِها من المصدر نفسِه** (D-329): البندُ يطابق مسوّدتَه بمعرّفه لا بمصدره ومنصّته، ولكلّ
+ * منصّةٍ صورتُها — و«ابدأ» يرسل لكلّ بندٍ معرّفَه وزاويتَه ونوعَ صورة منصّته.
+ */
+describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-329)', () => {
+  beforeEach(() => {
+    db.raw.exec("UPDATE plans SET status = 'superseded'; DELETE FROM posts")
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a2', 'x', 'member', 'e2', 'عمر', 'active')`)
+    const items = [
+      { id: 'aaaaaaaaaa', sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاويةُ الصباح من التقرير', day: '2099-02-01', time: '06:00', why: 'ل' },
+      { id: 'bbbbbbbbbb', sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاويةُ المساء من التقرير', day: '2099-02-01', time: '15:30', why: 'ل' },
+      { id: 'cccccccccc', sourceId: 's1', platform: 'x', kind: 'text', angle: 'جملةٌ واحدةٌ من التقرير', day: '2099-02-01', time: '12:00', why: 'ل' },
+    ]
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status, span, choices_json) VALUES ('pl2', '2099-02-01', ?, 'm', 'approved', 'week', ?)`)
+      .run(JSON.stringify({ rationale: 'ر', items }), JSON.stringify({ channels: ['linkedin', 'x'], autoImage: true, imageStyle: 'infographic',
+        imageStyles: { linkedin: 'illustration', x: 'none' }, times: { linkedin: ['09:00', '18:30'] }, zone: 'Asia/Riyadh' }))
+    const text = (n: string): string => `نصُّ منشور ${n} كما كُتب من زاويته ليُعتمَد، وفيه ما يكفي من الكلام ليكون منشورًا حقيقيًّا يقرؤه الناس.`
+    const ins = db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, plan_id, source_id, source_refs) VALUES (?, ?, 'text', ?, 'draft', ?, 'pl2', 's1', ?)`)
+    ins.run('q2', 'linkedin', text('المساء'), 'draft:s1:linkedin:h:i:bbbbbbbbbb', JSON.stringify(['s1', 'item:bbbbbbbbbb']))
+    ins.run('q1', 'linkedin', text('الصباح'), 'draft:s1:linkedin:h:i:aaaaaaaaaa', JSON.stringify(['s1', 'item:aaaaaaaaaa']))
+    ins.run('q3', 'x', 'جملةُ X من زاويتها.', 'draft:s1:x:h:i:cccccccccc', JSON.stringify(['s1', 'item:cccccccccc']))
+  })
+
+  it('كلُّ بندٍ ببطاقة مسوّدته، و«اعتمد» على أحدهما يجدوله في موعده وحدَه — والآخرُ ينتظر', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    // ‏ترتيبُ الإدراج عكسُ ترتيب البنود: المطابقةُ بالمعرّف لا بأوّل مسوّدةٍ للمصدر والمنصّة
+    expect(html.indexOf('نصُّ منشور الصباح')).toBeLessThan(html.indexOf('نصُّ منشور المساء'))
+    expect(html.indexOf('id="c-0"')).toBeLessThan(html.indexOf('نصُّ منشور الصباح'))
+    expect(html.indexOf('نصُّ منشور الصباح')).toBeLessThan(html.indexOf('id="c-1"'))
+    // ‏«بلا صورة» لـ X لا تُعَدّ نقصًا، ورسمُ LinkedIn الفنّيُّ يُطلب بنوعه من زرّ البطاقة
+    expect(html).toContain('2 بلا صورة')
+    expect(html).toContain('name="style" value="illustration"')
+    expect(html).toContain('name="style" value="infographic"')
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '1', key: keyOf(html, 1), post: 'q2' }), headers: { Cookie: cookie } }, env)
+    // ‏والوقتُ وقتُ البند (اختاره المالكُ لمنصّته) لا أرجحُ الساعات، فلا يلتقي منشورا اليوم في ساعةٍ واحدة
+    expect(db.raw.prepare('SELECT id, status, scheduled_at FROM posts ORDER BY id').all()).toEqual([
+      { id: 'q1', status: 'draft', scheduled_at: null }, { id: 'q2', status: 'queued', scheduled_at: '2099-02-01 15:30:00' }, { id: 'q3', status: 'draft', scheduled_at: null },
+    ])
+    // ‏و«أزِل» على البند الأوّل يرفض مسوّدتَه هو، لا مسوّدةَ جاره من المصدر نفسِه
+    const fresh = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(fresh, 0) }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT id, status FROM posts WHERE platform = 'linkedin' ORDER BY id").all()).toEqual([{ id: 'q1', status: 'rejected' }, { id: 'q2', status: 'queued' }])
+  })
+
+  it('«ابدأ» يرسل لكلّ بندٍ معرّفَه وزاويتَه وصورةَ منصّته — وبندا المصدر الواحد رسالتان لا واحدة', async () => {
+    const sent: { draft: Record<string, unknown> }[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: { draft: Record<string, unknown> } }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    await app.request('/panel/plan/start', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2' }), headers: { Cookie: cookie } }, env)
+    expect(sent.map((m) => [m.draft['platform'], m.draft['itemId'], m.draft['angle'], m.draft['autoImage'], m.draft['imageStyle']])).toEqual([
+      ['linkedin', 'aaaaaaaaaa', 'زاويةُ الصباح من التقرير', true, 'illustration'],
+      ['linkedin', 'bbbbbbbbbb', 'زاويةُ المساء من التقرير', true, 'illustration'],
+      ['x', 'cccccccccc', 'جملةٌ واحدةٌ من التقرير', false, 'infographic'],
+    ])
+  })
+
+  it('المعالجُ يحمل لكلّ منصّةٍ إيقاعَها حتّى ثلاثٍ في اليوم وأوقاتَها وصورتَها', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['name="cadence_linkedin" value="14"', 'name="cadence_x" value="21"', 'name="time_linkedin" value="09:00"', 'name="time_x" value="18:30"',
+      'name="image_linkedin"', '<option value="illustration">رسمٌ فنّيّ</option>', '<option value="none">بلا صورة</option>']) expect(html).toContain(s)
+    expect((html.match(/name="time_linkedin"/g) ?? []).length).toBe(3)
+  })
+})
+
 describe('«عندي خطّة» (D-287)', () => {
   it('CSV يُسكَّن ويُفتح في المراجعة بلا جدولة، ونصٌّ بلا مزوّدٍ يُردّ بسببه', async () => {
     db.raw.exec("UPDATE plans SET status = 'superseded'")

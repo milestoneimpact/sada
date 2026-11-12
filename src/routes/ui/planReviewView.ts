@@ -25,7 +25,7 @@ import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { stamp } from '../../lib/time/zone'
 import { AR_LATN, num } from '../../lib/format'
-import { SPAN_LABEL, spanDays } from '../../lib/plan/prompt'
+import { SPAN_LABEL, imageFor, spanDays } from '../../lib/plan/prompt'
 import { GAP_LABEL, type Gap, type ReviewCard, type ReviewModel } from '../../lib/plan/review'
 
 const AR = num
@@ -93,7 +93,9 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
   if (c.post === null || c.item.kind === 'video' || c.post.status === 'published' || c.post.status === 'queued') return html``
   if (c.mediaMime !== null && c.mediaMime !== undefined && c.mediaMime.startsWith('video/')) return html``
   const back = html`<input type="hidden" name="back" value="plan"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="w" value="${w}">`
-  const style = html`<input type="hidden" name="style" value="${m.plan.choices.imageStyle}">`
+  // ‏ونوعُ الصورة نوعُ منصّتها (D-329)، وما اختير له «بلا صورة» يُرسم بالنوع العامّ حين يُطلب بالزرّ
+  const chosen = imageFor(m.plan.choices, c.item.platform)
+  const style = html`<input type="hidden" name="style" value="${chosen === 'none' ? m.plan.choices.imageStyle : chosen}">`
   if (c.mediaId === null) {
     return maySpend()
       ? html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>
@@ -219,7 +221,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const written = m.cards.filter((c) => c.post !== null).length
   const settled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
   // ‏ما يُكتب أو يُرسم الآن: الصفحةُ تعيد تحميلَ نفسها ما دام شيءٌ في الطريق (السكربتُ يقرأ `data-live`)
-  const live = written < m.cards.length ? 'write' : m.plan.choices.autoImage && m.gaps.no_image > 0 ? 'image' : ''
+  const live = written < m.cards.length ? 'write' : m.gaps.no_image > 0 ? 'image' : ''
   const progress = written < m.cards.length
     ? html`<p class="hint m-0" role="status">كُتب ${AR(written)} من ${AR(m.cards.length)} — صدى يكتب الباقي الآن بصوره، والصفحةُ تتحدّث وحدَها.</p>`
     : html``

@@ -20,9 +20,9 @@
 import type { Db } from '../tokens'
 import { decide, undoApprove } from '../draft/store'
 import { reschedulePost, unschedule } from '../schedule/job'
-import { KIND_FITS_SQL, kindFits, schedulePlan, type PlanSchedule } from './schedule'
+import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
 import { dayWithin, touchPlan } from './edit'
-import { asSpan, type PlanItem } from './prompt'
+import { asSpan, imageFor, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
 
 export interface ReviewCard {
@@ -66,16 +66,7 @@ export interface ReviewModel {
 
 /** بصمةُ البند: مصدرُه ومنصّتُه ويومُه وساعتُه — ما يتغيّر بفعلٍ عليه أو على غيره. */
 export function itemKey(item: PlanItem): string {
-  return `${item.sourceId}|${item.platform}|${item.day}|${item.time}`
-}
-
-function refsOf(raw: string | null): string[] {
-  try {
-    const parsed = JSON.parse(raw ?? '[]') as unknown
-    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
-  }
+  return `${item.id ?? item.sourceId}|${item.platform}|${item.day}|${item.time}`
 }
 
 export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promise<ReviewModel> {
@@ -96,7 +87,6 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
       .then((r) => r.results).catch(() => []),
   ])
-  const wantsImage = plan.choices.autoImage
   const latestMedia = new Map<string, string>()
   const mimeOf = new Map<string, string>()
   for (const m of media) if (!latestMedia.has(m.post_id)) { latestMedia.set(m.post_id, m.id); mimeOf.set(m.id, m.mime) }
@@ -105,13 +95,13 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
 
   const cards: ReviewCard[] = plan.plan.items.map((item, index) => {
     // ‏وبندُ السلسلة لمسوّدة السلسلة (مراجعة D-324): المصدرُ والمنصّةُ وحدهما يجمعان البندين على مسوّدةٍ واحدة
-    const row = posts.find((p) => p.platform === item.platform && (p.source_id === item.sourceId || refsOf(p.source_refs).includes(item.sourceId))
-      && kindFits(item.kind, p.idempotency_key)) ?? null
+    const row = posts.find((p) => itemOwns(item, p)) ?? null
     const mediaId = row === null ? null : latestMedia.get(row.id) ?? null
     const gaps: Gap[] = []
     if (row === null) gaps.push('unwritten')
     else {
-      if (wantsImage && mediaId === null && item.kind !== 'video') gaps.push('no_image')
+      // ‏والصورةُ تُطلب بمنصّتها (D-329): «بلا صورة» لـ X لا تجعل منشوراتِها ناقصة
+      if (imageFor(plan.choices, item.platform) !== 'none' && mediaId === null && item.kind !== 'video') gaps.push('no_image')
       if (row.status === 'draft') gaps.push('pending')
     }
     if ((slots.get(`${item.platform}|${item.day}|${item.time}`) ?? 0) > 1) gaps.push('clash')
@@ -134,6 +124,21 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items }
     }),
   }
+}
+
+/**
+ * مسوّدةُ البند في خطّته — بالمطابقة نفسِها التي تقرأ بها المراجعةُ والجدولة (`itemOwns`)، فلا يُصيب فعلٌ على بندٍ مسوّدةَ
+ * بندٍ آخر من المصدر نفسِه. و`where` شرطُ الحال، ثابتٌ من الشيفرة لا من مدخل.
+ */
+async function postOf(
+  db: Db, org: string, planId: string, item: PlanItem, where: "status = 'queued'" | "status <> 'rejected'",
+): Promise<{ id: string; status: string; scheduled_at: string | null } | null> {
+  const { results } = await db
+    .prepare(`SELECT id, status, scheduled_at, platform, source_id, source_refs, idempotency_key FROM posts
+               WHERE org_id = ? AND plan_id = ? AND platform = ? AND ${where} ORDER BY created_at`)
+    .bind(org, planId, item.platform)
+    .all<{ id: string; status: string; scheduled_at: string | null; platform: string; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
+  return results.find((p) => itemOwns(item, p)) ?? null
 }
 
 type Act = { readonly ok: true; readonly note?: string } | { readonly ok: false; readonly reason: string }
@@ -170,11 +175,7 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
   at.plan.items[index] = { ...item, day }
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
   await touchPlan(db, org, planId)
-  const queued = await db
-    .prepare(`SELECT id, scheduled_at FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
-                AND status = 'queued' AND ${KIND_FITS_SQL}`)
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
-    .first<{ id: string; scheduled_at: string | null }>()
+  const queued = await postOf(db, org, planId, item, "status = 'queued'")
   if (queued !== null && queued.scheduled_at !== null) {
     const moved = new Date(queued.scheduled_at.replace(' ', 'T') + 'Z')
     moved.setUTCDate(moved.getUTCDate() + days)
@@ -192,11 +193,7 @@ export async function dropItem(db: Db, org: string, planId: string, index: numbe
   const at = await itemAt(db, org, planId, index, key)
   if (typeof at === 'string') return { ok: false, reason: at }
   const item = at.plan.items[index]!
-  const post = await db
-    .prepare(`SELECT id, status FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
-                AND status <> 'rejected' AND ${KIND_FITS_SQL}`)
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
-    .first<{ id: string; status: string }>()
+  const post = await postOf(db, org, planId, item, "status <> 'rejected'")
   if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُحذف من الخطّة' }
   // ‏والمجدولُ يُسحب موعدُه أوّلًا بـ`unschedule` وحارسِها (D-327): ما أُرسل للنشر لا يُستردّ، فيُردّ الحذفُ بسببه
   if (post !== null && post.status === 'queued') {

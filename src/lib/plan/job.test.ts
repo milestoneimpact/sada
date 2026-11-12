@@ -6,9 +6,9 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { approvePlan, eligible, ideaOf, latestPlan, planSpan, type PlanDeps } from './job'
+import { approvePlan, eligible, ideaOf, latestPlan, planSpan, planWindows, type PlanDeps } from './job'
 import {
-  CALL_CAP, EMPTY_CHOICES, MAX_ITEMS, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
+  applyTimes, CALL_CAP, EMPTY_CHOICES, imageFor, MAX_ITEMS, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
 } from './prompt'
 import { writeSetting } from '../settings'
 import { writeRoute } from '../ai/routes'
@@ -601,7 +601,12 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(stored?.plan.rationale).toBe('شهر 1 ثمّ شهر 2')
     expect(stored?.choices).toEqual({
       channels: ['linkedin', 'instagram'], cadence: { linkedin: 2, instagram: 1 }, sources: [a, b], ideas: ['فكرةٌ عن الوقف'], assets: [], autoImage: true, imageStyle: 'infographic', startDay: '2026-11-01',
+      imageStyles: {}, times: {}, zone: '',
     })
+    // ‏ولكلّ بندٍ معرّفُه (D-329)، ولا معرّفين متساويين
+    const ids = stored!.plan.items.map((i) => i.id)
+    expect(ids.every((id) => /^[0-9a-f]{10}$/.test(id ?? ''))).toBe(true)
+    expect(new Set(ids).size).toBe(ids.length)
     // ‏والفكرةُ تُقرأ من اختياراتها بمعرّف بندها
     expect(ideaOf('idea:1', stored!.choices)).toBe('فكرةٌ عن الوقف')
     expect(ideaOf('idea:2', stored!.choices)).toBeNull()
@@ -620,6 +625,42 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     // ‏وبندٌ من الفكرة يُقبل
     const out = await planSpan({ ...deps(net({ payload: plan([item('idea:1', { platform: 'x' })]) })), sources: [a], ideas: ['فكرةٌ بكلمات المالك'] })
     expect(out).toMatchObject({ kind: 'planned', items: 1, dropped: 0 })
+  })
+
+  it('لكلّ منصّةٍ صورتُها وأوقاتُها (D-329): تُقرأ بحدودها، وما لم يُذكر يأخذ العامّ', () => {
+    const c = readChoices({ channels: ['linkedin', 'x'], autoImage: true, imageStyle: 'infographic',
+      imageStyles: { linkedin: 'illustration', x: 'none', threads: 'illustration', instagram: 'gif' },
+      times: { linkedin: ['09:00', '25:00', '09:00', '14:30'], x: ['x'], nope: ['10:00'] }, zone: 'Asia/Riyadh' })
+    expect(c.imageStyles).toEqual({ linkedin: 'illustration', x: 'none' })
+    expect(c.times).toEqual({ linkedin: ['09:00', '14:30'] })
+    expect(imageFor(c, 'linkedin')).toBe('illustration')
+    expect(imageFor(c, 'x')).toBe('none')
+    expect(imageFor(c, 'instagram')).toBe('infographic')
+    expect(imageFor({ ...c, autoImage: false }, 'instagram')).toBe('none')
+  })
+
+  it('أوقاتُ المالك تغلب ما كتبه المخطِّط: منشوراتُ اليوم على المنصّة بالترتيب، ومنصّةٌ بلا أوقاتٍ كما هي', () => {
+    const it0 = (platform: 'linkedin' | 'x', day: string, time: string, angle: string) => ({ sourceId: 's', platform, angle, day, time, why: '' })
+    const out = applyTimes(
+      [it0('linkedin', '2026-11-02', '11:00', 'ب'), it0('linkedin', '2026-11-02', '06:00', 'أ'), it0('linkedin', '2026-11-02', '13:00', 'ج'), it0('x', '2026-11-02', '07:00', 'س')],
+      { linkedin: ['09:00', '18:30'] },
+      // ‏الرياض: UTC+3
+      (day, time) => ({ day, time: `${String(Number(time.slice(0, 2)) - 3).padStart(2, '0')}${time.slice(2)}` }),
+      () => true,
+    )
+    expect(out.map((i) => `${i.platform} ${i.time} ${i.angle}`)).toEqual(['linkedin 06:00 أ', 'linkedin 06:00 ج', 'x 07:00 س', 'linkedin 15:30 ب'])
+  })
+
+  it('إيقاعٌ فوق سقف النداء يُقسَم نوافذَ أقصر، والشهران شهرٌ وشهر، وما يتّسع نافذةٌ واحدة', () => {
+    expect(planWindows('2026-11-01', 'month', { linkedin: 3, x: 3 })).toEqual([{ start: '2026-11-01', span: 'month' }])
+    expect(planWindows('2026-11-01', '2months', { linkedin: 3 }).map((w) => w.start)).toEqual(['2026-11-01', '2026-11-29'])
+    // ‏منشوران في اليوم على منصّتين: 28 في الأسبوع — أسبوعان في النداء
+    expect(planWindows('2026-11-01', 'month', { linkedin: 14, x: 14 })).toEqual([{ start: '2026-11-01', span: '2weeks' }, { start: '2026-11-15', span: '2weeks' }])
+    // ‏ثلاثةٌ في اليوم على منصّتين: 42 في الأسبوع — أسبوعٌ في النداء
+    expect(planWindows('2026-11-01', '2weeks', { linkedin: 21, x: 21 }).map((w) => w.span)).toEqual(['week', 'week'])
+    expect(systemPrompt({ channels: ['linkedin', 'x'], cadence: { linkedin: 14, x: 3 } })).toContain('linkedin: 14 في الأسبوع (حتّى 2 في اليوم الواحد)')
+    expect(systemPrompt({ channels: ['linkedin', 'x'], cadence: { linkedin: 14, x: 3 } })).not.toContain('ولا تضع منشورين في يوم واحد على القناة نفسها.')
+    expect(systemPrompt({ channels: ['linkedin', 'x'], cadence: { linkedin: 3, x: 3 } })).toContain('ولا تضع منشورين في يوم واحد على القناة نفسها.')
   })
 
   it('اختياراتٌ قديمةٌ أو فاسدة تُقرأ بافتراضاتها الآمنة', () => {

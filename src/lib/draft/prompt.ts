@@ -223,7 +223,7 @@ export interface SourceBrief {
 }
 
 /** ما يُعطاه النموذج عن المصدر — خلاصتُه لا نصُّه كاملا. */
-export function userPrompt(brief: SourceBrief, thread = false): string {
+export function userPrompt(brief: SourceBrief, thread = false, angle = ''): string {
   return [
     `# ${brief.name}`,
     '',
@@ -232,6 +232,8 @@ export function userPrompt(brief: SourceBrief, thread = false): string {
     '',
     brief.themes.length === 0 ? '' : `## المحاور\n${brief.themes.join(' · ')}`,
     '',
+    // ‏زاويةُ بند الخطّة (D-329): المصدرُ الواحدُ يحمل أكثر من منشور، وكلٌّ يُكتب من زاويته — والمادّةُ ما في الخلاصة لا غير
+    angle === '' ? '' : `## الزاوية المطلوبة\n${angle}\n\nاكتب من هذه الزاوية وحدها، ولا تجمع معها غيرَها ممّا في الخلاصة. والقيدُ كما هو: لا رقم ولا اسم إلّا ما ورد في الخلاصة.\n`,
     thread ? 'اكتب سلسلة X واحدة من هذه المادّة.' : 'اكتب منشورا واحدا من هذه المادّة.',
   ]
     .filter((line) => line !== '')

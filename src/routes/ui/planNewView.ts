@@ -37,6 +37,7 @@ const FINAL_PER_IMAGE = (imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0) * NEUR
 import { weekStart, type PlanPlatform } from '../../lib/plan/prompt'
 import { maySpend, SPEND_LOCKED } from '../../lib/access'
 import { button } from './components/button'
+import { field } from './components/field'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
 export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
@@ -49,11 +50,27 @@ const SPANS = [
   { id: '2months', label: 'شهران', weeks: 8, note: 'رؤيةٌ أبعد — تُبنى شهرًا شهرًا' },
 ] as const
 
-/** مستوياتُ الإيقاع في الأسبوع لكلّ منصّة. */
+/**
+ * مستوياتُ الإيقاع في الأسبوع لكلّ منصّة — وفوق السبعة أكثرُ من منشورٍ في اليوم على المنصّة نفسِها (D-329): كلٌّ يُكتب من
+ * زاويته، فلا يتكرّر نصّ.
+ */
 const PACES = [
-  { n: 2, label: 'خفيف' },
-  { n: 3, label: 'متوازن' },
-  { n: 5, label: 'نشِط' },
+  { n: 2, label: 'خفيف', unit: 'في الأسبوع' },
+  { n: 3, label: 'متوازن', unit: 'في الأسبوع' },
+  { n: 5, label: 'نشِط', unit: 'في الأسبوع' },
+  { n: 7, label: 'يوميًّا', unit: 'في الأسبوع' },
+  { n: 14, label: 'مرّتان في اليوم', unit: 'في الأسبوع' },
+  { n: 21, label: 'ثلاثٌ في اليوم', unit: 'في الأسبوع' },
+] as const
+
+/** أوّلُ وقتٍ مقترَح لكلّ منصّة بتوقيت المالك — يُغيَّر، ويُضاف إليه ثانٍ وثالث لمن ينشر أكثر من مرّةٍ في اليوم. */
+const FIRST_TIME: Readonly<Partial<Record<PlanPlatform, string>>> = { linkedin: '09:00', x: '18:30' }
+
+const IMAGE_OPTIONS = [
+  { v: '', label: 'كالافتراض' },
+  { v: 'illustration', label: 'رسمٌ فنّيّ' },
+  { v: 'infographic', label: 'إنفوجرافيك' },
+  { v: 'none', label: 'بلا صورة' },
 ] as const
 
 const STEPS = ['الفترة', 'المنصّات', 'المحتوى', 'المراجعة'] as const
@@ -121,13 +138,25 @@ function spanStep(start: string, perWeek: number, channels: number): Html {
 function channelCard(p: PlanPlatform, perWeek: number): Html {
   const preset = PACES.some((x) => x.n === perWeek) ? perWeek : null
   const paces = PACES.map((x) => html`<label class="wz-pill"><input type="radio" name="cadence_${p}" value="${String(x.n)}"${preset === x.n ? raw(' checked') : ''}>
-      <span><b>${x.label}</b> · ${AR(x.n)} في الأسبوع</span></label>`)
+      <span><b>${x.label}</b> · ${AR(x.n)} ${x.unit}</span></label>`)
+  const name = platformLabel(p)
+  // ‏ولكلّ منصّةٍ أوقاتُها وصورتُها (D-329): حقولٌ عاديّةٌ تُرسَل مع النموذج، والفارغُ منها يأخذ ما يختاره المخطِّط والافتراض
+  const first = FIRST_TIME[p] ?? ''
+  const images = IMAGE_OPTIONS.map((o) => html`<option value="${o.v}">${o.label}</option>`)
   return html`<fieldset class="wz-pf card" data-pf="${p}">
     <legend class="wz-pf-h"><label class="row gap-2"><input type="checkbox" name="channel" value="${p}" checked>
       <span class="pf-logo" aria-hidden="true">${raw(LOGOS[p] ?? '')}</span><b>${platformLabel(p)}</b></label></legend>
     <div class="wz-pills" role="radiogroup" aria-label="إيقاع ${platformLabel(p)}">${paces}
       <label class="wz-pill"><input type="radio" name="cadence_${p}" value="custom"${preset === null ? raw(' checked') : ''}>
         <span><b>مخصّص</b> <input type="number" name="cadence_custom_${p}" min="1" max="28" step="1" value="${String(preset === null ? Math.max(1, perWeek) : 4)}" dir="ltr" aria-label="${platformLabel(p)}: منشورات في الأسبوع"></span></label>
+    </div>
+    <div class="wz-pf-more">
+      ${raw(field({
+        id: 'wz-time-' + p, label: 'أوقات نشر ' + name + ' بتوقيتك',
+        hint: 'وقتٌ لكلّ منشورٍ في اليوم، والفارغُ يُترك. بلا وقتٍ يختار صدى أرجحَ الساعات.',
+        control: html`<div class="row gap-2 wz-times"><input type="time" id="wz-time-${p}" name="time_${p}" value="${first}" dir="ltr"><input type="time" name="time_${p}" value="" dir="ltr" aria-label="${name}: وقتٌ ثانٍ في اليوم"><input type="time" name="time_${p}" value="" dir="ltr" aria-label="${name}: وقتٌ ثالث في اليوم"></div>`.value,
+      }))}
+      ${raw(field({ id: 'wz-image-' + p, label: 'صورةُ منشورات ' + name, control: html`<select id="wz-image-${p}" name="image_${p}">${images}</select>`.value }))}
     </div></fieldset>`
 }
 
@@ -140,7 +169,7 @@ function channelStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
         ? ''
         : html`<p class="hint m-0">${missing.map((p) => platformLabel(p)).join(' و')} غير مربوطة — <a href="${panelHref('channels')}">اربطها</a> لتظهر هنا.</p>`}`
   return html`<section class="wz-step" data-step="2" aria-labelledby="wz-t2">
-    ${stepHead(2, 'على أيّ منصّة، وكم مرّة؟', 'المربوطُ وحدَه يظهر. والإيقاعُ عددُ المنشورات في الأسبوع لكلّ منصّة.')}
+    ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوطُ وحدَه يظهر. ولكلّ منصّةٍ إيقاعُها وأوقاتُها وصورتُها — فيصحّ رسمٌ فنّيٌّ هنا وإنفوجرافيك هناك، ووقتان في اليوم نفسِه.')}
     <div class="stack">${body}</div>
   </section>`
 }

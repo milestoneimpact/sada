@@ -468,6 +468,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
 .wz-pf[data-pf=x] .pf-logo{background:var(--pf-x)}
 .wz-pills{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-top:var(--s-3)}
+/* ‏أوقاتُ المنصّة وصورتُها تحت إيقاعها (D-329): عمودان حين يتّسع، وعمودٌ على الهاتف */
+.wz-pf-more{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); margin-top:var(--s-4); align-items:start}
+.wz-times input{flex:1 1 6rem; min-width:0}
 .wz-pill{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-1) var(--s-4);
   border:var(--bd); border-radius:var(--r-pill); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pill input[type=radio]{margin:0; accent-color:var(--accent)}

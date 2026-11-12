@@ -29,7 +29,7 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
-import { asImageStyle, asSpan, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { asImageChoice, asImageStyle, asSpan, asTimes, imageFor, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanChoices, type PlanPlatform } from '../../lib/plan/prompt'
 import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
@@ -92,7 +92,14 @@ plan.post('/panel/plan/generate', async (c) => {
       ? brief.channels.filter(isPlanPlatform)
       : [...linked].filter(isPlanPlatform)
   const cadence: Partial<Record<PlanPlatform, number>> = {}
+  // ‏ولكلّ منصّةٍ صورتُها وأوقاتُها (D-329): «رسمٌ فنّيٌّ لـ LinkedIn وإنفوجرافيك لـ X»، ووقتٌ لهذه ووقتٌ لتلك في اليوم نفسِه
+  const imageStyles: Partial<Record<PlanPlatform, NonNullable<ReturnType<typeof asImageChoice>>>> = {}
+  const times: Partial<Record<PlanPlatform, readonly string[]>> = {}
   for (const ch of channels) {
+    const image = asImageChoice(f.get('image_' + ch))
+    if (image !== null) imageStyles[ch] = image
+    const at = asTimes(f.getAll('time_' + ch).map(String))
+    if (at.length > 0) times[ch] = at
     // ‏«مخصّص» في شاشة الخطّة الجديدة (D-283) يحمل رقمَه في حقلٍ بجانبه
     const picked = f.get('cadence_' + ch)
     const raw = picked === 'custom' ? f.get('cadence_custom_' + ch) : picked
@@ -122,11 +129,14 @@ plan.post('/panel/plan/generate', async (c) => {
     ideas,
     ...(autoImage === undefined ? {} : { autoImage }),
     imageStyle,
+    imageStyles: imageStyles as PlanChoices['imageStyles'],
+    times,
+    zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
   })
 
   // ‏والتقديرُ قبل «ابدأ» (D-257 · D-282): ما سيُكتب وما سيُرسم، بوسيط ما أُنفق فعلًا — فلا إنفاقَ قبل أن يرى المالكُ الرقم
-  const wanted = autoImage ?? (await readSettings(c.env.DB)).autoImage
+  const wanted = Object.values(imageStyles).some((x) => x !== 'none') || (autoImage ?? (await readSettings(c.env.DB)).autoImage)
   const written = outcome.kind === 'planned' ? await latestPlan(c.env.DB, org) : null
   const estimate = written === null ? '' : estimateLine(estimatePlan({ items: written.plan.items, autoImage: wanted, ...(await unitCosts(c.env.DB, org)) }))
 
@@ -252,24 +262,28 @@ async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<Retu
   if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
   const seen = new Set<string>()
   const items = plan.plan.items.filter((i) => {
-    // ‏والسلسلةُ بندٌ غيرُ التغريدة من المصدر نفسِه (D-324): مفتاحُ مسوّدتها غيرُ مفتاحها
-    const k = `${i.sourceId}:${i.platform}${i.kind === 'thread' ? ':thread' : ''}`
+    // ‏والسلسلةُ بندٌ غيرُ التغريدة من المصدر نفسِه (D-324): مفتاحُ مسوّدتها غيرُ مفتاحها. وبندٌ بمعرّفه (D-329) مسوّدةٌ مستقلّة —
+    // ‏إلّا بندَ الفكرة: مفتاحُ مسوّدتها الفكرةُ والمنصّة، فالمكرَّرُ منه «كُتبت من قبل»
+    const k = i.id !== undefined && !i.sourceId.startsWith('idea:') ? 'item:' + i.id : `${i.sourceId}:${i.platform}${i.kind === 'thread' ? ':thread' : ''}`
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
-  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ
-  const autoImage = plan.choices.channels.length === 0 ? undefined : plan.choices.autoImage
+  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ. ولكلّ منصّةٍ اختيارُها (D-329)
+  const legacy = plan.choices.channels.length === 0
+  const autoImage = legacy ? undefined : plan.choices.channels.some((ch) => imageFor(plan.choices, ch) !== 'none')
   if (items.length > 0) {
     await env.GENERATE_QUEUE.sendBatch(items.map((i) => {
       const idea = ideaOf(i.sourceId, plan.choices)
+      const image = imageFor(plan.choices, i.platform)
       return {
         body: { draft: {
           sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
           ...(i.asset === undefined ? {} : { asset: i.asset }),
           ...(idea === null ? {} : { idea }),
-          ...(autoImage === undefined ? {} : { autoImage }),
-          imageStyle: plan.choices.imageStyle,
+          ...(legacy ? {} : { autoImage: image !== 'none' }),
+          imageStyle: image === 'none' ? plan.choices.imageStyle : image,
+          ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
           ...(i.kind === 'thread' && i.platform === 'x' ? { shape: 'thread' as const } : {}),
         } },
       }
