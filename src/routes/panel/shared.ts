@@ -342,7 +342,7 @@ export function finalizeLater(
  * ‏الرسالةُ المؤجَّلةُ إلى دقيقتها (`dispatchSoon`). **واختبارُها يشتقّها من الشيفرة** (`routes/soon.test.ts`): كلُّ مسارٍ ينادي
  * ‏دالّةَ جدولةٍ بنفسه أو بوسيط — وكانت القائمةُ تُكتب باليد ففاتها «ثبّت الخطّة» و«اعتمد» المستوردة و«أخّر» المحدَّد (مراجعة D-320).
  */
-export const SCHEDULING_PATHS = /^\/panel\/(?:drafts\/(?:decide|schedule|spread\/apply|undo-unschedule|reschedule)|plan\/(?:schedule|pin|review\/(?:delay|bulk))|plan-import\/[^/]+\/approve|uploads\/[^/]+\/(?:posts|schedule))$/
+export const SCHEDULING_PATHS = /^\/panel\/(?:drafts\/(?:decide|schedule|spread\/apply|undo-unschedule|reschedule)|plan\/(?:schedule|pin|approve-all|review\/(?:approve|delay|bulk))|plan-import\/[^/]+\/approve|uploads\/[^/]+\/(?:posts|schedule))$/
 
 /**
  * ‏**موعدٌ قريبٌ يُرسَل إلى دقيقته الآن** (D-320): الدورةُ ترسل ما يحلّ قبل التي بعدها، وموعدٌ بعد خمس دقائق يُضبط بين دورتين

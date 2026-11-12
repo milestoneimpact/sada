@@ -58,7 +58,7 @@ describe('مواصفة الأيقونات', () => {
     const MIRRORS = ['external', 'back', 'go', 'send', 'tasks', 'posts'] as const
     const FIXED = [
       'overview', 'sources', 'channels', 'providers', 'settings', 'report', 'plan', 'guide', 'add', 'chevron',
-      'search', 'account', 'bell', 'more', 'like', 'heart', 'comment', 'repost', 'share', 'bookmark', 'views', 'globe', 'play', 'close',
+      'search', 'account', 'bell', 'more', 'like', 'heart', 'comment', 'repost', 'share', 'bookmark', 'views', 'globe', 'play', 'close', 'check',
     ] as const
     expect([...MIRRORS, ...FIXED].sort()).toEqual(Object.keys(ICON).sort())
     for (const k of MIRRORS) expect(direction(ICON[k]), k).toBe('mirrors')

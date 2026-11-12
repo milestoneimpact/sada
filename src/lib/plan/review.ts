@@ -19,7 +19,7 @@
  */
 import type { Db } from '../tokens'
 import { decide, undoApprove } from '../draft/store'
-import { reschedulePost } from '../schedule/job'
+import { reschedulePost, unschedule } from '../schedule/job'
 import { KIND_FITS_SQL, kindFits, schedulePlan, type PlanSchedule } from './schedule'
 import { dayWithin, touchPlan } from './edit'
 import { asSpan, type PlanItem } from './prompt'
@@ -185,8 +185,8 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
 }
 
 /**
- * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول لا يُحذف من هنا:
- * يُلغى موعدُه من بطاقته أوّلًا، فلا يختفي منشورٌ مجدولٌ بضغطةٍ في مراجعة.
+ * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول يُسحب موعدُه أوّلًا
+ * (D-327: «أزِل» على البطاقة يُزيل المنصّةَ من يومها)، وما أُرسل للنشر أو نُشر لا يُحذف.
  */
 export async function dropItem(db: Db, org: string, planId: string, index: number, key: string, by: string): Promise<Act> {
   const at = await itemAt(db, org, planId, index, key)
@@ -197,8 +197,12 @@ export async function dropItem(db: Db, org: string, planId: string, index: numbe
                 AND status <> 'rejected' AND ${KIND_FITS_SQL}`)
     .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
     .first<{ id: string; status: string }>()
-  if (post !== null && (post.status === 'queued' || post.status === 'published')) {
-    return { ok: false, reason: post.status === 'queued' ? 'منشورُه مجدول — ألغِ موعدَه من بطاقته أوّلًا' : 'نُشر منشورُه — لا يُحذف من الخطّة' }
+  if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُحذف من الخطّة' }
+  // ‏والمجدولُ يُسحب موعدُه أوّلًا بـ`unschedule` وحارسِها (D-327): ما أُرسل للنشر لا يُستردّ، فيُردّ الحذفُ بسببه
+  if (post !== null && post.status === 'queued') {
+    const pulled = await unschedule(db, post.id, org)
+    if (!pulled.ok) return { ok: false, reason: `منشورُه مجدول وتعذّر سحبُ موعده: ${pulled.reason}` }
+    post.status = 'approved'
   }
   at.plan.items.splice(index, 1)
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
@@ -210,22 +214,54 @@ export async function dropItem(db: Db, org: string, planId: string, index: numbe
 }
 
 /**
- * **ثبّت الخطّة**: صورةُ البنود في `plan_versions` بإصدارها، ثمّ جدولةُ المعتمَد بـ `schedulePlan`. وما لم يُعتمد يبقى مسوّدةً
- * تنتظر، يُقال عددُه ولا يُجدوَل. وتثبيتُ إصدارٍ مثبَّتٍ من قبل لا يكتب صورةً ثانية.
+ * **«اعتمد» يجدول** (D-327): كلُّ ما اعتُمد من الخطّة ولم يُجدوَل يُوضع في موعد بنده بـ `schedulePlan` نفسِها، وتُحفظ صورةُ
+ * الإصدار الجاري في `plan_versions` (تُحدَّث إن كانت، فالإصدارُ الواحدُ صفٌّ واحدٌ بعدّاده) ويُختم `locked_at`.
+ *
+ * كان الاعتمادُ علامةً والجدولةُ زرًّا ثانيًا في آخر الصفحة («ثبّت الخطّة»)، **وما اعتُمد بعد التثبيت لا يُجدوَل أبدًا**:
+ * التثبيتُ الثاني يردّ «مثبَّتٌ من قبل». فصار الاعتمادُ نفسُه يسوّي الخطّة، ولا منشورَ معتمَدًا يبقى بلا موعد.
+ */
+export async function settlePlan(db: Db, org: string, plan: StoredPlan, by: string, now: Date): Promise<PlanSchedule & { readonly version: number }> {
+  const result = await schedulePlan(db, org, plan, now)
+  const meta = await db
+    .prepare('SELECT version, plan_json FROM plans WHERE id = ? AND org_id = ?')
+    .bind(plan.id, org)
+    .first<{ version: number; plan_json: string }>()
+  const version = meta?.version ?? 1
+  if (result.scheduled > 0) {
+    await db
+      .prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (plan_id, version) DO UPDATE SET scheduled = plan_versions.scheduled + excluded.scheduled, plan_json = excluded.plan_json`)
+      .bind(crypto.randomUUID(), plan.id, version, meta?.plan_json ?? JSON.stringify(plan.plan), result.scheduled, by, org)
+      .run()
+    await db.prepare("UPDATE plans SET locked_at = COALESCE(locked_at, datetime('now')), status = 'approved' WHERE id = ? AND org_id = ?").bind(plan.id, org).run()
+  }
+  return { ...result, version }
+}
+
+/**
+ * **تراجَع** (D-327): منشورٌ جُدول من الخطّة ولم يُرسَل يُسحب موعدُه ويعود مسوّدةً تنتظر القرار — بـ `unschedule` و`undoApprove`
+ * وحرّاسِهما. والمعتمَدُ بلا موعدٍ يعود مسوّدةً وحدَه.
+ */
+export async function undoItem(db: Db, org: string, planId: string, postId: string): Promise<Act> {
+  const post = await db
+    .prepare('SELECT status FROM posts WHERE id = ? AND org_id = ? AND plan_id = ?')
+    .bind(postId, org, planId)
+    .first<{ status: string }>()
+  if (post === null) return { ok: false, reason: 'لا منشور بهذا المعرّف في الخطّة' }
+  if (post.status === 'queued') {
+    const pulled = await unschedule(db, postId, org)
+    if (!pulled.ok) return { ok: false, reason: pulled.reason }
+  }
+  const back = await undoApprove(db, org, postId)
+  return back.ok ? { ok: true } : { ok: false, reason: back.reason }
+}
+
+/**
+ * **ثبّت الخطّة** — الطريقُ القديم إلى `settlePlan`، يبقى لنموذجٍ مفتوحٍ في تبويبٍ قديم. و`already` حين لا شيءَ جديدًا يُجدوَل
+ * والإصدارُ مثبَّت.
  */
 export async function pinPlan(db: Db, org: string, plan: StoredPlan, by: string, now: Date): Promise<PlanSchedule & { readonly version: number; readonly already: boolean }> {
-  const meta = await db
-    .prepare('SELECT version, locked_at, plan_json FROM plans WHERE id = ? AND org_id = ?')
-    .bind(plan.id, org)
-    .first<{ version: number; locked_at: string | null; plan_json: string }>()
-  const version = meta?.version ?? 1
-  if (meta !== null && meta.locked_at !== null) return { scheduled: 0, skipped: [], version, already: true }
-  const result = await schedulePlan(db, org, plan, now)
-  await db
-    .prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)
-              ON CONFLICT (plan_id, version) DO NOTHING`)
-    .bind(crypto.randomUUID(), plan.id, version, meta?.plan_json ?? JSON.stringify(plan.plan), result.scheduled, by, org)
-    .run()
-  await db.prepare("UPDATE plans SET locked_at = datetime('now'), status = 'approved' WHERE id = ? AND org_id = ?").bind(plan.id, org).run()
-  return { ...result, version, already: false }
+  const before = await db.prepare('SELECT locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org).first<{ locked_at: string | null }>()
+  const result = await settlePlan(db, org, plan, by, now)
+  return { ...result, already: before !== null && before.locked_at !== null && result.scheduled === 0 }
 }

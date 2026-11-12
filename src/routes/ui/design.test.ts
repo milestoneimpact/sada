@@ -113,7 +113,7 @@ describe('زرٌّ معطَّلٌ يقول لماذا (D-325)', () => {
     return out
   }
 
-  it('«ثبّت الخطّة» بلا بندٍ معتمَد: معطَّلٌ وسببُه سطرٌ تحته', () => {
+  it('شاشةُ الخطّة بلا زرٍّ معطَّل (D-327): «ثبّت الخطّة» زال، و«اعتمد الأسبوع» يظهر حين يوجد ما يُعتمد', () => {
     const items = [{ sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاوية', day: '2026-11-08', time: '06:00', why: 'ل' }]
     const m = {
       plan: { id: 'pl1', week: '2026-11-08', plan: { rationale: '', items }, model: 'm', status: 'approved', createdAt: '2026-11-02 08:00:00', span: 'week',
@@ -122,8 +122,9 @@ describe('زرٌّ معطَّلٌ يقول لماذا (D-325)', () => {
       cards: [{ index: 0, key: 'k0', item: items[0], post: { id: 'p0', status: 'draft', text: 'نصّ', scheduledAt: null }, mediaId: null, gaps: ['pending'] }],
     } as never
     const html = planReviewScreen(m, null)
-    expect(html).toMatch(/<button class="btn btn-primary" type="submit" disabled aria-describedby="rv-pin-why">ثبّت الخطّة<\/button>/)
-    expect(html).toContain('id="rv-pin-why">اعتمد بندًا واحدًا على الأقلّ')
+    expect(html).not.toContain('ثبّت الخطّة')
+    expect(html).not.toMatch(/<button[^>]* disabled/)
+    expect(html).toMatch(/<button class="btn btn-primary" type="submit" name="do" value="approve"><svg[^>]*>.*?<\/svg><span>اعتمد الأسبوع \(1\)<\/span><\/button>/)
     expect(reasons(html)).toEqual([])
   })
 

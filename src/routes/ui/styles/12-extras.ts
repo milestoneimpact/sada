@@ -519,8 +519,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 }
 
 /* ── مراجعةُ الخطّة (D-286) ───────────────────────────────────────────
-   تقويمٌ مصغَّرٌ بسبعة أعمدة، و«ما ينقص» سطرٌ واحد، والبطاقاتُ شبكةٌ تحت رأس يومها،
-   وشريطا الجملة والتثبيت ملتصقان. والسطوحُ من العُدّة (card · card-inset). */
+   تقويمٌ بسبعة أعمدة، وشريطُ أسابيع، و«ما ينقص» سطرٌ واحد، والبطاقاتُ شبكةٌ تحت رأس يومها،
+   وشريطا الجملة والاعتماد ملتصقان (D-327). والسطوحُ من العُدّة (card · card-inset). */
 .rv-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1); margin:var(--s-3) 0 var(--s-4)}
 .rv-wd{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); text-align:center}
 .rv-cd{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--s-0); min-height:var(--tap);
@@ -534,7 +534,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-bulk[hidden]{display:none}
 .rv-day + .rv-day{margin-top:var(--s-6)}
 .rv-dh{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; scroll-margin-block-start:var(--s-16)}
-.rv-cards{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))}
+.rv-cards{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
 .rv{display:flex; flex-direction:column; gap:var(--s-3); scroll-margin-block-start:var(--s-16)}
 .rv-h{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-sel{display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); margin:calc(-1 * var(--s-2))}
@@ -542,16 +542,27 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-pf{width:var(--s-6); height:var(--s-6)}
 .rv-pf[data-pf=linkedin]{background:var(--pf-linkedin)}
 .rv-pf[data-pf=x]{background:var(--pf-x)}
-.rv-b{display:flex; gap:var(--s-3); align-items:flex-start}
-.rv-thumb{flex:none; width:var(--s-16); height:var(--s-16); object-fit:cover; border-radius:var(--r-control); border:var(--bd-soft)}
-.rv-t{min-width:0}
-.rv-text{display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
+/* ‏والبطاقةُ منشورٌ بشكل منصّته (D-327): المعاينةُ بعرض البطاقة، وسطرُ الصورة بأزراره تحتها */
+.rv-pv{min-width:0}
+.rv-img{align-items:center; padding-top:var(--s-2); border-top:var(--bd-soft)}
+/* ‏شعاراتُ منصّات اليوم في خانته، والنقطةُ فوق العدد لما ينتظر — اللونُ لا يقول وحدَه: الاسمُ في aria-label */
+.rv-dots{display:flex; gap:var(--s-0); justify-content:center}
+.rv-dot{width:var(--s-4); height:var(--s-4)}
+.rv-cd.is-wait{border:var(--bd-dash)}
+/* ‏شريطُ الأسابيع: روابطُ بهدف لمسٍ كامل، والمعروضُ بسطح المحدَّد */
+.rv-weeks{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-bottom:var(--s-4)}
+.rv-wk{display:flex; flex-direction:column; justify-content:center; gap:var(--s-0); min-height:var(--tap); padding:var(--s-2) var(--s-3);
+  border:var(--bd-soft); border-radius:var(--r-control); color:var(--ink); text-decoration:none; font-size:var(--t-small); line-height:var(--lh-small)}
+.rv-wk span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.rv-wk em{font-style:normal; font-weight:600; color:var(--accent)}
+.rv-wk.is-on{background:var(--selected); border-color:var(--accent)}
 .rv-acts{margin-top:auto}
 .rv-foot{position:sticky; bottom:var(--s-3); z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
   margin-top:var(--s-6); padding:var(--s-3) var(--s-4)}
 @media${below('md')}{.rv-foot{bottom:calc(var(--s-16) + var(--safe-b))}}
 @media${below('sm')}{
   .rv-foot .btn{flex:1 1 auto}
+  .rv-wk{flex:1 1 auto}
   /* ‏سبعةُ أعمدةٍ عند 320 تصغّر اليومَ دون هدف اللمس: الأيّامُ التي فيها بنودٌ وحدَها، شريطًا بأهدافٍ كاملة */
   .rv-cal{display:flex; flex-wrap:wrap}
   .rv-wd,.rv-cd:not(.is-on){display:none}

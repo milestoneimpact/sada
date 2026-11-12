@@ -218,13 +218,13 @@ export function planSection(input: PlanInput): string {
 }
 
 /**
- * **«اعتمد الخطّة كاملةً»** (D-282): كلُّ مسوّدةٍ من الخطّة تنتظر القرار تُعتمَد بضغطة، والتأكيدُ يقول العددَ وأنّ شيئًا
- * لا يُنشر قبل الجدولة. ولا زرَّ حين لا شيءَ ينتظر.
+ * **«اعتمد الخطّة كاملةً»** (D-282 · D-327): كلُّ مسوّدةٍ من الخطّة تنتظر القرار تُعتمَد بضغطة وتُجدوَل في موعد بندها،
+ * والتأكيدُ يقول العددَ وأنّها تُنشر بعدها وحدَها. ولا زرَّ حين لا شيءَ ينتظر.
  */
 export function approveAllForm(planId: string, pending: number, primary = true): Html {
   if (pending === 0) return html``
   return html`<form class="inline" method="POST" action="/panel/plan/approve-all" data-busy="جار الاعتماد…"
-      data-confirm="${html`اعتمد ${pending} ${pending === 1 ? 'مسوّدة' : 'مسوّدات'} من الخطّة كما كُتبت؟ ولا يُنشر منها شيء حتّى تجدولها.`}">
+      data-confirm="${html`اعتمد ${pending} ${pending === 1 ? 'مسوّدة' : 'مسوّدات'} من الخطّة كما كُتبت؟ تُجدوَل في مواعيد بنودها وتُنشر وحدَها.`}">
       <input type="hidden" name="id" value="${planId}">
       <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">اعتمد الخطّة كاملة</button></form>`
 }

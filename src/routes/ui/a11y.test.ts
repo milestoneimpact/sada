@@ -452,7 +452,7 @@ describe('مراجعةُ D-323', () => {
     expect(calls).toBe(2)
   })
 
-  it('وحذفُ البند في مراجعة الخطّة هادم: زرُّه أحمر، والحوارُ بفعلٍ أحمر والتركيزُ على «إلغاء»', () => {
+  it('وإزالةُ البند في مراجعة الخطّة هادمة: زرُّه أحمر، والحوارُ بفعلٍ أحمر والتركيزُ على «إلغاء»', () => {
     const items = [{ sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاوية', day: '2026-11-08', time: '06:00', why: 'ل' }]
     const m = {
       plan: { id: 'pl1', week: '2026-11-08', plan: { rationale: '', items }, model: 'm', status: 'approved', createdAt: '2026-11-02 08:00:00', span: 'week',
@@ -461,14 +461,14 @@ describe('مراجعةُ D-323', () => {
       cards: [{ index: 0, key: 'k0', item: items[0], post: { id: 'p0', status: 'draft', text: 'نصّ', scheduledAt: null }, mediaId: null, gaps: ['pending'] }],
     } as never
     const html = planReviewScreen(m, null)
-    for (const label of ['احذف', 'احذفها']) {
-      expect(html, label).toMatch(new RegExp(`<button class="btn btn-danger btn-sm"[^>]*>${label}</button>`))
-    }
+    // ‏«أزِل» على البطاقة بزرّ العُدّة وأيقونته (D-327)، و«أزِلها» في شريط المحدَّد
+    expect(html).toMatch(/<button class="btn btn-danger btn-sm" type="submit"><svg[^>]*>.*?<\/svg><span>أزِل<\/span><\/button>/)
+    expect(html).toMatch(/<button class="btn btn-danger btn-sm"[^>]*>أزِلها<\/button>/)
     const w = boot(html)
     const d = w.document
     ;(d.querySelector('form[action="/panel/plan/review/drop"] button') as unknown as { click(): void }).click()
     const ok = d.querySelector('#sada-cf [data-cf=ok]') as unknown as { className: string; textContent: string }
-    expect(ok.textContent).toBe('احذف')
+    expect(ok.textContent).toBe('أزِل')
     expect(ok.className).toContain('btn-danger')
     expect((d.activeElement as unknown as { getAttribute(n: string): string | null }).getAttribute('data-cf')).toBe('no')
   })

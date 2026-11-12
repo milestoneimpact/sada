@@ -49,15 +49,26 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(html).toContain('مسوّدة · الإصدار 1')
     // ‏بندٌ لم يُكتب، وواحدٌ ينتظر، واثنان بلا صورة، وموعدان مكرَّران لـ LinkedIn
     for (const s of ['1 لم تُكتب بعد', '1 تنتظر اعتمادك', '2 بلا صورة', '2 موعدٌ مكرَّر']) expect(html).toContain(s)
-    expect(html).toContain('href="#c-2">1 لم تُكتب بعد')
-    expect(html).toContain('action="/panel/plan/pin"')
+    expect(html).toContain('href="?w=1#c-2">1 لم تُكتب بعد')
+    // ‏والمنشورُ بشكل منصّته، وأزرارُ الصورة على بطاقته، ولا «ثبّت»: الاعتمادُ يجدول (D-327)
+    expect(html).toContain('class="np np-li')
+    expect(html).toContain('action="/panel/media/generate"')
+    expect(html).not.toContain('action="/panel/plan/pin"')
+    expect(html).toContain('اعتمد الأسبوع (1)')
   })
 
   it('اعتمد · أخّر · احذف — والبصمةُ تردّ فعلًا من صفحةٍ قديمة', async () => {
     const { cookie, csrf } = await session()
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
-    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    // ‏«اعتمد» يجدول في موعد بنده (D-327) — ومعه ما كان معتمَدًا بلا موعد، والإصدارُ يُحفظ ويُختم
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-01-04 07:00:00' })
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
+    expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 2 }])
+    expect((db.raw.prepare("SELECT locked_at FROM plans WHERE id = 'pl1'").get() as { locked_at: string | null }).locked_at).not.toBeNull()
+    // ‏و«تراجَع»: يُسحب الموعدُ وتعود مسوّدةً
+    await app.request('/panel/plan/review/undo', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft', scheduled_at: null })
     await app.request('/panel/plan/review/delay', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '2', key: keyOf(html, 2), days: '1' }), headers: { Cookie: cookie } }, env)
     const plan = JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: { day: string }[] }
     expect(plan.items[2]!.day).toBe('2099-01-07')
@@ -91,9 +102,51 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(after).toContain('عُدّلت بعد التثبيت · الإصدار 2 غير مثبَّت')
     expect(after).toContain('الإصدار 1 — ثُبّت')
-    // ‏ومنشورٌ مجدولٌ لا يُحذف من المراجعة
+    // ‏و«أزِل» على مجدول (D-327): يُسحب موعدُه ويُرفض ويخرج بندُه — وما أُرسل للنشر لا يُزال
+    db.raw.exec("UPDATE posts SET dispatched_at = datetime('now') WHERE id = 'p2'")
     await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(after, 1) }), headers: { Cookie: cookie } }, env)
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
+    db.raw.exec("UPDATE posts SET dispatched_at = NULL WHERE id = 'p2'")
+    await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(after, 1) }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'rejected', scheduled_at: null })
+    expect((JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: unknown[] }).items).toHaveLength(2)
+  })
+
+  it('ما اعتُمد بعد التثبيت يُجدوَل (D-327) — كان يبقى معتمَدًا بلا موعدٍ إلى الأبد', async () => {
+    const { cookie, csrf } = await session()
+    await app.request('/panel/plan/pin', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft' })
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    const res = await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1', w: '1' }), headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review?w=1#c-0')
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
+    // ‏والإصدارُ الواحدُ صفٌّ واحدٌ بعدّاده
+    expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 2 }])
+    const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(after).toContain('action="/panel/plan/review/undo"')
+    expect(after).toContain('2 مجدولةً من 3')
+  })
+
+  it('«اعتمد الخطّة كاملة» من شاشة الخطّة: تُعتمَد وتُجدوَل وتعود إليها', async () => {
+    const { cookie, csrf } = await session()
+    const res = await app.request('/panel/plan/approve-all', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', back: 'review' }), headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    expect(db.raw.prepare("SELECT id, status FROM posts ORDER BY id").all()).toEqual([{ id: 'p1', status: 'queued' }, { id: 'p2', status: 'queued' }])
+    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '1 اعتُمدت · 0 تعثّرت · 2 جُدولت' })
+  })
+
+  it('والنظامُ موقوف: يُعتمَد ولا يُجدوَل ويُقال، ثمّ «جدوِل» على البطاقة بعد رفع الإيقاف', async () => {
+    const { cookie, csrf } = await session()
+    db.raw.exec("DELETE FROM settings WHERE key = 'paused'; INSERT INTO settings (key, value) VALUES ('paused', 'true')")
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    const held = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(held).toContain('موقوفٌ مؤقّتًا')
+    expect(held).toContain('معتمَدة بلا موعد')
+    db.raw.exec("UPDATE settings SET value = 'false' WHERE key = 'paused'")
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(held, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
   })
 
   it('الجملة: اعتمادُ المحدَّد، والحذفُ من الآخر إلى الأوّل فلا يتبدّل فهرسٌ', async () => {
@@ -103,7 +156,8 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const approve = form({ _csrf: csrf, id: 'pl1', do: 'approve' })
     approve.append('sel', sel(0, 'p1'))
     await app.request('/panel/plan/review/bulk', { method: 'POST', body: approve, headers: { Cookie: cookie } }, env)
-    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    // ‏والمعتمَدُ بالجملة يُجدوَل (D-327)، و«أزِلها» يسحب موعدَه ويرفضه
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
     const drop = form({ _csrf: csrf, id: 'pl1', do: 'drop' })
     drop.append('sel', sel(0, 'p1')); drop.append('sel', sel(2, ''))
     await app.request('/panel/plan/review/bulk', { method: 'POST', body: drop, headers: { Cookie: cookie } }, env)
@@ -193,12 +247,12 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
 })
 
 describe('«الخطّة» وجهةٌ واحدة (D-289)', () => {
-  it('تفتح ما يناسب الحال: المراجعة لمسوّدة، والعرض لمثبَّتة، و«خطّة جديدة» بلا خطّة', async () => {
+  it('تفتح شاشةَ الخطّة مسوّدةً ومثبَّتةً (D-327: فيها الاعتماد)، و«خطّة جديدة» بلا خطّة', async () => {
     const { cookie } = await session()
     const go = async () => (await app.request('/panel/plan', { headers: { Cookie: cookie } }, env)).headers.get('Location')
     expect(await go()).toBe('/panel/plan/review')
     db.raw.exec("UPDATE plans SET locked_at = datetime('now')")
-    expect(await go()).toBe('/panel/plan/view')
+    expect(await go()).toBe('/panel/plan/review')
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     expect(await go()).toBe('/panel/plan/new')
   })
