@@ -38,6 +38,7 @@ import { weekStart, type PlanPlatform } from '../../lib/plan/prompt'
 import { maySpend, SPEND_LOCKED } from '../../lib/access'
 import { button } from './components/button'
 import { field } from './components/field'
+import { card } from './components/card'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
 export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
@@ -287,10 +288,23 @@ export function planNewScreen(d: PlanNewData): string {
   const form = html`<form method="POST" action="/panel/plan/generate" class="card wz" id="pn" data-busy="جار التحليل والبناء…"${d.picked ? raw(' data-start="3"') : ''}${d.replacing ? raw(' data-confirm="ستحلّ محلّ خطّتك لهذا المدى. أتمضي؟"') : ''}>
     <input type="hidden" name="then" value="review">
     ${bar}${spanStep(start, preset, shown.length)}${channelStep(d, shown)}${contentStep(d)}${reviewStep(d, shown, count)}${foot}
-  </form>
-  <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" id="pn-up"><input type="hidden" name="return" value="plan"></form>
+  </form>`
+  // ‏نموذجا الإضافة خارج شبكة المعاينة: كلٌّ منهما كان يأخذ خانةً فيها فتنزل المعاينةُ تحت المعالج
+  const helpers = html`<form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" id="pn-up"><input type="hidden" name="return" value="plan"></form>
   <form method="POST" action="/panel/sources/link" id="pn-link"><input type="hidden" name="return" value="plan"></form>`
-  return html`${raw(head)}${ways}${form}`.value
+  /*
+   * ‏**المعاينةُ الحيّة** (D-331، بقرار D-328): تقويمُ المدى بجانب الخطوات، يتبدّل مع كلّ اختيار — المدّةُ تمدّه، والمنصّةُ تظهر في
+   * ‏أيّامها، والإيقاعُ يملؤها. يرسمه السكربتُ من اختيارات النموذج نفسِها (فهو مخفيٌّ بدونه)، وشعاراتُ المنصّات من قوالبَ رسمها
+   * ‏الخادم. **وهو توزيعٌ تقريبيّ** يُقال: الأيّامُ الفعليّةُ يختارها المخطِّطُ من المصادر.
+   */
+  const preview = html`<div class="wz-pv" id="pn-pv" hidden>${raw(card({
+    title: 'المعاينة', titleId: 'pn-pv-t', attrs: 'role="complementary" aria-labelledby="pn-pv-t"',
+    body: html`<div class="wz-pv-grid" id="pn-pv-grid" role="img" aria-label="توزيعٌ تقريبيٌّ للمنشورات على أيّام المدى"></div>
+      <p class="m-0 mt-3" id="pn-pv-sum" role="status"></p>
+      <p class="hint m-0 mt-2">توزيعٌ تقريبيّ — الأيّامُ الفعليّةُ يختارها صدى من مصادرك، وتنقلها بعدها بالسحب.</p>
+      ${shown.map((p) => html`<template id="pn-logo-${p}"><span class="pf-logo rv-pf rv-dot" data-pf="${p}">${raw(LOGOS[p] ?? '')}</span></template>`)}`.value,
+  }))}</div>`
+  return html`${raw(head)}${ways}<div class="wz-grid">${form}${preview}</div>${helpers}`.value
 }
 
 /**
@@ -334,6 +348,31 @@ export const PLAN_NEW_SCRIPT = `(function(){
     var sc=document.getElementById('pn-s-ch'); if(sc)sc.textContent=names.length?names.join(' · '):'—';
     var all=f.querySelector('input[name="source"][value="all"]'), picked=f.querySelectorAll('input[name="source"]:checked:not([value="all"])').length;
     var ss=document.getElementById('pn-s-src'); if(ss)ss.textContent=(all&&all.checked)||picked===0?'كلُّ المصادر المحلَّلة':picked.toLocaleString('ar-u-nu-latn')+' من مصادرك';
+    draw(weeks,text);
+  }
+  // ‏المعاينةُ الحيّة: أيّامُ المدى بشعارات منصّاتها — توزيعٌ متباعدٌ بعدد الأسبوع، وفوق السبعة أكثرُ من شعارٍ في اليوم
+  var pv=document.getElementById('pn-pv'), pvGrid=document.getElementById('pn-pv-grid'), pvSum=document.getElementById('pn-pv-sum');
+  var SPREAD={1:[2],2:[1,4],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4],6:[0,1,2,3,4,5]};
+  function draw(weeks,text){
+    if(!pv||!pvGrid)return; pv.hidden=false;
+    var chans=[]; f.querySelectorAll('input[name="channel"]:checked').forEach(function(ch,i){
+      var p=ch.value, pick=f.querySelector('input[name="cadence_'+p+'"]:checked'), n=pick?pick.value:'3';
+      if(n==='custom'){var c=f.querySelector('input[name="cadence_custom_'+p+'"]'); n=c?c.value:'0';}
+      n=Math.max(0,Math.min(28,Math.floor(Number(n)||0)));
+      var days=n>=7?[0,1,2,3,4,5,6]:(SPREAD[n]||[]).map(function(d){return (d+(n<5?i:0))%7;});
+      chans.push({p:p,days:days,each:n>7?Math.ceil(n/7):1});
+    });
+    var s=document.getElementById('plan-start'), t0=s&&s.value?Date.parse(s.value+'T12:00:00Z'):NaN;
+    while(pvGrid.firstChild)pvGrid.removeChild(pvGrid.firstChild);
+    for(var d=0;d<weeks*7;d++){
+      var cell=document.createElement('span'); cell.className='wz-pv-c'; var any=false;
+      chans.forEach(function(c){ if(c.days.indexOf(d%7)<0)return; var tpl=document.getElementById('pn-logo-'+c.p); if(!tpl)return;
+        for(var k=0;k<c.each;k++){cell.appendChild(tpl.content.cloneNode(true)); any=true;} });
+      if(any)cell.classList.add('is-on');
+      else if(!isNaN(t0)){var b=document.createElement('bdi'); b.className='mono'; b.textContent=String(new Date(t0+d*86400000).getUTCDate()); cell.appendChild(b);}
+      pvGrid.appendChild(cell);
+    }
+    if(pvSum)pvSum.textContent=text;
   }
   f.addEventListener('change',upd); f.addEventListener('input',upd);
   // ‏«الكلّ» وما سواه لا يجتمعان: اختيارُ مصدرٍ يرفع «الكلّ»، ورفعُ آخرِها يعيده
