@@ -28,6 +28,7 @@ import worker from '../../src/index'
 import { toBase64 } from '../../src/lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../../src/test/fakes'
 import { fakeAi, heldQueue, installNetwork, memoryBucket, type NetCall } from './fakes'
+import { runPlanBuild, type PlanBuildMessage } from '../../src/routes/panel/plan'
 import { seed, type Seeded } from './seed'
 import type { EmailMessage } from '../../src/test/cloudflareEmail'
 
@@ -165,7 +166,12 @@ export async function startServer(options: StartOptions = {}): Promise<Stack> {
     const kv = fakeKv()
     const bucket = memoryBucket()
     const publishQueue = heldQueue('publish')
-    const generateQueue = heldQueue('generate')
+    // ‏رسالةُ بناء الخطّة تُستهلك هنا كما يستهلكها الطابور (D-332): بدونها تبقى شاشةُ البناء تدور؛ ورسائلُ الكتابة تبقى محجوزةً كما كانت
+    const generateQueue = heldQueue('generate', (body) => {
+      if (typeof body === 'object' && body !== null && 'planBuild' in body) {
+        void runPlanBuild(envOf() as never, (body as PlanBuildMessage).planBuild).catch(() => undefined)
+      }
+    })
     const seeded = await seed(db, encKey, bucket, video)
     return { db, kv, bucket, publishQueue, generateQueue, seeded }
   }

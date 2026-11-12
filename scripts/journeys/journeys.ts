@@ -721,6 +721,8 @@ const R12: Journey = {
     await m.tap(visible(page.locator('label.wz-opt').filter({ has: page.locator('input[name="image_style"][value="none"]') })).first(), '«بلا صورة»')
     await m.tap(button(page, 'التالي'), '«التالي» — المراجعة: العددُ والكلفة')
     await m.tap(button(page, 'حلّل وابنِ الخطّة'), '«حلّل وابنِ الخطّة»', { key: true })
+    // ‏البناءُ في الخلفيّة (D-332): شاشةُ «صدى يبني خطّتك» بخطواتها، ثمّ تنتقل وحدَها إلى الخطّة حين يكتمل التخطيط
+    await page.waitForURL(/\/panel\/plan\/review/, { timeout: 30_000 })
     const plans = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM plans WHERE span = 'month' AND status <> 'superseded'")?.n ?? 0
     const queued = stack.generateQueue.sent.length
     const at = new URL(page.url()).pathname

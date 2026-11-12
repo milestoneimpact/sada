@@ -4,6 +4,7 @@ import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
+import { runPlanBuild } from './panel/plan'
 
 let db: FakeDb
 let env: Record<string, unknown>
@@ -281,6 +282,61 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
     for (const s of ['name="cadence_linkedin" value="14"', 'name="cadence_x" value="21"', 'name="time_linkedin" value="09:00"', 'name="time_x" value="18:30"',
       'name="image_linkedin"', '<option value="illustration">رسمٌ فنّيّ</option>', '<option value="none">بلا صورة</option>']) expect(html).toContain(s)
     expect((html.match(/name="time_linkedin"/g) ?? []).length).toBe(3)
+  })
+})
+
+/**
+ * **بناءُ الخطّة في الخلفيّة** (D-332): «حلّل وابنِ» لا ينادي النموذجَ في طلب الصفحة — يكتب حالَ البناء ويرسل رسالةً ويفتح شاشتَه.
+ */
+describe('بناءُ الخطّة في الخلفيّة وحالُه يُرى (D-332)', () => {
+  const wizard = (csrf: string): FormData => {
+    const f = form({ _csrf: csrf, span: 'month', then: 'review', image_style: 'none', cadence_linkedin: '14', start: '2099-03-01' })
+    f.append('channel', 'linkedin'); f.append('time_linkedin', '09:00'); f.append('time_linkedin', '18:30')
+    return f
+  }
+
+  it('الضغطةُ تكتب الحالَ وترسل رسالةً واحدةً باختيارات المعالج وتفتح شاشةَ البناء — ولا نداءَ في الطلب', async () => {
+    const sent: { planBuild: { org: string; jobId: string; params: Record<string, unknown> } }[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: (typeof sent)[number] }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    const res = await app.request('/panel/plan/generate', { method: 'POST', body: wizard(csrf), headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/building')
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.planBuild.params).toMatchObject({ span: 'month', channels: ['linkedin'], cadence: { linkedin: 14 }, times: { linkedin: ['09:00', '18:30'] }, startDay: '2099-03-01', autoImage: false })
+    expect(db.raw.prepare("SELECT count(*) AS n FROM cost_ledger").get()).toEqual({ n: 0 })
+    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.generate'").get()).toEqual({ detail: 'queued' })
+    // ‏منشوران في اليوم لشهر: 14 في الأسبوع × 4 = 56 ≤ سقف النداء، فجزءٌ واحد؛ والشاشةُ تقول ما يجري
+    const screen = await (await app.request('/panel/plan/building', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['صدى يبني خطّتك', 'id="pb-plan"', 'id="pb-prog" max="1" value="0"', 'لك أن تغادر الصفحة', 'href="/panel/plan/building"']) expect(screen).toContain(s)
+    expect(await (await app.request('/panel/plan/build.json', { headers: { Cookie: cookie } }, env)).json()).toMatchObject({ state: 'queued', done: 0, total: 1 })
+    // ‏وضغطةٌ ثانيةٌ والأوّلُ يجري: شاشتُه لا رسالةٌ ثانيةٌ مدفوعة — و«الخطّة» في الرافدة تفتحها أيضًا
+    const again = await app.request('/panel/plan/generate', { method: 'POST', body: wizard(csrf), headers: { Cookie: cookie } }, env)
+    expect(again.headers.get('Location')).toBe('/panel/plan/building')
+    expect(sent).toHaveLength(1)
+    expect((await app.request('/panel/plan', { headers: { Cookie: cookie } }, env)).headers.get('Location')).toBe('/panel/plan/building')
+  })
+
+  it('المستهلكُ بلا مزوّدٍ جاهز: الحالُ «فشل» بسببه، والشاشةُ تقوله وتعيد إلى المعالج — ورسالةُ بناءٍ استُبدل تُترك', async () => {
+    const sent: { planBuild: { org: string; jobId: string; params: never } }[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: (typeof sent)[number] }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    await app.request('/panel/plan/generate', { method: 'POST', body: wizard(csrf), headers: { Cookie: cookie } }, env)
+    await runPlanBuild(env as never, { ...sent[0]!.planBuild, jobId: 'ليس-الجاري' })
+    expect(await (await app.request('/panel/plan/build.json', { headers: { Cookie: cookie } }, env)).json()).toMatchObject({ state: 'queued' })
+    await runPlanBuild(env as never, sent[0]!.planBuild)
+    expect(await (await app.request('/panel/plan/build.json', { headers: { Cookie: cookie } }, env)).json()).toMatchObject({ state: 'failed' })
+    const screen = await (await app.request('/panel/plan/building', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['تعذّر بناءُ الخطّة', '<b>السبب:</b>', 'href="/panel/plan/new"']) expect(screen).toContain(s)
+    // ‏وبعد الفشل «الخطّة» تعود إلى شاشتها، والمعالجُ يبدأ بناءً جديدًا
+    expect((await app.request('/panel/plan', { headers: { Cookie: cookie } }, env)).headers.get('Location')).toBe('/panel/plan/review')
+    await app.request('/panel/plan/generate', { method: 'POST', body: wizard(csrf), headers: { Cookie: cookie } }, env)
+    expect(sent).toHaveLength(2)
+  })
+
+  it('بلا بناءٍ لا شاشةَ له، وبلا جلسةٍ لا حال', async () => {
+    const { cookie } = await session()
+    expect((await app.request('/panel/plan/building', { headers: { Cookie: cookie } }, env)).headers.get('Location')).toBe('/panel/plan')
+    expect((await app.request('/panel/plan/build.json', {}, env)).status).toBe(401)
   })
 })
 

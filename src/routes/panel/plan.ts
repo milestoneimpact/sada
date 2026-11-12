@@ -37,7 +37,10 @@ import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
-import { approvePlan, ideaOf, latestPlan, planSpan } from '../../lib/plan/job'
+import { approvePlan, ideaOf, latestPlan, planSpan, planWindows } from '../../lib/plan/job'
+import { readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
+import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
+import type { PlanDeps } from '../../lib/plan/job'
 import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
@@ -118,6 +121,27 @@ plan.post('/panel/plan/generate', async (c) => {
     : f.has('auto_image') ? f.getAll('auto_image').map(String).includes('1') : undefined
   const imageStyle = asImageStyle(styleRaw)
   const startRaw = String(f.get('start') ?? '')
+
+  /*
+   * ‏**بناءٌ في الخلفيّة بحالٍ يُرى** (D-332): من المعالج («حلّل وابنِ») تُكتب حالُ البناء وتُرسَل رسالةٌ إلى طابور التوليد وتُفتح
+   * ‏شاشتُه — فلا ينتظر المالكُ صفحةً بيضاء، ولا يُقطع النداءُ بمهلة الصفحة. وبناءٌ يجري يفتح شاشتَه ولا يبدأ نداءً مدفوعًا ثانيًا.
+   * ‏وبلا طابور (بيئةٌ لم يُربط فيها) أو من زرٍّ قديم: الطريقُ المباشرُ كما كان.
+   */
+  const queue = c.env.GENERATE_QUEUE as Env['GENERATE_QUEUE'] | undefined
+  if (f.get('then') === 'review' && queue !== undefined && !(await readSettings(c.env.DB)).paused) {
+    if (running(await readBuild(c.env.KV, org), new Date())) return c.redirect('/panel/plan/building', 303)
+    const params: PlanBuildParams = {
+      span, channels, cadence: cadence as Cadence, sources, ideas, imageStyle, imageStyles: imageStyles as PlanChoices['imageStyles'], times,
+      zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+      ...(autoImage === undefined ? {} : { autoImage }),
+      ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
+    }
+    const build: PlanBuild = { id: crypto.randomUUID(), state: 'queued', done: 0, total: planWindows(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? startRaw : weekStart(new Date()), span, cadence as Cadence).length, startedAt: new Date().toISOString() }
+    await writeBuild(c.env.KV, org, build)
+    await queue.sendBatch([{ body: { planBuild: { org, jobId: build.id, params } } }])
+    await record(c.env.DB, { actor: 'panel', action: 'plan.generate', target: build.id, detail: 'queued' }, c.req.raw)
+    return c.redirect('/panel/plan/building', 303)
+  }
 
   const outcome = await planSpan({
     db: c.env.DB,
@@ -260,7 +284,7 @@ plan.post('/panel/plan/approve', async (c) => {
  * **«ابدأ»: كلُّ بندٍ مرّةً إلى الطابور** — مسوّدتُه وصورتُه باختيار الخطّة (D-258 · D-282 · D-285). مشتركٌ بين زرّ «ابدأ»
  * و«حلّل وابنِ» في المعالج (D-286)، فالطريقُ واحدٌ بحرّاسه.
  */
-async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>): Promise<{ items: number; clips: number; autoImage: boolean | undefined }> {
+export async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>): Promise<{ items: number; clips: number; autoImage: boolean | undefined }> {
   if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
   const seen = new Set<string>()
   const items = plan.plan.items.filter((i) => {
@@ -890,6 +914,67 @@ plan.get('/panel/plan/view', async (c) => {
   )
 })
 
+// ── بناءُ الخطّة في الخلفيّة (D-332) ──────────────────────────────────
+
+/** ما يحمله طلبُ البناء إلى المستهلك: اختياراتُ المعالج كما قُرئت وفُحصت في المسار. */
+export type PlanBuildParams = Pick<PlanDeps, 'span' | 'channels' | 'cadence' | 'sources' | 'ideas' | 'autoImage' | 'imageStyle' | 'imageStyles' | 'times' | 'zone' | 'startDay'>
+
+export interface PlanBuildMessage {
+  readonly planBuild: { readonly org: string; readonly jobId: string; readonly params: PlanBuildParams }
+}
+
+/**
+ * **مستهلكُ بناء الخطّة** — يُنادى من طابور التوليد (`index.ts`). يخطّط بـ`planSpan` نفسِها بحرّاسها وسقوفها ودفترها، ويحدّث الحالَ
+ * عند كلّ جزء، ثمّ يرسل بنودَ الخطّة للكتابة بـ`enqueuePlan` نفسِها. **والرسالةُ لا تُعاد**: النداءُ مدفوع، وإعادتُه دفعٌ ثانٍ — فالفشلُ
+ * يُكتب في الحال بسببه ويُقرأ في شاشته. ورسالةٌ لبناءٍ استُبدل (معرّفٌ غيرُ الجاري) تُترك.
+ */
+export async function runPlanBuild(env: Env, body: PlanBuildMessage['planBuild']): Promise<void> {
+  const { org, jobId, params } = body
+  const current = await readBuild(env.KV, org)
+  if (current === null || current.id !== jobId || current.state === 'done' || current.state === 'failed') return
+  const save = (patch: Partial<PlanBuild>): Promise<void> => writeBuild(env.KV, org, { ...current, ...patch })
+  try {
+    await save({ state: 'planning' })
+    const outcome = await planSpan({
+      db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: env as unknown as Record<string, string | undefined>, org, ...params,
+      onProgress: (done, total) => save({ state: 'planning', done, total }),
+    })
+    if (outcome.kind !== 'planned') {
+      await save({ state: 'failed', note: outcome.reason })
+      await record(env.DB, { actor: 'system', action: 'plan.build', target: jobId, detail: (outcome.kind + ': ' + outcome.reason).slice(0, 200) })
+      return
+    }
+    const built = await latestPlan(env.DB, org)
+    const started = built === null || (await readSettings(env.DB)).paused ? null : await enqueuePlan(env, org, built)
+    await save({ state: 'done', done: outcome.calls, total: outcome.calls, planId: outcome.planId, note: sayPlanned(outcome, params.span ?? 'week', '') })
+    await record(env.DB, { actor: 'system', action: 'plan.build', target: outcome.planId, detail: 'planned · ' + String(started?.items ?? 0) + ' بندًا للكتابة' })
+  } catch (error) {
+    await save({ state: 'failed', note: error instanceof Error ? error.message.slice(0, 200) : 'عطلٌ غير متوقّع' }).catch(() => undefined)
+  }
+}
+
+plan.get('/panel/plan/building', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  if (found === null) return c.redirect('/panel/plan', 303)
+  const body = planBuildScreen(shownBuild(found, new Date()), new Date())
+  return page((nonce) =>
+    soloPage('صدى — بناء الخطّة', { href: panelHref('posts'), label: 'المنشورات' }, body, nonce,
+      PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
+  )
+})
+
+/** حالُ البناء JSON لسكربت شاشته — خلف الجلسة، ولا يحمل إلّا الحالَ وعدَّه وسطرَه. */
+plan.get('/panel/plan/build.json', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.json({ state: 'none' }, 401)
+  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  if (found === null) return c.json({ state: 'none' }, 404)
+  const b = shownBuild(found, new Date())
+  return c.json({ state: b.state, done: b.done, total: b.total, line: planningLine(b.done, b.total) }, 200, { 'Cache-Control': 'private, no-store' })
+})
+
 /**
  * **«الخطّة» وجهةٌ واحدة** (D-289 · D-327): بلا خطّةٍ «خطّة جديدة»، وما سواها شاشةُ الخطّة نفسُها — فيها الشهرُ والأسبوعُ والاعتماد.
  * كانت المثبَّتةُ تفتح «العرض»، وهو للقراءة بلا زرّ اعتماد: فمن فتح خطّتَه لم يجد ما يعتمد به. و«العرض» زرٌّ فيها للطباعة.
@@ -898,5 +983,7 @@ plan.get('/panel/plan', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const current = await latestPlan(c.env.DB, activeOrg(session.record))
+  // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
+  if (running(await readBuild(c.env.KV, activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
   return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
 })

@@ -432,6 +432,12 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
    خطوةٌ في كلّ شاشة: شريطُ تقدّمٍ بأسماء الخطوات، وبطاقاتُ اختيارٍ كبيرة، وشريطٌ ثابتٌ تحت.
    **وبلا سكربتٍ تُرى الخطواتُ متتابعةً** يفصلها خطّ — و«wz-on» يضيفه السكربتُ وحدَه. */
 .card.wz{max-width:calc(var(--measure) * 1.6 + var(--s-16)); padding-bottom:0}
+/* ── شاشةُ بناء الخطّة (D-332): ثلاثُ خطواتٍ بحالها، وما ينتظر أهدأُ حبرًا ── */
+/* ‏والبطاقةُ بعرض المقروء: خطواتٌ قصيرةٌ في بطاقةٍ بعرض الشاشة تترك نصفَها فارغًا (قيس ‏48٪) */
+#pb{max-width:calc(var(--measure) + var(--s-16))}
+.pb-steps{display:flex; flex-direction:column; gap:var(--s-4); margin:0; padding:0; list-style:none}
+.pb-step{display:flex; flex-direction:column; gap:var(--s-2)}
+.pb-step[data-state=wait] b{color:var(--ink-2); font-weight:400}
 /* ── المعاينةُ الحيّة بجانب المعالج (D-331): عمودٌ ثانٍ من «lg»، وتحته دونها ── */
 .wz-grid{display:grid; gap:var(--s-5); align-items:start}
 .wz-pv{min-width:0}
