@@ -1,5 +1,5 @@
 /** الوثائق والطباعة ولوحة الأوامر والتنبيهات والموعد — الوحدةُ 12 من 14 في ورقة الأنماط، بترتيبها (`scripts/split_styles.mjs`). */
-import { below } from '../tokens'
+import { atLeast, below } from '../tokens'
 
 export const EXTRAS = `/* ── الوثائق العامّة ──────────────────────────────────────────────────
    عمود واحد مقيَّد العرض: سطر يمتدّ عبر شاشة عريضة يُقرأ بعين تقفز،
@@ -432,6 +432,23 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
    خطوةٌ في كلّ شاشة: شريطُ تقدّمٍ بأسماء الخطوات، وبطاقاتُ اختيارٍ كبيرة، وشريطٌ ثابتٌ تحت.
    **وبلا سكربتٍ تُرى الخطواتُ متتابعةً** يفصلها خطّ — و«wz-on» يضيفه السكربتُ وحدَه. */
 .card.wz{max-width:calc(var(--measure) * 1.6 + var(--s-16)); padding-bottom:0}
+/* ── شاشةُ بناء الخطّة (D-332): ثلاثُ خطواتٍ بحالها، وما ينتظر أهدأُ حبرًا ── */
+/* ‏والبطاقةُ بعرض المقروء: خطواتٌ قصيرةٌ في بطاقةٍ بعرض الشاشة تترك نصفَها فارغًا (قيس ‏48٪) */
+#pb{max-width:calc(var(--measure) + var(--s-16))}
+.pb-steps{display:flex; flex-direction:column; gap:var(--s-4); margin:0; padding:0; list-style:none}
+.pb-step{display:flex; flex-direction:column; gap:var(--s-2)}
+.pb-step[data-state=wait] b{color:var(--ink-2); font-weight:400}
+/* ── المعاينةُ الحيّة بجانب المعالج (D-331): عمودٌ ثانٍ من «lg»، وتحته دونها ── */
+.wz-grid{display:grid; gap:var(--s-5); align-items:start}
+.wz-pv{min-width:0}
+.wz-pv-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
+.wz-pv-c{display:flex; flex-wrap:wrap; align-content:center; justify-content:center; gap:var(--s-0); aspect-ratio:1; padding:var(--s-0);
+  border-radius:var(--r-inline); background:var(--surface-2); transition:background var(--dur-2) var(--ease)}
+.wz-pv-c.is-on{background:var(--selected)}
+@media${atLeast('lg')}{
+  .wz-grid{grid-template-columns:minmax(0,1fr) minmax(0,22rem)}
+  .wz-pv{position:sticky; top:calc(var(--topbar) + var(--s-4))}
+}
 .wz-bar{display:flex; gap:var(--s-2); margin:0 0 var(--s-6); padding:0; list-style:none}
 .wz-bar li{flex:1 1 0; min-width:0; display:flex; align-items:center; gap:var(--s-2); padding-bottom:var(--s-2);
   border-bottom:var(--stroke) solid var(--line); color:var(--ink-3); font-size:var(--t-ui); line-height:var(--lh-ui);

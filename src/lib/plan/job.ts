@@ -88,6 +88,8 @@ export interface PlanDeps {
   readonly imageStyles?: PlanChoices['imageStyles']
   readonly times?: PlanChoices['times']
   readonly zone?: string | null
+  /** يُنادى قبل كلّ جزءٍ يُخطَّط وبعد آخرها (D-332): كم اكتمل من كم — لشاشة البناء. وعطلُه لا يوقف التخطيط. */
+  readonly onProgress?: (done: number, total: number) => Promise<void>
 }
 
 interface Row {
@@ -248,7 +250,12 @@ async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Cal
     } else {
       if (provider.baseUrl === null) return fail({ kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false })
       const result = await chatCompletion(
-        { baseUrl: provider.baseUrl, apiKey: resolved.key, model: route.model, system, user, json: true },
+        {
+          baseUrl: provider.baseUrl, apiKey: resolved.key, model: route.model, system, user, json: true,
+          // ‏خطّةُ ستّين بندًا أطولُ من ‏4096 رمزًا ومن ‏30 ثانية (D-332): كان الجوابُ يُقطع أو النداءُ يُلغى بعد أن انتظر المالك
+          maxTokens: Math.min(16_000, Math.max(4096, maxItems(span, cadence) * 160 + 600)),
+          timeoutMs: 240_000,
+        },
         deps.fetchImpl,
       )
       text = result.text
@@ -325,11 +332,16 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   // ‏وإيقاعٌ يتجاوز سقفَ النداء (D-329: منشوران أو ثلاثةٌ في اليوم) يُقسَم على نوافذَ أقصر: أسبوعان ثمّ أسبوع
   const windows = planWindows(start, span, cadence)
   const parts: Extract<Called, { ok: true }>[] = []
+  const tell = async (done: number): Promise<void> => {
+    if (deps.onProgress !== undefined) await deps.onProgress(done, windows.length).catch(() => undefined)
+  }
   for (const w of windows) {
+    await tell(parts.length)
     const called = await planOnce(ctx, w.start, w.span)
     if (!called.ok) return called.outcome
     parts.push(called)
   }
+  await tell(windows.length)
   // ‏وأوقاتُ المالك لكلّ منصّة تغلب ما كتبه المخطِّط، ولكلّ بندٍ معرّفُه (D-329)
   const zone = deps.zone ?? null
   const timed = applyTimes(

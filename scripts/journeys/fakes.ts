@@ -166,16 +166,20 @@ export function memoryBucket() {
 // ── الطوابير ──────────────────────────────────────────────────────────
 
 /** طابورٌ يحفظ ما أُرسل ولا يستهلكه: لا نشرَ من نسخةٍ محلّيّة. */
-export function heldQueue(name: string) {
+export function heldQueue(name: string, /** ‏ما يُستهلك محلّيًّا من الرسائل (D-332: بناءُ الخطّة) — يُنادى بعد الإرسال، ولا يُنتظَر */ deliver?: (body: unknown) => void) {
   const sent: { body: unknown; at: string }[] = []
+  const hold = (body: unknown): void => {
+    sent.push({ body, at: new Date().toISOString() })
+    if (deliver !== undefined) setTimeout(() => deliver(body), 0)
+  }
   return {
     name,
     sent,
     async send(body: unknown) {
-      sent.push({ body, at: new Date().toISOString() })
+      hold(body)
     },
     async sendBatch(messages: readonly { body: unknown }[]) {
-      for (const message of messages) sent.push({ body: message.body, at: new Date().toISOString() })
+      for (const message of messages) hold(message.body)
     },
   }
 }

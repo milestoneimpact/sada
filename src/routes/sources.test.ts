@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
+import { PLAN_NEW_SCRIPT } from './ui/planNewView'
 import { app } from '../index'
 
 let db: FakeDb
@@ -126,6 +127,20 @@ describe('مجموعةُ مصادر في طلبٍ واحد (D-327)', () => {
     expect(html).toMatch(/<input type="file" name="file" form="pn-up"[^>]* multiple>/)
     expect(html).toMatch(/<textarea id="pn-url" name="url" form="pn-link"/)
     for (const s of ['.srt', 'مقطع YouTube', 'موقعٌ (يُقرأ مع صفحاته التعريفيّة)']) expect(html).toContain(s)
+  })
+
+  it('المعاينةُ الحيّة بجانب المعالج (D-331): مخفيّةٌ بلا سكربت، وقوالبُ شعاراتها من الخادم، ونموذجا الإضافة خارج شبكتها', async () => {
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a9', 'linkedin', 'member', 'e9', 'عمر', 'active')`)
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toMatch(/<div class="wz-grid"><form method="POST" action="\/panel\/plan\/generate"/)
+    expect(html).toContain('<div class="wz-pv" id="pn-pv" hidden>')
+    expect(html).toContain('<template id="pn-logo-linkedin">')
+    // ‏نموذجا الإضافة بعد الشبكة لا فيها: كلٌّ منهما كان خانةً تُنزل المعاينةَ تحت المعالج
+    expect(html.indexOf('id="pn-up"')).toBeGreaterThan(html.indexOf('id="pn-pv"'))
+    // ‏ومتغيّرُ شبكة المعاينة باسمه: كان «grid» فاصطدم بقائمة المصادر في السكربت نفسِه، ومحاها عند كلّ اختيار
+    expect(PLAN_NEW_SCRIPT.match(/[ ,]grid=/g)).toHaveLength(1)
+    expect(PLAN_NEW_SCRIPT).toContain("pvGrid=document.getElementById('pn-pv-grid')")
   })
 })
 

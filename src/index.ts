@@ -51,6 +51,7 @@ import { generateForPost, resumeWaiting } from './lib/image/job'
 import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
+import { runPlanBuild, type PlanBuildMessage } from './routes/panel/plan'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -546,12 +547,18 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
   }
 }
 
-async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage>, env: Env): Promise<void> {
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage | PlanBuildMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلٌ يُرمى يُعاد بتباعد ولا يُسقط الدفعة
     await guarded(message, 'analyze', async (m) => {
       if ('draft' in m.body) {
         await planDraft(m as QueueMessage<PlanDraftMessage>, env)
+        return
+      }
+      // ‏بناءُ الخطّة في الخلفيّة (D-332): يُقَرّ قبل أن يبدأ — نداءُ التخطيط مدفوع، وإعادةُ الرسالة دفعٌ ثانٍ؛ والفشلُ يُكتب في حاله
+      if ('planBuild' in m.body) {
+        m.ack()
+        await runPlanBuild(env, (m.body as PlanBuildMessage).planBuild)
         return
       }
       const outcome = await analyzeSource(

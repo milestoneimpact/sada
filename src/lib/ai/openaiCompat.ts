@@ -57,6 +57,8 @@ export interface CompatRequest {
   /** يُطلب JSON. والتحقّق من الشكل عندنا: لا نثق بوعد المزوّد. */
   readonly json?: boolean
   readonly maxTokens?: number
+  /** ‏مهلةُ النداء بالملّي ثانية — وغيابُها ‏90 ثانية (D-332): كتابةُ نصٍّ تأخذ أكثر من ‏30 عند مزوّدٍ بطيء، والتخطيطُ يطلب أكثر. */
+  readonly timeoutMs?: number
   /**
    * صورة تُقرأ مع النصّ (D-243) — اللهجة نفسها لا سائق ثانٍ: يصير `content`
    * مصفوفة أجزاء فيها `image_url`. وعنوان أو `data:` كلاهما يُقبَل.
@@ -125,10 +127,14 @@ export async function chatCompletion(
         Authorization: `Bearer ${request.apiKey.trim()}`,
       },
       body: JSON.stringify(body),
-    }, fetchImpl)
+    }, fetchImpl, request.timeoutMs ?? 90_000)
   } catch (error) {
+    // ‏والمهلةُ تُقال بالعربيّة وبما يُفعل (D-332): كان «The operation was aborted due to timeout» يصل المالكَ كما رماه المتصفّح
+    const timedOut = error instanceof Error && /abort|timeout|timed out/i.test(`${error.name} ${error.message}`)
     throw new CompatError(
-      `تعذّر الوصول: ${error instanceof Error ? error.message : 'عطل شبكة'}`,
+      timedOut
+        ? 'لم يُجب المزوّدُ في المهلة — أعد المحاولة، أو اختر مدّةً أقصر أو إيقاعًا أخفّ'
+        : `تعذّر الوصول: ${error instanceof Error ? error.message : 'عطل شبكة'}`,
       502,
       true,
     )

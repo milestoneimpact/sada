@@ -26,6 +26,7 @@ import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
+import { PLAN_BUILD_SCRIPT, planBuildScreen } from '../src/routes/ui/planBuildView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
@@ -507,6 +508,12 @@ writeAudited(
       version: 2, lockedAt: null, cards: cards as never, gaps: { unwritten: 1, no_image: 1, pending: 1, clash: 0 },
       versions: [{ version: 1, lockedAt: '2026-11-03 10:00:00', lockedBy: 'owner', scheduled: 3, items: 4 }],
     } as never
+  // ‏شاشةُ بناء الخطّة (D-332): الجزءُ الثاني من أربعةٍ يُخطَّط، بعد دقيقتين
+  writeAudited(
+    '/tmp/screen-plan-build.html',
+    soloPage('صدى — بناء الخطّة', { href: '/panel#posts', label: 'المنشورات' },
+      planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  )
   writeAudited(
     '/tmp/screen-plan-review.html',
     soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
