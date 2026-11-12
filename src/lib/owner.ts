@@ -553,6 +553,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏المراقبُ عند مزوّده، ونداؤه لا يُحفَظ هنا (D-061)
     done: () => null,
   },
+  {
+    code: 'M-48',
+    title: 'خطّة حيّة على staging (بعد D-327)',
+    ifLeft: 'رابطُ مقطع YouTube لم يُجرَّب حيًّا — تأجيلٌ لا خطر.',
+    unblocks: 'guard',
+    // ‏تجربةٌ بيد المالك، ولا أثرَ لها يُقرأ من هنا (D-061)
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

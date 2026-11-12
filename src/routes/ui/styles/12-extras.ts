@@ -553,10 +553,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-weeks{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-bottom:var(--s-4)}
 .rv-wk{display:flex; flex-direction:column; justify-content:center; gap:var(--s-0); min-height:var(--tap); padding:var(--s-2) var(--s-3);
   border:var(--bd-soft); border-radius:var(--r-control); color:var(--ink); text-decoration:none; font-size:var(--t-small); line-height:var(--lh-small)}
-.rv-wk span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .rv-wk em{font-style:normal; font-weight:600; color:var(--accent)}
 .rv-wk.is-on{background:var(--selected); border-color:var(--accent)}
 .rv-acts{margin-top:auto}
+.rv-acts form{display:inline-flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-foot{position:sticky; bottom:var(--s-3); z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
   margin-top:var(--s-6); padding:var(--s-3) var(--s-4)}
 @media${below('md')}{.rv-foot{bottom:calc(var(--s-16) + var(--safe-b))}}

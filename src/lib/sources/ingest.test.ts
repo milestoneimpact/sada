@@ -1,7 +1,7 @@
 /** مصادرُ من غير Drive (D-284): الرفعُ والرابط، بقاعدةٍ حقيقيّة وR2 وشبكةٍ مزيّفين. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { cleanConverted, ingestFile, ingestLink, pageTitle, parseLink, type IngestDeps, type ToMarkdown } from './ingest'
+import { captionText, cleanCaptions, cleanConverted, ingestFile, ingestLink, pageTitle, parseLink, siteLinks, videoId, type IngestDeps, type ToMarkdown } from './ingest'
 
 let db: FakeDb
 let objects: Map<string, string | Uint8Array>
@@ -194,3 +194,102 @@ describe('رابطُ صفحة — التحويلُ يُفحص في كلّ قفز
   })
 })
 
+
+
+/** ‏مصادرُ D-327: الموقعُ كاملًا، ورابطُ المقطع، وملفُّ الترجمة. */
+describe('رابطُ موقعٍ ورابطُ مقطعٍ وملفُّ ترجمة (D-327)', () => {
+  const htmlRes = (body: string): Response => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+  /** شبكةٌ مزيّفة: عنوانٌ إلى جوابه، وما سواه ٤٠٤ — وتُسجَّل العناوينُ المطلوبة. */
+  function net(pages: Record<string, () => Response>): { fetchImpl: typeof fetch; asked: string[] } {
+    const asked: string[] = []
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input)
+      asked.push(url)
+      return (pages[url] ?? (() => new Response('لا', { status: 404 })))()
+    }) as typeof fetch
+    return { fetchImpl, asked }
+  }
+  const body = (t: string): string => `<html><head><title>${t}</title></head><body><p>${'نصُّ ' + t + ' بما يكفي ليُبنى عليه منشورٌ يُقرأ. '.repeat(30)}</p></body></html>`
+
+  it('روابطُ الرئيسيّة: المضيفُ نفسُه، والتعريفيُّ أوّلًا، وبلا دخولٍ ولا خصوصيّةٍ ولا مضيفٍ آخر', () => {
+    const home = new URL('https://example.org/')
+    const html = `<a href="/blog/2024/long/path">عميق</a><a href="/news">أخبار</a><a href="https://other.org/about">غريب</a>
+      <a href="/login">دخول</a><a href="/privacy">خصوصيّة</a><a href="/about#team">من نحن</a><a href="/about">مكرَّر</a><a href="/services/">خدمات</a><a href="#top">أعلى</a>`
+    expect(siteLinks(html, home).map((u) => u.pathname)).toEqual(['/about', '/services/', '/news'])
+  })
+
+  it('جذرُ الموقع يُقرأ مع صفحاته التعريفيّة مصدرًا واحدًا، وصفحةٌ تعذّرت لا تُسقطه', async () => {
+    const { fetchImpl, asked } = net({
+      'https://example.org/': () => htmlRes(`<html><head><title>مؤسّسة الأثر</title></head><body><p>${'رئيسيّةُ المؤسّسة وما تعمل عليه في قياس الأثر. '.repeat(12)}</p>
+        <a href="/about">من نحن</a><a href="/services">خدماتنا</a><a href="/gone">صفحةٌ زالت</a></body></html>`),
+      'https://example.org/about': () => htmlRes(body('من نحن')),
+      'https://example.org/services': () => htmlRes(body('خدماتنا')),
+    })
+    const out = await ingestLink(deps({ toMarkdown: undefined, fetchImpl }), 'org_owner', 'https://example.org')
+    expect(out).toMatchObject({ kind: 'added', name: 'مؤسّسة الأثر' })
+    expect(asked).toEqual(['https://example.org/', 'https://example.org/about', 'https://example.org/services', 'https://example.org/gone'])
+    const text = objects.get((db.raw.prepare('SELECT text_key FROM sources').get() as { text_key: string }).text_key) as string
+    for (const part of ['## مؤسّسة الأثر', '## من نحن', '## خدماتنا', 'نصُّ خدماتنا']) expect(text).toContain(part)
+    expect(db.raw.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 1 })
+  })
+
+  it('رابطُ مقالٍ (ليس جذرًا) يُقرأ وحدَه — لا زحفَ على الموقع', async () => {
+    const { fetchImpl, asked } = net({ 'https://example.org/blog/post': () => htmlRes(body('المقال') + '<a href="/about">من نحن</a>') })
+    expect((await ingestLink(deps({ toMarkdown: undefined, fetchImpl }), 'org_owner', 'https://example.org/blog/post')).kind).toBe('added')
+    expect(asked).toEqual(['https://example.org/blog/post'])
+  })
+
+  it('معرّفُ المقطع من صيغ الرابط، وما ليس مقطعًا null', () => {
+    const id = (u: string): string | null => videoId(new URL(u))
+    expect(id('https://www.youtube.com/watch?v=jNQXAC9IVRw&t=3')).toBe('jNQXAC9IVRw')
+    expect(id('https://youtu.be/jNQXAC9IVRw')).toBe('jNQXAC9IVRw')
+    expect(id('https://m.youtube.com/shorts/jNQXAC9IVRw')).toBe('jNQXAC9IVRw')
+    expect(id('https://www.youtube.com/channel/abc')).toBeNull()
+    expect(id('https://example.org/watch?v=jNQXAC9IVRw')).toBeNull()
+  })
+
+  it('مسارُ الترجمة يُقرأ JSON وXML، والمكرَّرُ مرّةً', () => {
+    expect(captionText(JSON.stringify({ events: [{ segs: [{ utf8: 'أهلًا ' }, { utf8: 'بكم' }] }, { segs: [{ utf8: 'أهلًا بكم' }] }, { segs: [{ utf8: 'في الحلقة' }] }, {}] })))
+      .toBe('أهلًا بكم\nفي الحلقة')
+    expect(captionText('<transcript><text start="0" dur="1">قيادةُ &amp;amp; قياس</text><text start="1" dur="1">الأثر</text></transcript>')).toBe('قيادةُ & قياس\nالأثر')
+  })
+
+  it('رابطُ مقطع: العنوانُ والوصفُ وما قيل فيه — والعربيّةُ المكتوبةُ قبل الآليّة — مصدرٌ واحدٌ بعنوانه القانونيّ', async () => {
+    const tracks = JSON.stringify([
+      { baseUrl: 'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en&kind=asr', languageCode: 'en', kind: 'asr' },
+      { baseUrl: 'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=ar', languageCode: 'ar' },
+    ])
+    const spoken = { events: Array.from({ length: 30 }, (_, i) => ({ segs: [{ utf8: `جملةٌ رقم ${i} ممّا قيل في المقطع عن قياس الأثر` }] })) }
+    const { fetchImpl, asked } = net({
+      'https://www.youtube.com/watch?v=abcdefghijk&hl=ar': () => htmlRes(`<title>حلقة الأثر - YouTube</title><script>var x={"title":"حلقةُ الأثر","shortDescription":"وصفٌ قصير\\nبسطرين","captionTracks":${tracks},"other":1}</script>`),
+      'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=ar&fmt=json3': () => new Response(JSON.stringify(spoken), { headers: { 'Content-Type': 'application/json' } }),
+    })
+    const out = await ingestLink(deps({ fetchImpl }), 'org_owner', 'https://youtu.be/abcdefghijk?si=xyz')
+    expect(out).toMatchObject({ kind: 'added', name: 'حلقةُ الأثر' })
+    expect(asked[1]).toBe('https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=ar&fmt=json3')
+    const row = db.raw.prepare('SELECT origin_url, text_key FROM sources').get() as { origin_url: string; text_key: string }
+    expect(row.origin_url).toBe('https://www.youtube.com/watch?v=abcdefghijk')
+    const text = objects.get(row.text_key) as string
+    for (const part of ['# حلقةُ الأثر', '## وصفُ المقطع', 'بسطرين', '## ما قيل في المقطع', 'جملةٌ رقم 29']) expect(text).toContain(part)
+    // ‏والرابطُ نفسُه بصيغةٍ أخرى مصدرٌ واحد
+    expect((await ingestLink(deps({ fetchImpl }), 'org_owner', 'https://www.youtube.com/watch?v=abcdefghijk')).kind).toBe('exists')
+  })
+
+  it('مقطعٌ بلا ترجمةٍ ولا وصفٍ كافٍ يُردّ بما يفعله المالك، ولا يُكتب مصدر', async () => {
+    const { fetchImpl } = net({ 'https://www.youtube.com/watch?v=abcdefghijk&hl=ar': () => htmlRes('<title>مقطع - YouTube</title><script>var x={"shortDescription":"قصير"}</script>') })
+    const out = await ingestLink(deps({ fetchImpl }), 'org_owner', 'https://www.youtube.com/watch?v=abcdefghijk')
+    expect(out).toMatchObject({ kind: 'rejected' })
+    expect((out as { reason: string }).reason).toContain('srt')
+    expect(db.raw.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 0 })
+  })
+
+  it('ملفُّ ترجمةٍ (srt · vtt) يُرفع نصًّا بلا أرقامٍ ولا مواقيت', async () => {
+    expect(cleanCaptions('WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\n<v عمر>أهلًا بكم</v>\n\n2\n00:00:03.000 --> 00:00:05.000\nأهلًا بكم\nفي الحلقة\n')).toBe('أهلًا بكم\nفي الحلقة')
+    const srt = Array.from({ length: 12 }, (_, i) => `${i + 1}\n00:00:0${i % 9},000 --> 00:00:0${(i % 9) + 1},000\nسطرٌ رقم ${i} ممّا قيل في اللقاء عن الحوكمة`).join('\n\n')
+    const out = await ingestFile(deps(), 'org_owner', { name: 'لقاء.srt', type: 'application/x-subrip', bytes: bytes(srt) })
+    expect(out.kind).toBe('added')
+    const text = objects.get((db.raw.prepare('SELECT text_key FROM sources').get() as { text_key: string }).text_key) as string
+    expect(text).not.toContain('-->')
+    expect(text.split('\n')[0]).toBe('سطرٌ رقم 0 ممّا قيل في اللقاء عن الحوكمة')
+  })
+})

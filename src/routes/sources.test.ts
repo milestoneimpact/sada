@@ -92,6 +92,43 @@ describe('رابطٌ من المعالج', () => {
   })
 })
 
+describe('مجموعةُ مصادر في طلبٍ واحد (D-327)', () => {
+  it('ملفّان معًا بلا سكربت: كلٌّ يُحفظ بطريقه، والمرفوضُ يُسمّى ولا يُسقط غيرَه', async () => {
+    const { cookie, csrf } = await session()
+    const body = upload(csrf, 'أوّل.txt', TEXT)
+    body.append('file', new File([TEXT + ' ثانٍ'], 'ثانٍ.txt', { type: 'text/plain' }))
+    body.append('file', new File(['x'], 'برنامج.exe', { type: 'application/octet-stream' }))
+    const res = await app.request('/panel/sources/upload', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/panel/plan/new')
+    expect(db.raw.prepare("SELECT name FROM sources ORDER BY name").all()).toEqual([{ name: 'أوّل.txt' }, { name: 'ثانٍ.txt' }])
+    expect(db.raw.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'source.upload'").get()).toEqual({ n: 3 })
+    const back = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    // ‏بلا مزوّدِ تحليلٍ في الاختبار: حُفظ الملفّان ولم يُحلَّلا، والثالثُ رُفض — والعددُ وأوّلُ سببين يُقالان في المعالج نفسِه
+    expect(back).toContain('أُضيف 0 من 3')
+    expect(back).toContain('وتعذّر 3')
+    expect(back).toContain('«أوّل.txt»')
+  })
+
+  it('روابطُ بسطرٍ لكلٍّ: كلٌّ يُفحص وحدَه، والمكرَّرُ مرّةً، وما ليس https يُردّ بسببه', async () => {
+    const { cookie, csrf } = await session()
+    const body = new FormData()
+    body.set('_csrf', csrf); body.set('return', 'plan'); body.set('url', 'http://example.com/a\nhttp://example.com/b\nhttp://example.com/a')
+    const res = await app.request('/panel/sources/link', { method: 'POST', body, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/new')
+    expect(db.raw.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'source.link'").get()).toEqual({ n: 2 })
+    expect(db.raw.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 0 })
+  })
+
+  it('المعالجُ يقبل عدّةَ ملفّاتٍ وعدّةَ روابط، ويذكر الموقعَ والمقطع', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toMatch(/<input type="file" name="file" form="pn-up"[^>]* multiple>/)
+    expect(html).toMatch(/<textarea id="pn-url" name="url" form="pn-link"/)
+    for (const s of ['.srt', 'مقطع YouTube', 'موقعٌ (يُقرأ مع صفحاته التعريفيّة)']) expect(html).toContain(s)
+  })
+})
+
 describe('المعالج', () => {
   it('يحمل بابَي الإضافة بنموذجين مستقلّين، وشاراتِ الأنواع، والمصدرُ المضافُ للتوّ محدَّد', async () => {
     db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash, kind) VALUES

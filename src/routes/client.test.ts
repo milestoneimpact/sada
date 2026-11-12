@@ -313,10 +313,12 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     // ‏واللوحةُ تحمل الطريقَ إلى «خطّة جديدة» لا النموذجَ نفسَه (D-283)
     expect(html).toContain('href="/panel/plan/new"')
     expect(html).not.toContain('name="ideas"')
-    // ‏والشاشةُ بأمدائها الثلاثة ويوم بدايتها وأفكارها وصورتها — والشهران يقبلهما الخادمُ ولا يُعرَضان
+    // ‏والشاشةُ بأمدائها الأربعة (D-327: الشهران يُعرَضان بطلب المالك) ويوم بدايتها وأفكارها وصورتها
     const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
     for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'name="start"', 'name="ideas"', 'name="image_style" value="illustration"', 'name="source" value="all"', 'action="/panel/plan/generate"']) expect(screen).toContain(s)
-    expect(screen).not.toContain('value="2months"')
+    expect(screen).toContain('value="2months"')
+    // ‏والصورةُ مع كلّ منشورٍ افتراضُ المعالج (D-327)
+    expect(screen).toContain('name="image_style" value="infographic" data-cost="0" checked')
     // ‏والمربوطُ وحدَه يُرى: لا خانةَ لمنصّةٍ غيرِ مربوطة ولا لما ليس في الخطّة اليوم
     expect(screen).not.toContain('value="instagram"')
     expect(screen).not.toContain('value="tiktok"')

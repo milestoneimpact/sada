@@ -41,11 +41,12 @@ import { button } from './components/button'
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
 export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
 
-/** المدى الذي يُعرَض: أسبوعٌ وأسبوعان وشهر. والشهران يقبلهما الخادمُ ولا يُعرَضان (طلبُ المالك). */
+/** المدى الذي يُعرَض: أسبوعٌ وأسبوعان وشهرٌ وشهران (D-327: «أسبوعيّةٌ وشهريّةٌ أو حتّى شهران» بطلب المالك). */
 const SPANS = [
   { id: 'week', label: 'أسبوع', weeks: 1, note: 'للبدء أو لحملةٍ قصيرة' },
   { id: '2weeks', label: 'أسبوعان', weeks: 2, note: 'إيقاعٌ ثابتٌ بلا التزامٍ طويل' },
-  { id: 'month', label: 'شهر', weeks: 4, note: 'الأنسبُ لخطّةٍ تُعتمَد وتُثبَّت' },
+  { id: 'month', label: 'شهر', weeks: 4, note: 'الأنسبُ لخطّةٍ تُراجَع أسبوعًا أسبوعًا' },
+  { id: '2months', label: 'شهران', weeks: 8, note: 'رؤيةٌ أبعد — تُبنى شهرًا شهرًا' },
 ] as const
 
 /** مستوياتُ الإيقاع في الأسبوع لكلّ منصّة. */
@@ -172,15 +173,15 @@ function contentStep(d: PlanNewData): Html {
   const add = d.canAdd === false
     ? html``
     : html`<div class="wz-add card card-inset">
-      <label class="wz-drop card" id="pn-drop"><input type="file" name="file" form="pn-up" accept="${UPLOAD_EXTENSIONS.map((e) => '.' + e).join(',')}" id="pn-file">
-        <span class="wz-big">ارفع ملفًّا</span>
-        <span class="ago">اسحبه إلى هنا أو اختره — PDF وWord وExcel وPowerPoint ونصّ، حتّى 10MB. يُحفظ في مكتبتك ويُحلَّل الآن.</span>
+      <label class="wz-drop card" id="pn-drop"><input type="file" name="file" form="pn-up" accept="${UPLOAD_EXTENSIONS.map((e) => '.' + e).join(',')}" id="pn-file" multiple>
+        <span class="wz-big">ارفع ملفًّا أو أكثر</span>
+        <span class="ago">اسحبها إلى هنا أو اخترها — PDF وWord وExcel وPowerPoint ونصّ وملفُّ ترجمة مقطع (srt · vtt)، حتّى 10MB للملفّ. تُحفظ في مكتبتك وتُحلَّل الآن.</span>
         <span class="wz-prog" id="pn-prog" hidden><span></span></span></label>
-      <noscript><button class="btn btn-secondary btn-sm" type="submit" form="pn-up">ارفع الملفّ المختار</button></noscript>
-      <div class="field m-0"><label for="pn-url">أو أضف رابطًا</label>
-        <div class="row gap-2"><input type="url" id="pn-url" name="url" form="pn-link" placeholder="https://…" dir="ltr" inputmode="url" autocomplete="off">
-          <button class="btn btn-secondary" type="submit" form="pn-link" id="pn-link-go">اقرأ الرابط</button></div>
-        <p class="field-hint m-0">مقالٌ أو صفحةٌ أو PDF. يُستخرج نصُّه ويُحلَّل كأيّ مصدر.</p></div>
+      <noscript><button class="btn btn-secondary btn-sm" type="submit" form="pn-up">ارفع ما اخترت</button></noscript>
+      <div class="field m-0"><label for="pn-url">أو أضف رابطًا أو أكثر</label>
+        <p class="field-hint m-0" id="pn-url-hint">سطرٌ لكلّ رابط، حتّى ستّة: موقعٌ (يُقرأ مع صفحاته التعريفيّة) أو مقالٌ أو PDF أو مقطع YouTube (يُقرأ وصفُه وما قيل فيه). يُستخرج المحتوى ويُحلَّل كأيّ مصدر.</p>
+        <div class="row gap-2"><textarea id="pn-url" name="url" form="pn-link" rows="2" placeholder="https://…" dir="ltr" inputmode="url" autocomplete="off" aria-describedby="pn-url-hint"></textarea>
+          <button class="btn btn-secondary" type="submit" form="pn-link" id="pn-link-go">اقرأ الروابط</button></div></div>
       <p class="m-0 wz-say" id="pn-add-say" role="status" aria-live="polite"></p>
     </div>`
   return html`<section class="wz-step" data-step="3" aria-labelledby="wz-t3">
@@ -316,8 +317,12 @@ export const PLAN_NEW_SCRIPT = `(function(){
   });
   var say=document.getElementById('pn-add-say'), grid=document.getElementById('pn-srcs');
   var csrf=(document.querySelector('#pn-up input[name="_csrf"]')||{}).value||'';
+  // ‏مجموعةُ مصادر (D-327): تُرسَل واحدًا واحدًا فيُرى كلٌّ في لحظته، وفي آخرها العددُ وأوّلُ ما تعذّر
+  var run={n:0,ok:0,bad:''};
+  function begin(n){run={n:n,ok:0,bad:''};}
   function added(r){
-    if(!r||!r.ok){say.textContent=(r&&r.reason)||'تعذّر — أعد المحاولة.'; say.setAttribute('data-tone','bad'); return;}
+    if(!r||!r.ok){var why=(r&&r.reason)||'تعذّر — أعد المحاولة.'; if(!run.bad)run.bad=why; say.textContent=why; say.setAttribute('data-tone','bad'); return;}
+    if(r.ready)run.ok++; else if(!run.bad)run.bad='«'+r.name+'» '+r.note;
     say.textContent='«'+r.name+'» '+r.note; say.setAttribute('data-tone',r.ready?'ok':'warn');
     if(!r.ready||f.querySelector('input[name="source"][value="'+r.id+'"]'))return;
     var l=document.createElement('label'); l.className='wz-src is-new';
@@ -330,29 +335,43 @@ export const PLAN_NEW_SCRIPT = `(function(){
     var all=f.querySelector('input[name="source"][value="all"]'); if(all)all.checked=false; upd();
   }
   var file=document.getElementById('pn-file'), drop=document.getElementById('pn-drop'), prog=document.getElementById('pn-prog');
-  function upload(fl){
+  function total(){
+    if(run.n<2)return;
+    say.textContent='أُضيف '+run.ok.toLocaleString('ar-u-nu-latn')+' من '+run.n.toLocaleString('ar-u-nu-latn')+(run.bad?' — وتعذّر: '+run.bad:' وصارت جاهزةً للخطّة.');
+    say.setAttribute('data-tone',run.bad?(run.ok?'warn':'bad'):'ok');
+  }
+  function uploadAll(list){
+    var q=Array.prototype.slice.call(list||[],0,6); if(!q.length)return; begin(q.length);
+    (function next(){var fl=q.shift(); if(!fl){total(); return;} upload(fl,next);})();
+  }
+  function upload(fl,then){
     if(!fl)return; var fd=new FormData(); fd.append('_csrf',csrf); fd.append('return','plan'); fd.append('file',fl);
     var x=new XMLHttpRequest(); x.open('POST','/panel/sources/upload'); x.setRequestHeader('Accept','application/json');
     prog.hidden=false; var bar=prog.firstElementChild; bar.style.inlineSize='0%'; say.removeAttribute('data-tone'); say.textContent='يُرفع «'+fl.name+'»…';
     x.upload.onprogress=function(e){if(e.lengthComputable){bar.style.inlineSize=Math.round(e.loaded/e.total*100)+'%'; if(e.loaded===e.total)say.textContent='يُقرأ ويُحلَّل…';}};
-    x.onload=function(){prog.hidden=true; var r=null; try{r=JSON.parse(x.responseText);}catch(e){} added(r); file.value='';};
-    x.onerror=function(){prog.hidden=true; added(null);};
+    x.onload=function(){prog.hidden=true; var r=null; try{r=JSON.parse(x.responseText);}catch(e){} added(r); file.value=''; if(then)then();};
+    x.onerror=function(){prog.hidden=true; added(null); if(then)then();};
     x.send(fd);
   }
-  if(file){file.addEventListener('change',function(){upload(file.files&&file.files[0]);});}
+  if(file){file.addEventListener('change',function(){uploadAll(file.files);});}
   if(drop){
     ['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault(); drop.classList.add('is-over');});});
     ['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault(); drop.classList.remove('is-over');});});
-    drop.addEventListener('drop',function(e){var fl=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; upload(fl);});
+    drop.addEventListener('drop',function(e){uploadAll(e.dataTransfer&&e.dataTransfer.files);});
   }
   var link=document.getElementById('pn-link');
   if(link){link.addEventListener('submit',function(e){
-    e.preventDefault(); var u=document.getElementById('pn-url'); if(!u||!u.value)return;
-    var btn=document.getElementById('pn-link-go'); btn.disabled=true; say.removeAttribute('data-tone'); say.textContent='تُقرأ الصفحة وتُحلَّل…';
-    var fd=new FormData(); fd.append('_csrf',csrf); fd.append('return','plan'); fd.append('url',u.value);
-    fetch('/panel/sources/link',{method:'POST',body:fd,headers:{Accept:'application/json'},credentials:'same-origin'})
-      .then(function(r){return r.json();}).then(function(r){added(r); if(r&&r.ok)u.value='';})
-      .catch(function(){added(null);}).finally(function(){btn.disabled=false;});
+    e.preventDefault(); var u=document.getElementById('pn-url'); if(!u||!u.value.trim())return;
+    var btn=document.getElementById('pn-link-go'); btn.disabled=true;
+    var q=u.value.split(/\\s+/).filter(function(x){return x;}).slice(0,6), left=[]; begin(q.length);
+    (function next(){
+      var one=q.shift(); if(!one){u.value=left.join('\\n'); btn.disabled=false; total(); return;}
+      say.removeAttribute('data-tone'); say.textContent='يُقرأ ويُحلَّل: '+one.slice(0,60)+'…';
+      var fd=new FormData(); fd.append('_csrf',csrf); fd.append('return','plan'); fd.append('url',one);
+      fetch('/panel/sources/link',{method:'POST',body:fd,headers:{Accept:'application/json'},credentials:'same-origin'})
+        .then(function(r){return r.json();}).then(function(r){added(r); if(!r||!r.ok)left.push(one);})
+        .catch(function(){added(null); left.push(one);}).then(next);
+    })();
   });}
   // ‏Enter في حقلٍ لا يقفز إلى البناء قبل الخطوة الأخيرة
   f.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.form===f&&at<steps.length){e.preventDefault(); show(at+1,true);} });

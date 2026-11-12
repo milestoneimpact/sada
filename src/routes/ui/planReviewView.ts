@@ -113,7 +113,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
   // ‏والموعدُ الذي جُدولت إليه يُقال في الشارة: قد يكون أرجحَ ساعات المنصّة لا ساعةَ البند
-  const when = status === 'queued' && c.post?.scheduledAt !== null && c.post?.scheduledAt !== undefined ? ' · ' + stamp(c.post.scheduledAt, zone).slice(5, 16) : ''
+  const when = status === 'queued' && c.post?.scheduledAt !== null && c.post?.scheduledAt !== undefined ? stamp(c.post.scheduledAt, zone).slice(5, 16) : ''
   const preview = c.post === null
     ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">صدى يكتبه الآن — يظهر هنا وحدَه.</span></div>`
     : raw(nativePost({
@@ -134,7 +134,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
       <span class="pf-logo rv-pf" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
       <b>${label}</b><bdi class="mono">${local}</bdi>
       <span class="grow"></span>
-      <span class="st ${st.tone}">${st.text}<bdi>${when}</bdi></span>
+      <span class="st ${st.tone}">${st.text}</span>${when === '' ? html`` : html`<bdi class="mono">${when}</bdi>`}
     </header>
     <div class="rv-pv">${preview}</div>
     ${c.post === null || c.item.why === 'من خطّتك المرفوعة' ? html`` : html`<p class="hint m-0">${c.item.angle}</p>`}
@@ -153,7 +153,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
 
 /**
  * تقويمُ الخطّة: كلُّ يومٍ بشعارات منصّاته وعددِ بنوده. و`hrefOf` يقول إلى أين يذهب اليوم — المراجعةُ إلى أسبوعه، والعرضُ إلى
- * موضعه في الصفحة. **واللونُ لا يقول وحدَه**: ما ينتظر يُكتب في اسم الرابط ويُعلَّم بنقطةٍ فوق العدد.
+ * موضعه في الصفحة. **واللونُ لا يقول وحدَه**: ما ينتظر يُكتب في اسم الرابط ويُعلَّم بإطارٍ متقطّع.
  */
 export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day) => '#d-' + day): Html {
   const start = m.plan.week
@@ -171,8 +171,9 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
     if (n === 0) { cells.push(html`<span class="rv-cd" aria-hidden="true"><b>${dayLabel(day, 'short')}</b></span>`); continue }
     const open = cards.filter((c) => c.post === null || waits(c)).length
     const platforms = [...new Set(cards.map((c) => c.item.platform))]
-    cells.push(html`<a class="rv-cd is-on${open > 0 ? ' is-wait' : ''}" href="${hrefOf(day)}" aria-label="${dayLabel(day)}: ${AR(n)} ${n === 1 ? 'منشور' : 'منشورات'}${open > 0 ? '، ' + AR(open) + ' تنتظر' : '، كلُّها مجدولة'}"><b>${dayLabel(day, 'short')}</b>
-      <span class="rv-dots" aria-hidden="true">${platforms.map((p) => html`<span class="pf-logo rv-pf rv-dot" data-pf="${p}">${raw(LOGOS[p] ?? '')}</span>`)}</span><span>${AR(n)}</span></a>`)
+    // ‏والاسمُ ممّا يُرى (WCAG 2.5.3): رقمُ اليوم والعددُ نصٌّ ظاهر، وما يشرحهما نصٌّ لقارئ الشاشة بينهما — لا `aria-label` يحجبهما
+    cells.push(html`<a class="rv-cd is-on${open > 0 ? ' is-wait' : ''}" href="${hrefOf(day)}"><b>${dayLabel(day, 'short')}</b>
+      <span class="rv-dots" aria-hidden="true">${platforms.map((p) => html`<span class="pf-logo rv-pf rv-dot" data-pf="${p}">${raw(LOGOS[p] ?? '')}</span>`)}</span><span>${AR(n)}<i class="vh"> ${n === 1 ? 'منشور' : 'منشورات'}${open > 0 ? '، ' + AR(open) + ' تنتظر' : '، كلُّها مجدولة'}</i></span></a>`)
   }
   return html`<nav class="rv-cal" aria-label="أيّام الخطّة">${['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map((d) => html`<span class="rv-wd" aria-hidden="true">${d}</span>`)}${cells}</nav>`
 }
@@ -198,9 +199,9 @@ function weekTabs(m: ReviewModel, shown: number): Html {
     const inWeek = m.cards.filter((c) => weekOfDay(m.plan.week, c.item.day) === w)
     const open = inWeek.filter((c) => c.post === null || waits(c)).length
     tabs.push(html`<a class="rv-wk${w === shown ? ' is-on' : ''}" href="?w=${String(w)}"${w === shown ? raw(' aria-current="page"') : ''}><b>الأسبوع ${AR(w)}</b>
-      <span>${dayLabel(from, 'short')}–${dayLabel(shift(from, 6), 'short')} · ${AR(inWeek.length)} ${open > 0 ? html`· <em>${AR(open)} تنتظر</em>` : ''}</span></a>`)
+      <span class="ago">${dayLabel(from, 'short')}–${dayLabel(shift(from, 6), 'short')} · ${AR(inWeek.length)} ${open > 0 ? html`· <em>${AR(open)} تنتظر</em>` : ''}</span></a>`)
   }
-  tabs.push(html`<a class="rv-wk${shown === 0 ? ' is-on' : ''}" href="?w=all"${shown === 0 ? raw(' aria-current="page"') : ''}><b>الكلّ</b><span>${AR(m.cards.length)} منشورًا</span></a>`)
+  tabs.push(html`<a class="rv-wk${shown === 0 ? ' is-on' : ''}" href="?w=all"${shown === 0 ? raw(' aria-current="page"') : ''}><b>الكلّ</b><span class="ago">${AR(m.cards.length)} منشورًا</span></a>`)
   return html`<nav class="rv-weeks" aria-label="أسابيع الخطّة">${tabs}</nav>`
 }
 

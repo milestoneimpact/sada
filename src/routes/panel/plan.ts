@@ -186,7 +186,9 @@ plan.get('/panel/plan/new', async (c) => {
     taskReadyAlone(c, 'plan'),
   ])
   const used = await neuronsUsedToday(c.env.DB)
-  const body = planNewScreen({
+  // ‏وما قيل بعد إضافة مصدرٍ بلا سكربت يُرى هنا حيث عاد المالك (D-327)، لا في أوّل صفحةٍ يفتحها بعدها
+  const flash = await takeFlash(c.env, c.req.raw)
+  const body = (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' }))) + planNewScreen({
     now: new Date(),
     linked: [...new Set(accounts.filter((a) => a.status === 'active').map((a) => a.platform as string))],
     perWeek: brief.perWeek,
@@ -199,7 +201,8 @@ plan.get('/panel/plan/new', async (c) => {
       draft: freeImagesLeft(imageNeurons(DRAFT_IMAGE_MODEL, 1024, 1024) ?? 0, used),
       final: freeImagesLeft(imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0, used),
     },
-    autoImage: settings.autoImage,
+    // ‏والصورةُ مع كلّ منشورٍ افتراضُ المعالج (D-327 بقرار المالك): إنفوجرافيك رسمُه مجّانيّ، و«بلا صورة» اختيارٌ يُرى
+    autoImage: true,
     ready,
     replacing: current !== null,
     // ‏ما أُضيف للتوّ بلا سكربت يُحدَّد (D-284) — ومن المحلَّل وحدَه، لا معرّفًا يكتبه أحد
