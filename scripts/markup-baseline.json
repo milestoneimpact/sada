@@ -92,10 +92,10 @@
   "routes/ui/planNewView.ts": {
     "buttons": 9,
     "cards": 6,
-    "inputs": 11
+    "inputs": 10
   },
   "routes/ui/planReviewView.ts": {
-    "buttons": 11,
+    "buttons": 8,
     "cards": 3,
     "inputs": 1
   },

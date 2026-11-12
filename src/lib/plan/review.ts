@@ -19,10 +19,10 @@
  */
 import type { Db } from '../tokens'
 import { decide, undoApprove } from '../draft/store'
-import { reschedulePost } from '../schedule/job'
-import { KIND_FITS_SQL, kindFits, schedulePlan, type PlanSchedule } from './schedule'
+import { reschedulePost, unschedule } from '../schedule/job'
+import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
 import { dayWithin, touchPlan } from './edit'
-import { asSpan, type PlanItem } from './prompt'
+import { asSpan, imageFor, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
 
 export interface ReviewCard {
@@ -66,16 +66,7 @@ export interface ReviewModel {
 
 /** بصمةُ البند: مصدرُه ومنصّتُه ويومُه وساعتُه — ما يتغيّر بفعلٍ عليه أو على غيره. */
 export function itemKey(item: PlanItem): string {
-  return `${item.sourceId}|${item.platform}|${item.day}|${item.time}`
-}
-
-function refsOf(raw: string | null): string[] {
-  try {
-    const parsed = JSON.parse(raw ?? '[]') as unknown
-    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
-  }
+  return `${item.id ?? item.sourceId}|${item.platform}|${item.day}|${item.time}`
 }
 
 export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promise<ReviewModel> {
@@ -96,7 +87,6 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
       .then((r) => r.results).catch(() => []),
   ])
-  const wantsImage = plan.choices.autoImage
   const latestMedia = new Map<string, string>()
   const mimeOf = new Map<string, string>()
   for (const m of media) if (!latestMedia.has(m.post_id)) { latestMedia.set(m.post_id, m.id); mimeOf.set(m.id, m.mime) }
@@ -105,13 +95,13 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
 
   const cards: ReviewCard[] = plan.plan.items.map((item, index) => {
     // ‏وبندُ السلسلة لمسوّدة السلسلة (مراجعة D-324): المصدرُ والمنصّةُ وحدهما يجمعان البندين على مسوّدةٍ واحدة
-    const row = posts.find((p) => p.platform === item.platform && (p.source_id === item.sourceId || refsOf(p.source_refs).includes(item.sourceId))
-      && kindFits(item.kind, p.idempotency_key)) ?? null
+    const row = posts.find((p) => itemOwns(item, p)) ?? null
     const mediaId = row === null ? null : latestMedia.get(row.id) ?? null
     const gaps: Gap[] = []
     if (row === null) gaps.push('unwritten')
     else {
-      if (wantsImage && mediaId === null && item.kind !== 'video') gaps.push('no_image')
+      // ‏والصورةُ تُطلب بمنصّتها (D-329): «بلا صورة» لـ X لا تجعل منشوراتِها ناقصة
+      if (imageFor(plan.choices, item.platform) !== 'none' && mediaId === null && item.kind !== 'video') gaps.push('no_image')
       if (row.status === 'draft') gaps.push('pending')
     }
     if ((slots.get(`${item.platform}|${item.day}|${item.time}`) ?? 0) > 1) gaps.push('clash')
@@ -134,6 +124,21 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items }
     }),
   }
+}
+
+/**
+ * مسوّدةُ البند في خطّته — بالمطابقة نفسِها التي تقرأ بها المراجعةُ والجدولة (`itemOwns`)، فلا يُصيب فعلٌ على بندٍ مسوّدةَ
+ * بندٍ آخر من المصدر نفسِه. و`where` شرطُ الحال، ثابتٌ من الشيفرة لا من مدخل.
+ */
+async function postOf(
+  db: Db, org: string, planId: string, item: PlanItem, where: "status = 'queued'" | "status <> 'rejected'",
+): Promise<{ id: string; status: string; scheduled_at: string | null } | null> {
+  const { results } = await db
+    .prepare(`SELECT id, status, scheduled_at, platform, source_id, source_refs, idempotency_key FROM posts
+               WHERE org_id = ? AND plan_id = ? AND platform = ? AND ${where} ORDER BY created_at`)
+    .bind(org, planId, item.platform)
+    .all<{ id: string; status: string; scheduled_at: string | null; platform: string; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
+  return results.find((p) => itemOwns(item, p)) ?? null
 }
 
 type Act = { readonly ok: true; readonly note?: string } | { readonly ok: false; readonly reason: string }
@@ -170,11 +175,7 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
   at.plan.items[index] = { ...item, day }
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
   await touchPlan(db, org, planId)
-  const queued = await db
-    .prepare(`SELECT id, scheduled_at FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
-                AND status = 'queued' AND ${KIND_FITS_SQL}`)
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
-    .first<{ id: string; scheduled_at: string | null }>()
+  const queued = await postOf(db, org, planId, item, "status = 'queued'")
   if (queued !== null && queued.scheduled_at !== null) {
     const moved = new Date(queued.scheduled_at.replace(' ', 'T') + 'Z')
     moved.setUTCDate(moved.getUTCDate() + days)
@@ -185,20 +186,44 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
 }
 
 /**
- * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول لا يُحذف من هنا:
- * يُلغى موعدُه من بطاقته أوّلًا، فلا يختفي منشورٌ مجدولٌ بضغطةٍ في مراجعة.
+ * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بـ UTC) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
+ * يتحرّك موعدُها معه بـ `reschedulePost` وحرّاسِه (لا ماضٍ، ولا ما أُرسل للنشر)؛ **وإن رُدّ تحريكُها لم يتحرّك البندُ**، فلا
+ * يقول التقويمُ يومًا والمنشورُ يخرج في غيره. وما نُشر لا يُنقل.
+ */
+export async function moveItem(db: Db, org: string, planId: string, index: number, key: string, to: { readonly day: string; readonly time: string }, now: Date): Promise<Act> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to.day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(to.time)) return { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+  const at = await itemAt(db, org, planId, index, key)
+  if (typeof at === 'string') return { ok: false, reason: at }
+  const item = at.plan.items[index]!
+  if (item.day === to.day && item.time === to.time) return { ok: true }
+  if (!dayWithin(to.day, at.start, asSpan(at.span))) return { ok: false, reason: 'اليومُ خارج مدى الخطّة' }
+  const post = await postOf(db, org, planId, item, "status <> 'rejected'")
+  if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُنقل' }
+  if (post !== null && post.status === 'queued') {
+    const r = await reschedulePost(db, post.id, `${to.day}T${to.time}`, now, org)
+    if (!r.ok) return { ok: false, reason: `لم يُنقل: ${r.reason}` }
+  }
+  at.plan.items[index] = { ...item, day: to.day, time: to.time }
+  await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
+  await touchPlan(db, org, planId)
+  return { ok: true }
+}
+
+/**
+ * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول يُسحب موعدُه أوّلًا
+ * (D-327: «أزِل» على البطاقة يُزيل المنصّةَ من يومها)، وما أُرسل للنشر أو نُشر لا يُحذف.
  */
 export async function dropItem(db: Db, org: string, planId: string, index: number, key: string, by: string): Promise<Act> {
   const at = await itemAt(db, org, planId, index, key)
   if (typeof at === 'string') return { ok: false, reason: at }
   const item = at.plan.items[index]!
-  const post = await db
-    .prepare(`SELECT id, status FROM posts WHERE org_id = ? AND plan_id = ? AND platform = ? AND (source_id = ? OR source_refs LIKE ?)
-                AND status <> 'rejected' AND ${KIND_FITS_SQL}`)
-    .bind(org, planId, item.platform, item.sourceId, `%"${item.sourceId}"%`, item.kind === 'thread' ? 1 : 0)
-    .first<{ id: string; status: string }>()
-  if (post !== null && (post.status === 'queued' || post.status === 'published')) {
-    return { ok: false, reason: post.status === 'queued' ? 'منشورُه مجدول — ألغِ موعدَه من بطاقته أوّلًا' : 'نُشر منشورُه — لا يُحذف من الخطّة' }
+  const post = await postOf(db, org, planId, item, "status <> 'rejected'")
+  if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُحذف من الخطّة' }
+  // ‏والمجدولُ يُسحب موعدُه أوّلًا بـ`unschedule` وحارسِها (D-327): ما أُرسل للنشر لا يُستردّ، فيُردّ الحذفُ بسببه
+  if (post !== null && post.status === 'queued') {
+    const pulled = await unschedule(db, post.id, org)
+    if (!pulled.ok) return { ok: false, reason: `منشورُه مجدول وتعذّر سحبُ موعده: ${pulled.reason}` }
+    post.status = 'approved'
   }
   at.plan.items.splice(index, 1)
   await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
@@ -210,22 +235,54 @@ export async function dropItem(db: Db, org: string, planId: string, index: numbe
 }
 
 /**
- * **ثبّت الخطّة**: صورةُ البنود في `plan_versions` بإصدارها، ثمّ جدولةُ المعتمَد بـ `schedulePlan`. وما لم يُعتمد يبقى مسوّدةً
- * تنتظر، يُقال عددُه ولا يُجدوَل. وتثبيتُ إصدارٍ مثبَّتٍ من قبل لا يكتب صورةً ثانية.
+ * **«اعتمد» يجدول** (D-327): كلُّ ما اعتُمد من الخطّة ولم يُجدوَل يُوضع في موعد بنده بـ `schedulePlan` نفسِها، وتُحفظ صورةُ
+ * الإصدار الجاري في `plan_versions` (تُحدَّث إن كانت، فالإصدارُ الواحدُ صفٌّ واحدٌ بعدّاده) ويُختم `locked_at`.
+ *
+ * كان الاعتمادُ علامةً والجدولةُ زرًّا ثانيًا في آخر الصفحة («ثبّت الخطّة»)، **وما اعتُمد بعد التثبيت لا يُجدوَل أبدًا**:
+ * التثبيتُ الثاني يردّ «مثبَّتٌ من قبل». فصار الاعتمادُ نفسُه يسوّي الخطّة، ولا منشورَ معتمَدًا يبقى بلا موعد.
+ */
+export async function settlePlan(db: Db, org: string, plan: StoredPlan, by: string, now: Date): Promise<PlanSchedule & { readonly version: number }> {
+  const result = await schedulePlan(db, org, plan, now)
+  const meta = await db
+    .prepare('SELECT version, plan_json FROM plans WHERE id = ? AND org_id = ?')
+    .bind(plan.id, org)
+    .first<{ version: number; plan_json: string }>()
+  const version = meta?.version ?? 1
+  if (result.scheduled > 0) {
+    await db
+      .prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (plan_id, version) DO UPDATE SET scheduled = plan_versions.scheduled + excluded.scheduled, plan_json = excluded.plan_json`)
+      .bind(crypto.randomUUID(), plan.id, version, meta?.plan_json ?? JSON.stringify(plan.plan), result.scheduled, by, org)
+      .run()
+    await db.prepare("UPDATE plans SET locked_at = COALESCE(locked_at, datetime('now')), status = 'approved' WHERE id = ? AND org_id = ?").bind(plan.id, org).run()
+  }
+  return { ...result, version }
+}
+
+/**
+ * **تراجَع** (D-327): منشورٌ جُدول من الخطّة ولم يُرسَل يُسحب موعدُه ويعود مسوّدةً تنتظر القرار — بـ `unschedule` و`undoApprove`
+ * وحرّاسِهما. والمعتمَدُ بلا موعدٍ يعود مسوّدةً وحدَه.
+ */
+export async function undoItem(db: Db, org: string, planId: string, postId: string): Promise<Act> {
+  const post = await db
+    .prepare('SELECT status FROM posts WHERE id = ? AND org_id = ? AND plan_id = ?')
+    .bind(postId, org, planId)
+    .first<{ status: string }>()
+  if (post === null) return { ok: false, reason: 'لا منشور بهذا المعرّف في الخطّة' }
+  if (post.status === 'queued') {
+    const pulled = await unschedule(db, postId, org)
+    if (!pulled.ok) return { ok: false, reason: pulled.reason }
+  }
+  const back = await undoApprove(db, org, postId)
+  return back.ok ? { ok: true } : { ok: false, reason: back.reason }
+}
+
+/**
+ * **ثبّت الخطّة** — الطريقُ القديم إلى `settlePlan`، يبقى لنموذجٍ مفتوحٍ في تبويبٍ قديم. و`already` حين لا شيءَ جديدًا يُجدوَل
+ * والإصدارُ مثبَّت.
  */
 export async function pinPlan(db: Db, org: string, plan: StoredPlan, by: string, now: Date): Promise<PlanSchedule & { readonly version: number; readonly already: boolean }> {
-  const meta = await db
-    .prepare('SELECT version, locked_at, plan_json FROM plans WHERE id = ? AND org_id = ?')
-    .bind(plan.id, org)
-    .first<{ version: number; locked_at: string | null; plan_json: string }>()
-  const version = meta?.version ?? 1
-  if (meta !== null && meta.locked_at !== null) return { scheduled: 0, skipped: [], version, already: true }
-  const result = await schedulePlan(db, org, plan, now)
-  await db
-    .prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)
-              ON CONFLICT (plan_id, version) DO NOTHING`)
-    .bind(crypto.randomUUID(), plan.id, version, meta?.plan_json ?? JSON.stringify(plan.plan), result.scheduled, by, org)
-    .run()
-  await db.prepare("UPDATE plans SET locked_at = datetime('now'), status = 'approved' WHERE id = ? AND org_id = ?").bind(plan.id, org).run()
-  return { ...result, version, already: false }
+  const before = await db.prepare('SELECT locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org).first<{ locked_at: string | null }>()
+  const result = await settlePlan(db, org, plan, by, now)
+  return { ...result, already: before !== null && before.locked_at !== null && result.scheduled === 0 }
 }

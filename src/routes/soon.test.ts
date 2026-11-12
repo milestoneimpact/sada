@@ -66,8 +66,9 @@ describe('أفعالُ الموعد (D-320)', () => {
   it('مراجعة D-320: الاشتقاقُ يرى الاثني عشر، ومنها الثلاثةُ التي فاتت القائمةَ المكتوبة', () => {
     expect(SCHEDULING).toEqual([
       '/panel/drafts/decide', '/panel/drafts/reschedule', '/panel/drafts/schedule', '/panel/drafts/spread/apply',
-      '/panel/drafts/undo-unschedule', '/panel/plan-import/:id/approve', '/panel/plan/pin', '/panel/plan/review/bulk',
-      '/panel/plan/review/delay', '/panel/plan/schedule', '/panel/uploads/:id/posts', '/panel/uploads/:id/schedule',
+      '/panel/drafts/undo-unschedule', '/panel/plan-import/:id/approve', '/panel/plan/approve-all', '/panel/plan/pin',
+      '/panel/plan/review/approve', '/panel/plan/review/bulk',
+      '/panel/plan/review/delay', '/panel/plan/review/move', '/panel/plan/schedule', '/panel/uploads/:id/posts', '/panel/uploads/:id/schedule',
     ])
   })
 

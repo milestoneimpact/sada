@@ -138,6 +138,17 @@ media.post('/panel/media/generate', (c) => imageRoute(c, false))
  */
 media.post('/panel/media/regenerate', (c) => imageRoute(c, true))
 
+/**
+ * **من بطاقة الخطّة يُعاد إليها** (D-327): «ولّد صورة» و«بدّلها» و«بدون صورة» على بطاقة البند في `/panel/plan/review`، فالعودةُ
+ * إلى البطاقة في أسبوعها. والفهرسُ والأسبوعُ يُفحصان قبل أن يُكتبا في العنوان.
+ */
+function toPlanCard(form: FormData): Response | null {
+  if (form.get('back') !== 'plan') return null
+  const w = String(form.get('w') ?? '')
+  const index = String(form.get('index') ?? '')
+  return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + (/^(?:\d{1,2}|all)$/.test(w) ? '?w=' + w : '') + (/^\d{1,3}$/.test(index) ? '#c-' + index : '') } })
+}
+
 async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Promise<Response> {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
@@ -200,7 +211,7 @@ async function imageRoute(c: Context<{ Bindings: Env }>, replace: boolean): Prom
   )
   await setFlash(c.env, c.req.raw, flash)
   // ‏والصورةُ المولَّدةُ في بطاقتها: كان المالكُ يعود إلى رأس اللوح والصورةُ عند ‏2442px
-  return toCard('d', id)
+  return toPlanCard(gate.form) ?? toCard('d', id)
 }
 
 /**
@@ -286,7 +297,7 @@ media.post('/panel/media/reject', async (c) => {
     kind: done ? 'ok' : 'bad',
     text: done ? 'رُفضت الصورة — وتبقى بكلفتها، فما دُفع ثمنُه يُرى.' : 'لا صورة بهذه الحال.',
   })
-  return owner === null ? back('posts') : toCard('d', owner.post_id)
+  return toPlanCard(gate.form) ?? (owner === null ? back('posts') : toCard('d', owner.post_id))
 })
 
 /**

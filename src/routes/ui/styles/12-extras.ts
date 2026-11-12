@@ -468,6 +468,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
 .wz-pf[data-pf=x] .pf-logo{background:var(--pf-x)}
 .wz-pills{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-top:var(--s-3)}
+/* ‏أوقاتُ المنصّة وصورتُها تحت إيقاعها (D-329): عمودان حين يتّسع، وعمودٌ على الهاتف */
+.wz-pf-more{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); margin-top:var(--s-4); align-items:start}
+.wz-times input{flex:1 1 6rem; min-width:0}
 .wz-pill{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-1) var(--s-4);
   border:var(--bd); border-radius:var(--r-pill); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pill input[type=radio]{margin:0; accent-color:var(--accent)}
@@ -519,8 +522,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 }
 
 /* ── مراجعةُ الخطّة (D-286) ───────────────────────────────────────────
-   تقويمٌ مصغَّرٌ بسبعة أعمدة، و«ما ينقص» سطرٌ واحد، والبطاقاتُ شبكةٌ تحت رأس يومها،
-   وشريطا الجملة والتثبيت ملتصقان. والسطوحُ من العُدّة (card · card-inset). */
+   تقويمٌ بسبعة أعمدة، وشريطُ أسابيع، و«ما ينقص» سطرٌ واحد، والبطاقاتُ شبكةٌ تحت رأس يومها،
+   وشريطا الجملة والاعتماد ملتصقان (D-327). والسطوحُ من العُدّة (card · card-inset). */
 .rv-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1); margin:var(--s-3) 0 var(--s-4)}
 .rv-wd{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); text-align:center}
 .rv-cd{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--s-0); min-height:var(--tap);
@@ -534,7 +537,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-bulk[hidden]{display:none}
 .rv-day + .rv-day{margin-top:var(--s-6)}
 .rv-dh{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; scroll-margin-block-start:var(--s-16)}
-.rv-cards{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))}
+.rv-cards{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
 .rv{display:flex; flex-direction:column; gap:var(--s-3); scroll-margin-block-start:var(--s-16)}
 .rv-h{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-sel{display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); margin:calc(-1 * var(--s-2))}
@@ -542,16 +545,70 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-pf{width:var(--s-6); height:var(--s-6)}
 .rv-pf[data-pf=linkedin]{background:var(--pf-linkedin)}
 .rv-pf[data-pf=x]{background:var(--pf-x)}
-.rv-b{display:flex; gap:var(--s-3); align-items:flex-start}
-.rv-thumb{flex:none; width:var(--s-16); height:var(--s-16); object-fit:cover; border-radius:var(--r-control); border:var(--bd-soft)}
-.rv-t{min-width:0}
-.rv-text{display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
+/* ‏والبطاقةُ منشورٌ بشكل منصّته (D-327): المعاينةُ بعرض البطاقة، وسطرُ الصورة بأزراره تحتها */
+.rv-pv{min-width:0}
+.rv-img{align-items:center; padding-top:var(--s-2); border-top:var(--bd-soft)}
+/* ‏شعاراتُ منصّات اليوم في خانته، والنقطةُ فوق العدد لما ينتظر — اللونُ لا يقول وحدَه: الاسمُ في aria-label */
+.rv-dots{display:flex; gap:var(--s-0); justify-content:center}
+.rv-dot{width:var(--s-4); height:var(--s-4)}
+.rv-cd.is-wait{border:var(--bd-dash)}
+/* ── لوحةُ الشهر (D-330): اليومُ بمصغَّرات منشوراته، وهدفُ إفلاتٍ حين تُسحب إليه مصغَّرة ── */
+.rv-prog{display:block; inline-size:100%; block-size:var(--s-2); accent-color:var(--accent)}
+.rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
+.rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
+.rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}
+.rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400}
+/* ‏رأسُ اليوم والمصغَّرةُ يُلمسان: هدفُ كلٍّ ‏44px (قيس ‏24 و‏32 عند ‏768) */
+.rv-cd-h{display:flex; align-items:center; justify-content:space-between; gap:var(--s-1); padding:0 var(--s-1); min-height:var(--tap); min-width:var(--tap); color:inherit; text-decoration:none; border-radius:var(--r-inline)}
+.rv-cd-h span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--accent); font-weight:600}
+.rv-cd.is-day{position:relative; transition:background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
+.rv-cd.is-over{background:var(--selected); border-color:var(--accent)}
+.rv-mini{display:flex; align-items:center; gap:var(--s-1); min-height:var(--tap); padding:var(--s-0) var(--s-1); border-radius:var(--r-inline);
+  background:var(--surface); border:var(--bd-soft); color:var(--ink-2); text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption); min-width:0}
+.rv-mini[draggable=true]{cursor:grab}
+.rv-mini.is-drag{opacity:.35}
+.rv-mini-img{flex:none; width:var(--s-6); height:var(--s-6); object-fit:cover; border-radius:var(--r-inline)}
+.rv-mini bdi{min-width:0; overflow:hidden; text-overflow:ellipsis}
+/* ‏حالُ المصغَّرة نقطةٌ بلونها، واسمُها نصٌّ لقارئ الشاشة بجانبها — اللونُ لا يقول وحدَه */
+.rv-st{flex:none; margin-inline-start:auto; width:var(--s-2); height:var(--s-2); border-radius:var(--r-pill); background:var(--ink-3)}
+.rv-mini[data-st=wait] .rv-st{background:var(--warn)}
+.rv-mini[data-st=set] .rv-st{background:var(--ok)}
+.rv-mini[data-st=done] .rv-st{background:var(--accent)}
+.rv-mini[data-st=bad] .rv-st{background:var(--bad)}
+@media(hover:hover){.rv-mini:hover{border-color:var(--field); color:var(--ink)}}
+/* ── لوحُ البطاقة (D-330): «<dialog>» بجانب الشاشة على العريض، وورقةٌ من الأسفل على الهاتف ── */
+.rv-sheet{position:fixed; inset-block:0; inset-inline:auto 0; margin:0; width:min(100%,30rem); max-width:none; height:100%; max-height:none; padding:0;
+  color:var(--ink); background:var(--dialog); border:0; border-inline-start:var(--bd); box-shadow:var(--sh-3)}
+.rv-sheet::backdrop{background:var(--scrim)}
+.rv-sh{display:flex; flex-direction:column; height:100%}
+.rv-sh-h{display:flex; align-items:center; gap:var(--s-2); padding:var(--s-3) var(--s-4); border-bottom:var(--bd)}
+.rv-sh-t{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; min-width:0}
+.rv-sh-b{flex:1 1 auto; overflow:auto; padding:var(--s-4); display:flex; flex-direction:column; gap:var(--s-4)}
+.rv-sh-when{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))}
+.rv-sh-f{display:flex; flex-wrap:wrap; gap:var(--s-2); padding:var(--s-3) var(--s-4) calc(var(--s-3) + var(--safe-b)); border-top:var(--bd)}
+.rv-sh-f form,.rv-sh-f .btn{flex:1 1 auto}
+.rv-sh-f form .btn{width:100%; justify-content:center}
+/* ‏شريطُ الأسابيع: روابطُ بهدف لمسٍ كامل، والمعروضُ بسطح المحدَّد */
+.rv-weeks{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-bottom:var(--s-4)}
+.rv-wk{display:flex; flex-direction:column; justify-content:center; gap:var(--s-0); min-height:var(--tap); padding:var(--s-2) var(--s-3);
+  border:var(--bd-soft); border-radius:var(--r-control); color:var(--ink); text-decoration:none; font-size:var(--t-small); line-height:var(--lh-small)}
+.rv-wk em{font-style:normal; font-weight:600; color:var(--accent)}
+.rv-wk.is-on{background:var(--selected); border-color:var(--accent)}
 .rv-acts{margin-top:auto}
+.rv-acts form{display:inline-flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-foot{position:sticky; bottom:var(--s-3); z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
   margin-top:var(--s-6); padding:var(--s-3) var(--s-4)}
 @media${below('md')}{.rv-foot{bottom:calc(var(--s-16) + var(--safe-b))}}
 @media${below('sm')}{
   .rv-foot .btn{flex:1 1 auto}
+  .rv-wk{flex:1 1 auto}
+  /* ‏اللوحةُ على الهاتف شريطُ أيّامٍ بعددها كما كانت — المصغَّراتُ في بطاقات الأسبوع تحتها */
+  .rv-cal.is-board .rv-cd{min-height:var(--tap); padding:0 var(--s-2); align-items:center; justify-content:center}
+  .rv-mini{display:none}
+  .rv-cd-h{flex-direction:column; justify-content:center; gap:0}
+  .rv-sheet{inset-block:auto 0; inset-inline:0; width:100%; height:auto; max-height:92%; border-inline-start:0; border-top:var(--bd); border-radius:var(--r-sheet) var(--r-sheet) 0 0}
+  /* ‏والمعاينةُ داخل بطاقةٍ أضيقُ من عرض المنصّة عند 320: شريطُ أفعال LinkedIn يفيض بـ2px بالخطّ الأكبر — فتأخذ من حشوة البطاقة */
+  .rv-pv{margin-inline:calc(-1 * var(--s-3))}
   /* ‏سبعةُ أعمدةٍ عند 320 تصغّر اليومَ دون هدف اللمس: الأيّامُ التي فيها بنودٌ وحدَها، شريطًا بأهدافٍ كاملة */
   .rv-cal{display:flex; flex-wrap:wrap}
   .rv-wd,.rv-cd:not(.is-on){display:none}

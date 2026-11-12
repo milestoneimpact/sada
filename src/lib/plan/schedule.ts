@@ -12,6 +12,7 @@ import { schedulePost } from '../schedule/job'
 import { approveMany } from '../draft/store'
 import { readPeaks } from '../schedule/peak'
 import type { StoredPlan } from './job'
+import type { PlanItem } from './prompt'
 
 export interface PlanSchedule {
   readonly scheduled: number
@@ -66,9 +67,20 @@ export function kindFits(kind: string | undefined, key: string): boolean {
   return (kind === 'thread') === key.endsWith(':thread')
 }
 
-/** شرطُ `kindFits` في SQL — ومعاملُه `1` لبند السلسلة و`0` لغيره. */
-export const KIND_FITS_SQL = `(NOT (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%')
-                               OR (idempotency_key LIKE '%:thread') = ?)`
+/**
+ * **أهذه مسوّدةُ هذا البند؟** — موضعٌ واحدٌ للمطابقة (D-329). بندٌ بمعرّفٍ تطابقه المسوّدةُ التي تحمل `item:<id>` في مراجعها وحدَها،
+ * فبندان من المصدر نفسِه على المنصّة نفسِها لا يتنازعان مسوّدة. وبندٌ بلا معرّف (خطّةٌ قبل D-329، أو مُسكَّنةٌ من ملفّ) كما كان:
+ * المصدرُ والمنصّةُ ونوعُ البند.
+ */
+export function itemOwns(
+  item: PlanItem,
+  post: { readonly platform: string; readonly source_id: string | null; readonly source_refs: string | null; readonly idempotency_key: string },
+): boolean {
+  if (post.platform !== item.platform) return false
+  const refs = readRefs(post.source_refs)
+  if (item.id !== undefined) return refs.includes(`item:${item.id}`)
+  return (post.source_id === item.sourceId || refs.includes(item.sourceId)) && kindFits(item.kind, post.idempotency_key)
+}
 
 function readRefs(raw: string | null): string[] {
   try {
@@ -90,9 +102,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   let scheduled = 0
   for (const post of posts) {
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
-    const refs = readRefs(post.source_refs)
-    const item = plan.plan.items.find((i) => (i.sourceId === post.source_id || refs.includes(i.sourceId)) && i.platform === post.platform
-      && kindFits(i.kind, post.idempotency_key))
+    const item = plan.plan.items.find((i) => itemOwns(i, post))
     if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
     if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, org, post.platform)).hours[0]?.hour ?? null)
     if (!accounts.has(post.platform)) {
@@ -104,7 +114,11 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
     }
     const account = accounts.get(post.platform) ?? null
     if (account === null) { skipped.push({ postId: post.id, reason: `لا حسابَ ${post.platform} مربوطًا لهذا العميل` }); continue }
-    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peaks.get(post.platform) ?? null, now), now)
+    // ‏وأرجحُ الساعات لا يغلب وقتًا اختاره المالكُ للمنصّة، ولا يجمع منشورَي اليوم الواحد في ساعةٍ واحدة (D-329)
+    const chosen = (plan.choices?.times?.[item.platform]?.length ?? 0) > 0
+    const sameDay = plan.plan.items.filter((i) => i.platform === item.platform && i.day === item.day).length
+    const peak = chosen || sameDay > 1 ? null : peaks.get(post.platform) ?? null
+    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peak, now), now)
     if (result.ok) scheduled += 1
     else skipped.push({ postId: post.id, reason: result.reason })
   }

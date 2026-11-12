@@ -9,9 +9,11 @@ import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
-import { reviewModel, delayItem, dropItem, pinPlan } from '../../lib/plan/review'
-import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../ui/planReviewView'
-import { approveMany, decide } from '../../lib/draft/store'
+import { reviewModel, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
+import { localToUtc } from '../../lib/time/local'
+import { localParts } from '../../lib/time/zone'
+import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
@@ -29,7 +31,7 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
-import { asImageStyle, asSpan, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanPlatform } from '../../lib/plan/prompt'
+import { asImageChoice, asImageStyle, asSpan, asTimes, imageFor, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanChoices, type PlanPlatform } from '../../lib/plan/prompt'
 import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
@@ -47,6 +49,7 @@ import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
 import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back } from './shared'
+import type { PlanSchedule } from '../../lib/plan/schedule'
 
 export const plan = new Hono<{ Bindings: Env }>()
 
@@ -91,7 +94,14 @@ plan.post('/panel/plan/generate', async (c) => {
       ? brief.channels.filter(isPlanPlatform)
       : [...linked].filter(isPlanPlatform)
   const cadence: Partial<Record<PlanPlatform, number>> = {}
+  // ‏ولكلّ منصّةٍ صورتُها وأوقاتُها (D-329): «رسمٌ فنّيٌّ لـ LinkedIn وإنفوجرافيك لـ X»، ووقتٌ لهذه ووقتٌ لتلك في اليوم نفسِه
+  const imageStyles: Partial<Record<PlanPlatform, NonNullable<ReturnType<typeof asImageChoice>>>> = {}
+  const times: Partial<Record<PlanPlatform, readonly string[]>> = {}
   for (const ch of channels) {
+    const image = asImageChoice(f.get('image_' + ch))
+    if (image !== null) imageStyles[ch] = image
+    const at = asTimes(f.getAll('time_' + ch).map(String))
+    if (at.length > 0) times[ch] = at
     // ‏«مخصّص» في شاشة الخطّة الجديدة (D-283) يحمل رقمَه في حقلٍ بجانبه
     const picked = f.get('cadence_' + ch)
     const raw = picked === 'custom' ? f.get('cadence_custom_' + ch) : picked
@@ -121,11 +131,14 @@ plan.post('/panel/plan/generate', async (c) => {
     ideas,
     ...(autoImage === undefined ? {} : { autoImage }),
     imageStyle,
+    imageStyles: imageStyles as PlanChoices['imageStyles'],
+    times,
+    zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
   })
 
   // ‏والتقديرُ قبل «ابدأ» (D-257 · D-282): ما سيُكتب وما سيُرسم، بوسيط ما أُنفق فعلًا — فلا إنفاقَ قبل أن يرى المالكُ الرقم
-  const wanted = autoImage ?? (await readSettings(c.env.DB)).autoImage
+  const wanted = Object.values(imageStyles).some((x) => x !== 'none') || (autoImage ?? (await readSettings(c.env.DB)).autoImage)
   const written = outcome.kind === 'planned' ? await latestPlan(c.env.DB, org) : null
   const estimate = written === null ? '' : estimateLine(estimatePlan({ items: written.plan.items, autoImage: wanted, ...(await unitCosts(c.env.DB, org)) }))
 
@@ -185,7 +198,9 @@ plan.get('/panel/plan/new', async (c) => {
     taskReadyAlone(c, 'plan'),
   ])
   const used = await neuronsUsedToday(c.env.DB)
-  const body = planNewScreen({
+  // ‏وما قيل بعد إضافة مصدرٍ بلا سكربت يُرى هنا حيث عاد المالك (D-327)، لا في أوّل صفحةٍ يفتحها بعدها
+  const flash = await takeFlash(c.env, c.req.raw)
+  const body = (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' }))) + planNewScreen({
     now: new Date(),
     linked: [...new Set(accounts.filter((a) => a.status === 'active').map((a) => a.platform as string))],
     perWeek: brief.perWeek,
@@ -198,7 +213,8 @@ plan.get('/panel/plan/new', async (c) => {
       draft: freeImagesLeft(imageNeurons(DRAFT_IMAGE_MODEL, 1024, 1024) ?? 0, used),
       final: freeImagesLeft(imageNeurons(FINAL_IMAGE_MODEL, 1344, 704) ?? 0, used),
     },
-    autoImage: settings.autoImage,
+    // ‏والصورةُ مع كلّ منشورٍ افتراضُ المعالج (D-327 بقرار المالك): إنفوجرافيك رسمُه مجّانيّ، و«بلا صورة» اختيارٌ يُرى
+    autoImage: true,
     ready,
     replacing: current !== null,
     // ‏ما أُضيف للتوّ بلا سكربت يُحدَّد (D-284) — ومن المحلَّل وحدَه، لا معرّفًا يكتبه أحد
@@ -248,24 +264,28 @@ async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<Retu
   if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
   const seen = new Set<string>()
   const items = plan.plan.items.filter((i) => {
-    // ‏والسلسلةُ بندٌ غيرُ التغريدة من المصدر نفسِه (D-324): مفتاحُ مسوّدتها غيرُ مفتاحها
-    const k = `${i.sourceId}:${i.platform}${i.kind === 'thread' ? ':thread' : ''}`
+    // ‏والسلسلةُ بندٌ غيرُ التغريدة من المصدر نفسِه (D-324): مفتاحُ مسوّدتها غيرُ مفتاحها. وبندٌ بمعرّفه (D-329) مسوّدةٌ مستقلّة —
+    // ‏إلّا بندَ الفكرة: مفتاحُ مسوّدتها الفكرةُ والمنصّة، فالمكرَّرُ منه «كُتبت من قبل»
+    const k = i.id !== undefined && !i.sourceId.startsWith('idea:') ? 'item:' + i.id : `${i.sourceId}:${i.platform}${i.kind === 'thread' ? ':thread' : ''}`
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
-  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ
-  const autoImage = plan.choices.channels.length === 0 ? undefined : plan.choices.autoImage
+  // ‏واختيارُ الصورة من الخطّة (D-282) — وما قبل 0037 بلا اختيارٍ فيُترك للإعداد العامّ. ولكلّ منصّةٍ اختيارُها (D-329)
+  const legacy = plan.choices.channels.length === 0
+  const autoImage = legacy ? undefined : plan.choices.channels.some((ch) => imageFor(plan.choices, ch) !== 'none')
   if (items.length > 0) {
     await env.GENERATE_QUEUE.sendBatch(items.map((i) => {
       const idea = ideaOf(i.sourceId, plan.choices)
+      const image = imageFor(plan.choices, i.platform)
       return {
         body: { draft: {
           sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
           ...(i.asset === undefined ? {} : { asset: i.asset }),
           ...(idea === null ? {} : { idea }),
-          ...(autoImage === undefined ? {} : { autoImage }),
-          imageStyle: plan.choices.imageStyle,
+          ...(legacy ? {} : { autoImage: image !== 'none' }),
+          imageStyle: image === 'none' ? plan.choices.imageStyle : image,
+          ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
           ...(i.kind === 'thread' && i.platform === 'x' ? { shape: 'thread' as const } : {}),
         } },
       }
@@ -338,12 +358,14 @@ plan.post('/panel/plan/approve-all', async (c) => {
   }
   const done = await approvePlanDrafts(c.env.DB, org, plan.id, deciderOf(gate.session.record.via))
   finalizeLater(c, org, done.ids ?? [])
-  await record(c.env.DB, { actor: 'panel', action: 'plan.approve_all', target: plan.id, detail: `${done.done} اعتُمدت · ${done.failed.length} تعثّرت` }, c.req.raw)
+  // ‏والمعتمَدُ يُجدوَل في موعد بنده الآن (D-327) — لا خطوةَ ثانيةً بعد الاعتماد
+  const settled = done.done === 0 ? null : await settleNow(c.env, org, plan, deciderOf(gate.session.record.via))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.approve_all', target: plan.id, detail: String(done.done) + ' اعتُمدت · ' + String(done.failed.length) + ' تعثّرت · ' + String(settled === null || settled === 'paused' ? 0 : settled.scheduled) + ' جُدولت' }, c.req.raw)
   await setFlash(c.env, c.req.raw, {
     kind: done.done === 0 && done.failed.length === 0 ? 'warn' : done.failed.length === 0 ? 'ok' : done.done === 0 ? 'bad' : 'warn',
-    text: sayApprovedAll(done.done, done.failed),
+    text: sayApprovedAll(done.done, done.failed) + (settled === null ? '' : ' ' + saySettled(settled)),
   })
-  return c.redirect('/panel/client', 303)
+  return c.redirect(gate.form.get('back') === 'review' ? '/panel/plan/review' : '/panel/client', 303)
 })
 
 /**
@@ -531,18 +553,40 @@ plan.post('/panel/plan-import/:id/approve', async (c) => {
 
 // ── مراجعةُ الخطّة وتثبيتُها (D-286) ──────────────────────────────────
 
+/**
+ * **«اعتمد» يجدول** (D-327): ما اعتُمد من الخطّة يُوضع في موعد بنده بعد الاعتماد نفسِه (`settlePlan`). والإيقافُ المؤقّتُ يمنع
+ * الجدولةَ لا الاعتماد — فيُقال، ويُجدوَل المعتمَدُ عند أوّل اعتمادٍ بعد رفعه.
+ */
+async function settleNow(env: Env, org: string, plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>, by: string): Promise<(PlanSchedule & { readonly version: number }) | 'paused'> {
+  if ((await readSettings(env.DB)).paused) return 'paused'
+  return settlePlan(env.DB, org, plan, by, new Date())
+}
+
+/** جملةُ ما جُدول بعد الاعتماد — وما تعذّر بسببه الأوّل. */
+function saySettled(settled: (PlanSchedule & { readonly version: number }) | 'paused'): string {
+  if (settled === 'paused') return 'وصدى موقوفٌ مؤقّتًا، فلا يُجدوَل شيءٌ حتّى يُرفع الإيقاف.'
+  const first = settled.skipped[0]
+  return (settled.scheduled === 0 ? 'ولم يُجدوَل شيء' : settled.scheduled === 1 ? 'وجُدول منشورٌ في موعده' : 'وجُدول ' + String(settled.scheduled) + ' في مواعيدها') +
+    (first === undefined ? '.' : '، وتعذّر ' + String(settled.skipped.length) + ': ' + first.reason + '.')
+}
+
 plan.get('/panel/plan/review', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
   const current = await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
-  const [model, zone, flash] = await Promise.all([
+  const [model, zone, flash, orgRow, accounts] = await Promise.all([
     reviewModel(c.env.DB, org, current),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     takeFlash(c.env, c.req.raw),
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
+      .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
   ])
-  const body = planReviewScreen(model, zone ?? null) +
+  const authors: Record<string, string> = {}
+  for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
+  const body = planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
@@ -550,22 +594,57 @@ plan.get('/panel/plan/review', async (c) => {
   )
 })
 
-/** العودةُ إلى البطاقة نفسِها، لا إلى رأس الصفحة. */
-const toCard = (index: unknown): Response =>
-  new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + (Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
+/** الأسبوعُ المعروض كما أرسله النموذج — رقمٌ أو «all»، وما سواهما لا يُكتب في العنوان. */
+const weekOf = (form: FormData): string => {
+  const w = String(form.get('w') ?? '')
+  return /^(?:\d{1,2}|all)$/.test(w) ? '?w=' + w : ''
+}
+
+/** العودةُ إلى البطاقة نفسِها في أسبوعها، لا إلى رأس الصفحة. */
+const toCard = (form: FormData, anchor = true): Response => {
+  const index = form.get('index')
+  return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + weekOf(form) + (anchor && index !== null && Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
+}
 
 plan.post('/panel/plan/review/approve', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const org = activeOrg(gate.session.record)
   const id = String(gate.form.get('post') ?? '')
-  const row = await c.env.DB.prepare('SELECT text FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<{ text: string }>()
+  const by = deciderOf(gate.session.record.via)
+  const row = await c.env.DB.prepare('SELECT text, status FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<{ text: string; status: string }>()
+  // ‏ومعتمَدٌ بلا موعد (اعتُمد والنظامُ موقوف، أو تعذّرت جدولتُه) يُجدوَل بالزرّ نفسِه بلا اعتمادٍ ثانٍ
   const result = row === null
     ? { ok: false as const, reason: 'لا مسوّدة بهذا المعرّف' }
-    : await decide(c.env.DB, org, id, { kind: 'approve', text: row.text }, deciderOf(gate.session.record.via))
-  if (result.ok) finalizeLater(c, org, [id])
-  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'اعتُمدت كما كُتبت.' } : { kind: 'bad', text: result.reason })
-  return toCard(gate.form.get('index'))
+    : row.status === 'approved' || row.status === 'edited'
+      ? { ok: true as const }
+      : await decide(c.env.DB, org, id, { kind: 'approve', text: row.text }, by)
+  if (!result.ok) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: result.reason })
+    return toCard(gate.form)
+  }
+  finalizeLater(c, org, [id])
+  const current = await latestPlan(c.env.DB, org)
+  const settled = current === null ? null : await settleNow(c.env, org, current, by)
+  const missed = settled === null || settled === 'paused' ? undefined : settled.skipped.find((x) => x.postId === id)
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.approve', target: id, detail: settled === null ? 'approved' : settled === 'paused' ? 'approved · paused' : missed === undefined ? 'approved · scheduled' : ('approved · ' + missed.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, settled === 'paused'
+    ? { kind: 'warn', text: 'اعتُمدت. ' + saySettled(settled).slice(1) }
+    : missed !== undefined
+      ? { kind: 'warn', text: 'اعتُمدت ولم تُجدوَل: ' + missed.reason }
+      : { kind: 'ok', text: 'اعتُمدت وجُدولت في موعدها — وتُنشر وحدَها. «تراجَع» على بطاقتها ما دامت لم تُرسَل.' })
+  return toCard(gate.form)
+})
+
+/** **تراجَع** (D-327): المجدولُ يُسحب موعدُه ويعود مسوّدةً تنتظر القرار — والحكمُ في `undoItem`. */
+plan.post('/panel/plan/review/undo', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('post') ?? '')
+  const result = await undoItem(c.env.DB, activeOrg(gate.session.record), String(gate.form.get('id') ?? ''), id)
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.undo', target: id, detail: result.ok ? 'restored' : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'سُحب موعدُها وعادت مسوّدةً تنتظر قرارك.' } : { kind: 'bad', text: 'تعذّر التراجع: ' + result.reason })
+  return toCard(gate.form)
 })
 
 plan.post('/panel/plan/review/delay', async (c) => {
@@ -577,7 +656,70 @@ plan.post('/panel/plan/review/delay', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: result.note === undefined ? 'ok' : 'warn', text: result.note ?? (days === 7 ? 'أُخّر أسبوعًا.' : 'أُخّر يومًا.') }
     : { kind: 'bad', text: result.reason })
-  return toCard(f.get('index'))
+  return toCard(f)
+})
+
+/**
+ * **انقل البند** (D-330): يومٌ بتوقيت المالك (من السحب في اللوحة أو من لوح البطاقة) وساعةٌ إن ذُكرت — وإلّا ساعتُه كما هي بتوقيته.
+ * يُحوَّلان إلى UTC هنا، والحكمُ كلُّه في `moveItem`.
+ */
+plan.post('/panel/plan/review/move', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const current = await latestPlan(c.env.DB, org)
+  const item = current === null || current.id !== String(f.get('id') ?? '') ? undefined : current.plan.items[Number(f.get('index'))]
+  const day = String(f.get('day') ?? '')
+  let result: Awaited<ReturnType<typeof moveItem>> = { ok: false, reason: 'تغيّرت الخطّة منذ فتحت الصفحة — أعد تحميلها' }
+  if (item !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const was = localParts(new Date(item.day + 'T' + item.time + ':00Z'), zone)
+    const asked = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.get('time') ?? '')) ? String(f.get('time')).split(':').map(Number) : [was.hour, was.minute]
+    const [y, mo, d] = day.split('-').map(Number)
+    const at = localToUtc(y!, mo!, d!, asked[0]!, asked[1]!, zone)
+    result = at === null
+      ? { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+      : await moveItem(c.env.DB, org, current!.id, Number(f.get('index')), String(f.get('key') ?? ''), { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16) }, new Date())
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.move', target: String(f.get('id') ?? ''), detail: result.ok ? day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند — ومنشورُه المجدولُ معه.' } : { kind: 'bad', text: result.reason })
+  return toCard(f, false)
+})
+
+/** **نصُّ المسوّدة من لوح البطاقة** (D-330): «احفظ» يكتب ولا يعتمد — والحكمُ في `saveText` (المسوّدةُ وحدَها، وحدُّ المنصّة). */
+plan.post('/panel/plan/review/text', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('post') ?? '')
+  const result = await saveText(c.env.DB, activeOrg(gate.session.record), id, String(gate.form.get('text') ?? ''))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.text', target: id, detail: result.ok ? 'saved' : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُفظ النصّ — ويبقى مسوّدةً حتّى تعتمده.' } : { kind: 'bad', text: result.reason })
+  return toCard(gate.form)
+})
+
+/**
+ * **لوحُ البطاقة** (D-330): جزءُ صفحةٍ لبندٍ واحد — معاينتُه ونصُّه وصورتُه وموعدُه وأفعالُه — يطلبه سكربتُ الشاشة حين تُضغط
+ * مصغَّرة. خلف الجلسة كالشاشة، ونماذجُه بـ CSRF الجلسة، **ولا يفعل شيئًا**: الأفعالُ نماذجُ إلى مساراتها بحرّاسها.
+ */
+plan.get('/panel/plan/review/card', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.text('انتهت الجلسة', 401)
+  const org = activeOrg(session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null) return c.text('لا خطّة', 404)
+  const [model, zone, orgRow, accounts] = await Promise.all([
+    reviewModel(c.env.DB, org, current),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
+      .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
+  ])
+  const authors: Record<string, string> = {}
+  for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
+  const body = planSheet(model, Number(c.req.query('i')), zone ?? null, { week: c.req.query('w') ?? null, orgName: orgRow?.name ?? 'خطّتي', authors })
+  if (body === null) return c.text('لا بند بهذا الرقم', 404)
+  return new Response(injectCsrf(body, session.record.csrf), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' } })
 })
 
 plan.post('/panel/plan/review/drop', async (c) => {
@@ -585,8 +727,8 @@ plan.post('/panel/plan/review/drop', async (c) => {
   if ('denied' in gate) return gate.denied
   const f = gate.form
   const result = await dropItem(c.env.DB, activeOrg(gate.session.record), String(f.get('id') ?? ''), Number(f.get('index')), String(f.get('key') ?? ''), deciderOf(gate.session.record.via))
-  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُذف البند من الخطّة.' } : { kind: 'bad', text: result.reason })
-  return c.redirect('/panel/plan/review', 303)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'أُزيل البند من الخطّة.' } : { kind: 'bad', text: result.reason })
+  return toCard(f, false)
 })
 
 /**
@@ -607,9 +749,10 @@ plan.post('/panel/plan/review/bulk', async (c) => {
   }).filter((p) => Number.isInteger(p.index)).sort((a, b) => b.index - a.index)
   if (picked.length === 0) {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم يُحدَّد بند.' })
-    return c.redirect('/panel/plan/review', 303)
+    return toCard(f, false)
   }
   let done = 0
+  let tail = ''
   const failed: string[] = []
   if (act === 'approve') {
     const ids = picked.map((p) => p.post).filter((x) => x !== '')
@@ -617,6 +760,9 @@ plan.post('/panel/plan/review/bulk', async (c) => {
     done = r.done.length
     failed.push(...r.failed.map((x) => x.reason))
     finalizeLater(c, org, r.done)
+    // ‏والمعتمَدُ يُجدوَل في مواعيد بنوده الآن (D-327)
+    const current = done === 0 ? null : await latestPlan(c.env.DB, org)
+    if (current !== null && current.id === planId) tail = ' ' + saySettled(await settleNow(c.env, org, current, deciderOf(gate.session.record.via)))
   } else if (act === 'delay' || act === 'drop') {
     for (const p of picked) {
       const r = act === 'delay'
@@ -629,9 +775,9 @@ plan.post('/panel/plan/review/bulk', async (c) => {
   const verb = act === 'approve' ? 'اعتُمد' : act === 'delay' ? 'أُخّر' : 'حُذف'
   await setFlash(c.env, c.req.raw, {
     kind: failed.length === 0 ? 'ok' : done === 0 ? 'bad' : 'warn',
-    text: verb + ' ' + String(done) + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ')),
+    text: verb + ' ' + String(done) + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ') + '.') + tail,
   })
-  return c.redirect('/panel/plan/review', 303)
+  return toCard(f, false)
 })
 
 plan.post('/panel/plan/pin', async (c) => {
@@ -745,12 +891,12 @@ plan.get('/panel/plan/view', async (c) => {
 })
 
 /**
- * **«الخطّة» وجهةٌ واحدة** (D-289): تفتح ما يناسب حالَ خطّة العميل — بلا خطّة «خطّة جديدة»، ومثبَّتةٌ «العرض»، وما سواهما «المراجعة».
+ * **«الخطّة» وجهةٌ واحدة** (D-289 · D-327): بلا خطّةٍ «خطّة جديدة»، وما سواها شاشةُ الخطّة نفسُها — فيها الشهرُ والأسبوعُ والاعتماد.
+ * كانت المثبَّتةُ تفتح «العرض»، وهو للقراءة بلا زرّ اعتماد: فمن فتح خطّتَه لم يجد ما يعتمد به. و«العرض» زرٌّ فيها للطباعة.
  */
 plan.get('/panel/plan', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const current = await latestPlan(c.env.DB, activeOrg(session.record))
-  const to = current === null ? '/panel/plan/new' : current.lockedAt !== null && current.lockedAt !== undefined ? '/panel/plan/view' : '/panel/plan/review'
-  return c.redirect(to, 303)
+  return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
 })

@@ -28,8 +28,9 @@ import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
 import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
+import { localToUtc } from '../time/local'
 import {
-  asSpan, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, systemPrompt, userPrompt, weekStart,
+  applyTimes, asSpan, CALL_CAP, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
   type Cadence, type Plan, type PlanChoices, type PlanImageStyle, type PlanPlatform, type PlanSource, type PlanSpan,
 } from './prompt'
 import type { Db } from '../tokens'
@@ -83,6 +84,10 @@ export interface PlanDeps {
   readonly autoImage?: boolean
   /** نوعُ الصورة الآليّة (D-285). */
   readonly imageStyle?: PlanImageStyle
+  /** الصورةُ لكلّ منصّة، وأوقاتُ نشرها بتوقيت المالك ومنطقتُه (D-329). */
+  readonly imageStyles?: PlanChoices['imageStyles']
+  readonly times?: PlanChoices['times']
+  readonly zone?: string | null
 }
 
 interface Row {
@@ -276,6 +281,22 @@ async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Cal
   return { ok: true, plan: read.plan, dropped: read.dropped, droppedWhy: read.droppedWhy, cost: priced.total, units: priced.units, model: spent.model }
 }
 
+/**
+ * نوافذُ النداء: ما يتّسع له نداءٌ واحد (`CALL_CAP`) يبقى نافذةً، والشهران شهرٌ ثمّ شهر كما كانا. وإيقاعٌ أكثف يُقسَم على
+ * أسبوعين أسبوعين ثمّ أسبوعًا أسبوعًا — فلا يُقصّ آخرُ المدى لأنّ النموذجَ لا يقرأ مئةَ بندٍ قراءةً واحدة.
+ */
+export function planWindows(start: string, span: PlanSpan, cadence: Cadence): { start: string; span: PlanSpan }[] {
+  const weeks = spanDays(span) / 7
+  const perWeek = Object.values(cadence).reduce((a, b) => a + Math.max(0, Math.floor(b ?? 0)), 0)
+  const fit = perWeek <= 0 ? 4 : perWeek * 4 <= CALL_CAP ? 4 : perWeek * 2 <= CALL_CAP ? 2 : 1
+  const chunk = Math.min(fit, span === '2months' ? 4 : weeks)
+  if (chunk >= weeks) return [{ start, span }]
+  const name: Record<number, PlanSpan> = { 1: 'week', 2: '2weeks', 4: 'month' }
+  const out: { start: string; span: PlanSpan }[] = []
+  for (let w = 0; w < weeks; w += chunk) out.push({ start: addDays(start, w * 7), span: name[Math.min(chunk, weeks - w)] ?? 'week' })
+  return out
+}
+
 export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   const now = (deps.now ?? (() => new Date()))()
   const org = deps.org ?? 'org_owner'
@@ -301,18 +322,30 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   const ctx: Caller = { deps, sources, channels, cadence, voice: voiceSection(await readBrief(deps.db, org)) }
 
   // ٣ إلى ٦ · نداءٌ لكلّ شهرٍ على الأكثر — والشهران شهرٌ ثمّ شهر
-  const windows: { start: string; span: PlanSpan }[] = span === '2months'
-    ? [{ start, span: 'month' }, { start: addDays(start, 28), span: 'month' }]
-    : [{ start, span }]
+  // ‏وإيقاعٌ يتجاوز سقفَ النداء (D-329: منشوران أو ثلاثةٌ في اليوم) يُقسَم على نوافذَ أقصر: أسبوعان ثمّ أسبوع
+  const windows = planWindows(start, span, cadence)
   const parts: Extract<Called, { ok: true }>[] = []
   for (const w of windows) {
     const called = await planOnce(ctx, w.start, w.span)
     if (!called.ok) return called.outcome
     parts.push(called)
   }
+  // ‏وأوقاتُ المالك لكلّ منصّة تغلب ما كتبه المخطِّط، ولكلّ بندٍ معرّفُه (D-329)
+  const zone = deps.zone ?? null
+  const timed = applyTimes(
+    parts.flatMap((p) => p.plan.items),
+    deps.times ?? {},
+    (day, time) => {
+      const [y, mo, d] = day.split('-').map(Number)
+      const [h, mi] = time.split(':').map(Number)
+      const at = localToUtc(y!, mo!, d!, h!, mi!, zone)
+      return at === null ? null : { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16) }
+    },
+    (day) => day >= start && day < addDays(start, spanDays(span)),
+  )
   const merged: Plan = {
-    rationale: parts.map((p) => p.plan.rationale).filter((r) => r !== '').join(' ثمّ '),
-    items: parts.flatMap((p) => p.plan.items),
+    rationale: [...new Set(parts.map((p) => p.plan.rationale).filter((r) => r !== ''))].join(' ثمّ '),
+    items: timed.map((item) => ({ ...item, id: crypto.randomUUID().replace(/-/g, '').slice(0, 10) })),
   }
   const dropped = parts.reduce((n, p) => n + p.dropped, 0)
   const droppedWhy = parts.map((p) => p.droppedWhy).filter((w) => w !== '').join('، ')
@@ -324,6 +357,7 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   const choices: PlanChoices = {
     channels, cadence, sources: only === 'all' ? 'all' : [...only], ideas, assets: [...(deps.assets ?? [])],
     autoImage: deps.autoImage === true, imageStyle: deps.imageStyle ?? 'infographic', startDay: start,
+    imageStyles: deps.imageStyles ?? {}, times: deps.times ?? {}, zone: zone ?? '',
   }
   const planId = crypto.randomUUID()
   await deps.db

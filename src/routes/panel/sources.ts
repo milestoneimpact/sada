@@ -1,5 +1,5 @@
 /**
- * مسارات اللوحة — مصدرٌ يُضاف الآن (D-284): ملفٌّ يُرفع، أو رابطُ صفحة.
+ * مسارات اللوحة — مصدرٌ يُضاف الآن (D-284 · D-327): ملفٌّ يُرفع، أو رابطُ موقعٍ أو مقالٍ أو مقطع — واحدًا أو مجموعة.
  *
  * كلاهما يمرّ بالخطوات نفسِها: **يُستلم ويُستخرج نصُّه** (`lib/sources/ingest.ts`)، **ثمّ يُحلَّل في الطلب نفسِه**
  * بـ `analyzeSource` بسقوفه وحرّاسه — فيعود جاهزًا للخطّة في لحظته، لا بعد مسحٍ في الفجر.
@@ -48,18 +48,25 @@ function analysisNote(out: AnalyzeOutcome): { ready: boolean; note: string } {
   }
 }
 
-async function finish(
-  c: { env: Env; req: { raw: Request; header(name: string): string | undefined } },
-  action: string,
-  form: FormData,
-  outcome: IngestOutcome,
-): Promise<Response> {
-  const wantsJson = (c.req.header('Accept') ?? '').includes('application/json')
+/** كم مصدرًا يُضاف في طلبٍ واحد (D-327) — كلٌّ يُقرأ ويُحلَّل في الطلب نفسِه، وما فوق الستّة يتجاوز مهلتَه. */
+export const MAX_BATCH = 6
+
+type Ctx = { env: Env; req: { raw: Request; header(name: string): string | undefined } }
+
+interface Added {
+  readonly ok: boolean
+  readonly id?: string
+  readonly name?: string
+  readonly state?: string
+  readonly ready: boolean
+  readonly note: string
+}
+
+/** مصدرٌ واحد: يُسجَّل، ويُحلَّل إن قُبل، ويعود بما يُقال عنه. */
+async function settle(c: Ctx, action: string, outcome: IngestOutcome): Promise<Added> {
   if (outcome.kind === 'rejected') {
     await record(c.env.DB, { actor: 'panel', action, target: null, detail: ('rejected: ' + outcome.reason).slice(0, 200) }, c.req.raw)
-    if (wantsJson) return Response.json({ ok: false, reason: outcome.reason }, { status: 422 })
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: outcome.reason })
-    return new Response(null, { status: 303, headers: { Location: RETURNS[String(form.get('return') ?? '')] ?? RETURNS['library']! } })
+    return { ok: false, ready: false, note: outcome.reason }
   }
   const analyzed = await analyzeSource(
     {
@@ -75,20 +82,58 @@ async function finish(
   const { ready, note } = analysisNote(analyzed)
   await record(c.env.DB, { actor: 'panel', action, target: outcome.id, detail: outcome.kind + ' · ' + analyzed.kind }, c.req.raw)
   const said = outcome.kind === 'exists' ? 'موجودٌ في مصادرك من قبل' : outcome.kind === 'updated' ? 'حُدّث نصُّه' : 'أُضيف إلى مصادرك'
-  if (wantsJson) {
-    return Response.json({ ok: true, id: outcome.id, name: outcome.name, state: outcome.kind, ready, note: said + ' — ' + note })
+  return { ok: true, id: outcome.id, name: outcome.name, state: outcome.kind, ready, note: said + ' — ' + note }
+}
+
+const returnTo = (form: FormData): string => RETURNS[String(form.get('return') ?? '')] ?? RETURNS['library']!
+
+async function finish(c: Ctx, action: string, form: FormData, outcome: IngestOutcome): Promise<Response> {
+  const wantsJson = (c.req.header('Accept') ?? '').includes('application/json')
+  const done = await settle(c, action, outcome)
+  if (!done.ok) {
+    if (wantsJson) return Response.json({ ok: false, reason: done.note }, { status: 422 })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.note })
+    return new Response(null, { status: 303, headers: { Location: returnTo(form) } })
   }
-  await setFlash(c.env, c.req.raw, { kind: ready ? 'ok' : 'warn', text: '«' + outcome.name + '» ' + said + ' — ' + note })
-  const to = RETURNS[String(form.get('return') ?? '')] ?? RETURNS['library']!
-  return new Response(null, { status: 303, headers: { Location: to.includes('#') ? to : to + '?picked=' + encodeURIComponent(outcome.id) } })
+  if (wantsJson) return Response.json({ ok: true, id: done.id, name: done.name, state: done.state, ready: done.ready, note: done.note })
+  await setFlash(c.env, c.req.raw, { kind: done.ready ? 'ok' : 'warn', text: '«' + (done.name ?? '') + '» ' + done.note })
+  const to = returnTo(form)
+  return new Response(null, { status: 303, headers: { Location: to.includes('#') ? to : to + '?picked=' + encodeURIComponent(done.id ?? '') } })
+}
+
+/**
+ * **مجموعةُ مصادرَ في طلبٍ واحد** (D-327): روابطُ وملفّاتٌ معًا، كلٌّ يُقرأ ويُحلَّل بطريقه كما لو أُرسل وحدَه — فالمرفوضُ
+ * يُسمّى بسببه ولا يُسقط غيرَه. بلا سكربت؛ والمعالجُ بسكربته يرسلها واحدًا واحدًا فيرى المالكُ كلًّا في لحظته.
+ */
+async function finishMany(c: Ctx, form: FormData, jobs: readonly { readonly action: string; readonly label: string; readonly run: () => Promise<IngestOutcome> }[], dropped: number): Promise<Response> {
+  let ready = 0
+  const failed: string[] = []
+  for (const job of jobs) {
+    const done = await settle(c, job.action, await job.run())
+    if (done.ok && done.ready) ready += 1
+    else failed.push('«' + (done.name ?? job.label) + '»: ' + done.note)
+  }
+  const text = 'أُضيف ' + String(ready) + ' من ' + String(jobs.length) + ' وصار جاهزًا للخطّة' +
+    (failed.length === 0 ? '.' : '. وتعذّر ' + String(failed.length) + ' — ' + failed.slice(0, 2).join(' · ')) +
+    (dropped > 0 ? ' وتُرك ' + String(dropped) + ' فوق الستّة — أضفها في دفعةٍ ثانية.' : '')
+  await setFlash(c.env, c.req.raw, { kind: failed.length === 0 && dropped === 0 ? 'ok' : ready === 0 ? 'bad' : 'warn', text })
+  return new Response(null, { status: 303, headers: { Location: returnTo(form) } })
 }
 
 sources.post('/panel/sources/upload', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
-  const file = gate.form.get('file')
-  const outcome: IngestOutcome = file instanceof File && file.size > 0
-    ? await ingestFile(ingestDeps(c.env), activeOrg(gate.session.record), {
+  const org = activeOrg(gate.session.record)
+  const files = gate.form.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
+  if (files.length > 1) {
+    return finishMany(c, gate.form, files.slice(0, MAX_BATCH).map((file) => ({
+      action: 'source.upload', label: file.name,
+      run: async () => ingestFile(ingestDeps(c.env), org, { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }),
+    })), Math.max(0, files.length - MAX_BATCH))
+  }
+  const file = files[0]
+  const outcome: IngestOutcome = file !== undefined
+    ? await ingestFile(ingestDeps(c.env), org, {
       name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()),
     })
     : { kind: 'rejected', reason: 'لم يصل ملفّ — اختر ملفًّا ثمّ ارفعه.' }
@@ -98,7 +143,15 @@ sources.post('/panel/sources/upload', async (c) => {
 sources.post('/panel/sources/link', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
-  const outcome = await ingestLink(ingestDeps(c.env), activeOrg(gate.session.record), String(gate.form.get('url') ?? ''))
+  const org = activeOrg(gate.session.record)
+  // ‏سطرٌ لكلّ رابط (D-327): موقعٌ ومقالٌ ومقطعٌ معًا — والواحدُ كما كان
+  const urls = [...new Set(String(gate.form.get('url') ?? '').split(/\s+/).filter((u) => u !== ''))]
+  if (urls.length > 1) {
+    return finishMany(c, gate.form, urls.slice(0, MAX_BATCH).map((url) => ({
+      action: 'source.link', label: url.slice(0, 60), run: () => ingestLink(ingestDeps(c.env), org, url),
+    })), Math.max(0, urls.length - MAX_BATCH))
+  }
+  const outcome = await ingestLink(ingestDeps(c.env), org, urls[0] ?? '')
   return finish(c, 'source.link', gate.form, outcome)
 })
 

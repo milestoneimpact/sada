@@ -49,15 +49,26 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(html).toContain('مسوّدة · الإصدار 1')
     // ‏بندٌ لم يُكتب، وواحدٌ ينتظر، واثنان بلا صورة، وموعدان مكرَّران لـ LinkedIn
     for (const s of ['1 لم تُكتب بعد', '1 تنتظر اعتمادك', '2 بلا صورة', '2 موعدٌ مكرَّر']) expect(html).toContain(s)
-    expect(html).toContain('href="#c-2">1 لم تُكتب بعد')
-    expect(html).toContain('action="/panel/plan/pin"')
+    expect(html).toContain('href="?w=1#c-2">1 لم تُكتب بعد')
+    // ‏والمنشورُ بشكل منصّته، وأزرارُ الصورة على بطاقته، ولا «ثبّت»: الاعتمادُ يجدول (D-327)
+    expect(html).toContain('class="np np-li')
+    expect(html).toContain('action="/panel/media/generate"')
+    expect(html).not.toContain('action="/panel/plan/pin"')
+    expect(html).toContain('اعتمد الأسبوع (1)')
   })
 
   it('اعتمد · أخّر · احذف — والبصمةُ تردّ فعلًا من صفحةٍ قديمة', async () => {
     const { cookie, csrf } = await session()
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
-    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    // ‏«اعتمد» يجدول في موعد بنده (D-327) — ومعه ما كان معتمَدًا بلا موعد، والإصدارُ يُحفظ ويُختم
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-01-04 07:00:00' })
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
+    expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 2 }])
+    expect((db.raw.prepare("SELECT locked_at FROM plans WHERE id = 'pl1'").get() as { locked_at: string | null }).locked_at).not.toBeNull()
+    // ‏و«تراجَع»: يُسحب الموعدُ وتعود مسوّدةً
+    await app.request('/panel/plan/review/undo', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft', scheduled_at: null })
     await app.request('/panel/plan/review/delay', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '2', key: keyOf(html, 2), days: '1' }), headers: { Cookie: cookie } }, env)
     const plan = JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: { day: string }[] }
     expect(plan.items[2]!.day).toBe('2099-01-07')
@@ -91,9 +102,51 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(after).toContain('عُدّلت بعد التثبيت · الإصدار 2 غير مثبَّت')
     expect(after).toContain('الإصدار 1 — ثُبّت')
-    // ‏ومنشورٌ مجدولٌ لا يُحذف من المراجعة
+    // ‏و«أزِل» على مجدول (D-327): يُسحب موعدُه ويُرفض ويخرج بندُه — وما أُرسل للنشر لا يُزال
+    db.raw.exec("UPDATE posts SET dispatched_at = datetime('now') WHERE id = 'p2'")
     await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(after, 1) }), headers: { Cookie: cookie } }, env)
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
+    db.raw.exec("UPDATE posts SET dispatched_at = NULL WHERE id = 'p2'")
+    await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '1', key: keyOf(after, 1) }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'rejected', scheduled_at: null })
+    expect((JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: unknown[] }).items).toHaveLength(2)
+  })
+
+  it('ما اعتُمد بعد التثبيت يُجدوَل (D-327) — كان يبقى معتمَدًا بلا موعدٍ إلى الأبد', async () => {
+    const { cookie, csrf } = await session()
+    await app.request('/panel/plan/pin', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft' })
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    const res = await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1', w: '1' }), headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review?w=1#c-0')
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
+    // ‏والإصدارُ الواحدُ صفٌّ واحدٌ بعدّاده
+    expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 2 }])
+    const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(after).toContain('action="/panel/plan/review/undo"')
+    expect(after).toContain('2 مجدولةً من 3')
+  })
+
+  it('«اعتمد الخطّة كاملة» من شاشة الخطّة: تُعتمَد وتُجدوَل وتعود إليها', async () => {
+    const { cookie, csrf } = await session()
+    const res = await app.request('/panel/plan/approve-all', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', back: 'review' }), headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    expect(db.raw.prepare("SELECT id, status FROM posts ORDER BY id").all()).toEqual([{ id: 'p1', status: 'queued' }, { id: 'p2', status: 'queued' }])
+    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '1 اعتُمدت · 0 تعثّرت · 2 جُدولت' })
+  })
+
+  it('والنظامُ موقوف: يُعتمَد ولا يُجدوَل ويُقال، ثمّ «جدوِل» على البطاقة بعد رفع الإيقاف', async () => {
+    const { cookie, csrf } = await session()
+    db.raw.exec("DELETE FROM settings WHERE key = 'paused'; INSERT INTO settings (key, value) VALUES ('paused', 'true')")
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    const held = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(held).toContain('موقوفٌ مؤقّتًا')
+    expect(held).toContain('معتمَدة بلا موعد')
+    db.raw.exec("UPDATE settings SET value = 'false' WHERE key = 'paused'")
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(held, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
   })
 
   it('الجملة: اعتمادُ المحدَّد، والحذفُ من الآخر إلى الأوّل فلا يتبدّل فهرسٌ', async () => {
@@ -103,7 +156,8 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const approve = form({ _csrf: csrf, id: 'pl1', do: 'approve' })
     approve.append('sel', sel(0, 'p1'))
     await app.request('/panel/plan/review/bulk', { method: 'POST', body: approve, headers: { Cookie: cookie } }, env)
-    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+    // ‏والمعتمَدُ بالجملة يُجدوَل (D-327)، و«أزِلها» يسحب موعدَه ويرفضه
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
     const drop = form({ _csrf: csrf, id: 'pl1', do: 'drop' })
     drop.append('sel', sel(0, 'p1')); drop.append('sel', sel(2, ''))
     await app.request('/panel/plan/review/bulk', { method: 'POST', body: drop, headers: { Cookie: cookie } }, env)
@@ -119,6 +173,114 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(res.headers.get('Location')).toBe('/panel/plan/new')
     const wizard = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
     expect(wizard).toContain('name="then" value="review"')
+  })
+})
+
+/**
+ * **منشوران في اليوم على المنصّة نفسِها من المصدر نفسِه** (D-329): البندُ يطابق مسوّدتَه بمعرّفه لا بمصدره ومنصّته، ولكلّ
+ * منصّةٍ صورتُها — و«ابدأ» يرسل لكلّ بندٍ معرّفَه وزاويتَه ونوعَ صورة منصّته.
+ */
+describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-329)', () => {
+  beforeEach(() => {
+    db.raw.exec("UPDATE plans SET status = 'superseded'; DELETE FROM posts")
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a2', 'x', 'member', 'e2', 'عمر', 'active')`)
+    const items = [
+      { id: 'aaaaaaaaaa', sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاويةُ الصباح من التقرير', day: '2099-02-01', time: '06:00', why: 'ل' },
+      { id: 'bbbbbbbbbb', sourceId: 's1', platform: 'linkedin', kind: 'text', angle: 'زاويةُ المساء من التقرير', day: '2099-02-01', time: '15:30', why: 'ل' },
+      { id: 'cccccccccc', sourceId: 's1', platform: 'x', kind: 'text', angle: 'جملةٌ واحدةٌ من التقرير', day: '2099-02-01', time: '12:00', why: 'ل' },
+    ]
+    db.raw.prepare(`INSERT INTO plans (id, week_start, plan_json, model, status, span, choices_json) VALUES ('pl2', '2099-02-01', ?, 'm', 'approved', 'week', ?)`)
+      .run(JSON.stringify({ rationale: 'ر', items }), JSON.stringify({ channels: ['linkedin', 'x'], autoImage: true, imageStyle: 'infographic',
+        imageStyles: { linkedin: 'illustration', x: 'none' }, times: { linkedin: ['09:00', '18:30'] }, zone: 'Asia/Riyadh' }))
+    const text = (n: string): string => `نصُّ منشور ${n} كما كُتب من زاويته ليُعتمَد، وفيه ما يكفي من الكلام ليكون منشورًا حقيقيًّا يقرؤه الناس.`
+    const ins = db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, plan_id, source_id, source_refs) VALUES (?, ?, 'text', ?, 'draft', ?, 'pl2', 's1', ?)`)
+    ins.run('q2', 'linkedin', text('المساء'), 'draft:s1:linkedin:h:i:bbbbbbbbbb', JSON.stringify(['s1', 'item:bbbbbbbbbb']))
+    ins.run('q1', 'linkedin', text('الصباح'), 'draft:s1:linkedin:h:i:aaaaaaaaaa', JSON.stringify(['s1', 'item:aaaaaaaaaa']))
+    ins.run('q3', 'x', 'جملةُ X من زاويتها.', 'draft:s1:x:h:i:cccccccccc', JSON.stringify(['s1', 'item:cccccccccc']))
+  })
+
+  it('كلُّ بندٍ ببطاقة مسوّدته، و«اعتمد» على أحدهما يجدوله في موعده وحدَه — والآخرُ ينتظر', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    // ‏ترتيبُ الإدراج عكسُ ترتيب البنود: المطابقةُ بالمعرّف لا بأوّل مسوّدةٍ للمصدر والمنصّة
+    expect(html.indexOf('نصُّ منشور الصباح')).toBeLessThan(html.indexOf('نصُّ منشور المساء'))
+    expect(html.indexOf('id="c-0"')).toBeLessThan(html.indexOf('نصُّ منشور الصباح'))
+    expect(html.indexOf('نصُّ منشور الصباح')).toBeLessThan(html.indexOf('id="c-1"'))
+    // ‏«بلا صورة» لـ X لا تُعَدّ نقصًا، ورسمُ LinkedIn الفنّيُّ يُطلب بنوعه من زرّ البطاقة
+    expect(html).toContain('2 بلا صورة')
+    expect(html).toContain('name="style" value="illustration"')
+    expect(html).toContain('name="style" value="infographic"')
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '1', key: keyOf(html, 1), post: 'q2' }), headers: { Cookie: cookie } }, env)
+    // ‏والوقتُ وقتُ البند (اختاره المالكُ لمنصّته) لا أرجحُ الساعات، فلا يلتقي منشورا اليوم في ساعةٍ واحدة
+    expect(db.raw.prepare('SELECT id, status, scheduled_at FROM posts ORDER BY id').all()).toEqual([
+      { id: 'q1', status: 'draft', scheduled_at: null }, { id: 'q2', status: 'queued', scheduled_at: '2099-02-01 15:30:00' }, { id: 'q3', status: 'draft', scheduled_at: null },
+    ])
+    // ‏و«أزِل» على البند الأوّل يرفض مسوّدتَه هو، لا مسوّدةَ جاره من المصدر نفسِه
+    const fresh = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/drop', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(fresh, 0) }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT id, status FROM posts WHERE platform = 'linkedin' ORDER BY id").all()).toEqual([{ id: 'q1', status: 'rejected' }, { id: 'q2', status: 'queued' }])
+  })
+
+  it('«ابدأ» يرسل لكلّ بندٍ معرّفَه وزاويتَه وصورةَ منصّته — وبندا المصدر الواحد رسالتان لا واحدة', async () => {
+    const sent: { draft: Record<string, unknown> }[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: { draft: Record<string, unknown> } }[]) { sent.push(...b.map((x) => x.body)) } }
+    const { cookie, csrf } = await session()
+    await app.request('/panel/plan/start', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2' }), headers: { Cookie: cookie } }, env)
+    expect(sent.map((m) => [m.draft['platform'], m.draft['itemId'], m.draft['angle'], m.draft['autoImage'], m.draft['imageStyle']])).toEqual([
+      ['linkedin', 'aaaaaaaaaa', 'زاويةُ الصباح من التقرير', true, 'illustration'],
+      ['linkedin', 'bbbbbbbbbb', 'زاويةُ المساء من التقرير', true, 'illustration'],
+      ['x', 'cccccccccc', 'جملةٌ واحدةٌ من التقرير', false, 'infographic'],
+    ])
+  })
+
+  it('لوحةُ الشهر بمصغَّراتها، ولوحُ البطاقة جزءُ صفحةٍ بنماذجها وCSRF — ورقمٌ لا بندَ له 404 (D-330)', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('id="rv-root"')
+    expect(html).toContain('class="rv-cal is-board"')
+    expect(html).toMatch(/<a class="rv-mini" href="\?w=1#c-0" data-sheet="0" data-st="wait" draggable="true" data-move="0" data-key="aaaaaaaaaa\|linkedin\|2099-02-01\|06:00">/)
+    expect(html).toContain('<dialog class="rv-sheet" id="rv-sheet"')
+    const card = await app.request('/panel/plan/review/card?i=1&w=1', { headers: { Cookie: cookie } }, env)
+    expect(card.status).toBe(200)
+    const sheet = await card.text()
+    expect(sheet).not.toContain('<html')
+    for (const s of ['نصُّ منشور المساء', 'action="/panel/plan/review/text"', 'action="/panel/plan/review/move"', 'name="day" value="2099-02-01"', 'name="time" value="18:30"',
+      'action="/panel/plan/review/approve"', 'data-sheet="2"', `name="_csrf" value="${csrf}"`]) expect(sheet).toContain(s)
+    // ‏والسابقُ بترتيب الموعد لا بترتيب البنود: قبل منشور المساء منشورُ X عند الظهر، ولا تاليَ له في يومه
+    expect(sheet).not.toContain('data-sheet="0"')
+    expect((await app.request('/panel/plan/review/card?i=9', { headers: { Cookie: cookie } }, env)).status).toBe(404)
+    expect((await app.request('/panel/plan/review/card?i=1', {}, env)).status).toBe(401)
+  })
+
+  it('«احفظ النصّ» يكتب ولا يعتمد، و«انقل» بيومٍ وساعةٍ بتوقيت المالك — ومجدولٌ يتحرّك موعدُه، وخارجُ المدى يُردّ (D-330)', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    const text = 'نصٌّ كتبه المالكُ في لوح البطاقة بدل ما كتبه النموذج، وفيه ما يكفي ليكون منشورًا يُقرأ ويُعتمد.'
+    await app.request('/panel/plan/review/text', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), post: 'q1', text }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT text, status FROM posts WHERE id = 'q1'").get()).toEqual({ text, status: 'draft' })
+    // ‏بندٌ مجدول يُنقل: 2099-02-03 الساعة 10:15 بتوقيت الرياض = 07:15 بـ UTC
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), post: 'q1' }), headers: { Cookie: cookie } }, env)
+    const moved = await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), day: '2099-02-03', time: '10:15', w: '1' }), headers: { Cookie: cookie } }, env)
+    expect(moved.headers.get('Location')).toBe('/panel/plan/review?w=1')
+    const items = (): { day: string; time: string }[] => (JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl2'").get() as { plan_json: string }).plan_json) as { items: { day: string; time: string }[] }).items
+    expect(items()[0]).toMatchObject({ day: '2099-02-03', time: '07:15' })
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'q1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-02-03 07:15:00' })
+    // ‏والسحبُ يرسل اليومَ وحدَه: الساعةُ تبقى كما هي بتوقيت المالك
+    const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '2', key: keyOf(after, 2), day: '2099-02-05' }), headers: { Cookie: cookie } }, env)
+    expect(items()[2]).toMatchObject({ day: '2099-02-05', time: '12:00' })
+    // ‏وخارجُ المدى يُردّ ولا يتبدّل شيء
+    const last = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '2', key: keyOf(last, 2), day: '2099-03-01' }), headers: { Cookie: cookie } }, env)
+    expect(items()[2]).toMatchObject({ day: '2099-02-05' })
+  })
+
+  it('المعالجُ يحمل لكلّ منصّةٍ إيقاعَها حتّى ثلاثٍ في اليوم وأوقاتَها وصورتَها', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['name="cadence_linkedin" value="14"', 'name="cadence_x" value="21"', 'name="time_linkedin" value="09:00"', 'name="time_x" value="18:30"',
+      'name="image_linkedin"', '<option value="illustration">رسمٌ فنّيّ</option>', '<option value="none">بلا صورة</option>']) expect(html).toContain(s)
+    expect((html.match(/name="time_linkedin"/g) ?? []).length).toBe(3)
   })
 })
 
@@ -193,12 +355,12 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
 })
 
 describe('«الخطّة» وجهةٌ واحدة (D-289)', () => {
-  it('تفتح ما يناسب الحال: المراجعة لمسوّدة، والعرض لمثبَّتة، و«خطّة جديدة» بلا خطّة', async () => {
+  it('تفتح شاشةَ الخطّة مسوّدةً ومثبَّتةً (D-327: فيها الاعتماد)، و«خطّة جديدة» بلا خطّة', async () => {
     const { cookie } = await session()
     const go = async () => (await app.request('/panel/plan', { headers: { Cookie: cookie } }, env)).headers.get('Location')
     expect(await go()).toBe('/panel/plan/review')
     db.raw.exec("UPDATE plans SET locked_at = datetime('now')")
-    expect(await go()).toBe('/panel/plan/view')
+    expect(await go()).toBe('/panel/plan/review')
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     expect(await go()).toBe('/panel/plan/new')
   })

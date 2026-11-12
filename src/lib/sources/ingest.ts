@@ -47,6 +47,9 @@ const EXT_MIME: Readonly<Record<string, string>> = {
   md: 'text/markdown',
   html: 'text/html',
   htm: 'text/html',
+  // ‏ملفُّ ترجمة المقطع (D-327): نصُّ ما قيل فيه — يُقرأ نصًّا بعد نزع أرقامه ومواقيته
+  srt: 'text/plain',
+  vtt: 'text/plain',
 }
 /** ما يُقرأ نصًّا كما هو، بلا تحويل. */
 const PLAIN = new Set(['text/plain', 'text/markdown', 'text/csv'])
@@ -106,6 +109,20 @@ export function cleanConverted(text: string): string {
     .trim()
 }
 
+/**
+ * ملفُّ ترجمةٍ (SRT أو WebVTT) نصًّا يُقرأ (D-327): بلا رأسٍ ولا أرقامِ مقاطعَ ولا مواقيتَ ولا وسوم، والسطرُ المكرَّرُ
+ * (ترجمةٌ متدحرجةٌ تعيد آخرَ سطرٍ) مرّةً واحدة.
+ */
+export function cleanCaptions(raw: string): string {
+  const out: string[] = []
+  for (const line of raw.replace(/\r/g, '').split('\n')) {
+    const t = line.replace(/<[^>]+>/g, '').trim()
+    if (t === '' || t === 'WEBVTT' || /^\d+$/.test(t) || /-->/.test(t) || /^(?:NOTE|STYLE|Kind:|Language:)/.test(t)) continue
+    if (out[out.length - 1] !== t) out.push(t)
+  }
+  return out.join('\n')
+}
+
 /** المحارفُ التي تحمل معنًى — بلا علامات Markdown ولا فراغ. */
 function meaningful(text: string): number {
   return text.replace(/[#*_\u0060>\-|\s]/g, '').length
@@ -114,7 +131,8 @@ function meaningful(text: string): number {
 async function convert(deps: IngestDeps, name: string, bytes: Uint8Array, mime: string): Promise<string | { error: string }> {
   if (PLAIN.has(mime)) {
     try {
-      return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes)
+      const plain = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes)
+      return /\.(?:srt|vtt)$/i.test(name) ? cleanCaptions(plain) : plain
     } catch {
       return { error: 'الملفّ ليس UTF-8 — احفظه بترميز UTF-8 ثمّ ارفعه.' }
     }
@@ -299,7 +317,7 @@ export const MAX_LINK_HOPS = 5
  * نفسِها، وخمسُ قفزاتٍ على الأكثر. **وما يبقى**: Workers لا يحلّ الاسمَ قبل النداء، فاسمٌ عامٌّ يشير سجلُّه إلى عنوانٍ
  * داخليٍّ لا يُرى هنا (`net/ipGuard.ts`).
  */
-async function followLink(deps: IngestDeps, first: URL): Promise<Response | string> {
+async function followLink(deps: IngestDeps, first: URL, extra: Readonly<Record<string, string>> = {}): Promise<Response | string> {
   const call = withTimeout(deps.fetchImpl ?? fetch, 30_000)
   let target = first
   for (let hop = 0; hop <= MAX_LINK_HOPS; hop += 1) {
@@ -307,7 +325,7 @@ async function followLink(deps: IngestDeps, first: URL): Promise<Response | stri
     try {
       response = await call(target.toString(), {
         redirect: 'manual',
-        headers: { Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8', 'User-Agent': 'Sada/1.0 (content reader)' },
+        headers: { Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8', 'User-Agent': 'Sada/1.0 (content reader)', ...extra },
       })
     } catch {
       return 'تعذّر الوصول إلى الصفحة — تحقّق من الرابط أو جرّب بعد قليل.'
@@ -329,6 +347,163 @@ async function followLink(deps: IngestDeps, first: URL): Promise<Response | stri
   return `الصفحةُ تحوِّل أكثرَ من ${MAX_LINK_HOPS} مرّات — الصق رابطَ المقال نفسِه (خمس قفزاتٍ على الأكثر).`
 }
 
+/** نصُّ صفحةٍ HTML — بـ Workers AI إن رُبط، وإلّا ما بين الوسوم. */
+async function htmlText(deps: IngestDeps, bytes: Uint8Array, html: string): Promise<string> {
+  if (deps.toMarkdown === undefined) return stripHtml(html)
+  const out = await convert(deps, 'page.html', bytes, 'text/html')
+  return typeof out === 'string' ? out : stripHtml(html)
+}
+
+// ── رابطُ موقعٍ كامل (D-327) ──────────────────────────────────────────
+
+/** كم صفحةً داخليّةً تُقرأ مع الرئيسيّة — أربعٌ تكفي «من نحن» و«خدماتنا» وأختيهما، وكلُّ صفحةٍ نداءٌ يُنتظَر. */
+export const MAX_SITE_PAGES = 4
+
+/** ما يدلّ على صفحةٍ تعرّف بالجهة وما تقدّمه — يُقدَّم على غيره. */
+const SITE_HINTS = /about|who-we-are|services|solutions|products|programs|projects|work|impact|vision|mission|story|عن|من-نحن|نحن|خدمات|حلول|منتجات|برامج|مشاريع|رؤية|رسالة|أثر/i
+/** ما لا يحمل محتوى يُبنى عليه. */
+const SITE_SKIP = /login|signin|sign-in|signup|register|cart|checkout|account|privacy|terms|cookie|contact|wp-admin|feed|tag\/|category\/|\.(?:png|jpe?g|gif|svg|webp|css|js|zip|mp4|mp3)$|تسجيل|دخول|سلة|خصوصية|شروط|اتصل/i
+
+/**
+ * روابطُ الرئيسيّة الداخليّة التي تستحقّ القراءة: المضيفُ نفسُه، ومسارٌ قصير (جزءٌ أو جزءان)، بلا مكرَّرٍ ولا ما في `SITE_SKIP`.
+ * وما يطابق `SITE_HINTS` أوّلًا، ثمّ بترتيب ورودها في الصفحة (القائمةُ العليا قبل التذييل).
+ */
+export function siteLinks(html: string, home: URL, cap = MAX_SITE_PAGES): URL[] {
+  const seen = new Set<string>([home.pathname.replace(/\/+$/, '')])
+  const found: { url: URL; hint: boolean; at: number }[] = []
+  let at = 0
+  for (const m of html.matchAll(/<a\b[^>]*\bhref=["']([^"'#]+)["']/gi)) {
+    at += 1
+    let url: URL
+    try { url = new URL(m[1]!.trim(), home) } catch { continue }
+    if (url.protocol !== 'https:' || url.hostname !== home.hostname) continue
+    url.hash = ''
+    url.search = ''
+    const path = url.pathname.replace(/\/+$/, '')
+    let readable = path
+    try { readable = decodeURIComponent(path) } catch { /* مسارٌ بترميزٍ فاسد يُقرأ كما هو */ }
+    if (path === '' || seen.has(path) || path.split('/').length > 3 || SITE_SKIP.test(readable)) continue
+    seen.add(path)
+    found.push({ url, hint: SITE_HINTS.test(readable), at })
+  }
+  return found.sort((a, b) => Number(b.hint) - Number(a.hint) || a.at - b.at).slice(0, cap).map((f) => f.url)
+}
+
+/**
+ * **رابطُ الموقع يُقرأ موقعًا لا صفحة** (D-327): الرئيسيّةُ وحدَها شعارٌ وعناوين، وما يُبنى عليه في «من نحن» و«خدماتنا».
+ * فحين يكون الرابطُ جذرَ الموقع تُقرأ معه أربعُ صفحاتٍ داخليّةٍ على الأكثر، كلٌّ بحرّاس الرابط نفسِها (`followLink`)، وتُضمّ
+ * إلى نصّ المصدر تحت عناوينها. **وصفحةٌ تعذّرت لا تُسقط المصدر**: يُبنى على ما قُرئ.
+ */
+async function siteExtras(deps: IngestDeps, home: URL, html: string): Promise<string> {
+  const parts: string[] = []
+  for (const link of siteLinks(html, home)) {
+    const checked = parseLink(link.toString())
+    if (typeof checked === 'string') continue
+    const response = await followLink(deps, checked).catch(() => null)
+    if (response === null || typeof response === 'string' || !response.ok) continue
+    const type = (response.headers.get('Content-Type') ?? '').split(';')[0]!.trim().toLowerCase()
+    if (type !== 'text/html' && type !== 'application/xhtml+xml' && type !== '') continue
+    const bytes = await readCapped(response, MAX_PAGE_BYTES).catch(() => null)
+    if (bytes === null) continue
+    const page = new TextDecoder().decode(bytes)
+    const text = await htmlText(deps, bytes, page)
+    if (meaningful(text) < THIN_TEXT) continue
+    parts.push(`## ${pageTitle(page) ?? link.pathname}\n\n${text}`)
+  }
+  return parts.join('\n\n')
+}
+
+// ── رابطُ مقطع (D-327) ────────────────────────────────────────────────
+
+/** معرّفُ مقطع YouTube من رابطه: `watch?v=` · `youtu.be/` · `shorts/` · `live/` · `embed/` — وما سواها `null`. */
+export function videoId(url: URL): string | null {
+  const host = url.hostname.toLowerCase().replace(/^(?:www|m|music)\./, '')
+  let id: string | null = null
+  if (host === 'youtu.be') id = url.pathname.split('/')[1] ?? null
+  else if (host === 'youtube.com') {
+    const seg = url.pathname.split('/')
+    id = url.pathname === '/watch' ? url.searchParams.get('v') : ['shorts', 'live', 'embed'].includes(seg[1] ?? '') ? seg[2] ?? null : null
+  }
+  return id !== null && /^[A-Za-z0-9_-]{6,20}$/.test(id) ? id : null
+}
+
+/** سلسلةُ JSON من داخل صفحة (`"key":"…"`) بقيمتها المفكوكة. */
+function jsonString(html: string, key: string): string | null {
+  const m = new RegExp(`"${key}":"((?:[^"\\\\]|\\\\.)*)"`).exec(html)
+  if (m === null) return null
+  try { return JSON.parse(`"${m[1]!}"`) as string } catch { return null }
+}
+
+const decodeEntities = (t: string): string => t
+  .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+
+/** نصُّ مسار الترجمة: JSON (`fmt=json3`) أو XML — وما لم يُقرأ فارغ. */
+export function captionText(body: string): string {
+  const lines: string[] = []
+  try {
+    const parsed = JSON.parse(body) as { events?: { segs?: { utf8?: string }[] }[] }
+    for (const e of parsed.events ?? []) {
+      const t = (e.segs ?? []).map((x) => x.utf8 ?? '').join('').replace(/\s+/g, ' ').trim()
+      if (t !== '' && lines[lines.length - 1] !== t) lines.push(t)
+    }
+  } catch {
+    for (const m of body.matchAll(/<(?:text|p)\b[^>]*>([\s\S]*?)<\/(?:text|p)>/g)) {
+      const t = decodeEntities(decodeEntities(m[1]!.replace(/<[^>]+>/g, ''))).replace(/\s+/g, ' ').trim()
+      if (t !== '' && lines[lines.length - 1] !== t) lines.push(t)
+    }
+  }
+  return lines.join('\n')
+}
+
+/** متصفّحٌ عاديّ: صفحةُ المقطع تُرجع لقارئٍ آليٍّ هيكلًا بلا بياناته. */
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+  'Accept-Language': 'ar,en;q=0.8',
+} as const
+
+/**
+ * **رابطُ مقطعٍ يُقرأ نصًّا** (D-327): عنوانُه ووصفُه من صفحته، ونصُّ ما قيل فيه من مسار الترجمة إن أتاحه صاحبُه (العربيّةُ
+ * أوّلًا، ثمّ المكتوبةُ باليد قبل الآليّة). **بلا نداءٍ مدفوع**: لا يُنزَّل المقطعُ ولا يُفرَّغ صوتُه. فمقطعٌ بلا ترجمةٍ ولا وصفٍ
+ * كافٍ يُردّ بما يفعله المالك: يرفع ملفَّ ترجمته (srt · vtt) أو نصَّه.
+ */
+async function videoText(deps: IngestDeps, id: string): Promise<{ text: string; title: string | null } | string> {
+  const none = 'لا نصَّ مكتوبًا متاحًا لهذا المقطع (بلا ترجمةٍ ولا وصفٍ كافٍ) — ارفع ملفَّ ترجمته (srt أو vtt) أو نصَّه في ملفّ.'
+  const page = await followLink(deps, new URL(`https://www.youtube.com/watch?v=${id}&hl=ar`), BROWSER_HEADERS)
+  if (typeof page === 'string') return page
+  if (!page.ok) return `صفحةُ المقطع ردّت ${page.status} — تحقّق من الرابط، أو ارفع ملفَّ ترجمته (srt أو vtt).`
+  const bytes = await readCapped(page, MAX_PAGE_BYTES)
+  if (bytes === null) return none
+  const html = new TextDecoder().decode(bytes)
+  const title = jsonString(html, 'title') ?? pageTitle(html)?.replace(/\s*-\s*YouTube\s*$/, '') ?? null
+  const description = jsonString(html, 'shortDescription') ?? ''
+
+  let spoken = ''
+  const tracks = /"captionTracks":(\[[\s\S]*?\])/.exec(html)?.[1]
+  if (tracks !== undefined) {
+    try {
+      const list = (JSON.parse(tracks) as { baseUrl?: string; languageCode?: string; kind?: string }[]).filter((t) => typeof t.baseUrl === 'string')
+      const rank = (t: { languageCode?: string; kind?: string }): number => (t.languageCode?.startsWith('ar') === true ? 0 : 2) + (t.kind === 'asr' ? 1 : 0)
+      const best = [...list].sort((a, b) => rank(a) - rank(b))[0]
+      // ‏عنوانُ المسار من الصفحة: يُفحص كأيّ رابط، ولا يُتبَع إلى غير مضيف المقاطع
+      const track = best === undefined ? 'no' : parseLink(best.baseUrl!)
+      if (typeof track !== 'string' && /(?:^|\.)youtube\.com$/.test(track.hostname)) {
+        track.searchParams.set('fmt', 'json3')
+        const got = await followLink(deps, track, BROWSER_HEADERS)
+        if (typeof got !== 'string' && got.ok) {
+          const body = await readCapped(got, MAX_PAGE_BYTES)
+          if (body !== null) spoken = captionText(new TextDecoder().decode(body))
+        }
+      }
+    } catch {
+      // ‏قائمةُ مساراتٍ لا تُقرأ: يُبنى على الوصف إن كفى
+    }
+  }
+  if (meaningful(spoken) + meaningful(description) < THIN_TEXT) return none
+  const text = [`# ${title ?? 'مقطع'}`, description.trim() === '' ? '' : `## وصفُ المقطع\n\n${description.trim()}`, spoken === '' ? '' : `## ما قيل في المقطع\n\n${spoken}`]
+    .filter((x) => x !== '').join('\n\n')
+  return { text, title }
+}
+
 /**
  * رابطُ صفحة. **والرابطُ نفسُه مرّتين مصدرٌ واحد**: يُعاد قراءتُه، فإن تغيّر نصُّه حُدّث الصفُّ وبصمتُه فيُعاد تحليلُه،
  * وإن لم يتغيّر قيل «موجود» ولم يُكتب شيء.
@@ -336,6 +511,13 @@ async function followLink(deps: IngestDeps, first: URL): Promise<Response | stri
 export async function ingestLink(deps: IngestDeps, org: string, raw: string): Promise<IngestOutcome> {
   const url = parseLink(raw)
   if (typeof url === 'string') return reject(url)
+  // ‏رابطُ مقطع (D-327): يُقرأ عنوانُه ووصفُه وما قيل فيه، لا صفحةُ المشغّل
+  const clip = videoId(url)
+  if (clip !== null) {
+    const video = await videoText(deps, clip)
+    if (typeof video === 'string') return reject(video)
+    return keepLink(deps, org, new URL(`https://www.youtube.com/watch?v=${clip}`), video.text, video.title ?? `مقطع ${clip}`, 'text/html')
+  }
   const fetched = await followLink(deps, url)
   if (typeof fetched === 'string') return reject(fetched)
   const response = fetched
@@ -361,11 +543,11 @@ export async function ingestLink(deps: IngestDeps, org: string, raw: string): Pr
   } else if (type === 'text/html' || type === 'application/xhtml+xml' || type === '') {
     const html = new TextDecoder().decode(bytes)
     title = pageTitle(html)
-    if (deps.toMarkdown !== undefined) {
-      const out = await convert(deps, 'page.html', bytes, 'text/html')
-      text = typeof out === 'string' ? out : stripHtml(html)
-    } else {
-      text = stripHtml(html)
+    text = await htmlText(deps, bytes, html)
+    // ‏جذرُ الموقع (D-327): تُقرأ معه صفحاتُه التعريفيّة فيُبنى على الموقع لا على رئيسيّته وحدَها
+    if (url.pathname.replace(/\/+$/, '') === '' && url.search === '') {
+      const more = await siteExtras(deps, url, html).catch(() => '')
+      if (more !== '') text = `## ${title ?? url.hostname}\n\n${text}\n\n${more}`
     }
   } else {
     return reject(`نوعُ المحتوى ${type} لا يُقرأ — الرابطُ صفحةٌ أو PDF.`)
@@ -381,9 +563,15 @@ export async function ingestLink(deps: IngestDeps, org: string, raw: string): Pr
       ? 'الصفحةُ بلا نصٍّ كافٍ — قد تُرسَم بـ JavaScript (يحتاج CF_BROWSER_TOKEN) أو تكون خلف تسجيل دخول.'
       : 'الصفحةُ بلا نصٍّ كافٍ — قد تكون خلف تسجيل دخول. انسخ نصَّها في ملفٍّ وارفعه.')
   }
+  return keepLink(deps, org, url, text, title ?? `${url.hostname}${url.pathname === '/' ? '' : url.pathname}`, mime)
+}
+
+/** يحفظ نصَّ الرابط مصدرًا — جديدًا، أو محدَّثًا إن تغيّر نصُّه، أو «موجود» إن لم يتغيّر. */
+async function keepLink(deps: IngestDeps, org: string, url: URL, raw: string, title: string, mime: string): Promise<IngestOutcome> {
+  let text = raw
   if (new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) text = text.slice(0, MAX_TEXT_BYTES / 4)
 
-  const name = (title ?? `${url.hostname}${url.pathname === '/' ? '' : url.pathname}`).slice(0, 160)
+  const name = title.slice(0, 160)
   const ref = (await sha256(url.toString())).slice(0, 24)
   const hash = await sha256(text)
   const prior = await deps.db

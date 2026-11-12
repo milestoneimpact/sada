@@ -732,14 +732,15 @@ const R12: Journey = {
 }
 
 /**
- * ر-13 · مراجعةُ الخطّة: اعتمد بندًا ثمّ «ثبّت الخطّة» (D-293). البذرةُ خطّةُ شهرٍ ببندين ومسوّدتيهما تنتظران
- * القرار، والنجاحُ الإصدارُ ١ في `plan_versions` والمعتمَدُ مجدولًا و`locked_at` مختومًا.
+ * ر-13 · شاشةُ الخطّة: «اعتمد» على بندٍ يجدوله (D-293 · D-327). البذرةُ خطّةُ شهرٍ ببندين ومسوّدتيهما تنتظران
+ * القرار، والنجاحُ الإصدارُ ١ في `plan_versions` والمعتمَدُ مجدولًا و`locked_at` مختومًا — **بلا «ثبّت الخطّة»**: كانت خطوةً
+ * ثانيةً بحوار تأكيدها، وما اعتُمد بعدها لا يُجدوَل.
  */
 let r13Plan = ''
 const R13: Journey = {
   id: 'R-13',
-  title: 'مراجعة الخطّة: اعتمد بندًا ثمّ «ثبّت الخطّة»',
-  plan: { target: '3 = البابُ وقرارُ البند والتثبيت — التراجعُ بدل التأكيد (D-303 · D-326)' },
+  title: 'شاشة الخطّة: «اعتمد» على بندٍ يجدوله في موعده',
+  plan: { target: '2 = البابُ و«اعتمد» — الاعتمادُ يجدول، و«تراجَع» على البطاقة بدل التأكيد (D-327)' },
   async prepare(stack) {
     const { doc, slides } = stack.seeded.sources
     const day = (plus: number): string => { const d = new Date(); d.setUTCDate(d.getUTCDate() + plus); return d.toISOString().slice(0, 10) }
@@ -765,15 +766,41 @@ const R13: Journey = {
   async run({ page, m, stack }) {
     await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (2)» في بطاقة «خطّةُ الشهر»')
     await m.tap(visible(page.locator('form[action="/panel/plan/review/approve"] button[type="submit"]')).first(), '«اعتمد» على البند الأوّل')
-    // ‏والتأكيدُ حوارٌ في الصفحة بفعله (D-323) — يُعَدّ خطوةً بعد هذه في المقياس. وكان قبلها لا يظهر أصلًا: سؤالُ النموذج
-    // ‏في سكربت اللوحة وحدَه، وصفحةُ المراجعة لا تحمله، فكانت «ثبّت الخطّة» تُرسَل بلا سؤال
-    await m.tap(button(page, 'ثبّت الخطّة'), '«ثبّت الخطّة»', { key: true })
+    // ‏ولا «ثبّت الخطّة» بعدها (D-327): الاعتمادُ نفسُه يجدول ويحفظ الإصدار
+    await page.waitForURL(/\/panel\/plan\/review/)
     const versions = q<{ n: number }>(stack, 'SELECT COUNT(*) AS n FROM plan_versions WHERE plan_id = ? AND version = 1', r13Plan)?.n ?? 0
     const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
     const locked = q<{ locked_at: string | null }>(stack, 'SELECT locked_at FROM plans WHERE id = ?', r13Plan)?.locked_at ?? null
     return {
       success: versions === 1 && queued === 1 && locked !== null,
       verified: `الإصدار 1 محفوظ: ${versions} · مجدول من الخطّة: ${queued} من بندٍ معتمَد · ثُبّتت ${locked === null ? 'لا' : 'نعم'}`,
+    }
+  },
+}
+
+/**
+ * ‏**ر-16 · لوحُ البطاقة** (D-330، بقرار D-328): من مصغَّرةٍ في لوحة الشهر يُفتح اللوح، ويُعتمَد المنشورُ منه **بلا إعادة تحميل**.
+ * ‏البذرةُ بذرةُ ر-13، والنجاحُ من القاعدة (المنشورُ مجدول) ومن الصفحة (اللوحُ يعرض «تراجَع عن الاعتماد»، ومصغَّرتُه بحال المجدول).
+ * ‏وهو اختبارُ السكربت في متصفّحٍ حيّ: ما لا يراه اختبارٌ يرسل نموذجًا ويقرأ صفحة.
+ */
+const R16: Journey = {
+  id: 'R-16',
+  title: 'لوح البطاقة: من مصغَّرةٍ في لوحة الشهر إلى «اعتمد وجدوِل» بلا إعادة تحميل',
+  plan: { target: '3 = البابُ والمصغَّرةُ و«اعتمد وجدوِل» في اللوح (D-330)' },
+  prepare: (stack) => R13.prepare!(stack),
+  async run({ page, m, stack }) {
+    await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (2)» في بطاقة «خطّةُ الشهر»')
+    // ‏على العريض مصغَّرةُ اللوحة، وعلى الهاتف (المصغَّراتُ مطويّةٌ هناك) «عدّل» على البطاقة — كلاهما يفتح اللوحَ نفسَه
+    await m.tap(visible(page.locator('.rv-mini[data-sheet], .rv-acts a[data-sheet]')).first(), 'المنشورُ الأوّل: مصغَّرتُه في اللوحة، أو «عدّل» على بطاقته في الهاتف')
+    const sheet = page.locator('#rv-sheet[open]')
+    await sheet.waitFor({ timeout: 8000 })
+    await m.tap(sheet.locator('form[action="/panel/plan/review/approve"] button[type="submit"]'), '«اعتمد وجدوِل» في اللوح', { key: true })
+    await sheet.locator('form[action="/panel/plan/review/undo"]').waitFor({ timeout: 8000 })
+    const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
+    const set = await page.locator('.rv-mini[data-st="set"]').count()
+    return {
+      success: queued === 1 && set === 1,
+      verified: `مجدولٌ من الخطّة: ${queued} · مصغَّراتٌ بحال المجدول: ${set} · اللوحُ يعرض «تراجَع عن الاعتماد»`,
     }
   },
 }
@@ -980,6 +1007,6 @@ const R15: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15]
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16]
 
 export { Blocked }

@@ -54,7 +54,8 @@ jobs:
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # ‏كانت ‏45 والمقيسُ ‏43:16 (D-326)؛ وتشغيلُ #248 أُلغي عند ‏45:04 قبل أن ينتهي — مهلةٌ على دقيقتين من المقيس تُسقط الناجح (D-329)
+    timeout-minutes: 60
     steps:
       # ‏بمعرّف التزامٍ كامل لا بوسمٍ يتحرّك، كما في ci.yml (D-319)
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

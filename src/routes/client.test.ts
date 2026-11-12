@@ -280,7 +280,7 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
       VALUES (?, 'linkedin', 'text', 'نصٌّ يكفي لأن يكون منشورًا يُقرأ ويُعتمد كما كُتب', ?, ?, ?, 's1', ?)`).run(id, status, id, plan, org)
   }
 
-  it('«اعتمد الخطّة كاملةً» يعتمد مسوّداتِ هذه الخطّة لهذا العميل وحدها، ولا يُنشر شيء', async () => {
+  it('«اعتمد الخطّة كاملةً» يعتمد مسوّداتِ هذه الخطّة لهذا العميل وحدها، وبلا حسابٍ مربوطٍ لا يُجدوَل شيء', async () => {
     seedPlan('approved')
     db.raw.exec("INSERT INTO orgs (id, name, kind) VALUES ('org_b', 'عميل', 'agency')")
     post('p1', 'org_owner', 'pl1'); post('p2', 'org_owner', 'pl1'); post('p3', 'org_owner', null); post('p4', 'org_b', 'pl1'); post('p5', 'org_owner', 'pl1', 'rejected')
@@ -295,7 +295,7 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(rows.map((r) => [r.id, r.status])).toEqual([['p1', 'approved'], ['p2', 'approved'], ['p3', 'draft'], ['p4', 'draft'], ['p5', 'rejected']])
     expect(rows.filter((r) => r.status === 'approved').every((r) => r.approved_by !== null && r.approved_at !== null)).toBe(true)
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status IN ('queued', 'published')").get()).toEqual({ n: 0 })
-    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '2 اعتُمدت · 0 تعثّرت' })
+    expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '2 اعتُمدت · 0 تعثّرت · 0 جُدولت' })
     const after = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
     expect(after).toContain('اعتُمدت مسوّدتان من الخطّة كما كُتبت')
     expect(after).toContain('action="/panel/plan/schedule"')
@@ -313,10 +313,12 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     // ‏واللوحةُ تحمل الطريقَ إلى «خطّة جديدة» لا النموذجَ نفسَه (D-283)
     expect(html).toContain('href="/panel/plan/new"')
     expect(html).not.toContain('name="ideas"')
-    // ‏والشاشةُ بأمدائها الثلاثة ويوم بدايتها وأفكارها وصورتها — والشهران يقبلهما الخادمُ ولا يُعرَضان
+    // ‏والشاشةُ بأمدائها الأربعة (D-327: الشهران يُعرَضان بطلب المالك) ويوم بدايتها وأفكارها وصورتها
     const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
     for (const s of ['value="week"', 'value="2weeks"', 'value="month"', 'name="start"', 'name="ideas"', 'name="image_style" value="illustration"', 'name="source" value="all"', 'action="/panel/plan/generate"']) expect(screen).toContain(s)
-    expect(screen).not.toContain('value="2months"')
+    expect(screen).toContain('value="2months"')
+    // ‏والصورةُ مع كلّ منشورٍ افتراضُ المعالج (D-327)
+    expect(screen).toContain('name="image_style" value="infographic" data-cost="0" checked')
     // ‏والمربوطُ وحدَه يُرى: لا خانةَ لمنصّةٍ غيرِ مربوطة ولا لما ليس في الخطّة اليوم
     expect(screen).not.toContain('value="instagram"')
     expect(screen).not.toContain('value="tiktok"')

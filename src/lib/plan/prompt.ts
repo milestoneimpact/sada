@@ -138,8 +138,10 @@ export function systemPrompt(options: PromptOptions = {}): string {
   const cadence = options.cadence ?? {}
   const rhythm = channels.map((c) => {
     const n = Math.max(0, Math.floor(cadence[c] ?? 0))
-    return n > 0 ? `${c}: ${n} في الأسبوع` : `${c}: بلا إيقاعٍ محدَّد`
+    // ‏إيقاعٌ فوق سبعة (D-329): أكثرُ من منشورٍ في اليوم على القناة نفسِها — يُقال بعدده في اليوم
+    return n > 7 ? `${c}: ${n} في الأسبوع (حتّى ${Math.ceil(n / 7)} في اليوم الواحد)` : n > 0 ? `${c}: ${n} في الأسبوع` : `${c}: بلا إيقاعٍ محدَّد`
   })
+  const dense = channels.some((c) => Math.floor(cadence[c] ?? 0) > 7)
   const names = channels.map((c) => `\`${c}\``).join(' أو ')
   return [
     'أنت محرّر محتوًى يخطّط مدًى من الأيّام لحساب مهنيّ واحد.',
@@ -160,6 +162,8 @@ export function systemPrompt(options: PromptOptions = {}): string {
     '',
     '**ولا تكرّر مصدرا في قناة استُعمل فيها**، إلّا أن يكون عالي',
     'الاستحقاق وللزاوية الثانية وجه مختلف حقّا.',
+    // ‏كلُّ بندٍ يُكتب من زاويته وحدها (D-329)، فالمصدرُ الغنيُّ يحمل أكثر من منشورٍ حين يطلب الإيقاعُ ذلك
+    ...(dense ? ['**وحين يزيد الإيقاعُ المطلوب على عدد المصادر** يُعاد المصدرُ بزاويةٍ مختلفةٍ حقًّا في كلّ مرّة:', 'كلُّ بندٍ منشورٌ مستقلٌّ يُكتب من زاويته وحدها، فلا زاويتين متشابهتين.'] : []),
     '',
     '## القنوات وإيقاعها',
     '',
@@ -171,7 +175,9 @@ export function systemPrompt(options: PromptOptions = {}): string {
     '## التوزيع',
     '',
     'باعد بين البنود: يوم فارغ بين منشورين خير من يومين متتاليين.',
-    'ولا تضع منشورين في يوم واحد على القناة نفسها.',
+    dense
+      ? 'وقناةٌ إيقاعُها فوق سبعةٍ في الأسبوع تأخذ أكثر من منشورٍ في اليوم بأوقاتٍ بينها ثلاثُ ساعاتٍ فأكثر؛ وما سواها لا منشورين لها في يوم واحد.'
+      : 'ولا تضع منشورين في يوم واحد على القناة نفسها.',
     'والأوقات بـ UTC، واختر ما بين 05:00 و 15:00 — وهو نهار الخليج.',
     '',
     '## المخرَج',
@@ -274,6 +280,11 @@ export function planSchema(channels: readonly PlanPlatform[] = DEFAULT_CHANNELS,
 export const PLAN_SCHEMA = planSchema()
 
 export interface PlanItem {
+  /**
+   * معرّفُ البند (D-329) — ثابتٌ ما عاش البند، يُكتب في `source_refs` لمسوّدته (`item:<id>`) وفي مفتاحها. به يطابق البندُ
+   * مسوّدتَه، فيصحّ بندان من المصدر نفسِه على المنصّة نفسِها (منشوران في اليوم). وغيابُه خطّةٌ قبل D-329 تُطابَق كما كانت.
+   */
+  readonly id?: string
   readonly sourceId: string
   readonly platform: PlanPlatform
   readonly angle: string
@@ -309,15 +320,41 @@ export interface PlanChoices {
   /** نوعُ الصورة الآليّة (D-285): إنفوجرافيك (الافتراض) أو رسمٌ فنّيّ بمستويَي المسوّدة والنهائيّة. */
   readonly imageStyle: PlanImageStyle
   readonly startDay: string
+  /**
+   * الصورةُ لكلّ منصّة (D-329): رسمٌ فنّيٌّ لـ LinkedIn وإنفوجرافيك لـ X مثلًا، أو بلا صورة. وما لم يُذكر يأخذ العامّ
+   * (`autoImage` · `imageStyle`) — فخطّةٌ قبل D-329 تُقرأ كما كانت.
+   */
+  readonly imageStyles: Readonly<Partial<Record<PlanPlatform, PlanImageChoice>>>
+  /** أوقاتُ النشر لكلّ منصّة بتوقيت المالك (D-329): `HH:MM`، واحدٌ إلى ثلاثة — منشوراتُ اليوم تأخذها بالترتيب. */
+  readonly times: Readonly<Partial<Record<PlanPlatform, readonly string[]>>>
+  /** منطقةُ المالك التي كُتبت بها `times` — و`''` الرياض. */
+  readonly zone: string
 }
 
 export type PlanImageStyle = 'infographic' | 'illustration'
+export type PlanImageChoice = PlanImageStyle | 'none'
+
+export function asImageChoice(v: unknown): PlanImageChoice | null {
+  return v === 'none' || v === 'infographic' || v === 'illustration' ? v : null
+}
+
+/** ما يُرسَم لمنشور هذه المنصّة: اختيارُها إن ذُكر، وإلّا العامّ. */
+export function imageFor(choices: PlanChoices, platform: PlanPlatform): PlanImageChoice {
+  // ‏`?.`: خطّةٌ قُرئت قبل D-329 بلا هذا الحقل تأخذ العامّ ولا تسقط
+  return choices.imageStyles?.[platform] ?? (choices.autoImage ? choices.imageStyle : 'none')
+}
+
+/** `HH:MM` صالحة، حتّى ثلاثٍ بلا مكرَّر، مرتّبةً. */
+export function asTimes(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : []
+  return [...new Set(list.filter((t): t is string => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)))].sort().slice(0, 3)
+}
 
 export function asImageStyle(v: unknown): PlanImageStyle {
   return v === 'illustration' ? 'illustration' : 'infographic'
 }
 
-export const EMPTY_CHOICES: PlanChoices = { channels: [], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: false, imageStyle: 'infographic', startDay: '' }
+export const EMPTY_CHOICES: PlanChoices = { channels: [], cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: false, imageStyle: 'infographic', startDay: '', imageStyles: {}, times: {}, zone: '' }
 
 const IDEA_CAP = 20
 
@@ -335,6 +372,16 @@ export function readChoices(raw: unknown): PlanChoices {
       if (isPlanPlatform(k) && typeof n === 'number' && Number.isFinite(n)) cadence[k] = Math.min(28, Math.max(0, Math.floor(n)))
     }
   }
+  const imageStyles: Partial<Record<PlanPlatform, PlanImageChoice>> = {}
+  const times: Partial<Record<PlanPlatform, readonly string[]>> = {}
+  for (const [k, x] of Object.entries(typeof v.imageStyles === 'object' && v.imageStyles !== null ? v.imageStyles as Record<string, unknown> : {})) {
+    const choice = asImageChoice(x)
+    if (isPlanPlatform(k) && choice !== null) imageStyles[k] = choice
+  }
+  for (const [k, x] of Object.entries(typeof v.times === 'object' && v.times !== null ? v.times as Record<string, unknown> : {})) {
+    const list = asTimes(x)
+    if (isPlanPlatform(k) && list.length > 0) times[k] = list
+  }
   const strings = (x: unknown, cap: number): string[] => (Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string' && s !== '').slice(0, cap) : [])
   return {
     channels: [...new Set(channels)],
@@ -345,6 +392,9 @@ export function readChoices(raw: unknown): PlanChoices {
     autoImage: v.autoImage === true,
     imageStyle: asImageStyle(v.imageStyle),
     startDay: typeof v.startDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.startDay) ? v.startDay : '',
+    imageStyles,
+    times,
+    zone: typeof v.zone === 'string' ? v.zone : '',
   }
 }
 
@@ -455,4 +505,30 @@ export function parsePlan(
     dropped,
     droppedWhy: [...why.entries()].map(([k, n]) => (n === 1 ? k : `${k} ×${n}`)).join('، '),
   }
+}
+
+/**
+ * **أوقاتُ المالك لكلّ منصّة** (D-329): منشوراتُ اليوم على المنصّة تأخذ أوقاتَها بالترتيب (الأوّلُ الأوّلَ، وما زاد يدور)،
+ * محوَّلةً من توقيته إلى UTC. ومنصّةٌ بلا أوقاتٍ تبقى على ما كتبه المخطِّط. ووقتٌ يُخرج البندَ من يومه بـ UTC (فجرُ الرياض)
+ * يُحفظ بيومه الجديد إن بقي في المدى، وإلّا بقي البندُ كما كان.
+ */
+export function applyTimes(
+  items: readonly PlanItem[],
+  times: PlanChoices['times'],
+  toUtc: (day: string, time: string) => { day: string; time: string } | null,
+  inSpan: (day: string) => boolean,
+): PlanItem[] {
+  const seen = new Map<string, number>()
+  return [...items]
+    .sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`))
+    .map((item) => {
+      const list = times[item.platform]
+      if (list === undefined || list.length === 0) return item
+      const slot = `${item.platform}|${item.day}`
+      const n = seen.get(slot) ?? 0
+      seen.set(slot, n + 1)
+      const at = toUtc(item.day, list[n % list.length]!)
+      return at === null || !inSpan(at.day) ? item : { ...item, day: at.day, time: at.time }
+    })
+    .sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`))
 }

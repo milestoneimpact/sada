@@ -127,6 +127,11 @@ export async function draftPost(
   /** مزوّد يغلب التوجيه لهذه الكتابة وحدها (D-244) — مقارنة لا تبديل. */
   provider?: string,
   shape: DraftShape = 'single',
+  /**
+   * بندُ الخطّة الذي تُكتب له (D-329): معرّفُه يدخل المفتاحَ (`:i:<id>`) فمسوّدتان من المصدر نفسِه على المنصّة نفسِها لا تلتقيان،
+   * وزاويتُه تدخل الموجّه فلا تُكتبان نصًّا واحدًا. وغيابُه الكتابةُ من المصدر كما كانت، بمفتاحها كما كان حرفًا.
+   */
+  angle?: { readonly id: string; readonly text: string },
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
   const thread = shape === 'thread' && platform === 'x'
@@ -162,7 +167,7 @@ export async function draftPost(
    */
   // ‏والمسوّدةُ في منظّمة مصدرها (D-277): بها يُسأل عن المفتاح وبها يُكتب الصفّ
   const org = row.org_id ?? 'org_owner'
-  const key = `${draftKey(row.id, platform, hash, provider)}${thread ? ':thread' : ''}`
+  const key = `${draftKey(row.id, platform, hash, provider)}${angle === undefined ? '' : `:i:${angle.id}`}${thread ? ':thread' : ''}`
   const existing = await deps.db
     .prepare('SELECT id, status FROM posts WHERE idempotency_key = ? AND org_id = ?')
     .bind(key, org)
@@ -174,7 +179,7 @@ export async function draftPost(
     org,
     // ‏وصوتُ العميل من موجز منظّمة المصدر (D-257) — وفارغٌ إن لم يُكتب، فالموجّهُ كما كان
     system: systemPrompt(spec, 'source', voiceSection(await readBrief(deps.db, org)), thread),
-    user: userPrompt(brief, thread),
+    user: userPrompt(brief, thread, angle?.text ?? ''),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,
     refId: row.id,

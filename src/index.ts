@@ -491,6 +491,9 @@ export interface PlanDraftMessage {
     readonly imageStyle?: 'infographic' | 'illustration'
     /** ‏بندٌ طُلب سلسلةً على X (D-324) — وغيابُه منشورٌ واحدٌ كما كان. */
     readonly shape?: 'thread'
+    /** ‏معرّفُ بند الخطّة وزاويتُه (D-329): تُكتب المسوّدةُ من الزاوية وتُربط ببندها — وغيابُهما خطّةٌ قبل D-329. */
+    readonly itemId?: string
+    readonly angle?: string
   }
 }
 
@@ -504,6 +507,7 @@ export interface PlanDraftMessage {
 async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Promise<void> {
   const { sourceId, platform, org, idea } = message.body.draft
   const shape = message.body.draft.shape === 'thread' ? 'thread' : 'single'
+  const itemId = /^[0-9a-f]{6,32}$/.test(message.body.draft.itemId ?? '') ? message.body.draft.itemId : undefined
   const secrets = env as unknown as Record<string, string | undefined>
   const deps = { db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: secrets, org }
   // ‏فكرةُ المالك (D-282) تُكتب بباب «اكتب من فكرتك» نفسِه، لا بطريقٍ ثانٍ حول حرّاسه
@@ -511,7 +515,7 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
     ? idea === undefined || idea === ''
       ? { kind: 'failed' as const, reason: 'بندُ فكرةٍ بلا نصّها', retryable: false }
       : await draftFromIdea(deps, idea, platform, shape)
-    : await draftPost(deps, sourceId, platform, undefined, shape)
+    : await draftPost(deps, sourceId, platform, undefined, shape, itemId === undefined ? undefined : { id: itemId, text: message.body.draft.angle ?? '' })
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
   if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)
@@ -520,7 +524,8 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
   const planId = message.body.draft.planId
   if (outcome.kind === 'drafted' && planId !== undefined) {
     // ‏ومسوّدةُ الفكرة تحمل معرّفَ بندها في `source_refs`، فتجدها جدولةُ الخطّة كما تجد مسوّدةَ المصدر
-    const refs = sourceId.startsWith('idea:') ? JSON.stringify([sourceId]) : null
+    // ‏ومعرّفُ البند فيها أيضًا (D-329): به تطابق المراجعةُ والجدولةُ البندَ بمسوّدته حين يتكرّر المصدرُ على المنصّة
+    const refs = itemId !== undefined ? JSON.stringify([sourceId, `item:${itemId}`]) : sourceId.startsWith('idea:') ? JSON.stringify([sourceId]) : null
     await env.DB.prepare('UPDATE posts SET plan_id = ?, source_refs = coalesce(?, source_refs) WHERE id = ? AND org_id = ? AND plan_id IS NULL')
       .bind(planId, refs, outcome.postId, org).run()
       .catch((error: unknown) => console.warn({ job: 'plan-draft-link', post: outcome.postId, failed: String(error) }))
