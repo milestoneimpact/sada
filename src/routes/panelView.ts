@@ -70,6 +70,7 @@ import { emptyState } from './ui/components/empty'
 import { ORG_KIND_LABEL, ORG_KINDS, ORG_NAME_MAX, OWNER_ORG, type OrgRow } from '../lib/tenancy'
 
 import { OWNER_EMAIL } from '../lib/ownerEmail'
+import { taskHref } from '../lib/owner'
 import type { Role } from '../lib/ownerEmail'
 
 export { escapeHtml, injectCsrf, shell }
@@ -1456,7 +1457,7 @@ function settingsPane(d: ShellData & SettingsData): string {
           ${d.slide.missing.includes('key')
             ? (d.slide.missing.includes('account') ? 'مفتاحُ المتصفّح ومعرّفُ الحساب' : 'مفتاحُ المتصفّح')
             : 'معرّفُ الحساب'}،
-          <b>فلا يقع نداءٌ ولا كلفة</b>، وتخرج الصورة بلا عنوان. وخطواتُه في «ما عليك».</span></div>
+          <b>فلا يقع نداءٌ ولا كلفة</b>، وتخرج الصورة بلا عنوان. وخطواتُه في <a class="tap" href="${taskHref('M-19')}">ما عليك</a>.</span></div>
         <details class="setup mt-2"><summary>للمطوّر</summary>
           <p class="hint">${d.slide.missing.includes('key')
             ? '<span class="mono">CF_BROWSER_TOKEN</span> في أسرار Worker، وصلاحيّتُه <span class="mono">Browser Rendering · Edit</span> لا صلاحيّة Workers AI. '

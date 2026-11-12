@@ -89,12 +89,13 @@ describe('سطر «ولّد صورة» — بترتيب generateForPost', () => 
     const noKey = image({ slide: slideGate({ overlay: true, hasBrowserKey: false, hasAccount: false }) })
     expect(noKey.next).toMatchObject({
       key: 'overlay', state: 'now', note: 'بلا مفتاح المتصفّح',
-      action: { label: 'ما عليك', href: '/panel/tasks' },
+      // ‏وM-19 قدرةٌ في «تفتح قدرة» (متابعة D-324): الرابطُ يصل صفحتَها وعنوانَها، لا «ما عليك» التي لم تعد تحملها
+      action: { label: 'ما عليك', href: '/panel/tasks/later#task-t-M-19' },
     })
     expect(noKey.blocked).toBe(false)
 
     const noAccount = image({ slide: slideGate({ overlay: true, hasBrowserKey: true, hasAccount: false }) })
-    expect(noAccount.next).toMatchObject({ state: 'now', note: 'بلا معرّف حساب Cloudflare', action: { href: '/panel/tasks' } })
+    expect(noAccount.next).toMatchObject({ state: 'now', note: 'بلا معرّف حساب Cloudflare', action: { href: '/panel/tasks/later#task-t-M-19' } })
   })
 
   it('والموجز بعد البيئة: المفتاحان حاضران وبلا مزوّد يكتب — «لا مزوّد يصوغ العنوان»', () => {

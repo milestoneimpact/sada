@@ -26,6 +26,7 @@ import { money, parseSqliteUtc, relativeTime } from '../../../lib/format'
 import { zoneNote } from '../../../lib/time/zone'
 import { momentLabel, presetAt } from '../../../lib/time/local'
 import { whyFailed } from '../../../lib/publish/reasons'
+import { taskHref } from '../../../lib/owner'
 import { escapeHtml } from '../escape'
 import { ICON } from '../icons'
 import { containsUrl } from '../../../lib/idempotency'
@@ -87,7 +88,8 @@ function scheduleBlock(d: DraftRow, input: EditorInput): { readonly text: string
   }
   if (input.targets.some((t) => t.platform === d.platform)) return null
   if (input.pageOnly.includes(d.platform)) {
-    return { text: 'الصفحة مربوطة، والنشر باسمها لم يُبن بعد. اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: '/panel/tasks' }
+    // ‏وموافقةُ Community Management مهمّةُ M-03، قدرةٌ في «تفتح قدرة» (متابعة D-324)
+    return { text: 'الصفحة مربوطة، والنشر باسمها لم يُبن بعد. اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: taskHref('M-03') }
   }
   return { text: `لا قناة ${specOf(d.platform).label} مربوطة، ويبقى النصّ حتّى تُربَط.`, label: 'اربط قناة', href: '#channels' }
 }

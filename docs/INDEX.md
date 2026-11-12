@@ -9,7 +9,7 @@
 2. [`HANDOVER.md`](HANDOVER.md) — ما هو صدى، وأين تبدأ، وقبل كلّ دفعة.
 3. [`ROADMAP-3.md`](ROADMAP-3.md) — الحكمُ الحاليّ، ومقياسُ النضج، **وما التالي** بالآفاق.
 4. [`STATUS.md`](STATUS.md) — آخرُ عشرين سطرًا: ما بُني وبأيّ قرار.
-5. [`MANUAL-TASKS.md`](MANUAL-TASKS.md) — جدولُ «ما عليك الآن» في رأسه؛ والحالُ الحيُّ في `/panel/tasks`.
+5. [`MANUAL-TASKS.md`](MANUAL-TASKS.md) — جدولُ «ما عليك الآن» في رأسه؛ والحالُ الحيُّ في `/panel/tasks`، وما يفتح قدرةً في `/panel/tasks/later`.
 6. [`DECISIONS.md`](DECISIONS.md) — القراراتُ الجارية (D-250 فما بعد)، وفهرسُ ما قبلها.
 
 ## الحيّة — تُقرأ وتُحدَّث

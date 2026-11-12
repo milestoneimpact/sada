@@ -14,7 +14,7 @@ import { channelsSection, setupPane } from '../src/routes/ui/channels'
 import type { AppStatus } from '../src/lib/oauth/apps'
 import { connectedBody, refusedBody } from '../src/routes/ui/oauthResult'
 import { reportScreen } from '../src/routes/ui/reportView'
-import { gatesScreen, tasksScreen } from '../src/routes/ui/tasksView'
+import { gatesScreen, laterScreen, laterTitle, tasksScreen } from '../src/routes/ui/tasksView'
 import { noticesScreen } from '../src/routes/ui/noticesView'
 import { ownerRows } from '../src/lib/owner'
 import { currentPhase, gatesOf, type GateFacts } from '../src/lib/gates'
@@ -378,28 +378,40 @@ const GATE_FIXTURE: GateFacts = {
 }
 const GATES = gatesOf(GATE_FIXTURE)
 
+// ‏المهامُّ كلُّها بحالٍ وسطى: بعضٌ تمّ، وبعضٌ عليك، وبعضٌ لا يُعرَف. و«ما عليك» يرسم ما يوقف أو يحرس منها ويعدّ القدرةَ في سطر،
+// ‏و«تفتح قدرة» يرسم القدرةَ (متابعة D-324) — من الصفوف نفسِها، فالعددُ في السطر عددُ الصفحة
+const OWNER_ROWS = ownerRows({
+  secrets: new Set(['TOKEN_ENC_KEY', 'ADMIN_TOKEN']),
+  vars: new Set(['CF_AI_ACCOUNT_ID']),
+  linked: new Set(['linkedin']),
+  appsConfigured: new Set(['linkedin', 'x']),
+  appsVerified: new Set(['linkedin']),
+  anyPublished: false,
+  videoPriced: false,
+  linkedInVersionDue: true,   // D-072: حال وسطى تُرسَم لتُقاس
+  tilesChosen: 4, promoCapUsd: 0,
+})
+
 writeAudited(
   '/tmp/screen-tasks.html',
   page(
     'صدى — مهامّ المالك',
     tasksScreen({
       env: 'staging',
-      rows: ownerRows({
-        // حالٌ وسطى: بعضٌ تمّ، وبعضٌ عليك، وبعضٌ لا يُعرَف
-        secrets: new Set(['TOKEN_ENC_KEY', 'ADMIN_TOKEN']),
-        vars: new Set(['CF_AI_ACCOUNT_ID']),
-        linked: new Set(['linkedin']),
-        appsConfigured: new Set(['linkedin', 'x']),
-        appsVerified: new Set(['linkedin']),
-        anyPublished: false,
-        videoPriced: false,
-        linkedInVersionDue: true,   // D-072: حال وسطى تُرسَم لتُقاس
-              tilesChosen: 4, promoCapUsd: 0,
-      }),
+      rows: OWNER_ROWS,
       // ‏والبوّاباتُ سطرٌ يقول مرحلتَها، وبطاقاتُها في عيّنتها أدناه
       phase: currentPhase(GATES),
     }),
   ),
+)
+
+// ── «تفتح قدرة» (متابعة D-324): مهامُّ القدرة خرجت من «ما عليك» إلى صفحتها، فتُرسَم كما تُخدَم ────
+// ‏والعودةُ إلى «ما عليك» والرافدةُ عليها كما في المسار
+writeAudited(
+  '/tmp/screen-tasks-later.html',
+  soloPage(laterTitle(), { href: '/panel/tasks', label: sectionLabel('tasks') },
+    laterScreen({ env: 'staging', rows: OWNER_ROWS }), 'n', '',
+    buildCommands({ onPanel: false }), soloNav('tasks')),
 )
 
 // ── «بوّابات المراحل» (دمجُ D-318 مع D-324): خرجت من «ما عليك» إلى صفحتها، فتُرسَم كما تُخدَم ────

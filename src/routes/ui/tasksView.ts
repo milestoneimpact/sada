@@ -17,10 +17,10 @@
  */
 import { escapeHtml } from './shell'
 import { sectionLabel } from './command'
-import { secretCommand, taskDoc, TASKS_DOC, type OwnerRow, type Unblocks } from '../../lib/owner'
+import { secretCommand, taskDoc, TASKS_DOC, TASKS_LATER, type OwnerRow, type Unblocks } from '../../lib/owner'
 import type { Gate, ItemState } from '../../lib/gates'
 import { statusBadge, type Tone } from './components/badge'
-import { html, raw } from './html'
+import { html, join, raw, type Html } from './html'
 import { DEVICES, formatVital, METRICS, MIN_SAMPLES, THRESHOLDS, type Metric, type Rating, type VitalsSummary } from '../../lib/vitals'
 
 const MARK: Readonly<Record<string, { g: string; cls: Tone; label: string }>> = {
@@ -179,6 +179,7 @@ export function gatesScreen(d: GatesScreenData): string {
 }
 
 export interface TasksScreenData {
+  /** ‏المهامُّ كلُّها: «ما عليك» يرسم البوّابةَ والحارس، ويعدّ القدرةَ في سطرٍ إلى صفحتها (متابعة D-324). */
   readonly rows: readonly OwnerRow[]
   /** أوّلُ مرحلةٍ لم تُجتَز — أو `null` إن اجتِزن. يقولها سطرُ البوّابات وحدَه، وبطاقاتُها في `/panel/gates`. */
   readonly phase: string | null
@@ -249,51 +250,132 @@ function list(rows: readonly OwnerRow[], env: string): string {
   return rows.map((r, i) => item(r, env, i === first)).join('')
 }
 
-export function tasksScreen(d: TasksScreenData): string {
-  const todo = d.rows.filter((r) => r.state === false)
-  const unknown = d.rows.filter((r) => r.state === null)
-  const done = d.rows.filter((r) => r.state === true)
+/** ‏ما في الصفحة بحاله: عليك · لا يُعرَف · تمّت — ومن صفوفها وحدها، فالرأسُ والرقاقةُ يعدّان الشيءَ نفسَه. */
+function tally(rows: readonly OwnerRow[]): { readonly todo: readonly OwnerRow[]; readonly unknown: readonly OwnerRow[]; readonly done: readonly OwnerRow[] } {
+  return {
+    todo: rows.filter((r) => r.state === false),
+    unknown: rows.filter((r) => r.state === null),
+    done: rows.filter((r) => r.state === true),
+  }
+}
 
-  const lede =
-    todo.length === 0
-      ? unknown.length === 0
-        ? '<b>لا شيء عليك ممّا يُعرَف من هنا.</b>'
-        : `<b>لا شيء عليك ممّا يُعرَف من هنا</b> — و${unknown.length} لا تُقرأ
+/** ‏الرأسُ حين لا شيء عليك ممّا يُعرَف — ويقول المجهولَ إن كان، فلا يُقرأ الفراغُ «تمّ كلُّ شيء». */
+function idleLede(unknown: number): Html {
+  return unknown === 0
+    ? html`<b>لا شيء عليك ممّا يُعرَف من هنا.</b>`
+    : html`<b>لا شيء عليك ممّا يُعرَف من هنا</b> — و${unknown} لا تُقرأ
            من اللوحة، تُراجَع في بوّابة المنصّة.`
-      : `<b>${todo.length}</b> عليك، منها
-         <b>${todo.filter((r) => r.unblocks === 'gate').length}</b> توقف بوّابة مرحلة.`
+}
 
-  return `<div class="page-head">
-    <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>ما يقع عليك أنت</div>
-      <h1>${escapeHtml(sectionLabel('tasks'))}</h1>
-      <p class="lede">${lede}</p>
-    </div>
-  </div>
-
-  <div class="card">
+/**
+ * ‏بطاقةُ القائمة — **في الصفحتين بقالبٍ واحد**: الرقاقةُ بما في الصفحة، والشرحُ مرّةً، ومعنى الأنواع التي فيها وحدها، ثمّ المعلّقةُ
+ * ‏فما تمّ مطويًّا (EASE-PLAN: كانت الصفحةُ ثلاثَ عشرةَ شاشةً على الهاتف، وأوّلُها لا يقول ما بقي).
+ * ‏و`list` و`bold` لم يُحوَّلا إلى `html` بعدُ (`item` و`commandBox` تحتهما): مخرَجُهما يمرّ بـ`raw` عند الحدّ.
+ */
+function listCard(rows: readonly OwnerRow[], env: string, kinds: readonly Unblocks[]): Html {
+  const { todo, unknown, done } = tally(rows)
+  return html`<div class="card">
     <div class="card-head"><h2>القائمة</h2><div class="grow"></div>
       <span class="chip">${done.length} تمّت · ${todo.length} عليك · ${
         unknown.length} لا تُعرَف</span></div>
     <p class="hint"><b>الحالُ يُقرأ من صدى نفسِه</b>، ولا يُكتَب بيد. وما يقع عند المنصّة يُقال «لا يُعرَف من هنا».</p>
-    <p class="hint">${(['gate', 'guard', 'capability'] as const)
-      .map((k) => `<b>«${OPENS[k].label}»</b>: ${bold(OPENS[k].why)}.`).join(' ')}</p>
-    ${list(d.rows.filter((r) => r.state !== true), d.env)}
-    ${/* ‏وما تمّ يُطوى (EASE-PLAN): كانت الصفحةُ ثلاثَ عشرةَ شاشةً على الهاتف، وأوّلُها لا يقول ما بقي */''}${done.length === 0
+    <p class="hint">${join(kinds.map((k) => html`<b>«${OPENS[k].label}»</b>: ${raw(bold(OPENS[k].why))}.`), html` `)}</p>
+    ${raw(list(rows.filter((r) => r.state !== true), env))}
+    ${done.length === 0
       ? ''
-      : `<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${list(done, d.env)}</details>`}
-  </div>
+      : html`<details class="setup mt-3"><summary>تمّت (${done.length})</summary>${raw(list(done, env))}</details>`}
+  </div>`
+}
 
-  ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: سطرٌ يقول حالَها ويحيل إلى صفحتها (دمجُ D-318 مع D-324) */''}<p class="hint mt-6"><a class="tap" href="/panel/gates">بوّابات المراحل</a> · ${escapeHtml(phaseLine(d.phase))}</p>
-
-  ${vitalsCard(d.vitals, d.rejects)}
-
-  <div class="card">
+/** ‏وأين الخطوات — في الصفحتين: العناصرُ الستّةُ في الوثيقة وحدها، ورابطُها لا اسمُ ملفّها. */
+function stepsCard(): Html {
+  return html`<div class="card">
     <h2>وأين الخطوات</h2>
     <p class="hint">كلّ مهمّة لها صفحة بالعناصر الستّة في
-      <a class="tap" href="${escapeHtml(TASKS_DOC)}" target="_blank" rel="noopener noreferrer"
+      <a class="tap" href="${TASKS_DOC}" target="_blank" rel="noopener noreferrer"
         data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a> — بأسماء الأزرار كما تراها
       على الشاشة، وعلامة النجاح، وما يُقرأ أوّلا إن فشلت.
       <b>ومعرِّف هنا بلا صفحة هناك يُسقط CI</b>، فلا يبقى عنوان بلا خطوات.</p>
   </div>`
+}
+
+/** ‏اسمُ صفحة القدرة في رأسها وفي سطرها وفي عنوان المتصفّح — من موضعٍ واحد (متابعة D-324). */
+export const LATER_LABEL = 'تفتح قدرة'
+
+/** ‏عنوانُ المتصفّح: «ما عليك» ثمّ الصفحة، فيُعرَف موضعُها في التبويب والسجلّ. */
+export function laterTitle(): string {
+  return 'صدى — ' + sectionLabel('tasks') + ' · ' + LATER_LABEL
+}
+
+/**
+ * ‏سطرُ «تفتح قدرة» في رأس «ما عليك» (متابعة D-324) — **في الشاشة الأولى**: الرأسُ يعدّ ما يوقف أو يحرس وحدَه، فبلا هذا السطر
+ * ‏يقرأ المالكُ «3 عليك» وقد كانت «10» ولا يعرف أين ذهب الباقي. ويعدّ ما عليك منها كما تعدّه صفحتُها.
+ */
+function laterLine(rows: readonly OwnerRow[]): Html {
+  const n = rows.filter((r) => r.state === false).length
+  return html`<p class="hint m-0 mt-2"><a class="tap" href="${TASKS_LATER}">${LATER_LABEL}</a> · ${
+    n === 0 ? 'لا شيء عليك ممّا يُعرَف منها' : html`${n} عليك`}، ولا ينكسر شيء بتركها.</p>`
+}
+
+export function tasksScreen(d: TasksScreenData): string {
+  // ‏**القائمةُ بنوعها** (متابعة D-324): البوّابةُ والحارسُ هنا، والقدرةُ في صفحتها وسطرُها في الرأس
+  const here = d.rows.filter((r) => r.unblocks !== 'capability')
+  const { todo, unknown } = tally(here)
+
+  const lede =
+    todo.length === 0
+      ? idleLede(unknown.length)
+      : html`<b>${todo.length}</b> عليك، منها
+         <b>${todo.filter((r) => r.unblocks === 'gate').length}</b> توقف بوّابة مرحلة.`
+
+  // ‏و`vitalsCard` يعيد نصًّا (`.value` من قالب `html` نفسِه)، فيمرّ بـ`raw` عند الحدّ
+  return html`<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>ما يقع عليك أنت</div>
+      <h1>${sectionLabel('tasks')}</h1>
+      <p class="lede">${lede}</p>
+      ${laterLine(d.rows.filter((r) => r.unblocks === 'capability'))}
+    </div>
+  </div>
+
+  ${listCard(here, d.env, ['gate', 'guard'])}
+
+  ${/* ‏وبوّاباتُ المراحل لغةُ خطّة المشروع لا سؤالُ اليوم: سطرٌ يقول حالَها ويحيل إلى صفحتها (دمجُ D-318 مع D-324) */''}<p class="hint mt-6"><a class="tap" href="/panel/gates">بوّابات المراحل</a> · ${phaseLine(d.phase)}</p>
+
+  ${raw(vitalsCard(d.vitals, d.rejects))}
+
+  ${stepsCard()}`.value
+}
+
+export interface LaterScreenData {
+  /** ‏المهامُّ كلُّها، والصفحةُ ترسم ما يفتح قدرةً منها وحدَه. */
+  readonly rows: readonly OwnerRow[]
+  readonly env: string
+}
+
+/**
+ * ‏**شاشةُ «تفتح قدرة»** — `/panel/tasks/later` (متابعة D-324).
+ *
+ * ‏كانت مهامُّ القدرة في «ما عليك» مع البوّابات والحرّاس، فبلغت الصفحةُ ‏14.0KB مضغوطًا والسقفُ ‏14KB، والمهمّةُ نحو ‏0.19KB،
+ * ‏ومهامُّ D-321 وD-322 قادمة. وD-324 كتب قاعدةَ العبور التالي: تُقسَم القائمةُ بنوعها ولا يُرفع السقف. فالقدرةُ هنا بطاقتُها
+ * ‏نفسُها وطيّاتُها نفسُها، بدور «ما عليك» وجلستها وموضعها في الرافدة، والعودةُ إليها.
+ */
+export function laterScreen(d: LaterScreenData): string {
+  const rows = d.rows.filter((r) => r.unblocks === 'capability')
+  const { todo, unknown } = tally(rows)
+  const lede = todo.length === 0
+    ? idleLede(unknown.length)
+    : html`<b>${todo.length}</b> عليك، وكلٌّ منها يفتح لصدى ما لا يقدر عليه اليوم.`
+
+  return html`<div class="page-head">
+    <div class="txt">
+      <div class="eyebrow"><span class="ln"></span>${sectionLabel('tasks')}</div>
+      <h1>${LATER_LABEL}</h1>
+      <p class="lede">${lede}</p>
+    </div>
+  </div>
+
+  ${listCard(rows, d.env, ['capability'])}
+
+  ${stepsCard()}`.value
 }

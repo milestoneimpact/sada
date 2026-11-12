@@ -50,7 +50,7 @@ import { basename } from 'node:path'
 /** العيّناتُ التي تسمّي الأشياءَ بأسمائها التقنيّة عمدًا — وسببُ كلٍّ. */
 const LEGAL = ['privacy.html'] // ‏نصٌّ قانونيّ: ما يُخزَّن وأين، بأسمائه
 const SETUP = ['screen-wizard.html', 'screen-li-setup.html', 'screen-refused.html', 'screen-connected.html'] // ‏أسماءُ شاشات المنصّة كما هي (HANDOVER §6)
-const TASKS = ['screen-tasks.html'] // ‏المهمّةُ برقمها: هو ما يُسأل به عنها
+const TASKS = ['screen-tasks.html', 'screen-tasks-later.html'] // ‏المهمّةُ برقمها: هو ما يُسأل به عنها (وصفحةُ القدرة منها، متابعة D-324)
 
 /**
  * @type {readonly { id: string; re: RegExp; say: string; except?: readonly string[] }[]}

@@ -64,6 +64,7 @@ import { shortcutsSwitch } from '../components/tabs'
 import { filterBar } from '../components/filterbar'
 import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
+import { taskHref } from '../../../lib/owner'
 import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 import { stagesAttr } from '../components/stages'
@@ -239,7 +240,7 @@ function scheduler(
         <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقة <span class="mono">Community Management API</span>.</span>
         <span class="grow"></span>
-        <a class="btn btn-secondary btn-sm" href="/panel/tasks">ما عليك</a>
+        <a class="btn btn-secondary btn-sm" href="${taskHref('M-03')}">ما عليك</a>
       </div>`
     }
     return `<div class="card card-inset sched none" ${anchor}>

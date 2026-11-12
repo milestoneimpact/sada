@@ -9,6 +9,7 @@ import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
+import { OWNER_TASKS } from '../lib/owner'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -34,6 +35,16 @@ async function open(scoped = env, path = '/panel/tasks'): Promise<string> {
 
 /** ‏شاشةُ «بوّابات المراحل» (دمجُ D-318 مع D-324): خرجت من «ما عليك» إلى صفحتها. */
 const gates = (scoped = env): Promise<string> => open(scoped, '/panel/gates')
+/** ‏وشاشةُ «تفتح قدرة» (متابعة D-324): مهامُّ القدرة خرجت من «ما عليك» إلى صفحتها، وما يوقف أو يحرس بقي. */
+const later = (scoped = env): Promise<string> => open(scoped, '/panel/tasks/later')
+/** ‏العددُ في رأس الصفحة («<b>N</b> عليك») — والرقمُ هو الدليل لا النصّ. */
+const ledeCount = (h: string): number => Number(/(\d+)<\/b> عليك/.exec(h)?.[1] ?? '0')
+/** ‏والعددُ في سطر «تفتح قدرة» على «ما عليك». */
+const laterCount = (h: string): number => Number(/href="\/panel\/tasks\/later">تفتح قدرة<\/a> · (\d+) عليك/.exec(h)?.[1] ?? '0')
+/** ‏والعددُ في رقاقة القائمة («N تمّت · N عليك · N لا تُعرَف») — لا أوّلُ «· N عليك» في الصفحة، فسطرُ «تفتح قدرة» قبلها. */
+const chipCount = (h: string): number => Number(/<span class="chip">\d+ تمّت · (\d+) عليك/.exec(h)?.[1] ?? '-1')
+/** ‏رموزُ المهامّ المرسومة في الصفحة، معلّقةً أو مطويّةً فيما تمّ. */
+const codesIn = (h: string): string[] => [...h.matchAll(/<bdi dir="ltr">(M-\d+)<\/bdi><\/small>/g)].map((m) => m[1]!)
 
 describe('الباب', () => {
   it('لا يُفتَح بلا جلسة', async () => {
@@ -45,11 +56,15 @@ describe('الباب', () => {
     expect((await app.request('/panel/gates', {}, env)).status).toBe(401)
   })
 
+  it('ولا بابُ «تفتح قدرة»', async () => {
+    expect((await app.request('/panel/tasks/later', {}, env)).status).toBe(401)
+  })
+
   /**
    * ‏**والبابان بدورٍ واحد** (`requiredRole`): البوّاباتُ كانت طيّةً في «ما عليك» فلا يراها إلّا من يرى «ما عليك».
    * ‏وبابُها الجديد لا يُفتح لمن دونه، ولا يُغلق على من فوقه.
    */
-  it('والبوّاباتُ لمن يرى «ما عليك» وحدَه: الناشرُ يُردّ عن البابين، والمديرُ يفتحهما', async () => {
+  it('والبوّاباتُ و«تفتح قدرة» لمن يرى «ما عليك» وحدَه: الناشرُ يُردّ عن الأبواب الثلاثة، والمديرُ يفتحها', async () => {
     const member = async (email: string, role: 'admin' | 'publisher'): Promise<string> => {
       db.raw.prepare("INSERT INTO members (email, role, orgs, invited_by) VALUES (?, ?, '*', 'owner')").run(email, role)
       const res = await emailLogin(app, env, { email })
@@ -58,7 +73,7 @@ describe('الباب', () => {
     }
     const publisher = await member('p@example.com', 'publisher')
     const admin = await member('a@example.com', 'admin')
-    for (const path of ['/panel/tasks', '/panel/gates']) {
+    for (const path of ['/panel/tasks', '/panel/gates', '/panel/tasks/later']) {
       const denied = await app.request(path, { headers: { Cookie: publisher } }, env)
       expect(denied.status, path).toBe(303)
       expect(denied.headers.get('Location'), path).toBe('/panel')
@@ -75,18 +90,21 @@ describe('والحال يُشتقّ لا يُكتَب', () => {
     expect(html).toContain('عليك')
   })
 
-  /** ومتغيّرا الكيان يُشتقّان من البيئة نفسِها لا من صفٍّ يُكتَب. */
+  /**
+   * ومتغيّرا الكيان يُشتقّان من البيئة نفسِها لا من صفٍّ يُكتَب. **وM-17 قدرةٌ**، فعدُّها في «تفتح قدرة» وفي سطرها على
+   * «ما عليك» (متابعة D-324)، ورأسُ «ما عليك» لا يتبدّل: يعدّ ما يوقف أو يحرس وحدَه.
+   */
   it('ومتغيّرا الكيان حين يُضبطان تصير M-17 «تمّت»', async () => {
-    const before = await open()
+    const legal = { ...env, LEGAL_ENTITY: 'بصائر للاستشارات', LEGAL_CONTACT: 'omar@example.com' }
+    const before = await later()
     expect(before).toContain('M-17')
+    const after = await later(legal)
+    expect(ledeCount(after)).toBe(ledeCount(before) - 1)
 
-    const after = await open({
-      ...env, LEGAL_ENTITY: 'بصائر للاستشارات', LEGAL_CONTACT: 'omar@example.com',
-    })
-    // العدُّ ينقص واحدا — والرقمُ هو الدليل لا النصّ
-    const count = (h: string): number =>
-      Number(/(\d+)<\/b> عليك/.exec(h)?.[1] ?? '0')
-    expect(count(after)).toBe(count(before) - 1)
+    const tasksBefore = await open()
+    const tasksAfter = await open(legal)
+    expect(laterCount(tasksAfter)).toBe(laterCount(tasksBefore) - 1)
+    expect(ledeCount(tasksAfter)).toBe(ledeCount(tasksBefore))
   })
 
   it('وربط حساب يُتمّ مهمّتَه', async () => {
@@ -94,9 +112,11 @@ describe('والحال يُشتقّ لا يُكتَب', () => {
       `INSERT INTO accounts (id, platform, kind, external_id, display_name)
        VALUES ('a1', 'youtube', 'org', 'UC1', 'قناتي')`,
     )
-    const html = await open()
-    expect(html).toContain('M-15')
-    expect(html).toContain('تمّت')
+    // ‏وربطُ YouTube قدرةٌ: في «تفتح قدرة»، وفي طيّة ما تمّ منها
+    const html = await later()
+    const done = html.slice(html.indexOf('<details class="setup mt-3">'))
+    expect(done).toContain('<summary>تمّت (1)</summary>')
+    expect(done).toContain('M-15')
   })
 })
 
@@ -106,18 +126,22 @@ describe('ولا علامة صحّ على ما لم يُتحقَّق منه', ()
    * **وقولُ «لم تتمّ» عن طلبٍ قُبل يجعل المالكَ يعيده.**
    */
   it('ما يقع عند المنصّة يُقال «لا يُعرَف من هنا»', async () => {
-    const html = await open()
+    // ‏وموافقةُ Community Management قدرةٌ: في «تفتح قدرة» (متابعة D-324)
+    const html = await later()
     expect(html).toContain('لا يُعرَف من هنا')
     expect(html).toContain('M-03')
   })
 
-  it('والعدّ لا يشمل ما لا يُعرَف', async () => {
-    const html = await open()
-    const unknown = Number(/(\d+) لا تُعرَف/.exec(html)?.[1] ?? '0')
-    const todo = Number(/· (\d+) عليك/.exec(html)?.[1] ?? '0')
-    expect(unknown).toBeGreaterThan(0)
-    // ولو عُدّ المجهولُ لصار المجموعُ أكبر — والرقمُ لا ينزل أبدا فيُهمَل
-    expect(todo).toBeLessThan(todo + unknown)
+  it('والعدّ لا يشمل ما لا يُعرَف — في الصفحتين', async () => {
+    for (const html of [await open(), await later()]) {
+      const unknown = Number(/(\d+) لا تُعرَف/.exec(html)?.[1] ?? '0')
+      const todo = chipCount(html)
+      expect(unknown).toBeGreaterThan(0)
+      // ولو عُدّ المجهولُ لصار المجموعُ أكبر — والرقمُ لا ينزل أبدا فيُهمَل
+      expect(todo).toBeLessThan(todo + unknown)
+      // ‏والرأسُ يعدّ ما في الرقاقة نفسَه: ما عليك في هذه الصفحة
+      expect(ledeCount(html)).toBe(todo)
+    }
   })
 })
 
@@ -212,6 +236,59 @@ describe('صفحة البوّابات وسطرُها في «ما عليك»', ()
   })
 })
 
+/**
+ * ‏**ما يفتح قدرةً صفحتُه، و«ما عليك» يحيل إليها بسطرٍ يعدّ** (متابعة D-324): كانت «ما عليك» ‏14.0KB مضغوطًا والسقفُ ‏14KB،
+ * ‏ومهامُّ D-321 وD-322 قادمة؛ وD-324 كتب قاعدةَ العبور التالي: تُقسَم القائمةُ بنوعها. فبقي ما يوقف مرحلةً أو يحرس،
+ * ‏وخرج ما يفتح قدرةً إلى `/panel/tasks/later`.
+ */
+describe('«تفتح قدرة» صفحتُها، وسطرُها في «ما عليك»', () => {
+  it('كلُّ مهمّةٍ في صفحة نوعها مرّةً، ولا تسقط واحدة', async () => {
+    const tasks = codesIn(await open())
+    const capability = codesIn(await later())
+    for (const t of OWNER_TASKS) {
+      const [here, there] = t.unblocks === 'capability' ? [capability, tasks] : [tasks, capability]
+      expect(here.filter((c) => c === t.code), t.code).toHaveLength(1)
+      expect(there, t.code).not.toContain(t.code)
+    }
+    expect(tasks.length + capability.length).toBe(OWNER_TASKS.length)
+  })
+
+  it('«ما عليك» يحمل سطرًا إليها يعدّ ما عليك منها، وفي الشاشة الأولى تحت الرأس', async () => {
+    const html = await open()
+    const head = /<div class="page-head">[\s\S]*?<\/div>\s*<\/div>/.exec(html)?.[0] ?? ''
+    expect(head).toContain('<a class="tap" href="/panel/tasks/later">تفتح قدرة</a> · ')
+    const n = laterCount(html)
+    expect(n).toBeGreaterThan(0)
+    // ‏والعددُ عددُ صفحتها نفسُه: رأسُها ورقاقتُها
+    const page = await later()
+    expect(ledeCount(page)).toBe(n)
+    expect(chipCount(page)).toBe(n)
+  })
+
+  it('وصفحتُها صفحةٌ من اللوحة: عنوانُها، وعودتُها إلى «ما عليك»، وموضعُها في الرافدة', async () => {
+    const html = await later()
+    expect(html).toContain('<title>صدى — ما عليك · تفتح قدرة</title>')
+    expect(html).toContain('<h1>تفتح قدرة</h1>')
+    const back = /<nav class="back"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? ''
+    expect(back).toContain('href="/panel/tasks"')
+    expect(back).toContain('ما عليك')
+    expect(html).toContain('href="/panel/tasks" aria-current="page"')
+    expect(html).toContain('cmdk-open')
+    expect(html).toContain('href="/panel/help"')
+    // ‏والمعلّقةُ الأولى مفتوحةٌ وحدَها، وما تمّ مطويّ، كما في «ما عليك»
+    expect(html.match(/<details class="setup task[^"]*" open>/g)).toHaveLength(1)
+    // ‏وشرحُ النوع مرّةً في رأسها، لا في كلّ صفّ
+    expect(html.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
+  })
+
+  /** ‏**والرابطُ إلى مهمّةٍ خرجت يصل صفحتَها** — بمرساة عنوانها، لا «ما عليك» التي لم تعد تحملها. */
+  it('ورابطُ «ما عليك لتُجاز» في صفحة YouTube يصل M-28 في «تفتح قدرة»', async () => {
+    const html = await open(env, '/panel/channels/youtube?tab=setup')
+    expect(html).toContain('href="/panel/tasks/later#task-t-M-28">ما عليك لتُجاز</a>')
+    expect(await later()).toContain('id="task-t-M-28"')
+  })
+})
+
 describe('وشريط الرموز المقتربة', () => {
   async function panel(): Promise<string> {
     const login = await emailLogin(app, env)
@@ -272,18 +349,22 @@ describe('وشريط الرموز المقتربة', () => {
  * `wrangler` للبيئة الحاليّة وزرَّ نسخ، ولا تحمله مهمّةٌ تمّت.
  */
 describe('أمر wrangler في صفّ المهمّة (D-126)', () => {
-  it('المهمّة المفتوحة تحمل الأمر للبيئة الحاليّة وزرّ النسخ', async () => {
+  it('المهمّة المفتوحة تحمل الأمر للبيئة الحاليّة وزرّ النسخ — في صفحة نوعها', async () => {
+    // ‏M-04 بوّابةٌ في «ما عليك»، وM-19 قدرةٌ في «تفتح قدرة» (متابعة D-324)
     const html = await open()
-    expect(html).toContain('data-copy="cmd-M-19"')
-    expect(html).toContain('npx wrangler secret put CF_BROWSER_TOKEN --env staging')
     expect(html).toContain('npx wrangler secret put X_CLIENT_ID --env staging\nnpx wrangler secret put X_CLIENT_SECRET --env staging')
     expect(html).not.toContain('--env production')
+    const capability = await later()
+    expect(capability).toContain('data-copy="cmd-M-19"')
+    expect(capability).toContain('npx wrangler secret put CF_BROWSER_TOKEN --env staging')
+    expect(capability).not.toContain('--env production')
   })
 })
 
 describe('قرارات المالك في «ما عليك» (D-130)', () => {
   it('بوّابة الستّة وسقف الترويج صفّان بحالهما من الإعدادات، ولكلّ بابُه', async () => {
-    const html = await open()
+    // ‏وكلتاهما قدرة: في «تفتح قدرة» (متابعة D-324)
+    const html = await later()
     expect(html).toContain('M-20')
     expect(html).toContain('4 من 6 بطاقات مختارة')
     expect(html).toContain('M-21')
@@ -293,20 +374,22 @@ describe('قرارات المالك في «ما عليك» (D-130)', () => {
 })
 
 
-describe('مهامّ الربط في «ما عليك» (ر-1)', () => {
+describe('مهامّ الربط في «تفتح قدرة» (ر-1 · متابعة D-324)', () => {
   it('كلّ مهمّة ربط تحمل زرَّها، وكلّ مفتوحة رابط خطواتها', async () => {
-    const html = await open()
+    const html = await later()
     expect(html).toContain('href="/panel/channels/instagram?tab=setup#ci-instagram">اضبط Instagram</a>')
     expect(html).toContain('href="/panel/channels/tiktok?tab=setup#ci-tiktok">اضبط TikTok</a>')
     expect(html).toContain('href="/panel/channels/youtube?tab=setup#ci-youtube">اضبط YouTube</a>')
     expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md#m-24"')
     expect(html).toContain('href="/panel/settings#tiles">اختر بطاقاتك</a>')
-    // ‏واسمُ الوثيقة رابطٌ لا نصٌّ يُقرأ ولا يُفتَح
-    expect(html).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md"')
+    // ‏واسمُ الوثيقة رابطٌ لا نصٌّ يُقرأ ولا يُفتَح — في «ما عليك» وفي «تفتح قدرة»
+    for (const page of [await open(), html]) {
+      expect(page).toContain('href="https://github.com/milestoneimpact/sada/blob/main/docs/MANUAL-TASKS.md"')
+    }
   })
 
   it('وبعد حفظ سرَّي Instagram يصير الزرّ «اربط Instagram» ويقول ما قِيس', async () => {
-    const html = await open({ ...env, INSTAGRAM_APP_ID: 'ig-id', INSTAGRAM_APP_SECRET: 'ig-secret' })
+    const html = await later({ ...env, INSTAGRAM_APP_ID: 'ig-id', INSTAGRAM_APP_SECRET: 'ig-secret' })
     expect(html).toContain('href="/oauth/instagram/start">اربط Instagram</a>')
     expect(html).toContain('سرّا التطبيق محفوظان — بقي «اربط»')
     expect(html).not.toContain('ig-secret')
@@ -314,12 +397,13 @@ describe('مهامّ الربط في «ما عليك» (ر-1)', () => {
 })
 
 describe('«ما عليك» بلغة المالك (D-203)', () => {
-  it('العنوان أوّل الصفّ والرمز صغير بعده، ولا مسار ملفّ نصًّا ظاهرًا', async () => {
-    const html = await open()
-    expect(html).not.toMatch(/<span class="mono">M-\d+<\/span>/)
-    expect(html).toMatch(/<small class="ago"><bdi dir="ltr">M-\d+<\/bdi><\/small>/)
-    const shown = html.replace(/<[^>]*>/g, ' ')
-    expect(shown).not.toMatch(/docs\/|STATUS\.md|PLAN\.md|MANUAL-TASKS\.md/)
-    expect(html).toContain('data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a>')
+  it('العنوان أوّل الصفّ والرمز صغير بعده، ولا مسار ملفّ نصًّا ظاهرًا — في الصفحتين', async () => {
+    for (const html of [await open(), await later()]) {
+      expect(html).not.toMatch(/<span class="mono">M-\d+<\/span>/)
+      expect(html).toMatch(/<small class="ago"><bdi dir="ltr">M-\d+<\/bdi><\/small>/)
+      const shown = html.replace(/<[^>]*>/g, ' ')
+      expect(shown).not.toMatch(/docs\/|STATUS\.md|PLAN\.md|MANUAL-TASKS\.md/)
+      expect(html).toContain('data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a>')
+    }
   })
 })

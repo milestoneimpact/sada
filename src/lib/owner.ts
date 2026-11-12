@@ -596,6 +596,34 @@ export function ownerRows(facts: OwnerFacts): OwnerRow[] {
   })
 }
 
+/**
+ * ‏صفحتا «ما عليك» في اللوحة (متابعة D-324): **ما يوقف مرحلةً أو يحرس** في `/panel/tasks`، و**ما يفتح قدرةً** في صفحته.
+ *
+ * ‏كانت القائمةُ كلُّها صفحةً واحدة، فبلغت ‏14.0KB مضغوطًا والسقفُ ‏14KB (`audit_size`)، ومهامُّ قرارين قادمة. والقاعدةُ التي كتبها
+ * ‏D-324 للعبور التالي: تُقسَم القائمةُ بنوعها ولا يُرفع السقف. والحارسُ والبوّابةُ أوّلًا لأنّ تركهما يوقف أو يُطمئن كذبًا،
+ * ‏والقدرةُ لا ينكسر شيءٌ بتركها.
+ */
+export const TASKS_PAGE = '/panel/tasks'
+export const TASKS_LATER = '/panel/tasks/later'
+
+/** ‏صفحةُ النوع: القدرةُ في صفحتها، والبوّابةُ والحارسُ في «ما عليك». */
+function pageOf(kind: Unblocks): string {
+  return kind === 'capability' ? TASKS_LATER : TASKS_PAGE
+}
+
+/**
+ * ‏**أين تُرى المهمّةُ في اللوحة**: صفحةُ نوعها ومرساةُ عنوانها فيها (`task-t-M-19`، معرّفُ عنوان الطيّة نفسُه).
+ *
+ * ‏كانت الروابطُ إلى مهمّةٍ بعينها («بلا مفتاح المتصفّح · ما عليك»، و«ما عليك لتُجاز») تُكتب `/panel/tasks` نصًّا، فلمّا خرجت
+ * ‏القدرةُ إلى صفحتها صارت تصل صفحةً لا تحملها. فالرابطُ يُحسَب من السجلّ: مهمّةٌ يتبدّل نوعُها يتبعها كلُّ رابطٍ إليها،
+ * ‏ورمزٌ لا مهمّةَ له يُسقط البناءَ لا يُرسَم رابطًا ميّتًا.
+ */
+export function taskHref(code: string): string {
+  const task = OWNER_TASKS.find((t) => t.code === code)
+  if (task === undefined) throw new Error(`لا مهمّة ${code} في OWNER_TASKS`)
+  return `${pageOf(task.unblocks)}#task-t-${code}`
+}
+
 /** كم مهمّةً **يُعرَف** أنّها لم تتمّ — ولا يُعدّ فيها ما لا يُعرَف. */
 export function pendingCount(facts: OwnerFacts): number {
   return ownerRows(facts).filter((r) => r.state === false).length
