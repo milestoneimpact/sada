@@ -563,6 +563,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 @media${below('sm')}{
   .rv-foot .btn{flex:1 1 auto}
   .rv-wk{flex:1 1 auto}
+  /* ‏والمعاينةُ داخل بطاقةٍ أضيقُ من عرض المنصّة عند 320: شريطُ أفعال LinkedIn يفيض بـ2px بالخطّ الأكبر — فتأخذ من حشوة البطاقة */
+  .rv-pv{margin-inline:calc(-1 * var(--s-3))}
   /* ‏سبعةُ أعمدةٍ عند 320 تصغّر اليومَ دون هدف اللمس: الأيّامُ التي فيها بنودٌ وحدَها، شريطًا بأهدافٍ كاملة */
   .rv-cal{display:flex; flex-wrap:wrap}
   .rv-wd,.rv-cd:not(.is-on){display:none}
