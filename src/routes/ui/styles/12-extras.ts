@@ -558,11 +558,12 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}
 .rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400}
-.rv-cd-h{display:flex; align-items:center; justify-content:space-between; gap:var(--s-1); padding:0 var(--s-1); min-height:var(--s-6); color:inherit; text-decoration:none; border-radius:var(--r-inline)}
+/* ‏رأسُ اليوم والمصغَّرةُ يُلمسان: هدفُ كلٍّ ‏44px (قيس ‏24 و‏32 عند ‏768) */
+.rv-cd-h{display:flex; align-items:center; justify-content:space-between; gap:var(--s-1); padding:0 var(--s-1); min-height:var(--tap); min-width:var(--tap); color:inherit; text-decoration:none; border-radius:var(--r-inline)}
 .rv-cd-h span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--accent); font-weight:600}
 .rv-cd.is-day{position:relative; transition:background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease)}
 .rv-cd.is-over{background:var(--selected); border-color:var(--accent)}
-.rv-mini{display:flex; align-items:center; gap:var(--s-1); min-height:var(--s-8); padding:var(--s-0) var(--s-1); border-radius:var(--r-inline);
+.rv-mini{display:flex; align-items:center; gap:var(--s-1); min-height:var(--tap); padding:var(--s-0) var(--s-1); border-radius:var(--r-inline);
   background:var(--surface); border:var(--bd-soft); color:var(--ink-2); text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption); min-width:0}
 .rv-mini[draggable=true]{cursor:grab}
 .rv-mini.is-drag{opacity:.35}
