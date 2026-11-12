@@ -14,6 +14,7 @@ import { linkStates, viewChannels, type LinkedAccount } from '../src/lib/channel
 import { PRIVATE_ONLY } from '../src/lib/media/uploads'
 import { pivot } from '../src/lib/pivot'
 import { pulses } from '../src/lib/ops/heartbeat'
+import { sli } from '../src/lib/ops/slo'
 import { imageProviderGate, slideGate } from '../src/lib/image/gate'
 import { imageReadiness, infographicReadiness, routeDot, videoReadiness } from '../src/lib/media/readiness'
 import { videoCapGate } from '../src/lib/limits'
@@ -364,7 +365,19 @@ const data: PanelData = {
     { job: 'metrics', at: ago(5), outcome: 'ok', detail: '2 مستحقّ' },
     { job: 'scan', at: ago(26), outcome: 'ok', detail: 'رأى 3 · جديد 1 · تغيّر 0' },
     { job: 'alerts', at: ago(26), outcome: 'ok', detail: 'لا إذن يقترب' },
+    { job: 'backup', at: ago(50), outcome: 'ok', detail: '38 جدولًا · 1204 صفًّا · 212KB' },
   ], new Date()),
+  /*
+   * ‏«صحّة صدى» (D-321) بحالاتها الثلاث معًا ليُقاس كلٌّ: مؤشّرٌ في هدفه بهامشٍ ينقص، وآخرُ بما ردّته المنصّةُ مستثنًى، وثالثٌ
+   * ‏«لا قياس» (المراقبُ لم يسأل) — ونسخةٌ قبل يومين ومحاولةٌ فشلت بعدها.
+   */
+  health: {
+    slis: [sli('on_time', 124, 125), sli('success', 40, 40, 2), sli('availability', 0, 0)],
+    bound: true,
+    lastOk: { id: 'b1', at: ago(50), status: 'ok', objectKey: 'snapshots/x.sada', tables: 38, rows: 1204, bytes: 216_900, kid: 'c693c945', ms: 840, pruned: 0, detail: null },
+    last: { id: 'b2', at: ago(2), status: 'failed', objectKey: null, tables: 0, rows: 0, bytes: 0, kid: null, ms: 120, pruned: 0, detail: 'D1_ERROR: overloaded' },
+    read: true,
+  },
   today: {
     items: [
       { at: ago(0.5), kind: 'note', text: 'تغيير إعداد — بطاقات اللوح — مرّتين', go: '#activity', goLabel: 'سجلّ النشاط' },

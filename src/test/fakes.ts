@@ -41,6 +41,9 @@ export function fakeDb(): FakeDb {
   db.exec('PRAGMA foreign_keys = ON')
   db.exec(MIGRATION)
 
+  /** ‏نصُّ كلّ جملة — لتعرف `batch` القراءةَ من الكتابة فتردّ صفوفَها كما يردّها D1 (D-321). */
+  const queryOf = new WeakMap<DbStatement, string>()
+
   const prepare = (query: string): DbStatement => {
     let bound: unknown[] = []
     const args = (): never[] => {
@@ -65,6 +68,7 @@ export function fakeDb(): FakeDb {
         return db.prepare(query).run(...args())
       },
     }
+    queryOf.set(statement, query)
     return statement
   }
 
@@ -73,7 +77,11 @@ export function fakeDb(): FakeDb {
     db.exec('BEGIN')
     try {
       const out: unknown[] = []
-      for (const statement of statements) out.push(await statement.run())
+      // ‏‏كـ D1: لكلّ جملةٍ `D1Result`، وصفوفُ القراءة في `results` (كانت `run()` لكلّ جملة، فدفعةُ قراءةٍ تعود بلا صفوف)
+      for (const statement of statements) {
+        const query = queryOf.get(statement) ?? ''
+        out.push(/^\s*(SELECT|WITH|PRAGMA)\b/i.test(query) ? await statement.all() : await statement.run())
+      }
       db.exec('COMMIT')
       return out
     } catch (error) {

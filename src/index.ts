@@ -45,6 +45,8 @@ import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { pulseReport } from './lib/ops/pulse'
+import { snapshotDue, takeSnapshot } from './lib/ops/backup'
+import { prunePulseSlots, recordProbe } from './lib/ops/slo'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
 import { draftFromIdea, draftPost } from './lib/draft/job'
@@ -133,7 +135,10 @@ function servedVersion(env: Env): string | null {
  * ‏إنّه وقف — فيسأله مراقبٌ خارج Cloudflare (M-47). ولا تخبئة: جوابُ دقيقةٍ مضت ليس نبضًا.
  */
 app.get('/pulse', async (c) => {
-  const report = await pulseReport(c.env.DB, new Date()).catch(() => ({ healthy: false }))
+  const now = new Date()
+  const report = await pulseReport(c.env.DB, now).catch(() => ({ healthy: false }))
+  // ‏**وكلُّ سؤالٍ يُعدّ في خانته** (D-321): منه «التوافرُ من الخارج» في «صحّة صدى». مرّةً للخانة في كلّ نسخة، ولا يرمي
+  await recordProbe(c.env.DB, now, report.healthy)
   c.header('Cache-Control', 'no-store')
   return c.json({ ok: report.healthy }, report.healthy ? 200 : 503)
 })
@@ -1091,6 +1096,33 @@ async function providersTick(env: Env): Promise<void> {
 }
 
 /**
+ * ‏**النسخةُ الاحتياطيّة** (D-321) — تُسأل في الدورة اليوميّة وتُؤخذ كلَّ سبعة أيّام (`snapshotDue`)، فما يسقط اليومَ يُعاد غدًا لا
+ * ‏بعد أسبوع، ولا جدولَ خامسٌ في `wrangler.toml`. وبلا دلوٍ خاصّ (`BACKUP`، M-51) تنبض `skipped` بسببها ولا تكتب في غيره.
+ */
+async function backupTick(env: Env): Promise<void> {
+  if (env.BACKUP === undefined) {
+    // ‏والسببُ بلا رمز مهمّة: يُرى في «هل الآلة تعمل؟»، والمهمّةُ بعنوانها في «ما عليك» (`audit_copy`)
+    await beat(env.DB, 'backup', 'skipped', 'لا دلو خاصّ مربوط بعد — بابُه في «ما عليك»')
+    return
+  }
+  const now = new Date()
+  try {
+    if (!(await snapshotDue(env.DB, now))) return
+    const out = await takeSnapshot({ db: env.DB, bucket: env.BACKUP, encKey: env.TOKEN_ENC_KEY, env: env.SADA_ENV, now })
+    if (out.ok) {
+      console.info({ job: 'backup', tables: out.tables, rows: out.rows, bytes: out.bytes, ms: out.ms, pruned: out.pruned })
+      await beat(env.DB, 'backup', 'ok', `${out.tables} جدولًا · ${out.rows} صفًّا · ${Math.ceil(out.bytes / 1024)}KB`)
+    } else {
+      console.error({ job: 'backup', failed: out.detail })
+      await beat(env.DB, 'backup', 'failed', out.detail)
+    }
+  } catch (error) {
+    console.error({ job: 'backup', failed: error instanceof Error ? error.message : 'unexpected_error' })
+    await beat(env.DB, 'backup', 'failed', error instanceof Error ? error.message : 'unexpected_error')
+  }
+}
+
+/**
  * **دورةُ التدوير** (D-318) — في كلّ دورةٍ ما دام `TOKEN_ENC_KEY_PREV` مضبوطًا، وإلّا لا تعمل أصلًا. دفعةٌ في كلّ جدول،
  * والتالية تُكمل؛ وما بقي يُقرأ في `/admin/ready` (`keys.pending`).
  */
@@ -1122,6 +1154,11 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
     await providersTick(env)
     await alertTick(env)
     await quotaTick(env)
+    // ‏آخرًا (D-321): النسخةُ تقرأ ما كتبه المسحُ، ولا تؤخّر ما يُنتظر
+    await backupTick(env)
+    await prunePulseSlots(env.DB, new Date()).catch((error: unknown) => {
+      console.error({ job: 'pulse-prune', failed: error instanceof Error ? error.message : 'unexpected_error' })
+    })
   }
   if (controller.cron === METRICS_CRON) {
     await metricsTick(env)

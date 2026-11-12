@@ -158,6 +158,31 @@ jobs:
           fi
           echo "معرّفات الإنتاج مضبوطة."
 
+      # ‏**علامةُ Time Travel قبل الترحيل** (D-321): ترحيلٌ يكسر القاعدةَ يُرجَع منها إلى اللحظة التي قبله بأمرٍ واحد
+      # ‏(docs/RUNBOOK.md §٢)، والأمرُ كاملًا في ملخّص العمل. **ولا ترحيلَ بلا علامة**: تعذُّرُها يوقف النشرَ قبل أن يتغيّر شيء،
+      # ‏وإعادةُ التشغيل تكفي. والوقتُ يُطبع معها: منه تُشتقّ العلامةُ نفسُها بعدُ (`time-travel info --timestamp`) ما دام في نافذتها.
+      - name: علامةُ الاسترجاع قبل الترحيل
+        id: bookmark
+        if: steps.head.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          DB="$([ "$TARGET" = production ] && echo sada || echo sada-staging)"
+          AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          npx wrangler d1 time-travel info "$DB" --env "$TARGET" --json > "$RUNNER_TEMP/bookmark.json"
+          BOOKMARK=$(node scripts/deploy_checks.mjs bookmark "$RUNNER_TEMP/bookmark.json")
+          echo "bookmark=$BOOKMARK" >> "$GITHUB_OUTPUT"
+          echo "علامةُ $DB قبل الترحيل ($AT): $BOOKMARK"
+          {
+            echo "### علامةُ الاسترجاع قبل الترحيل"
+            echo ""
+            echo "\`$DB\` عند \`$AT\` — العلامة \`$BOOKMARK\`. إن كسر الترحيلُ القاعدة (docs/RUNBOOK.md §٢):"
+            echo ""
+            echo '```'
+            echo "npx wrangler d1 time-travel restore $DB --env $TARGET --bookmark=$BOOKMARK"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # الترحيل قبل الدالة (CLAUDE.md): Worker يقرأ عمودا لم يُضَف ينكسر
       # على منشور مجدول. والترتيب هنا هو الترتيب نفسه في الوثيقة
       # لا علم تأكيد هنا: wrangler لا يقبل -y ولا --yes على هذا الأمر

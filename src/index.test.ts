@@ -293,3 +293,55 @@ describe('نبضُ التجديد (تحقّق D-320 على main)', () => {
     expect(renewBeat()?.outcome).toBe('failed')
   })
 })
+
+/**
+ * ‏**النسخةُ الاحتياطيّة في الدورة اليوميّة** (D-321): تُؤخذ حين يمضي أسبوعٌ على آخر نسخة، إلى الدلو الخاصّ وحدَه؛ وبلا دلوٍ خاصٍّ
+ * ‏نبضٌ `skipped` بسببه ولا شيءَ يُكتب في `MEDIA`.
+ */
+describe('النسخة الاحتياطيّة (D-321)', () => {
+  const backupBeat = () => db.raw.prepare("SELECT outcome, detail FROM heartbeats WHERE job = 'backup'").get() as { outcome: string; detail: string } | undefined
+  function bucket() {
+    const objects = new Map<string, Uint8Array>()
+    return {
+      objects,
+      async put(key: string, value: Uint8Array) { objects.set(key, value) },
+      async list() { return { objects: [...objects.keys()].map((key) => ({ key })), truncated: false } },
+      async delete(keys: string | string[]) { for (const k of [keys].flat()) objects.delete(k) },
+      async get() { throw new Error('MEDIA لا يُقرأ ولا يُكتب في النسخة') },
+    }
+  }
+
+  it('بلا دلوٍ خاصّ: نبضٌ skipped بسببه وبابِه، ولا يُكتب شيءٌ في دلو الوسائط', async () => {
+    const { toBase64 } = await import('./lib/crypto')
+    const media = bucket()
+    const real = globalThis.fetch
+    globalThis.fetch = drive(0)
+    try {
+      await worker.scheduled({ cron: '3 3 * * *' } as ScheduledController, { ...env(0), MEDIA: media, TOKEN_ENC_KEY: toBase64(crypto.getRandomValues(new Uint8Array(32))) } as never)
+    } finally {
+      globalThis.fetch = real
+    }
+    expect(backupBeat()).toEqual({ outcome: 'skipped', detail: 'لا دلو خاصّ مربوط بعد — بابُه في «ما عليك»' })
+    expect(media.objects.size).toBe(0)
+  })
+
+  it('بدلوٍ خاصّ: نسخةٌ واحدةٌ في الأسبوع، والدورةُ التالية في اليوم نفسِه لا تأخذ ثانية', async () => {
+    const { toBase64 } = await import('./lib/crypto')
+    const BACKUP = bucket()
+    const extra = { BACKUP, TOKEN_ENC_KEY: toBase64(crypto.getRandomValues(new Uint8Array(32))) }
+    const real = globalThis.fetch
+    globalThis.fetch = drive(0)
+    try {
+      await worker.scheduled({ cron: '3 3 * * *' } as ScheduledController, { ...env(0), ...extra } as never)
+      expect(backupBeat()?.outcome).toBe('ok')
+      expect([...BACKUP.objects.keys()]).toHaveLength(1)
+      await worker.scheduled({ cron: '3 3 * * *' } as ScheduledController, { ...env(0), ...extra } as never)
+      // ‏ودورةُ الربع لا تأخذ نسخةً أصلًا
+      await worker.scheduled({ cron: '*/15 * * * *' } as ScheduledController, { ...env(0), ...extra } as never)
+    } finally {
+      globalThis.fetch = real
+    }
+    expect([...BACKUP.objects.keys()]).toHaveLength(1)
+    expect((db.raw.prepare("SELECT count(*) AS n FROM backups WHERE status = 'ok'").get() as { n: number }).n).toBe(1)
+  })
+})

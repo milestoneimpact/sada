@@ -7,7 +7,7 @@
 import type { Db } from '../tokens'
 import { parseSqliteUtc } from '../format'
 
-export type Job = 'renew' | 'dispatch' | 'scan' | 'alerts' | 'metrics' | 'report' | 'publish'
+export type Job = 'renew' | 'dispatch' | 'scan' | 'alerts' | 'metrics' | 'report' | 'publish' | 'backup'
 export type Outcome = 'ok' | 'failed' | 'skipped'
 
 export interface Heartbeat {
@@ -25,6 +25,7 @@ export interface Heartbeat {
  * `renew` و`dispatch` على كلّ تشغيل (كلَّ ربع ساعة، ومعها ‏:07 كلَّ ساعة).
  * `metrics` كلَّ ساعة. `scan` و`alerts` يوميًّا عند ‏03:00. `report` أسبوعيًّا
  * الاثنين ‏04:14. و`publish` عند الطلب: لا موعدَ له فلا يُحكَم بالتأخّر.
+ * ‏و`backup` (D-321) يُسأل كلَّ يومٍ عند ‏03:03 ويأخذ نسخةً كلَّ سبعة أيّام، وينبض حين يحاول — أو `skipped` كلَّ يوم بلا دلوٍ خاصّ.
  */
 export const CADENCE: Readonly<Record<Job, { readonly label: string; readonly everySeconds: number | null }>> = {
   renew: { label: 'تجديد الأذونات', everySeconds: 15 * 60 },
@@ -34,9 +35,10 @@ export const CADENCE: Readonly<Record<Job, { readonly label: string; readonly ev
   alerts: { label: 'تنبيهات الانتهاء', everySeconds: 24 * 60 * 60 },
   report: { label: 'النتائج الأسبوعيّة', everySeconds: 7 * 24 * 60 * 60 },
   publish: { label: 'النشر في الموعد', everySeconds: null },
+  backup: { label: 'النسخة الاحتياطيّة', everySeconds: 7 * 24 * 60 * 60 },
 }
 
-export const JOBS: readonly Job[] = ['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report']
+export const JOBS: readonly Job[] = ['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report', 'backup']
 
 /**
  * ‏**ومنذ متى تسقط** (مراجعة D-320): `failed_since` أوّلُ نبضٍ ساقطٍ بعد آخر ما لم يسقط، يبقى ما دامت تسقط، ويُمحى بأوّل ما لا
