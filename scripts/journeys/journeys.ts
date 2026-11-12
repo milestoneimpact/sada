@@ -779,6 +779,33 @@ const R13: Journey = {
 }
 
 /**
+ * ‏**ر-16 · لوحُ البطاقة** (D-330، بقرار D-328): من مصغَّرةٍ في لوحة الشهر يُفتح اللوح، ويُعتمَد المنشورُ منه **بلا إعادة تحميل**.
+ * ‏البذرةُ بذرةُ ر-13، والنجاحُ من القاعدة (المنشورُ مجدول) ومن الصفحة (اللوحُ يعرض «تراجَع عن الاعتماد»، ومصغَّرتُه بحال المجدول).
+ * ‏وهو اختبارُ السكربت في متصفّحٍ حيّ: ما لا يراه اختبارٌ يرسل نموذجًا ويقرأ صفحة.
+ */
+const R16: Journey = {
+  id: 'R-16',
+  title: 'لوح البطاقة: من مصغَّرةٍ في لوحة الشهر إلى «اعتمد وجدوِل» بلا إعادة تحميل',
+  plan: { target: '3 = البابُ والمصغَّرةُ و«اعتمد وجدوِل» في اللوح (D-330)' },
+  prepare: (stack) => R13.prepare!(stack),
+  async run({ page, m, stack }) {
+    await m.tap(link(page, /راجع واعتمد/), '«راجع واعتمد (2)» في بطاقة «خطّةُ الشهر»')
+    // ‏على العريض مصغَّرةُ اللوحة، وعلى الهاتف (المصغَّراتُ مطويّةٌ هناك) «عدّل» على البطاقة — كلاهما يفتح اللوحَ نفسَه
+    await m.tap(visible(page.locator('.rv-mini[data-sheet], .rv-acts a[data-sheet]')).first(), 'المنشورُ الأوّل: مصغَّرتُه في اللوحة، أو «عدّل» على بطاقته في الهاتف')
+    const sheet = page.locator('#rv-sheet[open]')
+    await sheet.waitFor({ timeout: 8000 })
+    await m.tap(sheet.locator('form[action="/panel/plan/review/approve"] button[type="submit"]'), '«اعتمد وجدوِل» في اللوح', { key: true })
+    await sheet.locator('form[action="/panel/plan/review/undo"]').waitFor({ timeout: 8000 })
+    const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
+    const set = await page.locator('.rv-mini[data-st="set"]').count()
+    return {
+      success: queued === 1 && set === 1,
+      verified: `مجدولٌ من الخطّة: ${queued} · مصغَّراتٌ بحال المجدول: ${set} · اللوحُ يعرض «تراجَع عن الاعتماد»`,
+    }
+  },
+}
+
+/**
  * ‏**ر-14 «بنفسي»** (D-324): المالكُ يكتب منشورَه ويعتمده — بلا نموذجٍ ولا كلفة. كان كلُّ بابٍ إلى مسوّدةٍ يمرّ بنموذجٍ مدفوع،
  * ‏فلا هدفَ له في §6 ولا «قبل»: الطريقُ لم يكن. والنصُّ يُلصق (خطوةٌ واحدة) كما يُلصق في ر-1، والنجاحُ من القاعدة: نصُّه حرفًا،
  * ‏و`model = owner`، ولا صفَّ في الدفتر، والحالُ بعد «اعتمد».
@@ -980,6 +1007,6 @@ const R15: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15]
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16]
 
 export { Blocked }

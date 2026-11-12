@@ -186,6 +186,30 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
 }
 
 /**
+ * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بـ UTC) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
+ * يتحرّك موعدُها معه بـ `reschedulePost` وحرّاسِه (لا ماضٍ، ولا ما أُرسل للنشر)؛ **وإن رُدّ تحريكُها لم يتحرّك البندُ**، فلا
+ * يقول التقويمُ يومًا والمنشورُ يخرج في غيره. وما نُشر لا يُنقل.
+ */
+export async function moveItem(db: Db, org: string, planId: string, index: number, key: string, to: { readonly day: string; readonly time: string }, now: Date): Promise<Act> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to.day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(to.time)) return { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+  const at = await itemAt(db, org, planId, index, key)
+  if (typeof at === 'string') return { ok: false, reason: at }
+  const item = at.plan.items[index]!
+  if (item.day === to.day && item.time === to.time) return { ok: true }
+  if (!dayWithin(to.day, at.start, asSpan(at.span))) return { ok: false, reason: 'اليومُ خارج مدى الخطّة' }
+  const post = await postOf(db, org, planId, item, "status <> 'rejected'")
+  if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُنقل' }
+  if (post !== null && post.status === 'queued') {
+    const r = await reschedulePost(db, post.id, `${to.day}T${to.time}`, now, org)
+    if (!r.ok) return { ok: false, reason: `لم يُنقل: ${r.reason}` }
+  }
+  at.plan.items[index] = { ...item, day: to.day, time: to.time }
+  await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(at.plan), planId, org).run()
+  await touchPlan(db, org, planId)
+  return { ok: true }
+}
+
+/**
  * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول يُسحب موعدُه أوّلًا
  * (D-327: «أزِل» على البطاقة يُزيل المنصّةَ من يومها)، وما أُرسل للنشر أو نُشر لا يُحذف.
  */

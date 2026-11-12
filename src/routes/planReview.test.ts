@@ -233,6 +233,48 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
     ])
   })
 
+  it('لوحةُ الشهر بمصغَّراتها، ولوحُ البطاقة جزءُ صفحةٍ بنماذجها وCSRF — ورقمٌ لا بندَ له 404 (D-330)', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('id="rv-root"')
+    expect(html).toContain('class="rv-cal is-board"')
+    expect(html).toMatch(/<a class="rv-mini" href="\?w=1#c-0" data-sheet="0" data-st="wait" draggable="true" data-move="0" data-key="aaaaaaaaaa\|linkedin\|2099-02-01\|06:00">/)
+    expect(html).toContain('<dialog class="rv-sheet" id="rv-sheet"')
+    const card = await app.request('/panel/plan/review/card?i=1&w=1', { headers: { Cookie: cookie } }, env)
+    expect(card.status).toBe(200)
+    const sheet = await card.text()
+    expect(sheet).not.toContain('<html')
+    for (const s of ['نصُّ منشور المساء', 'action="/panel/plan/review/text"', 'action="/panel/plan/review/move"', 'name="day" value="2099-02-01"', 'name="time" value="18:30"',
+      'action="/panel/plan/review/approve"', 'data-sheet="2"', `name="_csrf" value="${csrf}"`]) expect(sheet).toContain(s)
+    // ‏والسابقُ بترتيب الموعد لا بترتيب البنود: قبل منشور المساء منشورُ X عند الظهر، ولا تاليَ له في يومه
+    expect(sheet).not.toContain('data-sheet="0"')
+    expect((await app.request('/panel/plan/review/card?i=9', { headers: { Cookie: cookie } }, env)).status).toBe(404)
+    expect((await app.request('/panel/plan/review/card?i=1', {}, env)).status).toBe(401)
+  })
+
+  it('«احفظ النصّ» يكتب ولا يعتمد، و«انقل» بيومٍ وساعةٍ بتوقيت المالك — ومجدولٌ يتحرّك موعدُه، وخارجُ المدى يُردّ (D-330)', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    const text = 'نصٌّ كتبه المالكُ في لوح البطاقة بدل ما كتبه النموذج، وفيه ما يكفي ليكون منشورًا يُقرأ ويُعتمد.'
+    await app.request('/panel/plan/review/text', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), post: 'q1', text }), headers: { Cookie: cookie } }, env)
+    expect(db.raw.prepare("SELECT text, status FROM posts WHERE id = 'q1'").get()).toEqual({ text, status: 'draft' })
+    // ‏بندٌ مجدول يُنقل: 2099-02-03 الساعة 10:15 بتوقيت الرياض = 07:15 بـ UTC
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), post: 'q1' }), headers: { Cookie: cookie } }, env)
+    const moved = await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '0', key: keyOf(html, 0), day: '2099-02-03', time: '10:15', w: '1' }), headers: { Cookie: cookie } }, env)
+    expect(moved.headers.get('Location')).toBe('/panel/plan/review?w=1')
+    const items = (): { day: string; time: string }[] => (JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl2'").get() as { plan_json: string }).plan_json) as { items: { day: string; time: string }[] }).items
+    expect(items()[0]).toMatchObject({ day: '2099-02-03', time: '07:15' })
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'q1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-02-03 07:15:00' })
+    // ‏والسحبُ يرسل اليومَ وحدَه: الساعةُ تبقى كما هي بتوقيت المالك
+    const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '2', key: keyOf(after, 2), day: '2099-02-05' }), headers: { Cookie: cookie } }, env)
+    expect(items()[2]).toMatchObject({ day: '2099-02-05', time: '12:00' })
+    // ‏وخارجُ المدى يُردّ ولا يتبدّل شيء
+    const last = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '2', key: keyOf(last, 2), day: '2099-03-01' }), headers: { Cookie: cookie } }, env)
+    expect(items()[2]).toMatchObject({ day: '2099-02-05' })
+  })
+
   it('المعالجُ يحمل لكلّ منصّةٍ إيقاعَها حتّى ثلاثٍ في اليوم وأوقاتَها وصورتَها', async () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()

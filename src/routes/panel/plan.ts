@@ -9,9 +9,11 @@ import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
-import { reviewModel, delayItem, dropItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
-import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../ui/planReviewView'
-import { approveMany, decide } from '../../lib/draft/store'
+import { reviewModel, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
+import { localToUtc } from '../../lib/time/local'
+import { localParts } from '../../lib/time/zone'
+import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
@@ -655,6 +657,69 @@ plan.post('/panel/plan/review/delay', async (c) => {
     ? { kind: result.note === undefined ? 'ok' : 'warn', text: result.note ?? (days === 7 ? 'أُخّر أسبوعًا.' : 'أُخّر يومًا.') }
     : { kind: 'bad', text: result.reason })
   return toCard(f)
+})
+
+/**
+ * **انقل البند** (D-330): يومٌ بتوقيت المالك (من السحب في اللوحة أو من لوح البطاقة) وساعةٌ إن ذُكرت — وإلّا ساعتُه كما هي بتوقيته.
+ * يُحوَّلان إلى UTC هنا، والحكمُ كلُّه في `moveItem`.
+ */
+plan.post('/panel/plan/review/move', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const current = await latestPlan(c.env.DB, org)
+  const item = current === null || current.id !== String(f.get('id') ?? '') ? undefined : current.plan.items[Number(f.get('index'))]
+  const day = String(f.get('day') ?? '')
+  let result: Awaited<ReturnType<typeof moveItem>> = { ok: false, reason: 'تغيّرت الخطّة منذ فتحت الصفحة — أعد تحميلها' }
+  if (item !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const was = localParts(new Date(item.day + 'T' + item.time + ':00Z'), zone)
+    const asked = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.get('time') ?? '')) ? String(f.get('time')).split(':').map(Number) : [was.hour, was.minute]
+    const [y, mo, d] = day.split('-').map(Number)
+    const at = localToUtc(y!, mo!, d!, asked[0]!, asked[1]!, zone)
+    result = at === null
+      ? { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+      : await moveItem(c.env.DB, org, current!.id, Number(f.get('index')), String(f.get('key') ?? ''), { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16) }, new Date())
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.move', target: String(f.get('id') ?? ''), detail: result.ok ? day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند — ومنشورُه المجدولُ معه.' } : { kind: 'bad', text: result.reason })
+  return toCard(f, false)
+})
+
+/** **نصُّ المسوّدة من لوح البطاقة** (D-330): «احفظ» يكتب ولا يعتمد — والحكمُ في `saveText` (المسوّدةُ وحدَها، وحدُّ المنصّة). */
+plan.post('/panel/plan/review/text', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('post') ?? '')
+  const result = await saveText(c.env.DB, activeOrg(gate.session.record), id, String(gate.form.get('text') ?? ''))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.text', target: id, detail: result.ok ? 'saved' : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'حُفظ النصّ — ويبقى مسوّدةً حتّى تعتمده.' } : { kind: 'bad', text: result.reason })
+  return toCard(gate.form)
+})
+
+/**
+ * **لوحُ البطاقة** (D-330): جزءُ صفحةٍ لبندٍ واحد — معاينتُه ونصُّه وصورتُه وموعدُه وأفعالُه — يطلبه سكربتُ الشاشة حين تُضغط
+ * مصغَّرة. خلف الجلسة كالشاشة، ونماذجُه بـ CSRF الجلسة، **ولا يفعل شيئًا**: الأفعالُ نماذجُ إلى مساراتها بحرّاسها.
+ */
+plan.get('/panel/plan/review/card', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.text('انتهت الجلسة', 401)
+  const org = activeOrg(session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null) return c.text('لا خطّة', 404)
+  const [model, zone, orgRow, accounts] = await Promise.all([
+    reviewModel(c.env.DB, org, current),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+    c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
+      .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
+  ])
+  const authors: Record<string, string> = {}
+  for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
+  const body = planSheet(model, Number(c.req.query('i')), zone ?? null, { week: c.req.query('w') ?? null, orgName: orgRow?.name ?? 'خطّتي', authors })
+  if (body === null) return c.text('لا بند بهذا الرقم', 404)
+  return new Response(injectCsrf(body, session.record.csrf), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' } })
 })
 
 plan.post('/panel/plan/review/drop', async (c) => {

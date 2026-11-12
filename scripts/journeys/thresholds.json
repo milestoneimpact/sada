@@ -242,12 +242,12 @@
       "phone": {
         "success": true,
         "steps": 2,
-        "loads": 2
+        "loads": 1
       },
       "desktop": {
         "success": true,
         "steps": 2,
-        "loads": 2
+        "loads": 1
       }
     },
     "R-14": {
@@ -273,6 +273,19 @@
       "desktop": {
         "success": true,
         "steps": 4,
+        "loads": 1
+      }
+    },
+    "R-16": {
+      "why": "3 = البابُ والمصغَّرةُ (أو «عدّل» على الهاتف) و«اعتمد وجدوِل» في اللوح (D-330)؛ قيس 3 و3 وتحميلٌ واحد — الاعتمادُ بلا إعادة تحميل",
+      "desktop": {
+        "success": true,
+        "steps": 3,
+        "loads": 1
+      },
+      "phone": {
+        "success": true,
+        "steps": 3,
         "loads": 1
       }
     }
