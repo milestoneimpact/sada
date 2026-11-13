@@ -5,6 +5,7 @@
  * والرفعُ من هنا يُربط بالبند نفسِه. والفلاترُ روابطُ لا سكربت: تعمل بلا JavaScript، وتُحفظ في العنوان.
  */
 import { escapeHtml } from './escape'
+import { button } from './components/button'
 import { pageHead } from './parts'
 import { notice, toastRegion } from './components/toast'
 import { kb } from '../../lib/format'
@@ -16,6 +17,8 @@ export interface LibraryData {
   readonly origin: AssetOrigin | null
   /** وجهُ الاختيار: البندُ الذي يُختار له. */
   readonly pick: { readonly plan: string; readonly index: number } | null
+  /** وجهُ الاختيار لمنشورٍ مكتوب (D-334): «اختر من المكتبة» على بطاقة الخطّة — المنشورُ وبطاقتُه وأسبوعُها للعودة. */
+  readonly pickPost?: { readonly post: string; readonly index: number; readonly w: string } | null
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -28,6 +31,7 @@ function query(d: LibraryData, change: { kind?: AssetKind | null; origin?: Asset
   if (kind !== null) q.set('kind', kind)
   if (origin !== null) q.set('origin', origin)
   if (d.pick !== null) { q.set('plan', d.pick.plan); q.set('index', String(d.pick.index)) }
+  if (d.pickPost !== undefined && d.pickPost !== null) { q.set('post', d.pickPost.post); q.set('index', String(d.pickPost.index)); if (d.pickPost.w !== '') q.set('w', d.pickPost.w) }
   const s = q.toString()
   return `/panel/assets${s === '' ? '' : `?${s}`}`
 }
@@ -39,6 +43,9 @@ function chips<T extends string>(d: LibraryData, labels: Readonly<Record<T, stri
 }
 
 function hidden(d: LibraryData): string {
+  if (d.pickPost !== undefined && d.pickPost !== null) {
+    return '<input type="hidden" name="post" value="' + escapeHtml(d.pickPost.post) + '"><input type="hidden" name="index" value="' + String(d.pickPost.index) + '"><input type="hidden" name="w" value="' + escapeHtml(d.pickPost.w) + '">'
+  }
   return d.pick === null ? ''
     : `<input type="hidden" name="id" value="${escapeHtml(d.pick.plan)}"><input type="hidden" name="index" value="${d.pick.index}">`
 }
@@ -50,13 +57,20 @@ function tile(a: Asset, d: LibraryData): string {
   const open = a.drive !== null
     ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.drive)}" target="_blank" rel="noopener">افتح في Drive</a>`
     : a.preview !== null ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.preview)}" target="_blank" rel="noopener">افتح</a>` : ''
-  const pick = d.pick === null ? ''
+  const forPost = d.pickPost !== undefined && d.pickPost !== null
+  // ‏عدّادُ الاستعمال (D-334): يُرى قبل الاختيار، فلا تتكرّر الصورةُ بلا قصد
+  const used = a.uses === undefined || a.uses === 0 ? '' : ' · ' + (a.uses === 1 ? 'في منشورٍ واحد' : 'في ' + String(a.uses) + ' منشورات')
+  const pick = forPost
+    ? a.kind !== 'image' || a.origin === 'drive' ? ''
+      : '<form class="inline" method="POST" action="/panel/plan/review/image">' + hidden(d) + '<input type="hidden" name="ref" value="' + escapeHtml(a.ref) + '">'
+        + button({ label: 'استعملها لهذا المنشور', variant: 'primary', size: 'sm', type: 'submit' }) + '</form>'
+    : d.pick === null ? ''
     : `<form class="inline" method="POST" action="/panel/plan/item">${hidden(d)}<input type="hidden" name="asset" value="${escapeHtml(a.ref)}">
         <button class="btn btn-primary btn-sm" type="submit">${a.origin === 'drive' ? 'اكتب منه' : 'اختر لهذا البند'}</button></form>`
   return `<article class="card card-inset tile">
     ${media}
     <div class="kv-k"><bdi>${escapeHtml(a.name)}</bdi></div>
-    <div class="note">${escapeHtml(folderOf(a))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}</div>
+    <div class="note">${escapeHtml(folderOf(a))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}${escapeHtml(used)}</div>
     <div class="row gap-2 mt-3">${pick}${open}</div>
   </article>`
 }
@@ -69,7 +83,10 @@ export function libraryScreen(d: LibraryData): string {
     const f = folderOf(a)
     folders.set(f, [...(folders.get(f) ?? []), a])
   }
-  const lead = d.pick === null
+  const lead = d.pickPost !== undefined && d.pickPost !== null
+    ? '<b>اختر صورةً لهذا المنشور</b> — تُربط به بلا كلفة، وصورتُه الحاليّةُ تُستبدل. أو ارفع جديدةً فتُحفظ في الأصول وتُربط به. <a href="/panel/plan/review'
+      + (d.pickPost.w === '' ? '' : '?w=' + escapeHtml(d.pickPost.w)) + '#c-' + String(d.pickPost.index) + '">عُد إلى الخطّة</a>'
+    : d.pick === null
     ? 'كلُّ ما رُفع أو وُلّد أو في Drive — <b>يُحفظ مصنَّفًا ويُعاد استعمالُه بلا كلفة</b>.'
     : `<b>اختر ملفًّا لبند الخطّة</b> — أو ارفع جديدًا فيُحفظ في الأصول ويُربط به. <a href="/panel/client#board">عُد إلى الخطّة</a>`
   const accept = [...LIBRARY_MIMES].join(',')
@@ -78,7 +95,7 @@ export function libraryScreen(d: LibraryData): string {
       <p class="note">PNG أو JPEG أو WebP حتّى 5MB. والمقاطعُ من <a href="/panel/library#videos">فيديوهاتك</a> وتظهر هنا بعد رفعها.</p>
       ${hidden(d)}
       <div class="row gap-2 mt-3"><input type="file" name="file" accept="${accept}" required>
-      <button class="btn btn-primary btn-sm" type="submit">ارفع${d.pick === null ? '' : ' واربطه بالبند'}</button></div>
+      <button class="btn btn-primary btn-sm" type="submit">ارفع${d.pickPost !== undefined && d.pickPost !== null ? ' واربطها بالمنشور' : d.pick === null ? '' : ' واربطه بالبند'}</button></div>
     </form>`
 
   return `${pageHead('الأصول', 'أصولُ العميل', lead)}

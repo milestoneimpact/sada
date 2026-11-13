@@ -97,13 +97,15 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
   // ‏ونوعُ الصورة نوعُ منصّتها (D-329)، وما اختير له «بلا صورة» يُرسم بالنوع العامّ حين يُطلب بالزرّ
   const chosen = imageFor(m.plan.choices, c.item.platform)
   const style = html`<input type="hidden" name="style" value="${chosen === 'none' ? m.plan.choices.imageStyle : chosen}">`
+  // ‏«من المكتبة» (D-334): صورةٌ سبق رسمُها أو رفعُها تُربط بهذا المنشور بلا كلفة — رابطٌ إلى الأصول في وجه الاختيار
+  const lib = raw(button({ label: 'من المكتبة', size: 'sm', href: '/panel/assets?kind=image&post=' + encodeURIComponent(c.post.id) + '&index=' + String(c.index) + (w === '' ? '' : '&w=' + encodeURIComponent(w)) }))
   if (c.mediaId === null) {
     return maySpend()
-      ? html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>
+      ? html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>${lib}
           <form class="inline" method="POST" action="/panel/media/generate" data-busy="تُرسم الصورة…">${back}${style}<input type="hidden" name="id" value="${c.post.id}">${raw(button({ label: 'ولّد صورة', size: 'sm', type: 'submit' }))}</form></div>`
-      : html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span></div>`
+      : html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>${lib}</div>`
   }
-  return html`<div class="row gap-2 rv-img"><span class="hint">الصورة</span><span class="grow"></span>
+  return html`<div class="row gap-2 rv-img"><span class="hint">الصورة</span><span class="grow"></span>${lib}
       ${maySpend() ? html`<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="تُرسم الصورة…">${back}${style}<input type="hidden" name="id" value="${c.post.id}"><input type="hidden" name="media" value="${c.mediaId}">${raw(button({ label: 'بدّلها', size: 'sm', type: 'submit' }))}</form>` : html``}
       <form class="inline" method="POST" action="/panel/media/reject">${back}<input type="hidden" name="id" value="${c.mediaId}">${raw(button({ label: 'بدون صورة', size: 'sm', type: 'submit' }))}</form></div>`
 }
@@ -122,7 +124,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
     : raw(nativePost({
       platform: c.item.platform as never, id: c.post.id, author: { name: view.authors?.[c.item.platform] ?? view.orgName ?? 'خطّتي', kind: null },
       text: c.post.text, when: local,
-      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true },
+      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true, width: c.mediaWidth ?? null, height: c.mediaHeight ?? null },
       poster: null, metrics: null, variant: 'feed',
     }))
   const approve = c.post === null || (status !== 'draft' && status !== 'approved' && status !== 'edited')
@@ -198,7 +200,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
         const text = c.post === null ? 'تُكتب الآن' : STATUS[c.post.status]?.text ?? c.post.status
         const movable = c.post === null || c.post.status !== 'published'
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
-          ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}" alt="" loading="lazy" width="28" height="28">`}
+          ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}" alt="" loading="lazy" decoding="async" width="28" height="28">`}
           <span class="pf-logo rv-pf rv-dot" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
           <bdi class="mono">${stamp(c.item.day + ' ' + c.item.time, board.zone).slice(11, 16)}</bdi><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
       })}
@@ -327,7 +329,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
     : raw(nativePost({
       platform: c.item.platform as never, id: c.post.id, author: { name: view.authors?.[c.item.platform] ?? view.orgName ?? 'خطّتي', kind: null },
       text: c.post.text, when: localTime,
-      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true },
+      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true, width: c.mediaWidth ?? null, height: c.mediaHeight ?? null },
       poster: null, metrics: null, variant: 'feed',
     }))
   const edit = c.post === null
