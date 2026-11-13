@@ -1,4 +1,4 @@
-/* رونق 1.2 — مكتبةُ الأنماط. استوردها، ثمّ اكتب رموز هويّتك فوقها. الأيقونات: Lucide (ISC). */
+/* رونق 1.3 — مكتبةُ الأنماط. استوردها، ثمّ اكتب رموز هويّتك فوقها. الأيقونات: Lucide (ISC). */
 
 /* التخطيط: لوحةٌ عميقة (حلقةُ الصحّة) ← شريطٌ لاصق بلوحة أوامر ← المفاتيح (المزوّدُ الأوّل أعرض) ← المسارات ← الحراسة. */
 :root{
@@ -13,7 +13,9 @@
   --f-ui:"IBM Plex Sans Arabic",system-ui,"Segoe UI",Tahoma,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   --f-display:var(--f-ui);
-  --ease:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  --ease:cubic-bezier(.2,0,0,1); --ease-std:cubic-bezier(.4,0,.2,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  /* 1.3: منحنى توقيعيّ واحد، والخروج أسرع من الدخول */
+  --dur-enter:.24s; --dur-exit:.16s;
   /* نظامُ حركة رونق: ثلاث سرعات وخمسة معانٍ — وصول، تأكيد، رفض، انتظار، احتفال */
   --m-fast:.16s; --m-base:.32s; --m-slow:.6s;
   --skel:linear-gradient(90deg,var(--inset) 0%,var(--line-soft) 50%,var(--inset) 100%);
@@ -480,3 +482,65 @@ h2{font-family:var(--f-display);font-size:28px;line-height:1.35;margin:4px 0 0;f
 .r-palwrap .grp{font-size:12px;color:var(--mute);padding:10px 12px 4px;cursor:default}
 .r-keys dl{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0;padding:16px}
 .r-keys dt{margin:0} .r-keys dd{margin:0;font-size:14px;color:var(--ink-2)}
+
+/* ═════ 1.3 ═════ */
+
+/* (1) طابور الرسائل */
+.r-toasts{position:fixed;z-index:80;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column-reverse;gap:8px;align-items:center;width:min(520px,calc(100% - 32px));pointer-events:none}
+.r-toasts:focus{outline:none}
+.r-toasts .toast{position:relative;left:auto;bottom:auto;transform:translateY(12px) scale(.97);opacity:0;width:100%;pointer-events:auto;transition:opacity var(--dur-enter) var(--ease),transform var(--dur-enter) var(--spring)}
+.r-toasts .toast.show{transform:none;opacity:1}
+.r-toasts .toast.leaving{transition-duration:var(--dur-exit);opacity:0;transform:translateY(6px) scale(.98)}
+.r-toasts .toast .x{background:none;border:0;color:inherit;opacity:.55;font-size:18px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
+.r-toasts .toast .x:hover{opacity:1}
+.r-toasts .toast:nth-child(2){opacity:.92} .r-toasts .toast:nth-child(3){opacity:.8}
+
+/* (2) الخروج أسرع: الألواح */
+.sheet{transition-duration:var(--dur-exit)} .sheet-open .sheet{transition-duration:.42s}
+.scrim{transition-duration:var(--dur-exit)} .sheet-open .scrim{transition-duration:var(--dur-enter)}
+
+/* (5) التلميح */
+.r-tip{position:fixed;z-index:90;max-width:260px;padding:6px 10px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.5;pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity var(--dur-exit) var(--ease),transform var(--dur-exit) var(--ease)}
+.r-tip.on{opacity:1;transform:none;transition-duration:var(--dur-enter)}
+
+/* (6) حجزُ المكان: سطرُ الحقل لا يدفع ما تحته، والصور بنسبتها */
+.r-field small,.edit small{min-block-size:20px;display:block}
+.r-media{aspect-ratio:var(--ratio,16/9);background:var(--inset);border-radius:var(--r-md,12px);overflow:hidden}
+.skel.sk-l{block-size:14px} .skel.sk-b{block-size:58px}
+
+/* (7) إيقاف الحركة من الواجهة */
+:root[data-motion-off] *,:root[data-motion-off] *::before,:root[data-motion-off] *::after{animation:none!important;transition-duration:0s!important;scroll-behavior:auto!important}
+:root[data-motion-off]::view-transition-group(*),:root[data-motion-off]::view-transition-old(*),:root[data-motion-off]::view-transition-new(*){animation:none!important}
+
+/* (8) الشريط بعد أوّل تمرير */
+.nav[data-scrolled],.g-bar[data-scrolled]{box-shadow:0 8px 24px -16px rgba(0,0,0,.35);background:color-mix(in srgb,var(--card) 78%,transparent);backdrop-filter:saturate(1.5) blur(16px);-webkit-backdrop-filter:saturate(1.5) blur(16px);transition:box-shadow var(--dur-enter) var(--ease),background var(--dur-enter) var(--ease)}
+
+/* (9) سلّم الأزرار، والثانويّ الملوّن، والعمق الداكن */
+:root{--btn-h-sm:32px;--btn-h-md:40px;--btn-h-lg:56px}
+.btn{min-height:var(--btn-h-md);border-radius:var(--r-btn,11px);transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease),transform .1s var(--ease)}
+.btn.sm{min-height:var(--btn-h-sm)} .btn.lg{min-height:var(--btn-h-lg);padding:0 24px;font-size:16px}
+.btn:active{transform:translateY(1px) scale(.99)}
+.btn.tint{background:color-mix(in srgb,var(--brand) 11%,transparent);border-color:transparent;color:var(--brand)}
+.btn.tint:hover{background:color-mix(in srgb,var(--brand) 17%,transparent)}
+:root[data-theme="dark"] .btn:not(.ghost):not(.tint){box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.45)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn:not(.ghost):not(.tint){box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.45)}}
+
+/* (10) أهدافُ اللمس */
+@media (pointer:coarse){
+  .btn,.btn.sm,.r-chip,.switch,.help,.opt,.tabbar a,.r-table th button,.seg a,.dens button{min-block-size:44px}
+  .r-check{inline-size:22px;block-size:22px}
+  .r-toolbar,.kfoot,.pact,.r-filters{gap:8px}
+}
+
+/* (11) طابعُ الزوايا بخاصيّة واحدة */
+:root,:root[data-radius="soft"]{--r-sm:8px;--r-md:12px;--r-lg:18px;--r-btn:11px}
+:root[data-radius="sharp"]{--r-sm:4px;--r-md:6px;--r-lg:8px;--r-btn:6px}
+:root[data-radius="round"]{--r-sm:10px;--r-md:16px;--r-lg:24px;--r-btn:999px}
+.key,.panel,.g-cell,.g-item,.sk-card,.statebox,.r-detail,.r-cl,.r-table-wrap,.routes,.log,.wizard,.adder{border-radius:var(--r-lg)}
+.kbody,.pick,.hint,.conseq,.err,.r-cl li,.steps li,.search input,.kin,.r-field input,.r-field textarea,.r-search input,.toast,.pal,.popover{border-radius:var(--r-md)}
+.state,.r-chip,.tag,.src{border-radius:var(--r-sm)}
+:root[data-radius="round"] .state,:root[data-radius="round"] .r-chip{border-radius:999px}
+
+/* (3) العناوين: تقاربُ الحروف للّاتينيّ وحده — العربيّ متّصلٌ ينكسر به، فيُشدّ بالوزن والسطر */
+h1,h2,h3{line-height:1.25}
+:lang(en) h1,:lang(en) h2,[dir="ltr"] h1,[dir="ltr"] h2{letter-spacing:-.03em}
