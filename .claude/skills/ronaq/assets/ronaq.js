@@ -1,4 +1,4 @@
-/* رونق 1.1 — سلوكُ المكوّنات. بلا اعتماديّات. ‏window.Ronaq */
+/* رونق 1.2 — سلوكُ المكوّنات. بلا اعتماديّات. ‏window.Ronaq */
 (function(){
 'use strict';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -106,12 +106,152 @@ function table(host, cfg){
   return { render, state: st, setRows(r){ cfg.rows = r; render() } };
 }
 
+
+/* ═════ 1.2 · الوصول: حبسُ التركيز وتنقّلُ القوائم بالأسهم ═════ */
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])';
+/** يحبس التركيز داخل لوح، ويجعل ما خلفه خاملًا (inert). يعيد دالّة الفكّ، وتعيد التركيز إلى من فتحه. */
+function trap(panel){
+  const opener = document.activeElement, dead = [];
+  // ‏الخمولُ على كلّ مستوى: إخوةُ اللوح، ثمّ إخوةُ أبيه… حتّى body — فاللوحُ داخل حاويةٍ مشتركة لا يُفلت
+  for(let n = panel; n && n !== document.body; n = n.parentElement)
+    [...(n.parentElement ? n.parentElement.children : [])].forEach(sib => { if(sib !== n && !sib.inert && sib.tagName !== 'SCRIPT'){ sib.inert = true; dead.push(sib) } });
+  const tabbables = () => [...panel.querySelectorAll(FOCUSABLE)].filter(x => x.tabIndex >= 0 && x.offsetParent !== null);
+  const onKey = e => { if(e.key !== 'Tab') return; const f = tabbables(); if(!f.length) return;
+    const first = f[0], last = f[f.length-1];
+    if(e.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))){ e.preventDefault(); last.focus() }
+    else if(!e.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))){ e.preventDefault(); first.focus() } };
+  document.addEventListener('keydown', onKey, true);
+  const f = panel.querySelector('[autofocus]') || tabbables()[0]; f && setTimeout(() => f.focus(), 30);
+  return () => { dead.forEach(el => el.inert = false); document.removeEventListener('keydown', onKey, true); opener && opener.focus && opener.focus() };
+}
+/** قائمة بالأسهم (roving tabindex): ↑↓ ثمّ Home/End، والحرف الأوّل يقفز. */
+function listbox(list, itemSel='[role="option"]'){
+  const items = () => [...list.querySelectorAll(itemSel)];
+  const set = i => { const it = items(); it.forEach((x,k) => x.tabIndex = k===i ? 0 : -1); it[i] && it[i].focus() };
+  items().forEach((x,k) => x.tabIndex = k===0 ? 0 : -1);
+  list.addEventListener('keydown', e => { const it = items(), i = it.indexOf(document.activeElement); if(i < 0) return;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); set(Math.min(it.length-1, i+1)) }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); set(Math.max(0, i-1)) }
+    else if(e.key === 'Home'){ e.preventDefault(); set(0) } else if(e.key === 'End'){ e.preventDefault(); set(it.length-1) }
+    else if(e.key.length === 1){ const j = it.findIndex((x,k) => k > i && x.textContent.trim().startsWith(e.key)); if(j >= 0) set(j) } });
+}
+
+/* ═════ 1.2 · العربيّة: الجمع والوقت والتاريخ ═════ */
+const PR = new Intl.PluralRules('ar');
+/** ‏plural(n, {one:'منشور', two:'منشوران', few:'منشورات', many:'منشورًا', other:'منشور', zero:'لا منشور'}) */
+function plural(n, f){
+  if(n === 0 && f.zero) return f.zero;
+  const k = PR.select(n);
+  if(k === 'one') return f.one2 || `${f.one} واحد`;
+  if(k === 'two') return f.two;
+  return `${n} ${f[k] || f.other}`;
+}
+const RTF = new Intl.RelativeTimeFormat('ar', {numeric:'auto'});
+/** وقتٌ نسبيّ عربيّ صحيح: «قبل 3 دقائق»، «أمس»، «بعد ساعتين». */
+function ago(date, now = Date.now()){
+  const d = (new Date(date) - now) / 1000, a = Math.abs(d);
+  const [v,u] = a < 45 ? [0,'second'] : a < 3600 ? [d/60,'minute'] : a < 86400 ? [d/3600,'hour'] : a < 2592000 ? [d/86400,'day'] : [d/2592000,'month'];
+  return u === 'second' ? 'الآن' : RTF.format(Math.round(v), u);
+}
+/** تاريخ عربيّ، وهجريٌّ بخيار. الأرقام لاتينيّة كقاعدة رونق. */
+function date(d, {hijri=false, style='medium'}={}){
+  return new Intl.DateTimeFormat(hijri ? 'ar-SA-u-ca-islamic-umalqura-nu-latn' : 'ar-u-nu-latn', {dateStyle:style}).format(new Date(d));
+}
+
+/* ═════ 1.2 · رسالةٌ تتبع العمليّة ═════ */
+/** ‏track(promiseFn, {loading, success:(v)=>msg, error:(e)=>msg}) — رسالةٌ واحدة تتحوّل، وفي الفشل «أعد المحاولة». */
+function track(fn, m){
+  toast(m.loading, {}); const t = $('#r-toast'); t.classList.add('loading'); t.querySelector('.ic').textContent = '◌'; clearTimeout(th);
+  return Promise.resolve().then(fn).then(v => { t.classList.remove('loading'); toast(m.success(v)); return v },
+    e => { t.classList.remove('loading'); toast(m.error(e), {bad:true, undo:() => track(fn, m)}); t.querySelector('.undo').textContent = 'أعد المحاولة'; throw e });
+}
+
+/* ═════ 1.2 · النماذج: تحقّقٌ لحظيّ، حفظٌ تلقائيّ، حمايةٌ من المغادرة ═════ */
+/**
+ * ‏form(el, {rules:{name:(v)=>msg|''}, save:(data)=>Promise, delay:800})
+ * التحقّق بعد مغادرة الحقل ثمّ أثناء الكتابة، والحفظ التلقائيّ بعد سكون، والمغادرة بتعديلٍ لم يُحفظ تُنبَّه.
+ */
+function form(el, cfg){
+  let dirty = false, timer = 0; const status = el.querySelector('[data-status]');
+  const say = (txt, cls='') => { if(status){ status.textContent = txt; status.className = 'r-fstatus ' + cls } };
+  const check = inp => { const r = cfg.rules && cfg.rules[inp.name]; if(!r) return true; const msg = r(inp.value.trim());
+    const h = document.getElementById(inp.getAttribute('aria-describedby'));
+    inp.setAttribute('aria-invalid', msg ? 'true' : 'false'); inp.classList.toggle('invalid', !!msg);
+    if(h){ h.textContent = msg || h.dataset.hint || ''; h.classList.toggle('why-bad', !!msg) } return !msg };
+  el.addEventListener('focusout', e => { if(e.target.name){ e.target.dataset.touched = '1'; check(e.target) } });
+  el.addEventListener('input', e => {
+    if(e.target.dataset.touched) check(e.target);
+    dirty = true; say('تعديلٌ لم يُحفظ', 'dirty'); clearTimeout(timer);
+    timer = setTimeout(async () => { const ok = [...el.elements].filter(x => x.name).every(check); if(!ok){ say('صحّح الحقول المعلَّمة', 'bad'); return }
+      say('يحفظ…', 'busy'); await cfg.save(Object.fromEntries(new FormData(el))); dirty = false; const at = Date.now(); say('حُفظ الآن', 'ok');
+      clearInterval(el._t); el._t = setInterval(() => { if(!dirty) say('حُفظ ' + ago(at), 'ok') }, 15000) }, cfg.delay || 800) });
+  addEventListener('beforeunload', e => { if(dirty){ e.preventDefault(); e.returnValue = '' } });
+  return { get dirty(){ return dirty } };
+}
+
+/* ═════ 1.2 · مسار الإعداد ═════ */
+/** ‏checklist(host, [{id,title,desc,action,done}]) — «اكتمال الإعداد 3 من 5» حتّى يكتمل، ثمّ يشكر ويختفي. */
+function checklist(host, steps, {onAct}={}){
+  function render(){
+    const n = steps.filter(s => s.done).length, all = n === steps.length, pct = n / steps.length;
+    host.innerHTML = all ? `<div class="r-cl done" role="status"><i data-lucide="sparkles"></i><b>اكتمل الإعداد</b><span>كلّ شيءٍ جاهز. هذه القائمة لن تظهر مجدّدًا.</span></div>` :
+    `<div class="r-cl"><div class="r-cl-h"><svg class="r-cl-ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/><circle cx="18" cy="18" r="15" style="stroke-dasharray:94.25;stroke-dashoffset:${94.25*(1-pct)}"/></svg>
+      <div><b>اكتمال الإعداد</b><span>${n} من ${steps.length}</span></div></div>
+      <ol>${steps.map(s => `<li class="${s.done?'ok':''}"><span class="d" aria-hidden="true">${s.done?'✓':''}</span><div><b>${esc(s.title)}</b><span>${esc(s.desc)}</span></div>${s.done?'<span class="tag t-free">تمّ</span>':`<button class="btn sm primary" type="button" data-step="${s.id}">${esc(s.action)}</button>`}</li>`).join('')}</ol></div>`;
+    icons(host);
+  }
+  host.addEventListener('click', e => { const b = e.target.closest('[data-step]'); if(!b) return; const s = steps.find(x => x.id === b.dataset.step);
+    Promise.resolve(onAct ? onAct(s) : true).then(ok => { if(ok !== false){ vt(() => { s.done = true; render() }); announce(`تمّ: ${s.title}`) } }) });
+  render(); return { render };
+}
+
+/* ═════ 1.2 · الذاكرة: لوحة أوامر بالأخيرة، ونافذة الاختصارات ═════ */
+const store = { get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d }catch(e){ return d } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch(e){} } };
+/** ‏palette([{id,title,hint,icon,keys?,run}]) — ⌘K. «الأخيرة» أوّلًا، وحبسُ تركيز، وأسهم. */
+function palette(cmds){
+  const wrap = document.createElement('div'); wrap.className = 'r-palwrap'; wrap.hidden = true;
+  wrap.innerHTML = `<div class="pal" role="dialog" aria-modal="true" aria-label="لوحة الأوامر"><div class="top"><input type="search" placeholder="ابحث عن أمر…" aria-label="ابحث عن أمر"></div><ul role="listbox"></ul>
+    <div class="foot"><span><span class="kbd">↑↓</span> تنقّل</span><span><span class="kbd">↵</span> نفّذ</span><span><span class="kbd">?</span> الاختصارات</span></div></div>`;
+  document.body.append(wrap); const inp = $('input', wrap), ul = $('ul', wrap); let sel = 0, shown = [], release = null;
+  function render(){
+    const q = inp.value.trim(), rec = store.get('ronaq-recent', []);
+    const recent = q ? [] : rec.map(id => cmds.find(c => c.id === id)).filter(Boolean);
+    const rest = cmds.filter(c => (!q || (c.title + ' ' + (c.hint||'')).includes(q)) && !recent.includes(c));
+    shown = [...recent, ...rest]; sel = Math.min(sel, Math.max(0, shown.length-1));
+    ul.innerHTML = (recent.length ? '<li class="grp" role="presentation">الأخيرة</li>' : '') +
+      shown.map((c,i) => (i === recent.length && recent.length ? '<li class="grp" role="presentation">كلّ الأوامر</li>' : '') +
+      `<li role="option" aria-selected="${i===sel}" data-i="${i}"><i data-lucide="${c.icon||'arrow-left'}"></i>${esc(c.title)}<span class="k">${c.keys?`<span class="kbd">${esc(c.keys)}</span>`:esc(c.hint||'')}</span></li>`).join('') || '<li class="grp">لا أمر بهذا الاسم</li>';
+    icons(ul); const a = ul.querySelector('[aria-selected="true"]'); a && a.scrollIntoView({block:'nearest'});
+  }
+  function run(i){ const c = shown[i]; if(!c) return; store.set('ronaq-recent', [c.id, ...store.get('ronaq-recent', []).filter(x => x !== c.id)].slice(0,4)); close(); setTimeout(c.run, 120) }
+  function open(){ wrap.hidden = false; requestAnimationFrame(() => wrap.classList.add('on')); inp.value = ''; sel = 0; render(); release = trap(wrap) }
+  function close(){ wrap.classList.remove('on'); setTimeout(() => wrap.hidden = true, 200); release && release() }
+  inp.addEventListener('input', () => { sel = 0; render() });
+  wrap.addEventListener('keydown', e => { if(e.key === 'ArrowDown'){ e.preventDefault(); sel = Math.min(shown.length-1, sel+1); render() } else if(e.key === 'ArrowUp'){ e.preventDefault(); sel = Math.max(0, sel-1); render() } else if(e.key === 'Enter'){ e.preventDefault(); run(sel) } else if(e.key === 'Escape') close() });
+  wrap.addEventListener('click', e => { const li = e.target.closest('li[data-i]'); if(li) run(+li.dataset.i); else if(e.target === wrap) close() });
+  addEventListener('keydown', e => { if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); wrap.hidden ? open() : close() } });
+  return { open, close };
+}
+/** ‏shortcuts([{keys:'⌘K', label:'لوحة الأوامر'}]) — «?» يفتح النافذة، وكلّ زرٍّ له data-keys يُظهر اختصاره عند المرور. */
+function shortcuts(list){
+  const d = document.createElement('div'); d.className = 'r-palwrap'; d.hidden = true;
+  d.innerHTML = `<div class="pal r-keys" role="dialog" aria-modal="true" aria-label="اختصارات لوحة المفاتيح"><div class="top"><b>اختصارات لوحة المفاتيح</b></div><dl>${list.map(x => `<dt><span class="kbd">${esc(x.keys)}</span></dt><dd>${esc(x.label)}</dd>`).join('')}</dl><div class="foot"><span><span class="kbd">Esc</span> إغلاق</span></div></div>`;
+  document.body.append(d); let release = null;
+  const open = () => { d.hidden = false; requestAnimationFrame(() => d.classList.add('on')); release = trap(d) };
+  const close = () => { d.classList.remove('on'); setTimeout(() => d.hidden = true, 200); release && release() };
+  addEventListener('keydown', e => { const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if(e.key === '?' && !typing){ e.preventDefault(); d.hidden ? open() : close() } else if(e.key === 'Escape' && !d.hidden) close() });
+  d.addEventListener('click', e => { if(e.target === d) close() });
+  document.querySelectorAll('[data-keys]').forEach(b => b.title = `${b.textContent.trim()} · ${b.dataset.keys}`);
+  return { open, close };
+}
+
 /** الانتقال من بطاقةٍ إلى تفاصيلها: يتشارك العنصران اسمًا واحدًا فيتحوّل أحدهما إلى الآخر. */
 function morph(fromEl, toFn){
   fromEl.style.viewTransitionName = 'r-morph';
   return vt(() => { fromEl.style.viewTransitionName = ''; toFn() });
 }
 
-window.Ronaq = { icons, vt, announce, toast, countTo, reject, table, morph, esc, reduce, ICONS, version: '1.1' };
+window.Ronaq = { icons, vt, announce, toast, track, countTo, reject, table, morph, trap, listbox, plural, ago, date, form, checklist, palette, shortcuts, store, esc, reduce, ICONS, version: '1.2' };
 document.addEventListener('DOMContentLoaded', () => icons());
 })();

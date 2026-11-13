@@ -1,4 +1,4 @@
-/* رونق 1.1 — مكتبةُ الأنماط. استوردها، ثمّ اكتب رموز هويّتك فوقها. الأيقونات: Lucide (ISC). */
+/* رونق 1.2 — مكتبةُ الأنماط. استوردها، ثمّ اكتب رموز هويّتك فوقها. الأيقونات: Lucide (ISC). */
 
 /* التخطيط: لوحةٌ عميقة (حلقةُ الصحّة) ← شريطٌ لاصق بلوحة أوامر ← المفاتيح (المزوّدُ الأوّل أعرض) ← المسارات ← الحراسة. */
 :root{
@@ -443,3 +443,40 @@ h2{font-family:var(--f-display);font-size:28px;line-height:1.35;margin:4px 0 0;f
 :root[data-identity="nakhla"][data-theme="dark"]{
   --deep:#1f0e09; --deep-2:#36190f; --brand:#f0b48a; --brand-fg:#2a120a; --mint:#e7a36a; --gold:#e3c385; --gold-soft:#2a2013;
   --bg:#110b08; --card:#1a120e; --inset:#221813; --line:#3a2a20; --line-soft:#2a1e17}
+
+/* ═════ 1.2 ═════ */
+/* المكتبة لا تفترض بيئتها: «hidden» يُخفي دائمًا، وإلّا غطّى لوحٌ مخفيّ الصفحة */
+[hidden]{display:none!important}
+.toast.loading .ic{background:var(--inset);color:var(--ink);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.r-field{display:grid;gap:6px}
+.r-field label{font-size:13px;font-weight:500;color:var(--ink-2)}
+.r-field input,.r-field textarea{width:100%;min-height:44px;border-radius:11px;border:1px solid var(--line);background:var(--bg);padding:10px 14px;transition:border-color var(--m-fast) var(--ease),box-shadow var(--m-fast) var(--ease)}
+.r-field textarea{min-height:96px;resize:vertical}
+.r-field input:focus,.r-field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 16%,transparent)}
+.r-field .invalid{border-color:var(--bad);box-shadow:0 0 0 4px color-mix(in srgb,var(--bad) 12%,transparent)}
+.r-field small{font-size:12px;color:var(--mute)} .r-field small.why-bad{color:var(--bad)}
+.r-fstatus{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.r-fstatus::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.r-fstatus.ok{color:var(--ok)} .r-fstatus.dirty{color:var(--warn)} .r-fstatus.bad{color:var(--bad)} .r-fstatus.busy::before{animation:blink .8s infinite}
+@keyframes blink{50%{opacity:.25}}
+.r-cl{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:14px;box-shadow:var(--shadow)}
+.r-cl-h{display:flex;gap:12px;align-items:center}
+.r-cl-h b{display:block} .r-cl-h span{font-size:13px;color:var(--mute)}
+.r-cl-ring{width:42px;height:42px;transform:rotate(-90deg)}
+.r-cl-ring circle{fill:none;stroke-width:4;stroke:var(--inset)}
+.r-cl-ring circle+circle{stroke:var(--ok);stroke-linecap:round;transition:stroke-dashoffset var(--m-slow) var(--ease)}
+.r-cl ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.r-cl li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border-radius:12px;background:var(--inset)}
+.r-cl li .d{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:700}
+.r-cl li.ok .d{background:var(--ok);border-color:var(--ok);color:#fff}
+.r-cl li.ok b{text-decoration:line-through;color:var(--mute)}
+.r-cl li b{display:block;font-size:14px} .r-cl li span{font-size:12px;color:var(--ink-3)}
+.r-cl.done{grid-template-columns:auto 1fr;align-items:center;background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 35%,var(--line))}
+.r-cl.done svg{color:var(--ok)} .r-cl.done span{grid-column:2;font-size:13px;color:var(--ink-3)}
+.r-palwrap{position:fixed;inset:0;z-index:60;display:grid;place-items:start center;padding:14vh 16px 16px;background:var(--scrim);opacity:0;transition:opacity .2s var(--ease)}
+.r-palwrap.on{opacity:1}
+.r-palwrap .pal{transform:none}
+.r-palwrap .grp{font-size:12px;color:var(--mute);padding:10px 12px 4px;cursor:default}
+.r-keys dl{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0;padding:16px}
+.r-keys dt{margin:0} .r-keys dd{margin:0;font-size:14px;color:var(--ink-2)}
