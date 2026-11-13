@@ -317,9 +317,12 @@ describe('التركيب — واللوحة لا تُركَّب نصف تركي�
 
   it('والنصّ يبقى داخل نطاق nonce — لا وسم ثان بلا ختم', () => {
     const html = shell('ت', '<p>x</p>', 'n1', 'var a=1;', { commands: [one] })
-    expect(html.match(/<script/g)).toHaveLength(3) // ‏ثيم الإقلاع، ثمّ الأصل العامّ، ثمّ نصّ الصفحة
+    expect(html.match(/<script/g)).toHaveLength(4) // ‏ثيم الإقلاع، ثمّ الأصل العامّ، ثمّ نصّ الصفحة، ثمّ قواعدُ الجلب المسبق (D-344)
     expect(html).not.toContain('<script>')
     expect(html.match(/<script nonce="n1"/g)).toHaveLength(3)
+    // ‏وقواعدُ الجلب المسبق بيانٌ بختمه: للشاشات الساكنة وحدَها، ولا الخطّةُ ولا المنشورات
+    expect(html).toMatch(/<script type="speculationrules" nonce="n1">\{"prefetch":\[\{"where":\{"href_matches":\["\/panel\/tasks"/)
+    expect(html).not.toMatch(/speculationrules[^<]*\/panel\/plan/)
   })
 })
 

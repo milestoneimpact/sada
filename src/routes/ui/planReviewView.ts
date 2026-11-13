@@ -396,6 +396,12 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
     : button({ label: text, variant: 'icon', icon, href: '?w=' + String(weekOfDay(m.plan.week, x.item.day)) + '#c-' + String(x.index), attrs: 'data-sheet="' + String(x.index) + '"' })
   const before = nav(prev, 'البند السابق', ICON.go)
   const after = nav(next, 'البند التالي', ICON.back)
+  // ‏من المنشور إلى أصله (D-345): مصدرُه في المكتبة، ورحلتُه بعد أن يُجدول أو يُنشر — ضغطةٌ واحدةٌ لكلٍّ منهما
+  const srcName = m.sourceNames?.[c.item.sourceId]
+  const origin = srcName === undefined && (c.post === null || (status !== 'queued' && status !== 'published'))
+    ? html``
+    : html`<p class="hint m-0">${srcName === undefined ? html`` : html`كُتب من <a href="/panel/library#sources">${srcName}</a>`}${
+        c.post !== null && (status === 'queued' || status === 'published') ? html`${srcName === undefined ? '' : ' · '}<a href="/panel/journey/${c.post.id}">رحلةُ المنشور</a>` : html``}</p>`
   return html`<div class="rv-sh" data-index="${String(c.index)}">
     <header class="rv-sh-h">
       <span class="pf-logo rv-pf" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
@@ -408,6 +414,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
     <div class="rv-sh-b">
       <div class="rv-pv">${preview}</div>
       ${c.post === null || c.item.why === 'من خطّتك المرفوعة' ? html`` : html`<p class="hint m-0">الزاوية: ${c.item.angle}</p>`}
+      ${origin}
       ${edit}
       ${imageActs(c, m, w)}
       ${move}

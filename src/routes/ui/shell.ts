@@ -11,6 +11,7 @@ import { escapeHtml } from './escape'
 import { html, join, raw } from './html'
 import { ICON } from './icons'
 import { segmented } from './components/tabs'
+import { familyTabs, PREFETCH_RULES } from './families'
 import { menu, menuAction, menuItem } from './components/menu'
 import { count } from './components/badge'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
@@ -263,7 +264,8 @@ export function densitySwitch(withId = true): string {
  */
 export function soloPage(
   title: string,
-  back: { readonly href: string; readonly label: string },
+  /** و`at` عنوانُ الشاشة في عائلتها (D-342): به يُرسم شريطُ أخواتها أعلى المحتوى. */
+  back: { readonly href: string; readonly label: string; readonly at?: string },
   body: string,
   nonce: string,
   script = '',
@@ -281,7 +283,7 @@ export function soloPage(
 ): string {
   // ‏الجسدُ والرافدةُ مرسومان في وحداتٍ لم تُحوَّل بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
   const inner = html`${raw(backNav(back.href, back.label))}
-         <main id="main">${raw(body)}</main>`
+         <main id="main">${raw(back.at === undefined ? '' : familyTabs(back.at))}${raw(body)}</main>`
   return shell(
     title,
     html`<a class="skip" href="#main">تخطّي إلى المحتوى</a>
@@ -421,6 +423,8 @@ ${FONT_PRELOAD}
       if (options.panelScript === true) tags.push(html`<script nonce="${nonce}" src="${panelScript().path}"></script>`)
       const inline = stripJs(script)
       if (inline !== '') tags.push(html`<script nonce="${nonce}">${raw(inline)}</script>`)
+      // ‏الجلبُ المسبق (D-344): بيانٌ لا شيفرة، وبـ`nonce` كسائر الوسوم
+      tags.push(html`<script type="speculationrules" nonce="${nonce}">${raw(PREFETCH_RULES)}</script>`)
       return join(tags)
     })()
   }</body></html>`.value

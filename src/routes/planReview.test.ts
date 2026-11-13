@@ -343,6 +343,17 @@ describe('«أضف منشورًا» إلى يومٍ في الخطّة (D-336)', 
     expect(html).toContain('<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>')
   })
 
+  it('من المنشور إلى أصله (D-345): لوحُ البطاقة يسمّي مصدرَها برابطٍ إلى المكتبة، ورحلتُه بعد أن يُجدول', async () => {
+    const { cookie, csrf } = await session()
+    const draft = await (await app.request('/panel/plan/review/card?i=0', { headers: { Cookie: cookie } }, env)).text()
+    expect(draft).toContain('كُتب من <a href="/panel/library#sources">تقرير</a>')
+    expect(draft).not.toContain('رحلةُ المنشور')
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
+    const queued = await (await app.request('/panel/plan/review/card?i=0', { headers: { Cookie: cookie } }, env)).text()
+    expect(queued).toContain('<a href="/panel/journey/p1">رحلةُ المنشور</a>')
+  })
+
   it('ثلاثةٌ في اليوم على المنصّة حدٌّ: الرابعُ يُردّ', async () => {
     for (const time of ['10:00', '11:00']) await add({ platform: 'x', day: '2099-01-06', time, angle: 'منشورٌ إضافيّ' })
     expect(items()).toHaveLength(5)

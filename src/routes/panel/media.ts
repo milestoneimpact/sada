@@ -59,7 +59,7 @@ media.get('/panel/assets', async (c) => {
     flash: await takeFlash(c.env, c.req.raw),
   })
   return page((nonce) =>
-    soloPage('صدى — الأصول', { href: '/panel/client', label: 'رحلة العميل' }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('accounts')),
   )
 })
