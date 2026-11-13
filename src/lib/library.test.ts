@@ -26,7 +26,7 @@ describe('أصولُ العميل (D-260)', () => {
 
   it('التصنيف: النوعُ › المنشأ › الشهر', () => {
     expect(folderOf({ kind: 'image', origin: 'generated', at: '2026-10-02 10:00:00' })).toBe('صور › مولَّدة › 2026-10')
-    expect(folderOf({ kind: 'doc', origin: 'drive', at: '2026-09-01 00:00:00' })).toBe('مستندات › من Drive › 2026-09')
+    expect(folderOf({ kind: 'doc', origin: 'drive', at: '2026-09-01 00:00:00' })).toBe('ملفّات › من Drive › 2026-09')
   })
 
   it('الأنهارُ الأربعة بمنظّمتها، أحدثُها أوّلًا — وأصلُ عميلٍ آخر لا يُرى ولا يُوجد', async () => {

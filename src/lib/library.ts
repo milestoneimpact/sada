@@ -33,7 +33,7 @@ export interface Asset {
   readonly tags?: readonly string[]
 }
 
-export const KIND_LABEL: Readonly<Record<AssetKind, string>> = { image: 'صور', video: 'مقاطع', doc: 'مستندات' }
+export const KIND_LABEL: Readonly<Record<AssetKind, string>> = { image: 'صور', video: 'مقاطع', doc: 'ملفّات' }
 export const ORIGIN_LABEL: Readonly<Record<AssetOrigin, string>> = { generated: 'مولَّدة', upload: 'مرفوعة', drive: 'من Drive' }
 
 /** سقفُ صورة المكتبة — كسقف الصورة المولَّدة (`image/job.ts`)، وما فوقه ترفضه المنصّاتُ قبلنا. */
