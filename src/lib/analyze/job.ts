@@ -68,7 +68,7 @@ export type AnalyzeOutcome =
 export interface AnalyzeJobDeps {
   readonly db: Db
   readonly serviceAccountJson: string
-  /** سرّ Worker. يغلب الخزانة دائما — والخزانة تُستعمل حين يغيب. */
+  /** سرّ Worker — احتياطٌ يُستعمل حين تخلو الخزانة (D-346). */
   readonly anthropicKey: string
   /** مفتاح التشفير، لازمٌ لقراءة الخزانة. */
   readonly encKey?: string

@@ -221,16 +221,24 @@ export interface ResolvedKey {
   readonly source: KeySource
 }
 
-/** **سرّ Worker أوّلا ودائما.** ثمّ المحفوظ، وبشرط أن يكون مفعَّلا. */
+/**
+ * **الخزانةُ أوّلًا، ثمّ سرُّ Worker احتياطًا** (D-346).
+ *
+ * كان سرُّ Worker يغلب دائمًا: فمفتاحٌ قديمٌ نُسي في أسرار Cloudflare يعلو
+ * على الصالح المحفوظ من اللوحة — والمالكُ يحفظ ويختبر ويرى «يعمل»، ثمّ يفشل
+ * كلُّ ملفٍّ بـ401 من مفتاحٍ لا يراه. **فاللوحةُ صارت مصدرَ الضبط**، والسرُّ
+ * يسدّ الغياب وحده: لا صفّ، أو صفٌّ بلا مفتاح، أو معطَّل، أو لا يُفكّ.
+ */
 export async function resolveKey(
   db: Db,
   encKey: string,
   provider: string,
   workerSecret: string | undefined,
 ): Promise<ResolvedKey> {
-  if (typeof workerSecret === 'string' && workerSecret.trim().length > 0) {
-    return { key: workerSecret.trim(), source: 'worker_secret' }
-  }
+  const fallback: ResolvedKey =
+    typeof workerSecret === 'string' && workerSecret.trim().length > 0
+      ? { key: workerSecret.trim(), source: 'worker_secret' }
+      : { key: null, source: 'none' }
 
   let row: { key_enc: string | null; key_iv: string | null; enabled: number } | null
   try {
@@ -240,19 +248,18 @@ export async function resolveKey(
       .bind(provider, OWNER_ORG)
       .first<{ key_enc: string | null; key_iv: string | null; enabled: number }>()
   } catch {
-    return { key: null, source: 'none' }
+    return fallback
   }
   if (row === null || row.enabled !== 1 || row.key_enc === null || row.key_iv === null) {
-    return { key: null, source: 'none' }
+    return fallback
   }
+  if (encKey.length === 0) return fallback
 
   try {
-    return {
-      key: await openScoped(encKey, VAULT_SCOPE, { ciphertext: row.key_enc, iv: row.key_iv }, keyContext(provider), LEGACY_RAW),
-      source: 'vault',
-    }
+    const key = await openScoped(encKey, VAULT_SCOPE, { ciphertext: row.key_enc, iv: row.key_iv }, keyContext(provider), LEGACY_RAW)
+    return key.trim().length > 0 ? { key, source: 'vault' } : fallback
   } catch {
-    return { key: null, source: 'none' }
+    return fallback
   }
 }
 
