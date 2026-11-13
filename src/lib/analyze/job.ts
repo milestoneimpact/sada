@@ -27,7 +27,8 @@ import { spentOf, type Spent } from '../ai/spent'
 import { analyzeText, AnalyzeError, type AnalyzeDeps } from './claude'
 import { describeImage, type VisionDeps } from './vision'
 import { routeFor } from '../ai/routes'
-import { CompatError } from '../ai/openaiCompat'
+import { chatCompletion, CompatError } from '../ai/openaiCompat'
+import { ANALYSIS_SCHEMA, SYSTEM_PROMPT, userPrompt, type Analysis } from './prompt'
 import { withTimeout } from '../net/timeout'
 
 /**
@@ -211,8 +212,22 @@ export async function analyzeSource(
     await releaseAnalysis(deps.db, source.id)
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
   }
+  /*
+   * ‏ثمّ المزوّد **من «توجيه المهامّ»** لا من ثابت: كان التحليلُ ينادي Anthropic
+   * ‏حرفًا، واللوحةُ تقول غيرَه وتعرض «جاهز» — يُقرأ ولا يُطاع (علّة D-079/D-091).
+   */
+  const route = await routeFor(deps.db, 'analyze')
+  const provider = await getProvider(deps.db, route.provider)
+  if (provider === null || !provider.enabled) {
+    await releaseAnalysis(deps.db, source.id)
+    return { kind: 'failed', sourceId: source.id, reason: `مزوّد «الفهم» غير متاح: ${route.provider}`, retryable: false }
+  }
+  if (provider.kind !== 'anthropic' && provider.baseUrl === null) {
+    await releaseAnalysis(deps.db, source.id)
+    return { kind: 'failed', sourceId: source.id, reason: `لا عنوان لمزوّد «الفهم»: ${provider.label}`, retryable: false }
+  }
   // ثمّ حارس المزوّد: تفصيلٌ تحت الجملة لا فوقها
-  const providerBlocker = await checkProvider(deps.db, 'anthropic')
+  const providerBlocker = await checkProvider(deps.db, provider.name)
   if (providerBlocker !== null) {
     await releaseAnalysis(deps.db, source.id)
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(providerBlocker) }
@@ -221,11 +236,12 @@ export async function analyzeSource(
   // خطوةُ الكلفة (٦) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
   // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
   const charge = async (spent: Spent): Promise<number> => {
-    const cost = analysisCost(spent)
+    const priced = provider.kind === 'anthropic' ? { total: analysisCost(spent), priced: true } : costOf(provider, spent)
+    const cost = priced.total
     const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
     await recordCost(deps.db, {
-      provider: 'anthropic',
-      operation: `analyze:${spent.model}`,
+      provider: provider.name,
+      operation: priced.priced ? `analyze:${spent.model}` : `analyze:${spent.model}:price_unverified`,
       units,
       unitCost: units === 0 ? 0 : cost / units,
       refId: source.id,
@@ -300,20 +316,28 @@ export async function analyzeSource(
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
-    // ٥ · النداء — بالمفتاح المحلول: سرّ Worker أوّلا ثمّ الخزانة
+    // ٥ · النداء — بالمزوّد والنموذج المختارَين، والمفتاحُ من مصدره (سرّ Worker للمدمَج ثمّ الخزانة)
+    const workerSecret = provider.builtin
+      ? provider.name === 'anthropic' ? deps.anthropicKey : provider.name === 'gemini' ? deps.geminiKey : undefined
+      : undefined
     const resolved =
       deps.encKey === undefined || deps.encKey.length === 0
-        ? { key: deps.anthropicKey, source: 'worker_secret' as const }
-        : await resolveKey(deps.db, deps.encKey, 'anthropic', deps.anthropicKey)
-    const claudeDeps: AnalyzeDeps = {
-      apiKey: resolved.key ?? '',
-      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+        ? { key: workerSecret ?? null }
+        : await resolveKey(deps.db, deps.encKey, provider.name, workerSecret)
+    if (resolved.key === null || resolved.key.length === 0) {
+      await releaseAnalysis(deps.db, source.id)
+      return { kind: 'failed', sourceId: source.id, reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
     }
-    const result = await analyzeText(claudeDeps, {
-      name: source.name,
-      text,
-      now,
-    })
+    const result = provider.kind === 'anthropic'
+      ? await analyzeText(
+        {
+          apiKey: resolved.key,
+          model: route.model,
+          ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+        } satisfies AnalyzeDeps,
+        { name: source.name, text, now },
+      )
+      : await analyzeCompat(provider, resolved.key, route.model, { name: source.name, text, now }, deps.fetchImpl)
 
     // ٦ · الكلفة **قبل** الكتابة (D-008)
     const cost = await charge({ ...result.usage, model: result.model })
@@ -341,7 +365,7 @@ export async function analyzeSource(
     // ومستهلكُ الطابور يعيد المبتور، فكلُّ إعادةٍ صفٌّ — ويراه السقفُ في التالية
     const late = spentOf(error)
     if (late !== null) await charge(late)
-    if (error instanceof AnalyzeError) {
+    if (error instanceof AnalyzeError || error instanceof CompatError) {
       await releaseAnalysis(deps.db, source.id)
       return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }
     }
@@ -350,4 +374,50 @@ export async function analyzeSource(
     await releaseAnalysis(deps.db, source.id)
     return { kind: 'failed', sourceId: source.id, reason, retryable: true }
   }
+}
+
+/**
+ * ‏التحليلُ عند مزوّدٍ بلهجة `chat/completions` (DeepSeek وGemini وCloudflare وغيرُها).
+ * ‏والمخطّطُ يُكتب في التلقين لأنّ `json_object` هو الأضعفُ الذي يفهمه الجميع —
+ * ‏ثمّ يُفحص الشكلُ هنا، فجوابٌ ناقصٌ يُرَدّ بكلفته لا يُكتب تحليلًا.
+ */
+async function analyzeCompat(
+  provider: Provider,
+  apiKey: string,
+  model: string,
+  input: { name: string; text: string; now: Date },
+  fetchImpl?: typeof fetch,
+): Promise<{ analysis: Analysis; usage: Spent; model: string }> {
+  const result = await chatCompletion(
+    {
+      baseUrl: provider.baseUrl ?? '',
+      apiKey,
+      model,
+      system: `${SYSTEM_PROMPT}\n\nأعِد كائن JSON واحدًا فقط، بلا نصٍّ قبله ولا بعده، يطابق هذا المخطّط:\n${JSON.stringify(ANALYSIS_SCHEMA)}`,
+      user: userPrompt(input),
+      json: true,
+      maxTokens: 8000,
+      timeoutMs: 120_000,
+    },
+    fetchImpl,
+  )
+  const spent: Spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stripFence(result.text))
+  } catch {
+    throw new CompatError(`${provider.label}: الجواب ليس JSON صالحًا`, 502, true, spent)
+  }
+  const a = parsed as Partial<Analysis> | null
+  if (a === null || typeof a !== 'object' || typeof a.summary !== 'string' || typeof a.worth_score !== 'number') {
+    throw new CompatError(`${provider.label}: الجواب لا يطابق مخطّط التحليل`, 502, true, spent)
+  }
+  return { analysis: a as Analysis, usage: spent, model: result.model }
+}
+
+/** ‏بعضُ النماذج يلفّ JSON بسياج ```json رغم الطلب. */
+function stripFence(text: string): string {
+  const t = text.trim()
+  const m = /^```(?:json)?\s*([\s\S]*?)\s*```$/.exec(t)
+  return m === null ? t : m[1]!
 }
