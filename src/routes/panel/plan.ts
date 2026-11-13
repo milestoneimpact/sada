@@ -9,7 +9,7 @@ import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
-import { reviewModel, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
+import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
 import { localToUtc } from '../../lib/time/local'
 import { localParts } from '../../lib/time/zone'
@@ -284,6 +284,24 @@ plan.post('/panel/plan/approve', async (c) => {
  * **«ابدأ»: كلُّ بندٍ مرّةً إلى الطابور** — مسوّدتُه وصورتُه باختيار الخطّة (D-258 · D-282 · D-285). مشتركٌ بين زرّ «ابدأ»
  * و«حلّل وابنِ» في المعالج (D-286)، فالطريقُ واحدٌ بحرّاسه.
  */
+/** رسالةُ كتابة بندٍ واحد — بصورته باختيار منصّته (D-329). مشتركةٌ بين «ابدأ» و«أضف منشورًا» (D-336). */
+function draftMessage(plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>, i: import('../../lib/plan/prompt').PlanItem, org: string) {
+  const legacy = plan.choices.channels.length === 0
+  const idea = ideaOf(i.sourceId, plan.choices)
+  const image = imageFor(plan.choices, i.platform)
+  return {
+    body: { draft: {
+      sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
+      ...(i.asset === undefined ? {} : { asset: i.asset }),
+      ...(idea === null ? {} : { idea }),
+      ...(legacy ? {} : { autoImage: image !== 'none' }),
+      imageStyle: image === 'none' ? plan.choices.imageStyle : image,
+      ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
+      ...(i.kind === 'thread' && i.platform === 'x' ? { shape: 'thread' as const } : {}),
+    } },
+  }
+}
+
 export async function enqueuePlan(env: Env, org: string, plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>): Promise<{ items: number; clips: number; autoImage: boolean | undefined }> {
   if (plan.status === 'draft') await approvePlan(env.DB, plan.id, org)
   const seen = new Set<string>()
@@ -299,21 +317,7 @@ export async function enqueuePlan(env: Env, org: string, plan: NonNullable<Await
   const legacy = plan.choices.channels.length === 0
   const autoImage = legacy ? undefined : plan.choices.channels.some((ch) => imageFor(plan.choices, ch) !== 'none')
   if (items.length > 0) {
-    await env.GENERATE_QUEUE.sendBatch(items.map((i) => {
-      const idea = ideaOf(i.sourceId, plan.choices)
-      const image = imageFor(plan.choices, i.platform)
-      return {
-        body: { draft: {
-          sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
-          ...(i.asset === undefined ? {} : { asset: i.asset }),
-          ...(idea === null ? {} : { idea }),
-          ...(legacy ? {} : { autoImage: image !== 'none' }),
-          imageStyle: image === 'none' ? plan.choices.imageStyle : image,
-          ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
-          ...(i.kind === 'thread' && i.platform === 'x' ? { shape: 'thread' as const } : {}),
-        } },
-      }
-    }))
+    await env.GENERATE_QUEUE.sendBatch(items.map((i) => draftMessage(plan, i, org)))
   }
   // ‏بندُ مقطعٍ بلا أصل لا يفشل ولا يُرسَم له شيء: مسوّدتُه تنتظر مقطعًا — يُقال الآن لا عند الجدولة
   const clips = items.filter((i) => CLIP_CHANNELS.has(i.platform) && i.asset === undefined).length
@@ -708,6 +712,38 @@ plan.post('/panel/plan/review/move', async (c) => {
   }
   await record(c.env.DB, { actor: 'panel', action: 'plan.review.move', target: String(f.get('id') ?? ''), detail: result.ok ? day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
   await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند — ومنشورُه المجدولُ معه.' } : { kind: 'bad', text: result.reason })
+  return toCard(f, false)
+})
+
+/**
+ * **«أضف منشورًا»** (D-336): بندٌ بيد المالك في يومٍ وساعةٍ بتوقيته، يُكتب فورًا كسائر البنود. والحكمُ في `addItem`؛ والإيقافُ المؤقّتُ
+ * يُقال قبل أن يُكتب شيء — فلا بندَ بلا مسوّدةٍ تأتيه.
+ */
+plan.post('/panel/plan/review/add', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const day = String(f.get('day') ?? '')
+  const time = String(f.get('time') ?? '')
+  let result: Awaited<ReturnType<typeof addItem>> = { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+  if ((await readSettings(c.env.DB)).paused) result = { ok: false, reason: 'صدى موقوفٌ مؤقّتًا — لا يُكتب شيءٌ حتّى يُرفع الإيقاف' }
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(day) && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    const [y, mo, d] = day.split('-').map(Number)
+    const [h, mi] = time.split(':').map(Number)
+    const at = localToUtc(y!, mo!, d!, h!, mi!, zone)
+    if (at !== null) {
+      result = await addItem(c.env.DB, org, id, { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16), platform: String(f.get('platform') ?? ''), angle: String(f.get('angle') ?? '') })
+    }
+  }
+  if (result.ok) {
+    const current = await latestPlan(c.env.DB, org)
+    if (current !== null && current.id === id) await c.env.GENERATE_QUEUE.send(draftMessage(current, result.item, org).body)
+  }
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.add', target: id, detail: result.ok ? result.item.platform + ' ' + day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'أُضيف المنشور — صدى يكتبه الآن ويظهر في يومه.' } : { kind: 'bad', text: result.reason })
   return toCard(f, false)
 })
 

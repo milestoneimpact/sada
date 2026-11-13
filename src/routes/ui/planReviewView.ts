@@ -281,6 +281,23 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       data-confirm="${'اعتمد ' + AR(allDrafts) + ' منشورًا من الخطّة كلِّها وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
       <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="back" value="review">
       ${raw(button({ label: 'اعتمد الخطّة كاملة (' + AR(allDrafts) + ')', type: 'submit' }))}</form>`
+  // ‏«أضف منشورًا» (D-336): يومٌ من المعروض، ومنصّةٌ من قنوات الخطّة، وساعةٌ بتوقيت المالك، وجملةٌ تقول ما يقوله — نموذجٌ إلى مساره
+  const channels = [...new Set([...m.plan.choices.channels, ...m.cards.map((c) => c.item.platform)])]
+  const firstDay = shown === 0 ? m.plan.week : shift(m.plan.week, (shown - 1) * 7)
+  const lastDay = shown === 0 ? end : [shift(firstDay, 6), end].sort()[0]!
+  const today = (view.now ?? new Date()).toISOString().slice(0, 10)
+  const addDay = today >= firstDay && today <= lastDay ? today : firstDay
+  const add = channels.length === 0 ? html`` : html`<details class="fold rv-add"><summary><span>أضف منشورًا إلى ${scope}</span></summary>
+      <form method="POST" action="/panel/plan/review/add" class="rv-add-f" data-busy="يُضاف…">
+        <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}">
+        ${raw(field({ id: 'rv-add-angle', label: 'ما يقوله المنشور', hint: 'جملةٌ واحدة — صدى يكتب المنشورَ منها ومن مصادر الخطّة.', control: html`<input type="text" id="rv-add-angle" name="angle" maxlength="200" required>`.value }))}
+        <div class="row">
+          ${raw(field({ id: 'rv-add-p', label: 'المنصّة', control: html`<select id="rv-add-p" name="platform">${channels.map((p) => html`<option value="${p}">${platformLabel(p as never)}</option>`)}</select>`.value }))}
+          ${raw(field({ id: 'rv-add-day', label: 'اليوم', control: html`<input type="date" id="rv-add-day" name="day" value="${addDay}" min="${firstDay}" max="${lastDay}" dir="ltr" required>`.value }))}
+          ${raw(field({ id: 'rv-add-time', label: 'الساعة بتوقيتك', control: html`<input type="time" id="rv-add-time" name="time" value="09:00" dir="ltr" required>`.value }))}
+          ${raw(button({ label: 'أضف واكتبه', variant: 'primary', type: 'submit' }))}
+        </div>
+      </form></details>`
   const weekHref = (day: string): string => '?w=' + String(weekOfDay(m.plan.week, day)) + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
@@ -297,6 +314,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="أزِل البنودَ المحدَّدة من الخطّة؟">أزِلها</button>
     </form>
     ${list}
+    ${add}
     ${versions}
     <div class="rv-foot card"><span class="grow">${AR(settled)} مجدولةً من ${AR(m.cards.length)}${m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : ''}</span>${approveWeek}${approveAll}</div>
     </div>
@@ -338,6 +356,8 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
       ? html`<form method="POST" action="/panel/plan/review/text" class="stack" data-busy="جار الحفظ…">${hidden}<input type="hidden" name="post" value="${c.post.id}">
           ${raw(field({ id: 'rv-sh-text', label: 'النصّ', hint: 'اكتب هنا ثمّ احفظ — يبقى مسوّدةً حتّى تعتمده.',
             control: html`<textarea id="rv-sh-text" name="text" rows="7" dir="auto">${c.post.text}</textarea>`.value }))}
+          ${/* ‏رقائقُ الهاشتاق (D-336): يملؤها السكربتُ من النصّ نفسِه — ضغطةٌ تُزيل الوسمَ من النصّ، والحفظُ بالنموذج كما هو */''}
+          <div class="rv-tags" id="rv-sh-tags" role="group" aria-label="هاشتاقات المنشور — اضغط وسمًا لتُزيله من النصّ"></div>
           <div class="row gap-2">${raw(button({ label: 'احفظ النصّ', size: 'sm', type: 'submit' }))}</div></form>`
       : status === 'published'
         ? html``
@@ -455,6 +475,26 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
   });
 
   // ‏لوحُ البطاقة
+  // ‏رقائقُ الهاشتاق (D-336): تُقرأ من نصّ المسوّدة وتُرسم بـtextContent — لا innerHTML بنصّ المستخدم (D-328)
+  function words(line){return line.split(' ').join(String.fromCharCode(9)).split(String.fromCharCode(9));}
+  function tags(){
+    var box=document.getElementById('rv-sh-tags'), ta=document.getElementById('rv-sh-text'); if(!box||!ta)return;
+    var seen=[]; ta.value.split(String.fromCharCode(10)).forEach(function(l){words(l).forEach(function(x){if(x.charAt(0)==='#'&&x.length>1&&seen.indexOf(x)<0)seen.push(x);});});
+    while(box.firstChild)box.removeChild(box.firstChild);
+    seen.forEach(function(t){
+      var b=document.createElement('button'); b.type='button'; b.className='rv-tag'; b.setAttribute('data-tag',t);
+      var s=document.createElement('span'); s.textContent=t; b.appendChild(s);
+      var x=document.createElement('span'); x.className='vh'; x.textContent=' — أزِله من النصّ'; b.appendChild(x);
+      box.appendChild(b);
+    });
+  }
+  document.addEventListener('input',function(e){if(e.target&&e.target.id==='rv-sh-text')tags();});
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('.rv-tag'):null, ta=document.getElementById('rv-sh-text'); if(!b||!ta)return;
+    var t=b.getAttribute('data-tag');
+    ta.value=ta.value.split(String.fromCharCode(10)).map(function(l){return l.split(' ').filter(function(x){return x!==t;}).join(' ');}).join(String.fromCharCode(10)).replace(new RegExp('[ '+String.fromCharCode(10)+']+$'),'');
+    tags(); ta.focus();
+  });
   function shut(){openI=null; if(sheet&&sheet.open)sheet.close(); if(sheet)sheet.innerHTML='';}
   function fill(i,keep){
     if(!sheet||typeof sheet.showModal!=='function')return Promise.resolve(false);
@@ -463,7 +503,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
       .then(function(t){
         var typing=keep&&sheet.contains(document.activeElement)&&/^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName);
         if(typing)return true;
-        sheet.innerHTML=t; openI=i; if(!sheet.open)sheet.showModal();
+        sheet.innerHTML=t; openI=i; if(!sheet.open)sheet.showModal(); tags();
         var x=sheet.querySelector('[data-sheet-close]'); if(x&&!keep)x.focus();
         return true;
       })
@@ -499,6 +539,37 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
     body.append('key',g.key||''); body.append('day',d.getAttribute('data-day')); body.append('w',root.getAttribute('data-w')||'');
     post('/panel/plan/review/move',body,null);
   });
+
+  // ‏السحبُ باللمس (D-336): ضغطةٌ مطوّلةٌ على مصغَّرةٍ تحملها، والإفلاتُ على يومٍ ينقلها — بالطلب نفسِه إلى المسار نفسِه.
+  // ‏وقبل أن تُحمَل: الإصبعُ يمرّر الصفحةَ كعادته، والنقرةُ تفتح اللوح
+  var hold=null, held=null, over=null, ate=false;
+  function drop(){ if(hold){clearTimeout(hold); hold=null;} if(held)held.el.classList.remove('is-held'); if(over)over.classList.remove('is-over'); held=null; over=null; }
+  document.addEventListener('touchstart',function(e){
+    var m=e.target&&e.target.closest?e.target.closest('.rv-mini[data-move]'):null; drop(); if(!m||e.touches.length!==1)return;
+    var t=e.touches[0], x=t.clientX, y=t.clientY;
+    hold=setTimeout(function(){ hold=null; held={el:m,index:m.getAttribute('data-move'),key:m.getAttribute('data-key'),from:m.closest('[data-day]'),x:x,y:y}; m.classList.add('is-held'); if(navigator.vibrate)navigator.vibrate(10); },380);
+    m._x=x; m._y=y;
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    var t=e.touches[0]; if(!t)return;
+    if(hold){ var m=e.target&&e.target.closest?e.target.closest('.rv-mini[data-move]'):null; if(!m||Math.abs(t.clientX-m._x)>8||Math.abs(t.clientY-m._y)>8)drop(); return; }
+    if(!held)return;
+    e.preventDefault();
+    var el=document.elementFromPoint(t.clientX,t.clientY), d=el&&el.closest?el.closest('.rv-cal [data-day]'):null;
+    if(over&&over!==d)over.classList.remove('is-over'); over=d; if(d)d.classList.add('is-over');
+  },{passive:false});
+  document.addEventListener('touchend',function(e){
+    if(!held){drop(); return;}
+    var g=held, d=over; drop(); ate=true; setTimeout(function(){ate=false;},400); e.preventDefault();
+    if(!d||d===g.from)return;
+    var body=new FormData(); body.append('_csrf',csrf()); body.append('id',root.getAttribute('data-plan')||''); body.append('index',g.index);
+    body.append('key',g.key||''); body.append('day',d.getAttribute('data-day')); body.append('w',root.getAttribute('data-w')||'');
+    post('/panel/plan/review/move',body,null);
+  },{passive:false});
+  document.addEventListener('touchcancel',drop);
+  // ‏والنقرةُ التي تلي الإفلات لا تفتح اللوح
+  document.addEventListener('click',function(e){ if(ate&&e.target&&e.target.closest&&e.target.closest('.rv-mini')){e.preventDefault(); e.stopPropagation();} },true);
+  document.addEventListener('contextmenu',function(e){ if((held||hold)&&e.target&&e.target.closest&&e.target.closest('.rv-mini[data-move]'))e.preventDefault(); });
 
   // ‏تحديثٌ حيّ ما دام صدى يكتب أو يرسم
   var tries=0;

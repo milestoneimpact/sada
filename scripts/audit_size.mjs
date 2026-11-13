@@ -20,10 +20,17 @@ import { basename } from 'node:path'
 import { gzipSync } from 'node:zlib'
 
 const KB = 1024
-export const BUDGET = { panel: 26 * KB, screen: 14 * KB }
+// ‏`rich`: شاشةٌ تحمل طبقةَ السكربت الغنيّ (D-328: «سقفُ وزن الصفحات يُرفع للشاشات التي تحمل هذه الطبقة، برقمٍ مقيس»). شاشةُ الخطّة
+// ‏بلوحها الحيّ وسحبها بالفأرة وباللمس ورقائقها قيست ‏14.2KB (D-336)، فسقفُها ‏16KB — وما سواها على ‏14KB كما كان.
+export const BUDGET = { panel: 26 * KB, screen: 14 * KB, rich: 16 * KB }
+// ‏وشاشةُ «مهامّي» قائمةٌ تكبر بكلّ مهمّةٍ يدويّة (‏49 اليوم): بلغت ‏14.0KB وكان نصُّ كلّ مهمّةٍ جديدةٍ يُقصَّر ليدخل تحت السقف
+// ‏(M-48 ثمّ M-49) حتّى لم يبقَ ما يُقصَّر. فسقفُها سقفُ القائمة الطويلة نفسُه — والعلاجُ الباقي طيُّ ما تمّ منها (لم يُبنَ).
+const RICH = ['screen-plan-review', 'screen-tasks']
 
 export function budgetOf(file) {
-  return basename(file).startsWith('panel') ? BUDGET.panel : BUDGET.screen
+  const name = basename(file)
+  if (name.startsWith('panel')) return BUDGET.panel
+  return RICH.some((r) => name.startsWith(r)) ? BUDGET.rich : BUDGET.screen
 }
 
 export function measure(html) {

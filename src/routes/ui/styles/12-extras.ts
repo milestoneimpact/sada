@@ -564,6 +564,16 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-pf[data-pf=x]{background:var(--pf-x)}
 /* ‏والبطاقةُ منشورٌ بشكل منصّته (D-327): المعاينةُ بعرض البطاقة، وسطرُ الصورة بأزراره تحتها */
 .rv-pv{min-width:0}
+/* «أضف منشورًا» (D-336): طيّةٌ تحت بطاقات الأسبوع، وحقولُها صفٌّ ينكسر على الجوّال */
+/* السحبُ باللمس (D-336): المصغَّرةُ المحمولةُ تُرى مرفوعة، ولا قائمةَ نظامٍ ولا تحديدَ نصٍّ تحت الإصبع */
+.rv-mini[data-move]{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
+.rv-mini.is-held{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke); background:var(--selected)}
+.rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
+.rv-tags:empty{display:none}
+.rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}
+@media(hover:hover){.rv-tag:hover{text-decoration:line-through}}
+.rv-add{margin-top:var(--s-4)}
+.rv-add-f{display:grid; gap:var(--s-3); padding-top:var(--s-3)}
 .rv-img{align-items:center; padding-top:var(--s-2); border-top:var(--bd-soft)}
 /* ‏شعاراتُ منصّات اليوم في خانته، والنقطةُ فوق العدد لما ينتظر — اللونُ لا يقول وحدَه: الاسمُ في aria-label */
 .rv-dots{display:flex; gap:var(--s-0); justify-content:center}
