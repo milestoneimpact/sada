@@ -1,4 +1,4 @@
-/* رونق 1.2 — سلوكُ المكوّنات. بلا اعتماديّات. ‏window.Ronaq */
+/* رونق 1.3 — سلوكُ المكوّنات. بلا اعتماديّات. ‏window.Ronaq */
 (function(){
 'use strict';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -27,17 +27,44 @@ function announce(msg){
   l.textContent=''; setTimeout(()=>l.textContent=msg, 40);
 }
 
-/** الرسالة: ‏toast('حُفظ', {undo: fn, bad: false}) — التراجع خمس ثوانٍ. */
-let undoFn = null, th = 0;
+/**
+ * الرسائل (1.3): طابورٌ مرئيّ حتّى 3، والمؤقّت يتوقّف عند المرور والتركيز وحين تُخفى الصفحة ثمّ يستأنف بما بقي.
+ * ‏toast(msg,{undo,bad,action,duration}) يعيد مقبضًا ‏{update(msg,opt), close()}. و F8 ينقل التركيز إلى الرسائل، وEsc يعيده.
+ */
+const MAX_TOASTS = 3;
+function region(){
+  let r = $('#r-toasts');
+  if(!r){ r = document.createElement('section'); r.id = 'r-toasts'; r.className = 'r-toasts'; r.tabIndex = -1;
+    r.setAttribute('aria-label', 'الإشعارات (F8)'); document.body.append(r);
+    let back = null;
+    addEventListener('keydown', e => { if(e.key === 'F8'){ e.preventDefault(); back = document.activeElement; (r.querySelector('button') || r).focus() } });
+    r.addEventListener('keydown', e => { if(e.key === 'Escape' && back){ back.focus(); back = null } });
+    document.addEventListener('visibilitychange', () => r.querySelectorAll('.toast').forEach(t => t._pause && (document.hidden ? t._pause() : t._resume())));
+  }
+  return r;
+}
 function toast(msg, opt={}){
-  let t = $('#r-toast');
-  if(!t){ t = document.createElement('div'); t.id='r-toast'; t.className='toast';
-    t.innerHTML='<span class="ic">✓</span><span class="tt"></span><button class="undo" type="button" hidden>تراجع</button>'; document.body.append(t);
-    t.querySelector('.undo').addEventListener('click', () => { const f = undoFn; undoFn = null; t.classList.remove('show'); f && f() }) }
-  t.classList.toggle('bad', !!opt.bad); t.querySelector('.ic').textContent = opt.bad ? '!' : '✓';
-  t.querySelector('.tt').textContent = msg; undoFn = opt.undo || null; t.querySelector('.undo').hidden = !undoFn;
-  t.classList.add('show'); clearTimeout(th); th = setTimeout(()=>{ t.classList.remove('show'); undoFn = null }, opt.undo ? 5000 : 2600);
-  announce(msg);
+  const r = region(), t = document.createElement('div');
+  t.className = 'toast show'; t.setAttribute('role', opt.bad ? 'alert' : 'status');
+  t.innerHTML = '<span class="ic"></span><span class="tt"></span><button class="undo" type="button" hidden></button><button class="x" type="button" aria-label="إغلاق">×</button>';
+  let left = 0, started = 0, timer = 0, fn = null;
+  const close = () => { clearTimeout(timer); t.classList.remove('show'); t.classList.add('leaving'); setTimeout(() => t.remove(), 200) };
+  const run = ms => { left = ms; started = Date.now(); clearTimeout(timer); if(ms > 0) timer = setTimeout(close, ms) };
+  t._pause = () => { clearTimeout(timer); left -= Date.now() - started };
+  t._resume = () => run(Math.max(1200, left));
+  const update = (m, o={}) => {
+    t.classList.toggle('bad', !!o.bad); t.classList.toggle('loading', !!o.loading);
+    $('.ic', t).textContent = o.loading ? '◌' : o.bad ? '!' : '✓'; $('.tt', t).textContent = m;
+    fn = o.undo || o.action && o.action.run || null; const u = $('.undo', t); u.hidden = !fn; u.textContent = o.action ? o.action.label : 'تراجع';
+    run(o.loading ? 0 : (o.duration || (fn ? 6000 : 4000))); announce(m);
+  };
+  $('.undo', t).addEventListener('click', () => { const f = fn; close(); f && f() });
+  $('.x', t).addEventListener('click', close);
+  ['pointerenter','focusin'].forEach(ev => t.addEventListener(ev, t._pause));
+  ['pointerleave','focusout'].forEach(ev => t.addEventListener(ev, e => { if(!t.contains(e.relatedTarget)) t._resume() }));
+  r.prepend(t); [...r.querySelectorAll('.toast:not(.leaving)')].slice(MAX_TOASTS).forEach(x => x.remove());
+  update(msg, opt);
+  return { el: t, update, close };
 }
 
 /** عدٌّ إلى قيمة. */
@@ -73,8 +100,8 @@ function table(host, cfg){
   (cfg.actions||[]).forEach((a,i) => bulk.insertAdjacentHTML('beforeend', `<button class="btn sm" type="button" data-a="${i}"><i data-lucide="${a.icon}"></i>${esc(a.label)}</button>`));
   bulk.insertAdjacentHTML('beforeend', `<button class="btn sm" type="button" data-clear>إلغاء التحديد</button>`);
   function view(){
-    let r = cfg.rows.filter(x => (!st.filter || x[cfg.filters.key]===st.filter) && (!st.q || JSON.stringify(x).includes(st.q)));
-    if(st.sort) r = r.slice().sort((a,b) => (a[st.sort] > b[st.sort] ? 1 : a[st.sort] < b[st.sort] ? -1 : 0) * st.dir);
+    let r = cfg.rows.filter(x => (!st.filter || x[cfg.filters.key]===st.filter) && match(cfg.columns.map(c => x[c.key]).join(' '), st.q));
+    if(st.sort) r = r.slice().sort((a,b) => (typeof a[st.sort] === 'number' ? a[st.sort] - b[st.sort] : COLL.compare(String(a[st.sort]), String(b[st.sort]))) * st.dir);
     return r;
   }
   function render(){
@@ -124,17 +151,31 @@ function trap(panel){
   const f = panel.querySelector('[autofocus]') || tabbables()[0]; f && setTimeout(() => f.focus(), 30);
   return () => { dead.forEach(el => el.inert = false); document.removeEventListener('keydown', onKey, true); opener && opener.focus && opener.focus() };
 }
-/** قائمة بالأسهم (roving tabindex): ↑↓ ثمّ Home/End، والحرف الأوّل يقفز. */
+/** قائمة بالأسهم (roving tabindex): ↑↓ وHome/End، والكتابة تقفز إلى أوّل خيارٍ يبدأ بما كُتب (يُفرَّغ بعد ثانية، ويطابق العربيّة مطبَّعة). */
 function listbox(list, itemSel='[role="option"]'){
   const items = () => [...list.querySelectorAll(itemSel)];
   const set = i => { const it = items(); it.forEach((x,k) => x.tabIndex = k===i ? 0 : -1); it[i] && it[i].focus() };
   items().forEach((x,k) => x.tabIndex = k===0 ? 0 : -1);
+  let buf = '', bt = 0;
   list.addEventListener('keydown', e => { const it = items(), i = it.indexOf(document.activeElement); if(i < 0) return;
     if(e.key === 'ArrowDown'){ e.preventDefault(); set(Math.min(it.length-1, i+1)) }
     else if(e.key === 'ArrowUp'){ e.preventDefault(); set(Math.max(0, i-1)) }
     else if(e.key === 'Home'){ e.preventDefault(); set(0) } else if(e.key === 'End'){ e.preventDefault(); set(it.length-1) }
-    else if(e.key.length === 1){ const j = it.findIndex((x,k) => k > i && x.textContent.trim().startsWith(e.key)); if(j >= 0) set(j) } });
+    else if(e.key.length === 1 && !e.metaKey && !e.ctrlKey && e.key !== ' '){
+      clearTimeout(bt); buf += e.key; bt = setTimeout(() => buf = '', 1000);
+      const label = x => norm((x.querySelector('b') || x).textContent), q = norm(buf);
+      const order = [...it.slice(i + (buf.length === 1 ? 1 : 0)), ...it.slice(0, i + (buf.length === 1 ? 1 : 0))];
+      const hit = order.find(x => label(x).startsWith(q)); if(hit) set(it.indexOf(hit)) } });
 }
+
+/* ═════ 1.3 · البحث العربيّ ═════ */
+/** تطبيع: بلا تشكيل ولا تطويل، وأ/إ/آ/ٱ ← ا، وى ← ي، وة ← ه، وؤ/ئ ← و/ي، وحالةُ اللاتينيّ صغيرة. */
+function norm(s){
+  return String(s ?? '').normalize('NFKC').replace(/[ً-ٰٟـ]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').toLowerCase().trim();
+}
+const COLL = new Intl.Collator('ar', {numeric:true, sensitivity:'base'});
+const match = (hay, q) => !q || norm(hay).includes(norm(q));
 
 /* ═════ 1.2 · العربيّة: الجمع والوقت والتاريخ ═════ */
 const PR = new Intl.PluralRules('ar');
@@ -161,9 +202,9 @@ function date(d, {hijri=false, style='medium'}={}){
 /* ═════ 1.2 · رسالةٌ تتبع العمليّة ═════ */
 /** ‏track(promiseFn, {loading, success:(v)=>msg, error:(e)=>msg}) — رسالةٌ واحدة تتحوّل، وفي الفشل «أعد المحاولة». */
 function track(fn, m){
-  toast(m.loading, {}); const t = $('#r-toast'); t.classList.add('loading'); t.querySelector('.ic').textContent = '◌'; clearTimeout(th);
-  return Promise.resolve().then(fn).then(v => { t.classList.remove('loading'); toast(m.success(v)); return v },
-    e => { t.classList.remove('loading'); toast(m.error(e), {bad:true, undo:() => track(fn, m)}); t.querySelector('.undo').textContent = 'أعد المحاولة'; throw e });
+  const h = toast(m.loading, {loading:true});
+  return Promise.resolve().then(fn).then(v => { h.update(m.success(v)); return v },
+    e => { h.update(m.error(e), {bad:true, action:{label:'أعد المحاولة', run:() => track(fn, m).catch(()=>{})}}); throw e });
 }
 
 /* ═════ 1.2 · النماذج: تحقّقٌ لحظيّ، حفظٌ تلقائيّ، حمايةٌ من المغادرة ═════ */
@@ -216,7 +257,7 @@ function palette(cmds){
   function render(){
     const q = inp.value.trim(), rec = store.get('ronaq-recent', []);
     const recent = q ? [] : rec.map(id => cmds.find(c => c.id === id)).filter(Boolean);
-    const rest = cmds.filter(c => (!q || (c.title + ' ' + (c.hint||'')).includes(q)) && !recent.includes(c));
+    const rest = cmds.filter(c => match(c.title + ' ' + (c.hint||''), q) && !recent.includes(c));
     shown = [...recent, ...rest]; sel = Math.min(sel, Math.max(0, shown.length-1));
     ul.innerHTML = (recent.length ? '<li class="grp" role="presentation">الأخيرة</li>' : '') +
       shown.map((c,i) => (i === recent.length && recent.length ? '<li class="grp" role="presentation">كلّ الأوامر</li>' : '') +
@@ -246,12 +287,64 @@ function shortcuts(list){
   return { open, close };
 }
 
+/* ═════ 1.3 · التلميحات بمجموعة تأخير ═════ */
+/** ‏<button data-tip="نصّ"> — يظهر بعد 700ms، وفورًا إن انتقلتَ من تلميحٍ آخر خلال 300ms. لا تلميح باللمس، وEsc يخفيه. */
+function tips(root=document){
+  let tip = $('#r-tip'); if(!tip){ tip = document.createElement('div'); tip.id = 'r-tip'; tip.className = 'r-tip'; tip.setAttribute('role','tooltip'); tip.hidden = true; document.body.append(tip) }
+  let timer = 0, lastClose = 0, cur = null;
+  const show = el => { cur = el; tip.textContent = el.dataset.tip; tip.hidden = false; el.setAttribute('aria-describedby','r-tip');
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    let top = r.top - h - 8; if(top < 8) top = r.bottom + 8;
+    tip.style.top = top + 'px'; tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width/2 - w/2)) + 'px'; tip.classList.add('on') };
+  const hide = () => { clearTimeout(timer); if(cur){ cur.removeAttribute('aria-describedby'); lastClose = Date.now() } cur = null; tip.classList.remove('on'); tip.hidden = true };
+  const enter = e => { const el = e.target.closest && e.target.closest('[data-tip]'); if(!el || (e.pointerType === 'touch')) return;
+    clearTimeout(timer); if(Date.now() - lastClose < 300) show(el); else timer = setTimeout(() => show(el), 700) };
+  root.addEventListener('pointerover', enter); root.addEventListener('focusin', enter);
+  root.addEventListener('pointerout', e => { if(e.target.closest && e.target.closest('[data-tip]')) hide() });
+  root.addEventListener('focusout', hide); addEventListener('keydown', e => { if(e.key === 'Escape') hide() });
+}
+
+/* ═════ 1.3 · تفضيلات المستخدم: الحركة وطابع الزوايا ═════ */
+/** ‏motion(false) يوقف الحركة كلّها ويحفظ الاختيار؛ ‏radius('sharp'|'soft'|'round'). */
+function motion(on){ document.documentElement.toggleAttribute('data-motion-off', !on); store.set('ronaq-motion', !!on) }
+function radius(kind){ document.documentElement.setAttribute('data-radius', kind); store.set('ronaq-radius', kind) }
+
+/* ═════ 1.3 · الشريط اللاصق يتغيّر بعد أوّل تمرير ═════ */
+function stickyNav(nav){
+  const s = document.createElement('div'); s.style.cssText = 'position:absolute;top:0;height:1px;width:1px;pointer-events:none';
+  document.body.prepend(s);
+  new IntersectionObserver(([e]) => nav.toggleAttribute('data-scrolled', !e.isIntersecting)).observe(s);
+}
+
+/* ═════ 1.3 · قائمةٌ فرعيّة بمثلّث سماح ═════ */
+/** ‏submenu(trigger, menu) — يبقى المفتوح مفتوحًا 300ms ما دام المؤشّر يتّجه نحوه قُطريًّا (والجهة من dir). */
+function submenu(trigger, menu){
+  let closeT = 0, last = null;
+  const inTri = (p, a, b, c) => { const s = (p1, p2, p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    const d1 = s(p, a, b), d2 = s(p, b, c), d3 = s(p, c, a); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) };
+  const open = () => { clearTimeout(closeT); menu.hidden = false; trigger.setAttribute('aria-expanded','true') };
+  const close = () => { menu.hidden = true; trigger.setAttribute('aria-expanded','false') };
+  trigger.addEventListener('pointerenter', open);
+  trigger.addEventListener('pointermove', e => last = {x:e.clientX, y:e.clientY});
+  trigger.addEventListener('pointerleave', e => { const r = menu.getBoundingClientRect(), rtl = getComputedStyle(menu).direction === 'rtl';
+    const edge = rtl ? r.right : r.left, p = {x:e.clientX, y:e.clientY}, a = last || p;
+    if(inTri(p, a, {x:edge, y:r.top - 8}, {x:edge, y:r.bottom + 8})) closeT = setTimeout(close, 300); else close() });
+  menu.addEventListener('pointerenter', () => clearTimeout(closeT));
+  menu.addEventListener('pointerleave', () => closeT = setTimeout(close, 150));
+  trigger.addEventListener('keydown', e => { const rtl = getComputedStyle(trigger).direction === 'rtl';
+    if(e.key === (rtl ? 'ArrowLeft' : 'ArrowRight') || e.key === 'Enter'){ e.preventDefault(); open(); const f = menu.querySelector(FOCUSABLE); f && f.focus() } });
+  menu.addEventListener('keydown', e => { const rtl = getComputedStyle(menu).direction === 'rtl';
+    if(e.key === (rtl ? 'ArrowRight' : 'ArrowLeft') || e.key === 'Escape'){ e.preventDefault(); close(); trigger.focus() } });
+}
+
 /** الانتقال من بطاقةٍ إلى تفاصيلها: يتشارك العنصران اسمًا واحدًا فيتحوّل أحدهما إلى الآخر. */
 function morph(fromEl, toFn){
   fromEl.style.viewTransitionName = 'r-morph';
   return vt(() => { fromEl.style.viewTransitionName = ''; toFn() });
 }
 
-window.Ronaq = { icons, vt, announce, toast, track, countTo, reject, table, morph, trap, listbox, plural, ago, date, form, checklist, palette, shortcuts, store, esc, reduce, ICONS, version: '1.2' };
-document.addEventListener('DOMContentLoaded', () => icons());
+window.Ronaq = { icons, vt, announce, toast, track, countTo, reject, table, morph, trap, listbox, plural, ago, date, form, checklist, palette, shortcuts, store, norm, match, collator: COLL, tips, motion, radius, stickyNav, submenu, esc, reduce, ICONS, version: '1.3' };
+document.addEventListener('DOMContentLoaded', () => { icons(); tips();
+  if(store.get('ronaq-motion', true) === false) document.documentElement.setAttribute('data-motion-off','');
+  const rk = store.get('ronaq-radius', null); if(rk) document.documentElement.setAttribute('data-radius', rk) });
 })();
