@@ -65,6 +65,8 @@ export interface ReviewModel {
   readonly cards: readonly ReviewCard[]
   readonly gaps: Readonly<Record<Gap, number>>
   readonly versions: readonly PlanVersion[]
+  /** اسمُ كلّ مصدرٍ في الخطّة بمعرّفه (D-345) — به يدلّ المنشورُ على أصله. وغيابُه (فكرةٌ، أو مصدرٌ حُذف) لا يُرسم. */
+  readonly sourceNames?: Readonly<Record<string, string>>
 }
 
 /** بصمةُ البند: مصدرُه ومنصّتُه ويومُه وساعتُه — ما يتغيّر بفعلٍ عليه أو على غيره. */
@@ -115,12 +117,17 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at },
     }
   })
+  const named = await db.prepare('SELECT id, name FROM sources WHERE org_id = ? LIMIT 500').bind(org)
+    .all<{ id: string; name: string }>().then((r) => r.results).catch(() => [])
+  const inPlan = new Set(plan.plan.items.map((i) => i.sourceId))
+  const sourceNames = Object.fromEntries(named.filter((s) => inPlan.has(s.id)).map((s) => [s.id, s.name]))
   const gaps: Record<Gap, number> = { unwritten: 0, no_image: 0, pending: 0, clash: 0 }
   for (const c of cards) for (const g of c.gaps) gaps[g] += 1
   return {
     plan,
     version: meta?.version ?? 1,
     lockedAt: meta?.locked_at ?? null,
+    sourceNames,
     cards,
     gaps,
     versions: versions.map((v) => {
