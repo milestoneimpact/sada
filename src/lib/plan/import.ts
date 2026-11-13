@@ -10,6 +10,7 @@
  * منصّته، وموعدٌ في المستقبل. ولكلّ صفٍّ مفتاحٌ من محتواه (D-004): استيرادُ الملفّ
  * نفسِه مرّتين لا يصنع منشورًا مكرّرًا.
  */
+import { PLATFORM_LABEL } from '../oauth/providers'
 import { atomically, type Db, type DbStatement } from '../tokens'
 import { isLinkedInPage, type LinkedAccount } from '../channels'
 import { isThread, longestTweet, THREAD_MAX, tweetsOf } from '../draft/thread'
@@ -30,9 +31,8 @@ export type PlanPlatform = 'linkedin' | 'x' | 'youtube' | 'tiktok' | 'instagram'
 /** حدُّ النصّ المكتوب — X بوزنه (D-071). وحدودُ نصّ المقطع في `captionProblem`. */
 const TEXT_LIMIT: Readonly<Record<'linkedin' | 'x', number>> = { linkedin: 3000, x: 280 }
 
-const LABEL: Readonly<Record<PlanPlatform, string>> = {
-  linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
-}
+/** اسمُ المنصّة من مصدره الواحد (D-340). */
+const LABEL: Readonly<Record<string, string>> = PLATFORM_LABEL
 
 /**
  * أسماءُ المنصّات كما قد يكتبها المالك — بالعربيّة أو بالإنجليزيّة، بأيّ حالةٍ أحرف.

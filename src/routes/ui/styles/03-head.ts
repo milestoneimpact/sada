@@ -69,7 +69,7 @@ a.pill::after{content:''; position:absolute; inset:50% 0 auto; height:var(--tap)
    صيغة «card-alert» نفسَها (الحافّة ‏٤px بلون الحال، والسطح والحدّ والظلّ الأوّل)، ودالّتُه
    «notice()». ورمز الحال ‏١٦ بجوار نصّ ‏١٥، ووسطُه على وسط السطر الأوّل (‏٢٤). **والنغمة صنف
    على الإشعار** («toast-note bad») لأنّ سكربت اللوحة يقرؤها ليقرّر أيذهب وحدَه أم يبقى. */
-.toast-note{display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-3) var(--s-4);
+.toast-note{display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-3) var(--s-4); animation:toast-in var(--dur-3) var(--ease-out);
   border-radius:var(--r-card); margin-bottom:var(--s-4); font-size:var(--t-ui); line-height:var(--lh-ui);
   border:var(--bd); background:var(--surface); box-shadow:var(--sh-1);
   border-inline-start:var(--s-1) solid var(--line);

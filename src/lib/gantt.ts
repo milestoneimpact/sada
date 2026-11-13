@@ -22,6 +22,7 @@
  * يأخذ صفوفًا ونافذةً ويردّ مواضعَ بالنسبة المئويّة. **فيُختبَر بالحساب**، ولا يعرف
  * قاعدةً ولا HTML. والتواريخُ تُقرأ بـ `parseSqliteUtc` لأنّها بصيغة القاعدة.
  */
+import { POST_STATUS } from './status'
 import { parseSqliteUtc } from './format'
 import { PLATFORM_LABEL, platformLabel } from './oauth/providers'
 import { dayRange, localParts } from './time/zone'
@@ -172,10 +173,8 @@ export const STATUS_TONE: Readonly<Record<string, GanttTone>> = {
   published: 'ok', failed: 'bad', rejected: 'idle',
 }
 
-export const STATUS_LABEL: Readonly<Record<string, string>> = {
-  draft: 'تنتظر قرارك', approved: 'معتمَدة بلا إرسال', edited: 'معتمَدة بعد تعديل',
-  rejected: 'مرفوضة', queued: 'مجدولة', published: 'نُشرت', failed: 'فشل النشر',
-}
+/** النصُّ من المصدر الواحد (D-340)؛ والنغمةُ أعلاه ترميزُ الرسم لا شارةُ الحال. */
+export const STATUS_LABEL: Readonly<Record<string, string>> = Object.fromEntries(Object.entries(POST_STATUS).map(([k, f]) => [k, f.label]))
 
 const PLAN_TONE: Readonly<Record<string, GanttTone>> = { draft: 'pending', approved: 'ok', superseded: 'idle' }
 export const PLAN_LABEL: Readonly<Record<string, string>> = {

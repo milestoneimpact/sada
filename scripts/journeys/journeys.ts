@@ -716,10 +716,12 @@ const R12: Journey = {
   },
   async run({ page, m, stack }) {
     await m.tap(link(page, 'ابنِ خطّة'), '«ابنِ خطّة» في بطاقة «خطّةُ الشهر»')
-    await m.tap(button(page, 'التالي'), '«التالي» — الفترة: شهر، مختارةٌ سلفًا')
-    await m.tap(button(page, 'التالي'), '«التالي» — المنصّات المربوطة بإيقاعها، مختارةٌ سلفًا')
+    // ‏على الشاشة العريضة المنشئُ شاشةٌ واحدة (D-338): الخطواتُ كلُّها ظاهرةٌ ولا «التالي» — وعلى الهاتف خطوةٌ في كلّ شاشة
+    const stepped = async (label: string): Promise<void> => { if (await page.locator('#wz-next').isVisible()) await m.tap(button(page, 'التالي'), label) }
+    await stepped('«التالي» — الفترة: شهر، مختارةٌ سلفًا')
+    await stepped('«التالي» — المنصّات المربوطة بإيقاعها، مختارةٌ سلفًا')
     await m.tap(visible(page.locator('label.wz-opt').filter({ has: page.locator('input[name="image_style"][value="none"]') })).first(), '«بلا صورة»')
-    await m.tap(button(page, 'التالي'), '«التالي» — المراجعة: العددُ والكلفة')
+    await stepped('«التالي» — المراجعة: العددُ والكلفة')
     await m.tap(button(page, 'حلّل وابنِ الخطّة'), '«حلّل وابنِ الخطّة»', { key: true })
     // ‏البناءُ في الخلفيّة (D-332): شاشةُ «صدى يبني خطّتك» بخطواتها، ثمّ تنتقل وحدَها إلى الخطّة حين يكتمل التخطيط
     await page.waitForURL(/\/panel\/plan\/review/, { timeout: 30_000 })

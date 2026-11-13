@@ -33,6 +33,7 @@ import { NARROW } from './styles/11-narrow'
 import { EXTRAS } from './styles/12-extras'
 import { EDITIONS } from './styles/13-editions'
 import { TOUCH } from './styles/14-touch'
+import { MOTION } from './styles/12-motion'
 
 /**
  * ‏**والورقةُ وحداتٌ بترتيبها** في `styles/` (`scripts/split_styles.mjs`): المتأخّرُ يغلب عند تساوي
@@ -41,4 +42,4 @@ import { TOUCH } from './styles/14-touch'
  * ‏**ولا `@layer` بعد**: جُرّبت طبقةٌ لكلّ وحدة فقاست لقطاتُ الأنماط المحسوبة ‏347 تغيّرًا مختلفًا، أوّلُها
  * ‏أزرارٌ تكسب حدًّا وحشوًا. فالطبقةُ تقلب ما كان المحدّدُ الأخصُّ يحسمه بين وحدتين، وكلُّ موضعٍ منها قرارٌ لا نقل.
  */
-export const STYLE = TOKENS + BASE + SHELL + HEAD + CARDS + MOMENT + TABLES + CONTROLS + SECTIONS + DECISION + PAGES + NARROW + EXTRAS + EDITIONS + TOUCH
+export const STYLE = TOKENS + BASE + SHELL + HEAD + CARDS + MOMENT + TABLES + CONTROLS + SECTIONS + DECISION + PAGES + NARROW + EXTRAS + MOTION + EDITIONS + TOUCH

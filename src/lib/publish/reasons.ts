@@ -9,6 +9,7 @@
  * وما ليس رمزا (جوابُ المنصّة نفسِها) يُقال كما جاء: «ردّته المنصّة: …»،
  * فذاك نصُّها لا نصُّنا، **وترجمتُه تخمين**.
  */
+import { PLATFORM_LABEL } from '../oauth/providers'
 import type { Platform } from '../oauth/providers'
 
 export type FailAction = 'requeue' | 'relink' | 'open' | 'confirm' | 'none'
@@ -47,9 +48,7 @@ export const REASONS: Readonly<Record<string, FailReason>> = {
 const PLATFORM_PREFIX: ReadonlySet<string> = new Set(['x', 'linkedin', 'youtube', 'tiktok', 'instagram'])
 
 /** أسماءُ المنصّات كما يقرؤها المالك — لا مفتاحُها في القاعدة («youtube»). */
-const LABELS: Readonly<Record<string, string>> = {
-  x: 'X', linkedin: 'LinkedIn', youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram',
-}
+const LABELS: Readonly<Record<string, string>> = PLATFORM_LABEL
 
 /**
  * ‏جملُ HTTP الإنجليزيّة كما تردّها المنصّة («Internal Server Error») تُقال بالعربيّة (D-202)،

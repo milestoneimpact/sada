@@ -9,6 +9,7 @@
  * والمنشورُ يُرسم بـ `nativePost` (D-172): بنيةُ المنصّة بجلد صدى، بلا رقمٍ مخترَع. **والطباعةُ تحسينٌ لا غاية**: زرٌّ
  * واحد، وورقةُ أنماطٍ بمقاس التسليم (25 × 20.05 سم) تُخفي ما ليس من الوثيقة.
  */
+import { postStatus } from '../../lib/status'
 import { html, raw, type Html } from './html'
 import { LOGOS } from './logos'
 import { nativePost } from './nativePost'
@@ -32,9 +33,6 @@ export interface PlanDocData {
   readonly zone: string | null
 }
 
-const STATUS: Readonly<Record<string, string>> = {
-  draft: 'تنتظر الاعتماد', approved: 'معتمَدة', edited: 'معتمَدة', queued: 'مجدولة', published: 'نُشرت', failed: 'تعثّرت',
-}
 
 function figure(n: number, label: string): Html {
   return html`<div class="pd-kpi"><b>${AR(n)}</b><span>${label}</span></div>`
@@ -53,7 +51,7 @@ function post(c: ReviewCard, d: PlanDocData): Html {
     }))
   return html`<article class="pd-post">
     <header class="pd-post-h"><span class="pf-logo rv-pf" data-pf="${platform}" aria-hidden="true">${raw(LOGOS[platform] ?? '')}</span>
-      <bdi class="mono">${local}</bdi><span class="grow"></span><span class="chip">${c.post === null ? 'يُكتب' : STATUS[c.post.status] ?? c.post.status}</span></header>
+      <bdi class="mono">${local}</bdi><span class="grow"></span><span class="chip">${c.post === null ? 'يُكتب' : postStatus(c.post.status).label}</span></header>
     ${frame}
     ${c.item.why === 'من خطّتك المرفوعة' ? html`` : html`<p class="hint m-0">${c.item.angle}</p>`}
   </article>`
