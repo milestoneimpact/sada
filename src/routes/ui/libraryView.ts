@@ -121,6 +121,6 @@ export function libraryScreen(d: LibraryData): string {
   ${folders.size === 0
     ? '<p class="hint mt-4">لا شيءَ هنا بعد — ارفع صورة، أو ولّد صورةً لمسوّدة، أو أضف ملفًّا إلى مجلّد Drive.</p>'
     : [...folders].map(([f, list]) => `<section class="mt-4" aria-label="${escapeHtml(f)}">
-        <h2>${escapeHtml(f)} <span class="count">${list.length}</span></h2>
+        <h2 class="lib-h">${escapeHtml(f)} <span class="count">${list.length}</span></h2>
         <div class="lib-grid">${list.map((a) => tile(a, d)).join('')}</div></section>`).join('')}`
 }

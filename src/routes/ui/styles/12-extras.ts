@@ -591,6 +591,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .lib-find{display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--s-3); margin-bottom:var(--s-4)}
 /* حقلُ الملفّ: خطُّ الحقول (لا يقرّبه iOS) وهدفُ لمسٍ كامل */
 #upload input[type=file]{min-height:var(--tap); padding-block:var(--s-2); font-size:var(--t-body); max-width:100%}
+/* عنوانُ مجلّد الأصول: درجةُ h3 من السلّم (كان عنوانَ المتصفّح الافتراضيّ) */
+.lib-h{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .lib-marks{display:grid; gap:var(--s-2); margin-top:var(--s-3)}
 .lib-tags{align-items:center}
 .lib-tag-edit{min-width:0}
