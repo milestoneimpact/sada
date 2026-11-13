@@ -73,6 +73,7 @@
   "routes/ui/styles/08-sections.ts": 1,
   "routes/ui/styles/11-narrow.ts": 1,
   "routes/ui/styles/12-extras.ts": 1,
+  "routes/ui/styles/12-motion.ts": 1,
   "routes/ui/styles/13-editions.ts": 1,
   "routes/ui/styles/14-touch.ts": 1,
   "routes/ui/tasksView.ts": 5,

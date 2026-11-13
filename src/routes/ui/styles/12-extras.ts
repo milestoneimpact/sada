@@ -487,6 +487,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-opts-top{align-items:start}
 .wz-pf{margin:0; padding:var(--s-4)}
 .wz-pf-h label{min-height:var(--tap)}
+.wz-pf-h input{margin:0}
 .wz-pf-h{padding:0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pf .pf-logo{width:var(--s-8); height:var(--s-8)}
 .wz-pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
@@ -574,7 +575,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* «أضف منشورًا» (D-336): طيّةٌ تحت بطاقات الأسبوع، وحقولُها صفٌّ ينكسر على الجوّال */
 /* السحبُ باللمس (D-336): المصغَّرةُ المحمولةُ تُرى مرفوعة، ولا قائمةَ نظامٍ ولا تحديدَ نصٍّ تحت الإصبع */
 .rv-mini[data-move]{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
-.rv-mini.is-held{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke); background:var(--selected)}
+.rv-mini.is-held{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke); background:var(--selected); box-shadow:var(--sh-3); transform:scale(1.04)}
 /* عرضُ القائمة (D-337): الجدولُ والبطاقاتُ لا يجتمعان — والمنظارُ على جذر الشاشة */
 .rv-vw{display:inline-flex; gap:var(--s-1)}
 .rv-vw .btn[aria-pressed="true"]{background:var(--selected); border-color:var(--accent)}

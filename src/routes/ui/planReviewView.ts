@@ -439,7 +439,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
   function upd(){var bar=document.getElementById('rv-bulk'), n=document.getElementById('rv-n'); if(!bar||!n)return;
     var k=root.querySelectorAll('input[name="sel"]:checked').length; bar.hidden=k===0; n.textContent=k.toLocaleString('ar-u-nu-latn')+' محدَّدًا';}
   document.addEventListener('change',function(e){if(e.target&&e.target.name==='sel')upd();});
-  upd(); view();
+  upd(); view(); setTimeout(function(){root.setAttribute('data-seen','1');},700);
   // ‏منظارُ العرض (D-337): بطاقاتٌ أو قائمة — يُحفظ في المتصفّح وحدَه (تفضيلُ عرضٍ لا بيان)، ويُعاد بعد كلّ تحديثٍ حيّ
   function view(set){
     var v=set||root.getAttribute('data-view'); if(!v){try{v=localStorage.getItem('rv-view');}catch(_){} }
@@ -465,10 +465,13 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
     var doc=new DOMParser().parseFromString(text.replace(/<(style|script)\\b[\\s\\S]*?<\\/\\1>/gi,''),'text/html'), next=doc.getElementById('rv-root');
     if(!next)return false;
     var picked=[]; root.querySelectorAll('input[name="sel"]:checked').forEach(function(x){picked.push(x.value);});
+    // ‏settle (D-341): ما تبدّلت حالُه بين الرسمين تنبض شارتُه مرّةً — الفعلُ يُرى أثرُه حيث وقع
+    var was={}; root.querySelectorAll('.rv[id]').forEach(function(a){var s=a.querySelector('.st'); was[a.id]=s?s.textContent:'';});
     vt(function(){
       root.innerHTML=next.innerHTML;
       ['data-live','data-plan','data-w'].forEach(function(a){root.setAttribute(a,next.getAttribute(a)||'');});
       root.querySelectorAll('input[name="sel"]').forEach(function(x){if(picked.indexOf(x.value)>=0)x.checked=true;});
+      root.querySelectorAll('.rv[id]').forEach(function(a){var s=a.querySelector('.st'); if(s&&was[a.id]!==undefined&&was[a.id]!==s.textContent)s.classList.add('m-settle');});
       upd(); view();
     });
     if(!quiet)say(doc);
