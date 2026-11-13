@@ -286,6 +286,64 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
 })
 
 /**
+ * **«أضف منشورًا»** (D-336): بندٌ بيد المالك يدخل الخطّةَ بمعرّفه ويُرسَل إلى الكتابة — والحدودُ تُردّ بأسبابها ولا يُكتب شيء.
+ */
+describe('«أضف منشورًا» إلى يومٍ في الخطّة (D-336)', () => {
+  const items = (): { id?: string; platform: string; day: string; time: string; angle: string; sourceId: string }[] =>
+    (JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl1'").get() as { plan_json: string }).plan_json) as { items: never[] }).items
+  let sent: { draft: Record<string, unknown> }[]
+  beforeEach(() => {
+    sent = []
+    env['GENERATE_QUEUE'] = { async send(b: { draft: Record<string, unknown> }) { sent.push(b) }, async sendBatch() { /* لا يُنادى هنا */ } }
+  })
+  const add = async (fields: Record<string, string>): Promise<Response> => {
+    const { cookie, csrf } = await session()
+    return app.request('/panel/plan/review/add', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', w: '1', ...fields }), headers: { Cookie: cookie } }, env)
+  }
+
+  it('النموذجُ على الشاشة بقنوات الخطّة ومداها، والإضافةُ تكتب بندًا بمعرّفه من مصدر منصّته وترسله إلى الكتابة', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('action="/panel/plan/review/add"')
+    expect(html).toMatch(/name="day" value="2099-01-04" min="2099-01-04" max="2099-01-10"/)
+    const res = await add({ platform: 'x', day: '2099-01-05', time: '10:30', angle: '  إعلانُ   الورشة القادمة ' })
+    expect(res.status).toBe(303)
+    const added = items()[3]!
+    // ‏الساعةُ بتوقيت المالك (الرياض) تُحفظ UTC
+    expect(added).toMatchObject({ platform: 'x', day: '2099-01-05', time: '07:30', angle: 'إعلانُ الورشة القادمة', sourceId: 's2' })
+    expect(added.id).toMatch(/^a[0-9a-f]{11}$/)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.draft).toMatchObject({ platform: 'x', sourceId: 's2', planId: 'pl1', itemId: added.id, angle: 'إعلانُ الورشة القادمة' })
+  })
+
+  it('خارجُ المدى، ومنصّةٌ ليست من القنوات، وجملةٌ فارغة، وساعةٌ مشغولة، وبلا CSRF — تُردّ ولا بندَ ولا رسالة', async () => {
+    await add({ platform: 'x', day: '2099-02-01', time: '10:30', angle: 'خارج المدى' })
+    await add({ platform: 'tiktok', day: '2099-01-05', time: '10:30', angle: 'منصّةٌ أخرى' })
+    await add({ platform: 'x', day: '2099-01-05', time: '10:30', angle: ' ' })
+    await add({ platform: 'x', day: '2099-01-06', time: '12:00', angle: 'ساعةٌ مشغولة' })
+    const { cookie } = await session()
+    await app.request('/panel/plan/review/add', { method: 'POST', body: form({ id: 'pl1', platform: 'x', day: '2099-01-05', time: '10:30', angle: 'بلا رمز' }), headers: { Cookie: cookie } }, env)
+    expect(items()).toHaveLength(3)
+    expect(sent).toHaveLength(0)
+  })
+
+  it('لوحُ المسوّدة يحمل موضعَ رقائق الهاشتاق فارغًا — يملؤه السكربتُ من النصّ، ولا نصَّ مستخدمٍ يُكتب فيه من الخادم', async () => {
+    const { cookie } = await session()
+    const sheet = await (await app.request('/panel/plan/review/card?i=0', { headers: { Cookie: cookie } }, env)).text()
+    expect(sheet).toContain('<div class="rv-tags" id="rv-sh-tags" role="group"')
+    expect(sheet).toMatch(/id="rv-sh-tags"[^>]*><\/div>/)
+  })
+
+  it('ثلاثةٌ في اليوم على المنصّة حدٌّ: الرابعُ يُردّ', async () => {
+    for (const time of ['10:00', '11:00']) await add({ platform: 'x', day: '2099-01-06', time, angle: 'منشورٌ إضافيّ' })
+    expect(items()).toHaveLength(5)
+    await add({ platform: 'x', day: '2099-01-06', time: '15:00', angle: 'الرابع' })
+    expect(items()).toHaveLength(5)
+    expect(sent).toHaveLength(2)
+  })
+})
+
+/**
  * **«من المكتبة» على بطاقة المنشور** (D-334): صورةٌ في الأصول تُربط بمنشورٍ مكتوب — الكائنُ نفسُه بلا نسخ، والصورةُ السابقةُ تُرفض،
  * وعدّادُ الاستعمال يُرى في المكتبة. والمجدولُ وغيرُ الصورة يُردّان بسببهما.
  */

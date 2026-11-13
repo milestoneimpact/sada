@@ -214,6 +214,49 @@ export async function moveItem(db: Db, org: string, planId: string, index: numbe
   return { ok: true }
 }
 
+/** أكثرُ ما يحمله يومٌ واحدٌ على منصّةٍ واحدة — كما في إيقاع المعالج (D-329). */
+export const MAX_PER_DAY = 3
+
+/**
+ * **أضف منشورًا** (D-336): بندٌ يكتبه المالك بيده في يومٍ من الخطّة — منصّتُه من قنواتها، وزاويتُه جملتُه، ومصدرُه مصدرُ بندٍ فيها
+ * (فالمسوّدةُ تُكتب من مادّةٍ قرأها صدى لا من فراغ). يُعاد البندُ بمعرّفه ليُرسَل إلى الكتابة. والخطّةُ المثبَّتةُ تصير «عُدّلت بعد التثبيت»
+ * بـ`touchPlan` كأيّ تعديل.
+ */
+export async function addItem(
+  db: Db, org: string, planId: string,
+  input: { readonly day: string; readonly time: string; readonly platform: string; readonly angle: string },
+): Promise<{ readonly ok: true; readonly item: PlanItem } | { readonly ok: false; readonly reason: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.time)) return { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
+  const angle = input.angle.replace(/\s+/g, ' ').trim()
+  if (angle.length < 3) return { ok: false, reason: 'اكتب في جملةٍ ما يقوله المنشور' }
+  if (angle.length > 200) return { ok: false, reason: 'الجملةُ أطولُ من 200 حرف' }
+  const row = await db
+    .prepare('SELECT plan_json, week_start, span, status, choices_json FROM plans WHERE id = ? AND org_id = ?')
+    .bind(planId, org)
+    .first<{ plan_json: string; week_start: string; span: string; status: string; choices_json: string | null }>()
+  if (row === null || row.status === 'superseded') return { ok: false, reason: 'لا خطّة بهذا المعرّف' }
+  if (!dayWithin(input.day, row.week_start, asSpan(row.span))) return { ok: false, reason: 'اليومُ خارج مدى الخطّة' }
+  const plan = JSON.parse(row.plan_json) as { items: PlanItem[] }
+  const channels = new Set<string>([...plan.items.map((i) => i.platform), ...(((JSON.parse(row.choices_json ?? '{}') as { channels?: unknown }).channels as string[] | undefined) ?? [])])
+  if (!channels.has(input.platform)) return { ok: false, reason: 'هذه المنصّةُ ليست من قنوات الخطّة' }
+  const sameDay = plan.items.filter((i) => i.platform === input.platform && i.day === input.day)
+  if (sameDay.length >= MAX_PER_DAY) return { ok: false, reason: 'في هذا اليوم ' + String(MAX_PER_DAY) + ' منشوراتٍ على هذه المنصّة — وهو الحدّ' }
+  if (sameDay.some((i) => i.time === input.time)) return { ok: false, reason: 'في هذه الساعة منشورٌ على المنصّة نفسِها — اختر ساعةً أخرى' }
+  // ‏المصدر: بندُ المنصّة نفسِها أوّلًا، ثمّ أيُّ بند — والفكرةُ (`idea:`) مفتاحُ مسوّدتها غيرُ البند فلا تصلح أصلًا لبندٍ جديد
+  const real = plan.items.filter((i) => !i.sourceId.startsWith('idea:'))
+  const from = real.find((i) => i.platform === input.platform) ?? real[0]
+  if (from === undefined) return { ok: false, reason: 'لا مصدرَ في هذه الخطّة يُكتب منه — أضف مصدرًا وابنِ خطّةً منه' }
+  const item: PlanItem = {
+    id: 'a' + crypto.randomUUID().replace(/-/g, '').slice(0, 11),
+    sourceId: from.sourceId, platform: input.platform as PlanItem['platform'], angle,
+    day: input.day, time: input.time, why: 'أضافه المالك بيده', kind: 'text',
+  }
+  plan.items.push(item)
+  await db.prepare('UPDATE plans SET plan_json = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(plan), planId, org).run()
+  await touchPlan(db, org, planId)
+  return { ok: true, item }
+}
+
 /**
  * **احذف**: البندُ يخرج من الخطّة، ومسوّدتُه تُرفض (تبقى بكلفتها، فما دُفع ثمنُه يُرى). ومنشورٌ جُدول يُسحب موعدُه أوّلًا
  * (D-327: «أزِل» على البطاقة يُزيل المنصّةَ من يومها)، وما أُرسل للنشر أو نُشر لا يُحذف.

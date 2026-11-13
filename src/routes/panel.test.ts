@@ -4685,6 +4685,63 @@ describe('الوسيط يُبثّ بمداه (D-182)', () => {
   })
 })
 
+describe('المصغَّرةُ على مسار الصورة (D-335)', () => {
+  async function seedImage(): Promise<string> {
+    const postId = crypto.randomUUID()
+    await db.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key) VALUES (?, 'linkedin', 'text', 'نصّ', 'draft', ?)`).bind(postId, 'k-' + postId).run()
+    const id = crypto.randomUUID()
+    await db.prepare(`INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key)
+       VALUES (?, ?, 'gen/pic', 'image/png', 9, 'و', 'm', 0, 'ready', ?)`).bind(id, postId, 'img:' + postId).run()
+    return id
+  }
+  function bucket() {
+    const objects = new Map<string, Uint8Array>([['gen/pic', new Uint8Array(900)]])
+    return {
+      objects,
+      async head(key: string) { const b = objects.get(key); return b === undefined ? null : { size: b.length } },
+      async get(key: string) { const b = objects.get(key); return b === undefined ? null : { size: b.length, body: b } },
+      async put(key: string, value: ArrayBuffer) { objects.set(key, new Uint8Array(value)) },
+    }
+  }
+  const shrinker = (calls: { n: number }) => ({ input: () => ({ transform: () => ({ output: async () => { calls.n += 1; return { response: () => new Response(new Uint8Array(40)) } } }) }) })
+
+  it('‏`?w=160` WebP صغيرةٌ بوسم مقاسها تُصنع مرّةً، و‏304 بعدها — ومقاسٌ خارج القائمة والأصلُ كما كانا، وبلا جلسةٍ ‏403', async () => {
+    const b = bucket()
+    const calls = { n: 0 }
+    env['MEDIA'] = b
+    env['IMAGES'] = shrinker(calls)
+    const id = await seedImage()
+    const cookie = await login()
+    const small = await app.request(`/panel/media/${id}?w=160`, withSession(cookie), env)
+    expect(small.headers.get('Content-Type')).toBe('image/webp')
+    expect(small.headers.get('Content-Length')).toBe('40')
+    expect(small.headers.get('ETag')).toBe(`"${id}:w160"`)
+    expect(small.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable')
+    expect(b.objects.has('thumb/160/gen/pic')).toBe(true)
+    await app.request(`/panel/media/${id}?w=160`, withSession(cookie), env)
+    expect(calls.n).toBe(1)
+    expect((await app.request(`/panel/media/${id}?w=160`, withSession(cookie, { headers: { 'If-None-Match': `"${id}:w160"` } }), env)).status).toBe(304)
+    for (const path of [`/panel/media/${id}`, `/panel/media/${id}?w=999`]) {
+      const full = await app.request(path, withSession(cookie), env)
+      expect(full.headers.get('Content-Type')).toBe('image/png')
+      expect(full.headers.get('ETag')).toBe(`"${id}"`)
+    }
+    expect((await app.request(`/panel/media/${id}?w=160`, {}, env)).status).toBe(403)
+  })
+
+  it('بلا ربطٍ: الأصلُ يُسلَّم ساعةً وبلا وسم — فلا تُثبَّت الكاملةُ تحت عنوان المصغَّرة', async () => {
+    env['MEDIA'] = bucket()
+    delete env['IMAGES']
+    const id = await seedImage()
+    const cookie = await login()
+    const out = await app.request(`/panel/media/${id}?w=800`, withSession(cookie), env)
+    expect(out.status).toBe(200)
+    expect(out.headers.get('Content-Type')).toBe('image/png')
+    expect(out.headers.get('Cache-Control')).toBe('private, max-age=3600')
+    expect(out.headers.get('ETag')).toBeNull()
+  })
+})
+
 /**
  * ‏صفحةٌ لا نصٌّ خامّ (D-189): رابطٌ قديمٌ إلى منصّةٍ أو أسبوعٍ أو منشورٍ لا وجودَ له يفتح صفحةَ
  * ‏٤٠٤ بالرافدة وبابِ الرئيسيّة، وجملتُه تقول ما لم يُوجَد.

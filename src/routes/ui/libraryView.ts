@@ -52,7 +52,7 @@ function hidden(d: LibraryData): string {
 
 function tile(a: Asset, d: LibraryData): string {
   const media = a.preview !== null && a.kind === 'image'
-    ? `<img class="lib-thumb" src="${escapeHtml(a.preview)}" alt="" loading="lazy" decoding="async">`
+    ? `<img class="lib-thumb" src="${escapeHtml(a.preview)}?w=800" alt="" loading="lazy" decoding="async">`
     : `<div class="lib-thumb lib-ico" aria-hidden="true">${ICON[a.kind]}</div>`
   const open = a.drive !== null
     ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.drive)}" target="_blank" rel="noopener">افتح في Drive</a>`
