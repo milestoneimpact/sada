@@ -531,3 +531,78 @@ describe('مصادرُ من غير Drive (D-284)', () => {
     expect(calls).toEqual([])
   })
 })
+
+/*
+ * ‏«الفهم» يطيع «توجيه المهامّ»: كان ينادي Anthropic حرفًا واللوحةُ تقول DeepSeek
+ * ‏وتعرض «جاهز» — فيفشل كلُّ ملفٍّ بـ401 من مزوّدٍ لم يختره المالك.
+ */
+describe('analyzeSource — المزوّد من التوجيه', () => {
+  async function routeToCompat(): Promise<void> {
+    const { upsertProvider } = await import('../providers')
+    const { writeRoute } = await import('../ai/routes')
+    await upsertProvider(db, {
+      name: 'deepseek', label: 'DeepSeek', kind: 'openai_compat',
+      baseUrl: 'https://api.deepseek.com/v1', priceIn: 1, priceOut: 2,
+    }, 'test')
+    await writeRoute(db, 'analyze', 'deepseek', 'deepseek-chat', 'test')
+  }
+
+  function compatNet(content: unknown, finish = 'stop'): typeof fetch {
+    const google = net()
+    return (async (input: unknown, init?: RequestInit): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('api.deepseek.com')) {
+        calls.push(url)
+        return Response.json({
+          model: 'deepseek-chat',
+          choices: [{ message: { content }, finish_reason: finish }],
+          usage: { prompt_tokens: 1000, completion_tokens: 200 },
+        })
+      }
+      return google(input as RequestInfo, init)
+    }) as unknown as typeof fetch
+  }
+
+  it('ينادي المزوّد المختار لا Anthropic، ويسجّل الكلفة باسمه', async () => {
+    await routeToCompat()
+    const sourceId = await seedSource()
+    const out = await analyzeSource(
+      { ...deps(compatNet('```json\n' + JSON.stringify(ANALYSIS) + '\n```')) },
+      sourceId,
+    )
+    // ‏بلا مفتاحٍ في الخزانة يُقال ذلك بالاسم — لا 401 من مزوّدٍ آخر
+    expect(out).toMatchObject({ kind: 'failed', retryable: false })
+    expect((out as { reason: string }).reason).toContain('DeepSeek')
+    expect(calls.filter((u) => u.includes('anthropic'))).toHaveLength(0)
+  })
+
+  it('بمفتاحٍ في الخزانة: يحلّل عند DeepSeek ويكتب صفّ الكلفة عليه', async () => {
+    await routeToCompat()
+    const { saveKey } = await import('../providers')
+    const encKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+    await saveKey(db, encKey, 'deepseek', 'sk-deepseek-test', 'test')
+    const sourceId = await seedSource()
+    const out = await analyzeSource(
+      { ...deps(compatNet('```json\n' + JSON.stringify(ANALYSIS) + '\n```')), encKey },
+      sourceId,
+    )
+    expect(out).toMatchObject({ kind: 'analyzed', worth: 0.8 })
+    expect(calls.some((u) => u.includes('api.deepseek.com'))).toBe(true)
+    expect(calls.filter((u) => u.includes('anthropic'))).toHaveLength(0)
+    const cost = db.raw.prepare('SELECT provider, operation FROM cost_ledger').get() as { provider: string; operation: string }
+    expect(cost).toEqual({ provider: 'deepseek', operation: 'analyze:deepseek-chat' })
+  })
+
+  it('نموذجٌ أنفق حدَّه تفكيرًا: يُقال السببُ لا «لا نصّ»، وتُسجَّل كلفتُه', async () => {
+    await routeToCompat()
+    const { saveKey } = await import('../providers')
+    const encKey = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+    await saveKey(db, encKey, 'deepseek', 'sk-deepseek-test', 'test')
+    const sourceId = await seedSource()
+    const out = await analyzeSource({ ...deps(compatNet('', 'length')), encKey }, sourceId)
+    expect(out).toMatchObject({ kind: 'failed', retryable: true })
+    expect((out as { reason: string }).reason).toContain('تفكيرًا')
+    const n = db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }
+    expect(n.n).toBe(1)
+  })
+})

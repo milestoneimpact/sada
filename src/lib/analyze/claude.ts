@@ -48,6 +48,8 @@ export const MODEL = ROUTES.analyze.model
 
 export interface AnalyzeDeps {
   readonly apiKey: string
+  /** النموذجُ المختار في «توجيه المهامّ» — وغيابُه يعني افتراضَ السجلّ. */
+  readonly model?: string
   readonly fetchImpl?: typeof fetch
 }
 
@@ -90,7 +92,7 @@ export async function analyzeText(
   let message: Anthropic.Message
   try {
     message = await client.messages.create({
-      model: MODEL,
+      model: deps.model ?? MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
       output_config: {

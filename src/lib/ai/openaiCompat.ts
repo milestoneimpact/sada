@@ -174,12 +174,23 @@ export async function chatCompletion(
   if (empty && typeof refusal === 'string' && refusal.trim().length > 0) {
     throw new CompatError('رفض المزوّد الطلب', 422, false, spent)
   }
-  if (empty) {
-    throw new CompatError('لا نصّ في جواب المزوّد', 502, true, spent)
-  }
-  // بُتر قبل تمامه: قد يتمّ في محاولةٍ ثانية
+  /*
+   * ‏والبترُ **قبل** الفراغ: نموذجٌ يفكّر (DeepSeek V4 Pro، R1، Gemini Pro) قد
+   * ‏ينفق حدَّ الرموز كلَّه تفكيرًا فيعود `content` فارغًا و`finish_reason: length`.
+   * ‏كان يُقال «لا نصّ» فيُخفى السببُ وعلاجُه.
+   */
   if (first?.['finish_reason'] === 'length') {
-    throw new CompatError('بُتر الجواب قبل تمامه', 502, true, spent)
+    throw new CompatError(
+      empty
+        ? `أنفق ${model} حدَّ الرموز تفكيرًا قبل أن يكتب — اختر في «توجيه المهامّ» نموذجًا لا يفكّر، أو مدًى أقصر`
+        : 'بُتر الجواب قبل تمامه',
+      502,
+      true,
+      spent,
+    )
+  }
+  if (empty) {
+    throw new CompatError(`لا نصّ في جواب المزوّد (${model})`, 502, true, spent)
   }
 
   return { text, usage, model }
