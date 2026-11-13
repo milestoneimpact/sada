@@ -29,6 +29,9 @@ export interface NpMedia {
   readonly mime: string
   /** رُكّبت الشريحةُ بمقاس المنصّة (`note === ''`)، فنسبتُها معلومة. */
   readonly composed: boolean
+  /** أبعادُ الصورة كما حُفظت (0029) — بها يُحجز مكانُها قبل أن تصل فلا تقفز الصفحة (D-333). */
+  readonly width?: number | null
+  readonly height?: number | null
 }
 
 export interface NpMetrics {
@@ -100,8 +103,10 @@ function mediaFigure(input: NativePostInput, stage: boolean): string {
   const size = !stage && m.composed && (input.platform === 'linkedin' || input.platform === 'x')
     ? SLIDE_SIZE[input.platform]
     : null
-  const dims = size === null ? '' : ` width="${size.width}" height="${size.height}"`
-  return `<img src="${escapeHtml(src)}" alt="الصورة المولَّدة لهذا المنشور" loading="lazy" data-media${dims}>`
+  // ‏والأبعادُ تحجز المكان (D-333): مقاسُ الشريحة للمركَّبة، وإلّا ما حُفظ للصورة — وبلا أبعادٍ تُرسم كما كانت
+  const known = size ?? (typeof m.width === 'number' && typeof m.height === 'number' && m.width > 0 && m.height > 0 ? { width: m.width, height: m.height } : null)
+  const dims = known === null ? '' : ` width="${known.width}" height="${known.height}"`
+  return `<img src="${escapeHtml(src)}" alt="الصورة المولَّدة لهذا المنشور" loading="lazy" decoding="async" data-media${dims}>`
 }
 
 function linkedin(input: NativePostInput): string {

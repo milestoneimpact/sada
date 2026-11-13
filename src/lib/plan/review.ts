@@ -34,6 +34,9 @@ export interface ReviewCard {
   readonly mediaId: string | null
   /** نوعُ الوسيط — للمعاينة بشكل المنصّة (D-288). */
   readonly mediaMime?: string | null
+  /** أبعادُه كما حُفظت — يُحجز بها مكانُ الصورة قبل أن تصل (D-333). */
+  readonly mediaWidth?: number | null
+  readonly mediaHeight?: number | null
   /** ما ينقص هذه البطاقةَ وحدَها. */
   readonly gaps: readonly Gap[]
 }
@@ -78,10 +81,10 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       .bind(org, plan.id)
       .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
       .then((r) => r.results).catch(() => []),
-    db.prepare(`SELECT m.id, m.post_id, m.mime FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
+    db.prepare(`SELECT m.id, m.post_id, m.mime, m.width, m.height FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
       .bind(org, plan.id)
-      .all<{ id: string; post_id: string; mime: string }>().then((r) => r.results).catch(() => []),
+      .all<{ id: string; post_id: string; mime: string; width: number | null; height: number | null }>().then((r) => r.results).catch(() => []),
     db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
       .bind(org, plan.id)
       .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
@@ -89,7 +92,8 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   ])
   const latestMedia = new Map<string, string>()
   const mimeOf = new Map<string, string>()
-  for (const m of media) if (!latestMedia.has(m.post_id)) { latestMedia.set(m.post_id, m.id); mimeOf.set(m.id, m.mime) }
+  const dimsOf = new Map<string, { width: number | null; height: number | null }>()
+  for (const m of media) if (!latestMedia.has(m.post_id)) { latestMedia.set(m.post_id, m.id); mimeOf.set(m.id, m.mime); dimsOf.set(m.id, { width: m.width, height: m.height }) }
   const slots = new Map<string, number>()
   for (const i of plan.plan.items) slots.set(`${i.platform}|${i.day}|${i.time}`, (slots.get(`${i.platform}|${i.day}|${i.time}`) ?? 0) + 1)
 
@@ -107,6 +111,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     if ((slots.get(`${item.platform}|${item.day}|${item.time}`) ?? 0) > 1) gaps.push('clash')
     return {
       index, key: itemKey(item), item, mediaId, mediaMime: mediaId === null ? null : mimeOf.get(mediaId) ?? null, gaps,
+      mediaWidth: mediaId === null ? null : dimsOf.get(mediaId)?.width ?? null, mediaHeight: mediaId === null ? null : dimsOf.get(mediaId)?.height ?? null,
       post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at },
     }
   })

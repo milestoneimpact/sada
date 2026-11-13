@@ -4662,6 +4662,27 @@ describe('الوسيط يُبثّ بمداه (D-182)', () => {
     expect(out.status).toBe(416)
     expect(out.headers.get('Content-Range')).toBe('bytes */100')
   })
+
+  it('الصورةُ تُحفظ سنةً بوسمها، والمطابقُ ‏304 بلا قراءة R2 — وبلا جلسةٍ لا ‏304، وطلبُ المدى يمضي إلى الكائن (D-333)', async () => {
+    const bucket = rangedBucket()
+    let reads = 0
+    env['MEDIA'] = { ...bucket, async get(...args: Parameters<typeof bucket.get>) { reads += 1; return bucket.get(...args) } }
+    const id = await seedVideo()
+    const cookie = await login()
+    const first = await app.request(`/panel/media/${id}`, withSession(cookie), env)
+    expect(first.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable')
+    expect(first.headers.get('ETag')).toBe(`"${id}"`)
+    expect(reads).toBe(1)
+    const again = await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { 'If-None-Match': `W/"${id}", "x"` } }), env)
+    expect(again.status).toBe(304)
+    expect(again.headers.get('ETag')).toBe(`"${id}"`)
+    expect(reads).toBe(1)
+    // ‏وسمٌ آخر: الكائنُ كلُّه. وبلا جلسةٍ: ‏403 ولو طابق الوسم — الحفظُ لا يفتح بابًا
+    expect((await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { 'If-None-Match': '"another"' } }), env)).status).toBe(200)
+    expect((await app.request(`/panel/media/${id}`, { headers: { 'If-None-Match': `"${id}"` } }, env)).status).toBe(403)
+    // ‏والمقطعُ بمداه لا يُختصَر ‏304
+    expect((await app.request(`/panel/media/${id}`, withSession(cookie, { headers: { Range: 'bytes=0-9', 'If-None-Match': `"${id}"` } }), env)).status).toBe(206)
+  })
 })
 
 /**

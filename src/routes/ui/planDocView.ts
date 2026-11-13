@@ -48,7 +48,7 @@ function post(c: ReviewCard, d: PlanDocData): Html {
     : raw(nativePost({
       platform, id: c.post.id, author: { name: d.authors[platform] ?? d.orgName, kind: null },
       text: c.post.text, when: dayLabel(c.item.day).split('،')[0] + ' ' + local,
-      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true },
+      media: c.mediaId === null ? null : { id: c.mediaId, mime: c.mediaMime ?? 'image/png', composed: true, width: c.mediaWidth ?? null, height: c.mediaHeight ?? null },
       poster: null, metrics: null, variant: 'feed',
     }))
   return html`<article class="pd-post">
