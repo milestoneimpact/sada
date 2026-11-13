@@ -28,7 +28,7 @@ export interface Asset {
   readonly drive: string | null
   /** في كم منشورٍ يُستعمل الآن (D-334) — صفوفُ `media` الجاهزةُ التي تشير إلى كائنه. وغيابُه لما لا يُربط (مصدرُ Drive). */
   readonly uses?: number
-  /** علامتا المالك (D-346): المفضّلةُ والوسوم — لما له كائنٌ في R2 (لا مصدرُ Drive). */
+  /** علامتا المالك (D-347): المفضّلةُ والوسوم — لما له كائنٌ في R2 (لا مصدرُ Drive). */
   readonly favourite?: boolean
   readonly tags?: readonly string[]
 }
@@ -74,7 +74,7 @@ export async function listLibrary(db: Db, org: string, limit = 300): Promise<Ass
     read('SELECT id, drive_file_id, name, mime, last_seen_at AS at FROM sources WHERE org_id = ?1 ORDER BY last_seen_at DESC LIMIT ?2'),
     // ‏عدّادُ الاستعمال (D-334): كم منشورًا يحمل هذا الكائنَ الآن — جملةٌ واحدةٌ للمكتبة كلِّها، و`?2` يُربط فيها حدًّا واسعًا
     read(`SELECT r2_key, COUNT(DISTINCT post_id) AS n FROM media WHERE org_id = ?1 AND status = 'ready' GROUP BY r2_key LIMIT ?2 * 20`),
-    // ‏علاماتُ المالك (D-346) — وجدولٌ لم يُرحَّل يُسقط العلاماتِ وحدَها
+    // ‏علاماتُ المالك (D-347) — وجدولٌ لم يُرحَّل يُسقط العلاماتِ وحدَها
     read('SELECT r2_key, favourite, tags FROM asset_marks WHERE org_id = ?1 LIMIT ?2 * 20'),
   ])
   const markOf = new Map(marks.map((r) => [str(r['r2_key']), { favourite: num(r['favourite']) === 1, tags: splitTags(str(r['tags'])) }]))
@@ -113,7 +113,7 @@ export function cleanTags(raw: string): string[] {
   return out
 }
 
-/** البحثُ في المكتبة (D-346): الاسمُ أو وسمٌ يحوي النصّ، والمفضّلةُ وحدَها إن طُلبت — في الذاكرة على ما قُرئ. */
+/** البحثُ في المكتبة (D-347): الاسمُ أو وسمٌ يحوي النصّ، والمفضّلةُ وحدَها إن طُلبت — في الذاكرة على ما قُرئ. */
 export function searchAssets(assets: readonly Asset[], q: string, favOnly: boolean): Asset[] {
   const needle = q.trim().toLowerCase()
   return assets.filter((a) => (!favOnly || a.favourite === true)
@@ -121,7 +121,7 @@ export function searchAssets(assets: readonly Asset[], q: string, favOnly: boole
 }
 
 /**
- * **علّم أصلًا** (D-346): مفضّلةٌ أو وسوم. المرجعُ يُحلّ إلى كائنه في R2 **بمنظّمة الجلسة** — فمرجعُ عميلٍ آخر لا يُعلَّم — وما لم يُذكر
+ * **علّم أصلًا** (D-347): مفضّلةٌ أو وسوم. المرجعُ يُحلّ إلى كائنه في R2 **بمنظّمة الجلسة** — فمرجعُ عميلٍ آخر لا يُعلَّم — وما لم يُذكر
  * من العلامتين يبقى كما هو. ومصدرُ Drive لا كائنَ له فلا يُعلَّم.
  */
 export async function markAsset(

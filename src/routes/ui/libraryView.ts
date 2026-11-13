@@ -22,7 +22,7 @@ export interface LibraryData {
   /** وجهُ الاختيار لمنشورٍ مكتوب (D-334): «اختر من المكتبة» على بطاقة الخطّة — المنشورُ وبطاقتُه وأسبوعُها للعودة. */
   readonly pickPost?: { readonly post: string; readonly index: number; readonly w: string } | null
   readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
-  /** البحثُ والمفضّلة (D-346). */
+  /** البحثُ والمفضّلة (D-347). */
   readonly q?: string
   readonly fav?: boolean
 }
@@ -84,7 +84,7 @@ function tile(a: Asset, d: LibraryData): string {
 }
 
 export function libraryScreen(d: LibraryData): string {
-  // ‏البحثُ والمفضّلة أوّلًا (D-346)، ثمّ النوعُ والمنشأ — والمفضّلةُ تتقدّم في مجلّدها
+  // ‏البحثُ والمفضّلة أوّلًا (D-347)، ثمّ النوعُ والمنشأ — والمفضّلةُ تتقدّم في مجلّدها
   const shown = searchAssets(d.assets, d.q ?? '', d.fav === true)
     .filter((a) => (d.kind === null || a.kind === d.kind) && (d.origin === null || a.origin === d.origin))
     .sort((a, b) => Number(b.favourite === true) - Number(a.favourite === true))
@@ -102,7 +102,7 @@ export function libraryScreen(d: LibraryData): string {
     ? 'كلُّ ما رُفع أو وُلّد أو في Drive — <b>يُحفظ مصنَّفًا ويُعاد استعمالُه بلا كلفة</b>.'
     : `<b>اختر ملفًّا لبند الخطّة</b> — أو ارفع جديدًا فيُحفظ في الأصول ويُربط به. <a href="/panel/client#board">عُد إلى الخطّة</a>`
   const accept = [...LIBRARY_MIMES].join(',')
-  // ‏نموذجُ الرفع بحقلٍ من العُدّة (اسمٌ يُقرأ، وهدفُ لمسٍ كامل)، ورابطُ المقاطع زرٌّ لا كلمةٌ صغيرةٌ في سطر (D-346)
+  // ‏نموذجُ الرفع بحقلٍ من العُدّة (اسمٌ يُقرأ، وهدفُ لمسٍ كامل)، ورابطُ المقاطع زرٌّ لا كلمةٌ صغيرةٌ في سطر (D-347)
   const upload = '<form class="card card-inset" id="upload" method="POST" action="/panel/assets/upload" enctype="multipart/form-data">'
     + hidden(d)
     + field({ id: 'lib-up', label: 'ارفع صورة', hint: 'PNG أو JPEG أو WebP حتّى 5MB. والمقاطعُ تُرفع من «فيديوهاتك» وتظهر هنا بعدها.',

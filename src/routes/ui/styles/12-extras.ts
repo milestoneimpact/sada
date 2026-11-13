@@ -587,7 +587,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* وحقلُ الملفّ هدفُ لمسٍ كاملٌ كسائر الحقول */
 .add-src input[type=file]{min-height:var(--tap); padding-block:var(--s-2)}
 .add-src{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); align-items:start}
-/* مكتبةُ الأصول (D-346): شريطُ البحث صفٌّ ينكسر، وعلاماتُ البلاطة تحت أفعالها */
+/* مكتبةُ الأصول (D-347): شريطُ البحث صفٌّ ينكسر، وعلاماتُ البلاطة تحت أفعالها */
 .lib-find{display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--s-3); margin-bottom:var(--s-4)}
 /* حقلُ الملفّ: خطُّ الحقول (لا يقرّبه iOS) وهدفُ لمسٍ كامل */
 #upload input[type=file]{min-height:var(--tap); padding-block:var(--s-2); font-size:var(--t-body); max-width:100%}

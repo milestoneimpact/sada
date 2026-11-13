@@ -515,7 +515,7 @@ writeAudited(
     soloPage('صدى — بناء الخطّة', { href: '/panel#posts', label: 'المنشورات' },
       planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
   )
-  // ‏«كلُّ الأصول» (D-346): البحثُ والمفضّلةُ والوسومُ على بلاطاتها — مولَّدةٌ ومرفوعةٌ ومقطعٌ ومصدرُ Drive
+  // ‏«كلُّ الأصول» (D-347): البحثُ والمفضّلةُ والوسومُ على بلاطاتها — مولَّدةٌ ومرفوعةٌ ومقطعٌ ومصدرُ Drive
   writeAudited(
     '/tmp/screen-assets.html',
     soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' },

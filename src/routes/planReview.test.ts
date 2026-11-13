@@ -396,7 +396,7 @@ describe('«من المكتبة» على بطاقة المنشور (D-334)', () 
     expect(ready(A)).toEqual(['lib/one'])
   })
 
-  it('المكتبةُ ببحثها وعلاماتها (D-346): «فضّلها» و«احفظ الوسوم» يعودان إلى العرض نفسِه، والبحثُ يحصر، وبلا CSRF لا يُكتب', async () => {
+  it('المكتبةُ ببحثها وعلاماتها (D-347): «فضّلها» و«احفظ الوسوم» يعودان إلى العرض نفسِه، والبحثُ يحصر، وبلا CSRF لا يُكتب', async () => {
     const { cookie, csrf } = await session()
     const page = await (await app.request('/panel/assets?kind=image', { headers: { Cookie: cookie } }, env)).text()
     expect(page).toContain('<form method="GET" action="/panel/assets" class="lib-find" role="search">')

@@ -1,4 +1,4 @@
-/** علاماتُ الأصل (D-346): الوسومُ تُقلَّم، والبحثُ بالاسم والوسم والمفضّلة، والعلامةُ بمنظّمتها ولكائنها. */
+/** علاماتُ الأصل (D-347): الوسومُ تُقلَّم، والبحثُ بالاسم والوسم والمفضّلة، والعلامةُ بمنظّمتها ولكائنها. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
 import { cleanTags, listLibrary, markAsset, searchAssets, MAX_TAGS, type Asset } from './library'
@@ -10,7 +10,7 @@ beforeEach(() => {
 })
 const asset = async (ref: string): Promise<Asset> => (await listLibrary(db, 'org_owner')).find((a) => a.ref === ref)!
 
-describe('علاماتُ الأصل (D-346)', () => {
+describe('علاماتُ الأصل (D-347)', () => {
   it('الوسومُ تُقلَّم: بلا «#» ولا مكرَّرٍ ولا فارغ، بفاصلةٍ عربيّةٍ أو لاتينيّة، وحدُّها ثمانية', () => {
     expect(cleanTags(' #هويّة ، شعار,شعار,, حملة  الصيف ')).toEqual(['هويّة', 'شعار', 'حملة الصيف'])
     expect(cleanTags(Array.from({ length: 12 }, (_, i) => 't' + String(i)).join(','))).toHaveLength(MAX_TAGS)
