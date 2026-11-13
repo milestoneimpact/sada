@@ -80,6 +80,11 @@ migrations_dir = "migrations"
 [env.staging.ai]
 binding = "AI"
 
+# ‏المصغَّرات (D-335): Cloudflare Images يصغّر الصورةَ مرّةً ثمّ تُحفظ في R2. بلا مفتاح، والسقفُ الشهريّ في الشيفرة دون الحدّ المجّانيّ.
+# ‏**في staging وحدَه** حتّى يقول المالك إنّها تعمل (M-49) — والإنتاجُ بلا ربطٍ يسلّم الصورةَ الكاملةَ كما كان.
+[env.staging.images]
+binding = "IMAGES"
+
 [[env.staging.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "sada-media-staging"

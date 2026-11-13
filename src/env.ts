@@ -24,6 +24,11 @@ export interface Env {
   readonly DB: D1Database
   readonly MEDIA: R2Bucket
   /**
+   * ربطُ Cloudflare Images للمصغَّرات (D-335) — **اختياريّ**: بيئةٌ بلا ربطٍ تسلّم الصورةَ الكاملةَ كما كانت.
+   * بلا مفتاحٍ ولا سرّ؛ والسقفُ الشهريّ في `lib/media/thumb.ts` دون الحدّ المجّانيّ.
+   */
+  readonly IMAGES?: import('./lib/media/thumb').Shrinker
+  /**
    * رابطُ Workers AI — **ولا مفتاحَ معه** (D-050).
    *
    * الحسابُ نفسه هو الإذن ما دام النداءُ من داخل Cloudflare. ورمزُ

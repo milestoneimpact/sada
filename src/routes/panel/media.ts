@@ -23,6 +23,7 @@ import { validZone, zoneNote } from '../../lib/time/zone'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
 import { editPlanItem } from '../../lib/plan/edit'
+import { thumbFor, thumbWidth } from '../../lib/media/thumb'
 import { addLibraryFile, attachToPost, libraryProblem, listLibrary, rawObject } from '../../lib/library'
 import { libraryScreen } from '../ui/libraryView'
 import { captionIssues, captionsFor, readCaptions, saveCaptions } from '../../lib/media/captions'
@@ -138,6 +139,29 @@ media.post('/panel/plan/review/image', async (c) => {
 })
 
 const KEEP = 'private, max-age=31536000, immutable'
+
+/**
+ * **المصغَّرةُ إن طُلبت بمقاسها** (D-335): `?w=160|800` على مسارَي الصورة. تُسلَّم WebP من R2 (أو تُصنع وتُحفظ)، بوسمٍ يخصّ المقاس.
+ * و`null`: لا مقاسَ طُلب، أو طلبُ مدًى، أو لم تُصنع (بلا ربطٍ، عند السقف، عطل) — فيمضي المسارُ إلى الأصل. **وتُنادى بعد فحص الجلسة والمنظّمة.**
+ */
+async function small(c: Context<{ Bindings: Env }>, name: string, key: string, mime: string): Promise<Response | null> {
+  const width = c.req.header('Range') === undefined ? thumbWidth(c.req.query('w')) : null
+  if (width === null) return null
+  const tag = tagOf(name + ':w' + String(width))
+  const same = unchanged(c.req.raw, tag)
+  if (same !== null) return same
+  const made = await thumbFor({ bucket: c.env.MEDIA as never, kv: c.env.KV, images: c.env.IMAGES }, key, mime, width)
+  if (made === null) return null
+  return new Response(made.body as BodyInit, {
+    headers: {
+      'Content-Length': String(made.size), 'Content-Type': 'image/webp', 'Cache-Control': KEEP, ETag: tag,
+      'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox",
+    },
+  })
+}
+/** الأصلُ بدل مصغَّرةٍ لم تُصنع: **ساعةً وبلا وسم** — فيُعاد السؤالُ عنها، ولا تُثبَّت الكاملةُ سنةً تحت عنوان المصغَّرة. */
+const keepFor = (c: Context<{ Bindings: Env }>): { 'Cache-Control': string; ETag?: string } | null =>
+  c.req.header('Range') === undefined && thumbWidth(c.req.query('w')) !== null ? { 'Cache-Control': 'private, max-age=3600' } : null
 const tagOf = (id: string): string => '"' + id.replace(/[^A-Za-z0-9:_-]/g, '') + '"'
 function unchanged(request: Request, tag: string): Response | null {
   // ‏طلبُ مدًى (مقطع) يمضي إلى R2: ‏304 للكائن كلِّه لا لجزءٍ منه
@@ -151,6 +175,8 @@ media.get('/panel/assets/raw/:ref', async (c) => {
   if (session === null) return c.text('غير مصرَّح', 403)
   const found = await rawObject(c.env.DB, activeOrg(session.record), c.req.param('ref'))
   if (found === null) return c.text('لا ملفّ', 404)
+  const thumb = await small(c, c.req.param('ref'), found.key, found.mime)
+  if (thumb !== null) return thumb
   const tag = tagOf(c.req.param('ref'))
   const same = unchanged(c.req.raw, tag)
   if (same !== null) return same
@@ -167,8 +193,7 @@ media.get('/panel/assets/raw/:ref', async (c) => {
         : { 'Content-Range': `bytes ${span.start}-${span.end}/${object.size}`, 'Content-Length': String(span.end - span.start + 1) }),
       'Accept-Ranges': 'bytes',
       'Content-Type': found.mime,
-      'Cache-Control': KEEP,
-      ETag: tag,
+      ...(keepFor(c) ?? { 'Cache-Control': KEEP, ETag: tag }),
       'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; sandbox",
     },
@@ -376,6 +401,8 @@ media.get('/panel/media/:id', async (c) => {
     .bind(c.req.param('id'), activeOrg(session.record))
     .first<{ r2_key: string; mime: string }>()
   if (row === null) return c.text('لا صورة', 404)
+  const thumb = await small(c, c.req.param('id'), row.r2_key, row.mime)
+  if (thumb !== null) return thumb
   const tag = tagOf(c.req.param('id'))
   const same = unchanged(c.req.raw, tag)
   if (same !== null) return same
@@ -407,8 +434,7 @@ media.get('/panel/media/:id', async (c) => {
       'Accept-Ranges': 'bytes',
       'Content-Type': row.mime,
       // خاصّةٌ لا عامّة: وسيطٌ مشترك لا يخزّن ما يخصّ جلسة — وسنةً بلا سؤال، فالبايتاتُ لا تتبدّل بمعرّفها (D-333)
-      'Cache-Control': KEEP,
-      ETag: tag,
+      ...(keepFor(c) ?? { 'Cache-Control': KEEP, ETag: tag }),
       'X-Content-Type-Options': 'nosniff',
       // الوسيطُ بايتاتٌ لا صفحة (D-152): لا برمجةَ ولا أصلَ لو جاء نوعٌ غيرُ متوقَّع
       'Content-Security-Policy': "default-src 'none'; sandbox",
