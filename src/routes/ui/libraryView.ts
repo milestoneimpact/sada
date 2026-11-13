@@ -4,6 +4,7 @@
  * وتُفتح بوجهين: تصفّحًا، **أو اختيارًا لبندٍ في الخطّة** (`?plan=…&index=…`) فيصير تحت كلّ ملفٍّ زرُّ «اختر لهذا البند»،
  * والرفعُ من هنا يُربط بالبند نفسِه. والفلاترُ روابطُ لا سكربت: تعمل بلا JavaScript، وتُحفظ في العنوان.
  */
+import { ICON as SVG } from './icons'
 import { escapeHtml } from './escape'
 import { button } from './components/button'
 import { field } from './components/field'
@@ -27,7 +28,8 @@ export interface LibraryData {
   readonly fav?: boolean
 }
 
-const ICON: Readonly<Record<AssetKind, string>> = { image: '▣', video: '▶', doc: '¶' }
+// ‏أيقوناتُ العُدّة لا حروفُ رموزٍ يرسمها خطُّ النظام (D-347)
+const KIND_ICON: Readonly<Record<AssetKind, string>> = { image: SVG.sources, video: SVG.play, doc: SVG.guide }
 
 function query(d: LibraryData, change: { kind?: AssetKind | null; origin?: AssetOrigin | null }): string {
   const q = new URLSearchParams()
@@ -60,7 +62,7 @@ function hidden(d: LibraryData): string {
 function tile(a: Asset, d: LibraryData): string {
   const media = a.preview !== null && a.kind === 'image'
     ? `<img class="lib-thumb" src="${escapeHtml(a.preview)}?w=800" alt="" loading="lazy" decoding="async">`
-    : `<div class="lib-thumb lib-ico" aria-hidden="true">${ICON[a.kind]}</div>`
+    : `<div class="lib-thumb lib-ico" aria-hidden="true">${KIND_ICON[a.kind]}</div>`
   const open = a.drive !== null
     ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.drive)}" target="_blank" rel="noopener">افتح في Drive</a>`
     : a.preview !== null ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(a.preview)}" target="_blank" rel="noopener">افتح</a>` : ''
