@@ -60,7 +60,7 @@ reports.get('/panel/tasks', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة' },
+    soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة', at: '/panel/tasks' },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('tasks')),
   )
@@ -79,7 +79,7 @@ reports.get('/panel/gates', async (c) => {
   const body = gatesScreen({ gates, phase: currentPhase(gates) })
 
   return page((nonce) =>
-    soloPage('صدى — بوّابات المراحل', { href: '/panel/tasks', label: sectionLabel('tasks') },
+    soloPage('صدى — بوّابات المراحل', { href: '/panel/tasks', label: sectionLabel('tasks'), at: '/panel/gates' },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('tasks')),
   )
@@ -118,7 +118,7 @@ reports.get('/panel/report', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(`صدى — ${sectionLabel('results')}`, { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage(`صدى — ${sectionLabel('results')}`, { href: '/panel', label: 'اللوحة', at: '/panel/report' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })
@@ -148,7 +148,7 @@ reports.get('/panel/timeline', async (c) => {
   })
 
   return page((nonce) =>
-    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, TIMELINE_SCRIPT,
+    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة', at: '/panel/timeline' }, injectCsrf(body, session.record.csrf), nonce, TIMELINE_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })

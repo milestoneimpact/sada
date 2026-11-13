@@ -583,6 +583,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 #rv-root[data-view="list"] .rv-day{display:none}
 .rv-list td:last-child{min-width:0; overflow-wrap:anywhere}
 .rv-list a{color:inherit; text-decoration-color:var(--line)}
+/* «أضف مصدرًا» (D-343): نموذجان جنبًا إلى جنب حيث يتّسع، ومتتابعان حيث يضيق */
+.add-src{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); align-items:start}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
 .rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}

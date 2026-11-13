@@ -267,6 +267,10 @@ export function buildCommands(
   }
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
+    label: 'أضف مصدرًا', note: 'ملفٌّ أو رابطٌ يُقرأ ويُحلَّل — في المكتبة', group: 'الأفعال',
+    href: '/panel/library#add-source', icon: '', alias: 'add source upload link url file اضف مصدر ارفع ملف رابط',
+  },
+  {
     label: 'المساعدة', note: 'كيف يعمل صدى في سبع محطّات، والأسئلةُ الأولى، والاختصارات', group: 'الأفعال',
     href: '/panel/help', icon: '', alias: 'help faq keys shortcuts guide مساعده اسئله اختصارات دليل',
   },

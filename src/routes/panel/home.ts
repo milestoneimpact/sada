@@ -83,6 +83,8 @@ interface SourceRow {
   kind?: string
   origin_url?: string | null
   file_key?: string | null
+  /** كم منشورًا كُتب منه (D-343) — غيرُ المرفوض. */
+  uses?: number
 }
 
 function toPanelSource(row: SourceRow): PanelSource {
@@ -102,6 +104,7 @@ function toPanelSource(row: SourceRow): PanelSource {
   const analyzed = hash !== null
   return {
     id: row.id,
+    uses: row.uses ?? 0,
     driveFileId: row.drive_file_id,
     name: row.name,
     analyzed,
@@ -301,7 +304,8 @@ async function loadSources(c: PanelContext, org: string): Promise<PanelSource[]>
   try {
     const { results } = await c.env.DB.prepare(
       `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at, s.kind, s.origin_url, s.file_key,
-              i.worth_score, i.summary, i.themes_json
+              i.worth_score, i.summary, i.themes_json,
+              (SELECT COUNT(*) FROM posts p WHERE p.source_id = s.id AND p.org_id = s.org_id AND p.status <> 'rejected') AS uses
          FROM sources s
          LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
         WHERE s.org_id = ?

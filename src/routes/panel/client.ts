@@ -289,7 +289,7 @@ client.get('/panel/insights', async (c) => {
   const input = await insightsInput(c, activeOrg(session.record))
   const body = insightsScreen({ ...input, works: whatWorks(input.facts, input.zone) })
   return page((nonce) =>
-    soloPage(`صدى — ${sectionLabel('results')} · ما ينجح`, { href: '/panel', label: 'اللوحة' }, body, nonce, '',
+    soloPage(`صدى — ${sectionLabel('results')} · ما ينجح`, { href: '/panel', label: 'اللوحة', at: '/panel/insights' }, body, nonce, '',
       buildCommands({ onPanel: false }), soloNav('results')),
   )
 })

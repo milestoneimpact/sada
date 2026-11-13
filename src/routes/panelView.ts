@@ -26,6 +26,8 @@ import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
 import { earliestLocal } from './ui/when'
 import { tabs } from './ui/components/tabs'
+import { familyTabs } from './ui/families'
+import { addSourceCard } from './ui/sections/addSource'
 import type { SlideGate } from '../lib/image/gate'
 import type { MediaReady } from '../lib/media/readiness'
 import { planSection, type PlanFormInput } from './ui/sections/plan'
@@ -266,6 +268,8 @@ export interface PanelSource {
   readonly kind?: string
   /** عنوانُ الصفحة لمصدر الرابط. */
   readonly originUrl?: string | null
+  /** كم منشورًا كُتب منه (D-343). */
+  readonly uses?: number
   /** أللمرفوع أصلٌ في R2 يُنزَّل؟ */
   readonly hasFile?: boolean
 }
@@ -604,7 +608,10 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
     ? `<form class="inline" method="POST" action="/panel/analyze" data-busy="جار…">
          <input type="hidden" name="id" value="${escapeHtml(s.id)}">
          ${button({ label: 'حلّل الآن', size: 'sm', type: 'submit' })}</form>`
-    : ''
+    // ‏من المصدر إلى العمل (D-343): المحلَّلُ يُبنى منه — المعالجُ يفتح على خطوة المحتوى وهو مختار
+    : button({ label: 'ابنِ خطّةً منه', size: 'sm', href: '/panel/plan/new?picked=' + encodeURIComponent(s.id) })
+  // ‏والمصدرُ يقول أين استُعمل (D-343)
+  const used = s.uses === undefined || s.uses === 0 ? '' : ' <span class="ago">' + (s.uses === 1 ? 'كُتب منه منشورٌ واحد' : 'كُتب منه ' + String(s.uses) + ' منشورات') + '</span>'
   /*
    * **«افتح في Drive»** (D-126): المعرِّفُ في اليد والرابطُ ثابتُ الصيغة،
    * ويفتح في تبويبٍ جديدٍ بأيقونة المغادرة — كرابط بوّابة المطوّرين.
@@ -628,7 +635,7 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
-    <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}</div>${body}</td>
+    <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}${used}</div>${body}</td>
     <td data-label="الحال">${status}</td>
     <td data-label="الاستحقاق">${worthCell(s.worth)}</td>
     <td data-label="آخر ظهور">${agoTag(s.lastSeenAt, now, zone)}</td>
@@ -1177,8 +1184,10 @@ function libraryPane(d: ShellData & LibraryData): string {
   return `<section data-pane="library" hidden>
   ${/* ‏رأسٌ بلا فقرة (D-277): «التحليل نداء مدفوع» في «؟» بجوار عنوان الملفّات، حيث زرُّ «حلّل الآن» */''}
   ${pageHead('المادّة', sectionLabel('library'), '')}
+  ${familyTabs('/panel/library')}
   ${libraryTabs(pending, d.uploads.length, libraryImages.length)}
   <div data-sub id="sources">
+  ${addSourceCard()}
   ${/*
     * **ولا يُقال العنوانُ مرّتين** (D-122). كانت الترويسةُ هنا
     * «المصادر والتحليل» — **وهي عنوانُ اللوح نفسُه فوقها**. فيقول
@@ -1603,7 +1612,7 @@ function panesOf(view: PaneView): string {
     case 'library': return libraryPane(view.data)
     case 'accounts': return accountsPane(view.data)
     case 'settings': return settingsPane(view.data)
-    case 'results': return pivotPane(view.data.pivot)
+    case 'results': return familyTabs('/panel/analysis') + pivotPane(view.data.pivot)
   }
 }
 

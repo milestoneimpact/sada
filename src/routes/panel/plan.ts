@@ -247,7 +247,7 @@ plan.get('/panel/plan/new', async (c) => {
     canAdd: allows(session.record.role ?? 'owner', 'admin'),
   })
   return page((nonce) =>
-    soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+    soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
       PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
@@ -617,7 +617,7 @@ plan.get('/panel/plan/review', async (c) => {
   const body = planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
-    soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+    soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
       PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
@@ -945,7 +945,7 @@ plan.get('/panel/plan/view', async (c) => {
   for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
   const body = planDocScreen({ model, orgName: orgRow?.name ?? 'خطّتي', authors, sources: names, zone: zone ?? null })
   return page((nonce) =>
-    soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, body, nonce,
+    soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة', at: '/panel/plan/view' }, body, nonce,
       PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })

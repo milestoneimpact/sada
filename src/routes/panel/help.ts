@@ -16,7 +16,7 @@ help.get('/panel/help', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   return page((nonce) =>
-    soloPage('صدى — المساعدة', { href: '/panel', label: 'اللوحة' },
+    soloPage('صدى — المساعدة', { href: '/panel', label: 'اللوحة', at: '/panel/help' },
       injectCsrf(helpScreen(), session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('overview')),
   )
