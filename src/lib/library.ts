@@ -26,6 +26,8 @@ export interface Asset {
   readonly preview: string | null
   /** «افتح في Drive» لمصادره وحدها. */
   readonly drive: string | null
+  /** في كم منشورٍ يُستعمل الآن (D-334) — صفوفُ `media` الجاهزةُ التي تشير إلى كائنه. وغيابُه لما لا يُربط (مصدرُ Drive). */
+  readonly uses?: number
 }
 
 export const KIND_LABEL: Readonly<Record<AssetKind, string>> = { image: 'صور', video: 'مقاطع', doc: 'مستندات' }
@@ -58,26 +60,30 @@ const num = (v: unknown): number | null => (v === null || v === undefined ? null
 export async function listLibrary(db: Db, org: string, limit = 300): Promise<Asset[]> {
   const read = (sql: string): Promise<Row[]> =>
     db.prepare(sql).bind(org, limit).all<Row>().then((r) => r.results).catch(() => [])
-  const [media, uploads, files, sources] = await Promise.all([
+  const [media, uploads, files, sources, used] = await Promise.all([
     // ‏الصورةُ المولَّدة مرّةً واحدة وإن رُبطت بمنشورات: أقدمُ صفٍّ لكائنها
     read(`SELECT MIN(id) AS id, r2_key, mime, bytes, MIN(created_at) AS at, MAX(headline) AS name FROM media
            WHERE org_id = ?1 AND status = 'ready' AND upload_id IS NULL AND model NOT IN ('library', 'upload')
            GROUP BY r2_key ORDER BY at DESC LIMIT ?2`),
-    read(`SELECT id, name, mime, bytes, created_at AS at FROM uploads
+    read(`SELECT id, r2_key, name, mime, bytes, created_at AS at FROM uploads
            WHERE org_id = ?1 AND status = 'ready' ORDER BY created_at DESC LIMIT ?2`),
-    read('SELECT id, name, mime, bytes, created_at AS at FROM library_files WHERE org_id = ?1 ORDER BY created_at DESC LIMIT ?2'),
+    read('SELECT id, r2_key, name, mime, bytes, created_at AS at FROM library_files WHERE org_id = ?1 ORDER BY created_at DESC LIMIT ?2'),
     read('SELECT id, drive_file_id, name, mime, last_seen_at AS at FROM sources WHERE org_id = ?1 ORDER BY last_seen_at DESC LIMIT ?2'),
+    // ‏عدّادُ الاستعمال (D-334): كم منشورًا يحمل هذا الكائنَ الآن — جملةٌ واحدةٌ للمكتبة كلِّها، و`?2` يُربط فيها حدًّا واسعًا
+    read(`SELECT r2_key, COUNT(DISTINCT post_id) AS n FROM media WHERE org_id = ?1 AND status = 'ready' GROUP BY r2_key LIMIT ?2 * 20`),
   ])
+  const usesOf = new Map(used.map((r) => [str(r['r2_key']), num(r['n']) ?? 0]))
+  const uses = (r: Row): number => usesOf.get(str(r['r2_key'])) ?? 0
   const all: Asset[] = [
     ...media.map((r): Asset => ({ ref: `m:${str(r['id'])}`, origin: 'generated', kind: kindOf(str(r['mime'])),
       name: str(r['name']) || 'صورة مولَّدة', mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/media/${encodeURIComponent(str(r['id']))}`, drive: null })),
+      preview: `/panel/media/${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
     ...uploads.map((r): Asset => ({ ref: `u:${str(r['id'])}`, origin: 'upload', kind: 'video', name: str(r['name']),
       mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/assets/raw/u:${encodeURIComponent(str(r['id']))}`, drive: null })),
+      preview: `/panel/assets/raw/u:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
     ...files.map((r): Asset => ({ ref: `f:${str(r['id'])}`, origin: 'upload', kind: 'image', name: str(r['name']),
       mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/assets/raw/f:${encodeURIComponent(str(r['id']))}`, drive: null })),
+      preview: `/panel/assets/raw/f:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
     ...sources.map((r): Asset => ({ ref: `s:${str(r['id'])}`, origin: 'drive', kind: kindOf(str(r['mime'])), name: str(r['name']),
       mime: str(r['mime']), bytes: null, at: str(r['at']), preview: null, drive: driveFileUrl(str(r['drive_file_id'])) })),
   ]
@@ -143,6 +149,33 @@ export function attachStatement(db: Db, org: string, postId: string, ref: string
            FROM library_files WHERE id = ?4 AND org_id = ?5`
   return db.prepare(`INSERT OR IGNORE INTO media
       (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key, width, height, org_id, brand_id) ${from}`).bind(crypto.randomUUID(), postId, key, p.id, org)
+}
+
+/**
+ * **صورةٌ من المكتبة لمنشورٍ مكتوب** (D-334) — «اختر من المكتبة» على بطاقة الخطّة. الكائنُ نفسُه يُربط بالمنشور بـ`attachStatement`
+ * (بلا نسخٍ ولا كلفة)، **وصورتُه الحاليّةُ تُرفض أوّلًا** بـ`reject` كما في «بدّلها» — فلا يحمل المنشورُ صورتين يختار الناشرُ بينهما.
+ * والمنشورُ مسوّدةٌ أو معتمَدٌ بلا موعد: ما جُدول أو نُشر لا تُبدَّل صورتُه من هنا. والمقطعُ والمستندُ ومصدرُ Drive لا تُربط صورةً.
+ */
+export async function attachToPost(
+  db: Db, org: string, postId: string, ref: string,
+  reject: (mediaId: string) => Promise<unknown>,
+): Promise<{ readonly ok: true; readonly name: string } | { readonly ok: false; readonly reason: string }> {
+  const post = await db.prepare('SELECT status FROM posts WHERE id = ? AND org_id = ?').bind(postId, org).first<{ status: string }>()
+  if (post === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
+  if (post.status !== 'draft' && post.status !== 'approved' && post.status !== 'edited') {
+    return { ok: false, reason: post.status === 'queued' ? 'منشورٌ مجدول — «تراجَع» أوّلًا ثمّ بدّل صورتَه' : 'لا تُبدَّل صورةُ منشورٍ نُشر أو رُفض' }
+  }
+  const asset = await findAsset(db, org, ref)
+  if (asset === null || asset.kind !== 'image' || asset.origin === 'drive') return { ok: false, reason: 'هذا الملفّ ليس صورةً في مكتبتك' }
+  const statement = attachStatement(db, org, postId, ref)
+  if (statement === null) return { ok: false, reason: 'هذا الملفّ لا يُربط بمنشور' }
+  const { results: current } = await db
+    .prepare("SELECT id FROM media WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE 'image/%'")
+    .bind(postId, org)
+    .all<{ id: string }>()
+  for (const m of current) await reject(m.id)
+  await statement.run()
+  return { ok: true, name: asset.name }
 }
 
 /** صورةٌ يرفعها المالك إلى المكتبة — النوعُ والحجمُ هنا، والبايتاتُ في R2 قبل الصفّ. */

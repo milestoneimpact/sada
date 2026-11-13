@@ -23,7 +23,7 @@ import { validZone, zoneNote } from '../../lib/time/zone'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
 import { editPlanItem } from '../../lib/plan/edit'
-import { addLibraryFile, libraryProblem, listLibrary, rawObject } from '../../lib/library'
+import { addLibraryFile, attachToPost, libraryProblem, listLibrary, rawObject } from '../../lib/library'
 import { libraryScreen } from '../ui/libraryView'
 import { captionIssues, captionsFor, readCaptions, saveCaptions } from '../../lib/media/captions'
 import { momentLabel, presetAt } from '../../lib/time/local'
@@ -31,7 +31,7 @@ import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
 import {
-  deciderOf, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, toCard,
+  deciderOf, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, toCard, POST_ID,
 } from './shared'
 
 export const media = new Hono<{ Bindings: Env }>()
@@ -51,6 +51,10 @@ media.get('/panel/assets', async (c) => {
     kind: kind === 'image' || kind === 'video' || kind === 'doc' ? kind : null,
     origin: origin === 'generated' || origin === 'upload' || origin === 'drive' ? origin : null,
     pick: /^[A-Za-z0-9_-]{1,80}$/.test(plan) && Number.isInteger(index) && index >= 0 ? { plan, index } : null,
+    // ‏«اختر من المكتبة» على بطاقة الخطّة (D-334): المنشورُ وبطاقتُه وأسبوعُها — وكلٌّ يُفحص قبل أن يُكتب في نموذجٍ أو رابط
+    pickPost: POST_ID.test(c.req.query('post') ?? '') && Number.isInteger(index) && index >= 0
+      ? { post: c.req.query('post')!, index, w: /^(?:\d{1,2}|all)$/.test(c.req.query('w') ?? '') ? c.req.query('w')! : '' }
+      : null,
     flash: await takeFlash(c.env, c.req.raw),
   })
   return page((nonce) =>
@@ -84,6 +88,13 @@ media.post('/panel/assets/upload', async (c) => {
   await c.env.MEDIA.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } })
   const id = await addLibraryFile(c.env.DB, org, { key, name: cleanName(file.name), mime: file.type, bytes: file.size })
   await record(c.env.DB, { actor: 'panel', action: 'library.upload', target: id }, c.req.raw)
+  // ‏ومن «اختر من المكتبة» لمنشورٍ مكتوب (D-334): المرفوعةُ تُربط به وتعود إلى بطاقته
+  const forPost = String(f.get('post') ?? '')
+  if (POST_ID.test(forPost)) {
+    const linked = await attachToPost(c.env.DB, org, forPost, 'f:' + id, (m) => rejectMedia(c.env.DB, org, m))
+    await setFlash(c.env, c.req.raw, linked.ok ? { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول، وربطت بالمنشور.' } : { kind: 'bad', text: linked.reason })
+    return toPlanCard(withBack(f)) ?? c.redirect('/panel/plan/review', 303)
+  }
   if (planId !== '') {
     const linked = await editPlanItem(c.env.DB, org, planId, Number(f.get('index')), { asset: `f:${id}` })
     await setFlash(c.env, c.req.raw, linked.ok ? { kind: 'ok', text: 'رُفعت الصورة وحُفظت في الأصول، وربطت بالبند.' } : { kind: 'bad', text: linked.reason })
@@ -103,6 +114,29 @@ media.post('/panel/assets/upload', async (c) => {
  * - `ETag` المعرّفُ نفسُه، و`If-None-Match` يطابقه يُردّ ‏304 **قبل أن يُقرأ R2** — بعد فحص الجلسة والمنظّمة كما في كلّ طلب.
  * - `Cache-Control: private, max-age=31536000, immutable`: خاصٌّ بمتصفّح المالك (لا وسيطَ مشتركًا يخزّن ما خلف جلسة)، وسنةً بلا سؤال.
  */
+/** نموذجُ اختيارٍ من المكتبة يعود إلى بطاقة الخطّة: `toPlanCard` تقرأ `back=plan`. */
+function withBack(form: FormData): FormData {
+  form.set('back', 'plan')
+  return form
+}
+
+/**
+ * **«استعملها لهذا المنشور»** (D-334): صورةٌ من المكتبة تُربط بمنشورٍ مكتوب — والحكمُ كلُّه في `attachToPost` (الحال، والمنظّمة، وأنّها صورة).
+ */
+media.post('/panel/plan/review/image', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const post = String(gate.form.get('post') ?? '')
+  const ref = String(gate.form.get('ref') ?? '')
+  const done = await attachToPost(c.env.DB, org, post, ref, (m) => rejectMedia(c.env.DB, org, m))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.image', target: post, detail: done.ok ? ref.slice(0, 80) : ('refused:' + done.reason).slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, done.ok
+    ? { kind: 'ok', text: 'رُبطت «' + done.name + '» بالمنشور من مكتبتك — بلا كلفة.' }
+    : { kind: 'bad', text: done.reason })
+  return toPlanCard(withBack(gate.form)) ?? c.redirect('/panel/plan/review', 303)
+})
+
 const KEEP = 'private, max-age=31536000, immutable'
 const tagOf = (id: string): string => '"' + id.replace(/[^A-Za-z0-9:_-]/g, '') + '"'
 function unchanged(request: Request, tag: string): Response | null {

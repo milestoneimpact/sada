@@ -286,6 +286,55 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
 })
 
 /**
+ * **«من المكتبة» على بطاقة المنشور** (D-334): صورةٌ في الأصول تُربط بمنشورٍ مكتوب — الكائنُ نفسُه بلا نسخ، والصورةُ السابقةُ تُرفض،
+ * وعدّادُ الاستعمال يُرى في المكتبة. والمجدولُ وغيرُ الصورة يُردّان بسببهما.
+ */
+describe('«من المكتبة» على بطاقة المنشور (D-334)', () => {
+  const A = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const B = 'bbbbbbbb-0000-4000-8000-000000000002'
+  beforeEach(() => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, approved_by, approved_at, account_id, scheduled_at) VALUES
+      ('${A}', 'linkedin', 'text', 'منشورٌ أوّل', 'draft', 'kA', NULL, NULL, NULL, NULL), ('${B}', 'linkedin', 'text', 'منشورٌ ثانٍ', 'queued', 'kB', 'o', '2099-01-01 00:00:00', 'a1', '2099-02-01 00:00:00')`)
+    db.raw.exec(`INSERT INTO library_files (id, org_id, r2_key, name, mime, bytes) VALUES ('f1', 'org_owner', 'lib/one', 'شعار.png', 'image/png', 5)`)
+    db.raw.exec(`INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key) VALUES ('m-old', '${A}', 'gen/old', 'image/png', 5, 'و', 'm', 'k-old')`)
+  })
+  const ready = (post: string): string[] => (db.raw.prepare("SELECT r2_key FROM media WHERE post_id = ? AND status = 'ready'").all(post) as { r2_key: string }[]).map((r) => r.r2_key)
+
+  it('الرابطُ على البطاقة، ووجهُ الاختيار في الأصول بزرّه للصور وحدَها — والربطُ يبدّل الصورةَ ويعود إلى البطاقة، والعدّادُ يُرى', async () => {
+    const { cookie, csrf } = await session()
+    const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(review).toMatch(/href="\/panel\/assets\?kind=image&amp;post=p1&amp;index=0[^"]*"><span>من المكتبة/)
+    const lib = await (await app.request(`/panel/assets?post=${A}&index=1&w=1`, { headers: { Cookie: cookie } }, env)).text()
+    expect(lib).toContain('اختر صورةً لهذا المنشور')
+    expect(lib).toContain('action="/panel/plan/review/image"')
+    expect(lib.split('استعملها لهذا المنشور').length - 1).toBe(2) // ‏الصورتان: المولَّدةُ والمرفوعة
+    expect(lib).toContain('في منشورٍ واحد')
+    const res = await app.request('/panel/plan/review/image', { method: 'POST', body: form({ _csrf: csrf, post: A, ref: 'f:f1', index: '1', w: '1' }), headers: { Cookie: cookie } }, env)
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review?w=1#c-1')
+    expect(ready(A)).toEqual(['lib/one'])
+    // ‏وإعادةُ الاختيار لا تُكثّر الصفوف، والعودةُ إلى السابقة بعد رفضها تعمل
+    await app.request('/panel/plan/review/image', { method: 'POST', body: form({ _csrf: csrf, post: A, ref: 'f:f1', index: '1' }), headers: { Cookie: cookie } }, env)
+    expect(ready(A)).toEqual(['lib/one'])
+  })
+
+  it('المجدولُ يُردّ بسببه، وما ليس في المكتبة، ومنشورٌ لا وجودَ له — ولا صفَّ يُكتب', async () => {
+    const { cookie, csrf } = await session()
+    const send = (fields: Record<string, string>): Promise<Response> =>
+      Promise.resolve(app.request('/panel/plan/review/image', { method: 'POST', body: form({ _csrf: csrf, index: '0', ...fields }), headers: { Cookie: cookie } }, env))
+    await send({ post: B, ref: 'f:f1' })
+    expect(ready(B)).toEqual([])
+    await send({ post: A, ref: 'f:nope' })
+    await send({ post: 'cccccccc-0000', ref: 'f:f1' })
+    expect(ready(A)).toEqual(['gen/old'])
+    // ‏وبلا CSRF لا يمضي
+    const bare = await app.request('/panel/plan/review/image', { method: 'POST', body: form({ post: A, ref: 'f:f1' }), headers: { Cookie: cookie } }, env)
+    expect(bare.status).not.toBe(303)
+    expect(ready(A)).toEqual(['gen/old'])
+  })
+})
+
+/**
  * **بناءُ الخطّة في الخلفيّة** (D-332): «حلّل وابنِ» لا ينادي النموذجَ في طلب الصفحة — يكتب حالَ البناء ويرسل رسالةً ويفتح شاشتَه.
  */
 describe('بناءُ الخطّة في الخلفيّة وحالُه يُرى (D-332)', () => {

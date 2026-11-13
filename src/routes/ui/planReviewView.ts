@@ -97,13 +97,15 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
   // ‏ونوعُ الصورة نوعُ منصّتها (D-329)، وما اختير له «بلا صورة» يُرسم بالنوع العامّ حين يُطلب بالزرّ
   const chosen = imageFor(m.plan.choices, c.item.platform)
   const style = html`<input type="hidden" name="style" value="${chosen === 'none' ? m.plan.choices.imageStyle : chosen}">`
+  // ‏«من المكتبة» (D-334): صورةٌ سبق رسمُها أو رفعُها تُربط بهذا المنشور بلا كلفة — رابطٌ إلى الأصول في وجه الاختيار
+  const lib = raw(button({ label: 'من المكتبة', size: 'sm', href: '/panel/assets?kind=image&post=' + encodeURIComponent(c.post.id) + '&index=' + String(c.index) + (w === '' ? '' : '&w=' + encodeURIComponent(w)) }))
   if (c.mediaId === null) {
     return maySpend()
-      ? html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>
+      ? html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>${lib}
           <form class="inline" method="POST" action="/panel/media/generate" data-busy="تُرسم الصورة…">${back}${style}<input type="hidden" name="id" value="${c.post.id}">${raw(button({ label: 'ولّد صورة', size: 'sm', type: 'submit' }))}</form></div>`
-      : html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span></div>`
+      : html`<div class="row gap-2 rv-img"><span class="hint">بدون صورة</span><span class="grow"></span>${lib}</div>`
   }
-  return html`<div class="row gap-2 rv-img"><span class="hint">الصورة</span><span class="grow"></span>
+  return html`<div class="row gap-2 rv-img"><span class="hint">الصورة</span><span class="grow"></span>${lib}
       ${maySpend() ? html`<form class="inline" method="POST" action="/panel/media/regenerate" data-busy="تُرسم الصورة…">${back}${style}<input type="hidden" name="id" value="${c.post.id}"><input type="hidden" name="media" value="${c.mediaId}">${raw(button({ label: 'بدّلها', size: 'sm', type: 'submit' }))}</form>` : html``}
       <form class="inline" method="POST" action="/panel/media/reject">${back}<input type="hidden" name="id" value="${c.mediaId}">${raw(button({ label: 'بدون صورة', size: 'sm', type: 'submit' }))}</form></div>`
 }
