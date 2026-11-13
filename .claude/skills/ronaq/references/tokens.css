@@ -1,0 +1,45 @@
+/*
+ * رونق — الرموز. استبدل قيم الطبقة «هويّة» لكلّ منصّة، وأبقِ الأسماء.
+ * ثلاث كتل: الفاتح على :root، ثمّ الداكن مرّتين (تفضيل النظام، واختيار صريح).
+ * لا لون في مكوّن إلّا من هنا.
+ */
+:root{
+  --bg:#f5f7f7; --card:#ffffff; --inset:#f0f3f3; --line:#e2e7e7; --line-soft:#edf1f1;
+  --ink:#0f1a1c; --ink-2:#344246; --ink-3:#56666a; --mute:#7a898c;
+  --deep:#0b2f31; --deep-2:#103e40; --on-deep:#eaf6f3; --on-deep-2:#a9cfc8;
+  --brand:#0e6b64; --brand-fg:#ffffff; --mint:#4cd1b6; --gold:#a8834a; --gold-soft:#f6efe2;
+  --ok:#0b7a55; --ok-bg:#e5f5ee; --bad:#b42323; --bad-bg:#fcebea; --warn:#9a5a0a; --warn-bg:#fdf2e2; --idle:#56666a; --idle-bg:#eef2f2;
+  --shadow:0 1px 1px rgba(11,47,49,.04),0 12px 32px -18px rgba(11,47,49,.22);
+  --shadow-lift:0 2px 4px rgba(11,47,49,.05),0 26px 52px -22px rgba(11,47,49,.32);
+  --scrim:rgba(3,16,15,.5);
+  --f-ui:"IBM Plex Sans Arabic",system-ui,"Segoe UI",Tahoma,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --f-display:var(--f-ui);
+  --ease:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  /* نظامُ حركة رونق: ثلاث سرعات وخمسة معانٍ — وصول، تأكيد، رفض، انتظار، احتفال */
+  --m-fast:.16s; --m-base:.32s; --m-slow:.6s;
+  --skel:linear-gradient(90deg,var(--inset) 0%,var(--line-soft) 50%,var(--inset) 100%);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#080c10; --card:#10171d; --inset:#151e25; --line:#22303a; --line-soft:#19242c;
+  --ink:#eef3f3; --ink-2:#c9d4d5; --ink-3:#9fb0b2; --mute:#7f9093;
+  --deep:#06191b; --deep-2:#0b2a2c; --on-deep:#eaf6f3; --on-deep-2:#8fbab2;
+  --brand:#7fe0cb; --brand-fg:#062022; --mint:#4cd1b6; --gold:#d6b67c; --gold-soft:#231d12;
+  --ok:#6fd9ad; --ok-bg:#0d2a20; --bad:#f2a0a0; --bad-bg:#2d1416; --warn:#f2c27a; --warn-bg:#2b2011; --idle:#9fb0b2; --idle-bg:#18222a;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 12px 32px -18px rgba(0,0,0,.7); --shadow-lift:0 2px 4px rgba(0,0,0,.35),0 26px 52px -22px rgba(0,0,0,.8); --scrim:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#080c10; --card:#10171d; --inset:#151e25; --line:#22303a; --line-soft:#19242c;
+  --ink:#eef3f3; --ink-2:#c9d4d5; --ink-3:#9fb0b2; --mute:#7f9093;
+  --deep:#06191b; --deep-2:#0b2a2c; --on-deep:#eaf6f3; --on-deep-2:#8fbab2;
+  --brand:#7fe0cb; --brand-fg:#062022; --mint:#4cd1b6; --gold:#d6b67c; --gold-soft:#231d12;
+  --ok:#6fd9ad; --ok-bg:#0d2a20; --bad:#f2a0a0; --bad-bg:#2d1416; --warn:#f2c27a; --warn-bg:#2b2011; --idle:#9fb0b2; --idle-bg:#18222a;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 12px 32px -18px rgba(0,0,0,.7); --shadow-lift:0 2px 4px rgba(0,0,0,.35),0 26px 52px -22px rgba(0,0,0,.8); --scrim:rgba(0,0,0,.6); color-scheme:dark}
+
+
+/* ── الحركة: خمسة معانٍ، لكلّ معنى حركةٌ واحدة ── */
+@keyframes r-draw{from{stroke-dashoffset:2400;opacity:0}}
+@keyframes r-arrive{from{opacity:.001;transform:translateY(12px)}}
+@keyframes r-confirm{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 45%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+@keyframes r-reject{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+@keyframes r-wait{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
