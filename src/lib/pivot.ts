@@ -24,6 +24,7 @@
  */
 
 /** صفُّ الحقيقة — **منشورٌ واحد**، بكلّ ما يُقاس عليه. */
+import { POST_STATUS } from './status'
 import { PLATFORM_LABEL } from './oauth/providers'
 import { neutralizeFormula } from './csv'
 
@@ -83,10 +84,7 @@ export const NO_KEY = '—'
  */
 const KEY_LABEL: Readonly<Partial<Record<Dimension, Readonly<Record<string, string>>>>> = {
   platform: PLATFORM_LABEL,
-  status: {
-    draft: 'تنتظر قرارك', approved: 'معتمَدة', edited: 'معتمَدة بعد تعديل',
-    rejected: 'مرفوضة', queued: 'مجدولة', published: 'نُشرت', failed: 'فشل النشر',
-  },
+  status: Object.fromEntries(Object.entries(POST_STATUS).map(([k, f]) => [k, f.label])),
   type: { text: 'نصّ', image: 'صورة', document: 'مستند', thread: 'سلسلة' },
 }
 

@@ -17,6 +17,7 @@
  * - **لا اسمَ مستخدمٍ ولا صورةَ حسابٍ مخترَعة**: الحرفُ الأوّل من الاسم المحفوظ.
  * - **الحالُ والكلفةُ والأزرارُ خارج الإطار** دائمًا: الإطارُ صورةُ المنشور لا غير.
  */
+import { PLATFORM_LABEL } from '../../lib/oauth/providers'
 import { escapeHtml } from './escape'
 import { ICON } from './icons'
 import { SLIDE_SIZE } from '../../lib/image/slide'
@@ -57,9 +58,8 @@ export interface NativePostInput {
   readonly variant: NpVariant
 }
 
-const LABEL: Readonly<Record<NpPlatform, string>> = {
-  linkedin: 'LinkedIn', x: 'X', instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube',
-}
+/** اسمُ المنصّة من مصدره الواحد (D-340). */
+const LABEL: Readonly<Record<string, string>> = PLATFORM_LABEL
 
 const CLASS: Readonly<Record<NpPlatform, string>> = {
   linkedin: 'np-li', x: 'np-x', instagram: 'np-ig', tiktok: 'np-tt', youtube: 'np-yt',

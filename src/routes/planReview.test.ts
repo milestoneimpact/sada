@@ -334,6 +334,15 @@ describe('«أضف منشورًا» إلى يومٍ في الخطّة (D-336)', 
     expect(sheet).toMatch(/id="rv-sh-tags"[^>]*><\/div>/)
   })
 
+  it('عرضُ القائمة (D-337): المعروضُ جدولًا بصفٍّ لكلّ بندٍ يفتح لوحَه، ومبدّلُ المنظار مخفيٌّ حتّى يُظهره السكربت', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/plan/review?w=all', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('<div class="scroll rv-list"><table>')
+    expect((html.match(/<tr><td><span class="ago">/g) ?? []).length).toBe(3)
+    expect(html).toMatch(/<a href="#c-0" data-sheet="0">نصُّ المنشور الأوّل/)
+    expect(html).toContain('<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>')
+  })
+
   it('ثلاثةٌ في اليوم على المنصّة حدٌّ: الرابعُ يُردّ', async () => {
     for (const time of ['10:00', '11:00']) await add({ platform: 'x', day: '2099-01-06', time, angle: 'منشورٌ إضافيّ' })
     expect(items()).toHaveLength(5)

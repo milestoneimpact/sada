@@ -39,6 +39,7 @@ import { maySpend, SPEND_LOCKED } from '../../lib/access'
 import { button } from './components/button'
 import { field } from './components/field'
 import { card } from './components/card'
+import { BP } from './tokens'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
 export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
@@ -198,7 +199,7 @@ function contentStep(d: PlanNewData): Html {
   ]
   const picked = d.autoImage ? 'infographic' : 'none'
   const imageChoice = html`<fieldset class="field mt-3"><legend>الصورة مع كلّ منشور</legend>
-      <div class="wz-opts">${styles.map((x) => html`<label class="wz-opt card"><input type="radio" name="image_style" value="${x.v}" data-cost="${String(x.cost)}"${x.v === picked ? raw(' checked') : ''}>
+      <div class="wz-opts wz-opts-top">${styles.map((x) => html`<label class="wz-opt card"><input type="radio" name="image_style" value="${x.v}" data-cost="${String(x.cost)}"${x.v === picked ? raw(' checked') : ''}>
         <span class="wz-big">${x.title}</span>${x.notes.map((n) => html`<span class="ago">${n}</span>`)}</label>`)}</div></fieldset>`
   const add = d.canAdd === false
     ? html``
@@ -319,13 +320,33 @@ export const PLAN_NEW_SCRIPT = `(function(){
   var perDraft=Number(out&&out.getAttribute('data-draft'))||0, perImage=Number(out&&out.getAttribute('data-image'))||0;
   var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches, at=Number(f.getAttribute('data-start'))||1;
   f.classList.add('wz-on');
+  // ‏المنشئُ في شاشةٍ واحدة (D-338): حيث تتّسع الشاشةُ للمعاينة بجانب النموذج تُرى الخطواتُ الأربعُ كلُّها متتابعةً، والشريطُ فهرسٌ
+  // ‏يتبع التمرير، و«حلّل وابنِ» حاضرٌ دائمًا. وعلى الهاتف خطوةٌ في كلّ شاشة كما كانت
+  var wide=matchMedia('(min-width:__LG__px)'), one=wide.matches, spy=null;
+  function mark(){ bar.forEach(function(b,i){ if(i+1===at)b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); b.classList.toggle('is-done',i+1<at);}); }
+  function watch(){
+    if(spy){spy.disconnect(); spy=null;}
+    if(!one||typeof IntersectionObserver!=='function')return;
+    // ‏الخطوةُ التي يقطع رأسُها الثلثَ الأعلى من الشاشة هي الحاليّة
+    spy=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){at=steps.indexOf(e.target)+1; mark();} }); },{rootMargin:'-20% 0px -60% 0px'});
+    steps.forEach(function(s){spy.observe(s);});
+  }
   function show(n,focus){
     at=Math.max(1,Math.min(steps.length,n));
+    if(one){
+      f.classList.add('wz-one'); steps.forEach(function(s){s.classList.add('is-on'); s.classList.remove('wz-in');}); mark();
+      prev.hidden=true; next.hidden=true; if(go)go.hidden=false;
+      if(focus){var t=steps[at-1], hh=t.querySelector('h2'); if(hh){hh.setAttribute('tabindex','-1'); hh.focus({preventScroll:true});} t.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
+      return;
+    }
+    f.classList.remove('wz-one');
     steps.forEach(function(s,i){s.classList.toggle('is-on',i+1===at); if(!reduce&&i+1===at){s.classList.remove('wz-in'); void s.offsetWidth; s.classList.add('wz-in');}});
     bar.forEach(function(b,i){ if(i+1===at)b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); b.classList.toggle('is-done',i+1<at);});
     prev.hidden=at===1; next.hidden=at===steps.length; if(go)go.hidden=at!==steps.length;
     if(focus){var h=steps[at-1].querySelector('h2'); if(h){h.setAttribute('tabindex','-1'); h.focus({preventScroll:true});} f.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
   }
+  function mode(){ one=wide.matches; show(at,false); watch(); }
+  if(wide.addEventListener)wide.addEventListener('change',mode);
   prev.addEventListener('click',function(){show(at-1,true);});
   next.addEventListener('click',function(){show(at+1,true);});
   bar.forEach(function(b){b.addEventListener('click',function(){show(Number(b.getAttribute('data-to')),true);});});
@@ -442,6 +463,6 @@ export const PLAN_NEW_SCRIPT = `(function(){
     })();
   });}
   // ‏Enter في حقلٍ لا يقفز إلى البناء قبل الخطوة الأخيرة
-  f.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.form===f&&at<steps.length){e.preventDefault(); show(at+1,true);} });
-  upd(); show(at,false);
-})();`
+  f.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.form===f&&at<steps.length&&!one){e.preventDefault(); show(at+1,true);} });
+  upd(); show(at,one&&at>1); watch();
+})();`.replace('__LG__', String(BP.lg))

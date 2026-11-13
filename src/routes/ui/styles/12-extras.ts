@@ -465,6 +465,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-on .wz-step{display:none}
 .wz-on .wz-step.is-on{display:block; margin:0; padding:0; border:0}
 .wz-in{animation:rise var(--dur-3) var(--ease-out)}
+/* المنشئُ في شاشةٍ واحدة (D-338): الخطواتُ كلُّها متتابعةً بفاصلها، والشريطُ فهرسٌ لاصقٌ يتبع التمرير، والرأسُ لا يختبئ تحته */
+.wz-on.wz-one .wz-step.is-on{margin-top:var(--s-8); padding-top:var(--s-8); border-top:var(--bd-soft); scroll-margin-top:var(--s-16)}
+.wz-on.wz-one .wz-bar + .wz-step.is-on{margin-top:0; padding-top:0; border-top:0}
+.wz-on.wz-one .wz-bar{position:sticky; top:0; z-index:4; margin-inline:calc(-1 * var(--pad-card)); padding:var(--s-3) var(--pad-card) 0; background:var(--surface)}
 .wz-head{margin-bottom:var(--s-5)}
 .wz-head h2{margin:var(--s-1) 0; font-size:var(--t-h2); line-height:var(--lh-h2)}
 .wz-head h2:focus{outline:none}
@@ -479,7 +483,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-opt:has(:focus-visible),.wz-pill:has(:focus-visible),.wz-src:has(:focus-visible),.wz-drop:has(:focus-visible){outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke)}
 .wz-big{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
 .wz-sub{font-weight:600; color:var(--accent)}
+/* اختياراتُ الصورة شروحُها متفاوتةُ الطول: كلٌّ بارتفاع نصّه، فلا بطاقةَ نصفُها فراغ (D-338) */
+.wz-opts-top{align-items:start}
 .wz-pf{margin:0; padding:var(--s-4)}
+.wz-pf-h label{min-height:var(--tap)}
 .wz-pf-h{padding:0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pf .pf-logo{width:var(--s-8); height:var(--s-8)}
 .wz-pf[data-pf=linkedin] .pf-logo{background:var(--pf-linkedin)}
@@ -568,6 +575,13 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* السحبُ باللمس (D-336): المصغَّرةُ المحمولةُ تُرى مرفوعة، ولا قائمةَ نظامٍ ولا تحديدَ نصٍّ تحت الإصبع */
 .rv-mini[data-move]{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
 .rv-mini.is-held{outline:var(--stroke) solid var(--focus); outline-offset:var(--stroke); background:var(--selected)}
+/* عرضُ القائمة (D-337): الجدولُ والبطاقاتُ لا يجتمعان — والمنظارُ على جذر الشاشة */
+.rv-vw{display:inline-flex; gap:var(--s-1)}
+.rv-vw .btn[aria-pressed="true"]{background:var(--selected); border-color:var(--accent)}
+#rv-root:not([data-view="list"]) .rv-list{display:none}
+#rv-root[data-view="list"] .rv-day{display:none}
+.rv-list td:last-child{min-width:0; overflow-wrap:anywhere}
+.rv-list a{color:inherit; text-decoration-color:var(--line)}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
 .rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}

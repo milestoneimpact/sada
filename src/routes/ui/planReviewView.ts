@@ -23,6 +23,7 @@ import { maySpend } from '../../lib/access'
 import { button } from './components/button'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
+import { postStatus } from '../../lib/status'
 import { localParts, stamp } from '../../lib/time/zone'
 import { field } from './components/field'
 import { AR_LATN, num } from '../../lib/format'
@@ -44,14 +45,8 @@ export function shift(day: string, n: number): string {
   return at.toISOString().slice(0, 10)
 }
 
-const STATUS: Readonly<Record<string, { tone: string; text: string }>> = {
-  draft: { tone: 'warn', text: 'تنتظر اعتمادك' },
-  approved: { tone: 'warn', text: 'معتمَدة بلا موعد' },
-  edited: { tone: 'warn', text: 'معتمَدة بلا موعد' },
-  queued: { tone: 'ok', text: 'مجدولة' },
-  published: { tone: 'ok', text: 'نُشرت' },
-  failed: { tone: 'bad', text: 'تعثّر نشرُها' },
-}
+/** وجهُ الحال من المصدر الواحد (D-340) — بمفتاحَي هذه الشاشة. */
+const face = (status: string): { tone: string; text: string } => { const f = postStatus(status); return { tone: f.tone, text: f.label } }
 
 export interface ReviewView {
   /** الأسبوعُ المطلوب من العنوان (`?w=`): رقمٌ من 1 أو «all» — وما سواهما يُحسَب. */
@@ -113,7 +108,7 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
 function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewView, w: string): Html {
   const planId = m.plan.id
   const local = stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)
-  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : STATUS[c.post.status] ?? { tone: 'idle', text: c.post.status }
+  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(c.post.status)
   const hidden = html`<input type="hidden" name="id" value="${planId}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
@@ -197,7 +192,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
       <a class="rv-cd-h" href="${hrefOf(day)}"><b>${dayLabel(day, 'short')}</b>${said}</a>
       ${cards.map((c) => {
         const st = c.post === null ? 'writing' : waits(c) ? 'wait' : c.post.status === 'published' ? 'done' : c.post.status === 'failed' ? 'bad' : 'set'
-        const text = c.post === null ? 'تُكتب الآن' : STATUS[c.post.status]?.text ?? c.post.status
+        const text = c.post === null ? 'تُكتب الآن' : face(c.post.status).text
         const movable = c.post === null || c.post.status !== 'published'
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
           ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}?w=160" alt="" loading="lazy" decoding="async" width="28" height="28">`}
@@ -221,6 +216,8 @@ function gapsBar(m: ReviewModel): Html {
 }
 
 /** شريطُ الأسابيع: رابطٌ لكلّ أسبوعٍ بمداه وما ينتظر فيه، و«الكلّ». ولا شريطَ لخطّة أسبوعٍ واحد. */
+const scopeName = (m: ReviewModel, shown: number): string => shown === 0 ? 'الخطّة' : weeksOf(m) === 1 ? 'الأسبوع' : 'الأسبوع ' + AR(shown)
+
 function weekTabs(m: ReviewModel, shown: number): Html {
   const weeks = Math.ceil(spanDays(m.plan.span ?? 'week') / 7)
   if (weeks <= 1) return html``
@@ -266,12 +263,25 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     : [...byDay.entries()].map(([day, cards]) => html`<section class="rv-day" aria-labelledby="d-${day}">
       <h2 class="rv-dh" id="d-${day}">${dayLabel(day)}</h2>
       <div class="rv-cards">${cards.map((c) => card(c, m, zone, view, w))}</div></section>`)
+  // ‏عرضُ القائمة (D-337): المعروضُ نفسُه جدولًا مضغوطًا — يومٌ وساعةٌ ومنصّةٌ وحالٌ وأوّلُ النصّ، والصفُّ يفتح لوحَ بطاقته.
+  // ‏تبديلُ المنظار بالسكربت وحدَه (D-328)، وبلا سكربتٍ البطاقاتُ كما هي والجدولُ مخفيّ
+  const rows = visible.map((c) => {
+    const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(c.post.status)
+    const text = c.post === null ? c.item.angle : c.post.text.replace(/\s+/g, ' ').trim()
+    return html`<tr><td><span class="ago">${dayLabel(c.item.day, 'short')}</span> <bdi dir="ltr" class="mono">${stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)}</bdi></td>
+      <td>${platformLabel(c.item.platform as never)}</td><td><span class="st ${st.tone}">${st.text}</span></td>
+      <td><a href="#c-${String(c.index)}" data-sheet="${String(c.index)}">${text.length > 80 ? text.slice(0, 80) + '…' : text}</a></td></tr>`
+  })
+  const table = visible.length === 0 ? html`` : html`<div class="scroll rv-list"><table><caption class="vh">منشوراتُ ${scopeName(m, shown)} قائمةً</caption>
+      <thead><tr><th scope="col">الموعد</th><th scope="col">المنصّة</th><th scope="col">الحال</th><th scope="col">المنشور</th></tr></thead><tbody>${rows}</tbody></table></div>`
+  const toggle = html`<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>
+      ${raw(button({ label: 'بطاقات', size: 'sm', attrs: 'data-view="cards" aria-pressed="true"' }))}${raw(button({ label: 'قائمة', size: 'sm', attrs: 'data-view="list" aria-pressed="false"' }))}</span>`
   const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
       <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${AR(v.items)} بندًا، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
   // ‏«اعتمد الأسبوع»: مسوّداتُ المعروض كلُّها بنموذج الجملة نفسِه — لا طريقَ ثانيًا حول فحص الاعتماد
   const weekDrafts = visible.filter((c) => c.post !== null && c.post.status === 'draft')
   const allDrafts = m.gaps.pending
-  const scope = shown === 0 ? 'الخطّة' : weeksOf(m) === 1 ? 'الأسبوع' : 'الأسبوع ' + AR(shown)
+  const scope = scopeName(m, shown)
   const approveWeek = weekDrafts.length === 0 ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/bulk" data-busy="جار الاعتماد…"
       data-confirm="${'اعتمد ' + AR(weekDrafts.length) + (weekDrafts.length === 1 ? ' منشورًا' : ' منشورات') + ' كما كُتبت وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
       <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}">
@@ -301,7 +311,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const weekHref = (day: string): string => '?w=' + String(weekOfDay(m.plan.week, day)) + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
-    <div class="row gap-2 mb-3">${state}<span class="grow"></span><a class="btn btn-secondary btn-sm" href="/panel/plan/view">اعرض واطبع</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
+    <div class="row gap-2 mb-3">${state}<span class="grow"></span>${toggle}<a class="btn btn-secondary btn-sm" href="/panel/plan/view">اعرض واطبع</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
     ${progress}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) })}
     ${weekTabs(m, shown)}
@@ -314,6 +324,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="أزِل البنودَ المحدَّدة من الخطّة؟">أزِلها</button>
     </form>
     ${list}
+    ${table}
     ${add}
     ${versions}
     <div class="rv-foot card"><span class="grow">${AR(settled)} مجدولةً من ${AR(m.cards.length)}${m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : ''}</span>${approveWeek}${approveAll}</div>
@@ -336,7 +347,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
   const prev = order[at - 1], next = order[at + 1]
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
-  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : STATUS[status] ?? { tone: 'idle', text: status }
+  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(status)
   const local = localParts(new Date(c.item.day + 'T' + c.item.time + ':00Z'), zone)
   const two = (n: number): string => String(n).padStart(2, '0')
   const localDay = String(local.year) + '-' + two(local.month) + '-' + two(local.day)
@@ -428,7 +439,17 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
   function upd(){var bar=document.getElementById('rv-bulk'), n=document.getElementById('rv-n'); if(!bar||!n)return;
     var k=root.querySelectorAll('input[name="sel"]:checked').length; bar.hidden=k===0; n.textContent=k.toLocaleString('ar-u-nu-latn')+' محدَّدًا';}
   document.addEventListener('change',function(e){if(e.target&&e.target.name==='sel')upd();});
-  upd();
+  upd(); view();
+  // ‏منظارُ العرض (D-337): بطاقاتٌ أو قائمة — يُحفظ في المتصفّح وحدَه (تفضيلُ عرضٍ لا بيان)، ويُعاد بعد كلّ تحديثٍ حيّ
+  function view(set){
+    var v=set||root.getAttribute('data-view'); if(!v){try{v=localStorage.getItem('rv-view');}catch(_){} }
+    if(v!=='list')v='cards';
+    root.setAttribute('data-view',v);
+    if(set){try{localStorage.setItem('rv-view',v);}catch(_){}}
+    var g=root.querySelector('.rv-vw'); if(!g)return; g.hidden=false;
+    g.querySelectorAll('[data-view]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view')===v));});
+  }
+  document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('.rv-vw [data-view]'):null; if(b)view(b.getAttribute('data-view'));});
   function here(){return '/panel/plan/review'+location.search;}
   // ‏الإشعارُ من ردّ الخادم كما رسمه؛ ويذهب وحدَه بعد ستّ ثوانٍ إلّا الخطأ
   var flashT=null;
@@ -448,7 +469,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
       root.innerHTML=next.innerHTML;
       ['data-live','data-plan','data-w'].forEach(function(a){root.setAttribute(a,next.getAttribute(a)||'');});
       root.querySelectorAll('input[name="sel"]').forEach(function(x){if(picked.indexOf(x.value)>=0)x.checked=true;});
-      upd();
+      upd(); view();
     });
     if(!quiet)say(doc);
     return true;

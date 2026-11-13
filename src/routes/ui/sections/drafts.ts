@@ -19,6 +19,7 @@
  * (D-009)، والطابورُ نفسه ينتظر قناةً مربوطة. **وزرٌّ يقول «انشر» ثمّ لا
  * ينشر أسوأ من غيابه.**
  */
+import { postStatus } from '../../../lib/status'
 import { deciderText } from '../../../lib/decider'
 export { deciderText }
 import type { DraftRow } from '../../../lib/draft/store'
@@ -67,15 +68,6 @@ import { OVERLAY_OFF, SLIDE_SIZE } from '../../../lib/image/slide'
 import type { MediaLine, MediaReady } from '../../../lib/media/readiness'
 import { stagesAttr } from '../components/stages'
 
-const STATUS: Readonly<Record<string, { cls: Tone; glyph: string; text: string }>> = {
-  draft: { cls: 'idle', glyph: '○', text: 'تنتظر قرارك' },
-  approved: { cls: 'ok', glyph: '●', text: 'معتمَدة' },
-  edited: { cls: 'ok', glyph: '●', text: 'معتمَدة بعد تعديل' },
-  rejected: { cls: 'bad', glyph: '✕', text: 'مرفوضة' },
-  queued: { cls: 'warn', glyph: '◔', text: 'مجدولة' },
-  published: { cls: 'ok', glyph: '✓', text: 'نُشرت' },
-  failed: { cls: 'bad', glyph: '▲', text: 'فشل النشر' },
-}
 
 /**
  * حبّةُ الحال — **و`queued` حالان لا حال**: ينتظر ساعته، أو غادر. وشارةٌ تقول «مجدولة» فوق
@@ -84,7 +76,7 @@ const STATUS: Readonly<Record<string, { cls: Tone; glyph: string; text: string }
 export function statusOf(d: DraftRow): { readonly cls: Tone; readonly glyph: string; readonly text: string } {
   return d.status === 'queued' && d.dispatchedAt !== null
     ? { cls: 'warn', glyph: '↑', text: 'في الطريق' }
-    : (STATUS[d.status] ?? STATUS['draft']!)
+    : ((f) => ({ cls: f.tone, glyph: f.glyph, text: f.label }))(postStatus(d.status))
 }
 
 
