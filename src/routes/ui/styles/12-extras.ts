@@ -584,6 +584,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-list td:last-child{min-width:0; overflow-wrap:anywhere}
 .rv-list a{color:inherit; text-decoration-color:var(--line)}
 /* «أضف مصدرًا» (D-343): نموذجان جنبًا إلى جنب حيث يتّسع، ومتتابعان حيث يضيق */
+/* وحقلُ الملفّ هدفُ لمسٍ كاملٌ كسائر الحقول */
+.add-src input[type=file]{min-height:var(--tap); padding-block:var(--s-2)}
 .add-src{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); align-items:start}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
