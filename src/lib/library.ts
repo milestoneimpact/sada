@@ -28,6 +28,9 @@ export interface Asset {
   readonly drive: string | null
   /** في كم منشورٍ يُستعمل الآن (D-334) — صفوفُ `media` الجاهزةُ التي تشير إلى كائنه. وغيابُه لما لا يُربط (مصدرُ Drive). */
   readonly uses?: number
+  /** علامتا المالك (D-346): المفضّلةُ والوسوم — لما له كائنٌ في R2 (لا مصدرُ Drive). */
+  readonly favourite?: boolean
+  readonly tags?: readonly string[]
 }
 
 export const KIND_LABEL: Readonly<Record<AssetKind, string>> = { image: 'صور', video: 'مقاطع', doc: 'مستندات' }
@@ -60,7 +63,7 @@ const num = (v: unknown): number | null => (v === null || v === undefined ? null
 export async function listLibrary(db: Db, org: string, limit = 300): Promise<Asset[]> {
   const read = (sql: string): Promise<Row[]> =>
     db.prepare(sql).bind(org, limit).all<Row>().then((r) => r.results).catch(() => [])
-  const [media, uploads, files, sources, used] = await Promise.all([
+  const [media, uploads, files, sources, used, marks] = await Promise.all([
     // ‏الصورةُ المولَّدة مرّةً واحدة وإن رُبطت بمنشورات: أقدمُ صفٍّ لكائنها
     read(`SELECT MIN(id) AS id, r2_key, mime, bytes, MIN(created_at) AS at, MAX(headline) AS name FROM media
            WHERE org_id = ?1 AND status = 'ready' AND upload_id IS NULL AND model NOT IN ('library', 'upload')
@@ -71,23 +74,73 @@ export async function listLibrary(db: Db, org: string, limit = 300): Promise<Ass
     read('SELECT id, drive_file_id, name, mime, last_seen_at AS at FROM sources WHERE org_id = ?1 ORDER BY last_seen_at DESC LIMIT ?2'),
     // ‏عدّادُ الاستعمال (D-334): كم منشورًا يحمل هذا الكائنَ الآن — جملةٌ واحدةٌ للمكتبة كلِّها، و`?2` يُربط فيها حدًّا واسعًا
     read(`SELECT r2_key, COUNT(DISTINCT post_id) AS n FROM media WHERE org_id = ?1 AND status = 'ready' GROUP BY r2_key LIMIT ?2 * 20`),
+    // ‏علاماتُ المالك (D-346) — وجدولٌ لم يُرحَّل يُسقط العلاماتِ وحدَها
+    read('SELECT r2_key, favourite, tags FROM asset_marks WHERE org_id = ?1 LIMIT ?2 * 20'),
   ])
+  const markOf = new Map(marks.map((r) => [str(r['r2_key']), { favourite: num(r['favourite']) === 1, tags: splitTags(str(r['tags'])) }]))
+  const marked = (r: Row): { favourite: boolean; tags: readonly string[] } => markOf.get(str(r['r2_key'])) ?? { favourite: false, tags: [] }
   const usesOf = new Map(used.map((r) => [str(r['r2_key']), num(r['n']) ?? 0]))
   const uses = (r: Row): number => usesOf.get(str(r['r2_key'])) ?? 0
   const all: Asset[] = [
     ...media.map((r): Asset => ({ ref: `m:${str(r['id'])}`, origin: 'generated', kind: kindOf(str(r['mime'])),
       name: str(r['name']) || 'صورة مولَّدة', mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/media/${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
+      preview: `/panel/media/${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r), ...marked(r) })),
     ...uploads.map((r): Asset => ({ ref: `u:${str(r['id'])}`, origin: 'upload', kind: 'video', name: str(r['name']),
       mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/assets/raw/u:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
+      preview: `/panel/assets/raw/u:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r), ...marked(r) })),
     ...files.map((r): Asset => ({ ref: `f:${str(r['id'])}`, origin: 'upload', kind: 'image', name: str(r['name']),
       mime: str(r['mime']), bytes: num(r['bytes']), at: str(r['at']),
-      preview: `/panel/assets/raw/f:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r) })),
+      preview: `/panel/assets/raw/f:${encodeURIComponent(str(r['id']))}`, drive: null, uses: uses(r), ...marked(r) })),
     ...sources.map((r): Asset => ({ ref: `s:${str(r['id'])}`, origin: 'drive', kind: kindOf(str(r['mime'])), name: str(r['name']),
       mime: str(r['mime']), bytes: null, at: str(r['at']), preview: null, drive: driveFileUrl(str(r['drive_file_id'])) })),
   ]
   return all.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/** أكثرُ ما يحمله أصلٌ من وسوم، وأطولُ وسم — قليلةٌ تُقرأ على البلاطة. */
+export const MAX_TAGS = 8
+const MAX_TAG_LENGTH = 24
+const splitTags = (stored: string): string[] => stored.split('\n').filter((t) => t !== '')
+
+/** الوسومُ كما يكتبها المالك (بفاصلةٍ عربيّةٍ أو لاتينيّةٍ أو سطر) — مقلَّمةً بلا «#» وبلا مكرَّر، وحدُّها `MAX_TAGS`. */
+export function cleanTags(raw: string): string[] {
+  const out: string[] = []
+  for (const part of raw.split(/[،,\n]/)) {
+    const tag = part.replace(/#/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LENGTH)
+    if (tag !== '' && !out.includes(tag)) out.push(tag)
+    if (out.length === MAX_TAGS) break
+  }
+  return out
+}
+
+/** البحثُ في المكتبة (D-346): الاسمُ أو وسمٌ يحوي النصّ، والمفضّلةُ وحدَها إن طُلبت — في الذاكرة على ما قُرئ. */
+export function searchAssets(assets: readonly Asset[], q: string, favOnly: boolean): Asset[] {
+  const needle = q.trim().toLowerCase()
+  return assets.filter((a) => (!favOnly || a.favourite === true)
+    && (needle === '' || a.name.toLowerCase().includes(needle) || (a.tags ?? []).some((t) => t.toLowerCase().includes(needle))))
+}
+
+/**
+ * **علّم أصلًا** (D-346): مفضّلةٌ أو وسوم. المرجعُ يُحلّ إلى كائنه في R2 **بمنظّمة الجلسة** — فمرجعُ عميلٍ آخر لا يُعلَّم — وما لم يُذكر
+ * من العلامتين يبقى كما هو. ومصدرُ Drive لا كائنَ له فلا يُعلَّم.
+ */
+export async function markAsset(
+  db: Db, org: string, ref: string, change: { readonly favourite?: boolean; readonly tags?: string },
+): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
+  const p = parseRef(ref)
+  if (p === null || p.tag === 's') return { ok: false, reason: 'هذا الأصلُ لا يُعلَّم' }
+  const key = p.tag === 'm'
+    ? (await db.prepare("SELECT r2_key FROM media WHERE id = ? AND org_id = ? AND status = 'ready'").bind(p.id, org).first<{ r2_key: string }>().catch(() => null))?.r2_key
+    : (await rawObject(db, org, ref))?.key
+  if (key === undefined) return { ok: false, reason: 'لا أصلَ بهذا المرجع في مكتبتك' }
+  const now = await db.prepare('SELECT favourite, tags FROM asset_marks WHERE org_id = ? AND r2_key = ?').bind(org, key)
+    .first<{ favourite: number; tags: string }>().catch(() => null)
+  const favourite = change.favourite ?? (now?.favourite === 1)
+  const tags = change.tags === undefined ? now?.tags ?? '' : cleanTags(change.tags).join('\n')
+  await db.prepare(`INSERT INTO asset_marks (org_id, r2_key, favourite, tags) VALUES (?, ?, ?, ?)
+      ON CONFLICT (org_id, r2_key) DO UPDATE SET favourite = excluded.favourite, tags = excluded.tags, updated_at = datetime('now')`)
+    .bind(org, key, favourite ? 1 : 0, tags).run()
+  return { ok: true }
 }
 
 /** أصلٌ بعينه لعميل الجلسة — وغيرُه `null`، فمرجعٌ من عميلٍ آخر لا يُحفظ ولا يُربط. */

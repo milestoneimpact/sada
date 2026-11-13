@@ -38,7 +38,7 @@
   "routes/ui/icons.ts": 1,
   "routes/ui/insightsView.ts": 17,
   "routes/ui/journeyView.ts": 8,
-  "routes/ui/libraryView.ts": 14,
+  "routes/ui/libraryView.ts": 13,
   "routes/ui/moment.ts": 2,
   "routes/ui/monthlyView.ts": 12,
   "routes/ui/nativePost.ts": 35,

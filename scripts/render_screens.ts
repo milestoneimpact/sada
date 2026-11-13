@@ -27,6 +27,7 @@ import { spreadScreen } from '../src/routes/ui/spreadView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
 import { PLAN_BUILD_SCRIPT, planBuildScreen } from '../src/routes/ui/planBuildView'
+import { libraryScreen } from '../src/routes/ui/libraryView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
@@ -514,6 +515,20 @@ writeAudited(
     soloPage('صدى — بناء الخطّة', { href: '/panel#posts', label: 'المنشورات' },
       planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
   )
+  // ‏«كلُّ الأصول» (D-346): البحثُ والمفضّلةُ والوسومُ على بلاطاتها — مولَّدةٌ ومرفوعةٌ ومقطعٌ ومصدرُ Drive
+  writeAudited(
+    '/tmp/screen-assets.html',
+    soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' },
+      libraryScreen({
+        assets: [
+          { ref: 'm:a1', origin: 'generated', kind: 'image', name: 'ثلاثةُ أرقامٍ من تقرير الأثر', mime: 'image/png', bytes: 412000, at: '2026-11-10 09:00:00', preview: '/panel/media/a1', drive: null, uses: 3, favourite: true, tags: ['هويّة', 'تقرير الأثر'] },
+          { ref: 'f:a2', origin: 'upload', kind: 'image', name: 'شعار ميلستون.png', mime: 'image/png', bytes: 88000, at: '2026-11-08 14:20:00', preview: '/panel/assets/raw/f:a2', drive: null, uses: 0, favourite: false, tags: [] },
+          { ref: 'u:a3', origin: 'upload', kind: 'video', name: 'كلمةُ الافتتاح.mp4', mime: 'video/mp4', bytes: 18400000, at: '2026-11-05 11:00:00', preview: '/panel/assets/raw/u:a3', drive: null, uses: 1, favourite: false, tags: ['فعاليّة'] },
+          { ref: 's:a4', origin: 'drive', kind: 'doc', name: 'تقرير الأثر 2025', mime: 'application/pdf', bytes: null, at: '2026-11-01 08:00:00', preview: null, drive: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view' },
+        ],
+        kind: null, origin: null, pick: null, q: '', fav: false,
+      }), 'n', '', buildCommands({ onPanel: false }), soloNav('accounts')),
+  )
   writeAudited(
     '/tmp/screen-plan-review.html',
     soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
@@ -583,7 +598,7 @@ writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody(), 'n', '',
 writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّة بهذا الاسم'))
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
-console.log('رُسمت ثماني عشرة في /tmp')
+console.log('رُسمت تسع عشرة في /tmp')
 
 // ‏الخطُّ الزمنيّ للمحفظة (D-212) عيّنةٌ مدقَّقة (D-213): صفحةٌ لا يرسمها شيءٌ لا يقرؤها حارس
 {
